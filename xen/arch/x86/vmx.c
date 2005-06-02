@@ -243,7 +243,7 @@ static void vmx_dr_access (unsigned long exit_qualification, struct cpu_user_reg
 {
     unsigned int reg;
     unsigned long *reg_p = 0;
-    struct exec_domain *ed = current;
+    struct vcpu *v = current;
     unsigned long eip;
 
     __vmread(GUEST_EIP, &eip);
@@ -272,18 +272,18 @@ static void vmx_dr_access (unsigned long exit_qualification, struct cpu_user_reg
     case TYPE_MOV_TO_DR: 
         /* don't need to check the range */
         if (reg != REG_ESP)
-            ed->arch.guest_context.debugreg[reg] = *reg_p; 
+            v->arch.guest_context.debugreg[reg] = *reg_p; 
         else {
             unsigned long value;
             __vmread(GUEST_ESP, &value);
-            ed->arch.guest_context.debugreg[reg] = value;
+            v->arch.guest_context.debugreg[reg] = value;
         }
         break;
     case TYPE_MOV_FROM_DR:
         if (reg != REG_ESP)
-            *reg_p = ed->arch.guest_context.debugreg[reg];
+            *reg_p = v->arch.guest_context.debugreg[reg];
         else {
-            __vmwrite(GUEST_ESP, ed->arch.guest_context.debugreg[reg]);
+            __vmwrite(GUEST_ESP, v->arch.guest_context.debugreg[reg]);
         }
         break;
     }
@@ -296,7 +296,7 @@ static void vmx_dr_access (unsigned long exit_qualification, struct cpu_user_reg
 static void vmx_vmexit_do_invlpg(unsigned long va) 
 {
     unsigned long eip;
-    struct exec_domain *ed = current;
+    struct vcpu *v = current;
 
     __vmread(GUEST_EIP, &eip);
 
@@ -307,7 +307,7 @@ static void vmx_vmexit_do_invlpg(unsigned long va)
      * We do the safest things first, then try to update the shadow
      * copying from guest
      */
-    shadow_invlpg(ed, va);
+    shadow_invlpg(v, va);
 }
 
 static int check_for_null_selector(unsigned long eip)
@@ -362,7 +362,7 @@ static int check_for_null_selector(unsigned long eip)
 static void vmx_io_instruction(struct cpu_user_regs *regs, 
                    unsigned long exit_qualification, unsigned long inst_len) 
 {
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
     vcpu_iodata_t *vio;
     ioreq_t *p;
     unsigned long addr;
@@ -489,7 +489,7 @@ vmx_copy(void *buf, unsigned long laddr, int size, int dir)
 }
 
 int
-vmx_world_save(struct exec_domain *d, struct vmx_assist_context *c)
+vmx_world_save(struct vcpu *d, struct vmx_assist_context *c)
 {
     unsigned long inst_len;
     int error = 0;
@@ -554,7 +554,7 @@ vmx_world_save(struct exec_domain *d, struct vmx_assist_context *c)
 }
 
 int
-vmx_world_restore(struct exec_domain *d, struct vmx_assist_context *c)
+vmx_world_restore(struct vcpu *d, struct vmx_assist_context *c)
 {
     unsigned long mfn, old_cr4;
     int error = 0;
@@ -664,7 +664,7 @@ skip_cr3:
 enum { VMX_ASSIST_INVOKE = 0, VMX_ASSIST_RESTORE };
 
 int
-vmx_assist(struct exec_domain *d, int mode)
+vmx_assist(struct vcpu *d, int mode)
 {
     struct vmx_assist_context c;
     unsigned long magic, cp;
@@ -731,7 +731,7 @@ error:
 
 static int vmx_set_cr0(unsigned long value)
 {
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
     unsigned long old_base_mfn, mfn;
     unsigned long eip;
     int paging_enabled;
@@ -821,7 +821,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 {
     unsigned long value;
     unsigned long old_cr;
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
 
     switch (gp) {
         CASE_GET_REG(EAX, eax);
@@ -937,7 +937,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
 {
     unsigned long value;
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
 
     if (cr != 3)
         __vmx_bug(regs);
@@ -1046,7 +1046,7 @@ static inline void vmx_vmexit_do_mwait(void)
 char print_buf[BUF_SIZ];
 static int index;
 
-static void vmx_print_line(const char c, struct exec_domain *d) 
+static void vmx_print_line(const char c, struct vcpu *d) 
 {
 
     if (index == MAX_LINE || c == '\n') {
@@ -1109,7 +1109,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 {
     unsigned int exit_reason, idtv_info_field;
     unsigned long exit_qualification, eip, inst_len = 0;
-    struct exec_domain *ed = current;
+    struct vcpu *v = current;
     int error;
 
     if ((error = __vmread(VM_EXIT_REASON, &exit_reason)))
@@ -1143,7 +1143,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     }
 
     __vmread(GUEST_EIP, &eip);
-    TRACE_3D(TRC_VMX_VMEXIT, ed->domain->domain_id, eip, exit_reason);
+    TRACE_3D(TRC_VMX_VMEXIT, v->domain->domain_id, eip, exit_reason);
 
     switch (exit_reason) {
     case EXIT_REASON_EXCEPTION_NMI:
@@ -1164,7 +1164,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
         perfc_incra(cause_vector, vector);
 
-        TRACE_3D(TRC_VMX_VECTOR, ed->domain->domain_id, eip, vector);
+        TRACE_3D(TRC_VMX_VECTOR, v->domain->domain_id, eip, vector);
         switch (vector) {
 #ifdef XEN_DEBUGGER
         case TRAP_debug:
@@ -1216,7 +1216,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                         (unsigned long)regs.eax, (unsigned long)regs.ebx,
                         (unsigned long)regs.ecx, (unsigned long)regs.edx,
                         (unsigned long)regs.esi, (unsigned long)regs.edi);
-            ed->arch.arch_vmx.vmx_platform.mpci.inst_decoder_regs = &regs;
+            v->arch.arch_vmx.vmx_platform.mpci.inst_decoder_regs = &regs;
 
             if (!(error = vmx_do_page_fault(va, &regs))) {
                 /*
@@ -1230,8 +1230,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                            TRAP_page_fault);
                 __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
                 __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, regs.error_code);
-                ed->arch.arch_vmx.cpu_cr2 = va;
-                TRACE_3D(TRC_VMX_INT, ed->domain->domain_id, TRAP_page_fault, va);
+                v->arch.arch_vmx.cpu_cr2 = va;
+                TRACE_3D(TRC_VMX_INT, v->domain->domain_id, TRAP_page_fault, va);
             }
             break;
         }
@@ -1300,7 +1300,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __vmread(GUEST_EIP, &eip);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
 
-        vmx_print_line(regs.eax, ed); /* provides the current domain */
+        vmx_print_line(regs.eax, v); /* provides the current domain */
         __update_guest_eip(inst_len);
         break;
     case EXIT_REASON_CR_ACCESS:
@@ -1348,13 +1348,13 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __vmx_bug(&regs);       /* should not happen */
     }
 
-    vmx_intr_assist(ed);
+    vmx_intr_assist(v);
     return;
 }
 
 asmlinkage void load_cr2(void)
 {
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
 
     local_irq_disable();        
 #ifdef __i386__

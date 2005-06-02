@@ -15,8 +15,8 @@
 #include <asm/processor.h>
 
 extern void init_fpu(void);
-extern void save_init_fpu(struct exec_domain *tsk);
-extern void restore_fpu(struct exec_domain *tsk);
+extern void save_init_fpu(struct vcpu *tsk);
+extern void restore_fpu(struct vcpu *tsk);
 
 #define unlazy_fpu(_tsk) do { \
     if ( test_bit(_VCPUF_fpu_dirtied, &(_tsk)->vcpu_flags) ) \
@@ -29,12 +29,12 @@ extern void restore_fpu(struct exec_domain *tsk);
 } while ( 0 )
 
 /* Make domain the FPU owner */
-static inline void setup_fpu(struct exec_domain *ed)
+static inline void setup_fpu(struct vcpu *v)
 {
-    if ( !test_and_set_bit(_VCPUF_fpu_dirtied, &ed->vcpu_flags) )
+    if ( !test_and_set_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
     {
-        if ( test_bit(_VCPUF_fpu_initialised, &ed->vcpu_flags) )
-            restore_fpu(ed);
+        if ( test_bit(_VCPUF_fpu_initialised, &v->vcpu_flags) )
+            restore_fpu(v);
         else
             init_fpu();
     }

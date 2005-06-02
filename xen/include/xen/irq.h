@@ -67,9 +67,9 @@ extern hw_irq_controller no_irq_type;
 extern void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs);
 
 struct domain;
-struct exec_domain;
+struct vcpu;
 extern int pirq_guest_unmask(struct domain *p);
-extern int pirq_guest_bind(struct exec_domain *p, int irq, int will_share);
+extern int pirq_guest_bind(struct vcpu *p, int irq, int will_share);
 extern int pirq_guest_unbind(struct domain *p, int irq);
 extern int pirq_guest_bindable(int irq, int will_share);
 

@@ -94,7 +94,7 @@ s_time_t get_s_time(void)
     return now; 
 }
 
-void update_dom_time(struct exec_domain *ed)
+void update_dom_time(struct vcpu *v)
 {
 // FIXME: implement this?
 //	printf("update_dom_time: called, not implemented, skipping\n");
@@ -161,10 +161,10 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		//domain0_ready = 1; // moved to xensetup.c
 		current->vcpu_info->arch.pending_interruption = 1;
 	}
-	if (domain0_ready && vcpu_timer_expired(dom0->exec_domain[0])) {
-		vcpu_pend_timer(dom0->exec_domain[0]);
-		//vcpu_set_next_timer(dom0->exec_domain[0]);
-		domain_wake(dom0->exec_domain[0]);
+	if (domain0_ready && vcpu_timer_expired(dom0->vcpu[0])) {
+		vcpu_pend_timer(dom0->vcpu[0]);
+		//vcpu_set_next_timer(dom0->vcpu[0]);
+		domain_wake(dom0->vcpu[0]);
 	}
 	if (!is_idle_task(current->domain) && current->domain != dom0) {
 		if (vcpu_timer_expired(current)) {
@@ -304,7 +304,7 @@ static irqreturn_t
 vmx_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
     unsigned long new_itm;
-    struct exec_domain *ed = current;
+    struct vcpu *v = current;
 
 
     new_itm = local_cpu_data->itm_next;
@@ -319,7 +319,7 @@ vmx_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
          * fixing that would require updates to all
          * platforms.
          */
-        update_process_times(user_mode(ed, regs));
+        update_process_times(user_mode(v, regs));
 #endif
         new_itm += local_cpu_data->itm_delta;
 

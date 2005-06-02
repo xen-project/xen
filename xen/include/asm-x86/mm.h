@@ -146,7 +146,7 @@ void init_frametable(void);
 
 int alloc_page_type(struct pfn_info *page, unsigned int type);
 void free_page_type(struct pfn_info *page, unsigned int type);
-extern void invalidate_shadow_ldt(struct exec_domain *d);
+extern void invalidate_shadow_ldt(struct vcpu *d);
 extern int shadow_remove_all_write_access(
     struct domain *d, unsigned long gpfn, unsigned long gmfn);
 extern u32 shadow_remove_all_access( struct domain *d, unsigned long gmfn);
@@ -299,7 +299,7 @@ struct ptwr_info {
     /* Info about last ptwr update batch. */
     unsigned int prev_nr_updates;
     /* Exec domain which created writable mapping. */
-    struct exec_domain *ed;
+    struct vcpu *vcpu;
 };
 
 #define PTWR_PT_ACTIVE 0
@@ -348,5 +348,5 @@ void propagate_page_fault(unsigned long addr, u16 error_code);
 int update_grant_va_mapping(unsigned long va,
                             l1_pgentry_t _nl1e, 
                             struct domain *d,
-                            struct exec_domain *ed);
+                            struct vcpu *v);
 #endif /* __ASM_X86_MM_H__ */

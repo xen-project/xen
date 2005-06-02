@@ -51,6 +51,6 @@ typedef         __u64           uint64_t;
 
 
 struct domain;
-struct exec_domain;
+struct vcpu;
 
 #endif /* __TYPES_H__ */

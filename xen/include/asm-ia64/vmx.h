@@ -29,10 +29,10 @@ extern unsigned int vmx_enabled;
 extern void vmx_init_env(void);
 extern void vmx_final_setup_domain(struct domain *d);
 extern void vmx_init_double_mapping_stub(void);
-extern void vmx_save_state(struct exec_domain *ed);
-extern void vmx_load_state(struct exec_domain *ed);
+extern void vmx_save_state(struct vcpu *v);
+extern void vmx_load_state(struct vcpu *v);
 extern vmx_insert_double_mapping(u64,u64,u64,u64,u64);
 extern void vmx_purge_double_mapping(u64, u64, u64);
-extern void vmx_change_double_mapping(struct exec_domain *ed, u64 oldrr7, u64 newrr7);
+extern void vmx_change_double_mapping(struct vcpu *v, u64 oldrr7, u64 newrr7);
 
 #endif /* _ASM_IA64_VT_H */

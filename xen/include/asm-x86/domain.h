@@ -66,13 +66,13 @@ struct arch_domain
 
 } __cacheline_aligned;
 
-struct arch_exec_domain
+struct arch_vcpu
 {
     struct vcpu_guest_context guest_context;
 
     unsigned long      flags; /* TF_ */
 
-    void (*schedule_tail) (struct exec_domain *);
+    void (*schedule_tail) (struct vcpu *);
 
     /* Bounce information for propagating an exception to guest OS. */
     struct trap_bounce trap_bounce;

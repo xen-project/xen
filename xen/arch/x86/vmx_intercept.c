@@ -34,7 +34,7 @@
 /* for intercepting io request after vm_exit, return value: 0--not handle; 1--handled */
 int vmx_io_intercept(ioreq_t *p)
 {
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
     struct vmx_handler_t *handler = &(d->arch.arch_vmx.vmx_platform.vmx_handler);
     int i;
     unsigned long addr, offset;
@@ -50,7 +50,7 @@ int vmx_io_intercept(ioreq_t *p)
 
 int register_io_handler(unsigned long addr, unsigned long offset, intercept_action_t action)
 {
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
     struct vmx_handler_t *handler = &(d->arch.arch_vmx.vmx_platform.vmx_handler);
     int num = handler->num_slot;
 
@@ -162,7 +162,7 @@ static void resume_pit_io(ioreq_t *p)
 /* the intercept action for PIT DM retval:0--not handled; 1--handled */
 int intercept_pit_io(ioreq_t *p)
 {
-    struct exec_domain *d = current;
+    struct vcpu *d = current;
     struct vmx_virpit_t *vpit = &(d->arch.arch_vmx.vmx_platform.vmx_pit);
 
     if (p->size != 1 ||
@@ -204,7 +204,7 @@ static void pit_timer_fn(void *data)
 /* Only some PIT operations such as load init counter need a hypervisor hook.
  * leave all other operations in user space DM
  */
-void vmx_hooks_assist(struct exec_domain *d)
+void vmx_hooks_assist(struct vcpu *d)
 {
     vcpu_iodata_t *vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
     ioreq_t *p = &vio->vp_ioreq;

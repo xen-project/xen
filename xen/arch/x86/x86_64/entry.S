@@ -19,15 +19,15 @@
         movq (reg),reg;
 
         ALIGN
-/* %rbx: struct exec_domain, interrupts disabled */
+/* %rbx: struct vcpu, interrupts disabled */
 switch_to_kernel:
-        leaq  EDOMAIN_trap_bounce(%rbx),%rdx
-        movq  EDOMAIN_syscall_addr(%rbx),%rax
+        leaq  VCPU_trap_bounce(%rbx),%rdx
+        movq  VCPU_syscall_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movw  $0,TRAPBOUNCE_flags(%rdx)
         call  create_bounce_frame
 
-/* %rbx: struct exec_domain */
+/* %rbx: struct vcpu */
 restore_all_guest:
         RESTORE_ALL
         testw $TRAP_syscall,4(%rsp)
@@ -68,8 +68,8 @@ DBLFLT1:GET_CURRENT(%rbx)
         jmp   test_all_events
 failsafe_callback:
         GET_CURRENT(%rbx)
-        leaq  EDOMAIN_trap_bounce(%rbx),%rdx
-        movq  EDOMAIN_failsafe_addr(%rbx),%rax
+        leaq  VCPU_trap_bounce(%rbx),%rdx
+        movq  VCPU_failsafe_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
         call  create_bounce_frame
@@ -113,7 +113,7 @@ ENTRY(syscall_enter)
         movl  $TRAP_syscall,4(%rsp)
         SAVE_ALL
         GET_CURRENT(%rbx)
-        testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
+        testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
         jz    switch_to_kernel
 
 /*hypercall:*/
@@ -125,25 +125,25 @@ ENTRY(syscall_enter)
         callq *(%r10,%rax,8)
         movq %rax,UREGS_rax(%rsp)       # save the return value
 
-/* %rbx: struct exec_domain */
+/* %rbx: struct vcpu */
 test_all_events:
         cli                             # tests must not race interrupts
 /*test_softirqs:*/  
-        movl  EDOMAIN_processor(%rbx),%eax
+        movl  VCPU_processor(%rbx),%eax
         shl   $IRQSTAT_shift,%rax
         leaq  irq_stat(%rip),%rcx
         testl $~0,(%rcx,%rax,1)
         jnz   process_softirqs
 /*test_guest_events:*/
-        movq  EDOMAIN_vcpu_info(%rbx),%rax
+        movq  VCPU_vcpu_info(%rbx),%rax
         testb $0xFF,VCPUINFO_upcall_mask(%rax)
         jnz   restore_all_guest
         testb $0xFF,VCPUINFO_upcall_pending(%rax)
         jz    restore_all_guest
 /*process_guest_events:*/
         sti
-        leaq  EDOMAIN_trap_bounce(%rbx),%rdx
-        movq  EDOMAIN_event_addr(%rbx),%rax
+        leaq  VCPU_trap_bounce(%rbx),%rdx
+        movq  VCPU_event_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movw  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
         call  create_bounce_frame
@@ -231,7 +231,7 @@ vmx_test_all_events:
 /* test_all_events: */
         cli                             # tests must not race interrupts
 /*test_softirqs:*/  
-        movl  EDOMAIN_processor(%rbx),%eax
+        movl  VCPU_processor(%rbx),%eax
         shl   $IRQSTAT_shift,%rax
         leaq  irq_stat(%rip), %rdx
         testl $~0,(%rdx,%rax,1)
@@ -274,7 +274,7 @@ vmx_process_softirqs:
 #endif
 
         ALIGN
-/* %rbx: struct exec_domain */
+/* %rbx: struct vcpu */
 process_softirqs:
         sti       
         call do_softirq
@@ -282,17 +282,17 @@ process_softirqs:
 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
 /*   { RCX, R11, [DS-GS,] [CR2,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }   */
-/* %rdx: trap_bounce, %rbx: struct exec_domain                           */
+/* %rdx: trap_bounce, %rbx: struct vcpu                           */
 /* On return only %rbx is guaranteed non-clobbered.                      */
 create_bounce_frame:
-        testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
+        testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
         jnz   1f
         /* Push new frame at registered guest-OS stack base. */
         pushq %rdx
         movq  %rbx,%rdi
         call  toggle_guest_mode
         popq  %rdx
-        movq  EDOMAIN_kernel_sp(%rbx),%rsi
+        movq  VCPU_kernel_sp(%rbx),%rsi
         jmp   2f
 1:      /* In kernel context already: push new frame at existing %rsp. */
         movq  UREGS_rsp+8(%rsp),%rsi
@@ -311,7 +311,7 @@ FLT2:   movq  %rax,32(%rsi)             # SS
 FLT3:   movq  %rax,24(%rsi)             # RSP
         movq  UREGS_eflags+8(%rsp),%rax
 FLT4:   movq  %rax,16(%rsi)             # RFLAGS
-        movq  EDOMAIN_vcpu_info(%rbx),%rax
+        movq  VCPU_vcpu_info(%rbx),%rax
         pushq VCPUINFO_upcall_mask(%rax)
         testb $TBF_INTERRUPT,%cl
         setnz VCPUINFO_upcall_mask(%rax)# TBF_INTERRUPT -> clear upcall mask
@@ -371,9 +371,9 @@ FLT14:  movq  %rax,(%rsi)               # RCX
 .previous
 
         ALIGN
-/* %rbx: struct exec_domain */
+/* %rbx: struct vcpu */
 process_guest_exception_and_events:
-        leaq  EDOMAIN_trap_bounce(%rbx),%rdx
+        leaq  VCPU_trap_bounce(%rbx),%rdx
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    test_all_events
         call  create_bounce_frame

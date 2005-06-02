@@ -82,7 +82,7 @@
 +
 +		if (vector != IA64_TIMER_VECTOR) {
 +			/* FIXME: Leave IRQ re-route later */
-+			vmx_vcpu_pend_interrupt(dom0->exec_domain[0],vector);
++			vmx_vcpu_pend_interrupt(dom0->vcpu[0],vector);
 +			wake_dom0 = 1;
 +		}
 +		else {	// FIXME: Handle Timer only now
@@ -108,7 +108,7 @@
 +	 */
 +	irq_exit();
 +	if ( wake_dom0 && current != dom0 ) 
-+		domain_wake(dom0->exec_domain[0]);
++		domain_wake(dom0->vcpu[0]);
 +}
 +#endif
 +

@@ -155,7 +155,7 @@ typedef u64 *(TTAG_FN)(PTA pta, u64 va, u64 rid, u64 ps);
 typedef u64 *(GET_MFN_FN)(domid_t d, u64 gpfn, u64 pages);
 typedef void *(REM_NOTIFIER_FN)(struct hash_cb *hcb, thash_data_t *entry);
 typedef void (RECYCLE_FN)(struct hash_cb *hc, u64 para);
-typedef rr_t (GET_RR_FN)(struct exec_domain *vcpu, u64 reg);
+typedef rr_t (GET_RR_FN)(struct vcpu *vcpu, u64 reg);
 typedef thash_data_t *(FIND_OVERLAP_FN)(struct thash_cb *hcb, 
         u64 va, u64 ps, int rid, char cl, search_section_t s_sect);
 typedef thash_data_t *(FIND_NEXT_OVL_FN)(struct thash_cb *hcb);
@@ -204,7 +204,7 @@ typedef struct thash_cb {
         GET_RR_FN       *get_rr_fn;
         RECYCLE_FN      *recycle_notifier;
         thash_cch_mem_t *cch_freelist;
-        struct exec_domain *vcpu;
+        struct vcpu *vcpu;
         PTA     pta;
         /* VTLB/VHPT common information */
         FIND_OVERLAP_FN *find_overlap;
@@ -306,7 +306,7 @@ extern void thash_purge_entries_ex(thash_cb_t *hcb,
                         u64 rid, u64 va, u64 sz, 
                         search_section_t p_sect, 
                         CACHE_LINE_TYPE cl);
-extern thash_cb_t *init_domain_tlb(struct exec_domain *d);
+extern thash_cb_t *init_domain_tlb(struct vcpu *d);
 
 /*
  * Purge all TCs or VHPT entries including those in Hash table.
@@ -330,8 +330,8 @@ extern thash_data_t *vtlb_lookup_ex(thash_cb_t *hcb,
 extern u64 machine_ttag(PTA pta, u64 va, u64 rid, u64 ps);
 extern u64 machine_thash(PTA pta, u64 va, u64 rid, u64 ps);
 extern void purge_machine_tc_by_domid(domid_t domid);
-extern void machine_tlb_insert(struct exec_domain *d, thash_data_t *tlb);
-extern rr_t vmmu_get_rr(struct exec_domain *vcpu, u64 va);
+extern void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb);
+extern rr_t vmmu_get_rr(struct vcpu *vcpu, u64 va);
 
 #define   VTLB_DEBUG
 #ifdef   VTLB_DEBUG

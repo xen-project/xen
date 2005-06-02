@@ -154,23 +154,23 @@ void startup_cpu_idle_loop(void)
 	continue_cpu_idle_loop();
 }
 
-struct exec_domain *arch_alloc_exec_domain_struct(void)
+struct vcpu *arch_alloc_vcpu_struct(void)
 {
-	/* Per-vp stack is used here. So we need keep exec_domain
+	/* Per-vp stack is used here. So we need keep vcpu
 	 * same page as per-vp stack */
 	return alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER);
 }
 
-void arch_free_exec_domain_struct(struct exec_domain *ed)
+void arch_free_vcpu_struct(struct vcpu *v)
 {
-	free_xenheap_pages(ed, KERNEL_STACK_SIZE_ORDER);
+	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
 }
 
 #ifdef CONFIG_VTI
-void arch_do_createdomain(struct exec_domain *ed)
+void arch_do_createdomain(struct vcpu *v)
 {
-	struct domain *d = ed->domain;
-	struct thread_info *ti = alloc_thread_info(ed);
+	struct domain *d = v->domain;
+	struct thread_info *ti = alloc_thread_info(v);
 
 	/* If domain is VMX domain, shared info area is created
 	 * by domain and then domain notifies HV by specific hypercall.
@@ -187,18 +187,18 @@ void arch_do_createdomain(struct exec_domain *ed)
 	 * normal xen convention.
 	 */
 	d->shared_info = NULL;
-	ed->vcpu_info = (void *)alloc_xenheap_page();
-	if (!ed->vcpu_info) {
+	v->vcpu_info = (void *)alloc_xenheap_page();
+	if (!v->vcpu_info) {
    		printk("ERROR/HALTING: CAN'T ALLOC PAGE\n");
    		while (1);
 	}
-	memset(ed->vcpu_info, 0, PAGE_SIZE);
+	memset(v->vcpu_info, 0, PAGE_SIZE);
 
 	/* Clear thread_info to clear some important fields, like preempt_count */
 	memset(ti, 0, sizeof(struct thread_info));
 
 	/* Allocate per-domain vTLB and vhpt */
-	ed->arch.vtlb = init_domain_tlb(ed);
+	v->arch.vtlb = init_domain_tlb(v);
 
 	/* Physical->machine page table will be allocated when 
 	 * final setup, since we have no the maximum pfn number in 
@@ -215,20 +215,20 @@ void arch_do_createdomain(struct exec_domain *ed)
 	// stay on kernel stack because may get interrupts!
 	// ia64_ret_from_clone (which b0 gets in new_thread) switches
 	// to user stack
-	ed->arch._thread.on_ustack = 0;
+	v->arch._thread.on_ustack = 0;
 }
 #else // CONFIG_VTI
-void arch_do_createdomain(struct exec_domain *ed)
+void arch_do_createdomain(struct vcpu *v)
 {
-	struct domain *d = ed->domain;
+	struct domain *d = v->domain;
 
 	d->shared_info = (void *)alloc_xenheap_page();
-	ed->vcpu_info = (void *)alloc_xenheap_page();
-	if (!ed->vcpu_info) {
+	v->vcpu_info = (void *)alloc_xenheap_page();
+	if (!v->vcpu_info) {
    		printk("ERROR/HALTING: CAN'T ALLOC PAGE\n");
    		while (1);
 	}
-	memset(ed->vcpu_info, 0, PAGE_SIZE);
+	memset(v->vcpu_info, 0, PAGE_SIZE);
 	/* pin mapping */
 	// FIXME: Does this belong here?  Or do only at domain switch time?
 #if 0
@@ -246,7 +246,7 @@ void arch_do_createdomain(struct exec_domain *ed)
 	d->max_pages = (128*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
 	if ((d->metaphysical_rid = allocate_metaphysical_rid()) == -1UL)
 		BUG();
-	ed->vcpu_info->arch.metaphysical_mode = 1;
+	v->vcpu_info->arch.metaphysical_mode = 1;
 #define DOMAIN_RID_BITS_DEFAULT 18
 	if (!allocate_rid_range(d,DOMAIN_RID_BITS_DEFAULT)) // FIXME
 		BUG();
@@ -258,22 +258,22 @@ void arch_do_createdomain(struct exec_domain *ed)
 	// stay on kernel stack because may get interrupts!
 	// ia64_ret_from_clone (which b0 gets in new_thread) switches
 	// to user stack
-	ed->arch._thread.on_ustack = 0;
+	v->arch._thread.on_ustack = 0;
 }
 #endif // CONFIG_VTI
 
-void arch_do_boot_vcpu(struct exec_domain *p)
+void arch_do_boot_vcpu(struct vcpu *v)
 {
 	return;
 }
 
-int arch_set_info_guest(struct exec_domain *p, struct vcpu_guest_context *c)
+int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 {
 	dummy();
 	return 1;
 }
 
-int arch_final_setup_guest(struct exec_domain *p, struct vcpu_guest_context *c)
+int arch_final_setup_guest(struct vcpu *v, struct vcpu_guest_context *c)
 {
 	dummy();
 	return 1;
@@ -285,12 +285,12 @@ void domain_relinquish_resources(struct domain *d)
 }
 
 #ifdef CONFIG_VTI
-void new_thread(struct exec_domain *ed,
+void new_thread(struct vcpu *v,
                 unsigned long start_pc,
                 unsigned long start_stack,
                 unsigned long start_info)
 {
-	struct domain *d = ed->domain;
+	struct domain *d = v->domain;
 	struct switch_stack *sw;
 	struct xen_regs *regs;
 	struct ia64_boot_param *bp;
@@ -302,12 +302,12 @@ void new_thread(struct exec_domain *ed,
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
 	if (d == dom0) start_pc += dom0_start;
 #endif
-	regs = (struct xen_regs *) ((unsigned long) ed + IA64_STK_OFFSET) - 1;
+	regs = (struct xen_regs *) ((unsigned long) v + IA64_STK_OFFSET) - 1;
 	sw = (struct switch_stack *) regs - 1;
 	/* Sanity Clear */
 	memset(sw, 0, sizeof(struct xen_regs) + sizeof(struct switch_stack));
 
-	if (VMX_DOMAIN(ed)) {
+	if (VMX_DOMAIN(v)) {
 		/* dt/rt/it:1;i/ic:1, si:1, vm/bn:1, ac:1 */
 		regs->cr_ipsr = 0x501008826008; /* Need to be expanded as macro */
 	} else {
@@ -320,42 +320,42 @@ void new_thread(struct exec_domain *ed,
 	regs->ar_rsc = 0x0;
 	regs->cr_ifs = 0x0;
 	regs->ar_fpsr = sw->ar_fpsr = FPSR_DEFAULT;
-	sw->ar_bspstore = (unsigned long)ed + IA64_RBS_OFFSET;
-	printf("new_thread: ed=%p, regs=%p, sw=%p, new_rbs=%p, IA64_STK_OFFSET=%p, &r8=%p\n",
-		ed,regs,sw,sw->ar_bspstore,IA64_STK_OFFSET,&regs->r8);
+	sw->ar_bspstore = (unsigned long)v + IA64_RBS_OFFSET;
+	printf("new_thread: v=%p, regs=%p, sw=%p, new_rbs=%p, IA64_STK_OFFSET=%p, &r8=%p\n",
+		v,regs,sw,sw->ar_bspstore,IA64_STK_OFFSET,&regs->r8);
 	printf("iip:0x%lx,ipsr:0x%lx\n", regs->cr_iip, regs->cr_ipsr);
 
 	sw->b0 = (unsigned long) &ia64_ret_from_clone;
-	ed->arch._thread.ksp = (unsigned long) sw - 16;
+	v->arch._thread.ksp = (unsigned long) sw - 16;
 	printk("new_thread, about to call init_all_rr\n");
-	if (VMX_DOMAIN(ed)) {
-		vmx_init_all_rr(ed);
+	if (VMX_DOMAIN(v)) {
+		vmx_init_all_rr(v);
 	} else
-		init_all_rr(ed);
+		init_all_rr(v);
 	// set up boot parameters (and fake firmware)
 	printk("new_thread, about to call dom_fw_setup\n");
-	VMX_VPD(ed,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);  //FIXME
+	VMX_VPD(v,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);  //FIXME
 	printk("new_thread, done with dom_fw_setup\n");
 
-	if (VMX_DOMAIN(ed)) {
+	if (VMX_DOMAIN(v)) {
 		/* Virtual processor context setup */
-		VMX_VPD(ed, vpsr) = IA64_PSR_BN;
-		VPD_CR(ed, dcr) = 0;
+		VMX_VPD(v, vpsr) = IA64_PSR_BN;
+		VPD_CR(v, dcr) = 0;
 	} else {
 		// don't forget to set this!
-		ed->vcpu_info->arch.banknum = 1;
+		v->vcpu_info->arch.banknum = 1;
 	}
 }
 #else // CONFIG_VTI
 
 // heavily leveraged from linux/arch/ia64/kernel/process.c:copy_thread()
 // and linux/arch/ia64/kernel/process.c:kernel_thread()
-void new_thread(struct exec_domain *ed,
+void new_thread(struct vcpu *v,
 	            unsigned long start_pc,
 	            unsigned long start_stack,
 	            unsigned long start_info)
 {
-	struct domain *d = ed->domain;
+	struct domain *d = v->domain;
 	struct switch_stack *sw;
 	struct pt_regs *regs;
 	unsigned long new_rbs;
@@ -366,10 +366,10 @@ void new_thread(struct exec_domain *ed,
 #ifdef CONFIG_DOMAIN0_CONTIGUOUS
 	if (d == dom0) start_pc += dom0_start;
 #endif
-	regs = (struct pt_regs *) ((unsigned long) ed + IA64_STK_OFFSET) - 1;
+	regs = (struct pt_regs *) ((unsigned long) v + IA64_STK_OFFSET) - 1;
 	sw = (struct switch_stack *) regs - 1;
 	memset(sw,0,sizeof(struct switch_stack)+sizeof(struct pt_regs));
-	new_rbs = (unsigned long) ed + IA64_RBS_OFFSET;
+	new_rbs = (unsigned long) v + IA64_RBS_OFFSET;
 	regs->cr_ipsr = ia64_getreg(_IA64_REG_PSR)
 		| IA64_PSR_BITS_TO_SET | IA64_PSR_BN
 		& ~(IA64_PSR_BITS_TO_CLEAR | IA64_PSR_RI | IA64_PSR_IS);
@@ -389,20 +389,20 @@ void new_thread(struct exec_domain *ed,
 	sw->caller_unat = 0;
 	sw->ar_pfs = 0;
 	sw->ar_bspstore = new_rbs;
-	//regs->r13 = (unsigned long) ed;
-printf("new_thread: ed=%p, start_pc=%p, regs=%p, sw=%p, new_rbs=%p, IA64_STK_OFFSET=%p, &r8=%p\n",
-ed,start_pc,regs,sw,new_rbs,IA64_STK_OFFSET,&regs->r8);
+	//regs->r13 = (unsigned long) v;
+printf("new_thread: v=%p, start_pc=%p, regs=%p, sw=%p, new_rbs=%p, IA64_STK_OFFSET=%p, &r8=%p\n",
+v,start_pc,regs,sw,new_rbs,IA64_STK_OFFSET,&regs->r8);
 	sw->b0 = (unsigned long) &ia64_ret_from_clone;
-	ed->arch._thread.ksp = (unsigned long) sw - 16;
-	//ed->thread_info->flags = 0;
+	v->arch._thread.ksp = (unsigned long) sw - 16;
+	//v->thread_info->flags = 0;
 printk("new_thread, about to call init_all_rr\n");
-	init_all_rr(ed);
+	init_all_rr(v);
 	// set up boot parameters (and fake firmware)
 printk("new_thread, about to call dom_fw_setup\n");
 	regs->r28 = dom_fw_setup(d,saved_command_line,256L);  //FIXME
 printk("new_thread, done with dom_fw_setup\n");
 	// don't forget to set this!
-	ed->vcpu_info->arch.banknum = 1;
+	v->vcpu_info->arch.banknum = 1;
 }
 #endif // CONFIG_VTI
 
@@ -737,9 +737,9 @@ domU_staging_write_32(unsigned long at, unsigned long a, unsigned long b,
  * here.
  */
 void
-post_arch_do_create_domain(struct exec_domain *ed, int vmx_domain)
+post_arch_do_create_domain(struct vcpu *v, int vmx_domain)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
 
     if (!vmx_domain) {
 	d->shared_info = (void*)alloc_xenheap_page();
@@ -786,7 +786,7 @@ int construct_dom0(struct domain *d,
     unsigned long alloc_start, alloc_end;
     struct pfn_info *page = NULL;
     start_info_t *si;
-    struct exec_domain *ed = d->exec_domain[0];
+    struct vcpu *v = d->vcpu[0];
     struct domain_setup_info dsi;
     unsigned long p_start;
     unsigned long pkern_start;
@@ -882,7 +882,7 @@ int construct_dom0(struct domain *d,
 	machine_to_phys_mapping[mfn] = mfn;
     }
 
-    post_arch_do_create_domain(ed, vmx_dom0);
+    post_arch_do_create_domain(v, vmx_dom0);
 
     /* Load Dom0 image to its own memory */
     loaddomainelfimage(d,image_start);
@@ -898,7 +898,7 @@ int construct_dom0(struct domain *d,
     /* Physical mode emulation initialization, including
      * emulation ID allcation and related memory request
      */
-    physical_mode_init(ed);
+    physical_mode_init(v);
     /* Dom0's pfn is equal to mfn, so there's no need to allocate pmt
      * for dom0
      */
@@ -916,11 +916,11 @@ int construct_dom0(struct domain *d,
 	vmx_final_setup_domain(dom0);
     
     /* vpd is ready now */
-    vlsapic_reset(ed);
-    vtm_init(ed);
+    vlsapic_reset(v);
+    vtm_init(v);
 
     set_bit(_DOMF_constructed, &d->domain_flags);
-    new_thread(ed, pkern_entry, 0, 0);
+    new_thread(v, pkern_entry, 0, 0);
 
     // FIXME: Hack for keyboard input
 #ifdef CLONE_DOMAIN0
@@ -928,12 +928,12 @@ if (d == dom0)
 #endif
     serial_input_init();
     if (d == dom0) {
-    	ed->vcpu_info->arch.delivery_mask[0] = -1L;
-    	ed->vcpu_info->arch.delivery_mask[1] = -1L;
-    	ed->vcpu_info->arch.delivery_mask[2] = -1L;
-    	ed->vcpu_info->arch.delivery_mask[3] = -1L;
+    	v->vcpu_info->arch.delivery_mask[0] = -1L;
+    	v->vcpu_info->arch.delivery_mask[1] = -1L;
+    	v->vcpu_info->arch.delivery_mask[2] = -1L;
+    	v->vcpu_info->arch.delivery_mask[3] = -1L;
     }
-    else __set_bit(0x30,ed->vcpu_info->arch.delivery_mask);
+    else __set_bit(0x30,v->vcpu_info->arch.delivery_mask);
 
     return 0;
 }
@@ -953,7 +953,7 @@ int construct_dom0(struct domain *d,
 	//l1_pgentry_t *l1tab = NULL, *l1start = NULL;
 	struct pfn_info *page = NULL;
 	start_info_t *si;
-	struct exec_domain *ed = d->exec_domain[0];
+	struct vcpu *v = d->vcpu[0];
 
 	struct domain_setup_info dsi;
 	unsigned long p_start;
@@ -1095,19 +1095,19 @@ int construct_dom0(struct domain *d,
 
 	set_bit(_DOMF_constructed, &d->domain_flags);
 
-	new_thread(ed, pkern_entry, 0, 0);
+	new_thread(v, pkern_entry, 0, 0);
 	// FIXME: Hack for keyboard input
 #ifdef CLONE_DOMAIN0
 if (d == dom0)
 #endif
 	serial_input_init();
 	if (d == dom0) {
-		ed->vcpu_info->arch.delivery_mask[0] = -1L;
-		ed->vcpu_info->arch.delivery_mask[1] = -1L;
-		ed->vcpu_info->arch.delivery_mask[2] = -1L;
-		ed->vcpu_info->arch.delivery_mask[3] = -1L;
+		v->vcpu_info->arch.delivery_mask[0] = -1L;
+		v->vcpu_info->arch.delivery_mask[1] = -1L;
+		v->vcpu_info->arch.delivery_mask[2] = -1L;
+		v->vcpu_info->arch.delivery_mask[3] = -1L;
 	}
-	else __set_bit(0x30,ed->vcpu_info->arch.delivery_mask);
+	else __set_bit(0x30,v->vcpu_info->arch.delivery_mask);
 
 	return 0;
 }
@@ -1120,7 +1120,7 @@ int construct_domU(struct domain *d,
 	           char *cmdline)
 {
 	int i, rc;
-	struct exec_domain *ed = d->exec_domain[0];
+	struct vcpu *v = d->vcpu[0];
 	unsigned long pkern_entry;
 
 #ifndef DOMU_AUTO_RESTART
@@ -1161,25 +1161,25 @@ int construct_domU(struct domain *d,
 
 	printk("calling new_thread, entry=%p\n",pkern_entry);
 #ifdef DOMU_AUTO_RESTART
-	ed->domain->arch.image_start = image_start;
-	ed->domain->arch.image_len = image_len;
-	ed->domain->arch.entry = pkern_entry;
+	v->domain->arch.image_start = image_start;
+	v->domain->arch.image_len = image_len;
+	v->domain->arch.entry = pkern_entry;
 #endif
-	new_thread(ed, pkern_entry, 0, 0);
+	new_thread(v, pkern_entry, 0, 0);
 	printk("new_thread returns\n");
-	__set_bit(0x30,ed->vcpu_info->arch.delivery_mask);
+	__set_bit(0x30,v->vcpu_info->arch.delivery_mask);
 
 	return 0;
 }
 
 #ifdef DOMU_AUTO_RESTART
-void reconstruct_domU(struct exec_domain *ed)
+void reconstruct_domU(struct vcpu *v)
 {
 	/* re-copy the OS image to reset data values to original */
 	printk("reconstruct_domU: restarting domain %d...\n",
-		ed->domain->domain_id);
-	loaddomainelfimage(ed->domain,ed->domain->arch.image_start);
-	new_thread(ed, ed->domain->arch.entry, 0, 0);
+		v->domain->domain_id);
+	loaddomainelfimage(v->domain,v->domain->arch.image_start);
+	new_thread(v, v->domain->arch.entry, 0, 0);
 }
 #endif
 
@@ -1229,9 +1229,9 @@ void dummy(void)
 
 
 #if 0
-void switch_to(struct exec_domain *prev, struct exec_domain *next)
+void switch_to(struct vcpu *prev, struct vcpu *next)
 {
- 	struct exec_domain *last;
+ 	struct vcpu *last;
 
 	__switch_to(prev,next,last);
 	//set_current(next);
@@ -1240,7 +1240,7 @@ void switch_to(struct exec_domain *prev, struct exec_domain *next)
 
 void domain_pend_keyboard_interrupt(int irq)
 {
-	vcpu_pend_interrupt(dom0->exec_domain[0],irq);
+	vcpu_pend_interrupt(dom0->vcpu[0],irq);
 }
 
 /////////////////////////////////

@@ -49,8 +49,8 @@ xen_do_IRQ(ia64_vector vector)
 		}
 #endif
 		//FIXME: TEMPORARY HACK!!!!
-		vcpu_pend_interrupt(dom0->exec_domain[0],vector);
-		domain_wake(dom0->exec_domain[0]);
+		vcpu_pend_interrupt(dom0->vcpu[0],vector);
+		domain_wake(dom0->vcpu[0]);
 		return(1);
 	}
 	return(0);

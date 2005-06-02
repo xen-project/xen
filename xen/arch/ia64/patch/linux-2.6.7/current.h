@@ -6,7 +6,7 @@
   */
 +#ifdef XEN
 +struct domain;
-+#define get_current()	((struct exec_domain *) ia64_getreg(_IA64_REG_TP))
++#define get_current()	((struct vcpu *) ia64_getreg(_IA64_REG_TP))
 +#define current get_current()
 +//#define set_current(d)	ia64_setreg(_IA64_REG_TP,(void *)d);
 +#define set_current(d)		(ia64_r13 = (void *)d)

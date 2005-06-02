@@ -55,8 +55,8 @@ struct arch_vmx_struct {
 #define ARCH_VMX_VMCS_RESUME    2       /* Needs VMCS resume */
 #define ARCH_VMX_IO_WAIT        3       /* Waiting for I/O completion */
 
-void vmx_do_launch(struct exec_domain *); 
-void vmx_do_resume(struct exec_domain *); 
+void vmx_do_launch(struct vcpu *); 
+void vmx_do_resume(struct vcpu *); 
 
 struct vmcs_struct *alloc_vmcs(void);
 void free_vmcs(struct vmcs_struct *);

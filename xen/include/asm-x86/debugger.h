@@ -60,7 +60,7 @@ static inline int debugger_trap_fatal(
 static inline int debugger_trap_entry(
     unsigned int vector, struct cpu_user_regs *regs)
 {
-    struct exec_domain *ed = current;
+    struct vcpu *v = current;
 
     if ( !KERNEL_MODE(ed, regs) || (ed->domain->domain_id == 0) )
         return 0;

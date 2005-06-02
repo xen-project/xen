@@ -232,35 +232,35 @@ void arch_init_memory(void)
     subarch_init_memory(dom_xen);
 }
 
-void write_ptbase(struct exec_domain *ed)
+void write_ptbase(struct vcpu *v)
 {
-    write_cr3(pagetable_get_paddr(ed->arch.monitor_table));
+    write_cr3(pagetable_get_paddr(v->arch.monitor_table));
 }
 
-void invalidate_shadow_ldt(struct exec_domain *d)
+void invalidate_shadow_ldt(struct vcpu *v)
 {
     int i;
     unsigned long pfn;
     struct pfn_info *page;
     
-    if ( d->arch.shadow_ldt_mapcnt == 0 )
+    if ( v->arch.shadow_ldt_mapcnt == 0 )
         return;
 
-    d->arch.shadow_ldt_mapcnt = 0;
+    v->arch.shadow_ldt_mapcnt = 0;
 
     for ( i = 16; i < 32; i++ )
     {
-        pfn = l1e_get_pfn(d->arch.perdomain_ptes[i]);
+        pfn = l1e_get_pfn(v->arch.perdomain_ptes[i]);
         if ( pfn == 0 ) continue;
-        d->arch.perdomain_ptes[i] = l1e_empty();
+        v->arch.perdomain_ptes[i] = l1e_empty();
         page = &frame_table[pfn];
         ASSERT_PAGE_IS_TYPE(page, PGT_ldt_page);
-        ASSERT_PAGE_IS_DOMAIN(page, d->domain);
+        ASSERT_PAGE_IS_DOMAIN(page, v->domain);
         put_page_and_type(page);
     }
 
     /* Dispose of the (now possibly invalid) mappings from the TLB.  */
-    percpu_info[d->processor].deferred_ops |= DOP_FLUSH_TLB | DOP_RELOAD_LDT;
+    percpu_info[v->processor].deferred_ops |= DOP_FLUSH_TLB | DOP_RELOAD_LDT;
 }
 
 
@@ -287,25 +287,25 @@ static int alloc_segdesc_page(struct pfn_info *page)
 /* Map shadow page at offset @off. */
 int map_ldt_shadow_page(unsigned int off)
 {
-    struct exec_domain *ed = current;
-    struct domain *d = ed->domain;
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
     unsigned long gpfn, gmfn;
     l1_pgentry_t l1e, nl1e;
-    unsigned gva = ed->arch.guest_context.ldt_base + (off << PAGE_SHIFT);
+    unsigned gva = v->arch.guest_context.ldt_base + (off << PAGE_SHIFT);
     int res;
 
 #if defined(__x86_64__)
     /* If in user mode, switch to kernel mode just to read LDT mapping. */
-    extern void toggle_guest_mode(struct exec_domain *);
-    int user_mode = !(ed->arch.flags & TF_kernel_mode);
-#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(ed)
+    extern void toggle_guest_mode(struct vcpu *);
+    int user_mode = !(v->arch.flags & TF_kernel_mode);
+#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
 #elif defined(__i386__)
 #define TOGGLE_MODE() ((void)0)
 #endif
 
     BUG_ON(unlikely(in_irq()));
 
-    shadow_sync_va(ed, gva);
+    shadow_sync_va(v, gva);
 
     TOGGLE_MODE();
     __copy_from_user(&l1e, &linear_pg_table[l1_linear_offset(gva)],
@@ -335,8 +335,8 @@ int map_ldt_shadow_page(unsigned int off)
 
     nl1e = l1e_from_pfn(gmfn, l1e_get_flags(l1e) | _PAGE_RW);
 
-    ed->arch.perdomain_ptes[off + 16] = nl1e;
-    ed->arch.shadow_ldt_mapcnt++;
+    v->arch.perdomain_ptes[off + 16] = nl1e;
+    v->arch.shadow_ldt_mapcnt++;
 
     return 1;
 }
@@ -615,7 +615,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
              unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) )
 
             // XXX SMP BUG?
-            invalidate_shadow_ldt(e->exec_domain[0]);
+            invalidate_shadow_ldt(e->vcpu[0]);
         put_page(page);
     }
 }
@@ -1433,8 +1433,8 @@ int get_page_type(struct pfn_info *page, u32 type)
 
 int new_guest_cr3(unsigned long mfn)
 {
-    struct exec_domain *ed = current;
-    struct domain *d = ed->domain;
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
     int okay;
     unsigned long old_base_mfn;
 
@@ -1445,13 +1445,13 @@ int new_guest_cr3(unsigned long mfn)
 
     if ( likely(okay) )
     {
-        invalidate_shadow_ldt(ed);
+        invalidate_shadow_ldt(v);
 
-        old_base_mfn = pagetable_get_pfn(ed->arch.guest_table);
-        ed->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
-        update_pagetables(ed); /* update shadow_table and monitor_table */
+        old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+        v->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+        update_pagetables(v); /* update shadow_table and monitor_table */
 
-        write_ptbase(ed);
+        write_ptbase(v);
 
         if ( shadow_mode_refcounts(d) )
             put_page(&frame_table[old_base_mfn]);
@@ -1461,12 +1461,12 @@ int new_guest_cr3(unsigned long mfn)
         /* CR3 also holds a ref to its shadow... */
         if ( shadow_mode_enabled(d) )
         {
-            if ( ed->arch.monitor_shadow_ref )
-                put_shadow_ref(ed->arch.monitor_shadow_ref);
-            ed->arch.monitor_shadow_ref =
-                pagetable_get_pfn(ed->arch.monitor_table);
-            ASSERT(!page_get_owner(&frame_table[ed->arch.monitor_shadow_ref]));
-            get_shadow_ref(ed->arch.monitor_shadow_ref);
+            if ( v->arch.monitor_shadow_ref )
+                put_shadow_ref(v->arch.monitor_shadow_ref);
+            v->arch.monitor_shadow_ref =
+                pagetable_get_pfn(v->arch.monitor_table);
+            ASSERT(!page_get_owner(&frame_table[v->arch.monitor_shadow_ref]));
+            get_shadow_ref(v->arch.monitor_shadow_ref);
         }
     }
     else
@@ -1560,15 +1560,15 @@ static inline unsigned long vcpuset_to_pcpuset(
 {
     unsigned int  vcpu;
     unsigned long pset = 0;
-    struct exec_domain *ed;
+    struct vcpu *v;
 
     while ( vset != 0 )
     {
         vcpu = find_first_set_bit(vset);
         vset &= ~(1UL << vcpu);
         if ( (vcpu < MAX_VIRT_CPUS) &&
-             ((ed = d->exec_domain[vcpu]) != NULL) )
-            pset |= 1UL << ed->processor;
+             ((v = d->vcpu[vcpu]) != NULL) )
+            pset |= 1UL << v->processor;
     }
 
     return pset;
@@ -1584,8 +1584,8 @@ int do_mmuext_op(
     int rc = 0, i = 0, okay, cpu = smp_processor_id();
     unsigned int type, done = 0;
     struct pfn_info *page;
-    struct exec_domain *ed = current;
-    struct domain *d = ed->domain, *e;
+    struct vcpu *v = current;
+    struct domain *d = v->domain, *e;
     u32 x, y, _d, _nd;
 
     LOCK_BIGLOCK(d);
@@ -1710,8 +1710,8 @@ int do_mmuext_op(
             else
             {
                 unsigned long old_mfn =
-                    pagetable_get_pfn(ed->arch.guest_table_user);
-                ed->arch.guest_table_user = mk_pagetable(op.mfn << PAGE_SHIFT);
+                    pagetable_get_pfn(v->arch.guest_table_user);
+                v->arch.guest_table_user = mk_pagetable(op.mfn << PAGE_SHIFT);
                 if ( old_mfn != 0 )
                     put_page_and_type(&frame_table[old_mfn]);
             }
@@ -1724,7 +1724,7 @@ int do_mmuext_op(
     
         case MMUEXT_INVLPG_LOCAL:
             if ( shadow_mode_enabled(d) )
-                shadow_invlpg(ed, op.linear_addr);
+                shadow_invlpg(v, op.linear_addr);
             local_flush_tlb_one(op.linear_addr);
             break;
 
@@ -1792,13 +1792,13 @@ int do_mmuext_op(
                 okay = 0;
                 MEM_LOG("Bad args to SET_LDT: ptr=%lx, ents=%lx", ptr, ents);
             }
-            else if ( (ed->arch.guest_context.ldt_ents != ents) || 
-                      (ed->arch.guest_context.ldt_base != ptr) )
+            else if ( (v->arch.guest_context.ldt_ents != ents) || 
+                      (v->arch.guest_context.ldt_base != ptr) )
             {
-                invalidate_shadow_ldt(ed);
-                ed->arch.guest_context.ldt_base = ptr;
-                ed->arch.guest_context.ldt_ents = ents;
-                load_LDT(ed);
+                invalidate_shadow_ldt(v);
+                v->arch.guest_context.ldt_base = ptr;
+                v->arch.guest_context.ldt_ents = ents;
+                load_LDT(v);
                 percpu_info[cpu].deferred_ops &= ~DOP_RELOAD_LDT;
                 if ( ents != 0 )
                     percpu_info[cpu].deferred_ops |= DOP_RELOAD_LDT;
@@ -1943,8 +1943,8 @@ int do_mmu_update(
     struct pfn_info *page;
     int rc = 0, okay = 1, i = 0, cpu = smp_processor_id();
     unsigned int cmd, done = 0;
-    struct exec_domain *ed = current;
-    struct domain *d = ed->domain;
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
     u32 type_info;
     struct map_dom_mem_cache mapcache, sh_mapcache;
 
@@ -1953,7 +1953,7 @@ int do_mmu_update(
     cleanup_writable_pagetable(d);
 
     if ( unlikely(shadow_mode_enabled(d)) )
-        check_pagetable(ed, "pre-mmu"); /* debug */
+        check_pagetable(v, "pre-mmu"); /* debug */
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
@@ -2096,7 +2096,7 @@ int do_mmu_update(
                         if ( page_is_page_table(page) &&
                              !page_out_of_sync(page) )
                         {
-                            shadow_mark_mfn_out_of_sync(ed, gpfn, mfn);
+                            shadow_mark_mfn_out_of_sync(v, gpfn, mfn);
                         }
                     }
 
@@ -2185,7 +2185,7 @@ int do_mmu_update(
         __put_user(done + i, pdone);
 
     if ( unlikely(shadow_mode_enabled(d)) )
-        check_pagetable(ed, "post-mmu"); /* debug */
+        check_pagetable(v, "post-mmu"); /* debug */
 
     UNLOCK_BIGLOCK(d);
     return rc;
@@ -2197,7 +2197,7 @@ int do_mmu_update(
 int update_grant_va_mapping(unsigned long va,
                             l1_pgentry_t _nl1e, 
                             struct domain *d,
-                            struct exec_domain *ed)
+                            struct vcpu *v)
 {
     /* Caller must:
      * . own d's BIGLOCK 
@@ -2216,7 +2216,7 @@ int update_grant_va_mapping(unsigned long va,
     // just everything involved in getting to this L1 (i.e. we need
     // linear_pg_table[l1_linear_offset(va)] to be in sync)...
     //
-    __shadow_sync_va(ed, va);
+    __shadow_sync_va(v, va);
 
     pl1e = &linear_pg_table[l1_linear_offset(va)];
 
@@ -2242,7 +2242,7 @@ int update_grant_va_mapping(unsigned long va,
     }
 
     if ( unlikely(shadow_mode_enabled(d)) )
-        shadow_do_update_va_mapping(va, _nl1e, ed);
+        shadow_do_update_va_mapping(va, _nl1e, v);
 
     return rc;
 }
@@ -2252,12 +2252,12 @@ int do_update_va_mapping(unsigned long va,
                          unsigned long val32,
                          unsigned long flags)
 {
-    l1_pgentry_t       val  = l1e_from_intpte(val32);
-    struct exec_domain *ed  = current;
-    struct domain      *d   = ed->domain;
-    unsigned int        cpu = ed->processor;
-    unsigned long       vset, pset, bmap_ptr;
-    int                 rc = 0;
+    l1_pgentry_t   val = l1e_from_intpte(val32);
+    struct vcpu   *v   = current;
+    struct domain *d   = v->domain;
+    unsigned int   cpu = v->processor;
+    unsigned long  vset, pset, bmap_ptr;
+    int            rc  = 0;
 
     perfc_incrc(calls_to_update_va);
 
@@ -2269,7 +2269,7 @@ int do_update_va_mapping(unsigned long va,
     cleanup_writable_pagetable(d);
 
     if ( unlikely(shadow_mode_enabled(d)) )
-        check_pagetable(ed, "pre-va"); /* debug */
+        check_pagetable(v, "pre-va"); /* debug */
 
     if ( unlikely(!mod_l1_entry(&linear_pg_table[l1_linear_offset(va)],
                                 val)) )
@@ -2288,9 +2288,9 @@ int do_update_va_mapping(unsigned long va,
             domain_crash();
         }
     
-        rc = shadow_do_update_va_mapping(va, val, ed);
+        rc = shadow_do_update_va_mapping(va, val, v);
 
-        check_pagetable(ed, "post-va"); /* debug */
+        check_pagetable(v, "post-va"); /* debug */
     }
 
     switch ( flags & UVMF_FLUSHTYPE_MASK )
@@ -2376,27 +2376,27 @@ int do_update_va_mapping_otherdomain(unsigned long va,
  * Descriptor Tables
  */
 
-void destroy_gdt(struct exec_domain *ed)
+void destroy_gdt(struct vcpu *v)
 {
     int i;
     unsigned long pfn;
 
-    ed->arch.guest_context.gdt_ents = 0;
+    v->arch.guest_context.gdt_ents = 0;
     for ( i = 0; i < FIRST_RESERVED_GDT_PAGE; i++ )
     {
-        if ( (pfn = l1e_get_pfn(ed->arch.perdomain_ptes[i])) != 0 )
+        if ( (pfn = l1e_get_pfn(v->arch.perdomain_ptes[i])) != 0 )
             put_page_and_type(&frame_table[pfn]);
-        ed->arch.perdomain_ptes[i] = l1e_empty();
-        ed->arch.guest_context.gdt_frames[i] = 0;
+        v->arch.perdomain_ptes[i] = l1e_empty();
+        v->arch.guest_context.gdt_frames[i] = 0;
     }
 }
 
 
-long set_gdt(struct exec_domain *ed, 
+long set_gdt(struct vcpu *v, 
              unsigned long *frames,
              unsigned int entries)
 {
-    struct domain *d = ed->domain;
+    struct domain *d = v->domain;
     /* NB. There are 512 8-byte entries per GDT page. */
     int i, nr_pages = (entries + 511) / 512;
     unsigned long pfn;
@@ -2413,14 +2413,14 @@ long set_gdt(struct exec_domain *ed,
             goto fail;
 
     /* Tear down the old GDT. */
-    destroy_gdt(ed);
+    destroy_gdt(v);
 
     /* Install the new GDT. */
-    ed->arch.guest_context.gdt_ents = entries;
+    v->arch.guest_context.gdt_ents = entries;
     for ( i = 0; i < nr_pages; i++ )
     {
-        ed->arch.guest_context.gdt_frames[i] = frames[i];
-        ed->arch.perdomain_ptes[i] =
+        v->arch.guest_context.gdt_frames[i] = frames[i];
+        v->arch.perdomain_ptes[i] =
             l1e_from_pfn(frames[i], __PAGE_HYPERVISOR);
     }
 
@@ -2610,8 +2610,8 @@ void ptwr_flush(struct domain *d, const int which)
 
     ASSERT(!shadow_mode_enabled(d));
 
-    if ( unlikely(d->arch.ptwr[which].ed != current) )
-        write_ptbase(d->arch.ptwr[which].ed);
+    if ( unlikely(d->arch.ptwr[which].vcpu != current) )
+        write_ptbase(d->arch.ptwr[which].vcpu);
 
     l1va = d->arch.ptwr[which].l1va;
     ptep = (unsigned long *)&linear_pg_table[l1_linear_offset(l1va)];
@@ -2676,7 +2676,7 @@ void ptwr_flush(struct domain *d, const int which)
 
     d->arch.ptwr[which].l1va = 0;
 
-    if ( unlikely(d->arch.ptwr[which].ed != current) )
+    if ( unlikely(d->arch.ptwr[which].vcpu != current) )
         write_ptbase(current);
 }
 
@@ -2871,7 +2871,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
      * If this is a multi-processor guest then ensure that the page is hooked
      * into at most one L2 table, which must be the one running on this VCPU.
      */
-    if ( (d->exec_domain[0]->next_in_list != NULL) &&
+    if ( (d->vcpu[0]->next_in_list != NULL) &&
          ((page->u.inuse.type_info & PGT_count_mask) != 
           (!!(page->u.inuse.type_info & PGT_pinned) +
            (which == PTWR_PT_ACTIVE))) )
@@ -2905,7 +2905,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
 
     d->arch.ptwr[which].l1va   = addr | 1;
     d->arch.ptwr[which].l2_idx = l2_idx;
-    d->arch.ptwr[which].ed     = current;
+    d->arch.ptwr[which].vcpu   = current;
     
     /* For safety, disconnect the L1 p.t. page from current space. */
     if ( which == PTWR_PT_ACTIVE )

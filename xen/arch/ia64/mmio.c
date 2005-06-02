@@ -211,7 +211,7 @@ static inline VCPU *lid_2_vcpu (struct domain *d, u64 id, u64 eid)
 	LID	  lid;
 	
 	for (i=0; i<MAX_VIRT_CPUS; i++) {
-		vcpu = d->exec_domain[i];
+		vcpu = d->vcpu[i];
 		lid.val = VPD_CR(vcpu, lid);
 		if ( lid.id == id && lid.eid == eid ) {
 		    return vcpu;

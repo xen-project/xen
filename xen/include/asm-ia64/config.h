@@ -107,13 +107,13 @@ struct page;
 
 // initial task has a different name in Xen
 //#define	idle0_task	init_task
-#define	idle0_exec_domain	init_task
+#define	idle0_vcpu	init_task
 
 // avoid redefining task_t in asm/thread_info.h
 #define task_t	struct domain
 
 // avoid redefining task_struct in asm/current.h
-#define task_struct exec_domain
+#define task_struct vcpu
 
 // linux/include/asm-ia64/machvec.h (linux/arch/ia64/lib/io.c)
 #define platform_inb	__ia64_inb

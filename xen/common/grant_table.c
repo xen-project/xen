@@ -62,7 +62,7 @@ put_maptrack_handle(
 static int
 __gnttab_activate_grant_ref(
     struct domain          *mapping_d,          /* IN */
-    struct exec_domain     *mapping_ed,
+    struct vcpu     *mapping_ed,
     struct domain          *granting_d,
     grant_ref_t             ref,
     u16                     dev_hst_ro_flags,
@@ -319,7 +319,7 @@ __gnttab_map_grant_ref(
     domid_t               dom;
     grant_ref_t           ref;
     struct domain        *ld, *rd;
-    struct exec_domain   *led;
+    struct vcpu   *led;
     u16                   dev_hst_ro_flags;
     int                   handle;
     unsigned long         frame = 0, host_virt_addr;
