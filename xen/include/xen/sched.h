@@ -5,7 +5,6 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>
-#include <xen/cache.h>
 #include <xen/smp.h>
 #include <public/xen.h>
 #include <public/dom0_ops.h>
