@@ -4,6 +4,7 @@
 #define APIC_DEFINITION 1
 #include <xen/config.h>
 #include <xen/cpumask.h>
+#include <asm/current.h>
 #include <asm/mpspec.h>
 #include <asm/mach-default/mach_apicdef.h>
 #include <asm/genapic.h>

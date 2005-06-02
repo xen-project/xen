@@ -6,6 +6,7 @@
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/event.h>
+#include <asm/current.h>
 #include <asm/smpboot.h>
 #include <public/xen.h>
 #include <public/physdev.h>

@@ -23,6 +23,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 
+#include <asm/current.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
 #include <asm/msr.h>

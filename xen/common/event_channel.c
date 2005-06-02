@@ -22,6 +22,7 @@
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <xen/irq.h>
+#include <asm/current.h>
 
 #include <public/xen.h>
 #include <public/event_channel.h>

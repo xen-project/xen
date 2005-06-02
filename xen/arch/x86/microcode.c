@@ -77,6 +77,7 @@
 #include <xen/smp.h>
 #include <xen/spinlock.h>
 
+#include <asm/current.h>
 #include <asm/msr.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>

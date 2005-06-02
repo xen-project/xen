@@ -22,6 +22,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
+#include <asm/current.h>
 #include <asm/asm_defns.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>

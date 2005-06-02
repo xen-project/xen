@@ -8,7 +8,6 @@
 #include <xen/config.h>
 #include <xen/kernel.h>
 #include <xen/cpumask.h>
-#include <asm/current.h>
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC

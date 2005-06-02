@@ -11,6 +11,7 @@
 #include <xen/irq.h>
 #include <xen/perfc.h>
 #include <xen/sched.h>
+#include <asm/current.h>
 #include <asm/smpboot.h>
 
 irq_desc_t irq_desc[NR_IRQS];

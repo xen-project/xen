@@ -8,6 +8,7 @@
 #include <xen/irq.h>
 #include <xen/console.h>
 #include <xen/sched.h>
+#include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
 

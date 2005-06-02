@@ -15,6 +15,7 @@
 #include <xen/sched.h>
 #include <xen/mm.h>
 #include <xen/perfc.h>
+#include <asm/current.h>
 #include <asm/domain_page.h>
 #include <asm/flushtlb.h>
 #include <asm/hardirq.h>

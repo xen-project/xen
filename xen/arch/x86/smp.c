@@ -14,6 +14,7 @@
 #include <xen/delay.h>
 #include <xen/perfc.h>
 #include <xen/spinlock.h>
+#include <asm/current.h>
 #include <asm/smp.h>
 #include <asm/mc146818rtc.h>
 #include <asm/flushtlb.h>

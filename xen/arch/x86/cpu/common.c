@@ -3,6 +3,7 @@
 #include <xen/string.h>
 #include <xen/delay.h>
 #include <xen/smp.h>
+#include <asm/current.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
 #include <asm/msr.h>

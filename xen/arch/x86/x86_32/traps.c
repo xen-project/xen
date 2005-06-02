@@ -6,6 +6,7 @@
 #include <xen/console.h>
 #include <xen/mm.h>
 #include <xen/irq.h>
+#include <asm/current.h>
 #include <asm/flushtlb.h>
 
 #ifdef CONFIG_VMX

@@ -18,6 +18,7 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <public/sched_ctl.h>
+#include <asm/current.h>
 
 extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
 extern void arch_getdomaininfo_ctxt(

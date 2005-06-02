@@ -22,6 +22,7 @@
 #include <xen/sched.h>
 #include <xen/console.h>
 #include <xen/smp.h>
+#include <asm/current.h>
 #include <asm/mc146818rtc.h>
 #include <asm/msr.h>
 #include <asm/mpspec.h>

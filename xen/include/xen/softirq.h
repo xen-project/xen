@@ -17,6 +17,7 @@
 #include <xen/lib.h>
 #include <xen/smp.h>
 #include <asm/bitops.h>
+#include <asm/current.h>
 #include <asm/hardirq.h>
 
 typedef void (*softirq_handler)(void);

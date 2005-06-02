@@ -40,6 +40,7 @@
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/delay.h>
+#include <asm/current.h>
 #include <asm/mc146818rtc.h>
 #include <asm/desc.h>
 #include <asm/div64.h>
