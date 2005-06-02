@@ -167,8 +167,6 @@ struct domain_setup_info
     unsigned int xen_elf_image;
 };
 
-#include <asm/uaccess.h> /* for KERNEL_DS */
-
 extern struct domain idle0_domain;
 extern struct exec_domain idle0_exec_domain;
 
@@ -274,8 +272,6 @@ extern void context_switch(
 /* Called by the scheduler to continue running the current exec_domain. */
 extern void continue_running(
     struct exec_domain *same);
-
-void domain_init(void);
 
 int idle_cpu(int cpu); /* Is CPU 'cpu' idle right now? */
 
