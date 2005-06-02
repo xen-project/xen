@@ -153,7 +153,8 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
             goto drop;
         skb_reserve(nskb, hlen);
         __skb_put(nskb, skb->len);
-        (void)skb_copy_bits(skb, -hlen, nskb->data - hlen, skb->len + hlen);
+        if (skb_copy_bits(skb, -hlen, nskb->data - hlen, skb->len + hlen))
+            BUG();
         nskb->dev = skb->dev;
         nskb->proto_csum_valid = skb->proto_csum_valid;
         dev_kfree_skb(skb);
