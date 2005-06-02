@@ -28,6 +28,7 @@
 #include <xen/mm.h>
 #include <xen/perfc.h>
 #include <asm/processor.h>
+#include <asm/regs.h>
 #include <asm/x86_emulate.h>
 
 /* Make the scary benign errors go away. */

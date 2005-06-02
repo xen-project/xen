@@ -6,7 +6,6 @@
 #include <xen/types.h>
 #include <xen/spinlock.h>
 #include <xen/cache.h>
-#include <asm/regs.h>
 #include <xen/smp.h>
 #include <asm/page.h>
 #include <asm/processor.h>
