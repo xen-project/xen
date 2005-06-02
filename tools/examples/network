@@ -72,6 +72,12 @@ s/inet/ip addr add/
 s@\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/[0-9]\+\)@\1@
 s/${src}/dev ${dst}/
 " | sh -e
+    # Remove automatic routes on destionation device
+    ip route list | sed -ne "
+/dev ${dst}\( \|$\)/ {
+  s/^/ip route del /
+  p
+}" | sh -e
 }
 
 # Usage: del_addrs src
@@ -95,16 +101,17 @@ transfer_routes () {
     # List all routes and grep the ones with $src in.
     # Stick 'ip route del' on the front to delete.
     # Change $src to $dst and use 'ip route add' to add.
-    ip route list | grep ${src} | sed -e "
-h
-s/^/ip route del /
-P
-g
-s/${src}/${dst}/
-s/^/ip route add /
-P
-d
-" | sh -e
+    ip route list | sed -ne "
+/dev ${src}\( \|$\)/ {
+  h
+  s/^/ip route del /
+  P
+  g
+  s/${src}/${dst}/
+  s/^/ip route add /
+  P
+  d
+}" | sh -e
 }
 
 # Usage: create_bridge bridge
