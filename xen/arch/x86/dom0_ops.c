@@ -155,7 +155,10 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         {
             if ( (d->arch.iobmp_mask = xmalloc_array(
                 u8, IOBMP_BYTES)) == NULL )
+            {
+                put_domain(d);
                 break;
+            }
             memset(d->arch.iobmp_mask, 0xFF, IOBMP_BYTES);
         }
 
