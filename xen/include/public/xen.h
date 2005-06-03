@@ -70,6 +70,7 @@
 #define VIRQ_DOM_EXC    3  /* (DOM0) Exceptional event for some domain.   */
 #define VIRQ_PARITY_ERR 4  /* (DOM0) NMI parity error.                    */
 #define VIRQ_IO_ERR     5  /* (DOM0) NMI I/O error.                       */
+#define VIRQ_PDB        6  /* (DOM0) PDB                                  */
 #define NR_VIRQS        7
 
 /*

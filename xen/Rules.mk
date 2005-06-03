@@ -55,6 +55,11 @@ ifeq ($(domu_debug),y)
 CFLAGS += -DDOMU_DEBUG
 endif
 
+ifeq ($(pdb),y)
+CFLAGS += -g -DPDB_DEBUG
+endif
+
+
 ifeq ($(crash_debug),y)
 CFLAGS += -g -DCRASH_DEBUG
 endif
