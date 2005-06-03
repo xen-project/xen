@@ -54,9 +54,9 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
         set_bit(_DOMF_idle_domain, &d->domain_flags);
 
     if ( !is_idle_task(d) &&
-         ((init_event_channels(d) != 0) || (grant_table_create(d) != 0)) )
+         ((evtchn_init(d) != 0) || (grant_table_create(d) != 0)) )
     {
-        destroy_event_channels(d);
+        evtchn_destroy(d);
         free_domain_struct(d);
         return NULL;
     }
@@ -251,7 +251,7 @@ void domain_destruct(struct domain *d)
     *pd = d->next_in_hashbucket;
     write_unlock(&domlist_lock);
 
-    destroy_event_channels(d);
+    evtchn_destroy(d);
     grant_table_destroy(d);
 
     free_perdomain_pt(d);

@@ -74,6 +74,33 @@ static int irq_bindcount[NR_IRQS];
 /* Bitmap indicating which PIRQs require Xen to be notified on unmask. */
 static unsigned long pirq_needs_unmask_notify[NR_PIRQS/sizeof(unsigned long)];
 
+#ifdef CONFIG_SMP
+
+static u8  cpu_evtchn[NR_EVENT_CHANNELS];
+static u32 cpu_evtchn_mask[NR_CPUS][NR_EVENT_CHANNELS/32];
+
+#define active_evtchns(cpu,sh,idx)              \
+    ((sh)->evtchn_pending[idx] &                \
+     cpu_evtchn_mask[cpu][idx] &                \
+     ~(sh)->evtchn_mask[idx])
+
+static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
+{
+    clear_bit(chn, (unsigned long *)cpu_evtchn_mask[cpu_evtchn[chn]]);
+    set_bit(chn, (unsigned long *)cpu_evtchn_mask[cpu]);
+    cpu_evtchn[chn] = cpu;
+}
+
+#else
+
+#define active_evtchns(cpu,sh,idx)              \
+    ((sh)->evtchn_pending[idx] &                \
+     ~(sh)->evtchn_mask[idx])
+
+#define bind_evtchn_to_cpu(chn,cpu) ((void)0)
+
+#endif
+
 /* Upcall to generic IRQ layer. */
 #ifdef CONFIG_X86
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,9)
@@ -109,9 +136,9 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 {
     u32 	   l1, l2;
     unsigned int   l1i, l2i, port;
-    int            irq;
+    int            irq, cpu = smp_processor_id();
     shared_info_t *s = HYPERVISOR_shared_info;
-    vcpu_info_t   *vcpu_info = &s->vcpu_data[smp_processor_id()];
+    vcpu_info_t   *vcpu_info = &s->vcpu_data[cpu];
 
     vcpu_info->evtchn_upcall_pending = 0;
     
@@ -122,7 +149,7 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
         l1i = __ffs(l1);
         l1 &= ~(1 << l1i);
         
-        while ( (l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i]) != 0 )
+        while ( (l2 = active_evtchns(cpu, s, l1i)) != 0 )
         {
             l2i = __ffs(l2);
             l2 &= ~(1 << l2i);
@@ -171,6 +198,8 @@ int bind_virq_to_irq(int virq)
         irq_to_evtchn[irq]    = evtchn;
 
         per_cpu(virq_to_irq, cpu)[virq] = irq;
+
+        bind_evtchn_to_cpu(evtchn, cpu);
     }
 
     irq_bindcount[irq]++;
@@ -225,8 +254,13 @@ int bind_ipi_on_cpu_to_irq(int cpu, int ipi)
         irq_to_evtchn[irq]    = evtchn;
 
         per_cpu(ipi_to_evtchn, cpu)[ipi] = evtchn;
-    } else
+
+        bind_evtchn_to_cpu(evtchn, cpu);
+    } 
+    else
+    {
 	irq = evtchn_to_irq[evtchn];
+    }
 
     irq_bindcount[irq]++;
 
@@ -545,6 +579,11 @@ void __init init_IRQ(void)
     irq_ctx_init(0);
 
     spin_lock_init(&irq_mapping_update_lock);
+
+#ifdef CONFIG_SMP
+    /* By default all event channels notify CPU#0. */
+    memset(cpu_evtchn_mask[0], ~0, sizeof(cpu_evtchn_mask[0]));
+#endif
 
     for ( cpu = 0; cpu < NR_CPUS; cpu++ ) {
 	/* No VIRQ -> IRQ mappings. */

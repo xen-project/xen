@@ -53,7 +53,7 @@ static inline void evtchn_set_pending(struct vcpu *v, int port)
 
 /*
  * send_guest_virq:
- *  @d:        Domain to which virtual IRQ should be sent
+ *  @v:        VCPU to which virtual IRQ should be sent
  *  @virq:     Virtual IRQ number (VIRQ_*)
  */
 static inline void send_guest_virq(struct vcpu *v, int virq)
@@ -69,10 +69,7 @@ static inline void send_guest_virq(struct vcpu *v, int virq)
  *  @d:        Domain to which physical IRQ should be sent
  *  @pirq:     Physical IRQ number
  */
-static inline void send_guest_pirq(struct vcpu *v, int pirq)
-{
-    evtchn_set_pending(v, v->domain->pirq_to_evtchn[pirq]);
-}
+extern void send_guest_pirq(struct domain *d, int pirq);
 
 #define event_pending(_d)                                     \
     ((_d)->vcpu_info->evtchn_upcall_pending && \
