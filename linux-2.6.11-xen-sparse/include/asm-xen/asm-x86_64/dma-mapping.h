@@ -39,11 +39,11 @@ static inline dma_addr_t dma_map_single(struct device *hwdev, void *ptr,
 
 	if (direction == DMA_NONE)
 		out_of_line_bug();
-	addr = virt_to_phys(ptr);
+	addr = virt_to_machine(ptr);
 
 	if ((addr+size) & ~*hwdev->dma_mask)
 		out_of_line_bug();
-	return phys_to_machine(addr);
+	return addr;
 }
 
 static inline void dma_unmap_single(struct device *hwdev, dma_addr_t dma_addr,
