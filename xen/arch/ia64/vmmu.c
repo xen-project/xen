@@ -20,6 +20,7 @@
  *  Yaozu Dong (Eddie Dong) (Eddie.dong@intel.com)
  */
 #include <linux/sched.h>
+#include <linux/mm.h>
 #include <asm/tlb.h>
 #include <asm/gcc_intrin.h>
 #include <asm/vcpu.h>

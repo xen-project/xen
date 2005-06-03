@@ -90,7 +90,7 @@ struct page
         /* Page is on a free list. */
         struct {
             /* Mask of possibly-tainted TLBs. */
-            u64 cpu_mask;
+            cpumask_t cpumask;
             /* Order-size of the free chunk this page is the head of. */
             u8 order;
         } free;
