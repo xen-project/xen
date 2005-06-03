@@ -134,9 +134,11 @@ void destroy_context(struct mm_struct *mm)
 			kfree(mm->context.ldt);
 		mm->context.size = 0;
 	}
-	spin_lock(&mm_unpinned_lock);
-	list_del(&mm->context.unpinned);
-	spin_unlock(&mm_unpinned_lock);
+	if (!mm->context.pinned) {
+		spin_lock(&mm_unpinned_lock);
+		list_del(&mm->context.unpinned);
+		spin_unlock(&mm_unpinned_lock);
+	}
 }
 
 static int read_ldt(void __user * ptr, unsigned long bytecount)
