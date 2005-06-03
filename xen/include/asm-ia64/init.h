@@ -14,7 +14,7 @@
 #define __exitdata   \
     __attribute_used__ __attribute__ ((__section__ (".data.exit")))
 #define __initsetup  \
-    __attribute_used__ __attribute__ ((__section__ (".setup.init")))
+    __attribute_used__ __attribute__ ((__section__ (".init.setup")))
 #define __init_call  \
     __attribute_used__ __attribute__ ((__section__ (".initcall1.init")))
 #define __exit_call  \

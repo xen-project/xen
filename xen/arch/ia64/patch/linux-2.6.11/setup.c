@@ -1,5 +1,5 @@
---- /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/../../linux-2.6.11/arch/ia64/kernel/setup.c	2005-03-01 23:37:49.000000000 -0800
-+++ /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/arch/ia64/setup.c	2005-05-18 12:40:50.000000000 -0700
+--- ../../linux-2.6.11/arch/ia64/kernel/setup.c	2005-03-02 00:37:49.000000000 -0700
++++ arch/ia64/setup.c	2005-06-03 10:14:24.000000000 -0600
 @@ -51,6 +51,10 @@
  #include <asm/smp.h>
  #include <asm/system.h>
@@ -11,7 +11,7 @@
  
  #if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
  # error "struct cpuinfo_ia64 too big!"
-@@ -127,7 +130,16 @@
+@@ -127,7 +131,16 @@
  		range_end   = min(end, rsvd_region[i].start);
  
  		if (range_start < range_end)
@@ -28,7 +28,7 @@
  
  		/* nothing more available in this segment */
  		if (range_end == end) return 0;
-@@ -185,7 +197,12 @@
+@@ -185,7 +198,12 @@
  	n++;
  
  	rsvd_region[n].start = (unsigned long) ia64_imva((void *)KERNEL_START);
@@ -41,7 +41,7 @@
  	n++;
  
  #ifdef CONFIG_BLK_DEV_INITRD
-@@ -299,7 +316,11 @@
+@@ -299,17 +317,25 @@
  }
  
  void __init
@@ -53,22 +53,33 @@
  {
  	unw_init();
  
-@@ -308,8 +329,14 @@
+ 	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
+ 
  	*cmdline_p = __va(ia64_boot_param->command_line);
++#ifdef XEN
++	efi_init();
++#else
  	strlcpy(saved_command_line, *cmdline_p, COMMAND_LINE_SIZE);
  
-+#ifdef XEN
-+	cmdline_parse(*cmdline_p);
-+#undef CONFIG_ACPI_BOOT
-+#endif
  	efi_init();
-+#ifndef XEN
  	io_port_init();
 +#endif
  
  #ifdef CONFIG_IA64_GENERIC
  	{
-@@ -351,8 +378,18 @@
+@@ -336,6 +362,11 @@
+ 	}
+ #endif
+ 
++#ifdef XEN
++	early_cmdline_parse(cmdline_p);
++	cmdline_parse(*cmdline_p);
++#undef CONFIG_ACPI_BOOT
++#endif
+ 	if (early_console_setup(*cmdline_p) == 0)
+ 		mark_bsp_online();
+ 
+@@ -351,8 +382,18 @@
  # endif
  #endif /* CONFIG_APCI_BOOT */
  
@@ -87,7 +98,7 @@
  	/* process SAL system table: */
  	ia64_sal_init(efi.sal_systab);
  
-@@ -360,6 +397,10 @@
+@@ -360,6 +401,10 @@
  	cpu_physical_id(0) = hard_smp_processor_id();
  #endif
  
@@ -98,7 +109,7 @@
  	cpu_init();	/* initialize the bootstrap CPU */
  
  #ifdef CONFIG_ACPI_BOOT
-@@ -492,12 +533,14 @@
+@@ -492,12 +537,14 @@
  {
  }
  
@@ -113,7 +124,7 @@
  
  void
  identify_cpu (struct cpuinfo_ia64 *c)
-@@ -551,6 +594,12 @@
+@@ -551,6 +598,12 @@
  	}
  	c->unimpl_va_mask = ~((7L<<61) | ((1L << (impl_va_msb + 1)) - 1));
  	c->unimpl_pa_mask = ~((1L<<63) | ((1L << phys_addr_size) - 1));
@@ -126,7 +137,7 @@
  }
  
  void
-@@ -659,7 +708,11 @@
+@@ -659,7 +712,11 @@
  					| IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC));
  	atomic_inc(&init_mm.mm_count);
  	current->active_mm = &init_mm;

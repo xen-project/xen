@@ -1010,6 +1010,7 @@
 421098b2PHgzf_Gg4R65YRNi_QzMKQ xen/arch/ia64/dom0_ops.c
 421098b2O7jsNfzQXA1v3rbAc1QhpA xen/arch/ia64/dom_fw.c
 421098b2ZlaBcyiuuPr3WpzaSDwg6Q xen/arch/ia64/domain.c
+42a08294zRikvZk_CR1iVojHjcVFZw xen/arch/ia64/hpsimserial.c
 4239e98a_HX-FCIcXtVqY0BbrDqVug xen/arch/ia64/hypercall.c
 4295e18f42gf1T-8W97A3KSlBaY1tA xen/arch/ia64/hyperprivop.S
 421098b3LYAS8xJkQiGP7tiTlyBt0Q xen/arch/ia64/idle0_task.c

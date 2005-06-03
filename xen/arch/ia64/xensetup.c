@@ -19,6 +19,7 @@
 #include <asm/meminit.h>
 #include <asm/page.h>
 #include <asm/setup.h>
+#include <xen/string.h>
 
 unsigned long xenheap_phys_end;
 
@@ -35,39 +36,18 @@ extern unsigned long domain0_ready;
 int find_max_pfn (unsigned long, unsigned long, void *);
 void start_of_day(void);
 
-/* opt_console: comma-separated list of console outputs. */
-#ifdef IA64
-unsigned char opt_console[30] = "com1";
-#else
-unsigned char opt_console[30] = "com1,vga";
-#endif
-/* opt_conswitch: a character pair controlling console switching. */
-/* Char 1: CTRL+<char1> is used to switch console input between Xen and DOM0 */
-/* Char 2: If this character is 'x', then do not auto-switch to DOM0 when it */
-/*         boots. Any other value, or omitting the char, enables auto-switch */
-unsigned char opt_conswitch[5] = "a"; /* NB. '`' would disable switching. */
-/* opt_com[12]: Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
-unsigned char opt_com1[30] = "", opt_com2[30] = "";
-/* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
-unsigned int opt_dom0_mem = 16000;
 /* opt_noht: If true, Hyperthreading is ignored. */
-int opt_noht=0;
+int opt_noht = 0;
+boolean_param("noht", opt_noht);
+
 /* opt_nosmp: If true, secondary processors are ignored. */
-int opt_nosmp=0;
-/* opt_noreboot: If true, machine will need manual reset on error. */
-int opt_noreboot=0;
-/* opt_watchdog: If true, run a watchdog NMI on each processor. */
-int opt_watchdog=0;
-/* opt_pdb: Name of serial port for Xen pervasive debugger (and enable pdb) */
-unsigned char opt_pdb[10] = "none";
-/* opt_tbuf_size: trace buffer size (in pages) */
-unsigned int opt_tbuf_size = 10;
-/* opt_sched: scheduler - default to Borrowed Virtual Time */
-char opt_sched[10] = "bvt";
-/* opt_leveltrigger, opt_edgetrigger: Force an IO-APIC-routed IRQ to be */
-/*                                    level- or edge-triggered.         */
-/* Example: 'leveltrigger=4,5,6,20 edgetrigger=21'. */
-char opt_leveltrigger[30] = "", opt_edgetrigger[30] = "";
+static int opt_nosmp = 0;
+boolean_param("nosmp", opt_nosmp);
+
+/* maxcpus: maximum number of CPUs to activate. */
+static unsigned int max_cpus = NR_CPUS;
+integer_param("maxcpus", max_cpus); 
+
 /*
  * opt_xenheap_megabytes: Size of Xen heap in megabytes, including:
  *	xen image
@@ -80,23 +60,6 @@ char opt_leveltrigger[30] = "", opt_edgetrigger[30] = "";
  */
 unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
 unsigned long xenheap_size = XENHEAP_DEFAULT_SIZE;
-/*
- * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
- *  fatal:  Xen prints diagnostic message and then hangs.
- *  dom0:   The NMI is virtualised to DOM0.
- *  ignore: The NMI error is cleared and ignored.
- */
-#ifdef NDEBUG
-char opt_nmi[10] = "dom0";
-#else
-char opt_nmi[10] = "fatal";
-#endif
-/*
- * Comma-separated list of hexadecimal page numbers containing bad bytes.
- * e.g. 'badpage=0x3f45,0x8a321'.
- */
-char opt_badpage[100] = "";
-
 extern long running_on_sim;
 unsigned long xen_pstart;
 
@@ -133,6 +96,42 @@ static void __init do_initcalls(void)
         (*call)();
 }
 
+/*
+ * IPF loader only supports one commaind line currently, for
+ * both xen and guest kernel. This function provides pre-parse
+ * to mixed command line, to split it into two parts.
+ *
+ * User should split the parameters by "--", with strings after
+ * spliter for guest kernel. Missing "--" means whole line belongs
+ * to guest. Example:
+ *	"com2=57600,8n1 console=com2 -- console=ttyS1 console=tty
+ * root=/dev/sda3 ro"
+ */
+void early_cmdline_parse(char **cmdline_p)
+{
+    char *guest_cmd;
+    char *split = "--";
+
+    if (*cmdline_p == NULL) {
+	saved_command_line[0] = '\0';
+	return;
+    }
+
+    guest_cmd = strstr(*cmdline_p, split);
+    /* If no spliter, whole line is for guest */
+    if (guest_cmd == NULL) {
+	guest_cmd = *cmdline_p;
+	*cmdline_p = NULL;
+    } else {
+	*guest_cmd = '\0';	/* Split boot parameters for xen and guest */
+	guest_cmd += strlen(split);
+	while (*guest_cmd == ' ') guest_cmd++;
+    }
+
+    strlcpy(saved_command_line, guest_cmd, COMMAND_LINE_SIZE);
+    return;
+}
+
 void start_kernel(void)
 {
     unsigned char *cmdline;
@@ -154,7 +153,8 @@ void start_kernel(void)
     early_setup_arch(&cmdline);
 
     /* We initialise the serial devices very early so we can get debugging. */
-    ns16550_init();
+    if (running_on_sim) hpsim_serial_init();
+    else ns16550_init();
     serial_init_preirq();
 
     init_console();
