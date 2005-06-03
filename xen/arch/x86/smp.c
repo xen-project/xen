@@ -185,7 +185,8 @@ inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 #include <mach_ipi.h>
 
 static spinlock_t flush_lock = SPIN_LOCK_UNLOCKED;
-static unsigned long flush_cpumask, flush_va;
+static cpumask_t flush_cpumask;
+static unsigned long flush_va;
 
 asmlinkage void smp_invalidate_interrupt(void)
 {
@@ -198,30 +199,26 @@ asmlinkage void smp_invalidate_interrupt(void)
         else
             local_flush_tlb_one(flush_va);
     }
-    clear_bit(smp_processor_id(), &flush_cpumask);
+    cpu_clear(smp_processor_id(), flush_cpumask);
 }
 
-void __flush_tlb_mask(unsigned long mask, unsigned long va)
+void __flush_tlb_mask(cpumask_t mask, unsigned long va)
 {
     ASSERT(local_irq_is_enabled());
     
-    if ( mask & (1UL << smp_processor_id()) )
+    if ( cpu_isset(smp_processor_id(), mask) )
     {
         local_flush_tlb();
-        mask &= ~(1UL << smp_processor_id());
+        cpu_clear(smp_processor_id(), mask);
     }
 
-    if ( mask != 0 )
+    if ( !cpus_empty(mask) )
     {
         spin_lock(&flush_lock);
         flush_cpumask = mask;
         flush_va      = va;
-        {
-            cpumask_t _mask;
-            cpus_addr(_mask)[0] = mask;
-            send_IPI_mask(_mask, INVALIDATE_TLB_VECTOR);
-        }
-        while ( flush_cpumask != 0 )
+        send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
+        while ( !cpus_empty(flush_cpumask) )
             cpu_relax();
         spin_unlock(&flush_lock);
     }
@@ -236,11 +233,11 @@ void new_tlbflush_clock_period(void)
     if ( num_online_cpus() > 1 )
     {
         spin_lock(&flush_lock);
-        flush_cpumask  = (1UL << num_online_cpus()) - 1;
-        flush_cpumask &= ~(1UL << smp_processor_id());
-        flush_va       = FLUSHVA_ALL;
+        flush_cpumask = cpu_online_map;
+        flush_va      = FLUSHVA_ALL;
         send_IPI_allbutself(INVALIDATE_TLB_VECTOR);
-        while ( flush_cpumask != 0 )
+        cpu_clear(smp_processor_id(), flush_cpumask);
+        while ( !cpus_empty(flush_cpumask) )
             cpu_relax();
         spin_unlock(&flush_lock);
     }
@@ -261,12 +258,10 @@ void flush_tlb_all_pge(void)
     local_flush_tlb_pge();
 }
 
-void smp_send_event_check_mask(unsigned long cpu_mask)
+void smp_send_event_check_mask(cpumask_t mask)
 {
-    cpumask_t mask;
-    cpu_mask &= ~(1UL << smp_processor_id());
-    cpus_addr(mask)[0] = cpu_mask;
-    if ( cpu_mask != 0 )
+    cpu_clear(smp_processor_id(), mask);
+    if ( !cpus_empty(mask) )
         send_IPI_mask(mask, EVENT_CHECK_VECTOR);
 }
 
@@ -277,9 +272,8 @@ void smp_send_event_check_mask(unsigned long cpu_mask)
 struct call_data_struct {
     void (*func) (void *info);
     void *info;
-    unsigned long started;
-    unsigned long finished;
-    int wait;
+    atomic_t started;
+    atomic_t finished;
 };
 
 static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
@@ -296,18 +290,17 @@ int smp_call_function(
     void (*func) (void *info), void *info, int unused, int wait)
 {
     struct call_data_struct data;
-    unsigned long cpuset;
+    unsigned int nr_cpus = num_online_cpus() - 1;
 
     ASSERT(local_irq_is_enabled());
 
-    cpuset = ((1UL << num_online_cpus()) - 1) & ~(1UL << smp_processor_id());
-    if ( cpuset == 0 )
+    if ( nr_cpus == 0 )
         return 0;
 
     data.func = func;
     data.info = info;
-    data.started = data.finished = 0;
-    data.wait = wait;
+    atomic_set(&data.started, 0);
+    atomic_set(&data.finished, 0);
 
     spin_lock(&call_lock);
 
@@ -316,7 +309,7 @@ int smp_call_function(
 
     send_IPI_allbutself(CALL_FUNCTION_VECTOR);
 
-    while ( (wait ? data.finished : data.started) != cpuset )
+    while ( atomic_read(wait ? &data.finished : &data.started) != nr_cpus )
         cpu_relax();
 
     spin_unlock(&call_lock);
@@ -358,16 +351,11 @@ asmlinkage void smp_call_function_interrupt(void)
     ack_APIC_irq();
     perfc_incrc(ipis);
 
-    if ( call_data->wait )
-    {
-        (*func)(info);
-        mb();
-        set_bit(smp_processor_id(), &call_data->finished);
-    }
-    else
-    {
-        mb();
-        set_bit(smp_processor_id(), &call_data->started);
-        (*func)(info);
-    }
+    mb();
+    atomic_inc(&call_data->started);
+
+    (*func)(info);
+
+    mb();
+    atomic_inc(&call_data->finished);
 }

@@ -445,9 +445,9 @@ gnttab_map_grant_ref(
             flush++;
 
     if ( flush == 1 )
-        flush_tlb_one_mask(current->domain->cpuset, va);
+        flush_tlb_one_mask(current->domain->cpumask, va);
     else if ( flush != 0 ) 
-        flush_tlb_mask(current->domain->cpuset);
+        flush_tlb_mask(current->domain->cpumask);
 
     return 0;
 }
@@ -641,9 +641,9 @@ gnttab_unmap_grant_ref(
             flush++;
 
     if ( flush == 1 )
-        flush_tlb_one_mask(current->domain->cpuset, va);
+        flush_tlb_one_mask(current->domain->cpumask, va);
     else if ( flush != 0 ) 
-        flush_tlb_mask(current->domain->cpuset);
+        flush_tlb_mask(current->domain->cpumask);
 
     return 0;
 }

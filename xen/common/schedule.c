@@ -209,7 +209,8 @@ void domain_sleep_sync(struct vcpu *v)
     while ( test_bit(_VCPUF_running, &v->vcpu_flags) && !domain_runnable(v) )
         cpu_relax();
 
-    sync_lazy_execstate_cpuset(v->domain->cpuset & (1UL << v->processor));
+    if ( cpu_isset(v->processor, v->domain->cpumask) )
+        sync_lazy_execstate_cpu(v->processor);
 }
 
 void domain_wake(struct vcpu *v)

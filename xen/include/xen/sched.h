@@ -131,8 +131,8 @@ struct domain
 
     struct vcpu *vcpu[MAX_VIRT_CPUS];
 
-    /* Bitmask of CPUs on which this domain is running. */
-    unsigned long cpuset;
+    /* Bitmask of CPUs which are holding onto this domain's state. */
+    cpumask_t        cpumask;
 
     struct arch_domain arch;
 };
@@ -249,7 +249,8 @@ void domain_sleep_sync(struct vcpu *d);
  * Force loading of currently-executing domain state on the specified set
  * of CPUs. This is used to counteract lazy state switching where required.
  */
-extern void sync_lazy_execstate_cpuset(unsigned long cpuset);
+extern void sync_lazy_execstate_cpu(unsigned int cpu);
+extern void sync_lazy_execstate_mask(cpumask_t mask);
 extern void sync_lazy_execstate_all(void);
 extern int __sync_lazy_execstate(void);
 

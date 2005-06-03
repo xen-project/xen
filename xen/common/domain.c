@@ -166,8 +166,8 @@ static void domain_shutdown_finalise(void)
         while ( test_bit(_VCPUF_running, &v->vcpu_flags) )
             cpu_relax();
 
-    sync_lazy_execstate_cpuset(d->cpuset);
-    BUG_ON(d->cpuset != 0);
+    sync_lazy_execstate_mask(d->cpumask);
+    BUG_ON(!cpus_empty(d->cpumask));
 
     sync_pagetable_state(d);
 

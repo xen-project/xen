@@ -44,24 +44,16 @@ static inline int NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
 }
 
 /*
- * Filter the given set of CPUs, returning only those that may not have
- * flushed their TLBs since @page_timestamp.
+ * Filter the given set of CPUs, removing those that definitely flushed their
+ * TLB since @page_timestamp.
  */
-static inline unsigned long tlbflush_filter_cpuset(
-    unsigned long cpuset, u32 page_timestamp)
-{
-    int i;
-    unsigned long remain;
-
-    for ( i = 0, remain = ~0UL; (cpuset & remain) != 0; i++, remain <<= 1 )
-    {
-        if ( (cpuset & (1UL << i)) &&
-             !NEED_FLUSH(tlbflush_time[i], page_timestamp) )
-            cpuset &= ~(1UL << i);
-    }
-
-    return cpuset;
-}
+#define tlbflush_filter(mask, page_timestamp)                   \
+do {                                                            \
+    unsigned int cpu;                                           \
+    for_each_cpu_mask ( cpu, mask )                             \
+        if ( !NEED_FLUSH(tlbflush_time[cpu], page_timestamp) )  \
+            cpu_clear(cpu, mask);                               \
+} while ( 0 )
 
 extern void new_tlbflush_clock_period(void);
 
@@ -93,19 +85,19 @@ extern void write_cr3(unsigned long cr3);
 #define local_flush_tlb_one(__addr) \
     __asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
 
-#define flush_tlb_all()     flush_tlb_mask((1 << num_online_cpus()) - 1)
+#define flush_tlb_all()     flush_tlb_mask(cpu_online_map)
 
 #ifndef CONFIG_SMP
-#define flush_tlb_all_pge()          local_flush_tlb_pge()
-#define flush_tlb_mask(_mask)        local_flush_tlb()
-#define flush_tlb_one_mask(_mask,_v) local_flush_tlb_one(_v)
+#define flush_tlb_all_pge()        local_flush_tlb_pge()
+#define flush_tlb_mask(mask)       local_flush_tlb()
+#define flush_tlb_one_mask(mask,v) local_flush_tlb_one(_v)
 #else
 #include <xen/smp.h>
 #define FLUSHVA_ALL (~0UL)
 extern void flush_tlb_all_pge(void);
-extern void __flush_tlb_mask(unsigned long mask, unsigned long va);
-#define flush_tlb_mask(_mask)        __flush_tlb_mask(_mask,FLUSHVA_ALL)
-#define flush_tlb_one_mask(_mask,_v) __flush_tlb_mask(_mask,_v)
+extern void __flush_tlb_mask(cpumask_t mask, unsigned long va);
+#define flush_tlb_mask(mask)       __flush_tlb_mask(mask,FLUSHVA_ALL)
+#define flush_tlb_one_mask(mask,v) __flush_tlb_mask(mask,v)
 #endif
 
 #endif /* __FLUSHTLB_H__ */

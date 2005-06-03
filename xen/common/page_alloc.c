@@ -485,7 +485,7 @@ void init_domheap_pages(unsigned long ps, unsigned long pe)
 struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
 {
     struct pfn_info *pg;
-    unsigned long mask = 0;
+    cpumask_t mask;
     int i;
 
     ASSERT(!in_irq());
@@ -493,17 +493,27 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
     if ( unlikely((pg = alloc_heap_pages(MEMZONE_DOM, order)) == NULL) )
         return NULL;
 
-    for ( i = 0; i < (1 << order); i++ )
+    mask = pg->u.free.cpumask;
+    tlbflush_filter(mask, pg->tlbflush_timestamp);
+
+    pg->count_info        = 0;
+    pg->u.inuse._domain   = 0;
+    pg->u.inuse.type_info = 0;
+
+    for ( i = 1; i < (1 << order); i++ )
     {
-        mask |= tlbflush_filter_cpuset(
-            pg[i].u.free.cpu_mask & ~mask, pg[i].tlbflush_timestamp);
+        /* Add in any extra CPUs that need flushing because of this page. */
+        cpumask_t extra_cpus_mask;
+        cpus_andnot(extra_cpus_mask, pg[i].u.free.cpumask, mask);
+        tlbflush_filter(extra_cpus_mask, pg[i].tlbflush_timestamp);
+        cpus_or(mask, mask, extra_cpus_mask);
 
         pg[i].count_info        = 0;
         pg[i].u.inuse._domain   = 0;
         pg[i].u.inuse.type_info = 0;
     }
 
-    if ( unlikely(mask != 0) )
+    if ( unlikely(!cpus_empty(mask)) )
     {
         perfc_incrc(need_flush_tlb_flush);
         flush_tlb_mask(mask);
@@ -576,7 +586,7 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
             ASSERT(((pg[i].u.inuse.type_info & PGT_count_mask) == 0) ||
                    shadow_tainted_refcnts(d));
             pg[i].tlbflush_timestamp  = tlbflush_current_time();
-            pg[i].u.free.cpu_mask     = d->cpuset;
+            pg[i].u.free.cpumask      = d->cpumask;
             list_del(&pg[i].list);
         }
 

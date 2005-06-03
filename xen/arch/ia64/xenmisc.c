@@ -58,7 +58,8 @@ platform_is_hp_ski(void)
 
 /* calls in xen/common code that are unused on ia64 */
 
-void sync_lazy_execstate_cpuset(unsigned long cpuset) {}
+void sync_lazy_execstate_cpu(unsigned int cpu) {}
+void sync_lazy_execstate_mask(cpumask_t mask) {}
 void sync_lazy_execstate_all(void) {}
 
 int grant_table_create(struct domain *d) { return 0; }

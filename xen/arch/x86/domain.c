@@ -94,7 +94,7 @@ void startup_cpu_idle_loop(void)
 
     ASSERT(is_idle_task(v->domain));
     percpu_ctxt[smp_processor_id()].curr_vcpu = v;
-    set_bit(smp_processor_id(), &v->domain->cpuset);
+    cpu_set(smp_processor_id(), v->domain->cpumask);
     v->arch.schedule_tail = continue_idle_task;
 
     idle_loop();
@@ -744,7 +744,7 @@ static void __context_switch(void)
     }
 
     if ( p->domain != n->domain )
-        set_bit(cpu, &n->domain->cpuset);
+        cpu_set(cpu, n->domain->cpumask);
 
     write_ptbase(n);
 
@@ -757,7 +757,7 @@ static void __context_switch(void)
     }
 
     if ( p->domain != n->domain )
-        clear_bit(cpu, &p->domain->cpuset);
+        cpu_clear(cpu, p->domain->cpumask);
 
     percpu_ctxt[cpu].curr_vcpu = n;
 }
@@ -817,19 +817,27 @@ int __sync_lazy_execstate(void)
     return 1;
 }
 
-void sync_lazy_execstate_cpuset(unsigned long cpuset)
+void sync_lazy_execstate_cpu(unsigned int cpu)
 {
-    if ( cpuset & (1 << smp_processor_id()) )
+    if ( cpu == smp_processor_id() )
+        (void)__sync_lazy_execstate();
+    else
+        flush_tlb_mask(cpumask_of_cpu(cpu));
+}
+
+void sync_lazy_execstate_mask(cpumask_t mask)
+{
+    if ( cpu_isset(smp_processor_id(), mask) )
         (void)__sync_lazy_execstate();
     /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
-    flush_tlb_mask(cpuset & ~(1 << smp_processor_id()));
+    flush_tlb_mask(mask);
 }
 
 void sync_lazy_execstate_all(void)
 {
     __sync_lazy_execstate();
     /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
-    flush_tlb_mask(((1<<num_online_cpus())-1) & ~(1 << smp_processor_id()));
+    flush_tlb_mask(cpu_online_map);
 }
 
 unsigned long __hypercall_create_continuation(
@@ -971,7 +979,7 @@ void domain_relinquish_resources(struct domain *d)
 {
     struct vcpu *v;
 
-    BUG_ON(d->cpuset != 0);
+    BUG_ON(!cpus_empty(d->cpumask));
 
     physdev_destroy_state(d);
 

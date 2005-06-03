@@ -20,14 +20,14 @@
 
 
 //Huh? This seems to be used on ia64 even if !CONFIG_SMP
-void flush_tlb_mask(unsigned long mask)
+void flush_tlb_mask(cpumask_t mask)
 {
 	dummy();
 }
 //#if CONFIG_SMP || IA64
 #if CONFIG_SMP
 //Huh? This seems to be used on ia64 even if !CONFIG_SMP
-void smp_send_event_check_mask(unsigned long cpu_mask)
+void smp_send_event_check_mask(cpumask_t mask)
 {
 	dummy();
 	//send_IPI_mask(cpu_mask, EVENT_CHECK_VECTOR);
@@ -35,7 +35,7 @@ void smp_send_event_check_mask(unsigned long cpu_mask)
 
 
 //Huh? This seems to be used on ia64 even if !CONFIG_SMP
-int try_flush_tlb_mask(unsigned long mask)
+int try_flush_tlb_mask(cpumask_t mask)
 {
 	dummy();
 	return 1;

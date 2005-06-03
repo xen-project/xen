@@ -22,8 +22,9 @@
  */
 extern void smp_send_stop(void);
 
-extern void smp_send_event_check_mask(unsigned long cpu_mask);
-#define smp_send_event_check_cpu(_cpu) smp_send_event_check_mask(1<<(_cpu))
+extern void smp_send_event_check_mask(cpumask_t mask);
+#define smp_send_event_check_cpu(cpu) \
+    smp_send_event_check_mask(cpumask_of_cpu(cpu))
 
 /*
  * Prepare machine for booting other CPUs.
@@ -86,8 +87,8 @@ void smp_prepare_boot_cpu(void);
  *	These macros fold the SMP functionality into a single CPU system
  */
 
-#define smp_send_event_check_mask(_m)           ((void)0)
-#define smp_send_event_check_cpu(_p)            ((void)0) 
+#define smp_send_event_check_mask(m)            ((void)0)
+#define smp_send_event_check_cpu(p)             ((void)0) 
 #ifndef __smp_processor_id
 #define smp_processor_id()			0
 #endif

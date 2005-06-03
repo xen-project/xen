@@ -428,7 +428,7 @@ void free_shadow_page(unsigned long smfn)
     // No TLB flushes are needed the next time this page gets allocated.
     //
     page->tlbflush_timestamp = 0;
-    page->u.free.cpu_mask = 0;
+    page->u.free.cpumask     = CPU_MASK_NONE;
 
     if ( type == PGT_l1_shadow )
     {
@@ -2532,7 +2532,7 @@ void __shadow_sync_all(struct domain *d)
     // page table page needs to be vcpu private).
     //
 #if 0 // this should be enabled for SMP guests...
-    flush_tlb_mask(((1<<num_online_cpus()) - 1) & ~(1<<smp_processor_id()));
+    flush_tlb_mask(cpu_online_map);
 #endif
     need_flush = 1;
 

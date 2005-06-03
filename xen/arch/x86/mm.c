@@ -1348,13 +1348,13 @@ int get_page_type(struct pfn_info *page, u32 type)
                  * may be unnecessary (e.g., page was GDT/LDT) but those
                  * circumstances should be very rare.
                  */
-                unsigned long cpuset = tlbflush_filter_cpuset(
-                    page_get_owner(page)->cpuset, page->tlbflush_timestamp);
+                cpumask_t mask = page_get_owner(page)->cpumask;
+                tlbflush_filter(mask, page->tlbflush_timestamp);
 
-                if ( unlikely(cpuset != 0) )
+                if ( unlikely(!cpus_empty(mask)) )
                 {
                     perfc_incrc(need_flush_tlb_flush);
-                    flush_tlb_mask(cpuset);
+                    flush_tlb_mask(mask);
                 }
 
                 /* We lose existing type, back pointer, and validity. */
@@ -1555,23 +1555,23 @@ static int set_foreigndom(unsigned int cpu, domid_t domid)
     return okay;
 }
 
-static inline unsigned long vcpuset_to_pcpuset(
-    struct domain *d, unsigned long vset)
+static inline cpumask_t vcpumask_to_pcpumask(
+    struct domain *d, unsigned long vmask)
 {
-    unsigned int  vcpu;
-    unsigned long pset = 0;
+    unsigned int vcpu_id;
+    cpumask_t    pmask;
     struct vcpu *v;
 
-    while ( vset != 0 )
+    while ( vmask != 0 )
     {
-        vcpu = find_first_set_bit(vset);
-        vset &= ~(1UL << vcpu);
-        if ( (vcpu < MAX_VIRT_CPUS) &&
-             ((v = d->vcpu[vcpu]) != NULL) )
-            pset |= 1UL << v->processor;
+        vcpu_id = find_first_set_bit(vmask);
+        vmask &= ~(1UL << vcpu_id);
+        if ( (vcpu_id < MAX_VIRT_CPUS) &&
+             ((v = d->vcpu[vcpu_id]) != NULL) )
+            cpu_set(v->processor, pmask);
     }
 
-    return pset;
+    return pmask;
 }
 
 int do_mmuext_op(
@@ -1731,34 +1731,28 @@ int do_mmuext_op(
         case MMUEXT_TLB_FLUSH_MULTI:
         case MMUEXT_INVLPG_MULTI:
         {
-            unsigned long vset, pset;
-            if ( unlikely(get_user(vset, (unsigned long *)op.cpuset)) )
+            unsigned long vmask;
+            cpumask_t     pmask;
+            if ( unlikely(get_user(vmask, (unsigned long *)op.vcpumask)) )
             {
                 okay = 0;
                 break;
             }
-            pset = vcpuset_to_pcpuset(d, vset);
+            pmask = vcpumask_to_pcpumask(d, vmask);
+            cpus_and(pmask, pmask, d->cpumask);
             if ( op.cmd == MMUEXT_TLB_FLUSH_MULTI )
-            {
-                BUG_ON(shadow_mode_enabled(d) && ((pset & d->cpuset) != (1<<cpu)));
-                flush_tlb_mask(pset & d->cpuset);
-            }
+                flush_tlb_mask(pmask);
             else
-            {
-                BUG_ON(shadow_mode_enabled(d) && ((pset & d->cpuset) != (1<<cpu)));
-                flush_tlb_one_mask(pset & d->cpuset, op.linear_addr);
-            }
+                flush_tlb_one_mask(pmask, op.linear_addr);
             break;
         }
 
         case MMUEXT_TLB_FLUSH_ALL:
-            BUG_ON(shadow_mode_enabled(d) && (d->cpuset != (1<<cpu)));
-            flush_tlb_mask(d->cpuset);
+            flush_tlb_mask(d->cpumask);
             break;
     
         case MMUEXT_INVLPG_ALL:
-            BUG_ON(shadow_mode_enabled(d) && (d->cpuset != (1<<cpu)));
-            flush_tlb_one_mask(d->cpuset, op.linear_addr);
+            flush_tlb_one_mask(d->cpumask, op.linear_addr);
             break;
 
         case MMUEXT_FLUSH_CACHE:
@@ -2256,7 +2250,8 @@ int do_update_va_mapping(unsigned long va,
     struct vcpu   *v   = current;
     struct domain *d   = v->domain;
     unsigned int   cpu = v->processor;
-    unsigned long  vset, pset, bmap_ptr;
+    unsigned long  vmask, bmap_ptr;
+    cpumask_t      pmask;
     int            rc  = 0;
 
     perfc_incrc(calls_to_update_va);
@@ -2304,14 +2299,14 @@ int do_update_va_mapping(unsigned long va,
             local_flush_tlb();
             break;
         case UVMF_ALL:
-            BUG_ON(shadow_mode_enabled(d) && (d->cpuset != (1<<cpu)));
-            flush_tlb_mask(d->cpuset);
+            flush_tlb_mask(d->cpumask);
             break;
         default:
-            if ( unlikely(get_user(vset, (unsigned long *)bmap_ptr)) )
+            if ( unlikely(get_user(vmask, (unsigned long *)bmap_ptr)) )
                 rc = -EFAULT;
-            pset = vcpuset_to_pcpuset(d, vset);
-            flush_tlb_mask(pset & d->cpuset);
+            pmask = vcpumask_to_pcpumask(d, vmask);
+            cpus_and(pmask, pmask, d->cpumask);
+            flush_tlb_mask(pmask);
             break;
         }
         break;
@@ -2325,15 +2320,14 @@ int do_update_va_mapping(unsigned long va,
             local_flush_tlb_one(va);
             break;
         case UVMF_ALL:
-            BUG_ON(shadow_mode_enabled(d) && (d->cpuset != (1<<cpu)));
-            flush_tlb_one_mask(d->cpuset, va);
+            flush_tlb_one_mask(d->cpumask, va);
             break;
         default:
-            if ( unlikely(get_user(vset, (unsigned long *)bmap_ptr)) )
+            if ( unlikely(get_user(vmask, (unsigned long *)bmap_ptr)) )
                 rc = -EFAULT;
-            pset = vcpuset_to_pcpuset(d, vset);
-            BUG_ON(shadow_mode_enabled(d) && (pset != (1<<cpu)));
-            flush_tlb_one_mask(pset & d->cpuset, va);
+            pmask = vcpumask_to_pcpumask(d, vmask);
+            cpus_and(pmask, pmask, d->cpumask);
+            flush_tlb_one_mask(pmask, va);
             break;
         }
         break;
@@ -2646,7 +2640,7 @@ void ptwr_flush(struct domain *d, const int which)
 
     /* Ensure that there are no stale writable mappings in any TLB. */
     /* NB. INVLPG is a serialising instruction: flushes pending updates. */
-    flush_tlb_one_mask(d->cpuset, l1va);
+    flush_tlb_one_mask(d->cpumask, l1va);
     PTWR_PRINTK("[%c] disconnected_l1va at %p now %lx\n",
                 PTWR_PRINT_WHICH, ptep, pte);
 
@@ -2911,7 +2905,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
     if ( which == PTWR_PT_ACTIVE )
     {
         l2e_remove_flags(*pl2e, _PAGE_PRESENT);
-        flush_tlb_mask(d->cpuset);
+        flush_tlb_mask(d->cpumask);
     }
     
     /* Temporarily map the L1 page, and make a copy of it. */

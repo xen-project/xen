@@ -3,6 +3,7 @@
 #define __ASM_X86_MM_H__
 
 #include <xen/config.h>
+#include <xen/cpumask.h>
 #include <xen/list.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -41,7 +42,7 @@ struct pfn_info
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
             /* Mask of possibly-tainted TLBs. */
-            u32 cpu_mask;
+            cpumask_t cpumask;
             /* Order-size of the free chunk this page is the head of. */
             u8 order;
         } PACKED free;
