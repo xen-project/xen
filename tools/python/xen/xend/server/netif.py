@@ -230,7 +230,7 @@ class NetDev(Dev):
                 vm = xd.domain_lookup(dom)
                 vmname = vm.name
             except:
-                vmname = 'DOM%d' % dom
+                vmname = 'Domain-%d' % dom
         return { 'domain': vmname,
                  'vif'   : self.get_vifname(), 
                  'mac'   : self.get_mac(),

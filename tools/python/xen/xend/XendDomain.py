@@ -20,7 +20,7 @@ import sxp
 import XendRoot; xroot = XendRoot.instance()
 import XendCheckpoint
 import XendDB
-import XendDomainInfo
+from xen.xend.XendDomainInfo import XendDomainInfo, shutdown_reason
 import EventServer; eserver = EventServer.instance()
 from XendError import XendError
 from XendLogging import log
@@ -31,6 +31,13 @@ __all__ = [ "XendDomain" ]
 
 SHUTDOWN_TIMEOUT = 30
 
+class XendDomainDict(dict):
+    def get_by_name(self, name):
+        try:
+            return filter(lambda d: d.name == name, self.values())[0]
+        except IndexError, err:
+            return None
+
 class XendDomain:
     """Index of all domains. Singleton.
     """
@@ -38,15 +45,8 @@ class XendDomain:
     """Path to domain database."""
     dbpath = "domain"
 
-    class XendDomainDict(dict):
-        def get_by_name(self, name):
-            try:
-                return filter(lambda d: d.name == name, self.values())[0]
-            except IndexError, err:
-                return None
-
     """Dict of domain info indexed by domain id."""
-    domains = XendDomainDict()
+    domains = None
     
     def __init__(self):
         # Hack alert. Python does not support mutual imports, but XendDomainInfo
@@ -54,6 +54,7 @@ class XendDomain:
         # to import XendDomain from XendDomainInfo causes unbounded recursion.
         # So we stuff the XendDomain instance (self) into xroot's components.
         xroot.add_component("xen.xend.XendDomain", self)
+        self.domains = XendDomainDict()
         # Table of domain info indexed by domain id.
         self.db = XendDB.XendDB(self.dbpath)
         eserver.subscribe('xend.virq', self.onVirq)
@@ -84,6 +85,8 @@ class XendDomain:
     def xen_domain(self, dom):
         """Get info about a single domain from xc.
         Returns None if not found.
+
+        @param dom domain id
         """
         try:
             dom = int(dom)
@@ -189,7 +192,7 @@ class XendDomain:
                 continue
             log.debug('XendDomain>reap> domain died name=%s id=%s', name, id)
             if d['shutdown']:
-                reason = XendDomainInfo.shutdown_reason(d['shutdown_reason'])
+                reason = shutdown_reason(d['shutdown_reason'])
                 log.debug('XendDomain>reap> shutdown name=%s id=%s reason=%s', name, id, reason)
                 if reason in ['suspend']:
                     if dominfo and dominfo.is_terminated():
@@ -203,8 +206,8 @@ class XendDomain:
                     eserver.inject('xend.domain.exit', [name, id, reason])
                     self.domain_restart_schedule(id, reason)
             else:
-               if xroot.get_enable_dump() == 'true':
-                   xc.domain_dumpcore(dom = int(id), corefile = "/var/xen/dump/%s.%s.core"%(name,id))
+               if xroot.get_enable_dump():
+                   self.domain_dumpcore(int(id))
                eserver.inject('xend.domain.exit', [name, id, 'crash']) 
             destroyed += 1
             self.final_domain_destroy(id)
@@ -216,7 +219,7 @@ class XendDomain:
             self.reap()
         doms = self.xen_domains()
         # Add entries for any domains we don't know about.
-        for (id, d) in doms.items():
+        for id in doms.keys():
             if id not in self.domains:
                 self.domain_lookup(id)
         # Remove entries for domains that no longer exist.
@@ -326,9 +329,7 @@ class XendDomain:
 
         try:
             fd = os.open(src, os.O_RDONLY)
-
             return XendCheckpoint.restore(self, fd)
-
         except OSError, ex:
             raise XendError("can't read guest state file %s: %s" %
                             (src, ex[1]))
@@ -343,20 +344,19 @@ class XendDomain:
         self.refresh_domain(id)
         return self.domains.get(id)
 
-    def domain_lookup(self, name):
-        name = str(name)
-        dominfo = self.domains.get_by_name(name) or self.domains.get(name)
-        if dominfo:
-            return dominfo
-        try:
-            d = self.xen_domain(name)
-            if d:
-                log.info("Creating entry for unknown domain: id=%s", name)
-                dominfo = XendDomainInfo.vm_recreate(None, d)
-                self._add_domain(dominfo)
-                return dominfo
-        except Exception, ex:
-            log.exception("Error creating domain info: id=%s", name)
+    def domain_lookup(self, id):
+        name = str(id)
+        dominfo = self.domains.get_by_name(name) or self.domains.get(id)
+        if not dominfo:
+            try:
+                info = self.xen_domain(id)
+                if info:
+                    log.info("Creating entry for unknown domain: id=%s", name)
+                    dominfo = XendDomainInfo.vm_recreate(None, info)
+                    self._add_domain(dominfo)
+            except Exception, ex:
+                log.exception("Error creating domain info: id=%s", name)
+        return dominfo
 
     def domain_unpause(self, id):
         """Unpause domain execution.
@@ -595,6 +595,7 @@ class XendDomain:
             return xc.sedf_domain_get(dominfo.dom)
         except Exception, ex:
             raise XendError(str(ex))
+
     def domain_device_create(self, id, devconfig):
         """Create a new device for a domain.
 
@@ -700,11 +701,28 @@ class XendDomain:
             raise XendError(str(ex))
 
     def domain_mem_target_set(self, id, target):
+        """Set the memory target for a domain.
+
+        @param id: domain
+        @param target: memory target (in MB)
+        @return: 0 on success, -1 on error
+        """
         dominfo = self.domain_lookup(id)
         return dominfo.mem_target_set(target)
+
+    def domain_dumpcore(self, id):
+        """Save a core dump for a crashed domain.
+
+        @param id: domain
+        """
+        dominfo = self.domain_lookup(id)
+        corefile = "/var/xen/dump/%s.%s.core"% (dominfo.name, dominfo.id)
+        try:
+            xc.domain_dumpcore(dom=dominfo.id, corefile=corefile)
+        except Exception, ex:
+            log.warning("Dumpcore failed, id=%s name=%s: %s",
+                        dominfo.id, dominfo.name, ex)
         
-
-
 def instance():
     """Singleton constructor. Use this instead of the class constructor.
     """

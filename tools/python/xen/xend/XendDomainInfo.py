@@ -45,11 +45,16 @@ DOMAIN_REBOOT   = 1
 """Shutdown code for suspend."""
 DOMAIN_SUSPEND  = 2
 
+"""Shutdown code for crash."""
+DOMAIN_CRASH    = 3
+
 """Map shutdown codes to strings."""
 shutdown_reasons = {
     DOMAIN_POWEROFF: "poweroff",
     DOMAIN_REBOOT  : "reboot",
-    DOMAIN_SUSPEND : "suspend" }
+    DOMAIN_SUSPEND : "suspend",
+    DOMAIN_CRASH   : "crash",
+    }
 
 """Map shutdown reasons to the message type to use.
 """

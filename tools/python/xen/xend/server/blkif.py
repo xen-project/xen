@@ -56,7 +56,7 @@ class BlkifBackend:
 
     def openEvtchn(self):
         self.evtchn = channel.eventChannel(self.backendDomain, self.frontendDomain)
-        
+
     def getEventChannelBackend(self):
         val = 0
         if self.evtchn:

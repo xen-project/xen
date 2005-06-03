@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+
 #include "xc_private.h"
 #include "linux_boot_params.h"
 
@@ -842,8 +843,8 @@ static PyMethodDef pyxc_methods[] = {
     { "domain_dumpcore", 
       (PyCFunction)pyxc_domain_dumpcore, 
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "dump core of a domain.\n"
-      " dom [int]: Identifier of domain to be paused.\n\n"
+      "Dump core of a domain.\n"
+      " dom [int]: Identifier of domain to dump core of.\n\n"
       " corefile [string]: Name of corefile to be created.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 

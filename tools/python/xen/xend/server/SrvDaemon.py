@@ -167,7 +167,7 @@ class Daemon:
         return pid
 
     def daemonize(self):
-        if not DAEMONIZE: return
+        if not XEND_DAEMONIZE: return
         # Detach from TTY.
         os.setsid()
 
@@ -177,16 +177,16 @@ class Daemon:
         os.close(0)
         os.close(1)
         os.close(2)
-        if DEBUG:
+        if XEND_DEBUG:
             os.open('/dev/null', os.O_RDONLY)
             # XXX KAF: Why doesn't this capture output from C extensions that
             # fprintf(stdout) or fprintf(stderr) ??
-            os.open('/var/log/xend-debug.log', os.O_WRONLY|os.O_CREAT)
+            os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT)
             os.dup(1)
         else:
             os.open('/dev/null', os.O_RDWR)
             os.dup(0)
-            os.open('/var/log/xend-debug.log', os.O_WRONLY|os.O_CREAT)
+            os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT)
 
         
     def start(self, trace=0):
@@ -308,7 +308,7 @@ class Daemon:
             servers.start()
         except Exception, ex:
             print >>sys.stderr, 'Exception starting xend:', ex
-            if DEBUG:
+            if XEND_DEBUG:
                 traceback.print_exc()
             log.exception("Exception starting xend")
             self.exit(1)

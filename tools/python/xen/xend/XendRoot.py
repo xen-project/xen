@@ -177,7 +177,10 @@ class XendRoot:
         logfile = self.get_config_value("logfile", self.logfile_default)
         loglevel = self.get_config_value("loglevel", self.loglevel_default)
         self.logging = XendLogging(logfile, level=loglevel)
-        #self.logging.addLogStderr()
+
+        from xen.xend.server import params
+        if params.XEND_DEBUG:
+            self.logging.addLogStderr()
 
     def get_logging(self):
         """Get the XendLogging instance.
@@ -241,9 +244,9 @@ class XendRoot:
 
     def get_config_bool(self, name, val=None):
         v = self.get_config_value(name, val)
-        if v in ['yes', '1', 'on', 1, True]:
+        if v in ['yes', '1', 'on', 'true', 1, True]:
             return True
-        if v in ['no', '0', 'off', 0, False]:
+        if v in ['no', '0', 'off', 'false', 0, False]:
             return False
         raise XendError("invalid xend config %s: expected bool: %s" % (name, v))
 
@@ -325,7 +328,7 @@ class XendRoot:
         return self.get_config_value('network-script', 'network')
 
     def get_enable_dump(self):
-        return self.get_config_value('enable-dump', 'false')
+        return self.get_config_bool('enable-dump', 'no')
 
     def get_vif_bridge(self):
         return self.get_config_value('vif-bridge', 'xen-br0')
