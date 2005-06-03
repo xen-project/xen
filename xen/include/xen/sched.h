@@ -8,6 +8,8 @@
 #include <xen/smp.h>
 #include <public/xen.h>
 #include <public/dom0_ops.h>
+#include <xen/time.h>
+#include <xen/ac_timer.h>
 #include <xen/grant_table.h>
 #include <asm/domain.h>
 
