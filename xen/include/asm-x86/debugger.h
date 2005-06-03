@@ -80,6 +80,50 @@ static inline int debugger_trap_entry(
 #define debugger_trap_fatal(_v, _r) (0)
 #define debugger_trap_immediate()
 
+#elif defined(PDB_DEBUG)
+
+#include <xen/event.h>
+#include <xen/softirq.h>
+#include <xen/sched.h>
+#include <asm/regs.h>
+
+static inline int debugger_trap_entry(unsigned int vector,
+				      struct cpu_user_regs *regs)
+{
+    struct vcpu *vcpu = current;
+
+    if ( !KERNEL_MODE(vcpu, regs) || (vcpu->domain->domain_id == 0) )
+        return 0;
+    
+    switch ( vector )
+    {
+    case TRAP_debug:
+    case TRAP_int3:
+    {
+        struct vcpu  *ptr;
+
+        /* suspend the guest domain */
+        for_each_vcpu ( vcpu->domain, ptr )
+        {
+            test_and_set_bit(_VCPUF_ctrl_pause, &ptr->vcpu_flags);
+        }
+        sync_lazy_execstate_mask(vcpu->domain->cpumask);        /* TLB flush */
+        raise_softirq(SCHEDULE_SOFTIRQ);
+
+        /* notify the debugger */
+        send_guest_virq(dom0->vcpu[0], VIRQ_PDB);
+
+        return 1;
+    }
+    default:
+        break;
+    }
+
+    return 0;
+}
+
+#define debugger_trap_fatal(_v, _r) (0)
+#define debugger_trap_immediate()
 
 #elif 0
 

@@ -17,6 +17,7 @@ SRCS     += xc_sedf.c
 SRCS     += xc_bvtsched.c
 SRCS     += xc_core.c
 SRCS     += xc_domain.c
+SRCS     += xc_debug.c
 SRCS     += xc_evtchn.c
 SRCS     += xc_gnttab.c
 SRCS     += xc_linux_build.c
@@ -93,7 +94,7 @@ rpm: build
 	mv staging/i386/*.rpm .
 	rm -rf staging
 
-libxc.a: $(LIB_OBJS)
+libxc.a: $(OBJS)
 	$(AR) rc $@ $^
 
 libxc.so: libxc.so.$(MAJOR)
