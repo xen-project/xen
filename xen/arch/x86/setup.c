@@ -147,6 +147,8 @@ static void __init start_of_day(void)
 
     early_cpu_init();
 
+    paging_init();
+
     /* Unmap the first page of CPU0's stack. */
     memguard_guard_stack(cpu0_stack);
 
@@ -167,8 +169,6 @@ static void __init start_of_day(void)
     find_smp_config();
 
     smp_alloc_memory();
-
-    paging_init();
 
     dmi_scan_machine();
 

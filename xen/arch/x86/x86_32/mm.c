@@ -28,6 +28,9 @@
 #include <asm/fixmap.h>
 #include <asm/domain_page.h>
 
+unsigned int PAGE_HYPERVISOR         = __PAGE_HYPERVISOR;
+unsigned int PAGE_HYPERVISOR_NOCACHE = __PAGE_HYPERVISOR_NOCACHE;
+
 static unsigned long mpt_size;
 
 struct pfn_info *alloc_xen_pagetable(void)
@@ -72,6 +75,19 @@ void __init paging_init(void)
 
     idle0_vcpu.arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
 
+    if ( cpu_has_pge )
+    {
+        /* Suitable Xen mapping can be GLOBAL. */
+        PAGE_HYPERVISOR         |= _PAGE_GLOBAL;
+        PAGE_HYPERVISOR_NOCACHE |= _PAGE_GLOBAL;
+        /* Transform early mappings (e.g., the frametable). */
+        for ( v = HYPERVISOR_VIRT_START; v; v += (1 << L2_PAGETABLE_SHIFT) )
+            if ( (l2e_get_flags(idle_pg_table_l2[l2_linear_offset(v)]) &
+                  (_PAGE_PSE|_PAGE_PRESENT)) == (_PAGE_PSE|_PAGE_PRESENT) )
+                l2e_add_flags(idle_pg_table_l2[l2_linear_offset(v)],
+                              _PAGE_GLOBAL);
+    }
+
     /*
      * Allocate and map the machine-to-phys table and create read-only mapping 
      * of MPT for guest-OS use.  Without PAE we'll end up with one 4MB page, 
@@ -86,25 +102,11 @@ void __init paging_init(void)
         if ( (pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER)) == NULL )
             panic("Not enough memory to bootstrap Xen.\n");
         idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i] =
-            l2e_from_page(pg, __PAGE_HYPERVISOR | _PAGE_PSE);
+            l2e_from_page(pg, PAGE_HYPERVISOR | _PAGE_PSE);
         idle_pg_table_l2[l2_linear_offset(RO_MPT_VIRT_START) + i] =
             l2e_from_page(pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW);
     }
     memset((void *)RDWR_MPT_VIRT_START, 0x55, mpt_size);
-
-    /* Xen PSE mappings can all be GLOBAL. */
-    if ( cpu_has_pge )
-    {
-        for ( v = HYPERVISOR_VIRT_START; v; v += (1 << L2_PAGETABLE_SHIFT) )
-        {
-            if ( (l2e_get_flags(idle_pg_table_l2[l2_linear_offset(v)]) &
-                  (_PAGE_PSE|_PAGE_PRESENT)) != (_PAGE_PSE|_PAGE_PRESENT) )
-                continue;
-            if ( (v >= RO_MPT_VIRT_START) && (v < RO_MPT_VIRT_END) )
-                continue;
-            l2e_add_flags(idle_pg_table_l2[l2_linear_offset(v)], _PAGE_GLOBAL);
-        }
-    }
 
     /* Create page tables for ioremap(). */
     for ( i = 0; i < (IOREMAP_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )

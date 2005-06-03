@@ -20,6 +20,11 @@
 #define l1_linear_offset(_a) ((_a) >> L1_PAGETABLE_SHIFT)
 #define l2_linear_offset(_a) ((_a) >> L2_PAGETABLE_SHIFT)
 
+#ifndef __ASSEMBLY__
+extern unsigned int PAGE_HYPERVISOR;
+extern unsigned int PAGE_HYPERVISOR_NOCACHE;
+#endif
+
 #endif /* __X86_32_PAGE_H__ */
 
 /*

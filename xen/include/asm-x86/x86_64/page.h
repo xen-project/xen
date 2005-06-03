@@ -76,6 +76,9 @@ typedef l4_pgentry_t root_pgentry_t;
 #define L3_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX) /* must-be-zero */
 #define L4_DISALLOW_MASK (0xFFFFF180U & ~_PAGE_NX) /* must-be-zero */
 
+#define PAGE_HYPERVISOR         (__PAGE_HYPERVISOR         | _PAGE_GLOBAL)
+#define PAGE_HYPERVISOR_NOCACHE (__PAGE_HYPERVISOR_NOCACHE | _PAGE_GLOBAL)
+
 #endif /* __X86_64_PAGE_H__ */
 
 /*

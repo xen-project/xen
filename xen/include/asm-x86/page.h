@@ -257,11 +257,6 @@ extern void paging_init(void);
 #define __PAGE_HYPERVISOR_NOCACHE \
     (_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_PCD | _PAGE_ACCESSED)
 
-#define MAKE_GLOBAL(_x) ((_x) | _PAGE_GLOBAL)
-
-#define PAGE_HYPERVISOR MAKE_GLOBAL(__PAGE_HYPERVISOR)
-#define PAGE_HYPERVISOR_NOCACHE MAKE_GLOBAL(__PAGE_HYPERVISOR_NOCACHE)
-
 #ifndef __ASSEMBLY__
 
 static __inline__ int get_order(unsigned long size)
