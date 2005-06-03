@@ -6,6 +6,7 @@
 #ifdef PERF_COUNTERS
 #include <xen/sched.h>
 #include <xen/perfc.h>
+#include <asm/current.h>
 #endif
 
 extern struct exception_table_entry __start___ex_table[];

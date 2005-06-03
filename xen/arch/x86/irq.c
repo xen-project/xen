@@ -184,22 +184,22 @@ typedef struct {
     u8 nr_guests;
     u8 in_flight;
     u8 shareable;
-    struct vcpu *guest[IRQ_MAX_GUESTS];
+    struct domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
 static void __do_IRQ_guest(int irq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
-    struct vcpu        *v;
+    struct domain      *d;
     int                 i;
 
     for ( i = 0; i < action->nr_guests; i++ )
     {
-        v = action->guest[i];
-        if ( !test_and_set_bit(irq, &v->domain->pirq_mask) )
+        d = action->guest[i];
+        if ( !test_and_set_bit(irq, &d->pirq_mask) )
             action->in_flight++;
-        send_guest_pirq(v, irq);
+        send_guest_pirq(d, irq);
     }
 }
 
@@ -294,7 +294,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
         goto out;
     }
 
-    action->guest[action->nr_guests++] = v;
+    action->guest[action->nr_guests++] = v->domain;
 
  out:
     spin_unlock_irqrestore(&desc->lock, flags);
@@ -328,7 +328,7 @@ int pirq_guest_unbind(struct domain *d, int irq)
     else
     {
         i = 0;
-        while ( action->guest[i] && action->guest[i]->domain != d )
+        while ( action->guest[i] && (action->guest[i] != d) )
             i++;
         memmove(&action->guest[i], &action->guest[i+1], IRQ_MAX_GUESTS-i-1);
         action->nr_guests--;

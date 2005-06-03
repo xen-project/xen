@@ -29,12 +29,25 @@
 #define _PAGE_PSE       0x080
 #define _PAGE_GLOBAL    0x100
 
-
+#if defined(__i386__)
 #define L1_PAGETABLE_SHIFT       12
 #define L2_PAGETABLE_SHIFT       22
- 
+#elif defined(__x86_64__)
+#define L1_PAGETABLE_SHIFT      12
+#define L2_PAGETABLE_SHIFT      21
+#define L3_PAGETABLE_SHIFT      30
+#define L4_PAGETABLE_SHIFT      39
+#endif
+
+#if defined(__i386__) 
 #define ENTRIES_PER_L1_PAGETABLE 1024
 #define ENTRIES_PER_L2_PAGETABLE 1024
+#elif defined(__x86_64__)
+#define L1_PAGETABLE_ENTRIES    512
+#define L2_PAGETABLE_ENTRIES    512
+#define L3_PAGETABLE_ENTRIES    512
+#define L4_PAGETABLE_ENTRIES    512
+#endif
  
 #define PAGE_SHIFT              L1_PAGETABLE_SHIFT
 #define PAGE_SIZE               (1UL << PAGE_SHIFT)
@@ -42,11 +55,26 @@
 
 typedef unsigned long l1_pgentry_t;
 typedef unsigned long l2_pgentry_t;
+#if defined(__x86_64__)
+typedef unsigned long l3_pgentry_t;
+typedef unsigned long l4_pgentry_t;
+#endif
 
+#if defined(__i386__)
 #define l1_table_offset(_a) \
           (((_a) >> L1_PAGETABLE_SHIFT) & (ENTRIES_PER_L1_PAGETABLE - 1))
 #define l2_table_offset(_a) \
           ((_a) >> L2_PAGETABLE_SHIFT)
+#elif defined(__x86_64__)
+#define l1_table_offset(_a) \
+  (((_a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1))
+#define l2_table_offset(_a) \
+  (((_a) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1))
+#define l3_table_offset(_a) \
+	(((_a) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1))
+#define l4_table_offset(_a) \
+	(((_a) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1))
+#endif
 
 #define ERROR(_m, _a...)  \
     fprintf(stderr, "ERROR: " _m "\n" , ## _a )

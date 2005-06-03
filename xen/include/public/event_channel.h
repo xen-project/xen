@@ -51,9 +51,11 @@ typedef struct {
 } PACKED evtchn_bind_interdomain_t; /* 12 bytes */
 
 /*
- * EVTCHNOP_bind_virq: Bind a local event channel to IRQ <irq>.
+ * EVTCHNOP_bind_virq: Bind a local event channel to IRQ <irq> on calling vcpu.
  * NOTES:
- *  1. A virtual IRQ may be bound to at most one event channel per domain.
+ *  1. A virtual IRQ may be bound to at most one event channel per vcpu.
+ *  2. The allocated event channel is bound to the calling vcpu. The binding
+ *     may not be changed.
  */
 #define EVTCHNOP_bind_virq        1
 typedef struct {
@@ -78,6 +80,20 @@ typedef struct {
     /* OUT parameters. */
     u32 port;                         /*  8 */
 } PACKED evtchn_bind_pirq_t; /* 12 bytes */
+
+/*
+ * EVTCHNOP_bind_ipi: Bind a local event channel to receive events.
+ * NOTES:
+ *  1. The allocated event channel is bound to the calling vcpu. The binding
+ *     may not be changed.
+ */
+#define EVTCHNOP_bind_ipi         7
+typedef struct {
+    /* IN parameters. */
+    u32 ipi_vcpu;                     /*  0 */
+    /* OUT parameters. */
+    u32 port;                         /*  4 */
+} PACKED evtchn_bind_ipi_t; /* 8 bytes */
 
 /*
  * EVTCHNOP_close: Close the communication channel which has an endpoint at
@@ -145,18 +161,6 @@ typedef struct {
     } PACKED u;
 } PACKED evtchn_status_t; /* 20 bytes */
 
-/*
- * EVTCHNOP_bind_ipi: Bind a local event channel to receive events.
- */
-#define EVTCHNOP_bind_ipi         7
-typedef struct {
-    /* IN parameters. */
-    u32 ipi_vcpu;                     /*  0 */
-    /* OUT parameters. */
-    u32 port;                         /*  4 */
-} PACKED evtchn_bind_ipi_t; /* 8 bytes */
-
-
 typedef struct {
     u32 cmd; /* EVTCHNOP_* */         /*  0 */
     u32 __reserved;                   /*  4 */
@@ -165,10 +169,10 @@ typedef struct {
         evtchn_bind_interdomain_t bind_interdomain;
         evtchn_bind_virq_t        bind_virq;
         evtchn_bind_pirq_t        bind_pirq;
+        evtchn_bind_ipi_t         bind_ipi;
         evtchn_close_t            close;
         evtchn_send_t             send;
         evtchn_status_t           status;
-        evtchn_bind_ipi_t         bind_ipi;
         u8                        __dummy[24];
     } PACKED u;
 } PACKED evtchn_op_t; /* 32 bytes */

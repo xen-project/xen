@@ -19,7 +19,11 @@ extern rwlock_t domlist_lock;
 /* A global pointer to the initial domain (DOM0). */
 extern struct domain *dom0;
 
-typedef struct event_channel_st
+#define MAX_EVTCHNS        1024
+#define EVTCHNS_PER_BUCKET 128
+#define NR_EVTCHN_BUCKETS  (MAX_EVTCHNS / EVTCHNS_PER_BUCKET)
+
+struct evtchn
 {
 #define ECS_FREE         0 /* Channel is available for use.                  */
 #define ECS_RESERVED     1 /* Channel is reserved.                           */
@@ -28,24 +32,23 @@ typedef struct event_channel_st
 #define ECS_PIRQ         4 /* Channel is bound to a physical IRQ line.       */
 #define ECS_VIRQ         5 /* Channel is bound to a virtual IRQ line.        */
 #define ECS_IPI          6 /* Channel is bound to a virtual IPI line.        */
-    u16 state;
+    u16 state;             /* ECS_* */
+    u16 notify_vcpu_id;    /* VCPU for local delivery notification */
     union {
         struct {
             domid_t remote_domid;
-        } __attribute__ ((packed)) unbound; /* state == ECS_UNBOUND */
+        } unbound;     /* state == ECS_UNBOUND */
         struct {
-            u16                 remote_port;
-            struct vcpu *remote_dom;
-        } __attribute__ ((packed)) interdomain; /* state == ECS_INTERDOMAIN */
-        u16 pirq; /* state == ECS_PIRQ */
-        u16 virq; /* state == ECS_VIRQ */
-        u32 ipi_vcpu; /* state == ECS_IPI */
+            u16            remote_port;
+            struct domain *remote_dom;
+        } interdomain; /* state == ECS_INTERDOMAIN */
+        u16 pirq;      /* state == ECS_PIRQ */
+        u16 virq;      /* state == ECS_VIRQ */
     } u;
-} event_channel_t;
+};
 
-int  init_event_channels(struct domain *d);
-void destroy_event_channels(struct domain *d);
-int  init_vcpu_event_channels(struct vcpu *v);
+int  evtchn_init(struct domain *d);
+void evtchn_destroy(struct domain *d);
 
 #define CPUMAP_RUNANYWHERE 0xFFFFFFFF
 
@@ -109,9 +112,8 @@ struct domain
     struct domain   *next_in_hashbucket;
 
     /* Event channel information. */
-    event_channel_t *event_channel;
-    unsigned int     max_event_channel;
-    spinlock_t       event_channel_lock;
+    struct evtchn   *evtchn[NR_EVTCHN_BUCKETS];
+    spinlock_t       evtchn_lock;
 
     grant_table_t   *grant_table;
 
