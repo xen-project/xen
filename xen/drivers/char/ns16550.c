@@ -16,7 +16,7 @@
 #include <asm/io.h>
 
 /* Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
-static char opt_com1[30] = "", opt_com2[30] = "";
+char opt_com1[30] = "", opt_com2[30] = "";
 string_param("com1", opt_com1);
 string_param("com2", opt_com2);
 

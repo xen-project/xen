@@ -309,6 +309,8 @@ softlink include/linux/topology.h include/asm-ia64/linux/topology.h
 softlink include/linux/seqlock.h include/asm-ia64/linux/seqlock.h
 softlink include/linux/jiffies.h include/asm-ia64/linux/jiffies.h
 
+softlink drivers/firmware/pcdp.h arch/ia64/pcdp.h
+
 null include/asm-ia64/linux/file.h
 null include/asm-ia64/linux/module.h
 null include/asm-ia64/linux/swap.h

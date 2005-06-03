@@ -107,12 +107,15 @@ static void __init do_initcalls(void)
  *	"com2=57600,8n1 console=com2 -- console=ttyS1 console=tty
  * root=/dev/sda3 ro"
  */
+static char null[4] = { 0 };
+
 void early_cmdline_parse(char **cmdline_p)
 {
     char *guest_cmd;
     char *split = "--";
 
     if (*cmdline_p == NULL) {
+	*cmdline_p = &null[0];
 	saved_command_line[0] = '\0';
 	return;
     }
@@ -121,7 +124,7 @@ void early_cmdline_parse(char **cmdline_p)
     /* If no spliter, whole line is for guest */
     if (guest_cmd == NULL) {
 	guest_cmd = *cmdline_p;
-	*cmdline_p = NULL;
+	*cmdline_p = &null[0];
     } else {
 	*guest_cmd = '\0';	/* Split boot parameters for xen and guest */
 	guest_cmd += strlen(split);

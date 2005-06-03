@@ -4,7 +4,7 @@ include $(BASEDIR)/Rules.mk
 
 OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
 	xenmisc.o pdb-stub.o acpi.o hypercall.o \
-	machvec.o dom0_ops.o domain.o hpsimserial.o \
+	machvec.o dom0_ops.o domain.o hpsimserial.o pcdp.o \
 	idle0_task.o pal.o hpsim.o efi.o efi_stub.o ivt.o mm_contig.o \
 	xenmem.o sal.o cmdline.o mm_init.o tlb.o smpboot.o \
 	extable.o linuxextable.o xenirq.o xentime.o \
