@@ -7,6 +7,7 @@
 #include <asm/vmmu.h>
 #include <asm/regionreg.h>
 #endif // CONFIG_VTI
+#include <xen/list.h>
 
 extern void arch_do_createdomain(struct vcpu *);
 

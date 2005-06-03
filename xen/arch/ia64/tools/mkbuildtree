@@ -48,6 +48,7 @@ mkdir include/asm-ia64/linux/byteorder
 # use "gcc -Iinclude/asm-ia64" to find these linux includes
 #ln -s $XEN/include/xen $XEN/include/linux
 #ln -s $XEN/include/asm-ia64/linux $XEN/include/asm-ia64/xen 
+ln -s ../slab.h include/asm-ia64/linux/slab.h
 
 # prepare for building asm-offsets (circular dependency)
 #echo '#define IA64_TASK_SIZE 0' > include/asm-ia64/asm-offsets.h

@@ -1,12 +1,13 @@
 --- /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/../../linux-2.6.11/arch/ia64/kernel/setup.c	2005-03-01 23:37:49.000000000 -0800
 +++ /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/arch/ia64/setup.c	2005-05-18 12:40:50.000000000 -0700
-@@ -51,6 +51,9 @@
+@@ -51,6 +51,10 @@
  #include <asm/smp.h>
  #include <asm/system.h>
  #include <asm/unistd.h>
 +#ifdef CONFIG_VTI
 +#include <asm/vmx.h>
 +#endif // CONFIG_VTI
++#include <asm/io.h>
  
  #if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
  # error "struct cpuinfo_ia64 too big!"
