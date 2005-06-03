@@ -144,61 +144,7 @@ def add_device_handler(name, type):
 
 def get_device_handler(name):
     return device_handlers[name]
-    
 
-def vm_create(config):
-    """Create a VM from a configuration.
-    If a vm has been partially created and there is an error it
-    is destroyed.
-
-    @param config    configuration
-    @raise: VmError for invalid configuration
-    """
-    vm = XendDomainInfo()
-    vm.construct(config)
-    return vm
-
-def vm_restore(config):
-    """Create a domain and a VM object to do a restore.
-
-    @param config:    domain configuration
-    """
-    vm = XendDomainInfo()
-    dom = xc.domain_create()
-    vm.dom_construct(dom, config)
-    return vm
-
-def vm_recreate(savedinfo, info):
-    """Create the VM object for an existing domain.
-
-    @param savedinfo: saved info from the domain DB
-    @type  savedinfo: sxpr
-    @param info:      domain info from xc
-    @type  info:      xc domain dict
-    """
-    log.debug('savedinfo=' + prettyprintstring(savedinfo))
-    log.debug('info=' + str(info))
-    vm = XendDomainInfo()
-    vm.recreate = True
-    vm.savedinfo = savedinfo
-    vm.setdom(info['dom'])
-    vm.memory = info['mem_kb']/1024
-    start_time = sxp.child_value(savedinfo, 'start_time')
-    if start_time is not None:
-        vm.start_time = float(start_time)
-    vm.restart_state = sxp.child_value(savedinfo, 'restart_state')
-    vm.restart_count = int(sxp.child_value(savedinfo, 'restart_count', 0))
-    restart_time = sxp.child_value(savedinfo, 'restart_time')
-    if restart_time is not None:
-        vm.restart_time = float(restart_time)
-    config = sxp.child_value(savedinfo, 'config')
-    if config:
-        vm.construct(config)
-    else:
-        vm.name = sxp.child_value(savedinfo, 'name', "Domain-%d" % info['dom'])
-    vm.recreate = False
-    vm.savedinfo = None
-    return vm
 
 def dom_get(dom):
     """Get info from xen for an existing domain.
@@ -218,9 +164,88 @@ class XendDomainInfo:
     """
     MINIMUM_RESTART_TIME = 20
 
+    def _create(cls):
+        """Create a vm object.
+
+        @return vm
+        """
+        vm = cls()
+        return vm
+
+    _create = classmethod(_create)
+
+    def create(cls, config):
+        """Create a VM from a configuration.
+        If a vm has been partially created and there is an error it
+        is destroyed.
+
+        @param config    configuration
+        @raise: VmError for invalid configuration
+        """
+        vm = cls._create()
+        vm.construct(config)
+        return vm
+
+    create = classmethod(create)
+
+    def recreate(cls, savedinfo, info, unknown=False):
+        """Create the VM object for an existing domain.
+
+        @param savedinfo: saved info from the domain DB
+        @param info:      domain info from xc
+        @type  info:      xc domain dict
+        """
+        if unknown:
+            vm = cls._create()
+        else:
+            vm = cls()
+
+        log.debug('savedinfo=' + prettyprintstring(savedinfo))
+        log.debug('info=' + str(info))
+
+        vm.recreate = True
+        vm.savedinfo = savedinfo
+        vm.setdom(info['dom'])
+        vm.memory = info['mem_kb']/1024
+
+        start_time = sxp.child_value(savedinfo, 'start_time')
+        if start_time is not None:
+            vm.start_time = float(start_time)
+        vm.restart_state = sxp.child_value(savedinfo, 'restart_state')
+        vm.restart_count = int(sxp.child_value(savedinfo, 'restart_count', 0))
+        restart_time = sxp.child_value(savedinfo, 'restart_time')
+        if restart_time is not None:
+            vm.restart_time = float(restart_time)
+        config = sxp.child_value(savedinfo, 'config')
+
+        if config:
+            vm.construct(config)
+        else:
+            vm.name = sxp.child_value(savedinfo, 'name', "Domain-%d" % info['dom'])
+        vm.recreate = False
+        vm.savedinfo = None
+
+        return vm
+
+    recreate = classmethod(recreate)
+
+    def restore(cls, config):
+        """Create a domain and a VM object to do a restore.
+
+        @param config:    domain configuration
+        """
+        vm = cls._create()
+        dom = xc.domain_create()
+        vm.setdom(dom)
+        vm.dom_construct(dom, config)
+        return vm
+
+    restore = classmethod(restore)
+
     def __init__(self):
         self.recreate = 0
         self.restore = 0
+        
         self.config = None
         self.id = None
         self.dom = None

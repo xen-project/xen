@@ -133,7 +133,7 @@ class XendDomain:
         @param info:      domain info from xen
         @return: domain
         """
-        dominfo = XendDomainInfo.vm_recreate(savedinfo, info)
+        dominfo = XendDomainInfo.recreate(savedinfo, info)
         self.domains[dominfo.id] = dominfo
         return dominfo
 
@@ -282,8 +282,7 @@ class XendDomain:
         @param config: configuration
         @return: domain
         """
-        dominfo = XendDomainInfo.vm_create(config)
-        self._add_domain(dominfo)
+        dominfo = XendDomainInfo.create(config)
         return dominfo
 
     def domain_restart(self, dominfo):
@@ -316,7 +315,7 @@ class XendDomain:
         @param vmconfig: vm configuration
         """
         config = sxp.child_value(vmconfig, 'config')
-        dominfo = XendDomainInfo.vm_restore(config)
+        dominfo = XendDomainInfo.restore(config)
         self._add_domain(dominfo)
         return dominfo
     
@@ -352,7 +351,7 @@ class XendDomain:
                 info = self.xen_domain(id)
                 if info:
                     log.info("Creating entry for unknown domain: id=%s", name)
-                    dominfo = XendDomainInfo.vm_recreate(None, info)
+                    dominfo = XendDomainInfo.recreate(None, info, unknown=True)
                     self._add_domain(dominfo)
             except Exception, ex:
                 log.exception("Error creating domain info: id=%s", name)

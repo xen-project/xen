@@ -285,7 +285,7 @@ def prettyprint(sxpr, out=sys.stdout, width=80):
         sxp.show(sxpr, out=out)
     print >> out
 
-def prettyprintstring(sxp, width=80):
+def prettyprintstring(sxpr, width=80):
     """Prettyprint an SXP form to a string.
 
     sxpr	s-expression

@@ -833,6 +833,7 @@ static PyMethodDef pyxc_methods[] = {
       0, "\n"
       "Query the xc control interface file descriptor.\n\n"
       "Returns: [int] file descriptor\n" },
+
     { "domain_create", 
       (PyCFunction)pyxc_domain_create, 
       METH_VARARGS | METH_KEYWORDS, "\n"
@@ -844,7 +845,7 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_domain_dumpcore, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Dump core of a domain.\n"
-      " dom [int]: Identifier of domain to dump core of.\n\n"
+      " dom [int]: Identifier of domain to dump core of.\n"
       " corefile [string]: Name of corefile to be created.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
