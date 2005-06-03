@@ -54,6 +54,15 @@ static inline void * phys_to_virt(unsigned long address)
 #define page_to_pfn(_page)  ((unsigned long)((_page) - frame_table))
 #define page_to_virt(_page) phys_to_virt(page_to_phys(_page))
 
+/* We don't need real ioremap() on Xen/x86. */
+#define ioremap(x,l) (__va(x))
+
+#define readb(x) (*(volatile char *)(x))
+#define readw(x) (*(volatile short *)(x))
+#define readl(x) (*(volatile int *)(x))
+#define writeb(d,x) (*(volatile char *)(x) = (d))
+#define writew(d,x) (*(volatile short *)(x) = (d))
+#define writel(d,x) (*(volatile int *)(x) = (d))
 
 /*
  * IO bus memory addresses are also 1:1 with the physical address

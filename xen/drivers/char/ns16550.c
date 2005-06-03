@@ -21,11 +21,13 @@ string_param("com1", opt_com1);
 string_param("com2", opt_com2);
 
 static struct ns16550 {
-    int baud, data_bits, parity, stop_bits, io_base, irq;
+    int baud, data_bits, parity, stop_bits, irq;
+    unsigned long io_base;   /* I/O port or memory-mapped I/O address. */
+    char *remapped_io_base;  /* Remapped virtual address of mmap I/O.  */ 
     struct irqaction irqaction;
 } ns16550_com[2] = {
-    { 0, 0, 0, 0, 0x3f8, 4 },
-    { 0, 0, 0, 0, 0x2f8, 3 }
+    { 0, 0, 0, 0, 4, 0x3f8 },
+    { 0, 0, 0, 0, 3, 0x2f8 }
 };
 
 /* Register offsets */
@@ -82,6 +84,20 @@ static struct ns16550 {
 #define PARITY_MARK     (5<<3)
 #define PARITY_SPACE    (7<<3)
 
+static char ns_read_reg(struct ns16550 *uart, int reg)
+{
+    if ( uart->remapped_io_base == NULL )
+        return inb(uart->io_base + reg);
+    return readb(uart->remapped_io_base + reg);
+}
+
+static void ns_write_reg(struct ns16550 *uart, int reg, char c)
+{
+    if ( uart->remapped_io_base == NULL )
+        return outb(c, uart->io_base + reg);
+    writeb(c, uart->remapped_io_base + reg);
+}
+
 static void ns16550_interrupt(
     int irq, void *dev_id, struct cpu_user_regs *regs)
 {
@@ -92,20 +108,20 @@ static void ns16550_putc(struct serial_port *port, char c)
 {
     struct ns16550 *uart = port->uart;
 
-    while ( !(inb(uart->io_base + LSR) & LSR_THRE) )
+    while ( !(ns_read_reg(uart, LSR) & LSR_THRE) )
         cpu_relax();
 
-    outb(c, uart->io_base + THR);
+    ns_write_reg(uart, THR, c);
 }
 
 static int ns16550_getc(struct serial_port *port, char *pc)
 {
     struct ns16550 *uart = port->uart;
 
-    if ( !(inb(uart->io_base + LSR) & LSR_DR) )
+    if ( !(ns_read_reg(uart, LSR) & LSR_DR) )
         return 0;
 
-    *pc = inb(uart->io_base + RBR);
+    *pc = ns_read_reg(uart, RBR);
     return 1;
 }
 
@@ -114,22 +130,26 @@ static void ns16550_init_preirq(struct serial_port *port)
     struct ns16550 *uart = port->uart;
     unsigned char lcr;
 
+    /* I/O ports are distinguished by their size (16 bits). */
+    if ( uart->io_base >= 0x10000 )
+        uart->remapped_io_base = (char *)ioremap(uart->io_base, 8);
+
     lcr = (uart->data_bits - 5) | ((uart->stop_bits - 1) << 2) | uart->parity;
 
     /* No interrupts. */
-    outb(0, uart->io_base + IER);
+    ns_write_reg(uart, IER, 0);
 
     /* Line control and baud-rate generator. */
-    outb(lcr | LCR_DLAB,    uart->io_base + LCR);
-    outb(115200/uart->baud, uart->io_base + DLL); /* baud lo */
-    outb(0,                 uart->io_base + DLM); /* baud hi */
-    outb(lcr,               uart->io_base + LCR); /* parity, data, stop */
+    ns_write_reg(uart, LCR, lcr | LCR_DLAB);
+    ns_write_reg(uart, DLL, 115200/uart->baud); /* baud lo */
+    ns_write_reg(uart, DLM, 0);                 /* baud hi */
+    ns_write_reg(uart, LCR, lcr);               /* parity, data, stop */
 
     /* No flow ctrl: DTR and RTS are both wedged high to keep remote happy. */
-    outb(MCR_DTR | MCR_RTS, uart->io_base + MCR);
+    ns_write_reg(uart, MCR, MCR_DTR | MCR_RTS);
 
     /* Enable and clear the FIFOs. Set a large trigger threshold. */
-    outb(FCR_ENABLE | FCR_CLRX | FCR_CLTX | FCR_TRG14, uart->io_base + FCR);
+    ns_write_reg(uart, FCR, FCR_ENABLE | FCR_CLRX | FCR_CLTX | FCR_TRG14);
 }
 
 static void ns16550_init_postirq(struct serial_port *port)
@@ -144,13 +164,13 @@ static void ns16550_init_postirq(struct serial_port *port)
         printk("ERROR: Failed to allocate na16550 IRQ %d\n", uart->irq);
 
     /* For sanity, clear the receive FIFO. */
-    outb(FCR_ENABLE | FCR_CLRX | FCR_TRG14, uart->io_base + FCR);
+    ns_write_reg(uart, FCR, FCR_ENABLE | FCR_CLRX | FCR_TRG14);
 
     /* Master interrupt enable; also keep DTR/RTS asserted. */
-    outb(MCR_OUT2 | MCR_DTR | MCR_RTS, uart->io_base + MCR);
+    ns_write_reg(uart, MCR, MCR_OUT2 | MCR_DTR | MCR_RTS);
 
     /* Enable receive interrupts. */
-    outb(IER_ERDAI, uart->io_base + IER);
+    ns_write_reg(uart, IER, IER_ERDAI);
 }
 
 #ifdef CONFIG_X86
@@ -227,20 +247,13 @@ static void ns16550_parse_port_config(struct ns16550 *uart, char *conf)
     if ( *conf == ',' )
     {
         conf++;
-
         uart->io_base = simple_strtol(conf, &conf, 0);
-        if ( (uart->io_base <= 0x0000) || (uart->io_base > 0xfff0) )
-            PARSE_ERR("I/O port base 0x%x is outside the supported range.",
-                      uart->io_base);
 
-        if ( *conf != ',' )
-            PARSE_ERR("Missing IRQ specifier.");
-            
-        conf++;
-            
-        uart->irq = simple_strtol(conf, &conf, 10);
-        if ( (uart->irq <= 0) || (uart->irq >= 32) )
-            PARSE_ERR("IRQ %d is outside the supported range.", uart->irq);
+        if ( *conf == ',' )
+        {
+            conf++;
+            uart->irq = simple_strtol(conf, &conf, 10);
+        }
     }
 
     serial_register_uart(uart - ns16550_com, &ns16550_driver, uart);

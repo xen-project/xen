@@ -12,7 +12,6 @@
 
 #define bt_ioremap(b,l)  ((u8 *)__acpi_map_table(b,l))
 #define bt_iounmap(b,l)  ((void)0)
-#define ioremap(b,l)     (__va(b))
 #define memcpy_fromio    memcpy
 #define alloc_bootmem(l) xmalloc_bytes(l)
 
