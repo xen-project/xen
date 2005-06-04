@@ -55,22 +55,22 @@ static inline int debugger_trap_fatal(
 
 #elif defined(DOMU_DEBUG)
 
-#include <xen/softirq.h>
+#include <xen/sched.h>
+#include <asm/regs.h>
 
 static inline int debugger_trap_entry(
     unsigned int vector, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
 
-    if ( !KERNEL_MODE(ed, regs) || (ed->domain->domain_id == 0) )
+    if ( !KERNEL_MODE(v, regs) || (v->domain->domain_id == 0) )
         return 0;
     
     switch ( vector )
     {
     case TRAP_int3:
     case TRAP_debug:
-        set_bit(_VCPUF_ctrl_pause, &ed->vcpu_flags);
-        raise_softirq(SCHEDULE_SOFTIRQ);
+        domain_pause_for_debugger();
         return 1;
     }
 
@@ -79,7 +79,6 @@ static inline int debugger_trap_entry(
 
 #define debugger_trap_fatal(_v, _r) (0)
 #define debugger_trap_immediate()
-
 
 #elif 0
 

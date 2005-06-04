@@ -363,3 +363,8 @@ void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,
         munmap(va, PAGE_SIZE);
     }
 }
+
+int xc_dom0_op(int xc_handle, dom0_op_t *op)
+{
+    return do_dom0_op(xc_handle, op);
+}

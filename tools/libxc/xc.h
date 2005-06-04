@@ -499,5 +499,10 @@ int xc_gnttab_dump_table(int        xc_handle,
                          u32        dom,
                          s16       *status);
 
+/* Get current total pages allocated to a domain. */
+long xc_get_tot_pages(int xc_handle, u32 domid);
+
+/* Execute a privileged dom0 operation. */
+int xc_dom0_op(int xc_handle, dom0_op_t *op);
 
 #endif /* __XC_H__ */

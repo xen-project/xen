@@ -224,6 +224,26 @@ void domain_shutdown(u8 reason)
 }
 
 
+void domain_pause_for_debugger(void)
+{
+    struct domain *d = current->domain;
+    struct vcpu *v;
+
+    /*
+     * NOTE: This does not synchronously pause the domain. The debugger
+     * must issue a PAUSEDOMAIN command to ensure that all execution
+     * has ceased and guest state is committed to memory.
+     */
+    for_each_vcpu ( d, v )
+    {
+        set_bit(_VCPUF_ctrl_pause, &v->vcpu_flags);
+        domain_sleep_nosync(v);
+    }
+
+    send_guest_virq(dom0->vcpu[0], VIRQ_DEBUGGER);
+}
+
+
 /* Release resources belonging to task @p. */
 void domain_destruct(struct domain *d)
 {
