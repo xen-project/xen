@@ -82,6 +82,8 @@ static inline unsigned long MAKE_ID(domid_t fe_dom, ACTIVE_RING_IDX idx)
 
 /*-----[ Ring helpers ]---------------------------------------------------*/
 
+static void maybe_trigger_blktap_schedule(void);
+
 inline int write_resp_to_fe_ring(blkif_t *blkif, blkif_response_t *rsp)
 {
     blkif_response_t *resp_d;
@@ -125,6 +127,9 @@ void kick_fe_domain(blkif_t *blkif)
     RING_PUSH_RESPONSES(&blkif->blk_ring);
     notify_via_evtchn(blkif->evtchn);
     DPRINTK("notified FE(dom %u)\n", blkif->domid);
+
+    /* We just feed up a batch of request slots... */
+    maybe_trigger_blktap_schedule();
     
 }
 
@@ -219,15 +224,10 @@ static int blkio_schedule(void *arg)
                 add_to_blkdev_list_tail(blkif);
             blkif_put(blkif);
         }
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-        /* Push the batch through to disc. */
-        run_task_queue(&tq_disk);
-#endif
     }
 }
 
-static void maybe_trigger_blkio_schedule(void)
+static void maybe_trigger_blktap_schedule(void)
 {
     /*
      * Needed so that two processes, who together make the following predicate
@@ -236,7 +236,7 @@ static void maybe_trigger_blkio_schedule(void)
      */
     smp_mb();
 
-    if ( (NR_ACTIVE_REQS < (MAX_ACTIVE_REQS)) && /* XXX!!! was M_A_R/2*/
+    if ( (NR_ACTIVE_REQS < (MAX_ACTIVE_REQS/2)) &&
          !list_empty(&blkio_schedule_list) ) 
         wake_up(&blkio_schedule_wait);
 }
@@ -262,7 +262,7 @@ irqreturn_t blkif_ptfe_int(int irq, void *dev_id, struct pt_regs *regs)
     blkif_t *blkif = dev_id;
 
     add_to_blkdev_list_tail(blkif);
-    maybe_trigger_blkio_schedule();
+    maybe_trigger_blktap_schedule();
     return IRQ_HANDLED;
 }
 
@@ -280,8 +280,6 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
     int more_to_do = 0;
     int notify_be = 0, notify_user = 0;
     
-    DPRINTK("PT got FE interrupt.\n");
-
     if (NR_ACTIVE_REQS == MAX_ACTIVE_REQS) return 1;
     
     /* lock both rings */

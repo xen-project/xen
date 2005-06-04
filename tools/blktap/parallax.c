@@ -88,17 +88,14 @@ void blkif_create(blkif_be_create_t *create)
     blkif->domid  = domid;
     blkif->handle = handle;
     blkif->status = DISCONNECTED;
-/*
-    spin_lock_init(&blkif->vbd_lock);
-    spin_lock_init(&blkif->blk_ring_lock);
-    atomic_set(&blkif->refcnt, 0);
-*/
+
     pblkif = &blkif_hash[BLKIF_HASH(domid, handle)];
     while ( *pblkif != NULL )
     {
         if ( ((*pblkif)->domid == domid) && ((*pblkif)->handle == handle) )
         {
-            DPRINTF("Could not create blkif: already exists\n");
+            DPRINTF("Could not create blkif: already exists (%d,%d)\n",
+                domid, handle);
             create->status = BLKIF_BE_STATUS_INTERFACE_EXISTS;
             free(blkif);
             return;
@@ -142,7 +139,6 @@ void blkif_destroy(blkif_be_destroy_t *destroy)
 
  destroy:
     *pblkif = blkif->hash_next;
-    /* destroy_all_vbds(blkif); */
     free(blkif);
     destroy->status = BLKIF_BE_STATUS_OKAY;
 }
@@ -184,8 +180,36 @@ void vbd_create(blkif_be_vbd_create_t *create)
         vdip = &(*vdip)->next;
     *vdip = vdi;
     
-    DPRINTF("vbd_grow: happy return!\n"); 
+    DPRINTF("blkif_create succeeded\n"); 
     create->status = BLKIF_BE_STATUS_OKAY;
+}
+
+void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
+{
+    blkif_t            *blkif;
+    vdi_t              *vdi, **vdip;
+    blkif_vdev_t        vdevice = destroy->vdevice;
+    
+    blkif = blkif_find_by_handle(destroy->domid, destroy->blkif_handle);
+    if ( blkif == NULL )
+    {
+        DPRINTF("vbd_destroy attempted for non-existent blkif (%u,%u)\n", 
+                destroy->domid, destroy->blkif_handle); 
+        destroy->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
+        return;
+    }
+
+    vdip = &blkif->vdi_hash[VDI_HASH(vdevice)];
+    while ((*vdip != NULL) && ((*vdip)->vdevice != vdevice))
+        vdip = &(*vdip)->next;
+
+    if (*vdip != NULL) 
+    {
+        vdi = *vdip;
+        *vdip = vdi->next;
+        vdi_put(vdi);
+    }
+        
 }
 
 int parallax_control(control_msg_t *msg)
@@ -220,6 +244,20 @@ int parallax_control(control_msg_t *msg)
             goto parse_error;
         vbd_create((blkif_be_vbd_create_t *)msg->msg);
         break;
+        
+    case CMSG_BLKIF_BE_VBD_DESTROY:
+        if ( msg->length != sizeof(blkif_be_vbd_destroy_t) )
+            goto parse_error;
+        vbd_destroy((blkif_be_vbd_destroy_t *)msg->msg);
+        break;
+
+    case CMSG_BLKIF_BE_CONNECT:
+    case CMSG_BLKIF_BE_DISCONNECT:
+        /* we don't manage the device channel, the tap does. */
+        break;
+
+    default:
+        goto parse_error;
     }
     return 0;
 parse_error:
@@ -480,7 +518,7 @@ int parallax_write(blkif_request_t *req, blkif_t *blkif)
                 sector, blkif_first_sect(req->frame_and_sects[i]),
                 blkif_last_sect (req->frame_and_sects[i]),
                 vblock, gblock, size); 
-        
+      
         /* XXX: For now we just freak out if they try to write a   */
         /* non block-sized, block-aligned page.                    */
         
@@ -516,8 +554,6 @@ int parallax_request(blkif_request_t *req)
     blkif_response_t *rsp;
     domid_t  dom   = ID_TO_DOM(req->id);
     blkif_t *blkif = blkif_find_by_handle(dom, 0);
-
-    //DPRINTF("parallax_request: req=%p, dom=%d, blkif=%p\n", req, dom, blkif); 
     
     if (blkif == NULL)
         goto err;
@@ -535,14 +571,15 @@ int parallax_request(blkif_request_t *req)
         return parallax_write(req, blkif);
         
     } else {
+        printf("Unknown request message type!\n");
         /* Unknown operation */
         goto err;
     }
     
 err:
     rsp = (blkif_response_t *)req;
-    rsp->id = req->id;
     rsp->operation = req->operation;
+    rsp->id = req->id;
     rsp->status = BLKIF_RSP_ERROR;
     return BLKTAP_RESPOND;  
 }

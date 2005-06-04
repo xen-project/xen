@@ -34,7 +34,7 @@
 #else
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
-#define DEBUG_RING_IDXS 1
+#define DEBUG_RING_IDXS 0
 
 #define POLLRDNORM     0x040 
 
@@ -171,27 +171,27 @@ void print_hooks(void)
     response_hook_t *rsp_hook;
     ctrl_hook_t     *ctrl_hook;
     
-    printf("Control Hooks:\n");
+    DPRINTF("Control Hooks:\n");
     ctrl_hook = ctrl_hook_chain;
     while (ctrl_hook != NULL)
     {
-        printf("  [0x%p] %s\n", ctrl_hook->func, ctrl_hook->name);
+        DPRINTF("  [0x%p] %s\n", ctrl_hook->func, ctrl_hook->name);
         ctrl_hook = ctrl_hook->next;
     }
     
-    printf("Request Hooks:\n");
+    DPRINTF("Request Hooks:\n");
     req_hook = request_hook_chain;
     while (req_hook != NULL)
     {
-        printf("  [0x%p] %s\n", req_hook->func, req_hook->name);
+        DPRINTF("  [0x%p] %s\n", req_hook->func, req_hook->name);
         req_hook = req_hook->next;
     }
     
-    printf("Response Hooks:\n");
+    DPRINTF("Response Hooks:\n");
     rsp_hook = response_hook_chain;
     while (rsp_hook != NULL)
     {
-        printf("  [0x%p] %s\n", rsp_hook->func, rsp_hook->name);
+        DPRINTF("  [0x%p] %s\n", rsp_hook->func, rsp_hook->name);
         rsp_hook = rsp_hook->next;
     }
 }
@@ -300,7 +300,7 @@ int blktap_attach_poll(int fd, short events, int (*func)(int fd))
     ph->events      = events;
     ph->active      = 1;
     
-    printf("Added fd %d at ph index %d, now %d phs.\n", fd, ph_cons-1, 
+    DPRINTF("Added fd %d at ph index %d, now %d phs.\n", fd, ph_cons-1, 
             nr_pollhooks());
     
     return 0;
@@ -318,7 +318,7 @@ void blktap_detach_poll(int fd)
             break;
         }
         
-    printf("Removed fd %d at ph index %d, now %d phs.\n", fd, i, 
+    DPRINTF("Removed fd %d at ph index %d, now %d phs.\n", fd, i, 
             nr_pollhooks());
 }
 
@@ -337,7 +337,6 @@ void pollhook_init(void)
 
 void __attribute__ ((constructor)) blktaplib_init(void)
 {
-    printf("[[ C O N S T R U C T O R ]]\n");
     pollhook_init();
 }
 
@@ -385,7 +384,7 @@ int blktap_listen(void)
 
     /* assign the rings to the mapped memory */
     csring = (ctrl_sring_t *)blktap_mem;
-    BACK_RING_INIT(&ctrl_ring, csring, CONTROL_RING_MEM);
+    BACK_RING_INIT(&ctrl_ring, csring, PAGE_SIZE);
     
     sring = (blkif_sring_t *)((unsigned long)blktap_mem + PAGE_SIZE);
     FRONT_RING_INIT(&be_ring, sring, PAGE_SIZE);
@@ -393,10 +392,7 @@ int blktap_listen(void)
     sring = (blkif_sring_t *)((unsigned long)blktap_mem + (2 *PAGE_SIZE));
     BACK_RING_INIT(&fe_ring, sring, PAGE_SIZE);
 
-    mmap_vstart = (unsigned long)blktap_mem + (BLKTAP_RING_PAGES << PAGE_SHIFT);
-    
-    printf("fe_ring mapped at: %p\n", fe_ring.sring);
-    printf("be_ring mapped at: %p\n", be_ring.sring);
+    mmap_vstart = (unsigned long)blktap_mem +(BLKTAP_RING_PAGES << PAGE_SHIFT);
 
     ioctl(fd, BLKTAP_IOCTL_SETMODE, BLKTAP_MODE_INTERPOSE );
 
@@ -560,7 +556,9 @@ void got_sig_bus() {
 }
 
 void got_sig_int() {
-    printf("quitting -- returning to passthrough mode.\n");
+    DPRINTF("quitting -- returning to passthrough mode.\n");
     if (fd > 0) ioctl(fd, BLKTAP_IOCTL_SETMODE, BLKTAP_MODE_PASSTHROUGH );
+    close(fd);
+    fd = 0;
     exit(0);
 } 

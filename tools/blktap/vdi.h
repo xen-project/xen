@@ -27,7 +27,7 @@ typedef struct vdi {
     snap_id_t   snap;             /* next snapshot slot for this VDI         */
     struct vdi *next;             /* used to hash-chain in blkif.            */
     blkif_vdev_t vdevice;         /* currently mounted as...                 */
-    struct radix_lock *radix_lock;/* per-line L1 RW lock for parallel reqs   */ 
+    struct radix_lock *radix_lock;/* per-line L1 RW lock for parallel reqs   */
     char        name[VDI_NAME_SZ];/* human readable vdi name                 */
 } vdi_t;
 
@@ -42,6 +42,7 @@ typedef struct vdi_registry {
 int __init_vdi(void);
 
 vdi_t *vdi_get(u64 vdi_id);
+void vdi_put(vdi_t *vdi);
 vdi_registry_t *get_vdi_registry(void);
 vdi_t *vdi_create(snap_id_t *parent_snap, char *name);
 u64 vdi_lookup_block(vdi_t *vdi, u64 vdi_block, int *writable);

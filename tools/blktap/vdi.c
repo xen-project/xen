@@ -128,6 +128,9 @@ vdi_t *vdi_create(snap_id_t *parent_snap, char *name)
     return vdi;
 }
 
+/* vdi_get and vdi_put currently act more like alloc/free -- they don't 
+ * do refcount-based allocation.  
+ */
 vdi_t *vdi_get(u64 vdi_id)
 {
     u64 vdi_blk;
@@ -150,6 +153,12 @@ vdi_t *vdi_get(u64 vdi_id)
     radix_lock_init(vdi->radix_lock);
     
     return vdi;
+}
+
+void vdi_put(vdi_t *vdi)
+{
+    free(vdi->radix_lock);
+    freeblock(vdi);
 }
 
 u64 vdi_lookup_block(vdi_t *vdi, u64 vdi_block, int *writable)

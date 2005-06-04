@@ -49,7 +49,6 @@ rcache_t *rcache[RCHASH_SIZE];
 void __rcache_init(void)
 {
     int i;
-printf("rcache_init!\n");
 
     for (i=0; i<RCHASH_SIZE; i++)
         rcache[i] = NULL;
