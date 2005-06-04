@@ -1,6 +1,6 @@
 OCAMLMAKEFILE = OCamlMakefile
 
-XEN_ROOT    = ../..
+XEN_ROOT    = ../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 # overwrite LDFLAGS from xen/tool/Rules.mk
@@ -17,6 +17,7 @@ OCAMLLIBPATH= $(OCAML_ROOT)/lib/ocaml
 
 INCLUDES   += -I $(XEN_XC)
 INCLUDES   += -I $(XEN_LIBXC)
+INCLUDES   += -I ../libxendebug
 INCLUDES   += -I $(OCAML_ROOT)/lib/ocaml
 
 CFLAGS     += $(INCLUDES)
@@ -25,11 +26,12 @@ CFLAGS     += -Werror
 CFLAGS     += -g
 
 CLIBS      += xc
-CLIBS      += xutil
+CLIBS      += xendebug
 CLIBS      += pdb
 
 LIBDIRS    += $(XEN_LIBXC)
 LIBDIRS    += $(XEN_LIBXUTIL)
+LIBDIRS    += ../libxendebug
 LIBDIRS    += .
 
 LIBS       += unix str

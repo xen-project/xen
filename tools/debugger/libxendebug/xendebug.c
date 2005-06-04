@@ -1,14 +1,33 @@
 /*
- * xc_debug.c
+ * xendebug.c
  *
  * alex ho
  * http://www.cl.cam.ac.uk/netos/pdb
  *
- * xc_debug_memory_page adapted from xc_ptrace.c
+ * xendebug_memory_page adapted from xc_ptrace.c
  */
 
-#include "xc_private.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <xc.h>
 #include "list.h"
+
+#if defined(__i386__)
+#define L1_PAGETABLE_SHIFT       12
+#define L2_PAGETABLE_SHIFT       22
+#elif defined(__x86_64__)
+#define L1_PAGETABLE_SHIFT      12
+#define L2_PAGETABLE_SHIFT      21
+#define L3_PAGETABLE_SHIFT      30
+#define L4_PAGETABLE_SHIFT      39
+#endif
+
+#define PAGE_SHIFT L1_PAGETABLE_SHIFT
+#define PAGE_SIZE  (1UL<<PAGE_SHIFT)
+#define PAGE_MASK  (~(PAGE_SIZE - 1))
 
 /* from xen/include/asm-x86/processor.h */
 #define X86_EFLAGS_TF	0x00000100 /* Trap Flag */
@@ -54,12 +73,12 @@ static domain_context_t domain_context_list;
 
 /* initialization */
 
-static boolean xc_debug_initialized = false;
+static boolean xendebug_initialized = false;
 
 static __inline__ void
-xc_debug_initialize()
+xendebug_initialize()
 {
-    if ( !xc_debug_initialized )
+    if ( !xendebug_initialized )
     {
         memset((void *) &domain_context_list, 0, sizeof(domain_context_t));
         INIT_LIST_HEAD(&domain_context_list.list);
@@ -67,14 +86,14 @@ xc_debug_initialize()
         memset((void *) &bwcpoint_list, 0, sizeof(bwcpoint_t));
         INIT_LIST_HEAD(&bwcpoint_list.list);
 
-        xc_debug_initialized = true;
+        xendebug_initialized = true;
     }
 }
 
 /**************/
 
 static domain_context_p
-xc_debug_domain_context_search (u32 domid)
+xendebug_domain_context_search (u32 domid)
 {
     struct list_head *entry;
     domain_context_p  ctxt;
@@ -89,14 +108,14 @@ xc_debug_domain_context_search (u32 domid)
 }
 
 static __inline__ domain_context_p
-xc_debug_get_context (int xc_handle, u32 domid, u32 vcpu)
+xendebug_get_context (int xc_handle, u32 domid, u32 vcpu)
 {
     int rc;
     domain_context_p ctxt;
 
-    xc_debug_initialize();
+    xendebug_initialize();
 
-    if ( (ctxt = xc_debug_domain_context_search(domid)) == NULL)
+    if ( (ctxt = xendebug_domain_context_search(domid)) == NULL)
         return NULL;
 
     if ( !ctxt->valid[vcpu] )
@@ -112,7 +131,7 @@ xc_debug_get_context (int xc_handle, u32 domid, u32 vcpu)
 }
 
 static __inline__ int
-xc_debug_set_context (int xc_handle, domain_context_p ctxt, u32 vcpu)
+xendebug_set_context (int xc_handle, domain_context_p ctxt, u32 vcpu)
 {
     dom0_op_t op;
     int rc;
@@ -129,7 +148,7 @@ xc_debug_set_context (int xc_handle, domain_context_p ctxt, u32 vcpu)
     if ( (rc = mlock(&ctxt->context[vcpu], sizeof(vcpu_guest_context_t))) )
         return rc;
 
-    rc = do_dom0_op(xc_handle, &op);
+    rc = xc_dom0_op(xc_handle, &op);
     (void) munlock(&ctxt->context[vcpu], sizeof(vcpu_guest_context_t));
 
     return rc;
@@ -138,13 +157,13 @@ xc_debug_set_context (int xc_handle, domain_context_p ctxt, u32 vcpu)
 /**************/
 
 int
-xc_debug_attach(int xc_handle,
+xendebug_attach(int xc_handle,
                 u32 domid,
                 u32 vcpu)
 {
     domain_context_p ctxt;
 
-    xc_debug_initialize();
+    xendebug_initialize();
 
     if ( (ctxt = malloc(sizeof(domain_context_t))) == NULL )
         return -1;
@@ -157,15 +176,15 @@ xc_debug_attach(int xc_handle,
 }
 
 int
-xc_debug_detach(int xc_handle,
+xendebug_detach(int xc_handle,
                 u32 domid,
                 u32 vcpu)
 {
     domain_context_p ctxt;
     
-    xc_debug_initialize();
+    xendebug_initialize();
 
-    if ( (ctxt = xc_debug_domain_context_search (domid)) == NULL)
+    if ( (ctxt = xendebug_domain_context_search (domid)) == NULL)
         return -EINVAL;
 
     list_del(&ctxt->list);
@@ -178,7 +197,7 @@ xc_debug_detach(int xc_handle,
 }
 
 int
-xc_debug_read_registers(int xc_handle,
+xendebug_read_registers(int xc_handle,
                         u32 domid,
                         u32 vcpu,
                         cpu_user_regs_t **regs)
@@ -186,9 +205,9 @@ xc_debug_read_registers(int xc_handle,
     domain_context_p ctxt;
     int rc = -1;
 
-    xc_debug_initialize();
+    xendebug_initialize();
 
-    ctxt = xc_debug_get_context(xc_handle, domid, vcpu);
+    ctxt = xendebug_get_context(xc_handle, domid, vcpu);
     if (ctxt)
     {
         *regs = &ctxt->context[vcpu].user_regs;
@@ -199,7 +218,7 @@ xc_debug_read_registers(int xc_handle,
 }
 
 int
-xc_debug_read_fpregisters (int xc_handle,
+xendebug_read_fpregisters (int xc_handle,
                            u32 domid,
                            u32 vcpu,
                            char **regs)
@@ -207,9 +226,9 @@ xc_debug_read_fpregisters (int xc_handle,
     domain_context_p ctxt;
     int rc = -1;
 
-    xc_debug_initialize();
+    xendebug_initialize();
 
-    ctxt = xc_debug_get_context(xc_handle, domid, vcpu);
+    ctxt = xendebug_get_context(xc_handle, domid, vcpu);
     if (ctxt)
     {
         *regs = ctxt->context[vcpu].fpu_ctxt.x;
@@ -220,7 +239,7 @@ xc_debug_read_fpregisters (int xc_handle,
 }
 
 int
-xc_debug_write_registers(int xc_handle,
+xendebug_write_registers(int xc_handle,
                          u32 domid,
                          u32 vcpu,
                          cpu_user_regs_t *regs)
@@ -228,34 +247,34 @@ xc_debug_write_registers(int xc_handle,
     domain_context_p ctxt;
     int rc = -1;
 
-    xc_debug_initialize();
+    xendebug_initialize();
 
-    ctxt = xc_debug_get_context(xc_handle, domid, vcpu);
+    ctxt = xendebug_get_context(xc_handle, domid, vcpu);
     if (ctxt)
     {
         memcpy(&ctxt->context[vcpu].user_regs, regs, sizeof(cpu_user_regs_t));
-        rc = xc_debug_set_context(xc_handle, ctxt, vcpu);
+        rc = xendebug_set_context(xc_handle, ctxt, vcpu);
     }
     
     return rc;
 }
 
 int
-xc_debug_step(int xc_handle,
+xendebug_step(int xc_handle,
               u32 domid,
               u32 vcpu)
 {
     domain_context_p ctxt;
     int rc;
 
-    xc_debug_initialize();
+    xendebug_initialize();
 
-    ctxt = xc_debug_get_context(xc_handle, domid, vcpu);
+    ctxt = xendebug_get_context(xc_handle, domid, vcpu);
     if (!ctxt) return -EINVAL;
 
     ctxt->context[vcpu].user_regs.eflags |= X86_EFLAGS_TF;
 
-    if ( (rc = xc_debug_set_context(xc_handle, ctxt, vcpu)) )
+    if ( (rc = xendebug_set_context(xc_handle, ctxt, vcpu)) )
         return rc;
 
     ctxt->valid[vcpu] = false;
@@ -263,22 +282,22 @@ xc_debug_step(int xc_handle,
 }
 
 int
-xc_debug_continue(int xc_handle,
+xendebug_continue(int xc_handle,
                   u32 domid,
                   u32 vcpu)
 {
     domain_context_p ctxt;
     int rc;
 
-    xc_debug_initialize();
+    xendebug_initialize();
 
-    ctxt = xc_debug_get_context(xc_handle, domid, vcpu);
+    ctxt = xendebug_get_context(xc_handle, domid, vcpu);
     if (!ctxt) return -EINVAL;
 
     if ( ctxt->context[vcpu].user_regs.eflags & X86_EFLAGS_TF )
     {
         ctxt->context[vcpu].user_regs.eflags &= ~X86_EFLAGS_TF;
-        if ( (rc = xc_debug_set_context(xc_handle, ctxt, vcpu)) )
+        if ( (rc = xendebug_set_context(xc_handle, ctxt, vcpu)) )
             return rc;
     }
     ctxt->valid[vcpu] = false;
@@ -292,7 +311,7 @@ xc_debug_continue(int xc_handle,
 
 /* access to one page */
 static int
-xc_debug_memory_page (domain_context_p ctxt, int xc_handle, u32 vcpu,
+xendebug_memory_page (domain_context_p ctxt, int xc_handle, u32 vcpu,
                       int protection, memory_t address, int length, u8 *buffer)
 {
     vcpu_guest_context_t *vcpu_ctxt = &ctxt->context[vcpu];
@@ -388,7 +407,7 @@ xc_debug_memory_page (domain_context_p ctxt, int xc_handle, u32 vcpu,
 
 /* divide a memory operation into accesses to individual pages */
 static int
-xc_debug_memory_op (domain_context_p ctxt, int xc_handle, u32 vcpu,
+xendebug_memory_op (domain_context_p ctxt, int xc_handle, u32 vcpu,
                     int protection, memory_t address, int length, u8 *buffer)
 {
     int      remain;              /* number of bytes to touch past this page */
@@ -396,21 +415,21 @@ xc_debug_memory_op (domain_context_p ctxt, int xc_handle, u32 vcpu,
 
     while ( (remain = (address + length - 1) - (address | (PAGE_SIZE-1))) > 0)
     {
-        bytes += xc_debug_memory_page(ctxt, xc_handle, vcpu, protection,
+        bytes += xendebug_memory_page(ctxt, xc_handle, vcpu, protection,
                                       address, length - remain, buffer);
         buffer += (length - remain);
         length = remain;
         address = (address | (PAGE_SIZE - 1)) + 1;
     }
 
-    bytes += xc_debug_memory_page(ctxt, xc_handle, vcpu, protection,
+    bytes += xendebug_memory_page(ctxt, xc_handle, vcpu, protection,
                                   address, length, buffer);
 
     return bytes;
 }
 
 int
-xc_debug_read_memory(int xc_handle,
+xendebug_read_memory(int xc_handle,
                      u32 domid,
                      u32 vcpu,
                      memory_t address,
@@ -419,18 +438,18 @@ xc_debug_read_memory(int xc_handle,
 {
     domain_context_p ctxt;
 
-    xc_debug_initialize();
+    xendebug_initialize();
 
-    ctxt = xc_debug_get_context(xc_handle, domid, vcpu);
+    ctxt = xendebug_get_context(xc_handle, domid, vcpu);
 
-    xc_debug_memory_op(ctxt, xc_handle, vcpu, PROT_READ, 
+    xendebug_memory_op(ctxt, xc_handle, vcpu, PROT_READ, 
                        address, length, data);
 
     return 0;
 }
 
 int
-xc_debug_write_memory(int xc_handle,
+xendebug_write_memory(int xc_handle,
                       u32 domid,
                       u32 vcpu,
                       memory_t address,
@@ -439,10 +458,10 @@ xc_debug_write_memory(int xc_handle,
 {
     domain_context_p ctxt;
 
-    xc_debug_initialize();
+    xendebug_initialize();
 
-    ctxt = xc_debug_get_context(xc_handle, domid, vcpu);
-    xc_debug_memory_op(ctxt, xc_handle, vcpu, PROT_READ | PROT_WRITE,
+    ctxt = xendebug_get_context(xc_handle, domid, vcpu);
+    xendebug_memory_op(ctxt, xc_handle, vcpu, PROT_READ | PROT_WRITE,
 
                        address, length, data);
 
@@ -450,7 +469,7 @@ xc_debug_write_memory(int xc_handle,
 }
 
 int
-xc_debug_insert_memory_breakpoint(int xc_handle,
+xendebug_insert_memory_breakpoint(int xc_handle,
                                   u32 domid,
                                   u32 vcpu,
                                   memory_t address,
@@ -462,7 +481,7 @@ xc_debug_insert_memory_breakpoint(int xc_handle,
     printf("insert breakpoint %d:%lx %d\n",
             domid, address, length);
 
-    xc_debug_initialize();
+    xendebug_initialize();
 
     bkpt = malloc(sizeof(bwcpoint_t));
     if ( bkpt == NULL )
@@ -481,10 +500,10 @@ xc_debug_insert_memory_breakpoint(int xc_handle,
     bkpt->address = address;
     bkpt->domain  = domid;
 
-    xc_debug_read_memory(xc_handle, domid, vcpu, address, 1,
+    xendebug_read_memory(xc_handle, domid, vcpu, address, 1,
                          &bkpt->old_value);
 
-    xc_debug_write_memory(xc_handle, domid, vcpu, address, 1, 
+    xendebug_write_memory(xc_handle, domid, vcpu, address, 1, 
                           &breakpoint_opcode);
     
     list_add(&bkpt->list, &bwcpoint_list.list);
@@ -496,7 +515,7 @@ xc_debug_insert_memory_breakpoint(int xc_handle,
 }
 
 int
-xc_debug_remove_memory_breakpoint(int xc_handle,
+xendebug_remove_memory_breakpoint(int xc_handle,
                                   u32 domid,
                                   u32 vcpu,
                                   memory_t address,
@@ -523,7 +542,7 @@ xc_debug_remove_memory_breakpoint(int xc_handle,
 
     list_del(&bkpt->list);
 
-    xc_debug_write_memory(xc_handle, domid, vcpu, address, 1, 
+    xendebug_write_memory(xc_handle, domid, vcpu, address, 1, 
                           &bkpt->old_value);
 
     free(bkpt);
@@ -531,7 +550,7 @@ xc_debug_remove_memory_breakpoint(int xc_handle,
 }
 
 int
-xc_debug_query_domain_stop(int xc_handle, int *dom_list, int dom_list_size)
+xendebug_query_domain_stop(int xc_handle, int *dom_list, int dom_list_size)
 {
     xc_dominfo_t *info;
     u32 first_dom = 0;

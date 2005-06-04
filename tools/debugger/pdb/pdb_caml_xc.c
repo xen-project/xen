@@ -7,7 +7,7 @@
  */
 
 #include <xc.h>
-#include <xc_debug.h>
+#include <xendebug.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,7 +105,7 @@ read_registers (value context)
 
     decode_context(&ctx, context);
 
-    if ( xc_debug_read_registers(xc_handle, ctx.domain, ctx.vcpu, &regs) )
+    if ( xendebug_read_registers(xc_handle, ctx.domain, ctx.vcpu, &regs) )
     {
         printf("(pdb) read registers error!\n");  fflush(stdout);
         failwith("read registers error");
@@ -156,7 +156,7 @@ write_register (value context, value reg, value newval)
 
     decode_context(&ctx, context);
 
-    if ( xc_debug_read_registers(xc_handle, ctx.domain, ctx.vcpu, &regs) )
+    if ( xendebug_read_registers(xc_handle, ctx.domain, ctx.vcpu, &regs) )
     {
         printf("(pdb) write register (get) error!\n");  fflush(stdout);
         failwith("write register error");
@@ -186,7 +186,7 @@ write_register (value context, value reg, value newval)
     case PDB_GS:  regs->gs  = val; break;
     }
 
-    if ( xc_debug_write_registers(xc_handle, ctx.domain, ctx.vcpu, regs) )
+    if ( xendebug_write_registers(xc_handle, ctx.domain, ctx.vcpu, regs) )
     {
         printf("(pdb) write register (set) error!\n");  fflush(stdout);
         failwith("write register error");
@@ -221,7 +221,7 @@ read_memory (value context, value address, value length)
         failwith("read memory error");
     }
 
-    if ( xc_debug_read_memory(xc_handle, ctx.domain, ctx.vcpu, 
+    if ( xendebug_read_memory(xc_handle, ctx.domain, ctx.vcpu, 
                               my_address, my_length, buffer) )
     {
         printf("(pdb) read memory error!\n");  fflush(stdout);
@@ -285,7 +285,7 @@ write_memory (value context, value address, value val_list)
 
     my_address = (memory_t) Int32_val(address);
 
-    if ( xc_debug_write_memory(xc_handle, ctx.domain, ctx.vcpu,
+    if ( xendebug_write_memory(xc_handle, ctx.domain, ctx.vcpu,
                                my_address, length, buffer) )
     {
         printf("(pdb) write memory error!\n");  fflush(stdout);
@@ -333,7 +333,7 @@ continue_target (value context)
 
     decode_context(&ctx, context);
 
-    if ( xc_debug_continue(xc_handle, ctx.domain, ctx.vcpu) )
+    if ( xendebug_continue(xc_handle, ctx.domain, ctx.vcpu) )
     {
         printf("(pdb) continue\n");  fflush(stdout);
         failwith("continue");
@@ -354,7 +354,7 @@ step_target (value context)
 
     decode_context(&ctx, context);
 
-    if ( xc_debug_step(xc_handle, ctx.domain, ctx.vcpu) )
+    if ( xendebug_step(xc_handle, ctx.domain, ctx.vcpu) )
     {
         printf("(pdb) step\n");  fflush(stdout);
         failwith("step");
@@ -382,7 +382,7 @@ insert_memory_breakpoint (value context, value address, value length)
     printf ("(pdb) insert memory breakpoint 0x%lx %d\n",
             my_address, my_length);
 
-    if ( xc_debug_insert_memory_breakpoint(xc_handle, ctx.domain, ctx.vcpu,
+    if ( xendebug_insert_memory_breakpoint(xc_handle, ctx.domain, ctx.vcpu,
                                            my_address, my_length) )
     {
         printf("(pdb) error: insert memory breakpoint\n");  fflush(stdout);
@@ -411,7 +411,7 @@ remove_memory_breakpoint (value context, value address, value length)
 
     decode_context(&ctx, context);
 
-    if ( xc_debug_remove_memory_breakpoint(xc_handle, 
+    if ( xendebug_remove_memory_breakpoint(xc_handle, 
                                            ctx.domain, ctx.vcpu,
                                            my_address, my_length) )
     {
@@ -435,7 +435,7 @@ attach_debugger (value domain, value vcpu)
 
     printf ("(pdb) attach domain [%d.%d]\n", my_domain, my_vcpu);
 
-    if ( xc_debug_attach(xc_handle, my_domain, my_vcpu) )
+    if ( xendebug_attach(xc_handle, my_domain, my_vcpu) )
     {
         printf("(pdb) attach error!\n");  fflush(stdout);
         failwith("attach error");
@@ -458,7 +458,7 @@ detach_debugger (value domain, value vcpu)
 
     printf ("(pdb) detach domain [%d.%d]\n", my_domain, my_vcpu);
 
-    if ( xc_debug_detach(xc_handle, my_domain, my_vcpu) )
+    if ( xendebug_detach(xc_handle, my_domain, my_vcpu) )
     {
         printf("(pdb) detach error!\n");  fflush(stdout);
         failwith("detach error");
@@ -514,7 +514,7 @@ query_domain_stop (value unit)
     int dom_list[max_domains];
     int loop, count;
 
-    count = xc_debug_query_domain_stop(xc_handle, dom_list, max_domains);
+    count = xendebug_query_domain_stop(xc_handle, dom_list, max_domains);
     if ( count < 0 )
     {
         printf("(pdb) query domain stop!\n");  fflush(stdout);
