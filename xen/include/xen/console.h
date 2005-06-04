@@ -22,4 +22,7 @@ void console_endboot(int disable_vga);
 void console_force_unlock(void);
 void console_force_lock(void);
 
+void console_start_sync(void);
+void console_end_sync(void);
+
 #endif /* __CONSOLE_H__ */

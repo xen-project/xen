@@ -101,16 +101,24 @@ static void ns_write_reg(struct ns16550 *uart, int reg, char c)
 static void ns16550_interrupt(
     int irq, void *dev_id, struct cpu_user_regs *regs)
 {
-    serial_rx_interrupt(dev_id, regs);
+    struct serial_port *port = dev_id;
+    struct ns16550 *uart = port->uart;
+
+    if ( (ns_read_reg(uart, IIR) & 7) == 2 )
+        serial_tx_interrupt(port, regs);
+    else
+        serial_rx_interrupt(port, regs);
+}
+
+static int ns16550_tx_empty(struct serial_port *port)
+{
+    struct ns16550 *uart = port->uart;
+    return !!(ns_read_reg(uart, LSR) & LSR_THRE);
 }
 
 static void ns16550_putc(struct serial_port *port, char c)
 {
     struct ns16550 *uart = port->uart;
-
-    while ( !(ns_read_reg(uart, LSR) & LSR_THRE) )
-        cpu_relax();
-
     ns_write_reg(uart, THR, c);
 }
 
@@ -150,6 +158,10 @@ static void ns16550_init_preirq(struct serial_port *port)
 
     /* Enable and clear the FIFOs. Set a large trigger threshold. */
     ns_write_reg(uart, FCR, FCR_ENABLE | FCR_CLRX | FCR_CLTX | FCR_TRG14);
+
+    /* Check this really is a 16550+. Otherwise we have no FIFOs. */
+    if ( (ns_read_reg(uart, IIR) & 0xc0) == 0xc0 )
+        port->tx_fifo_size = 16;
 }
 
 static void ns16550_init_postirq(struct serial_port *port)
@@ -157,20 +169,19 @@ static void ns16550_init_postirq(struct serial_port *port)
     struct ns16550 *uart = port->uart;
     int rc;
 
+    serial_async_transmit(port);
+
     uart->irqaction.handler = ns16550_interrupt;
     uart->irqaction.name    = "ns16550";
     uart->irqaction.dev_id  = port;
     if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
         printk("ERROR: Failed to allocate na16550 IRQ %d\n", uart->irq);
 
-    /* For sanity, clear the receive FIFO. */
-    ns_write_reg(uart, FCR, FCR_ENABLE | FCR_CLRX | FCR_TRG14);
-
     /* Master interrupt enable; also keep DTR/RTS asserted. */
     ns_write_reg(uart, MCR, MCR_OUT2 | MCR_DTR | MCR_RTS);
 
-    /* Enable receive interrupts. */
-    ns_write_reg(uart, IER, IER_ERDAI);
+    /* Enable receive and transmit interrupts. */
+    ns_write_reg(uart, IER, IER_ERDAI | IER_ETHREI);
 }
 
 #ifdef CONFIG_X86
@@ -188,6 +199,7 @@ static struct uart_driver ns16550_driver = {
     .init_preirq  = ns16550_init_preirq,
     .init_postirq = ns16550_init_postirq,
     .endboot      = ns16550_endboot,
+    .tx_empty     = ns16550_tx_empty,
     .putc         = ns16550_putc,
     .getc         = ns16550_getc
 };

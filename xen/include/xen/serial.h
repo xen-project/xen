@@ -16,8 +16,12 @@ typedef void (*serial_rx_fn)(char, struct cpu_user_regs *);
 void serial_set_rx_handler(int handle, serial_rx_fn fn);
 
 /* Number of characters we buffer for a polling receiver. */
-#define RXBUFSZ 32
-#define MASK_RXBUF_IDX(_i) ((_i)&(RXBUFSZ-1))
+#define SERIAL_RXBUFSZ 32
+#define MASK_SERIAL_RXBUF_IDX(_i) ((_i)&(SERIAL_RXBUFSZ-1))
+
+/* Number of characters we buffer for an interrupt-driven transmitter. */
+#define SERIAL_TXBUFSZ 16384
+#define MASK_SERIAL_TXBUF_IDX(_i) ((_i)&(SERIAL_TXBUFSZ-1))
 
 struct uart_driver;
 
@@ -25,10 +29,17 @@ struct serial_port {
     /* Uart-driver parameters. */
     struct uart_driver *driver;
     void               *uart;
+    /* Number of characters the port can hold for transmit. */
+    int                 tx_fifo_size;
+    /* Transmit data buffer (interrupt-driven uart). */
+    char               *txbuf;
+    unsigned int        txbufp, txbufc;
+    /* Force synchronous transmit. */
+    int                 sync;
     /* Receiver callback functions (asynchronous receivers). */
     serial_rx_fn        rx_lo, rx_hi, rx;
     /* Receive data buffer (polling receivers). */
-    char                rxbuf[RXBUFSZ];
+    char                rxbuf[SERIAL_RXBUFSZ];
     unsigned int        rxbufp, rxbufc;
     /* Serial I/O is concurrency-safe. */
     spinlock_t          lock;
@@ -40,9 +51,11 @@ struct uart_driver {
     void (*init_postirq)(struct serial_port *);
     /* Hook to clean up after Xen bootstrap (before domain 0 runs). */
     void (*endboot)(struct serial_port *);
-    /* Put a char onto the serial line. */
+    /* Transmit FIFO ready to receive up to @tx_fifo_size characters? */
+    int  (*tx_empty)(struct serial_port *);
+    /* Put a character onto the serial line. */
     void (*putc)(struct serial_port *, char);
-    /* Get a char from the serial line: returns FALSE if no char available. */
+    /* Get a character from the serial line: returns 0 if none available. */
     int  (*getc)(struct serial_port *, char *);
 };
 
@@ -76,13 +89,23 @@ void serial_puts(int handle, const char *s);
 char serial_getc(int handle);
 
 /* Forcibly prevent serial lockup when the system is in a bad way. */
+/* (NB. This also forces an implicit serial_start_sync()). */
 void serial_force_unlock(int handle);
 
+/* Start/end a synchronous region (temporarily disable interrupt-driven tx). */
+void serial_start_sync(int handle);
+void serial_end_sync(int handle);
+
+/*
+ * Initialisation and helper functions for uart drivers.
+ */
 /* Register a uart on serial port @idx (e.g., @idx==0 is COM1). */
 void serial_register_uart(int idx, struct uart_driver *driver, void *uart);
-
-/* Driver helper function: process receive work in interrupt context. */
+/* Place the serial port into asynchronous transmit mode. */
+void serial_async_transmit(struct serial_port *port);
+/* Process work in interrupt context. */
 void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs);
+void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs);
 
 /*
  * Initialisers for individual uart drivers.

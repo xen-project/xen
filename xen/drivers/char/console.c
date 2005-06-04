@@ -467,6 +467,16 @@ void console_force_lock(void)
     spin_lock(&console_lock);
 }
 
+void console_start_sync(void)
+{
+    serial_start_sync(sercon_handle);
+}
+
+void console_end_sync(void)
+{
+    serial_end_sync(sercon_handle);
+}
+
 void console_putc(char c)
 {
     serial_putc(sercon_handle, c);

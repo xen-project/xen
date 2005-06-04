@@ -205,6 +205,7 @@ asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
     };
 
     watchdog_disable();
+    console_start_sync();
 
     show_registers(regs);
 
