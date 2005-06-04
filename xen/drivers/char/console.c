@@ -24,16 +24,20 @@
 #include <asm/debugger.h>
 #include <asm/io.h>
 
-/* opt_console: comma-separated list of console outputs. */
+/* console: comma-separated list of console outputs. */
 static char opt_console[30] = OPT_CONSOLE_STR;
 string_param("console", opt_console);
 
-/* opt_conswitch: a character pair controlling console switching. */
+/* conswitch: a character pair controlling console switching. */
 /* Char 1: CTRL+<char1> is used to switch console input between Xen and DOM0 */
 /* Char 2: If this character is 'x', then do not auto-switch to DOM0 when it */
 /*         boots. Any other value, or omitting the char, enables auto-switch */
 static unsigned char opt_conswitch[5] = "a";
 string_param("conswitch", opt_conswitch);
+
+/* sync_console: force synchronous console output (useful for debugging). */
+static int opt_sync_console;
+boolean_param("sync_console", opt_sync_console);
 
 static int xpos, ypos;
 static unsigned char *video;
@@ -437,6 +441,12 @@ void init_console(void)
            XEN_COMPILER, XEN_COMPILE_DATE);
     printk(" Latest ChangeSet: %s\n\n", XEN_CHANGESET);
     set_printk_prefix("(XEN) ");
+
+    if ( opt_sync_console )
+    {
+        serial_start_sync(sercon_handle);
+        printk("Console output is synchronous.\n");
+    }
 }
 
 void console_endboot(int disable_vga)

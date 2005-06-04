@@ -1729,6 +1729,13 @@ editing \path{grub.conf}.
  transmitted/received character.
  [NB. Default for this option is `com1,vga'] 
 
+\item [sync\_console ]
+ Force synchronous console output. This is useful if you system fails
+ unexpectedly before it has sent all available output to the
+ console. In most cases Xen will automatically enter synchronous mode
+ when an exceptional event occurs, but this option provides a manual
+ fallback.
+
 \item [conswitch=$<$switch-char$><$auto-switch-char$>$ ] 
  Specify how to switch serial-console input between
  Xen and DOM0. The required sequence is CTRL-$<$switch-char$>$
