@@ -443,6 +443,7 @@ void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
              (blktap_mode & BLKTAP_MODE_COPY_FE) ) {
             
             blktap_write_ctrl_ring(msg);
+            blktap_kick_user();
         }
         
         switch ( msg->subtype )
