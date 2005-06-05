@@ -196,8 +196,9 @@ int main(int argc, char* argv[])
 	    break;
         case XCS_VIRQ:
             printf("[VIRQ    ] : %d\n", msg.u.control.local_port);
+	    break;
         default:
-            printf("[UNKNOWN ]\n");
+            printf("[UNKNOWN ] : %d\n", msg.type);
         }
     }
     
