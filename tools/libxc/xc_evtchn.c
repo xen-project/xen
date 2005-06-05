@@ -39,8 +39,9 @@ int xc_evtchn_alloc_unbound(int xc_handle,
     int         rc;
 
     op.cmd = EVTCHNOP_alloc_unbound;
-    op.u.alloc_unbound.dom = (domid_t)dom;
-   
+    op.u.alloc_unbound.dom  = (domid_t)dom;
+    op.u.alloc_unbound.port = (port != NULL) ? *port : 0;
+
     if ( (rc = do_evtchn_op(xc_handle, &op)) == 0 )
     {
         if ( port != NULL )

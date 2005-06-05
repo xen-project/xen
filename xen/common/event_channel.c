@@ -35,6 +35,8 @@
 #define evtchn_from_port(d,p) \
     (&(bucket_from_port(d,p))[(p)&(EVTCHNS_PER_BUCKET-1)])
 
+#define ERROR_EXIT(_errno) do { rc = (_errno); goto out; } while ( 0 )
+
 static int get_free_port(struct domain *d)
 {
     struct evtchn *chn;
@@ -61,30 +63,48 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 {
     struct evtchn *chn;
     struct domain *d = current->domain;
-    int            port;
+    int            port = alloc->port;
+    long           rc = 0;
 
     spin_lock(&d->evtchn_lock);
 
-    if ( (port = get_free_port(d)) >= 0 )
+    /* Obtain, or ensure that we already have, a valid <port>. */
+    if ( port == 0 )
     {
-        chn = evtchn_from_port(d, port);
+        if ( (port = get_free_port(d)) < 0 )
+            ERROR_EXIT(port);
+    }
+    else if ( !port_is_valid(d, port) )
+        ERROR_EXIT(-EINVAL);
+    chn = evtchn_from_port(d, port);
+
+    /* Validate channel's current state. */
+    switch ( chn->state )
+    {
+    case ECS_FREE:
         chn->state = ECS_UNBOUND;
         chn->u.unbound.remote_domid = alloc->dom;
+        break;
+
+    case ECS_UNBOUND:
+        if ( chn->u.unbound.remote_domid != alloc->dom )
+            ERROR_EXIT(-EINVAL);
+        break;
+
+    default:
+        ERROR_EXIT(-EINVAL);
     }
 
+ out:
     spin_unlock(&d->evtchn_lock);
 
-    if ( port < 0 )
-        return port;
-
     alloc->port = port;
-    return 0;
+    return rc;
 }
 
 
 static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 {
-#define ERROR_EXIT(_errno) do { rc = (_errno); goto out; } while ( 0 )
     struct evtchn *chn1, *chn2;
     struct domain *d1, *d2;
     int            port1 = bind->port1, port2 = bind->port2;
@@ -217,7 +237,6 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     bind->port2 = port2;
 
     return rc;
-#undef ERROR_EXIT
 }
 
 

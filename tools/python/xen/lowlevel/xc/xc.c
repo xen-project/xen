@@ -494,11 +494,12 @@ static PyObject *pyxc_evtchn_alloc_unbound(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     u32 dom;
-    int port;
+    int port = 0;
 
-    static char *kwd_list[] = { "dom", NULL };
+    static char *kwd_list[] = { "dom", "port", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &dom) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list,
+                                      &dom, &port) )
         return NULL;
 
     if ( xc_evtchn_alloc_unbound(xc->xc_handle, dom, &port) != 0 )
