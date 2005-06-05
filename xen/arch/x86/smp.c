@@ -272,6 +272,7 @@ void smp_send_event_check_mask(cpumask_t mask)
 struct call_data_struct {
     void (*func) (void *info);
     void *info;
+    int wait;
     atomic_t started;
     atomic_t finished;
 };
@@ -299,6 +300,7 @@ int smp_call_function(
 
     data.func = func;
     data.info = info;
+    data.wait = wait;
     atomic_set(&data.started, 0);
     atomic_set(&data.finished, 0);
 
@@ -345,17 +347,22 @@ asmlinkage void smp_event_check_interrupt(void)
 
 asmlinkage void smp_call_function_interrupt(void)
 {
-    void (*func) (void *info) = call_data->func;
+    void (*func)(void *info) = call_data->func;
     void *info = call_data->info;
 
     ack_APIC_irq();
     perfc_incrc(ipis);
 
-    mb();
-    atomic_inc(&call_data->started);
-
-    (*func)(info);
-
-    mb();
-    atomic_inc(&call_data->finished);
+    if ( call_data->wait )
+    {
+        (*func)(info);
+        mb();
+        atomic_inc(&call_data->finished);
+    }
+    else
+    {
+        mb();
+        atomic_inc(&call_data->started);
+        (*func)(info);
+    }
 }
