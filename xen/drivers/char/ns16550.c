@@ -49,7 +49,15 @@ static struct ns16550 {
 #define IER_ELSI        0x04    /* rx line status       */
 #define IER_EMSI        0x08    /* MODEM status         */
 
-/* FIFO control register */
+/* Interrupt Identification Register */
+#define IIR_NOINT       0x01    /* no interrupt pending */
+#define IIR_IMASK       0x06    /* interrupt identity:  */
+#define IIR_LSI         0x06    /*  - rx line status    */
+#define IIR_RDAI        0x04    /*  - rx data recv'd    */
+#define IIR_THREI       0x02    /*  - tx reg. empty     */
+#define IIR_MSI         0x00    /*  - MODEM status      */
+
+/* FIFO Control Register */
 #define FCR_ENABLE      0x01    /* enable FIFO          */
 #define FCR_CLRX        0x02    /* clear Rx FIFO        */
 #define FCR_CLTX        0x04    /* clear Tx FIFO        */
@@ -59,7 +67,7 @@ static struct ns16550 {
 #define FCR_TRG8        0x80    /* Rx FIFO trig lev 8   */
 #define FCR_TRG14       0xc0    /* Rx FIFO trig lev 14  */
 
-/* Line control register */
+/* Line Control Register */
 #define LCR_DLAB        0x80    /* Divisor Latch Access */
 
 /* Modem Control Register */
@@ -104,10 +112,11 @@ static void ns16550_interrupt(
     struct serial_port *port = dev_id;
     struct ns16550 *uart = port->uart;
 
-    if ( (ns_read_reg(uart, IIR) & 7) == 2 )
+    while ( !(ns_read_reg(uart, IIR) & IIR_NOINT) )
+    {
         serial_tx_interrupt(port, regs);
-    else
         serial_rx_interrupt(port, regs);
+    }
 }
 
 static int ns16550_tx_empty(struct serial_port *port)

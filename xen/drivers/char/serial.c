@@ -22,20 +22,13 @@ static struct serial_port com[2] = {
 void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
 {
     char c;
-    serial_rx_fn fn;
+    serial_rx_fn fn = NULL;
     unsigned long flags;
 
-    BUG_ON(!port->driver);
-    BUG_ON(!port->driver->getc);
+    spin_lock_irqsave(&port->lock, flags);
 
-    for ( ; ; )
+    if ( port->driver->getc(port, &c) )
     {
-        spin_lock_irqsave(&port->lock, flags);
-
-        if ( !port->driver->getc(port, &c) )
-            break;
-
-        fn = NULL;
         if ( port->rx != NULL )
             fn = port->rx;
         else if ( (c & 0x80) && (port->rx_hi != NULL) )
@@ -44,16 +37,12 @@ void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
             fn = port->rx_lo;
         else if ( (port->rxbufp - port->rxbufc) != SERIAL_RXBUFSZ )
             port->rxbuf[MASK_SERIAL_RXBUF_IDX(port->rxbufp++)] = c;            
-
-        spin_unlock_irqrestore(&port->lock, flags);
-
-        if ( fn != NULL )
-            (*fn)(c & 0x7f, regs);
-
-        cpu_relax();
     }
 
     spin_unlock_irqrestore(&port->lock, flags);
+
+    if ( fn != NULL )
+        (*fn)(c & 0x7f, regs);
 }
 
 void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
@@ -61,18 +50,17 @@ void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
     int i;
     unsigned long flags;
 
-    BUG_ON(!port->driver);
-    BUG_ON(!port->driver->tx_empty);
-    BUG_ON(!port->driver->putc);
-
     spin_lock_irqsave(&port->lock, flags);
 
-    for ( i = 0; i < port->tx_fifo_size; i++ )
+    if ( port->driver->tx_empty(port) )
     {
-        if ( port->txbufc == port->txbufp )
-            break;
-        port->driver->putc(
-            port, port->txbuf[MASK_SERIAL_TXBUF_IDX(port->txbufc++)]);
+        for ( i = 0; i < port->tx_fifo_size; i++ )
+        {
+            if ( port->txbufc == port->txbufp )
+                break;
+            port->driver->putc(
+                port, port->txbuf[MASK_SERIAL_TXBUF_IDX(port->txbufc++)]);
+        }
     }
 
     spin_unlock_irqrestore(&port->lock, flags);
@@ -146,8 +134,29 @@ void serial_putc(int handle, char c)
 
 void serial_puts(int handle, const char *s)
 {
-    while ( *s != '\0' )
-        serial_putc(handle, *s++);
+    struct serial_port *port = &com[handle & SERHND_IDX];
+    unsigned long flags;
+    char c;
+
+    if ( (handle == -1) || !port->driver || !port->driver->putc )
+        return;
+
+    spin_lock_irqsave(&port->lock, flags);
+
+    while ( (c = *s++) != '\0' )
+    {
+        if ( (c == '\n') && (handle & SERHND_COOKED) )
+            __serial_putc(port, '\r');
+
+        if ( handle & SERHND_HI )
+            c |= 0x80;
+        else if ( handle & SERHND_LO )
+            c &= 0x7f;
+
+        __serial_putc(port, c);
+    }
+
+    spin_unlock_irqrestore(&port->lock, flags);
 }
 
 char serial_getc(int handle)
