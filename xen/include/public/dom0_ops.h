@@ -164,9 +164,11 @@ typedef struct {
  */
 #define DOM0_READCONSOLE      19
 typedef struct {
-    memory_t str;
-    u32      count;
-    u32      cmd;
+    /* IN variables. */
+    u32      clear;        /* Non-zero -> clear after reading. */
+    /* IN/OUT variables. */
+    char    *buffer;       /* In: Buffer start; Out: Used buffer start */
+    u32      count;        /* In: Buffer size;  Out: Used buffer size  */
 } dom0_readconsole_t;
 
 /* 

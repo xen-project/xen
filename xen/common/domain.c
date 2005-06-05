@@ -122,18 +122,9 @@ void domain_kill(struct domain *d)
 
 void domain_crash(void)
 {
-    struct domain *d = current->domain;
-
-    if ( d->domain_id == 0 )
-    {
-        show_registers(guest_cpu_user_regs());
-        panic("Domain 0 crashed!\n");
-    }
-
-#ifndef NDEBUG
+    printk("Domain %d (vcpu#%d) crashed on cpu#%d:\n",
+           current->domain->domain_id, current->vcpu_id, smp_processor_id());
     show_registers(guest_cpu_user_regs());
-#endif
-
     domain_shutdown(SHUTDOWN_crash);
 }
 

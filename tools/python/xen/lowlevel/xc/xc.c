@@ -678,7 +678,8 @@ static PyObject *pyxc_readconsolering(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     unsigned int clear = 0;
-    char         str[32768];
+    char         _str[32768], *str = _str;
+    unsigned int count = 32768;
     int          ret;
 
     static char *kwd_list[] = { "clear", NULL };
@@ -686,11 +687,11 @@ static PyObject *pyxc_readconsolering(PyObject *self,
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|i", kwd_list, &clear) )
         return NULL;
 
-    ret = xc_readconsolering(xc->xc_handle, str, sizeof(str), clear);
+    ret = xc_readconsolering(xc->xc_handle, &str, &count, clear);
     if ( ret < 0 )
         return PyErr_SetFromErrno(xc_error);
 
-    return PyString_FromStringAndSize(str, ret);
+    return PyString_FromStringAndSize(str, count);
 }
 
 static PyObject *pyxc_physinfo(PyObject *self,

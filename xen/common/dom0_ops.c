@@ -449,9 +449,11 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     
     case DOM0_READCONSOLE:
     {
-        ret = read_console_ring(op->u.readconsole.str, 
-                                op->u.readconsole.count,
-                                op->u.readconsole.cmd); 
+        ret = read_console_ring(
+            &op->u.readconsole.buffer, 
+            &op->u.readconsole.count,
+            op->u.readconsole.clear); 
+        copy_to_user(u_dom0_op, op, sizeof(*op));
     }
     break;
 

@@ -317,6 +317,14 @@ void serial_end_sync(int handle)
     spin_unlock_irqrestore(&port->lock, flags);
 }
 
+int serial_tx_space(int handle)
+{
+    struct serial_port *port = &com[handle & SERHND_IDX];
+    if ( handle == -1 )
+        return SERIAL_TXBUFSZ;
+    return SERIAL_TXBUFSZ - (port->txbufp - port->txbufc);
+}
+
 void serial_init_preirq(void)
 {
     int i;

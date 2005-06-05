@@ -388,8 +388,8 @@ int xc_physdev_pci_access_modify(int xc_handle,
                                  int enable);
 
 int xc_readconsolering(int xc_handle,
-                       char *str, 
-                       unsigned int max_chars, 
+                       char **pbuffer,
+                       unsigned int *pnr_chars, 
                        int clear);
 
 typedef dom0_physinfo_t xc_physinfo_t;

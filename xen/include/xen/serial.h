@@ -96,6 +96,9 @@ void serial_force_unlock(int handle);
 void serial_start_sync(int handle);
 void serial_end_sync(int handle);
 
+/* Return number of bytes headroom in transmit buffer. */
+int serial_tx_space(int handle);
+
 /*
  * Initialisation and helper functions for uart drivers.
  */

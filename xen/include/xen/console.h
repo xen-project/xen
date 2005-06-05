@@ -13,8 +13,7 @@ extern spinlock_t console_lock;
 
 void set_printk_prefix(const char *prefix);
 
-#define CONSOLE_RING_CLEAR 1
-long read_console_ring(unsigned long, unsigned int, unsigned int);
+long read_console_ring(char **, u32 *, int);
 
 void init_console(void);
 void console_endboot(int disable_vga);
