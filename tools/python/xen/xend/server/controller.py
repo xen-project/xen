@@ -228,19 +228,20 @@ class DevController:
         If change is true the device is a change to an existing domain,
         i.e. it is being added at runtime rather than when the domain is created.
         """
-        dev = self.newDevice(self.nextDeviceId(), config, recreate=recreate)
+        # skanky hack: we use the device ids to maybe find the savedinfo
+        # of the device...
+        id = self.nextDeviceId()
+        if recreate:
+            recreate = self.vm.get_device_savedinfo(self.getType(), id)
+        dev = self.newDevice(id, config, recreate=recreate)
         dev.init(recreate=recreate)
         self.addDevice(dev)
-        idx = self.getDeviceIndex(dev)
-        recreate = self.vm.get_device_recreate(self.getType(), idx)
         dev.attach(recreate=recreate, change=change)
 
     def configureDevice(self, id, config, change=False):
         """Reconfigure an existing device.
         May be defined in subclass."""
-        dev = self.getDevice(id)
-        if not dev:
-            raise XendError("invalid device id: " + id)
+        dev = self.getDevice(id, error=True)
         dev.configure(config, change=change)
 
     def destroyDevice(self, id, change=False, reboot=False):
@@ -251,9 +252,7 @@ class DevController:
 
         The device is not deleted, since it may be recreated later.
         """
-        dev = self.getDevice(id)
-        if not dev:
-            raise XendError("invalid device id: " + id)
+        dev = self.getDevice(id, error=True)
         dev.destroy(change=change, reboot=reboot)
         return dev
 
@@ -278,24 +277,15 @@ class DevController:
     def isDestroyed(self):
         return self.destroyed
 
-    def getDevice(self, id):
-        return self.devices.get(id)
-
-    def getDeviceByIndex(self, idx):
-        if 0 <= idx < len(self.device_order):
-            return self.device_order[idx]
-        else:
-            return None
-
-    def getDeviceIndex(self, dev):
-        return self.device_order.index(dev)
+    def getDevice(self, id, error=False):
+        dev = self.devices.get(id)
+        if error and not dev:
+            raise XendError("invalid device id: " + id)
+        return dev
 
     def getDeviceIds(self):
         return [ dev.getId() for dev in self.device_order ]
 
-    def getDeviceIndexes(self):
-        return range(0, len(self.device_order))
-    
     def getDevices(self):
         return self.device_order
 
@@ -379,9 +369,6 @@ class Dev:
 
     def getId(self):
         return self.id
-
-    def getIndex(self):
-        return self.controller.getDeviceIndex(self)
 
     def getConfig(self):
         return self.config

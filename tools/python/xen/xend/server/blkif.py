@@ -293,7 +293,6 @@ class BlkDev(Dev):
             val.append(['uname', self.uname])
         if self.node:
             val.append(['node', self.node])
-        val.append(['index', self.getIndex()])
         return val
 
     def getBackend(self):

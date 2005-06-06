@@ -186,7 +186,6 @@ class UsbDev(Dev):
                ['port', self.port],
                ['path', self.path],
                ]
-        val.append(['index', self.getIndex()])
         return val
 
     def getBackend(self):

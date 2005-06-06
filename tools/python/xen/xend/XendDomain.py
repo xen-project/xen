@@ -650,13 +650,13 @@ class XendDomain:
         @return: device object (or None)
         """
         dominfo = self.domain_lookup(id)
-        return dominfo.getDeviceByIndex(type, devid)
+        return dominfo.getDevice(type, devid)
 
     def domain_vif_limit_set(self, id, vif, credit, period):
         """Limit the vif's transmission rate
         """
         dominfo = self.domain_lookup(id)
-        dev = dominfo.getDeviceById('vif', vif)
+        dev = dominfo.getDevice('vif', vif)
         if not dev:
             raise XendError("invalid vif")
         return dev.setCreditLimit(credit, period)

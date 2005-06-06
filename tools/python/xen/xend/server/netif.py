@@ -199,7 +199,6 @@ class NetDev(Dev):
             val.append(['evtchn',
                         self.evtchn['port1'],
                         self.evtchn['port2']])
-        val.append(['index', self.getIndex()])
         return val
 
     def get_vifname(self):

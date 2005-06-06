@@ -353,7 +353,7 @@ class XendDomainInfo:
         self.controllers[type] = ctrl
         return ctrl
 
-    def createDevice(self, type, devconfig, recreate=False):
+    def createDevice(self, type, devconfig):
         ctrl = self.findDeviceController(type)
         return ctrl.createDevice(devconfig, recreate=self.recreate)
 
@@ -369,30 +369,14 @@ class XendDomainInfo:
         ctrl = self.getDeviceController(type)
         return ctrl.deleteDevice(id)
 
-    def getDevice(self, type, id):
+    def getDevice(self, type, id, error=True):
         ctrl = self.getDeviceController(type)
-        return ctrl.getDevice(id)
+        return ctrl.getDevice(id, error=error)
         
-    def getDeviceByIndex(self, type, idx):
-        ctrl = self.getDeviceController(type)
-        return ctrl.getDeviceByIndex(idx)
-
-    def getDeviceConfig(self, type, id):
-        ctrl = self.getDeviceController(type)
-        return ctrl.getDeviceConfig(id)
-
     def getDeviceIds(self, type):
         ctrl = self.getDeviceController(type)
         return ctrl.getDeviceIds()
     
-    def getDeviceIndexes(self, type):
-        ctrl = self.getDeviceController(type)
-        return ctrl.getDeviceIndexes()
-    
-    def getDeviceConfigs(self, type):
-        ctrl = self.getDeviceController(type)
-        return ctrl.getDeviceConfigs()
-
     def getDeviceSxprs(self, type):
         ctrl = self.getDeviceController(type)
         return ctrl.getDeviceSxprs()
@@ -578,24 +562,23 @@ class XendDomainInfo:
                 devices.append(dev)
         return devices
 
-    def get_device_savedinfo(self, type, index):
+    def get_device_savedinfo(self, type, id):
         val = None
         if self.savedinfo is None:
             return val
         devices = sxp.child(self.savedinfo, 'devices')
         if devices is None:
             return val
-        index = str(index)
         for d in sxp.children(devices, type):
-            dindex = sxp.child_value(d, 'index')
-            if dindex is None: continue
-            if str(dindex) == index:
+            did = sxp.child_value(d, 'id')
+            if did is None: continue
+            if int(did) == id:
                 val = d
                 break
         return val
 
-    def get_device_recreate(self, type, index):
-        return self.get_device_savedinfo(type, index) or self.recreate
+    def get_device_recreate(self, type, id):
+        return self.get_device_savedinfo(type, id) or self.recreate
 
     def add_config(self, val):
         """Add configuration data to a virtual machine.
@@ -765,7 +748,6 @@ class XendDomainInfo:
 
     def create_configured_devices(self):
         devices = sxp.children(self.config, 'device')
-        indexes = {}
         for d in devices:
             dev_config = sxp.child0(d)
             if dev_config is None:
@@ -774,13 +756,7 @@ class XendDomainInfo:
             ctrl_type = get_device_handler(dev_type)
             if ctrl_type is None:
                 raise VmError('unknown device type: ' + dev_type)
-            # Keep track of device indexes by type, so we can fish
-            # out saved info for recreation.
-            idx = indexes.get(dev_type, -1)
-            idx += 1
-            indexes[ctrl_type] = idx
-            recreate = self.get_device_recreate(dev_type, idx)
-            self.createDevice(ctrl_type, dev_config, recreate=recreate)
+            self.createDevice(ctrl_type, dev_config)
         
     def create_devices(self):
         """Create the devices for a vm.
@@ -840,16 +816,14 @@ class XendDomainInfo:
         self.config.append(['device', dev.getConfig()])
         return dev.sxpr()
 
-    def device_configure(self, dev_config, idx):
+    def device_configure(self, dev_config, id):
         """Configure an existing device.
 
         @param dev_config: device configuration
-        @param idx:  device index
+        @param id:         device id
         """
         type = sxp.name(dev_config)
-        dev = self.getDeviceByIndex(type, idx)
-        if not dev:
-            raise VmError('invalid device: %s %s' % (type, idx))
+        dev = self.getDevice(type, id)
         old_config = dev.getConfig()
         new_config = dev.configure(dev_config, change=True)
         # Patch new config into vm config.
@@ -859,26 +833,22 @@ class XendDomainInfo:
         self.config[old_index] = new_full_config
         return new_config
 
-    def device_refresh(self, type, idx):
+    def device_refresh(self, type, id):
         """Refresh a device.
 
         @param type: device type
-        @param idx:  device index
+        @param id:   device id
         """
-        dev = self.getDeviceByIndex(type, idx)
-        if not dev:
-            raise VmError('invalid device: %s %s' % (type, idx))
+        dev = self.getDevice(type, id)
         dev.refresh()
         
-    def device_delete(self, type, idx):
+    def device_delete(self, type, id):
         """Destroy and remove a device.
 
         @param type: device type
-        @param idx:  device index
+        @param id:   device id
         """
-        dev = self.getDeviceByIndex(type, idx)
-        if not dev:
-            raise VmError('invalid device: %s %s' % (type, idx))
+        dev = self.getDevice(type, id)
         dev_config = dev.getConfig()
         if dev_config:
             self.config.remove(['device', dev_config])

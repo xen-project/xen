@@ -129,7 +129,6 @@ class ConsoleDev(Dev, protocol.ServerFactory):
             val.append(['local_port',   self.getLocalPort()  ])
             val.append(['remote_port',  self.getRemotePort() ])
             val.append(['console_port', self.console_port    ])
-            val.append(['index', self.getIndex()])
             if self.addr:
                 val.append(['connected', self.addr[0], self.addr[1]])
         finally:
