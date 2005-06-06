@@ -76,6 +76,31 @@ typedef unsigned long l4_pgentry_t;
 	(((_a) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1))
 #endif
 
+struct domain_setup_info
+{
+    unsigned long v_start;
+    unsigned long v_end;
+    unsigned long v_kernstart;
+    unsigned long v_kernend;
+    unsigned long v_kernentry;
+
+    unsigned int  load_symtab;
+    unsigned long symtab_addr;
+    unsigned long symtab_len;
+};
+
+typedef int (*parseimagefunc)(char *image, unsigned long image_size,
+			      struct domain_setup_info *dsi);
+typedef int (*loadimagefunc)(char *image, unsigned long image_size, int xch,
+			     u32 dom, unsigned long *parray,
+			     struct domain_setup_info *dsi);
+
+struct load_funcs
+{
+    parseimagefunc parseimage;
+    loadimagefunc loadimage;
+};
+
 #define ERROR(_m, _a...)  \
     fprintf(stderr, "ERROR: " _m "\n" , ## _a )
 
@@ -260,7 +285,7 @@ typedef struct mfn_mapper {
     
 } mfn_mapper_t;
 
-unsigned long xc_get_m2p_start_mfn ( int xc_handle );
+unsigned long xc_get_m2p_start_mfn (int xc_handle);
 
 int xc_copy_to_domain_page(int xc_handle, u32 domid,
                             unsigned long dst_pfn, void *src_page);
@@ -273,7 +298,11 @@ void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,
                    int xch, u32 dom, unsigned long *parray,
                    unsigned long vstart);
 
-int pin_table(
-    int xc_handle, unsigned int type, unsigned long mfn, domid_t dom);
+int pin_table(int xc_handle, unsigned int type, unsigned long mfn,
+	      domid_t dom);
+
+/* image loading */
+int probe_elf(char *image, unsigned long image_size, struct load_funcs *funcs);
+int probe_bin(char *image, unsigned long image_size, struct load_funcs *funcs);
 
 #endif /* __XC_PRIVATE_H__ */

@@ -20,22 +20,13 @@
 #define LINUX_KERNEL_ENTR_ADDR   0x00100000
 #define LINUX_PAGE_OFFSET        0xC0000000
 
-struct domain_setup_info
-{
-    unsigned long v_start;
-    unsigned long v_end;
-    unsigned long v_kernstart;
-    unsigned long v_kernend;
-    unsigned long v_kernentry;
-};
-
 static int
 parseelfimage(
     char *elfbase, unsigned long elfsize, struct domain_setup_info *dsi);
 static int
 loadelfimage(
     char *elfbase, int xch, u32 dom, unsigned long *parray,
-    unsigned long vstart);
+    struct domain_setup_info *dsi);
 
 static void build_e820map(struct mem_map *mem_mapp, unsigned long mem_size)
 {
@@ -255,7 +246,7 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
-    loadelfimage(image, xc_handle, dom, page_array, dsi.v_start);
+    loadelfimage(image, xc_handle, dom, page_array, &dsi);
 
     /* Load the initial ramdisk image. */
     if ( initrd_len != 0 )
@@ -626,6 +617,7 @@ int xc_vmx_build(int xc_handle,
 
     launch_op.cmd = DOM0_SETDOMAININFO;
     rc = do_dom0_op(xc_handle, &launch_op);
+    
     return rc;
 
  error_out:
@@ -717,7 +709,7 @@ static int parseelfimage(char *elfbase,
 static int
 loadelfimage(
     char *elfbase, int xch, u32 dom, unsigned long *parray,
-    unsigned long vstart)
+    struct domain_setup_info *dsi)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase;
     Elf_Phdr *phdr;
@@ -734,7 +726,7 @@ loadelfimage(
         
         for ( done = 0; done < phdr->p_filesz; done += chunksz )
         {
-            pa = (phdr->p_paddr + done) - vstart - LINUX_PAGE_OFFSET;
+            pa = (phdr->p_paddr + done) - dsi->v_start - LINUX_PAGE_OFFSET;
             if ((va = xc_map_foreign_range(
 			xch, dom, PAGE_SIZE, PROT_WRITE,
 			parray[pa>>PAGE_SHIFT])) == 0)
@@ -749,7 +741,7 @@ loadelfimage(
 
         for ( ; done < phdr->p_memsz; done += chunksz )
         {
-            pa = (phdr->p_paddr + done) - vstart - LINUX_PAGE_OFFSET;
+            pa = (phdr->p_paddr + done) - dsi->v_start - LINUX_PAGE_OFFSET;
             if ((va = xc_map_foreign_range(
 			xch, dom, PAGE_SIZE, PROT_WRITE,
 			parray[pa>>PAGE_SHIFT])) == 0)
