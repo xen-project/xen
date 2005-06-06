@@ -29,6 +29,8 @@ from xen.xend.XendLogging import log
 from XendError import XendError, VmError
 from xen.xend.XendRoot import get_component
 
+from xen.xend.uuid import getUuid
+
 """Flag for a block device backend domain."""
 SIF_BLK_BE_DOMAIN = (1<<4)
 
@@ -143,12 +145,16 @@ class XendDomainInfo:
     """
     MINIMUM_RESTART_TIME = 20
 
-    def _create(cls):
-        """Create a vm object.
+    def _create(cls, uuid=None):
+        """Create a vm object with a uuid.
 
+        @param uuid uuid to use (generated if None)
         @return vm
         """
+        if uuid is None:
+            uuid = getUuid()
         vm = cls()
+        vm.uuid = uuid
         return vm
 
     _create = classmethod(_create)
@@ -167,17 +173,14 @@ class XendDomainInfo:
 
     create = classmethod(create)
 
-    def recreate(cls, savedinfo, info, unknown=False):
+    def recreate(cls, savedinfo, info, uuid=None):
         """Create the VM object for an existing domain.
 
         @param savedinfo: saved info from the domain DB
         @param info:      domain info from xc
         @type  info:      xc domain dict
         """
-        if unknown:
-            vm = cls._create()
-        else:
-            vm = cls()
+        vm = cls._create(uuid=uuid)
 
         log.debug('savedinfo=' + prettyprintstring(savedinfo))
         log.debug('info=' + str(info))
@@ -209,12 +212,12 @@ class XendDomainInfo:
 
     recreate = classmethod(recreate)
 
-    def restore(cls, config):
+    def restore(cls, config, uuid=None):
         """Create a domain and a VM object to do a restore.
 
         @param config:    domain configuration
         """
-        vm = cls._create()
+        vm = cls._create(uuid=uuid)
         dom = xc.domain_create()
         vm.setdom(dom)
         vm.dom_construct(vm.id, config)
@@ -227,6 +230,7 @@ class XendDomainInfo:
         self.restore = 0
         
         self.config = None
+        self.uuid = None
         self.id = None
         self.cpu_weight = 1
         self.start_time = None
@@ -365,7 +369,8 @@ class XendDomainInfo:
                 ['id', self.id],
                 ['name', self.name],
                 ['memory', self.memory] ]
-
+        if self.uuid:
+            sxpr.append(['uuid', self.uuid])
         if self.info:
             sxpr.append(['maxmem', self.info['maxmem_kb']/1024 ])
             run   = (self.info['running']  and 'r') or '-'
