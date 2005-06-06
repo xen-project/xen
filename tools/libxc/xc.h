@@ -252,7 +252,9 @@ int xc_linux_build(int xc_handle,
                    const char *cmdline,
                    unsigned int control_evtchn,
                    unsigned long flags,
-                   unsigned int vcpus);
+                   unsigned int vcpus,
+                   unsigned int store_evtchn,
+                   unsigned long *store_mfn);
 
 int
 xc_plan9_build (int xc_handle,

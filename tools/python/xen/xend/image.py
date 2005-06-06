@@ -202,21 +202,22 @@ class LinuxImageHandler(ImageHandler):
     ostype = "linux"
 
     def buildDomain(self):
-        #if self.vm.store_channel:
-        #    store_evtchn = self.vm.store_channel.port2
-        #else:
-        #    store_evtchn = 0
-        d  = xc.linux_build(dom            = self.vm.getDomain(),
-                            image          = self.kernel,
-                            control_evtchn = self.vm.channel.getRemotePort(),
-                            #store_evtchn   = store_evtchn,
-                            cmdline        = self.cmdline,
-                            ramdisk        = self.ramdisk,
-                            flags          = self.flags,
-                            vcpus          = self.vm.vcpus)
-        #if isinstance(d, dict):
-        #    self.vm.store_mfn = d.get('store_mfn')
-        return 0
+        if self.vm.store_channel:
+            store_evtchn = self.vm.store_channel.port2
+        else:
+            store_evtchn = 0
+        ret = xc.linux_build(dom            = self.vm.getDomain(),
+                             image          = self.kernel,
+                             control_evtchn = self.vm.channel.getRemotePort(),
+                             store_evtchn   = store_evtchn,
+                             cmdline        = self.cmdline,
+                             ramdisk        = self.ramdisk,
+                             flags          = self.flags,
+                             vcpus          = self.vm.vcpus)
+        if isinstance(ret, dict):
+            self.vm.store_mfn = ret.get('store_mfn')
+            return 0
+        return ret
 
 class Plan9ImageHandler(ImageHandler):
 

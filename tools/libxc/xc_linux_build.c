@@ -40,17 +40,18 @@ loadelfsymtab(
     struct domain_setup_info *dsi);
 
 static int setup_guest(int xc_handle,
-                         u32 dom,
-                         char *image, unsigned long image_size,
-                         gzFile initrd_gfd, unsigned long initrd_len,
-                         unsigned long nr_pages,
-                         unsigned long *pvsi, unsigned long *pvke,
-                         vcpu_guest_context_t *ctxt,
-                         const char *cmdline,
-                         unsigned long shared_info_frame,
-                         unsigned int control_evtchn,
-                         unsigned long flags,
-                         unsigned int vcpus)
+                       u32 dom,
+                       char *image, unsigned long image_size,
+                       gzFile initrd_gfd, unsigned long initrd_len,
+                       unsigned long nr_pages,
+                       unsigned long *pvsi, unsigned long *pvke,
+                       unsigned long *pvss, vcpu_guest_context_t *ctxt,
+                       const char *cmdline,
+                       unsigned long shared_info_frame,
+                       unsigned int control_evtchn,
+                       unsigned long flags,
+                       unsigned int vcpus,
+		       unsigned int store_evtchn, unsigned long *store_mfn)
 {
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
@@ -74,6 +75,8 @@ static int setup_guest(int xc_handle,
     unsigned long vphysmap_end;
     unsigned long vstartinfo_start;
     unsigned long vstartinfo_end;
+    unsigned long vstoreinfo_start;
+    unsigned long vstoreinfo_end;
     unsigned long vstack_start;
     unsigned long vstack_end;
     unsigned long vpt_start;
@@ -109,7 +112,10 @@ static int setup_guest(int xc_handle,
         vpt_end          = vpt_start + (nr_pt_pages * PAGE_SIZE);
         vstartinfo_start = vpt_end;
         vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
-        vstack_start     = vstartinfo_end;
+        /* Place store shared page after startinfo. */
+        vstoreinfo_start = vstartinfo_end;
+        vstoreinfo_end   = vstartinfo_end + PAGE_SIZE;
+        vstack_start     = vstoreinfo_end;
         vstack_end       = vstack_start + PAGE_SIZE;
         v_end            = (vstack_end + (1<<22)-1) & ~((1<<22)-1);
         if ( (v_end - vstack_end) < (512 << 10) )
@@ -125,6 +131,7 @@ static int setup_guest(int xc_handle,
            " Phys-Mach map: %08lx->%08lx\n"
            " Page tables:   %08lx->%08lx\n"
            " Start info:    %08lx->%08lx\n"
+           " Store page:    %08lx->%08lx\n"
            " Boot stack:    %08lx->%08lx\n"
            " TOTAL:         %08lx->%08lx\n",
            dsi.v_kernstart, dsi.v_kernend, 
@@ -132,6 +139,7 @@ static int setup_guest(int xc_handle,
            vphysmap_start, vphysmap_end,
            vpt_start, vpt_end,
            vstartinfo_start, vstartinfo_end,
+           vstoreinfo_start, vstoreinfo_end,
            vstack_start, vstack_end,
            dsi.v_start, v_end);
     printf(" ENTRY ADDRESS: %08lx\n", dsi.v_kernentry);
@@ -261,6 +269,8 @@ static int setup_guest(int xc_handle,
     start_info->nr_pt_frames = nr_pt_pages;
     start_info->mfn_list     = vphysmap_start;
     start_info->domain_controller_evtchn = control_evtchn;
+    start_info->store_page   = vstoreinfo_start;
+    start_info->store_evtchn = store_evtchn;
     if ( initrd_len != 0 )
     {
         start_info->mod_start    = vinitrd_start;
@@ -269,6 +279,9 @@ static int setup_guest(int xc_handle,
     strncpy((char *)start_info->cmd_line, cmdline, MAX_CMDLINE);
     start_info->cmd_line[MAX_CMDLINE-1] = '\0';
     munmap(start_info, PAGE_SIZE);
+
+    /* Tell our caller where we told domain store page was. */
+    *store_mfn = page_array[((vstoreinfo_start-dsi.v_start)>>PAGE_SHIFT)];
 
     /* shared_info page starts its life empty. */
     shared_info = xc_map_foreign_range(
@@ -291,6 +304,7 @@ static int setup_guest(int xc_handle,
     free(page_array);
 
     *pvsi = vstartinfo_start;
+    *pvss = vstack_start;
     *pvke = dsi.v_kernentry;
 
     return 0;
@@ -310,7 +324,9 @@ int xc_linux_build(int xc_handle,
                    const char *cmdline,
                    unsigned int control_evtchn,
                    unsigned long flags,
-                   unsigned int vcpus)
+                   unsigned int vcpus,
+                   unsigned int store_evtchn,
+                   unsigned long *store_mfn)
 {
     dom0_op_t launch_op, op;
     int initrd_fd = -1;
@@ -320,7 +336,7 @@ int xc_linux_build(int xc_handle,
     unsigned long nr_pages;
     char         *image = NULL;
     unsigned long image_size, initrd_size=0;
-    unsigned long vstartinfo_start, vkern_entry;
+    unsigned long vstartinfo_start, vkern_entry, vstack_start;
 
     if ( (nr_pages = xc_get_tot_pages(xc_handle, domid)) < 0 )
     {
@@ -377,11 +393,12 @@ int xc_linux_build(int xc_handle,
     }
 
     if ( setup_guest(xc_handle, domid, image, image_size, 
-                       initrd_gfd, initrd_size, nr_pages, 
-                       &vstartinfo_start, &vkern_entry,
-                       ctxt, cmdline,
-                       op.u.getdomaininfo.shared_info_frame,
-                       control_evtchn, flags, vcpus) < 0 )
+                     initrd_gfd, initrd_size, nr_pages, 
+                     &vstartinfo_start, &vkern_entry,
+                     &vstack_start, ctxt, cmdline,
+                     op.u.getdomaininfo.shared_info_frame,
+                     control_evtchn, flags, vcpus,
+                     store_evtchn, store_mfn) < 0 )
     {
         ERROR("Error constructing guest OS");
         goto error_out;
@@ -412,7 +429,7 @@ int xc_linux_build(int xc_handle,
     ctxt->user_regs.ss = FLAT_KERNEL_DS;
     ctxt->user_regs.cs = FLAT_KERNEL_CS;
     ctxt->user_regs.eip = vkern_entry;
-    ctxt->user_regs.esp = vstartinfo_start + 2*PAGE_SIZE;
+    ctxt->user_regs.esp = vstack_start + PAGE_SIZE;
     ctxt->user_regs.esi = vstartinfo_start;
     ctxt->user_regs.eflags = 1 << 9; /* Interrupt Enable */
 
@@ -434,7 +451,7 @@ int xc_linux_build(int xc_handle,
 
     /* Ring 1 stack is the initial stack. */
     ctxt->kernel_ss = FLAT_KERNEL_DS;
-    ctxt->kernel_sp = vstartinfo_start + 2*PAGE_SIZE;
+    ctxt->kernel_sp = vstack_start + PAGE_SIZE;
 
     /* No debugging. */
     memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));

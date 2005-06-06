@@ -148,7 +148,7 @@ class XendDomainInfo:
     def _create(cls, uuid=None):
         """Create a vm object with a uuid.
 
-        @param uuid uuid to use (generated if None)
+        @param uuid uuid to use
         @return vm
         """
         if uuid is None:
@@ -178,6 +178,7 @@ class XendDomainInfo:
 
         @param savedinfo: saved info from the domain DB
         @param info:      domain info from xc
+        @param uuid:      uuid to use
         @type  info:      xc domain dict
         """
         vm = cls._create(uuid=uuid)
@@ -216,6 +217,7 @@ class XendDomainInfo:
         """Create a domain and a VM object to do a restore.
 
         @param config:    domain configuration
+        @param uuid:      uuid to use
         """
         vm = cls._create(uuid=uuid)
         dom = xc.domain_create()
@@ -239,6 +241,8 @@ class XendDomainInfo:
         self.image = None
 
         self.channel = None
+        self.store_channel = None
+        self.store_mfs = None
         self.controllers = {}
         
         self.info = None

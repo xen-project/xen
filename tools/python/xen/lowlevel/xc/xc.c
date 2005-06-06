@@ -260,25 +260,28 @@ static PyObject *pyxc_linux_build(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32   dom;
+    u32 dom;
     char *image, *ramdisk = NULL, *cmdline = "";
-    int   control_evtchn, flags = 0, vcpus = 1;
+    int flags = 0, vcpus = 1;
+    int control_evtchn, store_evtchn;
+    unsigned long store_mfn = 0;
 
-    static char *kwd_list[] = { "dom", "control_evtchn", 
-                                "image", "ramdisk", "cmdline", "flags", "vcpus",
-                                NULL };
+    static char *kwd_list[] = { "dom", "control_evtchn", "store_evtchn", 
+                                "image", "ramdisk", "cmdline", "flags",
+				"vcpus", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ssii", kwd_list, 
-                                      &dom, &control_evtchn, 
-                                      &image, &ramdisk, &cmdline, &flags, &vcpus) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssii", kwd_list,
+                                      &dom, &control_evtchn, &store_evtchn,
+                                      &image, &ramdisk, &cmdline, &flags,
+                                      &vcpus) )
         return NULL;
 
     if ( xc_linux_build(xc->xc_handle, dom, image,
-                        ramdisk, cmdline, control_evtchn, flags, vcpus) != 0 )
+                        ramdisk, cmdline, control_evtchn, flags, vcpus,
+                        store_evtchn, &store_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
-    Py_INCREF(zero);
-    return zero;
+    return Py_BuildValue("{s:i}", "store_mfn", store_mfn);
 }
 
 static PyObject *pyxc_plan9_build(PyObject *self,
