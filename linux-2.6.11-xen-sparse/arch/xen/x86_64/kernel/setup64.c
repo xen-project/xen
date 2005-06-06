@@ -208,7 +208,7 @@ void __init check_efer(void)
 
 void __init cpu_gdt_init(struct desc_ptr *gdt_descr)
 {
-	unsigned long frames[gdt_descr->size >> PAGE_SHIFT];
+	unsigned long frames[16];
 	unsigned long va;
 	int f;
 

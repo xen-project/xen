@@ -554,7 +554,7 @@ void __init early_cpu_init(void)
 
 void __init cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
 {
-	unsigned long frames[gdt_descr->size >> PAGE_SHIFT];
+	unsigned long frames[16];
 	unsigned long va;
 	int f;
 
