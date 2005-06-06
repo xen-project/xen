@@ -8,10 +8,7 @@
 #include <xen/irq.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
-
-#ifdef CONFIG_VMX
 #include <asm/vmx.h>
-#endif
 
 /* All CPUs have their own IDT to allow int80 direct trap. */
 idt_entry_t *idt_tables[NR_CPUS] = { 0 };
@@ -19,10 +16,8 @@ idt_entry_t *idt_tables[NR_CPUS] = { 0 };
 void show_registers(struct cpu_user_regs *regs)
 {
     unsigned long ss, ds, es, fs, gs, cs;
-    unsigned long eip, esp, eflags;
+    unsigned long eip, esp, eflags, cr0, cr3;
     const char *context;
-#ifdef CONFIG_VMX
-    unsigned long cr0, cr3;
 
     if ( VMX_DOMAIN(current) && (regs->eflags == 0) )
     {
@@ -40,10 +35,13 @@ void show_registers(struct cpu_user_regs *regs)
         context = "vmx guest";
     }
     else
-#endif
     {
-        eip = regs->eip;
+        eip    = regs->eip;
         eflags = regs->eflags;
+        cr0    = read_cr0();
+        cr3    = read_cr3();
+
+        __asm__ ( "movl %%fs,%0 ; movl %%gs,%1" : "=r" (fs), "=r" (gs) );
 
         if ( GUEST_MODE(regs) )
         {
@@ -51,21 +49,16 @@ void show_registers(struct cpu_user_regs *regs)
             ss  = regs->ss & 0xffff;
             ds  = regs->ds & 0xffff;
             es  = regs->es & 0xffff;
-            fs  = regs->fs & 0xffff;
-            gs  = regs->gs & 0xffff;
             cs  = regs->cs & 0xffff;
             context = "guest";
         }
         else
         {
-            esp = (unsigned long)(&regs->esp);
+            esp = (unsigned long)&regs->esp;
             ss  = __HYPERVISOR_DS;
             ds  = __HYPERVISOR_DS;
             es  = __HYPERVISOR_DS;
-            fs  = __HYPERVISOR_DS;
-            gs  = __HYPERVISOR_DS;
             cs  = __HYPERVISOR_CS;
-            
             context = "hypervisor";
         }
     }
@@ -78,12 +71,10 @@ void show_registers(struct cpu_user_regs *regs)
            regs->eax, regs->ebx, regs->ecx, regs->edx);
     printk("esi: %08x   edi: %08x   ebp: %08x   esp: %08lx\n",
            regs->esi, regs->edi, regs->ebp, esp);
+    printk("cr0: %08lx   cr3: %08lx\n", cr0, cr3);
     printk("ds: %04lx   es: %04lx   fs: %04lx   gs: %04lx   "
            "ss: %04lx   cs: %04lx\n",
            ds, es, fs, gs, ss, cs);
-#ifdef CONFIG_VMX
-    printk("cr0: %08lx   cr3: %08lx\n", cr0, cr3);
-#endif
 
     if ( GUEST_MODE(regs) )
         show_guest_stack();
