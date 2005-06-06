@@ -210,7 +210,7 @@ void arch_do_createdomain(struct vcpu *v)
 	 */
 	d->xen_vastart = 0xf000000000000000;
 	d->xen_vaend = 0xf300000000000000;
-	d->breakimm = 0x1000;
+	d->arch.breakimm = 0x1000;
 
 	// stay on kernel stack because may get interrupts!
 	// ia64_ret_from_clone (which b0 gets in new_thread) switches
@@ -244,9 +244,11 @@ void arch_do_createdomain(struct vcpu *v)
 	}
 #endif
 	d->max_pages = (128*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
-	if ((d->metaphysical_rid = allocate_metaphysical_rid()) == -1UL)
+	if ((d->arch.metaphysical_rr0 = allocate_metaphysical_rr0()) == -1UL)
 		BUG();
 	v->vcpu_info->arch.metaphysical_mode = 1;
+	v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
+	v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
 #define DOMAIN_RID_BITS_DEFAULT 18
 	if (!allocate_rid_range(d,DOMAIN_RID_BITS_DEFAULT)) // FIXME
 		BUG();
@@ -254,7 +256,8 @@ void arch_do_createdomain(struct vcpu *v)
 	d->xen_vastart = 0xf000000000000000;
 	d->xen_vaend = 0xf300000000000000;
 	d->shared_info_va = 0xf100000000000000;
-	d->breakimm = 0x1000;
+	d->arch.breakimm = 0x1000;
+	ed->arch.breakimm = d->arch.breakimm;
 	// stay on kernel stack because may get interrupts!
 	// ia64_ret_from_clone (which b0 gets in new_thread) switches
 	// to user stack

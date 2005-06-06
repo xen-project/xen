@@ -747,14 +747,16 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 #define HYPERPRIVOP_COVER		0x4
 #define HYPERPRIVOP_ITC_D		0x5
 #define HYPERPRIVOP_ITC_I		0x6
-#define HYPERPRIVOP_MAX			0x6
+#define HYPERPRIVOP_SSM_I		0x7
+#define HYPERPRIVOP_MAX			0x7
 
 char *hyperpriv_str[HYPERPRIVOP_MAX+1] = {
-	0, "rfi", "rsm.dt", "ssm.dt", "cover", "itc.d", "itc.i",
+	0, "rfi", "rsm.dt", "ssm.dt", "cover", "itc.d", "itc.i", "ssm.i",
 	0
 };
 
-unsigned long hyperpriv_cnt[HYPERPRIVOP_MAX+1] = { 0 };
+unsigned long slow_hyperpriv_cnt[HYPERPRIVOP_MAX+1] = { 0 };
+unsigned long fast_hyperpriv_cnt[HYPERPRIVOP_MAX+1] = { 0 };
 
 /* hyperprivops are generally executed in assembly (with physical psr.ic off)
  * so this code is primarily used for debugging them */
@@ -765,13 +767,12 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 	INST64 inst;
 	UINT64 val;
 
-// FIXME: Add instrumentation for these
 // FIXME: Handle faults appropriately for these
 	if (!iim || iim > HYPERPRIVOP_MAX) {
 		printf("bad hyperprivop; ignored\n");
 		return 1;
 	}
-	hyperpriv_cnt[iim]++;
+	slow_hyperpriv_cnt[iim]++;
 	switch(iim) {
 	    case HYPERPRIVOP_RFI:
 		(void)vcpu_rfi(v);
@@ -792,6 +793,9 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 	    case HYPERPRIVOP_ITC_I:
 		inst.inst = 0;
 		(void)priv_itc_i(v,inst);
+		return 1;
+	    case HYPERPRIVOP_SSM_I:
+		(void)vcpu_set_psr_i(ed);
 		return 1;
 	}
 	return 0;
@@ -981,18 +985,28 @@ int dump_hyperprivop_counts(char *buf)
 {
 	int i;
 	char *s = buf;
-	s += sprintf(s,"Slow hyperprivops:\n");
+	unsigned long total = 0;
+	for (i = 1; i <= HYPERPRIVOP_MAX; i++) total += slow_hyperpriv_cnt[i];
+	s += sprintf(s,"Slow hyperprivops (total %d):\n",total);
 	for (i = 1; i <= HYPERPRIVOP_MAX; i++)
-		if (hyperpriv_cnt[i])
+		if (slow_hyperpriv_cnt[i])
 			s += sprintf(s,"%10d %s\n",
-				hyperpriv_cnt[i], hyperpriv_str[i]);
+				slow_hyperpriv_cnt[i], hyperpriv_str[i]);
+	total = 0;
+	for (i = 1; i <= HYPERPRIVOP_MAX; i++) total += fast_hyperpriv_cnt[i];
+	s += sprintf(s,"Fast hyperprivops (total %d):\n",total);
+	for (i = 1; i <= HYPERPRIVOP_MAX; i++)
+		if (fast_hyperpriv_cnt[i])
+			s += sprintf(s,"%10d %s\n",
+				fast_hyperpriv_cnt[i], hyperpriv_str[i]);
 	return s - buf;
 }
 
 void zero_hyperprivop_counts(void)
 {
 	int i;
-	for (i = 0; i <= HYPERPRIVOP_MAX; i++) hyperpriv_cnt[i] = 0;
+	for (i = 0; i <= HYPERPRIVOP_MAX; i++) slow_hyperpriv_cnt[i] = 0;
+	for (i = 0; i <= HYPERPRIVOP_MAX; i++) fast_hyperpriv_cnt[i] = 0;
 }
 
 #define TMPBUFLEN 8*1024
@@ -1002,6 +1016,7 @@ int dump_privop_counts_to_user(char __user *ubuf, int len)
 	int n = dump_privop_counts(buf);
 
 	n += dump_hyperprivop_counts(buf + n);
+	n += dump_reflect_counts(buf + n);
 #ifdef PRIVOP_ADDR_COUNT
 	n += dump_privop_addrs(buf + n);
 #endif
@@ -1019,6 +1034,7 @@ int zero_privop_counts_to_user(char __user *ubuf, int len)
 #ifdef PRIVOP_ADDR_COUNT
 	zero_privop_addrs();
 #endif
+	zero_reflect_counts();
 	if (len < TMPBUFLEN) return -1;
 	if (__copy_to_user(ubuf,buf,n)) return -1;
 	return n;
