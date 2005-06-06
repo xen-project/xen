@@ -812,6 +812,7 @@
 4270e4efFg3wHCCxXpA0h6yoMTkeSQ tools/python/xen/util/blkif.py
 4055ee4dwy4l0MghZosxoiu6zmhc9Q tools/python/xen/util/console_client.py
 40c9c468IienauFHQ_xJIcqnPJ8giQ tools/python/xen/util/ip.py
+42a4a80aiq_AT5whiSw-fKhNhRKITw tools/python/xen/util/mac.py
 41dde8b0yuJX-S79w4xJKxBQ-Mhp1A tools/python/xen/util/memmap.py
 4288c6fcB1kUAqX0gzU85GGxmamS4Q tools/python/xen/util/process.py
 4059c6a0pnxhG8hwSOivXybbGOwuXw tools/python/xen/util/tempfile.py

@@ -4,6 +4,8 @@
 
 import random
 
+from xen.util.mac import macFromString, macToString
+
 from xen.xend import sxp
 from xen.xend import Vifctl
 from xen.xend.XendError import XendError, VmError
@@ -49,15 +51,19 @@ class NetDev(Dev):
     def _get_config_mac(self, config):
         vmac = sxp.child_value(config, 'mac')
         if not vmac: return None
-        mac = [ int(x, 16) for x in vmac.split(':') ]
-        if len(mac) != 6: raise XendError("invalid mac: %s" % vmac)
+        try:
+            mac = macFromString(vmac)
+        except:
+            raise XendError("invalid mac: %s" % vmac)
         return mac
 
     def _get_config_be_mac(self, config):
         vmac = sxp.child_value(config, 'be_mac')
         if not vmac: return None
-        mac = [ int(x, 16) for x in vmac.split(':') ]
-        if len(mac) != 6: raise XendError("invalid backend mac: %s" % vmac)
+        try:
+            mac = macFromString(vmac)
+        except:
+            raise XendError("invalid backend mac: %s" % vmac)
         return mac
 
     def _get_config_ipaddr(self, config):
@@ -212,12 +218,12 @@ class NetDev(Dev):
     def get_mac(self):
         """Get the MAC address as a string.
         """
-        return ':'.join(map(lambda x: "%02x" % x, self.mac))
+        return macToString(self.mac)
 
     def get_be_mac(self):
         """Get the backend MAC address as a string.
         """
-        return ':'.join(map(lambda x: "%02x" % x, self.be_mac))
+        return macToString(self.be_mac)
 
     def vifctl_params(self, vmname=None):
         """Get the parameters to pass to vifctl.
