@@ -90,7 +90,7 @@ GLOBAL_ENTRY(fast_break_reflect)
 	mov cr.ipsr=r20;;
 	// save ipsr in shared_info, vipsr.cpl==(ipsr.cpl==3)?3:0
 	cmp.ne p7,p0=3,r21;;
-(p7)	mov r21=r0
+(p7)	mov r21=r0 ;;
 	dep r20=r21,r20,IA64_PSR_CPL0_BIT,2 ;;
 	dep r20=r23,r20,IA64_PSR_RI_BIT,2 ;;
 	// vipsr.i=vpsr.i
@@ -110,7 +110,7 @@ GLOBAL_ENTRY(fast_break_reflect)
 	// save ifs in shared_info
 	adds r21=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r21]=r0 ;;
-	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18
+	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r0 ;;
 	cover ;;
 	mov r20=cr.ifs;;

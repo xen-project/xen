@@ -257,7 +257,7 @@ void arch_do_createdomain(struct vcpu *v)
 	d->xen_vaend = 0xf300000000000000;
 	d->shared_info_va = 0xf100000000000000;
 	d->arch.breakimm = 0x1000;
-	ed->arch.breakimm = d->arch.breakimm;
+	v->arch.breakimm = d->arch.breakimm;
 	// stay on kernel stack because may get interrupts!
 	// ia64_ret_from_clone (which b0 gets in new_thread) switches
 	// to user stack

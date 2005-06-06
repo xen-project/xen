@@ -795,7 +795,7 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 		(void)priv_itc_i(v,inst);
 		return 1;
 	    case HYPERPRIVOP_SSM_I:
-		(void)vcpu_set_psr_i(ed);
+		(void)vcpu_set_psr_i(v);
 		return 1;
 	}
 	return 0;
