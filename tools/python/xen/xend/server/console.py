@@ -14,9 +14,9 @@ from xen.xend.XendLogging import log
 from xen.xend import XendRoot; xroot = XendRoot.instance()
 from xen.xend import sxp
 
-from controller import CtrlMsgRcvr, Dev, DevController
-from messages import *
-from params import *
+from xen.xend.server.controller import CtrlMsgRcvr, Dev, DevController
+from xen.xend.server.messages import *
+from xen.xend.server.params import *
 
 class ConsoleProtocol(protocol.Protocol):
     """Asynchronous handler for a console socket.

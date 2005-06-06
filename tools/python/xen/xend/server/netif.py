@@ -11,9 +11,9 @@ from xen.xend.XendLogging import log
 from xen.xend import XendVnet
 from xen.xend.XendRoot import get_component
 
-import channel
-from controller import CtrlMsgRcvr, Dev, DevController
-from messages import *
+from xen.xend.server import channel
+from xen.xend.server.controller import CtrlMsgRcvr, Dev, DevController
+from xen.xend.server.messages import *
 
 class NetDev(Dev):
     """A network device.

@@ -63,10 +63,10 @@ def save(xd, fd, dominfo):
             if fd == child.fromchild.fileno():
                 l = child.fromchild.readline()
                 if l.rstrip() == "suspend":
-                    log.info("suspending %s" % dominfo.id)
+                    log.info("suspending %d" % dominfo.id)
                     xd.domain_shutdown(dominfo.id, reason='suspend')
                     dominfo.state_wait("suspended")
-                    log.info("suspend %s done" % dominfo.id)
+                    log.info("suspend %d done" % dominfo.id)
                     child.tochild.write("done\n")
                     child.tochild.flush()
         if filter(lambda (fd, event): event & select.POLLHUP, r):

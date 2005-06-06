@@ -4,7 +4,7 @@ for a domain.
 """
 
 from xen.xend.XendError import XendError
-from messages import msgTypeName, printMsg, getMessageType
+from xen.xend.server.messages import msgTypeName, printMsg, getMessageType
 
 DEBUG = 0
 

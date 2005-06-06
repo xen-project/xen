@@ -32,9 +32,6 @@ import event
 import relocate
 from params import *
 
-DAEMONIZE = 0
-DEBUG = 1
-
 class Daemon:
     """The xend daemon.
     """

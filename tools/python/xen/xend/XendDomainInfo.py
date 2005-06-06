@@ -14,21 +14,20 @@ import time
 import threading
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
-import xen.util.ip
-from xen.xend.server import channel, controller
+from xen.util.ip import check_subnet, get_current_ipgw
 from xen.util.blkif import blkdev_uname_to_file
 
-from server.channel import channelFactory
-import server.SrvDaemon; xend = server.SrvDaemon.instance()
-from server import messages
+from xen.xend.server import channel, controller
+from xen.xend.server import SrvDaemon; xend = SrvDaemon.instance()
+from xen.xend.server import messages
+from xen.xend.server.channel import channelFactory
 
+from xen.xend import sxp
+from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendBootloader import bootloader
-import sxp
-from XendLogging import log
+from xen.xend.XendLogging import log
 from XendError import XendError, VmError
-from XendRoot import get_component
-
-from PrettyPrint import prettyprintstring
+from xen.xend.XendRoot import get_component
 
 """Flag for a block device backend domain."""
 SIF_BLK_BE_DOMAIN = (1<<4)
@@ -144,7 +143,6 @@ def add_device_handler(name, type):
 
 def get_device_handler(name):
     return device_handlers[name]
-
 
 def dom_get(dom):
     """Get info from xen for an existing domain.
@@ -321,7 +319,7 @@ class XendDomainInfo:
 
     def __str__(self):
         s = "domain"
-        s += " id=" + self.id
+        s += " id=" + str(self.id)
         s += " name=" + self.name
         s += " memory=" + str(self.memory)
         console = self.getConsole()

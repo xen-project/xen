@@ -3,16 +3,16 @@
 """
 import string
 
+from xen.util import blkif
+from xen.xend.XendError import XendError, VmError
+from xen.xend.XendRoot import get_component
+from xen.xend.XendLogging import log
 from xen.xend import sxp
 from xen.xend import Blkctl
-from xen.xend.XendError import XendError, VmError
-from xen.xend.XendLogging import log
-from xen.util import blkif
-from xen.xend.XendRoot import get_component
 
-import channel
-from controller import CtrlMsgRcvr, Dev, DevController
-from messages import *
+from xen.xend.server import channel
+from xen.xend.server.controller import CtrlMsgRcvr, Dev, DevController
+from xen.xend.server.messages import *
 
 class BlkifBackend:
     """ Handler for the 'back-end' channel to a block device driver domain

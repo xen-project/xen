@@ -8,9 +8,9 @@ from xen.xend import sxp
 from xen.xend.XendLogging import log
 from xen.xend.XendError import XendError
 
-import channel
-from controller import Dev, DevController
-from messages import *
+from xen.xend.server import channel
+from xen.xend.server.controller import Dev, DevController
+from xen.xend.server.messages import *
 
 class UsbBackend:
     """Handler for the 'back-end' channel to a USB device driver domain

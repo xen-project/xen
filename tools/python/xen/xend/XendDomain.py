@@ -7,25 +7,23 @@
 """
 import errno
 import os
-import scheduler
-import string
 import sys
-import traceback
 import time
+import traceback
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 
-from xen.xend.server import relocate
-import sxp
-import XendRoot; xroot = XendRoot.instance()
-import XendCheckpoint
-import XendDB
+from xen.xend import sxp
+from xen.xend import XendRoot; xroot = XendRoot.instance()
+from xen.xend import XendCheckpoint
 from xen.xend.XendDomainInfo import XendDomainInfo, shutdown_reason
-import EventServer; eserver = EventServer.instance()
-from XendError import XendError
-from XendLogging import log
-
+from xen.xend import EventServer; eserver = EventServer.instance()
+from xen.xend.XendError import XendError
+from xen.xend.XendLogging import log
+from xen.xend import scheduler
 from xen.xend.server import channel
+from xen.xend.server import relocate
+from xen.xend import XendDB
 
 __all__ = [ "XendDomain" ]
 
@@ -55,7 +53,6 @@ class XendDomain:
         # So we stuff the XendDomain instance (self) into xroot's components.
         xroot.add_component("xen.xend.XendDomain", self)
         self.domains = XendDomainDict()
-        # Table of domain info indexed by domain id.
         self.db = XendDB.XendDB(self.dbpath)
         eserver.subscribe('xend.virq', self.onVirq)
         self.initial_refresh()
@@ -160,9 +157,9 @@ class XendDomain:
         info = self.domains.get(id)
         if info:
             del self.domains[id]
+            self.db.delete(str(id))
             if notify:
                 eserver.inject('xend.domain.died', [info.name, info.id])
-            self.db.delete(str(id))
 
     def reap(self):
         """Look for domains that have crashed or stopped.
@@ -179,11 +176,9 @@ class XendDomain:
                 casualties.append(d)
         for d in casualties:
             id = d['dom']
-            #print 'reap>', id
             dominfo = self.domains.get(id)
             name = (dominfo and dominfo.name) or '??'
             if dominfo and dominfo.is_terminated():
-                #print 'reap> already terminated:', id
                 continue
             log.debug('XendDomain>reap> domain died name=%s id=%d', name, id)
             if d['shutdown']:
@@ -268,6 +263,7 @@ class XendDomain:
         @return: domain
         """
         dominfo = XendDomainInfo.create(config)
+        self._add_domain(dominfo)
         return dominfo
 
     def domain_restart(self, dominfo):
@@ -296,14 +292,13 @@ class XendDomain:
         """Configure an existing domain. This is intended for internal
         use by domain restore and migrate.
 
-        @param id:       domain id
         @param vmconfig: vm configuration
         """
         config = sxp.child_value(vmconfig, 'config')
         dominfo = XendDomainInfo.restore(config)
         self._add_domain(dominfo)
         return dominfo
-    
+
     def domain_restore(self, src, progress=False):
         """Restore a domain from file.
 
@@ -604,7 +599,7 @@ class XendDomain:
 
         @param id:   domain id
         @param devconfig: device configuration
-        @param devid:  device index
+        @param devid:  device id
         @return: updated device configuration
         """
         dominfo = self.domain_lookup(id)
@@ -616,7 +611,7 @@ class XendDomain:
         """Refresh a device.
 
         @param id:  domain id
-        @param devid:  device index
+        @param devid:  device id
         @param type: device type
         """
         dominfo = self.domain_lookup(id)
@@ -628,7 +623,7 @@ class XendDomain:
         """Destroy a device.
 
         @param id:  domain id
-        @param devid:  device index
+        @param devid:  device id
         @param type: device type
         """
         dominfo = self.domain_lookup(id)
@@ -648,10 +643,10 @@ class XendDomain:
 
     def domain_devtype_get(self, id, type, devid):
         """Get a device from a domain.
-
+        
         @param id:  domain
         @param type: device type
-        @param devid:  device index
+        @param devid:  device id
         @return: device object (or None)
         """
         dominfo = self.domain_lookup(id)
