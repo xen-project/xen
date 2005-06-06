@@ -17,10 +17,10 @@ import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 from xen.util.ip import check_subnet, get_current_ipgw
 from xen.util.blkif import blkdev_uname_to_file
 
-from xen.xend.server import channel, controller
+from xen.xend.server import controller
 from xen.xend.server import SrvDaemon; xend = SrvDaemon.instance()
 from xen.xend.server import messages
-from xen.xend.server.channel import channelFactory
+from xen.xend.server.channel import EventChannel, channelFactory
 
 from xen.xend import sxp
 from xen.xend.PrettyPrint import prettyprintstring
@@ -242,7 +242,7 @@ class XendDomainInfo:
 
         self.channel = None
         self.store_channel = None
-        self.store_mfs = None
+        self.store_mfn = None
         self.controllers = {}
         
         self.info = None
@@ -285,6 +285,9 @@ class XendDomainInfo:
 
     def getChannel(self):
         return self.channel
+
+    def getStoreChannel(self):
+        return self.store_channel
 
     def update(self, info):
         """Update with  info from xc.domain_getinfo().
@@ -401,6 +404,8 @@ class XendDomainInfo:
 
         if self.channel:
             sxpr.append(self.channel.sxpr())
+        if self.store_channel:
+            sxpr.append(self.store_channel.sxpr())
         console = self.getConsole()
         if console:
             sxpr.append(console.sxpr())
@@ -550,8 +555,16 @@ class XendDomainInfo:
     def destroy(self):
         """Completely destroy the vm.
         """
-        self.cleanup()
-        self.destroy_domain()
+        try:
+            self.cleanup()
+        except Exception, ex:
+            log.warning("error in domain cleanup: %s", ex)
+            pass
+        try:
+            self.destroy_domain()
+        except Exception, ex:
+            log.warning("error in domain destroy: %s", ex)
+            pass
 
     def destroy_domain(self):
         """Destroy the vm's domain.
@@ -559,8 +572,11 @@ class XendDomainInfo:
         devices have been released.
         """
         if self.channel:
-            self.channel.close()
-            self.channel = None
+            try:
+                self.channel.close()
+                self.channel = None
+            except:
+                pass
         if self.image:
             try:
                 self.image.destroy()
@@ -617,20 +633,32 @@ class XendDomainInfo:
         if not self.restore:
             self.setdom(dom)
 
-    def create_channel(self):
-        """Create the control channel to the domain.
-        If saved info is available recreate the channel using the saved ports.
+    def openChannel(self, name, local, remote):
+        """Create a channel to the domain.
+        If saved info is available recreate the channel.
+        
+        @param local default local port
+        @param remote default remote port
         """
         local = 0
         remote = 1
         if self.savedinfo:
-            info = sxp.child(self.savedinfo, "channel")
+            info = sxp.child(self.savedinfo, name)
             if info:
                 local = int(sxp.child_value(info, "local_port", 0))
                 remote = int(sxp.child_value(info, "remote_port", 1))
-        self.channel = channelFactory().openChannel(str(self.id),
-                                                    local_port=local,
-                                                    remote_port=remote)
+        chan = channelFactory().openChannel(self.id, local_port=local,
+                                            remote_port=remote)
+        return chan
+
+    def eventChannel(self, name):
+        return EventChannel.interdomain(0, self.id)
+
+    def create_channel(self):
+        """Create the channels to the domain.
+        """
+        self.channel = self.openChannel("channel", 0, 1)
+        self.store_channel = self.eventChannel("store_channel")
 
     def create_configured_devices(self):
         devices = sxp.children(self.config, 'device')

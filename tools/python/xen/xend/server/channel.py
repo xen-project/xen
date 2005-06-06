@@ -14,52 +14,90 @@ DEBUG = 0
 
 RESPONSE_TIMEOUT = 20.0
 
-def eventChannel(dom1, dom2):
-    """Create an event channel between domains.
-    The returned dict contains dom1, dom2, port1 and port2 on success.
-
-    @return dict (empty on error)
+class EventChannel(dict):
+    """An event channel between domains.
     """
-    evtchn = xc.evtchn_bind_interdomain(dom1=dom1, dom2=dom2)
-    if evtchn:
-        evtchn['dom1'] = dom1
-        evtchn['dom2'] = dom2
-    return evtchn
+
+    def interdomain(cls, dom1, dom2, port1=0, port2=0):
+        """Create an event channel between domains.
+        
+        @return EventChannel (None on error)
+        """
+        v = xc.evtchn_bind_interdomain(dom1=dom1, dom2=dom2,
+                                       port1=port1, port2=port2)
+        if v:
+            v = cls(dom1, dom2, v)
+        return v
+
+    interdomain = classmethod(interdomain)
+
+    def __init__(self, dom1, dom2, d):
+        d['dom1'] = dom1
+        d['dom2'] = dom2
+        self.update(d)
+        self.dom1 = dom1
+        self.dom2 = dom2
+        self.port1 = d.get('port1')
+        self.port2 = d.get('port2')
+
+    def close(self):
+        """Close the event channel.
+        """
+        def evtchn_close(dom, port):
+            try:
+                xc.evtchn_close(dom=dom, port=port)
+            except Exception, ex:
+                pass
+            
+        if DEBUG:
+            print 'EventChannel>close>', self
+        evtchn_close(self.dom1, self.port1)
+        evtchn_close(self.dom2, self.port2)
+
+    def sxpr(self):
+        return ['event-channel',
+                ['dom1',  self.dom1  ],
+                ['port1', self.port1 ],
+                ['dom2',  self.dom2  ],
+                ['port2', self.port2 ]
+                ]
+
+    def __repr__(self):
+        return ("<EventChannel dom1:%s:%s dom2:%s:%s>"
+                % (self.dom1, self.port1, self.dom2, self.port2))
+
+def eventChannel(dom1, dom2, port1=0, port2=0):
+    """Create an event channel between domains.
+        
+    @return EventChannel (None on error)
+    """
+    return EventChannel.interdomain(dom1, dom2, port1=port1, port2=port2)
 
 def eventChannelClose(evtchn):
-    """Close an event channel that was opened by eventChannel().
+    """Close an event channel.
     """
-    def evtchn_close(dom, port):
-        if (dom is None) or (port is None): return
-        try:
-            xc.evtchn_close(dom=dom, port=port)
-        except Exception, ex:
-            pass
-        
     if not evtchn: return
-    if DEBUG:
-        print 'eventChannelClose>', evtchn
-    evtchn_close(evtchn.get('dom1'), evtchn.get('port1'))
-    evtchn_close(evtchn.get('dom2'), evtchn.get('port2'))
-    
+    evtchn.close()
 
 class ChannelFactory:
-    """Factory for creating channels.
+    """Factory for creating control channels.
     Maintains a table of channels.
     """
 
     """ Channels indexed by index. """
-    channels = {}
+    channels = None
 
     thread = None
 
     notifier = None
 
     """Map of ports to the virq they signal."""
-    virqPorts = {}
+    virqPorts = None
 
     def __init__(self):
         """Constructor - do not use. Use the channelFactory function."""
+        self.channels = {}
+        self.virqPorts = {}
         self.notifier = xu.notifier()
         # Register interest in virqs.
         self.bind_virq(xen.lowlevel.xc.VIRQ_DOM_EXC)
@@ -69,10 +107,6 @@ class ChannelFactory:
         port = self.notifier.bind_virq(virq)
         self.virqPorts[port] = virq
         log.info("Virq %s on port %s", virq, port)
-
-    def virq(self):
-        log.error("virq")
-        self.notifier.virq_send(self.virqPort)
 
     def start(self):
         """Fork a thread to read messages.
@@ -182,9 +216,13 @@ class ChannelFactory:
         return None
 
     def openChannel(self, dom, local_port=0, remote_port=0):
-        return (self.findChannel(dom, local_port=local_port, remote_port=remote_port)
-                or
-                self.newChannel(dom, local_port, remote_port))
+        chan = self.findChannel(dom, local_port=local_port,
+                                remote_port=remote_port)
+        if chan:
+            return chan
+        chan = self.newChannel(dom, local_port, remote_port)
+        return chan
+        
 
     def createPort(self, dom, local_port=0, remote_port=0):
         """Create a port for a channel to the given domain.
@@ -218,7 +256,7 @@ def channelFactory():
     return inst
 
 class Channel:
-    """Chanel to a domain.
+    """Control channel to a domain.
     Maintains a list of device handlers to dispatch requests to, based
     on the request type.
     """
