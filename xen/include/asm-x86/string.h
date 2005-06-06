@@ -136,23 +136,6 @@ static inline char *strchr(const char *s, int c)
     return __res;
 }
 
-#define __HAVE_ARCH_STRRCHR
-static inline char *strrchr(const char *s, int c)
-{
-    long d0, d1;
-    register char *__res;
-    __asm__ __volatile__ (
-        "   mov  %%al,%%ah  \n"
-        "1: lodsb           \n"
-        "   cmp  %%ah,%%al  \n"
-        "   jne  2f         \n"
-        "   lea  -1(%1),%0  \n"
-        "2: test %%al,%%al  \n"
-        "   jne  1b         \n"
-        : "=g" (__res), "=&S" (d0), "=&a" (d1) : "0" (0), "1" (s), "2" (c) );
-    return __res;
-}
-
 #define __HAVE_ARCH_STRLEN
 static inline size_t strlen(const char *s)
 {
@@ -321,24 +304,6 @@ static inline void *__constant_c_memset(void *s, unsigned long c, size_t count)
     return s; 
 }
 
-#define __HAVE_ARCH_STRNLEN
-static inline size_t strnlen(const char *s, size_t count)
-{
-    long d0;
-    register int __res;
-    __asm__ __volatile__ (
-        "   jmp  2f       \n"
-        "1: cmpb $0,(%3)  \n"
-        "   je   3f       \n"
-        "   inc  %3       \n"
-        "2: dec  %1       \n"
-        "   jns  1b       \n"
-        "3: subl %2,%0    \n"
-        : "=a" (__res), "=&d" (d0)
-        : "c" ((int)(long)s), "0" (s), "1" (count) );
-    return __res;
-}
-
 /*
  * This looks horribly ugly, but the compiler can optimize it totally,
  * as we by now know that both pattern and count is constant..
@@ -426,20 +391,5 @@ static always_inline void *__constant_c_and_count_memset(
 (__builtin_constant_p(c) ? \
  __constant_c_x_memset((s),(MEMSET_PATTERN_MUL*(unsigned char)(c)),(count)) : \
  __var_x_memset((s),(c),(count)))
-
-#define __HAVE_ARCH_MEMSCAN
-static inline void *memscan(void *addr, int c, size_t size)
-{
-    if ( size == 0 )
-        return addr;
-    __asm__ (
-        "   repnz; scasb \n"
-        "   jnz  1f      \n"
-        "   dec  %0      \n"
-        "1:              \n"
-        : "=D" (addr), "=c" (size)
-        : "0" (addr), "1" (size), "a" (c) );
-    return addr;
-}
 
 #endif /* __X86_STRING_H__ */
