@@ -237,8 +237,6 @@ class XendDomainInfo:
         self.channel = None
         self.controllers = {}
         
-        self.configs = []
-        
         self.info = None
         self.blkif_backend = False
         self.netif_backend = False
@@ -333,9 +331,10 @@ class XendDomainInfo:
         self.controllers[type] = ctrl
         return ctrl
 
-    def createDevice(self, type, devconfig):
+    def createDevice(self, type, devconfig, change=False):
         ctrl = self.findDeviceController(type)
-        return ctrl.createDevice(devconfig, recreate=self.recreate)
+        return ctrl.createDevice(devconfig, recreate=self.recreate,
+                                 change=change)
 
     def configureDevice(self, type, id, devconfig):
         ctrl = self.getDeviceController(type)
@@ -521,22 +520,6 @@ class XendDomainInfo:
         #                            self.store_mfn,
         #                            self.store_channel)
 
-    def config_devices(self, name):
-        """Get a list of the 'device' nodes of a given type from the config.
-
-        @param name: device type
-        @type  name: string
-        @return: device configs
-        @rtype: list
-        """
-        devices = []
-        for d in sxp.children(self.config, 'device'):
-            dev = sxp.child0(d)
-            if dev is None: continue
-            if name == sxp.name(dev):
-                devices.append(dev)
-        return devices
-
     def get_device_savedinfo(self, type, id):
         val = None
         if self.savedinfo is None:
@@ -554,13 +537,6 @@ class XendDomainInfo:
 
     def get_device_recreate(self, type, id):
         return self.get_device_savedinfo(type, id) or self.recreate
-
-    def add_config(self, val):
-        """Add configuration data to a virtual machine.
-
-        @param val: data to add
-        """
-        self.configs.append(val)
 
     def destroy(self):
         """Completely destroy the vm.
@@ -606,8 +582,6 @@ class XendDomainInfo:
         for ctrl in self.getDeviceControllers():
             if ctrl.isDestroyed(): continue
             ctrl.destroyController(reboot=reboot)
-        if not reboot:
-            self.configs = []
 
     def show(self):
         """Print virtual machine info.
@@ -615,11 +589,6 @@ class XendDomainInfo:
         print "[VM dom=%d name=%s memory=%d" % (self.id, self.name, self.memory)
         print "image:"
         sxp.show(self.image)
-        print
-        for val in self.configs:
-            print "config:"
-            sxp.show(val)
-            print
         print "]"
 
     def init_domain(self):
