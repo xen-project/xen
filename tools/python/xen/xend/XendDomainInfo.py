@@ -577,6 +577,12 @@ class XendDomainInfo:
                 self.channel = None
             except:
                 pass
+        if self.store_channel:
+            try:
+                self.store_channel.close()
+                self.store_channel = None
+            except:
+                pass
         if self.image:
             try:
                 self.image.destroy()
