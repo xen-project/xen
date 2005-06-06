@@ -43,6 +43,8 @@ typedef unsigned int u32;
 typedef signed long long s64;
 typedef unsigned long long u64;
 #define BITS_PER_LONG 32
+#define BYTES_PER_LONG 4
+#define LONG_BYTEORDER 2
 typedef unsigned int size_t;
 #if defined(CONFIG_X86_PAE)
 typedef u64 physaddr_t;
@@ -53,6 +55,8 @@ typedef u32 physaddr_t;
 typedef signed long s64;
 typedef unsigned long u64;
 #define BITS_PER_LONG 64
+#define BYTES_PER_LONG 8
+#define LONG_BYTEORDER 3
 typedef unsigned long size_t;
 typedef u64 physaddr_t;
 #endif
