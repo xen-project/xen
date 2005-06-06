@@ -30,7 +30,7 @@ class SrvConsole(SrvDir):
             #self.ls()
             req.write('<p>%s</p>' % self.info)
             req.write('<p><a href="%s">Connect to domain %d</a></p>'
-                      % (self.info.uri(), self.info.dom))
+                      % (self.info.uri(), self.info.id))
             self.form(req)
             req.write('</body></html>')
 

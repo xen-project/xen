@@ -43,7 +43,7 @@ def save(xd, fd, dominfo):
     write_exact(fd, config, "could not write guest state file: config")
 
     cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
-           dominfo.id]
+           str(dominfo.id)]
     log.info("[xc_save] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     
@@ -109,7 +109,7 @@ def restore(xd, fd):
             "not a valid guest state file: pfn count out of range")
 
     cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
-           dominfo.id, str(nr_pfns)]
+           str(dominfo.id), str(nr_pfns)]
     log.info("[xc_restore] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     child.tochild.close()

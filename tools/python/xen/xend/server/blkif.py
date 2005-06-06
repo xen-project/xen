@@ -3,12 +3,12 @@
 """
 import string
 
-from xen.util import blkif
-from xen.xend.XendError import XendError, VmError
-from xen.xend import XendRoot
-from xen.xend.XendLogging import log
 from xen.xend import sxp
 from xen.xend import Blkctl
+from xen.xend.XendError import XendError, VmError
+from xen.xend.XendLogging import log
+from xen.util import blkif
+from xen.xend.XendRoot import get_component
 
 import channel
 from controller import CtrlMsgRcvr, Dev, DevController
@@ -206,7 +206,8 @@ class BlkDev(Dev):
             raise VmError('vbd: Device not found: %s' % self.dev)
         
         try:
-            self.backendDomain = int(sxp.child_value(config, 'backend', '0'))
+            xd = get_component('xen.xend.XendDomain')
+            self.backendDomain = xd.domain_lookup_by_name(sxp.child_value(config, 'backend', '0')).id
         except:
             raise XendError('invalid backend domain')
 
@@ -263,7 +264,7 @@ class BlkDev(Dev):
 
     def check_mounted(self, name):
         mode = blkif.mount_mode(name)
-        xd = XendRoot.get_component('xen.xend.XendDomain')
+        xd = get_component('xen.xend.XendDomain')
         for vm in xd.list():
             ctrl = vm.getDeviceController(self.getType(), error=False)
             if (not ctrl): continue

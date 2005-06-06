@@ -86,7 +86,7 @@ STATE_VM_SUSPENDED  = "suspended"
 def domain_exists(name):
     # See comment in XendDomain constructor.
     xd = get_component('xen.xend.XendDomain')
-    return xd.domain_lookup(name)
+    return xd.domain_lookup_by_name(name)
 
 def shutdown_reason(code):
     """Get a shutdown reason from a code.
@@ -248,7 +248,6 @@ class XendDomainInfo:
         
         self.config = None
         self.id = None
-        self.dom = None
         self.cpu_weight = 1
         self.start_time = None
         self.name = None
@@ -290,11 +289,10 @@ class XendDomainInfo:
 
         @param dom: domain id
         """
-        self.dom = int(dom)
-        self.id = str(dom)
+        self.id = int(dom)
 
     def getDomain(self):
-        return self.dom
+        return self.id
 
     def getName(self):
         return self.name
@@ -484,7 +482,7 @@ class XendDomainInfo:
             return
         if dominfo.is_terminated():
             return
-        if not self.dom or (dominfo.dom != self.dom):
+        if not self.id or (dominfo.id != self.id):
             raise VmError('vm name clash: ' + name)
         
     def construct(self, config):
@@ -532,8 +530,8 @@ class XendDomainInfo:
         if self.memory is None:
             raise VmError('missing memory size')
         cpu = sxp.child_value(config, 'cpu')
-        if self.recreate and self.dom and cpu is not None and int(cpu) >= 0:
-            xc.domain_pincpu(self.dom, 0, 1<<int(cpu))
+        if self.recreate and self.id and cpu is not None and int(cpu) >= 0:
+            xc.domain_pincpu(self.id, 0, 1<<int(cpu))
         try:
             image = sxp.child_value(self.config, 'image')
             vcpus = sxp.child_value(image, 'vcpus')
@@ -622,9 +620,9 @@ class XendDomainInfo:
         if self.channel:
             self.channel.close()
             self.channel = None
-        if self.dom is None: return 0
+        if self.id is None: return 0
         try:
-            return xc.domain_destroy(dom=self.dom)
+            return xc.domain_destroy(dom=self.id)
         except Exception, err:
             log.exception("Domain destroy failed: %s", self.name)
 
@@ -652,7 +650,7 @@ class XendDomainInfo:
     def show(self):
         """Print virtual machine info.
         """
-        print "[VM dom=%d name=%s memory=%d" % (self.dom, self.name, self.memory)
+        print "[VM dom=%d name=%s memory=%d" % (self.id, self.name, self.memory)
         print "image:"
         sxp.show(self.image)
         print
@@ -671,7 +669,7 @@ class XendDomainInfo:
             self.start_time = time.time()
         if self.restore:
             return
-        dom = self.dom or 0
+        dom = self.id or 0
         memory = self.memory
         try:
             cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
@@ -707,8 +705,8 @@ class XendDomainInfo:
         if ramdisk and not os.path.isfile(ramdisk):
             raise VmError('Kernel ramdisk does not exist: %s' % ramdisk)
         if len(cmdline) >= 256:
-            log.warning('kernel cmdline too long, domain %d', self.dom)
-        dom = self.dom
+            log.warning('kernel cmdline too long, domain %d', self.id)
+        dom = self.id
         buildfn = getattr(xc, '%s_build' % ostype)
         flags = 0
         if self.netif_backend: flags |= SIF_NET_BE_DOMAIN
@@ -763,7 +761,7 @@ class XendDomainInfo:
             if info:
                 local = int(sxp.child_value(info, "local_port", 0))
                 remote = int(sxp.child_value(info, "remote_port", 1))
-        self.channel = channelFactory().openChannel(self.dom,
+        self.channel = channelFactory().openChannel(str(self.id),
                                                     local_port=local,
                                                     remote_port=remote)
 
@@ -810,7 +808,7 @@ class XendDomainInfo:
         #todo: self.memory?
         memory = sxp.child_value(self.config, "memory")
         # Create an event channel
-        device_channel = channel.eventChannel(0, self.dom)
+        device_channel = channel.eventChannel(0, self.id)
         # see if a vncviewer was specified
         # XXX RN: bit of a hack. should unify this, maybe stick in config space
         vncconnect=""
@@ -830,7 +828,7 @@ class XendDomainInfo:
         os.system(device_model
                   + " -f %s" % device_config
                   + vncconnect
-                  + " -d %d" % self.dom
+                  + " -d %d" % self.id
                   + " -p %d" % device_channel['port1']
                   + " -m %s" % memory)
 
@@ -1222,7 +1220,7 @@ def vm_field_maxmem(vm, config, val, index):
         maxmem = int(maxmem)
     except:
         raise VmError("invalid maxmem: " + str(maxmem))
-    xc.domain_setmaxmem(vm.dom, maxmem_kb = maxmem * 1024)
+    xc.domain_setmaxmem(vm.id, maxmem_kb = maxmem * 1024)
 
 #============================================================================
 # Register image handlers.

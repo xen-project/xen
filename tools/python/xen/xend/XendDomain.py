@@ -78,7 +78,7 @@ class XendDomain:
         domlist = xc.domain_getinfo()
         doms = {}
         for d in domlist:
-            domid = str(d['dom'])
+            domid = d['dom']
             doms[domid] = d
         return doms
 
@@ -86,12 +86,8 @@ class XendDomain:
         """Get info about a single domain from xc.
         Returns None if not found.
 
-        @param dom domain id
+        @param dom domain id (int)
         """
-        try:
-            dom = int(dom)
-        except ValueError:
-            return None
         dominfo = xc.domain_getinfo(dom, 1)
         if dominfo == [] or dominfo[0]['dom'] != dom:
             dominfo = None
@@ -104,13 +100,12 @@ class XendDomain:
         """
         doms = self.xen_domains()
         for config in self.db.fetchall("").values():
-            domid = str(sxp.child_value(config, 'id'))
+            domid = int(sxp.child_value(config, 'id'))
             if domid in doms:
                 try:
                     self._new_domain(config, doms[domid])
-                    self.update_domain(domid)
                 except Exception, ex:
-                    log.exception("Error recreating domain info: id=%s", domid)
+                    log.exception("Error recreating domain info: id=%d", domid)
                     self._delete_domain(domid)
             else:
                 self._delete_domain(domid)
@@ -121,7 +116,7 @@ class XendDomain:
 
         info	domain info
         """
-        self.db.save(info.id, info.sxpr())
+        self.db.save(str(info.id), info.sxpr())
 
     def close(self):
         pass
@@ -135,6 +130,7 @@ class XendDomain:
         """
         dominfo = XendDomainInfo.recreate(savedinfo, info)
         self.domains[dominfo.id] = dominfo
+        self.sync_domain(dominfo)
         return dominfo
 
     def _add_domain(self, info, notify=True):
@@ -147,7 +143,7 @@ class XendDomain:
         for i, d in self.domains.items():
             if i != d.id:
                 del self.domains[i]
-                self.db.delete(i)
+                self.db.delete(str(i))
         if info.id in self.domains:
             notify = False
         self.domains[info.id] = info
@@ -166,7 +162,7 @@ class XendDomain:
             del self.domains[id]
             if notify:
                 eserver.inject('xend.domain.died', [info.name, info.id])
-            self.db.delete(id)
+            self.db.delete(str(id))
 
     def reap(self):
         """Look for domains that have crashed or stopped.
@@ -181,22 +177,21 @@ class XendDomain:
                             not(d['running'] or d['paused'] or d['blocked']))
             if dead:
                 casualties.append(d)
-        destroyed = 0
         for d in casualties:
-            id = str(d['dom'])
+            id = d['dom']
             #print 'reap>', id
             dominfo = self.domains.get(id)
             name = (dominfo and dominfo.name) or '??'
             if dominfo and dominfo.is_terminated():
                 #print 'reap> already terminated:', id
                 continue
-            log.debug('XendDomain>reap> domain died name=%s id=%s', name, id)
+            log.debug('XendDomain>reap> domain died name=%s id=%d', name, id)
             if d['shutdown']:
                 reason = shutdown_reason(d['shutdown_reason'])
-                log.debug('XendDomain>reap> shutdown name=%s id=%s reason=%s', name, id, reason)
+                log.debug('XendDomain>reap> shutdown name=%s id=%d reason=%s', name, id, reason)
                 if reason in ['suspend']:
                     if dominfo and dominfo.is_terminated():
-                        log.debug('XendDomain>reap> Suspended domain died id=%s', id)
+                        log.debug('XendDomain>reap> Suspended domain died id=%d', id)
                     else:
                         eserver.inject('xend.domain.suspended', [name, id])
                         if dominfo:
@@ -207,9 +202,8 @@ class XendDomain:
                     self.domain_restart_schedule(id, reason)
             else:
                if xroot.get_enable_dump():
-                   self.domain_dumpcore(int(id))
+                   self.domain_dumpcore(id)
                eserver.inject('xend.domain.exit', [name, id, 'crash']) 
-            destroyed += 1
             self.final_domain_destroy(id)
 
     def refresh(self, cleanup=False):
@@ -237,16 +231,7 @@ class XendDomain:
             scheduler.now(self.domain_restarts)
 
     def update_domain(self, id):
-        """Update the saved info for a domain.
-
-        @param id: domain id
-        """
-        dominfo = self.domains.get(id)
-        if dominfo:
-            self.sync_domain(dominfo)
-
-    def refresh_domain(self, id):
-        """Refresh information for a single domain.
+        """Update information for a single domain.
 
         @param id: domain id
         """
@@ -339,22 +324,30 @@ class XendDomain:
         @param id: domain id
         @return: domain object (or None)
         """
-        id = str(id)
-        self.refresh_domain(id)
+        self.update_domain(id)
         return self.domains.get(id)
 
     def domain_lookup(self, id):
-        name = str(id)
-        dominfo = self.domains.get_by_name(name) or self.domains.get(id)
+        dominfo = self.domains.get(id)
         if not dominfo:
             try:
                 info = self.xen_domain(id)
                 if info:
-                    log.info("Creating entry for unknown domain: id=%s", name)
+                    log.info("Creating entry for unknown domain: id=%d", id)
                     dominfo = XendDomainInfo.recreate(None, info, unknown=True)
                     self._add_domain(dominfo)
             except Exception, ex:
-                log.exception("Error creating domain info: id=%s", name)
+                log.exception("Error creating domain info: id=%d", id)
+        return dominfo
+
+    def domain_lookup_by_name(self, name):
+        dominfo = self.domains.get_by_name(name)
+        if not dominfo:
+            try:
+                id = int(name)
+                dominfo = self.domain_lookup(id)
+            except ValueError:
+                pass
         return dominfo
 
     def domain_unpause(self, id):
@@ -365,7 +358,7 @@ class XendDomain:
         dominfo = self.domain_lookup(id)
         eserver.inject('xend.domain.unpause', [dominfo.name, dominfo.id])
         try:
-            return xc.domain_unpause(dom=dominfo.dom)
+            return xc.domain_unpause(dom=dominfo.id)
         except Exception, ex:
             raise XendError(str(ex))
     
@@ -377,7 +370,7 @@ class XendDomain:
         dominfo = self.domain_lookup(id)
         eserver.inject('xend.domain.pause', [dominfo.name, dominfo.id])
         try:
-            return xc.domain_pause(dom=dominfo.dom)
+            return xc.domain_pause(dom=dominfo.id)
         except Exception, ex:
             raise XendError(str(ex))
     
@@ -435,7 +428,7 @@ class XendDomain:
         @param id:     domain id
         @param reason: shutdown reason
         """
-        log.debug('domain_restart_schedule> %s %s %d', id, reason, force)
+        log.debug('domain_restart_schedule> %d %s %d', id, reason, force)
         dominfo = self.domain_lookup(id)
         if not dominfo:
             return
@@ -483,7 +476,7 @@ class XendDomain:
         except:
             #todo
             try:
-                val = xc.domain_destroy(dom=int(id))
+                val = xc.domain_destroy(dom=id)
             except Exception, ex:
                 raise XendError(str(ex))
         return val       
@@ -552,7 +545,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.domain_pincpu(int(dominfo.id), vcpu, cpumap)
+            return xc.domain_pincpu(dominfo.id, vcpu, cpumap)
         except Exception, ex:
             raise XendError(str(ex))
 
@@ -561,7 +554,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.bvtsched_domain_set(dom=dominfo.dom, mcuadv=mcuadv,
+            return xc.bvtsched_domain_set(dom=dominfo.id, mcuadv=mcuadv,
                                           warpback=warpback, warpvalue=warpvalue, 
                                           warpl=warpl, warpu=warpu)
         except Exception, ex:
@@ -572,7 +565,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.bvtsched_domain_get(dominfo.dom)
+            return xc.bvtsched_domain_get(dominfo.id)
         except Exception, ex:
             raise XendError(str(ex))
     
@@ -580,18 +573,18 @@ class XendDomain:
     def domain_cpu_sedf_set(self, id, period, slice, latency, extratime, weight):
         """Set Simple EDF scheduler parameters for a domain.
         """
-	dominfo = self.domain_lookup(id)
+        dominfo = self.domain_lookup(id)
         try:
-            return xc.sedf_domain_set(dominfo.dom, period, slice, latency, extratime, weight)
+            return xc.sedf_domain_set(dominfo.id, period, slice, latency, extratime, weight)
         except Exception, ex:
             raise XendError(str(ex))
 
     def domain_cpu_sedf_get(self, id):
-        """Get Atropos scheduler parameters for a domain.
+        """Get Simple EDF scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.sedf_domain_get(dominfo.dom)
+            return xc.sedf_domain_get(dominfo.id)
         except Exception, ex:
             raise XendError(str(ex))
 
@@ -603,44 +596,44 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         val = dominfo.device_create(devconfig)
-        self.update_domain(dominfo.id)
+        self.sync_domain(dominfo)
         return val
 
-    def domain_device_configure(self, id, devconfig, idx):
+    def domain_device_configure(self, id, devconfig, devid):
         """Configure an existing device for a domain.
 
         @param id:   domain id
         @param devconfig: device configuration
-        @param idx:  device index
+        @param devid:  device index
         @return: updated device configuration
         """
         dominfo = self.domain_lookup(id)
-        val = dominfo.device_configure(devconfig, idx)
-        self.update_domain(dominfo.id)
+        val = dominfo.device_configure(devconfig, devid)
+        self.sync_domain(dominfo)
         return val
     
-    def domain_device_refresh(self, id, type, idx):
+    def domain_device_refresh(self, id, type, devid):
         """Refresh a device.
 
         @param id:  domain id
-        @param idx:  device index
+        @param devid:  device index
         @param type: device type
         """
         dominfo = self.domain_lookup(id)
-        val = dominfo.device_refresh(type, idx)
-        self.update_domain(dominfo.id)
+        val = dominfo.device_refresh(type, devid)
+        self.sync_domain(dominfo)
         return val
 
-    def domain_device_destroy(self, id, type, idx):
+    def domain_device_destroy(self, id, type, devid):
         """Destroy a device.
 
         @param id:  domain id
-        @param idx:  device index
+        @param devid:  device index
         @param type: device type
         """
         dominfo = self.domain_lookup(id)
-        val = dominfo.device_destroy(type, idx)
-        self.update_domain(dominfo.id)
+        val = dominfo.device_destroy(type, devid)
+        self.sync_domain(dominfo)
         return val
 
     def domain_devtype_ls(self, id, type):
@@ -653,16 +646,16 @@ class XendDomain:
         dominfo = self.domain_lookup(id)
         return dominfo.getDeviceSxprs(type)
 
-    def domain_devtype_get(self, id, type, idx):
+    def domain_devtype_get(self, id, type, devid):
         """Get a device from a domain.
 
         @param id:  domain
         @param type: device type
-        @param idx:  device index
+        @param devid:  device index
         @return: device object (or None)
         """
         dominfo = self.domain_lookup(id)
-        return dominfo.getDeviceByIndex(type, idx)
+        return dominfo.getDeviceByIndex(type, devid)
 
     def domain_vif_limit_set(self, id, vif, credit, period):
         """Limit the vif's transmission rate
@@ -681,33 +674,33 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.shadow_control(dominfo.dom, op)
+            return xc.shadow_control(dominfo.id, op)
         except Exception, ex:
             raise XendError(str(ex))
 
     def domain_maxmem_set(self, id, mem):
         """Set the memory limit for a domain.
 
-        @param dom: domain
+        @param id: domain
         @param mem: memory limit (in MB)
         @return: 0 on success, -1 on error
         """
         dominfo = self.domain_lookup(id)
         maxmem = int(mem) * 1024
         try:
-            return xc.domain_setmaxmem(dominfo.dom, maxmem_kb = maxmem)
+            return xc.domain_setmaxmem(dominfo.id, maxmem_kb = maxmem)
         except Exception, ex:
             raise XendError(str(ex))
 
-    def domain_mem_target_set(self, id, target):
+    def domain_mem_target_set(self, id, mem):
         """Set the memory target for a domain.
 
         @param id: domain
-        @param target: memory target (in MB)
+        @param mem: memory target (in MB)
         @return: 0 on success, -1 on error
         """
         dominfo = self.domain_lookup(id)
-        return dominfo.mem_target_set(target)
+        return dominfo.mem_target_set(mem)
 
     def domain_dumpcore(self, id):
         """Save a core dump for a crashed domain.
