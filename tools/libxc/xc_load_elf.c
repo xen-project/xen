@@ -29,9 +29,9 @@ loadelfsymtab(
     char *image, int xch, u32 dom, unsigned long *parray,
     struct domain_setup_info *dsi);
 
-int xc_elf_probe(char *image,
-                 unsigned long image_size,
-                 struct load_funcs *load_funcs)
+int probe_elf(char *image,
+	      unsigned long image_size,
+	      struct load_funcs *load_funcs)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)image;
 

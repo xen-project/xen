@@ -108,9 +108,9 @@ loadbinimage(
     char *image, unsigned long image_size, int xch, u32 dom,
     unsigned long *parray, struct domain_setup_info *dsi);
 
-int xc_bin_probe(char *image,
-                 unsigned long image_size,
-                 struct load_funcs *load_funcs)
+int probe_bin(char *image,
+	      unsigned long image_size,
+	      struct load_funcs *load_funcs)
 {
     if ( NULL == findtable(image, image_size) )
     {
