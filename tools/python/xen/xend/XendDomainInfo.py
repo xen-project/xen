@@ -219,7 +219,8 @@ class XendDomainInfo:
         if config:
             vm.construct(config)
         else:
-            vm.name = sxp.child_value(savedinfo, 'name', "Domain-%d" % info['dom'])
+            vm.setName(sxp.child_value(savedinfo, 'name',
+                                       "Domain-%d" % info['dom']))
         vm.recreate = False
         vm.savedinfo = None
 
@@ -291,6 +292,10 @@ class XendDomainInfo:
 
     def getDomain(self):
         return self.id
+
+    def setName(self, name):
+        self.name = name
+        #self.db.name = self.name
 
     def getName(self):
         return self.name
@@ -477,7 +482,7 @@ class XendDomainInfo:
         self.config = config
         try:
             # Initial domain create.
-            self.name = sxp.child_value(config, 'name')
+            self.setName(sxp.child_value(config, 'name'))
             self.check_name(self.name)
             self.configure_cpus(config)
             self.find_image_handler()
