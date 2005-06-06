@@ -115,18 +115,18 @@ class DevControllerTable:
     def getDevControllerClass(self, type):
         return self.controllerClasses.get(type)
 
-    def addDevControllerClass(self, klass):
-        self.controllerClasses[klass.getType()] = klass
+    def addDevControllerClass(self, cls):
+        self.controllerClasses[cls.getType()] = cls
 
     def delDevControllerClass(self, type):
         if type in self.controllerClasses:
             del self.controllerClasses[type]
 
     def createDevController(self, type, vm, recreate=False):
-        klass = self.getDevControllerClass(type)
-        if not klass:
+        cls = self.getDevControllerClass(type)
+        if not cls:
             raise XendError("unknown device type: " + type)
-        return klass.createDevController(vm, recreate=recreate)
+        return cls.createDevController(vm, recreate=recreate)
 
 def getDevControllerTable():
     """Singleton constructor for the controller table.
@@ -138,11 +138,11 @@ def getDevControllerTable():
         devControllerTable = DevControllerTable()
     return devControllerTable
 
-def addDevControllerClass(name, klass):
+def addDevControllerClass(name, cls):
     """Add a device controller class to the controller table.
     """
-    klass.name = name
-    getDevControllerTable().addDevControllerClass(klass)
+    cls.type = name
+    getDevControllerTable().addDevControllerClass(cls)
 
 def createDevController(name, vm, recreate=False):
     return getDevControllerTable().createDevController(name, vm, recreate=recreate)
@@ -155,21 +155,22 @@ class DevController:
 
     """
 
-    name = None
-
-    def createDevController(klass, vm, recreate=False):
+    def createDevController(cls, vm, recreate=False):
         """Class method to create a dev controller.
         """
-        ctrl = klass(vm, recreate=recreate)
+        ctrl = cls(vm, recreate=recreate)
         ctrl.initController(recreate=recreate)
         return ctrl
 
     createDevController = classmethod(createDevController)
 
-    def getType(klass):
-        return klass.name
+    def getType(cls):
+        return cls.type
 
     getType = classmethod(getType)
+
+    # Set when registered.
+    type = None
 
     def __init__(self, vm, recreate=False):
         self.destroyed = False

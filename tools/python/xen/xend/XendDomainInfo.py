@@ -217,7 +217,7 @@ class XendDomainInfo:
         vm = cls._create()
         dom = xc.domain_create()
         vm.setdom(dom)
-        vm.dom_construct(dom, config)
+        vm.dom_construct(vm.id, config)
         return vm
 
     restore = classmethod(restore)
@@ -598,10 +598,6 @@ class XendDomainInfo:
             return
         if self.start_time is None:
             self.start_time = time.time()
-        if self.restore:
-            return
-        dom = self.id or 0
-        memory = self.memory
         try:
             cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
         except:
