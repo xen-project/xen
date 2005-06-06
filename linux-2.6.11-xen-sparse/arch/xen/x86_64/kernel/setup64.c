@@ -336,9 +336,7 @@ void __init cpu_init (void)
 	CD(0); CD(1); CD(2); CD(3); /* no db4 and db5 */; CD(6); CD(7);
 
 #undef CD
-#if 0
 	fpu_init(); 
-#endif
 
 #ifdef CONFIG_NUMA
 	numa_add_cpu(cpu);

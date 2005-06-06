@@ -147,12 +147,12 @@ struct alt_instr {
 #define clts() (HYPERVISOR_fpu_taskswitch(0))
 static inline unsigned long read_cr0(void)
 { 
-        BUG();
+	return 0;
 } 
 
 static inline void write_cr0(unsigned long val) 
 { 
-        BUG();
+	/* Ignore, Linux tries to clear TS and EM */
 } 
 
 static inline unsigned long read_cr3(void)
