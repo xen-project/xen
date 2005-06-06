@@ -849,6 +849,7 @@
 40c9c468xzANp6o2D_MeCYwNmOIUsQ tools/python/xen/xend/XendVnet.py
 40c9c468x191zetrVlMnExfsQWHxIQ tools/python/xen/xend/__init__.py
 40c9c468S2YnCEKmk4ey8XQIST7INg tools/python/xen/xend/encode.py
+42a475165HuglqWwNi2fjqNOIHbIKQ tools/python/xen/xend/image.py
 4266169ezWIlXSfY50n6HSoVFbosmw tools/python/xen/xend/scheduler.py
 40c9c468IxQabrKJSWs0aEjl-27mRQ tools/python/xen/xend/server/SrvConsole.py
 40c9c4689Io5bxfbYIfRiUvsiLX0EQ tools/python/xen/xend/server/SrvConsoleDir.py

@@ -114,25 +114,6 @@ def get_config_handler(name):
     """
     return config_handlers.get(name)
 
-"""Table of handlers for virtual machine images.
-Indexed by image type.
-"""
-image_handlers = {}
-
-def add_image_handler(name, h):
-    """Add a handler for an image type
-    @param name:     image type
-    @param h:        handler: fn(config, name, memory, image)
-    """
-    image_handlers[name] = h
-
-def get_image_handler(name):
-    """Get the handler for an image type.
-    @param name:     image type
-    @return: handler or None
-    """
-    return image_handlers.get(name)
-
 """Table of handlers for devices.
 Indexed by device type.
 """
@@ -252,8 +233,6 @@ class XendDomainInfo:
         self.name = None
         self.memory = None
         self.image = None
-        self.ramdisk = None
-        self.cmdline = None
 
         self.channel = None
         self.controllers = {}
@@ -278,8 +257,6 @@ class XendDomainInfo:
         
         self.console_port = None
         self.savedinfo = None
-        self.image_handler = None
-        self.is_vmx = False
         self.vcpus = 1
         self.bootloader = None
 
@@ -330,8 +307,6 @@ class XendDomainInfo:
         console = self.getConsole()
         if console:
             s += " console=" + str(console.console_port)
-        if self.image:
-            s += " image=" + self.image
         s += ""
         return s
 
@@ -484,8 +459,8 @@ class XendDomainInfo:
             # Initial domain create.
             self.setName(sxp.child_value(config, 'name'))
             self.check_name(self.name)
+            self.init_image()
             self.configure_cpus(config)
-            self.find_image_handler()
             self.init_domain()
             self.register_domain()
             self.configure_bootloader()
@@ -527,29 +502,24 @@ class XendDomainInfo:
         except:
             raise VmError('invalid vcpus value')
 
-    def find_image_handler(self):
-        """Construct the boot image for the domain.
-
-        @return vm
+    def init_image(self):
+        """Create boot image handler for the domain.
         """
         image = sxp.child_value(self.config, 'image')
         if image is None:
             raise VmError('missing image')
-        image_name = sxp.name(image)
-        if image_name is None:
-            raise VmError('missing image name')
-        if image_name == "vmx":
-            self.is_vmx = True
-        image_handler = get_image_handler(image_name)
-        if image_handler is None:
-            raise VmError('unknown image type: ' + image_name)
-        self.image_handler = image_handler
-        return self
+        self.image = ImageHandler.create(self, image)
 
     def construct_image(self):
-        image = sxp.child_value(self.config, 'image')
-        self.image_handler(self, image)
-        return self
+        """Construct the boot image for the domain.
+        """
+        self.create_channel()
+        self.image.createImage()
+        #self.image.exportToDB()
+        #if self.store_channel:
+        #    self.db.introduceDomain(self.id,
+        #                            self.store_mfn,
+        #                            self.store_channel)
 
     def config_devices(self, name):
         """Get a list of the 'device' nodes of a given type from the config.
@@ -596,7 +566,7 @@ class XendDomainInfo:
         """Completely destroy the vm.
         """
         self.cleanup()
-        return self.destroy_domain()
+        self.destroy_domain()
 
     def destroy_domain(self):
         """Destroy the vm's domain.
@@ -606,9 +576,15 @@ class XendDomainInfo:
         if self.channel:
             self.channel.close()
             self.channel = None
+        if self.image:
+            try:
+                self.image.destroy()
+                self.image = None
+            except:
+                pass
         if self.id is None: return 0
         try:
-            return xc.domain_destroy(dom=self.id)
+            xc.domain_destroy(dom=self.id)
         except Exception, err:
             log.exception("Domain destroy failed: %s", self.name)
 
@@ -661,80 +637,11 @@ class XendDomainInfo:
             cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
         except:
             raise VmError('invalid cpu')
-        cpu_weight = self.cpu_weight
-        memory = memory * 1024 + self.pgtable_size(memory)
-        dom = xc.domain_create(dom= dom)
-        if self.bootloader:
-            try:
-                if kernel: os.unlink(kernel)
-                if ramdisk: os.unlink(ramdisk)
-            except OSError, e:
-                log.warning('unable to unlink kernel/ramdisk: %s' %(e,))
-
-        if dom <= 0:
-            raise VmError('Creating domain failed: name=%s memory=%d'
-                          % (self.name, memory))
-        xc.domain_setcpuweight(dom, cpu_weight)
-        xc.domain_setmaxmem(dom, memory)
-        xc.domain_memory_increase_reservation(dom, memory)
-        if cpu != -1:
-            xc.domain_pincpu(dom, 0, 1<<int(cpu))
-        log.debug('init_domain> Created domain=%d name=%s memory=%d', dom, self.name, memory)
-        self.setdom(dom)
-
-    def build_domain(self, ostype, kernel, ramdisk, cmdline, memmap):
-        """Build the domain boot image.
-        """
-        if self.recreate or self.restore: return
-        if not os.path.isfile(kernel):
-            raise VmError('Kernel image does not exist: %s' % kernel)
-        if ramdisk and not os.path.isfile(ramdisk):
-            raise VmError('Kernel ramdisk does not exist: %s' % ramdisk)
-        if len(cmdline) >= 256:
-            log.warning('kernel cmdline too long, domain %d', self.id)
-        dom = self.id
-        buildfn = getattr(xc, '%s_build' % ostype)
-        flags = 0
-        if self.netif_backend: flags |= SIF_NET_BE_DOMAIN
-        if self.blkif_backend: flags |= SIF_BLK_BE_DOMAIN
-        #todo generalise this
-        if ostype == "vmx":
-            log.debug('building vmx domain')            
-            err = buildfn(dom            = dom,
-                          image          = kernel,
-                          control_evtchn = 0,
-                          memsize        = self.memory,
-                          memmap         = memmap,
-                          cmdline        = cmdline,
-                          ramdisk        = ramdisk,
-                          flags          = flags)
-        else:
-            log.debug('building dom with %d vcpus', self.vcpus)
-            err = buildfn(dom            = dom,
-                          image          = kernel,
-                          control_evtchn = self.channel.getRemotePort(),
-                          cmdline        = cmdline,
-                          ramdisk        = ramdisk,
-                          flags          = flags,
-                          vcpus          = self.vcpus)
-            if err != 0:
-                raise VmError('Building domain failed: type=%s dom=%d err=%d'
-                              % (ostype, dom, err))
-            
-    def create_domain(self, ostype, kernel, ramdisk, cmdline, memmap=''):
-        """Create a domain. Builds the image but does not configure it.
-
-        @param ostype:  OS type
-        @param kernel:  kernel image
-        @param ramdisk: kernel ramdisk
-        @param cmdline: kernel commandline
-        """
-
-        self.create_channel()
-        self.build_domain(ostype, kernel, ramdisk, cmdline, memmap)
-        self.image = kernel
-        self.ramdisk = ramdisk
-        self.cmdline = cmdline
+        dom = self.image.initDomain(self.id, self.memory, cpu, self.cpu_weight)
+        log.debug('init_domain> Created domain=%d name=%s memory=%d',
+                  dom, self.name, self.memory)
+        if not self.restore:
+            self.setdom(dom)
 
     def create_channel(self):
         """Create the control channel to the domain.
@@ -773,43 +680,6 @@ class XendDomainInfo:
                 ctrl.initController(reboot=True)
         else:
             self.create_configured_devices()
-        if self.is_vmx:
-            self.create_vmx_model()
-
-    def create_vmx_model(self):
-        #todo: remove special case for vmx
-        device_model = sxp.child_value(self.config, 'device_model')
-        if not device_model:
-            raise VmError("vmx: missing device model")
-        device_config = sxp.child_value(self.config, 'device_config')
-        if not device_config:
-            raise VmError("vmx: missing device config")
-        #todo: self.memory?
-        memory = sxp.child_value(self.config, "memory")
-        # Create an event channel
-        device_channel = channel.eventChannel(0, self.id)
-        # see if a vncviewer was specified
-        # XXX RN: bit of a hack. should unify this, maybe stick in config space
-        vncconnect=""
-        image = sxp.child_value(self.config, "image")
-        args = sxp.child_value(image, "args")
-        if args:
-            arg_list = string.split(args)
-            for arg in arg_list:
-                al = string.split(arg, '=')
-                if al[0] == "VNC_VIEWER":
-                    vncconnect=" -v %s" % al[1]
-                    break
-
-        # Execute device model.
-        #todo: Error handling
-        # XXX RN: note that the order of args matter!
-        os.system(device_model
-                  + " -f %s" % device_config
-                  + vncconnect
-                  + " -d %d" % self.id
-                  + " -p %d" % device_channel['port1']
-                  + " -m %s" % memory)
 
     def device_create(self, dev_config):
         """Create a new device.
@@ -862,9 +732,7 @@ class XendDomainInfo:
     def configure_bootloader(self):
         """Configure boot loader.
         """
-        bl = sxp.child_value(self.config, "bootloader")
-        if bl is not None:
-            self.bootloader = bl
+        self.bootloader = sxp.child_value(self.config, "bootloader")
 
     def configure_console(self):
         """Configure the vm console port.
@@ -1052,19 +920,6 @@ class XendDomainInfo:
                 log.warning("Unknown config field %s", field_name)
             index[field_name] = field_index + 1
 
-    def pgtable_size(self, memory):
-        """Return the size of memory needed for 1:1 page tables for physical
-           mode.
-
-        @param memory: size in MB
-        @return size in KB
-        """
-        if self.is_vmx:
-            # Logic x86-32 specific. 
-            # 1 page for the PGD + 1 pte page for 4MB of memory (rounded)
-            return (1 + ((memory + 3) >> 2)) * 4
-        return 0
-
     def mem_target_set(self, target):
         """Set domain memory target in pages.
         """
@@ -1090,83 +945,6 @@ class XendDomainInfo:
         if not self.shutdown_pending:
             return 0
         return timeout - (time.time() - self.shutdown_pending['start'])
-
-def vm_image_linux(vm, image):
-    """Create a VM for a linux image.
-
-    @param name:      vm name
-    @param memory:    vm memory
-    @param image:     image config
-    @return: vm
-    """
-    kernel = sxp.child_value(image, "kernel")
-    cmdline = ""
-    ip = sxp.child_value(image, "ip", None)
-    if ip:
-        cmdline += " ip=" + ip
-    root = sxp.child_value(image, "root")
-    if root:
-        cmdline += " root=" + root
-    args = sxp.child_value(image, "args")
-    if args:
-        cmdline += " " + args
-    ramdisk = sxp.child_value(image, "ramdisk", '')
-    log.debug("creating linux domain with cmdline: %s" %(cmdline,))
-    vm.create_domain("linux", kernel, ramdisk, cmdline)
-    return vm
-
-def vm_image_plan9(vm, image):
-    """Create a VM for a Plan 9 image.
-
-    name      vm name
-    memory    vm memory
-    image     image config
-
-    returns vm 
-    """
-    kernel = sxp.child_value(image, "kernel")
-    cmdline = ""
-    ip = sxp.child_value(image, "ip", "dhcp")
-    if ip:
-        cmdline += "ip=" + ip
-    root = sxp.child_value(image, "root")
-    if root:
-        cmdline += "root=" + root
-    args = sxp.child_value(image, "args")
-    if args:
-        cmdline += " " + args
-    ramdisk = sxp.child_value(image, "ramdisk", '')
-    log.debug("creating plan9 domain with cmdline: %s" %(cmdline,))
-    vm.create_domain("plan9", kernel, ramdisk, cmdline)
-    return vm
-    
-def vm_image_vmx(vm, image):
-    """Create a VM for the VMX environment.
-
-    @param name:      vm name
-    @param memory:    vm memory
-    @param image:     image config
-    @return: vm
-    """
-    kernel = sxp.child_value(image, "kernel")
-    cmdline = ""
-    ip = sxp.child_value(image, "ip", "dhcp")
-    if ip:
-        cmdline += " ip=" + ip
-    root = sxp.child_value(image, "root")
-    if root:
-        cmdline += " root=" + root
-    args = sxp.child_value(image, "args")
-    if args:
-        cmdline += " " + args
-    ramdisk = sxp.child_value(image, "ramdisk", '')
-    memmap = sxp.child_value(vm.config, "memmap", '')
-    memmap = sxp.parse(open(memmap))[0]
-    from xen.util.memmap import memmap_parse
-    memmap = memmap_parse(memmap)
-    log.debug("creating vmx domain with cmdline: %s" %(cmdline,))
-    vm.create_domain("vmx", kernel, ramdisk, cmdline, memmap)
-    return vm
 
 def vm_field_ignore(vm, config, val, index):
     """Dummy config field handler used for fields with built-in handling.
@@ -1197,9 +975,16 @@ def vm_field_maxmem(vm, config, val, index):
 
 #============================================================================
 # Register image handlers.
-add_image_handler('linux', vm_image_linux)
-add_image_handler('plan9', vm_image_plan9)
-add_image_handler('vmx',   vm_image_vmx)
+from image import          \
+     addImageHandlerClass, \
+     ImageHandler,         \
+     LinuxImageHandler,    \
+     Plan9ImageHandler,    \
+     VmxImageHandler
+
+addImageHandlerClass(LinuxImageHandler)
+addImageHandlerClass(Plan9ImageHandler)
+addImageHandlerClass(VmxImageHandler)
 
 # Ignore the fields we already handle.
 add_config_handler('name',       vm_field_ignore)
