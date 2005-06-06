@@ -529,7 +529,7 @@ int xc_vmx_build(int xc_handle,
 
     if ( mlock(&st_ctxt, sizeof(st_ctxt) ) )
     {   
-        PERROR("Unable to mlock ctxt");
+        PERROR("xc_vmx_build: ctxt mlock failed");
         return 1;
     }
 

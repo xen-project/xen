@@ -26,18 +26,16 @@ do_gnttab_op( int xc_handle,
 
     if ( mlock(op, sizeof(*op)) != 0 )
     {
-        PERROR("Could not lock memory for Xen hypercall");
-        goto out1;
+        PERROR("do_gnttab_op: op mlock failed");
+        goto out;
     }
 
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
-    {
-        printf("do_gnttab_op: hypercall returned error %d\n", ret);
-        goto out2;
-    }
+        ERROR("do_gnttab_op: HYPERVISOR_grant_table_op failed: %d", ret);
 
- out2: (void)munlock(op, sizeof(*op));
- out1: return ret;
+    (void)munlock(op, sizeof(*op));
+ out:
+    return ret;
 }
 
 

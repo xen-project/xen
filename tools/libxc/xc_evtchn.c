@@ -19,15 +19,16 @@ static int do_evtchn_op(int xc_handle, evtchn_op_t *op)
 
     if ( mlock(op, sizeof(*op)) != 0 )
     {
-        PERROR("Could not lock memory for Xen hypercall");
-        goto out1;
+        PERROR("do_evtchn_op: op mlock failed");
+        goto out;
     }
 
-    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
-        goto out2;
+    if ((ret = do_xen_hypercall(xc_handle, &hypercall)) < 0)
+        ERROR("do_evtchn_op: HYPERVISOR_event_channel_op failed: %d", ret);
 
- out2: (void)munlock(op, sizeof(*op));
- out1: return ret;
+    (void)munlock(op, sizeof(*op));
+ out:
+    return ret;
 }
 
 

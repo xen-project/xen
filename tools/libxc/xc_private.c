@@ -122,7 +122,7 @@ static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
 
     if ( mlock(mmu->updates, sizeof(mmu->updates)) != 0 )
     {
-        PERROR("Could not lock pagetable update array");
+        PERROR("flush_mmu_updates: mmu updates mlock failed");
         err = 1;
         goto out;
     }
@@ -226,7 +226,7 @@ int xc_get_pfn_list(int xc_handle,
 
     if ( mlock(pfn_buf, max_pfns * sizeof(unsigned long)) != 0 )
     {
-        PERROR("Could not lock pfn list buffer");
+        PERROR("xc_get_pfn_list: pfn_buf mlock failed");
         return -1;
     }    
 

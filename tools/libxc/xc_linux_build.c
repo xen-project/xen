@@ -193,7 +193,7 @@ static int setup_guest(int xc_handle,
     }
 
     (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
-			   &dsi);
+                           &dsi);
 
     /* Load the initial ramdisk image. */
     if ( initrd_len != 0 )
@@ -466,7 +466,7 @@ int xc_linux_build(int xc_handle,
 
     if ( mlock(&st_ctxt, sizeof(st_ctxt) ) )
     {   
-        PERROR("Unable to mlock ctxt");
+        PERROR("xc_linux_build: ctxt mlock failed");
         return 1;
     }
 
