@@ -1,8 +1,5 @@
-#ifndef _X86_TYPES_H
-#define _X86_TYPES_H
-
-typedef unsigned short umode_t;
-
+#ifndef __X86_TYPES_H__
+#define __X86_TYPES_H__
 
 /*
  * __xx is ok: it doesn't pollute the POSIX namespace. Use these in the
@@ -45,7 +42,6 @@ typedef unsigned long long u64;
 #define BITS_PER_LONG 32
 #define BYTES_PER_LONG 4
 #define LONG_BYTEORDER 2
-typedef unsigned int size_t;
 #if defined(CONFIG_X86_PAE)
 typedef u64 physaddr_t;
 #else
@@ -57,15 +53,9 @@ typedef unsigned long u64;
 #define BITS_PER_LONG 64
 #define BYTES_PER_LONG 8
 #define LONG_BYTEORDER 3
-typedef unsigned long size_t;
 typedef u64 physaddr_t;
 #endif
 
-/* DMA addresses come in generic and 64-bit flavours.  */
+typedef unsigned long size_t;
 
-typedef unsigned long dma_addr_t;
-typedef u64 dma64_addr_t;
-
-typedef unsigned short xmem_bufctl_t;
-
-#endif
+#endif /* __X86_TYPES_H__ */

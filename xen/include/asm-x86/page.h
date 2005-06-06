@@ -185,22 +185,26 @@ typedef struct { u64 pfn; } pagetable_t;
 #define pfn_valid(_pfn)     ((_pfn) < max_page)
 
 /* High table entries are reserved by the hypervisor. */
-/* FIXME: this breaks with PAE -- kraxel */
+#if defined(CONFIG_X86_32) && !defined(CONFIG_PAE)
 #define DOMAIN_ENTRIES_PER_L2_PAGETABLE     \
   (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
 #define HYPERVISOR_ENTRIES_PER_L2_PAGETABLE \
   (L2_PAGETABLE_ENTRIES - DOMAIN_ENTRIES_PER_L2_PAGETABLE)
+#else
+#define DOMAIN_ENTRIES_PER_L2_PAGETABLE     0
+#define HYPERVISOR_ENTRIES_PER_L2_PAGETABLE 0
+#endif
 
 #define linear_l1_table                                                 \
     ((l1_pgentry_t *)(LINEAR_PT_VIRT_START))
-#define __linear_l2_table                                                 \
+#define __linear_l2_table                                               \
     ((l2_pgentry_t *)(LINEAR_PT_VIRT_START +                            \
                      (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0))))
-#define __linear_l3_table                                                 \
+#define __linear_l3_table                                               \
     ((l3_pgentry_t *)(LINEAR_PT_VIRT_START +                            \
                      (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0)) +   \
                      (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<1))))
-#define __linear_l4_table                                                 \
+#define __linear_l4_table                                               \
     ((l4_pgentry_t *)(LINEAR_PT_VIRT_START +                            \
                      (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0)) +   \
                      (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<1)) +   \

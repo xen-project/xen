@@ -1387,7 +1387,7 @@
 3ddb79c3Hgbb2g8CyWLMCK-6_ZVQSQ xen/include/asm-x86/smp.h
 3ddb79c3jn8ALV_S9W5aeTYUQRKBpg xen/include/asm-x86/smpboot.h
 3ddb79c3NiyQE2vQnyGiaBnNjBO1rA xen/include/asm-x86/spinlock.h
-40e1966akOHWvvunCED7x3HPv35QvQ xen/include/asm-x86/string.h
+3e7f358aG11EvMI9VJ4_9hD4LUO7rQ xen/include/asm-x86/string.h
 3ddb79c3ezddh34MdelJpa5tNR00Dw xen/include/asm-x86/system.h
 42033fc1Bb8ffTshBYFGouGkiAMoUQ xen/include/asm-x86/time.h
 3ddb79c4HugMq7IYGxcQKFBpKwKhzA xen/include/asm-x86/types.h
@@ -1404,13 +1404,11 @@
 429c852fskvSOgcD5EC25_m9um9t4g xen/include/asm-x86/x86_32/page-3level.h
 4208e2a3ZNFroNXbX9OYaOB-xtUyDQ xen/include/asm-x86/x86_32/page.h
 3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/x86_32/regs.h
-3e7f358aG11EvMI9VJ4_9hD4LUO7rQ xen/include/asm-x86/x86_32/string.h
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen/include/asm-x86/x86_32/uaccess.h
 41bf1717bML6GxpclTWJabiaO5W5vg xen/include/asm-x86/x86_64/asm_defns.h
 41febc4b1aCGLsm0Y0b_82h7lFtrEA xen/include/asm-x86/x86_64/domain_page.h
 4208e2a3Fktw4ZttKdDxbhvTQ6brfQ xen/include/asm-x86/x86_64/page.h
 404f1bb86rAXB3aLS1vYdcqpJiEcyg xen/include/asm-x86/x86_64/regs.h
-40e1966azOJZfNI6Ilthe6Q-T3Hewg xen/include/asm-x86/x86_64/string.h
 404f1bc4tWkB9Qr8RkKtZGW5eMQzhw xen/include/asm-x86/x86_64/uaccess.h
 422f27c8RHFkePhD34VIEpMMqofZcA xen/include/asm-x86/x86_emulate.h
 400304fcmRQmDdFYEzDh0wcBba9alg xen/include/public/COPYING
