@@ -238,6 +238,8 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.ii
 
 void foodpi(void) {}
 
+unsigned long pending_false_positive = 0;
+
 // ONLY gets called from ia64_leave_kernel
 // ONLY call with interrupts disabled?? (else might miss one?)
 // NEVER successful if already reflecting a trap/fault because psr.i==0
@@ -254,6 +256,8 @@ void deliver_pending_interrupt(struct pt_regs *regs)
 printf("*#*#*#* about to deliver early timer to domain %d!!!\n",v->domain->domain_id);
 			reflect_interruption(0,isr,0,regs,IA64_EXTINT_VECTOR);
 		}
+		else if (PSCB(v,pending_interruption))
+			++pending_false_positive;
 	}
 }
 
@@ -764,7 +768,7 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 		vcpu_set_gr(current,8,-1L);
 		break;
 	    default:
-		printf("ia64_handle_break: bad ssc code %lx\n",ssc);
+		printf("ia64_handle_break: bad ssc code %lx, iip=%p\n",ssc,regs->cr_iip);
 		break;
 	}
 	vcpu_increment_iip(current);

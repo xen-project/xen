@@ -49,6 +49,7 @@ void foo(void)
 	DEFINE(XSI_IPSR, (SHAREDINFO_ADDR+offsetof(vcpu_info_t, arch.ipsr)));
 	DEFINE(XSI_IPSR_OFS, offsetof(vcpu_info_t, arch.ipsr));
 	DEFINE(XSI_IFS_OFS, offsetof(vcpu_info_t, arch.ifs));
+	DEFINE(XSI_ISR_OFS, offsetof(vcpu_info_t, arch.isr));
 	DEFINE(XSI_IIM_OFS, offsetof(vcpu_info_t, arch.iim));
 	DEFINE(XSI_BANKNUM_OFS, offsetof(vcpu_info_t, arch.banknum));
 	DEFINE(XSI_BANK0_OFS, offsetof(vcpu_info_t, arch.bank0_regs[0]));
