@@ -334,6 +334,7 @@ static void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         case 1:
             s->irq_base = val & 0xf8;
             s->init_state = 2;
+            pit_reset_vmx_vectors();
             break;
         case 2:
             if (s->init4) {

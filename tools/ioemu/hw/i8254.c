@@ -50,6 +50,7 @@ typedef struct PITChannelState {
     int64_t next_transition_time;
     QEMUTimer *irq_timer;
     int irq;
+    int vmx_channel; /* Is this accelerated by VMX ? */
 } PITChannelState;
 
 struct PITState {
@@ -214,12 +215,47 @@ int pit_get_gate(PITState *pit, int channel)
     return s->gate;
 }
 
-static inline void pit_load_count(PITChannelState *s, int val)
+void pit_reset_vmx_vectors()
 {
     extern void *shared_page;
     ioreq_t *req; 
-    int irq;
+    int irq, i;
+    PITChannelState *s;
 
+    /* Assumes PIT is wired to IRQ0 and -1 is uninitialized irq base */
+    if ((irq = pic_irq2vec(0)) == -1)
+        return;
+
+    for(i = 0; i < 3; i++) {
+        if (pit_state.channels[i].vmx_channel)
+             break;
+    }
+    
+    if (i == 3)
+        return;
+
+    /* Assumes just one VMX accelerated channel */
+    vmx_channel = i;
+    s = &pit_state.channels[vmx_channel];
+    fprintf(logfile,
+    	"VMX_PIT:guest init pit channel %d!\n", vmx_channel);
+    req = &((vcpu_iodata_t *) shared_page)->vp_ioreq;
+
+    req->state = STATE_IORESP_HOOK;
+    /*
+     * info passed to HV as following
+     * -- init count:16 bit, timer vec:8 bit,
+     * PIT channel(0~2):2 bit, rw mode:2 bit
+     */
+    req->u.data = s->count;
+    req->u.data |= (irq << 16);
+    req->u.data |= (vmx_channel << 24);
+    req->u.data |= ((s->rw_mode) << 26);
+    fprintf(logfile, "VMX_PIT:pass info 0x%llx to HV!\n", req->u.data);
+}
+
+static inline void pit_load_count(PITChannelState *s, int val)
+{
     if (val == 0)
         val = 0x10000;
     s->count_load_time = qemu_get_clock(vm_clock);
@@ -228,25 +264,8 @@ static inline void pit_load_count(PITChannelState *s, int val)
     /* guest init this pit channel for periodic mode. we do not update related
      * timer so the channel never send intr from device model*/
     if (vmx_channel != -1 && s->mode == 2) {
-	/* get the pit irq(0)'s vector from pic DM */
-	if ((irq = pic_irq2vec(0)) >= 0) {
-	    fprintf(logfile,
-	    	"VMX_PIT:guest init pit channel %d!\n", vmx_channel);
-	    req = &((vcpu_iodata_t *) shared_page)->vp_ioreq;
-
-	    req->state = STATE_IORESP_HOOK;
-	    /*
-	     * info passed to HV as following
-	     * -- init count:16 bit, timer vec:8 bit,
-	     * PIT channel(0~2):2 bit, rw mode:2 bit
-	     */
-	    req->u.data = s->count;
-	    req->u.data |= (irq << 16);
-	    req->u.data |= (vmx_channel << 24);
-	    req->u.data |= ((s->rw_mode) << 26);
-	    fprintf(logfile, "VMX_PIT:pass info 0x%llx to HV!\n", req->u.data);
-	    vmx_channel = -1;
-	}
+        pit_reset_vmx_vectors();
+        vmx_channel = -1;
     }
 
 /*    pit_irq_timer_update(s, s->count_load_time);*/
@@ -306,6 +325,7 @@ static void pit_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         }
     } else {
         s = &pit->channels[addr];
+        s->vmx_channel = 1;
         vmx_channel = addr;
         switch(s->write_state) {
         default:
