@@ -15,9 +15,9 @@
 #include <xen/time.h>
 #include <xen/console.h>
 #include <xen/softirq.h>
-#include <public/dom0_ops.h>
-#include <asm/domain_page.h>
+#include <xen/domain_page.h>
 #include <asm/debugger.h>
+#include <public/dom0_ops.h>
 
 /* Both these structures are protected by the domlist_lock. */
 rwlock_t domlist_lock = RW_LOCK_UNLOCKED;

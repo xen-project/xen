@@ -31,7 +31,7 @@
 #include <xen/irq.h>
 #include <xen/softirq.h>
 #include <xen/shadow.h>
-#include <asm/domain_page.h>
+#include <xen/domain_page.h>
 #include <asm/page.h>
 
 /*
@@ -383,9 +383,9 @@ void scrub_heap_pages(void)
             }
             else
             {
-                p = map_domain_mem(pfn << PAGE_SHIFT);
+                p = map_domain_page(pfn);
                 clear_page(p);
-                unmap_domain_mem(p);
+                unmap_domain_page(p);
             }
         }
         
@@ -674,9 +674,9 @@ static void page_scrub_softirq(void)
         {
             pg = list_entry(ent, struct pfn_info, list);
             ent = ent->prev;
-            p = map_domain_mem(page_to_phys(pg));
+            p = map_domain_page(page_to_pfn(pg));
             clear_page(p);
-            unmap_domain_mem(p);
+            unmap_domain_page(p);
             free_heap_pages(MEMZONE_DOM, pg, 0);
         }
     } while ( (NOW() - start) < MILLISECS(1) );

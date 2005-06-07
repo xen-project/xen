@@ -11,13 +11,13 @@
 #include <xen/serial.h>
 #include <xen/trace.h>
 #include <xen/multiboot.h>
+#include <xen/domain_page.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
 #include <asm/processor.h>
 #include <asm/mpspec.h>
 #include <asm/apic.h>
 #include <asm/desc.h>
-#include <asm/domain_page.h>
 #include <asm/shadow.h>
 #include <asm/e820.h>
 

@@ -15,16 +15,19 @@
 #include <xen/sched.h>
 #include <xen/mm.h>
 #include <xen/perfc.h>
+#include <xen/domain_page.h>
 #include <asm/current.h>
-#include <asm/domain_page.h>
 #include <asm/flushtlb.h>
 #include <asm/hardirq.h>
+
+#define MAPCACHE_ORDER    10
+#define MAPCACHE_ENTRIES  (1 << MAPCACHE_ORDER)
 
 l1_pgentry_t *mapcache;
 static unsigned int map_idx, epoch, shadow_epoch[NR_CPUS];
 static spinlock_t map_lock = SPIN_LOCK_UNLOCKED;
 
-void *map_domain_mem(unsigned long pa)
+void *map_domain_page(unsigned long pfn)
 {
     unsigned long va;
     unsigned int idx, cpu = smp_processor_id();
@@ -34,7 +37,7 @@ void *map_domain_mem(unsigned long pa)
 #endif
 
     ASSERT(!in_irq());
-    perfc_incrc(map_domain_mem_count);
+    perfc_incrc(map_domain_page_count);
 
     spin_lock(&map_lock);
 
@@ -58,15 +61,15 @@ void *map_domain_mem(unsigned long pa)
     }
     while ( l1e_get_flags(cache[idx]) & _PAGE_PRESENT );
 
-    cache[idx] = l1e_from_paddr(pa & PAGE_MASK, __PAGE_HYPERVISOR);
+    cache[idx] = l1e_from_pfn(pfn, __PAGE_HYPERVISOR);
 
     spin_unlock(&map_lock);
 
-    va = MAPCACHE_VIRT_START + (idx << PAGE_SHIFT) + (pa & ~PAGE_MASK);
+    va = MAPCACHE_VIRT_START + (idx << PAGE_SHIFT);
     return (void *)va;
 }
 
-void unmap_domain_mem(void *va)
+void unmap_domain_page(void *va)
 {
     unsigned int idx;
     ASSERT((void *)MAPCACHE_VIRT_START <= va);

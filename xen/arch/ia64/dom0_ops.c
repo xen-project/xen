@@ -13,12 +13,9 @@
 #include <public/dom0_ops.h>
 #include <xen/sched.h>
 #include <xen/event.h>
-#include <asm/domain_page.h>
-//#include <asm/msr.h>
 #include <asm/pdb.h>
 #include <xen/trace.h>
 #include <xen/console.h>
-//#include <xen/shadow.h>
 #include <public/sched_ctl.h>
 
 #define TRC_DOM0OP_ENTER_BASE  0x00020000

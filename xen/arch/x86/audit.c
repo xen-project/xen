@@ -122,7 +122,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
     void adjust_l2_page(unsigned long mfn, int shadow)
     {
-        unsigned long *pt = map_domain_mem(mfn << PAGE_SHIFT);
+        unsigned long *pt = map_domain_page(mfn);
         int i;
 
         for ( i = 0; i < l2limit; i++ )
@@ -205,12 +205,12 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             adjust(hl2page, 0);
         }
 
-        unmap_domain_mem(pt);
+        unmap_domain_page(pt);
     }
 
     void adjust_hl2_page(unsigned long hl2mfn)
     {
-        unsigned long *pt = map_domain_mem(hl2mfn << PAGE_SHIFT);
+        unsigned long *pt = map_domain_page(hl2mfn);
         int i;
 
         for ( i = 0; i < l2limit; i++ )
@@ -251,12 +251,12 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             }
         }
 
-        unmap_domain_mem(pt);
+        unmap_domain_page(pt);
     }
 
     void adjust_l1_page(unsigned long l1mfn)
     {
-        unsigned long *pt = map_domain_mem(l1mfn << PAGE_SHIFT);
+        unsigned long *pt = map_domain_page(l1mfn);
         int i;
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
@@ -323,7 +323,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             }
         }
 
-        unmap_domain_mem(pt);
+        unmap_domain_page(pt);
     }
 
     void adjust_shadow_tables()
@@ -615,7 +615,7 @@ void _audit_domain(struct domain *d, int flags)
                              unsigned long mfn)
     {
         struct pfn_info *page = &frame_table[mfn];
-        unsigned long *pt = map_domain_mem(mfn<<PAGE_SHIFT);
+        unsigned long *pt = map_domain_page(mfn);
         int i;
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
@@ -627,7 +627,7 @@ void _audit_domain(struct domain *d, int flags)
                        page->count_info, i, pt[i]);
         }
 
-        unmap_domain_mem(pt);           
+        unmap_domain_page(pt);           
     }
 
     void scan_for_pfn_in_grant_table(struct domain *d, unsigned xmfn)

@@ -27,14 +27,12 @@
 #include <xen/perfc.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
+#include <xen/domain_page.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/processor.h>
-#include <asm/domain_page.h>
-#include <public/dom0_ops.h>
-#ifdef CONFIG_VMX
 #include <asm/vmx.h>
-#endif
+#include <public/dom0_ops.h>
 
 /* Shadow PT operation mode : shadow-mode variable in arch_domain. */
 

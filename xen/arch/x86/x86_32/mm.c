@@ -22,11 +22,13 @@
 #include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/sched.h>
 #include <asm/current.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/fixmap.h>
-#include <asm/domain_page.h>
+
+extern l1_pgentry_t *mapcache;
 
 unsigned int PAGE_HYPERVISOR         = __PAGE_HYPERVISOR;
 unsigned int PAGE_HYPERVISOR_NOCACHE = __PAGE_HYPERVISOR_NOCACHE;

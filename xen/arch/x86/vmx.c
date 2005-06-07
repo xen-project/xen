@@ -24,6 +24,7 @@
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
+#include <xen/domain_page.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/shadow.h>
@@ -102,7 +103,7 @@ void stop_vmx(void)
 }
 
 /*
- * Not all cases recevie valid value in the VM-exit instruction length field.
+ * Not all cases receive valid value in the VM-exit instruction length field.
  */
 #define __get_instruction_length(len) \
     __vmread(INSTRUCTION_LEN, &(len)); \
@@ -117,8 +118,6 @@ static void inline __update_guest_eip(unsigned long inst_len)
     __vmwrite(GUEST_EIP, current_eip + inst_len);
 }
 
-
-#include <asm/domain_page.h>
 
 static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs) 
 {
@@ -468,23 +467,24 @@ enum { COPY_IN = 0, COPY_OUT };
 static inline int
 vmx_copy(void *buf, unsigned long laddr, int size, int dir)
 {
-    unsigned char *addr;
+    char *addr;
     unsigned long mfn;
 
-    if ((size + (laddr & (PAGE_SIZE - 1))) >= PAGE_SIZE) {
+    if ( (size + (laddr & (PAGE_SIZE - 1))) >= PAGE_SIZE )
+    {
     	printf("vmx_copy exceeds page boundary\n");
-	return 0;
+        return 0;
     }
 
     mfn = phys_to_machine_mapping(laddr >> PAGE_SHIFT);
-    addr = map_domain_mem((mfn << PAGE_SHIFT) | (laddr & ~PAGE_MASK));
+    addr = (char *)map_domain_page(mfn) + (laddr & ~PAGE_MASK);
 
     if (dir == COPY_IN)
 	    memcpy(buf, addr, size);
     else
 	    memcpy(addr, buf, size);
 
-    unmap_domain_mem(addr);
+    unmap_domain_page(addr);
     return 1;
 }
 

@@ -189,7 +189,8 @@ extern unsigned long _end; /* standard ELF symbol */
 
 #elif defined(__i386__)
 
-#define CONFIG_X86_32 1
+#define CONFIG_X86_32      1
+#define CONFIG_DOMAIN_PAGE 1
 
 #define asmlinkage __attribute__((regparm(0)))
 
@@ -198,7 +199,7 @@ extern unsigned long _end; /* standard ELF symbol */
  *                                                       ------ ------
  *  I/O remapping area                                   ( 4MB)
  *  Direct-map (1:1) area [Xen code/data/heap]           (12MB)
- *  map_domain_mem cache                                 ( 4MB)
+ *  map_domain_page cache                                ( 4MB)
  *  Per-domain mappings                                  ( 4MB)
  *  Shadow linear pagetable                              ( 4MB) ( 8MB)
  *  Guest linear pagetable                               ( 4MB) ( 8MB)

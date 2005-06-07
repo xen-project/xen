@@ -15,7 +15,6 @@
 #include <xen/event.h>
 #include <xen/shadow.h>
 #include <asm/current.h>
-#include <asm/domain_page.h>
 #include <asm/hardirq.h>
 
 /*

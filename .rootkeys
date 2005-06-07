@@ -1285,7 +1285,6 @@
 421098b6ZcIrn_gdqjUtdJyCE0YkZQ xen/include/asm-ia64/debugger.h
 421098b6z0zSuW1rcSJK1gR8RUi-fw xen/include/asm-ia64/dom_fw.h
 421098b6Nn0I7hGB8Mkd1Cis0KMkhA xen/include/asm-ia64/domain.h
-4241e879ry316Y_teC18DuK7mGKaQw xen/include/asm-ia64/domain_page.h
 4241e880hAyo_dk0PPDYj3LsMIvf-Q xen/include/asm-ia64/flushtlb.h
 421098b6X3Fs2yht42TE2ufgKqt2Fw xen/include/asm-ia64/ia64_int.h
 421098b7psFAn8kbeR-vcRCdc860Vw xen/include/asm-ia64/init.h
@@ -1333,7 +1332,6 @@
 3ddb79c34BFiXjBJ_cCKB0aCsV1IDw xen/include/asm-x86/desc.h
 40715b2dTokMLYGSuD58BnxOqyWVew xen/include/asm-x86/div64.h
 4204e7acwzqgXyTAPKa1nM-L7Ec0Qw xen/include/asm-x86/domain.h
-41febc4bBKTKHhnAu_KPYwgNkHjFlg xen/include/asm-x86/domain_page.h
 41d3eaaeIBzW621S1oa0c2yk7X43qQ xen/include/asm-x86/e820.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen/include/asm-x86/fixmap.h
 3e2d29944GI24gf7vOP_7x8EyuqxeA xen/include/asm-x86/flushtlb.h
@@ -1399,14 +1397,12 @@
 420951dcqyUCe_gXA_XJPu1ix_poKg xen/include/asm-x86/vmx_virpit.h
 41c0c412lQ0NVVN9PsOSznQ-qhOiPA xen/include/asm-x86/vmx_vmcs.h
 418fbcfe_WliJPToeVM-9VStvym-hw xen/include/asm-x86/x86_32/asm_defns.h
-3e20b82fl1jmQiKdLy7fxMcutfpjWA xen/include/asm-x86/x86_32/domain_page.h
 429c852fi3pvfa9kIjryYK5AGBmXAg xen/include/asm-x86/x86_32/page-2level.h
 429c852fskvSOgcD5EC25_m9um9t4g xen/include/asm-x86/x86_32/page-3level.h
 4208e2a3ZNFroNXbX9OYaOB-xtUyDQ xen/include/asm-x86/x86_32/page.h
 3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/x86_32/regs.h
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen/include/asm-x86/x86_32/uaccess.h
 41bf1717bML6GxpclTWJabiaO5W5vg xen/include/asm-x86/x86_64/asm_defns.h
-41febc4b1aCGLsm0Y0b_82h7lFtrEA xen/include/asm-x86/x86_64/domain_page.h
 4208e2a3Fktw4ZttKdDxbhvTQ6brfQ xen/include/asm-x86/x86_64/page.h
 404f1bb86rAXB3aLS1vYdcqpJiEcyg xen/include/asm-x86/x86_64/regs.h
 404f1bc4tWkB9Qr8RkKtZGW5eMQzhw xen/include/asm-x86/x86_64/uaccess.h
@@ -1443,6 +1439,7 @@
 3ddb79c05DdHQ0UxX_jKsXdR4QlMCA xen/include/xen/delay.h
 4294b5efxcDdUVp4XMEE__IFw7nPow xen/include/xen/dmi.h
 40f2b4a2hC3HtChu-ArD8LyojxWMjg xen/include/xen/domain.h
+3e20b82fl1jmQiKdLy7fxMcutfpjWA xen/include/xen/domain_page.h
 3ddb79c2O729EttZTYu1c8LcsUO_GQ xen/include/xen/elf.h
 3ddb79c0HIghfBF8zFUdmXhOU8i6hA xen/include/xen/errno.h
 3ddb79c1W0lQca8gRV7sN6j3iY4Luw xen/include/xen/event.h

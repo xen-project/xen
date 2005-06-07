@@ -14,8 +14,6 @@
 #include <xen/sched.h>
 #include <asm/ptrace.h>
 #include <xen/keyhandler.h> 
-//#include <asm/apic.h>
-#include <asm/domain_page.h>                           /* [un]map_domain_mem */
 #include <asm/processor.h>
 #include <asm/pdb.h>
 #include <xen/list.h>

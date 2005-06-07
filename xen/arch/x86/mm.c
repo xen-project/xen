@@ -94,12 +94,12 @@
 #include <xen/perfc.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
+#include <xen/domain_page.h>
 #include <asm/shadow.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm/domain_page.h>
 #include <asm/ldt.h>
 #include <asm/x86_emulate.h>
 
@@ -269,17 +269,17 @@ static int alloc_segdesc_page(struct pfn_info *page)
     struct desc_struct *descs;
     int i;
 
-    descs = map_domain_mem((page-frame_table) << PAGE_SHIFT);
+    descs = map_domain_page(page_to_pfn(page));
 
     for ( i = 0; i < 512; i++ )
         if ( unlikely(!check_descriptor(&descs[i])) )
             goto fail;
 
-    unmap_domain_mem(descs);
+    unmap_domain_page(descs);
     return 1;
 
  fail:
-    unmap_domain_mem(descs);
+    unmap_domain_page(descs);
     return 0;
 }
 
@@ -665,14 +665,14 @@ static int alloc_l1_table(struct pfn_info *page)
 
     ASSERT(!shadow_mode_refcounts(d));
 
-    pl1e = map_domain_mem(pfn << PAGE_SHIFT);
+    pl1e = map_domain_page(pfn);
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         if ( is_guest_l1_slot(i) &&
              unlikely(!get_page_from_l1e(pl1e[i], d)) )
             goto fail;
 
-    unmap_domain_mem(pl1e);
+    unmap_domain_page(pl1e);
     return 1;
 
  fail:
@@ -680,7 +680,7 @@ static int alloc_l1_table(struct pfn_info *page)
         if ( is_guest_l1_slot(i) )
             put_page_from_l1e(pl1e[i], d);
 
-    unmap_domain_mem(pl1e);
+    unmap_domain_page(pl1e);
     return 0;
 }
 
@@ -699,7 +699,7 @@ static inline int fixup_pae_linear_mappings(l3_pgentry_t *pl3e)
         return 0;
     }
 
-    pl2e = map_domain_mem(l3e_get_paddr(pl3e[3]));
+    pl2e = map_domain_page(l3e_get_pfn(pl3e[3]));
     for (i = 0; i < 4; i++) {
         vaddr = LINEAR_PT_VIRT_START + (i << L2_PAGETABLE_SHIFT);
         idx = (vaddr >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES-1);
@@ -709,7 +709,7 @@ static inline int fixup_pae_linear_mappings(l3_pgentry_t *pl3e)
         } else
             pl2e[idx] = l2e_empty();
     }
-    unmap_domain_mem(pl2e);
+    unmap_domain_page(pl2e);
 
     return 1;
 }
@@ -749,7 +749,7 @@ static int alloc_l2_table(struct pfn_info *page, unsigned int type)
     ASSERT( !shadow_mode_refcounts(d) );
    
     
-    pl2e = map_domain_mem(pfn << PAGE_SHIFT);
+    pl2e = map_domain_page(pfn);
 
     for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ ) {
         vaddr = i << L2_PAGETABLE_SHIFT;
@@ -790,7 +790,7 @@ static int alloc_l2_table(struct pfn_info *page, unsigned int type)
     }
 #endif
 
-    unmap_domain_mem(pl2e);
+    unmap_domain_page(pl2e);
     return 1;
 
  fail:
@@ -798,7 +798,7 @@ static int alloc_l2_table(struct pfn_info *page, unsigned int type)
         if ( is_guest_l2_slot(type, i) )
             put_page_from_l2e(pl2e[i], pfn);
 
-    unmap_domain_mem(pl2e);
+    unmap_domain_page(pl2e);
     return 0;
 }
 
@@ -815,7 +815,7 @@ static int alloc_l3_table(struct pfn_info *page)
 
     ASSERT( !shadow_mode_refcounts(d) );
 
-    pl3e = map_domain_mem(pfn << PAGE_SHIFT);
+    pl3e = map_domain_page(pfn);
     for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ ) {
         vaddr = i << L3_PAGETABLE_SHIFT;
         if ( is_guest_l3_slot(i) &&
@@ -825,7 +825,7 @@ static int alloc_l3_table(struct pfn_info *page)
 
     if (!fixup_pae_linear_mappings(pl3e))
         goto fail;
-    unmap_domain_mem(pl3e);
+    unmap_domain_page(pl3e);
     return 1;
 
  fail:
@@ -833,7 +833,7 @@ static int alloc_l3_table(struct pfn_info *page)
         if ( is_guest_l3_slot(i) )
             put_page_from_l3e(pl3e[i], pfn);
 
-    unmap_domain_mem(pl3e);
+    unmap_domain_page(pl3e);
     return 0;
 }
 
@@ -891,13 +891,13 @@ static void free_l1_table(struct pfn_info *page)
     l1_pgentry_t *pl1e;
     int i;
 
-    pl1e = map_domain_mem(pfn << PAGE_SHIFT);
+    pl1e = map_domain_page(pfn);
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         if ( is_guest_l1_slot(i) )
             put_page_from_l1e(pl1e[i], d);
 
-    unmap_domain_mem(pl1e);
+    unmap_domain_page(pl1e);
 }
 
 
@@ -907,14 +907,14 @@ static void free_l2_table(struct pfn_info *page)
     l2_pgentry_t *pl2e;
     int i;
 
-    pl2e = map_domain_mem(pfn << PAGE_SHIFT);
+    pl2e = map_domain_page(pfn);
 
     for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ ) {
         if ( is_guest_l2_slot(page->u.inuse.type_info, i) )
             put_page_from_l2e(pl2e[i], pfn);
     }
 
-    unmap_domain_mem(pl2e);
+    unmap_domain_page(pl2e);
 }
 
 
@@ -926,13 +926,13 @@ static void free_l3_table(struct pfn_info *page)
     l3_pgentry_t *pl3e;
     int           i;
 
-    pl3e = map_domain_mem(pfn << PAGE_SHIFT);
+    pl3e = map_domain_page(pfn);
 
     for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
         if ( is_guest_l3_slot(i) )
             put_page_from_l3e(pl3e[i], pfn);
 
-    unmap_domain_mem(pl3e);
+    unmap_domain_page(pl3e);
 }
 
 #endif
@@ -2011,7 +2011,8 @@ int do_mmu_update(
                 break;
             }
 
-            va = map_domain_mem_with_cache(req.ptr, &mapcache);
+            va = map_domain_page_with_cache(mfn, &mapcache);
+            va = (void *)((unsigned long)va + (req.ptr & ~PAGE_MASK));
             page = &frame_table[mfn];
 
             switch ( (type_info = page->u.inuse.type_info) & PGT_type_mask )
@@ -2105,7 +2106,7 @@ int do_mmu_update(
                 break;
             }
 
-            unmap_domain_mem_with_cache(va, &mapcache);
+            unmap_domain_page_with_cache(va, &mapcache);
 
             put_page(page);
             break;
@@ -2452,6 +2453,7 @@ long do_update_descriptor(unsigned long pa, u64 desc)
     struct domain *dom = current->domain;
     unsigned long gpfn = pa >> PAGE_SHIFT;
     unsigned long mfn;
+    unsigned int  offset = (pa & ~PAGE_MASK) / sizeof(struct desc_struct);
     struct desc_struct *gdt_pent, d;
     struct pfn_info *page;
     long ret = -EINVAL;
@@ -2460,18 +2462,18 @@ long do_update_descriptor(unsigned long pa, u64 desc)
 
     LOCK_BIGLOCK(dom);
 
-    if ( !VALID_MFN(mfn = __gpfn_to_mfn(dom, gpfn)) ) {
-        UNLOCK_BIGLOCK(dom);
-        return -EINVAL;
-    }
-
-    if ( (pa & 7) || (mfn >= max_page) || !check_descriptor(&d) ) {
+    if ( !VALID_MFN(mfn = __gpfn_to_mfn(dom, gpfn)) ||
+         ((pa % sizeof(struct desc_struct)) != 0) ||
+         (mfn >= max_page) ||
+         !check_descriptor(&d) )
+    {
         UNLOCK_BIGLOCK(dom);
         return -EINVAL;
     }
 
     page = &frame_table[mfn];
-    if ( unlikely(!get_page(page, dom)) ) {
+    if ( unlikely(!get_page(page, dom)) )
+    {
         UNLOCK_BIGLOCK(dom);
         return -EINVAL;
     }
@@ -2505,9 +2507,9 @@ long do_update_descriptor(unsigned long pa, u64 desc)
     }
 
     /* All is good so make the update. */
-    gdt_pent = map_domain_mem((mfn << PAGE_SHIFT) | (pa & ~PAGE_MASK));
-    memcpy(gdt_pent, &d, 8);
-    unmap_domain_mem(gdt_pent);
+    gdt_pent = map_domain_page(mfn);
+    memcpy(&gdt_pent[offset], &d, 8);
+    unmap_domain_page(gdt_pent);
 
     if ( shadow_mode_enabled(dom) )
         shadow_unlock(dom);
@@ -2650,7 +2652,7 @@ void ptwr_flush(struct domain *d, const int which)
 
     pl1e = d->arch.ptwr[which].pl1e;
     modified = revalidate_l1(d, pl1e, d->arch.ptwr[which].page);
-    unmap_domain_mem(pl1e);
+    unmap_domain_page(pl1e);
     perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
     d->arch.ptwr[which].prev_nr_updates  = modified;
 
@@ -2741,13 +2743,14 @@ static int ptwr_emulated_update(
         return X86EMUL_UNHANDLEABLE;
 
     /* Checked successfully: do the update (write or cmpxchg). */
-    pl1e = map_domain_mem(page_to_phys(page) + (addr & ~PAGE_MASK));
+    pl1e = map_domain_page(page_to_pfn(page));
+    pl1e = (l1_pgentry_t *)((unsigned long)pl1e + (addr & ~PAGE_MASK));
     if ( do_cmpxchg )
     {
         ol1e = l1e_from_intpte(old);
         if ( cmpxchg((unsigned long *)pl1e, old, val) != old )
         {
-            unmap_domain_mem(pl1e);
+            unmap_domain_page(pl1e);
             put_page_from_l1e(nl1e, d);
             return X86EMUL_CMPXCHG_FAILED;
         }
@@ -2757,7 +2760,7 @@ static int ptwr_emulated_update(
         ol1e  = *pl1e;
         *pl1e = nl1e;
     }
-    unmap_domain_mem(pl1e);
+    unmap_domain_page(pl1e);
 
     /* Finally, drop the old PTE. */
     put_page_from_l1e(ol1e, d);
@@ -2909,7 +2912,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
     }
     
     /* Temporarily map the L1 page, and make a copy of it. */
-    d->arch.ptwr[which].pl1e = map_domain_mem(pfn << PAGE_SHIFT);
+    d->arch.ptwr[which].pl1e = map_domain_page(pfn);
     memcpy(d->arch.ptwr[which].page,
            d->arch.ptwr[which].pl1e,
            L1_PAGETABLE_ENTRIES * sizeof(l1_pgentry_t));
@@ -2922,7 +2925,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
         MEM_LOG("ptwr: Could not update pte at %p", (unsigned long *)
                 &linear_pg_table[addr>>PAGE_SHIFT]);
         /* Toss the writable pagetable state and crash. */
-        unmap_domain_mem(d->arch.ptwr[which].pl1e);
+        unmap_domain_page(d->arch.ptwr[which].pl1e);
         d->arch.ptwr[which].l1va = 0;
         domain_crash();
         return 0;
