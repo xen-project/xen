@@ -685,53 +685,78 @@ static int alloc_l1_table(struct pfn_info *page)
 }
 
 #ifdef CONFIG_X86_PAE
-static inline int fixup_pae_linear_mappings(l3_pgentry_t *pl3e)
+static int create_pae_xen_mappings(l3_pgentry_t *pl3e)
 {
-    l2_pgentry_t *pl2e;
-    unsigned long vaddr;
-    int i,idx;
+    struct pfn_info *page;
+    l2_pgentry_t    *pl2e;
+    l3_pgentry_t     l3e3;
+    int              i;
 
-    while ((unsigned long)pl3e & ~PAGE_MASK)
-        pl3e--;
+    pl3e = (l3_pgentry_t *)((unsigned long)pl3e & PAGE_MASK);
 
-    if (!(l3e_get_flags(pl3e[3]) & _PAGE_PRESENT)) {
-        printk("Installing a L3 PAE pt without L2 in slot #3 isn't going to fly ...\n");
+    /* 3rd L3 slot contains L2 with Xen-private mappings. It *must* exist. */
+    l3e3 = pl3e[3];
+    if ( !(l3e_get_flags(l3e3) & _PAGE_PRESENT) )
+    {
+        MEM_LOG("PAE L3 3rd slot is empty");
         return 0;
     }
 
-    pl2e = map_domain_page(l3e_get_pfn(pl3e[3]));
-    for (i = 0; i < 4; i++) {
-        vaddr = LINEAR_PT_VIRT_START + (i << L2_PAGETABLE_SHIFT);
-        idx = (vaddr >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES-1);
-        if (l3e_get_flags(pl3e[i]) & _PAGE_PRESENT) {
-            pl2e[idx] = l2e_from_paddr(l3e_get_paddr(pl3e[i]),
-                                       __PAGE_HYPERVISOR);
-        } else
-            pl2e[idx] = l2e_empty();
+    /*
+     * The Xen-private mappings include linear mappings. The L2 thus cannot
+     * be shared by multiple L3 tables. The test here is adequate because:
+     *  1. Cannot appear in slots != 3 because the page would then then have
+     *     unknown va backpointer, which get_page_type() explicitly disallows.
+     *  2. Cannot appear in another page table's L3:
+     *     a. alloc_l3_table() calls this function and this check will fail
+     *     b. mod_l3_entry() disallows updates to slot 3 in an existing table
+     */
+    page = l3e_get_page(l3e3);
+    BUG_ON(page->u.inuse.type_info & PGT_pinned);
+    BUG_ON((page->u.inuse.type_info & PGT_count_mask) == 0);
+    if ( (page->u.inuse.type_info & PGT_count_mask) != 1 )
+    {
+        MEM_LOG("PAE L3 3rd slot is shared");
+        return 0;
     }
+
+    /* Xen private mappings. */
+    pl2e = map_domain_page(l3e_get_pfn(l3e3));
+    memcpy(&pl2e[L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)],
+           &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
+           L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
+    for ( i = 0; i < (PERDOMAIN_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
+        pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
+            l2e_from_page(
+                virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt) + i,
+                __PAGE_HYPERVISOR);
+    for ( i = 0; i < (LINEARPT_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
+        pl2e[l2_table_offset(LINEAR_PT_VIRT_START) + i] =
+            (l3e_get_flags(pl3e[i]) & _PAGE_PRESENT) ?
+            l2e_from_pfn(l3e_get_pfn(pl3e[i]), __PAGE_HYPERVISOR) :
+            l2e_empty();
     unmap_domain_page(pl2e);
 
     return 1;
 }
 
-static inline unsigned long fixup_pae_vaddr(unsigned long l2vaddr,
-                                            unsigned long l2type)
+static inline int l1_backptr(
+    unsigned long *backptr, unsigned long offset_in_l2, unsigned long l2_type)
 {
-    unsigned long l3vaddr;
-    
-    if ((l2type & PGT_va_mask) == PGT_va_unknown) {
-        printk("%s: hooking one l2 pt into multiple l3 slots isn't allowed, sorry\n",
-               __FUNCTION__);
-        domain_crash();
-    }
-    l3vaddr = ((l2type & PGT_va_mask) >> PGT_va_shift)
-        << L3_PAGETABLE_SHIFT;
-    return l3vaddr + l2vaddr;
+    unsigned long l2_backptr = l2_type & PGT_va_mask;
+    BUG_ON(l2_backptr == PGT_va_unknown);
+    if ( l2_backptr == PGT_va_mutable )
+        return 0;
+    *backptr = 
+        ((l2_backptr >> PGT_va_shift) << L3_PAGETABLE_SHIFT) | 
+        (offset_in_l2 << L2_PAGETABLE_SHIFT);
+    return 1;
 }
 
 #else
-# define fixup_pae_linear_mappings(unused) (1)
-# define fixup_pae_vaddr(vaddr, type) (vaddr)
+# define create_pae_xen_mappings(pl3e) (1)
+# define l1_backptr(bp,l2o,l2t) \
+    ({ *(bp) = (l2o) << L2_PAGETABLE_SHIFT; 1; })
 #endif
 
 static int alloc_l2_table(struct pfn_info *page, unsigned int type)
@@ -742,18 +767,18 @@ static int alloc_l2_table(struct pfn_info *page, unsigned int type)
     l2_pgentry_t  *pl2e;
     int            i;
 
-    // See the code in shadow_promote() to understand why this is here...
+    /* See the code in shadow_promote() to understand why this is here. */
     if ( (PGT_base_page_table == PGT_l2_page_table) &&
          unlikely(shadow_mode_refcounts(d)) )
         return 1;
-    ASSERT( !shadow_mode_refcounts(d) );
-   
+    ASSERT(!shadow_mode_refcounts(d));
     
     pl2e = map_domain_page(pfn);
 
-    for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ ) {
-        vaddr = i << L2_PAGETABLE_SHIFT;
-        vaddr = fixup_pae_vaddr(vaddr,type);
+    for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
+    {
+        if ( !l1_backptr(&vaddr, i, type) )
+            goto fail;
         if ( is_guest_l2_slot(type, i) &&
              unlikely(!get_page_from_l2e(pl2e[i], pfn, d, vaddr)) )
             goto fail;
@@ -771,24 +796,6 @@ static int alloc_l2_table(struct pfn_info *page, unsigned int type)
             virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt),
             __PAGE_HYPERVISOR);
 #endif
-#if CONFIG_PAGING_LEVELS == 3
-    if (3 == ((type & PGT_va_mask) >> PGT_va_shift)) {
-        unsigned long v,src,dst;
-        void *virt;
-        /* Xen private mappings. */
-        dst = L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1);
-        src = L2_PAGETABLE_FIRST_XEN_SLOT;
-        memcpy(&pl2e[dst], &idle_pg_table_l2[src],
-               L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
-        for (v = PERDOMAIN_VIRT_START; v < PERDOMAIN_VIRT_END;
-             v += (1 << L2_PAGETABLE_SHIFT)) {
-            dst = (v >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES-1);
-            virt = page_get_owner(page)->arch.mm_perdomain_pt + (v-PERDOMAIN_VIRT_START);
-            pl2e[dst] = l2e_from_page(virt_to_page(virt), __PAGE_HYPERVISOR);
-        }
-        /* see fixup_pae_linear_mappings() for linear pagetables */
-    }
-#endif
 
     unmap_domain_page(pl2e);
     return 1;
@@ -804,7 +811,6 @@ static int alloc_l2_table(struct pfn_info *page, unsigned int type)
 
 
 #if CONFIG_PAGING_LEVELS >= 3
-
 static int alloc_l3_table(struct pfn_info *page)
 {
     struct domain *d = page_get_owner(page);
@@ -813,18 +819,20 @@ static int alloc_l3_table(struct pfn_info *page)
     l3_pgentry_t  *pl3e;
     int            i;
 
-    ASSERT( !shadow_mode_refcounts(d) );
+    ASSERT(!shadow_mode_refcounts(d));
 
     pl3e = map_domain_page(pfn);
-    for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ ) {
+    for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
+    {
         vaddr = i << L3_PAGETABLE_SHIFT;
         if ( is_guest_l3_slot(i) &&
              unlikely(!get_page_from_l3e(pl3e[i], pfn, d, vaddr)) )
             goto fail;
     }
 
-    if (!fixup_pae_linear_mappings(pl3e))
+    if ( !create_pae_xen_mappings(pl3e) )
         goto fail;
+
     unmap_domain_page(pl3e);
     return 1;
 
@@ -836,11 +844,11 @@ static int alloc_l3_table(struct pfn_info *page)
     unmap_domain_page(pl3e);
     return 0;
 }
-
+#else
+#define alloc_l3_table(page) (0)
 #endif
 
 #if CONFIG_PAGING_LEVELS >= 4
-
 static int alloc_l4_table(struct pfn_info *page)
 {
     struct domain *d = page_get_owner(page);
@@ -848,12 +856,11 @@ static int alloc_l4_table(struct pfn_info *page)
     l4_pgentry_t  *pl4e = page_to_virt(page);
     int            i;
 
-    // See the code in shadow_promote() to understand why this is here...
+    /* See the code in shadow_promote() to understand why this is here. */
     if ( (PGT_base_page_table == PGT_l4_page_table) &&
          shadow_mode_refcounts(d) )
         return 1;
-
-    ASSERT( !shadow_mode_refcounts(d) );
+    ASSERT(!shadow_mode_refcounts(d));
 
     for ( i = 0; i < L4_PAGETABLE_ENTRIES; i++ )
         if ( is_guest_l4_slot(i) &&
@@ -880,8 +887,9 @@ static int alloc_l4_table(struct pfn_info *page)
 
     return 0;
 }
-
-#endif /* __x86_64__ */
+#else
+#define alloc_l4_table(page) (0)
+#endif
 
 
 static void free_l1_table(struct pfn_info *page)
@@ -909,10 +917,9 @@ static void free_l2_table(struct pfn_info *page)
 
     pl2e = map_domain_page(pfn);
 
-    for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ ) {
+    for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
         if ( is_guest_l2_slot(page->u.inuse.type_info, i) )
             put_page_from_l2e(pl2e[i], pfn);
-    }
 
     unmap_domain_page(pl2e);
 }
@@ -1060,10 +1067,8 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         if ( !l2e_has_changed(ol2e, nl2e, _PAGE_PRESENT))
             return UPDATE_ENTRY(l2, pl2e, ol2e, nl2e);
 
-        vaddr = (((unsigned long)pl2e & ~PAGE_MASK) / sizeof(l2_pgentry_t))
-            << L2_PAGETABLE_SHIFT;
-        vaddr = fixup_pae_vaddr(vaddr,type);
-        if ( unlikely(!get_page_from_l2e(nl2e, pfn, current->domain, vaddr)) )
+        if ( unlikely(!l1_backptr(&vaddr, pgentry_ptr_to_slot(pl2e), type)) ||
+             unlikely(!get_page_from_l2e(nl2e, pfn, current->domain, vaddr)) )
             return 0;
 
         if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e)) )
@@ -1099,6 +1104,15 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         return 0;
     }
 
+#ifdef CONFIG_PAE
+    /*
+     * Disallow updates to final L3 slot. It contains Xen mappings, and it
+     * would be a pain to ensure they remain continuously valid throughout.
+     */
+    if ( pgentry_ptr_to_slot(pl3e) >= 3 )
+        return 0;
+#endif
+
     if ( unlikely(__copy_from_user(&ol3e, pl3e, sizeof(ol3e)) != 0) )
         return 0;
 
@@ -1120,9 +1134,9 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         if ( unlikely(!get_page_from_l3e(nl3e, pfn, current->domain, vaddr)) )
             return 0;
 
-        if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e) ||
-                      !fixup_pae_linear_mappings(pl3e)) )
+        if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e)) )
         {
+            BUG_ON(!create_pae_xen_mappings(pl3e));
             put_page_from_l3e(nl3e, pfn);
             return 0;
         }
@@ -1131,9 +1145,11 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         return 1;
     }
 
-    if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e) ||
-                  !fixup_pae_linear_mappings(pl3e)) )
+    if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e)) )
+    {
+        BUG_ON(!create_pae_xen_mappings(pl3e));
         return 0;
+    }
 
     put_page_from_l3e(ol3e, pfn);
     return 1;
@@ -1202,14 +1218,10 @@ int alloc_page_type(struct pfn_info *page, unsigned int type)
         return alloc_l1_table(page);
     case PGT_l2_page_table:
         return alloc_l2_table(page, type);
-#if CONFIG_PAGING_LEVELS >= 3
     case PGT_l3_page_table:
         return alloc_l3_table(page);
-#endif
-#if CONFIG_PAGING_LEVELS >= 4
     case PGT_l4_page_table:
         return alloc_l4_table(page);
-#endif
     case PGT_gdt_page:
     case PGT_ldt_page:
         return alloc_segdesc_page(page);
@@ -1388,13 +1400,14 @@ int get_page_type(struct pfn_info *page, u32 type)
                 else if ( ((type & PGT_va_mask) != PGT_va_mutable) &&
                           ((type & PGT_va_mask) != (x & PGT_va_mask)) )
                 {
-                    /* This table is may be mapped at multiple locations. */
+#ifdef CONFIG_PAE
+                    /* We use backptr as extra typing. Cannot be unknown. */
+                    if ( (type & PGT_type_mask) == PGT_l2_page_table )
+                        return 0;
+#endif
+                    /* This table is possibly mapped at multiple locations. */
                     nx &= ~PGT_va_mask;
                     nx |= PGT_va_unknown;
-#if 0 /* debug */
-                    printk("%s: pfn %lx type %x -> %x (tag as unknown)\n",
-                           __FUNCTION__,page_to_pfn(page),x,nx);
-#endif
                 }
             }
             if ( unlikely(!(x & PGT_validated)) )
@@ -1658,21 +1671,19 @@ int do_mmuext_op(
             
             break;
 
+#ifndef CONFIG_PAE /* Unsafe on PAE because of Xen-private mappings. */
         case MMUEXT_PIN_L2_TABLE:
             type = PGT_l2_page_table;
             goto pin_page;
+#endif
 
-#if CONFIG_PAGING_LEVELS >= 3
         case MMUEXT_PIN_L3_TABLE:
             type = PGT_l3_page_table;
             goto pin_page;
-#endif
 
-#if CONFIG_PAGING_LEVELS >= 4
         case MMUEXT_PIN_L4_TABLE:
             type = PGT_l4_page_table;
             goto pin_page;
-#endif
 
         case MMUEXT_UNPIN_TABLE:
             if ( unlikely(!(okay = get_page_from_pagenr(op.mfn, FOREIGNDOM))) )
