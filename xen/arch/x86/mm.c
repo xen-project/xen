@@ -1940,7 +1940,7 @@ int do_mmu_update(
     struct vcpu *v = current;
     struct domain *d = v->domain;
     u32 type_info;
-    struct map_dom_mem_cache mapcache, sh_mapcache;
+    struct domain_mmap_cache mapcache, sh_mapcache;
 
     LOCK_BIGLOCK(d);
 
@@ -1956,8 +1956,8 @@ int do_mmu_update(
             (void)get_user(done, pdone);
     }
 
-    init_map_domain_mem_cache(&mapcache);
-    init_map_domain_mem_cache(&sh_mapcache);
+    domain_mmap_cache_init(&mapcache);
+    domain_mmap_cache_init(&sh_mapcache);
 
     if ( !set_foreigndom(cpu, foreigndom) )
     {
@@ -2169,8 +2169,8 @@ int do_mmu_update(
     }
 
  out:
-    destroy_map_domain_mem_cache(&mapcache);
-    destroy_map_domain_mem_cache(&sh_mapcache);
+    domain_mmap_cache_destroy(&mapcache);
+    domain_mmap_cache_destroy(&sh_mapcache);
 
     process_deferred_ops(cpu);
 

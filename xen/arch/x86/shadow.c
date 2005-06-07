@@ -763,8 +763,8 @@ void free_monitor_pagetable(struct vcpu *v)
 
 int
 set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
-              struct map_dom_mem_cache *l2cache,
-              struct map_dom_mem_cache *l1cache)
+              struct domain_mmap_cache *l2cache,
+              struct domain_mmap_cache *l1cache)
 {
     unsigned long phystab = pagetable_get_paddr(d->arch.phys_table);
     l2_pgentry_t *l2, l2e;
@@ -808,14 +808,14 @@ alloc_p2m_table(struct domain *d)
     struct pfn_info *page, *l2page;
     l2_pgentry_t *l2;
     unsigned long mfn, pfn;
-    struct map_dom_mem_cache l1cache, l2cache;
+    struct domain_mmap_cache l1cache, l2cache;
 
     l2page = alloc_domheap_page(NULL);
     if ( l2page == NULL )
         return 0;
 
-    init_map_domain_mem_cache(&l1cache);
-    init_map_domain_mem_cache(&l2cache);
+    domain_mmap_cache_init(&l1cache);
+    domain_mmap_cache_init(&l2cache);
 
     d->arch.phys_table = mk_pagetable(page_to_phys(l2page));
     l2 = map_domain_mem_with_cache(page_to_phys(l2page), &l2cache);
@@ -851,8 +851,8 @@ alloc_p2m_table(struct domain *d)
         list_ent = page->list.next;
     }
 
-    destroy_map_domain_mem_cache(&l2cache);
-    destroy_map_domain_mem_cache(&l1cache);
+    domain_mmap_cache_destroy(&l2cache);
+    domain_mmap_cache_destroy(&l1cache);
 
     return 1;
 }
@@ -2682,7 +2682,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
 void shadow_l1_normal_pt_update(
     struct domain *d,
     unsigned long pa, l1_pgentry_t gpte,
-    struct map_dom_mem_cache *cache)
+    struct domain_mmap_cache *cache)
 {
     unsigned long sl1mfn;    
     l1_pgentry_t *spl1e, spte;
@@ -2707,7 +2707,7 @@ void shadow_l1_normal_pt_update(
 void shadow_l2_normal_pt_update(
     struct domain *d,
     unsigned long pa, l2_pgentry_t gpde,
-    struct map_dom_mem_cache *cache)
+    struct domain_mmap_cache *cache)
 {
     unsigned long sl2mfn;
     l2_pgentry_t *spl2e;
@@ -2732,7 +2732,7 @@ void shadow_l2_normal_pt_update(
 void shadow_l3_normal_pt_update(
     struct domain *d,
     unsigned long pa, l3_pgentry_t gpde,
-    struct map_dom_mem_cache *cache)
+    struct domain_mmap_cache *cache)
 {
     BUG(); // not yet implemented
 }
@@ -2742,7 +2742,7 @@ void shadow_l3_normal_pt_update(
 void shadow_l4_normal_pt_update(
     struct domain *d,
     unsigned long pa, l4_pgentry_t gpde,
-    struct map_dom_mem_cache *cache)
+    struct domain_mmap_cache *cache)
 {
     BUG(); // not yet implemented
 }

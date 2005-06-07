@@ -27,31 +27,36 @@ extern void *map_domain_mem(unsigned long pa);
  */
 extern void unmap_domain_mem(void *va);
 
-struct map_dom_mem_cache {
+#define DMCACHE_ENTRY_VALID 1UL
+#define DMCACHE_ENTRY_HELD  2UL
+
+struct domain_mmap_cache {
     unsigned long pa;
     void *va;
 };
 
 static inline void
-init_map_domain_mem_cache(struct map_dom_mem_cache *cache)
+domain_mmap_cache_init(struct domain_mmap_cache *cache)
 {
     ASSERT(cache != NULL);
     cache->pa = 0;
 }
 
 static inline void *
-map_domain_mem_with_cache(unsigned long pa, struct map_dom_mem_cache *cache)
+map_domain_mem_with_cache(unsigned long pa, struct domain_mmap_cache *cache)
 {
     ASSERT(cache != NULL);
+    BUG_ON(cache->pa & DMCACHE_ENTRY_HELD);
 
     if ( likely(cache->pa) )
     {
+        cache->pa |= DMCACHE_ENTRY_HELD;
         if ( likely((pa & PAGE_MASK) == (cache->pa & PAGE_MASK)) )
             goto done;
         unmap_domain_mem(cache->va);
     }
 
-    cache->pa = (pa & PAGE_MASK) | 1;
+    cache->pa = (pa & PAGE_MASK) | DMCACHE_ENTRY_HELD | DMCACHE_ENTRY_VALID;
     cache->va = map_domain_mem(cache->pa);
 
  done:
@@ -60,14 +65,14 @@ map_domain_mem_with_cache(unsigned long pa, struct map_dom_mem_cache *cache)
 }
 
 static inline void
-unmap_domain_mem_with_cache(void *va, struct map_dom_mem_cache *cache)
+unmap_domain_mem_with_cache(void *va, struct domain_mmap_cache *cache)
 {
     ASSERT(cache != NULL);
-    unmap_domain_mem(va);
+    cache->pa &= ~DMCACHE_ENTRY_HELD;
 }
 
 static inline void
-destroy_map_domain_mem_cache(struct map_dom_mem_cache *cache)
+domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
 {
     ASSERT(cache != NULL);
     if ( likely(cache->pa) )

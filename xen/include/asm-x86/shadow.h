@@ -121,25 +121,25 @@ extern void __shadow_sync_all(struct domain *d);
 extern int __shadow_out_of_sync(struct vcpu *v, unsigned long va);
 extern int set_p2m_entry(
     struct domain *d, unsigned long pfn, unsigned long mfn,
-    struct map_dom_mem_cache *l2cache,
-    struct map_dom_mem_cache *l1cache);
+    struct domain_mmap_cache *l2cache,
+    struct domain_mmap_cache *l1cache);
 extern void remove_shadow(struct domain *d, unsigned long gpfn, u32 stype);
 
 extern void shadow_l1_normal_pt_update(struct domain *d,
                                        unsigned long pa, l1_pgentry_t l1e,
-                                       struct map_dom_mem_cache *cache);
+                                       struct domain_mmap_cache *cache);
 extern void shadow_l2_normal_pt_update(struct domain *d,
                                        unsigned long pa, l2_pgentry_t l2e,
-                                       struct map_dom_mem_cache *cache);
+                                       struct domain_mmap_cache *cache);
 #if CONFIG_PAGING_LEVELS >= 3
 extern void shadow_l3_normal_pt_update(struct domain *d,
                                        unsigned long pa, l3_pgentry_t l3e,
-                                       struct map_dom_mem_cache *cache);
+                                       struct domain_mmap_cache *cache);
 #endif
 #if CONFIG_PAGING_LEVELS >= 4
 extern void shadow_l4_normal_pt_update(struct domain *d,
                                        unsigned long pa, l4_pgentry_t l4e,
-                                       struct map_dom_mem_cache *cache);
+                                       struct domain_mmap_cache *cache);
 #endif
 extern int shadow_do_update_va_mapping(unsigned long va,
                                        l1_pgentry_t val,
