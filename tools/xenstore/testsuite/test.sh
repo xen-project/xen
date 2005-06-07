@@ -1,0 +1,44 @@
+#! /bin/sh
+
+set -e
+set -m
+
+run_test()
+{
+    rm -rf $XENSTORED_ROOTDIR
+    mkdir $XENSTORED_ROOTDIR
+# Weird failures with this.
+    if type valgrind >/dev/null 2>&1; then
+	valgrind -q --logfile-fd=3 ./xenstored_test --output-pid --no-fork 3>testsuite/tmp/vgout > /tmp/pid &
+	while [ ! -s /tmp/pid ]; do sleep 0; done
+	PID=`cat /tmp/pid`
+	rm /tmp/pid
+    else
+	PID=`./xenstored_test --output-pid`
+    fi
+    if sh -e $2 $1; then
+	if [ -s testsuite/tmp/vgout ]; then
+	    kill $PID
+	    echo VALGRIND errors:
+	    cat testsuite/tmp/vgout
+	    return 1
+	fi
+	echo shutdown | ./xs_test
+	return 0
+    else
+	# In case daemon is wedged.
+	kill $PID
+	sleep 1
+	return 1
+    fi
+}
+
+for f in testsuite/[0-9]*.sh; do
+    if run_test $f; then
+	echo Test $f passed...
+    else
+	echo Test $f failed, running verbosely...
+	run_test $f -x
+	exit 1
+    fi
+done

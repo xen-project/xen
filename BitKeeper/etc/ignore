@@ -128,8 +128,13 @@ tools/xcs/xcs
 tools/xcs/xcsdump
 tools/xcutils/xc_restore
 tools/xcutils/xc_save
+tools/xenstore/testsuite/tmp/*
+tools/xenstore/xen
+tools/xenstore/xenstored_test
+tools/xenstore/xs_random
+tools/xenstore/xs_stress
+tools/xenstore/xs_test
 tools/xentrace/xentrace
-tools/xfrd/xfrd
 xen/BLOG
 xen/TAGS
 xen/arch/x86/asm-offsets.s
