@@ -125,9 +125,13 @@ class Daemon:
     def cleanup_xend(self, kill=False):
         return self.cleanup_process(XEND_PID_FILE, "xend", kill)
 
+    def cleanup_xenstored(self, kill=False):
+        return self.cleanup_process(XENSTORED_PID_FILE, "xenstored", kill)
+
     def cleanup(self, kill=False):
         self.cleanup_xend(kill=kill)
-            
+        self.cleanup_xenstored(kill=kill)
+
     def status(self):
         """Returns the status of the xend daemon.
         The return value is defined by the LSB:
@@ -163,6 +167,27 @@ class Daemon:
             pidfile.close()
         return pid
 
+    def start_xenstored(self):
+        """Fork and exec xenstored, writing its pid to XENSTORED_PID_FILE.
+        """
+        def mkdirs(p):
+            try:
+                os.makedirs(p)
+            except:
+                pass
+        mkdirs(XENSTORED_RUN_DIR)
+        mkdirs(XENSTORED_LIB_DIR)
+        
+        pid = self.fork_pid(XENSTORED_PID_FILE)
+        if pid:
+            # Parent
+            log.info("Started xenstored, pid=%d", pid)
+        else:
+            # Child
+            if XEND_DAEMONIZE and (not XENSTORED_DEBUG):
+                self.daemonize()
+            os.execl("/usr/sbin/xenstored", "xenstored", "--no-fork")
+
     def daemonize(self):
         if not XEND_DAEMONIZE: return
         # Detach from TTY.
@@ -193,10 +218,14 @@ class Daemon:
         4  Insufficient privileges
         """
         xend_pid = self.cleanup_xend()
+        xenstored_pid = self.cleanup_xenstored()
 
         if self.set_user():
             return 4
         os.chdir("/")
+
+        if xenstored_pid == 0:
+            self.start_xenstored()
 
         if xend_pid > 0:
             # Trying to run an already-running service is a success.
