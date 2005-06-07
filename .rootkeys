@@ -805,6 +805,7 @@
 40dc4076hGpwa8-sWRN0jtXZeQJuKg tools/python/xen/__init__.py
 40dfd40aMOhnw_cQLve9462UR5yYxQ tools/python/xen/lowlevel/__init__.py
 3fbd0a42l40lM0IICw2jXbQBVZSdZg tools/python/xen/lowlevel/xc/xc.c
+42a59f20JpCmm9DsCoVZowGafnhBuw tools/python/xen/lowlevel/xs/xs.c
 40dc4076St6AmPTmQPrtQ6LGHPxGmw tools/python/xen/lowlevel/xu/__init__.py
 40dc4076CwBYRTUQDdbdU1L6KcLgSw tools/python/xen/lowlevel/xu/xu.c
 40d8915cyoVA0hJxiBFNymL7YvDaRg tools/python/xen/util/Brctl.py

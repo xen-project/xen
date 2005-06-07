@@ -3,6 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS :=
 SUBDIRS += libxc
+SUBDIRS += xenstore
 SUBDIRS += misc
 SUBDIRS += examples
 SUBDIRS += xentrace
