@@ -283,7 +283,7 @@ int vmx_clear_pending_io_event(struct vcpu *v)
 
     /* Note: VMX domains may need upcalls as well */
     if (!v->vcpu_info->evtchn_pending_sel) 
-        v->vcpu_info->evtchn_upcall_pending = 0;
+        clear_bit(0, &v->vcpu_info->evtchn_upcall_pending);
 
     /* clear the pending bit for IOPACKET_PORT */
     return test_and_clear_bit(IOPACKET_PORT, 
@@ -311,10 +311,16 @@ void vmx_wait_io()
     extern void do_block();
 
     do {
-        do_block();
+        if(!test_bit(IOPACKET_PORT, 
+            &current->domain->shared_info->evtchn_pending[0]))
+            do_block();
         vmx_check_events(current);
         if (!test_bit(ARCH_VMX_IO_WAIT, &current->arch.arch_vmx.flags))
             break;
+        /* Events other than IOPACKET_PORT might have woken us up. In that
+           case, safely go back to sleep. */
+        clear_bit(IOPACKET_PORT>>5, &current->vcpu_info->evtchn_pending_sel);
+        clear_bit(0, &current->vcpu_info->evtchn_upcall_pending);
     } while(1);
 }
 
