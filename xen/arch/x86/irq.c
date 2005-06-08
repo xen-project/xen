@@ -20,12 +20,12 @@ static void __do_IRQ_guest(int vector);
 
 void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs) { }
 
-static void enable_none(unsigned int irq) { }
-static unsigned int startup_none(unsigned int irq) { return 0; }
-static void disable_none(unsigned int irq) { }
-static void ack_none(unsigned int irq)
+static void enable_none(unsigned int vector) { }
+static unsigned int startup_none(unsigned int vector) { return 0; }
+static void disable_none(unsigned int vector) { }
+static void ack_none(unsigned int vector)
 {
-    printk("Unexpected IRQ trap at vector %02x.\n", irq);
+    printk("Unexpected IRQ trap at vector %02x.\n", vector);
     ack_APIC_irq();
 }
 
@@ -55,7 +55,7 @@ inline void disable_irq_nosync(unsigned int irq)
     if ( desc->depth++ == 0 )
     {
         desc->status |= IRQ_DISABLED;
-        desc->handler->disable(irq);
+        desc->handler->disable(vector);
     }
 
     spin_unlock_irqrestore(&desc->lock, flags);
@@ -74,7 +74,7 @@ void enable_irq(unsigned int irq)
         desc->status &= ~IRQ_DISABLED;
         if ( (desc->status & (IRQ_PENDING | IRQ_REPLAY)) == IRQ_PENDING )
             desc->status |= IRQ_REPLAY;
-        desc->handler->enable(irq);
+        desc->handler->enable(vector);
     }
 
     spin_unlock_irqrestore(&desc->lock, flags);
@@ -83,14 +83,13 @@ void enable_irq(unsigned int irq)
 asmlinkage void do_IRQ(struct cpu_user_regs *regs)
 {
     unsigned int      vector = regs->entry_vector;
-    unsigned int      irq = vector_to_irq(vector);
     irq_desc_t       *desc = &irq_desc[vector];
     struct irqaction *action;
 
     perfc_incrc(irqs);
 
     spin_lock(&desc->lock);
-    desc->handler->ack(irq);
+    desc->handler->ack(vector);
 
     if ( likely(desc->status & IRQ_GUEST) )
     {
@@ -117,7 +116,7 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
         desc->status &= ~IRQ_PENDING;
         irq_enter(smp_processor_id());
         spin_unlock_irq(&desc->lock);
-        action->handler(irq, action->dev_id, regs);
+        action->handler(vector_to_irq(vector), action->dev_id, regs);
         spin_lock_irq(&desc->lock);
         irq_exit(smp_processor_id());
     }
@@ -125,7 +124,7 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
     desc->status &= ~IRQ_INPROGRESS;
 
  out:
-    desc->handler->end(irq);
+    desc->handler->end(vector);
     spin_unlock(&desc->lock);
 }
 
@@ -163,7 +162,7 @@ int setup_irq(unsigned int irq, struct irqaction *new)
     desc->action  = new;
     desc->depth   = 0;
     desc->status &= ~IRQ_DISABLED;
-    desc->handler->startup(irq);
+    desc->handler->startup(vector);
 
     spin_unlock_irqrestore(&desc->lock,flags);
 
@@ -220,7 +219,7 @@ int pirq_guest_unmask(struct domain *d)
             if ( !test_bit(d->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
                  test_and_clear_bit(pirq, &d->pirq_mask) &&
                  (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
-                desc->handler->end(pirq);
+                desc->handler->end(irq_to_vector(pirq));
             spin_unlock_irq(&desc->lock);
         }
     }
@@ -273,12 +272,12 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
         desc->depth = 0;
         desc->status |= IRQ_GUEST;
         desc->status &= ~IRQ_DISABLED;
-        desc->handler->startup(irq);
+        desc->handler->startup(vector);
 
         /* Attempt to bind the interrupt target to the correct CPU. */
         cpu_set(v->processor, cpumask);
         if ( desc->handler->set_affinity != NULL )
-            desc->handler->set_affinity(irq, cpumask);
+            desc->handler->set_affinity(vector, cpumask);
     }
     else if ( !will_share || !action->shareable )
     {
@@ -318,7 +317,7 @@ int pirq_guest_unbind(struct domain *d, int irq)
 
     if ( test_and_clear_bit(irq, &d->pirq_mask) &&
          (--action->in_flight == 0) )
-        desc->handler->end(irq);
+        desc->handler->end(vector);
 
     if ( action->nr_guests == 1 )
     {
@@ -327,7 +326,7 @@ int pirq_guest_unbind(struct domain *d, int irq)
         desc->depth   = 1;
         desc->status |= IRQ_DISABLED;
         desc->status &= ~IRQ_GUEST;
-        desc->handler->shutdown(irq);
+        desc->handler->shutdown(vector);
     }
     else
     {

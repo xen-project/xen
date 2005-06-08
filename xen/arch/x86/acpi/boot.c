@@ -88,22 +88,6 @@ EXPORT_SYMBOL(x86_acpiid_to_apicid);
  */
 enum acpi_irq_model_id		acpi_irq_model = ACPI_IRQ_MODEL_PIC;
 
-#if 0/*def	CONFIG_X86_64*/
-
-/* rely on all ACPI tables being in the direct mapping */
-char *__acpi_map_table(unsigned long phys_addr, unsigned long size)
-{
-	if (!phys_addr || !size)
-	return NULL;
-
-	if (phys_addr < (end_pfn_map << PAGE_SHIFT))
-		return __va(phys_addr);
-
-	return NULL;
-}
-
-#else
-
 /*
  * Temporarily use the virtual area starting from FIX_IO_APIC_BASE_END,
  * to map the target physical address. The problem is that set_fixmap()
@@ -143,7 +127,6 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 
 	return ((char *) base + offset);
 }
-#endif
 
 #ifdef CONFIG_PCI_MMCONFIG
 static int __init acpi_parse_mcfg(unsigned long phys_addr, unsigned long size)
@@ -289,42 +272,6 @@ acpi_parse_ioapic (
 	return 0;
 }
 
-#ifdef CONFIG_ACPI_INTERPRETER
-/*
- * Parse Interrupt Source Override for the ACPI SCI
- */
-static void
-acpi_sci_ioapic_setup(u32 gsi, u16 polarity, u16 trigger)
-{
-	if (trigger == 0)	/* compatible SCI trigger is level */
-		trigger = 3;
-
-	if (polarity == 0)	/* compatible SCI polarity is low */
-		polarity = 3;
-
-	/* Command-line over-ride via acpi_sci= */
-	if (acpi_sci_flags.trigger)
-		trigger = acpi_sci_flags.trigger;
-
-	if (acpi_sci_flags.polarity)
-		polarity = acpi_sci_flags.polarity;
-
-	/*
- 	 * mp_config_acpi_legacy_irqs() already setup IRQs < 16
-	 * If GSI is < 16, this will update its flags,
-	 * else it will create a new mp_irqs[] entry.
-	 */
-	mp_override_legacy_irq(gsi, polarity, trigger, gsi);
-
-	/*
-	 * stash over-ride to indicate we've been here
-	 * and for later update of acpi_fadt
-	 */
-	acpi_sci_override_gsi = gsi;
-	return;
-}
-#endif
-
 static int __init
 acpi_parse_int_src_ovr (
 	acpi_table_entry_header *header, const unsigned long end)
@@ -337,14 +284,6 @@ acpi_parse_int_src_ovr (
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
-
-#ifdef CONFIG_ACPI_INTERPRETER
-	if (intsrc->bus_irq == acpi_fadt.sci_int) {
-		acpi_sci_ioapic_setup(intsrc->global_irq,
-			intsrc->flags.polarity, intsrc->flags.trigger);
-		return 0;
-	}
-#endif
 
 	if (acpi_skip_timer_override &&
 		intsrc->bus_irq == 0 && intsrc->global_irq == 2) {
@@ -381,122 +320,6 @@ acpi_parse_nmi_src (
 }
 
 #endif /* CONFIG_X86_IO_APIC */
-
-#ifdef	CONFIG_ACPI_BUS
-
-/*
- * acpi_pic_sci_set_trigger()
- * 
- * use ELCR to set PIC-mode trigger type for SCI
- *
- * If a PIC-mode SCI is not recognized or gives spurious IRQ7's
- * it may require Edge Trigger -- use "acpi_sci=edge"
- *
- * Port 0x4d0-4d1 are ECLR1 and ECLR2, the Edge/Level Control Registers
- * for the 8259 PIC.  bit[n] = 1 means irq[n] is Level, otherwise Edge.
- * ECLR1 is IRQ's 0-7 (IRQ 0, 1, 2 must be 0)
- * ECLR2 is IRQ's 8-15 (IRQ 8, 13 must be 0)
- */
-
-void __init
-acpi_pic_sci_set_trigger(unsigned int irq, u16 trigger)
-{
-	unsigned int mask = 1 << irq;
-	unsigned int old, new;
-
-	/* Real old ELCR mask */
-	old = inb(0x4d0) | (inb(0x4d1) << 8);
-
-	/*
-	 * If we use ACPI to set PCI irq's, then we should clear ELCR
-	 * since we will set it correctly as we enable the PCI irq
-	 * routing.
-	 */
-	new = acpi_noirq ? old : 0;
-
-	/*
-	 * Update SCI information in the ELCR, it isn't in the PCI
-	 * routing tables..
-	 */
-	switch (trigger) {
-	case 1:	/* Edge - clear */
-		new &= ~mask;
-		break;
-	case 3: /* Level - set */
-		new |= mask;
-		break;
-	}
-
-	if (old == new)
-		return;
-
-	printk(PREFIX "setting ELCR to %04x (from %04x)\n", new, old);
-	outb(new, 0x4d0);
-	outb(new >> 8, 0x4d1);
-}
-
-
-#endif /* CONFIG_ACPI_BUS */
-
-int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
-{
-#ifdef CONFIG_X86_IO_APIC
-	if (use_pci_vector() && !platform_legacy_irq(gsi))
- 		*irq = IO_APIC_VECTOR(gsi);
-	else
-#endif
-		*irq = gsi;
-	return 0;
-}
-
-unsigned int acpi_register_gsi(u32 gsi, int edge_level, int active_high_low)
-{
-	unsigned int irq;
-	unsigned int plat_gsi = gsi;
-
-#ifdef CONFIG_PCI
-	/*
-	 * Make sure all (legacy) PCI IRQs are set as level-triggered.
-	 */
-	if (acpi_irq_model == ACPI_IRQ_MODEL_PIC) {
-		extern void eisa_set_level_irq(unsigned int irq);
-
-		if (edge_level == ACPI_LEVEL_SENSITIVE)
-				eisa_set_level_irq(gsi);
-	}
-#endif
-
-#ifdef CONFIG_X86_IO_APIC
-	if (acpi_irq_model == ACPI_IRQ_MODEL_IOAPIC) {
-		plat_gsi = mp_register_gsi(gsi, edge_level, active_high_low);
-	}
-#endif
-	acpi_gsi_to_irq(plat_gsi, &irq);
-	return irq;
-}
-EXPORT_SYMBOL(acpi_register_gsi);
-
-/*
- *  ACPI based hotplug support for CPU
- */
-#ifdef CONFIG_ACPI_HOTPLUG_CPU
-int
-acpi_map_lsapic(acpi_handle handle, int *pcpu)
-{
-	/* TBD */
-	return -EINVAL;
-}
-EXPORT_SYMBOL(acpi_map_lsapic);
-
-
-int
-acpi_unmap_lsapic(int cpu)
-{
-	/* TBD */
-	return -EINVAL;
-}
-EXPORT_SYMBOL(acpi_unmap_lsapic);
-#endif /* CONFIG_ACPI_HOTPLUG_CPU */
 
 static unsigned long __init
 acpi_scan_rsdp (
