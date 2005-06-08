@@ -74,7 +74,6 @@ int construct_dom0(struct domain *d,
                    unsigned long _initrd_start, unsigned long initrd_len,
                    char *cmdline)
 {
-    char *dst;
     int i, rc;
     unsigned long pfn, mfn;
     unsigned long nr_pages;
@@ -580,17 +579,9 @@ int construct_dom0(struct domain *d,
                si->mod_len, si->mod_start);
     }
 
-    dst = (char *)si->cmd_line;
+    memset(si->cmd_line, 0, sizeof(si->cmd_line));
     if ( cmdline != NULL )
-    {
-        for ( i = 0; i < 255; i++ )
-        {
-            if ( cmdline[i] == '\0' )
-                break;
-            *dst++ = cmdline[i];
-        }
-    }
-    *dst = '\0';
+        strncpy(si->cmd_line, cmdline, sizeof(si->cmd_line)-1);
 
     /* Reinstate the caller's page tables. */
     write_ptbase(current);

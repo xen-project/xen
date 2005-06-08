@@ -318,12 +318,13 @@ union xen_start_info_union xen_start_info_union;
 static __init void parse_cmdline_early (char ** cmdline_p)
 {
 	char c = ' ', *to = command_line, *from = COMMAND_LINE;
-	int len = 0;
+	int len = 0, max_cmdline;
 
-	memcpy(saved_command_line, xen_start_info.cmd_line, MAX_CMDLINE);
+	if ((max_cmdline = MAX_GUEST_CMDLINE) > COMMAND_LINE_SIZE)
+		max_cmdline = COMMAND_LINE_SIZE;
+	memcpy(saved_command_line, xen_start_info.cmd_line, max_cmdline);
 	/* Save unparsed command line copy for /proc/cmdline */
-	memcpy(saved_command_line, COMMAND_LINE, COMMAND_LINE_SIZE);
-	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
+	saved_command_line[max_cmdline-1] = '\0';
 
 	for (;;) {
 		if (c != ' ') 
