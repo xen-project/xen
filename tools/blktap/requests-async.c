@@ -1,6 +1,6 @@
-/* read.c
+/* requests-async.c
  *
- * asynchronous read experiment for parallax.
+ * asynchronous request dispatcher for radix access in parallax.
  */
 
 #include <stdio.h>
@@ -16,9 +16,6 @@
 #define L2_IDX(_a) (((_a) & 0x000000000003fe00ULL) >> 9)
 #define L3_IDX(_a) (((_a) & 0x00000000000001ffULL))
 
-
-
-//#define STANDALONE
 
 #if 0
 #define DPRINTF(_f, _a...) printf ( _f , ## _a )
@@ -45,10 +42,10 @@ struct io_req {
 
 void clear_w_bits(radix_tree_node node) 
 {
-	int i;
-	for (i=0; i<RADIX_TREE_MAP_ENTRIES; i++)
-		node[i] = node[i] & ONEMASK;
-	return;
+    int i;
+    for (i=0; i<RADIX_TREE_MAP_ENTRIES; i++)
+        node[i] = node[i] & ONEMASK;
+    return;
 }
 
 enum states {
@@ -89,15 +86,15 @@ enum states {
     ALLOC_L3_L2f,
     WRITE_L2_L3f,
 
-	/* L1 Zero Path */
+    /* L1 Zero Path */
     ALLOC_DATA_L1z,
     ALLOC_L3_L1z,
     ALLOC_L2_L1z,
     WRITE_L1_L1z,
 
-	/* L1 Fault Path */
-	READ_L2_L1f,
-	READ_L3_L1f,
+    /* L1 Fault Path */
+    READ_L2_L1f,
+    READ_L3_L1f,
     ALLOC_DATA_L1f,
     ALLOC_L3_L1f,
     ALLOC_L2_L1f,
@@ -123,9 +120,9 @@ int async_read(vdi_t *vdi, u64 vaddr, io_cb_t cb, void *param)
     DPRINTF("async_read\n");
 
     req = (struct io_req *)malloc(sizeof (struct io_req));
-	req->radix[0] = req->radix[1] = req->radix[2] = NULL;
+    req->radix[0] = req->radix[1] = req->radix[2] = NULL;
 
-	if (req == NULL) {perror("req was NULL in async_read"); return(-1); }
+    if (req == NULL) {perror("req was NULL in async_read"); return(-1); }
 	
     req->op    = IO_OP_READ;
     req->root  = vdi->radix_root;
@@ -135,7 +132,7 @@ int async_read(vdi_t *vdi, u64 vaddr, io_cb_t cb, void *param)
     req->param = param;
     req->state = READ_LOCKED;
 
-	block_rlock(req->lock, L1_IDX(vaddr), read_cb, req);
+    block_rlock(req->lock, L1_IDX(vaddr), read_cb, req);
 	
     return 0;
 }
@@ -148,10 +145,9 @@ int   async_write(vdi_t *vdi, u64 vaddr, char *block,
 
 
     req = (struct io_req *)malloc(sizeof (struct io_req));
-	req->radix[0] = req->radix[1] = req->radix[2] = NULL;
-    //DPRINTF("async_write\n");
+    req->radix[0] = req->radix[1] = req->radix[2] = NULL;
     
-	if (req == NULL) {perror("req was NULL in async_write"); return(-1); }
+    if (req == NULL) {perror("req was NULL in async_write"); return(-1); }
 
     req->op    = IO_OP_WRITE;
     req->root  = vdi->radix_root;
@@ -163,10 +159,10 @@ int   async_write(vdi_t *vdi, u64 vaddr, char *block,
     req->radix_addr[L1] = getid(req->root); /* for consistency */
     req->state = WRITE_LOCKED;
 
-	block_wlock(req->lock, L1_IDX(vaddr), write_cb, req);
+    block_wlock(req->lock, L1_IDX(vaddr), write_cb, req);
 
 
-	return 0;
+    return 0;
 }
 
 void read_cb(struct io_ret ret, void *param)
@@ -197,11 +193,11 @@ void read_cb(struct io_ret ret, void *param)
         idx  = getid( node[L1_IDX(req->vaddr)] );
         free(block);
         if ( idx == ZERO ) {
-        	req->state = RETURN_ZERO;
-        	block_runlock(req->lock, L1_IDX(req->vaddr), read_cb, req);
+            req->state = RETURN_ZERO;
+            block_runlock(req->lock, L1_IDX(req->vaddr), read_cb, req);
         } else {
-	        req->state = READ_L2;
-	        block_read(idx, read_cb, req);
+            req->state = READ_L2;
+            block_read(idx, read_cb, req);
         }
         break;
 
@@ -214,11 +210,11 @@ void read_cb(struct io_ret ret, void *param)
         idx  = getid( node[L2_IDX(req->vaddr)] );
         free(block);
         if ( idx == ZERO ) {
-        	req->state = RETURN_ZERO;
-        	block_runlock(req->lock, L1_IDX(req->vaddr), read_cb, req);
+            req->state = RETURN_ZERO;
+            block_runlock(req->lock, L1_IDX(req->vaddr), read_cb, req);
         } else {
-	        req->state = READ_L3;
-	        block_read(idx, read_cb, req);
+            req->state = READ_L3;
+            block_read(idx, read_cb, req);
         }
         break;
 
@@ -231,11 +227,11 @@ void read_cb(struct io_ret ret, void *param)
         idx  = getid( node[L3_IDX(req->vaddr)] );
         free(block);
         if ( idx == ZERO )  {
-        	req->state = RETURN_ZERO;
-        	block_runlock(req->lock, L1_IDX(req->vaddr), read_cb, req);
+            req->state = RETURN_ZERO;
+            block_runlock(req->lock, L1_IDX(req->vaddr), read_cb, req);
         } else {
-	        req->state = READ_DATA;
-	        block_read(idx, read_cb, req);
+            req->state = READ_DATA;
+            block_read(idx, read_cb, req);
         }
         break;
 
@@ -249,9 +245,9 @@ void read_cb(struct io_ret ret, void *param)
         break;
         
     case READ_UNLOCKED:
-	{
-		struct io_ret r;
-		io_cb_t cb;
+    {
+        struct io_ret r;
+        io_cb_t cb;
         DPRINTF("READ_UNLOCKED\n");
         req_param = req->param;
         r         = req->retval;
@@ -262,18 +258,18 @@ void read_cb(struct io_ret ret, void *param)
     }
     
     case RETURN_ZERO:
-	{
-		struct io_ret r;
-		io_cb_t cb;
-	    DPRINTF("RETURN_ZERO\n");
-	    req_param = req->param;
+    {
+        struct io_ret r;
+        io_cb_t cb;
+        DPRINTF("RETURN_ZERO\n");
+        req_param = req->param;
         cb        = req->cb;
-	    free(req);
+        free(req);
         r.type = IO_BLOCK_T;
         r.u.b = newblock();
-	    cb(r, req_param);
-	    break;
-	}
+        cb(r, req_param);
+        break;
+    }
         
     default:
     	DPRINTF("*** Write: Bad state! (%d) ***\n", req->state);
@@ -283,16 +279,16 @@ void read_cb(struct io_ret ret, void *param)
     return;
 
  fail:
-	{
-		struct io_ret r;
-		io_cb_t cb;
-		DPRINTF("asyn_read had a read error.\n");
+    {
+        struct io_ret r;
+        io_cb_t cb;
+        DPRINTF("asyn_read had a read error.\n");
         req_param = req->param;
         r         = ret;
         cb        = req->cb;
         free(req);
         cb(r, req_param);
-	}
+    }
 
 
 }
@@ -304,11 +300,10 @@ void write_cb(struct io_ret r, void *param)
     u64 a, addr;
     void *req_param;
 
-    //DPRINTF("write_cb\n");
     switch(req->state) {
     	
     case WRITE_LOCKED:
-    
+        
         DPRINTF("WRITE_LOCKED (%llu)\n", L1_IDX(req->vaddr));
     	req->state = READ_L1;
     	block_read(getid(req->root), write_cb, req); 
@@ -326,9 +321,9 @@ void write_cb(struct io_ret r, void *param)
         req->radix[L1] = node;
 
         if ( addr == ZERO ) {
-        	/* L1 empty subtree: */
-        	req->state = ALLOC_DATA_L1z;
-        	block_alloc( req->block, write_cb, req );
+            /* L1 empty subtree: */
+            req->state = ALLOC_DATA_L1z;
+            block_alloc( req->block, write_cb, req );
         } else if ( !iswritable(a) ) {
             /* L1 fault: */
             req->state = READ_L2_L1f;
@@ -351,7 +346,7 @@ void write_cb(struct io_ret r, void *param)
         req->radix[L2] = node;
 
         if ( addr == ZERO ) {
-        	/* L2 empty subtree: */
+            /* L2 empty subtree: */
             req->state = ALLOC_DATA_L2z;
             block_alloc( req->block, write_cb, req );
         } else if ( !iswritable(a) ) {
@@ -447,7 +442,7 @@ void write_cb(struct io_ret r, void *param)
         addr = getid(a);
 
         req->radix[L3] = node;
-		req->state = ALLOC_DATA_L2f;
+        req->state = ALLOC_DATA_L2f;
         block_alloc( req->block, write_cb, req );
         break;
                 
@@ -520,14 +515,14 @@ void write_cb(struct io_ret r, void *param)
         req->radix[L2] = node;
         
         if (addr == ZERO) {
-        	/* nothing below L2, create an empty L3 and alloc data. */
-        	/* (So skip READ_L3_L1f.) */
-        	req->radix[L3] = newblock();
-        	req->state = ALLOC_DATA_L1f;
-        	block_alloc( req->block, write_cb, req );
+            /* nothing below L2, create an empty L3 and alloc data. */
+            /* (So skip READ_L3_L1f.) */
+            req->radix[L3] = newblock();
+            req->state = ALLOC_DATA_L1f;
+            block_alloc( req->block, write_cb, req );
         } else {
-			req->state = READ_L3_L1f;
-			block_read( addr, write_cb, req );
+            req->state = READ_L3_L1f;
+            block_read( addr, write_cb, req );
         }
         break;
         
@@ -541,7 +536,7 @@ void write_cb(struct io_ret r, void *param)
         addr = getid(a);
 
         req->radix[L3] = node;
-		req->state = ALLOC_DATA_L1f;
+        req->state = ALLOC_DATA_L1f;
         block_alloc( req->block, write_cb, req );
         break;
                 
@@ -587,7 +582,7 @@ void write_cb(struct io_ret r, void *param)
         DPRINTF("DONE\n");
         /* free any saved node vals. */
         for (i=0; i<3; i++)
-        	if (req->radix[i] != 0) free(req->radix[i]);
+            if (req->radix[i] != 0) free(req->radix[i]);
         req->retval = r;
         req->state = WRITE_UNLOCKED;
         block_wunlock(req->lock, L1_IDX(req->vaddr), write_cb, req);
@@ -601,7 +596,7 @@ void write_cb(struct io_ret r, void *param)
         req_param = req->param;
         r         = req->retval;
         cb        = req->cb;
-	    free(req);
+        free(req);
         cb(r, req_param);
         break;
     }
@@ -614,16 +609,16 @@ void write_cb(struct io_ret r, void *param)
     return;
     
  fail:
-	{
-		struct io_ret r;
-		io_cb_t cb;
-		DPRINTF("asyn_write had a read error mid-way.\n");
+    {
+        struct io_ret r;
+        io_cb_t cb;
+        DPRINTF("asyn_write had a read error mid-way.\n");
         req_param = req->param;
         cb        = req->cb;
         r.type = IO_INT_T;
         r.u.i  = -1;
         free(req);
         cb(r, req_param);
-	}
+    }
 }
 

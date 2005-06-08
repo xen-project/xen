@@ -328,33 +328,33 @@ typedef struct {
 pending_t pending_list[MAX_REQUESTS];
 
 struct cb_param {
-	pending_t *pent;
-	int       segment;
-	u64       sector; 
-	u64       vblock; /* for debug printing -- can be removed. */
+    pending_t *pent;
+    int       segment;
+    u64       sector; 
+    u64       vblock; /* for debug printing -- can be removed. */
 };
 
 static void read_cb(struct io_ret r, void *in_param)
 {
-	struct cb_param *param = (struct cb_param *)in_param;
-	pending_t *p = param->pent;
-	int segment = param->segment;
-	blkif_request_t *req = p->req;
+    struct cb_param *param = (struct cb_param *)in_param;
+    pending_t *p = param->pent;
+    int segment = param->segment;
+    blkif_request_t *req = p->req;
     unsigned long size, offset, start;
-	char *dpage, *spage;
+    char *dpage, *spage;
 	
-	spage  = IO_BLOCK(r);
-	if (spage == NULL) { p->error++; goto finish; }
-	dpage  = (char *)MMAP_VADDR(ID_TO_IDX(req->id), segment);
+    spage  = IO_BLOCK(r);
+    if (spage == NULL) { p->error++; goto finish; }
+    dpage  = (char *)MMAP_VADDR(ID_TO_IDX(req->id), segment);
     
     /* Calculate read size and offset within the read block. */
 
     offset = (param->sector << SECTOR_SHIFT) % BLOCK_SIZE;
     size = ( blkif_last_sect (req->frame_and_sects[segment]) -
              blkif_first_sect(req->frame_and_sects[segment]) + 1
-           ) << SECTOR_SHIFT;
+        ) << SECTOR_SHIFT;
     start = blkif_first_sect(req->frame_and_sects[segment]) 
-            << SECTOR_SHIFT;
+        << SECTOR_SHIFT;
 
     DPRINTF("ParallaxRead: sect: %lld (%ld,%ld),  "
             "vblock %llx, "
@@ -371,23 +371,23 @@ static void read_cb(struct io_ret r, void *in_param)
     pthread_mutex_lock(&p->mutex);
     p->count--;
     
-	if (p->count == 0) {
+    if (p->count == 0) {
     	blkif_response_t *rsp;
     	
         rsp = (blkif_response_t *)req;
         rsp->id = req->id;
         rsp->operation = BLKIF_OP_READ;
     	if (p->error == 0) {
-	        rsp->status = BLKIF_RSP_OKAY;
+            rsp->status = BLKIF_RSP_OKAY;
     	} else {
-    		rsp->status = BLKIF_RSP_ERROR;
+            rsp->status = BLKIF_RSP_ERROR;
     	}
         blktap_inject_response(rsp);       
     }
     
     pthread_mutex_unlock(&p->mutex);
 	
-	free(param); /* TODO: replace with cached alloc/dealloc */
+    free(param); /* TODO: replace with cached alloc/dealloc */
 }	
 
 int parallax_read(blkif_request_t *req, blkif_t *blkif)
@@ -414,21 +414,20 @@ int parallax_read(blkif_request_t *req, blkif_t *blkif)
         pthread_t tid;
         int ret;
         struct cb_param *p;
-
-	    /* Round the requested segment to a block address. */
-	    sector  = req->sector_number + (8*i);
-	    vblock = (sector << SECTOR_SHIFT) >> BLOCK_SHIFT;
-
-		/* TODO: Replace this call to malloc with a cached allocation */
-		p = (struct cb_param *)malloc(sizeof(struct cb_param));
-		p->pent = pent;
-		p->sector = sector; 
-		p->segment = i;     
-		p->vblock = vblock; /* dbg */
-		
-	    /* Get that block from the store. */
-	    async_read(vdi, vblock, read_cb, (void *)p);
-
+        
+        /* Round the requested segment to a block address. */
+        sector  = req->sector_number + (8*i);
+        vblock = (sector << SECTOR_SHIFT) >> BLOCK_SHIFT;
+        
+        /* TODO: Replace this call to malloc with a cached allocation */
+        p = (struct cb_param *)malloc(sizeof(struct cb_param));
+        p->pent = pent;
+        p->sector = sector; 
+        p->segment = i;     
+        p->vblock = vblock; /* dbg */
+        
+        /* Get that block from the store. */
+        async_read(vdi, vblock, read_cb, (void *)p);    
     }
     
     return BLKTAP_STOLEN;
@@ -444,33 +443,33 @@ err:
 
 static void write_cb(struct io_ret r, void *in_param)
 {
-	struct cb_param *param = (struct cb_param *)in_param;
-	pending_t *p = param->pent;
-	blkif_request_t *req = p->req;
-
-	/* catch errors from the block code. */
-	if (IO_INT(r) < 0) p->error++;
-	
+    struct cb_param *param = (struct cb_param *)in_param;
+    pending_t *p = param->pent;
+    blkif_request_t *req = p->req;
+    
+    /* catch errors from the block code. */
+    if (IO_INT(r) < 0) p->error++;
+    
     pthread_mutex_lock(&p->mutex);
     p->count--;
     
-	if (p->count == 0) {
+    if (p->count == 0) {
     	blkif_response_t *rsp;
     	
         rsp = (blkif_response_t *)req;
         rsp->id = req->id;
         rsp->operation = BLKIF_OP_WRITE;
     	if (p->error == 0) {
-	        rsp->status = BLKIF_RSP_OKAY;
+            rsp->status = BLKIF_RSP_OKAY;
     	} else {
-    		rsp->status = BLKIF_RSP_ERROR;
+            rsp->status = BLKIF_RSP_ERROR;
     	}
         blktap_inject_response(rsp);       
     }
     
     pthread_mutex_unlock(&p->mutex);
 	
-	free(param); /* TODO: replace with cached alloc/dealloc */
+    free(param); /* TODO: replace with cached alloc/dealloc */
 }
 
 int parallax_write(blkif_request_t *req, blkif_t *blkif)
@@ -496,7 +495,7 @@ int parallax_write(blkif_request_t *req, blkif_t *blkif)
     
     for (i = 0; i < req->nr_segments; i++) {
         struct cb_param *p;
-            
+        
         spage  = (char *)MMAP_VADDR(ID_TO_IDX(req->id), i);
         
         /* Round the requested segment to a block address. */
@@ -509,7 +508,7 @@ int parallax_write(blkif_request_t *req, blkif_t *blkif)
         offset = (sector << SECTOR_SHIFT) % BLOCK_SIZE;
         size = ( blkif_last_sect (req->frame_and_sects[i]) -
                  blkif_first_sect(req->frame_and_sects[i]) + 1
-               ) << SECTOR_SHIFT;
+            ) << SECTOR_SHIFT;
         start = blkif_first_sect(req->frame_and_sects[i]) << SECTOR_SHIFT;
 
         DPRINTF("ParallaxWrite: sect: %lld (%ld,%ld),  "
@@ -527,15 +526,15 @@ int parallax_write(blkif_request_t *req, blkif_t *blkif)
             goto err;
         }
         
- 		/* TODO: Replace this call to malloc with a cached allocation */
-		p = (struct cb_param *)malloc(sizeof(struct cb_param));
-		p->pent = pent;
-		p->sector = sector; 
-		p->segment = i;     
-		p->vblock = vblock; /* dbg */
-		
+        /* TODO: Replace this call to malloc with a cached allocation */
+        p = (struct cb_param *)malloc(sizeof(struct cb_param));
+        p->pent = pent;
+        p->sector = sector; 
+        p->segment = i;     
+        p->vblock = vblock; /* dbg */
+        
         /* Issue the write to the store. */
-	    async_write(vdi, vblock, spage, write_cb, (void *)p);
+        async_write(vdi, vblock, spage, write_cb, (void *)p);
     }
 
     return BLKTAP_STOLEN;
