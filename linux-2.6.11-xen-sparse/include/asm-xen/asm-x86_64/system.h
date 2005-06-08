@@ -145,30 +145,38 @@ struct alt_instr {
  * Clear and set 'TS' bit respectively
  */
 #define clts() (HYPERVISOR_fpu_taskswitch(0))
+
 static inline unsigned long read_cr0(void)
 { 
-	return 0;
+	unsigned long cr0;
+	asm volatile("movq %%cr0,%0" : "=r" (cr0));
+	return cr0;
 } 
 
 static inline void write_cr0(unsigned long val) 
 { 
-	/* Ignore, Linux tries to clear TS and EM */
+	asm volatile("movq %0,%%cr0" :: "r" (val));
 } 
 
 static inline unsigned long read_cr3(void)
 { 
-        BUG();
+	unsigned long cr3;
+	asm("movq %%cr3,%0" : "=r" (cr3));
+	return cr3;
 } 
 
 static inline unsigned long read_cr4(void)
 { 
-        BUG();
+	unsigned long cr4;
+	asm("movq %%cr4,%0" : "=r" (cr4));
+	return cr4;
 } 
 
 static inline void write_cr4(unsigned long val)
 { 
-        BUG();
+	asm volatile("movq %0,%%cr4" :: "r" (val));
 } 
+
 #define stts() (HYPERVISOR_fpu_taskswitch(1))
 
 #define wbinvd() \
