@@ -409,7 +409,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
     if ( cmdline != NULL )
     {
-        static char dom0_cmdline[256];
+        static char dom0_cmdline[MAX_GUEST_CMDLINE];
 
         /* Skip past the image name. */
         while ( *cmdline == ' ' ) cmdline++;

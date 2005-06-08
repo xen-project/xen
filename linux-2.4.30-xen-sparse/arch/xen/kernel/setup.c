@@ -113,7 +113,7 @@ int enable_acpi_smp_table;
 /* Raw start-of-day parameters from the hypervisor. */
 union xen_start_info_union xen_start_info_union;
 
-#define COMMAND_LINE_SIZE 256
+#define COMMAND_LINE_SIZE MAX_GUEST_CMDLINE
 static char command_line[COMMAND_LINE_SIZE];
 char saved_command_line[COMMAND_LINE_SIZE];
 

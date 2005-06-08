@@ -238,6 +238,7 @@ static always_inline void * __constant_memcpy(
         }
     }
 #undef COMMON
+    return to;
 }
 
 #define __HAVE_ARCH_MEMCPY
@@ -367,6 +368,7 @@ static always_inline void *__constant_c_and_count_memset(
         }
     }
 #undef COMMON
+    return s;
 }
 
 #define __constant_c_x_memset(s, c, count) \

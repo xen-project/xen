@@ -430,7 +430,7 @@ typedef struct shared_info_st
  *     extended by an extra 4MB to ensure this.
  */
 
-#define MAX_CMDLINE 256
+#define MAX_GUEST_CMDLINE 1024
 typedef struct {
     /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */
     memory_t nr_pages;        /*  0: Total pages allocated to this domain. */
@@ -451,8 +451,8 @@ typedef struct {
     _MEMORY_PADDING(F);
     memory_t mod_len;         /* 56: Size (bytes) of pre-loaded module.    */
     _MEMORY_PADDING(G);
-    s8 cmd_line[MAX_CMDLINE]; /* 64 */
-} PACKED start_info_t; /* 320 bytes */
+    s8 cmd_line[MAX_GUEST_CMDLINE]; /* 64 */
+} PACKED start_info_t; /* 1088 bytes */
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */

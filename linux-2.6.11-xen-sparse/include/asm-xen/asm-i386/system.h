@@ -107,14 +107,25 @@ static inline unsigned long _get_base(char * addr)
  * Clear and set 'TS' bit respectively
  */
 #define clts() (HYPERVISOR_fpu_taskswitch(0))
-#define read_cr0() \
-	BUG();
+#define read_cr0() ({ \
+	unsigned int __dummy; \
+	__asm__( \
+		"movl %%cr0,%0\n\t" \
+		:"=r" (__dummy)); \
+	__dummy; \
+})
 #define write_cr0(x) \
-	BUG();
-#define read_cr4() \
-	BUG();
+	__asm__("movl %0,%%cr0": :"r" (x));
+
+#define read_cr4() ({ \
+	unsigned int __dummy; \
+	__asm__( \
+		"movl %%cr4,%0\n\t" \
+		:"=r" (__dummy)); \
+	__dummy; \
+})
 #define write_cr4(x) \
-	BUG();
+	__asm__("movl %0,%%cr4": :"r" (x));
 #define stts() (HYPERVISOR_fpu_taskswitch(1))
 
 #endif	/* __KERNEL__ */

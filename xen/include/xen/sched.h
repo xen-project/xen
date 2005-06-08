@@ -155,7 +155,7 @@ struct domain_setup_info
     unsigned long symtab_addr;
     unsigned long symtab_len;
     /* Indicate whether it's xen specific image */
-    unsigned int xen_elf_image;
+    char *xen_section_string;
 };
 
 extern struct domain idle0_domain;

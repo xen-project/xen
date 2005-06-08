@@ -11,12 +11,6 @@
 #include <xen/elf.h>
 #include <xen/sched.h>
 
-#ifdef CONFIG_X86
-#define FORCE_XENELF_IMAGE 1
-#elif defined(__ia64__)
-#define FORCE_XENELF_IMAGE 0
-#endif
-
 static void loadelfsymtab(struct domain_setup_info *dsi, int doload);
 static inline int is_loadable_phdr(Elf_Phdr *phdr)
 {
@@ -85,16 +79,8 @@ int parseelfimage(struct domain_setup_info *dsi)
 
         break;
     }
-    if ( guestinfo == NULL )
-    {
-        printk("Not a Xen-ELF image: '__xen_guest' section not found.\n");
-	dsi->xen_elf_image = 0;
-#if FORCE_XENELF_IMAGE
-        return -EINVAL;
-#endif
-    } else {
-	dsi->xen_elf_image = 1;
-    }
+
+    dsi->xen_section_string = guestinfo;
 
     for ( h = 0; h < ehdr->e_phnum; h++ ) 
     {

@@ -74,8 +74,7 @@ int construct_dom0(struct domain *d,
                    unsigned long _initrd_start, unsigned long initrd_len,
                    char *cmdline)
 {
-    char *dst;
-    int i, rc;
+    int i, rc, dom0_pae, xen_pae;
     unsigned long pfn, mfn;
     unsigned long nr_pages;
     unsigned long nr_pt_pages;
@@ -123,7 +122,8 @@ int construct_dom0(struct domain *d,
     unsigned long mpt_alloc;
 
     extern void physdev_init_dom0(struct domain *);
-    extern void translate_l2pgtable(struct domain *d, l1_pgentry_t *p2m, unsigned long l2mfn);
+    extern void translate_l2pgtable(
+        struct domain *d, l1_pgentry_t *p2m, unsigned long l2mfn);
 
     /* Sanity! */
     if ( d->domain_id != 0 ) 
@@ -150,6 +150,21 @@ int construct_dom0(struct domain *d,
 
     if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;
+
+    if ( dsi.xen_section_string == NULL )
+    {
+        printk("Not a Xen-ELF image: '__xen_guest' section not found.\n");
+        return -EINVAL;
+    }
+
+    dom0_pae = !!strstr(dsi.xen_section_string, "PAE=yes");
+    xen_pae  = (CONFIG_PAGING_LEVELS == 3);
+    if ( dom0_pae != xen_pae )
+    {
+        printk("PAE mode mismatch between Xen and DOM0 (xen=%s, dom0=%s)\n",
+               xen_pae ? "yes" : "no", dom0_pae ? "yes" : "no");
+        return -EINVAL;
+    }
 
     /* Align load address to 4MB boundary. */
     dsi.v_start &= ~((1UL<<22)-1);
@@ -580,17 +595,9 @@ int construct_dom0(struct domain *d,
                si->mod_len, si->mod_start);
     }
 
-    dst = (char *)si->cmd_line;
+    memset(si->cmd_line, 0, sizeof(si->cmd_line));
     if ( cmdline != NULL )
-    {
-        for ( i = 0; i < 255; i++ )
-        {
-            if ( cmdline[i] == '\0' )
-                break;
-            *dst++ = cmdline[i];
-        }
-    }
-    *dst = '\0';
+        strncpy(si->cmd_line, cmdline, sizeof(si->cmd_line)-1);
 
     /* Reinstate the caller's page tables. */
     write_ptbase(current);

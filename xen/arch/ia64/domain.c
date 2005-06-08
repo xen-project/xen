@@ -823,14 +823,14 @@ int construct_dom0(struct domain *d,
 
     /* Temp workaround */
     if (running_on_sim)
-	dsi.xen_elf_image = 1;
+	dsi.xen_section_string = (char *)1;
 
-    if ((!vmx_enabled) && !dsi.xen_elf_image) {
+    if ((!vmx_enabled) && !dsi.xen_section_string) {
 	printk("Lack of hardware support for unmodified vmx dom0\n");
 	panic("");
     }
 
-    if (vmx_enabled && !dsi.xen_elf_image) {
+    if (vmx_enabled && !dsi.xen_section_string) {
 	printk("Dom0 is vmx domain!\n");
 	vmx_dom0 = 1;
     }

@@ -382,8 +382,8 @@ static int setup_guest(int xc_handle,
         start_info->mod_start    = vinitrd_start;
         start_info->mod_len      = initrd_len;
     }
-    strncpy((char *)start_info->cmd_line, cmdline, MAX_CMDLINE);
-    start_info->cmd_line[MAX_CMDLINE-1] = '\0';
+    strncpy((char *)start_info->cmd_line, cmdline, MAX_GUEST_CMDLINE);
+    start_info->cmd_line[MAX_GUEST_CMDLINE-1] = '\0';
     munmap(start_info, PAGE_SIZE);
 
     /* shared_info page starts its life empty. */

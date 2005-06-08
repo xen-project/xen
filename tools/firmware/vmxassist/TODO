@@ -1,0 +1,8 @@
+
+- Use the VME extensions (interrupt handling)
+
+- Use E820 map in vmxassist instead of cmos hack
+
+- Add ACPI support (Nitin's patch)
+
+
