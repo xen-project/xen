@@ -1104,7 +1104,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         return 0;
     }
 
-#ifdef CONFIG_PAE
+#ifdef CONFIG_X86_PAE
     /*
      * Disallow updates to final L3 slot. It contains Xen mappings, and it
      * would be a pain to ensure they remain continuously valid throughout.
@@ -1400,7 +1400,7 @@ int get_page_type(struct pfn_info *page, u32 type)
                 else if ( ((type & PGT_va_mask) != PGT_va_mutable) &&
                           ((type & PGT_va_mask) != (x & PGT_va_mask)) )
                 {
-#ifdef CONFIG_PAE
+#ifdef CONFIG_X86_PAE
                     /* We use backptr as extra typing. Cannot be unknown. */
                     if ( (type & PGT_type_mask) == PGT_l2_page_table )
                         return 0;
@@ -1671,7 +1671,7 @@ int do_mmuext_op(
             
             break;
 
-#ifndef CONFIG_PAE /* Unsafe on PAE because of Xen-private mappings. */
+#ifndef CONFIG_X86_PAE /* Unsafe on PAE because of Xen-private mappings. */
         case MMUEXT_PIN_L2_TABLE:
             type = PGT_l2_page_table;
             goto pin_page;
