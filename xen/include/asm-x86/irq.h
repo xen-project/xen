@@ -8,16 +8,19 @@
 #include <asm/asm_defns.h>
 #include <irq_vectors.h>
 
-extern void disable_irq(unsigned int);
+#define IO_APIC_IRQ(irq)    (((irq) >= 16) || ((1<<(irq)) & io_apic_irqs))
+#define IO_APIC_VECTOR(irq) (irq_vector[irq])
+#define LEGACY_VECTOR(irq)  ((irq) + FIRST_EXTERNAL_VECTOR)
+#define irq_to_vector(irq)  \
+    (IO_APIC_IRQ(irq) ? IO_APIC_VECTOR(irq) : LEGACY_VECTOR(irq))
+#define vector_to_irq(vec)  (vector_irq[vec])
+
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
 
 extern int vector_irq[NR_VECTORS];
 extern u8 irq_vector[NR_IRQ_VECTORS];
-#define IO_APIC_VECTOR(irq)     irq_vector[irq]
 #define AUTO_ASSIGN             -1
-
-extern void (*interrupt[NR_IRQS])(void);
 
 #define platform_legacy_irq(irq)	((irq) < 16)
 
@@ -39,13 +42,5 @@ extern unsigned long io_apic_irqs;
 
 extern atomic_t irq_err_count;
 extern atomic_t irq_mis_count;
-
-#define IO_APIC_IRQ(x) (((x) >= 16) || ((1<<(x)) & io_apic_irqs))
-
-static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
-{
-    if (IO_APIC_IRQ(i))
-        send_IPI_self(IO_APIC_VECTOR(i));
-}
 
 #endif /* _ASM_HW_IRQ_H */

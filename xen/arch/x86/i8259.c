@@ -43,28 +43,10 @@ BUILD_COMMON_IRQ()
 	BI(x,8) BI(x,9) BI(x,a) BI(x,b) \
 	BI(x,c) BI(x,d) BI(x,e) BI(x,f)
 
-/*
- * ISA PIC or low IO-APIC triggered (INTA-cycle or APIC) interrupts:
- * (these are usually mapped to vectors 0x20-0x2f)
- */
-BUILD_16_IRQS(0x0)
-
-#ifdef CONFIG_X86_IO_APIC
-/*
- * The IO-APIC gives us many more interrupt sources. Most of these 
- * are unused but an SMP system is supposed to have enough memory ...
- * sometimes (mostly wrt. hw bugs) we get corrupted vectors all
- * across the spectrum, so we really want to be prepared to get all
- * of these. Plus, more powerful systems might have more than 64
- * IO-APIC registers.
- *
- * (these are usually mapped into the 0x20-0xff vector range)
- */
-BUILD_16_IRQS(0x1) BUILD_16_IRQS(0x2) BUILD_16_IRQS(0x3)
+BUILD_16_IRQS(0x0) BUILD_16_IRQS(0x1) BUILD_16_IRQS(0x2) BUILD_16_IRQS(0x3)
 BUILD_16_IRQS(0x4) BUILD_16_IRQS(0x5) BUILD_16_IRQS(0x6) BUILD_16_IRQS(0x7)
 BUILD_16_IRQS(0x8) BUILD_16_IRQS(0x9) BUILD_16_IRQS(0xa) BUILD_16_IRQS(0xb)
-BUILD_16_IRQS(0xc)
-#endif
+BUILD_16_IRQS(0xc) BUILD_16_IRQS(0xd) BUILD_16_IRQS(0xe) BUILD_16_IRQS(0xf)
 
 #undef BUILD_16_IRQS
 #undef BI
@@ -101,15 +83,11 @@ BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
 	IRQ(x,8), IRQ(x,9), IRQ(x,a), IRQ(x,b), \
 	IRQ(x,c), IRQ(x,d), IRQ(x,e), IRQ(x,f)
 
-    void (*interrupt[NR_IRQS])(void) = {
-	IRQLIST_16(0x0),
-
-#ifdef CONFIG_X86_IO_APIC
-        IRQLIST_16(0x1), IRQLIST_16(0x2), IRQLIST_16(0x3),
+    static void (*interrupt[])(void) = {
+	IRQLIST_16(0x0), IRQLIST_16(0x1), IRQLIST_16(0x2), IRQLIST_16(0x3),
 	IRQLIST_16(0x4), IRQLIST_16(0x5), IRQLIST_16(0x6), IRQLIST_16(0x7),
 	IRQLIST_16(0x8), IRQLIST_16(0x9), IRQLIST_16(0xa), IRQLIST_16(0xb),
-	IRQLIST_16(0xc)
-#endif
+	IRQLIST_16(0xc), IRQLIST_16(0xd), IRQLIST_16(0xe), IRQLIST_16(0xf)
     };
 
 #undef IRQ
@@ -128,7 +106,7 @@ spinlock_t i8259A_lock = SPIN_LOCK_UNLOCKED;
 
 static void end_8259A_irq (unsigned int irq)
 {
-    if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+    if (!(irq_desc[irq_to_vector(irq)].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
         enable_8259A_irq(irq);
 }
 
@@ -225,7 +203,7 @@ void make_8259A_irq(unsigned int irq)
 {
     disable_irq_nosync(irq);
     io_apic_irqs &= ~(1<<irq);
-    irq_desc[irq].handler = &i8259A_irq_type;
+    irq_desc[irq_to_vector(irq)].handler = &i8259A_irq_type;
     enable_irq(irq);
 }
 
@@ -384,11 +362,17 @@ void __init init_IRQ(void)
     for ( i = 0; i < NR_IRQS; i++ )
     {
         irq_desc[i].status  = IRQ_DISABLED;
-        irq_desc[i].handler = (i<16) ? &i8259A_irq_type : &no_irq_type;
+        irq_desc[i].handler = &no_irq_type;
         irq_desc[i].action  = NULL;
         irq_desc[i].depth   = 1;
         spin_lock_init(&irq_desc[i].lock);
-        set_intr_gate(FIRST_EXTERNAL_VECTOR+i, interrupt[i]);
+        set_intr_gate(i, interrupt[i]);
+    }
+
+    for ( i = 0; i < 16; i++ )
+    {
+        vector_irq[LEGACY_VECTOR(i)] = i;
+        irq_desc[LEGACY_VECTOR(i)].handler = &i8259A_irq_type;
     }
 
     /*
@@ -397,7 +381,6 @@ void __init init_IRQ(void)
      */
     irq_vector[0] = FIRST_DEVICE_VECTOR;
     vector_irq[FIRST_DEVICE_VECTOR] = 0;
-    set_intr_gate(FIRST_DEVICE_VECTOR, interrupt[0]);
 
     /* Various IPI functions. */
     set_intr_gate(EVENT_CHECK_VECTOR, event_check_interrupt);
