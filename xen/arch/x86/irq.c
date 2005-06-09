@@ -44,42 +44,6 @@ struct hw_interrupt_type no_irq_type = {
 
 atomic_t irq_err_count;
 
-inline void disable_irq_nosync(unsigned int irq)
-{
-    unsigned int  vector = irq_to_vector(irq);
-    irq_desc_t   *desc = &irq_desc[vector];
-    unsigned long flags;
-
-    spin_lock_irqsave(&desc->lock, flags);
-
-    if ( desc->depth++ == 0 )
-    {
-        desc->status |= IRQ_DISABLED;
-        desc->handler->disable(vector);
-    }
-
-    spin_unlock_irqrestore(&desc->lock, flags);
-}
-
-void enable_irq(unsigned int irq)
-{
-    unsigned int  vector = irq_to_vector(irq);
-    irq_desc_t   *desc = &irq_desc[vector];
-    unsigned long flags;
-
-    spin_lock_irqsave(&desc->lock, flags);
-
-    if ( --desc->depth == 0 )
-    {
-        desc->status &= ~IRQ_DISABLED;
-        if ( (desc->status & (IRQ_PENDING | IRQ_REPLAY)) == IRQ_PENDING )
-            desc->status |= IRQ_REPLAY;
-        desc->handler->enable(vector);
-    }
-
-    spin_unlock_irqrestore(&desc->lock, flags);
-}
-
 asmlinkage void do_IRQ(struct cpu_user_regs *regs)
 {
     unsigned int      vector = regs->entry_vector;

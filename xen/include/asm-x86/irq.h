@@ -18,9 +18,6 @@
     (IO_APIC_IRQ(irq) ? IO_APIC_VECTOR(irq) : LEGACY_VECTOR(irq))
 #define vector_to_irq(vec)  (vector_irq[vec])
 
-extern void disable_irq_nosync(unsigned int);
-extern void enable_irq(unsigned int);
-
 extern int vector_irq[NR_VECTORS];
 extern u8 irq_vector[NR_IRQ_VECTORS];
 #define AUTO_ASSIGN             -1
@@ -30,7 +27,6 @@ extern u8 irq_vector[NR_IRQ_VECTORS];
 void disable_8259A_irq(unsigned int irq);
 void enable_8259A_irq(unsigned int irq);
 int i8259A_irq_pending(unsigned int irq);
-void make_8259A_irq(unsigned int irq);
 void init_8259A(int aeoi);
 
 void setup_IO_APIC(void);

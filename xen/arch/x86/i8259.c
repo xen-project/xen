@@ -204,13 +204,6 @@ int i8259A_irq_pending(unsigned int irq)
     return ret;
 }
 
-void make_8259A_irq(unsigned int irq)
-{
-    disable_irq_nosync(irq);
-    io_apic_irqs &= ~(1<<irq);
-    enable_irq(irq);
-}
-
 /*
  * This function assumes to be called rarely. Switching between
  * 8259A registers is slow.

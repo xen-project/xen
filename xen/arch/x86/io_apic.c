@@ -34,6 +34,8 @@
 #include <mach_apic.h>
 #include <io_ports.h>
 
+#define make_8259A_irq(irq) (io_apic_irqs &= ~(1<<(irq)))
+
 int (*ioapic_renumber_irq)(int ioapic, int irq);
 atomic_t irq_mis_count;
 
@@ -1278,8 +1280,8 @@ static struct hw_interrupt_type ioapic_level_type = {
 static inline void init_IO_APIC_traps(void)
 {
     int irq;
-    for (irq = 0; irq < NR_IRQS ; irq++)
-        if (IO_APIC_IRQ(irq) && !IO_APIC_VECTOR(irq) && (irq < 16))
+    for (irq = 0; irq < 16 ; irq++)
+        if (IO_APIC_IRQ(irq) && !IO_APIC_VECTOR(irq))
             make_8259A_irq(irq);
 }
 
