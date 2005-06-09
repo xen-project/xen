@@ -130,7 +130,7 @@ class Daemon:
 
     def cleanup(self, kill=False):
         self.cleanup_xend(kill=kill)
-        self.cleanup_xenstored(kill=kill)
+        #self.cleanup_xenstored(kill=kill)
 
     def status(self):
         """Returns the status of the xend daemon.
