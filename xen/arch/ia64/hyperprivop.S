@@ -15,10 +15,12 @@
 #include <public/arch-ia64.h>
 
 #define FAST_HYPERPRIVOP_CNT
+#define FAST_REFLECT_CNT
 
 // Should be included from common header file (also in process.c)
 //  NO PSR_CLR IS DIFFERENT! (CPL)
 #define IA64_PSR_CPL1	(__IA64_UL(1) << IA64_PSR_CPL1_BIT)
+#define IA64_PSR_CPL0	(__IA64_UL(1) << IA64_PSR_CPL0_BIT)
 // note IA64_PSR_PK removed from following, why is this necessary?
 #define	DELIVER_PSR_SET	(IA64_PSR_IC | IA64_PSR_I | \
 			IA64_PSR_DT | IA64_PSR_RT | IA64_PSR_CPL1 | \
@@ -116,7 +118,6 @@ GLOBAL_ENTRY(fast_hyperprivop)
 //	r17 == cr.iim
 //	r18 == XSI_PSR_IC
 //	r19 == vpsr.ic (low 32 bits) | vpsr.i (high 32 bits)
-//	r22 == IA64_KR(CURRENT)+IA64_VCPU_BREAKIMM_OFFSET
 //	r31 == pr
 ENTRY(hyper_ssm_i)
 	// give up for now if: ipsr.be==1, ipsr.pp==1
@@ -135,8 +136,8 @@ ENTRY(hyper_ssm_i)
 	st8 [r20]=r21;;
 #endif
 	// set shared_mem iip to instruction after HYPER_SSM_I
-extr.u r20=r30,41,2 ;;
-cmp.eq p6,p7=2,r20 ;;
+	extr.u r20=r30,41,2 ;;
+	cmp.eq p6,p7=2,r20 ;;
 (p6)	mov r20=0
 (p6)	adds r29=16,r29
 (p7)	adds r20=1,r20 ;;
@@ -218,59 +219,82 @@ cmp.eq p6,p7=2,r20 ;;
 //	r17 == cr.iim
 //	r18 == XSI_PSR_IC
 //	r19 == vpsr.ic (low 32 bits) | vpsr.i (high 32 bits)
-//	r22 == IA64_KR(CURRENT)+IA64_VCPU_BREAKIMM_OFFSET
 //	r31 == pr
 GLOBAL_ENTRY(fast_break_reflect)
-	mov r20=cr.ipsr;;
-	// if big-endian domain or privileged-perfmon bits set, do slow way
-	extr.u r21=r20,IA64_PSR_BE_BIT,1 ;;
-	cmp.ne p7,p0=r21,r0
+//#define FAST_BREAK
+#ifndef FAST_BREAK
+	br.sptk.many dispatch_break_fault ;;
+#endif
+	mov r30=cr.ipsr;;
+	mov r29=cr.iip;;
+	extr.u r21=r30,IA64_PSR_BE_BIT,1 ;;
+	cmp.ne p7,p0=r21,r0 ;;
 (p7)	br.sptk.many dispatch_break_fault ;;
-	extr.u r21=r20,IA64_PSR_PP_BIT,1 ;;
-	cmp.ne p7,p0=r21,r0
+	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
+	cmp.ne p7,p0=r21,r0 ;;
 (p7)	br.sptk.many dispatch_break_fault ;;
-	// ensure ipsr.cpl==2, ipsr.ri==0
-	// FIXME: any other psr bits need to be properly set/validated?
-	//   ...see process.c: DELIVER_PSR_CLR/SET
-	extr.u r21=r20,IA64_PSR_CPL0_BIT,2;;
-	extr.u r23=r20,IA64_PSR_RI_BIT,2;;
-	dep r20=-1,r20,IA64_PSR_CPL1_BIT,1 ;;
-	dep r20=0,r20,IA64_PSR_CPL0_BIT,1 ;;
-	dep r20=0,r20,IA64_PSR_RI_BIT,2 ;;
-	mov cr.ipsr=r20;;
-	// save ipsr in shared_info, vipsr.cpl==(ipsr.cpl==3)?3:0
-	cmp.ne p7,p0=3,r21;;
-(p7)	mov r21=r0 ;;
-	dep r20=r21,r20,IA64_PSR_CPL0_BIT,2 ;;
-	dep r20=r23,r20,IA64_PSR_RI_BIT,2 ;;
-	// vipsr.i=vpsr.i
-	adds r21=XSI_PSR_I_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld4 r21=[r21];;
-	dep r20=r21,r20,IA64_PSR_I_BIT,1 ;;
-	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
-	// FIXME: any other vpsr bits need to be properly set/validated?
-	st8 [r21]=r20;;
+#ifdef FAST_REFLECT_CNT
+	movl r20=fast_reflect_count+((0x2c00>>8)*8);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
 	// save iim in shared_info
 	adds r21=XSI_IIM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r17;;
-	// save iip in shared_info
-	mov r20=cr.iip;;
+	// save iip in shared_info (DON'T POINT TO NEXT INSTRUCTION!)
 	adds r21=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st8 [r21]=r20;;
-	// save ifs in shared_info
+	st8 [r21]=r29;;
+	// set shared_mem isr
+	adds r21=XSI_ISR_OFS-XSI_PSR_IC_OFS,r18 ;; 
+	st8 [r21]=r16 ;;
+	// set cr.ipsr
+	mov r29=r30 ;;
+	movl r28=DELIVER_PSR_SET;;
+	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0);;
+	or r29=r29,r28;;
+	and r29=r29,r27;;
+	mov cr.ipsr=r29;;
+	// set shared_mem ipsr (from ipsr in r30 with ipsr.ri already set)
+	extr.u r29=r30,IA64_PSR_CPL0_BIT,2;;
+	cmp.eq p6,p7=3,r29;;
+(p6)	dep r30=-1,r30,IA64_PSR_CPL0_BIT,2
+(p7)	dep r30=0,r30,IA64_PSR_CPL0_BIT,2
+	;;
+	movl r28=(IA64_PSR_DT|IA64_PSR_IT|IA64_PSR_RT);;
+	movl r27=~(IA64_PSR_BE|IA64_PSR_PP|IA64_PSR_BN);;
+	or r30=r30,r28;;
+	and r30=r30,r27;;
+	// also set shared_mem ipsr.i and ipsr.ic appropriately
+	ld8 r20=[r18];;
+	extr.u r22=r20,32,32
+	cmp4.eq p6,p7=r20,r0;;
+(p6)	dep r30=0,r30,IA64_PSR_IC_BIT,1
+(p7)	dep r30=-1,r30,IA64_PSR_IC_BIT,1 ;;
+	cmp4.eq p6,p7=r22,r0;;
+(p6)	dep r30=0,r30,IA64_PSR_I_BIT,1
+(p7)	dep r30=-1,r30,IA64_PSR_I_BIT,1 ;;
+	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r21]=r30 ;;
+	// set shared_mem interrupt_delivery_enabled to 0
+	// set shared_mem interrupt_collection_enabled to 0
+	st8 [r18]=r0;;
+	// cover and set shared_mem precover_ifs to cr.ifs
+	// set shared_mem ifs and incomplete_regframe to 0
+	cover ;;
+	mov r20=cr.ifs;;
 	adds r21=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r21]=r0 ;;
 	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r0 ;;
-	cover ;;
-	mov r20=cr.ifs;;
 	adds r21=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st8 [r21]=r20;;
+	st8 [r21]=r20 ;;
 	// vpsr.i = vpsr.ic = 0 on delivery of interruption
 	st8 [r18]=r0;;
 	// FIXME: need to save iipa and isr to be arch-compliant
 	// set iip to go to domain IVA break instruction vector
-	adds r22=IA64_VCPU_IVA_OFFSET-IA64_VCPU_BREAKIMM_OFFSET,r22;;
+	mov r22=IA64_KR(CURRENT);;
+	adds r22=IA64_VCPU_IVA_OFFSET,r22;;
 	ld8 r23=[r22];;
 	movl r24=0x2c00;;
 	add r24=r24,r23;;

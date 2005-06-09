@@ -1,17 +1,19 @@
 --- ../../linux-2.6.11/arch/ia64/kernel/efi.c	2005-03-02 00:37:47.000000000 -0700
-+++ arch/ia64/efi.c	2005-04-29 14:09:24.000000000 -0600
-@@ -320,6 +320,10 @@
++++ arch/ia64/efi.c	2005-06-08 20:23:39.000000000 -0600
+@@ -320,6 +320,12 @@
  		if (!(md->attribute & EFI_MEMORY_WB))
  			continue;
  
 +#ifdef XEN
++// this works around a problem in the ski bootloader
++		if (md->type != EFI_CONVENTIONAL_MEMORY)  continue;
 +// this is a temporary hack to avoid CONFIG_VIRTUAL_MEM_MAP
 +		if (md->phys_addr >= 0x100000000) continue;
 +#endif
  		/*
  		 * granule_addr is the base of md's first granule.
  		 * [granule_addr - first_non_wb_addr) is guaranteed to
-@@ -719,6 +723,30 @@
+@@ -719,6 +725,30 @@
  	return 0;
  }
  

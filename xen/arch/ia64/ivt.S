@@ -798,12 +798,7 @@ ENTRY(break_fault)
 	cmp4.eq p6,p7=r23,r17			// Xen-reserved breakimm?
 (p6)	br.spnt.many dispatch_break_fault
 	;;
-//#define FAST_BREAK
-#ifdef FAST_BREAK
 	br.sptk.many fast_break_reflect
-#else
-	br.spnt.many dispatch_break_fault
-#endif
 	;;
 #endif
 	mov r16=IA64_KR(CURRENT)		// r16 = current task; 12 cycle read lat.
