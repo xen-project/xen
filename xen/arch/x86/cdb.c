@@ -14,6 +14,7 @@
 #include <asm/debugger.h>
 #include <xen/init.h>
 #include <xen/smp.h>
+#include <xen/console.h>
 #include <asm/apic.h>
 
 /* Printk isn't particularly safe just after we've trapped to the
