@@ -19,6 +19,7 @@
 #include <asm-xen/xen_proc.h>
 #include <asm-xen/linux-public/privcmd.h>
 #include <asm-xen/gnttab.h>
+#include <asm/synch_bitops.h>
 
 #if 1
 #define ASSERT(_p) \
@@ -125,7 +126,7 @@ gnttab_end_foreign_access( grant_ref_t ref, int readonly )
         if ( (flags = nflags) & (GTF_reading|GTF_writing) )
             printk(KERN_ALERT "WARNING: g.e. still in use!\n");
     }
-    while ( (nflags = cmpxchg(&shared[ref].flags, flags, 0)) != flags );
+    while ( (nflags = synch_cmpxchg(&shared[ref].flags, flags, 0)) != flags );
 
     put_free_entry(ref);
 }
@@ -172,7 +173,7 @@ gnttab_end_foreign_transfer(
      * Otherwise invalidate the grant entry against future use.
      */
     if ( likely(flags != GTF_accept_transfer) ||
-         (cmpxchg(&shared[ref].flags, flags, 0) != GTF_accept_transfer) )
+         (synch_cmpxchg(&shared[ref].flags, flags, 0) != GTF_accept_transfer) )
         while ( unlikely((frame = shared[ref].frame) == 0) )
             cpu_relax();
 
