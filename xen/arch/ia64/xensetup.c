@@ -218,6 +218,9 @@ void start_kernel(void)
 
     init_frametable();
 
+    ia64_fph_enable();
+    __ia64_init_fpu();
+
     alloc_dom0();
 #ifdef DOMU_BUILD_STAGING
     alloc_domU_staging();

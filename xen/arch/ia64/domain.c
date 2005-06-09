@@ -406,6 +406,7 @@ printk("new_thread, about to call dom_fw_setup\n");
 printk("new_thread, done with dom_fw_setup\n");
 	// don't forget to set this!
 	v->vcpu_info->arch.banknum = 1;
+	memset(v->arch._thread.fph,0,sizeof(struct ia64_fpreg)*96);
 }
 #endif // CONFIG_VTI
 
