@@ -395,7 +395,7 @@ unsigned long get_machine_pfn(unsigned long addr)
         pmd_t* pmd = pmd_offset(pud, addr);
         pte_t *pte = pte_offset_kernel(pmd, addr);
         
-        return (pte->pte >> PAGE_SHIFT);
+        return pte_mfn(*pte);
 } 
 
 #define ALIGN_TO_4K __attribute__((section(".data.page_aligned")))

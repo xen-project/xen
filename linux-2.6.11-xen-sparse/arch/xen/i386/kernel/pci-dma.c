@@ -24,53 +24,6 @@ struct dma_coherent_mem {
 	unsigned long	*bitmap;
 };
 
-static void
-xen_contig_memory(unsigned long vstart, unsigned int order)
-{
-	/*
-	 * Ensure multi-page extents are contiguous in machine memory.
-	 * This code could be cleaned up some, and the number of
-	 * hypercalls reduced.
-	 */
-	pgd_t         *pgd; 
-	pud_t         *pud; 
-	pmd_t         *pmd;
-	pte_t         *pte;
-	unsigned long  pfn, i, flags;
-
-	scrub_pages(vstart, 1 << order);
-
-        balloon_lock(flags);
-
-	/* 1. Zap current PTEs, giving away the underlying pages. */
-	for (i = 0; i < (1<<order); i++) {
-		pgd = pgd_offset_k(vstart + (i*PAGE_SIZE));
-		pud = pud_offset(pgd, vstart + (i*PAGE_SIZE));
-		pmd = pmd_offset(pud, vstart + (i*PAGE_SIZE));
-		pte = pte_offset_kernel(pmd, vstart + (i*PAGE_SIZE));
-		pfn = pte_val_ma(*pte) >> PAGE_SHIFT;
-		HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
-					     __pte_ma(0), 0);
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
-			INVALID_P2M_ENTRY;
-		if (HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
-					  &pfn, 1, 0) != 1) BUG();
-	}
-	/* 2. Get a new contiguous memory extent. */
-	if (HYPERVISOR_dom_mem_op(MEMOP_increase_reservation,
-				  &pfn, 1, order) != 1) BUG();
-	/* 3. Map the new extent in place of old pages. */
-	for (i = 0; i < (1<<order); i++) {
-		HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE),
-			__pte_ma(((pfn+i)<<PAGE_SHIFT)|__PAGE_KERNEL), 0);
-		xen_machphys_update(pfn+i, (__pa(vstart)>>PAGE_SHIFT)+i);
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = pfn+i;
-	}
-	flush_tlb_all();
-
-	balloon_unlock(flags);
-}
-
 void *dma_alloc_coherent(struct device *dev, size_t size,
 			   dma_addr_t *dma_handle, int gfp)
 {

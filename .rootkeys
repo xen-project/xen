@@ -291,7 +291,6 @@
 424efaa6xbX9LkKyaXvgbL9s_39Trw linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/x8664_ksyms.c
 424efaa670zlQTtnOYK_aNgqhmSx-Q linux-2.6.11-xen-sparse/arch/xen/x86_64/mm/Makefile
 424efaa6HUC68-hBHgiWOMDfKZogIA linux-2.6.11-xen-sparse/arch/xen/x86_64/mm/fault.c
-424f001d6S-OiHsk1n9gv1jGwws-9w linux-2.6.11-xen-sparse/arch/xen/x86_64/mm/hypervisor.c
 424efaa65ELRJ3JfgQQKLzW6y0ECYQ linux-2.6.11-xen-sparse/arch/xen/x86_64/mm/init.c
 424efaa60dTbHfv65JBLVhNLcNPcRA linux-2.6.11-xen-sparse/arch/xen/x86_64/mm/ioremap.c
 424efaa6uMX8YJASAVJT8ral74dz9Q linux-2.6.11-xen-sparse/arch/xen/x86_64/mm/pageattr.c
@@ -400,7 +399,6 @@
 424efa20fTFqmaE0stH6lfB_4yN_lA linux-2.6.11-xen-sparse/include/asm-xen/asm-x86_64/ptrace.h
 424efa21fY4IvK0luYgDJHKV-MD3eQ linux-2.6.11-xen-sparse/include/asm-xen/asm-x86_64/segment.h
 424efa21KcupuJlHgmPiTk_T214FrA linux-2.6.11-xen-sparse/include/asm-xen/asm-x86_64/smp.h
-424f001eT-7wjT_7K5AMlNVigIcuHA linux-2.6.11-xen-sparse/include/asm-xen/asm-x86_64/synch_bitops.h
 424efa210ZRt2U_8WmtyI7g74Nz-4Q linux-2.6.11-xen-sparse/include/asm-xen/asm-x86_64/system.h
 424f001eBp9fMbZ0Mo2kRJQ84gMgRw linux-2.6.11-xen-sparse/include/asm-xen/asm-x86_64/timer.h
 424efa21Xk2acvaHYnpyTCLE6nU6hw linux-2.6.11-xen-sparse/include/asm-xen/asm-x86_64/tlbflush.h
@@ -415,6 +413,7 @@
 3f108af1ylCIm82H052FVTfXACBHrw linux-2.6.11-xen-sparse/include/asm-xen/linux-public/privcmd.h
 3fa8e3f0kBLeE4To2vpdi3cpJbIkbQ linux-2.6.11-xen-sparse/include/asm-xen/linux-public/suspend.h
 4122466356eIBnC9ot44WSVVIFyhQA linux-2.6.11-xen-sparse/include/asm-xen/queues.h
+42a885cawNQ18_b7i5-G7ekMsZ48hw linux-2.6.11-xen-sparse/include/asm-xen/synch_bitops.h
 3f689063BoW-HWV3auUJ-OqXfcGArw linux-2.6.11-xen-sparse/include/asm-xen/xen_proc.h
 419b4e93z2S0gR17XTy8wg09JEwAhg linux-2.6.11-xen-sparse/include/linux/gfp.h
 42305f545Vc5SLCUewZ2-n-P9JJhEQ linux-2.6.11-xen-sparse/include/linux/highmem.h

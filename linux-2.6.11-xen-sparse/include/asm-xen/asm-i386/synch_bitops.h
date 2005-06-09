@@ -89,6 +89,22 @@ static inline unsigned long __synch_cmpxchg(volatile void *ptr,
 				       "0"(old)
 				     : "memory");
 		return prev;
+#ifdef CONFIG_X86_64
+	case 4:
+		__asm__ __volatile__("lock; cmpxchgl %k1,%2"
+				     : "=a"(prev)
+				     : "q"(new), "m"(*__synch_xg(ptr)),
+				       "0"(old)
+				     : "memory");
+		return prev;
+	case 8:
+		__asm__ __volatile__("lock; cmpxchgq %1,%2"
+				     : "=a"(prev)
+				     : "q"(new), "m"(*__synch_xg(ptr)),
+				       "0"(old)
+				     : "memory");
+		return prev;
+#else
 	case 4:
 		__asm__ __volatile__("lock; cmpxchgl %1,%2"
 				     : "=a"(prev)
@@ -96,6 +112,7 @@ static inline unsigned long __synch_cmpxchg(volatile void *ptr,
 				       "0"(old)
 				     : "memory");
 		return prev;
+#endif
 	}
 	return old;
 }

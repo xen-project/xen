@@ -19,7 +19,7 @@
 #include <asm-xen/xen_proc.h>
 #include <asm-xen/linux-public/privcmd.h>
 #include <asm-xen/gnttab.h>
-#include <asm/synch_bitops.h>
+#include <asm-xen/synch_bitops.h>
 
 #if 1
 #define ASSERT(_p) \
