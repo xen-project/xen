@@ -6,8 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <assert.h>
 #include <pthread.h>
+#include <err.h>
+#include <zlib.h> /* for crc32() */
 #include "requests-async.h"
 #include "vdi.h"
 #include "radix.h"
@@ -23,6 +26,10 @@
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
 
+struct block_info {
+    u32        crc;
+    u32        unused;
+};
 
 struct io_req {
     enum { IO_OP_READ, IO_OP_WRITE } op;
@@ -34,16 +41,17 @@ struct io_req {
     struct radix_lock *lock;
 
     /* internal stuff: */
-    struct io_ret    retval;/* holds the return while we unlock. */
-    char            *block; /* the block to write */
-    radix_tree_node  radix[3];
-    u64              radix_addr[3];
+    struct io_ret     retval;/* holds the return while we unlock. */
+    char             *block; /* the block to write */
+    radix_tree_node   radix[3];
+    u64               radix_addr[3];
+    struct block_info bi;
 };
 
 void clear_w_bits(radix_tree_node node) 
 {
     int i;
-    for (i=0; i<RADIX_TREE_MAP_ENTRIES; i++)
+    for (i=0; i<RADIX_TREE_MAP_ENTRIES; i+=2)
         node[i] = node[i] & ONEMASK;
     return;
 }
@@ -63,6 +71,7 @@ enum states {
     /* write */
     WRITE_LOCKED,
     WRITE_DATA,
+    WRITE_L3,
     WRITE_UNLOCKED,
     
     /* L3 Zero Path */
@@ -112,18 +121,19 @@ enum radix_offsets {
 static void read_cb(struct io_ret ret, void *param);
 static void write_cb(struct io_ret ret, void *param);
 
-
-int async_read(vdi_t *vdi, u64 vaddr, io_cb_t cb, void *param)
+int vdi_read(vdi_t *vdi, u64 vaddr, io_cb_t cb, void *param)
 {
     struct io_req *req;
 
-    DPRINTF("async_read\n");
+    if (!VALID_VADDR(vaddr)) return ERR_BAD_VADDR;
+    /* Every second line in the bottom-level radix tree is used to      */
+    /* store crc32 values etc. We shift the vadder here to achied this. */
+    vaddr <<= 1;
 
     req = (struct io_req *)malloc(sizeof (struct io_req));
-    req->radix[0] = req->radix[1] = req->radix[2] = NULL;
+    if (req == NULL) return ERR_NOMEM;
 
-    if (req == NULL) {perror("req was NULL in async_read"); return(-1); }
-	
+    req->radix[0] = req->radix[1] = req->radix[2] = NULL;	
     req->op    = IO_OP_READ;
     req->root  = vdi->radix_root;
     req->lock  = vdi->radix_lock; 
@@ -138,26 +148,35 @@ int async_read(vdi_t *vdi, u64 vaddr, io_cb_t cb, void *param)
 }
 
 
-int   async_write(vdi_t *vdi, u64 vaddr, char *block, 
-                  io_cb_t cb, void *param)
+int   vdi_write(vdi_t *vdi, u64 vaddr, char *block, 
+                io_cb_t cb, void *param)
 {
     struct io_req *req;
 
+    if (!VALID_VADDR(vaddr)) return ERR_BAD_VADDR;
+    /* Every second line in the bottom-level radix tree is used to      */
+    /* store crc32 values etc. We shift the vadder here to achied this. */
+    vaddr <<= 1;
 
     req = (struct io_req *)malloc(sizeof (struct io_req));
-    req->radix[0] = req->radix[1] = req->radix[2] = NULL;
-    
-    if (req == NULL) {perror("req was NULL in async_write"); return(-1); }
+    if (req == NULL) return ERR_NOMEM; 
 
-    req->op    = IO_OP_WRITE;
-    req->root  = vdi->radix_root;
-    req->lock  = vdi->radix_lock; 
-    req->vaddr = vaddr;
-    req->block = block;
-    req->cb    = cb;
-    req->param = param;
+    req->radix[0] = req->radix[1] = req->radix[2] = NULL;
+    req->op     = IO_OP_WRITE;
+    req->root   = vdi->radix_root;
+    req->lock   = vdi->radix_lock; 
+    req->vaddr  = vaddr;
+    req->block  = block;
+    /* Todo: add a pseodoheader to the block to include some location   */
+    /* information in the CRC as well.                                  */
+    req->bi.crc = (u32) crc32(0L, Z_NULL, 0); 
+    req->bi.crc = (u32) crc32(req->bi.crc, block, BLOCK_SIZE); 
+    req->bi.unused = 0xdeadbeef;
+
+    req->cb     = cb;
+    req->param  = param;
     req->radix_addr[L1] = getid(req->root); /* for consistency */
-    req->state = WRITE_LOCKED;
+    req->state  = WRITE_LOCKED;
 
     block_wlock(req->lock, L1_IDX(vaddr), write_cb, req);
 
@@ -165,7 +184,7 @@ int   async_write(vdi_t *vdi, u64 vaddr, char *block,
     return 0;
 }
 
-void read_cb(struct io_ret ret, void *param)
+static void read_cb(struct io_ret ret, void *param)
 {
     struct io_req *req = (struct io_req *)param;
     radix_tree_node node;
@@ -219,12 +238,16 @@ void read_cb(struct io_ret ret, void *param)
         break;
 
     case READ_L3:
-    
+    {
+        struct block_info *bi;
+
         DPRINTF("READ_L3\n");
         block = IO_BLOCK(ret);
         if (block == NULL) goto fail;
         node = (radix_tree_node) block;
         idx  = getid( node[L3_IDX(req->vaddr)] );
+        bi = (struct block_info *) &node[L3_IDX(req->vaddr) + 1];
+        req->bi = *bi;
         free(block);
         if ( idx == ZERO )  {
             req->state = RETURN_ZERO;
@@ -234,16 +257,47 @@ void read_cb(struct io_ret ret, void *param)
             block_read(idx, read_cb, req);
         }
         break;
-
+    }
     case READ_DATA:
-    
+    {
+        u32 crc;
+
         DPRINTF("READ_DATA\n");
-        if (IO_BLOCK(ret) == NULL) goto fail;
+        block = IO_BLOCK(ret);
+        if (block == NULL) goto fail;
+
+        /* crc check */
+        crc = (u32) crc32(0L, Z_NULL, 0); 
+        crc = (u32) crc32(crc, block, BLOCK_SIZE); 
+        if (crc != req->bi.crc) {
+            /* TODO: add a retry loop here.                          */
+            /* Do this after the cache is added -- make sure to      */
+            /* invalidate the bad page before reissuing the read.    */
+
+            warn("Bad CRC on vaddr (%Lu:%d)\n", req->vaddr, req->bi.unused);
+#ifdef PRINT_BADCRC_PAGES
+            {
+                int j;
+                for (j=0; j<BLOCK_SIZE; j++) {
+                    if isprint(block[j]) {
+                        printf("%c", block[j]);
+                    } else {
+                        printf(".");
+                    }
+                    if ((j % 64) == 0) printf("\n");
+                }
+            }
+#endif /* PRINT_BADCRC_PAGES */
+
+            /* fast and loose for the moment. */
+            /* goto fail;                     */
+        }
+
         req->retval = ret;
         req->state = READ_UNLOCKED;
         block_runlock(req->lock, L1_IDX(req->vaddr), read_cb, req);
         break;
-        
+    }
     case READ_UNLOCKED:
     {
         struct io_ret r;
@@ -293,12 +347,13 @@ void read_cb(struct io_ret ret, void *param)
 
 }
 
-void write_cb(struct io_ret r, void *param)
+static void write_cb(struct io_ret r, void *param)
 {
     struct io_req *req = (struct io_req *)param;
     radix_tree_node node;
     u64 a, addr;
     void *req_param;
+    struct block_info *bi;
 
     switch(req->state) {
     	
@@ -383,6 +438,19 @@ void write_cb(struct io_ret r, void *param)
         }
         break;
     
+    case WRITE_DATA:
+
+        DPRINTF("WRITE_DATA\n");
+        /* The L3 radix points to the correct block, we just need to  */
+        /* update the crc.                                            */
+        if (IO_INT(r) < 0) goto fail;
+        bi  = (struct block_info *) &req->radix[L3][L3_IDX(req->vaddr)+1];
+        req->bi.unused = 101;
+        *bi = req->bi;
+        req->state = WRITE_L3;
+        block_write(req->radix_addr[L3], (char*)req->radix[L3], write_cb, req);
+        break;
+    
     /* L3 Zero Path: */
 
     case ALLOC_DATA_L3z:
@@ -391,6 +459,9 @@ void write_cb(struct io_ret r, void *param)
         addr = IO_ADDR(r);
         a = writable(addr);
         req->radix[L3][L3_IDX(req->vaddr)] = a;
+        bi  = (struct block_info *) &req->radix[L3][L3_IDX(req->vaddr)+1];
+        req->bi.unused = 102;
+        *bi = req->bi;
         req->state = WRITE_L3_L3z;
         block_write(req->radix_addr[L3], (char*)req->radix[L3], write_cb, req);
         break;
@@ -398,11 +469,14 @@ void write_cb(struct io_ret r, void *param)
     /* L3 Fault Path: */
 
     case ALLOC_DATA_L3f:
-
+    
         DPRINTF("ALLOC_DATA_L3f\n");
         addr = IO_ADDR(r);
         a = writable(addr);
         req->radix[L3][L3_IDX(req->vaddr)] = a;
+        bi  = (struct block_info *) &req->radix[L3][L3_IDX(req->vaddr)+1];
+        req->bi.unused = 103;
+        *bi = req->bi;
         req->state = WRITE_L3_L3f;
         block_write(req->radix_addr[L3], (char*)req->radix[L3], write_cb, req);
         break;
@@ -416,6 +490,9 @@ void write_cb(struct io_ret r, void *param)
         a = writable(addr);
         req->radix[L3] = newblock();
         req->radix[L3][L3_IDX(req->vaddr)] = a;
+        bi  = (struct block_info *) &req->radix[L3][L3_IDX(req->vaddr)+1];
+        req->bi.unused = 104;
+        *bi = req->bi;
         req->state = ALLOC_L3_L2z;
         block_alloc( (char*)req->radix[L3], write_cb, req );
         break;
@@ -452,6 +529,9 @@ void write_cb(struct io_ret r, void *param)
         addr = IO_ADDR(r);
         a = writable(addr);
         req->radix[L3][L3_IDX(req->vaddr)] = a;
+        bi  = (struct block_info *) &req->radix[L3][L3_IDX(req->vaddr)+1];
+        req->bi.unused = 105;
+        *bi = req->bi;
         req->state = ALLOC_L3_L2f;
         block_alloc( (char*)req->radix[L3], write_cb, req );
         break;
@@ -475,10 +555,13 @@ void write_cb(struct io_ret r, void *param)
         a = writable(addr);
         req->radix[L3] = newblock();
         req->radix[L3][L3_IDX(req->vaddr)] = a;
+        bi  = (struct block_info *) &req->radix[L3][L3_IDX(req->vaddr)+1];
+        req->bi.unused = 106;
+        *bi = req->bi;
         req->state = ALLOC_L3_L1z;
         block_alloc( (char*)req->radix[L3], write_cb, req );
         break;
-
+        
     case ALLOC_L3_L1z:
 
         DPRINTF("ALLOC_L3_L1z\n");
@@ -546,6 +629,9 @@ void write_cb(struct io_ret r, void *param)
         addr = IO_ADDR(r);
         a = writable(addr);
         req->radix[L3][L3_IDX(req->vaddr)] = a;
+        bi  = (struct block_info *) &req->radix[L3][L3_IDX(req->vaddr)+1];
+        req->bi.unused = 107;
+        *bi = req->bi;
         req->state = ALLOC_L3_L1f;
         block_alloc( (char*)req->radix[L3], write_cb, req );
         break;
@@ -570,7 +656,7 @@ void write_cb(struct io_ret r, void *param)
         block_write(req->radix_addr[L1], (char*)req->radix[L1], write_cb, req);
         break;
 
-    case WRITE_DATA:
+    case WRITE_L3:
     case WRITE_L3_L3z:
     case WRITE_L3_L3f:
     case WRITE_L2_L2z:
@@ -590,8 +676,8 @@ void write_cb(struct io_ret r, void *param)
     }
     case WRITE_UNLOCKED:
     {
-		struct io_ret r;
-		io_cb_t cb;
+        struct io_ret r;
+        io_cb_t cb;
         DPRINTF("WRITE_UNLOCKED!\n");
         req_param = req->param;
         r         = req->retval;
@@ -612,13 +698,57 @@ void write_cb(struct io_ret r, void *param)
     {
         struct io_ret r;
         io_cb_t cb;
+        int i;
+
         DPRINTF("asyn_write had a read error mid-way.\n");
         req_param = req->param;
         cb        = req->cb;
         r.type = IO_INT_T;
         r.u.i  = -1;
+        /* free any saved node vals. */
+        for (i=0; i<3; i++)
+            if (req->radix[i] != 0) free(req->radix[i]);
         free(req);
         cb(r, req_param);
     }
 }
 
+char *vdi_read_s(vdi_t *vdi, u64 vaddr)
+{
+    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    char *block = NULL;
+    int ret;
+
+    void reads_cb(struct io_ret r, void *param) 
+    {
+        block = IO_BLOCK(r);
+        pthread_mutex_unlock((pthread_mutex_t *)param);
+    }
+
+    pthread_mutex_lock(&m);
+    ret = vdi_read(vdi, vaddr, reads_cb, &m);
+
+    if (ret == 0) pthread_mutex_lock(&m);
+    
+    return block;
+}
+
+
+int vdi_write_s(vdi_t *vdi, u64 vaddr, char *block)
+{
+    pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    int ret, result;
+
+    void writes_cb(struct io_ret r, void *param) 
+    {
+        result = IO_INT(r);
+        pthread_mutex_unlock((pthread_mutex_t *)param);
+    }
+
+    pthread_mutex_lock(&m);
+    ret = vdi_write(vdi, vaddr, block, writes_cb, &m);
+
+    if (ret == 0) pthread_mutex_lock(&m);
+    
+    return result;
+}

@@ -34,7 +34,7 @@ unsigned long blktap_ring_ok; /* make this ring->state */
 static wait_queue_head_t blktap_wait;
 
 /* Where things are inside the device mapping. */
-struct vm_area_struct *blktap_vma;
+struct vm_area_struct *blktap_vma = NULL;
 unsigned long mmap_vstart;
 unsigned long rings_vstart;
 
@@ -139,7 +139,14 @@ static int blktap_release(struct inode *inode, struct file *filp)
 
     ClearPageReserved(virt_to_page(blktap_ube_ring.sring));
     free_page((unsigned long) blktap_ube_ring.sring);
-    
+
+    /* Clear any active mappings. */
+    if (blktap_vma != NULL) {
+        zap_page_range(blktap_vma, blktap_vma->vm_start, 
+                       blktap_vma->vm_end - blktap_vma->vm_start, NULL);
+        blktap_vma = NULL;
+    }
+
     return 0;
 }
 

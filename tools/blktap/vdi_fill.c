@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include "blockstore.h"
 #include "radix.h"
+#include "requests-async.h"
 #include "vdi.h"
 
 int main(int argc, char *argv[])
@@ -30,6 +31,7 @@ int main(int argc, char *argv[])
     u64          vblock = 0, count=0;
     
     __init_blockstore();
+    init_block_async();
     __init_vdi();
     
     if ( argc < 3 ) {
@@ -64,10 +66,7 @@ int main(int argc, char *argv[])
     printf("%011Ld blocks total\n", tot_size / BLOCK_SIZE);    
     printf("           ");
     while ( ( count = read(fd, spage, BLOCK_SIZE) ) > 0 ) {
-        u64 gblock = 0;
-        
-        gblock = allocblock(spage);
-        vdi_update_block(vdi, vblock, gblock);
+        vdi_write_s(vdi, vblock, spage);
         
         vblock++;
         if ((vblock % 512) == 0)

@@ -489,8 +489,6 @@
 42277b02P1C0FYj3gqwTZUD8sxKCug tools/blktap/blockstore.h
 42371b8aL1JsxAXOd4bBhmZKDyjiJg tools/blktap/blockstored.c
 42371b8aD_x3L9MKsXciMNqkuk58eQ tools/blktap/bstest.c
-423f270cbEKiTMapKnCyqkuwGvgOMA tools/blktap/parallax-threaded.c
-423f270cFdXryIcD7HTPUl_Dbk4DAQ tools/blktap/parallax-threaded.h
 42277b03930x2TJT3PZlw6o0GERXpw tools/blktap/parallax.c
 42277b03XQYq8bujXSz7JAZ8N7j_pA tools/blktap/radix.c
 42277b03vZ4-jno_mgKmAcCW3ycRAg tools/blktap/radix.h
@@ -507,6 +505,7 @@
 423f270c_QDjGLQ_YdaOtyBM5n9BDg tools/blktap/vdi_snap_delete.c
 42277b043Fjy5-H7LyBtUPyDlZFo6A tools/blktap/vdi_snap_list.c
 42277b04vhqD6Lq3WmGbaESoAAKdhw tools/blktap/vdi_tree.c
+42277b04RnFo07c1LcdmLn-FtRJEmw tools/blktap/vdi_unittest.c
 42277b047H8fTVyUf75BWAjh6Zpsqg tools/blktap/vdi_validate.c
 4124b307nRyK3dhn1hAsvrY76NuV3g tools/check/Makefile
 4124b307vHLUWbfpemVefmaWDcdfag tools/check/README

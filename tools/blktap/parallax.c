@@ -427,7 +427,7 @@ int parallax_read(blkif_request_t *req, blkif_t *blkif)
         p->vblock = vblock; /* dbg */
         
         /* Get that block from the store. */
-        async_read(vdi, vblock, read_cb, (void *)p);    
+        vdi_read(vdi, vblock, read_cb, (void *)p);    
     }
     
     return BLKTAP_STOLEN;
@@ -534,7 +534,7 @@ int parallax_write(blkif_request_t *req, blkif_t *blkif)
         p->vblock = vblock; /* dbg */
         
         /* Issue the write to the store. */
-        async_write(vdi, vblock, spage, write_cb, (void *)p);
+        vdi_write(vdi, vblock, spage, write_cb, (void *)p);
     }
 
     return BLKTAP_STOLEN;
@@ -595,7 +595,7 @@ int main(int argc, char *argv[])
     DPRINTF("parallax: starting.\n"); 
     __init_blockstore();
     DPRINTF("parallax: initialized blockstore...\n"); 
-	init_block_async();
+    init_block_async();
     DPRINTF("parallax: initialized async blocks...\n"); 
     __init_vdi();
     DPRINTF("parallax: initialized vdi registry etc...\n"); 

@@ -18,6 +18,7 @@
 #include "blockstore.h"
 #include "radix.h"
 #include "vdi.h"
+#include "requests-async.h"
 
 int main(int argc, char *argv[])
 {
@@ -31,6 +32,7 @@ int main(int argc, char *argv[])
     u64          vblock = 0, count=0;
     
     __init_blockstore();
+    init_block_async();
     __init_vdi();
     
     if ( argc < 3 ) {
@@ -64,17 +66,14 @@ int main(int argc, char *argv[])
     
     printf("           ");
     while ( ( count = read(fd, spage, BLOCK_SIZE) ) > 0 ) {
-        u64 gblock = 0;
-        
-        gblock = vdi_lookup_block(vdi, vblock, NULL);
-        
-        if (gblock == 0) {
+
+        dpage = vdi_read_s(vdi, vblock);
+
+        if (dpage == NULL) {
             printf("\n\nfound an unmapped VDI block (%Ld)\n", vblock);
             exit(0);
         }
-        
-        dpage = readblock(gblock);
-        
+
         if (memcmp(spage, dpage, BLOCK_SIZE) != 0) {
             printf("\n\nblocks don't match! (%Ld)\n", vblock);
             exit(0);
@@ -83,8 +82,10 @@ int main(int argc, char *argv[])
         freeblock(dpage);
         
         vblock++;
-        printf("\b\b\b\b\b\b\b\b\b\b\b%011Ld", vblock);
-        fflush(stdout);
+        if ((vblock % 1024) == 0) {
+            printf("\b\b\b\b\b\b\b\b\b\b\b%011Ld", vblock);
+            fflush(stdout);
+        }
     }
     printf("\n");
     

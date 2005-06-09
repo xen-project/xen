@@ -17,7 +17,6 @@
 #include <stdarg.h>
 #include "blockstore.h"
 #include <pthread.h>
-#include "parallax-threaded.h"
 
 //#define BLOCKSTORE_REMOTE
 //#define BSDEBUG

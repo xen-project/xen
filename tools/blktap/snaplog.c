@@ -97,6 +97,7 @@ int __snap_block_create(snap_id_t *parent_id, snap_id_t *fork_id,
     
     new_id->index = 0;
     new_id->block = allocblock(blk);
+    freeblock(blk);
     if (new_id->block == 0)
         return -1;
     
