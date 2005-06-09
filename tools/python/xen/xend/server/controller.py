@@ -4,7 +4,8 @@ for a domain.
 """
 
 from xen.xend.XendError import XendError
-from messages import msgTypeName, printMsg, getMessageType
+from xen.xend.xenstore import DBVar
+from xen.xend.server.messages import msgTypeName, printMsg, getMessageType
 
 DEBUG = 0
 
@@ -115,18 +116,18 @@ class DevControllerTable:
     def getDevControllerClass(self, type):
         return self.controllerClasses.get(type)
 
-    def addDevControllerClass(self, klass):
-        self.controllerClasses[klass.getType()] = klass
+    def addDevControllerClass(self, cls):
+        self.controllerClasses[cls.getType()] = cls
 
     def delDevControllerClass(self, type):
         if type in self.controllerClasses:
             del self.controllerClasses[type]
 
     def createDevController(self, type, vm, recreate=False):
-        klass = self.getDevControllerClass(type)
-        if not klass:
+        cls = self.getDevControllerClass(type)
+        if not cls:
             raise XendError("unknown device type: " + type)
-        return klass.createDevController(vm, recreate=recreate)
+        return cls.createDevController(vm, recreate=recreate)
 
 def getDevControllerTable():
     """Singleton constructor for the controller table.
@@ -138,11 +139,11 @@ def getDevControllerTable():
         devControllerTable = DevControllerTable()
     return devControllerTable
 
-def addDevControllerClass(name, klass):
+def addDevControllerClass(name, cls):
     """Add a device controller class to the controller table.
     """
-    klass.name = name
-    getDevControllerTable().addDevControllerClass(klass)
+    cls.type = name
+    getDevControllerTable().addDevControllerClass(cls)
 
 def createDevController(name, vm, recreate=False):
     return getDevControllerTable().createDevController(name, vm, recreate=recreate)
@@ -155,28 +156,56 @@ class DevController:
 
     """
 
-    name = None
+    # State:
+    # controller/<type> : for controller
+    # device/<type>/<id>   : for each device
 
-    def createDevController(klass, vm, recreate=False):
+    def createDevController(cls, vm, recreate=False):
         """Class method to create a dev controller.
         """
-        ctrl = klass(vm, recreate=recreate)
+        ctrl = cls(vm, recreate=recreate)
         ctrl.initController(recreate=recreate)
+        ctrl.exportToDB()
         return ctrl
 
     createDevController = classmethod(createDevController)
 
-    def getType(klass):
-        return klass.name
+    def getType(cls):
+        return cls.type
 
     getType = classmethod(getType)
+
+    __exports__ = [
+        DBVar('type',      'str'),
+        DBVar('destroyed', 'bool'),
+        ]
+
+    # Set when registered.
+    type = None
 
     def __init__(self, vm, recreate=False):
         self.destroyed = False
         self.vm = vm
+        self.db = self.getDB()
         self.deviceId = 0
         self.devices = {}
         self.device_order = []
+
+    def getDB(self):
+        """Get the db node to use for a controller.
+        """
+        return self.vm.db.addChild("/controller/%s" % self.getType())
+
+    def getDevDB(self, id):
+        """Get the db node to use for a device.
+        """
+        return self.vm.db.addChild("/device/%s/%s" % (self.getType(), id))
+
+    def exportToDB(self, save=False):
+        self.db.exportToDB(self, fields=self.__exports__, save=save)
+
+    def importFromDB(self):
+        self.db.importFromDB(self, fields=self.__exports__)
 
     def getDevControllerType(self):
         return self.dctype
@@ -229,18 +258,19 @@ class DevController:
         i.e. it is being added at runtime rather than when the domain is created.
         """
         dev = self.newDevice(self.nextDeviceId(), config, recreate=recreate)
+        if self.vm.recreate:
+            dev.importFromDB()
         dev.init(recreate=recreate)
         self.addDevice(dev)
-        idx = self.getDeviceIndex(dev)
-        recreate = self.vm.get_device_recreate(self.getType(), idx)
+        if not recreate:
+            dev.exportToDB()
         dev.attach(recreate=recreate, change=change)
+        dev.exportToDB()
 
     def configureDevice(self, id, config, change=False):
         """Reconfigure an existing device.
         May be defined in subclass."""
-        dev = self.getDevice(id)
-        if not dev:
-            raise XendError("invalid device id: " + id)
+        dev = self.getDevice(id, error=True)
         dev.configure(config, change=change)
 
     def destroyDevice(self, id, change=False, reboot=False):
@@ -251,9 +281,7 @@ class DevController:
 
         The device is not deleted, since it may be recreated later.
         """
-        dev = self.getDevice(id)
-        if not dev:
-            raise XendError("invalid device id: " + id)
+        dev = self.getDevice(id, error=True)
         dev.destroy(change=change, reboot=reboot)
         return dev
 
@@ -278,24 +306,15 @@ class DevController:
     def isDestroyed(self):
         return self.destroyed
 
-    def getDevice(self, id):
-        return self.devices.get(id)
-
-    def getDeviceByIndex(self, idx):
-        if 0 <= idx < len(self.device_order):
-            return self.device_order[idx]
-        else:
-            return None
-
-    def getDeviceIndex(self, dev):
-        return self.device_order.index(dev)
+    def getDevice(self, id, error=False):
+        dev = self.devices.get(id)
+        if error and not dev:
+            raise XendError("invalid device id: " + id)
+        return dev
 
     def getDeviceIds(self):
         return [ dev.getId() for dev in self.device_order ]
 
-    def getDeviceIndexes(self):
-        return range(0, len(self.device_order))
-    
     def getDevices(self):
         return self.device_order
 
@@ -353,11 +372,42 @@ class Dev:
     @type controller: DevController
     """
     
+    # ./status       : need 2: actual and requested?
+    # down-down: initial.
+    # up-up: fully up.
+    # down-up: down requested, still up. Watch front and back, when both
+    # down go to down-down. But what if one (or both) is not connected?
+    # Still have front/back trees with status? Watch front/status, back/status?
+    # up-down: up requested, still down.
+    # Back-end watches ./status, front/status
+    # Front-end watches ./status, back/status
+    # i.e. each watches the other 2.
+    # Each is status/request status/actual?
+    #
+    # backend?
+    # frontend?
+
+    __exports__ = [
+        DBVar('id',        ty='int'),
+        DBVar('type',      ty='str'),
+        DBVar('config',    ty='sxpr'),
+        DBVar('destroyed', ty='bool'),
+        ]
+
     def __init__(self, controller, id, config, recreate=False):
         self.controller = controller
         self.id = id
         self.config = config
         self.destroyed = False
+        self.type = self.getType()
+
+        self.db = controller.getDevDB(id)
+
+    def exportToDB(self, save=False):
+        self.db.exportToDB(self, fields=self.__exports__, save=save)
+
+    def importFromDB(self):
+        self.db.importFromDB(self, fields=self.__exports__)
 
     def getDomain(self):
         return self.controller.getDomain()
@@ -379,9 +429,6 @@ class Dev:
 
     def getId(self):
         return self.id
-
-    def getIndex(self):
-        return self.controller.getDeviceIndex(self)
 
     def getConfig(self):
         return self.config

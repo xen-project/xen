@@ -25,9 +25,6 @@ import sxp
 class XendRoot:
     """Root of the management classes."""
 
-    """Default path to the root of the database."""
-    dbroot_default = "/var/lib/xen/xend-db"
-
     """Default path to the config file."""
     config_default = "/etc/xen/xend-config.sxp"
 
@@ -82,7 +79,6 @@ class XendRoot:
     components = {}
 
     def __init__(self):
-        self.dbroot = None
         self.config_path = None
         self.config = None
         self.logging = None
@@ -171,13 +167,15 @@ class XendRoot:
     def configure(self):
         self.set_config()
         self.configure_logger()
-        self.dbroot = self.get_config_value("dbroot", self.dbroot_default)
 
     def configure_logger(self):
         logfile = self.get_config_value("logfile", self.logfile_default)
         loglevel = self.get_config_value("loglevel", self.loglevel_default)
         self.logging = XendLogging(logfile, level=loglevel)
-        #self.logging.addLogStderr()
+
+        from xen.xend.server import params
+        if params.XEND_DEBUG:
+            self.logging.addLogStderr()
 
     def get_logging(self):
         """Get the XendLogging instance.
@@ -188,11 +186,6 @@ class XendRoot:
         """Get the logger.
         """
         return self.logging and self.logging.getLogger()
-
-    def get_dbroot(self):
-        """Get the path to the database root.
-        """
-        return self.dbroot
 
     def set_config(self):
         """If the config file exists, read it. If not, ignore it.
@@ -241,9 +234,9 @@ class XendRoot:
 
     def get_config_bool(self, name, val=None):
         v = self.get_config_value(name, val)
-        if v in ['yes', '1', 'on', 1, True]:
+        if v in ['yes', '1', 'on', 'true', 1, True]:
             return True
-        if v in ['no', '0', 'off', 0, False]:
+        if v in ['no', '0', 'off', 'false', 0, False]:
             return False
         raise XendError("invalid xend config %s: expected bool: %s" % (name, v))
 
@@ -325,7 +318,7 @@ class XendRoot:
         return self.get_config_value('network-script', 'network')
 
     def get_enable_dump(self):
-        return self.get_config_value('enable-dump', 'false')
+        return self.get_config_bool('enable-dump', 'no')
 
     def get_vif_bridge(self):
         return self.get_config_value('vif-bridge', 'xen-br0')

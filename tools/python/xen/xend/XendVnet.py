@@ -4,11 +4,10 @@
 """
 
 from xen.util import Brctl
-
-import sxp
-import XendDB
-from XendError import XendError
-from XendLogging import log
+from xen.xend import sxp
+from xen.xend.XendError import XendError
+from xen.xend.XendLogging import log
+from xen.xend.xenstore import XenNode, DBMap
 
 def vnet_cmd(cmd):
     out = None
@@ -63,14 +62,15 @@ class XendVnet:
     """Index of all vnets. Singleton.
     """
 
-    dbpath = "vnet"
+    dbpath = "/vnet"
 
     def __init__(self):
         # Table of vnet info indexed by vnet id.
         self.vnet = {}
-        self.db = XendDB.XendDB(self.dbpath)
-        vnets = self.db.fetchall("")
-        for config in vnets.values():
+        self.dbmap = DBMap(db=XenNode(self.dbpath))
+        self.dbmap.readDB()
+        for vnetdb in self.dbmap.values():
+            config = vnetdb.config
             info = XendVnetInfo(config)
             self.vnet[info.id] = info
             try:
@@ -115,7 +115,7 @@ class XendVnet:
         """
         info = XendVnetInfo(config)
         self.vnet[info.id] = info
-        self.db.save(info.id, info.sxpr())
+        self.dbmap["%s/config" % info.id] = info.sxpr()
         info.configure()
 
     def vnet_delete(self, id):
@@ -126,7 +126,7 @@ class XendVnet:
         info = self.vnet_get(id)
         if info:
             del self.vnet[id]
-            self.db.delete(id)
+            self.dbmap.delete(id)
             info.delete()
 
 def instance():

@@ -1370,7 +1370,8 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args, PyObject *kwds)
 
  fail1:
     PyObject_Del((PyObject *)xup);
-    return NULL;    
+    PyErr_SetString(PyExc_ValueError, "cannot create port");
+    return NULL;
 }
 
 static PyObject *xu_port_getattr(PyObject *obj, char *name)

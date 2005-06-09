@@ -94,8 +94,8 @@ tools/cmdline/*
 tools/cmdline/xen/*
 tools/firmware/*.bin
 tools/firmware/*.sym
-tools/firmware/*bios/*bios*.txt
 tools/firmware/*/biossums
+tools/firmware/*bios/*bios*.txt
 tools/firmware/rombios/BIOS-bochs-latest
 tools/firmware/rombios/_rombios_.c
 tools/firmware/rombios/rombios.s
@@ -140,6 +140,13 @@ tools/xcs/xcs
 tools/xcs/xcsdump
 tools/xcutils/xc_restore
 tools/xcutils/xc_save
+tools/xenstore/testsuite/tmp/*
+tools/xenstore/xen
+tools/xenstore/xenstored
+tools/xenstore/xenstored_test
+tools/xenstore/xs_random
+tools/xenstore/xs_stress
+tools/xenstore/xs_test
 tools/xentrace/xentrace
 tools/xfrd/xfrd
 xen/BLOG

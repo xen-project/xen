@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+
 #include "xc_private.h"
 #include "linux_boot_params.h"
 
@@ -259,25 +260,28 @@ static PyObject *pyxc_linux_build(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32   dom;
+    u32 dom;
     char *image, *ramdisk = NULL, *cmdline = "";
-    int   control_evtchn, flags = 0, vcpus = 1;
+    int flags = 0, vcpus = 1;
+    int control_evtchn, store_evtchn;
+    unsigned long store_mfn = 0;
 
-    static char *kwd_list[] = { "dom", "control_evtchn", 
-                                "image", "ramdisk", "cmdline", "flags", "vcpus",
-                                NULL };
+    static char *kwd_list[] = { "dom", "control_evtchn", "store_evtchn", 
+                                "image", "ramdisk", "cmdline", "flags",
+				"vcpus", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ssii", kwd_list, 
-                                      &dom, &control_evtchn, 
-                                      &image, &ramdisk, &cmdline, &flags, &vcpus) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssii", kwd_list,
+                                      &dom, &control_evtchn, &store_evtchn,
+                                      &image, &ramdisk, &cmdline, &flags,
+                                      &vcpus) )
         return NULL;
 
     if ( xc_linux_build(xc->xc_handle, dom, image,
-                        ramdisk, cmdline, control_evtchn, flags, vcpus) != 0 )
+                        ramdisk, cmdline, control_evtchn, flags, vcpus,
+                        store_evtchn, &store_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
-    Py_INCREF(zero);
-    return zero;
+    return Py_BuildValue("{s:i}", "store_mfn", store_mfn);
 }
 
 static PyObject *pyxc_plan9_build(PyObject *self,
@@ -834,6 +838,7 @@ static PyMethodDef pyxc_methods[] = {
       0, "\n"
       "Query the xc control interface file descriptor.\n\n"
       "Returns: [int] file descriptor\n" },
+
     { "domain_create", 
       (PyCFunction)pyxc_domain_create, 
       METH_VARARGS | METH_KEYWORDS, "\n"
@@ -844,8 +849,8 @@ static PyMethodDef pyxc_methods[] = {
     { "domain_dumpcore", 
       (PyCFunction)pyxc_domain_dumpcore, 
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "dump core of a domain.\n"
-      " dom [int]: Identifier of domain to be paused.\n\n"
+      "Dump core of a domain.\n"
+      " dom [int]: Identifier of domain to dump core of.\n"
       " corefile [string]: Name of corefile to be created.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 

@@ -1,0 +1,7 @@
+TODO in no particular order.  Some of these will never be done.  There
+are omissions of important but necessary things.  It is up to the
+reader to fill in the blanks.
+
+- Remove calls to system() from daemon
+- Timeout failed watch responses
+- Timeout blocking transactions

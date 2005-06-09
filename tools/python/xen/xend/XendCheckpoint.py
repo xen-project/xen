@@ -43,7 +43,7 @@ def save(xd, fd, dominfo):
     write_exact(fd, config, "could not write guest state file: config")
 
     cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
-           dominfo.id]
+           str(dominfo.id)]
     log.info("[xc_save] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     
@@ -63,10 +63,10 @@ def save(xd, fd, dominfo):
             if fd == child.fromchild.fileno():
                 l = child.fromchild.readline()
                 if l.rstrip() == "suspend":
-                    log.info("suspending %s" % dominfo.id)
+                    log.info("suspending %d" % dominfo.id)
                     xd.domain_shutdown(dominfo.id, reason='suspend')
                     dominfo.state_wait("suspended")
-                    log.info("suspend %s done" % dominfo.id)
+                    log.info("suspend %d done" % dominfo.id)
                     child.tochild.write("done\n")
                     child.tochild.flush()
         if filter(lambda (fd, event): event & select.POLLHUP, r):
@@ -109,7 +109,7 @@ def restore(xd, fd):
             "not a valid guest state file: pfn count out of range")
 
     cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
-           dominfo.id, str(nr_pfns)]
+           str(dominfo.id), str(nr_pfns)]
     log.info("[xc_restore] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     child.tochild.close()

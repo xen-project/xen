@@ -7,10 +7,11 @@
 from xen.xend import sxp
 from xen.xend.XendLogging import log
 from xen.xend.XendError import XendError
+from xen.xend.xenstore import DBVar
 
-import channel
-from controller import Dev, DevController
-from messages import *
+from xen.xend.server import channel
+from xen.xend.server.controller import Dev, DevController
+from xen.xend.server.messages import *
 
 class UsbBackend:
     """Handler for the 'back-end' channel to a USB device driver domain
@@ -141,6 +142,11 @@ class UsbBackend:
 
 
 class UsbDev(Dev):
+
+    __exports__ = Dev.__exports__ + [
+        DBVar('port', ty='int'),
+        DBVar('path', ty='str'),
+        ]
     
     def __init__(self, controller, id, config, recreate=False):
         Dev.__init__(self, controller, id, config, recreate=recreate)
@@ -186,7 +192,6 @@ class UsbDev(Dev):
                ['port', self.port],
                ['path', self.path],
                ]
-        val.append(['index', self.getIndex()])
         return val
 
     def getBackend(self):

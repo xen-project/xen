@@ -4,20 +4,74 @@
 
 import random
 
+from xen.util.mac import macFromString, macToString
+
 from xen.xend import sxp
 from xen.xend import Vifctl
 from xen.xend.XendError import XendError, VmError
 from xen.xend.XendLogging import log
 from xen.xend import XendVnet
 from xen.xend.XendRoot import get_component
+from xen.xend.xenstore import DBVar
 
-import channel
-from controller import CtrlMsgRcvr, Dev, DevController
-from messages import *
+from xen.xend.server import channel
+from xen.xend.server.controller import CtrlMsgRcvr, Dev, DevController
+from xen.xend.server.messages import *
 
 class NetDev(Dev):
     """A network device.
     """
+
+    # State:
+    # inherited + 
+    # ./config
+    # ./mac
+    # ./be_mac
+    # ./bridge
+    # ./script
+    # ./ipaddr ?
+    #
+    # ./credit
+    # ./period
+    #
+    # ./vifctl: up/down?
+    # ./vifname
+    #
+    #
+    # Poss should have no backend state here - except for ref to backend's own tree
+    # for the device? And a status - the one we want.
+    # ./back/dom
+    # ./back/devid - id for back-end (netif_handle) - same as front/devid
+    # ./back/id    - backend id (if more than one b/e per domain)
+    # ./back/status
+    # ./back/tx_shmem_frame  - actually these belong in back-end state
+    # ./back/rx_shmem_frame
+    #
+    # ./front/dom
+    # ./front/devid
+    # ./front/status - need 2: one for requested, one for actual? Or drive from dev status
+    # and this is front status only.
+    # ./front/tx_shmem_frame
+    # ./front/rx_shmem_frame
+    #
+    # ./evtchn/front - here or in front/back?
+    # ./evtchn/back
+    # ./evtchn/status ?
+    # At present created by dev: but should be created unbound by front/back
+    # separately and then bound (by back)?
+
+    __exports__ = Dev.__exports__ + [
+        DBVar('config',  ty='sxpr'),
+        DBVar('mac',     ty='mac'),
+        DBVar('be_mac',  ty='mac'),
+        DBVar('bridge',  ty='str'),
+        DBVar('script',  ty='str'),
+        #DBVar('ipaddr'),
+        DBVar('credit',  ty='int'),
+        DBVar('period',  ty='int'),
+        DBVar('vifname', ty='str'),
+        DBVar('evtchn'),                #todo: export fields (renamed)
+        ]
 
     def __init__(self, controller, id, config, recreate=False):
         Dev.__init__(self, controller, id, config, recreate=recreate)
@@ -49,15 +103,19 @@ class NetDev(Dev):
     def _get_config_mac(self, config):
         vmac = sxp.child_value(config, 'mac')
         if not vmac: return None
-        mac = [ int(x, 16) for x in vmac.split(':') ]
-        if len(mac) != 6: raise XendError("invalid mac: %s" % vmac)
+        try:
+            mac = macFromString(vmac)
+        except:
+            raise XendError("invalid mac: %s" % vmac)
         return mac
 
     def _get_config_be_mac(self, config):
         vmac = sxp.child_value(config, 'be_mac')
         if not vmac: return None
-        mac = [ int(x, 16) for x in vmac.split(':') ]
-        if len(mac) != 6: raise XendError("invalid backend mac: %s" % vmac)
+        try:
+            mac = macFromString(vmac)
+        except:
+            raise XendError("invalid backend mac: %s" % vmac)
         return mac
 
     def _get_config_ipaddr(self, config):
@@ -102,7 +160,7 @@ class NetDev(Dev):
             else:
                 #todo: Code below will fail on xend restart when backend is not domain 0.
                 xd = get_component('xen.xend.XendDomain')
-                self.backendDomain = int(xd.domain_lookup(sxp.child_value(config, 'backend', '0')).id)
+                self.backendDomain = xd.domain_lookup_by_name(sxp.child_value(config, 'backend', '0')).id
         except:
             raise XendError('invalid backend domain')
         return self.config
@@ -127,13 +185,13 @@ class NetDev(Dev):
         ipaddr = self._get_config_ipaddr(config)
         
         xd = get_component('xen.xend.XendDomain')
-        backendDomain = str(xd.domain_lookup(sxp.child_value(config, 'backend', '0')).id)
+        backendDomain = xd.domain_lookup_by_name(sxp.child_value(config, 'backend', '0')).id
 
         if (mac is not None) and (mac != self.mac):
             raise XendError("cannot change mac")
         if (be_mac is not None) and (be_mac != self.be_mac):
             raise XendError("cannot change backend mac")
-        if (backendDomain is not None) and (backendDomain != str(self.backendDomain)):
+        if (backendDomain is not None) and (backendDomain != self.backendDomain):
             raise XendError("cannot change backend")
         if (bridge is not None) and (bridge != self.bridge):
             changes['bridge'] = bridge
@@ -199,7 +257,6 @@ class NetDev(Dev):
             val.append(['evtchn',
                         self.evtchn['port1'],
                         self.evtchn['port2']])
-        val.append(['index', self.getIndex()])
         return val
 
     def get_vifname(self):
@@ -213,12 +270,12 @@ class NetDev(Dev):
     def get_mac(self):
         """Get the MAC address as a string.
         """
-        return ':'.join(map(lambda x: "%02x" % x, self.mac))
+        return macToString(self.mac)
 
     def get_be_mac(self):
         """Get the backend MAC address as a string.
         """
-        return ':'.join(map(lambda x: "%02x" % x, self.be_mac))
+        return macToString(self.be_mac)
 
     def vifctl_params(self, vmname=None):
         """Get the parameters to pass to vifctl.
@@ -230,7 +287,7 @@ class NetDev(Dev):
                 vm = xd.domain_lookup(dom)
                 vmname = vm.name
             except:
-                vmname = 'DOM%d' % dom
+                vmname = 'Domain-%d' % dom
         return { 'domain': vmname,
                  'vif'   : self.get_vifname(), 
                  'mac'   : self.get_mac(),

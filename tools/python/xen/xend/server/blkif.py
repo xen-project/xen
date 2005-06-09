@@ -5,14 +5,15 @@ import string
 
 from xen.util import blkif
 from xen.xend.XendError import XendError, VmError
-from xen.xend import XendRoot
+from xen.xend.XendRoot import get_component
 from xen.xend.XendLogging import log
 from xen.xend import sxp
 from xen.xend import Blkctl
+from xen.xend.xenstore import DBVar
 
-import channel
-from controller import CtrlMsgRcvr, Dev, DevController
-from messages import *
+from xen.xend.server import channel
+from xen.xend.server.controller import CtrlMsgRcvr, Dev, DevController
+from xen.xend.server.messages import *
 
 class BlkifBackend:
     """ Handler for the 'back-end' channel to a block device driver domain
@@ -56,7 +57,7 @@ class BlkifBackend:
 
     def openEvtchn(self):
         self.evtchn = channel.eventChannel(self.backendDomain, self.frontendDomain)
-        
+
     def getEventChannelBackend(self):
         val = 0
         if self.evtchn:
@@ -158,6 +159,18 @@ class BlkDev(Dev):
     """Info record for a block device.
     """
 
+    __exports__ = Dev.__exports__ + [
+        DBVar('dev',          ty='str'),
+        DBVar('vdev',         ty='int'),
+        DBVar('mode',         ty='str'),
+        DBVar('viftype',      ty='str'),
+        DBVar('params',       ty='str'),
+        DBVar('node',         ty='str'),
+        DBVar('device',       ty='long'),
+        DBVar('start_sector', ty='long'),
+        DBVar('nr_sectors',   ty='long'),
+        ]
+
     def __init__(self, controller, id, config, recreate=False):
         Dev.__init__(self, controller, id, config, recreate=recreate)
         self.dev = None
@@ -206,7 +219,8 @@ class BlkDev(Dev):
             raise VmError('vbd: Device not found: %s' % self.dev)
         
         try:
-            self.backendDomain = int(sxp.child_value(config, 'backend', '0'))
+            xd = get_component('xen.xend.XendDomain')
+            self.backendDomain = xd.domain_lookup_by_name(sxp.child_value(config, 'backend', '0')).id
         except:
             raise XendError('invalid backend domain')
 
@@ -214,8 +228,7 @@ class BlkDev(Dev):
 
     def attach(self, recreate=False, change=False):
         if recreate:
-            node = sxp.child_value(recreate, 'node')
-            self.setNode(node)
+            pass
         else:
             node = Blkctl.block('bind', self.type, self.params)
             self.setNode(node)
@@ -263,7 +276,7 @@ class BlkDev(Dev):
 
     def check_mounted(self, name):
         mode = blkif.mount_mode(name)
-        xd = XendRoot.get_component('xen.xend.XendDomain')
+        xd = get_component('xen.xend.XendDomain')
         for vm in xd.list():
             ctrl = vm.getDeviceController(self.getType(), error=False)
             if (not ctrl): continue
@@ -292,14 +305,14 @@ class BlkDev(Dev):
             val.append(['uname', self.uname])
         if self.node:
             val.append(['node', self.node])
-        val.append(['index', self.getIndex()])
         return val
 
     def getBackend(self):
         return self.controller.getBackend(self.backendDomain)
 
     def refresh(self):
-        log.debug("Refreshing vbd domain=%d id=%s", self.frontendDomain, self.id)
+        log.debug("Refreshing vbd domain=%d id=%s", self.frontendDomain,
+                  self.id)
         self.interfaceChanged()
 
     def destroy(self, change=False, reboot=False):
@@ -308,7 +321,8 @@ class BlkDev(Dev):
         @param change: change flag
         """
         self.destroyed = True
-        log.debug("Destroying vbd domain=%d id=%s", self.frontendDomain, self.id)
+        log.debug("Destroying vbd domain=%d id=%s", self.frontendDomain,
+                  self.id)
         self.send_be_vbd_destroy()
         if change:
             self.interfaceChanged()
@@ -445,5 +459,4 @@ class BlkifController(DevController):
                 log.error("Exception connecting backend: %s", ex)
         else:
             log.error('interface connect on unknown interface: id=%d', id)
-    
 

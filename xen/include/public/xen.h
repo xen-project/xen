@@ -432,27 +432,30 @@ typedef struct shared_info_st
 
 #define MAX_GUEST_CMDLINE 1024
 typedef struct {
-    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */
-    memory_t nr_pages;        /*  0: Total pages allocated to this domain. */
+    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.        */
+    memory_t nr_pages;        /*  0: Total pages allocated to this domain.    */
     _MEMORY_PADDING(A);
-    memory_t shared_info;     /*  8: MACHINE address of shared info struct.*/
+    memory_t shared_info;     /*  8: MACHINE address of shared info struct.   */
     _MEMORY_PADDING(B);
-    u32      flags;           /* 16: SIF_xxx flags.                        */
+    u32      flags;           /* 16: SIF_xxx flags.                           */
     u16      domain_controller_evtchn; /* 20 */
     u16      __pad;
-    /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).      */
-    memory_t pt_base;         /* 24: VIRTUAL address of page directory.    */
+    /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).         */
+    memory_t pt_base;         /* 24: VIRTUAL address of page directory.       */
     _MEMORY_PADDING(C);
-    memory_t nr_pt_frames;    /* 32: Number of bootstrap p.t. frames.      */
+    memory_t nr_pt_frames;    /* 32: Number of bootstrap p.t. frames.         */
     _MEMORY_PADDING(D);
-    memory_t mfn_list;        /* 40: VIRTUAL address of page-frame list.   */
+    memory_t mfn_list;        /* 40: VIRTUAL address of page-frame list.      */
     _MEMORY_PADDING(E);
-    memory_t mod_start;       /* 48: VIRTUAL address of pre-loaded module. */
+    memory_t mod_start;       /* 48: VIRTUAL address of pre-loaded module.    */
     _MEMORY_PADDING(F);
-    memory_t mod_len;         /* 56: Size (bytes) of pre-loaded module.    */
+    memory_t mod_len;         /* 56: Size (bytes) of pre-loaded module.       */
     _MEMORY_PADDING(G);
     s8 cmd_line[MAX_GUEST_CMDLINE]; /* 64 */
-} PACKED start_info_t; /* 1088 bytes */
+    memory_t store_page;      /* 1088: VIRTUAL address of store page.         */
+    _MEMORY_PADDING(H);
+    u16      store_evtchn;    /* 1096: Event channel for store communication. */
+} PACKED start_info_t; /* 1098 bytes */
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */

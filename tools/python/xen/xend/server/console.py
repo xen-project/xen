@@ -13,10 +13,11 @@ from xen.xend import EventServer; eserver = EventServer.instance()
 from xen.xend.XendLogging import log
 from xen.xend import XendRoot; xroot = XendRoot.instance()
 from xen.xend import sxp
+from xen.xend.xenstore import DBVar
 
-from controller import CtrlMsgRcvr, Dev, DevController
-from messages import *
-from params import *
+from xen.xend.server.controller import CtrlMsgRcvr, Dev, DevController
+from xen.xend.server.messages import *
+from xen.xend.server.params import *
 
 class ConsoleProtocol(protocol.Protocol):
     """Asynchronous handler for a console socket.
@@ -76,6 +77,12 @@ class ConsoleDev(Dev, protocol.ServerFactory):
     STATUS_CONNECTED = 'connected'
     STATUS_LISTENING = 'listening'
 
+    __exports__ = Dev.__exports__ + [
+        DBVar('status',       ty='str'),
+        #DBVar('listening',    ty='str'),
+        DBVar('console_port', ty='int'),
+        ]
+
     def __init__(self, controller, id, config, recreate=False):
         Dev.__init__(self, controller, id, config)
         self.lock = threading.RLock()
@@ -129,7 +136,6 @@ class ConsoleDev(Dev, protocol.ServerFactory):
             val.append(['local_port',   self.getLocalPort()  ])
             val.append(['remote_port',  self.getRemotePort() ])
             val.append(['console_port', self.console_port    ])
-            val.append(['index', self.getIndex()])
             if self.addr:
                 val.append(['connected', self.addr[0], self.addr[1]])
         finally:

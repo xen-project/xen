@@ -14,52 +14,129 @@ DEBUG = 0
 
 RESPONSE_TIMEOUT = 20.0
 
-def eventChannel(dom1, dom2):
-    """Create an event channel between domains.
-    The returned dict contains dom1, dom2, port1 and port2 on success.
-
-    @return dict (empty on error)
+class EventChannel(dict):
+    """An event channel between domains.
     """
-    evtchn = xc.evtchn_bind_interdomain(dom1=dom1, dom2=dom2)
-    if evtchn:
-        evtchn['dom1'] = dom1
-        evtchn['dom2'] = dom2
-    return evtchn
+
+    def interdomain(cls, dom1, dom2, port1=0, port2=0):
+        """Create an event channel between domains.
+        
+        @return EventChannel (None on error)
+        """
+        v = xc.evtchn_bind_interdomain(dom1=dom1, dom2=dom2,
+                                       port1=port1, port2=port2)
+        if v:
+            v = cls(dom1, dom2, v)
+        return v
+
+    interdomain = classmethod(interdomain)
+
+    def restoreFromDB(cls, db, dom1, dom2, port1=0, port2=0):
+        """Create an event channel using db info if available.
+        Inverse to saveToDB().
+
+        @param db db
+        @param dom1
+        @param dom2
+        @param port1
+        @param port2
+        """
+        try:
+            dom1  = int(db['dom1'])
+        except: pass
+        try:
+            dom2  = int(db['dom2'])
+        except: pass
+        try:
+            port1 = int(db['port1'])
+        except: pass
+        try:
+            port2 = int(db['port2'])
+        except: pass
+        evtchn = cls.interdomain(dom1, dom2, port1=port1, port2=port2)
+        return evtchn
+
+    restoreFromDB = classmethod(restoreFromDB)
+
+    def __init__(self, dom1, dom2, d):
+        d['dom1'] = dom1
+        d['dom2'] = dom2
+        self.update(d)
+        self.dom1 = dom1
+        self.dom2 = dom2
+        self.port1 = d.get('port1')
+        self.port2 = d.get('port2')
+
+    def close(self):
+        """Close the event channel.
+        """
+        def evtchn_close(dom, port):
+            try:
+                xc.evtchn_close(dom=dom, port=port)
+            except Exception, ex:
+                pass
+            
+        if DEBUG:
+            print 'EventChannel>close>', self
+        evtchn_close(self.dom1, self.port1)
+        evtchn_close(self.dom2, self.port2)
+
+    def saveToDB(self, db):
+        """Save the event channel to the db so it can be restored later,
+        using restoreFromDB() on the class.
+
+        @param db db
+        """
+        db['dom1']  = str(self.dom1)
+        db['dom2']  = str(self.dom2)
+        db['port1'] = str(self.port1)
+        db['port2'] = str(self.port2)
+        db.saveDB()
+
+    def sxpr(self):
+        return ['event-channel',
+                ['dom1',  self.dom1  ],
+                ['port1', self.port1 ],
+                ['dom2',  self.dom2  ],
+                ['port2', self.port2 ]
+                ]
+
+    def __repr__(self):
+        return ("<EventChannel dom1:%d:%d dom2:%d:%d>"
+                % (self.dom1, self.port1, self.dom2, self.port2))
+
+def eventChannel(dom1, dom2, port1=0, port2=0):
+    """Create an event channel between domains.
+        
+    @return EventChannel (None on error)
+    """
+    return EventChannel.interdomain(dom1, dom2, port1=port1, port2=port2)
 
 def eventChannelClose(evtchn):
-    """Close an event channel that was opened by eventChannel().
+    """Close an event channel.
     """
-    def evtchn_close(dom, port):
-        if (dom is None) or (port is None): return
-        try:
-            xc.evtchn_close(dom=dom, port=port)
-        except Exception, ex:
-            pass
-        
     if not evtchn: return
-    if DEBUG:
-        print 'eventChannelClose>', evtchn
-    evtchn_close(evtchn.get('dom1'), evtchn.get('port1'))
-    evtchn_close(evtchn.get('dom2'), evtchn.get('port2'))
-    
+    evtchn.close()
 
 class ChannelFactory:
-    """Factory for creating channels.
+    """Factory for creating control channels.
     Maintains a table of channels.
     """
 
     """ Channels indexed by index. """
-    channels = {}
+    channels = None
 
     thread = None
 
     notifier = None
 
     """Map of ports to the virq they signal."""
-    virqPorts = {}
+    virqPorts = None
 
     def __init__(self):
         """Constructor - do not use. Use the channelFactory function."""
+        self.channels = {}
+        self.virqPorts = {}
         self.notifier = xu.notifier()
         # Register interest in virqs.
         self.bind_virq(xen.lowlevel.xc.VIRQ_DOM_EXC)
@@ -69,10 +146,6 @@ class ChannelFactory:
         port = self.notifier.bind_virq(virq)
         self.virqPorts[port] = virq
         log.info("Virq %s on port %s", virq, port)
-
-    def virq(self):
-        log.error("virq")
-        self.notifier.virq_send(self.virqPort)
 
     def start(self):
         """Fork a thread to read messages.
@@ -182,9 +255,13 @@ class ChannelFactory:
         return None
 
     def openChannel(self, dom, local_port=0, remote_port=0):
-        return (self.findChannel(dom, local_port=local_port, remote_port=remote_port)
-                or
-                self.newChannel(dom, local_port, remote_port))
+        chan = self.findChannel(dom, local_port=local_port,
+                                remote_port=remote_port)
+        if chan:
+            return chan
+        chan = self.newChannel(dom, local_port, remote_port)
+        return chan
+        
 
     def createPort(self, dom, local_port=0, remote_port=0):
         """Create a port for a channel to the given domain.
@@ -203,8 +280,31 @@ class ChannelFactory:
         @type  remote: int
         @return: port object
         """
-        return xu.port(dom, local_port=int(local_port),
-                       remote_port=int(remote_port))
+        return xu.port(dom, local_port=local_port, remote_port=remote_port)
+
+    def restoreFromDB(self, db, dom, local, remote):
+        """Create a channel using ports restored from the db (if available).
+        Otherwise use the given ports. This is the inverse operation to
+        saveToDB() on a channel.
+
+        @param db db
+        @param dom  domain the channel connects to
+        @param local default local port
+        @param remote default remote port
+        """
+        try:
+            local_port  = int(db['local_port'])
+        except:
+            local_port = local
+        try:
+            remote_port = int(db['remote_port'])
+        except:
+            remote_port = remote
+        try:
+            chan = self.openChannel(dom, local_port, remote_port)
+        except:
+            return None
+        return chan
 
 def channelFactory():
     """Singleton constructor for the channel factory.
@@ -218,7 +318,7 @@ def channelFactory():
     return inst
 
 class Channel:
-    """Chanel to a domain.
+    """Control channel to a domain.
     Maintains a list of device handlers to dispatch requests to, based
     on the request type.
     """
@@ -238,6 +338,17 @@ class Channel:
         self.queue = ResponseQueue(self)
         # Make sure the port will deliver all the messages.
         self.port.register(TYPE_WILDCARD)
+
+    def saveToDB(self, db):
+        """Save the channel ports to the db so the channel can be restored later,
+        using restoreFromDB() on the factory.
+
+        @param db db
+        """
+        if self.closed: return
+        db['local_port'] = str(self.getLocalPort())
+        db['remote_port'] = str(self.getRemotePort())
+        db.saveDB()
 
     def getKey(self):
         """Get the channel key.

@@ -10,6 +10,8 @@
 
 static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 {
+    DPRINTK("Received netif backend message, subtype=%d\n", msg->subtype);
+    
     switch ( msg->subtype )
     {
     case CMSG_NETIF_BE_CREATE:
