@@ -1,6 +1,5 @@
 XEN_ROOT=../..
-# This does something wrong to TARGET_ARCH.
-#include $(XEN_ROOT)/tools/Rules.mk
+include $(XEN_ROOT)/tools/Rules.mk
 LIBDIR = lib
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 
@@ -20,7 +19,10 @@ BASECFLAGS+= -I$(XEN_ROOT)/tools/libxc
 BASECFLAGS+= -I$(XEN_ROOT)/xen/include/public
 BASECFLAGS+= -I.
 
-CFLAGS+=$(BASECFLAGS)
+CFLAGS += $(BASECFLAGS)
+ifeq ($(XEN_TARGET_ARCH),x86_64)
+CFLAGS += -fPIC
+endif
 LDFLAGS=$(PROFILE) -L$(XEN_LIBXC)
 TESTDIR=`pwd`/testsuite/tmp
 TESTFLAGS=-DTESTING
