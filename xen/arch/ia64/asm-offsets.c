@@ -46,12 +46,19 @@ void foo(void)
 	DEFINE(XSI_PSR_IC, (SHAREDINFO_ADDR+offsetof(vcpu_info_t, arch.interrupt_collection_enabled)));
 	DEFINE(XSI_PSR_I_OFS, offsetof(vcpu_info_t, arch.interrupt_delivery_enabled));
 	DEFINE(XSI_IIP_OFS, offsetof(vcpu_info_t, arch.iip));
+	DEFINE(XSI_IPSR, (SHAREDINFO_ADDR+offsetof(vcpu_info_t, arch.ipsr)));
 	DEFINE(XSI_IPSR_OFS, offsetof(vcpu_info_t, arch.ipsr));
 	DEFINE(XSI_IFS_OFS, offsetof(vcpu_info_t, arch.ifs));
+	DEFINE(XSI_ISR_OFS, offsetof(vcpu_info_t, arch.isr));
+	DEFINE(XSI_IIM_OFS, offsetof(vcpu_info_t, arch.iim));
 	DEFINE(XSI_BANKNUM_OFS, offsetof(vcpu_info_t, arch.banknum));
+	DEFINE(XSI_BANK0_OFS, offsetof(vcpu_info_t, arch.bank0_regs[0]));
+	DEFINE(XSI_BANK1_OFS, offsetof(vcpu_info_t, arch.bank1_regs[0]));
 	DEFINE(XSI_METAPHYS_OFS, offsetof(vcpu_info_t, arch.metaphysical_mode));
+	DEFINE(XSI_PRECOVER_IFS_OFS, offsetof(vcpu_info_t, arch.precover_ifs));
 	DEFINE(XSI_INCOMPL_REG_OFS, offsetof(vcpu_info_t, arch.incomplete_regframe));
 	DEFINE(XSI_PEND_OFS, offsetof(vcpu_info_t, arch.pending_interruption));
+	DEFINE(XSI_RR0_OFS, offsetof(vcpu_info_t, arch.rrs[0]));
 	//DEFINE(IA64_TASK_BLOCKED_OFFSET,offsetof (struct task_struct, blocked));
 	//DEFINE(IA64_TASK_CLEAR_CHILD_TID_OFFSET,offsetof (struct task_struct, clear_child_tid));
 	//DEFINE(IA64_TASK_GROUP_LEADER_OFFSET, offsetof (struct task_struct, group_leader));
@@ -63,6 +70,11 @@ void foo(void)
 	//DEFINE(IA64_TASK_TGID_OFFSET, offsetof (struct task_struct, tgid));
 	DEFINE(IA64_TASK_THREAD_KSP_OFFSET, offsetof (struct vcpu, arch._thread.ksp));
 	DEFINE(IA64_TASK_THREAD_ON_USTACK_OFFSET, offsetof (struct vcpu, arch._thread.on_ustack));
+
+	DEFINE(IA64_VCPU_META_RR0_OFFSET, offsetof (struct vcpu, arch.metaphysical_rr0));
+	DEFINE(IA64_VCPU_META_SAVED_RR0_OFFSET, offsetof (struct vcpu, arch.metaphysical_saved_rr0));
+	DEFINE(IA64_VCPU_BREAKIMM_OFFSET, offsetof (struct vcpu, arch.breakimm));
+	DEFINE(IA64_VCPU_IVA_OFFSET, offsetof (struct vcpu, arch.iva));
 
 	BLANK();
 

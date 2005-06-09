@@ -50,6 +50,8 @@ extern struct task_struct *vmx_ia64_switch_to (void *next_task);
 } while (0)
 #else // CONFIG_VTI
 #define __switch_to(prev,next,last) do {							 \
+	ia64_save_fpu(prev->arch._thread.fph);							\
+	ia64_load_fpu(next->arch._thread.fph);							\
 	if (IA64_HAS_EXTRA_STATE(prev))								 \
 		ia64_save_extra(prev);								 \
 	if (IA64_HAS_EXTRA_STATE(next))								 \

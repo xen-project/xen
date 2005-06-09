@@ -27,7 +27,7 @@ struct trap_bounce {
 struct arch_domain {
     struct mm_struct *active_mm;
     struct mm_struct *mm;
-    int metaphysical_rid;
+    int metaphysical_rr0;
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */
     int rid_bits;		/* number of virtual rid bits (default: 18) */
@@ -47,11 +47,9 @@ struct arch_domain {
     u64 entry;
 #endif
 };
-#define metaphysical_rid arch.metaphysical_rid
 #define starting_rid arch.starting_rid
 #define ending_rid arch.ending_rid
 #define rid_bits arch.rid_bits
-#define breakimm arch.breakimm
 #define xen_vastart arch.xen_vastart
 #define xen_vaend arch.xen_vaend
 #define shared_info_va arch.shared_info_va
@@ -75,6 +73,9 @@ struct arch_vcpu {
 	unsigned long xen_timer_interval;
 #endif
     void *regs;	/* temporary until find a better way to do privops */
+    int metaphysical_rr0;		// from arch_domain (so is pinned)
+    int metaphysical_saved_rr0;		// from arch_domain (so is pinned)
+    int breakimm;			// from arch_domain (so is pinned)
     struct mm_struct *active_mm;
     struct thread_struct _thread;	// this must be last
 #ifdef CONFIG_VTI

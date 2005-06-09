@@ -26,9 +26,9 @@ setup_serial_console(struct pcdp_uart *uart)
 #ifdef XEN
 	extern char opt_com1[1];
 	if (opt_com1[0]) return 0;
-	sprintf(&opt_com1[0], "0x%lx,%lu,%dn1",
-		uart->addr.address, uart->baud,
-		uart->bits ? uart->bits : 8);
+	sprintf(&opt_com1[0], "%lu,%dn1,0x%lx,9",
+		uart->baud, uart->bits ? uart->bits : 8,
+		uart->addr.address);
 	return 0;
 #else
 #ifdef CONFIG_SERIAL_8250_CONSOLE

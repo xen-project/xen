@@ -130,6 +130,42 @@ unsigned long translate_domain_mpaddr(unsigned long mpaddr)
 	return ((pteval & _PAGE_PPN_MASK) | (mpaddr & ~PAGE_MASK));
 }
 
+unsigned long slow_reflect_count[0x80] = { 0 };
+unsigned long fast_reflect_count[0x80] = { 0 };
+
+#define inc_slow_reflect_count(vec) slow_reflect_count[vec>>8]++;
+
+void zero_reflect_counts(void)
+{
+	int i;
+	for (i=0; i<0x80; i++) slow_reflect_count[i] = 0;
+	for (i=0; i<0x80; i++) fast_reflect_count[i] = 0;
+}
+
+int dump_reflect_counts(char *buf)
+{
+	int i,j,cnt;
+	char *s = buf;
+
+	s += sprintf(s,"Slow reflections by vector:\n");
+	for (i = 0, j = 0; i < 0x80; i++) {
+		if (cnt = slow_reflect_count[i]) {
+			s += sprintf(s,"0x%02x00:%10d, ",i,cnt);
+			if ((j++ & 3) == 3) s += sprintf(s,"\n");
+		}
+	}
+	if (j & 3) s += sprintf(s,"\n");
+	s += sprintf(s,"Fast reflections by vector:\n");
+	for (i = 0, j = 0; i < 0x80; i++) {
+		if (cnt = fast_reflect_count[i]) {
+			s += sprintf(s,"0x%02x00:%10d, ",i,cnt);
+			if ((j++ & 3) == 3) s += sprintf(s,"\n");
+		}
+	}
+	if (j & 3) s += sprintf(s,"\n");
+	return s - buf;
+}
+
 void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long itiriim, struct pt_regs *regs, unsigned long vector)
 {
 	unsigned long vcpu_get_ipsr_int_state(struct vcpu *,unsigned long);
@@ -165,6 +201,7 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.ii
 		regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
 // NOTE: nested trap must NOT pass PSCB address
 		//regs->r31 = (unsigned long) &PSCB(v);
+		inc_slow_reflect_count(vector);
 		return;
 
 	}
@@ -195,9 +232,13 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.ii
 
 	PSCB(v,interrupt_delivery_enabled) = 0;
 	PSCB(v,interrupt_collection_enabled) = 0;
+
+	inc_slow_reflect_count(vector);
 }
 
 void foodpi(void) {}
+
+unsigned long pending_false_positive = 0;
 
 // ONLY gets called from ia64_leave_kernel
 // ONLY call with interrupts disabled?? (else might miss one?)
@@ -215,6 +256,8 @@ void deliver_pending_interrupt(struct pt_regs *regs)
 printf("*#*#*#* about to deliver early timer to domain %d!!!\n",v->domain->domain_id);
 			reflect_interruption(0,isr,0,regs,IA64_EXTINT_VECTOR);
 		}
+		else if (PSCB(v,pending_interruption))
+			++pending_false_positive;
 	}
 }
 
@@ -725,30 +768,31 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 		vcpu_set_gr(current,8,-1L);
 		break;
 	    default:
-		printf("ia64_handle_break: bad ssc code %lx\n",ssc);
+		printf("ia64_handle_break: bad ssc code %lx, iip=%p\n",ssc,regs->cr_iip);
 		break;
 	}
 	vcpu_increment_iip(current);
 }
 
+int first_break = 1;
+
 void
 ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim)
 {
-	static int first_time = 1;
 	struct domain *d = (struct domain *) current->domain;
 	struct vcpu *v = (struct domain *) current;
 	extern unsigned long running_on_sim;
 
-	if (first_time) {
+	if (first_break) {
 		if (platform_is_hp_ski()) running_on_sim = 1;
 		else running_on_sim = 0;
-		first_time = 0;
+		first_break = 0;
 	}
 	if (iim == 0x80001 || iim == 0x80002) {	//FIXME: don't hardcode constant
 		if (running_on_sim) do_ssc(vcpu_get_gr(current,36), regs);
 		else do_ssc(vcpu_get_gr(current,36), regs);
 	}
-	else if (iim == d->breakimm) {
+	else if (iim == d->arch.breakimm) {
 		if (ia64_hypercall(regs))
 			vcpu_increment_iip(current);
 	}
@@ -811,7 +855,8 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		check_lazy_cover = 1;
 		vector = IA64_DATA_ACCESS_RIGHTS_VECTOR; break;
 	    case 25:
-		vector = IA64_DISABLED_FPREG_VECTOR; break;
+		vector = IA64_DISABLED_FPREG_VECTOR;
+		break;
 	    case 26:
 printf("*** NaT fault... attempting to handle as privop\n");
 		vector = priv_emulate(v,regs,isr);

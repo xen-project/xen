@@ -45,6 +45,7 @@ fi
 mkdir include/asm-generic
 mkdir include/asm-ia64/linux
 mkdir include/asm-ia64/linux/byteorder
+mkdir include/asm-ia64/sn
 # use "gcc -Iinclude/asm-ia64" to find these linux includes
 #ln -s $XEN/include/xen $XEN/include/linux
 #ln -s $XEN/include/asm-ia64/linux $XEN/include/asm-ia64/xen 
@@ -197,6 +198,12 @@ null include/asm-ia64/pdb.h
 null include/asm-ia64/module.h
 null include/asm-ia64/ia32.h
 null include/asm-ia64/tlbflush.h
+
+null include/asm-ia64/sn/arch.h
+null include/asm-ia64/sn/geo.h
+null include/asm-ia64/sn/nodepda.h
+null include/asm-ia64/sn/sn_cpuid.h
+cp_patch include/asm-ia64/sn/sn_sal.h include/asm-ia64/sn/sn_sal.h sn_sal.h
 
 softlink include/asm-ia64/acpi.h include/asm-ia64/acpi.h
 softlink include/asm-ia64/asmmacro.h include/asm-ia64/asmmacro.h

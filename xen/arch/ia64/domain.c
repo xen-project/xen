@@ -210,7 +210,7 @@ void arch_do_createdomain(struct vcpu *v)
 	 */
 	d->xen_vastart = 0xf000000000000000;
 	d->xen_vaend = 0xf300000000000000;
-	d->breakimm = 0x1000;
+	d->arch.breakimm = 0x1000;
 
 	// stay on kernel stack because may get interrupts!
 	// ia64_ret_from_clone (which b0 gets in new_thread) switches
@@ -244,9 +244,11 @@ void arch_do_createdomain(struct vcpu *v)
 	}
 #endif
 	d->max_pages = (128*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
-	if ((d->metaphysical_rid = allocate_metaphysical_rid()) == -1UL)
+	if ((d->arch.metaphysical_rr0 = allocate_metaphysical_rr0()) == -1UL)
 		BUG();
 	v->vcpu_info->arch.metaphysical_mode = 1;
+	v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
+	v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
 #define DOMAIN_RID_BITS_DEFAULT 18
 	if (!allocate_rid_range(d,DOMAIN_RID_BITS_DEFAULT)) // FIXME
 		BUG();
@@ -254,7 +256,8 @@ void arch_do_createdomain(struct vcpu *v)
 	d->xen_vastart = 0xf000000000000000;
 	d->xen_vaend = 0xf300000000000000;
 	d->shared_info_va = 0xf100000000000000;
-	d->breakimm = 0x1000;
+	d->arch.breakimm = 0x1000;
+	v->arch.breakimm = d->arch.breakimm;
 	// stay on kernel stack because may get interrupts!
 	// ia64_ret_from_clone (which b0 gets in new_thread) switches
 	// to user stack
@@ -403,6 +406,7 @@ printk("new_thread, about to call dom_fw_setup\n");
 printk("new_thread, done with dom_fw_setup\n");
 	// don't forget to set this!
 	v->vcpu_info->arch.banknum = 1;
+	memset(v->arch._thread.fph,0,sizeof(struct ia64_fpreg)*96);
 }
 #endif // CONFIG_VTI
 
@@ -450,7 +454,11 @@ extern unsigned long vhpt_paddr, vhpt_pend;
 		if (d == dom0) p = map_new_domain0_page(mpaddr);
 		else
 #endif
+		{
 			p = alloc_domheap_page(d);
+			// zero out pages for security reasons
+			memset(__va(page_to_phys(p)),0,PAGE_SIZE);
+		}
 		if (unlikely(!p)) {
 printf("map_new_domain_page: Can't alloc!!!! Aaaargh!\n");
 			return(p);
@@ -509,7 +517,6 @@ tryagain:
 	}
 	/* if lookup fails and mpaddr is "legal", "create" the page */
 	if ((mpaddr >> PAGE_SHIFT) < d->max_pages) {
-		// FIXME: should zero out pages for security reasons
 		if (map_new_domain_page(d,mpaddr)) goto tryagain;
 	}
 	printk("lookup_domain_mpa: bad mpa %p (> %p\n",

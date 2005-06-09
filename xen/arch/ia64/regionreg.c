@@ -63,9 +63,14 @@ unsigned long allocate_reserved_rid(void)
 
 
 // returns -1 if none available
-unsigned long allocate_metaphysical_rid(void)
+unsigned long allocate_metaphysical_rr0(void)
 {
-	unsigned long rid = allocate_reserved_rid();
+	ia64_rr rrv;
+
+	rrv.rid = allocate_reserved_rid();
+	rrv.ps = PAGE_SHIFT;
+	rrv.ve = 0;
+	return rrv.rrval;
 }
 
 int deallocate_metaphysical_rid(unsigned long rid)
@@ -282,22 +287,20 @@ int set_one_rr(unsigned long rr, unsigned long val)
 		if (rreg == 6) newrrv.ve = VHPT_ENABLED_REGION_7;
 		else newrrv.ve = VHPT_ENABLED_REGION_0_TO_6;
 		newrrv.ps = PAGE_SHIFT;
+		if (rreg == 0) v->arch.metaphysical_saved_rr0 = newrrv.rrval;
 		set_rr(rr,newrrv.rrval);
 	}
 	return 1;
 }
 
 // set rr0 to the passed rid (for metaphysical mode so don't use domain offset
-int set_metaphysical_rr(unsigned long rr, unsigned long rid)
+int set_metaphysical_rr0(void)
 {
+	struct vcpu *v = current;
 	ia64_rr rrv;
 	
-	rrv.rrval = 0;
-	rrv.rid = rid;
-	rrv.ps = PAGE_SHIFT;
 //	rrv.ve = 1; 	FIXME: TURN ME BACK ON WHEN VHPT IS WORKING
-	rrv.ve = 0;
-	set_rr(rr,rrv.rrval);
+	set_rr(0,v->arch.metaphysical_rr0);
 }
 
 // validates/changes region registers 0-6 in the currently executing domain
@@ -322,7 +325,7 @@ void init_all_rr(struct vcpu *v)
 	ia64_rr rrv;
 
 	rrv.rrval = 0;
-	rrv.rid = v->domain->metaphysical_rid;
+	rrv.rrval = v->domain->arch.metaphysical_rr0;
 	rrv.ps = PAGE_SHIFT;
 	rrv.ve = 1;
 if (!v->vcpu_info) { printf("Stopping in init_all_rr\n"); dummy(); }
@@ -376,7 +379,7 @@ unsigned long load_region_regs(struct vcpu *v)
 		ia64_rr rrv;
 
 		rrv.rrval = 0;
-		rrv.rid = v->domain->metaphysical_rid;
+		rrv.rid = v->domain->arch.metaphysical_rr0;
 		rrv.ps = PAGE_SHIFT;
 		rrv.ve = 1;
 		rr0 = rrv.rrval;
