@@ -1262,8 +1262,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         if (vector == LOCAL_TIMER_VECTOR) {
             smp_apic_timer_interrupt(&regs);
         } else {
-            regs.entry_vector = (vector == FIRST_DEVICE_VECTOR?
-                     0 : vector_irq[vector]);
+            regs.entry_vector = vector;
             do_IRQ(&regs);
         }
         break;
