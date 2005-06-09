@@ -68,7 +68,7 @@ unsigned char acpi_legacy_devices;
 const char *
 acpi_get_sysname (void)
 {
-#ifdef CONFIG_IA64_GENERIC
+/* #ifdef CONFIG_IA64_GENERIC */
 	unsigned long rsdp_phys;
 	struct acpi20_table_rsdp *rsdp;
 	struct acpi_table_xsdt *xsdt;
@@ -101,6 +101,7 @@ acpi_get_sysname (void)
 	}
 
 	return "dig";
+/*
 #else
 # if defined (CONFIG_IA64_HP_SIM)
 	return "hpsim";
@@ -114,6 +115,7 @@ acpi_get_sysname (void)
 #	error Unknown platform.  Fix acpi.c.
 # endif
 #endif
+*/
 }
 
 #ifdef CONFIG_ACPI_BOOT
