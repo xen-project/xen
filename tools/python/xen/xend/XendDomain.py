@@ -119,12 +119,10 @@ class XendDomain:
     def _new_domain(self, db, info):
         """Create a domain entry from saved info.
 
-        @param db:        saved info from the db
-        @param info:      domain info from xen
+        @param db:   saved info from the db
+        @param info: domain info from xen
         @return: domain
         """
-        log.error(db)
-        log.error(db.uuid)
         dominfo = XendDomainInfo.recreate(db, info)
         self.domains[dominfo.id] = dominfo
         return dominfo
