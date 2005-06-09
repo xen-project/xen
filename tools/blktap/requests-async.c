@@ -51,6 +51,14 @@ struct io_req {
 void clear_w_bits(radix_tree_node node) 
 {
     int i;
+    for (i=0; i<RADIX_TREE_MAP_ENTRIES; i++)
+        node[i] = node[i] & ONEMASK;
+    return;
+}
+
+void clear_L3_w_bits(radix_tree_node node) 
+{
+    int i;
     for (i=0; i<RADIX_TREE_MAP_ENTRIES; i+=2)
         node[i] = node[i] & ONEMASK;
     return;
@@ -513,7 +521,7 @@ static void write_cb(struct io_ret r, void *param)
     
     	DPRINTF("READ_L3_L2f\n");
         node = (radix_tree_node) IO_BLOCK(r);
-        clear_w_bits(node);
+        clear_L3_w_bits(node);
         if (node == NULL) goto fail;
         a    = node[L2_IDX(req->vaddr)];
         addr = getid(a);
@@ -613,7 +621,7 @@ static void write_cb(struct io_ret r, void *param)
     
     	DPRINTF("READ_L3_L1f\n");
         node = (radix_tree_node) IO_BLOCK(r);
-        clear_w_bits(node);
+        clear_L3_w_bits(node);
         if (node == NULL) goto fail;
         a    = node[L2_IDX(req->vaddr)];
         addr = getid(a);

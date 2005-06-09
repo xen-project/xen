@@ -80,7 +80,7 @@ install: all
 	$(INSTALL_PROG) $(IBINS) $(DESTDIR)/$(BLKTAP_INSTALL_DIR)
 
 clean:
-	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS blkdump $(VDI_TOOLS) parallax
+	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS blkdump $(VDI_TOOLS) parallax vdi_unittest
 
 rpm: all
 	rm -rf staging
