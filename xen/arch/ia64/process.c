@@ -774,18 +774,19 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 	vcpu_increment_iip(current);
 }
 
+int first_break = 1;
+
 void
 ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim)
 {
-	static int first_time = 1;
 	struct domain *d = (struct domain *) current->domain;
 	struct vcpu *v = (struct domain *) current;
 	extern unsigned long running_on_sim;
 
-	if (first_time) {
+	if (first_break) {
 		if (platform_is_hp_ski()) running_on_sim = 1;
 		else running_on_sim = 0;
-		first_time = 0;
+		first_break = 0;
 	}
 	if (iim == 0x80001 || iim == 0x80002) {	//FIXME: don't hardcode constant
 		if (running_on_sim) do_ssc(vcpu_get_gr(current,36), regs);
@@ -821,6 +822,8 @@ ia64_handle_privop (unsigned long ifa, struct pt_regs *regs, unsigned long isr, 
 #define INTR_TYPE_MAX	10
 UINT64 int_counts[INTR_TYPE_MAX];
 
+void dis_foo(void) { }
+
 void
 ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim, unsigned long vector)
 {
@@ -854,7 +857,10 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		check_lazy_cover = 1;
 		vector = IA64_DATA_ACCESS_RIGHTS_VECTOR; break;
 	    case 25:
-		vector = IA64_DISABLED_FPREG_VECTOR; break;
+		vector = IA64_DISABLED_FPREG_VECTOR;
+//printf("*** Attempting to handle disabled_fpreg\n");
+		dis_foo();
+		break;
 	    case 26:
 printf("*** NaT fault... attempting to handle as privop\n");
 		vector = priv_emulate(v,regs,isr);

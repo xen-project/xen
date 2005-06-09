@@ -221,7 +221,7 @@ ENTRY(hyper_ssm_i)
 //	r19 == vpsr.ic (low 32 bits) | vpsr.i (high 32 bits)
 //	r31 == pr
 GLOBAL_ENTRY(fast_break_reflect)
-//#define FAST_BREAK
+#define FAST_BREAK
 #ifndef FAST_BREAK
 	br.sptk.many dispatch_break_fault ;;
 #endif
@@ -233,6 +233,18 @@ GLOBAL_ENTRY(fast_break_reflect)
 	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
 	cmp.ne p7,p0=r21,r0 ;;
 (p7)	br.sptk.many dispatch_break_fault ;;
+#if 1 /* special handling in case running on simulator */
+	movl r20=first_break;;
+	ld4 r23=[r20];;
+	movl r21=0x80001;
+	movl r22=0x80002;;
+	cmp.ne p7,p0=r23,r0;;
+(p7)	br.sptk.many dispatch_break_fault ;;
+	cmp.eq p7,p0=r21,r17;
+(p7)	br.sptk.many dispatch_break_fault ;;
+	cmp.eq p7,p0=r22,r17;
+(p7)	br.sptk.many dispatch_break_fault ;;
+#endif
 #ifdef FAST_REFLECT_CNT
 	movl r20=fast_reflect_count+((0x2c00>>8)*8);;
 	ld8 r21=[r20];;
