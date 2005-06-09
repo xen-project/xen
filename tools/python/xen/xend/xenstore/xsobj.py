@@ -201,7 +201,10 @@ class DBVar:
         setAttr(o, self.attr, val)
 
     def getDB(self, db):
-        data = getattr(db, self.path)
+        try:
+            data = getattr(db, self.path)
+        except AttributeError:
+            return None
         return DBConverter.convertFromDB(data, ty=self.ty)
 
     def setDB(self, db, val):

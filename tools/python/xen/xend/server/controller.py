@@ -4,6 +4,7 @@ for a domain.
 """
 
 from xen.xend.XendError import XendError
+from xen.xend.xenstore import DBVar
 from xen.xend.server.messages import msgTypeName, printMsg, getMessageType
 
 DEBUG = 0
@@ -155,11 +156,16 @@ class DevController:
 
     """
 
+    # State:
+    # controller/<type> : for controller
+    # device/<type>/<id>   : for each device
+
     def createDevController(cls, vm, recreate=False):
         """Class method to create a dev controller.
         """
         ctrl = cls(vm, recreate=recreate)
         ctrl.initController(recreate=recreate)
+        ctrl.exportToDB()
         return ctrl
 
     createDevController = classmethod(createDevController)
@@ -169,15 +175,37 @@ class DevController:
 
     getType = classmethod(getType)
 
+    __exports__ = [
+        DBVar('type',      'str'),
+        DBVar('destroyed', 'bool'),
+        ]
+
     # Set when registered.
     type = None
 
     def __init__(self, vm, recreate=False):
         self.destroyed = False
         self.vm = vm
+        self.db = self.getDB()
         self.deviceId = 0
         self.devices = {}
         self.device_order = []
+
+    def getDB(self):
+        """Get the db node to use for a controller.
+        """
+        return self.vm.db.addChild("/controller/%s" % self.getType())
+
+    def getDevDB(self, id):
+        """Get the db node to use for a device.
+        """
+        return self.vm.db.addChild("/device/%s/%s" % (self.getType(), id))
+
+    def exportToDB(self, save=False):
+        self.db.exportToDB(self, fields=self.__exports__, save=save)
+
+    def importFromDB(self):
+        self.db.importFromDB(self, fields=self.__exports__)
 
     def getDevControllerType(self):
         return self.dctype
@@ -229,15 +257,15 @@ class DevController:
         If change is true the device is a change to an existing domain,
         i.e. it is being added at runtime rather than when the domain is created.
         """
-        # skanky hack: we use the device ids to maybe find the savedinfo
-        # of the device...
-        id = self.nextDeviceId()
-        if recreate:
-            recreate = self.vm.get_device_savedinfo(self.getType(), id)
-        dev = self.newDevice(id, config, recreate=recreate)
+        dev = self.newDevice(self.nextDeviceId(), config, recreate=recreate)
+        if self.vm.recreate:
+            dev.importFromDB()
         dev.init(recreate=recreate)
         self.addDevice(dev)
+        if not recreate:
+            dev.exportToDB()
         dev.attach(recreate=recreate, change=change)
+        dev.exportToDB()
 
     def configureDevice(self, id, config, change=False):
         """Reconfigure an existing device.
@@ -344,11 +372,42 @@ class Dev:
     @type controller: DevController
     """
     
+    # ./status       : need 2: actual and requested?
+    # down-down: initial.
+    # up-up: fully up.
+    # down-up: down requested, still up. Watch front and back, when both
+    # down go to down-down. But what if one (or both) is not connected?
+    # Still have front/back trees with status? Watch front/status, back/status?
+    # up-down: up requested, still down.
+    # Back-end watches ./status, front/status
+    # Front-end watches ./status, back/status
+    # i.e. each watches the other 2.
+    # Each is status/request status/actual?
+    #
+    # backend?
+    # frontend?
+
+    __exports__ = [
+        DBVar('id',        ty='int'),
+        DBVar('type',      ty='str'),
+        DBVar('config',    ty='sxpr'),
+        DBVar('destroyed', ty='bool'),
+        ]
+
     def __init__(self, controller, id, config, recreate=False):
         self.controller = controller
         self.id = id
         self.config = config
         self.destroyed = False
+        self.type = self.getType()
+
+        self.db = controller.getDevDB(id)
+
+    def exportToDB(self, save=False):
+        self.db.exportToDB(self, fields=self.__exports__, save=save)
+
+    def importFromDB(self):
+        self.db.importFromDB(self, fields=self.__exports__)
 
     def getDomain(self):
         return self.controller.getDomain()

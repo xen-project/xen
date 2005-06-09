@@ -13,6 +13,7 @@ from xen.xend import EventServer; eserver = EventServer.instance()
 from xen.xend.XendLogging import log
 from xen.xend import XendRoot; xroot = XendRoot.instance()
 from xen.xend import sxp
+from xen.xend.xenstore import DBVar
 
 from xen.xend.server.controller import CtrlMsgRcvr, Dev, DevController
 from xen.xend.server.messages import *
@@ -75,6 +76,12 @@ class ConsoleDev(Dev, protocol.ServerFactory):
     STATUS_CLOSED    = 'closed'
     STATUS_CONNECTED = 'connected'
     STATUS_LISTENING = 'listening'
+
+    __exports__ = Dev.__exports__ + [
+        DBVar('status',       ty='str'),
+        #DBVar('listening',    ty='str'),
+        DBVar('console_port', ty='int'),
+        ]
 
     def __init__(self, controller, id, config, recreate=False):
         Dev.__init__(self, controller, id, config)

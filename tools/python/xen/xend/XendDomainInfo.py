@@ -30,6 +30,7 @@ from XendError import XendError, VmError
 from xen.xend.XendRoot import get_component
 
 from xen.xend.uuid import getUuid
+from xen.xend.xenstore import DBVar
 
 """Flag for a block device backend domain."""
 SIF_BLK_BE_DOMAIN = (1<<4)
@@ -145,94 +146,92 @@ class XendDomainInfo:
     """
     MINIMUM_RESTART_TIME = 20
 
-    def _create(cls, uuid=None):
-        """Create a vm object with a uuid.
-
-        @param uuid uuid to use
-        @return vm
-        """
-        if uuid is None:
-            uuid = getUuid()
-        vm = cls()
-        vm.uuid = uuid
-        return vm
-
-    _create = classmethod(_create)
-
-    def create(cls, config):
+    def create(cls, parentdb, config):
         """Create a VM from a configuration.
-        If a vm has been partially created and there is an error it
-        is destroyed.
 
+        @param parentdb:  parent db
         @param config    configuration
         @raise: VmError for invalid configuration
         """
-        vm = cls._create()
+        uuid = getUuid()
+        db = parentdb.addChild(uuid)
+        vm = cls(db)
         vm.construct(config)
+        vm.saveDB(sync=True)
         return vm
 
     create = classmethod(create)
 
-    def recreate(cls, savedinfo, info, uuid=None):
+    def recreate(cls, db, info):
         """Create the VM object for an existing domain.
 
-        @param savedinfo: saved info from the domain DB
+        @param db:        domain db
         @param info:      domain info from xc
-        @param uuid:      uuid to use
-        @type  info:      xc domain dict
         """
-        vm = cls._create(uuid=uuid)
-
-        log.debug('savedinfo=' + prettyprintstring(savedinfo))
+        dom = info['dom']
+        vm = cls(db)
+        db.readDB()
+        vm.importFromDB()
+        config = vm.config
         log.debug('info=' + str(info))
+        log.debug('config=' + prettyprintstring(config))
 
-        vm.recreate = True
-        vm.savedinfo = savedinfo
-        vm.setdom(info['dom'])
+        vm.setdom(dom)
         vm.memory = info['mem_kb']/1024
 
-        start_time = sxp.child_value(savedinfo, 'start_time')
-        if start_time is not None:
-            vm.start_time = float(start_time)
-        vm.restart_state = sxp.child_value(savedinfo, 'restart_state')
-        vm.restart_count = int(sxp.child_value(savedinfo, 'restart_count', 0))
-        restart_time = sxp.child_value(savedinfo, 'restart_time')
-        if restart_time is not None:
-            vm.restart_time = float(restart_time)
-        config = sxp.child_value(savedinfo, 'config')
-
         if config:
-            vm.construct(config)
+            try:
+                vm.recreate = True
+                vm.construct(config)
+            finally:
+                vm.recreate = False
         else:
-            vm.setName(sxp.child_value(savedinfo, 'name',
-                                       "Domain-%d" % info['dom']))
-        vm.recreate = False
-        vm.savedinfo = None
+            vm.setName("Domain-%d" % dom)
 
+        vm.exportToDB(save=True)
         return vm
 
     recreate = classmethod(recreate)
 
-    def restore(cls, config, uuid=None):
+    def restore(cls, parentdb, config, uuid=None):
         """Create a domain and a VM object to do a restore.
 
+        @param parentdb:  parent db
         @param config:    domain configuration
         @param uuid:      uuid to use
         """
-        vm = cls._create(uuid=uuid)
+        db = parentdb.addChild(uuid)
+        vm = cls(db)
         dom = xc.domain_create()
         vm.setdom(dom)
         vm.dom_construct(vm.id, config)
+        vm.saveDB(sync=True)
         return vm
 
     restore = classmethod(restore)
 
-    def __init__(self):
+    __exports__ = [
+        DBVar('id',            ty='str'),
+        DBVar('name',          ty='str'),
+        DBVar('uuid',          ty='str'),
+        DBVar('config',        ty='sxpr'),
+        DBVar('start_time',    ty='float'),
+        DBVar('state',         ty='str'),
+        DBVar('store_mfn',     ty='long'),
+        DBVar('restart_mode',  ty='str'),
+        DBVar('restart_state', ty='str'),
+        DBVar('restart_time',  ty='float'),
+        DBVar('restart_count', ty='int'),
+        ]
+    
+    def __init__(self, db):
+        self.db = db
+        self.uuid = db.getName()
+
         self.recreate = 0
         self.restore = 0
         
         self.config = None
-        self.uuid = None
         self.id = None
         self.cpu_weight = 1
         self.start_time = None
@@ -262,9 +261,24 @@ class XendDomainInfo:
         self.restart_count = 0
         
         self.console_port = None
-        self.savedinfo = None
         self.vcpus = 1
         self.bootloader = None
+
+    def setDB(self, db):
+        self.db = db
+
+    def saveDB(self, save=False, sync=False):
+        self.db.saveDB(save=save, sync=sync)
+
+    def exportToDB(self, save=False, sync=False):
+        if self.channel:
+            self.channel.saveToDB(self.db.addChild("channel"))
+        if self.store_channel:
+            self.store_channel.saveToDB(self.db.addChild("store_channel"))
+        self.db.exportToDB(self, fields=self.__exports__, save=save, sync=sync)
+
+    def importFromDB(self):
+        self.db.importFromDB(self, fields=self.__exports__)
 
     def setdom(self, dom):
         """Set the domain id.
@@ -272,13 +286,14 @@ class XendDomainInfo:
         @param dom: domain id
         """
         self.id = int(dom)
+        #self.db.id = self.id
 
     def getDomain(self):
         return self.id
 
     def setName(self, name):
         self.name = name
-        #self.db.name = self.name
+        self.db.name = self.name
 
     def getName(self):
         return self.name
@@ -301,6 +316,7 @@ class XendDomainInfo:
             self.state = state
             self.state_updated.notifyAll()
         self.state_updated.release()
+        self.saveDB()
 
     def state_wait(self, state):
         self.state_updated.acquire()
@@ -484,6 +500,7 @@ class XendDomainInfo:
             self.configure_restart()
             self.construct_image()
             self.configure()
+            self.exportToDB()
         except Exception, ex:
             # Catch errors, cleanup and re-raise.
             print 'Domain construction error:', ex
@@ -495,6 +512,7 @@ class XendDomainInfo:
     def register_domain(self):
         xd = get_component('xen.xend.XendDomain')
         xd._add_domain(self)
+        self.exportToDB()
 
     def configure_cpus(self, config):
         try:
@@ -528,42 +546,26 @@ class XendDomainInfo:
         """
         self.create_channel()
         self.image.createImage()
-        #self.image.exportToDB()
+        self.image.exportToDB()
         #if self.store_channel:
         #    self.db.introduceDomain(self.id,
         #                            self.store_mfn,
         #                            self.store_channel)
 
-    def get_device_savedinfo(self, type, id):
-        val = None
-        if self.savedinfo is None:
-            return val
-        devices = sxp.child(self.savedinfo, 'devices')
-        if devices is None:
-            return val
-        for d in sxp.children(devices, type):
-            did = sxp.child_value(d, 'id')
-            if did is None: continue
-            if int(did) == id:
-                val = d
-                break
-        return val
-
-    def get_device_recreate(self, type, id):
-        return self.get_device_savedinfo(type, id) or self.recreate
-
-    def destroy(self):
-        """Completely destroy the vm.
+    def delete(self):
+        """Delete the vm's db.
         """
+        if self.dom_get(self.id):
+            return
+        self.id = None
+        self.saveDB(sync=True)
         try:
-            self.cleanup()
+            # Todo: eventually will have to wait for devices to signal
+            # destruction before can delete the db.
+            if self.db:
+                self.db.delete()
         except Exception, ex:
-            log.warning("error in domain cleanup: %s", ex)
-            pass
-        try:
-            self.destroy_domain()
-        except Exception, ex:
-            log.warning("error in domain destroy: %s", ex)
+            log.warning("error in domain db delete: %s", ex)
             pass
 
     def destroy_domain(self):
@@ -571,6 +573,18 @@ class XendDomainInfo:
         The domain will not finally go away unless all vm
         devices have been released.
         """
+        if self.id is None:
+            return
+        try:
+            xc.domain_destroy(dom=self.id)
+        except Exception, err:
+            log.exception("Domain destroy failed: %s", self.name)
+
+    def cleanup(self):
+        """Cleanup vm resources: release devices.
+        """
+        self.state = STATE_VM_TERMINATED
+        self.release_devices()
         if self.channel:
             try:
                 self.channel.close()
@@ -583,23 +597,25 @@ class XendDomainInfo:
                 self.store_channel = None
             except:
                 pass
+            #try:
+            #    self.db.releaseDomain(self.id)
+            #except Exception, ex:
+            #    log.warning("error in domain release on xenstore: %s", ex)
+            #    pass
         if self.image:
             try:
                 self.image.destroy()
                 self.image = None
             except:
                 pass
-        if self.id is None: return 0
-        try:
-            xc.domain_destroy(dom=self.id)
-        except Exception, err:
-            log.exception("Domain destroy failed: %s", self.name)
 
-    def cleanup(self):
-        """Cleanup vm resources: release devices.
+    def destroy(self):
+        """Clenup vm and destroy domain.
         """
-        self.state = STATE_VM_TERMINATED
-        self.release_devices()
+        self.cleanup()
+        self.destroy_domain()
+        self.saveDB()
+        return 0
 
     def is_terminated(self):
         """Check if a domain has been terminated.
@@ -639,27 +655,24 @@ class XendDomainInfo:
         if not self.restore:
             self.setdom(dom)
 
-    def openChannel(self, name, local, remote):
+    def openChannel(self, key, local, remote):
         """Create a channel to the domain.
         If saved info is available recreate the channel.
         
+        @param key db key for the saved data (if any)
         @param local default local port
         @param remote default remote port
         """
-        local = 0
-        remote = 1
-        if self.savedinfo:
-            info = sxp.child(self.savedinfo, name)
-            if info:
-                local = int(sxp.child_value(info, "local_port", 0))
-                remote = int(sxp.child_value(info, "remote_port", 1))
-        chan = channelFactory().openChannel(self.id, local_port=local,
-                                            remote_port=remote)
+        db = self.db.addChild(key)
+        chan = channelFactory().restoreFromDB(db, self.id, local, remote)
+        #todo: save here?
+        #chan.saveToDB(db)
         return chan
 
-    def eventChannel(self, name):
-        return EventChannel.interdomain(0, self.id)
-
+    def eventChannel(self, key):
+        db = self.db.addChild(key)
+        return EventChannel.restoreFromDB(db, 0, self.id)
+        
     def create_channel(self):
         """Create the channels to the domain.
         """
@@ -823,6 +836,7 @@ class XendDomainInfo:
             if self.bootloader:
                 self.config = self.bootloader_config()
             self.construct(self.config)
+            self.saveDB()
         finally:
             self.restart_state = None
 

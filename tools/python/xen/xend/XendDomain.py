@@ -23,7 +23,8 @@ from xen.xend.XendLogging import log
 from xen.xend import scheduler
 from xen.xend.server import channel
 from xen.xend.server import relocate
-from xen.xend import XendDB
+from xen.xend.uuid import getUuid
+from xen.xend.xenstore import XenNode, DBMap
 
 __all__ = [ "XendDomain" ]
 
@@ -40,9 +41,6 @@ class XendDomain:
     """Index of all domains. Singleton.
     """
 
-    """Path to domain database."""
-    dbpath = "domain"
-
     """Dict of domain info indexed by domain id."""
     domains = None
     
@@ -53,7 +51,7 @@ class XendDomain:
         # So we stuff the XendDomain instance (self) into xroot's components.
         xroot.add_component("xen.xend.XendDomain", self)
         self.domains = XendDomainDict()
-        self.db = XendDB.XendDB(self.dbpath)
+        self.dbmap = DBMap(db=XenNode("/domain"))
         eserver.subscribe('xend.virq', self.onVirq)
         self.initial_refresh()
 
@@ -96,11 +94,18 @@ class XendDomain:
         """Refresh initial domain info from db.
         """
         doms = self.xen_domains()
-        for config in self.db.fetchall("").values():
-            domid = int(sxp.child_value(config, 'id'))
-            if domid in doms:
+        self.dbmap.readDB()
+        for domdb in self.dbmap.values():
+            try:
+                domid = int(domdb.id)
+            except:
+                domid = None
+            # XXX if domid in self.domains, then something went wrong
+            if (domid is None) or (domid in self.domains):
+                domdb.delete()
+            elif domid in doms:
                 try:
-                    self._new_domain(config, doms[domid])
+                    self._new_domain(domdb, doms[domid]) 
                 except Exception, ex:
                     log.exception("Error recreating domain info: id=%d", domid)
                     self._delete_domain(domid)
@@ -108,27 +113,20 @@ class XendDomain:
                 self._delete_domain(domid)
         self.refresh(cleanup=True)
 
-    def sync_domain(self, info):
-        """Sync info for a domain to disk.
-
-        info	domain info
-        """
-        self.db.save(str(info.id), info.sxpr())
-
     def close(self):
         pass
 
-    def _new_domain(self, savedinfo, info):
+    def _new_domain(self, db, info):
         """Create a domain entry from saved info.
 
-        @param savedinfo: saved info from the db
+        @param db:        saved info from the db
         @param info:      domain info from xen
         @return: domain
         """
-        uuid = sxp.child_value(savedinfo, 'uuid')
-        dominfo = XendDomainInfo.recreate(savedinfo, info, uuid)
+        log.error(db)
+        log.error(db.uuid)
+        dominfo = XendDomainInfo.recreate(db, info)
         self.domains[dominfo.id] = dominfo
-        self.sync_domain(dominfo)
         return dominfo
 
     def _add_domain(self, info, notify=True):
@@ -141,11 +139,11 @@ class XendDomain:
         for i, d in self.domains.items():
             if i != d.id:
                 del self.domains[i]
-                self.db.delete(str(i))
+                self.dbmap.delete(d.uuid)
         if info.id in self.domains:
             notify = False
         self.domains[info.id] = info
-        self.sync_domain(info)
+        info.exportToDB(save=True)
         if notify:
             eserver.inject('xend.domain.create', [info.name, info.id])
 
@@ -155,12 +153,26 @@ class XendDomain:
         @param id:     domain id
         @param notify: send a domain died event if true
         """
+        try:
+            if self.xen_domain(id):
+                return
+        except:
+            pass
         info = self.domains.get(id)
         if info:
             del self.domains[id]
-            self.db.delete(str(id))
+            info.cleanup()
+            info.delete()
             if notify:
                 eserver.inject('xend.domain.died', [info.name, info.id])
+        # XXX this should not be needed
+        for domdb in self.dbmap.values():
+            try:
+                domid = int(domdb.id)
+            except:
+                domid = None
+            if (domid is None) or (domid == id):
+                domdb.delete()
 
     def reap(self):
         """Look for domains that have crashed or stopped.
@@ -263,8 +275,7 @@ class XendDomain:
         @param config: configuration
         @return: domain
         """
-        dominfo = XendDomainInfo.create(config)
-        self._add_domain(dominfo)
+        dominfo = XendDomainInfo.create(self.dbmap, config)
         return dominfo
 
     def domain_restart(self, dominfo):
@@ -277,7 +288,6 @@ class XendDomain:
                        [dominfo.name, dominfo.id, "begin"])
         try:
             dominfo.restart()
-            self._add_domain(dominfo)
             log.info('Restarted domain name=%s id=%s', dominfo.name, dominfo.id)
             eserver.inject("xend.domain.restart",
                            [dominfo.name, dominfo.id, "success"])
@@ -297,8 +307,7 @@ class XendDomain:
         """
         config = sxp.child_value(vmconfig, 'config')
         uuid = sxp.child_value(vmconfig, 'uuid')
-        dominfo = XendDomainInfo.restore(config, uuid=uuid)
-        self._add_domain(dominfo)
+        dominfo = XendDomainInfo.restore(self.dbmap, config, uuid=uuid)
         return dominfo
 
     def domain_restore(self, src, progress=False):
@@ -330,8 +339,12 @@ class XendDomain:
             try:
                 info = self.xen_domain(id)
                 if info:
-                    log.info("Creating entry for unknown domain: id=%d", id)
-                    dominfo = XendDomainInfo.recreate(None, info)
+                    uuid = getUuid()
+                    log.info(
+                        "Creating entry for unknown domain: id=%d uuid=%s",
+                        id, uuid)
+                    db = self.dbmap.addChild(uuid)
+                    dominfo = XendDomainInfo.recreate(db, info)
                     self._add_domain(dominfo)
             except Exception, ex:
                 log.exception("Error creating domain info: id=%d", id)
@@ -593,7 +606,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         val = dominfo.device_create(devconfig)
-        self.sync_domain(dominfo)
+        dominfo.exportToDB()
         return val
 
     def domain_device_configure(self, id, devconfig, devid):
@@ -606,7 +619,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         val = dominfo.device_configure(devconfig, devid)
-        self.sync_domain(dominfo)
+        dominfo.exportToDB()
         return val
     
     def domain_device_refresh(self, id, type, devid):
@@ -618,7 +631,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         val = dominfo.device_refresh(type, devid)
-        self.sync_domain(dominfo)
+        dominfo.exportToDB()
         return val
 
     def domain_device_destroy(self, id, type, devid):
@@ -630,7 +643,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         val = dominfo.device_destroy(type, devid)
-        self.sync_domain(dominfo)
+        dominfo.exportToDB()
         return val
 
     def domain_devtype_ls(self, id, type):

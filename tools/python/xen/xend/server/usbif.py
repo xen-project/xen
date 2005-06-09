@@ -7,6 +7,7 @@
 from xen.xend import sxp
 from xen.xend.XendLogging import log
 from xen.xend.XendError import XendError
+from xen.xend.xenstore import DBVar
 
 from xen.xend.server import channel
 from xen.xend.server.controller import Dev, DevController
@@ -141,6 +142,11 @@ class UsbBackend:
 
 
 class UsbDev(Dev):
+
+    __exports__ = Dev.__exports__ + [
+        DBVar('port', ty='int'),
+        DBVar('path', ty='str'),
+        ]
     
     def __init__(self, controller, id, config, recreate=False):
         Dev.__init__(self, controller, id, config, recreate=recreate)

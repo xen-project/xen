@@ -4,7 +4,7 @@ import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 from xen.xend import sxp
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
-#from xen.xend.xenstore import DBVar
+from xen.xend.xenstore import DBVar
 
 class ImageHandler:
     """Abstract base class for image handlers.
@@ -73,7 +73,7 @@ class ImageHandler:
     #======================================================================
     # Instance vars and methods.
 
-    #db = None
+    db = None
     ostype = None
 
     config = None
@@ -82,25 +82,25 @@ class ImageHandler:
     cmdline = None
     flags = 0
 
-    #__exports__ = [
-    #    DBVar('ostype',  ty='str'),
-    #    DBVar('config',  ty='sxpr'),
-    #    DBVar('kernel',  ty='str'),
-    #    DBVar('ramdisk', ty='str'),
-    #    DBVar('cmdline', ty='str'),
-    #    DBVar('flags',   ty='int'),
-    #    ]
+    __exports__ = [
+        DBVar('ostype',  ty='str'),
+        DBVar('config',  ty='sxpr'),
+        DBVar('kernel',  ty='str'),
+        DBVar('ramdisk', ty='str'),
+        DBVar('cmdline', ty='str'),
+        DBVar('flags',   ty='int'),
+        ]
 
     def __init__(self, vm, config):
         self.vm = vm
-        #self.db = vm.db.addChild('/image')
+        self.db = vm.db.addChild('/image')
         self.config = config
 
-    #def exportToDB(self, save=False):
-    #    self.db.exportToDB(self, fields=self.__exports__, save=save)
+    def exportToDB(self, save=False):
+        self.db.exportToDB(self, fields=self.__exports__, save=save)
 
-    #def importFromDB(self):
-    #    self.db.importFromDB(self, fields=self.__exports__)
+    def importFromDB(self):
+        self.db.importFromDB(self, fields=self.__exports__)
 
     def unlink(self, f):
         if not f: return
@@ -234,11 +234,11 @@ class Plan9ImageHandler(ImageHandler):
 
 class VmxImageHandler(ImageHandler):
 
-    #__exports__ = ImageHandler.__exports__ + [
-    #    DBVar('memmap',        ty='str'),
-    #    DBVar('memmap_value',  ty='sxpr'),
-    #    # device channel?
-    #    ]
+    __exports__ = ImageHandler.__exports__ + [
+        DBVar('memmap',        ty='str'),
+        DBVar('memmap_value',  ty='sxpr'),
+        # device channel?
+        ]
     
     ostype = "vmx"
     memmap = None

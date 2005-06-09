@@ -31,6 +31,33 @@ class EventChannel(dict):
 
     interdomain = classmethod(interdomain)
 
+    def restoreFromDB(cls, db, dom1, dom2, port1=0, port2=0):
+        """Create an event channel using db info if available.
+        Inverse to saveToDB().
+
+        @param db db
+        @param dom1
+        @param dom2
+        @param port1
+        @param port2
+        """
+        try:
+            dom1  = int(db['dom1'])
+        except: pass
+        try:
+            dom2  = int(db['dom2'])
+        except: pass
+        try:
+            port1 = int(db['port1'])
+        except: pass
+        try:
+            port2 = int(db['port2'])
+        except: pass
+        evtchn = cls.interdomain(dom1, dom2, port1=port1, port2=port2)
+        return evtchn
+
+    restoreFromDB = classmethod(restoreFromDB)
+
     def __init__(self, dom1, dom2, d):
         d['dom1'] = dom1
         d['dom2'] = dom2
@@ -54,6 +81,18 @@ class EventChannel(dict):
         evtchn_close(self.dom1, self.port1)
         evtchn_close(self.dom2, self.port2)
 
+    def saveToDB(self, db):
+        """Save the event channel to the db so it can be restored later,
+        using restoreFromDB() on the class.
+
+        @param db db
+        """
+        db['dom1']  = str(self.dom1)
+        db['dom2']  = str(self.dom2)
+        db['port1'] = str(self.port1)
+        db['port2'] = str(self.port2)
+        db.saveDB()
+
     def sxpr(self):
         return ['event-channel',
                 ['dom1',  self.dom1  ],
@@ -63,7 +102,7 @@ class EventChannel(dict):
                 ]
 
     def __repr__(self):
-        return ("<EventChannel dom1:%s:%s dom2:%s:%s>"
+        return ("<EventChannel dom1:%d:%d dom2:%d:%d>"
                 % (self.dom1, self.port1, self.dom2, self.port2))
 
 def eventChannel(dom1, dom2, port1=0, port2=0):
@@ -241,8 +280,31 @@ class ChannelFactory:
         @type  remote: int
         @return: port object
         """
-        return xu.port(dom, local_port=int(local_port),
-                       remote_port=int(remote_port))
+        return xu.port(dom, local_port=local_port, remote_port=remote_port)
+
+    def restoreFromDB(self, db, dom, local, remote):
+        """Create a channel using ports restored from the db (if available).
+        Otherwise use the given ports. This is the inverse operation to
+        saveToDB() on a channel.
+
+        @param db db
+        @param dom  domain the channel connects to
+        @param local default local port
+        @param remote default remote port
+        """
+        try:
+            local_port  = int(db['local_port'])
+        except:
+            local_port = local
+        try:
+            remote_port = int(db['remote_port'])
+        except:
+            remote_port = remote
+        try:
+            chan = self.openChannel(dom, local_port, remote_port)
+        except:
+            return None
+        return chan
 
 def channelFactory():
     """Singleton constructor for the channel factory.
@@ -276,6 +338,17 @@ class Channel:
         self.queue = ResponseQueue(self)
         # Make sure the port will deliver all the messages.
         self.port.register(TYPE_WILDCARD)
+
+    def saveToDB(self, db):
+        """Save the channel ports to the db so the channel can be restored later,
+        using restoreFromDB() on the factory.
+
+        @param db db
+        """
+        if self.closed: return
+        db['local_port'] = str(self.getLocalPort())
+        db['remote_port'] = str(self.getRemotePort())
+        db.saveDB()
 
     def getKey(self):
         """Get the channel key.

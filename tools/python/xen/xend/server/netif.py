@@ -12,6 +12,7 @@ from xen.xend.XendError import XendError, VmError
 from xen.xend.XendLogging import log
 from xen.xend import XendVnet
 from xen.xend.XendRoot import get_component
+from xen.xend.xenstore import DBVar
 
 from xen.xend.server import channel
 from xen.xend.server.controller import CtrlMsgRcvr, Dev, DevController
@@ -20,6 +21,57 @@ from xen.xend.server.messages import *
 class NetDev(Dev):
     """A network device.
     """
+
+    # State:
+    # inherited + 
+    # ./config
+    # ./mac
+    # ./be_mac
+    # ./bridge
+    # ./script
+    # ./ipaddr ?
+    #
+    # ./credit
+    # ./period
+    #
+    # ./vifctl: up/down?
+    # ./vifname
+    #
+    #
+    # Poss should have no backend state here - except for ref to backend's own tree
+    # for the device? And a status - the one we want.
+    # ./back/dom
+    # ./back/devid - id for back-end (netif_handle) - same as front/devid
+    # ./back/id    - backend id (if more than one b/e per domain)
+    # ./back/status
+    # ./back/tx_shmem_frame  - actually these belong in back-end state
+    # ./back/rx_shmem_frame
+    #
+    # ./front/dom
+    # ./front/devid
+    # ./front/status - need 2: one for requested, one for actual? Or drive from dev status
+    # and this is front status only.
+    # ./front/tx_shmem_frame
+    # ./front/rx_shmem_frame
+    #
+    # ./evtchn/front - here or in front/back?
+    # ./evtchn/back
+    # ./evtchn/status ?
+    # At present created by dev: but should be created unbound by front/back
+    # separately and then bound (by back)?
+
+    __exports__ = Dev.__exports__ + [
+        DBVar('config',  ty='sxpr'),
+        DBVar('mac',     ty='mac'),
+        DBVar('be_mac',  ty='mac'),
+        DBVar('bridge',  ty='str'),
+        DBVar('script',  ty='str'),
+        #DBVar('ipaddr'),
+        DBVar('credit',  ty='int'),
+        DBVar('period',  ty='int'),
+        DBVar('vifname', ty='str'),
+        DBVar('evtchn'),                #todo: export fields (renamed)
+        ]
 
     def __init__(self, controller, id, config, recreate=False):
         Dev.__init__(self, controller, id, config, recreate=recreate)

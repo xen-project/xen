@@ -9,6 +9,7 @@ from xen.xend.XendRoot import get_component
 from xen.xend.XendLogging import log
 from xen.xend import sxp
 from xen.xend import Blkctl
+from xen.xend.xenstore import DBVar
 
 from xen.xend.server import channel
 from xen.xend.server.controller import CtrlMsgRcvr, Dev, DevController
@@ -158,6 +159,18 @@ class BlkDev(Dev):
     """Info record for a block device.
     """
 
+    __exports__ = Dev.__exports__ + [
+        DBVar('dev',          ty='str'),
+        DBVar('vdev',         ty='int'),
+        DBVar('mode',         ty='str'),
+        DBVar('viftype',      ty='str'),
+        DBVar('params',       ty='str'),
+        DBVar('node',         ty='str'),
+        DBVar('device',       ty='long'),
+        DBVar('start_sector', ty='long'),
+        DBVar('nr_sectors',   ty='long'),
+        ]
+
     def __init__(self, controller, id, config, recreate=False):
         Dev.__init__(self, controller, id, config, recreate=recreate)
         self.dev = None
@@ -215,8 +228,7 @@ class BlkDev(Dev):
 
     def attach(self, recreate=False, change=False):
         if recreate:
-            node = sxp.child_value(recreate, 'node')
-            self.setNode(node)
+            pass
         else:
             node = Blkctl.block('bind', self.type, self.params)
             self.setNode(node)
@@ -299,7 +311,8 @@ class BlkDev(Dev):
         return self.controller.getBackend(self.backendDomain)
 
     def refresh(self):
-        log.debug("Refreshing vbd domain=%d id=%s", self.frontendDomain, self.id)
+        log.debug("Refreshing vbd domain=%d id=%s", self.frontendDomain,
+                  self.id)
         self.interfaceChanged()
 
     def destroy(self, change=False, reboot=False):
@@ -308,7 +321,8 @@ class BlkDev(Dev):
         @param change: change flag
         """
         self.destroyed = True
-        log.debug("Destroying vbd domain=%d id=%s", self.frontendDomain, self.id)
+        log.debug("Destroying vbd domain=%d id=%s", self.frontendDomain,
+                  self.id)
         self.send_be_vbd_destroy()
         if change:
             self.interfaceChanged()
@@ -445,5 +459,4 @@ class BlkifController(DevController):
                 log.error("Exception connecting backend: %s", ex)
         else:
             log.error('interface connect on unknown interface: id=%d', id)
-    
 

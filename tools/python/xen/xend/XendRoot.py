@@ -25,9 +25,6 @@ import sxp
 class XendRoot:
     """Root of the management classes."""
 
-    """Default path to the root of the database."""
-    dbroot_default = "/var/lib/xen/xend-db"
-
     """Default path to the config file."""
     config_default = "/etc/xen/xend-config.sxp"
 
@@ -82,7 +79,6 @@ class XendRoot:
     components = {}
 
     def __init__(self):
-        self.dbroot = None
         self.config_path = None
         self.config = None
         self.logging = None
@@ -171,7 +167,6 @@ class XendRoot:
     def configure(self):
         self.set_config()
         self.configure_logger()
-        self.dbroot = self.get_config_value("dbroot", self.dbroot_default)
 
     def configure_logger(self):
         logfile = self.get_config_value("logfile", self.logfile_default)
@@ -191,11 +186,6 @@ class XendRoot:
         """Get the logger.
         """
         return self.logging and self.logging.getLogger()
-
-    def get_dbroot(self):
-        """Get the path to the database root.
-        """
-        return self.dbroot
 
     def set_config(self):
         """If the config file exists, read it. If not, ignore it.
