@@ -453,7 +453,11 @@ extern unsigned long vhpt_paddr, vhpt_pend;
 		if (d == dom0) p = map_new_domain0_page(mpaddr);
 		else
 #endif
+		{
 			p = alloc_domheap_page(d);
+			// zero out pages for security reasons
+			memset(__va(page_to_phys(p)),0,PAGE_SIZE);
+		}
 		if (unlikely(!p)) {
 printf("map_new_domain_page: Can't alloc!!!! Aaaargh!\n");
 			return(p);
@@ -512,7 +516,6 @@ tryagain:
 	}
 	/* if lookup fails and mpaddr is "legal", "create" the page */
 	if ((mpaddr >> PAGE_SHIFT) < d->max_pages) {
-		// FIXME: should zero out pages for security reasons
 		if (map_new_domain_page(d,mpaddr)) goto tryagain;
 	}
 	printk("lookup_domain_mpa: bad mpa %p (> %p\n",

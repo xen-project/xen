@@ -822,8 +822,6 @@ ia64_handle_privop (unsigned long ifa, struct pt_regs *regs, unsigned long isr, 
 #define INTR_TYPE_MAX	10
 UINT64 int_counts[INTR_TYPE_MAX];
 
-void dis_foo(void) { }
-
 void
 ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim, unsigned long vector)
 {
@@ -858,8 +856,6 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		vector = IA64_DATA_ACCESS_RIGHTS_VECTOR; break;
 	    case 25:
 		vector = IA64_DISABLED_FPREG_VECTOR;
-//printf("*** Attempting to handle disabled_fpreg\n");
-		dis_foo();
 		break;
 	    case 26:
 printf("*** NaT fault... attempting to handle as privop\n");
