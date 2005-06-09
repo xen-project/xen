@@ -266,7 +266,7 @@ void domain_destruct(struct domain *d)
     grant_table_destroy(d);
 
     free_perdomain_pt(d);
-    free_xenheap_page((unsigned long)d->shared_info);
+    free_xenheap_page(d->shared_info);
 
     free_domain_struct(d);
 

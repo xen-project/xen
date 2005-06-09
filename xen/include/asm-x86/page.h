@@ -7,7 +7,7 @@
 #else
 #define PAGE_SIZE           (1 << PAGE_SHIFT)
 #endif
-#define PAGE_MASK           (~(PAGE_SIZE-1))
+#define PAGE_MASK           (~(intpte_t)(PAGE_SIZE-1))
 #define PAGE_FLAG_MASK      (~0U)
 
 #ifndef __ASSEMBLY__

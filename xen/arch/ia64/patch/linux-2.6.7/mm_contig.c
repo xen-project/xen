@@ -204,7 +204,7 @@
 +
 +	/* Request continuous trunk from boot allocator, since HV
 +	 * address is identity mapped */
-+	p = alloc_boot_pages(frame_table_size, FT_ALIGN_SIZE);
++	p = alloc_boot_pages(frame_table_size>>PAGE_SHIFT, FT_ALIGN_SIZE>>PAGE_SHIFT) << PAGE_SHIFT;
 +	if (p == 0)
 +		panic("Not enough memory for frame table.\n");
 +

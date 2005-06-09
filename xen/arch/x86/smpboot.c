@@ -781,7 +781,7 @@ static int __init do_boot_cpu(int apicid)
 	/* So we see what's up   */
 	printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
 
-	stack = (void *)alloc_xenheap_pages(STACK_ORDER);
+	stack = alloc_xenheap_pages(STACK_ORDER);
 #if defined(__i386__)
 	stack_start.esp = (void *)__pa(stack);
 #elif defined(__x86_64__)

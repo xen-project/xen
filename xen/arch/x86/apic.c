@@ -580,10 +580,9 @@ void __init init_apic_mappings(void)
      * zeroes page to simulate the local APIC and another
      * one for the IO-APIC.
      */
-    if (!smp_found_config && detect_init_APIC()) {
-        apic_phys = alloc_xenheap_page();
-        apic_phys = __pa(apic_phys);
-    } else
+    if (!smp_found_config && detect_init_APIC())
+        apic_phys = __pa(alloc_xenheap_page());
+    else
         apic_phys = mp_lapic_addr;
 
     set_fixmap_nocache(FIX_APIC_BASE, apic_phys);
@@ -616,8 +615,7 @@ void __init init_apic_mappings(void)
                 }
             } else {
 fake_ioapic_page:
-                ioapic_phys = alloc_xenheap_page();
-                ioapic_phys = __pa(ioapic_phys);
+                ioapic_phys = __pa(alloc_xenheap_page());
             }
             set_fixmap_nocache(idx, ioapic_phys);
             apic_printk(APIC_VERBOSE, "mapped IOAPIC to %08lx (%08lx)\n",

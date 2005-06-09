@@ -68,7 +68,7 @@ void init_trace_bufs(void)
     nr_pages = num_online_cpus() * opt_tbuf_size;
     order    = get_order(nr_pages * PAGE_SIZE);
     
-    if ( (rawbuf = (char *)alloc_xenheap_pages(order)) == NULL )
+    if ( (rawbuf = alloc_xenheap_pages(order)) == NULL )
     {
         printk("Xen trace buffers: memory allocation failed\n");
         return;

@@ -363,7 +363,7 @@ void serial_async_transmit(struct serial_port *port)
 {
     BUG_ON(!port->driver->tx_empty);
     if ( !port->txbuf )
-        port->txbuf = (char *)alloc_xenheap_pages(get_order(SERIAL_TXBUFSZ));
+        port->txbuf = alloc_xenheap_pages(get_order(SERIAL_TXBUFSZ));
 }
 
 /*
