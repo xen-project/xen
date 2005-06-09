@@ -24,7 +24,9 @@
             "callq *(%%rax); "                           \
             "movq  %%rax,"STR(MULTICALL_result)"(%0); "  \
             : : "b" (_call)                              \
-            : "rax", "rdi", "rsi", "rdx", "rcx", "r8" ); \
+              /* all the caller-saves registers */       \
+            : "rax", "rcx", "rdx", "rsi", "rdi",         \
+              "r8",  "r9",  "r10", "r11" );              \
     } while ( 0 )
 
 #else
@@ -42,7 +44,9 @@
             "call  *hypercall_table(,%%eax,4); "       \
             "movl  %%eax,"STR(MULTICALL_result)"(%0); "\
             "addl  $20,%%esp; "                        \
-            : : "b" (_call) : "eax", "ecx", "edx" );   \
+            : : "b" (_call)                            \
+              /* all the caller-saves registers */     \
+            : "eax", "ecx", "edx" );                   \
     } while ( 0 )
 
 #endif
