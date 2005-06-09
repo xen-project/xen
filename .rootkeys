@@ -480,7 +480,6 @@
 4209033ewLAHdhGrT_2jo3Gb_5bDcA tools/blktap/README
 42277b02mYXxgijE7MFeUe9d8eldMw tools/blktap/README-PARALLAX
 4209033fHgtGpb_K16_xC9CpkjNZLw tools/blktap/blkdump.c
-42090340_mvZtozMjghPJO0qsjk4NQ tools/blktap/blkint.h
 42090340rc2q1wmlGn6HtiJAkqhtNQ tools/blktap/blktaplib.c
 42090340C-WkRPT7N3t-8Lzehzogdw tools/blktap/blktaplib.h
 428df8fdkg84W8yveE50EbkbTUZgjQ tools/blktap/block-async.c
