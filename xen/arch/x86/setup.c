@@ -33,10 +33,6 @@ static unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
 integer_param("xenheap_megabytes", opt_xenheap_megabytes);
 #endif
 
-/* opt_noht: If true, Hyperthreading is ignored. */
-int opt_noht = 0;
-boolean_param("noht", opt_noht);
-
 /* opt_nosmp: If true, secondary processors are ignored. */
 static int opt_nosmp = 0;
 boolean_param("nosmp", opt_nosmp);

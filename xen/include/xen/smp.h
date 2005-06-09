@@ -59,7 +59,6 @@ static inline int on_each_cpu(void (*func) (void *info), void *info,
 }
 
 extern int ht_per_core;
-extern int opt_noht;
 
 extern volatile unsigned long smp_msg_data;
 extern volatile int smp_src_cpu;
