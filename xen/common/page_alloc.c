@@ -133,7 +133,7 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
  */
 
 /* Initialise allocator to handle up to @max_page pages. */
-unsigned long init_boot_allocator(unsigned long bitmap_start)
+physaddr_t init_boot_allocator(physaddr_t bitmap_start)
 {
     bitmap_start = round_pgup(bitmap_start);
 
@@ -148,7 +148,7 @@ unsigned long init_boot_allocator(unsigned long bitmap_start)
     return bitmap_start + bitmap_size;
 }
 
-void init_boot_pages(unsigned long ps, unsigned long pe)
+void init_boot_pages(physaddr_t ps, physaddr_t pe)
 {
     unsigned long bad_pfn;
     char *p;
@@ -179,23 +179,20 @@ void init_boot_pages(unsigned long ps, unsigned long pe)
     }
 }
 
-unsigned long alloc_boot_pages(unsigned long size, unsigned long align)
+unsigned long alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
 {
     unsigned long pg, i;
 
-    size  = round_pgup(size) >> PAGE_SHIFT;
-    align = round_pgup(align) >> PAGE_SHIFT;
-
-    for ( pg = 0; (pg + size) < (bitmap_size*8); pg += align )
+    for ( pg = 0; (pg + nr_pfns) < (bitmap_size*8); pg += pfn_align )
     {
-        for ( i = 0; i < size; i++ )
+        for ( i = 0; i < nr_pfns; i++ )
             if ( allocated_in_map(pg + i) )
                  break;
 
-        if ( i == size )
+        if ( i == nr_pfns )
         {
-            map_alloc(pg, size);
-            return pg << PAGE_SHIFT;
+            map_alloc(pg, nr_pfns);
+            return pg;
         }
     }
 
@@ -402,14 +399,14 @@ void scrub_heap_pages(void)
  * XEN-HEAP SUB-ALLOCATOR
  */
 
-void init_xenheap_pages(unsigned long ps, unsigned long pe)
+void init_xenheap_pages(physaddr_t ps, physaddr_t pe)
 {
     unsigned long flags;
 
     ps = round_pgup(ps);
     pe = round_pgdown(pe);
 
-    memguard_guard_range(__va(ps), pe - ps);
+    memguard_guard_range(phys_to_virt(ps), pe - ps);
 
     /*
      * Yuk! Ensure there is a one-page buffer between Xen and Dom zones, to
@@ -424,7 +421,7 @@ void init_xenheap_pages(unsigned long ps, unsigned long pe)
 }
 
 
-unsigned long alloc_xenheap_pages(unsigned int order)
+void *alloc_xenheap_pages(unsigned int order)
 {
     unsigned long flags;
     struct pfn_info *pg;
@@ -446,22 +443,22 @@ unsigned long alloc_xenheap_pages(unsigned int order)
         pg[i].u.inuse.type_info = 0;
     }
 
-    return (unsigned long)page_to_virt(pg);
+    return page_to_virt(pg);
 
  no_memory:
     printk("Cannot handle page request order %d!\n", order);
-    return 0;
+    return NULL;
 }
 
 
-void free_xenheap_pages(unsigned long p, unsigned int order)
+void free_xenheap_pages(void *v, unsigned int order)
 {
     unsigned long flags;
 
-    memguard_guard_range((void *)p, 1 << (order + PAGE_SHIFT));    
+    memguard_guard_range(v, 1 << (order + PAGE_SHIFT));    
 
     local_irq_save(flags);
-    free_heap_pages(MEMZONE_XEN, virt_to_page(p), order);
+    free_heap_pages(MEMZONE_XEN, virt_to_page(v), order);
     local_irq_restore(flags);
 }
 
@@ -471,7 +468,7 @@ void free_xenheap_pages(unsigned long p, unsigned int order)
  * DOMAIN-HEAP SUB-ALLOCATOR
  */
 
-void init_domheap_pages(unsigned long ps, unsigned long pe)
+void init_domheap_pages(physaddr_t ps, physaddr_t pe)
 {
     ASSERT(!in_irq());
 

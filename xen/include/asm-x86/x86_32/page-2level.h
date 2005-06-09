@@ -48,7 +48,7 @@ typedef l2_pgentry_t root_pgentry_t;
 
 /* Extract flags into 12-bit integer, or turn 12-bit flags into a pte mask. */
 #define get_pte_flags(x) ((int)(x) & 0xFFF)
-#define put_pte_flags(x) ((intpte_t)(x))
+#define put_pte_flags(x) ((intpte_t)((x) & 0xFFF))
 
 #define L1_DISALLOW_MASK (0xFFFFF180U) /* PAT/GLOBAL */
 #define L2_DISALLOW_MASK (0xFFFFF180U) /* PSE/GLOBAL */

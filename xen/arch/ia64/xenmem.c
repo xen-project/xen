@@ -82,17 +82,18 @@ paging_init (void)
 #define FT_ALIGN_SIZE	(16UL << 20)
 void __init init_frametable(void)
 {
-	unsigned long i, p;
+	unsigned long i, pfn;
 	frame_table_size = max_page * sizeof(struct pfn_info);
 	frame_table_size = (frame_table_size + PAGE_SIZE - 1) & PAGE_MASK;
 
 	/* Request continuous trunk from boot allocator, since HV
 	 * address is identity mapped */
-	p = alloc_boot_pages(frame_table_size, FT_ALIGN_SIZE);
-	if (p == 0)
+	pfn = alloc_boot_pages(
+            frame_table_size >> PAGE_SHIFT, FT_ALIGN_SIZE >> PAGE_SHIFT);
+	if (pfn == 0)
 		panic("Not enough memory for frame table.\n");
 
-	frame_table = __va(p);
+	frame_table = __va(pfn << PAGE_SHIFT);
 	memset(frame_table, 0, frame_table_size);
 	printk("size of frame_table: %lukB\n",
 		frame_table_size >> 10);

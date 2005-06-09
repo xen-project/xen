@@ -375,7 +375,7 @@ __gnttab_map_grant_ref(
         grant_table_t   *lgt      = ld->grant_table;
 
         /* Grow the maptrack table. */
-        new_mt = (void *)alloc_xenheap_pages(lgt->maptrack_order + 1);
+        new_mt = alloc_xenheap_pages(lgt->maptrack_order + 1);
         if ( new_mt == NULL )
         {
             put_domain(rd);
@@ -388,7 +388,7 @@ __gnttab_map_grant_ref(
         for ( i = lgt->maptrack_limit; i < (lgt->maptrack_limit << 1); i++ )
             new_mt[i].ref_and_flags = (i+1) << MAPTRACK_REF_SHIFT;
 
-        free_xenheap_pages((unsigned long)lgt->maptrack, lgt->maptrack_order);
+        free_xenheap_pages(lgt->maptrack, lgt->maptrack_order);
         lgt->maptrack          = new_mt;
         lgt->maptrack_order   += 1;
         lgt->maptrack_limit  <<= 1;
@@ -1095,7 +1095,7 @@ grant_table_create(
     memset(t->active, 0, sizeof(active_grant_entry_t) * NR_GRANT_ENTRIES);
 
     /* Tracking of mapped foreign frames table */
-    if ( (t->maptrack = (void *)alloc_xenheap_page()) == NULL )
+    if ( (t->maptrack = alloc_xenheap_page()) == NULL )
         goto no_mem;
     t->maptrack_order = 0;
     t->maptrack_limit = PAGE_SIZE / sizeof(grant_mapping_t);
@@ -1104,7 +1104,7 @@ grant_table_create(
         t->maptrack[i].ref_and_flags = (i+1) << MAPTRACK_REF_SHIFT;
 
     /* Shared grant table. */
-    t->shared = (void *)alloc_xenheap_pages(ORDER_GRANT_FRAMES);
+    t->shared = alloc_xenheap_pages(ORDER_GRANT_FRAMES);
     if ( t->shared == NULL )
         goto no_mem;
     memset(t->shared, 0, NR_GRANT_FRAMES * PAGE_SIZE);
@@ -1127,7 +1127,7 @@ grant_table_create(
     {
         xfree(t->active);
         if ( t->maptrack != NULL )
-            free_xenheap_page((unsigned long)t->maptrack);
+            free_xenheap_page(t->maptrack);
         xfree(t);
     }
     return -ENOMEM;
@@ -1216,8 +1216,8 @@ grant_table_destroy(
     {
         /* Free memory relating to this grant table. */
         d->grant_table = NULL;
-        free_xenheap_pages((unsigned long)t->shared, ORDER_GRANT_FRAMES);
-        free_xenheap_page((unsigned long)t->maptrack);
+        free_xenheap_pages(t->shared, ORDER_GRANT_FRAMES);
+        free_xenheap_page(t->maptrack);
         xfree(t->active);
         xfree(t);
     }

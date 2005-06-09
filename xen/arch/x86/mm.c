@@ -145,31 +145,28 @@ static struct domain *dom_xen, *dom_io;
 
 /* Frame table and its size in pages. */
 struct pfn_info *frame_table;
-unsigned long frame_table_size;
 unsigned long max_page;
 
 void __init init_frametable(void)
 {
-    unsigned long i, p, step;
+    unsigned long nr_pages, page_step, i, pfn;
 
-    frame_table      = (struct pfn_info *)FRAMETABLE_VIRT_START;
-    frame_table_size = max_page * sizeof(struct pfn_info);
-    frame_table_size = (frame_table_size + PAGE_SIZE - 1) & PAGE_MASK;
+    frame_table = (struct pfn_info *)FRAMETABLE_VIRT_START;
 
-    step = (1 << L2_PAGETABLE_SHIFT);
-    for ( i = 0; i < frame_table_size; i += step )
+    nr_pages  = PFN_UP(max_page * sizeof(*frame_table));
+    page_step = (1 << L2_PAGETABLE_SHIFT) >> PAGE_SHIFT;
+
+    for ( i = 0; i < nr_pages; i += page_step )
     {
-        p = alloc_boot_pages(min(frame_table_size - i, step), step);
-        if ( p == 0 )
+        pfn = alloc_boot_pages(min(nr_pages - i, page_step), page_step);
+        if ( pfn == 0 )
             panic("Not enough memory for frame table\n");
         map_pages_to_xen(
-            FRAMETABLE_VIRT_START + i,
-            p >> PAGE_SHIFT,
-            step >> PAGE_SHIFT,
-            PAGE_HYPERVISOR);
+            FRAMETABLE_VIRT_START + (i << PAGE_SHIFT),
+            pfn, page_step, PAGE_HYPERVISOR);
     }
 
-    memset(frame_table, 0, frame_table_size);
+    memset(frame_table, 0, nr_pages << PAGE_SHIFT);
 }
 
 void arch_init_memory(void)
@@ -2954,15 +2951,15 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
 
 int ptwr_init(struct domain *d)
 {
-    void *x = (void *)alloc_xenheap_page();
-    void *y = (void *)alloc_xenheap_page();
+    void *x = alloc_xenheap_page();
+    void *y = alloc_xenheap_page();
 
     if ( (x == NULL) || (y == NULL) )
     {
         if ( x != NULL )
-            free_xenheap_page((unsigned long)x);
+            free_xenheap_page(x);
         if ( y != NULL )
-            free_xenheap_page((unsigned long)y);
+            free_xenheap_page(y);
         return -ENOMEM;
     }
 
@@ -2975,8 +2972,8 @@ int ptwr_init(struct domain *d)
 void ptwr_destroy(struct domain *d)
 {
     cleanup_writable_pagetable(d);
-    free_xenheap_page((unsigned long)d->arch.ptwr[PTWR_PT_ACTIVE].page);
-    free_xenheap_page((unsigned long)d->arch.ptwr[PTWR_PT_INACTIVE].page);
+    free_xenheap_page(d->arch.ptwr[PTWR_PT_ACTIVE].page);
+    free_xenheap_page(d->arch.ptwr[PTWR_PT_INACTIVE].page);
 }
 
 void cleanup_writable_pagetable(struct domain *d)

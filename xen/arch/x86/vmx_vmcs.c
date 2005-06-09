@@ -41,8 +41,8 @@ struct vmcs_struct *alloc_vmcs(void)
 
     rdmsr(MSR_IA32_VMX_BASIC_MSR, vmx_msr_low, vmx_msr_high);
     vmcs_size = vmx_msr_high & 0x1fff;
-    vmcs = (struct vmcs_struct *) alloc_xenheap_pages(get_order(vmcs_size)); 
-    memset((char *) vmcs, 0, vmcs_size); /* don't remove this */
+    vmcs = alloc_xenheap_pages(get_order(vmcs_size)); 
+    memset((char *)vmcs, 0, vmcs_size); /* don't remove this */
 
     vmcs->vmcs_revision_id = vmx_msr_low;
     return vmcs;
@@ -53,7 +53,7 @@ void free_vmcs(struct vmcs_struct *vmcs)
     int order;
 
     order = (vmcs_size >> PAGE_SHIFT) - 1;
-    free_xenheap_pages((unsigned long) vmcs, order);
+    free_xenheap_pages(vmcs, order);
 }
 
 static inline int construct_vmcs_controls(void)

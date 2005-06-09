@@ -680,7 +680,9 @@ void alloc_dom0(void)
       * Some old version linux, like 2.4, assumes physical memory existing
       * in 2nd 64M space.
       */
-     dom0_start = alloc_boot_pages(dom0_size,dom0_align);
+     dom0_start = alloc_boot_pages(
+         dom0_size >> PAGE_SHIFT, dom0_align >> PAGE_SHIFT);
+     dom0_start <<= PAGE_SHIFT;
 	if (!dom0_start) {
 	printf("construct_dom0: can't allocate contiguous memory size=%p\n",
 		dom0_size);
@@ -698,7 +700,9 @@ void alloc_domU_staging(void)
 {
 	domU_staging_size = 32*1024*1024; //FIXME: Should be configurable
 	printf("alloc_domU_staging: starting (initializing %d MB...)\n",domU_staging_size/(1024*1024));
-	domU_staging_start= alloc_boot_pages(domU_staging_size,domU_staging_align);
+	domU_staging_start = alloc_boot_pages(
+            domU_staging_size >> PAGE_SHIFT, domU_staging_align >> PAGE_SHIFT);
+        domU_staging_start <<= PAGE_SHIFT;
 	if (!domU_staging_size) {
 		printf("alloc_domU_staging: can't allocate, spinning...\n");
 		while(1);

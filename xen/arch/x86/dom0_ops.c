@@ -259,7 +259,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             break;
         }
 
-        l_arr = (unsigned long *)alloc_xenheap_page();
+        l_arr = alloc_xenheap_page();
  
         ret = 0;
         for( n = 0; n < num; )
@@ -324,7 +324,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             n += j;
         }
 
-        free_xenheap_page((unsigned long)l_arr);
+        free_xenheap_page(l_arr);
 
         put_domain(d);
     }

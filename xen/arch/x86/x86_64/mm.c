@@ -32,13 +32,13 @@
 struct pfn_info *alloc_xen_pagetable(void)
 {
     extern int early_boot;
-    unsigned long p;
+    unsigned long pfn;
 
     if ( !early_boot )
         return alloc_domheap_page(NULL);
 
-    p = alloc_boot_pages(PAGE_SIZE, PAGE_SIZE);
-    return ((p == 0) ? NULL : phys_to_page(p));
+    pfn = alloc_boot_pages(1, 1);
+    return ((pfn == 0) ? NULL : pfn_to_page(pfn));
 }
 
 void free_xen_pagetable(struct pfn_info *pg)
@@ -82,12 +82,12 @@ void __init paging_init(void)
     idle0_vcpu.arch.monitor_table = mk_pagetable(__pa(idle_pg_table));
 
     /* Create user-accessible L2 directory to map the MPT for guests. */
-    l3_ro_mpt = (l3_pgentry_t *)alloc_xenheap_page();
+    l3_ro_mpt = alloc_xenheap_page();
     clear_page(l3_ro_mpt);
     idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)] =
         l4e_from_page(
             virt_to_page(l3_ro_mpt), __PAGE_HYPERVISOR | _PAGE_USER);
-    l2_ro_mpt = (l2_pgentry_t *)alloc_xenheap_page();
+    l2_ro_mpt = alloc_xenheap_page();
     clear_page(l2_ro_mpt);
     l3_ro_mpt[l3_table_offset(RO_MPT_VIRT_START)] =
         l3e_from_page(
