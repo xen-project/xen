@@ -1099,6 +1099,7 @@
 41a26ebcJ30TFl1v2kR8rqpEBvOtVw xen/arch/ia64/regionreg.c
 421098b69pUiIJrqu_w0JMUnZ2uc2A xen/arch/ia64/smp.c
 421098b6_ToSGrf6Pk1Uwg5aMAIBxg xen/arch/ia64/smpboot.c
+42a8bd43dIEIsS-EoQqt5Df1RTr5Hg xen/arch/ia64/sn_console.c
 428b9f38JJDW35iDn5DlfXTu700rkQ xen/arch/ia64/tools/README.RunVT
 421098b6AUdbxR3wyn1ATcmNuTao_Q xen/arch/ia64/tools/README.xenia64
 42376c6dfyY0eq8MS2dK3BW2rFuEGg xen/arch/ia64/tools/README.xenia64linux
