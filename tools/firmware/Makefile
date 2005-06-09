@@ -2,7 +2,7 @@ XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 TARGET      := vmxassist/vmxloader
-INSTALL_DIR := $(DESTDIR)/usr/share/xen
+INSTALL_DIR := $(DESTDIR)/usr/lib/xen/boot
 
 SUBDIRS :=
 SUBDIRS += rombios

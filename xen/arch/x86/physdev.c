@@ -60,7 +60,7 @@ long do_physdev_op(physdev_op_t *uop)
             break;
         op.u.irq_status_query.flags = 0;
         /* Edge-triggered interrupts don't need an explicit unmask downcall. */
-        if ( strstr(irq_desc[irq].handler->typename, "edge") == NULL )
+        if ( strstr(irq_desc[irq_to_vector(irq)].handler->typename, "edge") == NULL )
             op.u.irq_status_query.flags |= PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY;
         ret = 0;
         break;
@@ -89,7 +89,6 @@ long do_physdev_op(physdev_op_t *uop)
             return -EINVAL;
         
         op.u.irq_op.vector = assign_irq_vector(irq);
-        set_intr_gate(op.u.irq_op.vector, interrupt[irq]);
         ret = 0;
         break;
 

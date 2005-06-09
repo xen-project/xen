@@ -36,10 +36,6 @@ extern unsigned long domain0_ready;
 int find_max_pfn (unsigned long, unsigned long, void *);
 void start_of_day(void);
 
-/* opt_noht: If true, Hyperthreading is ignored. */
-int opt_noht = 0;
-boolean_param("noht", opt_noht);
-
 /* opt_nosmp: If true, secondary processors are ignored. */
 static int opt_nosmp = 0;
 boolean_param("nosmp", opt_nosmp);

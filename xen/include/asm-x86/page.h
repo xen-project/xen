@@ -185,7 +185,7 @@ typedef struct { u64 pfn; } pagetable_t;
 #define pfn_valid(_pfn)     ((_pfn) < max_page)
 
 /* High table entries are reserved by the hypervisor. */
-#if defined(CONFIG_X86_32) && !defined(CONFIG_PAE)
+#if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
 #define DOMAIN_ENTRIES_PER_L2_PAGETABLE     \
   (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
 #define HYPERVISOR_ENTRIES_PER_L2_PAGETABLE \

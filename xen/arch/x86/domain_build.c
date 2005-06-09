@@ -597,7 +597,7 @@ int construct_dom0(struct domain *d,
 
     memset(si->cmd_line, 0, sizeof(si->cmd_line));
     if ( cmdline != NULL )
-        strncpy(si->cmd_line, cmdline, sizeof(si->cmd_line)-1);
+        strncpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line)-1);
 
     /* Reinstate the caller's page tables. */
     write_ptbase(current);
