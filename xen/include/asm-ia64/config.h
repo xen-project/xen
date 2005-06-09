@@ -27,6 +27,8 @@
 // needed by include/asm-ia64/processor.h (and other places)
 typedef int pid_t;
 
+// now needed for xen/include/mm.h
+typedef unsigned long physaddr_t;
 // from include/linux/kernel.h
 #define ALIGN(x,a) (((x)+(a)-1)&~((a)-1))
 
