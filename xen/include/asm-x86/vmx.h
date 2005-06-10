@@ -41,11 +41,36 @@ extern unsigned int cpu_rev;
  * Need fill bits for SENTER
  */
 
-#define MONITOR_PIN_BASED_EXEC_CONTROLS         0x0000001f      
-#define MONITOR_CPU_BASED_EXEC_CONTROLS         0x0581e7f2
-#define MONITOR_VM_EXIT_CONTROLS                0x0003edff
-#define MONITOR_VM_ENTRY_CONTROLS               0x000011ff
+#define MONITOR_PIN_BASED_EXEC_CONTROLS_RESERVED_VALUE         0x00000016
 
+#define MONITOR_PIN_BASED_EXEC_CONTROLS       \
+    MONITOR_PIN_BASED_EXEC_CONTROLS_RESERVED_VALUE |   \
+    PIN_BASED_EXT_INTR_MASK |   \
+    PIN_BASED_NMI_EXITING
+
+#define MONITOR_CPU_BASED_EXEC_CONTROLS_RESERVED_VALUE         0x0401e172
+
+#define MONITOR_CPU_BASED_EXEC_CONTROLS \
+    MONITOR_CPU_BASED_EXEC_CONTROLS_RESERVED_VALUE |    \
+    CPU_BASED_HLT_EXITING | \
+    CPU_BASED_INVDPG_EXITING | \
+    CPU_BASED_MWAIT_EXITING | \
+    CPU_BASED_MOV_DR_EXITING | \
+    CPU_BASED_UNCOND_IO_EXITING | \
+    CPU_BASED_CR8_LOAD_EXITING | \
+    CPU_BASED_CR8_STORE_EXITING
+
+#define MONITOR_VM_EXIT_CONTROLS_RESERVED_VALUE                0x0003edff
+
+#define VM_EXIT_CONTROLS_IA_32E_MODE		0x00000200
+
+#define MONITOR_VM_EXIT_CONTROLS                \
+    MONITOR_VM_EXIT_CONTROLS_RESERVED_VALUE |\
+    VM_EXIT_ACK_INTR_ON_EXIT
+
+#define VM_ENTRY_CONTROLS_RESERVED_VALUE        0x000011ff
+#define VM_ENTRY_CONTROLS_IA_32E_MODE           0x00000200
+#define MONITOR_VM_ENTRY_CONTROLS       VM_ENTRY_CONTROLS_RESERVED_VALUE 
 /*
  * Exit Reasons
  */
@@ -91,7 +116,8 @@ extern unsigned int cpu_rev;
 #define TYPE_MOV_FROM_CR                (1 << 4)
 #define TYPE_CLTS                       (2 << 4)
 #define	TYPE_LMSW			(3 << 4)
-#define CONTROL_REG_ACCESS_REG          0x700   /* 10:8, general purpose register */
+#define CONTROL_REG_ACCESS_REG          0xf00   /* 10:8, general purpose register */
+#define	LMSW_SOURCE_DATA		(0xFFFF << 16) /* 16:31 lmsw source */
 #define REG_EAX                         (0 << 8) 
 #define REG_ECX                         (1 << 8) 
 #define REG_EDX                         (2 << 8) 
@@ -100,7 +126,14 @@ extern unsigned int cpu_rev;
 #define REG_EBP                         (5 << 8) 
 #define REG_ESI                         (6 << 8) 
 #define REG_EDI                         (7 << 8) 
-#define	LMSW_SOURCE_DATA		(0xFFFF << 16) /* 16:31 lmsw source */
+#define REG_R8                         (8 << 8)
+#define REG_R9                         (9 << 8)
+#define REG_R10                        (10 << 8)
+#define REG_R11                        (11 << 8)
+#define REG_R12                        (12 << 8)
+#define REG_R13                        (13 << 8)
+#define REG_R14                        (14 << 8)
+#define REG_R15                        (15 << 8)
 
 /*
  * Exit Qualifications for MOV for Debug Register Access
@@ -109,7 +142,7 @@ extern unsigned int cpu_rev;
 #define DEBUG_REG_ACCESS_TYPE           0x10    /* 4, direction of access */
 #define TYPE_MOV_TO_DR                  (0 << 4) 
 #define TYPE_MOV_FROM_DR                (1 << 4)
-#define DEBUG_REG_ACCESS_REG            0x700   /* 11:8, general purpose register */
+#define DEBUG_REG_ACCESS_REG            0xf00   /* 11:8, general purpose register */
  
 #define EXCEPTION_BITMAP_DE     (1 << 0)        /* Divide Error */
 #define EXCEPTION_BITMAP_DB     (1 << 1)        /* Debug */

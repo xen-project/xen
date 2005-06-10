@@ -414,7 +414,7 @@ int arch_set_info_guest(
         /* Ensure real hardware interrupts are enabled. */
         v->arch.guest_context.user_regs.eflags |= EF_IE;
     } else {
-        __vmwrite(GUEST_EFLAGS, v->arch.guest_context.user_regs.eflags);
+        __vmwrite(GUEST_RFLAGS, v->arch.guest_context.user_regs.eflags);
         if (v->arch.guest_context.user_regs.eflags & EF_TF)
                 __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
         else 

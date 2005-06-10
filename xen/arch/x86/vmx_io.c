@@ -42,10 +42,10 @@ static void load_cpu_user_regs(struct cpu_user_regs *regs)
      * Write the guest register value into VMCS
      */
     __vmwrite(GUEST_SS_SELECTOR, regs->ss);
-    __vmwrite(GUEST_ESP, regs->esp);
-    __vmwrite(GUEST_EFLAGS, regs->eflags);
+    __vmwrite(GUEST_RSP, regs->esp);
+    __vmwrite(GUEST_RFLAGS, regs->eflags);
     __vmwrite(GUEST_CS_SELECTOR, regs->cs);
-    __vmwrite(GUEST_EIP, regs->eip);
+    __vmwrite(GUEST_RIP, regs->eip);
 }
 
 static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *regs, long value)
@@ -439,7 +439,7 @@ void vmx_intr_assist(struct vcpu *d)
         return;
     }
 
-    __vmread(GUEST_EFLAGS, &eflags);
+    __vmread(GUEST_RFLAGS, &eflags);
     if (irq_masked(eflags)) {
         VMX_DBG_LOG(DBG_LEVEL_1, "guesting pending: %x, eflags: %lx",
                     highest_vector, eflags);
@@ -479,7 +479,7 @@ void vmx_do_resume(struct vcpu *d)
         __vmwrite(GUEST_CR3, pagetable_get_paddr(d->domain->arch.phys_table));
 
     __vmwrite(HOST_CR3, pagetable_get_paddr(d->arch.monitor_table));
-    __vmwrite(HOST_ESP, (unsigned long)get_stack_bottom());
+    __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 
     if (event_pending(d)) {
         vmx_check_events(d);

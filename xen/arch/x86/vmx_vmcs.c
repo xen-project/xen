@@ -199,7 +199,7 @@ void vmx_do_launch(struct vcpu *v)
 
     __vmwrite(GUEST_CR3, pagetable_get_paddr(v->arch.guest_table));
     __vmwrite(HOST_CR3, pagetable_get_paddr(v->arch.monitor_table));
-    __vmwrite(HOST_ESP, (unsigned long)get_stack_bottom());
+    __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 
     v->arch.schedule_tail = arch_vmx_do_resume;
 }
@@ -308,19 +308,19 @@ construct_init_vmcs_guest(struct cpu_user_regs *regs,
     error |= __vmwrite(GUEST_GS_BASE, host_env->ds_base);
     error |= __vmwrite(GUEST_IDTR_BASE, host_env->idtr_base);
 
-    error |= __vmwrite(GUEST_ESP, regs->esp);
-    error |= __vmwrite(GUEST_EIP, regs->eip);
+    error |= __vmwrite(GUEST_RSP, regs->esp);
+    error |= __vmwrite(GUEST_RIP, regs->eip);
 
     eflags = regs->eflags & ~VMCS_EFLAGS_RESERVED_0; /* clear 0s */
     eflags |= VMCS_EFLAGS_RESERVED_1; /* set 1s */
 
-    error |= __vmwrite(GUEST_EFLAGS, eflags);
+    error |= __vmwrite(GUEST_RFLAGS, eflags);
 
     error |= __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
     __asm__ __volatile__ ("mov %%dr7, %0\n" : "=r" (dr7));
     error |= __vmwrite(GUEST_DR7, dr7);
-    error |= __vmwrite(GUEST_VMCS0, 0xffffffff);
-    error |= __vmwrite(GUEST_VMCS1, 0xffffffff);
+    error |= __vmwrite(VMCS_LINK_POINTER, 0xffffffff);
+    error |= __vmwrite(VMCS_LINK_POINTER_HIGH, 0xffffffff);
 
     return error;
 }
@@ -362,7 +362,7 @@ static inline int construct_vmcs_host(struct host_execution_env *host_env)
     __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (crn) : ); 
     host_env->cr4 = crn;
     error |= __vmwrite(HOST_CR4, crn);
-    error |= __vmwrite(HOST_EIP, (unsigned long) vmx_asm_vmexit_handler);
+    error |= __vmwrite(HOST_RIP, (unsigned long) vmx_asm_vmexit_handler);
 
     return error;
 }

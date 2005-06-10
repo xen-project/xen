@@ -21,9 +21,9 @@ void show_registers(struct cpu_user_regs *regs)
 
     if ( VMX_DOMAIN(current) && (regs->eflags == 0) )
     {
-        __vmread(GUEST_EIP, &eip);
-        __vmread(GUEST_ESP, &esp);
-        __vmread(GUEST_EFLAGS, &eflags);
+        __vmread(GUEST_RIP, &eip);
+        __vmread(GUEST_RSP, &esp);
+        __vmread(GUEST_RFLAGS, &eflags);
         __vmread(GUEST_SS_SELECTOR, &ss);
         __vmread(GUEST_DS_SELECTOR, &ds);
         __vmread(GUEST_ES_SELECTOR, &es);
