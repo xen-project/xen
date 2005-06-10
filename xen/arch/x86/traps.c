@@ -422,6 +422,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
         }
 
         if ( (addr < PAGE_OFFSET) &&
+             !VM86_MODE(regs) && ((regs->cs & 3) == 1) && /* ring 1 */
              ((regs->error_code & 3) == 3) && /* write-protection fault */
              ptwr_do_page_fault(addr) )
         {
