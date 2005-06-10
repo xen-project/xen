@@ -277,7 +277,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     u32           disp32 = 0;
     u8            *eip;         /* ptr to instruction start */
     u8            *pb, b;       /* ptr into instr. / current instr. byte */
-    u16           *pseg = NULL; /* segment for memory operand (NULL=default) */
+    int            gs_override = 0;
 
     /* WARNING: We only work for ring-3 segments. */
     if ( unlikely(VM86_MODE(regs)) || unlikely(!RING_3(regs)) )
@@ -310,36 +310,32 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
         switch ( b )
         {
         case 0x67: /* Address-size override */
-            DPRINTK("Unhandleable prefix byte %02x\n", b);
-            goto fixme;
+        case 0x2e: /* CS override */
+        case 0x3e: /* DS override */
+        case 0x26: /* ES override */
+        case 0x64: /* FS override */
+        case 0x36: /* SS override */
+            DPRINTK("Unhandled prefix %02x\n", b);
+            goto fail;
         case 0x66: /* Operand-size override */
         case 0xf0: /* LOCK */
         case 0xf2: /* REPNE/REPNZ */
         case 0xf3: /* REP/REPE/REPZ */
             break;
-        case 0x2e: /* CS override */
-            pseg = &regs->cs;
-            break;
-        case 0x3e: /* DS override */
-            pseg = &regs->ds;
-            break;
-        case 0x26: /* ES override */
-            pseg = &regs->es;
-            break;
-        case 0x64: /* FS override */
-            pseg = &regs->fs;
-            break;
         case 0x65: /* GS override */
-            pseg = &regs->gs;
-            break;
-        case 0x36: /* SS override */
-            pseg = &regs->ss;
+            gs_override = 1;
             break;
         default: /* Not a prefix byte */
             goto done_prefix;
         }
     }
  done_prefix:
+
+    if ( !gs_override )
+    {
+        DPRINTK("Only instructions with GS override\n");
+        goto fail;
+    }
 
     decode = insn_decode[b]; /* opcode byte */
     pb++;
@@ -351,12 +347,13 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     
     if ( !(decode & HAS_MODRM) )
     {
+        /* Must be a <disp32>, or bail. */
         if ( (decode & 7) != 4 )
             goto fail;
 
         if ( get_user(offset, (u32 *)pb) )
         {
-            DPRINTK("Fault while extracting <disp8>.\n");
+            DPRINTK("Fault while extracting <disp32>.\n");
             goto page_fault;
         }
         pb += 4;
@@ -394,8 +391,6 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     switch ( modrm >> 6 )
     {
     case 0:
-        if ( pseg == NULL )
-            pseg = &regs->ds;
         disp32 = 0;
         if ( rm == 5 ) /* disp32 rather than (EBP) */
         {
@@ -410,8 +405,6 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
         break;
 
     case 1:
-        if ( pseg == NULL ) /* NB. EBP defaults to SS */
-            pseg = (rm == 5) ? &regs->ss : &regs->ds;
         if ( get_user(disp8, pb) )
         {
             DPRINTK("Fault while extracting <disp8>.\n");
@@ -422,8 +415,6 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
         break;
 
     case 2:
-        if ( pseg == NULL ) /* NB. EBP defaults to SS */
-            pseg = (rm == 5) ? &regs->ss : &regs->ds;
         if ( get_user(disp32, (u32 *)pb) )
         {
             DPRINTK("Fault while extracting <disp8>.\n");
@@ -442,7 +433,7 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
         offset += *(u32 *)memreg;
 
  skip_modrm:
-    if ( !fixup_seg((u16)(*pseg), offset) )
+    if ( !fixup_seg((u16)regs->gs, offset) )
         goto fail;
 
     /* Success! */
