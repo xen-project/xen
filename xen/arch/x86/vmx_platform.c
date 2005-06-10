@@ -52,12 +52,12 @@ static long get_reg_value(int size, int index, int seg, struct cpu_user_regs *re
 void store_cpu_user_regs(struct cpu_user_regs *regs)
 {
     __vmread(GUEST_SS_SELECTOR, &regs->ss);
-    __vmread(GUEST_ESP, &regs->esp);
-    __vmread(GUEST_EFLAGS, &regs->eflags);
+    __vmread(GUEST_RSP, &regs->esp);
+    __vmread(GUEST_RFLAGS, &regs->eflags);
     __vmread(GUEST_CS_SELECTOR, &regs->cs);
     __vmread(GUEST_DS_SELECTOR, &regs->ds);
     __vmread(GUEST_ES_SELECTOR, &regs->es);
-    __vmread(GUEST_EIP, &regs->eip);
+    __vmread(GUEST_RIP, &regs->eip);
 }
 
 static long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
@@ -238,7 +238,7 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
     unsigned long eflags;
     int index, vm86 = 0;
 
-    __vmread(GUEST_EFLAGS, &eflags);
+    __vmread(GUEST_RFLAGS, &eflags);
     if (eflags & X86_EFLAGS_VM)
 	vm86 = 1;
 
@@ -551,10 +551,10 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     mpci_p = &current->arch.arch_vmx.vmx_platform.mpci;
     inst_decoder_regs = mpci_p->inst_decoder_regs;
 
-    __vmread(GUEST_EIP, &eip);
+    __vmread(GUEST_RIP, &eip);
     __vmread(INSTRUCTION_LEN, &inst_len);
 
-    __vmread(GUEST_EFLAGS, &eflags);
+    __vmread(GUEST_RFLAGS, &eflags);
     vm86 = eflags & X86_EFLAGS_VM;
 
     if (vm86) {
@@ -583,7 +583,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     if (vmx_decode(check_prefix(inst, &mmio_inst), &mmio_inst) == DECODE_failure)
         domain_crash_synchronous();
 
-    __vmwrite(GUEST_EIP, eip + inst_len);
+    __vmwrite(GUEST_RIP, eip + inst_len);
     store_cpu_user_regs(inst_decoder_regs);
 
     // Only handle "mov" and "movs" instructions!

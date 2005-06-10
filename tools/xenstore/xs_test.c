@@ -153,7 +153,7 @@ static bool write_all_choice(int fd, const void *data, unsigned int len)
 {
 	if (fd == -2)
 		return write_all_shmem(fd, data, len);
-	return write_all(fd, data, len);
+	return xs_write_all(fd, data, len);
 }
 
 /* We want access to internal functions. */
@@ -176,11 +176,11 @@ static void __attribute__((noreturn)) usage(void)
 	     "  watch <path> <prio>\n"
 	     "  waitwatch\n"
 	     "  ackwatch\n"
-	     "  unwatch <path>\n"
+	     "  unwatch <path> <token>\n"
 	     "  close\n"
 	     "  start <node>\n"
 	     "  abort\n"
-	     "  introduce <domid> <mfn> <eventchn>\n"
+	     "  introduce <domid> <mfn> <eventchn> <path>\n"
 	     "  commit\n"
 	     "  sleep <seconds>\n"
 	     "  dump\n");
@@ -491,7 +491,7 @@ static void dump_dir(unsigned int handle,
 		printf("%s%s: ", spacing, dir[i]);
 		for (j = 0; j < numperms; j++) {
 			char buffer[100];
-			if (!perm_to_string(&perms[j], buffer))
+			if (!xs_perm_to_string(&perms[j], buffer))
 				barf("perm to string");
 			printf("%s ", buffer);
 		}

@@ -11,7 +11,7 @@
 
 #include <linux/config.h>
 #include <asm/pgtable.h>
-#include <asm/mm.h>
+#include <xen/mm.h>
 
 extern struct page *zero_page_memmap_ptr;
 struct pfn_info *frame_table;

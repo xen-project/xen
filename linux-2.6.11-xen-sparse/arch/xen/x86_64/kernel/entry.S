@@ -109,7 +109,6 @@ VGCF_IN_SYSCALL = (1<<8)
 #define preempt_stop
 #define retint_kernel retint_restore_args
 #endif	
-	
 
 /*
  * C code is not supposed to know about undefined top of stack. Every time 
@@ -118,7 +117,15 @@ VGCF_IN_SYSCALL = (1<<8)
  * RESTORE_TOP_OF_STACK syncs the syscall state after any possible ptregs
  * manipulation.
  */        	
-		
+
+	/* %rsp:at FRAMEEND */ 
+	.macro FIXUP_TOP_OF_STACK tmp
+	movq    $__USER_CS,CS(%rsp)
+	movq 	$-1,RCX(%rsp)
+	.endm
+
+	.macro RESTORE_TOP_OF_STACK tmp,offset=0
+	.endm
 
 	.macro FAKE_STACK_FRAME child_rip
 	/* push in order ss, rsp, eflags, cs, rip */
@@ -209,6 +216,7 @@ rff_action:
 	je   int_ret_from_sys_call
 	testl $_TIF_IA32,threadinfo_flags(%rcx)
 	jnz  int_ret_from_sys_call
+	RESTORE_TOP_OF_STACK %rdi,ARGOFFSET
 	jmp ret_from_sys_call
 rff_trace:
 	movq %rsp,%rdi
@@ -311,6 +319,7 @@ sysret_signal:
 tracesys:			 
 	SAVE_REST
 	movq $-ENOSYS,RAX(%rsp)
+	FIXUP_TOP_OF_STACK %rdi
 	movq %rsp,%rdi
 	call syscall_trace_enter
 	LOAD_ARGS ARGOFFSET  /* reload args from stack in case ptrace changed it */
@@ -323,6 +332,7 @@ tracesys:
 1:	SAVE_REST
 	movq %rsp,%rdi
 	call syscall_trace_leave
+	RESTORE_TOP_OF_STACK %rbx
 	RESTORE_REST
 	jmp ret_from_sys_call
 		
@@ -421,7 +431,9 @@ ENTRY(ptregscall_common)
 	CFI_ADJUST_CFA_OFFSET	-8
 	SAVE_REST
 	movq %r11, %r15
+	FIXUP_TOP_OF_STACK %r11
 	call *%rax
+	RESTORE_TOP_OF_STACK %r11
 	movq %r15, %r11
 	RESTORE_REST
 	pushq %r11
@@ -435,10 +447,12 @@ ENTRY(stub_execve)
 	CFI_ADJUST_CFA_OFFSET	-8
 	SAVE_REST
 	movq %r11, %r15
+	FIXUP_TOP_OF_STACK %r11
 	call sys_execve
 	GET_THREAD_INFO(%rcx)
 	bt $TIF_IA32,threadinfo_flags(%rcx)
 	jc exec_32bit
+	RESTORE_TOP_OF_STACK %r11
 	movq %r15, %r11
 	RESTORE_REST
 	push %r11
@@ -460,6 +474,7 @@ ENTRY(stub_rt_sigreturn)
 	addq $8, %rsp		
 	SAVE_REST
 	movq %rsp,%rdi
+	FIXUP_TOP_OF_STACK %r11
 	call sys_rt_sigreturn
 	movq %rax,RAX(%rsp) # fixme, this could be done at the higher layer
 	RESTORE_REST

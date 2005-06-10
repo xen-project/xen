@@ -268,6 +268,9 @@ bool do_introduce(struct connection *conn, struct buffered_data *in)
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
 		return send_error(conn, EINVAL);
 
+	if (!conn->can_write)
+		return send_error(conn, EROFS);
+
 	/* Hang domain off "in" until we're finished. */
 	domain = talloc(in, struct domain);
 	domain->domid = atoi(vec[0]);

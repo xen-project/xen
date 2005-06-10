@@ -21,7 +21,7 @@
 
 #ifdef TESTING
 bool test_write_all(int fd, void *contents, unsigned int len);
-#define write_all test_write_all
+#define xs_write_all test_write_all
 
 int test_mkdir(const char *dir, int perms);
 #define mkdir test_mkdir

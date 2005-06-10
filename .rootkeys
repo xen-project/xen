@@ -707,17 +707,6 @@
 428d0d88lVaOC64YBZ1Wzt-WV4JaSw tools/ioemu/osdep.c
 428d0d885W7r27CDEJCW6Jlbxggc9g tools/ioemu/osdep.h
 428d0d88CiP9tVdIdLWAzOnCOSdafg tools/ioemu/path.c
-428d0d88jzHltLAzyhV1lpFckzy8CA tools/ioemu/pc-bios/Makefile
-428d0d889pv_iPNBFn6cNRzQfJMC3A tools/ioemu/pc-bios/README
-428d0d88mhWW8SQFNfp-NaH3c8QQkg tools/ioemu/pc-bios/bios.bin
-428d0d88LMSMDbTFG1-sS8LL90hExw tools/ioemu/pc-bios/bios.diff
-428d0d89SHpdZE1S-ywjJCulIWs4Ag tools/ioemu/pc-bios/linux_boot.S
-428d0d89hiL0UgU71ero86GEu1loaA tools/ioemu/pc-bios/linux_boot.bin
-428d0d894MKpOb385vcoB_s_4q0QOA tools/ioemu/pc-bios/ppc_rom.bin
-428d0d896uo6qr-ONYkpleolayT4zw tools/ioemu/pc-bios/proll.bin
-428d0d893gsF8AcCadeYXcKM-aqssA tools/ioemu/pc-bios/proll.patch
-428d0d89GgbrVx4Ov3Zg-SFX_0BRdw tools/ioemu/pc-bios/vgabios-cirrus.bin
-428d0d89h9nqxPIgDpPMXZIWkdosNw tools/ioemu/pc-bios/vgabios.bin
 428d0d8908B65zMmhdGVME3jv7gpww tools/ioemu/qemu-binfmt-conf.sh
 428d0d89taY6NPlnIyOAMQd_Ww5qUw tools/ioemu/qemu-img.c
 428d0d89FY-g4UPH-ZW7t5ZCqvQVTQ tools/ioemu/readline.c

@@ -71,7 +71,7 @@ int xc_interface_open(void)
 		return fd;
 
 	memset(page, 0, sizeof(page));
-	if (!write_all(fd, page, sizeof(page)))
+	if (!xs_write_all(fd, page, sizeof(page)))
 		barf_perror("Failed to write /tmp/xcmap page");
 	
 	return fd;

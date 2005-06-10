@@ -48,7 +48,7 @@ const char *xs_daemon_transactions(void)
 }
 
 /* Simple routines for writing to sockets, etc. */
-bool write_all(int fd, const void *data, unsigned int len)
+bool xs_write_all(int fd, const void *data, unsigned int len)
 {
 	while (len) {
 		int done;
@@ -66,7 +66,7 @@ bool write_all(int fd, const void *data, unsigned int len)
 }
 
 /* Convert strings to permissions.  False if a problem. */
-bool strings_to_perms(struct xs_permissions *perms, unsigned int num,
+bool xs_strings_to_perms(struct xs_permissions *perms, unsigned int num,
 		      const char *strings)
 {
 	const char *p;
@@ -104,7 +104,7 @@ bool strings_to_perms(struct xs_permissions *perms, unsigned int num,
 }
 
 /* Convert permissions to a string (up to len MAX_STRLEN(domid_t)+1). */
-bool perm_to_string(const struct xs_permissions *perm, char *buffer)
+bool xs_perm_to_string(const struct xs_permissions *perm, char *buffer)
 {
 	switch (perm->perms) {
 	case XS_PERM_WRITE:
@@ -128,7 +128,7 @@ bool perm_to_string(const struct xs_permissions *perm, char *buffer)
 }
 
 /* Given a string and a length, count how many strings (nul terms). */
-unsigned int count_strings(const char *strings, unsigned int len)
+unsigned int xs_count_strings(const char *strings, unsigned int len)
 {
 	unsigned int num;
 	const char *p;

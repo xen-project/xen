@@ -163,10 +163,13 @@ uninstall:
 	rm -rf $(D)/etc/init.d/xend*
 	rm -rf $(D)/usr/$(LIBDIR)/libxc* $(D)/usr/$(LIBDIR)/libxutil*
 	rm -rf $(D)/usr/$(LIBDIR)/python/xen $(D)/usr/include/xen
+	rm -rf $(D)/usr/$(LIBDIR)/share/xen $(D)/usr/$(LIBDIR)/libxenstore*
+	rm -rf $(D)/var/run/xen* $(D)/var/lib/xen*
 	rm -rf $(D)/usr/include/xcs_proto.h $(D)/usr/include/xc.h
+	rm -rf $(D)/usr/include/xs_lib.h $(D)/usr/include/xs.h
 	rm -rf $(D)/usr/sbin/xcs $(D)/usr/sbin/xcsdump $(D)/usr/sbin/xen*
 	rm -rf $(D)/usr/sbin/netfix
-	rm -rf $(D)/usr/sbin/xfrd $(D)/usr/sbin/xm $(D)/var/lib/xen
+	rm -rf $(D)/usr/sbin/xfrd $(D)/usr/sbin/xm
 	rm -rf $(D)/usr/share/doc/xen  $(D)/usr/man/man*/xentrace*
 	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/miniterm
 	rm -rf $(D)/boot/*xen*

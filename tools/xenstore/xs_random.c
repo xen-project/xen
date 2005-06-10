@@ -223,10 +223,10 @@ static struct xs_permissions *file_get_perms(struct file_ops_info *info,
 		release_file(perms, size);
 		return ret;
 	}
-	*num = count_strings(perms, size);
+	*num = xs_count_strings(perms, size);
 
 	ret = new_array(struct xs_permissions, *num);
-	if (!strings_to_perms(ret, *num, perms))
+	if (!xs_strings_to_perms(ret, *num, perms))
 		barf("Reading permissions from %s", permfile);
 	release_file(perms, size);
 	return ret;
@@ -267,7 +267,7 @@ static bool file_set_perms(struct file_ops_info *info,
 	for (i = 0; i < num; i++) {
 		char buffer[100];
 
-		if (!perm_to_string(&perms[i], buffer)) {
+		if (!xs_perm_to_string(&perms[i], buffer)) {
 			int saved_errno = errno;
 			close(fd);
 			errno = saved_errno;
@@ -536,7 +536,7 @@ static char *dump_dir(struct ops *ops,
 		ret = talloc_asprintf_append(ret, "%s%s: ", spacing, dir[i]);
 		for (j = 0; j < numperms; j++) {
 			char buffer[100];
-			if (!perm_to_string(&perms[j], buffer))
+			if (!xs_perm_to_string(&perms[j], buffer))
 				barf("perm to string");
 			ret = talloc_asprintf_append(ret, "%s ", buffer);
 		}

@@ -19,10 +19,10 @@
         "jmp 3f;"                                                       \
         "2:testb $3,"STR(UREGS_cs)"(%esp);"                             \
         "jz 1f;"                                                        \
-        "movl %ds,"STR(UREGS_ds)"(%esp);"                               \
-        "movl %es,"STR(UREGS_es)"(%esp);"                               \
-        "movl %fs,"STR(UREGS_fs)"(%esp);"                               \
-        "movl %gs,"STR(UREGS_gs)"(%esp);"                               \
+        "mov %ds,"STR(UREGS_ds)"(%esp);"                                \
+        "mov %es,"STR(UREGS_es)"(%esp);"                                \
+        "mov %fs,"STR(UREGS_fs)"(%esp);"                                \
+        "mov %gs,"STR(UREGS_gs)"(%esp);"                                \
         "3:"
 
 #define SAVE_ALL_NOSEGREGS(_reg)                \
@@ -31,8 +31,8 @@
 
 #define SET_XEN_SEGMENTS(_reg)                                  \
         "movl $("STR(__HYPERVISOR_DS)"),%e"STR(_reg)"x;"        \
-        "movl %e"STR(_reg)"x,%ds;"                              \
-        "movl %e"STR(_reg)"x,%es;"
+        "mov %e"STR(_reg)"x,%ds;"                              \
+        "mov %e"STR(_reg)"x,%es;"
 
 #define SAVE_ALL(_reg)                          \
         __SAVE_ALL_PRE                          \
@@ -56,10 +56,10 @@
         jmp 3f;                                         \
         2:testb $3,UREGS_cs(%esp);                      \
         jz 1f;                                          \
-        movl %ds,UREGS_ds(%esp);                        \
-        movl %es,UREGS_es(%esp);                        \
-        movl %fs,UREGS_fs(%esp);                        \
-        movl %gs,UREGS_gs(%esp);                        \
+        mov %ds,UREGS_ds(%esp);                         \
+        mov %es,UREGS_es(%esp);                         \
+        mov %fs,UREGS_fs(%esp);                         \
+        mov %gs,UREGS_gs(%esp);                         \
         3:
 
 #define SAVE_ALL_NOSEGREGS(_reg)                \
@@ -68,8 +68,8 @@
 
 #define SET_XEN_SEGMENTS(_reg)                          \
         movl $(__HYPERVISOR_DS),%e ## _reg ## x;        \
-        movl %e ## _reg ## x,%ds;                       \
-        movl %e ## _reg ## x,%es;
+        mov %e ## _reg ## x,%ds;                        \
+        mov %e ## _reg ## x,%es;
 
 #define SAVE_ALL(_reg)                          \
         __SAVE_ALL_PRE                          \
