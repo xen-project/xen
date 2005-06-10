@@ -8,7 +8,7 @@
 
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "/boot/vmlinuz-rhel3-static"
+kernel = "/usr/lib/xen/boot/vmxloader"
 
 # Optional ramdisk.
 #ramdisk = "/boot/initrd.gz"
@@ -75,7 +75,7 @@ root = "/dev/hda1 ro"
 #nfs_root   = '/full/path/to/root/directory'
 
 # Sets runlevel 4.
-extra = "acpi=off console=ttyS0 console=tty0 1"
+#extra = "acpi=off console=ttyS0 console=tty0 1"
 
 #----------------------------------------------------------------------------
 # Set according to whether you want the domain restarted when it exits.
