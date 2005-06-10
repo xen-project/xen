@@ -176,11 +176,11 @@ static void __attribute__((noreturn)) usage(void)
 	     "  watch <path> <prio>\n"
 	     "  waitwatch\n"
 	     "  ackwatch\n"
-	     "  unwatch <path>\n"
+	     "  unwatch <path> <token>\n"
 	     "  close\n"
 	     "  start <node>\n"
 	     "  abort\n"
-	     "  introduce <domid> <mfn> <eventchn>\n"
+	     "  introduce <domid> <mfn> <eventchn> <path>\n"
 	     "  commit\n"
 	     "  sleep <seconds>\n"
 	     "  dump\n");

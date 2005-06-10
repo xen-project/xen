@@ -56,6 +56,9 @@ struct connection
 	/* Are we blocked waiting for a transaction to end?  Contains node. */
 	char *blocked;
 
+	/* Is this a read-only connection? */
+	bool can_write;
+
 	/* Our current event.  If all used, we're waiting for ack. */
 	struct watch_event *event;
 

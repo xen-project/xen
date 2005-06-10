@@ -617,7 +617,7 @@ bool check_node_perms(struct connection *conn, const char *node,
 		return false;
 	}
 
-	if (!conn->write && (perm & XS_PERM_WRITE)) {
+	if (!conn->can_write && (perm & XS_PERM_WRITE)) {
 		errno = EROFS;
 		return false;
 	}
@@ -938,6 +938,12 @@ static bool process_message(struct connection *conn, struct buffered_data *in)
 		return do_set_perms(conn, in);
 
 	case XS_SHUTDOWN:
+		/* FIXME: Implement gentle shutdown too. */
+		/* Only tools can do this. */
+		if (conn->id != 0)
+			return send_error(conn, EACCES);
+		if (!conn->can_write)
+			return send_error(conn, EROFS);
 		send_ack(conn, XS_SHUTDOWN);
 		/* Everything hangs off auto-free context, freed at exit. */
 		exit(0);
@@ -1137,6 +1143,7 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	new->transaction = NULL;
 	new->write = write;
 	new->read = read;
+	new->can_write = true;
 
 	talloc_set_fail_handler(out_of_mem, &talloc_fail);
 	if (setjmp(talloc_fail)) {
@@ -1170,10 +1177,11 @@ static void accept_connection(int sock, bool canwrite)
 	if (fd < 0)
 		return;
 
-	conn = new_connection(canwrite ? writefd : NULL, readfd);
-	if (conn)
+	conn = new_connection(writefd, readfd);
+	if (conn) {
 		conn->fd = fd;
-	else
+		conn->can_write = canwrite;
+	} else
 		close(fd);
 }
 
