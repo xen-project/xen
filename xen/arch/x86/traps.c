@@ -423,6 +423,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
         }
 
         if ( (addr < HYPERVISOR_VIRT_START) &&
+             KERNEL_MODE(v, regs) &&
              ((regs->error_code & 3) == 3) && /* write-protection fault */
              ptwr_do_page_fault(d, addr) )
         {
