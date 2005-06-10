@@ -92,8 +92,11 @@ install: xenstored libxenstore.a
 	$(INSTALL_DIR) -p $(DESTDIR)/var/run/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/sbin
+	$(INSTALL_DIR) -p $(DESTDIR)/usr/include
 	$(INSTALL_PROG) xenstored $(DESTDIR)/usr/sbin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) libxenstore.a $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include
+	$(INSTALL_DATA) xs_lib.h $(DESTDIR)/usr/include
 
 -include $(PROG_DEP)
