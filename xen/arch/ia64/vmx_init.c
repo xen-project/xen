@@ -41,6 +41,7 @@
 #include <public/arch-ia64.h>
 #include <asm/vmx_phy_mode.h>
 #include <asm/vmx.h>
+#include <xen/mm.h>
 
 /* Global flag to identify whether Intel vmx feature is on */
 u32 vmx_enabled = 0;
