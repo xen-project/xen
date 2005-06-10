@@ -51,23 +51,9 @@ common  de-ch  es     fo  fr-ca  hu     ja  mk  nl-be      pt  sl     tr
 
 install: all 
 	mkdir -p "$(bindir)"
-ifndef CONFIG_WIN32
-#	install -m 755 -s $(TOOLS) "$(bindir)"
-endif
 	mkdir -p "$(DESTDIR)/$(datadir)"
-	install -m 644 pc-bios/bios.bin pc-bios/vgabios.bin \
-                       pc-bios/vgabios-cirrus.bin \
-                       pc-bios/ppc_rom.bin \
-                       pc-bios/proll.bin \
-                       pc-bios/linux_boot.bin "$(DESTDIR)/$(datadir)"
-	#mkdir -p "$(DESTDIR)/$(docdir)"
-	#install -m 644 qemu-doc.html  qemu-tech.html "$(DESTDIR)/$(docdir)"
-ifndef CONFIG_WIN32
-	#mkdir -p "$(DESTDIR)/$(mandir)/man1"
-	#install qemu.1 qemu-mkcow.1 "$(DESTDIR)/$(mandir)/man1"
 	mkdir -p "$(DESTDIR)/$(datadir)/keymaps"
 	install -m 644 $(addprefix keymaps/,$(KEYMAPS)) "$(DESTDIR)/$(datadir)/keymaps"
-endif
 	for d in $(TARGET_DIRS); do \
 	$(MAKE) -C $$d $@ || exit 1 ; \
         done
@@ -105,14 +91,6 @@ tarbin:
         $(DESTDIR)/$(bindir)/qemu-arm \
         $(DESTDIR)/$(bindir)/qemu-sparc \
         $(DESTDIR)/$(bindir)/qemu-ppc \
-	$(DESTDIR)/$(datadir)/bios.bin \
-	$(DESTDIR)/$(datadir)/vgabios.bin \
-	$(DESTDIR)/$(datadir)/vgabios-cirrus.bin \
-	$(DESTDIR)/$(datadir)/ppc_rom.bin \
-	$(DESTDIR)/$(datadir)/proll.bin \
-	$(DESTDIR)/$(datadir)/linux_boot.bin \
-	$(DESTDIR)/$(docdir)/qemu-doc.html \
-	$(DESTDIR)/$(docdir)/qemu-tech.html \
 	$(DESTDIR)/$(mandir)/man1/qemu.1 $(DESTDIR)/$(mandir)/man1/qemu-mkcow.1 )
 
 ifneq ($(wildcard .depend),)
