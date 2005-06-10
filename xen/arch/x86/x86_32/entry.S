@@ -176,10 +176,10 @@ vmx_process_softirqs:
 restore_all_guest:
         testl $X86_EFLAGS_VM,UREGS_eflags(%esp)
         jnz  restore_all_vm86
-FLT1:   movl UREGS_ds(%esp),%ds
-FLT2:   movl UREGS_es(%esp),%es
-FLT3:   movl UREGS_fs(%esp),%fs
-FLT4:   movl UREGS_gs(%esp),%gs
+FLT1:   mov UREGS_ds(%esp),%ds
+FLT2:   mov UREGS_es(%esp),%es
+FLT3:   mov UREGS_fs(%esp),%fs
+FLT4:   mov UREGS_gs(%esp),%gs
 restore_all_vm86:
         popl %ebx
         popl %ecx
@@ -306,7 +306,7 @@ create_bounce_frame:
         testl $(2|X86_EFLAGS_VM),%ecx
         jz   ring1 /* jump if returning to an existing ring-1 activation */
         movl VCPU_kernel_sp(%ebx),%esi
-FLT6:   movl VCPU_kernel_ss(%ebx),%gs
+FLT6:   mov VCPU_kernel_ss(%ebx),%gs
         testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
         jz   nvm86_1
         subl $16,%esi       /* push ES/DS/FS/GS (VM86 stack frame) */
@@ -326,7 +326,7 @@ FLT12:  movl %eax,%gs:4(%esi)
         jmp 1f
 ring1:  /* obtain ss/esp from oldss/oldesp -- a ring-1 activation exists */
         movl UREGS_esp+4(%esp),%esi
-FLT13:  movl UREGS_ss+4(%esp),%gs 
+FLT13:  mov UREGS_ss+4(%esp),%gs 
 1:      /* Construct a stack frame: EFLAGS, CS/EIP */
         movb TRAPBOUNCE_flags(%edx),%cl
         subl $12,%esi
@@ -383,7 +383,7 @@ FLT26:  movl %eax,%gs:12(%esi)
 nvm86_3:/* Rewrite our stack frame and return to ring 1. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         andl $0xfffcbeff,UREGS_eflags+4(%esp)
-        movl %gs,UREGS_ss+4(%esp)
+        mov %gs,UREGS_ss+4(%esp)
         movl %esi,UREGS_esp+4(%esp)
         movzwl TRAPBOUNCE_cs(%edx),%eax
         movl %eax,UREGS_cs+4(%esp)
@@ -670,7 +670,7 @@ do_switch_vm86:
 
         # GS:ESI == Ring-1 stack activation
         movl UREGS_esp(%esp),%esi
-VFLT1:  movl UREGS_ss(%esp),%gs
+VFLT1:  mov UREGS_ss(%esp),%gs
 
         # ES:EDI == Ring-0 stack activation
         leal UREGS_eip(%esp),%edi
