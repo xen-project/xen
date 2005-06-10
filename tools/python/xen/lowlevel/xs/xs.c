@@ -85,7 +85,7 @@ static PyObject *xspy_read(PyObject *self, PyObject *args, PyObject *kwds)
 
     struct xs_handle *xh = xshandle(self);
     char *xsval = NULL;
-    int xsval_n = 0;
+    unsigned int xsval_n = 0;
     PyObject *val = NULL;
 
     if (!xh)
@@ -134,7 +134,7 @@ static PyObject *xspy_ls(PyObject *self, PyObject *args, PyObject *kwds)
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
     char **xsval = NULL;
-    int xsval_n = 0;
+    unsigned int xsval_n = 0;
     int i;
 
     if (!xh)
@@ -183,7 +183,7 @@ static PyObject *xspy_get_permissions(PyObject *self, PyObject *args,
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
     struct xs_permissions *perms;
-    int perms_n = 0;
+    unsigned int perms_n = 0;
     int i;
 
     if (!xh)
