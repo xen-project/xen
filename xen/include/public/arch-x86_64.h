@@ -153,16 +153,16 @@ typedef struct cpu_user_regs {
     u32 error_code;    /* private */
     u32 entry_vector;  /* private */
     union { u64 rip, eip; };
-    u16 cs;
+    u16 cs, _pad0[1];
     u8  saved_upcall_mask;
-    u8  _pad0[5];
+    u8  _pad1[3];
     union { u64 rflags, eflags; };
     union { u64 rsp, esp; };
-    u16 ss, _pad1[3];
-    u16 es, _pad2[3];
-    u16 ds, _pad3[3];
-    u16 fs, _pad4[3]; /* Non-zero => takes precedence over fs_base.      */
-    u16 gs, _pad5[3]; /* Non-zero => takes precedence over gs_base_user. */
+    u16 ss, _pad2[3];
+    u16 es, _pad3[3];
+    u16 ds, _pad4[3];
+    u16 fs, _pad5[3]; /* Non-zero => takes precedence over fs_base.      */
+    u16 gs, _pad6[3]; /* Non-zero => takes precedence over gs_base_user. */
 } cpu_user_regs_t;
 
 typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
