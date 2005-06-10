@@ -118,7 +118,7 @@ static bool read_all(int fd, void *data, unsigned int len)
 
 #ifdef XSTEST
 #define read_all read_all_choice
-#define write_all write_all_choice
+#define xs_write_all write_all_choice
 #endif
 
 static int get_error(const char *errorstring)
@@ -179,11 +179,11 @@ static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
 	ignorepipe.sa_flags = 0;
 	sigaction(SIGPIPE, &ignorepipe, &oldact);
 
-	if (!write_all(h->fd, &msg, sizeof(msg)))
+	if (!xs_write_all(h->fd, &msg, sizeof(msg)))
 		goto fail;
 
 	for (i = 0; i < num_vecs; i++)
-		if (!write_all(h->fd, iovec[i].iov_base, iovec[i].iov_len))
+		if (!xs_write_all(h->fd, iovec[i].iov_base, iovec[i].iov_len))
 			goto fail;
 
 	/* Watches can have fired before reply comes: daemon detects
@@ -253,7 +253,7 @@ char **xs_directory(struct xs_handle *h, const char *path, unsigned int *num)
 		return NULL;
 
 	/* Count the strings. */
-	*num = count_strings(strings, len);
+	*num = xs_count_strings(strings, len);
 
 	/* Transfer to one big alloc for easy freeing. */
 	ret = malloc(*num * sizeof(char *) + len);
@@ -342,7 +342,7 @@ struct xs_permissions *xs_get_permissions(struct xs_handle *h,
 		return NULL;
 
 	/* Count the strings: each one perms then domid. */
-	*num = count_strings(strings, len);
+	*num = xs_count_strings(strings, len);
 
 	/* Transfer to one big alloc for easy freeing. */
 	ret = malloc(*num * sizeof(struct xs_permissions));
@@ -351,7 +351,7 @@ struct xs_permissions *xs_get_permissions(struct xs_handle *h,
 		return NULL;
 	}
 
-	if (!strings_to_perms(ret, *num, strings)) {
+	if (!xs_strings_to_perms(ret, *num, strings)) {
 		free_no_errno(ret);
 		ret = NULL;
 	}
@@ -376,7 +376,7 @@ bool xs_set_permissions(struct xs_handle *h, const char *path,
 	for (i = 0; i < num_perms; i++) {
 		char buffer[MAX_STRLEN(domid_t)+1];
 
-		if (!perm_to_string(&perms[i], buffer))
+		if (!xs_perm_to_string(&perms[i], buffer))
 			goto unwind;
 
 		iov[i+1].iov_base = strdup(buffer);

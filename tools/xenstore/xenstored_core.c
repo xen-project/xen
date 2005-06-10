@@ -81,7 +81,7 @@ bool test_write_all(int fd, void *contents, unsigned int len)
 		errno = ENOSPC;
 		return false;
 	}
-	return write_all(fd, contents, len);
+	return xs_write_all(fd, contents, len);
 }
 
 int test_mkdir(const char *dir, int perms);
@@ -443,9 +443,9 @@ static struct xs_permissions *get_perms(struct transaction *transaction,
 	if (!strings)
 		return NULL;
 
-	*num = count_strings(strings, size);
+	*num = xs_count_strings(strings, size);
 	ret = talloc_array(node, struct xs_permissions, *num);
-	if (!strings_to_perms(ret, *num, strings))
+	if (!xs_strings_to_perms(ret, *num, strings))
 		corrupt(NULL, "Permissions corrupt for %s", node);
 
 	return ret;
@@ -460,7 +460,7 @@ static char *perms_to_strings(const char *node,
 	char buffer[MAX_STRLEN(domid_t) + 1];
 
 	for (*len = 0, i = 0; i < num; i++) {
-		if (!perm_to_string(&perms[i], buffer))
+		if (!xs_perm_to_string(&perms[i], buffer))
 			return NULL;
 
 		strings = talloc_realloc(node, strings, char,
@@ -506,7 +506,7 @@ static char *tempfile(const char *path, void *contents, unsigned int len)
 	if (!fd)
 		return NULL;
 	talloc_set_destructor(tmppath, destroy_path);
-	if (!write_all(*fd, contents, len))
+	if (!xs_write_all(*fd, contents, len))
 		return NULL;
 
 	return tmppath;
@@ -721,14 +721,14 @@ static bool new_directory(struct connection *conn,
 	permstr = perms_to_strings(dir, &perms, 1, &len);
 	fd = talloc_open(node_permfile(conn->transaction, node),
 			 O_WRONLY|O_CREAT|O_EXCL, 0640);
-	if (!fd || !write_all(*fd, permstr, len))
+	if (!fd || !xs_write_all(*fd, permstr, len))
 		return false;
 
 	if (data) {
 		char *datapath = node_datafile(conn->transaction, node);
 
 		fd = talloc_open(datapath, O_WRONLY|O_CREAT|O_EXCL, 0640);
-		if (!fd || !write_all(*fd, data, datalen))
+		if (!fd || !xs_write_all(*fd, data, datalen))
 			return false;
 	}
 
@@ -878,7 +878,7 @@ static bool do_set_perms(struct connection *conn, struct buffered_data *in)
 	char *node;
 	struct xs_permissions *perms;
 
-	num = count_strings(in->buffer, in->used);
+	num = xs_count_strings(in->buffer, in->used);
 	if (num < 2)
 		return send_error(conn, EINVAL);
 
@@ -898,7 +898,7 @@ static bool do_set_perms(struct connection *conn, struct buffered_data *in)
 		return send_error(conn, errno);
 
 	perms = talloc_array(node, struct xs_permissions, num);
-	if (!strings_to_perms(perms, num, in->buffer))
+	if (!xs_strings_to_perms(perms, num, in->buffer))
 		return send_error(conn, errno);
 
 	if (!set_perms(conn->transaction, node, perms, num))
