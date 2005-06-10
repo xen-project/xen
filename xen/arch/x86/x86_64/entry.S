@@ -320,8 +320,6 @@ FLT4:   movq  %rax,16(%rsi)             # RFLAGS
         movw  UREGS_cs+8(%rsp),%ax      # Bits  0-15: CS
 FLT5:   movq  %rax,8(%rsi)              # CS/saved_upcall_mask
         movq  UREGS_rip+8(%rsp),%rax
-        testq %rax,%rax
-        jz    domain_crash_synchronous
 FLT6:   movq  %rax,(%rsi)               # RIP
         testb $TBF_EXCEPTION_ERRCODE,%cl
         jz    1f
@@ -357,6 +355,8 @@ FLT14:  movq  %rax,(%rsi)               # RCX
         movq  %rsi,UREGS_rsp+8(%rsp)
         movq  $__GUEST_CS,UREGS_cs+8(%rsp)
         movq  TRAPBOUNCE_eip(%rdx),%rax
+        testq %rax,%rax
+        jz    domain_crash_synchronous
         movq  %rax,UREGS_rip+8(%rsp)
         movb  $0,TRAPBOUNCE_flags(%rdx)
         ret
