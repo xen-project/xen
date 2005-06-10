@@ -19,15 +19,16 @@
         movq (reg),reg;
 
         ALIGN
-/* %rbx: struct vcpu, interrupts disabled */
+/* %rbx: struct vcpu */
 switch_to_kernel:
         leaq  VCPU_trap_bounce(%rbx),%rdx
         movq  VCPU_syscall_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movw  $0,TRAPBOUNCE_flags(%rdx)
         call  create_bounce_frame
+        jmp   test_all_events
 
-/* %rbx: struct vcpu */
+/* %rbx: struct vcpu, interrupts disabled */
 restore_all_guest:
         RESTORE_ALL
         testw $TRAP_syscall,4(%rsp)
@@ -38,7 +39,6 @@ restore_all_guest:
         popq  %r11                    # CS
         cmpw  $__GUEST_CS32,%r11
         popq  %r11                    # RFLAGS
-        cli                           # No interrupts after stack switch
         popq  %rsp                    # RSP
         je    1f
         sysretq
@@ -107,6 +107,7 @@ restore_all_xen:
  */
         ALIGN
 ENTRY(syscall_enter)
+        sti
         movl  $__GUEST_SS,24(%rsp)
         pushq %rcx
         pushq $0
@@ -117,7 +118,6 @@ ENTRY(syscall_enter)
         jz    switch_to_kernel
 
 /*hypercall:*/
-        sti
         movq  %r10,%rcx
         andq  $(NR_hypercalls-1),%rax
         leaq  hypercall_table(%rip),%r10
