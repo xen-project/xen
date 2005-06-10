@@ -74,7 +74,7 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 		else do_ssc(vcpu_get_gr(current,36), regs);
 	}
 #endif
-	if (iim == d->breakimm) {
+	if (iim == d->arch.breakimm) {
 		struct ia64_sal_retval x;
 		switch (regs->r2) {
 		    case FW_HYPERCALL_PAL_CALL:
