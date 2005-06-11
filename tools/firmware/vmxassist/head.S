@@ -135,7 +135,7 @@ _start:
 	.align	4
 	.globl	halt
 halt:
-	pushl	$halt_msg
+	push	$halt_msg
 	call	printf
 #ifdef TEST
         movw    $0x8A00, %dx
