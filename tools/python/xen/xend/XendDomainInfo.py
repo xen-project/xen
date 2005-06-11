@@ -701,6 +701,7 @@ class XendDomainInfo:
                 ctrl.initController(reboot=True)
         else:
             self.create_configured_devices()
+        self.image.createDeviceModel()
 
     def device_create(self, dev_config):
         """Create a new device.

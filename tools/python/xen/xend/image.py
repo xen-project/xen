@@ -1,10 +1,12 @@
-import os
+import os, string
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 from xen.xend import sxp
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 from xen.xend.xenstore import DBVar
+
+from xen.xend.server import channel
 
 class ImageHandler:
     """Abstract base class for image handlers.
@@ -303,7 +305,7 @@ class VmxImageHandler(ImageHandler):
                   + " -f %s" % device_config
                   + self.vncParams()
                   + " -d %d" % self.vm.getDomain()
-                  + " -p %d" % self.device_channel['port1']
+                  + " -p %d" % (int(self.device_channel.port1)-1)
                   + " -m %s" % self.vm.memory)
 
     def vncParams(self):
