@@ -18,6 +18,9 @@
 # Place - Suite 330, Boston, MA 02111-1307 USA.
 #
 
+XEN_ROOT = ../../..
+include $(XEN_ROOT)/tools/Rules.mk
+
 # The emulator code lives in ROM space
 TEXTADDR=0x000D0000
 DEFINES=-DDEBUG -DTEXTADDR=${TEXTADDR}
@@ -32,19 +35,24 @@ CPP=cpp -P
 OBJCOPY=objcopy -p -O binary -R .note -R .comment -R .bss -S --gap-fill=0
 CFLAGS=${DEFINES} -I. $(XENINC) -Wall -fno-builtin -O2 -msoft-float
 
+ifeq ($(XEN_COMPILE_ARCH),x86_64)
+CFLAGS  += -m32 -march=i686
+LDFLAGS += -m elf_i386
+endif
+
 OBJECTS = head.o trap.o vm86.o setup.o util.o
 
 all: vmxloader
 
 vmxloader: roms.h vmxloader.c
-	${CC} ${DEFINES} -c vmxloader.c
-	$(CC) -o vmxloader.tmp -nostdlib -Wl,-N -Wl,-Ttext -Wl,0x100000 vmxloader.o
+	${CC} ${CFLAGS} ${DEFINES} -c vmxloader.c
+	$(CC) -o vmxloader.tmp -m32 -nostdlib -Wl,-N -Wl,-Ttext -Wl,0x100000 vmxloader.o
 	objcopy --change-addresses=0xC0000000 vmxloader.tmp vmxloader
 	rm -f vmxloader.tmp
 
 vmxassist.bin: vmxassist.ld ${OBJECTS}
 	${CPP} ${DEFINES} vmxassist.ld > vmxassist.tmp
-	${LD} -o vmxassist -nostdlib --fatal-warnings -N -T vmxassist.tmp ${OBJECTS}
+	${LD} -o vmxassist ${LDFLAGS} -nostdlib --fatal-warnings -N -T vmxassist.tmp ${OBJECTS}
 	nm -n vmxassist > vmxassist.sym
 	${OBJCOPY} vmxassist vmxassist.tmp
 	dd if=vmxassist.tmp of=vmxassist.bin ibs=512 conv=sync
