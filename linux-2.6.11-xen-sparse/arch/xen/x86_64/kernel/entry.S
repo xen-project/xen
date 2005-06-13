@@ -67,9 +67,9 @@ VGCF_IN_SYSCALL = (1<<8)
 #define preempt_disable(reg)	incl TI_preempt_count(reg)
 #define preempt_enable(reg)	decl TI_preempt_count(reg)
 #define XEN_LOCK_VCPU_INFO_SMP(reg) preempt_disable(%rbp)		; \
-				movl TI_cpu(%rbp),reg			; \
+				movq TI_cpu(%rbp),reg			; \
 				shl  $sizeof_vcpu_shift,reg		; \
-				addl HYPERVISOR_shared_info,reg
+				addq HYPERVISOR_shared_info,reg
 #define XEN_UNLOCK_VCPU_INFO_SMP(reg) preempt_enable(%rbp)
 #define XEN_UNLOCK_VCPU_INFO_SMP_fixup .byte 0xff,0xff,0xff
 #define Ux00 0xff
@@ -80,7 +80,7 @@ VGCF_IN_SYSCALL = (1<<8)
 #define XEN_UNBLOCK_EVENTS(reg)	XEN_LOCK_VCPU_INFO_SMP(reg)		; \
 				movb $0,evtchn_upcall_mask(reg)		; \
     				XEN_UNLOCK_VCPU_INFO_SMP(reg)
-#define XEN_SAVE_UPCALL_MASK(reg,tmp,off) GET_THREAD_INFO(%ebp)		; \
+#define XEN_SAVE_UPCALL_MASK(reg,tmp,off) GET_THREAD_INFO(%rbp)		; \
 				XEN_LOCK_VCPU_INFO_SMP(reg)		; \
 				movb evtchn_upcall_mask(reg), tmp	; \
 				movb tmp, off(%rsp)			; \
