@@ -64,18 +64,25 @@ typedef struct {
 	unsigned long krs[8];	// kernel registers
 	unsigned long pkrs[8];	// protection key registers
 	unsigned long tmp[8];	// temp registers (e.g. for hyperprivops)
-//} PACKED arch_shared_info_t;
+//} PACKED arch_vcpu_info_t;
 } arch_vcpu_info_t;		// DON'T PACK 
 
 typedef struct {
+	int evtchn_vector;
+	int domain_controller_evtchn;
+	unsigned int flags;
+//} PACKED arch_shared_info_t;
 } arch_shared_info_t;		// DON'T PACK 
 
 /*
  * The following is all CPU context. Note that the i387_ctxt block is filled 
  * in by FXSAVE if the CPU has feature FXSR; otherwise FSAVE is used.
  */
+#include <asm/ptrace.h>
 typedef struct vcpu_guest_context {
-    //unsigned long flags;
+	struct pt_regs regs;
+	arch_vcpu_info_t vcpu;
+	arch_shared_info_t shared;
 } PACKED vcpu_guest_context_t;
 
 #endif /* !__ASSEMBLY__ */

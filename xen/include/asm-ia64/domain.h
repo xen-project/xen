@@ -11,9 +11,6 @@
 
 extern void arch_do_createdomain(struct vcpu *);
 
-extern int arch_final_setup_guestos(
-    struct vcpu *, struct vcpu_guest_context *);
-
 extern void domain_relinquish_resources(struct domain *);
 
 #ifdef CONFIG_VTI

@@ -539,7 +539,7 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
     } else
 #endif // CONFIG_VTI
     {
-	if (!test_bit(vector,PSCB(vcpu,delivery_mask))) return;
+	/* if (!test_bit(vector,PSCB(vcpu,delivery_mask))) return; */
 	if (test_bit(vector,PSCBX(vcpu,irr))) {
 //printf("vcpu_pend_interrupt: overrun\n");
 	}
@@ -569,10 +569,10 @@ UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 	UINT64 *p, *q, *r, bits, bitnum, mask, i, vector;
 
 	p = &PSCBX(vcpu,irr[3]);
-	q = &PSCB(vcpu,delivery_mask[3]);
+	/* q = &PSCB(vcpu,delivery_mask[3]); */
 	r = &PSCBX(vcpu,insvc[3]);
 	for (i = 3; ; p--, q--, r--, i--) {
-		bits = *p & *q;
+		bits = *p /* & *q */;
 		if (bits) break; // got a potential interrupt
 		if (*r) {
 			// nothing in this word which is pending+inservice

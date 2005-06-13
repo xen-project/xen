@@ -19,8 +19,6 @@ extern unsigned long translate_domain_mpaddr(unsigned long);
 extern struct ia64_sal_retval pal_emulator_static(UINT64);
 extern struct ia64_sal_retval sal_emulator(UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64);
 
-void fooefi(void) {}
-
 int
 ia64_hypercall (struct pt_regs *regs)
 {
@@ -122,6 +120,28 @@ ia64_hypercall (struct pt_regs *regs)
 	    case 0xfffb: // test dummy hypercall
 		regs->r8 = domU_staging_read_8(vcpu_get_gr(v,32));
 		break;
+
+	    case __HYPERVISOR_dom0_op:
+		regs->r8 = do_dom0_op(regs->r14);
+		break;
+
+	    case __HYPERVISOR_dom_mem_op:
+		/* regs->r8 = do_dom_mem_op(regs->r14, regs->r15, regs->r16, regs->r17, regs->r18); */
+		/* we don't handle reservations; just return success */
+		regs->r8 = regs->r16;
+		break;
+
+	    case __HYPERVISOR_event_channel_op:
+		regs->r8 = do_event_channel_op(regs->r14);
+		break;
+
+	    case __HYPERVISOR_console_io:
+		regs->r8 = do_console_io(regs->r14, regs->r15, regs->r16);
+		break;
+
+	    default:
+		printf("unknown hypercall %x\n", regs->r2);
+		regs->r8 = (unsigned long)-1;
 	}
 	return 1;
 }

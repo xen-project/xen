@@ -1140,6 +1140,7 @@
 425ae516juUB257qrwUdsL9AsswrqQ xen/arch/ia64/patch/linux-2.6.11/time.c
 425ae5167zQn7zYcgKtDUDX2v-e8mw xen/arch/ia64/patch/linux-2.6.11/tlb.c
 425ae5162bIl2Dgd19x-FceB4L9oGw xen/arch/ia64/patch/linux-2.6.11/types.h
+42ae01f01KDfSgVQnscwJ0psRmEaCw xen/arch/ia64/patch/linux-2.6.11/uaccess.h
 425ae516cFUNY2jHD46bujcF5NJheA xen/arch/ia64/patch/linux-2.6.11/unaligned.c
 421098b39QFMC-1t1r38CA7NxAYBPA xen/arch/ia64/patch/linux-2.6.7/bootmem.h
 421098b3SIA1vZX9fFUjo1T3o_jMCQ xen/arch/ia64/patch/linux-2.6.7/current.h
