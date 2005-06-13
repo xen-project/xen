@@ -14,9 +14,9 @@
  */
 
 /* Needed for Python versions earlier than 2.3. */
-//#ifndef PyMODINIT_FUNC
-//#define PyMODINIT_FUNC DL_EXPORT(void)
-//#endif
+#ifndef PyMODINIT_FUNC
+#define PyMODINIT_FUNC DL_EXPORT(void)
+#endif
 
 #define PYPKG    "xen.lowlevel.xs"
 
