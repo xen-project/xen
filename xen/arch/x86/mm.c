@@ -1237,7 +1237,7 @@ void free_page_type(struct pfn_info *page, unsigned int type)
         {
             gpfn = __mfn_to_gpfn(owner, page_to_pfn(page));
             ASSERT(VALID_M2P(gpfn));
-            remove_shadow(owner, gpfn, type);
+            remove_shadow(owner, gpfn, type & PGT_type_mask);
         }
     }
 
