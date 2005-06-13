@@ -727,23 +727,20 @@ void __init setup_arch(char **cmdline_p)
        acpi_reserve_bootmem();
 #endif
 #ifdef CONFIG_BLK_DEV_INITRD
-        if (xen_start_info.mod_start) {
-                if (LOADER_TYPE && INITRD_START) {
-                        if (INITRD_START + INITRD_SIZE <= (end_pfn << PAGE_SHIFT)) {
-                                /* reserve_bootmem_generic(INITRD_START, INITRD_SIZE); */
-                                initrd_start = INITRD_START + PAGE_OFFSET;
-                                initrd_end = initrd_start+INITRD_SIZE;
-                                initrd_below_start_ok = 1;
-                        }
-                        else {
-                                printk(KERN_ERR "initrd extends beyond end of memory "
-                                       "(0x%08lx > 0x%08lx)\ndisabling initrd\n",
-                                       (unsigned long)(INITRD_START + INITRD_SIZE),
-                                       (unsigned long)(end_pfn << PAGE_SHIFT));
-                                initrd_start = 0;
-                        }
-                }
-        }
+	if (xen_start_info.mod_start) {
+		if (INITRD_START + INITRD_SIZE <= (end_pfn << PAGE_SHIFT)) {
+			/*reserve_bootmem_generic(INITRD_START, INITRD_SIZE);*/
+			initrd_start = INITRD_START + PAGE_OFFSET;
+			initrd_end = initrd_start+INITRD_SIZE;
+			initrd_below_start_ok = 1;
+		} else {
+			printk(KERN_ERR "initrd extends beyond end of memory "
+				"(0x%08lx > 0x%08lx)\ndisabling initrd\n",
+				(unsigned long)(INITRD_START + INITRD_SIZE),
+				(unsigned long)(end_pfn << PAGE_SHIFT));
+			initrd_start = 0;
+		}
+	}
 #endif
 	paging_init();
 #ifdef CONFIG_X86_LOCAL_APIC
