@@ -230,19 +230,6 @@ void arch_do_createdomain(struct vcpu *v)
 	d->xen_vastart = 0xf000000000000000;
 	d->xen_vaend = 0xf300000000000000;
 	d->arch.breakimm = 0x1000;
-
-	d->arch.mm = xmalloc(struct mm_struct);
-	if (unlikely(!d->arch.mm)) {
-		printk("Can't allocate mm_struct for domain %d\n",d->domain_id);
-		return -ENOMEM;
-	}
-	memset(d->arch.mm, 0, sizeof(*d->arch.mm));
-	d->arch.mm->pgd = pgd_alloc(d->arch.mm);
-	if (unlikely(!d->arch.mm->pgd)) {
-		printk("Can't allocate pgd for domain %d\n",d->domain_id);
-		return -ENOMEM;
-	}
-}
 }
 #else // CONFIG_VTI
 void arch_do_createdomain(struct vcpu *v)
@@ -366,21 +353,22 @@ void new_thread(struct vcpu *v,
 	regs->cr_iip = start_pc;
 	regs->cr_ifs = 0; /* why? - matthewc */
 	regs->ar_fpsr = FPSR_DEFAULT;
-	if (VMX_DOMAIN(ed)) {
+	if (VMX_DOMAIN(v)) {
 		vmx_init_all_rr(v);
 	} else
 		init_all_rr(v);
-	/* should this be regs->r28 in the non-VMX case? - matthewc */
-	VMX_VPD(v,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);  //FIXME
+
 	if (VMX_DOMAIN(v)) {
+		VMX_VPD(v,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);
 		/* Virtual processor context setup */
 		VMX_VPD(v, vpsr) = IA64_PSR_BN;
 		VPD_CR(v, dcr) = 0;
 	} else {
+		regs->r28 = dom_fw_setup(d,saved_command_line,256L);
 		v->vcpu_info->arch.banknum = 1;
-		/* v->vcpu_info->arch.metaphysical_mode = 1;  why not? - matthewc */
+		v->vcpu_info->arch.metaphysical_mode = 1;
+		d->shared_info->arch.flags = (d == dom0) ? (SIF_INITDOMAIN|SIF_PRIVILEGED|SIF_BLK_BE_DOMAIN|SIF_NET_BE_DOMAIN|SIF_USB_BE_DOMAIN) : 0;
 	}
-	/* d->shared_info->arch.flags = (d == dom0) ? (SIF_INITDOMAIN|SIF_PRIVILEGED|SIF_BLK_BE_DOMAIN|SIF_NET_BE_DOMAIN|SIF_USB_BE_DOMAIN) : 0;  shared_info not set yet? */
 }
 #else // CONFIG_VTI
 
