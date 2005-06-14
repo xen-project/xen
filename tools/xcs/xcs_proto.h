@@ -40,7 +40,7 @@
 #define TYPE_VIRQ      0xfffe
 
 typedef struct {
-    u32 session_id;
+    unsigned long  session_id;
 } xcs_connect_msg_t;
 
 typedef struct {
