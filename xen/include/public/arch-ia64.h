@@ -19,6 +19,32 @@
 /* NB. Both the following are 64 bits each. */
 typedef unsigned long memory_t;   /* Full-sized pointer/address/memory-size. */
 
+#define MAX_NR_SECTION  32  // at most 32 memory holes
+typedef struct {
+    unsigned long	start; 	/* start of memory hole */
+    unsigned long	end;	/* end of memory hole */
+} mm_section_t;
+
+typedef struct {
+    unsigned long	mfn : 56;
+    unsigned long	type: 8;
+} pmt_entry_t;
+
+#define GPFN_MEM		(0UL << 56)	/* Guest pfn is normal mem */
+#define GPFN_FRAME_BUFFER	(1UL << 56)	/* VGA framebuffer */
+#define GPFN_LOW_MMIO		(2UL << 56)	/* Low MMIO range */
+#define GPFN_PIB		(3UL << 56)	/* PIB base */
+#define GPFN_IOSAPIC		(4UL << 56)	/* IOSAPIC base */
+#define GPFN_LEGACY_IO		(5UL << 56)	/* Legacy I/O base */
+#define GPFN_GFW		(6UL << 56)	/* Guest Firmware */
+#define GPFN_HIGH_MMIO		(7UL << 56)	/* High MMIO range */
+
+#define GPFN_IO_MASK		(7UL << 56)	/* Guest pfn is I/O type */
+#define GPFN_INV_MASK		(31UL << 59)	/* Guest pfn is invalid */
+
+#define INVALID_MFN              (~0UL)
+
+
 typedef struct
 {
 } PACKED cpu_user_regs;

@@ -6,6 +6,7 @@
 #include <asm/vmx_vpd.h>
 #include <asm/vmmu.h>
 #include <asm/regionreg.h>
+#include <public/arch-ia64.h>
 #endif // CONFIG_VTI
 #include <xen/list.h>
 
@@ -33,7 +34,15 @@ struct arch_domain {
     int imp_va_msb;
     ia64_rr emul_phy_rr0;
     ia64_rr emul_phy_rr4;
-    u64 *pmt;	/* physical to machine table */
+    unsigned long *pmt;	/* physical to machine table */
+    /*
+     * max_pfn is the maximum page frame in guest physical space, including
+     * inter-middle I/O ranges and memory holes. This is different with
+     * max_pages in domain struct, which indicates maximum memory size
+     */
+    unsigned long max_pfn;
+    unsigned int section_nr;
+    mm_section_t *sections;	/* Describe memory hole except for Dom0 */
 #endif  //CONFIG_VTI
     u64 xen_vastart;
     u64 xen_vaend;

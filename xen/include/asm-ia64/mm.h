@@ -375,17 +375,40 @@ extern unsigned long *mpt_table;
 #undef machine_to_phys_mapping
 #define machine_to_phys_mapping	mpt_table
 
+#define INVALID_M2P_ENTRY        (~0U)
+#define VALID_M2P(_e)            (!((_e) & (1U<<63)))
+#define IS_INVALID_M2P_ENTRY(_e) (!VALID_M2P(_e))
 /* If pmt table is provided by control pannel later, we need __get_user
 * here. However if it's allocated by HV, we should access it directly
 */
-#define phys_to_machine_mapping(d, gpfn)	\
-    ((d) == dom0 ? gpfn : (d)->arch.pmt[(gpfn)])
+#define phys_to_machine_mapping(d, gpfn)			\
+    ((d) == dom0 ? gpfn : 					\
+	(gpfn <= d->arch.max_pfn ? (d)->arch.pmt[(gpfn)] :	\
+		INVALID_MFN))
 
 #define __mfn_to_gpfn(_d, mfn)			\
     machine_to_phys_mapping[(mfn)]
 
 #define __gpfn_to_mfn(_d, gpfn)			\
     phys_to_machine_mapping((_d), (gpfn))
+
+#define __gpfn_invalid(_d, gpfn)			\
+	(__gpfn_to_mfn((_d), (gpfn)) & GPFN_INV_MASK)
+
+#define __gpfn_valid(_d, gpfn)	!__gpfn_invalid(_d, gpfn)
+
+/* Return I/O type if trye */
+#define __gpfn_is_io(_d, gpfn)				\
+	(__gpfn_valid(_d, gpfn) ? 			\
+	(__gpfn_to_mfn((_d), (gpfn)) & GPFN_IO_MASK) : 0)
+
+#define __gpfn_is_mem(_d, gpfn)				\
+	(__gpfn_valid(_d, gpfn) ?			\
+	((__gpfn_to_mfn((_d), (gpfn)) & GPFN_IO_MASK) == GPFN_MEM) : 0)
+
+
+#define __gpa_to_mpa(_d, gpa)   \
+    ((__gpfn_to_mfn((_d),(gpa)>>PAGE_SHIFT)<<PAGE_SHIFT)|((gpa)&~PAGE_MASK))
 #endif // CONFIG_VTI
 
 #endif /* __ASM_IA64_MM_H__ */
