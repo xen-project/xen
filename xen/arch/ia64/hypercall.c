@@ -126,8 +126,7 @@ ia64_hypercall (struct pt_regs *regs)
 		break;
 
 	    case __HYPERVISOR_dom_mem_op:
-		/* regs->r8 = do_dom_mem_op(regs->r14, regs->r15, regs->r16, regs->r17, regs->r18); */
-		/* we don't handle reservations; just return success */
+		regs->r8 = do_dom_mem_op(regs->r14, regs->r15, regs->r16, regs->r17, regs->r18); 
 		regs->r8 = regs->r16;
 		break;
 
