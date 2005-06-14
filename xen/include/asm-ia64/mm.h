@@ -27,43 +27,12 @@ typedef unsigned long page_flags_t;
 
 /*
  * Per-page-frame information.
+ * 
+ * Every architecture must ensure the following:
+ *  1. 'struct pfn_info' contains a 'struct list_head list'.
+ *  2. Provide a PFN_ORDER() macro for accessing the order of a free page.
  */
-
-//FIXME: This can go away when common/dom0_ops.c is fully arch-independent
-#if 0
-struct pfn_info
-{
-    /* Each frame can be threaded onto a doubly-linked list. */
-    struct list_head list;
-    /* Context-dependent fields follow... */
-    union {
-
-        /* Page is in use by a domain. */
-        struct {
-            /* Owner of this page. */
-            struct domain *domain;
-            /* Reference count and various PGC_xxx flags and fields. */
-            u32 count_info;
-            /* Type reference count and various PGT_xxx flags and fields. */
-            u32 type_info;
-        } inuse;
-
-        /* Page is on a free list. */
-        struct {
-            /* Mask of possibly-tainted TLBs. */
-            unsigned long cpu_mask;
-            /* Must be at same offset as 'u.inuse.count_flags'. */
-            u32 __unavailable;
-            /* Order-size of the free chunk this page is the head of. */
-            u8 order;
-        } free;
-
-    } u;
-
-    /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
-    u32 tlbflush_timestamp;
-};
-#endif
+#define PFN_ORDER(_pfn)	((_pfn)->u.free.order)
 
 struct page
 {
@@ -82,7 +51,7 @@ struct page
         /* Page is in use by a domain. */
         struct {
             /* Owner of this page. */
-            u64	_domain;
+            u32	_domain;
             /* Type reference count and various PGT_xxx flags and fields. */
             u32 type_info;
         } inuse;
@@ -104,36 +73,48 @@ struct page
 
 #define set_page_count(p,v) 	atomic_set(&(p)->_count, v - 1)
 
-//FIXME: These can go away when common/dom0_ops.c is fully arch-independent
- /* The following page types are MUTUALLY EXCLUSIVE. */
+/* Still small set of flags defined by far on IA-64 */
+/* The following page types are MUTUALLY EXCLUSIVE. */
 #define PGT_none            (0<<29) /* no special uses of this page */
 #define PGT_l1_page_table   (1<<29) /* using this page as an L1 page table? */
 #define PGT_l2_page_table   (2<<29) /* using this page as an L2 page table? */
 #define PGT_l3_page_table   (3<<29) /* using this page as an L3 page table? */
 #define PGT_l4_page_table   (4<<29) /* using this page as an L4 page table? */
-#define PGT_gdt_page        (5<<29) /* using this page in a GDT? */
-#define PGT_ldt_page        (6<<29) /* using this page in an LDT? */
-#define PGT_writeable_page  (7<<29) /* has writable mappings of this page? */
-#define PGT_type_mask       (7<<29) /* Bits 29-31. */
+#define PGT_writeable_page  (5<<29) /* has writable mappings of this page? */
+#define PGT_type_mask       (5<<29) /* Bits 29-31. */
+
  /* Has this page been validated for use as its current type? */
 #define _PGT_validated      28
 #define PGT_validated       (1<<_PGT_validated)
- /* 28-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1<<28)-1)
+/* Owning guest has pinned this page to its current type? */
+#define _PGT_pinned         27
+#define PGT_pinned          (1U<<_PGT_pinned)
+
+/* 27-bit count of uses of this frame as its current type. */
+#define PGT_count_mask      ((1U<<27)-1)
 
 /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated      31
 #define PGC_allocated       (1U<<_PGC_allocated)
-#define PFN_ORDER(_pfn)	((_pfn)->u.free.order)
+/* Set when the page is used as a page table */
+#define _PGC_page_table     30
+#define PGC_page_table      (1U<<_PGC_page_table)
+/* 30-bit count of references to this frame. */
+#define PGC_count_mask      ((1U<<30)-1)
 
 #define IS_XEN_HEAP_FRAME(_pfn) ((page_to_phys(_pfn) < xenheap_phys_end) \
 				 && (page_to_phys(_pfn) >= xen_pstart))
 
-#define pickle_domptr(_d)	((u64)(_d))
-#define unpickle_domptr(_d)	((struct domain*)(_d))
+static inline struct domain *unpickle_domptr(u32 _d)
+{ return (_d == 0) ? NULL : __va(_d); }
+static inline u32 pickle_domptr(struct domain *_d)
+{ return (_d == NULL) ? 0 : (u32)__pa(_d); }
 
 #define page_get_owner(_p)	(unpickle_domptr((_p)->u.inuse._domain))
 #define page_set_owner(_p, _d)	((_p)->u.inuse._domain = pickle_domptr(_d))
+
+/* Dummy now */
+#define SHARE_PFN_WITH_DOMAIN(_pfn, _dom) do { } while (0)
 
 extern struct pfn_info *frame_table;
 extern unsigned long frame_table_size;
@@ -151,15 +132,45 @@ void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
 static inline void put_page(struct pfn_info *page)
 {
-	dummy();
+    u32 nx, x, y = page->count_info;
+
+    do {
+	x = y;
+	nx = x - 1;
+    }
+    while (unlikely((y = cmpxchg(&page->count_info, x, nx)) != x));
+
+    if (unlikely((nx & PGC_count_mask) == 0))
+	free_domheap_page(page);
 }
 
-
+/* count_info and ownership are checked atomically. */
 static inline int get_page(struct pfn_info *page,
                            struct domain *domain)
 {
-	dummy();
+    u64 x, nx, y = *((u64*)&page->count_info);
+    u32 _domain = pickle_domptr(domain);
+
+    do {
+	x = y;
+	nx = x + 1;
+	if (unlikely((x & PGC_count_mask) == 0) ||	/* Not allocated? */
+	    unlikely((nx & PGC_count_mask) == 0) ||	/* Count overflow? */
+	    unlikely((x >> 32) != _domain)) {		/* Wrong owner? */
+	    DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%08x\n",
+		page_to_pfn(page), domain, unpickle_domptr(d),
+		x, page->u.inuse.typeinfo);
+	    return 0;
+	}
+    }
+    while(unlikely(y = cmpxchg(&page->count_info, x, nx)) != x);
+
+    return 1;
 }
+
+/* No type info now */
+#define put_page_and_type(page) put_page((page))
+#define get_page_and_type(page, domain, type) get_page((page))
 
 #define	set_machinetophys(_mfn, _pfn) do { } while(0);
 
