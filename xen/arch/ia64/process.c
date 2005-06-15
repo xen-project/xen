@@ -313,45 +313,31 @@ void xen_handle_domain_access(unsigned long address, unsigned long isr, struct p
 	}
 if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
 		
+	if (trp = match_tr(current,address)) {
+		// FIXME address had better be pre-validated on insert
+		pteval = translate_domain_pte(trp->page_flags,address,trp->itir);
+		vcpu_itc_no_srlz(current,6,address,pteval,-1UL,(trp->itir>>2)&0x3f);
+		return;
+	}
 	// if we are fortunate enough to have it in the 1-entry TLB...
 	if (pteval = match_dtlb(ed,address,&ps,NULL)) {
 		vcpu_itc_no_srlz(ed,6,address,pteval,-1UL,ps);
 		return;
 	}
-	// look in the TRs
-	fault = vcpu_tpa(ed,address,&mpaddr);
-	if (fault != IA64_NO_FAULT) {
-		static int uacnt = 0;
-		// can't translate it, just fail (poor man's exception)
-		// which results in retrying execution
-//printk("*** xen_handle_domain_access: poor man's exception cnt=%i iip=%p, addr=%p...\n",uacnt++,iip,address);
-		if (ia64_done_with_exception(regs)) {
+	if (ia64_done_with_exception(regs)) {
 //if (!(uacnt++ & 0x3ff)) printk("*** xen_handle_domain_access: successfully handled cnt=%d iip=%p, addr=%p...\n",uacnt,iip,address);
 			return;
-		}
-		else {
-			// should never happen.  If it does, region 0 addr may
-			// indicate a bad xen pointer
-			printk("*** xen_handle_domain_access: exception table"
-                               " lookup failed, iip=%p, addr=%p, spinning...\n",
-				iip,address);
-			panic_domain(regs,"*** xen_handle_domain_access: exception table"
-                               " lookup failed, iip=%p, addr=%p, spinning...\n",
-				iip,address);
-		}
 	}
-	if (d == dom0) {
-		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-			printk("xen_handle_domain_access: vcpu_tpa returned out-of-bounds dom0 mpaddr %p! continuing...\n",mpaddr);
-			tdpfoo();
-		}
+	else {
+		// should never happen.  If it does, region 0 addr may
+		// indicate a bad xen pointer
+		printk("*** xen_handle_domain_access: exception table"
+                       " lookup failed, iip=%p, addr=%p, spinning...\n",
+			iip,address);
+		panic_domain(regs,"*** xen_handle_domain_access: exception table"
+                       " lookup failed, iip=%p, addr=%p, spinning...\n",
+			iip,address);
 	}
-//printk("*** xen_handle_domain_access: tpa resolved miss @%p...\n",address);
-	pteval = lookup_domain_mpa(d,mpaddr);
-	// would be nice to have a counter here
-	//printf("Handling privop data TLB miss\n");
-	// FIXME, must be inlined or potential for nested fault here!
-	vcpu_itc_no_srlz(ed,2,address,pteval,-1UL,PAGE_SHIFT);
 }
 
 void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *regs, unsigned long itir)
@@ -441,7 +427,7 @@ panic_domain(0,"ia64_do_page_fault: @%p???, iip=%p, b0=%p, itc=%p (spinning...)\
 				if (pteval & _PAGE_P)
 				{
 					pteval = translate_domain_pte(pteval,address,itir);
-					vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,(itir>>2)&0x3f);
+					vcpu_itc_no_srlz(current,is_data?6:1,address,pteval,-1UL,(itir>>2)&0x3f);
 					return;
 				}
 				else vector = is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
