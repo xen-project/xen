@@ -542,6 +542,7 @@
 42a0c8dasiso9c-2sCvHBzP6YVjATA tools/debugger/pdb/evtchn.mli
 42a0c8daXD_6Y62A_u5-PO_Klrhi0w tools/debugger/pdb/pdb_caml_xc.c
 42a0c8danJXun9ay5SPBhhkKvuUPfg tools/debugger/pdb/pdb_xen.c
+42b03d06llc_GE7fXGQ6-rYR4VFAcw tools/debugger/pdb/readme
 42a0c8dbjK6Du89D2SUcxsuAdlUu3w tools/debugger/pdb/server.ml
 401d7e160vaxMBAUSLSicuZ7AQjJ3w tools/examples/Makefile
 401d7e16UgeqroJQTIhwkrDVkoWgZQ tools/examples/README
