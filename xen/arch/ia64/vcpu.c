@@ -1589,7 +1589,8 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 		// addresses never get flushed.  More work needed if this
 		// ever happens.
 //printf("vhpt_insert(%p,%p,%p)\n",vaddr,pte,1L<<logps);
-		vhpt_insert(vaddr,pte,logps<<2);
+		if (logps > PAGE_SHIFT) vhpt_multiple_insert(vaddr,pte,logps);
+		else vhpt_insert(vaddr,pte,logps<<2);
 	}
 	// even if domain pagesize is larger than PAGE_SIZE, just put
 	// PAGE_SIZE mapping in the vhpt for now, else purging is complicated

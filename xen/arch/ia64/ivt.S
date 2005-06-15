@@ -348,12 +348,23 @@ ENTRY(alt_itlb_miss)
 //	;;
 //#endif
 #endif
+#ifdef XEN
+	mov r31=pr
+	mov r16=cr.ifa		// get address that caused the TLB miss
+	;;
+late_alt_itlb_miss:
+	movl r17=PAGE_KERNEL
+	mov r21=cr.ipsr
+	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
+	;;
+#else
 	mov r16=cr.ifa		// get address that caused the TLB miss
 	movl r17=PAGE_KERNEL
 	mov r21=cr.ipsr
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	mov r31=pr
 	;;
+#endif
 #ifdef CONFIG_DISABLE_VHPT
 	shr.u r22=r16,61			// get the region number into r21
 	;;
@@ -399,13 +410,18 @@ ENTRY(alt_dtlb_miss)
 //	;;
 //#endif
 #endif
+#ifdef XEN
+	mov r31=pr
 	mov r16=cr.ifa		// get address that caused the TLB miss
+	;;
+late_alt_dtlb_miss:
 	movl r17=PAGE_KERNEL
 	mov r20=cr.isr
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	mov r21=cr.ipsr
-	mov r31=pr
 	;;
+#else
+#endif
 #ifdef CONFIG_DISABLE_VHPT
 	shr.u r22=r16,61			// get the region number into r21
 	;;

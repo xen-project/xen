@@ -140,12 +140,20 @@ CC_##Name:;							\
 	mov r16 = cr.ifa;					\
 	movl r30 = int_counts;					\
 	;;							\
+	extr.u r17=r16,59,5					\
+	;;							\
+	cmp.eq p6,p0=0x1e,r17;					\
+(p6)	br.cond.spnt	.Alt_##Name				\
+	;;							\
+	cmp.eq p6,p0=0x1d,r17;					\
+(p6)	br.cond.spnt	.Alt_##Name				\
+	;;							\
 	thash r28 = r16;					\
 	adds  r30 = CAUSE_VHPT_CC_HANDLED << 3, r30;		\
 	;;							\
 	ttag r19 = r16;						\
-	ld8 r27 = [r30];					\
-	adds r17 = VLE_CCHAIN_OFFSET, r28;			\
+ld8 r27 = [r30];					\
+adds r17 = VLE_CCHAIN_OFFSET, r28;			\
 	;;							\
 	ld8 r17 = [r17];					\
 	;;							\
@@ -192,6 +200,11 @@ CC_##Name:;							\
 	rfi;							\
 	;;							\
 								\
+.Alt_##Name:;							\
+	mov pr = r31, 0x1ffff;					\
+	;;							\
+	br.cond.sptk late_alt_##Name				\
+	;;							\
 .Out_##Name:;							\
 	mov pr = r31, 0x1ffff;					\
 	;;							\
