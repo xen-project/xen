@@ -754,7 +754,7 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 		vcpu_set_gr(current,8,-1L);
 		break;
 	    default:
-		printf("ia64_handle_break: bad ssc code %lx, iip=%p\n",ssc,regs->cr_iip);
+		printf("ia64_handle_break: bad ssc code %lx, iip=%p, b0=%p\n",ssc,regs->cr_iip,regs->b0);
 		break;
 	}
 	vcpu_increment_iip(current);

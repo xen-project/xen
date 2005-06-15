@@ -748,10 +748,16 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 #define HYPERPRIVOP_ITC_D		0x5
 #define HYPERPRIVOP_ITC_I		0x6
 #define HYPERPRIVOP_SSM_I		0x7
-#define HYPERPRIVOP_MAX			0x7
+#define HYPERPRIVOP_GET_IVR		0x8
+#define HYPERPRIVOP_GET_TPR		0x9
+#define HYPERPRIVOP_SET_TPR		0xa
+#define HYPERPRIVOP_EOI			0xb
+#define HYPERPRIVOP_SET_ITM		0xc
+#define HYPERPRIVOP_MAX			0xc
 
 char *hyperpriv_str[HYPERPRIVOP_MAX+1] = {
 	0, "rfi", "rsm.dt", "ssm.dt", "cover", "itc.d", "itc.i", "ssm.i",
+	"=ivr", "=tpr", "tpr=", "eoi", "itm=",
 	0
 };
 
@@ -796,6 +802,23 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 		return 1;
 	    case HYPERPRIVOP_SSM_I:
 		(void)vcpu_set_psr_i(v);
+		return 1;
+	    case HYPERPRIVOP_GET_IVR:
+		(void)vcpu_get_ivr(v,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_GET_TPR:
+		(void)vcpu_get_tpr(v,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_SET_TPR:
+		(void)vcpu_set_tpr(v,regs->r8);
+		return 1;
+	    case HYPERPRIVOP_EOI:
+		(void)vcpu_set_eoi(v,0L);
+		return 1;
+	    case HYPERPRIVOP_SET_ITM:
+		(void)vcpu_set_itm(v,regs->r8);
 		return 1;
 	}
 	return 0;
