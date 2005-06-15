@@ -23,8 +23,8 @@ typedef struct pt_regs REGS;
 
 #define PRIVOP_ADDR_COUNT
 #ifdef PRIVOP_ADDR_COUNT
-#define _RSM 0
-#define _SSM 1
+#define _GET_IFA 0
+#define _THASH 1
 #define PRIVOP_COUNT_NINSTS 2
 #define PRIVOP_COUNT_NADDRS 30
 

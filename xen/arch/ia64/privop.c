@@ -753,11 +753,17 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 #define HYPERPRIVOP_SET_TPR		0xa
 #define HYPERPRIVOP_EOI			0xb
 #define HYPERPRIVOP_SET_ITM		0xc
-#define HYPERPRIVOP_MAX			0xc
+#define HYPERPRIVOP_THASH		0xd
+#define HYPERPRIVOP_PTC_GA		0xe
+#define HYPERPRIVOP_ITR_D		0xf
+#define HYPERPRIVOP_GET_RR		0x10
+#define HYPERPRIVOP_SET_RR		0x11
+#define HYPERPRIVOP_MAX			0x11
 
 char *hyperpriv_str[HYPERPRIVOP_MAX+1] = {
 	0, "rfi", "rsm.dt", "ssm.dt", "cover", "itc.d", "itc.i", "ssm.i",
-	"=ivr", "=tpr", "tpr=", "eoi", "itm=",
+	"=ivr", "=tpr", "tpr=", "eoi", "itm=", "thash", "ptc.ga", "itr.d",
+	"=rr", "rr=",
 	0
 };
 
@@ -772,6 +778,7 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 	struct vcpu *v = (struct domain *) current;
 	INST64 inst;
 	UINT64 val;
+	UINT64 itir, ifa;
 
 // FIXME: Handle faults appropriately for these
 	if (!iim || iim > HYPERPRIVOP_MAX) {
@@ -819,6 +826,27 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 		return 1;
 	    case HYPERPRIVOP_SET_ITM:
 		(void)vcpu_set_itm(v,regs->r8);
+		return 1;
+	    case HYPERPRIVOP_THASH:
+		(void)vcpu_thash(v,regs->r8,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_PTC_GA:
+		// FIXME: this doesn't seem to work yet, turned off
+		//(void)vcpu_ptc_ga(v,regs->r8,regs->r9);
+		//return 1;
+		break;
+	    case HYPERPRIVOP_ITR_D:
+		(void)vcpu_get_itir(v,&itir);
+		(void)vcpu_get_ifa(v,&ifa);
+		(void)vcpu_itr_d(v,regs->r8,regs->r9,itir,ifa);
+		return 1;
+	    case HYPERPRIVOP_GET_RR:
+		(void)vcpu_get_rr(v,regs->r8,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_SET_RR:
+		(void)vcpu_set_rr(v,regs->r8,regs->r9);
 		return 1;
 	}
 	return 0;
