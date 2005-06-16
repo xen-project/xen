@@ -194,21 +194,21 @@ void arch_do_createdomain(struct vcpu *v)
 	memset(ti, 0, sizeof(struct thread_info));
 	init_switch_stack(v);
 
-	/* If domain is VMX domain, shared info area is created
-	 * by domain and then domain notifies HV by specific hypercall.
-	 * If domain is xenolinux, shared info area is created by
-	 * HV.
-	 * Since we have no idea about whether domain is VMX now,
-	 * (dom0 when parse and domN when build), postpone possible
-	 * allocation.
-	 */
+ 	/* Shared info area is required to be allocated at domain
+ 	 * creation, since control panel will write some I/O info
+ 	 * between front end and back end to that area. However for
+ 	 * vmx domain, our design is to let domain itself to allcoate
+ 	 * shared info area, to keep machine page contiguous. So this
+ 	 * page will be released later when domainN issues request
+ 	 * after up.
+ 	 */
+ 	d->shared_info = (void *)alloc_xenheap_page();
 
 	/* FIXME: Because full virtual cpu info is placed in this area,
 	 * it's unlikely to put it into one shareinfo page. Later
 	 * need split vcpu context from vcpu_info and conforms to
 	 * normal xen convention.
 	 */
-	d->shared_info = NULL;
 	v->vcpu_info = (void *)alloc_xenheap_page();
 	if (!v->vcpu_info) {
    		printk("ERROR/HALTING: CAN'T ALLOC PAGE\n");

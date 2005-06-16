@@ -282,11 +282,9 @@
     ;;                  \
 .mem.offset 0,0; st8.spill [r4]=r20,16;     \
 .mem.offset 8,0; st8.spill [r5]=r21,16;     \
-    mov r18=b6;         \
     ;;                  \
 .mem.offset 0,0; st8.spill [r4]=r22,16;     \
 .mem.offset 8,0; st8.spill [r5]=r23,16;     \
-    mov r19=b7;     \
     ;;                  \
 .mem.offset 0,0; st8.spill [r4]=r24,16;     \
 .mem.offset 8,0; st8.spill [r5]=r25,16;     \
@@ -296,9 +294,11 @@
     ;;                  \
 .mem.offset 0,0; st8.spill [r4]=r28,16;     \
 .mem.offset 8,0; st8.spill [r5]=r29,16;     \
+    mov r26=b6;         \
     ;;                  \
 .mem.offset 0,0; st8.spill [r4]=r30,16;     \
 .mem.offset 8,0; st8.spill [r5]=r31,16;     \
+    mov r27=b7;     \
     ;;                  \
     mov r30=ar.unat;    \
     ;;      \
@@ -317,8 +317,8 @@
     adds r2=PT(B6)-PT(F10),r2;      \
     adds r3=PT(B7)-PT(F11),r3;      \
     ;;          \
-    st8 [r2]=r18,16;       /* b6 */    \
-    st8 [r3]=r19,16;       /* b7 */    \
+    st8 [r2]=r26,16;       /* b6 */    \
+    st8 [r3]=r27,16;       /* b7 */    \
     ;;                  \
     st8 [r2]=r9;           /* ar.csd */    \
     st8 [r3]=r10;          /* ar.ssd */    \
