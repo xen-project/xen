@@ -1383,7 +1383,6 @@
 428b9f38is0zTsIm96_BKo4MLw0SzQ xen/include/asm-ia64/vmx_pal_vsa.h
 428b9f38iDqbugHUheJrcTCD7zlb4g xen/include/asm-ia64/vmx_phy_mode.h
 428b9f38grd_B0AGB1yp0Gi2befHaQ xen/include/asm-ia64/vmx_platform.h
-428b9f38lm0ntDBusHggeQXkx1-1HQ xen/include/asm-ia64/vmx_ptrace.h
 428b9f38XgwHchZEpOzRtWfz0agFNQ xen/include/asm-ia64/vmx_vcpu.h
 428b9f38tDTTJbkoONcAB9ODP8CiVg xen/include/asm-ia64/vmx_vpd.h
 428b9f38_o0U5uJqmxZf_bqi6_PqVw xen/include/asm-ia64/vtm.h

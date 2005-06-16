@@ -2,6 +2,7 @@
 #define __ASM_DOMAIN_H__
 
 #include <linux/thread_info.h>
+#include <asm/tlb.h>
 #ifdef CONFIG_VTI
 #include <asm/vmx_vpd.h>
 #include <asm/vmmu.h>

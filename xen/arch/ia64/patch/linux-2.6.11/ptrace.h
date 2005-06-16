@@ -4,9 +4,9 @@
   * (because the memory stack pointer MUST ALWAYS be aligned this way)
   *
   */
-+#ifdef CONFIG_VTI
-+#include "vmx_ptrace.h"
-+#else  //CONFIG_VTI
++#ifdef XEN
++#include <public/arch-ia64.h>
++#else
  struct pt_regs {
  	/* The following registers are saved by SAVE_MIN: */
  	unsigned long b6;		/* scratch */
@@ -14,7 +14,7 @@
  	struct ia64_fpreg f10;		/* scratch */
  	struct ia64_fpreg f11;		/* scratch */
  };
-+#endif // CONFIG_VTI
++#endif
  
  /*
   * This structure contains the addition registers that need to
