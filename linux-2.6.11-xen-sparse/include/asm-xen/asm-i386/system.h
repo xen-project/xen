@@ -8,6 +8,7 @@
 #include <asm/segment.h>
 #include <asm/cpufeature.h>
 #include <asm-xen/hypervisor.h>
+#include <asm/smp_alt.h>
 
 #ifdef __KERNEL__
 
@@ -251,19 +252,19 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 	unsigned long prev;
 	switch (size) {
 	case 1:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgb %b1,%2"
+		__asm__ __volatile__(LOCK "cmpxchgb %b1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 2:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgw %w1,%2"
+		__asm__ __volatile__(LOCK "cmpxchgw %w1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 4:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %1,%2"
+		__asm__ __volatile__(LOCK "cmpxchgl %1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
@@ -427,11 +428,55 @@ struct alt_instr {
 #endif
 
 #ifdef CONFIG_SMP
-#define smp_mb()	mb()
-#define smp_rmb()	rmb()
 #define smp_wmb()	wmb()
-#define smp_read_barrier_depends()	read_barrier_depends()
+#if defined(CONFIG_SMP_ALTERNATIVES) && !defined(MODULE)
+#define smp_alt_mb(instr)                                           \
+__asm__ __volatile__("6667:\nnop\nnop\nnop\nnop\nnop\nnop\n6668:\n" \
+		     ".section __smp_alternatives,\"a\"\n"          \
+		     ".long 6667b\n"                                \
+                     ".long 6673f\n"                                \
+		     ".previous\n"                                  \
+		     ".section __smp_replacements,\"a\"\n"          \
+		     "6673:.byte 6668b-6667b\n"                     \
+		     ".byte 6670f-6669f\n"                          \
+		     ".byte 6671f-6670f\n"                          \
+                     ".byte 0\n"                                    \
+		     ".byte %c0\n"                                  \
+		     "6669:lock;addl $0,0(%%esp)\n"                 \
+		     "6670:" instr "\n"                             \
+		     "6671:\n"                                      \
+		     ".previous\n"                                  \
+		     :                                              \
+		     : "i" (X86_FEATURE_XMM2)                       \
+		     : "memory")
+#define smp_rmb() smp_alt_mb("lfence")
+#define smp_mb()  smp_alt_mb("mfence")
+#define set_mb(var, value) do {                                     \
+unsigned long __set_mb_temp;                                        \
+__asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
+		     ".section __smp_alternatives,\"a\"\n"          \
+		     ".long 6667b\n"                                \
+		     ".long 6673f\n"                                \
+		     ".previous\n"                                  \
+		     ".section __smp_replacements,\"a\"\n"          \
+		     "6673: .byte 6668b-6667b\n"                    \
+		     ".byte 6670f-6669f\n"                          \
+		     ".byte 0\n"                                    \
+		     ".byte 6671f-6670f\n"                          \
+		     ".byte -1\n"                                   \
+		     "6669: xchg %1, %0\n"                          \
+		     "6670:movl %1, %0\n"                           \
+		     "6671:\n"                                      \
+		     ".previous\n"                                  \
+		     : "=m" (var), "=r" (__set_mb_temp)             \
+		     : "1" (value)                                  \
+		     : "memory"); } while (0)
+#else
+#define smp_rmb()	rmb()
+#define smp_mb()	mb()
 #define set_mb(var, value) do { xchg(&var, value); } while (0)
+#endif
+#define smp_read_barrier_depends()	read_barrier_depends()
 #else
 #define smp_mb()	barrier()
 #define smp_rmb()	barrier()

@@ -54,6 +54,8 @@
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 
+#include <asm/smp_alt.h>
+
 #ifndef CONFIG_X86_IO_APIC
 #define Dprintk(args...)
 #endif
@@ -1186,6 +1188,10 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (max_cpus <= cpucount+1)
 			continue;
 
+#ifdef CONFIG_SMP_ALTERNATIVES
+		if (kicked == 1)
+			prepare_for_smp();
+#endif
 		if (do_boot_cpu(cpu))
 			printk("CPU #%d not responding - cannot use it.\n",
 								cpu);
@@ -1301,6 +1307,11 @@ void __devinit smp_prepare_boot_cpu(void)
 /* must be called with the cpucontrol mutex held */
 static int __devinit cpu_enable(unsigned int cpu)
 {
+#ifdef CONFIG_SMP_ALTERNATIVES
+	if (num_online_cpus() == 1)
+		prepare_for_smp();
+#endif
+
 	/* get the target out of its holding state */
 	per_cpu(cpu_state, cpu) = CPU_UP_PREPARE;
 	wmb();
@@ -1340,6 +1351,12 @@ int __cpu_disable(void)
 	fixup_irqs(map);
 	/* It's now safe to remove this processor from the online map */
 	cpu_clear(cpu, cpu_online_map);
+
+#ifdef CONFIG_SMP_ALTERNATIVES
+	if (num_online_cpus() == 1)
+		unprepare_for_smp();
+#endif
+
 	return 0;
 }
 

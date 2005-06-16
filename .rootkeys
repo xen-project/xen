@@ -470,6 +470,7 @@
 428359d4b3fDYtazwXi4UUmSWaOUew patches/linux-2.6.11/linux-2.6.11.12.patch
 4296fb998LGSWCcljGKbOCUv3h9uRQ patches/linux-2.6.11/net-csum.patch
 429ae875I9ZrqrRDjGD34IC2kzDREw patches/linux-2.6.11/rcu-nohz.patch
+42b165fcilFTNezi9NIsG2ecLZVU0w patches/linux-2.6.11/smp-alts.patch
 429ba3007184K-y6WHQ6KgY65-lEIQ patches/linux-2.6.11/udp-frag.patch
 424f001e_M1Tnxc52rDrmCLelnDWMQ patches/linux-2.6.11/x86_64-linux.patch
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile

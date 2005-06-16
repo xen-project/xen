@@ -372,6 +372,19 @@ config SMP
 
 	  If you don't know what to do here, say N.
 
+config SMP_ALTERNATIVES
+        bool "SMP alternatives support (EXPERIMENTAL)"
+        depends on SMP && EXPERIMENTAL
+        help
+          Try to reduce the overhead of running an SMP kernel on a uniprocessor
+          host slightly by replacing certain key instruction sequences
+          according to whether we currently have more than one CPU available.
+          This should provide a noticeable boost to performance when
+          running SMP kernels on UP machines, and have negligible impact
+          when running on an true SMP host.
+
+          If unsure, say N.
+
 config NR_CPUS
 	int "Maximum number of CPUs (2-255)"
 	range 2 255
