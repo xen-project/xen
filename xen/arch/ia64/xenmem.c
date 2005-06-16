@@ -52,7 +52,7 @@ paging_init (void)
 		panic("Not enough memory to bootstrap Xen.\n");
 
 	printk("machine to physical table: 0x%lx\n", (u64)mpt_table);
-	memset(mpt_table, 0x55, mpt_table_size);
+	memset(mpt_table, INVALID_M2P_ENTRY, mpt_table_size);
 
 	/* Any more setup here? On VMX enabled platform,
 	 * there's no need to keep guest linear pg table,

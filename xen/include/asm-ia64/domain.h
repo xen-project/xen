@@ -2,17 +2,16 @@
 #define __ASM_DOMAIN_H__
 
 #include <linux/thread_info.h>
+#include <asm/tlb.h>
 #ifdef CONFIG_VTI
 #include <asm/vmx_vpd.h>
 #include <asm/vmmu.h>
 #include <asm/regionreg.h>
+#include <public/arch-ia64.h>
 #endif // CONFIG_VTI
 #include <xen/list.h>
 
 extern void arch_do_createdomain(struct vcpu *);
-
-extern int arch_final_setup_guestos(
-    struct vcpu *, struct vcpu_guest_context *);
 
 extern void domain_relinquish_resources(struct domain *);
 
@@ -36,7 +35,15 @@ struct arch_domain {
     int imp_va_msb;
     ia64_rr emul_phy_rr0;
     ia64_rr emul_phy_rr4;
-    u64 *pmt;	/* physical to machine table */
+    unsigned long *pmt;	/* physical to machine table */
+    /*
+     * max_pfn is the maximum page frame in guest physical space, including
+     * inter-middle I/O ranges and memory holes. This is different with
+     * max_pages in domain struct, which indicates maximum memory size
+     */
+    unsigned long max_pfn;
+    unsigned int section_nr;
+    mm_section_t *sections;	/* Describe memory hole except for Dom0 */
 #endif  //CONFIG_VTI
     u64 xen_vastart;
     u64 xen_vaend;

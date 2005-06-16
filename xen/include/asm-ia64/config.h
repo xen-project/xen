@@ -177,8 +177,7 @@ void sort_main_extable(void);
 // see include/asm-x86/atomic.h (different from standard linux)
 #define _atomic_set(v,i) (((v).counter) = (i))
 #define _atomic_read(v) ((v).counter)
-// FIXME following needs work
-#define atomic_compareandswap(old, new, v) old
+#define atomic_compareandswap(old, new, v) ((atomic_t){ cmpxchg(v, _atomic_read(old), _atomic_read(new)) })
 
 // see include/asm-ia64/mm.h, handle remaining pfn_info uses until gone
 #define pfn_info page
@@ -226,6 +225,8 @@ struct screen_info { };
 #define asmlinkage
 
 #define FORCE_CRASH()	asm("break 0;;");
+
+#define dummy()	dummy_called(__FUNCTION__)
 
 // these declarations got moved at some point, find a better place for them
 extern int ht_per_core;

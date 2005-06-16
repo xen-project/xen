@@ -116,7 +116,6 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 		    case FW_HYPERCALL_EFI_GET_TIME:
 			{
 			unsigned long *tv, *tc;
-			fooefi();
 			vmx_vcpu_get_gr(v, 32, &tv);
 			vmx_vcpu_get_gr(v, 33, &tc);
 			printf("efi_get_time(%p,%p) called...",tv,tc);

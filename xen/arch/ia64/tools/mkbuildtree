@@ -259,7 +259,7 @@ softlink include/asm-ia64/string.h include/asm-ia64/string.h
 softlink include/asm-ia64/thread_info.h include/asm-ia64/thread_info.h
 softlink include/asm-ia64/timex.h include/asm-ia64/timex.h
 softlink include/asm-ia64/topology.h include/asm-ia64/topology.h
-softlink include/asm-ia64/uaccess.h include/asm-ia64/uaccess.h
+cp_patch include/asm-ia64/uaccess.h include/asm-ia64/uaccess.h uaccess.h
 softlink include/asm-ia64/unaligned.h include/asm-ia64/unaligned.h
 softlink include/asm-ia64/unistd.h include/asm-ia64/unistd.h
 softlink include/asm-ia64/unwind.h include/asm-ia64/unwind.h

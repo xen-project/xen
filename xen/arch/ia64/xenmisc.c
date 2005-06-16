@@ -63,13 +63,7 @@ void sync_lazy_execstate_mask(cpumask_t mask) {}
 void sync_lazy_execstate_all(void) {}
 
 int grant_table_create(struct domain *d) { return 0; }
-void grant_table_destroy(struct domain *d)
-{
-	printf("grant_table_destroy: domain_destruct not tested!!!\n");
-	printf("grant_table_destroy: ensure atomic_* calls work in domain_destruct!!\n");
-	dummy();
-	return;
-}
+void grant_table_destroy(struct domain *d) { return; }
 
 struct pt_regs *guest_cpu_user_regs(void) { return ia64_task_regs(current); }
 

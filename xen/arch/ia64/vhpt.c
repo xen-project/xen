@@ -87,6 +87,37 @@ void vhpt_map(void)
 	ia64_srlz_i();
 }
 
+void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long logps)
+{
+	unsigned long mask = (1L << logps) - 1;
+	int i;
+
+	if (logps-PAGE_SHIFT > 10) {
+		// if this happens, we may want to revisit this algorithm
+		printf("vhpt_multiple_insert:logps-PAGE_SHIFT>10,spinning..\n");
+		while(1);
+	}
+	if (logps-PAGE_SHIFT > 2) {
+		// FIXME: Should add counter here to see how often this
+		//  happens (e.g. for 16MB pages!) and determine if it
+		//  is a performance problem.  On a quick look, it takes
+		//  about 39000 instrs for a 16MB page and it seems to occur
+		//  only a few times/second, so OK for now.
+		//  An alternate solution would be to just insert the one
+		//  16KB in the vhpt (but with the full mapping)?
+		//printf("vhpt_multiple_insert: logps-PAGE_SHIFT==%d,"
+			//"va=%p, pa=%p, pa-masked=%p\n",
+			//logps-PAGE_SHIFT,vaddr,pte&_PFN_MASK,
+			//(pte&_PFN_MASK)&~mask);
+	}
+	vaddr &= ~mask;
+	pte = ((pte & _PFN_MASK) & ~mask) | (pte & ~_PFN_MASK);
+	for (i = 1L << (logps-PAGE_SHIFT); i > 0; i--) {
+		vhpt_insert(vaddr,pte,logps<<2);
+		vaddr += PAGE_SIZE;
+	}
+}
+
 void vhpt_init(void)
 {
 	unsigned long vhpt_total_size, vhpt_alignment, vhpt_imva;

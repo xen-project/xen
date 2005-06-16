@@ -348,12 +348,23 @@ ENTRY(alt_itlb_miss)
 //	;;
 //#endif
 #endif
+#ifdef XEN
+	mov r31=pr
+	mov r16=cr.ifa		// get address that caused the TLB miss
+	;;
+late_alt_itlb_miss:
+	movl r17=PAGE_KERNEL
+	mov r21=cr.ipsr
+	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
+	;;
+#else
 	mov r16=cr.ifa		// get address that caused the TLB miss
 	movl r17=PAGE_KERNEL
 	mov r21=cr.ipsr
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	mov r31=pr
 	;;
+#endif
 #ifdef CONFIG_DISABLE_VHPT
 	shr.u r22=r16,61			// get the region number into r21
 	;;
@@ -367,9 +378,15 @@ ENTRY(alt_itlb_miss)
 #endif
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
 	and r19=r19,r16		// clear ed, reserved bits, and PTE control bits
+#ifdef XEN
+	shr.u r18=r16,55	// move address bit 59 to bit 4
+	;;
+	and r18=0x10,r18	// bit 4=address-bit(59)
+#else
 	shr.u r18=r16,57	// move address bit 61 to bit 4
 	;;
 	andcm r18=0x10,r18	// bit 4=~address-bit(61)
+#endif
 	cmp.ne p8,p0=r0,r23	// psr.cpl != 0?
 	or r19=r17,r19		// insert PTE control bits into r19
 	;;
@@ -393,13 +410,18 @@ ENTRY(alt_dtlb_miss)
 //	;;
 //#endif
 #endif
+#ifdef XEN
+	mov r31=pr
 	mov r16=cr.ifa		// get address that caused the TLB miss
+	;;
+late_alt_dtlb_miss:
 	movl r17=PAGE_KERNEL
 	mov r20=cr.isr
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	mov r21=cr.ipsr
-	mov r31=pr
 	;;
+#else
+#endif
 #ifdef CONFIG_DISABLE_VHPT
 	shr.u r22=r16,61			// get the region number into r21
 	;;
@@ -414,24 +436,33 @@ ENTRY(alt_dtlb_miss)
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
 	and r22=IA64_ISR_CODE_MASK,r20		// get the isr.code field
 	tbit.nz p6,p7=r20,IA64_ISR_SP_BIT	// is speculation bit on?
+#ifdef XEN
+	shr.u r18=r16,55			// move address bit 59 to bit 4
+	and r19=r19,r16				// clear ed, reserved bits, and PTE control bits
+	tbit.nz p9,p0=r20,IA64_ISR_NA_BIT	// is non-access bit on?
+	;;
+	and r18=0x10,r18	// bit 4=address-bit(59)
+#else
 	shr.u r18=r16,57			// move address bit 61 to bit 4
 	and r19=r19,r16				// clear ed, reserved bits, and PTE control bits
 	tbit.nz p9,p0=r20,IA64_ISR_NA_BIT	// is non-access bit on?
 	;;
 	andcm r18=0x10,r18	// bit 4=~address-bit(61)
+#endif
 	cmp.ne p8,p0=r0,r23
 (p9)	cmp.eq.or.andcm p6,p7=IA64_ISR_CODE_LFETCH,r22	// check isr.code field
 (p8)	br.cond.spnt page_fault
 #ifdef XEN
 	;;
-	// FIXME: inadequate test, this is where we test for Xen address
-	// note that 0xf000 (cached) and 0xd000 (uncached) addresses
-	// should be OK.  (Though no I/O is done in Xen, EFI needs uncached
-	// addresses and some domain EFI calls are passed through)
-	tbit.nz p0,p8=r16,60
-(p8)	br.cond.spnt page_fault
-//(p8)	br.cond.spnt 0
-	;;
+	// Test for Xen address, if not handle via page_fault
+	// note that 0xf000 (cached) and 0xe800 (uncached) addresses
+	// should be OK.
+	extr.u r22=r16,59,5;;
+	cmp.eq p8,p0=0x1e,r22
+(p8)	br.cond.spnt 1f;;
+	cmp.ne p8,p0=0x1d,r22
+(p8)	br.cond.sptk page_fault ;;
+1:
 #endif
 
 	dep r21=-1,r21,IA64_PSR_ED_BIT,1

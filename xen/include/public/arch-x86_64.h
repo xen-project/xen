@@ -73,6 +73,9 @@
 #define HYPERVISOR_VIRT_END   (0xFFFF880000000000UL)
 #endif
 
+/* Maximum number of virtual CPUs in multi-processor guests. */
+#define MAX_VIRT_CPUS 32
+
 #ifndef __ASSEMBLY__
 
 /* The machine->physical mapping table starts at this address, read-only. */
