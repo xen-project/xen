@@ -14,6 +14,10 @@
 #define _MEMORY_PADDING(_X)
 #define MEMORY_PADDING 
 
+/* Maximum number of virtual CPUs in multi-processor guests. */
+/* WARNING: before changing this, check that shared_info fits on a page */
+#define MAX_VIRT_CPUS 1
+
 #ifndef __ASSEMBLY__
 
 /* NB. Both the following are 64 bits each. */
