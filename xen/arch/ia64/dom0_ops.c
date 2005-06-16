@@ -18,14 +18,6 @@
 #include <xen/console.h>
 #include <public/sched_ctl.h>
 
-#define TRC_DOM0OP_ENTER_BASE  0x00020000
-#define TRC_DOM0OP_LEAVE_BASE  0x00030000
-
-static int msr_cpu_mask;
-static unsigned long msr_addr;
-static unsigned long msr_lo;
-static unsigned long msr_hi;
-
 long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 {
     long ret = 0;
@@ -35,6 +27,49 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 
     switch ( op->cmd )
     {
+    /*
+     * NOTE: DOM0_GETMEMLIST has somewhat different semantics on IA64 -
+     * it actually allocates and maps pages.
+     */
+    case DOM0_GETMEMLIST:
+    {
+        unsigned long i;
+        struct domain *d = find_domain_by_id(op->u.getmemlist.domain);
+        unsigned long start_page = op->u.getmemlist.max_pfns >> 32;
+        unsigned long nr_pages = op->u.getmemlist.max_pfns & 0xffffffff;
+        unsigned long pfn;
+        unsigned long *buffer = op->u.getmemlist.buffer;
+        struct page *page;
+
+        ret = -EINVAL;
+        if ( d != NULL )
+        {
+            ret = 0;
+
+            for ( i = start_page; i < (start_page + nr_pages); i++ )
+            {
+                page = map_new_domain_page(d, i << PAGE_SHIFT);
+                if ( page == NULL )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
+                pfn = page_to_pfn(page);
+                if ( put_user(pfn, buffer) )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                buffer++;
+            }
+
+            op->u.getmemlist.num_pfns = i - start_page;
+            copy_to_user(u_dom0_op, op, sizeof(*op));
+            
+            put_domain(d);
+        }
+    }
+    break;
 
     default:
         ret = -ENOSYS;
@@ -42,11 +77,4 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     }
 
     return ret;
-}
-
-void arch_getdomaininfo_ctxt(struct domain *d, struct vcpu_guest_context *c)
-{ 
-    int i;
-
-	dummy();
 }

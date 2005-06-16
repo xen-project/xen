@@ -28,13 +28,13 @@
 #include "public/xen.h"
 #include "asm/tlb.h"
 
-#define         THASH_TLB_TR            0
-#define         THASH_TLB_TC            1
-#define         THASH_TLB_FM            2       // foreign map
+//#define         THASH_TLB_TR            0
+//#define         THASH_TLB_TC            1
 
-#define         THASH_SECTION_TR        (1<<0)
-#define         THASH_SECTION_TC        (1<<1)
-#define         THASH_SECTION_FM        (1<<2)
+
+// bit definition of TR, TC search cmobination
+//#define         THASH_SECTION_TR        (1<<0)
+//#define         THASH_SECTION_TC        (1<<1)
 
 /*
  * Next bit definition must be same with THASH_TLB_XX
@@ -43,8 +43,7 @@ typedef union search_section {
         struct {
                 u32 tr : 1;
                 u32 tc : 1;
-                u32 fm : 1;
-                u32 rsv: 29;
+                u32 rsv: 30;
         };
         u32     v;
 } search_section_t;
@@ -80,12 +79,10 @@ typedef struct thash_data {
             u64 ig1  :  11; //53-63
         };
         struct {
-            u64 __rv1 : 12;
-            // sizeof(domid_t) must be less than 38!!! Refer to its definition
-            u64 fm_dom : 38; // 12-49 foreign map domain ID
-            u64 __rv2 : 3;   // 50-52
+            u64 __rv1 : 53;	// 0-52
             // next extension to ig1, only for TLB instance
-            u64 section : 2;     // 53-54 TR, TC or FM (thash_TLB_XX)
+            u64 tc : 1;     // 53 TR or TC
+            u64 locked  : 1;	// 54 entry locked or not
             CACHE_LINE_TYPE cl : 1; // I side or D side cache line
             u64 nomap : 1;   // entry cann't be inserted into machine TLB.
             u64 __ig1  :  5; // 56-61
@@ -227,8 +224,8 @@ typedef struct thash_cb {
            INVALID_ENTRY(hcb, hash) = 1;        \
            hash->next = NULL; }
 
-#define PURGABLE_ENTRY(hcb,en)          \
-                ((hcb)->ht == THASH_VHPT || (en)->section == THASH_TLB_TC)
+#define PURGABLE_ENTRY(hcb,en)  \
+		((hcb)->ht == THASH_VHPT || ( (en)->tc && !(en->locked)) )
 
 
 /*
@@ -306,7 +303,7 @@ extern void thash_purge_entries_ex(thash_cb_t *hcb,
                         u64 rid, u64 va, u64 sz, 
                         search_section_t p_sect, 
                         CACHE_LINE_TYPE cl);
-extern thash_cb_t *init_domain_tlb(struct vcpu *d);
+extern void thash_purge_and_insert(thash_cb_t *hcb, thash_data_t *in);
 
 /*
  * Purge all TCs or VHPT entries including those in Hash table.
@@ -323,6 +320,7 @@ extern thash_data_t *vtlb_lookup(thash_cb_t *hcb,
                         thash_data_t *in);
 extern thash_data_t *vtlb_lookup_ex(thash_cb_t *hcb, 
                         u64 rid, u64 va,CACHE_LINE_TYPE cl);
+extern int thash_lock_tc(thash_cb_t *hcb, u64 va, u64 size, int rid, char cl, int lock);
 
 
 #define   ITIR_RV_MASK      (((1UL<<32)-1)<<32 | 0x3)
@@ -332,6 +330,7 @@ extern u64 machine_thash(PTA pta, u64 va, u64 rid, u64 ps);
 extern void purge_machine_tc_by_domid(domid_t domid);
 extern void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb);
 extern rr_t vmmu_get_rr(struct vcpu *vcpu, u64 va);
+extern thash_cb_t *init_domain_tlb(struct vcpu *d);
 
 #define   VTLB_DEBUG
 #ifdef   VTLB_DEBUG

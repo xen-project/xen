@@ -5,7 +5,7 @@
  #define SLOW_DOWN_IO	do { } while (0)
  
 +#ifdef XEN
-+#define __IA64_UNCACHED_OFFSET	0xd000000000000000UL	/* region 6 */
++#define __IA64_UNCACHED_OFFSET	0xe800000000000000UL
 +#else
  #define __IA64_UNCACHED_OFFSET	0xc000000000000000UL	/* region 6 */
 +#endif

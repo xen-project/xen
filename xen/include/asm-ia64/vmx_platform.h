@@ -25,7 +25,7 @@
 struct mmio_list;
 typedef struct virutal_platform_def {
     //unsigned long          *real_mode_data; /* E820, etc. */
-    //unsigned long          shared_page_va;
+    unsigned long          shared_page_va;
     //struct vmx_virpit_t    vmx_pit;
     //struct vmx_handler_t   vmx_handler;
     //struct mi_per_cpu_info mpci;            /* MMIO */

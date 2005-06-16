@@ -454,12 +454,13 @@ IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
     data.itir=itir;
     data.vadr=PAGEALIGN(ifa,data.ps);
-    data.section=THASH_TLB_TC;
+    data.tc = 1;
     data.cl=ISIDE_TLB;
     vmx_vcpu_get_rr(vcpu, ifa, &vrr);
     data.rid = vrr.rid;
     
-    sections.v = THASH_SECTION_TR;
+    sections.tr = 1;
+    sections.tc = 0;
 
     ovl = thash_find_overlap(hcb, &data, sections);
     while (ovl) {
@@ -467,9 +468,7 @@ IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
         panic("Tlb conflict!!");
         return;
     }
-    sections.v = THASH_SECTION_TC;
-    thash_purge_entries(hcb, &data, sections);
-    thash_insert(hcb, &data, ifa);
+    thash_purge_and_insert(hcb, &data);
     return IA64_NO_FAULT;
 }
 
@@ -488,11 +487,12 @@ IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
     data.itir=itir;
     data.vadr=PAGEALIGN(ifa,data.ps);
-    data.section=THASH_TLB_TC;
+    data.tc = 1;
     data.cl=DSIDE_TLB;
     vmx_vcpu_get_rr(vcpu, ifa, &vrr);
     data.rid = vrr.rid;
-    sections.v = THASH_SECTION_TR;
+    sections.tr = 1;
+    sections.tc = 0;
 
     ovl = thash_find_overlap(hcb, &data, sections);
     if (ovl) {
@@ -500,41 +500,26 @@ IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
         panic("Tlb conflict!!");
         return;
     }
-    sections.v = THASH_SECTION_TC;
-    thash_purge_entries(hcb, &data, sections);
-    thash_insert(hcb, &data, ifa);
+    thash_purge_and_insert(hcb, &data);
     return IA64_NO_FAULT;
 }
 
-IA64FAULT insert_foreignmap(VCPU *vcpu, UINT64 pte, UINT64 ps, UINT64 va)
+/*
+ * Return TRUE/FALSE for success of lock operation
+ */
+int vmx_lock_guest_dtc (VCPU *vcpu, UINT64 va, int lock)
 {
 
-    thash_data_t data, *ovl;
     thash_cb_t  *hcb;
-    search_section_t sections;
-    rr_t    vrr;
+    rr_t  vrr;
+    u64	  preferred_size;
 
-    hcb = vmx_vcpu_get_vtlb(vcpu);
-    data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
-    data.itir=0;
-    data.ps = ps;
-    data.vadr=PAGEALIGN(va,ps);
-    data.section=THASH_TLB_FM;
-    data.cl=DSIDE_TLB;
     vmx_vcpu_get_rr(vcpu, va, &vrr);
-    data.rid = vrr.rid;
-    sections.v = THASH_SECTION_TR|THASH_SECTION_TC|THASH_SECTION_FM;
-
-    ovl = thash_find_overlap(hcb, &data, sections);
-    if (ovl) {
-          // generate MCA.
-        panic("Foreignmap Tlb conflict!!");
-        return;
-    }
-    thash_insert(hcb, &data, va);
-    return IA64_NO_FAULT;
+    hcb = vmx_vcpu_get_vtlb(vcpu);
+    va = PAGEALIGN(va,vrr.ps);
+    preferred_size = PSIZE(vrr.ps);
+    return thash_lock_tc(hcb, va, preferred_size, vrr.rid, DSIDE_TLB, lock);
 }
-
 
 IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64 idx)
 {
@@ -548,11 +533,12 @@ IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64
     data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
     data.itir=itir;
     data.vadr=PAGEALIGN(ifa,data.ps);
-    data.section=THASH_TLB_TR;
+    data.tc = 0;
     data.cl=ISIDE_TLB;
     vmx_vcpu_get_rr(vcpu, ifa, &vrr);
     data.rid = vrr.rid;
-    sections.v = THASH_SECTION_TR;
+    sections.tr = 1;
+    sections.tc = 0;
 
     ovl = thash_find_overlap(hcb, &data, sections);
     if (ovl) {
@@ -560,7 +546,8 @@ IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64
         panic("Tlb conflict!!");
         return;
     }
-    sections.v=THASH_SECTION_TC;
+    sections.tr = 0;
+    sections.tc = 1;
     thash_purge_entries(hcb, &data, sections);
     thash_tr_insert(hcb, &data, ifa, idx);
     return IA64_NO_FAULT;
@@ -579,11 +566,12 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64
     data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
     data.itir=itir;
     data.vadr=PAGEALIGN(ifa,data.ps);
-    data.section=THASH_TLB_TR;
+    data.tc = 0;
     data.cl=DSIDE_TLB;
     vmx_vcpu_get_rr(vcpu, ifa, &vrr);
     data.rid = vrr.rid;
-    sections.v = THASH_SECTION_TR;
+    sections.tr = 1;
+    sections.tc = 0;
 
     ovl = thash_find_overlap(hcb, &data, sections);
     while (ovl) {
@@ -591,7 +579,8 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64
         panic("Tlb conflict!!");
         return;
     }
-    sections.v=THASH_SECTION_TC;
+    sections.tr = 0;
+    sections.tc = 1;
     thash_purge_entries(hcb, &data, sections);
     thash_tr_insert(hcb, &data, ifa, idx);
     return IA64_NO_FAULT;
@@ -607,7 +596,8 @@ IA64FAULT vmx_vcpu_ptr_d(VCPU *vcpu,UINT64 vadr,UINT64 ps)
 
     hcb = vmx_vcpu_get_vtlb(vcpu);
     rr=vmx_vcpu_rr(vcpu,vadr);
-    sections.v = THASH_SECTION_TR | THASH_SECTION_TC;
+    sections.tr = 1;
+    sections.tc = 1;
     thash_purge_entries_ex(hcb,rr.rid,vadr,ps,sections,DSIDE_TLB);
     return IA64_NO_FAULT;
 }
@@ -619,7 +609,8 @@ IA64FAULT vmx_vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 ps)
     search_section_t sections;
     hcb = vmx_vcpu_get_vtlb(vcpu);
     rr=vmx_vcpu_rr(vcpu,vadr);
-    sections.v = THASH_SECTION_TR | THASH_SECTION_TC;
+    sections.tr = 1;
+    sections.tc = 1;
     thash_purge_entries_ex(hcb,rr.rid,vadr,ps,sections,ISIDE_TLB);
     return IA64_NO_FAULT;
 }
@@ -632,7 +623,8 @@ IA64FAULT vmx_vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 ps)
     thash_data_t data, *ovl;
     hcb = vmx_vcpu_get_vtlb(vcpu);
     vrr=vmx_vcpu_rr(vcpu,vadr);
-    sections.v = THASH_SECTION_TC;
+    sections.tr = 0;
+    sections.tc = 1;
     vadr = PAGEALIGN(vadr, ps);
 
     thash_purge_entries_ex(hcb,vrr.rid,vadr,ps,sections,DSIDE_TLB);

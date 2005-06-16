@@ -41,40 +41,46 @@
 //	r19 == vpsr.ic (low 32 bits) | vpsr.i (high 32 bits)
 //	r31 == pr
 GLOBAL_ENTRY(fast_hyperprivop)
-#if 1
 	// HYPERPRIVOP_SSM_I?
 	// assumes domain interrupts pending, so just do it
 	cmp.eq p7,p6=XEN_HYPER_SSM_I,r17
 (p7)	br.sptk.many hyper_ssm_i;;
-#endif
-#if 1
-	// if domain interrupts pending, give up for now and do it the slow way
+
+	// FIXME. This algorithm gives up (goes to the slow path) if there
+	// are ANY interrupts pending, even if they are currently
+	// undeliverable.  This should be improved later...
 	adds r20=XSI_PEND_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld8 r20=[r20] ;;
-	cmp.ne p7,p0=r0,r20
-(p7)	br.sptk.many dispatch_break_fault ;;
+	ld4 r20=[r20] ;;
+	cmp.eq p7,p0=r0,r20
+(p7)	br.cond.sptk.many 1f
+	mov r20=IA64_KR(CURRENT);;
+	adds r21=IA64_VCPU_IRR0_OFFSET,r20;
+	adds r22=IA64_VCPU_IRR0_OFFSET+8,r20;;
+	ld8 r23=[r21],16; ld8 r24=[r22],16;;
+	ld8 r21=[r21]; ld8 r22=[r22];;
+	or r23=r23,r24; or r21=r21,r22;;
+	or r20=r23,r21;;
+1:	// when we get to here r20=~=interrupts pending
 
 	// HYPERPRIVOP_RFI?
 	cmp.eq p7,p6=XEN_HYPER_RFI,r17
 (p7)	br.sptk.many hyper_rfi;;
 
+	cmp.ne p7,p0=r20,r0
+(p7)	br.spnt.many dispatch_break_fault ;;
+
 // hard to test, because only called from rbs_switch
 	// HYPERPRIVOP_COVER?
 	cmp.eq p7,p6=XEN_HYPER_COVER,r17
 (p7)	br.sptk.many hyper_cover;;
-#endif
 
-#if 1
 	// HYPERPRIVOP_SSM_DT?
 	cmp.eq p7,p6=XEN_HYPER_SSM_DT,r17
 (p7)	br.sptk.many hyper_ssm_dt;;
-#endif
 
-#if 1
 	// HYPERPRIVOP_RSM_DT?
 	cmp.eq p7,p6=XEN_HYPER_RSM_DT,r17
 (p7)	br.sptk.many hyper_rsm_dt;;
-#endif
 
 	// if not one of the above, give up for now and do it the slow way
 	br.sptk.many dispatch_break_fault ;;
@@ -336,12 +342,16 @@ GLOBAL_ENTRY(fast_break_reflect)
 
 // ensure that, if giving up, registers at entry to fast_hyperprivop unchanged
 ENTRY(hyper_rfi)
-#ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_RFI);;
-	ld8 r21=[r20];;
-	adds r21=1,r21;;
-	st8 [r20]=r21;;
-#endif
+	// if no interrupts pending, proceed
+	cmp.eq p7,p0=r20,r0
+(p7)	br.sptk.many 1f
+	// interrupts pending, if rfi'ing to interrupts on, go slow way
+	adds r20=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r21=[r20];;		// r21 = vcr.ipsr
+	extr.u r22=r21,IA64_PSR_I_BIT,1 ;;
+	cmp.ne p7,p0=r22,r0 ;;
+(p7)	br.spnt.many dispatch_break_fault ;;
+1:
 	adds r20=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r21=[r20];;		// r21 = vcr.ipsr
 	extr.u r22=r21,IA64_PSR_BE_BIT,1 ;;
@@ -375,7 +385,13 @@ ENTRY(hyper_rfi)
 (p7)	br.sptk.many dispatch_break_fault ;;
 
 	// OK now, let's do an rfi.
-	// r18=&vpsr.i|vpsr.ic, r21==vpsr, r20==&vcr.iip, r22=vcr.iip
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_RFI);;
+	ld8 r23=[r20];;
+	adds r23=1,r23;;
+	st8 [r20]=r23;;
+#endif
+	// r18=&vpsr.i|vpsr.ic, r21==vpsr, r22=vcr.iip
 	mov cr.iip=r22;;
 	adds r20=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r20]=r0 ;;
