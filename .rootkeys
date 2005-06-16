@@ -1359,6 +1359,7 @@
 421098b6ZcIrn_gdqjUtdJyCE0YkZQ xen/include/asm-ia64/debugger.h
 421098b6z0zSuW1rcSJK1gR8RUi-fw xen/include/asm-ia64/dom_fw.h
 421098b6Nn0I7hGB8Mkd1Cis0KMkhA xen/include/asm-ia64/domain.h
+42b1d2d0rkNCmG2nFOnL-OfhJG9mDw xen/include/asm-ia64/event.h
 4241e880hAyo_dk0PPDYj3LsMIvf-Q xen/include/asm-ia64/flushtlb.h
 421098b6X3Fs2yht42TE2ufgKqt2Fw xen/include/asm-ia64/ia64_int.h
 421098b7psFAn8kbeR-vcRCdc860Vw xen/include/asm-ia64/init.h
@@ -1406,6 +1407,7 @@
 40715b2dTokMLYGSuD58BnxOqyWVew xen/include/asm-x86/div64.h
 4204e7acwzqgXyTAPKa1nM-L7Ec0Qw xen/include/asm-x86/domain.h
 41d3eaaeIBzW621S1oa0c2yk7X43qQ xen/include/asm-x86/e820.h
+42b1d2caFkOByU5n4LuMnT05f3kJFg xen/include/asm-x86/event.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen/include/asm-x86/fixmap.h
 3e2d29944GI24gf7vOP_7x8EyuqxeA xen/include/asm-x86/flushtlb.h
 4294b5eep4lWuDtYUR74gYwt-_FnHA xen/include/asm-x86/genapic.h
