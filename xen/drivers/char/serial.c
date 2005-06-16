@@ -176,11 +176,15 @@ char serial_getc(int handle)
             if ( port->rxbufp != port->rxbufc )
             {
                 c = port->rxbuf[MASK_SERIAL_RXBUF_IDX(port->rxbufc++)];
+                spin_unlock_irqrestore(&port->lock, flags);
                 break;
             }
             
             if ( port->driver->getc(port, &c) )
+            {
+                spin_unlock_irqrestore(&port->lock, flags);
                 break;
+            }
 
             spin_unlock_irqrestore(&port->lock, flags);
 
