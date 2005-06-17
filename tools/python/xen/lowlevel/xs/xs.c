@@ -1,3 +1,8 @@
+/* 
+    Python interface to the Xen Store Daemon.
+    Copyright (C) 2005 Mike Wray Hewlett-Packard
+*/
+
 #include <Python.h>
 
 #include <stdio.h>
