@@ -69,7 +69,6 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	cmp.ne p7,p0=r20,r0
 (p7)	br.spnt.many dispatch_break_fault ;;
 
-// hard to test, because only called from rbs_switch
 	// HYPERPRIVOP_COVER?
 	cmp.eq p7,p6=XEN_HYPER_COVER,r17
 (p7)	br.sptk.many hyper_cover;;
@@ -81,6 +80,14 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	// HYPERPRIVOP_RSM_DT?
 	cmp.eq p7,p6=XEN_HYPER_RSM_DT,r17
 (p7)	br.sptk.many hyper_rsm_dt;;
+
+	// HYPERPRIVOP_GET_TPR?
+	cmp.eq p7,p6=XEN_HYPER_GET_TPR,r17
+(p7)	br.sptk.many hyper_get_tpr;;
+
+	// HYPERPRIVOP_SET_TPR?
+	cmp.eq p7,p6=XEN_HYPER_SET_TPR,r17
+(p7)	br.sptk.many hyper_set_tpr;;
 
 	// if not one of the above, give up for now and do it the slow way
 	br.sptk.many dispatch_break_fault ;;
@@ -455,7 +462,6 @@ ENTRY(hyper_cover)
 	rfi
 	;;
 
-#if 1
 // return from metaphysical mode (meta=1) to virtual mode (meta=0)
 ENTRY(hyper_ssm_dt)
 #ifdef FAST_HYPERPRIVOP_CNT
@@ -526,4 +532,60 @@ ENTRY(hyper_rsm_dt)
 	mov pr=r31,-1 ;;
 	rfi
 	;;
+
+ENTRY(hyper_get_tpr)
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_GET_TPR);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
 #endif
+	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	adds r20=XSI_TPR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r8=[r20];;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_get_tpr)
+
+// if we get to here, there are no interrupts pending so we
+// can change virtual tpr to any value without fear of provoking
+// (or accidentally missing) delivering an interrupt
+ENTRY(hyper_set_tpr)
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SET_TPR);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	movl r27=0xff00;;
+	adds r20=XSI_TPR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	andcm r8=r8,r27;;
+	st8 [r20]=r8;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_set_tpr)

@@ -59,6 +59,7 @@ void foo(void)
 	DEFINE(XSI_INCOMPL_REG_OFS, offsetof(vcpu_info_t, arch.incomplete_regframe));
 	DEFINE(XSI_PEND_OFS, offsetof(vcpu_info_t, arch.pending_interruption));
 	DEFINE(XSI_RR0_OFS, offsetof(vcpu_info_t, arch.rrs[0]));
+	DEFINE(XSI_TPR_OFS, offsetof(vcpu_info_t, arch.tpr));
 	//DEFINE(IA64_TASK_BLOCKED_OFFSET,offsetof (struct task_struct, blocked));
 	//DEFINE(IA64_TASK_CLEAR_CHILD_TID_OFFSET,offsetof (struct task_struct, clear_child_tid));
 	//DEFINE(IA64_TASK_GROUP_LEADER_OFFSET, offsetof (struct task_struct, group_leader));
