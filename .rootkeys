@@ -1109,6 +1109,7 @@
 421098b3ys5GAr4z6_H1jD33oem82g xen/arch/ia64/irq.c
 4272a8e4lavI6DrTvqaIhXeR5RuKBw xen/arch/ia64/ivt.S
 421098b3Heh72KuoVlND3CH6c0B0aA xen/arch/ia64/lib/Makefile
+42b2eaeez20voHWlBDjrqORiNg6uhg xen/arch/ia64/mm.c
 421098b3O0MYMUsmYVFy84VV_1gFwQ xen/arch/ia64/mm_init.c
 428b9f38Gp0KcPokG9Nq5v1rGk2FkA xen/arch/ia64/mmio.c
 425ae516maKAsHBJVSzs19cdRgt3Nw xen/arch/ia64/patch/linux-2.6.11/cpumask.h
@@ -1207,6 +1208,7 @@
 428b9f38PglyXM-mJJfo19ycuQrEhw xen/arch/ia64/vlsapic.c
 428b9f38EmpBsMHL3WbOZoieteBGdQ xen/arch/ia64/vmmu.c
 428b9f38hU-X5aX0MIY3EU0Yw4PjcA xen/arch/ia64/vmx_entry.S
+42b2eaf3YR7Sfx76IvKeqfHJiU6qXw xen/arch/ia64/vmx_hypercall.c
 428b9f38S76bWI96g7uPLmE-uAcmdg xen/arch/ia64/vmx_init.c
 428b9f385AMSyCRYBsckQClQY4ZgHA xen/arch/ia64/vmx_interrupt.c
 428b9f380IOjPmj0N6eelH-WJjl1xg xen/arch/ia64/vmx_ivt.S
