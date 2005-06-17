@@ -149,6 +149,12 @@ ia64_hypercall (struct pt_regs *regs)
 		regs->r8 = do_event_channel_op(regs->r14);
 		break;
 
+#ifndef CONFIG_VTI
+	    case __HYPERVISOR_grant_table_op:
+		regs->r8 = do_grant_table_op(regs->r14, regs->r15, regs->r16);
+		break;
+#endif
+
 	    case __HYPERVISOR_console_io:
 		regs->r8 = do_console_io(regs->r14, regs->r15, regs->r16);
 		break;

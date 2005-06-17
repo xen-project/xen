@@ -132,6 +132,7 @@ void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
 static inline void put_page(struct pfn_info *page)
 {
+#ifdef CONFIG_VTI	// doesn't work with non-VTI in grant tables yet
     u32 nx, x, y = page->count_info;
 
     do {
@@ -142,12 +143,14 @@ static inline void put_page(struct pfn_info *page)
 
     if (unlikely((nx & PGC_count_mask) == 0))
 	free_domheap_page(page);
+#endif
 }
 
 /* count_info and ownership are checked atomically. */
 static inline int get_page(struct pfn_info *page,
                            struct domain *domain)
 {
+#if 0
     u64 x, nx, y = *((u64*)&page->count_info);
     u32 _domain = pickle_domptr(domain);
 
@@ -164,7 +167,7 @@ static inline int get_page(struct pfn_info *page,
 	}
     }
     while(unlikely(y = cmpxchg(&page->count_info, x, nx)) != x);
-
+#endif
     return 1;
 }
 
