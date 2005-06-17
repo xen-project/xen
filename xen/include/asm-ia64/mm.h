@@ -169,8 +169,29 @@ static inline int get_page(struct pfn_info *page,
 }
 
 /* No type info now */
-#define put_page_and_type(page) put_page((page))
-#define get_page_and_type(page, domain, type) get_page((page))
+#define put_page_type(page)
+#define get_page_type(page, type) 1
+static inline void put_page_and_type(struct pfn_info *page)
+{
+    put_page_type(page);
+    put_page(page);
+}
+
+
+static inline int get_page_and_type(struct pfn_info *page,
+                                    struct domain *domain,
+                                    u32 type)
+{
+    int rc = get_page(page, domain);
+
+    if ( likely(rc) && unlikely(!get_page_type(page, type)) )
+    {
+        put_page(page);
+        rc = 0;
+    }
+
+    return rc;
+}
 
 #define	set_machinetophys(_mfn, _pfn) do { } while(0);
 
