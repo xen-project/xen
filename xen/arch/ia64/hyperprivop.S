@@ -66,6 +66,10 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	cmp.eq p7,p6=XEN_HYPER_RFI,r17
 (p7)	br.sptk.many hyper_rfi;;
 
+	// HYPERPRIVOP_GET_IVR?
+	cmp.eq p7,p6=XEN_HYPER_GET_IVR,r17
+(p7)	br.sptk.many hyper_get_ivr;;
+
 	cmp.ne p7,p0=r20,r0
 (p7)	br.spnt.many dispatch_break_fault ;;
 
@@ -589,3 +593,35 @@ ENTRY(hyper_set_tpr)
 	rfi
 	;;
 END(hyper_set_tpr)
+
+ENTRY(hyper_get_ivr)
+	// when we get to here r20=~=interrupts pending
+	cmp.ne p7,p0=r20,r0
+(p7)	br.spnt.many dispatch_break_fault ;;
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_GET_IVR);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+// if we get to here, there are no interrupts pending so we
+// force pending to zero and return SPURIOUS_VECTOR
+	adds r20=XSI_PEND_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st4 [r20]=r0;;
+	mov r8=15;;
+	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_get_ivr)
