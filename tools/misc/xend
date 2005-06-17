@@ -86,9 +86,7 @@ def xcs_running():
     
 def start_xcs():
     if (not xcs_running()):
-        if os.fork():
-            time.sleep(0.1) # let xcs start
-        else:
+        if os.fork() == 0 :
             if not os.path.isdir(os.path.dirname(XCS_PATH)):
                 os.makedirs(os.path.dirname(XCS_PATH))
             try:
@@ -98,11 +96,15 @@ def start_xcs():
                 msg("Tried to start xcs, but failed. Is it installed?")
                 hline()
                 raise CheckError("couldn't start xcs")
-        if (not xcs_running()):
-            hline()
-            msg("Failed to start the control interface switch.")
-            hline()
-            raise CheckError("xcs not running")
+        for n in range(10) :
+            if (xcs_running()):
+                break
+            time.sleep(0.1)
+        else :
+                hline()
+                msg("Failed to start the control interface switch.")
+                hline()
+                raise CheckError("xcs not running")
             
 def stop_xcs():
     try:
