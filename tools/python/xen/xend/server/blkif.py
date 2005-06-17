@@ -193,6 +193,13 @@ class BlkDev(Dev):
         self.backendId = 0
         self.configure(self.config, recreate=recreate)
 
+    def exportToDB(self, save=False):
+        Dev.exportToDB(self, save=save)
+        backend = self.getBackend()
+        if backend and backend.evtchn:
+            db = self.db.addChild("evtchn")
+            backend.evtchn.exportToDB(db, save=save)
+
     def init(self, recreate=False, reboot=False):
         self.frontendDomain = self.getDomain()
         self.frontendChannel = self.getChannel()
