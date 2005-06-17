@@ -20,15 +20,12 @@ BASECFLAGS+= -I$(XEN_ROOT)/xen/include/public
 BASECFLAGS+= -I.
 
 CFLAGS += $(BASECFLAGS)
-ifeq ($(XEN_TARGET_ARCH),x86_64)
-CFLAGS += -fPIC
-endif
 LDFLAGS=$(PROFILE) -L$(XEN_LIBXC)
 TESTDIR=`pwd`/testsuite/tmp
 TESTFLAGS=-DTESTING
 TESTENV=XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
 
-all: xen xenstored libxenstore.a
+all: xen xenstored libxenstore.a libxenstore-pic.a
 
 testcode: xen xs_test xenstored_test xs_random
 
@@ -56,10 +53,18 @@ xs_test_lib.o: xs.c
 talloc_test.o: talloc.c
 	$(COMPILE.c) -o $@ $<
 
-libxenstore.a: libxenstore.a(xs.o) libxenstore.a(xs_lib.o)
+LIB_OBJS     := xs.o xs_lib.o
+
+LIB_OBJS_A   := $(patsubst %.o,libxenstore.a(%.o),$(LIB_OBJS))
+LIB_OBJS_PIC := $(patsubst %.o,libxenstore-pic.a(%.opic),$(LIB_OBJS))
+
+libxenstore.a: $(LIB_OBJS_A)
+
+libxenstore-pic.a: $(LIB_OBJS_PIC)
 
 clean: testsuite-clean
-	rm -f *.o *.a xs_test xenstored xenstored_test xs_random xs_stress xen
+	rm -f *.o *.opic *.a
+	rm -f xs_test xenstored xenstored_test xs_random xs_stress xen
 	-$(RM) $(PROG_DEP)
 
 check: testsuite-run randomcheck stresstest
@@ -88,7 +93,7 @@ TAGS:
 tarball: clean
 	cd .. && tar -c -j -v -h -f xenstore.tar.bz2 xenstore/
 
-install: xenstored libxenstore.a
+install: xenstored libxenstore.a libxenstore-pic.a
 	$(INSTALL_DIR) -p $(DESTDIR)/var/run/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/sbin
@@ -96,7 +101,11 @@ install: xenstored libxenstore.a
 	$(INSTALL_PROG) xenstored $(DESTDIR)/usr/sbin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) libxenstore.a $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DATA) libxenstore-pic.a $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include
 	$(INSTALL_DATA) xs_lib.h $(DESTDIR)/usr/include
 
 -include $(PROG_DEP)
+
+# never delete any intermediate files.
+.SECONDARY:

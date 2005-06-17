@@ -44,7 +44,8 @@ DEPS     = .*.d
 LIB_OBJS := $(patsubst %.c,%.o,$(SRCS))
 PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
 
-LIB      := libxc.a libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
+LIB      := libxc.a libxc-pic.a
+LIB      += libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
 
 all: build
 build: check-for-zlib mk-symlinks
@@ -96,6 +97,9 @@ rpm: build
 	rm -rf staging
 
 libxc.a: $(LIB_OBJS)
+	$(AR) rc $@ $^
+
+libxc-pic.a: $(PIC_OBJS)
 	$(AR) rc $@ $^
 
 libxc.so: libxc.so.$(MAJOR)
