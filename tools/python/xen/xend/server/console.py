@@ -214,7 +214,8 @@ class ConsoleDev(Dev, protocol.ServerFactory):
                     self.unix_listener = reactor.listenUNIX(path, self)
                 if xroot.get_xend_http_server():
                     interface = xroot.get_console_address()
-                    self.tcp_listener = reactor.listenTCP(self.console_port, self, interface=interface)
+                    self.tcp_listener = reactor.listenTCP(
+                        self.console_port, self, interface=interface)
         finally:
             self.lock.release()
 

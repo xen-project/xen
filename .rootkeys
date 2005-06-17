@@ -17,7 +17,6 @@
 3f9e7d60PWZJeVh5xdnk0nLUdxlqEA docs/figs/xenlogo.eps
 418a3248xjIqmNKo0v_XQSfAvlBGFw docs/html.sty
 41c0c4116itF389v0CEWcmzue6zJkA docs/misc/VMX_changes.txt
-4022a73cgxX1ryj1HgS-IwwB6NUi2A docs/misc/XenDebugger-HOWTO
 412f4bd9sm5mCQ8BkrgKcAKZGadq7Q docs/misc/blkif-drivers-explained.txt
 420b949cy9ZGzED74Fz_DaWlK7tT4g docs/misc/crashdb.txt
 4251a1f82AexscYEiF4Iku8Gc_kWfQ docs/misc/grant-tables.txt
@@ -471,6 +470,7 @@
 428359d4b3fDYtazwXi4UUmSWaOUew patches/linux-2.6.11/linux-2.6.11.12.patch
 4296fb998LGSWCcljGKbOCUv3h9uRQ patches/linux-2.6.11/net-csum.patch
 429ae875I9ZrqrRDjGD34IC2kzDREw patches/linux-2.6.11/rcu-nohz.patch
+42b165fcilFTNezi9NIsG2ecLZVU0w patches/linux-2.6.11/smp-alts.patch
 429ba3007184K-y6WHQ6KgY65-lEIQ patches/linux-2.6.11/udp-frag.patch
 424f001e_M1Tnxc52rDrmCLelnDWMQ patches/linux-2.6.11/x86_64-linux.patch
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
@@ -542,6 +542,7 @@
 42a0c8dasiso9c-2sCvHBzP6YVjATA tools/debugger/pdb/evtchn.mli
 42a0c8daXD_6Y62A_u5-PO_Klrhi0w tools/debugger/pdb/pdb_caml_xc.c
 42a0c8danJXun9ay5SPBhhkKvuUPfg tools/debugger/pdb/pdb_xen.c
+42b03d06llc_GE7fXGQ6-rYR4VFAcw tools/debugger/pdb/readme
 42a0c8dbjK6Du89D2SUcxsuAdlUu3w tools/debugger/pdb/server.ml
 401d7e160vaxMBAUSLSicuZ7AQjJ3w tools/examples/Makefile
 401d7e16UgeqroJQTIhwkrDVkoWgZQ tools/examples/README
@@ -1065,6 +1066,9 @@
 42a57d98fdO519YyATk4_Zwr1STNfQ tools/xenstore/testsuite/07watch.sh
 42a57d98zZUtvirUMjmHxFphJjmO7Q tools/xenstore/testsuite/08transaction.sh
 42a57d98sn9RbpBgHRv1D99Kt7LwYA tools/xenstore/testsuite/09domain.sh
+42b2a4bfxAwHlRgd31SJBgFnj8g3MA tools/xenstore/testsuite/10domain-homedir.sh
+42b2a4bfHbUp4IB8tfNIa8j37S27fw tools/xenstore/testsuite/11domain-watch.sh
+42b2a4bfhrB5v6uYKPj6jSO_Ng0PAA tools/xenstore/testsuite/12readonly.sh
 42a57d98tSuoFCHnnM2GgENXJrRQmw tools/xenstore/testsuite/test.sh
 42a57d98zxDP2Ti7dTznGROi66rUGw tools/xenstore/utils.c
 42a57d98SDvOYCEjmCjwHSk6390GLA tools/xenstore/utils.h
@@ -1080,11 +1084,13 @@
 42a57d99-zLxBjzC7rfj_perV-orUg tools/xenstore/xenstored_watch.h
 42a57d99BnkhISKgCCRcUqhteyuxCw tools/xenstore/xs.c
 42a57d99FyiYSz9AkKKROrRydnA-gQ tools/xenstore/xs.h
+42b29922EYQ87Y4fwZXSkEHgtQk7CQ tools/xenstore/xs_dom0_test.c
 42a57d99SrtsJCDUlKyRPf3EX86A1Q tools/xenstore/xs_lib.c
 42a57d99L2pYeMFyjQ_4Rnb17xTSMg tools/xenstore/xs_lib.h
 42a57d99Kl6Ba8oCHv2fggl7QN9QZA tools/xenstore/xs_random.c
 42a57d99SHYR1lQOD0shuErPDg9NKQ tools/xenstore/xs_stress.c
 42a57d996aBawpkQNOWkNWXD6LrhPg tools/xenstore/xs_test.c
+42b2a4bfp-lhxBfenUyHlvw7bPcVgA tools/xenstore/xs_watch_stress.c
 403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
 40a107afN60pFdURgBv9KwEzgRl5mQ tools/xentrace/formats
 420d52d2_znVbT4JAPIU36vQOme83g tools/xentrace/xenctx.c

@@ -63,42 +63,28 @@ VGCF_IN_SYSCALL = (1<<8)
 #define sizeof_vcpu_shift		3
 
 #ifdef CONFIG_SMP
-#define XEN_GET_VCPU_INFO(reg)
-#define preempt_disable(reg)	incl TI_preempt_count(reg)
-#define preempt_enable(reg)	decl TI_preempt_count(reg)
-#define XEN_LOCK_VCPU_INFO_SMP(reg) preempt_disable(%rbp)		; \
-				movl TI_cpu(%rbp),reg			; \
+#define preempt_disable(reg)	incl threadinfo_preempt_count(reg)
+#define preempt_enable(reg)	decl threadinfo_preempt_count(reg)
+#define XEN_GET_VCPU_INFO(reg)	preempt_disable(%rbp)			; \
+				movq %gs:pda_cpunumber,reg		; \
 				shl  $sizeof_vcpu_shift,reg		; \
-				addl HYPERVISOR_shared_info,reg
-#define XEN_UNLOCK_VCPU_INFO_SMP(reg) preempt_enable(%rbp)
-#define XEN_UNLOCK_VCPU_INFO_SMP_fixup .byte 0xff,0xff,0xff
-#define Ux00 0xff
-#define XEN_LOCKED_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
-#define XEN_BLOCK_EVENTS(reg)	XEN_LOCK_VCPU_INFO_SMP(reg)		; \
-				XEN_LOCKED_BLOCK_EVENTS(reg)		; \
-    				XEN_UNLOCK_VCPU_INFO_SMP(reg)
-#define XEN_UNBLOCK_EVENTS(reg)	XEN_LOCK_VCPU_INFO_SMP(reg)		; \
-				movb $0,evtchn_upcall_mask(reg)		; \
-    				XEN_UNLOCK_VCPU_INFO_SMP(reg)
-#define XEN_SAVE_UPCALL_MASK(reg,tmp,off) GET_THREAD_INFO(%ebp)		; \
-				XEN_LOCK_VCPU_INFO_SMP(reg)		; \
-				movb evtchn_upcall_mask(reg), tmp	; \
-				movb tmp, off(%rsp)			; \
-    				XEN_UNLOCK_VCPU_INFO_SMP(reg)
+				addq HYPERVISOR_shared_info,reg
+#define XEN_PUT_VCPU_INFO(reg)	preempt_enable(%rbp)			; \
+#define XEN_PUT_VCPU_INFO_fixup .byte 0xff,0xff,0xff
 #else
 #define XEN_GET_VCPU_INFO(reg)	movq HYPERVISOR_shared_info,reg
-#define XEN_LOCK_VCPU_INFO_SMP(reg) movq HYPERVISOR_shared_info,reg
-#define XEN_UNLOCK_VCPU_INFO_SMP(reg)
-#define XEN_UNLOCK_VCPU_INFO_SMP_fixup
-#define Ux00 0x00
-#define XEN_LOCKED_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
-#define XEN_BLOCK_EVENTS(reg)	XEN_LOCKED_BLOCK_EVENTS(reg)
-#define XEN_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
-#define XEN_SAVE_UPCALL_MASK(reg,tmp,off) \
-	movb evtchn_upcall_mask(reg), tmp; \
-	movb tmp, off(%rsp)
+#define XEN_PUT_VCPU_INFO(reg)
+#define XEN_PUT_VCPU_INFO_fixup
 #endif
 
+#define XEN_LOCKED_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
+#define XEN_LOCKED_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
+#define XEN_BLOCK_EVENTS(reg)	XEN_GET_VCPU_INFO(reg)			; \
+				XEN_LOCKED_BLOCK_EVENTS(reg)		; \
+    				XEN_PUT_VCPU_INFO(reg)
+#define XEN_UNBLOCK_EVENTS(reg)	XEN_GET_VCPU_INFO(reg)			; \
+				XEN_LOCKED_UNBLOCK_EVENTS(reg)		; \
+    				XEN_PUT_VCPU_INFO(reg)
 #define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(reg)
 
 	.code64
@@ -256,8 +242,6 @@ ENTRY(system_call)
 	CFI_STARTPROC
 	SAVE_ARGS -8,0
 	movq  %rax,ORIG_RAX-ARGOFFSET(%rsp) 
-        XEN_GET_VCPU_INFO(%r11)
-        XEN_SAVE_UPCALL_MASK(%r11,%cl,EVENT_MASK-ARGOFFSET)      # saved %rcx          
         XEN_UNBLOCK_EVENTS(%r11)        
 	GET_THREAD_INFO(%rcx)
 	testl $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),threadinfo_flags(%rcx)
@@ -277,7 +261,6 @@ ret_from_sys_call:
 	/* edi:	flagmask */
 sysret_check:		
 	GET_THREAD_INFO(%rcx)
-        XEN_GET_VCPU_INFO(%rsi)
         XEN_BLOCK_EVENTS(%rsi)        
 	movl threadinfo_flags(%rcx),%edx
 	andl %edi,%edx
@@ -291,7 +274,6 @@ sysret_check:
 sysret_careful:
 	bt $TIF_NEED_RESCHED,%edx
 	jnc sysret_signal
-        XEN_GET_VCPU_INFO(%rsi)
         XEN_BLOCK_EVENTS(%rsi)        
 	pushq %rdi
 	call schedule
@@ -301,7 +283,6 @@ sysret_careful:
 	/* Handle a signal */ 
 sysret_signal:
 /*	sti */
-        XEN_GET_VCPU_INFO(%rsi)
         XEN_UNBLOCK_EVENTS(%rsi)        
 	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME|_TIF_SINGLESTEP),%edx
 	jz    1f
@@ -345,7 +326,6 @@ badsys:
  * Has correct top of stack, but partial stack frame.
  */ 	
 ENTRY(int_ret_from_sys_call)	
-        XEN_GET_VCPU_INFO(%rsi)
         XEN_BLOCK_EVENTS(%rsi)
 	testb $3,CS-ARGOFFSET(%rsp)
         jnz 1f
@@ -369,7 +349,6 @@ int_careful:
 	bt $TIF_NEED_RESCHED,%edx
 	jnc  int_very_careful
 /*	sti */
-        XEN_GET_VCPU_INFO(%rsi)
         XEN_UNBLOCK_EVENTS(%rsi)
 	pushq %rdi
 	call schedule
@@ -379,7 +358,6 @@ int_careful:
 	/* handle signals and tracing -- both require a full stack frame */
 int_very_careful:
 /*	sti */
-        XEN_GET_VCPU_INFO(%rsi)
         XEN_UNBLOCK_EVENTS(%rsi)
 	SAVE_REST
 	/* Check for syscall exit trace */	
@@ -529,11 +507,11 @@ retint_check:
 retint_restore_args:
         movb EVENT_MASK-REST_SKIP(%rsp), %al
         notb %al			# %al == ~saved_mask
-        XEN_LOCK_VCPU_INFO_SMP(%rsi)
+        XEN_GET_VCPU_INFO(%rsi)
         andb evtchn_upcall_mask(%rsi),%al
 	andb $1,%al			# %al == mask & ~saved_mask
 	jnz restore_all_enable_events	# != 0 => reenable event delivery      
-        XEN_UNLOCK_VCPU_INFO_SMP(%rsi)
+        XEN_PUT_VCPU_INFO(%rsi)
 		
 	RESTORE_ARGS 0,8,0						
 	testb $3,8(%rsp)                # check CS
@@ -548,13 +526,11 @@ user_mode:
 retint_careful:
 	bt    $TIF_NEED_RESCHED,%edx
 	jnc   retint_signal
-	XEN_GET_VCPU_INFO(%rsi)
 	XEN_UNBLOCK_EVENTS(%rsi)
 /*	sti */        
 	pushq %rdi
 	call  schedule
 	popq %rdi		
-	XEN_GET_VCPU_INFO(%rsi)        
 	XEN_BLOCK_EVENTS(%rsi)		
 	GET_THREAD_INFO(%rcx)
 /*	cli */
@@ -563,7 +539,6 @@ retint_careful:
 retint_signal:
 	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME|_TIF_SINGLESTEP),%edx
 	jz    retint_restore_args
-        XEN_GET_VCPU_INFO(%rsi)
         XEN_UNBLOCK_EVENTS(%rsi)
 	SAVE_REST
 	movq $-1,ORIG_RAX(%rsp) 			
@@ -571,7 +546,6 @@ retint_signal:
 	movq %rsp,%rdi		# &pt_regs
 	call do_notify_resume
 	RESTORE_REST
-        XEN_GET_VCPU_INFO(%rsi)        
         XEN_BLOCK_EVENTS(%rsi)		
 	movl $_TIF_NEED_RESCHED,%edi
 	GET_THREAD_INFO(%rcx)	
@@ -590,10 +564,8 @@ retint_kernel:
 	jc   retint_restore_args
 	movl $PREEMPT_ACTIVE,threadinfo_preempt_count(%rcx)
 /*	sti */
-	XEN_GET_VCPU_INFO(%rsi)
 	XEN_UNBLOCK_EVENTS(%rsi)
 	call schedule
-	XEN_GET_VCPU_INFO(%rsi) /* %esi can be different */
 	XEN_BLOCK_EVENTS(%rsi)
 /*	cli */
 	GET_THREAD_INFO(%rcx)
@@ -728,17 +700,10 @@ error_call_handler:
 	movq %rsp,%rdi
 	movq ORIG_RAX(%rsp),%rsi	# get error code 
 	movq $-1,ORIG_RAX(%rsp)
-        leaq do_hypervisor_callback,%rcx
-        cmpq %rax,%rcx
-        je 0f                           # don't save event mask for callbacks
-        XEN_GET_VCPU_INFO(%r11)
-        XEN_SAVE_UPCALL_MASK(%r11,%cl,EVENT_MASK)
-0:              
 	call *%rax
 error_exit:		
 	RESTORE_REST
 /*	cli */
-	XEN_GET_VCPU_INFO(%rsi)        
 	XEN_BLOCK_EVENTS(%rsi)		
 	GET_THREAD_INFO(%rcx)	
 	testb $3,CS-ARGOFFSET(%rsp)
@@ -807,7 +772,7 @@ restore_all_enable_events:
 scrit:	/**** START OF CRITICAL REGION ****/
 	XEN_TEST_PENDING(%rsi)
 	jnz  14f			# process more events if necessary...
-	XEN_UNLOCK_VCPU_INFO_SMP(%rsi)
+	XEN_PUT_VCPU_INFO(%rsi)
         RESTORE_ARGS 0,8,0
         testb $3,8(%rsp)                # check CS
         jnz  crit_user_mode
@@ -817,7 +782,7 @@ crit_user_mode:
         SWITCH_TO_USER 0
         
 14:	XEN_LOCKED_BLOCK_EVENTS(%rsi)
-	XEN_UNLOCK_VCPU_INFO_SMP(%rsi)
+	XEN_PUT_VCPU_INFO(%rsi)
 	SAVE_REST
         movq %rsp,%rdi                  # set the argument again
 	jmp  11b

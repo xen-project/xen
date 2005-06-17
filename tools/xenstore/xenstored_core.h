@@ -16,8 +16,10 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
-#ifndef _XENSTORED_INTERNAL_H
-#define _XENSTORED_INTERNAL_H
+
+#ifndef _XENSTORED_CORE_H
+#define _XENSTORED_CORE_H
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <errno.h>
@@ -59,8 +61,8 @@ struct connection
 	/* Is this a read-only connection? */
 	bool can_write;
 
-	/* Our current event.  If all used, we're waiting for ack. */
-	struct watch_event *event;
+	/* Are we waiting for a watch event ack? */
+	bool waiting_for_ack;
 
 	/* Buffered incoming data. */
 	struct buffered_data *in;
@@ -105,6 +107,9 @@ bool send_ack(struct connection *conn, enum xsd_sockmsg_type type);
 /* Send an error: error is usually "errno". */
 bool send_error(struct connection *conn, int error);
 
+/* Canonicalize this path if possible. */
+char *canonicalize(struct connection *conn, const char *node);
+
 /* Check permissions on this node. */
 bool check_node_perms(struct connection *conn, const char *node,
 		      enum xs_perm_type perm);
@@ -121,6 +126,10 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read);
 void handle_input(struct connection *conn);
 void handle_output(struct connection *conn);
 
+/* Is this a valid node name? */
+bool is_valid_nodename(const char *node);
+
 /* Convenient talloc-style destructor for paths. */
 int destroy_path(void *path);
-#endif /* _XENSTORED_INTERNAL_H */
+
+#endif /* _XENSTORED_CORE_H */

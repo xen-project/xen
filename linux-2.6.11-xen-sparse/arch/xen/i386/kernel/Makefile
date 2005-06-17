@@ -42,6 +42,7 @@ c-obj-$(CONFIG_ACPI_SRAT) 	+= srat.o
 c-obj-$(CONFIG_HPET_TIMER) 	+= time_hpet.o
 c-obj-$(CONFIG_EFI) 		+= efi.o efi_stub.o
 c-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+c-obj-$(CONFIG_SMP_ALTERNATIVES)+= smpalts.o
 
 EXTRA_AFLAGS   := -traditional
 

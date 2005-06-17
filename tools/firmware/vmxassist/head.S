@@ -106,6 +106,7 @@ rom_gdtr:
  * main and setup our own environment.
  */
 	.globl	_start
+	.code32
 _start:
 	cli
 

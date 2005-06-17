@@ -50,7 +50,7 @@ static void work(unsigned int cycles, unsigned int childnum)
 		}
 		if (streq(lockdir, ""))
 			strcpy(lockdir, "/");
-		
+
 		if (!xs_transaction_start(h, lockdir))
 			barf_perror("%i: starting transaction %i on %s",
 				    childnum, i, lockdir);

@@ -72,7 +72,7 @@ static void set_cloexec(int fd)
 
 static int xcs_ctrl_fd = -1; /* control connection to the xcs server. */
 static int xcs_data_fd = -1; /*    data connection to the xcs server. */
-static u32 xcs_session_id = 0;
+static unsigned long  xcs_session_id = 0;
 
 static int xcs_ctrl_send(xcs_msg_t *msg);
 static int xcs_ctrl_read(xcs_msg_t *msg);

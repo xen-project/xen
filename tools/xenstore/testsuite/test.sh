@@ -9,7 +9,7 @@ run_test()
     mkdir $XENSTORED_ROOTDIR
 # Weird failures with this.
     if type valgrind >/dev/null 2>&1; then
-	valgrind -q --logfile-fd=3 ./xenstored_test --output-pid --no-fork 3>testsuite/tmp/vgout > /tmp/pid &
+	valgrind -q --logfile-fd=3 ./xenstored_test --output-pid --no-fork 3>testsuite/tmp/vgout > /tmp/pid 2> testsuite/tmp/xenstored_errors &
 	while [ ! -s /tmp/pid ]; do sleep 0; done
 	PID=`cat /tmp/pid`
 	rm /tmp/pid

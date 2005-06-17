@@ -47,6 +47,8 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 EXPORT_SYMBOL(force_evtchn_callback);
 EXPORT_SYMBOL(evtchn_do_upcall);
+EXPORT_SYMBOL(bind_evtchn_to_irq);
+EXPORT_SYMBOL(unbind_evtchn_from_irq);
 #endif
 
 /*

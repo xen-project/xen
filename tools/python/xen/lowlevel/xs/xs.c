@@ -1,3 +1,8 @@
+/* 
+    Python interface to the Xen Store Daemon.
+    Copyright (C) 2005 Mike Wray Hewlett-Packard
+*/
+
 #include <Python.h>
 
 #include <stdio.h>
@@ -14,9 +19,9 @@
  */
 
 /* Needed for Python versions earlier than 2.3. */
-//#ifndef PyMODINIT_FUNC
-//#define PyMODINIT_FUNC DL_EXPORT(void)
-//#endif
+#ifndef PyMODINIT_FUNC
+#define PyMODINIT_FUNC DL_EXPORT(void)
+#endif
 
 #define PYPKG    "xen.lowlevel.xs"
 
@@ -46,6 +51,53 @@ static inline PyObject *pyvalue_str(char *val) {
             ? PyString_FromString(val)
             : PyErr_SetFromErrno(PyExc_RuntimeError));
 }
+
+#define xspy_read_doc "\n"			\
+	"Read data from a path.\n"		\
+	" path [string]: xenstore path\n"	\
+	"\n"					\
+	"Returns: [string] data read.\n"	\
+	"Raises RuntimeError on error.\n"	\
+	"\n"
+
+static PyObject *xspy_read(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    static char *kwd_spec[] = { "path", NULL };
+    static char *arg_spec = "s|";
+    char *path = NULL;
+
+    struct xs_handle *xh = xshandle(self);
+    char *xsval = NULL;
+    unsigned int xsval_n = 0;
+    PyObject *val = NULL;
+
+    if (!xh)
+	goto exit;
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
+                                     &path))
+        goto exit;
+    xsval = xs_read(xh, path, &xsval_n);
+    if (!xsval) {
+        val = pyvalue_int(0);
+        goto exit;
+    }
+    val = PyString_FromStringAndSize(xsval, xsval_n);
+ exit:
+    if (xsval)
+	free(xsval);
+    return val;
+}
+
+#define xspy_write_doc "\n"					\
+	"Write data to a path.\n"				\
+	" path   [string] : xenstore path to write to\n."	\
+	" data   [string] : data to write.\n"			\
+	" create [int]    : create flag, default 0.\n"		\
+	" excl   [int]    : exclusive flag, default 0.\n"	\
+	"\n"							\
+	"Returns: [int] 0 on success.\n"			\
+	"Raises RuntimeError on error.\n"			\
+	"\n"
 
 static PyObject *xspy_write(PyObject *self, PyObject *args, PyObject *kwds)
 {
@@ -77,53 +129,13 @@ static PyObject *xspy_write(PyObject *self, PyObject *args, PyObject *kwds)
     return val;
 }
 
-static PyObject *xspy_read(PyObject *self, PyObject *args, PyObject *kwds)
-{
-    static char *kwd_spec[] = { "path", NULL };
-    static char *arg_spec = "s|";
-    char *path = NULL;
-
-    struct xs_handle *xh = xshandle(self);
-    char *xsval = NULL;
-    unsigned int xsval_n = 0;
-    PyObject *val = NULL;
-
-    if (!xh)
-	goto exit;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
-                                     &path))
-        goto exit;
-    xsval = xs_read(xh, path, &xsval_n);
-    if (!xsval) {
-        val = pyvalue_int(0);
-        goto exit;
-    }
-    val = PyString_FromStringAndSize(xsval, xsval_n);
- exit:
-    if (xsval)
-	free(xsval);
-    return val;
-}
-
-static PyObject *xspy_mkdir(PyObject *self, PyObject *args, PyObject *kwds)
-{
-    static char *kwd_spec[] = { "path", NULL };
-    static char *arg_spec = "s|";
-    char *path = NULL;
-
-    struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
-    int xsval = 0;
-
-    if (!xh)
-	goto exit;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
-        goto exit;
-    xsval = xs_mkdir(xh, path);
-    val = pyvalue_int(xsval);
- exit:
-    return val;
-}
+#define xspy_ls_doc "\n"					\
+	"List a directory.\n"					\
+	" path [string]: path to list.\n"			\
+	"\n"							\
+	"Returns: [string array] list of subdirectory names.\n"	\
+	"Raises RuntimeError on error.\n"			\
+	"\n"
 
 static PyObject *xspy_ls(PyObject *self, PyObject *args, PyObject *kwds)
 {
@@ -153,6 +165,41 @@ static PyObject *xspy_ls(PyObject *self, PyObject *args, PyObject *kwds)
     return val;
 }
 
+#define xspy_mkdir_doc "\n"					\
+	"Make a directory.\n"					\
+	" path [string]: path to directory to create.\n"	\
+	"\n"							\
+	"Returns: [int] 0 on success.\n"			\
+	"Raises RuntimeError on error.\n"			\
+	"\n"
+
+static PyObject *xspy_mkdir(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    static char *kwd_spec[] = { "path", NULL };
+    static char *arg_spec = "s|";
+    char *path = NULL;
+
+    struct xs_handle *xh = xshandle(self);
+    PyObject *val = NULL;
+    int xsval = 0;
+
+    if (!xh)
+	goto exit;
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
+        goto exit;
+    xsval = xs_mkdir(xh, path);
+    val = pyvalue_int(xsval);
+ exit:
+    return val;
+}
+
+#define xspy_rm_doc "\n"			\
+	"Remove a path.\n"			\
+	" path [string] : path to remove\n"	\
+	"Returns: [int] 0 on success.\n"	\
+	"Raises RuntimeError on error.\n"	\
+	"\n"
+
 static PyObject *xspy_rm(PyObject *self, PyObject *args, PyObject *kwds)
 {
     static char *kwd_spec[] = { "path", NULL };
@@ -172,6 +219,14 @@ static PyObject *xspy_rm(PyObject *self, PyObject *args, PyObject *kwds)
  exit:
     return val;
 }
+
+#define xspy_get_permissions_doc "\n"		\
+	"Get the permissions for a path\n"	\
+	" path [string]: xenstore path.\n"	\
+	"\n"					\
+	"Returns: permissions array.\n"		\
+	"Raises RuntimeError on error.\n"	\
+	"\n"
 
 static PyObject *xspy_get_permissions(PyObject *self, PyObject *args,
 				      PyObject *kwds)
@@ -208,6 +263,15 @@ static PyObject *xspy_get_permissions(PyObject *self, PyObject *args,
  exit:
     return val;
 }
+
+#define xspy_set_permissions_doc "\n"		\
+	"Set the permissions for a path\n"	\
+	" path  [string] : xenstore path.\n"	\
+	" perms          : permissions.\n"	\
+	"\n"					\
+	"Returns: [int] 0 on success.\n"	\
+	"Raises RuntimeError on error.\n"	\
+	"\n"
 
 static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
 				      PyObject *kwds)
@@ -275,12 +339,22 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
     return val;
 }
 
+#define xspy_watch_doc "\n"					\
+	"Watch a path, get notifications when it changes.\n"	\
+	" path  [string] : xenstore path.\n"			\
+	" token [string] : returned in watch notification\n"	\
+	"\n"							\
+	"Returns: [int] 0 on success.\n"			\
+	"Raises RuntimeError on error.\n"			\
+	"\n"
+
 static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwd_spec[] = { "path", "priority", NULL };
-    static char *arg_spec = "s|i";
+    static char *kwd_spec[] = { "path", "priority", "token", NULL };
+    static char *arg_spec = "s|is";
     char *path = NULL;
     int priority = 0;
+    char *token = "";
 
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
@@ -289,13 +363,21 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
     if (!xh)
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, 
-                                     &path, &priority))
+                                     &path, &priority, &token))
         goto exit;
-    xsval = xs_watch(xh, path, priority);
+    xsval = xs_watch(xh, path, token, priority);
     val = pyvalue_int(xsval);
  exit:
     return val;
 }
+
+#define xspy_read_watch_doc "\n"		\
+	"Read a watch notification.\n"		\
+	" path [string]: xenstore path.\n"	\
+	"\n"					\
+	"Returns: [tuple] (path, token).\n"	\
+	"Raises RuntimeError on error.\n"	\
+	"\n"
 
 static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
 				 PyObject *kwds)
@@ -305,25 +387,39 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
 
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
-    char *xsval = NULL;
+    char **xsval = NULL;
 
     if (!xh)
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
         goto exit;
     xsval = xs_read_watch(xh);
-    val = pyvalue_str(xsval);
+    if (!xsval) {
+            val = PyErr_SetFromErrno(PyExc_RuntimeError);
+            goto exit;
+    }
+    /* Create tuple (path, token). */
+    val = Py_BuildValue("(ss)", xsval[0], xsval[1]);
  exit:
     if (xsval)
 	free(xsval);
     return val;
 }
 
+#define xspy_acknowledge_watch_doc "\n"					\
+	"Acknowledge a watch notification that has been read.\n"	\
+	" token [string] : returned in watch notification\n"		\
+	"\n"								\
+	"Returns: [int] 0 on success.\n"				\
+	"Raises RuntimeError on error.\n"				\
+	"\n"
+
 static PyObject *xspy_acknowledge_watch(PyObject *self, PyObject *args,
 					PyObject *kwds)
 {
-    static char *kwd_spec[] = { NULL };
-    static char *arg_spec = "";
+    static char *kwd_spec[] = { "token", NULL };
+    static char *arg_spec = "s";
+    char *token;
 
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
@@ -331,19 +427,29 @@ static PyObject *xspy_acknowledge_watch(PyObject *self, PyObject *args,
 
     if (!xh)
 	goto exit;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &token))
         goto exit;
-    xsval = xs_acknowledge_watch(xh);
+    xsval = xs_acknowledge_watch(xh, token);
     val = pyvalue_int(xsval);
  exit:
     return val;
 }
+
+#define xspy_unwatch_doc "\n"				\
+	"Stop watching a path.\n"			\
+	" path  [string] : xenstore path.\n"		\
+	" token [string] : token from the watch.\n"	\
+	"\n"						\
+	"Returns: [int] 0 on success.\n"		\
+	"Raises RuntimeError on error.\n"		\
+	"\n"
 
 static PyObject *xspy_unwatch(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwd_spec[] = { "path", NULL };
-    static char *arg_spec = "s|";
+    static char *kwd_spec[] = { "path", "token", NULL };
+    static char *arg_spec = "s|s";
     char *path = NULL;
+    char *token = "";
 
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
@@ -351,13 +457,23 @@ static PyObject *xspy_unwatch(PyObject *self, PyObject *args, PyObject *kwds)
 
     if (!xh)
 	goto exit;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path,
+				     &token))
         goto exit;
-    xsval = xs_unwatch(xh, path);
+    xsval = xs_unwatch(xh, path, token);
     val = pyvalue_int(xsval);
  exit:
     return val;
 }
+
+#define xspy_transaction_start_doc "\n"				\
+	"Start a transaction on a path.\n"			\
+	"Only one transaction can be active at a time.\n"	\
+	" path [string]: xenstore path.\n"			\
+	"\n"							\
+	"Returns: [int] 0 on success.\n"			\
+	"Raises RuntimeError on error.\n"			\
+	"\n"
 
 static PyObject *xspy_transaction_start(PyObject *self, PyObject *args,
 					PyObject *kwds)
@@ -380,6 +496,15 @@ static PyObject *xspy_transaction_start(PyObject *self, PyObject *args,
     return val;
 }
 
+#define xspy_transaction_end_doc "\n"					\
+	"End the current transaction.\n"				\
+	"Attempts to commit the transaction unless abort is true.\n"	\
+	" abort [int]: Abort flag..\n"					\
+	"\n"								\
+	"Returns: [int] 0 on success.\n"				\
+	"Raises RuntimeError on error.\n"				\
+	"\n"
+
 static PyObject *xspy_transaction_end(PyObject *self, PyObject *args,
 				      PyObject *kwds)
 {
@@ -400,6 +525,17 @@ static PyObject *xspy_transaction_end(PyObject *self, PyObject *args,
  exit:
     return val;
 }
+
+#define xspy_introduce_domain_doc "\n"					\
+	"Tell xenstore about a domain so it can talk to it.\n"		\
+	" dom  [int]   : domain id\n"					\
+	" page [long]  : address of domain's xenstore page\n"		\
+	" port [int]   : port the domain is using for xenstore\n"	\
+	" path [string]: path to the domain's data in xenstore\n"	\
+	"\n"								\
+	"Returns: [int] 0 on success.\n"				\
+	"Raises RuntimeError on error.\n"				\
+	"\n"
 
 static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
 				       PyObject *kwds)
@@ -429,6 +565,15 @@ static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
     return val;
 }
 
+#define xspy_release_domain_doc "\n"					\
+	"Tell xenstore to release its channel to a domain.\n"		\
+	"Unless this is done the domain will not be released.\n"	\
+	" dom [int]: domain id\n"					\
+	"\n"								\
+	"Returns: [int] 0 on success.\n"				\
+	"Raises RuntimeError on error.\n"				\
+	"\n"
+
 static PyObject *xspy_release_domain(PyObject *self, PyObject *args,
 				     PyObject *kwds)
 {
@@ -453,6 +598,13 @@ static PyObject *xspy_release_domain(PyObject *self, PyObject *args,
     return val;
 }
 
+#define xspy_close_doc "\n"			\
+	"Close the connection to xenstore.\n"	\
+	"\n"					\
+	"Returns: [int] 0 on success.\n"	\
+	"Raises RuntimeError on error.\n"	\
+	"\n"
+
 static PyObject *xspy_close(PyObject *self, PyObject *args, PyObject *kwds)
 {
     static char *kwd_spec[] = { NULL };
@@ -473,6 +625,13 @@ static PyObject *xspy_close(PyObject *self, PyObject *args, PyObject *kwds)
     return val;
 }
 
+#define xspy_shutdown_doc "\n"			\
+	"Shutdown the xenstore daemon.\n"	\
+	"\n"					\
+	"Returns: [int] 0 on success.\n"	\
+	"Raises RuntimeError on error.\n"	\
+	"\n"
+
 static PyObject *xspy_shutdown(PyObject *self, PyObject *args, PyObject *kwds)
 {
     static char *kwd_spec[] = { NULL };
@@ -492,49 +651,31 @@ static PyObject *xspy_shutdown(PyObject *self, PyObject *args, PyObject *kwds)
     return val;
 }
 
-#define XSPY_METH(_name) \
-    #_name, \
-    (PyCFunction) xspy_ ## _name, \
-    (METH_VARARGS | METH_KEYWORDS)
-// mtime
-// ctime
+#define XSPY_METH(_name) {			\
+    .ml_name  = #_name,				\
+    .ml_meth  = (PyCFunction) xspy_ ## _name,	\
+    .ml_flags = (METH_VARARGS | METH_KEYWORDS),	\
+    .ml_doc   = xspy_ ## _name ## _doc }
 
 static PyMethodDef xshandle_methods[] = {
-    { XSPY_METH(read), 
-      "read(path) : read data\n" },
-    { XSPY_METH(write), 
-      "write(path, data, [creat], [excl]): write data\n" },
-    { XSPY_METH(ls), 
-      "ls(path): list directory.\n" },
-    { XSPY_METH(mkdir), 
-      "mkdir(path): make a directory.\n" },
-    { XSPY_METH(rm),
-      "rm(path): remove a path (dir must be empty).\n" },
-    { XSPY_METH(get_permissions),
-      "get_permissions(path)\n" },
-    { XSPY_METH(set_permissions),
-      "set_permissions(path)\n" },
-    { XSPY_METH(watch), 
-      "watch(path)\n" },
-    { XSPY_METH(read_watch), 
-      "read_watch()\n" },
-    { XSPY_METH(acknowledge_watch), 
-      "acknowledge_watch()\n" },
-    { XSPY_METH(unwatch), 
-      "unwatch()\n" },
-    { XSPY_METH(transaction_start), 
-      "transaction_start()\n" },
-    { XSPY_METH(transaction_end), 
-      "transaction_end([abort])\n" },
-    { XSPY_METH(introduce_domain), 
-      "introduce_domain(dom, page, port)\n" },
-    { XSPY_METH(release_domain), 
-      "release_domain(dom)\n" },
-    { XSPY_METH(close), 
-      "close()\n" },
-    { XSPY_METH(shutdown), 
-      "shutdown()\n" },
-    { NULL, NULL, 0, NULL }
+     XSPY_METH(read),
+     XSPY_METH(write),
+     XSPY_METH(ls),
+     XSPY_METH(mkdir),
+     XSPY_METH(rm),
+     XSPY_METH(get_permissions),
+     XSPY_METH(set_permissions),
+     XSPY_METH(watch),
+     XSPY_METH(read_watch),
+     XSPY_METH(acknowledge_watch),
+     XSPY_METH(unwatch),
+     XSPY_METH(transaction_start),
+     XSPY_METH(transaction_end),
+     XSPY_METH(introduce_domain),
+     XSPY_METH(release_domain),
+     XSPY_METH(close),
+     XSPY_METH(shutdown),
+     { /* Terminator. */ },
 };
 
 static PyObject *xshandle_getattr(PyObject *self, char *name)
@@ -604,8 +745,15 @@ static PyObject *xshandle_open(PyObject *self, PyObject *args, PyObject *kwds)
 }
 
 static PyMethodDef xs_methods[] = {
-    { "open", (PyCFunction)xshandle_open, (METH_VARARGS | METH_KEYWORDS), 
-      "Open a connection to the xenstore daemon.\n" },
+    { .ml_name  = "open",
+      .ml_meth  = (PyCFunction)xshandle_open,
+      .ml_flags = (METH_VARARGS | METH_KEYWORDS), 
+      .ml_doc   = "\n"
+      "Open a connection to the xenstore daemon.\n"
+      "Returns: xs connection object.\n"
+      "Raises RuntimeError on error.\n"
+      "\n"
+    },
     { NULL, NULL, 0, NULL }
 };
 

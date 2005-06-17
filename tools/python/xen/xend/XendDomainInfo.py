@@ -157,7 +157,7 @@ class XendDomainInfo:
         db = parentdb.addChild(uuid)
         vm = cls(db)
         vm.construct(config)
-        vm.saveDB(sync=True)
+        vm.saveToDB(sync=True)
         return vm
 
     create = classmethod(create)
@@ -193,7 +193,7 @@ class XendDomainInfo:
 
     recreate = classmethod(recreate)
 
-    def restore(cls, parentdb, config, uuid=None):
+    def restore(cls, parentdb, config, uuid):
         """Create a domain and a VM object to do a restore.
 
         @param parentdb:  parent db
@@ -202,16 +202,20 @@ class XendDomainInfo:
         """
         db = parentdb.addChild(uuid)
         vm = cls(db)
-        dom = xc.domain_create()
-        vm.setdom(dom)
-        vm.dom_construct(vm.id, config)
-        vm.saveDB(sync=True)
+        id = xc.domain_create()
+        vm.setdom(id)
+        try:
+            vm.restore = True
+            vm.construct(config)
+        finally:
+            vm.restore = False
+        vm.exportToDB(save=True, sync=True)
         return vm
 
     restore = classmethod(restore)
 
     __exports__ = [
-        DBVar('id',            ty='str'),
+        DBVar('id',            ty='int'),
         DBVar('name',          ty='str'),
         DBVar('uuid',          ty='str'),
         DBVar('config',        ty='sxpr'),
@@ -267,14 +271,17 @@ class XendDomainInfo:
     def setDB(self, db):
         self.db = db
 
-    def saveDB(self, save=False, sync=False):
+    def saveToDB(self, save=False, sync=False):
         self.db.saveDB(save=save, sync=sync)
 
     def exportToDB(self, save=False, sync=False):
         if self.channel:
-            self.channel.saveToDB(self.db.addChild("channel"))
+            self.channel.saveToDB(self.db.addChild("channel"), save=save)
         if self.store_channel:
-            self.store_channel.saveToDB(self.db.addChild("store_channel"))
+            self.store_channel.saveToDB(self.db.addChild("store_channel"),
+                                        save=save)
+        if self.image:
+            self.image.exportToDB(save=save, sync=sync)
         self.db.exportToDB(self, fields=self.__exports__, save=save, sync=sync)
 
     def importFromDB(self):
@@ -316,7 +323,7 @@ class XendDomainInfo:
             self.state = state
             self.state_updated.notifyAll()
         self.state_updated.release()
-        self.saveDB()
+        self.saveToDB()
 
     def state_wait(self, state):
         self.state_updated.acquire()
@@ -325,14 +332,14 @@ class XendDomainInfo:
         self.state_updated.release()
 
     def __str__(self):
-        s = "domain"
+        s = "<domain"
         s += " id=" + str(self.id)
         s += " name=" + self.name
         s += " memory=" + str(self.memory)
         console = self.getConsole()
         if console:
             s += " console=" + str(console.console_port)
-        s += ""
+        s += ">"
         return s
 
     __repr__ = __str__
@@ -422,15 +429,19 @@ class XendDomainInfo:
             sxpr.append(self.channel.sxpr())
         if self.store_channel:
             sxpr.append(self.store_channel.sxpr())
+        if self.store_mfn:
+            sxpr.append(['store_mfn', self.store_mfn])
         console = self.getConsole()
         if console:
             sxpr.append(console.sxpr())
+
         if self.restart_count:
             sxpr.append(['restart_count', self.restart_count])
         if self.restart_state:
             sxpr.append(['restart_state', self.restart_state])
         if self.restart_time:
             sxpr.append(['restart_time', str(self.restart_time)])
+
         devs = self.sxpr_devices()
         if devs:
             sxpr.append(devs)
@@ -546,7 +557,7 @@ class XendDomainInfo:
         """
         self.create_channel()
         self.image.createImage()
-        self.image.exportToDB()
+        self.exportToDB()
         #if self.store_channel:
         #    self.db.introduceDomain(self.id,
         #                            self.store_mfn,
@@ -558,7 +569,7 @@ class XendDomainInfo:
         if self.dom_get(self.id):
             return
         self.id = None
-        self.saveDB(sync=True)
+        self.saveToDB(sync=True)
         try:
             # Todo: eventually will have to wait for devices to signal
             # destruction before can delete the db.
@@ -614,7 +625,7 @@ class XendDomainInfo:
         """
         self.cleanup()
         self.destroy_domain()
-        self.saveDB()
+        self.saveToDB()
         return 0
 
     def is_terminated(self):
@@ -649,14 +660,13 @@ class XendDomainInfo:
             cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
         except:
             raise VmError('invalid cpu')
-        dom = self.image.initDomain(self.id, self.memory, cpu, self.cpu_weight)
+        id = self.image.initDomain(self.id, self.memory, cpu, self.cpu_weight)
         log.debug('init_domain> Created domain=%d name=%s memory=%d',
-                  dom, self.name, self.memory)
-        if not self.restore:
-            self.setdom(dom)
+                  id, self.name, self.memory)
+        self.setdom(id)
 
     def openChannel(self, key, local, remote):
-        """Create a channel to the domain.
+        """Create a control channel to the domain.
         If saved info is available recreate the channel.
         
         @param key db key for the saved data (if any)
@@ -670,6 +680,11 @@ class XendDomainInfo:
         return chan
 
     def eventChannel(self, key):
+        """Create an event channel to the domain.
+        If saved info is available recreate the channel.
+        
+        @param key db key for the saved data (if any)
+        """
         db = self.db.addChild(key)
         return EventChannel.restoreFromDB(db, 0, self.id)
         
@@ -833,11 +848,12 @@ class XendDomainInfo:
             self.state = STATE_VM_OK
             self.shutdown_pending = None
             self.restart_check()
+            self.exportToDB()
             self.restart_state = STATE_RESTART_BOOTING
             if self.bootloader:
                 self.config = self.bootloader_config()
             self.construct(self.config)
-            self.saveDB()
+            self.saveToDB()
         finally:
             self.restart_state = None
 
@@ -910,23 +926,6 @@ class XendDomainInfo:
             blkif = self.createDeviceController("vbd")
             backend = blkif.getBackend(0)
             backend.connect(recreate=self.recreate)
-
-    def dom_construct(self, dom, config):
-        """Construct a vm for an existing domain.
-
-        @param dom: domain id
-        @param config: domain configuration
-        """
-        d = dom_get(dom)
-        if not d:
-            raise VmError("Domain not found: %d" % dom)
-        try:
-            self.restore = True
-            self.setdom(dom)
-            self.memory = d['mem_kb']/1024
-            self.construct(config)
-        finally:
-            self.restore = False
 
     def configure_fields(self):
         """Process the vm configuration fields using the registered handlers.

@@ -98,8 +98,8 @@ class ImageHandler:
         self.db = vm.db.addChild('/image')
         self.config = config
 
-    def exportToDB(self, save=False):
-        self.db.exportToDB(self, fields=self.__exports__, save=save)
+    def exportToDB(self, save=False, sync=False):
+        self.db.exportToDB(self, fields=self.__exports__, save=save, sync=sync)
 
     def importFromDB(self):
         self.db.importFromDB(self, fields=self.__exports__)

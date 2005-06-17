@@ -20,7 +20,6 @@
 #include "machine.h"
 #include "offsets.h"
 
-
 /*
  * All processor exception/faults/interrupts end up here.
  *
@@ -43,6 +42,7 @@
 	.endm
 
 	.section .rodata
+	.code32
 	.align	4
 	.global	trap_handlers
 trap_handlers:
@@ -96,6 +96,7 @@ trap_handlers:
 	TRAP_HANDLER	47, 0	/* irq 15 */
 
 	.text
+	.code32
 	.align	16
 common_trap:				/* common trap handler */
 	pushl	%gs

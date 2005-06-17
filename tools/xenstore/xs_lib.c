@@ -67,7 +67,7 @@ bool xs_write_all(int fd, const void *data, unsigned int len)
 
 /* Convert strings to permissions.  False if a problem. */
 bool xs_strings_to_perms(struct xs_permissions *perms, unsigned int num,
-		      const char *strings)
+			 const char *strings)
 {
 	const char *p;
 	char *end;
@@ -138,4 +138,3 @@ unsigned int xs_count_strings(const char *strings, unsigned int len)
 
 	return num;
 }
-	

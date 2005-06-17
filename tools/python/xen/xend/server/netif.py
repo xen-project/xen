@@ -66,11 +66,9 @@ class NetDev(Dev):
         DBVar('be_mac',  ty='mac'),
         DBVar('bridge',  ty='str'),
         DBVar('script',  ty='str'),
-        #DBVar('ipaddr'),
         DBVar('credit',  ty='int'),
         DBVar('period',  ty='int'),
         DBVar('vifname', ty='str'),
-        DBVar('evtchn'),                #todo: export fields (renamed)
         ]
 
     def __init__(self, controller, id, config, recreate=False):
@@ -89,8 +87,15 @@ class NetDev(Dev):
         self.bridge = None
         self.script = None
         self.ipaddr = None
+        self.mtu = None
         self.vifname = None
         self.configure(self.config, recreate=recreate)
+
+    def exportToDB(self, save=False):
+        Dev.exportToDB(self, save=save)
+        if self.evtchn:
+            db = self.db.addChild("evtchn")
+            self.evtchn.exportToDB(db, save=save)
 
     def init(self, recreate=False, reboot=False):
         self.destroyed = False
@@ -128,6 +133,15 @@ class NetDev(Dev):
             val = None
         return val
 
+    def _get_config_mtu(self, config):
+        mtu = sxp.child_value(config, 'mtu')
+        if not mtu: return None
+        try:
+            mtu = int(mtu)
+        except:
+            raise XendError("invalid mtu: %s" & mtu)
+        return mtu
+
     def configure(self, config, change=False, recreate=False):
         if change:
             return self.reconfigure(config)
@@ -152,6 +166,7 @@ class NetDev(Dev):
         self.bridge = sxp.child_value(config, 'bridge')
         self.script = sxp.child_value(config, 'script')
         self.ipaddr = self._get_config_ipaddr(config) or []
+        self.mtu = self._get_config_mtu(config)
         self._config_credit_limit(config)
         
         try:
@@ -183,6 +198,7 @@ class NetDev(Dev):
         bridge = sxp.child_value(config, 'bridge')
         script = sxp.child_value(config, 'script')
         ipaddr = self._get_config_ipaddr(config)
+        mtu = self._get_config_mtu(config)
         
         xd = get_component('xen.xend.XendDomain')
         backendDomain = xd.domain_lookup_by_name(sxp.child_value(config, 'backend', '0')).id
@@ -199,6 +215,8 @@ class NetDev(Dev):
             changes['script'] = script
         if (ipaddr is not None) and (ipaddr != self.ipaddr):
             changes['ipaddr'] = ipaddr
+        if (mtu is not None) and (mtu != self.mtu):
+            changes['mtu'] = mtu
 
         if changes:
             self.vifctl("down")

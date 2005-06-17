@@ -1,6 +1,8 @@
 import string
 import types
 
+from xen.xend.XendLogging import log
+
 from xen.xend import sxp
 from xsnode import XenNode
 from xen.util.mac import macToString, macFromString
@@ -14,14 +16,19 @@ def hasAttr(obj, attr):
         return hasattr(obj, attr)
 
 def getAttr(obj, attr):
-    if isinstance(obj, dict):
-        return dict.get(attr)
-    else:
-        return getattr(obj, attr, None)
+    try:
+        if isinstance(obj, dict):
+            return obj.get(attr)
+        else:
+            return getattr(obj, attr, None)
+    except AttributeError:
+        return None
+    except LookupError:
+        return None
 
 def setAttr(obj, attr, val):
     if isinstance(obj, dict):
-        dict[attr] = val
+        obj[attr] = val
     else:
         setattr(obj, attr, val)
 
@@ -48,15 +55,15 @@ class DBConverter:
 
     getConverter = classmethod(getConverter)
 
-    def convertToDB(cls, val, ty=None):
-        return cls.getConverter(ty).toDB(val)
+    def exportTypeToDB(cls, db, path, val, ty=None):
+        return cls.getConverter(ty).exportToDB(db, path, val)
 
-    convertToDB = classmethod(convertToDB)
+    exportTypeToDB = classmethod(exportTypeToDB)
 
-    def convertFromDB(cls, val, ty=None):
-        return cls.getConverter(ty).fromDB(val)
+    def importTypeFromDB(cls, db, path, ty=None):
+        return cls.getConverter(ty).importFromDB(db, path)
 
-    convertFromDB = classmethod(convertFromDB)
+    importTypeFromDB = classmethod(importTypeFromDB)
 
     # Must define in subclass.
     name = None
@@ -69,6 +76,26 @@ class DBConverter:
             raise ValueError("invalid converter name: '%s'" % self.name)
         self.converters[self.name] = self
 
+    def exportToDB(self, db, path, val):
+        if val is None:
+            return
+        try:
+            data = self.toDB(val)
+        except Exception, ex:
+            raise
+        setattr(db, path, data)
+
+    def importFromDB(self, db, path):
+        data = getAttr(db, path)
+        if data is None:
+            val = None
+        else:
+            try:
+                val = self.fromDB(data.getData())
+            except Exception, ex:
+                raise
+        return val
+        
     def toDB(self, val):
         raise NotImplementedError()
 
@@ -178,10 +205,12 @@ class DBVar:
         self.attr = varpath[-1]
 
     def exportToDB(self, db, obj):
-        self.setDB(db, self.getObj(obj))
+        val = self.getObj(obj)
+        DBConverter.exportTypeToDB(db, self.path, val, ty=self.ty)
 
     def importFromDB(self, db, obj):
-        self.setObj(obj, self.getDB(db))
+        val = DBConverter.importTypeFromDB(db, self.path, ty=self.ty)
+        self.setObj(obj, val)
 
     def getObj(self, obj):
         o = obj
@@ -199,23 +228,6 @@ class DBVar:
         if val is None and hasAttr(o, self.attr):
             return
         setAttr(o, self.attr, val)
-
-    def getDB(self, db):
-        try:
-            data = getattr(db, self.path)
-        except AttributeError:
-            return None
-        return DBConverter.convertFromDB(data, ty=self.ty)
-
-    def setDB(self, db, val):
-        # Don't set in db if val is None.
-        #print 'DBVar>setDB>', self.path, 'val=', val
-        if val is None:
-            return
-        data = DBConverter.convertToDB(val, ty=self.ty)
-        #print 'DBVar>setDB>', self.path, 'data=', data
-        setattr(db, self.path, data)
-        
 
 class DBMap(dict):
     """A persistent map. Extends dict with persistence.
@@ -314,6 +326,21 @@ class DBMap(dict):
             traceback.print_exc()
             print 'DBMap>releaseDomain>', ex
             pass # todo: don't ignore
+
+    def watch(self, fn, path=""):
+        return self.__db__.watch(fn, path=path)
+
+    def unwatch(self, sid):
+        return self.__db__.unwatch(sid)
+
+    def subscribe(self, event, fn):
+        return self.__db__.subscribe(event, fn)
+
+    def unsubscribe(self, sid):
+        return self.__db__.unsubscribe(sid)
+
+    def sendEvent(self, event, val):
+        return self.__db__.sendEvent(event, val)
         
     def transactionBegin(self):
         # Begin a transaction.
@@ -328,12 +355,6 @@ class DBMap(dict):
         # We have changed values, what do we do?
         pass
 
-    def watch(self, fn):
-        pass
-
-    def unwatch(self, watch):
-        pass
-        
     def checkName(self, k):
         if k == "":
             raise ValueError("invalid key, empty string")
@@ -455,6 +476,9 @@ class DBMap(dict):
             if x == "": continue
             n = n._addChild(x)
         return n
+
+    def getDB(self):
+        return self.__db__
 
     def setDB(self, db):
         if (db is not None) and not isinstance(db, XenNode):
