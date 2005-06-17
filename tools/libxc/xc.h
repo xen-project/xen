@@ -114,7 +114,11 @@ int xc_domain_pincpu(int xc_handle,
                      u32 domid,
                      int cpu);
 /**
- * This function will return information about one or more domains.
+ * This function will return information about one or more domains. It is
+ * designed to iterate over the list of domains. If a single domain is
+ * requested, this function will return the next domain in the list - if
+ * one exists. It is, therefore, important in this case to make sure the
+ * domain requested was the one returned.
  *
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm first_domid the first domain to enumerate information from.  Domains
