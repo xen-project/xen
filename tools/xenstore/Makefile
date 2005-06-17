@@ -27,7 +27,7 @@ TESTENV=XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
 
 all: xen xenstored libxenstore.a libxenstore-pic.a
 
-testcode: xen xs_test xenstored_test xs_random
+testcode: xen xs_test xenstored_test xs_random xs_dom0_test
 
 xen:
 	ln -sf $(XEN_ROOT)/xen/include/public $@
@@ -63,8 +63,8 @@ libxenstore.a: $(LIB_OBJS_A)
 libxenstore-pic.a: $(LIB_OBJS_PIC)
 
 clean: testsuite-clean
-	rm -f *.o *.opic *.a
-	rm -f xs_test xenstored xenstored_test xs_random xs_stress xen
+	rm -f *.o *.opic *.a xen
+	rm -f xs_test xenstored xenstored_test xs_random xs_stress xs_dom0_test
 	-$(RM) $(PROG_DEP)
 
 check: testsuite-run randomcheck stresstest
@@ -86,6 +86,9 @@ randomcheck: xs_random xenstored_test
 stresstest: xs_stress xenstored_test
 	rm -rf $(TESTDIR)/store
 	export $(TESTENV); PID=`./xenstored_test --output-pid`; ./xs_stress 10000; ret=$$?; kill $$PID; exit $$ret
+
+xs_dom0_test: xs_dom0_test.o utils.o
+	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxc -o $@
 
 TAGS:
 	etags `find . -name '*.[ch]'`

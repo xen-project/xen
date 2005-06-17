@@ -1081,6 +1081,7 @@
 42a57d99-zLxBjzC7rfj_perV-orUg tools/xenstore/xenstored_watch.h
 42a57d99BnkhISKgCCRcUqhteyuxCw tools/xenstore/xs.c
 42a57d99FyiYSz9AkKKROrRydnA-gQ tools/xenstore/xs.h
+42b29922EYQ87Y4fwZXSkEHgtQk7CQ tools/xenstore/xs_dom0_test.c
 42a57d99SrtsJCDUlKyRPf3EX86A1Q tools/xenstore/xs_lib.c
 42a57d99L2pYeMFyjQ_4Rnb17xTSMg tools/xenstore/xs_lib.h
 42a57d99Kl6Ba8oCHv2fggl7QN9QZA tools/xenstore/xs_random.c
