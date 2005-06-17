@@ -46,12 +46,12 @@ class Subscription:
             watcher.delSubs(self)
         return watcher
 
-    def notify(self, path, val):
+    def notify(self, token, path, val):
         try:
-            self.fn(self, path, val)
-        except SystemExitException:
+            self.fn(self, token, path, val)
+        except SystemExit:
             raise
-        except:
+        except Exception, ex:
             pass
 
 class Watcher:
@@ -71,6 +71,9 @@ class Watcher:
     def getPath(self):
         return self.path
 
+    def getToken(self):
+        return self.path
+
     def addSubs(self, subs):
         self.subscriptions.append(subs)
         self.watch()
@@ -83,14 +86,15 @@ class Watcher:
     def watch(self):
         if self.xs: return
         self.xs = xs.open()
-        self.xs.watch(self.path)
+        self.xs.watch(path=self.getPath(), token=self.getToken())
 
     def unwatch(self):
         if self.xs:
-            try:
-                self.xs.unwatch(self.path)
-            except Exception, ex:
-                print 'Watcher>unwatch>', ex
+## Possibly crashes xenstored.
+##            try:
+##                self.xs.unwatch(path=self.getPath(), token=self.getToken())
+##            except Exception, ex:
+##                print 'Watcher>unwatch>', ex
             try:
                 self.xs.close()
             except Exception, ex:
@@ -102,17 +106,22 @@ class Watcher:
 
     def getNotification(self):
         p = self.xs.read_watch()
-        self.xs.acknowledge_watch()
+        self.xs.acknowledge_watch(p[1])
         return p
 
     def notify(self):
         try:
-            p = self.getNotification()
-            v = self.xs.read(p)
-            for s in subscriptions:
-                s.notify(p, v)
+            (path, token) = self.getNotification()
+            if path.endswith("@eid"):
+                pass
+            else:
+                val = self.xs.read(path)
+                for subs in self.subscriptions:
+                    subs.notify(token, path, val)
+        except SystemExit:
+            raise
         except Exception, ex:
-            print 'Notify exception:', ex
+            raise
 
 class EventWatcher(Watcher):
 
@@ -124,6 +133,9 @@ class EventWatcher(Watcher):
             store.write(self.eidPath, str(0))
 
     def getEvent(self):
+        return self.event
+
+    def getToken(self):
         return self.event
 
 class XenStore:
@@ -145,8 +157,10 @@ class XenStore:
                     self.xs = xs.open()
                     ex = None
                     break
+                except SystemExit:
+                    raise
                 except Exception, ex:
-                    print >>sys.stderr, "Exception connecting to xsdaemon:", ex
+                    print >>sys.stderr, "Exception connecting to xenstored:", ex
                     print >>sys.stderr, "Trying again..."
                     time.sleep(1)
             else:
@@ -241,7 +255,10 @@ class XenStore:
 
     def write(self, path, data, create=True, excl=False):
         self.mkdirs(path)
-        self.getxs().write(path, data, create=create, excl=excl)
+        try:
+            self.getxs().write(path, data, create=create, excl=excl)
+        except Exception, ex:
+            raise
 
     def begin(self, path):
         self.getxs().transaction_start(path)
@@ -261,7 +278,10 @@ class XenStore:
         del self.subscriptions[s.sid]
         watcher = s.unwatch()
         if watcher and not watcher.watching():
-            del self.watchers[path]
+            try:
+                del self.watchers[watcher.getPath()]
+            except:
+                pass
 
     def subscribe(self, event, fn):
         path = getEventPath(event)
@@ -280,13 +300,10 @@ class XenStore:
             self.mkdirs(eventPath)
             eid = 1
             if self.exists(eidPath):
-                data = self.read(eidPath)
-                print 'sendEvent>', 'data=', data, type(data)
                 try:
                     eid = int(self.read(eidPath))
                     eid += 1
                 except Exception, ex:
-                    print 'sendEvent>', ex
                     pass
             self.write(eidPath, str(eid))
             self.write(os.path.join(eventPath, str(eid)), data)
@@ -346,6 +363,15 @@ def getXenStore():
         xenstore = XenStore()
         return xenstore
 
+def sendEvent(event, val):
+    getXenStore.sendEvent(event, val)
+
+def subscribe(event, fn):
+    return getXenStore().subscribe(event, fn)
+
+def unsubscribe(sid):
+    getXenStore().unsubscribe(sid)
+
 class XenNode:
 
     def __init__(self, path="/", create=True):
@@ -389,9 +415,7 @@ class XenNode:
             return None
 
     def setData(self, data, path=""):
-        path = self.relPath(path)
-        #print 'XenNode>setData>', 'path=', path, 'data=', data
-        return self.store.write(path, data)
+        return self.store.write(self.relPath(path), data)
 
     def getLock(self):
         return None
