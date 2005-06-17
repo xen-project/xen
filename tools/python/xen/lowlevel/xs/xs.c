@@ -625,11 +625,11 @@ static PyObject *xspy_close(PyObject *self, PyObject *args, PyObject *kwds)
     return val;
 }
 
-#define xspy_shutdown_doc "\n"				\
-	"Shutdown the xenstore daemon (xsdaemon).\n"	\
-	"\n"						\
-	"Returns: [int] 0 on success.\n"		\
-	"Raises RuntimeError on error.\n"		\
+#define xspy_shutdown_doc "\n"			\
+	"Shutdown the xenstore daemon.\n"	\
+	"\n"					\
+	"Returns: [int] 0 on success.\n"	\
+	"Raises RuntimeError on error.\n"	\
 	"\n"
 
 static PyObject *xspy_shutdown(PyObject *self, PyObject *args, PyObject *kwds)
