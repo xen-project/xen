@@ -35,10 +35,7 @@
 #ifdef __ia64__
 #define __addr_ok(a) 1	// FIXME-ia64: a variant of access_ok??
 // FIXME-ia64: need to implement real cmpxchg_user on ia64
-#define cmpxchg_user(_p,_o,_n) ((*_p == _o) ? ((*_p = _n), 0) : ((_o = *_p), 0))
-// FIXME-ia64: the following are meaningless on ia64? move to some header file
-#define put_page(x) do { } while (0)
-#define put_page_type(x) do { } while (0)
+//#define cmpxchg_user(_p,_o,_n) ((*_p == _o) ? ((*_p = _n), 0) : ((_o = *_p), 0))
 // FIXME-ia64: these belong in an asm/grant_table.h... PAGE_SIZE different
 #undef ORDER_GRANT_FRAMES
 //#undef NUM_GRANT_FRAMES
