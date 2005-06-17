@@ -144,6 +144,7 @@ tools/xenstore/testsuite/tmp/*
 tools/xenstore/xen
 tools/xenstore/xenstored
 tools/xenstore/xenstored_test
+tools/xenstore/xs_dom0_test
 tools/xenstore/xs_random
 tools/xenstore/xs_stress
 tools/xenstore/xs_test
