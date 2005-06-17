@@ -196,6 +196,36 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     }
     break;
 
+    case IOCTL_PRIVCMD_INITDOMAIN_STORE:
+    {
+        extern int do_xenbus_probe(void*);
+
+        if (xen_start_info.store_evtchn != 0) {
+            ret = -EINVAL;
+            break;
+        }
+
+        /* Allocate page. */
+        xen_start_info.store_page = get_zeroed_page(GFP_KERNEL);
+        if (!xen_start_info.store_page) {
+            ret = -ENOMEM;
+            break;
+        }
+
+        /* We don't refcnt properly, so set reserved on page.
+         * (this allocation is permanent) */
+        SetPageReserved(virt_to_page(xen_start_info.store_page));
+
+        /* Initial connect. Setup channel and page. */
+        xen_start_info.store_evtchn = data;
+        ret = pfn_to_mfn(virt_to_phys((void *)xen_start_info.store_page) >>
+                         PAGE_SHIFT);
+
+        /* We'll return then this will wait for daemon to answer */
+        // kthread_run(do_xenbus_probe, NULL, "xenbus_probe");
+    }
+    break;
+
     default:
         ret = -EINVAL;
         break;

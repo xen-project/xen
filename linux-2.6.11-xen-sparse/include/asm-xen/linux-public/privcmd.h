@@ -84,5 +84,7 @@ typedef struct privcmd_blkmsg
     _IOC(_IOC_NONE, 'P', 3, sizeof(privcmd_mmapbatch_t))
 #define IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN \
     _IOC(_IOC_READ, 'P', 4, sizeof(unsigned long))
+#define IOCTL_PRIVCMD_INITDOMAIN_STORE \
+    _IOC(_IOC_READ, 'P', 5, 0)
 
 #endif /* __PRIVCMD_H__ */
