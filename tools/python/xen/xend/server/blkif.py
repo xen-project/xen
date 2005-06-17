@@ -167,6 +167,7 @@ class BlkDev(Dev):
         DBVar('params',       ty='str'),
         DBVar('node',         ty='str'),
         DBVar('device',       ty='long'),
+        DBVar('dev_handle',   ty='long'),
         DBVar('start_sector', ty='long'),
         DBVar('nr_sectors',   ty='long'),
         ]

@@ -81,7 +81,7 @@ class EventChannel(dict):
         evtchn_close(self.dom1, self.port1)
         evtchn_close(self.dom2, self.port2)
 
-    def saveToDB(self, db):
+    def saveToDB(self, db, save=False):
         """Save the event channel to the db so it can be restored later,
         using restoreFromDB() on the class.
 
@@ -91,7 +91,7 @@ class EventChannel(dict):
         db['dom2']  = str(self.dom2)
         db['port1'] = str(self.port1)
         db['port2'] = str(self.port2)
-        db.saveDB()
+        db.saveDB(save=save)
 
     def sxpr(self):
         return ['event-channel',
@@ -339,7 +339,7 @@ class Channel:
         # Make sure the port will deliver all the messages.
         self.port.register(TYPE_WILDCARD)
 
-    def saveToDB(self, db):
+    def saveToDB(self, db, save=False):
         """Save the channel ports to the db so the channel can be restored later,
         using restoreFromDB() on the factory.
 
@@ -348,7 +348,7 @@ class Channel:
         if self.closed: return
         db['local_port'] = str(self.getLocalPort())
         db['remote_port'] = str(self.getRemotePort())
-        db.saveDB()
+        db.saveDB(save=save)
 
     def getKey(self):
         """Get the channel key.

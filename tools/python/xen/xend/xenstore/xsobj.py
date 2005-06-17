@@ -1,6 +1,8 @@
 import string
 import types
 
+from xen.xend.XendLogging import log
+
 from xen.xend import sxp
 from xsnode import XenNode
 from xen.util.mac import macToString, macFromString
@@ -14,14 +16,19 @@ def hasAttr(obj, attr):
         return hasattr(obj, attr)
 
 def getAttr(obj, attr):
-    if isinstance(obj, dict):
-        return dict.get(attr)
-    else:
-        return getattr(obj, attr, None)
+    try:
+        if isinstance(obj, dict):
+            return obj.get(attr)
+        else:
+            return getattr(obj, attr, None)
+    except AttributeError:
+        return None
+    except LookupError:
+        return None
 
 def setAttr(obj, attr, val):
     if isinstance(obj, dict):
-        dict[attr] = val
+        obj[attr] = val
     else:
         setattr(obj, attr, val)
 
@@ -53,8 +60,8 @@ class DBConverter:
 
     convertToDB = classmethod(convertToDB)
 
-    def convertFromDB(cls, val, ty=None):
-        return cls.getConverter(ty).fromDB(val)
+    def convertFromDB(cls, data, ty=None):
+        return cls.getConverter(ty).fromDB(data.getData())
 
     convertFromDB = classmethod(convertFromDB)
 
@@ -201,9 +208,8 @@ class DBVar:
         setAttr(o, self.attr, val)
 
     def getDB(self, db):
-        try:
-            data = getattr(db, self.path)
-        except AttributeError:
+        data = getAttr(db, self.path)
+        if data is None:
             return None
         return DBConverter.convertFromDB(data, ty=self.ty)
 
@@ -214,8 +220,7 @@ class DBVar:
             return
         data = DBConverter.convertToDB(val, ty=self.ty)
         #print 'DBVar>setDB>', self.path, 'data=', data
-        setattr(db, self.path, data)
-        
+        setAttr(db, self.path, data)
 
 class DBMap(dict):
     """A persistent map. Extends dict with persistence.
