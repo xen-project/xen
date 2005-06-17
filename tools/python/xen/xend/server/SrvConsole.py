@@ -36,7 +36,7 @@ class SrvConsole(SrvDir):
                 req.write('</body></html>')
             return ''
         except Exception, ex:
-            self._perform_err(ex, req)
+            self._perform_err(ex, "console", req)
 
     def form(self, req):
         req.write('<form method="post" action="%s">' % req.prePathURL())

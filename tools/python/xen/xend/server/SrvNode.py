@@ -60,7 +60,7 @@ class SrvNode(SrvDir):
                 req.write('</body></html>')
             return ''
         except Exception, ex:
-            self._perform_err(ex, req)
+            self._perform_err(ex, "node info", req)
             
     def info(self):
         return self.xn.info()

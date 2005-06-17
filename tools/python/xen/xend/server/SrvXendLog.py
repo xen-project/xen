@@ -21,4 +21,4 @@ class SrvXendLog(SrvDir):
         try:
             return self.logfile.render(req)
         except Exception, ex:
-            self._perform_err(ex, req)
+            self._perform_err(ex, "log", req)

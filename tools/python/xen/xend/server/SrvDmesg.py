@@ -31,7 +31,7 @@ class SrvDmesg(SrvDir):
                 req.write('</pre></body></html>')
             return ''
         except Exception, ex:
-            self._perform_err(ex, req)
+            self._perform_err(ex, "dmesg", req)
             
     def info(self):
         return self.xd.info()

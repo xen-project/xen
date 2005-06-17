@@ -133,7 +133,7 @@ class SrvDomainDir(SrvDir):
                 req.write("</body></html>")
             return ''
         except Exception, ex:
-            self._perform_err(ex, req)
+            self._perform_err(ex, "ls_domain", req)
 
     def ls_domain(self, req, use_sxp=0):
         url = req.prePathURL()

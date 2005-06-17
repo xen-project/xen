@@ -88,7 +88,7 @@ class SrvVnetDir(SrvDir):
                 req.write("</body></html>")
             return ''
         except Exception, ex:
-            self._perform_err(ex, req)
+            self._perform_err(ex, "ls_vnet", req)
 
     def ls_vnet(self, req, use_sxp=0):
         url = req.prePathURL()
