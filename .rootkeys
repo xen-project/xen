@@ -1066,6 +1066,9 @@
 42a57d98fdO519YyATk4_Zwr1STNfQ tools/xenstore/testsuite/07watch.sh
 42a57d98zZUtvirUMjmHxFphJjmO7Q tools/xenstore/testsuite/08transaction.sh
 42a57d98sn9RbpBgHRv1D99Kt7LwYA tools/xenstore/testsuite/09domain.sh
+42b2a4bfxAwHlRgd31SJBgFnj8g3MA tools/xenstore/testsuite/10domain-homedir.sh
+42b2a4bfHbUp4IB8tfNIa8j37S27fw tools/xenstore/testsuite/11domain-watch.sh
+42b2a4bfhrB5v6uYKPj6jSO_Ng0PAA tools/xenstore/testsuite/12readonly.sh
 42a57d98tSuoFCHnnM2GgENXJrRQmw tools/xenstore/testsuite/test.sh
 42a57d98zxDP2Ti7dTznGROi66rUGw tools/xenstore/utils.c
 42a57d98SDvOYCEjmCjwHSk6390GLA tools/xenstore/utils.h
@@ -1087,6 +1090,7 @@
 42a57d99Kl6Ba8oCHv2fggl7QN9QZA tools/xenstore/xs_random.c
 42a57d99SHYR1lQOD0shuErPDg9NKQ tools/xenstore/xs_stress.c
 42a57d996aBawpkQNOWkNWXD6LrhPg tools/xenstore/xs_test.c
+42b2a4bfp-lhxBfenUyHlvw7bPcVgA tools/xenstore/xs_watch_stress.c
 403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
 40a107afN60pFdURgBv9KwEzgRl5mQ tools/xentrace/formats
 420d52d2_znVbT4JAPIU36vQOme83g tools/xentrace/xenctx.c

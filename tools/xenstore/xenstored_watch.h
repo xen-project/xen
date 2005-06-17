@@ -16,13 +16,15 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+
 #ifndef _XENSTORED_WATCH_H
 #define _XENSTORED_WATCH_H
+
 #include "xenstored_core.h"
 
 bool do_watch(struct connection *conn, struct buffered_data *in);
-bool do_watch_ack(struct connection *conn);
-bool do_unwatch(struct connection *conn, const char *node);
+bool do_watch_ack(struct connection *conn, const char *token);
+bool do_unwatch(struct connection *conn, struct buffered_data *in);
 
 /* Is this a watch event message for this connection? */
 bool is_watch_event(struct connection *conn, struct buffered_data *out);
@@ -30,13 +32,15 @@ bool is_watch_event(struct connection *conn, struct buffered_data *out);
 /* Look through our watches: if any of them have an event, queue it. */
 void queue_next_event(struct connection *conn);
 
-/* Is this connection waiting for a watch acknowledgement? */
-bool waiting_for_ack(struct connection *conn);
-
-/* Reset event if we were sending one */
-void reset_watch_event(struct connection *conn);
-
 /* Fire all watches. */
 void fire_watches(struct transaction *trans, const char *node);
+
+/* Find shortest timeout: if any, reduce tv (may already be set). */
+void shortest_watch_ack_timeout(struct timeval *tv);
+
+/* Check for watches which may have timed out. */
+void check_watch_ack_timeout(void);
+
+void dump_watches(struct connection *conn);
 
 #endif /* _XENSTORED_WATCH_H */

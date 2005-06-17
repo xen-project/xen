@@ -277,10 +277,11 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
 
 static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwd_spec[] = { "path", "priority", NULL };
-    static char *arg_spec = "s|i";
+    static char *kwd_spec[] = { "path", "priority", "token", NULL };
+    static char *arg_spec = "s|is";
     char *path = NULL;
     int priority = 0;
+    char *token;
 
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
@@ -289,9 +290,9 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
     if (!xh)
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, 
-                                     &path, &priority))
+                                     &path, &priority, &token))
         goto exit;
-    xsval = xs_watch(xh, path, priority);
+    xsval = xs_watch(xh, path, token, priority);
     val = pyvalue_int(xsval);
  exit:
     return val;
@@ -305,14 +306,19 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
 
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
-    char *xsval = NULL;
+    char **xsval = NULL;
 
     if (!xh)
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
         goto exit;
     xsval = xs_read_watch(xh);
-    val = pyvalue_str(xsval);
+    if(!xsval){
+            val = PyErr_SetFromErrno(PyExc_RuntimeError);
+            goto exit;
+    }
+    /* Create tuple (path, token). */
+    val = Py_BuildValue("(ss)", xsval[0], xsval[1]);
  exit:
     if (xsval)
 	free(xsval);
@@ -323,7 +329,8 @@ static PyObject *xspy_acknowledge_watch(PyObject *self, PyObject *args,
 					PyObject *kwds)
 {
     static char *kwd_spec[] = { NULL };
-    static char *arg_spec = "";
+    static char *arg_spec = "s";
+    char *token = "";
 
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
@@ -331,9 +338,9 @@ static PyObject *xspy_acknowledge_watch(PyObject *self, PyObject *args,
 
     if (!xh)
 	goto exit;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &token))
         goto exit;
-    xsval = xs_acknowledge_watch(xh);
+    xsval = xs_acknowledge_watch(xh, token);
     val = pyvalue_int(xsval);
  exit:
     return val;
@@ -341,9 +348,10 @@ static PyObject *xspy_acknowledge_watch(PyObject *self, PyObject *args,
 
 static PyObject *xspy_unwatch(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwd_spec[] = { "path", NULL };
-    static char *arg_spec = "s|";
+    static char *kwd_spec[] = { "path", "token", NULL };
+    static char *arg_spec = "s|s";
     char *path = NULL;
+    char *token = "";
 
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
@@ -351,9 +359,10 @@ static PyObject *xspy_unwatch(PyObject *self, PyObject *args, PyObject *kwds)
 
     if (!xh)
 	goto exit;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path,
+				     &token))
         goto exit;
-    xsval = xs_unwatch(xh, path);
+    xsval = xs_unwatch(xh, path, token);
     val = pyvalue_int(xsval);
  exit:
     return val;

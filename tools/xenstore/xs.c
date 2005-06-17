@@ -159,8 +159,7 @@ static void *read_reply(int fd, enum xsd_sockmsg_type *type, unsigned int *len)
 
 /* Send message to xs, get malloc'ed reply.  NULL and set errno on error. */
 static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
-		      const struct iovec *iovec,
-		      unsigned int num_vecs,
+		      const struct iovec *iovec, unsigned int num_vecs,
 		      unsigned int *len)
 {
 	struct xsd_sockmsg msg;
@@ -330,8 +329,7 @@ bool xs_rm(struct xs_handle *h, const char *path)
  * Returns malloced array, or NULL: call free() after use.
  */
 struct xs_permissions *xs_get_permissions(struct xs_handle *h,
-					  const char *path,
-					  unsigned int *num)
+					  const char *path, unsigned int *num)
 {
 	char *strings;
 	unsigned int len;
@@ -400,61 +398,75 @@ unwind:
 
 /* Watch a node for changes (poll on fd to detect, or call read_watch()).
  * When the node (or any child) changes, fd will become readable.
+ * Token is returned when watch is read, to allow matching.
  * Priority indicates order if multiple watchers: higher is first.
  * Returns false on failure.
  */
-bool xs_watch(struct xs_handle *h, const char *path, unsigned int priority)
+bool xs_watch(struct xs_handle *h, const char *path, const char *token,
+	      unsigned int priority)
 {
 	char prio[MAX_STRLEN(priority)];
-	struct iovec iov[2];
+	struct iovec iov[3];
 
 	sprintf(prio, "%u", priority);
 	iov[0].iov_base = (void *)path;
 	iov[0].iov_len = strlen(path) + 1;
-	iov[1].iov_base = prio;
-	iov[1].iov_len = strlen(prio) + 1;
+	iov[1].iov_base = (void *)token;
+	iov[1].iov_len = strlen(token) + 1;
+	iov[2].iov_base = prio;
+	iov[2].iov_len = strlen(prio) + 1;
 
 	return xs_bool(xs_talkv(h, XS_WATCH, iov, ARRAY_SIZE(iov), NULL));
 }
 
 /* Find out what node change was on (will block if nothing pending).
- * Returns malloced path, or NULL: call free() after use.
+ * Returns array of two pointers: path and token, or NULL.
+ * Call free() after use.
  */
-char *xs_read_watch(struct xs_handle *h)
+char **xs_read_watch(struct xs_handle *h)
 {
 	struct xsd_sockmsg msg;
-	char *path;
+	char **ret;
 
 	if (!read_all(h->fd, &msg, sizeof(msg)))
 		return NULL;
 
 	assert(msg.type == XS_WATCH_EVENT);
-	path = malloc(msg.len);
-	if (!path)
+	ret = malloc(sizeof(char *)*2 + msg.len);
+	if (!ret)
 		return NULL;
 
-	if (!read_all(h->fd, path, msg.len)) {
-		free_no_errno(path);
+	ret[0] = (char *)(ret + 2);
+	if (!read_all(h->fd, ret[0], msg.len)) {
+		free_no_errno(ret);
 		return NULL;
 	}
-	return path;
+	ret[1] = ret[0] + strlen(ret[0]) + 1;
+	return ret;
 }
 
 /* Acknowledge watch on node.  Watches must be acknowledged before
  * any other watches can be read.
  * Returns false on failure.
  */
-bool xs_acknowledge_watch(struct xs_handle *h)
+bool xs_acknowledge_watch(struct xs_handle *h, const char *token)
 {
-	return xs_bool(xs_single(h, XS_WATCH_ACK, "OK", NULL));
+	return xs_bool(xs_single(h, XS_WATCH_ACK, token, NULL));
 }
 
 /* Remove a watch on a node.
  * Returns false on failure (no watch on that node).
  */
-bool xs_unwatch(struct xs_handle *h, const char *path)
+bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
 {
-	return xs_bool(xs_single(h, XS_UNWATCH, path, NULL));
+	struct iovec iov[2];
+
+	iov[0].iov_base = (char *)path;
+	iov[0].iov_len = strlen(path) + 1;
+	iov[1].iov_base = (char *)token;
+	iov[1].iov_len = strlen(token) + 1;
+
+	return xs_bool(xs_talkv(h, XS_UNWATCH, iov, ARRAY_SIZE(iov), NULL));
 }
 
 /* Start a transaction: changes by others will not be seen during this
@@ -488,11 +500,8 @@ bool xs_transaction_end(struct xs_handle *h, bool abort)
  * This tells the store daemon about a shared memory page and event channel
  * associated with a domain: the domain uses these to communicate.
  */
-bool xs_introduce_domain(struct xs_handle *h,
-			 domid_t domid,
-			 unsigned long mfn,
-			 unsigned int eventchn,
-			 const char *path)
+bool xs_introduce_domain(struct xs_handle *h, domid_t domid, unsigned long mfn,
+			 unsigned int eventchn, const char *path)
 {
 	char domid_str[MAX_STRLEN(domid)];
 	char mfn_str[MAX_STRLEN(mfn)];
@@ -515,8 +524,7 @@ bool xs_introduce_domain(struct xs_handle *h,
 	return xs_bool(xs_talkv(h, XS_INTRODUCE, iov, ARRAY_SIZE(iov), NULL));
 }
 
-bool xs_release_domain(struct xs_handle *h,
-		       domid_t domid)
+bool xs_release_domain(struct xs_handle *h, domid_t domid)
 {
 	char domid_str[MAX_STRLEN(domid)];
 

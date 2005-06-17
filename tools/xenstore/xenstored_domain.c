@@ -65,11 +65,6 @@ struct domain
 
 static LIST_HEAD(domains);
 
-void domain_set_conn(struct domain *domain, struct connection *conn)
-{
-	domain->conn = conn;
-}
-
 struct ringbuf_head
 {
 	u32 write; /* Next place to write to */
@@ -268,6 +263,9 @@ bool do_introduce(struct connection *conn, struct buffered_data *in)
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
 		return send_error(conn, EINVAL);
 
+	if (conn->id != 0)
+		return send_error(conn, EACCES);
+
 	if (!conn->can_write)
 		return send_error(conn, EROFS);
 
@@ -275,16 +273,18 @@ bool do_introduce(struct connection *conn, struct buffered_data *in)
 	domain = talloc(in, struct domain);
 	domain->domid = atoi(vec[0]);
 	domain->port = atoi(vec[2]);
-	domain->path = talloc_strdup(domain, vec[3]);
-	talloc_set_destructor(domain, destroy_domain);
-	if (!domain->port || !domain->domid)
+	if (!domain->port || !domain->domid || !is_valid_nodename(vec[3]))
 		return send_error(conn, EINVAL);
+	domain->path = talloc_strdup(domain, vec[3]);
 	domain->page = xc_map_foreign_range(*xc_handle, domain->domid,
 					    getpagesize(),
 					    PROT_READ|PROT_WRITE,
 					    atol(vec[1]));
 	if (!domain->page)
 		return send_error(conn, errno);
+
+	list_add(&domain->list, &domains);
+	talloc_set_destructor(domain, destroy_domain);
 
 	/* One in each half of page. */
 	domain->input = domain->page;
@@ -298,7 +298,6 @@ bool do_introduce(struct connection *conn, struct buffered_data *in)
 	domain->conn->domain = domain;
 
 	talloc_steal(domain->conn, domain);
-	list_add(&domain->list, &domains);
 
 	return send_ack(conn, XS_INTRODUCE);
 }
@@ -326,6 +325,9 @@ bool do_release(struct connection *conn, const char *domid_str)
 	domid = atoi(domid_str);
 	if (!domid)
 		return send_error(conn, EINVAL);
+
+	if (conn->id != 0)
+		return send_error(conn, EACCES);
 
 	domain = find_domain_by_domid(domid);
 	if (!domain)
@@ -363,6 +365,14 @@ static int close_xc_handle(void *_handle)
 {
 	xc_interface_close(*(int *)_handle);
 	return 0;
+}
+
+/* Returns the implicit path of a connection (only domains have this) */
+const char *get_implicit_path(const struct connection *conn)
+{
+	if (!conn->domain)
+		return NULL;
+	return conn->domain->path;
 }
 
 /* Returns the event channel handle. */

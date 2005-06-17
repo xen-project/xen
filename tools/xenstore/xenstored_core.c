@@ -122,6 +122,33 @@ void __attribute__((noreturn)) corrupt(struct connection *conn,
 	_exit(2);
 }
 
+static char *sockmsg_string(enum xsd_sockmsg_type type)
+{
+	switch (type) {
+	case XS_DEBUG: return "DEBUG";
+	case XS_SHUTDOWN: return "SHUTDOWN";
+	case XS_DIRECTORY: return "DIRECTORY";
+	case XS_READ: return "READ";
+	case XS_GET_PERMS: return "GET_PERMS";
+	case XS_WATCH: return "WATCH";
+	case XS_WATCH_ACK: return "WATCH_ACK";
+	case XS_UNWATCH: return "UNWATCH";
+	case XS_TRANSACTION_START: return "TRANSACTION_START";
+	case XS_TRANSACTION_END: return "TRANSACTION_END";
+	case XS_INTRODUCE: return "INTRODUCE";
+	case XS_RELEASE: return "RELEASE";
+	case XS_GETDOMAINPATH: return "GETDOMAINPATH";
+	case XS_WRITE: return "WRITE";
+	case XS_MKDIR: return "MKDIR";
+	case XS_RM: return "RM";
+	case XS_SET_PERMS: return "SET_PERMS";
+	case XS_WATCH_EVENT: return "WATCH_EVENT";
+	case XS_ERROR: return "ERROR";
+	default:
+		return "**UNKNOWN**";
+	}
+}
+
 static bool write_message(struct connection *conn)
 {
 	int ret;
@@ -129,8 +156,9 @@ static bool write_message(struct connection *conn)
 
 	if (out->inhdr) {
 		if (verbose)
-			xprintf("Writing msg %i out to %p\n",
-				out->hdr.msg.type, conn);
+			xprintf("Writing msg %s (%s) out to %p\n",
+				sockmsg_string(out->hdr.msg.type),
+				out->buffer, conn);
 		ret = conn->write(conn, out->hdr.raw + out->used,
 				  sizeof(out->hdr) - out->used);
 		if (ret < 0)
@@ -148,9 +176,6 @@ static bool write_message(struct connection *conn)
 			return true;
 	}
 
-	if (verbose)
-		xprintf("Writing data len %i out to %p\n",
-			out->hdr.msg.len, conn);
 	ret = conn->write(conn, out->buffer + out->used,
 			  out->hdr.msg.len - out->used);
 
@@ -162,10 +187,7 @@ static bool write_message(struct connection *conn)
 		return true;
 
 	conn->out = NULL;
-
-	/* If this was an event, we wait for ack, otherwise we're done. */
-	if (!is_watch_event(conn, out))
-		talloc_free(out);
+	talloc_free(out);
 
 	queue_next_event(conn);
 	return true;
@@ -402,7 +424,7 @@ static bool valid_chars(const char *node)
 		       "0123456789-/_@") == strlen(node));
 }
 
-static bool is_valid_nodename(const char *node)
+bool is_valid_nodename(const char *node)
 {
 	/* Must start in /. */
 	if (!strstarts(node, "/"))
@@ -601,16 +623,23 @@ static int check_with_parents(struct connection *conn, const char *node,
 	return errnum;
 }
 
+char *canonicalize(struct connection *conn, const char *node)
+{
+	const char *prefix;
+
+	if (!node || strstarts(node, "/"))
+		return (char *)node;
+	prefix = get_implicit_path(conn);
+	if (prefix)
+		return talloc_asprintf(node, "%s/%s", prefix, node);
+	return (char *)node;
+}
+
 bool check_node_perms(struct connection *conn, const char *node,
 		      enum xs_perm_type perm)
 {
 	struct xs_permissions *perms;
 	unsigned int num;
-
-	if (!node) {
-		errno = EINVAL;
-		return false;
-	}
 
 	if (!node || !is_valid_nodename(node)) {
 		errno = EINVAL;
@@ -651,6 +680,7 @@ static bool send_directory(struct connection *conn, const char *node)
 	DIR *dir;
 	struct dirent *dirent;
 
+	node = canonicalize(conn, node);
 	if (!check_node_perms(conn, node, XS_PERM_READ))
 		return send_error(conn, errno);
 
@@ -680,6 +710,7 @@ static bool do_read(struct connection *conn, const char *node)
 	unsigned int size;
 	int *fd;
 
+	node = canonicalize(conn, node);
 	if (!check_node_perms(conn, node, XS_PERM_READ))
 		return send_error(conn, errno);
 
@@ -750,7 +781,7 @@ static bool do_write(struct connection *conn, struct buffered_data *in)
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
 		return send_error(conn, EINVAL);
 
-	node = vec[0];
+	node = canonicalize(conn, vec[0]);
 	if (!within_transaction(conn->transaction, node))
 		return send_error(conn, EROFS);
 
@@ -804,6 +835,7 @@ static bool do_write(struct connection *conn, struct buffered_data *in)
 
 static bool do_mkdir(struct connection *conn, const char *node)
 {
+	node = canonicalize(conn, node);
 	if (!check_node_perms(conn, node, XS_PERM_WRITE|XS_PERM_CREATE))
 		return send_error(conn, errno);
 
@@ -826,6 +858,7 @@ static bool do_rm(struct connection *conn, const char *node)
 {
 	char *tmppath, *path;
 
+	node = canonicalize(conn, node);
 	if (!check_node_perms(conn, node, XS_PERM_WRITE))
 		return send_error(conn, errno);
 
@@ -848,6 +881,7 @@ static bool do_rm(struct connection *conn, const char *node)
 
 	add_change_node(conn->transaction, node);
 	send_ack(conn, XS_RM);
+	/* FIXME: traverse and fire watches for ALL of them! */
 	fire_watches(conn->transaction, node);
 	return false;
 }
@@ -858,6 +892,7 @@ static bool do_get_perms(struct connection *conn, const char *node)
 	char *strings;
 	unsigned int len, num;
 
+	node = canonicalize(conn, node);
 	if (!check_node_perms(conn, node, XS_PERM_READ))
 		return send_error(conn, errno);
 
@@ -883,7 +918,7 @@ static bool do_set_perms(struct connection *conn, struct buffered_data *in)
 		return send_error(conn, EINVAL);
 
 	/* First arg is node name. */
-	node = in->buffer;
+	node = canonicalize(conn, in->buffer);
 	in->buffer += strlen(in->buffer) + 1;
 	num--;
 
@@ -968,10 +1003,10 @@ static bool process_message(struct connection *conn, struct buffered_data *in)
 		return do_watch(conn, in);
 
 	case XS_WATCH_ACK:
-		return do_watch_ack(conn);
+		return do_watch_ack(conn, onearg(in));
 
 	case XS_UNWATCH:
-		return do_unwatch(conn, onearg(in));
+		return do_unwatch(conn, in);
 
 	case XS_TRANSACTION_START:
 		return do_transaction_start(conn, onearg(in));
@@ -1015,13 +1050,13 @@ static void consider_message(struct connection *conn)
 	}
 
 	if (verbose)
-		xprintf("Got message %i len %i from %p\n",
-			type, conn->in->hdr.msg.len, conn);
+		xprintf("Got message %s len %i from %p\n",
+			sockmsg_string(type), conn->in->hdr.msg.len, conn);
 
 	/* We might get a command while waiting for an ack: this means
 	 * the other end discarded it: we will re-transmit. */
 	if (type != XS_WATCH_ACK)
-		reset_watch_event(conn);
+		conn->waiting_for_ack = false;
 
 	/* Careful: process_message may free connection.  We detach
 	 * "in" beforehand and allocate the new buffer to avoid
@@ -1136,7 +1171,6 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 
 	new->blocked = false;
 	new->out = new->waiting_reply = NULL;
-	new->event = NULL;
 	new->fd = -1;
 	new->id = 0;
 	new->domain = NULL;
@@ -1202,6 +1236,42 @@ static void time_relative_to_now(struct timeval *tv)
 		tv->tv_usec -= now.tv_usec;
 	}
 }
+
+#ifdef TESTING
+/* Useful for running under debugger. */
+void dump_connection(void)
+{
+	struct connection *i;
+
+	list_for_each_entry(i, &connections, list) {
+		printf("Connection %p:\n", i);
+		if (i->id)
+			printf("    id = %i\n", i->id);
+		if (i->blocked)
+			printf("    blocked on = %s\n", i->blocked);
+		if (i->waiting_for_ack)
+			printf("    waiting_for_ack TRUE\n");
+		if (!i->in->inhdr || i->in->used)
+			printf("    got %i bytes of %s\n",
+			       i->in->used, i->in->inhdr ? "header" : "data");
+		if (i->out)
+			printf("    sending message %s (%s) out\n",
+			       sockmsg_string(i->out->hdr.msg.type),
+			       i->out->buffer);
+		if (i->waiting_reply)
+			printf("    ... and behind is queued %s (%s)\n",
+			       sockmsg_string(i->waiting_reply->hdr.msg.type),
+			       i->waiting_reply->buffer);
+#if 0
+		if (i->transaction)
+			dump_transaction(i);
+		if (i->domain)
+			dump_domain(i);
+#endif
+		dump_watches(i);
+	}
+}
+#endif
 
 static struct option options[] = { { "no-fork", 0, NULL, 'N' },
 				   { "verbose", 0, NULL, 'V' },
@@ -1314,6 +1384,7 @@ int main(int argc, char *argv[])
 
 		timerclear(&tv);
 		shortest_transaction_timeout(&tv);
+		shortest_watch_ack_timeout(&tv);
 		if (timerisset(&tv)) {
 			time_relative_to_now(&tv);
 			tvp = &tv;
@@ -1351,8 +1422,15 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		if (tvp)
+		/* Flush output for domain connections,  */
+		list_for_each_entry(i, &connections, list)
+			if (i->domain && i->out)
+				handle_output(i);
+
+		if (tvp) {
 			check_transaction_timeout();
+			check_watch_ack_timeout();
+		}
 
 		/* If transactions ended, we might be able to do more work. */
 		unblock_connections();

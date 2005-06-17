@@ -16,6 +16,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+
 #ifndef _XENSTORED_DOMAIN_H
 #define _XENSTORED_DOMAIN_H
 
@@ -33,6 +34,7 @@ bool do_get_domain_path(struct connection *conn, const char *domid_str);
 /* Returns the event channel handle */
 int domain_init(void);
 
-void domain_set_conn(struct domain *domain, struct connection *conn);
+/* Returns the implicit path of a connection (only domains have this) */
+const char *get_implicit_path(const struct connection *conn);
 
 #endif /* _XENSTORED_DOMAIN_H */

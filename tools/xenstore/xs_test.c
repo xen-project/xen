@@ -173,9 +173,9 @@ static void __attribute__((noreturn)) usage(void)
 	     "  getperm <path>\n"
 	     "  setperm <path> <id> <flags> ...\n"
 	     "  shutdown\n"
-	     "  watch <path> <prio>\n"
+	     "  watch <path> <token> <prio>\n"
 	     "  waitwatch\n"
-	     "  ackwatch\n"
+	     "  ackwatch <token>\n"
 	     "  unwatch <path> <token>\n"
 	     "  close\n"
 	     "  start <node>\n"
@@ -358,36 +358,37 @@ static void do_shutdown(unsigned int handle)
 		failed(handle);
 }
 
-static void do_watch(unsigned int handle, const char *node, const char *pri)
+static void do_watch(unsigned int handle, const char *node, const char *token,
+		     const char *pri)
 {
-	if (!xs_watch(handles[handle], node, atoi(pri)))
+	if (!xs_watch(handles[handle], node, token, atoi(pri)))
 		failed(handle);
 }
 
 static void do_waitwatch(unsigned int handle)
 {
-	char *node;
+	char **vec;
 
-	node = xs_read_watch(handles[handle]);
-	if (!node)
+	vec = xs_read_watch(handles[handle]);
+	if (!vec)
 		failed(handle);
 
 	if (handle)
-		printf("%i:%s\n", handle, node);
+		printf("%i:%s:%s\n", handle, vec[0], vec[1]);
 	else
-		printf("%s\n", node);
-	free(node);
+		printf("%s:%s\n", vec[0], vec[1]);
+	free(vec);
 }
 
-static void do_ackwatch(unsigned int handle)
+static void do_ackwatch(unsigned int handle, const char *token)
 {
-	if (!xs_acknowledge_watch(handles[handle]))
+	if (!xs_acknowledge_watch(handles[handle], token))
 		failed(handle);
 }
 
-static void do_unwatch(unsigned int handle, const char *node)
+static void do_unwatch(unsigned int handle, const char *node, const char *token)
 {
-	if (!xs_unwatch(handles[handle], node))
+	if (!xs_unwatch(handles[handle], node, token))
 		failed(handle);
 }
 
@@ -613,13 +614,13 @@ int main(int argc, char *argv[])
 		else if (streq(command, "shutdown"))
 			do_shutdown(handle);
 		else if (streq(command, "watch"))
-			do_watch(handle, arg(line, 1), arg(line, 2));
+			do_watch(handle, arg(line, 1), arg(line, 2), arg(line, 3));
 		else if (streq(command, "waitwatch"))
 			do_waitwatch(handle);
 		else if (streq(command, "ackwatch"))
-			do_ackwatch(handle);
+			do_ackwatch(handle, arg(line, 1));
 		else if (streq(command, "unwatch"))
-			do_unwatch(handle, arg(line, 1));
+			do_unwatch(handle, arg(line, 1), arg(line, 2));
 		else if (streq(command, "close")) {
 			xs_daemon_close(handles[handle]);
 			handles[handle] = NULL;

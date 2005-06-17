@@ -201,6 +201,7 @@ bool do_transaction_start(struct connection *conn, const char *node)
 	if (conn->transaction)
 		return send_error(conn, EBUSY);
 
+	node = canonicalize(conn, node);
 	if (!check_node_perms(conn, node, XS_PERM_READ))
 		return send_error(conn, errno);
 
