@@ -57,6 +57,7 @@ $(patsubst %,pristine-%/.valid-pristine,$(ALLSPARSETREES)) : pristine-%/.valid-p
 	mkdir -p tmp-pristine-$*
 	touch tmp-pristine-$*/.bk_skip
 	tar -C tmp-pristine-$* -jxf $<
+	-@rm tmp-pristine-$*/pax_global_header
 	mv tmp-pristine-$*/* $(@D)
 	@rm -rf tmp-pristine-$*
 	touch $@ # update timestamp to avoid rebuild
