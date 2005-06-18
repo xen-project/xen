@@ -27,15 +27,17 @@ include/.asm-ignore: include/asm
 	@mv include/asm include/.asm-ignore
 	@echo '  SYMLINK include/asm -> include/asm-$(XENARCH)'
 	$(Q)if [ ! -d include ]; then mkdir -p include; fi;
-	@ln -fsn asm-$(XENARCH) include/asm
+	@ln -fsn $(srctree)/include/asm-$(XENARCH) include/asm
 
 include/asm-xen/asm:
 	@echo '  SYMLINK $@ -> include/asm-xen/asm-$(XENARCH)'
-	@ln -fsn asm-$(XENARCH) $@
+	@mkdir -p include/asm-xen
+	@ln -fsn $(srctree)/include/asm-xen/asm-$(XENARCH) $@
 
 arch/xen/arch:
 	@rm -f $@
-	@ln -fsn $(XENARCH) $@
+	@mkdir -p arch/xen
+	@ln -fsn $(srctree)/arch/xen/$(XENARCH) $@
 
 arch/$(XENARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
