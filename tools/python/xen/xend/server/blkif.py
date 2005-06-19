@@ -50,6 +50,9 @@ class BlkifBackend:
     def getId(self):
         return self.id
 
+    def getEvtchn(self):
+        return self.evtchn
+
     def closeEvtchn(self):
         if self.evtchn:
             channel.eventChannelClose(self.evtchn)
@@ -198,7 +201,7 @@ class BlkDev(Dev):
         backend = self.getBackend()
         if backend and backend.evtchn:
             db = self.db.addChild("evtchn")
-            backend.evtchn.exportToDB(db, save=save)
+            backend.evtchn.saveToDB(db, save=save)
 
     def init(self, recreate=False, reboot=False):
         self.frontendDomain = self.getDomain()

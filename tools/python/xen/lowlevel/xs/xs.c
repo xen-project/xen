@@ -1,7 +1,7 @@
 /* 
-    Python interface to the Xen Store Daemon.
-    Copyright (C) 2005 Mike Wray Hewlett-Packard
-*/
+ * Python interface to the Xen Store Daemon.
+ * Copyright (C) 2005 Mike Wray Hewlett-Packard
+ */
 
 #include <Python.h>
 
@@ -196,6 +196,7 @@ static PyObject *xspy_mkdir(PyObject *self, PyObject *args, PyObject *kwds)
 #define xspy_rm_doc "\n"			\
 	"Remove a path.\n"			\
 	" path [string] : path to remove\n"	\
+	"\n"					\
 	"Returns: [int] 0 on success.\n"	\
 	"Raises RuntimeError on error.\n"	\
 	"\n"
@@ -339,13 +340,14 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
     return val;
 }
 
-#define xspy_watch_doc "\n"					\
-	"Watch a path, get notifications when it changes.\n"	\
-	" path  [string] : xenstore path.\n"			\
-	" token [string] : returned in watch notification\n"	\
-	"\n"							\
-	"Returns: [int] 0 on success.\n"			\
-	"Raises RuntimeError on error.\n"			\
+#define xspy_watch_doc "\n"						\
+	"Watch a path, get notifications when it changes.\n"		\
+	" path     [string] : xenstore path.\n"				\
+	" priority [int]    : watch priority (default 0).\n"		\
+	" token    [string] : returned in watch notification.\n"	\
+	"\n"								\
+	"Returns: [int] 0 on success.\n"				\
+	"Raises RuntimeError on error.\n"				\
 	"\n"
 
 static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
@@ -371,12 +373,14 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
     return val;
 }
 
-#define xspy_read_watch_doc "\n"		\
-	"Read a watch notification.\n"		\
-	" path [string]: xenstore path.\n"	\
-	"\n"					\
-	"Returns: [tuple] (path, token).\n"	\
-	"Raises RuntimeError on error.\n"	\
+#define xspy_read_watch_doc "\n"				\
+	"Read a watch notification.\n"				\
+	"The notification must be acknowledged by passing\n"	\
+	"the token to acknowledge_watch().\n"			\
+	" path [string]: xenstore path.\n"			\
+	"\n"							\
+	"Returns: [tuple] (path, token).\n"			\
+	"Raises RuntimeError on error.\n"			\
 	"\n"
 
 static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
@@ -408,7 +412,7 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
 
 #define xspy_acknowledge_watch_doc "\n"					\
 	"Acknowledge a watch notification that has been read.\n"	\
-	" token [string] : returned in watch notification\n"		\
+	" token [string] : from the watch notification\n"		\
 	"\n"								\
 	"Returns: [int] 0 on success.\n"				\
 	"Raises RuntimeError on error.\n"				\
@@ -499,7 +503,7 @@ static PyObject *xspy_transaction_start(PyObject *self, PyObject *args,
 #define xspy_transaction_end_doc "\n"					\
 	"End the current transaction.\n"				\
 	"Attempts to commit the transaction unless abort is true.\n"	\
-	" abort [int]: Abort flag..\n"					\
+	" abort [int]: abort flag (default 0).\n"			\
 	"\n"								\
 	"Returns: [int] 0 on success.\n"				\
 	"Raises RuntimeError on error.\n"				\
@@ -556,10 +560,7 @@ static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &dom, &page, &port, &path))
         goto exit;
-    printf("%s> dom=%u page=0x%08lx port=%u path=%s\n", __FUNCTION__, dom,
-	   page, port, path);
     xsval = xs_introduce_domain(xh, dom, page, port, path);
-    printf("%s> xsval=%d\n", __FUNCTION__, xsval);
     val = pyvalue_int(xsval);
  exit:
     return val;
@@ -590,9 +591,7 @@ static PyObject *xspy_release_domain(PyObject *self, PyObject *args,
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &dom))
         goto exit;
-    printf("%s> dom=%u\n", __FUNCTION__, dom);
     xsval = xs_release_domain(xh, dom);
-    printf("%s> xsval=%d\n", __FUNCTION__, xsval);
     val = pyvalue_int(xsval);
  exit:
     return val;
@@ -651,6 +650,28 @@ static PyObject *xspy_shutdown(PyObject *self, PyObject *args, PyObject *kwds)
     return val;
 }
 
+#define xspy_fileno_doc "\n"					\
+	"Get the file descriptor of the xenstore socket.\n"	\
+	"Allows an xs object to be passed to select().\n"	\
+	"\n"							\
+	"Returns: [int] file descriptor.\n"			\
+	"\n"
+
+static PyObject *xspy_fileno(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    static char *kwd_spec[] = { NULL };
+    static char *arg_spec = "";
+
+    struct xs_handle *xh = xshandle(self);
+    PyObject *val = NULL;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
+        goto exit;
+    val = PyInt_FromLong((xh ? xs_fileno(xh) : -1));
+ exit:
+    return val;
+}
+
 #define XSPY_METH(_name) {			\
     .ml_name  = #_name,				\
     .ml_meth  = (PyCFunction) xspy_ ## _name,	\
@@ -675,17 +696,14 @@ static PyMethodDef xshandle_methods[] = {
      XSPY_METH(release_domain),
      XSPY_METH(close),
      XSPY_METH(shutdown),
+     XSPY_METH(fileno),
      { /* Terminator. */ },
 };
 
 static PyObject *xshandle_getattr(PyObject *self, char *name)
 {
     PyObject *val = NULL;
-    if (strcmp(name, "fileno") == 0) {
-        struct xs_handle *xh = xshandle(self);
-        val = PyInt_FromLong((xh ? xs_fileno(xh) : -1));
-    } else
-        val = Py_FindMethod(xshandle_methods, self, name);
+    val = Py_FindMethod(xshandle_methods, self, name);
     return val;
 }
 
@@ -754,7 +772,7 @@ static PyMethodDef xs_methods[] = {
       "Raises RuntimeError on error.\n"
       "\n"
     },
-    { NULL, NULL, 0, NULL }
+    { /* Terminator. */ }
 };
 
 PyMODINIT_FUNC initxs (void)
