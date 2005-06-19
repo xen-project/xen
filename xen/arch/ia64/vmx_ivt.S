@@ -180,7 +180,7 @@ ENTRY(vmx_dtlb_miss)
     mov r29=cr.ipsr;
     ;;
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
-(p6)br.sptk vmx_fault_1
+(p6)br.sptk vmx_fault_2
     mov r16 = cr.ifa
     ;;
     thash r17 = r16
@@ -249,9 +249,9 @@ ENTRY(vmx_alt_itlb_miss)
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	;;
 	and r19=r19,r16		// clear ed, reserved bits, and PTE control bits
-	shr.u r18=r16,57	// move address bit 61 to bit 4
+	shr.u r18=r16,55	// move address bit 59 to bit 4
 	;;
-	andcm r18=0x10,r18	// bit 4=~address-bit(61)
+	and r18=0x10,r18	// bit 4=address-bit(61)
 	or r19=r17,r19		// insert PTE control bits into r19
 	;;
 	or r19=r19,r18		// set bit 4 (uncached) if the access was to region 6
@@ -280,11 +280,11 @@ ENTRY(vmx_alt_dtlb_miss)
 	;;
 	and r22=IA64_ISR_CODE_MASK,r20		// get the isr.code field
 	tbit.nz p6,p7=r20,IA64_ISR_SP_BIT	// is speculation bit on?
-	shr.u r18=r16,57			// move address bit 61 to bit 4
+	shr.u r18=r16,55			// move address bit 59 to bit 4
 	and r19=r19,r16				// clear ed, reserved bits, and PTE control bits
 	tbit.nz p9,p0=r20,IA64_ISR_NA_BIT	// is non-access bit on?
 	;;
-	andcm r18=0x10,r18	// bit 4=~address-bit(61)
+	and r18=0x10,r18	// bit 4=address-bit(61)
 (p9) cmp.eq.or.andcm p6,p7=IA64_ISR_CODE_LFETCH,r22	// check isr.code field
 	dep r24=-1,r24,IA64_PSR_ED_BIT,1
 	or r19=r19,r17		// insert PTE control bits into r19
@@ -346,7 +346,12 @@ END(vmx_daccess_bit)
 ENTRY(vmx_break_fault)
 	mov r31=pr
     mov r19=11
-    br.sptk.many vmx_dispatch_break_fault
+    mov r30=cr.iim
+    mov r29=0x1100
+    ;;
+    cmp4.eq  p6,p7=r29,r30
+    (p6) br.dptk.few vmx_hypercall_dispatch
+    (p7) br.sptk.many vmx_dispatch_break_fault
 END(vmx_break_fault)
 
 	.org vmx_ia64_ivt+0x3000
@@ -929,9 +934,8 @@ END(vmx_dispatch_tlb_miss)
 
 
 ENTRY(vmx_dispatch_break_fault)
-    cmp.ne pEml,pNonEml=r0,r0       /* force pNonEml =1, don't save r4 ~ r7 */
-    ;;
     VMX_SAVE_MIN_WITH_COVER_R19
+    ;;
     ;;
     alloc r14=ar.pfs,0,0,4,0 // now it's safe (must be first in insn group!)
     mov out0=cr.ifa
@@ -951,7 +955,35 @@ ENTRY(vmx_dispatch_break_fault)
     ;;
     mov rp=r14
     br.call.sptk.many b6=vmx_ia64_handle_break
+    ;;
 END(vmx_dispatch_break_fault)
+
+
+ENTRY(vmx_hypercall_dispatch)
+    VMX_SAVE_MIN_WITH_COVER
+    ssm psr.ic
+    ;;
+    srlz.i                  // guarantee that interruption collection is on
+    ;;
+    ssm psr.i               // restore psr.i
+    adds r3=16,r2                // set up second base pointer
+    ;;
+    VMX_SAVE_REST
+    ;;
+    movl r14=ia64_leave_hypervisor
+    movl r2=hyper_call_table
+    ;;
+    mov rp=r14
+    shladd r2=r15,3,r2
+    ;;
+    ld8 r2=[r2]
+    ;;
+    mov b6=r2
+    ;;
+    br.call.sptk.many b6=b6
+    ;;
+END(vmx_hypercall_dispatch)
+
 
 
 ENTRY(vmx_dispatch_interrupt)
@@ -976,3 +1008,39 @@ ENTRY(vmx_dispatch_interrupt)
 	mov rp=r14
 	br.call.sptk.many b6=vmx_ia64_handle_irq
 END(vmx_dispatch_interrupt)
+
+
+
+    .rodata
+    .align 8
+    .globl hyper_call_table
+hyper_call_table:
+    data8 hyper_not_support     //hyper_set_trap_table     /*  0 */
+    data8 hyper_mmu_update
+    data8 hyper_not_support     //hyper_set_gdt
+    data8 hyper_not_support     //hyper_stack_switch
+    data8 hyper_not_support     //hyper_set_callbacks
+    data8 hyper_not_support     //hyper_fpu_taskswitch     /*  5 */
+    data8 hyper_sched_op
+    data8 hyper_dom0_op
+    data8 hyper_not_support     //hyper_set_debugreg
+    data8 hyper_not_support     //hyper_get_debugreg
+    data8 hyper_not_support     //hyper_update_descriptor  /* 10 */
+    data8 hyper_not_support     //hyper_set_fast_trap
+    data8 hyper_dom_mem_op
+    data8 hyper_not_support     //hyper_multicall
+    data8 hyper_not_support     //hyper_update_va_mapping
+    data8 hyper_not_support     //hyper_set_timer_op       /* 15 */
+    data8 hyper_event_channel_op
+    data8 hyper_xen_version
+    data8 hyper_not_support     //hyper_console_io
+    data8 hyper_not_support     //hyper_physdev_op
+    data8 hyper_not_support     //hyper_grant_table_op     /* 20 */
+    data8 hyper_not_support     //hyper_vm_assist
+    data8 hyper_not_support     //hyper_update_va_mapping_otherdomain
+    data8 hyper_not_support     //hyper_switch_vm86
+    data8 hyper_not_support     //hyper_boot_vcpu
+    data8 hyper_not_support     //hyper_ni_hypercall       /* 25 */
+    data8 hyper_not_support     //hyper_mmuext_op
+    data8 hyper_lock_page
+    data8 hyper_set_shared_page

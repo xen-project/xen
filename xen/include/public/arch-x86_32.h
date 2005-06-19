@@ -73,6 +73,9 @@
 #define machine_to_phys_mapping ((u32 *)HYPERVISOR_VIRT_START)
 #endif
 
+/* Maximum number of virtual CPUs in multi-processor guests. */
+#define MAX_VIRT_CPUS 32
+
 #ifndef __ASSEMBLY__
 
 /* NB. Both the following are 32 bits each. */

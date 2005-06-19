@@ -252,7 +252,7 @@ static thash_data_t *_vtlb_next_overlap_in_chain(thash_cb_t *hcb)
 
     /* Find overlap TLB entry */
     for (cch=priv->cur_cch; cch; cch = cch->next) {
-        if ( ((1UL<<cch->section) & priv->s_sect.v) &&
+        if ( ( cch->tc ? priv->s_sect.tc : priv->s_sect.tr )  &&
             __is_tlb_overlap(hcb, cch, priv->rid, priv->cl,
                 priv->_curva, priv->_eva) ) {
             return cch;
@@ -322,7 +322,7 @@ int __tlb_to_vhpt(thash_cb_t *hcb,
 
 void thash_tr_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va, int idx)
 {
-    if ( hcb->ht != THASH_TLB || entry->section != THASH_TLB_TR ) {
+    if ( hcb->ht != THASH_TLB || entry->tc ) {
         panic("wrong parameter\n");
     }
     entry->vadr = PAGEALIGN(entry->vadr,entry->ps);
@@ -356,7 +356,7 @@ thash_data_t *__alloc_chain(thash_cb_t *hcb,thash_data_t *entry)
  *  3: The caller need to make sure the new entry will not overlap 
  *     with any existed entry.
  */
-static void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
+void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 {
     thash_data_t    *hash_table, *cch;
     rr_t  vrr;
@@ -411,7 +411,7 @@ void thash_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
     rr_t  vrr;
     
     vrr = (hcb->get_rr_fn)(hcb->vcpu,entry->vadr);
-    if ( entry->ps != vrr.ps && entry->section==THASH_TLB_TC) {
+    if ( entry->ps != vrr.ps && entry->tc ) {
         panic("Not support for multiple page size now\n");
     }
     entry->vadr = PAGEALIGN(entry->vadr,entry->ps);
@@ -450,7 +450,7 @@ static void rem_vtlb(thash_cb_t *hcb, thash_data_t *entry)
     thash_internal_t *priv = &hcb->priv;
     int idx;
     
-    if ( entry->section == THASH_TLB_TR ) {
+    if ( !entry->tc ) {
         return rem_tr(hcb, entry->cl, entry->tr_idx);
     }
     rem_thash(hcb, entry);
@@ -525,19 +525,19 @@ thash_data_t *thash_find_overlap(thash_cb_t *hcb,
             thash_data_t *in, search_section_t s_sect)
 {
     return (hcb->find_overlap)(hcb, in->vadr, 
-            in->ps, in->rid, in->cl, s_sect);
+            PSIZE(in->ps), in->rid, in->cl, s_sect);
 }
 
 static thash_data_t *vtlb_find_overlap(thash_cb_t *hcb, 
-        u64 va, u64 ps, int rid, char cl, search_section_t s_sect)
+        u64 va, u64 size, int rid, char cl, search_section_t s_sect)
 {
     thash_data_t    *hash_table;
     thash_internal_t *priv = &hcb->priv;
     u64     tag;
     rr_t    vrr;
 
-    priv->_curva = PAGEALIGN(va,ps);
-    priv->_eva = priv->_curva + PSIZE(ps);
+    priv->_curva = va & ~(size-1);
+    priv->_eva = priv->_curva + size;
     priv->rid = rid;
     vrr = (hcb->get_rr_fn)(hcb->vcpu,va);
     priv->ps = vrr.ps;
@@ -553,15 +553,15 @@ static thash_data_t *vtlb_find_overlap(thash_cb_t *hcb,
 }
 
 static thash_data_t *vhpt_find_overlap(thash_cb_t *hcb, 
-        u64 va, u64 ps, int rid, char cl, search_section_t s_sect)
+        u64 va, u64 size, int rid, char cl, search_section_t s_sect)
 {
     thash_data_t    *hash_table;
     thash_internal_t *priv = &hcb->priv;
     u64     tag;
     rr_t    vrr;
 
-    priv->_curva = PAGEALIGN(va,ps);
-    priv->_eva = priv->_curva + PSIZE(ps);
+    priv->_curva = va & ~(size-1);
+    priv->_eva = priv->_curva + size;
     priv->rid = rid;
     vrr = (hcb->get_rr_fn)(hcb->vcpu,va);
     priv->ps = vrr.ps;
@@ -691,13 +691,46 @@ void thash_purge_entries_ex(thash_cb_t *hcb,
 {
     thash_data_t    *ovl;
 
-    ovl = (hcb->find_overlap)(hcb, va, ps, rid, cl, p_sect);
+    ovl = (hcb->find_overlap)(hcb, va, PSIZE(ps), rid, cl, p_sect);
     while ( ovl != NULL ) {
         (hcb->rem_hash)(hcb, ovl);
         ovl = (hcb->next_overlap)(hcb);
     };
 }
 
+/*
+ * Purge overlap TCs and then insert the new entry to emulate itc ops.
+ *    Notes: Only TC entry can purge and insert.
+ */
+void thash_purge_and_insert(thash_cb_t *hcb, thash_data_t *in)
+{
+    thash_data_t    *ovl;
+    search_section_t sections;
+
+#ifdef   XEN_DEBUGGER
+    vrr = (hcb->get_rr_fn)(hcb->vcpu,in->vadr);
+	if ( in->ps != vrr.ps || hcb->ht != THASH_TLB || !in->tc ) {
+		panic ("Oops, wrong call for purge_and_insert\n");
+		return;
+	}
+#endif
+    in->vadr = PAGEALIGN(in->vadr,in->ps);
+    in->ppn = PAGEALIGN(in->ppn, in->ps-12);
+    sections.tr = 0;
+    sections.tc = 1;
+    ovl = (hcb->find_overlap)(hcb, in->vadr, PSIZE(in->ps),
+    				 in->rid, in->cl, sections);
+    if(ovl)
+        (hcb->rem_hash)(hcb, ovl);
+#ifdef   XEN_DEBUGGER
+    ovl = (hcb->next_overlap)(hcb);
+    if ( ovl ) {
+		panic ("Oops, 2+ overlaps for purge_and_insert\n");
+		return;
+    }
+#endif
+    (hcb->ins_hash)(hcb, in, in->vadr);
+}
 
 /*
  * Purge all TCs or VHPT entries including those in Hash table.
@@ -766,6 +799,42 @@ thash_data_t *vtlb_lookup_ex(thash_cb_t *hcb,
     return NULL;
 }
 
+/*
+ * Lock/Unlock TC if found.
+ *     NOTES: Only the page in prefered size can be handled.
+ *   return:
+ *          1: failure
+ *          0: success
+ */
+int thash_lock_tc(thash_cb_t *hcb, u64 va, u64 size, int rid, char cl, int lock)
+{
+	thash_data_t	*ovl;
+	search_section_t	sections;
+
+    sections.tr = 1;
+    sections.tc = 1;
+	ovl = (hcb->find_overlap)(hcb, va, size, rid, cl, sections);
+	if ( ovl ) {
+		if ( !ovl->tc ) {
+//			panic("Oops, TR for lock\n");
+			return 0;
+		}
+		else if ( lock ) {
+			if ( ovl->locked ) {
+				DPRINTK("Oops, already locked entry\n");
+			}
+			ovl->locked = 1;
+		}
+		else if ( !lock ) {
+			if ( !ovl->locked ) {
+				DPRINTK("Oops, already unlocked entry\n");
+			}
+			ovl->locked = 0;
+		}
+		return 0;
+	}
+	return 1;
+}
 
 /*
  * Notifier when TLB is deleted from hash table and its collision chain.
@@ -823,7 +892,6 @@ void thash_init(thash_cb_t *hcb, u64 sz)
         INVALIDATE_HASH(hcb,hash_table);
     }
 }
-
 
 #ifdef  VTLB_DEBUG
 static  u64 cch_length_statistics[MAX_CCH_LENGTH+1];

@@ -39,11 +39,11 @@ typedef struct {
 typedef union {
         unsigned long   value;
         struct {
-                uint64_t ve : 1;
-                uint64_t rv1 : 1;
-                uint64_t ps  : 6;
-                uint64_t rid : 24;
-                uint64_t rv2 : 32;
+                unsigned long ve : 1;
+                unsigned long rv1 : 1;
+                unsigned long ps  : 6;
+                unsigned long rid : 24;
+                unsigned long rv2 : 32;
         };
 } rr_t;
 #endif // CONFIG_VTI
