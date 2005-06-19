@@ -31,3 +31,6 @@ endif
 
 LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i)) 
 CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
+
+# Choose the best mirror to download linux kernel
+KERNEL_REPO = http://www.kernel.org
