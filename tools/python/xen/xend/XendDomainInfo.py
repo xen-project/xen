@@ -511,7 +511,7 @@ class XendDomainInfo:
             self.configure_restart()
             self.construct_image()
             self.configure()
-            self.exportToDB()
+            self.exportToDB(save=True)
         except Exception, ex:
             # Catch errors, cleanup and re-raise.
             print 'Domain construction error:', ex
@@ -523,7 +523,7 @@ class XendDomainInfo:
     def register_domain(self):
         xd = get_component('xen.xend.XendDomain')
         xd._add_domain(self)
-        self.exportToDB()
+        self.exportToDB(save=True)
 
     def configure_cpus(self, config):
         try:
