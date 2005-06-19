@@ -193,23 +193,30 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 	}
 
 	display_cacheinfo(c);
-	detect_ht(c);
-
-#ifdef CONFIG_X86_HT
-	/* AMD dual core looks like HT but isn't really. Hide it from the
-	   scheduler. This works around problems with the domain scheduler.
-	   Also probably gives slightly better scheduling and disables
-	   SMT nice which is harmful on dual core.
-	   TBD tune the domain scheduler for dual core. */
-	if (cpu_has(c, X86_FEATURE_CMP_LEGACY))
-		smp_num_siblings = 1;
-#endif
 
 	if (cpuid_eax(0x80000000) >= 0x80000008) {
 		c->x86_num_cores = (cpuid_ecx(0x80000008) & 0xff) + 1;
 		if (c->x86_num_cores & (c->x86_num_cores - 1))
 			c->x86_num_cores = 1;
 	}
+
+#ifdef CONFIG_X86_HT
+	/*
+	 * On a AMD dual core setup the lower bits of the APIC id
+	 * distingush the cores.  Assumes number of cores is a power
+	 * of two.
+	 */
+	if (c->x86_num_cores > 1) {
+		int cpu = smp_processor_id();
+		unsigned bits = 0;
+		while ((1 << bits) < c->x86_num_cores)
+			bits++;
+		cpu_core_id[cpu] = phys_proc_id[cpu] & ((1<<bits)-1);
+		phys_proc_id[cpu] >>= bits;
+		printk(KERN_INFO "CPU %d(%d) -> Core %d\n",
+		       cpu, c->x86_num_cores, cpu_core_id[cpu]);
+	}
+#endif
 }
 
 static unsigned int amd_size_cache(struct cpuinfo_x86 * c, unsigned int size)

@@ -8,6 +8,7 @@
 #include <xen/config.h>
 #include <xen/kernel.h>
 #include <xen/cpumask.h>
+#include <asm/current.h>
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -34,6 +35,7 @@ extern void smp_alloc_memory(void);
 extern int pic_mode;
 extern int smp_num_siblings;
 extern cpumask_t cpu_sibling_map[];
+extern cpumask_t cpu_core_map[];
 
 extern void smp_flush_tlb(void);
 extern void smp_invalidate_rcv(void);		/* Process an NMI */

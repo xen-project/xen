@@ -184,8 +184,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
          * domains will all share the second HT of each CPU. Since dom0 is on 
 	     * CPU 0, we favour high numbered CPUs in the event of a tie.
          */
-        pro = ht_per_core - 1;
-        for ( i = pro; i < num_online_cpus(); i += ht_per_core )
+        pro = smp_num_siblings - 1;
+        for ( i = pro; i < num_online_cpus(); i += smp_num_siblings )
             if ( cnt[i] <= cnt[pro] )
                 pro = i;
 

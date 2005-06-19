@@ -66,7 +66,6 @@ boolean_param("noapic", skip_ioapic_setup);
 
 int early_boot = 1;
 
-int ht_per_core = 1;
 cpumask_t cpu_present_map;
 
 /* Limits of Xen heap, used to initialise the allocator. */
