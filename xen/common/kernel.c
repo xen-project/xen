@@ -1,10 +1,7 @@
 /******************************************************************************
  * kernel.c
  * 
- * This file should contain architecture-independent bootstrap and low-level
- * help routines. It's a bit x86/PC specific right now!
- * 
- * Copyright (c) 2002-2003 K A Fraser
+ * Copyright (c) 2002-2005 K A Fraser
  */
 
 #include <xen/config.h>
@@ -14,6 +11,7 @@
 #include <xen/compile.h>
 #include <xen/sched.h>
 #include <asm/current.h>
+#include <public/version.h>
 
 void cmdline_parse(char *cmdline)
 {
@@ -83,11 +81,38 @@ void cmdline_parse(char *cmdline)
  * Simple hypercalls.
  */
 
-long do_xen_version(int cmd)
+long do_xen_version(int cmd, void *arg)
 {
-    if ( cmd != 0 )
-        return -ENOSYS;
-    return (XEN_VERSION<<16) | (XEN_SUBVERSION);
+    switch ( cmd )
+    {
+    case XENVER_version:
+    {
+        return (XEN_VERSION<<16) | (XEN_SUBVERSION);
+    }
+
+    case XENVER_extraversion:
+    {
+        char extraversion[16];
+        safe_strcpy(extraversion, XEN_EXTRAVERSION);
+        if ( copy_to_user(arg, extraversion, sizeof(extraversion)) )
+            return -EFAULT;
+        return 0;
+    }
+
+    case XENVER_compile_info:
+    {
+        struct xen_compile_info info;
+        safe_strcpy(info.compiler,       XEN_COMPILER);
+        safe_strcpy(info.compile_by,     XEN_COMPILE_BY);
+        safe_strcpy(info.compile_domain, XEN_COMPILE_DOMAIN);
+        safe_strcpy(info.compile_date,   XEN_COMPILE_DATE);
+        if ( copy_to_user(arg, &info, sizeof(info)) )
+            return -EFAULT;
+        return 0;
+    }
+    }
+
+    return -ENOSYS;
 }
 
 long do_vm_assist(unsigned int cmd, unsigned int type)
