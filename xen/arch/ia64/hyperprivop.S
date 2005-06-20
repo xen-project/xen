@@ -93,6 +93,10 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	cmp.eq p7,p6=XEN_HYPER_SET_TPR,r17
 (p7)	br.sptk.many hyper_set_tpr;;
 
+	// HYPERPRIVOP_EOI?
+	cmp.eq p7,p6=XEN_HYPER_EOI,r17
+(p7)	br.sptk.many hyper_eoi;;
+
 	// if not one of the above, give up for now and do it the slow way
 	br.sptk.many dispatch_break_fault ;;
 
@@ -594,6 +598,115 @@ ENTRY(hyper_set_tpr)
 	;;
 END(hyper_set_tpr)
 
+#if 1
+// This seems to work, but I saw a flurry of "timer tick before it's due"
+// so will leave the old version around until this gets understood/tracked down
+// Also, vcpu_get_ivr provides a domain "heartbeat" for debugging, so we
+// need to be able to easily turn that back on.
+ENTRY(hyper_get_ivr)
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r22=fast_hyperpriv_cnt+(8*XEN_HYPER_GET_IVR);;
+	ld8 r21=[r22];;
+	adds r21=1,r21;;
+	st8 [r22]=r21;;
+#endif
+	mov r30=r0;;
+	mov r8=15;;
+	// when we get to here r20=~=interrupts pending
+	cmp.eq p7,p0=r20,r0;;
+(p7)	adds r20=XSI_PEND_OFS-XSI_PSR_IC_OFS,r18 ;;
+(p7)	st4 [r20]=r30;;
+(p7)	br.spnt.many 1f ;;
+	mov r22=IA64_KR(CURRENT);;
+	adds r24=IA64_VCPU_INSVC3_OFFSET,r22;;
+	mov r25=192
+	adds r22=IA64_VCPU_IRR3_OFFSET,r22;;
+	ld8 r23=[r22];;
+	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	adds r24=-8,r24;;
+(p6)	adds r25=-64,r25;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	adds r24=-8,r24;;
+(p6)	adds r25=-64,r25;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	adds r24=-8,r24;;
+(p6)	adds r25=-64,r25;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+	cmp.eq p6,p0=r23,r0
+(p6)	br.cond.sptk.many 1f;	// this is actually an error
+	// r22 points to non-zero element of irr, r23 has value
+	// r24 points to corr element of insvc, r25 has elt*64
+	ld8 r26=[r24];;
+	cmp.geu p6,p0=r26,r23
+(p6)	br.cond.spnt.many 1f;
+	// not masked by insvc, get vector number
+	shr.u r26=r23,1;;
+	or r26=r23,r26;;
+	shr.u r27=r26,2;;
+	or r26=r26,r27;;
+	shr.u r27=r26,4;;
+	or r26=r26,r27;;
+	shr.u r27=r26,8;;
+	or r26=r26,r27;;
+	shr.u r27=r26,16;;
+	or r26=r26,r27;;
+	shr.u r27=r26,32;;
+	or r26=r26,r27;;
+	andcm r26=0xffffffffffffffff,r26;;
+	popcnt r26=r26;;
+	sub r26=63,r26;;
+	// r26 now contains the bit index (mod 64)
+	mov r27=1;;
+	shl r27=r27,r26;;
+	// r27 now contains the (within the proper word) bit mask 
+	add r26=r25,r26
+	// r26 now contains the vector [0..255]
+	adds r20=XSI_TPR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r20=[r20] ;;
+	extr.u r28=r20,16,1
+	extr.u r29=r20,4,4 ;;
+	cmp.ne p6,p0=r28,r0	// if tpr.mmi is set, return SPURIOUS
+(p6)	br.cond.sptk.many 1f;
+	shl r29=r29,4;;
+	adds r29=15,r29;;
+	cmp.ge p6,p0=r29,r26
+(p6)	br.cond.sptk.many 1f;
+	// OK, have an unmasked vector to process/return
+	ld8 r25=[r24];;
+	or r25=r25,r27;;
+	st8 [r24]=r25;;
+	ld8 r25=[r22];;
+	andcm r25=r25,r27;;
+	st8 [r22]=r25;;
+	mov r8=r26;;
+1:	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_get_ivr)
+#else
+// This version goes to slow path unless all irr bits are zero, in which
+// case it simply returns SPURIOUS and sets pending to zero.  Since a domain
+// gets cr.ivr approx twice per interrupt (once to get the vector and
+// once to see if there are any more), this version still gets used
+// for approximately half of all gets of cr.ivr
 ENTRY(hyper_get_ivr)
 	// when we get to here r20=~=interrupts pending
 	cmp.ne p7,p0=r20,r0
@@ -625,3 +738,67 @@ ENTRY(hyper_get_ivr)
 	rfi
 	;;
 END(hyper_get_ivr)
+#endif
+
+ENTRY(hyper_eoi)
+	// when we get to here r20=~=interrupts pending
+	cmp.ne p7,p0=r20,r0
+(p7)	br.spnt.many dispatch_break_fault ;;
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_EOI);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	mov r22=IA64_KR(CURRENT);;
+	adds r22=IA64_VCPU_INSVC3_OFFSET,r22;;
+	ld8 r23=[r22];;
+	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+	cmp.eq p6,p0=r23,r0
+(p6)	br.cond.sptk.many 1f;	// this is actually an error
+	// r22 points to non-zero element of insvc, r23 has value
+	shr.u r24=r23,1;;
+	or r24=r23,r24;;
+	shr.u r25=r24,2;;
+	or r24=r24,r25;;
+	shr.u r25=r24,4;;
+	or r24=r24,r25;;
+	shr.u r25=r24,8;;
+	or r24=r24,r25;;
+	shr.u r25=r24,16;;
+	or r24=r24,r25;;
+	shr.u r25=r24,32;;
+	or r24=r24,r25;;
+	andcm r24=0xffffffffffffffff,r24;;
+	popcnt r24=r24;;
+	sub r24=63,r24;;
+	// r24 now contains the bit index
+	mov r25=1;;
+	shl r25=r25,r24;;
+	andcm r23=r23,r25;;
+	st8 [r22]=r23;;
+1:	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_eoi)
