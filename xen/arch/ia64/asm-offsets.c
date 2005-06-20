@@ -79,8 +79,10 @@ void foo(void)
 	DEFINE(IA64_VCPU_IRR0_OFFSET, offsetof (struct vcpu, arch.irr[0]));
 	DEFINE(IA64_VCPU_IRR3_OFFSET, offsetof (struct vcpu, arch.irr[3]));
 	DEFINE(IA64_VCPU_INSVC3_OFFSET, offsetof (struct vcpu, arch.insvc[3]));
+	DEFINE(IA64_VCPU_DOMAIN_ITM_OFFSET, offsetof (struct vcpu, arch.domain_itm));
 
 	BLANK();
+	DEFINE(IA64_CPUINFO_ITM_NEXT_OFFSET, offsetof (struct cpuinfo_ia64, itm_next));
 
 	//DEFINE(IA64_SIGHAND_SIGLOCK_OFFSET,offsetof (struct sighand_struct, siglock));
 

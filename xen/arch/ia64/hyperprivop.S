@@ -97,6 +97,10 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	cmp.eq p7,p6=XEN_HYPER_EOI,r17
 (p7)	br.sptk.many hyper_eoi;;
 
+	// HYPERPRIVOP_SET_ITM?
+	cmp.eq p7,p6=XEN_HYPER_SET_ITM,r17
+(p7)	br.sptk.many hyper_set_itm;;
+
 	// if not one of the above, give up for now and do it the slow way
 	br.sptk.many dispatch_break_fault ;;
 
@@ -802,3 +806,46 @@ ENTRY(hyper_eoi)
 	rfi
 	;;
 END(hyper_eoi)
+
+ENTRY(hyper_set_itm)
+	// when we get to here r20=~=interrupts pending
+	cmp.ne p7,p0=r20,r0
+(p7)	br.spnt.many dispatch_break_fault ;;
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SET_ITM);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	movl r20=(PERCPU_ADDR)+IA64_CPUINFO_ITM_NEXT_OFFSET;;
+	ld8 r21=[r20];;
+	mov r20=IA64_KR(CURRENT);;
+	adds r20=IA64_VCPU_DOMAIN_ITM_OFFSET,r20;;
+	st8 [r20]=r8;;
+	cmp.geu p6,p0=r21,r8;;
+(p6)	mov r21=r8;;
+	// now "safe set" cr.itm=r21
+	mov r23=100;;
+2:	mov cr.itm=r21;;
+	srlz.d;;
+	mov r22=ar.itc ;;
+	cmp.leu p6,p0=r21,r22;;
+	add r21=r21,r23;;
+	shl r23=r23,1;;
+(p6)	br.cond.spnt.few 2b;;
+1:	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_set_itm)
