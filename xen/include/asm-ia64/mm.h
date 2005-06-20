@@ -150,7 +150,7 @@ static inline void put_page(struct pfn_info *page)
 static inline int get_page(struct pfn_info *page,
                            struct domain *domain)
 {
-#if 0
+#ifdef CONFIG_VTI
     u64 x, nx, y = *((u64*)&page->count_info);
     u32 _domain = pickle_domptr(domain);
 
