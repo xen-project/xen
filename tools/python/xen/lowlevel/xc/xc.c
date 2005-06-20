@@ -78,13 +78,14 @@ static PyObject *pyxc_domain_create(PyObject *self,
 
     u32          dom = 0;
     int          ret;
+    u32          ssidref = 0xFFFFFFFF;
 
-    static char *kwd_list[] = { "dom", NULL };
+    static char *kwd_list[] = { "dom", "ssidref", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|i", kwd_list, &dom))
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwd_list, &dom, &ssidref))
         return NULL;
 
-    if ( (ret = xc_domain_create(xc->xc_handle, &dom)) < 0 )
+    if ( (ret = xc_domain_create(xc->xc_handle, ssidref, &dom)) < 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return PyInt_FromLong(dom);
@@ -230,7 +231,7 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
         }
                  
         info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
-                                  ",s:l,s:L,s:l,s:i}",
+                                  ",s:l,s:L,s:l,s:i,s:i}",
                                   "dom",       info[i].domid,
                                   "vcpus",     info[i].vcpus,
                                   "dying",     info[i].dying,
@@ -242,6 +243,7 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
                                   "mem_kb",    info[i].nr_pages*4,
                                   "cpu_time",  info[i].cpu_time,
                                   "maxmem_kb", info[i].max_memkb,
+                                  "ssidref",   info[i].ssidref,
                                   "shutdown_reason", info[i].shutdown_reason);
         PyDict_SetItemString( info_dict, "vcpu_to_cpu", vcpu_list );
         PyDict_SetItemString( info_dict, "cpumap", cpumap_list );

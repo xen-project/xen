@@ -202,7 +202,9 @@ class XendDomainInfo:
         """
         db = parentdb.addChild(uuid)
         vm = cls(db)
-        id = xc.domain_create()
+        ssidref = int(sxp.child_value(config, 'ssidref'))
+        log.debug('restoring with ssidref='+str(ssidref))
+        id = xc.domain_create(ssidref = ssidref)
         vm.setdom(id)
         try:
             vm.restore = True
@@ -241,6 +243,7 @@ class XendDomainInfo:
         self.start_time = None
         self.name = None
         self.memory = None
+        self.ssidref = None
         self.image = None
 
         self.channel = None
@@ -316,6 +319,7 @@ class XendDomainInfo:
         """
         self.info = info
         self.memory = self.info['mem_kb'] / 1024
+        self.ssidref = self.info['ssidref']
 
     def state_set(self, state):
         self.state_updated.acquire()
@@ -336,6 +340,7 @@ class XendDomainInfo:
         s += " id=" + str(self.id)
         s += " name=" + self.name
         s += " memory=" + str(self.memory)
+        s += " ssidref=" + str(self.ssidref)
         console = self.getConsole()
         if console:
             s += " console=" + str(console.console_port)
@@ -398,7 +403,8 @@ class XendDomainInfo:
         sxpr = ['domain',
                 ['id', self.id],
                 ['name', self.name],
-                ['memory', self.memory] ]
+                ['memory', self.memory],
+                ['ssidref', self.ssidref] ]
         if self.uuid:
             sxpr.append(['uuid', self.uuid])
         if self.info:
@@ -533,6 +539,7 @@ class XendDomainInfo:
         self.memory = int(sxp.child_value(config, 'memory'))
         if self.memory is None:
             raise VmError('missing memory size')
+        self.ssidref = int(sxp.child_value(config, 'ssidref'))
         cpu = sxp.child_value(config, 'cpu')
         if self.recreate and self.id and cpu is not None and int(cpu) >= 0:
             xc.domain_pincpu(self.id, 0, 1<<int(cpu))
@@ -644,7 +651,7 @@ class XendDomainInfo:
     def show(self):
         """Print virtual machine info.
         """
-        print "[VM dom=%d name=%s memory=%d" % (self.id, self.name, self.memory)
+        print "[VM dom=%d name=%s memory=%d ssidref=%d" % (self.id, self.name, self.memory, self.ssidref)
         print "image:"
         sxp.show(self.image)
         print "]"
@@ -660,7 +667,7 @@ class XendDomainInfo:
             cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
         except:
             raise VmError('invalid cpu')
-        id = self.image.initDomain(self.id, self.memory, cpu, self.cpu_weight)
+        id = self.image.initDomain(self.id, self.memory, self.ssidref, cpu, self.cpu_weight)
         log.debug('init_domain> Created domain=%d name=%s memory=%d',
                   id, self.name, self.memory)
         self.setdom(id)
@@ -1011,6 +1018,7 @@ addImageHandlerClass(VmxImageHandler)
 # Ignore the fields we already handle.
 add_config_handler('name',       vm_field_ignore)
 add_config_handler('memory',     vm_field_ignore)
+add_config_handler('ssidref',    vm_field_ignore)
 add_config_handler('cpu',        vm_field_ignore)
 add_config_handler('cpu_weight', vm_field_ignore)
 add_config_handler('console',    vm_field_ignore)

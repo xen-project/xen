@@ -451,6 +451,13 @@ def set_bool(opt, k, v):
     else:
         opt.opts.err('Invalid value:' +v)
         
+def set_u32(opt, k, v):
+    """Set an option to an u32 value."""
+    try:
+        v = u32(v)
+    except:
+        opt.opts.err('Invalid value: ' + str(v))
+    opt.set(v)
 
 def set_value(opt, k, v):
     """Set an option to a value."""

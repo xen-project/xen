@@ -30,6 +30,7 @@
 #include <xen/sched.h>
 #include <xen/shadow.h>
 #include <xen/mm.h>
+#include <acm/acm_hooks.h>
 
 #define PIN_FAIL(_lbl, _rc, _f, _a...)   \
     do {                           \
@@ -355,6 +356,11 @@ __gnttab_map_grant_ref(
         DPRINTK("Bad ref (%d) or flags (%x).\n", ref, dev_hst_ro_flags);
         (void)__put_user(GNTST_bad_gntref, &uop->handle);
         return GNTST_bad_gntref;
+    }
+
+    if (acm_pre_grant_map_ref(dom)) {
+        (void)__put_user(GNTST_permission_denied, &uop->handle);
+        return GNTST_permission_denied;
     }
 
     if ( unlikely((rd = find_domain_by_id(dom)) == NULL) ||

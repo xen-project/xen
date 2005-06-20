@@ -137,6 +137,8 @@ struct domain
     cpumask_t        cpumask;
 
     struct arch_domain arch;
+
+    void *ssid; /* sHype security subject identifier */
 };
 
 struct domain_setup_info

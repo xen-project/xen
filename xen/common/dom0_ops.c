@@ -19,6 +19,7 @@
 #include <asm/current.h>
 #include <public/dom0_ops.h>
 #include <public/sched_ctl.h>
+#include <acm/acm_hooks.h>
 
 extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
 extern void arch_getdomaininfo_ctxt(
@@ -91,6 +92,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 {
     long ret = 0;
     dom0_op_t curop, *op = &curop;
+    void *ssid = NULL; /* save security ptr between pre and post/fail hooks */
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
@@ -99,6 +101,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         return -EFAULT;
 
     if ( op->interface_version != DOM0_INTERFACE_VERSION )
+        return -EACCES;
+
+    if ( acm_pre_dom0_op(op, &ssid) )
         return -EACCES;
 
     switch ( op->cmd )
@@ -357,6 +362,11 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             ((d->domain_flags & DOMF_shutdown) ? DOMFLAGS_SHUTDOWN : 0) |
             d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
 
+        if (d->ssid != NULL)
+            op->u.getdomaininfo.ssidref = ((struct acm_ssid_domain *)d->ssid)->ssidref;
+        else    
+            op->u.getdomaininfo.ssidref = ACM_DEFAULT_SSID;
+
         op->u.getdomaininfo.tot_pages   = d->tot_pages;
         op->u.getdomaininfo.max_pages   = d->max_pages;
         op->u.getdomaininfo.shared_info_frame = 
@@ -493,7 +503,10 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = arch_do_dom0_op(op,u_dom0_op);
 
     }
-
+    if (!ret)
+        acm_post_dom0_op(op, ssid);
+    else
+        acm_fail_dom0_op(op, ssid);
     return ret;
 }
 

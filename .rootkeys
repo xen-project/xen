@@ -785,6 +785,8 @@
 41adc641dV-0cDLSyzMs5BT8nL7v3Q tools/misc/xenperf.c
 4056f5155QYZdsk-1fLdjsZPFTnlhg tools/misc/xensymoops
 40cf2937dqM1jWW87O5OoOYND8leuA tools/misc/xm
+42b742f6JFcp6LFpYu-B4AEsfQwSFw tools/policy/Makefile
+42b742f66XOdRMrwaHvbCdSSQyCrFw tools/policy/policy_tool.c
 4270cc81g3nSNYCZ1ryCMDEbLtMtbQ tools/pygrub/Makefile
 4270deeccyRsJn6jLnRh9odRtMW9SA tools/pygrub/README
 4270cc81EIl7NyaS3Av6IPRk2c2a6Q tools/pygrub/setup.py
@@ -1101,6 +1103,12 @@
 3f72f1bdJPsV3JCnBqs9ddL9tr6D2g xen/COPYING
 3ddb79bcbOVHh38VJzc97-JEGD4dJQ xen/Makefile
 3ddb79bcWnTwYsQRWl_PaneJfa6p0w xen/Rules.mk
+42b742f6XHTfIEm_hUPtzjKr37LVhw xen/acm/Makefile
+42b742f6tHzn0fZWH3TjPva8gbqpow xen/acm/acm_chinesewall_hooks.c
+42b742f6bM8kZwuIUbepHZ8SQQkjJA xen/acm/acm_core.c
+42b742f6cwfrPubqH47gQpke8xkYSA xen/acm/acm_null_hooks.c
+42b742f69qSxm5MM-wtPaWtCqyI3KA xen/acm/acm_policy.c
+42b742f6VbmdlwekQRMhXugjcu9QXg xen/acm/acm_simple_type_enforcement_hooks.c
 421098b25A0RvuYN3rP28ga3_FN3_Q xen/arch/ia64/Makefile
 421098b2okIeYXS9w9avmSozls61xA xen/arch/ia64/Rules.mk
 421098b21p12UcKjHBrLh_LjlvNEwA xen/arch/ia64/acpi.c
@@ -1324,6 +1332,7 @@
 41a61536SZbR6cj1ukWTb0DYU-vz9w xen/common/multicall.c
 3ddb79bdD4SLmmdMD7yLW5HcUWucXw xen/common/page_alloc.c
 3e54c38dkHAev597bPr71-hGzTdocg xen/common/perfc.c
+42b742f6mgq9puEr7lUrLST0VEpsig xen/common/policy_ops.c
 40589968dD2D1aejwSOvrROg7fOvGQ xen/common/sched_bvt.c
 41ebbfe9oF1BF3cH5v7yE3eOL9uPbA xen/common/sched_sedf.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c
@@ -1339,6 +1348,9 @@
 4049e6bfNSIq7s7OV-Bd69QD0RpR2Q xen/drivers/char/console.c
 4298e018XQtZkCdufpyFimOGZqqsFA xen/drivers/char/ns16550.c
 3e4a8cb7nMChlro4wvOBo76n__iCFA xen/drivers/char/serial.c
+42b742f6OteAMPWnoqxqfRX3yxD0yw xen/include/acm/acm_core.h
+42b742f6XfIijctEwA0YWL2BoWtDNg xen/include/acm/acm_endian.h
+42b742f6jXvp1vdbU2v2WJjTPku65A xen/include/acm/acm_hooks.h
 40715b2cFpte_UNWnBZW0Du7z9AhTQ xen/include/acpi/acconfig.h
 40715b2ctNvVZ058w8eM8DR9hOat_A xen/include/acpi/acexcep.h
 40715b2com8I01qcHcAw47e93XsCqQ xen/include/acpi/acglobal.h
@@ -1489,6 +1501,8 @@
 404f1bc4tWkB9Qr8RkKtZGW5eMQzhw xen/include/asm-x86/x86_64/uaccess.h
 422f27c8RHFkePhD34VIEpMMqofZcA xen/include/asm-x86/x86_emulate.h
 400304fcmRQmDdFYEzDh0wcBba9alg xen/include/public/COPYING
+42b742f6duiOTlZvysQkRYZHYBXqvg xen/include/public/acm.h
+42b742f7TIMsQgUaNDJXp3QlBve2SQ xen/include/public/acm_dom0_setup.h
 421098b7OKb9YH_EUA_UpCxBjaqtgA xen/include/public/arch-ia64.h
 404f1bc68SXxmv0zQpXBWGrCzSyp8w xen/include/public/arch-x86_32.h
 404f1bc7IwU-qnH8mJeVu0YsNGMrcw xen/include/public/arch-x86_64.h
@@ -1502,6 +1516,7 @@
 41d40e9b8zCk5VDqhVbuQyhc7G3lqA xen/include/public/io/ring.h
 41ee5e8c6mLxIx82KPsbpt_uts_vSA xen/include/public/io/usbif.h
 4051db79512nOCGweabrFWO2M2h5ng xen/include/public/physdev.h
+42b742f7Lzy8SKKG25L_-fgk5FHA2Q xen/include/public/policy_ops.h
 40589968wmhPmV5-ENbBYmMjnedgKw xen/include/public/sched_ctl.h
 404f3d2eR2Owk-ZcGOx9ULGHg3nrww xen/include/public/trace.h
 42b5a5f2QC1IxeuwCwwsOEhvcJ2BJg xen/include/public/version.h

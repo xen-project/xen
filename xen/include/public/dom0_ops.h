@@ -43,6 +43,8 @@ typedef struct sched_adjdom_cmd dom0_adjustdom_t;
 
 #define DOM0_CREATEDOMAIN      8
 typedef struct {
+    /* IN parameters */
+    u32 ssidref;
     /* IN/OUT parameters. */
     /* Identifier for new domain (auto-allocate if zero is specified). */
     domid_t domain;
@@ -88,6 +90,7 @@ typedef struct {
     u32      n_vcpu;
     s32      vcpu_to_cpu[MAX_VIRT_CPUS];  /* current mapping   */
     cpumap_t cpumap[MAX_VIRT_CPUS];       /* allowable mapping */
+    u32	     ssidref;
 } dom0_getdomaininfo_t;
 
 #define DOM0_SETDOMAININFO      13

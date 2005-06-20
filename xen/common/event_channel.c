@@ -26,6 +26,7 @@
 
 #include <public/xen.h>
 #include <public/event_channel.h>
+#include <acm/acm_hooks.h>
 
 #define bucket_from_port(d,p) \
     ((d)->evtchn[(p)/EVTCHNS_PER_BUCKET])
@@ -586,6 +587,9 @@ long do_event_channel_op(evtchn_op_t *uop)
 
     if ( copy_from_user(&op, uop, sizeof(op)) != 0 )
         return -EFAULT;
+
+    if (acm_pre_event_channel(&op))
+        return -EACCES;
 
     switch ( op.cmd )
     {

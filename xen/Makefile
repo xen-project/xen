@@ -46,6 +46,7 @@ clean: delete-unfresh-files
 	$(MAKE) -C tools clean
 	$(MAKE) -C common clean
 	$(MAKE) -C drivers clean
+	$(MAKE) -C acm clean
 	$(MAKE) -C arch/$(TARGET_ARCH) clean
 	rm -f include/asm *.o $(TARGET)* *~ core
 	rm -f include/asm-*/asm-offsets.h
@@ -58,6 +59,7 @@ $(TARGET): delete-unfresh-files
 	$(MAKE) include/asm-$(TARGET_ARCH)/asm-offsets.h
 	$(MAKE) -C common
 	$(MAKE) -C drivers
+	$(MAKE) -C acm
 	$(MAKE) -C arch/$(TARGET_ARCH)
 
 # drivers/char/console.o may contain static banner/compile info. Blow it away.
@@ -109,7 +111,7 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 
 .PHONY: default debug install dist clean delete-unfresh-files TAGS tags
 
-SUBDIRS = arch/$(TARGET_ARCH) common drivers 
+SUBDIRS = acm arch/$(TARGET_ARCH) common drivers 
 define all_sources
     ( find include/asm-$(TARGET_ARCH) -name SCCS -prune -o -name '*.h' -print; \
       find include -type d -name SCCS -prune -o \( -name "asm-*" -o \

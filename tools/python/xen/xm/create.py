@@ -120,6 +120,10 @@ gopts.var('memory', val='MEMORY',
           fn=set_int, default=128,
           use="Domain memory in MB.")
 
+gopts.var('ssidref', val='SSIDREF',
+          fn=set_u32, default=0xffffffff,
+          use="Security Identifier.")
+
 gopts.var('maxmem', val='MEMORY',
           fn=set_int, default=None,
           use="Maximum domain memory in MB.")
@@ -405,7 +409,8 @@ def make_config(opts, vals):
     
     config = ['vm',
               ['name', vals.name ],
-              ['memory', vals.memory ]]
+              ['memory', vals.memory ],
+              ['ssidref', vals.ssidref ]]
     if vals.maxmem:
         config.append(['maxmem', vals.maxmem])
     if vals.cpu is not None:
