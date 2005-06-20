@@ -778,6 +778,16 @@
 40c9c469kT0H9COWzA4XzPBjWK0WsA tools/misc/netfix
 4022a73cEKvrYe_DVZW2JlAxobg9wg tools/misc/nsplitd/Makefile
 4022a73cKms4Oq030x2JBzUB426lAQ tools/misc/nsplitd/nsplitd.c
+42b74436oXEaaUH_dPcGFviMiwNgCQ tools/misc/policyprocessor/SecurityLabel.java
+42b74436fIW8ZI3pUpu13-Ox6G2cOA tools/misc/policyprocessor/SecurityPolicySpec.xsd
+42b74436T4CN4HMWsuaHD2zS8jY1BA tools/misc/policyprocessor/SsidsEntry.java
+42b74436Dk3WKJl6-SyP3LEBo3DXkQ tools/misc/policyprocessor/XmlToBin.java
+42b74436ABj4SOVBWqY_IEIboFUkeA tools/misc/policyprocessor/XmlToBinInterface.java
+42b7443684kBOrEBKFod4fGvnJ-rdA tools/misc/policyprocessor/myHandler.java
+42b74436JjvZmOp2DfMb-TnpGZXQ8w tools/misc/policyprocessor/readme.install
+42b74436-0Ig0yb-w1BYyCAFVTwqUg tools/misc/policyprocessor/readme.xen
+42b74436WAJ6lmTO3foadk2527PFBQ tools/misc/policyprocessor/xen_sample_def.xml
+42b744365VrTALmqRroQOBZ9EopUsw tools/misc/policyprocessor/xen_sample_policy.xml
 42308df9dv_ZuP49nNPIROEMQ3F_LA tools/misc/xc_shadow.c
 3f5ef5a2ir1kVAthS14Dc5QIRCEFWg tools/misc/xen-clone
 3f5ef5a2dTZP0nnsFoeq2jRf3mWDDg tools/misc/xen-clone.README
