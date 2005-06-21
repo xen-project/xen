@@ -205,8 +205,7 @@ IA64FAULT priv_itc_d(VCPU *vcpu, INST64 inst)
 		return(IA64_ILLOP_FAULT);
 	if ((fault = vcpu_get_ifa(vcpu,&ifa)) != IA64_NO_FAULT)
 		return(IA64_ILLOP_FAULT);
-	if (!inst.inst) pte = vcpu_get_tmp(vcpu,0);
-	else pte = vcpu_get_gr(vcpu,inst.M41.r2);
+	pte = vcpu_get_gr(vcpu,inst.M41.r2);
 
 	return (vcpu_itc_d(vcpu,pte,itir,ifa));
 }
@@ -220,8 +219,7 @@ IA64FAULT priv_itc_i(VCPU *vcpu, INST64 inst)
 		return(IA64_ILLOP_FAULT);
 	if ((fault = vcpu_get_ifa(vcpu,&ifa)) != IA64_NO_FAULT)
 		return(IA64_ILLOP_FAULT);
-	if (!inst.inst) pte = vcpu_get_tmp(vcpu,0);
-	else pte = vcpu_get_gr(vcpu,inst.M41.r2);
+	pte = vcpu_get_gr(vcpu,inst.M41.r2);
 
 	return (vcpu_itc_i(vcpu,pte,itir,ifa));
 }
@@ -800,12 +798,14 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 		(void)vcpu_cover(v);
 		return 1;
 	    case HYPERPRIVOP_ITC_D:
-		inst.inst = 0;
-		(void)priv_itc_d(v,inst);
+		(void)vcpu_get_itir(v,&itir);
+		(void)vcpu_get_ifa(v,&ifa);
+		(void)vcpu_itc_d(v,regs->r8,itir,ifa);
 		return 1;
 	    case HYPERPRIVOP_ITC_I:
-		inst.inst = 0;
-		(void)priv_itc_i(v,inst);
+		(void)vcpu_get_itir(v,&itir);
+		(void)vcpu_get_ifa(v,&ifa);
+		(void)vcpu_itc_i(v,regs->r8,itir,ifa);
 		return 1;
 	    case HYPERPRIVOP_SSM_I:
 		(void)vcpu_set_psr_i(v);
