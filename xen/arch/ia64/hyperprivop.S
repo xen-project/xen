@@ -105,6 +105,10 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	cmp.eq p7,p6=XEN_HYPER_SET_RR,r17
 (p7)	br.sptk.many hyper_set_rr;;
 
+	// HYPERPRIVOP_GET_RR?
+	cmp.eq p7,p6=XEN_HYPER_GET_RR,r17
+(p7)	br.sptk.many hyper_get_rr;;
+
 	// if not one of the above, give up for now and do it the slow way
 	br.sptk.many dispatch_break_fault ;;
 
@@ -820,10 +824,36 @@ ENTRY(hyper_set_itm)
 	;;
 END(hyper_set_itm)
 
-ENTRY(hyper_set_rr)
-#if 1
-	br.sptk.many dispatch_break_fault ;;
+ENTRY(hyper_get_rr)
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_GET_RR);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
 #endif
+	extr.u r25=r8,61,3;;
+	adds r20=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18 ;;
+	shl r25=r25,3;;
+	add r20=r20,r25;;
+	ld8 r8=[r20];;
+1:	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_get_rr)
+
+ENTRY(hyper_set_rr)
 	extr.u r25=r8,61,3;;
 	cmp.leu p7,p0=7,r25	// punt on setting rr7
 (p7)	br.spnt.many dispatch_break_fault ;;
@@ -839,7 +869,7 @@ ENTRY(hyper_set_rr)
 	ld4 r22=[r21];;
 	adds r21=IA64_VCPU_ENDING_RID_OFFSET,r20;;
 	ld4 r23=[r21];;
-	adds r24=IA64_VCPU_META_SAVED_RR0_OFFSET,r22;;
+	adds r24=IA64_VCPU_META_SAVED_RR0_OFFSET,r20;;
 	add r22=r26,r22;;
 	cmp.geu p6,p0=r22,r23	// if r9.rid + starting_rid >= ending_rid
 (p6)	br.cond.sptk.many 1f;	// this is an error, but just ignore/return
