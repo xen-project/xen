@@ -131,6 +131,7 @@ static int get_error(const char *errorstring)
 	return xsd_errors[i].errnum;
 }
 
+/* Adds extra nul terminator, because we generally (always?) hold strings. */
 static void *read_reply(int fd, enum xsd_sockmsg_type *type, unsigned int *len)
 {
 	struct xsd_sockmsg msg;
@@ -140,7 +141,7 @@ static void *read_reply(int fd, enum xsd_sockmsg_type *type, unsigned int *len)
 	if (!read_all(fd, &msg, sizeof(msg)))
 		return NULL;
 
-	ret = malloc(msg.len);
+	ret = malloc(msg.len + 1);
 	if (!ret)
 		return NULL;
 
@@ -154,6 +155,7 @@ static void *read_reply(int fd, enum xsd_sockmsg_type *type, unsigned int *len)
 	*type = msg.type;
 	if (len)
 		*len = msg.len;
+	((char *)ret)[msg.len] = '\0';
 	return ret;
 }
 
@@ -269,9 +271,9 @@ char **xs_directory(struct xs_handle *h, const char *path, unsigned int *num)
 	return ret;
 }
 
-/* Get the value of a single file.
+/* Get the value of a single file, nul terminated.
  * Returns a malloced value: call free() on it after use.
- * len indicates length in bytes.
+ * len indicates length in bytes, not including the nul.
  */
 void *xs_read(struct xs_handle *h, const char *path, unsigned int *len)
 {

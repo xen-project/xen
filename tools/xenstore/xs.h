@@ -45,9 +45,9 @@ void xs_daemon_close(struct xs_handle *);
  */
 char **xs_directory(struct xs_handle *h, const char *path, unsigned int *num);
 
-/* Get the value of a single file.
+/* Get the value of a single file, nul terminated.
  * Returns a malloced value: call free() on it after use.
- * len indicates length in bytes.
+ * len indicates length in bytes, not including the nul.
  */
 void *xs_read(struct xs_handle *h, const char *path, unsigned int *len);
 

@@ -240,6 +240,8 @@ static void do_read(unsigned int handle, char *path)
 	if (!value)
 		failed(handle);
 
+	/* It's supposed to nul terminate for us. */
+	assert(value[len] == '\0');
 	if (handle)
 		printf("%i:%.*s\n", handle, len, value);
 	else
@@ -261,7 +263,7 @@ static void do_write(unsigned int handle, char *path, char *flags, char *data)
 	else
 		barf("write flags 'none', 'create' or 'excl' only");
 
-	if (!xs_write(handles[handle], path, data, strlen(data)+1, f))
+	if (!xs_write(handles[handle], path, data, strlen(data), f))
 		failed(handle);
 }
 
