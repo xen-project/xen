@@ -27,7 +27,7 @@
 //#define DEBUG_PIC
 
 //#define DEBUG_IRQ_LATENCY
-//#define DEBUG_IRQ_COUNT
+#define DEBUG_IRQ_COUNT
 
 typedef struct PicState {
     uint8_t last_irr; /* edge detection */

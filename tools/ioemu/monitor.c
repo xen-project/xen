@@ -123,6 +123,108 @@ static int compare_cmd(const char *name, const char *list)
     return 0;
 }
 
+static void help_cmd1(term_cmd_t *cmds, const char *prefix, const char *name)
+{
+    term_cmd_t *cmd;
+
+    for(cmd = cmds; cmd->name != NULL; cmd++) {
+        if (!name || !strcmp(name, cmd->name))
+            term_printf("%s%s %s -- %s\n", prefix, cmd->name, cmd->params, cmd->help);
+    }
+}
+
+static void help_cmd(const char *name)
+{
+    if (name && !strcmp(name, "info")) {
+        help_cmd1(info_cmds, "info ", NULL);
+    } else {
+        help_cmd1(term_cmds, "", name);
+        if (name && !strcmp(name, "log")) {
+            CPULogItem *item;
+            term_printf("Log items (comma separated):\n");
+            term_printf("%-10s %s\n", "none", "remove all logs");
+            for(item = cpu_log_items; item->mask != 0; item++) {
+                term_printf("%-10s %s\n", item->name, item->help);
+            }
+        }
+    }
+}
+
+static void do_help(const char *name)
+{
+    help_cmd(name);
+}
+
+static void do_commit(void)
+{
+    int i;
+
+    for (i = 0; i < MAX_DISKS; i++) {
+        if (bs_table[i]) {
+            bdrv_commit(bs_table[i]);
+        }
+    }
+}
+
+static void do_info(const char *item)
+{
+    term_cmd_t *cmd;
+
+    if (!item)
+        goto help;
+    for(cmd = info_cmds; cmd->name != NULL; cmd++) {
+        if (compare_cmd(item, cmd->name))
+            goto found;
+    }
+ help:
+    help_cmd("info");
+    return;
+ found:
+    cmd->handler();
+}
+
+static void do_info_version(void)
+{
+  term_printf("%s\n", QEMU_VERSION);
+}
+
+static void do_info_network(void)
+{
+    int i, j;
+    NetDriverState *nd;
+
+    for(i = 0; i < nb_nics; i++) {
+        nd = &nd_table[i];
+        term_printf("%d: ifname=%s macaddr=", i, nd->ifname);
+        for(j = 0; j < 6; j++) {
+            if (j > 0)
+                term_printf(":");
+            term_printf("%02x", nd->macaddr[j]);
+        }
+        term_printf("\n");
+    }
+}
+
+static void do_info_block(void)
+{
+    bdrv_info();
+}
+
+static void do_info_history (void)
+{
+    int i;
+    const char *str;
+
+    i = 0;
+    for(;;) {
+        str = readline_get_history(i);
+        if (!str)
+            break;
+        term_printf("%d: '%s'\n", i, str);
+        i++;
+    }
+}
+
 static void do_quit(void)
 {
     extern int domid;
@@ -134,11 +236,190 @@ static void do_quit(void)
     exit(0);
 }
 
+static int eject_device(BlockDriverState *bs, int force)
+{
+    if (bdrv_is_inserted(bs)) {
+        if (!force) {
+            if (!bdrv_is_removable(bs)) {
+                term_printf("device is not removable\n");
+                return -1;
+            }
+            if (bdrv_is_locked(bs)) {
+                term_printf("device is locked\n");
+                return -1;
+            }
+        }
+        bdrv_close(bs);
+    }
+    return 0;
+}
+
+static void do_eject(int force, const char *filename)
+{
+    BlockDriverState *bs;
+
+    bs = bdrv_find(filename);
+    if (!bs) {
+        term_printf("device not found\n");
+        return;
+    }
+    eject_device(bs, force);
+}
+
+static void do_change(const char *device, const char *filename)
+{
+    BlockDriverState *bs;
+#if 0
+    int i;
+    char password[256];
+#endif
+
+    bs = bdrv_find(device);
+    if (!bs) {
+        term_printf("device not found\n");
+        return;
+    }
+    if (eject_device(bs, 0) < 0)
+        return;
+    bdrv_open(bs, filename, 0);
+#if 0
+    if (bdrv_is_encrypted(bs)) {
+        term_printf("%s is encrypted.\n", device);
+        for(i = 0; i < 3; i++) {
+            monitor_readline("Password: ", 1, password, sizeof(password));
+            if (bdrv_set_key(bs, password) == 0)
+                break;
+            term_printf("invalid password\n");
+        }
+    }
+#endif
+}
+
+static void do_screen_dump(const char *filename)
+{
+    vga_screen_dump(filename);
+}
+
+static void do_log(const char *items)
+{
+    int mask;
+
+    if (!strcmp(items, "none")) {
+        mask = 0;
+    } else {
+        mask = cpu_str_to_log_mask(items);
+        if (!mask) {
+            help_cmd("log");
+            return;
+        }
+    }
+    cpu_set_log(mask);
+}
+
 static term_cmd_t term_cmds[] = {
+    { "help|?", "s?", do_help,
+      "[cmd]", "show the help" },
+    { "commit", "", do_commit,
+      "", "commit changes to the disk images (if -snapshot is used)" },
+    { "info", "s?", do_info,
+      "subcommand", "show various information about the system state" },
+    { "q|quit", "", do_quit,
+      "", "quit the emulator" },
+    { "eject", "-fB", do_eject,
+      "[-f] device", "eject a removable media (use -f to force it)" },
+    { "change", "BF", do_change,
+      "device filename", "change a removable media" },
+    { "screendump", "F", do_screen_dump,
+      "filename", "save screen into PPM image 'filename'" },
+    { "log", "s", do_log,
+      "item1[,...]", "activate logging of the specified items to '/tmp/qemu.log'" },
     { "q|quit", "", do_quit,
       "", "quit the emulator" },
     { NULL, NULL, }, 
 };
+
+static term_cmd_t info_cmds[] = {
+    { "version", "", do_info_version,
+      "", "show the version of qemu" },
+    { "network", "", do_info_network,
+      "", "show the network state" },
+    { "block", "", do_info_block,
+      "", "show the block devices" },
+    { "history", "", do_info_history,
+      "", "show the command line history", },
+    { "irq", "", irq_info,
+      "", "show the interrupts statistics (if available)", },
+    { "pic", "", pic_info,
+      "", "show i8259 (PIC) state", },
+    { "pci", "", pci_info,
+      "", "show PCI info", },
+    { NULL, NULL, },
+};
+
+static int get_str(char *buf, int buf_size, const char **pp)
+{
+    const char *p;
+    char *q;
+    int c;
+
+    q = buf;
+    p = *pp;
+    while (isspace(*p))
+        p++;
+    if (*p == '\0') {
+    fail:
+        *q = '\0';
+        *pp = p;
+        return -1;
+    }
+    if (*p == '\"') {
+        p++;
+        while (*p != '\0' && *p != '\"') {
+            if (*p == '\\') {
+                p++;
+                c = *p++;
+                switch(c) {
+                case 'n':
+                    c = '\n';
+                    break;
+                case 'r':
+                    c = '\r';
+                    break;
+                case '\\':
+                case '\'':
+                case '\"':
+                    break;
+                default:
+                    qemu_printf("unsupported escape code: '\\%c'\n", c);
+                    goto fail;
+                }
+                if ((q - buf) < buf_size - 1) {
+                    *q++ = c;
+                }
+            } else {
+                if ((q - buf) < buf_size - 1) {
+                    *q++ = *p;
+                }
+                p++;
+            }
+        }
+        if (*p != '\"') {
+            qemu_printf("unterminated string\n");
+            goto fail;
+        }
+        p++;
+    } else {
+        while (*p != '\0' && !isspace(*p)) {
+            if ((q - buf) < buf_size - 1) {
+                *q++ = *p;
+            }
+            p++;
+        }
+    }
+    *q = '\0';
+    *pp = p;
+    return 0;
+}
 
 #define MAX_ARGS 16
 
@@ -149,6 +430,7 @@ static void monitor_handle_command(const char *cmdline)
     int c, nb_args, len, i;
     term_cmd_t *cmd;
     char cmdname[256];
+    char buf[1024];
     void *str_allocated[MAX_ARGS];
     void *args[MAX_ARGS];
 
@@ -193,10 +475,53 @@ static void monitor_handle_command(const char *cmdline)
             break;
         typestr++;
         switch(c) {
-        /* TODO: add more commands we need here to support vmx device model */
         case 'F':
         case 'B':
         case 's':
+            {
+                int ret;
+                char *str;
+
+                while (isspace(*p))
+                    p++;
+                if (*typestr == '?') {
+                    typestr++;
+                    if (*p == '\0') {
+                        /* no optional string: NULL argument */
+                        str = NULL;
+                        goto add_str;
+                    }
+                }
+                ret = get_str(buf, sizeof(buf), &p);
+                if (ret < 0) {
+                    switch(c) {
+                    case 'F':
+                        term_printf("%s: filename expected\n", cmdname);
+                        break;
+                    case 'B':
+                        term_printf("%s: block device name expected\n", cmdname);
+                        break;
+                    default:
+                        term_printf("%s: string expected\n", cmdname);
+                        break;
+                    }
+                    goto fail;
+                }
+                str = qemu_malloc(strlen(buf) + 1);
+                strcpy(str, buf);
+                str_allocated[nb_args] = str;
+            add_str:
+                if (nb_args >= MAX_ARGS) {
+#if 0
+                error_args:
+#endif
+                    term_printf("%s: too many arguments\n", cmdname);
+                    goto fail;
+                }
+                args[nb_args++] = str;
+            }
+            break;
+        /* TODO: add more commands we need here to support vmx device model */
         case '/':
         case 'i':
         case '-':
