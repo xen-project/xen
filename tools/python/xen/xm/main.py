@@ -383,7 +383,7 @@ class ProgList(Prog):
             self.brief_list(doms)
 
     def brief_list(self, doms):
-        print 'Name              Id  Mem(MB)  CPU VCPU(s)  State  Time(s)  Console  SSID-REF'
+        print 'Name              Id  Mem(MB)  CPU VCPU(s)  State  Time(s)  Console'
         for dom in doms:
             info = server.xend_domain(dom)
             d = {}
@@ -404,7 +404,7 @@ class ProgList(Prog):
                 d['ssidref2'] = (int(sxp.child_value(info, 'ssidref', '-1')) >> 16) & 0xffff
                 print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3d  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %(port)4s    s:%(ssidref2)02x/p:%(ssidref1)02x" % d)
             else:
-                print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3d  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %(port)4s     default" % d)
+                print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3d  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %(port)4s" % d)
 
     def show_vcpus(self, doms):
         print 'Name              Id  VCPU  CPU  CPUMAP'

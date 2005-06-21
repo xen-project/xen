@@ -35,16 +35,6 @@ When you apply the patches and startup xen, you should at first not notice any
 difference because the default policy is the "NULL" policy, which as the name 
 implies does not enforce anything.
 
-However, when you try
-
-[root@laptop policy]# xm list
-Name              Id  Mem(MB)  CPU  State  Time(s)  Console  SSID-REF
-Domain-0           0      620   0  r----     25.6            default
-
-You might detect a new parameter "SSID-REF" displayed for domains. This 
-parameter describes the subject security identifier reference of the domain. It 
-is shown as "default" since there is no policy to be enforced.
-
 To display the currently enforced policy, use the policy tool under xeno-
 unstable.bk/tools/policy: policy_tool getpolicy. You should see output like the 
 one below.
@@ -346,7 +336,7 @@ First start xmsec1: xm create -c xmsec1 (succeeds)
 
 Then
 [root@laptop policy]# xm list 
-Name              Id  Mem(MB)  CPU  State  Time(s)  Console  SSID-REF
+Name              Id  Mem(MB)  CPU  State  Time(s)  Console  
 Domain-0           0      620   0  r----     42.3            s:00/p:00
 xmnosec            1        9   0  -b---      0.3    9601    s:00/p:05
 xmsec1             2        9   0  -b---      0.2    9602    s:01/p:01
@@ -453,7 +443,7 @@ Linux version 2.6.11-xenU (root@laptop.home.org) (gcc version 3.4.2 20041017
 .
 .
 [root@laptop policy]# xm list
-Name              Id  Mem(MB)  CPU  State  Time(s)  Console  SSID-REF
+Name              Id  Mem(MB)  CPU  State  Time(s)  Console  
 Domain-0           0      620   0  r----     71.7            s:00/p:00
 xmsec1             1        9   0  -b---      0.3    9601    s:01/p:01
 xmsec2             2        7   0  -b---      0.3    9602    s:02/p:02   << our domain runs both policies with ssidref 2
