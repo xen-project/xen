@@ -606,11 +606,6 @@ ENTRY(hyper_set_tpr)
 	;;
 END(hyper_set_tpr)
 
-#if 1
-// This seems to work, but I saw a flurry of "timer tick before it's due"
-// so will leave the old version around until this gets understood/tracked down
-// Also, vcpu_get_ivr provides a domain "heartbeat" for debugging, so we
-// need to be able to easily turn that back on.
 ENTRY(hyper_get_ivr)
 #ifdef FAST_HYPERPRIVOP_CNT
 	movl r22=fast_hyperpriv_cnt+(8*XEN_HYPER_GET_IVR);;
@@ -618,17 +613,16 @@ ENTRY(hyper_get_ivr)
 	adds r21=1,r21;;
 	st8 [r22]=r21;;
 #endif
-	mov r30=r0;;
 	mov r8=15;;
 	// when we get to here r20=~=interrupts pending
 	cmp.eq p7,p0=r20,r0;;
 (p7)	adds r20=XSI_PEND_OFS-XSI_PSR_IC_OFS,r18 ;;
-(p7)	st4 [r20]=r30;;
+(p7)	st4 [r20]=r0;;
 (p7)	br.spnt.many 1f ;;
-	mov r22=IA64_KR(CURRENT);;
-	adds r24=IA64_VCPU_INSVC3_OFFSET,r22;;
+	mov r30=IA64_KR(CURRENT);;
+	adds r24=IA64_VCPU_INSVC3_OFFSET,r30;;
 	mov r25=192
-	adds r22=IA64_VCPU_IRR3_OFFSET,r22;;
+	adds r22=IA64_VCPU_IRR3_OFFSET,r30;;
 	ld8 r23=[r22];;
 	cmp.eq p6,p0=r23,r0;;
 (p6)	adds r22=-8,r22;;
@@ -693,6 +687,16 @@ ENTRY(hyper_get_ivr)
 	andcm r25=r25,r27;;
 	st8 [r22]=r25;;
 	mov r8=r26;;
+	// if its a clock tick, remember itm to avoid delivering it twice
+	adds r20=XSI_ITV_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r20=[r20];;
+	extr.u r20=r20,0,8;;
+	cmp.eq p6,p0=r20,r8
+	adds r22=IA64_VCPU_DOMAIN_ITM_LAST_OFFSET,r30
+	adds r23=IA64_VCPU_DOMAIN_ITM_OFFSET,r30;;
+	ld8 r23=[r23];;
+(p6)	st8 [r22]=r23;;
+	// all done
 1:	mov r24=cr.ipsr
 	mov r25=cr.iip;;
 	extr.u r26=r24,41,2 ;;
@@ -709,44 +713,6 @@ ENTRY(hyper_get_ivr)
 	rfi
 	;;
 END(hyper_get_ivr)
-#else
-// This version goes to slow path unless all irr bits are zero, in which
-// case it simply returns SPURIOUS and sets pending to zero.  Since a domain
-// gets cr.ivr approx twice per interrupt (once to get the vector and
-// once to see if there are any more), this version still gets used
-// for approximately half of all gets of cr.ivr
-ENTRY(hyper_get_ivr)
-	// when we get to here r20=~=interrupts pending
-	cmp.ne p7,p0=r20,r0
-(p7)	br.spnt.many dispatch_break_fault ;;
-#ifdef FAST_HYPERPRIVOP_CNT
-	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_GET_IVR);;
-	ld8 r21=[r20];;
-	adds r21=1,r21;;
-	st8 [r20]=r21;;
-#endif
-// if we get to here, there are no interrupts pending so we
-// force pending to zero and return SPURIOUS_VECTOR
-	adds r20=XSI_PEND_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r20]=r0;;
-	mov r8=15;;
-	mov r24=cr.ipsr
-	mov r25=cr.iip;;
-	extr.u r26=r24,41,2 ;;
-	cmp.eq p6,p7=2,r26 ;;
-(p6)	mov r26=0
-(p6)	adds r25=16,r25
-(p7)	adds r26=1,r26
-	;;
-	dep r24=r26,r24,41,2
-	;;
-	mov cr.ipsr=r24
-	mov cr.iip=r25
-	mov pr=r31,-1 ;;
-	rfi
-	;;
-END(hyper_get_ivr)
-#endif
 
 ENTRY(hyper_eoi)
 	// when we get to here r20=~=interrupts pending
