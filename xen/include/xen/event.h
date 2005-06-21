@@ -13,6 +13,7 @@
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <asm/bitops.h>
+#include <asm/event.h>
 
 /*
  * EVENT-CHANNEL NOTIFICATIONS
@@ -34,6 +35,7 @@ static inline void evtchn_set_pending(struct vcpu *v, int port)
     {
         /* The VCPU pending flag must be set /after/ update to evtchn-pend. */
         set_bit(0, &v->vcpu_info->evtchn_upcall_pending);
+        evtchn_notify(v);
 
         /*
          * NB1. 'vcpu_flags' and 'processor' must be checked /after/ update of

@@ -27,7 +27,7 @@ vpath linux-%.tar.bz2 $(LINUX_SRC_PATH)
 linux-%.tar.bz2: override _LINUX_VDIR = $(word 1,$(subst ., ,$*)).$(word 2,$(subst ., ,$*))
 linux-%.tar.bz2:
 	@echo "Cannot find $@ in path $(LINUX_SRC_PATH)"
-	wget http://www.kernel.org/pub/linux/kernel/v$(_LINUX_VDIR)/$@ -O./$@
+	wget $(KERNEL_REPO)/pub/linux/kernel/v$(_LINUX_VDIR)/$@ -O./$@
 
 # Expand NetBSD release to NetBSD version
 NETBSD_RELEASE  ?= 2.0
@@ -57,6 +57,7 @@ $(patsubst %,pristine-%/.valid-pristine,$(ALLSPARSETREES)) : pristine-%/.valid-p
 	mkdir -p tmp-pristine-$*
 	touch tmp-pristine-$*/.bk_skip
 	tar -C tmp-pristine-$* -jxf $<
+	-@rm tmp-pristine-$*/pax_global_header
 	mv tmp-pristine-$*/* $(@D)
 	@rm -rf tmp-pristine-$*
 	touch $@ # update timestamp to avoid rebuild

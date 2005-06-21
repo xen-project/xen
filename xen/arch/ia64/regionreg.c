@@ -274,6 +274,7 @@ int set_one_rr(unsigned long rr, unsigned long val)
 		return 0;
 	}
 
+#ifdef CONFIG_VTI
 	memrrv.rrval = rrv.rrval;
 	if (rreg == 7) {
 		newrrv.rid = newrid;
@@ -290,6 +291,15 @@ int set_one_rr(unsigned long rr, unsigned long val)
 		if (rreg == 0) v->arch.metaphysical_saved_rr0 = newrrv.rrval;
 		set_rr(rr,newrrv.rrval);
 	}
+#else
+	memrrv.rrval = rrv.rrval;
+	newrrv.rid = newrid;
+	newrrv.ve = 1;  // VHPT now enabled for region 7!!
+	newrrv.ps = PAGE_SHIFT;
+	if (rreg == 0) v->arch.metaphysical_saved_rr0 = newrrv.rrval;
+	if (rreg == 7) ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info);
+	else set_rr(rr,newrrv.rrval);
+#endif
 	return 1;
 }
 

@@ -43,8 +43,9 @@ typedef	union {
 
 #ifdef PRIVOP_ADDR_COUNT
 struct privop_addr_count privop_addr_counter[PRIVOP_COUNT_NINSTS] = {
-	{ "rsm", { 0 }, { 0 }, 0 },
-	{ "ssm", { 0 }, { 0 }, 0 }
+	{ "=ifa", { 0 }, { 0 }, 0 },
+	{ "thash", { 0 }, { 0 }, 0 },
+	0
 };
 extern void privop_count_addr(unsigned long addr, int inst);
 #define	PRIVOP_COUNT_ADDR(regs,inst) privop_count_addr(regs->cr_iip,inst)
@@ -135,7 +136,7 @@ IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 	struct ia64_psr psr, imm, *ipsr;
 	REGS *regs = vcpu_regs(vcpu);
 
-	PRIVOP_COUNT_ADDR(regs,_RSM);
+	//PRIVOP_COUNT_ADDR(regs,_RSM);
 	// TODO: All of these bits need to be virtualized
 	// TODO: Only allowed for current vcpu
 	__asm__ __volatile ("mov %0=psr;;" : "=r"(psr) :: "memory");
@@ -183,7 +184,7 @@ IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 	REGS *regs = vcpu_regs(vcpu);
 	UINT64 mask, enabling_interrupts = 0;
 
-	PRIVOP_COUNT_ADDR(regs,_SSM);
+	//PRIVOP_COUNT_ADDR(regs,_SSM);
 	// TODO: All of these bits need to be virtualized
 	__asm__ __volatile ("mov %0=psr;;" : "=r"(psr) :: "memory");
 	imm = *(struct ia64_psr *)&imm24;
@@ -369,6 +370,8 @@ IA64FAULT vcpu_get_iip(VCPU *vcpu, UINT64 *pval)
 IA64FAULT vcpu_get_ifa(VCPU *vcpu, UINT64 *pval)
 {
 	UINT64 val = PSCB(vcpu,ifa);
+	REGS *regs = vcpu_regs(vcpu);
+	PRIVOP_COUNT_ADDR(regs,_GET_IFA);
 	*pval = val;
 	return (IA64_NO_FAULT);
 }
@@ -422,6 +425,8 @@ IA64FAULT vcpu_get_iha(VCPU *vcpu, UINT64 *pval)
 {
 	//return vcpu_thash(vcpu,PSCB(vcpu,ifa),pval);
 	UINT64 val = PSCB(vcpu,iha);
+	REGS *regs = vcpu_regs(vcpu);
+	PRIVOP_COUNT_ADDR(regs,_THASH);
 	*pval = val;
 	return (IA64_NO_FAULT);
 }
@@ -539,7 +544,7 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
     } else
 #endif // CONFIG_VTI
     {
-	if (!test_bit(vector,PSCB(vcpu,delivery_mask))) return;
+	/* if (!test_bit(vector,PSCB(vcpu,delivery_mask))) return; */
 	if (test_bit(vector,PSCBX(vcpu,irr))) {
 //printf("vcpu_pend_interrupt: overrun\n");
 	}
@@ -569,10 +574,10 @@ UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 	UINT64 *p, *q, *r, bits, bitnum, mask, i, vector;
 
 	p = &PSCBX(vcpu,irr[3]);
-	q = &PSCB(vcpu,delivery_mask[3]);
+	/* q = &PSCB(vcpu,delivery_mask[3]); */
 	r = &PSCBX(vcpu,insvc[3]);
 	for (i = 3; ; p--, q--, r--, i--) {
-		bits = *p & *q;
+		bits = *p /* & *q */;
 		if (bits) break; // got a potential interrupt
 		if (*r) {
 			// nothing in this word which is pending+inservice
@@ -1589,7 +1594,8 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 		// addresses never get flushed.  More work needed if this
 		// ever happens.
 //printf("vhpt_insert(%p,%p,%p)\n",vaddr,pte,1L<<logps);
-		vhpt_insert(vaddr,pte,logps<<2);
+		if (logps > PAGE_SHIFT) vhpt_multiple_insert(vaddr,pte,logps);
+		else vhpt_insert(vaddr,pte,logps<<2);
 	}
 	// even if domain pagesize is larger than PAGE_SIZE, just put
 	// PAGE_SIZE mapping in the vhpt for now, else purging is complicated

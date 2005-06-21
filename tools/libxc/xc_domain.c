@@ -9,6 +9,7 @@
 #include "xc_private.h"
 
 int xc_domain_create(int xc_handle,
+                     u32 ssidref,
                      u32 *pdomid)
 {
     int err;
@@ -16,6 +17,7 @@ int xc_domain_create(int xc_handle,
 
     op.cmd = DOM0_CREATEDOMAIN;
     op.u.createdomain.domain = (domid_t)*pdomid;
+    op.u.createdomain.ssidref = ssidref;
     if ( (err = do_dom0_op(xc_handle, &op)) != 0 )
         return err;
 
@@ -101,6 +103,7 @@ int xc_domain_getinfo(int xc_handle,
             info->crashed  = 1;
         }
 
+        info->ssidref  = op.u.getdomaininfo.ssidref;
         info->nr_pages = op.u.getdomaininfo.tot_pages;
         info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT);
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;

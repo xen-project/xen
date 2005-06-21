@@ -95,7 +95,7 @@ class NetDev(Dev):
         Dev.exportToDB(self, save=save)
         if self.evtchn:
             db = self.db.addChild("evtchn")
-            self.evtchn.exportToDB(db, save=save)
+            self.evtchn.saveToDB(db, save=save)
 
     def init(self, recreate=False, reboot=False):
         self.destroyed = False

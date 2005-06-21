@@ -623,7 +623,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
             /* Only copy the packet if it fits in the current MTU. */
             if (skb->len <= (dev->mtu + ETH_HLEN)) {
                 if ((skb->tail > skb->end) && net_ratelimit())
-                    printk(KERN_INFO "Received packet needs %d bytes more "
+                    printk(KERN_INFO "Received packet needs %zd bytes more "
                            "headroom.\n", skb->tail - skb->end);
 
                 if ((nskb = alloc_xen_skb(skb->len + 2)) != NULL) {
@@ -967,9 +967,9 @@ static int create_netdev(int handle, struct net_device **val)
 
     /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
     for (i = 0; i <= NETIF_TX_RING_SIZE; i++)
-        np->tx_skbs[i] = (void *)(i+1);
+        np->tx_skbs[i] = (void *)((unsigned long) i+1);
     for (i = 0; i <= NETIF_RX_RING_SIZE; i++)
-        np->rx_skbs[i] = (void *)(i+1);
+        np->rx_skbs[i] = (void *)((unsigned long) i+1);
 
     dev->open            = network_open;
     dev->hard_start_xmit = network_start_xmit;
@@ -1343,7 +1343,7 @@ static int xennet_proc_read(
 {
     struct net_device *dev = (struct net_device *)((unsigned long)data & ~3UL);
     struct net_private *np = netdev_priv(dev);
-    int len = 0, which_target = (int)data & 3;
+    int len = 0, which_target = (unsigned long) data & 3;
     
     switch (which_target)
     {
@@ -1368,7 +1368,7 @@ static int xennet_proc_write(
 {
     struct net_device *dev = (struct net_device *)((unsigned long)data & ~3UL);
     struct net_private *np = netdev_priv(dev);
-    int which_target = (int)data & 3;
+    int which_target = (unsigned long) data & 3;
     char string[64];
     long target;
 

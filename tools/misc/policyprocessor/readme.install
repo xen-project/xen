@@ -1,0 +1,33 @@
+# Author: Ray Valdez, rvaldez@us.ibm.com 
+# Version: 1.0
+#
+# install readme
+#
+PREREQUISITES:
+
+Prior to installation of the policy processor tool (XmlToBin) you must have...
+
+ 1. Java version 1.4.2
+ 2. xmlParserAPIs.jar and xercesImpl.jar
+
+The above can be obtained from the Sun Developer Network web site at
+http://java.sun.com/j2se/1.4.2/download.html.
+
+XmlParserAPIs and xercesImpl jars can be obtained from
+http://www.apache.org/dist/xml/xerces-j (Xerces-J-bin.2.6.2.tar.gz,
+for example).
+
+The tool has been tested with J2SE v1.4.2_08 JRE on Linux (32-bit
+INTEL).
+
+INSTALLATION
+
+1. Set PATH to include $HOME_JAVA/bin and $HOME_JAVA/jre/bin
+   where $HOME_JAVA is your java installation directory
+
+2. Compile XmlToBin:
+   javac XmlToBin.java
+	
+USAGE
+
+ See readme.xen

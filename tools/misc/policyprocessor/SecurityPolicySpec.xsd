@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Author: Ray Valdez, rvaldez@us.ibm.com -->
+<!-- xml schema definition for xen xml policies -->
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+targetNamespace="http://www.ibm.com"
+xmlns="http://www.ibm.com" 
+elementFormDefault="qualified">
+
+<xsd:element name="TE" type="xsd:string" />
+<xsd:element name="ChWall" type="xsd:string" />
+
+<xsd:element name="Definition">
+  <xsd:complexType>
+ 	<xsd:sequence>
+
+	  <!-- simple type enforcement -->
+	  <xsd:element name="Types" minOccurs ="0" maxOccurs="1">
+		<xsd:complexType>
+		  <xsd:sequence>
+			<xsd:element ref="TE" minOccurs ="1" maxOccurs ="unbounded"/>
+		  </xsd:sequence>
+		</xsd:complexType>
+	  </xsd:element>
+
+	  <!-- chinese wall -->
+	  <!--   type definition -->
+	  <xsd:element name="ChWallTypes" minOccurs ="0" maxOccurs="1">
+		<xsd:complexType>
+		  <xsd:sequence>
+			<xsd:element ref="ChWall"  minOccurs ="1" maxOccurs ="unbounded"/>
+
+      	   	</xsd:sequence>
+          </xsd:complexType>
+	</xsd:element>
+
+  	<!--   conflict set -->
+	  <xsd:element name="ConflictSet" minOccurs ="0" maxOccurs="unbounded">
+		<xsd:complexType>
+		  <xsd:sequence>
+			<xsd:element ref="ChWall"  minOccurs ="2" maxOccurs ="unbounded"/>
+		  </xsd:sequence>
+		</xsd:complexType>
+	</xsd:element>
+
+	</xsd:sequence>
+  </xsd:complexType>
+</xsd:element>
+
+<xsd:element name="Policy">
+    <xsd:complexType>
+      <xsd:sequence>
+
+	<xsd:element name="PolicyHeader">
+    	<xsd:complexType>
+      	   <xsd:all>
+		<xsd:element name = "Name" type="xsd:string"/>
+		<xsd:element name = "DateTime" type="xsd:dateTime"/>
+		<xsd:element name = "Tag" minOccurs ="1" maxOccurs ="1" type="xsd:string"/>
+		<xsd:element name = "TypeDefinition">
+    		<xsd:complexType>
+      	   	  <xsd:all>
+			<xsd:element name = "url" type="xsd:string"/>
+			<xsd:element name = "hash" minOccurs ="0" maxOccurs ="1" type="xsd:string"/>
+      	   	  </xsd:all>
+    		</xsd:complexType>
+		</xsd:element>
+
+      	   </xsd:all>
+    	</xsd:complexType>
+	</xsd:element>
+
+	<xsd:element name="VM" minOccurs ="1" maxOccurs="unbounded">
+    	  <xsd:complexType>
+      	   <xsd:sequence>
+		<xsd:element name="id" type="xsd:integer"/>
+		<xsd:element ref="TE" minOccurs="0" maxOccurs="unbounded" />
+		<xsd:element ref="ChWall" minOccurs ="0" maxOccurs="unbounded"/>
+      	   </xsd:sequence>
+    	  </xsd:complexType>
+	</xsd:element>
+
+	<xsd:element name="Vlan" minOccurs ="0" maxOccurs="unbounded">
+    	  <xsd:complexType>
+      	   <xsd:sequence>
+		<xsd:element name="vid" type="xsd:integer"/>
+		<xsd:element ref="TE" minOccurs="1" maxOccurs="unbounded" />
+      	   </xsd:sequence>
+    	  </xsd:complexType>
+	</xsd:element>
+
+	<xsd:element name="Slot" minOccurs ="0" maxOccurs="unbounded">
+    	  <xsd:complexType>
+      	   <xsd:sequence>
+		<xsd:element name="bus" type="xsd:integer"/>
+		<xsd:element name="slot" type="xsd:integer"/>
+		<xsd:element ref="TE" minOccurs="1" maxOccurs="unbounded" />
+      	   </xsd:sequence>
+    	  </xsd:complexType>
+	</xsd:element>
+
+
+      </xsd:sequence>
+    </xsd:complexType>
+</xsd:element>
+
+<!-- root element -->
+<xsd:element name="SecurityPolicySpec">
+    <xsd:complexType>
+      <xsd:choice>
+		<xsd:element ref="Definition" minOccurs ="1" maxOccurs="unbounded"/>
+		<xsd:element ref="Policy" minOccurs ="1" maxOccurs="unbounded"/>
+      </xsd:choice>
+    </xsd:complexType>
+</xsd:element>
+</xsd:schema>

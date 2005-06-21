@@ -751,6 +751,7 @@ ENTRY(hypercall_table)
         .long do_boot_vcpu
         .long do_ni_hypercall       /* 25 */
         .long do_mmuext_op
+	 .long do_policy_op          /* 27 */
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .long do_ni_hypercall
         .endr

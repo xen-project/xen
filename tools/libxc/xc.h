@@ -110,6 +110,7 @@ int xc_waitdomain_core(int domain,
 
 typedef struct {
     u32           domid;
+    u32           ssidref;
     unsigned int  dying:1, crashed:1, shutdown:1, 
                   paused:1, blocked:1, running:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
@@ -124,6 +125,7 @@ typedef struct {
 
 typedef dom0_getdomaininfo_t xc_domaininfo_t;
 int xc_domain_create(int xc_handle, 
+                     u32 ssidref,
                      u32 *pdomid);
 
 

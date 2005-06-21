@@ -748,10 +748,22 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 #define HYPERPRIVOP_ITC_D		0x5
 #define HYPERPRIVOP_ITC_I		0x6
 #define HYPERPRIVOP_SSM_I		0x7
-#define HYPERPRIVOP_MAX			0x7
+#define HYPERPRIVOP_GET_IVR		0x8
+#define HYPERPRIVOP_GET_TPR		0x9
+#define HYPERPRIVOP_SET_TPR		0xa
+#define HYPERPRIVOP_EOI			0xb
+#define HYPERPRIVOP_SET_ITM		0xc
+#define HYPERPRIVOP_THASH		0xd
+#define HYPERPRIVOP_PTC_GA		0xe
+#define HYPERPRIVOP_ITR_D		0xf
+#define HYPERPRIVOP_GET_RR		0x10
+#define HYPERPRIVOP_SET_RR		0x11
+#define HYPERPRIVOP_MAX			0x11
 
 char *hyperpriv_str[HYPERPRIVOP_MAX+1] = {
 	0, "rfi", "rsm.dt", "ssm.dt", "cover", "itc.d", "itc.i", "ssm.i",
+	"=ivr", "=tpr", "tpr=", "eoi", "itm=", "thash", "ptc.ga", "itr.d",
+	"=rr", "rr=",
 	0
 };
 
@@ -766,6 +778,7 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 	struct vcpu *v = (struct domain *) current;
 	INST64 inst;
 	UINT64 val;
+	UINT64 itir, ifa;
 
 // FIXME: Handle faults appropriately for these
 	if (!iim || iim > HYPERPRIVOP_MAX) {
@@ -796,6 +809,44 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 		return 1;
 	    case HYPERPRIVOP_SSM_I:
 		(void)vcpu_set_psr_i(v);
+		return 1;
+	    case HYPERPRIVOP_GET_IVR:
+		(void)vcpu_get_ivr(v,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_GET_TPR:
+		(void)vcpu_get_tpr(v,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_SET_TPR:
+		(void)vcpu_set_tpr(v,regs->r8);
+		return 1;
+	    case HYPERPRIVOP_EOI:
+		(void)vcpu_set_eoi(v,0L);
+		return 1;
+	    case HYPERPRIVOP_SET_ITM:
+		(void)vcpu_set_itm(v,regs->r8);
+		return 1;
+	    case HYPERPRIVOP_THASH:
+		(void)vcpu_thash(v,regs->r8,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_PTC_GA:
+		// FIXME: this doesn't seem to work yet, turned off
+		//(void)vcpu_ptc_ga(v,regs->r8,regs->r9);
+		//return 1;
+		break;
+	    case HYPERPRIVOP_ITR_D:
+		(void)vcpu_get_itir(v,&itir);
+		(void)vcpu_get_ifa(v,&ifa);
+		(void)vcpu_itr_d(v,regs->r8,regs->r9,itir,ifa);
+		return 1;
+	    case HYPERPRIVOP_GET_RR:
+		(void)vcpu_get_rr(v,regs->r8,&val);
+		regs->r8 = val;
+		return 1;
+	    case HYPERPRIVOP_SET_RR:
+		(void)vcpu_set_rr(v,regs->r8,regs->r9);
 		return 1;
 	}
 	return 0;

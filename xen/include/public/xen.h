@@ -58,6 +58,7 @@
 #define __HYPERVISOR_boot_vcpu            24
 #define __HYPERVISOR_set_segment_base     25 /* x86/64 only */
 #define __HYPERVISOR_mmuext_op            26
+#define __HYPERVISOR_policy_op		  27
 
 /* 
  * VIRTUAL INTERRUPTS
@@ -286,9 +287,6 @@ typedef struct
 
 /* Event channel endpoints per domain. */
 #define NR_EVENT_CHANNELS 1024
-
-/* Support for multi-processor guests. */
-#define MAX_VIRT_CPUS 32
 
 /*
  * Per-VCPU information goes here. This will be cleaned up more when Xen 

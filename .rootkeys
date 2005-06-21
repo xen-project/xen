@@ -21,6 +21,7 @@
 420b949cy9ZGzED74Fz_DaWlK7tT4g docs/misc/crashdb.txt
 4251a1f82AexscYEiF4Iku8Gc_kWfQ docs/misc/grant-tables.txt
 424d462b5GuApQ_NyMsRFt9LbrsWow docs/misc/sedf_scheduler_mini-HOWTO.txt
+42b7434c-M2l4Og0klGf6xSAARqa2w docs/misc/shype4xen_readme.txt
 40d6ccbfKKBq8jE0ula4eHEzBiQuDA docs/misc/xen_config.html
 410a4c2bAO_m_l4RsiiPHnZ4ixHWbQ docs/misc/xend.tex
 3f9e7d564bWFB-Czjv1qdmE6o0GqNg docs/src/interface.tex
@@ -777,6 +778,16 @@
 40c9c469kT0H9COWzA4XzPBjWK0WsA tools/misc/netfix
 4022a73cEKvrYe_DVZW2JlAxobg9wg tools/misc/nsplitd/Makefile
 4022a73cKms4Oq030x2JBzUB426lAQ tools/misc/nsplitd/nsplitd.c
+42b74436oXEaaUH_dPcGFviMiwNgCQ tools/misc/policyprocessor/SecurityLabel.java
+42b74436fIW8ZI3pUpu13-Ox6G2cOA tools/misc/policyprocessor/SecurityPolicySpec.xsd
+42b74436T4CN4HMWsuaHD2zS8jY1BA tools/misc/policyprocessor/SsidsEntry.java
+42b74436Dk3WKJl6-SyP3LEBo3DXkQ tools/misc/policyprocessor/XmlToBin.java
+42b74436ABj4SOVBWqY_IEIboFUkeA tools/misc/policyprocessor/XmlToBinInterface.java
+42b7443684kBOrEBKFod4fGvnJ-rdA tools/misc/policyprocessor/myHandler.java
+42b74436JjvZmOp2DfMb-TnpGZXQ8w tools/misc/policyprocessor/readme.install
+42b74436-0Ig0yb-w1BYyCAFVTwqUg tools/misc/policyprocessor/readme.xen
+42b74436WAJ6lmTO3foadk2527PFBQ tools/misc/policyprocessor/xen_sample_def.xml
+42b744365VrTALmqRroQOBZ9EopUsw tools/misc/policyprocessor/xen_sample_policy.xml
 42308df9dv_ZuP49nNPIROEMQ3F_LA tools/misc/xc_shadow.c
 3f5ef5a2ir1kVAthS14Dc5QIRCEFWg tools/misc/xen-clone
 3f5ef5a2dTZP0nnsFoeq2jRf3mWDDg tools/misc/xen-clone.README
@@ -785,6 +796,8 @@
 41adc641dV-0cDLSyzMs5BT8nL7v3Q tools/misc/xenperf.c
 4056f5155QYZdsk-1fLdjsZPFTnlhg tools/misc/xensymoops
 40cf2937dqM1jWW87O5OoOYND8leuA tools/misc/xm
+42b742f6JFcp6LFpYu-B4AEsfQwSFw tools/policy/Makefile
+42b742f66XOdRMrwaHvbCdSSQyCrFw tools/policy/policy_tool.c
 4270cc81g3nSNYCZ1ryCMDEbLtMtbQ tools/pygrub/Makefile
 4270deeccyRsJn6jLnRh9odRtMW9SA tools/pygrub/README
 4270cc81EIl7NyaS3Av6IPRk2c2a6Q tools/pygrub/setup.py
@@ -1101,6 +1114,12 @@
 3f72f1bdJPsV3JCnBqs9ddL9tr6D2g xen/COPYING
 3ddb79bcbOVHh38VJzc97-JEGD4dJQ xen/Makefile
 3ddb79bcWnTwYsQRWl_PaneJfa6p0w xen/Rules.mk
+42b742f6XHTfIEm_hUPtzjKr37LVhw xen/acm/Makefile
+42b742f6tHzn0fZWH3TjPva8gbqpow xen/acm/acm_chinesewall_hooks.c
+42b742f6bM8kZwuIUbepHZ8SQQkjJA xen/acm/acm_core.c
+42b742f6cwfrPubqH47gQpke8xkYSA xen/acm/acm_null_hooks.c
+42b742f69qSxm5MM-wtPaWtCqyI3KA xen/acm/acm_policy.c
+42b742f6VbmdlwekQRMhXugjcu9QXg xen/acm/acm_simple_type_enforcement_hooks.c
 421098b25A0RvuYN3rP28ga3_FN3_Q xen/arch/ia64/Makefile
 421098b2okIeYXS9w9avmSozls61xA xen/arch/ia64/Rules.mk
 421098b21p12UcKjHBrLh_LjlvNEwA xen/arch/ia64/acpi.c
@@ -1146,6 +1165,7 @@
 425ae516juUB257qrwUdsL9AsswrqQ xen/arch/ia64/patch/linux-2.6.11/time.c
 425ae5167zQn7zYcgKtDUDX2v-e8mw xen/arch/ia64/patch/linux-2.6.11/tlb.c
 425ae5162bIl2Dgd19x-FceB4L9oGw xen/arch/ia64/patch/linux-2.6.11/types.h
+42ae01f01KDfSgVQnscwJ0psRmEaCw xen/arch/ia64/patch/linux-2.6.11/uaccess.h
 425ae516cFUNY2jHD46bujcF5NJheA xen/arch/ia64/patch/linux-2.6.11/unaligned.c
 421098b39QFMC-1t1r38CA7NxAYBPA xen/arch/ia64/patch/linux-2.6.7/bootmem.h
 421098b3SIA1vZX9fFUjo1T3o_jMCQ xen/arch/ia64/patch/linux-2.6.7/current.h
@@ -1323,6 +1343,7 @@
 41a61536SZbR6cj1ukWTb0DYU-vz9w xen/common/multicall.c
 3ddb79bdD4SLmmdMD7yLW5HcUWucXw xen/common/page_alloc.c
 3e54c38dkHAev597bPr71-hGzTdocg xen/common/perfc.c
+42b742f6mgq9puEr7lUrLST0VEpsig xen/common/policy_ops.c
 40589968dD2D1aejwSOvrROg7fOvGQ xen/common/sched_bvt.c
 41ebbfe9oF1BF3cH5v7yE3eOL9uPbA xen/common/sched_sedf.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c
@@ -1338,6 +1359,9 @@
 4049e6bfNSIq7s7OV-Bd69QD0RpR2Q xen/drivers/char/console.c
 4298e018XQtZkCdufpyFimOGZqqsFA xen/drivers/char/ns16550.c
 3e4a8cb7nMChlro4wvOBo76n__iCFA xen/drivers/char/serial.c
+42b742f6OteAMPWnoqxqfRX3yxD0yw xen/include/acm/acm_core.h
+42b742f6XfIijctEwA0YWL2BoWtDNg xen/include/acm/acm_endian.h
+42b742f6jXvp1vdbU2v2WJjTPku65A xen/include/acm/acm_hooks.h
 40715b2cFpte_UNWnBZW0Du7z9AhTQ xen/include/acpi/acconfig.h
 40715b2ctNvVZ058w8eM8DR9hOat_A xen/include/acpi/acexcep.h
 40715b2com8I01qcHcAw47e93XsCqQ xen/include/acpi/acglobal.h
@@ -1364,6 +1388,7 @@
 421098b6ZcIrn_gdqjUtdJyCE0YkZQ xen/include/asm-ia64/debugger.h
 421098b6z0zSuW1rcSJK1gR8RUi-fw xen/include/asm-ia64/dom_fw.h
 421098b6Nn0I7hGB8Mkd1Cis0KMkhA xen/include/asm-ia64/domain.h
+42b1d2d0rkNCmG2nFOnL-OfhJG9mDw xen/include/asm-ia64/event.h
 4241e880hAyo_dk0PPDYj3LsMIvf-Q xen/include/asm-ia64/flushtlb.h
 421098b6X3Fs2yht42TE2ufgKqt2Fw xen/include/asm-ia64/ia64_int.h
 421098b7psFAn8kbeR-vcRCdc860Vw xen/include/asm-ia64/init.h
@@ -1388,7 +1413,6 @@
 428b9f38is0zTsIm96_BKo4MLw0SzQ xen/include/asm-ia64/vmx_pal_vsa.h
 428b9f38iDqbugHUheJrcTCD7zlb4g xen/include/asm-ia64/vmx_phy_mode.h
 428b9f38grd_B0AGB1yp0Gi2befHaQ xen/include/asm-ia64/vmx_platform.h
-428b9f38lm0ntDBusHggeQXkx1-1HQ xen/include/asm-ia64/vmx_ptrace.h
 428b9f38XgwHchZEpOzRtWfz0agFNQ xen/include/asm-ia64/vmx_vcpu.h
 428b9f38tDTTJbkoONcAB9ODP8CiVg xen/include/asm-ia64/vmx_vpd.h
 428b9f38_o0U5uJqmxZf_bqi6_PqVw xen/include/asm-ia64/vtm.h
@@ -1412,6 +1436,7 @@
 40715b2dTokMLYGSuD58BnxOqyWVew xen/include/asm-x86/div64.h
 4204e7acwzqgXyTAPKa1nM-L7Ec0Qw xen/include/asm-x86/domain.h
 41d3eaaeIBzW621S1oa0c2yk7X43qQ xen/include/asm-x86/e820.h
+42b1d2caFkOByU5n4LuMnT05f3kJFg xen/include/asm-x86/event.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen/include/asm-x86/fixmap.h
 3e2d29944GI24gf7vOP_7x8EyuqxeA xen/include/asm-x86/flushtlb.h
 4294b5eep4lWuDtYUR74gYwt-_FnHA xen/include/asm-x86/genapic.h
@@ -1487,6 +1512,8 @@
 404f1bc4tWkB9Qr8RkKtZGW5eMQzhw xen/include/asm-x86/x86_64/uaccess.h
 422f27c8RHFkePhD34VIEpMMqofZcA xen/include/asm-x86/x86_emulate.h
 400304fcmRQmDdFYEzDh0wcBba9alg xen/include/public/COPYING
+42b742f6duiOTlZvysQkRYZHYBXqvg xen/include/public/acm.h
+42b742f7TIMsQgUaNDJXp3QlBve2SQ xen/include/public/acm_dom0_setup.h
 421098b7OKb9YH_EUA_UpCxBjaqtgA xen/include/public/arch-ia64.h
 404f1bc68SXxmv0zQpXBWGrCzSyp8w xen/include/public/arch-x86_32.h
 404f1bc7IwU-qnH8mJeVu0YsNGMrcw xen/include/public/arch-x86_64.h
@@ -1500,8 +1527,10 @@
 41d40e9b8zCk5VDqhVbuQyhc7G3lqA xen/include/public/io/ring.h
 41ee5e8c6mLxIx82KPsbpt_uts_vSA xen/include/public/io/usbif.h
 4051db79512nOCGweabrFWO2M2h5ng xen/include/public/physdev.h
+42b742f7Lzy8SKKG25L_-fgk5FHA2Q xen/include/public/policy_ops.h
 40589968wmhPmV5-ENbBYmMjnedgKw xen/include/public/sched_ctl.h
 404f3d2eR2Owk-ZcGOx9ULGHg3nrww xen/include/public/trace.h
+42b5a5f2QC1IxeuwCwwsOEhvcJ2BJg xen/include/public/version.h
 4266bd01Ul-pC01ZVvBkhBnv5eqzvw xen/include/public/vmx_assist.h
 3ddb79c25UE59iu4JJcbRalx95mvcg xen/include/public/xen.h
 3e397e66m2tO3s-J8Jnr7Ws_tGoPTg xen/include/xen/ac_timer.h

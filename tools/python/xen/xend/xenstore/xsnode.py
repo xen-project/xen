@@ -64,7 +64,7 @@ class Watcher:
 
     def fileno(self):
         if self.xs:
-            return self.xs.fileno
+            return self.xs.fileno()
         else:
             return -1
 

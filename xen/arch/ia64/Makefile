@@ -15,7 +15,7 @@ OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
 ifeq ($(CONFIG_VTI),y)
 OBJS += vmx_init.o vmx_virt.o vmx_vcpu.o vmx_process.o vmx_vsa.o vmx_ivt.o \
 	vmx_phy_mode.o vmx_utility.o vmx_interrupt.o vmx_entry.o vmmu.o \
-	vtlb.o mmio.o vlsapic.o
+	vtlb.o mmio.o vlsapic.o vmx_hypercall.o mm.o
 endif
 # perfmon.o
 # unwind.o needed for kernel unwinding (rare)
