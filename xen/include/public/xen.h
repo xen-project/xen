@@ -58,7 +58,7 @@
 #define __HYPERVISOR_boot_vcpu            24
 #define __HYPERVISOR_set_segment_base     25 /* x86/64 only */
 #define __HYPERVISOR_mmuext_op            26
-#define __HYPERVISOR_policy_op		  27
+#define __HYPERVISOR_policy_op            27
 
 /* 
  * VIRTUAL INTERRUPTS
@@ -201,8 +201,11 @@ struct mmuext_op {
 #define SCHEDOP_yield           0   /* Give up the CPU voluntarily.       */
 #define SCHEDOP_block           1   /* Block until an event is received.  */
 #define SCHEDOP_shutdown        2   /* Stop executing this domain.        */
+#define SCHEDOP_vcpu_down       3   /* make target VCPU not-runnable.     */
+#define SCHEDOP_vcpu_up         4   /* make target VCPU runnable.         */
 #define SCHEDOP_cmdmask       255   /* 8-bit command. */
 #define SCHEDOP_reasonshift     8   /* 8-bit reason code. (SCHEDOP_shutdown) */
+#define SCHEDOP_vcpushift       8   /* 8-bit VCPU target. (SCHEDOP_up|down) */
 
 /*
  * Reason codes for SCHEDOP_shutdown. These may be interpreted by control 

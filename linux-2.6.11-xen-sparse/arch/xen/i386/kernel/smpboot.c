@@ -1397,6 +1397,10 @@ int __devinit __cpu_up(unsigned int cpu)
 	}
 
 #ifdef CONFIG_HOTPLUG_CPU
+#ifdef CONFIG_XEN
+	/* Tell hypervisor to bring vcpu up. */
+	HYPERVISOR_vcpu_up(cpu);
+#endif
 	/* Already up, and in cpu_quiescent now? */
 	if (cpu_isset(cpu, smp_commenced_mask)) {
 		cpu_enable(cpu);

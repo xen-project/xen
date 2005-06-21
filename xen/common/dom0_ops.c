@@ -339,9 +339,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
          * - domain is marked as paused or blocked only if all its vcpus 
          *   are paused or blocked 
          * - domain is marked as running if any of its vcpus is running
+         * - only map vcpus that aren't down.  Note, at some point we may
+         *   wish to demux the -1 value to indicate down vs. not-ever-booted
+         *   
          */
         for_each_vcpu ( d, v ) {
-            op->u.getdomaininfo.vcpu_to_cpu[v->vcpu_id] = v->processor;
+            /* only map vcpus that are up */
+            if ( !(test_bit(_VCPUF_down, &v->vcpu_flags)) )
+                op->u.getdomaininfo.vcpu_to_cpu[v->vcpu_id] = v->processor;
             op->u.getdomaininfo.cpumap[v->vcpu_id]      = v->cpumap;
             if ( !(v->vcpu_flags & VCPUF_ctrl_pause) )
                 flags &= ~DOMFLAGS_PAUSED;
@@ -384,6 +389,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         struct vcpu_guest_context *c;
         struct domain             *d;
         struct vcpu               *v;
+        int i;
 
         d = find_domain_by_id(op->u.getvcpucontext.domain);
         if ( d == NULL )
@@ -398,8 +404,16 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             put_domain(d);
             break;
         }
+
+        /* find first valid vcpu starting from request. */
+        v = NULL;
+        for ( i = op->u.getvcpucontext.vcpu; i < MAX_VIRT_CPUS; i++ )
+        {
+            v = d->vcpu[i];
+            if ( v != NULL && !(test_bit(_VCPUF_down, &v->vcpu_flags)) )
+                break;
+        }
         
-        v = d->vcpu[op->u.getvcpucontext.vcpu];
         if ( v == NULL )
         {
             ret = -ESRCH;

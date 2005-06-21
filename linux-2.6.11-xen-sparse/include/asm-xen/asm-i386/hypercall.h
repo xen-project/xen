@@ -517,4 +517,35 @@ HYPERVISOR_boot_vcpu(
     return ret;
 }
 
+static inline int
+HYPERVISOR_vcpu_down(
+    int vcpu)
+{
+    int ret;
+    unsigned long ign1;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1)
+	: "0" (__HYPERVISOR_sched_op),
+	  "1" (SCHEDOP_vcpu_down | (vcpu << SCHEDOP_vcpushift))
+        : "memory" );
+
+    return ret;
+}
+
+static inline int
+HYPERVISOR_vcpu_up(
+    int vcpu)
+{
+    int ret;
+    unsigned long ign1;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1)
+	: "0" (__HYPERVISOR_sched_op),
+	  "1" (SCHEDOP_vcpu_up | (vcpu << SCHEDOP_vcpushift))
+        : "memory" );
+
+    return ret;
+}
 #endif /* __HYPERCALL_H__ */

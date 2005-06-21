@@ -154,8 +154,13 @@ void cpu_idle (void)
 				cpu_clear(cpu, cpu_idle_map);
 			rmb();
 
-			if (cpu_is_offline(cpu))
+			if (cpu_is_offline(cpu)) {
+#if defined(CONFIG_XEN) && defined(CONFIG_HOTPLUG_CPU)
+				/* Tell hypervisor to take vcpu down. */
+				HYPERVISOR_vcpu_down(cpu);
+#endif
 				play_dead();
+         }
 
 			irq_stat[cpu].idle_timestamp = jiffies;
 			xen_idle();

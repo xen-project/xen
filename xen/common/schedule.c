@@ -261,6 +261,40 @@ static long do_yield(void)
     return 0;
 }
 
+/* Mark target vcpu as non-runnable so it is not scheduled */
+static long do_vcpu_down(int vcpu)
+{
+    struct vcpu *target;
+    
+    if ( vcpu > MAX_VIRT_CPUS )
+        return -EINVAL;
+
+    target = current->domain->vcpu[vcpu];
+    if ( target == NULL )
+        return -ESRCH;
+    set_bit(_VCPUF_down, &target->vcpu_flags);
+
+    return 0;
+}
+
+/* Mark target vcpu as runnable and wake it */
+static long do_vcpu_up(int vcpu)
+{
+    struct vcpu *target;
+   
+    if (vcpu > MAX_VIRT_CPUS)
+        return -EINVAL;
+
+    target = current->domain->vcpu[vcpu];
+    if ( target == NULL )
+        return -ESRCH;
+    clear_bit(_VCPUF_down, &target->vcpu_flags);
+    /* wake vcpu */
+    domain_wake(target);
+
+    return 0;
+}
+
 /*
  * Demultiplex scheduler-related hypercalls.
  */
@@ -288,6 +322,16 @@ long do_sched_op(unsigned long op)
                  current->domain->domain_id, current->vcpu_id,
                  (op >> SCHEDOP_reasonshift));
         domain_shutdown((u8)(op >> SCHEDOP_reasonshift));
+        break;
+    }
+    case SCHEDOP_vcpu_down:
+    {
+        ret = do_vcpu_down((int)(op >> SCHEDOP_vcpushift));
+        break;
+    }
+    case SCHEDOP_vcpu_up:
+    {
+        ret = do_vcpu_up((int)(op >> SCHEDOP_vcpushift));
         break;
     }
 

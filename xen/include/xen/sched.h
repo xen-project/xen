@@ -348,6 +348,9 @@ extern struct domain *domain_list;
  /* Initialization completed. */
 #define _VCPUF_initialised     8
 #define VCPUF_initialised      (1UL<<_VCPUF_initialised)
+ /* VCPU is not-runnable */
+#define _VCPUF_down            9
+#define VCPUF_down             (1UL<<_VCPUF_down)
 
 /*
  * Per-domain flags (domain_flags).
@@ -377,7 +380,7 @@ extern struct domain *domain_list;
 static inline int domain_runnable(struct vcpu *v)
 {
     return ( (atomic_read(&v->pausecnt) == 0) &&
-             !(v->vcpu_flags & (VCPUF_blocked|VCPUF_ctrl_pause)) &&
+             !(v->vcpu_flags & (VCPUF_blocked|VCPUF_ctrl_pause|VCPUF_down)) &&
              !(v->domain->domain_flags & (DOMF_shutdown|DOMF_shuttingdown)) );
 }
 
