@@ -148,11 +148,10 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 	for (j = i; j < i + n_rid_blocks; ++j) ridblock_owner[j] = d;
 	
 	// setup domain struct
-	d->rid_bits = ridbits;
-	d->starting_rid = i << IA64_MIN_IMPL_RID_BITS;
-	d->ending_rid = (i+n_rid_blocks) << IA64_MIN_IMPL_RID_BITS;
+	d->arch.rid_bits = ridbits;
+	d->arch.starting_rid = i << IA64_MIN_IMPL_RID_BITS; d->arch.ending_rid = (i+n_rid_blocks) << IA64_MIN_IMPL_RID_BITS;
 printf("###allocating rid_range, domain %p: starting_rid=%lx, ending_rid=%lx\n",
-d,d->starting_rid, d->ending_rid);
+d,d->arch.starting_rid, d->arch.ending_rid);
 	
 	return 1;
 }
@@ -161,14 +160,14 @@ d,d->starting_rid, d->ending_rid);
 int deallocate_rid_range(struct domain *d)
 {
 	int i;
-	int rid_block_end = d->ending_rid >> IA64_MIN_IMPL_RID_BITS;
-	int rid_block_start = d->starting_rid >> IA64_MIN_IMPL_RID_BITS;
+	int rid_block_end = d->arch.ending_rid >> IA64_MIN_IMPL_RID_BITS;
+	int rid_block_start = d->arch.starting_rid >> IA64_MIN_IMPL_RID_BITS;
 
 	return 1;  // KLUDGE ALERT
 	//
 	// not all domains will have allocated RIDs (physical mode loaders for instance)
 	//
-	if (d->rid_bits == 0) return 1;
+	if (d->arch.rid_bits == 0) return 1;
 
 #ifdef DEBUG
 	for (i = rid_block_start; i < rid_block_end; ++i) {
@@ -179,9 +178,9 @@ int deallocate_rid_range(struct domain *d)
 	for (i = rid_block_start; i < rid_block_end; ++i)
 	ridblock_owner[i] = NULL;
 	
-	d->rid_bits = 0;
-	d->starting_rid = 0;
-	d->ending_rid = 0;
+	d->arch.rid_bits = 0;
+	d->arch.starting_rid = 0;
+	d->arch.ending_rid = 0;
 	return 1;
 }
 
@@ -193,9 +192,8 @@ int deallocate_rid_range(struct domain *d)
 //  a region register; anytime it is "viewable" outside of this module,
 //  it should be unmangled
 
-//This appears to work in Xen... turn it on later so no complications yet
-#define CONFIG_MANGLE_RIDS
-#ifdef CONFIG_MANGLE_RIDS
+// NOTE: this function is also implemented in assembly code in hyper_set_rr!!
+// Must ensure these two remain consistent!
 static inline unsigned long
 vmMangleRID(unsigned long RIDVal)
 {
@@ -214,11 +212,6 @@ vmMangleRID(unsigned long RIDVal)
 
 // since vmMangleRID is symmetric, use it for unmangling also
 #define vmUnmangleRID(x)	vmMangleRID(x)
-#else
-// no mangling/unmangling
-#define vmMangleRID(x)	(x)
-#define vmUnmangleRID(x) (x)
-#endif
 
 static inline void
 set_rr_no_srlz(unsigned long rr, unsigned long rrval)
@@ -265,12 +258,12 @@ int set_one_rr(unsigned long rr, unsigned long val)
 
 	rrv.rrval = val;
 	newrrv.rrval = 0;
-	newrid = v->domain->starting_rid + rrv.rid;
+	newrid = v->arch.starting_rid + rrv.rid;
 
-	if (newrid > v->domain->ending_rid) {
+	if (newrid > v->arch.ending_rid) {
 		printk("can't set rr%d to %lx, starting_rid=%lx,"
 			"ending_rid=%lx, val=%lx\n", rreg, newrid,
-			v->domain->starting_rid,v->domain->ending_rid,val);
+			v->arch.starting_rid,v->arch.ending_rid,val);
 		return 0;
 	}
 
@@ -358,7 +351,7 @@ unsigned long physicalize_rid(struct vcpu *v, unsigned long rrval)
 	ia64_rr rrv;
 	    
 	rrv.rrval = rrval;
-	rrv.rid += v->domain->starting_rid;
+	rrv.rid += v->arch.starting_rid;
 	return rrv.rrval;
 }
 
@@ -368,7 +361,7 @@ virtualize_rid(struct vcpu *v, unsigned long rrval)
 	ia64_rr rrv;
 	    
 	rrv.rrval = rrval;
-	rrv.rid -= v->domain->starting_rid;
+	rrv.rid -= v->arch.starting_rid;
 	return rrv.rrval;
 }
 

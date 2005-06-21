@@ -54,9 +54,6 @@ struct arch_domain {
     u64 entry;
 #endif
 };
-#define starting_rid arch.starting_rid
-#define ending_rid arch.ending_rid
-#define rid_bits arch.rid_bits
 #define xen_vastart arch.xen_vastart
 #define xen_vaend arch.xen_vaend
 #define shared_info_va arch.shared_info_va
@@ -83,6 +80,8 @@ struct arch_vcpu {
     int metaphysical_rr0;		// from arch_domain (so is pinned)
     int metaphysical_saved_rr0;		// from arch_domain (so is pinned)
     int breakimm;			// from arch_domain (so is pinned)
+    int starting_rid;		/* first RID assigned to domain */
+    int ending_rid;		/* one beyond highest RID assigned to domain */
     struct mm_struct *active_mm;
     struct thread_struct _thread;	// this must be last
 #ifdef CONFIG_VTI

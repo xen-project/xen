@@ -101,6 +101,10 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	cmp.eq p7,p6=XEN_HYPER_SET_ITM,r17
 (p7)	br.sptk.many hyper_set_itm;;
 
+	// HYPERPRIVOP_SET_RR?
+	cmp.eq p7,p6=XEN_HYPER_SET_RR,r17
+(p7)	br.sptk.many hyper_set_rr;;
+
 	// if not one of the above, give up for now and do it the slow way
 	br.sptk.many dispatch_break_fault ;;
 
@@ -849,3 +853,63 @@ ENTRY(hyper_set_itm)
 	rfi
 	;;
 END(hyper_set_itm)
+
+ENTRY(hyper_set_rr)
+#if 1
+	br.sptk.many dispatch_break_fault ;;
+#endif
+	extr.u r25=r8,61,3;;
+	cmp.leu p7,p0=7,r25	// punt on setting rr7
+(p7)	br.spnt.many dispatch_break_fault ;;
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SET_RR);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	extr.u r26=r9,8,24	// r26 = r9.rid
+	mov r20=IA64_KR(CURRENT);;
+	adds r21=IA64_VCPU_STARTING_RID_OFFSET,r20;;
+	ld4 r22=[r21];;
+	adds r21=IA64_VCPU_ENDING_RID_OFFSET,r20;;
+	ld4 r23=[r21];;
+	adds r24=IA64_VCPU_META_SAVED_RR0_OFFSET,r22;;
+	add r22=r26,r22;;
+	cmp.geu p6,p0=r22,r23	// if r9.rid + starting_rid >= ending_rid
+(p6)	br.cond.sptk.many 1f;	// this is an error, but just ignore/return
+	// r21=starting_rid
+	adds r20=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18 ;;
+	shl r25=r25,3;;
+	add r20=r20,r25;;
+	st8 [r20]=r9;;		// store away exactly what was passed
+	// but adjust value actually placed in rr[r8]
+	// r22 contains adjusted rid, "mangle" it (see regionreg.c)
+	// and set ps to PAGE_SHIFT and ve to 1
+	extr.u r27=r22,0,8
+	extr.u r28=r22,8,8
+	extr.u r29=r22,16,8;;
+	dep.z r23=PAGE_SHIFT,2,6;;
+	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
+	dep r23=r27,r23,24,8;;
+	dep r23=r28,r23,16,8;;
+	dep r23=r29,r23,8,8
+	cmp.eq p6,p0=r25,r0;;	// if rr0, save for metaphysical
+(p6)	st4 [r24]=r23
+	mov rr[r8]=r23;;
+	// done, mosey on back
+1:	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_set_rr)

@@ -54,6 +54,7 @@ void foo(void)
 	DEFINE(XSI_BANKNUM_OFS, offsetof(vcpu_info_t, arch.banknum));
 	DEFINE(XSI_BANK0_OFS, offsetof(vcpu_info_t, arch.bank0_regs[0]));
 	DEFINE(XSI_BANK1_OFS, offsetof(vcpu_info_t, arch.bank1_regs[0]));
+	DEFINE(XSI_RR0_OFS, offsetof(vcpu_info_t, arch.rrs[0]));
 	DEFINE(XSI_METAPHYS_OFS, offsetof(vcpu_info_t, arch.metaphysical_mode));
 	DEFINE(XSI_PRECOVER_IFS_OFS, offsetof(vcpu_info_t, arch.precover_ifs));
 	DEFINE(XSI_INCOMPL_REG_OFS, offsetof(vcpu_info_t, arch.incomplete_regframe));
@@ -79,6 +80,8 @@ void foo(void)
 	DEFINE(IA64_VCPU_IRR0_OFFSET, offsetof (struct vcpu, arch.irr[0]));
 	DEFINE(IA64_VCPU_IRR3_OFFSET, offsetof (struct vcpu, arch.irr[3]));
 	DEFINE(IA64_VCPU_INSVC3_OFFSET, offsetof (struct vcpu, arch.insvc[3]));
+	DEFINE(IA64_VCPU_STARTING_RID_OFFSET, offsetof (struct vcpu, arch.starting_rid));
+	DEFINE(IA64_VCPU_ENDING_RID_OFFSET, offsetof (struct vcpu, arch.ending_rid));
 	DEFINE(IA64_VCPU_DOMAIN_ITM_OFFSET, offsetof (struct vcpu, arch.domain_itm));
 
 	BLANK();
