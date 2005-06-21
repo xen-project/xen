@@ -23,9 +23,9 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 # The emulator code lives in ROM space
 TEXTADDR=0x000D0000
+
 DEFINES=-DDEBUG -DTEXTADDR=${TEXTADDR}
-XENINC=-I../../../xen/include
-#TEXTADDR=0x000E0000
+XENINC=-I$(XEN_ROOT)/xen/include
 #DEFINES=-DDEBUG -DTEST -DTEXTADDR=${TEXTADDR}
 #XENINC=-I/home/leendert/xen/xeno-unstable.bk/xen/include
 

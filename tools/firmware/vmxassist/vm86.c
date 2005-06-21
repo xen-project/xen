@@ -39,6 +39,13 @@ enum vm86_mode mode;
 
 #ifdef DEBUG
 int traceset = 0;
+
+char *states[] = {
+	"<VM86_REAL>",
+	"<VM86_REAL_TO_PROTECTED>",
+	"<VM86_PROTECTED_TO_REAL>",
+	"<VM86_PROTECTED>"
+};
 #endif /* DEBUG */
 
 
@@ -596,7 +603,6 @@ set_mode(struct regs *regs, enum vm86_mode newmode)
 {
 	switch (newmode) {
 	case VM86_REAL:
-		TRACE((regs, 0, "<VM86_REAL>"));
 		if (mode == VM86_PROTECTED_TO_REAL) {
 			real_mode(regs);
 			break;
@@ -607,7 +613,6 @@ set_mode(struct regs *regs, enum vm86_mode newmode)
 		break;
 
 	case VM86_REAL_TO_PROTECTED:
-		TRACE((regs, 0, "<VM86_REAL_TO_PROTECTED>"));
 		if (mode == VM86_REAL) {
 			regs->eflags |= EFLAGS_TF;
 			break;
@@ -624,7 +629,6 @@ set_mode(struct regs *regs, enum vm86_mode newmode)
 			panic("unexpected protected-to-real mode transition");
 
 	case VM86_PROTECTED:
-		TRACE((regs, 0, "<VM86_PROTECTED>"));
 		if (mode == VM86_REAL_TO_PROTECTED) {
 			protected_mode(regs);
 			break;
@@ -634,6 +638,7 @@ set_mode(struct regs *regs, enum vm86_mode newmode)
 	}
 
 	mode = newmode;
+	TRACE((regs, 0, states[mode]));
 }
 
 void

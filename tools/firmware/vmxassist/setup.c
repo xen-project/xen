@@ -21,10 +21,8 @@
 #include "util.h"
 #include "machine.h"
 
-#ifndef TEST
 #if (VMXASSIST_BASE != TEXTADDR)
 #error VMXAssist base mismatch
-#endif
 #endif
 
 #define	NR_PGD		(PGSIZE / sizeof(unsigned))
@@ -118,8 +116,8 @@ setup_gdt(void)
 			      "movl %%eax,%%fs;"
 			      "movl %%eax,%%gs;"
 			      "movl %%eax,%%ss" : : "a" (DATA_SELECTOR));
-/* XXX 0x10 == CODE_SELECTOR (figure out gnuas) */
-	__asm__ __volatile__ ("ljmp $0x10,$1f; 1:");
+
+	__asm__ __volatile__ ("ljmp %0,$1f; 1:" : : "i" (CODE_SELECTOR));
 
 	__asm__ __volatile__ ("ltr %%ax" : : "a" (TSS_SELECTOR));
 }
