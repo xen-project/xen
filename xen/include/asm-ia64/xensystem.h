@@ -68,7 +68,7 @@ extern struct task_struct *vmx_ia64_switch_to (void *next_task);
 	asm volatile ("mov ar.ccv=%0;;" :: "rO"(old));			\
 	asm volatile ("mov %2=r0;;\n"					\
 		"[1:]\tcmpxchg"_size".acq %0=[%3],%4,ar.ccv\n"		\
-		"\t.xdata4 \"__ex_table\", 1b-., 1f.+4\n"		\
+		"\t.xdata4 \"__ex_table\", 1b-., 1f-.+4\n"		\
 		"[1:]"							\
 		: "=r"(old), "=r"(__gu_r9), "=r"(__gu_r8) :		\
 		"r"(ptr), "r"(new) : "memory");				\
