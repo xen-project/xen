@@ -410,7 +410,8 @@ class ProgList(Prog):
         print 'Name              Id  VCPU  CPU  CPUMAP'
         for dom in doms:
             info = server.xend_domain(dom)
-            vcpu_to_cpu = sxp.child_value(info, 'vcpu_to_cpu', '?').replace('-','')
+            # XXX this is quite broken for cpu's > 9
+            vcpu_to_cpu = sxp.child_value(info, 'vcpu_to_cpu', '?').replace('-1','#')
             cpumap = sxp.child_value(info, 'cpumap', [])
             mask = ((int(sxp.child_value(info, 'vcpus', '0')))**2) - 1
             count = 0
@@ -419,7 +420,10 @@ class ProgList(Prog):
                 d['name']   = sxp.child_value(info, 'name', '??')
                 d['dom']    = int(sxp.child_value(info, 'id', '-1'))
                 d['vcpu']   = int(count)
-                d['cpu']    = int(cpu)
+                if cpu == "#":
+                    d['cpu']    = int("-1")
+                else:
+                    d['cpu']    = int(cpu)
                 d['cpumap'] = int(cpumap[count])&mask
                 count = count + 1
                 print ("%(name)-16s %(dom)3d  %(vcpu)4d  %(cpu)3d  0x%(cpumap)x" % d)
@@ -571,6 +575,35 @@ MEMORY_TARGET megabytes"""
         server.xend_domain_mem_target_set(dom, mem_target)
 
 xm.prog(ProgBalloon)
+
+class ProgVcpuhotplug(Prog):
+    group = 'domain'
+    name  = 'vcpu-hotplug'
+    info  = """Enable or disable a VCPU in a domain."""
+
+    def help(self, args):
+        print args[0], "DOM VCPU [0|1]"
+        print """\nRequest virtual processor VCPU to be disabled or enabled in
+domain DOM"""
+
+    def main(self, args):
+        if len(args) != 4: self.err("%s: Invalid arguments(s)" % args[0])
+        name = args[1]
+        vcpu = int(args[2])
+        state = int(args[3])
+        dom = server.xend_domain(name)
+        id = sxp.child_value(dom, 'id')
+        vcpu_to_cpu = sxp.child_value(dom, 'vcpu_to_cpu', '-1')
+        # only send state change if states differ 
+        try:
+            # (down going up) or (up going down)
+            if (vcpu_to_cpu[vcpu] == "-1" and state == 1) or \
+               (vcpu_to_cpu[vcpu] != "-1" and state == 0):
+                server.xend_domain_vcpu_hotplug(id, vcpu, state)
+        except IndexError:
+            print "Invalid VCPU(%d)"%(vcpu)
+
+xm.prog(ProgVcpuhotplug)
 
 class ProgDomid(Prog):
     group = 'domain'

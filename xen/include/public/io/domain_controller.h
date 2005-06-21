@@ -61,6 +61,7 @@ typedef struct {
 #define CMSG_MEM_REQUEST    7  /* Memory reservation reqs */
 #define CMSG_USBIF_BE       8  /* USB controller backend  */
 #define CMSG_USBIF_FE       9  /* USB controller frontend */
+#define CMSG_VCPU_HOTPLUG  10  /* Hotplug VCPU messages   */
 
 /******************************************************************************
  * CONSOLE DEFINITIONS
@@ -756,6 +757,25 @@ typedef struct {
     char key;      /* 0: sysrq key */
     char __pad[3]; /* 1: */
 } PACKED shutdown_sysrq_t; /* 4 bytes */
+
+/******************************************************************************
+ * VCPU HOTPLUG CONTROLS
+ */
+
+/*
+ * Subtypes for shutdown messages.
+ */
+#define CMSG_VCPU_HOTPLUG_OFF   0   /* turn vcpu off */
+#define CMSG_VCPU_HOTPLUG_ON    1   /* turn vcpu on  */
+
+/*
+ * CMSG_VCPU_HOTPLUG:
+ *  Indicate which vcpu's state should change
+ */
+typedef struct {
+    u32 vcpu;         /* 0: VCPU's whose state will change */
+    u32 status;       /* 4: Return code indicates success or failure. */
+} PACKED vcpu_hotplug_t;
 
 /******************************************************************************
  * MEMORY CONTROLS

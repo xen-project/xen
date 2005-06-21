@@ -956,6 +956,18 @@ class XendDomainInfo:
             msg = messages.packMsg('mem_request_t', { 'target' : target * (1 << 8)} )
             self.channel.writeRequest(msg)
 
+    def vcpu_hotplug(self, vcpu, state):
+        """Disable or enable VCPU in domain.
+        """
+        log.error("Holly Shit! %d %d\n" % (vcpu, state))
+        if self.channel:
+            if int(state) == 0:
+                msg = messages.packMsg('vcpu_hotplug_off_t', { 'vcpu' : vcpu} )
+            else:
+                msg = messages.packMsg('vcpu_hotplug_on_t',  { 'vcpu' : vcpu} )
+
+            self.channel.writeRequest(msg)
+
     def shutdown(self, reason, key=0):
         msgtype = shutdown_messages.get(reason)
         if not msgtype:

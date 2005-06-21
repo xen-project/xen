@@ -744,6 +744,14 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         C2P(mem_request_t, target, Int, Long);
         C2P(mem_request_t, status, Int, Long);
         return dict;
+    case TYPE(CMSG_VCPU_HOTPLUG, CMSG_VCPU_HOTPLUG_OFF):
+        C2P(vcpu_hotplug_t, vcpu, Int, Long);
+        C2P(vcpu_hotplug_t, status, Int, Long);
+        return dict;
+    case TYPE(CMSG_VCPU_HOTPLUG, CMSG_VCPU_HOTPLUG_ON):
+        C2P(vcpu_hotplug_t, vcpu, Int, Long);
+        C2P(vcpu_hotplug_t, status, Int, Long);
+        return dict;
     }
 
     return PyString_FromStringAndSize((char *)xum->msg.msg, xum->msg.length);
@@ -908,6 +916,14 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
         break;
     case TYPE(CMSG_MEM_REQUEST, CMSG_MEM_REQUEST_SET):
         P2C(mem_request_t, target, u32);
+        break;
+    case TYPE(CMSG_VCPU_HOTPLUG, CMSG_VCPU_HOTPLUG_OFF):
+        P2C(vcpu_hotplug_t, vcpu, u32);
+        P2C(vcpu_hotplug_t, status, u32);
+        break;
+    case TYPE(CMSG_VCPU_HOTPLUG, CMSG_VCPU_HOTPLUG_ON):
+        P2C(vcpu_hotplug_t, vcpu, u32);
+        P2C(vcpu_hotplug_t, status, u32);
         break;
     case TYPE(CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_STATUS_CHANGED):
         P2C(usbif_fe_interface_status_changed_t, status, u32);

@@ -1303,6 +1303,14 @@ void __devinit smp_prepare_boot_cpu(void)
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
+#include <asm-xen/ctrl_if.h>
+
+/* hotplug down/up funtion pointer and target vcpu */
+struct vcpu_hotplug_handler_t {
+	void (*fn)();
+	u32 vcpu;
+};
+static struct vcpu_hotplug_handler_t vcpu_hotplug_handler;
 
 /* must be called with the cpucontrol mutex held */
 static int __devinit cpu_enable(unsigned int cpu)
@@ -1374,6 +1382,78 @@ void __cpu_die(unsigned int cpu)
 	}
  	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
 }
+
+static int vcpu_hotplug_cpu_process(void *unused)
+{
+	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
+
+	if (handler->fn) {
+		(*(handler->fn))(handler->vcpu);
+		handler->fn = NULL;
+	}
+	return 0;
+}
+
+static void __vcpu_hotplug_handler(void *unused)
+{
+	int err;
+
+	err = kernel_thread(vcpu_hotplug_cpu_process, 
+			    NULL, CLONE_FS | CLONE_FILES);
+	if (err < 0)
+		printk(KERN_ALERT "Error creating hotplug_cpu process!\n");
+
+}
+
+static void vcpu_hotplug_event_handler(ctrl_msg_t *msg, unsigned long id)
+{
+	static DECLARE_WORK(vcpu_hotplug_work, __vcpu_hotplug_handler, NULL);
+	vcpu_hotplug_t *req = (vcpu_hotplug_t *)&msg->msg[0];
+	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
+	ssize_t ret;
+
+	if (msg->length != sizeof(vcpu_hotplug_t))
+		goto parse_error;
+
+	/* grab target vcpu from msg */
+	handler->vcpu = req->vcpu;
+
+	/* determine which function to call based on msg subtype */
+	switch (msg->subtype) {
+        case CMSG_VCPU_HOTPLUG_OFF:
+		handler->fn = (void *)&cpu_down;
+		ret = schedule_work(&vcpu_hotplug_work);
+		req->status = (u32) ret;
+		break;
+        case CMSG_VCPU_HOTPLUG_ON:
+		handler->fn = (void *)&cpu_up;
+		ret = schedule_work(&vcpu_hotplug_work);
+		req->status = (u32) ret;
+		break;
+        default:
+		goto parse_error;
+	}
+
+	ctrl_if_send_response(msg);
+	return;
+ parse_error:
+	msg->length = 0;
+	ctrl_if_send_response(msg);
+}
+
+static int __init setup_vcpu_hotplug_event(void)
+{
+	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
+
+	handler->fn = NULL;
+	ctrl_if_register_receiver(CMSG_VCPU_HOTPLUG,
+				  vcpu_hotplug_event_handler, 0);
+
+	return 0;
+}
+
+__initcall(setup_vcpu_hotplug_event);
+
 #else /* ... !CONFIG_HOTPLUG_CPU */
 int __cpu_disable(void)
 {

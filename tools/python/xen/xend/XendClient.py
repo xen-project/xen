@@ -271,6 +271,12 @@ class Xend:
                              'target'    : mem_target })
         return val
 
+    def xend_domain_vcpu_hotplug(self, id, vcpu, state):
+        return self.xendPost(self.domainurl(id),
+                            {'op'         : 'vcpu_hotplug',
+                             'vcpu'       : vcpu,
+                             'state'      : state })
+
     def xend_domain_vif_limit(self, id, vif, credit, period):
         return self.xendPost(self.domainurl(id),
                             { 'op'      : 'vif_limit_set',

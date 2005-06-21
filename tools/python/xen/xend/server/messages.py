@@ -309,6 +309,24 @@ mem_request_formats = {
 msg_formats.update(mem_request_formats)
 
 #============================================================================
+# Domain vcpu hotplug message.
+#============================================================================
+
+CMSG_VCPU_HOTPLUG     = 10
+CMSG_VCPU_HOTPLUG_OFF = 0
+CMSG_VCPU_HOTPLUG_ON  = 1
+
+vcpu_hotplug_formats = {
+    'vcpu_hotplug_off_t':
+    (CMSG_VCPU_HOTPLUG, CMSG_VCPU_HOTPLUG_OFF),
+
+    'vcpu_hotplug_on_t':
+    (CMSG_VCPU_HOTPLUG, CMSG_VCPU_HOTPLUG_ON)
+    }
+
+msg_formats.update(vcpu_hotplug_formats)
+
+#============================================================================
 class Msg:
     pass
 

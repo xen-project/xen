@@ -180,6 +180,14 @@ class SrvDomain(SrvDir):
         val = fn(req.args, {'dom': self.dom.id})
         return val
 
+    def op_vcpu_hotplug(self, op, req):
+        fn = FormFn(self.xd.domain_vcpu_hotplug,
+                    [['dom', 'int'],
+                     ['vcpu', 'int'],
+                     ['state', 'int']])
+        val = fn(req.args, {'dom': self.dom.id})
+        return val
+
     def render_POST(self, req):
         return self.perform(req)
         

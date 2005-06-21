@@ -710,6 +710,18 @@ class XendDomain:
         dominfo = self.domain_lookup(id)
         return dominfo.mem_target_set(mem)
 
+    def domain_vcpu_hotplug(self, id, vcpu, state):
+        """Enable or disable VCPU vcpu in DOM id
+
+        @param id: domain
+        @param vcpu: target VCPU in domain
+        @param state: which state VCPU will become
+        @return: 0 on success, -1 on error
+        """
+
+        dominfo = self.domain_lookup(id)
+        return dominfo.vcpu_hotplug(vcpu, state)
+
     def domain_dumpcore(self, id):
         """Save a core dump for a crashed domain.
 
