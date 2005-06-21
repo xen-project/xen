@@ -109,6 +109,10 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	cmp.eq p7,p6=XEN_HYPER_GET_RR,r17
 (p7)	br.sptk.many hyper_get_rr;;
 
+	// HYPERPRIVOP_PTC_GA?
+	cmp.eq p7,p6=XEN_HYPER_PTC_GA,r17
+(p7)	br.sptk.many hyper_ptc_ga;;
+
 	// if not one of the above, give up for now and do it the slow way
 	br.sptk.many dispatch_break_fault ;;
 
@@ -909,3 +913,7 @@ ENTRY(hyper_set_rr)
 	rfi
 	;;
 END(hyper_set_rr)
+
+ENTRY(hyper_ptc_ga)
+	br.spnt.many dispatch_break_fault ;;
+END(hyper_ptc_ga)

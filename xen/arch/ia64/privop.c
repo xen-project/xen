@@ -832,10 +832,8 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 		regs->r8 = val;
 		return 1;
 	    case HYPERPRIVOP_PTC_GA:
-		// FIXME: this doesn't seem to work yet, turned off
-		//(void)vcpu_ptc_ga(v,regs->r8,regs->r9);
-		//return 1;
-		break;
+		(void)vcpu_ptc_ga(v,regs->r8,(1L << ((regs->r9 & 0xfc) >> 2)));
+		return 1;
 	    case HYPERPRIVOP_ITR_D:
 		(void)vcpu_get_itir(v,&itir);
 		(void)vcpu_get_ifa(v,&ifa);
