@@ -2793,12 +2793,24 @@ static int ptwr_emulated_cmpxchg(
     return ptwr_emulated_update(addr, old, new, bytes, 1);
 }
 
+static int ptwr_emulated_cmpxchg8b(
+    unsigned long addr,
+    unsigned long old,
+    unsigned long old_hi,
+    unsigned long new,
+    unsigned long new_hi)
+{
+    return ptwr_emulated_update(
+        addr, ((u64)old_hi << 32) | old, ((u64)new_hi << 32) | new, 8, 1);
+}
+
 static struct x86_mem_emulator ptwr_mem_emulator = {
-    .read_std         = x86_emulate_read_std,
-    .write_std        = x86_emulate_write_std,
-    .read_emulated    = x86_emulate_read_std,
-    .write_emulated   = ptwr_emulated_write,
-    .cmpxchg_emulated = ptwr_emulated_cmpxchg
+    .read_std           = x86_emulate_read_std,
+    .write_std          = x86_emulate_write_std,
+    .read_emulated      = x86_emulate_read_std,
+    .write_emulated     = ptwr_emulated_write,
+    .cmpxchg_emulated   = ptwr_emulated_cmpxchg,
+    .cmpxchg8b_emulated = ptwr_emulated_cmpxchg8b
 };
 
 /* Write page fault handler: check if guest is trying to modify a PTE. */
