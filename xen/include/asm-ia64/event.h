@@ -11,6 +11,7 @@
 
 static inline void evtchn_notify(struct vcpu *v)
 {
+	vcpu_pend_interrupt(v, v->vcpu_info->arch.evtchn_vector);
 }
 
 #endif

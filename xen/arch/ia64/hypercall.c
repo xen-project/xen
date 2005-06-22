@@ -40,6 +40,17 @@ ia64_hypercall (struct pt_regs *regs)
 #endif
 		x = pal_emulator_static(regs->r28);
 		if (regs->r28 == PAL_HALT_LIGHT) {
+#if 1
+#define SPURIOUS_VECTOR 15
+			if (vcpu_check_pending_interrupts(v)!=SPURIOUS_VECTOR) {
+//printf("Domain trying to go idle when interrupt pending!\n");
+//this shouldn't happen, but it apparently does quite a bit!  so don't
+//allow it to happen... i.e. if a domain has an interrupt pending and
+//it tries to halt itself because it thinks it is idle, just return here
+//as deliver_pending_interrupt is called on the way out and will deliver it
+			}
+			else
+#endif
 			do_sched_op(SCHEDOP_yield);
 			//break;
 		}
@@ -137,6 +148,12 @@ ia64_hypercall (struct pt_regs *regs)
 	    case __HYPERVISOR_event_channel_op:
 		regs->r8 = do_event_channel_op(regs->r14);
 		break;
+
+#ifndef CONFIG_VTI
+	    case __HYPERVISOR_grant_table_op:
+		regs->r8 = do_grant_table_op(regs->r14, regs->r15, regs->r16);
+		break;
+#endif
 
 	    case __HYPERVISOR_console_io:
 		regs->r8 = do_console_io(regs->r14, regs->r15, regs->r16);

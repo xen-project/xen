@@ -54,11 +54,14 @@ void foo(void)
 	DEFINE(XSI_BANKNUM_OFS, offsetof(vcpu_info_t, arch.banknum));
 	DEFINE(XSI_BANK0_OFS, offsetof(vcpu_info_t, arch.bank0_regs[0]));
 	DEFINE(XSI_BANK1_OFS, offsetof(vcpu_info_t, arch.bank1_regs[0]));
+	DEFINE(XSI_RR0_OFS, offsetof(vcpu_info_t, arch.rrs[0]));
 	DEFINE(XSI_METAPHYS_OFS, offsetof(vcpu_info_t, arch.metaphysical_mode));
 	DEFINE(XSI_PRECOVER_IFS_OFS, offsetof(vcpu_info_t, arch.precover_ifs));
 	DEFINE(XSI_INCOMPL_REG_OFS, offsetof(vcpu_info_t, arch.incomplete_regframe));
 	DEFINE(XSI_PEND_OFS, offsetof(vcpu_info_t, arch.pending_interruption));
 	DEFINE(XSI_RR0_OFS, offsetof(vcpu_info_t, arch.rrs[0]));
+	DEFINE(XSI_TPR_OFS, offsetof(vcpu_info_t, arch.tpr));
+	DEFINE(XSI_ITV_OFS, offsetof(vcpu_info_t, arch.itv));
 	//DEFINE(IA64_TASK_BLOCKED_OFFSET,offsetof (struct task_struct, blocked));
 	//DEFINE(IA64_TASK_CLEAR_CHILD_TID_OFFSET,offsetof (struct task_struct, clear_child_tid));
 	//DEFINE(IA64_TASK_GROUP_LEADER_OFFSET, offsetof (struct task_struct, group_leader));
@@ -78,8 +81,13 @@ void foo(void)
 	DEFINE(IA64_VCPU_IRR0_OFFSET, offsetof (struct vcpu, arch.irr[0]));
 	DEFINE(IA64_VCPU_IRR3_OFFSET, offsetof (struct vcpu, arch.irr[3]));
 	DEFINE(IA64_VCPU_INSVC3_OFFSET, offsetof (struct vcpu, arch.insvc[3]));
+	DEFINE(IA64_VCPU_STARTING_RID_OFFSET, offsetof (struct vcpu, arch.starting_rid));
+	DEFINE(IA64_VCPU_ENDING_RID_OFFSET, offsetof (struct vcpu, arch.ending_rid));
+	DEFINE(IA64_VCPU_DOMAIN_ITM_OFFSET, offsetof (struct vcpu, arch.domain_itm));
+	DEFINE(IA64_VCPU_DOMAIN_ITM_LAST_OFFSET, offsetof (struct vcpu, arch.domain_itm_last));
 
 	BLANK();
+	DEFINE(IA64_CPUINFO_ITM_NEXT_OFFSET, offsetof (struct cpuinfo_ia64, itm_next));
 
 	//DEFINE(IA64_SIGHAND_SIGLOCK_OFFSET,offsetof (struct sighand_struct, siglock));
 
