@@ -2,13 +2,13 @@
 #ifndef __X86_PAGE_H__
 #define __X86_PAGE_H__
 
-#ifndef __ASSEMBLY__
-#define PAGE_SIZE           (1UL << PAGE_SHIFT)
-#else
+/*
+ * It is important that the masks are signed quantities. This ensures that
+ * the compiler sign-extends a 32-bit mask to 64 bits if that is required.
+ */
 #define PAGE_SIZE           (1 << PAGE_SHIFT)
-#endif
-#define PAGE_MASK           (~(intpte_t)(PAGE_SIZE-1))
-#define PAGE_FLAG_MASK      (~0U)
+#define PAGE_MASK           (~(PAGE_SIZE-1))
+#define PAGE_FLAG_MASK      (~0)
 
 #ifndef __ASSEMBLY__
 # include <asm/types.h>
