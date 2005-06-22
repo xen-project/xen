@@ -20,7 +20,7 @@
 #include <asm/desc.h>
 #include <asm/shadow.h>
 #include <asm/e820.h>
-#include <public/acm_dom0_setup.h>
+#include <acm/acm_hooks.h>
 
 extern void dmi_scan_machine(void);
 extern void generic_apic_probe(void);
@@ -188,7 +188,7 @@ static void __init start_of_day(void)
 
     arch_init_memory();
 
-    scheduler_init();	
+    scheduler_init();
 
     identify_cpu(&boot_cpu_data);
     if ( cpu_has_fxsr )
@@ -383,8 +383,8 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     init_xenheap_pages(xenheap_phys_start, xenheap_phys_end);
     printk("Xen heap: %luMB (%lukB)\n",
-	   (xenheap_phys_end-xenheap_phys_start) >> 20,
-	   (xenheap_phys_end-xenheap_phys_start) >> 10);
+           (xenheap_phys_end-xenheap_phys_start) >> 20,
+           (xenheap_phys_end-xenheap_phys_start) >> 10);
 
     early_boot = 0;
 

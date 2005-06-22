@@ -1513,7 +1513,6 @@
 422f27c8RHFkePhD34VIEpMMqofZcA xen/include/asm-x86/x86_emulate.h
 400304fcmRQmDdFYEzDh0wcBba9alg xen/include/public/COPYING
 42b742f6duiOTlZvysQkRYZHYBXqvg xen/include/public/acm.h
-42b742f7TIMsQgUaNDJXp3QlBve2SQ xen/include/public/acm_dom0_setup.h
 421098b7OKb9YH_EUA_UpCxBjaqtgA xen/include/public/arch-ia64.h
 404f1bc68SXxmv0zQpXBWGrCzSyp8w xen/include/public/arch-x86_32.h
 404f1bc7IwU-qnH8mJeVu0YsNGMrcw xen/include/public/arch-x86_64.h

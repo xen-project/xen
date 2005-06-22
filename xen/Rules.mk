@@ -35,7 +35,9 @@ OBJS    += $(patsubst %.c,%.o,$(C_SRCS))
 ALL_OBJS := $(BASEDIR)/common/common.o
 ALL_OBJS += $(BASEDIR)/drivers/char/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/acpi/driver.o
+ifdef ACM_USE_SECURITY_POLICY
 ALL_OBJS += $(BASEDIR)/acm/acm.o
+endif
 ALL_OBJS += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
 
 
