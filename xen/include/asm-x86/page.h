@@ -6,7 +6,11 @@
  * It is important that the masks are signed quantities. This ensures that
  * the compiler sign-extends a 32-bit mask to 64 bits if that is required.
  */
+#ifndef __ASSEMBLY__
+#define PAGE_SIZE           (1L << PAGE_SHIFT)
+#else
 #define PAGE_SIZE           (1 << PAGE_SHIFT)
+#endif
 #define PAGE_MASK           (~(PAGE_SIZE-1))
 #define PAGE_FLAG_MASK      (~0)
 
