@@ -19,13 +19,11 @@ null_init_domain_ssid(void **chwall_ssid, ssidref_t ssidref)
 	return ACM_OK;
 }
 
-
 static void
 null_free_domain_ssid(void *chwall_ssid)
 {
 	return;
 }
-
 
 static int
 null_dump_binary_policy(u8 *buf, u16 buf_size) 
@@ -33,14 +31,11 @@ null_dump_binary_policy(u8 *buf, u16 buf_size)
 	return 0;
 }
 
-
-
 static int
 null_set_binary_policy(u8 *buf, u16 buf_size) 
 {	
-	return -1;
+	return ACM_OK;
 }
-
 	
 static int 
 null_dump_stats(u8 *buf, u16 buf_size)
@@ -48,7 +43,6 @@ null_dump_stats(u8 *buf, u16 buf_size)
 	/* no stats for NULL policy */
 	return 0;
 }
-
 
 /* now define the hook structure similarly to LSM */
 struct acm_operations acm_null_ops = {
@@ -72,5 +66,4 @@ struct acm_operations acm_null_ops = {
 	.fail_grant_map_ref		= NULL,
 	.pre_grant_setup	       	= NULL,
 	.fail_grant_setup		= NULL
-
 };
