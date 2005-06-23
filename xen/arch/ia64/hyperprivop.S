@@ -66,10 +66,13 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	cmp.eq p7,p6=XEN_HYPER_RFI,r17
 (p7)	br.sptk.many hyper_rfi;;
 
+	// HYPERPRIVOP_GET_IVR?
+	cmp.eq p7,p6=XEN_HYPER_GET_IVR,r17
+(p7)	br.sptk.many hyper_get_ivr;;
+
 	cmp.ne p7,p0=r20,r0
 (p7)	br.spnt.many dispatch_break_fault ;;
 
-// hard to test, because only called from rbs_switch
 	// HYPERPRIVOP_COVER?
 	cmp.eq p7,p6=XEN_HYPER_COVER,r17
 (p7)	br.sptk.many hyper_cover;;
@@ -81,6 +84,42 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	// HYPERPRIVOP_RSM_DT?
 	cmp.eq p7,p6=XEN_HYPER_RSM_DT,r17
 (p7)	br.sptk.many hyper_rsm_dt;;
+
+	// HYPERPRIVOP_GET_TPR?
+	cmp.eq p7,p6=XEN_HYPER_GET_TPR,r17
+(p7)	br.sptk.many hyper_get_tpr;;
+
+	// HYPERPRIVOP_SET_TPR?
+	cmp.eq p7,p6=XEN_HYPER_SET_TPR,r17
+(p7)	br.sptk.many hyper_set_tpr;;
+
+	// HYPERPRIVOP_EOI?
+	cmp.eq p7,p6=XEN_HYPER_EOI,r17
+(p7)	br.sptk.many hyper_eoi;;
+
+	// HYPERPRIVOP_SET_ITM?
+	cmp.eq p7,p6=XEN_HYPER_SET_ITM,r17
+(p7)	br.sptk.many hyper_set_itm;;
+
+	// HYPERPRIVOP_SET_RR?
+	cmp.eq p7,p6=XEN_HYPER_SET_RR,r17
+(p7)	br.sptk.many hyper_set_rr;;
+
+	// HYPERPRIVOP_GET_RR?
+	cmp.eq p7,p6=XEN_HYPER_GET_RR,r17
+(p7)	br.sptk.many hyper_get_rr;;
+
+	// HYPERPRIVOP_PTC_GA?
+	cmp.eq p7,p6=XEN_HYPER_PTC_GA,r17
+(p7)	br.sptk.many hyper_ptc_ga;;
+
+	// HYPERPRIVOP_ITC_D?
+	cmp.eq p7,p6=XEN_HYPER_ITC_D,r17
+(p7)	br.sptk.many hyper_itc_d;;
+
+	// HYPERPRIVOP_ITC_I?
+	cmp.eq p7,p6=XEN_HYPER_ITC_I,r17
+(p7)	br.sptk.many hyper_itc_i;;
 
 	// if not one of the above, give up for now and do it the slow way
 	br.sptk.many dispatch_break_fault ;;
@@ -343,14 +382,15 @@ GLOBAL_ENTRY(fast_break_reflect)
 // ensure that, if giving up, registers at entry to fast_hyperprivop unchanged
 ENTRY(hyper_rfi)
 	// if no interrupts pending, proceed
+	mov r30=r0
 	cmp.eq p7,p0=r20,r0
 (p7)	br.sptk.many 1f
-	// interrupts pending, if rfi'ing to interrupts on, go slow way
+	;;
 	adds r20=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r21=[r20];;		// r21 = vcr.ipsr
 	extr.u r22=r21,IA64_PSR_I_BIT,1 ;;
-	cmp.ne p7,p0=r22,r0 ;;
-(p7)	br.spnt.many dispatch_break_fault ;;
+	mov r30=r22	
+	// r30 determines whether we might deliver an immediate extint
 1:
 	adds r20=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r21=[r20];;		// r21 = vcr.ipsr
@@ -384,13 +424,17 @@ ENTRY(hyper_rfi)
 (p7)	cmp.geu p0,p7=r22,r24 ;;	//    !(iip>=high)
 (p7)	br.sptk.many dispatch_break_fault ;;
 
-	// OK now, let's do an rfi.
+1:	// OK now, let's do an rfi.
 #ifdef FAST_HYPERPRIVOP_CNT
 	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_RFI);;
 	ld8 r23=[r20];;
 	adds r23=1,r23;;
 	st8 [r20]=r23;;
 #endif
+	cmp.ne p6,p0=r30,r0
+(p6)	br.cond.sptk.many check_extint;
+	;;
+just_do_rfi:
 	// r18=&vpsr.i|vpsr.ic, r21==vpsr, r22=vcr.iip
 	mov cr.iip=r22;;
 	adds r20=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -403,11 +447,12 @@ ENTRY(hyper_rfi)
 	dep r21=-1,r21,IA64_PSR_CPL1_BIT,1 ;;
 	// vpsr.i = vcr.ipsr.i; vpsr.ic = vcr.ipsr.ic
 	mov r19=r0 ;;
-	extr.u r22=r21,IA64_PSR_I_BIT,1 ;;
-	cmp.ne p7,p6=r22,r0 ;;
+	extr.u r23=r21,IA64_PSR_I_BIT,1 ;;
+	cmp.ne p7,p6=r23,r0 ;;
+	// not done yet
 (p7)	dep r19=-1,r19,32,1
-	extr.u r22=r21,IA64_PSR_IC_BIT,1 ;;
-	cmp.ne p7,p6=r22,r0 ;;
+	extr.u r23=r21,IA64_PSR_IC_BIT,1 ;;
+	cmp.ne p7,p6=r23,r0 ;;
 (p7)	dep r19=-1,r19,0,1 ;;
 	st8 [r18]=r19 ;;
 	// force on psr.ic, i, dt, rt, it, bn
@@ -420,6 +465,80 @@ ENTRY(hyper_rfi)
 	;;
 	rfi
 	;;
+
+check_extint:
+	br.sptk.many dispatch_break_fault ;;
+
+	// r18=&vpsr.i|vpsr.ic, r21==vpsr, r22=vcr.iip
+	mov r30=IA64_KR(CURRENT);;
+	adds r24=IA64_VCPU_INSVC3_OFFSET,r30;;
+	mov r25=192
+	adds r22=IA64_VCPU_IRR3_OFFSET,r30;;
+	ld8 r23=[r22];;
+	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	adds r24=-8,r24;;
+(p6)	adds r25=-64,r25;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	adds r24=-8,r24;;
+(p6)	adds r25=-64,r25;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	adds r24=-8,r24;;
+(p6)	adds r25=-64,r25;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+	cmp.eq p6,p0=r23,r0
+(p6)	br.cond.sptk.many 1f;	// this is actually an error
+	// r22 points to non-zero element of irr, r23 has value
+	// r24 points to corr element of insvc, r25 has elt*64
+	ld8 r26=[r24];;
+	cmp.geu p6,p0=r26,r23
+(p6)	br.cond.spnt.many 1f;
+	// not masked by insvc, get vector number
+	shr.u r26=r23,1;;
+	or r26=r23,r26;;
+	shr.u r27=r26,2;;
+	or r26=r26,r27;;
+	shr.u r27=r26,4;;
+	or r26=r26,r27;;
+	shr.u r27=r26,8;;
+	or r26=r26,r27;;
+	shr.u r27=r26,16;;
+	or r26=r26,r27;;
+	shr.u r27=r26,32;;
+	or r26=r26,r27;;
+	andcm r26=0xffffffffffffffff,r26;;
+	popcnt r26=r26;;
+	sub r26=63,r26;;
+	// r26 now contains the bit index (mod 64)
+	mov r27=1;;
+	shl r27=r27,r26;;
+	// r27 now contains the (within the proper word) bit mask 
+	add r26=r25,r26
+	// r26 now contains the vector [0..255]
+	adds r20=XSI_TPR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r20=[r20] ;;
+	extr.u r28=r20,16,1
+	extr.u r29=r20,4,4 ;;
+	cmp.ne p6,p0=r28,r0	// if tpr.mmi is set, return SPURIOUS
+(p6)	br.cond.sptk.many 1f;
+	shl r29=r29,4;;
+	adds r29=15,r29;;
+	cmp.ge p6,p0=r29,r26
+(p6)	br.cond.sptk.many 1f;
+	// OK, have an unmasked vector to process/return
+	ld8 r25=[r24];;
+	or r25=r25,r27;;
+	st8 [r24]=r25;;
+	ld8 r25=[r22];;
+	andcm r25=r25,r27;;
+	st8 [r22]=r25;;
+	mov r8=r26;;
+	// not done yet
 
 ENTRY(hyper_cover)
 #ifdef FAST_HYPERPRIVOP_CNT
@@ -455,7 +574,6 @@ ENTRY(hyper_cover)
 	rfi
 	;;
 
-#if 1
 // return from metaphysical mode (meta=1) to virtual mode (meta=0)
 ENTRY(hyper_ssm_dt)
 #ifdef FAST_HYPERPRIVOP_CNT
@@ -526,4 +644,373 @@ ENTRY(hyper_rsm_dt)
 	mov pr=r31,-1 ;;
 	rfi
 	;;
+
+ENTRY(hyper_get_tpr)
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_GET_TPR);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
 #endif
+	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	adds r20=XSI_TPR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r8=[r20];;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_get_tpr)
+
+// if we get to here, there are no interrupts pending so we
+// can change virtual tpr to any value without fear of provoking
+// (or accidentally missing) delivering an interrupt
+ENTRY(hyper_set_tpr)
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SET_TPR);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	movl r27=0xff00;;
+	adds r20=XSI_TPR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	andcm r8=r8,r27;;
+	st8 [r20]=r8;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_set_tpr)
+
+ENTRY(hyper_get_ivr)
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r22=fast_hyperpriv_cnt+(8*XEN_HYPER_GET_IVR);;
+	ld8 r21=[r22];;
+	adds r21=1,r21;;
+	st8 [r22]=r21;;
+#endif
+	mov r8=15;;
+	// when we get to here r20=~=interrupts pending
+	cmp.eq p7,p0=r20,r0;;
+(p7)	adds r20=XSI_PEND_OFS-XSI_PSR_IC_OFS,r18 ;;
+(p7)	st4 [r20]=r0;;
+(p7)	br.spnt.many 1f ;;
+	mov r30=IA64_KR(CURRENT);;
+	adds r24=IA64_VCPU_INSVC3_OFFSET,r30;;
+	mov r25=192
+	adds r22=IA64_VCPU_IRR3_OFFSET,r30;;
+	ld8 r23=[r22];;
+	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	adds r24=-8,r24;;
+(p6)	adds r25=-64,r25;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	adds r24=-8,r24;;
+(p6)	adds r25=-64,r25;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	adds r24=-8,r24;;
+(p6)	adds r25=-64,r25;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+	cmp.eq p6,p0=r23,r0
+(p6)	br.cond.sptk.many 1f;	// this is actually an error
+	// r22 points to non-zero element of irr, r23 has value
+	// r24 points to corr element of insvc, r25 has elt*64
+	ld8 r26=[r24];;
+	cmp.geu p6,p0=r26,r23
+(p6)	br.cond.spnt.many 1f;
+	// not masked by insvc, get vector number
+	shr.u r26=r23,1;;
+	or r26=r23,r26;;
+	shr.u r27=r26,2;;
+	or r26=r26,r27;;
+	shr.u r27=r26,4;;
+	or r26=r26,r27;;
+	shr.u r27=r26,8;;
+	or r26=r26,r27;;
+	shr.u r27=r26,16;;
+	or r26=r26,r27;;
+	shr.u r27=r26,32;;
+	or r26=r26,r27;;
+	andcm r26=0xffffffffffffffff,r26;;
+	popcnt r26=r26;;
+	sub r26=63,r26;;
+	// r26 now contains the bit index (mod 64)
+	mov r27=1;;
+	shl r27=r27,r26;;
+	// r27 now contains the (within the proper word) bit mask 
+	add r26=r25,r26
+	// r26 now contains the vector [0..255]
+	adds r20=XSI_TPR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r20=[r20] ;;
+	extr.u r28=r20,16,1
+	extr.u r29=r20,4,4 ;;
+	cmp.ne p6,p0=r28,r0	// if tpr.mmi is set, return SPURIOUS
+(p6)	br.cond.sptk.many 1f;
+	shl r29=r29,4;;
+	adds r29=15,r29;;
+	cmp.ge p6,p0=r29,r26
+(p6)	br.cond.sptk.many 1f;
+	// OK, have an unmasked vector to process/return
+	ld8 r25=[r24];;
+	or r25=r25,r27;;
+	st8 [r24]=r25;;
+	ld8 r25=[r22];;
+	andcm r25=r25,r27;;
+	st8 [r22]=r25;;
+	mov r8=r26;;
+	// if its a clock tick, remember itm to avoid delivering it twice
+	adds r20=XSI_ITV_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r20=[r20];;
+	extr.u r20=r20,0,8;;
+	cmp.eq p6,p0=r20,r8
+	adds r22=IA64_VCPU_DOMAIN_ITM_LAST_OFFSET,r30
+	adds r23=IA64_VCPU_DOMAIN_ITM_OFFSET,r30;;
+	ld8 r23=[r23];;
+(p6)	st8 [r22]=r23;;
+	// all done
+1:	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_get_ivr)
+
+ENTRY(hyper_eoi)
+	// when we get to here r20=~=interrupts pending
+	cmp.ne p7,p0=r20,r0
+(p7)	br.spnt.many dispatch_break_fault ;;
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_EOI);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	mov r22=IA64_KR(CURRENT);;
+	adds r22=IA64_VCPU_INSVC3_OFFSET,r22;;
+	ld8 r23=[r22];;
+	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+(p6)	adds r22=-8,r22;;
+(p6)	ld8 r23=[r22];;
+(p6)	cmp.eq p6,p0=r23,r0;;
+	cmp.eq p6,p0=r23,r0
+(p6)	br.cond.sptk.many 1f;	// this is actually an error
+	// r22 points to non-zero element of insvc, r23 has value
+	shr.u r24=r23,1;;
+	or r24=r23,r24;;
+	shr.u r25=r24,2;;
+	or r24=r24,r25;;
+	shr.u r25=r24,4;;
+	or r24=r24,r25;;
+	shr.u r25=r24,8;;
+	or r24=r24,r25;;
+	shr.u r25=r24,16;;
+	or r24=r24,r25;;
+	shr.u r25=r24,32;;
+	or r24=r24,r25;;
+	andcm r24=0xffffffffffffffff,r24;;
+	popcnt r24=r24;;
+	sub r24=63,r24;;
+	// r24 now contains the bit index
+	mov r25=1;;
+	shl r25=r25,r24;;
+	andcm r23=r23,r25;;
+	st8 [r22]=r23;;
+1:	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_eoi)
+
+ENTRY(hyper_set_itm)
+	// when we get to here r20=~=interrupts pending
+	cmp.ne p7,p0=r20,r0
+(p7)	br.spnt.many dispatch_break_fault ;;
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SET_ITM);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	movl r20=(PERCPU_ADDR)+IA64_CPUINFO_ITM_NEXT_OFFSET;;
+	ld8 r21=[r20];;
+	mov r20=IA64_KR(CURRENT);;
+	adds r20=IA64_VCPU_DOMAIN_ITM_OFFSET,r20;;
+	st8 [r20]=r8;;
+	cmp.geu p6,p0=r21,r8;;
+(p6)	mov r21=r8;;
+	// now "safe set" cr.itm=r21
+	mov r23=100;;
+2:	mov cr.itm=r21;;
+	srlz.d;;
+	mov r22=ar.itc ;;
+	cmp.leu p6,p0=r21,r22;;
+	add r21=r21,r23;;
+	shl r23=r23,1;;
+(p6)	br.cond.spnt.few 2b;;
+1:	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_set_itm)
+
+ENTRY(hyper_get_rr)
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_GET_RR);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	extr.u r25=r8,61,3;;
+	adds r20=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18 ;;
+	shl r25=r25,3;;
+	add r20=r20,r25;;
+	ld8 r8=[r20];;
+1:	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_get_rr)
+
+ENTRY(hyper_set_rr)
+	extr.u r25=r8,61,3;;
+	cmp.leu p7,p0=7,r25	// punt on setting rr7
+(p7)	br.spnt.many dispatch_break_fault ;;
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SET_RR);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	extr.u r26=r9,8,24	// r26 = r9.rid
+	mov r20=IA64_KR(CURRENT);;
+	adds r21=IA64_VCPU_STARTING_RID_OFFSET,r20;;
+	ld4 r22=[r21];;
+	adds r21=IA64_VCPU_ENDING_RID_OFFSET,r20;;
+	ld4 r23=[r21];;
+	adds r24=IA64_VCPU_META_SAVED_RR0_OFFSET,r20;;
+	add r22=r26,r22;;
+	cmp.geu p6,p0=r22,r23	// if r9.rid + starting_rid >= ending_rid
+(p6)	br.cond.sptk.many 1f;	// this is an error, but just ignore/return
+	// r21=starting_rid
+	adds r20=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18 ;;
+	shl r25=r25,3;;
+	add r20=r20,r25;;
+	st8 [r20]=r9;;		// store away exactly what was passed
+	// but adjust value actually placed in rr[r8]
+	// r22 contains adjusted rid, "mangle" it (see regionreg.c)
+	// and set ps to PAGE_SHIFT and ve to 1
+	extr.u r27=r22,0,8
+	extr.u r28=r22,8,8
+	extr.u r29=r22,16,8;;
+	dep.z r23=PAGE_SHIFT,2,6;;
+	dep r23=-1,r23,0,1;;	// mangling is swapping bytes 1 & 3
+	dep r23=r27,r23,24,8;;
+	dep r23=r28,r23,16,8;;
+	dep r23=r29,r23,8,8
+	cmp.eq p6,p0=r25,r0;;	// if rr0, save for metaphysical
+(p6)	st4 [r24]=r23
+	mov rr[r8]=r23;;
+	// done, mosey on back
+1:	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_set_rr)
+
+ENTRY(hyper_ptc_ga)
+	br.spnt.many dispatch_break_fault ;;
+END(hyper_ptc_ga)
+
+ENTRY(hyper_itc_d)
+	br.spnt.many dispatch_break_fault ;;
+END(hyper_itc_d)
+
+ENTRY(hyper_itc_i)
+	br.spnt.many dispatch_break_fault ;;
+END(hyper_itc_i)
+

@@ -62,8 +62,10 @@ void sync_lazy_execstate_cpu(unsigned int cpu) {}
 void sync_lazy_execstate_mask(cpumask_t mask) {}
 void sync_lazy_execstate_all(void) {}
 
+#ifdef CONFIG_VTI
 int grant_table_create(struct domain *d) { return 0; }
 void grant_table_destroy(struct domain *d) { return; }
+#endif
 
 struct pt_regs *guest_cpu_user_regs(void) { return ia64_task_regs(current); }
 
@@ -71,6 +73,35 @@ void raise_actimer_softirq(void)
 {
 	raise_softirq(AC_TIMER_SOFTIRQ);
 }
+
+#ifndef CONFIG_VTI
+unsigned long
+__gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
+{
+	if (d == dom0)
+		return(gpfn);
+	else {
+		unsigned long pte = lookup_domain_mpa(d,gpfn << PAGE_SHIFT);
+		if (!pte) {
+printk("__gpfn_to_mfn_foreign: bad gpfn. spinning...\n");
+while(1);
+			return 0;
+		}
+		return ((pte & _PFN_MASK) >> PAGE_SHIFT);
+	}
+}
+
+u32
+__mfn_to_gpfn(struct domain *d, unsigned long frame)
+{
+	// FIXME: is this right?
+if ((frame << PAGE_SHIFT) & _PAGE_PPN_MASK) {
+printk("__mfn_to_gpfn: bad frame. spinning...\n");
+while(1);
+}
+	return frame;
+}
+#endif
 
 unsigned long __hypercall_create_continuation(
 	unsigned int op, unsigned int nr_args, ...)

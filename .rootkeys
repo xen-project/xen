@@ -1132,6 +1132,7 @@
 421098b2PHgzf_Gg4R65YRNi_QzMKQ xen/arch/ia64/dom0_ops.c
 421098b2O7jsNfzQXA1v3rbAc1QhpA xen/arch/ia64/dom_fw.c
 421098b2ZlaBcyiuuPr3WpzaSDwg6Q xen/arch/ia64/domain.c
+42b33bb9GLR-tzcaHalk8fz9cgK0aA xen/arch/ia64/grant_table.c
 42a08294zRikvZk_CR1iVojHjcVFZw xen/arch/ia64/hpsimserial.c
 4239e98a_HX-FCIcXtVqY0BbrDqVug xen/arch/ia64/hypercall.c
 4295e18f42gf1T-8W97A3KSlBaY1tA xen/arch/ia64/hyperprivop.S
@@ -1139,6 +1140,7 @@
 421098b3ys5GAr4z6_H1jD33oem82g xen/arch/ia64/irq.c
 4272a8e4lavI6DrTvqaIhXeR5RuKBw xen/arch/ia64/ivt.S
 421098b3Heh72KuoVlND3CH6c0B0aA xen/arch/ia64/lib/Makefile
+42b2eaeez20voHWlBDjrqORiNg6uhg xen/arch/ia64/mm.c
 421098b3O0MYMUsmYVFy84VV_1gFwQ xen/arch/ia64/mm_init.c
 428b9f38Gp0KcPokG9Nq5v1rGk2FkA xen/arch/ia64/mmio.c
 425ae516maKAsHBJVSzs19cdRgt3Nw xen/arch/ia64/patch/linux-2.6.11/cpumask.h
@@ -1237,6 +1239,7 @@
 428b9f38PglyXM-mJJfo19ycuQrEhw xen/arch/ia64/vlsapic.c
 428b9f38EmpBsMHL3WbOZoieteBGdQ xen/arch/ia64/vmmu.c
 428b9f38hU-X5aX0MIY3EU0Yw4PjcA xen/arch/ia64/vmx_entry.S
+42b2eaf3YR7Sfx76IvKeqfHJiU6qXw xen/arch/ia64/vmx_hypercall.c
 428b9f38S76bWI96g7uPLmE-uAcmdg xen/arch/ia64/vmx_init.c
 428b9f385AMSyCRYBsckQClQY4ZgHA xen/arch/ia64/vmx_interrupt.c
 428b9f380IOjPmj0N6eelH-WJjl1xg xen/arch/ia64/vmx_ivt.S
@@ -1405,6 +1408,7 @@
 421098b7Z6OwjZnrTZkh34DoDfcjrA xen/include/asm-ia64/regionreg.h
 421098b707cY5YluUcWK5Pc-71ETVw xen/include/asm-ia64/regs.h
 4214e2f3fbO_n9Z1kIcBR83d7W4OJw xen/include/asm-ia64/serial.h
+42b89683nnFDAElJewfm2JxG-pv1BQ xen/include/asm-ia64/shadow.h
 429fb3bc53qJOyKJCBfhDNmTasj8Gw xen/include/asm-ia64/slab.h
 421098b7GkWOnlzSmPvNAhByOSZ1Dw xen/include/asm-ia64/time.h
 421098b7FK3xgShpnH0I0Ou3O4fJ2Q xen/include/asm-ia64/tlb.h
@@ -1418,6 +1422,7 @@
 428b9f38is0zTsIm96_BKo4MLw0SzQ xen/include/asm-ia64/vmx_pal_vsa.h
 428b9f38iDqbugHUheJrcTCD7zlb4g xen/include/asm-ia64/vmx_phy_mode.h
 428b9f38grd_B0AGB1yp0Gi2befHaQ xen/include/asm-ia64/vmx_platform.h
+42b8e0d63B41CDo2Nqmf8Vt0_RercA xen/include/asm-ia64/vmx_uaccess.h
 428b9f38XgwHchZEpOzRtWfz0agFNQ xen/include/asm-ia64/vmx_vcpu.h
 428b9f38tDTTJbkoONcAB9ODP8CiVg xen/include/asm-ia64/vmx_vpd.h
 428b9f38_o0U5uJqmxZf_bqi6_PqVw xen/include/asm-ia64/vtm.h

@@ -103,6 +103,9 @@ extern char _end[]; /* standard ELF symbol */
 #define	get_cpu()	0
 #define put_cpu()	do {} while(0)
 
+// needed for common/dom0_ops.c until hyperthreading is supported
+#define smp_num_siblings 1
+
 // from linux/include/linux/mm.h
 struct page;
 

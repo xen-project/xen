@@ -258,6 +258,8 @@ void arch_do_createdomain(struct vcpu *v)
 #define DOMAIN_RID_BITS_DEFAULT 18
 	if (!allocate_rid_range(d,DOMAIN_RID_BITS_DEFAULT)) // FIXME
 		BUG();
+	v->arch.starting_rid = d->arch.starting_rid;
+	v->arch.ending_rid = d->arch.ending_rid;
 	// the following will eventually need to be negotiated dynamically
 	d->xen_vastart = 0xf000000000000000;
 	d->xen_vaend = 0xf300000000000000;
