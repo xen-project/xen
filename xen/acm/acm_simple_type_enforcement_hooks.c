@@ -31,7 +31,7 @@
 #include <asm/atomic.h>
 #include <acm/acm_endian.h>
 
-/* local cache structures for chinese wall policy */
+/* local cache structures for STE policy */
 struct ste_binary_policy ste_bin_pol;
 
 static inline int have_common_type (ssidref_t ref1, ssidref_t ref2) {
@@ -66,7 +66,7 @@ static int share_common_type(struct domain *subj, struct domain *obj)
 }
 
 /*
- * Initializing chinese wall policy (will be filled by policy partition
+ * Initializing STE policy (will be filled by policy partition
  * using setpolicy command)
  */
 int acm_init_ste_policy(void)
