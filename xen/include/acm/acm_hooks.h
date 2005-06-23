@@ -30,99 +30,59 @@
 #include <public/event_channel.h>
 #include <asm/current.h>
 
-#if (ACM_USE_SECURITY_POLICY == ACM_NULL_POLICY)
-
-static inline int acm_pre_dom0_op(dom0_op_t *op, void **ssid) 
-{ return 0; }
-static inline void acm_post_dom0_op(dom0_op_t *op, void *ssid) 
-{ return; }
-static inline void acm_fail_dom0_op(dom0_op_t *op, void *ssid) 
-{ return; }
-static inline int acm_pre_event_channel(evtchn_op_t *op) 
-{ return 0; }
-static inline int acm_pre_grant_map_ref(domid_t id) 
-{ return 0; }
-static inline int acm_pre_grant_setup(domid_t id) 
-{ return 0; }
-static inline int acm_init(void)
-{ return 0; }
-static inline void acm_post_domain0_create(domid_t domid) 
-{ return; }
-
-#else
-
-/* if ACM_TRACE_MODE defined, all hooks should
- * print a short trace message */
-/* #define ACM_TRACE_MODE */
-
-#ifdef ACM_TRACE_MODE
-# define traceprintk(fmt, args...) printk(fmt,## args)
-#else
-# define traceprintk(fmt, args...)
-#endif
-
-/* global variables */
-extern struct acm_operations *acm_primary_ops;
-extern struct acm_operations *acm_secondary_ops;
-
-/*********************************************************************
+/*
  * HOOK structure and meaning (justifies a few words about our model):
  * 
  * General idea: every policy-controlled system operation is reflected in a 
  *               transaction in the system's security state
  *
- *	Keeping the security state consistent requires "atomic" transactions.
+ *      Keeping the security state consistent requires "atomic" transactions.
  *      The name of the hooks to place around policy-controlled transactions
  *      reflects this. If authorizations do not involve security state changes,
  *      then and only then POST and FAIL hooks remain empty since we don't care
  *      about the eventual outcome of the operation from a security viewpoint.
  *
- *	PURPOSE of hook types:
+ *      PURPOSE of hook types:
  *      ======================
  *      PRE-Hooks
- *		a) general authorization to guard a controlled system operation
- *		b) prepare security state change
- *                 (means: fail hook must be able to "undo" this)
+ *       a) general authorization to guard a controlled system operation
+ *       b) prepare security state change
+ *          (means: fail hook must be able to "undo" this)
  *
- *	POST-Hooks
- *		a) commit prepared state change
+ *      POST-Hooks
+ *       a) commit prepared state change
  *
  *      FAIL-Hooks
- *		a) roll-back prepared security state change from PRE-Hook
+ *       a) roll-back prepared security state change from PRE-Hook
  *
  *
  *      PLACEMENT of hook types:
  *      ========================
- *	PRE-Hooks must be called:
- *		a) before a guarded/controlled system operation is started
- *		(return is ACM_ACCESS_PERMITTED or ACM_ACCESS_DENIED or error)
- *		   --> operation must be aborted if return is != ACM_ACCESS_PERMITTED
+ *      PRE-Hooks must be called before a guarded/controlled system operation
+ *      is started. They return ACM_ACCESS_PERMITTED, ACM_ACCESS_DENIED or
+ *      error. Operation must be aborted if return is not ACM_ACCESS_PERMITTED.
  *
- *	POST-Hooks must be called:
- *		a) after successful transaction (no return value; commit shall never fail)
+ *      POST-Hooks must be called after a successful system operation.
+ *      There is no return value: commit never fails.
  *
- *	FAIL-Hooks must be called:
- *		a) if system transaction (operation) fails somewhen after calling the PRE-hook
- *		   (obviously the POST-Hook is not called in this case)
- *		b) if another (secondary) policy denies access in its PRE-Hook
- *		   (policy layering is useful but requires additional handling)
+ *      FAIL-Hooks must be called:
+ *       a) if system transaction (operation) fails after calling the PRE-hook
+ *       b) if another (secondary) policy denies access in its PRE-Hook
+ *          (policy layering is useful but requires additional handling)
  *
+ * Hook model from a security transaction viewpoint:
+ *   start-sys-ops--> prepare ----succeed-----> commit --> sys-ops success
+ *                   (pre-hook)  \           (post-hook)
+ *                                \
+ *                               fail
+ *                                   \
+ *                                    \
+ *                                  roll-back
+ *                                 (fail-hook)
+ *                                        \
+ *                                       sys-ops error
  *
- *
- *       Hook model from a security transaction viewpoint:
- *
- *          start-sys-ops--> prepare ----succeed-----> commit --> sys-ops success
- *                          (pre-hook)  \           (post-hook)
- *                                       \
- *                                       fail
- *                                         \
- *                                          \
- *                                        roll-back
- *                                       (fail-hook)
- *                                             \
- *                                            sys-ops error
- *
- ********************************************************************/
+ */
 
 struct acm_operations {
     /* policy management functions (must always be defined!) */
@@ -147,6 +107,41 @@ struct acm_operations {
     int  (*pre_grant_setup)            (domid_t id);
     void (*fail_grant_setup)           (domid_t id);
 };
+
+/* global variables */
+extern struct acm_operations *acm_primary_ops;
+extern struct acm_operations *acm_secondary_ops;
+
+/* if ACM_TRACE_MODE defined, all hooks should
+ * print a short trace message */
+/* #define ACM_TRACE_MODE */
+
+#ifdef ACM_TRACE_MODE
+# define traceprintk(fmt, args...) printk(fmt,## args)
+#else
+# define traceprintk(fmt, args...)
+#endif
+
+#if (ACM_USE_SECURITY_POLICY == ACM_NULL_POLICY)
+
+static inline int acm_pre_dom0_op(dom0_op_t *op, void **ssid) 
+{ return 0; }
+static inline void acm_post_dom0_op(dom0_op_t *op, void *ssid) 
+{ return; }
+static inline void acm_fail_dom0_op(dom0_op_t *op, void *ssid) 
+{ return; }
+static inline int acm_pre_event_channel(evtchn_op_t *op) 
+{ return 0; }
+static inline int acm_pre_grant_map_ref(domid_t id) 
+{ return 0; }
+static inline int acm_pre_grant_setup(domid_t id) 
+{ return 0; }
+static inline int acm_init(void)
+{ return 0; }
+static inline void acm_post_domain0_create(domid_t domid) 
+{ return; }
+
+#else
 
 static inline int acm_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
 {

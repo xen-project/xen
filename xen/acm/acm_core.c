@@ -69,6 +69,8 @@ void acm_set_endian(void)
     }
 }
 
+#if (ACM_USE_SECURITY_POLICY != ACM_NULL_POLICY)
+
 /* initialize global security policy for Xen; policy write-locked already */
 static void
 acm_init_binary_policy(void *primary, void *secondary)
@@ -78,6 +80,7 @@ acm_init_binary_policy(void *primary, void *secondary)
 	acm_bin_pol.primary_binary_policy = primary;
 	acm_bin_pol.secondary_binary_policy = secondary;
 }
+
 
 int
 acm_init(void)
@@ -129,6 +132,7 @@ acm_init(void)
 	return ACM_OK;
 }
 
+#endif
 
 int
 acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
