@@ -527,8 +527,6 @@ int xc_linux_build(int xc_handle,
     if ( image != NULL )
         free(image);
 
-    ctxt->flags = 0;
-
     /*
      * Initial register values:
      *  DS,ES,FS,GS = FLAT_KERNEL_DS
