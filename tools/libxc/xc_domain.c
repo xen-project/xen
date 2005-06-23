@@ -79,6 +79,8 @@ int xc_domain_getinfo(int xc_handle,
     dom0_op_t op;
     int rc = 0; 
 
+    memset(info, 0, max_doms*sizeof(xc_dominfo_t));
+
     for ( nr_doms = 0; nr_doms < max_doms; nr_doms++ )
     {
         op.cmd = DOM0_GETDOMAININFO;
