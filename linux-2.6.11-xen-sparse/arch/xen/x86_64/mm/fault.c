@@ -563,6 +563,7 @@ no_context:
  */
 out_of_memory:
 	up_read(&mm->mmap_sem);
+out_of_memory2:
 	if (current->pid == 1) { 
 		yield();
 		goto again;

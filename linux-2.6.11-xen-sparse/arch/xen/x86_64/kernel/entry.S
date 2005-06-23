@@ -50,43 +50,8 @@
 
 #include "irq_vectors.h"
 
-EVENT_MASK      = (CS+4)
-VGCF_IN_SYSCALL = (1<<8)
-        
-/*
- * Copied from arch/xen/i386/kernel/entry.S
- */                        
-/* Offsets into shared_info_t. */                
-#define evtchn_upcall_pending		0
-#define evtchn_upcall_mask		1
-
-#define sizeof_vcpu_shift		3
-
-#ifdef CONFIG_SMP
-#define preempt_disable(reg)	incl threadinfo_preempt_count(reg)
-#define preempt_enable(reg)	decl threadinfo_preempt_count(reg)
-#define XEN_GET_VCPU_INFO(reg)	preempt_disable(%rbp)			; \
-				movq %gs:pda_cpunumber,reg		; \
-				shl  $sizeof_vcpu_shift,reg		; \
-				addq HYPERVISOR_shared_info,reg
-#define XEN_PUT_VCPU_INFO(reg)	preempt_enable(%rbp)			; \
-#define XEN_PUT_VCPU_INFO_fixup .byte 0xff,0xff,0xff
-#else
-#define XEN_GET_VCPU_INFO(reg)	movq HYPERVISOR_shared_info,reg
-#define XEN_PUT_VCPU_INFO(reg)
-#define XEN_PUT_VCPU_INFO_fixup
-#endif
-
-#define XEN_LOCKED_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
-#define XEN_LOCKED_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
-#define XEN_BLOCK_EVENTS(reg)	XEN_GET_VCPU_INFO(reg)			; \
-				XEN_LOCKED_BLOCK_EVENTS(reg)		; \
-    				XEN_PUT_VCPU_INFO(reg)
-#define XEN_UNBLOCK_EVENTS(reg)	XEN_GET_VCPU_INFO(reg)			; \
-				XEN_LOCKED_UNBLOCK_EVENTS(reg)		; \
-    				XEN_PUT_VCPU_INFO(reg)
-#define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(reg)
-
+#include "xen_entry.S"
+	
 	.code64
 
 #ifdef CONFIG_PREEMPT
@@ -172,8 +137,6 @@ VGCF_IN_SYSCALL = (1<<8)
         movq %r11,1*8(%rsp)
         movq %rcx,2*8(%rsp)              # we saved %rcx upon exceptions
         movq $\flag,3*8(%rsp)
-        movq $__USER_CS,5*8(%rsp)
-        movq $__USER_DS,8*8(%rsp)
         movq $__HYPERVISOR_switch_to_user,%rax
         syscall
         .endm

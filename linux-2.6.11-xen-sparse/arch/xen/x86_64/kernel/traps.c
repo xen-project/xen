@@ -931,6 +931,9 @@ static trap_info_t trap_table[] = {
 #endif
         { 19, 0, (__KERNEL_CS|0x3), 0, (unsigned long)simd_coprocessor_error     },
         { SYSCALL_VECTOR,  3, (__KERNEL_CS|0x3), 0, (unsigned long)system_call   },
+#ifdef CONFIG_IA32_EMULATION
+	{ IA32_SYSCALL_VECTOR, 3, (__KERNEL_CS|0x3), 0, (unsigned long)ia32_syscall},
+#endif
         {  0, 0,           0, 0,  0                                              }
 };
 

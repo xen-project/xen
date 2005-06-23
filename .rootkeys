@@ -263,6 +263,10 @@
 3f68905c5eiA-lBMQSvXLMWS1ikDEA linux-2.6.11-xen-sparse/arch/xen/kernel/xen_proc.c
 424efaa6xahU2q85_dT-SjUJEaivfg linux-2.6.11-xen-sparse/arch/xen/x86_64/Kconfig
 424efaa6kKleWe45IrqsG8gkejgEQA linux-2.6.11-xen-sparse/arch/xen/x86_64/Makefile
+42ba7fc4lb16rk9fVJeOBTPpy7bHFQ linux-2.6.11-xen-sparse/arch/xen/x86_64/ia32/Makefile
+42ba7fc4URo9Q9gyOqemf4cCcAfYCg linux-2.6.11-xen-sparse/arch/xen/x86_64/ia32/ia32entry.S
+42ba7fc4qPAX8G1HhVUPmps8xw_Odw linux-2.6.11-xen-sparse/arch/xen/x86_64/ia32/syscall32.c
+42ba7fc4xqwiER7U_2NvNwqxhRMo1g linux-2.6.11-xen-sparse/arch/xen/x86_64/ia32/vsyscall-int80.S
 424efaa6HSyuVodl6SxFGj39vlp6MA linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/Makefile
 428f0973_moB26LYt56xXKYCTqEdXw linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/acpi/Makefile
 428f0973NBdgINmWOEJjoIDL73SDbQ linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/apic.c
@@ -289,6 +293,7 @@
 424efaa7szEu90xkjpXk5TufZxxa4g linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/traps.c
 424efaa6sJsuHdGIGxm0r-ugsss3OQ linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/vsyscall.c
 424efaa6xbX9LkKyaXvgbL9s_39Trw linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/x8664_ksyms.c
+42ba7fc4mg4zVSdJUO5Wc9PM-KUbqg linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/xen_entry.S
 424efaa670zlQTtnOYK_aNgqhmSx-Q linux-2.6.11-xen-sparse/arch/xen/x86_64/mm/Makefile
 424efaa6HUC68-hBHgiWOMDfKZogIA linux-2.6.11-xen-sparse/arch/xen/x86_64/mm/fault.c
 424efaa65ELRJ3JfgQQKLzW6y0ECYQ linux-2.6.11-xen-sparse/arch/xen/x86_64/mm/init.c

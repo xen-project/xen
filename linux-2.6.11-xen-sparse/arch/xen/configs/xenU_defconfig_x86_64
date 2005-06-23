@@ -128,8 +128,8 @@ CONFIG_DUMMY_IOMMU=y
 #
 # Executable file formats / Emulations
 #
-# CONFIG_IA32_EMULATION is not set
-
+CONFIG_IA32_EMULATION=y
+# CONFIG_IA32_AOUT is not set
 #
 # Executable file formats
 #
