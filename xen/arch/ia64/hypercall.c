@@ -43,7 +43,8 @@ ia64_hypercall (struct pt_regs *regs)
 #if 1
 #define SPURIOUS_VECTOR 15
 			if (vcpu_check_pending_interrupts(v)!=SPURIOUS_VECTOR) {
-//printf("Domain trying to go idle when interrupt pending!\n");
+//				int pi = vcpu_check_pending_interrupts(v);
+//printf("idle w/int#%d pending!\n",pi);
 //this shouldn't happen, but it apparently does quite a bit!  so don't
 //allow it to happen... i.e. if a domain has an interrupt pending and
 //it tries to halt itself because it thinks it is idle, just return here

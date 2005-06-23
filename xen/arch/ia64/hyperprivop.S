@@ -17,6 +17,10 @@
 #define FAST_HYPERPRIVOP_CNT
 #define FAST_REFLECT_CNT
 
+// FIXME: This is defined in include/asm-ia64/hw_irq.h but this
+// doesn't appear to be include'able from assembly?
+#define IA64_TIMER_VECTOR 0xef
+
 // Should be included from common header file (also in process.c)
 //  NO PSR_CLR IS DIFFERENT! (CPL)
 #define IA64_PSR_CPL1	(__IA64_UL(1) << IA64_PSR_CPL1_BIT)
@@ -241,14 +245,23 @@ ENTRY(hyper_ssm_i)
 	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
 	bsw.1;;
-	st8 [r2]=r16,16; st8 [r3]=r17,16 ;;
-	st8 [r2]=r18,16; st8 [r3]=r19,16 ;;
-	st8 [r2]=r20,16; st8 [r3]=r21,16 ;;
-	st8 [r2]=r22,16; st8 [r3]=r23,16 ;;
-	st8 [r2]=r24,16; st8 [r3]=r25,16 ;;
-	st8 [r2]=r26,16; st8 [r3]=r27,16 ;;
-	st8 [r2]=r28,16; st8 [r3]=r29,16 ;;
-	st8 [r2]=r30,16; st8 [r3]=r31,16 ;;
+	// FIXME: need to handle ar.unat!
+	.mem.offset 0,0; st8.spill [r2]=r16,16;
+	.mem.offset 8,0; st8.spill [r3]=r17,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r18,16;
+	.mem.offset 8,0; st8.spill [r3]=r19,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r20,16;
+	.mem.offset 8,0; st8.spill [r3]=r21,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r22,16;
+	.mem.offset 8,0; st8.spill [r3]=r23,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r24,16;
+	.mem.offset 8,0; st8.spill [r3]=r25,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r26,16;
+	.mem.offset 8,0; st8.spill [r3]=r27,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r28,16;
+	.mem.offset 8,0; st8.spill [r3]=r29,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r30,16;
+	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
 	movl r31=XSI_IPSR;;
 	bsw.0 ;;
 	mov r2=r30; mov r3=r29;;
@@ -257,6 +270,175 @@ ENTRY(hyper_ssm_i)
 	mov pr=r31,-1 ;;
 	rfi
 	;;
+
+// reflect domain clock interrupt
+//	r31 == pr
+//	r30 == cr.ivr
+//	r29 == rp
+GLOBAL_ENTRY(fast_tick_reflect)
+#define FAST_TICK
+#ifndef FAST_TICK
+	br.cond.sptk.many rp;;
+#endif
+	mov r28=IA64_TIMER_VECTOR;;
+	cmp.ne p6,p0=r28,r30
+(p6)	br.cond.sptk.many rp;;
+	movl r20=(PERCPU_ADDR)+IA64_CPUINFO_ITM_NEXT_OFFSET;;
+	ld8 r21=[r20];;
+	mov r27=ar.itc;;
+	cmp.ltu p6,p0=r21,r27
+(p6)	br.cond.sptk.many rp;;
+	mov r17=cr.ipsr;;
+	// slow path if: ipsr.be==1, ipsr.pp==1
+	extr.u r21=r17,IA64_PSR_BE_BIT,1 ;;
+	cmp.ne p6,p0=r21,r0
+(p6)	br.cond.sptk.many rp;;
+	extr.u r21=r17,IA64_PSR_PP_BIT,1 ;;
+	cmp.ne p6,p0=r21,r0
+(p6)	br.cond.sptk.many rp;;
+#ifdef FAST_REFLECT_CNT
+	movl r20=fast_reflect_count+((0x3000>>8)*8);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	mov cr.eoi=r0;;
+	mov rp=r29;;
+	// vcpu_pend_timer(current)
+	movl r18=XSI_PSR_IC;;
+	adds r20=XSI_ITV_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r20=[r20];;
+	cmp.eq p6,p0=r20,r0	// if cr.itv==0 done
+(p6)	br.cond.sptk.many fast_tick_reflect_done;;
+	tbit.nz p6,p0=r20,16;;	// check itv.m (discard) bit
+(p6)	br.cond.sptk.many fast_tick_reflect_done;;
+	extr.u r27=r20,0,6	// r27 has low 6 bits of itv.vector
+	extr.u r26=r20,6,2;;	// r26 has irr index of itv.vector
+	mov r19=IA64_KR(CURRENT);;
+	adds r22=IA64_VCPU_DOMAIN_ITM_LAST_OFFSET,r19
+	adds r23=IA64_VCPU_DOMAIN_ITM_OFFSET,r19;;
+	ld8 r24=[r22];;
+	ld8 r23=[r23];;
+	cmp.eq p6,p0=r23,r24	// skip if this tick already delivered
+(p6)	br.cond.sptk.many fast_tick_reflect_done;;
+	// set irr bit
+	adds r21=IA64_VCPU_IRR0_OFFSET,r19;
+	shl r26=r26,3;;
+	add r21=r21,r26;;
+	mov r25=1;;
+	shl r22=r25,r27;;
+	ld8 r23=[r21];;
+	or r22=r22,r23;;
+	st8 [r21]=r22;;
+	// set PSCB(pending_interruption)!
+	adds r20=XSI_PEND_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st4 [r20]=r25;;
+	
+	// if interrupted at pl0, we're done
+	extr.u r16=r17,IA64_PSR_CPL0_BIT,2;;
+	cmp.eq p6,p0=r16,r0;;
+(p6)	br.cond.sptk.many fast_tick_reflect_done;;
+	// now deliver to iva+0x3000
+	//	r17 == cr.ipsr
+	//	r18 == XSI_PSR_IC
+	//	r19 == IA64_KR(CURRENT)
+	//	r31 == pr
+
+	// if guest vpsr.i is off, we're done
+	adds r21=XSI_PSR_I_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld4 r21=[r21];;
+	cmp.eq p6,p0=r21,r0
+(p6)	br.cond.sptk.many fast_tick_reflect_done;;
+
+	// OK, we have a clock tick to deliver to the active domain!
+	mov r16=cr.isr;;
+	mov r29=cr.iip;;
+	adds r21=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r21]=r29 ;;
+	// set shared_mem isr
+	extr.u r16=r16,38,1;;	// grab cr.isr.ir bit
+	dep r16=r16,r0,38,1 ;;	// insert into cr.isr (rest of bits zero)
+	extr.u r20=r17,41,2 ;;	// get ipsr.ri
+	dep r16=r20,r16,41,2 ;; // deposit cr.isr.ei
+	adds r21=XSI_ISR_OFS-XSI_PSR_IC_OFS,r18 ;; 
+	st8 [r21]=r16 ;;
+	// set cr.ipsr (make sure cpl==2!)
+	mov r29=r17 ;;
+	movl r28=DELIVER_PSR_SET;;
+	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0);;
+	or r29=r29,r28;;
+	and r29=r29,r27;;
+	mov cr.ipsr=r29;;
+	// set shared_mem ipsr (from ipsr in r17 with ipsr.ri already set)
+	extr.u r29=r17,IA64_PSR_CPL0_BIT,2;;
+	cmp.eq p6,p7=3,r29;;
+(p6)	dep r17=-1,r17,IA64_PSR_CPL0_BIT,2
+(p7)	dep r17=0,r17,IA64_PSR_CPL0_BIT,2
+	;;
+	movl r28=(IA64_PSR_DT|IA64_PSR_IT|IA64_PSR_RT);;
+	movl r27=~(IA64_PSR_BE|IA64_PSR_PP|IA64_PSR_BN|IA64_PSR_I|IA64_PSR_IC);;
+	dep r21=-1,r21,IA64_PSR_CPL1_BIT,1 ;;
+	or r17=r17,r28;;
+	and r17=r17,r27;;
+	ld4 r16=[r18],4;;
+	cmp.ne p6,p0=r16,r0;;
+(p6)	dep r17=-1,r17,IA64_PSR_IC_BIT,1 ;;
+	ld4 r16=[r18],-4;;
+	cmp.ne p6,p0=r16,r0;;
+(p6)	dep r17=-1,r17,IA64_PSR_I_BIT,1 ;;
+	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r21]=r17 ;;
+	// set shared_mem interrupt_delivery_enabled to 0
+	// set shared_mem interrupt_collection_enabled to 0
+	st8 [r18]=r0;;
+	// cover and set shared_mem precover_ifs to cr.ifs
+	// set shared_mem ifs and incomplete_regframe to 0
+	cover ;;
+	mov r20=cr.ifs;;
+	adds r21=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st4 [r21]=r0 ;;
+	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r21]=r0 ;;
+	adds r21=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r21]=r20 ;;
+	// leave cr.ifs alone for later rfi
+	// set iip to go to domain IVA break instruction vector
+	adds r22=IA64_VCPU_IVA_OFFSET,r19;;
+	ld8 r23=[r22];;
+	movl r24=0x3000;;
+	add r24=r24,r23;;
+	mov cr.iip=r24;;
+	// OK, now all set to go except for switch to virtual bank0
+	mov r30=r2; mov r29=r3;;
+	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
+	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
+	bsw.1;;
+	// FIXME: need to handle ar.unat!
+	.mem.offset 0,0; st8.spill [r2]=r16,16;
+	.mem.offset 8,0; st8.spill [r3]=r17,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r18,16;
+	.mem.offset 8,0; st8.spill [r3]=r19,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r20,16;
+	.mem.offset 8,0; st8.spill [r3]=r21,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r22,16;
+	.mem.offset 8,0; st8.spill [r3]=r23,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r24,16;
+	.mem.offset 8,0; st8.spill [r3]=r25,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r26,16;
+	.mem.offset 8,0; st8.spill [r3]=r27,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r28,16;
+	.mem.offset 8,0; st8.spill [r3]=r29,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r30,16;
+	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
+	movl r31=XSI_IPSR;;
+	bsw.0 ;;
+	mov r2=r30; mov r3=r29;;
+	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st4 [r20]=r0 ;;
+fast_tick_reflect_done:
+	mov pr=r31,-1 ;;
+	rfi
+END(fast_tick_reflect)
 
 // reflect domain breaks directly to domain
 // FIXME: DOES NOT WORK YET

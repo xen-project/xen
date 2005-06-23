@@ -781,6 +781,7 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 // FIXME: Handle faults appropriately for these
 	if (!iim || iim > HYPERPRIVOP_MAX) {
 		printf("bad hyperprivop; ignored\n");
+		printf("iim=%d, iip=%p\n",iim,regs->cr_iip);
 		return 1;
 	}
 	slow_hyperpriv_cnt[iim]++;

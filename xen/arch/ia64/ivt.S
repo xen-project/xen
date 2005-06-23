@@ -919,6 +919,21 @@ ENTRY(interrupt)
 	DBG_FAULT(12)
 	mov r31=pr		// prepare to save predicates
 	;;
+#ifdef XEN
+	mov r30=cr.ivr		// pass cr.ivr as first arg
+	// FIXME: this is a hack... use cpuinfo.pgd_quick because its
+	// not used anywhere else and we need a place to stash ivr and
+	// there's no registers available unused by SAVE_MIN/REST
+	movl r29=(PERCPU_ADDR)+IA64_CPUINFO_PGD_QUICK_OFFSET;;
+	st8 [r29]=r30;;
+	movl r28=slow_interrupt;;
+	mov r29=rp;;
+	mov rp=r28;;
+	br.cond.sptk.many fast_tick_reflect
+	;;
+slow_interrupt:
+	mov rp=r29;;
+#endif
 	SAVE_MIN_WITH_COVER	// uses r31; defines r2 and r3
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
@@ -928,7 +943,12 @@ ENTRY(interrupt)
 	SAVE_REST
 	;;
 	alloc r14=ar.pfs,0,0,2,0 // must be first in an insn group
+#ifdef XEN
+	movl out0=(PERCPU_ADDR)+IA64_CPUINFO_PGD_QUICK_OFFSET;;
+	ld8 out0=[out0];;
+#else
 	mov out0=cr.ivr		// pass cr.ivr as first arg
+#endif
 	add out1=16,sp		// pass pointer to pt_regs as second arg
 	;;
 	srlz.d			// make sure we see the effect of cr.ivr

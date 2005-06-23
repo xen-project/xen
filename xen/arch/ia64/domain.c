@@ -50,7 +50,7 @@ unsigned long dom0_size = 512*1024*1024; //FIXME: Should be configurable
 //FIXME: alignment should be 256MB, lest Linux use a 256MB page size
 unsigned long dom0_align = 256*1024*1024;
 #else // CONFIG_VTI
-unsigned long dom0_size = 256*1024*1024; //FIXME: Should be configurable
+unsigned long dom0_size = 512*1024*1024; //FIXME: Should be configurable
 //FIXME: alignment should be 256MB, lest Linux use a 256MB page size
 unsigned long dom0_align = 64*1024*1024;
 #endif // CONFIG_VTI
