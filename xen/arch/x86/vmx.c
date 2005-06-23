@@ -1009,10 +1009,50 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_read: ecx=%lx, eax=%lx, edx=%lx",
                 (unsigned long)regs->ecx, (unsigned long)regs->eax, 
                 (unsigned long)regs->edx);
-
-    rdmsr(regs->ecx, regs->eax, regs->edx);
+    switch (regs->ecx) {
+        case MSR_IA32_SYSENTER_CS:
+            __vmread(GUEST_SYSENTER_CS, &regs->eax);
+            regs->edx = 0;
+            break;
+        case MSR_IA32_SYSENTER_ESP:	
+             __vmread(GUEST_SYSENTER_ESP, &regs->eax);
+             regs->edx = 0;
+            break;
+        case MSR_IA32_SYSENTER_EIP:		
+            __vmread(GUEST_SYSENTER_EIP, &regs->eax);
+            regs->edx = 0;
+            break;
+        default:
+            rdmsr(regs->ecx, regs->eax, regs->edx);
+            break;
+    }
 
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_read returns: "
+                "ecx=%lx, eax=%lx, edx=%lx",
+                (unsigned long)regs->ecx, (unsigned long)regs->eax,
+                (unsigned long)regs->edx);
+}
+
+static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
+{
+    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_write: ecx=%lx, eax=%lx, edx=%lx",
+                (unsigned long)regs->ecx, (unsigned long)regs->eax, 
+                (unsigned long)regs->edx);
+    switch (regs->ecx) {
+        case MSR_IA32_SYSENTER_CS:
+            __vmwrite(GUEST_SYSENTER_CS, regs->eax);
+            break;
+        case MSR_IA32_SYSENTER_ESP:	
+             __vmwrite(GUEST_SYSENTER_ESP, regs->eax);
+            break;
+        case MSR_IA32_SYSENTER_EIP:		
+            __vmwrite(GUEST_SYSENTER_EIP, regs->eax);
+            break;
+        default:
+            break;
+    }
+
+    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_write returns: "
                 "ecx=%lx, eax=%lx, edx=%lx",
                 (unsigned long)regs->ecx, (unsigned long)regs->eax,
                 (unsigned long)regs->edx);
@@ -1332,9 +1372,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         break;
     case EXIT_REASON_MSR_WRITE:
         __vmread(GUEST_RIP, &eip);
-        VMX_DBG_LOG(DBG_LEVEL_1, "MSR_WRITE: eip=%lx, eax=%lx, edx=%lx",
-                eip, (unsigned long)regs.eax, (unsigned long)regs.edx);
-        /* just ignore this point */
+        vmx_do_msr_write(&regs);
         __get_instruction_length(inst_len);
         __update_guest_eip(inst_len);
         break;
