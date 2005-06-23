@@ -618,6 +618,7 @@ def main(argv):
         config = opts.vals.config
     else:
         opts.load_defconfig()
+        opts.vals.vnc = not opts.vals.dryrun
         preprocess(opts, opts.vals)
         if not opts.getopt('name') and opts.getopt('defconfig'):
             opts.setopt('name', os.path.basename(opts.getopt('defconfig')))
