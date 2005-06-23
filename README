@@ -40,7 +40,9 @@ Quick-Start Guide - Pre-Built Binary Release
 performed with root privileges.]
 
 1. Install the binary distribution onto your filesystem:
+
     # sh ./install.sh
+
    Amongst other things, this will install Xen and XenLinux kernel
    files in /boot, kernel modules and Python packages in /lib, and
    various control tools in standard 'bin' directories.
@@ -50,9 +52,11 @@ performed with root privileges.]
    alternatives such as LILO are *not* supported. You can most likely
    find your GRUB menu file at /boot/grub/menu.lst: edit this file to
    include an entry like the following:
+
     # title Xen 2.0 / XenLinux 2.6
     #   kernel /boot/xen-2.0.gz dom0_mem=<mem-kb> console=vga
     #   module /boot/vmlinuz-2.6-xen0 root=<root-dev> ro console=tty0
+
    For <mem-kb> you should specify the amount of memory, in kilobytes,
    to allocate for use by your initial XenLinux virtual machine. Note
    that Xen itself reserves about 32MB memory for internal use, which
@@ -79,3 +83,61 @@ provided by your Linux distributor:
 
 [NB. Unless noted otherwise, all the following steps should be
 performed with root privileges.]
+
+1. Download and untar the source tarball file. This will be a
+   file named xen-unstable-src.tgz, or xen-$version-src.tgz.
+   You can also pull the current version from the SCMS
+   that is being used (Bitkeeper, scheduled to change shortly).
+
+    # tar xzf xen-unstable-src.tgz
+
+   Assuming you are using the unstable tree, this will
+   untar into xen-unstable. The rest of the instructions
+   use the unstable tree as an example, substitute the
+   version for unstable.
+
+2. cd to xen-unstable (or whatever you sensibly rename it to).
+   The Linux (2.4 and 2.6), netbsd and freebsd kernel source
+   trees are in the $os-$version-xen-sparse directories.
+
+On Linux:
+
+3. For the very first build, or if you want to destroy existing
+   .configs and build trees, perform the following steps:
+
+    # make world
+    # make install
+
+   This will create the directories linux-2.6.11-dom0/ and
+   linux-2.6.11-domU/ after first cleaning everything. It will
+   create and install into the dist/ directory which is the
+   default install location. It will build the xen binary
+   (xen.gz), the boot images for dom0 and an unpriviledged
+   guest kernel (vmlinuz-2.6.11-xen0 and vmlinuz-2.6.11-xenU
+   respectively), the tools and the documentation.
+
+4. To rebuild an existing tree without modifying the config:
+    # make dist
+
+   This will build and install xen, kernels, tools, and
+   docs into the local dist/ directory.
+
+5. To rebuild a kernel with a modified config:
+
+    # cd linux-2.6.11-xen0         # or linux-2.6.11-xenU
+    # make ARCH=xen menuconfig     # or xconfig
+    # cd ..
+    # make dist
+    # make install
+
+   You can copy your own config into linux-2.6.11-xen0 first.
+   Alternatively, you can also copy your config file to
+   dist/install/boot/config-$version-xen0/U.  This is picked up
+   when a make dist is done. Include the ARCH=xen directive for
+   all make commands when building the kernels.
+
+6. To see a full list of targets and a brief description, type:
+    # make help
+
+7. Edit your grub.conf file as described above to have an
+   appropriate entry for your new kernel.
