@@ -1343,7 +1343,7 @@ static int xennet_proc_read(
 {
     struct net_device *dev = (struct net_device *)((unsigned long)data & ~3UL);
     struct net_private *np = netdev_priv(dev);
-    int len = 0, which_target = (unsigned long) data & 3;
+    int len = 0, which_target = (long)data & 3;
     
     switch (which_target)
     {
@@ -1368,7 +1368,7 @@ static int xennet_proc_write(
 {
     struct net_device *dev = (struct net_device *)((unsigned long)data & ~3UL);
     struct net_private *np = netdev_priv(dev);
-    int which_target = (unsigned long) data & 3;
+    int which_target = (long)data & 3;
     char string[64];
     long target;
 
