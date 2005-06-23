@@ -26,7 +26,7 @@ static int do_evtchn_op(int xc_handle, evtchn_op_t *op)
     if ((ret = do_xen_hypercall(xc_handle, &hypercall)) < 0)
         ERROR("do_evtchn_op: HYPERVISOR_event_channel_op failed: %d", ret);
 
-    (void)munlock(op, sizeof(*op));
+    safe_munlock(op, sizeof(*op));
  out:
     return ret;
 }

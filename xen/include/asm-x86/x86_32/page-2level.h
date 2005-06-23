@@ -46,6 +46,8 @@ typedef l2_pgentry_t root_pgentry_t;
  *  12-bit flags = (pte[11:0])
  */
 
+#define _PAGE_NX                0U
+
 /* Extract flags into 12-bit integer, or turn 12-bit flags into a pte mask. */
 #define get_pte_flags(x) ((int)(x) & 0xFFF)
 #define put_pte_flags(x) ((intpte_t)((x) & 0xFFF))

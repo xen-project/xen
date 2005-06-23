@@ -33,7 +33,7 @@ do_gnttab_op( int xc_handle,
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
         ERROR("do_gnttab_op: HYPERVISOR_grant_table_op failed: %d", ret);
 
-    (void)munlock(op, sizeof(*op));
+    safe_munlock(op, sizeof(*op));
  out:
     return ret;
 }

@@ -22,8 +22,10 @@ void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
     ioctlx.arr=arr;
     if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx ) < 0 )
     {
+        int saved_errno = errno;
 	perror("XXXXXXXX");
-	munmap(addr, num*PAGE_SIZE);
+	(void)munmap(addr, num*PAGE_SIZE);
+        errno = saved_errno;
 	return NULL;
     }
     return addr;
@@ -51,7 +53,9 @@ void *xc_map_foreign_range(int xc_handle, u32 dom,
     entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
     if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) < 0 )
     {
-	munmap(addr, size);
+        int saved_errno = errno;
+	(void)munmap(addr, size);
+        errno = saved_errno;
 	return NULL;
     }
     return addr;
@@ -134,8 +138,8 @@ static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
     }
 
     mmu->idx = 0;
-    
-    (void)munlock(mmu->updates, sizeof(mmu->updates));
+
+    safe_munlock(mmu->updates, sizeof(mmu->updates));
 
  out:
     return err;
@@ -232,7 +236,7 @@ int xc_get_pfn_list(int xc_handle,
 
     ret = do_dom0_op(xc_handle, &op);
 
-    (void)munlock(pfn_buf, max_pfns * sizeof(unsigned long));
+    safe_munlock(pfn_buf, max_pfns * sizeof(unsigned long));
 
 #if 0
 #ifdef DEBUG

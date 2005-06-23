@@ -14,7 +14,7 @@
  *
  * sHype policy management tool. This code runs in a domain and
  *     manages the Xen security policy by interacting with the
- *     Xen access control module via a /proc/xen/policycmd proc-ioctl, 
+ *     Xen access control module via a /proc/xen/privcmd proc-ioctl, 
  *     which is translated into a policy_op hypercall into Xen.
  * 
  * todo: implement setpolicy to dynamically set a policy cache.
@@ -229,7 +229,6 @@ void acm_dump_policy_buffer(void *buf, int buflen) {
 	default:
 		printf("UNKNOWN POLICY!\n");
 	}
-	printf("\nPolicy dump End.\n\n");
 }
 
 /*************************** set policy ****************************/
@@ -519,39 +518,35 @@ usage(char *progname){
 int
 main(int argc, char **argv) {
 
-	int policycmd_fd;
+	int policycmd_fd, ret;
 
-	if (argc < 2)
+	if (argc < 2) 
 		usage(argv[0]);
 		
 	if ((policycmd_fd = open("/proc/xen/privcmd", O_RDONLY)) <= 0) {
-		    printf("ERROR: Could not open xen policycmd device!\n");
+		    printf("ERROR: Could not open xen privcmd device!\n");
 		    exit(-1);
 	}
 	    
 	if (!strcmp(argv[1], "setpolicy")) {
 		if (argc != 2)
 			usage(argv[0]);
-		acm_domain_setpolicy(policycmd_fd);
-
+		ret = acm_domain_setpolicy(policycmd_fd);
 	} else if (!strcmp(argv[1], "getpolicy")) {
 		if (argc != 2)
 			usage(argv[0]);
-		acm_domain_getpolicy(policycmd_fd);
-
+		ret = acm_domain_getpolicy(policycmd_fd);
 	} else if (!strcmp(argv[1], "loadpolicy")) {
 		if (argc != 3) 
 			usage(argv[0]);
-		acm_domain_loadpolicy(policycmd_fd, argv[2]);
-
+		ret = acm_domain_loadpolicy(policycmd_fd, argv[2]);
 	} else if (!strcmp(argv[1], "dumpstats")) {
 		if (argc != 2) 
 			usage(argv[0]);
-		acm_domain_dumpstats(policycmd_fd);
-
+		ret = acm_domain_dumpstats(policycmd_fd);
 	} else
 		usage(argv[0]);
 
 	close(policycmd_fd);
-	return 0;
+	return ret;
 }

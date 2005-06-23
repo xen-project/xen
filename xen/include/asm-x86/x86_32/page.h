@@ -7,8 +7,6 @@
 #define VADDR_BITS              32
 #define VADDR_MASK              (~0UL)
 
-#define _PAGE_NX                0U
-
 #include <xen/config.h>
 #ifdef CONFIG_X86_PAE
 # include <asm/x86_32/page-3level.h>

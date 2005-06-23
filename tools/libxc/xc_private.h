@@ -101,12 +101,28 @@ struct load_funcs
     loadimagefunc loadimage;
 };
 
-#define ERROR(_m, _a...)  \
-    fprintf(stderr, "ERROR: " _m "\n" , ## _a )
+#define ERROR(_m, _a...)                                \
+do {                                                    \
+    int __saved_errno = errno;                          \
+    fprintf(stderr, "ERROR: " _m "\n" , ## _a );        \
+    errno = __saved_errno;                              \
+} while (0)
 
-#define PERROR(_m, _a...) \
-    fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a , \
-            errno, strerror(errno))
+
+#define PERROR(_m, _a...)                                       \
+do {                                                            \
+    int __saved_errno = errno;                                  \
+    fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,       \
+            __saved_errno, strerror(__saved_errno));            \
+    errno = __saved_errno;                                      \
+} while (0)
+
+static inline void safe_munlock(const void *addr, size_t len)
+{
+    int saved_errno = errno;
+    (void)munlock(addr, len);
+    errno = saved_errno;
+}
 
 static inline int do_privcmd(int xc_handle,
                              unsigned int cmd, 
@@ -125,7 +141,7 @@ static inline int do_xen_hypercall(int xc_handle,
 
 static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
 {
-    int ret = -1, errno_saved;
+    int ret = -1;
     privcmd_hypercall_t hypercall;
 
     op->interface_version = DOM0_INTERFACE_VERSION;
@@ -146,9 +162,7 @@ static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
                     " rebuild the user-space tool set?\n");
     }
 
-    errno_saved = errno;
-    (void)munlock(op, sizeof(*op));
-    errno = errno_saved;
+    safe_munlock(op, sizeof(*op));
 
  out1:
     return ret;
@@ -163,7 +177,6 @@ static inline int do_dom_mem_op(int            xc_handle,
 {
     privcmd_hypercall_t hypercall;
     long ret = -EINVAL;
-    int errno_saved;
 
     hypercall.op     = __HYPERVISOR_dom_mem_op;
     hypercall.arg[0] = (unsigned long)memop;
@@ -186,11 +199,7 @@ static inline int do_dom_mem_op(int            xc_handle,
     }
 
     if ( extent_list != NULL )
-    {
-        errno_saved = errno;
-        (void)munlock(extent_list, nr_extents*sizeof(unsigned long));
-        errno = errno_saved;
-    }
+        safe_munlock(extent_list, nr_extents*sizeof(unsigned long));
 
  out1:
     return ret;
@@ -204,7 +213,6 @@ static inline int do_mmuext_op(
 {
     privcmd_hypercall_t hypercall;
     long ret = -EINVAL;
-    int errno_saved;
 
     hypercall.op     = __HYPERVISOR_mmuext_op;
     hypercall.arg[0] = (unsigned long)op;
@@ -224,9 +232,7 @@ static inline int do_mmuext_op(
                     " rebuild the user-space tool set?\n",ret,errno);
     }
 
-    errno_saved = errno;
-    (void)munlock(op, nr_ops*sizeof(*op));
-    errno = errno_saved;
+    safe_munlock(op, nr_ops*sizeof(*op));
 
  out1:
     return ret;

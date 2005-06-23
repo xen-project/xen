@@ -30,21 +30,42 @@
 #include <public/event_channel.h>
 #include <asm/current.h>
 
+#if (ACM_USE_SECURITY_POLICY == ACM_NULL_POLICY)
+
+static inline int acm_pre_dom0_op(dom0_op_t *op, void **ssid) 
+{ return 0; }
+static inline void acm_post_dom0_op(dom0_op_t *op, void *ssid) 
+{ return; }
+static inline void acm_fail_dom0_op(dom0_op_t *op, void *ssid) 
+{ return; }
+static inline int acm_pre_event_channel(evtchn_op_t *op) 
+{ return 0; }
+static inline int acm_pre_grant_map_ref(domid_t id) 
+{ return 0; }
+static inline int acm_pre_grant_setup(domid_t id) 
+{ return 0; }
+static inline int acm_init(void)
+{ return 0; }
+static inline void acm_post_domain0_create(domid_t domid) 
+{ return; }
+
+#else
+
 /* if ACM_TRACE_MODE defined, all hooks should
  * print a short trace message */
 /* #define ACM_TRACE_MODE */
 
 #ifdef ACM_TRACE_MODE
-#  define traceprintk(fmt, args...) printk(fmt,## args)
+# define traceprintk(fmt, args...) printk(fmt,## args)
 #else
-#  define traceprintk(fmt, args...)
+# define traceprintk(fmt, args...)
 #endif
 
 /* global variables */
 extern struct acm_operations *acm_primary_ops;
 extern struct acm_operations *acm_secondary_ops;
 
-/**********************************************************************************************
+/*********************************************************************
  * HOOK structure and meaning (justifies a few words about our model):
  * 
  * General idea: every policy-controlled system operation is reflected in a 
@@ -60,7 +81,8 @@ extern struct acm_operations *acm_secondary_ops;
  *      ======================
  *      PRE-Hooks
  *		a) general authorization to guard a controlled system operation
- *		b) prepare security state change (means: fail hook must be able to "undo" this)
+ *		b) prepare security state change
+ *                 (means: fail hook must be able to "undo" this)
  *
  *	POST-Hooks
  *		a) commit prepared state change
@@ -100,238 +122,228 @@ extern struct acm_operations *acm_secondary_ops;
  *                                             \
  *                                            sys-ops error
  *
- *************************************************************************************************/
+ ********************************************************************/
 
 struct acm_operations {
-	/* policy management functions (must always be defined!) */
-	int  (*init_domain_ssid)	       	(void **ssid, ssidref_t ssidref);
-	void (*free_domain_ssid)	       	(void *ssid);
-	int  (*dump_binary_policy)		(u8 *buffer, u16 buf_size);
-	int  (*set_binary_policy)		(u8 *buffer, u16 buf_size);	
-	int  (*dump_statistics)			(u8 *buffer, u16 buf_size);
-	/* domain management control hooks (can be NULL) */
-	int  (*pre_domain_create)              	(void *subject_ssid, ssidref_t ssidref);
-	void (*post_domain_create) 		(domid_t domid, ssidref_t ssidref);
-	void (*fail_domain_create)             	(void *subject_ssid, ssidref_t ssidref);
-	void (*post_domain_destroy)		(void *object_ssid, domid_t id);
-	/* event channel control hooks  (can be NULL) */
-	int  (*pre_eventchannel_unbound)       	(domid_t id);
-	void (*fail_eventchannel_unbound)      	(domid_t id);
-	int  (*pre_eventchannel_interdomain)	(domid_t id1, domid_t id2);
-	int  (*fail_eventchannel_interdomain)	(domid_t id1, domid_t id2);
-	/* grant table control hooks (can be NULL)  */
-	int  (*pre_grant_map_ref)       	(domid_t id);
-	void (*fail_grant_map_ref)		(domid_t id);
-	int  (*pre_grant_setup)       		(domid_t id);
-	void (*fail_grant_setup)		(domid_t id);
+    /* policy management functions (must always be defined!) */
+    int  (*init_domain_ssid)           (void **ssid, ssidref_t ssidref);
+    void (*free_domain_ssid)           (void *ssid);
+    int  (*dump_binary_policy)         (u8 *buffer, u16 buf_size);
+    int  (*set_binary_policy)          (u8 *buffer, u16 buf_size);
+    int  (*dump_statistics)            (u8 *buffer, u16 buf_size);
+    /* domain management control hooks (can be NULL) */
+    int  (*pre_domain_create)          (void *subject_ssid, ssidref_t ssidref);
+    void (*post_domain_create)         (domid_t domid, ssidref_t ssidref);
+    void (*fail_domain_create)         (void *subject_ssid, ssidref_t ssidref);
+    void (*post_domain_destroy)        (void *object_ssid, domid_t id);
+    /* event channel control hooks  (can be NULL) */
+    int  (*pre_eventchannel_unbound)      (domid_t id);
+    void (*fail_eventchannel_unbound)     (domid_t id);
+    int  (*pre_eventchannel_interdomain)  (domid_t id1, domid_t id2);
+    int  (*fail_eventchannel_interdomain) (domid_t id1, domid_t id2);
+    /* grant table control hooks (can be NULL)  */
+    int  (*pre_grant_map_ref)          (domid_t id);
+    void (*fail_grant_map_ref)         (domid_t id);
+    int  (*pre_grant_setup)            (domid_t id);
+    void (*fail_grant_setup)           (domid_t id);
 };
 
-static inline int acm_pre_domain_create (void *subject_ssid, ssidref_t ssidref)
+static inline int acm_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
 {
-	if ((acm_primary_ops->pre_domain_create != NULL) && 
-		 acm_primary_ops->pre_domain_create (subject_ssid, ssidref))
-		return ACM_ACCESS_DENIED;
-	else if ((acm_secondary_ops->pre_domain_create != NULL) && 
-		 acm_secondary_ops->pre_domain_create (subject_ssid, ssidref)) {
-		/* roll-back primary */
-		if (acm_primary_ops->fail_domain_create != NULL)
-			acm_primary_ops->fail_domain_create (subject_ssid, ssidref);
-		return ACM_ACCESS_DENIED;
-	} else
-		return ACM_ACCESS_PERMITTED;
+    if ((acm_primary_ops->pre_domain_create != NULL) && 
+        acm_primary_ops->pre_domain_create(subject_ssid, ssidref))
+        return ACM_ACCESS_DENIED;
+    else if ((acm_secondary_ops->pre_domain_create != NULL) && 
+             acm_secondary_ops->pre_domain_create(subject_ssid, ssidref)) {
+        /* roll-back primary */
+        if (acm_primary_ops->fail_domain_create != NULL)
+            acm_primary_ops->fail_domain_create(subject_ssid, ssidref);
+        return ACM_ACCESS_DENIED;
+    } else
+        return ACM_ACCESS_PERMITTED;
 }
 
-static inline void acm_post_domain_create (domid_t domid, ssidref_t ssidref)
+static inline void acm_post_domain_create(domid_t domid, ssidref_t ssidref)
 {
-	if (acm_primary_ops->post_domain_create != NULL)
-		acm_primary_ops->post_domain_create (domid, ssidref);
-	if (acm_secondary_ops->post_domain_create != NULL)
-		acm_secondary_ops->post_domain_create (domid, ssidref);
+    if (acm_primary_ops->post_domain_create != NULL)
+        acm_primary_ops->post_domain_create(domid, ssidref);
+    if (acm_secondary_ops->post_domain_create != NULL)
+        acm_secondary_ops->post_domain_create(domid, ssidref);
 }
 
-static inline void acm_fail_domain_create (void *subject_ssid, ssidref_t ssidref)
+static inline void acm_fail_domain_create(
+    void *subject_ssid, ssidref_t ssidref)
 {
-	if (acm_primary_ops->fail_domain_create != NULL)
-		acm_primary_ops->fail_domain_create (subject_ssid, ssidref);
-	if (acm_secondary_ops->fail_domain_create != NULL)
-		acm_secondary_ops->fail_domain_create (subject_ssid, ssidref);
+    if (acm_primary_ops->fail_domain_create != NULL)
+        acm_primary_ops->fail_domain_create(subject_ssid, ssidref);
+    if (acm_secondary_ops->fail_domain_create != NULL)
+        acm_secondary_ops->fail_domain_create(subject_ssid, ssidref);
 }
 
-static inline void acm_post_domain_destroy (void *object_ssid, domid_t id)
+static inline void acm_post_domain_destroy(void *object_ssid, domid_t id)
 {
-	if (acm_primary_ops->post_domain_destroy != NULL)
-		acm_primary_ops->post_domain_destroy (object_ssid, id);
-	if (acm_secondary_ops->post_domain_destroy != NULL)
-		acm_secondary_ops->post_domain_destroy (object_ssid, id);
-	return;
+    if (acm_primary_ops->post_domain_destroy != NULL)
+        acm_primary_ops->post_domain_destroy(object_ssid, id);
+    if (acm_secondary_ops->post_domain_destroy != NULL)
+        acm_secondary_ops->post_domain_destroy(object_ssid, id);
+    return;
 }
 
-/*   event channel ops */
-
-static inline int acm_pre_eventchannel_unbound (domid_t id)
+static inline int acm_pre_eventchannel_unbound(domid_t id)
 {
-	if ((acm_primary_ops->pre_eventchannel_unbound != NULL) && 
-	    acm_primary_ops->pre_eventchannel_unbound (id))
-		return ACM_ACCESS_DENIED;
-	else if ((acm_secondary_ops->pre_eventchannel_unbound != NULL) && 
-		 acm_secondary_ops->pre_eventchannel_unbound (id)) {
-		/* roll-back primary */
-		if (acm_primary_ops->fail_eventchannel_unbound != NULL)
-			acm_primary_ops->fail_eventchannel_unbound (id);
-		return ACM_ACCESS_DENIED;
-	} else
-		return ACM_ACCESS_PERMITTED;
+    if ((acm_primary_ops->pre_eventchannel_unbound != NULL) && 
+        acm_primary_ops->pre_eventchannel_unbound(id))
+        return ACM_ACCESS_DENIED;
+    else if ((acm_secondary_ops->pre_eventchannel_unbound != NULL) && 
+             acm_secondary_ops->pre_eventchannel_unbound(id)) {
+        /* roll-back primary */
+        if (acm_primary_ops->fail_eventchannel_unbound != NULL)
+            acm_primary_ops->fail_eventchannel_unbound(id);
+        return ACM_ACCESS_DENIED;
+    } else
+        return ACM_ACCESS_PERMITTED;
 }
 
-static inline int acm_pre_eventchannel_interdomain (domid_t id1, domid_t id2)
-{	
-	if ((acm_primary_ops->pre_eventchannel_interdomain != NULL) &&
-	    acm_primary_ops->pre_eventchannel_interdomain (id1, id2))
-		return ACM_ACCESS_DENIED;
-	else if ((acm_secondary_ops->pre_eventchannel_interdomain != NULL) &&
-		 acm_secondary_ops->pre_eventchannel_interdomain (id1, id2)) {
-		/* roll-back primary */
-		if (acm_primary_ops->fail_eventchannel_interdomain != NULL)
-			acm_primary_ops->fail_eventchannel_interdomain (id1, id2);
-		return ACM_ACCESS_DENIED;
-	} else
-		return ACM_ACCESS_PERMITTED;
+static inline int acm_pre_eventchannel_interdomain(domid_t id1, domid_t id2)
+{
+    if ((acm_primary_ops->pre_eventchannel_interdomain != NULL) &&
+        acm_primary_ops->pre_eventchannel_interdomain(id1, id2))
+        return ACM_ACCESS_DENIED;
+    else if ((acm_secondary_ops->pre_eventchannel_interdomain != NULL) &&
+             acm_secondary_ops->pre_eventchannel_interdomain(id1, id2)) {
+        /* roll-back primary */
+        if (acm_primary_ops->fail_eventchannel_interdomain != NULL)
+            acm_primary_ops->fail_eventchannel_interdomain(id1, id2);
+        return ACM_ACCESS_DENIED;
+    } else
+        return ACM_ACCESS_PERMITTED;
 }
 
-/************ Xen inline hooks ***************/
-
-/* small macro to make the hooks more readable 
- * (eliminates hooks if NULL policy is active)
- */
-#if (ACM_USE_SECURITY_POLICY == ACM_NULL_POLICY)
-static inline int acm_pre_dom0_op(dom0_op_t *op, void **ssid) 
-{ return 0; }
-#else
 static inline int acm_pre_dom0_op(dom0_op_t *op, void **ssid) 
 {
-	int ret = -EACCES;
-	struct domain *d;
+    int ret = -EACCES;
+    struct domain *d;
 
-	switch(op->cmd) {
-	case DOM0_CREATEDOMAIN:
-		ret = acm_pre_domain_create(current->domain->ssid, op->u.createdomain.ssidref);
-		break;
-	case DOM0_DESTROYDOMAIN:
-		d = find_domain_by_id(op->u.destroydomain.domain);
-		if (d != NULL) {
-			*ssid = d->ssid; /* save for post destroy when d is gone */
-			/* no policy-specific hook */
-			put_domain(d);
-			ret = 0;
-		}
-		break;
-	default:
-		ret = 0; /* ok */
-	}
-	return ret;
+    switch(op->cmd) {
+    case DOM0_CREATEDOMAIN:
+        ret = acm_pre_domain_create(
+            current->domain->ssid, op->u.createdomain.ssidref);
+        break;
+    case DOM0_DESTROYDOMAIN:
+        d = find_domain_by_id(op->u.destroydomain.domain);
+        if (d != NULL) {
+            *ssid = d->ssid; /* save for post destroy when d is gone */
+            /* no policy-specific hook */
+            put_domain(d);
+            ret = 0;
+        }
+        break;
+    default:
+        ret = 0; /* ok */
+    }
+    return ret;
 }
-#endif
 
-
-#if (ACM_USE_SECURITY_POLICY == ACM_NULL_POLICY)
-static inline void acm_post_dom0_op(dom0_op_t *op, void *ssid) 
-{ return; }
-#else
 static inline void acm_post_dom0_op(dom0_op_t *op, void *ssid) 
 {
-	switch(op->cmd) {
-	case DOM0_CREATEDOMAIN:
-		/* initialialize shared sHype security labels for new domain */
-		acm_init_domain_ssid(op->u.createdomain.domain, op->u.createdomain.ssidref);
-		acm_post_domain_create(op->u.createdomain.domain, op->u.createdomain.ssidref);
-		break;
-	case DOM0_DESTROYDOMAIN:
-		acm_post_domain_destroy(ssid, op->u.destroydomain.domain);
-		/* free security ssid for the destroyed domain (also if running null policy */
-		acm_free_domain_ssid((struct acm_ssid_domain *)ssid);
-		break;
-	}
+    switch(op->cmd) {
+    case DOM0_CREATEDOMAIN:
+        /* initialialize shared sHype security labels for new domain */
+        acm_init_domain_ssid(
+            op->u.createdomain.domain, op->u.createdomain.ssidref);
+        acm_post_domain_create(
+            op->u.createdomain.domain, op->u.createdomain.ssidref);
+        break;
+    case DOM0_DESTROYDOMAIN:
+        acm_post_domain_destroy(ssid, op->u.destroydomain.domain);
+        /* free security ssid for the destroyed domain (also if null policy */
+        acm_free_domain_ssid((struct acm_ssid_domain *)ssid);
+        break;
+    }
 }
-#endif
 
-
-#if (ACM_USE_SECURITY_POLICy == ACM_NULL_POLICY)
-static inline void acm_fail_dom0_op(dom0_op_t *op, void *ssid) 
-{ return; }
-#else
 static inline void acm_fail_dom0_op(dom0_op_t *op, void *ssid) 
 {
-	switch(op->cmd) {
-	case DOM0_CREATEDOMAIN:
-		acm_fail_domain_create(current->domain->ssid, op->u.createdomain.ssidref);
-		break;
-	}
+    switch(op->cmd) {
+    case DOM0_CREATEDOMAIN:
+        acm_fail_domain_create(
+            current->domain->ssid, op->u.createdomain.ssidref);
+        break;
+    }
 }
-#endif
 
-
-#if (ACM_USE_SECURITY_POLICY == ACM_NULL_POLICY)
-static inline int acm_pre_event_channel(evtchn_op_t *op) 
-{ return 0; }
-#else
 static inline int acm_pre_event_channel(evtchn_op_t *op) 
 {
-	int ret = -EACCES;
+    int ret = -EACCES;
 
-	switch(op->cmd) {
-	case EVTCHNOP_alloc_unbound:
-		ret = acm_pre_eventchannel_unbound(op->u.alloc_unbound.dom);
-		break;
-	case EVTCHNOP_bind_interdomain:
-		ret = acm_pre_eventchannel_interdomain(op->u.bind_interdomain.dom1, op->u.bind_interdomain.dom2);
-		break;
-	default:
-		ret = 0; /* ok */
-	}
-	return ret;
+    switch(op->cmd) {
+    case EVTCHNOP_alloc_unbound:
+        ret = acm_pre_eventchannel_unbound(op->u.alloc_unbound.dom);
+        break;
+    case EVTCHNOP_bind_interdomain:
+        ret = acm_pre_eventchannel_interdomain(
+            op->u.bind_interdomain.dom1, op->u.bind_interdomain.dom2);
+        break;
+    default:
+        ret = 0; /* ok */
+    }
+    return ret;
 }
-#endif
 
-#if (ACM_USE_SECURITY_POLICY == ACM_NULL_POLICY)
-static inline int acm_pre_grant_map_ref(domid_t id) 
-{ return 0; }
-#else
-static inline int acm_pre_grant_map_ref (domid_t id)
+static inline int acm_pre_grant_map_ref(domid_t id)
 {
-	if ((acm_primary_ops->pre_grant_map_ref != NULL) &&
-	    acm_primary_ops->pre_grant_map_ref (id))
-		return ACM_ACCESS_DENIED;
-	else if ((acm_secondary_ops->pre_grant_map_ref != NULL) &&
-		 acm_secondary_ops->pre_grant_map_ref (id)) {
-		/* roll-back primary */
-		if (acm_primary_ops->fail_grant_map_ref != NULL)
-			acm_primary_ops->fail_grant_map_ref (id);
-		return ACM_ACCESS_DENIED;
-	} else
-		return ACM_ACCESS_PERMITTED;
+    if ( (acm_primary_ops->pre_grant_map_ref != NULL) &&
+         acm_primary_ops->pre_grant_map_ref(id) )
+    {
+        return ACM_ACCESS_DENIED;
+    }
+    else if ( (acm_secondary_ops->pre_grant_map_ref != NULL) &&
+              acm_secondary_ops->pre_grant_map_ref(id) )
+    {
+        /* roll-back primary */
+        if ( acm_primary_ops->fail_grant_map_ref != NULL )
+            acm_primary_ops->fail_grant_map_ref(id);
+        return ACM_ACCESS_DENIED;
+    }
+    else
+    {
+        return ACM_ACCESS_PERMITTED;
+    }
 }
-#endif
 
-
-#if (ACM_USE_SECURITY_POLICY == ACM_NULL_POLICY)
-static inline int acm_pre_grant_setup(domid_t id) 
-{ return 0; }
-#else
-static inline int acm_pre_grant_setup (domid_t id)
+static inline int acm_pre_grant_setup(domid_t id)
 {
-	if ((acm_primary_ops->pre_grant_setup != NULL) &&
-	    acm_primary_ops->pre_grant_setup (id))
-		return ACM_ACCESS_DENIED;
-	else if ((acm_secondary_ops->pre_grant_setup != NULL) &&
-		 acm_secondary_ops->pre_grant_setup (id)) {
-		/* roll-back primary */
-		if (acm_primary_ops->fail_grant_setup != NULL)
-			acm_primary_ops->fail_grant_setup (id);
-		return ACM_ACCESS_DENIED;
-	} else
-		return ACM_ACCESS_PERMITTED;
+    if ( (acm_primary_ops->pre_grant_setup != NULL) &&
+         acm_primary_ops->pre_grant_setup(id) )
+    {
+        return ACM_ACCESS_DENIED;
+    }
+    else if ( (acm_secondary_ops->pre_grant_setup != NULL) &&
+              acm_secondary_ops->pre_grant_setup(id) )
+    {
+        /* roll-back primary */
+        if (acm_primary_ops->fail_grant_setup != NULL)
+            acm_primary_ops->fail_grant_setup(id);
+        return ACM_ACCESS_DENIED;
+    }
+    else
+    {
+        return ACM_ACCESS_PERMITTED;
+    }
 }
-#endif
 
+/* predefined ssidref for DOM0 used by xen when creating DOM0 */
+#define ACM_DOM0_SSIDREF        0
+
+static inline void acm_post_domain0_create(domid_t domid)
+{
+    /* initialialize shared sHype security labels for new domain */
+    acm_init_domain_ssid(domid, ACM_DOM0_SSIDREF);
+    acm_post_domain_create(domid, ACM_DOM0_SSIDREF);
+}
+
+extern int acm_init(void);
+
+#endif
 
 #endif
