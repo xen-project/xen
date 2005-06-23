@@ -288,7 +288,7 @@ int map_ldt_shadow_page(unsigned int off)
     struct domain *d = v->domain;
     unsigned long gpfn, gmfn;
     l1_pgentry_t l1e, nl1e;
-    unsigned gva = v->arch.guest_context.ldt_base + (off << PAGE_SHIFT);
+    unsigned long gva = v->arch.guest_context.ldt_base + (off << PAGE_SHIFT);
     int res;
 
 #if defined(__x86_64__)

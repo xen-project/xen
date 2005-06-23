@@ -18,9 +18,7 @@ static inline void load_LDT(struct vcpu *v)
     {
         cpu = smp_processor_id();
         desc = gdt_table + __LDT(cpu) - FIRST_RESERVED_GDT_ENTRY;
-        desc->a = ((LDT_VIRT_START(v)&0xffff)<<16) | (ents*8-1);
-        desc->b = (LDT_VIRT_START(v)&(0xff<<24)) | 0x8200 |
-            ((LDT_VIRT_START(v)&0xff0000)>>16);
+        _set_tssldt_desc(desc, LDT_VIRT_START(v), ents*8-1, 2);
         __asm__ __volatile__ ( "lldt %%ax" : : "a" (__LDT(cpu)<<3) );
     }
 }

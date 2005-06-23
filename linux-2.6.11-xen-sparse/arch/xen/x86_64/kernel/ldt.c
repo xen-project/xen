@@ -62,7 +62,6 @@ static int alloc_ldt(mm_context_t *pc, unsigned mincount, int reload)
 	if (reload) {
 #ifdef CONFIG_SMP
 		cpumask_t mask;
-
 		preempt_disable();
 #endif
 		make_pages_readonly(pc->ldt, (pc->size * LDT_ENTRY_SIZE) /
@@ -73,8 +72,6 @@ static int alloc_ldt(mm_context_t *pc, unsigned mincount, int reload)
 		if (!cpus_equal(current->mm->cpu_vm_mask, mask))
 			smp_call_function(flush_ldt, NULL, 1, 1);
 		preempt_enable();
-#else
-		load_LDT(pc);
 #endif
 	}
 	if (oldsize) {
@@ -188,13 +185,12 @@ static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 {
 	struct task_struct *me = current;
 	struct mm_struct * mm = me->mm;
-	unsigned long entry = 0, *lp;
+	__u32 entry_1, entry_2, *lp;
 	unsigned long mach_lp;
 	int error;
 	struct user_desc ldt_info;
 
 	error = -EINVAL;
-
 	if (bytecount != sizeof(ldt_info))
 		goto out;
 	error = -EFAULT; 	
@@ -218,26 +214,26 @@ static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 			goto out_unlock;
 	}
 
-	lp = (unsigned long *)((ldt_info.entry_number << 3) + (char *) mm->context.ldt);
-	mach_lp = arbitrary_virt_to_machine(lp);
+	lp = (__u32 *) ((ldt_info.entry_number << 3) + (char *) mm->context.ldt);
+ 	mach_lp = arbitrary_virt_to_machine(lp);
 
    	/* Allow LDTs to be cleared by the user. */
    	if (ldt_info.base_addr == 0 && ldt_info.limit == 0) {
 		if (oldmode || LDT_empty(&ldt_info)) {
-                        entry = 0;
+			entry_1 = 0;
+			entry_2 = 0;
 			goto install;
 		}
 	}
 
-#if 0
-	entry = LDT_entry(&ldt_info);
-#endif
+	entry_1 = LDT_entry_a(&ldt_info);
+	entry_2 = LDT_entry_b(&ldt_info);
 	if (oldmode)
-		entry &= ~(1 << 20);
+		entry_2 &= ~(1 << 20);
 
 	/* Install the new entry ...  */
 install:
-	error = HYPERVISOR_update_descriptor(mach_lp, entry);
+	error = HYPERVISOR_update_descriptor(mach_lp, (unsigned long)((entry_1 | (unsigned long) entry_2 << 32)));
 
 out_unlock:
 	up(&mm->context.sem);

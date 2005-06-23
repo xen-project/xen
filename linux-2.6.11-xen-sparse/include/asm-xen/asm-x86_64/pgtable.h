@@ -30,7 +30,20 @@ extern void clear_kernel_mapping(unsigned long addr, unsigned long size);
 
 extern unsigned long pgkern_mask;
 
-#define arbitrary_virt_to_machine(__va) ({0;})
+#define virt_to_ptep(__va)						\
+({									\
+	pgd_t *__pgd = pgd_offset_k((unsigned long)(__va));		\
+	pud_t *__pud = pud_offset(__pgd, (unsigned long)(__va));	\
+	pmd_t *__pmd = pmd_offset(__pud, (unsigned long)(__va));	\
+	pte_offset_kernel(__pmd, (unsigned long)(__va));		\
+})
+
+#define arbitrary_virt_to_machine(__va)					\
+({									\
+	pte_t *__pte = virt_to_ptep(__va);				\
+	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
+	__pa | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
+})
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
@@ -210,6 +223,7 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
 #define PAGE_KERNEL_EXEC MAKE_GLOBAL(__PAGE_KERNEL_EXEC)
 #define PAGE_KERNEL_RO MAKE_GLOBAL(__PAGE_KERNEL_RO)
 #define PAGE_KERNEL_NOCACHE MAKE_GLOBAL(__PAGE_KERNEL_NOCACHE)
+#define PAGE_KERNEL_VSYSCALL32 __pgprot(__PAGE_KERNEL_VSYSCALL)
 #define PAGE_KERNEL_VSYSCALL MAKE_GLOBAL(__PAGE_KERNEL_VSYSCALL)
 #define PAGE_KERNEL_LARGE MAKE_GLOBAL(__PAGE_KERNEL_LARGE)
 #define PAGE_KERNEL_VSYSCALL_NOCACHE MAKE_GLOBAL(__PAGE_KERNEL_VSYSCALL_NOCACHE)
