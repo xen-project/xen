@@ -214,6 +214,14 @@ void vmx_hooks_assist(struct vcpu *d)
 
     /* load init count*/
     if (p->state == STATE_IORESP_HOOK) { 
+        /* set up actimer, handle re-init */
+        if ( active_ac_timer(&(vpit->pit_timer)) ) {
+            VMX_DBG_LOG(DBG_LEVEL_1, "VMX_PIT: guest reset PIT with channel %lx!\n", (unsigned long) ((p->u.data >> 24) & 0x3) );
+            rem_ac_timer(&(vpit->pit_timer));
+        }
+        else
+            init_ac_timer(&vpit->pit_timer, pit_timer_fn, vpit, 0);
+
         /* init count for this channel */
         vpit->init_val = (p->u.data & 0xFFFF) ; 
         /* frequency(ms) of pit */
@@ -248,9 +256,7 @@ void vmx_hooks_assist(struct vcpu *d)
 
         vpit->intr_bitmap = intr;
 
-        /* set up the actimer */
-        init_ac_timer(&vpit->pit_timer, pit_timer_fn, vpit, 0);
-        pit_timer_fn(vpit); /* timer seed */
+	set_ac_timer(&vpit->pit_timer, NOW() + MILLISECS(vpit->period));
 
         /*restore the state*/
         p->state = STATE_IORESP_READY;
