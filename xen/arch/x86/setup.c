@@ -262,7 +262,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
     {
-        printk("FATAL ERROR: Require at least one Multiboot module.\n");
+        printk("FATAL ERROR: dom0 kernel not specified."
+               " Check bootloader configuration.\n");
         EARLY_FAIL();
     }
 
