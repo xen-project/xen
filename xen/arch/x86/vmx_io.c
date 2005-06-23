@@ -86,7 +86,8 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
             regs->ebx |= ((value & 0xFF) << 8);
             break;
         default:
-            printk("size:%x, index:%x are invalid!\n", size, index);
+            printk("Error: size:%x, index:%x are invalid!\n", size, index);
+            domain_crash_synchronous();
             break;
 
         }
@@ -127,7 +128,8 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
             regs->edi |= (value & 0xFFFF);
             break;
         default:
-            printk("size:%x, index:%x are invalid!\n", size, index);
+            printk("Error: size:%x, index:%x are invalid!\n", size, index);
+            domain_crash_synchronous();
             break;
         }
         break;
@@ -158,25 +160,150 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
             regs->edi = value;
             break;
         default:
-            printk("size:%x, index:%x are invalid!\n", size, index);
+            printk("Error: size:%x, index:%x are invalid!\n", size, index);
+            domain_crash_synchronous();
             break;
         }
         break;
     default:
-        printk("size:%x, index:%x are invalid!\n", size, index);
+        printk("Error: size:%x, index:%x are invalid!\n", size, index);
+        domain_crash_synchronous();
         break;
     }
 }
 #else
 static void load_cpu_user_regs(struct cpu_user_regs *regs)
-{ 
-	/* XXX: TBD */
-	return;
+{
+    __vmwrite(GUEST_SS_SELECTOR, regs->ss);
+    __vmwrite(GUEST_RSP, regs->rsp);
+    __vmwrite(GUEST_RFLAGS, regs->rflags);
+    __vmwrite(GUEST_CS_SELECTOR, regs->cs);
+    __vmwrite(GUEST_RIP, regs->rip);
 }
+
+static inline void __set_reg_value(long *reg, int size, long value)
+{
+    switch (size) {
+        case BYTE_64:
+            *reg &= ~0xFF;
+            *reg |= (value & 0xFF);
+            break;
+        case WORD:
+            *reg &= ~0xFFFF;
+            *reg |= (value & 0xFFFF);
+            break;
+
+        case LONG:
+            *reg &= ~0xFFFFFFFF;
+            *reg |= (value & 0xFFFFFFFF);
+            break;
+        case QUAD:
+            *reg = value;
+            break;
+        default:
+            printk("Error: <__set_reg_value> : Unknown size for register\n");
+            domain_crash_synchronous();
+    }
+}
+
 static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *regs, long value)
 {
-	/* XXX: TBD */
-	return;
+    if (size == BYTE) {
+        switch (index) {
+            case 0:
+                regs->rax &= ~0xFF;
+                regs->rax |= (value & 0xFF);
+                break;
+            case 1:
+                regs->rcx &= ~0xFF;
+                regs->rcx |= (value & 0xFF);
+                break;
+            case 2:
+                regs->rdx &= ~0xFF;
+                regs->rdx |= (value & 0xFF);
+                break;
+            case 3:
+                regs->rbx &= ~0xFF;
+                regs->rbx |= (value & 0xFF);
+                break;
+            case 4:
+                regs->rax &= 0xFFFFFFFFFFFF00FF;
+                regs->rax |= ((value & 0xFF) << 8);
+                break;
+            case 5:
+                regs->rcx &= 0xFFFFFFFFFFFF00FF;
+                regs->rcx |= ((value & 0xFF) << 8);
+                break;
+            case 6:
+                regs->rdx &= 0xFFFFFFFFFFFF00FF;
+                regs->rdx |= ((value & 0xFF) << 8);
+                break;
+            case 7:
+                regs->rbx &= 0xFFFFFFFFFFFF00FF;
+                regs->rbx |= ((value & 0xFF) << 8);
+                break;
+            default:
+                printk("Error: size:%x, index:%x are invalid!\n", size, index);
+                domain_crash_synchronous();
+                break;
+        }
+
+    }
+
+    switch (index) {
+        case 0: 
+            __set_reg_value(&regs->rax, size, value);
+            break;
+        case 1: 
+            __set_reg_value(&regs->rcx, size, value);
+            break;
+        case 2: 
+            __set_reg_value(&regs->rdx, size, value);
+            break;
+        case 3: 
+            __set_reg_value(&regs->rbx, size, value);
+            break;
+        case 4: 
+            __set_reg_value(&regs->rsp, size, value);
+            break;
+        case 5: 
+            __set_reg_value(&regs->rbp, size, value);
+            break;
+        case 6: 
+            __set_reg_value(&regs->rsi, size, value);
+            break;
+        case 7: 
+            __set_reg_value(&regs->rdi, size, value);
+            break;
+        case 8: 
+            __set_reg_value(&regs->r8, size, value);
+            break;
+        case 9: 
+            __set_reg_value(&regs->r9, size, value);
+            break;
+        case 10: 
+            __set_reg_value(&regs->r10, size, value);
+            break;
+        case 11: 
+            __set_reg_value(&regs->r11, size, value);
+            break;
+        case 12: 
+            __set_reg_value(&regs->r12, size, value);
+            break;
+        case 13: 
+            __set_reg_value(&regs->r13, size, value);
+            break;
+        case 14: 
+            __set_reg_value(&regs->r14, size, value);
+            break;
+        case 15: 
+            __set_reg_value(&regs->r15, size, value);
+            break;
+        default:
+            printk("Error: <set_reg_value> Invalid index\n");
+            domain_crash_synchronous();
+    }
+    return;
 }
 #endif
 
@@ -269,7 +396,8 @@ void vmx_io_assist(struct vcpu *v)
         regs->eax = (p->u.data & 0xffffffff);
         break;
     default:
-        BUG();
+        printk("Error: %s unknwon port size\n", __FUNCTION__);
+        domain_crash_synchronous();
     }
 }
 

@@ -386,6 +386,9 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                     io_mem_write[io_index][1](io_mem_opaque[io_index], addr, val);
                     l = 2;
                 } else {
+                    if (l!=1){
+                        fprintf(logfile, "ERROR 8 bit mmio\n");
+                    }
                     /* 8 bit access */
                     val = ldub_raw(buf);
                     io_mem_write[io_index][0](io_mem_opaque[io_index], addr, val);

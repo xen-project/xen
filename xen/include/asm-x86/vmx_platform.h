@@ -40,6 +40,7 @@
 #define WORD    2
 #define LONG    4
 #define QUAD    8
+#define BYTE_64 16
 
       //For instruction.operand[].flag
 #define REGISTER    0x1
