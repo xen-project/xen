@@ -753,7 +753,7 @@ static inline int l1_backptr(
 #else
 # define create_pae_xen_mappings(pl3e) (1)
 # define l1_backptr(bp,l2o,l2t) \
-    ({ *(bp) = (l2o) << L2_PAGETABLE_SHIFT; 1; })
+    ({ *(bp) = (unsigned long)(l2o) << L2_PAGETABLE_SHIFT; 1; })
 #endif
 
 static int alloc_l2_table(struct pfn_info *page, unsigned int type)
@@ -821,7 +821,7 @@ static int alloc_l3_table(struct pfn_info *page)
     pl3e = map_domain_page(pfn);
     for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
     {
-        vaddr = i << L3_PAGETABLE_SHIFT;
+        vaddr = (unsigned long)i << L3_PAGETABLE_SHIFT;
         if ( is_guest_l3_slot(i) &&
              unlikely(!get_page_from_l3e(pl3e[i], pfn, d, vaddr)) )
             goto fail;
