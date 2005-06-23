@@ -43,7 +43,7 @@ int xc_readconsolering(int xc_handle,
         *pnr_chars = op.u.readconsole.count;
     }
 
-    (void)munlock(buffer, nr_chars);
+    safe_munlock(buffer, nr_chars);
 
     return ret;
 }    

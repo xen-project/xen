@@ -128,7 +128,7 @@ int xc_domain_get_vcpu_context(int xc_handle,
                                u32 vcpu,
                                vcpu_guest_context_t *ctxt)
 {
-    int rc, errno_saved;
+    int rc;
     dom0_op_t op;
 
     op.cmd = DOM0_GETVCPUCONTEXT;
@@ -143,11 +143,7 @@ int xc_domain_get_vcpu_context(int xc_handle,
     rc = do_dom0_op(xc_handle, &op);
 
     if ( ctxt != NULL )
-    {
-        errno_saved = errno;
-        (void)munlock(ctxt, sizeof(*ctxt));
-        errno = errno_saved;
-    }
+        safe_munlock(ctxt, sizeof(*ctxt));
 
     if ( rc > 0 )
         return -ESRCH;
