@@ -137,6 +137,8 @@ typedef struct vcpu_guest_context {
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
     unsigned long kernel_ss, kernel_sp;     /* Virtual TSS (only SS1/SP1)   */
     unsigned long pt_base;                  /* CR3 (pagetable base)         */
+    unsigned long cr0;                      /* CR0                          */
+    unsigned long cr4;                      /* CR4                          */
     unsigned long debugreg[8];              /* DB0-DB7 (debug registers)    */
     unsigned long event_callback_cs;        /* CS:EIP of event callback     */
     unsigned long event_callback_eip;

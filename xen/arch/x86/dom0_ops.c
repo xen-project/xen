@@ -393,8 +393,11 @@ void arch_getdomaininfo_ctxt(
 
 #ifdef __i386__
 #ifdef CONFIG_VMX
-    if ( VMX_DOMAIN(v) )
+    if ( VMX_DOMAIN(v) ) {
         save_vmx_cpu_user_regs(&c->user_regs);
+        __vmread(CR0_READ_SHADOW, &c->cr0);
+        __vmread(CR4_READ_SHADOW, &c->cr4);
+    }
 #endif
 #endif
 

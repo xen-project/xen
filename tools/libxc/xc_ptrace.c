@@ -3,6 +3,8 @@
 #include "xc_private.h"
 #include <time.h>
 
+#define X86_CR0_PE              0x00000001 /* Enable Protected Mode    (RW) */
+#define X86_CR0_PG              0x80000000 /* Paging                   (RW) */
 
 #define BSD_PAGE_MASK	(PAGE_SIZE-1)
 #define	PG_FRAME	(~((unsigned long)BSD_PAGE_MASK)
@@ -132,6 +134,13 @@ static int                      regs_valid[MAX_VIRT_CPUS];
 static unsigned long            cr3[MAX_VIRT_CPUS];
 static vcpu_guest_context_t ctxt[MAX_VIRT_CPUS];
 
+static inline int paging_enabled(vcpu_guest_context_t *v)
+{
+    unsigned long cr0 = v->cr0;
+
+    return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
+}
+
 /* --------------------- */
 
 static void *
@@ -179,7 +188,7 @@ map_domain_va(unsigned long domid, int cpu, void * guest_va, int perm)
     } 
     if ((pde = cr3_virt[cpu][vtopdi(va)]) == 0) /* logical address */
 	goto error_out;
-    if (ctxt[cpu].flags & VGCF_VMX_GUEST)
+    if ((ctxt[cpu].flags & VGCF_VMX_GUEST) && paging_enabled(&ctxt[cpu]))
         pde = page_array[pde >> PAGE_SHIFT] << PAGE_SHIFT;
     if (pde != pde_phys[cpu]) 
     {
