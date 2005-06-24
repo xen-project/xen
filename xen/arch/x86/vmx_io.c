@@ -181,7 +181,7 @@ static void load_cpu_user_regs(struct cpu_user_regs *regs)
     __vmwrite(GUEST_RIP, regs->rip);
 }
 
-static inline void __set_reg_value(long *reg, int size, long value)
+static inline void __set_reg_value(unsigned long *reg, int size, long value)
 {
     switch (size) {
         case BYTE_64:

@@ -19,7 +19,7 @@
 static int parseaout9image(char *, unsigned long, struct domain_setup_info *);
 static int loadaout9image(char *, unsigned long, int, u32, unsigned long *, struct domain_setup_info *);
 static void copyout(int, u32, unsigned long *, unsigned long, void *, int);
-struct Exec *get_header(unsigned char *, unsigned long, struct Exec *);
+struct Exec *get_header(char *, unsigned long, struct Exec *);
 
 
 int 
@@ -133,17 +133,20 @@ copyout(
         sz -= chunksz;
     }
 }
-    
+
+#define swap16(_v) ((((u16)(_v)>>8)&0xff)|(((u16)(_v)&0xff)<<8))
+#define swap32(_v) (((u32)swap16((u16)(_v))<<16)|(u32)swap16((u32)((_v)>>16)))
+
 /*
  * Decode the header from the start of image and return it.
  */
 struct Exec *
 get_header(
-    unsigned char *image,
+    char *image,
     unsigned long image_size,
     struct Exec *ehdr)
 {
-    unsigned long *v;
+    u32 *v, x;
     int i;
 
     if (A9_MAGIC == 0)
@@ -153,10 +156,10 @@ get_header(
         return 0;
 
     /* ... all big endian words */
-    v = (unsigned long *)ehdr;
-    for (i = 0; i < sizeof *ehdr; i += 4) {
-        v[i/4] = (image[i+0]<<24) | (image[i+1]<<16) | 
-                 (image[i+2]<<8) | image[i+3];
+    v = (u32 *)ehdr;
+    for (i = 0; i < sizeof(*ehdr); i += 4) {
+        x = *(u32 *)&image[i];
+        v[i/4] = swap32(x);
     }
 
     if(ehdr->magic != A9_MAGIC)
