@@ -310,5 +310,6 @@ int pin_table(int xc_handle, unsigned int type, unsigned long mfn,
 /* image loading */
 int probe_elf(char *image, unsigned long image_size, struct load_funcs *funcs);
 int probe_bin(char *image, unsigned long image_size, struct load_funcs *funcs);
+int probe_aout9(char *image, unsigned long image_size, struct load_funcs *funcs);
 
 #endif /* __XC_PRIVATE_H__ */

@@ -736,6 +736,7 @@
 41cc934abX-QLXJXW_clV_wRjM0zYg tools/libxc/plan9a.out.h
 3fbba6dc1uU7U3IFeF6A-XEOYF2MkQ tools/libxc/rpm.spec
 3fbba6dcrNxtygEcgJYAJJ1gCQqfsA tools/libxc/xc.h
+42bbe5b9J1BFuxACiiyj38Fucc2xgg tools/libxc/xc_aout9.h
 3fbba6dbEVkVMX0JuDFzap9jeaucGA tools/libxc/xc_bvtsched.c
 4273458dyF2_sKA6CFkNJQYb8eY2dA tools/libxc/xc_core.c
 3fbba6dbasJQV-MVElDC0DGSHMiL5w tools/libxc/xc_domain.c
@@ -745,6 +746,7 @@
 3fbba6dbNCU7U6nsMYiXzKkp3ztaJg tools/libxc/xc_linux_build.c
 3fbba6dbl267zZOAVHYLOdLCdhcZMw tools/libxc/xc_linux_restore.c
 3fbba6db7li3FJiABYtCmuGxOJxEGw tools/libxc/xc_linux_save.c
+42bbe5b95gdEdSyDdrK2ts7GEiK5Mw tools/libxc/xc_load_aout9.c
 42a40bc3vE3p9fPSJZQZK0MdQF9B8g tools/libxc/xc_load_bin.c
 42a40bc4diWfFsPGf0RW7qXMufU4YQ tools/libxc/xc_load_elf.c
 3fbba6db7WnnJr0KFrIFrqNlSKvFYg tools/libxc/xc_misc.c

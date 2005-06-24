@@ -19,6 +19,7 @@ SRCS     += xc_core.c
 SRCS     += xc_domain.c
 SRCS     += xc_evtchn.c
 SRCS     += xc_gnttab.c
+SRCS     += xc_load_aout9.c
 SRCS     += xc_load_bin.c
 SRCS     += xc_load_elf.c
 SRCS     += xc_linux_build.c

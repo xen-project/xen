@@ -14,6 +14,7 @@
 
 
 #include "xc_elf.h"
+#include "xc_aout9.h"
 #include <stdlib.h>
 #include <zlib.h>
 
@@ -38,7 +39,8 @@ static int probeimageformat(char *image,
                             struct load_funcs *load_funcs)
 {
     if ( probe_elf(image, image_size, load_funcs) &&
-         probe_bin(image, image_size, load_funcs) )
+         probe_bin(image, image_size, load_funcs) &&
+	 probe_aout9(image, image_size, load_funcs) )
     {
         ERROR( "Unrecognized image format" );
         return -EINVAL;
