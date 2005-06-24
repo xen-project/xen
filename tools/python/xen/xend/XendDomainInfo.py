@@ -26,7 +26,7 @@ from xen.xend import sxp
 from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendBootloader import bootloader
 from xen.xend.XendLogging import log
-from XendError import XendError, VmError
+from xen.xend.XendError import XendError, VmError
 from xen.xend.XendRoot import get_component
 
 from xen.xend.uuid import getUuid
