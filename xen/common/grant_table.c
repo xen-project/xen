@@ -258,7 +258,11 @@ __gnttab_activate_grant_ref(
     {
         /* Write update into the pagetable. */
         l1_pgentry_t pte;
-        pte = l1e_from_pfn(frame, _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY);
+        pte = l1e_from_pfn(frame, _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY
+#if defined(__x86_64__)
+            | _PAGE_USER               
+#endif
+            );
         if ( !(dev_hst_ro_flags & GNTMAP_readonly) )
             l1e_add_flags(pte,_PAGE_RW);
         rc = update_grant_va_mapping( host_virt_addr, pte, 

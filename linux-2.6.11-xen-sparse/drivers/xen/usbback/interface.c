@@ -170,7 +170,7 @@ void usbif_connect(usbif_be_connect_t *connect)
         return;
     }
 
-    prot = __pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED);
+    prot = __pgprot(_KERNPG_TABLE);
     error = direct_remap_area_pages(&init_mm, VMALLOC_VMADDR(vma->addr),
                                     shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
                                     prot, domid);

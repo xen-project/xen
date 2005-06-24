@@ -461,7 +461,8 @@ void mm_pin(struct mm_struct *mm)
     mm_walk(mm, PAGE_KERNEL_RO);
     HYPERVISOR_update_va_mapping(
         (unsigned long)mm->pgd,
-        pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL_RO), 0);
+        pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL_RO),
+        UVMF_TLB_FLUSH);
     xen_pgd_pin(__pa(mm->pgd));
     mm->context.pinned = 1;
     spin_lock(&mm_unpinned_lock);
@@ -480,6 +481,7 @@ void mm_unpin(struct mm_struct *mm)
         (unsigned long)mm->pgd,
         pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL), 0);
     mm_walk(mm, PAGE_KERNEL);
+    xen_tlb_flush();
     mm->context.pinned = 0;
     spin_lock(&mm_unpinned_lock);
     list_add(&mm->context.unpinned, &mm_unpinned);
