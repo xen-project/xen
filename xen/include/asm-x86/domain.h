@@ -112,9 +112,6 @@ struct arch_vcpu
 
     unsigned long monitor_shadow_ref;
 
-    /* Virtual CR2 value. Can be read/written by guest. */
-    unsigned long guest_cr2;
-
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
 } __cacheline_aligned;

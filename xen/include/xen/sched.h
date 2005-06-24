@@ -327,9 +327,6 @@ extern struct domain *domain_list;
  /* Has the FPU been used since it was last saved? */
 #define _VCPUF_fpu_dirtied     1
 #define VCPUF_fpu_dirtied      (1UL<<_VCPUF_fpu_dirtied)
- /* Has the guest OS requested 'stts'? */
-#define _VCPUF_guest_stts      2
-#define VCPUF_guest_stts       (1UL<<_VCPUF_guest_stts)
  /* Domain is blocked waiting for an event. */
 #define _VCPUF_blocked         3
 #define VCPUF_blocked          (1UL<<_VCPUF_blocked)

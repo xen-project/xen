@@ -8,7 +8,7 @@
  *  Copyright (C) 1995  Linus Torvalds
  *
  *  Pentium III FXSR, SSE support
- *	Gareth Hughes <gareth@valinux.com>, May 2000
+ *  Gareth Hughes <gareth@valinux.com>, May 2000
  */
 
 #include <xen/config.h>
@@ -115,7 +115,7 @@ static inline void kb_wait(void)
 void machine_restart(char * __unused)
 {
     int i;
-	
+
     if ( opt_noreboot )
     {
         printk("Reboot disabled on cmdline: require manual reset\n");
@@ -432,7 +432,7 @@ int arch_set_info_guest(
     if ( v->vcpu_id == 0 )
         d->vm_assist = c->vm_assist;
 
-    phys_basetab = c->pt_base;
+    phys_basetab = c->ctrlreg[3];
     v->arch.guest_table = mk_pagetable(phys_basetab);
 
     if ( shadow_mode_refcounts(d) )
@@ -453,24 +453,15 @@ int arch_set_info_guest(
         return rc;
     }
 
-#ifdef CONFIG_VMX
     if ( c->flags & VGCF_VMX_GUEST )
     {
-        int error;
-
-        // VMX uses the initially provided page tables as the P2M map.
-        //
-        // XXX: This creates a security issue -- Xen can't necessarily
-        //      trust the VMX domain builder.  Xen should validate this
-        //      page table, and/or build the table itself, or ???
-        //
+        /* VMX uses the initially provided page tables as the P2M map. */
         if ( !pagetable_get_paddr(d->arch.phys_table) )
             d->arch.phys_table = v->arch.guest_table;
 
-        if ( (error = vmx_final_setup_guest(v, c)) )
-            return error;
+        if ( (rc = vmx_final_setup_guest(v, c)) != 0 )
+            return rc;
     }
-#endif
 
     update_pagetables(v);
     
@@ -704,7 +695,7 @@ static inline void switch_kernel_stack(struct vcpu *n, unsigned int cpu)
 #endif
 
 #define loaddebug(_v,_reg) \
-	__asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
+    __asm__ __volatile__ ("mov %0,%%db" #_reg : : "r" ((_v)->debugreg[_reg]))
 
 static void __context_switch(void)
 {
@@ -982,6 +973,7 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
 void domain_relinquish_resources(struct domain *d)
 {
     struct vcpu *v;
+    unsigned long pfn;
 
     BUG_ON(!cpus_empty(d->cpumask));
 
@@ -995,22 +987,20 @@ void domain_relinquish_resources(struct domain *d)
     /* Drop the in-use references to page-table bases. */
     for_each_vcpu ( d, v )
     {
-        if ( pagetable_get_paddr(v->arch.guest_table) != 0 )
+        if ( (pfn = pagetable_get_pfn(v->arch.guest_table)) != 0 )
         {
-            if ( shadow_mode_refcounts(d) )
-                put_page(&frame_table[pagetable_get_pfn(v->arch.guest_table)]);
-            else
-                put_page_and_type(&frame_table[pagetable_get_pfn(v->arch.guest_table)]);
+            if ( !shadow_mode_refcounts(d) )
+                put_page_type(pfn_to_page(pfn));
+            put_page(pfn_to_page(pfn));
 
             v->arch.guest_table = mk_pagetable(0);
         }
 
-        if ( pagetable_get_paddr(v->arch.guest_table_user) != 0 )
+        if ( (pfn = pagetable_get_pfn(v->arch.guest_table_user)) != 0 )
         {
-            if ( shadow_mode_refcounts(d) )
-                put_page(&frame_table[pagetable_get_pfn(v->arch.guest_table_user)]);
-            else
-                put_page_and_type(&frame_table[pagetable_get_pfn(v->arch.guest_table_user)]);
+            if ( !shadow_mode_refcounts(d) )
+                put_page_type(pfn_to_page(pfn));
+            put_page(pfn_to_page(pfn));
 
             v->arch.guest_table_user = mk_pagetable(0);
         }

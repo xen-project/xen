@@ -974,7 +974,7 @@ start_ap(int apic_id)
 	ctxt.failsafe_callback_cs  = __KERNEL_CS;
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 
-	ctxt.pt_base = (vm_paddr_t)IdlePTD;
+	ctxt.ctrlreg[3] = (vm_paddr_t)IdlePTD;
 
 	boot_error = HYPERVISOR_boot_vcpu(bootAP, &ctxt);
 

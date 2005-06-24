@@ -22,7 +22,6 @@ SRCS     += xc_gnttab.c
 SRCS     += xc_load_bin.c
 SRCS     += xc_load_elf.c
 SRCS     += xc_linux_build.c
-SRCS     += xc_plan9_build.c
 SRCS     += xc_linux_restore.c
 SRCS     += xc_linux_save.c
 SRCS     += xc_misc.c

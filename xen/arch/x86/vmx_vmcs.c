@@ -168,7 +168,6 @@ void vmx_do_launch(struct vcpu *v)
     struct cpu_user_regs *regs = guest_cpu_user_regs();
 
     vmx_stts();
-    set_bit(_VCPUF_guest_stts, &v->vcpu_flags);
 
     cpu = smp_processor_id();
 

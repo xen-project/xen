@@ -489,7 +489,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
     }
 
     /* Uncanonicalise the page table base pointer. */
-    pfn = ctxt.pt_base >> PAGE_SHIFT;
+    pfn = ctxt.ctrlreg[3] >> PAGE_SHIFT;
     if ( (pfn >= nr_pfns) || ((pfn_type[pfn]&LTABTYPE_MASK) != L2TAB) )
     {
         printf("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx\n",
@@ -497,7 +497,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
         ERR("PT base is bad.");
         goto out;
     }
-    ctxt.pt_base = pfn_to_mfn_table[pfn] << PAGE_SHIFT;
+    ctxt.ctrlreg[3] = pfn_to_mfn_table[pfn] << PAGE_SHIFT;
 
     /* clear any pending events and the selector */
     memset(&(shared_info->evtchn_pending[0]), 0,

@@ -749,7 +749,6 @@
 42a40bc4diWfFsPGf0RW7qXMufU4YQ tools/libxc/xc_load_elf.c
 3fbba6db7WnnJr0KFrIFrqNlSKvFYg tools/libxc/xc_misc.c
 4051bce6CHAsYh8P5t2OHDtRWOP9og tools/libxc/xc_physdev.c
-41cc934aO1m6NxEh_8eDr9bJIMoLFA tools/libxc/xc_plan9_build.c
 3fbba6dctWRWlFJkYb6hdix2X4WMuw tools/libxc/xc_private.c
 3fbba6dcbVrG2hPzEzwdeV_UC8kydQ tools/libxc/xc_private.h
 42337174PxyzzPk62raDiYCIsfStDg tools/libxc/xc_ptrace.c

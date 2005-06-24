@@ -908,7 +908,7 @@ static int __init do_boot_cpu(int apicid)
 	ctxt.failsafe_callback_cs  = __KERNEL_CS;
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 
-	ctxt.pt_base = (unsigned long)virt_to_machine(swapper_pg_dir);
+	ctxt.ctrlreg[3] = (unsigned long)virt_to_machine(swapper_pg_dir);
 
 	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
 

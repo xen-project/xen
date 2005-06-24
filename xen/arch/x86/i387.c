@@ -29,7 +29,7 @@ void save_init_fpu(struct vcpu *tsk)
      * This causes us to set the real flag, so we'll need
      * to temporarily clear it while saving f-p state.
      */
-    if ( test_bit(_VCPUF_guest_stts, &tsk->vcpu_flags) )
+    if ( VMX_DOMAIN(tsk) || (tsk->arch.guest_context.ctrlreg[0] & X86_CR0_TS) )
         clts();
 
     if ( cpu_has_fxsr )

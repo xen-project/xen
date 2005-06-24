@@ -271,7 +271,7 @@ static int setup_guest(int xc_handle,
     /* First allocate page for page dir. */
     ppt_alloc = (vpt_start - dsi.v_start) >> PAGE_SHIFT;
     l2tab = page_array[ppt_alloc++] << PAGE_SHIFT;
-    ctxt->pt_base = l2tab;
+    ctxt->ctrlreg[3] = l2tab;
 
     /* Initialise the page tables. */
     if ( (vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, 
@@ -549,7 +549,7 @@ int xc_vmx_build(int xc_handle,
     }
 
     if ( !(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED) ||
-         (ctxt->pt_base != 0) )
+         (ctxt->ctrlreg[3] != 0) )
     {
         ERROR("Domain is already constructed");
         goto error_out;

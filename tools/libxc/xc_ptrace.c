@@ -75,7 +75,7 @@ struct gdb_regs {
 	int retval = xc_domain_get_vcpu_context(xc_handle, domid, cpu, &ctxt[cpu]); \
 	if (retval) \
 	    goto error_out; \
-	cr3[cpu] = ctxt[cpu].pt_base; /* physical address */ \
+	cr3[cpu] = ctxt[cpu].ctrlreg[3]; /* physical address */ \
 	regs_valid[cpu] = 1; \
     } \
 
@@ -136,7 +136,7 @@ static vcpu_guest_context_t ctxt[MAX_VIRT_CPUS];
 
 static inline int paging_enabled(vcpu_guest_context_t *v)
 {
-    unsigned long cr0 = v->cr0;
+    unsigned long cr0 = v->ctrlreg[0];
 
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
 }

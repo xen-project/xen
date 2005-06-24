@@ -193,7 +193,7 @@ xc_waitdomain_core(int domfd, int *status, int options)
 	    return -1;
 
 	for (i = 0; i < nr_vcpus; i++) {
-	    cr3[i] = ctxt[i].pt_base;
+	    cr3[i] = ctxt[i].ctrlreg[3];
 	}
 	if ((p2m_array = malloc(nr_pages * sizeof(unsigned long))) == NULL) {
 	    printf("Could not allocate p2m_array\n");

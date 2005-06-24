@@ -348,7 +348,7 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     if ( TI_GET_IF(ti) )
         tb->flags |= TBF_INTERRUPT;
 
-    v->arch.guest_cr2 = addr;
+    v->arch.guest_context.ctrlreg[2] = addr;
 }
 
 static int handle_perdomain_mapping_fault(
@@ -478,12 +478,12 @@ long do_fpu_taskswitch(int set)
 
     if ( set )
     {
-        set_bit(_VCPUF_guest_stts, &v->vcpu_flags);
+        v->arch.guest_context.ctrlreg[0] |= X86_CR0_TS;
         stts();
     }
     else
     {
-        clear_bit(_VCPUF_guest_stts, &v->vcpu_flags);
+        v->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
         if ( test_bit(_VCPUF_fpu_dirtied, &v->vcpu_flags) )
             clts();
     }
@@ -789,13 +789,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         switch ( (opcode >> 3) & 7 )
         {
         case 0: /* Read CR0 */
-            *reg = 
-                (read_cr0() & ~X86_CR0_TS) | 
-                (test_bit(_VCPUF_guest_stts, &v->vcpu_flags) ? X86_CR0_TS:0);
+            *reg = v->arch.guest_context.ctrlreg[0];
             break;
 
         case 2: /* Read CR2 */
-            *reg = v->arch.guest_cr2;
+            *reg = v->arch.guest_context.ctrlreg[2];
             break;
             
         case 3: /* Read CR3 */
@@ -820,7 +818,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case 2: /* Write CR2 */
-            v->arch.guest_cr2 = *reg;
+            v->arch.guest_context.ctrlreg[2] = *reg;
             break;
             
         case 3: /* Write CR3 */
@@ -1033,12 +1031,13 @@ asmlinkage int math_state_restore(struct cpu_user_regs *regs)
 
     setup_fpu(current);
 
-    if ( test_and_clear_bit(_VCPUF_guest_stts, &current->vcpu_flags) )
+    if ( current->arch.guest_context.ctrlreg[0] & X86_CR0_TS )
     {
         struct trap_bounce *tb = &current->arch.trap_bounce;
         tb->flags = TBF_EXCEPTION;
         tb->cs    = current->arch.guest_context.trap_ctxt[7].cs;
         tb->eip   = current->arch.guest_context.trap_ctxt[7].address;
+        current->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
     }
 
     return EXCRET_fault_fixed;

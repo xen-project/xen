@@ -459,7 +459,7 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
     shared_info_frame = info.shared_info_frame;
 
     /* A cheesy test to see whether the domain contains valid state. */
-    if ( ctxt.pt_base == 0 ){
+    if ( ctxt.ctrlreg[3] == 0 ){
         ERR("Domain is not in a valid Linux guest OS state");
         goto out;
     }
@@ -1015,11 +1015,11 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
     }
 
     /* Canonicalise the page table base pointer. */
-    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(ctxt.pt_base >> PAGE_SHIFT) ) {
+    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(ctxt.ctrlreg[3] >> PAGE_SHIFT) ) {
         ERR("PT base is not in range of pseudophys map");
         goto out;
     }
-    ctxt.pt_base = live_mfn_to_pfn_table[ctxt.pt_base >> PAGE_SHIFT] <<
+    ctxt.ctrlreg[3] = live_mfn_to_pfn_table[ctxt.ctrlreg[3] >> PAGE_SHIFT] <<
         PAGE_SHIFT;
 
     if (write(io_fd, &ctxt, sizeof(ctxt)) != sizeof(ctxt) ||

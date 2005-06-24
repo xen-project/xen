@@ -342,9 +342,9 @@ xendebug_memory_page (domain_context_p ctxt, int xc_handle, u32 vcpu,
         }
     }
 
-    if ( vcpu_ctxt->pt_base != ctxt->cr3_phys[vcpu]) 
+    if ( vcpu_ctxt->ctrlreg[3] != ctxt->cr3_phys[vcpu]) 
     {
-        ctxt->cr3_phys[vcpu] = vcpu_ctxt->pt_base;
+        ctxt->cr3_phys[vcpu] = vcpu_ctxt->ctrlreg[3];
         if ( ctxt->cr3_virt[vcpu] )
             munmap(ctxt->cr3_virt[vcpu], PAGE_SIZE);
         ctxt->cr3_virt[vcpu] = xc_map_foreign_range(xc_handle, ctxt->domid,
@@ -383,7 +383,7 @@ xendebug_memory_page (domain_context_p ctxt, int xc_handle, u32 vcpu,
         if ( ctxt->page_virt[vcpu] == NULL )
         {
             printf("cr3 %lx pde %lx page %lx pti %lx\n", 
-                   vcpu_ctxt->pt_base, pde, page, vtopti(va));
+                   vcpu_ctxt->ctrlreg[3], pde, page, vtopti(va));
             ctxt->page_phys[vcpu] = 0;
             return 0;
         }
