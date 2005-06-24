@@ -1020,11 +1020,9 @@ from image import          \
      addImageHandlerClass, \
      ImageHandler,         \
      LinuxImageHandler,    \
-     Plan9ImageHandler,    \
      VmxImageHandler
 
 addImageHandlerClass(LinuxImageHandler)
-addImageHandlerClass(Plan9ImageHandler)
 addImageHandlerClass(VmxImageHandler)
 
 # Ignore the fields we already handle.

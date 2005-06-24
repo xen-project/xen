@@ -221,19 +221,6 @@ class LinuxImageHandler(ImageHandler):
             return 0
         return ret
 
-class Plan9ImageHandler(ImageHandler):
-
-    ostype = "plan9"
-
-    def buildDomain(self):
-        return xc.plan9_build(dom            = self.vm.getDomain(),
-                              image          = self.kernel,
-                              control_evtchn = self.vm.channel.getRemotePort(),
-                              cmdline        = self.cmdline,
-                              ramdisk        = self.ramdisk,
-                              flags          = self.flags,
-                              vcpus          = self.vm.vcpus)
-
 class VmxImageHandler(ImageHandler):
 
     __exports__ = ImageHandler.__exports__ + [

@@ -263,14 +263,6 @@ int xc_linux_build(int xc_handle,
                    unsigned int store_evtchn,
                    unsigned long *store_mfn);
 
-int
-xc_plan9_build (int xc_handle,
-                u32 domid, 
-                const char *image_name,
-                const char *cmdline, 
-                unsigned int control_evtchn, 
-                unsigned long flags);
-
 struct mem_map;
 int xc_vmx_build(int xc_handle,
                  u32 domid,
