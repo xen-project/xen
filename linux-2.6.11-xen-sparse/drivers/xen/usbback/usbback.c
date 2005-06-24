@@ -646,7 +646,7 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
     ASSERT(buffer_mach);
 
     /* Always map writeable for now. */
-    remap_prot = _PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW;
+    remap_prot = _KERNPG_TABLE;
 
     for ( i = 0, offset = 0; offset < req->length;
           i++, offset += PAGE_SIZE )
