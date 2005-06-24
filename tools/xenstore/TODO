@@ -4,4 +4,6 @@ reader to fill in the blanks.
 
 - Remove calls to system() from daemon
 - Timeout failed watch responses
-- Timeout blocking transactions
+- Dynamic nodes
+- Persistant storage of introductions, watches and transactions, so daemon can restart
+- Remove assumption that rename doesn't fail

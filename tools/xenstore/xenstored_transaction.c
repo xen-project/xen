@@ -25,6 +25,7 @@
 #include <time.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <fcntl.h>
 #include "talloc.h"
 #include "list.h"
 #include "xenstored_transaction.h"
@@ -137,7 +138,7 @@ void add_change_node(struct transaction *trans, const char *node)
 
 char *node_dir_inside_transaction(struct transaction *trans, const char *node)
 {
-	return talloc_asprintf(node, "%s%s", trans->divert,
+	return talloc_asprintf(node, "%s/%s", trans->divert,
 			       node + strlen(trans->node));
 }
 
@@ -170,21 +171,6 @@ void check_transaction_timeout(void)
 	}
 }
 
-/* FIXME: Eliminate all uses of this */
-static bool do_command(const char *cmd)
-{
-	int ret;
-
-	ret = system(cmd);
-	if (ret == -1)
-		return false;
-	if (!WIFEXITED(ret) || WEXITSTATUS(ret) != 0) {
-		errno = EIO;
-		return false;
-	}
-	return true;
-}
-
 static int destroy_transaction(void *_transaction)
 {
 	struct transaction *trans = _transaction;
@@ -193,10 +179,66 @@ static int destroy_transaction(void *_transaction)
 	return destroy_path(trans->divert);
 }
 
+static bool copy_file(const char *src, const char *dst)
+{
+	int *infd, *outfd;
+	void *data;
+	unsigned int size;
+
+	infd = talloc_open(src, O_RDONLY, 0);
+	if (!infd)
+		return false;
+	outfd = talloc_open(dst, O_WRONLY|O_CREAT|O_EXCL, 0640);
+	if (!outfd)
+		return false;
+	data = read_all(infd, &size);
+	if (!data)
+		return false;
+	return xs_write_all(*outfd, data, size);
+}
+
+static bool copy_dir(const char *src, const char *dst)
+{
+	DIR **dir;
+	struct dirent *dirent;
+
+	if (mkdir(dst, 0750) != 0)
+		return false;
+
+	dir = talloc_opendir(src);
+	if (!dir)
+		return false;
+
+	while ((dirent = readdir(*dir)) != NULL) {
+		struct stat st;
+		char *newsrc, *newdst;
+
+		if (streq(dirent->d_name, ".") || streq(dirent->d_name, ".."))
+			continue;
+
+		newsrc = talloc_asprintf(src, "%s/%s", src, dirent->d_name);
+		newdst = talloc_asprintf(src, "%s/%s", dst, dirent->d_name);
+		if (stat(newsrc, &st) != 0)
+			return false;
+		
+		if (S_ISDIR(st.st_mode)) {
+			if (!copy_dir(newsrc, newdst))
+				return false;
+		} else {
+			if (!copy_file(newsrc, newdst))
+				return false;
+		}
+		/* Free now so we don't run out of file descriptors */
+		talloc_free(newsrc);
+		talloc_free(newdst);
+	}
+	return true;
+}
+
 bool do_transaction_start(struct connection *conn, const char *node)
 {
 	struct transaction *transaction;
-	char *dir, *cmd;
+	char *dir;
 
 	if (conn->transaction)
 		return send_error(conn, EBUSY);
@@ -213,14 +255,9 @@ bool do_transaction_start(struct connection *conn, const char *node)
 	/* Attach transaction to node for autofree until it's complete */
 	transaction = talloc(node, struct transaction);
 	transaction->node = talloc_strdup(transaction, node);
-	transaction->divert = talloc_asprintf(transaction, "%s/%p/", 
+	transaction->divert = talloc_asprintf(transaction, "%s/%p", 
 					      xs_daemon_transactions(),
 					      transaction);
-	cmd = talloc_asprintf(node, "cp -a %s %s", dir, transaction->divert);
-	if (!do_command(cmd))
-		corrupt(conn, "Creating transaction %s", transaction->divert);
-
-	talloc_steal(conn, transaction);
 	INIT_LIST_HEAD(&transaction->changes);
 	transaction->conn = conn;
 	timerclear(&transaction->timeout);
@@ -228,6 +265,11 @@ bool do_transaction_start(struct connection *conn, const char *node)
 	list_add_tail(&transaction->list, &transactions);
 	conn->transaction = transaction;
 	talloc_set_destructor(transaction, destroy_transaction);
+
+	if (!copy_dir(dir, transaction->divert))
+		return send_error(conn, errno);
+
+	talloc_steal(conn, transaction);
 	return send_ack(transaction->conn, XS_TRANSACTION_START);
 }
 

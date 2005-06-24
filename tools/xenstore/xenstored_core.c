@@ -246,7 +246,7 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock,
 }
 
 /* Read everything from a talloc_open'ed fd. */
-static void *read_all(int *fd, unsigned int *size)
+void *read_all(int *fd, unsigned int *size)
 {
 	unsigned int max = 4;
 	int ret;
@@ -271,7 +271,7 @@ static int destroy_fd(void *_fd)
 }
 
 /* Return a pointer to an fd, self-closing and attached to this pathname. */
-static int *talloc_open(const char *pathname, int flags, int mode)
+int *talloc_open(const char *pathname, int flags, int mode)
 {
 	int *fd;
 
@@ -534,6 +534,30 @@ static char *tempfile(const char *path, void *contents, unsigned int len)
 	return tmppath;
 }
 
+static int destroy_opendir(void *_dir)
+{
+	DIR **dir = _dir;
+	closedir(*dir);
+	return 0;
+}
+
+/* Return a pointer to a DIR*, self-closing and attached to this pathname. */
+DIR **talloc_opendir(const char *pathname)
+{
+	DIR **dir;
+
+	dir = talloc(pathname, DIR *);
+	*dir = opendir(pathname);
+	if (!*dir) {
+		int saved_errno = errno;
+		talloc_free(dir);
+		errno = saved_errno;
+		return NULL;
+	}
+	talloc_set_destructor(dir, destroy_opendir);
+	return dir;
+}
+
 /* We assume rename() doesn't fail on moves in same dir. */
 static void commit_tempfile(const char *path)
 {
@@ -677,7 +701,7 @@ static bool send_directory(struct connection *conn, const char *node)
 {
 	char *path, *reply = talloc_strdup(node, "");
 	unsigned int reply_len = 0;
-	DIR *dir;
+	DIR **dir;
 	struct dirent *dirent;
 
 	node = canonicalize(conn, node);
@@ -685,11 +709,11 @@ static bool send_directory(struct connection *conn, const char *node)
 		return send_error(conn, errno);
 
 	path = node_dir(conn->transaction, node);
-	dir = opendir(path);
+	dir = talloc_opendir(path);
 	if (!dir)
 		return send_error(conn, errno);
 
-	while ((dirent = readdir(dir)) != NULL) {
+	while ((dirent = readdir(*dir)) != NULL) {
 		int len = strlen(dirent->d_name) + 1;
 
 		if (!valid_chars(dirent->d_name))
@@ -699,7 +723,6 @@ static bool send_directory(struct connection *conn, const char *node)
 		strcpy(reply + reply_len, dirent->d_name);
 		reply_len += len;
 	}
-	closedir(dir);
 
 	return send_reply(conn, XS_DIRECTORY, reply, reply_len);
 }

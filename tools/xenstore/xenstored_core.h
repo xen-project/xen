@@ -20,6 +20,8 @@
 #ifndef _XENSTORED_CORE_H
 #define _XENSTORED_CORE_H
 
+#include <sys/types.h>
+#include <dirent.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <errno.h>
@@ -129,7 +131,16 @@ void handle_output(struct connection *conn);
 /* Is this a valid node name? */
 bool is_valid_nodename(const char *node);
 
+/* Return a pointer to an open dir, self-closig and attached to pathname. */
+DIR **talloc_opendir(const char *pathname);
+
+/* Return a pointer to an fd, self-closing and attached to this pathname. */
+int *talloc_open(const char *pathname, int flags, int mode);
+
 /* Convenient talloc-style destructor for paths. */
 int destroy_path(void *path);
+
+/* Read entire contents of a talloced fd. */
+void *read_all(int *fd, unsigned int *size);
 
 #endif /* _XENSTORED_CORE_H */
