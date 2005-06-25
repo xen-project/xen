@@ -167,6 +167,7 @@ xen/include/asm-*/asm-offsets.h
 xen/include/hypervisor-ifs/arch
 xen/include/public/public
 xen/include/xen/*.new
+xen/include/xen/acm_policy.h
 xen/include/xen/banner.h
 xen/include/xen/compile.h
 xen/tags

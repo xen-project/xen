@@ -1,4 +1,7 @@
-
+#
+# If you change any of these configuration options then you must
+# 'make clean' before rebuilding.
+#
 verbose     ?= n
 debug       ?= n
 perfc       ?= n
@@ -7,6 +10,14 @@ trace       ?= n
 optimize    ?= y
 domu_debug  ?= n
 crash_debug ?= n
+
+# ACM_USE_SECURITY_POLICY is set to security policy of Xen
+# Supported models are:
+#	ACM_NULL_POLICY (ACM will not be built with this policy)
+#	ACM_CHINESE_WALL_POLICY
+#	ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY
+#	ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY
+ACM_USE_SECURITY_POLICY ?= ACM_NULL_POLICY
 
 include $(BASEDIR)/../Config.mk
 
@@ -35,7 +46,7 @@ OBJS    += $(patsubst %.c,%.o,$(C_SRCS))
 ALL_OBJS := $(BASEDIR)/common/common.o
 ALL_OBJS += $(BASEDIR)/drivers/char/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/acpi/driver.o
-ifdef ACM_USE_SECURITY_POLICY
+ifneq ($(ACM_USE_SECURITY_POLICY),ACM_NULL_POLICY)
 ALL_OBJS += $(BASEDIR)/acm/acm.o
 endif
 ALL_OBJS += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o

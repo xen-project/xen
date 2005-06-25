@@ -22,8 +22,8 @@
  * todo: move from static policy choice to compile option.
  */
 
-#ifndef _XEN_PUBLIC_SHYPE_H
-#define _XEN_PUBLIC_SHYPE_H
+#ifndef _XEN_PUBLIC_ACM_H
+#define _XEN_PUBLIC_ACM_H
 
 #include "xen.h"
 #include "sched_ctl.h"
@@ -70,10 +70,6 @@
 	(X == ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY) ? "SIMPLE TYPE ENFORCEMENT policy" : \
 	(X == ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY) ? "CHINESE WALL AND SIMPLE TYPE ENFORCEMENT policy" : \
 	"UNDEFINED policy"
-
-#ifndef ACM_USE_SECURITY_POLICY
-#define ACM_USE_SECURITY_POLICY ACM_NULL_POLICY
-#endif
 
 /* defines a ssid reference used by xen */
 typedef u32 ssidref_t;
