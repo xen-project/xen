@@ -50,7 +50,7 @@ int acm_init_chwall_policy(void)
 {
 	/* minimal startup policy; policy write-locked already */
 	chwall_bin_pol.max_types = 1;
-	chwall_bin_pol.max_ssidrefs = 1;
+	chwall_bin_pol.max_ssidrefs = 2;
 	chwall_bin_pol.max_conflictsets = 1;
 	chwall_bin_pol.ssidrefs = (domaintype_t *)xmalloc_array(domaintype_t, chwall_bin_pol.max_ssidrefs*chwall_bin_pol.max_types);
 	chwall_bin_pol.conflict_sets = (domaintype_t *)xmalloc_array(domaintype_t, chwall_bin_pol.max_conflictsets*chwall_bin_pol.max_types);
@@ -81,9 +81,10 @@ chwall_init_domain_ssid(void **chwall_ssid, ssidref_t ssidref)
 	 * part of the global ssidref (same way we'll get the partial ssid pointer)
 	 */
 	chwall_ssidp->chwall_ssidref = GET_SSIDREF(ACM_CHINESE_WALL_POLICY, ssidref);
-	if (chwall_ssidp->chwall_ssidref >= chwall_bin_pol.max_ssidrefs) {
-		printkd("%s: ERROR chwall_ssidref(%x) > max(%x).\n",
-			__func__, chwall_ssidp->chwall_ssidref, chwall_bin_pol.max_ssidrefs-1);
+	if ((chwall_ssidp->chwall_ssidref >= chwall_bin_pol.max_ssidrefs) ||
+	    (chwall_ssidp->chwall_ssidref == ACM_DEFAULT_LOCAL_SSID)) {
+		printkd("%s: ERROR chwall_ssidref(%x) undefined (>max) or unset (0).\n",
+			__func__, chwall_ssidp->chwall_ssidref);
 		xfree(chwall_ssidp);
 		return ACM_INIT_SSID_ERROR;
 	}

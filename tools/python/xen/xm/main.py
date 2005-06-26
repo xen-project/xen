@@ -399,9 +399,9 @@ class ProgList(Prog):
                 d['port'] = sxp.child_value(console, 'console_port')
             else:
                 d['port'] = ''
-            if ((int(sxp.child_value(info, 'ssidref', '-1'))) != -1):
-                d['ssidref1'] =  int(sxp.child_value(info, 'ssidref', '-1')) & 0xffff
-                d['ssidref2'] = (int(sxp.child_value(info, 'ssidref', '-1')) >> 16) & 0xffff
+            if ((int(sxp.child_value(info, 'ssidref', '0'))) != 0):
+                d['ssidref1'] =  int(sxp.child_value(info, 'ssidref', '0')) & 0xffff
+                d['ssidref2'] = (int(sxp.child_value(info, 'ssidref', '0')) >> 16) & 0xffff
                 print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3d  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %(port)4s    s:%(ssidref2)02x/p:%(ssidref1)02x" % d)
             else:
                 print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3d  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %(port)4s" % d)

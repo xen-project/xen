@@ -78,7 +78,7 @@ static PyObject *pyxc_domain_create(PyObject *self,
 
     u32          dom = 0;
     int          ret;
-    u32          ssidref = 0xFFFFFFFF;
+    u32          ssidref = 0x0;
 
     static char *kwd_list[] = { "dom", "ssidref", NULL };
 

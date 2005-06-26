@@ -328,7 +328,7 @@ static inline int acm_pre_grant_setup(domid_t id)
 }
 
 /* predefined ssidref for DOM0 used by xen when creating DOM0 */
-#define ACM_DOM0_SSIDREF        0
+#define ACM_DOM0_SSIDREF       0x00010001 
 
 static inline void acm_post_domain0_create(domid_t domid)
 {

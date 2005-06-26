@@ -73,14 +73,15 @@ int acm_init_ste_policy(void)
 {
 	/* minimal startup policy; policy write-locked already */
 	ste_bin_pol.max_types = 1;
-	ste_bin_pol.max_ssidrefs = 1;
-	ste_bin_pol.ssidrefs = (domaintype_t *)xmalloc_array(domaintype_t, 1);
-	
+	ste_bin_pol.max_ssidrefs = 2;
+	ste_bin_pol.ssidrefs = (domaintype_t *)xmalloc_array(domaintype_t, 2);
+	memset(ste_bin_pol.ssidrefs, 0, 2);
+
 	if (ste_bin_pol.ssidrefs == NULL)
 		return ACM_INIT_SSID_ERROR;
 
-	/* initialize state */
-	ste_bin_pol.ssidrefs[0] = 1;
+	/* initialize state so that dom0 can start up and communicate with itself */
+	ste_bin_pol.ssidrefs[1] = 1;
 
 	/* init stats */
 	atomic_set(&(ste_bin_pol.ec_eval_count), 0);
@@ -106,9 +107,10 @@ ste_init_domain_ssid(void **ste_ssid, ssidref_t ssidref)
 
 	/* get policy-local ssid reference */
 	ste_ssidp->ste_ssidref = GET_SSIDREF(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, ssidref);
-	if (ste_ssidp->ste_ssidref >= ste_bin_pol.max_ssidrefs) {
-		printkd("%s: ERROR ste_ssidref (%x) > max(%x).\n",
-			__func__, ste_ssidp->ste_ssidref, ste_bin_pol.max_ssidrefs-1);
+	if ((ste_ssidp->ste_ssidref >= ste_bin_pol.max_ssidrefs) ||
+	    (ste_ssidp->ste_ssidref == ACM_DEFAULT_LOCAL_SSID))	{
+		printkd("%s: ERROR ste_ssidref (%x) undefined or unset (0).\n",
+			__func__, ste_ssidp->ste_ssidref);
 		xfree(ste_ssidp);
 		return ACM_INIT_SSID_ERROR;
 	}

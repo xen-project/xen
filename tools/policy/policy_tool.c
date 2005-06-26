@@ -234,14 +234,14 @@ void acm_dump_policy_buffer(void *buf, int buflen) {
 /*************************** set policy ****************************/
 
 int acm_domain_set_chwallpolicy(void *bufstart, int buflen) {
-#define CWALL_MAX_SSIDREFS      	5
+#define CWALL_MAX_SSIDREFS      	6
 #define CWALL_MAX_TYPES  		10
 #define CWALL_MAX_CONFLICTSETS		2
 
      struct acm_chwall_policy_buffer *chwall_bin_pol = (struct acm_chwall_policy_buffer *)bufstart;
      domaintype_t *ssidrefs, *conflicts;
      int ret = 0;
-     int i,j;
+     int j;
 
      chwall_bin_pol->chwall_max_types = htons(CWALL_MAX_TYPES);
      chwall_bin_pol->chwall_max_ssidrefs = htons(CWALL_MAX_SSIDREFS);
@@ -261,13 +261,13 @@ int acm_domain_set_chwallpolicy(void *bufstart, int buflen) {
 			   return -1; /* not enough space */
 
      ssidrefs = (domaintype_t *)(bufstart+ntohs(chwall_bin_pol->chwall_ssid_offset));
-     for(i=0; i< CWALL_MAX_SSIDREFS; i++) {
-	     for (j=0; j< CWALL_MAX_TYPES; j++)
-		     ssidrefs[i*CWALL_MAX_TYPES + j] = htons(0);
-	     /* here, set type i for ssidref i; generally, a ssidref can have multiple chwall types */
-	     if (i < CWALL_MAX_SSIDREFS)
-		     ssidrefs[i*CWALL_MAX_TYPES + i] = htons(1);
-     }
+     memset(ssidrefs, 0, CWALL_MAX_TYPES*CWALL_MAX_SSIDREFS*sizeof(domaintype_t));
+
+     /* now set type j-1 for ssidref i+1 */
+     for(j=0; j<= CWALL_MAX_SSIDREFS; j++)
+         if ((0 < j) &&( j <= CWALL_MAX_TYPES))
+             ssidrefs[j*CWALL_MAX_TYPES + j - 1] = htons(1);
+
      ret += CWALL_MAX_TYPES*CWALL_MAX_SSIDREFS*sizeof(domaintype_t);
      if ((buflen - ret) < (CWALL_MAX_CONFLICTSETS*CWALL_MAX_TYPES*sizeof(domaintype_t)))
 			   return -1; /* not enough space */
@@ -276,10 +276,10 @@ int acm_domain_set_chwallpolicy(void *bufstart, int buflen) {
      conflicts = (domaintype_t *)(bufstart + 
 				  ntohs(chwall_bin_pol->chwall_conflict_sets_offset));
      memset((void *)conflicts, 0, CWALL_MAX_CONFLICTSETS*CWALL_MAX_TYPES*sizeof(domaintype_t));
-     /* just 1 conflict set [0]={2,3}, [1]={0,5,6} */
+     /* just 1 conflict set [0]={2,3}, [1]={1,5,6} */
      if (CWALL_MAX_TYPES > 3) {
 	     conflicts[2] = htons(1); conflicts[3] = htons(1); /* {2,3} */
-	     conflicts[CWALL_MAX_TYPES] = htons(1); conflicts[CWALL_MAX_TYPES+5] = htons(1); 
+	     conflicts[CWALL_MAX_TYPES+1] = htons(1); conflicts[CWALL_MAX_TYPES+5] = htons(1); 
 	     conflicts[CWALL_MAX_TYPES+6] = htons(1);/* {0,5,6} */
      }
      ret += sizeof(domaintype_t)*CWALL_MAX_CONFLICTSETS*CWALL_MAX_TYPES;
@@ -287,12 +287,12 @@ int acm_domain_set_chwallpolicy(void *bufstart, int buflen) {
 }
 
 int acm_domain_set_stepolicy(void *bufstart, int buflen) {
-#define STE_MAX_SSIDREFS      	5
-#define STE_MAX_TYPES  		5
+#define STE_MAX_SSIDREFS        6
+#define STE_MAX_TYPES  	        5
 	
     struct acm_ste_policy_buffer *ste_bin_pol = (struct acm_ste_policy_buffer *)bufstart;
     domaintype_t *ssidrefs;
-    int i,j, ret = 0;
+    int j, ret = 0;
 
     ste_bin_pol->ste_max_types = htons(STE_MAX_TYPES);
     ste_bin_pol->ste_max_ssidrefs = htons(STE_MAX_SSIDREFS);
@@ -304,14 +304,14 @@ int acm_domain_set_stepolicy(void *bufstart, int buflen) {
 	    return -1; /* not enough space */
 
      ssidrefs = (domaintype_t *)(bufstart+ntohs(ste_bin_pol->ste_ssid_offset));
-     for(i=0; i< STE_MAX_SSIDREFS; i++) {
-	     for (j=0; j< STE_MAX_TYPES; j++)
-		     ssidrefs[i*STE_MAX_TYPES + j] = htons(0);
-	     /* set type i in ssidref 0 and ssidref i */
-	     ssidrefs[i] = htons(1); /* ssidref 0 has all types set */
-	     if (i < STE_MAX_SSIDREFS)
-		     ssidrefs[i*STE_MAX_TYPES + i] = htons(1);
-     }
+     memset(ssidrefs, 0, STE_MAX_TYPES*STE_MAX_SSIDREFS*sizeof(domaintype_t));
+     /* all types 1 for ssidref 1 */
+     for(j=0; j< STE_MAX_TYPES; j++)
+	 ssidrefs[1*STE_MAX_TYPES +j] = htons(1);
+     /* now set type j-1 for ssidref j */
+     for(j=0; j< STE_MAX_SSIDREFS; j++)
+	     if ((0 < j) &&( j <= STE_MAX_TYPES))
+		     ssidrefs[j*STE_MAX_TYPES + j - 1] = htons(1);
      ret += STE_MAX_TYPES*STE_MAX_SSIDREFS*sizeof(domaintype_t);
      return ret;
 }

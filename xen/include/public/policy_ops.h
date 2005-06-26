@@ -28,7 +28,7 @@
  * This makes sure that old versions of policy tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define POLICY_INTERFACE_VERSION   0xAAAA0001
+#define POLICY_INTERFACE_VERSION   0xAAAA0002
 
 /************************************************************************/
 

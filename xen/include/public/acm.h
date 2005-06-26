@@ -41,8 +41,8 @@
 #endif
 
 /* default ssid reference value if not supplied */
-#define ACM_DEFAULT_SSID 	0xffffffff
-#define ACM_DEFAULT_LOCAL_SSID  0xffff
+#define ACM_DEFAULT_SSID 	0x0
+#define ACM_DEFAULT_LOCAL_SSID  0x0
 
 /* Internal ACM ERROR types */
 #define ACM_OK				 0
