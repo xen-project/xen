@@ -1,7 +1,7 @@
 /**
  * (C) Copyright IBM Corp. 2005
  *
- * $Id: XmlToBin.java,v 1.2 2005/06/17 20:00:04 rvaldez Exp $
+ * $Id: XmlToBin.java,v 1.3 2005/06/20 21:07:37 rvaldez Exp $
  *
  * Author: Ray Valdez
  *
@@ -1088,7 +1088,18 @@ public class XmlToBin
   /* Get VM security information */
   elementList = root.getElementsByTagName ("VM");
   printDebug ("\n pDT:: partition length of NodeList:" + elementList.getLength());
+  /* Add default Ssid to Ste and Chw bags */			
+  SecurityLabel defEntry = new SecurityLabel();
 
+  defEntry.chwTypes = new Vector();
+  defEntry.steTypes = new Vector();
+  defEntry.chwIDs = new Vector();
+  defEntry.ids = new Vector();
+
+  defEntry.steSsidPosition =0;
+  defEntry.chwSsidPosition =0;
+  bagOfChwSsids.add(defEntry);
+  bagOfSsids.add(defEntry);
 
   for (int x = 0; x < elementList.getLength(); x++)
   {
@@ -1326,11 +1337,11 @@ public class XmlToBin
 	  /* Get vid */
       	  NodeList elist = e1.getElementsByTagName ("vid");
       	  String idStr = elist.item(0).getFirstChild().getNodeValue();  
-      	  printDebug ("pDTVS:: vid:" + idStr);
+      	  printDebug (" pDTVS:: vid:" + idStr);
 
 	  /* Get TE */
       	  elist = e1.getElementsByTagName ("TE");
-          printDebug ("pDTVS:: Total ste types: " + elist.getLength());
+          printDebug (" pDTVS:: Total ste types: " + elist.getLength());
 
 	  Vector colorTypes = new Vector();
 	  for (int j = 0; j < elist.getLength(); j++)
@@ -1396,11 +1407,11 @@ public class XmlToBin
 	  item.bus = elist.item(0).getFirstChild().getNodeValue();  
       	  elist = e1.getElementsByTagName ("slot");
       	  item.slot = elist.item(0).getFirstChild().getNodeValue();  
-      	  printDebug ("pDT:: bus and slot:" + item.bus + " "+ item.slot);
+      	  printDebug (" pDT:: bus and slot:" + item.bus + " "+ item.slot);
 
 	  /* Get TE */
       	  elist = e1.getElementsByTagName ("TE");
-          printDebug ("pDT:: Total ste types: " + elist.getLength());
+          printDebug (" pDT:: Total ste types: " + elist.getLength());
 
 	  Vector colorTypes = new Vector();
 	  for (int j = 0; j < elist.getLength(); j++)
@@ -1409,7 +1420,7 @@ public class XmlToBin
         	Node childNode = knode.getFirstChild();     
         	String value = childNode.getNodeValue();
 
-		printDebug ("pDT:: My color is: " + value);
+		printDebug (" pDT:: My color is: " + value);
 		if (!bagOfTypes.contains(value))
 		{
 		  throw new IOException("pDT:: bus: " + item.bus + " slot: "+ item.slot + " has unknown type : "+ value);

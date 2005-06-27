@@ -1,7 +1,7 @@
 /**
  * (C) Copyright IBM Corp. 2005
  *
- * $Id: XmlToBinInterface.java,v 1.2 2005/06/17 20:00:04 rvaldez Exp $
+ * $Id: XmlToBinInterface.java,v 1.3 2005/06/20 21:07:37 rvaldez Exp $
  *
  * Author: Ray Valdez
  *
@@ -123,7 +123,7 @@ public interface XmlToBinInterface
   final short binaryBufferHeaderSz = (3 * u32Size + 4* u16Size);
 
   /* copied directlty from policy_ops.h */
-  final int POLICY_INTERFACE_VERSION = 0xAAAA0000;
+  final int POLICY_INTERFACE_VERSION = 0xAAAA0002;
 
   /* copied directly from acm.h */
   final int ACM_MAGIC  =  0x0001debc;
