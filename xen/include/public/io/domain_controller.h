@@ -62,6 +62,7 @@ typedef struct {
 #define CMSG_USBIF_BE       8  /* USB controller backend  */
 #define CMSG_USBIF_FE       9  /* USB controller frontend */
 #define CMSG_VCPU_HOTPLUG  10  /* Hotplug VCPU messages   */
+#define CMSG_DEBUG         11  /* PDB backend             */
 
 /******************************************************************************
  * CONSOLE DEFINITIONS
@@ -794,5 +795,18 @@ typedef struct {
     u32 status;       /* 4: Return code indicates success or failure. */
 } PACKED mem_request_t; /* 8 bytes */
 
+
+/******************************************************************************
+ * PDB INTERFACE DEFINITIONS
+ */
+
+#define CMSG_DEBUG_CONNECTION_STATUS 0
+typedef struct {
+#define PDB_CONNECTION_STATUS_UP   1
+#define PDB_CONNECTION_STATUS_DOWN 2
+    u32      status;
+    memory_t ring;       /* status: UP */
+    u32      evtchn;     /* status: UP */
+} PACKED pdb_connection_t, *pdb_connection_p;
 
 #endif /* __XEN_PUBLIC_IO_DOMAIN_CONTROLLER_H__ */

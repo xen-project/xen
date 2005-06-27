@@ -77,7 +77,7 @@ let gdb_read_registers ctx =
     (Printf.sprintf "%08lx" (Util.flip_int32 regs.esi)) ^
     (Printf.sprintf "%08lx" (Util.flip_int32 regs.edi)) ^
     (Printf.sprintf "%08lx" (Util.flip_int32 regs.eip)) ^
-    (Printf.sprintf "%08lx" (Util.flip_int32 regs.eflags)) ^
+    (Printf.sprintf "%08lx" (Util.flip_int32 regs.efl)) ^
     (Printf.sprintf "%08lx" (Util.flip_int32 regs.cs)) ^
     (Printf.sprintf "%08lx" (Util.flip_int32 regs.ss)) ^
     (Printf.sprintf "%08lx" (Util.flip_int32 regs.ds)) ^
@@ -140,7 +140,7 @@ let gdb_write_register ctx command =
     |  6 -> PDB.write_register ctx ESI new_val
     |  7 -> PDB.write_register ctx EDI new_val
     |  8 -> PDB.write_register ctx EIP new_val
-    |  9 -> PDB.write_register ctx EFLAGS new_val
+    |  9 -> PDB.write_register ctx EFL new_val
     | 10 -> PDB.write_register ctx CS new_val
     | 11 -> PDB.write_register ctx SS new_val
     | 12 -> PDB.write_register ctx DS new_val
@@ -195,13 +195,15 @@ let gdb_last_signal =
  *)
 let pdb_extensions command sock =
   let process_extension key value =
-    (* since this command can change the context, we need to grab it each time *)
+    (* since this command can change the context, 
+       we need to grab it again each time *)
     let ctx = PDB.find_context sock in
     match key with
     | "status" ->
-	print_endline (string_of_context ctx);
 	PDB.debug_contexts ();
-	debugger_status ()
+	(* print_endline ("debugger status");
+	   debugger_status () 
+	*)
     | "context" ->
         PDB.add_context sock (List.hd value) 
                              (int_list_of_string_list (List.tl value))
@@ -216,6 +218,7 @@ let pdb_extensions command sock =
   | Unknown_context s -> 
       print_endline (Printf.sprintf "unknown context [%s]" s);
       "E01"
+  | Unknown_domain -> "E01"
   | Failure s -> "E01"
 
 
@@ -274,27 +277,47 @@ let process_command command sock =
     | 'Z' -> gdb_insert_bwcpoint ctx command
     | _ -> 
 	print_endline (Printf.sprintf "unknown gdb command [%s]" command);
-	""
+	"E02"
   with
     Unimplemented s ->
       print_endline (Printf.sprintf "loser. unimplemented command [%s][%s]" 
 		                    command s);
-      ""
-
+      "E03"
 
 (**
-   process_evtchn  
+   process_xen_domain
+
+   This is called whenever a domain debug assist responds to a
+   pdb packet.
+*)
+
+let process_xen_domain fd =
+  let channel = Evtchn.read fd in
+  let ctx = find_context fd in
+  
+  begin
+    match ctx with
+      | Xen_domain d -> Xen_domain.process_response (Xen_domain.get_ring d)
+      | _ -> failwith ("process_xen_domain called without Xen_domain context")
+  end;
+    
+  Evtchn.unmask fd channel                                (* allow next virq *)
+  
+
+(**
+   process_xen_virq
 
    This is called each time a virq_pdb is sent from xen to dom 0.
    It is sent by Xen when a domain hits a breakpoint. 
 
-   Think of this as the continuation function for a "c" or "s" command.
+   Think of this as the continuation function for a "c" or "s" command
+   issued to a domain.
 *)
 
 external query_domain_stop : unit -> (int * int) list = "query_domain_stop"
 (* returns a list of paused domains : () -> (domain, vcpu) list *)
 
-let process_evtchn fd =
+let process_xen_virq fd =
   let channel = Evtchn.read fd in
   let find_pair (dom, vcpu) =
     print_endline (Printf.sprintf "checking %d.%d" dom vcpu);
@@ -313,3 +336,17 @@ let process_evtchn fd =
   Util.send_reply sock "S05";
   Evtchn.unmask fd channel                                (* allow next virq *)
   
+
+(**
+   process_xen_xcs
+
+   This is called each time the software assist residing in a backend 
+   domain starts up.  The control message includes the address of a 
+   shared ring page and our end of an event channel (which indicates
+   when data is available on the ring).
+*)
+
+let process_xen_xcs xcs_fd =
+  let (local_evtchn_fd, evtchn, dom, ring) = Xcs.read xcs_fd in
+  add_xen_domain_context local_evtchn_fd dom evtchn ring;
+  local_evtchn_fd

@@ -7,6 +7,11 @@
  *  @version 1
  *)
 
+val _setup : unit -> Unix.file_descr
+val _bind : Unix.file_descr -> int -> unit
+
+val bind_interdomain : int -> int * int
+
 
 val setup : unit -> Unix.file_descr
 val read : Unix.file_descr -> int

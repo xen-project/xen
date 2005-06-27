@@ -14,6 +14,7 @@ let dev_minor = 201                                      (* EVTCHN_DEV_MINOR *)
 let virq_pdb = 6                                      (* as defined VIRQ_PDB *)
 
 external bind_virq : int -> int = "evtchn_bind_virq"
+external bind_interdomain : int -> int * int = "evtchn_bind_interdomain"
 external bind : Unix.file_descr -> int -> unit = "evtchn_bind"
 external unbind : Unix.file_descr -> int -> unit = "evtchn_unbind"
 external ec_open : string -> int -> int -> Unix.file_descr = "evtchn_open"
@@ -21,10 +22,17 @@ external read : Unix.file_descr -> int = "evtchn_read"
 external ec_close : Unix.file_descr -> unit = "evtchn_close"
 external unmask : Unix.file_descr -> int -> unit = "evtchn_unmask"
 
+let _setup () =
+  let fd = ec_open dev_name dev_major dev_minor in
+  fd
+
+let _bind fd port =
+  bind fd port
+
 let setup () =
   let port = bind_virq virq_pdb in
-  let fd = ec_open dev_name dev_major dev_minor in
-  bind fd port;
+  let fd = _setup() in
+  _bind fd port;
   fd
 
 let teardown fd =

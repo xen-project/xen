@@ -42,20 +42,6 @@ pdb_close (int xc_handle)
 }
 
 
-int 
-pdb_evtchn_bind_virq (int xc_handle, int virq, int *port)
-{
-    int rc;
-    
-    if ( (rc = xc_evtchn_bind_virq(xc_handle, virq, port) < 0 ) )
-    {
-        fprintf(stderr, "(pdb) error binding virq to event channel: %d (%s)\n",
-                errno, strerror(errno));
-    }
-    return rc;
-}
-
-
 #include <sys/ioctl.h>
 
 /* /dev/xen/evtchn ioctls */
