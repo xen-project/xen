@@ -9,63 +9,58 @@
 
 
 type register =
-  | EBX
+  | EAX
   | ECX
   | EDX
+  | EBX
+  | ESP
+  | EBP
   | ESI
   | EDI
-  | EBP
-  | EAX
-  | Error_code
-  | Entry_vector
   | EIP
+  | EFL
   | CS
-  | EFLAGS
-  | ESP
   | SS
-  | ES
   | DS
+  | ES
   | FS
   | GS
 
 type registers =
-    { ebx : int32;
+    { eax : int32;
       ecx : int32;
       edx : int32;
+      ebx : int32;
+      esp : int32;
+      ebp : int32;
       esi : int32;
       edi : int32;
-      ebp : int32;
-      eax : int32;
-      error_code : int32;
-      entry_vector : int32;
       eip : int32;
-      cs : int32;
-      eflags : int32;
-      esp : int32;
-      ss : int32;
-      es : int32;
-      ds : int32;
-      fs : int32;
-      gs : int32
+      efl : int32;
+      cs  : int32;
+      ss  : int32;
+      ds  : int32;
+      es  : int32;
+      fs  : int32;
+      gs  : int32
     }
 
 let null_registers =
-  { ebx = 0l;
-    ecx = 0l;
-    edx = 0l;
-    esi = 0l;
-    edi = 0l;
-    ebp = 0l;
-    eax = 0l;
-    error_code = 0l;
-    entry_vector = 0l;
-    eip = 0l;
-    cs = 0l;
-    eflags = 0l;
-    esp = 0l;
-    ss = 0l;
-    es = 0l;
-    ds = 0l;
-    fs = 0l;
-    gs = 0l
-  }
+    { eax = 0l;
+      ecx = 0l;
+      edx = 0l;
+      ebx = 0l;
+      esp = 0l;
+      ebp = 0l;
+      esi = 0l;
+      edi = 0l;
+      eip = 0l;
+      efl = 0l;
+      cs  = 0l;
+      ss  = 0l;
+      ds  = 0l;
+      es  = 0l;
+      fs  = 0l;
+      gs  = 0l
+    }
+

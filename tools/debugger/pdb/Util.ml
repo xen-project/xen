@@ -103,7 +103,7 @@ let get_connection_info fd =
   let get_local_info fd =
     let sockname = Unix.getsockname fd in
     match sockname with
-    | Unix.ADDR_UNIX(s) -> s
+    | Unix.ADDR_UNIX(s) -> "unix"
     | Unix.ADDR_INET(a,p) -> ((Unix.string_of_inet_addr a) ^ ":" ^
 			      (string_of_int p))
   and get_remote_info fd =
@@ -117,6 +117,9 @@ let get_connection_info fd =
     get_remote_info fd
   with
   | Unix.Unix_error (Unix.ENOTSOCK, s1, s2) -> 
+      let s = Unix.fstat fd in
+      Printf.sprintf "dev: %d, inode: %d" s.Unix.st_dev s.Unix.st_ino
+  | Unix.Unix_error (Unix.EBADF, s1, s2) -> 
       let s = Unix.fstat fd in
       Printf.sprintf "dev: %d, inode: %d" s.Unix.st_dev s.Unix.st_ino
   | _ -> get_local_info fd

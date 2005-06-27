@@ -59,6 +59,7 @@ let process_input conn sock =
   conn.length <- conn.length + length;
   let re = Str.regexp "[^\\$]*\\$\\([^#]*\\)#\\(..\\)" in
 
+  (* interrupt the target if there was a ctrl-c *)
   begin
     try
       let break = String.index conn.buffer '\003' + 1 in
@@ -118,9 +119,13 @@ let process_input conn sock =
  *  connection_hash is a hash (duh!) with one connection_t for each
  *  open connection.
  * 
- *  in_list is a list of active sockets.  it also contains two 
- *  magic entries: server_sock for accepting new entries and 
- *  event_sock for Xen event channel asynchronous notifications.
+ *  in_list is a list of active sockets.  it also contains a number
+ *  of magic entries: 
+ *  - server_sock   for accepting new client connections (e.g. gdb)
+ *  - xen_virq_sock for Xen virq asynchronous notifications (via evtchn).
+ *                  This is used by context = domain
+ *  - xcs_sock      for xcs messages when a new backend domain registers
+ *                  This is used by context = process
  *)
 let main_server_loop sockaddr =
   let connection_hash = Hashtbl.create 10
@@ -143,10 +148,20 @@ let main_server_loop sockaddr =
       begin
 	try
 	  match PDB.find_context sock with
-	  | PDB.Event_channel ->
-	      print_endline (Printf.sprintf "[%s] event channel"
+	  | PDB.Xen_virq ->
+	      print_endline (Printf.sprintf "[%s] Xen virq"
 			                    (Util.get_connection_info sock));
-	      Debugger.process_evtchn sock;
+	      Debugger.process_xen_virq sock;
+	      (new_list, closed_list)
+	  | PDB.Xen_xcs ->
+	      print_endline (Printf.sprintf "[%s] Xen xcs"
+			                    (Util.get_connection_info sock));
+	      let new_xen_domain = Debugger.process_xen_xcs sock in
+	      (new_xen_domain :: new_list, closed_list)
+	  | PDB.Xen_domain d ->
+	      print_endline (Printf.sprintf "[%s] Xen domain"
+			                    (Util.get_connection_info sock));
+	      Debugger.process_xen_domain sock;
 	      (new_list, closed_list)
 	  | _ ->
 	      let conn = Hashtbl.find connection_hash sock in
@@ -167,18 +182,22 @@ let main_server_loop sockaddr =
 	    (new_list, sock :: closed_list)
       end
   in
+
   let rec helper in_list server_sock =
-  (*
-   * List.iter (fun x->Printf.printf "{%s} " 
-   *                                (Util.get_connection_info x)) in_list;   
-   * Printf.printf "\n";
-   *)
+
+    (*    
+     List.iter (fun x->Printf.printf " {%s}\n" 
+                                    (Util.get_connection_info x)) in_list;   
+     Printf.printf "\n";
+    *)
+
     let (rd_list, _, _) = select in_list [] [] (-1.0) in 
     let (new_list, closed_list) = List.fold_left (process_socket server_sock)
 	                                         ([],[]) rd_list  in
     let merge_list = Util.list_remove (new_list @ in_list) closed_list  in
     helper merge_list server_sock
   in
+
   try
     let server_sock = socket (domain_of_sockaddr sockaddr) SOCK_STREAM 0 in
     setsockopt server_sock SO_REUSEADDR true;
@@ -186,16 +205,19 @@ let main_server_loop sockaddr =
     listen server_sock 2;
 
     PDB.open_debugger ();
-    let event_sock = Evtchn.setup () in
-    PDB.add_context event_sock "event channel" [];
-    helper [server_sock; event_sock] server_sock
+    let xen_virq_sock = Evtchn.setup () in
+    PDB.add_context xen_virq_sock "xen virq" [];
+
+    let xcs_sock = Xcs.setup () in
+    PDB.add_context xcs_sock "xen xcs" [];
+    helper [server_sock; xen_virq_sock; xcs_sock] server_sock
   with
   | Sys.Break ->
       print_endline "break: cleaning up";
       PDB.close_debugger ();
       Hashtbl.iter (fun sock conn -> close sock) connection_hash
-  | Unix_error(e,err,param) -> 
-      Printf.printf "unix error: [%s][%s][%s]\n" (error_message e) err param
+(*  | Unix_error(e,err,param) -> 
+      Printf.printf "unix error: [%s][%s][%s]\n" (error_message e) err param*)
   | Sys_error s -> Printf.printf "sys error: [%s]\n" s
   | Failure s -> Printf.printf "failure: [%s]\n" s
   | End_of_file -> Printf.printf "end of file\n"
@@ -207,7 +229,7 @@ let get_port () =
     int_of_string Sys.argv.(1)
   else
     begin
-      print_endline (Printf.sprintf "syntax error: %s <port>" Sys.argv.(0));
+      print_endline (Printf.sprintf "error: %s <port>" Sys.argv.(0));
       exit 1
     end
 
