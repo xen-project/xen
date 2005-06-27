@@ -2442,6 +2442,10 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
     unsigned long frames[16];
     long ret;
 
+    /* Rechecked in set_gdt, but ensures a sane limit for copy_from_user(). */
+    if ( entries > FIRST_RESERVED_GDT_ENTRY )
+        return -EINVAL;
+    
     if ( copy_from_user(frames, frame_list, nr_pages * sizeof(unsigned long)) )
         return -EFAULT;
 
