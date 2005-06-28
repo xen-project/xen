@@ -27,6 +27,7 @@
 // ROM BIOS for use with Bochs/Plex x86 emulation environment
 
 #define VMXASSIST
+#undef VMXTEST
 
 // ROM BIOS compatability entry points:
 // ===================================
@@ -4070,10 +4071,10 @@ ASM_END
         switch(regs.u.r8.al)
         {
          case 0x20: // coded by osmaker aka K.J.
-            if(regs.u.r32.edx == 0x534D4150)
+            if(regs.u.r32.edx == 0x534D4150) /* SMAP */
             {
 #ifdef VMXASSIST
-		if ((regs.u.r16.bx / 0x14)* 0x14 == regs.u.r16.bx) {
+		if ((regs.u.r16.bx / 0x14) * 0x14 == regs.u.r16.bx) {
 		    Bit16u e820_table_size = read_word(0xe000, 0x8) * 0x14;
 
 		    if (regs.u.r16.bx + 0x14 <= e820_table_size) {
@@ -10353,8 +10354,17 @@ dummy_iret_handler:
   HALT(__LINE__)
   iret
 
+#ifdef VMXTEST
+.org 0xffe0
+  jmp 0xf000:post;
+#endif
+
 .org 0xfff0 ; Power-up Entry Point
+#ifdef VMXTEST
+  jmp 0xd000:0x0003;
+#else
   jmp 0xf000:post
+#endif
 
 .org 0xfff5 ; ASCII Date ROM was built - 8 characters in MM/DD/YY
 .ascii BIOS_BUILD_DATE

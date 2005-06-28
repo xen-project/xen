@@ -950,7 +950,7 @@ trap(int trapno, int errno, struct regs *regs)
 
 	default:
 	invalid:
-		printf("Trap (%d) while in %s mode\n",
+		printf("Trap (0x%x) while in %s mode\n",
 		    trapno, regs->eflags & EFLAGS_VM ? "real" : "protected");
 		if (trapno == 14)
 			printf("Page fault address 0x%x\n", get_cr2());

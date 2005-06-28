@@ -74,6 +74,36 @@ hexdump(unsigned char *data, int sz)
 }
 
 void
+print_e820_map(struct e820entry *map, int entries)
+{
+	struct e820entry *m;
+
+	if (entries > 32)
+		entries = 32;
+
+	for (m = map; m < &map[entries]; m++) {
+		printf("%08lx%08lx - %08lx%08lx ",
+			(unsigned long) (m->addr >> 32),
+			(unsigned long) (m->addr),
+			(unsigned long) ((m->addr+m->size) >> 32),
+			(unsigned long) ((m->addr+m->size)));
+
+		switch (m->type) {
+		case E820_RAM:
+			printf("(RAM)\n"); break;
+		case E820_RESERVED:
+			printf("(Reserved)\n"); break;
+		case E820_ACPI:
+			printf("(ACPI Data)\n"); break;
+		case E820_NVS:
+			printf("(ACPI NVS)\n"); break;
+		default:
+			printf("(Type %ld)\n", m->type); break;
+		}
+	}
+}
+
+void
 dump_dtr(unsigned long base, unsigned long limit)
 {
 	unsigned long long entry;

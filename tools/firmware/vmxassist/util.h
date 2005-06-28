@@ -23,6 +23,24 @@
 #include <stdarg.h>
 #include <vm86.h>
 
+
+#define	LINUX_E820_MAP_NR	((unsigned char *)0x901E8)
+#define	LINUX_E820_MAP		((struct e820entry *)0x902D0)
+
+#define	E820_RAM	1
+#define	E820_RESERVED	2
+#define	E820_ACPI	3
+#define	E820_NVS	4
+#define	E820_IO		16
+#define	E820_SHARED	17
+
+struct e820entry {
+	unsigned long long	addr;
+	unsigned long long	size;
+	unsigned long		type;
+} __attribute__((packed));
+
+
 #define	offsetof(type, member)	((unsigned) &((type *)0)->member)
 
 struct vmx_assist_context;
@@ -30,6 +48,7 @@ struct vmx_assist_context;
 extern void hexdump(unsigned char *, int);
 extern void dump_regs(struct regs *);
 extern void dump_vmx_context(struct vmx_assist_context *);
+extern void print_e820_map(struct e820entry *, int);
 extern void dump_dtr(unsigned long, unsigned long);
 extern void *memcpy(void *, const void *, unsigned);
 extern void *memset(void *, int, unsigned);
