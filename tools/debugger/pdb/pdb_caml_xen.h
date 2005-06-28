@@ -1,3 +1,11 @@
+/*
+ * pdb_caml_xen.h
+ *
+ * http://www.cl.cam.ac.uk/netos/pdb
+ *
+ * generic xen definitions
+ *
+ */
 
 #ifndef _PDB_CAML_XEN_DEFINED_
 #define _PDB_CAML_XEN_DEFINED_

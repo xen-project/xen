@@ -1,12 +1,15 @@
 /*
- *  xcs stuff
+ * xcs stuff
  *
- *  this is responsible for establishing the initial connection
- *  between a backend domain and the pdb server.
+ * http://www.cl.cam.ac.uk/netos/pdb
  *
- *  liberated from xu.c
+ * this is responsible for establishing the initial connection
+ * between a backend domain and the pdb server.
+ *
+ * liberated from xu.c
  *
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

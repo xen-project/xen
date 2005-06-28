@@ -1,3 +1,11 @@
+/*
+ * pdb_caml_evtchn.c
+ *
+ * http://www.cl.cam.ac.uk/netos/pdb
+ *
+ * PDB's OCaml interface library for event channels
+ */
+
 #include <xc.h>
 #include <stdio.h>
 #include <stdlib.h>

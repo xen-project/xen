@@ -1,3 +1,11 @@
+(** xcs.mli
+ *
+ *  xen control switch interface
+ *
+ *  @author copyright (c) 2005 alex ho
+ *  @see <www.cl.cam.ac.uk/netos/pdb> pervasive debugger
+ *  @version 1
+ *)
 
 
 val setup : unit -> Unix.file_descr
