@@ -32,6 +32,12 @@
 #include <xen/mm.h>
 #include <acm/acm_hooks.h>
 
+#if defined(CONFIG_X86_64)
+#define GRANT_PTE_FLAGS (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#else
+#define GRANT_PTE_FLAGS (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY)
+#endif
+
 #define PIN_FAIL(_lbl, _rc, _f, _a...)   \
     do {                           \
         DPRINTK( _f, ## _a );      \
@@ -258,11 +264,7 @@ __gnttab_activate_grant_ref(
     {
         /* Write update into the pagetable. */
         l1_pgentry_t pte;
-        pte = l1e_from_pfn(frame, _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY
-#if defined(__x86_64__)
-            | _PAGE_USER               
-#endif
-            );
+        pte = l1e_from_pfn(frame, GRANT_PTE_FLAGS);
         if ( !(dev_hst_ro_flags & GNTMAP_readonly) )
             l1e_add_flags(pte,_PAGE_RW);
         rc = update_grant_va_mapping( host_virt_addr, pte, 
