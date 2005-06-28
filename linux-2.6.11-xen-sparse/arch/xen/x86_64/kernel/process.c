@@ -474,51 +474,26 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 	 * Switch DS and ES.
 	 * This won't pick up thread selector changes, but I guess that is ok.
 	 */
-	asm volatile("movl %%es,%0" : "=m" (prev->es)); 
-	if (unlikely(next->es | prev->es))
+	if (unlikely(next->es))
 		loadsegment(es, next->es); 
 	
-	asm volatile ("movl %%ds,%0" : "=m" (prev->ds)); 
-	if (unlikely(next->ds | prev->ds))
+	if (unlikely(next->ds))
 		loadsegment(ds, next->ds);
 
 	/* 
 	 * Switch FS and GS.
 	 */
-	{ 
-		unsigned fsindex;
-		asm volatile("movl %%fs,%0" : "=g" (fsindex)); 
-		/* segment register != 0 always requires a reload. 
-		   also reload when it has changed. 
-		   when prev process used 64bit base always reload
-		   to avoid an information leak. */
-		if (unlikely(fsindex | next->fsindex | prev->fs)) {
-			loadsegment(fs, next->fsindex);
-			/* check if the user used a selector != 0
-	                 * if yes clear 64bit base, since overloaded base
-                         * is always mapped to the Null selector
-                         */
-			if (fsindex)
-			prev->fs = 0;				
-		}
-		/* when next process has a 64bit base use it */
-		if (next->fs) {
-                        HYPERVISOR_set_segment_base(SEGBASE_FS, next->fs); 
-                }
-		prev->fsindex = fsindex;
-	}
-	{ 
-		unsigned gsindex;
-		asm volatile("movl %%gs,%0" : "=g" (gsindex)); 
-		if (unlikely(gsindex | next->gsindex | prev->gs)) {
-			load_gs_index(next->gsindex);
-			if (gsindex)
-			prev->gs = 0;				
-		}
-		if (next->gs)
-                    HYPERVISOR_set_segment_base(SEGBASE_GS_USER, next->gs); 
-		prev->gsindex = gsindex;
-	}
+	if (unlikely(next->fsindex))
+		loadsegment(fs, next->fsindex);
+
+	if (next->fs)
+		HYPERVISOR_set_segment_base(SEGBASE_FS, next->fs); 
+	
+	if (unlikely(next->gsindex))
+		load_gs_index(next->gsindex);
+
+	if (next->gs)
+		HYPERVISOR_set_segment_base(SEGBASE_GS_USER, next->gs); 
 
 	/* 
 	 * Switch the PDA context.
@@ -660,7 +635,6 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 			if (doit) {
 		load_gs_index(0);
                 ret = HYPERVISOR_set_segment_base(SEGBASE_GS_USER, addr);
-                printk("do_arch_prctl: SET_SET: addr = %lx\n", addr);
 			} 
 		}
 		put_cpu();
@@ -700,7 +674,6 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 			base = read_32bit_tls(task, FS_TLS);
 		else if (doit) {
 			rdmsrl(MSR_FS_BASE, base);
-                        printk("do_arch_prctl: GET_FS: addr = %lx\n", addr);
 		} else
 			base = task->thread.fs;
 		ret = put_user(base, (unsigned long __user *)addr); 
@@ -712,7 +685,6 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 			base = read_32bit_tls(task, GS_TLS);
 		else if (doit) {
 			rdmsrl(MSR_KERNEL_GS_BASE, base);
-                        printk("do_arch_prctl: GET_GS: addr = %lx\n", addr);
 		} else
 			base = task->thread.gs;
 		ret = put_user(base, (unsigned long __user *)addr); 

@@ -16,18 +16,48 @@
 int init_new_context(struct task_struct *tsk, struct mm_struct *mm);
 void destroy_context(struct mm_struct *mm);
 
-#ifdef CONFIG_SMP
-
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
+#if 0 /*  XEN: no lazy tlb */
 	if (read_pda(mmu_state) == TLBSTATE_OK) 
 		write_pda(mmu_state, TLBSTATE_LAZY);
-}
-#else
-static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
-{
-}
 #endif
+}
+
+#define prepare_arch_switch(rq,next)	__prepare_arch_switch()
+#define finish_arch_switch(rq, next)	spin_unlock_irq(&(rq)->lock)
+#define task_running(rq, p)		((rq)->curr == (p))
+
+static inline void __prepare_arch_switch(void)
+{
+	/*
+	 * Save away %es, %ds, %fs and %gs. Must happen before reload
+	 * of cr3/ldt (i.e., not in __switch_to).
+	 */
+	__asm__ __volatile__ (
+		"movl %%es,%0 ; movl %%ds,%1 ; movl %%fs,%2 ; movl %%gs,%3"
+		: "=m" (current->thread.es),
+		  "=m" (current->thread.ds),
+		  "=m" (current->thread.fsindex),
+		  "=m" (current->thread.gsindex) );
+
+	if (current->thread.ds)
+		__asm__ __volatile__ ( "movl %0,%%ds" : : "r" (0) );
+
+	if (current->thread.es)
+		__asm__ __volatile__ ( "movl %0,%%es" : : "r" (0) );
+
+	if (current->thread.fsindex) {
+		__asm__ __volatile__ ( "movl %0,%%fs" : : "r" (0) );
+		current->thread.fs = 0;
+	}
+
+	if (current->thread.gsindex) {
+		load_gs_index(0);
+		current->thread.gs = 0;
+	}
+}
+
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, 
 			     struct task_struct *tsk)
