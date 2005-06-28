@@ -4,6 +4,7 @@ obj-y	+= console/
 obj-y	+= evtchn/
 obj-y	+= balloon/
 obj-y	+= privcmd/
+obj-y	+= xenbus/
 
 obj-$(CONFIG_XEN_BLKDEV_BACKEND)	+= blkback/
 obj-$(CONFIG_XEN_NETDEV_BACKEND)	+= netback/

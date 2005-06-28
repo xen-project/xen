@@ -565,10 +565,10 @@ class XendDomainInfo:
         self.create_channel()
         self.image.createImage()
         self.exportToDB()
-        #if self.store_channel:
-        #    self.db.introduceDomain(self.id,
-        #                            self.store_mfn,
-        #                            self.store_channel)
+        if self.store_channel:
+            self.db.introduceDomain(self.id,
+                                    self.store_mfn,
+                                    self.store_channel)
 
     def delete(self):
         """Delete the vm's db.
@@ -615,11 +615,11 @@ class XendDomainInfo:
                 self.store_channel = None
             except:
                 pass
-            #try:
-            #    self.db.releaseDomain(self.id)
-            #except Exception, ex:
-            #    log.warning("error in domain release on xenstore: %s", ex)
-            #    pass
+            try:
+                self.db.releaseDomain(self.id)
+            except Exception, ex:
+                log.warning("error in domain release on xenstore: %s", ex)
+                pass
         if self.image:
             try:
                 self.image.destroy()

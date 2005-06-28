@@ -346,6 +346,11 @@
 41ee5e8bglvqKvZSY5uJ5JGQejEwyQ linux-2.6.11-xen-sparse/drivers/xen/usbback/usbback.c
 41ee5e8ckZ9xVNvu9NHIZDK7JqApmQ linux-2.6.11-xen-sparse/drivers/xen/usbfront/usbfront.c
 41ee5e8ck9scpGirfqEZRARbGDyTXA linux-2.6.11-xen-sparse/drivers/xen/usbfront/xhci.h
+42c16ff4NMHjAt9hJHldXC-4_A6HRw linux-2.6.11-xen-sparse/drivers/xen/xenbus/Makefile
+42c16ff4IWzDjvg0o08Nt-JrmuoJsA linux-2.6.11-xen-sparse/drivers/xen/xenbus/xenbus_comms.c
+42c16ff4DukLxK4_pUAN0Gv0jLNaZQ linux-2.6.11-xen-sparse/drivers/xen/xenbus/xenbus_comms.h
+42c16ff4fR8SNUirS3q19HNzTVoDXw linux-2.6.11-xen-sparse/drivers/xen/xenbus/xenbus_probe.c
+42c16ff4goC8GfJvEqNFgE1Y8fNs5g linux-2.6.11-xen-sparse/drivers/xen/xenbus/xenbus_xs.c
 412f47e4RKD-R5IS5gEXvcT8L4v8gA linux-2.6.11-xen-sparse/include/asm-generic/pgtable.h
 42400318xlBIV46qyxLTaDepPLNyhg linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/agp.h
 40f56239YAjS52QG2FIAQpHDZAdGHg linux-2.6.11-xen-sparse/include/asm-xen/asm-i386/desc.h
@@ -420,6 +425,7 @@
 4122466356eIBnC9ot44WSVVIFyhQA linux-2.6.11-xen-sparse/include/asm-xen/queues.h
 42a885cawNQ18_b7i5-G7ekMsZ48hw linux-2.6.11-xen-sparse/include/asm-xen/synch_bitops.h
 3f689063BoW-HWV3auUJ-OqXfcGArw linux-2.6.11-xen-sparse/include/asm-xen/xen_proc.h
+42c16ff4t7djt61KEsejdrL8gNfQSA linux-2.6.11-xen-sparse/include/asm-xen/xenbus.h
 419b4e93z2S0gR17XTy8wg09JEwAhg linux-2.6.11-xen-sparse/include/linux/gfp.h
 42305f545Vc5SLCUewZ2-n-P9JJhEQ linux-2.6.11-xen-sparse/include/linux/highmem.h
 419dfc609zbti8rqL60tL2dHXQ_rvQ linux-2.6.11-xen-sparse/include/linux/irq.h
