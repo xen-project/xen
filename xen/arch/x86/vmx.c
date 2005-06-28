@@ -1159,15 +1159,19 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
     __vmread(IDT_VECTORING_INFO_FIELD, &idtv_info_field);
     if (idtv_info_field & INTR_INFO_VALID_MASK) {
-        __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
-        if ((idtv_info_field & 0xff) == 14) {
-            unsigned long error_code;
+	if ((idtv_info_field & 0x0700) != 0x400) { /* exclude soft ints */
+            __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
 
-            __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
-            printk("#PG error code: %lx\n", error_code);
-        }
-        VMX_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x",
-                idtv_info_field);
+	    if (idtv_info_field & 0x800) { /* valid error code */
+		unsigned long error_code;
+		printk("VMX exit %x: %x/%lx\n",
+			exit_reason, idtv_info_field, error_code);
+		__vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
+		__vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
+	    } else
+	    	printk("VMX exit %x: %x\n", exit_reason, idtv_info_field);
+	}
+        VMX_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
     }
 
     /* don't bother H/W interrutps */
@@ -1399,7 +1403,6 @@ asmlinkage void load_cr2(void)
 #else
     asm volatile("movq %0,%%cr2": :"r" (d->arch.arch_vmx.cpu_cr2));
 #endif
-
 }
 
 #endif /* CONFIG_VMX */

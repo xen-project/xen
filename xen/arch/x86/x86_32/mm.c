@@ -80,6 +80,7 @@ void __init paging_init(void)
     if ( cpu_has_pge )
     {
         /* Suitable Xen mapping can be GLOBAL. */
+        set_in_cr4(X86_CR4_PGE);
         PAGE_HYPERVISOR         |= _PAGE_GLOBAL;
         PAGE_HYPERVISOR_NOCACHE |= _PAGE_GLOBAL;
         /* Transform early mappings (e.g., the frametable). */

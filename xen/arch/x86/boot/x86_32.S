@@ -20,16 +20,10 @@ ENTRY(start)
 	/* Checksum: must be the negated sum of the first two fields. */
 	.long	-0x1BADB005
         
-bad_cpu_msg:
-        .asciz "ERR: Not a P6-compatible CPU!"
 not_multiboot_msg:
         .asciz "ERR: Not a Multiboot bootloader!"
-bad_cpu:
-        mov     $bad_cpu_msg-__PAGE_OFFSET,%esi
-        jmp     print_err
 not_multiboot:
         mov     $not_multiboot_msg-__PAGE_OFFSET,%esi
-print_err:
         mov     $0xB8000,%edi  # VGA framebuffer
 1:      mov     (%esi),%bl
         test    %bl,%bl        # Terminate on '\0' sentinel
@@ -60,19 +54,6 @@ __start:
         /* Reset EFLAGS (subsumes CLI and CLD). */
 	pushl	$0
 	popf
-
-        /* CPU type checks. We need P6+. */
-        mov     $0x200000,%edx
-        pushfl
-        pop     %ecx
-        and     %edx,%ecx
-        jne     bad_cpu            # ID bit should be clear
-        pushl   %edx
-        popfl
-        pushfl
-        pop     %ecx
-        and     %edx,%ecx
-        je      bad_cpu            # ID bit should be set
 
         /* Set up FPU. */
         fninit
