@@ -34,7 +34,7 @@ ENTRY(startup_32)
 
 	/* Copy the necessary stuff from xen_start_info structure. */
 	mov  $xen_start_info_union,%edi
-	mov  $128,%ecx
+	mov  $512,%ecx
 	rep movsl
 
 #ifdef CONFIG_SMP
