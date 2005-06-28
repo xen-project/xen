@@ -282,20 +282,20 @@ GLOBAL_ENTRY(fast_tick_reflect)
 #endif
 	mov r28=IA64_TIMER_VECTOR;;
 	cmp.ne p6,p0=r28,r30
-(p6)	br.cond.sptk.many rp;;
+(p6)	br.cond.spnt.few rp;;
 	movl r20=(PERCPU_ADDR)+IA64_CPUINFO_ITM_NEXT_OFFSET;;
 	ld8 r21=[r20];;
 	mov r27=ar.itc;;
 	cmp.ltu p6,p0=r21,r27
-(p6)	br.cond.sptk.many rp;;
+(p6)	br.cond.spnt.few rp;;
 	mov r17=cr.ipsr;;
 	// slow path if: ipsr.be==1, ipsr.pp==1
 	extr.u r21=r17,IA64_PSR_BE_BIT,1 ;;
 	cmp.ne p6,p0=r21,r0
-(p6)	br.cond.sptk.many rp;;
+(p6)	br.cond.spnt.few rp;;
 	extr.u r21=r17,IA64_PSR_PP_BIT,1 ;;
 	cmp.ne p6,p0=r21,r0
-(p6)	br.cond.sptk.many rp;;
+(p6)	br.cond.spnt.few rp;;
 #ifdef FAST_REFLECT_CNT
 	movl r20=fast_reflect_count+((0x3000>>8)*8);;
 	ld8 r21=[r20];;
@@ -309,9 +309,9 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	adds r20=XSI_ITV_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r20=[r20];;
 	cmp.eq p6,p0=r20,r0	// if cr.itv==0 done
-(p6)	br.cond.sptk.many fast_tick_reflect_done;;
+(p6)	br.cond.spnt.few fast_tick_reflect_done;;
 	tbit.nz p6,p0=r20,16;;	// check itv.m (discard) bit
-(p6)	br.cond.sptk.many fast_tick_reflect_done;;
+(p6)	br.cond.spnt.few fast_tick_reflect_done;;
 	extr.u r27=r20,0,6	// r27 has low 6 bits of itv.vector
 	extr.u r26=r20,6,2;;	// r26 has irr index of itv.vector
 	mov r19=IA64_KR(CURRENT);;
@@ -320,7 +320,7 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	ld8 r24=[r22];;
 	ld8 r23=[r23];;
 	cmp.eq p6,p0=r23,r24	// skip if this tick already delivered
-(p6)	br.cond.sptk.many fast_tick_reflect_done;;
+(p6)	br.cond.spnt.few fast_tick_reflect_done;;
 	// set irr bit
 	adds r21=IA64_VCPU_IRR0_OFFSET,r19;
 	shl r26=r26,3;;
@@ -337,20 +337,19 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	// if interrupted at pl0, we're done
 	extr.u r16=r17,IA64_PSR_CPL0_BIT,2;;
 	cmp.eq p6,p0=r16,r0;;
-(p6)	br.cond.sptk.many fast_tick_reflect_done;;
-	// now deliver to iva+0x3000
-	//	r17 == cr.ipsr
-	//	r18 == XSI_PSR_IC
-	//	r19 == IA64_KR(CURRENT)
-	//	r31 == pr
-
+(p6)	br.cond.spnt.few fast_tick_reflect_done;;
 	// if guest vpsr.i is off, we're done
 	adds r21=XSI_PSR_I_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld4 r21=[r21];;
 	cmp.eq p6,p0=r21,r0
-(p6)	br.cond.sptk.many fast_tick_reflect_done;;
+(p6)	br.cond.spnt.few fast_tick_reflect_done;;
 
 	// OK, we have a clock tick to deliver to the active domain!
+	// so deliver to iva+0x3000
+	//	r17 == cr.ipsr
+	//	r18 == XSI_PSR_IC
+	//	r19 == IA64_KR(CURRENT)
+	//	r31 == pr
 	mov r16=cr.isr;;
 	mov r29=cr.iip;;
 	adds r21=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
@@ -456,21 +455,21 @@ GLOBAL_ENTRY(fast_break_reflect)
 	mov r29=cr.iip;;
 	extr.u r21=r30,IA64_PSR_BE_BIT,1 ;;
 	cmp.ne p7,p0=r21,r0 ;;
-(p7)	br.sptk.many dispatch_break_fault ;;
+(p7)	br.spnt.few dispatch_break_fault ;;
 	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
 	cmp.ne p7,p0=r21,r0 ;;
-(p7)	br.sptk.many dispatch_break_fault ;;
+(p7)	br.spnt.few dispatch_break_fault ;;
 #if 1 /* special handling in case running on simulator */
 	movl r20=first_break;;
 	ld4 r23=[r20];;
 	movl r21=0x80001;
 	movl r22=0x80002;;
 	cmp.ne p7,p0=r23,r0;;
-(p7)	br.sptk.many dispatch_break_fault ;;
+(p7)	br.spnt.few dispatch_break_fault ;;
 	cmp.eq p7,p0=r21,r17;
-(p7)	br.sptk.many dispatch_break_fault ;;
+(p7)	br.spnt.few dispatch_break_fault ;;
 	cmp.eq p7,p0=r22,r17;
-(p7)	br.sptk.many dispatch_break_fault ;;
+(p7)	br.spnt.few dispatch_break_fault ;;
 #endif
 #ifdef FAST_REFLECT_CNT
 	movl r20=fast_reflect_count+((0x2c00>>8)*8);;
@@ -579,24 +578,26 @@ ENTRY(hyper_rfi)
 	extr.u r22=r21,IA64_PSR_BE_BIT,1 ;;
 	// if turning on psr.be, give up for now and do it the slow way
 	cmp.ne p7,p0=r22,r0
-(p7)	br.sptk.many dispatch_break_fault ;;
+(p7)	br.spnt.few dispatch_break_fault ;;
 	// if (!(vpsr.dt && vpsr.rt && vpsr.it)), do it the slow way
 	movl r20=(IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_IT);;
 	and r22=r20,r21
 	;;
 	cmp.ne p7,p0=r22,r20
-(p7)	br.sptk.many dispatch_break_fault ;;
+(p7)	br.spnt.few dispatch_break_fault ;;
 	// if was in metaphys mode, do it the slow way (FIXME later?)
 	adds r20=XSI_METAPHYS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld4 r20=[r20];;
 	cmp.ne p7,p0=r20,r0
-(p7)	br.sptk.many dispatch_break_fault ;;
+(p7)	br.spnt.few dispatch_break_fault ;;
 	// if domain hasn't already done virtual bank switch
 	//  do it the slow way (FIXME later?)
+#if 0
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld4 r20=[r20];;
 	cmp.eq p7,p0=r20,r0
-(p7)	br.sptk.many dispatch_break_fault ;;
+(p7)	br.spnt.few dispatch_break_fault ;;
+#endif
 	// validate vcr.iip, if in Xen range, do it the slow way
 	adds r20=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r22=[r20];;
@@ -604,7 +605,11 @@ ENTRY(hyper_rfi)
 	movl r24=XEN_VIRT_SPACE_HIGH ;;
 	cmp.ltu p0,p7=r22,r23 ;;	// if !(iip<low) &&
 (p7)	cmp.geu p0,p7=r22,r24 ;;	//    !(iip>=high)
-(p7)	br.sptk.many dispatch_break_fault ;;
+(p7)	br.spnt.few dispatch_break_fault ;;
+#ifndef RFI_TO_INTERRUPT
+	cmp.ne p6,p0=r30,r0
+(p6)	br.cond.spnt.few dispatch_break_fault ;;
+#endif
 
 1:	// OK now, let's do an rfi.
 #ifdef FAST_HYPERPRIVOP_CNT
@@ -613,9 +618,12 @@ ENTRY(hyper_rfi)
 	adds r23=1,r23;;
 	st8 [r20]=r23;;
 #endif
+#ifdef RFI_TO_INTERRUPT
+	// maybe do an immediate interrupt delivery?
 	cmp.ne p6,p0=r30,r0
-(p6)	br.cond.sptk.many check_extint;
-	;;
+(p6)	br.cond.spnt.few rfi_check_extint;;
+#endif
+
 just_do_rfi:
 	// r18=&vpsr.i|vpsr.ic, r21==vpsr, r22=vcr.iip
 	mov cr.iip=r22;;
@@ -643,43 +651,75 @@ just_do_rfi:
 	or r21=r21,r20
 	;;
 	mov cr.ipsr=r21
-	mov pr=r31,-1
+	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld4 r21=[r20];;
+	cmp.ne p7,p0=r21,r0	// domain already did "bank 1 switch?"
+(p7)	br.cond.spnt.few 1f;
+	// OK, now all set to go except for switch to virtual bank1
+	mov r22=1;; st4 [r20]=r22;
+	mov r30=r2; mov r29=r3;;
+	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
+	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
+	bsw.1;;
+	// FIXME: need to handle ar.unat!
+	.mem.offset 0,0; ld8.fill r16=[r2],16 ;
+	.mem.offset 8,0; ld8.fill r17=[r3],16 ;;
+	.mem.offset 0,0; ld8.fill r18=[r2],16 ;
+	.mem.offset 0,0; ld8.fill r19=[r3],16 ;;
+	.mem.offset 8,0; ld8.fill r20=[r2],16 ;
+	.mem.offset 8,0; ld8.fill r21=[r3],16 ;;
+	.mem.offset 8,0; ld8.fill r22=[r2],16 ;
+	.mem.offset 8,0; ld8.fill r23=[r3],16 ;;
+	.mem.offset 8,0; ld8.fill r24=[r2],16 ;
+	.mem.offset 8,0; ld8.fill r25=[r3],16 ;;
+	.mem.offset 8,0; ld8.fill r26=[r2],16 ;
+	.mem.offset 8,0; ld8.fill r27=[r3],16 ;;
+	.mem.offset 8,0; ld8.fill r28=[r2],16 ;
+	.mem.offset 8,0; ld8.fill r29=[r3],16 ;;
+	.mem.offset 8,0; ld8.fill r30=[r2],16 ;
+	.mem.offset 8,0; ld8.fill r31=[r3],16 ;;
+	bsw.0 ;;
+	mov r2=r30; mov r3=r29;;
+1:	mov pr=r31,-1
 	;;
 	rfi
 	;;
 
-check_extint:
-	br.sptk.many dispatch_break_fault ;;
+#ifdef RFI_TO_INTERRUPT
+GLOBAL_ENTRY(rfi_check_extint)
+	//br.sptk.many dispatch_break_fault ;;
 
 	// r18=&vpsr.i|vpsr.ic, r21==vpsr, r22=vcr.iip
+	// make sure none of these get trashed in case going to just_do_rfi
 	mov r30=IA64_KR(CURRENT);;
 	adds r24=IA64_VCPU_INSVC3_OFFSET,r30;;
 	mov r25=192
-	adds r22=IA64_VCPU_IRR3_OFFSET,r30;;
-	ld8 r23=[r22];;
+	adds r16=IA64_VCPU_IRR3_OFFSET,r30;;
+	ld8 r23=[r16];;
 	cmp.eq p6,p0=r23,r0;;
-(p6)	adds r22=-8,r22;;
+(p6)	adds r16=-8,r16;;
 (p6)	adds r24=-8,r24;;
 (p6)	adds r25=-64,r25;;
-(p6)	ld8 r23=[r22];;
+(p6)	ld8 r23=[r16];;
 (p6)	cmp.eq p6,p0=r23,r0;;
-(p6)	adds r22=-8,r22;;
+(p6)	adds r16=-8,r16;;
 (p6)	adds r24=-8,r24;;
 (p6)	adds r25=-64,r25;;
-(p6)	ld8 r23=[r22];;
+(p6)	ld8 r23=[r16];;
 (p6)	cmp.eq p6,p0=r23,r0;;
-(p6)	adds r22=-8,r22;;
+(p6)	adds r16=-8,r16;;
 (p6)	adds r24=-8,r24;;
 (p6)	adds r25=-64,r25;;
-(p6)	ld8 r23=[r22];;
+(p6)	ld8 r23=[r16];;
 (p6)	cmp.eq p6,p0=r23,r0;;
 	cmp.eq p6,p0=r23,r0
-(p6)	br.cond.sptk.many 1f;	// this is actually an error
-	// r22 points to non-zero element of irr, r23 has value
+(p6)	br.cond.spnt.few just_do_rfi;	// this is actually an error
+	// r16 points to non-zero element of irr, r23 has value
 	// r24 points to corr element of insvc, r25 has elt*64
 	ld8 r26=[r24];;
 	cmp.geu p6,p0=r26,r23
-(p6)	br.cond.spnt.many 1f;
+(p6)	br.cond.spnt.many just_do_rfi;
+
 	// not masked by insvc, get vector number
 	shr.u r26=r23,1;;
 	or r26=r23,r26;;
@@ -706,21 +746,109 @@ check_extint:
 	ld8 r20=[r20] ;;
 	extr.u r28=r20,16,1
 	extr.u r29=r20,4,4 ;;
-	cmp.ne p6,p0=r28,r0	// if tpr.mmi is set, return SPURIOUS
-(p6)	br.cond.sptk.many 1f;
+	cmp.ne p6,p0=r28,r0	// if tpr.mmi is set, just rfi
+(p6)	br.cond.spnt.few just_do_rfi;;
 	shl r29=r29,4;;
 	adds r29=15,r29;;
-	cmp.ge p6,p0=r29,r26
-(p6)	br.cond.sptk.many 1f;
-	// OK, have an unmasked vector to process/return
-	ld8 r25=[r24];;
-	or r25=r25,r27;;
-	st8 [r24]=r25;;
-	ld8 r25=[r22];;
-	andcm r25=r25,r27;;
-	st8 [r22]=r25;;
-	mov r8=r26;;
-	// not done yet
+	cmp.ge p6,p0=r29,r26	// if tpr masks interrupt, just rfi
+(p6)	br.cond.spnt.few just_do_rfi;;
+
+// this doesn't work yet (dies early after getting to user mode)
+// but happens relatively infrequently, so fix it later.
+// NOTE that these will be counted incorrectly for now (for privcnt output)
+GLOBAL_ENTRY(rfi_with_interrupt)
+#if 1
+	br.sptk.many dispatch_break_fault ;;
+#endif
+
+	// OK, have an unmasked vector, so deliver extint to vcr.iva+0x3000
+	//	r18 == XSI_PSR_IC
+	//	r21 == vipsr (ipsr in shared_mem)
+	//	r30 == IA64_KR(CURRENT)
+	//	r31 == pr
+	mov r17=cr.ipsr;;
+	mov r16=cr.isr;;
+	// set shared_mem isr
+	extr.u r16=r16,38,1;;	// grab cr.isr.ir bit
+	dep r16=r16,r0,38,1 ;;	// insert into cr.isr (rest of bits zero)
+	extr.u r20=r21,41,2 ;;	// get v(!)psr.ri
+	dep r16=r20,r16,41,2 ;; // deposit cr.isr.ei
+	adds r22=XSI_ISR_OFS-XSI_PSR_IC_OFS,r18 ;; 
+	st8 [r22]=r16 ;;
+	// set cr.ipsr (make sure cpl==2!)
+	mov r29=r17 ;;
+	movl r28=DELIVER_PSR_SET;;
+	movl r27=~(DELIVER_PSR_CLR|IA64_PSR_CPL0);;
+	or r29=r29,r28;;
+	and r29=r29,r27;;
+	mov cr.ipsr=r29;;
+	// v.ipsr and v.iip are already set (and v.iip validated) as rfi target
+	// set shared_mem interrupt_delivery_enabled to 0
+	// set shared_mem interrupt_collection_enabled to 0
+	st8 [r18]=r0;;
+	// cover and set shared_mem precover_ifs to cr.ifs
+	// set shared_mem ifs and incomplete_regframe to 0
+#if 0
+	cover ;;
+	mov r20=cr.ifs;;
+	adds r22=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st4 [r22]=r0 ;;
+	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r22]=r0 ;;
+	adds r22=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r22]=r20 ;;
+	// leave cr.ifs alone for later rfi
+#else
+	adds r22=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st4 [r22]=r0 ;;
+	adds r22=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r20=[r22];;
+	st8 [r22]=r0 ;;
+	adds r22=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r22]=r20 ;;
+#endif
+	// set iip to go to domain IVA break instruction vector
+	adds r22=IA64_VCPU_IVA_OFFSET,r30;;
+	ld8 r23=[r22];;
+	movl r24=0x3000;;
+	add r24=r24,r23;;
+	mov cr.iip=r24;;
+#if 0
+	// OK, now all set to go except for switch to virtual bank0
+	mov r30=r2; mov r29=r3;;
+	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
+	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
+	bsw.1;;
+	// FIXME: need to handle ar.unat!
+	.mem.offset 0,0; st8.spill [r2]=r16,16;
+	.mem.offset 8,0; st8.spill [r3]=r17,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r18,16;
+	.mem.offset 8,0; st8.spill [r3]=r19,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r20,16;
+	.mem.offset 8,0; st8.spill [r3]=r21,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r22,16;
+	.mem.offset 8,0; st8.spill [r3]=r23,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r24,16;
+	.mem.offset 8,0; st8.spill [r3]=r25,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r26,16;
+	.mem.offset 8,0; st8.spill [r3]=r27,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r28,16;
+	.mem.offset 8,0; st8.spill [r3]=r29,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r30,16;
+	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
+	movl r31=XSI_IPSR;;
+	bsw.0 ;;
+	mov r2=r30; mov r3=r29;;
+#else
+	bsw.1;;
+	movl r31=XSI_IPSR;;
+	bsw.0 ;;
+#endif
+	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st4 [r20]=r0 ;;
+	mov pr=r31,-1 ;;
+	rfi
+#endif // RFI_TO_INTERRUPT
 
 ENTRY(hyper_cover)
 #ifdef FAST_HYPERPRIVOP_CNT
@@ -919,7 +1047,7 @@ ENTRY(hyper_get_ivr)
 (p6)	ld8 r23=[r22];;
 (p6)	cmp.eq p6,p0=r23,r0;;
 	cmp.eq p6,p0=r23,r0
-(p6)	br.cond.sptk.many 1f;	// this is actually an error
+(p6)	br.cond.spnt.few 1f;	// this is actually an error
 	// r22 points to non-zero element of irr, r23 has value
 	// r24 points to corr element of insvc, r25 has elt*64
 	ld8 r26=[r24];;
@@ -952,11 +1080,11 @@ ENTRY(hyper_get_ivr)
 	extr.u r28=r20,16,1
 	extr.u r29=r20,4,4 ;;
 	cmp.ne p6,p0=r28,r0	// if tpr.mmi is set, return SPURIOUS
-(p6)	br.cond.sptk.many 1f;
+(p6)	br.cond.spnt.few 1f;
 	shl r29=r29,4;;
 	adds r29=15,r29;;
 	cmp.ge p6,p0=r29,r26
-(p6)	br.cond.sptk.many 1f;
+(p6)	br.cond.spnt.few 1f;
 	// OK, have an unmasked vector to process/return
 	ld8 r25=[r24];;
 	or r25=r25,r27;;
@@ -1016,7 +1144,7 @@ ENTRY(hyper_eoi)
 (p6)	ld8 r23=[r22];;
 (p6)	cmp.eq p6,p0=r23,r0;;
 	cmp.eq p6,p0=r23,r0
-(p6)	br.cond.sptk.many 1f;	// this is actually an error
+(p6)	br.cond.spnt.few 1f;	// this is actually an error
 	// r22 points to non-zero element of insvc, r23 has value
 	shr.u r24=r23,1;;
 	or r24=r23,r24;;
@@ -1146,7 +1274,7 @@ ENTRY(hyper_set_rr)
 	adds r24=IA64_VCPU_META_SAVED_RR0_OFFSET,r20;;
 	add r22=r26,r22;;
 	cmp.geu p6,p0=r22,r23	// if r9.rid + starting_rid >= ending_rid
-(p6)	br.cond.sptk.many 1f;	// this is an error, but just ignore/return
+(p6)	br.cond.spnt.few 1f;	// this is an error, but just ignore/return
 	// r21=starting_rid
 	adds r20=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18 ;;
 	shl r25=r25,3;;

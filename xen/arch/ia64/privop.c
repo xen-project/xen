@@ -693,8 +693,8 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 		break;
 	}
         //printf("We who are about do die salute you\n");
-	printf("handle_op: can't handle privop at 0x%lx (op=0x%016lx) slot %d (type=%d)\n",
-		 iip, (UINT64)inst.inst, slot, slot_type);
+	printf("handle_op: can't handle privop at 0x%lx (op=0x%016lx) slot %d (type=%d), ipsr=%p\n",
+		 iip, (UINT64)inst.inst, slot, slot_type, ipsr);
         //printf("vtop(0x%lx)==0x%lx\n", iip, tr_vtop(iip));
         //thread_mozambique("privop fault\n");
 	return (IA64_ILLOP_FAULT);
@@ -734,6 +734,8 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 		// update iip/ipsr to point to the next instruction
 		(void)vcpu_increment_iip(vcpu);
 	}
+	if (fault == IA64_ILLOP_FAULT)
+		printf("priv_emulate: priv_handle_op fails, isr=%p\n",isr);
 	return fault;
 }
 
