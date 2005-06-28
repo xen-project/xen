@@ -570,13 +570,13 @@ __gnttab_unmap_grant_ref(
         /* Frame is now unmapped for device access. */
     }
 
-#ifdef __ia64__
-// FIXME-ia64: any error checking need to be done here?
-#else
     if ( (virt != 0) &&
          (flags & GNTMAP_host_map) &&
          ((act->pin & (GNTPIN_hstw_mask | GNTPIN_hstr_mask)) > 0))
     {
+#ifdef __ia64__
+// FIXME-ia64: any error checking need to be done here?
+#else
         l1_pgentry_t   *pl1e;
         unsigned long   _ol1e;
 
@@ -609,6 +609,7 @@ __gnttab_unmap_grant_ref(
             rc = -EINVAL;
             goto unmap_out;
         }
+#endif
 
         map->ref_and_flags &= ~GNTMAP_host_map;
 
@@ -627,7 +628,6 @@ __gnttab_unmap_grant_ref(
         rc = 0;
         *va = virt;
     }
-#endif
 
     if ( (map->ref_and_flags & (GNTMAP_device_map|GNTMAP_host_map)) == 0)
     {
@@ -696,6 +696,7 @@ gnttab_setup_table(
     gnttab_setup_table_t  op;
     struct domain        *d;
     int                   i;
+    unsigned long addr;
 
     if ( count != 1 )
         return -EINVAL;
@@ -735,10 +736,24 @@ gnttab_setup_table(
     {
         ASSERT(d->grant_table != NULL);
         (void)put_user(GNTST_okay, &uop->status);
+#ifdef __ia64__
+	if (d == dom0) {
+            for ( i = 0; i < op.nr_frames; i++ )
+                (void)put_user(
+                    (virt_to_phys(d->grant_table->shared) >> PAGE_SHIFT) + i,
+                    &uop->frame_list[i]);
+	} else {
+            /* IA64 hack - need to map it somewhere */
+            addr = (1UL << 40);
+            map_domain_page(d, addr, virt_to_phys(d->grant_table->shared));
+            (void)put_user(addr >> PAGE_SHIFT, &uop->frame_list[0]);
+        }
+#else
         for ( i = 0; i < op.nr_frames; i++ )
             (void)put_user(
                 (virt_to_phys(d->grant_table->shared) >> PAGE_SHIFT) + i,
                 &uop->frame_list[i]);
+#endif
     }
 
     put_domain(d);
