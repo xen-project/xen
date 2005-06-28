@@ -769,11 +769,11 @@ ENTRY(failsafe_callback)
 .section .fixup,"ax";	\
 6:	movq $0,(%rsp);	\
 	jmp 1b;		\
-7:	movq $0,(%rsp);	\
+7:	movq $0,8(%rsp);	\
 	jmp 2b;		\
-8:	movq $0,(%rsp);	\
+8:	movq $0,16(%rsp);	\
 	jmp 3b;		\
-9:	movq $0,(%rsp);	\
+9:	movq $0,24(%rsp);	\
 	jmp 4b;		\
 .previous;		\
 .section __ex_table,"a";\
