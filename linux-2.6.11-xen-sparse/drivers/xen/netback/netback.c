@@ -297,8 +297,7 @@ static void net_rx_action(unsigned long unused)
         netif->stats.tx_packets++;
 
         /* The update_va_mapping() must not fail. */
-        if ( unlikely(mcl[0].result != 0) )
-            BUG();
+        BUG_ON(mcl[0].result != 0);
 
         /* Check the reassignment error code. */
         status = NETIF_RSP_OKAY;
@@ -441,8 +440,7 @@ static void net_tx_action(unsigned long unused)
     while ( dealloc_cons != dp )
     {
         /* The update_va_mapping() must not fail. */
-        if ( unlikely(mcl[0].result != 0) )
-            BUG();
+        BUG_ON(mcl[0].result != 0);
 
         pending_idx = dealloc_ring[MASK_PEND_IDX(dealloc_cons++)];
 
@@ -794,8 +792,8 @@ static int __init netback_init(void)
     
     netif_interface_init();
 
-    if ( (mmap_vstart = allocate_empty_lowmem_region(MAX_PENDING_REQS)) == 0 )
-        BUG();
+    mmap_vstart = allocate_empty_lowmem_region(MAX_PENDING_REQS);
+    BUG_ON(mmap_vstart == 0);
 
     for ( i = 0; i < MAX_PENDING_REQS; i++ )
     {
