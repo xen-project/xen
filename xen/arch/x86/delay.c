@@ -12,12 +12,13 @@
 
 #include <xen/config.h>
 #include <xen/delay.h>
+#include <xen/time.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
 
 void __udelay(unsigned long usecs)
 {
-    unsigned long ticks = usecs * ticks_per_usec;
+    unsigned long ticks = usecs * (cpu_khz / 1000);
     unsigned long s, e;
 
     rdtscl(s);

@@ -33,8 +33,7 @@
 #include <asm/mc146818rtc.h>
 
 /* GLOBAL */
-unsigned long cpu_khz;  /* Detected as we calibrate the TSC */
-unsigned long ticks_per_usec; /* TSC ticks per microsecond. */
+unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 int timer_ack = 0;
 unsigned long volatile jiffies;
@@ -375,7 +374,6 @@ void __init time_init(void)
     if ( !ticks_per_frac )
         panic("Error calibrating TSC\n");
 
-    ticks_per_usec = ticks_per_frac / (1000000/CALIBRATE_FRAC);
     cpu_khz = ticks_per_frac / (1000/CALIBRATE_FRAC);
 
     cpu_freq = (u64)ticks_per_frac * (u64)CALIBRATE_FRAC;
