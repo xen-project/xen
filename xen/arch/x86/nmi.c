@@ -240,7 +240,6 @@ void __pminit setup_apic_nmi_watchdog(void)
     }
 
     init_ac_timer(&nmi_timer[cpu], nmi_timer_fn, NULL, cpu);
-    nmi_timer_fn(NULL);
 
     nmi_pm_init();
 }
@@ -257,18 +256,33 @@ static unsigned int watchdog_on;
 void watchdog_disable(void)
 {
     unsigned long flags;
+
     spin_lock_irqsave(&watchdog_lock, flags);
+
     if ( watchdog_disable_count++ == 0 )
         watchdog_on = 0;
+
     spin_unlock_irqrestore(&watchdog_lock, flags);
 }
 
 void watchdog_enable(void)
 {
+    unsigned int  cpu;
     unsigned long flags;
+
     spin_lock_irqsave(&watchdog_lock, flags);
+
     if ( --watchdog_disable_count == 0 )
+    {
         watchdog_on = 1;
+        /*
+         * Ensure periodic heartbeats are active. We cannot do this earlier
+         * during setup because the timer infrastructure is not available. 
+         */
+        for_each_online_cpu ( cpu )
+            set_ac_timer(&nmi_timer[cpu], NOW());
+    }
+
     spin_unlock_irqrestore(&watchdog_lock, flags);
 }
 

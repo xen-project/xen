@@ -75,7 +75,7 @@ unsigned long xenheap_phys_start, xenheap_phys_end;
 extern void arch_init_memory(void);
 extern void init_IRQ(void);
 extern void trap_init(void);
-extern void time_init(void);
+extern void early_time_init(void);
 extern void ac_timer_init(void);
 extern void initialize_keytable(void);
 extern void early_cpu_init(void);
@@ -184,7 +184,7 @@ static void __init start_of_day(void)
 
     ac_timer_init();
 
-    time_init();
+    early_time_init();
 
     arch_init_memory();
 
@@ -205,14 +205,19 @@ static void __init start_of_day(void)
     for_each_cpu ( i )
         cpu_set(i, cpu_present_map);
 
-    /* Sanity: We ought to be taking interrupts by now. */
-    local_irq_enable();
+    /*
+     * Initialise higher-level timer functions. We do this fairly late
+     * (post-SMP) because the time bases and scale factors need to be updated 
+     * regularly, and SMP initialisation can cause a long delay with 
+     * interrupts not yet enabled.
+     */
+    init_xen_time();
 
     initialize_keytable();
 
     serial_init_postirq();
 
-    init_xen_time();
+    BUG_ON(!local_irq_is_enabled());
 
     for_each_present_cpu ( i )
     {

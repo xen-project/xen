@@ -239,6 +239,8 @@ static inline u64 get_time_delta(void)
     u32      low;
     u64      delta, tsc;
 
+    ASSERT(st_scale_f || st_scale_i);
+
     rdtscll(tsc);
     low = (u32)(tsc >> rdtsc_bitshift);
     delta_tsc = (s32)(low - shifted_tsc_irq);
@@ -349,13 +351,17 @@ int __init init_xen_time()
     st_scale_f = scale & 0xffffffff;
     st_scale_i = scale >> 32;
 
+    local_irq_disable();
+
     /* System time ticks from zero. */
     rdtscll(full_tsc_irq);
     stime_irq = (s_time_t)0;
     shifted_tsc_irq = (u32)(full_tsc_irq >> rdtsc_bitshift);
 
     /* Wallclock time starts as the initial RTC time. */
-    wc_sec  = get_cmos_time();
+    wc_sec = get_cmos_time();
+
+    local_irq_enable();
 
     printk("Time init:\n");
     printk(".... cpu_freq:    %08X:%08X\n", (u32)(cpu_freq>>32),(u32)cpu_freq);
@@ -367,7 +373,7 @@ int __init init_xen_time()
 
 
 /* Early init function. */
-void __init time_init(void)
+void __init early_time_init(void)
 {
     unsigned long ticks_per_frac = calibrate_tsc();
 
