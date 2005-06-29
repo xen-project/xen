@@ -191,8 +191,8 @@ void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long it
 		if (vector != IA64_DATA_TLB_VECTOR &&
 		    vector != IA64_ALT_DATA_TLB_VECTOR &&
 		    vector != IA64_VHPT_TRANS_VECTOR) {
-panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.iip=%p\n",
-	vector,regs->cr_iip,ifa,isr,PSCB(v,iip));
+panic_domain(regs,"psr.ic off, delivering fault=%lx,ipsr=%p,iip=%p,ifa=%p,isr=%p,PSCB.iip=%p\n",
+	vector,regs->cr_ipsr,regs->cr_iip,ifa,isr,PSCB(v,iip));
 			
 		}
 //printf("Delivering NESTED DATA TLB fault\n");
@@ -754,7 +754,8 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 		vcpu_set_gr(current,8,-1L);
 		break;
 	    default:
-		printf("ia64_handle_break: bad ssc code %lx, iip=%p, b0=%p\n",ssc,regs->cr_iip,regs->b0);
+		printf("ia64_handle_break: bad ssc code %lx, iip=%p, b0=%p... spinning\n",ssc,regs->cr_iip,regs->b0);
+		while(1);
 		break;
 	}
 	vcpu_increment_iip(current);
@@ -845,6 +846,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		break;
 	    case 26:
 printf("*** NaT fault... attempting to handle as privop\n");
+printf("isr=%p, ifa=%p,iip=%p,ipsr=%p\n",isr,ifa,regs->cr_iip,psr);
 		vector = priv_emulate(v,regs,isr);
 		if (vector == IA64_NO_FAULT) {
 printf("*** Handled privop masquerading as NaT fault\n");

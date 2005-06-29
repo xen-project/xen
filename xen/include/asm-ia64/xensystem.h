@@ -66,13 +66,12 @@ extern struct task_struct *vmx_ia64_switch_to (void *next_task);
 	register long __gu_r8 asm ("r8");				\
 	register long __gu_r9 asm ("r9");				\
 	asm volatile ("mov ar.ccv=%0;;" :: "rO"(old));			\
-	asm volatile ("mov %2=r0;;\n"					\
-		"[1:]\tcmpxchg"_size".acq %0=[%3],%4,ar.ccv\n"		\
-		"\t.xdata4 \"__ex_table\", 1b-., 1f-.+4\n"		\
+	asm volatile ("mov %1=r0;;\n"					\
+		"[1:]\tcmpxchg"_size".acq %0=[%2],%3,ar.ccv\n"		\
+		"\t.xdata4 \"__ex_table\", 1b-., 1f-.\n"		\
 		"[1:]"							\
-		: "=r"(old), "=r"(__gu_r9), "=r"(__gu_r8) :		\
+		: "=r"(old), "=r"(__gu_r8) :				\
 		"r"(ptr), "r"(new) : "memory");				\
-	(old) = __gu_r9;						\
 	__gu_r8;							\
 })
 

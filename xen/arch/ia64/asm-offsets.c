@@ -88,6 +88,7 @@ void foo(void)
 
 	BLANK();
 	DEFINE(IA64_CPUINFO_ITM_NEXT_OFFSET, offsetof (struct cpuinfo_ia64, itm_next));
+	DEFINE(IA64_CPUINFO_PGD_QUICK_OFFSET, offsetof (struct cpuinfo_ia64, pgd_quick));
 
 	//DEFINE(IA64_SIGHAND_SIGLOCK_OFFSET,offsetof (struct sighand_struct, siglock));
 

@@ -50,7 +50,7 @@ unsigned long dom0_size = 512*1024*1024; //FIXME: Should be configurable
 //FIXME: alignment should be 256MB, lest Linux use a 256MB page size
 unsigned long dom0_align = 256*1024*1024;
 #else // CONFIG_VTI
-unsigned long dom0_size = 256*1024*1024; //FIXME: Should be configurable
+unsigned long dom0_size = 512*1024*1024; //FIXME: Should be configurable
 //FIXME: alignment should be 256MB, lest Linux use a 256MB page size
 unsigned long dom0_align = 64*1024*1024;
 #endif // CONFIG_VTI
@@ -465,8 +465,42 @@ if (unlikely(page_to_phys(p) > vhpt_paddr && page_to_phys(p) < vhpt_pend)) {
 		set_pte(pte, pfn_pte(page_to_phys(p) >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
 	}
-	else printk("map_new_domain_page: page %p already mapped!\n",p);
+	else printk("map_new_domain_page: mpaddr %lx already mapped!\n",mpaddr);
 	return p;
+}
+
+/* map a physical address to the specified metaphysical addr */
+void map_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr)
+{
+	struct mm_struct *mm = d->arch.mm;
+	pgd_t *pgd;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+
+	if (!mm->pgd) {
+		printk("map_domain_page: domain pgd must exist!\n");
+		return;
+	}
+	pgd = pgd_offset(mm,mpaddr);
+	if (pgd_none(*pgd))
+		pgd_populate(mm, pgd, pud_alloc_one(mm,mpaddr));
+
+	pud = pud_offset(pgd, mpaddr);
+	if (pud_none(*pud))
+		pud_populate(mm, pud, pmd_alloc_one(mm,mpaddr));
+
+	pmd = pmd_offset(pud, mpaddr);
+	if (pmd_none(*pmd))
+		pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm,mpaddr));
+//		pmd_populate(mm, pmd, pte_alloc_one(mm,mpaddr));
+
+	pte = pte_offset_map(pmd, mpaddr);
+	if (pte_none(*pte)) {
+		set_pte(pte, pfn_pte(physaddr >> PAGE_SHIFT,
+			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
+	}
+	else printk("map_domain_page: mpaddr %lx already mapped!\n",mpaddr);
 }
 
 void mpafoo(unsigned long mpaddr)
