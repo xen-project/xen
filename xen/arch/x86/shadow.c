@@ -1906,7 +1906,7 @@ static int snapshot_entry_matches(
     unsigned long gpfn, unsigned index)
 {
     unsigned long smfn = __shadow_status(d, gpfn, PGT_snapshot);
-    l1_pgentry_t *snapshot; // could be L1s or L2s or ...
+    l1_pgentry_t *snapshot, gpte; // could be L1s or L2s or ...
     int entries_match;
 
     perfc_incrc(snapshot_entry_matches_calls);
@@ -1916,10 +1916,14 @@ static int snapshot_entry_matches(
 
     snapshot = map_domain_page(smfn);
 
+    if (__copy_from_user(&gpte, &guest_pt[index],
+                         sizeof(gpte)))
+        return 0;
+
     // This could probably be smarter, but this is sufficent for
     // our current needs.
     //
-    entries_match = !l1e_has_changed(guest_pt[index], snapshot[index],
+    entries_match = !l1e_has_changed(gpte, snapshot[index],
                                      PAGE_FLAG_MASK);
 
     unmap_domain_page(snapshot);
