@@ -738,8 +738,8 @@
 428d0d89FY-g4UPH-ZW7t5ZCqvQVTQ tools/ioemu/readline.c
 428d0d89dLURbktZFufDKSHan01GFg tools/ioemu/sdl.c
 428d0d82dUmXkgIy11G-hoKTkhvkfQ tools/ioemu/target-i386-dm/Makefile
-428d0d8atdIE_8ACJPPii5_asQNafw tools/ioemu/target-i386-dm/device-model
 428d0d8ahpRAYl6s_itBxnTcxyMHaQ tools/ioemu/target-i386-dm/helper2.c
+42c3a83bi-eu2QI4iQLkImYUVs0H6w tools/ioemu/target-i386-dm/qemu-dm.debug
 428d0d8aU3Moaq4zNW5QMV_NxD-4XA tools/ioemu/target-i386-dm/qemu-ifup
 428d0d8aqidj8n5H2_2qhBV0mIIJzA tools/ioemu/target-i386-dm/qemu-vgaram-bin.gz
 428d0d8bMq0ZpccpHb1iVvSNbJjRxg tools/ioemu/thunk.c

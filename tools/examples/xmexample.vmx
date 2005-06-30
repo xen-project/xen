@@ -87,18 +87,12 @@ root = "/dev/hda1 ro"
 
 #============================================================================
 
-# New stuff
-memmap = '/etc/xen/mem-map.sxp'
-device_model = '/usr/bin/device-model'
-device_config = '/etc/xen/xmexample.vmx'
 
-#============================================================================
-#
-# config item for qemu device model
-# Note: no space between =
-#-----------------------------------------------------------------------------
-# Qemu binary path
-qemubin='/usr/bin/qemu-dm'
+# New stuff
+device_model = '/usr/bin/qemu-dm'
+
+# Advanced users only. Don't touch if you don't know what you're doing
+memmap = '/etc/xen/mem-map.sxp'
 
 #-----------------------------------------------------------------------------
 # Disk image for 

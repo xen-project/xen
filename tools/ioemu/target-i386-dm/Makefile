@@ -390,7 +390,7 @@ install: all
 ifneq ($(PROGS),)
 	install -m 755 -s $(PROGS) "$(DESTDIR)$(bindir)"
 endif
-	install -m 755 device-model "$(DESTDIR)$(bindir)"
+	install -m 755 qemu-dm.debug "$(DESTDIR)$(bindir)"
 	install -m 755 qemu-ifup "$(DESTDIR)$(configdir)"
 	gunzip -c qemu-vgaram-bin.gz >qemu-vgaram-bin 
 	install -m 755 qemu-vgaram-bin "$(DESTDIR)$(configdir)"

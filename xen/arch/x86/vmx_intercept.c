@@ -35,7 +35,7 @@
 int vmx_io_intercept(ioreq_t *p)
 {
     struct vcpu *d = current;
-    struct vmx_handler_t *handler = &(d->arch.arch_vmx.vmx_platform.vmx_handler);
+    struct vmx_handler_t *handler = &(d->domain->arch.vmx_platform.vmx_handler);
     int i;
     unsigned long addr, offset;
     for (i = 0; i < handler->num_slot; i++) {
@@ -51,7 +51,7 @@ int vmx_io_intercept(ioreq_t *p)
 int register_io_handler(unsigned long addr, unsigned long offset, intercept_action_t action)
 {
     struct vcpu *d = current;
-    struct vmx_handler_t *handler = &(d->arch.arch_vmx.vmx_platform.vmx_handler);
+    struct vmx_handler_t *handler = &(d->domain->arch.vmx_platform.vmx_handler);
     int num = handler->num_slot;
 
     if (num >= MAX_IO_HANDLER) {
@@ -163,7 +163,7 @@ static void resume_pit_io(ioreq_t *p)
 int intercept_pit_io(ioreq_t *p)
 {
     struct vcpu *d = current;
-    struct vmx_virpit_t *vpit = &(d->arch.arch_vmx.vmx_platform.vmx_pit);
+    struct vmx_virpit_t *vpit = &(d->domain->arch.vmx_platform.vmx_pit);
 
     if (p->size != 1 ||
         p->pdata_valid ||
@@ -206,10 +206,10 @@ static void pit_timer_fn(void *data)
  */
 void vmx_hooks_assist(struct vcpu *d)
 {
-    vcpu_iodata_t *vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
+    vcpu_iodata_t * vio = get_vio(d->domain, d->vcpu_id);
     ioreq_t *p = &vio->vp_ioreq;
     unsigned long *intr = &(vio->vp_intr[0]);
-    struct vmx_virpit_t *vpit = &(d->arch.arch_vmx.vmx_platform.vmx_pit);
+    struct vmx_virpit_t *vpit = &(d->domain->arch.vmx_platform.vmx_pit);
     int rw_mode;
 
     /* load init count*/

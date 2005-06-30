@@ -68,7 +68,6 @@ struct arch_vmx_struct {
     unsigned long           cpu_cr3;
     unsigned long           cpu_state;
     struct msr_state        msr_content;
-    struct virutal_platform_def     vmx_platform; 
 };
 
 #define vmx_schedule_tail(next)         \

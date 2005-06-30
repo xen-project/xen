@@ -151,8 +151,10 @@ int vmx_setup_platform(struct vcpu *d, struct cpu_user_regs *regs)
     /* Initialise shared page */
     mpfn = phys_to_machine_mapping(gpfn);
     p = map_domain_page(mpfn);
-    memset(p, 0, PAGE_SIZE);
-    d->arch.arch_vmx.vmx_platform.shared_page_va = (unsigned long)p;
+    d->domain->arch.vmx_platform.shared_page_va = (unsigned long)p;
+
+   clear_bit(iopacket_port(d->domain), 
+             &d->domain->shared_info->evtchn_mask[0]);
 
     return 0;
 }

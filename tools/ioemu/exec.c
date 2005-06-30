@@ -127,7 +127,7 @@ void cpu_exec_init(void)
 void cpu_set_log(int log_flags)
 {
     loglevel = log_flags;
-    if (loglevel && !logfile) {
+    if (!logfile) {
         logfile = fopen(logfilename, "w");
         if (!logfile) {
             perror(logfilename);

@@ -8,6 +8,7 @@
 #include "xc_elf.h"
 #include <stdlib.h>
 #include <zlib.h>
+#include <xen/io/ioreq.h>
 #include "linux_boot_params.h"
 
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
@@ -173,6 +174,9 @@ static int setup_guest(int xc_handle,
     unsigned long vpt_start;
     unsigned long vpt_end;
     unsigned long v_end;
+
+    unsigned long shared_page_frame = 0;
+    shared_iopage_t *sp;
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
@@ -382,6 +386,8 @@ static int setup_guest(int xc_handle,
         boot_paramsp->e820_map[i].addr = mem_mapp->map[i].addr; 
         boot_paramsp->e820_map[i].size = mem_mapp->map[i].size; 
         boot_paramsp->e820_map[i].type = mem_mapp->map[i].type; 
+        if (mem_mapp->map[i].type == E820_SHARED)
+            shared_page_frame = (mem_mapp->map[i].addr >> PAGE_SHIFT);
     }
     munmap(boot_paramsp, PAGE_SIZE); 
 
@@ -406,6 +412,15 @@ static int setup_guest(int xc_handle,
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
     munmap(shared_info, PAGE_SIZE);
+
+    /* Populate the event channel port in the shared page */
+    if ((sp = (shared_iopage_t *) xc_map_foreign_range(
+		xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
+		page_array[shared_page_frame])) == 0)
+	goto error_out;
+    memset(sp, 0, PAGE_SIZE);
+    sp->sp_global.eport = control_evtchn;
+    munmap(sp, PAGE_SIZE);
 
     /*
      * Pin down l2tab addr as page dir page - causes hypervisor to provide

@@ -254,9 +254,69 @@ gopts.var('device_model', val='FILE',
           fn=set_value, default='',
           use="Path to device model program.")
 
-gopts.var('device_config', val='FILE',
+gopts.var('hda', val='FILE',
           fn=set_value, default='',
-          use="Path to device model configuration.")
+          use="Path to hda")
+
+gopts.var('hdb', val='FILE',
+          fn=set_value, default='',
+          use="Path to hdb")
+
+gopts.var('hdc', val='FILE',
+          fn=set_value, default='',
+          use="Path to hdc")
+
+gopts.var('hdd', val='FILE',
+          fn=set_value, default='',
+          use="Path to hdd")
+
+gopts.var('fda', val='FILE',
+          fn=set_value, default='',
+          use="Path to fda")
+
+gopts.var('fdb', val='FILE',
+          fn=set_value, default='',
+          use="Path to fdb")
+
+gopts.var('serial', val='FILE',
+          fn=set_value, default='',
+          use="Path to serial or pty or vc")
+
+gopts.var('localtime', val='no|yes',
+          fn=set_bool, default=0,
+          use="Is RTC set to localtime?")
+
+gopts.var('stdvga', val='no|yes',
+          fn=set_bool, default=0,
+          use="Use std vga or cirrhus logic graphics")
+
+gopts.var('isa', val='no|yes',
+          fn=set_bool, default=0,
+          use="Simulate an ISA only system?")
+
+gopts.var('cdrom', val='FILE',
+          fn=set_value, default='',
+          use="Path to cdrom")
+
+gopts.var('macaddr', val='MACADDR',
+          fn=set_value, default='',
+          use="Macaddress of the first network interface")
+
+gopts.var('boot', val="a|b|c|d",
+          fn=set_value, default='c',
+          use="Default boot device")
+
+gopts.var('nographic', val='no|yes',
+          fn=set_bool, default=0,
+          use="Should device models use graphics?")
+
+gopts.var('sdl', val='',
+          fn=set_value, default=None,
+          use="""Should the device model use SDL?""")
+
+gopts.var('display', val='DISPLAY',
+          fn=set_value, default='localhost:0',
+          use="X11 display to use")
 
 def strip(pre, s):
     """Strip prefix 'pre' if present.
@@ -382,12 +442,11 @@ def configure_vfr(opts, config, vals):
 def configure_vmx(opts, config_devs, vals):
     """Create the config for VMX devices.
     """
-    memmap = vals.memmap
-    device_model = vals.device_model
-    device_config = vals.device_config
-    config_devs.append(['memmap', memmap])
-    config_devs.append(['device_model', device_model])
-    config_devs.append(['device_config', device_config])
+    args = [ 'memmap', 'device_model', 'hda', 'hdb', 'hdc', 'hdd', 'cdrom',
+ 	     'boot', 'fda', 'fdb', 'localtime', 'serial', 'macaddr', 'stdvga', 
+             'isa', 'nographic', 'vnc', 'sdl', 'display']	 
+    for a in args:
+    	config_devs.append([a, vals.__dict__[a]])
 
 def run_bootloader(opts, config, vals):
     if not os.access(vals.bootloader, os.X_OK):
@@ -614,10 +673,13 @@ def main(argv):
         if '=' in arg:
             (var, val) = arg.strip().split('=', 1)
             gopts.setvar(var.strip(), val.strip())
+    opts.vals.display = os.getenv("DISPLAY")
     if opts.vals.config:
         config = opts.vals.config
     else:
         opts.load_defconfig()
+        if opts.vals.dryrun:
+	    opts.vals.vnc = 0
         preprocess(opts, opts.vals)
         if not opts.getopt('name') and opts.getopt('defconfig'):
             opts.setopt('name', os.path.basename(opts.getopt('defconfig')))

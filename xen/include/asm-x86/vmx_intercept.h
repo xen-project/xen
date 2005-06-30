@@ -9,7 +9,6 @@
 #include <xen/errno.h>
 #include <public/io/ioreq.h>
 
-
 #define MAX_IO_HANDLER 6
 
 typedef int (*intercept_action_t)(ioreq_t*);

@@ -345,7 +345,7 @@ static int vmx_final_setup_guest(
     v->arch.schedule_tail = arch_vmx_do_launch;
 
 #if defined (__i386)
-    v->arch.arch_vmx.vmx_platform.real_mode_data = 
+    v->domain->arch.vmx_platform.real_mode_data = 
         (unsigned long *) regs->esi;
 #endif
 
@@ -356,7 +356,6 @@ static int vmx_final_setup_guest(
          */
         memset(&v->domain->shared_info->evtchn_mask[0], 0xff, 
                sizeof(v->domain->shared_info->evtchn_mask));
-        clear_bit(IOPACKET_PORT, &v->domain->shared_info->evtchn_mask[0]);
 
         /* Put the domain in shadow mode even though we're going to be using
          * the shared 1:1 page table initially. It shouldn't hurt */
@@ -906,7 +905,7 @@ static void vmx_relinquish_resources(struct vcpu *v)
     v->arch.arch_vmx.vmcs = 0;
     
     free_monitor_pagetable(v);
-    rem_ac_timer(&v->arch.arch_vmx.vmx_platform.vmx_pit.pit_timer);
+    rem_ac_timer(&v->domain->arch.vmx_platform.vmx_pit.pit_timer);
 }
 #else
 #define vmx_relinquish_resources(_v) ((void)0)

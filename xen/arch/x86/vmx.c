@@ -388,7 +388,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
         return;
     }
 
-    vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
+    vio = get_vio(d->domain, d->vcpu_id);
     if (vio == 0) {
         printk("bad shared page: %lx", (unsigned long) vio);
         domain_crash_synchronous(); 
@@ -458,7 +458,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
 
     set_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags);
     p->state = STATE_IOREQ_READY;
-    evtchn_send(IOPACKET_PORT);
+    evtchn_send(iopacket_port(d->domain));
     vmx_wait_io();
 }
 
@@ -1260,7 +1260,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                         (unsigned long)regs.eax, (unsigned long)regs.ebx,
                         (unsigned long)regs.ecx, (unsigned long)regs.edx,
                         (unsigned long)regs.esi, (unsigned long)regs.edi);
-            v->arch.arch_vmx.vmx_platform.mpci.inst_decoder_regs = &regs;
+            v->domain->arch.vmx_platform.mpci.inst_decoder_regs = &regs;
 
             if (!(error = vmx_do_page_fault(va, &regs))) {
                 /*

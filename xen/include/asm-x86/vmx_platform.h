@@ -77,7 +77,7 @@ struct mi_per_cpu_info
     struct cpu_user_regs        *inst_decoder_regs;
 };
 
-struct virutal_platform_def {
+struct virtual_platform_def {
     unsigned long          *real_mode_data; /* E820, etc. */
     unsigned long          shared_page_va;
     struct vmx_virpit_t    vmx_pit;

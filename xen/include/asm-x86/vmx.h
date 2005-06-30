@@ -26,6 +26,8 @@
 #include <asm/vmx_vmcs.h>
 #include <asm/i387.h>
 
+#include <public/io/ioreq.h>
+
 extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_resume(void);
 extern void vmx_asm_do_launch(void);
@@ -335,6 +337,16 @@ static inline int vmx_paging_enabled(struct vcpu *v)
 
     __vmread(CR0_READ_SHADOW, &cr0);
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
+}
+
+static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
+{
+    return &((shared_iopage_t *) d->arch.vmx_platform.shared_page_va)->vcpu_iodata[cpu];
+}
+
+static inline int iopacket_port(struct domain *d)
+{
+    return ((shared_iopage_t *) d->arch.vmx_platform.shared_page_va)->sp_global.eport;
 }
 
 #endif /* __ASM_X86_VMX_H__ */

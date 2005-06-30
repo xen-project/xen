@@ -565,10 +565,11 @@ static void send_mmio_req(unsigned long gpa,
     struct cpu_user_regs *inst_decoder_regs;
     extern long evtchn_send(int lport);
 
-    mpci_p = &current->arch.arch_vmx.vmx_platform.mpci;
+    mpci_p = &current->domain->arch.vmx_platform.mpci;
     inst_decoder_regs = mpci_p->inst_decoder_regs;
 
-    vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
+    vio = get_vio(d->domain, d->vcpu_id);
+
     if (vio == NULL) {
         printk("bad shared page\n");
         domain_crash_synchronous(); 
@@ -612,7 +613,7 @@ static void send_mmio_req(unsigned long gpa,
 	p->port_mm, p->size, p->addr, value, p->count);
 #endif
 
-    evtchn_send(IOPACKET_PORT);
+    evtchn_send(iopacket_port(d->domain));
     vmx_wait_io();
 }
 
@@ -626,7 +627,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     unsigned char inst[MAX_INST_LEN];
     int vm86, ret;
      
-    mpci_p = &current->arch.arch_vmx.vmx_platform.mpci;
+    mpci_p = &current->domain->arch.vmx_platform.mpci;
     inst_decoder_regs = mpci_p->inst_decoder_regs;
 
     __vmread(GUEST_RIP, &eip);

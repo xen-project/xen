@@ -29,8 +29,6 @@
 #define STATE_IORESP_READY      3
 #define STATE_IORESP_HOOK       4
 
-#define IOPACKET_PORT   2
-
 /* VMExit dispatcher should cooperate with instruction decoder to
    prepare this structure and notify service OS and DM by sending
    virq */
@@ -53,9 +51,23 @@ typedef struct {
 #define BITS_PER_BYTE   8
 #define INTR_LEN        (MAX_VECTOR/(BITS_PER_BYTE * sizeof(unsigned long)))
 
+/* We only track the master PIC state here */
+typedef struct {
+    uint16_t irr; /* interrupt request register */
+    uint16_t imr; /* interrupt mask register */
+    uint16_t isr; /* interrupt service register */
+
+    int     eport; /* Event channel port */
+} global_iodata_t;
+
 typedef struct {
     ioreq_t         vp_ioreq;
     unsigned long   vp_intr[INTR_LEN];
 } vcpu_iodata_t;
+
+typedef struct {
+    global_iodata_t     sp_global;
+    vcpu_iodata_t       vcpu_iodata[1];
+} shared_iopage_t;
 
 #endif /* _IOREQ_H_ */

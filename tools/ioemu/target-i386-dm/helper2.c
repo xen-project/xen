@@ -45,14 +45,16 @@
 
 #include <limits.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
 
 #include "xc.h"
 #include <io/ioreq.h>
 
 #include "cpu.h"
 #include "exec-all.h"
+#include "vl.h"
 
-void *shared_page;
+shared_iopage_t *shared_page = NULL;
 
 CPUX86State *cpu_86_init(void)
 {
@@ -116,19 +118,27 @@ int evtchn_fd = -1;
 //the evtchn port for polling the notification, should be inputed as bochs's parameter
 u16 ioreq_port = 0;
 
-void *shared_page = NULL;
-
 //some functions to handle the io req packet
+void
+sp_info()
+{
+	ioreq_t *req;
+
+	req = &(shared_page->vcpu_iodata[0].vp_ioreq);
+        term_printf("event port: %d\n", shared_page->sp_global.eport);
+        term_printf("req state: %x, pvalid: %x, addr: %llx, data: %llx, count: %llx, size: %llx\n", req->state, req->pdata_valid, req->addr, req->u.data, req->count, req->size);
+}
 
 //get the ioreq packets from share mem
 ioreq_t* __cpu_get_ioreq(void)
 {
 	ioreq_t *req;
-	req = &((vcpu_iodata_t *) shared_page)->vp_ioreq;
+
+	req = &(shared_page->vcpu_iodata[0].vp_ioreq);
 	if (req->state == STATE_IOREQ_READY) {
 		req->state = STATE_IOREQ_INPROCESS;
 	} else {
-		fprintf(logfile, "False I/O requrest ... in-service already: %x, pvalid: %x,port: %llx, data: %llx, count: %llx, size: %llx\n", req->state, req->pdata_valid, req->addr, req->u.data, req->count, req->size);
+		fprintf(logfile, "False I/O request ... in-service already: %x, pvalid: %x,port: %llx, data: %llx, count: %llx, size: %llx\n", req->state, req->pdata_valid, req->addr, req->u.data, req->count, req->size);
 		req = NULL;
 	}
 
@@ -310,8 +320,7 @@ do_interrupt(CPUState *env, int vector)
 
 	// Send a message on the event channel. Add the vector to the shared mem
 	// page.
-
-	intr = &(((vcpu_iodata_t *) shared_page)->vp_intr[0]);
+	intr = &(shared_page->vcpu_iodata[0].vp_intr[0]);
 	atomic_set_bit(vector, intr);
         if (loglevel & CPU_LOG_INT)
                 fprintf(logfile, "injecting vector: %x\n", vector);

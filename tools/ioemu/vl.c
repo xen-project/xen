@@ -116,7 +116,7 @@ const char* keyboard_layout = 0;
 int64_t ticks_per_sec;
 int boot_device = 'c';
 int ram_size;
-int domid;
+int domid = -1;
 static char network_script[1024];
 int pit_min_timer_count = 0;
 int nb_nics;
@@ -2402,6 +2402,9 @@ int main(int argc, char **argv)
     macaddr[4] = 0x34;
     macaddr[5] = 0x56;
     
+    /* init debug */
+    cpu_set_log(0);
+
     optind = 1;
     for(;;) {
         if (optind >= argc)
@@ -2808,10 +2811,13 @@ int main(int argc, char **argv)
 	    exit(-1);
     }
 
-
     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
 				       PROT_READ|PROT_WRITE,
 				       page_array[nr_pages - 1]);
+
+
+    fprintf(logfile, "shared page at pfn:%lx, mfn: %lx\n", (nr_pages-1), 
+           (page_array[nr_pages - 1]));
 
     /* we always create the cdrom drive, even if no disk is there */
     bdrv_init();

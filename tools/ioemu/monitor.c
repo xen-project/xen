@@ -353,6 +353,8 @@ static term_cmd_t info_cmds[] = {
       "", "show i8259 (PIC) state", },
     { "pci", "", pci_info,
       "", "show PCI info", },
+    { "vmxiopage", "", sp_info,
+      "", "show VMX device model shared page info", },
     { NULL, NULL, },
 };
 

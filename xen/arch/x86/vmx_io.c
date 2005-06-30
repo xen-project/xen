@@ -317,10 +317,11 @@ void vmx_io_assist(struct vcpu *v)
     struct mi_per_cpu_info *mpci_p;
     struct cpu_user_regs *inst_decoder_regs;
 
-    mpci_p = &v->arch.arch_vmx.vmx_platform.mpci;
+    mpci_p = &v->domain->arch.vmx_platform.mpci;
     inst_decoder_regs = mpci_p->inst_decoder_regs;
 
-    vio = (vcpu_iodata_t *) v->arch.arch_vmx.vmx_platform.shared_page_va;
+    vio = get_vio(v->domain, v->vcpu_id);
+
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, 
                     "bad shared page: %lx", (unsigned long) vio);
@@ -356,10 +357,10 @@ void vmx_io_assist(struct vcpu *v)
             }
             int size = -1, index = -1;
 
-            size = operand_size(v->arch.arch_vmx.vmx_platform.mpci.mmio_target);
-            index = operand_index(v->arch.arch_vmx.vmx_platform.mpci.mmio_target);
+            size = operand_size(v->domain->arch.vmx_platform.mpci.mmio_target);
+            index = operand_index(v->domain->arch.vmx_platform.mpci.mmio_target);
 
-            if (v->arch.arch_vmx.vmx_platform.mpci.mmio_target & WZEROEXTEND) {
+            if (v->domain->arch.vmx_platform.mpci.mmio_target & WZEROEXTEND) {
                 p->u.data = p->u.data & 0xffff;
             }        
             set_reg_value(size, index, 0, regs, p->u.data);
@@ -404,18 +405,18 @@ void vmx_io_assist(struct vcpu *v)
 int vmx_clear_pending_io_event(struct vcpu *v) 
 {
     struct domain *d = v->domain;
+    int port = iopacket_port(d);
 
     /* evtchn_pending is shared by other event channels in 0-31 range */
-    if (!d->shared_info->evtchn_pending[IOPACKET_PORT>>5])
-        clear_bit(IOPACKET_PORT>>5, &v->vcpu_info->evtchn_pending_sel);
+    if (!d->shared_info->evtchn_pending[port>>5])
+        clear_bit(port>>5, &v->vcpu_info->evtchn_pending_sel);
 
     /* Note: VMX domains may need upcalls as well */
     if (!v->vcpu_info->evtchn_pending_sel) 
         clear_bit(0, &v->vcpu_info->evtchn_upcall_pending);
 
-    /* clear the pending bit for IOPACKET_PORT */
-    return test_and_clear_bit(IOPACKET_PORT, 
-                              &d->shared_info->evtchn_pending[0]);
+    /* clear the pending bit for port */
+    return test_and_clear_bit(port, &d->shared_info->evtchn_pending[0]);
 }
 
 /* Because we've cleared the pending events first, we need to guarantee that
@@ -437,17 +438,17 @@ void vmx_check_events(struct vcpu *d)
 void vmx_wait_io()
 {
     extern void do_block();
+    int port = iopacket_port(current->domain);
 
     do {
-        if(!test_bit(IOPACKET_PORT, 
-            &current->domain->shared_info->evtchn_pending[0]))
+        if(!test_bit(port, &current->domain->shared_info->evtchn_pending[0]))
             do_block();
         vmx_check_events(current);
         if (!test_bit(ARCH_VMX_IO_WAIT, &current->arch.arch_vmx.flags))
             break;
         /* Events other than IOPACKET_PORT might have woken us up. In that
            case, safely go back to sleep. */
-        clear_bit(IOPACKET_PORT>>5, &current->vcpu_info->evtchn_pending_sel);
+        clear_bit(port>>5, &current->vcpu_info->evtchn_pending_sel);
         clear_bit(0, &current->vcpu_info->evtchn_upcall_pending);
     } while(1);
 }
@@ -522,7 +523,8 @@ static inline int find_highest_pending_irq(struct vcpu *d)
 {
     vcpu_iodata_t *vio;
 
-    vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
+    vio = get_vio(d->domain, d->vcpu_id);
+
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, 
                     "bad shared page: %lx", (unsigned long) vio);
@@ -536,7 +538,8 @@ static inline void clear_highest_bit(struct vcpu *d, int vector)
 {
     vcpu_iodata_t *vio;
 
-    vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
+    vio = get_vio(d->domain, d->vcpu_id);
+
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, 
                     "bad shared page: %lx", (unsigned long) vio);
@@ -555,7 +558,7 @@ void vmx_intr_assist(struct vcpu *d)
 {
     int highest_vector = find_highest_pending_irq(d);
     unsigned long intr_fields, eflags;
-    struct vmx_virpit_t *vpit = &(d->arch.arch_vmx.vmx_platform.vmx_pit);
+    struct vmx_virpit_t *vpit = &(d->domain->arch.vmx_platform.vmx_pit);
 
     if (highest_vector == -1)
         return;

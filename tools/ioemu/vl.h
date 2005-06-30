@@ -624,6 +624,7 @@ void pic_init(void);
 uint32_t pic_intack_read(CPUState *env);
 void pic_info(void);
 void irq_info(void);
+void sp_info(void);
 int pic_irq2vec(int irq);
 
 /* i8254.c */

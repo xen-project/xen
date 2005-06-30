@@ -231,7 +231,7 @@ class VmxImageHandler(ImageHandler):
     
     ostype = "vmx"
     memmap = None
-    memmap_value = None
+    memmap_value = []
     device_channel = None
 
     def createImage(self):
@@ -242,9 +242,12 @@ class VmxImageHandler(ImageHandler):
         self.createDomain()
 
     def buildDomain(self):
+        # Create an event channel
+        self.device_channel = channel.eventChannel(0, self.vm.getDomain())
+        log.info("VMX device model port: %d", self.device_channel.port2)
         return xc.vmx_build(dom            = self.vm.getDomain(),
                             image          = self.kernel,
-                            control_evtchn = 0,
+                            control_evtchn = self.device_channel.port2,
                             memsize        = self.vm.memory,
                             memmap         = self.memmap_value,
                             cmdline        = self.cmdline,
@@ -254,51 +257,74 @@ class VmxImageHandler(ImageHandler):
     def parseMemmap(self):
         self.memmap = sxp.child_value(self.vm.config, "memmap")
         if self.memmap is None:
-            raise VmError("missing memmap")
+            return
         memmap = sxp.parse(open(self.memmap))[0]
         from xen.util.memmap import memmap_parse
         self.memmap_value = memmap_parse(memmap)
         
-    def createDeviceModel_old(self):
-        device_model = sxp.child_value(self.vm.config, 'device_model')
-        if not device_model:
-            raise VmError("vmx: missing device model")
-        device_config = sxp.child_value(self.vm.config, 'device_config')
-        if not device_config:
-            raise VmError("vmx: missing device config")
-        # Create an event channel.
-        self.device_channel = channel.eventChannel(0, self.vm.getDomain())
-        # Execute device model.
-        #todo: Error handling
-        os.system(device_model
-                  + " -f %s" % device_config
-                  + " -d %d" % self.vm.getDomain()
-                  + " -p %d" % self.device_channel['port1']
-                  + " -m %s" % self.vm.memory)
+    # Return a list of cmd line args to the device models based on the
+    # xm config file
+    def parseDeviceModelArgs(self):
+	dmargs = [ 'hda', 'hdb', 'hdc', 'hdd', 'cdrom', 'boot', 'fda', 'fdb',
+                   'localtime', 'serial', 'macaddr', 'stdvga', 'isa' ] 
+	ret = []
+	for a in dmargs:
+       	    v = sxp.child_value(self.vm.config, a)
 
+            # python doesn't allow '-' in variable names
+            if a == 'stdvga': a = 'std-vga'
+
+            # Handle booleans gracefully
+            if a in ['localtime', 'std-vga', 'isa']:
+                v = int(v)
+
+	    log.debug("args: %s, val: %s" % (a,v))
+	    if v: 
+		ret.append("-%s" % a)
+		ret.append("%s" % v)
+
+	# Handle graphics library related options
+	vnc = int(sxp.child_value(self.vm.config, 'vnc'))
+	sdl = int(sxp.child_value(self.vm.config, 'sdl'))
+	nographic = int(sxp.child_value(self.vm.config, 'nographic'))
+	if nographic:
+	    ret.append('-nographic')
+	    return ret
+	
+	if vnc and sdl:
+	    ret = ret + ['-vnc-and-sdl', '-k', 'en-us']
+	elif vnc:
+	    ret = ret + ['-vnc', '-k', 'en-us']
+	if vnc:
+	    vncport = int(self.vm.getDomain()) + 5900
+	    ret = ret + ['-vncport', '%d' % vncport]
+	return ret
+	      	  
     def createDeviceModel(self):
         device_model = sxp.child_value(self.vm.config, 'device_model')
         if not device_model:
             raise VmError("vmx: missing device model")
-        device_config = sxp.child_value(self.vm.config, 'device_config')
-        if not device_config:
-            raise VmError("vmx: missing device config")
-        # Create an event channel
-        self.device_channel = channel.eventChannel(0, self.vm.getDomain())
         # Execute device model.
         #todo: Error handling
         # XXX RN: note that the order of args matter!
-        os.system(device_model
-                  + " -f %s" % device_config
-                  + self.vncParams()
-                  + " -d %d" % self.vm.getDomain()
-                  + " -p %d" % (int(self.device_channel.port1)-1)
-                  + " -m %s" % self.vm.memory)
+        args = [device_model]
+        vnc = self.vncParams()
+        if len(vnc):
+            args = args + vnc
+        args = args + ([ "-d",  "%d" % self.vm.getDomain(),
+                  "-p", "%d" % self.device_channel.port1,
+                  "-m", "%s" % self.vm.memory ])
+	args = args + self.parseDeviceModelArgs()
+        env = dict(os.environ)
+        env['DISPLAY'] = sxp.child_value(self.vm.config, 'display')
+        log.info("spawning device models: %s %s", device_model, args)
+        self.pid = os.spawnve(os.P_NOWAIT, device_model, args, env)
+        log.info("device model pid: %d", self.pid)
 
     def vncParams(self):
         # see if a vncviewer was specified
         # XXX RN: bit of a hack. should unify this, maybe stick in config space
-        vncconnect=""
+        vncconnect=[]
         image = self.config
         args = sxp.child_value(image, "args")
         if args:
@@ -306,12 +332,14 @@ class VmxImageHandler(ImageHandler):
             for arg in arg_list:
                 al = string.split(arg, '=')
                 if al[0] == "VNC_VIEWER":
-                    vncconnect=" -v %s" % al[1]
+                    vncconnect=["-vncconnect", "%s" % al[1]]
                     break
         return vncconnect
 
     def destroy(self):
         channel.eventChannelClose(self.device_channel)
+        os.system("kill -KILL"
+                + " %d" % self.pid)
 
     def getDomainMemory(self, mem_mb):
         return (mem_mb * 1024) + self.getPageTableSize(mem_mb)

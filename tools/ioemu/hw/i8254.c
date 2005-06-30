@@ -217,7 +217,7 @@ int pit_get_gate(PITState *pit, int channel)
 
 void pit_reset_vmx_vectors()
 {
-    extern void *shared_page;
+    extern shared_iopage_t *shared_page;
     ioreq_t *req; 
     int irq, i;
     PITChannelState *s;
@@ -239,7 +239,7 @@ void pit_reset_vmx_vectors()
     s = &pit_state.channels[vmx_channel];
     fprintf(logfile,
     	"VMX_PIT:guest init pit channel %d!\n", vmx_channel);
-    req = &((vcpu_iodata_t *) shared_page)->vp_ioreq;
+    req = &shared_page->vcpu_iodata[0].vp_ioreq;
 
     req->state = STATE_IORESP_HOOK;
     /*
