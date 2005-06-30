@@ -681,6 +681,8 @@
 428d0d84zbtT2C8Xci_SqMP5bZ-wcQ tools/ioemu/hw/i8254.c
 428d0d84KlR61OwSzjF0-L4iz58dfQ tools/ioemu/hw/i8259.c
 428d0d84auhZx6c5Kv3WrfM2UZvqHA tools/ioemu/hw/ide.c
+42c3a8bcqaiyuOWldKc1vXUP12-1Bg tools/ioemu/hw/ioapic.c
+42c3a8bcMP67Od-xEnQaYAHahibD_w tools/ioemu/hw/ioapic.h
 428d0d84WSlhNzdrcb-f-Lg-W9dniQ tools/ioemu/hw/iommu.c
 428d0d84ri8ZtvhB6RJr1YNejjNWIQ tools/ioemu/hw/lance.c
 428d0d84cxFFgDv5fBFrlxGoCiy6Nw tools/ioemu/hw/m48t08.c
@@ -1570,6 +1572,7 @@
 40f5623cTZ80EwjWUBlh44A9F9i_Lg xen/include/public/io/netif.h
 41d40e9b8zCk5VDqhVbuQyhc7G3lqA xen/include/public/io/ring.h
 41ee5e8c6mLxIx82KPsbpt_uts_vSA xen/include/public/io/usbif.h
+42c3a8bcUFXJKVc8tWCFilICv2cNaA xen/include/public/io/vmx_vlapic.h
 4051db79512nOCGweabrFWO2M2h5ng xen/include/public/physdev.h
 42b742f7Lzy8SKKG25L_-fgk5FHA2Q xen/include/public/policy_ops.h
 40589968wmhPmV5-ENbBYmMjnedgKw xen/include/public/sched_ctl.h

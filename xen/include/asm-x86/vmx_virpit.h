@@ -20,7 +20,7 @@ struct vmx_virpit_t {
     int vector;				/* the pit irq vector */
     unsigned int period;		/* the frequency. e.g. 10ms*/
     unsigned int channel;		/* the pit channel, counter 0~2 */
-    unsigned long *intr_bitmap;
+    u64  *intr_bitmap;
     unsigned int pending_intr_nr;	/* the couner for pending timer interrupts */
     unsigned long long inject_point;	/* the time inject virt intr */
     struct ac_timer pit_timer;		/* periodic timer for mode 2*/

@@ -153,6 +153,8 @@ int vmx_setup_platform(struct vcpu *d, struct cpu_user_regs *regs)
     p = map_domain_page(mpfn);
     d->domain->arch.vmx_platform.shared_page_va = (unsigned long)p;
 
+   VMX_DBG_LOG(DBG_LEVEL_1, "eport: %x\n", iopacket_port(d->domain));
+
    clear_bit(iopacket_port(d->domain), 
              &d->domain->shared_info->evtchn_mask[0]);
 

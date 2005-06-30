@@ -213,7 +213,8 @@ void vmx_hooks_assist(struct vcpu *d)
 {
     vcpu_iodata_t * vio = get_vio(d->domain, d->vcpu_id);
     ioreq_t *p = &vio->vp_ioreq;
-    unsigned long *intr = &(vio->vp_intr[0]);
+    shared_iopage_t *sp = get_sp(d->domain);
+    u64 *intr = &(sp->sp_global.pic_intr[0]);
     struct vmx_virpit_t *vpit = &(d->domain->arch.vmx_platform.vmx_pit);
     int rw_mode;
 

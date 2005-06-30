@@ -53,6 +53,7 @@ target_phys_addr_t pci_mem_base;
 static int pci_irq_index;
 static uint32_t pci_irq_levels[4][PCI_IRQ_WORDS];
 static PCIBus *first_bus;
+extern FILE *logfile;
 
 static PCIBus *pci_register_bus(void)
 {
@@ -569,13 +570,26 @@ static void piix3_reset(PIIX3State *d)
     pci_conf[0xae] = 0x00;
 }
 
+#define PIIX_CONFIG_XBCS 0x4f
+void piix3_write_config(PCIDevice *d,
+  uint32_t address, uint32_t val, int len)
+{
+    if ((PIIX3State *)d != piix3_state){
+        fprintf(logfile, "piix3_write_config: error PCIDevice\n");
+        return;
+    }
+
+    pci_default_write_config(d, address, val, len);
+}
+
+
 void piix3_init(PCIBus *bus)
 {
     PIIX3State *d;
     uint8_t *pci_conf;
 
     d = (PIIX3State *)pci_register_device(bus, "PIIX3", sizeof(PIIX3State),
-                                          -1, NULL, NULL);
+                                          -1, NULL, piix3_write_config);
     register_savevm("PIIX3", 0, 1, generic_pci_save, generic_pci_load, d);
 
     piix3_state = d;

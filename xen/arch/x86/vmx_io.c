@@ -22,6 +22,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/trace.h>
+#include <xen/event.h>
 
 #include <asm/current.h>
 #include <asm/cpufeature.h>
@@ -29,10 +30,12 @@
 #include <asm/msr.h>
 #include <asm/vmx.h>
 #include <asm/vmx_vmcs.h>
-#include <xen/event.h>
-#include <public/io/ioreq.h>
 #include <asm/vmx_platform.h>
 #include <asm/vmx_virpit.h>
+#include <asm/apic.h>
+
+#include <public/io/ioreq.h>
+#include <public/io/vmx_vlapic.h>
 
 #ifdef CONFIG_VMX
 #if defined (__i386__)
@@ -515,38 +518,100 @@ static __inline__ int find_highest_irq(u32 *pintr)
     return __fls(pintr[0]);
 }
 
+#define BSP_CPU(d)    (!(d->vcpu_id))
+static inline void clear_extint(struct vcpu *v)
+{
+    global_iodata_t *spg;
+    int i;
+    spg = &get_sp(v->domain)->sp_global;
+
+    for(i = 0; i < INTR_LEN; i++)
+        spg->pic_intr[i] = 0;
+}
+
+static inline void clear_highest_bit(struct vcpu *v, int vector)
+{
+    global_iodata_t *spg;
+
+    spg = &get_sp(v->domain)->sp_global;
+
+    clear_bit(vector, &spg->pic_intr[0]);
+}
+
+static inline int find_highest_pic_irq(struct vcpu *v)
+{
+    u64 intr[INTR_LEN];
+    global_iodata_t *spg;
+    int i;
+
+    if(!BSP_CPU(v))
+        return -1;
+
+    spg = &get_sp(v->domain)->sp_global;
+
+    for(i = 0; i < INTR_LEN; i++){
+        intr[i] = spg->pic_intr[i] & ~spg->pic_mask[i];
+    }
+
+    return find_highest_irq((u32 *)&intr[0]);
+}
+
 /*
  * Return 0-255 for pending irq.
  *        -1 when no pending.
  */
-static inline int find_highest_pending_irq(struct vcpu *d)
+static inline int find_highest_pending_irq(struct vcpu *v, int *type)
 {
-    vcpu_iodata_t *vio;
-
-    vio = get_vio(d->domain, d->vcpu_id);
-
-    if (vio == 0) {
-        VMX_DBG_LOG(DBG_LEVEL_1, 
-                    "bad shared page: %lx", (unsigned long) vio);
-        domain_crash_synchronous();
+    int result = -1;
+    if ((result = find_highest_pic_irq(v)) != -1){
+        *type = VLAPIC_DELIV_MODE_EXT;
+        return result;
     }
-        
-    return find_highest_irq((unsigned int *)&vio->vp_intr[0]);
+    return result;
 }
 
-static inline void clear_highest_bit(struct vcpu *d, int vector)
+static inline void
+interrupt_post_injection(struct vcpu * v, int vector, int type)
 {
-    vcpu_iodata_t *vio;
+    struct vmx_virpit_t *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
+    switch(type)
+    {
+        case VLAPIC_DELIV_MODE_EXT:
+            if (vpit->pending_intr_nr && vector == vpit->vector)
+                vpit->pending_intr_nr--;
+            else
+                clear_highest_bit(v, vector);
 
-    vio = get_vio(d->domain, d->vcpu_id);
+            if (vector == vpit->vector && !vpit->first_injected){
+                vpit->first_injected = 1;
+                vpit->pending_intr_nr = 0;
+            }
+            if (vector == vpit->vector)
+                vpit->inject_point = NOW();
+            break;
 
-    if (vio == 0) {
-        VMX_DBG_LOG(DBG_LEVEL_1, 
-                    "bad shared page: %lx", (unsigned long) vio);
-        domain_crash_synchronous();
+        default:
+            printk("Not support interrupt type\n");
+            break;
     }
-        
-    clear_bit(vector, &vio->vp_intr[0]);
+}
+
+static inline void
+enable_irq_window(unsigned long cpu_exec_control)
+{
+    if (!(cpu_exec_control & CPU_BASED_VIRTUAL_INTR_PENDING)) {
+        cpu_exec_control |= CPU_BASED_VIRTUAL_INTR_PENDING;
+        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, cpu_exec_control);
+    }
+}
+
+static inline void
+disable_irq_window(unsigned long cpu_exec_control)
+{
+    if ( cpu_exec_control & CPU_BASED_VIRTUAL_INTR_PENDING ) {
+        cpu_exec_control &= ~CPU_BASED_VIRTUAL_INTR_PENDING;
+        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, cpu_exec_control);
+    }
 }
 
 static inline int irq_masked(unsigned long eflags)
@@ -554,50 +619,68 @@ static inline int irq_masked(unsigned long eflags)
     return ((eflags & X86_EFLAGS_IF) == 0);
 }
 
-void vmx_intr_assist(struct vcpu *d) 
+void vmx_intr_assist(struct vcpu *v) 
 {
-    int highest_vector = find_highest_pending_irq(d);
-    unsigned long intr_fields, eflags;
-    struct vmx_virpit_t *vpit = &(d->domain->arch.vmx_platform.vmx_pit);
+    int intr_type;
+    int highest_vector = find_highest_pending_irq(v, &intr_type);
+    unsigned long intr_fields, eflags, interruptibility, cpu_exec_control;
 
-    if (highest_vector == -1)
-        return;
+    __vmread(CPU_BASED_VM_EXEC_CONTROL, &cpu_exec_control);
 
-    __vmread(VM_ENTRY_INTR_INFO_FIELD, &intr_fields);
-    if (intr_fields & INTR_INFO_VALID_MASK) {
-        VMX_DBG_LOG(DBG_LEVEL_1, "vmx_intr_assist: intr_fields: %lx",
-                    intr_fields);
+    if (highest_vector == -1) {
+        disable_irq_window(cpu_exec_control);
         return;
     }
 
-    __vmread(GUEST_RFLAGS, &eflags);
-    if (irq_masked(eflags)) {
-        VMX_DBG_LOG(DBG_LEVEL_1, "guesting pending: %x, eflags: %lx",
-                    highest_vector, eflags);
-        return;
-    }
-        
-    if (vpit->pending_intr_nr && highest_vector == vpit->vector)
-        vpit->pending_intr_nr--;
-    else
-        clear_highest_bit(d, highest_vector); 
+     __vmread(VM_ENTRY_INTR_INFO_FIELD, &intr_fields);
 
-    /* close the window between guest PIT initialization and sti */
-    if (highest_vector == vpit->vector && !vpit->first_injected){
-        vpit->first_injected = 1;
-        vpit->pending_intr_nr = 0;
-    }
+     if (intr_fields & INTR_INFO_VALID_MASK) {
+         VMX_DBG_LOG(DBG_LEVEL_1, "vmx_intr_assist: intr_fields: %lx",
+           intr_fields);
+         return;
+     }
 
-    intr_fields = (INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR | highest_vector);
-    __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
+     __vmread(GUEST_INTERRUPTIBILITY_INFO, &interruptibility);
 
-    __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
+     if (interruptibility) {
+         enable_irq_window(cpu_exec_control);
+         VMX_DBG_LOG(DBG_LEVEL_1, "guesting pending: %x, interruptibility: %lx",
+                     highest_vector, interruptibility);
+         return;
+     }
 
-    TRACE_3D(TRC_VMX_INT, d->domain->domain_id, highest_vector, 0);
-    if (highest_vector == vpit->vector)
-        vpit->inject_point = NOW();
+     __vmread(GUEST_RFLAGS, &eflags);
 
-    return;
+     switch (intr_type) {
+         case VLAPIC_DELIV_MODE_EXT:
+             if (irq_masked(eflags)) {
+                 enable_irq_window(cpu_exec_control);
+                 VMX_DBG_LOG(DBG_LEVEL_1, "guesting pending: %x, eflags: %lx",
+                             highest_vector, eflags);
+                 return;
+             }
+
+             intr_fields = (INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR 
+                            | highest_vector);
+             __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
+             __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
+
+             TRACE_3D(TRC_VMX_INT, v->domain->domain_id, highest_vector, 0);
+             break;
+         case VLAPIC_DELIV_MODE_FIXED:
+         case VLAPIC_DELIV_MODE_LPRI:
+         case VLAPIC_DELIV_MODE_SMI:
+         case VLAPIC_DELIV_MODE_NMI:
+         case VLAPIC_DELIV_MODE_INIT:
+         case VLAPIC_DELIV_MODE_STARTUP:
+         default:
+             printk("Unsupported interrupt type\n");
+             BUG();
+             break;
+     }
+
+     interrupt_post_injection(v, highest_vector, intr_type);
+     return;
 }
 
 void vmx_do_resume(struct vcpu *d) 

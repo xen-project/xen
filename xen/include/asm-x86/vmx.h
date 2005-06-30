@@ -339,14 +339,19 @@ static inline int vmx_paging_enabled(struct vcpu *v)
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
 }
 
+static inline shared_iopage_t *get_sp(struct domain *d)
+{
+    return (shared_iopage_t *) d->arch.vmx_platform.shared_page_va;
+}
+
 static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
 {
-    return &((shared_iopage_t *) d->arch.vmx_platform.shared_page_va)->vcpu_iodata[cpu];
+    return &get_sp(d)->vcpu_iodata[cpu];
 }
 
 static inline int iopacket_port(struct domain *d)
 {
-    return ((shared_iopage_t *) d->arch.vmx_platform.shared_page_va)->sp_global.eport;
+    return get_sp(d)->sp_global.eport;
 }
 
 #endif /* __ASM_X86_VMX_H__ */

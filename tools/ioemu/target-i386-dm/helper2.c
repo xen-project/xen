@@ -320,7 +320,7 @@ do_interrupt(CPUState *env, int vector)
 
 	// Send a message on the event channel. Add the vector to the shared mem
 	// page.
-	intr = &(shared_page->vcpu_iodata[0].vp_intr[0]);
+	intr = &(shared_page->sp_global.pic_intr[0]);
 	atomic_set_bit(vector, intr);
         if (loglevel & CPU_LOG_INT)
                 fprintf(logfile, "injecting vector: %x\n", vector);
@@ -345,11 +345,11 @@ int main_loop(void)
 	FD_ZERO(&rfds);
 
 	while (1) {
-            if (vm_running) {
-                if (shutdown_requested) {
-                    break;
+                if (vm_running) {
+                    if (shutdown_requested) {
+                        break;
+                    }
                 }
-            }
 
 		/* Wait up to one seconds. */
 		tv.tv_sec = 0;
@@ -370,14 +370,19 @@ int main_loop(void)
 #endif
 
 		main_loop_wait(0);
-
+#ifdef APIC_SUPPORT
+		ioapic_update_EOI();
+#endif
 		cpu_timer_handler(env);
 		if (env->interrupt_request & CPU_INTERRUPT_HARD) {
                         env->interrupt_request &= ~CPU_INTERRUPT_HARD;
 			vector = cpu_get_pic_interrupt(env); 
 			do_interrupt(env, vector);
 		}
-
+#ifdef APIC_SUPPORT
+		if (ioapic_has_intr())
+                    do_ioapic();
+#endif
 		if (env->send_event) {
 			int ret;
 			ret = xc_evtchn_send(xc_handle, ioreq_port);

@@ -573,7 +573,7 @@ static inline target_ulong get_phys_addr_code(CPUState *env, target_ulong addr)
 }
 #endif
 
-//#define DEBUG_UNUSED_IOPORT
-//#define DEBUG_IOPORT
+#define DEBUG_UNUSED_IOPORT
+#define DEBUG_IOPORT
 #define TARGET_VMX
 

@@ -49,14 +49,11 @@ typedef struct {
 
 #define MAX_VECTOR    256
 #define BITS_PER_BYTE   8
-#define INTR_LEN        (MAX_VECTOR/(BITS_PER_BYTE * sizeof(unsigned long)))
+#define INTR_LEN        (MAX_VECTOR/(BITS_PER_BYTE * sizeof(u64)))
 
-/* We only track the master PIC state here */
 typedef struct {
-    uint16_t irr; /* interrupt request register */
-    uint16_t imr; /* interrupt mask register */
-    uint16_t isr; /* interrupt service register */
-
+    u64   pic_intr[INTR_LEN];
+    u64   pic_mask[INTR_LEN];
     int     eport; /* Event channel port */
 } global_iodata_t;
 

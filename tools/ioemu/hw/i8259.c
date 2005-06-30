@@ -22,12 +22,16 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
+#include "xc.h"
+#include <io/ioreq.h>
 
 /* debug PIC */
 //#define DEBUG_PIC
 
 //#define DEBUG_IRQ_LATENCY
 #define DEBUG_IRQ_COUNT
+
+extern void pit_reset_vmx_vectors();
 
 typedef struct PicState {
     uint8_t last_irr; /* edge detection */
@@ -121,6 +125,26 @@ static int pic_get_irq(PicState *s)
     }
 }
 
+/* pic[1] is connected to pin2 of pic[0] */
+#define CASCADE_IRQ 2
+
+static void shared_page_update()
+{
+    extern shared_iopage_t *shared_page;
+    uint8_t * pmask = (uint8_t *)&(shared_page->sp_global.pic_mask[0]);
+    int           index;
+
+    index = pics[0].irq_base/8;
+    pmask[index] = pics[0].imr;
+    index = pics[1].irq_base/8;
+
+    if ( pics[0].imr &  (1 << CASCADE_IRQ) ) {
+        pmask[index] = 0xff;
+    } else {
+        pmask[index] = pics[1].imr;
+    }
+}
+
 /* raise irq to CPU if necessary. must be called every time the active
    irq may change */
 static void pic_update_irq(void)
@@ -150,14 +174,18 @@ static void pic_update_irq(void)
 #endif
         cpu_interrupt(cpu_single_env, CPU_INTERRUPT_HARD);
     }
+    shared_page_update();
 }
 
 #ifdef DEBUG_IRQ_LATENCY
 int64_t irq_time[16];
 #endif
 
+extern void ioapic_legacy_irq(int irq, int level);
+
 void pic_set_irq(int irq, int level)
 {
+    ioapic_legacy_irq(irq, level);
 #if defined(DEBUG_PIC) || defined(DEBUG_IRQ_COUNT)
     if (level != irq_level[irq]) {
 #if defined(DEBUG_PIC)
@@ -255,6 +283,7 @@ static void pic_reset(void *opaque)
     tmp = s->elcr_mask;
     memset(s, 0, sizeof(PicState));
     s->elcr_mask = tmp;
+    shared_page_update();
 }
 
 static void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
