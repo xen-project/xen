@@ -24,8 +24,8 @@ include $(XEN_ROOT)/tools/Rules.mk
 # The emulator code lives in ROM space
 TEXTADDR=0x000D0000
 
-DEFINES=-DDEBUG -DTEXTADDR=${TEXTADDR}
-XENINC=-I$(XEN_ROOT)/xen/include
+DEFINES=-DDEBUG -DTEXTADDR=${TEXTADDR} -D_ACPI_
+XENINC=-I$(XEN_ROOT)/xen/include -I$(XEN_ROOT)/tools/libxc
 #DEFINES=-DDEBUG -DTEST -DTEXTADDR=${TEXTADDR}
 #XENINC=-I/home/leendert/xen/xeno-unstable.bk/xen/include
 
@@ -44,7 +44,7 @@ OBJECTS = head.o trap.o vm86.o setup.o util.o
 
 all: vmxloader
 
-vmxloader: roms.h vmxloader.c
+vmxloader: roms.h vmxloader.c acpi.h
 	${CC} ${CFLAGS} ${DEFINES} -c vmxloader.c
 	$(CC) -o vmxloader.tmp -m32 -nostdlib -Wl,-N -Wl,-Ttext -Wl,0x100000 vmxloader.o
 	objcopy --change-addresses=0xC0000000 vmxloader.tmp vmxloader
@@ -79,6 +79,9 @@ roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabi
 	./mkhex vgabios_cirrusvga ../vgabios/VGABIOS-lgpl-latest.cirrus.bin >> roms.h
 	./mkhex vmxassist vmxassist.bin >> roms.h
 
+acpi.h: ../acpi/acpi.bin
+	./mkhex acpi ../acpi/acpi.bin > acpi.h
+
 offsets.h: gen
 	./gen > offsets.h
 
@@ -86,7 +89,7 @@ gen:	gen.c
 	${CC} ${CFLAGS} -o gen gen.c
 
 clean:
-	rm -f vmxassist vmxassist.tmp vmxassist.bin vmxassist.run vmxassist.sym head.s roms.h
+	rm -f vmxassist vmxassist.tmp vmxassist.bin vmxassist.run vmxassist.sym head.s roms.h acpi.h
 	rm -f vmxloader vmxloader.tmp vmxloader.o ${OBJECTS}
 	rm -f gen gen.o offsets.h
 

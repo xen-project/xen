@@ -1,0 +1,24 @@
+ACPI Table for domain firmware
+
+
+INSTALL
+-----------------
+Simply make is OK.
+# make 
+
+
+Note on DSDT Table
+------------------
+DSDT table source code is acpi_dsdt.asl
+It is already compiled and the output is acpi_dsdt.c
+Usually, user is not expected to change the acpi_dsdt.asl.
+In case that the acpi_dsdt.asl need to be updated, please 
+Follow the instruction:
+
+# make acpi_dsdt.c
+
+Note:
+DSDT compiler "iasl" is needed. By default, it will be downloaded 
+using wget in Makefile. if it failed, please download manually from 
+http://developer.intel.com/technology/iapc/acpi/downloads.htm. 
+then compile and install iasl

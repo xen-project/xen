@@ -24,6 +24,12 @@
 #include "machine.h"
 #include "roms.h"
 
+#ifdef _ACPI_
+#include "acpi.h"
+#include "../acpi/acpi2_0.h"  // for ACPI_PHYSICAL_ADDRESS
+#endif
+
+
 /*
  * C runtime start off
  */
@@ -102,6 +108,16 @@ main()
 		memcpy((void *)0xC0000,
 			vgabios_stdvga, sizeof(vgabios_stdvga));
 	}
+#ifdef _ACPI_
+	puts("Loading ACPI ...\n");
+    if (ACPI_PHYSICAL_ADDRESS+sizeof(acpi) <= 0xF0000 ){
+        /* make sure acpi table does not overlap rombios
+ 		 * currently acpi less than 8K will be OK.
+		 */
+		 memcpy((void *)ACPI_PHYSICAL_ADDRESS, acpi, sizeof(acpi));
+	}
+#endif
+			
 	puts("Loading VMXAssist ...\n");
 	memcpy((void *)TEXTADDR, vmxassist, sizeof(vmxassist));
 	puts("Go ...\n");
