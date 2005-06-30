@@ -31,14 +31,17 @@
 
 #ifdef CONFIG_VMX
 
-/* for intercepting io request after vm_exit, return value: 0--not handle; 1--handled */
-int vmx_io_intercept(ioreq_t *p)
+/* Check if the request is handled inside xen
+   return value: 0 --not handled; 1 --handled */
+int vmx_io_intercept(ioreq_t *p, int type)
 {
     struct vcpu *d = current;
     struct vmx_handler_t *handler = &(d->domain->arch.vmx_platform.vmx_handler);
     int i;
     unsigned long addr, offset;
     for (i = 0; i < handler->num_slot; i++) {
+        if( type != handler->hdl_list[i].type)
+            continue;
         addr   = handler->hdl_list[i].addr;
         offset = handler->hdl_list[i].offset;
         if (p->addr >= addr &&
@@ -48,7 +51,8 @@ int vmx_io_intercept(ioreq_t *p)
     return 0;
 }
 
-int register_io_handler(unsigned long addr, unsigned long offset, intercept_action_t action)
+int register_io_handler(unsigned long addr, unsigned long offset, 
+                        intercept_action_t action, int type)
 {
     struct vcpu *d = current;
     struct vmx_handler_t *handler = &(d->domain->arch.vmx_platform.vmx_handler);
@@ -62,6 +66,7 @@ int register_io_handler(unsigned long addr, unsigned long offset, intercept_acti
     handler->hdl_list[num].addr = addr;
     handler->hdl_list[num].offset = offset;
     handler->hdl_list[num].action = action;
+    handler->hdl_list[num].type = type;
     handler->num_slot++;
     return 1;
 
@@ -262,7 +267,7 @@ void vmx_hooks_assist(struct vcpu *d)
         p->state = STATE_IORESP_READY;
 
 	/* register handler to intercept the PIT io when vm_exit */
-	register_io_handler(0x40, 4, intercept_pit_io); 
+	register_portio_handler(0x40, 4, intercept_pit_io); 
     }
 
 }

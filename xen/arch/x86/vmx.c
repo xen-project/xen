@@ -135,17 +135,20 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
     }
 #endif
 
-    if (!vmx_paging_enabled(current))
+    if (!vmx_paging_enabled(current)){
         handle_mmio(va, va);
-
+        return 1;
+    }
     gpte = gva_to_gpte(va);
     if (!(l1e_get_flags(gpte) & _PAGE_PRESENT) )
             return 0;
     gpa = l1e_get_paddr(gpte) + (va & ~PAGE_MASK);
 
     /* Use 1:1 page table to identify MMIO address space */
-    if (mmio_space(gpa))
+    if (mmio_space(gpa)){
         handle_mmio(va, gpa);
+        return 1;
+    }
 
     result = shadow_fault(va, regs);
 
@@ -451,10 +454,9 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
     p->port_mm = 0;
 
     /* Check if the packet needs to be intercepted */
-    if (vmx_io_intercept(p)) {
+    if (vmx_portio_intercept(p))
 	/* no blocking & no evtchn notification */
         return;
-    } 
 
     set_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags);
     p->state = STATE_IOREQ_READY;

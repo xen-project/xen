@@ -606,12 +606,11 @@ static void send_mmio_req(unsigned long gpa,
     if ((pvalid) && vmx_paging_enabled(current))
         p->u.pdata = (void *) gva_to_gpa(p->u.data);
 
-#if 0
-    printf("send_mmio_req: eip 0x%lx:0x%lx, dir %d, pdata_valid %d, ",
-	inst_decoder_regs->cs, inst_decoder_regs->eip, p->dir, p->pdata_valid);
-    printf("port_mm %d, size %lld, addr 0x%llx, value 0x%lx, count %lld\n",
-	p->port_mm, p->size, p->addr, value, p->count);
-#endif
+    if (vmx_mmio_intercept(p)){
+        p->state = STATE_IORESP_READY;
+        vmx_io_assist(d);
+        return;
+    }
 
     evtchn_send(iopacket_port(d->domain));
     vmx_wait_io();
@@ -709,6 +708,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
             // Send the request and waiting for return value.
             mpci_p->mmio_target = mmio_inst.operand[1];
             send_mmio_req(gpa, &mmio_inst, value, IOREQ_READ, 0);
+            return;
         } else {
             // Write to MMIO
             if (mmio_inst.operand[0] & IMMEDIATE) {
@@ -728,6 +728,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     if (!strncmp((char *)mmio_inst.i_name, "stos", 4)) {
         send_mmio_req(gpa, &mmio_inst,
             inst_decoder_regs->eax, IOREQ_WRITE, 0);
+        return;
     }
 
     domain_crash_synchronous();
