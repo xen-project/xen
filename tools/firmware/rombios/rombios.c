@@ -9722,8 +9722,6 @@ post_default_ints:
   call _copy_e820_table
 #endif
 
-  call pcibios_init
-
   call rom_scan
 
   call _print_bios_banner 
