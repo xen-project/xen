@@ -92,18 +92,20 @@ static void build_e820map(struct mem_map *mem_mapp, unsigned long mem_size)
 }
 
 static int zap_mmio_range(int xc_handle, u32 dom,
-                            l2_pgentry_t *vl2tab,
+                            l2_pgentry_32_t *vl2tab,
                             unsigned long mmio_range_start,
                             unsigned long mmio_range_size)
 {
     unsigned long mmio_addr;
     unsigned long mmio_range_end = mmio_range_start + mmio_range_size;
     unsigned long vl2e;
-    l1_pgentry_t *vl1tab;
+    l1_pgentry_32_t *vl1tab;
 
     mmio_addr = mmio_range_start & PAGE_MASK;
     for (; mmio_addr < mmio_range_end; mmio_addr += PAGE_SIZE) {
         vl2e = vl2tab[l2_table_offset(mmio_addr)];
+        if (vl2e == 0)
+            continue;
         vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                 PROT_READ|PROT_WRITE, vl2e >> PAGE_SHIFT);
 	if (vl1tab == 0) {
@@ -121,7 +123,7 @@ static int zap_mmio_ranges(int xc_handle, u32 dom,
                             struct mem_map *mem_mapp)
 {
     int i;
-    l2_pgentry_t *vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+    l2_pgentry_32_t *vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                                 PROT_READ|PROT_WRITE,
                                                 l2tab >> PAGE_SHIFT);
     if (vl2tab == 0)
@@ -149,8 +151,8 @@ static int setup_guest(int xc_handle,
                          unsigned long flags,
                          struct mem_map * mem_mapp)
 {
-    l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
-    l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
+    l1_pgentry_32_t *vl1tab=NULL, *vl1e=NULL;
+    l2_pgentry_32_t *vl2tab=NULL, *vl2e=NULL;
     unsigned long *page_array = NULL;
     unsigned long l2tab;
     unsigned long l1tab;
@@ -426,8 +428,10 @@ static int setup_guest(int xc_handle,
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
      * correct protection for the page
      */ 
+#ifdef __i386__
     if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE, l2tab>>PAGE_SHIFT, dom) )
         goto error_out;
+#endif
 
     /* Send the page update requests down to the hypervisor. */
     if ( finish_mmu_updates(xc_handle, mmu) )
@@ -646,7 +650,7 @@ int xc_vmx_build(int xc_handle,
     return -1;
 }
 
-static inline int is_loadable_phdr(Elf_Phdr *phdr)
+static inline int is_loadable_phdr(Elf32_Phdr *phdr)
 {
     return ((phdr->p_type == PT_LOAD) &&
             ((phdr->p_flags & (PF_W|PF_X)) != 0));
@@ -656,9 +660,9 @@ static int parseelfimage(char *elfbase,
                          unsigned long elfsize,
                          struct domain_setup_info *dsi)
 {
-    Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase;
-    Elf_Phdr *phdr;
-    Elf_Shdr *shdr;
+    Elf32_Ehdr *ehdr = (Elf32_Ehdr *)elfbase;
+    Elf32_Phdr *phdr;
+    Elf32_Shdr *shdr;
     unsigned long kernstart = ~0UL, kernend=0UL;
     char *shstrtab;
     int h;
@@ -687,13 +691,13 @@ static int parseelfimage(char *elfbase,
         ERROR("ELF image has no section-header strings table (shstrtab).");
         return -EINVAL;
     }
-    shdr = (Elf_Shdr *)(elfbase + ehdr->e_shoff + 
+    shdr = (Elf32_Shdr *)(elfbase + ehdr->e_shoff + 
                         (ehdr->e_shstrndx*ehdr->e_shentsize));
     shstrtab = elfbase + shdr->sh_offset;
     
     for ( h = 0; h < ehdr->e_phnum; h++ ) 
     {
-        phdr = (Elf_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
+        phdr = (Elf32_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
         if ( phdr->p_paddr < kernstart )
@@ -726,8 +730,8 @@ loadelfimage(
     char *elfbase, int xch, u32 dom, unsigned long *parray,
     struct domain_setup_info *dsi)
 {
-    Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase;
-    Elf_Phdr *phdr;
+    Elf32_Ehdr *ehdr = (Elf32_Ehdr *)elfbase;
+    Elf32_Phdr *phdr;
     int h;
 
     char         *va;
@@ -735,7 +739,7 @@ loadelfimage(
 
     for ( h = 0; h < ehdr->e_phnum; h++ ) 
     {
-        phdr = (Elf_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
+        phdr = (Elf32_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
         

@@ -8,9 +8,9 @@
 struct mem_map {
     int nr_map;
     struct entry {
-        unsigned long long addr;	/* start of memory segment */
-        unsigned long long size;	/* size of memory segment */
-        unsigned long type;		/* type of memory segment */
+        u64 addr;	/* start of memory segment */
+        u64 size;	/* size of memory segment */
+        u32 type;		/* type of memory segment */
 #define E820_RAM        1
 #define E820_RESERVED   2
 #define E820_ACPI       3 /* usable as RAM once ACPI tables have been read */
@@ -18,7 +18,7 @@ struct mem_map {
 #define E820_IO         16
 #define E820_SHARED     17
 
-        unsigned long caching_attr;    /* used by hypervisor */
+        u32 caching_attr;    /* used by hypervisor */
 #define MEMMAP_UC	0
 #define MEMMAP_WC	1
 #define MEMMAP_WT	4
@@ -29,15 +29,15 @@ struct mem_map {
 };
 
 struct e820entry {
-	unsigned long long addr;	/* start of memory segment */
-	unsigned long long size;	/* size of memory segment */
-	unsigned long type;		/* type of memory segment */
-};
+	u64 addr;	/* start of memory segment */
+	u64 size;	/* size of memory segment */
+	u32 type;	/* type of memory segment */
+}__attribute__((packed));
 
 struct e820map {
-    int nr_map;
+    u32 nr_map;
     struct e820entry map[E820MAX];
-};
+}__attribute__((packed));
 
 struct drive_info_struct { __u8 dummy[32]; }; 
 
@@ -64,8 +64,8 @@ struct screen_info {
     unsigned short lfb_width;		/* 0x12 */
     unsigned short lfb_height;		/* 0x14 */
     unsigned short lfb_depth;		/* 0x16 */
-    unsigned long  lfb_base;		/* 0x18 */
-    unsigned long  lfb_size;		/* 0x1c */
+    unsigned int   lfb_base;		/* 0x18 */
+    unsigned int   lfb_size;		/* 0x1c */
     unsigned short dontuse2, dontuse3;	/* 0x20 -- CL_MAGIC and CL_OFFSET here */
     unsigned short lfb_linelength;	/* 0x24 */
     unsigned char  red_size;		/* 0x26 */

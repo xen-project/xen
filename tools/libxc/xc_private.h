@@ -53,6 +53,8 @@
 #define PAGE_SIZE               (1UL << PAGE_SHIFT)
 #define PAGE_MASK               (~(PAGE_SIZE-1))
 
+typedef u32 l1_pgentry_32_t;
+typedef u32 l2_pgentry_32_t;
 typedef unsigned long l1_pgentry_t;
 typedef unsigned long l2_pgentry_t;
 #if defined(__x86_64__)
