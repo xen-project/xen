@@ -637,6 +637,8 @@
 428d0d82HvgRPoyU3f60_u_t1L28Ag tools/ioemu/README
 428d0d82aoWewa_6Z5kNUTgkRw0wNg tools/ioemu/TODO
 428d0d82WYi8vrG7RKKyIJw01DAnGg tools/ioemu/VERSION
+42c3a871n2v9J47-sowMlC1x4DSwQQ tools/ioemu/aes.c
+42c3a871x3RluaD_Viya0FQ-iSHGHw tools/ioemu/aes.h
 428d0d82wB05ibBxTCSsAhz3qRO7Gg tools/ioemu/block-cloop.c
 428d0d82cucBBZFks3aMSL0-C3L9Nw tools/ioemu/block-cow.c
 428d0d82s5FM7xmnj1XLAMlt_DdRIA tools/ioemu/block-qcow.c

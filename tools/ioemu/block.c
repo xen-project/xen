@@ -544,5 +544,6 @@ BlockDriver bdrv_raw = {
 void bdrv_init(void)
 {
     bdrv_register(&bdrv_raw);
+    bdrv_register(&bdrv_qcow);
     bdrv_register(&bdrv_cloop);
 }

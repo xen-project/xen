@@ -245,8 +245,8 @@ endif
 
 # must use static linking to avoid leaving stuff in virtual address space
 VL_OBJS=vl.o exec.o monitor.o osdep.o block.o readline.o pci.o console.o 
-#VL_OBJS+=block-cow.o block-qcow.o block-vmdk.o block-cloop.o
-VL_OBJS+= block-cloop.o
+VL_OBJS+=block-cow.o block-qcow.o block-vmdk.o block-cloop.o aes.o
+#VL_OBJS+= block-cloop.o
 
 SOUND_HW = sb16.o
 AUDIODRV = audio.o noaudio.o wavaudio.o
