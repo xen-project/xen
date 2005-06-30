@@ -51,47 +51,47 @@ union vmcs_arbytes {
  * World switch state
  */
 typedef struct vmx_assist_context {
-	unsigned long		eip;		/* execution pointer */
-	unsigned long		esp;		/* stack point */
-	unsigned long		eflags;		/* flags register */
-	unsigned long		cr0;
-	unsigned long		cr3;		/* page table directory */
-	unsigned long		cr4;
-	unsigned long		idtr_limit;	/* idt */
-	unsigned long		idtr_base;
-	unsigned long		gdtr_limit;	/* gdt */
-	unsigned long		gdtr_base;
-	unsigned long		cs_sel;		/* cs selector */
-	unsigned long		cs_limit;
-	unsigned long		cs_base;
+	u32		eip;		/* execution pointer */
+	u32		esp;		/* stack point */
+	u32		eflags;		/* flags register */
+	u32		cr0;
+	u32		cr3;		/* page table directory */
+	u32		cr4;
+	u32		idtr_limit;	/* idt */
+	u32		idtr_base;
+	u32		gdtr_limit;	/* gdt */
+	u32		gdtr_base;
+	u32		cs_sel;		/* cs selector */
+	u32		cs_limit;
+	u32		cs_base;
 	union vmcs_arbytes	cs_arbytes;
-	unsigned long		ds_sel;		/* ds selector */
-	unsigned long		ds_limit;
-	unsigned long		ds_base;
+	u32		ds_sel;		/* ds selector */
+	u32		ds_limit;
+	u32		ds_base;
 	union vmcs_arbytes	ds_arbytes;
-	unsigned long		es_sel;		/* es selector */
-	unsigned long		es_limit;
-	unsigned long		es_base;
+	u32		es_sel;		/* es selector */
+	u32		es_limit;
+	u32		es_base;
 	union vmcs_arbytes	es_arbytes;
-	unsigned long		ss_sel;		/* ss selector */
-	unsigned long		ss_limit;
-	unsigned long		ss_base;
+	u32		ss_sel;		/* ss selector */
+	u32		ss_limit;
+	u32		ss_base;
 	union vmcs_arbytes	ss_arbytes;
-	unsigned long		fs_sel;		/* fs selector */
-	unsigned long		fs_limit;
-	unsigned long		fs_base;
+	u32		fs_sel;		/* fs selector */
+	u32		fs_limit;
+	u32		fs_base;
 	union vmcs_arbytes	fs_arbytes;
-	unsigned long		gs_sel;		/* gs selector */
-	unsigned long		gs_limit;
-	unsigned long		gs_base;
+	u32		gs_sel;		/* gs selector */
+	u32		gs_limit;
+	u32		gs_base;
 	union vmcs_arbytes	gs_arbytes;
-	unsigned long		tr_sel;		/* task selector */
-	unsigned long		tr_limit;
-	unsigned long		tr_base;
+	u32		tr_sel;		/* task selector */
+	u32		tr_limit;
+	u32		tr_base;
 	union vmcs_arbytes	tr_arbytes;
-	unsigned long		ldtr_sel;	/* ldtr selector */
-	unsigned long		ldtr_limit;
-	unsigned long		ldtr_base;
+	u32		ldtr_sel;	/* ldtr selector */
+	u32		ldtr_limit;
+	u32		ldtr_base;
 	union vmcs_arbytes	ldtr_arbytes;
 } vmx_assist_context_t;
 

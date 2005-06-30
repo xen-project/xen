@@ -18,7 +18,7 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 #include <stdarg.h>
-#include <public/vmx_assist.h>
+#include <vm86.h>
 
 #include "util.h"
 #include "machine.h"

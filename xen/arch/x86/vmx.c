@@ -581,7 +581,7 @@ vmx_world_restore(struct vcpu *d, struct vmx_assist_context *c)
 	 */
 	mfn = phys_to_machine_mapping(c->cr3 >> PAGE_SHIFT);
 	if (mfn != pagetable_get_pfn(d->arch.guest_table)) {
-	    printk("Invalid CR3 value=%lx", c->cr3);
+	    printk("Invalid CR3 value=%x", c->cr3);
 	    domain_crash_synchronous();
 	    return 0;
 	}
@@ -591,9 +591,9 @@ vmx_world_restore(struct vcpu *d, struct vmx_assist_context *c)
 	 * If different, make a shadow. Check if the PDBR is valid
 	 * first.
 	 */
-	VMX_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %lx", c->cr3);
+	VMX_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %x", c->cr3);
 	if ((c->cr3 >> PAGE_SHIFT) > d->domain->max_pages) {
-	    printk("Invalid CR3 value=%lx", c->cr3);
+	    printk("Invalid CR3 value=%x", c->cr3);
 	    domain_crash_synchronous(); 
 	    return 0;
 	}
@@ -604,7 +604,7 @@ vmx_world_restore(struct vcpu *d, struct vmx_assist_context *c)
 	 * arch.shadow_table should now hold the next CR3 for shadow
 	 */
 	d->arch.arch_vmx.cpu_cr3 = c->cr3;
-	VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", c->cr3);
+	VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %x", c->cr3);
 	__vmwrite(GUEST_CR3, pagetable_get_paddr(d->arch.shadow_table));
     }
 
@@ -669,7 +669,8 @@ int
 vmx_assist(struct vcpu *d, int mode)
 {
     struct vmx_assist_context c;
-    unsigned long magic, cp;
+    u32 magic;
+    unsigned long cp;
 
     /* make sure vmxassist exists (this is not an error) */
     if (!vmx_copy(&magic, VMXASSIST_MAGIC_OFFSET, sizeof(magic), COPY_IN))

@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
-#include <public/vmx_assist.h>
+#include <vm86.h>
 
 int
 main()
