@@ -166,16 +166,23 @@ __change_page_attr(unsigned long address, unsigned long pfn, pgprot_t prot,
 		BUG();
 
 	/* on x86-64 the direct mapping set at boot is not using 4k pages */
- 	BUG_ON(PageReserved(kpte_page));
-
-	switch (page_count(kpte_page)) {
- 	case 1:
-		save_page(address, kpte_page); 		     
-		revert_page(address, ref_prot);
-		break;
- 	case 0:
- 		BUG(); /* memleak and failed 2M page regeneration */
- 	}
+// 	BUG_ON(PageReserved(kpte_page));
+	/*
+	 * ..., but the XEN guest kernels (currently) do:
+	 * If the pte was reserved, it means it was created at boot
+	 * time (not via split_large_page) and in turn we must not
+	 * replace it with a large page.
+	 */
+	if (!PageReserved(kpte_page)) {
+		switch (page_count(kpte_page)) {
+		case 1:
+			save_page(address, kpte_page); 		     
+			revert_page(address, ref_prot);
+			break;
+		case 0:
+			BUG(); /* memleak and failed 2M page regeneration */
+	 	}
+	}
 	return 0;
 } 
 
