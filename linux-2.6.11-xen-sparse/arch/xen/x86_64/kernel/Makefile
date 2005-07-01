@@ -22,7 +22,7 @@ s-obj-y	:=
 #obj-$(CONFIG_X86_MCE)         += mce.o
 #obj-$(CONFIG_MTRR)		+= ../../i386/kernel/cpu/mtrr/
 obj-$(CONFIG_ACPI_BOOT)		+= acpi/
-obj-$(CONFIG_X86_MSR)		+= msr.o
+c-obj-$(CONFIG_X86_MSR)		+= msr.o
 obj-$(CONFIG_MICROCODE)		+= microcode.o
 obj-$(CONFIG_X86_CPUID)		+= cpuid.o
 #obj-$(CONFIG_SMP)		+= smp.o smpboot.o trampoline.o
@@ -55,13 +55,14 @@ quirks-y			+= ../../../i386/kernel/quirks.o
 c-link	:= init_task.o
 s-link	:= vsyscall.o 
 
-$(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-link)) $(patsubst %.o,$(obj)/%.S,$(s-obj-y) $(s-link)):
-	ln -fsn $(srctree)/arch/x86_64/kernel/$(notdir $@) $@
+$(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-obj-m) $(c-link)) $(patsubst %.o,$(obj)/%.S,$(s-obj-y) $(s-link)):
+	@ln -fsn $(srctree)/arch/x86_64/kernel/$(notdir $@) $@
 
 $(patsubst %.o,$(obj)/%.c,$(i386-obj-y)):
-	ln -fsn $(srctree)/arch/xen/i386/kernel/$(notdir $@) $@
+	@ln -fsn $(srctree)/arch/xen/i386/kernel/$(notdir $@) $@
 
 obj-y	+= $(c-obj-y) $(s-obj-y) $(i386-obj-y)
+obj-m	+= $(c-obj-m)
 
-clean-files += $(patsubst %.o,%.c,$(c-obj-y) $(c-obj-) $(c-link) $(i386-obj-y))
+clean-files += $(patsubst %.o,%.c,$(c-obj-y) $(c-obj-m) $(c-obj-) $(c-link) $(i386-obj-y))
 clean-files += $(patsubst %.o,%.S,$(s-obj-y) $(s-obj-) $(s-link))

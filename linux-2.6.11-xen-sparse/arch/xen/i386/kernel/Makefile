@@ -84,12 +84,13 @@ $(obj)/vsyscall-syms.o: $(src)/vsyscall.lds $(obj)/vsyscall-sysenter.o FORCE
 c-link	:= init_task.o
 s-link	:= vsyscall-int80.o vsyscall-sysenter.o vsyscall-sigreturn.o vsyscall.lds.o
 
-$(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-link)) $(patsubst %.o,$(obj)/%.S,$(s-obj-y) $(s-link)):
+$(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-obj-m) $(c-link)) $(patsubst %.o,$(obj)/%.S,$(s-obj-y) $(s-link)):
 	@ln -fsn $(srctree)/arch/i386/kernel/$(notdir $@) $@
 
 $(obj)/vsyscall-int80.S: $(obj)/vsyscall-sigreturn.S
 
 obj-y	+= $(c-obj-y) $(s-obj-y)
+obj-m	+= $(c-obj-m)
 
-clean-files += $(patsubst %.o,%.c,$(c-obj-y) $(c-obj-) $(c-link))
+clean-files += $(patsubst %.o,%.c,$(c-obj-y) $(c-obj-m) $(c-obj-) $(c-link))
 clean-files += $(patsubst %.o,%.S,$(s-obj-y) $(s-obj-) $(s-link))
