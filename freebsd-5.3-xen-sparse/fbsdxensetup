@@ -1,6 +1,11 @@
 #!/bin/csh -f
 
-setenv XENROOT `bk root`
+setenv XENROOT `pwd`
+cd $XENROOT
+if ( ! -d freebsd-5.3-xen-sparse ) then
+  echo "Please run this script from the root of the Xen source tree"
+  exit 1
+endif
 rm -rf $XENROOT/fbsdtmp $XENROOT/freebsd-5.3-xenU
 mkdir -p $XENROOT/fbsdtmp
 cd $XENROOT/fbsdtmp
