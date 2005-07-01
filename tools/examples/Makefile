@@ -13,8 +13,6 @@ XEN_CONFIGS = xend-config.sxp
 XEN_CONFIGS += xmexample1 
 XEN_CONFIGS += xmexample2
 XEN_CONFIGS += xmexample.vmx
-XEN_CONFIGS += mem-map.sxp
-XEN_CONFIGS += bochsrc
 
 # Xen script dir and scripts to go there.
 XEN_SCRIPT_DIR = /etc/xen/scripts
@@ -23,10 +21,13 @@ XEN_SCRIPTS += network-route vif-route
 XEN_SCRIPTS += block-file
 XEN_SCRIPTS += block-enbd
 
+XEN_BOOT_DIR = /usr/lib/xen/boot
+XEN_BOOT = mem-map.sxp
+
 all: 
 build:
 
-install: all install-initd install-configs install-scripts
+install: all install-initd install-configs install-scripts install-boot
 
 install-initd:
 	[ -d $(DESTDIR)/etc/init.d ] || $(INSTALL_DIR) $(DESTDIR)/etc/init.d
@@ -49,6 +50,14 @@ install-scripts:
 	for i in $(XEN_SCRIPTS); \
 	    do [ -a $(DESTDIR)$(XEN_SCRIPT_DIR)/$$i ] || \
 	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
+	done
+
+install-boot:
+	[ -d $(DESTDIR)$(XEN_BOOT_DIR) ] || \
+		$(INSTALL_DIR) $(DESTDIR)$(XEN_BOOT_DIR)
+	for i in $(XEN_BOOT); \
+	    do [ -a $(DESTDIR)$(XEN_BOOT_DIR)/$$i ] || \
+	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_BOOT_DIR); \
 	done
 
 clean:

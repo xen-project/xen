@@ -89,10 +89,10 @@ root = "/dev/hda1 ro"
 
 
 # New stuff
-device_model = '/usr/bin/qemu-dm'
+device_model = '/usr/lib/xen/bin/qemu-dm'
 
 # Advanced users only. Don't touch if you don't know what you're doing
-memmap = '/etc/xen/mem-map.sxp'
+memmap = '/usr/lib/xen/boot/mem-map.sxp'
 
 #-----------------------------------------------------------------------------
 # Disk image for 
