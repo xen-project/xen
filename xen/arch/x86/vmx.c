@@ -178,32 +178,6 @@ static void vmx_do_no_device_fault(void)
     __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
 }
 
-static void vmx_do_general_protection_fault(struct cpu_user_regs *regs) 
-{
-    unsigned long eip, error_code;
-    unsigned long intr_fields;
-
-    __vmread(GUEST_RIP, &eip);
-    __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
-
-    VMX_DBG_LOG(DBG_LEVEL_1,
-                "vmx_general_protection_fault: eip = %lx, erro_code = %lx",
-                eip, error_code);
-
-    VMX_DBG_LOG(DBG_LEVEL_1,
-                "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
-                (unsigned long)regs->eax, (unsigned long)regs->ebx,
-                (unsigned long)regs->ecx, (unsigned long)regs->edx,
-                (unsigned long)regs->esi, (unsigned long)regs->edi);
-
-    /* Reflect it back into the guest */
-    intr_fields = (INTR_INFO_VALID_MASK | 
-		   INTR_TYPE_EXCEPTION |
-		   INTR_INFO_DELIEVER_CODE_MASK |
-		   TRAP_gp_fault);
-    __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
-    __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
-}
 
 static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs) 
 {
@@ -1249,11 +1223,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             vmx_do_no_device_fault();
             break;  
         }
-        case TRAP_gp_fault:
-        {
-            vmx_do_general_protection_fault(&regs);
-            break;  
-        }
         case TRAP_page_fault:
         {
             __vmread(EXIT_QUALIFICATION, &va);
@@ -1269,14 +1238,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                 /*
                  * Inject #PG using Interruption-Information Fields
                  */
-                unsigned long intr_fields;
-
-                intr_fields = (INTR_INFO_VALID_MASK | 
-                           INTR_TYPE_EXCEPTION |
-                           INTR_INFO_DELIEVER_CODE_MASK |
-                           TRAP_page_fault);
-                __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
-                __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, regs.error_code);
+                vmx_inject_exception(v, TRAP_page_fault, regs.error_code);
                 v->arch.arch_vmx.cpu_cr2 = va;
                 TRACE_3D(TRC_VMX_INT, v->domain->domain_id, TRAP_page_fault, va);
             }
@@ -1286,8 +1248,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             do_nmi(&regs, 0);
             break;
         default:
-            printk("unexpected VMexit for exception vector 0x%x\n", vector);
-            //__vmx_bug(&regs);
+            vmx_reflect_exception(v);
             break;
         }
         break;

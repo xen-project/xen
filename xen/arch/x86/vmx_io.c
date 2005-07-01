@@ -660,11 +660,7 @@ void vmx_intr_assist(struct vcpu *v)
                  return;
              }
 
-             intr_fields = (INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR 
-                            | highest_vector);
-             __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
-             __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
-
+             vmx_inject_extint(v, highest_vector, VMX_INVALID_ERROR_CODE);
              TRACE_3D(TRC_VMX_INT, v->domain->domain_id, highest_vector, 0);
              break;
          case VLAPIC_DELIV_MODE_FIXED:

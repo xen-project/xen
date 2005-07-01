@@ -339,6 +339,63 @@ static inline int vmx_paging_enabled(struct vcpu *v)
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
 }
 
+#define VMX_INVALID_ERROR_CODE  -1
+
+static inline int __vmx_inject_exception(struct vcpu *v, int trap, int type, 
+                                         int error_code)
+{
+    unsigned long intr_fields;
+
+    /* Reflect it back into the guest */
+    intr_fields = (INTR_INFO_VALID_MASK | type | trap);
+    if (error_code != VMX_INVALID_ERROR_CODE) {
+        __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
+        intr_fields |= INTR_INFO_DELIEVER_CODE_MASK;
+     }
+    
+    __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
+    return 0;
+}
+
+static inline int vmx_inject_exception(struct vcpu *v, int trap, int error_code)
+{
+    return __vmx_inject_exception(v, trap, INTR_TYPE_EXCEPTION, error_code);
+}
+
+static inline int vmx_inject_extint(struct vcpu *v, int trap, int error_code)
+{
+    __vmx_inject_exception(v, trap, INTR_TYPE_EXT_INTR, error_code);
+    __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
+
+    return 0;
+}
+
+static inline int vmx_reflect_exception(struct vcpu *v)
+{
+    int error_code, vector;
+
+    __vmread(VM_EXIT_INTR_INFO, &vector);
+    if (vector & INTR_INFO_DELIEVER_CODE_MASK)
+        __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
+    else
+        error_code = VMX_INVALID_ERROR_CODE;
+    vector &= 0xff;
+
+#ifndef NDEBUG
+    {
+        unsigned long eip;
+
+        __vmread(GUEST_RIP, &eip);
+        VMX_DBG_LOG(DBG_LEVEL_1,
+                    "vmx_reflect_exception: eip = %lx, error_code = %x",
+                    eip, error_code);
+    }
+#endif /* NDEBUG */
+
+    vmx_inject_exception(v, vector, error_code);
+    return 0;
+}
+
 static inline shared_iopage_t *get_sp(struct domain *d)
 {
     return (shared_iopage_t *) d->arch.vmx_platform.shared_page_va;
