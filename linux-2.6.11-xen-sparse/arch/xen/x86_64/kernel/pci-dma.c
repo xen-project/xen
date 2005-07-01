@@ -58,6 +58,8 @@ void dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 	} 
 }
 
+EXPORT_SYMBOL(dma_unmap_sg);
+
 struct dma_coherent_mem {
 	void		*virt_base;
 	u32		device_base;

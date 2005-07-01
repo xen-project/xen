@@ -59,7 +59,9 @@ EXPORT_SYMBOL(disable_irq_nosync);
 EXPORT_SYMBOL(probe_irq_mask);
 EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(pm_idle);
-// EXPORT_SYMBOL(pm_power_off);
+#ifdef CONFIG_ACPI_BOOT
+EXPORT_SYMBOL(pm_power_off);
+#endif
 EXPORT_SYMBOL(get_cmos_time);
 
 EXPORT_SYMBOL(__down_failed);
