@@ -7,3 +7,5 @@ driver.o: $(OBJS)
 
 clean:
 	rm -f *.o *~ core
+
+console.o: $(BASEDIR)/include/xen/compile.h
