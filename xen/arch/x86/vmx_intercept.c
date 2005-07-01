@@ -216,7 +216,7 @@ void vmx_hooks_assist(struct vcpu *d)
     shared_iopage_t *sp = get_sp(d->domain);
     u64 *intr = &(sp->sp_global.pic_intr[0]);
     struct vmx_virpit_t *vpit = &(d->domain->arch.vmx_platform.vmx_pit);
-    int rw_mode;
+    int rw_mode, reinit = 0;
 
     /* load init count*/
     if (p->state == STATE_IORESP_HOOK) { 
@@ -224,6 +224,7 @@ void vmx_hooks_assist(struct vcpu *d)
         if ( active_ac_timer(&(vpit->pit_timer)) ) {
             VMX_DBG_LOG(DBG_LEVEL_1, "VMX_PIT: guest reset PIT with channel %lx!\n", (unsigned long) ((p->u.data >> 24) & 0x3) );
             rem_ac_timer(&(vpit->pit_timer));
+            reinit = 1;
         }
         else
             init_ac_timer(&vpit->pit_timer, pit_timer_fn, vpit, 0);
@@ -268,7 +269,8 @@ void vmx_hooks_assist(struct vcpu *d)
         p->state = STATE_IORESP_READY;
 
 	/* register handler to intercept the PIT io when vm_exit */
-	register_portio_handler(0x40, 4, intercept_pit_io); 
+        if (!reinit)
+	    register_portio_handler(0x40, 4, intercept_pit_io); 
     }
 
 }
