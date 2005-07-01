@@ -65,19 +65,19 @@ static int xs_init_done = 0;
 char *xenbus_path(const char *dir, const char *name)
 {
 	char *ret;
-        if(name && strlen(name)){
-                ret = kmalloc(strlen(dir) + 1 + strlen(name) + 1, GFP_KERNEL);
-                if (!ret)
-                        return NULL;
-                strcpy(ret, dir);
+	int len;
+
+	len = strlen(dir) + 1;
+	if (name)
+		len += strlen(name) + 1;
+	ret = kmalloc(len, GFP_KERNEL);
+	if (ret == NULL)
+	    return NULL;
+	strcpy(ret, dir);
+	if (name) {
 		strcat(ret, "/");
 		strcat(ret, name);
-	} else {
-                ret = kmalloc(strlen(dir) + 1, GFP_KERNEL);
-                if (!ret)
-                        return NULL;
-                strcpy(ret, dir);
-        }
+	}
 	return ret;
 }
 
@@ -85,59 +85,58 @@ char *xenbus_path(const char *dir, const char *name)
 
 char *xenbus_read(const char *dir, const char *name, unsigned int *data_n)
 {
-        int err = 0;
+	int err = 0;
 	char *data = NULL;
 	char *path = xenbus_path(dir, name);
-        int n = 0;
+	int n = 0;
 
 	if (!path) {
-                err = -ENOMEM;
-                goto out;
-        }
+		err = -ENOMEM;
+		goto out;
+	}
 	data = xs_read(path, &n);
-	if (IS_ERR(data)){
-                err = PTR_ERR(data);
-                if(err == -EISDIR){
-                        err = -ENOENT;
-                }
-        } else if(n == 0){
-                err = -ENOENT;
-                kfree(data);
-        }
-        kfree(path);
+	if (IS_ERR(data)) {
+		err = PTR_ERR(data);
+		if (err == -EISDIR)
+			err = -ENOENT;
+	} else if (n == 0) {
+		err = -ENOENT;
+		kfree(data);
+	}
+	kfree(path);
   out:
-        if(data_n)
-                *data_n = n;
+	if (data_n)
+		*data_n = n;
 	return (err ? ERR_PTR(err) : data);
 }
 
 int xenbus_write(const char *dir, const char *name, const char *data, int data_n)
 {
-        int err = 0;
+	int err = 0;
 	char *path = xenbus_path(dir, name);
 
 	if (!path)
 		return -ENOMEM;
-        err = xs_write(path, data, data_n, O_CREAT);
+	err = xs_write(path, data, data_n, O_CREAT);
 	kfree(path);
-        return err;
+	return err;
 }
 
 int xenbus_read_string(const char *dir, const char *name, char **val)
 {
-        int err = 0;
+	int err = 0;
 
-        *val = xenbus_read(dir, name, NULL);
-        if (IS_ERR(*val)) {
-                err = PTR_ERR(*val);
-                *val = NULL;
-        }
-        return err;
+	*val = xenbus_read(dir, name, NULL);
+	if (IS_ERR(*val)) {
+		err = PTR_ERR(*val);
+		*val = NULL;
+	}
+	return err;
 }
 
 int xenbus_write_string(const char *dir, const char *name, const char *val)
 {
-        return xenbus_write(dir, name, val, strlen(val) + 1);
+	return xenbus_write(dir, name, val, strlen(val) + 1);
 }
 
 int xenbus_read_ulong(const char *dir, const char *name, unsigned long *val)
@@ -149,23 +148,23 @@ int xenbus_read_ulong(const char *dir, const char *name, unsigned long *val)
 	data = xenbus_read(dir, name, &data_n);
 	if (IS_ERR(data)) {
 		err = PTR_ERR(data);
-                goto out;
-        }
-        if (data_n <= 1) {
-                err = -ENOENT;
-                goto free_data;
-        }
-        *val = simple_strtoul(data, &end, 10);
-        if (end != data + data_n - 1) {
-                printk("XENBUS: Path %s/%s, bad parse of '%s' as ulong\n",
-                       dir, name, data);
-                err = -EINVAL;
+		goto out;
+	}
+	if (data_n <= 1) {
+		err = -ENOENT;
+		goto free_data;
+	}
+	*val = simple_strtoul(data, &end, 10);
+	if (end != data + data_n - 1) {
+		printk("XENBUS: Path %s/%s, bad parse of '%s' as ulong\n",
+		       dir, name, data);
+		err = -EINVAL;
 	}
   free_data:
 	kfree(data);
   out:
-        if (err)
-                *val = 0;
+	if (err)
+		*val = 0;
 	return err;
 }
 
@@ -173,7 +172,7 @@ int xenbus_write_ulong(const char *dir, const char *name, unsigned long val)
 {
 	char data[32] = {};
 
-        snprintf(data, sizeof(data), "%lu", val);
+	snprintf(data, sizeof(data), "%lu", val);
 	return xenbus_write(dir, name, data, strlen(data) + 1);
 }
 
@@ -186,23 +185,23 @@ int xenbus_read_long(const char *dir, const char *name, long *val)
 	data = xenbus_read(dir, name, &data_n);
 	if (IS_ERR(data)) {
 		err = PTR_ERR(data);
-                goto out;
-        }
-        if (data_n <= 1) {
-                err = -ENOENT;
-                goto free_data;
-        }
-        *val = simple_strtol(data, &end, 10);
-        if (end != data + data_n - 1) {
-                printk("XENBUS: Path %s/%s, bad parse of '%s' as long\n",
-                       dir, name, data);
-                err = -EINVAL;
-        }
+		goto out;
+	}
+	if (data_n <= 1) {
+		err = -ENOENT;
+		goto free_data;
+	}
+	*val = simple_strtol(data, &end, 10);
+	if (end != data + data_n - 1) {
+		printk("XENBUS: Path %s/%s, bad parse of '%s' as long\n",
+		       dir, name, data);
+		err = -EINVAL;
+	}
   free_data:
 	kfree(data);
   out:
-        if (err)
-                *val = 0;
+	if (err)
+		*val = 0;
 	return err;
 }
 
@@ -210,7 +209,7 @@ int xenbus_write_long(const char *dir, const char *name, long val)
 {
 	char data[32] = {};
 
-        snprintf(data, sizeof(data), "%li", val);
+	snprintf(data, sizeof(data), "%li", val);
 	return xenbus_write(dir, name, data, strlen(data) + 1);
 }
 
@@ -222,42 +221,40 @@ int xenbus_write_long(const char *dir, const char *name, long val)
  * Each X denotes a hex digit: 0..9, a..f, A..F.
  * Also supports using '-' as the separator instead of ':'.
  */
-static int mac_aton(const char *macstr, unsigned int n, unsigned char mac[6]){
-        int err = -EINVAL;
-        int i, j;
-        const char *p;
-        char sep = 0;
-        
-        if(!macstr || n != MAC_LENGTH){
-                goto exit;
-        }
-        for(i = 0, p = macstr; i < 6; i++){
-                unsigned char d = 0;
-                if(i){
-                        if(!sep){
-                                if(*p == ':' || *p == '-') sep = *p;
-                        }
-                        if(sep && *p == sep){
-                                p++;
-                        } else {
-                                goto exit;
-                        }
-                }
-                for(j = 0; j < 2; j++, p++){
-                        if(j) d <<= 4;
-                        if(isdigit(*p)){
-                                d += *p - '0';
-                        } else if(isxdigit(*p)){
-                                d += toupper(*p) - 'A' + 10;
-                        } else {
-                                goto exit;
-                        }
-                }
-                mac[i] = d;
-        }
-        err = 0;
+static int mac_aton(const char *macstr, unsigned int n, unsigned char mac[6])
+{
+	int err = -EINVAL;
+	int i, j;
+	const char *p;
+	char sep = 0;
+	
+	if (!macstr || n != MAC_LENGTH)
+		goto exit;
+	for (i = 0, p = macstr; i < 6; i++) {
+		unsigned char d = 0;
+		if (i) {
+			if (!sep && (*p == ':' || *p == '-'))
+				sep = *p;
+			if (sep && *p == sep)
+				p++;
+			else
+				goto exit;
+		}
+		for (j = 0; j < 2; j++, p++) {
+			if (j)
+				d <<= 4;
+			if (isdigit(*p))
+				d += *p - '0';
+			else if (isxdigit(*p))
+				d += toupper(*p) - 'A' + 10;
+			else
+				goto exit;
+		}
+		mac[i] = d;
+	}
+	err = 0;
   exit:
-        return err;
+	return err;
 }
 
 int xenbus_read_mac(const char *dir, const char *name, unsigned char mac[6])
@@ -269,35 +266,35 @@ int xenbus_read_mac(const char *dir, const char *name, unsigned char mac[6])
 	data = xenbus_read(dir, name, &data_n);
 	if (IS_ERR(data)) {
 		err = PTR_ERR(data);
-                goto out;
-        }
-        if (data_n <= 1) {
-                err = -ENOENT;
-                goto free_data;
-        }
-        err = mac_aton(data, data_n - 1, mac);
-        if (err) {
-                printk("XENBUS: Path %s/%s, bad parse of '%s' as mac\n",
-                       dir, name, data);
-                err = -EINVAL;
-        }
+		goto out;
+	}
+	if (data_n <= 1) {
+		err = -ENOENT;
+		goto free_data;
+	}
+	err = mac_aton(data, data_n - 1, mac);
+	if (err) {
+		printk("XENBUS: Path %s/%s, bad parse of '%s' as mac\n",
+		       dir, name, data);
+		err = -EINVAL;
+	}
   free_data:
-        kfree(data);
+	kfree(data);
   out:
-        if(err)
-                memset(mac, 0, sizeof(mac));
-        return err;
+	if (err)
+		memset(mac, 0, sizeof(mac));
+	return err;
 }
 
 int xenbus_write_mac(const char *dir, const char *name, const unsigned char mac[6])
 {
-        char buf[MAC_LENGTH + 1] = {};
-        int buf_n = sizeof(buf);
-        
-        snprintf(buf, buf_n, "%02x:%02x:%02x:%02x:%02x:%02x",
-                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        buf[buf_n - 1] = '\0';
-        return xenbus_write(dir, name, buf, buf_n);
+	char buf[MAC_LENGTH + 1] = {};
+	int buf_n = sizeof(buf);
+	
+	snprintf(buf, buf_n, "%02x:%02x:%02x:%02x:%02x:%02x",
+		 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+	buf[buf_n - 1] = '\0';
+	return xenbus_write(dir, name, buf, buf_n);
 }
 
 /* Read event channel information from xenstore.
@@ -310,30 +307,30 @@ int xenbus_write_mac(const char *dir, const char *name, const unsigned char mac[
  */
 int xenbus_read_evtchn(const char *dir, const char *name, struct xenbus_evtchn *evtchn)
 {
-        int err = 0;
-        char *evtchn_path = xenbus_path(dir, name);
+	int err = 0;
+	char *evtchn_path = xenbus_path(dir, name);
 
-        if (!evtchn_path) {
-                err = -ENOMEM;
-                goto out;
-        }
-        err = xenbus_read_ulong(evtchn_path, "dom1",  &evtchn->dom1);
-        if(err)
-                goto free_evtchn_path;
-        err = xenbus_read_ulong(evtchn_path, "port1", &evtchn->port1);
-        if(err)
-                goto free_evtchn_path;
-        err = xenbus_read_ulong(evtchn_path, "dom2",  &evtchn->dom2);
-        if(err)
-                goto free_evtchn_path;
-        err = xenbus_read_ulong(evtchn_path, "port2", &evtchn->port2);
+	if (!evtchn_path) {
+		err = -ENOMEM;
+		goto out;
+	}
+	err = xenbus_read_ulong(evtchn_path, "dom1",  &evtchn->dom1);
+	if (err)
+		goto free_evtchn_path;
+	err = xenbus_read_ulong(evtchn_path, "port1", &evtchn->port1);
+	if (err)
+		goto free_evtchn_path;
+	err = xenbus_read_ulong(evtchn_path, "dom2",  &evtchn->dom2);
+	if (err)
+		goto free_evtchn_path;
+	err = xenbus_read_ulong(evtchn_path, "port2", &evtchn->port2);
 
   free_evtchn_path:
-        kfree(evtchn_path);
+	kfree(evtchn_path);
   out:
-        if (err)
-                *evtchn = (struct xenbus_evtchn){};
-        return err;
+	if (err)
+		*evtchn = (struct xenbus_evtchn){};
+	return err;
 }
 
 /* Write a message to 'dir'.
@@ -342,66 +339,66 @@ int xenbus_read_evtchn(const char *dir, const char *name, struct xenbus_evtchn *
  */
 int xenbus_message(const char *dir, const char *val, ...)
 {
-        static const char *mid_name = "@mid";
-        va_list args;
-        int err = 0;
-        char *mid_path = NULL; 
-        char *msg_path = NULL;
-        char mid_str[32] = {};
-        long mid = 0;
-        int i;
+	static const char *mid_name = "@mid";
+	va_list args;
+	int err = 0;
+	char *mid_path = NULL; 
+	char *msg_path = NULL;
+	char mid_str[32] = {};
+	long mid = 0;
+	int i;
 
-        va_start(args, val);
-        mid_path = xenbus_path(dir, mid_name);
-        if (!mid_path) {
-                err = -ENOMEM;
-                goto out;
-        }
-        err = xenbus_read_long(dir, mid_name, &mid);
-        if(err != -ENOENT)
-                goto out;
-        mid++;
-        err = xenbus_write_long(dir, mid_name, mid);
-        if(err)
-                goto out;
-        sprintf(mid_str, "%li", mid);
-        msg_path = xenbus_path(dir, mid_str);
-        if (!mid_path) {
-                err = -ENOMEM;
-                goto out;
-        }
+	va_start(args, val);
+	mid_path = xenbus_path(dir, mid_name);
+	if (!mid_path) {
+		err = -ENOMEM;
+		goto out;
+	}
+	err = xenbus_read_long(dir, mid_name, &mid);
+	if (err != -ENOENT)
+		goto out;
+	mid++;
+	err = xenbus_write_long(dir, mid_name, mid);
+	if (err)
+		goto out;
+	sprintf(mid_str, "%li", mid);
+	msg_path = xenbus_path(dir, mid_str);
+	if (!mid_path) {
+		err = -ENOMEM;
+		goto out;
+	}
 
-        for(i = 0; i < 16; i++){
-                char *k, *v;
-                k = va_arg(args, char *);
-                if(!k)
-                        break;
-                v = va_arg(args, char *);
-                if(!v)
-                        break;
-                err = xenbus_write_string(msg_path, k, v);
-                if(err)
-                        goto out;
-        }
-        err = xenbus_write_string(msg_path, NULL, val);
+	for (i = 0; i < 16; i++) {
+		char *k, *v;
+		k = va_arg(args, char *);
+		if (!k)
+			break;
+		v = va_arg(args, char *);
+		if (!v)
+			break;
+		err = xenbus_write_string(msg_path, k, v);
+		if (err)
+			goto out;
+	}
+	err = xenbus_write_string(msg_path, NULL, val);
 
   out:
-        kfree(msg_path);
-        kfree(mid_path);
-        va_end(args);
-        return err;
+	kfree(msg_path);
+	kfree(mid_path);
+	va_end(args);
+	return err;
 }
 
 /* If something in array of ids matches this device, return it. */
 static const struct xenbus_device_id *
 match_device(const struct xenbus_device_id *arr, struct xenbus_device *dev)
 {
-	for( ; !streq(arr->devicetype, ""); arr++) {
+	for (; !streq(arr->devicetype, ""); arr++) {
 		if (!streq(arr->devicetype, dev->devicetype))
 			continue;
 
-		if (streq(arr->subtype, "")
-		    || streq(arr->subtype, dev->subtype)) {
+		if (streq(arr->subtype, "") ||
+		    streq(arr->subtype, dev->subtype)) {
 			return arr;
 		}
 	}
@@ -427,63 +424,63 @@ static struct bus_type xenbus_type = {
 
 /* Bus type for backend drivers. */
 static struct bus_type xenback_type = {
-        .name  = "xenback",
-        .match = xenbus_match,
+	.name  = "xenback",
+	.match = xenbus_match,
 };
 
 struct xenbus_for_dev {
-        int (*fn)(struct xenbus_device *, void *);
-        void *data;
+	int (*fn)(struct xenbus_device *, void *);
+	void *data;
 };
 
 static int for_dev(struct device *_dev, void *_data)
 {
-        struct xenbus_device *dev = to_xenbus_device(_dev);
-        struct xenbus_for_dev *data = _data;
-        dev = to_xenbus_device(_dev);
-        return data->fn(dev, data->data);
+	struct xenbus_device *dev = to_xenbus_device(_dev);
+	struct xenbus_for_dev *data = _data;
+	dev = to_xenbus_device(_dev);
+	return data->fn(dev, data->data);
 }
 
 int xenbus_for_each_dev(struct xenbus_device * start, void * data,
-                        int (*fn)(struct xenbus_device *, void *))
+			int (*fn)(struct xenbus_device *, void *))
 {
-        struct xenbus_for_dev for_data = {
-                .fn = fn,
-                .data = data,
-        };
-        if(!fn)
-                return -EINVAL;
-        printk("%s> data=%p fn=%p for_data=%p\n", __FUNCTION__,
-               data, fn, &for_data);
-        return bus_for_each_dev(&xenbus_type, 
-                                (start ? &start->dev : NULL),
-                                &for_data, for_dev);
+	struct xenbus_for_dev for_data = {
+		.fn = fn,
+		.data = data,
+	};
+	if (!fn)
+		return -EINVAL;
+	printk("%s> data=%p fn=%p for_data=%p\n", __FUNCTION__,
+	       data, fn, &for_data);
+	return bus_for_each_dev(&xenbus_type, 
+				(start ? &start->dev : NULL),
+				&for_data, for_dev);
 }
 
 struct xenbus_for_drv {
-        int (*fn)(struct xenbus_driver *, void *);
-        void *data;
+	int (*fn)(struct xenbus_driver *, void *);
+	void *data;
 };
 
 static int for_drv(struct device_driver *_drv, void *_data)
 {
-        struct xenbus_driver *drv = to_xenbus_driver(_drv);
-        struct xenbus_for_drv *data = _data;
-        return data->fn(drv, data->data);
+	struct xenbus_driver *drv = to_xenbus_driver(_drv);
+	struct xenbus_for_drv *data = _data;
+	return data->fn(drv, data->data);
 }
 
 int xenbus_for_each_drv(struct xenbus_driver * start, void * data,
-                        int (*fn)(struct xenbus_driver *, void *))
+			int (*fn)(struct xenbus_driver *, void *))
 {
-        struct xenbus_for_drv for_data = {
-                .fn = fn,
-                .data = data,
-        };
-        if(!fn)
-                return -EINVAL;
-        return bus_for_each_drv(&xenbus_type,
-                                (start ? &start->driver: NULL),
-                                &for_data, for_drv);
+	struct xenbus_for_drv for_data = {
+		.fn = fn,
+		.data = data,
+	};
+	if (!fn)
+		return -EINVAL;
+	return bus_for_each_drv(&xenbus_type,
+				(start ? &start->driver: NULL),
+				&for_data, for_drv);
 }
 
 static int xenbus_dev_probe(struct device *_dev)
@@ -506,17 +503,17 @@ static int xenbus_dev_remove(struct device *_dev)
 	struct xenbus_device *dev = to_xenbus_device(_dev);
 	struct xenbus_driver *drv = to_xenbus_driver(_dev->driver);
 
-        if(!drv->remove)
-                return 0;
-        return drv->remove(dev);
+	if (!drv->remove)
+		return 0;
+	return drv->remove(dev);
 }
 
 int xenbus_register_driver(struct xenbus_driver *drv)
 {
-        int err = 0;
+	int err = 0;
 
-        printk("%s> frontend driver %p %s\n", __FUNCTION__,
-               drv, drv->name);
+	printk("%s> frontend driver %p %s\n", __FUNCTION__,
+	       drv, drv->name);
 	drv->driver.name = drv->name;
 	drv->driver.bus = &xenbus_type;
 	drv->driver.owner = drv->owner;
@@ -524,12 +521,12 @@ int xenbus_register_driver(struct xenbus_driver *drv)
 	drv->driver.remove = xenbus_dev_remove;
 
 	err = driver_register(&drv->driver);
-        if(err == 0 && xs_init_done && drv->connect){
-                printk("%s> connecting driver %p %s\n", __FUNCTION__,
-                       drv, drv->name);
-                drv->connect(drv);
-        }
-        return err;
+	if (err == 0 && xs_init_done && drv->connect) {
+		printk("%s> connecting driver %p %s\n", __FUNCTION__,
+		       drv, drv->name);
+		drv->connect(drv);
+	}
+	return err;
 }
 
 void xenbus_unregister_driver(struct xenbus_driver *drv)
@@ -558,14 +555,13 @@ static int xenbus_probe_device(const char *dir, const char *name)
 	}
 
 	err = xenbus_read_long(nodename, XENBUS_DEVICE_ID, &id);
-	if (err == -ENOENT) {
+	if (err == -ENOENT)
 		id = 0;
-        } else if (err != 0) {
+	else if (err != 0)
 		goto free_devicetype;
-        }
 
 	dprintf("> devicetype='%s' name='%s' id=%ld\n", devicetype, name, id);
-        /* FIXME: This could be a rescan. Don't re-register existing devices. */
+	/* FIXME: This could be a rescan. Don't re-register existing devices. */
 
 	/* Add space for the strings. */
 	xendev_n = sizeof(*xendev) + strlen(nodename) + strlen(devicetype) + 2;
@@ -576,7 +572,7 @@ static int xenbus_probe_device(const char *dir, const char *name)
 	}
 	memset(xendev, 0, xendev_n);
 
-        snprintf(xendev->dev.bus_id, BUS_ID_SIZE, "%s-%s", devicetype, name);
+	snprintf(xendev->dev.bus_id, BUS_ID_SIZE, "%s-%s", devicetype, name);
 	xendev->dev.bus = &xenbus_type;
 
 	xendev->id = id;
@@ -588,14 +584,13 @@ static int xenbus_probe_device(const char *dir, const char *name)
 	strcpy(xendev->devicetype, devicetype);
 
 	/* Register with generic device framework. */
-        printk("XENBUS: Registering device %s\n", xendev->dev.bus_id);
+	printk("XENBUS: Registering device %s\n", xendev->dev.bus_id);
 	err = device_register(&xendev->dev);
-        if (err) {
-                printk("XENBUS: Registering device %s: error %i\n",
-                       xendev->dev.bus_id, err);
-        }
-	if (err)
+	if (err) {
+		printk("XENBUS: Registering device %s: error %i\n",
+		       xendev->dev.bus_id, err);
 		kfree(xendev);
+	}
 
 free_devicetype:
 	kfree(devicetype);
@@ -682,7 +677,7 @@ static int xenbus_probe_backend(const char *dir, const char *name)
 	}
 
 	dprintf("> devicetype='%s'\n", devicetype);
-        /* FIXME: This could be a rescan. Don't re-register existing devices. */
+	/* FIXME: This could be a rescan. Don't re-register existing devices. */
 
 	/* Add space for the strings. */
 	xendev_n = sizeof(*xendev) + strlen(nodename) + strlen(devicetype) + 2;
@@ -693,7 +688,7 @@ static int xenbus_probe_backend(const char *dir, const char *name)
 	}
 	memset(xendev, 0, xendev_n);
 
-        snprintf(xendev->dev.bus_id, BUS_ID_SIZE, "%s", devicetype);
+	snprintf(xendev->dev.bus_id, BUS_ID_SIZE, "%s", devicetype);
 	xendev->dev.bus = &xenback_type;
 
 	/* Copy the strings into the extra space. */
@@ -703,14 +698,13 @@ static int xenbus_probe_backend(const char *dir, const char *name)
 	strcpy(xendev->devicetype, devicetype);
 
 	/* Register with generic device framework. */
-        printk("XENBUS: Registering backend %s\n", xendev->dev.bus_id);
+	printk("XENBUS: Registering backend %s\n", xendev->dev.bus_id);
 	err = device_register(&xendev->dev);
-        if (err) {
-                printk("XENBUS: Registering device %s: error %i\n",
-                       xendev->dev.bus_id, err);
-        }
-	if (err)
+	if (err) {
+		printk("XENBUS: Registering device %s: error %i\n",
+		       xendev->dev.bus_id, err);
 		kfree(xendev);
+	}
 
 free_devicetype:
 	kfree(devicetype);
@@ -747,10 +741,10 @@ unlock:
 
 int xenbus_register_backend(struct xenbus_driver *drv)
 {
-        int err = 0;
+	int err = 0;
 
-        printk("%s> backend driver %p %s\n", __FUNCTION__,
-               drv, drv->name);
+	printk("%s> backend driver %p %s\n", __FUNCTION__,
+	       drv, drv->name);
 	drv->driver.name = drv->name;
 	drv->driver.bus = &xenback_type;
 	drv->driver.owner = drv->owner;
@@ -758,12 +752,12 @@ int xenbus_register_backend(struct xenbus_driver *drv)
 	drv->driver.remove = xenbus_dev_remove;
 
 	err = driver_register(&drv->driver);
-        if(err == 0 && xs_init_done && drv->connect){
-                printk("%s> connecting driver %p %s\n", __FUNCTION__,
-                       drv, drv->name);
-                drv->connect(drv);
-        }
-        return err;
+	if (err == 0 && xs_init_done && drv->connect) {
+		printk("%s> connecting driver %p %s\n", __FUNCTION__,
+		       drv, drv->name);
+		drv->connect(drv);
+	}
+	return err;
 }
 
 void xenbus_unregister_backend(struct xenbus_driver *drv)
@@ -772,17 +766,17 @@ void xenbus_unregister_backend(struct xenbus_driver *drv)
 }
 
 int xenbus_for_each_backend(struct xenbus_driver * start, void * data,
-                            int (*fn)(struct xenbus_driver *, void *))
+			    int (*fn)(struct xenbus_driver *, void *))
 {
-        struct xenbus_for_drv for_data = {
-                .fn = fn,
-                .data = data,
-        };
-        if(!fn)
-                return -EINVAL;
-        return bus_for_each_drv(&xenback_type,
-                                (start ? &start->driver: NULL),
-                                &for_data, for_drv);
+	struct xenbus_for_drv for_data = {
+		.fn = fn,
+		.data = data,
+	};
+	if (!fn)
+		return -EINVAL;
+	return bus_for_each_drv(&xenback_type,
+				(start ? &start->driver: NULL),
+				&for_data, for_drv);
 }
 
 static void test_callback(struct xenbus_watch *w, const char *node)
@@ -792,67 +786,68 @@ static void test_callback(struct xenbus_watch *w, const char *node)
 
 static void test_watch(void)
 {
-        static int init_done = 0;
+	static int init_done = 0;
 	static struct xenbus_watch watch = { .node = "/", 
 					     .priority = 0, 
 					     .callback = test_callback };
 
-        if(init_done) return;
+	if (init_done)
+		return;
 	printk("registering watch %lX = %i\n",
-               (long)&watch,
+	       (long)&watch,
 	       register_xenbus_watch(&watch));
-        init_done = 1;
+	init_done = 1;
 }
 
 static int xenbus_driver_connect(struct xenbus_driver *drv, void *data)
 {
-        printk("%s> driver %p %s\n", __FUNCTION__, drv, drv->name);
-        if (drv->connect) {
-                printk("%s> connecting driver %p %s\n", __FUNCTION__,
-                       drv, drv->name);
-                drv->connect(drv);
-        }
-        printk("%s< driver %p %s\n", __FUNCTION__, drv, drv->name);
-        return 0;
+	printk("%s> driver %p %s\n", __FUNCTION__, drv, drv->name);
+	if (drv->connect) {
+		printk("%s> connecting driver %p %s\n", __FUNCTION__,
+		       drv, drv->name);
+		drv->connect(drv);
+	}
+	printk("%s< driver %p %s\n", __FUNCTION__, drv, drv->name);
+	return 0;
 }
 
 int do_xenbus_connect(void *unused)
 {
 	int err = 0;
 
-        printk("%s> xs_init_done=%d\n", __FUNCTION__, xs_init_done);
+	printk("%s> xs_init_done=%d\n", __FUNCTION__, xs_init_done);
 	if (xs_init_done)
-                goto exit;
-        /* Initialize xenstore comms unless already done. */
-        printk("store_evtchn = %i\n", xen_start_info.store_evtchn);
-        err = xs_init();
-        if (err) {
-                printk("XENBUS: Error initializing xenstore comms:"
-                       " %i\n", err);
-                goto exit;
-        }
-        xs_init_done = 1;
+		goto exit;
+	/* Initialize xenstore comms unless already done. */
+	printk("store_evtchn = %i\n", xen_start_info.store_evtchn);
+	err = xs_init();
+	if (err) {
+		printk("XENBUS: Error initializing xenstore comms:"
+		       " %i\n", err);
+		goto exit;
+	}
+	xs_init_done = 1;
 
-        /* Notify drivers that xenstore has connected. */
-        test_watch();
-        printk("%s> connect drivers...\n", __FUNCTION__);
-        xenbus_for_each_drv(NULL, NULL, xenbus_driver_connect);
-        printk("%s> connect backends...\n", __FUNCTION__);
-        xenbus_for_each_backend(NULL, NULL, xenbus_driver_connect);
-        
-        /* Enumerate devices and backends in xenstore. */
+	/* Notify drivers that xenstore has connected. */
+	test_watch();
+	printk("%s> connect drivers...\n", __FUNCTION__);
+	xenbus_for_each_drv(NULL, NULL, xenbus_driver_connect);
+	printk("%s> connect backends...\n", __FUNCTION__);
+	xenbus_for_each_backend(NULL, NULL, xenbus_driver_connect);
+	
+	/* Enumerate devices and backends in xenstore. */
 	xenbus_probe_devices(XENBUS_DEVICE_DIR);
-        xenbus_probe_backends(XENBUS_BACKEND_DIR);
+	xenbus_probe_backends(XENBUS_BACKEND_DIR);
 
 exit:
-        printk("%s< err=%d\n", __FUNCTION__, err);
-        return err;
+	printk("%s< err=%d\n", __FUNCTION__, err);
+	return err;
 }
 
 static int __init xenbus_probe_init(void)
 {
-        bus_register(&xenbus_type);
-        bus_register(&xenback_type);
+	bus_register(&xenbus_type);
+	bus_register(&xenback_type);
 
 	if (!xen_start_info.store_evtchn)
 		return 0;
