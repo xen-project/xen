@@ -1,6 +1,6 @@
 #!/bin/sh -x
 
-# usage: xen-clone bk_repository dest_dir orig_linux_dir
+# usage: xen-clone hg_repository dest_dir orig_linux_dir
 # 
 # this script contains some CL site specific details, but can easily be adapted
 #
@@ -10,22 +10,20 @@
 
 case "$SITE" in
 UCCL)
-	BK_REP=${1:-/usr/groups/xeno/BK/xeno.bk}
-	# BK_REP=${1:-xeno-master/xeno.bk}
+	BK_REP=${1:-http://hg.srg.cl.cam.ac.uk/xen-unstable.hg}
 	LINUX_DIR=${3:-/usr/groups/xeno/archive/}
 	;;
 *)
-	BK_REP=${1:-bk://xen.bkbits.net/xeno-1.0.bk}
-	# BK_REP=${1:-ssh://xen@xen.bkbits.net/xeno-1.0.bk}
+	BK_REP=${1:-http://xenbits.xensource.com/xen-unstable.hg}
 	LINUX_DIR=${3:-.:..}
 ;;
 esac
 
 DEST_DIR=${2:-xeno-clone}
 DEST_BK_REP=`basename "${BK_REP}"`
-DEST_VER=`basename ${DEST_BK_REP} .bk`
+DEST_VER=`basename ${DEST_BK_REP} .hg`
 
-echo usage: xen-clone bk_repository dest_dir orig_linux_dir
+echo usage: xen-clone hg dest_dir orig_linux_dir
 echo Source BK Repository : ${BK_REP}
 echo Destination Dir/Repository : ${DEST_DIR}/${DEST_BK_REP}
 echo Pristine Linux Source directory : ${LINUX_DIR}
@@ -54,10 +52,10 @@ esac
 # clone the master repository (now checked-out by default)
 if [ ! -d ${DEST_BK_REP} ] 
 then 
-bk clone ${BK_REP} ${DEST_BK_REP}
+mkdir -p ${DEST_BK_REP} ; cd ${DEST_BK_REP} ; hg init ${BK_REP} ${DEST_BK_REP} ; hg co ; cd ${TOP}
 else
 cd ${DEST_BK_REP}
-bk pull
+hg pull ; hg co
 cd ${TOP}
 fi
 
@@ -79,8 +77,8 @@ then
   ln -sf ../install install
  fi
 
- make -j4 world
- make -j4 linux24
+ make -j4 KERNELS=linux-* world
+ #make -j4 linux24
  cd ../install/boot
  if [ -r vmlinuz-2.6-xen0 ]
  then
