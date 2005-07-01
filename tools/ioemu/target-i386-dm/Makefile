@@ -3,12 +3,11 @@ include $(XEN_ROOT)/tools/Rules.mk
 include config.mak
 override TARGET_ARCH=i386
 
-#assume we directly put qemu code in tools/, same level as bochs dm(ioemu)
-XEN_PATH=../../..
+INSTALL_DIR := $(DESTDIR)/usr/lib/xen/bin
 TARGET_PATH=$(SRC_PATH)/target-$(TARGET_ARCH)
 VPATH=$(SRC_PATH):$(TARGET_PATH):$(SRC_PATH)/hw:$(SRC_PATH)/audio
-DEFINES=-I. -I$(TARGET_PATH) -I$(SRC_PATH) -I$(XEN_PATH)/xen/include/public
-DEFINES+= -I$(XEN_PATH)/tools/libxc
+DEFINES=-I. -I$(TARGET_PATH) -I$(SRC_PATH) -I$(XEN_ROOT)/xen/include/public
+DEFINES+= -I$(XEN_ROOT)/tools/libxc
 ifdef CONFIG_USER_ONLY
 VPATH+=:$(SRC_PATH)/linux-user
 DEFINES+=-I$(SRC_PATH)/linux-user -I$(SRC_PATH)/linux-user/$(TARGET_ARCH)
@@ -32,7 +31,7 @@ QEMU_SYSTEM=qemu-fast
 endif
 
 QEMU_SYSTEM=qemu-dm
-PROGS=$(QEMU_SYSTEM)
+PROGS=$(QEMU_SYSTEM) $(QEMU_SYSTEM).debug
 
 ifdef CONFIG_USER_ONLY
 PROGS=$(QEMU_USER)
@@ -383,12 +382,11 @@ distclean:
 	rm -rf *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe slirp qemu-vgaram-bin
 
 install: all 
-	if [ ! -d $(DESTDIR)$(bindir) ];then mkdir -p $(DESTDIR)$(bindir);fi
+	if [ ! -d $(INSTALL_DIR) ];then mkdir -p $(INSTALL_DIR);fi
 	if [ ! -d $(DESTDIR)$(configdir) ];then mkdir -p $(DESTDIR)$(configdir);fi
 ifneq ($(PROGS),)
-	install -m 755 -s $(PROGS) "$(DESTDIR)$(bindir)"
+	install -m 755 -s $(PROGS) "$(INSTALL_DIR)"
 endif
-	install -m 755 qemu-dm.debug "$(DESTDIR)$(bindir)"
 	install -m 755 qemu-ifup "$(DESTDIR)$(configdir)"
 	gunzip -c qemu-vgaram-bin.gz >qemu-vgaram-bin 
 	install -m 755 qemu-vgaram-bin "$(DESTDIR)$(configdir)"
