@@ -32,17 +32,17 @@ quiet_cmd_syscall = SYSCALL $@
 
 
 $(obj)/vsyscall-int80.so $(obj)/vsyscall-sysenter.so $(obj)/vsyscall-syscall.so: \
-$(obj)/vsyscall-%.so: $(src)/vsyscall.lds $(src)/vsyscall-%.o FORCE
+$(obj)/vsyscall-%.so: $(obj)/vsyscall.lds $(obj)/vsyscall-%.o FORCE
 	$(call if_changed,syscall)
 
-AFLAGS_vsyscall-int80.o = -m32
+AFLAGS_vsyscall-int80.o = -m32 -I$(obj)
 AFLAGS_vsyscall-sysenter.o = -m32
 AFLAGS_vsyscall-syscall.o = -m32
 CFLAGS_ia32_ioctl.o += -Ifs/
 
 s-link	:= vsyscall-syscall.o vsyscall-sysenter.o vsyscall-sigreturn.o
 
-$(src)/vsyscall.lds:
+$(obj)/vsyscall.lds:
 	@ln -fsn $(srctree)/arch/x86_64/ia32/$(notdir $@) $@
 
 $(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-link)) $(patsubst %.o,$(obj)/%.S,$(s-obj-y) $(s-link)):
