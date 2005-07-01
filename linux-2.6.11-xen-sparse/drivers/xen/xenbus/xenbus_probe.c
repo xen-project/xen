@@ -103,12 +103,6 @@ char *xenbus_read(const char *dir, const char *name, unsigned int *data_n)
         } else if(n == 0){
                 err = -ENOENT;
                 kfree(data);
-        } else if(data[n - 1] != '\0') {
-                /* This shouldn't happen: everything is supposed to be a string. */
-		printk("XENBUS: Reading path %s: missing null terminator len=%i\n", path, n); 
-                err = -EINVAL;
-                kfree(data);
-                n = 0;
         }
         kfree(path);
   out:
