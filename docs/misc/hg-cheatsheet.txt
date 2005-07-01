@@ -148,7 +148,7 @@ By default, Hg just shows the first line of the changset comments. You
 can find further information with "hg -v history".
 
 The changeset identifier has two parts, a _local_ monotonically
-increasing changeset id, 4792 above, and a _global_ hash, which
+increasing changeset id, 5599 above, and a _global_ hash, which
 follows the colon on the changeset line.  The hash uniquely identifies
 the changeset and its lineage back to the root of the changeset tree
 -- it is useful for distributed management and so on.  However, as it
@@ -190,8 +190,8 @@ marking, though deletes should be picked up automatically
 
 creation:
 
-   touch a (or otherwise created a file)
-   hg add a
+   touch a.txt (or otherwise created a file)
+   hg add a.txt
 
 You can see what has changed using:
 
