@@ -474,7 +474,6 @@ no_context:
 		       machine_to_phys(page));
 	}
 #endif
-	show_trace(NULL, (unsigned long *)&regs[1]);
 	die("Oops", regs, error_code);
 	bust_spinlocks(0);
 	do_exit(SIGKILL);
