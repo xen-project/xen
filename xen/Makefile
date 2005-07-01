@@ -67,9 +67,12 @@ endif
 	$(MAKE) -C arch/$(TARGET_ARCH)
 
 # drivers/char/console.o contains static banner/compile info. Blow it away.
+# Don't refresh these files during e.g., 'sudo make install'
 delete-unfresh-files:
-	rm -f include/xen/banner.h include/xen/compile.h drivers/char/console.o
-	$(MAKE) -C arch/$(TARGET_ARCH) delete-unfresh-files
+	@if [ ! -r include/xen/compile.h -o -O include/xen/compile.h ]; then \
+		rm -f include/xen/{banner,compile}.h; \
+		$(MAKE) -C arch/$(TARGET_ARCH) delete-unfresh-files; \
+	fi
 
 # acm_policy.h contains security policy for Xen
 include/xen/acm_policy.h:
