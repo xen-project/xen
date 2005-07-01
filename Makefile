@@ -177,12 +177,10 @@ uninstall:
 
 # Legacy targets for compatibility
 linux24:
-	$(MAKE) linux-2.4-xen0-build
-	$(MAKE) linux-2.4-xenU-build
+	$(MAKE) 'KERNELS=linux-2.4*' dist
 
 linux26:
-	$(MAKE) linux-2.6-xen0-build
-	$(MAKE) linux-2.6-xenU-build
+	$(MAKE) 'KERNELS=linux-2.6*' dist
 
 netbsd20:
 	$(MAKE) netbsd-2.0-xenU-build

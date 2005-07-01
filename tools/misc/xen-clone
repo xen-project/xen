@@ -52,7 +52,7 @@ esac
 # clone the master repository (now checked-out by default)
 if [ ! -d ${DEST_BK_REP} ] 
 then 
-mkdir -p ${DEST_BK_REP} ; cd ${DEST_BK_REP} ; hg init ${BK_REP} ${DEST_BK_REP} ; hg co ; cd ${TOP}
+mkdir -p ${DEST_BK_REP} ; cd ${DEST_BK_REP} ; hg init ${BK_REP} ; hg co ; cd ${TOP}
 else
 cd ${DEST_BK_REP}
 hg pull ; hg co
