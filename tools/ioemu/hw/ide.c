@@ -1850,7 +1850,11 @@ static void ide_guess_geometry(IDEState *s)
                a cylinder boundary */
             s->heads = p->end_head + 1;
             s->sectors = p->end_sector & 63;
+            if (s->sectors == 0)
+                continue;
             s->cylinders = s->nb_sectors / (s->heads * s->sectors);
+            if (s->cylinders < 1 || s->cylinders > 16383)
+                continue;
 #if 0
             printf("guessed partition: CHS=%d %d %d\n", 
                    s->cylinders, s->heads, s->sectors);
@@ -1884,8 +1888,12 @@ static void ide_init2(IDEState *ide_state, int irq,
                 s->sectors = secs;
             } else {
                 ide_guess_geometry(s);
-                if (s->cylinders == 0) {
-                    /* if no geometry, use a LBA compatible one */
+
+                /* if heads > 16, it means that a BIOS LBA
+                   translation was active, so the default
+                   hardware geometry is OK */
+                if ((s->heads > 16) || (s->cylinders == 0)) {
+                    /* if no geometry, use a standard physical disk geometry */
                     cylinders = nb_sectors / (16 * 63);
                     if (cylinders > 16383)
                         cylinders = 16383;
