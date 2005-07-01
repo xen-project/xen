@@ -15,33 +15,16 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <inttypes.h>
 
-/*
- * Here I'm taking care not to conflict with possible typedef's in
- * standard headers by instead using the macro namespace.
- */
-#undef u8
-#undef u16
-#undef u32
-#undef u64
-#undef s8
-#undef s16
-#undef s32
-#undef s64
-#define u8  unsigned char
-#define u16 unsigned short
-#define u32 unsigned int
-#define s8  signed char
-#define s16 signed short
-#define s32 signed int
-#if defined(__i386__)
-#define u64 unsigned long long
-#define s64 signed long long
-#else
-#define u64 unsigned long
-#define s64 signed long
-#endif
-
+#define u8  uint8_t
+#define u16 uint16_t
+#define u32 uint32_t
+#define u64 uint64_t
+#define s8  int8_t
+#define s16 int16_t
+#define s32 int32_t
+#define s64 int64_t
 #include "../../../include/xen/elf.h"
 
 #define DYNAMICALLY_FILLED   0
