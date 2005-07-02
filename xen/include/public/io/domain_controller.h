@@ -87,10 +87,10 @@ typedef struct control_if {
 #define CMSG_BLKIF_FE_INTERFACE_DISCONNECT      34
 #define CMSG_BLKIF_FE_INTERFACE_QUERY           35
 
-/* These are used by both front-end and back-end drivers. */
+#ifndef blkif_vdev_t
 #define blkif_vdev_t   u16
+#endif
 #define blkif_pdev_t   u32
-#define blkif_sector_t u64
 
 /*
  * CMSG_BLKIF_FE_INTERFACE_STATUS:

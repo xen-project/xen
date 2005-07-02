@@ -11,7 +11,9 @@
 
 #include "ring.h"
 
+#ifndef blkif_vdev_t
 #define blkif_vdev_t   u16
+#endif
 #define blkif_sector_t u64
 
 #define BLKIF_OP_READ      0
