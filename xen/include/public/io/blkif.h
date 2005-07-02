@@ -28,12 +28,12 @@
  */
 #define BLKIF_MAX_SEGMENTS_PER_REQUEST 11
 
-typedef struct {
-    u8             operation;    /*  0: BLKIF_OP_???                         */
-    u8             nr_segments;  /*  1: number of segments                   */
-    blkif_vdev_t   device;       /*  2: only for read/write requests         */
-    unsigned long  id;           /*  4: private guest value, echoed in resp  */
-    blkif_sector_t sector_number;    /* start sector idx on disk (r/w only)  */
+typedef struct blkif_request {
+    u8             operation;    /* BLKIF_OP_???                         */
+    u8             nr_segments;  /* number of segments                   */
+    blkif_vdev_t   device;       /* only for read/write requests         */
+    unsigned long  id;           /* private guest value, echoed in resp  */
+    blkif_sector_t sector_number;/* start sector idx on disk (r/w only)  */
     /* @f_a_s[2:0]=last_sect ; @f_a_s[5:3]=first_sect                        */
 #ifdef CONFIG_XEN_BLKDEV_GRANT
     /* @f_a_s[:16]= grant reference (16 bits)                                */
@@ -43,7 +43,7 @@ typedef struct {
     /* @first_sect: first sector in frame to transfer (inclusive).           */
     /* @last_sect: last sector in frame to transfer (inclusive).             */
     unsigned long  frame_and_sects[BLKIF_MAX_SEGMENTS_PER_REQUEST];
-} PACKED blkif_request_t;
+} blkif_request_t;
 
 #define blkif_first_sect(_fas) (((_fas)>>3)&7)
 #define blkif_last_sect(_fas)  ((_fas)&7)
@@ -52,11 +52,11 @@ typedef struct {
 #define blkif_gref_from_fas(_fas) ((_fas)>>16)
 #endif
 
-typedef struct {
+typedef struct blkif_response {
     unsigned long   id;              /* copied from request */
     u8              operation;       /* copied from request */
     s16             status;          /* BLKIF_RSP_???       */
-} PACKED blkif_response_t;
+} blkif_response_t;
 
 #define BLKIF_RSP_ERROR  -1 /* non-specific 'error' */
 #define BLKIF_RSP_OKAY    0 /* non-specific 'okay'  */
@@ -88,11 +88,10 @@ DEFINE_RING_TYPES(blkif, blkif_request_t, blkif_response_t);
 #define VDISK_READONLY     0x4
 
 typedef struct vdisk {
-    blkif_sector_t capacity;     /*  0: Size in terms of 512-byte sectors.   */
-    blkif_vdev_t   device;       /*  8: Device number (opaque 16 bit value). */
-    u16            info;         /* 10: Device type and flags (VDISK_*).     */
-    u16            sector_size;  /* 12: Minimum alignment for requests.      */
-    u16            _pad;
-} PACKED vdisk_t; /* 16 bytes */
+    blkif_sector_t capacity;     /* Size in terms of 512-byte sectors.   */
+    blkif_vdev_t   device;       /* Device number (opaque 16 bit value). */
+    u16            info;         /* Device type and flags (VDISK_*).     */
+    u16            sector_size;  /* Minimum alignment for requests.      */
+} vdisk_t; /* 16 bytes */
 
 #endif /* __XEN_PUBLIC_IO_BLKIF_H__ */

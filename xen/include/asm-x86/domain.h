@@ -68,7 +68,9 @@ struct arch_domain
 
 struct arch_vcpu
 {
-    struct vcpu_guest_context guest_context;
+    /* Needs 16-byte aligment for FXSAVE/FXRSTOR. */
+    struct vcpu_guest_context guest_context
+    __attribute__((__aligned__(16)));
 
     unsigned long      flags; /* TF_ */
 

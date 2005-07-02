@@ -7,13 +7,6 @@
 #ifndef __HYPERVISOR_IF_IA64_H__
 #define __HYPERVISOR_IF_IA64_H__
 
-// "packed" generates awful code
-#define PACKED
-
-/* Pointers are naturally 64 bits in this architecture; no padding needed. */
-#define _MEMORY_PADDING(_X)
-#define MEMORY_PADDING 
-
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* WARNING: before changing this, check that shared_info fits on a page */
 #define MAX_VIRT_CPUS 1
@@ -48,11 +41,6 @@ typedef struct {
 
 #define INVALID_MFN              (~0UL)
 
-
-typedef struct
-{
-} PACKED cpu_user_regs;
-
 /*
  * NB. This may become a 64-bit count with no shift. If this happens then the 
  * structure size will still be 8 bytes, so no other alignments will change.
@@ -60,7 +48,7 @@ typedef struct
 typedef struct {
     unsigned int  tsc_bits;      /* 0: 32 bits read from the CPU's TSC. */
     unsigned int  tsc_bitshift;  /* 4: 'tsc_bits' uses N:N+31 of TSC.   */
-} PACKED tsc_timestamp_t; /* 8 bytes */
+} tsc_timestamp_t; /* 8 bytes */
 
 struct pt_fpreg {
         union {
@@ -183,20 +171,20 @@ typedef struct {
 	unsigned long pkrs[8];	// protection key registers
 	unsigned long tmp[8];	// temp registers (e.g. for hyperprivops)
 	int evtchn_vector;
-//} PACKED arch_vcpu_info_t;
-} arch_vcpu_info_t;		// DON'T PACK 
+} arch_vcpu_info_t;
+#define __ARCH_HAS_VCPU_INFO
 
 typedef struct {
 	int domain_controller_evtchn;
 	unsigned int flags;
-//} PACKED arch_shared_info_t;
+//} arch_shared_info_t;
 } arch_shared_info_t;		// DON'T PACK 
 
 typedef struct vcpu_guest_context {
 	struct pt_regs regs;
 	arch_vcpu_info_t vcpu;
 	arch_shared_info_t shared;
-} PACKED vcpu_guest_context_t;
+} vcpu_guest_context_t;
 
 #endif /* !__ASSEMBLY__ */
 

@@ -295,8 +295,7 @@ typedef struct
  * Per-VCPU information goes here. This will be cleaned up more when Xen 
  * actually supports multi-VCPU guests.
  */
-typedef struct
-{
+typedef struct vcpu_info {
     /*
      * 'evtchn_upcall_pending' is written non-zero by Xen to indicate
      * a pending notification for a particular VCPU. It is then cleared 
@@ -322,20 +321,20 @@ typedef struct
      * an upcall activation. The mask is cleared when the VCPU requests
      * to block: this avoids wakeup-waiting races.
      */
-    u8 evtchn_upcall_pending;           /* 0 */
-    u8 evtchn_upcall_mask;              /* 1 */
-    u8 pad0, pad1;
-    u32 evtchn_pending_sel;             /* 4 */
-    arch_vcpu_info_t arch;              /* 8 */
-} PACKED vcpu_info_t;                   /* 8 + arch */
+    u8 evtchn_upcall_pending;
+    u8 evtchn_upcall_mask;
+    u32 evtchn_pending_sel;
+#ifdef __ARCH_HAS_VCPU_INFO
+    arch_vcpu_info_t arch;
+#endif
+} vcpu_info_t;
 
 /*
  * Xen/kernel shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.
  */
-typedef struct shared_info_st
-{
-    vcpu_info_t vcpu_data[MAX_VIRT_CPUS];  /*   0 */
+typedef struct shared_info {
+    vcpu_info_t vcpu_data[MAX_VIRT_CPUS];
 
     u32 n_vcpu;
 
@@ -370,14 +369,14 @@ typedef struct shared_info_st
      * 32-bit selector to be set. Each bit in the selector covers a 32-bit
      * word in the PENDING bitfield array.
      */
-    u32 evtchn_pending[32];             /*   4 */
-    u32 evtchn_mask[32];                /* 136 */
+    u32 evtchn_pending[32];
+    u32 evtchn_mask[32];
 
     /*
      * Time: The following abstractions are exposed: System Time, Clock Time,
      * Domain Virtual Time. Domains can access Cycle counter time directly.
      */
-    u64                cpu_freq;        /* 264: CPU frequency (Hz).          */
+    u64                cpu_freq;        /* CPU frequency (Hz).          */
 
     /*
      * The following values are updated periodically (and not necessarily
@@ -386,8 +385,8 @@ typedef struct shared_info_st
      * incremented immediately after. See the Xen-specific Linux code for an
      * example of how to read these values safely (arch/xen/kernel/time.c).
      */
-    u32                time_version1;   /* 272 */
-    u32                time_version2;   /* 276 */
+    u32                time_version1;
+    u32                time_version2;
     tsc_timestamp_t    tsc_timestamp;   /* TSC at last update of time vals.  */
     u64                system_time;     /* Time, in nanosecs, since boot.    */
     u32                wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
@@ -399,12 +398,12 @@ typedef struct shared_info_st
      * Allow a domain to specify a timeout value in system time and 
      * domain virtual time.
      */
-    u64                wall_timeout;    /* 312 */
-    u64                domain_timeout;  /* 320 */
+    u64                wall_timeout;
+    u64                domain_timeout;
 
     arch_shared_info_t arch;
 
-} PACKED shared_info_t;
+} shared_info_t;
 
 /*
  * Start-of-day memory layout for the initial domain (DOM0):
@@ -432,31 +431,22 @@ typedef struct shared_info_st
  */
 
 #define MAX_GUEST_CMDLINE 1024
-typedef struct {
-    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.        */
-    memory_t nr_pages;        /*  0: Total pages allocated to this domain.    */
-    _MEMORY_PADDING(A);
-    memory_t shared_info;     /*  8: MACHINE address of shared info struct.   */
-    _MEMORY_PADDING(B);
-    u32      flags;           /* 16: SIF_xxx flags.                           */
-    u16      domain_controller_evtchn; /* 20 */
-    u16      __pad;
-    /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).         */
-    memory_t pt_base;         /* 24: VIRTUAL address of page directory.       */
-    _MEMORY_PADDING(C);
-    memory_t nr_pt_frames;    /* 32: Number of bootstrap p.t. frames.         */
-    _MEMORY_PADDING(D);
-    memory_t mfn_list;        /* 40: VIRTUAL address of page-frame list.      */
-    _MEMORY_PADDING(E);
-    memory_t mod_start;       /* 48: VIRTUAL address of pre-loaded module.    */
-    _MEMORY_PADDING(F);
-    memory_t mod_len;         /* 56: Size (bytes) of pre-loaded module.       */
-    _MEMORY_PADDING(G);
-    s8 cmd_line[MAX_GUEST_CMDLINE]; /* 64 */
-    memory_t store_page;      /* 1088: VIRTUAL address of store page.         */
-    _MEMORY_PADDING(H);
-    u16      store_evtchn;    /* 1096: Event channel for store communication. */
-} PACKED start_info_t; /* 1098 bytes */
+typedef struct start_info {
+    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
+    memory_t nr_pages;        /* Total pages allocated to this domain.    */
+    memory_t shared_info;     /* MACHINE address of shared info struct.   */
+    u32      flags;           /* SIF_xxx flags.                           */
+    u16      domain_controller_evtchn;
+    /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).     */
+    memory_t pt_base;         /* VIRTUAL address of page directory.       */
+    memory_t nr_pt_frames;    /* Number of bootstrap p.t. frames.         */
+    memory_t mfn_list;        /* VIRTUAL address of page-frame list.      */
+    memory_t mod_start;       /* VIRTUAL address of pre-loaded module.    */
+    memory_t mod_len;         /* Size (bytes) of pre-loaded module.       */
+    s8 cmd_line[MAX_GUEST_CMDLINE];
+    memory_t store_page;      /* VIRTUAL address of store page.           */
+    u16      store_evtchn;    /* Event channel for store communication.   */
+} start_info_t;
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */

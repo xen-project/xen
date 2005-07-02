@@ -37,7 +37,7 @@ struct pfn_info
             u32 _domain; /* pickled format */
             /* Type reference count and various PGT_xxx flags and fields. */
             u32 type_info;
-        } PACKED inuse;
+        } inuse;
 
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
@@ -45,11 +45,10 @@ struct pfn_info
             cpumask_t cpumask;
             /* Order-size of the free chunk this page is the head of. */
             u8 order;
-        } PACKED free;
+        } free;
 
-    } PACKED u;
-
-} PACKED;
+    } u;
+};
 
  /* The following page types are MUTUALLY EXCLUSIVE. */
 #define PGT_none            (0<<29) /* no special uses of this page */

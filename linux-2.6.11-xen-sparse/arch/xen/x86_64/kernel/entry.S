@@ -127,7 +127,7 @@
          * Must be consistent with the definition in arch_x86_64.h:    
          *     struct switch_to_user {
          *        u64 rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
-         *     } PACKED;
+         *     };
          * #define VGCF_IN_SYSCALL (1<<8) 
          */
         .macro SWITCH_TO_USER flag

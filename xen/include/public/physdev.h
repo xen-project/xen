@@ -11,56 +11,51 @@
 #define PHYSDEVOP_APIC_WRITE            9
 #define PHYSDEVOP_ASSIGN_VECTOR         10
 
-typedef struct {
+typedef struct physdevop_irq_status_query {
     /* IN */
-    u32 irq;                          /*  0 */
+    u32 irq;
     /* OUT */
 /* Need to call PHYSDEVOP_IRQ_UNMASK_NOTIFY when the IRQ has been serviced? */
 #define PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY (1<<0)
-    u32 flags;                        /*  4 */
-} PACKED physdevop_irq_status_query_t; /* 8 bytes */
+    u32 flags;
+} physdevop_irq_status_query_t;
 
-typedef struct {
+typedef struct physdevop_set_iopl {
     /* IN */
-    u32 iopl;                         /*  0 */
-} PACKED physdevop_set_iopl_t; /* 4 bytes */
+    u32 iopl;
+} physdevop_set_iopl_t;
 
-typedef struct {
+typedef struct physdevop_set_iobitmap {
     /* IN */
-    memory_t bitmap;                  /*  0 */
-    MEMORY_PADDING;
-    u32      nr_ports;                /*  8 */
-    u32      __pad0;                  /* 12 */
-} PACKED physdevop_set_iobitmap_t; /* 16 bytes */
+    memory_t bitmap;
+    u32      nr_ports;
+} physdevop_set_iobitmap_t;
 
-typedef struct {
+typedef struct physdevop_apic {
     /* IN */
-    u32 apic;                          /*  0 */
+    u32 apic;
     u32 offset;
     /* IN or OUT */
     u32 value;
-} PACKED physdevop_apic_t; 
+} physdevop_apic_t; 
 
-typedef struct {
+typedef struct physdevop_irq {
     /* IN */
-    u32 irq;                          /*  0 */
+    u32 irq;
     /* OUT */
     u32 vector;
-} PACKED physdevop_irq_t; 
+} physdevop_irq_t; 
 
-typedef struct _physdev_op_st 
-{
-    u32 cmd;                          /*  0 */
-    u32 __pad;                        /*  4 */
-    union {                           /*  8 */
+typedef struct physdev_op {
+    u32 cmd;
+    union {
         physdevop_irq_status_query_t      irq_status_query;
         physdevop_set_iopl_t              set_iopl;
         physdevop_set_iobitmap_t          set_iobitmap;
         physdevop_apic_t                  apic_op;
         physdevop_irq_t                   irq_op;
-        u8                                __dummy[32];
-    } PACKED u;
-} PACKED physdev_op_t; /* 40 bytes */
+    } u;
+} physdev_op_t;
 
 #endif /* __XEN_PUBLIC_PHYSDEV_H__ */
 

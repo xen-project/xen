@@ -9,31 +9,28 @@
 #ifndef __XEN_PUBLIC_IO_NETIF_H__
 #define __XEN_PUBLIC_IO_NETIF_H__
 
-typedef struct {
-    memory_t addr;   /*  0: Machine address of packet.  */
-    MEMORY_PADDING;
+typedef struct netif_tx_request {
+    memory_t addr;   /* Machine address of packet.  */
     u16      csum_blank:1; /* Proto csum field blank?   */
-    u16      id:15;  /*  8: Echoed in response message. */
-    u16      size;   /* 10: Packet size in bytes.       */
-} PACKED netif_tx_request_t; /* 12 bytes */
+    u16      id:15;  /* Echoed in response message. */
+    u16      size;   /* Packet size in bytes.       */
+} netif_tx_request_t;
+
+typedef struct netif_tx_response {
+    u16      id;
+    s8       status;
+} netif_tx_response_t;
 
 typedef struct {
-    u16      id;     /*  0 */
-    s8       status; /*  2 */
-    u8       __pad;  /*  3 */
-} PACKED netif_tx_response_t; /* 4 bytes */
+    u16       id;    /* Echoed in response message.        */
+} netif_rx_request_t;
 
 typedef struct {
-    u16       id;    /*  0: Echoed in response message.        */
-} PACKED netif_rx_request_t; /* 2 bytes */
-
-typedef struct {
-    memory_t addr;   /*  0: Machine address of packet.              */
-    MEMORY_PADDING;
+    memory_t addr;   /* Machine address of packet.              */
     u16      csum_valid:1; /* Protocol checksum is validated?       */
-    u16      id:15;  /*  8:  */
-    s16      status; /* 10: -ve: BLKIF_RSP_* ; +ve: Rx'ed pkt size. */
-} PACKED netif_rx_response_t; /* 12 bytes */
+    u16      id:15;
+    s16      status; /* -ve: BLKIF_RSP_* ; +ve: Rx'ed pkt size. */
+} netif_rx_response_t;
 
 /*
  * We use a special capitalised type name because it is _essential_ that all 
@@ -53,7 +50,7 @@ typedef u32 NETIF_RING_IDX;
 #define NETIF_RX_RING_SIZE 256
 
 /* This structure must fit in a memory page. */
-typedef struct {
+typedef struct netif_tx_interface {
     /*
      * Frontend places packets into ring at tx_req_prod.
      * Frontend receives event when tx_resp_prod passes tx_event.
@@ -61,30 +58,30 @@ typedef struct {
      * may use it to determine if all queued packets have been seen by the
      * backend.
      */
-    NETIF_RING_IDX req_prod;       /*  0 */
-    NETIF_RING_IDX req_cons;       /*  4 */
-    NETIF_RING_IDX resp_prod;      /*  8 */
-    NETIF_RING_IDX event;          /* 12 */
-    union {                        /* 16 */
+    NETIF_RING_IDX req_prod;
+    NETIF_RING_IDX req_cons;
+    NETIF_RING_IDX resp_prod;
+    NETIF_RING_IDX event;
+    union {
         netif_tx_request_t  req;
         netif_tx_response_t resp;
-    } PACKED ring[NETIF_TX_RING_SIZE];
-} PACKED netif_tx_interface_t;
+    } ring[NETIF_TX_RING_SIZE];
+} netif_tx_interface_t;
 
 /* This structure must fit in a memory page. */
-typedef struct {
+typedef struct netif_rx_interface {
     /*
      * Frontend places empty buffers into ring at rx_req_prod.
      * Frontend receives event when rx_resp_prod passes rx_event.
      */
-    NETIF_RING_IDX req_prod;       /*  0 */
-    NETIF_RING_IDX resp_prod;      /*  4 */
-    NETIF_RING_IDX event;          /*  8 */
-    union {                        /* 12 */
+    NETIF_RING_IDX req_prod;
+    NETIF_RING_IDX resp_prod;
+    NETIF_RING_IDX event;
+    union {
         netif_rx_request_t  req;
         netif_rx_response_t resp;
-    } PACKED ring[NETIF_RX_RING_SIZE];
-} PACKED netif_rx_interface_t;
+    } ring[NETIF_RX_RING_SIZE];
+} netif_rx_interface_t;
 
 /* Descriptor status values */
 #define NETIF_RSP_DROPPED         -2

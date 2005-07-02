@@ -15,13 +15,12 @@
  * will be allocated, and the field filled in on return.
  */
 #define EVTCHNOP_alloc_unbound    6
-typedef struct {
+typedef struct evtchn_alloc_unbound {
     /* IN parameters */
-    domid_t dom;                      /*  0 */
-    u16     __pad;
+    domid_t dom;
     /* IN/OUT parameters */
-    u32     port;                     /*  4 */
-} PACKED evtchn_alloc_unbound_t; /* 8 bytes */
+    u32     port;
+} evtchn_alloc_unbound_t;
 
 /*
  * EVTCHNOP_bind_interdomain: Construct an interdomain event channel between
@@ -44,12 +43,12 @@ typedef struct {
  *     be closed or unbound.
  */
 #define EVTCHNOP_bind_interdomain 0
-typedef struct {
+typedef struct evtchn_bind_interdomain {
     /* IN parameters. */
-    domid_t dom1, dom2;               /*  0,  2 */
+    domid_t dom1, dom2;
     /* IN/OUT parameters. */
-    u32     port1, port2;             /*  4,  8 */
-} PACKED evtchn_bind_interdomain_t; /* 12 bytes */
+    u32     port1, port2;
+} evtchn_bind_interdomain_t;
 
 /*
  * EVTCHNOP_bind_virq: Bind a local event channel to IRQ <irq> on calling vcpu.
@@ -59,12 +58,12 @@ typedef struct {
  *     may not be changed.
  */
 #define EVTCHNOP_bind_virq        1
-typedef struct {
+typedef struct evtchn_bind_virq {
     /* IN parameters. */
-    u32 virq;                         /*  0 */
+    u32 virq;
     /* OUT parameters. */
-    u32 port;                         /*  4 */
-} PACKED evtchn_bind_virq_t; /* 8 bytes */
+    u32 port;
+} evtchn_bind_virq_t;
 
 /*
  * EVTCHNOP_bind_pirq: Bind a local event channel to IRQ <irq>.
@@ -73,14 +72,14 @@ typedef struct {
  *  2. Only a sufficiently-privileged domain may bind to a physical IRQ.
  */
 #define EVTCHNOP_bind_pirq        2
-typedef struct {
+typedef struct evtchn_bind_pirq {
     /* IN parameters. */
-    u32 pirq;                         /*  0 */
+    u32 pirq;
 #define BIND_PIRQ__WILL_SHARE 1
-    u32 flags; /* BIND_PIRQ__* */     /*  4 */
+    u32 flags; /* BIND_PIRQ__* */
     /* OUT parameters. */
-    u32 port;                         /*  8 */
-} PACKED evtchn_bind_pirq_t; /* 12 bytes */
+    u32 port;
+} evtchn_bind_pirq_t;
 
 /*
  * EVTCHNOP_bind_ipi: Bind a local event channel to receive events.
@@ -89,12 +88,12 @@ typedef struct {
  *     may not be changed.
  */
 #define EVTCHNOP_bind_ipi         7
-typedef struct {
+typedef struct evtchn_bind_ipi {
     /* IN parameters. */
-    u32 ipi_vcpu;                     /*  0 */
+    u32 ipi_vcpu;
     /* OUT parameters. */
-    u32 port;                         /*  4 */
-} PACKED evtchn_bind_ipi_t; /* 8 bytes */
+    u32 port;
+} evtchn_bind_ipi_t;
 
 /*
  * EVTCHNOP_close: Close the communication channel which has an endpoint at
@@ -106,24 +105,23 @@ typedef struct {
  *     for which <dom> is not DOMID_SELF.
  */
 #define EVTCHNOP_close            3
-typedef struct {
+typedef struct evtchn_close {
     /* IN parameters. */
-    domid_t dom;                      /*  0 */
-    u16     __pad;
-    u32     port;                     /*  4 */
+    domid_t dom;
+    u32     port;
     /* No OUT parameters. */
-} PACKED evtchn_close_t; /* 8 bytes */
+} evtchn_close_t;
 
 /*
  * EVTCHNOP_send: Send an event to the remote end of the channel whose local
  * endpoint is <DOMID_SELF, local_port>.
  */
 #define EVTCHNOP_send             4
-typedef struct {
+typedef struct evtchn_send {
     /* IN parameters. */
-    u32     local_port;               /*  0 */
+    u32     local_port;
     /* No OUT parameters. */
-} PACKED evtchn_send_t; /* 4 bytes */
+} evtchn_send_t;
 
 /*
  * EVTCHNOP_status: Get the current status of the communication channel which
@@ -134,11 +132,10 @@ typedef struct {
  *     channel for which <dom> is not DOMID_SELF.
  */
 #define EVTCHNOP_status           5
-typedef struct {
+typedef struct evtchn_status {
     /* IN parameters */
-    domid_t dom;                      /*  0 */
-    u16     __pad;
-    u32     port;                     /*  4 */
+    domid_t dom;
+    u32     port;
     /* OUT parameters */
 #define EVTCHNSTAT_closed       0  /* Channel is not in use.                 */
 #define EVTCHNSTAT_unbound      1  /* Channel is waiting interdom connection.*/
@@ -146,26 +143,24 @@ typedef struct {
 #define EVTCHNSTAT_pirq         3  /* Channel is bound to a phys IRQ line.   */
 #define EVTCHNSTAT_virq         4  /* Channel is bound to a virtual IRQ line */
 #define EVTCHNSTAT_ipi          5  /* Channel is bound to a virtual IPI line */
-    u32     status;                   /*  8 */
-    union {                           /* 12 */
+    u32     status;
+    union {
         struct {
-            domid_t dom;                              /* 12 */
-        } PACKED unbound; /* EVTCHNSTAT_unbound */
+            domid_t dom;
+        } unbound; /* EVTCHNSTAT_unbound */
         struct {
-            domid_t dom;                              /* 12 */
-            u16     __pad;
-            u32     port;                             /* 16 */
-        } PACKED interdomain; /* EVTCHNSTAT_interdomain */
-        u32 pirq;      /* EVTCHNSTAT_pirq        */   /* 12 */
-        u32 virq;      /* EVTCHNSTAT_virq        */   /* 12 */
-        u32 ipi_vcpu;  /* EVTCHNSTAT_ipi         */   /* 12 */
-    } PACKED u;
-} PACKED evtchn_status_t; /* 20 bytes */
+            domid_t dom;
+            u32     port;
+        } interdomain; /* EVTCHNSTAT_interdomain */
+        u32 pirq;      /* EVTCHNSTAT_pirq        */
+        u32 virq;      /* EVTCHNSTAT_virq        */
+        u32 ipi_vcpu;  /* EVTCHNSTAT_ipi         */
+    } u;
+} evtchn_status_t;
 
-typedef struct {
-    u32 cmd; /* EVTCHNOP_* */         /*  0 */
-    u32 __reserved;                   /*  4 */
-    union {                           /*  8 */
+typedef struct evtchn_op {
+    u32 cmd; /* EVTCHNOP_* */
+    union {
         evtchn_alloc_unbound_t    alloc_unbound;
         evtchn_bind_interdomain_t bind_interdomain;
         evtchn_bind_virq_t        bind_virq;
@@ -174,8 +169,7 @@ typedef struct {
         evtchn_close_t            close;
         evtchn_send_t             send;
         evtchn_status_t           status;
-        u8                        __dummy[24];
-    } PACKED u;
-} PACKED evtchn_op_t; /* 32 bytes */
+    } u;
+} evtchn_op_t;
 
 #endif /* __XEN_PUBLIC_EVENT_CHANNEL_H__ */

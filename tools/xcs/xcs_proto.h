@@ -75,7 +75,7 @@ typedef struct {
         xcs_interface_msg_t interface;
         
         xcs_control_msg_t   control;   /* These are xcs data message types */
-    } PACKED u;
+    } u;
 } xcs_msg_t;
 
 /* message validation macros. */

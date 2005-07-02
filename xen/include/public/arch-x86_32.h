@@ -9,21 +9,6 @@
 #ifndef __XEN_PUBLIC_ARCH_X86_32_H__
 #define __XEN_PUBLIC_ARCH_X86_32_H__
 
-#ifndef PACKED
-/* GCC-specific way to pack structure definitions (no implicit padding). */
-#define PACKED __attribute__ ((packed))
-#endif
-
-/*
- * Pointers and other address fields inside interface structures are padded to
- * 64 bits. This means that field alignments aren't different between 32- and
- * 64-bit architectures. 
- */
-/* NB. Multi-level macro ensures __LINE__ is expanded before concatenation. */
-#define __MEMORY_PADDING(_X) u32 __pad_ ## _X
-#define _MEMORY_PADDING(_X)  __MEMORY_PADDING(_X)
-#define MEMORY_PADDING       _MEMORY_PADDING(__LINE__)
-
 /*
  * SEGMENT DESCRIPTOR TABLES
  */
@@ -88,12 +73,12 @@ typedef unsigned long memory_t;   /* Full-sized pointer/address/memory-size. */
 #define TI_GET_IF(_ti)       ((_ti)->flags & 4)
 #define TI_SET_DPL(_ti,_dpl) ((_ti)->flags |= (_dpl))
 #define TI_SET_IF(_ti,_if)   ((_ti)->flags |= ((!!(_if))<<2))
-typedef struct {
-    u8       vector;  /* 0: exception vector                              */
-    u8       flags;   /* 1: 0-3: privilege level; 4: clear event enable?  */
-    u16      cs;      /* 2: code selector                                 */
-    memory_t address; /* 4: code address                                  */
-} PACKED trap_info_t; /* 8 bytes */
+typedef struct trap_info {
+    u8       vector;  /* exception vector                              */
+    u8       flags;   /* 0-3: privilege level; 4: clear event enable?  */
+    u16      cs;      /* code selector                                 */
+    memory_t address; /* code address                                  */
+} trap_info_t;
 
 typedef struct cpu_user_regs {
     u32 ebx;
@@ -125,13 +110,13 @@ typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
  * in by FXSAVE if the CPU has feature FXSR; otherwise FSAVE is used.
  */
 typedef struct vcpu_guest_context {
+    /* FPU registers come first so they can be aligned for FXSAVE/FXRSTOR. */
+    struct { char x[512]; } fpu_ctxt;       /* User-level FPU registers     */
 #define VGCF_I387_VALID (1<<0)
 #define VGCF_VMX_GUEST  (1<<1)
 #define VGCF_IN_KERNEL  (1<<2)
     unsigned long flags;                    /* VGCF_* flags                 */
     cpu_user_regs_t user_regs;              /* User-level CPU registers     */
-    struct { char x[512]; } fpu_ctxt        /* User-level FPU registers     */
-    __attribute__((__aligned__(16)));       /* (needs 16-byte alignment)    */
     trap_info_t   trap_ctxt[256];           /* Virtual IDT                  */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
@@ -145,13 +130,10 @@ typedef struct vcpu_guest_context {
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
 } vcpu_guest_context_t;
 
-typedef struct {
+typedef struct arch_shared_info {
     /* MFN of a table of MFNs that make up p2m table */
     u64 pfn_to_mfn_frame_list;
 } arch_shared_info_t;
-
-typedef struct {
-} arch_vcpu_info_t;
 
 #endif
 

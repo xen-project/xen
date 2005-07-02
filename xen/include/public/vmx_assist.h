@@ -43,7 +43,7 @@ union vmcs_arbytes {
 				g		: 1,
 				null_bit	: 1, 
 				reserved2	: 15;
-	}  __attribute__((packed)) fields;
+	} fields;
 	unsigned int bytes;
 };
 

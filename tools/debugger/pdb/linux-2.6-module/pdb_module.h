@@ -28,7 +28,7 @@ typedef struct
         pdb_op_rd_reg_t rd_reg;
         pdb_op_wr_reg_t wr_reg;
     } u;
-} PACKED pdb_request_t, *pdb_request_p;
+} pdb_request_t, *pdb_request_p;
  
 
 #define PDB_RESPONSE_OKAY   0
@@ -38,7 +38,7 @@ typedef struct {
     u8   operation;       /* copied from request */
     s16  status;          /* PDB_RESPONSE_???    */
     u32  value;
-} PACKED pdb_response_t, *pdb_response_p;
+} pdb_response_t, *pdb_response_p;
 
 
 DEFINE_RING_TYPES(pdb, pdb_request_t, pdb_response_t);
