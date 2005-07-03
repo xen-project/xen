@@ -92,7 +92,7 @@ long do_xen_version(int cmd, void *arg)
 
     case XENVER_extraversion:
     {
-        char extraversion[16];
+        xen_extraversion_t extraversion;
         safe_strcpy(extraversion, XEN_EXTRAVERSION);
         if ( copy_to_user(arg, extraversion, sizeof(extraversion)) )
             return -EFAULT;
