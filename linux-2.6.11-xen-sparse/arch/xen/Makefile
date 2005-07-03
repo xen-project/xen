@@ -63,13 +63,8 @@ all: vmlinuz
 vmlinuz: vmlinux
 	$(Q)$(MAKE) $(build)=arch/xen/boot vmlinuz
 
-ifeq ($(INSTALL_PATH),)
-install.sh := $(shell find $(srctree)/arch/$(XENARCH) -name install.sh)
-endif
-
 XINSTALL_NAME ?= $(KERNELRELEASE)
 install: vmlinuz
-ifeq ($(install.sh),)
 	mkdir -p $(INSTALL_PATH)/boot
 	ln -f -s vmlinuz-$(XINSTALL_NAME)$(INSTALL_SUFFIX) $(INSTALL_PATH)/boot/vmlinuz-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(XENGUEST)$(INSTALL_SUFFIX)
 	rm -f $(INSTALL_PATH)/boot/vmlinuz-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
@@ -80,9 +75,6 @@ ifeq ($(install.sh),)
 	ln -f -s vmlinuz-$(XINSTALL_NAME)$(INSTALL_SUFFIX) $(INSTALL_PATH)/boot/vmlinuz-$(VERSION).$(PATCHLEVEL)$(XENGUEST)$(INSTALL_SUFFIX)
 	mkdir -p $(INSTALL_PATH)/usr/include/xen/linux
 	install -m0644 $(srctree)/include/asm-xen/linux-public/*.h $(INSTALL_PATH)/usr/include/xen/linux
-else
-	sh $(install.sh) $(KERNELRELEASE) $< System.map "$(INSTALL_PATH)"
-endif
 
 archclean:
 	@if [ -e arch/xen/arch ]; then $(MAKE) $(clean)=arch/xen/arch; fi;
