@@ -15,10 +15,11 @@
 /* arg == NULL; returns major:minor (16:16). */
 #define XENVER_version      0
 
-/* arg == 16-char string buffer. */
+/* arg == xen_extraversion_t. */
 #define XENVER_extraversion 1
+typedef char xen_extraversion_t[16];
 
-/* arg == xenversion_compile_info_t. */
+/* arg == xen_compile_info_t. */
 #define XENVER_compile_info 2
 typedef struct xen_compile_info {
     char compiler[64];
