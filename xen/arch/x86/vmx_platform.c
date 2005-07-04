@@ -503,7 +503,7 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
 
 int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_len)
 {
-    l1_pgentry_t gpte;
+    unsigned long gpa;
     unsigned long mfn;
     unsigned char *inst_start;
     int remaining = 0;
@@ -513,8 +513,9 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
 
     if ( vmx_paging_enabled(current) )
     {
-        gpte = gva_to_gpte(guest_eip);
-        mfn = phys_to_machine_mapping(l1e_get_pfn(gpte));
+        gpa = gva_to_gpa(guest_eip);
+        mfn = phys_to_machine_mapping(gpa >> PAGE_SHIFT);
+
         /* Does this cross a page boundary ? */
         if ( (guest_eip & PAGE_MASK) != ((guest_eip + inst_len) & PAGE_MASK) )
         {
@@ -533,8 +534,9 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
 
     if ( remaining )
     {
-        gpte = gva_to_gpte(guest_eip+inst_len+remaining);
-        mfn = phys_to_machine_mapping(l1e_get_pfn(gpte));
+        gpa = gva_to_gpa(guest_eip+inst_len+remaining);
+        mfn = phys_to_machine_mapping(gpa >> PAGE_SHIFT);
+
         inst_start = map_domain_page(mfn);
         memcpy((char *)buf+inst_len, inst_start, remaining);
         unmap_domain_page(inst_start);

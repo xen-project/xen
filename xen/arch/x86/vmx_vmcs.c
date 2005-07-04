@@ -65,8 +65,12 @@ static inline int construct_vmcs_controls(void)
 
     error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL, 
                        MONITOR_CPU_BASED_EXEC_CONTROLS);
-
+#if defined (__x86_64__)
+    error |= __vmwrite(VM_EXIT_CONTROLS, 
+      MONITOR_VM_EXIT_CONTROLS | VM_EXIT_CONTROLS_IA_32E_MODE);
+#else
     error |= __vmwrite(VM_EXIT_CONTROLS, MONITOR_VM_EXIT_CONTROLS);
+#endif
     error |= __vmwrite(VM_ENTRY_CONTROLS, MONITOR_VM_ENTRY_CONTROLS);
 
     return error;
@@ -93,6 +97,11 @@ struct host_execution_env {
     unsigned long tr_base;
     unsigned long ds_base;
     unsigned long cs_base;
+#ifdef __x86_64__ 
+    unsigned long fs_base; 
+    unsigned long gs_base; 
+#endif 
+
     /* control registers */
     unsigned long cr3;
     unsigned long cr0;
@@ -230,8 +239,8 @@ construct_init_vmcs_guest(struct cpu_user_regs *regs,
     /* interrupt */
     error |= __vmwrite(VM_ENTRY_INTR_INFO_FIELD, 0);
     /* mask */
-    error |= __vmwrite(CR0_GUEST_HOST_MASK, 0xffffffff);
-    error |= __vmwrite(CR4_GUEST_HOST_MASK, 0xffffffff);
+    error |= __vmwrite(CR0_GUEST_HOST_MASK, -1UL);
+    error |= __vmwrite(CR4_GUEST_HOST_MASK, -1UL);
 
     error |= __vmwrite(PAGE_FAULT_ERROR_CODE_MASK, 0);
     error |= __vmwrite(PAGE_FAULT_ERROR_CODE_MATCH, 0);
@@ -298,9 +307,19 @@ construct_init_vmcs_guest(struct cpu_user_regs *regs,
     shadow_cr &= ~X86_CR0_PG;
     error |= __vmwrite(CR0_READ_SHADOW, shadow_cr);
     /* CR3 is set in vmx_final_setup_guest */
+#ifdef __x86_64__
+    error |= __vmwrite(GUEST_CR4, host_env->cr4 & ~X86_CR4_PAE);
+    printk("construct_init_vmcs_guest: guest CR4 is %lx\n", host_env->cr4 );
+#else
     error |= __vmwrite(GUEST_CR4, host_env->cr4);
+#endif
     shadow_cr = host_env->cr4;
+
+#ifdef __x86_64__
+    shadow_cr &= ~(X86_CR4_PGE | X86_CR4_VMXE | X86_CR4_PAE);
+#else
     shadow_cr &= ~(X86_CR4_PGE | X86_CR4_VMXE);
+#endif
     error |= __vmwrite(CR4_READ_SHADOW, shadow_cr);
 
     error |= __vmwrite(GUEST_ES_BASE, host_env->ds_base);
@@ -339,16 +358,24 @@ static inline int construct_vmcs_host(struct host_execution_env *host_env)
     error |= __vmwrite(HOST_ES_SELECTOR, host_env->ds_selector);
     error |= __vmwrite(HOST_SS_SELECTOR, host_env->ds_selector);
     error |= __vmwrite(HOST_DS_SELECTOR, host_env->ds_selector);
+#if defined (__i386__)
     error |= __vmwrite(HOST_FS_SELECTOR, host_env->ds_selector);
     error |= __vmwrite(HOST_GS_SELECTOR, host_env->ds_selector);
+    error |= __vmwrite(HOST_FS_BASE, host_env->ds_base); 
+    error |= __vmwrite(HOST_GS_BASE, host_env->ds_base); 
 
+#else
+    rdmsrl(MSR_FS_BASE, host_env->fs_base); 
+    rdmsrl(MSR_GS_BASE, host_env->gs_base); 
+    error |= __vmwrite(HOST_FS_BASE, host_env->fs_base); 
+    error |= __vmwrite(HOST_GS_BASE, host_env->gs_base); 
+
+#endif
     host_env->cs_selector = __HYPERVISOR_CS;
     error |= __vmwrite(HOST_CS_SELECTOR, host_env->cs_selector);
 
     host_env->ds_base = 0;
     host_env->cs_base = 0;
-    error |= __vmwrite(HOST_FS_BASE, host_env->ds_base);
-    error |= __vmwrite(HOST_GS_BASE, host_env->ds_base);
 
 /* Debug */
     __asm__ __volatile__ ("sidt  (%0) \n" :: "a"(&desc) : "memory");
@@ -366,6 +393,12 @@ static inline int construct_vmcs_host(struct host_execution_env *host_env)
     host_env->cr4 = crn;
     error |= __vmwrite(HOST_CR4, crn);
     error |= __vmwrite(HOST_RIP, (unsigned long) vmx_asm_vmexit_handler);
+#ifdef __x86_64__ 
+    /* TBD: support cr8 for 64-bit guest */ 
+    __vmwrite(VIRTUAL_APIC_PAGE_ADDR, 0); 
+    __vmwrite(TPR_THRESHOLD, 0); 
+    __vmwrite(SECONDARY_VM_EXEC_CONTROL, 0); 
+#endif 
 
     return error;
 }
