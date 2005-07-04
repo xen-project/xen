@@ -3,7 +3,7 @@ Mercurial(hg) Cheatsheet for Xen
 ================================
 
 Written by Andrew Warfield, extended by Michael Fetterman and Ian Pratt
-June 29, 2005
+June 29, 2005, extended by Grzegorz Milos 04 July 2005.
 
 Overview
 --------
@@ -121,7 +121,7 @@ without any merging of any kind.  "hg pull -u" implies merging with
 the current state of your working directory.  If you weren't already
 "updated" to your local repository's tip, you might be surprised to
 find yourself merging the results of the pull with a non-tip node in
-your local repository.  
+your local repository. 
 
 
 Revision History
@@ -258,6 +258,11 @@ Generating a patch is easy,
 
 will generate a patch describing the diff between that changeset and 
 its parent.
+    
+To generate a patch between two specified revisions use:
+   hg diff -r A -r B [files]
+NB: BK syntax -rA..B isn't supported by Hg.   
+
 
 Pushing changesets to a parent repository
 -----------------------------------------
@@ -384,7 +389,7 @@ Additional useful commands
 Shows the differences between whatever changeset you most recently
 checked out, and your current working directory:
 
-   hg diff
+   hg diff 
 
 View an annotated version of a source file:
 
