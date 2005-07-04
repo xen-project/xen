@@ -43,8 +43,8 @@ class XendNode:
 
     def physinfo(self):
         pinfo = self.xc.physinfo()
-        info = [['cores', pinfo['cores']],
-                ['hyperthreads_per_core', pinfo['ht_per_core']],
+        info = [['cores_per_socket', pinfo['cores_per_socket']],
+                ['threads_per_core', pinfo['threads_per_core']],
                 ['cpu_mhz', pinfo['cpu_khz']/1000],
                 ['memory', pinfo['total_pages']/256],
                 ['free_memory', pinfo['free_pages']/256]]

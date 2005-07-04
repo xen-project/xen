@@ -273,7 +273,10 @@ unsigned int get_num_cpus()
 
     xc_interface_close(xc_handle);
 
-    return op.u.physinfo.ht_per_core * op.u.physinfo.cores;
+    return (op.u.physinfo.threads_per_core *
+            op.u.physinfo.cores_per_socket *
+            op.u.physinfo.sockets_per_node *
+            op.u.physinfo.nr_nodes);
 }
 
 

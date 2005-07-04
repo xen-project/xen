@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA1009
+#define DOM0_INTERFACE_VERSION   0xAAAA100A
 
 /************************************************************************/
 
@@ -206,8 +206,10 @@ typedef struct {
  */
 #define DOM0_PHYSINFO         22
 typedef struct {
-    u32      ht_per_core;
-    u32      cores;
+    u32      threads_per_core;
+    u32      cores_per_socket;
+    u32      sockets_per_node;
+    u32      nr_nodes;
     u32      cpu_khz;
     memory_t total_pages;
     memory_t free_pages;

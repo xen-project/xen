@@ -179,11 +179,14 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     {
         dom0_physinfo_t *pi = &op->u.physinfo;
 
-        pi->ht_per_core = smp_num_siblings;
-        pi->cores       = boot_cpu_data.x86_num_cores;
-        pi->total_pages = max_page;
-        pi->free_pages  = avail_domheap_pages();
-        pi->cpu_khz     = cpu_khz;
+        pi->threads_per_core = smp_num_siblings;
+        pi->cores_per_socket = boot_cpu_data.x86_num_cores;
+        pi->sockets_per_node = 
+            num_online_cpus() / (pi->threads_per_core * pi->cores_per_socket);
+        pi->nr_nodes         = 1;
+        pi->total_pages      = max_page;
+        pi->free_pages       = avail_domheap_pages();
+        pi->cpu_khz          = cpu_khz;
 
         copy_to_user(u_dom0_op, op, sizeof(*op));
         ret = 0;

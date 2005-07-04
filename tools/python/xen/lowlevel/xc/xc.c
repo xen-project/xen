@@ -47,7 +47,8 @@ static PyObject *pyxc_domain_dumpcore(PyObject *self,
 
     static char *kwd_list[] = { "dom", "corefile", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list, &dom, &corefile) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list,
+                                      &dom, &corefile) )
         goto exit;
 
     if ( (corefile == NULL) || (corefile[0] == '\0') )
@@ -82,7 +83,8 @@ static PyObject *pyxc_domain_create(PyObject *self,
 
     static char *kwd_list[] = { "dom", "ssidref", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwd_list, &dom, &ssidref))
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwd_list,
+                                      &dom, &ssidref))
         return NULL;
 
     if ( (ret = xc_domain_create(xc->xc_handle, ssidref, &dom)) < 0 )
@@ -687,11 +689,13 @@ static PyObject *pyxc_physinfo(PyObject *self,
         return PyErr_SetFromErrno(xc_error);
 
     return Py_BuildValue("{s:i,s:i,s:l,s:l,s:l}",
-                         "ht_per_core", info.ht_per_core,
-                         "cores",       info.cores,
-                         "total_pages", info.total_pages,
-                         "free_pages",  info.free_pages,
-                         "cpu_khz",     info.cpu_khz);
+                         "threads_per_core", info.threads_per_core,
+                         "cores_per_socket", info.cores_per_socket,
+                         "sockets_per_node", info.sockets_per_node,
+                         "nr_nodes",         info.nr_nodes,
+                         "total_pages",      info.total_pages,
+                         "free_pages",       info.free_pages,
+                         "cpu_khz",          info.cpu_khz);
 }
 
 static PyObject *pyxc_sedf_domain_set(PyObject *self,
@@ -702,12 +706,15 @@ static PyObject *pyxc_sedf_domain_set(PyObject *self,
     u32 domid;
     u64 period, slice, latency;
     u16 extratime, weight;
-    static char *kwd_list[] = { "dom", "period", "slice", "latency", "extratime", "weight",NULL };
+    static char *kwd_list[] = { "dom", "period", "slice",
+                                "latency", "extratime", "weight",NULL };
     
-    if( !PyArg_ParseTupleAndKeywords(args, kwds, "iLLLhh", kwd_list, &domid,
-                                     &period, &slice, &latency, &extratime, &weight) )
+    if( !PyArg_ParseTupleAndKeywords(args, kwds, "iLLLhh", kwd_list, 
+                                     &domid, &period, &slice,
+                                     &latency, &extratime, &weight) )
         return NULL;
-   if ( xc_sedf_domain_set(xc->xc_handle, domid, period, slice, latency, extratime,weight) != 0 )
+   if ( xc_sedf_domain_set(xc->xc_handle, domid, period,
+                           slice, latency, extratime,weight) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     Py_INCREF(zero);
