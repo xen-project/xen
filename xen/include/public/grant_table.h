@@ -259,13 +259,4 @@ typedef struct gnttab_dump_table {
     "permission denied"                         \
 }
 
-typedef struct gnttab_op {
-    union {
-        gnttab_map_grant_ref_t    map_grant_ref;
-        gnttab_unmap_grant_ref_t  unmap_grant_ref;
-        gnttab_setup_table_t      setup_table;
-        gnttab_dump_table_t       dump_table;
-    } u;
-} gnttab_op_t;
-
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */

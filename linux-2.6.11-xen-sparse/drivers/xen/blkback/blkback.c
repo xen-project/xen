@@ -116,23 +116,23 @@ static void make_response(blkif_t *blkif, unsigned long id,
 static void fast_flush_area(int idx, int nr_pages)
 {
 #ifdef CONFIG_XEN_BLKDEV_GRANT
-    gnttab_op_t       aop[BLKIF_MAX_SEGMENTS_PER_REQUEST];
-    unsigned int      i, invcount = 0;
-    u16               handle;
+    struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+    unsigned int i, invcount = 0;
+    u16 handle;
 
     for ( i = 0; i < nr_pages; i++ )
     {
         if ( BLKBACK_INVALID_HANDLE != ( handle = pending_handle(idx, i) ) )
         {
-            aop[i].u.unmap_grant_ref.host_virt_addr = MMAP_VADDR(idx, i);
-            aop[i].u.unmap_grant_ref.dev_bus_addr   = 0;
-            aop[i].u.unmap_grant_ref.handle         = handle;
+            unmap[i].host_virt_addr = MMAP_VADDR(idx, i);
+            unmap[i].dev_bus_addr   = 0;
+            unmap[i].handle         = handle;
             pending_handle(idx, i) = BLKBACK_INVALID_HANDLE;
             invcount++;
         }
     }
     if ( unlikely(HYPERVISOR_grant_table_op(
-                    GNTTABOP_unmap_grant_ref, aop, invcount)))
+                    GNTTABOP_unmap_grant_ref, unmap, invcount)))
         BUG();
 #else
 
@@ -387,21 +387,21 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
 
 #ifdef CONFIG_XEN_BLKDEV_GRANT
     {
-        gnttab_op_t     op;
+        struct gnttab_map_grant_ref map;
 
-        op.u.map_grant_ref.host_virt_addr = MMAP_VADDR(pending_idx, 0);
-        op.u.map_grant_ref.flags = GNTMAP_host_map;
-        op.u.map_grant_ref.ref = blkif_gref_from_fas(req->frame_and_sects[0]);
-        op.u.map_grant_ref.dom = blkif->domid;
+        map.host_virt_addr = MMAP_VADDR(pending_idx, 0);
+        map.flags = GNTMAP_host_map;
+        map.ref = blkif_gref_from_fas(req->frame_and_sects[0]);
+        map.dom = blkif->domid;
 
         if ( unlikely(HYPERVISOR_grant_table_op(
-                        GNTTABOP_map_grant_ref, &op, 1)))
+                        GNTTABOP_map_grant_ref, &map, 1)))
             BUG();
 
-        if ( op.u.map_grant_ref.handle < 0 )
+        if ( map.handle < 0 )
             goto out;
 
-        pending_handle(pending_idx, 0) = op.u.map_grant_ref.handle;
+        pending_handle(pending_idx, 0) = map.handle;
     }
 #else /* else CONFIG_XEN_BLKDEV_GRANT */
 
@@ -445,7 +445,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     int i, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
     pending_req_t *pending_req;
 #ifdef CONFIG_XEN_BLKDEV_GRANT
-    gnttab_op_t       aop[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+    struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 #else
     unsigned long remap_prot;
     multicall_entry_t mcl[BLKIF_MAX_SEGMENTS_PER_REQUEST];
@@ -486,21 +486,21 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
             goto bad_descriptor;
         preq.nr_sects += seg[i].nsec;
 
-        aop[i].u.map_grant_ref.host_virt_addr = MMAP_VADDR(pending_idx, i);
-        aop[i].u.map_grant_ref.dom = blkif->domid;
-        aop[i].u.map_grant_ref.ref = blkif_gref_from_fas(fas);
-        aop[i].u.map_grant_ref.flags = GNTMAP_host_map;
+        map[i].host_virt_addr = MMAP_VADDR(pending_idx, i);
+        map[i].dom = blkif->domid;
+        map[i].ref = blkif_gref_from_fas(fas);
+        map[i].flags = GNTMAP_host_map;
         if ( operation == WRITE )
-            aop[i].u.map_grant_ref.flags |= GNTMAP_readonly;
+            map[i].flags |= GNTMAP_readonly;
     }
 
     if ( unlikely(HYPERVISOR_grant_table_op(
-                    GNTTABOP_map_grant_ref, aop, nseg)))
+                    GNTTABOP_map_grant_ref, map, nseg)))
         BUG();
 
     for ( i = 0; i < nseg; i++ )
     {
-        if ( unlikely(aop[i].u.map_grant_ref.handle < 0) )
+        if ( unlikely(map[i].handle < 0) )
         {
             DPRINTK("invalid buffer -- could not remap it\n");
             fast_flush_area(pending_idx, nseg);
@@ -508,9 +508,9 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         }
 
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
-            FOREIGN_FRAME(aop[i].u.map_grant_ref.dev_bus_addr);
+            FOREIGN_FRAME(map[i].dev_bus_addr);
 
-        pending_handle(pending_idx, i) = aop[i].u.map_grant_ref.handle;
+        pending_handle(pending_idx, i) = map[i].handle;
     }
 #endif
 
@@ -518,7 +518,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     {
         fas         = req->frame_and_sects[i];
 #ifdef CONFIG_XEN_BLKDEV_GRANT
-        seg[i].buf  = (aop[i].u.map_grant_ref.dev_bus_addr << PAGE_SHIFT) |
+        seg[i].buf  = (map[i].dev_bus_addr << PAGE_SHIFT) |
                       (blkif_first_sect(fas) << 9);
 #else
         seg[i].buf  = (fas & PAGE_MASK) | (blkif_first_sect(fas) << 9);
