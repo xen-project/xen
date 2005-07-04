@@ -273,6 +273,12 @@ Pushes changes up to a parent. You can't push if you pulled the
 repository off the web interface. In fact, you can currently only push
 to an ssh target -- filesystem drectory targets don't work, but this
 will be fixed soon.
+For now it is possible to set up assymetric pull/push paths. Pulls can
+be done via web interface while pushes via ssh. Example of .hg/hgrc config
+file:
+  | [paths]
+  | default = http://your.server/repository_name
+  | default-push = ssh://[username@]your.server//repository_location
 
 
 Repository history
