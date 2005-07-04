@@ -907,6 +907,24 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			continue;
 		}
 
+                if (vma && (vma->vm_flags & VM_FOREIGN))
+                {
+                    struct page **map = vma->vm_private_data;
+                    int offset = (start - vma->vm_start) >> PAGE_SHIFT;
+
+                    if (map[offset] != NULL) {
+                        if (pages) {
+                            pages[i] = map[offset];
+                        } 
+                        if (vmas) 
+                            vmas[i] = vma;
+                        i++;
+                        start += PAGE_SIZE;
+                        len--;
+                        continue;
+                    }
+                }
+
 		if (!vma || (vma->vm_flags & VM_IO)
 				|| !(flags & vma->vm_flags))
 			return i ? : -EFAULT;
