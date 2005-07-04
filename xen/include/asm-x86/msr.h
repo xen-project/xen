@@ -18,6 +18,8 @@
 			  : /* no outputs */ \
 			  : "c" (msr), "a" (val1), "d" (val2))
 
+#define wrmsrl(msr,val) wrmsr(msr,(__u32)((__u64)(val)),((__u64)(val))>>32) 
+
 #define rdmsr_user(msr,val1,val2) ({\
     int _rc; \
     __asm__ __volatile__( \

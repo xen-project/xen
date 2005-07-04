@@ -27,6 +27,14 @@
 extern int start_vmx(void);
 extern void stop_vmx(void);
 
+#if defined (__x86_64__)
+extern void vmx_load_msrs(struct vcpu *p, struct vcpu *n);
+void vmx_restore_msrs(struct vcpu *d);
+#else
+#define vmx_load_msrs(_p, _n)      ((void)0)
+#define vmx_restore_msrs(_v)       ((void)0)
+#endif
+
 void vmx_enter_scheduler(void);
 
 enum {
@@ -87,7 +95,6 @@ struct vmcs_struct *alloc_vmcs(void);
 void free_vmcs(struct vmcs_struct *);
 int  load_vmcs(struct arch_vmx_struct *, u64);
 int  store_vmcs(struct arch_vmx_struct *, u64);
-void dump_vmcs(void);
 int  construct_vmcs(struct arch_vmx_struct *, struct cpu_user_regs *, 
                     struct vcpu_guest_context *, int);
 
