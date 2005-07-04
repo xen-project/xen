@@ -296,6 +296,8 @@ void arch_do_boot_vcpu(struct vcpu *v)
 }
 
 #ifdef CONFIG_VMX
+static int vmx_switch_on;
+
 void arch_vmx_do_resume(struct vcpu *v) 
 {
     u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
@@ -363,6 +365,9 @@ static int vmx_final_setup_guest(
                            SHM_enable|SHM_refcounts|
                            SHM_translate|SHM_external);
     }
+
+    if (!vmx_switch_on)
+        vmx_switch_on = 1;
 
     return 0;
 
@@ -441,9 +446,12 @@ int arch_set_info_guest(
     }
     else
     {
-        if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
-                                PGT_base_page_table) )
-            return -EINVAL;
+#ifdef __x86_64__
+        if ( !(c->flags & VGCF_VMX_GUEST) )
+#endif
+            if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
+                  PGT_base_page_table) )
+                return -EINVAL;
     }
 
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
@@ -523,6 +531,12 @@ void toggle_guest_mode(struct vcpu *v)
         ".previous"                             \
         : "=r" (__r) : "r" (value), "0" (__r) );\
     __r; })
+
+#if CONFIG_VMX
+#define load_msrs(_p, _n)     if (vmx_switch_on) vmx_load_msrs((_p), (_n))
+#else
+#define load_msrs(_p, _n)     ((void)0)
+#endif 
 
 static void load_segments(struct vcpu *p, struct vcpu *n)
 {
@@ -681,6 +695,7 @@ long do_switch_to_user(void)
 #elif defined(__i386__)
 
 #define load_segments(_p, _n) ((void)0)
+#define load_msrs(_p, _n)     ((void)0)
 #define save_segments(_p)     ((void)0)
 #define clear_segments()      ((void)0)
 
@@ -780,6 +795,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         {
             load_LDT(next);
             load_segments(realprev, next);
+            load_msrs(realprev, next);
         }
     }
 
