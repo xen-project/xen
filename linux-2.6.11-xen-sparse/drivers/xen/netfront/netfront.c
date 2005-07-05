@@ -395,10 +395,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 	phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] 
 	    = INVALID_P2M_ENTRY;
 
-        rx_mcl[i].op = __HYPERVISOR_update_va_mapping;
-        rx_mcl[i].args[0] = (unsigned long)skb->head;
-        rx_mcl[i].args[1] = 0;
-        rx_mcl[i].args[2] = 0;
+	MULTI_update_va_mapping(rx_mcl+i, (unsigned long)skb->head,
+				__pte(0), 0);
     }
 
     /* After all PTEs have been zapped we blow away stale TLB entries. */
@@ -585,10 +583,8 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         mmu->ptr  = (rx->addr & PAGE_MASK) | MMU_MACHPHYS_UPDATE;
         mmu->val  = __pa(skb->head) >> PAGE_SHIFT;
         mmu++;
-        mcl->op = __HYPERVISOR_update_va_mapping;
-        mcl->args[0] = (unsigned long)skb->head;
-        mcl->args[1] = (rx->addr & PAGE_MASK) | __PAGE_KERNEL;
-        mcl->args[2] = 0;
+	MULTI_update_va_mapping(mcl, (unsigned long)skb->head,
+				pfn_pte_ma(rx->addr >> PAGE_SHIFT, PAGE_KERNEL), 0);
         mcl++;
 
         phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = 

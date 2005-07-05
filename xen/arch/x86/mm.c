@@ -2020,7 +2020,8 @@ int do_mmu_update(
             }
 
             va = map_domain_page_with_cache(mfn, &mapcache);
-            va = (void *)((unsigned long)va + (req.ptr & ~PAGE_MASK));
+            va = (void *)((unsigned long)va +
+                          (unsigned long)(req.ptr & ~PAGE_MASK));
             page = &frame_table[mfn];
 
             switch ( (type_info = page->u.inuse.type_info) & PGT_type_mask )
@@ -2164,7 +2165,7 @@ int do_mmu_update(
             break;
 
         default:
-            MEM_LOG("Invalid page update command %lx", req.ptr);
+            MEM_LOG("Invalid page update command %x", cmd);
             break;
         }
 
@@ -2251,11 +2252,10 @@ int update_grant_va_mapping(unsigned long va,
 }
 
 
-int do_update_va_mapping(unsigned long va,
-                         unsigned long val32,
+int do_update_va_mapping(unsigned long va, u64 val64,
                          unsigned long flags)
 {
-    l1_pgentry_t   val = l1e_from_intpte(val32);
+    l1_pgentry_t   val = l1e_from_intpte(val64);
     struct vcpu   *v   = current;
     struct domain *d   = v->domain;
     unsigned int   cpu = v->processor;
@@ -2349,8 +2349,7 @@ int do_update_va_mapping(unsigned long va,
     return rc;
 }
 
-int do_update_va_mapping_otherdomain(unsigned long va,
-                                     unsigned long val32,
+int do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
                                      unsigned long flags,
                                      domid_t domid)
 {
@@ -2368,7 +2367,7 @@ int do_update_va_mapping_otherdomain(unsigned long va,
         return -ESRCH;
     }
 
-    rc = do_update_va_mapping(va, val32, flags);
+    rc = do_update_va_mapping(va, val64, flags);
 
     return rc;
 }

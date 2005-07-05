@@ -274,8 +274,8 @@ typedef u16 domid_t;
  */
 typedef struct
 {
-    memory_t ptr;       /* Machine address of PTE. */
-    memory_t val;       /* New contents of PTE.    */
+    u64 ptr;       /* Machine address of PTE. */
+    u64 val;       /* New contents of PTE.    */
 } mmu_update_t;
 
 /*

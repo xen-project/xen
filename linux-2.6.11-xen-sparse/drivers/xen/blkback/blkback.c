@@ -141,10 +141,8 @@ static void fast_flush_area(int idx, int nr_pages)
 
     for ( i = 0; i < nr_pages; i++ )
     {
-        mcl[i].op = __HYPERVISOR_update_va_mapping;
-        mcl[i].args[0] = MMAP_VADDR(idx, i);
-        mcl[i].args[1] = 0;
-        mcl[i].args[2] = 0;
+	MULTI_update_va_mapping(mcl+i, MMAP_VADDR(idx, i),
+				__pte(0), 0);
     }
 
     mcl[nr_pages-1].args[2] = UVMF_TLB_FLUSH|UVMF_ALL;
@@ -545,11 +543,10 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 
     for ( i = 0; i < nseg; i++ )
     {
-        mcl[i].op = __HYPERVISOR_update_va_mapping_otherdomain;
-        mcl[i].args[0] = MMAP_VADDR(pending_idx, i);
-        mcl[i].args[1] = (seg[i].buf & PAGE_MASK) | remap_prot;
-        mcl[i].args[2] = 0;
-        mcl[i].args[3] = blkif->domid;
+	MULTI_update_va_mapping_otherdomain(
+	    mcl+i, MMAP_VADDR(pending_idx, i),
+	    pfn_pte_ma(seg[i].buf >> PAGE_SHIFT, remap_prot),
+	    0, blkif->domid);
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
         if ( blkif->is_blktap )
             mcl[i].args[3] = ID_TO_DOM(req->id);

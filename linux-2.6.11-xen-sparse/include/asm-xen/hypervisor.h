@@ -139,4 +139,49 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages);
 
 #include <asm/hypercall.h>
 
+static inline void
+MULTI_update_va_mapping(
+    multicall_entry_t *mcl, unsigned long va,
+    pte_t new_val, unsigned long flags)
+{
+    mcl->op = __HYPERVISOR_update_va_mapping;
+    mcl->args[0] = va;
+#if defined(CONFIG_X86_64)
+    mcl->args[1] = new_val.pte;
+    mcl->args[2] = flags;
+#elif defined(CONFIG_X86_PAE)
+    mcl->args[1] = new_val.pte_low;
+    mcl->args[2] = new_val.pte_high;
+    mcl->args[3] = flags;
+#else
+    mcl->args[1] = new_val.pte_low;
+    mcl->args[2] = 0;
+    mcl->args[3] = flags;
+#endif
+}
+
+static inline void
+MULTI_update_va_mapping_otherdomain(
+    multicall_entry_t *mcl, unsigned long va,
+    pte_t new_val, unsigned long flags, domid_t domid)
+{
+    mcl->op = __HYPERVISOR_update_va_mapping_otherdomain;
+    mcl->args[0] = va;
+#if defined(CONFIG_X86_64)
+    mcl->args[1] = new_val.pte;
+    mcl->args[2] = flags;
+    mcl->args[3] = domid;
+#elif defined(CONFIG_X86_PAE)
+    mcl->args[1] = new_val.pte_low;
+    mcl->args[2] = new_val.pte_high;
+    mcl->args[3] = flags;
+    mcl->args[4] = domid;
+#else
+    mcl->args[1] = new_val.pte_low;
+    mcl->args[2] = 0;
+    mcl->args[3] = flags;
+    mcl->args[4] = domid;
+#endif
+}
+
 #endif /* __HYPERVISOR_H__ */

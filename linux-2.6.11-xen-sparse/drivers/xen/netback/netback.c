@@ -234,11 +234,9 @@ static void net_rx_action(unsigned long unused)
          * Heed the comment in pgtable-2level.h:pte_page(). :-)
          */
         phys_to_machine_mapping[__pa(skb->data) >> PAGE_SHIFT] = new_mfn;
-        
-        mcl->op = __HYPERVISOR_update_va_mapping;
-        mcl->args[0] = vdata;
-        mcl->args[1] = (new_mfn << PAGE_SHIFT) | __PAGE_KERNEL;
-        mcl->args[2] = 0;
+
+        MULTI_update_va_mapping(mcl, vdata,
+				pfn_pte_ma(new_mfn, PAGE_KERNEL), 0);
         mcl++;
 
         mcl->op = __HYPERVISOR_mmuext_op;
@@ -425,10 +423,8 @@ static void net_tx_action(unsigned long unused)
     while ( dc != dp )
     {
         pending_idx = dealloc_ring[MASK_PEND_IDX(dc++)];
-        mcl[0].op = __HYPERVISOR_update_va_mapping;
-        mcl[0].args[0] = MMAP_VADDR(pending_idx);
-        mcl[0].args[1] = 0;
-        mcl[0].args[2] = 0;
+	MULTI_update_va_mapping(mcl, MMAP_VADDR(pending_idx),
+				__pte(0), 0);
         mcl++;     
     }
 
@@ -571,11 +567,10 @@ static void net_tx_action(unsigned long unused)
         /* Packets passed to netif_rx() must have some headroom. */
         skb_reserve(skb, 16);
 
-        mcl[0].op = __HYPERVISOR_update_va_mapping_otherdomain;
-        mcl[0].args[0] = MMAP_VADDR(pending_idx);
-        mcl[0].args[1] = (txreq.addr & PAGE_MASK) | __PAGE_KERNEL;
-        mcl[0].args[2] = 0;
-        mcl[0].args[3] = netif->domid;
+	MULTI_update_va_mapping_otherdomain(
+	    mcl, MMAP_VADDR(pending_idx),
+	    pfn_pte_ma(txreq.addr >> PAGE_SHIFT, PAGE_KERNEL),
+	    0, netif->domid);
         mcl++;
 
         memcpy(&pending_tx_info[pending_idx].req, &txreq, sizeof(txreq));

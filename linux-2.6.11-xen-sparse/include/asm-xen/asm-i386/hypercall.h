@@ -371,13 +371,19 @@ HYPERVISOR_update_va_mapping(
     unsigned long va, pte_t new_val, unsigned long flags)
 {
     int ret;
-    unsigned long ign1, ign2, ign3;
+    unsigned long ign1, ign2, ign3, ign4;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3)
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
 	: "0" (__HYPERVISOR_update_va_mapping), 
-          "1" (va), "2" ((new_val).pte_low), "3" (flags)
+          "1" (va), "2" ((new_val).pte_low),
+#ifdef CONFIG_X86_PAE
+	  "3" ((new_val).pte_high),
+#else
+	  "3" (0),
+#endif
+	  "4" (flags)
 	: "memory" );
 
     if ( unlikely(ret < 0) )
@@ -473,13 +479,20 @@ HYPERVISOR_update_va_mapping_otherdomain(
     unsigned long va, pte_t new_val, unsigned long flags, domid_t domid)
 {
     int ret;
-    unsigned long ign1, ign2, ign3, ign4;
+    unsigned long ign1, ign2, ign3, ign4, ign5;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3),
+	  "=S" (ign4), "=D" (ign5)
 	: "0" (__HYPERVISOR_update_va_mapping_otherdomain),
-          "1" (va), "2" ((new_val).pte_low), "3" (flags), "4" (domid) :
+          "1" (va), "2" ((new_val).pte_low),
+#ifdef CONFIG_X86_PAE
+	  "3" ((new_val).pte_high),
+#else
+	  "3" (0),
+#endif
+	  "4" (flags), "5" (domid) :
         "memory" );
     
     return ret;

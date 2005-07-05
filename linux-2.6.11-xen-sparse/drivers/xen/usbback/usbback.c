@@ -189,10 +189,8 @@ static void fast_flush_area(int idx, int nr_pages)
 
     for ( i = 0; i < nr_pages; i++ )
     {
-        mcl[i].op = __HYPERVISOR_update_va_mapping;
-        mcl[i].args[0] = MMAP_VADDR(idx, i);
-        mcl[i].args[1] = 0;
-        mcl[i].args[2] = 0;
+	MULTI_update_va_mapping(mcl+i, MMAP_VADDR(idx, i),
+				__pte(0), 0);
     }
 
     mcl[nr_pages-1].args[2] = UVMF_TLB_FLUSH|UVMF_ALL;
@@ -651,11 +649,10 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
     for ( i = 0, offset = 0; offset < req->length;
           i++, offset += PAGE_SIZE )
     {
-	mcl[i].op = __HYPERVISOR_update_va_mapping_otherdomain;
-	mcl[i].args[0] = MMAP_VADDR(pending_idx, i);
-        mcl[i].args[1] = ((buffer_mach & PAGE_MASK) + offset) | remap_prot;
-        mcl[i].args[2] = 0;
-        mcl[i].args[3] = up->domid;
+	MULTI_update_va_mapping_otherdomain(
+	    mcl+i, MMAP_VADDR(pending_idx, i),
+	    pfn_pte_ma(buffer_mach >> PAGE_SHIFT, remap_prot),
+	    0, up->domid);
         
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
             FOREIGN_FRAME((buffer_mach + offset) >> PAGE_SHIFT);
@@ -667,11 +664,10 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
     if ( req->pipe_type == 0 && req->num_iso > 0 ) /* Maybe schedule ISO... */
     {
         /* Map in ISO schedule, if necessary. */
-        mcl[i].op = __HYPERVISOR_update_va_mapping_otherdomain;
-        mcl[i].args[0] = MMAP_VADDR(pending_idx, i);
-        mcl[i].args[1] = (req->iso_schedule & PAGE_MASK) | remap_prot;
-        mcl[i].args[2] = 0;
-        mcl[i].args[3] = up->domid;
+	MULTI_update_va_mapping_otherdomain(
+	    mcl+i, MMAP_VADDR(pending_idx, i),
+	    pfn_pte_ma(req->iso_schedule >> PAGE_SHIFT, remap_prot),
+	    0, up->domid);
 
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
             FOREIGN_FRAME(req->iso_schedule >> PAGE_SHIFT);
