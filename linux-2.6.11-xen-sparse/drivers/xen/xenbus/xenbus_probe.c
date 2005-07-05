@@ -136,7 +136,7 @@ int xenbus_read_string(const char *dir, const char *name, char **val)
 
 int xenbus_write_string(const char *dir, const char *name, const char *val)
 {
-	return xenbus_write(dir, name, val, strlen(val) + 1);
+	return xenbus_write(dir, name, val, strlen(val));
 }
 
 int xenbus_read_ulong(const char *dir, const char *name, unsigned long *val)
@@ -155,7 +155,7 @@ int xenbus_read_ulong(const char *dir, const char *name, unsigned long *val)
 		goto free_data;
 	}
 	*val = simple_strtoul(data, &end, 10);
-	if (end != data + data_n - 1) {
+	if (end != data + data_n) {
 		printk("XENBUS: Path %s/%s, bad parse of '%s' as ulong\n",
 		       dir, name, data);
 		err = -EINVAL;
@@ -173,7 +173,7 @@ int xenbus_write_ulong(const char *dir, const char *name, unsigned long val)
 	char data[32] = {};
 
 	snprintf(data, sizeof(data), "%lu", val);
-	return xenbus_write(dir, name, data, strlen(data) + 1);
+	return xenbus_write(dir, name, data, strlen(data));
 }
 
 int xenbus_read_long(const char *dir, const char *name, long *val)
@@ -192,7 +192,7 @@ int xenbus_read_long(const char *dir, const char *name, long *val)
 		goto free_data;
 	}
 	*val = simple_strtol(data, &end, 10);
-	if (end != data + data_n - 1) {
+	if (end != data + data_n) {
 		printk("XENBUS: Path %s/%s, bad parse of '%s' as long\n",
 		       dir, name, data);
 		err = -EINVAL;
@@ -210,7 +210,7 @@ int xenbus_write_long(const char *dir, const char *name, long val)
 	char data[32] = {};
 
 	snprintf(data, sizeof(data), "%li", val);
-	return xenbus_write(dir, name, data, strlen(data) + 1);
+	return xenbus_write(dir, name, data, strlen(data));
 }
 
 /* Number of characters in string form of a MAC address. */
@@ -272,7 +272,7 @@ int xenbus_read_mac(const char *dir, const char *name, unsigned char mac[6])
 		err = -ENOENT;
 		goto free_data;
 	}
-	err = mac_aton(data, data_n - 1, mac);
+	err = mac_aton(data, data_n, mac);
 	if (err) {
 		printk("XENBUS: Path %s/%s, bad parse of '%s' as mac\n",
 		       dir, name, data);
@@ -288,12 +288,11 @@ int xenbus_read_mac(const char *dir, const char *name, unsigned char mac[6])
 
 int xenbus_write_mac(const char *dir, const char *name, const unsigned char mac[6])
 {
-	char buf[MAC_LENGTH + 1] = {};
+	char buf[MAC_LENGTH] = {};
 	int buf_n = sizeof(buf);
 	
 	snprintf(buf, buf_n, "%02x:%02x:%02x:%02x:%02x:%02x",
 		 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-	buf[buf_n - 1] = '\0';
 	return xenbus_write(dir, name, buf, buf_n);
 }
 
