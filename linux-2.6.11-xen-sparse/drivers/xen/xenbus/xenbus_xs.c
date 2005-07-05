@@ -54,7 +54,8 @@ static int get_error(const char *errorstring)
 
 	for (i = 0; !streq(errorstring, xsd_errors[i].errstring); i++) {
 		if (i == ARRAY_SIZE(xsd_errors) - 1) {
-			printk(KERN_WARNING "XENBUS xen store gave: unknown error %s",
+			printk(KERN_WARNING
+			       "XENBUS xen store gave: unknown error %s",
 			       errorstring);
 			return EINVAL;
 		}
@@ -197,14 +198,14 @@ char **xs_directory(const char *path, unsigned int *num)
 /* Check if a path exists. Return 1 if it does. */
 int xs_exists(const char *path)
 {
-        char **dir;
-        int dir_n;
+	char **dir;
+	int dir_n;
 
-        dir = xs_directory(path, &dir_n);
-        if(IS_ERR(dir))
-                return 0;
-        kfree(dir);
-        return 1;
+	dir = xs_directory(path, &dir_n);
+	if (IS_ERR(dir))
+		return 0;
+	kfree(dir);
+	return 1;
 }
 
 /* Make a directory, creating dirs on the path to it if necessary.
@@ -212,30 +213,29 @@ int xs_exists(const char *path)
  */
 int xs_mkdirs(const char *path)
 {
-        int err = 0;
-        char s[strlen(path) + 1], *p = s;
+	int err = 0;
+	char s[strlen(path) + 1], *p = s;
 
-        if(xs_exists(path))
-                goto out;
-        strcpy(p, path);
-        if(*p == '/')
-                p++;
-        for( ; ; ){
-                p = strchr(p, '/');
-                if(p)
-                        *p = '\0';
-                if(!xs_exists(s)){
-                        err = xs_mkdir(s);
-                        if(err)
-                                goto out;
-                        
-                }
-                if(!p)
-                        break;
-                *p++ = '/';
+	if (xs_exists(path))
+		goto out;
+	strcpy(p, path);
+	if (*p == '/')
+		p++;
+	for (;;) {
+		p = strchr(p, '/');
+		if (p)
+			*p = '\0';
+		if (!xs_exists(s)) {
+			err = xs_mkdir(s);
+			if (err)
+				goto out;
+		}
+		if (!p)
+			break;
+		*p++ = '/';
        }
-  out:
-        return err;
+ out:
+	return err;
 }
 
 
