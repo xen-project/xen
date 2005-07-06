@@ -96,6 +96,8 @@ repository from:
  
   http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads/xen-unstable.hg.tar.gz
 
+  (or copy from /usr/groups/netos/html/xen/downloads/xen-unstable.hg.tar.gz)
+
 Untar the repository on your disk, cd into it, and then pull the most
 recent changes:
 
@@ -430,4 +432,7 @@ Show the parents of a changeset:
  you have two parents.  Otherwise, the single parent is the changeset
  which you most recently checked out.
 
+Show the revision history for a single file
+
+   hg [-v] log <filename>
 
