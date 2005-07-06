@@ -219,9 +219,7 @@ void blkif_connect(blkif_be_connect_t *connect)
         op.ref            = ref;
         op.dom            = domid;
        
-        if(unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))) {
-            BUG();
-        }
+        BUG_ON( HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) );
        
         handle = op.handle;
        
@@ -231,10 +229,6 @@ void blkif_connect(blkif_be_connect_t *connect)
             vfree(vma->addr);
             return;
         }
-
-        phys_to_machine_mapping[__pa(VMALLOC_VMADDR(vma->addr)) >>
-                                PAGE_SHIFT] =
-                      FOREIGN_FRAME(shmem_frame);
 
         blkif->shmem_ref = ref;
         blkif->shmem_handle = handle;

@@ -1,0 +1,48 @@
+
+OS           = linux
+
+LINUX_SERIES = 2.6
+
+EXTRAVERSION = xen
+
+LINUX_DIR    = $(OS)-$(LINUX_VER)-$(EXTRAVERSION)
+
+include buildconfigs/Rules.mk
+
+.PHONY: build clean delete
+
+# The real action starts here!
+build: $(LINUX_DIR)/include/linux/autoconf.h
+	if grep "^CONFIG_MODULES=" $(LINUX_DIR)/.config ; then \
+	    $(MAKE) -C $(LINUX_DIR) ARCH=xen modules ; \
+	    $(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_MOD_PATH=$(DESTDIR) modules_install ; \
+	fi
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(DESTDIR) install
+
+$(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
+	rm -rf $(LINUX_DIR)
+	cp -al $(<D) $(LINUX_DIR)
+	# Apply arch-xen patches
+	( cd linux-$(LINUX_VER)-xen-sparse ; \
+          ./mkbuildtree ../$(LINUX_DIR) )
+	# Re-use config from install dir if one exits else use default config
+	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
+	[ -r $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION-$(EXTRAVERSION) ] && \
+	  cp $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION-$(EXTRAVERSION) $(LINUX_DIR)/.config \
+	  || cp $(LINUX_DIR)/arch/xen/configs/$(EXTRAVERSION)_defconfig_$(XEN_TARGET_ARCH) \
+		$(LINUX_DIR)/.config
+	# Patch kernel Makefile to set EXTRAVERSION
+	( cd $(LINUX_DIR) ; \
+	  sed -e 's/^EXTRAVERSION.*/&$$(XENGUEST)\nXENGUEST = -$(EXTRAVERSION)/' Makefile >Mk.tmp ; \
+	  rm -f Makefile ; mv Mk.tmp Makefile )
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen oldconfig
+
+config: CONFIGMODE = menuconfig
+config: $(LINUX_DIR)/include/linux/autoconf.h
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen $(CONFIGMODE)
+
+clean::
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean
+
+delete: 
+	rm -rf tmp-$(OS)-$(LINUX_VER) $(LINUX_DIR) 

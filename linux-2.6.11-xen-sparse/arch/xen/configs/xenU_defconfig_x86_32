@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.11-xenU
-# Wed May  4 17:14:10 2005
+# Linux kernel version: 2.6.11.12-xenU
+# Wed Jul  6 17:44:54 2005
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -123,8 +123,9 @@ CONFIG_X86_CPUID=y
 # Firmware Drivers
 #
 # CONFIG_EDD is not set
-CONFIG_NOHIGHMEM=y
-# CONFIG_HIGHMEM4G is not set
+# CONFIG_NOHIGHMEM is not set
+CONFIG_HIGHMEM4G=y
+CONFIG_HIGHMEM=y
 CONFIG_HAVE_DEC_LOCK=y
 # CONFIG_REGPARM is not set
 
@@ -139,6 +140,7 @@ CONFIG_MAGIC_SYSRQ=y
 # CONFIG_DEBUG_SPINLOCK is not set
 # CONFIG_DEBUG_SPINLOCK_SLEEP is not set
 # CONFIG_DEBUG_KOBJECT is not set
+# CONFIG_DEBUG_HIGHMEM is not set
 CONFIG_DEBUG_BUGVERBOSE=y
 # CONFIG_DEBUG_INFO is not set
 # CONFIG_DEBUG_FS is not set
