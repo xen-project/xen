@@ -140,6 +140,7 @@ typedef struct blkif_fe_driver_status {
 typedef struct blkif_fe_interface_connect {
     u32      handle;
     memory_t shmem_frame;
+    int      shmem_ref;
 } blkif_fe_interface_connect_t;
 
 /*
@@ -249,6 +250,7 @@ typedef struct blkif_be_connect {
     domid_t    domid;         /* Domain attached to new interface.   */
     u32        blkif_handle;  /* Domain-specific interface handle.   */
     memory_t   shmem_frame;   /* Page cont. shared comms window.     */
+    int        shmem_ref;     /* Grant table reference.              */
     u32        evtchn;        /* Event channel for notifications.    */
     /* OUT */
     u32        status;

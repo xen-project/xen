@@ -126,7 +126,8 @@ class BlkifBackend:
                       { 'domid'        : self.frontendDomain,
                         'blkif_handle' : self.id,
                         'evtchn'       : self.getEventChannelBackend(),
-                        'shmem_frame'  : val['shmem_frame'] })
+                        'shmem_frame'  : val['shmem_frame'],
+                        'shmem_ref'    : val['shmem_ref'] })
         msg = self.backendChannel.requestResponse(msg)
         #todo: check return status
         val = unpackMsg('blkif_be_connect_t', msg)

@@ -39,6 +39,23 @@ static void __blkif_disconnect_complete(void *arg)
      * must still be notified to the remote driver.
      */
     unbind_evtchn_from_irq(blkif->evtchn);
+
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    {
+        /*
+         * Release the shared memory page.
+         */
+        struct gnttab_unmap_grant_ref op;
+
+        op.host_virt_addr = blkif->shmem_vaddr;
+        op.handle         = blkif->shmem_handle;
+        op.dev_bus_addr   = 0;
+
+        if(unlikely(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1))) {
+            BUG();
+        }
+    }
+#endif
     vfree(blkif->blk_ring.sring);
 
     /* Construct the deferred response message. */
@@ -154,8 +171,12 @@ void blkif_connect(blkif_be_connect_t *connect)
     unsigned int   evtchn = connect->evtchn;
     unsigned long  shmem_frame = connect->shmem_frame;
     struct vm_struct *vma;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    int ref = connect->shmem_ref;
+#else
     pgprot_t       prot;
     int            error;
+#endif
     blkif_t       *blkif;
     blkif_sring_t *sring;
 
@@ -174,6 +195,7 @@ void blkif_connect(blkif_be_connect_t *connect)
         return;
     }
 
+#ifndef CONFIG_XEN_BLKDEV_GRANT
     prot = __pgprot(_KERNPG_TABLE);
     error = direct_remap_area_pages(&init_mm, VMALLOC_VMADDR(vma->addr),
                                     shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
@@ -189,6 +211,36 @@ void blkif_connect(blkif_be_connect_t *connect)
         vfree(vma->addr);
         return;
     }
+#else
+    { /* Map: Use the Grant table reference */
+        struct gnttab_map_grant_ref op;
+        op.host_virt_addr = VMALLOC_VMADDR(vma->addr);
+        op.flags          = GNTMAP_host_map;
+        op.ref            = ref;
+        op.dom            = domid;
+       
+        if(unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))) {
+            BUG();
+        }
+       
+        handle = op.handle;
+       
+        if (op.handle < 0) {
+            DPRINTK(" Grant table operation failure !\n");
+            connect->status = BLKIF_BE_STATUS_MAPPING_ERROR;
+            vfree(vma->addr);
+            return;
+        }
+
+        phys_to_machine_mapping[__pa(VMALLOC_VMADDR(vma->addr)) >>
+                                PAGE_SHIFT] =
+                      FOREIGN_FRAME(shmem_frame);
+
+        blkif->shmem_ref = ref;
+        blkif->shmem_handle = handle;
+        blkif->shmem_vaddr = VMALLOC_VMADDR(vma->addr);
+    }
+#endif
 
     if ( blkif->status != DISCONNECTED )
     {

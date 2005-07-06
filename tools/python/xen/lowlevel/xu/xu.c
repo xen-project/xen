@@ -594,6 +594,7 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
     case TYPE(CMSG_BLKIF_FE, CMSG_BLKIF_FE_INTERFACE_CONNECT):
         C2P(blkif_fe_interface_connect_t, handle,      Int, Long);
         C2P(blkif_fe_interface_connect_t, shmem_frame, Int, Long);
+        C2P(blkif_fe_interface_connect_t, shmem_ref  , Int, Long);
         return dict;
     case TYPE(CMSG_BLKIF_FE, CMSG_BLKIF_FE_INTERFACE_DISCONNECT):
         C2P(blkif_fe_interface_disconnect_t, handle, Int, Long);
@@ -612,6 +613,7 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         C2P(blkif_be_connect_t, domid,        Int, Long);
         C2P(blkif_be_connect_t, blkif_handle, Int, Long);
         C2P(blkif_be_connect_t, shmem_frame,  Int, Long);
+        C2P(blkif_be_connect_t, shmem_ref,    Int, Long);
         C2P(blkif_be_connect_t, evtchn,       Int, Long);
         C2P(blkif_be_connect_t, status,       Int, Long);
         return dict;
@@ -842,6 +844,7 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
         P2C(blkif_be_connect_t, domid,        u32);
         P2C(blkif_be_connect_t, blkif_handle, u32);
         P2C(blkif_be_connect_t, shmem_frame,  memory_t);
+        P2C(blkif_be_connect_t, shmem_ref,    u32);
         P2C(blkif_be_connect_t, evtchn,       u16);
         break;
     case TYPE(CMSG_BLKIF_BE, CMSG_BLKIF_BE_DISCONNECT):

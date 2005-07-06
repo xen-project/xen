@@ -1136,6 +1136,12 @@ static void blkif_send_interface_connect(void)
     msg->handle      = 0;
     msg->shmem_frame = (virt_to_machine(blk_ring.sring) >> PAGE_SHIFT);
     
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    msg->shmem_ref   = gnttab_claim_grant_reference( &gref_head, gref_terminal );
+    ASSERT( msg->shmem_ref != -ENOSPC );
+    gnttab_grant_foreign_access_ref ( msg->shmem_ref , rdomid, msg->shmem_frame, 0 );
+#endif
+
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }
 
@@ -1261,9 +1267,6 @@ static void blkif_connect(blkif_fe_interface_status_t *status)
 
     blkif_evtchn = status->evtchn;
     blkif_irq    = bind_evtchn_to_irq(blkif_evtchn);
-#ifdef CONFIG_XEN_BLKDEV_GRANT
-    rdomid       = status->domid;
-#endif
 
     err = request_irq(blkif_irq, blkif_int, SA_SAMPLE_RANDOM, "blkif", NULL);
     if ( err )
@@ -1300,6 +1303,10 @@ static void unexpected(blkif_fe_interface_status_t *status)
 
 static void blkif_status(blkif_fe_interface_status_t *status)
 {
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    rdomid       = status->domid; /* need to set rdomid early */
+#endif
+
     if ( status->handle != blkif_handle )
     {
         WPRINTK(" Invalid blkif: handle=%u\n", status->handle);
