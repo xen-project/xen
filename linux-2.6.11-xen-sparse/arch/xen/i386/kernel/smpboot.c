@@ -103,6 +103,11 @@ static int trampoline_exec;
 DEFINE_PER_CPU(int, cpu_state) = { 0 };
 #endif
 
+static DEFINE_PER_CPU(int, resched_irq);
+static DEFINE_PER_CPU(int, callfunc_irq);
+static char resched_name[NR_CPUS][15];
+static char callfunc_name[NR_CPUS][15];
+
 #if 0
 /*
  * Currently trivial. Write the real->protected mode
@@ -1328,6 +1333,10 @@ static int __devinit cpu_enable(unsigned int cpu)
 	while (!cpu_online(cpu))
 		cpu_relax();
 
+   /* re-route bound IRQs 0 to cpu */
+   rebind_evtchn_from_irq(0, cpu,  per_cpu(resched_irq, cpu));
+   rebind_evtchn_from_irq(0, cpu, per_cpu(callfunc_irq, cpu));
+
 	fixup_irqs(cpu_online_map);
 	/* counter the disable in fixup_irqs() */
 	local_irq_enable();
@@ -1357,6 +1366,11 @@ int __cpu_disable(void)
 
 	cpu_clear(cpu, map);
 	fixup_irqs(map);
+
+   /* re-route IRQs from dead vcpu to another */
+   rebind_evtchn_from_irq(cpu, 0,  per_cpu(resched_irq, cpu));
+   rebind_evtchn_from_irq(cpu, 0, per_cpu(callfunc_irq, cpu));
+
 	/* It's now safe to remove this processor from the online map */
 	cpu_clear(cpu, cpu_online_map);
 
@@ -1513,11 +1527,6 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 extern irqreturn_t smp_reschedule_interrupt(int, void *, struct pt_regs *);
 extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
-
-static DEFINE_PER_CPU(int, resched_irq);
-static DEFINE_PER_CPU(int, callfunc_irq);
-static char resched_name[NR_CPUS][15];
-static char callfunc_name[NR_CPUS][15];
 
 void __init smp_intr_init(void)
 {

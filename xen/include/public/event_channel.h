@@ -158,6 +158,13 @@ typedef struct evtchn_status {
     } u;
 } evtchn_status_t;
 
+#define EVTCHNOP_rebind        8
+typedef struct {
+    /* IN parameters. */
+    u32 port;                         /*  0 */
+    u32 vcpu;                         /*  4 */
+} evtchn_rebind_t; /* 8 bytes */
+
 typedef struct evtchn_op {
     u32 cmd; /* EVTCHNOP_* */
     union {
@@ -169,6 +176,7 @@ typedef struct evtchn_op {
         evtchn_close_t            close;
         evtchn_send_t             send;
         evtchn_status_t           status;
+        evtchn_rebind_t           rebind;
     } u;
 } evtchn_op_t;
 
