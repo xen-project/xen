@@ -1,19 +1,18 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
  ****************************************************************************
  * (C) 2003 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2005 - Grzegorz Milos - Intel Research Cambridge
  ****************************************************************************
  *
  *        File: time.h
  *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
- *     Changes: 
+ *     Changes: Grzegorz Milos (gm281@cam.ac.uk)
  *              
- *        Date: Jul 2003
+ *        Date: Jul 2003, changesJun 2005
  * 
  * Environment: Xen Minimal OS
  * Description: Time and timer functions
  *
- ****************************************************************************
- * $Id: h-insert.h,v 1.4 2002/11/08 16:03:55 rn Exp $
  ****************************************************************************
  */
 
@@ -53,5 +52,6 @@ void     init_time(void);
 s_time_t get_s_time(void);
 s_time_t get_v_time(void);
 void     gettimeofday(struct timeval *tv);
+void     block(u32 millisecs);
 
 #endif /* _TIME_H_ */

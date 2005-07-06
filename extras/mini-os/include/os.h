@@ -23,7 +23,7 @@
 #ifndef __ASSEMBLY__
 #include <types.h>
 #endif
-#include <xen-public/xen.h>
+#include <xen/xen.h>
 
 #define __KERNEL_CS  FLAT_KERNEL_CS
 #define __KERNEL_DS  FLAT_KERNEL_DS
@@ -57,7 +57,6 @@
 #define pt_regs xen_regs
 
 void trap_init(void);
-void dump_regs(struct pt_regs *regs);
 
 /* 
  * The use of 'barrier' in the following reflects their use as local-lock
@@ -274,7 +273,62 @@ static __inline__ void atomic_inc(atomic_t *v)
 #define rdtscll(val) \
      __asm__ __volatile__("rdtsc" : "=A" (val))
 
+static __inline__ unsigned long __ffs(unsigned long word)
+{
+        __asm__("bsfl %1,%0"
+                :"=r" (word)
+                :"rm" (word));
+        return word;
+}
 
+#define ADDR (*(volatile long *) addr)
+
+static __inline__ void synch_set_bit(int nr, volatile void * addr)
+{
+    __asm__ __volatile__ ( 
+        "lock btsl %1,%0"
+        : "=m" (ADDR) : "Ir" (nr) : "memory" );
+}
+
+static __inline__ void synch_clear_bit(int nr, volatile void * addr)
+{
+    __asm__ __volatile__ (
+        "lock btrl %1,%0"
+        : "=m" (ADDR) : "Ir" (nr) : "memory" );
+}
+
+static __inline__ int synch_test_and_set_bit(int nr, volatile void * addr)
+{
+    int oldbit;
+    __asm__ __volatile__ (
+        "lock btsl %2,%1\n\tsbbl %0,%0"
+        : "=r" (oldbit), "=m" (ADDR) : "Ir" (nr) : "memory");
+    return oldbit;
+}
+
+
+static __inline__ int synch_const_test_bit(int nr, const volatile void * addr)
+{
+    return ((1UL << (nr & 31)) & 
+            (((const volatile unsigned int *) addr)[nr >> 5])) != 0;
+}
+
+static __inline__ int synch_var_test_bit(int nr, volatile void * addr)
+{
+    int oldbit;
+    __asm__ __volatile__ (
+        "btl %2,%1\n\tsbbl %0,%0"
+        : "=r" (oldbit) : "m" (ADDR), "Ir" (nr) );
+    return oldbit;
+}
+
+#define synch_test_bit(nr,addr) \
+(__builtin_constant_p(nr) ? \
+ synch_const_test_bit((nr),(addr)) : \
+ synch_var_test_bit((nr),(addr)))
 #endif /* !__ASSEMBLY__ */
+
+#define rdtsc(low,high) \
+     __asm__ __volatile__("rdtsc" : "=a" (low), "=d" (high))
 
 #endif /* _OS_H_ */

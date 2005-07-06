@@ -51,6 +51,7 @@ extras/mini-os/mini-os\..*
 install/.*
 linux-.*-xen0/.*
 linux-.*-xenU/.*
+linux-.*-xen/.*
 linux-.*\.patch
 linux-2\.6\.10-xen-sparse/include/asm-xen/hypervisor\.h\.smh
 linux-xen-sparse

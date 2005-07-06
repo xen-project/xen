@@ -1,5 +1,6 @@
 
 #include <os.h>
+#include <traps.h>
 #include <hypervisor.h>
 #include <mm.h>
 #include <lib.h>
@@ -37,21 +38,22 @@ void dump_regs(struct pt_regs *regs)
 
 #ifdef __x86_64__
     esp = regs->rsp;
-    ss  = regs->ss;
+    ss  = regs->xss;
 #else
     esp = (unsigned long) (&regs->esp);
     ss = __KERNEL_DS;
-    if (regs->cs & 2) {
+    if (regs->xcs & 2) {
+printk("CS is true, esp is %x\n", regs->esp);
         esp = regs->esp;
-        ss = regs->ss & 0xffff;
+        ss = regs->xss & 0xffff;
     }
 #endif
-    printf("EIP:    %04x:[<%p>] %08x\n",
-           0xffff & regs->cs , regs->eip, regs->error_code);
+    printf("EIP:    %04x:[<%p>]\n",
+           0xffff & regs->xcs , regs->eip);
     printf("EFLAGS: %p\n",regs->eflags);
-    printf("eax: %p   ebx: %p   ecx: %p   edx: %p\n",
+    printf("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
            regs->eax, regs->ebx, regs->ecx, regs->edx);
-    printf("esi: %p   edi: %p   ebp: %p   esp: %p\n",
+    printf("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
            regs->esi, regs->edi, regs->ebp, esp);
 #ifdef __x86_64__
     printf("r8 : %p   r9 : %p   r10: %p   r11: %p\n",
@@ -60,40 +62,28 @@ void dump_regs(struct pt_regs *regs)
            regs->r12, regs->r13, regs->r14, regs->r15);
 #endif
     printf("ds: %04x   es: %04x   ss: %04x\n",
-           regs->ds & 0xffff, regs->es & 0xffff, ss);
+           regs->xds & 0xffff, regs->xes & 0xffff, ss);
 }	
 
 
-static __inline__ void dump_code(unsigned long eip)
+static void do_trap(int trapnr, char *str, struct pt_regs * regs, unsigned long error_code)
 {
-    unsigned char *ptr = (unsigned char *)eip;
-    int x;
-    
-    printk("Bytes at eip: ");
-    for ( x = -4; x < 5; x++ )
-        printf("%02x ", ptr[x]);
-    printk("\n");
-}
-
-static void __inline__ do_trap(int trapnr, char *str,
-                               struct pt_regs * regs)
-{
-    printk("FATAL:  Unhandled Trap %d (%s)\n", trapnr, str);
+    printk("FATAL:  Unhandled Trap %d (%s), error code=0x%lx\n", trapnr, str, error_code);
+    printk("Regs address %p\n", regs);
     dump_regs(regs);
-    dump_code(regs->eip);
     do_exit();
 }
 
 #define DO_ERROR(trapnr, str, name) \
-void do_##name(struct pt_regs * regs) \
+void do_##name(struct pt_regs * regs, unsigned long error_code) \
 { \
-	do_trap(trapnr, str, regs); \
+	do_trap(trapnr, str, regs, error_code); \
 }
 
 #define DO_ERROR_INFO(trapnr, str, name, sicode, siaddr) \
-void do_##name(struct pt_regs * regs) \
+void do_##name(struct pt_regs * regs, unsigned long error_code) \
 { \
-	do_trap(trapnr, str, regs); \
+	do_trap(trapnr, str, regs, error_code); \
 }
 
 DO_ERROR_INFO( 0, "divide error", divide_error, FPE_INTDIV, regs->eip)
@@ -109,13 +99,11 @@ DO_ERROR(12, "stack segment", stack_segment)
 DO_ERROR_INFO(17, "alignment check", alignment_check, BUS_ADRALN, 0)
 DO_ERROR(18, "machine check", machine_check)
 
-extern unsigned long virt_cr2;
-void do_page_fault(struct pt_regs *regs)
+void do_page_fault(struct pt_regs *regs, unsigned long error_code,
+								                     unsigned long addr)
 {
-    unsigned long addr = virt_cr2;
     printk("Page fault at linear address %p\n", addr);
     dump_regs(regs);
-    dump_code(regs->eip);
 #ifdef __x86_64__
     {
         unsigned long *tab = (unsigned long *)start_info.pt_base;
@@ -126,35 +114,33 @@ void do_page_fault(struct pt_regs *regs)
         page = tab[l4_table_offset(addr)];
         tab = __va(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
         printk(" L4 = %p (%p)\n", page, tab);
-        if ( !(page & _PAGE_PRESENT) )
+        if ( !(page & AGERESENT) )
             goto out;
 
         page = tab[l3_table_offset(addr)];
         tab = __va(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
         printk("  L3 = %p (%p)\n", page, tab);
-        if ( !(page & _PAGE_PRESENT) )
+        if ( !(page & AGERESENT) )
             goto out;
         
         page = tab[l2_table_offset(addr)];
         tab = __va(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
         printk("   L2 = %p (%p) %s\n", page, tab,
-               (page & _PAGE_PSE) ? "(2MB)" : "");
-        if ( !(page & _PAGE_PRESENT) || (page & _PAGE_PSE) )
+               (page & AGESE) ? "(2MB)" : "");
+        if ( !(page & AGERESENT) || (page & AGESE) )
             goto out;
         
         page = tab[l1_table_offset(addr)];
         printk("    L1 = %p\n", page);
     }
 #endif
- out:
     do_exit();
 }
 
-void do_general_protection(struct pt_regs *regs)
+void do_general_protection(struct pt_regs *regs, long error_code)
 {
-    printk("GPF\n");
+    printk("GPF %p, error_code=%lx\n", regs, error_code);
     dump_regs(regs);
-    dump_code(regs->eip);
     do_exit();
 }
 
@@ -172,7 +158,6 @@ void do_coprocessor_error(struct pt_regs * regs)
 {
     printk("Copro error\n");
     dump_regs(regs);
-    dump_code(regs->eip);
     do_exit();
 }
 
@@ -196,28 +181,25 @@ void do_spurious_interrupt_bug(struct pt_regs * regs)
  * The 'privilege ring' field specifies the least-privileged ring that
  * can trap to that vector using a software-interrupt instruction (INT).
  */
-#ifdef __x86_64__
-#define _P 0,
-#endif
 static trap_info_t trap_table[] = {
-    {  0, 0, __KERNEL_CS, _P (unsigned long)divide_error                },
-    {  1, 0, __KERNEL_CS, _P (unsigned long)debug                       },
-    {  3, 3, __KERNEL_CS, _P (unsigned long)int3                        },
-    {  4, 3, __KERNEL_CS, _P (unsigned long)overflow                    },
-    {  5, 3, __KERNEL_CS, _P (unsigned long)bounds                      },
-    {  6, 0, __KERNEL_CS, _P (unsigned long)invalid_op                  },
-    {  7, 0, __KERNEL_CS, _P (unsigned long)device_not_available        },
-    {  9, 0, __KERNEL_CS, _P (unsigned long)coprocessor_segment_overrun },
-    { 10, 0, __KERNEL_CS, _P (unsigned long)invalid_TSS                 },
-    { 11, 0, __KERNEL_CS, _P (unsigned long)segment_not_present         },
-    { 12, 0, __KERNEL_CS, _P (unsigned long)stack_segment               },
-    { 13, 0, __KERNEL_CS, _P (unsigned long)general_protection          },
-    { 14, 0, __KERNEL_CS, _P (unsigned long)page_fault                  },
-    { 15, 0, __KERNEL_CS, _P (unsigned long)spurious_interrupt_bug      },
-    { 16, 0, __KERNEL_CS, _P (unsigned long)coprocessor_error           },
-    { 17, 0, __KERNEL_CS, _P (unsigned long)alignment_check             },
-    { 18, 0, __KERNEL_CS, _P (unsigned long)machine_check               },
-    { 19, 0, __KERNEL_CS, _P (unsigned long)simd_coprocessor_error      },
+    {  0, 0, __KERNEL_CS, (unsigned long)divide_error                },
+    {  1, 0, __KERNEL_CS, (unsigned long)debug                       },
+    {  3, 3, __KERNEL_CS, (unsigned long)int3                        },
+    {  4, 3, __KERNEL_CS, (unsigned long)overflow                    },
+    {  5, 3, __KERNEL_CS, (unsigned long)bounds                      },
+    {  6, 0, __KERNEL_CS, (unsigned long)invalid_op                  },
+    {  7, 0, __KERNEL_CS, (unsigned long)device_not_available        },
+    {  9, 0, __KERNEL_CS, (unsigned long)coprocessor_segment_overrun },
+    { 10, 0, __KERNEL_CS, (unsigned long)invalid_TSS                 },
+    { 11, 0, __KERNEL_CS, (unsigned long)segment_not_present         },
+    { 12, 0, __KERNEL_CS, (unsigned long)stack_segment               },
+    { 13, 0, __KERNEL_CS, (unsigned long)general_protection          },
+    { 14, 0, __KERNEL_CS, (unsigned long)page_fault                  },
+    { 15, 0, __KERNEL_CS, (unsigned long)spurious_interrupt_bug      },
+    { 16, 0, __KERNEL_CS, (unsigned long)coprocessor_error           },
+    { 17, 0, __KERNEL_CS, (unsigned long)alignment_check             },
+    { 18, 0, __KERNEL_CS, (unsigned long)machine_check               },
+    { 19, 0, __KERNEL_CS, (unsigned long)simd_coprocessor_error      },
     {  0, 0,           0, 0                           }
 };
     
@@ -227,3 +209,4 @@ void trap_init(void)
 {
     HYPERVISOR_set_trap_table(trap_table);    
 }
+

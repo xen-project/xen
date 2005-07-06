@@ -2,10 +2,12 @@
  ****************************************************************************
  * (C) 2003 - Rolf Neugebauer - Intel Research Cambridge
  * (C) 2002-2003 - Keir Fraser - University of Cambridge 
+ * (C) 2005 - Grzegorz Milos - Intel Research Cambridge
  ****************************************************************************
  *
  *        File: time.c
  *      Author: Rolf Neugebauer and Keir Fraser
+ *     Changes: Grzegorz Milos
  *
  * Description: Simple time and timer functions
  *
@@ -30,6 +32,7 @@
 
 
 #include <os.h>
+#include <traps.h>
 #include <types.h>
 #include <hypervisor.h>
 #include <events.h>
@@ -40,9 +43,13 @@
  * Time functions
  *************************************************************************/
 
-static unsigned int rdtsc_bitshift;
-static u32 st_scale_f; /* convert ticks -> usecs */
-static u32 st_scale_i; /* convert ticks -> usecs */
+/* Cached *multiplier* to convert TSC counts to microseconds.
+ * (see the equation below).
+ * Equal to 2^32 * (1 / (clocks per usec) ).
+ * Initialized in time_init.
+ */
+static unsigned long fast_gettimeoffset_quotient;
+
 
 /* These are peridically updated in shared_info, and then copied here. */
 static u32 shadow_tsc_stamp;
@@ -70,7 +77,7 @@ static void get_time_values_from_xen(void)
         rmb();
         shadow_tv.tv_sec    = HYPERVISOR_shared_info->wc_sec;
         shadow_tv.tv_usec   = HYPERVISOR_shared_info->wc_usec;
-        shadow_tsc_stamp    = HYPERVISOR_shared_info->tsc_timestamp.tsc_bits;
+        shadow_tsc_stamp    = (u32)HYPERVISOR_shared_info->tsc_timestamp;
         shadow_system_time  = HYPERVISOR_shared_info->system_time;
         rmb();
     }
@@ -81,22 +88,33 @@ static void get_time_values_from_xen(void)
 #define TIME_VALUES_UP_TO_DATE \
     (shadow_time_version == HYPERVISOR_shared_info->time_version2)
 
-
-static __inline__ unsigned long get_time_delta_usecs(void)
+static u32  get_time_delta_usecs(void)
 {
-    s32      delta_tsc;
-    u32      low;
-    u64      delta, tsc;
+	register unsigned long eax, edx;
 
-    rdtscll(tsc);
-    low = (u32)(tsc >> rdtsc_bitshift);
-    delta_tsc = (s32)(low - shadow_tsc_stamp);
-    if ( unlikely(delta_tsc < 0) ) delta_tsc = 0;
-    delta = ((u64)delta_tsc * st_scale_f);
-    delta >>= 32;
-    delta += ((u64)delta_tsc * st_scale_i);
+	/* Read the Time Stamp Counter */
 
-    return (unsigned long)delta;
+	rdtsc(eax,edx);
+
+	/* .. relative to previous jiffy (32 bits is enough) */
+	eax -= shadow_tsc_stamp;
+
+	/*
+	 * Time offset = (tsc_low delta) * fast_gettimeoffset_quotient
+	 *             = (tsc_low delta) * (usecs_per_clock)
+	 *             = (tsc_low delta) * (usecs_per_jiffy / clocks_per_jiffy)
+	 *
+	 * Using a mull instead of a divl saves up to 31 clock cycles
+	 * in the critical path.
+	 */
+
+	__asm__("mull %2"
+		:"=a" (eax), "=d" (edx)
+		:"rm" (fast_gettimeoffset_quotient),
+		 "0" (eax));
+
+	/* our adjusted time offset in microseconds */
+	return edx;
 }
 
 s64 get_s_time (void)
@@ -139,6 +157,25 @@ void gettimeofday(struct timeval *tv)
     *tv = _tv;
 }
 
+static void print_current_time(void)
+{
+    struct timeval tv;
+
+    get_time_values_from_xen();
+
+    gettimeofday(&tv);
+    printk("T(s=%ld us=%ld)\n", tv.tv_sec, tv.tv_usec);
+}
+
+void block(u32 millisecs)
+{
+    struct timeval tv;
+    gettimeofday(&tv);
+    //printk("tv.tv_sec=%ld, tv.tv_usec=%ld, shadow_system_time=%lld\n", tv.tv_sec, tv.tv_usec, shadow_system_time );
+    HYPERVISOR_set_timer_op(get_s_time() + 1000000LL * (s64) millisecs);
+    HYPERVISOR_block();
+}
+
 
 /*
  * Just a dummy 
@@ -146,41 +183,38 @@ void gettimeofday(struct timeval *tv)
 static void timer_handler(int ev, struct pt_regs *regs)
 {
     static int i;
-    struct timeval tv;
 
     get_time_values_from_xen();
 
     i++;
     if (i >= 1000) {
-        gettimeofday(&tv);
-        printf("T(s=%ld us=%ld)\n", tv.tv_sec, tv.tv_usec);
+        print_current_time();
         i = 0;
     }
 }
 
 
+
 void init_time(void)
 {
-    u64         __cpu_khz, cpu_freq, scale;
+    u64         __cpu_khz;
     unsigned long cpu_khz;
 
     __cpu_khz = HYPERVISOR_shared_info->cpu_freq;
+
     cpu_khz = (u32) (__cpu_khz/1000);
-
-    rdtsc_bitshift = HYPERVISOR_shared_info->tsc_timestamp.tsc_bitshift;
-    cpu_freq       = HYPERVISOR_shared_info->cpu_freq;
-
-    scale = 1000000LL << (32 + rdtsc_bitshift);
-    scale /= cpu_freq;
-
-    st_scale_f = scale & 0xffffffff;
-    st_scale_i = scale >> 32;
 
     printk("Xen reported: %lu.%03lu MHz processor.\n", 
            cpu_khz / 1000, cpu_khz % 1000);
+	/* (10^6 * 2^32) / cpu_hz = (10^3 * 2^32) / cpu_khz =
+	   (2^32 * 1 / (clocks/us)) */
+	{	
+		unsigned long eax=0, edx=1000;
+		__asm__("divl %2"
+		    :"=a" (fast_gettimeoffset_quotient), "=d" (edx)
+		    :"r" (cpu_khz),
+		    "0" (eax), "1" (edx));
+	}
 
-    add_ev_action(EV_TIMER, &timer_handler);
-    enable_ev_action(EV_TIMER);
-    enable_hypervisor_event(EV_TIMER);
-
+    bind_virq(VIRQ_TIMER, &timer_handler);
 }

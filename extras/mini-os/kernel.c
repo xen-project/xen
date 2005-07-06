@@ -5,6 +5,7 @@
  * from head.S.
  * 
  * Copyright (c) 2002-2003, K A Fraser & R Neugebauer
+ * Copyright (c) 2005, Grzegorz Milos, Intel Research Cambridge
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -56,10 +57,6 @@ char stack[8192];
 void hypervisor_callback(void);
 void failsafe_callback(void);
 
-/* default event handlers */
-static void exit_handler(int ev, struct pt_regs *regs);
-static void debug_handler(int ev, struct pt_regs *regs);
-
 extern char shared_info[PAGE_SIZE];
 
 static shared_info_t *map_shared_info(unsigned long pa)
@@ -80,6 +77,7 @@ static shared_info_t *map_shared_info(unsigned long pa)
 void start_kernel(start_info_t *si)
 {
     static char hello[] = "Bootstrapping...\n";
+    int i;
     (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(hello), hello);
 
     /* Copy the start_info struct to a globally-accessible area. */
@@ -126,28 +124,32 @@ void start_kernel(start_info_t *si)
     init_mm();
 
     /* set up events */
-//    init_events();
-
-    /*
-     * These need to be replaced with event-channel/control-interface
-     * equivalents.
-     */
-#if 0
-    /* Install some handlers. */
-    add_ev_action(EV_DIE, &exit_handler);
-    enable_ev_action(EV_DIE);
-    enable_hypervisor_event(EV_DIE);
-
-    add_ev_action(EV_DEBUG, &debug_handler);
-    enable_ev_action(EV_DEBUG);
-    enable_hypervisor_event(EV_DEBUG);
-#endif
-
+    init_events();
     /* init time and timers */
-//    init_time();
+    init_time();
 
     /* do nothing */
-    for ( ; ; ) HYPERVISOR_yield();
+    i = 0;
+    for ( ; ; ) 
+    {      
+        if(i >= 1000)         
+        {
+            {
+                unsigned long saved;
+                __asm__ ("movl %%esp, %0"
+                         :"=r"(saved)  /* y is output operand */
+                            /* x is input operand */);
+//                        :"a"); /* %eax is clobbered register */
+                printk("ESP=0x%lx\n", saved);
+            }
+            
+            printk("1000 bloks\n");
+            i=0;            
+        }
+//        HYPERVISOR_yield();
+        block(1);
+        i++;
+    }
 }
 
 
@@ -162,14 +164,4 @@ void do_exit(void)
 {
     printk("do_exit called!\n");
     for ( ;; ) HYPERVISOR_shutdown();
-}
-static void exit_handler(int ev, struct pt_regs *regs) {
-    do_exit();
-}
-
-/*
- * a debug handler to print out some state from the guest
- */
-static void debug_handler(int ev, struct pt_regs *regs) {
-    dump_regs(regs);
 }

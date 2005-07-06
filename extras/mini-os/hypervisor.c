@@ -4,6 +4,7 @@
  * Communication to/from hypervisor.
  * 
  * Copyright (c) 2002-2003, K A Fraser
+ * Copyright (c) 2005, Grzegorz Milos, gm281@cam.ac.uk,Intel Research Cambridge
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -26,65 +27,69 @@
 
 #include <os.h>
 #include <hypervisor.h>
+#include <events.h>
 
-static unsigned long event_mask = 0;
-static unsigned long ev_err_count;
+#define active_evtchns(cpu,sh,idx)              \
+    ((sh)->evtchn_pending[idx] &                \
+     ~(sh)->evtchn_mask[idx])
 
 void do_hypervisor_callback(struct pt_regs *regs)
 {
-    unsigned long events, flags;
-    shared_info_t *shared = HYPERVISOR_shared_info;
+    u32 	       l1, l2;
+    unsigned int   l1i, l2i, port;
+    int            cpu = 0;
+    shared_info_t *s = HYPERVISOR_shared_info;
+    vcpu_info_t   *vcpu_info = &s->vcpu_data[cpu];
 
-    do {
-        /* Specialised local_irq_save(). */
-        flags = test_and_clear_bit(EVENTS_MASTER_ENABLE_BIT, 
-                                   &shared->events_mask);
-        barrier();
+    vcpu_info->evtchn_upcall_pending = 0;
+    
+    /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
+    l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
+    while ( l1 != 0 )
+    {
+        l1i = __ffs(l1);
+        l1 &= ~(1 << l1i);
+        
+        while ( (l2 = active_evtchns(cpu, s, l1i)) != 0 )
+        {
+            l2i = __ffs(l2);
+            l2 &= ~(1 << l2i);
 
-        events  = xchg(&shared->events, 0);
-        events &= event_mask;
-
-        /* 'events' now contains some pending events to handle. */
-        __asm__ __volatile__ (
-            "   push %1                            ;"
-            "   sub  $4,%%esp                      ;"
-            "   jmp  2f                            ;"
-            "1: btrl %%eax,%0                      ;" /* clear bit     */
-            "   mov  %%eax,(%%esp)                 ;"
-            "   call do_event                      ;" /* do_event(event) */
-            "2: bsfl %0,%%eax                      ;" /* %eax == bit # */
-            "   jnz  1b                            ;"
-            "   add  $8,%%esp                      ;"
-            /* we use %ebx because it is callee-saved */
-            : : "b" (events), "r" (regs)
-            /* clobbered by callback function calls */
-            : "eax", "ecx", "edx", "memory" ); 
-
-        /* Specialised local_irq_restore(). */
-        if ( flags ) set_bit(EVENTS_MASTER_ENABLE_BIT, &shared->events_mask);
-        barrier();
+            port = (l1i << 5) + l2i;
+			do_event(port, regs);
+        }
     }
-    while ( shared->events );
 }
 
-void enable_hypervisor_event(unsigned int ev)
+
+inline void mask_evtchn(u32 port)
 {
-    set_bit(ev, &event_mask);
-    set_bit(ev, &HYPERVISOR_shared_info->events_mask);
-    if ( test_bit(EVENTS_MASTER_ENABLE_BIT, 
-                  &HYPERVISOR_shared_info->events_mask) )
-        do_hypervisor_callback(NULL);
+    shared_info_t *s = HYPERVISOR_shared_info;
+    synch_set_bit(port, &s->evtchn_mask[0]);
 }
 
-void disable_hypervisor_event(unsigned int ev)
+inline void unmask_evtchn(u32 port)
 {
-    clear_bit(ev, &event_mask);
-    clear_bit(ev, &HYPERVISOR_shared_info->events_mask);
+    shared_info_t *s = HYPERVISOR_shared_info;
+    vcpu_info_t *vcpu_info = &s->vcpu_data[smp_processor_id()];
+
+    synch_clear_bit(port, &s->evtchn_mask[0]);
+
+    /*
+     * The following is basically the equivalent of 'hw_resend_irq'. Just like
+     * a real IO-APIC we 'lose the interrupt edge' if the channel is masked.
+     */
+    if (  synch_test_bit        (port,    &s->evtchn_pending[0]) && 
+         !synch_test_and_set_bit(port>>5, &vcpu_info->evtchn_pending_sel) )
+    {
+        vcpu_info->evtchn_upcall_pending = 1;
+        if ( !vcpu_info->evtchn_upcall_mask )
+            force_evtchn_callback();
+    }
 }
 
-void ack_hypervisor_event(unsigned int ev)
+inline void clear_evtchn(u32 port)
 {
-    if ( !(event_mask & (1<<ev)) )
-        atomic_inc((atomic_t *)&ev_err_count);
-    set_bit(ev, &HYPERVISOR_shared_info->events_mask);
+    shared_info_t *s = HYPERVISOR_shared_info;
+    synch_clear_bit(port, &s->evtchn_pending[0]);
 }
