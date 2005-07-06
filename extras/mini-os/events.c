@@ -1,19 +1,18 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
  ****************************************************************************
  * (C) 2003 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2005 - Grzegorz Milos - Intel Research Cambridge
  ****************************************************************************
  *
  *        File: events.c
  *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
- *     Changes: 
+ *     Changes: Grzegorz Milos (gm281@cam.ac.uk)
  *              
- *        Date: Jul 2003
+ *        Date: Jul 2003, changes Jun 2005
  * 
  * Environment: Xen Minimal OS
- * Description: Deal with events
+ * Description: Deals with events recieved on event channels
  *
- ****************************************************************************
- * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
  ****************************************************************************
  */
 
@@ -22,25 +21,25 @@
 #include <events.h>
 #include <lib.h>
 
+#include <xen/event_channel.h>
 static ev_action_t ev_actions[NR_EVS];
-void default_handler(int ev, struct pt_regs *regs);
+void default_handler(u32 port, struct pt_regs *regs);
 
 
 /*
- * demux events to different handlers
+ * Demux events to different handlers.
  */
-unsigned int do_event(int ev, struct pt_regs *regs)
+int do_event(u32 port, struct pt_regs *regs)
 {
     ev_action_t  *action;
 
-    if (ev >= NR_EVS) {
-        printk("Large event number %d\n", ev);
+    if (port >= NR_EVS) {
+        printk("Port number too large: %d\n", port);
         return 0;
     }
 
-    action = &ev_actions[ev];
+    action = &ev_actions[port];
     action->count++;
-    ack_hypervisor_event(ev);
 
     if (!action->handler)
         goto out;
@@ -49,45 +48,49 @@ unsigned int do_event(int ev, struct pt_regs *regs)
         goto out;
     
     /* call the handler */
-    action->handler(ev, regs);
+    action->handler(port, regs);
+
+	clear_evtchn(port);
     
  out:
     return 1;
 
 }
 
-/*
- * add a handler
- */
-unsigned int add_ev_action( int ev, void (*handler)(int, struct pt_regs *) )
+int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *) )
 {
-    if (ev_actions[ev].handler) {
-        printk ("event[%d] already handled by %p", ev, ev_actions[ev].handler);
-        return 0;
+	evtchn_op_t op;
+	int ret = 0;
+	u32 port;
+
+	/* Try to bind the virq to a port */
+	op.cmd = EVTCHNOP_bind_virq;
+	op.u.bind_virq.virq = virq;
+
+	if ( HYPERVISOR_event_channel_op(&op) != 0 )
+	{
+		ret = 1;
+		printk("Failed to bind virtual IRQ %d\n", virq);
+		goto out;
     }
 
-    ev_actions[ev].handler = handler;
-    return 1;
-}
+    port = op.u.bind_virq.port;
+	
+	if(ev_actions[port].handler)
+        printk("WARN: Handler for port %d already registered, replacing\n",
+				port);
 
-unsigned int enable_ev_action( int ev )
-{
-    if (!ev_actions[ev].handler) {
-        printk ("enable event[%d], no handler installed", ev);
-        return 0;
-    }
-    ev_actions[ev].status &= ~EVS_DISABLED;
-    return 1;
-}
-
-unsigned int disable_ev_action( int ev )
-{
-    ev_actions[ev].status |= EVS_DISABLED;
-    return 1;
+	ev_actions[port].handler = handler;
+	ev_actions[port].status &= ~EVS_DISABLED;
+	
+	/* Finally unmask the port */
+	unmask_evtchn(port);
+out:
+	return ret;
 }
 
 /*
- * initially all events are without a handler and disabled
+ * Initially all events are without a handler and disabled
  */
 void init_events(void)
 {
@@ -101,6 +104,6 @@ void init_events(void)
     }
 }
 
-void default_handler(int ev, struct pt_regs *regs) {
-    printk("X[%d] ", ev);
+void default_handler(u32 port, struct pt_regs *regs) {
+    printk("[Port %d] - event received\n", port);
 }

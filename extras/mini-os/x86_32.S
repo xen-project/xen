@@ -1,4 +1,6 @@
 #include <os.h>
+#include <xen/arch-x86_32.h>
+
 
 .section __xen_guest
         .asciz  "XEN_VER=3.0,LOADER=generic,PT_MODE_WRITABLE"
@@ -21,6 +23,7 @@ stack_start:
 shared_info:
         .org 0x2000
         
+
 ES		= 0x20
 ORIG_EAX	= 0x24
 EIP		= 0x28
@@ -62,6 +65,31 @@ ENTRY(divide_error)
 do_exception:
 	pushl %ds
 	pushl %eax
+	xorl %eax, %eax
+	pushl %ebp
+	pushl %edi
+	pushl %esi
+	pushl %edx
+	decl %eax			# eax = -1
+	pushl %ecx
+	pushl %ebx
+	cld
+	movl %es, %ecx
+	movl ES(%esp), %edi		# get the function address
+	movl ORIG_EAX(%esp), %edx	# get the error code
+	movl %eax, ORIG_EAX(%esp)
+	movl %ecx, ES(%esp)
+	movl $(__KERNEL_DS), %ecx
+	movl %ecx, %ds
+	movl %ecx, %es
+	movl %esp,%eax			# pt_regs pointer
+    pushl %edx
+    pushl %eax
+	call *%edi
+    addl $8,%esp
+    
+/*    pushl %ds
+	pushl %eax
 	xorl %eax,%eax
 	pushl %ebp
 	pushl %edi
@@ -83,7 +111,7 @@ do_exception:
 	movl %edx,%ds
 	movl %edx,%es
 	call *%edi
-	addl $8,%esp
+	addl $8,%esp  */
 
         
 ret_from_exception:
@@ -112,19 +140,19 @@ ENTRY(hypervisor_callback)
         cmpl $ecrit,%eax
         jb   critical_region_fixup
 11:     push %esp
-#        call do_hypervisor_callback
+        call do_hypervisor_callback
         add  $4,%esp
         movl HYPERVISOR_shared_info,%esi
         xorl %eax,%eax
         movb CS(%esp),%cl
     	test $2,%cl          # slow return to ring 2 or 3
         jne  safesti
-safesti:btsl $31,4(%esi)     # reenable event callbacks
+safesti:movb $0,1(%esi)     # reenable event callbacks
 scrit:  /**** START OF CRITICAL REGION ****/
-        cmpl %eax,(%esi)
-        jne  14f              # process more events if necessary...
+        testb $0xFF,(%esi)
+        jnz  14f              # process more events if necessary...
         RESTORE_ALL
-14:     btrl %eax,4(%esi)
+14:     movb $1,1(%esi)
         jmp  11b
 ecrit:  /**** END OF CRITICAL REGION ****/
 # [How we do the fixup]. We want to merge the current stack frame with the
@@ -153,7 +181,7 @@ critical_region_fixup:
         jmp  11b
          
 critical_fixup_table:        
-        .byte 0x00,0x00                       # cmpl %eax,(%esi)
+        .byte 0x00,0x00,0x00                  # testb $0xff,(%esi)
         .byte 0x00,0x00                       # jne  14f
         .byte 0x00                            # pop  %ebx
         .byte 0x04                            # pop  %ecx
@@ -166,7 +194,7 @@ critical_fixup_table:
         .byte 0x20                            # pop  %es
         .byte 0x24,0x24,0x24                  # add  $4,%esp
         .byte 0x28                            # iret
-        .byte 0x00,0x00,0x00,0x00,0x00        # btrl $31,4(%esi)
+        .byte 0x00,0x00,0x00,0x00             # movb $1,1(%esi)
         .byte 0x00,0x00                       # jmp  11b
        
 # Hypervisor uses this for application faults while it executes.
@@ -220,10 +248,6 @@ ENTRY(coprocessor_segment_overrun)
 	pushl $do_coprocessor_segment_overrun
 	jmp do_exception
 
-ENTRY(double_fault)
-	pushl $do_double_fault
-	jmp do_exception
-
 ENTRY(invalid_TSS)
 	pushl $do_invalid_TSS
 	jmp do_exception
@@ -246,32 +270,30 @@ ENTRY(alignment_check)
 
 # This handler is special, because it gets an extra value on its stack,
 # which is the linear faulting address.
+# fastcall register usage:  %eax = pt_regs, %edx = error code,
+#			    %ecx = fault address
 ENTRY(page_fault)
 	pushl %ds
 	pushl %eax
-	xorl %eax,%eax
+	xorl %eax, %eax
 	pushl %ebp
 	pushl %edi
 	pushl %esi
 	pushl %edx
-	decl %eax			# eax = -1
+	decl %eax			/* eax = -1 */
 	pushl %ecx
 	pushl %ebx
 	cld
-	movl %es,%ecx
-	movl ORIG_EAX(%esp), %esi	# get the error code
-	movl ES(%esp), %edi		# get the faulting address
+	movl %es,%edi
+	movl ES(%esp), %ecx		/* get the faulting address */
+	movl ORIG_EAX(%esp), %edx	/* get the error code */
 	movl %eax, ORIG_EAX(%esp)
-	movl %ecx, ES(%esp)
-	movl %esp,%edx
-        pushl %edi                      # push the faulting address
-	pushl %esi			# push the error code
-	pushl %edx			# push the pt_regs pointer
-	movl $(__KERNEL_DS),%edx
-	movl %edx,%ds
-	movl %edx,%es
+	movl %edi, ES(%esp)
+	movl $(__KERNEL_DS),%eax
+	movl %eax, %ds
+	movl %eax, %es
+	movl %esp,%eax			/* pt_regs pointer */
 	call do_page_fault
-	addl $12,%esp
 	jmp ret_from_exception
 
 ENTRY(machine_check)

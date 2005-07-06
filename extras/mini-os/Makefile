@@ -1,11 +1,12 @@
+debug ?= y
 
-CC := gcc
-LD := ld
+include $(CURDIR)/../../Config.mk
 
-TARGET_ARCH := $(shell uname -m | sed -e s/i.86/x86_32/)
+# Set TARGET_ARCH
+override TARGET_ARCH     := $(XEN_TARGET_ARCH)
 
 # NB. '-Wcast-qual' is nasty, so I omitted it.
-CFLAGS := -fno-builtin -O3 -Wall -Ih/ -Wredundant-decls -Wno-format
+CFLAGS := -fno-builtin -Wall -Werror -Iinclude/ -Wredundant-decls -Wno-format
 CFLAGS += -Wstrict-prototypes -Wnested-externs -Wpointer-arith -Winline
 
 ifeq ($(TARGET_ARCH),x86_32)
@@ -19,23 +20,25 @@ CFLAGS += -fno-asynchronous-unwind-tables
 LDFLAGS := -m elf_x86_64
 endif
 
+ifeq ($(debug),y)
+CFLAGS += -g
+else
+CFLAGS += -O3
+endif
+
 TARGET := mini-os
 
 OBJS := $(TARGET_ARCH).o
 OBJS += $(patsubst %.c,%.o,$(wildcard *.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard lib/*.c))
 
-OBJS := $(subst events.o,,$(OBJS))
-OBJS := $(subst hypervisor.o,,$(OBJS))
-OBJS := $(subst time.o,,$(OBJS))
-
-HDRS := $(wildcard h/*.h)
-HDRS += $(wildcard h/xen-public/*.h)
+HDRS := $(wildcard include/*.h)
+HDRS += $(wildcard include/xen/*.h)
 
 default: $(TARGET)
 
 xen-public:
-	[ -e h/xen-public ] || ln -sf ../../../xen/include/public h/xen-public
+	[ -e include/xen ] || ln -sf ../../../xen/include/public include/xen
 
 $(TARGET): xen-public $(OBJS)
 	$(LD) -N -T minios-$(TARGET_ARCH).lds $(OBJS) -o $@.elf
@@ -51,3 +54,4 @@ clean:
 
 %.o: %.S $(HDRS) Makefile
 	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
+

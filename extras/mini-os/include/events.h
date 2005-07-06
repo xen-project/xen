@@ -1,34 +1,27 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
  ****************************************************************************
  * (C) 2003 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2005 - Grzegorz Milos - Intel Reseach Cambridge
  ****************************************************************************
  *
  *        File: events.h
  *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
- *     Changes: 
+ *     Changes: Grzegorz Milos (gm281@cam.ac.uk)
  *              
- *        Date: Jul 2003
+ *        Date: Jul 2003, changes Jun 2005
  * 
  * Environment: Xen Minimal OS
- * Description: deal with events
+ * Description: Deals with events on the event channels
  *
- ****************************************************************************
- * $Id: h-insert.h,v 1.4 2002/11/08 16:03:55 rn Exp $
  ****************************************************************************
  */
 
 #ifndef _EVENTS_H_
 #define _EVENTS_H_
 
-/* _EVENT_* are defined in xen-public/xen.h  */
-#define EV_BLKDEV _EVENT_BLKDEV
-#define EV_TIMER  _EVENT_TIMER
-#define EV_DIE    _EVENT_DIE
-#define EV_DEBUG  _EVENT_DEBUG
-#define EV_NET    _EVENT_NET
-#define EV_PS2    _EVENT_PS2
+#include<traps.h>
 
-#define NR_EVS (sizeof(HYPERVISOR_shared_info->events) * 8)
+#define NR_EVS 1024
 
 /* ev handler status */
 #define EVS_INPROGRESS	1	/* Event handler active - do not enter! */
@@ -44,10 +37,8 @@ typedef struct _ev_action_t {
 } ev_action_t;
 
 /* prototypes */
-unsigned int do_event(int ev, struct pt_regs *regs);
-unsigned int add_ev_action( int ev, void (*handler)(int, struct pt_regs *) );
-unsigned int enable_ev_action( int ev );
-unsigned int disable_ev_action( int ev );
+int do_event(u32 port, struct pt_regs *regs);
+int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *) );
 void init_events(void);
 
 #endif /* _EVENTS_H_ */

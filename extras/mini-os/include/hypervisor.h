@@ -1,9 +1,12 @@
 /******************************************************************************
  * hypervisor.h
  * 
- * Linux-specific hypervisor handling.
+ * Hypervisor handling.
  * 
+ * TODO - x86_64 broken!
+ *
  * Copyright (c) 2002, K A Fraser
+ * Copyright (c) 2005, Grzegorz Milos
  */
 
 #ifndef _HYPERVISOR_H_
@@ -11,8 +14,10 @@
 
 #include <types.h>
 
-#include <xen-public/xen.h>
-#include <xen-public/io/domain_controller.h>
+#include <xen/xen.h>
+#include <xen/io/domain_controller.h>
+
+
 
 /*
  * a placeholder for the start of day information passed up from the hypervisor
@@ -27,10 +32,10 @@ extern union start_info_union start_info_union;
 
 
 /* hypervisor.c */
-void do_hypervisor_callback(struct pt_regs *regs);
-void enable_hypervisor_event(unsigned int ev);
-void disable_hypervisor_event(unsigned int ev);
-void ack_hypervisor_event(unsigned int ev);
+//void do_hypervisor_callback(struct pt_regs *regs);
+void mask_evtchn(u32 port);
+void unmask_evtchn(u32 port);
+void clear_evtchn(u32 port);
 
 /*
  * Assembler stubs for hyper-calls.
@@ -47,6 +52,20 @@ void ack_hypervisor_event(unsigned int ev);
 #define _a3 "d"
 #define _a4 "b"
 #endif
+
+static __inline__ int HYPERVISOR_event_channel_op(
+    void *op)
+{
+    int ret;
+    unsigned long ignore;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ignore)
+	: "0" (__HYPERVISOR_event_channel_op), "1" (op)
+	: "memory" );
+
+    return ret;
+}
 
 static __inline__ int HYPERVISOR_set_trap_table(trap_info_t *table)
 {
@@ -201,16 +220,38 @@ static __inline__ int HYPERVISOR_suspend(unsigned long srec)
     return ret;
 }
 
-static __inline__ long HYPERVISOR_set_timer_op(void *timer_arg)
+#ifdef __i386__
+static __inline__ long HYPERVISOR_set_timer_op( u64 timeout )
 {
     int ret;
+    unsigned long timeout_hi = (unsigned long)(timeout>>32);
+    unsigned long timeout_lo = (unsigned long)timeout;
+    unsigned long ign1, ign2;
+
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_set_timer_op),
-        _a1 (timer_arg) : "memory" );
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_set_timer_op), "b" (timeout_lo), "c" (timeout_hi)
+	: "memory");
 
     return ret;
 }
+#else
+static __inline__ long HYPERVISOR_set_timer_op( u64 timeout )
+{
+    int ret;
+
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret)
+	: "0" ((unsigned long)__HYPERVISOR_set_timer_op),
+	  "D" (timeout)
+	: __syscall_clobber );
+
+    return ret;
+}
+#endif
+
 
 static __inline__ int HYPERVISOR_dom0_op(void *dom0_op)
 {
