@@ -385,7 +385,7 @@ install: all
 	if [ ! -d $(INSTALL_DIR) ];then mkdir -p $(INSTALL_DIR);fi
 	if [ ! -d $(DESTDIR)$(configdir) ];then mkdir -p $(DESTDIR)$(configdir);fi
 	install -m 755 -s $(PROGS) "$(INSTALL_DIR)"
-	install -m 755 -s qemu-dm.debug "$(INSTALL_DIR)"
+	install -m 755 qemu-dm.debug "$(INSTALL_DIR)"
 	install -m 755 qemu-ifup "$(DESTDIR)$(configdir)"
 	gunzip -c qemu-vgaram-bin.gz >qemu-vgaram-bin 
 	install -m 755 qemu-vgaram-bin "$(DESTDIR)$(configdir)"
