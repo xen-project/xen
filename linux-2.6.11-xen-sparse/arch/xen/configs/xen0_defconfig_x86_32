@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.11-xen0
-# Wed May  4 17:11:56 2005
+# Linux kernel version: 2.6.11.12-xen0
+# Wed Jul  6 18:26:29 2005
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -128,8 +128,9 @@ CONFIG_X86_CPUID=y
 # Firmware Drivers
 #
 # CONFIG_EDD is not set
-CONFIG_NOHIGHMEM=y
-# CONFIG_HIGHMEM4G is not set
+# CONFIG_NOHIGHMEM is not set
+CONFIG_HIGHMEM4G=y
+CONFIG_HIGHMEM=y
 CONFIG_MTRR=y
 CONFIG_HAVE_DEC_LOCK=y
 # CONFIG_REGPARM is not set
@@ -146,8 +147,9 @@ CONFIG_PCI=y
 # CONFIG_PCI_GOMMCONFIG is not set
 # CONFIG_PCI_GODIRECT is not set
 CONFIG_PCI_GOANY=y
-# CONFIG_PCI_BIOS is not set
+CONFIG_PCI_BIOS=y
 CONFIG_PCI_DIRECT=y
+CONFIG_PCI_MMCONFIG=y
 # CONFIG_PCIEPORTBUS is not set
 # CONFIG_PCI_MSI is not set
 CONFIG_PCI_LEGACY_PROC=y
@@ -183,6 +185,7 @@ CONFIG_MAGIC_SYSRQ=y
 # CONFIG_DEBUG_SPINLOCK is not set
 # CONFIG_DEBUG_SPINLOCK_SLEEP is not set
 # CONFIG_DEBUG_KOBJECT is not set
+# CONFIG_DEBUG_HIGHMEM is not set
 CONFIG_DEBUG_BUGVERBOSE=y
 # CONFIG_DEBUG_INFO is not set
 # CONFIG_DEBUG_FS is not set
