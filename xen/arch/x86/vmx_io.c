@@ -621,7 +621,7 @@ static inline int irq_masked(unsigned long eflags)
 
 void vmx_intr_assist(struct vcpu *v) 
 {
-    int intr_type;
+    int intr_type = 0;
     int highest_vector = find_highest_pending_irq(v, &intr_type);
     unsigned long intr_fields, eflags, interruptibility, cpu_exec_control;
 
