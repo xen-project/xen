@@ -220,10 +220,12 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 
     chn1->u.interdomain.remote_dom  = d2;
     chn1->u.interdomain.remote_port = (u16)port2;
+    chn1->notify_vcpu_id            = 0;
     chn1->state                     = ECS_INTERDOMAIN;
     
     chn2->u.interdomain.remote_dom  = d1;
     chn2->u.interdomain.remote_port = (u16)port1;
+    chn2->notify_vcpu_id            = 0;
     chn2->state                     = ECS_INTERDOMAIN;
 
  out:
@@ -324,8 +326,10 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 
     chn = evtchn_from_port(d, port);
 
+    chn->notify_vcpu_id = 0;
+
     d->pirq_to_evtchn[pirq] = port;
-    rc = pirq_guest_bind(d->vcpu[chn->notify_vcpu_id], pirq, 
+    rc = pirq_guest_bind(d->vcpu[0], pirq, 
                          !!(bind->flags & BIND_PIRQ__WILL_SHARE));
     if ( rc != 0 )
     {
