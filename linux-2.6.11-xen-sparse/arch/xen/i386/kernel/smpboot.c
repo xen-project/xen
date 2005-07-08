@@ -1533,13 +1533,13 @@ void __init smp_intr_init(void)
 	int cpu = smp_processor_id();
 
 	per_cpu(resched_irq, cpu) =
-		bind_ipi_to_irq(RESCHEDULE_VECTOR);
+		bind_ipi_on_cpu_to_irq(RESCHEDULE_VECTOR);
 	sprintf(resched_name[cpu], "resched%d", cpu);
 	BUG_ON(request_irq(per_cpu(resched_irq, cpu), smp_reschedule_interrupt,
 	                   SA_INTERRUPT, resched_name[cpu], NULL));
 
 	per_cpu(callfunc_irq, cpu) =
-		bind_ipi_to_irq(CALL_FUNCTION_VECTOR);
+		bind_ipi_on_cpu_to_irq(CALL_FUNCTION_VECTOR);
 	sprintf(callfunc_name[cpu], "callfunc%d", cpu);
 	BUG_ON(request_irq(per_cpu(callfunc_irq, cpu),
 	                   smp_call_function_interrupt,

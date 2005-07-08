@@ -86,7 +86,7 @@ static u32 cpu_evtchn_mask[NR_CPUS][NR_EVENT_CHANNELS/32];
      cpu_evtchn_mask[cpu][idx] &                \
      ~(sh)->evtchn_mask[idx])
 
-static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
+void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
 {
     clear_bit(chn, (unsigned long *)cpu_evtchn_mask[cpu_evtchn[chn]]);
     set_bit(chn, (unsigned long *)cpu_evtchn_mask[cpu]);
@@ -99,8 +99,9 @@ static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
     ((sh)->evtchn_pending[idx] &                \
      ~(sh)->evtchn_mask[idx])
 
-#define bind_evtchn_to_cpu(chn,cpu) ((void)0)
-
+void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
+{
+}
 #endif
 
 /* Upcall to generic IRQ layer. */
@@ -228,6 +229,13 @@ void unbind_virq_from_irq(int virq)
         if ( HYPERVISOR_event_channel_op(&op) != 0 )
             panic("Failed to unbind virtual IRQ %d\n", virq);
 
+	/* This is a slight hack.  Interdomain ports can be allocated
+	   directly by userspace, and at that point they get bound by
+	   Xen to vcpu 0.  We therefore need to make sure that if we
+	   get an event on an event channel we don't know about vcpu 0
+	   handles it.  Binding channels to vcpu 0 when closing them
+	   achieves this. */
+	bind_evtchn_to_cpu(evtchn, 0);
         evtchn_to_irq[evtchn] = -1;
         irq_to_evtchn[irq]    = -1;
         per_cpu(virq_to_irq, cpu)[virq]     = -1;
@@ -320,6 +328,8 @@ void unbind_ipi_from_irq(int ipi)
 	if ( HYPERVISOR_event_channel_op(&op) != 0 )
 	    panic("Failed to unbind virtual IPI %d on cpu %d\n", ipi, cpu);
 
+	/* See comments in unbind_virq_from_irq */
+	bind_evtchn_to_cpu(evtchn, 0);
         evtchn_to_irq[evtchn] = -1;
         irq_to_evtchn[irq]    = -1;
 	per_cpu(ipi_to_evtchn, cpu)[ipi] = 0;
@@ -474,6 +484,7 @@ static unsigned int startup_pirq(unsigned int irq)
 
     pirq_query_unmask(irq_to_pirq(irq));
 
+    bind_evtchn_to_cpu(evtchn, 0);
     evtchn_to_irq[evtchn] = irq;
     irq_to_evtchn[irq]    = evtchn;
 
@@ -499,6 +510,7 @@ static void shutdown_pirq(unsigned int irq)
     if ( HYPERVISOR_event_channel_op(&op) != 0 )
         panic("Failed to unbind physical IRQ %d\n", irq);
 
+    bind_evtchn_to_cpu(evtchn, 0);
     evtchn_to_irq[evtchn] = -1;
     irq_to_evtchn[irq]    = -1;
 }
@@ -598,6 +610,7 @@ void irq_resume(void)
         evtchn = op.u.bind_virq.port;
         
         /* Record the new mapping. */
+	bind_evtchn_to_cpu(evtchn, 0);
         evtchn_to_irq[evtchn] = irq;
         irq_to_evtchn[irq]    = evtchn;
 
