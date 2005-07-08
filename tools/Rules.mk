@@ -7,12 +7,12 @@ XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 
 ifeq ($(XEN_TARGET_ARCH),x86_32)
 CFLAGS  += -m32 -march=i686
-LDFLAGS += -m elf_i386
+LDFLAGS += -m32
 endif
 
 ifeq ($(XEN_TARGET_ARCH),x86_64)
 CFLAGS  += -m64
-LDFLAGS += -m elf_x86_64
+LDFLAGS += -m64
 endif
 
 X11_LDPATH = -L/usr/X11R6/$(LIBDIR)

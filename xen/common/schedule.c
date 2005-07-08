@@ -38,8 +38,8 @@
 #include <xen/mm.h>
 #include <public/sched_ctl.h>
 
-/* opt_sched: scheduler - default to Borrowed Virtual Time */
-static char opt_sched[10] = "bvt";
+/* opt_sched: scheduler - default to SEDF */
+static char opt_sched[10] = "sedf";
 string_param("sched", opt_sched);
 
 #if defined(WAKE_HISTO)

@@ -17,8 +17,7 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 XEN_ROOT=../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CC           = gcc
-CFLAGS       = -Wall -O3 
+CFLAGS      += -Wall -O3 
 
 HDRS         = $(wildcard *.h)
 SRCS         = $(wildcard *.c)

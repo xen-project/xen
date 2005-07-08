@@ -271,6 +271,38 @@ int bind_ipi_on_cpu_to_irq(int cpu, int ipi)
     return irq;
 }
 
+void rebind_evtchn_from_ipi(int cpu, int newcpu, int ipi)
+{
+    evtchn_op_t op;
+    int evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi];
+
+    spin_lock(&irq_mapping_update_lock);
+
+    op.cmd          = EVTCHNOP_rebind;
+    op.u.rebind.port = evtchn;
+    op.u.rebind.vcpu = newcpu;
+    if ( HYPERVISOR_event_channel_op(&op) != 0 )
+       printk(KERN_INFO "Failed to rebind IPI%d to CPU%d\n",ipi,newcpu);
+
+    spin_unlock(&irq_mapping_update_lock);
+}
+
+void rebind_evtchn_from_irq(int cpu, int newcpu, int irq)
+{
+    evtchn_op_t op;
+    int evtchn = irq_to_evtchn[irq];
+
+    spin_lock(&irq_mapping_update_lock);
+
+    op.cmd          = EVTCHNOP_rebind;
+    op.u.rebind.port = evtchn;
+    op.u.rebind.vcpu = newcpu;
+    if ( HYPERVISOR_event_channel_op(&op) != 0 )
+       printk(KERN_INFO "Failed to rebind IRQ%d to CPU%d\n",irq,newcpu);
+
+    spin_unlock(&irq_mapping_update_lock);
+}
+
 void unbind_ipi_on_cpu_from_irq(int cpu, int ipi)
 {
     evtchn_op_t op;

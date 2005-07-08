@@ -29,16 +29,13 @@ XENINC=-I$(XEN_ROOT)/xen/include -I$(XEN_ROOT)/tools/libxc
 #DEFINES=-DDEBUG -DTEST -DTEXTADDR=${TEXTADDR}
 #XENINC=-I/home/leendert/xen/xeno-unstable.bk/xen/include
 
-LD=ld
-CC=gcc
-CPP=cpp -P
-OBJCOPY=objcopy -p -O binary -R .note -R .comment -R .bss -S --gap-fill=0
-CFLAGS=${DEFINES} -I. $(XENINC) -Wall -fno-builtin -O2 -msoft-float
-
-ifeq ($(XEN_COMPILE_ARCH),x86_64)
+LD       = ld
+CC       = gcc
+CPP      = cpp -P
+OBJCOPY  = objcopy -p -O binary -R .note -R .comment -R .bss -S --gap-fill=0
+CFLAGS   = ${DEFINES} -I. $(XENINC) -Wall -fno-builtin -O2 -msoft-float
 CFLAGS  += -m32 -march=i686
-LDFLAGS += -m elf_i386
-endif
+LDFLAGS  = -m elf_i386
 
 OBJECTS = head.o trap.o vm86.o setup.o util.o
 

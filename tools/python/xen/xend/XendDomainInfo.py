@@ -423,8 +423,10 @@ class XendDomainInfo:
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])    
             sxpr.append(['vcpus', self.info['vcpus']])
             sxpr.append(['cpumap', self.info['cpumap']])
-            sxpr.append(['vcpu_to_cpu', ''.join(map(lambda x: str(x),
-                        self.info['vcpu_to_cpu'][0:self.info['vcpus']]))])
+            # build a string, using '|' to seperate items, show only up
+            # to number of vcpus in domain, and trim the trailing '|'
+            sxpr.append(['vcpu_to_cpu', ''.join(map(lambda x: str(x)+'|',
+                        self.info['vcpu_to_cpu'][0:self.info['vcpus']]))[:-1]])
             
         if self.start_time:
             up_time =  time.time() - self.start_time  

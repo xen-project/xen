@@ -583,6 +583,29 @@ static long evtchn_status(evtchn_status_t *status)
     return rc;
 }
 
+static long evtchn_rebind(evtchn_rebind_t *bind) 
+{
+    struct domain *d    = current->domain;
+    int            port = bind->port;
+    int            vcpu = bind->vcpu;
+    struct evtchn *chn;
+    long             rc = 0;
+
+    spin_lock(&d->evtchn_lock);
+
+    if ( !port_is_valid(d, port) )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
+
+    chn = evtchn_from_port(d, port);
+    chn->notify_vcpu_id = vcpu;
+
+ out:
+    spin_unlock(&d->evtchn_lock);
+    return rc;
+}
 
 long do_event_channel_op(evtchn_op_t *uop)
 {
@@ -637,6 +660,12 @@ long do_event_channel_op(evtchn_op_t *uop)
 
     case EVTCHNOP_status:
         rc = evtchn_status(&op.u.status);
+        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+            rc = -EFAULT;
+        break;
+
+    case EVTCHNOP_rebind:
+        rc = evtchn_rebind(&op.u.rebind);
         if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
             rc = -EFAULT;
         break;
