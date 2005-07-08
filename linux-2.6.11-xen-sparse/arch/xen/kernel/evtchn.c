@@ -236,17 +236,17 @@ void unbind_virq_from_irq(int virq)
     spin_unlock(&irq_mapping_update_lock);
 }
 
-int bind_ipi_on_cpu_to_irq(int cpu, int ipi)
+int bind_ipi_on_cpu_to_irq(int ipi)
 {
     evtchn_op_t op;
     int evtchn, irq;
+    int cpu = smp_processor_id();
 
     spin_lock(&irq_mapping_update_lock);
 
     if ( (evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi]) == 0 )
     {
-        op.cmd                 = EVTCHNOP_bind_ipi;
-        op.u.bind_ipi.ipi_vcpu = cpu;
+        op.cmd = EVTCHNOP_bind_ipi;
         if ( HYPERVISOR_event_channel_op(&op) != 0 )
             panic("Failed to bind virtual IPI %d on cpu %d\n", ipi, cpu);
         evtchn = op.u.bind_ipi.port;
@@ -278,9 +278,9 @@ void rebind_evtchn_from_ipi(int cpu, int newcpu, int ipi)
 
     spin_lock(&irq_mapping_update_lock);
 
-    op.cmd          = EVTCHNOP_rebind;
-    op.u.rebind.port = evtchn;
-    op.u.rebind.vcpu = newcpu;
+    op.cmd              = EVTCHNOP_bind_vcpu;
+    op.u.bind_vcpu.port = evtchn;
+    op.u.bind_vcpu.vcpu = newcpu;
     if ( HYPERVISOR_event_channel_op(&op) != 0 )
        printk(KERN_INFO "Failed to rebind IPI%d to CPU%d\n",ipi,newcpu);
 
@@ -294,18 +294,19 @@ void rebind_evtchn_from_irq(int cpu, int newcpu, int irq)
 
     spin_lock(&irq_mapping_update_lock);
 
-    op.cmd          = EVTCHNOP_rebind;
-    op.u.rebind.port = evtchn;
-    op.u.rebind.vcpu = newcpu;
+    op.cmd              = EVTCHNOP_bind_vcpu;
+    op.u.bind_vcpu.port = evtchn;
+    op.u.bind_vcpu.vcpu = newcpu;
     if ( HYPERVISOR_event_channel_op(&op) != 0 )
        printk(KERN_INFO "Failed to rebind IRQ%d to CPU%d\n",irq,newcpu);
 
     spin_unlock(&irq_mapping_update_lock);
 }
 
-void unbind_ipi_on_cpu_from_irq(int cpu, int ipi)
+void unbind_ipi_from_irq(int ipi)
 {
     evtchn_op_t op;
+    int cpu    = smp_processor_id();
     int evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi];
     int irq    = irq_to_evtchn[evtchn];
 
