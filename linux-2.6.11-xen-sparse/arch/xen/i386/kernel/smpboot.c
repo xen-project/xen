@@ -1325,7 +1325,6 @@ static int __devinit cpu_enable(unsigned int cpu)
 		prepare_for_smp();
 #endif
 
-	printk("<0>Starting enable cpu.\n");
 	/* get the target out of its holding state */
 	per_cpu(cpu_state, cpu) = CPU_UP_PREPARE;
 	wmb();
@@ -1334,9 +1333,7 @@ static int __devinit cpu_enable(unsigned int cpu)
 	while (!cpu_online(cpu))
 		cpu_relax();
 
-	printk("<0>Calling fixup_irqs.\n");
 	fixup_irqs(cpu_online_map);
-	printk("<0>Called fixup_irqs.\n");
 
 	/* counter the disable in fixup_irqs() */
 	local_irq_enable();
@@ -1361,12 +1358,6 @@ int __cpu_disable(void)
 
 	cpu_clear(cpu, map);
 	fixup_irqs(map);
-	printk("<0>Done fixup_irqs.\n");
-
-	local_irq_enable();
-	printk("<0>Interrupts on.\n");
-	local_irq_disable();
-	printk("<0>Interrupts off again.\n");
 
 	/* It's now safe to remove this processor from the online map */
 	cpu_clear(cpu, cpu_online_map);
@@ -1495,7 +1486,6 @@ int __devinit __cpu_up(unsigned int cpu)
 	/* Already up, and in cpu_quiescent now? */
 	if (cpu_isset(cpu, smp_commenced_mask)) {
 		cpu_enable(cpu);
-		printk("<0>cpu_enable completed.\n");
 		return 0;
 	}
 #endif

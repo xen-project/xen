@@ -341,15 +341,12 @@ static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
     evtchn_op_t op;
     int evtchn;
 
-    printk("<0>Rebind irq %d to vcpu %d.\n", irq, tcpu);
     spin_lock(&irq_mapping_update_lock);
     evtchn = irq_to_evtchn[irq];
     if (!VALID_EVTCHN(evtchn)) {
 	spin_unlock(&irq_mapping_update_lock);
 	return;
     }
-
-    printk("<0>Is evtchn %d.\n", evtchn);
 
     /* Tell Xen to send future instances of this interrupt to the
        other vcpu */
@@ -374,11 +371,10 @@ static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
        from the hotplug/hotunplug path.  In that case, all cpus are
        stopped with interrupts disabled, and the missed interrupts
        will be picked up when they start again.  This is kind of a
-       hack. */
+       hack.
+    */
     if (!irqs_disabled()) {
-	printk("<0>Doing nop ipi\n");
 	smp_call_function(do_nothing_function, NULL, 0, 0);
-	printk("<0>Done nop ipi\n");
     }
 }
 
