@@ -20,6 +20,7 @@
 
 #include <xen/spinlock.h>
 #include <public/acm.h>
+#include <xen/acm_policy.h>
 #include <public/policy_ops.h>
 
 /* Xen-internal representation of the binary policy */
