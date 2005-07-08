@@ -88,6 +88,60 @@ static int allocate_domid(domid_t *pdom)
     return err;
 }
 
+static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
+{
+    struct vcpu   *v;
+    u64 cpu_time = 0;
+    int vcpu_count = 0;
+    int flags = DOMFLAGS_PAUSED | DOMFLAGS_BLOCKED;
+    
+    info->domain = d->domain_id;
+    
+    memset(&info->vcpu_to_cpu, -1, sizeof(info->vcpu_to_cpu));
+    memset(&info->cpumap, 0, sizeof(info->cpumap));
+    
+    /* 
+     * - domain is marked as paused or blocked only if all its vcpus 
+     *   are paused or blocked 
+     * - domain is marked as running if any of its vcpus is running
+     * - only map vcpus that aren't down.  Note, at some point we may
+     *   wish to demux the -1 value to indicate down vs. not-ever-booted
+     *   
+     */
+    for_each_vcpu ( d, v ) {
+        /* only map vcpus that are up */
+        if ( !(test_bit(_VCPUF_down, &v->vcpu_flags)) )
+            info->vcpu_to_cpu[v->vcpu_id] = v->processor;
+        info->cpumap[v->vcpu_id] = v->cpumap;
+        if ( !(v->vcpu_flags & VCPUF_ctrl_pause) )
+            flags &= ~DOMFLAGS_PAUSED;
+        if ( !(v->vcpu_flags & VCPUF_blocked) )
+            flags &= ~DOMFLAGS_BLOCKED;
+        if ( v->vcpu_flags & VCPUF_running )
+            flags |= DOMFLAGS_RUNNING;
+        if ( v->cpu_time > cpu_time )
+            cpu_time += v->cpu_time;
+        vcpu_count++;
+    }
+    
+    info->cpu_time = cpu_time;
+    info->n_vcpu = vcpu_count;
+    
+    info->flags = flags |
+        ((d->domain_flags & DOMF_dying)    ? DOMFLAGS_DYING    : 0) |
+        ((d->domain_flags & DOMF_shutdown) ? DOMFLAGS_SHUTDOWN : 0) |
+        d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
+
+    if (d->ssid != NULL)
+        info->ssidref = ((struct acm_ssid_domain *)d->ssid)->ssidref;
+    else    
+        info->ssidref = ACM_DEFAULT_SSID;
+    
+    info->tot_pages         = d->tot_pages;
+    info->max_pages         = d->max_pages;
+    info->shared_info_frame = __pa(d->shared_info) >> PAGE_SHIFT;
+}
+
 long do_dom0_op(dom0_op_t *u_dom0_op)
 {
     long ret = 0;
@@ -306,10 +360,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_GETDOMAININFO:
     { 
         struct domain *d;
-        struct vcpu   *v;
-        u64 cpu_time = 0;
-        int vcpu_count = 0;
-        int flags = DOMFLAGS_PAUSED | DOMFLAGS_BLOCKED;
 
         read_lock(&domlist_lock);
 
@@ -328,59 +378,59 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         read_unlock(&domlist_lock);
 
-        op->u.getdomaininfo.domain = d->domain_id;
-
-        memset(&op->u.getdomaininfo.vcpu_to_cpu, -1,
-               sizeof(op->u.getdomaininfo.vcpu_to_cpu));
-        memset(&op->u.getdomaininfo.cpumap, 0,
-               sizeof(op->u.getdomaininfo.cpumap));
-
-        /* 
-         * - domain is marked as paused or blocked only if all its vcpus 
-         *   are paused or blocked 
-         * - domain is marked as running if any of its vcpus is running
-         * - only map vcpus that aren't down.  Note, at some point we may
-         *   wish to demux the -1 value to indicate down vs. not-ever-booted
-         *   
-         */
-        for_each_vcpu ( d, v ) {
-            /* only map vcpus that are up */
-            if ( !(test_bit(_VCPUF_down, &v->vcpu_flags)) )
-                op->u.getdomaininfo.vcpu_to_cpu[v->vcpu_id] = v->processor;
-            op->u.getdomaininfo.cpumap[v->vcpu_id]      = v->cpumap;
-            if ( !(v->vcpu_flags & VCPUF_ctrl_pause) )
-                flags &= ~DOMFLAGS_PAUSED;
-            if ( !(v->vcpu_flags & VCPUF_blocked) )
-                flags &= ~DOMFLAGS_BLOCKED;
-            if ( v->vcpu_flags & VCPUF_running )
-                flags |= DOMFLAGS_RUNNING;
-            if ( v->cpu_time > cpu_time )
-                cpu_time += v->cpu_time;
-            vcpu_count++;
-        }
-
-        op->u.getdomaininfo.cpu_time = cpu_time;
-        op->u.getdomaininfo.n_vcpu = vcpu_count;
-
-        op->u.getdomaininfo.flags = flags |
-            ((d->domain_flags & DOMF_dying)    ? DOMFLAGS_DYING    : 0) |
-            ((d->domain_flags & DOMF_shutdown) ? DOMFLAGS_SHUTDOWN : 0) |
-            d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
-
-        if (d->ssid != NULL)
-            op->u.getdomaininfo.ssidref = ((struct acm_ssid_domain *)d->ssid)->ssidref;
-        else    
-            op->u.getdomaininfo.ssidref = ACM_DEFAULT_SSID;
-
-        op->u.getdomaininfo.tot_pages   = d->tot_pages;
-        op->u.getdomaininfo.max_pages   = d->max_pages;
-        op->u.getdomaininfo.shared_info_frame = 
-            __pa(d->shared_info) >> PAGE_SHIFT;
+        getdomaininfo(d, &op->u.getdomaininfo);
 
         if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )     
             ret = -EINVAL;
 
         put_domain(d);
+    }
+    break;
+
+    case DOM0_GETDOMAININFOLIST:
+    { 
+        struct domain *d;
+        dom0_getdomaininfo_t info;
+        dom0_getdomaininfo_t *buffer = op->u.getdomaininfolist.buffer;
+        u32 num_domains = 0;
+
+        read_lock(&domlist_lock);
+
+        for_each_domain ( d )
+        {
+            if ( d->domain_id < op->u.getdomaininfolist.first_domain )
+                continue;
+            if ( num_domains == op->u.getdomaininfolist.max_domains )
+                break;
+            if ( (d == NULL) || !get_domain(d) )
+            {
+                ret = -ESRCH;
+                break;
+            }
+
+            getdomaininfo(d, &info);
+
+            put_domain(d);
+
+            if ( copy_to_user(buffer, &info, sizeof(dom0_getdomaininfo_t)) )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            
+            buffer++;
+            num_domains++;
+        }
+        
+        read_unlock(&domlist_lock);
+        
+        if ( ret != 0 )
+            break;
+        
+        op->u.getdomaininfolist.num_domains = num_domains;
+
+        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+            ret = -EINVAL;
     }
     break;
 

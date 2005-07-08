@@ -688,7 +688,7 @@ static PyObject *pyxc_physinfo(PyObject *self,
     if ( xc_physinfo(xc->xc_handle, &info) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
-    return Py_BuildValue("{s:i,s:i,s:l,s:l,s:l}",
+    return Py_BuildValue("{s:i,s:i,s:i,s:i,s:l,s:l,s:i}",
                          "threads_per_core", info.threads_per_core,
                          "cores_per_socket", info.cores_per_socket,
                          "sockets_per_node", info.sockets_per_node,
