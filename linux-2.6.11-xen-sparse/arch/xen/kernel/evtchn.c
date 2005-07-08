@@ -271,38 +271,6 @@ int bind_ipi_on_cpu_to_irq(int ipi)
     return irq;
 }
 
-void rebind_evtchn_from_ipi(int cpu, int newcpu, int ipi)
-{
-    evtchn_op_t op;
-    int evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi];
-
-    spin_lock(&irq_mapping_update_lock);
-
-    op.cmd              = EVTCHNOP_bind_vcpu;
-    op.u.bind_vcpu.port = evtchn;
-    op.u.bind_vcpu.vcpu = newcpu;
-    if ( HYPERVISOR_event_channel_op(&op) != 0 )
-       printk(KERN_INFO "Failed to rebind IPI%d to CPU%d\n",ipi,newcpu);
-
-    spin_unlock(&irq_mapping_update_lock);
-}
-
-void rebind_evtchn_from_irq(int cpu, int newcpu, int irq)
-{
-    evtchn_op_t op;
-    int evtchn = irq_to_evtchn[irq];
-
-    spin_lock(&irq_mapping_update_lock);
-
-    op.cmd              = EVTCHNOP_bind_vcpu;
-    op.u.bind_vcpu.port = evtchn;
-    op.u.bind_vcpu.vcpu = newcpu;
-    if ( HYPERVISOR_event_channel_op(&op) != 0 )
-       printk(KERN_INFO "Failed to rebind IRQ%d to CPU%d\n",irq,newcpu);
-
-    spin_unlock(&irq_mapping_update_lock);
-}
-
 void unbind_ipi_from_irq(int ipi)
 {
     evtchn_op_t op;
@@ -363,6 +331,63 @@ void unbind_evtchn_from_irq(int evtchn)
     spin_unlock(&irq_mapping_update_lock);
 }
 
+static void do_nothing_function(void *ign)
+{
+}
+
+/* Rebind an evtchn so that it gets delivered to a specific cpu */
+static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
+{
+    evtchn_op_t op;
+    int evtchn;
+
+    printk("<0>Rebind irq %d to vcpu %d.\n", irq, tcpu);
+    spin_lock(&irq_mapping_update_lock);
+    evtchn = irq_to_evtchn[irq];
+    if (!VALID_EVTCHN(evtchn)) {
+	spin_unlock(&irq_mapping_update_lock);
+	return;
+    }
+
+    printk("<0>Is evtchn %d.\n", evtchn);
+
+    /* Tell Xen to send future instances of this interrupt to the
+       other vcpu */
+    op.cmd = EVTCHNOP_bind_vcpu;
+    op.u.bind_vcpu.port = evtchn;
+    op.u.bind_vcpu.vcpu = tcpu;
+
+    /* If this fails, it usually just indicates that we're dealing
+       with a virq or IPI channel, which don't actually need to be
+       rebound.  Ignore it, but don't do the xenlinux-level rebind
+       in that case. */
+    if (HYPERVISOR_event_channel_op(&op) >= 0)
+	bind_evtchn_to_cpu(evtchn, tcpu);
+
+    spin_unlock(&irq_mapping_update_lock);
+
+    /* Now send the new target processor a NOP IPI.  When this
+       returns, it will check for any pending interrupts, and so
+       service any that got delivered to the wrong processor by
+       mistake. */
+    /* XXX: The only time this is called with interrupts disabled is
+       from the hotplug/hotunplug path.  In that case, all cpus are
+       stopped with interrupts disabled, and the missed interrupts
+       will be picked up when they start again.  This is kind of a
+       hack. */
+    if (!irqs_disabled()) {
+	printk("<0>Doing nop ipi\n");
+	smp_call_function(do_nothing_function, NULL, 0, 0);
+	printk("<0>Done nop ipi\n");
+    }
+}
+
+
+static void set_affinity_irq(unsigned irq, cpumask_t dest)
+{
+    unsigned tcpu = first_cpu(dest);
+    rebind_irq_to_cpu(irq, tcpu);
+}
 
 /*
  * Interface to generic handling in irq.c
@@ -425,7 +450,7 @@ static struct hw_interrupt_type dynirq_type = {
     disable_dynirq,
     ack_dynirq,
     end_dynirq,
-    NULL
+    set_affinity_irq
 };
 
 static inline void pirq_unmask_notify(int pirq)
@@ -549,7 +574,7 @@ static struct hw_interrupt_type pirq_type = {
     disable_pirq,
     ack_pirq,
     end_pirq,
-    NULL
+    set_affinity_irq
 };
 
 void irq_suspend(void)

@@ -1312,7 +1312,7 @@ void __devinit smp_prepare_boot_cpu(void)
 
 /* hotplug down/up funtion pointer and target vcpu */
 struct vcpu_hotplug_handler_t {
-	void (*fn)();
+	void (*fn)(int vcpu);
 	u32 vcpu;
 };
 static struct vcpu_hotplug_handler_t vcpu_hotplug_handler;
@@ -1325,6 +1325,7 @@ static int __devinit cpu_enable(unsigned int cpu)
 		prepare_for_smp();
 #endif
 
+	printk("<0>Starting enable cpu.\n");
 	/* get the target out of its holding state */
 	per_cpu(cpu_state, cpu) = CPU_UP_PREPARE;
 	wmb();
@@ -1333,11 +1334,10 @@ static int __devinit cpu_enable(unsigned int cpu)
 	while (!cpu_online(cpu))
 		cpu_relax();
 
-   /* re-route bound IRQs 0 to cpu */
-   rebind_evtchn_from_irq(0, cpu,  per_cpu(resched_irq, cpu));
-   rebind_evtchn_from_irq(0, cpu, per_cpu(callfunc_irq, cpu));
-
+	printk("<0>Calling fixup_irqs.\n");
 	fixup_irqs(cpu_online_map);
+	printk("<0>Called fixup_irqs.\n");
+
 	/* counter the disable in fixup_irqs() */
 	local_irq_enable();
 	return 0;
@@ -1359,17 +1359,14 @@ int __cpu_disable(void)
 	if (cpu == 0)
 		return -EBUSY;
 
-	/* Allow any queued timer interrupts to get serviced */
-	local_irq_enable();
-	mdelay(1);
-	local_irq_disable();
-
 	cpu_clear(cpu, map);
 	fixup_irqs(map);
+	printk("<0>Done fixup_irqs.\n");
 
-   /* re-route IRQs from dead vcpu to another */
-   rebind_evtchn_from_irq(cpu, 0,  per_cpu(resched_irq, cpu));
-   rebind_evtchn_from_irq(cpu, 0, per_cpu(callfunc_irq, cpu));
+	local_irq_enable();
+	printk("<0>Interrupts on.\n");
+	local_irq_disable();
+	printk("<0>Interrupts off again.\n");
 
 	/* It's now safe to remove this processor from the online map */
 	cpu_clear(cpu, cpu_online_map);
@@ -1498,6 +1495,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	/* Already up, and in cpu_quiescent now? */
 	if (cpu_isset(cpu, smp_commenced_mask)) {
 		cpu_enable(cpu);
+		printk("<0>cpu_enable completed.\n");
 		return 0;
 	}
 #endif
@@ -1533,13 +1531,13 @@ void __init smp_intr_init(void)
 	int cpu = smp_processor_id();
 
 	per_cpu(resched_irq, cpu) =
-		bind_ipi_to_irq(RESCHEDULE_VECTOR);
+		bind_ipi_on_cpu_to_irq(RESCHEDULE_VECTOR);
 	sprintf(resched_name[cpu], "resched%d", cpu);
 	BUG_ON(request_irq(per_cpu(resched_irq, cpu), smp_reschedule_interrupt,
 	                   SA_INTERRUPT, resched_name[cpu], NULL));
 
 	per_cpu(callfunc_irq, cpu) =
-		bind_ipi_to_irq(CALL_FUNCTION_VECTOR);
+		bind_ipi_on_cpu_to_irq(CALL_FUNCTION_VECTOR);
 	sprintf(callfunc_name[cpu], "callfunc%d", cpu);
 	BUG_ON(request_irq(per_cpu(callfunc_irq, cpu),
 	                   smp_call_function_interrupt,

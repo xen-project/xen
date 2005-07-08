@@ -587,13 +587,16 @@ static long evtchn_bind_vcpu(evtchn_bind_vcpu_t *bind)
     struct evtchn *chn;
     long           rc = 0;
 
-    if ( (vcpu >= MAX_VIRT_CPUS) || (d->vcpu[vcpu] == NULL) )
+    if ( (vcpu >= MAX_VIRT_CPUS) || (d->vcpu[vcpu] == NULL) ) {
+        printf("vcpu %d bad.\n", vcpu);
         return -EINVAL;
+    }
 
     spin_lock(&d->evtchn_lock);
 
     if ( !port_is_valid(d, port) )
     {
+        printf("port %d bad.\n", port);
         rc = -EINVAL;
         goto out;
     }
@@ -607,6 +610,7 @@ static long evtchn_bind_vcpu(evtchn_bind_vcpu_t *bind)
         chn->notify_vcpu_id = vcpu;
         break;
     default:
+        printf("evtchn type %d can't be rebound.\n", chn->state);
         rc = -EINVAL;
         break;
     }
