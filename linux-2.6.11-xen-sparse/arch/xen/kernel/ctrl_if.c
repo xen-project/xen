@@ -491,6 +491,8 @@ void ctrl_if_resume(void)
          * pick up its end of the event channel from 
          */
         evtchn_op_t op;
+	extern void bind_evtchn_to_cpu(unsigned port, unsigned cpu);
+
         op.cmd = EVTCHNOP_bind_interdomain;
         op.u.bind_interdomain.dom1 = DOMID_SELF;
         op.u.bind_interdomain.dom2 = DOMID_SELF;
@@ -500,6 +502,7 @@ void ctrl_if_resume(void)
             BUG();
         xen_start_info.domain_controller_evtchn = op.u.bind_interdomain.port1;
         initdom_ctrlif_domcontroller_port   = op.u.bind_interdomain.port2;
+	bind_evtchn_to_cpu(op.u.bind_interdomain.port1, 0);
     }
 
     /* Sync up with shared indexes. */
