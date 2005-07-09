@@ -283,10 +283,7 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
 {
     struct evtchn *chn;
     struct domain *d = current->domain;
-    int            port, ipi_vcpu = bind->ipi_vcpu;
-
-    if ( (ipi_vcpu >= MAX_VIRT_CPUS) || (d->vcpu[ipi_vcpu] == NULL) )
-        return -EINVAL;
+    int            port;
 
     spin_lock(&d->evtchn_lock);
 
@@ -294,7 +291,7 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     {
         chn = evtchn_from_port(d, port);
         chn->state          = ECS_IPI;
-        chn->notify_vcpu_id = ipi_vcpu;
+        chn->notify_vcpu_id = current->vcpu_id;
     }
 
     spin_unlock(&d->evtchn_lock);
@@ -325,7 +322,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     chn = evtchn_from_port(d, port);
 
     d->pirq_to_evtchn[pirq] = port;
-    rc = pirq_guest_bind(d->vcpu[chn->notify_vcpu_id], pirq, 
+    rc = pirq_guest_bind(d->vcpu[0], pirq, 
                          !!(bind->flags & BIND_PIRQ__WILL_SHARE));
     if ( rc != 0 )
     {
@@ -437,7 +434,9 @@ static long __evtchn_close(struct domain *d1, int port1)
         BUG();
     }
 
-    chn1->state = ECS_FREE;
+    /* Reset binding to vcpu0 when the channel is freed. */
+    chn1->state          = ECS_FREE;
+    chn1->notify_vcpu_id = 0;
 
  out:
     if ( d2 != NULL )
@@ -566,12 +565,13 @@ static long evtchn_status(evtchn_status_t *status)
         status->u.virq = chn->u.virq;
         break;
     case ECS_IPI:
-        status->status     = EVTCHNSTAT_ipi;
-        status->u.ipi_vcpu = chn->notify_vcpu_id;
+        status->status = EVTCHNSTAT_ipi;
         break;
     default:
         BUG();
     }
+
+    status->vcpu = chn->notify_vcpu_id;
 
  out:
     spin_unlock(&d->evtchn_lock);
@@ -579,24 +579,41 @@ static long evtchn_status(evtchn_status_t *status)
     return rc;
 }
 
-static long evtchn_rebind(evtchn_rebind_t *bind) 
+static long evtchn_bind_vcpu(evtchn_bind_vcpu_t *bind) 
 {
     struct domain *d    = current->domain;
     int            port = bind->port;
     int            vcpu = bind->vcpu;
     struct evtchn *chn;
-    long             rc = 0;
+    long           rc = 0;
+
+    if ( (vcpu >= MAX_VIRT_CPUS) || (d->vcpu[vcpu] == NULL) ) {
+        printf("vcpu %d bad.\n", vcpu);
+        return -EINVAL;
+    }
 
     spin_lock(&d->evtchn_lock);
 
     if ( !port_is_valid(d, port) )
     {
+        printf("port %d bad.\n", port);
         rc = -EINVAL;
         goto out;
     }
 
     chn = evtchn_from_port(d, port);
-    chn->notify_vcpu_id = vcpu;
+    switch ( chn->state )
+    {
+    case ECS_UNBOUND:
+    case ECS_INTERDOMAIN:
+    case ECS_PIRQ:
+        chn->notify_vcpu_id = vcpu;
+        break;
+    default:
+        printf("evtchn type %d can't be rebound.\n", chn->state);
+        rc = -EINVAL;
+        break;
+    }
 
  out:
     spin_unlock(&d->evtchn_lock);
@@ -660,10 +677,8 @@ long do_event_channel_op(evtchn_op_t *uop)
             rc = -EFAULT;
         break;
 
-    case EVTCHNOP_rebind:
-        rc = evtchn_rebind(&op.u.rebind);
-        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
-            rc = -EFAULT;
+    case EVTCHNOP_bind_vcpu:
+        rc = evtchn_bind_vcpu(&op.u.bind_vcpu);
         break;
 
     default:

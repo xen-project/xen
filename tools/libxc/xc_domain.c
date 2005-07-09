@@ -125,6 +125,33 @@ int xc_domain_getinfo(int xc_handle,
     return nr_doms;
 }
 
+int xc_domain_getinfolist(int xc_handle,
+                          u32 first_domain,
+                          unsigned int max_domains,
+                          xc_domaininfo_t *info)
+{
+    int ret = 0;
+    dom0_op_t op;
+
+    if(mlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0)
+        return -1;
+    
+    op.cmd = DOM0_GETDOMAININFOLIST;
+    op.u.getdomaininfolist.first_domain = first_domain;
+    op.u.getdomaininfolist.max_domains  = max_domains;
+    op.u.getdomaininfolist.buffer       = info;
+
+    if(xc_dom0_op(xc_handle, &op) < 0)
+        ret = -1;
+    else
+        ret = op.u.getdomaininfolist.num_domains;
+    
+    if(munlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0)
+        ret = -1;
+    
+    return ret;
+}
+
 int xc_domain_get_vcpu_context(int xc_handle,
                                u32 domid,
                                u32 vcpu,

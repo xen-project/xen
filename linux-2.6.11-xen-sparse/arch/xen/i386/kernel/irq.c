@@ -274,7 +274,7 @@ void fixup_irqs(cpumask_t map)
 		}
 		if (irq_desc[irq].handler->set_affinity)
 			irq_desc[irq].handler->set_affinity(irq, mask);
-		else if (irq_desc[irq].action && !(warned++))
+		else if (irq_desc[irq].action)
 			printk("Cannot set affinity for irq %i\n", irq);
 	}
 

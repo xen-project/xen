@@ -94,6 +94,9 @@ DECLARE_TRAP_HANDLER(alignment_check);
 DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
 DECLARE_TRAP_HANDLER(machine_check);
 
+long do_set_debugreg(int reg, unsigned long value);
+unsigned long do_get_debugreg(int reg);
+
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
 
@@ -568,8 +571,8 @@ static inline int admin_io_okay(
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
-    unsigned long *reg, eip = regs->eip;
-    u8 opcode, modrm_reg = 0, rep_prefix = 0;
+    unsigned long *reg, eip = regs->eip, res;
+    u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0;
     unsigned int port, i, op_bytes = 4, data;
 
     /* Legacy prefixes. */
@@ -604,7 +607,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     if ( (opcode & 0xf0) == 0x40 )
     {
         modrm_reg = (opcode & 4) << 1;  /* REX.R */
-        /* REX.W, REX.B and REX.X do not need to be decoded. */
+        modrm_rm  = (opcode & 1) << 3;  /* REX.B */
+
+        /* REX.W and REX.X do not need to be decoded. */
         opcode = insn_fetch(u8, 1, eip);
     }
 #endif
@@ -782,11 +787,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
     case 0x20: /* MOV CR?,<reg> */
         opcode = insn_fetch(u8, 1, eip);
-        if ( (opcode & 0xc0) != 0xc0 )
-            goto fail;
-        modrm_reg |= opcode & 7;
-        reg = decode_register(modrm_reg, regs, 0);
-        switch ( (opcode >> 3) & 7 )
+        modrm_reg |= (opcode >> 3) & 7;
+        modrm_rm  |= (opcode >> 0) & 7;
+        reg = decode_register(modrm_rm, regs, 0);
+        switch ( modrm_reg )
         {
         case 0: /* Read CR0 */
             *reg = v->arch.guest_context.ctrlreg[0];
@@ -805,13 +809,22 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         }
         break;
 
+    case 0x21: /* MOV DR?,<reg> */
+        opcode = insn_fetch(u8, 1, eip);
+        modrm_reg |= (opcode >> 3) & 7;
+        modrm_rm  |= (opcode >> 0) & 7;
+        reg = decode_register(modrm_rm, regs, 0);
+        if ( (res = do_get_debugreg(modrm_reg)) > (unsigned long)-256 )
+            goto fail;
+        *reg = res;
+        break;
+
     case 0x22: /* MOV <reg>,CR? */
         opcode = insn_fetch(u8, 1, eip);
-        if ( (opcode & 0xc0) != 0xc0 )
-            goto fail;
-        modrm_reg |= opcode & 7;
-        reg = decode_register(modrm_reg, regs, 0);
-        switch ( (opcode >> 3) & 7 )
+        modrm_reg |= (opcode >> 3) & 7;
+        modrm_rm  |= (opcode >> 0) & 7;
+        reg = decode_register(modrm_rm, regs, 0);
+        switch ( modrm_reg )
         {
         case 0: /* Write CR0 */
             (void)do_fpu_taskswitch(!!(*reg & X86_CR0_TS));
@@ -826,6 +839,15 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             (void)new_guest_cr3(*reg);
             UNLOCK_BIGLOCK(v->domain);
             break;
+
+    case 0x23: /* MOV <reg>,DR? */
+        opcode = insn_fetch(u8, 1, eip);
+        modrm_reg |= (opcode >> 3) & 7;
+        modrm_rm  |= (opcode >> 0) & 7;
+        reg = decode_register(modrm_rm, regs, 0);
+        if ( do_set_debugreg(modrm_reg, *reg) != 0 )
+            goto fail;
+        break;
 
         default:
             goto fail;

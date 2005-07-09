@@ -192,6 +192,24 @@ int xc_domain_getinfo(int xc_handle,
                       xc_dominfo_t *info);
 
 /**
+ * This function will return information about one or more domains, using a
+ * single hypercall.  The domain information will be stored into the supplied
+ * array of xc_domaininfo_t structures.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm first_domain the first domain to enumerate information from.
+ *                    Domains are currently enumerate in order of creation.
+ * @parm max_domains the number of elements in info
+ * @parm info an array of max_doms size that will contain the information for
+ *            the enumerated domains.
+ * @return the number of domains enumerated or -1 on error
+ */
+int xc_domain_getinfolist(int xc_handle,
+                          u32 first_domain,
+                          unsigned int max_domains,
+                          xc_domaininfo_t *info);
+
+/**
  * This function returns information about one domain.  This information is
  * more detailed than the information from xc_domain_getinfo().
  *

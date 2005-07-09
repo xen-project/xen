@@ -577,11 +577,12 @@ typedef struct usbif_fe_interface_connect {
 } usbif_fe_interface_connect_t;
 
 /*
- * CMSG_BLKIF_FE_INTERFACE_DISCONNECT:
+ * CMSG_USBIF_FE_INTERFACE_DISCONNECT:
  *  If successful, the domain controller will acknowledge with a
  *  STATUS_DISCONNECTED message.
  */
 typedef struct usbif_fe_interface_disconnect {
+    int dummy; /* make struct non-empty */
 } usbif_fe_interface_disconnect_t;
 
 

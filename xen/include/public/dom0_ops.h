@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA100C
+#define DOM0_INTERFACE_VERSION   0xAAAA100E
 
 /************************************************************************/
 
@@ -357,6 +357,16 @@ typedef struct {
     u64     cpu_time;                 
 } dom0_getvcpucontext_t;
 
+#define DOM0_GETDOMAININFOLIST    38
+typedef struct {
+    /* IN variables. */
+    domid_t               first_domain;
+    memory_t              max_domains;
+    dom0_getdomaininfo_t *buffer;
+    /* OUT variables. */
+    memory_t              num_domains;
+} dom0_getdomaininfolist_t;
+
 typedef struct {
     u32 cmd;
     u32 interface_version; /* DOM0_INTERFACE_VERSION */
@@ -389,6 +399,7 @@ typedef struct {
         dom0_microcode_t         microcode;
         dom0_ioport_permission_t ioport_permission;
         dom0_getvcpucontext_t    getvcpucontext;
+        dom0_getdomaininfolist_t getdomaininfolist;
     } u;
 } dom0_op_t;
 

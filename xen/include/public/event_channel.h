@@ -89,8 +89,6 @@ typedef struct evtchn_bind_pirq {
  */
 #define EVTCHNOP_bind_ipi         7
 typedef struct evtchn_bind_ipi {
-    /* IN parameters. */
-    u32 ipi_vcpu;
     /* OUT parameters. */
     u32 port;
 } evtchn_bind_ipi_t;
@@ -144,6 +142,7 @@ typedef struct evtchn_status {
 #define EVTCHNSTAT_virq         4  /* Channel is bound to a virtual IRQ line */
 #define EVTCHNSTAT_ipi          5  /* Channel is bound to a virtual IPI line */
     u32     status;
+    u32     vcpu;                  /* VCPU to which this channel is bound.   */
     union {
         struct {
             domid_t dom;
@@ -154,16 +153,25 @@ typedef struct evtchn_status {
         } interdomain; /* EVTCHNSTAT_interdomain */
         u32 pirq;      /* EVTCHNSTAT_pirq        */
         u32 virq;      /* EVTCHNSTAT_virq        */
-        u32 ipi_vcpu;  /* EVTCHNSTAT_ipi         */
     } u;
 } evtchn_status_t;
 
-#define EVTCHNOP_rebind        8
-typedef struct {
+/*
+ * EVTCHNOP_bind_vcpu: Specify which vcpu a channel should notify when an
+ * event is pending.
+ * NOTES:
+ *  1. IPI- and VIRQ-bound channels always notify the vcpu that initialised
+ *     the binding. This binding cannot be changed.
+ *  2. All other channels notify vcpu0 by default. This default is set when
+ *     the channel is allocated (a port that is freed and subsequently reused
+ *     has its binding reset to vcpu0).
+ */
+#define EVTCHNOP_bind_vcpu        8
+typedef struct evtchn_bind_vcpu {
     /* IN parameters. */
-    u32 port;                         /*  0 */
-    u32 vcpu;                         /*  4 */
-} evtchn_rebind_t; /* 8 bytes */
+    u32 port;
+    u32 vcpu;
+} evtchn_bind_vcpu_t;
 
 typedef struct evtchn_op {
     u32 cmd; /* EVTCHNOP_* */
@@ -176,7 +184,7 @@ typedef struct evtchn_op {
         evtchn_close_t            close;
         evtchn_send_t             send;
         evtchn_status_t           status;
-        evtchn_rebind_t           rebind;
+        evtchn_bind_vcpu_t        bind_vcpu;
     } u;
 } evtchn_op_t;
 
