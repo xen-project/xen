@@ -46,6 +46,8 @@ void foo(void)
 	DEFINE(XSI_PSR_IC, (SHAREDINFO_ADDR+offsetof(vcpu_info_t, arch.interrupt_collection_enabled)));
 	DEFINE(XSI_PSR_I_OFS, offsetof(vcpu_info_t, arch.interrupt_delivery_enabled));
 	DEFINE(XSI_IIP_OFS, offsetof(vcpu_info_t, arch.iip));
+	DEFINE(XSI_IFA_OFS, offsetof(vcpu_info_t, arch.ifa));
+	DEFINE(XSI_ITIR_OFS, offsetof(vcpu_info_t, arch.itir));
 	DEFINE(XSI_IPSR, (SHAREDINFO_ADDR+offsetof(vcpu_info_t, arch.ipsr)));
 	DEFINE(XSI_IPSR_OFS, offsetof(vcpu_info_t, arch.ipsr));
 	DEFINE(XSI_IFS_OFS, offsetof(vcpu_info_t, arch.ifs));
@@ -61,6 +63,7 @@ void foo(void)
 	DEFINE(XSI_PEND_OFS, offsetof(vcpu_info_t, arch.pending_interruption));
 	DEFINE(XSI_RR0_OFS, offsetof(vcpu_info_t, arch.rrs[0]));
 	DEFINE(XSI_TPR_OFS, offsetof(vcpu_info_t, arch.tpr));
+	DEFINE(XSI_PTA_OFS, offsetof (vcpu_info_t, arch.pta));
 	DEFINE(XSI_ITV_OFS, offsetof(vcpu_info_t, arch.itv));
 	//DEFINE(IA64_TASK_BLOCKED_OFFSET,offsetof (struct task_struct, blocked));
 	//DEFINE(IA64_TASK_CLEAR_CHILD_TID_OFFSET,offsetof (struct task_struct, clear_child_tid));
@@ -85,6 +88,8 @@ void foo(void)
 	DEFINE(IA64_VCPU_ENDING_RID_OFFSET, offsetof (struct vcpu, arch.ending_rid));
 	DEFINE(IA64_VCPU_DOMAIN_ITM_OFFSET, offsetof (struct vcpu, arch.domain_itm));
 	DEFINE(IA64_VCPU_DOMAIN_ITM_LAST_OFFSET, offsetof (struct vcpu, arch.domain_itm_last));
+	DEFINE(IA64_VCPU_ITLB_OFFSET, offsetof (struct vcpu, arch.itlb));
+	DEFINE(IA64_VCPU_DTLB_OFFSET, offsetof (struct vcpu, arch.dtlb));
 
 	BLANK();
 	DEFINE(IA64_CPUINFO_ITM_NEXT_OFFSET, offsetof (struct cpuinfo_ia64, itm_next));

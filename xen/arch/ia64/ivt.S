@@ -666,7 +666,12 @@ END(dirty_bit)
 // 0x2400 Entry 9 (size 64 bundles) Instruction Access-bit (27)
 ENTRY(iaccess_bit)
 #ifdef XEN
-	REFLECT(9)
+	mov r31=pr;
+	mov r16=cr.isr
+	mov r17=cr.ifa
+	mov r19=9
+	movl r20=0x2400
+	br.sptk.many fast_access_reflect;;
 #endif
 	DBG_FAULT(9)
 	// Like Entry 8, except for instruction access
@@ -734,7 +739,12 @@ END(iaccess_bit)
 // 0x2800 Entry 10 (size 64 bundles) Data Access-bit (15,55)
 ENTRY(daccess_bit)
 #ifdef XEN
-	REFLECT(10)
+	mov r31=pr;
+	mov r16=cr.isr
+	mov r17=cr.ifa
+	mov r19=10
+	movl r20=0x2800
+	br.sptk.many fast_access_reflect;;
 #endif
 	DBG_FAULT(10)
 	// Like Entry 8, except for data access
@@ -1395,7 +1405,12 @@ END(iaccess_rights)
 // 0x5300 Entry 23 (size 16 bundles) Data Access Rights (14,53)
 ENTRY(daccess_rights)
 #ifdef XEN
-	REFLECT(23)
+	mov r31=pr;
+	mov r16=cr.isr
+	mov r17=cr.ifa
+	mov r19=23
+	movl r20=0x5300
+	br.sptk.many fast_access_reflect;;
 #endif
 	DBG_FAULT(23)
 	mov r16=cr.ifa
@@ -1821,7 +1836,7 @@ END(ia32_interrupt)
 
 #ifdef XEN
 	.org ia64_ivt+0x8000
-ENTRY(dispatch_reflection)
+GLOBAL_ENTRY(dispatch_reflection)
 	/*
 	 * Input:
 	 *	psr.ic:	off

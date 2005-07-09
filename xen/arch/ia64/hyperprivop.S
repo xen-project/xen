@@ -125,6 +125,10 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	cmp.eq p7,p6=XEN_HYPER_ITC_I,r17
 (p7)	br.sptk.many hyper_itc_i;;
 
+	// HYPERPRIVOP_THASH?
+	cmp.eq p7,p6=XEN_HYPER_THASH,r17
+(p7)	br.sptk.many hyper_thash;;
+
 	// if not one of the above, give up for now and do it the slow way
 	br.sptk.many dispatch_break_fault ;;
 
@@ -440,7 +444,6 @@ fast_tick_reflect_done:
 END(fast_tick_reflect)
 
 // reflect domain breaks directly to domain
-// FIXME: DOES NOT WORK YET
 //	r16 == cr.isr
 //	r17 == cr.iim
 //	r18 == XSI_PSR_IC
@@ -471,15 +474,30 @@ GLOBAL_ENTRY(fast_break_reflect)
 	cmp.eq p7,p0=r22,r17;
 (p7)	br.spnt.few dispatch_break_fault ;;
 #endif
-#ifdef FAST_REFLECT_CNT
-	movl r20=fast_reflect_count+((0x2c00>>8)*8);;
-	ld8 r21=[r20];;
-	adds r21=1,r21;;
-	st8 [r20]=r21;;
-#endif
+	movl r20=0x2c00;
 	// save iim in shared_info
 	adds r21=XSI_IIM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r17;;
+	// fall through
+
+
+// reflect to domain ivt+r20
+// sets up isr,iip,ipsr,ifs (FIXME: do iipa too)
+//	r16 == cr.isr
+//	r18 == XSI_PSR_IC
+//	r20 == offset into ivt
+//	r29 == iip
+//	r30 == ipsr
+//	r31 == pr
+ENTRY(fast_reflect)
+#ifdef FAST_REFLECT_CNT
+	movl r22=fast_reflect_count;
+	shr r23=r20,5;;
+	add r22=r22,r23;;
+	ld8 r21=[r22];;
+	adds r21=1,r21;;
+	st8 [r22]=r21;;
+#endif
 	// save iip in shared_info (DON'T POINT TO NEXT INSTRUCTION!)
 	adds r21=XSI_IIP_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r29;;
@@ -504,9 +522,9 @@ GLOBAL_ENTRY(fast_break_reflect)
 	or r30=r30,r28;;
 	and r30=r30,r27;;
 	// also set shared_mem ipsr.i and ipsr.ic appropriately
-	ld8 r20=[r18];;
-	extr.u r22=r20,32,32
-	cmp4.eq p6,p7=r20,r0;;
+	ld8 r24=[r18];;
+	extr.u r22=r24,32,32
+	cmp4.eq p6,p7=r24,r0;;
 (p6)	dep r30=0,r30,IA64_PSR_IC_BIT,1
 (p7)	dep r30=-1,r30,IA64_PSR_IC_BIT,1 ;;
 	cmp4.eq p6,p7=r22,r0;;
@@ -520,13 +538,13 @@ GLOBAL_ENTRY(fast_break_reflect)
 	// cover and set shared_mem precover_ifs to cr.ifs
 	// set shared_mem ifs and incomplete_regframe to 0
 	cover ;;
-	mov r20=cr.ifs;;
+	mov r24=cr.ifs;;
 	adds r21=XSI_INCOMPL_REG_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r21]=r0 ;;
 	adds r21=XSI_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st8 [r21]=r0 ;;
 	adds r21=XSI_PRECOVER_IFS_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st8 [r21]=r20 ;;
+	st8 [r21]=r24 ;;
 	// vpsr.i = vpsr.ic = 0 on delivery of interruption
 	st8 [r18]=r0;;
 	// FIXME: need to save iipa and isr to be arch-compliant
@@ -534,22 +552,30 @@ GLOBAL_ENTRY(fast_break_reflect)
 	mov r22=IA64_KR(CURRENT);;
 	adds r22=IA64_VCPU_IVA_OFFSET,r22;;
 	ld8 r23=[r22];;
-	movl r24=0x2c00;;
-	add r24=r24,r23;;
-	mov cr.iip=r24;;
+	add r20=r20,r23;;
+	mov cr.iip=r20;;
 	// OK, now all set to go except for switch to virtual bank0
 	mov r30=r2; mov r29=r3;;
 	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
 	bsw.1;;
-	st8 [r2]=r16,16; st8 [r3]=r17,16 ;;
-	st8 [r2]=r18,16; st8 [r3]=r19,16 ;;
-	st8 [r2]=r20,16; st8 [r3]=r21,16 ;;
-	st8 [r2]=r22,16; st8 [r3]=r23,16 ;;
-	st8 [r2]=r24,16; st8 [r3]=r25,16 ;;
-	st8 [r2]=r26,16; st8 [r3]=r27,16 ;;
-	st8 [r2]=r28,16; st8 [r3]=r29,16 ;;
-	st8 [r2]=r30,16; st8 [r3]=r31,16 ;;
+	// FIXME: need to handle ar.unat!
+	.mem.offset 0,0; st8.spill [r2]=r16,16;
+	.mem.offset 8,0; st8.spill [r3]=r17,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r18,16;
+	.mem.offset 8,0; st8.spill [r3]=r19,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r20,16;
+	.mem.offset 8,0; st8.spill [r3]=r21,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r22,16;
+	.mem.offset 8,0; st8.spill [r3]=r23,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r24,16;
+	.mem.offset 8,0; st8.spill [r3]=r25,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r26,16;
+	.mem.offset 8,0; st8.spill [r3]=r27,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r28,16;
+	.mem.offset 8,0; st8.spill [r3]=r29,16 ;;
+	.mem.offset 0,0; st8.spill [r2]=r30,16;
+	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
 	movl r31=XSI_IPSR;;
 	bsw.0 ;;
 	mov r2=r30; mov r3=r29;;
@@ -558,6 +584,41 @@ GLOBAL_ENTRY(fast_break_reflect)
 	mov pr=r31,-1 ;;
 	rfi
 	;;
+
+// reflect access faults (0x2400,0x2800,0x5300) directly to domain
+//	r16 == isr
+//	r17 == ifa
+//	r19 == reflect number (only pass-thru to dispatch_reflection)
+//	r20 == offset into ivt
+//	r31 == pr
+GLOBAL_ENTRY(fast_access_reflect)
+	mov r30=cr.ipsr;;
+	mov r29=cr.iip;;
+	extr.u r21=r30,IA64_PSR_BE_BIT,1 ;;
+	cmp.ne p7,p0=r21,r0
+(p7)	br.spnt.few dispatch_reflection ;;
+	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
+	cmp.ne p7,p0=r21,r0
+(p7)	br.spnt.few dispatch_reflection ;;
+	extr.u r21=r30,IA64_PSR_CPL0_BIT,2 ;;
+	cmp.eq p7,p0=r21,r0
+(p7)	br.spnt.few dispatch_reflection ;;
+	movl r18=XSI_PSR_IC;;
+	ld8 r21=[r18];;
+	cmp.eq p7,p0=r0,r21
+(p7)	br.spnt.few dispatch_reflection ;;
+	// set shared_mem ifa, FIXME: should we validate it?
+	mov r17=cr.ifa;;
+	adds r21=XSI_IFA_OFS-XSI_PSR_IC_OFS,r18 ;; 
+	st8 [r21]=r17 ;;
+	// get rr[ifa] and save to itir in shared memory (extra bits ignored)
+	shr.u r22=r17,61
+	adds r23=XSI_ITIR_OFS-XSI_PSR_IC_OFS,r18 
+	adds r21=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18 ;;
+	shladd r22=r22,3,r21;;
+	ld8 r22=[r22];;
+	st8 [r23]=r22;;
+	br.cond.sptk.many fast_reflect;;
 
 
 // ensure that, if giving up, registers at entry to fast_hyperprivop unchanged
@@ -1312,8 +1373,146 @@ ENTRY(hyper_set_rr)
 	;;
 END(hyper_set_rr)
 
+// this routine was derived from optimized assembly output from
+// vcpu_thash so it is dense and difficult to read but it works
+// On entry:
+//	r18 == XSI_PSR_IC
+//	r31 == pr
+GLOBAL_ENTRY(hyper_thash)
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_THASH);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	shr.u r20 = r8, 61
+	addl r25 = 1, r0
+	movl r17 = 0xe000000000000000
+	;;
+	and r21 = r17, r8		// VHPT_Addr1
+	;;
+	shladd r28 = r20, 3, r18
+	adds r19 = XSI_PTA_OFS-XSI_PSR_IC_OFS, r18
+	;;
+	adds r27 = XSI_RR0_OFS-XSI_PSR_IC_OFS, r28
+	addl r28 = 32767, r0
+	ld8 r24 = [r19]			// pta
+	;;
+	ld8 r23 = [r27]			// rrs[vadr>>61]
+	extr.u r26 = r24, 2, 6
+	;;
+	extr.u r22 = r23, 2, 6
+	shl r30 = r25, r26
+	;;
+	shr.u r19 = r8, r22
+	shr.u r29 = r24, 15
+	;;
+	adds r17 = -1, r30
+	;;
+	shladd r27 = r19, 3, r0
+	extr.u r26 = r17, 15, 46
+	;;
+	andcm r24 = r29, r26
+	and r19 = r28, r27
+	shr.u r25 = r27, 15
+	;;
+	and r23 = r26, r25
+	;;
+	or r22 = r24, r23
+	;;
+	dep.z r20 = r22, 15, 46
+	;;
+	or r16 = r20, r21
+	;;
+	or r8 = r19, r16
+	// done, update iip/ipsr to next instruction
+	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_thash)
+
 ENTRY(hyper_ptc_ga)
-	br.spnt.many dispatch_break_fault ;;
+#ifdef CONFIG_SMP
+FIXME: ptc.ga instruction requires spinlock for SMP
+#endif
+	// FIXME: validate not flushing Xen addresses
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_PTC_GA);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	mov r28=r8
+	extr.u r19=r9,2,6		// addr_range=1<<((r9&0xfc)>>2)
+	mov r20=1
+	shr.u r24=r8,61
+	addl r27=56,r0			// PAGE_SHIFT<<2 (for ptc.ga)
+	movl r26=0x8000000000000000	// INVALID_TI_TAG
+	mov r30=ar.lc
+	;;
+	shl r19=r20,r19
+	cmp.eq p7,p0=7,r24
+(p7)	br.spnt.many dispatch_break_fault ;;	// slow way for rr7
+	;;
+	cmp.le p7,p0=r19,r0		// skip flush if size<=0
+(p7)	br.cond.dpnt 2f ;;
+	extr.u r24=r19,0,PAGE_SHIFT
+	shr.u r23=r19,PAGE_SHIFT ;;	// repeat loop for n pages
+	cmp.ne p7,p0=r24,r0 ;;
+(p7)	adds r23=1,r23 ;;		// n_pages<size<n_pages+1? extra iter
+	mov ar.lc=r23
+	movl r29=PAGE_SIZE;;
+1:
+	thash r25=r28 ;;
+	adds r25=16,r25 ;;
+	ld8 r24=[r25] ;;
+	// FIXME: should check if tag matches, not just blow it away
+	or r24=r26,r24 ;;		// vhpt_entry->ti_tag = 1
+	st8 [r25]=r24
+	ptc.ga r28,r27 ;;
+	srlz.i ;;
+	add r28=r29,r28
+	br.cloop.sptk.few 1b
+	;;
+2:
+	mov ar.lc=r30 ;;
+	mov r29=cr.ipsr
+	mov r30=cr.iip;;
+	mov r27=IA64_KR(CURRENT);;
+	adds r25=IA64_VCPU_DTLB_OFFSET,r27
+	adds r26=IA64_VCPU_ITLB_OFFSET,r27;;
+	ld8 r24=[r25]
+	ld8 r27=[r26] ;;
+	and r24=-2,r24
+	and r27=-2,r27 ;;
+	st8 [r25]=r24			// set 1-entry i/dtlb as not present
+	st8 [r26]=r27 ;;
+	// increment to point to next instruction
+	extr.u r26=r29,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r30=16,r30
+(p7)	adds r26=1,r26
+	;;
+	dep r29=r26,r29,41,2
+	;;
+	mov cr.ipsr=r29
+	mov cr.iip=r30
+	mov pr=r31,-1 ;;
+	rfi
+	;;
 END(hyper_ptc_ga)
 
 ENTRY(hyper_itc_d)
@@ -1323,5 +1522,3 @@ END(hyper_itc_d)
 ENTRY(hyper_itc_i)
 	br.spnt.many dispatch_break_fault ;;
 END(hyper_itc_i)
-
-// ignore me
