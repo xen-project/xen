@@ -1033,6 +1033,36 @@ void zero_privop_addrs(void)
 }
 #endif
 
+extern unsigned long dtlb_translate_count;
+extern unsigned long tr_translate_count;
+extern unsigned long phys_translate_count;
+extern unsigned long vhpt_translate_count;
+extern unsigned long lazy_cover_count;
+extern unsigned long idle_when_pending;
+extern unsigned long pal_halt_light_count;
+
+int dump_misc_stats(char *buf)
+{
+	char *s = buf;
+	s += sprintf(s,"Virtual TR translations: %d\n",tr_translate_count);
+	s += sprintf(s,"Virtual VHPT translations: %d\n",vhpt_translate_count);
+	s += sprintf(s,"Virtual DTLB translations: %d\n",dtlb_translate_count);
+	s += sprintf(s,"Physical translations: %d\n",phys_translate_count);
+	s += sprintf(s,"Idle when pending: %d\n",idle_when_pending);
+	s += sprintf(s,"PAL_HALT_LIGHT (no pending): %d\n",pal_halt_light_count);
+	s += sprintf(s,"Lazy covers: %d\n",lazy_cover_count);
+	return s - buf;
+}
+
+void zero_misc_stats(void)
+{
+	dtlb_translate_count = 0;
+	tr_translate_count = 0;
+	phys_translate_count = 0;
+	vhpt_translate_count = 0;
+	lazy_cover_count = 0;
+}
+
 int dump_hyperprivop_counts(char *buf)
 {
 	int i;
@@ -1072,6 +1102,7 @@ int dump_privop_counts_to_user(char __user *ubuf, int len)
 #ifdef PRIVOP_ADDR_COUNT
 	n += dump_privop_addrs(buf + n);
 #endif
+	n += dump_misc_stats(buf + n);
 	if (len < TMPBUFLEN) return -1;
 	if (__copy_to_user(ubuf,buf,n)) return -1;
 	return n;
@@ -1086,6 +1117,7 @@ int zero_privop_counts_to_user(char __user *ubuf, int len)
 #ifdef PRIVOP_ADDR_COUNT
 	zero_privop_addrs();
 #endif
+	zero_misc_stats();
 	zero_reflect_counts();
 	if (len < TMPBUFLEN) return -1;
 	if (__copy_to_user(ubuf,buf,n)) return -1;

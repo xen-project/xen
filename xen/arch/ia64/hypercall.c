@@ -19,12 +19,16 @@ extern unsigned long translate_domain_mpaddr(unsigned long);
 extern struct ia64_sal_retval pal_emulator_static(UINT64);
 extern struct ia64_sal_retval sal_emulator(UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64);
 
+unsigned long idle_when_pending = 0;
+unsigned long pal_halt_light_count = 0;
+
 int
 ia64_hypercall (struct pt_regs *regs)
 {
 	struct vcpu *v = (struct domain *) current;
 	struct ia64_sal_retval x;
 	unsigned long *tv, *tc;
+	int pi;
 
 	switch (regs->r2) {
 	    case FW_HYPERCALL_PAL_CALL:
@@ -40,19 +44,21 @@ ia64_hypercall (struct pt_regs *regs)
 #endif
 		x = pal_emulator_static(regs->r28);
 		if (regs->r28 == PAL_HALT_LIGHT) {
-#if 1
 #define SPURIOUS_VECTOR 15
-			if (vcpu_check_pending_interrupts(v)!=SPURIOUS_VECTOR) {
-//				int pi = vcpu_check_pending_interrupts(v);
+			pi = vcpu_check_pending_interrupts(v);
+			if (pi != SPURIOUS_VECTOR) {
+				idle_when_pending++;
+				pi = vcpu_pend_unspecified_interrupt(v);
 //printf("idle w/int#%d pending!\n",pi);
 //this shouldn't happen, but it apparently does quite a bit!  so don't
 //allow it to happen... i.e. if a domain has an interrupt pending and
 //it tries to halt itself because it thinks it is idle, just return here
 //as deliver_pending_interrupt is called on the way out and will deliver it
 			}
-			else
-#endif
-			do_sched_op(SCHEDOP_yield);
+			else {
+				pal_halt_light_count++;
+				do_sched_op(SCHEDOP_yield);
+			}
 			//break;
 		}
 		regs->r8 = x.status; regs->r9 = x.v0;

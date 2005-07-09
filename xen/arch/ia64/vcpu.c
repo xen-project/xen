@@ -53,8 +53,15 @@ extern void privop_count_addr(unsigned long addr, int inst);
 #define	PRIVOP_COUNT_ADDR(x,y) do {} while (0)
 #endif
 
+unsigned long dtlb_translate_count = 0;
+unsigned long tr_translate_count = 0;
+unsigned long phys_translate_count = 0;
+
 unsigned long vcpu_verbose = 0;
 #define verbose(a...) do {if (vcpu_verbose) printf(a);} while(0)
+
+extern TR_ENTRY *match_tr(VCPU *vcpu, unsigned long ifa);
+extern TR_ENTRY *match_dtlb(VCPU *vcpu, unsigned long ifa);
 
 /**************************************************************************
  VCPU general register access routines
@@ -224,6 +231,9 @@ IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 //else printf("but nothing pending\n");
 	}
 #endif
+	if (enabling_interrupts &&
+		vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
+			PSCB(vcpu,pending_interruption) = 1;
 	return IA64_NO_FAULT;
 }
 
@@ -267,6 +277,9 @@ IA64FAULT vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
 			return IA64_EXTINT_VECTOR;
 	}
 #endif
+	if (enabling_interrupts &&
+		vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
+			PSCB(vcpu,pending_interruption) = 1;
 	return IA64_NO_FAULT;
 }
 
@@ -531,6 +544,11 @@ IA64FAULT vcpu_set_iha(VCPU *vcpu, UINT64 val)
 /**************************************************************************
  VCPU interrupt control register access routines
 **************************************************************************/
+
+void vcpu_pend_unspecified_interrupt(VCPU *vcpu)
+{
+	PSCB(vcpu,pending_interruption) = 1;
+}
 
 void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 {
@@ -1241,28 +1259,101 @@ IA64FAULT vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 	return (IA64_ILLOP_FAULT);
 }
 
+#define itir_ps(itir)	((itir >> 2) & 0x3f)
+#define itir_mask(itir) (~((1UL << itir_ps(itir)) - 1))
+
+unsigned long vhpt_translate_count = 0;
+
+IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir)
+{
+	unsigned long pta, pta_mask, iha, pte, ps;
+	TR_ENTRY *trp;
+	ia64_rr rr;
+
+	if (!(address >> 61)) {
+		if (!PSCB(vcpu,metaphysical_mode))
+			panic_domain(0,"vcpu_translate: bad address %p\n", address);
+
+		*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX;
+		*itir = PAGE_SHIFT << 2;
+		phys_translate_count++;
+		return IA64_NO_FAULT;
+	}
+
+	/* check translation registers */
+	if ((trp = match_tr(vcpu,address))) {
+			tr_translate_count++;
+		*pteval = trp->page_flags;
+		*itir = trp->itir;
+		return IA64_NO_FAULT;
+	}
+
+	/* check 1-entry TLB */
+	if ((trp = match_dtlb(vcpu,address))) {
+		dtlb_translate_count++;
+		*pteval = trp->page_flags;
+		*itir = trp->itir;
+		return IA64_NO_FAULT;
+	}
+
+	/* check guest VHPT */
+	pta = PSCB(vcpu,pta);
+	rr.rrval = PSCB(vcpu,rrs)[address>>61];
+	if (rr.ve && (pta & IA64_PTA_VE))
+	{
+		if (pta & IA64_PTA_VF)
+		{
+			/* long format VHPT - not implemented */
+			return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
+		}
+		else
+		{
+			/* short format VHPT */
+
+			/* avoid recursively walking VHPT */
+			pta_mask = (itir_mask(pta) << 3) >> 3;
+			if (((address ^ pta) & pta_mask) == 0)
+				return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
+
+			vcpu_thash(vcpu, address, &iha);
+			if (__copy_from_user(&pte, (void *)iha, sizeof(pte)) != 0)
+				return IA64_VHPT_TRANS_VECTOR;
+
+			/* 
+			 * Optimisation: this VHPT walker aborts on not-present pages
+			 * instead of inserting a not-present translation, this allows
+			 * vectoring directly to the miss handler.
+	\		 */
+			if (pte & _PAGE_P)
+			{
+				*pteval = pte;
+				*itir = vcpu_get_itir_on_fault(vcpu,address);
+				vhpt_translate_count++;
+				return IA64_NO_FAULT;
+			}
+			return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
+		}
+	}
+	return (is_data ? IA64_ALT_DATA_TLB_VECTOR : IA64_ALT_INST_TLB_VECTOR);
+}
+
 IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 {
-	extern TR_ENTRY *match_tr(VCPU *,UINT64);
-	unsigned long match_dtlb(VCPU *, unsigned long, unsigned long *, unsigned long *);
-	TR_ENTRY *trp;
-	UINT64 mask, pteval, mp_pte, ps;
+	UINT64 pteval, itir, mask;
+	IA64FAULT fault;
 
-extern unsigned long privop_trace;
-	if (pteval = match_dtlb(vcpu, vadr, &ps, &mp_pte) && (mp_pte != -1UL)) {
-		mask = (1L << ps) - 1;
-		*padr = ((mp_pte & _PAGE_PPN_MASK) & ~mask) | (vadr & mask);
-		verbose("vcpu_tpa: addr=%p @%p, successful, padr=%p\n",vadr,PSCB(vcpu,iip),*padr);
+	fault = vcpu_translate(vcpu, vadr, 1, &pteval, &itir);
+	if (fault == IA64_NO_FAULT)
+	{
+		mask = itir_mask(itir);
+		*padr = (pteval & _PAGE_PPN_MASK & mask) | (vadr & ~mask);
 		return (IA64_NO_FAULT);
 	}
-	if (trp=match_tr(current,vadr)) {
-		mask = (1L << trp->ps) - 1;
-		*padr = ((trp->ppn << 12) & ~mask) | (vadr & mask);
-		verbose("vcpu_tpa: addr=%p @%p, successful, padr=%p\n",vadr,PSCB(vcpu,iip),*padr);
-		return (IA64_NO_FAULT);
+	else
+	{
+		PSCB(vcpu,tmp[0]) = vadr;       // save ifa in vcpu structure, then specify IA64_FORCED_IFA
+		return (fault | IA64_FORCED_IFA);
 	}
-	verbose("vcpu_tpa addr=%p, @%p, forcing data miss\n",vadr,PSCB(vcpu,iip));
-	return vcpu_force_data_miss(vcpu, vadr);
 }
 
 IA64FAULT vcpu_tak(VCPU *vcpu, UINT64 vadr, UINT64 *key)
@@ -1614,15 +1705,12 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 
 // NOTE: returns a physical pte, NOT a "metaphysical" pte, so do not check
 // the physical address contained for correctness
-unsigned long match_dtlb(VCPU *vcpu, unsigned long ifa, unsigned long *ps, unsigned long *mp_pte)
+TR_ENTRY *match_dtlb(VCPU *vcpu, unsigned long ifa)
 {
 	TR_ENTRY *trp;
 
-	if (trp = vcpu_match_tr_entry(vcpu,&vcpu->arch.dtlb,ifa,1)) {
-		if (ps) *ps = trp->ps;
-		if (mp_pte) *mp_pte = vcpu->arch.dtlb_pte;
-		return (trp->page_flags);
-	}
+	if (trp = vcpu_match_tr_entry(vcpu,&vcpu->arch.dtlb,ifa,1))
+		return (&vcpu->arch.dtlb);
 	return 0UL;
 }
 
@@ -1679,11 +1767,12 @@ IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr)
 	// TODO: Only allowed for current vcpu
 	UINT64 mpaddr, ps;
 	IA64FAULT fault;
-	unsigned long match_dtlb(VCPU *, unsigned long, unsigned long *, unsigned long *);
+	TR_ENTRY *trp;
 	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 	unsigned long pteval, dom_imva;
 
-	if (pteval = match_dtlb(vcpu, vadr, NULL, NULL)) {
+	if ((trp = match_dtlb(vcpu,vadr))) {
+		pteval = trp->page_flags;
 		dom_imva = __va(pteval & _PFN_MASK);
 		ia64_fc(dom_imva);
 		return IA64_NO_FAULT;
