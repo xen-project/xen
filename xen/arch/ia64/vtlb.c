@@ -26,7 +26,7 @@
 #include <asm/vmx_mm_def.h>
 #include <asm/gcc_intrin.h>
 #include <xen/interrupt.h>
-#include <asm/vcpu.h>
+#include <asm/vmx_vcpu.h>
 #define  MAX_CCH_LENGTH     40
 
 
@@ -401,6 +401,8 @@ static void vhpt_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
             panic("Can't convert to machine VHPT entry\n");
         }
         hash_table->next = cch;
+        if(hash_table->tag==hash_table->next->tag)
+            while(1);
     }
     return /*hash_table*/;
 }
@@ -466,10 +468,11 @@ int   cch_depth=0;
 static thash_data_t *thash_rem_cch(thash_cb_t *hcb, thash_data_t *cch)
 {
     thash_data_t *next;
-    
+
     if ( ++cch_depth > MAX_CCH_LENGTH ) {
         printf ("cch length > MAX_CCH_LENGTH, exceed the expected length\n");
-    }
+        while(1);
+   }
     if ( cch -> next ) {
         next = thash_rem_cch(hcb, cch->next);
     }

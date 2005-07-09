@@ -37,10 +37,13 @@
 #include <asm/asm-offsets.h>  /* for IA64_THREAD_INFO_SIZE */
 
 #include <asm/vcpu.h>   /* for function declarations */
+#include <public/arch-ia64.h>
 #ifdef CONFIG_VTI
 #include <asm/vmx.h>
 #include <asm/vmx_vcpu.h>
+#include <asm/vmx_vpd.h>
 #include <asm/pal.h>
+#include <public/io/ioreq.h>
 #endif // CONFIG_VTI
 
 #define CONFIG_DOMAIN0_CONTIGUOUS
@@ -203,18 +206,20 @@ void arch_do_createdomain(struct vcpu *v)
  	 * after up.
  	 */
  	d->shared_info = (void *)alloc_xenheap_page();
-
-	/* FIXME: Because full virtual cpu info is placed in this area,
-	 * it's unlikely to put it into one shareinfo page. Later
-	 * need split vcpu context from vcpu_info and conforms to
-	 * normal xen convention.
+	/* Now assume all vcpu info and event indicators can be
+	 * held in one shared page. Definitely later we need to
+	 * consider more about it
 	 */
-	v->vcpu_info = (void *)alloc_xenheap_page();
-	if (!v->vcpu_info) {
-   		printk("ERROR/HALTING: CAN'T ALLOC PAGE\n");
-   		while (1);
+
+	memset(d->shared_info, 0, PAGE_SIZE);
+	v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
+	/* Mask all events, and specific port will be unmasked
+	 * when customer subscribes to it.
+	 */
+	if(v == d->vcpu[0]) {
+	    memset(&d->shared_info->evtchn_mask[0], 0xff,
+		sizeof(d->shared_info->evtchn_mask));
 	}
-	memset(v->vcpu_info, 0, PAGE_SIZE);
 
 	/* Allocate per-domain vTLB and vhpt */
 	v->arch.vtlb = init_domain_tlb(v);
@@ -291,6 +296,7 @@ void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 	c->shared = v->domain->shared_info->arch;
 }
 
+#ifndef CONFIG_VTI
 int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 {
 	struct pt_regs *regs = (struct pt_regs *) ((unsigned long) v + IA64_STK_OFFSET) - 1;
@@ -312,6 +318,79 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	v->domain->shared_info->arch = c->shared;
 	return 0;
 }
+#else // CONFIG_VTI
+int arch_set_info_guest(
+    struct vcpu *v, struct vcpu_guest_context *c)
+{
+    struct domain *d = v->domain;
+    int i, rc, ret;
+    unsigned long progress = 0;
+
+    if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        return 0;
+
+    /* Lazy FP not implemented yet */
+    clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
+    if ( c->flags & VGCF_FPU_VALID )
+        set_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
+
+    /* Sync d/i cache conservatively, after domain N is loaded */
+    ret = ia64_pal_cache_flush(3, 0, &progress, NULL);
+    if (ret != PAL_STATUS_SUCCESS)
+            panic("PAL CACHE FLUSH failed for dom[%d].\n",
+		v->domain->domain_id);
+    DPRINTK("Sync i/d cache for dom%d image SUCC\n",
+		v->domain->domain_id);
+
+    /* Physical mode emulation initialization, including
+     * emulation ID allcation and related memory request
+     */
+    physical_mode_init(v);
+
+    /* FIXME: only support PMT table continuously by far */
+    d->arch.pmt = __va(c->pt_base);
+    d->arch.max_pfn = c->pt_max_pfn;
+    v->arch.arch_vmx.vmx_platform.shared_page_va = __va(c->share_io_pg);
+    memset((char *)__va(c->share_io_pg),0,PAGE_SIZE);
+
+    if (c->flags & VGCF_VMX_GUEST) {
+	if (!vmx_enabled)
+	    panic("No VMX hardware feature for vmx domain.\n");
+
+	vmx_final_setup_domain(d);
+
+	/* One more step to enable interrupt assist */
+	set_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags);
+    }
+
+    vlsapic_reset(v);
+    vtm_init(v);
+
+    /* Only open one port for I/O and interrupt emulation */
+    if (v == d->vcpu[0]) {
+	memset(&d->shared_info->evtchn_mask[0], 0xff,
+		sizeof(d->shared_info->evtchn_mask));
+	clear_bit(IOPACKET_PORT, &d->shared_info->evtchn_mask[0]);
+    }
+    /* Setup domain context. Actually IA-64 is a bit different with
+     * x86, with almost all system resources better managed by HV
+     * directly. CP only needs to provide start IP of guest, which
+     * ideally is the load address of guest Firmware.
+     */
+    new_thread(v, c->guest_iip, 0, 0);
+
+
+    d->xen_vastart = 0xf000000000000000;
+    d->xen_vaend = 0xf300000000000000;
+    d->arch.breakimm = 0x1000 + d->domain_id;
+    v->arch._thread.on_ustack = 0;
+
+    /* Don't redo final setup */
+    set_bit(_VCPUF_initialised, &v->vcpu_flags);
+
+    return 0;
+}
+#endif // CONFIG_VTI
 
 void arch_do_boot_vcpu(struct vcpu *v)
 {
@@ -361,7 +440,10 @@ void new_thread(struct vcpu *v,
 		init_all_rr(v);
 
 	if (VMX_DOMAIN(v)) {
-		VMX_VPD(v,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);
+		if (d == dom0) {
+		    VMX_VPD(v,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);
+		    printk("new_thread, done with dom_fw_setup\n");
+		}
 		/* Virtual processor context setup */
 		VMX_VPD(v, vpsr) = IA64_PSR_BN;
 		VPD_CR(v, dcr) = 0;
@@ -556,6 +638,7 @@ tryagain:
 }
 
 // FIXME: ONLY USE FOR DOMAIN PAGE_SIZE == PAGE_SIZE
+#ifndef CONFIG_VTI
 unsigned long domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 {
 	unsigned long pte = lookup_domain_mpa(d,mpaddr);
@@ -566,6 +649,14 @@ unsigned long domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 	imva |= mpaddr & ~PAGE_MASK;
 	return(imva);
 }
+#else // CONFIG_VTI
+unsigned long domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
+{
+    unsigned long imva = __gpa_to_mpa(d, mpaddr);
+
+    return __va(imva);
+}
+#endif // CONFIG_VTI
 
 // remove following line if not privifying in memory
 //#define HAVE_PRIVIFY_MEMORY
@@ -812,6 +903,17 @@ void build_shared_info(struct domain *d)
     /* ... */
 }
 
+/*
+ * Domain 0 has direct access to all devices absolutely. However
+ * the major point of this stub here, is to allow alloc_dom_mem
+ * handled with order > 0 request. Dom0 requires that bit set to
+ * allocate memory for other domains.
+ */
+void physdev_init_dom0(struct domain *d)
+{
+	set_bit(_DOMF_physdev_access, &d->domain_flags);
+}
+
 extern unsigned long running_on_sim;
 unsigned int vmx_dom0 = 0;
 int construct_dom0(struct domain *d, 
@@ -963,6 +1065,7 @@ int construct_dom0(struct domain *d,
     set_bit(_DOMF_constructed, &d->domain_flags);
     new_thread(v, pkern_entry, 0, 0);
 
+    physdev_init_dom0(d);
     // FIXME: Hack for keyboard input
 #ifdef CLONE_DOMAIN0
 if (d == dom0)
@@ -978,6 +1081,8 @@ if (d == dom0)
 
     return 0;
 }
+
+
 #else //CONFIG_VTI
 
 int construct_dom0(struct domain *d, 

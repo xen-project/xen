@@ -166,6 +166,16 @@ typedef union{
     };
 } ipi_d_t;
 
+typedef union {
+    __u64 val;
+    struct {
+        __u64 ig0 : 4;
+        __u64 mic : 4;
+        __u64 rsv : 8;
+        __u64 mmi : 1;
+        __u64 ig1 : 47;
+    };
+} tpr_t;
 
 #define IA64_ISR_CODE_MASK0     0xf
 #define IA64_UNIMPL_DADDR_FAULT     0x30

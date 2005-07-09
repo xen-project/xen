@@ -95,7 +95,7 @@
 #include <asm/vmx_vcpu.h>
 #include <asm/vmmu.h>
 #include <asm/regionreg.h>
-
+#include <asm/vmx_mm_def.h>
 /*
         uregs->ptr is virtual address
         uregs->val is pte value
@@ -109,8 +109,9 @@ int do_mmu_update(mmu_update_t *ureqs,u64 count,u64 *pdone,u64 foreigndom)
     mmu_update_t req;
     ia64_rr rr;
     thash_cb_t *hcb;
-    thash_data_t entry={0};
+    thash_data_t entry={0},*ovl;
     vcpu = current;
+    search_section_t sections;
     hcb = vmx_vcpu_get_vtlb(vcpu);
     for ( i = 0; i < count; i++ )
     {
@@ -124,8 +125,18 @@ int do_mmu_update(mmu_update_t *ureqs,u64 count,u64 *pdone,u64 foreigndom)
             entry.cl = DSIDE_TLB;
             rr = vmx_vcpu_rr(vcpu, req.ptr);
             entry.ps = rr.ps;
+            entry.key = redistribute_rid(rr.rid);
             entry.rid = rr.rid;
-            vtlb_insert(hcb, &entry, req.ptr);
+            entry.vadr = PAGEALIGN(req.ptr,entry.ps);
+            sections.tr = 1;
+            sections.tc = 0;
+            ovl = thash_find_overlap(hcb, &entry, sections);
+            if (ovl) {
+                  // generate MCA.
+                panic("Tlb conflict!!");
+                return;
+            }
+            thash_purge_and_insert(hcb, &entry);
         }else if(cmd == MMU_MACHPHYS_UPDATE){
             mfn = req.ptr >>PAGE_SHIFT;
             gpfn = req.val;

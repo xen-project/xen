@@ -45,7 +45,9 @@
 #include <asm/dom_fw.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/kregs.h>
+#include <asm/vmx.h>
 #include <asm/vmx_mm_def.h>
+#include <xen/mm.h>
 /* reset all PSR field to 0, except up,mfl,mfh,pk,dt,rt,mc,it */
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
 
@@ -53,7 +55,7 @@
 extern struct ia64_sal_retval pal_emulator_static(UINT64);
 extern struct ia64_sal_retval sal_emulator(UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64);
 extern void rnat_consumption (VCPU *vcpu);
-
+#define DOMN_PAL_REQUEST    0x110000
 IA64FAULT
 vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim)
 {
@@ -148,7 +150,10 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 				regs->r2);
 #endif
 		vmx_vcpu_increment_iip(current);
-	} else
+	}else if(iim == DOMN_PAL_REQUEST){
+        pal_emul(current);
+		vmx_vcpu_increment_iip(current);
+    }  else
 		vmx_reflect_interruption(ifa,isr,iim,11);
 }
 
@@ -187,26 +192,43 @@ void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
 // ONLY gets called from ia64_leave_kernel
 // ONLY call with interrupts disabled?? (else might miss one?)
 // NEVER successful if already reflecting a trap/fault because psr.i==0
-void vmx_deliver_pending_interrupt(struct pt_regs *regs)
+void leave_hypervisor_tail(struct pt_regs *regs)
 {
 	struct domain *d = current->domain;
 	struct vcpu *v = current;
 	// FIXME: Will this work properly if doing an RFI???
 	if (!is_idle_task(d) ) {	// always comes from guest
-		//vcpu_poke_timer(v);
-		//if (vcpu_deliverable_interrupts(v)) {
-		//	unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
-		//	foodpi();
-		//	reflect_interruption(0,isr,0,regs,IA64_EXTINT_VECTOR);
-		//}
 	        extern void vmx_dorfirfi(void);
 		struct pt_regs *user_regs = vcpu_regs(current);
 
+ 		if (local_softirq_pending())
+ 			do_softirq();
+		local_irq_disable();
+ 
 		if (user_regs != regs)
 			printk("WARNING: checking pending interrupt in nested interrupt!!!\n");
-		if (regs->cr_iip == *(unsigned long *)vmx_dorfirfi)
-			return;
-		vmx_check_pending_irq(v);
+
+		/* VMX Domain N has other interrupt source, saying DM  */
+                if (test_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags))
+                      vmx_intr_assist(v);
+
+ 		/* FIXME: Check event pending indicator, and set
+ 		 * pending bit if necessary to inject back to guest.
+ 		 * Should be careful about window between this check
+ 		 * and above assist, since IOPACKET_PORT shouldn't be
+ 		 * injected into vmx domain.
+ 		 *
+ 		 * Now hardcode the vector as 0x10 temporarily
+ 		 */
+ 		if (event_pending(v)&&(!((v->arch.arch_vmx.in_service[0])&(1UL<<0x10)))) {
+ 			VPD_CR(v, irr[0]) |= 1UL << 0x10;
+ 			v->arch.irq_new_pending = 1;
+ 		}
+ 
+ 		if ( v->arch.irq_new_pending ) {
+ 			v->arch.irq_new_pending = 0;
+ 			vmx_check_pending_irq(v);
+ 		}
 	}
 }
 
@@ -244,7 +266,11 @@ void vmx_hpw_miss(VCPU *vcpu, u64 vec, u64 vadr)
         return;
     }
     if((vec==2)&&(!vpsr.dt)){
-        physical_dtlb_miss(vcpu, vadr);
+        if(vcpu->domain!=dom0&&__gpfn_is_io(vcpu->domain,(vadr<<1)>>(PAGE_SHIFT+1))){
+            emulate_io_inst(vcpu,((vadr<<1)>>1),4);   //  UC
+        }else{
+            physical_dtlb_miss(vcpu, vadr);
+        }
         return;
     }
     vrr = vmx_vcpu_rr(vcpu,vadr);
@@ -255,6 +281,11 @@ void vmx_hpw_miss(VCPU *vcpu, u64 vec, u64 vadr)
 //    prepare_if_physical_mode(vcpu);
 
     if(data=vtlb_lookup_ex(vtlb, vrr.rid, vadr,type)){
+        if(vcpu->domain!=dom0&&type==DSIDE_TLB && __gpfn_is_io(vcpu->domain, data->ppn>>(PAGE_SHIFT-12))){
+            vadr=(vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
+            emulate_io_inst(vcpu, vadr, data->ma);
+            return IA64_FAULT;
+        }
     	if ( data->ps != vrr.ps ) {
     		machine_tlb_insert(vcpu, data);
     	}

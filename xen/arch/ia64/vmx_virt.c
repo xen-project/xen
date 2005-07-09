@@ -1276,7 +1276,13 @@ IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
 }
 
 
-
+static void post_emulation_action(VCPU *vcpu)
+{
+    if ( vcpu->arch.irq_new_condition ) {
+        vcpu->arch.irq_new_condition = 0;
+        vhpi_detection(vcpu);
+    }
+}
 
 //#define  BYPASS_VMAL_OPCODE
 extern IA64_SLOT_TYPE  slot_types[0x20][3];
@@ -1336,7 +1342,7 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
     slot = ((struct ia64_psr *)&(regs->cr_ipsr))->ri;
     if (!slot) inst.inst = bundle.slot0;
     else if (slot == 1)
-        inst.inst = bundle.slot1a + (bundle.slot1b<<23);
+        inst.inst = bundle.slot1a + (bundle.slot1b<<18);
     else if (slot == 2) inst.inst = bundle.slot2;
     else printf("priv_handle_op: illegal slot: %d\n", slot);
     slot_type = slot_types[bundle.template][slot];
@@ -1478,9 +1484,11 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
 	status=IA64_FAULT;
         break;
     default:
-        printf("unknown cause %d:\n", cause);
+        printf("unknown cause %d, iip: %lx, ipsr: %lx\n", cause,regs->cr_iip,regs->cr_ipsr);
+        while(1);
 	/* For unknown cause, let hardware to re-execute */
 	status=IA64_RETRY;
+        break;
 //        panic("unknown cause in virtualization intercept");
     };
 
@@ -1494,6 +1502,7 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
     }
 
     recover_if_physical_mode(vcpu);
+    post_emulation_action (vcpu);
 //TODO    set_irq_check(v);
     return;
 

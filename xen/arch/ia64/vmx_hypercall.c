@@ -141,21 +141,27 @@ void hyper_lock_page(void)
 static int do_set_shared_page(VCPU *vcpu, u64 gpa)
 {
     u64 shared_info, o_info;
+    struct domain *d = vcpu->domain;
+    struct vcpu *v;
     if(vcpu->domain!=dom0)
         return -EPERM;
     shared_info = __gpa_to_mpa(vcpu->domain, gpa);
     o_info = (u64)vcpu->domain->shared_info;
-    vcpu->domain->shared_info= (shared_info_t *)__va(shared_info);
+    d->shared_info= (shared_info_t *)__va(shared_info);
 
     /* Copy existing shared info into new page */
-    if (!o_info) {
-	memcpy((void*)vcpu->domain->shared_info, (void*)o_info, PAGE_SIZE);
-	/* If original page belongs to xen heap, then relinguish back
-	 * to xen heap. Or else, leave to domain itself to decide.
-	 */
-	if (likely(IS_XEN_HEAP_FRAME(virt_to_page(o_info))))
-		free_xenheap_page(o_info);
-    }
+    if (o_info) {
+    	memcpy((void*)d->shared_info, (void*)o_info, PAGE_SIZE);
+    	for_each_vcpu(d, v) {
+	        v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
+    	}
+    	/* If original page belongs to xen heap, then relinguish back
+    	 * to xen heap. Or else, leave to domain itself to decide.
+    	 */
+    	if (likely(IS_XEN_HEAP_FRAME(virt_to_page(o_info))))
+	    	free_xenheap_page(o_info);
+    } else
+        memset(d->shared_info, 0, PAGE_SIZE);
     return 0;
 }
 

@@ -30,7 +30,6 @@ struct vcpu *idle_task[NR_CPUS] = { &idle0_vcpu };
 #ifdef CLONE_DOMAIN0
 struct domain *clones[CLONE_DOMAIN0];
 #endif
-extern struct domain *dom0;
 extern unsigned long domain0_ready;
 
 int find_max_pfn (unsigned long, unsigned long, void *);

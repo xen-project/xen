@@ -19,8 +19,8 @@
  *      Kun Tian (Kevin Tian) (kevin.tian@intel.com)
  */
 
-#ifndef _VPD_H_
-#define _VPD_H_
+#ifndef _ASM_IA64_VMX_VPD_H_
+#define _ASM_IA64_VMX_VPD_H_
 
 #ifndef __ASSEMBLY__
 
@@ -123,6 +123,7 @@ struct arch_vmx_struct {
 	vpd_t       *vpd;
 	vtime_t	    vtm;
     unsigned long   vrr[8];
+    unsigned long   vkr[8];
     unsigned long   mrr5;
     unsigned long   mrr6;
     unsigned long   mrr7;
@@ -145,6 +146,7 @@ struct arch_vmx_struct {
 #define ARCH_VMX_VMCS_LAUNCH    1       /* Needs VMCS launch */
 #define ARCH_VMX_VMCS_RESUME    2       /* Needs VMCS resume */
 #define ARCH_VMX_IO_WAIT        3       /* Waiting for I/O completion */
+#define ARCH_VMX_INTR_ASSIST   4       /* Need DM's assist to issue intr */
 
 
 #define VMX_DEBUG 1
@@ -191,4 +193,4 @@ extern unsigned int opt_vmx_debug_level;
 #define VPD_VMM_VAIL_START_OFFSET	31744
 
 
-#endif /* _VPD_H_ */
+#endif /* _ASM_IA64_VMX_VPD_H_ */

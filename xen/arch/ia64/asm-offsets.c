@@ -224,6 +224,7 @@ void foo(void)
 
 #ifdef  CONFIG_VTI
 	DEFINE(IA64_VPD_BASE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.vpd));
+ 	DEFINE(IA64_VLSAPIC_INSVC_BASE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.in_service[0]));
 	DEFINE(IA64_VPD_CR_VPTA_OFFSET, offsetof (cr_t, pta));
 	DEFINE(XXX_THASH_SIZE, sizeof (thash_data_t));
 

@@ -53,7 +53,7 @@
 
 #define VMM_RR_SHIFT    20
 #define VMM_RR_MASK     ((1UL<<VMM_RR_SHIFT)-1)
-#define VRID_2_MRID(vcpu,rid)  ((rid) & VMM_RR_MASK) | \
+//#define VRID_2_MRID(vcpu,rid)  ((rid) & VMM_RR_MASK) | \
                 ((vcpu->domain->domain_id) << VMM_RR_SHIFT)
 extern u64 indirect_reg_igfld_MASK ( int type, int index, u64 value);
 extern u64 cr_igfld_mask (int index, u64 value);
@@ -69,7 +69,7 @@ extern void vmx_vcpu_set_psr_sync_mpsr(VCPU * vcpu, UINT64 value);
 extern IA64FAULT vmx_vcpu_cover(VCPU *vcpu);
 extern thash_cb_t *vmx_vcpu_get_vtlb(VCPU *vcpu);
 extern thash_cb_t *vmx_vcpu_get_vhpt(VCPU *vcpu);
-ia64_rr vmx_vcpu_rr(VCPU *vcpu,UINT64 vadr);
+extern ia64_rr vmx_vcpu_rr(VCPU *vcpu,UINT64 vadr);
 extern IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val);
 extern IA64FAULT vmx_vcpu_get_rr(VCPU *vcpu, UINT64 reg, UINT64 *pval);
 extern IA64FAULT vmx_vcpu_get_pkr(VCPU *vcpu, UINT64 reg, UINT64 *pval);
@@ -112,10 +112,10 @@ extern uint64_t guest_read_vivr(VCPU *vcpu);
 extern void vmx_inject_vhpi(VCPU *vcpu, u8 vec);
 extern void vmx_vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector);
 extern struct virutal_platform_def *vmx_vcpu_get_plat(VCPU *vcpu);
-extern void memread_p(VCPU *vcpu, void *src, void *dest, size_t s);
-extern void memread_v(VCPU *vcpu, thash_data_t *vtlb, void *src, void *dest, size_t s);
-extern void memwrite_v(VCPU *vcpu, thash_data_t *vtlb, void *src, void *dest, size_t s);
-extern void memwrite_p(VCPU *vcpu, void *src, void *dest, size_t s);
+extern void memread_p(VCPU *vcpu, u64 *src, u64 *dest, size_t s);
+extern void memread_v(VCPU *vcpu, thash_data_t *vtlb, u64 *src, u64 *dest, size_t s);
+extern void memwrite_v(VCPU *vcpu, thash_data_t *vtlb, u64 *src, u64 *dest, size_t s);
+extern void memwrite_p(VCPU *vcpu, u64 *src, u64 *dest, size_t s);
 
 
 /**************************************************************************
@@ -401,14 +401,8 @@ vmx_vcpu_set_lid(VCPU *vcpu, u64 val)
     VPD_CR(vcpu,lid)=val;
     return IA64_NO_FAULT;
 }
-static inline
-IA64FAULT
-vmx_vcpu_set_tpr(VCPU *vcpu, u64 val)
-{
-    VPD_CR(vcpu,tpr)=val;
-    //TODO
-    return IA64_NO_FAULT;
-}
+extern IA64FAULT vmx_vcpu_set_tpr(VCPU *vcpu, u64 val);
+
 static inline
 IA64FAULT
 vmx_vcpu_set_eoi(VCPU *vcpu, u64 val)
