@@ -541,11 +541,12 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     else
         remap_prot = _PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED;
 
+
     for ( i = 0; i < nseg; i++ )
     {
 	MULTI_update_va_mapping_otherdomain(
 	    mcl+i, MMAP_VADDR(pending_idx, i),
-	    pfn_pte_ma(seg[i].buf >> PAGE_SHIFT, remap_prot),
+	    pfn_pte_ma(seg[i].buf >> PAGE_SHIFT, __pgprot(remap_prot)),
 	    0, blkif->domid);
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
         if ( blkif->is_blktap )
