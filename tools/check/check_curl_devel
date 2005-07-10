@@ -1,0 +1,11 @@
+#!/bin/bash
+# CHECK-BUILD
+
+function error {
+    echo 'Check for libcurl includes failed.'
+    exit 1
+}
+
+set -e
+[ -e /usr/include/curl ] || error
+[ -e /usr/include/curl/curl.h ] || error

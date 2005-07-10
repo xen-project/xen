@@ -1,0 +1,10 @@
+#!/bin/bash
+# CHECK-BUILD CHECK-INSTALL
+
+function error {
+        echo 'Check for CURL library failed.'
+        exit 1
+}
+
+set -e
+ldconfig -p | grep libcurl.so || error
