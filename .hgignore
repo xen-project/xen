@@ -1,4 +1,6 @@
 .*\.a
+.*\.cmi
+.*\.cmo
 .*\.d
 .*\.o
 .*\.opic
@@ -93,6 +95,7 @@ tools/blktap/xen/.*
 tools/check/\..*
 tools/cmdline/.*
 tools/cmdline/xen/.*
+tools/debugger/pdb/pdb
 tools/firmware/acpi/acpigen
 tools/firmware/.*\.bin
 tools/firmware/.*\.sym
