@@ -349,7 +349,7 @@ FLT13:  movq  %rax,8(%rsi)              # R11
 FLT14:  movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
-        movq  $TRAP_syscall,UREGS_entry_vector+8(%rsp)
+        movl  $TRAP_syscall,UREGS_entry_vector+8(%rsp)
         andl  $0xfffcbeff,UREGS_eflags+8(%rsp)
         movq  $__GUEST_SS,UREGS_ss+8(%rsp)
         movq  %rsi,UREGS_rsp+8(%rsp)
