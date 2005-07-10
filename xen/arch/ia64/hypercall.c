@@ -34,7 +34,7 @@ ia64_hypercall (struct pt_regs *regs)
 	    case FW_HYPERCALL_PAL_CALL:
 		//printf("*** PAL hypercall: index=%d\n",regs->r28);
 		//FIXME: This should call a C routine
-#if 1
+#if 0
 		// This is very conservative, but avoids a possible
 		// (and deadly) freeze in paravirtualized domains due
 		// to a yet-to-be-found bug where pending_interruption
@@ -47,8 +47,9 @@ ia64_hypercall (struct pt_regs *regs)
 #define SPURIOUS_VECTOR 15
 			pi = vcpu_check_pending_interrupts(v);
 			if (pi != SPURIOUS_VECTOR) {
-				idle_when_pending++;
-				pi = vcpu_pend_unspecified_interrupt(v);
+				if (!v->vcpu_info->arch.pending_interruption)
+					idle_when_pending++;
+				vcpu_pend_unspecified_interrupt(v);
 //printf("idle w/int#%d pending!\n",pi);
 //this shouldn't happen, but it apparently does quite a bit!  so don't
 //allow it to happen... i.e. if a domain has an interrupt pending and

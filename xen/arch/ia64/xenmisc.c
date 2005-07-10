@@ -257,6 +257,8 @@ void *module_text_address(unsigned long addr) { return NULL; }
 void cs10foo(void) {}
 void cs01foo(void) {}
 
+unsigned long context_switch_count = 0;
+
 // context_switch
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
@@ -276,6 +278,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 	/* Housekeeping for prev domain */
 #endif // CONFIG_VTI
 
+	context_switch_count++;
 	switch_to(prev,next,prev);
 #ifdef CONFIG_VTI
 	/* Post-setup for new domain */
