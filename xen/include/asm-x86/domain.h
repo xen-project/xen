@@ -29,6 +29,7 @@ struct arch_domain
     u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */
 
     /* Shadow mode status and controls. */
+    struct shadow_ops *ops;
     unsigned int shadow_mode;  /* flags to control shadow table operation */
     unsigned int shadow_nest;  /* Recursive depth of shadow_lock() nesting */
     /* Shadow mode has tainted page reference counts? */

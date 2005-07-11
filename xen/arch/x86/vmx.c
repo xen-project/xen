@@ -38,6 +38,10 @@
 #include <asm/vmx_vmcs.h>
 #include <asm/vmx_intercept.h>
 #include <asm/shadow.h>
+#if CONFIG_PAGING_LEVELS >= 4
+#include <asm/shadow_64.h>
+#endif
+
 #include <public/io/ioreq.h>
 
 #ifdef CONFIG_VMX
@@ -964,6 +968,12 @@ static int vmx_set_cr0(unsigned long value)
             vm_entry_value |= VM_ENTRY_CONTROLS_IA_32E_MODE;
             __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
 
+#if CONFIG_PAGING_LEVELS >= 4 
+            if(!shadow_set_guest_paging_levels(d->domain, 4)) {
+                printk("Unsupported guest paging levels\n");
+                domain_crash_synchronous(); /* need to take a clean path */
+            }
+#endif
         }
 
 	unsigned long crn;

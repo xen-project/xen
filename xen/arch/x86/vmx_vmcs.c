@@ -28,10 +28,13 @@
 #include <asm/processor.h>
 #include <asm/msr.h>
 #include <asm/vmx.h>
+#include <asm/flushtlb.h>
 #include <xen/event.h>
 #include <xen/kernel.h>
 #include <public/io/ioreq.h>
-
+#if CONFIG_PAGING_LEVELS >= 4
+#include <asm/shadow_64.h>
+#endif
 #ifdef CONFIG_VMX
 
 struct vmcs_struct *alloc_vmcs(void) 

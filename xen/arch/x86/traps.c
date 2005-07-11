@@ -438,6 +438,9 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
 
     if ( unlikely(shadow_mode_enabled(d)) &&
          ((addr < HYPERVISOR_VIRT_START) ||
+#if defined(__x86_64__)
+          (addr >= HYPERVISOR_VIRT_END) ||
+#endif
           (shadow_mode_external(d) && GUEST_CONTEXT(v, regs))) &&
          shadow_fault(addr, regs) )
         return EXCRET_fault_fixed;

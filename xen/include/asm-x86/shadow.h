@@ -33,6 +33,7 @@
 #include <asm/processor.h>
 #include <asm/vmx.h>
 #include <public/dom0_ops.h>
+#include <asm/shadow_public.h>
 
 /* Shadow PT operation mode : shadow-mode variable in arch_domain. */
 
@@ -135,6 +136,7 @@ extern void shadow_l3_normal_pt_update(struct domain *d,
                                        struct domain_mmap_cache *cache);
 #endif
 #if CONFIG_PAGING_LEVELS >= 4
+#include <asm/page-guest32.h>
 extern void shadow_l4_normal_pt_update(struct domain *d,
                                        unsigned long pa, l4_pgentry_t l4e,
                                        struct domain_mmap_cache *cache);
@@ -146,7 +148,10 @@ extern int shadow_do_update_va_mapping(unsigned long va,
 
 static inline unsigned long __shadow_status(
     struct domain *d, unsigned long gpfn, unsigned long stype);
+
+#if CONFIG_PAGING_LEVELS <= 2
 static inline void update_hl2e(struct vcpu *v, unsigned long va);
+#endif
 
 extern void vmx_shadow_clear_state(struct domain *);
 
@@ -209,11 +214,12 @@ __shadow_sync_va(struct vcpu *v, unsigned long va)
         //
         __shadow_sync_all(v->domain);
     }
-
+#if CONFIG_PAGING_LEVELS <= 2
     // Also make sure the HL2 is up-to-date for this address.
     //
     if ( unlikely(shadow_mode_translate(v->domain)) )
         update_hl2e(v, va);
+#endif
 }
 
 static void inline
@@ -501,7 +507,7 @@ static inline int mark_dirty(struct domain *d, unsigned int mfn)
 
 
 /************************************************************************/
-
+#if CONFIG_PAGING_LEVELS <= 2
 static inline void
 __shadow_get_l2e(
     struct vcpu *v, unsigned long va, l2_pgentry_t *psl2e)
@@ -623,7 +629,7 @@ static inline void shadow_sync_and_drop_references(
 
     shadow_unlock(d);
 }
-
+#endif
 /************************************************************************/
 
 /*
@@ -709,7 +715,7 @@ shadow_unpin(unsigned long smfn)
 
 
 /************************************************************************/
-
+#if CONFIG_PAGING_LEVELS <= 2
 extern void shadow_mark_va_out_of_sync(
     struct vcpu *v, unsigned long gpfn, unsigned long mfn,
     unsigned long va);
@@ -783,6 +789,7 @@ static inline int l1pte_read_fault(
 
     return 1;
 }
+#endif
 
 static inline void l1pte_propagate_from_guest(
     struct domain *d, l1_pgentry_t gpte, l1_pgentry_t *spte_p)
@@ -1535,6 +1542,7 @@ shadow_update_min_max(unsigned long smfn, int index)
         sl1page->tlbflush_timestamp = SHADOW_ENCODE_MIN_MAX(min, max);
 }
 
+#if CONFIG_PAGING_LEVELS <= 2
 extern void shadow_map_l1_into_current_l2(unsigned long va);
 
 void static inline
@@ -1602,7 +1610,7 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
 
     shadow_update_min_max(l2e_get_pfn(sl2e), l1_table_offset(va));
 }
-
+#endif
 /************************************************************************/
 
 static inline int
@@ -1626,6 +1634,7 @@ shadow_mode_page_writable(struct domain *d, unsigned long gpfn)
     return 0;
 }
 
+#if CONFIG_PAGING_LEVELS <= 2
 static inline l1_pgentry_t gva_to_gpte(unsigned long gva)
 {
     l2_pgentry_t gpde;
@@ -1664,7 +1673,7 @@ static inline unsigned long gva_to_gpa(unsigned long gva)
 
     return l1e_get_paddr(gpte) + (gva & ~PAGE_MASK); 
 }
-
+#endif
 /************************************************************************/
 
 extern void __update_pagetables(struct vcpu *v);
@@ -1699,14 +1708,14 @@ static inline void update_pagetables(struct vcpu *v)
 
     if ( likely(!shadow_mode_external(d)) )
     {
+        if ( shadow_mode_enabled(d) )
+            v->arch.monitor_table = v->arch.shadow_table;
+        else
 #ifdef __x86_64__
         if ( !(v->arch.flags & TF_kernel_mode) )
             v->arch.monitor_table = v->arch.guest_table_user;
         else
 #endif
-        if ( shadow_mode_enabled(d) )
-            v->arch.monitor_table = v->arch.shadow_table;
-        else
             v->arch.monitor_table = v->arch.guest_table;
     }
 }

@@ -51,24 +51,25 @@ struct pfn_info
 };
 
  /* The following page types are MUTUALLY EXCLUSIVE. */
-#define PGT_none            (0<<29) /* no special uses of this page */
-#define PGT_l1_page_table   (1<<29) /* using this page as an L1 page table? */
-#define PGT_l2_page_table   (2<<29) /* using this page as an L2 page table? */
-#define PGT_l3_page_table   (3<<29) /* using this page as an L3 page table? */
-#define PGT_l4_page_table   (4<<29) /* using this page as an L4 page table? */
-#define PGT_gdt_page        (5<<29) /* using this page in a GDT? */
-#define PGT_ldt_page        (6<<29) /* using this page in an LDT? */
-#define PGT_writable_page   (7<<29) /* has writable mappings of this page? */
+#define PGT_none            (0U<<29) /* no special uses of this page */
+#define PGT_l1_page_table   (1U<<29) /* using this page as an L1 page table? */
+#define PGT_l2_page_table   (2U<<29) /* using this page as an L2 page table? */
+#define PGT_l3_page_table   (3U<<29) /* using this page as an L3 page table? */
+#define PGT_l4_page_table   (4U<<29) /* using this page as an L4 page table? */
+#define PGT_gdt_page        (5U<<29) /* using this page in a GDT? */
+#define PGT_ldt_page        (6U<<29) /* using this page in an LDT? */
+#define PGT_writable_page   (7U<<29) /* has writable mappings of this page? */
 
 #define PGT_l1_shadow       PGT_l1_page_table
 #define PGT_l2_shadow       PGT_l2_page_table
 #define PGT_l3_shadow       PGT_l3_page_table
 #define PGT_l4_shadow       PGT_l4_page_table
-#define PGT_hl2_shadow      (5<<29)
-#define PGT_snapshot        (6<<29)
-#define PGT_writable_pred   (7<<29) /* predicted gpfn with writable ref */
+#define PGT_hl2_shadow      (5U<<29)
+#define PGT_snapshot        (6U<<29)
+#define PGT_writable_pred   (7U<<29) /* predicted gpfn with writable ref */
 
-#define PGT_type_mask       (7<<29) /* Bits 29-31. */
+#define PGT_fl1_shadow      (5U<<29)
+#define PGT_type_mask       (7U<<29) /* Bits 29-31. */
 
  /* Has this page been validated for use as its current type? */
 #define _PGT_validated      28

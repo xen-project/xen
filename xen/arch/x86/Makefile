@@ -13,6 +13,11 @@ OBJS := $(subst cpu/centaur.o,,$(OBJS))
 OBJS := $(subst cpu/cyrix.o,,$(OBJS))
 OBJS := $(subst cpu/rise.o,,$(OBJS))
 OBJS := $(subst cpu/transmeta.o,,$(OBJS))
+OBJS := $(subst shadow32.o,,$(OBJS))
+else
+OBJS := $(subst shadow.o,,$(OBJS))
+OBJS := $(subst shadow_public.o,,$(OBJS))
+OBJS := $(subst shadow_xxx.o,,$(OBJS))
 endif
 
 OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))

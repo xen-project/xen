@@ -404,7 +404,7 @@ int arch_set_info_guest(
         set_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
 
     v->arch.flags &= ~TF_kernel_mode;
-    if ( c->flags & VGCF_IN_KERNEL )
+    if ( (c->flags & VGCF_IN_KERNEL) || (c->flags & VGCF_VMX_GUEST) )
         v->arch.flags |= TF_kernel_mode;
 
     memcpy(&v->arch.guest_context, c, sizeof(*c));

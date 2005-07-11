@@ -198,6 +198,14 @@ typedef struct { u64 pfn; } pagetable_t;
 #else
 #define DOMAIN_ENTRIES_PER_L2_PAGETABLE     0
 #define HYPERVISOR_ENTRIES_PER_L2_PAGETABLE 0
+
+#define DOMAIN_ENTRIES_PER_L4_PAGETABLE     \
+    (l4_table_offset(HYPERVISOR_VIRT_START))
+#define GUEST_ENTRIES_PER_L4_PAGETABLE     \
+    (l4_table_offset(HYPERVISOR_VIRT_END))
+#define HYPERVISOR_ENTRIES_PER_L4_PAGETABLE \
+    (L4_PAGETABLE_ENTRIES - GUEST_ENTRIES_PER_L4_PAGETABLE  \
+     + DOMAIN_ENTRIES_PER_L4_PAGETABLE)
 #endif
 
 #define linear_l1_table                                                 \

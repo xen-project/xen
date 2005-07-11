@@ -846,6 +846,8 @@ void _audit_domain(struct domain *d, int flags)
         {
         case PGT_l1_page_table:
         case PGT_l2_page_table:
+        case PGT_l3_page_table:
+        case PGT_l4_page_table:
             if ( (page->u.inuse.type_info & PGT_count_mask) != 0 )
             {
                 printk("Audit %d: type count!=0 t=%x ot=%x c=%x mfn=%lx\n",
