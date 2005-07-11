@@ -13,6 +13,9 @@
 
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#ifdef __x86_64__
+#define L3_PROT (_PAGE_PRESENT)
+#endif
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
@@ -91,6 +94,7 @@ static void build_e820map(struct mem_map *mem_mapp, unsigned long mem_size)
     mem_mapp->nr_map = nr_map;
 }
 
+#ifdef __i386__
 static int zap_mmio_range(int xc_handle, u32 dom,
                             l2_pgentry_32_t *vl2tab,
                             unsigned long mmio_range_start,
@@ -138,6 +142,65 @@ static int zap_mmio_ranges(int xc_handle, u32 dom,
     munmap(vl2tab, PAGE_SIZE);
     return 0;
 }
+#else
+static int zap_mmio_range(int xc_handle, u32 dom,
+                           l3_pgentry_t *vl3tab,
+                           unsigned long mmio_range_start,
+                           unsigned long mmio_range_size)
+{
+   unsigned long mmio_addr;
+   unsigned long mmio_range_end = mmio_range_start + mmio_range_size;
+   unsigned long vl2e = 0;
+   unsigned long vl3e;
+   l1_pgentry_t *vl1tab;
+   l2_pgentry_t *vl2tab;
+ 
+   mmio_addr = mmio_range_start & PAGE_MASK;
+   for (; mmio_addr < mmio_range_end; mmio_addr += PAGE_SIZE) {
+       vl3e = vl3tab[l3_table_offset(mmio_addr)];
+       if (vl3e == 0)
+           continue;
+       vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+               PROT_READ|PROT_WRITE, vl3e >> PAGE_SHIFT);
+       if (vl2tab == 0) {
+           PERROR("Failed zap MMIO range");
+           return -1;
+       }
+       vl2e = vl2tab[l2_table_offset(mmio_addr)];
+       if (vl2e == 0)
+           continue;
+       vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+               PROT_READ|PROT_WRITE, vl2e >> PAGE_SHIFT);
+
+       vl1tab[l1_table_offset(mmio_addr)] = 0;
+       munmap(vl2tab, PAGE_SIZE);
+       munmap(vl1tab, PAGE_SIZE);
+   }
+   return 0;
+}
+
+static int zap_mmio_ranges(int xc_handle, u32 dom,
+                           unsigned long l3tab,
+                           struct mem_map *mem_mapp)
+{
+   int i;
+   l3_pgentry_t *vl3tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                               PROT_READ|PROT_WRITE,
+                                               l3tab >> PAGE_SHIFT);
+   if (vl3tab == 0)
+   	return -1;
+   for (i = 0; i < mem_mapp->nr_map; i++) {
+       if ((mem_mapp->map[i].type == E820_IO)
+         && (mem_mapp->map[i].caching_attr == MEMMAP_UC))
+           if (zap_mmio_range(xc_handle, dom, vl3tab,
+	    		mem_mapp->map[i].addr, mem_mapp->map[i].size) == -1)
+		return -1;
+   }
+   munmap(vl3tab, PAGE_SIZE);
+   return 0;
+}
+
+#endif
 
 static int setup_guest(int xc_handle,
                          u32 dom, int memsize,
@@ -151,9 +214,13 @@ static int setup_guest(int xc_handle,
                          unsigned long flags,
                          struct mem_map * mem_mapp)
 {
-    l1_pgentry_32_t *vl1tab=NULL, *vl1e=NULL;
-    l2_pgentry_32_t *vl2tab=NULL, *vl2e=NULL;
+    l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
+    l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
     unsigned long *page_array = NULL;
+#ifdef __x86_64__
+    l3_pgentry_t *vl3tab=NULL, *vl3e=NULL;
+    unsigned long l3tab;
+#endif
     unsigned long l2tab;
     unsigned long l1tab;
     unsigned long count, i;
@@ -212,7 +279,11 @@ static int setup_guest(int xc_handle,
     if(initrd_len == 0)
         vinitrd_start = vinitrd_end = 0;
 
+#ifdef __i386__
     nr_pt_pages = 1 + ((memsize + 3) >> 2);
+#else
+    nr_pt_pages = 5 + ((memsize + 1) >> 1);
+#endif
     vpt_start   = v_end;
     vpt_end     = vpt_start + (nr_pt_pages * PAGE_SIZE);
 
@@ -274,6 +345,7 @@ static int setup_guest(int xc_handle,
     if ( (mmu = init_mmu_updates(xc_handle, dom)) == NULL )
         goto error_out;
 
+#ifdef __i386__
     /* First allocate page for page dir. */
     ppt_alloc = (vpt_start - dsi.v_start) >> PAGE_SHIFT;
     l2tab = page_array[ppt_alloc++] << PAGE_SHIFT;
@@ -310,7 +382,64 @@ static int setup_guest(int xc_handle,
     }
     munmap(vl1tab, PAGE_SIZE);
     munmap(vl2tab, PAGE_SIZE);
+#else
+    /* First allocate pdpt */
+    ppt_alloc = (vpt_start - dsi.v_start) >> PAGE_SHIFT;
+    /* here l3tab means pdpt, only 4 entry is used */
+    l3tab = page_array[ppt_alloc++] << PAGE_SHIFT;
+    ctxt->ctrlreg[3] = l3tab;
 
+    /* Initialise the page tables. */
+    if ( (vl3tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, 
+                                        PROT_READ|PROT_WRITE, 
+                                        l3tab >> PAGE_SHIFT)) == NULL )
+        goto error_out;
+    memset(vl3tab, 0, PAGE_SIZE);
+
+    vl3e = &vl3tab[l3_table_offset(dsi.v_start)];
+
+    for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
+    {
+        if (!(count % (1 << (L3_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)))){
+            l2tab = page_array[ppt_alloc++] << PAGE_SHIFT;
+
+            if (vl2tab != NULL)
+                munmap(vl2tab, PAGE_SIZE);
+
+            if ( (vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                      PROT_READ|PROT_WRITE,
+                      l2tab >> PAGE_SHIFT)) == NULL )
+                goto error_out;
+
+            memset(vl2tab, 0, PAGE_SIZE);
+            *vl3e++ = l2tab | L3_PROT;
+            vl2e = &vl2tab[l2_table_offset(dsi.v_start + (count << PAGE_SHIFT))];
+        }
+        if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
+        {
+            l1tab = page_array[ppt_alloc++] << PAGE_SHIFT;
+            if ( vl1tab != NULL )
+                munmap(vl1tab, PAGE_SIZE);
+            if ( (vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                      PROT_READ|PROT_WRITE,
+                      l1tab >> PAGE_SHIFT)) == NULL )
+            {
+                munmap(vl2tab, PAGE_SIZE);
+                goto error_out;
+            }
+            memset(vl1tab, 0, PAGE_SIZE);
+            vl1e = &vl1tab[l1_table_offset(dsi.v_start + (count<<PAGE_SHIFT))];
+            *vl2e++ = l1tab | L2_PROT;
+        }
+
+        *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
+        vl1e++;
+    }
+
+    munmap(vl1tab, PAGE_SIZE);
+    munmap(vl2tab, PAGE_SIZE);
+    munmap(vl3tab, PAGE_SIZE);
+#endif
     /* Write the machine->phys table entries. */
     for ( count = 0; count < nr_pages; count++ )
     {
@@ -325,6 +454,7 @@ static int setup_guest(int xc_handle,
 		xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
 		page_array[(vboot_params_start-dsi.v_start)>>PAGE_SHIFT])) == 0)
         goto error_out;
+
     memset(boot_paramsp, 0, sizeof(*boot_paramsp));
 
     strncpy((char *)boot_paramsp->cmd_line, cmdline, 0x800);
@@ -381,7 +511,11 @@ static int setup_guest(int xc_handle,
 
     /* memsize is in megabytes */
     build_e820map(mem_mapp, memsize << 20);
+#if defined (__i386__)
     if (zap_mmio_ranges(xc_handle, dom, l2tab, mem_mapp) == -1)
+#else
+    if (zap_mmio_ranges(xc_handle, dom, l3tab, mem_mapp) == -1)
+#endif
     	goto error_out;
     boot_paramsp->e820_map_nr = mem_mapp->nr_map;
     for (i=0; i<mem_mapp->nr_map; i++) {

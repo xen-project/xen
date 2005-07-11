@@ -122,6 +122,7 @@ int vmx_setup_platform(struct vcpu *d, struct cpu_user_regs *regs)
     struct e820entry *e820p;
     unsigned long gpfn = 0;
 
+    local_flush_tlb_pge();
     regs->ebx = 0;   /* Linux expects ebx to be 0 for boot proc */
 
     n = regs->ecx;
@@ -311,8 +312,7 @@ construct_init_vmcs_guest(struct cpu_user_regs *regs,
     error |= __vmwrite(CR0_READ_SHADOW, shadow_cr);
     /* CR3 is set in vmx_final_setup_guest */
 #ifdef __x86_64__
-    error |= __vmwrite(GUEST_CR4, host_env->cr4 & ~X86_CR4_PAE);
-    printk("construct_init_vmcs_guest: guest CR4 is %lx\n", host_env->cr4 );
+    error |= __vmwrite(GUEST_CR4, host_env->cr4 & ~X86_CR4_PSE);
 #else
     error |= __vmwrite(GUEST_CR4, host_env->cr4);
 #endif

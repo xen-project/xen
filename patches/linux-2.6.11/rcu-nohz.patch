@@ -1,0 +1,16 @@
+diff -ur linux-2.6.11/kernel/rcupdate.c linux-2.6.11-rcu/kernel/rcupdate.c
+--- linux-2.6.11/kernel/rcupdate.c	2005-05-30 10:51:41 +01:00
++++ linux-2.6.11-rcu/kernel/rcupdate.c	2005-05-30 10:53:53 +01:00
+@@ -202,8 +202,11 @@
+  */
+ static void cpu_quiet(int cpu, struct rcu_ctrlblk *rcp, struct rcu_state *rsp)
+ {
++	cpumask_t mask;
++
+ 	cpu_clear(cpu, rsp->cpumask);
+-	if (cpus_empty(rsp->cpumask)) {
++	cpus_andnot(mask, rsp->cpumask, nohz_cpu_mask);
++	if (cpus_empty(mask)) {
+ 		/* batch completed ! */
+ 		rcp->completed = rcp->cur;
+ 		rcu_start_batch(rcp, rsp, 0);

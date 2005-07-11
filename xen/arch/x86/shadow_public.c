@@ -162,7 +162,7 @@ static pagetable_t page_table_convert(struct domain *d)
     return mk_pagetable(page_to_phys(l4page));
 }
 
-void alloc_monitor_pagetable(struct vcpu *v)
+static void alloc_monitor_pagetable(struct vcpu *v)
 {
     unsigned long mmfn;
     l4_pgentry_t *mpl4e;
