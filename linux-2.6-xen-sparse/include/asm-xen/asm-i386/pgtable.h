@@ -400,7 +400,7 @@ extern void noexec_setup(const char *str);
 		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
 			    HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG|UVMF_MULTI|(unsigned long)((__vma)->vm_mm->cpu_vm_mask.bits)); \
 			} else {                                          \
-                            xen_l1_entry_update((__ptep), (__entry).pte_low); \
+                            xen_l1_entry_update((__ptep), (__entry)); \
 			    flush_tlb_page((__vma), (__address));         \
 			}                                                 \
 		}							  \
@@ -419,7 +419,7 @@ do {				  					\
 		HYPERVISOR_update_va_mapping((__address),		\
 					     __entry, 0);		\
 	} else {							\
-		xen_l1_entry_update((__ptep), (__entry).pte_low);	\
+		xen_l1_entry_update((__ptep), (__entry));	\
 	}								\
 } while (0)
 

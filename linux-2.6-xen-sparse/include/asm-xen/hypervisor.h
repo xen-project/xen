@@ -40,9 +40,13 @@
 #include <asm/ptrace.h>
 #include <asm/page.h>
 #if defined(__i386__)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#include <asm-generic/pgtable-nopmd.h>
-#endif
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#  ifdef CONFIG_X86_PAE
+#   include <asm-generic/pgtable-nopud.h>
+#  else
+#   include <asm-generic/pgtable-nopmd.h>
+#  endif
+# endif
 #endif
 
 /* arch/xen/i386/kernel/setup.c */
@@ -80,11 +84,9 @@ void xen_tlb_flush(void);
 void xen_invlpg(unsigned long ptr);
 
 #ifndef CONFIG_XEN_SHADOW_MODE
-void xen_l1_entry_update(pte_t *ptr, unsigned long val);
+void xen_l1_entry_update(pte_t *ptr, pte_t val);
 void xen_l2_entry_update(pmd_t *ptr, pmd_t val);
-#ifdef __x86_64__
-void xen_l3_entry_update(pud_t *ptr, pud_t val); /* x86_64 only */
-#endif
+void xen_l3_entry_update(pud_t *ptr, pud_t val); /* x86_64/PAE */
 void xen_l4_entry_update(pgd_t *ptr, pgd_t val); /* x86_64 only */
 void xen_pgd_pin(unsigned long ptr);
 void xen_pgd_unpin(unsigned long ptr);

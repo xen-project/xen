@@ -15,6 +15,8 @@
 #include <linux/config.h>
 #include <linux/string.h>
 #include <linux/types.h>
+#include <linux/kernel.h>
+#include <asm/bug.h>
 #include <asm-xen/xen-public/xen.h>
 #include <asm-xen/foreign_page.h>
 
@@ -84,9 +86,40 @@ typedef struct { unsigned long pte_low, pte_high; } pte_t;
 typedef struct { unsigned long long pmd; } pmd_t;
 typedef struct { unsigned long long pgd; } pgd_t;
 typedef struct { unsigned long long pgprot; } pgprot_t;
-#define pmd_val(x)	((x).pmd)
-#define pte_val(x)	((x).pte_low | ((unsigned long long)(x).pte_high << 32))
-#define __pmd(x) ((pmd_t) { (x) } )
+#define __pte(x) ({ unsigned long long _x = (x); \
+    (((_x)&1) ? ((pte_t) {phys_to_machine(_x)}) : ((pte_t) {(_x)})); })
+#define __pgd(x) ({ unsigned long long _x = (x); \
+    (((_x)&1) ? ((pgd_t) {phys_to_machine(_x)}) : ((pgd_t) {(_x)})); })
+#define __pmd(x) ({ unsigned long long _x = (x); \
+    (((_x)&1) ? ((pmd_t) {phys_to_machine(_x)}) : ((pmd_t) {(_x)})); })
+static inline unsigned long long pte_val(pte_t x)
+{
+	unsigned long long ret;
+
+	if (x.pte_low) {
+		ret = x.pte_low | (unsigned long long)x.pte_high << 32;
+		ret = machine_to_phys(ret) | 1;
+	} else {
+		ret = 0;
+	}
+	return ret;
+}
+static inline unsigned long long pmd_val(pmd_t x)
+{
+	unsigned long long ret = x.pmd;
+	if (ret) ret = machine_to_phys(ret) | 1;
+	return ret;
+}
+static inline unsigned long long pgd_val(pgd_t x)
+{
+	unsigned long long ret = x.pgd;
+	if (ret) ret = machine_to_phys(ret) | 1;
+	return ret;
+}
+static inline unsigned long long pte_val_ma(pte_t x)
+{
+	return (unsigned long long)x.pte_high << 32 | x.pte_low;
+}
 #define HPAGE_SHIFT	21
 #else
 typedef struct { unsigned long pte_low; } pte_t;
@@ -96,6 +129,16 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define pte_val(x)	(((x).pte_low & 1) ? machine_to_phys((x).pte_low) : \
 			 (x).pte_low)
 #define pte_val_ma(x)	((x).pte_low)
+#define __pte(x) ({ unsigned long _x = (x); \
+    (((_x)&1) ? ((pte_t) {phys_to_machine(_x)}) : ((pte_t) {(_x)})); })
+#define __pgd(x) ({ unsigned long _x = (x); \
+    (((_x)&1) ? ((pgd_t) {phys_to_machine(_x)}) : ((pgd_t) {(_x)})); })
+static inline unsigned long pgd_val(pgd_t x)
+{
+	unsigned long ret = x.pgd;
+	if (ret) ret = machine_to_phys(ret) | 1;
+	return ret;
+}
 #define HPAGE_SHIFT	22
 #endif
 #define PTE_MASK	PAGE_MASK
@@ -107,20 +150,9 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
 #endif
 
-
-static inline unsigned long pgd_val(pgd_t x)
-{
-	unsigned long ret = x.pgd;
-	if (ret) ret = machine_to_phys(ret);
-	return ret;
-}
 #define pgprot_val(x)	((x).pgprot)
 
-#define __pte(x) ({ unsigned long _x = (x); \
-    (((_x)&1) ? ((pte_t) {phys_to_machine(_x)}) : ((pte_t) {(_x)})); })
 #define __pte_ma(x)	((pte_t) { (x) } )
-#define __pgd(x) ({ unsigned long _x = (x); \
-    (((_x)&1) ? ((pgd_t) {phys_to_machine(_x)}) : ((pgd_t) {(_x)})); })
 #define __pgprot(x)	((pgprot_t) { (x) } )
 
 #endif /* !__ASSEMBLY__ */

@@ -581,11 +581,11 @@ config HIGHMEM4G
 	  Select this if you have a 32-bit processor and between 1 and 4
 	  gigabytes of physical RAM.
 
-#config HIGHMEM64G
-#	bool "64GB"
-#	help
-#	  Select this if you have a 32-bit processor and more than 4
-#	  gigabytes of physical RAM.
+config HIGHMEM64G
+	bool "64GB"
+	help
+	  Select this if you have a 32-bit processor and more than 4
+	  gigabytes of physical RAM.
 
 endchoice
 

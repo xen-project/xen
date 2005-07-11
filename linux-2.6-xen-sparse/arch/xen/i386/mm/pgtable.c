@@ -364,6 +364,7 @@ void pgd_free(pgd_t *pgd)
 		if (!HAVE_SHARED_KERNEL_PMD) {
 			pmd_t *pmd = (void *)__va(pgd_val(pgd[USER_PTRS_PER_PGD])-1);
 			make_page_writable(pmd);
+			memset(pmd, 0, PTRS_PER_PMD*sizeof(pmd_t));
 			kmem_cache_free(pmd_cache, pmd);
 		}
 	}

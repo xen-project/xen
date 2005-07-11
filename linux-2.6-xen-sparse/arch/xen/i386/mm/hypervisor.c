@@ -47,15 +47,20 @@
 #elif defined(CONFIG_X86_64)
 #define pmd_val_ma(v) (v).pmd
 #else
-#define pmd_val_ma(v) (v).pud.pgd.pgd
+#ifdef CONFIG_X86_PAE
+# define pmd_val_ma(v) ((v).pmd)
+# define pud_val_ma(v) ((v).pgd.pgd)
+#else
+# define pmd_val_ma(v) ((v).pud.pgd.pgd)
+#endif
 #endif
 
 #ifndef CONFIG_XEN_SHADOW_MODE
-void xen_l1_entry_update(pte_t *ptr, unsigned long val)
+void xen_l1_entry_update(pte_t *ptr, pte_t val)
 {
     mmu_update_t u;
     u.ptr = virt_to_machine(ptr);
-    u.val = val;
+    u.val = pte_val_ma(val);
     BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -66,6 +71,16 @@ void xen_l2_entry_update(pmd_t *ptr, pmd_t val)
     u.val = pmd_val_ma(val);
     BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
 }
+
+#ifdef CONFIG_X86_PAE
+void xen_l3_entry_update(pud_t *ptr, pud_t val)
+{
+    mmu_update_t u;
+    u.ptr = virt_to_machine(ptr);
+    u.val = pud_val_ma(val);
+    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
+}
+#endif
 
 #ifdef CONFIG_X86_64
 void xen_l3_entry_update(pud_t *ptr, pud_t val)
@@ -171,6 +186,8 @@ void xen_pgd_pin(unsigned long ptr)
     struct mmuext_op op;
 #ifdef CONFIG_X86_64
     op.cmd = MMUEXT_PIN_L4_TABLE;
+#elif defined(CONFIG_X86_PAE)
+    op.cmd = MMUEXT_PIN_L3_TABLE;
 #else
     op.cmd = MMUEXT_PIN_L2_TABLE;
 #endif
