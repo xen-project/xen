@@ -1107,7 +1107,14 @@ void __init zone_sizes_init(void)
 	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
 	unsigned int max_dma, low;
 
-	max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
+	/*
+	 * XEN: Our notion of "DMA memory" is fake when running over Xen.
+	 * We simply put all RAM in the DMA zone so that those drivers which
+	 * needlessly specify GFP_DMA do not get starved of RAM unnecessarily.
+	 * Those drivers that *do* require lowmem are screwed anyway when
+	 * running over Xen!
+	 */
+	max_dma = max_low_pfn;
 	low = max_low_pfn;
 
 	if (low < max_dma)
