@@ -1,6 +1,8 @@
 #ifndef _I386_PGTABLE_2LEVEL_DEFS_H
 #define _I386_PGTABLE_2LEVEL_DEFS_H
 
+#define HAVE_SHARED_KERNEL_PMD 0
+
 /*
  * traditional i386 two-level paging structure:
  */

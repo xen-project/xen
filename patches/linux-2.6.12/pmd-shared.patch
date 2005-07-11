@@ -1,0 +1,134 @@
+diff -urNpP linux-2.6.12/arch/i386/mm/init.c linux-2.6.12.new/arch/i386/mm/init.c
+--- linux-2.6.12/arch/i386/mm/init.c	2005-06-17 20:48:29.000000000 +0100
++++ linux-2.6.12.new/arch/i386/mm/init.c	2005-07-11 16:28:09.778165582 +0100
+@@ -634,7 +634,7 @@ void __init pgtable_cache_init(void)
+ 				PTRS_PER_PGD*sizeof(pgd_t),
+ 				0,
+ 				pgd_ctor,
+-				PTRS_PER_PMD == 1 ? pgd_dtor : NULL);
++				pgd_dtor);
+ 	if (!pgd_cache)
+ 		panic("pgtable_cache_init(): Cannot create pgd cache");
+ }
+diff -urNpP linux-2.6.12/arch/i386/mm/pageattr.c linux-2.6.12.new/arch/i386/mm/pageattr.c
+--- linux-2.6.12/arch/i386/mm/pageattr.c	2005-06-17 20:48:29.000000000 +0100
++++ linux-2.6.12.new/arch/i386/mm/pageattr.c	2005-07-11 16:28:09.775165494 +0100
+@@ -75,7 +75,7 @@ static void set_pmd_pte(pte_t *kpte, uns
+ 	unsigned long flags;
+ 
+ 	set_pte_atomic(kpte, pte); 	/* change init_mm */
+-	if (PTRS_PER_PMD > 1)
++	if (HAVE_SHARED_KERNEL_PMD)
+ 		return;
+ 
+ 	spin_lock_irqsave(&pgd_lock, flags);
+diff -urNpP linux-2.6.12/arch/i386/mm/pgtable.c linux-2.6.12.new/arch/i386/mm/pgtable.c
+--- linux-2.6.12/arch/i386/mm/pgtable.c	2005-06-17 20:48:29.000000000 +0100
++++ linux-2.6.12.new/arch/i386/mm/pgtable.c	2005-07-11 16:32:01.478023726 +0100
+@@ -199,14 +199,14 @@ void pgd_ctor(void *pgd, kmem_cache_t *c
+ {
+ 	unsigned long flags;
+ 
+-	if (PTRS_PER_PMD == 1)
++	if (!HAVE_SHARED_KERNEL_PMD)
+ 		spin_lock_irqsave(&pgd_lock, flags);
+ 
+ 	memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
+ 			swapper_pg_dir + USER_PTRS_PER_PGD,
+ 			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+ 
+-	if (PTRS_PER_PMD > 1)
++	if (HAVE_SHARED_KERNEL_PMD)
+ 		return;
+ 
+ 	pgd_list_add(pgd);
+@@ -214,11 +214,13 @@ void pgd_ctor(void *pgd, kmem_cache_t *c
+ 	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
+ }
+ 
+-/* never called when PTRS_PER_PMD > 1 */
+ void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
+ {
+ 	unsigned long flags; /* can be called from interrupt context */
+ 
++	if (HAVE_SHARED_KERNEL_PMD)
++		return;
++
+ 	spin_lock_irqsave(&pgd_lock, flags);
+ 	pgd_list_del(pgd);
+ 	spin_unlock_irqrestore(&pgd_lock, flags);
+@@ -226,12 +228,29 @@ void pgd_dtor(void *pgd, kmem_cache_t *c
+ 
+ pgd_t *pgd_alloc(struct mm_struct *mm)
+ {
+-	int i;
++	int i = 0;
+ 	pgd_t *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
+ 
+ 	if (PTRS_PER_PMD == 1 || !pgd)
+ 		return pgd;
+ 
++	if (!HAVE_SHARED_KERNEL_PMD) {
++		/* alloc and copy kernel pmd */
++		unsigned long flags;
++		pgd_t *copy_pgd = pgd_offset_k(PAGE_OFFSET);
++		pud_t *copy_pud = pud_offset(copy_pgd, PAGE_OFFSET);
++		pmd_t *copy_pmd = pmd_offset(copy_pud, PAGE_OFFSET);
++		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
++		if (0 == pmd)
++			goto out_oom;
++
++		spin_lock_irqsave(&pgd_lock, flags);
++		memcpy(pmd, copy_pmd, PAGE_SIZE);
++		spin_unlock_irqrestore(&pgd_lock, flags);
++		set_pgd(&pgd[USER_PTRS_PER_PGD], __pgd(1 + __pa(pmd)));
++	}
++
++	/* alloc user pmds */
+ 	for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
+ 		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
+ 		if (!pmd)
+@@ -252,9 +271,16 @@ void pgd_free(pgd_t *pgd)
+ 	int i;
+ 
+ 	/* in the PAE case user pgd entries are overwritten before usage */
+-	if (PTRS_PER_PMD > 1)
+-		for (i = 0; i < USER_PTRS_PER_PGD; ++i)
+-			kmem_cache_free(pmd_cache, (void *)__va(pgd_val(pgd[i])-1));
++	if (PTRS_PER_PMD > 1) {
++		for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
++			pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
++			kmem_cache_free(pmd_cache, pmd);
++		}
++		if (!HAVE_SHARED_KERNEL_PMD) {
++			pmd_t *pmd = (void *)__va(pgd_val(pgd[USER_PTRS_PER_PGD])-1);
++			kmem_cache_free(pmd_cache, pmd);
++		}
++	}
+ 	/* in the non-PAE case, free_pgtables() clears user pgd entries */
+ 	kmem_cache_free(pgd_cache, pgd);
+ }
+diff -urNpP linux-2.6.12/include/asm-i386/pgtable-2level-defs.h linux-2.6.12.new/include/asm-i386/pgtable-2level-defs.h
+--- linux-2.6.12/include/asm-i386/pgtable-2level-defs.h	2005-06-17 20:48:29.000000000 +0100
++++ linux-2.6.12.new/include/asm-i386/pgtable-2level-defs.h	2005-07-11 16:28:09.733164251 +0100
+@@ -1,6 +1,8 @@
+ #ifndef _I386_PGTABLE_2LEVEL_DEFS_H
+ #define _I386_PGTABLE_2LEVEL_DEFS_H
+ 
++#define HAVE_SHARED_KERNEL_PMD 0
++
+ /*
+  * traditional i386 two-level paging structure:
+  */
+diff -urNpP linux-2.6.12/include/asm-i386/pgtable-3level-defs.h linux-2.6.12.new/include/asm-i386/pgtable-3level-defs.h
+--- linux-2.6.12/include/asm-i386/pgtable-3level-defs.h	2005-06-17 20:48:29.000000000 +0100
++++ linux-2.6.12.new/include/asm-i386/pgtable-3level-defs.h	2005-07-11 16:28:09.755164902 +0100
+@@ -1,6 +1,8 @@
+ #ifndef _I386_PGTABLE_3LEVEL_DEFS_H
+ #define _I386_PGTABLE_3LEVEL_DEFS_H
+ 
++#define HAVE_SHARED_KERNEL_PMD 1
++
+ /*
+  * PGDIR_SHIFT determines what a top-level page table entry can map
+  */
