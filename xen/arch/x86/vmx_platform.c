@@ -264,7 +264,7 @@ static inline unsigned long get_immediate(int op16, const unsigned char *inst, i
 
     switch(mod) {
         case 0:
-            if (rm == 5) {
+            if (rm == 5 || rm == 4) {
                 if (op16)
                     inst = inst + 2; //disp16, skip 2 bytes
                 else
@@ -361,6 +361,11 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
     }
 
     switch(*inst) {
+        case 0x81:
+            /* This is only a workaround for cmpl instruction*/
+            strcpy((char *)thread_inst->i_name, "cmp");
+            return DECODE_success;
+
         case 0x88:
             /* mov r8 to m8 */
             thread_inst->op_size = BYTE;
@@ -633,7 +638,6 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 
     __vmread(GUEST_RIP, &eip);
     __vmread(INSTRUCTION_LEN, &inst_len);
-
     __vmread(GUEST_RFLAGS, &eflags);
     vm86 = eflags & X86_EFLAGS_VM;
 
@@ -733,6 +737,12 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     if (!strncmp((char *)mmio_inst.i_name, "stos", 4)) {
         send_mmio_req(gpa, &mmio_inst,
             inst_decoder_regs->eax, IOREQ_WRITE, 0);
+        return;
+    }
+    /* Workaround for cmp instruction */
+    if (!strncmp((char *)mmio_inst.i_name, "cmp", 3)) {
+        inst_decoder_regs->eflags &= ~X86_EFLAGS_ZF;
+        __vmwrite(GUEST_RFLAGS, inst_decoder_regs->eflags);
         return;
     }
 
