@@ -677,7 +677,7 @@ int _shadow_mode_refcounts(struct domain *d)
     return shadow_mode_refcounts(d);
 }
 
-void alloc_monitor_pagetable(struct vcpu *v)
+static void alloc_monitor_pagetable(struct vcpu *v)
 {
     unsigned long mmfn;
     l2_pgentry_t *mpl2e;

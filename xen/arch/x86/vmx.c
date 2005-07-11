@@ -801,7 +801,11 @@ vmx_world_restore(struct vcpu *d, struct vmx_assist_context *c)
 skip_cr3:
 
     error |= __vmread(CR4_READ_SHADOW, &old_cr4);
+#if defined (__i386__)
     error |= __vmwrite(GUEST_CR4, (c->cr4 | X86_CR4_VMXE));
+#else
+    error |= __vmwrite(GUEST_CR4, (c->cr4 | X86_CR4_VMXE | X86_CR4_PAE));
+#endif
     error |= __vmwrite(CR4_READ_SHADOW, c->cr4);
 
     error |= __vmwrite(GUEST_IDTR_LIMIT, c->idtr_limit);
@@ -860,7 +864,7 @@ vmx_assist(struct vcpu *d, int mode)
 {
     struct vmx_assist_context c;
     u32 magic;
-    unsigned long cp;
+    u32 cp;
 
     /* make sure vmxassist exists (this is not an error) */
     if (!vmx_copy(&magic, VMXASSIST_MAGIC_OFFSET, sizeof(magic), COPY_IN))
@@ -1191,7 +1195,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
 
         __vmread(CR4_READ_SHADOW, &old_cr);
         if (pae_disabled)
-            __vmwrite(GUEST_CR4, ((value & ~X86_CR4_PAE) | X86_CR4_VMXE));
+            __vmwrite(GUEST_CR4, value| X86_CR4_VMXE);
         else
             __vmwrite(GUEST_CR4, value| X86_CR4_VMXE);
 

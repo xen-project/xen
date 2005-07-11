@@ -351,6 +351,8 @@ class VmxImageHandler(ImageHandler):
         @param mem_mb: size in MB
         @return size in KB
         """
-        # Logic x86-32 specific. 
         # 1 page for the PGD + 1 pte page for 4MB of memory (rounded)
-        return (1 + ((mem_mb + 3) >> 2)) * 4
+        if os.uname()[4] == 'x86_64':
+            return (5 + ((mem_mb + 1) >> 1)) * 4
+        else:
+            return (1 + ((mem_mb + 3) >> 2)) * 4
