@@ -843,6 +843,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             UNLOCK_BIGLOCK(v->domain);
             break;
 
+        default:
+            goto fail;
+        }
+        break;
+
     case 0x23: /* MOV <reg>,DR? */
         opcode = insn_fetch(u8, 1, eip);
         modrm_reg |= (opcode >> 3) & 7;
@@ -850,11 +855,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         reg = decode_register(modrm_rm, regs, 0);
         if ( do_set_debugreg(modrm_reg, *reg) != 0 )
             goto fail;
-        break;
-
-        default:
-            goto fail;
-        }
         break;
 
     case 0x30: /* WRMSR */
