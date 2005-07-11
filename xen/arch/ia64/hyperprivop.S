@@ -288,9 +288,10 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	cmp.ne p6,p0=r28,r30
 (p6)	br.cond.spnt.few rp;;
 	movl r20=(PERCPU_ADDR)+IA64_CPUINFO_ITM_NEXT_OFFSET;;
-	ld8 r21=[r20];;
+	ld8 r26=[r20];;
 	mov r27=ar.itc;;
-	cmp.ltu p6,p0=r21,r27
+	adds r27=200,r27	// safety margin
+	cmp.ltu p6,p0=r26,r27
 (p6)	br.cond.spnt.few rp;;
 	mov r17=cr.ipsr;;
 	// slow path if: ipsr.be==1, ipsr.pp==1
@@ -300,14 +301,16 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	extr.u r21=r17,IA64_PSR_PP_BIT,1 ;;
 	cmp.ne p6,p0=r21,r0
 (p6)	br.cond.spnt.few rp;;
+	// definitely have a domain tick
+	mov cr.eoi=r0;;
+	mov rp=r29;;
+	mov cr.itm=r26;;	// ensure next tick
 #ifdef FAST_REFLECT_CNT
 	movl r20=fast_reflect_count+((0x3000>>8)*8);;
 	ld8 r21=[r20];;
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
 #endif
-	mov cr.eoi=r0;;
-	mov rp=r29;;
 	// vcpu_pend_timer(current)
 	movl r18=XSI_PSR_IC;;
 	adds r20=XSI_ITV_OFS-XSI_PSR_IC_OFS,r18 ;;
