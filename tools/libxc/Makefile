@@ -59,7 +59,7 @@ check-for-zlib:
 	false; \
 	fi
 
-LINUX_ROOT := $(wildcard $(XEN_ROOT)/linux-2.6.*-xen-sparse)
+LINUX_ROOT := $(XEN_ROOT)/linux-2.6-xen-sparse
 mk-symlinks:
 	[ -e xen/linux ] || mkdir -p xen/linux
 	[ -e xen/io ]    || mkdir -p xen/io
