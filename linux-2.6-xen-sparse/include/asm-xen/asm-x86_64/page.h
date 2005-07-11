@@ -145,10 +145,6 @@ static inline pgd_t __pgd(unsigned long x)
 
 #define __pgprot(x)	((pgprot_t) { (x) } )
 
-extern unsigned long vm_stack_flags, vm_stack_flags32;
-extern unsigned long vm_data_default_flags, vm_data_default_flags32;
-extern unsigned long vm_force_exec32;
-
 #define __START_KERNEL		0xffffffff80100000UL
 #define __START_KERNEL_map	0xffffffff80000000UL
 #define __PAGE_OFFSET           0xffff880000000000UL	

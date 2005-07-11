@@ -62,7 +62,7 @@ static struct console early_vga_console = {
 #ifndef CONFIG_XEN
 /* Serial functions loosely based on a similar package from Klaus P. Gerlicher */ 
 
-int early_serial_base = 0x3f8;  /* ttyS0 */ 
+static int early_serial_base = 0x3f8;  /* ttyS0 */
 
 #define XMTRDY          0x20
 

@@ -11,7 +11,7 @@
 #define dma_free_noncoherent(d, s, v, h) dma_free_coherent(d, s, v, h)
 
 void *dma_alloc_coherent(struct device *dev, size_t size,
-			   dma_addr_t *dma_handle, int flag);
+			   dma_addr_t *dma_handle, unsigned int __nocast flag);
 
 void dma_free_coherent(struct device *dev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle);

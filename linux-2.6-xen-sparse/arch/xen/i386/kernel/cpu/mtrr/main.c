@@ -31,7 +31,7 @@ struct mtrr_ops *mtrr_if = &generic_mtrr_ops;
 unsigned int num_var_ranges;
 unsigned int *usage_table;
 
-void __init set_num_var_ranges(void)
+static void __init set_num_var_ranges(void)
 {
 	dom0_op_t op;
 

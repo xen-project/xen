@@ -69,6 +69,8 @@ static int __initdata smp_b_stepping;
 int smp_num_siblings = 1;
 int phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
 EXPORT_SYMBOL(phys_proc_id);
+int cpu_core_id[NR_CPUS]; /* Core ID of each logical CPU */
+EXPORT_SYMBOL(cpu_core_id);
 
 /* bitmap of online cpus */
 cpumask_t cpu_online_map;
@@ -83,9 +85,6 @@ struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 u8 x86_cpu_to_apicid[NR_CPUS] =
 			{ [0 ... NR_CPUS-1] = 0xff };
 EXPORT_SYMBOL(x86_cpu_to_apicid);
-
-/* Set when the idlers are all forked */
-int smp_threads_ready;
 
 #if 0
 /*
@@ -121,6 +120,8 @@ static unsigned long __init setup_trampoline(void)
 	return virt_to_phys(trampoline_base);
 }
 #endif
+
+static void map_cpu_to_logical_apicid(void);
 
 /*
  * We are called very early to get the low memory for the
@@ -352,7 +353,7 @@ extern void calibrate_delay(void);
 
 static atomic_t init_deasserted;
 
-void __init smp_callin(void)
+static void __init smp_callin(void)
 {
 	int cpuid, phys_id;
 	unsigned long timeout;
@@ -449,7 +450,7 @@ void __init smp_callin(void)
 #endif
 }
 
-int cpucount;
+static int cpucount;
 
 
 static irqreturn_t ldebug_interrupt(
@@ -567,7 +568,7 @@ static inline void unmap_cpu_to_node(int cpu)
 
 u8 cpu_2_logical_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
 
-void map_cpu_to_logical_apicid(void)
+static void map_cpu_to_logical_apicid(void)
 {
 	int cpu = smp_processor_id();
 	int apicid = smp_processor_id();
@@ -576,7 +577,7 @@ void map_cpu_to_logical_apicid(void)
 	map_cpu_to_node(cpu, apicid_to_node(apicid));
 }
 
-void unmap_cpu_to_logical_apicid(int cpu)
+static void unmap_cpu_to_logical_apicid(int cpu)
 {
 	cpu_2_logical_apicid[cpu] = BAD_APICID;
 	unmap_cpu_to_node(cpu);
@@ -861,6 +862,9 @@ static int __init do_boot_cpu(int apicid)
 	if (cpu_gdt_descr[0].size > PAGE_SIZE)
 		BUG();
 	cpu_gdt_descr[cpu].size = cpu_gdt_descr[0].size;
+	printk("GDT: copying %d bytes from %lx to %lx\n",
+		cpu_gdt_descr[0].size, cpu_gdt_descr[0].address,
+		cpu_gdt_descr[cpu].address); 
 	memcpy((void *)cpu_gdt_descr[cpu].address,
 	       (void *)cpu_gdt_descr[0].address, cpu_gdt_descr[0].size);
 
@@ -916,6 +920,7 @@ static int __init do_boot_cpu(int apicid)
 	ctxt.ctrlreg[3] = (unsigned long)virt_to_machine(swapper_pg_dir);
 
 	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
+	printk("boot error: %ld\n", boot_error);
 
 	if (!boot_error) {
 		/*
@@ -1016,9 +1021,6 @@ static int __init do_boot_cpu(int apicid)
 	return boot_error;
 }
 
-cycles_t cacheflush_time;
-unsigned long cache_decay_ticks;
-
 static void smp_tune_scheduling (void)
 {
 	unsigned long cachesize;       /* kB   */
@@ -1039,7 +1041,6 @@ static void smp_tune_scheduling (void)
 		 * this basically disables processor-affinity
 		 * scheduling on SMP without a TSC.
 		 */
-		cacheflush_time = 0;
 		return;
 	} else {
 		cachesize = boot_cpu_data.x86_cache_size;
@@ -1047,17 +1048,7 @@ static void smp_tune_scheduling (void)
 			cachesize = 16; /* Pentiums, 2x8kB cache */
 			bandwidth = 100;
 		}
-
-		cacheflush_time = (cpu_khz>>10) * (cachesize<<10) / bandwidth;
 	}
-
-	cache_decay_ticks = (long)cacheflush_time/cpu_khz + 1;
-
-	printk("per-CPU timeslice cutoff: %ld.%02ld usecs.\n",
-		(long)cacheflush_time/(cpu_khz/1000),
-		((long)cacheflush_time*100/(cpu_khz/1000)) % 100);
-	printk("task migration cache decay timeout: %ld msecs.\n",
-		cache_decay_ticks);
 }
 
 /*
@@ -1071,6 +1062,8 @@ static int boot_cpu_logical_apicid;
 void *xquad_portio;
 
 cpumask_t cpu_sibling_map[NR_CPUS] __cacheline_aligned;
+cpumask_t cpu_core_map[NR_CPUS] __cacheline_aligned;
+EXPORT_SYMBOL(cpu_core_map);
 
 static void __init smp_boot_cpus(unsigned int max_cpus)
 {
@@ -1102,6 +1095,9 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	cpus_clear(cpu_sibling_map[0]);
 	cpu_set(0, cpu_sibling_map[0]);
 
+	cpus_clear(cpu_core_map[0]);
+	cpu_set(0, cpu_core_map[0]);
+
 #ifdef CONFIG_X86_IO_APIC
 	/*
 	 * If we couldn't find an SMP configuration at boot time,
@@ -1119,6 +1115,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 					   " Using dummy APIC emulation.\n");
 #endif
 		map_cpu_to_logical_apicid();
+		cpu_set(0, cpu_sibling_map[0]);
+		cpu_set(0, cpu_core_map[0]);
 		return;
 	}
 #endif
@@ -1144,6 +1142,10 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		printk(KERN_ERR "... forcing use of dummy APIC emulation. (tell your hw vendor)\n");
 		smpboot_clear_io_apic_irqs();
 		phys_cpu_present_map = physid_mask_of_physid(0);
+		cpu_set(0, cpu_sibling_map[0]);
+		cpu_set(0, cpu_core_map[0]);
+		cpu_set(0, cpu_sibling_map[0]);
+		cpu_set(0, cpu_core_map[0]);
 		return;
 	}
 
@@ -1246,10 +1248,13 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * construct cpu_sibling_map[], so that we can tell sibling CPUs
 	 * efficiently.
 	 */
-	for (cpu = 0; cpu < NR_CPUS; cpu++)
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		cpus_clear(cpu_sibling_map[cpu]);
+		cpus_clear(cpu_core_map[cpu]);
+	}
 
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		struct cpuinfo_x86 *c = cpu_data + cpu;
 		int siblings = 0;
 		int i;
 		if (!cpu_isset(cpu, cpu_callout_map))
@@ -1259,7 +1264,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 			for (i = 0; i < NR_CPUS; i++) {
 				if (!cpu_isset(i, cpu_callout_map))
 					continue;
-				if (phys_proc_id[cpu] == phys_proc_id[i]) {
+				if (cpu_core_id[cpu] == cpu_core_id[i]) {
 					siblings++;
 					cpu_set(i, cpu_sibling_map[cpu]);
 				}
@@ -1269,14 +1274,22 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 			cpu_set(cpu, cpu_sibling_map[cpu]);
 		}
 
-		if (siblings != smp_num_siblings)
+		if (siblings != smp_num_siblings) {
 			printk(KERN_WARNING "WARNING: %d siblings found for CPU%d, should be %d\n", siblings, cpu, smp_num_siblings);
+			smp_num_siblings = siblings;
+		}
+		if (c->x86_num_cores > 1) {
+			for (i = 0; i < NR_CPUS; i++) {
+				if (!cpu_isset(i, cpu_callout_map))
+					continue;
+				if (phys_proc_id[cpu] == phys_proc_id[i]) {
+					cpu_set(i, cpu_core_map[cpu]);
+				}
+			}
+		} else {
+			cpu_core_map[cpu] = cpu_sibling_map[cpu];
+		}
 	}
-
-#if 0
-	if (nmi_watchdog == NMI_LOCAL_APIC)
-		check_nmi_watchdog();
-#endif
 
 	smpboot_setup_io_apic();
 

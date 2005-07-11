@@ -99,6 +99,11 @@ EXPORT_SYMBOL(__get_user_1);
 EXPORT_SYMBOL(__get_user_2);
 EXPORT_SYMBOL(__get_user_4);
 
+EXPORT_SYMBOL(__put_user_1);
+EXPORT_SYMBOL(__put_user_2);
+EXPORT_SYMBOL(__put_user_4);
+EXPORT_SYMBOL(__put_user_8);
+
 EXPORT_SYMBOL(strpbrk);
 EXPORT_SYMBOL(strstr);
 
@@ -114,7 +119,6 @@ EXPORT_SYMBOL(dma_alloc_coherent);
 EXPORT_SYMBOL(dma_free_coherent);
 
 #ifdef CONFIG_PCI
-EXPORT_SYMBOL(pcibios_penalize_isa_irq);
 EXPORT_SYMBOL(pci_mem_start);
 #endif
 
@@ -146,7 +150,6 @@ EXPORT_SYMBOL(smp_call_function);
 
 /* TLB flushing */
 EXPORT_SYMBOL(flush_tlb_page);
-EXPORT_SYMBOL_GPL(flush_tlb_all);
 #endif
 
 #ifdef CONFIG_X86_IO_APIC
@@ -167,10 +170,6 @@ EXPORT_SYMBOL(rtc_lock);
 
 EXPORT_SYMBOL_GPL(set_nmi_callback);
 EXPORT_SYMBOL_GPL(unset_nmi_callback);
-
-#undef memcmp
-extern int memcmp(const void *,const void *,__kernel_size_t);
-EXPORT_SYMBOL(memcmp);
 
 EXPORT_SYMBOL(register_die_notifier);
 #ifdef CONFIG_HAVE_DEC_LOCK

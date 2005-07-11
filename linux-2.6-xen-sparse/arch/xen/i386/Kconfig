@@ -74,6 +74,7 @@ config M386
 	  - "Winchip-C6" for original IDT Winchip.
 	  - "Winchip-2" for IDT Winchip 2.
 	  - "Winchip-2A" for IDT Winchips with 3dNow! capabilities.
+	  - "GeodeGX1" for Geode GX1 (Cyrix MediaGX).
 	  - "CyrixIII/VIA C3" for VIA Cyrix III or VIA C3.
 	  - "VIA C3-2 for VIA C3-2 "Nehemiah" (model 9 and above).
 
@@ -201,6 +202,11 @@ config MWINCHIP3D
 	  stores for this CPU, which can increase performance of some
 	  operations.
 
+config MGEODEGX1
+	bool "GeodeGX1"
+	help
+	  Select this for a Geode GX1 (Cyrix MediaGX) chip.
+
 config MCYRIXIII
 	bool "CyrixIII/VIA-C3"
 	help
@@ -249,7 +255,7 @@ config X86_L1_CACHE_SHIFT
 	int
 	default "7" if MPENTIUM4 || X86_GENERIC
 	default "4" if X86_ELAN || M486 || M386
-	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MEFFICEON || MCYRIXIII || MK6 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || M586 || MVIAC3_2
+	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MEFFICEON || MCYRIXIII || MK6 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || M586 || MVIAC3_2 || MGEODEGX1
 	default "6" if MK7 || MK8 || MPENTIUMM
 
 config RWSEM_GENERIC_SPINLOCK
@@ -268,7 +274,7 @@ config GENERIC_CALIBRATE_DELAY
 
 config X86_PPRO_FENCE
 	bool
-	depends on M686 || M586MMX || M586TSC || M586 || M486 || M386
+	depends on M686 || M586MMX || M586TSC || M586 || M486 || M386 || MGEODEGX1
 	default y
 
 config X86_F00F_BUG
@@ -298,7 +304,7 @@ config X86_POPAD_OK
 
 config X86_ALIGNMENT_16
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || X86_ELAN || MK6 || M586MMX || M586TSC || M586 || M486 || MVIAC3_2
+	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || X86_ELAN || MK6 || M586MMX || M586TSC || M586 || M486 || MVIAC3_2 || MGEODEGX1
 	default y
 
 config X86_GOOD_APIC
@@ -434,7 +440,7 @@ config PREEMPT_BKL
 
 #config X86_TSC
 #	 bool
-#	depends on (MWINCHIP3D || MWINCHIP2 || MCRUSOE || MEFFICEON || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2) && !X86_NUMAQ
+# 	depends on (MWINCHIP3D || MWINCHIP2 || MCRUSOE || MEFFICEON || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2 || MGEODEGX1) && !X86_NUMAQ
 #	 default y
 
 #config X86_MCE
@@ -473,6 +479,24 @@ config PREEMPT_BKL
 #	 help
 #	   Enabling this feature will cause a message to be printed when the P4
 #	   enters thermal throttling.
+
+config X86_REBOOTFIXUPS
+	bool "Enable X86 board specific fixups for reboot"
+	depends on X86
+	default n
+	---help---
+	  This enables chipset and/or board specific fixups to be done
+	  in order to get reboot to work correctly. This is only needed on
+	  some combinations of hardware and BIOS. The symptom, for which
+	  this config is intended, is when reboot ends with a stalled/hung
+	  system.
+
+	  Currently, the only fixup is for the Geode GX1/CS5530A/TROM2.1.
+	  combination.
+
+	  Say Y if you want to enable the fixup. Currently, it's safe to
+	  enable this option even if you don't need it.
+	  Say N otherwise.
 
 config MICROCODE
 	tristate "/dev/cpu/microcode - Intel IA32 CPU microcode support"
@@ -599,6 +623,16 @@ config HAVE_ARCH_BOOTMEM_NODE
 	depends on NUMA
 	default y
 
+config HAVE_MEMORY_PRESENT
+	bool
+	depends on DISCONTIGMEM
+	default y
+
+config NEED_NODE_MEMMAP_SIZE
+	bool
+	depends on DISCONTIGMEM
+	default y
+
 #config HIGHPTE
 #	bool "Allocate 3rd-level pagetables from highmem"
 #	depends on HIGHMEM4G || HIGHMEM64G
@@ -682,13 +716,18 @@ config REGPARM
 
 config X86_LOCAL_APIC
 	bool
-	depends on !SMP && X86_UP_APIC
+	depends on XEN_PRIVILEGED_GUEST && (X86_UP_APIC || ((X86_VISWS || SMP) && !X86_VOYAGER))
 	default y
 
 config X86_IO_APIC
 	bool
-	depends on !SMP && X86_UP_IOAPIC
+	depends on XEN_PRIVILEGED_GUEST && (X86_UP_IOAPIC || (SMP && !(X86_VISWS || X86_VOYAGER)))
 	default y
+
+config X86_VISWS_APIC
+	bool
+	depends on X86_VISWS
+  	default y
 
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
@@ -704,20 +743,10 @@ if XEN_PHYSDEV_ACCESS
 
 menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
 
-config X86_VISWS_APIC
-	bool
-	depends on X86_VISWS
-	default y
-
-config X86_LOCAL_APIC
-	bool
-	depends on (X86_VISWS || SMP) && !X86_VOYAGER
-	default y
-
 config X86_UP_APIC
-	bool "Local APIC support on uniprocessors" if !SMP
-	depends on !(X86_VISWS || X86_VOYAGER)
-	---help---
+	bool "Local APIC support on uniprocessors"
+	depends on !SMP && !(X86_VISWS || X86_VOYAGER)
+	help
 	  A local APIC (Advanced Programmable Interrupt Controller) is an
 	  integrated interrupt controller in the CPU. If you have a single-CPU
 	  system which has a processor with a local APIC, you can say Y here to
@@ -727,27 +756,17 @@ config X86_UP_APIC
 	  performance counters), and the NMI watchdog which detects hard
 	  lockups.
 
-	  If you have a system with several CPUs, you do not need to say Y
-	  here: the local APIC will be used automatically.
-
 config X86_UP_IOAPIC
 	bool "IO-APIC support on uniprocessors"
-	depends on !SMP && X86_UP_APIC
+	depends on X86_UP_APIC
 	help
 	  An IO-APIC (I/O Advanced Programmable Interrupt Controller) is an
 	  SMP-capable replacement for PC-style interrupt controllers. Most
-	  SMP systems and a small number of uniprocessor systems have one.
+	  SMP systems and many recent uniprocessor systems have one.
+
 	  If you have a single-CPU system with an IO-APIC, you can say Y here
 	  to use it. If you say Y here even though your machine doesn't have
 	  an IO-APIC, then the kernel will still run with no slowdown at all.
-
-	  If you have a system with several CPUs, you do not need to say Y
-	  here: the IO-APIC will be used automatically.
-
-config X86_IO_APIC
-	bool
-	depends on SMP && !(X86_VISWS || X86_VOYAGER)
-	default y
 
 config PCI
 	bool "PCI support" if !X86_VISWS
@@ -809,13 +828,17 @@ config PCI_DIRECT
 
 config PCI_MMCONFIG
 	bool
-	depends on PCI && (PCI_GOMMCONFIG || (PCI_GOANY && ACPI))
+	depends on PCI && ACPI && (PCI_GOMMCONFIG || PCI_GOANY)
 	select ACPI_BOOT
 	default y
 
 source "drivers/pci/pcie/Kconfig"
 
 source "drivers/pci/Kconfig"
+
+config ISA_DMA_API
+	bool
+	default y
 
 config ISA
 	bool "ISA support"
@@ -846,17 +869,13 @@ config EISA
 source "drivers/eisa/Kconfig"
 
 config MCA
-	bool "MCA support"
-	depends on !(X86_VISWS || X86_VOYAGER)
+	bool "MCA support" if !(X86_VISWS || X86_VOYAGER)
+	default y if X86_VOYAGER
 	help
 	  MicroChannel Architecture is found in some IBM PS/2 machines and
 	  laptops.  It is a bus system similar to PCI or ISA. See
 	  <file:Documentation/mca.txt> (and especially the web page given
 	  there) before attempting to build an MCA bus kernel.
-
-config MCA
-	depends on X86_VOYAGER
-	default y if X86_VOYAGER
 
 source "drivers/mca/Kconfig"
 
@@ -879,8 +898,6 @@ source "drivers/pci/hotplug/Kconfig"
 endmenu
 
 endif
-
-source "arch/i386/Kconfig.debug"
 
 #
 # Use the generic interrupt handling code in kernel/irq/:
@@ -917,5 +934,22 @@ config PC
 	bool
 	depends on X86 && !EMBEDDED
 	default y
+
+config SECCOMP
+	bool "Enable seccomp to safely compute untrusted bytecode"
+	depends on PROC_FS
+	default y
+	help
+	  This kernel feature is useful for number crunching applications
+	  that may need to compute untrusted bytecode during their
+	  execution. By using pipes or other transports made available to
+	  the process as file descriptors supporting the read/write
+	  syscalls, it's possible to isolate those applications in
+	  their own address space using seccomp. Once seccomp is
+	  enabled via /proc/<pid>/seccomp, it cannot be disabled
+	  and the task is only allowed to execute a few safe syscalls
+	  defined by each seccomp mode.
+
+	  If unsure, say Y. Only embedded should say N here.
 
 endmenu

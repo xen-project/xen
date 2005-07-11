@@ -1,65 +1,7 @@
-
-From: Zwane Mwaikambo <zwane@linuxpower.ca>
-
-Find attached the i386 cpu hotplug patch updated for Ingo's latest round of
-goodies.  In order to avoid dumping cpu hotplug code into kernel/irq/* i
-dropped the cpu_online check in do_IRQ() by modifying fixup_irqs().  The
-difference being that on cpu offline, fixup_irqs() is called before we
-clear the cpu from cpu_online_map and a long delay in order to ensure that
-we never have any queued external interrupts on the APICs.  Due to my usual
-test victims being in boxes a continent away this hasn't been tested, but
-i'll cover bug reports (nudge, Nathan!  ;)
-
-1) Add CONFIG_HOTPLUG_CPU
-2) disable local APIC timer on dead cpus.
-3) Disable preempt around irq balancing to prevent CPUs going down.
-4) Print irq stats for all possible cpus.
-5) Debugging check for interrupts on offline cpus.
-6) Hacky fixup_irqs() to redirect irqs when cpus go off/online.
-7) play_dead() for offline cpus to spin inside.
-8) Handle offline cpus set in flush_tlb_others().
-9) Grab lock earlier in smp_call_function() to prevent CPUs going down.
-10) Implement __cpu_disable() and __cpu_die().
-11) Enable local interrupts in cpu_enable() after fixup_irqs()
-12) Don't fiddle with NMI on dead cpu, but leave intact on other cpus.
-13) Program IRQ affinity whilst cpu is still in cpu_online_map on offline.
-
-Signed-off-by: Zwane Mwaikambo <zwane@linuxpower.ca>
-DESC
-ppc64: fix hotplug cpu
-EDESC
-From: Zwane Mwaikambo <zwane@fsmlabs.com>
-
-I seem to have broken this when I moved the clearing of the dying cpu to 
-arch specific code.
-
-Signed-off-by: Zwane Mwaikambo <zwane@fsmlabs.com>
-Signed-off-by: Andrew Morton <akpm@osdl.org>
----
-
- 25-akpm/arch/i386/Kconfig               |    9 ++
- 25-akpm/arch/i386/kernel/apic.c         |    3 
- 25-akpm/arch/i386/kernel/io_apic.c      |    2 
- 25-akpm/arch/i386/kernel/irq.c          |   66 +++++++++++++++++----
- 25-akpm/arch/i386/kernel/msr.c          |    2 
- 25-akpm/arch/i386/kernel/process.c      |   35 +++++++++++
- 25-akpm/arch/i386/kernel/smp.c          |   25 +++++---
- 25-akpm/arch/i386/kernel/smpboot.c      |   98 ++++++++++++++++++++++++++++++--
- 25-akpm/arch/i386/kernel/traps.c        |    8 ++
- 25-akpm/arch/ia64/kernel/smpboot.c      |    3 
- 25-akpm/arch/ppc64/kernel/pSeries_smp.c |    5 +
- 25-akpm/arch/s390/kernel/smp.c          |    4 -
- 25-akpm/include/asm-i386/cpu.h          |    2 
- 25-akpm/include/asm-i386/irq.h          |    4 +
- 25-akpm/include/asm-i386/smp.h          |    3 
- 25-akpm/kernel/cpu.c                    |   14 +---
- arch/ppc64/kernel/smp.c                 |    0 
- 17 files changed, 242 insertions(+), 41 deletions(-)
-
-diff -puN arch/i386/Kconfig~i386-cpu-hotplug-updated-for-mm arch/i386/Kconfig
---- 25/arch/i386/Kconfig~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/arch/i386/Kconfig	2005-02-23 02:20:06.000000000 -0800
-@@ -1205,6 +1205,15 @@ config SCx200
+diff -Naur linux-2.6.12.orig/arch/i386/Kconfig linux-2.6.12/arch/i386/Kconfig
+--- linux-2.6.12.orig/arch/i386/Kconfig	2005-07-08 12:33:40.000000000 -0400
++++ linux-2.6.12/arch/i386/Kconfig	2005-07-08 12:34:10.000000000 -0400
+@@ -1226,6 +1226,15 @@
  	  This support is also available as a module.  If compiled as a
  	  module, it will be called scx200.
  
@@ -75,9 +17,9 @@ diff -puN arch/i386/Kconfig~i386-cpu-hotplug-updated-for-mm arch/i386/Kconfig
  source "drivers/pcmcia/Kconfig"
  
  source "drivers/pci/hotplug/Kconfig"
-diff -puN arch/i386/kernel/apic.c~i386-cpu-hotplug-updated-for-mm arch/i386/kernel/apic.c
---- 25/arch/i386/kernel/apic.c~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/arch/i386/kernel/apic.c	2005-02-23 02:20:06.000000000 -0800
+diff -Naur linux-2.6.12.orig/arch/i386/kernel/apic.c linux-2.6.12/arch/i386/kernel/apic.c
+--- linux-2.6.12.orig/arch/i386/kernel/apic.c	2005-07-08 12:33:40.000000000 -0400
++++ linux-2.6.12/arch/i386/kernel/apic.c	2005-07-08 12:34:10.000000000 -0400
 @@ -26,6 +26,7 @@
  #include <linux/mc146818rtc.h>
  #include <linux/kernel_stat.h>
@@ -86,7 +28,7 @@ diff -puN arch/i386/kernel/apic.c~i386-cpu-hotplug-updated-for-mm arch/i386/kern
  
  #include <asm/atomic.h>
  #include <asm/smp.h>
-@@ -1048,7 +1049,7 @@ void __init setup_secondary_APIC_clock(v
+@@ -1048,7 +1049,7 @@
  	setup_APIC_timer(calibration_result);
  }
  
@@ -95,10 +37,10 @@ diff -puN arch/i386/kernel/apic.c~i386-cpu-hotplug-updated-for-mm arch/i386/kern
  {
  	if (using_apic_timer) {
  		unsigned long v;
-diff -puN arch/i386/kernel/io_apic.c~i386-cpu-hotplug-updated-for-mm arch/i386/kernel/io_apic.c
---- 25/arch/i386/kernel/io_apic.c~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/arch/i386/kernel/io_apic.c	2005-02-23 02:20:06.000000000 -0800
-@@ -576,9 +576,11 @@ static int balanced_irq(void *unused)
+diff -Naur linux-2.6.12.orig/arch/i386/kernel/io_apic.c linux-2.6.12/arch/i386/kernel/io_apic.c
+--- linux-2.6.12.orig/arch/i386/kernel/io_apic.c	2005-07-08 12:33:40.000000000 -0400
++++ linux-2.6.12/arch/i386/kernel/io_apic.c	2005-07-08 12:34:10.000000000 -0400
+@@ -576,9 +576,11 @@
  		try_to_freeze(PF_FREEZE);
  		if (time_after(jiffies,
  				prev_balance_time+balanced_irq_interval)) {
@@ -110,9 +52,9 @@ diff -puN arch/i386/kernel/io_apic.c~i386-cpu-hotplug-updated-for-mm arch/i386/k
  		}
  	}
  	return 0;
-diff -puN arch/i386/kernel/irq.c~i386-cpu-hotplug-updated-for-mm arch/i386/kernel/irq.c
---- 25/arch/i386/kernel/irq.c~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/arch/i386/kernel/irq.c	2005-02-23 02:20:06.000000000 -0800
+diff -Naur linux-2.6.12.orig/arch/i386/kernel/irq.c linux-2.6.12/arch/i386/kernel/irq.c
+--- linux-2.6.12.orig/arch/i386/kernel/irq.c	2005-07-08 12:33:40.000000000 -0400
++++ linux-2.6.12/arch/i386/kernel/irq.c	2005-07-08 12:36:06.000000000 -0400
 @@ -15,6 +15,9 @@
  #include <linux/seq_file.h>
  #include <linux/interrupt.h>
@@ -121,9 +63,9 @@ diff -puN arch/i386/kernel/irq.c~i386-cpu-hotplug-updated-for-mm arch/i386/kerne
 +#include <linux/cpu.h>
 +#include <linux/delay.h>
  
- #ifndef CONFIG_X86_LOCAL_APIC
- /*
-@@ -209,9 +212,8 @@ int show_interrupts(struct seq_file *p, 
+ DEFINE_PER_CPU(irq_cpustat_t, irq_stat) ____cacheline_maxaligned_in_smp;
+ EXPORT_PER_CPU_SYMBOL(irq_stat);
+@@ -210,9 +213,8 @@
  
  	if (i == 0) {
  		seq_printf(p, "           ");
@@ -135,7 +77,7 @@ diff -puN arch/i386/kernel/irq.c~i386-cpu-hotplug-updated-for-mm arch/i386/kerne
  		seq_putc(p, '\n');
  	}
  
-@@ -224,9 +226,8 @@ int show_interrupts(struct seq_file *p, 
+@@ -225,9 +227,8 @@
  #ifndef CONFIG_SMP
  		seq_printf(p, "%10u ", kstat_irqs(i));
  #else
@@ -147,7 +89,7 @@ diff -puN arch/i386/kernel/irq.c~i386-cpu-hotplug-updated-for-mm arch/i386/kerne
  #endif
  		seq_printf(p, " %14s", irq_desc[i].handler->typename);
  		seq_printf(p, "  %s", action->name);
-@@ -239,16 +240,13 @@ skip:
+@@ -240,16 +241,13 @@
  		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
  	} else if (i == NR_IRQS) {
  		seq_printf(p, "NMI: ");
@@ -155,20 +97,20 @@ diff -puN arch/i386/kernel/irq.c~i386-cpu-hotplug-updated-for-mm arch/i386/kerne
 -			if (cpu_online(j))
 -				seq_printf(p, "%10u ", nmi_count(j));
 +		for_each_cpu(j)
-+			seq_printf(p, "%10u ", nmi_count(j));
++ 			seq_printf(p, "%10u ", nmi_count(j));
  		seq_putc(p, '\n');
  #ifdef CONFIG_X86_LOCAL_APIC
  		seq_printf(p, "LOC: ");
 -		for (j = 0; j < NR_CPUS; j++)
 -			if (cpu_online(j))
 -				seq_printf(p, "%10u ",
--					irq_stat[j].apic_timer_irqs);
+-					per_cpu(irq_stat,j).apic_timer_irqs);
 +		for_each_cpu(j)
-+			seq_printf(p, "%10u ", irq_stat[j].apic_timer_irqs);
++			seq_printf(p, "%10u ", per_cpu(irq_stat,j).apic_timer_irqs);
  		seq_putc(p, '\n');
  #endif
  		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
-@@ -258,3 +256,45 @@ skip:
+@@ -259,3 +257,45 @@
  	}
  	return 0;
  }
@@ -214,10 +156,10 @@ diff -puN arch/i386/kernel/irq.c~i386-cpu-hotplug-updated-for-mm arch/i386/kerne
 +}
 +#endif
 +
-diff -puN arch/i386/kernel/msr.c~i386-cpu-hotplug-updated-for-mm arch/i386/kernel/msr.c
---- 25/arch/i386/kernel/msr.c~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/arch/i386/kernel/msr.c	2005-02-23 02:20:06.000000000 -0800
-@@ -260,7 +260,7 @@ static struct file_operations msr_fops =
+diff -Naur linux-2.6.12.orig/arch/i386/kernel/msr.c linux-2.6.12/arch/i386/kernel/msr.c
+--- linux-2.6.12.orig/arch/i386/kernel/msr.c	2005-07-08 12:33:40.000000000 -0400
++++ linux-2.6.12/arch/i386/kernel/msr.c	2005-07-08 12:34:10.000000000 -0400
+@@ -260,7 +260,7 @@
  	.open = msr_open,
  };
  
@@ -226,9 +168,9 @@ diff -puN arch/i386/kernel/msr.c~i386-cpu-hotplug-updated-for-mm arch/i386/kerne
  {
  	int err = 0;
  	struct class_device *class_err;
-diff -puN arch/i386/kernel/process.c~i386-cpu-hotplug-updated-for-mm arch/i386/kernel/process.c
---- 25/arch/i386/kernel/process.c~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/arch/i386/kernel/process.c	2005-02-23 02:20:06.000000000 -0800
+diff -Naur linux-2.6.12.orig/arch/i386/kernel/process.c linux-2.6.12/arch/i386/kernel/process.c
+--- linux-2.6.12.orig/arch/i386/kernel/process.c	2005-07-08 12:33:40.000000000 -0400
++++ linux-2.6.12/arch/i386/kernel/process.c	2005-07-08 12:36:43.000000000 -0400
 @@ -13,6 +13,7 @@
  
  #include <stdarg.h>
@@ -237,7 +179,7 @@ diff -puN arch/i386/kernel/process.c~i386-cpu-hotplug-updated-for-mm arch/i386/k
  #include <linux/errno.h>
  #include <linux/sched.h>
  #include <linux/fs.h>
-@@ -55,6 +56,9 @@
+@@ -54,6 +55,9 @@
  #include <linux/irq.h>
  #include <linux/err.h>
  
@@ -246,8 +188,8 @@ diff -puN arch/i386/kernel/process.c~i386-cpu-hotplug-updated-for-mm arch/i386/k
 +
  asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
  
- int hlt_counter;
-@@ -139,6 +143,34 @@ static void poll_idle (void)
+ static int hlt_counter;
+@@ -138,6 +142,34 @@
  	}
  }
  
@@ -282,19 +224,19 @@ diff -puN arch/i386/kernel/process.c~i386-cpu-hotplug-updated-for-mm arch/i386/k
  /*
   * The idle thread. There's no useful work to be
   * done, so just try to conserve power and have a
-@@ -162,6 +194,9 @@ void cpu_idle (void)
+@@ -160,6 +192,9 @@
  			if (!idle)
  				idle = default_idle;
  
 +			if (cpu_is_offline(cpu))
 +				play_dead();
 +
- 			irq_stat[cpu].idle_timestamp = jiffies;
+ 			__get_cpu_var(irq_stat).idle_timestamp = jiffies;
  			idle();
  		}
-diff -puN arch/i386/kernel/smpboot.c~i386-cpu-hotplug-updated-for-mm arch/i386/kernel/smpboot.c
---- 25/arch/i386/kernel/smpboot.c~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/arch/i386/kernel/smpboot.c	2005-02-23 02:20:06.000000000 -0800
+diff -Naur linux-2.6.12.orig/arch/i386/kernel/smpboot.c linux-2.6.12/arch/i386/kernel/smpboot.c
+--- linux-2.6.12.orig/arch/i386/kernel/smpboot.c	2005-07-08 12:33:40.000000000 -0400
++++ linux-2.6.12/arch/i386/kernel/smpboot.c	2005-07-08 12:34:10.000000000 -0400
 @@ -44,6 +44,9 @@
  #include <linux/smp_lock.h>
  #include <linux/irq.h>
@@ -305,9 +247,9 @@ diff -puN arch/i386/kernel/smpboot.c~i386-cpu-hotplug-updated-for-mm arch/i386/k
  
  #include <linux/delay.h>
  #include <linux/mc146818rtc.h>
-@@ -89,6 +92,9 @@ extern unsigned char trampoline_end  [];
- static unsigned char *trampoline_base;
- static int trampoline_exec;
+@@ -90,6 +93,9 @@
+ 
+ static void map_cpu_to_logical_apicid(void);
  
 +/* State of each CPU. */
 +DEFINE_PER_CPU(int, cpu_state) = { 0 };
@@ -315,7 +257,7 @@ diff -puN arch/i386/kernel/smpboot.c~i386-cpu-hotplug-updated-for-mm arch/i386/k
  /*
   * Currently trivial. Write the real->protected mode
   * bootstrap into the page concerned. The caller
-@@ -1095,6 +1101,9 @@ static void __init smp_boot_cpus(unsigne
+@@ -1107,6 +1113,9 @@
     who understands all this stuff should rewrite it properly. --RR 15/Jul/02 */
  void __init smp_prepare_cpus(unsigned int max_cpus)
  {
@@ -325,7 +267,7 @@ diff -puN arch/i386/kernel/smpboot.c~i386-cpu-hotplug-updated-for-mm arch/i386/k
  	smp_boot_cpus(max_cpus);
  }
  
-@@ -1104,20 +1113,99 @@ void __devinit smp_prepare_boot_cpu(void
+@@ -1116,20 +1125,99 @@
  	cpu_set(smp_processor_id(), cpu_callout_map);
  }
  
@@ -430,9 +372,9 @@ diff -puN arch/i386/kernel/smpboot.c~i386-cpu-hotplug-updated-for-mm arch/i386/k
  	local_irq_enable();
  	/* Unleash the CPU! */
  	cpu_set(cpu, smp_commenced_mask);
-diff -puN arch/i386/kernel/smp.c~i386-cpu-hotplug-updated-for-mm arch/i386/kernel/smp.c
---- 25/arch/i386/kernel/smp.c~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/arch/i386/kernel/smp.c	2005-02-23 02:20:06.000000000 -0800
+diff -Naur linux-2.6.12.orig/arch/i386/kernel/smp.c linux-2.6.12/arch/i386/kernel/smp.c
+--- linux-2.6.12.orig/arch/i386/kernel/smp.c	2005-07-08 12:33:40.000000000 -0400
++++ linux-2.6.12/arch/i386/kernel/smp.c	2005-07-08 12:34:10.000000000 -0400
 @@ -19,6 +19,7 @@
  #include <linux/mc146818rtc.h>
  #include <linux/cache.h>
@@ -441,7 +383,7 @@ diff -puN arch/i386/kernel/smp.c~i386-cpu-hotplug-updated-for-mm arch/i386/kerne
  
  #include <asm/mtrr.h>
  #include <asm/tlbflush.h>
-@@ -163,7 +164,7 @@ void send_IPI_mask_bitmask(cpumask_t cpu
+@@ -163,7 +164,7 @@
  	unsigned long flags;
  
  	local_irq_save(flags);
@@ -450,7 +392,7 @@ diff -puN arch/i386/kernel/smp.c~i386-cpu-hotplug-updated-for-mm arch/i386/kerne
  	/*
  	 * Wait for idle.
  	 */
-@@ -345,21 +346,21 @@ out:
+@@ -345,21 +346,21 @@
  static void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
  						unsigned long va)
  {
@@ -477,7 +419,7 @@ diff -puN arch/i386/kernel/smp.c~i386-cpu-hotplug-updated-for-mm arch/i386/kerne
  	/*
  	 * i'm not happy about this global shared spinlock in the
  	 * MM hot path, but we'll see how contended it is.
-@@ -484,6 +485,7 @@ void smp_send_nmi_allbutself(void)
+@@ -474,6 +475,7 @@
   */
  void smp_send_reschedule(int cpu)
  {
@@ -485,7 +427,7 @@ diff -puN arch/i386/kernel/smp.c~i386-cpu-hotplug-updated-for-mm arch/i386/kerne
  	send_IPI_mask(cpumask_of_cpu(cpu), RESCHEDULE_VECTOR);
  }
  
-@@ -524,10 +526,16 @@ int smp_call_function (void (*func) (voi
+@@ -514,10 +516,16 @@
   */
  {
  	struct call_data_struct data;
@@ -504,7 +446,7 @@ diff -puN arch/i386/kernel/smp.c~i386-cpu-hotplug-updated-for-mm arch/i386/kerne
  
  	/* Can deadlock when called with interrupts disabled */
  	WARN_ON(irqs_disabled());
-@@ -539,7 +547,6 @@ int smp_call_function (void (*func) (voi
+@@ -529,7 +537,6 @@
  	if (wait)
  		atomic_set(&data.finished, 0);
  
@@ -512,10 +454,10 @@ diff -puN arch/i386/kernel/smp.c~i386-cpu-hotplug-updated-for-mm arch/i386/kerne
  	call_data = &data;
  	mb();
  	
-diff -puN arch/i386/kernel/traps.c~i386-cpu-hotplug-updated-for-mm arch/i386/kernel/traps.c
---- 25/arch/i386/kernel/traps.c~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/arch/i386/kernel/traps.c	2005-02-23 02:20:06.000000000 -0800
-@@ -669,6 +669,14 @@ fastcall void do_nmi(struct pt_regs * re
+diff -Naur linux-2.6.12.orig/arch/i386/kernel/traps.c linux-2.6.12/arch/i386/kernel/traps.c
+--- linux-2.6.12.orig/arch/i386/kernel/traps.c	2005-07-08 12:33:40.000000000 -0400
++++ linux-2.6.12/arch/i386/kernel/traps.c	2005-07-08 12:34:10.000000000 -0400
+@@ -624,6 +624,14 @@
  	nmi_enter();
  
  	cpu = smp_processor_id();
@@ -530,26 +472,28 @@ diff -puN arch/i386/kernel/traps.c~i386-cpu-hotplug-updated-for-mm arch/i386/ker
  	++nmi_count(cpu);
  
  	if (!nmi_callback(regs, cpu))
-diff -puN arch/ia64/kernel/smpboot.c~i386-cpu-hotplug-updated-for-mm arch/ia64/kernel/smpboot.c
---- 25/arch/ia64/kernel/smpboot.c~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/arch/ia64/kernel/smpboot.c	2005-02-23 02:20:06.000000000 -0800
-@@ -590,9 +590,10 @@ int __cpu_disable(void)
- 	if (cpu == 0)
- 		return -EBUSY;
+diff -Naur linux-2.6.12.orig/arch/ppc64/kernel/pSeries_smp.c linux-2.6.12/arch/ppc64/kernel/pSeries_smp.c
+--- linux-2.6.12.orig/arch/ppc64/kernel/pSeries_smp.c	2005-07-08 12:33:42.000000000 -0400
++++ linux-2.6.12/arch/ppc64/kernel/pSeries_smp.c	2005-07-08 12:34:10.000000000 -0400
+@@ -92,10 +92,13 @@
  
+ int pSeries_cpu_disable(void)
+ {
++	int cpu = smp_processor_id();
++
 +	cpu_clear(cpu, cpu_online_map);
- 	fixup_irqs();
- 	local_flush_tlb_all();
--	printk ("Disabled cpu %u\n", smp_processor_id());
-+	printk("Disabled cpu %u\n", cpu);
- 	return 0;
- }
+ 	systemcfg->processorCount--;
  
-diff -puN arch/ppc64/kernel/smp.c~i386-cpu-hotplug-updated-for-mm arch/ppc64/kernel/smp.c
-diff -puN arch/s390/kernel/smp.c~i386-cpu-hotplug-updated-for-mm arch/s390/kernel/smp.c
---- 25/arch/s390/kernel/smp.c~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/arch/s390/kernel/smp.c	2005-02-23 02:20:06.000000000 -0800
-@@ -679,12 +679,14 @@ __cpu_disable(void)
+ 	/*fix boot_cpuid here*/
+-	if (smp_processor_id() == boot_cpuid)
++	if (cpu == boot_cpuid)
+ 		boot_cpuid = any_online_cpu(cpu_online_map);
+ 
+ 	/* FIXME: abstract this to not be platform specific later on */
+diff -Naur linux-2.6.12.orig/arch/s390/kernel/smp.c linux-2.6.12/arch/s390/kernel/smp.c
+--- linux-2.6.12.orig/arch/s390/kernel/smp.c	2005-07-08 12:33:42.000000000 -0400
++++ linux-2.6.12/arch/s390/kernel/smp.c	2005-07-08 12:34:10.000000000 -0400
+@@ -679,12 +679,14 @@
  {
  	unsigned long flags;
  	ec_creg_mask_parms cr_parms;
@@ -565,9 +509,9 @@ diff -puN arch/s390/kernel/smp.c~i386-cpu-hotplug-updated-for-mm arch/s390/kerne
  
  #ifdef CONFIG_PFAULT
  	/* Disable pfault pseudo page faults on this cpu. */
-diff -puN include/asm-i386/cpu.h~i386-cpu-hotplug-updated-for-mm include/asm-i386/cpu.h
---- 25/include/asm-i386/cpu.h~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/include/asm-i386/cpu.h	2005-02-23 02:20:06.000000000 -0800
+diff -Naur linux-2.6.12.orig/include/asm-i386/cpu.h linux-2.6.12/include/asm-i386/cpu.h
+--- linux-2.6.12.orig/include/asm-i386/cpu.h	2005-07-08 12:33:58.000000000 -0400
++++ linux-2.6.12/include/asm-i386/cpu.h	2005-07-08 12:34:10.000000000 -0400
 @@ -5,6 +5,7 @@
  #include <linux/cpu.h>
  #include <linux/topology.h>
@@ -576,16 +520,16 @@ diff -puN include/asm-i386/cpu.h~i386-cpu-hotplug-updated-for-mm include/asm-i38
  
  #include <asm/node.h>
  
-@@ -17,4 +18,5 @@ extern int arch_register_cpu(int num);
+@@ -16,4 +17,5 @@
  extern void arch_unregister_cpu(int);
  #endif
  
 +DECLARE_PER_CPU(int, cpu_state);
  #endif /* _ASM_I386_CPU_H_ */
-diff -puN include/asm-i386/irq.h~i386-cpu-hotplug-updated-for-mm include/asm-i386/irq.h
---- 25/include/asm-i386/irq.h~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/include/asm-i386/irq.h	2005-02-23 02:20:06.000000000 -0800
-@@ -38,4 +38,8 @@ extern void release_vm86_irqs(struct tas
+diff -Naur linux-2.6.12.orig/include/asm-i386/irq.h linux-2.6.12/include/asm-i386/irq.h
+--- linux-2.6.12.orig/include/asm-i386/irq.h	2005-07-08 12:33:58.000000000 -0400
++++ linux-2.6.12/include/asm-i386/irq.h	2005-07-08 12:34:10.000000000 -0400
+@@ -38,4 +38,8 @@
  extern int irqbalance_disable(char *str);
  #endif
  
@@ -594,10 +538,10 @@ diff -puN include/asm-i386/irq.h~i386-cpu-hotplug-updated-for-mm include/asm-i38
 +#endif
 +
  #endif /* _ASM_IRQ_H */
-diff -puN include/asm-i386/smp.h~i386-cpu-hotplug-updated-for-mm include/asm-i386/smp.h
---- 25/include/asm-i386/smp.h~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/include/asm-i386/smp.h	2005-02-23 02:20:06.000000000 -0800
-@@ -85,6 +85,9 @@ static __inline int logical_smp_processo
+diff -Naur linux-2.6.12.orig/include/asm-i386/smp.h linux-2.6.12/include/asm-i386/smp.h
+--- linux-2.6.12.orig/include/asm-i386/smp.h	2005-07-08 12:33:58.000000000 -0400
++++ linux-2.6.12/include/asm-i386/smp.h	2005-07-08 12:34:10.000000000 -0400
+@@ -83,6 +83,9 @@
  }
  
  #endif
@@ -607,10 +551,10 @@ diff -puN include/asm-i386/smp.h~i386-cpu-hotplug-updated-for-mm include/asm-i38
  #endif /* !__ASSEMBLY__ */
  
  #define NO_PROC_ID		0xFF		/* No processor magic marker */
-diff -puN kernel/cpu.c~i386-cpu-hotplug-updated-for-mm kernel/cpu.c
---- 25/kernel/cpu.c~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:06.000000000 -0800
-+++ 25-akpm/kernel/cpu.c	2005-02-23 02:20:06.000000000 -0800
-@@ -63,19 +63,15 @@ static int take_cpu_down(void *unused)
+diff -Naur linux-2.6.12.orig/kernel/cpu.c linux-2.6.12/kernel/cpu.c
+--- linux-2.6.12.orig/kernel/cpu.c	2005-07-08 12:33:26.000000000 -0400
++++ linux-2.6.12/kernel/cpu.c	2005-07-08 12:34:10.000000000 -0400
+@@ -63,19 +63,15 @@
  {
  	int err;
  
@@ -635,22 +579,3 @@ diff -puN kernel/cpu.c~i386-cpu-hotplug-updated-for-mm kernel/cpu.c
  }
  
  int cpu_down(unsigned int cpu)
-diff -puN arch/ppc64/kernel/pSeries_smp.c~i386-cpu-hotplug-updated-for-mm arch/ppc64/kernel/pSeries_smp.c
---- 25/arch/ppc64/kernel/pSeries_smp.c~i386-cpu-hotplug-updated-for-mm	2005-02-23 02:20:08.000000000 -0800
-+++ 25-akpm/arch/ppc64/kernel/pSeries_smp.c	2005-02-23 02:20:08.000000000 -0800
-@@ -86,10 +86,13 @@ static int query_cpu_stopped(unsigned in
- 
- int pSeries_cpu_disable(void)
- {
-+	int cpu = smp_processor_id();
-+
-+	cpu_clear(cpu, cpu_online_map);
- 	systemcfg->processorCount--;
- 
- 	/*fix boot_cpuid here*/
--	if (smp_processor_id() == boot_cpuid)
-+	if (cpu == boot_cpuid)
- 		boot_cpuid = any_online_cpu(cpu_online_map);
- 
- 	/* FIXME: abstract this to not be platform specific later on */
-_

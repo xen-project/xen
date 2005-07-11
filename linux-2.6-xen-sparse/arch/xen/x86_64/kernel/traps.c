@@ -28,6 +28,7 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
+#include <linux/nmi.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -119,95 +120,106 @@ int printk_address(unsigned long address)
 } 
 #endif
 
-unsigned long *in_exception_stack(int cpu, unsigned long stack) 
-{ 
-	int k;
-	for (k = 0; k < N_EXCEPTION_STACKS; k++) {
-		struct tss_struct *tss = &per_cpu(init_tss, cpu);
-		unsigned long end = tss->ist[k] + EXCEPTION_STKSZ;
+static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
+					unsigned *usedp, const char **idp)
+{
+	static const char ids[N_EXCEPTION_STACKS][8] = {
+		[DEBUG_STACK - 1] = "#DB",
+		[NMI_STACK - 1] = "NMI",
+		[DOUBLEFAULT_STACK - 1] = "#DF",
+		[STACKFAULT_STACK - 1] = "#SS",
+		[MCE_STACK - 1] = "#MC",
+	};
+	unsigned k;
 
-		if (stack >= tss->ist[k]  && stack <= end)
+	for (k = 0; k < N_EXCEPTION_STACKS; k++) {
+		unsigned long end;
+
+		end = per_cpu(init_tss, cpu).ist[k];
+		if (stack >= end)
+			continue;
+		if (stack >= end - EXCEPTION_STKSZ) {
+			if (*usedp & (1U << k))
+				break;
+			*usedp |= 1U << k;
+			*idp = ids[k];
 			return (unsigned long *)end;
+		}
 	}
 	return NULL;
-} 
+}
 
 /*
  * x86-64 can have upto three kernel stacks: 
  * process stack
  * interrupt stack
- * severe exception (double fault, nmi, stack fault) hardware stack
- * Check and process them in order.
+ * severe exception (double fault, nmi, stack fault, debug, mce) hardware stack
  */
 
 void show_trace(unsigned long *stack)
 {
 	unsigned long addr;
-	unsigned long *irqstack, *irqstack_end, *estack_end;
-	const int cpu = safe_smp_processor_id();
+	const unsigned cpu = safe_smp_processor_id();
+	unsigned long *irqstack_end = (unsigned long *)cpu_pda[cpu].irqstackptr;
 	int i;
+	unsigned used = 0;
 
 	printk("\nCall Trace:");
-	i = 0; 
-	
-	estack_end = in_exception_stack(cpu, (unsigned long)stack); 
-	if (estack_end) { 
-		while (stack < estack_end) { 
-			addr = *stack++; 
-			if (__kernel_text_address(addr)) {
-				i += printk_address(addr);
-				i += printk(" "); 
-				if (i > 50) {
-					printk("\n"); 
-					i = 0;
-				}
+
+#define HANDLE_STACK(cond) \
+	do while (cond) { \
+		addr = *stack++; \
+		if (kernel_text_address(addr)) { \
+			/* \
+			 * If the address is either in the text segment of the \
+			 * kernel, or in the region which contains vmalloc'ed \
+			 * memory, it *may* be the address of a calling \
+			 * routine; if so, print it so that someone tracing \
+			 * down the cause of the crash will be able to figure \
+			 * out the call path that was taken. \
+			 */ \
+			i += printk_address(addr); \
+			if (i > 50) { \
+				printk("\n       "); \
+				i = 0; \
+			} \
+			else \
+				i += printk(" "); \
+		} \
+	} while (0)
+
+	for(i = 0; ; ) {
+		const char *id;
+		unsigned long *estack_end;
+		estack_end = in_exception_stack(cpu, (unsigned long)stack,
+						&used, &id);
+
+		if (estack_end) {
+			i += printk(" <%s> ", id);
+			HANDLE_STACK (stack < estack_end);
+			i += printk(" <EOE> ");
+			stack = (unsigned long *) estack_end[-2];
+			continue;
+		}
+		if (irqstack_end) {
+			unsigned long *irqstack;
+			irqstack = irqstack_end -
+				(IRQSTACKSIZE - 64) / sizeof(*irqstack);
+
+			if (stack >= irqstack && stack < irqstack_end) {
+				i += printk(" <IRQ> ");
+				HANDLE_STACK (stack < irqstack_end);
+				stack = (unsigned long *) (irqstack_end[-1]);
+				irqstack_end = NULL;
+				i += printk(" <EOI> ");
+				continue;
 			}
 		}
-		i += printk(" <EOE> "); 
-		i += 7;
-		stack = (unsigned long *) estack_end[-2]; 
-	}  
-
-	irqstack_end = (unsigned long *) (cpu_pda[cpu].irqstackptr);
-	irqstack = (unsigned long *) (cpu_pda[cpu].irqstackptr - IRQSTACKSIZE + 64);
-
-	if (stack >= irqstack && stack < irqstack_end) {
-		printk("<IRQ> ");  
-		while (stack < irqstack_end) {
-			addr = *stack++;
-			/*
-			 * If the address is either in the text segment of the
-			 * kernel, or in the region which contains vmalloc'ed
-			 * memory, it *may* be the address of a calling
-			 * routine; if so, print it so that someone tracing
-			 * down the cause of the crash will be able to figure
-			 * out the call path that was taken.
-			 */
-			 if (__kernel_text_address(addr)) {
-				 i += printk_address(addr);
-				 i += printk(" "); 
-				 if (i > 50) { 
-					printk("\n       ");
-					 i = 0;
-				 } 
-			}
-		} 
-		stack = (unsigned long *) (irqstack_end[-1]);
-		printk(" <EOI> ");
-		i += 7;
-	} 
-
-	while (((long) stack & (THREAD_SIZE-1)) != 0) {
-		addr = *stack++;
-		if (__kernel_text_address(addr)) {
-			i += printk_address(addr);
-			i += printk(" "); 
-			if (i > 50) { 
-				printk("\n       ");
-					 i = 0;
-			} 
-		}
+		break;
 	}
+
+	HANDLE_STACK (((long) stack & (THREAD_SIZE-1)) != 0);
+#undef HANDLE_STACK
 	printk("\n");
 }
 
@@ -243,6 +255,7 @@ void show_stack(struct task_struct *tsk, unsigned long * rsp)
 		if (i && ((i % 4) == 0))
 			printk("\n       ");
 		printk("%016lx ", *stack++);
+		touch_nmi_watchdog();
 	}
 	show_trace((unsigned long *)rsp);
 }
@@ -319,10 +332,12 @@ void handle_BUG(struct pt_regs *regs)
 	printk(KERN_ALERT "Kernel BUG at %.50s:%d\n", f.filename, f.line);
 } 
 
+#ifdef CONFIG_BUG
 void out_of_line_bug(void)
 { 
 	BUG(); 
 } 
+#endif
 
 static DEFINE_SPINLOCK(die_lock);
 static int die_owner = -1;
@@ -348,7 +363,6 @@ void oops_end(void)
 	die_owner = -1;
 	bust_spinlocks(0); 
 	spin_unlock(&die_lock); 
-	local_irq_enable();	/* make sure back scroll still works */
 	if (panic_on_oops)
 		panic("Oops"); 
 } 
@@ -489,24 +503,8 @@ DO_ERROR(10, SIGSEGV, "invalid TSS", invalid_TSS)
 DO_ERROR(11, SIGBUS,  "segment not present", segment_not_present)
 DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, 0)
 DO_ERROR(18, SIGSEGV, "reserved", reserved)
-
-#define DO_ERROR_STACK(trapnr, signr, str, name) \
-asmlinkage void *do_##name(struct pt_regs * regs, long error_code) \
-{ \
-	struct pt_regs *pr = ((struct pt_regs *)(current->thread.rsp0))-1; \
-	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
-							== NOTIFY_STOP) \
-		return regs; \
-	if (regs->cs & 3) { \
-		memcpy(pr, regs, sizeof(struct pt_regs)); \
-		regs = pr; \
-	} \
-	do_trap(trapnr, signr, str, regs, error_code, NULL); \
-	return regs;		\
-}
-
-DO_ERROR_STACK(12, SIGBUS,  "stack segment", stack_segment)
-DO_ERROR_STACK( 8, SIGSEGV, "double fault", double_fault)
+DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
+DO_ERROR( 8, SIGSEGV, "double fault", double_fault)
 
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
@@ -585,6 +583,8 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 	printk("Do you have a strange power saving mode enabled?\n");
 }
 
+/* Runs on IST stack. This code must keep interrupts off all the time.
+   Nested NMIs are prevented by the CPU. */
 asmlinkage void default_do_nmi(struct pt_regs *regs)
 {
 	unsigned char reason = 0;
@@ -619,15 +619,6 @@ asmlinkage void default_do_nmi(struct pt_regs *regs)
 		mem_parity_error(reason, regs);
 	if (reason & 0x40)
 		io_check_error(reason, regs);
-
-	/*
-	 * Reassert NMI in case it became active meanwhile
-	 * as it's edge-triggered.
-	 */
-	outb(0x8f, 0x70);
-	inb(0x71);		/* dummy */
-	outb(0x0f, 0x70);
-	inb(0x71);		/* dummy */
 }
 
 asmlinkage void do_int3(struct pt_regs * regs, long error_code)
@@ -639,19 +630,33 @@ asmlinkage void do_int3(struct pt_regs * regs, long error_code)
 	return;
 }
 
-/* runs on IST stack. */
-asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
+/* Help handler running on IST stack to switch back to user stack
+   for scheduling or signal handling. The actual stack switch is done in
+   entry.S */
+asmlinkage struct pt_regs *sync_regs(struct pt_regs *eregs)
 {
-	struct pt_regs *pr;
+	struct pt_regs *regs = eregs;
+	/* Did already sync */
+	if (eregs == (struct pt_regs *)eregs->rsp)
+		;
+	/* Exception from user space */
+	else if (eregs->cs & 3)
+		regs = ((struct pt_regs *)current->thread.rsp0) - 1;
+	/* Exception from kernel and interrupts are enabled. Move to
+ 	   kernel process stack. */
+	else if (eregs->eflags & X86_EFLAGS_IF)
+		regs = (struct pt_regs *)(eregs->rsp -= sizeof(struct pt_regs));
+	if (eregs != regs)
+		*regs = *eregs;
+	return regs;
+}
+
+/* runs on IST stack. */
+asmlinkage void do_debug(struct pt_regs * regs, unsigned long error_code)
+{
 	unsigned long condition;
 	struct task_struct *tsk = current;
 	siginfo_t info;
-
-	pr = (struct pt_regs *)(current->thread.rsp0)-1;
-	if (regs->cs & 3) {
-		memcpy(pr, regs, sizeof(struct pt_regs));
-		regs = pr;
-	}	
 
 #ifdef CONFIG_CHECKING
        { 
@@ -669,9 +674,9 @@ asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
 	asm("movq %%db6,%0" : "=r" (condition));
 
 	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
-						SIGTRAP) == NOTIFY_STOP) {
-		return regs;
-	}
+						SIGTRAP) == NOTIFY_STOP)
+		return;
+
 	conditional_sti(regs);
 
 	/* Mask out spurious debug traps due to lazy DR7 setting */
@@ -684,9 +689,7 @@ asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
 	tsk->thread.debugreg6 = condition;
 
 	/* Mask out spurious TF errors due to lazy TF clearing */
-	if ((condition & DR_STEP) &&
-	    (notify_die(DIE_DEBUGSTEP, "debugstep", regs, condition,
-			1, SIGTRAP) != NOTIFY_STOP)) {
+	if (condition & DR_STEP) {
 		/*
 		 * The TF error should be masked out only if the current
 		 * process is not traced and if the TRAP flag has been set
@@ -698,8 +701,14 @@ asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
 		 */
                 if ((regs->cs & 3) == 0)
                        goto clear_TF_reenable;
-		if ((tsk->ptrace & (PT_DTRACE|PT_PTRACED)) == PT_DTRACE)
-			goto clear_TF;
+		/*
+		 * Was the TF flag set by a debugger? If so, clear it now,
+		 * so that register information is correct.
+		 */
+		if (tsk->ptrace & PT_DTRACE) {
+			regs->eflags &= ~TF_MASK;
+			tsk->ptrace &= ~PT_DTRACE;
+		}
 	}
 
 	/* Ok, finally something we can handle */
@@ -715,18 +724,11 @@ asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
 	force_sig_info(SIGTRAP, &info, tsk);	
 clear_dr7:
 	asm volatile("movq %0,%%db7"::"r"(0UL));
-	notify_die(DIE_DEBUG, "debug", regs, condition, 1, SIGTRAP);
-	return regs;
+	return;
 
 clear_TF_reenable:
 	set_tsk_thread_flag(tsk, TIF_SINGLESTEP);
-
-clear_TF:
-	/* RED-PEN could cause spurious errors */
-	if (notify_die(DIE_DEBUG, "debug2", regs, condition, 1, SIGTRAP) 
-								!= NOTIFY_STOP)
 	regs->eflags &= ~TF_MASK;
-	return regs;	
 }
 
 static int kernel_math_error(struct pt_regs *regs, char *str)
@@ -738,14 +740,8 @@ static int kernel_math_error(struct pt_regs *regs, char *str)
 		return 1;
 	}
 	notify_die(DIE_GPF, str, regs, 0, 16, SIGFPE);
-#if 0
-	/* This should be a die, but warn only for now */
+	/* Illegal floating point operation in the kernel */
 	die(str, regs, 0);
-#else
-	printk(KERN_DEBUG "%s: %s at ", current->comm, str);
-	printk_address(regs->rip);
-	printk("\n");
-#endif
 	return 0;
 }
 
@@ -829,7 +825,7 @@ asmlinkage void do_simd_coprocessor_error(struct pt_regs *regs)
 
 	conditional_sti(regs);
 	if ((regs->cs & 3) == 0 &&
-        	kernel_math_error(regs, "simd math error"))
+        	kernel_math_error(regs, "kernel simd math error"))
 		return;
 
 	/*

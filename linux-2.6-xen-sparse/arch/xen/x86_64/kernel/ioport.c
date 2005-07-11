@@ -25,8 +25,7 @@
  *
  */
 
-// asmlinkage long sys_iopl(unsigned int level, struct pt_regs *regs)
-asmlinkage long sys_iopl(unsigned int new_io_pl)
+asmlinkage long sys_iopl(unsigned int new_io_pl, struct pt_regs *regs)
 {
         unsigned int old_io_pl = current->thread.io_pl;
         physdev_op_t op;
@@ -59,5 +58,5 @@ asmlinkage long sys_iopl(unsigned int new_io_pl)
  */
 asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
-  return turn_on ? sys_iopl(3) : 0;
+  return turn_on ? sys_iopl(3, NULL) : 0;
 }

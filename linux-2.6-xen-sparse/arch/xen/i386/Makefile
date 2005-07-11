@@ -14,6 +14,8 @@
 # 19990713  Artur Skawina <skawina@geocities.com>
 #           Added '-march' and '-mpreferred-stack-boundary' support
 #
+# 20050320  Kianusch Sayah Karadji <kianusch@sk-tech.net>
+#           Added support for GEODE CPU
 
 XENARCH	:= $(subst ",,$(CONFIG_XENARCH))
 
@@ -55,6 +57,9 @@ cflags-$(CONFIG_MVIAC3_2)	+= $(call cc-option,-march=c3-2,-march=i686)
 
 # AMD Elan support
 cflags-$(CONFIG_X86_ELAN)	+= -march=i486
+
+# Geode GX1 support
+cflags-$(CONFIG_MGEODEGX1)		+= $(call cc-option,-march=pentium-mmx,-march=i486)
 
 # -mregparm=3 works ok on gcc-3.0 and later
 #

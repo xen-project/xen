@@ -84,7 +84,7 @@ static inline unsigned long _get_base(char * addr)
 #define loadsegment(seg,value)			\
 	asm volatile("\n"			\
 		"1:\t"				\
-		"movl %0,%%" #seg "\n"		\
+		"mov %0,%%" #seg "\n"		\
 		"2:\n"				\
 		".section .fixup,\"ax\"\n"	\
 		"3:\t"				\
@@ -96,13 +96,13 @@ static inline unsigned long _get_base(char * addr)
 		".align 4\n\t"			\
 		".long 1b,3b\n"			\
 		".previous"			\
-		: :"m" (*(unsigned int *)&(value)))
+		: :"m" (value))
 
 /*
  * Save a segment register away
  */
 #define savesegment(seg, value) \
-	asm volatile("movl %%" #seg ",%0":"=m" (*(int *)&(value)))
+	asm volatile("mov %%" #seg ",%0":"=m" (value))
 
 /*
  * Clear and set 'TS' bit respectively
@@ -573,5 +573,7 @@ void enable_hlt(void);
 
 extern int es7000_plat;
 void cpu_idle_wait(void);
+
+extern unsigned long arch_align_stack(unsigned long sp);
 
 #endif

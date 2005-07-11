@@ -48,9 +48,13 @@ $(obj)/vsyscall.lds:
 $(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-link)) $(patsubst %.o,$(obj)/%.S,$(s-obj-y) $(s-link)):
 	@ln -fsn $(srctree)/arch/x86_64/ia32/$(notdir $@) $@
 
-$(obj)/vsyscall-int80.S: $(obj)/vsyscall-sigreturn.S
+$(obj)/vsyscall-int80.S: $(obj)/vsyscall-sigreturn.S ../../i386/kernel/vsyscall-note.S
 $(obj)/vsyscall-sysenter.S: $(obj)/vsyscall-sigreturn.S
 $(obj)/vsyscall-syscall.S: $(obj)/vsyscall-sigreturn.S
+
+../../i386/kernel/vsyscall-note.S:
+	@ln -fsn $(srctree)/arch/i386/kernel/$(notdir $@) $(srctree)/arch/xen/i386/kernel/$(notdir $@)
+	make -C arch/xen/i386/kernel vsyscall-note.S
 
 obj-y	+= $(c-obj-y) $(s-obj-y)
 

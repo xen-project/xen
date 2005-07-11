@@ -19,6 +19,9 @@
 #include <linux/cpu.h>
 #include <linux/delay.h>
 
+DEFINE_PER_CPU(irq_cpustat_t, irq_stat) ____cacheline_maxaligned_in_smp;
+EXPORT_PER_CPU_SYMBOL(irq_stat);
+
 #ifndef CONFIG_X86_LOCAL_APIC
 /*
  * 'what should we do if we get a hw irq event on an illegal vector'.
@@ -244,7 +247,7 @@ skip:
 #ifdef CONFIG_X86_LOCAL_APIC
 		seq_printf(p, "LOC: ");
 		for_each_cpu(j)
-			seq_printf(p, "%10u ", irq_stat[j].apic_timer_irqs);
+			seq_printf(p, "%10u ", per_cpu(irq_stat, j).apic_timer_irqs);
 		seq_putc(p, '\n');
 #endif
 		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));

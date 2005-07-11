@@ -99,12 +99,12 @@ extern struct cpuinfo_x86 cpu_data[];
 #endif
 
 extern	int phys_proc_id[NR_CPUS];
+extern	int cpu_core_id[NR_CPUS];
 extern char ignore_fpu_irq;
 
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void print_cpu_info(struct cpuinfo_x86 *);
 extern unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c);
-extern void dodgy_tsc(void);
 
 #ifdef CONFIG_X86_HT
 extern void detect_ht(struct cpuinfo_x86 *c);
@@ -138,7 +138,7 @@ static inline void detect_ht(struct cpuinfo_x86 *c) {}
  * clear %ecx since some cpus (Cyrix MII) do not set or clear %ecx
  * resulting in stale register contents being returned.
  */
-static inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
+static inline void cpuid(unsigned int op, unsigned int *eax, unsigned int *ebx, unsigned int *ecx, unsigned int *edx)
 {
 	__asm__("cpuid"
 		: "=a" (*eax),
@@ -146,6 +146,18 @@ static inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
 		  "=c" (*ecx),
 		  "=d" (*edx)
 		: "0" (op), "c"(0));
+}
+
+/* Some CPUID calls want 'count' to be placed in ecx */
+static inline void cpuid_count(int op, int count, int *eax, int *ebx, int *ecx,
+	       	int *edx)
+{
+	__asm__("cpuid"
+		: "=a" (*eax),
+		  "=b" (*ebx),
+		  "=c" (*ecx),
+		  "=d" (*edx)
+		: "0" (op), "c" (count));
 }
 
 /*
@@ -500,6 +512,13 @@ static inline void load_esp0(struct tss_struct *tss, struct thread_struct *threa
 	regs->eip = new_eip;					\
 	regs->esp = new_esp;					\
 } while (0)
+
+/*
+ * This special macro can be used to load a debugging register
+ */
+#define loaddebug(thread,register) \
+	HYPERVISOR_set_debugreg((register),     \
+			((thread)->debugreg[register]))
 
 /* Forward declaration, a strange C thing */
 struct task_struct;

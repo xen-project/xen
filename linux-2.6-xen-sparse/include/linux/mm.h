@@ -37,10 +37,6 @@ extern int sysctl_legacy_va_layout;
 #include <asm/processor.h>
 #include <asm/atomic.h>
 
-#ifndef MM_VM_SIZE
-#define MM_VM_SIZE(mm)	((TASK_SIZE + PGDIR_SIZE - 1) & PGDIR_MASK)
-#endif
-
 #define nth_page(page,n) pfn_to_page(page_to_pfn((page)) + (n))
 
 /*
@@ -164,7 +160,8 @@ extern unsigned int kobjsize(const void *objp);
 #define VM_ACCOUNT	0x00100000	/* Is a VM accounted object */
 #define VM_HUGETLB	0x00400000	/* Huge TLB Page VM */
 #define VM_NONLINEAR	0x00800000	/* Is non-linear (remap_file_pages) */
-#define VM_FOREIGN      0x01000000      /* Has pages belonging to another VM */
+#define VM_MAPPED_COPY	0x01000000	/* T if mapped copy of data (nommu mmap) */
+#define VM_FOREIGN	0x02000000	/* Has pages belonging to another VM */
 
 #ifndef VM_STACK_DEFAULT_FLAGS		/* arch can override this */
 #define VM_STACK_DEFAULT_FLAGS VM_DATA_DEFAULT_FLAGS
@@ -582,17 +579,19 @@ struct zap_details {
 	pgoff_t	first_index;			/* Lowest page->index to unmap */
 	pgoff_t last_index;			/* Highest page->index to unmap */
 	spinlock_t *i_mmap_lock;		/* For unmap_mapping_range: */
-	unsigned long break_addr;		/* Where unmap_vmas stopped */
 	unsigned long truncate_count;		/* Compare vm_truncate_count */
 };
 
-void zap_page_range(struct vm_area_struct *vma, unsigned long address,
+unsigned long zap_page_range(struct vm_area_struct *vma, unsigned long address,
 		unsigned long size, struct zap_details *);
-int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
+unsigned long unmap_vmas(struct mmu_gather **tlb, struct mm_struct *mm,
 		struct vm_area_struct *start_vma, unsigned long start_addr,
 		unsigned long end_addr, unsigned long *nr_accounted,
 		struct zap_details *);
-void clear_page_range(struct mmu_gather *tlb, unsigned long addr, unsigned long end);
+void free_pgd_range(struct mmu_gather **tlb, unsigned long addr,
+		unsigned long end, unsigned long floor, unsigned long ceiling);
+void free_pgtables(struct mmu_gather **tlb, struct vm_area_struct *start_vma,
+		unsigned long floor, unsigned long ceiling);
 int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 			struct vm_area_struct *vma);
 int zeromap_page_range(struct vm_area_struct *vma, unsigned long from,
@@ -639,9 +638,9 @@ extern unsigned long do_mremap(unsigned long addr,
  * These functions are passed a count `nr_to_scan' and a gfpmask.  They should
  * scan `nr_to_scan' objects, attempting to free them.
  *
- * The callback must the number of objects which remain in the cache.
+ * The callback must return the number of objects which remain in the cache.
  *
- * The callback will be passes nr_to_scan == 0 when the VM is querying the
+ * The callback will be passed nr_to_scan == 0 when the VM is querying the
  * cache size, so a fastpath for that case is appropriate.
  */
 typedef int (*shrinker_t)(int nr_to_scan, unsigned int gfp_mask);
@@ -728,6 +727,7 @@ extern void __vma_link_rb(struct mm_struct *, struct vm_area_struct *,
 extern struct vm_area_struct *copy_vma(struct vm_area_struct **,
 	unsigned long addr, unsigned long len, pgoff_t pgoff);
 extern void exit_mmap(struct mm_struct *);
+extern int may_expand_vm(struct mm_struct *mm, unsigned long npages);
 
 extern unsigned long get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 
@@ -843,7 +843,7 @@ static inline void vm_stat_unaccount(struct vm_area_struct *vma)
 }
 
 /* update per process rss and vm hiwater data */
-extern void update_mem_hiwater(void);
+extern void update_mem_hiwater(struct task_struct *tsk);
 
 #ifndef CONFIG_DEBUG_PAGEALLOC
 static inline void
@@ -860,6 +860,9 @@ int in_gate_area(struct task_struct *task, unsigned long addr);
 int in_gate_area_no_task(unsigned long addr);
 #define in_gate_area(task, addr) ({(void)task; in_gate_area_no_task(addr);})
 #endif	/* __HAVE_ARCH_GATE_AREA */
+
+/* /proc/<pid>/oom_adj set to -17 protects from the oom-killer */
+#define OOM_DISABLE -17
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

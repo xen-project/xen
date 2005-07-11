@@ -30,9 +30,9 @@
 
 static mempool_t *page_pool, *isa_page_pool;
 
-static void *page_pool_alloc(int gfp_mask, void *data)
+static void *page_pool_alloc(unsigned int __nocast gfp_mask, void *data)
 {
-	int gfp = gfp_mask | (int) (long) data;
+	unsigned int gfp = gfp_mask | (unsigned int) (long) data;
 
 	return alloc_page(gfp);
 }
@@ -90,7 +90,8 @@ static void flush_all_zero_pkmaps(void)
 		 * So no dangers, even with speculative execution.
 		 */
 		page = pte_page(pkmap_page_table[i]);
-		pte_clear(&pkmap_page_table[i]);
+		pte_clear(&init_mm, (unsigned long)page_address(page),
+			  &pkmap_page_table[i]);
 
 		set_page_address(page, NULL);
 	}
@@ -138,7 +139,8 @@ start:
 		}
 	}
 	vaddr = PKMAP_ADDR(last_pkmap_nr);
-	set_pte(&(pkmap_page_table[last_pkmap_nr]), mk_pte(page, kmap_prot));
+	set_pte_at(&init_mm, vaddr,
+		   &(pkmap_page_table[last_pkmap_nr]), mk_pte(page, kmap_prot));
 
 	pkmap_count[last_pkmap_nr] = 1;
 	set_page_address(page, (void *)vaddr);
@@ -332,6 +334,7 @@ static void bounce_end_io(struct bio *bio, mempool_t *pool, int err)
 			continue;
 
 		mempool_free(bvec->bv_page, pool);	
+		dec_page_state(nr_bounce);
 	}
 
 	bio_endio(bio_orig, bio_orig->bi_size, err);
@@ -412,6 +415,7 @@ static void __blk_queue_bounce(request_queue_t *q, struct bio **bio_orig,
 		to->bv_page = mempool_alloc(pool, q->bounce_gfp);
 		to->bv_len = from->bv_len;
 		to->bv_offset = from->bv_offset;
+		inc_page_state(nr_bounce);
 
 		if (rw == WRITE) {
 			char *vto, *vfrom;

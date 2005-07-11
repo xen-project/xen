@@ -7,7 +7,7 @@
  *		2 of the License, or (at your option) any later version.
  *
  *	Derived from the non IP parts of dev.c 1.0.19
- * 		Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
+ * 		Authors:	Ross Biro
  *				Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *				Mark Evans, <evansmp@uhura.aston.ac.uk>
  *
@@ -766,6 +766,18 @@ int dev_change_name(struct net_device *dev, char *newname)
 }
 
 /**
+ *	netdev_features_change - device changes fatures
+ *	@dev: device to cause notification
+ *
+ *	Called to indicate a device has changed features.
+ */
+void netdev_features_change(struct net_device *dev)
+{
+	notifier_call_chain(&netdev_chain, NETDEV_FEAT_CHANGE, dev);
+}
+EXPORT_SYMBOL(netdev_features_change);
+
+/**
  *	netdev_state_change - device changes state
  *	@dev: device to cause notification
  *
@@ -1219,6 +1231,19 @@ int __skb_linearize(struct sk_buff *skb, int gfp_mask)
  *	A negative errno code is returned on a failure. A success does not
  *	guarantee the frame will be transmitted as it may be dropped due
  *	to congestion or traffic shaping.
+ *
+ * -----------------------------------------------------------------------------------
+ *      I notice this method can also return errors from the queue disciplines,
+ *      including NET_XMIT_DROP, which is a positive value.  So, errors can also
+ *      be positive.
+ *
+ *      Regardless of the return value, the skb is consumed, so it is currently
+ *      difficult to retry a send to this method.  (You can bump the ref count
+ *      before sending to hold a reference for retry if you are careful.)
+ *
+ *      When calling this method, interrupts MUST be enabled.  This is because
+ *      the BH enable code must have IRQs enabled so that it will not deadlock.
+ *          --BLG
  */
 
 int dev_queue_xmit(struct sk_buff *skb)
@@ -1456,13 +1481,10 @@ int netif_rx(struct sk_buff *skb)
 	struct softnet_data *queue;
 	unsigned long flags;
 
-#ifdef CONFIG_NETPOLL
-	if (skb->dev->netpoll_rx && netpoll_rx(skb)) {
-		kfree_skb(skb);
+	/* if netpoll wants it, pretend we never saw it */
+	if (netpoll_rx(skb))
 		return NET_RX_DROP;
-	}
-#endif
-	
+
 	if (!skb->stamp.tv_sec)
 		net_timestamp(&skb->stamp);
 
@@ -1590,6 +1612,10 @@ static __inline__ int deliver_skb(struct sk_buff *skb,
 
 #if defined(CONFIG_BRIDGE) || defined (CONFIG_BRIDGE_MODULE)
 int (*br_handle_frame_hook)(struct net_bridge_port *p, struct sk_buff **pskb);
+struct net_bridge;
+struct net_bridge_fdb_entry *(*br_fdb_get_hook)(struct net_bridge *br,
+						unsigned char *addr);
+void (*br_fdb_put_hook)(struct net_bridge_fdb_entry *ent);
 
 static __inline__ int handle_bridge(struct sk_buff **pskb,
 				    struct packet_type **pt_prev, int *ret)
@@ -1658,12 +1684,9 @@ int netif_receive_skb(struct sk_buff *skb)
 	int ret = NET_RX_DROP;
 	unsigned short type;
 
-#ifdef CONFIG_NETPOLL
-	if (skb->dev->netpoll_rx && skb->dev->poll && netpoll_rx(skb)) {
-		kfree_skb(skb);
+	/* if we've gotten here through NAPI, check netpoll */
+	if (skb->dev->poll && netpoll_rx(skb))
 		return NET_RX_DROP;
-	}
-#endif
 
 	if (!skb->stamp.tv_sec)
 		net_timestamp(&skb->stamp);
@@ -1761,6 +1784,7 @@ static int process_backlog(struct net_device *backlog_dev, int *budget)
 	struct softnet_data *queue = &__get_cpu_var(softnet_data);
 	unsigned long start_time = jiffies;
 
+	backlog_dev->weight = weight_p;
 	for (;;) {
 		struct sk_buff *skb;
 		struct net_device *dev;
@@ -1821,8 +1845,10 @@ static void net_rx_action(struct softirq_action *h)
 
 		dev = list_entry(queue->poll_list.next,
 				 struct net_device, poll_list);
+		netpoll_poll_lock(dev);
 
 		if (dev->quota <= 0 || dev->poll(dev, &budget)) {
+			netpoll_poll_unlock(dev);
 			local_irq_disable();
 			list_del(&dev->poll_list);
 			list_add_tail(&dev->poll_list, &queue->poll_list);
@@ -1831,6 +1857,7 @@ static void net_rx_action(struct softirq_action *h)
 			else
 				dev->quota = dev->weight;
 		} else {
+			netpoll_poll_unlock(dev);
 			dev_put(dev);
 			local_irq_disable();
 		}
@@ -2340,6 +2367,21 @@ int dev_set_mtu(struct net_device *dev, int new_mtu)
 	return err;
 }
 
+int dev_set_mac_address(struct net_device *dev, struct sockaddr *sa)
+{
+	int err;
+
+	if (!dev->set_mac_address)
+		return -EOPNOTSUPP;
+	if (sa->sa_family != dev->type)
+		return -EINVAL;
+	if (!netif_device_present(dev))
+		return -ENODEV;
+	err = dev->set_mac_address(dev, sa);
+	if (!err)
+		notifier_call_chain(&netdev_chain, NETDEV_CHANGEADDR, dev);
+	return err;
+}
 
 /*
  *	Perform the SIOCxIFxxx calls.
@@ -2386,17 +2428,7 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 			return 0;
 
 		case SIOCSIFHWADDR:
-			if (!dev->set_mac_address)
-				return -EOPNOTSUPP;
-			if (ifr->ifr_hwaddr.sa_family != dev->type)
-				return -EINVAL;
-			if (!netif_device_present(dev))
-				return -ENODEV;
-			err = dev->set_mac_address(dev, &ifr->ifr_hwaddr);
-			if (!err)
-				notifier_call_chain(&netdev_chain,
-						    NETDEV_CHANGEADDR, dev);
-			return err;
+			return dev_set_mac_address(dev, &ifr->ifr_hwaddr);
 
 		case SIOCSIFHWBROADCAST:
 			if (ifr->ifr_hwaddr.sa_family != dev->type)
@@ -3112,7 +3144,7 @@ void free_netdev(struct net_device *dev)
 void synchronize_net(void) 
 {
 	might_sleep();
-	synchronize_kernel();
+	synchronize_rcu();
 }
 
 /**
@@ -3362,6 +3394,7 @@ EXPORT_SYMBOL(dev_set_allmulti);
 EXPORT_SYMBOL(dev_set_promiscuity);
 EXPORT_SYMBOL(dev_change_flags);
 EXPORT_SYMBOL(dev_set_mtu);
+EXPORT_SYMBOL(dev_set_mac_address);
 EXPORT_SYMBOL(free_netdev);
 EXPORT_SYMBOL(netdev_boot_setup_check);
 EXPORT_SYMBOL(netdev_set_master);
@@ -3377,9 +3410,12 @@ EXPORT_SYMBOL(unregister_netdevice);
 EXPORT_SYMBOL(unregister_netdevice_notifier);
 EXPORT_SYMBOL(net_enable_timestamp);
 EXPORT_SYMBOL(net_disable_timestamp);
+EXPORT_SYMBOL(dev_get_flags);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);
+EXPORT_SYMBOL(br_fdb_get_hook);
+EXPORT_SYMBOL(br_fdb_put_hook);
 #endif
 
 #ifdef CONFIG_KMOD

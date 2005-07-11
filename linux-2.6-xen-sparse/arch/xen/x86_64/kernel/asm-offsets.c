@@ -63,8 +63,8 @@ int main(void)
 	       offsetof (struct rt_sigframe32, uc.uc_mcontext));
 	BLANK();
 #endif
-	DEFINE(SIZEOF_PBE, sizeof(struct pbe));
 	DEFINE(pbe_address, offsetof(struct pbe, address));
 	DEFINE(pbe_orig_address, offsetof(struct pbe, orig_address));
+	DEFINE(pbe_next, offsetof(struct pbe, next));
 	return 0;
 }

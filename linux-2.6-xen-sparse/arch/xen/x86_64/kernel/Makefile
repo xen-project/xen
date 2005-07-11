@@ -38,6 +38,7 @@ c-obj-$(CONFIG_X86_IO_APIC)	+= genapic.o genapic_cluster.o genapic_flat.o
 c-obj-$(CONFIG_DUMMY_IOMMU)	+= pci-nommu.o pci-dma.o
 #obj-$(CONFIG_SWIOTLB)		+= swiotlb.o
 obj-$(CONFIG_KPROBES)		+= kprobes.o
+obj-$(CONFIG_X86_PM_TIMER)	+= pmtimer.o
 
 c-obj-$(CONFIG_MODULES)		+= module.o
 

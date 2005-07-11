@@ -2,6 +2,12 @@
  * Handle the memory map.
  * The functions here do the job until bootmem takes over.
  * $Id: e820.c,v 1.4 2002/09/19 19:25:32 ak Exp $
+ *
+ *  Getting sanitize_e820_map() in sync with i386 version by applying change:
+ *  -  Provisions for empty E820 memory regions (reported by certain BIOSes).
+ *     Alex Achenbach <xela@slit.de>, December 2002.
+ *  Venkatesh Pallipadi <venkatesh.pallipadi@intel.com>
+ *
  */
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -279,7 +285,7 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 	int chgidx, still_changing;
 	int overlap_entries;
 	int new_bios_entry;
-	int old_nr, new_nr;
+	int old_nr, new_nr, chg_nr;
 	int i;
 
 	/*
@@ -333,20 +339,24 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 	for (i=0; i < 2*old_nr; i++)
 		change_point[i] = &change_point_list[i];
 
-	/* record all known change-points (starting and ending addresses) */
+	/* record all known change-points (starting and ending addresses),
+	   omitting those that are for empty memory regions */
 	chgidx = 0;
 	for (i=0; i < old_nr; i++)	{
-		change_point[chgidx]->addr = biosmap[i].addr;
-		change_point[chgidx++]->pbios = &biosmap[i];
-		change_point[chgidx]->addr = biosmap[i].addr + biosmap[i].size;
-		change_point[chgidx++]->pbios = &biosmap[i];
+		if (biosmap[i].size != 0) {
+			change_point[chgidx]->addr = biosmap[i].addr;
+			change_point[chgidx++]->pbios = &biosmap[i];
+			change_point[chgidx]->addr = biosmap[i].addr + biosmap[i].size;
+			change_point[chgidx++]->pbios = &biosmap[i];
+		}
 	}
+	chg_nr = chgidx;
 
 	/* sort change-point list by memory addresses (low -> high) */
 	still_changing = 1;
 	while (still_changing)	{
 		still_changing = 0;
-		for (i=1; i < 2*old_nr; i++)  {
+		for (i=1; i < chg_nr; i++)  {
 			/* if <current_addr> > <last_addr>, swap */
 			/* or, if current=<start_addr> & last=<end_addr>, swap */
 			if ((change_point[i]->addr < change_point[i-1]->addr) ||
@@ -369,7 +379,7 @@ static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 	last_type = 0;		 /* start with undefined memory type */
 	last_addr = 0;		 /* start with 0 as last starting address */
 	/* loop through change-points, determining affect on the new bios map */
-	for (chgidx=0; chgidx < 2*old_nr; chgidx++)
+	for (chgidx=0; chgidx < chg_nr; chgidx++)
 	{
 		/* keep track of all overlapping bios entries */
 		if (change_point[chgidx]->addr == change_point[chgidx]->pbios->addr)
@@ -512,22 +522,67 @@ extern unsigned long xen_override_max_pfn;
 
 void __init parse_memopt(char *p, char **from) 
 { 
-	/*
-	 * mem=XXX[kKmM] limits kernel memory to XXX+1MB
-	 *
-	 * It would be more logical to count from 0 instead of from
-	 * HIGH_MEMORY, but we keep that for now for i386 compatibility. 
-	 *	
-	 * No support for custom mapping like i386.  The reason is
-	 * that we need to read the e820 map anyways to handle the
-	 * ACPI mappings in the direct map.  Also on x86-64 there
-	 * should be always a good e820 map. This is only an upper
-	 * limit, you cannot force usage of memory not in e820.
-	 *
-	 * -AK
-			 */
-	end_user_pfn = memparse(p, from) + HIGH_MEMORY;
+	end_user_pfn = memparse(p, from);
 	end_user_pfn >>= PAGE_SHIFT;	
         xen_override_max_pfn = (unsigned long) end_user_pfn;
 } 
 
+unsigned long pci_mem_start = 0xaeedbabe;
+
+/*
+ * Search for the biggest gap in the low 32 bits of the e820
+ * memory space.  We pass this space to PCI to assign MMIO resources
+ * for hotplug or unconfigured devices in.
+ * Hopefully the BIOS let enough space left.
+ */
+__init void e820_setup_gap(void)
+{
+	unsigned long gapstart, gapsize;
+	unsigned long last;
+	int i;
+	int found = 0;
+
+	last = 0x100000000ull;
+	gapstart = 0x10000000;
+	gapsize = 0x400000;
+	i = e820.nr_map;
+	while (--i >= 0) {
+		unsigned long long start = e820.map[i].addr;
+		unsigned long long end = start + e820.map[i].size;
+
+		/*
+		 * Since "last" is at most 4GB, we know we'll
+		 * fit in 32 bits if this condition is true
+		 */
+		if (last > end) {
+			unsigned long gap = last - end;
+
+			if (gap > gapsize) {
+				gapsize = gap;
+				gapstart = end;
+				found = 1;
+			}
+		}
+		if (start < last)
+			last = start;
+	}
+
+	if (!found) {
+		gapstart = (end_pfn << PAGE_SHIFT) + 1024*1024;
+		printk(KERN_ERR "PCI: Warning: Cannot find a gap in the 32bit address range\n"
+		       KERN_ERR "PCI: Unassigned devices with 32bit resource registers may break!\n");
+	}
+
+	/*
+	 * Start allocating dynamic PCI memory a bit into the gap,
+	 * aligned up to the nearest megabyte.
+	 *
+	 * Question: should we try to pad it up a bit (do something
+	 * like " + (gapsize >> 3)" in there too?). We now have the
+	 * technology.
+	 */
+	pci_mem_start = (gapstart + 0xfffff) & ~0xfffff;
+
+	printk(KERN_INFO "Allocating PCI resources starting at %lx (gap: %lx:%lx)\n",
+		pci_mem_start, gapstart, gapsize);
+}

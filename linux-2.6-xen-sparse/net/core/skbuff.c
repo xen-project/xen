@@ -86,8 +86,10 @@ static kmem_cache_t *skbuff_head_cache;
  */
 void skb_over_panic(struct sk_buff *skb, int sz, void *here)
 {
-	printk(KERN_INFO "skput:over: %p:%d put:%d dev:%s",
-		here, skb->len, sz, skb->dev ? skb->dev->name : "<NULL>");
+	printk(KERN_EMERG "skb_over_panic: text:%p len:%d put:%d head:%p "
+	                  "data:%p tail:%p end:%p dev:%s\n",
+	       here, skb->len, sz, skb->head, skb->data, skb->tail, skb->end,
+	       skb->dev ? skb->dev->name : "<NULL>");
 	BUG();
 }
 
@@ -102,8 +104,10 @@ void skb_over_panic(struct sk_buff *skb, int sz, void *here)
 
 void skb_under_panic(struct sk_buff *skb, int sz, void *here)
 {
-	printk(KERN_INFO "skput:under: %p:%d put:%d dev:%s",
-               here, skb->len, sz, skb->dev ? skb->dev->name : "<NULL>");
+	printk(KERN_EMERG "skb_under_panic: text:%p len:%d put:%d head:%p "
+	                  "data:%p tail:%p end:%p dev:%s\n",
+	       here, skb->len, sz, skb->head, skb->data, skb->tail, skb->end,
+	       skb->dev ? skb->dev->name : "<NULL>");
 	BUG();
 }
 
@@ -241,7 +245,8 @@ static void skb_clone_fraglist(struct sk_buff *skb)
 void skb_release_data(struct sk_buff *skb)
 {
 	if (!skb->cloned ||
-	    atomic_dec_and_test(&(skb_shinfo(skb)->dataref))) {
+	    !atomic_sub_return(skb->nohdr ? (1 << SKB_DATAREF_SHIFT) + 1 : 1,
+			       &skb_shinfo(skb)->dataref)) {
 		if (skb_shinfo(skb)->nr_frags) {
 			int i;
 			for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
@@ -275,20 +280,14 @@ void kfree_skbmem(struct sk_buff *skb)
 
 void __kfree_skb(struct sk_buff *skb)
 {
-	if (skb->list) {
-	 	printk(KERN_WARNING "Warning: kfree_skb passed an skb still "
-		       "on a list (from %p).\n", NET_CALLER(skb));
-		BUG();
-	}
+	BUG_ON(skb->list != NULL);
 
 	dst_release(skb->dst);
 #ifdef CONFIG_XFRM
 	secpath_put(skb->sp);
 #endif
-	if(skb->destructor) {
-		if (in_irq())
-			printk(KERN_WARNING "Warning: kfree_skb on "
-					    "hard IRQ %p\n", NET_CALLER(skb));
+	if (skb->destructor) {
+		WARN_ON(in_irq());
 		skb->destructor(skb);
 	}
 #ifdef CONFIG_NETFILTER
@@ -353,6 +352,7 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	C(csum);
 	C(local_df);
 	n->cloned = 1;
+	n->nohdr = 0;
 	C(proto_csum_valid);
 	C(proto_csum_blank);
 	C(pkt_type);
@@ -606,6 +606,7 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail, int gfp_mask)
 	skb->h.raw   += off;
 	skb->nh.raw  += off;
 	skb->cloned   = 0;
+	skb->nohdr    = 0;
 	atomic_set(&skb_shinfo(skb)->dataref, 1);
 	return 0;
 
@@ -984,69 +985,93 @@ fault:
 	return -EFAULT;
 }
 
-/* Keep iterating until skb_iter_next returns false. */
-void skb_iter_first(const struct sk_buff *skb, struct skb_iter *i)
-{
-	i->len = skb_headlen(skb);
-	i->data = (unsigned char *)skb->data;
-	i->nextfrag = 0;
-	i->fraglist = NULL;
-}
+/**
+ *	skb_store_bits - store bits from kernel buffer to skb
+ *	@skb: destination buffer
+ *	@offset: offset in destination
+ *	@from: source buffer
+ *	@len: number of bytes to copy
+ *
+ *	Copy the specified number of bytes from the source buffer to the
+ *	destination skb.  This function handles all the messy bits of
+ *	traversing fragment lists and such.
+ */
 
-int skb_iter_next(const struct sk_buff *skb, struct skb_iter *i)
+int skb_store_bits(const struct sk_buff *skb, int offset, void *from, int len)
 {
-	/* Unmap previous, if not head fragment. */
-	if (i->nextfrag)
-		kunmap_skb_frag(i->data);
+	int i, copy;
+	int start = skb_headlen(skb);
 
-	if (i->fraglist) {
-	fraglist:
-		/* We're iterating through fraglist. */
-		if (i->nextfrag < skb_shinfo(i->fraglist)->nr_frags) {
-			i->data = kmap_skb_frag(&skb_shinfo(i->fraglist)
-						->frags[i->nextfrag]);
-			i->len = skb_shinfo(i->fraglist)->frags[i->nextfrag]
-				.size;
-			i->nextfrag++;
-			return 1;
+	if (offset > (int)skb->len - len)
+		goto fault;
+
+	if ((copy = start - offset) > 0) {
+		if (copy > len)
+			copy = len;
+		memcpy(skb->data + offset, from, copy);
+		if ((len -= copy) == 0)
+			return 0;
+		offset += copy;
+		from += copy;
+	}
+
+	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
+		int end;
+
+		BUG_TRAP(start <= offset + len);
+
+		end = start + frag->size;
+		if ((copy = end - offset) > 0) {
+			u8 *vaddr;
+
+			if (copy > len)
+				copy = len;
+
+			vaddr = kmap_skb_frag(frag);
+			memcpy(vaddr + frag->page_offset + offset - start,
+			       from, copy);
+			kunmap_skb_frag(vaddr);
+
+			if ((len -= copy) == 0)
+				return 0;
+			offset += copy;
+			from += copy;
 		}
-		/* Fragments with fragments?  Too hard! */
-		BUG_ON(skb_shinfo(i->fraglist)->frag_list);
-		i->fraglist = i->fraglist->next;
-		if (!i->fraglist)
-			goto end;
-
-		i->len = skb_headlen(i->fraglist);
-		i->data = i->fraglist->data;
-		i->nextfrag = 0;
-		return 1;
+		start = end;
 	}
 
-	if (i->nextfrag < skb_shinfo(skb)->nr_frags) {
-		i->data = kmap_skb_frag(&skb_shinfo(skb)->frags[i->nextfrag]);
-		i->len = skb_shinfo(skb)->frags[i->nextfrag].size;
-		i->nextfrag++;
-		return 1;
+	if (skb_shinfo(skb)->frag_list) {
+		struct sk_buff *list = skb_shinfo(skb)->frag_list;
+
+		for (; list; list = list->next) {
+			int end;
+
+			BUG_TRAP(start <= offset + len);
+
+			end = start + list->len;
+			if ((copy = end - offset) > 0) {
+				if (copy > len)
+					copy = len;
+				if (skb_store_bits(list, offset - start,
+						   from, copy))
+					goto fault;
+				if ((len -= copy) == 0)
+					return 0;
+				offset += copy;
+				from += copy;
+			}
+			start = end;
+		}
 	}
+	if (!len)
+		return 0;
 
-	i->fraglist = skb_shinfo(skb)->frag_list;
-	if (i->fraglist)
-		goto fraglist;
-
-end:
-	/* Bug trap for callers */
-	i->data = NULL;
-	return 0;
+fault:
+	return -EFAULT;
 }
 
-void skb_iter_abort(const struct sk_buff *skb, struct skb_iter *i)
-{
-	/* Unmap previous, if not head fragment. */
-	if (i->data && i->nextfrag)
-		kunmap_skb_frag(i->data);
-	/* Bug trap for callers */
-	i->data = NULL;
-}
+EXPORT_SYMBOL(skb_store_bits);
 
 /* Checksum skb data. */
 
@@ -1446,7 +1471,7 @@ static inline void skb_split_no_header(struct sk_buff *skb,
 
 			if (pos < len) {
 				/* Split frag.
-				 * We have to variants in this case:
+				 * We have two variants in this case:
 				 * 1. Move all the frag to the second
 				 *    part, if it is possible. F.e.
 				 *    this approach is mandatory for TUX,
@@ -1469,6 +1494,9 @@ static inline void skb_split_no_header(struct sk_buff *skb,
 
 /**
  * skb_split - Split fragmented skb to two parts at length len.
+ * @skb: the buffer to split
+ * @skb1: the buffer to receive the second part
+ * @len: new length for skb
  */
 void skb_split(struct sk_buff *skb, struct sk_buff *skb1, const u32 len)
 {
@@ -1518,6 +1546,3 @@ EXPORT_SYMBOL(skb_queue_tail);
 EXPORT_SYMBOL(skb_unlink);
 EXPORT_SYMBOL(skb_append);
 EXPORT_SYMBOL(skb_split);
-EXPORT_SYMBOL(skb_iter_first);
-EXPORT_SYMBOL(skb_iter_next);
-EXPORT_SYMBOL(skb_iter_abort);

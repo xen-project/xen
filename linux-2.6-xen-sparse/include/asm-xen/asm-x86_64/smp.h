@@ -31,12 +31,16 @@ extern int disable_apic;
 
 struct pt_regs;
 
+extern cpumask_t cpu_present_mask;
+extern cpumask_t cpu_possible_map;
+extern cpumask_t cpu_online_map;
+extern cpumask_t cpu_callout_map;
+
 /*
  * Private routines/data
  */
  
 extern void smp_alloc_memory(void);
-extern cpumask_t cpu_online_map;
 extern volatile unsigned long smp_invalidate_needed;
 extern int pic_mode;
 extern int smp_num_siblings;
@@ -44,11 +48,12 @@ extern void smp_flush_tlb(void);
 extern void smp_message_irq(int cpl, void *dev_id, struct pt_regs *regs);
 extern void smp_send_reschedule(int cpu);
 extern void smp_invalidate_rcv(void);		/* Process an NMI */
-extern void (*mtrr_hook) (void);
 extern void zap_low_mappings(void);
 void smp_stop_cpu(void);
 extern cpumask_t cpu_sibling_map[NR_CPUS];
+extern cpumask_t cpu_core_map[NR_CPUS];
 extern u8 phys_proc_id[NR_CPUS];
+extern u8 cpu_core_id[NR_CPUS];
 
 #define SMP_TRAMPOLINE_BASE 0x6000
 
@@ -57,10 +62,6 @@ extern u8 phys_proc_id[NR_CPUS];
  * This simplifies scheduling and IPI sending and
  * compresses data structures.
  */
-
-extern cpumask_t cpu_callout_map;
-extern cpumask_t cpu_callin_map;
-#define cpu_possible_map cpu_callout_map
 
 static inline int num_booting_cpus(void)
 {
@@ -77,7 +78,7 @@ extern __inline int hard_smp_processor_id(void)
 }
 #endif
 
-#define safe_smp_processor_id() (disable_apic ? 0 : x86_apicid_to_cpu(hard_smp_processor_id()))
+extern int safe_smp_processor_id(void);
 
 #endif /* !ASSEMBLY */
 
@@ -97,22 +98,6 @@ extern u8 bios_cpu_apicid[];
 static inline unsigned int cpu_mask_to_apicid(cpumask_t cpumask)
 {
 	return cpus_addr(cpumask)[0];
-}
-
-static inline int x86_apicid_to_cpu(u8 apicid)
-{
-	int i;
-
-	for (i = 0; i < NR_CPUS; ++i)
-		if (x86_cpu_to_apicid[i] == apicid)
-			return i;
-
-	/* No entries in x86_cpu_to_apicid?  Either no MPS|ACPI,
-	 * or called too early.  Either way, we must be CPU 0. */
-      	if (x86_cpu_to_apicid[0] == BAD_APICID)
-		return 0;
-
-	return -1;
 }
 
 static inline int cpu_present_to_apicid(int mps_cpu)

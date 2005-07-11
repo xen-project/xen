@@ -39,6 +39,8 @@
 
 	.text
 	.code64
+	.globl startup_64
+startup_64:
 ENTRY(_start)
         cld                
 	movq init_rsp(%rip),%rsp
@@ -136,9 +138,8 @@ ENTRY(cpu_gdt_table)
 	.quad	0x00affa000000ffff	/* __USER_CS */
 	.quad	0x00cffa000000ffff	/* __KERNEL32_CS */        
 	.quad	0,0			/* TSS */
-	.quad	0			/* LDT */
+	.quad	0,0			/* LDT */
 	.quad   0,0,0			/* three TLS descriptors */ 
-	.quad	0			/* unused now */
 
 gdt_end:	
 	/* asm/segment.h:GDT_ENTRIES must match this */	
@@ -184,12 +185,6 @@ gdt:
 	.endr
 #endif
 
-ENTRY(gdt_table32)
-	.quad	0x0000000000000000	/* This one is magic */
-	.quad	0x0000000000000000	/* unused */
-	.quad	0x00af9a000000ffff	/* __KERNEL_CS */
-gdt32_end:	
-	
 /* We need valid kernel segments for data and code in long mode too
  * IRET will check the segment types  kkeil 2000/10/28
  * Also sysret mandates a special GDT layout 

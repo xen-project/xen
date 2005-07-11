@@ -132,7 +132,7 @@ extern inline void pgd_clear (pgd_t * pgd)
  * each domain will have separate page tables, with their own versions of
  * accessed & dirty state.
  */
-static inline pte_t ptep_get_and_clear(pte_t *xp)
+static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *xp)
 {
         pte_t pte = *xp;
         if (pte.pte)
@@ -150,7 +150,7 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
 #define PGDIR_MASK      (~(PGDIR_SIZE-1))
 
 #define USER_PTRS_PER_PGD       (TASK_SIZE/PGDIR_SIZE)
-#define FIRST_USER_PGD_NR       0
+#define FIRST_USER_ADDRESS	0
 
 #ifndef __ASSEMBLY__
 #define MAXMEM           0x3fffffffffffUL
@@ -262,10 +262,11 @@ static inline unsigned long pud_bad(pud_t pud)
        val &= ~(_PAGE_USER | _PAGE_DIRTY); 
        return val & ~(_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED);      
 } 
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
 
 #define pte_none(x)	(!(x).pte)
 #define pte_present(x)	((x).pte & (_PAGE_PRESENT | _PAGE_PROTNONE))
-#define pte_clear(xp)	do { set_pte(xp, __pte(0)); } while (0)
+#define pte_clear(mm,addr,xp)	do { set_pte_at(mm, addr, xp, __pte(0)); } while (0)
 
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
 
@@ -339,7 +340,9 @@ extern inline pte_t pte_mkdirty(pte_t pte)	{ __pte_val(pte) |= _PAGE_DIRTY; retu
 extern inline pte_t pte_mkyoung(pte_t pte)	{ __pte_val(pte) |= _PAGE_ACCESSED; return pte; }
 extern inline pte_t pte_mkwrite(pte_t pte)	{ __pte_val(pte) |= _PAGE_RW; return pte; }
 
-static inline int ptep_test_and_clear_dirty(pte_t *ptep)
+struct vm_area_struct;
+
+static inline int ptep_test_and_clear_dirty(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
 {
 	pte_t pte = *ptep;
 	int ret = pte_dirty(pte);
@@ -348,7 +351,7 @@ static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 	return ret;
 }
 
-static inline int ptep_test_and_clear_young(pte_t *ptep)
+static inline int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
 {
 	pte_t pte = *ptep;
 	int ret = pte_young(pte);
@@ -357,17 +360,11 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 	return ret;
 }
 
-static inline void ptep_set_wrprotect(pte_t *ptep)
+static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	pte_t pte = *ptep;
 	if (pte_write(pte))
 		set_pte(ptep, pte_wrprotect(pte));
-}
-static inline void ptep_mkdirty(pte_t *ptep)
-{
-	pte_t pte = *ptep;
-	if (!pte_dirty(pte))
-		xen_l1_entry_update(ptep, pte_mkdirty(pte).pte);
 }
 
 /*
@@ -517,6 +514,13 @@ int __direct_remap_area_pages(struct mm_struct *mm,
 #define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
 		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
 
+#define io_remap_pfn_range(vma, vaddr, pfn, size, prot)		\
+		remap_pfn_range(vma, vaddr, pfn, size, prot)
+
+#define MK_IOSPACE_PFN(space, pfn)	(pfn)
+#define GET_IOSPACE(pfn)		0
+#define GET_PFN(pfn)			(pfn)
+
 #define HAVE_ARCH_UNMAPPED_AREA
 
 #define pgtable_cache_init()   do { } while (0)
@@ -534,7 +538,6 @@ int __direct_remap_area_pages(struct mm_struct *mm,
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
-#define __HAVE_ARCH_PTEP_MKDIRTY
 #define __HAVE_ARCH_PTE_SAME
 #include <asm-generic/pgtable.h>
 

@@ -22,6 +22,9 @@
 DEFINE_PER_CPU(struct desc_struct, cpu_gdt_table[GDT_ENTRIES]);
 EXPORT_PER_CPU_SYMBOL(cpu_gdt_table);
 
+DEFINE_PER_CPU(unsigned char, cpu_16bit_stack[CPU_16BIT_STACK_SIZE]);
+EXPORT_PER_CPU_SYMBOL(cpu_16bit_stack);
+
 static int cachesize_override __initdata = -1;
 static int disable_x86_fxsr __initdata = 0;
 static int disable_x86_serial_nr __initdata = 1;
@@ -202,7 +205,7 @@ static inline int flag_is_changeable_p(u32 flag)
 
 
 /* Probe for the CPUID instruction */
-int __init have_cpuid_p(void)
+static int __init have_cpuid_p(void)
 {
 	return flag_is_changeable_p(X86_EFLAGS_ID);
 }
@@ -210,7 +213,7 @@ int __init have_cpuid_p(void)
 /* Do minimum CPU detection early.
    Fields really needed: vendor, cpuid_level, family, model, mask, cache alignment.
    The others are not touched to avoid unwanted side effects. */
-void __init early_cpu_detect(void)
+static void __init early_cpu_detect(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
 
@@ -243,6 +246,10 @@ void __init early_cpu_detect(void)
 	}
 
 	early_intel_workaround(c);
+
+#ifdef CONFIG_X86_HT
+	phys_proc_id[smp_processor_id()] = (cpuid_ebx(1) >> 24) & 0xff;
+#endif
 }
 
 void __init generic_identify(struct cpuinfo_x86 * c)
@@ -431,25 +438,15 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	mcheck_init(c);
 #endif
 }
-/*
- *	Perform early boot up checks for a valid TSC. See arch/i386/kernel/time.c
- */
- 
-void __init dodgy_tsc(void)
-{
-	if (( boot_cpu_data.x86_vendor == X86_VENDOR_CYRIX ) ||
-	    ( boot_cpu_data.x86_vendor == X86_VENDOR_NSC   ))
-		cpu_devs[X86_VENDOR_CYRIX]->c_init(&boot_cpu_data);
-}
 
 #ifdef CONFIG_X86_HT
 void __init detect_ht(struct cpuinfo_x86 *c)
 {
 	u32 	eax, ebx, ecx, edx;
-	int 	index_lsb, index_msb, tmp;
+	int 	index_msb, tmp;
 	int 	cpu = smp_processor_id();
 
-	if (!cpu_has(c, X86_FEATURE_HT))
+	if (!cpu_has(c, X86_FEATURE_HT) || cpu_has(c, X86_FEATURE_CMP_LEGACY))
 		return;
 
 	cpuid(1, &eax, &ebx, &ecx, &edx);
@@ -458,7 +455,6 @@ void __init detect_ht(struct cpuinfo_x86 *c)
 	if (smp_num_siblings == 1) {
 		printk(KERN_INFO  "CPU: Hyper-Threading is disabled\n");
 	} else if (smp_num_siblings > 1 ) {
-		index_lsb = 0;
 		index_msb = 31;
 
 		if (smp_num_siblings > NR_CPUS) {
@@ -467,21 +463,34 @@ void __init detect_ht(struct cpuinfo_x86 *c)
 			return;
 		}
 		tmp = smp_num_siblings;
-		while ((tmp & 1) == 0) {
-			tmp >>=1 ;
-			index_lsb++;
-		}
-		tmp = smp_num_siblings;
 		while ((tmp & 0x80000000 ) == 0) {
 			tmp <<=1 ;
 			index_msb--;
 		}
-		if (index_lsb != index_msb )
+		if (smp_num_siblings & (smp_num_siblings - 1))
 			index_msb++;
 		phys_proc_id[cpu] = phys_pkg_id((ebx >> 24) & 0xFF, index_msb);
 
 		printk(KERN_INFO  "CPU: Physical Processor ID: %d\n",
 		       phys_proc_id[cpu]);
+
+		smp_num_siblings = smp_num_siblings / c->x86_num_cores;
+
+		tmp = smp_num_siblings;
+		index_msb = 31;
+		while ((tmp & 0x80000000) == 0) {
+			tmp <<=1 ;
+			index_msb--;
+		}
+
+		if (smp_num_siblings & (smp_num_siblings - 1))
+			index_msb++;
+
+		cpu_core_id[cpu] = phys_pkg_id((ebx >> 24) & 0xFF, index_msb);
+
+		if (c->x86_num_cores > 1)
+			printk(KERN_INFO  "CPU: Processor Core ID: %d\n",
+			       cpu_core_id[cpu]);
 	}
 }
 #endif
@@ -528,7 +537,6 @@ extern int transmeta_init_cpu(void);
 extern int rise_init_cpu(void);
 extern int nexgen_init_cpu(void);
 extern int umc_init_cpu(void);
-void early_cpu_detect(void);
 
 void __init early_cpu_init(void)
 {
