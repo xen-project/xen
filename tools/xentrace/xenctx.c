@@ -90,7 +90,7 @@ void dump_ctx(u32 domid, u32 vcpu)
 
     ret = xc_domain_get_vcpu_context(xc_handle, domid, vcpu, &ctx);
     if (ret != 0) {
-        perror("xc_domain_getfullinfo");
+        perror("xc_domain_get_vcpu_context");
         exit(-1);
     }
     print_ctx(&ctx);

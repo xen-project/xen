@@ -14,7 +14,7 @@ CFLAGS  += -I $(XEN_LIBXC)
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
 
-BIN      = xentrace xenctx
+BIN      = xentrace
 SCRIPTS  = xentrace_format
 MAN1     = $(wildcard *.1)
 MAN8     = $(wildcard *.8)
