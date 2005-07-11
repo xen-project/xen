@@ -84,7 +84,7 @@ CONFIG_X86_GOOD_APIC=y
 # CONFIG_HPET_TIMER is not set
 # CONFIG_SMP is not set
 # CONFIG_PREEMPT is not set
-# CONFIG_MICROCODE is not set
+CONFIG_MICROCODE=y
 # CONFIG_X86_CPUID is not set
 # CONFIG_NUMA is not set
 # CONFIG_MTRR is not set
