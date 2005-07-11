@@ -2,6 +2,7 @@
 OS           = linux
 
 LINUX_SERIES = 2.4
+LINUX_VER    = 2.4.30
 
 EXTRAVERSION = xenU
 
@@ -19,11 +20,11 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 	fi
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(DESTDIR) install
 
-$(LINUX_DIR)/include/linux/autoconf.h: ref-linux-$(LINUX_VER)/.valid-ref
+$(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
 	rm -rf $(LINUX_DIR)
 	cp -al $(<D) $(LINUX_DIR)
 	# Apply arch-xen patches
-	( cd linux-$(LINUX_VER)-xen-sparse ; \
+	( cd linux-$(LINUX_SERIES)-xen-sparse ; \
           ./mkbuildtree ../$(LINUX_DIR) )
 	# Re-use config from install dir if one exits else use default config
 	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
