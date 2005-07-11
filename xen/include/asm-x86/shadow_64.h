@@ -485,8 +485,8 @@ static inline int guest_page_fault(struct vcpu *v,
 static inline unsigned long gva_to_gpa(unsigned long gva)
 {
     struct vcpu *v = current;
-    pgentry_64_t gl1e;
-    pgentry_64_t gl2e;
+    pgentry_64_t gl1e = {0};
+    pgentry_64_t gl2e = {0};
     unsigned long gpa;
 
     if (guest_page_fault(v, gva, 0, &gl2e, &gl1e))

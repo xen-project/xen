@@ -2623,7 +2623,7 @@ static void shadow_set_l1e_64(unsigned long va, pgentry_64_t *sl1e_p,
     struct vcpu *v = current;
     struct domain *d = v->domain;
     pgentry_64_t sle;
-    pgentry_64_t sle_up;
+    pgentry_64_t sle_up = {0};
     l1_pgentry_t old_spte;
     l1_pgentry_t sl1e = *(l1_pgentry_t *)sl1e_p;
     int i;
