@@ -46,6 +46,7 @@ nics=0
 # and MODE is r for read-only, w for read-write.
 
 #disk = [ 'phy:hda1,hda1,r' ]
+disk = [ 'file:/var/images/min-el3-i386.img,hda,w' ]
 
 #----------------------------------------------------------------------------
 # Set the kernel command line for the new domain.
@@ -96,10 +97,6 @@ memmap = '/usr/lib/xen/boot/mem-map.sxp'
 
 #-----------------------------------------------------------------------------
 # Disk image for 
-hda='/var/images/min-el3-i386.img'
-#hdb=
-#hdc=
-#hdd=
 #cdrom=
 
 #-----------------------------------------------------------------------------

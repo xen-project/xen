@@ -254,22 +254,6 @@ gopts.var('device_model', val='FILE',
           fn=set_value, default='',
           use="Path to device model program.")
 
-gopts.var('hda', val='FILE',
-          fn=set_value, default='',
-          use="Path to hda")
-
-gopts.var('hdb', val='FILE',
-          fn=set_value, default='',
-          use="Path to hdb")
-
-gopts.var('hdc', val='FILE',
-          fn=set_value, default='',
-          use="Path to hdc")
-
-gopts.var('hdd', val='FILE',
-          fn=set_value, default='',
-          use="Path to hdd")
-
 gopts.var('fda', val='FILE',
           fn=set_value, default='',
           use="Path to fda")
@@ -442,11 +426,12 @@ def configure_vfr(opts, config, vals):
 def configure_vmx(opts, config_devs, vals):
     """Create the config for VMX devices.
     """
-    args = [ 'memmap', 'device_model', 'hda', 'hdb', 'hdc', 'hdd', 'cdrom',
+    args = [ 'memmap', 'device_model', 'cdrom',
  	     'boot', 'fda', 'fdb', 'localtime', 'serial', 'macaddr', 'stdvga', 
-             'isa', 'nographic', 'vnc', 'sdl', 'display']	 
+             'isa', 'nographic', 'vnc', 'sdl', 'display']	  
     for a in args:
-    	config_devs.append([a, vals.__dict__[a]])
+	if (vals.__dict__[a]):
+    	    config_devs.append([a, vals.__dict__[a]])
 
 def run_bootloader(opts, config, vals):
     if not os.access(vals.bootloader, os.X_OK):
@@ -604,7 +589,7 @@ def preprocess_vnc(opts, vals):
     """If vnc was specified, spawn a vncviewer in listen mode
     and pass its address to the domain on the kernel command line.
     """
-    if not vals.vnc: return
+    if not vals.vnc or vals.dryrun: return
     vnc_display = choose_vnc_display()
     if not vnc_display:
         opts.warn("No free vnc display")
@@ -678,8 +663,6 @@ def main(argv):
         config = opts.vals.config
     else:
         opts.load_defconfig()
-        if opts.vals.dryrun:
-	    opts.vals.vnc = 0
         preprocess(opts, opts.vals)
         if not opts.getopt('name') and opts.getopt('defconfig'):
             opts.setopt('name', os.path.basename(opts.getopt('defconfig')))
