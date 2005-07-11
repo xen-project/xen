@@ -1445,12 +1445,9 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
 	    if (idtv_info_field & 0x800) { /* valid error code */
 		unsigned long error_code;
-		printk("VMX exit %x: %x/%lx\n",
-			exit_reason, idtv_info_field, error_code);
 		__vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
 		__vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
-	    } else
-	    	printk("VMX exit %x: %x\n", exit_reason, idtv_info_field);
+	    } 
 	}
         VMX_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
     }
