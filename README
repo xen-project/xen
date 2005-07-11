@@ -108,12 +108,12 @@ On Linux:
     # make world
     # make install
 
-   This will create the directories linux-2.6.11-dom0/ and
-   linux-2.6.11-domU/ after first cleaning everything. It will
+   This will create the directories linux-2.6-xen0/ and
+   linux-2.6-xenU/ after first cleaning everything. It will
    create and install into the dist/ directory which is the
    default install location. It will build the xen binary
-   (xen.gz), the boot images for dom0 and an unpriviledged
-   guest kernel (vmlinuz-2.6.11-xen0 and vmlinuz-2.6.11-xenU
+   (xen.gz), the boot images for dom0 and an unprivileged
+   guest kernel (vmlinuz-2.6.x-xen0 and vmlinuz-2.6.x-xenU
    respectively), the tools and the documentation.
 
 4. To rebuild an existing tree without modifying the config:
@@ -124,13 +124,13 @@ On Linux:
 
 5. To rebuild a kernel with a modified config:
 
-    # cd linux-2.6.11-xen0         # or linux-2.6.11-xenU
+    # cd linux-2.6-xen0            # or linux-2.6-xenU
     # make ARCH=xen menuconfig     # or xconfig
     # cd ..
     # make dist
     # make install
 
-   You can copy your own config into linux-2.6.11-xen0 first.
+   You can copy your own config into linux-2.6-xen0 first.
    Alternatively, you can also copy your config file to
    dist/install/boot/config-$version-xen0/U.  This is picked up
    when a make dist is done. Include the ARCH=xen directive for
