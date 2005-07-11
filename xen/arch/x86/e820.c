@@ -320,24 +320,27 @@ static unsigned long __init find_max_pfn(void)
 #ifdef __i386__
 static void __init clip_4gb(void)
 {
+    unsigned long long limit = (1ULL << 30) * MACHPHYS_MBYTES;
     int i;
 
-    /* 32-bit systems restricted to a 4GB physical memory map. */
+    /* 32-bit systems restricted to a 4GB physical memory map,
+     * with PAE to 16 GB (with current memory layout) */
     for ( i = 0; i < e820.nr_map; i++ )
     {
-        if ( (e820.map[i].addr + e820.map[i].size) <= 0x100000000ULL )
+        if ( (e820.map[i].addr + e820.map[i].size) <= limit )
             continue;
-        printk("WARNING: Only the first 4GB of the physical memory map "
+        printk("WARNING: Only the first %d GB of the physical memory map "
                "can be accessed\n"
                "         by Xen in 32-bit mode. "
-               "Truncating the memory map...\n");
-        if ( e820.map[i].addr >= 0x100000000ULL )
+               "Truncating the memory map...\n",
+	       MACHPHYS_MBYTES);
+        if ( e820.map[i].addr >= limit )
         {
             e820.nr_map = i;
         }
         else
         {
-            e820.map[i].size = 0x100000000ULL - e820.map[i].addr;
+            e820.map[i].size = limit - e820.map[i].addr;
             e820.nr_map = i + 1;                
         }            
     }
