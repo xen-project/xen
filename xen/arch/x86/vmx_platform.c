@@ -653,8 +653,11 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 
     init_instruction(&mmio_inst);
     
-    if (vmx_decode(inst, &mmio_inst) == DECODE_failure)
+    if (vmx_decode(inst, &mmio_inst) == DECODE_failure) {
+        printk("vmx decode failure: eip=%lx, va=%lx\n %x %x %x %x\n", eip, va, 
+               inst[0], inst[1], inst[2], inst[3]);
         domain_crash_synchronous();
+    }
 
     __vmwrite(GUEST_RIP, eip + inst_len);
     store_cpu_user_regs(inst_decoder_regs);
