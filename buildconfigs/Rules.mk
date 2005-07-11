@@ -17,7 +17,6 @@ vpath pristine-% $(PRISTINE_SRC_PATH)
 
 # Expand Linux series to Linux version
 LINUX_SERIES	?= 2.6
-LINUX_VER	?= $(patsubst linux-%-xen-sparse,%,$(wildcard linux-$(LINUX_SERIES)*-xen-sparse))
 
 # Setup Linux search path
 LINUX_SRC_PATH	?= .:..
@@ -52,7 +51,7 @@ else
 OS_VER = $(NETBSD_VER)
 endif
 
-$(patsubst %,pristine-%/.valid-pristine,$(ALLSPARSETREES)) : pristine-%/.valid-pristine: %.tar.bz2
+pristine-%/.valid-pristine: %.tar.bz2
 	rm -rf tmp-pristine-$* $(@D)
 	mkdir -p tmp-pristine-$*
 	touch tmp-pristine-$*/.bk_skip
