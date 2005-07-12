@@ -21,68 +21,21 @@ void *dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle
 void dma_free_coherent(struct device *dev, size_t size, void *vaddr,
 			 dma_addr_t dma_handle);
 
-#ifdef CONFIG_GART_IOMMU
-
 extern dma_addr_t dma_map_single(struct device *hwdev, void *ptr, size_t size,
 				 int direction);
 extern void dma_unmap_single(struct device *dev, dma_addr_t addr,size_t size,
 			     int direction);
 
-#else
-
-/* No IOMMU */
-
-static inline dma_addr_t dma_map_single(struct device *hwdev, void *ptr,
-					size_t size, int direction)
-{
-	dma_addr_t addr;
-
-	if (direction == DMA_NONE)
-		out_of_line_bug();
-	addr = virt_to_machine(ptr);
-
-	if ((addr+size) & ~*hwdev->dma_mask)
-		out_of_line_bug();
-	return addr;
-}
-
-static inline void dma_unmap_single(struct device *hwdev, dma_addr_t dma_addr,
-				    size_t size, int direction)
-{
-	if (direction == DMA_NONE)
-		out_of_line_bug();
-	/* Nothing to do */
-}
-#endif
-
 #define dma_map_page(dev,page,offset,size,dir) \
 	dma_map_single((dev), page_address(page)+(offset), (size), (dir))
 
-static inline void dma_sync_single_for_cpu(struct device *hwdev,
-					       dma_addr_t dma_handle,
-					       size_t size, int direction)
-{
-	if (direction == DMA_NONE)
-		out_of_line_bug();
+extern void
+dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
+			int direction);
 
-	if (swiotlb)
-		return swiotlb_sync_single_for_cpu(hwdev,dma_handle,size,direction);
-
-	flush_write_buffers();
-}
-
-static inline void dma_sync_single_for_device(struct device *hwdev,
-						  dma_addr_t dma_handle,
-						  size_t size, int direction)
-{
-        if (direction == DMA_NONE)
-		out_of_line_bug();
-
-	if (swiotlb)
-		return swiotlb_sync_single_for_device(hwdev,dma_handle,size,direction);
-
-	flush_write_buffers();
-}
+extern void
+dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t size,
+                           int direction);
 
 static inline void dma_sync_sg_for_cpu(struct device *hwdev,
 				       struct scatterlist *sg,
