@@ -77,13 +77,22 @@ write /dir/test create contents
 1 waitwatch
 1 unwatch /dir token2' | ./xs_test 2>&1`" = "1:/dir/test2:token2" ]
 
-# unwatch while watch pending.
+# unwatch while watch pending.  Next watcher gets the event.
 [ "`echo -e '1 watch /dir token1 0
 2 watch /dir token2 1
 write /dir/test create contents
 2 unwatch /dir token2
 1 waitwatch
 1 ackwatch token1' | ./xs_test 2>&1`" = "1:/dir/test:token1" ]
+
+# unwatch while watch pending.  Should clear this so we get next event.
+[ "`echo -e '1 watch /dir token1 0
+write /dir/test create contents
+1 unwatch /dir token1
+1 watch /dir/test token2 0
+write /dir/test none contents2
+1 waitwatch
+1 ackwatch token2' | ./xs_test 2>&1`" = "1:/dir/test:token2" ]
 
 # check we only get notified once.
 [ "`echo -e '1 watch /test token 100
@@ -117,4 +126,29 @@ write /dir/test create contents
 1 ackwatch token
 1 waitwatch' | ./xs_test 2>&1`" = "1:/test/subnode:token
 1:/test/subnode/subnode:token
+1:waitwatch timeout" ]
+
+# Watch event must have happened before we registered interest.
+[ "`echo -e '1 watch / token 100
+2 write /test/subnode create contents2
+2 watch / token2 0
+1 waitwatch
+1 ackwatch token
+2 waitwatch' | ./xs_test 2>&1`" = "1:/test/subnode:token
+2:waitwatch timeout" ]
+
+# Rm fires notification on child.
+[ "`echo -e '1 watch /test/subnode token 100
+2 rm /test
+1 waitwatch
+1 ackwatch token' | ./xs_test 2>&1`" = "1:/test/subnode:token" ]
+
+# Watch should not double-send after we ack, even if we did something in between.
+[ "`echo -e '1 watch /test2 token 100
+2 write /test2/foo create contents2
+1 waitwatch
+1 read /test2/foo
+1 ackwatch token
+1 waitwatch' | ./xs_test 2>&1`" = "1:/test2/foo:token
+1:contents2
 1:waitwatch timeout" ]

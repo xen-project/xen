@@ -143,4 +143,9 @@ int destroy_path(void *path);
 /* Read entire contents of a talloced fd. */
 void *read_all(int *fd, unsigned int *size);
 
+/* Tracing infrastructure. */
+void trace_create(const void *data, const char *type);
+void trace_destroy(const void *data, const char *type);
+void trace_watch_timeout(const struct connection *conn, const char *node, const char *token);
+
 #endif /* _XENSTORED_CORE_H */

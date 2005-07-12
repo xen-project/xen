@@ -52,3 +52,28 @@ dir /' | ./xs_test`" = "" ]
 1 dir /
 1 commit' | ./xs_test 2>&1`" = "1:dir
 FATAL: 1: commit: Connection timed out" ]
+
+# Events inside transactions don't trigger watches until (successful) commit.
+[ "`echo -e '1 watch / token 100
+2 start /
+2 mkdir /dir/sub
+1 waitwatch' | ./xs_test 2>&1`" = "1:waitwatch timeout" ]
+[ "`echo -e '1 watch / token 100
+2 start /
+2 mkdir /dir/sub
+2 abort
+1 waitwatch' | ./xs_test 2>&1`" = "1:waitwatch timeout" ]
+[ "`echo -e '1 watch / token 100
+2 start /
+2 mkdir /dir/sub
+2 commit
+1 waitwatch
+1 ackwatch token' | ./xs_test 2>&1`" = "1:/dir/sub:token" ]
+
+# Rm inside transaction works like rm outside: children get notified.
+[ "`echo -e '1 watch /dir/sub token 100
+2 start /
+2 rm /dir
+2 commit
+1 waitwatch
+1 ackwatch token' | ./xs_test 2>&1`" = "1:/dir/sub:token" ]

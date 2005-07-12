@@ -4,17 +4,17 @@
 [ "`echo -e 'getperm /test' | ./xs_test 2>&1`" = "FATAL: getperm: No such file or directory" ]
 [ "`echo -e 'getperm /dir/test' | ./xs_test 2>&1`" = "FATAL: getperm: No such file or directory" ]
 
-# Create file: we own it, noone has access.
+# Create file: inherits from root (0 READ)
 [ "`echo -e 'write /test excl contents' | ./xs_test 2>&1`" = "" ]
-[ "`echo -e 'getperm /test' | ./xs_test 2>&1`" = "0 NONE" ]
-[ "`echo -e 'setid 1\ngetperm /test' | ./xs_test 2>&1`" = "FATAL: getperm: Permission denied" ]
-[ "`echo -e 'setid 1\nread /test' | ./xs_test 2>&1`" = "FATAL: read: Permission denied" ]
-[ "`echo -e 'setid 1\nwrite /test none contents2' | ./xs_test 2>&1`" = "FATAL: write: Permission denied" ]
-
-# Grant everyone read access to file.
-[ "`echo -e 'setperm /test 0 READ' | ./xs_test 2>&1`" = "" ]
+[ "`echo -e 'getperm /test' | ./xs_test 2>&1`" = "0 READ" ]
 [ "`echo -e 'setid 1\ngetperm /test' | ./xs_test 2>&1`" = "0 READ" ]
 [ "`echo -e 'setid 1\nread /test' | ./xs_test 2>&1`" = "contents" ]
+[ "`echo -e 'setid 1\nwrite /test none contents2' | ./xs_test 2>&1`" = "FATAL: write: Permission denied" ]
+
+# Take away read access to file.
+[ "`echo -e 'setperm /test 0 NONE' | ./xs_test 2>&1`" = "" ]
+[ "`echo -e 'setid 1\ngetperm /test' | ./xs_test 2>&1`" = "FATAL: getperm: Permission denied" ]
+[ "`echo -e 'setid 1\nread /test' | ./xs_test 2>&1`" = "FATAL: read: Permission denied" ]
 [ "`echo -e 'setid 1\nwrite /test none contents2' | ./xs_test 2>&1`" = "FATAL: write: Permission denied" ]
 
 # Grant everyone write access to file.

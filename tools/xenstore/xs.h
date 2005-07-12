@@ -47,7 +47,7 @@ char **xs_directory(struct xs_handle *h, const char *path, unsigned int *num);
 
 /* Get the value of a single file, nul terminated.
  * Returns a malloced value: call free() on it after use.
- * len indicates length in bytes, not including the nul.
+ * len indicates length in bytes, not including terminator.
  */
 void *xs_read(struct xs_handle *h, const char *path, unsigned int *len);
 
@@ -103,7 +103,7 @@ char **xs_read_watch(struct xs_handle *h);
  */
 bool xs_acknowledge_watch(struct xs_handle *h, const char *token);
 
-/* Remove a watch on a node.
+/* Remove a watch on a node: implicitly acks any outstanding watch.
  * Returns false on failure (no watch on that node).
  */
 bool xs_unwatch(struct xs_handle *h, const char *path, const char *token);

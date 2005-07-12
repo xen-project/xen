@@ -14,7 +14,7 @@ commit
 start /
 abort' | ./xs_test --readonly 2>&1`" = "test
 contents
-0 NONE" ]
+0 READ" ]
 
 # These don't work
 [ "`echo 'write /test2 create contents' | ./xs_test --readonly 2>&1`" = "FATAL: write: Read-only file system" ]

@@ -23,12 +23,14 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <time.h>
+#include <assert.h>
 #include "talloc.h"
 #include "list.h"
 #include "xenstored_watch.h"
 #include "xs_lib.h"
 #include "utils.h"
 #include "xenstored_test.h"
+#include "xenstored_domain.h"
 
 /* FIXME: time out unacked watches. */
 
@@ -40,13 +42,17 @@ struct watch_event
 	/* The watch we are firing for (watch->events) */
 	struct list_head list;
 
-	/* Watch we are currently attached to. */
-	struct watch *watch;
+	/* Watches we need to fire for (watches[0]->events == this). */
+	struct watch **watches;
+	unsigned int num_watches;
 
 	struct timeval timeout;
 
 	/* Name of node which changed. */
 	char *node;
+
+	/* For remove, we trigger on all the children of this node too. */
+	bool recurse;
 };
 
 struct watch
@@ -56,6 +62,9 @@ struct watch
 
 	/* Current outstanding events applying to this watch. */
 	struct list_head events;
+
+	/* Is this relative to connnection's implicit path? */
+	bool relative;
 
 	char *token;
 	char *node;
@@ -84,6 +93,7 @@ static struct watch_event *get_first_event(struct connection *conn)
 void queue_next_event(struct connection *conn)
 {
 	struct watch_event *event;
+	const char *node;
 	char *buffer;
 	unsigned int len;
 
@@ -107,53 +117,63 @@ void queue_next_event(struct connection *conn)
 	/* If we decide to cancel, we will reset this. */
 	conn->waiting_for_ack = true;
 
+	/* If we deleted /foo and they're watching /foo/bar, that's what we
+	 * tell them has changed. */
+	if (!is_child(event->node, event->watches[0]->node)) {
+		assert(event->recurse);
+		node = event->watches[0]->node;
+	} else
+		node = event->node;
+
+	/* If watch placed using relative path, give them relative answer. */
+	if (event->watches[0]->relative) {
+		node += strlen(get_implicit_path(conn));
+		if (node[0] == '/') /* Could be "". */
+			node++;
+	}
+
 	/* Create reply from path and token */
-	len = strlen(event->node) + 1 + strlen(event->watch->token) + 1;
+	len = strlen(node) + 1 + strlen(event->watches[0]->token) + 1;
 	buffer = talloc_array(conn, char, len);
-	strcpy(buffer, event->node);
-	strcpy(buffer+strlen(event->node)+1, event->watch->token);
+	strcpy(buffer, node);
+	strcpy(buffer+strlen(node)+1, event->watches[0]->token);
 	send_reply(conn, XS_WATCH_EVENT, buffer, len);
 	talloc_free(buffer);
 }
 
-/* Watch on DIR applies to DIR, DIR/FILE, but not DIRLONG. */
-static bool watch_applies(const struct watch *watch, const char *node)
+static struct watch **find_watches(const char *node, bool recurse,
+				   unsigned int *num)
 {
-	return is_child(node, watch->node);
-}
+	struct watch *i;
+	struct watch **ret = NULL;
 
-static struct watch *find_watch(const char *node)
-{
-	struct watch *watch;
+	*num = 0;
 
-	list_for_each_entry(watch, &watches, list) {
-		if (watch_applies(watch, node))
-			return watch;
+	/* We include children too if this is an rm. */
+	list_for_each_entry(i, &watches, list) {
+		if (is_child(node, i->node) ||
+		    (recurse && is_child(i->node, node))) {
+			(*num)++;
+			ret = talloc_realloc(node, ret, struct watch *, *num);
+			ret[*num - 1] = i;
+		}
 	}
-	return NULL;
-}
-
-static struct watch *find_next_watch(struct watch *watch, const char *node)
-{
-	list_for_each_entry_continue(watch, &watches, list) {
-		if (watch_applies(watch, node))
-			return watch;
-	}
-	return NULL;
+	return ret;
 }
 
 /* FIXME: we fail to fire on out of memory.  Should drop connections. */
-void fire_watches(struct transaction *trans, const char *node)
+void fire_watches(struct transaction *trans, const char *node, bool recurse)
 {
-	struct watch *watch;
+	struct watch **watches;
 	struct watch_event *event;
+	unsigned int num_watches;
 
 	/* During transactions, don't fire watches. */
 	if (trans)
 		return;
 
-	watch = find_watch(node);
-	if (!watch)
+	watches = find_watches(node, recurse, &num_watches);
+	if (!watches)
 		return;
 
 	/* Create and fill in info about event. */
@@ -161,16 +181,19 @@ void fire_watches(struct transaction *trans, const char *node)
 	event->node = talloc_strdup(event, node);
 
 	/* Tie event to this watch. */
-	event->watch = watch;
-	list_add_tail(&event->list, &watch->events);
+	event->watches = watches;
+	talloc_steal(event, watches);
+	event->num_watches = num_watches;
+	event->recurse = recurse;
+	list_add_tail(&event->list, &watches[0]->events);
 
 	/* Warn if not finished after thirty seconds. */
 	gettimeofday(&event->timeout, NULL);
 	event->timeout.tv_sec += 30;
 
 	/* If connection not doing anything, queue this. */
-	if (!watch->conn->out)
-		queue_next_event(watch->conn);
+	if (!watches[0]->conn->out)
+		queue_next_event(watches[0]->conn);
 }
 
 /* We're done with this event: see if anyone else wants it. */
@@ -178,18 +201,41 @@ static void move_event_onwards(struct watch_event *event)
 {
 	list_del(&event->list);
 
-	/* Remove from this watch, and find next watch to put this on. */
-	event->watch = find_next_watch(event->watch, event->node);
-	if (!event->watch) {
+	event->num_watches--;
+	event->watches++;
+	if (!event->num_watches) {
 		talloc_free(event);
 		return;
 	}
 
-	list_add_tail(&event->list, &event->watch->events);
+	list_add_tail(&event->list, &event->watches[0]->events);
 
 	/* If connection not doing anything, queue this. */
-	if (!event->watch->conn->out)
-		queue_next_event(event->watch->conn);
+	if (!event->watches[0]->conn->out)
+		queue_next_event(event->watches[0]->conn);
+}
+
+static void remove_watch_from_events(struct watch *dying_watch)
+{
+	struct watch *watch;
+	struct watch_event *event;
+	unsigned int i;
+
+	list_for_each_entry(watch, &watches, list) {
+		list_for_each_entry(event, &watch->events, list) {
+			for (i = 0; i < event->num_watches; i++) {
+				if (event->watches[i] != dying_watch)
+					continue;
+
+				assert(i != 0);
+				memmove(event->watches+i,
+					event->watches+i+1,
+					(event->num_watches - (i+1))
+					* sizeof(struct watch *));
+				event->num_watches--;
+			}
+		}
+	}
 }
 
 static int destroy_watch(void *_watch)
@@ -203,6 +249,11 @@ static int destroy_watch(void *_watch)
 
 	/* Remove from global list. */
 	list_del(&watch->list);
+
+	/* Other events which match this watch must be cleared. */
+	remove_watch_from_events(watch);
+
+	trace_destroy(watch, "watch");
 	return 0;
 }
 
@@ -251,6 +302,8 @@ void check_watch_ack_timeout(void)
 				xprintf("Warning: timeout on watch event %s"
 					" token %s\n",
 					i->node, watch->token);
+				trace_watch_timeout(watch->conn, i->node,
+						    watch->token);
 				timerclear(&i->timeout);
 			}
 		}
@@ -261,10 +314,12 @@ bool do_watch(struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
 	char *vec[3];
+	bool relative;
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
 		return send_error(conn, EINVAL);
 
+	relative = !strstarts(vec[0], "/");
 	vec[0] = canonicalize(conn, vec[0]);
 	if (!check_node_perms(conn, vec[0], XS_PERM_READ))
 		return send_error(conn, errno);
@@ -274,10 +329,12 @@ bool do_watch(struct connection *conn, struct buffered_data *in)
 	watch->token = talloc_strdup(watch, vec[1]);
 	watch->conn = conn;
 	watch->priority = strtoul(vec[2], NULL, 0);
+	watch->relative = relative;
 	INIT_LIST_HEAD(&watch->events);
 
 	insert_watch(watch);
 	talloc_set_destructor(watch, destroy_watch);
+	trace_create(watch, "watch");
 	return send_ack(conn, XS_WATCH);
 }
 
@@ -285,11 +342,14 @@ bool do_watch_ack(struct connection *conn, const char *token)
 {
 	struct watch_event *event;
 
+	if (!token)
+		return send_error(conn, EINVAL);
+
 	if (!conn->waiting_for_ack)
 		return send_error(conn, ENOENT);
 
 	event = get_first_event(conn);
-	if (!streq(event->watch->token, token))
+	if (!streq(event->watches[0]->token, token))
 		return send_error(conn, EINVAL);
 
 	move_event_onwards(event);
@@ -305,6 +365,9 @@ bool do_unwatch(struct connection *conn, struct buffered_data *in)
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
 		return send_error(conn, EINVAL);
 
+	/* We don't need to worry if we're waiting for an ack for the
+	 * watch we're deleting: conn->waiting_for_ack was reset by
+	 * this command in consider_message anyway. */
 	node = canonicalize(conn, vec[0]);
 	list_for_each_entry(watch, &watches, list) {
 		if (watch->conn != conn)

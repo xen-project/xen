@@ -87,7 +87,7 @@ randomcheck: xs_random xenstored_test
 
 stresstest: xs_stress xs_watch_stress xenstored_test
 	rm -rf $(TESTDIR)/store
-	export $(TESTENV); PID=`./xenstored_test --output-pid`; ./xs_stress 5000; ret=$$?; kill $$PID; exit $$ret
+	export $(TESTENV); PID=`./xenstored_test --output-pid --trace-file=/tmp/trace`; ./xs_stress 5000; ret=$$?; kill $$PID; exit $$ret
 	rm -rf $(TESTDIR)/store
 	export $(TESTENV); PID=`./xenstored_test --output-pid`; ./xs_watch_stress; ret=$$?; kill $$PID; exit $$ret
 

@@ -13,17 +13,15 @@
 
 void xprintf(const char *fmt, ...)
 {
-        static FILE *out = NULL;
-        va_list args;
-        if (!out)
-                out = fopen("/dev/console", "w");
+	static FILE *out = NULL;
+	va_list args;
 	if (!out)
 		out = stderr;
 
-        va_start(args, fmt);
-        vfprintf(out, fmt, args);
-        va_end(args);
-        fflush(out);
+	va_start(args, fmt);
+	vfprintf(out, fmt, args);
+	va_end(args);
+	fflush(out);
 }
 
 void barf(const char *fmt, ...)
@@ -61,14 +59,14 @@ void barf_perror(const char *fmt, ...)
 
 void *_realloc_array(void *ptr, size_t size, size_t num)
 {
-        if (num >= SIZE_MAX/size)
-                return NULL;
-        return realloc_nofail(ptr, size * num);
+	if (num >= SIZE_MAX/size)
+		return NULL;
+	return realloc_nofail(ptr, size * num);
 }
 
 void *realloc_nofail(void *ptr, size_t size)
 {
-        ptr = realloc(ptr, size);
+	ptr = realloc(ptr, size);
 	if (ptr)
 		return ptr;
 	barf("realloc of %zu failed", size);

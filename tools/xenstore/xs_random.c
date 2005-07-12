@@ -201,7 +201,6 @@ static struct xs_permissions *file_get_perms(struct file_ops_info *info,
 	unsigned long size;
 	struct stat st;
 
-	/* No permfile: we didn't bother, return defaults. */
 	if (lstat(filename, &st) != 0)
 		return NULL;
 
@@ -211,18 +210,8 @@ static struct xs_permissions *file_get_perms(struct file_ops_info *info,
 		permfile = talloc_asprintf(path, "%s.perms", filename);
 
 	perms = grab_file(permfile, &size);
-	if (!perms) {
-		ret = new(struct xs_permissions);
-		ret[0].id = 0;
-		/* Default for root is readable. */
-		if (streq(path, "/"))
-			ret[0].perms = XS_PERM_READ;
-		else
-			ret[0].perms = XS_PERM_NONE;
-		*num = 1;
-		release_file(perms, size);
-		return ret;
-	}
+	if (!perms)
+		barf("Grabbing permissions for %s", permfile);
 	*num = xs_count_strings(perms, size);
 
 	ret = new_array(struct xs_permissions, *num);
@@ -231,6 +220,39 @@ static struct xs_permissions *file_get_perms(struct file_ops_info *info,
 	release_file(perms, size);
 	return ret;
 }
+
+static void do_command(const char *cmd)
+{
+	int ret;
+
+	ret = system(cmd);
+	if (ret == -1 || !WIFEXITED(ret) || WEXITSTATUS(ret) != 0)
+		barf_perror("Failed '%s': %i", cmd, ret);
+}
+
+static void init_perms(const char *filename)
+{
+	struct stat st;
+	char *permfile, *command;
+
+	if (lstat(filename, &st) != 0)
+		barf_perror("Failed to stat %s", filename);
+
+	if (S_ISDIR(st.st_mode)) 
+		permfile = talloc_asprintf(filename, "%s/.perms", filename);
+	else
+		permfile = talloc_asprintf(filename, "%s.perms", filename);
+
+	/* Leave permfile if it already exists. */
+	if (lstat(permfile, &st) == 0)
+		return;
+
+	/* Copy permissions from parent */
+	command = talloc_asprintf(filename, "cp %.*s/.perms %s",
+				  strrchr(filename, '/') - filename,
+				  filename, permfile);
+	do_command(command);
+}	
 
 static bool file_set_perms(struct file_ops_info *info,
 			   const char *path,
@@ -318,6 +340,7 @@ static bool file_write(struct file_ops_info *info,
 	if (write(fd, data, len) != (int)len)
 		barf_perror("Bad write to %s", filename);
 
+	init_perms(filename);
 	close(fd);
 	return true;
 }
@@ -339,16 +362,8 @@ static bool file_mkdir(struct file_ops_info *info, const char *path)
 		errno = saved_errno;
 		return false;
 	}
+	init_perms(dirname);
 	return true;
-}
-
-static void do_command(const char *cmd)
-{
-	int ret;
-
-	ret = system(cmd);
-	if (ret == -1 || !WIFEXITED(ret) || WEXITSTATUS(ret) != 0)
-		barf_perror("Failed '%s': %i", cmd, ret);
 }
 
 static bool file_rm(struct file_ops_info *info, const char *path)
@@ -969,8 +984,11 @@ static void cleanup(const char *dir)
 
 static void setup_file_ops(const char *dir)
 {
+	char *cmd = talloc_asprintf(NULL, "echo -n r0 > %s/.perms", dir);
 	if (mkdir(dir, 0700) != 0)
 		barf_perror("Creating directory %s", dir);
+	do_command(cmd);
+	talloc_free(cmd);
 }
 
 static void setup_xs_ops(void)

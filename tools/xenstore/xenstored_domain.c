@@ -273,7 +273,7 @@ bool do_introduce(struct connection *conn, struct buffered_data *in)
 	domain = talloc(in, struct domain);
 	domain->domid = atoi(vec[0]);
 	domain->port = atoi(vec[2]);
-	if (!domain->port || !domain->domid || !is_valid_nodename(vec[3]))
+	if ((domain->port <= 0) || !is_valid_nodename(vec[3]))
 		return send_error(conn, EINVAL);
 	domain->path = talloc_strdup(domain, vec[3]);
 	domain->page = xc_map_foreign_range(*xc_handle, domain->domid,
@@ -349,7 +349,7 @@ bool do_get_domain_path(struct connection *conn, const char *domid_str)
 		return send_error(conn, EINVAL);
 
 	domid = atoi(domid_str);
-	if (domid == 0)
+	if (domid == DOMID_SELF)
 		domain = conn->domain;
 	else
 		domain = find_domain_by_domid(domid);

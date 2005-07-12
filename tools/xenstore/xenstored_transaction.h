@@ -40,7 +40,7 @@ struct transaction *transaction_covering_node(const char *node);
 char *node_dir_inside_transaction(struct transaction *t, const char *node);
 
 /* This node was changed: can fail and longjmp. */
-void add_change_node(struct transaction *trans, const char *node);
+void add_change_node(struct transaction *trans, const char *node, bool recurse);
 
 /* Get shortest timeout: leave tv unset if none. */
 void shortest_transaction_timeout(struct timeval *tv);

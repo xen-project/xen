@@ -52,6 +52,7 @@
 
 static bool verbose;
 static LIST_HEAD(connections);
+static int tracefd = -1;
 
 #ifdef TESTING
 static bool failtest = false;
@@ -149,6 +150,86 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 	}
 }
 
+static void trace_io(const struct connection *conn,
+		     const char *prefix,
+		     const struct buffered_data *data)
+{
+	char string[64];
+	unsigned int i;
+
+	if (tracefd < 0)
+		return;
+
+	write(tracefd, prefix, strlen(prefix));
+	sprintf(string, " %p ", conn);
+	write(tracefd, string, strlen(string));
+	write(tracefd, sockmsg_string(data->hdr.msg.type),
+	      strlen(sockmsg_string(data->hdr.msg.type)));
+	write(tracefd, " (", 2);
+	for (i = 0; i < data->hdr.msg.len; i++) {
+		if (data->buffer[i] == '\0')
+			write(tracefd, " ", 1);
+		else
+			write(tracefd, data->buffer + i, 1);
+	}
+	write(tracefd, ")\n", 2);
+}
+
+void trace_create(const void *data, const char *type)
+{
+	char string[64];
+	if (tracefd < 0)
+		return;
+
+	write(tracefd, "CREATE ", strlen("CREATE "));
+	write(tracefd, type, strlen(type));
+	sprintf(string, " %p\n", data);
+	write(tracefd, string, strlen(string));
+}
+
+void trace_destroy(const void *data, const char *type)
+{
+	char string[64];
+	if (tracefd < 0)
+		return;
+
+	write(tracefd, "DESTROY ", strlen("DESTROY "));
+	write(tracefd, type, strlen(type));
+	sprintf(string, " %p\n", data);
+	write(tracefd, string, strlen(string));
+}
+
+void trace_watch_timeout(const struct connection *conn, const char *node, const char *token)
+{
+	char string[64];
+	if (tracefd < 0)
+		return;
+	write(tracefd, "WATCH_TIMEOUT ", strlen("WATCH_TIMEOUT "));
+	sprintf(string, " %p ", conn);
+	write(tracefd, string, strlen(string));
+	write(tracefd, " (", 2);
+	write(tracefd, node, strlen(node));
+	write(tracefd, " ", 1);
+	write(tracefd, token, strlen(token));
+	write(tracefd, ")\n", 2);
+}
+
+static void trace_blocked(const struct connection *conn,
+			  const struct buffered_data *data)
+{
+	char string[64];
+
+	if (tracefd < 0)
+		return;
+
+	write(tracefd, "BLOCKED", strlen("BLOCKED"));
+	sprintf(string, " %p (", conn);
+	write(tracefd, string, strlen(string));
+	write(tracefd, sockmsg_string(data->hdr.msg.type),
+	      strlen(sockmsg_string(data->hdr.msg.type)));
+	write(tracefd, ")\n", 2);
+}
+
 static bool write_message(struct connection *conn)
 {
 	int ret;
@@ -186,6 +267,7 @@ static bool write_message(struct connection *conn)
 	if (out->used != out->hdr.msg.len)
 		return true;
 
+	trace_io(conn, "OUT", out);
 	conn->out = NULL;
 	talloc_free(out);
 
@@ -213,6 +295,7 @@ static int destroy_conn(void *_conn)
 		close(conn->fd);
 	}
 	list_del(&conn->list);
+	trace_destroy(conn, "connection");
 	return 0;
 }
 
@@ -756,9 +839,9 @@ static bool do_read(struct connection *conn, const char *node)
 static bool new_directory(struct connection *conn,
 			  const char *node, void *data, unsigned int datalen)
 {
-	struct xs_permissions perms;
+	struct xs_permissions *perms;
 	char *permstr;
-	unsigned int len;
+	unsigned int num, len;
 	int *fd;
 	char *dir = node_dir(conn->transaction, node);
 
@@ -768,11 +851,12 @@ static bool new_directory(struct connection *conn,
 	/* Set destructor so we clean up if neccesary. */
 	talloc_set_destructor(dir, destroy_path);
 
-	/* Default permisisons: we own it, noone else has permission. */
-	perms.id = conn->id;
-	perms.perms = XS_PERM_NONE;
+	perms = get_perms(conn->transaction, get_parent(node), &num);
+	/* Domains own what they create. */
+	if (conn->id)
+		perms->id = conn->id;
 
-	permstr = perms_to_strings(dir, &perms, 1, &len);
+	permstr = perms_to_strings(dir, perms, num, &len);
 	fd = talloc_open(node_permfile(conn->transaction, node),
 			 O_WRONLY|O_CREAT|O_EXCL, 0640);
 	if (!fd || !xs_write_all(*fd, permstr, len))
@@ -805,7 +889,8 @@ static bool do_write(struct connection *conn, struct buffered_data *in)
 		return send_error(conn, EINVAL);
 
 	node = canonicalize(conn, vec[0]);
-	if (!within_transaction(conn->transaction, node))
+	if (/*suppress error on write outside transaction*/ 0 &&
+            !within_transaction(conn->transaction, node))
 		return send_error(conn, EROFS);
 
 	if (transaction_block(conn, node))
@@ -850,9 +935,9 @@ static bool do_write(struct connection *conn, struct buffered_data *in)
 		commit_tempfile(tmppath);
 	}
 
-	add_change_node(conn->transaction, node);
+	add_change_node(conn->transaction, node, false);
 	send_ack(conn, XS_WRITE);
-	fire_watches(conn->transaction, node);
+	fire_watches(conn->transaction, node, false);
 	return false;
 }
 
@@ -871,9 +956,9 @@ static bool do_mkdir(struct connection *conn, const char *node)
 	if (!new_directory(conn, node, NULL, 0))
 		return send_error(conn, errno);
 
-	add_change_node(conn->transaction, node);
+	add_change_node(conn->transaction, node, false);
 	send_ack(conn, XS_MKDIR);
-	fire_watches(conn->transaction, node);
+	fire_watches(conn->transaction, node, false);
 	return false;
 }
 
@@ -902,10 +987,9 @@ static bool do_rm(struct connection *conn, const char *node)
 	if (rename(path, tmppath) != 0)
 		return send_error(conn, errno);
 
-	add_change_node(conn->transaction, node);
+	add_change_node(conn->transaction, node, true);
 	send_ack(conn, XS_RM);
-	/* FIXME: traverse and fire watches for ALL of them! */
-	fire_watches(conn->transaction, node);
+	fire_watches(conn->transaction, node, true);
 	return false;
 }
 
@@ -961,9 +1045,9 @@ static bool do_set_perms(struct connection *conn, struct buffered_data *in)
 
 	if (!set_perms(conn->transaction, node, perms, num))
 		return send_error(conn, errno);
-	add_change_node(conn->transaction, node);
+	add_change_node(conn->transaction, node, false);
 	send_ack(conn, XS_SET_PERMS);
-	fire_watches(conn->transaction, node);
+	fire_watches(conn->transaction, node, false);
 	return false;
 }
 
@@ -1006,8 +1090,12 @@ static bool process_message(struct connection *conn, struct buffered_data *in)
 		/* Everything hangs off auto-free context, freed at exit. */
 		exit(0);
 
+	case XS_DEBUG:
+		if (streq(in->buffer, "print")) {
+			xprintf("debug: %s", in->buffer + get_string(in, 0));
+			return false;
+		}
 #ifdef TESTING
-	case XS_DEBUG: {
 		/* For testing, we allow them to set id. */
 		if (streq(in->buffer, "setid")) {
 			conn->id = atoi(in->buffer + get_string(in, 0));
@@ -1018,9 +1106,8 @@ static bool process_message(struct connection *conn, struct buffered_data *in)
 			send_ack(conn, XS_DEBUG);
 			failtest = true;
 		}
-		return false;
-	}
 #endif /* TESTING */
+		return false;
 
 	case XS_WATCH:
 		return do_watch(conn, in);
@@ -1092,6 +1179,7 @@ static void consider_message(struct connection *conn)
 		talloc_free(conn->in);
 		conn->in = in;
 		in = NULL;
+		trace_blocked(conn, conn->in);
 	}
 
 end:
@@ -1145,6 +1233,7 @@ void handle_input(struct connection *conn)
 	if (in->used != in->hdr.msg.len)
 		return;
 
+	trace_io(conn, "IN ", in);
 	consider_message(conn);
 	return;
 
@@ -1212,6 +1301,7 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 
 	list_add_tail(&new->list, &connections);
 	talloc_set_destructor(new, destroy_conn);
+	trace_create(new, "connection");
 	return new;
 }
 
@@ -1299,6 +1389,7 @@ void dump_connection(void)
 static struct option options[] = { { "no-fork", 0, NULL, 'N' },
 				   { "verbose", 0, NULL, 'V' },
 				   { "output-pid", 0, NULL, 'P' },
+				   { "trace-file", 1, NULL, 'T' },
 				   { NULL, 0, NULL, 0 } };
 
 int main(int argc, char *argv[])
@@ -1309,7 +1400,7 @@ int main(int argc, char *argv[])
 	bool dofork = true;
 	bool outputpid = false;
 
-	while ((opt = getopt_long(argc, argv, "DV", options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "DVT:", options, NULL)) != -1) {
 		switch (opt) {
 		case 'N':
 			dofork = false;
@@ -1319,6 +1410,13 @@ int main(int argc, char *argv[])
 			break;
 		case 'P':
 			outputpid = true;
+			break;
+		case 'T':
+			tracefd = open(optarg, O_WRONLY|O_CREAT|O_APPEND, 0600);
+			if (tracefd < 0)
+				barf_perror("Could not open tracefile %s",
+					    optarg);
+                        write(tracefd, "\n***\n", strlen("\n***\n"));
 			break;
 		}
 	}

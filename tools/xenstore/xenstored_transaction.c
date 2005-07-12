@@ -41,6 +41,9 @@ struct changed_node
 
 	/* The name of the node. */
 	char *node;
+
+	/* And the children? (ie. rm) */
+	bool recurse;
 };
 
 struct transaction
@@ -119,7 +122,7 @@ bool transaction_block(struct connection *conn, const char *node)
 
 /* Callers get a change node (which can fail) and only commit after they've
  * finished.  This way they don't have to unwind eg. a write. */
-void add_change_node(struct transaction *trans, const char *node)
+void add_change_node(struct transaction *trans, const char *node, bool recurse)
 {
 	struct changed_node *i;
 
@@ -132,7 +135,7 @@ void add_change_node(struct transaction *trans, const char *node)
 
 	i = talloc(trans, struct changed_node);
 	i->node = talloc_strdup(i, node);
-	INIT_LIST_HEAD(&i->list);
+	i->recurse = recurse;
 	list_add_tail(&i->list, &trans->changes);
 }
 
@@ -176,6 +179,7 @@ static int destroy_transaction(void *_transaction)
 	struct transaction *trans = _transaction;
 
 	list_del(&trans->list);
+	trace_destroy(trans, "transaction");
 	return destroy_path(trans->divert);
 }
 
@@ -263,13 +267,14 @@ bool do_transaction_start(struct connection *conn, const char *node)
 	timerclear(&transaction->timeout);
 	transaction->destined_to_fail = false;
 	list_add_tail(&transaction->list, &transactions);
-	conn->transaction = transaction;
 	talloc_set_destructor(transaction, destroy_transaction);
+	trace_create(transaction, "transaction");
 
 	if (!copy_dir(dir, transaction->divert))
 		return send_error(conn, errno);
 
 	talloc_steal(conn, transaction);
+	conn->transaction = transaction;
 	return send_ack(transaction->conn, XS_TRANSACTION_START);
 }
 
@@ -292,7 +297,7 @@ static bool commit_transaction(struct transaction *trans)
 
 	/* Fire off the watches for everything that changed. */
 	list_for_each_entry(i, &trans->changes, list)
-		fire_watches(NULL, i->node);
+		fire_watches(NULL, i->node, i->recurse);
 	return true;
 }
 
