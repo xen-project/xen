@@ -36,19 +36,10 @@
 #include <stdarg.h>
 #include "xenbus_comms.h"
 
-/* Directory inside a domain containing devices. */
-#define XENBUS_DEVICE_DIR  "device"
-
-/* Directory inside a domain containing backends. */
-#define XENBUS_BACKEND_DIR  "backend"
-
-/* Name of field containing device id. */
-#define XENBUS_DEVICE_ID   "id"
-
 /* Name of field containing device type. */
 #define XENBUS_DEVICE_TYPE "type"
 
-//#define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #define dprintf(_fmt, _args...) \
@@ -58,6 +49,32 @@ printk(KERN_INFO __stringify(KBUILD_MODNAME) " [DBG] %s"    _fmt, __FUNCTION__, 
 #endif
 
 static int xs_init_done = 0;
+
+/* Takes tuples of names, scanf-style args, and void **, NULL terminated. */
+int xenbus_gather(const char *dir, ...)
+{
+	va_list ap;
+	const char *name;
+	int ret = 0;
+
+	va_start(ap, dir);
+	while (ret == 0 && (name = va_arg(ap, char *)) != NULL) {
+		const char *fmt = va_arg(ap, char *);
+		void *result = va_arg(ap, void *);
+		char *p;
+
+		p = xenbus_read(dir, name, NULL);
+		if (IS_ERR(p)) {
+			ret = PTR_ERR(p);
+			break;
+		}
+		if (sscanf(p, fmt, result) == 0)
+			ret = -EINVAL;
+		kfree(p);
+	}
+	va_end(ap);
+	return ret;
+}
 
 /* Return the path to dir with /name appended.
  * If name is null or empty returns a copy of dir.
@@ -141,31 +158,7 @@ int xenbus_write_string(const char *dir, const char *name, const char *val)
 
 int xenbus_read_ulong(const char *dir, const char *name, unsigned long *val)
 {
-	int err = 0;
-	char *data = NULL, *end = NULL;
-	unsigned int data_n = 0;
-
-	data = xenbus_read(dir, name, &data_n);
-	if (IS_ERR(data)) {
-		err = PTR_ERR(data);
-		goto out;
-	}
-	if (data_n <= 1) {
-		err = -ENOENT;
-		goto free_data;
-	}
-	*val = simple_strtoul(data, &end, 10);
-	if (end != data + data_n) {
-		printk("XENBUS: Path %s/%s, bad parse of '%s' as ulong\n",
-		       dir, name, data);
-		err = -EINVAL;
-	}
-  free_data:
-	kfree(data);
-  out:
-	if (err)
-		*val = 0;
-	return err;
+	return xenbus_gather(dir, name, "%lu", val, NULL);
 }
 
 int xenbus_write_ulong(const char *dir, const char *name, unsigned long val)
@@ -178,31 +171,7 @@ int xenbus_write_ulong(const char *dir, const char *name, unsigned long val)
 
 int xenbus_read_long(const char *dir, const char *name, long *val)
 {
-	int err = 0;
-	char *data = NULL, *end = NULL;
-	unsigned int data_n = 0;
-
-	data = xenbus_read(dir, name, &data_n);
-	if (IS_ERR(data)) {
-		err = PTR_ERR(data);
-		goto out;
-	}
-	if (data_n <= 1) {
-		err = -ENOENT;
-		goto free_data;
-	}
-	*val = simple_strtol(data, &end, 10);
-	if (end != data + data_n) {
-		printk("XENBUS: Path %s/%s, bad parse of '%s' as long\n",
-		       dir, name, data);
-		err = -EINVAL;
-	}
-  free_data:
-	kfree(data);
-  out:
-	if (err)
-		*val = 0;
-	return err;
+	return xenbus_gather(dir, name, "%li", val, NULL);
 }
 
 int xenbus_write_long(const char *dir, const char *name, long val)
@@ -211,181 +180,6 @@ int xenbus_write_long(const char *dir, const char *name, long val)
 
 	snprintf(data, sizeof(data), "%li", val);
 	return xenbus_write(dir, name, data, strlen(data));
-}
-
-/* Number of characters in string form of a MAC address. */
-#define MAC_LENGTH    17
-
-/** Convert a mac address from a string of the form
- * XX:XX:XX:XX:XX:XX to numerical form (an array of 6 unsigned chars).
- * Each X denotes a hex digit: 0..9, a..f, A..F.
- * Also supports using '-' as the separator instead of ':'.
- */
-static int mac_aton(const char *macstr, unsigned int n, unsigned char mac[6])
-{
-	int err = -EINVAL;
-	int i, j;
-	const char *p;
-	char sep = 0;
-	
-	if (!macstr || n != MAC_LENGTH)
-		goto exit;
-	for (i = 0, p = macstr; i < 6; i++) {
-		unsigned char d = 0;
-		if (i) {
-			if (!sep && (*p == ':' || *p == '-'))
-				sep = *p;
-			if (sep && *p == sep)
-				p++;
-			else
-				goto exit;
-		}
-		for (j = 0; j < 2; j++, p++) {
-			if (j)
-				d <<= 4;
-			if (isdigit(*p))
-				d += *p - '0';
-			else if (isxdigit(*p))
-				d += toupper(*p) - 'A' + 10;
-			else
-				goto exit;
-		}
-		mac[i] = d;
-	}
-	err = 0;
-  exit:
-	return err;
-}
-
-int xenbus_read_mac(const char *dir, const char *name, unsigned char mac[6])
-{
-	int err = 0;
-	char *data = 0;
-	unsigned int data_n = 0;
-
-	data = xenbus_read(dir, name, &data_n);
-	if (IS_ERR(data)) {
-		err = PTR_ERR(data);
-		goto out;
-	}
-	if (data_n <= 1) {
-		err = -ENOENT;
-		goto free_data;
-	}
-	err = mac_aton(data, data_n, mac);
-	if (err) {
-		printk("XENBUS: Path %s/%s, bad parse of '%s' as mac\n",
-		       dir, name, data);
-		err = -EINVAL;
-	}
-  free_data:
-	kfree(data);
-  out:
-	if (err)
-		memset(mac, 0, sizeof(mac));
-	return err;
-}
-
-int xenbus_write_mac(const char *dir, const char *name, const unsigned char mac[6])
-{
-	char buf[MAC_LENGTH] = {};
-	int buf_n = sizeof(buf);
-	
-	snprintf(buf, buf_n, "%02x:%02x:%02x:%02x:%02x:%02x",
-		 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-	return xenbus_write(dir, name, buf, buf_n);
-}
-
-/* Read event channel information from xenstore.
- *
- * Event channel xenstore fields:
- * dom1		- backend domain id (int)
- * port1	- backend port (int)
- * dom2		- frontend domain id (int)
- * port2	- frontend port (int)
- */
-int xenbus_read_evtchn(const char *dir, const char *name, struct xenbus_evtchn *evtchn)
-{
-	int err = 0;
-	char *evtchn_path = xenbus_path(dir, name);
-
-	if (!evtchn_path) {
-		err = -ENOMEM;
-		goto out;
-	}
-	err = xenbus_read_ulong(evtchn_path, "dom1",  &evtchn->dom1);
-	if (err)
-		goto free_evtchn_path;
-	err = xenbus_read_ulong(evtchn_path, "port1", &evtchn->port1);
-	if (err)
-		goto free_evtchn_path;
-	err = xenbus_read_ulong(evtchn_path, "dom2",  &evtchn->dom2);
-	if (err)
-		goto free_evtchn_path;
-	err = xenbus_read_ulong(evtchn_path, "port2", &evtchn->port2);
-
-  free_evtchn_path:
-	kfree(evtchn_path);
-  out:
-	if (err)
-		*evtchn = (struct xenbus_evtchn){};
-	return err;
-}
-
-/* Write a message to 'dir'.
- * The data is 'val' followed by parameter names and values,
- * terminated by NULL.
- */
-int xenbus_message(const char *dir, const char *val, ...)
-{
-	static const char *mid_name = "@mid";
-	va_list args;
-	int err = 0;
-	char *mid_path = NULL; 
-	char *msg_path = NULL;
-	char mid_str[32] = {};
-	long mid = 0;
-	int i;
-
-	va_start(args, val);
-	mid_path = xenbus_path(dir, mid_name);
-	if (!mid_path) {
-		err = -ENOMEM;
-		goto out;
-	}
-	err = xenbus_read_long(dir, mid_name, &mid);
-	if (err != -ENOENT)
-		goto out;
-	mid++;
-	err = xenbus_write_long(dir, mid_name, mid);
-	if (err)
-		goto out;
-	sprintf(mid_str, "%li", mid);
-	msg_path = xenbus_path(dir, mid_str);
-	if (!mid_path) {
-		err = -ENOMEM;
-		goto out;
-	}
-
-	for (i = 0; i < 16; i++) {
-		char *k, *v;
-		k = va_arg(args, char *);
-		if (!k)
-			break;
-		v = va_arg(args, char *);
-		if (!v)
-			break;
-		err = xenbus_write_string(msg_path, k, v);
-		if (err)
-			goto out;
-	}
-	err = xenbus_write_string(msg_path, NULL, val);
-
-  out:
-	kfree(msg_path);
-	kfree(mid_path);
-	va_end(args);
-	return err;
 }
 
 /* If something in array of ids matches this device, return it. */
@@ -488,12 +282,18 @@ static int xenbus_dev_probe(struct device *_dev)
 	struct xenbus_driver *drv = to_xenbus_driver(_dev->driver);
 	const struct xenbus_device_id *id;
 
-	if (!drv->probe)
+	printk("Probing device '%s'\n", _dev->bus_id);
+	if (!drv->probe) {
+		printk("'%s' no probefn\n", _dev->bus_id);
 		return -ENODEV;
+	}
 
 	id = match_device(drv->ids, dev);
-	if (!id)
+	if (!id) {
+		printk("'%s' no id match\n", _dev->bus_id);
 		return -ENODEV;
+	}
+	printk("probing '%s' fn %p\n", _dev->bus_id, drv->probe);
 	return drv->probe(dev, id);
 }
 
@@ -533,33 +333,18 @@ void xenbus_unregister_driver(struct xenbus_driver *drv)
 	driver_unregister(&drv->driver);
 }
 
-static int xenbus_probe_device(const char *dir, const char *name)
+static int xenbus_probe_device(const char *dir, const char *name, const char *devicetype)
 {
 	int err;
 	struct xenbus_device *xendev;
 	unsigned int xendev_n;
-	long id;
-	char *nodename, *devicetype;
-	unsigned int devicetype_n;
+	char *nodename;
 
 	dprintf("> dir=%s name=%s\n", dir, name);
 	nodename = xenbus_path(dir, name);
 	if (!nodename)
 		return -ENOMEM;
 
-	devicetype = xenbus_read(nodename, XENBUS_DEVICE_TYPE, &devicetype_n);
-	if (IS_ERR(devicetype)) {
-		err = PTR_ERR(devicetype);
-		goto free_nodename;
-	}
-
-	err = xenbus_read_long(nodename, XENBUS_DEVICE_ID, &id);
-	if (err == -ENOENT)
-		id = 0;
-	else if (err != 0)
-		goto free_devicetype;
-
-	dprintf("> devicetype='%s' name='%s' id=%ld\n", devicetype, name, id);
 	/* FIXME: This could be a rescan. Don't re-register existing devices. */
 
 	/* Add space for the strings. */
@@ -567,14 +352,14 @@ static int xenbus_probe_device(const char *dir, const char *name)
 	xendev = kmalloc(xendev_n, GFP_KERNEL);
 	if (!xendev) {
 		err = -ENOMEM;
-		goto free_devicetype;
+		goto free_nodename;
 	}
 	memset(xendev, 0, xendev_n);
 
 	snprintf(xendev->dev.bus_id, BUS_ID_SIZE, "%s-%s", devicetype, name);
 	xendev->dev.bus = &xenbus_type;
 
-	xendev->id = id;
+	xendev->id = simple_strtol(name, NULL, 0);
 
 	/* Copy the strings into the extra space. */
 	xendev->nodename = (char *)(xendev + 1);
@@ -591,8 +376,6 @@ static int xenbus_probe_device(const char *dir, const char *name)
 		kfree(xendev);
 	}
 
-free_devicetype:
-	kfree(devicetype);
 free_nodename:
 	kfree(nodename);
 	dprintf("< err=%i\n", err);
@@ -619,7 +402,7 @@ static int xenbus_probe_device_type(const char *dirpath, const char *typename)
 	}
 
 	for (i = 0; i < dir_n; i++) {
-		err = xenbus_probe_device(path, dir[i]);
+		err = xenbus_probe_device(path, dir[i], typename);
 		if (err)
 			break;
 	}
@@ -778,26 +561,6 @@ int xenbus_for_each_backend(struct xenbus_driver * start, void * data,
 				&for_data, for_drv);
 }
 
-static void test_callback(struct xenbus_watch *w, const char *node)
-{
-	printk("test_callback: got watch hit for %s\n", node);
-}
-
-static void test_watch(void)
-{
-	static int init_done = 0;
-	static struct xenbus_watch watch = { .node = "/", 
-					     .priority = 0, 
-					     .callback = test_callback };
-
-	if (init_done)
-		return;
-	printk("registering watch %lX = %i\n",
-	       (long)&watch,
-	       register_xenbus_watch(&watch));
-	init_done = 1;
-}
-
 static int xenbus_driver_connect(struct xenbus_driver *drv, void *data)
 {
 	printk("%s> driver %p %s\n", __FUNCTION__, drv, drv->name);
@@ -810,7 +573,9 @@ static int xenbus_driver_connect(struct xenbus_driver *drv, void *data)
 	return 0;
 }
 
-int do_xenbus_connect(void *unused)
+
+/* called from a thread in privcmd/privcmd.c */
+int do_xenbus_probe(void *unused)
 {
 	int err = 0;
 
@@ -828,15 +593,14 @@ int do_xenbus_connect(void *unused)
 	xs_init_done = 1;
 
 	/* Notify drivers that xenstore has connected. */
-	test_watch();
 	printk("%s> connect drivers...\n", __FUNCTION__);
 	xenbus_for_each_drv(NULL, NULL, xenbus_driver_connect);
 	printk("%s> connect backends...\n", __FUNCTION__);
 	xenbus_for_each_backend(NULL, NULL, xenbus_driver_connect);
 	
 	/* Enumerate devices and backends in xenstore. */
-	xenbus_probe_devices(XENBUS_DEVICE_DIR);
-	xenbus_probe_backends(XENBUS_BACKEND_DIR);
+	xenbus_probe_devices("device");
+	xenbus_probe_backends("backend");
 
 exit:
 	printk("%s< err=%d\n", __FUNCTION__, err);
@@ -851,7 +615,7 @@ static int __init xenbus_probe_init(void)
 	if (!xen_start_info.store_evtchn)
 		return 0;
 
-	do_xenbus_connect(NULL);
+	do_xenbus_probe(NULL);
 	return 0;
 }
 

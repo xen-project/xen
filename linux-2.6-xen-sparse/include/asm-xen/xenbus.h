@@ -38,6 +38,7 @@ struct xenbus_device {
 	char *nodename;
 	int id;
 	struct device dev;
+	void *data;
 };
 
 static inline struct xenbus_device *to_xenbus_device(struct device *dev)
@@ -97,7 +98,8 @@ int xenbus_for_each_drv(struct xenbus_driver * start, void * data,
 int xenbus_for_each_backend(struct xenbus_driver * start, void * data,
                             int (*fn)(struct xenbus_driver *, void *));
 
-/* Caller must hold this lock to call these functions. */
+/* Caller must hold this lock to call these functions: it's also held
+ * across watch callbacks. */
 extern struct semaphore xs_lock;
 
 char **xs_directory(const char *path, unsigned int *num);
@@ -124,6 +126,10 @@ struct xenbus_watch
 int register_xenbus_watch(struct xenbus_watch *watch);
 void unregister_xenbus_watch(struct xenbus_watch *watch);
 
+/* Generic read function: NULL-terminated triples of name,
+ * sprintf-style type string, and pointer. */
+int xenbus_gather(const char *dir, ...);
+
 char *xenbus_path(const char *dir, const char *name);
 char *xenbus_read(const char *dir, const char *name, unsigned int *data_n);
 int xenbus_write(const char *dir, const char *name,
@@ -135,9 +141,5 @@ int xenbus_read_ulong(const char *dir, const char *name, unsigned long *val);
 int xenbus_write_ulong(const char *dir, const char *name, unsigned long val);
 int xenbus_read_long(const char *dir, const char *name, long *val);
 int xenbus_write_long(const char *dir, const char *name, long val);
-int xenbus_read_mac(const char *dir, const char *name, unsigned char mac[6]);
-int xenbus_write_mac(const char *dir, const char *name, const unsigned char mac[6]);
-int xenbus_read_evtchn(const char *dir, const char *name, struct xenbus_evtchn *evtchn);
-int xenbus_message(const char *dir, const char *val, ...);
 
 #endif /* _ASM_XEN_XENBUS_H */

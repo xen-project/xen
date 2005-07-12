@@ -45,7 +45,6 @@
 
 static void *xs_in, *xs_out;
 static LIST_HEAD(watches);
-static DECLARE_MUTEX(watches_lock);
 DECLARE_MUTEX(xs_lock);
 
 static int get_error(const char *errorstring)
@@ -88,6 +87,21 @@ static void *read_reply(enum xsd_sockmsg_type *type, unsigned int *len)
 	if (len)
 		*len = msg.len;
 	return ret;
+}
+
+/* Emergency write. */
+void xs_debug_write(const char *str, unsigned int count)
+{
+	struct xsd_sockmsg msg;
+	void *out = (void *)xen_start_info.store_page;
+
+	msg.type = XS_DEBUG;
+	msg.len = sizeof("print") + count + 1;
+
+	xb_write(out, &msg, sizeof(msg));
+	xb_write(out, "print", sizeof("print"));
+	xb_write(out, str, count);
+	xb_write(out, "", 1);
 }
 
 /* Send message to xs, get kmalloc'ed reply.  ERR_PTR() on error. */
@@ -233,7 +247,7 @@ int xs_mkdirs(const char *path)
 		if (!p)
 			break;
 		*p++ = '/';
-       }
+	}
  out:
 	return err;
 }
@@ -389,15 +403,11 @@ int register_xenbus_watch(struct xenbus_watch *watch)
 	int err;
 
 	sprintf(token, "%lX", (long)watch);
-	down(&watches_lock);
 	BUG_ON(find_watch(token));
 
-	down(&xs_lock);
 	err = xs_watch(watch->node, token, watch->priority);
-	up(&xs_lock);
 	if (!err)
 		list_add(&watch->list, &watches);
-	up(&watches_lock);
 	return err;
 }
 
@@ -407,14 +417,10 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 	int err;
 
 	sprintf(token, "%lX", (long)watch);
-	down(&watches_lock);
 	BUG_ON(!find_watch(token));
 
-	down(&xs_lock);
 	err = xs_unwatch(watch->node, token);
-	up(&xs_lock);
 	list_del(&watch->list);
-	up(&watches_lock);
 
 	if (err)
 		printk(KERN_WARNING "XENBUS Failed to release watch %s: %i\n",
@@ -423,16 +429,6 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 
 static int watch_thread(void *unused)
 {
-	int err;
-	unsigned long mtu;
-
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(HZ*10);
-	printk("watch_thread, doing read\n");
-	down(&xs_lock);
-	err = xenbus_read_long("", "mtu", &mtu);
-	up(&xs_lock);
-	printk("fake field read: %i (%lu)\n", err, mtu);
 
 	for (;;) {
 		char *token;
@@ -447,28 +443,25 @@ static int watch_thread(void *unused)
 		down(&xs_lock);
 		if (xs_input_avail(xs_in))
 			node = xs_read_watch(&token);
-		/* Release lock before calling callback. */
-		up(&xs_lock);
+
 		if (node && !IS_ERR(node)) {
 			struct xenbus_watch *w;
 			int err;
 
-			down(&watches_lock);
 			w = find_watch(token);
 			BUG_ON(!w);
 			w->callback(w, node);
-			up(&watches_lock);
-			down(&xs_lock);
+			/* FIXME: Only ack if it wasn't deleted. */
 			err = xs_acknowledge_watch(token);
 			if (err)
 				printk(KERN_WARNING
 				       "XENBUS acknowledge %s failed %i\n",
 				       node, err);
-			up(&xs_lock);
 			kfree(node);
 		} else
 			printk(KERN_WARNING "XENBUS xs_read_watch: %li\n",
 			       PTR_ERR(node));
+		up(&xs_lock);
 	}
 }
 
