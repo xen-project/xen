@@ -122,7 +122,7 @@ struct domain
      * domain's event-channel spinlock. Read accesses can also synchronise on 
      * the lock, but races don't usually matter.
      */
-#define NR_PIRQS 128 /* Put this somewhere sane! */
+#define NR_PIRQS 256 /* Put this somewhere sane! */
     u16              pirq_to_evtchn[NR_PIRQS];
     u32              pirq_mask[NR_PIRQS/32];
 
