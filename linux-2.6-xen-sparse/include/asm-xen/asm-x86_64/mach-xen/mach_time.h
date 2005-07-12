@@ -7,7 +7,7 @@
 #ifndef _MACH_TIME_H
 #define _MACH_TIME_H
 
-#include <linux/mc146818rtc.h>
+#include <asm-i386/mc146818rtc.h>
 
 /* for check timing call set_rtc_mmss() 500ms     */
 /* used in arch/i386/time.c::do_timer_interrupt() */

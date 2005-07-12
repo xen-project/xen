@@ -91,10 +91,10 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 extern inline int pud_present(pud_t pud)	{ return !pud_none(pud); }
 
 #ifdef CONFIG_SMP
-#define set_pte(pteptr, pteval) xen_l1_entry_update(pteptr, (pteval).pte)
+#define set_pte(pteptr, pteval) xen_l1_entry_update(pteptr, (pteval))
 
 #else
-#define set_pte(pteptr, pteval) xen_l1_entry_update(pteptr, (pteval.pte))
+#define set_pte(pteptr, pteval) xen_l1_entry_update(pteptr, (pteval))
 #if 0
 static inline void set_pte(pte_t *dst, pte_t val)
 {
@@ -347,7 +347,7 @@ static inline int ptep_test_and_clear_dirty(struct vm_area_struct *vma, unsigned
 	pte_t pte = *ptep;
 	int ret = pte_dirty(pte);
 	if (ret)
-		xen_l1_entry_update(ptep, pte_mkclean(pte).pte);
+		xen_l1_entry_update(ptep, pte_mkclean(pte));
 	return ret;
 }
 
@@ -356,7 +356,7 @@ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned
 	pte_t pte = *ptep;
 	int ret = pte_young(pte);
 	if (ret)
-		xen_l1_entry_update(ptep, pte_mkold(pte).pte);
+		xen_l1_entry_update(ptep, pte_mkold(pte));
 	return ret;
 }
 

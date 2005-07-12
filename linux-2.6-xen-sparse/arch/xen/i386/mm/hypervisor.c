@@ -343,7 +343,7 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
         pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE))); 
         pfn_array[i] = pte_mfn(*pte);
 #ifdef CONFIG_X86_64
-        xen_l1_entry_update(pte, 0);
+        xen_l1_entry_update(pte, __pte(0));
 #else
         HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE), __pte_ma(0), 0);
 #endif

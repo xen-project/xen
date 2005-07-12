@@ -67,7 +67,7 @@ static int init_mapping_done;
 static void __make_page_readonly(unsigned long va)
 {
         unsigned long addr;
-        pte_t *pte;
+        pte_t pte, *ptep;
 	unsigned long *page = (unsigned long *) init_level4_pgt;
 
 	addr = (unsigned long) page[pgd_index(va)];
@@ -79,15 +79,16 @@ static void __make_page_readonly(unsigned long va)
 	addr = page[pmd_index(va)];
 	addr_to_page(addr, page);
 
-	pte = (pte_t *) &page[pte_index(va)];
-	xen_l1_entry_update(pte, (*(unsigned long*)pte) & ~_PAGE_RW);
+	ptep = (pte_t *) &page[pte_index(va)];
+	pte.pte = (ptep->pte & ~_PAGE_RW);
+	xen_l1_entry_update(ptep, pte);
 	__flush_tlb_one(addr);
 }
 
 static void __make_page_writable(unsigned long va)
 {
         unsigned long addr;
-        pte_t *pte;
+        pte_t pte, *ptep;
         unsigned long *page = (unsigned long *) init_level4_pgt;
 
         addr = (unsigned long) page[pgd_index(va)];
@@ -99,8 +100,9 @@ static void __make_page_writable(unsigned long va)
         addr = page[pmd_index(va)];
         addr_to_page(addr, page);
 
-        pte = (pte_t *) &page[pte_index(va)];
-        xen_l1_entry_update(pte, (*(unsigned long*)pte)| _PAGE_RW);
+        ptep = (pte_t *) &page[pte_index(va)];
+	pte.pte = (ptep->pte | _PAGE_RW);
+        xen_l1_entry_update(ptep, pte);
 	__flush_tlb_one(addr);
 }
 
@@ -110,7 +112,7 @@ static void __make_page_writable(unsigned long va)
  */
 void make_page_readonly(void *va)
 {
-        pgd_t* pgd; pud_t *pud; pmd_t* pmd; pte_t *pte;
+	pgd_t* pgd; pud_t *pud; pmd_t* pmd; pte_t pte, *ptep;
         unsigned long addr = (unsigned long) va;
 
         if (!init_mapping_done) {
@@ -121,14 +123,15 @@ void make_page_readonly(void *va)
         pgd = pgd_offset_k(addr);
         pud = pud_offset(pgd, addr);
         pmd = pmd_offset(pud, addr);
-        pte = pte_offset_kernel(pmd, addr);
-        xen_l1_entry_update(pte, (*(unsigned long*)pte)&~_PAGE_RW);
+        ptep = pte_offset_kernel(pmd, addr);
+	pte.pte = (ptep->pte & ~_PAGE_RW);
+        xen_l1_entry_update(ptep, pte);
 	__flush_tlb_one(addr);
 }
 
 void make_page_writable(void *va)
 {
-        pgd_t* pgd; pud_t *pud; pmd_t* pmd; pte_t *pte;
+        pgd_t* pgd; pud_t *pud; pmd_t* pmd; pte_t pte, *ptep;
         unsigned long addr = (unsigned long) va;
 
         if (!init_mapping_done) {
@@ -139,8 +142,9 @@ void make_page_writable(void *va)
         pgd = pgd_offset_k(addr);
         pud = pud_offset(pgd, addr);
         pmd = pmd_offset(pud, addr);
-        pte = pte_offset_kernel(pmd, addr);
-        xen_l1_entry_update(pte, (*(unsigned long*)pte)|_PAGE_RW);
+        ptep = pte_offset_kernel(pmd, addr);
+	pte.pte = (ptep->pte | _PAGE_RW);
+        xen_l1_entry_update(ptep, pte);
 	__flush_tlb_one(addr);
 }
 
@@ -276,7 +280,7 @@ static void set_pte_phys(unsigned long vaddr,
 	if (!pte_none(*pte) &&
 	    pte_val(*pte) != (pte_val(new_pte) & __supported_pte_mask))
 		pte_ERROR(*pte);
-        xen_l1_entry_update(pte, new_pte.pte);
+        xen_l1_entry_update(pte, new_pte);
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -331,16 +335,12 @@ static void set_pte_phys_ma(unsigned long vaddr,
 	new_pte = pfn_pte_ma(phys >> PAGE_SHIFT, prot);
 	pte = pte_offset_kernel(pmd, vaddr);
 
-	if (!pte_none(*pte) &&
-	    pte_val_ma(*pte) != (pte_val_ma(new_pte) & __supported_pte_mask))
-		pte_ERROR(*pte);
-
         /* 
          * Note that the pte page is already RO, thus we want to use
          * xen_l1_entry_update(), not set_pte().
          */
         xen_l1_entry_update(pte, 
-                            (pfn_pte_ma(phys >> PAGE_SHIFT, prot).pte));
+                            pfn_pte_ma(phys >> PAGE_SHIFT, prot));
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -575,7 +575,7 @@ void __init extend_init_mapping(void)
 						  __pgprot(_KERNPG_TABLE | _PAGE_USER));
 
 				pte = (pte_t *) &pte_page[pte_index(va)];
-				xen_l1_entry_update(pte, new_pte.pte);
+				xen_l1_entry_update(pte, new_pte);
 				extended_size += PAGE_SIZE;
 			}
 		} 
