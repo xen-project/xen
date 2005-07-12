@@ -630,6 +630,83 @@ static inline void shadow_sync_and_drop_references(
     shadow_unlock(d);
 }
 #endif
+
+#if CONFIG_PAGING_LEVELS == 3
+/* dummy functions, PAE has no shadow support yet */
+
+static inline void
+__shadow_get_l2e(
+    struct vcpu *v, unsigned long va, l2_pgentry_t *psl2e)
+{
+    BUG();
+}
+
+static inline void
+__shadow_set_l2e(
+    struct vcpu *v, unsigned long va, l2_pgentry_t value)
+{
+    BUG();
+}
+
+static inline void
+__guest_get_l2e(
+    struct vcpu *v, unsigned long va, l2_pgentry_t *pl2e)
+{
+    BUG();
+}
+
+static inline void
+__guest_set_l2e(
+    struct vcpu *v, unsigned long va, l2_pgentry_t value)
+{
+    BUG();
+}
+
+static inline void shadow_drop_references(
+    struct domain *d, struct pfn_info *page)
+{
+    if ( likely(!shadow_mode_refcounts(d)) ||
+         ((page->u.inuse.type_info & PGT_count_mask) == 0) )
+        return;
+    BUG();
+}
+
+static inline void shadow_sync_and_drop_references(
+    struct domain *d, struct pfn_info *page)
+{
+    if ( likely(!shadow_mode_refcounts(d)) )
+        return;
+    BUG();
+}
+
+static inline int l1pte_write_fault(
+    struct vcpu *v, l1_pgentry_t *gpte_p, l1_pgentry_t *spte_p,
+    unsigned long va)
+{
+    BUG();
+    return 42;
+}
+
+static inline int l1pte_read_fault(
+    struct domain *d, l1_pgentry_t *gpte_p, l1_pgentry_t *spte_p)
+{
+    BUG();
+    return 42;
+}
+
+void static inline
+shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
+{
+    BUG();
+}
+
+static inline unsigned long gva_to_gpa(unsigned long gva)
+{
+    BUG();
+    return 42;
+}
+#endif
+    
 /************************************************************************/
 
 /*

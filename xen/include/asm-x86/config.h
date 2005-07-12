@@ -267,7 +267,11 @@ extern unsigned long _end; /* standard ELF symbol */
 #define L2_PAGETABLE_XEN_SLOTS \
     (L2_PAGETABLE_LAST_XEN_SLOT - L2_PAGETABLE_FIRST_XEN_SLOT + 1)
 
-#define PGT_base_page_table PGT_l2_page_table
+#ifdef CONFIG_X86_PAE
+# define PGT_base_page_table PGT_l3_page_table
+#else
+# define PGT_base_page_table PGT_l2_page_table
+#endif
 
 #define __HYPERVISOR_CS 0xe008
 #define __HYPERVISOR_DS 0xe010
