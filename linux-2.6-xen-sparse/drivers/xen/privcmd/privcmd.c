@@ -19,6 +19,7 @@
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/seq_file.h>
+#include <linux/kthread.h>
 
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
@@ -222,7 +223,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
                          PAGE_SHIFT);
 
         /* We'll return then this will wait for daemon to answer */
-        // kthread_run(do_xenbus_probe, NULL, "xenbus_probe");
+        kthread_run(do_xenbus_probe, NULL, "xenbus_probe");
     }
     break;
 

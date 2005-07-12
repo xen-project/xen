@@ -524,4 +524,13 @@ long xc_get_tot_pages(int xc_handle, u32 domid);
 /* Execute a privileged dom0 operation. */
 int xc_dom0_op(int xc_handle, dom0_op_t *op);
 
+/* Initializes the store (for dom0)
+   remote_port should be the remote end of a bound interdomain channel between
+   the store and dom0.
+
+   This function returns a shared frame that should be passed to
+   xs_introduce_domain
+ */
+long xc_init_store(int xc_handle, int remote_port);
+
 #endif /* __XC_H__ */

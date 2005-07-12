@@ -130,3 +130,8 @@ int xc_msr_write(int xc_handle, int cpu_mask, int msr, unsigned int low,
     
     return rc;
 }
+
+long xc_init_store(int xc_handle, int remote_port)
+{
+	return ioctl(xc_handle, IOCTL_PRIVCMD_INITDOMAIN_STORE, remote_port);
+}
