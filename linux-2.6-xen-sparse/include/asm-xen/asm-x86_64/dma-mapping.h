@@ -22,20 +22,20 @@ void dma_free_coherent(struct device *dev, size_t size, void *vaddr,
 			 dma_addr_t dma_handle);
 
 extern dma_addr_t dma_map_single(struct device *hwdev, void *ptr, size_t size,
-				 int direction);
+				 enum dma_data_direction direction);
 extern void dma_unmap_single(struct device *dev, dma_addr_t addr,size_t size,
-			     int direction);
+			     enum dma_data_direction direction);
 
 #define dma_map_page(dev,page,offset,size,dir) \
 	dma_map_single((dev), page_address(page)+(offset), (size), (dir))
 
 extern void
 dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
-			int direction);
+			enum dma_data_direction direction);
 
 extern void
 dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t size,
-                           int direction);
+                           enum dma_data_direction direction);
 
 static inline void dma_sync_sg_for_cpu(struct device *hwdev,
 				       struct scatterlist *sg,

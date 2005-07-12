@@ -231,7 +231,7 @@ dma_map_single(struct device *dev, void *ptr, size_t size,
 	 * boundary. Take into account buffer start offset. All other calls are
 	 * conservative and always search the dma_map list if it's non-empty.
 	 */
-	if ((((unsigned int)ptr & ~PAGE_MASK) + size) <= PAGE_SIZE) {
+	if (((((unsigned long)ptr) & ~PAGE_MASK) + size) <= PAGE_SIZE) {
 		dma = virt_to_bus(ptr);
 	} else {
 		BUG_ON((bnc = dma_alloc_coherent(dev, size, &dma, 0)) == NULL);
@@ -247,7 +247,7 @@ dma_map_single(struct device *dev, void *ptr, size_t size,
 		spin_unlock_irqrestore(&dma_map_lock, flags);
 	}
 
-	if ((dma+size) & ~*hwdev->dma_mask)
+	if ((dma+size) & ~*dev->dma_mask)
 		out_of_line_bug();
 	return dma;
 }
