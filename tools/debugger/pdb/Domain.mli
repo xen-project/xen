@@ -17,8 +17,8 @@ val new_context : int -> int -> context_t
 
 val set_domain : context_t -> int -> unit
 val get_domain : context_t -> int
-val set_execution_domain : context_t -> int -> unit
-val get_execution_domain : context_t -> int
+val set_vcpu : context_t -> int -> unit
+val get_vcpu : context_t -> int
 
 val string_of_context : context_t -> string
 

@@ -13,28 +13,28 @@ open Intel
 type context_t =
 {
   mutable domain : int;
-  mutable execution_domain : int
+  mutable vcpu : int
 }
 
-let default_context = { domain = 0; execution_domain = 0 }
+let default_context = { domain = 0; vcpu = 0 }
 
-let new_context dom exec_dom = {domain = dom; execution_domain = exec_dom}
+let new_context new_dom new_vcpu = {domain = new_dom; vcpu = new_vcpu}
 
 let set_domain ctx value =
   ctx.domain <- value
 
-let set_execution_domain ctx value =
-  ctx.execution_domain <- value
+let set_vcpu ctx value =
+  ctx.vcpu <- value
 
 let get_domain ctx =
   ctx.domain
 
-let get_execution_domain ctx =
-  ctx.execution_domain
+let get_vcpu ctx =
+  ctx.vcpu
 
 let string_of_context ctx =
-      Printf.sprintf "{domain} domain: %d, execution_domain: %d"
-                      ctx.domain  ctx.execution_domain
+      Printf.sprintf "{domain} domain: %d, vcpu: %d"
+                      ctx.domain  ctx.vcpu
 
 external read_registers : context_t -> registers = "dom_read_registers"
 external write_register : context_t -> register -> int32 -> unit =

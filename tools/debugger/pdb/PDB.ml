@@ -56,7 +56,7 @@ let find_domain dom vcpu =
       match ctx with
       |	Domain d ->
 	  if (((Domain.get_domain d) = dom) &&
-	      ((Domain.get_execution_domain d) = vcpu))
+	      ((Domain.get_vcpu d) = vcpu))
 	  then
 	    key :: list
 	  else
@@ -93,7 +93,7 @@ let find_xen_domain_context domain =
 let attach_debugger ctx =
   match ctx with
   | Domain d  -> Domain.attach_debugger (Domain.get_domain d) 
-	                                (Domain.get_execution_domain d)
+	                                (Domain.get_vcpu d)
   | Process p ->
       begin
 	let xdom_sock = find_xen_domain_context (Process.get_domain p) in
@@ -108,7 +108,7 @@ let attach_debugger ctx =
 let detach_debugger ctx =
   match ctx with
   | Domain d  -> Domain.detach_debugger (Domain.get_domain d) 
-	                                (Domain.get_execution_domain d)
+	                                (Domain.get_vcpu d)
   | Process p  -> Process.detach_debugger p
   | _ -> raise (Unimplemented "detach debugger")
 
