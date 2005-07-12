@@ -369,7 +369,7 @@ static void sedf_add_task(struct vcpu *d)
         inf->slice     = MILLISECS(15);
         inf->latency   = 0;
         inf->deadl_abs = 0;
-        inf->status     = EXTRA_NONE | SEDF_ASLEEP;/*EXTRA_AWARE; */
+        inf->status     = EXTRA_AWARE | SEDF_ASLEEP;
     } else {
         /*other domains run in best effort mode*/
         inf->period    = WEIGHT_PERIOD;
