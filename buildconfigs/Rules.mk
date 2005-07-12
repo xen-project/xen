@@ -54,11 +54,11 @@ endif
 pristine-%/.valid-pristine: %.tar.bz2
 	rm -rf tmp-pristine-$* $(@D)
 	mkdir -p tmp-pristine-$*
-	touch tmp-pristine-$*/.bk_skip
 	tar -C tmp-pristine-$* -jxf $<
 	-@rm tmp-pristine-$*/pax_global_header
 	mv tmp-pristine-$*/* $(@D)
 	@rm -rf tmp-pristine-$*
+	touch $(@D)/.hgskip
 	touch $@ # update timestamp to avoid rebuild
 
 PATCHDIRS := $(wildcard patches/*-*)
