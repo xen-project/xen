@@ -582,6 +582,7 @@ ENTRY(spurious_interrupt)
 	jmp error_entry
 	.endm
 
+#if 0
 	/* error code is on the stack already */
 	/* handle NMI like exceptions that can happen everywhere */
 	.macro paranoidentry sym
@@ -603,6 +604,7 @@ ENTRY(spurious_interrupt)
 	call \sym
 	cli
 	.endm
+#endif
 	
 /*
  * Exception entry point. This expects an error code/orig_rax on the stack
@@ -923,10 +925,10 @@ ENTRY(device_not_available)
 	/* runs on exception stack */
 ENTRY(debug)
 	CFI_STARTPROC
-	pushq $0
-	CFI_ADJUST_CFA_OFFSET 8		
-	paranoidentry do_debug
-	jmp paranoid_exit
+/*	pushq $0
+	CFI_ADJUST_CFA_OFFSET 8	*/
+	zeroentry do_debug
+/*	jmp paranoid_exit */
 	CFI_ENDPROC
 
 #if 0
@@ -945,7 +947,6 @@ ENTRY(nmi)
 	 * cannot get reschedule ticks.
 	 */
 	/* ebx:	no swapgs flag */
-#endif        
 paranoid_exit:
 	testl %ebx,%ebx				/* swapgs needed? */
 	jnz paranoid_restore
@@ -991,6 +992,7 @@ paranoid_schedule:
 	cli
 	jmp paranoid_userspace
 	CFI_ENDPROC
+#endif        
 
 ENTRY(int3)
 	zeroentry do_int3	
@@ -1010,12 +1012,14 @@ ENTRY(coprocessor_segment_overrun)
 ENTRY(reserved)
 	zeroentry do_reserved
 
+#if 0
 	/* runs on exception stack */
 ENTRY(double_fault)
 	CFI_STARTPROC
 	paranoidentry do_double_fault
 	jmp paranoid_exit
 	CFI_ENDPROC
+#endif
 
 ENTRY(invalid_TSS)
 	errorentry do_invalid_TSS
@@ -1026,8 +1030,7 @@ ENTRY(segment_not_present)
 	/* runs on exception stack */
 ENTRY(stack_segment)
 	CFI_STARTPROC
-	paranoidentry do_stack_segment
-	jmp paranoid_exit
+	errorentry do_stack_segment
 	CFI_ENDPROC
 
 ENTRY(general_protection)
