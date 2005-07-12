@@ -1,5 +1,6 @@
-XEN_ROOT=/anfs/nos1/ach61/bk
-KDIR=$(XEN_ROOT)/linux-2.6.11-xenU
+XEN_ROOT=../../../..
+LINUX_DIR  = linux-2.6.12-xenU
+KDIR       = $(XEN_ROOT)/$(LINUX_DIR)
 
 obj-m    += pdb.o
 pdb-objs += module.o
