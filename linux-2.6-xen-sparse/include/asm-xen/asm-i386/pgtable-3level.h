@@ -68,6 +68,7 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 		xen_l1_entry_update((pteptr), (pteval))
 # define set_pte_atomic(pteptr,pteval) set_pte(pteptr,pteval)
 #endif
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
 
 #ifdef CONFIG_XEN_SHADOW_MODE
 # define set_pmd(pmdptr,pmdval) \
@@ -105,7 +106,7 @@ static inline void pud_clear (pud_t * pud) { }
 #define pmd_offset(pud, address) ((pmd_t *) pud_page(*(pud)) + \
 			pmd_index(address))
 
-static inline pte_t ptep_get_and_clear(pte_t *ptep)
+static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	pte_t res;
 
