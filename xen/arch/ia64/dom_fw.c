@@ -154,7 +154,7 @@ offtime (unsigned long t, efi_time_t *tp)
 	return 1;
 }
 
-extern void pal_emulator_static (void);
+extern struct ia64_pal_retval pal_emulator_static (unsigned long);
 
 /* Macro to emulate SAL call using legacy IN and OUT calls to CF8, CFC etc.. */
 
@@ -220,17 +220,14 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	 */
 	status = 0;
 	if (index == SAL_FREQ_BASE) {
-		switch (in1) {
+		if (!running_on_sim)
+			status = ia64_sal_freq_base(in1,&r9,&r10);
+		else switch (in1) {
 		      case SAL_FREQ_BASE_PLATFORM:
 			r9 = 200000000;
 			break;
 
 		      case SAL_FREQ_BASE_INTERVAL_TIMER:
-			/*
-			 * Is this supposed to be the cr.itc frequency
-			 * or something platform specific?  The SAL
-			 * doc ain't exactly clear on this...
-			 */
 			r9 = 700000000;
 			break;
 
@@ -285,6 +282,96 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	return ((struct sal_ret_values) {status, r9, r10, r11});
 }
 
+struct ia64_pal_retval
+xen_pal_emulator(unsigned long index, unsigned long in1,
+	unsigned long in2, unsigned long in3)
+{
+	long r9  = 0;
+	long r10 = 0;
+	long r11 = 0;
+	long status = -1;
+
+	if (running_on_sim) return pal_emulator_static(index);
+	if (index >= PAL_COPY_PAL) {
+		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %d!!!!\n",
+				index);
+	}
+	else switch (index) {
+	    case PAL_MEM_ATTRIB:
+		status = ia64_pal_mem_attrib(&r9);
+		break;
+	    case PAL_FREQ_BASE:
+		status = ia64_pal_freq_base(&r9);
+		break;
+	    case PAL_PROC_GET_FEATURES:
+		status = ia64_pal_proc_get_features(&r9,&r10,&r11);
+		break;
+	    case PAL_BUS_GET_FEATURES:
+		status = ia64_pal_bus_get_features(&r9,&r10,&r11);
+		break;
+	    case PAL_FREQ_RATIOS:
+		status = ia64_pal_freq_ratios(&r9,&r10,&r11);
+		break;
+	    case PAL_PTCE_INFO:
+		status = ia64_get_ptce(&r9);
+		break;
+	    case PAL_VERSION:
+		status = ia64_pal_version(&r9,&r10);
+		break;
+	    case PAL_VM_PAGE_SIZE:
+		status = ia64_pal_vm_page_size(&r9,&r10);
+		break;
+	    case PAL_DEBUG_INFO:
+		status = ia64_pal_debug_info(&r9,&r10);
+		break;
+	    case PAL_CACHE_SUMMARY:
+		status = ia64_pal_cache_summary(&r9,&r10);
+		break;
+	    case PAL_VM_SUMMARY:
+		status = ia64_pal_vm_summary(&r9,&r10);
+		break;
+	    case PAL_RSE_INFO:
+		status = ia64_pal_rse_info(&r9,&r10);
+		break;
+	    case PAL_VM_INFO:
+		status = ia64_pal_vm_info(in1,in2,&r9,&r10);
+		break;
+	    case PAL_REGISTER_INFO:
+		status = ia64_pal_register_info(in1,&r9,&r10);
+		break;
+	    case PAL_CACHE_FLUSH:
+		return pal_emulator_static(index); /* FIXME */
+		break;
+	    case PAL_PERF_MON_INFO:
+		{
+			unsigned long pm_buffer[16];
+			status = ia64_pal_perf_mon_info(pm_buffer,&r9);
+			if (status != 0) break;
+			if (copy_to_user((void __user *)in1,pm_buffer,128))
+				printk("xen_pal_emulator: PAL_PERF_MON_INFO "
+					"can't copy to user!!!!\n");
+		}
+		break;
+	    case PAL_CACHE_INFO:
+		{
+			pal_cache_config_info_t ci;
+			status = ia64_pal_cache_config_info(in1,in2,&ci);
+			if (status != 0) break;
+			r9 = ci.pcci_info_1.pcci1_data;
+			r10 = ci.pcci_info_2.pcci2_data;
+		}
+		break;
+	    case PAL_VM_TR_READ:	/* FIXME: vcpu_get_tr?? */
+		break;
+	    case PAL_HALT_INFO:		/* inappropriate info for guest? */
+		break;
+	    default:
+		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %d!!!!\n",
+				index);
+		break;
+	}
+	return ((struct ia64_pal_retval) {status, r9, r10, r11});
+}
 
 #define NFUNCPTRS 20
 

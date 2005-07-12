@@ -16,7 +16,7 @@
 #include <asm/dom_fw.h>
 
 extern unsigned long translate_domain_mpaddr(unsigned long);
-extern struct ia64_sal_retval pal_emulator_static(UINT64);
+extern struct ia64_pal_retval xen_pal_emulator(UINT64,UINT64,UINT64,UINT64);
 extern struct ia64_sal_retval sal_emulator(UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64);
 
 unsigned long idle_when_pending = 0;
@@ -27,6 +27,7 @@ ia64_hypercall (struct pt_regs *regs)
 {
 	struct vcpu *v = (struct domain *) current;
 	struct ia64_sal_retval x;
+	struct ia64_pal_retval y;
 	unsigned long *tv, *tc;
 	int pi;
 
@@ -42,7 +43,6 @@ ia64_hypercall (struct pt_regs *regs)
 		// in the idle loop, this should resolve it
 		v->vcpu_info->arch.pending_interruption = 1;
 #endif
-		x = pal_emulator_static(regs->r28);
 		if (regs->r28 == PAL_HALT_LIGHT) {
 #define SPURIOUS_VECTOR 15
 			pi = vcpu_check_pending_interrupts(v);
@@ -62,8 +62,15 @@ ia64_hypercall (struct pt_regs *regs)
 			}
 			//break;
 		}
-		regs->r8 = x.status; regs->r9 = x.v0;
-		regs->r10 = x.v1; regs->r11 = x.v2;
+		else if (regs->r28 >= PAL_COPY_PAL) {	/* FIXME */
+			printf("stacked PAL hypercalls not supported\n");
+			regs->r8 = -1;
+			break;
+		}
+		else y = xen_pal_emulator(regs->r28,regs->r29,
+						regs->r30,regs->r31);
+		regs->r8 = y.status; regs->r9 = y.v0;
+		regs->r10 = y.v1; regs->r11 = y.v2;
 		break;
 	    case FW_HYPERCALL_SAL_CALL:
 		x = sal_emulator(vcpu_get_gr(v,32),vcpu_get_gr(v,33),

@@ -931,10 +931,10 @@ ENTRY(interrupt)
 	;;
 #ifdef XEN
 	mov r30=cr.ivr		// pass cr.ivr as first arg
-	// FIXME: this is a hack... use cpuinfo.pgd_quick because its
+	// FIXME: this is a hack... use cpuinfo.ksoftirqd because its
 	// not used anywhere else and we need a place to stash ivr and
 	// there's no registers available unused by SAVE_MIN/REST
-	movl r29=(PERCPU_ADDR)+IA64_CPUINFO_PGD_QUICK_OFFSET;;
+	movl r29=(PERCPU_ADDR)+IA64_CPUINFO_KSOFTIRQD_OFFSET;;
 	st8 [r29]=r30;;
 	movl r28=slow_interrupt;;
 	mov r29=rp;;
@@ -954,7 +954,7 @@ slow_interrupt:
 	;;
 	alloc r14=ar.pfs,0,0,2,0 // must be first in an insn group
 #ifdef XEN
-	movl out0=(PERCPU_ADDR)+IA64_CPUINFO_PGD_QUICK_OFFSET;;
+	movl out0=(PERCPU_ADDR)+IA64_CPUINFO_KSOFTIRQD_OFFSET;;
 	ld8 out0=[out0];;
 #else
 	mov out0=cr.ivr		// pass cr.ivr as first arg

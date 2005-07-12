@@ -1263,6 +1263,7 @@ IA64FAULT vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 #define itir_mask(itir) (~((1UL << itir_ps(itir)) - 1))
 
 unsigned long vhpt_translate_count = 0;
+int in_vcpu_tpa = 0;
 
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir)
 {
@@ -1271,8 +1272,20 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 	ia64_rr rr;
 
 	if (!(address >> 61)) {
-		if (!PSCB(vcpu,metaphysical_mode))
+		if (!PSCB(vcpu,metaphysical_mode)) {
+			REGS *regs = vcpu_regs(vcpu);
+			unsigned long viip = PSCB(vcpu,iip);
+			unsigned long vipsr = PSCB(vcpu,ipsr);
+			unsigned long iip = regs->cr_iip;
+			unsigned long ipsr = regs->cr_ipsr;
+#if 0
+			printk("vcpu_translate: bad address %p, viip=%p, vipsr=%p, iip=%p, ipsr=%p\n", address, viip, vipsr, iip, ipsr);
+			if (in_vcpu_tpa) printk("vcpu_translate called from vcpu_tpa\n");
+			while(1);
 			panic_domain(0,"vcpu_translate: bad address %p\n", address);
+#endif
+			printk("vcpu_translate: bad address %p, viip=%p, vipsr=%p, iip=%p, ipsr=%p continuing\n", address, viip, vipsr, iip, ipsr);
+		}
 
 		*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX;
 		*itir = PAGE_SHIFT << 2;
@@ -1291,6 +1304,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 	/* check 1-entry TLB */
 	if ((trp = match_dtlb(vcpu,address))) {
 		dtlb_translate_count++;
+if (!in_vcpu_tpa) printf("vcpu_translate: found in vdtlb\n");
 		*pteval = trp->page_flags;
 		*itir = trp->itir;
 		return IA64_NO_FAULT;
@@ -1342,7 +1356,9 @@ IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 	UINT64 pteval, itir, mask;
 	IA64FAULT fault;
 
+in_vcpu_tpa=1;
 	fault = vcpu_translate(vcpu, vadr, 1, &pteval, &itir);
+in_vcpu_tpa=0;
 	if (fault == IA64_NO_FAULT)
 	{
 		mask = itir_mask(itir);
