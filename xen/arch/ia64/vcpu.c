@@ -1499,20 +1499,24 @@ IA64FAULT vcpu_get_cpuid(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 	// if reg > 3
 	switch(reg) {
 	    case 0:
-	    case 1:
 		memcpy(pval,"Xen/ia64",8);
+		break;
+	    case 1:
+		*pval = 0;
 		break;
 	    case 2:
 		*pval = 0;
 		break;
 	    case 3:
-		*pval = 0;  //FIXME: See vol1, 3.1.11
+		*pval = ia64_get_cpuid(3);
 		break;
 	    case 4:
-		*pval = 1;  //FIXME: See vol1, 3.1.11
+		*pval = ia64_get_cpuid(4);
 		break;
 	    default:
-		*pval = 0;  //FIXME: See vol1, 3.1.11
+		if (reg > (ia64_get_cpuid(3) & 0xff))
+			return IA64_RSVDREG_FAULT;
+		*pval = ia64_get_cpuid(reg);
 		break;
 	}
 	return (IA64_NO_FAULT);

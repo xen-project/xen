@@ -313,7 +313,14 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 		status = ia64_pal_freq_ratios(&r9,&r10,&r11);
 		break;
 	    case PAL_PTCE_INFO:
-		status = ia64_get_ptce(&r9);
+		{
+			ia64_ptce_info_t ptce;
+			status = ia64_get_ptce(&ptce);
+			if (status != 0) break;
+			r9 = ptce.base;
+			r10 = (ptce.count[0]<<32)|(ptce.count[1]&0xffffffffL);
+			r11 = (ptce.stride[0]<<32)|(ptce.stride[1]&0xffffffffL);
+		}
 		break;
 	    case PAL_VERSION:
 		status = ia64_pal_version(&r9,&r10);
@@ -340,18 +347,30 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 		status = ia64_pal_register_info(in1,&r9,&r10);
 		break;
 	    case PAL_CACHE_FLUSH:
-		return pal_emulator_static(index); /* FIXME */
+		/* FIXME */
+		printk("PAL_CACHE_FLUSH NOT IMPLEMENTED!\n");
+		BUG();
 		break;
 	    case PAL_PERF_MON_INFO:
 		{
 			unsigned long pm_buffer[16];
+			int i;
 			status = ia64_pal_perf_mon_info(pm_buffer,&r9);
-			if (status != 0) break;
+			if (status != 0) {
+				while(1)
+				printk("PAL_PERF_MON_INFO fails ret=%d\n",status);
+				break;
+			}
 			if (copy_to_user((void __user *)in1,pm_buffer,128)) {
+				while(1)
 				printk("xen_pal_emulator: PAL_PERF_MON_INFO "
 					"can't copy to user!!!!\n");
 				status = -1;
+				break;
 			}
+			printk("PAL_PERF_MON_INFO succeeds! r9=%lx\n",r9);
+			for (i=0; i<16;i++)
+			printk("pm_buffer[i]=%lx\n",pm_buffer[i]);
 		}
 		break;
 	    case PAL_CACHE_INFO:
@@ -364,8 +383,10 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 		}
 		break;
 	    case PAL_VM_TR_READ:	/* FIXME: vcpu_get_tr?? */
+		printk("PAL_VM_TR_READ NOT IMPLEMENTED, IGNORED!\n");
 		break;
 	    case PAL_HALT_INFO:		/* inappropriate info for guest? */
+		printk("PAL_HALT_INFO NOT IMPLEMENTED, IGNORED!\n");
 		break;
 	    default:
 		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %d!!!!\n",
