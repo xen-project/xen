@@ -368,9 +368,6 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 				status = -1;
 				break;
 			}
-			printk("PAL_PERF_MON_INFO succeeds! r9=%lx\n",r9);
-			for (i=0; i<16;i++)
-			printk("pm_buffer[i]=%lx\n",pm_buffer[i]);
 		}
 		break;
 	    case PAL_CACHE_INFO:
