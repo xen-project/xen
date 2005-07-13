@@ -51,6 +51,9 @@ else
 OS_VER = $(NETBSD_VER)
 endif
 
+pristine-%: pristine-%/.valid-pristine
+	@true
+
 pristine-%/.valid-pristine: %.tar.bz2
 	rm -rf tmp-pristine-$* $(@D)
 	mkdir -p tmp-pristine-$*
