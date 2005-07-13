@@ -32,6 +32,9 @@
 #if defined(__i386__)
 #define L1_PAGETABLE_SHIFT       12
 #define L2_PAGETABLE_SHIFT       22
+#define L1_PAGETABLE_SHIFT_PAE   12
+#define L2_PAGETABLE_SHIFT_PAE   21
+#define L3_PAGETABLE_SHIFT_PAE   30
 #elif defined(__x86_64__)
 #define L1_PAGETABLE_SHIFT      12
 #define L2_PAGETABLE_SHIFT      21
@@ -42,6 +45,9 @@
 #if defined(__i386__) 
 #define ENTRIES_PER_L1_PAGETABLE 1024
 #define ENTRIES_PER_L2_PAGETABLE 1024
+#define L1_PAGETABLE_ENTRIES_PAE  512
+#define L2_PAGETABLE_ENTRIES_PAE  512
+#define L3_PAGETABLE_ENTRIES_PAE    4
 #elif defined(__x86_64__)
 #define L1_PAGETABLE_ENTRIES    512
 #define L2_PAGETABLE_ENTRIES    512
@@ -55,6 +61,9 @@
 
 typedef u32 l1_pgentry_32_t;
 typedef u32 l2_pgentry_32_t;
+typedef u64 l1_pgentry_64_t;
+typedef u64 l2_pgentry_64_t;
+typedef u64 l3_pgentry_64_t;
 typedef unsigned long l1_pgentry_t;
 typedef unsigned long l2_pgentry_t;
 #if defined(__x86_64__)
@@ -67,6 +76,12 @@ typedef unsigned long l4_pgentry_t;
           (((_a) >> L1_PAGETABLE_SHIFT) & (ENTRIES_PER_L1_PAGETABLE - 1))
 #define l2_table_offset(_a) \
           ((_a) >> L2_PAGETABLE_SHIFT)
+#define l1_table_offset_pae(_a) \
+  (((_a) >> L1_PAGETABLE_SHIFT_PAE) & (L1_PAGETABLE_ENTRIES_PAE - 1))
+#define l2_table_offset_pae(_a) \
+  (((_a) >> L2_PAGETABLE_SHIFT_PAE) & (L2_PAGETABLE_ENTRIES_PAE - 1))
+#define l3_table_offset_pae(_a) \
+	(((_a) >> L3_PAGETABLE_SHIFT_PAE) & (L3_PAGETABLE_ENTRIES_PAE - 1))
 #elif defined(__x86_64__)
 #define l1_table_offset(_a) \
   (((_a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1))
@@ -87,6 +102,7 @@ struct domain_setup_info
     unsigned long v_kernentry;
 
     unsigned int  load_symtab;
+    unsigned int  pae_kernel;
     unsigned long symtab_addr;
     unsigned long symtab_len;
 };

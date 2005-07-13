@@ -115,6 +115,8 @@ static int parseelfimage(char *image,
             ERROR("Actually saw: '%s'", guestinfo);
             return -EINVAL;
         }
+        if ( (strstr(guestinfo, "PAE=yes") != NULL) )
+	    dsi->pae_kernel = 1;
 
         break;
     }

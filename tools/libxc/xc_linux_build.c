@@ -21,6 +21,7 @@
 #if defined(__i386__)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#define L3_PROT (_PAGE_PRESENT)
 #endif
 
 #if defined(__x86_64__)
@@ -49,6 +50,214 @@ static int probeimageformat(char *image,
     return 0;
 }
 
+#define alloc_pt(ltab, vltab) \
+        ltab = page_array[ppt_alloc++] << PAGE_SHIFT; \
+        if (vltab != NULL) { \
+            munmap(vltab, PAGE_SIZE); \
+        } \
+        if ((vltab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, \
+                          PROT_READ|PROT_WRITE, \
+                          ltab >> PAGE_SHIFT)) == NULL) { \
+            goto error_out; \
+        } \
+        memset(vltab, 0, PAGE_SIZE);
+
+#if defined(__i386__)
+
+static int setup_pg_tables(int xc_handle, u32 dom,
+			   vcpu_guest_context_t *ctxt,
+			   unsigned long dsi_v_start,
+			   unsigned long v_end,
+			   unsigned long *page_array,
+			   unsigned long vpt_start,
+			   unsigned long vpt_end)
+{
+    l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
+    l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
+    unsigned long l1tab = 0;
+    unsigned long l2tab = 0;
+    unsigned long ppt_alloc;
+    unsigned long count;
+
+    ppt_alloc = (vpt_start - dsi_v_start) >> PAGE_SHIFT;
+    alloc_pt(l2tab, vl2tab);
+    vl2e = &vl2tab[l2_table_offset(dsi_v_start)];
+    ctxt->ctrlreg[3] = l2tab;
+
+    for ( count = 0; count < ((v_end-dsi_v_start)>>PAGE_SHIFT); count++ )
+    {    
+        if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
+        {
+	    alloc_pt(l1tab, vl1tab);
+            vl1e = &vl1tab[l1_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
+            *vl2e++ = l1tab | L2_PROT;
+        }
+
+        *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
+        if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) && 
+             (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) )
+            *vl1e &= ~_PAGE_RW;
+        vl1e++;
+    }
+    munmap(vl1tab, PAGE_SIZE);
+    munmap(vl2tab, PAGE_SIZE);
+    return 0;
+
+ error_out:
+    if (vl1tab)
+	munmap(vl1tab, PAGE_SIZE);
+    if (vl2tab)
+	munmap(vl2tab, PAGE_SIZE);
+    return -1;
+}
+
+static int setup_pg_tables_pae(int xc_handle, u32 dom,
+			       vcpu_guest_context_t *ctxt,
+			       unsigned long dsi_v_start,
+			       unsigned long v_end,
+			       unsigned long *page_array,
+			       unsigned long vpt_start,
+			       unsigned long vpt_end)
+{
+    l1_pgentry_64_t *vl1tab=NULL, *vl1e=NULL;
+    l2_pgentry_64_t *vl2tab=NULL, *vl2e=NULL;
+    l3_pgentry_64_t *vl3tab=NULL, *vl3e=NULL;
+    unsigned long l1tab = 0;
+    unsigned long l2tab = 0;
+    unsigned long l3tab = 0;
+    unsigned long ppt_alloc;
+    unsigned long count;
+
+    /* First allocate page for page dir. */
+    ppt_alloc = (vpt_start - dsi_v_start) >> PAGE_SHIFT;
+    alloc_pt(l3tab, vl3tab);
+    vl3e = &vl3tab[l3_table_offset_pae(dsi_v_start)];
+    ctxt->ctrlreg[3] = l3tab;
+    
+    for ( count = 0; count < ((v_end-dsi_v_start)>>PAGE_SHIFT); count++)
+    {
+        if ( !((unsigned long)vl1e & (PAGE_SIZE-1)) )
+        {
+            alloc_pt(l1tab, vl1tab);
+            
+                if ( !((unsigned long)vl2e & (PAGE_SIZE-1)) )
+                {
+                    alloc_pt(l2tab, vl2tab);
+                    vl2e = &vl2tab[l2_table_offset_pae(dsi_v_start + (count<<PAGE_SHIFT))];
+                    *vl3e = l2tab | L3_PROT;
+                    vl3e++;
+                }
+            vl1e = &vl1tab[l1_table_offset_pae(dsi_v_start + (count<<PAGE_SHIFT))];
+            *vl2e = l1tab | L2_PROT;
+            vl2e++;
+        }
+        
+        *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
+        if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
+	     (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
+        {
+	    *vl1e &= ~_PAGE_RW;
+        }
+	vl1e++;
+    }
+     
+    munmap(vl1tab, PAGE_SIZE);
+    munmap(vl2tab, PAGE_SIZE);
+    munmap(vl3tab, PAGE_SIZE);
+    return 0;
+
+ error_out:
+    if (vl1tab)
+	munmap(vl1tab, PAGE_SIZE);
+    if (vl2tab)
+	munmap(vl2tab, PAGE_SIZE);
+    if (vl3tab)
+	munmap(vl3tab, PAGE_SIZE);
+    return -1;
+}
+
+#endif
+
+#if defined(__x86_64__)
+
+static int setup_pg_tables_64(int xc_handle, u32 dom,
+			      vcpu_guest_context_t *ctxt,
+			      unsigned long dsi_v_start,
+			      unsigned long v_end,
+			      unsigned long *page_array,
+			      unsigned long vpt_start,
+			      unsigned long vpt_end)
+{
+    l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
+    l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
+    l3_pgentry_t *vl3tab=NULL, *vl3e=NULL;
+    l4_pgentry_t *vl4tab=NULL, *vl4e=NULL;
+    unsigned long l2tab = 0;
+    unsigned long l1tab = 0;
+    unsigned long l3tab = 0;
+    unsigned long l4tab = 0;
+    unsigned long ppt_alloc;
+    unsigned long count;
+
+    /* First allocate page for page dir. */
+    ppt_alloc = (vpt_start - dsi_v_start) >> PAGE_SHIFT;
+    alloc_pt(l4tab, vl4tab);
+    vl4e = &vl4tab[l4_table_offset(dsi_v_start)];
+    ctxt->ctrlreg[3] = l4tab;
+    
+    for ( count = 0; count < ((v_end-dsi_v_start)>>PAGE_SHIFT); count++)
+    {
+        if ( !((unsigned long)vl1e & (PAGE_SIZE-1)) )
+        {
+            alloc_pt(l1tab, vl1tab);
+            
+                if ( !((unsigned long)vl2e & (PAGE_SIZE-1)) )
+                {
+                    alloc_pt(l2tab, vl2tab);
+                    if ( !((unsigned long)vl3e & (PAGE_SIZE-1)) )
+                    {
+                        alloc_pt(l3tab, vl3tab);
+                        vl3e = &vl3tab[l3_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
+                        *vl4e = l3tab | L4_PROT;
+                        vl4e++;
+                    }
+                    vl2e = &vl2tab[l2_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
+                    *vl3e = l2tab | L3_PROT;
+                    vl3e++;
+                }
+            vl1e = &vl1tab[l1_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
+            *vl2e = l1tab | L2_PROT;
+            vl2e++;
+        }
+        
+        *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
+        if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
+            (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
+        {
+                *vl1e &= ~_PAGE_RW;
+        }
+            vl1e++;
+    }
+     
+    munmap(vl1tab, PAGE_SIZE);
+    munmap(vl2tab, PAGE_SIZE);
+    munmap(vl3tab, PAGE_SIZE);
+    munmap(vl4tab, PAGE_SIZE);
+    return 0;
+
+ error_out:
+    if (vl1tab)
+	munmap(vl1tab, PAGE_SIZE);
+    if (vl2tab)
+	munmap(vl2tab, PAGE_SIZE);
+    if (vl3tab)
+	munmap(vl3tab, PAGE_SIZE);
+    if (vl4tab)
+	munmap(vl4tab, PAGE_SIZE);
+    return -1;
+}
+#endif
+
 static int setup_guest(int xc_handle,
                        u32 dom,
                        char *image, unsigned long image_size,
@@ -63,19 +272,7 @@ static int setup_guest(int xc_handle,
                        unsigned int vcpus,
 		       unsigned int store_evtchn, unsigned long *store_mfn)
 {
-    l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
-    l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
-#if defined(__x86_64__)
-    l3_pgentry_t *vl3tab=NULL, *vl3e=NULL;
-    l4_pgentry_t *vl4tab=NULL, *vl4e=NULL;
-#endif
     unsigned long *page_array = NULL;
-    unsigned long l2tab = 0;
-    unsigned long l1tab = 0;
-#if defined(__x86_64__)
-    unsigned long l3tab = 0;
-    unsigned long l4tab = 0;
-#endif
     unsigned long count, i;
     start_info_t *start_info;
     shared_info_t *shared_info;
@@ -83,7 +280,7 @@ static int setup_guest(int xc_handle,
     int rc;
 
     unsigned long nr_pt_pages;
-    unsigned long ppt_alloc, physmap_pfn;
+    unsigned long physmap_pfn;
     u32 *physmap, *physmap_e;
 
     struct load_funcs load_funcs;
@@ -144,9 +341,16 @@ static int setup_guest(int xc_handle,
         if ( (v_end - vstack_end) < (512UL << 10) )
             v_end += 1UL << 22; /* Add extra 4MB to get >= 512kB padding. */
 #if defined(__i386__)
-        if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
-               L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
-            break;
+	if (dsi.pae_kernel) {
+	    /* FIXME: assumes one L2 pgtable @ 0xc0000000 */
+	    if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT_PAE)-1)) >> 
+		   L2_PAGETABLE_SHIFT_PAE) + 2) <= nr_pt_pages )
+		break;
+	} else {
+	    if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
+		   L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
+		break;
+	}
 #endif
 #if defined(__x86_64__)
 #define NR(_l,_h,_s) \
@@ -225,114 +429,25 @@ static int setup_guest(int xc_handle,
     if ( (mmu = init_mmu_updates(xc_handle, dom)) == NULL )
         goto error_out;
 
+    /* setup page tables */
 #if defined(__i386__)
-    /* First allocate page for page dir. */
-    ppt_alloc = (vpt_start - dsi.v_start) >> PAGE_SHIFT;
-    l2tab = page_array[ppt_alloc++] << PAGE_SHIFT;
-    ctxt->ctrlreg[3] = l2tab;
-
-    /* Initialise the page tables. */
-    if ( (vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, 
-                                        PROT_READ|PROT_WRITE, 
-                                        l2tab >> PAGE_SHIFT)) == NULL )
-        goto error_out;
-    memset(vl2tab, 0, PAGE_SIZE);
-    vl2e = &vl2tab[l2_table_offset(dsi.v_start)];
-    for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
-    {    
-        if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
-        {
-            l1tab = page_array[ppt_alloc++] << PAGE_SHIFT;
-            if ( vl1tab != NULL )
-                munmap(vl1tab, PAGE_SIZE);
-            if ( (vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                                PROT_READ|PROT_WRITE,
-                                                l1tab >> PAGE_SHIFT)) == NULL )
-            {
-                munmap(vl2tab, PAGE_SIZE);
-                goto error_out;
-            }
-            memset(vl1tab, 0, PAGE_SIZE);
-            vl1e = &vl1tab[l1_table_offset(dsi.v_start + (count<<PAGE_SHIFT))];
-            *vl2e++ = l1tab | L2_PROT;
-        }
-
-        *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
-        if ( (count >= ((vpt_start-dsi.v_start)>>PAGE_SHIFT)) && 
-             (count <  ((vpt_end  -dsi.v_start)>>PAGE_SHIFT)) )
-            *vl1e &= ~_PAGE_RW;
-        vl1e++;
+    if (dsi.pae_kernel)
+	rc = setup_pg_tables_pae(xc_handle, dom, ctxt,
+				 dsi.v_start, v_end,
+				 page_array, vpt_start, vpt_end);
+    else {
+	rc = setup_pg_tables(xc_handle, dom, ctxt,
+			     dsi.v_start, v_end,
+			     page_array, vpt_start, vpt_end);
     }
-    munmap(vl1tab, PAGE_SIZE);
-    munmap(vl2tab, PAGE_SIZE);
 #endif
 #if defined(__x86_64__)
-
-#define alloc_pt(ltab, vltab) \
-        ltab = page_array[ppt_alloc++] << PAGE_SHIFT; \
-        if (vltab != NULL) { \
-            munmap(vltab, PAGE_SIZE); \
-        } \
-        if ((vltab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, \
-                          PROT_READ|PROT_WRITE, \
-                          ltab >> PAGE_SHIFT)) == NULL) { \
-            munmap(vltab, PAGE_SIZE); \
-            goto error_out; \
-        } \
-        memset(vltab, 0, PAGE_SIZE);
-
-    /* First allocate page for page dir. */
-    ppt_alloc = (vpt_start - dsi.v_start) >> PAGE_SHIFT;
-    l4tab = page_array[ppt_alloc++] << PAGE_SHIFT;
-    ctxt->ctrlreg[3] = l4tab;
-    
-    /* Intiliaize page table */
-    if ( (vl4tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                        PROT_READ|PROT_WRITE,
-                                        l4tab >> PAGE_SHIFT)) == NULL )
-            goto error_out;
-    memset(vl4tab, 0, PAGE_SIZE);
-    vl4e = &vl4tab[l4_table_offset(dsi.v_start)];
-    
-    for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++)
-    {
-        if ( !((unsigned long)vl1e & (PAGE_SIZE-1)) )
-        {
-            alloc_pt(l1tab, vl1tab);
-            
-                if ( !((unsigned long)vl2e & (PAGE_SIZE-1)) )
-                {
-                    alloc_pt(l2tab, vl2tab);
-                    if ( !((unsigned long)vl3e & (PAGE_SIZE-1)) )
-                    {
-                        alloc_pt(l3tab, vl3tab);
-                        vl3e = &vl3tab[l3_table_offset(dsi.v_start + (count<<PAGE_SHIFT))];
-                        *vl4e = l3tab | L4_PROT;
-                        vl4e++;
-                    }
-                    vl2e = &vl2tab[l2_table_offset(dsi.v_start + (count<<PAGE_SHIFT))];
-                    *vl3e = l2tab | L3_PROT;
-                    vl3e++;
-                }
-            vl1e = &vl1tab[l1_table_offset(dsi.v_start + (count<<PAGE_SHIFT))];
-            *vl2e = l1tab | L2_PROT;
-            vl2e++;
-        }
-        
-        *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
-        if ( (count >= ((vpt_start-dsi.v_start)>>PAGE_SHIFT)) &&
-            (count <  ((vpt_end  -dsi.v_start)>>PAGE_SHIFT)) ) 
-        {
-                *vl1e &= ~_PAGE_RW;
-        }
-            vl1e++;
-    }
-     
-    munmap(vl1tab, PAGE_SIZE);
-    munmap(vl2tab, PAGE_SIZE);
-    munmap(vl3tab, PAGE_SIZE);
-    munmap(vl4tab, PAGE_SIZE);
+    rc = setup_pg_tables_64(xc_handle, dom, ctxt,
+			    dsi.v_start, v_end,
+			    page_array, vpt_start, vpt_end);
 #endif
+    if (0 != rc)
+	goto error_out;
 
     /* Write the phys->machine and machine->phys table entries. */
     physmap_pfn = (vphysmap_start - dsi.v_start) >> PAGE_SHIFT;
@@ -363,9 +478,16 @@ static int setup_guest(int xc_handle,
     /*
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
      * correct protection for the page
-     */ 
-    if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE, l2tab>>PAGE_SHIFT, dom) )
-        goto error_out;
+     */
+    if (dsi.pae_kernel) {
+	if ( pin_table(xc_handle, MMUEXT_PIN_L3_TABLE,
+		       ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+	    goto error_out;
+    } else {
+	if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE,
+		       ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+	    goto error_out;
+    }
 #endif
 
 #if defined(__x86_64__)
@@ -373,9 +495,11 @@ static int setup_guest(int xc_handle,
      * Pin down l4tab addr as page dir page - causes hypervisor to  provide
      * correct protection for the page
      */
-     if ( pin_table(xc_handle, MMUEXT_PIN_L4_TABLE, l4tab>>PAGE_SHIFT, dom) )
+     if ( pin_table(xc_handle, MMUEXT_PIN_L4_TABLE,
+		    ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
         goto error_out;
 #endif
+
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
         page_array[(vstartinfo_start-dsi.v_start)>>PAGE_SHIFT]);
