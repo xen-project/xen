@@ -1,6 +1,12 @@
 ########################################
 # x86-specific definitions
 
+#
+# If you change any of these configuration options then you must
+# 'make clean' before rebuilding.
+#
+pae ?= n
+
 CFLAGS  += -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
 CFLAGS  += -iwithprefix include -Wall -Werror -Wno-pointer-arith -pipe
 CFLAGS  += -I$(BASEDIR)/include 
@@ -24,6 +30,9 @@ CFLAGS  += $(call test-gcc-flag,-fno-stack-protector-all)
 ifeq ($(TARGET_SUBARCH),x86_32)
 CFLAGS  += -m32 -march=i686
 LDFLAGS += -m elf_i386 
+ifeq ($(pae),y)
+CFLAGS  += -DCONFIG_X86_PAE=1
+endif
 endif
 
 ifeq ($(TARGET_SUBARCH),x86_64)

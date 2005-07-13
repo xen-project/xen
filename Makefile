@@ -31,6 +31,10 @@ all: dist
 include Config.mk
 include buildconfigs/Rules.mk
 
+ifeq ($(XEN_TARGET_X86_PAE),y)
+export pae=y
+endif
+
 .PHONY:	all dist install xen tools kernels docs world clean mkpatches mrproper
 .PHONY:	kbuild kdelete kclean
 

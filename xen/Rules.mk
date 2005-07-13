@@ -51,7 +51,6 @@ ALL_OBJS += $(BASEDIR)/acm/acm.o
 endif
 ALL_OBJS += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
 
-
 test-gcc-flag = $(shell $(CC) -v --help 2>&1 | grep -q " $(1) " && echo $(1))
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
@@ -91,4 +90,3 @@ CFLAGS := $(strip $(CFLAGS))
 
 %.o: %.S $(HDRS) Makefile
 	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
-
