@@ -22,13 +22,6 @@
 #include "pdb_module.h"
 #include "pdb_caml_xen.h"
 
-/* this order comes from linux-2.6.11/include/asm-i386/ptrace.h */
-enum x86_registers { LINUX_EBX, LINUX_ECX, LINUX_EDX, LINUX_ESI, LINUX_EDI,
-                     LINUX_EBP, LINUX_EAX, LINUX_DS,  LINUX_ES,  LINUX_FS,
-                     LINUX_GS,  LINUX_ORIG_EAX, LINUX_EIP, LINUX_CS, LINUX_EFL,
-                     LINUX_ESP, LINUX_SS };
-#define FRAME_SIZE 17
-
 typedef struct
 {
     int domain;
@@ -206,7 +199,7 @@ proc_read_registers (value context)
     CAMLparam1(context);
     CAMLlocal1(result);
 
-    u32 regs[FRAME_SIZE];
+    u32 regs[REGISTER_FRAME_SIZE];
 
     pdb_request_t req;
     context_t ctx;
@@ -218,7 +211,7 @@ proc_read_registers (value context)
     req.domain  = ctx.domain;
     req.process = ctx.process;
 
-    for (loop = 0; loop < FRAME_SIZE; loop++)
+    for (loop = 0; loop < REGISTER_FRAME_SIZE; loop++)
     {
         pdb_response_t resp;
 

@@ -20,12 +20,6 @@
 
 #include "pdb_caml_xen.h"
 
-/* this order comes from xen/include/public/arch-x86_32.h */
-enum x86_registers { PDB_EBX, PDB_ECX, PDB_EDX, PDB_ESI, PDB_EDI,
-                     PDB_EBP, PDB_EAX, PDB_Error_code, PDB_Entry_vector, 
-                     PDB_EIP, PDB_CS, PDB_EFLAGS, PDB_ESP, PDB_SS,
-                     PDB_ES, PDB_DS, PDB_FS, PDB_GS };
-
 typedef struct
 {
     int domain;
@@ -119,26 +113,25 @@ dom_write_register (value context, value reg, value newval)
 
     switch (my_reg)
     {
-    case PDB_EBX: regs->ebx = val; break;
-    case PDB_ECX: regs->ecx = val; break;
-    case PDB_EDX: regs->edx = val; break;
-    case PDB_ESI: regs->esi = val; break;
-    case PDB_EDI: regs->edi = val; break;
+    case GDB_EAX: regs->eax = val; break;
+    case GDB_ECX: regs->ecx = val; break;
+    case GDB_EDX: regs->edx = val; break;
+    case GDB_EBX: regs->ebx = val; break;
 
-    case PDB_EBP: regs->ebp = val; break;
-    case PDB_EAX: regs->eax = val; break;
-    case PDB_Error_code: regs->error_code = val; break;
-    case PDB_Entry_vector: regs->entry_vector = val; break;
+    case GDB_ESP: regs->esp = val; break;
+    case GDB_EBP: regs->ebp = val; break;
+    case GDB_ESI: regs->esi = val; break;
+    case GDB_EDI: regs->edi = val; break;
  
-    case PDB_EIP: regs->eip = val; break;
-    case PDB_CS:  regs->cs  = val; break;
-    case PDB_EFLAGS: regs->eflags = val; break;
-    case PDB_ESP: regs->esp = val; break;
-    case PDB_SS:  regs->ss  = val; break;
-    case PDB_ES:  regs->es  = val; break;
-    case PDB_DS:  regs->ds  = val; break;
-    case PDB_FS:  regs->fs  = val; break;
-    case PDB_GS:  regs->gs  = val; break;
+    case GDB_EIP: regs->eip = val; break;
+    case GDB_EFL: regs->eflags = val; break;
+
+    case GDB_CS:  regs->cs  = val; break;
+    case GDB_SS:  regs->ss  = val; break;
+    case GDB_DS:  regs->ds  = val; break;
+    case GDB_ES:  regs->es  = val; break;
+    case GDB_FS:  regs->fs  = val; break;
+    case GDB_GS:  regs->gs  = val; break;
     }
 
     if ( xendebug_write_registers(xc_handle, ctx.domain, ctx.vcpu, regs) )
@@ -437,9 +430,10 @@ query_domain_stop (value unit)
         failwith("query domain stop");
     }
 
-    printf ("QDS: %d\n", count);
+    printf ("QDS [%d]: \n", count);
     for (loop = 0; loop < count; loop ++)
-        printf ("  %d %d\n", loop, dom_list[loop]);
+        printf (" %d", dom_list[loop]);
+    printf ("\n");
 
     result = caml_alloc(2,0);
     if ( count > 0 )                                                  /* car */

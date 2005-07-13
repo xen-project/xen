@@ -331,7 +331,7 @@ let process_xen_virq fd =
   let (dom, vcpu) = List.find find_pair dom_list in
   let vec = 3 in
   let sock = PDB.find_domain dom vcpu in
-  print_endline (Printf.sprintf "handle bkpt d:%d ed:%d v:%d  %s" 
+  print_endline (Printf.sprintf "handle bkpt dom:%d vcpu:%d vec:%d  %s" 
 		   dom vcpu vec (Util.get_connection_info sock));
   Util.send_reply sock "S05";
   Evtchn.unmask fd channel                                (* allow next virq *)
