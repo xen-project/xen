@@ -194,16 +194,10 @@ void __init check_efer(void)
 {
 	unsigned long efer;
 
-        /*	rdmsrl(MSR_EFER, efer);  */
-
-        /*
-         * At this point, Xen does not like the bit 63.
-         * So NX is not supported. Come back later.
-         */
-        efer = 0;
-
+	rdmsrl(MSR_EFER, efer); 
         if (!(efer & EFER_NX) || do_not_nx) { 
                 __supported_pte_mask &= ~_PAGE_NX; 
+
         }       
 }
 

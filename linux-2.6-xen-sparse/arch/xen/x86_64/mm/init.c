@@ -641,8 +641,6 @@ void zap_low_mappings(void)
 #ifndef CONFIG_DISCONTIGMEM
 void __init paging_init(void)
 {
-        int i;
-
 	{
 		unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
                 /*	unsigned int max_dma; */
@@ -664,14 +662,17 @@ void __init paging_init(void)
         memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
+	{
+		int i;
         /* Setup mapping of lower 1st MB */
-        for (i = 0; i < NR_FIX_ISAMAPS; i++)
-                if (xen_start_info.flags & SIF_PRIVILEGED)
-                        set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
-                else
-                        __set_fixmap(FIX_ISAMAP_BEGIN - i,
-				     virt_to_machine(empty_zero_page),
-				     PAGE_KERNEL_RO);
+		for (i = 0; i < NR_FIX_ISAMAPS; i++)
+			if (xen_start_info.flags & SIF_PRIVILEGED)
+				set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
+			else
+				__set_fixmap(FIX_ISAMAP_BEGIN - i,
+					     virt_to_machine(empty_zero_page),
+					     PAGE_KERNEL_RO);
+	}
 #endif
 
 }
