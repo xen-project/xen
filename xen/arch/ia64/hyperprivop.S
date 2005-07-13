@@ -14,8 +14,15 @@
 #include <asm/system.h>
 #include <public/arch-ia64.h>
 
+#if 1	 // change to 0 to turn off all fast paths
+#define FAST_HYPERPRIVOPS
 #define FAST_HYPERPRIVOP_CNT
 #define FAST_REFLECT_CNT
+#define FAST_TICK
+#define FAST_BREAK
+#define FAST_ACCESS_REFLECT
+#undef RFI_TO_INTERRUPT // not working yet
+#endif
 
 // FIXME: This is defined in include/asm-ia64/hw_irq.h but this
 // doesn't appear to be include'able from assembly?
@@ -45,6 +52,9 @@
 //	r19 == vpsr.ic (low 32 bits) | vpsr.i (high 32 bits)
 //	r31 == pr
 GLOBAL_ENTRY(fast_hyperprivop)
+#ifndef FAST_HYPERPRIVOPS // see beginning of file
+	br.sptk.many dispatch_break_fault ;;
+#endif
 	// HYPERPRIVOP_SSM_I?
 	// assumes domain interrupts pending, so just do it
 	cmp.eq p7,p6=XEN_HYPER_SSM_I,r17
@@ -280,8 +290,7 @@ ENTRY(hyper_ssm_i)
 //	r30 == cr.ivr
 //	r29 == rp
 GLOBAL_ENTRY(fast_tick_reflect)
-#define FAST_TICK
-#ifndef FAST_TICK
+#ifndef FAST_TICK // see beginning of file
 	br.cond.sptk.many rp;;
 #endif
 	mov r28=IA64_TIMER_VECTOR;;
@@ -290,7 +299,7 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	movl r20=(PERCPU_ADDR)+IA64_CPUINFO_ITM_NEXT_OFFSET;;
 	ld8 r26=[r20];;
 	mov r27=ar.itc;;
-	adds r27=200,r27	// safety margin
+	adds r27=200,r27;;	// safety margin
 	cmp.ltu p6,p0=r26,r27
 (p6)	br.cond.spnt.few rp;;
 	mov r17=cr.ipsr;;
@@ -453,8 +462,7 @@ END(fast_tick_reflect)
 //	r19 == vpsr.ic (low 32 bits) | vpsr.i (high 32 bits)
 //	r31 == pr
 GLOBAL_ENTRY(fast_break_reflect)
-#define FAST_BREAK
-#ifndef FAST_BREAK
+#ifndef FAST_BREAK // see beginning of file
 	br.sptk.many dispatch_break_fault ;;
 #endif
 	mov r30=cr.ipsr;;
@@ -595,6 +603,9 @@ ENTRY(fast_reflect)
 //	r20 == offset into ivt
 //	r31 == pr
 GLOBAL_ENTRY(fast_access_reflect)
+#ifndef FAST_ACCESS_REFLECT // see beginning of file
+	br.spnt.few dispatch_reflection ;;
+#endif
 	mov r30=cr.ipsr;;
 	mov r29=cr.iip;;
 	extr.u r21=r30,IA64_PSR_BE_BIT,1 ;;
@@ -670,7 +681,7 @@ ENTRY(hyper_rfi)
 	cmp.ltu p0,p7=r22,r23 ;;	// if !(iip<low) &&
 (p7)	cmp.geu p0,p7=r22,r24 ;;	//    !(iip>=high)
 (p7)	br.spnt.few dispatch_break_fault ;;
-#ifndef RFI_TO_INTERRUPT
+#ifndef RFI_TO_INTERRUPT // see beginning of file
 	cmp.ne p6,p0=r30,r0
 (p6)	br.cond.spnt.few dispatch_break_fault ;;
 #endif

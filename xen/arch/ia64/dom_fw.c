@@ -347,9 +347,11 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 			unsigned long pm_buffer[16];
 			status = ia64_pal_perf_mon_info(pm_buffer,&r9);
 			if (status != 0) break;
-			if (copy_to_user((void __user *)in1,pm_buffer,128))
+			if (copy_to_user((void __user *)in1,pm_buffer,128)) {
 				printk("xen_pal_emulator: PAL_PERF_MON_INFO "
 					"can't copy to user!!!!\n");
+				status = -1;
+			}
 		}
 		break;
 	    case PAL_CACHE_INFO:
