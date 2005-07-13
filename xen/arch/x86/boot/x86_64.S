@@ -76,7 +76,7 @@ __start:
         cpuid
         bt      $29,%edx            # Long mode feature?
         jnc     bad_cpu
-        mov     %edx,%edi
+        mov     %edx,0x100310       # cpuid_ext_features
 skip_boot_checks:
 
         /* Set up FPU. */
@@ -95,6 +95,7 @@ skip_boot_checks:
         rdmsr
         btsl    $_EFER_LME,%eax /* Long Mode      */
         btsl    $_EFER_SCE,%eax /* SYSCALL/SYSRET */
+        mov     0x100310,%edi
         btl     $20,%edi        /* CPUID 0x80000001, EDX[20] */
         jnc     1f
         btsl    $_EFER_NX,%eax  /* No-Execute     */
@@ -105,10 +106,10 @@ skip_boot_checks:
         jmp     1f
 
 1:      /* Now in compatibility mode. Long-jump into 64-bit mode. */
-        ljmp    $(__HYPERVISOR_CS64),$0x100100
+        ljmp    $(__HYPERVISOR_CS64),$0x100200
         
         .code64
-        .org    0x0100
+        .org    0x0200
 
         /* Install relocated selectors (FS/GS unused). */
         lgdt    gdt_descr(%rip)
@@ -200,7 +201,10 @@ nopaging_gdt_descr:   /* 0x306 */
         .word   LAST_RESERVED_GDT_BYTE
         .quad   gdt_table - FIRST_RESERVED_GDT_BYTE - __PAGE_OFFSET
 
-        .word   0,0,0
+cpuid_ext_features:   /* 0x310 */
+        .long   0
+        
+        .word   0
 gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
 gdt:
