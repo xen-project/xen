@@ -7,11 +7,6 @@
 #ifndef __X86_CONFIG_H__
 #define __X86_CONFIG_H__
 
-#if defined(__i386__)
-// # define CONFIG_X86_PAE 1   /* yes */
- # undef CONFIG_X86_PAE      /* no  */
-#endif
-
 #if defined(__x86_64__)
 # define CONFIG_PAGING_LEVELS 4
 #elif defined(CONFIG_X86_PAE)
