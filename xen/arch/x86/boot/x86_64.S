@@ -63,7 +63,7 @@ __start:
         /* Check for Multiboot bootloader */
         cmp     $0x2BADB002,%eax
         jne     not_multiboot
-        
+
         /* Save the Multiboot info structure for later use. */
         mov     %ebx,0x100300       # multiboot_ptr
 
@@ -91,7 +91,7 @@ skip_boot_checks:
         mov     %eax,%cr3
 
         /* Set up EFER (Extended Feature Enable Register). */
-        movl    $MSR_EFER, %ecx
+        movl    $MSR_EFER,%ecx
         rdmsr
         btsl    $_EFER_LME,%eax /* Long Mode      */
         btsl    $_EFER_SCE,%eax /* SYSCALL/SYSRET */

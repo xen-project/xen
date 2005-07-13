@@ -2,6 +2,7 @@
 #include <public/xen.h>
 #include <asm/desc.h>
 #include <asm/page.h>
+#include <asm/msr.h>
 
 #define  SECONDARY_CPU_FLAG 0xA5A5A5A5
                 
@@ -57,13 +58,13 @@ __start:
 
         /* Set up FPU. */
         fninit
-        
+
         /* Set up CR4, except global flag which Intel requires should be     */
         /* left until after paging is enabled (IA32 Manual Vol. 3, Sec. 2.5) */
         mov     mmu_cr4_features-__PAGE_OFFSET,%ecx
         and     $0x7f,%cl   # CR4.PGE (global enable)
         mov     %ecx,%cr4
-                
+
         cmp     $(SECONDARY_CPU_FLAG),%ebx
         je      start_paging
                 
@@ -125,6 +126,24 @@ __start:
         loop    1b
 
 start_paging:
+#ifdef CONFIG_X86_PAE
+        /* Enable Execute-Disable (NX/XD) support if it is available. */
+        push    %ebx
+        mov     $0x80000000,%eax
+        cpuid
+        cmp     $0x80000000,%eax    /* Any function > 0x80000000? */
+        jbe     no_execute_disable
+        mov     $0x80000001,%eax
+        cpuid
+        bt      $20,%edx            /* Execute Disable? */
+        jnc     no_execute_disable
+        movl    $MSR_EFER,%ecx
+        rdmsr
+        bts     $_EFER_NX,%eax
+        wrmsr
+no_execute_disable:
+        pop     %ebx
+#endif
         mov     $idle_pg_table-__PAGE_OFFSET,%eax
         mov     %eax,%cr3
         mov     $0x80050033,%eax /* hi-to-lo: PG,AM,WP,NE,ET,MP,PE */
