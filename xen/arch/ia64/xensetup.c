@@ -14,7 +14,7 @@
 //#include <xen/delay.h>
 #include <xen/compile.h>
 //#include <xen/console.h>
-//#include <xen/serial.h>
+#include <xen/serial.h>
 #include <xen/trace.h>
 #include <asm/meminit.h>
 #include <asm/page.h>
