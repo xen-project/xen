@@ -801,11 +801,7 @@ vmx_world_restore(struct vcpu *d, struct vmx_assist_context *c)
 skip_cr3:
 
     error |= __vmread(CR4_READ_SHADOW, &old_cr4);
-#if defined (__i386__)
-    error |= __vmwrite(GUEST_CR4, (c->cr4 | X86_CR4_VMXE));
-#else
-    error |= __vmwrite(GUEST_CR4, (c->cr4 | X86_CR4_VMXE | X86_CR4_PAE));
-#endif
+    error |= __vmwrite(GUEST_CR4, (c->cr4 | VMX_CR4_HOST_MASK));
     error |= __vmwrite(CR4_READ_SHADOW, c->cr4);
 
     error |= __vmwrite(GUEST_IDTR_LIMIT, c->idtr_limit);
@@ -1178,13 +1174,10 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     {
         /* CR4 */
         unsigned long old_guest_cr;
-        unsigned long pae_disabled = 0;
 
         __vmread(GUEST_CR4, &old_guest_cr);
         if (value & X86_CR4_PAE){
             set_bit(VMX_CPU_STATE_PAE_ENABLED, &d->arch.arch_vmx.cpu_state);
-            if(!vmx_paging_enabled(d))
-                pae_disabled = 1;
         } else {
             if (test_bit(VMX_CPU_STATE_LMA_ENABLED,
                          &d->arch.arch_vmx.cpu_state)){
@@ -1194,11 +1187,8 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
         }
 
         __vmread(CR4_READ_SHADOW, &old_cr);
-        if (pae_disabled)
-            __vmwrite(GUEST_CR4, value| X86_CR4_VMXE);
-        else
-            __vmwrite(GUEST_CR4, value| X86_CR4_VMXE);
 
+        __vmwrite(GUEST_CR4, value| VMX_CR4_HOST_MASK);
         __vmwrite(CR4_READ_SHADOW, value);
 
         /*

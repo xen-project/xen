@@ -183,6 +183,13 @@ extern unsigned int cpu_rev;
       EXCEPTION_BITMAP_GP )
 #endif
 
+/* These bits in the CR4 are owned by the host */
+#ifdef __i386__
+#define VMX_CR4_HOST_MASK (X86_CR4_VMXE)
+#else
+#define VMX_CR4_HOST_MASK (X86_CR4_VMXE | X86_CR4_PAE)
+#endif
+
 #define VMCALL_OPCODE   ".byte 0x0f,0x01,0xc1\n"
 #define VMCLEAR_OPCODE  ".byte 0x66,0x0f,0xc7\n"        /* reg/opcode: /6 */
 #define VMLAUNCH_OPCODE ".byte 0x0f,0x01,0xc2\n"
