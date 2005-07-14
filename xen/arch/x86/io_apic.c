@@ -27,6 +27,7 @@
 #include <xen/delay.h>
 #include <xen/sched.h>
 #include <xen/acpi.h>
+#include <xen/keyhandler.h>
 #include <asm/io.h>
 #include <asm/mc146818rtc.h>
 #include <asm/smp.h>
@@ -744,7 +745,7 @@ static inline void UNEXPECTED_IO_APIC(void)
 {
 }
 
-void __init print_IO_APIC(void)
+void __init __print_IO_APIC(void)
 {
     int apic, i;
     union IO_APIC_reg_00 reg_00;
@@ -752,9 +753,6 @@ void __init print_IO_APIC(void)
     union IO_APIC_reg_02 reg_02;
     union IO_APIC_reg_03 reg_03;
     unsigned long flags;
-
-    if (apic_verbosity == APIC_QUIET)
-        return;
 
     printk(KERN_DEBUG "number of MP IRQ sources: %d.\n", mp_irq_entries);
     for (i = 0; i < nr_ioapics; i++)
@@ -887,6 +885,17 @@ void __init print_IO_APIC(void)
     printk(KERN_INFO ".................................... done.\n");
 
     return;
+}
+
+void print_IO_APIC(void)
+{
+    if (apic_verbosity != APIC_QUIET)
+        __print_IO_APIC();
+}
+
+void print_IO_APIC_keyhandler(unsigned char key)
+{
+    __print_IO_APIC();
 }
 
 static void __init enable_IO_APIC(void)
@@ -1531,6 +1540,8 @@ void __init setup_IO_APIC(void)
     init_IO_APIC_traps();
     check_timer();
     print_IO_APIC();
+
+    register_keyhandler('z', print_IO_APIC_keyhandler, "print ioapic info");
 }
 
 /* --------------------------------------------------------------------------
