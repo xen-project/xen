@@ -121,7 +121,7 @@ void
 setup_gdt(void)
 {
 	/* setup task state segment */
-	memset(&tss, 0, sizeof(0));
+	memset(&tss, 0, sizeof(tss));
 	tss.ss0 = DATA_SELECTOR;
 	tss.esp0 = (unsigned) stack_top - 4*4;
 	tss.iomap_base = offsetof(struct tss, iomap);
@@ -353,6 +353,9 @@ main()
 #endif
 	setup_gdt();
 	setup_idt();
+#ifdef	ENABLE_VME
+	set_cr4(get_cr4() | CR4_VME); 
+#endif
 	setup_ctx();
 	setup_pic();
 	start_bios();

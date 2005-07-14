@@ -40,7 +40,8 @@
 #define EFLAGS_TF	(1 << 8)
 #define EFLAGS_IF	(1 << 9)
 #define EFLAGS_DF	(1 << 10)
-#define EFLAGS_VM	(1 << 17)
+#define EFLAGS_IOPL (3 << 12)
+#define EFLAGS_VM	((1 << 17) | EFLAGS_IOPL)
 #define EFLAGS_VIF	(1 << 19)
 #define EFLAGS_VIP	(1 << 20)
 
@@ -109,6 +110,9 @@ struct tss {
 	unsigned short	_5;
 	unsigned short	_6;
 	unsigned short	iomap_base;
+#ifdef	ENABLE_VME
+	unsigned long	int_redir[8];
+#endif
 	unsigned char	iomap[8192];
 };
 
@@ -177,7 +181,6 @@ get_cr4(void)
         return rv;
 }
 
-#ifdef TEST
 static inline void
 set_cr3(unsigned addr)
 {
@@ -190,6 +193,7 @@ set_cr4(unsigned value)
 	__asm__ __volatile__("movl %0, %%cr4" : /* no outputs */ : "r"(value));
 }
 
+#ifdef TEST
 static inline void
 breakpoint(void)
 {
