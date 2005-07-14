@@ -24,11 +24,11 @@ static int __init
 setup_serial_console(struct pcdp_uart *uart)
 {
 #ifdef XEN
-	extern char opt_com1[1];
-	if (opt_com1[0]) return 0;
-	sprintf(&opt_com1[0], "%lu,%dn1,0x%lx,9",
-		uart->baud, uart->bits ? uart->bits : 8,
-		uart->addr.address);
+	extern struct ns16550_defaults ns16550_com1;
+	ns16550_com1.baud = uart->baud;
+	ns16550_com1.io_base = uart->addr.address;
+	if (uart->bits)
+		ns16550_com1.data_bits = uart->bits;
 	return 0;
 #else
 #ifdef CONFIG_SERIAL_8250_CONSOLE

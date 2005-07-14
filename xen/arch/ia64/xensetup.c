@@ -131,6 +131,12 @@ void early_cmdline_parse(char **cmdline_p)
     return;
 }
 
+struct ns16550_defaults ns16550_com1 = {
+    .data_bits = 8,
+    .parity    = 'n',
+    .stop_bits = 1
+};
+
 void start_kernel(void)
 {
     unsigned char *cmdline;
@@ -153,7 +159,7 @@ void start_kernel(void)
 
     /* We initialise the serial devices very early so we can get debugging. */
     if (running_on_sim) hpsim_serial_init();
-    else ns16550_init();
+    else ns16550_init(0, &ns16550_com1);
     serial_init_preirq();
 
     init_console();

@@ -247,6 +247,11 @@ void __init __start_xen(multiboot_info_t *mbi)
     unsigned long initial_images_start, initial_images_end;
     struct e820entry e820_raw[E820MAX];
     int i, e820_raw_nr = 0, bytes = 0;
+    struct ns16550_defaults ns16550 = {
+        .data_bits = 8,
+        .parity    = 'n',
+        .stop_bits = 1
+    };
 
     /* Parse the command-line options. */
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
@@ -259,7 +264,12 @@ void __init __start_xen(multiboot_info_t *mbi)
     smp_prepare_boot_cpu();
 
     /* We initialise the serial devices very early so we can get debugging. */
-    ns16550_init();
+    ns16550.io_base = 0x3f8;
+    ns16550.irq     = 4;
+    ns16550_init(0, &ns16550);
+    ns16550.io_base = 0x2f8;
+    ns16550.irq     = 3;
+    ns16550_init(1, &ns16550);
     serial_init_preirq();
 
     init_console();

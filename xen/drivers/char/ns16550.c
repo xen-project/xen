@@ -16,7 +16,7 @@
 #include <asm/io.h>
 
 /* Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
-char opt_com1[30] = "", opt_com2[30] = "";
+static char opt_com1[30] = "", opt_com2[30] = "";
 string_param("com1", opt_com1);
 string_param("com2", opt_com2);
 
@@ -25,10 +25,7 @@ static struct ns16550 {
     unsigned long io_base;   /* I/O port or memory-mapped I/O address. */
     char *remapped_io_base;  /* Remapped virtual address of mmap I/O.  */ 
     struct irqaction irqaction;
-} ns16550_com[2] = {
-    { 0, 0, 0, 0, 4, 0x3f8 },
-    { 0, 0, 0, 0, 3, 0x2f8 }
-};
+} ns16550_com[2] = { { 0 } };
 
 /* Register offsets */
 #define RBR             0x00    /* receive buffer       */
@@ -157,9 +154,12 @@ static void ns16550_init_preirq(struct serial_port *port)
     ns_write_reg(uart, IER, 0);
 
     /* Line control and baud-rate generator. */
-    ns_write_reg(uart, LCR, lcr | LCR_DLAB);
-    ns_write_reg(uart, DLL, 115200/uart->baud); /* baud lo */
-    ns_write_reg(uart, DLM, 0);                 /* baud hi */
+    if ( uart->baud != 0 )
+    {
+        ns_write_reg(uart, LCR, lcr | LCR_DLAB);
+        ns_write_reg(uart, DLL, 115200/uart->baud); /* baud lo */
+        ns_write_reg(uart, DLM, 0);                 /* baud hi */
+    }
     ns_write_reg(uart, LCR, lcr);               /* parity, data, stop */
 
     /* No flow ctrl: DTR and RTS are both wedged high to keep remote happy. */
@@ -177,6 +177,9 @@ static void ns16550_init_postirq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     int rc;
+
+    if ( uart->irq <= 0 )
+        return;
 
     serial_async_transmit(port);
 
@@ -213,6 +216,24 @@ static struct uart_driver ns16550_driver = {
     .getc         = ns16550_getc
 };
 
+static int parse_parity_char(int c)
+{
+    switch ( c )
+    {
+    case 'n':
+        return PARITY_NONE;
+    case 'o': 
+        return PARITY_ODD;
+    case 'e': 
+        return PARITY_EVEN;
+    case 'm': 
+        return PARITY_MARK;
+    case 's': 
+        return PARITY_SPACE;
+    }
+    return 0;
+}
+
 #define PARSE_ERR(_f, _a...)                 \
     do {                                     \
         printk( "ERROR: " _f "\n" , ## _a ); \
@@ -221,49 +242,24 @@ static struct uart_driver ns16550_driver = {
 
 static void ns16550_parse_port_config(struct ns16550 *uart, char *conf)
 {
-    if ( *conf == '\0' )
-        return;
+    int baud;
 
-    uart->baud = simple_strtol(conf, &conf, 10);
-    if ( (uart->baud < 1200) || (uart->baud > 115200) )
-        PARSE_ERR("Baud rate %d outside supported range.", uart->baud);
+    if ( (conf == NULL) || (*conf == '\0') )
+        goto config_parsed;
+
+    if ( (baud = simple_strtol(conf, &conf, 10)) != 0 )
+        uart->baud = baud;
 
     if ( *conf != ',' )
-        PARSE_ERR("Missing data/parity/stop specifiers.");
-
+        goto config_parsed;
     conf++;
 
     uart->data_bits = simple_strtol(conf, &conf, 10);
-    if ( (uart->data_bits < 5) || (uart->data_bits > 8) )
-        PARSE_ERR("%d data bits are unsupported.", uart->data_bits);
 
-    switch ( *conf )
-    {
-    case 'n':
-        uart->parity = PARITY_NONE;
-        break;
-    case 'o': 
-        uart->parity =  PARITY_ODD;
-        break;
-    case 'e': 
-        uart->parity =  PARITY_EVEN;
-        break;
-    case 'm': 
-        uart->parity =  PARITY_MARK;
-        break;
-    case 's': 
-        uart->parity =  PARITY_SPACE;
-        break;
-
-    default:
-        PARSE_ERR("Invalid parity specifier '%c'.", *conf);
-    }
-
+    uart->parity = parse_parity_char(*conf);
     conf++;
 
     uart->stop_bits = simple_strtol(conf, &conf, 10);
-    if ( (uart->stop_bits < 1) || (uart->stop_bits > 2) )
-        PARSE_ERR("%d stop bits are unsupported.", uart->stop_bits);
 
     if ( *conf == ',' )
     {
@@ -277,13 +273,39 @@ static void ns16550_parse_port_config(struct ns16550 *uart, char *conf)
         }
     }
 
+ config_parsed:
+    /* Sanity checks. */
+    if ( (uart->baud != 0) && ((uart->baud < 1200) || (uart->baud > 115200)) )
+        PARSE_ERR("Baud rate %d outside supported range.", uart->baud);
+    if ( (uart->data_bits < 5) || (uart->data_bits > 8) )
+        PARSE_ERR("%d data bits are unsupported.", uart->data_bits);
+    if ( (uart->stop_bits < 1) || (uart->stop_bits > 2) )
+        PARSE_ERR("%d stop bits are unsupported.", uart->stop_bits);
+    if ( uart->io_base == 0 )
+        PARSE_ERR("I/O base address must be specified.");
+
+    /* Register with generic serial driver. */
     serial_register_uart(uart - ns16550_com, &ns16550_driver, uart);
 }
 
-void ns16550_init(void)
+void ns16550_init(int index, struct ns16550_defaults *defaults)
 {
-    ns16550_parse_port_config(&ns16550_com[0], opt_com1);
-    ns16550_parse_port_config(&ns16550_com[1], opt_com2);
+    struct ns16550 *uart = &ns16550_com[index];
+
+    if ( (index < 0) || (index > 1) )
+        return;
+
+    if ( defaults != NULL )
+    {
+        uart->baud      = defaults->baud;
+        uart->data_bits = defaults->data_bits;
+        uart->parity    = parse_parity_char(defaults->parity);
+        uart->stop_bits = defaults->stop_bits;
+        uart->irq       = defaults->irq;
+        uart->io_base   = defaults->io_base;
+    }
+
+    ns16550_parse_port_config(uart, (index == 0) ? opt_com1 : opt_com2);
 }
 
 /*
