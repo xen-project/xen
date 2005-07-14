@@ -357,7 +357,7 @@ typedef struct {
     u64     cpu_time;                 
 } dom0_getvcpucontext_t;
 
-#define DOM0_GETDOMAININFOLIST    38
+#define DOM0_GETDOMAININFOLIST   38
 typedef struct {
     /* IN variables. */
     domid_t               first_domain;
@@ -366,6 +366,13 @@ typedef struct {
     /* OUT variables. */
     memory_t              num_domains;
 } dom0_getdomaininfolist_t;
+
+#define DOM0_PLATFORM_QUIRK      39  
+#define QUIRK_NOIRQBALANCING  1
+typedef struct {
+    /* IN variables. */
+    int quirk_id;
+} dom0_platform_quirk_t;
 
 typedef struct {
     u32 cmd;
@@ -400,6 +407,7 @@ typedef struct {
         dom0_ioport_permission_t ioport_permission;
         dom0_getvcpucontext_t    getvcpucontext;
         dom0_getdomaininfolist_t getdomaininfolist;
+        dom0_platform_quirk_t    platform_quirk;
     } u;
 } dom0_op_t;
 

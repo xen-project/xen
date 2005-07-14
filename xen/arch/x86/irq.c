@@ -16,7 +16,7 @@
 #include <asm/smpboot.h>
 
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
-static int opt_noirqbalance = 0;
+int opt_noirqbalance = 0;
 boolean_param("noirqbalance", opt_noirqbalance);
 
 irq_desc_t irq_desc[NR_IRQS];

@@ -18,6 +18,7 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <asm/shadow.h>
+#include <asm/irq.h>
 #include <public/sched_ctl.h>
 
 #include <asm/mtrr.h>
@@ -367,6 +368,23 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             copy_to_user(u_dom0_op, op, sizeof(*op));
             
             put_domain(d);
+        }
+    }
+    break;
+
+    case DOM0_PLATFORM_QUIRK:
+    {
+        extern int opt_noirqbalance;
+        switch ( op->u.platform_quirk.quirk_id )
+        {
+        case QUIRK_NOIRQBALANCING:
+            printk("Platform quirk -- Disabling IRQ balancing/affinity.\n");
+            opt_noirqbalance = 1;
+            setup_ioapic_dest();
+            break;
+        default:
+            ret = -EINVAL;
+            break;
         }
     }
     break;
