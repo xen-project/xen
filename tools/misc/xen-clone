@@ -60,7 +60,7 @@ cd ${TOP}
 fi
 
 
-if [ -d ${DEST_BK_REP}/linux-2.4.*-xen-sparse ]
+if [ -d ${DEST_BK_REP}/linux-2.4*-xen-sparse ]
 then
  # this is a new style Xen repository so building is dead easy
 
