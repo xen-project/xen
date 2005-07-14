@@ -1692,6 +1692,11 @@ editing \path{grub.conf}.
 \item [watchdog ] 
  Enable NMI watchdog which can report certain failures. 
 
+\item [noirqbalance ] 
+ Disable software IRQ balancing and affinity. This can be used on
+ systems such as Dell 1850/2850 that have workarounds in hardware for
+ IRQ-routing issues.
+
 \item [badpage=$<$page number$>$,$<$page number$>$, \ldots ] 
  Specify a list of pages not to be allocated for use 
  because they contain bad bytes. For example, if your

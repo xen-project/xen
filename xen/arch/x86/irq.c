@@ -6,6 +6,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/init.h>
 #include <xen/errno.h>
 #include <xen/event.h>
 #include <xen/irq.h>
@@ -13,6 +14,10 @@
 #include <xen/sched.h>
 #include <asm/current.h>
 #include <asm/smpboot.h>
+
+/* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
+static int opt_noirqbalance = 0;
+boolean_param("noirqbalance", opt_noirqbalance);
 
 irq_desc_t irq_desc[NR_IRQS];
 
@@ -240,7 +245,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
 
         /* Attempt to bind the interrupt target to the correct CPU. */
         cpu_set(v->processor, cpumask);
-        if ( desc->handler->set_affinity != NULL )
+        if ( !opt_noirqbalance && (desc->handler->set_affinity != NULL) )
             desc->handler->set_affinity(vector, cpumask);
     }
     else if ( !will_share || !action->shareable )
