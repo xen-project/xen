@@ -23,6 +23,7 @@ build: $(TARGETS)
 	$(MAKE) -C miniterm
 	$(MAKE) -C cpuperf
 	$(MAKE) -C mbootpack
+	$(MAKE) -C lomount
 
 install: build
 	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
@@ -30,6 +31,7 @@ install: build
 	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) $(INSTALL_SBIN) $(DESTDIR)/usr/sbin
 	$(MAKE) -C cpuperf install
+	$(MAKE) -C lomount install
 #       No sense in installing miniterm on the Xen box.
 #	$(MAKE) -C miniterm install
 #       Likewise mbootpack
@@ -40,6 +42,7 @@ clean:
 	$(MAKE) -C miniterm clean
 	$(MAKE) -C cpuperf clean
 	$(MAKE) -C mbootpack clean
+	$(MAKE) -C lomount clean
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
