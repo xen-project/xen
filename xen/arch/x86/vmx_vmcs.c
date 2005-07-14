@@ -55,25 +55,22 @@ void free_vmcs(struct vmcs_struct *vmcs)
 {
     int order;
 
-    order = (vmcs_size >> PAGE_SHIFT) - 1;
+    order = get_order(vmcs_size);
     free_xenheap_pages(vmcs, order);
 }
 
 static inline int construct_vmcs_controls(void)
 {
     int error = 0;
-        
+
     error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL, 
                        MONITOR_PIN_BASED_EXEC_CONTROLS);
 
     error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL, 
                        MONITOR_CPU_BASED_EXEC_CONTROLS);
-#if defined (__x86_64__)
-    error |= __vmwrite(VM_EXIT_CONTROLS, 
-      MONITOR_VM_EXIT_CONTROLS | VM_EXIT_CONTROLS_IA_32E_MODE);
-#else
+
     error |= __vmwrite(VM_EXIT_CONTROLS, MONITOR_VM_EXIT_CONTROLS);
-#endif
+
     error |= __vmwrite(VM_ENTRY_CONTROLS, MONITOR_VM_ENTRY_CONTROLS);
 
     return error;

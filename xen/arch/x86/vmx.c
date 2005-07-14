@@ -262,6 +262,20 @@ extern long evtchn_send(int lport);
 extern long do_block(void);
 void do_nmi(struct cpu_user_regs *, unsigned long);
 
+static int check_vmx_controls(ctrls, msr)
+{   
+    u32 vmx_msr_low, vmx_msr_high; 
+
+    rdmsr(msr, vmx_msr_low, vmx_msr_high);
+    if (ctrls < vmx_msr_low || ctrls > vmx_msr_high) {
+        printk("Insufficient VMX capability 0x%x, "
+               "msr=0x%x,low=0x%8x,high=0x%x\n", 
+               ctrls, msr, vmx_msr_low, vmx_msr_high);
+        return 0;
+    }
+    return 1;
+}
+
 int start_vmx(void)
 {
     struct vmcs_struct *vmcs;
@@ -291,6 +305,19 @@ int start_vmx(void)
               IA32_FEATURE_CONTROL_MSR_LOCK |
               IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON, 0);
     }
+
+    if (!check_vmx_controls(MONITOR_PIN_BASED_EXEC_CONTROLS, 
+            MSR_IA32_VMX_PINBASED_CTLS_MSR))
+        return 0;
+    if (!check_vmx_controls(MONITOR_CPU_BASED_EXEC_CONTROLS, 
+            MSR_IA32_VMX_PROCBASED_CTLS_MSR))
+        return 0;
+    if (!check_vmx_controls(MONITOR_VM_EXIT_CONTROLS, 
+            MSR_IA32_VMX_EXIT_CTLS_MSR))
+        return 0;
+    if (!check_vmx_controls(MONITOR_VM_ENTRY_CONTROLS, 
+            MSR_IA32_VMX_ENTRY_CTLS_MSR))
+        return 0;
 
     set_in_cr4(X86_CR4_VMXE);   /* Enable VMXE */
 
@@ -965,7 +992,7 @@ static int vmx_set_cr0(unsigned long value)
             set_bit(VMX_CPU_STATE_LMA_ENABLED,
               &d->arch.arch_vmx.cpu_state);
             __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
-            vm_entry_value |= VM_ENTRY_CONTROLS_IA_32E_MODE;
+            vm_entry_value |= VM_ENTRY_CONTROLS_IA32E_MODE;
             __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
 
 #if CONFIG_PAGING_LEVELS >= 4 
@@ -1028,7 +1055,7 @@ static int vmx_set_cr0(unsigned long value)
                 clear_bit(VMX_CPU_STATE_LMA_ENABLED,
                           &d->arch.arch_vmx.cpu_state);
                 __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
-                vm_entry_value &= ~VM_ENTRY_CONTROLS_IA_32E_MODE;
+                vm_entry_value &= ~VM_ENTRY_CONTROLS_IA32E_MODE;
                 __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
             }
         }

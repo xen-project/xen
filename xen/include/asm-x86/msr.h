@@ -94,6 +94,11 @@
 
 /* MSRs & bits used for VMX enabling */
 #define MSR_IA32_VMX_BASIC_MSR                  0x480
+#define MSR_IA32_VMX_PINBASED_CTLS_MSR          0x481
+#define MSR_IA32_VMX_PROCBASED_CTLS_MSR         0x482
+#define MSR_IA32_VMX_EXIT_CTLS_MSR              0x483
+#define MSR_IA32_VMX_ENTRY_CTLS_MSR             0x484
+#define MSR_IA32_VMX_MISC_MSR                   0x485
 #define IA32_FEATURE_CONTROL_MSR                0x3a
 #define IA32_FEATURE_CONTROL_MSR_LOCK           0x1
 #define IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON   0x4
