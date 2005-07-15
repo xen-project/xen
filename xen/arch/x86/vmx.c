@@ -1383,6 +1383,53 @@ static inline void vmx_vmexit_do_hlt(void)
     raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
+static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
+{
+    unsigned int vector;
+    int error;
+
+    asmlinkage void do_IRQ(struct cpu_user_regs *);
+    void smp_apic_timer_interrupt(struct cpu_user_regs *);
+    void timer_interrupt(int, void *, struct cpu_user_regs *);
+    void smp_event_check_interrupt(void);
+    void smp_invalidate_interrupt(void);
+    void smp_call_function_interrupt(void);
+    void smp_spurious_interrupt(struct cpu_user_regs *regs);
+    void smp_error_interrupt(struct cpu_user_regs *regs);
+
+    if ((error = __vmread(VM_EXIT_INTR_INFO, &vector))
+        && !(vector & INTR_INFO_VALID_MASK))
+        __vmx_bug(regs);
+
+    vector &= 0xff;
+    local_irq_disable();
+
+    switch(vector) {
+        case LOCAL_TIMER_VECTOR:
+            smp_apic_timer_interrupt(regs);
+            break;
+        case EVENT_CHECK_VECTOR:
+            smp_event_check_interrupt();
+            break;
+        case INVALIDATE_TLB_VECTOR:
+            smp_invalidate_interrupt();
+            break;
+        case CALL_FUNCTION_VECTOR:
+            smp_call_function_interrupt();
+            break;
+        case SPURIOUS_APIC_VECTOR:
+            smp_spurious_interrupt(regs);
+            break;
+        case ERROR_APIC_VECTOR:
+            smp_error_interrupt(regs);
+            break;
+        default:
+            regs->entry_vector = vector;
+            do_IRQ(regs);
+            break;
+    }
+}
+
 static inline void vmx_vmexit_do_mwait(void)
 {
 #if VMX_DEBUG
@@ -1586,27 +1633,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         break;
     }
     case EXIT_REASON_EXTERNAL_INTERRUPT: 
-    {
-        extern asmlinkage void do_IRQ(struct cpu_user_regs *);
-        extern void smp_apic_timer_interrupt(struct cpu_user_regs *);
-        extern void timer_interrupt(int, void *, struct cpu_user_regs *);
-        unsigned int    vector;
-
-        if ((error = __vmread(VM_EXIT_INTR_INFO, &vector))
-            && !(vector & INTR_INFO_VALID_MASK))
-            __vmx_bug(&regs);
-
-        vector &= 0xff;
-        local_irq_disable();
-
-        if (vector == LOCAL_TIMER_VECTOR) {
-            smp_apic_timer_interrupt(&regs);
-        } else {
-            regs.entry_vector = vector;
-            do_IRQ(&regs);
-        }
+        vmx_vmexit_do_extint(&regs);
         break;
-    }
     case EXIT_REASON_PENDING_INTERRUPT:
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL, 
               MONITOR_CPU_BASED_EXEC_CONTROLS);
