@@ -248,7 +248,7 @@ dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
 		if (&ent->list != &dma_map_head) {
 			off = dma_handle - ent->dma;
 			BUG_ON((off + size) > ent->size);
-			if (direction != DMA_TO_DEVICE)
+			/*if (direction != DMA_TO_DEVICE)*/
 				memcpy(ent->host+off, ent->bounce+off, size);
 		}
 	}
@@ -272,7 +272,7 @@ dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t siz
 		if (&ent->list != &dma_map_head) {
 			off = dma_handle - ent->dma;
 			BUG_ON((off + size) > ent->size);
-			if (direction != DMA_FROM_DEVICE)
+			/*if (direction != DMA_FROM_DEVICE)*/
 				memcpy(ent->bounce+off, ent->host+off, size);
 		}
 	}
