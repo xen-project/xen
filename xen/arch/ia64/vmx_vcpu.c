@@ -23,8 +23,6 @@
  *  Xuefei Xu (Anthony Xu) (Anthony.xu@intel.com)
  */
 
-
-
 #include <linux/sched.h>
 #include <public/arch-ia64.h>
 #include <asm/ia64_int.h>
@@ -71,8 +69,8 @@
 
 //unsigned long last_guest_rsm = 0x0;
 struct guest_psr_bundle{
-	unsigned long ip;
-	unsigned long psr;
+    unsigned long ip;
+    unsigned long psr;
 };
 
 struct guest_psr_bundle guest_psr_buf[100];
@@ -107,20 +105,24 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
                 IA64_PSR_SS | IA64_PSR_ED | IA64_PSR_IA
             ));
 
+    if ( !old_psr.i && (value & IA64_PSR_I) ) {
+        // vpsr.i 0->1
+        vcpu->arch.irq_new_condition = 1;
+    }
     new_psr.val=vmx_vcpu_get_psr(vcpu);
     {
-	struct xen_regs *regs = vcpu_regs(vcpu);
-	guest_psr_buf[guest_psr_index].ip = regs->cr_iip;
-	guest_psr_buf[guest_psr_index].psr = new_psr.val;
-	if (++guest_psr_index >= 100)
-	    guest_psr_index = 0;
+    struct xen_regs *regs = vcpu_regs(vcpu);
+    guest_psr_buf[guest_psr_index].ip = regs->cr_iip;
+    guest_psr_buf[guest_psr_index].psr = new_psr.val;
+    if (++guest_psr_index >= 100)
+        guest_psr_index = 0;
     }
 #if 0
     if (old_psr.i != new_psr.i) {
-	if (old_psr.i)
-		last_guest_rsm = vcpu_regs(vcpu)->cr_iip;
-	else
-		last_guest_rsm = 0;
+    if (old_psr.i)
+        last_guest_rsm = vcpu_regs(vcpu)->cr_iip;
+    else
+        last_guest_rsm = 0;
     }
 #endif
 
@@ -270,8 +272,8 @@ check_entry(u64 va, u64 ps, char *str)
 {
      va &= ~ (PSIZE(ps)-1);
      if ( va == 0x2000000002908000UL ||
-	  va == 0x600000000000C000UL ) {
-	stop();
+      va == 0x600000000000C000UL ) {
+    stop();
      }
      if (tlb_debug) printf("%s at %lx %lx\n", str, va, 1UL<<ps);
 }
@@ -433,4 +435,11 @@ IA64FAULT vmx_vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
     return IA64_NO_FAULT;
 }
 
+IA64FAULT
+vmx_vcpu_set_tpr(VCPU *vcpu, u64 val)
+{
+    VPD_CR(vcpu,tpr)=val;
+    vcpu->arch.irq_new_condition = 1;
+    return IA64_NO_FAULT;
+}
 

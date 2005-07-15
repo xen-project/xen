@@ -1,0 +1,22 @@
+diff -ur linux-2.6.11/net/ipv4/netfilter/ip_conntrack_proto_tcp.c linux-2.6.11-csum/net/ipv4/netfilter/ip_conntrack_proto_tcp.c
+--- linux-2.6.11/net/ipv4/netfilter/ip_conntrack_proto_tcp.c	2005-05-27 11:47:48 +01:00
++++ linux-2.6.11-csum/net/ipv4/netfilter/ip_conntrack_proto_tcp.c	2005-05-27 11:48:07 +01:00
+@@ -803,6 +803,7 @@
+ 	 */
+ 	/* FIXME: Source route IP option packets --RR */
+ 	if (hooknum == NF_IP_PRE_ROUTING
++	    && skb->ip_summed != CHECKSUM_UNNECESSARY
+ 	    && csum_tcpudp_magic(iph->saddr, iph->daddr, tcplen, IPPROTO_TCP,
+ 			         skb->ip_summed == CHECKSUM_HW ? skb->csum
+ 			      	 : skb_checksum(skb, iph->ihl*4, tcplen, 0))) {
+diff -ur linux-2.6.11/net/ipv4/netfilter/ip_conntrack_proto_udp.c linux-2.6.11-csum/net/ipv4/netfilter/ip_conntrack_proto_udp.c
+--- linux-2.6.11/net/ipv4/netfilter/ip_conntrack_proto_udp.c	2005-05-27 11:47:48 +01:00
++++ linux-2.6.11-csum/net/ipv4/netfilter/ip_conntrack_proto_udp.c	2005-05-27 11:48:07 +01:00
+@@ -120,6 +120,7 @@
+ 	 * and moreover root might send raw packets.
+ 	 * FIXME: Source route IP option packets --RR */
+ 	if (hooknum == NF_IP_PRE_ROUTING
++	    && skb->ip_summed != CHECKSUM_UNNECESSARY
+ 	    && csum_tcpudp_magic(iph->saddr, iph->daddr, udplen, IPPROTO_UDP,
+ 			         skb->ip_summed == CHECKSUM_HW ? skb->csum
+ 			      	 : skb_checksum(skb, iph->ihl*4, udplen, 0))) {

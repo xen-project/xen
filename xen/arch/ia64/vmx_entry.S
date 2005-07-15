@@ -217,7 +217,7 @@ GLOBAL_ENTRY(ia64_leave_hypervisor)
     alloc loc0=ar.pfs,0,1,1,0
     adds out0=16,r12
     ;;
-    br.call.sptk.many b0=vmx_deliver_pending_interrupt
+    br.call.sptk.many b0=leave_hypervisor_tail
     mov ar.pfs=loc0
     adds r8=IA64_VPD_BASE_OFFSET,r13
     ;;

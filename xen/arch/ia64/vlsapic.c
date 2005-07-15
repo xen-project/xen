@@ -133,7 +133,7 @@ uint64_t vtm_get_itc(VCPU *vcpu)
     // FIXME: should use local_irq_disable & local_irq_enable ??
     local_irq_save(spsr);
     guest_itc = now_itc(vtm);
-    update_last_itc(vtm, guest_itc);
+//    update_last_itc(vtm, guest_itc);
 
     local_irq_restore(spsr);
     return guest_itc;
@@ -174,12 +174,12 @@ void vtm_set_itv(VCPU *vcpu)
 /* Interrupt must be disabled at this point */
 
 extern u64 tick_to_ns(u64 tick);
-#define TIMER_SLOP (50*1000) /* ns */	/* copy from ac_timer.c */
+#define TIMER_SLOP (50*1000) /* ns */  /* copy from ac_timer.c */
 void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
 {
     uint64_t    cur_itc,vitm,vitv;
     uint64_t    expires;
-    long     	diff_now, diff_last;
+    long        diff_now, diff_last;
     uint64_t    spsr;
     
     vitv = VPD_CR(vcpu, itv);
@@ -237,21 +237,30 @@ void vtm_domain_in(VCPU *vcpu)
 
 #define  NMI_VECTOR         2
 #define  ExtINT_VECTOR      0
-
+#define  NULL_VECTOR        -1
 #define  VLSAPIC_INSVC(vcpu, i) ((vcpu)->arch.arch_vmx.in_service[i])
-/*
- * LID-CR64: Keep in vpd.
- * IVR-CR65: (RO) see guest_read_ivr().
- * TPR-CR66: Keep in vpd, acceleration enabled.
- * EOI-CR67: see guest_write_eoi().
- * IRR0-3 - CR68-71: (RO) Keep in vpd irq_pending[]
- *          can move to vpd for optimization.
- * ITV: in time virtualization.
- * PMV: Keep in vpd initialized as 0x10000.
- * CMCV: Keep in vpd initialized as 0x10000.
- * LRR0-1: Keep in vpd, initialized as 0x10000.
- *
- */
+static void update_vhpi(VCPU *vcpu, int vec)
+{
+    u64     vhpi;
+    if ( vec == NULL_VECTOR ) {
+        vhpi = 0;
+    }
+    else if ( vec == NMI_VECTOR ) { // NMI
+        vhpi = 32;
+    } else if (vec == ExtINT_VECTOR) { //ExtINT
+        vhpi = 16;
+    }
+    else {
+        vhpi = vec / 16;
+    }
+
+    VMX_VPD(vcpu,vhpi) = vhpi;
+    // TODO: Add support for XENO
+    if ( VMX_VPD(vcpu,vac).a_int ) {
+        ia64_call_vsa ( PAL_VPS_SET_PENDING_INTERRUPT, 
+                (uint64_t) &(vcpu->arch.arch_vmx.vpd), 0, 0,0,0,0,0);
+    }
+}
 
 void vlsapic_reset(VCPU *vcpu)
 {
@@ -268,9 +277,11 @@ void vlsapic_reset(VCPU *vcpu)
     VPD_CR(vcpu, cmcv) = 0x10000;
     VPD_CR(vcpu, lrr0) = 0x10000;   // default reset value?
     VPD_CR(vcpu, lrr1) = 0x10000;   // default reset value?
+    update_vhpi(vcpu, NULL_VECTOR);
     for ( i=0; i<4; i++) {
         VLSAPIC_INSVC(vcpu,i) = 0;
     }
+    DPRINTK("VLSAPIC inservice base=%lp\n", &VLSAPIC_INSVC(vcpu,0) );
 }
 
 /*
@@ -281,7 +292,7 @@ void vlsapic_reset(VCPU *vcpu)
  */
 static __inline__ int highest_bits(uint64_t *dat)
 {
-    uint64_t  bits, bitnum=-1;
+    uint64_t  bits, bitnum;
     int i;
     
     /* loop for all 256 bits */
@@ -292,12 +303,12 @@ static __inline__ int highest_bits(uint64_t *dat)
             return i*64+bitnum;
         }
     }
-   return -1;
+   return NULL_VECTOR;
 }
 
 /*
  * Return 0-255 for pending irq.
- *        -1 when no pending.
+ *        NULL_VECTOR: when no pending.
  */
 static int highest_pending_irq(VCPU *vcpu)
 {
@@ -320,7 +331,7 @@ static int highest_inservice_irq(VCPU *vcpu)
 static int is_higher_irq(int pending, int inservice)
 {
     return ( (pending >> 4) > (inservice>>4) || 
-                ((pending != -1) && (inservice == -1)) );
+                ((pending != NULL_VECTOR) && (inservice == NULL_VECTOR)) );
 }
 
 static int is_higher_class(int pending, int mic)
@@ -333,40 +344,96 @@ static int is_invalid_irq(int vec)
     return (vec == 1 || ((vec <= 14 && vec >= 3)));
 }
 
+#define   IRQ_NO_MASKED         0
+#define   IRQ_MASKED_BY_VTPR    1
+#define   IRQ_MASKED_BY_INSVC   2   // masked by inservice IRQ
+
 /* See Table 5-8 in SDM vol2 for the definition */
 static int
-irq_masked(VCPU *vcpu, int h_pending, int h_inservice)
+_xirq_masked(VCPU *vcpu, int h_pending, int h_inservice)
 {
-    uint64_t    vtpr;
+    tpr_t    vtpr;
+    uint64_t    mmi;
     
-    vtpr = VPD_CR(vcpu, tpr);
+    vtpr.val = VPD_CR(vcpu, tpr);
 
-    if ( h_pending == NMI_VECTOR && h_inservice != NMI_VECTOR )
+    if ( h_inservice == NMI_VECTOR ) {
+        return IRQ_MASKED_BY_INSVC;
+    }
+    if ( h_pending == NMI_VECTOR ) {
         // Non Maskable Interrupt
-        return 0;
+        return IRQ_NO_MASKED;
+    }
+    if ( h_inservice == ExtINT_VECTOR ) {
+        return IRQ_MASKED_BY_INSVC;
+    }
+    mmi = vtpr.mmi;
+    if ( h_pending == ExtINT_VECTOR ) {
+        if ( mmi ) {
+            // mask all external IRQ
+            return IRQ_MASKED_BY_VTPR;
+        }
+        else {
+            return IRQ_NO_MASKED;
+        }
+    }
 
-    if ( h_pending == ExtINT_VECTOR && h_inservice >= 16)
-        return (vtpr>>16)&1;    // vtpr.mmi
-
-    if ( !(vtpr&(1UL<<16)) &&
-          is_higher_irq(h_pending, h_inservice) &&
-          is_higher_class(h_pending, (vtpr>>4)&0xf) )
-        return 0;
-
-    return 1;
+    if ( is_higher_irq(h_pending, h_inservice) ) {
+        if ( !mmi && is_higher_class(h_pending, vtpr.mic) ) {
+            return IRQ_NO_MASKED;
+        }
+        else {
+            return IRQ_MASKED_BY_VTPR;
+        }
+    }
+    else {
+        return IRQ_MASKED_BY_INSVC;
+    }
 }
 
+static int irq_masked(VCPU *vcpu, int h_pending, int h_inservice)
+{
+    int mask;
+    
+    mask = _xirq_masked(vcpu, h_pending, h_inservice);
+    return mask;
+}
+
+
+/*
+ * May come from virtualization fault or
+ * nested host interrupt.
+ */
 void vmx_vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 {
     uint64_t    spsr;
 
     if (vector & ~0xff) {
-        printf("vmx_vcpu_pend_interrupt: bad vector\n");
+        DPRINTK("vmx_vcpu_pend_interrupt: bad vector\n");
         return;
     }
     local_irq_save(spsr);
     VPD_CR(vcpu,irr[vector>>6]) |= 1UL<<(vector&63);
     local_irq_restore(spsr);
+    vcpu->arch.irq_new_pending = 1;
+}
+
+/*
+ * Add batch of pending interrupt.
+ * The interrupt source is contained in pend_irr[0-3] with
+ * each bits stand for one interrupt.
+ */
+void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, UINT64 *pend_irr)
+{
+    uint64_t    spsr;
+    int     i;
+
+    local_irq_save(spsr);
+    for (i=0 ; i<4; i++ ) {
+        VPD_CR(vcpu,irr[i]) |= pend_irr[i];
+    }
+    local_irq_restore(spsr);
+    vcpu->arch.irq_new_pending = 1;
 }
 
 /*
@@ -383,7 +450,7 @@ void vmx_vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
  */
 int vmx_check_pending_irq(VCPU *vcpu)
 {
-    uint64_t  spsr;
+    uint64_t  spsr, mask;
     int     h_pending, h_inservice;
     int injected=0;
     uint64_t    isr;
@@ -391,22 +458,25 @@ int vmx_check_pending_irq(VCPU *vcpu)
 
     local_irq_save(spsr);
     h_pending = highest_pending_irq(vcpu);
-    if ( h_pending == -1 ) goto chk_irq_exit;
+    if ( h_pending == NULL_VECTOR ) goto chk_irq_exit;
     h_inservice = highest_inservice_irq(vcpu);
 
     vpsr.val = vmx_vcpu_get_psr(vcpu);
-    if (  vpsr.i &&
-        !irq_masked(vcpu, h_pending, h_inservice) ) {
-        //inject_guest_irq(v);
+    mask = irq_masked(vcpu, h_pending, h_inservice);
+    if (  vpsr.i && IRQ_NO_MASKED == mask ) {
         isr = vpsr.val & IA64_PSR_RI;
         if ( !vpsr.ic )
             panic("Interrupt when IC=0\n");
         vmx_reflect_interruption(0,isr,0, 12 ); // EXT IRQ
         injected = 1;
     }
-    else if ( VMX_VPD(vcpu,vac).a_int && 
-            is_higher_irq(h_pending,h_inservice) ) {
-        vmx_inject_vhpi(vcpu,h_pending);
+    else if ( mask == IRQ_MASKED_BY_INSVC ) {
+        // cann't inject VHPI
+//        DPRINTK("IRQ masked by higher inservice\n");
+    }
+    else {
+        // masked by vpsr.i or vtpr.
+        update_vhpi(vcpu,h_pending);
     }
 
 chk_irq_exit:
@@ -414,17 +484,21 @@ chk_irq_exit:
     return injected;
 }
 
+/*
+ * Only coming from virtualization fault.
+ */
 void guest_write_eoi(VCPU *vcpu)
 {
     int vec;
     uint64_t  spsr;
 
     vec = highest_inservice_irq(vcpu);
-    if ( vec < 0 ) panic("Wrong vector to EOI\n");
+    if ( vec == NULL_VECTOR ) panic("Wrong vector to EOI\n");
     local_irq_save(spsr);
     VLSAPIC_INSVC(vcpu,vec>>6) &= ~(1UL <<(vec&63));
     local_irq_restore(spsr);
     VPD_CR(vcpu, eoi)=0;    // overwrite the data
+    vmx_check_pending_irq(vcpu);
 }
 
 uint64_t guest_read_vivr(VCPU *vcpu)
@@ -435,37 +509,54 @@ uint64_t guest_read_vivr(VCPU *vcpu)
     local_irq_save(spsr);
     vec = highest_pending_irq(vcpu);
     h_inservice = highest_inservice_irq(vcpu);
-    if ( vec < 0 || irq_masked(vcpu, vec, h_inservice) ) {
+    if ( vec == NULL_VECTOR || 
+        irq_masked(vcpu, vec, h_inservice) != IRQ_NO_MASKED ) {
         local_irq_restore(spsr);
         return IA64_SPURIOUS_INT_VECTOR;
     }
  
     VLSAPIC_INSVC(vcpu,vec>>6) |= (1UL <<(vec&63));
     VPD_CR(vcpu, irr[vec>>6]) &= ~(1UL <<(vec&63));
-
-    h_inservice = highest_inservice_irq(vcpu);
-    next = highest_pending_irq(vcpu);
-    if ( VMX_VPD(vcpu,vac).a_int &&
-        (is_higher_irq(next, h_inservice) || (next == -1)) )
-        vmx_inject_vhpi(vcpu, next);
+    update_vhpi(vcpu, NULL_VECTOR);     // clear VHPI till EOI or IRR write
     local_irq_restore(spsr);
     return (uint64_t)vec;
 }
 
-void vmx_inject_vhpi(VCPU *vcpu, u8 vec)
+static void generate_exirq(VCPU *vcpu)
 {
-        VMX_VPD(vcpu,vhpi) = vec / 16;
-
-
-        // non-maskable
-        if ( vec == NMI_VECTOR ) // NMI
-                VMX_VPD(vcpu,vhpi) = 32;
-        else if (vec == ExtINT_VECTOR) //ExtINT
-                VMX_VPD(vcpu,vhpi) = 16;
-        else if (vec == -1)
-                VMX_VPD(vcpu,vhpi) = 0; /* Nothing pending */
-
-        ia64_call_vsa ( PAL_VPS_SET_PENDING_INTERRUPT, 
-            (uint64_t) &(vcpu->arch.arch_vmx.vpd), 0, 0,0,0,0,0);
+    IA64_PSR    vpsr;
+    uint64_t    isr;
+    
+    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    update_vhpi(vcpu, NULL_VECTOR);
+    isr = vpsr.val & IA64_PSR_RI;
+    if ( !vpsr.ic )
+        panic("Interrupt when IC=0\n");
+    vmx_reflect_interruption(0,isr,0, 12 ); // EXT IRQ
 }
 
+vhpi_detection(VCPU *vcpu)
+{
+    uint64_t    threshold,vhpi;
+    tpr_t       vtpr;
+    IA64_PSR    vpsr;
+    
+    vpsr.val = vmx_vcpu_get_psr(vcpu);
+    vtpr.val = VPD_CR(vcpu, tpr);
+
+    threshold = ((!vpsr.i) << 5) | (vtpr.mmi << 4) | vtpr.mic;
+    vhpi = VMX_VPD(vcpu,vhpi);
+    if ( vhpi > threshold ) {
+        // interrupt actived
+        generate_exirq (vcpu);
+    }
+}
+
+vmx_vexirq(VCPU *vcpu)
+{
+    static  uint64_t  vexirq_count=0;
+
+    vexirq_count ++;
+    printk("Virtual ex-irq %ld\n", vexirq_count);
+    generate_exirq (vcpu);
+}

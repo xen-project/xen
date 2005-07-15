@@ -666,7 +666,12 @@ END(dirty_bit)
 // 0x2400 Entry 9 (size 64 bundles) Instruction Access-bit (27)
 ENTRY(iaccess_bit)
 #ifdef XEN
-	REFLECT(9)
+	mov r31=pr;
+	mov r16=cr.isr
+	mov r17=cr.ifa
+	mov r19=9
+	movl r20=0x2400
+	br.sptk.many fast_access_reflect;;
 #endif
 	DBG_FAULT(9)
 	// Like Entry 8, except for instruction access
@@ -734,7 +739,12 @@ END(iaccess_bit)
 // 0x2800 Entry 10 (size 64 bundles) Data Access-bit (15,55)
 ENTRY(daccess_bit)
 #ifdef XEN
-	REFLECT(10)
+	mov r31=pr;
+	mov r16=cr.isr
+	mov r17=cr.ifa
+	mov r19=10
+	movl r20=0x2800
+	br.sptk.many fast_access_reflect;;
 #endif
 	DBG_FAULT(10)
 	// Like Entry 8, except for data access
@@ -921,10 +931,10 @@ ENTRY(interrupt)
 	;;
 #ifdef XEN
 	mov r30=cr.ivr		// pass cr.ivr as first arg
-	// FIXME: this is a hack... use cpuinfo.pgd_quick because its
+	// FIXME: this is a hack... use cpuinfo.ksoftirqd because its
 	// not used anywhere else and we need a place to stash ivr and
 	// there's no registers available unused by SAVE_MIN/REST
-	movl r29=(PERCPU_ADDR)+IA64_CPUINFO_PGD_QUICK_OFFSET;;
+	movl r29=(PERCPU_ADDR)+IA64_CPUINFO_KSOFTIRQD_OFFSET;;
 	st8 [r29]=r30;;
 	movl r28=slow_interrupt;;
 	mov r29=rp;;
@@ -944,7 +954,7 @@ slow_interrupt:
 	;;
 	alloc r14=ar.pfs,0,0,2,0 // must be first in an insn group
 #ifdef XEN
-	movl out0=(PERCPU_ADDR)+IA64_CPUINFO_PGD_QUICK_OFFSET;;
+	movl out0=(PERCPU_ADDR)+IA64_CPUINFO_KSOFTIRQD_OFFSET;;
 	ld8 out0=[out0];;
 #else
 	mov out0=cr.ivr		// pass cr.ivr as first arg
@@ -1395,7 +1405,12 @@ END(iaccess_rights)
 // 0x5300 Entry 23 (size 16 bundles) Data Access Rights (14,53)
 ENTRY(daccess_rights)
 #ifdef XEN
-	REFLECT(23)
+	mov r31=pr;
+	mov r16=cr.isr
+	mov r17=cr.ifa
+	mov r19=23
+	movl r20=0x5300
+	br.sptk.many fast_access_reflect;;
 #endif
 	DBG_FAULT(23)
 	mov r16=cr.ifa
@@ -1821,7 +1836,7 @@ END(ia32_interrupt)
 
 #ifdef XEN
 	.org ia64_ivt+0x8000
-ENTRY(dispatch_reflection)
+GLOBAL_ENTRY(dispatch_reflection)
 	/*
 	 * Input:
 	 *	psr.ic:	off

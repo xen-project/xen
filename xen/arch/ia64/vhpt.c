@@ -90,9 +90,10 @@ void vhpt_map(void)
 void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte, unsigned long logps)
 {
 	unsigned long mask = (1L << logps) - 1;
+	extern long running_on_sim;
 	int i;
 
-	if (logps-PAGE_SHIFT > 10) {
+	if (logps-PAGE_SHIFT > 10 && !running_on_sim) {
 		// if this happens, we may want to revisit this algorithm
 		printf("vhpt_multiple_insert:logps-PAGE_SHIFT>10,spinning..\n");
 		while(1);

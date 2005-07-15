@@ -347,11 +347,16 @@ ENTRY(vmx_break_fault)
 	mov r31=pr
     mov r19=11
     mov r30=cr.iim
-    mov r29=0x1100
+    movl r29=0x1100
     ;;
-    cmp4.eq  p6,p7=r29,r30
+    cmp.eq p6,p7=r30,r0
+    (p6) br.sptk vmx_fault_11
+    ;;
+    cmp.eq  p6,p7=r29,r30
     (p6) br.dptk.few vmx_hypercall_dispatch
     (p7) br.sptk.many vmx_dispatch_break_fault
+    ;;
+    VMX_FAULT(11);
 END(vmx_break_fault)
 
 	.org vmx_ia64_ivt+0x3000
@@ -363,6 +368,8 @@ ENTRY(vmx_interrupt)
     mov r29=cr.ipsr
     ;;
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT
+    tbit.z p0,p15=r29,IA64_PSR_I_BIT
+    ;;
 (p7) br.sptk vmx_dispatch_interrupt
     ;;
 	mov r27=ar.rsc			/* M */
@@ -447,7 +454,7 @@ ENTRY(vmx_interrupt)
     ;;
     srlz.i
 	;;
-    ssm psr.i
+    (p15) ssm psr.i
 	adds r3=8,r2		// set up second base pointer for SAVE_REST
 	srlz.i			// ensure everybody knows psr.ic is back on
 	;;
@@ -508,9 +515,12 @@ END(vmx_interrupt)
 	.org vmx_ia64_ivt+0x3400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3400 Entry 13 (size 64 bundles) Reserved
+ENTRY(vmx_virtual_exirq)
 	VMX_DBG_FAULT(13)
-	VMX_FAULT(13)
-
+	mov r31=pr
+        mov r19=13
+        br.sptk vmx_dispatch_vexirq
+END(vmx_virtual_exirq)
 
 	.org vmx_ia64_ivt+0x3800
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -876,7 +886,7 @@ ENTRY(vmx_dispatch_reflection)
     ;;
     srlz.i                  // guarantee that interruption collection is on
     ;;
-    ssm psr.i               // restore psr.i
+    (p15) ssm psr.i               // restore psr.i
     adds r3=16,r2                // set up second base pointer
     ;;
     VMX_SAVE_REST
@@ -887,8 +897,6 @@ ENTRY(vmx_dispatch_reflection)
 END(vmx_dispatch_reflection)
 
 ENTRY(vmx_dispatch_virtualization_fault)
-    cmp.eq pEml,pNonEml=r0,r0       /* force pEml =1, save r4 ~ r7 */
-    ;;
     VMX_SAVE_MIN_WITH_COVER_R19
     ;;
     alloc r14=ar.pfs,0,0,3,0        // now it's safe (must be first in insn group!)
@@ -899,7 +907,7 @@ ENTRY(vmx_dispatch_virtualization_fault)
     ;;
     srlz.i                  // guarantee that interruption collection is on
     ;;
-    ssm psr.i               // restore psr.i
+    (p15) ssm psr.i               // restore psr.i
     adds r3=16,r2                // set up second base pointer
     ;;
     VMX_SAVE_REST
@@ -910,6 +918,24 @@ ENTRY(vmx_dispatch_virtualization_fault)
 END(vmx_dispatch_virtualization_fault)
 
 
+ENTRY(vmx_dispatch_vexirq)
+    VMX_SAVE_MIN_WITH_COVER_R19
+    alloc r14=ar.pfs,0,0,1,0
+    mov out0=r13
+
+    ssm psr.ic
+    ;;
+    srlz.i                  // guarantee that interruption collection is on
+    ;;
+    (p15) ssm psr.i               // restore psr.i
+    adds r3=16,r2                // set up second base pointer
+    ;;
+    VMX_SAVE_REST
+    movl r14=ia64_leave_hypervisor
+    ;;
+    mov rp=r14
+    br.call.sptk.many b6=vmx_vexirq
+END(vmx_dispatch_vexirq)
 
 ENTRY(vmx_dispatch_tlb_miss)
     VMX_SAVE_MIN_WITH_COVER_R19
@@ -922,7 +948,7 @@ ENTRY(vmx_dispatch_tlb_miss)
     ;;
     srlz.i                  // guarantee that interruption collection is on
     ;;
-    ssm psr.i               // restore psr.i
+    (p15) ssm psr.i               // restore psr.i
     adds r3=16,r2                // set up second base pointer
     ;;
     VMX_SAVE_REST
@@ -947,7 +973,7 @@ ENTRY(vmx_dispatch_break_fault)
     ;;
     srlz.i                  // guarantee that interruption collection is on
     ;;
-    ssm psr.i               // restore psr.i
+    (p15)ssm psr.i               // restore psr.i
     adds r3=16,r2                // set up second base pointer
     ;;
     VMX_SAVE_REST
@@ -965,7 +991,7 @@ ENTRY(vmx_hypercall_dispatch)
     ;;
     srlz.i                  // guarantee that interruption collection is on
     ;;
-    ssm psr.i               // restore psr.i
+    (p15) ssm psr.i               // restore psr.i
     adds r3=16,r2                // set up second base pointer
     ;;
     VMX_SAVE_REST
@@ -987,8 +1013,6 @@ END(vmx_hypercall_dispatch)
 
 
 ENTRY(vmx_dispatch_interrupt)
-    cmp.ne pEml,pNonEml=r0,r0       /* force pNonEml =1, don't save r4 ~ r7 */
-    ;;
 	VMX_SAVE_MIN_WITH_COVER_R19	// uses r31; defines r2 and r3
 	;;
 	alloc r14=ar.pfs,0,0,2,0 // must be first in an insn group
@@ -999,7 +1023,7 @@ ENTRY(vmx_dispatch_interrupt)
 	;;
     srlz.i
     ;;
-    ssm psr.i
+    (p15) ssm psr.i
 	adds r3=16,r2		// set up second base pointer for SAVE_REST
 	;;
 	VMX_SAVE_REST

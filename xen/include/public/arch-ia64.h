@@ -181,6 +181,16 @@ typedef struct {
 } arch_shared_info_t;		// DON'T PACK 
 
 typedef struct vcpu_guest_context {
+#define VGCF_FPU_VALID (1<<0)
+#define VGCF_VMX_GUEST (1<<1)
+#define VGCF_IN_KERNEL (1<<2)
+	unsigned long flags;       /* VGCF_* flags */
+	unsigned long pt_base;     /* PMT table base */
+	unsigned long pt_max_pfn;  /* Max pfn including holes */
+	unsigned long share_io_pg; /* Shared page for I/O emulation */
+	unsigned long vm_assist;   /* VMASST_TYPE_* bitmap, now none on IPF */
+	unsigned long guest_iip;   /* Guest entry point */
+
 	struct pt_regs regs;
 	arch_vcpu_info_t vcpu;
 	arch_shared_info_t shared;

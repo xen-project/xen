@@ -135,6 +135,7 @@ extern IA64FAULT vcpu_ptc_g(VCPU *vcpu, UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_ptc_ga(VCPU *vcpu, UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_ptr_d(VCPU *vcpu,UINT64 vadr, UINT64 addr_range);
 extern IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr, UINT64 addr_range);
+extern IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir);
 extern IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr);
 /* misc */
 extern IA64FAULT vcpu_rfi(VCPU *vcpu);
@@ -149,6 +150,5 @@ extern UINT64 vcpu_deliverable_interrupts(VCPU *vcpu);
 extern void vcpu_itc_no_srlz(VCPU *vcpu, UINT64, UINT64, UINT64, UINT64, UINT64);
 extern UINT64 vcpu_get_tmp(VCPU *, UINT64);
 extern void vcpu_set_tmp(VCPU *, UINT64, UINT64);
-
 
 #endif

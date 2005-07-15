@@ -76,8 +76,6 @@ void schedule_tail(struct vcpu *next)
 #endif // CONFIG_VTI
 }
 
-extern TR_ENTRY *match_tr(struct vcpu *v, unsigned long ifa);
-
 void tdpfoo(void) { }
 
 // given a domain virtual address, pte and pagesize, extract the metaphysical
@@ -260,140 +258,29 @@ printf("*#*#*#* about to deliver early timer to domain %d!!!\n",v->domain->domai
 			++pending_false_positive;
 	}
 }
+unsigned long lazy_cover_count = 0;
 
 int handle_lazy_cover(struct vcpu *v, unsigned long isr, struct pt_regs *regs)
 {
 	if (!PSCB(v,interrupt_collection_enabled)) {
-		if (isr & IA64_ISR_IR) {
-//			printf("Handling lazy cover\n");
-			PSCB(v,ifs) = regs->cr_ifs;
-			PSCB(v,incomplete_regframe) = 1;
-			regs->cr_ifs = 0;
-			return(1); // retry same instruction with cr.ifs off
-		}
+		PSCB(v,ifs) = regs->cr_ifs;
+		PSCB(v,incomplete_regframe) = 1;
+		regs->cr_ifs = 0;
+		lazy_cover_count++;
+		return(1); // retry same instruction with cr.ifs off
 	}
 	return(0);
 }
 
-#define IS_XEN_ADDRESS(d,a) ((a >= d->xen_vastart) && (a <= d->xen_vaend))
-
-void xen_handle_domain_access(unsigned long address, unsigned long isr, struct pt_regs *regs, unsigned long itir)
-{
-	struct domain *d = (struct domain *) current->domain;
-	struct domain *ed = (struct vcpu *) current;
-	TR_ENTRY *trp;
-	unsigned long psr = regs->cr_ipsr, mask, flags;
-	unsigned long iip = regs->cr_iip;
-	// FIXME should validate address here
-	unsigned long pteval, mpaddr, ps;
-	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
-	unsigned long match_dtlb(struct vcpu *,unsigned long, unsigned long *, unsigned long *);
-	IA64FAULT fault;
-
-// NEED TO HANDLE THREE CASES:
-// 1) domain is in metaphysical mode
-// 2) domain address is in TR
-// 3) domain address is not in TR (reflect data miss)
-
-		// got here trying to read a privop bundle
-	     	//if (d->metaphysical_mode) {
-     	if (PSCB(current,metaphysical_mode) && !(address>>61)) {  //FIXME
-		if (d == dom0) {
-			if (address < dom0_start || address >= dom0_start + dom0_size) {
-				printk("xen_handle_domain_access: out-of-bounds"
-				   "dom0 mpaddr %p! continuing...\n",mpaddr);
-				tdpfoo();
-			}
-		}
-		pteval = lookup_domain_mpa(d,address);
-		//FIXME: check return value?
-		// would be nice to have a counter here
-		vcpu_itc_no_srlz(ed,2,address,pteval,-1UL,PAGE_SHIFT);
-		return;
-	}
-if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
-		
-	if (trp = match_tr(current,address)) {
-		// FIXME address had better be pre-validated on insert
-		pteval = translate_domain_pte(trp->page_flags,address,trp->itir);
-		vcpu_itc_no_srlz(current,6,address,pteval,-1UL,(trp->itir>>2)&0x3f);
-		return;
-	}
-	// if we are fortunate enough to have it in the 1-entry TLB...
-	if (pteval = match_dtlb(ed,address,&ps,NULL)) {
-		vcpu_itc_no_srlz(ed,6,address,pteval,-1UL,ps);
-		return;
-	}
-	if (ia64_done_with_exception(regs)) {
-//if (!(uacnt++ & 0x3ff)) printk("*** xen_handle_domain_access: successfully handled cnt=%d iip=%p, addr=%p...\n",uacnt,iip,address);
-			return;
-	}
-	else {
-		// should never happen.  If it does, region 0 addr may
-		// indicate a bad xen pointer
-		printk("*** xen_handle_domain_access: exception table"
-                       " lookup failed, iip=%p, addr=%p, spinning...\n",
-			iip,address);
-		panic_domain(regs,"*** xen_handle_domain_access: exception table"
-                       " lookup failed, iip=%p, addr=%p, spinning...\n",
-			iip,address);
-	}
-}
-
 void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *regs, unsigned long itir)
 {
-	struct domain *d = (struct domain *) current->domain;
-	TR_ENTRY *trp;
-	unsigned long psr = regs->cr_ipsr, mask, flags;
 	unsigned long iip = regs->cr_iip;
 	// FIXME should validate address here
-	unsigned long iha, pteval, mpaddr;
-	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
+	unsigned long pteval;
 	unsigned long is_data = !((isr >> IA64_ISR_X_BIT) & 1UL);
-	unsigned long vector;
 	IA64FAULT fault;
 
-
-	//The right way is put in VHPT and take another miss!
-
-	// weak attempt to avoid doing both I/D tlb insert to avoid
-	// problems for privop bundle fetch, doesn't work, deal with later
-	if (IS_XEN_ADDRESS(d,iip) && !IS_XEN_ADDRESS(d,address)) {
-		xen_handle_domain_access(address, isr, regs, itir);
-
-		return;
-	}
-
-	// FIXME: no need to pass itir in to this routine as we need to
-	// compute the virtual itir anyway (based on domain's RR.ps)
-	// AND ACTUALLY reflect_interruption doesn't use it anyway!
-	itir = vcpu_get_itir_on_fault(current,address);
-
-	if (PSCB(current,metaphysical_mode) && (is_data || !(address>>61))) {  //FIXME
-		// FIXME should validate mpaddr here
-		if (d == dom0) {
-			if (address < dom0_start || address >= dom0_start + dom0_size) {
-				printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, iip=%p! continuing...\n",address,iip);
-				printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, old iip=%p!\n",address,current->vcpu_info->arch.iip);
-				tdpfoo();
-			}
-		}
-		pteval = lookup_domain_mpa(d,address);
-		// FIXME, must be inlined or potential for nested fault here!
-		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,PAGE_SHIFT);
-		return;
-	}
-	if (trp = match_tr(current,address)) {
-		// FIXME address had better be pre-validated on insert
-		pteval = translate_domain_pte(trp->page_flags,address,trp->itir);
-		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,(trp->itir>>2)&0x3f);
-		return;
-	}
-
-	if (handle_lazy_cover(current, isr, regs)) return;
-if (!(address>>61)) {
-panic_domain(0,"ia64_do_page_fault: @%p???, iip=%p, b0=%p, itc=%p (spinning...)\n",address,iip,regs->b0,ia64_get_itc());
-}
+	if ((isr & IA64_ISR_IR) && handle_lazy_cover(current, isr, regs)) return;
 	if ((isr & IA64_ISR_SP)
 	    || ((isr & IA64_ISR_NA) && (isr & IA64_ISR_CODE_MASK) == IA64_ISR_CODE_LFETCH))
 	{
@@ -406,37 +293,29 @@ panic_domain(0,"ia64_do_page_fault: @%p???, iip=%p, b0=%p, itc=%p (spinning...)\
 		return;
 	}
 
-	if (vcpu_get_rr_ve(current, address) && (PSCB(current,pta) & IA64_PTA_VE))
+	fault = vcpu_translate(current,address,is_data,&pteval,&itir);
+	if (fault == IA64_NO_FAULT)
 	{
-		if (PSCB(current,pta) & IA64_PTA_VF)
-		{
-			/* long format VHPT - not implemented */
-			vector = is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
-		}
-		else
-		{
-			/* short format VHPT */
-			vcpu_thash(current, address, &iha);
-			if (__copy_from_user(&pteval, iha, sizeof(pteval)) == 0)
-			{
-				/* 
-				 * Optimisation: this VHPT walker aborts on not-present pages
-				 * instead of inserting a not-present translation, this allows
-				 * vectoring directly to the miss handler.
-	\			 */
-				if (pteval & _PAGE_P)
-				{
-					pteval = translate_domain_pte(pteval,address,itir);
-					vcpu_itc_no_srlz(current,is_data?6:1,address,pteval,-1UL,(itir>>2)&0x3f);
-					return;
-				}
-				else vector = is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
-			}
-			else vector = IA64_VHPT_TRANS_VECTOR;
-		}
+		pteval = translate_domain_pte(pteval,address,itir);
+		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,(itir>>2)&0x3f);
+		return;
 	}
-	else vector = is_data ? IA64_ALT_DATA_TLB_VECTOR : IA64_ALT_INST_TLB_VECTOR;
-	reflect_interruption(address, isr, itir, regs, vector);
+	else if (IS_VMM_ADDRESS(iip))
+	{
+		if (!ia64_done_with_exception(regs)) {
+			// should never happen.  If it does, region 0 addr may
+			// indicate a bad xen pointer
+			printk("*** xen_handle_domain_access: exception table"
+			       " lookup failed, iip=%p, addr=%p, spinning...\n",
+				iip,address);
+			panic_domain(regs,"*** xen_handle_domain_access: exception table"
+			       " lookup failed, iip=%p, addr=%p, spinning...\n",
+				iip,address);
+		}
+		return;
+	}
+
+	reflect_interruption(address, isr, 0, regs, fault);
 }
 
 void
@@ -865,6 +744,6 @@ printf("*** Handled privop masquerading as NaT fault\n");
 		while(vector);
 		return;
 	}
-	if (check_lazy_cover && handle_lazy_cover(v, isr, regs)) return;
+	if (check_lazy_cover && (isr & IA64_ISR_IR) && handle_lazy_cover(v, isr, regs)) return;
 	reflect_interruption(ifa,isr,itir,regs,vector);
 }

@@ -42,8 +42,6 @@ struct arch_domain {
      * max_pages in domain struct, which indicates maximum memory size
      */
     unsigned long max_pfn;
-    unsigned int section_nr;
-    mm_section_t *sections;	/* Describe memory hole except for Dom0 */
 #endif  //CONFIG_VTI
     u64 xen_vastart;
     u64 xen_vaend;
@@ -88,6 +86,8 @@ struct arch_vcpu {
     void (*schedule_tail) (struct vcpu *);
     struct trap_bounce trap_bounce;
     thash_cb_t *vtlb;
+    char irq_new_pending;
+    char irq_new_condition;    // vpsr.i/vtpr change, check for pending VHPI
     //for phycial  emulation
     unsigned long old_rsc;
     int mode_flags;

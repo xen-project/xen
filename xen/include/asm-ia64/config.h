@@ -49,6 +49,7 @@ typedef unsigned long physaddr_t;
 extern unsigned long xenheap_phys_end;
 extern unsigned long xen_pstart;
 extern unsigned long xenheap_size;
+extern struct domain *dom0;
 extern unsigned long dom0_start;
 extern unsigned long dom0_size;
 

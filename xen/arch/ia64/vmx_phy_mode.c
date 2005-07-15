@@ -119,30 +119,67 @@ physical_mode_init(VCPU *vcpu)
     vcpu->arch.old_rsc = 0;
     vcpu->arch.mode_flags = GUEST_IN_PHY;
 
-    psr = ia64_clear_ic();
-
-    ia64_set_rr((VRN0<<VRN_SHIFT), vcpu->domain->arch.emul_phy_rr0.rrval);
-    ia64_srlz_d();
-    ia64_set_rr((VRN4<<VRN_SHIFT), vcpu->domain->arch.emul_phy_rr4.rrval);
-    ia64_srlz_d();
-#if 0
-    /* FIXME: temp workaround to support guest physical mode */
-ia64_itr(0x1, IA64_TEMP_PHYSICAL, dom0_start,
-	 pte_val(pfn_pte((dom0_start >> PAGE_SHIFT), PAGE_KERNEL)),
-	 28);
-ia64_itr(0x2, IA64_TEMP_PHYSICAL, dom0_start,
-	 pte_val(pfn_pte((dom0_start >> PAGE_SHIFT), PAGE_KERNEL)),
-	 28);
-ia64_srlz_i();
-#endif
-    ia64_set_psr(psr);
-    ia64_srlz_i();
     return;
 }
 
 extern u64 get_mfn(domid_t domid, u64 gpfn, u64 pages);
+#if 0
+void
+physical_itlb_miss_domn(VCPU *vcpu, u64 vadr)
+{
+    u64 psr;
+    IA64_PSR vpsr;
+    u64 mppn,gppn,mpp1,gpp1;
+    struct domain *d;
+    static u64 test=0;
+    d=vcpu->domain;
+    if(test)
+        panic("domn physical itlb miss happen\n");
+    else
+        test=1;
+    vpsr.val=vmx_vcpu_get_psr(vcpu);
+    gppn=(vadr<<1)>>13;
+    mppn = get_mfn(DOMID_SELF,gppn,1);
+    mppn=(mppn<<12)|(vpsr.cpl<<7);
+    gpp1=0;
+    mpp1 = get_mfn(DOMID_SELF,gpp1,1);
+    mpp1=(mpp1<<12)|(vpsr.cpl<<7);
+//    if(vadr>>63)
+//        mppn |= PHY_PAGE_UC;
+//    else
+//        mppn |= PHY_PAGE_WB;
+    mpp1 |= PHY_PAGE_WB;
+    psr=ia64_clear_ic();
+    ia64_itr(0x1, IA64_TEMP_PHYSICAL, vadr&(~0xfff), (mppn|PHY_PAGE_WB), 24);
+    ia64_srlz_i();
+    ia64_itr(0x2, IA64_TEMP_PHYSICAL, vadr&(~0xfff), (mppn|PHY_PAGE_WB), 24);
+    ia64_stop();
+    ia64_srlz_i();
+    ia64_itr(0x1, IA64_TEMP_PHYSICAL+1, vadr&(~0x8000000000000fffUL), (mppn|PHY_PAGE_WB), 24);
+    ia64_srlz_i();
+    ia64_itr(0x2, IA64_TEMP_PHYSICAL+1, vadr&(~0x8000000000000fffUL), (mppn|PHY_PAGE_WB), 24);
+    ia64_stop();
+    ia64_srlz_i();
+    ia64_itr(0x1, IA64_TEMP_PHYSICAL+2, gpp1&(~0xfff), mpp1, 28);
+    ia64_srlz_i();
+    ia64_itr(0x2, IA64_TEMP_PHYSICAL+2, gpp1&(~0xfff), mpp1, 28);
+    ia64_stop();
+    ia64_srlz_i();
+    ia64_set_psr(psr);
+    ia64_srlz_i();
+    return;
+}
+#endif
+
 void
 physical_itlb_miss(VCPU *vcpu, u64 vadr)
+{
+        physical_itlb_miss_dom0(vcpu, vadr);
+}
+
+
+void
+physical_itlb_miss_dom0(VCPU *vcpu, u64 vadr)
 {
     u64 psr;
     IA64_PSR vpsr;
@@ -150,7 +187,11 @@ physical_itlb_miss(VCPU *vcpu, u64 vadr)
     vpsr.val=vmx_vcpu_get_psr(vcpu);
     gppn=(vadr<<1)>>13;
     mppn = get_mfn(DOMID_SELF,gppn,1);
-    mppn=(mppn<<12)|(vpsr.cpl<<7)|PHY_PAGE_WB;
+    mppn=(mppn<<12)|(vpsr.cpl<<7); 
+//    if(vadr>>63)
+//       mppn |= PHY_PAGE_UC;
+//    else
+    mppn |= PHY_PAGE_WB;
 
     psr=ia64_clear_ic();
     ia64_itc(1,vadr&(~0xfff),mppn,EMUL_PHY_PAGE_SHIFT);
@@ -159,12 +200,15 @@ physical_itlb_miss(VCPU *vcpu, u64 vadr)
     return;
 }
 
+
 void
 physical_dtlb_miss(VCPU *vcpu, u64 vadr)
 {
     u64 psr;
     IA64_PSR vpsr;
     u64 mppn,gppn;
+//    if(vcpu->domain!=dom0)
+//        panic("dom n physical dtlb miss happen\n");
     vpsr.val=vmx_vcpu_get_psr(vcpu);
     gppn=(vadr<<1)>>13;
     mppn = get_mfn(DOMID_SELF,gppn,1);
@@ -209,6 +253,8 @@ vmx_load_all_rr(VCPU *vcpu)
 	 * mode in same region
 	 */
 	if (is_physical_mode(vcpu)) {
+		if (vcpu->arch.mode_flags & GUEST_PHY_EMUL)
+			panic("Unexpected domain switch in phy emul\n");
 		ia64_set_rr((VRN0 << VRN_SHIFT),
 			     vcpu->domain->arch.emul_phy_rr0.rrval);
 		ia64_set_rr((VRN4 << VRN_SHIFT),
@@ -262,15 +308,10 @@ switch_to_virtual_rid(VCPU *vcpu)
     psr=ia64_clear_ic();
 
     mrr=vmx_vcpu_rr(vcpu,VRN0<<VRN_SHIFT);
-    mrr.rid = VRID_2_MRID(vcpu,mrr.rid);
-//VRID_2_MRID(vcpu,mrr.rid);
-    mrr.ve = 1;
-    ia64_set_rr(VRN0<<VRN_SHIFT, mrr.rrval );
+    ia64_set_rr(VRN0<<VRN_SHIFT, vmx_vrrtomrr(vcpu, mrr.rrval));
     ia64_srlz_d();
     mrr=vmx_vcpu_rr(vcpu,VRN4<<VRN_SHIFT);
-    mrr.rid = VRID_2_MRID(vcpu,mrr.rid);
-    mrr.ve = 1;
-    ia64_set_rr(VRN4<<VRN_SHIFT, mrr.rrval );
+    ia64_set_rr(VRN4<<VRN_SHIFT, vmx_vrrtomrr(vcpu, mrr.rrval));
     ia64_srlz_d();
     ia64_set_psr(psr);
     ia64_srlz_i();
@@ -377,8 +418,10 @@ check_mm_mode_switch (VCPU *vcpu,  IA64_PSR old_psr, IA64_PSR new_psr)
 void
 prepare_if_physical_mode(VCPU *vcpu)
 {
-    if (is_physical_mode(vcpu))
+    if (is_physical_mode(vcpu)) {
+	vcpu->arch.mode_flags |= GUEST_PHY_EMUL;
         switch_to_virtual_rid(vcpu);
+    }
     return;
 }
 
@@ -386,8 +429,10 @@ prepare_if_physical_mode(VCPU *vcpu)
 void
 recover_if_physical_mode(VCPU *vcpu)
 {
-    if (is_physical_mode(vcpu))
+    if (is_physical_mode(vcpu)) {
+	vcpu->arch.mode_flags &= ~GUEST_PHY_EMUL;
         switch_to_physical_rid(vcpu);
+    }
     return;
 }
 

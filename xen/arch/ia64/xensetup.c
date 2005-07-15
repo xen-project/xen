@@ -14,7 +14,7 @@
 //#include <xen/delay.h>
 #include <xen/compile.h>
 //#include <xen/console.h>
-//#include <xen/serial.h>
+#include <xen/serial.h>
 #include <xen/trace.h>
 #include <asm/meminit.h>
 #include <asm/page.h>
@@ -30,7 +30,6 @@ struct vcpu *idle_task[NR_CPUS] = { &idle0_vcpu };
 #ifdef CLONE_DOMAIN0
 struct domain *clones[CLONE_DOMAIN0];
 #endif
-extern struct domain *dom0;
 extern unsigned long domain0_ready;
 
 int find_max_pfn (unsigned long, unsigned long, void *);

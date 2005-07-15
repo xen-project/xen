@@ -35,4 +35,6 @@ extern vmx_insert_double_mapping(u64,u64,u64,u64,u64);
 extern void vmx_purge_double_mapping(u64, u64, u64);
 extern void vmx_change_double_mapping(struct vcpu *v, u64 oldrr7, u64 newrr7);
 
+extern void vmx_wait_io(void);
+extern void vmx_io_assist(struct vcpu *v);
 #endif /* _ASM_IA64_VT_H */

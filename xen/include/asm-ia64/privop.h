@@ -138,6 +138,19 @@ typedef union U_INST64_M47 {
     IA64_INST inst;
     struct { unsigned long qp:6, un14:14, r3:7, x6:6, x3:3, un1:1, major:4; };
 } INST64_M47;
+typedef union U_INST64_M1{
+    IA64_INST inst;
+    struct { unsigned long qp:6, r1:7, un7:7, r3:7, x:1, hint:2, x6:6, m:1, major:4; };
+} INST64_M1;
+typedef union U_INST64_M4 {
+    IA64_INST inst;
+    struct { unsigned long qp:6, un7:7, r2:7, r3:7, x:1, hint:2, x6:6, m:1, major:4; };
+} INST64_M4;
+typedef union U_INST64_M6 {
+    IA64_INST inst;
+    struct { unsigned long qp:6, f1:7, un7:7, r3:7, x:1, hint:2, x6:6, m:1, major:4; };
+} INST64_M6;
+
 #endif // CONFIG_VTI
 
 typedef union U_INST64 {
@@ -151,6 +164,11 @@ typedef union U_INST64 {
     INST64_I26 I26;	// mov register to ar (I unit)
     INST64_I27 I27;	// mov immediate to ar (I unit)
     INST64_I28 I28;	// mov from ar (I unit)
+#ifdef CONFIG_VTI
+    INST64_M1  M1;  // ld integer
+    INST64_M4  M4;  // st integer
+    INST64_M6  M6;  // ldfd floating pointer
+#endif // CONFIG_VTI
     INST64_M28 M28;	// purge translation cache entry
     INST64_M29 M29;	// mov register to ar (M unit)
     INST64_M30 M30;	// mov immediate to ar (M unit)

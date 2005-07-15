@@ -148,10 +148,14 @@
     mov r20=r1;         /* A */                         \
     mov r26=ar.unat;        /* M */                         \
     mov r29=cr.ipsr;        /* M */                         \
+    mov r18=cr.isr;         \
     COVER;              /* B;; (or nothing) */                  \
     ;;                                          \
-    tbit.z p6,p7=r29,IA64_PSR_VM_BIT;       \
+    tbit.z p6,p0=r29,IA64_PSR_VM_BIT;       \
+    tbit.nz.or p6,p0 = r18,39; \
+    ;;        \
 (p6) br.sptk.few vmx_panic;        \
+    tbit.z p0,p15=r29,IA64_PSR_I_BIT;   \
     mov r1=r16;                     \
 /*    mov r21=r16;	*/		\
     /* switch from user to kernel RBS: */                           \

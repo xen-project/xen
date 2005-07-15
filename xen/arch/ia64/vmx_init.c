@@ -40,6 +40,7 @@
 #include <asm/vmmu.h>
 #include <public/arch-ia64.h>
 #include <asm/vmx_phy_mode.h>
+#include <asm/processor.h>
 #include <asm/vmx.h>
 #include <xen/mm.h>
 
@@ -225,6 +226,17 @@ vmx_save_state(struct vcpu *v)
         vmx_purge_double_mapping(dom_rr7, KERNEL_START,
 				 (u64)v->arch.vtlb->ts->vhpt->hash);
 
+	/* Need to save KR when domain switch, though HV itself doesn;t
+	 * use them.
+	 */
+	v->arch.arch_vmx.vkr[0] = ia64_get_kr(0);
+	v->arch.arch_vmx.vkr[1] = ia64_get_kr(1);
+	v->arch.arch_vmx.vkr[2] = ia64_get_kr(2);
+	v->arch.arch_vmx.vkr[3] = ia64_get_kr(3);
+	v->arch.arch_vmx.vkr[4] = ia64_get_kr(4);
+	v->arch.arch_vmx.vkr[5] = ia64_get_kr(5);
+	v->arch.arch_vmx.vkr[6] = ia64_get_kr(6);
+	v->arch.arch_vmx.vkr[7] = ia64_get_kr(7);
 }
 
 /* Even guest is in physical mode, we still need such double mapping */
@@ -234,6 +246,7 @@ vmx_load_state(struct vcpu *v)
 	u64 status, psr;
 	u64 old_rr0, dom_rr7, rr0_xen_start, rr0_vhpt;
 	u64 pte_xen, pte_vhpt;
+	int i;
 
 	status = ia64_pal_vp_restore(v->arch.arch_vmx.vpd, 0);
 	if (status != PAL_STATUS_SUCCESS)
@@ -246,6 +259,14 @@ vmx_load_state(struct vcpu *v)
 				  (u64)v->arch.vtlb->ts->vhpt->hash,
 				  pte_xen, pte_vhpt);
 
+	ia64_set_kr(0, v->arch.arch_vmx.vkr[0]);
+	ia64_set_kr(1, v->arch.arch_vmx.vkr[1]);
+	ia64_set_kr(2, v->arch.arch_vmx.vkr[2]);
+	ia64_set_kr(3, v->arch.arch_vmx.vkr[3]);
+	ia64_set_kr(4, v->arch.arch_vmx.vkr[4]);
+	ia64_set_kr(5, v->arch.arch_vmx.vkr[5]);
+	ia64_set_kr(6, v->arch.arch_vmx.vkr[6]);
+	ia64_set_kr(7, v->arch.arch_vmx.vkr[7]);
 	/* Guest vTLB is not required to be switched explicitly, since
 	 * anchored in vcpu */
 }
@@ -290,7 +311,7 @@ vmx_final_setup_domain(struct domain *d)
 	vmx_create_vp(v);
 
 	/* Set this ed to be vmx */
-	v->arch.arch_vmx.flags = 1;
+	set_bit(ARCH_VMX_VMCS_LOADED, &v->arch.arch_vmx.flags);
 
 	/* Other vmx specific initialization work */
 }
