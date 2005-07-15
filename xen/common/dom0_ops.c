@@ -215,14 +215,16 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 pro = i;
 
         ret = -ENOMEM;
-        if ( (d = do_createdomain(dom, pro)) != NULL )
-            ret = 0;
-        
-    alloc_out:
-        spin_unlock(&alloc_lock);
+        if ( (d = do_createdomain(dom, pro)) == NULL )
+            goto alloc_out;
+
+        ret = 0;
 
         op->u.createdomain.domain = d->domain_id;
         copy_to_user(u_dom0_op, op, sizeof(*op));
+
+    alloc_out:
+        spin_unlock(&alloc_lock);
     }
     break;
 
