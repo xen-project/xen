@@ -903,6 +903,9 @@ gnttab_check_unmap(
     {
         map = &lgt->maptrack[handle];
 
+        if ( map->domid != rd->domain_id )
+            continue;
+
         if ( ( map->ref_and_flags & MAPTRACK_GNTMAP_MASK ) &&
              ( readonly ? 1 : (!(map->ref_and_flags & GNTMAP_readonly))))
         {
