@@ -1352,18 +1352,22 @@ int get_page_type(struct pfn_info *page, u32 type)
         {
             if ( (x & (PGT_type_mask|PGT_va_mask)) != type )
             {
-                /*
-                 * On type change we check to flush stale TLB entries. This 
-                 * may be unnecessary (e.g., page was GDT/LDT) but those
-                 * circumstances should be very rare.
-                 */
-                cpumask_t mask = page_get_owner(page)->cpumask;
-                tlbflush_filter(mask, page->tlbflush_timestamp);
-
-                if ( unlikely(!cpus_empty(mask)) )
+                if ( (x & PGT_type_mask) != (type & PGT_type_mask) )
                 {
-                    perfc_incrc(need_flush_tlb_flush);
-                    flush_tlb_mask(mask);
+                    /*
+                     * On type change we check to flush stale TLB
+                     * entries. This may be unnecessary (e.g., page
+                     * was GDT/LDT) but those circumstances should be
+                     * very rare.
+                     */
+                    cpumask_t mask = page_get_owner(page)->cpumask;
+                    tlbflush_filter(mask, page->tlbflush_timestamp);
+
+                    if ( unlikely(!cpus_empty(mask)) )
+                    {
+                        perfc_incrc(need_flush_tlb_flush);
+                        flush_tlb_mask(mask);
+                    }
                 }
 
                 /* We lose existing type, back pointer, and validity. */
