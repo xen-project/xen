@@ -39,55 +39,6 @@ static inline int is_free_domid(domid_t dom)
     return 0;
 }
 
-/*
- * Allocate a free domain id. We try to reuse domain ids in a fairly low range,
- * only expanding the range when there are no free domain ids. This is to keep 
- * domain ids in a range depending on the number that exist simultaneously,
- * rather than incrementing domain ids in the full 32-bit range.
- */
-static int allocate_domid(domid_t *pdom)
-{
-    static spinlock_t domid_lock = SPIN_LOCK_UNLOCKED;
-    static domid_t curdom = 0;
-    static domid_t topdom = 101;
-    int err = 0;
-    domid_t dom;
-
-    spin_lock(&domid_lock);
-
-    /* Try to use a domain id in the range 0..topdom, starting at curdom. */
-    for ( dom = curdom + 1; dom != curdom; dom++ )
-    {
-        if ( dom == topdom )
-            dom = 1;
-        if ( is_free_domid(dom) )
-            goto exit;
-    }
-
-    /* Couldn't find a free domain id in 0..topdom, try higher. */
-    for ( dom = topdom; dom < DOMID_FIRST_RESERVED; dom++ )
-    {
-        if ( is_free_domid(dom) )
-        {
-            topdom = dom + 1;
-            goto exit;
-        }
-    }
-
-    /* No free domain ids. */
-    err = -ENOMEM;
-
-  exit:
-    if ( err == 0 )
-    {
-        curdom = dom;
-        *pdom = dom;
-    }
-
-    spin_unlock(&domid_lock);
-    return err;
-}
-
 static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
 {
     struct vcpu   *v;
@@ -217,18 +168,33 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         domid_t        dom;
         struct vcpu   *v;
         unsigned int   i, cnt[NR_CPUS] = { 0 };
+        static spinlock_t alloc_lock = SPIN_LOCK_UNLOCKED;
+        static domid_t rover = 0;
 
+        spin_lock(&alloc_lock);
 
         dom = op->u.createdomain.domain;
         if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
         {
             ret = -EINVAL;
             if ( !is_free_domid(dom) )
-                break;
+                goto alloc_out;
         }
-        else if ( (ret = allocate_domid(&dom)) != 0 )
+        else
         {
-            break;
+            for ( dom = rover + 1; dom != rover; dom++ )
+            {
+                if ( dom == DOMID_FIRST_RESERVED )
+                    dom = 0;
+                if ( is_free_domid(dom) )
+                    break;
+            }
+
+            ret = -ENOMEM;
+            if ( dom == rover )
+                goto alloc_out;
+
+            rover = dom;
         }
 
         /* Do an initial CPU placement. Pick the least-populated CPU. */
@@ -249,11 +215,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 pro = i;
 
         ret = -ENOMEM;
-        if ( (d = do_createdomain(dom, pro)) == NULL )
-            break;
-
-        ret = 0;
+        if ( (d = do_createdomain(dom, pro)) != NULL )
+            ret = 0;
         
+    alloc_out:
+        spin_unlock(&alloc_lock);
+
         op->u.createdomain.domain = d->domain_id;
         copy_to_user(u_dom0_op, op, sizeof(*op));
     }
