@@ -96,11 +96,11 @@ include/xen/compile.h: include/xen/compile.h.in include/xen/banner.h
 	    -e 's/@@whoami@@/$(shell whoami)/g' \
 	    -e 's/@@domain@@/$(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))/g' \
 	    -e 's/@@hostname@@/$(shell hostname)/g' \
-	    -e 's/@@compiler@@/$(shell $(CC) $(CFLAGS) -v 2>&1 | tail -1)/g' \
+	    -e 's/@@compiler@@/$(shell $(CC) $(CFLAGS) -v 2>&1 | tail -n 1)/g' \
 	    -e 's/@@version@@/$(XEN_VERSION)/g' \
 	    -e 's/@@subversion@@/$(XEN_SUBVERSION)/g' \
 	    -e 's/@@extraversion@@/$(XEN_EXTRAVERSION)/g' \
-	    -e 's!@@changeset@@!$(shell (hg parents | awk -F: '/^changeset/{CS=$$3};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null || (head -6 ChangeLog | awk -F: '/^changeset/{CS=$$3};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null || echo information unavailable)!g' \
+	    -e 's!@@changeset@@!$(shell (hg parents | awk -F: '/^changeset/{CS=$$3};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null || (head -n 6 ChangeLog | awk -F: '/^changeset/{CS=$$3};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null || echo information unavailable)!g' \
 	    < include/xen/compile.h.in > $@.new
 	@cat include/xen/banner.h >> $@.new
 	@mv -f $@.new $@
