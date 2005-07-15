@@ -46,8 +46,18 @@ typedef u32 NETIF_RING_IDX;
 #define MASK_NETIF_RX_IDX(_i) ((_i)&(NETIF_RX_RING_SIZE-1))
 #define MASK_NETIF_TX_IDX(_i) ((_i)&(NETIF_TX_RING_SIZE-1))
 
+#ifdef __x86_64__
+/*
+ * This restriction can be lifted when we move netfront/netback to use
+ * grant tables. This will remove memory_t fields from the above structures
+ * and thus relax natural alignment restrictions.
+ */
+#define NETIF_TX_RING_SIZE 128
+#define NETIF_RX_RING_SIZE 128
+#else
 #define NETIF_TX_RING_SIZE 256
 #define NETIF_RX_RING_SIZE 256
+#endif
 
 /* This structure must fit in a memory page. */
 typedef struct netif_tx_interface {
