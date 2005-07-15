@@ -311,9 +311,10 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	init_all_rr(v);
 
 	// this should be in userspace
-	regs->r28 = dom_fw_setup(v->domain,"nomca nosmp xencons=ttyS console=ttyS0",256L);  //FIXME
+	regs->r28 = dom_fw_setup(v->domain,"nomca nosmp xencons=tty0 console=tty0",256L);  //FIXME
 	v->vcpu_info->arch.banknum = 1;
 	v->vcpu_info->arch.metaphysical_mode = 1;
+	v->arch.domain_itm_last = -1L;
 
 	v->domain->shared_info->arch = c->shared;
 	return 0;

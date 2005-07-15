@@ -21,6 +21,8 @@
 #define FAST_TICK
 #define FAST_BREAK
 #define FAST_ACCESS_REFLECT
+#define FAST_RFI
+#define FAST_SSM_I
 #undef RFI_TO_INTERRUPT // not working yet
 #endif
 
@@ -183,6 +185,9 @@ GLOBAL_ENTRY(fast_hyperprivop)
 //	r19 == vpsr.ic (low 32 bits) | vpsr.i (high 32 bits)
 //	r31 == pr
 ENTRY(hyper_ssm_i)
+#ifndef FAST_SSM_I
+	br.spnt.few dispatch_break_fault ;;
+#endif
 	// give up for now if: ipsr.be==1, ipsr.pp==1
 	mov r30=cr.ipsr;;
 	mov r29=cr.iip;;
@@ -259,7 +264,8 @@ ENTRY(hyper_ssm_i)
 	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
 	bsw.1;;
-	// FIXME: need to handle ar.unat!
+	// FIXME?: ar.unat is not really handled correctly,
+	// but may not matter if the OS is NaT-clean
 	.mem.offset 0,0; st8.spill [r2]=r16,16;
 	.mem.offset 8,0; st8.spill [r3]=r17,16 ;;
 	.mem.offset 0,0; st8.spill [r2]=r18,16;
@@ -424,11 +430,10 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	add r24=r24,r23;;
 	mov cr.iip=r24;;
 	// OK, now all set to go except for switch to virtual bank0
-	mov r30=r2; mov r29=r3;;
+	mov r30=r2; mov r29=r3;; mov r28=ar.unat;
 	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
 	bsw.1;;
-	// FIXME: need to handle ar.unat!
 	.mem.offset 0,0; st8.spill [r2]=r16,16;
 	.mem.offset 8,0; st8.spill [r3]=r17,16 ;;
 	.mem.offset 0,0; st8.spill [r2]=r18,16;
@@ -447,7 +452,11 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
 	movl r31=XSI_IPSR;;
 	bsw.0 ;;
-	mov r2=r30; mov r3=r29;;
+	// bank0 regs have no NaT bit, so ensure they are NaT clean
+	mov r16=r0; mov r17=r0; mov r19=r0;
+	mov r21=r0; mov r22=r0; mov r23=r0;
+	mov r24=r0; mov r25=r0; mov r26=r0; mov r27=r0;
+	mov r2=r30; mov r3=r29; mov ar.unat=r28;
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r20]=r0 ;;
 fast_tick_reflect_done:
@@ -566,11 +575,10 @@ ENTRY(fast_reflect)
 	add r20=r20,r23;;
 	mov cr.iip=r20;;
 	// OK, now all set to go except for switch to virtual bank0
-	mov r30=r2; mov r29=r3;;
+	mov r30=r2; mov r29=r3;; mov r28=ar.unat;
 	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
 	bsw.1;;
-	// FIXME: need to handle ar.unat!
 	.mem.offset 0,0; st8.spill [r2]=r16,16;
 	.mem.offset 8,0; st8.spill [r3]=r17,16 ;;
 	.mem.offset 0,0; st8.spill [r2]=r18,16;
@@ -589,7 +597,11 @@ ENTRY(fast_reflect)
 	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
 	movl r31=XSI_IPSR;;
 	bsw.0 ;;
-	mov r2=r30; mov r3=r29;;
+	// bank0 regs have no NaT bit, so ensure they are NaT clean
+	mov r16=r0; mov r17=r0; mov r19=r0;
+	mov r21=r0; mov r22=r0; mov r23=r0;
+	mov r24=r0; mov r25=r0; mov r26=r0; mov r27=r0;
+	mov r2=r30; mov r3=r29; mov ar.unat=r28;
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
 	st4 [r20]=r0 ;;
 	mov pr=r31,-1 ;;
@@ -637,6 +649,9 @@ GLOBAL_ENTRY(fast_access_reflect)
 
 // ensure that, if giving up, registers at entry to fast_hyperprivop unchanged
 ENTRY(hyper_rfi)
+#ifndef FAST_RFI
+	br.spnt.few dispatch_break_fault ;;
+#endif
 	// if no interrupts pending, proceed
 	mov r30=r0
 	cmp.eq p7,p0=r20,r0
@@ -736,7 +751,8 @@ just_do_rfi:
 	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
 	bsw.1;;
-	// FIXME: need to handle ar.unat!
+	// FIXME?: ar.unat is not really handled correctly,
+	// but may not matter if the OS is NaT-clean
 	.mem.offset 0,0; ld8.fill r16=[r2],16 ;
 	.mem.offset 8,0; ld8.fill r17=[r3],16 ;;
 	.mem.offset 0,0; ld8.fill r18=[r2],16 ;
