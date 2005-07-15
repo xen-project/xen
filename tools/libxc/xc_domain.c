@@ -107,7 +107,7 @@ int xc_domain_getinfo(int xc_handle,
 
         info->ssidref  = op.u.getdomaininfo.ssidref;
         info->nr_pages = op.u.getdomaininfo.tot_pages;
-        info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT);
+        info->max_memkb = op.u.getdomaininfo.max_pages << (PAGE_SHIFT - 10);
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
         info->cpu_time = op.u.getdomaininfo.cpu_time;
         info->vcpus = op.u.getdomaininfo.n_vcpu;

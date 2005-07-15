@@ -464,14 +464,14 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
         goto out;
     }
     
-    nr_pfns = info.max_memkb >> PAGE_SHIFT; 
+    nr_pfns = info.max_memkb >> (PAGE_SHIFT - 10);
 
     /* cheesy sanity check */
-    if ( nr_pfns > 1024*1024 ){
+    if ( nr_pfns > 1024*1024 )
+    {
         ERR("Invalid state record -- pfn count out of range: %lu", nr_pfns);
         goto out;
     }
-
 
     /* Map the shared info frame */
     live_shinfo = xc_map_foreign_range(xc_handle, dom,
