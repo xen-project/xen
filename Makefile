@@ -163,7 +163,7 @@ help:
 uninstall: DESTDIR=
 uninstall: D=$(DESTDIR)
 uninstall:
-	[ -d $(D)/etc/xen ] && mv -f $(D)/etc/xen $(D)/etc/xen.old-$(date +%s)
+	[ -d $(D)/etc/xen ] && mv -f $(D)/etc/xen $(D)/etc/xen.old-`date +%s`
 	rm -rf $(D)/etc/init.d/xend*
 	rm -rf $(D)/usr/$(LIBDIR)/libxc* $(D)/usr/$(LIBDIR)/libxutil*
 	rm -rf $(D)/usr/$(LIBDIR)/python/xen $(D)/usr/include/xen
