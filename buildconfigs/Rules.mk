@@ -101,7 +101,7 @@ ref-%/.valid-ref: pristine-%/.valid-pristine
 	rm -rf tmp-$@
 
 %-mrproper: %-mrproper-extra
-	rm -rf pristine-$* ref-$* $*.tar.bz2
+	rm -rf pristine-$(*)* ref-$(*)* $*.tar.bz2
 	rm -rf $*-xen.patch
 
 netbsd-%-mrproper-extra:
