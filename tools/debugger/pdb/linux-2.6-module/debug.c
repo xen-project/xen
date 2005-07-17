@@ -55,15 +55,47 @@ pdb_detach (int pid)
 /*
  * from linux-2.6.11/arch/i386/kernel/ptrace.c::getreg()
  */
-int
-pdb_read_register (int pid, pdb_op_rd_reg_p op, unsigned long *dest)
+
+static unsigned long
+_pdb_get_register (struct task_struct *target, int reg)
 {
-    int rc = 0;
-    struct task_struct *target;
+    unsigned long result = ~0UL;
     unsigned long offset;
     unsigned char *stack = 0L;
 
-    *dest = ~0UL;
+    switch (reg)
+    {
+    case FS:
+        result = target->thread.fs;
+        break;
+    case GS:
+        result = target->thread.gs;
+        break;
+    case DS:
+    case ES:
+    case SS:
+    case CS:
+        result = 0xffff;
+        /* fall through */
+    default:
+        if (reg > GS)
+            reg -= 2;
+
+        offset = reg * sizeof(long);
+        offset -= sizeof(struct pt_regs);
+        stack = (unsigned char *)target->thread.esp0;
+        stack += offset;
+        result &= *((int *)stack);
+    }
+
+    return result;
+}
+
+int
+pdb_read_register (int pid, pdb_op_rd_regs_p op)
+{
+    int rc = 0;
+    struct task_struct *target;
 
     read_lock(&tasklist_lock);
     target = find_task_by_pid(pid);
@@ -71,35 +103,23 @@ pdb_read_register (int pid, pdb_op_rd_reg_p op, unsigned long *dest)
         get_task_struct(target);
     read_unlock(&tasklist_lock);
 
-    switch (op->reg)
-    {
-    case FS:
-        *dest = target->thread.fs;
-        break;
-    case GS:
-        *dest = target->thread.gs;
-        break;
-    case DS:
-    case ES:
-    case SS:
-    case CS:
-        *dest = 0xffff;
-        /* fall through */
-    default:
-        if (op->reg > GS)
-            op->reg -= 2;
+    op->reg[ 0] = _pdb_get_register(target, LINUX_EAX);
+    op->reg[ 1] = _pdb_get_register(target, LINUX_ECX);
+    op->reg[ 2] = _pdb_get_register(target, LINUX_EDX);
+    op->reg[ 3] = _pdb_get_register(target, LINUX_EBX);
+    op->reg[ 4] = _pdb_get_register(target, LINUX_ESP);
+    op->reg[ 5] = _pdb_get_register(target, LINUX_EBP);
+    op->reg[ 6] = _pdb_get_register(target, LINUX_ESI);
+    op->reg[ 7] = _pdb_get_register(target, LINUX_EDI);
+    op->reg[ 8] = _pdb_get_register(target, LINUX_EIP);
+    op->reg[ 9] = _pdb_get_register(target, LINUX_EFL);
 
-        offset = op->reg * sizeof(long);
-        offset -= sizeof(struct pt_regs);
-        stack = (unsigned char *)target->thread.esp0;
-        stack += offset;
-        *dest &= *((int *)stack);
-    }
-
-    /*
-    printk ("pdb read register: 0x%x %2d 0x%p 0x%lx\n", 
-            pid, op->reg, stack, *dest);
-    */
+    op->reg[10] = _pdb_get_register(target, LINUX_CS);
+    op->reg[11] = _pdb_get_register(target, LINUX_SS);
+    op->reg[12] = _pdb_get_register(target, LINUX_DS);
+    op->reg[13] = _pdb_get_register(target, LINUX_ES);
+    op->reg[14] = _pdb_get_register(target, LINUX_FS);
+    op->reg[15] = _pdb_get_register(target, LINUX_GS);
 
     return rc;
 }

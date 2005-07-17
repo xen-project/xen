@@ -12,12 +12,6 @@ open PDB
 open Util
 open Str
 
-(** a few debugger commands such as step 's' and continue 'c' do 
- *  not immediately return a response to the debugger.  in these 
- *  cases we raise No_reply instead. 
- *)
-exception No_reply
-
 let initialize_debugger () =
   ()
 
@@ -295,12 +289,17 @@ let process_xen_domain fd =
   let channel = Evtchn.read fd in
   let ctx = find_context fd in
   
+  let (dom, pid, str) =
   begin
     match ctx with
       | Xen_domain d -> Xen_domain.process_response (Xen_domain.get_ring d)
       | _ -> failwith ("process_xen_domain called without Xen_domain context")
-  end;
-    
+  end 
+  in
+  let sock = PDB.find_process dom pid in
+  print_endline (Printf.sprintf "(linux) dom:%d pid:%d  %s  %s" 
+		   dom pid str (Util.get_connection_info sock));
+  Util.send_reply sock str;
   Evtchn.unmask fd channel                                (* allow next virq *)
   
 

@@ -21,5 +21,5 @@ val get_ring   : context_t -> int32
 
 val string_of_context : context_t -> string
 
-val process_response : int32 -> unit
+val process_response : int32 -> int * int * string
 

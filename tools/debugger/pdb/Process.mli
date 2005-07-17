@@ -27,7 +27,7 @@ val detach_debugger : context_t -> unit
 val pause : context_t -> unit
 
 
-val read_registers : context_t -> registers
+val read_registers : context_t -> unit
 val write_register : context_t -> register -> int32 -> unit
 val read_memory : context_t -> int32 -> int -> int list
 val write_memory : context_t -> int32 -> int list -> unit

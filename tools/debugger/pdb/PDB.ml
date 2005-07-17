@@ -7,9 +7,12 @@
  *  @version 1
  *)
 
+open Util
+
 exception Unimplemented of string
 exception Unknown_context of string
 exception Unknown_domain
+exception Unknown_process
 
 type context_t =
   | Void
@@ -44,6 +47,31 @@ let find_context key =
 
 let delete_context key =
   Hashtbl.remove hash key
+
+
+(**
+   find_process : Locate the socket associated with the context(s)
+   matching a particular (domain, process id) pair.  if there are multiple
+   contexts (there shouldn't be), then return the first one.
+ *)
+
+let find_process dom pid =
+    let find key ctx list =
+      match ctx with
+      |	Process p ->
+	  if (((Process.get_domain p) = dom) &&
+	      ((Process.get_process p) = pid))
+	  then
+	    key :: list
+	  else
+	    list
+      | _ -> list
+    in
+    let sock_list = Hashtbl.fold find hash [] in
+    match sock_list with
+    | hd::tl -> hd
+    | [] -> raise Unknown_process
+
 
 (**
    find_domain : Locate the socket associated with the context(s)
@@ -98,10 +126,13 @@ let attach_debugger ctx =
       begin
 	let xdom_sock = find_xen_domain_context (Process.get_domain p) in
 	let xdom_ctx = find_context xdom_sock in
-	match xdom_ctx with
-	  | Xen_domain d ->
-	      Process.attach_debugger p d
-	  | _ -> failwith ("context has wrong xen domain type")
+	begin
+	  match xdom_ctx with
+	    | Xen_domain d ->
+		Process.attach_debugger p d
+	    | _ -> failwith ("context has wrong xen domain type")
+	end;
+	raise No_reply
       end
   | _ -> raise (Unimplemented "attach debugger")
 
@@ -158,8 +189,8 @@ let add_context (key:Unix.file_descr) context params =
 	match params with
 	| dom::pid::_ ->
 	    let p = Process(Process.new_context dom pid) in
-	    attach_debugger p;
-	    Hashtbl.replace hash key p
+	    Hashtbl.replace hash key p;
+	    attach_debugger p
 	| _ -> failwith "bogus parameters to process context"
       end
   | "xen domain"
@@ -188,13 +219,21 @@ let read_registers ctx =
   match ctx with
   | Void -> Intel.null_registers                    (* default for startup *)
   | Domain d  -> Domain.read_registers d 
-  | Process p -> Process.read_registers p
+  | Process p ->
+      begin
+	Process.read_registers p;
+	raise No_reply
+      end
   | _ -> raise (Unimplemented "read registers")
 
 let write_register ctx register value =
   match ctx with
   | Domain d  -> Domain.write_register d register value
-  | Process p -> Process.write_register p register value
+  | Process p ->
+      begin
+	Process.write_register p register value;
+	raise No_reply
+      end
   | _ -> raise (Unimplemented "write register")
 
 

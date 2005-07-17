@@ -40,4 +40,4 @@ let get_ring ctx =
 let string_of_context ctx =
       Printf.sprintf "{xen domain assist} domain: %d" ctx.domain 
 
-external process_response : int32 -> unit = "process_handle_response"
+external process_response : int32 -> int * int * string = "process_handle_response"

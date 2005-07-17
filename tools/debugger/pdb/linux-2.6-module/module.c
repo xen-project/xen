@@ -54,6 +54,10 @@ pdb_process_request (pdb_request_t *request)
 {
     pdb_response_t resp;
 
+    resp.operation = request->operation;
+    resp.domain    = request->domain;
+    resp.process   = request->process;
+
     switch (request->operation)
     {
     case PDB_OPCODE_ATTACH :
@@ -64,9 +68,8 @@ pdb_process_request (pdb_request_t *request)
         pdb_detach(request->process);
         resp.status = PDB_RESPONSE_OKAY;
         break;
-    case PDB_OPCODE_RD_REG :
-        pdb_read_register(request->process, &request->u.rd_reg, 
-                          (unsigned long *)&resp.value);
+    case PDB_OPCODE_RD_REGS :
+        pdb_read_register(request->process, &resp.u.rd_regs);
         resp.status = PDB_RESPONSE_OKAY;
         break;
     case PDB_OPCODE_WR_REG :
@@ -78,8 +81,6 @@ pdb_process_request (pdb_request_t *request)
         resp.status = PDB_RESPONSE_ERROR;
     }
         
-    resp.operation = request->operation;
-            
     pdb_send_response (&resp);
     return;
 }

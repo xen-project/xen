@@ -154,3 +154,12 @@ let send_reply fd reply =
    * BUG NEED TO LISTEN FOR REPLY +/- AND POSSIBLY RE-TRANSMIT
    *)
 
+
+(** A few debugger commands such as step 's' and continue 'c' do 
+ *  not immediately return a response to the debugger.  In these 
+ *  cases we raise No_reply instead. 
+ *  This is also used by some contexts (such as Linux processes)
+ *  which utilize an asynchronous request / response protocol when
+ *  communicating with their respective backends.
+ *)
+exception No_reply

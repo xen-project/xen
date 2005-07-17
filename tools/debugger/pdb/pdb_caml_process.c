@@ -66,49 +66,89 @@ send_request (pdb_front_ring_t *pdb_ring, int evtchn, pdb_request_t *request)
 }
 
 /*
- * read a response from a pdb domain backend.
+ * process_handle_response : int32 -> int * int * string
  *
- * grabs the response off a ring.
+ * A backend domain has notified pdb (via an event channel)
+ * that a command has finished.
+ * We read the result from the channel and formulate a response
+ * as a single string.  Also return the domain and process.
  */
-static void
-read_response (pdb_front_ring_t *pdb_ring, pdb_response_p response)
+
+static inline unsigned int
+_flip (unsigned int orig)
 {
-    RING_IDX loop, rp;
-
-    rp = pdb_ring->sring->rsp_prod;
-    rmb(); /* Ensure we see queued responses up to 'rp'. */
-
-    for ( loop = pdb_ring->rsp_cons; loop != rp; loop++ )
-    {
-        pdb_response_p resp;
-
-        resp = RING_GET_RESPONSE(pdb_ring, loop);
-        memcpy(response, resp, sizeof(pdb_response_t));
-
-        /*        
-        printf ("got response %x %x %x\n", response->operation, 
-                response->status, response->value);
-        */
-    }
-    pdb_ring->rsp_cons = loop;
+    return (((orig << 24) & 0xff000000) | ((orig <<  8) & 0x00ff0000) |
+            ((orig >>  8) & 0x0000ff00) | ((orig >> 24) & 0x000000ff));
 }
-
-/*
- * process_handle_response : int32 -> unit
- */
 
 value
 process_handle_response (value ring)
 {
     CAMLparam1(ring);
+    CAMLlocal2(result, str);
 
+    RING_IDX rp;
+    pdb_response_p resp;
     pdb_front_ring_t *my_ring = (pdb_front_ring_t *)Int32_val(ring);
-    pdb_response_t resp;
+    char msg[2048];
+    int msglen;
 
-    if ( my_ring )
-        read_response(my_ring, &resp);
+    memset(msg, 0, sizeof(msg));
 
-    CAMLreturn(Val_unit);
+    rp = my_ring->sring->rsp_prod;
+    rmb(); /* Ensure we see queued responses up to 'rp'. */
+
+    sprintf(msg, "OK");
+
+    /* for ( loop = my_ring->rsp_cons; loop != rp; loop++ ) */
+    if (my_ring->rsp_cons != rp)
+    {
+        resp = RING_GET_RESPONSE(my_ring, my_ring->rsp_cons);
+
+        switch (resp->operation)
+        {
+        case PDB_OPCODE_ATTACH :
+        case PDB_OPCODE_DETACH :
+            break;
+            
+        case PDB_OPCODE_RD_REGS :
+        {
+            int loop;
+            pdb_op_rd_regs_p regs = &resp->u.rd_regs;
+            
+            for (loop = 0; loop < GDB_REGISTER_FRAME_SIZE * 8; loop += 8)
+            {
+                sprintf(&msg[loop], "%08x", _flip(regs->reg[loop >> 3]));
+            }
+                
+            break;
+        }
+
+        case PDB_OPCODE_WR_REG :
+        {
+            printf("(linux) wr regs\n");
+            /* should check the return status */
+            break;
+        }
+        default :
+            printf("(process) UNKNOWN MESSAGE TYPE IN RESPONSE\n");
+            break;
+        }
+
+        my_ring->rsp_cons++;
+    }
+    /* my_ring->rsp_cons = loop; */
+
+    msglen = strlen(msg);
+    result = caml_alloc(3,0);
+    str = alloc_string(msglen);
+    memmove(&Byte(str,0), msg, msglen);
+
+    Store_field(result, 0, Val_int(resp->domain));
+    Store_field(result, 1, Val_int(resp->process));
+    Store_field(result, 2, str);
+
+    CAMLreturn(result);
 }
 
 /*
@@ -120,27 +160,14 @@ proc_attach_debugger (value context)
     CAMLparam1(context);
     context_t ctx;
     pdb_request_t req;
-    pdb_response_t resp;
 
     decode_context(&ctx, context);
-
-    printf("(pdb) attach process [%d.%d] %d %p\n", ctx.domain, ctx.process,
-           ctx.evtchn, ctx.ring);
-    fflush(stdout);
 
     req.operation = PDB_OPCODE_ATTACH;
     req.domain  = ctx.domain;
     req.process = ctx.process;
 
     send_request (ctx.ring, ctx.evtchn, &req);
-
-    printf("awaiting response\n");
-    fflush(stdout);
-
-    read_response (ctx.ring, &resp);
-
-    printf("response %d %d\n", resp.operation, resp.status);
-    fflush(stdout);
 
     CAMLreturn(Val_unit);
 }
@@ -191,56 +218,25 @@ proc_pause_target (value context)
 
 
 /*
- * proc_read_registers : context_t -> int32
+ * proc_read_registers : context_t -> unit
  */
 value
 proc_read_registers (value context)
 {
     CAMLparam1(context);
-    CAMLlocal1(result);
-
-    u32 regs[REGISTER_FRAME_SIZE];
 
     pdb_request_t req;
     context_t ctx;
-    int loop;
 
     decode_context(&ctx, context);
 
-    req.operation = PDB_OPCODE_RD_REG;
+    req.operation = PDB_OPCODE_RD_REGS;
     req.domain  = ctx.domain;
     req.process = ctx.process;
 
-    for (loop = 0; loop < REGISTER_FRAME_SIZE; loop++)
-    {
-        pdb_response_t resp;
+    send_request (ctx.ring, ctx.evtchn, &req);
 
-        req.u.rd_reg.reg = loop;
-        send_request(ctx.ring, ctx.evtchn, &req);
-        read_response(ctx.ring, &resp);
-        regs[loop] = resp.value;
-    }
-
-    result = caml_alloc_tuple(16);
-
-    Store_field(result,  0, caml_copy_int32(regs[LINUX_EAX]));
-    Store_field(result,  1, caml_copy_int32(regs[LINUX_ECX]));
-    Store_field(result,  2, caml_copy_int32(regs[LINUX_EDX]));
-    Store_field(result,  3, caml_copy_int32(regs[LINUX_EBX]));
-    Store_field(result,  4, caml_copy_int32(regs[LINUX_ESP]));
-    Store_field(result,  5, caml_copy_int32(regs[LINUX_EBP]));
-    Store_field(result,  6, caml_copy_int32(regs[LINUX_ESI]));
-    Store_field(result,  7, caml_copy_int32(regs[LINUX_EDI]));
-    Store_field(result,  8, caml_copy_int32(regs[LINUX_EIP]));
-    Store_field(result,  9, caml_copy_int32(regs[LINUX_EFL]));
-    Store_field(result, 10, caml_copy_int32(regs[LINUX_CS]));          /* 16 */
-    Store_field(result, 11, caml_copy_int32(regs[LINUX_SS]));          /* 16 */
-    Store_field(result, 12, caml_copy_int32(regs[LINUX_DS]));          /* 16 */
-    Store_field(result, 13, caml_copy_int32(regs[LINUX_ES]));          /* 16 */
-    Store_field(result, 14, caml_copy_int32(regs[LINUX_FS]));          /* 16 */
-    Store_field(result, 15, caml_copy_int32(regs[LINUX_GS]));          /* 16 */
-
-    CAMLreturn(result);
+    CAMLreturn(Val_unit);
 }
 
 
@@ -257,7 +253,6 @@ proc_write_register (value context, value reg, value newval)
 
     context_t ctx;
     pdb_request_t req;
-    pdb_response_t resp;
 
     decode_context(&ctx, context);
 
@@ -290,7 +285,6 @@ proc_write_register (value context, value reg, value newval)
     }
 
     send_request(ctx.ring, ctx.evtchn, &req);
-    read_response(ctx.ring, &resp);
 
     CAMLreturn(Val_unit);
 }

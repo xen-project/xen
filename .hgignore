@@ -87,6 +87,11 @@
 ^tools/cmdline/.*$
 ^tools/cmdline/xen/.*$
 ^tools/debugger/pdb/pdb$
+^tools/debugger/pdb/linux-[0-9.]*-module/.*\.ko$
+^tools/debugger/pdb/linux-[0-9.]*-module/.*\.mod.c$
+^tools/debugger/pdb/linux-[0-9.]*-module/\..*\.cmd$
+^tools/debugger/pdb/linux-[0-9.]*-module/.tmp_versions/.*$
+^tools/debugger/pdb/._bcdi/.*$
 ^tools/firmware/acpi/acpigen$
 ^tools/firmware/.*\.bin$
 ^tools/firmware/.*\.sym$

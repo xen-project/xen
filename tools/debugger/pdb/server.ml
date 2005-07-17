@@ -9,7 +9,7 @@
 
 open Unix
 open Buffer
-
+open Util
 
 (**
  * connection_t: The state for each connection.
@@ -98,7 +98,7 @@ let process_input conn sock =
 			       (String.escaped reply));
 	      Util.send_reply sock reply
 	    with
-	      Debugger.No_reply ->
+	      Util.No_reply ->
 		print_endline (Printf.sprintf "[%s] %s -> null" 
 				 (Util.get_connection_info sock)
 				 (String.escaped command))
