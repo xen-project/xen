@@ -214,6 +214,7 @@ IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 	if (imm.ic)  PSCB(vcpu,interrupt_collection_enabled) = 1;
 	// TODO: do this faster
 	if (imm.mfl) { ipsr->mfl = 1; psr.mfl = 1; }
+	if (imm.mfh) { ipsr->mfh = 1; psr.mfh = 1; }
 	if (imm.ac) { ipsr->ac = 1; psr.ac = 1; }
 	if (imm.up) { ipsr->up = 1; psr.up = 1; }
 	if (imm.be) {
@@ -262,6 +263,7 @@ IA64FAULT vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
 	}
 	if (newpsr.ic)  PSCB(vcpu,interrupt_collection_enabled) = 1;
 	if (newpsr.mfl) { ipsr->mfl = 1; psr.mfl = 1; }
+	if (newpsr.mfh) { ipsr->mfh = 1; psr.mfh = 1; }
 	if (newpsr.ac) { ipsr->ac = 1; psr.ac = 1; }
 	if (newpsr.up) { ipsr->up = 1; psr.up = 1; }
 	if (newpsr.dt && newpsr.rt) vcpu_set_metaphysical_mode(vcpu,FALSE);
@@ -1263,7 +1265,6 @@ IA64FAULT vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 #define itir_mask(itir) (~((1UL << itir_ps(itir)) - 1))
 
 unsigned long vhpt_translate_count = 0;
-int in_vcpu_tpa = 0;
 
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir)
 {
@@ -1278,12 +1279,6 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 			unsigned long vipsr = PSCB(vcpu,ipsr);
 			unsigned long iip = regs->cr_iip;
 			unsigned long ipsr = regs->cr_ipsr;
-#if 0
-			printk("vcpu_translate: bad address %p, viip=%p, vipsr=%p, iip=%p, ipsr=%p\n", address, viip, vipsr, iip, ipsr);
-			if (in_vcpu_tpa) printk("vcpu_translate called from vcpu_tpa\n");
-			while(1);
-			panic_domain(0,"vcpu_translate: bad address %p\n", address);
-#endif
 			printk("vcpu_translate: bad address %p, viip=%p, vipsr=%p, iip=%p, ipsr=%p continuing\n", address, viip, vipsr, iip, ipsr);
 		}
 
@@ -1304,7 +1299,6 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 	/* check 1-entry TLB */
 	if ((trp = match_dtlb(vcpu,address))) {
 		dtlb_translate_count++;
-if (!in_vcpu_tpa) printf("vcpu_translate: found in vdtlb\n");
 		*pteval = trp->page_flags;
 		*itir = trp->itir;
 		return IA64_NO_FAULT;
@@ -1356,9 +1350,7 @@ IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 	UINT64 pteval, itir, mask;
 	IA64FAULT fault;
 
-in_vcpu_tpa=1;
 	fault = vcpu_translate(vcpu, vadr, 1, &pteval, &itir);
-in_vcpu_tpa=0;
 	if (fault == IA64_NO_FAULT)
 	{
 		mask = itir_mask(itir);
@@ -1785,49 +1777,26 @@ IA64FAULT vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 addr_range)
 IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr)
 {
 	// TODO: Only allowed for current vcpu
-	UINT64 mpaddr, ps;
+	UINT64 mpaddr, paddr;
 	IA64FAULT fault;
-	TR_ENTRY *trp;
-	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
-	unsigned long pteval, dom_imva;
+	unsigned long translate_domain_mpaddr(unsigned long);
+	IA64FAULT vcpu_tpa(VCPU *, UINT64, UINT64 *);
 
-	if ((trp = match_dtlb(vcpu,vadr))) {
-		pteval = trp->page_flags;
-		dom_imva = __va(pteval & _PFN_MASK);
-		ia64_fc(dom_imva);
-		return IA64_NO_FAULT;
-	}
 	fault = vcpu_tpa(vcpu, vadr, &mpaddr);
 	if (fault == IA64_NO_FAULT) {
-		struct domain *dom0;
-		unsigned long dom0_start, dom0_size;
-		if (vcpu == dom0) {
-			if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
-				printk("vcpu_fc: bad dom0 mpaddr %p!\n",mpaddr);
-			}
-		}
-		pteval = lookup_domain_mpa(vcpu->domain,mpaddr);
-		if (pteval) {
-			dom_imva = __va(pteval & _PFN_MASK);
-			ia64_fc(dom_imva);
-		}
-		else {
-			REGS *regs = vcpu_regs(vcpu);
-			printk("vcpu_fc: can't flush vadr=%p, iip=%p\n",
-					vadr,regs->cr_iip);
-		}
+		paddr = translate_domain_mpaddr(mpaddr);
+		ia64_fc(__va(paddr));
 	}
 	return fault;
 }
 
+int ptce_count = 0;
 IA64FAULT vcpu_ptc_e(VCPU *vcpu, UINT64 vadr)
 {
-
 	// Note that this only needs to be called once, i.e. the
 	// architected loop to purge the entire TLB, should use
 	//  base = stride1 = stride2 = 0, count0 = count 1 = 1
 
-	// FIXME: When VHPT is in place, flush that too!
 #ifdef VHPT_GLOBAL
 	vhpt_flush();	// FIXME: This is overdoing it
 #endif
@@ -1850,6 +1819,7 @@ IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 	// FIXME: validate not flushing Xen addresses
 	// if (Xen address) return(IA64_ILLOP_FAULT);
 	// FIXME: ??breaks if domain PAGE_SIZE < Xen PAGE_SIZE
+//printf("######## vcpu_ptc_ga(%p,%p) ##############\n",vadr,addr_range);
 #ifdef VHPT_GLOBAL
 	vhpt_flush_address(vadr,addr_range);
 #endif
