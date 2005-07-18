@@ -15,7 +15,7 @@ c-obj-y	:= semaphore.o i387.o sys_x86_64.o \
 		ptrace.o quirks.o syscall.o bootflag.o
 
 i386-obj-y			:= time.o
-obj-y				+= ../../i386/kernel/timers/
+#obj-y				+= ../../i386/kernel/timers/
 
 s-obj-y	:=
 

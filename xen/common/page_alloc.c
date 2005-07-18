@@ -351,10 +351,10 @@ void free_heap_pages(
 void scrub_heap_pages(void)
 {
     void *p;
-    unsigned long pfn, flags;
+    unsigned long pfn;
+    int cpu = smp_processor_id();
 
     printk("Scrubbing Free RAM: ");
-    watchdog_disable();
 
     for ( pfn = 0; pfn < (bitmap_size * 8); pfn++ )
     {
@@ -362,12 +362,15 @@ void scrub_heap_pages(void)
         if ( (pfn % ((100*1024*1024)/PAGE_SIZE)) == 0 )
             printk(".");
 
+        if ( unlikely(softirq_pending(cpu)) )
+            do_softirq();
+
         /* Quick lock-free check. */
         if ( allocated_in_map(pfn) )
             continue;
-        
-        spin_lock_irqsave(&heap_lock, flags);
-        
+
+        spin_lock_irq(&heap_lock);
+
         /* Re-check page status with lock held. */
         if ( !allocated_in_map(pfn) )
         {
@@ -385,11 +388,10 @@ void scrub_heap_pages(void)
                 unmap_domain_page(p);
             }
         }
-        
-        spin_unlock_irqrestore(&heap_lock, flags);
+
+        spin_unlock_irq(&heap_lock);
     }
 
-    watchdog_enable();
     printk("done.\n");
 }
 

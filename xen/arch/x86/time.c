@@ -1,16 +1,12 @@
-/****************************************************************************
- * (C) 2002-2003 - Rolf Neugebauer - Intel Research Cambridge
- * (C) 2002-2003 University of Cambridge
- ****************************************************************************
- *
- *        File: i386/time.c
- *      Author: Rolf Neugebar & Keir Fraser
- */
-
-/*
- *  linux/arch/i386/kernel/time.c
- *
- *  Copyright (C) 1991, 1992, 1995  Linus Torvalds
+/******************************************************************************
+ * arch/x86/time.c
+ * 
+ * Per-CPU time calibration and management.
+ * 
+ * Copyright (c) 2002-2005, K A Fraser
+ * 
+ * Portions from Linux are:
+ * Copyright (c) 1991, 1992, 1995  Linus Torvalds
  */
 
 #include <xen/config.h>
@@ -31,29 +27,74 @@
 #include <asm/processor.h>
 #include <asm/fixmap.h>
 #include <asm/mc146818rtc.h>
+#include <asm/div64.h>
+#include <io_ports.h>
 
-/* GLOBAL */
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 int timer_ack = 0;
 unsigned long volatile jiffies;
+static unsigned long wc_sec, wc_usec; /* UTC time at last 'time update'. */
 
-/* PRIVATE */
-static unsigned int    rdtsc_bitshift;  /* Which 32 bits of TSC do we use?   */
-static u64             cpu_freq;        /* CPU frequency (Hz)                */
-static u32             st_scale_f;      /* Cycles -> ns, fractional part     */
-static u32             st_scale_i;      /* Cycles -> ns, integer part        */
-static u32             shifted_tsc_irq; /* CPU0's TSC at last 'time update'  */
-static u64             full_tsc_irq;    /* ...ditto, but all 64 bits         */
-static s_time_t        stime_irq;       /* System time at last 'time update' */
-static unsigned long   wc_sec, wc_usec; /* UTC time at last 'time update'.   */
-static rwlock_t        time_lock = RW_LOCK_UNLOCKED;
+struct time_scale {
+    int shift;
+    u32 mul_frac;
+};
+
+struct cpu_time {
+    u64 local_tsc_stamp;
+    s_time_t stime_local_stamp;
+    s_time_t stime_master_stamp;
+    struct time_scale tsc_scale;
+    struct ac_timer calibration_timer;
+} __cacheline_aligned;
+
+static struct cpu_time cpu_time[NR_CPUS];
+
+/* Protected by platform_timer_lock. */
+static s_time_t stime_platform_stamp;
+static u64 platform_timer_stamp;
+static struct time_scale platform_timer_scale;
+static spinlock_t platform_timer_lock = SPIN_LOCK_UNLOCKED;
+
+static inline u32 down_shift(u64 time, int shift)
+{
+    if ( shift < 0 )
+        return (u32)(time >> -shift);
+    return (u32)((u32)time << shift);
+}
+
+/*
+ * 32-bit division of integer dividend and integer divisor yielding
+ * 32-bit fractional quotient.
+ */
+static inline u32 div_frac(u32 dividend, u32 divisor)
+{
+    u32 quotient, remainder;
+    ASSERT(dividend < divisor);
+    __asm__ ( 
+        "div %4"
+        : "=a" (quotient), "=d" (remainder)
+        : "0" (0), "1" (dividend), "r" (divisor) );
+    return quotient;
+}
+
+/*
+ * 32-bit multiplication of integer multiplicand and fractional multiplier
+ * yielding 32-bit integer product.
+ */
+static inline u32 mul_frac(u32 multiplicand, u32 multiplier)
+{
+    u32 product_int, product_frac;
+    __asm__ (
+        "mul %3"
+        : "=a" (product_frac), "=d" (product_int)
+        : "0" (multiplicand), "r" (multiplier) );
+    return product_int;
+}
 
 void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
-    write_lock_irq(&time_lock);
-
-#ifdef CONFIG_X86_IO_APIC
     if ( timer_ack ) 
     {
         extern spinlock_t i8259A_lock;
@@ -63,30 +104,9 @@ void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
         inb(0x20);
         spin_unlock(&i8259A_lock);
     }
-#endif
     
-    /*
-     * Updates TSC timestamp (used to interpolate passage of time between
-     * interrupts).
-     */
-    rdtscll(full_tsc_irq);
-    shifted_tsc_irq = (u32)(full_tsc_irq >> rdtsc_bitshift);
-
     /* Update jiffies counter. */
     (*(unsigned long *)&jiffies)++;
-
-    /* Update wall time. */
-    wc_usec += 1000000/HZ;
-    if ( wc_usec >= 1000000 )
-    {
-        wc_usec -= 1000000;
-        wc_sec++;
-    }
-
-    /* Updates system time (nanoseconds since boot). */
-    stime_irq += MILLISECS(1000/HZ);
-
-    write_unlock_irq(&time_lock);
 
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( !cpu_has_apic )
@@ -103,9 +123,9 @@ static struct irqaction irq0 = { timer_interrupt, "timer", NULL};
 #define CALIBRATE_FRAC  20      /* calibrate over 50ms */
 #define CALIBRATE_LATCH ((CLOCK_TICK_RATE+(CALIBRATE_FRAC/2))/CALIBRATE_FRAC)
 
-static unsigned long __init calibrate_tsc(void)
+static u64 calibrate_boot_tsc(void)
 {
-    u64 start, end, diff;
+    u64 start, end;
     unsigned long count;
 
     /* Set the Gate high, disable speaker */
@@ -118,9 +138,9 @@ static unsigned long __init calibrate_tsc(void)
      * terminal count mode), binary count, load 5 * LATCH count, (LSB and MSB)
      * to begin countdown.
      */
-    outb(0xb0, 0x43);           /* binary, mode 0, LSB/MSB, Ch 2 */
-    outb(CALIBRATE_LATCH & 0xff, 0x42); /* LSB of count */
-    outb(CALIBRATE_LATCH >> 8, 0x42);   /* MSB of count */
+    outb(0xb0, PIT_MODE);           /* binary, mode 0, LSB/MSB, Ch 2 */
+    outb(CALIBRATE_LATCH & 0xff, PIT_CH2); /* LSB of count */
+    outb(CALIBRATE_LATCH >> 8, PIT_CH2);   /* MSB of count */
 
     rdtscll(start);
     for ( count = 0; (inb(0x61) & 0x20) == 0; count++ )
@@ -131,15 +151,147 @@ static unsigned long __init calibrate_tsc(void)
     if ( count == 0 )
         return 0;
 
-    diff = end - start;
+    return ((end - start) * (u64)CALIBRATE_FRAC);
+}
 
-#if defined(__i386__)
-    /* If quotient doesn't fit in 32 bits then we return error (zero). */
-    if ( diff & ~0xffffffffULL )
-        return 0;
-#endif
+static void set_time_scale(struct time_scale *ts, u64 ticks_per_sec)
+{
+    u64 tps64 = ticks_per_sec;
+    u32 tps32;
+    int shift = 0;
 
-    return (unsigned long)diff;
+    while ( tps64 > (MILLISECS(1000)*2) )
+    {
+        tps64 >>= 1;
+        shift--;
+    }
+
+    tps32 = (u32)tps64;
+    while ( tps32 < (u32)MILLISECS(1000) )
+    {
+        tps32 <<= 1;
+        shift++;
+    }
+
+    ts->mul_frac = div_frac(MILLISECS(1000), tps32);
+    ts->shift    = shift;
+}
+
+static atomic_t tsc_calibrate_gang = ATOMIC_INIT(0);
+static unsigned int tsc_calibrate_status = 0;
+
+void calibrate_tsc_bp(void)
+{
+    while ( atomic_read(&tsc_calibrate_gang) != (num_booting_cpus() - 1) )
+        mb();
+
+    outb(CALIBRATE_LATCH & 0xff, PIT_CH2);
+    outb(CALIBRATE_LATCH >> 8, PIT_CH2);
+
+    tsc_calibrate_status = 1;
+	wmb();
+
+    while ( (inb(0x61) & 0x20) == 0 )
+        continue;
+
+    tsc_calibrate_status = 2;
+	wmb();
+
+    while ( atomic_read(&tsc_calibrate_gang) != 0 )
+        mb();
+}
+
+void calibrate_tsc_ap(void)
+{
+    u64 t1, t2, ticks_per_sec;
+
+    atomic_inc(&tsc_calibrate_gang);
+
+    while ( tsc_calibrate_status < 1 )
+        mb();
+
+    rdtscll(t1);
+
+    while ( tsc_calibrate_status < 2 )
+        mb();
+
+    rdtscll(t2);
+
+    ticks_per_sec = (t2 - t1) * (u64)CALIBRATE_FRAC;
+    set_time_scale(&cpu_time[smp_processor_id()].tsc_scale, ticks_per_sec);
+
+    atomic_dec(&tsc_calibrate_gang);
+}
+
+/* Protected by platform_timer_lock. */
+static u64 platform_pit_counter;
+static u16 pit_stamp;
+static struct ac_timer pit_overflow_timer;
+
+static u16 pit_read_counter(void)
+{
+    u16 count;
+    ASSERT(spin_is_locked(&platform_timer_lock));
+    outb(0x80, PIT_MODE);
+    count  = inb(PIT_CH2);
+    count |= inb(PIT_CH2) << 8;
+    return count;
+}
+
+static void pit_overflow(void *unused)
+{
+    u16 counter;
+
+    spin_lock(&platform_timer_lock);
+    counter = pit_read_counter();
+    platform_pit_counter += (u16)(pit_stamp - counter);
+    pit_stamp = counter;
+    spin_unlock(&platform_timer_lock);
+
+    set_ac_timer(&pit_overflow_timer, NOW() + MILLISECS(20));
+}
+
+static void init_platform_timer(void)
+{
+    init_ac_timer(&pit_overflow_timer, pit_overflow, NULL, 0);
+    pit_overflow(NULL);
+    platform_timer_stamp = platform_pit_counter;
+    set_time_scale(&platform_timer_scale, CLOCK_TICK_RATE);
+}
+
+static s_time_t __read_platform_stime(u64 platform_time)
+{
+    u64 diff64 = platform_time - platform_timer_stamp;
+    u32 diff   = down_shift(diff64, platform_timer_scale.shift);
+    ASSERT(spin_is_locked(&platform_timer_lock));
+    return (stime_platform_stamp + 
+            (u64)mul_frac(diff, platform_timer_scale.mul_frac));
+}
+
+static s_time_t read_platform_stime(void)
+{
+    u64 counter;
+    s_time_t stime;
+
+    spin_lock(&platform_timer_lock);
+    counter = platform_pit_counter + (u16)(pit_stamp - pit_read_counter());
+    stime   = __read_platform_stime(counter);
+    spin_unlock(&platform_timer_lock);
+
+    return stime;
+}
+
+static void platform_time_calibration(void)
+{
+    u64 counter;
+    s_time_t stamp;
+
+    spin_lock(&platform_timer_lock);
+    counter = platform_pit_counter + (u16)(pit_stamp - pit_read_counter());
+    stamp   = __read_platform_stime(counter);
+    stime_platform_stamp = stamp;
+    platform_timer_stamp = counter;
+    spin_unlock(&platform_timer_lock);
 }
 
 
@@ -233,140 +385,214 @@ static unsigned long get_cmos_time(void)
  * System Time
  ***************************************************************************/
 
-static inline u64 get_time_delta(void)
-{
-    s32      delta_tsc;
-    u32      low;
-    u64      delta, tsc;
-
-    ASSERT(st_scale_f || st_scale_i);
-
-    rdtscll(tsc);
-    low = (u32)(tsc >> rdtsc_bitshift);
-    delta_tsc = (s32)(low - shifted_tsc_irq);
-    if ( unlikely(delta_tsc < 0) ) delta_tsc = 0;
-    delta = ((u64)delta_tsc * st_scale_f);
-    delta >>= 32;
-    delta += ((u64)delta_tsc * st_scale_i);
-
-    return delta;
-}
-
 s_time_t get_s_time(void)
 {
+    struct cpu_time *t = &cpu_time[smp_processor_id()];
+    u64 tsc;
+    u32 delta;
     s_time_t now;
-    unsigned long flags;
 
-    read_lock_irqsave(&time_lock, flags);
+    rdtscll(tsc);
+    delta = down_shift(tsc - t->local_tsc_stamp, t->tsc_scale.shift);
+    now = t->stime_local_stamp + (u64)mul_frac(delta, t->tsc_scale.mul_frac);
 
-    now = stime_irq + get_time_delta();
-
-    /* Ensure that the returned system time is monotonically increasing. */
-    {
-        static s_time_t prev_now = 0;
-        if ( unlikely(now < prev_now) )
-            now = prev_now;
-        prev_now = now;
-    }
-
-    read_unlock_irqrestore(&time_lock, flags);
-
-    return now; 
+    return now;
 }
 
 static inline void __update_dom_time(struct vcpu *v)
 {
-    struct domain *d  = v->domain;
-    shared_info_t *si = d->shared_info;
+    struct cpu_time       *t = &cpu_time[smp_processor_id()];
+    struct vcpu_time_info *u = &v->domain->shared_info->vcpu_time[v->vcpu_id];
 
-    spin_lock(&d->time_lock);
-
-    si->time_version1++;
+    u->time_version1++;
     wmb();
 
-    si->cpu_freq       = cpu_freq;
-    si->tsc_timestamp  = full_tsc_irq;
-    si->system_time    = stime_irq;
-    si->wc_sec         = wc_sec;
-    si->wc_usec        = wc_usec;
+    u->tsc_timestamp     = t->local_tsc_stamp;
+    u->system_time       = t->stime_local_stamp;
+    u->tsc_to_system_mul = t->tsc_scale.mul_frac;
+    u->tsc_shift         = (s8)t->tsc_scale.shift;
 
     wmb();
-    si->time_version2++;
+    u->time_version2++;
 
-    spin_unlock(&d->time_lock);
+    /* Should only do this during do_settime(). */
+    v->domain->shared_info->wc_sec  = wc_sec;
+    v->domain->shared_info->wc_usec = wc_usec;
 }
 
 void update_dom_time(struct vcpu *v)
 {
-    unsigned long flags;
-
-    if ( v->domain->shared_info->tsc_timestamp != full_tsc_irq )
-    {
-        read_lock_irqsave(&time_lock, flags);
+    if ( v->domain->shared_info->vcpu_time[v->vcpu_id].tsc_timestamp != 
+         cpu_time[smp_processor_id()].local_tsc_stamp )
         __update_dom_time(v);
-        read_unlock_irqrestore(&time_lock, flags);
-    }
 }
 
 /* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
 void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
 {
-    s64 delta;
-    long _usecs = (long)usecs;
+    u64 x, base_usecs;
+    u32 y;
 
-    write_lock_irq(&time_lock);
+    base_usecs = system_time_base;
+    do_div(base_usecs, 1000);
 
-    delta = (s64)(stime_irq - system_time_base);
+    x = (secs * 1000000ULL) + (u64)usecs + base_usecs;
+    y = do_div(x, 1000000);
 
-    _usecs += (long)(delta/1000);
-    while ( _usecs >= 1000000 ) 
-    {
-        _usecs -= 1000000;
-        secs++;
-    }
+    wc_sec  = (unsigned long)x;
+    wc_usec = (unsigned long)y;
 
-    wc_sec  = secs;
-    wc_usec = _usecs;
-
-    /* Others will pick up the change at the next tick. */
     __update_dom_time(current);
-    send_guest_virq(current, VIRQ_TIMER);
-
-    write_unlock_irq(&time_lock);
 }
 
+static void local_time_calibration(void *unused)
+{
+    unsigned int cpu = smp_processor_id();
+
+    /*
+     * System timestamps, extrapolated from local and master oscillators,
+     * taken during this calibration and the previous calibration.
+     */
+    s_time_t prev_local_stime, curr_local_stime;
+    s_time_t prev_master_stime, curr_master_stime;
+
+    /* TSC timestamps taken during this calibration and prev calibration. */
+    u64 prev_tsc, curr_tsc;
+
+    /*
+     * System time and TSC ticks elapsed during the previous calibration
+     * 'epoch'. Also the accumulated error in the local estimate. All these
+     * values end up down-shifted to fit in 32 bits.
+     */
+    u64 stime_elapsed64, tsc_elapsed64, local_stime_error64;
+    u32 stime_elapsed32, tsc_elapsed32, local_stime_error32;
+
+    /* Calculated TSC shift to ensure 32-bit scale multiplier. */
+    int tsc_shift = 0;
+
+    prev_tsc          = cpu_time[cpu].local_tsc_stamp;
+    prev_local_stime  = cpu_time[cpu].stime_local_stamp;
+    prev_master_stime = cpu_time[cpu].stime_master_stamp;
+
+    /* Disable IRQs to get 'instantaneous' current timestamps. */
+    local_irq_disable();
+    rdtscll(curr_tsc);
+    curr_local_stime  = get_s_time();
+    curr_master_stime = read_platform_stime();
+    local_irq_enable();
+
+#if 0
+    printk("PRE%d: tsc=%lld stime=%lld master=%lld\n",
+           cpu, prev_tsc, prev_local_stime, prev_master_stime);
+    printk("CUR%d: tsc=%lld stime=%lld master=%lld %lld\n",
+           cpu, curr_tsc, curr_local_stime, curr_master_stime,
+           platform_pit_counter);
+#endif
+
+    /* Local time warps forward if it lags behind master time. */
+    if ( curr_local_stime < curr_master_stime )
+        curr_local_stime = curr_master_stime;
+
+    stime_elapsed64 = curr_master_stime - prev_master_stime;
+    tsc_elapsed64   = curr_tsc - prev_tsc;
+
+    /*
+     * Error in the local system time estimate. Clamp to epoch time period, or
+     * we could end up with a negative scale factor (time going backwards!).
+     * This effectively clamps the scale factor to >= 0.
+     */
+    local_stime_error64 = curr_local_stime - curr_master_stime;
+    if ( local_stime_error64 > stime_elapsed64 )
+        local_stime_error64 = stime_elapsed64;
+
+    /*
+     * We require 0 < stime_elapsed < 2^31.
+     * This allows us to binary shift a 32-bit tsc_elapsed such that:
+     * stime_elapsed < tsc_elapsed <= 2*stime_elapsed
+     */
+    while ( ((u32)stime_elapsed64 != stime_elapsed64) ||
+            ((s32)stime_elapsed64 < 0) )
+    {
+        stime_elapsed64     >>= 1;
+        tsc_elapsed64       >>= 1;
+        local_stime_error64 >>= 1;
+    }
+
+    /* stime_master_diff (and hence stime_error) now fit in a 32-bit word. */
+    stime_elapsed32     = (u32)stime_elapsed64;
+    local_stime_error32 = (u32)local_stime_error64;
+
+    /* tsc_elapsed <= 2*stime_elapsed */
+    while ( tsc_elapsed64 > (stime_elapsed32 * 2) )
+    {
+        tsc_elapsed64 >>= 1;
+        tsc_shift--;
+    }
+
+    /* Local difference must now fit in 32 bits. */
+    ASSERT((u32)tsc_elapsed64 == tsc_elapsed64);
+    tsc_elapsed32 = (u32)tsc_elapsed64;
+
+    /* tsc_elapsed > stime_elapsed */
+    ASSERT(tsc_elapsed32 != 0);
+    while ( tsc_elapsed32 <= stime_elapsed32 )
+    {
+        tsc_elapsed32 <<= 1;
+        tsc_shift++;
+    }
+
+#if 0
+    printk("---%d: %08x %d\n", cpu, 
+           div_frac(stime_elapsed32 - local_stime_error32, tsc_elapsed32),
+           tsc_shift);
+#endif
+
+    /* Record new timestamp information. */
+    cpu_time[cpu].tsc_scale.mul_frac = 
+        div_frac(stime_elapsed32 - local_stime_error32, tsc_elapsed32);
+    cpu_time[cpu].tsc_scale.shift    = tsc_shift;
+    cpu_time[cpu].local_tsc_stamp    = curr_tsc;
+    cpu_time[cpu].stime_local_stamp  = curr_local_stime;
+    cpu_time[cpu].stime_master_stamp = curr_master_stime;
+
+    set_ac_timer(&cpu_time[cpu].calibration_timer, NOW() + MILLISECS(1000));
+
+    if ( cpu == 0 )
+        platform_time_calibration();
+}
+
+void init_percpu_time(void)
+{
+    unsigned int cpu = smp_processor_id();
+    unsigned long flags;
+    s_time_t now;
+
+    local_irq_save(flags);
+    rdtscll(cpu_time[cpu].local_tsc_stamp);
+    now = (cpu == 0) ? 0 : read_platform_stime();
+    local_irq_restore(flags);
+
+    cpu_time[cpu].stime_master_stamp = now;
+    cpu_time[cpu].stime_local_stamp  = now;
+
+    init_ac_timer(&cpu_time[cpu].calibration_timer,
+                  local_time_calibration, NULL, cpu);
+    set_ac_timer(&cpu_time[cpu].calibration_timer, NOW() + MILLISECS(1000));
+}
 
 /* Late init function (after all CPUs are booted). */
-int __init init_xen_time()
+int __init init_xen_time(void)
 {
-    u64      scale;
-    unsigned int cpu_ghz;
-
-    cpu_ghz = (unsigned int)(cpu_freq / 1000000000ULL);
-    for ( rdtsc_bitshift = 0; cpu_ghz != 0; rdtsc_bitshift++, cpu_ghz >>= 1 )
-        continue;
-
-    scale  = 1000000000LL << (32 + rdtsc_bitshift);
-    scale /= cpu_freq;
-    st_scale_f = scale & 0xffffffff;
-    st_scale_i = scale >> 32;
+    wc_sec = get_cmos_time();
 
     local_irq_disable();
 
-    /* System time ticks from zero. */
-    rdtscll(full_tsc_irq);
-    stime_irq = (s_time_t)0;
-    shifted_tsc_irq = (u32)(full_tsc_irq >> rdtsc_bitshift);
+    init_percpu_time();
 
-    /* Wallclock time starts as the initial RTC time. */
-    wc_sec = get_cmos_time();
+    stime_platform_stamp = 0;
+    init_platform_timer();
 
     local_irq_enable();
-
-    printk("Time init:\n");
-    printk(".... cpu_freq:    %08X:%08X\n", (u32)(cpu_freq>>32),(u32)cpu_freq);
-    printk(".... scale:       %08X:%08X\n", (u32)(scale>>32),(u32)scale);
-    printk(".... Wall Clock:  %lds %ldus\n", wc_sec, wc_usec);
 
     return 0;
 }
@@ -375,15 +601,12 @@ int __init init_xen_time()
 /* Early init function. */
 void __init early_time_init(void)
 {
-    unsigned long ticks_per_frac = calibrate_tsc();
+    u64 tmp = calibrate_boot_tsc();
 
-    if ( !ticks_per_frac )
-        panic("Error calibrating TSC\n");
+    set_time_scale(&cpu_time[0].tsc_scale, tmp);
 
-    cpu_khz = ticks_per_frac / (1000/CALIBRATE_FRAC);
-
-    cpu_freq = (u64)ticks_per_frac * (u64)CALIBRATE_FRAC;
-
+    do_div(tmp, 1000);
+    cpu_khz = (unsigned long)tmp;
     printk("Detected %lu.%03lu MHz processor.\n", 
            cpu_khz / 1000, cpu_khz % 1000);
 

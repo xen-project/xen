@@ -202,7 +202,7 @@ static void ac_timer_softirq_action(void)
     do {
         heap = ac_timers[cpu].heap;
         now  = NOW();
-        
+
         while ( (GET_HEAP_SIZE(heap) != 0) &&
                 ((t = heap[1])->expires < (now + TIMER_SLOP)) )
         {

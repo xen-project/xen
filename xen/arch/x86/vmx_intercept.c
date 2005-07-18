@@ -24,10 +24,10 @@
 #include <asm/vmx_virpit.h>
 #include <asm/vmx_intercept.h>
 #include <public/io/ioreq.h>
-
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <asm/current.h>
+#include <io_ports.h>
 
 #ifdef CONFIG_VMX
 
@@ -175,7 +175,7 @@ int intercept_pit_io(ioreq_t *p)
         p->port_mm)
         return 0;
     
-    if (p->addr == 0x43 &&
+    if (p->addr == PIT_MODE &&
 	p->dir == 0 &&				/* write */
         ((p->u.data >> 4) & 0x3) == 0 &&	/* latch command */
         ((p->u.data >> 6) & 0x3) == (vpit->channel)) {/* right channel */
@@ -183,7 +183,7 @@ int intercept_pit_io(ioreq_t *p)
 	return 1;
     }
 
-    if (p->addr == (0x40 + vpit->channel) &&
+    if (p->addr == (PIT_CH0 + vpit->channel) &&
 	p->dir == 1) {	/* read */
         p->u.data = pit_read_io(vpit);
         resume_pit_io(p);

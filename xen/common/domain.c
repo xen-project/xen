@@ -42,8 +42,6 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     d->domain_id   = dom_id;
     v->processor  = cpu;
  
-    spin_lock_init(&d->time_lock);
-
     spin_lock_init(&d->big_lock);
 
     spin_lock_init(&d->page_alloc_lock);

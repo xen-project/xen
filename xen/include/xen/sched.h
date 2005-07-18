@@ -92,7 +92,6 @@ struct domain
     domid_t          domain_id;
 
     shared_info_t   *shared_info;     /* shared data area */
-    spinlock_t       time_lock;
 
     spinlock_t       big_lock;
 

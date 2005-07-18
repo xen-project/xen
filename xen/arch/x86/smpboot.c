@@ -40,6 +40,7 @@
 #include <xen/sched.h>
 #include <xen/irq.h>
 #include <xen/delay.h>
+#include <xen/softirq.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
 #include <asm/desc.h>
@@ -406,6 +407,7 @@ void __init smp_callin(void)
 	 */
 	if (cpu_has_tsc && cpu_khz)
 		synchronize_tsc_ap();
+	calibrate_tsc_ap();
 }
 
 int cpucount;
@@ -464,6 +466,8 @@ void __init start_secondary(void *unused)
 
 	/* We can take interrupts now: we're officially "up". */
 	local_irq_enable();
+
+        init_percpu_time();
 
 	wmb();
 	startup_cpu_idle_loop();
@@ -1149,6 +1153,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 */
 	if (cpu_has_tsc && cpucount && cpu_khz)
 		synchronize_tsc_bp();
+	calibrate_tsc_bp();
 }
 
 /* These are wrappers to interface to the new boot process.  Someone
@@ -1167,22 +1172,21 @@ void __devinit smp_prepare_boot_cpu(void)
 int __devinit __cpu_up(unsigned int cpu)
 {
 	/* This only works at boot for x86.  See "rewrite" above. */
-	if (cpu_isset(cpu, smp_commenced_mask)) {
-		local_irq_enable();
+	if (cpu_isset(cpu, smp_commenced_mask))
 		return -ENOSYS;
-	}
 
 	/* In case one didn't come up */
-	if (!cpu_isset(cpu, cpu_callin_map)) {
-		local_irq_enable();
+	if (!cpu_isset(cpu, cpu_callin_map))
 		return -EIO;
-	}
 
-	local_irq_enable();
 	/* Unleash the CPU! */
 	cpu_set(cpu, smp_commenced_mask);
-	while (!cpu_isset(cpu, cpu_online_map))
+	while (!cpu_isset(cpu, cpu_online_map)) {
 		mb();
+		if (softirq_pending(0))
+			do_softirq();
+	}
+
 	return 0;
 }
 
