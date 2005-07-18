@@ -291,8 +291,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 static long cnt[16] = { 50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
 static int i = 100;
 int id = ((struct vcpu *)current)->domain->domain_id & 0xf;
-if (!cnt[id]--) { printk("%x",id); cnt[id] = 50000; }
-if (!i--) { printk("+",id); i = 100000; }
+if (!cnt[id]--) { printk("%x",id); cnt[id] = 500000; }
+if (!i--) { printk("+",id); i = 1000000; }
 }
 	clear_bit(_VCPUF_running, &prev->vcpu_flags);
 	//if (!is_idle_task(next->domain) )
