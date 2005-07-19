@@ -1691,8 +1691,10 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
 /************************************************************************/
 
 static inline int
-shadow_mode_page_writable(struct domain *d, unsigned long gpfn)
+shadow_mode_page_writable(unsigned long va, struct cpu_user_regs *regs, unsigned long gpfn)
 {
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
     unsigned long mfn = __gpfn_to_mfn(d, gpfn);
     u32 type = frame_table[mfn].u.inuse.type_info & PGT_type_mask;
 
@@ -1701,11 +1703,14 @@ shadow_mode_page_writable(struct domain *d, unsigned long gpfn)
         type = shadow_max_pgtable_type(d, gpfn, NULL);
 
     if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
-         (type == PGT_l1_page_table) )
+         (type == PGT_l1_page_table) &&
+         (va < HYPERVISOR_VIRT_START) &&
+         KERNEL_MODE(v, regs) )
         return 1;
 
     if ( shadow_mode_write_all(d) &&
-         type && (type <= PGT_l4_page_table) )
+         type && (type <= PGT_l4_page_table) &&
+         KERNEL_MODE(v, regs) )
         return 1;
 
     return 0;

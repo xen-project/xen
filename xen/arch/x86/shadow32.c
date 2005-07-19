@@ -2612,7 +2612,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
 
         if ( unlikely(!(l1e_get_flags(gpte) & _PAGE_RW)) )
         {
-            if ( shadow_mode_page_writable(d, l1e_get_pfn(gpte)) )
+            if ( shadow_mode_page_writable(va, regs, l1e_get_pfn(gpte)) )
             {
                 allow_writes = 1;
                 l1e_add_flags(gpte, _PAGE_RW);
