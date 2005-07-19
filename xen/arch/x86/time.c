@@ -30,6 +30,8 @@
 #include <asm/div64.h>
 #include <io_ports.h>
 
+#define EPOCH MILLISECS(1000)
+
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 int timer_ack = 0;
@@ -80,8 +82,8 @@ static inline u32 div_frac(u32 dividend, u32 divisor)
 }
 
 /*
- * 32-bit multiplication of integer multiplicand and fractional multiplier
- * yielding 32-bit integer product.
+ * 32-bit multiplication of multiplicand and fractional multiplier
+ * yielding 32-bit product (radix point at same position as in multiplicand).
  */
 static inline u32 mul_frac(u32 multiplicand, u32 multiplier)
 {
@@ -461,14 +463,22 @@ static void local_time_calibration(void *unused)
 
     /*
      * System time and TSC ticks elapsed during the previous calibration
-     * 'epoch'. Also the accumulated error in the local estimate. All these
-     * values end up down-shifted to fit in 32 bits.
+     * 'epoch'. These values are down-shifted to fit in 32 bits.
      */
-    u64 stime_elapsed64, tsc_elapsed64, local_stime_error64;
-    u32 stime_elapsed32, tsc_elapsed32, local_stime_error32;
+    u64 stime_elapsed64, tsc_elapsed64;
+    u32 stime_elapsed32, tsc_elapsed32;
+
+    /* The accumulated error in the local estimate. */
+    u64 local_stime_err;
+
+    /* Error correction to slow down a fast local clock. */
+    u32 error_factor = 0;
 
     /* Calculated TSC shift to ensure 32-bit scale multiplier. */
     int tsc_shift = 0;
+
+    /* The overall calibration scale multiplier. */
+    u32 calibration_mul_frac;
 
     prev_tsc          = cpu_time[cpu].local_tsc_stamp;
     prev_local_stime  = cpu_time[cpu].stime_local_stamp;
@@ -497,13 +507,17 @@ static void local_time_calibration(void *unused)
     tsc_elapsed64   = curr_tsc - prev_tsc;
 
     /*
-     * Error in the local system time estimate. Clamp to epoch time period, or
-     * we could end up with a negative scale factor (time going backwards!).
-     * This effectively clamps the scale factor to >= 0.
+     * Calculate error-correction factor. This only slows down a fast local
+     * clock (slow clocks are warped forwards). The scale factor is clamped
+     * to >= 0.5.
      */
-    local_stime_error64 = curr_local_stime - curr_master_stime;
-    if ( local_stime_error64 > stime_elapsed64 )
-        local_stime_error64 = stime_elapsed64;
+    if ( curr_local_stime != curr_master_stime )
+    {
+        local_stime_err = curr_local_stime - curr_master_stime;
+        if ( local_stime_err > EPOCH )
+            local_stime_err = EPOCH;
+        error_factor = div_frac(EPOCH, EPOCH + (u32)local_stime_err);
+    }
 
     /*
      * We require 0 < stime_elapsed < 2^31.
@@ -513,14 +527,12 @@ static void local_time_calibration(void *unused)
     while ( ((u32)stime_elapsed64 != stime_elapsed64) ||
             ((s32)stime_elapsed64 < 0) )
     {
-        stime_elapsed64     >>= 1;
-        tsc_elapsed64       >>= 1;
-        local_stime_error64 >>= 1;
+        stime_elapsed64 >>= 1;
+        tsc_elapsed64   >>= 1;
     }
 
-    /* stime_master_diff (and hence stime_error) now fit in a 32-bit word. */
-    stime_elapsed32     = (u32)stime_elapsed64;
-    local_stime_error32 = (u32)local_stime_error64;
+    /* stime_master_diff now fits in a 32-bit word. */
+    stime_elapsed32 = (u32)stime_elapsed64;
 
     /* tsc_elapsed <= 2*stime_elapsed */
     while ( tsc_elapsed64 > (stime_elapsed32 * 2) )
@@ -541,21 +553,22 @@ static void local_time_calibration(void *unused)
         tsc_shift++;
     }
 
+    calibration_mul_frac = div_frac(stime_elapsed32, tsc_elapsed32);
+    if ( error_factor != 0 )
+        calibration_mul_frac = mul_frac(calibration_mul_frac, error_factor);
+
 #if 0
-    printk("---%d: %08x %d\n", cpu, 
-           div_frac(stime_elapsed32 - local_stime_error32, tsc_elapsed32),
-           tsc_shift);
+    printk("---%d: %08x %d\n", cpu, calibration_mul_frac, tsc_shift);
 #endif
 
     /* Record new timestamp information. */
-    cpu_time[cpu].tsc_scale.mul_frac = 
-        div_frac(stime_elapsed32 - local_stime_error32, tsc_elapsed32);
+    cpu_time[cpu].tsc_scale.mul_frac = calibration_mul_frac;
     cpu_time[cpu].tsc_scale.shift    = tsc_shift;
     cpu_time[cpu].local_tsc_stamp    = curr_tsc;
     cpu_time[cpu].stime_local_stamp  = curr_local_stime;
     cpu_time[cpu].stime_master_stamp = curr_master_stime;
 
-    set_ac_timer(&cpu_time[cpu].calibration_timer, NOW() + MILLISECS(1000));
+    set_ac_timer(&cpu_time[cpu].calibration_timer, NOW() + EPOCH);
 
     if ( cpu == 0 )
         platform_time_calibration();
@@ -577,7 +590,7 @@ void init_percpu_time(void)
 
     init_ac_timer(&cpu_time[cpu].calibration_timer,
                   local_time_calibration, NULL, cpu);
-    set_ac_timer(&cpu_time[cpu].calibration_timer, NOW() + MILLISECS(1000));
+    set_ac_timer(&cpu_time[cpu].calibration_timer, NOW() + EPOCH);
 }
 
 /* Late init function (after all CPUs are booted). */
