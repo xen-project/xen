@@ -227,9 +227,9 @@ static unsigned long get_usec_offset(struct shadow_time_info *shadow)
 static void update_wallclock(void)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
-	long wtm_nsec;
-	time_t wtm_sec, sec;
-	s64 nsec;
+	long wtm_nsec, xtime_nsec;
+	time_t wtm_sec, xtime_sec;
+	u64 tmp, usec;
 
 	shadow_tv.tv_sec  = s->wc_sec;
 	shadow_tv.tv_usec = s->wc_usec;
@@ -240,20 +240,22 @@ static void update_wallclock(void)
 	if ((time_status & STA_UNSYNC) != 0)
 		return;
 
-	/* Adjust shadow for jiffies that haven't updated xtime yet. */
-	shadow_tv.tv_usec -= 
-		(jiffies - wall_jiffies) * (USEC_PER_SEC / HZ);
-	HANDLE_USEC_UNDERFLOW(shadow_tv);
+	/* Adjust wall-clock time base based on wall_jiffies ticks. */
+	usec = processed_system_time;
+	do_div(usec, 1000);
+	usec += (u64)shadow_tv.tv_sec * 1000000ULL;
+	usec += (u64)shadow_tv.tv_usec;
+	usec -= (jiffies - wall_jiffies) * (USEC_PER_SEC / HZ);
 
-	/* Update our unsynchronised xtime appropriately. */
-	sec = shadow_tv.tv_sec;
-	nsec = shadow_tv.tv_usec * NSEC_PER_USEC;
+	/* Split wallclock base into seconds and nanoseconds. */
+	tmp = usec;
+	xtime_nsec = do_div(tmp, 1000000) * 1000ULL;
+	xtime_sec  = (time_t)tmp;
 
-	__normalize_time(&sec, &nsec);
-	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
-	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
+	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - xtime_sec);
+	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - xtime_nsec);
 
-	set_normalized_timespec(&xtime, sec, nsec);
+	set_normalized_timespec(&xtime, xtime_sec, xtime_nsec);
 	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
 }
 
