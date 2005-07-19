@@ -59,8 +59,8 @@ extern struct task_struct *vmx_ia64_switch_to (void *next_task);
 	if (IA64_HAS_EXTRA_STATE(next))								 \
 		ia64_load_extra(next);								 \
 	/*ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);*/			 \
-	/* vcpu_set_next_timer(next);  TURN ME BACK ON */					\
 	(last) = ia64_switch_to((next));							 \
+	vcpu_set_next_timer(current);								\
 } while (0)
 #endif // CONFIG_VTI
 
