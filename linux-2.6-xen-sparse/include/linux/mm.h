@@ -816,10 +816,6 @@ extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 extern int check_user_page_readable(struct mm_struct *mm, unsigned long address);
 int remap_pfn_range(struct vm_area_struct *, unsigned long,
 		unsigned long, unsigned long, pgprot_t);
-/* Allow arch override for mapping of device and I/O (non-RAM) pages. */
-#ifndef io_remap_pfn_range
-#define io_remap_pfn_range remap_pfn_range
-#endif
 
 #ifdef CONFIG_PROC_FS
 void __vm_stat_account(struct mm_struct *, unsigned long, struct file *, long);
