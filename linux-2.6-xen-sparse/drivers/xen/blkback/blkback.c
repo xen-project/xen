@@ -145,7 +145,7 @@ static void fast_flush_area(int idx, int nr_pages)
 				__pte(0), 0);
     }
 
-    mcl[nr_pages-1].args[2] = UVMF_TLB_FLUSH|UVMF_ALL;
+    mcl[nr_pages-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
     if ( unlikely(HYPERVISOR_multicall(mcl, nr_pages) != 0) )
         BUG();
 #endif
@@ -550,7 +550,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 	    0, blkif->domid);
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
         if ( blkif->is_blktap )
-            mcl[i].args[3] = ID_TO_DOM(req->id);
+            mcl[i].args[MULTI_UVMDOMID_INDEX] = ID_TO_DOM(req->id);
 #endif
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
             FOREIGN_FRAME(seg[i].buf >> PAGE_SHIFT);

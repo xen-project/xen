@@ -141,6 +141,14 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages);
 
 #include <asm/hypercall.h>
 
+#if defined(CONFIG_X86_64)
+#define MULTI_UVMFLAGS_INDEX 2
+#define MULTI_UVMDOMID_INDEX 3
+#else
+#define MULTI_UVMFLAGS_INDEX 3
+#define MULTI_UVMDOMID_INDEX 4
+#endif
+
 static inline void
 MULTI_update_va_mapping(
     multicall_entry_t *mcl, unsigned long va,

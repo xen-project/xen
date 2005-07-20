@@ -271,7 +271,7 @@ static void net_rx_action(unsigned long unused)
     mcl->args[3] = DOMID_SELF;
     mcl++;
 
-    mcl[-3].args[2] = UVMF_TLB_FLUSH|UVMF_ALL;
+    mcl[-3].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
     if ( unlikely(HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl) != 0) )
         BUG();
 
@@ -428,7 +428,7 @@ static void net_tx_action(unsigned long unused)
         mcl++;     
     }
 
-    mcl[-1].args[2] = UVMF_TLB_FLUSH|UVMF_ALL;
+    mcl[-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
     if ( unlikely(HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl) != 0) )
         BUG();
 
@@ -571,6 +571,7 @@ static void net_tx_action(unsigned long unused)
 	    mcl, MMAP_VADDR(pending_idx),
 	    pfn_pte_ma(txreq.addr >> PAGE_SHIFT, PAGE_KERNEL),
 	    0, netif->domid);
+
         mcl++;
 
         memcpy(&pending_tx_info[pending_idx].req, &txreq, sizeof(txreq));

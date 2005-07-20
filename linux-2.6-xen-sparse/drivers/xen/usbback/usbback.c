@@ -193,7 +193,7 @@ static void fast_flush_area(int idx, int nr_pages)
 				__pte(0), 0);
     }
 
-    mcl[nr_pages-1].args[2] = UVMF_TLB_FLUSH|UVMF_ALL;
+    mcl[nr_pages-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
     if ( unlikely(HYPERVISOR_multicall(mcl, nr_pages) != 0) )
         BUG();
 }
@@ -651,7 +651,7 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
     {
 	MULTI_update_va_mapping_otherdomain(
 	    mcl+i, MMAP_VADDR(pending_idx, i),
-	    pfn_pte_ma(buffer_mach >> PAGE_SHIFT, remap_prot),
+	    pfn_pte_ma((buffer_mach + offset) >> PAGE_SHIFT, remap_prot),
 	    0, up->domid);
         
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
