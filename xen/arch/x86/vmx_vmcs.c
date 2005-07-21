@@ -190,10 +190,14 @@ void vmx_do_launch(struct vcpu *v)
 
     vmx_setup_platform(v, regs);
 
+    __asm__ __volatile__ ("sidt  (%0) \n" :: "a"(&desc) : "memory");
+    host_env.idtr_limit = desc.size;
+    host_env.idtr_base = desc.address;
+    error |= __vmwrite(HOST_IDTR_BASE, host_env.idtr_base);
+ 
     __asm__ __volatile__ ("sgdt  (%0) \n" :: "a"(&desc) : "memory");
     host_env.gdtr_limit = desc.size;
     host_env.gdtr_base = desc.address;
-
     error |= __vmwrite(HOST_GDTR_BASE, host_env.gdtr_base);
 
     error |= __vmwrite(GUEST_LDTR_SELECTOR, 0);
@@ -351,7 +355,6 @@ static inline int construct_vmcs_host(struct host_execution_env *host_env)
 {
     int error = 0;
     unsigned long crn;
-    struct Xgt_desc_struct desc;
 
     /* Host Selectors */
     host_env->ds_selector = __HYPERVISOR_DS;
@@ -377,14 +380,7 @@ static inline int construct_vmcs_host(struct host_execution_env *host_env)
     host_env->ds_base = 0;
     host_env->cs_base = 0;
 
-/* Debug */
-    __asm__ __volatile__ ("sidt  (%0) \n" :: "a"(&desc) : "memory");
-    host_env->idtr_limit = desc.size;
-    host_env->idtr_base = desc.address;
-    error |= __vmwrite(HOST_IDTR_BASE, host_env->idtr_base);
-
     __asm__ __volatile__ ("mov %%cr0,%0" : "=r" (crn) : );
-
     host_env->cr0 = crn;
     error |= __vmwrite(HOST_CR0, crn); /* same CR0 */
 
@@ -392,6 +388,7 @@ static inline int construct_vmcs_host(struct host_execution_env *host_env)
     __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (crn) : ); 
     host_env->cr4 = crn;
     error |= __vmwrite(HOST_CR4, crn);
+
     error |= __vmwrite(HOST_RIP, (unsigned long) vmx_asm_vmexit_handler);
 #ifdef __x86_64__ 
     /* TBD: support cr8 for 64-bit guest */ 
