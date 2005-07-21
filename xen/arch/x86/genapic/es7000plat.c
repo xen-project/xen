@@ -136,7 +136,19 @@ parse_unisys_oem (char *oemptr, int oem_entries)
 		es7000_plat = 0;
 	} else {
 		printk("\nEnabling ES7000 specific features...\n");
-		es7000_plat = 1;
+		/*
+		 * Determine the generation of the ES7000 currently running.
+		 *
+		 * es7000_plat = 0 if the machine is NOT a Unisys ES7000 box
+		 * es7000_plat = 1 if the machine is a 5xx ES7000 box
+		 * es7000_plat = 2 if the machine is a x86_64 ES7000 box
+		 *
+		 */
+		if (!(boot_cpu_data.x86 <= 15 && boot_cpu_data.x86_model <= 2))
+			es7000_plat = 2;
+		else
+			es7000_plat = 1;
+
 		ioapic_renumber_irq = es7000_rename_gsi;
 	}
 	return es7000_plat;
@@ -286,7 +298,7 @@ es7000_stop_cpu(int cpu)
 void __init
 es7000_sw_apic()
 {
-	if (es7000_plat) {
+	if (es7000_plat == 1) {
 		int mip_status;
 		struct mip_reg es7000_mip_reg;
 
