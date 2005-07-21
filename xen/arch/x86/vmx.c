@@ -94,12 +94,16 @@ static void vmx_save_init_msrs(void)
     msr_content = msr->msr_items[VMX_INDEX_MSR_ ## address]; \
     break
 
-#define CASE_WRITE_MSR(address)   \
-    case MSR_ ## address:                   \
-    msr->msr_items[VMX_INDEX_MSR_ ## address] = msr_content; \
-    if (!test_bit(VMX_INDEX_MSR_ ## address, &msr->flags)){ \
-    	set_bit(VMX_INDEX_MSR_ ## address, &msr->flags);   \
-    }\
+#define CASE_WRITE_MSR(address)                                     \
+    case MSR_ ## address:                                           \
+    {                                                               \
+        msr->msr_items[VMX_INDEX_MSR_ ## address] = msr_content;    \
+        if (!test_bit(VMX_INDEX_MSR_ ## address, &msr->flags)) {    \
+            set_bit(VMX_INDEX_MSR_ ## address, &msr->flags);        \
+        }                                                           \
+        wrmsrl(MSR_ ## address, msr_content);                       \
+        set_bit(VMX_INDEX_MSR_ ## address, &host_state->flags);     \
+    }                                                               \
     break
 
 #define IS_CANO_ADDRESS(add) 1
@@ -1261,6 +1265,7 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         CASE_SET_REG(EBP, ebp);
         CASE_SET_REG(ESI, esi);
         CASE_SET_REG(EDI, edi);
+        CASE_EXTEND_SET_REG
     case REG_ESP:
         __vmwrite(GUEST_RSP, value);
         regs->esp = value;
