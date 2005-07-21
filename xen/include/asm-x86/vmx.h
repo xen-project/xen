@@ -447,4 +447,8 @@ static inline int iopacket_port(struct domain *d)
     return get_sp(d)->sp_global.eport;
 }
 
+/* Prototypes */
+void load_cpu_user_regs(struct cpu_user_regs *regs);
+void store_cpu_user_regs(struct cpu_user_regs *regs);
+
 #endif /* __ASM_X86_VMX_H__ */

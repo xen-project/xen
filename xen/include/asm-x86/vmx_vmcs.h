@@ -97,6 +97,8 @@ int  load_vmcs(struct arch_vmx_struct *, u64);
 int  store_vmcs(struct arch_vmx_struct *, u64);
 int  construct_vmcs(struct arch_vmx_struct *, struct cpu_user_regs *, 
                     struct vcpu_guest_context *, int);
+int modify_vmcs(struct arch_vmx_struct *arch_vmx,
+                struct cpu_user_regs *regs);
 
 #define VMCS_USE_HOST_ENV       1
 #define VMCS_USE_SEPARATE_ENV   0

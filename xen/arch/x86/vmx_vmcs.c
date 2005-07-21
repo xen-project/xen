@@ -453,6 +453,35 @@ int construct_vmcs(struct arch_vmx_struct *arch_vmx,
         return -EINVAL;         
     }
 
+    if (regs->eflags & EF_TF)
+        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+    else 
+        __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+
+    return 0;
+}
+
+/*
+ * modify guest eflags and execption bitmap for gdb
+ */
+int modify_vmcs(struct arch_vmx_struct *arch_vmx,
+                struct cpu_user_regs *regs)
+{
+    int error;
+    u64 vmcs_phys_ptr, old, old_phys_ptr;
+    vmcs_phys_ptr = (u64) virt_to_phys(arch_vmx->vmcs);
+
+    old_phys_ptr = virt_to_phys(&old);
+    __vmptrst(old_phys_ptr);
+    if ((error = load_vmcs(arch_vmx, vmcs_phys_ptr))) {
+        printk("modify_vmcs: load_vmcs failed: VMCS = %lx\n",
+                (unsigned long) vmcs_phys_ptr);
+        return -EINVAL; 
+    }
+    load_cpu_user_regs(regs);
+
+    __vmptrld(old_phys_ptr);
+
     return 0;
 }
 

@@ -417,12 +417,12 @@ int arch_set_info_guest(
 
         /* Ensure real hardware interrupts are enabled. */
         v->arch.guest_context.user_regs.eflags |= EF_IE;
-    } else {
-        __vmwrite(GUEST_RFLAGS, v->arch.guest_context.user_regs.eflags);
-        if (v->arch.guest_context.user_regs.eflags & EF_TF)
-                __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-        else 
-                __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+    }
+    else if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+    {
+        return modify_vmcs(
+            &v->arch.arch_vmx,
+            &v->arch.guest_context.user_regs);
     }
 
     if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
