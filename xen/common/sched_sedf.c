@@ -609,15 +609,16 @@ static inline void desched_extra_dom(s_time_t now, struct vcpu* d) {
             inf->score[EXTRA_UTIL_Q] = (inf->period << 10) /
                 inf->slice;
         else
-            /*give a domain w/ exweight = 1 as much as a domain with
-              util = 1/128*/
+            /*conversion between realtime utilisation and extrawieght:
+              full (ie 100%) utilization is equivalent to 128 extraweight*/
             inf->score[EXTRA_UTIL_Q] = (1<<17) / inf->extraweight;
     }
  check_extra_queues:
     /* Adding a runnable domain to the right queue and removing blocked ones*/
     if (sedf_runnable(d)) {
         /*add according to score: weighted round robin*/
-        if (inf->status & (EXTRA_AWARE | EXTRA_WANT_PEN_Q))
+        if (((inf->status & EXTRA_AWARE) && (i == EXTRA_UTIL_Q)) ||
+            ((inf->status & EXTRA_WANT_PEN_Q) && (i == EXTRA_PEN_Q)))
             extraq_add_sort_update(d, i, oldscore);
     }
     else {
@@ -627,12 +628,9 @@ static inline void desched_extra_dom(s_time_t now, struct vcpu* d) {
         /*make sure that we remove a blocked domain from the other
           extraq too*/
         if (i == EXTRA_PEN_Q) {
-            if (extraq_on(d, EXTRA_UTIL_Q))
-                extraq_del(d, EXTRA_UTIL_Q);
-        }
-        else {
-            if (extraq_on(d, EXTRA_PEN_Q))
-                extraq_del(d, EXTRA_PEN_Q);
+            if (extraq_on(d, EXTRA_UTIL_Q)) extraq_del(d, EXTRA_UTIL_Q);
+        } else {
+            if (extraq_on(d, EXTRA_PEN_Q)) extraq_del(d, EXTRA_PEN_Q);
         }
 #endif
     }
@@ -668,7 +666,8 @@ static inline struct task_slice sedf_do_extra_schedule (s_time_t now,
         if (!list_empty(extraq[EXTRA_UTIL_Q])) {
             /*use elements from the normal extraqueue*/
             runinf   = list_entry(extraq[EXTRA_UTIL_Q]->next,
-                                  struct sedf_vcpu_info, extralist[EXTRA_UTIL_Q]);
+                                  struct sedf_vcpu_info,
+                                  extralist[EXTRA_UTIL_Q]);
             runinf->status |= EXTRA_RUN_UTIL;
             ret.task = runinf->vcpu;
             ret.time = EXTRA_QUANTUM;
@@ -943,8 +942,7 @@ static inline void unblock_short_extra_support (struct sedf_vcpu_info* inf,
                 inf->status |= EXTRA_WANT_PEN_Q;
    
             /*(re-)add domain to the penalty extraq*/
-            extraq_add_sort_update(inf->vcpu,
-                                   EXTRA_PEN_Q, 0);
+            extraq_add_sort_update(inf->vcpu, EXTRA_PEN_Q, 0);
         }
     }
     /*give it a fresh slice in the next period!*/
@@ -1119,7 +1117,8 @@ void sedf_wake(struct vcpu *d) {
     s_time_t              now = NOW();
     struct sedf_vcpu_info* inf = EDOM_INFO(d);
  
-    PRINT(3, "sedf_wake was called, domain-id %i.%i\n",d->domain->domain_id, d->vcpu_id);
+    PRINT(3, "sedf_wake was called, domain-id %i.%i\n",d->domain->domain_id,
+          d->vcpu_id);
  
     if (unlikely(is_idle_task(d->domain)))
         return;
@@ -1145,7 +1144,7 @@ void sedf_wake(struct vcpu *d) {
     inf->block_tot++;
 #endif
     if (unlikely(now < PERIOD_BEGIN(inf))) {
-        PRINT(4,"extratime unblock\n");
+    	PRINT(4,"extratime unblock\n");
         /* unblocking in extra-time! */
 #if (EXTRA == EXTRA_BLOCK_WEIGHT)
         if (inf->status & EXTRA_WANT_PEN_Q) {
