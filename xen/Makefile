@@ -50,10 +50,10 @@ clean: delete-unfresh-files
 	$(MAKE) -C arch/$(TARGET_ARCH) clean
 	rm -f include/asm *.o $(TARGET)* *~ core
 	rm -f include/asm-*/asm-offsets.h
-	rm -f tools/figlet/*.o tools/figlet/figlet
 	rm -f include/xen/acm_policy.h
 
 $(TARGET): delete-unfresh-files
+	$(MAKE) -C tools
 	$(MAKE) include/xen/compile.h
 	$(MAKE) include/xen/acm_policy.h
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
@@ -71,7 +71,6 @@ endif
 delete-unfresh-files:
 	@if [ ! -r include/xen/compile.h -o -O include/xen/compile.h ]; then \
 		rm -f include/xen/{banner,compile}.h; \
-		$(MAKE) -C arch/$(TARGET_ARCH) delete-unfresh-files; \
 	fi
 
 # acm_policy.h contains security policy for Xen
@@ -105,12 +104,7 @@ include/xen/compile.h: include/xen/compile.h.in include/xen/banner.h
 	@cat include/xen/banner.h >> $@.new
 	@mv -f $@.new $@
 
-tools/figlet/figlet: tools/figlet/figlet.o
-	$(HOSTCC) -o $@ $<
-tools/figlet/figlet.o: tools/figlet/figlet.c
-	$(HOSTCC) -o $@ -c $<
-
-include/xen/banner.h: tools/figlet/figlet tools/figlet/xen.flf
+include/xen/banner.h:
 	tools/figlet/figlet -d tools/figlet Xen $(XEN_FULLVERSION) > $@.new
 	@mv -f $@.new $@
 

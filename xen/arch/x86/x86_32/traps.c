@@ -6,6 +6,7 @@
 #include <xen/console.h>
 #include <xen/mm.h>
 #include <xen/irq.h>
+#include <xen/symbols.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/vmx.h>
@@ -63,10 +64,10 @@ void show_registers(struct cpu_user_regs *regs)
         }
     }
 
-    printk("CPU:    %d\nEIP:    %04lx:[<%08lx>]      \nEFLAGS: %08lx   "
-           "CONTEXT: %s\n",
-           smp_processor_id(), (unsigned long)0xffff & regs->cs,
-           eip, eflags, context);
+    printk("CPU:    %d\nEIP:    %04lx:[<%08lx>]",
+           smp_processor_id(), (unsigned long)0xffff & regs->cs, eip);
+    print_symbol(" %s\n", eip);
+    printk("EFLAGS: %08lx   CONTEXT: %s\n", eflags, context);
     printk("eax: %08x   ebx: %08x   ecx: %08x   edx: %08x\n",
            regs->eax, regs->ebx, regs->ecx, regs->edx);
     printk("esi: %08x   edi: %08x   ebp: %08x   esp: %08lx\n",
@@ -119,8 +120,10 @@ asmlinkage void do_double_fault(void)
 
     /* Find information saved during fault and dump it to the console. */
     tss = &init_tss[cpu];
-    printk("CPU:    %d\nEIP:    %04x:[<%08x>]      \nEFLAGS: %08x\n",
-           cpu, tss->cs, tss->eip, tss->eflags);
+    printk("CPU:    %d\nEIP:    %04x:[<%08x>]",
+           cpu, tss->cs, tss->eip);
+    print_symbol(" %s\n", tss->eip);
+    printk("EFLAGS: %08x\n", tss->eflags);
     printk("CR3:    %08x\n", tss->__cr3);
     printk("eax: %08x   ebx: %08x   ecx: %08x   edx: %08x\n",
            tss->eax, tss->ebx, tss->ecx, tss->edx);

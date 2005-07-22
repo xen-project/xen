@@ -1,10 +1,9 @@
 #ifndef __X86_TYPES_H__
 #define __X86_TYPES_H__
 
-/*
- * __xx is ok: it doesn't pollute the POSIX namespace. Use these in the
- * header files exported to user space
- */
+#ifndef __ASSEMBLY__
+
+#include <xen/config.h>
 
 typedef __signed__ char __s8;
 typedef unsigned char __u8;
@@ -25,8 +24,6 @@ typedef unsigned long __u64;
 #endif
 #endif
 
-#include <xen/config.h>
-
 typedef signed char s8;
 typedef unsigned char u8;
 
@@ -39,9 +36,6 @@ typedef unsigned int u32;
 #if defined(__i386__)
 typedef signed long long s64;
 typedef unsigned long long u64;
-#define BITS_PER_LONG 32
-#define BYTES_PER_LONG 4
-#define LONG_BYTEORDER 2
 #if defined(CONFIG_X86_PAE)
 typedef u64 physaddr_t;
 #else
@@ -50,12 +44,21 @@ typedef u32 physaddr_t;
 #elif defined(__x86_64__)
 typedef signed long s64;
 typedef unsigned long u64;
-#define BITS_PER_LONG 64
-#define BYTES_PER_LONG 8
-#define LONG_BYTEORDER 3
 typedef u64 physaddr_t;
 #endif
 
 typedef unsigned long size_t;
+
+#endif /* __ASSEMBLY__ */
+
+#if defined(__i386__)
+#define BITS_PER_LONG 32
+#define BYTES_PER_LONG 4
+#define LONG_BYTEORDER 2
+#elif defined(__x86_64__)
+#define BITS_PER_LONG 64
+#define BYTES_PER_LONG 8
+#define LONG_BYTEORDER 3
+#endif
 
 #endif /* __X86_TYPES_H__ */

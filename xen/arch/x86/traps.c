@@ -40,6 +40,7 @@
 #include <xen/perfc.h>
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
+#include <xen/symbols.h>
 #include <asm/shadow.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -100,7 +101,7 @@ unsigned long do_get_debugreg(int reg);
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
 
-static inline int kernel_text_address(unsigned long addr)
+int is_kernel_text(unsigned long addr)
 {
     extern char _stext, _etext;
     if (addr >= (unsigned long) &_stext &&
@@ -108,6 +109,12 @@ static inline int kernel_text_address(unsigned long addr)
         return 1;
     return 0;
 
+}
+
+unsigned long kernel_text_end(void)
+{
+    extern char _etext;
+    return (unsigned long) &_etext;
 }
 
 void show_guest_stack(void)
@@ -150,11 +157,12 @@ void show_trace(unsigned long *esp)
     while ( ((long) stack & (STACK_SIZE-1)) != 0 )
     {
         addr = *stack++;
-        if ( kernel_text_address(addr) )
+        if ( is_kernel_text(addr) )
         {
             if ( (i != 0) && ((i % 6) == 0) )
                 printk("\n   ");
-            printk("[<%p>] ", _p(addr));
+            printk("[<%p>]", _p(addr));
+            print_symbol(" %s\n", addr);
             i++;
         }
     }
@@ -177,10 +185,7 @@ void show_stack(unsigned long *esp)
         if ( (i != 0) && ((i % 8) == 0) )
             printk("\n   ");
         addr = *stack++;
-        if ( kernel_text_address(addr) )
-            printk("[%p] ", _p(addr));
-        else
-            printk("%p ", _p(addr));
+        printk("%p ", _p(addr));
     }
     if ( i == 0 )
         printk("Stack empty.");
