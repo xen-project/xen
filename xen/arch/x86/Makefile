@@ -37,6 +37,15 @@ $(CURDIR)/arch.o: $(OBJS)
 $(TARGET)-syms: boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(TARGET_SUBARCH)/xen.lds
 	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) -o $@
+	nm -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
+	$(MAKE) $(BASEDIR)/xen-syms.o
+	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
+	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
+	nm -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
+	$(MAKE) $(BASEDIR)/xen-syms.o
+	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
+	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
+	rm -f $(BASEDIR)/xen-syms.S $(BASEDIR)/xen-syms.o
 
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(HDRS)
 	$(CC) $(CFLAGS) -S -o $@ $<
@@ -53,7 +62,4 @@ clean:
 	rm -f genapic/*.o genapic/*~ genapic/core
 	rm -f cpu/*.o cpu/*~ cpu/core
 
-delete-unfresh-files:
-	# nothing
-
-.PHONY: default clean delete-unfresh-files
+.PHONY: default clean

@@ -6,6 +6,7 @@
 #include <xen/errno.h>
 #include <xen/mm.h>
 #include <xen/irq.h>
+#include <xen/symbols.h>
 #include <xen/console.h>
 #include <xen/sched.h>
 #include <asm/current.h>
@@ -14,8 +15,10 @@
 
 void show_registers(struct cpu_user_regs *regs)
 {
-    printk("CPU:    %d\nEIP:    %04x:[<%016lx>]      \nEFLAGS: %016lx\n",
-           smp_processor_id(), 0xffff & regs->cs, regs->rip, regs->eflags);
+    printk("CPU:    %d\nEIP:    %04x:[<%016lx>]",
+           smp_processor_id(), 0xffff & regs->cs, regs->rip);
+    print_symbol(" %s\n", regs->rip);
+    printk("EFLAGS: %016lx\n", regs->eflags);
     printk("rax: %016lx   rbx: %016lx   rcx: %016lx   rdx: %016lx\n",
            regs->rax, regs->rbx, regs->rcx, regs->rdx);
     printk("rsi: %016lx   rdi: %016lx   rbp: %016lx   rsp: %016lx\n",
