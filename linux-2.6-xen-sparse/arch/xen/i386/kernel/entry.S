@@ -613,8 +613,6 @@ debug_stack_correct:
 	xorl %edx,%edx			# error code 0
 	movl %esp,%eax			# pt_regs pointer
 	call do_debug
-	testl %eax,%eax
-	jnz restore_all
 	jmp ret_from_exception
 
 #if 0 /* XEN */
@@ -669,8 +667,6 @@ ENTRY(int3)
 	xorl %edx,%edx		# zero error code
 	movl %esp,%eax		# pt_regs pointer
 	call do_int3
-	testl %eax,%eax
-	jnz restore_all
 	jmp ret_from_exception
 
 ENTRY(overflow)
