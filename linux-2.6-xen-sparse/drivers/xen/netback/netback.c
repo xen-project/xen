@@ -490,30 +490,20 @@ static void tx_credit_callback(unsigned long data)
     netif_schedule_work(netif);
 }
 
-/* Called after netfront has transmitted */
-static void net_tx_action(unsigned long unused)
+inline static void net_tx_action_dealloc(void)
 {
-    struct list_head *ent;
-    struct sk_buff *skb;
-    netif_t *netif;
-    netif_tx_request_t txreq;
-    u16 pending_idx;
-    NETIF_RING_IDX i;
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
     gnttab_unmap_grant_ref_t unmap_ops[MAX_PENDING_REQS];
     gnttab_unmap_grant_ref_t *gop;
-
-    gnttab_map_grant_ref_t map_ops[MAX_PENDING_REQS];
-    gnttab_map_grant_ref_t *mop;
 #else
     multicall_entry_t *mcl;
 #endif
+    u16 pending_idx;
     PEND_RING_IDX dc, dp;
-    unsigned int data_len;
+    netif_t *netif;
 
-
-    if ( (dc = dealloc_cons) == (dp = dealloc_prod) )
-        goto skip_dealloc;
+    dc = dealloc_cons;
+    dp = dealloc_prod;
 
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
     /*
@@ -582,7 +572,28 @@ static void net_tx_action(unsigned long unused)
 #endif
     }
 
- skip_dealloc:
+}
+
+/* Called after netfront has transmitted */
+static void net_tx_action(unsigned long unused)
+{
+    struct list_head *ent;
+    struct sk_buff *skb;
+    netif_t *netif;
+    netif_tx_request_t txreq;
+    u16 pending_idx;
+    NETIF_RING_IDX i;
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+    gnttab_map_grant_ref_t map_ops[MAX_PENDING_REQS];
+    gnttab_map_grant_ref_t *mop;
+#else
+    multicall_entry_t *mcl;
+#endif
+    unsigned int data_len;
+
+    if ( dealloc_cons != dealloc_prod )
+        net_tx_action_dealloc();
+
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
     mop = map_ops;
 #else
