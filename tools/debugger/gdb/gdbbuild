@@ -1,6 +1,6 @@
 #!/bin/sh
 
-XENROOT=`bk root`
+XENROOT=`hg root`
 export XENROOT
 
 cd $XENROOT/tools/debugger/gdb
