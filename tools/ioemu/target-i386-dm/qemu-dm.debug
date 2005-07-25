@@ -2,4 +2,4 @@
 
 echo $* > /tmp/args
 echo $DISPLAY >> /tmp/args
-exec /usr/bin/qemu-dm $*
+exec /usr/lib/xen/bin/qemu-dm $*
