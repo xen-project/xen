@@ -514,21 +514,45 @@ static void monitor_handle_command(const char *cmdline)
                 str_allocated[nb_args] = str;
             add_str:
                 if (nb_args >= MAX_ARGS) {
-#if 0
                 error_args:
-#endif
                     term_printf("%s: too many arguments\n", cmdname);
                     goto fail;
                 }
                 args[nb_args++] = str;
             }
             break;
+        case '-':
+            {
+                int has_option;
+                /* option */
+                
+                c = *typestr++;
+                if (c == '\0')
+                    goto bad_type;
+                while (isspace(*p)) 
+                    p++;
+                has_option = 0;
+                if (*p == '-') {
+                    p++;
+                    if (*p != c) {
+                        term_printf("%s: unsupported option -%c\n", 
+                                    cmdname, *p);
+                        goto fail;
+                    }
+                    p++;
+                    has_option = 1;
+                }
+                if (nb_args >= MAX_ARGS)
+                    goto error_args;
+                args[nb_args++] = (void *)has_option;
+            }
+            break;
         /* TODO: add more commands we need here to support vmx device model */
         case '/':
         case 'i':
-        case '-':
         default:
-            term_printf("%s: unknown type '%c', we only support quit command now.\n", cmdname, c);
+        bad_type:
+            term_printf("%s: unknown type '%c',not support now.\n", cmdname, c);
             goto fail;
         }
     }
