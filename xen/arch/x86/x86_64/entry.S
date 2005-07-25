@@ -587,6 +587,7 @@ ENTRY(hypercall_table)
         .quad do_boot_vcpu
         .quad do_set_segment_base   /* 25 */
         .quad do_mmuext_op
+        .quad do_policy_op
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .quad do_ni_hypercall
         .endr

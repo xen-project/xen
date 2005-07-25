@@ -24,6 +24,7 @@
 #include <xen/lib.h>
 #include <xen/delay.h>
 #include <xen/sched.h>
+#include <xen/multiboot.h>
 #include <public/acm.h>
 #include <acm/acm_core.h>
 #include <public/dom0_ops.h>
@@ -136,7 +137,9 @@ static inline int acm_pre_grant_map_ref(domid_t id)
 { return 0; }
 static inline int acm_pre_grant_setup(domid_t id) 
 { return 0; }
-static inline int acm_init(void)
+static inline int acm_init(unsigned int *initrdidx,
+                           const multiboot_info_t *mbi,
+                           unsigned long start)
 { return 0; }
 static inline void acm_post_domain0_create(domid_t domid) 
 { return; }
@@ -337,7 +340,9 @@ static inline void acm_post_domain0_create(domid_t domid)
     acm_post_domain_create(domid, ACM_DOM0_SSIDREF);
 }
 
-extern int acm_init(void);
+extern int acm_init(unsigned int *initrdidx,
+                    const multiboot_info_t *mbi,
+                    unsigned long start);
 
 #endif
 

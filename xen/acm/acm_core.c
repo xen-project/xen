@@ -6,6 +6,9 @@
  * Author:
  * Reiner Sailer <sailer@watson.ibm.com>
  *
+ * Contributors:
+ * Stefan Berger <stefanb@watson.ibm.com>
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, version 2 of the
@@ -25,6 +28,7 @@
 #include <xen/lib.h>
 #include <xen/delay.h>
 #include <xen/sched.h>
+#include <xen/multiboot.h>
 #include <acm/acm_hooks.h>
 #include <acm/acm_endian.h>
 
@@ -81,9 +85,68 @@ acm_init_binary_policy(void *primary, void *secondary)
 	acm_bin_pol.secondary_binary_policy = secondary;
 }
 
+static int
+acm_setup(unsigned int *initrdidx,
+          const multiboot_info_t *mbi,
+          unsigned long initial_images_start)
+{
+    int i;
+    module_t *mod = (module_t *)__va(mbi->mods_addr);
+    int rc = ACM_OK;
+
+    if (mbi->mods_count > 1)
+	    *initrdidx = 1;
+
+    /*
+     * Try all modules and see whichever could be the binary policy.
+     * Adjust the initrdidx if module[1] is the binary policy.
+     */
+    for (i = mbi->mods_count-1; i >= 1; i--) {
+        struct acm_policy_buffer *pol;
+        char *_policy_start; 
+        unsigned long _policy_len;
+#if defined(__i386__)
+        _policy_start = (char *)(initial_images_start + (mod[i].mod_start-mod[0].mod_start));
+#elif defined(__x86_64__)
+        _policy_start = __va(initial_images_start + (mod[i].mod_start-mod[0].mod_start));
+#else
+#error Architecture unsupported by sHype
+#endif
+        _policy_len   = mod[i].mod_end - mod[i].mod_start;
+	if (_policy_len < sizeof(struct acm_policy_buffer))
+		continue; /* not a policy */
+
+        pol = (struct acm_policy_buffer *)_policy_start;
+        if (ntohl(pol->magic) == ACM_MAGIC) {
+            rc = acm_set_policy((void *)_policy_start,
+                                (u16)_policy_len,
+                                ACM_USE_SECURITY_POLICY,
+                                0);
+            if (rc == ACM_OK) {
+                printf("Policy len  0x%lx, start at %p.\n",_policy_len,_policy_start);
+                if (i == 1) {
+                    if (mbi->mods_count > 2) {
+                        *initrdidx = 2;
+                    } else {
+                        *initrdidx = 0;
+                    }
+                } else {
+                    *initrdidx = 1;
+                }
+                break;
+            } else {
+            	printk("Invalid policy. %d.th module line.\n", i+1);
+            }
+        } /* end if a binary policy definition, i.e., (ntohl(pol->magic) == ACM_MAGIC ) */
+    }
+    return rc;
+}
+
 
 int
-acm_init(void)
+acm_init(unsigned int *initrdidx,
+         const multiboot_info_t *mbi,
+         unsigned long initial_images_start)
 {
 	int ret = -EINVAL;
 
@@ -127,10 +190,12 @@ acm_init(void)
 
 	if (ret != ACM_OK)
 		return -EINVAL;		
+	acm_setup(initrdidx, mbi, initial_images_start);
 	printk("%s: Enforcing Primary %s, Secondary %s.\n", __func__, 
 	       ACM_POLICY_NAME(acm_bin_pol.primary_policy_code), ACM_POLICY_NAME(acm_bin_pol.secondary_policy_code));
-	return ACM_OK;
+	return ret;
 }
+
 
 #endif
 
