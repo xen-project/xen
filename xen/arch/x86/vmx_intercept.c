@@ -197,12 +197,23 @@ int intercept_pit_io(ioreq_t *p)
 static void pit_timer_fn(void *data)
 {
     struct vmx_virpit_t *vpit = data;
+    s_time_t   next;
+    int        missed_ticks;
+
+    missed_ticks = (NOW() - vpit->scheduled) / MILLISECS(vpit->period);
 
     /* Set the pending intr bit, and send evtchn notification to myself. */
     if (test_and_set_bit(vpit->vector, vpit->intr_bitmap))
         vpit->pending_intr_nr++; /* already set, then count the pending intr */
 
-    set_ac_timer(&vpit->pit_timer, NOW() + MILLISECS(vpit->period));
+    /* pick up missed timer tick */
+    if ( missed_ticks > 0 ) {
+        vpit->pending_intr_nr+= missed_ticks;
+        vpit->scheduled += missed_ticks * MILLISECS(vpit->period);
+    }
+    next = vpit->scheduled + MILLISECS(vpit->period);
+    set_ac_timer(&vpit->pit_timer, next);
+    vpit->scheduled = next;
 }
 
 
@@ -263,7 +274,8 @@ void vmx_hooks_assist(struct vcpu *d)
 
         vpit->intr_bitmap = intr;
 
-	set_ac_timer(&vpit->pit_timer, NOW() + MILLISECS(vpit->period));
+        vpit->scheduled = NOW() + MILLISECS(vpit->period);
+        set_ac_timer(&vpit->pit_timer, vpit->scheduled);
 
         /*restore the state*/
         p->state = STATE_IORESP_READY;

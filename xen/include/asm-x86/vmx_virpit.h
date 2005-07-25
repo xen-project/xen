@@ -19,6 +19,7 @@ struct vmx_virpit_t {
     /* for simulation of counter 0 in mode 2*/
     int vector;				/* the pit irq vector */
     unsigned int period;		/* the frequency. e.g. 10ms*/
+    s_time_t scheduled;                 /* scheduled timer interrupt */
     unsigned int channel;		/* the pit channel, counter 0~2 */
     u64  *intr_bitmap;
     unsigned int pending_intr_nr;	/* the couner for pending timer interrupts */
