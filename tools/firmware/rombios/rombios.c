@@ -29,6 +29,11 @@
 #define VMXASSIST
 #undef VMXTEST
 
+// Xen full virtualization does not handle unaligned IO with page crossing.
+// Disable 32-bit PIO as a workaround.
+#define NO_PIO32
+
+
 // ROM BIOS compatability entry points:
 // ===================================
 // $e05b ; POST Entry Point
@@ -2248,6 +2253,9 @@ void ata_detect( )
       Bit16u cylinders, heads, spt, blksize;
       Bit8u  translation, removable, mode;
 
+      // default mode to PIO16
+      mode = ATA_MODE_PIO16;
+
       //Temporary values to do the transfer
       write_byte(ebda_seg,&EbdaData->ata.devices[device].device,ATA_DEVICE_HD);
       write_byte(ebda_seg,&EbdaData->ata.devices[device].mode, ATA_MODE_PIO16);
@@ -2256,7 +2264,10 @@ void ata_detect( )
         BX_PANIC("ata-detect: Failed to detect ATA device\n");
 
       removable = (read_byte(get_SS(),buffer+0) & 0x80) ? 1 : 0;
+#ifndef	NO_PIO32
       mode      = read_byte(get_SS(),buffer+96) ? ATA_MODE_PIO32 : ATA_MODE_PIO16;
+#endif
+
       blksize   = read_word(get_SS(),buffer+10);
       
       cylinders = read_word(get_SS(),buffer+(1*2)); // word 1
@@ -2346,6 +2357,9 @@ void ata_detect( )
       Bit8u  type, removable, mode;
       Bit16u blksize;
 
+      // default mode to PIO16
+      mode = ATA_MODE_PIO16;
+
       //Temporary values to do the transfer
       write_byte(ebda_seg,&EbdaData->ata.devices[device].device,ATA_DEVICE_CDROM);
       write_byte(ebda_seg,&EbdaData->ata.devices[device].mode, ATA_MODE_PIO16);
@@ -2355,7 +2369,9 @@ void ata_detect( )
 
       type      = read_byte(get_SS(),buffer+1) & 0x1f;
       removable = (read_byte(get_SS(),buffer+0) & 0x80) ? 1 : 0;
+#ifndef	NO_PIO32
       mode      = read_byte(get_SS(),buffer+96) ? ATA_MODE_PIO32 : ATA_MODE_PIO16;
+#endif
       blksize   = 2048;
 
       write_byte(ebda_seg,&EbdaData->ata.devices[device].device, type);
