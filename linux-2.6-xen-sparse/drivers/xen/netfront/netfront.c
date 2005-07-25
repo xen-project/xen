@@ -54,6 +54,25 @@
 #include <asm/page.h>
 #include <asm/uaccess.h>
 
+#if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
+#include <asm-xen/xen-public/grant_table.h>
+#include <asm-xen/gnttab.h>
+#ifdef GRANT_DEBUG
+static void
+dump_packet(int tag, u32 addr, u32 ap)
+{
+    unsigned char *p = (unsigned char *)ap;
+    int i;
+    
+    printk(KERN_ALERT "#### rx_poll   %c %08x ", tag & 0xff, addr);
+    for (i = 0; i < 20; i++) {
+        printk("%02x", p[i]);
+    }
+    printk("\n");
+}
+#endif
+#endif
+
 #ifndef __GFP_NOWARN
 #define __GFP_NOWARN 0
 #endif
@@ -80,6 +99,21 @@
 #define TX_TEST_IDX resp_prod /* aggressive: any outstanding responses? */
 #else
 #define TX_TEST_IDX req_cons  /* conservative: not seen all our requests? */
+#endif
+
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+static grant_ref_t gref_tx_head, gref_tx_terminal;
+static grant_ref_t grant_tx_ref[NETIF_TX_RING_SIZE + 1];
+#endif
+
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+static grant_ref_t gref_rx_head, gref_rx_terminal;
+static grant_ref_t grant_rx_ref[NETIF_RX_RING_SIZE + 1];
+#endif
+
+#if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
+static domid_t rdomid = 0;
+#define GRANT_INVALID_REF	(0xFFFF)
 #endif
 
 static void network_tx_buf_gc(struct net_device *dev);
@@ -322,6 +356,14 @@ static void network_tx_buf_gc(struct net_device *dev)
         for (i = np->tx_resp_cons; i != prod; i++) {
             id  = np->tx->ring[MASK_NETIF_TX_IDX(i)].resp.id;
             skb = np->tx_skbs[id];
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+            if (gnttab_query_foreign_access(grant_tx_ref[id]) != 0) {
+                printk(KERN_ALERT "netfront: query foreign access\n");
+            }
+            gnttab_end_foreign_access(grant_tx_ref[id], GNTMAP_readonly);
+            gnttab_release_grant_reference(&gref_tx_head, grant_tx_ref[id]);
+            grant_tx_ref[id] = GRANT_INVALID_REF;
+#endif
             ADD_ID_TO_FREELIST(np->tx_skbs, id);
             dev_kfree_skb_irq(skb);
         }
@@ -356,6 +398,9 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     struct sk_buff *skb;
     int i, batch_target;
     NETIF_RING_IDX req_prod = np->rx->req_prod;
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+    int ref;
+#endif
 
     if (unlikely(np->backend_state != BEST_CONNECTED))
         return;
@@ -388,7 +433,16 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         np->rx_skbs[id] = skb;
         
         np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.id = id;
-        
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+        if ((ref = gnttab_claim_grant_reference(&gref_rx_head, gref_rx_terminal)) < 0) {
+            printk(KERN_ALERT "#### netfront can't claim rx reference\n");
+            BUG();
+        }
+        grant_rx_ref[id] = ref;
+        gnttab_grant_foreign_transfer_ref(ref, rdomid,
+        virt_to_machine(skb->head) >> PAGE_SHIFT);
+        np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.gref = ref;
+#endif
         rx_pfn_array[i] = virt_to_machine(skb->head) >> PAGE_SHIFT;
 
 	/* Remove this page from pseudo phys map before passing back to Xen. */
@@ -436,6 +490,10 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     struct net_private *np = netdev_priv(dev);
     netif_tx_request_t *tx;
     NETIF_RING_IDX i;
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+    unsigned int ref;
+    unsigned long mfn;
+#endif
 
     if (unlikely(np->tx_full)) {
         printk(KERN_ALERT "%s: full queue wasn't stopped!\n", dev->name);
@@ -470,7 +528,18 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     tx = &np->tx->ring[MASK_NETIF_TX_IDX(i)].req;
 
     tx->id   = id;
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+    if ((ref = gnttab_claim_grant_reference(&gref_tx_head, gref_tx_terminal)) < 0) {
+        printk(KERN_ALERT "#### netfront can't claim tx grant reference\n");
+        BUG();
+    }
+    mfn = virt_to_machine(skb->data) >> PAGE_SHIFT;
+    gnttab_grant_foreign_access_ref(ref, rdomid, mfn, GNTMAP_readonly);
+    tx->addr = (ref << PAGE_SHIFT) | ((unsigned long)skb->data & ~PAGE_MASK);
+    grant_tx_ref[id] = ref;
+#else
     tx->addr = virt_to_machine(skb->data);
+#endif
     tx->size = skb->len;
     tx->csum_blank = (skb->ip_summed == CHECKSUM_HW);
 
@@ -530,6 +599,10 @@ static int netif_poll(struct net_device *dev, int *pbudget)
     int work_done, budget, more_to_do = 1;
     struct sk_buff_head rxq;
     unsigned long flags;
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+    unsigned long mfn;
+    grant_ref_t ref;
+#endif
 
     spin_lock(&np->rx_lock);
 
@@ -542,7 +615,6 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
     if ((budget = *pbudget) > dev->quota)
         budget = dev->quota;
-
     rp = np->rx->resp_prod;
     rmb(); /* Ensure we see queued responses up to 'rp'. */
 
@@ -550,7 +622,6 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		    (i != rp) && (work_done < budget);
 		    i++, work_done++) {
         rx = &np->rx->ring[MASK_NETIF_RX_IDX(i)].resp;
-
         /*
          * An error here is very odd. Usually indicates a backend bug,
          * low-memory condition, or that we didn't have reservation headroom.
@@ -565,11 +636,23 @@ static int netif_poll(struct net_device *dev, int *pbudget)
             continue;
         }
 
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+        ref = grant_rx_ref[rx->id];
+        grant_rx_ref[rx->id] = GRANT_INVALID_REF;
+
+        mfn = gnttab_end_foreign_transfer(ref);
+        gnttab_release_grant_reference(&gref_rx_head, ref);
+#endif
+
         skb = np->rx_skbs[rx->id];
         ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
 
         /* NB. We handle skb overflow later. */
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+        skb->data = skb->head + rx->addr;
+#else
         skb->data = skb->head + (rx->addr & ~PAGE_MASK);
+#endif
         skb->len  = rx->status;
         skb->tail = skb->data + skb->len;
 
@@ -580,16 +663,32 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         np->stats.rx_bytes += rx->status;
 
         /* Remap the page. */
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+        mmu->ptr = mfn << PAGE_SHIFT | MMU_MACHPHYS_UPDATE;
+#else
         mmu->ptr  = (rx->addr & PAGE_MASK) | MMU_MACHPHYS_UPDATE;
+#endif
         mmu->val  = __pa(skb->head) >> PAGE_SHIFT;
         mmu++;
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+	MULTI_update_va_mapping(mcl, (unsigned long)skb->head,
+				pfn_pte_ma(mfn, PAGE_KERNEL), 0);
+#else
 	MULTI_update_va_mapping(mcl, (unsigned long)skb->head,
 				pfn_pte_ma(rx->addr >> PAGE_SHIFT, PAGE_KERNEL), 0);
+#endif
         mcl++;
 
         phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = 
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+            mfn;
+#else
             rx->addr >> PAGE_SHIFT;
-
+#endif
+#ifdef GRANT_DEBUG
+        printk(KERN_ALERT "#### rx_poll     enqueue vdata=%08x mfn=%08x ref=%04x\n",
+               skb->data, mfn, ref);
+#endif
         __skb_queue_tail(&rxq, skb);
     }
 
@@ -608,6 +707,11 @@ static int netif_poll(struct net_device *dev, int *pbudget)
     }
 
     while ((skb = __skb_dequeue(&rxq)) != NULL) {
+#ifdef GRANT_DEBUG
+         printk(KERN_ALERT "#### rx_poll     dequeue vdata=%08x mfn=%08x\n",
+                skb->data, virt_to_machine(skb->data)>>PAGE_SHIFT);
+         dump_packet('d', skb->data, (unsigned long)skb->data);
+#endif
         /*
          * Enough room in skbuff for the data we were passed? Also, Linux 
          * expects at least 16 bytes headroom in each receive buffer.
@@ -615,6 +719,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         if (unlikely(skb->tail > skb->end) || 
 			unlikely((skb->data - skb->head) < 16)) {
             nskb = NULL;
+
 
             /* Only copy the packet if it fits in the current MTU. */
             if (skb->len <= (dev->mtu + ETH_HLEN)) {
@@ -646,7 +751,6 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         
         /* Set the shared-info area, which is hidden behind the real data. */
         init_skb_shinfo(skb);
-
         /* Ethernet-specific work. Delayed to here as it peeks the header. */
         skb->protocol = eth_type_trans(skb, dev);
 
@@ -919,6 +1023,9 @@ vif_connect(struct net_private *np, netif_fe_interface_status_t *status)
     network_connect(dev, status);
     np->evtchn = status->evtchn;
     np->irq = bind_evtchn_to_irq(np->evtchn);
+#if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
+    rdomid = status->domid;
+#endif
     (void)request_irq(np->irq, netif_int, SA_SAMPLE_RANDOM, dev->name, dev);
     netctrl_connected_count();
     (void)send_fake_arp(dev);
@@ -962,10 +1069,18 @@ static int create_netdev(int handle, struct net_device **val)
     np->rx_max_target = RX_MAX_TARGET;
 
     /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
-    for (i = 0; i <= NETIF_TX_RING_SIZE; i++)
+    for (i = 0; i <= NETIF_TX_RING_SIZE; i++) {
         np->tx_skbs[i] = (void *)((unsigned long) i+1);
-    for (i = 0; i <= NETIF_RX_RING_SIZE; i++)
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+        grant_tx_ref[i] = GRANT_INVALID_REF;
+#endif
+    }
+    for (i = 0; i <= NETIF_RX_RING_SIZE; i++) {
         np->rx_skbs[i] = (void *)((unsigned long) i+1);
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+        grant_rx_ref[i] = GRANT_INVALID_REF;
+#endif
+    }
 
     dev->open            = network_open;
     dev->hard_start_xmit = network_start_xmit;
@@ -1267,6 +1382,22 @@ static int __init netif_init(void)
 
     if (xen_start_info.flags & SIF_INITDOMAIN)
         return 0;
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+    if (gnttab_alloc_grant_references(NETIF_TX_RING_SIZE,
+                                      &gref_tx_head, &gref_tx_terminal) < 0) {
+        printk(KERN_ALERT "#### netfront can't alloc tx grant refs\n");
+        return 1;
+    }
+    printk(KERN_ALERT "#### netfront tx using grant tables\n");
+#endif
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+    if (gnttab_alloc_grant_references(NETIF_RX_RING_SIZE,
+                                      &gref_rx_head, &gref_rx_terminal) < 0) {
+        printk(KERN_ALERT "#### netfront can't alloc rx grant refs\n");
+        return 1;
+    }
+    printk(KERN_ALERT "#### netfront rx using grant tables\n");
+#endif
 
     if ((err = xennet_proc_init()) != 0)
         return err;
@@ -1284,6 +1415,16 @@ static int __init netif_init(void)
 
     DPRINTK("< err=%d\n", err);
     return err;
+}
+
+static void netif_exit(void)
+{
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+    gnttab_free_grant_references(NETIF_TX_RING_SIZE, gref_tx_head);
+#endif
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+    gnttab_free_grant_references(NETIF_RX_RING_SIZE, gref_rx_head);
+#endif
 }
 
 static void vif_suspend(struct net_private *np)
@@ -1478,3 +1619,4 @@ static void xennet_proc_delif(struct net_device *dev)
 #endif
 
 module_init(netif_init);
+module_exit(netif_exit);

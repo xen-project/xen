@@ -166,8 +166,14 @@ gnttab_end_foreign_transfer(
     u16           flags;
 
     flags = shared[ref].flags;
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+    /*
+     * But can't flags == (GTF_accept_transfer | GTF_transfer_completed)
+     * if gnttab_donate executes without interruption???
+     */
+#else
     ASSERT(flags == (GTF_accept_transfer | GTF_transfer_committed));
-
+#endif
     /*
      * If a transfer is committed then wait for the frame address to appear.
      * Otherwise invalidate the grant entry against future use.
