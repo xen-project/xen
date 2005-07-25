@@ -37,11 +37,11 @@ $(CURDIR)/arch.o: $(OBJS)
 $(TARGET)-syms: boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(TARGET_SUBARCH)/xen.lds
 	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) -o $@
-	nm -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
+	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
 	$(MAKE) $(BASEDIR)/xen-syms.o
 	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
-	nm -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
+	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
 	$(MAKE) $(BASEDIR)/xen-syms.o
 	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
 	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(BASEDIR)/xen-syms.o -o $@
