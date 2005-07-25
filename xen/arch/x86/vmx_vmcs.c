@@ -59,9 +59,11 @@ void free_vmcs(struct vmcs_struct *vmcs)
     free_xenheap_pages(vmcs, order);
 }
 
-static inline int construct_vmcs_controls(void)
+static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
 {
     int error = 0;
+    void *io_bitmap_a;
+    void *io_bitmap_b;
 
     error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL, 
                        MONITOR_PIN_BASED_EXEC_CONTROLS);
@@ -72,6 +74,20 @@ static inline int construct_vmcs_controls(void)
     error |= __vmwrite(VM_EXIT_CONTROLS, MONITOR_VM_EXIT_CONTROLS);
 
     error |= __vmwrite(VM_ENTRY_CONTROLS, MONITOR_VM_ENTRY_CONTROLS);
+
+    /* need to use 0x1000 instead of PAGE_SIZE */
+    io_bitmap_a = (void*) alloc_xenheap_pages(get_order(0x1000)); 
+    io_bitmap_b = (void*) alloc_xenheap_pages(get_order(0x1000)); 
+    memset(io_bitmap_a, 0xff, 0x1000);
+    /* don't bother debug port access */
+    clear_bit(PC_DEBUG_PORT, io_bitmap_a);
+    memset(io_bitmap_b, 0xff, 0x1000);
+
+    error |= __vmwrite(IO_BITMAP_A, (u64) virt_to_phys(io_bitmap_a));
+    error |= __vmwrite(IO_BITMAP_B, (u64) virt_to_phys(io_bitmap_b));
+
+    arch_vmx->io_bitmap_a = io_bitmap_a;
+    arch_vmx->io_bitmap_b = io_bitmap_b;
 
     return error;
 }
@@ -432,7 +448,7 @@ int construct_vmcs(struct arch_vmx_struct *arch_vmx,
                (unsigned long) vmcs_phys_ptr);
         return -EINVAL; 
     }
-    if ((error = construct_vmcs_controls())) {
+    if ((error = construct_vmcs_controls(arch_vmx))) {
         printk("construct_vmcs: construct_vmcs_controls failed\n");
         return -EINVAL;         
     }

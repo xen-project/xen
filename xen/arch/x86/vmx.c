@@ -609,11 +609,6 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
     else
         addr = regs->edx & 0xffff;
 
-    if (addr == 0x80) {
-        __update_guest_eip(inst_len);
-        return;
-    }
-
     vio = get_vio(d->domain, d->vcpu_id);
     if (vio == 0) {
         printk("bad shared page: %lx", (unsigned long) vio);
