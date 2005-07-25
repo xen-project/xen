@@ -172,8 +172,8 @@ static int shutdown_process(void *__unused)
 {
     static char *envp[] = { "HOME=/", "TERM=linux", 
                             "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
-    static char *restart_argv[]  = { "/sbin/shutdown", "-r", "now", NULL };
-    static char *poweroff_argv[] = { "/sbin/halt",     "-p",        NULL };
+    static char *restart_argv[]  = { "/sbin/reboot", NULL };
+    static char *poweroff_argv[] = { "/sbin/poweroff", NULL };
 
     extern asmlinkage long sys_reboot(int magic1, int magic2,
                                       unsigned int cmd, void *arg);
