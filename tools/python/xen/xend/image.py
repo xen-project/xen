@@ -284,18 +284,19 @@ class VmxImageHandler(ImageHandler):
 		ret.append("%s" % v)
 
         # Handle hd img related options
-        device = sxp.child(self.vm.config, 'device')
-        vbdinfo = sxp.child(device, 'vbd')
-        if not vbdinfo:
-            raise VmError("vmx: missing vbd configuration")
-        uname = sxp.child_value(vbdinfo, 'uname')
-        vbddev = sxp.child_value(vbdinfo, 'dev')
-        (vbdtype, vbdparam) = string.split(uname, ':', 1)
-        vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
-        if vbdtype != 'file' or vbddev not in vbddev_list:
-            raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
-        ret.append("-%s" % vbddev)
-        ret.append("%s" % vbdparam)
+        devices = sxp.children(self.vm.config, 'device')
+        for device in devices:
+            vbdinfo = sxp.child(device, 'vbd')
+            if not vbdinfo:
+                raise VmError("vmx: missing vbd configuration")
+            uname = sxp.child_value(vbdinfo, 'uname')
+            vbddev = sxp.child_value(vbdinfo, 'dev')
+            (vbdtype, vbdparam) = string.split(uname, ':', 1)
+            vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
+            if vbdtype != 'file' or vbddev not in vbddev_list:
+                raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
+            ret.append("-%s" % vbddev)
+            ret.append("%s" % vbdparam)
 
 	# Handle graphics library related options
 	vnc = sxp.child_value(self.vm.config, 'vnc')
