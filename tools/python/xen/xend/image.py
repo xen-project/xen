@@ -352,8 +352,9 @@ class VmxImageHandler(ImageHandler):
 
     def destroy(self):
         channel.eventChannelClose(self.device_channel)
-        os.system("kill -KILL"
-                + " %d" % self.pid)
+        import signal
+        os.kill(self.pid, signal.SIGKILL)
+        (pid, status) = os.waitpid(self.pid, 0)
 
     def getDomainMemory(self, mem_mb):
         return (mem_mb * 1024) + self.getPageTableSize(mem_mb)
