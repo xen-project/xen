@@ -202,7 +202,7 @@ map_domain_va(unsigned long domid, int cpu, void * guest_va, int perm)
     }
     if ((page = pde_virt[cpu][vtopti(va)]) == 0) /* logical address */
 	goto error_out;
-    if (ctxt[cpu].flags & VGCF_VMX_GUEST)
+    if (ctxt[cpu].flags & VGCF_VMX_GUEST && paging_enabled(&ctxt[cpu]))
         page = page_array[page >> PAGE_SHIFT] << PAGE_SHIFT;
     if (page != page_phys[cpu] || perm != prev_perm[cpu]) 
     {
