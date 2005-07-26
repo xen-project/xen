@@ -37,6 +37,7 @@ struct xenbus_device {
 	char *subtype;
 	char *nodename;
 	struct device dev;
+	int has_error;
 	void *data;
 };
 
@@ -96,6 +97,12 @@ int xenbus_printf(const char *dir, const char *node, const char *fmt, ...)
 /* Generic read function: NULL-terminated triples of name,
  * sprintf-style type string, and pointer. Returns 0 or errno.*/
 int xenbus_gather(const char *dir, ...);
+
+/* Report a (negative) errno into the store, with explanation. */
+void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt,...);
+
+/* Clear any error. */
+void xenbus_dev_ok(struct xenbus_device *dev);
 
 /* Register callback to watch this node. */
 struct xenbus_watch

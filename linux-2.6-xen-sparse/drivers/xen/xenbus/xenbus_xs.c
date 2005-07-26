@@ -43,6 +43,7 @@
 
 #define streq(a, b) (strcmp((a), (b)) == 0)
 
+static char printf_buffer[4096];
 static void *xs_in, *xs_out;
 static LIST_HEAD(watches);
 DECLARE_MUTEX(xenbus_lock);
@@ -339,17 +340,49 @@ int xenbus_printf(const char *dir, const char *node, const char *fmt, ...)
 {
 	va_list ap;
 	int ret;
-	static char buffer[4096];
 
 	BUG_ON(down_trylock(&xenbus_lock) == 0);
 	va_start(ap, fmt);
-	ret = vsnprintf(buffer, sizeof(buffer), fmt, ap);
+	ret = vsnprintf(printf_buffer, sizeof(printf_buffer), fmt, ap);
 	va_end(ap);
 
-	BUG_ON(ret > sizeof(buffer)-1);
-	return xenbus_write(dir, node, buffer, O_CREAT);
+	BUG_ON(ret > sizeof(printf_buffer)-1);
+	return xenbus_write(dir, node, printf_buffer, O_CREAT);
 }
 
+/* Report a (negative) errno into the store, with explanation. */
+void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
+	unsigned int len;
+
+	BUG_ON(down_trylock(&xenbus_lock) == 0);
+
+	len = sprintf(printf_buffer, "%i ", -err);
+	va_start(ap, fmt);
+	ret = vsnprintf(printf_buffer+len, sizeof(printf_buffer)-len, fmt, ap);
+	va_end(ap);
+
+	BUG_ON(len + ret > sizeof(printf_buffer)-1);
+	dev->has_error = 1;
+	if (xenbus_write(dev->nodename, "error", printf_buffer, O_CREAT) != 0)
+		printk("xenbus: failed to write error node for %s (%s)\n",
+		       dev->nodename, printf_buffer);
+}
+
+/* Clear any error. */
+void xenbus_dev_ok(struct xenbus_device *dev)
+{
+	if (dev->has_error) {
+		if (xenbus_rm(dev->nodename, "error") != 0)
+			printk("xenbus: failed to clear error node for %s\n",
+			       dev->nodename);
+		else
+			dev->has_error = 0;
+	}
+}
+	
 /* Takes tuples of names, scanf-style args, and void **, NULL terminated. */
 int xenbus_gather(const char *dir, ...)
 {
