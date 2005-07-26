@@ -37,4 +37,7 @@ int domain_init(void);
 /* Returns the implicit path of a connection (only domains have this) */
 const char *get_implicit_path(const struct connection *conn);
 
+/* Read existing connection information from store. */
+void restore_existing_connections(void);
+
 #endif /* _XENSTORED_DOMAIN_H */

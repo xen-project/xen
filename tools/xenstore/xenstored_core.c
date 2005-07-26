@@ -1386,6 +1386,45 @@ void dump_connection(void)
 }
 #endif
 
+static void setup_structure(void)
+{
+	struct xs_permissions perms = { .id = 0, .perms = XS_PERM_READ };
+	char *root, *dir, *permfile;
+
+	/* Create root directory, with permissions. */
+	if (mkdir(xs_daemon_store(), 0750) != 0) {
+		if (errno != EEXIST)
+			barf_perror("Could not create root %s",
+				    xs_daemon_store());
+		return;
+	}
+	root = talloc_strdup(talloc_autofree_context(), "/");
+	if (!set_perms(NULL, root, &perms, 1))
+		barf_perror("Could not create permissions in root");
+
+	/* Create tool directory, with xenstored subdir. */
+	dir = talloc_asprintf(root, "%s/%s", xs_daemon_store(), "tool");
+	if (mkdir(dir, 0750) != 0)
+		barf_perror("Making dir %s", dir);
+	
+	permfile = talloc_strdup(root, "/tool");
+	if (!set_perms(NULL, permfile, &perms, 1))
+		barf_perror("Could not create permissions on %s", permfile);
+
+	dir = talloc_asprintf(root, "%s/%s", dir, "xenstored");
+	if (mkdir(dir, 0750) != 0)
+		barf_perror("Making dir %s", dir);
+	
+	permfile = talloc_strdup(root, "/tool/xenstored");
+	if (!set_perms(NULL, permfile, &perms, 1))
+		barf_perror("Could not create permissions on %s", permfile);
+
+	talloc_free(root);
+	if (mkdir(xs_daemon_transactions(), 0750) != 0)
+		barf_perror("Could not create transaction dir %s",
+			    xs_daemon_transactions());
+}
+
 static struct option options[] = { { "no-fork", 0, NULL, 'N' },
 				   { "verbose", 0, NULL, 'V' },
 				   { "output-pid", 0, NULL, 'P' },
@@ -1461,21 +1500,13 @@ int main(int argc, char *argv[])
 		barf_perror("Could not listen on sockets");
 
 	/* If we're the first, create .perms file for root. */
-	if (mkdir(xs_daemon_store(), 0750) == 0) {
-		struct xs_permissions perms;
-		char *root = talloc_strdup(talloc_autofree_context(), "/");
-
-		perms.id = 0;
-		perms.perms = XS_PERM_READ;
-		if (!set_perms(NULL, root, &perms, 1))
-			barf_perror("Could not create permissions in root");
-		talloc_free(root);
-		mkdir(xs_daemon_transactions(), 0750);
-	} else if (errno != EEXIST)
-		barf_perror("Could not create root %s", xs_daemon_store());
+	setup_structure();
 
 	/* Listen to hypervisor. */
 	event_fd = domain_init();
+
+	/* Restore existing connections. */
+	restore_existing_connections();
 
 	/* Debugging: daemonize() closes standard fds, so dup here. */
 	tmpout = dup(STDOUT_FILENO);

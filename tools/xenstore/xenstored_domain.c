@@ -254,6 +254,38 @@ void handle_event(int event_fd)
 #endif
 }
 
+static struct domain *new_domain(void *context, domid_t domid,
+				 unsigned long mfn, int port,
+				 const char *path)
+{
+	struct domain *domain;
+	domain = talloc(context, struct domain);
+	domain->domid = domid;
+	domain->port = port;
+	domain->path = talloc_strdup(domain, path);
+	domain->page = xc_map_foreign_range(*xc_handle, domain->domid,
+					    getpagesize(),
+					    PROT_READ|PROT_WRITE,
+					    mfn);
+	if (!domain->page)
+		return NULL;
+
+	list_add(&domain->list, &domains);
+	talloc_set_destructor(domain, destroy_domain);
+
+	/* One in each half of page. */
+	domain->input = domain->page;
+	domain->output = domain->page + getpagesize()/2;
+
+	/* Tell kernel we're interested in this event. */
+	if (ioctl(eventchn_fd, EVENTCHN_BIND, domain->port) != 0)
+		return NULL;
+
+	domain->conn = new_connection(writechn, readchn);
+	domain->conn->domain = domain;
+	return domain;
+}
+
 /* domid, mfn, evtchn, path */
 bool do_introduce(struct connection *conn, struct buffered_data *in)
 {
@@ -269,34 +301,16 @@ bool do_introduce(struct connection *conn, struct buffered_data *in)
 	if (!conn->can_write)
 		return send_error(conn, EROFS);
 
-	/* Hang domain off "in" until we're finished. */
-	domain = talloc(in, struct domain);
-	domain->domid = atoi(vec[0]);
-	domain->port = atoi(vec[2]);
-	if ((domain->port <= 0) || !is_valid_nodename(vec[3]))
+	/* Sanity check args. */
+	if ((atoi(vec[2]) <= 0) || !is_valid_nodename(vec[3]))
 		return send_error(conn, EINVAL);
-	domain->path = talloc_strdup(domain, vec[3]);
-	domain->page = xc_map_foreign_range(*xc_handle, domain->domid,
-					    getpagesize(),
-					    PROT_READ|PROT_WRITE,
-					    atol(vec[1]));
-	if (!domain->page)
+	/* Hang domain off "in" until we're finished. */
+	domain = new_domain(in, atoi(vec[0]), atol(vec[1]), atol(vec[2]),
+			    vec[3]);
+	if (!domain)
 		return send_error(conn, errno);
 
-	list_add(&domain->list, &domains);
-	talloc_set_destructor(domain, destroy_domain);
-
-	/* One in each half of page. */
-	domain->input = domain->page;
-	domain->output = domain->page + getpagesize()/2;
-
-	/* Tell kernel we're interested in this event. */
-	if (ioctl(eventchn_fd, EVENTCHN_BIND, domain->port) != 0)
-		return send_error(conn, errno);
-
-	domain->conn = new_connection(writechn, readchn);
-	domain->conn->domain = domain;
-
+	/* Now domain belongs to its connection. */
 	talloc_steal(domain->conn, domain);
 
 	return send_ack(conn, XS_INTRODUCE);
@@ -373,6 +387,11 @@ const char *get_implicit_path(const struct connection *conn)
 	if (!conn->domain)
 		return NULL;
 	return conn->domain->path;
+}
+
+/* Restore existing connections. */
+void restore_existing_connections(void)
+{
 }
 
 /* Returns the event channel handle. */
