@@ -59,8 +59,7 @@ struct xenbus_driver {
 	const struct xenbus_device_id *ids;
 	int  (*probe)    (struct xenbus_device * dev,
 			  const struct xenbus_device_id * id);
-        int  (*remove)   (struct xenbus_device * dev);
-
+	int  (*remove)   (struct xenbus_device * dev);
 	struct device_driver driver;
 };
 

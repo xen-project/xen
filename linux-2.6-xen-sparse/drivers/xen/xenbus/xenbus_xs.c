@@ -347,8 +347,7 @@ int xenbus_printf(const char *dir, const char *node, const char *fmt, ...)
 	va_end(ap);
 
 	BUG_ON(ret > sizeof(buffer)-1);
-
-	return xenbus_write(dir, node, buffer, ret+1);
+	return xenbus_write(dir, node, buffer, O_CREAT);
 }
 
 /* Takes tuples of names, scanf-style args, and void **, NULL terminated. */

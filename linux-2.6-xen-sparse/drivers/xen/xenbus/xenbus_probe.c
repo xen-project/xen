@@ -1,6 +1,5 @@
 /******************************************************************************
  * Talks to Xen Store to figure out what devices we have.
- * Currently experiment code, but when I grow up I'll be a bus driver!
  *
  * Copyright (C) 2005 Rusty Russell, IBM Corporation
  * Copyright (C) 2005 Mike Wray, Hewlett-Packard
@@ -37,11 +36,6 @@
 #include <linux/fcntl.h>
 #include <stdarg.h>
 #include "xenbus_comms.h"
-
-/* Name of field containing device type. */
-#define XENBUS_DEVICE_TYPE "type"
-
-static int xs_init_done = 0;
 
 #define streq(a, b) (strcmp((a), (b)) == 0)
 
@@ -83,18 +77,13 @@ static int xenbus_dev_probe(struct device *_dev)
 	struct xenbus_driver *drv = to_xenbus_driver(_dev->driver);
 	const struct xenbus_device_id *id;
 
-	printk("Probing device '%s'\n", _dev->bus_id);
-	if (!drv->probe) {
-		printk("'%s' no probefn\n", _dev->bus_id);
+	if (!drv->probe)
 		return -ENODEV;
-	}
 
 	id = match_device(drv->ids, dev);
-	if (!id) {
-		printk("'%s' no id match\n", _dev->bus_id);
+	if (!id)
 		return -ENODEV;
-	}
-	printk("probing '%s' fn %p\n", _dev->bus_id, drv->probe);
+
 	return drv->probe(dev, id);
 }
 
@@ -125,94 +114,80 @@ void xenbus_unregister_driver(struct xenbus_driver *drv)
 }
 
 /* devices/<typename>/<name> */
-static int xenbus_probe_device(const char *typename, const char *name)
+static int xenbus_probe_device(const char *dirpath, const char *devicetype,
+			       const char *name)
 {
 	int err;
 	struct xenbus_device *xendev;
 	unsigned int stringlen;
 
-	pr_debug("> dir=%s name=%s\n", typename, name);
-
 	/* FIXME: This could be a rescan. Don't re-register existing devices. */
 
 	/* Nodename: /device/<typename>/<name>/ */
-	stringlen = strlen("device") + strlen(typename) + strlen(name) + 3;
+	stringlen = strlen(dirpath) + strlen(devicetype) + strlen(name) + 3;
 	/* Typename */
-	stringlen += strlen(typename) + 1;
-
+	stringlen += strlen(devicetype) + 1;
 	xendev = kmalloc(sizeof(*xendev) + stringlen, GFP_KERNEL);
 	if (!xendev)
 		return -ENOMEM;
-
 	memset(xendev, 0, sizeof(*xendev));
+
 	/* Copy the strings into the extra space. */
 	xendev->nodename = (char *)(xendev + 1);
-	sprintf(xendev->nodename, "%s/%s/%s", "device", typename, name);
+	sprintf(xendev->nodename, "%s/%s/%s", dirpath, devicetype, name);
 	xendev->devicetype = xendev->nodename + strlen(xendev->nodename) + 1;
-	strcpy(xendev->devicetype, typename);
+	strcpy(xendev->devicetype, devicetype);
 
 	/* FIXME: look for "subtype" field. */
-	snprintf(xendev->dev.bus_id, BUS_ID_SIZE, "%s-%s", typename, name);
+	snprintf(xendev->dev.bus_id, BUS_ID_SIZE, "%s-%s", devicetype, name);
 	xendev->dev.bus = &xenbus_type;
 
 	/* Register with generic device framework. */
-	printk("XENBUS: Registering device %s\n", xendev->dev.bus_id);
 	err = device_register(&xendev->dev);
 	if (err) {
 		printk("XENBUS: Registering device %s: error %i\n",
 		       xendev->dev.bus_id, err);
 		kfree(xendev);
 	}
-
-	pr_debug("< err=%i\n", err);
 	return err;
 }
 
-/* /device/<typename> */
-static int xenbus_probe_device_type(const char *typename)
+static int xenbus_probe_device_type(const char *dirpath, const char *typename)
 {
 	int err = 0;
 	char **dir;
 	unsigned int dir_n = 0;
 	int i;
 
-	dir = xenbus_directory("device", typename, &dir_n);
-	printk("dir %s has %u entries\n", typename, dir_n);
-	if (IS_ERR(dir)) {
-		printk("dir %s returned %li\n", typename, PTR_ERR(dir));
+	dir = xenbus_directory(dirpath, typename, &dir_n);
+	if (IS_ERR(dir))
 		return PTR_ERR(dir);
-	}
 
 	for (i = 0; i < dir_n; i++) {
-		printk("Probing %s/%s\n", dir[i], typename);
-		err = xenbus_probe_device(dir[i], typename);
+		err = xenbus_probe_device(dirpath, typename, dir[i]);
 		if (err)
 			break;
 	}
 	kfree(dir);
-	pr_debug("< err=%i\n", err);
 	return err;
 }
 
-static int xenbus_probe_devices(void)
+static int xenbus_probe_devices(const char *path)
 {
 	int err = 0;
 	char **dir;
 	unsigned int i, dir_n;
 
 	down(&xenbus_lock);
-	dir = xenbus_directory("device", "", &dir_n);
+	dir = xenbus_directory(path, "", &dir_n);
 	if (IS_ERR(dir)) {
 		err = PTR_ERR(dir);
 		goto unlock;
 	}
 	for (i = 0; i < dir_n; i++) {
-		err = xenbus_probe_device_type(dir[i]);
-		if (err) {
-			printk("xenbus: error %i probing device %s\n",
-			       -err, dir[i]);
+		err = xenbus_probe_device_type(path, dir[i]);
+		if (err)
 			break;
-		}
 	}
 	kfree(dir);
 unlock:
@@ -225,25 +200,18 @@ int do_xenbus_probe(void *unused)
 {
 	int err = 0;
 
-	printk("%s> xs_init_done=%d\n", __FUNCTION__, xs_init_done);
-	if (xs_init_done)
-		goto exit;
 	/* Initialize xenstore comms unless already done. */
 	printk("store_evtchn = %i\n", xen_start_info.store_evtchn);
 	err = xs_init();
 	if (err) {
 		printk("XENBUS: Error initializing xenstore comms:"
 		       " %i\n", err);
-		goto exit;
+		return err;
 	}
-	xs_init_done = 1;
 
 	/* Enumerate devices in xenstore. */
-	xenbus_probe_devices();
-
-exit:
-	printk("%s< err=%d\n", __FUNCTION__, err);
-	return err;
+	xenbus_probe_devices("device");
+	return 0;
 }
 
 static int __init xenbus_probe_init(void)
