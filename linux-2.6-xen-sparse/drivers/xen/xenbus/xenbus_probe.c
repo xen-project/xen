@@ -262,7 +262,9 @@ int do_xenbus_probe(void *unused)
 	/* Enumerate devices in xenstore. */
 	xenbus_probe_devices("device");
 
+	down(&xenbus_lock);
 	register_xenbus_watch(&dev_watch);
+	up(&xenbus_lock);
 	return 0;
 }
 
