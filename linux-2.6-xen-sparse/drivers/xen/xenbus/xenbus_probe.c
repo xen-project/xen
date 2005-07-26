@@ -131,7 +131,7 @@ static int cmp_dev(struct device *dev, void *data)
 	return 0;
 }
 
-/* FIXME: device_find seems to be broken. --RR */
+/* FIXME: device_find is fixed in 2.6.13-rc2 according to Greg KH --RR */
 struct xenbus_device *xenbus_device_find(const char *busid)
 {
 	struct xb_find_info info = { .dev = NULL, .busid = busid };
