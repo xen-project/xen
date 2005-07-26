@@ -150,6 +150,16 @@ struct xenbus_device *xenbus_device_find(const char *busid)
 	return info.dev;
 }
 
+
+static void xenbus_release_device(struct device *dev)
+{
+	if (dev) {
+		struct xenbus_device *xendev = to_xenbus_device(dev);
+
+		kfree(xendev->subtype);
+		kfree(xendev);
+	}
+}
 /* devices/<typename>/<name> */
 static int xenbus_probe_device(const char *dirpath, const char *devicetype,
 			       const char *name)
@@ -176,6 +186,7 @@ static int xenbus_probe_device(const char *dirpath, const char *devicetype,
 	/* FIXME: look for "subtype" field. */
 	snprintf(xendev->dev.bus_id, BUS_ID_SIZE, "%s-%s", devicetype, name);
 	xendev->dev.bus = &xenbus_type;
+	xendev->dev.release = xenbus_release_device;
 
 	/* Register with generic device framework. */
 	err = device_register(&xendev->dev);
