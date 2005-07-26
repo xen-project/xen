@@ -102,7 +102,7 @@ void queue_next_event(struct connection *conn)
 	if (conn->waiting_reply) {
 		conn->out = conn->waiting_reply;
 		conn->waiting_reply = NULL;
-		conn->waiting_for_ack = false;
+		conn->waiting_for_ack = NULL;
 		return;
 	}
 
@@ -115,7 +115,7 @@ void queue_next_event(struct connection *conn)
 		return;
 
 	/* If we decide to cancel, we will reset this. */
-	conn->waiting_for_ack = true;
+	conn->waiting_for_ack = event->watches[0];
 
 	/* If we deleted /foo and they're watching /foo/bar, that's what we
 	 * tell them has changed. */
@@ -348,12 +348,17 @@ bool do_watch_ack(struct connection *conn, const char *token)
 	if (!conn->waiting_for_ack)
 		return send_error(conn, ENOENT);
 
-	event = get_first_event(conn);
-	if (!streq(event->watches[0]->token, token))
+	event = list_top(&conn->waiting_for_ack->events,
+			 struct watch_event, list);
+	assert(event->watches[0] == conn->waiting_for_ack);
+	if (!streq(conn->waiting_for_ack->token, token)) {
+		/* They're confused: this will cause us to send event again */
+		conn->waiting_for_ack = NULL;
 		return send_error(conn, EINVAL);
+	}
 
 	move_event_onwards(event);
-	conn->waiting_for_ack = false;
+	conn->waiting_for_ack = NULL;
 	return send_ack(conn, XS_WATCH_ACK);
 }
 

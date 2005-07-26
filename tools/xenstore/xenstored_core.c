@@ -1166,7 +1166,7 @@ static void consider_message(struct connection *conn)
 	/* We might get a command while waiting for an ack: this means
 	 * the other end discarded it: we will re-transmit. */
 	if (type != XS_WATCH_ACK)
-		conn->waiting_for_ack = false;
+		conn->waiting_for_ack = NULL;
 
 	/* Careful: process_message may free connection.  We detach
 	 * "in" beforehand and allocate the new buffer to avoid

@@ -64,7 +64,7 @@ struct connection
 	bool can_write;
 
 	/* Are we waiting for a watch event ack? */
-	bool waiting_for_ack;
+	struct watch *waiting_for_ack;
 
 	/* Buffered incoming data. */
 	struct buffered_data *in;
