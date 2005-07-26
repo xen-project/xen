@@ -406,6 +406,35 @@ static void do_ackwatch(unsigned int handle, const char *token)
 		failed(handle);
 }
 
+static bool wait_for_input(unsigned int handle)
+{
+	unsigned int i;
+	for (i = 0; i < ARRAY_SIZE(handles); i++) {
+		int fd;
+
+		if (!handles[i] || i == handle)
+			continue;
+
+		fd = xs_fileno(handles[i]);
+		if (fd == -2) {
+			unsigned int avail;
+			get_input_chunk(in, in->buf, &avail);
+			if (avail != 0)
+				return true;
+		} else {
+			struct timeval tv = {.tv_sec = 0, .tv_usec = 0 };
+			fd_set set;
+
+			FD_ZERO(&set);
+			FD_SET(fd, &set);
+			if (select(fd+1, &set, NULL, NULL,&tv))
+				return true;
+		}
+	}
+	return false;
+}
+
+
 /* Async wait for watch on handle */
 static void do_command(unsigned int default_handle, char *line);
 static void do_async(unsigned int handle, char *line)
@@ -413,8 +442,14 @@ static void do_async(unsigned int handle, char *line)
 	int child;
 	unsigned int i;
 	children++;
-	if ((child = fork()) != 0)
+	if ((child = fork()) != 0) {
+		/* Wait until *something* happens, which indicates
+		 * child has created an event.  V. sloppy, but we can't
+		 * select on fake domain connections.
+		 */
+		while (!wait_for_input(handle));
 		return;
+	}
 
 	/* Don't keep other handles open in parent. */
 	for (i = 0; i < ARRAY_SIZE(handles); i++) {
@@ -632,7 +667,7 @@ static void do_command(unsigned int default_handle, char *line)
 	command = arg(line, 0);
 
 	if (timeout)
-		alarm(5);
+		alarm(1);
 
 	if (streq(command, "dir"))
 		do_dir(handle, arg(line, 1));
