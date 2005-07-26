@@ -121,8 +121,6 @@ static int xenbus_probe_device(const char *dirpath, const char *devicetype,
 	struct xenbus_device *xendev;
 	unsigned int stringlen;
 
-	/* FIXME: This could be a rescan. Don't re-register existing devices. */
-
 	/* Nodename: /device/<typename>/<name>/ */
 	stringlen = strlen(dirpath) + strlen(devicetype) + strlen(name) + 3;
 	/* Typename */
@@ -195,6 +193,58 @@ unlock:
 	return err;
 }
 
+/* FIXME: When all tools use transactions, we can ignore events on
+ * subpaths. */
+static void dev_changed(struct xenbus_watch *watch, const char *node)
+{
+	char busid[BUS_ID_SIZE];
+	unsigned int typelen, idlen;
+	int exists;
+	struct device *dev;
+	char *type;
+
+	/* Node is of form device/<type>/<identifier>[/...] */
+	type = strchr(node, '/');
+	if (!type)
+		return;
+	type++;
+
+	typelen = strcspn(type, "/");
+	if (!typelen)
+		return;
+	idlen = strcspn(type + typelen + 1, "/");
+	if (!idlen)
+		return;
+	if (typelen + strlen("-") + idlen + 1 > BUS_ID_SIZE) {
+		printk("Device for node %s is too big!\n", node);
+		return;
+	}
+
+	/* Create it with a / so we can see if it exists. */
+	sprintf(busid, "%.*s/%.*s", typelen, type, idlen, type + typelen + 1);
+	exists = xenbus_exists("device", busid);
+	busid[typelen] = '-';
+
+	dev = device_find(busid, &xenbus_type);
+	if (dev && !exists) {
+		printk("xenbus: Unregistering device %s\n", busid);
+		/* FIXME: free? */
+		device_unregister(dev);
+	}
+	if (!dev && exists) {
+		printk("xenbus: Adding device %s\n", busid);
+		busid[typelen] = '\0';
+		xenbus_probe_device("device", busid, busid+typelen+1);
+	}
+}
+
+/* We watch for devices appearing and vanishing. */
+static struct xenbus_watch dev_watch = {
+	/* FIXME: Ideally we'd only watch for changes 2 levels deep... */
+	.node = "device",
+	.callback = dev_changed,
+};
+
 /* called from a thread in privcmd/privcmd.c */
 int do_xenbus_probe(void *unused)
 {
@@ -211,6 +261,8 @@ int do_xenbus_probe(void *unused)
 
 	/* Enumerate devices in xenstore. */
 	xenbus_probe_devices("device");
+
+	register_xenbus_watch(&dev_watch);
 	return 0;
 }
 
