@@ -33,7 +33,10 @@ run_test()
     fi
 }
 
+MATCH=${1:-"*"}
 for f in testsuite/[0-9]*.sh; do
+    case `basename $f` in $MATCH) RUN=1;; esac
+    [ -n "$RUN" ] || continue
     if run_test $f; then
 	echo Test $f passed...
     else
