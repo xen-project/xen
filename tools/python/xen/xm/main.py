@@ -11,6 +11,13 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 
 from xen.xend import PrettyPrint
 from xen.xend import sxp
+# this is a nasty place to stick this in, but required because
+# log file access is set up via a 5 deep import chain.  This
+# ensures the user sees a useful message instead of a stack trace
+if os.getuid() != 0:
+    print "xm requires root access to execute, please try again as root"
+    sys.exit(1)
+
 from xen.xend.XendClient import XendError, server
 from xen.xend.XendClient import main as xend_client_main
 from xen.xm import create, destroy, migrate, shutdown, sysrq
