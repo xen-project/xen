@@ -231,7 +231,7 @@ int xenbus_exists(const char *dir, const char *node)
 	char **d;
 	int dir_n;
 
-	d = xenbus_directory(path, node, &dir_n);
+	d = xenbus_directory(dir, node, &dir_n);
 	if (IS_ERR(d))
 		return 0;
 	kfree(d);
