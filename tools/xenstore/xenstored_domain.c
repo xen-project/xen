@@ -239,7 +239,8 @@ void handle_event(int event_fd)
 	 * careful that handle_input/handle_output can destroy conn.
 	 */
 	while ((domain = find_domain(port)) != NULL) {
-		if (!domain->conn->blocked && buffer_has_input(domain->input))
+		if (domain->conn->state == OK
+		    && buffer_has_input(domain->input))
 			handle_input(domain->conn);
 		else if (domain->conn->out
 			 && buffer_has_output_room(domain->output))
@@ -287,33 +288,42 @@ static struct domain *new_domain(void *context, domid_t domid,
 }
 
 /* domid, mfn, evtchn, path */
-bool do_introduce(struct connection *conn, struct buffered_data *in)
+void do_introduce(struct connection *conn, struct buffered_data *in)
 {
 	struct domain *domain;
 	char *vec[4];
 
-	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
-		return send_error(conn, EINVAL);
+	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
+		send_error(conn, EINVAL);
+		return;
+	}
 
-	if (conn->id != 0)
-		return send_error(conn, EACCES);
+	if (conn->id != 0) {
+		send_error(conn, EACCES);
+		return;
+	}
 
-	if (!conn->can_write)
-		return send_error(conn, EROFS);
+	if (!conn->can_write) {
+		send_error(conn, EROFS);
+		return;
+	}
 
 	/* Sanity check args. */
-	if ((atoi(vec[2]) <= 0) || !is_valid_nodename(vec[3]))
-		return send_error(conn, EINVAL);
+	if ((atoi(vec[2]) <= 0) || !is_valid_nodename(vec[3])) {
+		send_error(conn, EINVAL);
+		return;
+	}
 	/* Hang domain off "in" until we're finished. */
 	domain = new_domain(in, atoi(vec[0]), atol(vec[1]), atol(vec[2]),
 			    vec[3]);
-	if (!domain)
-		return send_error(conn, errno);
+	if (!domain) {
+		send_error(conn, errno);
+		return;
+	}
 
 	/* Now domain belongs to its connection. */
 	talloc_steal(domain->conn, domain);
-
-	return send_ack(conn, XS_INTRODUCE);
+	send_ack(conn, XS_INTRODUCE);
 }
 
 static struct domain *find_domain_by_domid(domid_t domid)
@@ -328,39 +338,51 @@ static struct domain *find_domain_by_domid(domid_t domid)
 }
 
 /* domid */
-bool do_release(struct connection *conn, const char *domid_str)
+void do_release(struct connection *conn, const char *domid_str)
 {
 	struct domain *domain;
 	domid_t domid;
 
-	if (!domid_str)
-		return send_error(conn, EINVAL);
+	if (!domid_str) {
+		send_error(conn, EINVAL);
+		return;
+	}
 
 	domid = atoi(domid_str);
-	if (!domid)
-		return send_error(conn, EINVAL);
+	if (!domid) {
+		send_error(conn, EINVAL);
+		return;
+	}
 
-	if (conn->id != 0)
-		return send_error(conn, EACCES);
+	if (conn->id != 0) {
+		send_error(conn, EACCES);
+		return;
+	}
 
 	domain = find_domain_by_domid(domid);
-	if (!domain)
-		return send_error(conn, ENOENT);
+	if (!domain) {
+		send_error(conn, ENOENT);
+		return;
+	}
 
-	if (!domain->conn)
-		return send_error(conn, EINVAL);
+	if (!domain->conn) {
+		send_error(conn, EINVAL);
+		return;
+	}
 
 	talloc_free(domain->conn);
-	return send_ack(conn, XS_RELEASE);
+	send_ack(conn, XS_RELEASE);
 }
 
-bool do_get_domain_path(struct connection *conn, const char *domid_str)
+void do_get_domain_path(struct connection *conn, const char *domid_str)
 {
 	struct domain *domain;
 	domid_t domid;
 
-	if (!domid_str)
-		return send_error(conn, EINVAL);
+	if (!domid_str) {
+		send_error(conn, EINVAL);
+		return;
+	}
 
 	domid = atoi(domid_str);
 	if (domid == DOMID_SELF)
@@ -368,11 +390,11 @@ bool do_get_domain_path(struct connection *conn, const char *domid_str)
 	else
 		domain = find_domain_by_domid(domid);
 
-	if (!domain)
-		return send_error(conn, ENOENT);
-
-	return send_reply(conn, XS_GETDOMAINPATH, domain->path,
-			  strlen(domain->path) + 1);
+	if (!domain) 
+		send_error(conn, ENOENT);
+	else
+		send_reply(conn, XS_GETDOMAINPATH, domain->path,
+			   strlen(domain->path) + 1);
 }
 
 static int close_xc_handle(void *_handle)

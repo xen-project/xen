@@ -310,19 +310,23 @@ void check_watch_ack_timeout(void)
 	}
 }
 
-bool do_watch(struct connection *conn, struct buffered_data *in)
+void do_watch(struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
 	char *vec[3];
 	bool relative;
 
-	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
-		return send_error(conn, EINVAL);
+	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec)) {
+		send_error(conn, EINVAL);
+		return;
+	}
 
 	relative = !strstarts(vec[0], "/");
 	vec[0] = canonicalize(conn, vec[0]);
-	if (!check_node_perms(conn, vec[0], XS_PERM_READ))
-		return send_error(conn, errno);
+	if (!check_node_perms(conn, vec[0], XS_PERM_READ)) {
+		send_error(conn, errno);
+		return;
+	}
 
 	watch = talloc(conn, struct watch);
 	watch->node = talloc_strdup(watch, vec[0]);
@@ -335,18 +339,22 @@ bool do_watch(struct connection *conn, struct buffered_data *in)
 	insert_watch(watch);
 	talloc_set_destructor(watch, destroy_watch);
 	trace_create(watch, "watch");
-	return send_ack(conn, XS_WATCH);
+	send_ack(conn, XS_WATCH);
 }
 
-bool do_watch_ack(struct connection *conn, const char *token)
+void do_watch_ack(struct connection *conn, const char *token)
 {
 	struct watch_event *event;
 
-	if (!token)
-		return send_error(conn, EINVAL);
+	if (!token) {
+		send_error(conn, EINVAL);
+		return;
+	}
 
-	if (!conn->waiting_for_ack)
-		return send_error(conn, ENOENT);
+	if (!conn->waiting_for_ack) {
+		send_error(conn, ENOENT);
+		return;
+	}
 
 	event = list_top(&conn->waiting_for_ack->events,
 			 struct watch_event, list);
@@ -354,21 +362,24 @@ bool do_watch_ack(struct connection *conn, const char *token)
 	if (!streq(conn->waiting_for_ack->token, token)) {
 		/* They're confused: this will cause us to send event again */
 		conn->waiting_for_ack = NULL;
-		return send_error(conn, EINVAL);
+		send_error(conn, EINVAL);
+		return;
 	}
 
 	move_event_onwards(event);
 	conn->waiting_for_ack = NULL;
-	return send_ack(conn, XS_WATCH_ACK);
+	send_ack(conn, XS_WATCH_ACK);
 }
 
-bool do_unwatch(struct connection *conn, struct buffered_data *in)
+void do_unwatch(struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
 	char *node, *vec[2];
 
-	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec))
-		return send_error(conn, EINVAL);
+	if (get_strings(in, vec, ARRAY_SIZE(vec)) != ARRAY_SIZE(vec)) {
+		send_error(conn, EINVAL);
+		return;
+	}
 
 	/* We don't need to worry if we're waiting for an ack for the
 	 * watch we're deleting: conn->waiting_for_ack was reset by
@@ -380,10 +391,11 @@ bool do_unwatch(struct connection *conn, struct buffered_data *in)
 
 		if (streq(watch->node, node) && streq(watch->token, vec[1])) {
 			talloc_free(watch);
-			return send_ack(conn, XS_UNWATCH);
+			send_ack(conn, XS_UNWATCH);
+			return;
 		}
 	}
-	return send_error(conn, ENOENT);
+	send_error(conn, ENOENT);
 }
 
 #ifdef TESTING

@@ -22,9 +22,9 @@
 
 #include "xenstored_core.h"
 
-bool do_watch(struct connection *conn, struct buffered_data *in);
-bool do_watch_ack(struct connection *conn, const char *token);
-bool do_unwatch(struct connection *conn, struct buffered_data *in);
+void do_watch(struct connection *conn, struct buffered_data *in);
+void do_watch_ack(struct connection *conn, const char *token);
+void do_unwatch(struct connection *conn, struct buffered_data *in);
 
 /* Is this a watch event message for this connection? */
 bool is_watch_event(struct connection *conn, struct buffered_data *out);

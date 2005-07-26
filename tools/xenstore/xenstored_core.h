@@ -47,6 +47,14 @@ struct connection;
 typedef int connwritefn_t(struct connection *, const void *, unsigned int);
 typedef int connreadfn_t(struct connection *, void *, unsigned int);
 
+enum state
+{
+	/* Blocked by transaction. */
+	BLOCKED,
+	/* Completed */
+	OK,
+};
+
 struct connection
 {
 	struct list_head list;
@@ -57,8 +65,11 @@ struct connection
 	/* Who am I?  0 for socket connections. */
 	domid_t id;
 
-	/* Are we blocked waiting for a transaction to end?  Contains node. */
-	char *blocked;
+	/* Blocked on transaction? */
+	enum state state;
+
+	/* Node we are waiting for (if state == BLOCKED) */
+	char *blocked_by;
 
 	/* Is this a read-only connection? */
 	bool can_write;
@@ -100,14 +111,14 @@ bool is_child(const char *child, const char *parent);
 /* Create a new buffer with lifetime of context. */
 struct buffered_data *new_buffer(void *ctx);
 
-bool send_reply(struct connection *conn, enum xsd_sockmsg_type type,
-                const void *data, unsigned int len);
+void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
+		const void *data, unsigned int len);
 
 /* Some routines (write, mkdir, etc) just need a non-error return */
-bool send_ack(struct connection *conn, enum xsd_sockmsg_type type);
+void send_ack(struct connection *conn, enum xsd_sockmsg_type type);
 
 /* Send an error: error is usually "errno". */
-bool send_error(struct connection *conn, int error);
+void send_error(struct connection *conn, int error);
 
 /* Canonicalize this path if possible. */
 char *canonicalize(struct connection *conn, const char *node);
