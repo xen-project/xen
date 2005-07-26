@@ -45,37 +45,37 @@ echo write /test/entry1 create contents | ./xs_test
 sleep 1
 rm /test/entry1
 commit
-dir /test' | ./xs_test`" = "" ]
+dir /test' | ./xs_test --no-timeout`" = "" ]
 
 # ... as long as noone is waiting.
 [ "`echo -e '1 start /test
 2 mkdir /test/dir
 1 mkdir /test/dir
 1 dir /test
-1 commit' | ./xs_test 2>&1`" = "1:dir
+1 commit' | ./xs_test --no-timeout 2>&1`" = "1:dir
 FATAL: 1: commit: Connection timed out" ]
 
 # Events inside transactions don't trigger watches until (successful) commit.
-[ "`echo -e '1 watch /test token 100
+[ "`echo -e '1 watch /test token
 2 start /test
 2 mkdir /test/dir/sub
 1 waitwatch' | ./xs_test 2>&1`" = "1:waitwatch timeout" ]
-[ "`echo -e '1 watch /test token 100
+[ "`echo -e '1 watch /test token
 2 start /test
 2 mkdir /test/dir/sub
 2 abort
 1 waitwatch' | ./xs_test 2>&1`" = "1:waitwatch timeout" ]
-[ "`echo -e '1 watch /test token 100
+[ "`echo -e '1 watch /test token
 2 start /test
 2 mkdir /test/dir/sub
-2 commit
+2 async commit
 1 waitwatch
 1 ackwatch token' | ./xs_test 2>&1`" = "1:/test/dir/sub:token" ]
 
 # Rm inside transaction works like rm outside: children get notified.
-[ "`echo -e '1 watch /test/dir/sub token 100
+[ "`echo -e '1 watch /test/dir/sub token
 2 start /test
 2 rm /test/dir
-2 commit
+2 async commit
 1 waitwatch
 1 ackwatch token' | ./xs_test 2>&1`" = "1:/test/dir/sub:token" ]

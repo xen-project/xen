@@ -51,6 +51,8 @@ enum state
 {
 	/* Blocked by transaction. */
 	BLOCKED,
+	/* Waiting for watchers to ack event we caused */
+	WATCHED,
 	/* Completed */
 	OK,
 };
@@ -70,6 +72,12 @@ struct connection
 
 	/* Node we are waiting for (if state == BLOCKED) */
 	char *blocked_by;
+
+	/* Are we waiting for watches to be acked from an event we caused? */
+	unsigned int watches_unacked;
+
+	/* Type of ack to send once watches fired. */
+	enum xsd_sockmsg_type watch_ack;
 
 	/* Is this a read-only connection? */
 	bool can_write;
@@ -92,10 +100,14 @@ struct connection
 	/* The domain I'm associated with, if any. */
 	struct domain *domain;
 
+	/* My watches. */
+	struct list_head watches;
+
 	/* Methods for communicating over this connection: write can be NULL */
 	connwritefn_t *write;
 	connreadfn_t *read;
 };
+extern struct list_head connections;
 
 /* Return length of string (including nul) at this offset. */
 unsigned int get_string(const struct buffered_data *data,

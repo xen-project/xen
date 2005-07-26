@@ -82,11 +82,9 @@ bool xs_set_permissions(struct xs_handle *h, const char *path,
 /* Watch a node for changes (poll on fd to detect, or call read_watch()).
  * When the node (or any child) changes, fd will become readable.
  * Token is returned when watch is read, to allow matching.
- * Priority indicates order if multiple watchers: higher is first.
  * Returns false on failure.
  */
-bool xs_watch(struct xs_handle *h, const char *path, const char *token,
-	      unsigned int priority);
+bool xs_watch(struct xs_handle *h, const char *path, const char *token);
 
 /* Return the FD to poll on to see if a watch has fired. */
 int xs_fileno(struct xs_handle *h);

@@ -15,8 +15,9 @@ echo mkdir /test/3 | ./xs_test
 [ "`echo '1 watch /test/1 token1 0
 1 watch /test/2 token2 0
 1 watch /test/3 token3 0
-2 write /test/2 create contents2
+2 async write /test/2 create contents2
 1 waitwatch
-2 write /test/1 create contents1
-2 write /test/3 create contents3
-1 ackwatch token2' | ./xs_test 2>&1`" = "1:/test/2:token2" ]
+3 async write /test/1 create contents1
+4 async write /test/3 create contents3
+1 ackwatch token2
+1 close' | ./xs_test 2>&1`" = "1:/test/2:token2" ]

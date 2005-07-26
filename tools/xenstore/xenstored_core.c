@@ -51,7 +51,7 @@
 #include "xenstored_domain.h"
 
 static bool verbose;
-static LIST_HEAD(connections);
+LIST_HEAD(connections);
 static int tracefd = -1;
 
 #ifdef TESTING
@@ -959,8 +959,11 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	}
 
 	add_change_node(conn->transaction, node, false);
+	if (fire_watches(conn, node, false)) {
+		conn->watch_ack = XS_WRITE;
+		return;
+	}
 	send_ack(conn, XS_WRITE);
-	fire_watches(conn->transaction, node, false);
 }
 
 static void do_mkdir(struct connection *conn, const char *node)
@@ -985,8 +988,11 @@ static void do_mkdir(struct connection *conn, const char *node)
 	}
 
 	add_change_node(conn->transaction, node, false);
+	if (fire_watches(conn, node, false)) {
+		conn->watch_ack = XS_MKDIR;
+		return;
+	}
 	send_ack(conn, XS_MKDIR);
-	fire_watches(conn->transaction, node, false);
 }
 
 static void do_rm(struct connection *conn, const char *node)
@@ -1023,8 +1029,11 @@ static void do_rm(struct connection *conn, const char *node)
 	}
 
 	add_change_node(conn->transaction, node, true);
+	if (fire_watches(conn, node, true)) {
+		conn->watch_ack = XS_RM;
+		return;
+	}
 	send_ack(conn, XS_RM);
-	fire_watches(conn->transaction, node, true);
 }
 
 static void do_get_perms(struct connection *conn, const char *node)
@@ -1095,8 +1104,11 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 	}
 
 	add_change_node(conn->transaction, node, false);
+	if (fire_watches(conn, node, false)) {
+		conn->watch_ack = XS_SET_PERMS;
+		return;
+	}
 	send_ack(conn, XS_SET_PERMS);
-	fire_watches(conn->transaction, node, false);
 }
 
 /* Process "in" for conn: "in" will vanish after this conversation, so
@@ -1321,14 +1333,23 @@ static void unblock_connections(void)
 	struct connection *i, *tmp;
 
 	list_for_each_entry_safe(i, tmp, &connections, list) {
-		if (i->state == OK)
-			continue;
-
-		if (!transaction_covering_node(i->blocked_by)) {
-			talloc_free(i->blocked_by);
-			i->blocked_by = NULL;
-			i->state = OK;
-			consider_message(i);
+		switch (i->state) {
+		case BLOCKED:
+			if (!transaction_covering_node(i->blocked_by)) {
+				talloc_free(i->blocked_by);
+				i->blocked_by = NULL;
+				i->state = OK;
+				consider_message(i);
+			}
+			break;
+		case WATCHED:
+			if (i->watches_unacked == 0) {
+				i->state = OK;
+				send_ack(i, i->watch_ack);
+			}
+			break;
+		case OK:
+			break;
 		}
 	}
 
@@ -1351,6 +1372,8 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 
 	new->state = OK;
 	new->blocked_by = NULL;
+	new->watch_ack = XS_ERROR;
+	new->watches_unacked = 0;
 	new->out = new->waiting_reply = NULL;
 	new->fd = -1;
 	new->id = 0;
@@ -1359,6 +1382,7 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	new->write = write;
 	new->read = read;
 	new->can_write = true;
+	INIT_LIST_HEAD(&new->watches);
 
 	talloc_set_fail_handler(out_of_mem, &talloc_fail);
 	if (setjmp(talloc_fail)) {
@@ -1430,13 +1454,12 @@ void dump_connection(void)
 		printf("    state = %s\n",
 		       i->state == OK ? "OK"
 		       : i->state == BLOCKED ? "BLOCKED"
+		       : i->state == WATCHED ? "WATCHED"
 		       : "INVALID");
 		if (i->id)
 			printf("    id = %i\n", i->id);
 		if (i->blocked_by)
 			printf("    blocked on = %s\n", i->blocked_by);
-		if (i->waiting_for_ack)
-			printf("    waiting_for_ack TRUE\n");
 		if (!i->in->inhdr || i->in->used)
 			printf("    got %i bytes of %s\n",
 			       i->in->used, i->in->inhdr ? "header" : "data");

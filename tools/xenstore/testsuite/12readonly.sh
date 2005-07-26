@@ -9,7 +9,7 @@ tool" ]
 
 [ "`echo 'read /test
 getperm /test
-watch /test token 0
+watch /test token
 unwatch /test token 
 start /
 commit
@@ -27,7 +27,7 @@ abort' | ./xs_test --readonly 2>&1`" = "contents
 
 # Check that watches work like normal.
 set -m
-[ "`echo 'watch / token 0
+[ "`echo 'watch / token
 waitwatch
 ackwatch token' | ./xs_test --readonly 2>&1`" = "/test:token" ] &
 
@@ -36,6 +36,3 @@ if wait; then :; else
     echo Readonly wait test failed: $?
     exit 1
 fi
-    
-    
-

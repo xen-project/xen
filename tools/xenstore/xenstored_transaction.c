@@ -288,7 +288,6 @@ void do_transaction_start(struct connection *conn, const char *node)
 static bool commit_transaction(struct transaction *trans)
 {
 	char *tmp, *dir;
-	struct changed_node *i;
 
 	/* Move: orig -> .old, repl -> orig.  Cleanup deletes .old. */
 	dir = node_dir_outside_transaction(trans->node);
@@ -301,15 +300,15 @@ static bool commit_transaction(struct transaction *trans)
 			trans->divert, dir);
 
 	trans->divert = tmp;
-
-	/* Fire off the watches for everything that changed. */
-	list_for_each_entry(i, &trans->changes, list)
-		fire_watches(NULL, i->node, i->recurse);
 	return true;
 }
 
 void do_transaction_end(struct connection *conn, const char *arg)
 {
+	struct changed_node *i;
+	struct transaction *trans;
+	bool fired = false;
+
 	if (!arg || (!streq(arg, "T") && !streq(arg, "F"))) {
 		send_error(conn, EINVAL);
 		return;
@@ -320,24 +319,30 @@ void do_transaction_end(struct connection *conn, const char *arg)
 		return;
 	}
 
+	/* Set to NULL so fire_watches sends events. */
+	trans = conn->transaction;
+	conn->transaction = NULL;
+	/* Attach transaction to arg for auto-cleanup */
+	talloc_steal(arg, trans);
+
 	if (streq(arg, "T")) {
-		if (conn->transaction->destined_to_fail) {
+		if (trans->destined_to_fail) {
 			send_error(conn, ETIMEDOUT);
-			goto failed;
+			return;
 		}
-		if (!commit_transaction(conn->transaction)) {
+		if (!commit_transaction(trans)) {
 			send_error(conn, errno);
-			goto failed;
+			return;
 		}
+
+		/* Fire off the watches for everything that changed. */
+		list_for_each_entry(i, &trans->changes, list)
+			fired |= fire_watches(conn, i->node, i->recurse);
 	}
 
-	talloc_free(conn->transaction);
-	conn->transaction = NULL;
-	send_ack(conn, XS_TRANSACTION_END);
-	return;
-
-failed:
-	talloc_free(conn->transaction);
-	conn->transaction = NULL;
+	if (fired)
+		conn->watch_ack = XS_TRANSACTION_END;
+	else
+		send_ack(conn, XS_TRANSACTION_END);
 }
 

@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -33,6 +34,10 @@
 #define XSTEST
 
 static struct xs_handle *handles[10] = { NULL };
+static unsigned int children;
+
+static bool timeout = true;
+static bool readonly = false;
 
 struct ringbuf_head
 {
@@ -173,7 +178,9 @@ static void __attribute__((noreturn)) usage(void)
 	     "  getperm <path>\n"
 	     "  setperm <path> <id> <flags> ...\n"
 	     "  shutdown\n"
-	     "  watch <path> <token> <prio>\n"
+	     "  watch <path> <token>\n"
+	     "  async <command>...\n"
+	     "  asyncwait\n"
 	     "  waitwatch\n"
 	     "  ackwatch <token>\n"
 	     "  unwatch <path> <token>\n"
@@ -186,22 +193,34 @@ static void __attribute__((noreturn)) usage(void)
 	     "  dump\n");
 }
 
+static int argpos(const char *line, unsigned int num)
+{
+	unsigned int i, len = 0, off = 0;
+
+	for (i = 0; i <= num; i++) {
+		off += len;
+		off += strspn(line + off, " \t\n");
+		len = strcspn(line + off, " \t\n");
+		if (!len)
+			return off;
+	}
+	return off;
+}
+
 static char *arg(char *line, unsigned int num)
 {
 	static char *args[10];
-	unsigned int i, len = 0;
+	unsigned int off, len;
 
-	for (i = 0; i <= num; i++) {
-		line += len;
-		line += strspn(line, " \t\n");
-		len = strcspn(line, " \t\n");
-		if (!len)
-			barf("Can't get arg %u", num);
-	}
+	off = argpos(line, num);
+	len = strcspn(line + off, " \t\n");
+
+	if (!len)
+		barf("Can't get arg %u", num);
 
 	free(args[num]);
 	args[num] = malloc(len + 1);
-	memcpy(args[num], line, len);
+	memcpy(args[num], line+off, len);
 	args[num][len] = '\0';
 	return args[num];
 }
@@ -360,10 +379,9 @@ static void do_shutdown(unsigned int handle)
 		failed(handle);
 }
 
-static void do_watch(unsigned int handle, const char *node, const char *token,
-		     const char *pri)
+static void do_watch(unsigned int handle, const char *node, const char *token)
 {
-	if (!xs_watch(handles[handle], node, token, atoi(pri)))
+	if (!xs_watch(handles[handle], node, token))
 		failed(handle);
 }
 
@@ -386,6 +404,47 @@ static void do_ackwatch(unsigned int handle, const char *token)
 {
 	if (!xs_acknowledge_watch(handles[handle], token))
 		failed(handle);
+}
+
+/* Async wait for watch on handle */
+static void do_command(unsigned int default_handle, char *line);
+static void do_async(unsigned int handle, char *line)
+{
+	int child;
+	unsigned int i;
+	children++;
+	if ((child = fork()) != 0)
+		return;
+
+	/* Don't keep other handles open in parent. */
+	for (i = 0; i < ARRAY_SIZE(handles); i++) {
+		if (handles[i] && i != handle) {
+			xs_daemon_close(handles[i]);
+			handles[i] = NULL;
+		}
+	}
+
+	do_command(handle, line + argpos(line, 1));
+	exit(0);
+}
+
+static void do_asyncwait(unsigned int handle)
+{
+	int status;
+
+	if (handle)
+		barf("handle has no meaning with asyncwait");
+
+	if (children == 0)
+		barf("No children to wait for!");
+
+	if (waitpid(0, &status, 0) > 0) {
+		if (!WIFEXITED(status))
+			barf("async died");
+		if (WEXITSTATUS(status))
+			exit(WEXITSTATUS(status));
+	}
+	children--;
 }
 
 static void do_unwatch(unsigned int handle, const char *node, const char *token)
@@ -533,23 +592,106 @@ static void dump(int handle)
 	free(subdirs);
 }
 
+static int handle;
+
+static void alarmed(int sig __attribute__((unused)))
+{
+	if (handle) {
+		char handlename[10];
+		sprintf(handlename, "%u:", handle);
+		write(STDOUT_FILENO, handlename, strlen(handlename));
+	}
+	write(STDOUT_FILENO, command, strlen(command));
+	write(STDOUT_FILENO, " timeout\n", strlen(" timeout\n"));
+	exit(1);
+}
+
+static void do_command(unsigned int default_handle, char *line)
+{
+	char *endp;
+
+	if (strspn(line, " \n") == strlen(line))
+		return;
+	if (strstarts(line, "#"))
+		return;
+
+	handle = strtoul(line, &endp, 10);
+	if (endp != line)
+		memmove(line, endp+1, strlen(endp));
+	else
+		handle = default_handle;
+
+	if (!handles[handle]) {
+		if (readonly)
+			handles[handle] = xs_daemon_open_readonly();
+		else
+			handles[handle] = xs_daemon_open();
+		if (!handles[handle])
+			barf_perror("Opening connection to daemon");
+	}
+	command = arg(line, 0);
+
+	if (timeout)
+		alarm(5);
+
+	if (streq(command, "dir"))
+		do_dir(handle, arg(line, 1));
+	else if (streq(command, "read"))
+		do_read(handle, arg(line, 1));
+	else if (streq(command, "write"))
+		do_write(handle,
+			 arg(line, 1), arg(line, 2), arg(line, 3));
+	else if (streq(command, "setid"))
+		do_setid(handle, arg(line, 1));
+	else if (streq(command, "mkdir"))
+		do_mkdir(handle, arg(line, 1));
+	else if (streq(command, "rm"))
+		do_rm(handle, arg(line, 1));
+	else if (streq(command, "getperm"))
+		do_getperm(handle, arg(line, 1));
+	else if (streq(command, "setperm"))
+		do_setperm(handle, arg(line, 1), line);
+	else if (streq(command, "shutdown"))
+		do_shutdown(handle);
+	else if (streq(command, "watch"))
+		do_watch(handle, arg(line, 1), arg(line, 2));
+	else if (streq(command, "waitwatch"))
+		do_waitwatch(handle);
+	else if (streq(command, "async"))
+		do_async(handle, line);
+	else if (streq(command, "asyncwait"))
+		do_asyncwait(handle);
+	else if (streq(command, "ackwatch"))
+		do_ackwatch(handle, arg(line, 1));
+	else if (streq(command, "unwatch"))
+		do_unwatch(handle, arg(line, 1), arg(line, 2));
+	else if (streq(command, "close")) {
+		xs_daemon_close(handles[handle]);
+		handles[handle] = NULL;
+	} else if (streq(command, "start"))
+		do_start(handle, arg(line, 1));
+	else if (streq(command, "commit"))
+		do_end(handle, false);
+	else if (streq(command, "abort"))
+		do_end(handle, true);
+	else if (streq(command, "introduce"))
+		do_introduce(handle, arg(line, 1), arg(line, 2),
+			     arg(line, 3), arg(line, 4));
+	else if (streq(command, "release"))
+		do_release(handle, arg(line, 1));
+	else if (streq(command, "dump"))
+		dump(handle);
+	else if (streq(command, "sleep"))
+		sleep(atoi(arg(line, 1)));
+	else
+		barf("Unknown command %s", command);
+	fflush(stdout);
+	alarm(0);
+}
+
 int main(int argc, char *argv[])
 {
 	char line[1024];
-	bool readonly = false, timeout = true;
-	int handle;
-
-	static void alarmed(int sig __attribute__((unused)))
-	{
-		if (handle) {
-			char handlename[10];
-			sprintf(handlename, "%u:", handle);
-			write(STDOUT_FILENO, handlename, strlen(handlename));
-		}
-		write(STDOUT_FILENO, command, strlen(command));
-		write(STDOUT_FILENO, " timeout\n", strlen(" timeout\n"));
-		exit(1);
-	}
 
 	if (argc > 1 && streq(argv[1], "--readonly")) {
 		readonly = true;
@@ -557,7 +699,7 @@ int main(int argc, char *argv[])
 		argv++;
 	}
 
-	if (argc > 1 && streq(argv[1], "--notimeout")) {
+	if (argc > 1 && streq(argv[1], "--no-timeout")) {
 		timeout = false;
 		argc--;
 		argv++;
@@ -570,81 +712,10 @@ int main(int argc, char *argv[])
 	ringbuf_datasize = getpagesize() / 2 - sizeof(struct ringbuf_head);
 
 	signal(SIGALRM, alarmed);
-	while (fgets(line, sizeof(line), stdin)) {
-		char *endp;
+	while (fgets(line, sizeof(line), stdin))
+		do_command(0, line);
 
-		if (strspn(line, " \n") == strlen(line))
-			continue;
-		if (strstarts(line, "#"))
-			continue;
-
-		handle = strtoul(line, &endp, 10);
-		if (endp != line)
-			memmove(line, endp+1, strlen(endp));
-		else
-			handle = 0;
-
-		if (!handles[handle]) {
-			if (readonly)
-				handles[handle] = xs_daemon_open_readonly();
-			else
-				handles[handle] = xs_daemon_open();
-			if (!handles[handle])
-				barf_perror("Opening connection to daemon");
-		}
-		command = arg(line, 0);
-
-		if (timeout)
-			alarm(5);
-		if (streq(command, "dir"))
-			do_dir(handle, arg(line, 1));
-		else if (streq(command, "read"))
-			do_read(handle, arg(line, 1));
-		else if (streq(command, "write"))
-			do_write(handle,
-				 arg(line, 1), arg(line, 2), arg(line, 3));
-		else if (streq(command, "setid"))
-			do_setid(handle, arg(line, 1));
-		else if (streq(command, "mkdir"))
-			do_mkdir(handle, arg(line, 1));
-		else if (streq(command, "rm"))
-			do_rm(handle, arg(line, 1));
-		else if (streq(command, "getperm"))
-			do_getperm(handle, arg(line, 1));
-		else if (streq(command, "setperm"))
-			do_setperm(handle, arg(line, 1), line);
-		else if (streq(command, "shutdown"))
-			do_shutdown(handle);
-		else if (streq(command, "watch"))
-			do_watch(handle, arg(line, 1), arg(line, 2), arg(line, 3));
-		else if (streq(command, "waitwatch"))
-			do_waitwatch(handle);
-		else if (streq(command, "ackwatch"))
-			do_ackwatch(handle, arg(line, 1));
-		else if (streq(command, "unwatch"))
-			do_unwatch(handle, arg(line, 1), arg(line, 2));
-		else if (streq(command, "close")) {
-			xs_daemon_close(handles[handle]);
-			handles[handle] = NULL;
-		} else if (streq(command, "start"))
-			do_start(handle, arg(line, 1));
-		else if (streq(command, "commit"))
-			do_end(handle, false);
-		else if (streq(command, "abort"))
-			do_end(handle, true);
-		else if (streq(command, "introduce"))
-			do_introduce(handle, arg(line, 1), arg(line, 2),
-				     arg(line, 3), arg(line, 4));
-		else if (streq(command, "release"))
-			do_release(handle, arg(line, 1));
-		else if (streq(command, "dump"))
-			dump(handle);
-		else if (streq(command, "sleep"))
-			sleep(atoi(arg(line, 1)));
-		else
-			barf("Unknown command %s", command);
-		fflush(stdout);
-		alarm(0);
-	}
+	while (children)
+		do_asyncwait(0);
 	return 0;
 }
