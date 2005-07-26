@@ -233,29 +233,25 @@ static unsigned int char_count(const char *str, char c)
 static void dev_changed(struct xenbus_watch *watch, const char *node)
 {
 	char busid[BUS_ID_SIZE];
-	unsigned int typelen, idlen;
 	int exists;
 	struct xenbus_device *dev;
-	char *type;
+	char *p;
 
 	/* Node is of form device/<type>/<identifier>[/...] */
-	if (char_count(node, '/') != 3)
+	if (char_count(node, '/') != 2)
 		return;
 
-	type = strchr(node, '/');
-	type++;
-	typelen = strcspn(type, "/");
-	idlen = strcspn(type + typelen + 1, "/");
-	if (typelen + strlen("-") + idlen + 1 > BUS_ID_SIZE) {
+	/* Created or deleted? */
+	exists = xenbus_exists(node, "");
+
+	p = strchr(node, '/') + 1;
+	if (strlen(p) + 1 > BUS_ID_SIZE) {
 		printk("Device for node %s is too big!\n", node);
 		return;
 	}
-
-	/* Does it exist? */
-	exists = xenbus_exists(node, "");
-
-	/* Create it with a / so we can see if it exists. */
-	sprintf(busid, "%.*s-%.*s", typelen, type, idlen, type + typelen + 1);
+	/* Bus ID is name with / changed to - */
+	strcpy(busid, p);
+	*strchr(busid, '/') = '-';
 
 	dev = xenbus_device_find(busid);
 	printk("xenbus: device %s %s\n", busid, dev ? "exists" : "new");
@@ -263,12 +259,14 @@ static void dev_changed(struct xenbus_watch *watch, const char *node)
 		printk("xenbus: Unregistering device %s\n", busid);
 		/* FIXME: free? */
 		device_unregister(&dev->dev);
-	}
-	if (!dev && exists) {
+	} else if (!dev && exists) {
 		printk("xenbus: Adding device %s\n", busid);
-		busid[typelen] = '\0';
-		xenbus_probe_device("device", busid, busid+typelen+1);
-	}
+		/* Hack bus id back into two strings. */
+		*strrchr(busid, '-') = '\0';
+		xenbus_probe_device("device", busid, busid+strlen(busid)+1);
+	} else
+		printk("xenbus: strange, %s already %s\n", busid,
+		       exists ? "exists" : "gone");
 	if (dev)
 		put_device(&dev->dev);
 }
