@@ -409,18 +409,14 @@ int xenbus_gather(const char *dir, ...)
 	return ret;
 }
 
-static int xs_watch(const char *path, const char *token, unsigned int priority)
+static int xs_watch(const char *path, const char *token)
 {
-	char prio[32];
-	struct kvec iov[3];
+	struct kvec iov[2];
 
-	sprintf(prio, "%u", priority);
 	iov[0].iov_base = (void *)path;
 	iov[0].iov_len = strlen(path) + 1;
 	iov[1].iov_base = (void *)token;
 	iov[1].iov_len = strlen(token) + 1;
-	iov[2].iov_base = prio;
-	iov[2].iov_len = strlen(prio) + 1;
 
 	return xs_error(xs_talkv(XS_WATCH, iov, ARRAY_SIZE(iov), NULL));
 }
@@ -479,7 +475,7 @@ int register_xenbus_watch(struct xenbus_watch *watch)
 	sprintf(token, "%lX", (long)watch);
 	BUG_ON(find_watch(token));
 
-	err = xs_watch(watch->node, token, watch->priority);
+	err = xs_watch(watch->node, token);
 	if (!err)
 		list_add(&watch->list, &watches);
 	return err;

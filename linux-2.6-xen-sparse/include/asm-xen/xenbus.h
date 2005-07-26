@@ -109,7 +109,6 @@ struct xenbus_watch
 {
 	struct list_head list;
 	char *node;
-	unsigned int priority;
 	void (*callback)(struct xenbus_watch *, const char *node);
 };
 
