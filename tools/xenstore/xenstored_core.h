@@ -170,5 +170,6 @@ void *read_all(int *fd, unsigned int *size);
 void trace_create(const void *data, const char *type);
 void trace_destroy(const void *data, const char *type);
 void trace_watch_timeout(const struct connection *conn, const char *node, const char *token);
+void trace(const char *fmt, ...);
 
 #endif /* _XENSTORED_CORE_H */

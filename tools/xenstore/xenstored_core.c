@@ -111,6 +111,8 @@ void __attribute__((noreturn)) corrupt(struct connection *conn,
 	str = talloc_vasprintf(NULL, fmt, arglist);
 	va_end(arglist);
 
+	trace("xenstored corruption: connection id %i: err %s: %s",
+		conn ? (int)conn->id : -1, strerror(saved_errno), str);
 	eprintf("xenstored corruption: connection id %i: err %s: %s",
 		conn ? (int)conn->id : -1, strerror(saved_errno), str);
 #ifdef TESTING
@@ -228,6 +230,21 @@ static void trace_blocked(const struct connection *conn,
 	write(tracefd, sockmsg_string(data->hdr.msg.type),
 	      strlen(sockmsg_string(data->hdr.msg.type)));
 	write(tracefd, ")\n", 2);
+}
+
+void trace(const char *fmt, ...)
+{
+	va_list arglist;
+	char *str;
+
+	if (tracefd < 0)
+		return;
+
+	va_start(arglist, fmt);
+	str = talloc_vasprintf(NULL, fmt, arglist);
+	va_end(arglist);
+	write(tracefd, str, strlen(str));
+	talloc_free(str);
 }
 
 static bool write_message(struct connection *conn)

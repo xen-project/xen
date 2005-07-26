@@ -79,3 +79,15 @@ FATAL: 1: commit: Connection timed out" ]
 2 async commit
 1 waitwatch
 1 ackwatch token' | ./xs_test 2>&1`" = "1:/test/dir/sub:token" ]
+
+# Multiple events from single transaction don't trigger assert
+[ "`echo -e '1 watch /test token
+2 start /test
+2 write /test/1 create contents
+2 write /test/2 create contents
+2 async commit
+1 waitwatch
+1 ackwatch token
+1 waitwatch
+1 ackwatch token' | ./xs_test 2>&1`" = "1:/test/1:token
+1:/test/2:token" ]

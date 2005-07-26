@@ -134,8 +134,6 @@ bool fire_watches(struct connection *conn, const char *node, bool recurse)
 	if (conn->transaction)
 		return false;
 
-	assert(conn->state == OK);
-
 	/* Create an event for each watch.  Don't send to self. */
 	list_for_each_entry(i, &connections, list) {
 		if (i == conn)
