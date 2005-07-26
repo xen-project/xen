@@ -47,10 +47,13 @@ match_device(const struct xenbus_device_id *arr, struct xenbus_device *dev)
 		if (!streq(arr->devicetype, dev->devicetype))
 			continue;
 
-		if (streq(arr->subtype, "") ||
-		    streq(arr->subtype, dev->subtype)) {
+		/* If they don't care what subtype, it's a match. */
+		if (streq(arr->subtype, ""))
 			return arr;
-		}
+
+		/* If they care, device must have (same) subtype. */
+		if (dev->subtype && streq(arr->subtype, dev->subtype))
+			return arr;
 	}
 	return NULL;
 }
@@ -99,18 +102,25 @@ static int xenbus_dev_remove(struct device *_dev)
 
 int xenbus_register_driver(struct xenbus_driver *drv)
 {
+	int err;
+
 	drv->driver.name = drv->name;
 	drv->driver.bus = &xenbus_type;
 	drv->driver.owner = drv->owner;
 	drv->driver.probe = xenbus_dev_probe;
 	drv->driver.remove = xenbus_dev_remove;
 
-	return driver_register(&drv->driver);
+	down(&xenbus_lock);
+	err = driver_register(&drv->driver);
+	up(&xenbus_lock);
+	return err;
 }
 
 void xenbus_unregister_driver(struct xenbus_driver *drv)
 {
+	down(&xenbus_lock);
 	driver_unregister(&drv->driver);
+	up(&xenbus_lock);
 }
 
 struct xb_find_info
@@ -203,20 +213,16 @@ static int xenbus_probe_devices(const char *path)
 	char **dir;
 	unsigned int i, dir_n;
 
-	down(&xenbus_lock);
 	dir = xenbus_directory(path, "", &dir_n);
-	if (IS_ERR(dir)) {
-		err = PTR_ERR(dir);
-		goto unlock;
-	}
+	if (IS_ERR(dir))
+		return PTR_ERR(dir);
+
 	for (i = 0; i < dir_n; i++) {
 		err = xenbus_probe_device_type(path, dir[i]);
 		if (err)
 			break;
 	}
 	kfree(dir);
-unlock:
-	up(&xenbus_lock);
 	return err;
 }
 
@@ -292,10 +298,10 @@ int do_xenbus_probe(void *unused)
 		return err;
 	}
 
+	down(&xenbus_lock);
 	/* Enumerate devices in xenstore. */
 	xenbus_probe_devices("device");
-
-	down(&xenbus_lock);
+	/* Watch for changes. */
 	register_xenbus_watch(&dev_watch);
 	up(&xenbus_lock);
 	return 0;
