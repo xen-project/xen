@@ -113,6 +113,33 @@ void xenbus_unregister_driver(struct xenbus_driver *drv)
 	driver_unregister(&drv->driver);
 }
 
+struct xb_find_info
+{
+	struct xenbus_device *dev;
+	const char *busid;
+};
+
+static int cmp_dev(struct device *dev, void *data)
+{
+	struct xb_find_info *info = data;
+
+	if (streq(dev->bus_id, info->busid)) {
+		info->dev = container_of(get_device(dev),
+					 struct xenbus_device, dev);
+		return 1;
+	}
+	return 0;
+}
+
+/* FIXME: device_find seems to be broken. --RR */
+struct xenbus_device *xenbus_device_find(const char *busid)
+{
+	struct xb_find_info info = { .dev = NULL, .busid = busid };
+
+	bus_for_each_dev(&xenbus_type, NULL, &info, cmp_dev);
+	return info.dev;
+}
+
 /* devices/<typename>/<name> */
 static int xenbus_probe_device(const char *dirpath, const char *devicetype,
 			       const char *name)
@@ -200,7 +227,7 @@ static void dev_changed(struct xenbus_watch *watch, const char *node)
 	char busid[BUS_ID_SIZE];
 	unsigned int typelen, idlen;
 	int exists;
-	struct device *dev;
+	struct xenbus_device *dev;
 	char *type;
 
 	/* Node is of form device/<type>/<identifier>[/...] */
@@ -225,17 +252,19 @@ static void dev_changed(struct xenbus_watch *watch, const char *node)
 	exists = xenbus_exists("device", busid);
 	busid[typelen] = '-';
 
-	dev = device_find(busid, &xenbus_type);
+	dev = xenbus_device_find(busid);
 	if (dev && !exists) {
 		printk("xenbus: Unregistering device %s\n", busid);
 		/* FIXME: free? */
-		device_unregister(dev);
+		device_unregister(&dev->dev);
 	}
 	if (!dev && exists) {
 		printk("xenbus: Adding device %s\n", busid);
 		busid[typelen] = '\0';
 		xenbus_probe_device("device", busid, busid+typelen+1);
 	}
+	if (dev)
+		put_device(&dev->dev);
 }
 
 /* We watch for devices appearing and vanishing. */
