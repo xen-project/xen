@@ -33,9 +33,8 @@ bool is_watch_event(struct connection *conn, struct buffered_data *out);
 void queue_next_event(struct connection *conn);
 
 /* Fire all watches: recurse means all the children are effected (ie. rm).
- * Returns true if there were any, meaning connection has to wait.
  */
-bool fire_watches(struct connection *conn, const char *node, bool recurse);
+void fire_watches(struct connection *conn, const char *node, bool recurse);
 
 /* Find shortest timeout: if any, reduce tv (may already be set). */
 void shortest_watch_ack_timeout(struct timeval *tv);

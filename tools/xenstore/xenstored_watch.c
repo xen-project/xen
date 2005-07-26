@@ -41,9 +41,6 @@ struct watch_event
 	/* Data to send (node\0token\0). */
 	unsigned int len;
 	char *data;
-
-	/* Connection which caused watch event (which we are blocking) */
-	struct connection *cause;
 };
 
 struct watch
@@ -95,14 +92,10 @@ static int destroy_watch_event(void *_event)
 	struct watch_event *event = _event;
 
 	trace_destroy(event, "watch_event");
-	assert(event->cause->watches_unacked != 0);
-	/* If it hits zero, will unblock in unblock_connections. */
-	event->cause->watches_unacked--;
 	return 0;
 }
 
-static void add_event(struct connection *cause, struct watch *watch,
-		      const char *node)
+static void add_event(struct watch *watch, const char *node)
 {
 	struct watch_event *event;
 
@@ -117,22 +110,20 @@ static void add_event(struct connection *cause, struct watch *watch,
 	event->data = talloc_array(event, char, event->len);
 	strcpy(event->data, node);
 	strcpy(event->data + strlen(node) + 1, watch->token);
-	event->cause = cause;
-	cause->watches_unacked++;
 	talloc_set_destructor(event, destroy_watch_event);
 	list_add_tail(&event->list, &watch->events);
 	trace_create(event, "watch_event");
 }
 
 /* FIXME: we fail to fire on out of memory.  Should drop connections. */
-bool fire_watches(struct connection *conn, const char *node, bool recurse)
+void fire_watches(struct connection *conn, const char *node, bool recurse)
 {
 	struct connection *i;
 	struct watch *watch;
 
 	/* During transactions, don't fire watches. */
 	if (conn->transaction)
-		return false;
+		return;
 
 	/* Create an event for each watch.  Don't send to self. */
 	list_for_each_entry(i, &connections, list) {
@@ -141,18 +132,16 @@ bool fire_watches(struct connection *conn, const char *node, bool recurse)
 
 		list_for_each_entry(watch, &i->watches, list) {
 			if (is_child(node, watch->node))
-				add_event(conn, watch, node);
+				add_event(watch, node);
 			else if (recurse && is_child(watch->node, node))
-				add_event(conn, watch, watch->node);
+				add_event(watch, watch->node);
 			else
 				continue;
-			conn->state = WATCHED;
 			/* If connection not doing anything, queue this. */
 			if (!i->out)
 				queue_next_event(i);
 		}
 	}
-	return conn->state == WATCHED;
 }
 
 static int destroy_watch(void *_watch)

@@ -307,7 +307,6 @@ void do_transaction_end(struct connection *conn, const char *arg)
 {
 	struct changed_node *i;
 	struct transaction *trans;
-	bool fired = false;
 
 	if (!arg || (!streq(arg, "T") && !streq(arg, "F"))) {
 		send_error(conn, EINVAL);
@@ -337,12 +336,8 @@ void do_transaction_end(struct connection *conn, const char *arg)
 
 		/* Fire off the watches for everything that changed. */
 		list_for_each_entry(i, &trans->changes, list)
-			fired |= fire_watches(conn, i->node, i->recurse);
+			fire_watches(conn, i->node, i->recurse);
 	}
-
-	if (fired)
-		conn->watch_ack = XS_TRANSACTION_END;
-	else
-		send_ack(conn, XS_TRANSACTION_END);
+	send_ack(conn, XS_TRANSACTION_END);
 }
 

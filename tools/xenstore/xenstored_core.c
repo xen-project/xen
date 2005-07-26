@@ -976,10 +976,7 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	}
 
 	add_change_node(conn->transaction, node, false);
-	if (fire_watches(conn, node, false)) {
-		conn->watch_ack = XS_WRITE;
-		return;
-	}
+	fire_watches(conn, node, false);
 	send_ack(conn, XS_WRITE);
 }
 
@@ -1005,10 +1002,7 @@ static void do_mkdir(struct connection *conn, const char *node)
 	}
 
 	add_change_node(conn->transaction, node, false);
-	if (fire_watches(conn, node, false)) {
-		conn->watch_ack = XS_MKDIR;
-		return;
-	}
+	fire_watches(conn, node, false);
 	send_ack(conn, XS_MKDIR);
 }
 
@@ -1046,10 +1040,7 @@ static void do_rm(struct connection *conn, const char *node)
 	}
 
 	add_change_node(conn->transaction, node, true);
-	if (fire_watches(conn, node, true)) {
-		conn->watch_ack = XS_RM;
-		return;
-	}
+	fire_watches(conn, node, true);
 	send_ack(conn, XS_RM);
 }
 
@@ -1121,10 +1112,7 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 	}
 
 	add_change_node(conn->transaction, node, false);
-	if (fire_watches(conn, node, false)) {
-		conn->watch_ack = XS_SET_PERMS;
-		return;
-	}
+	fire_watches(conn, node, false);
 	send_ack(conn, XS_SET_PERMS);
 }
 
@@ -1359,12 +1347,6 @@ static void unblock_connections(void)
 				consider_message(i);
 			}
 			break;
-		case WATCHED:
-			if (i->watches_unacked == 0) {
-				i->state = OK;
-				send_ack(i, i->watch_ack);
-			}
-			break;
 		case OK:
 			break;
 		}
@@ -1389,8 +1371,6 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 
 	new->state = OK;
 	new->blocked_by = NULL;
-	new->watch_ack = XS_ERROR;
-	new->watches_unacked = 0;
 	new->out = new->waiting_reply = NULL;
 	new->fd = -1;
 	new->id = 0;
@@ -1471,7 +1451,6 @@ void dump_connection(void)
 		printf("    state = %s\n",
 		       i->state == OK ? "OK"
 		       : i->state == BLOCKED ? "BLOCKED"
-		       : i->state == WATCHED ? "WATCHED"
 		       : "INVALID");
 		if (i->id)
 			printf("    id = %i\n", i->id);
