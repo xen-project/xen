@@ -1,22 +1,23 @@
 #! /bin/sh
 
-# Root directory has nothing in it.
-[ "`echo -e 'dir /' | ./xs_test 2>&1`" = "" ]
+# Root directory has only tool dir in it.
+[ "`echo -e 'dir /' | ./xs_test 2>&1`" = "tool" ]
 
 # Create a file.
 [ "`echo -e 'write /test create contents' | ./xs_test 2>&1`" = "" ]
 
 # Directory shows it.
-[ "`echo -e 'dir /' | ./xs_test 2>&1`" = "test" ]
+[ "`echo -e 'dir /' | ./xs_test 2>&1 | sort`" = "test
+tool" ]
 
 # Make a new directory.
 [ "`echo -e 'mkdir /dir' | ./xs_test 2>&1`" = "" ]
 
 # Check it's there.
-DIR="`echo -e 'dir /' | ./xs_test 2>&1`"
-[ "$DIR" = "test
-dir" ] || [ "$DIR" = "dir
-test" ]
+DIR="`echo -e 'dir /' | ./xs_test 2>&1 | sort`"
+[ "$DIR" = "dir
+test
+tool" ]
 
 # Check it's empty.
 [ "`echo -e 'dir /dir' | ./xs_test 2>&1`" = "" ]

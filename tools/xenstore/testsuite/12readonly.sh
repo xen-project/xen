@@ -4,16 +4,17 @@
 [ "`echo 'write /test create contents' | ./xs_test 2>&1`" = "" ]
 
 # These are all valid.
-[ "`echo 'dir /
-read /test
+[ "`echo dir / | ./xs_test --readonly 2>&1 | sort`" = "test
+tool" ]
+
+[ "`echo 'read /test
 getperm /test
 watch /test token 0
 unwatch /test token 
 start /
 commit
 start /
-abort' | ./xs_test --readonly 2>&1`" = "test
-contents
+abort' | ./xs_test --readonly 2>&1`" = "contents
 0 READ" ]
 
 # These don't work
