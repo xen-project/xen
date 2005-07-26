@@ -253,7 +253,7 @@ static bool write_message(struct connection *conn)
 		out->used = 0;
 
 		/* Second write might block if non-zero. */
-		if (out->hdr.msg.len)
+		if (out->hdr.msg.len && !conn->domain)
 			return true;
 	}
 

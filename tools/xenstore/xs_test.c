@@ -85,6 +85,14 @@ static const void *get_input_chunk(const struct ringbuf_head *h,
 	return buf + h->read;
 }
 
+static int output_avail(struct ringbuf_head *out)
+{
+	unsigned int avail;
+
+	get_output_chunk(out, out->buf, &avail);
+	return avail != 0;
+}
+
 static void update_output_chunk(struct ringbuf_head *h, uint32_t len)
 {
 	h->write += len;
@@ -104,10 +112,12 @@ static bool read_all_shmem(int fd __attribute__((unused)),
 			   void *data, unsigned int len)
 {
 	unsigned int avail;
+	int was_full;
 
 	if (!check_buffer(in))
 		barf("Corrupt buffer");
 
+	was_full = !output_avail(in);
 	while (len) {
 		const void *src = get_input_chunk(in, in->buf, &avail);
 		if (avail > len)
@@ -119,7 +129,8 @@ static bool read_all_shmem(int fd __attribute__((unused)),
 	}
 
 	/* Tell other end we read something. */
-	kill(daemon_pid, SIGUSR2);
+	if (was_full)
+		kill(daemon_pid, SIGUSR2);
 	return true;
 }
 
