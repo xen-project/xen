@@ -220,8 +220,16 @@ unlock:
 	return err;
 }
 
-/* FIXME: When all tools use transactions, we can ignore events on
- * subpaths. */
+static unsigned int char_count(const char *str, char c)
+{
+	unsigned int i, ret = 0;
+
+	for (i = 0; str[i]; i++)
+		if (str[i] == c)
+			ret++;
+	return ret;
+}
+
 static void dev_changed(struct xenbus_watch *watch, const char *node)
 {
 	char busid[BUS_ID_SIZE];
@@ -231,28 +239,26 @@ static void dev_changed(struct xenbus_watch *watch, const char *node)
 	char *type;
 
 	/* Node is of form device/<type>/<identifier>[/...] */
-	type = strchr(node, '/');
-	if (!type)
+	if (char_count(node, '/') != 3)
 		return;
-	type++;
 
+	type = strchr(node, '/');
+	type++;
 	typelen = strcspn(type, "/");
-	if (!typelen)
-		return;
 	idlen = strcspn(type + typelen + 1, "/");
-	if (!idlen)
-		return;
 	if (typelen + strlen("-") + idlen + 1 > BUS_ID_SIZE) {
 		printk("Device for node %s is too big!\n", node);
 		return;
 	}
 
+	/* Does it exist? */
+	exists = xenbus_exists(node, "");
+
 	/* Create it with a / so we can see if it exists. */
-	sprintf(busid, "%.*s/%.*s", typelen, type, idlen, type + typelen + 1);
-	exists = xenbus_exists("device", busid);
-	busid[typelen] = '-';
+	sprintf(busid, "%.*s-%.*s", typelen, type, idlen, type + typelen + 1);
 
 	dev = xenbus_device_find(busid);
+	printk("xenbus: device %s %s\n", busid, dev ? "exists" : "new");
 	if (dev && !exists) {
 		printk("xenbus: Unregistering device %s\n", busid);
 		/* FIXME: free? */
