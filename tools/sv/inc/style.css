@@ -1,0 +1,32 @@
+
+P       {font-family: verdana, arial; font-size: 12px; color: black}
+.small  {font-size: 10px}
+
+TD.domainInfo     {font-family: verdana, arial; font-size: 10px; color: black}
+TD.domainInfoHead {font-family: verdana, arial; font-size: 10px; color: white; font-face: bold}
+
+TD.domainInfoHead {background-color: black}
+TR.domainInfoOdd  {background-color: white}
+TR.domainInfoEven {background-color: lightgrey}
+
+body { 
+	width: 670px;
+	margin: 0px;
+	padding: 0px;
+	background-color: #fff;
+	background-image: url(../images/orb_02.jpg);
+	background-repeat: repeat-y;
+	background-position: left top;
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: bold;
+	color: #333333;
+	letter-spacing: 0px;
+	scrollbar-base-color: #333333;
+	scrollbar-track-color: #666666;
+	scrollbar-face-color: #fff;
+	
+	
+	}
+        
+.button (cursor:hand)
+	

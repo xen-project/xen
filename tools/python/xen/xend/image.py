@@ -130,7 +130,13 @@ class ImageHandler:
         # xc.domain_setuuid(dom, uuid)
         xc.domain_setcpuweight(dom, cpu_weight)
         xc.domain_setmaxmem(dom, mem_kb)
-        xc.domain_memory_increase_reservation(dom, mem_kb)
+
+        try:
+            xc.domain_memory_increase_reservation(dom, mem_kb)
+        except:
+            xc.domain_destroy(dom)
+            raise
+
         if cpu != -1:
             xc.domain_pincpu(dom, 0, 1<<int(cpu))
         return dom
