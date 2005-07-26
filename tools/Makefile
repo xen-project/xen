@@ -13,7 +13,6 @@ SUBDIRS += xcutils
 SUBDIRS += pygrub
 SUBDIRS += firmware
 SUBDIRS += policy
-SUBDIRS += sv
 
 .PHONY: all install clean check check_clean ioemu eioemuinstall ioemuclean
 
