@@ -36,7 +36,6 @@ struct xenbus_device {
 	char *devicetype;
 	char *subtype;
 	char *nodename;
-	int id;
 	struct device dev;
 	void *data;
 };
@@ -58,21 +57,11 @@ struct xenbus_driver {
 	char *name;
 	struct module *owner;
 	const struct xenbus_device_id *ids;
-        /* Called when xenstore is connected. */
-        int  (*connect) (struct xenbus_driver * drv);
-
-	int  (*probe)    (struct xenbus_device * dev, const struct xenbus_device_id * id);
+	int  (*probe)    (struct xenbus_device * dev,
+			  const struct xenbus_device_id * id);
         int  (*remove)   (struct xenbus_device * dev);
-        int  (*configure)(struct xenbus_device * dev);
 
 	struct device_driver driver;
-};
-
-struct xenbus_evtchn {
-        unsigned long dom1;
-        unsigned long port1;
-        unsigned long dom2;
-        unsigned long port2;
 };
 
 static inline struct xenbus_driver *to_xenbus_driver(struct device_driver *drv)
@@ -83,36 +72,31 @@ static inline struct xenbus_driver *to_xenbus_driver(struct device_driver *drv)
 int xenbus_register_driver(struct xenbus_driver *drv);
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 
-int xenbus_register_backend(struct xenbus_driver *drv);
-void xenbus_unregister_backend(struct xenbus_driver *drv);
-
-/* Iterator over xenbus devices (frontend). */
-int xenbus_for_each_dev(struct xenbus_device * start, void * data,
-                        int (*fn)(struct xenbus_device *, void *));
-
-/* Iterator over xenbus drivers (frontend). */
-int xenbus_for_each_drv(struct xenbus_driver * start, void * data,
-                        int (*fn)(struct xenbus_driver *, void *));
-
-/* Iterator over xenbus drivers (backend). */
-int xenbus_for_each_backend(struct xenbus_driver * start, void * data,
-                            int (*fn)(struct xenbus_driver *, void *));
-
 /* Caller must hold this lock to call these functions: it's also held
  * across watch callbacks. */
-extern struct semaphore xs_lock;
+extern struct semaphore xenbus_lock;
 
-char **xs_directory(const char *path, unsigned int *num);
-void *xs_read(const char *path, unsigned int *len);
-int xs_write(const char *path,
-	     const void *data, unsigned int len, int createflags);
-int xs_mkdir(const char *path);
-int xs_exists(const char *path);
-int xs_mkdirs(const char *path);
-int xs_rm(const char *path);
-int xs_transaction_start(const char *subtree);
-int xs_transaction_end(int abort);
-char *xs_get_domain_path(domid_t domid);
+char **xenbus_directory(const char *dir, const char *node, unsigned int *num);
+void *xenbus_read(const char *dir, const char *node, unsigned int *len);
+int xenbus_write(const char *dir, const char *node,
+		 const char *string, int createflags);
+int xenbus_mkdir(const char *dir, const char *node);
+int xenbus_exists(const char *dir, const char *node);
+int xenbus_rm(const char *dir, const char *node);
+int xenbus_transaction_start(const char *subtree);
+int xenbus_transaction_end(int abort);
+
+/* Single read and scanf: returns -errno or num scanned if > 0. */
+int xenbus_scanf(const char *dir, const char *node, const char *fmt, ...)
+	__attribute__((format(scanf, 3, 4)));
+
+/* Single printf and write: returns -errno or 0. */
+int xenbus_printf(const char *dir, const char *node, const char *fmt, ...)
+	__attribute__((format(printf, 3, 4)));
+
+/* Generic read function: NULL-terminated triples of name,
+ * sprintf-style type string, and pointer. Returns 0 or errno.*/
+int xenbus_gather(const char *dir, ...);
 
 /* Register callback to watch this node. */
 struct xenbus_watch
@@ -125,21 +109,5 @@ struct xenbus_watch
 
 int register_xenbus_watch(struct xenbus_watch *watch);
 void unregister_xenbus_watch(struct xenbus_watch *watch);
-
-/* Generic read function: NULL-terminated triples of name,
- * sprintf-style type string, and pointer. */
-int xenbus_gather(const char *dir, ...);
-
-char *xenbus_path(const char *dir, const char *name);
-char *xenbus_read(const char *dir, const char *name, unsigned int *data_n);
-int xenbus_write(const char *dir, const char *name,
-                 const char *data, int data_n);
-
-int xenbus_read_string(const char *dir, const char *name, char **val);
-int xenbus_write_string(const char *dir, const char *name, const char *val);
-int xenbus_read_ulong(const char *dir, const char *name, unsigned long *val);
-int xenbus_write_ulong(const char *dir, const char *name, unsigned long val);
-int xenbus_read_long(const char *dir, const char *name, long *val);
-int xenbus_write_long(const char *dir, const char *name, long val);
 
 #endif /* _ASM_XEN_XENBUS_H */
