@@ -55,10 +55,6 @@ class XendDomain:
         eserver.subscribe('xend.virq', self.onVirq)
         self.initial_refresh()
 
-        dom0 = self.domain_lookup(0)
-        if not dom0:
-            dom0 = self.domain_unknown(0)
-
     def list(self):
         """Get list of domain objects.
 
@@ -116,6 +112,11 @@ class XendDomain:
             else:
                 self._delete_domain(domid)
         self.refresh(cleanup=True)
+
+        dom0 = self.domain_lookup(0)
+        if not dom0:
+            dom0 = self.domain_unknown(0)
+        dom0.dom0_init_store()    
 
     def close(self):
         pass
