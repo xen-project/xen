@@ -8,6 +8,12 @@ from xen.xend.xenstore import DBVar
 
 from xen.xend.server import channel
 
+"""Flag for a block device backend domain."""
+SIF_BLK_BE_DOMAIN = (1<<4)
+
+"""Flag for a net device backend domain."""
+SIF_NET_BE_DOMAIN = (1<<5)
+
 class ImageHandler:
     """Abstract base class for image handlers.
 

@@ -32,12 +32,6 @@ from xen.xend.XendRoot import get_component
 from xen.xend.uuid import getUuid
 from xen.xend.xenstore import DBVar
 
-"""Flag for a block device backend domain."""
-SIF_BLK_BE_DOMAIN = (1<<4)
-
-"""Flag for a net device backend domain."""
-SIF_NET_BE_DOMAIN = (1<<5)
-
 """Shutdown code for poweroff."""
 DOMAIN_POWEROFF = 0
 
