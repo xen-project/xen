@@ -31,6 +31,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     struct domain *d, **pd;
     struct vcpu *v;
 
+    ASSERT(cpu_online(cpu));
     if ( (d = alloc_domain_struct()) == NULL )
         return NULL;
 
@@ -41,7 +42,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     d->domain_id   = dom_id;
     v->processor  = cpu;
- 
+
     spin_lock_init(&d->big_lock);
 
     spin_lock_init(&d->page_alloc_lock);

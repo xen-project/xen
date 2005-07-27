@@ -1225,6 +1225,9 @@ void sedf_wake(struct vcpu *d) {
     /*check whether the awakened task needs to invoke the do_schedule
       routine. Try to avoid unnecessary runs but:
       Save approximation: Always switch to scheduler!*/
+    ASSERT(d->processor >= 0);
+    ASSERT(d->processor < NR_CPUS);
+    ASSERT(schedule_data[d->processor].curr);
     if (should_switch(schedule_data[d->processor].curr, d, now))
         cpu_raise_softirq(d->processor, SCHEDULE_SOFTIRQ);
 }

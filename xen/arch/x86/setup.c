@@ -35,7 +35,7 @@ integer_param("xenheap_megabytes", opt_xenheap_megabytes);
 #endif
 
 /* opt_nosmp: If true, secondary processors are ignored. */
-static int opt_nosmp = 0;
+int opt_nosmp = 0;
 boolean_param("nosmp", opt_nosmp);
 
 /* maxcpus: maximum number of CPUs to activate. */
