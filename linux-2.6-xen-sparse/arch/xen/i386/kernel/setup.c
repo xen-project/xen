@@ -1060,6 +1060,7 @@ static void __init register_bootmem_low_pages(unsigned long max_low_pfn)
 	}
 }
 
+#ifndef CONFIG_XEN
 /*
  * workaround for Dell systems that neglect to reserve EBDA
  */
@@ -1070,6 +1071,7 @@ static void __init reserve_ebda_region(void)
 	if (addr)
 		reserve_bootmem(addr, PAGE_SIZE);	
 }
+#endif
 
 #ifndef CONFIG_DISCONTIGMEM
 void __init setup_bootmem_allocator(void);
@@ -1152,6 +1154,13 @@ void __init setup_bootmem_allocator(void)
 	reserve_bootmem(HIGH_MEMORY, (PFN_PHYS(min_low_pfn) +
 			 bootmap_size + PAGE_SIZE-1) - (HIGH_MEMORY));
 
+#ifndef CONFIG_XEN
+	/*
+	 * reserve physical page 0 - it's a special BIOS page on many boxes,
+	 * enabling clean reboots, SMP operation, laptop functions.
+	 */
+	reserve_bootmem(0, PAGE_SIZE);
+
 	/* reserve EBDA region, it's a 4K region */
 	reserve_ebda_region();
 
@@ -1176,6 +1185,7 @@ void __init setup_bootmem_allocator(void)
 	 */
 	acpi_reserve_bootmem();
 #endif
+#endif /* !CONFIG_XEN */
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (xen_start_info.mod_start) {
