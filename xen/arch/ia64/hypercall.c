@@ -41,13 +41,13 @@ ia64_hypercall (struct pt_regs *regs)
 		// to a yet-to-be-found bug where pending_interruption
 		// is zero when it shouldn't be. Since PAL is called
 		// in the idle loop, this should resolve it
-		v->vcpu_info->arch.pending_interruption = 1;
+		VCPU(v,pending_interruption) = 1;
 #endif
 		if (regs->r28 == PAL_HALT_LIGHT) {
 #define SPURIOUS_VECTOR 15
 			pi = vcpu_check_pending_interrupts(v);
 			if (pi != SPURIOUS_VECTOR) {
-				if (!v->vcpu_info->arch.pending_interruption)
+				if (!VCPU(v,pending_interruption))
 					idle_when_pending++;
 				vcpu_pend_unspecified_interrupt(v);
 //printf("idle w/int#%d pending!\n",pi);

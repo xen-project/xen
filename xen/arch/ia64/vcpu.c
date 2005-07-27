@@ -28,7 +28,7 @@ typedef	union {
 
 // this def for vcpu_regs won't work if kernel stack is present
 #define	vcpu_regs(vcpu) ((struct pt_regs *) vcpu->arch.regs)
-#define	PSCB(x,y)	x->vcpu_info->arch.y
+#define	PSCB(x,y)	VCPU(x,y)
 #define	PSCBX(x,y)	x->arch.y
 
 #define	TRUE	1

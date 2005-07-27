@@ -50,7 +50,7 @@ extern unsigned long dom0_start, dom0_size;
 			IA64_PSR_ID | IA64_PSR_DA | IA64_PSR_DD | \
 			IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED | IA64_PSR_IA)
 
-#define PSCB(x,y)	x->vcpu_info->arch.y
+#define PSCB(x,y)	VCPU(x,y)
 #define PSCBX(x,y)	x->arch.y
 
 extern unsigned long vcpu_verbose;

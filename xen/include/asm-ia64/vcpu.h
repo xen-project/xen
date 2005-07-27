@@ -13,13 +13,9 @@ typedef	int BOOLEAN;
 struct vcpu;
 typedef	struct vcpu VCPU;
 
-// NOTE: The actual VCPU structure (struct virtualcpu) is defined in
-// thread.h.  Moving it to here caused a lot of files to change, so
-// for now, we'll leave well enough alone.
 typedef struct pt_regs REGS;
-//#define PSCB(vcpu)		(((struct spk_thread_t *)vcpu)->pscb)
-//#define vcpu_regs(vcpu)		&((struct spk_thread_t *)vcpu)->thread_regs
-//#define vcpu_thread(vcpu)	((struct spk_thread_t *)vcpu)
+
+#define VCPU(_v,_x)	_v->vcpu_info->arch._x
 
 #define PRIVOP_ADDR_COUNT
 #ifdef PRIVOP_ADDR_COUNT
