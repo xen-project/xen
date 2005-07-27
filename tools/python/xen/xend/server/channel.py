@@ -42,16 +42,16 @@ class EventChannel(dict):
         @param port2
         """
         try:
-            dom1  = int(db['dom1'])
+            dom1  = int(db['dom1'].getData())
         except: pass
         try:
-            dom2  = int(db['dom2'])
+            dom2  = int(db['dom2'].getData())
         except: pass
         try:
-            port1 = int(db['port1'])
+            port1 = int(db['port1'].getData())
         except: pass
         try:
-            port2 = int(db['port2'])
+            port2 = int(db['port2'].getData())
         except: pass
         evtchn = cls.interdomain(dom1, dom2, port1=port1, port2=port2)
         return evtchn
