@@ -55,6 +55,10 @@ class XendDomain:
         eserver.subscribe('xend.virq', self.onVirq)
         self.initial_refresh()
 
+        dom0 = self.domain_lookup(0)
+        if not dom0:
+            dom0 = self.domain_unknown(0)
+
     def list(self):
         """Get list of domain objects.
 
@@ -218,10 +222,6 @@ class XendDomain:
         if cleanup:
             self.reap()
         doms = self.xen_domains()
-        # Add entries for any domains we don't know about.
-        for id in doms.keys():
-            if id not in self.domains:
-                self.domain_lookup(id)
         # Remove entries for domains that no longer exist.
         # Update entries for existing domains.
         do_domain_restarts = False
@@ -331,22 +331,25 @@ class XendDomain:
         self.update_domain(id)
         return self.domains.get(id)
 
+    def domain_unknown(self, id):
+        try:
+            info = self.xen_domain(id)
+            if info:
+                uuid = getUuid()
+                log.info(
+                    "Creating entry for unknown domain: id=%d uuid=%s",
+                    id, uuid)
+                db = self.dbmap.addChild(uuid)
+                dominfo = XendDomainInfo.recreate(db, info)
+                dominfo.setdom(id)
+                self._add_domain(dominfo)
+                return dominfo
+        except Exception, ex:
+            log.exception("Error creating domain info: id=%d", id)
+        return None
+        
     def domain_lookup(self, id):
-        dominfo = self.domains.get(id)
-        if not dominfo:
-            try:
-                info = self.xen_domain(id)
-                if info:
-                    uuid = getUuid()
-                    log.info(
-                        "Creating entry for unknown domain: id=%d uuid=%s",
-                        id, uuid)
-                    db = self.dbmap.addChild(uuid)
-                    dominfo = XendDomainInfo.recreate(db, info)
-                    self._add_domain(dominfo)
-            except Exception, ex:
-                log.exception("Error creating domain info: id=%d", id)
-        return dominfo
+        return self.domains.get(id)
 
     def domain_lookup_by_name(self, name):
         dominfo = self.domains.get_by_name(name)
