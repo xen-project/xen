@@ -989,11 +989,8 @@ class XendDomainInfo:
             self.store_channel = self.eventChannel("store_channel")
         self.store_mfn = xc.init_store(self.store_channel.port2)
         if self.store_mfn >= 0:
-            try:
-                self.db.introduceDomain(self.id, self.store_mfn,
-                                        self.store_channel)
-            except:
-                pass
+            self.db.introduceDomain(self.id, self.store_mfn,
+                                    self.store_channel)
         self.exportToDB(save=True, sync=True)
 
 def vm_field_ignore(vm, config, val, index):
