@@ -39,8 +39,8 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     atomic_set(&d->refcnt, 1);
     atomic_set(&v->pausecnt, 0);
 
-    d->domain_id   = dom_id;
-    v->processor  = cpu;
+    d->domain_id = dom_id;
+    v->processor = cpu;
 
     spin_lock_init(&d->big_lock);
 

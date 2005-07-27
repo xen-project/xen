@@ -35,7 +35,7 @@ integer_param("xenheap_megabytes", opt_xenheap_megabytes);
 #endif
 
 /* opt_nosmp: If true, secondary processors are ignored. */
-int opt_nosmp = 0;
+static int opt_nosmp = 0;
 boolean_param("nosmp", opt_nosmp);
 
 /* maxcpus: maximum number of CPUs to activate. */
@@ -197,7 +197,12 @@ static void __init start_of_day(void)
         set_in_cr4(X86_CR4_OSXMMEXCPT);
 
     if ( opt_nosmp )
+    {
         max_cpus = 0;
+        smp_num_siblings = 1;
+        boot_cpu_data.x86_num_cores = 1;
+    }
+
     smp_prepare_cpus(max_cpus);
 
     /* We aren't hotplug-capable yet. */

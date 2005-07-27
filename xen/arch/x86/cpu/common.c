@@ -427,17 +427,12 @@ void __init detect_ht(struct cpuinfo_x86 *c)
 	u32 	eax, ebx, ecx, edx;
 	int 	index_msb, tmp;
 	int 	cpu = smp_processor_id();
-	extern int opt_nosmp;
 
 	if (!cpu_has(c, X86_FEATURE_HT) || cpu_has(c, X86_FEATURE_CMP_LEGACY))
 		return;
 
-	if (opt_nosmp) {
-		smp_num_siblings = 1;
-	} else {
-		cpuid(1, &eax, &ebx, &ecx, &edx);
-		smp_num_siblings = (ebx & 0xff0000) >> 16;
-	}
+	cpuid(1, &eax, &ebx, &ecx, &edx);
+	smp_num_siblings = (ebx & 0xff0000) >> 16;
 
 	if (smp_num_siblings == 1) {
 		printk(KERN_INFO  "CPU: Hyper-Threading is disabled\n");
