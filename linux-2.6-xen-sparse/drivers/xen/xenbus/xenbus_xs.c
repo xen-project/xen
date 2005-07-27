@@ -94,7 +94,7 @@ static void *read_reply(enum xsd_sockmsg_type *type, unsigned int *len)
 void xenbus_debug_write(const char *str, unsigned int count)
 {
 	struct xsd_sockmsg msg;
-	void *out = (void *)xen_start_info.store_page;
+	void *out = machine_to_virt(xen_start_info.store_mfn << PAGE_SHIFT);
 
 	msg.type = XS_DEBUG;
 	msg.len = sizeof("print") + count + 1;

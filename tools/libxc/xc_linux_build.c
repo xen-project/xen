@@ -500,6 +500,8 @@ static int setup_guest(int xc_handle,
         goto error_out;
 #endif
 
+    *store_mfn = page_array[(vstoreinfo_start-dsi.v_start) >> PAGE_SHIFT];
+
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
         page_array[(vstartinfo_start-dsi.v_start)>>PAGE_SHIFT]);
@@ -511,7 +513,7 @@ static int setup_guest(int xc_handle,
     start_info->nr_pt_frames = nr_pt_pages;
     start_info->mfn_list     = vphysmap_start;
     start_info->domain_controller_evtchn = control_evtchn;
-    start_info->store_page   = vstoreinfo_start;
+    start_info->store_mfn    = *store_mfn;
     start_info->store_evtchn = store_evtchn;
     if ( initrd_len != 0 )
     {
@@ -521,9 +523,6 @@ static int setup_guest(int xc_handle,
     strncpy((char *)start_info->cmd_line, cmdline, MAX_GUEST_CMDLINE);
     start_info->cmd_line[MAX_GUEST_CMDLINE-1] = '\0';
     munmap(start_info, PAGE_SIZE);
-
-    /* Tell our caller where we told domain store page was. */
-    *store_mfn = page_array[((vstoreinfo_start-dsi.v_start)>>PAGE_SHIFT)];
 
     /* shared_info page starts its life empty. */
     shared_info = xc_map_foreign_range(

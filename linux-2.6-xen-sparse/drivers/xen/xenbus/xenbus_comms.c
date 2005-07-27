@@ -202,10 +202,11 @@ int xb_init_comms(void **in, void **out)
 		return err;
 	}
 
-	/* FIXME zero out page -- domain builder should probably do this*/
-	memset((void *)xen_start_info.store_page, 0, PAGE_SIZE);
+	*out = machine_to_virt(xen_start_info.store_mfn << PAGE_SHIFT);
+	*in = *out + PAGE_SIZE / 2;
 
-	*out = (void *)xen_start_info.store_page;
-	*in = (void *)xen_start_info.store_page + PAGE_SIZE/2;
+	/* FIXME zero out page -- domain builder should probably do this*/
+	memset(*out, 0, PAGE_SIZE);
+
 	return 0;
 }

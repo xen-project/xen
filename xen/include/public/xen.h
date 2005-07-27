@@ -446,7 +446,7 @@ typedef struct start_info {
     memory_t mod_start;       /* VIRTUAL address of pre-loaded module.    */
     memory_t mod_len;         /* Size (bytes) of pre-loaded module.       */
     s8 cmd_line[MAX_GUEST_CMDLINE];
-    memory_t store_page;      /* VIRTUAL address of store page.           */
+    memory_t store_mfn;       /* MACHINE page number of shared page.      */
     u16      store_evtchn;    /* Event channel for store communication.   */
 } start_info_t;
 
