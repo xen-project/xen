@@ -184,9 +184,13 @@ class Daemon:
             log.info("Started xenstored, pid=%d", pid)
         else:
             # Child
-            if XEND_DAEMONIZE and (not XENSTORED_DEBUG):
+            if XEND_DAEMONIZE:
                 self.daemonize()
-            os.execl("/usr/sbin/xenstored", "xenstored", "--no-fork")
+            if XENSTORED_DEBUG:
+                os.execl("/usr/sbin/xenstored", "xenstored", "--no-fork",
+                         "-T", "/var/log/xenstored-trace.log")
+            else:
+                os.execl("/usr/sbin/xenstored", "xenstored", "--no-fork")
 
     def daemonize(self):
         if not XEND_DAEMONIZE: return
