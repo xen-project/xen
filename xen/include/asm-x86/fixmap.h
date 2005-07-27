@@ -30,6 +30,7 @@ enum fixed_addresses {
     FIX_IO_APIC_BASE_END = FIX_IO_APIC_BASE_0 + MAX_IO_APICS-1,
     FIX_ACPI_BEGIN,
     FIX_ACPI_END = FIX_ACPI_BEGIN + FIX_ACPI_PAGES - 1,
+    FIX_HPET_BASE,
     __end_of_fixed_addresses
 };
 

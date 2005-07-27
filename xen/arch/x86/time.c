@@ -28,11 +28,18 @@
 #include <asm/fixmap.h>
 #include <asm/mc146818rtc.h>
 #include <asm/div64.h>
+#include <asm/hpet.h>
 #include <io_ports.h>
+
+/* opt_hpet_force: If true, force HPET configuration via PCI space. */
+/* NB. This is a gross hack. Mainly useful for HPET testing. */
+static int opt_hpet_force = 0;
+boolean_param("hpet_force", opt_hpet_force);
 
 #define EPOCH MILLISECS(1000)
 
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
+unsigned long hpet_address;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 int timer_ack = 0;
 unsigned long volatile jiffies;
@@ -58,6 +65,7 @@ static s_time_t stime_platform_stamp;
 static u64 platform_timer_stamp;
 static struct time_scale platform_timer_scale;
 static spinlock_t platform_timer_lock = SPIN_LOCK_UNLOCKED;
+static u64 (*read_platform_count)(void);
 
 static inline u32 down_shift(u64 time, int shift)
 {
@@ -225,8 +233,13 @@ void calibrate_tsc_ap(void)
     atomic_dec(&tsc_calibrate_gang);
 }
 
+
+/************************************************************
+ * PLATFORM TIMER 1: PROGRAMMABLE INTERVAL TIMER (LEGACY PIT)
+ */
+
 /* Protected by platform_timer_lock. */
-static u64 platform_pit_counter;
+static u64 pit_counter64;
 static u16 pit_stamp;
 static struct ac_timer pit_overflow_timer;
 
@@ -246,20 +259,136 @@ static void pit_overflow(void *unused)
 
     spin_lock(&platform_timer_lock);
     counter = pit_read_counter();
-    platform_pit_counter += (u16)(pit_stamp - counter);
+    pit_counter64 += (u16)(pit_stamp - counter);
     pit_stamp = counter;
     spin_unlock(&platform_timer_lock);
 
     set_ac_timer(&pit_overflow_timer, NOW() + MILLISECS(20));
 }
 
-static void init_platform_timer(void)
+static u64 read_pit_count(void)
 {
+    return pit_counter64 + (u16)(pit_stamp - pit_read_counter());
+}
+
+static int init_pit(void)
+{
+    read_platform_count = read_pit_count;
+
     init_ac_timer(&pit_overflow_timer, pit_overflow, NULL, 0);
     pit_overflow(NULL);
-    platform_timer_stamp = platform_pit_counter;
+    platform_timer_stamp = pit_counter64;
     set_time_scale(&platform_timer_scale, CLOCK_TICK_RATE);
+
+    return 1;
 }
+
+/************************************************************
+ * PLATFORM TIMER 2: HIGH PRECISION EVENT TIMER (HPET)
+ */
+
+/* Protected by platform_timer_lock. */
+static u64 hpet_counter64, hpet_overflow_period;
+static u32 hpet_stamp;
+static struct ac_timer hpet_overflow_timer;
+
+static void hpet_overflow(void *unused)
+{
+    u32 counter;
+
+    spin_lock(&platform_timer_lock);
+    counter = hpet_read32(HPET_COUNTER);
+    hpet_counter64 += (u32)(counter - hpet_stamp);
+    hpet_stamp = counter;
+    spin_unlock(&platform_timer_lock);
+
+    set_ac_timer(&hpet_overflow_timer, NOW() + hpet_overflow_period);
+}
+
+static u64 read_hpet_count(void)
+{
+    return hpet_counter64 + (u32)(hpet_read32(HPET_COUNTER) - hpet_stamp);
+}
+
+static int init_hpet(void)
+{
+    u64 hpet_rate;
+    u32 hpet_id, hpet_period, cfg;
+    int i;
+
+    if ( (hpet_address == 0) && opt_hpet_force )
+    {
+		printk(KERN_WARNING "WARNING: Enabling HPET base manually!\n");
+        outl(0x800038a0, 0xcf8);
+        outl(0xff000001, 0xcfc);
+        outl(0x800038a0, 0xcf8);
+        hpet_address = inl(0xcfc) & 0xfffffffe;
+		printk(KERN_WARNING "WARNING: Enabled HPET at %#lx.\n", hpet_address);
+    }
+
+    if ( hpet_address == 0 )
+        return 0;
+
+    set_fixmap_nocache(FIX_HPET_BASE, hpet_address);
+
+    hpet_id = hpet_read32(HPET_ID);
+    if ( hpet_id == 0 )
+    {
+        printk("BAD HPET vendor id.\n");
+        return 0;
+    }
+
+    /* Check for sane period (100ps <= period <= 100ns). */
+    hpet_period = hpet_read32(HPET_PERIOD);
+    if ( (hpet_period > 100000000) || (hpet_period < 100000) )
+    {
+        printk("BAD HPET period %u.\n", hpet_period);
+        return 0;
+    }
+
+    cfg = hpet_read32(HPET_CFG);
+    cfg &= ~(HPET_CFG_ENABLE | HPET_CFG_LEGACY);
+    hpet_write32(cfg, HPET_CFG);
+
+    for ( i = 0; i <= ((hpet_id >> 8) & 31); i++ )
+    {
+        cfg = hpet_read32(HPET_T0_CFG + i*0x20);
+        cfg &= ~HPET_TN_ENABLE;
+        hpet_write32(cfg & ~HPET_TN_ENABLE, HPET_T0_CFG);
+    }
+
+    cfg = hpet_read32(HPET_CFG);
+    cfg |= HPET_CFG_ENABLE;
+    hpet_write32(cfg, HPET_CFG);
+
+    read_platform_count = read_hpet_count;
+
+    hpet_rate = 1000000000000000ULL; /* 10^15 */
+    (void)do_div(hpet_rate, hpet_period);
+    set_time_scale(&platform_timer_scale, hpet_rate);
+
+    /* Trigger overflow avoidance roughly when counter increments 2^31. */
+    if ( (hpet_rate >> 31) != 0 )
+    {
+        hpet_overflow_period = MILLISECS(1000);
+        (void)do_div(hpet_overflow_period, (u32)(hpet_rate >> 31) + 1);
+    }
+    else
+    {
+        hpet_overflow_period = MILLISECS(1000) << 31;
+        (void)do_div(hpet_overflow_period, (u32)hpet_rate);
+    }
+
+    init_ac_timer(&hpet_overflow_timer, hpet_overflow, NULL, 0);
+    hpet_overflow(NULL);
+    platform_timer_stamp = hpet_counter64;
+
+    return 1;
+}
+
+/************************************************************
+ * GENERIC PLATFORM TIMER INFRASTRUCTURE
+ */
 
 static s_time_t __read_platform_stime(u64 platform_time)
 {
@@ -276,7 +405,7 @@ static s_time_t read_platform_stime(void)
     s_time_t stime;
 
     spin_lock(&platform_timer_lock);
-    counter = platform_pit_counter + (u16)(pit_stamp - pit_read_counter());
+    counter = read_platform_count();
     stime   = __read_platform_stime(counter);
     spin_unlock(&platform_timer_lock);
 
@@ -289,11 +418,17 @@ static void platform_time_calibration(void)
     s_time_t stamp;
 
     spin_lock(&platform_timer_lock);
-    counter = platform_pit_counter + (u16)(pit_stamp - pit_read_counter());
+    counter = read_platform_count();
     stamp   = __read_platform_stime(counter);
     stime_platform_stamp = stamp;
     platform_timer_stamp = counter;
     spin_unlock(&platform_timer_lock);
+}
+
+static void init_platform_timer(void)
+{
+    if ( !init_hpet() )
+        BUG_ON(!init_pit());
 }
 
 
@@ -494,9 +629,8 @@ static void local_time_calibration(void *unused)
 #if 0
     printk("PRE%d: tsc=%lld stime=%lld master=%lld\n",
            cpu, prev_tsc, prev_local_stime, prev_master_stime);
-    printk("CUR%d: tsc=%lld stime=%lld master=%lld %lld\n",
-           cpu, curr_tsc, curr_local_stime, curr_master_stime,
-           platform_pit_counter);
+    printk("CUR%d: tsc=%lld stime=%lld master=%lld\n",
+           cpu, curr_tsc, curr_local_stime, curr_master_stime);
 #endif
 
     /* Local time warps forward if it lags behind master time. */
