@@ -34,8 +34,28 @@ default: $(OBJS) head.o ia64lib.o xen.lds.s
 		 > $(BASEDIR)/System.map
 
 
-asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp
+asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-xsi-offsets.h
 	$(CC) $(CFLAGS) -S -o $@ $<
+
+asm-xsi-offsets.s: asm-xsi-offsets.c 
+	$(CC) $(CFLAGS) -S -o $@ $<
+	
+asm-xsi-offsets.h: asm-xsi-offsets.s
+	@(set -e; \
+	  echo "/*"; \
+	  echo " * DO NOT MODIFY."; \
+	  echo " *"; \
+	  echo " * This file was auto-generated from $<"; \
+	  echo " *"; \
+	  echo " */"; \
+	  echo ""; \
+	  echo "#ifndef __ASM_XSI_OFFSETS_H__"; \
+	  echo "#define __ASM_XSI_OFFSETS_H__"; \
+	  echo ""; \
+	  sed -ne "/^->/{s:^->\([^ ]*\) [\$$#]*\([^ ]*\) \(.*\):#define \1 \2 /* \3 */:; s:->::; p;}"; \
+	  echo ""; \
+	  echo "#endif") <$< >$@
+	  mv $@ $(BASEDIR)/include/asm
 
 $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 # Need such symbol link to make linux headers available
@@ -60,6 +80,7 @@ ia64lib.o:
 
 clean:
 	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-offsets.s
+	rm -f asm-xsi-offsets.s 
 	rm -f lib/*.o
 
 # setup.o contains bits of compile.h so it must be blown away
@@ -68,4 +89,3 @@ delete-unfresh-files:
 #	rm -f setup.o
 
 .PHONY: default clean delete-unfresh-files
-
