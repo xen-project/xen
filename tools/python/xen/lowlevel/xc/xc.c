@@ -813,6 +813,22 @@ static PyObject *pyxc_domain_memory_increase_reservation(PyObject *self,
     return zero;
 }
 
+static PyObject *pyxc_init_store(PyObject *self, PyObject *args,
+				 PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    int remote_port;
+
+    static char *kwd_list[] = { "remote_port", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, 
+                                      &remote_port) )
+        return NULL;
+
+    return PyInt_FromLong(xc_init_store(xc->xc_handle, remote_port));
+}
+
 
 static PyMethodDef pyxc_methods[] = {
     { "handle",
@@ -1087,6 +1103,13 @@ static PyMethodDef pyxc_methods[] = {
       " dom [int]: Identifier of domain.\n"
       " mem_kb [long]: .\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "init_store", 
+      (PyCFunction)pyxc_init_store, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Initialize the store event channel and return the store page mfn.\n"
+      " remote_port [int]: store event channel port number.\n"
+      "Returns: [int] mfn on success; <0 on error.\n" },
 
     { NULL, NULL, 0, NULL }
 };
