@@ -319,12 +319,11 @@ static int init_hpet(void)
 
     if ( (hpet_address == 0) && opt_hpet_force )
     {
-        printk(KERN_WARNING "WARNING: Enabling HPET base manually!\n");
         outl(0x800038a0, 0xcf8);
         outl(0xff000001, 0xcfc);
         outl(0x800038a0, 0xcf8);
         hpet_address = inl(0xcfc) & 0xfffffffe;
-        printk(KERN_WARNING "WARNING: Enabled HPET at %#lx.\n", hpet_address);
+        printk("WARNING: Forcibly enabled HPET at %#lx.\n", hpet_address);
     }
 
     if ( hpet_address == 0 )
@@ -713,8 +712,9 @@ static void local_time_calibration(void *unused)
 #if 0
     printk("PRE%d: tsc=%lld stime=%lld master=%lld\n",
            cpu, prev_tsc, prev_local_stime, prev_master_stime);
-    printk("CUR%d: tsc=%lld stime=%lld master=%lld\n",
-           cpu, curr_tsc, curr_local_stime, curr_master_stime);
+    printk("CUR%d: tsc=%lld stime=%lld master=%lld -> %lld\n",
+           cpu, curr_tsc, curr_local_stime, curr_master_stime,
+           curr_master_stime - curr_local_stime);
 #endif
 
     /* Local time warps forward if it lags behind master time. */
@@ -776,7 +776,8 @@ static void local_time_calibration(void *unused)
         calibration_mul_frac = mul_frac(calibration_mul_frac, error_factor);
 
 #if 0
-    printk("---%d: %08x %d\n", cpu, calibration_mul_frac, tsc_shift);
+    printk("---%d: %08x %08x %d\n", cpu,
+           error_factor, calibration_mul_frac, tsc_shift);
 #endif
 
     /* Record new timestamp information. */
