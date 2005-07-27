@@ -18,7 +18,7 @@
 #define FAST_HYPERPRIVOPS
 #define FAST_HYPERPRIVOP_CNT
 #define FAST_REFLECT_CNT
-#define FAST_TICK
+//#define FAST_TICK
 #define FAST_BREAK
 #define FAST_ACCESS_REFLECT
 #define FAST_RFI
@@ -27,8 +27,8 @@
 #undef RFI_TO_INTERRUPT // not working yet
 #endif
 
-// FIXME: turn off for now... fix zero'ing regs, should be bank1?
-#define HANDLE_AR_UNAT
+// FIXME: turn off for now... but NaTs may crash Xen so re-enable soon!
+//#define HANDLE_AR_UNAT
 
 // FIXME: This is defined in include/asm-ia64/hw_irq.h but this
 // doesn't appear to be include'able from assembly?

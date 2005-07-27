@@ -291,6 +291,10 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 	long r11 = 0;
 	long status = -1;
 
+#define USE_PAL_EMULATOR
+#ifdef USE_PAL_EMULATOR
+	return pal_emulator_static(index);
+#endif
 	if (running_on_sim) return pal_emulator_static(index);
 	if (index >= PAL_COPY_PAL) {
 		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %d!!!!\n",
