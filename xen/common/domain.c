@@ -31,7 +31,6 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     struct domain *d, **pd;
     struct vcpu *v;
 
-    ASSERT(cpu_online(cpu));
     if ( (d = alloc_domain_struct()) == NULL )
         return NULL;
 
