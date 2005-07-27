@@ -199,13 +199,13 @@ void calibrate_tsc_bp(void)
     outb(CALIBRATE_LATCH >> 8, PIT_CH2);
 
     tsc_calibrate_status = 1;
-	wmb();
+    wmb();
 
     while ( (inb(0x61) & 0x20) == 0 )
         continue;
 
     tsc_calibrate_status = 2;
-	wmb();
+    wmb();
 
     while ( atomic_read(&tsc_calibrate_gang) != 0 )
         mb();
@@ -232,7 +232,6 @@ void calibrate_tsc_ap(void)
 
     atomic_dec(&tsc_calibrate_gang);
 }
-
 
 /************************************************************
  * PLATFORM TIMER 1: PROGRAMMABLE INTERVAL TIMER (LEGACY PIT)
@@ -280,6 +279,8 @@ static int init_pit(void)
     platform_timer_stamp = pit_counter64;
     set_time_scale(&platform_timer_scale, CLOCK_TICK_RATE);
 
+    printk("Platform timer is PIT\n");
+
     return 1;
 }
 
@@ -318,12 +319,12 @@ static int init_hpet(void)
 
     if ( (hpet_address == 0) && opt_hpet_force )
     {
-		printk(KERN_WARNING "WARNING: Enabling HPET base manually!\n");
+        printk(KERN_WARNING "WARNING: Enabling HPET base manually!\n");
         outl(0x800038a0, 0xcf8);
         outl(0xff000001, 0xcfc);
         outl(0x800038a0, 0xcf8);
         hpet_address = inl(0xcfc) & 0xfffffffe;
-		printk(KERN_WARNING "WARNING: Enabled HPET at %#lx.\n", hpet_address);
+        printk(KERN_WARNING "WARNING: Enabled HPET at %#lx.\n", hpet_address);
     }
 
     if ( hpet_address == 0 )
@@ -383,6 +384,89 @@ static int init_hpet(void)
     hpet_overflow(NULL);
     platform_timer_stamp = hpet_counter64;
 
+    printk("Platform timer is HPET\n");
+
+    return 1;
+}
+
+/************************************************************
+ * PLATFORM TIMER 3: IBM 'CYCLONE' TIMER
+ */
+
+int use_cyclone;
+
+/*
+ * Although the counter is read via a 64-bit register, I believe it is actually
+ * a 40-bit counter. Since this will wrap, I read only the low 32 bits and
+ * periodically fold into a 64-bit software counter, just as for PIT and HPET.
+ */
+#define CYCLONE_CBAR_ADDR   0xFEB00CD0
+#define CYCLONE_PMCC_OFFSET 0x51A0
+#define CYCLONE_MPMC_OFFSET 0x51D0
+#define CYCLONE_MPCS_OFFSET 0x51A8
+#define CYCLONE_TIMER_FREQ  100000000
+
+/* Protected by platform_timer_lock. */
+static u64 cyclone_counter64;
+static u32 cyclone_stamp;
+static struct ac_timer cyclone_overflow_timer;
+static volatile u32 *cyclone_timer; /* Cyclone MPMC0 register */
+
+static void cyclone_overflow(void *unused)
+{
+    u32 counter;
+
+    spin_lock(&platform_timer_lock);
+    counter = *cyclone_timer;
+    cyclone_counter64 += (u32)(counter - cyclone_stamp);
+    cyclone_stamp = counter;
+    spin_unlock(&platform_timer_lock);
+
+    set_ac_timer(&cyclone_overflow_timer, NOW() + MILLISECS(20000));
+}
+
+static u64 read_cyclone_count(void)
+{
+    return cyclone_counter64 + (u32)(*cyclone_timer - cyclone_stamp);
+}
+
+static volatile u32 *map_cyclone_reg(unsigned long regaddr)
+{
+    unsigned long pageaddr = regaddr &  PAGE_MASK;
+    unsigned long offset   = regaddr & ~PAGE_MASK;
+    set_fixmap_nocache(FIX_CYCLONE_TIMER, pageaddr);
+    return (volatile u32 *)(fix_to_virt(FIX_CYCLONE_TIMER) + offset);
+}
+
+static int init_cyclone(void)
+{
+    u32 base;
+    
+    if ( !use_cyclone )
+        return 0;
+
+    /* Find base address. */
+    base = *(map_cyclone_reg(CYCLONE_CBAR_ADDR));
+    if ( base == 0 )
+    {
+        printk(KERN_ERR "Cyclone: Could not find valid CBAR value.\n");
+        return 0;
+    }
+ 
+    /* Enable timer and map the counter register. */
+    *(map_cyclone_reg(base + CYCLONE_PMCC_OFFSET)) = 1;
+    *(map_cyclone_reg(base + CYCLONE_MPCS_OFFSET)) = 1;
+    cyclone_timer = map_cyclone_reg(base + CYCLONE_MPMC_OFFSET);
+
+    read_platform_count = read_cyclone_count;
+
+    init_ac_timer(&cyclone_overflow_timer, cyclone_overflow, NULL, 0);
+    cyclone_overflow(NULL);
+    platform_timer_stamp = cyclone_counter64;
+    set_time_scale(&platform_timer_scale, CYCLONE_TIMER_FREQ);
+
+    printk("Platform timer is IBM Cyclone\n");
+
     return 1;
 }
 
@@ -427,7 +511,7 @@ static void platform_time_calibration(void)
 
 static void init_platform_timer(void)
 {
-    if ( !init_hpet() )
+    if ( !init_cyclone() && !init_hpet() )
         BUG_ON(!init_pit());
 }
 

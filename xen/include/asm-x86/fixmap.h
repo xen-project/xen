@@ -31,6 +31,7 @@ enum fixed_addresses {
     FIX_ACPI_BEGIN,
     FIX_ACPI_END = FIX_ACPI_BEGIN + FIX_ACPI_PAGES - 1,
     FIX_HPET_BASE,
+    FIX_CYCLONE_TIMER,
     __end_of_fixed_addresses
 };
 
