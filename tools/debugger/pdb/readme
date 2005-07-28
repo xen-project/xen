@@ -31,7 +31,7 @@ Installation
   Build the target domains with debugging symbols.
   make CONFIG_DEBUG_INFO=true CONFIG_FRAME_POINTER=false linux-2.6-xenU-build
 
-  You can also change linux-2.6.11-xenU/Makefile
+  You can also change linux-2.6.12-xenU/Makefile
   CONFIG_CC_OPTIMIZE_FOR_SIZE from -O2 to -O
 
 - Build PDB
@@ -46,7 +46,7 @@ Usage
   domain-0.xeno# ./pdb <port>
 
 - Run GDB
-  hostname% gdb <xeno.bk>/dist/install/boot/vmlinux-syms-2.6.11.11-xenU
+  hostname% gdb <xeno.bk>/dist/install/boot/vmlinux-syms-2.6.12-xenU
 
   (gdb) target remote domain-0.xeno:<port>
 
@@ -76,9 +76,18 @@ Usage
   continue
   print
 
+Process
+
+  PDB can also debug a process running in a Linux 2.6 domain. 
+  After running PDB in domain 0, insert the pdb module in dom u:
+  
+  % insmod linux-2.6-module/pdb.ko
+
+  Load GDB with the appropriate symbols, and attach with
+
+  (gdb) maint packet x context = process <domid> <pid>
 
 To Do
 
 - watchpoints
 - support for SMP
-- support for user applications

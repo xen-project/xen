@@ -138,9 +138,13 @@ let attach_debugger ctx =
 
 let detach_debugger ctx =
   match ctx with
-  | Domain d  -> Domain.detach_debugger (Domain.get_domain d) 
-	                                (Domain.get_vcpu d)
-  | Process p  -> Process.detach_debugger p
+  | Domain d  -> 
+      Domain.detach_debugger (Domain.get_domain d) 
+	                     (Domain.get_vcpu d);
+      "OK"
+  | Process p  ->
+      Process.detach_debugger p;
+      raise No_reply
   | _ -> raise (Unimplemented "detach debugger")
 
 
@@ -240,13 +244,21 @@ let write_register ctx register value =
 let read_memory ctx addr len =
   match ctx with
   | Domain d  -> Domain.read_memory d addr len
-  | Process p -> Process.read_memory p addr len
+  | Process p ->
+      begin
+	Process.read_memory p addr len;
+	raise No_reply
+      end
   | _ -> raise (Unimplemented "read memory")
 
 let write_memory ctx addr values =
   match ctx with
   | Domain d  -> Domain.write_memory d addr values
-  | Process p -> Process.write_memory p addr values
+  | Process p ->
+      begin
+	Process.write_memory p addr values;
+	raise No_reply
+      end
   | _ -> raise (Unimplemented "write memory")
 
 

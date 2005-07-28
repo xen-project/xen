@@ -201,7 +201,7 @@ xcs_connect (value path, value msg_type)
     ret = connect(control_fd, (struct sockaddr *)&addr, len);
     if (ret < 0) 
     {
-        printf("error connecting to xcs(ctrl)! (%d)\n", errno);
+        printf("error connecting to xcs (ctrl)! (%d)\n", errno);
         goto ctrl_fd_fail;
     }
             
@@ -235,7 +235,7 @@ xcs_connect (value path, value msg_type)
     ret = connect(data_fd, (struct sockaddr *)&addr, len);
     if (ret < 0) 
     {
-        printf("error connecting to xcs(data)! (%d)\n", errno);
+        printf("error connecting to xcs (data)! (%d)\n", errno);
         goto data_fd_fail;
     }
 

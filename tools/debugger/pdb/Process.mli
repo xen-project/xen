@@ -29,7 +29,7 @@ val pause : context_t -> unit
 
 val read_registers : context_t -> unit
 val write_register : context_t -> register -> int32 -> unit
-val read_memory : context_t -> int32 -> int -> int list
+val read_memory : context_t -> int32 -> int -> unit
 val write_memory : context_t -> int32 -> int list -> unit
 	
 val continue : context_t -> unit

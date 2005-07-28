@@ -25,8 +25,7 @@ let exit_debugger () =
    hash.  It will be cleaned up with the socket is closed.
  *)
 let gdb_detach ctx =
-  PDB.detach_debugger ctx;
-  raise No_reply
+  PDB.detach_debugger ctx
 
 (**
    Kill Command
