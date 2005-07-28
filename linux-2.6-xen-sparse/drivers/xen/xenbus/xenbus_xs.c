@@ -479,8 +479,6 @@ int register_xenbus_watch(struct xenbus_watch *watch)
 	return err;
 }
 
-static struct xenbus_watch *watch_callback;
-
 void unregister_xenbus_watch(struct xenbus_watch *watch)
 {
 	char token[sizeof(watch) * 2 + 1];
@@ -492,12 +490,9 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 	err = xs_unwatch(watch->node, token);
 	list_del(&watch->list);
 
-	/* Make sure watch thread knows we unwatched, so don't ack. */
-	if (watch_callback == watch)
-		watch_callback = NULL;
-
 	if (err)
-		printk(KERN_WARNING "XENBUS Failed to release watch %s: %i\n",
+		printk(KERN_WARNING
+		       "XENBUS Failed to release watch %s: %i\n",
 		       watch->node, err);
 }
 
@@ -521,18 +516,13 @@ static int watch_thread(void *unused)
 			struct xenbus_watch *w;
 			int err;
 
+			err = xs_acknowledge_watch(token);
+			if (err)
+				printk(KERN_WARNING "XENBUS ack %s fail %i\n",
+				       node, err);
 			w = find_watch(token);
 			BUG_ON(!w);
-			watch_callback = w;
 			w->callback(w, node);
-
-			if (watch_callback) {
-				err = xs_acknowledge_watch(token);
-				if (err)
-					printk(KERN_WARNING
-					       "XENBUS ack %s fail %i\n",
-					       node, err);
-			}
 			kfree(node);
 		} else
 			printk(KERN_WARNING "XENBUS xs_read_watch: %li\n",
