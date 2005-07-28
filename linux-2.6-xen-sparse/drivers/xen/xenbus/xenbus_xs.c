@@ -44,7 +44,6 @@
 #define streq(a, b) (strcmp((a), (b)) == 0)
 
 static char printf_buffer[4096];
-static void *xs_in, *xs_out;
 static LIST_HEAD(watches);
 DECLARE_MUTEX(xenbus_lock);
 
@@ -69,7 +68,7 @@ static void *read_reply(enum xsd_sockmsg_type *type, unsigned int *len)
 	void *ret;
 	int err;
 
-	err = xb_read(xs_in, &msg, sizeof(msg));
+	err = xb_read(&msg, sizeof(msg));
 	if (err)
 		return ERR_PTR(err);
 
@@ -77,7 +76,7 @@ static void *read_reply(enum xsd_sockmsg_type *type, unsigned int *len)
 	if (!ret)
 		return ERR_PTR(-ENOMEM);
 
-	err = xb_read(xs_in, ret, msg.len);
+	err = xb_read(ret, msg.len);
 	if (err) {
 		kfree(ret);
 		return ERR_PTR(err);
@@ -94,15 +93,14 @@ static void *read_reply(enum xsd_sockmsg_type *type, unsigned int *len)
 void xenbus_debug_write(const char *str, unsigned int count)
 {
 	struct xsd_sockmsg msg;
-	void *out = machine_to_virt(xen_start_info.store_mfn << PAGE_SHIFT);
 
 	msg.type = XS_DEBUG;
 	msg.len = sizeof("print") + count + 1;
 
-	xb_write(out, &msg, sizeof(msg));
-	xb_write(out, "print", sizeof("print"));
-	xb_write(out, str, count);
-	xb_write(out, "", 1);
+	xb_write(&msg, sizeof(msg));
+	xb_write("print", sizeof("print"));
+	xb_write(str, count);
+	xb_write("", 1);
 }
 
 /* Send message to xs, get kmalloc'ed reply.  ERR_PTR() on error. */
@@ -123,12 +121,12 @@ static void *xs_talkv(enum xsd_sockmsg_type type,
 	for (i = 0; i < num_vecs; i++)
 		msg.len += iovec[i].iov_len;
 
-	err = xb_write(xs_out, &msg, sizeof(msg));
+	err = xb_write(&msg, sizeof(msg));
 	if (err)
 		return ERR_PTR(err);
 
 	for (i = 0; i < num_vecs; i++) {
-		err = xb_write(xs_out, iovec[i].iov_base, iovec[i].iov_len);;
+		err = xb_write(iovec[i].iov_base, iovec[i].iov_len);;
 		if (err)
 			return ERR_PTR(err);
 	}
@@ -509,14 +507,14 @@ static int watch_thread(void *unused)
 		char *token;
 		char *node = NULL;
 
-		wait_event(xb_waitq, xs_input_avail(xs_in));
+		wait_event(xb_waitq, xs_input_avail());
 
 		/* If this is a spurious wakeup caused by someone
 		 * doing an op, they'll hold the lock and the buffer
 		 * will be empty by the time we get there.		 
 		 */
 		down(&xenbus_lock);
-		if (xs_input_avail(xs_in))
+		if (xs_input_avail())
 			node = xs_read_watch(&token);
 
 		if (node && !IS_ERR(node)) {
@@ -548,7 +546,7 @@ int xs_init(void)
 	int err;
 	struct task_struct *watcher;
 
-	err = xb_init_comms(&xs_in, &xs_out);
+	err = xb_init_comms();
 	if (err)
 		return err;
 	

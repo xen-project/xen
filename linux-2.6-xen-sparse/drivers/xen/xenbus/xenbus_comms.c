@@ -47,6 +47,17 @@ struct ringbuf_head
 
 DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
 
+static inline struct ringbuf_head *outbuf(void)
+{
+	return machine_to_virt(xen_start_info.store_mfn << PAGE_SHIFT);
+}
+
+static inline struct ringbuf_head *inbuf(void)
+{
+	return machine_to_virt(xen_start_info.store_mfn << PAGE_SHIFT)
+		+ PAGE_SIZE/2;
+}
+
 static irqreturn_t wake_waiting(int irq, void *unused, struct pt_regs *regs)
 {
 	wake_up(&xb_waitq);
@@ -108,9 +119,10 @@ static int output_avail(struct ringbuf_head *out)
 	return avail != 0;
 }
 
-int xb_write(struct ringbuf_head *out, const void *data, unsigned len)
+int xb_write(const void *data, unsigned len)
 {
 	struct ringbuf_head h;
+	struct ringbuf_head *out = outbuf();
 
 	do {
 		void *dst;
@@ -141,24 +153,26 @@ int xb_write(struct ringbuf_head *out, const void *data, unsigned len)
 	return 0;
 }
 
-int xs_input_avail(struct ringbuf_head *in)
+int xs_input_avail(void)
 {
 	unsigned int avail;
+	struct ringbuf_head *in = inbuf();
 
 	get_input_chunk(in, in->buf, &avail);
 	return avail != 0;
 }
 
-int xb_read(struct ringbuf_head *in, void *data, unsigned len)
+int xb_read(void *data, unsigned len)
 {
 	struct ringbuf_head h;
+	struct ringbuf_head *in = inbuf();
 	int was_full;
 
 	while (len != 0) {
 		unsigned int avail;
 		const char *src;
 
-		wait_event(xb_waitq, xs_input_avail(in));
+		wait_event(xb_waitq, xs_input_avail());
 		h = *in;
 		mb();
 		if (!check_buffer(&h)) {
@@ -182,14 +196,14 @@ int xb_read(struct ringbuf_head *in, void *data, unsigned len)
 	}
 
 	/* If we left something, wake watch thread to deal with it. */
-	if (xs_input_avail(in))
+	if (xs_input_avail())
 		wake_up(&xb_waitq);
 
 	return 0;
 }
 
 /* Set up interrpt handler off store event channel. */
-int xb_init_comms(void **in, void **out)
+int xb_init_comms(void)
 {
 	int err, irq;
 
@@ -202,11 +216,9 @@ int xb_init_comms(void **in, void **out)
 		return err;
 	}
 
-	*out = machine_to_virt(xen_start_info.store_mfn << PAGE_SHIFT);
-	*in = *out + PAGE_SIZE / 2;
-
 	/* FIXME zero out page -- domain builder should probably do this*/
-	memset(*out, 0, PAGE_SIZE);
+	memset(machine_to_virt(xen_start_info.store_mfn << PAGE_SHIFT),
+	       0, PAGE_SIZE);
 
 	return 0;
 }
