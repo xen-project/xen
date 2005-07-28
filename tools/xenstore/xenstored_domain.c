@@ -261,8 +261,8 @@ static struct domain *new_domain(void *context, domid_t domid,
 {
 	struct domain *domain;
 	domain = talloc(context, struct domain);
+	domain->port = 0;
 	domain->domid = domid;
-	domain->port = port;
 	domain->path = talloc_strdup(domain, path);
 	domain->page = xc_map_foreign_range(*xc_handle, domain->domid,
 					    getpagesize(),
@@ -279,9 +279,10 @@ static struct domain *new_domain(void *context, domid_t domid,
 	domain->output = domain->page + getpagesize()/2;
 
 	/* Tell kernel we're interested in this event. */
-	if (ioctl(eventchn_fd, EVENTCHN_BIND, domain->port) != 0)
+	if (ioctl(eventchn_fd, EVENTCHN_BIND, port) != 0)
 		return NULL;
 
+	domain->port = port;
 	domain->conn = new_connection(writechn, readchn);
 	domain->conn->domain = domain;
 	return domain;
