@@ -1,6 +1,6 @@
 --- /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/../../linux-2.6.11/include/asm-ia64/kregs.h	2005-03-01 23:37:49.000000000 -0800
 +++ /home/adsharma/disk2/xen-ia64/xeno-unstable-rebase.bk/xen/include/asm-ia64/kregs.h	2005-05-18 12:40:50.000000000 -0700
-@@ -29,8 +29,20 @@
+@@ -29,8 +29,21 @@
   */
  #define IA64_TR_KERNEL		0	/* itr0, dtr0: maps kernel image (code & data) */
  #define IA64_TR_PALCODE		1	/* itr1: maps PALcode as required by EFI */
@@ -12,6 +12,7 @@
 +#ifdef XEN
 +#define IA64_TR_SHARED_INFO	3	/* dtr3: page shared with domain */
 +#define	IA64_TR_VHPT		4	/* dtr4: vhpt */
++#define IA64_TR_ARCH_INFO      5
 +#ifdef CONFIG_VTI
 +#define IA64_TR_VHPT_IN_DOM	5	/* dtr5: Double mapping for vhpt table in domain space */
 +#define IA64_TR_RR7_SWITCH_STUB	7	/* dtr7: mapping for rr7 switch stub */
