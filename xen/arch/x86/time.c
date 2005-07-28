@@ -233,6 +233,16 @@ void calibrate_tsc_ap(void)
     atomic_dec(&tsc_calibrate_gang);
 }
 
+static char *freq_string(u64 freq)
+{
+    static char s[20];
+    unsigned int x, y;
+    y = (unsigned int)do_div(freq, 1000000) / 1000;
+    x = (unsigned int)freq;
+    sprintf(s, "%u.%03uMHz", x, y);
+    return s;
+}
+
 /************************************************************
  * PLATFORM TIMER 1: PROGRAMMABLE INTERVAL TIMER (LEGACY PIT)
  */
@@ -279,7 +289,7 @@ static int init_pit(void)
     platform_timer_stamp = pit_counter64;
     set_time_scale(&platform_timer_scale, CLOCK_TICK_RATE);
 
-    printk("Platform timer is PIT\n");
+    printk("Platform timer is %s PIT\n", freq_string(CLOCK_TICK_RATE));
 
     return 1;
 }
@@ -319,12 +329,11 @@ static int init_hpet(void)
 
     if ( (hpet_address == 0) && opt_hpet_force )
     {
-        printk(KERN_WARNING "WARNING: Enabling HPET base manually!\n");
         outl(0x800038a0, 0xcf8);
         outl(0xff000001, 0xcfc);
         outl(0x800038a0, 0xcf8);
         hpet_address = inl(0xcfc) & 0xfffffffe;
-        printk(KERN_WARNING "WARNING: Enabled HPET at %#lx.\n", hpet_address);
+        printk("WARNING: Forcibly enabled HPET at %#lx.\n", hpet_address);
     }
 
     if ( hpet_address == 0 )
@@ -384,7 +393,7 @@ static int init_hpet(void)
     hpet_overflow(NULL);
     platform_timer_stamp = hpet_counter64;
 
-    printk("Platform timer is HPET\n");
+    printk("Platform timer is %s HPET\n", freq_string(hpet_rate));
 
     return 1;
 }
@@ -465,7 +474,8 @@ static int init_cyclone(void)
     platform_timer_stamp = cyclone_counter64;
     set_time_scale(&platform_timer_scale, CYCLONE_TIMER_FREQ);
 
-    printk("Platform timer is IBM Cyclone\n");
+    printk("Platform timer is %s IBM Cyclone\n",
+           freq_string(CYCLONE_TIMER_FREQ));
 
     return 1;
 }
@@ -713,8 +723,9 @@ static void local_time_calibration(void *unused)
 #if 0
     printk("PRE%d: tsc=%lld stime=%lld master=%lld\n",
            cpu, prev_tsc, prev_local_stime, prev_master_stime);
-    printk("CUR%d: tsc=%lld stime=%lld master=%lld\n",
-           cpu, curr_tsc, curr_local_stime, curr_master_stime);
+    printk("CUR%d: tsc=%lld stime=%lld master=%lld -> %lld\n",
+           cpu, curr_tsc, curr_local_stime, curr_master_stime,
+           curr_master_stime - curr_local_stime);
 #endif
 
     /* Local time warps forward if it lags behind master time. */
@@ -776,7 +787,8 @@ static void local_time_calibration(void *unused)
         calibration_mul_frac = mul_frac(calibration_mul_frac, error_factor);
 
 #if 0
-    printk("---%d: %08x %d\n", cpu, calibration_mul_frac, tsc_shift);
+    printk("---%d: %08x %08x %d\n", cpu,
+           error_factor, calibration_mul_frac, tsc_shift);
 #endif
 
     /* Record new timestamp information. */
