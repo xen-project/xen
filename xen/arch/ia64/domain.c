@@ -312,9 +312,9 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 
 	// this should be in userspace
 	regs->r28 = dom_fw_setup(v->domain,"nomca nosmp xencons=tty0 console=tty0 root=/dev/hda1",256L);  //FIXME
-	v->vcpu_info->arch.banknum = 1;
-	v->vcpu_info->arch.metaphysical_mode = 1;
 	v->arch.domain_itm_last = -1L;
+ 	VCPU(v, banknum) = 1;
+ 	VCPU(v, metaphysical_mode) = 1;
 
 	v->domain->shared_info->arch = c->shared;
 	return 0;
@@ -450,8 +450,8 @@ void new_thread(struct vcpu *v,
 		VPD_CR(v, dcr) = 0;
 	} else {
 		regs->r28 = dom_fw_setup(d,saved_command_line,256L);
-		v->vcpu_info->arch.banknum = 1;
-		v->vcpu_info->arch.metaphysical_mode = 1;
+		VCPU(v, banknum) = 1;
+		VCPU(v, metaphysical_mode) = 1;
 		d->shared_info->arch.flags = (d == dom0) ? (SIF_INITDOMAIN|SIF_PRIVILEGED|SIF_BLK_BE_DOMAIN|SIF_NET_BE_DOMAIN|SIF_USB_BE_DOMAIN) : 0;
 	}
 }
@@ -483,8 +483,8 @@ void new_thread(struct vcpu *v,
 	regs->ar_fpsr = FPSR_DEFAULT;
 	init_all_rr(v);
 	regs->r28 = dom_fw_setup(d,saved_command_line,256L);  //FIXME
-	v->vcpu_info->arch.banknum = 1;
-	v->vcpu_info->arch.metaphysical_mode = 1;
+	VCPU(v, banknum) = 1;
+	VCPU(v, metaphysical_mode) = 1;
 	d->shared_info->arch.flags = (d == dom0) ? (SIF_INITDOMAIN|SIF_PRIVILEGED|SIF_BLK_BE_DOMAIN|SIF_NET_BE_DOMAIN|SIF_USB_BE_DOMAIN) : 0;
 }
 #endif // CONFIG_VTI
@@ -1073,12 +1073,12 @@ if (d == dom0)
 #endif
     serial_input_init();
     if (d == dom0) {
-    	v->vcpu_info->arch.delivery_mask[0] = -1L;
-    	v->vcpu_info->arch.delivery_mask[1] = -1L;
-    	v->vcpu_info->arch.delivery_mask[2] = -1L;
-    	v->vcpu_info->arch.delivery_mask[3] = -1L;
+    	VCPU(v, delivery_mask[0]) = -1L;
+    	VCPU(v, delivery_mask[1]) = -1L;
+    	VCPU(v, delivery_mask[2]) = -1L;
+    	VCPU(v, delivery_mask[3]) = -1L;
     }
-    else __set_bit(0x30,v->vcpu_info->arch.delivery_mask);
+    else __set_bit(0x30,VCPU(v, delivery_mask));
 
     return 0;
 }
@@ -1234,12 +1234,12 @@ if (d == dom0)
 #endif
 	serial_input_init();
 	if (d == dom0) {
-		v->vcpu_info->arch.delivery_mask[0] = -1L;
-		v->vcpu_info->arch.delivery_mask[1] = -1L;
-		v->vcpu_info->arch.delivery_mask[2] = -1L;
-		v->vcpu_info->arch.delivery_mask[3] = -1L;
+		VCPU(v, delivery_mask[0]) = -1L;
+		VCPU(v, delivery_mask[1]) = -1L;
+		VCPU(v, delivery_mask[2]) = -1L;
+		VCPU(v, delivery_mask[3]) = -1L;
 	}
-	else __set_bit(0x30,v->vcpu_info->arch.delivery_mask);
+	else __set_bit(0x30, VCPU(v, delivery_mask));
 
 	return 0;
 }
@@ -1286,7 +1286,7 @@ int construct_domU(struct domain *d,
 #endif
 	new_thread(v, pkern_entry, 0, 0);
 	printk("new_thread returns\n");
-	__set_bit(0x30,v->vcpu_info->arch.delivery_mask);
+	__set_bit(0x30, VCPU(v, delivery_mask));
 
 	return 0;
 }
