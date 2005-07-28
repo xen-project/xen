@@ -233,6 +233,16 @@ void calibrate_tsc_ap(void)
     atomic_dec(&tsc_calibrate_gang);
 }
 
+static char *freq_string(u64 freq)
+{
+    static char s[20];
+    unsigned int x, y;
+    y = (unsigned int)do_div(freq, 1000000) / 1000;
+    x = (unsigned int)freq;
+    sprintf(s, "%u.%03uMHz", x, y);
+    return s;
+}
+
 /************************************************************
  * PLATFORM TIMER 1: PROGRAMMABLE INTERVAL TIMER (LEGACY PIT)
  */
@@ -279,7 +289,7 @@ static int init_pit(void)
     platform_timer_stamp = pit_counter64;
     set_time_scale(&platform_timer_scale, CLOCK_TICK_RATE);
 
-    printk("Platform timer is PIT\n");
+    printk("Platform timer is %s PIT\n", freq_string(CLOCK_TICK_RATE));
 
     return 1;
 }
@@ -383,7 +393,7 @@ static int init_hpet(void)
     hpet_overflow(NULL);
     platform_timer_stamp = hpet_counter64;
 
-    printk("Platform timer is HPET\n");
+    printk("Platform timer is %s HPET\n", freq_string(hpet_rate));
 
     return 1;
 }
@@ -464,7 +474,8 @@ static int init_cyclone(void)
     platform_timer_stamp = cyclone_counter64;
     set_time_scale(&platform_timer_scale, CYCLONE_TIMER_FREQ);
 
-    printk("Platform timer is IBM Cyclone\n");
+    printk("Platform timer is %s IBM Cyclone\n",
+           freq_string(CYCLONE_TIMER_FREQ));
 
     return 1;
 }
