@@ -155,7 +155,7 @@ IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 	// interrupt collection flag
 	//if (imm.ic) PSCB(vcpu,interrupt_delivery_enabled) = 0;
 	// just handle psr.up and psr.pp for now
-	if (imm24 & ~(IA64_PSR_PP | IA64_PSR_UP | IA64_PSR_SP
+	if (imm24 & ~(IA64_PSR_BE | IA64_PSR_PP | IA64_PSR_UP | IA64_PSR_SP
 		| IA64_PSR_I | IA64_PSR_IC | IA64_PSR_DT
 		| IA64_PSR_DFL | IA64_PSR_DFH))
 			return (IA64_ILLOP_FAULT);
@@ -164,6 +164,7 @@ IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 	if (imm.pp) { ipsr->pp = 0; psr.pp = 0; }
 	if (imm.up) { ipsr->up = 0; psr.up = 0; }
 	if (imm.sp) { ipsr->sp = 0; psr.sp = 0; }
+	if (imm.be) ipsr->be = 0;
 	if (imm.dt) vcpu_set_metaphysical_mode(vcpu,TRUE);
 	__asm__ __volatile (";; mov psr.l=%0;; srlz.d"::"r"(psr):"memory");
 	return IA64_NO_FAULT;
