@@ -212,6 +212,10 @@ void arch_do_createdomain(struct vcpu *v)
 	 */
 
 	memset(d->shared_info, 0, PAGE_SIZE);
+	d->shared_info->vcpu_data[v->vcpu_id].arch.privregs = 
+			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+	printf("arch_vcpu_info=%p\n", d->shared_info->vcpu_data[0].arch.privregs);
+	memset(d->shared_info->vcpu_data[v->vcpu_id].arch.privregs, 0, PAGE_SIZE);
 	v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
 	/* Mask all events, and specific port will be unmasked
 	 * when customer subscribes to it.
@@ -232,8 +236,8 @@ void arch_do_createdomain(struct vcpu *v)
 	/* FIXME: This is identity mapped address for xenheap. 
 	 * Do we need it at all?
 	 */
-	d->xen_vastart = 0xf000000000000000;
-	d->xen_vaend = 0xf300000000000000;
+	d->xen_vastart = XEN_START_ADDR;
+	d->xen_vaend = XEN_END_ADDR;
 	d->arch.breakimm = 0x1000;
 }
 #else // CONFIG_VTI
@@ -252,12 +256,16 @@ void arch_do_createdomain(struct vcpu *v)
    		while (1);
 	}
 	memset(d->shared_info, 0, PAGE_SIZE);
+	d->shared_info->vcpu_data[0].arch.privregs = 
+			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+	printf("arch_vcpu_info=%p\n", d->shared_info->vcpu_data[0].arch.privregs);
+	memset(d->shared_info->vcpu_data[0].arch.privregs, 0, PAGE_SIZE);
 	v->vcpu_info = &(d->shared_info->vcpu_data[0]);
 
-	d->max_pages = (128*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
+	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
 	if ((d->arch.metaphysical_rr0 = allocate_metaphysical_rr0()) == -1UL)
 		BUG();
-	v->vcpu_info->arch.metaphysical_mode = 1;
+	VCPU(v, metaphysical_mode) = 1;
 	v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
 	v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
 #define DOMAIN_RID_BITS_DEFAULT 18
@@ -266,9 +274,9 @@ void arch_do_createdomain(struct vcpu *v)
 	v->arch.starting_rid = d->arch.starting_rid;
 	v->arch.ending_rid = d->arch.ending_rid;
 	// the following will eventually need to be negotiated dynamically
-	d->xen_vastart = 0xf000000000000000;
-	d->xen_vaend = 0xf300000000000000;
-	d->shared_info_va = 0xf100000000000000;
+	d->xen_vastart = XEN_START_ADDR;
+	d->xen_vaend = XEN_END_ADDR;
+	d->shared_info_va = SHAREDINFO_ADDR;
 	d->arch.breakimm = 0x1000;
 	v->arch.breakimm = d->arch.breakimm;
 
@@ -292,7 +300,15 @@ void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 
 	printf("arch_getdomaininfo_ctxt\n");
 	c->regs = *regs;
-	c->vcpu = v->vcpu_info->arch;
+	c->vcpu.evtchn_vector = v->vcpu_info->arch.evtchn_vector;
+#if 0
+	if (c->vcpu.privregs && copy_to_user(c->vcpu.privregs,
+			v->vcpu_info->arch.privregs, sizeof(mapped_regs_t))) {
+		printk("Bad ctxt address: 0x%lx\n", c->vcpu.privregs);
+		return -EFAULT;
+	}
+#endif
+
 	c->shared = v->domain->shared_info->arch;
 }
 
@@ -307,7 +323,13 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT;
 	regs->ar_rsc |= (2 << 2); /* force PL2/3 */
 
-	v->vcpu_info->arch = c->vcpu;
+ 	v->vcpu_info->arch.evtchn_vector = c->vcpu.evtchn_vector;
+	if ( c->vcpu.privregs && copy_from_user(v->vcpu_info->arch.privregs,
+			   c->vcpu.privregs, sizeof(mapped_regs_t))) {
+	    printk("Bad ctxt address in arch_set_info_guest: 0x%lx\n", c->vcpu.privregs);
+	    return -EFAULT;
+	}
+
 	init_all_rr(v);
 
 	// this should be in userspace
@@ -381,8 +403,8 @@ int arch_set_info_guest(
     new_thread(v, c->guest_iip, 0, 0);
 
 
-    d->xen_vastart = 0xf000000000000000;
-    d->xen_vaend = 0xf300000000000000;
+    d->xen_vastart = XEN_START_ADDR;
+    d->xen_vaend = XEN_END_ADDR;
     d->arch.breakimm = 0x1000 + d->domain_id;
     v->arch._thread.on_ustack = 0;
 
@@ -395,7 +417,13 @@ int arch_set_info_guest(
 
 void arch_do_boot_vcpu(struct vcpu *v)
 {
+	struct domain *d = v->domain;
 	printf("arch_do_boot_vcpu: not implemented\n");
+
+	d->shared_info->vcpu_data[v->vcpu_id].arch.privregs = 
+			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+	printf("arch_vcpu_info=%p\n", d->shared_info->vcpu_data[v->vcpu_id].arch.privregs);
+	memset(d->shared_info->vcpu_data[v->vcpu_id].arch.privregs, 0, PAGE_SIZE);
 	return;
 }
 

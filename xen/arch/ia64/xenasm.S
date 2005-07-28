@@ -48,10 +48,11 @@ END(platform_is_hp_ski)
 // FIXME? Note that this turns off the DB bit (debug)
 #define PSR_BITS_TO_SET	IA64_PSR_BN
 
+//extern void ia64_new_rr7(unsigned long rid,void *shared_info, void *shared_arch_info);
 GLOBAL_ENTRY(ia64_new_rr7)
 	// not sure this unwind statement is correct...
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
-	alloc loc1 = ar.pfs, 2, 7, 0, 0
+	alloc loc1 = ar.pfs, 3, 8, 0, 0
 1:	{
 	  mov r28  = in0		// copy procedure index
 	  mov r8   = ip			// save ip to compute branch
@@ -71,6 +72,10 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	mov loc5=in1
 	;;
 	tpa loc5=loc5			// grab this BEFORE changing rr7
+	;;
+	mov loc7=in2			// arch_vcpu_info_t
+	;;
+	tpa loc7=loc7			// grab this BEFORE changing rr7
 	;;
 	mov loc3 = psr			// save psr
 	adds r8  = 1f-1b,r8		// calculate return address for call
@@ -206,6 +211,25 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	;;
 	itr.d dtr[r25]=r23		// wire in new mapping...
 	;;
+	// Map for arch_vcpu_info_t
+	movl r22=SHARED_ARCHINFO_ADDR
+	;;
+	movl r25=__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RW)
+	;;
+	mov r21=loc7			// saved sharedinfo physical address
+	;;
+	or r23=r25,r21			// construct PA | page properties
+	mov r24=PAGE_SHIFT<<2
+	;;
+	ptr.d	r22,r24
+	;;
+	mov cr.itir=r24
+	mov cr.ifa=r22
+	;;
+	mov r25=IA64_TR_ARCH_INFO
+	;;
+	itr.d dtr[r25]=r23		// wire in new mapping...
+	;;
 
 	// done, switch back to virtual and return
 	mov r16=loc3			// r16= original psr
@@ -278,12 +302,9 @@ GLOBAL_ENTRY(__get_domain_bundle)
 END(__get_domain_bundle)
 
 GLOBAL_ENTRY(dorfirfi)
-#define SI_CR_IIP_OFFSET 0x10
-#define SI_CR_IPSR_OFFSET 0x08
-#define SI_CR_IFS_OFFSET 0x18
-        movl r16 = SHAREDINFO_ADDR+SI_CR_IIP_OFFSET
-        movl r17 = SHAREDINFO_ADDR+SI_CR_IPSR_OFFSET
-        movl r18 = SHAREDINFO_ADDR+SI_CR_IFS_OFFSET
+        movl r16 = XSI_IIP
+        movl r17 = XSI_IPSR
+        movl r18 = XSI_IFS
 	;;
 	ld8 r16 = [r16]
 	ld8 r17 = [r17]

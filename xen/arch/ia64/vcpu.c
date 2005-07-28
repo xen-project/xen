@@ -1185,12 +1185,6 @@ IA64FAULT vcpu_rfi(VCPU *vcpu)
 	//if ((ifs & regs->cr_ifs & 0x8000000000000000L) && ifs != regs->cr_ifs) {
 	//if ((ifs & 0x8000000000000000L) && ifs != regs->cr_ifs) {
 	if (ifs & regs->cr_ifs & 0x8000000000000000L) {
-#define SI_OFS(x)	((char *)(&PSCB(vcpu,x)) - (char *)(vcpu->vcpu_info))
-if (SI_OFS(iip)!=0x10 || SI_OFS(ipsr)!=0x08 || SI_OFS(ifs)!=0x18) {
-printf("SI_CR_IIP/IPSR/IFS_OFFSET CHANGED, SEE dorfirfi\n");
-printf("SI_CR_IIP=0x%x,IPSR=0x%x,IFS_OFFSET=0x%x\n",SI_OFS(iip),SI_OFS(ipsr),SI_OFS(ifs));
-while(1);
-}
 		// TODO: validate PSCB(vcpu,iip)
 		// TODO: PSCB(vcpu,ipsr) = psr;
 		PSCB(vcpu,ipsr) = psr.i64;

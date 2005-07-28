@@ -226,7 +226,7 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,ipsr=%p,iip=%p,ifa=%p,isr=%p
 #ifdef CONFIG_SMP
 #error "sharedinfo doesn't handle smp yet"
 #endif
-	regs->r31 = &((shared_info_t *)SHAREDINFO_ADDR)->vcpu_data[0].arch;
+	regs->r31 = &(((mapped_regs_t *)SHARED_ARCHINFO_ADDR)->ipsr);
 
 	PSCB(v,interrupt_delivery_enabled) = 0;
 	PSCB(v,interrupt_collection_enabled) = 0;

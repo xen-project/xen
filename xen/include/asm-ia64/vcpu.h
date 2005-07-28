@@ -15,7 +15,7 @@ typedef	struct vcpu VCPU;
 
 typedef struct pt_regs REGS;
 
-#define VCPU(_v,_x)	_v->vcpu_info->arch._x
+#define VCPU(_v,_x)	_v->vcpu_info->arch.privregs->_x
 
 #define PRIVOP_ADDR_COUNT
 #ifdef PRIVOP_ADDR_COUNT

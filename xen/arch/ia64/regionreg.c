@@ -15,6 +15,7 @@
 #include <asm/regionreg.h>
 #include <asm/vhpt.h>
 #include <asm/vcpu.h>
+extern void ia64_new_rr7(unsigned long rid,void *shared_info, void *shared_arch_info);
 
 
 #define	IA64_MIN_IMPL_RID_BITS	(IA64_MIN_IMPL_RID_MSB+1)
@@ -274,7 +275,8 @@ int set_one_rr(unsigned long rr, unsigned long val)
 		newrrv.rid = newrid;
 		newrrv.ve = VHPT_ENABLED_REGION_7;
 		newrrv.ps = IA64_GRANULE_SHIFT;
-		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info);
+		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info,
+				v->vcpu_info->arch.privregs);
 	}
 	else {
 		newrrv.rid = newrid;
@@ -291,7 +293,8 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	newrrv.ve = 1;  // VHPT now enabled for region 7!!
 	newrrv.ps = PAGE_SHIFT;
 	if (rreg == 0) v->arch.metaphysical_saved_rr0 = newrrv.rrval;
-	if (rreg == 7) ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info);
+	if (rreg == 7) ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info,
+				v->vcpu_info->arch.privregs);
 	else set_rr(rr,newrrv.rrval);
 #endif
 	return 1;
