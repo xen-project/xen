@@ -63,7 +63,7 @@ static struct pfn_info *alloc_largest(struct domain *d, unsigned long max)
     unsigned int order = get_order(max * PAGE_SIZE);
     if ( (max & (max-1)) != 0 )
         order--;
-    while ( (page = alloc_domheap_pages(d, order)) == NULL )
+    while ( (page = alloc_domheap_pages(d, order, 0)) == NULL )
         if ( order-- == 0 )
             break;
     return page;

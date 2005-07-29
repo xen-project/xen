@@ -37,7 +37,8 @@ alloc_dom_mem(struct domain *d,
               unsigned long *extent_list, 
               unsigned long  start_extent,
               unsigned int   nr_extents,
-              unsigned int   extent_order)
+              unsigned int   extent_order,
+    		  unsigned int   flags)
 {
     struct pfn_info *page;
     unsigned long    i;
@@ -56,7 +57,8 @@ alloc_dom_mem(struct domain *d,
     {
         PREEMPT_CHECK(MEMOP_increase_reservation);
 
-        if ( unlikely((page = alloc_domheap_pages(d, extent_order)) == NULL) )
+        if ( unlikely((page = alloc_domheap_pages(d, extent_order,
+                                                  flags)) == NULL) )
         {
             DPRINTK("Could not allocate a frame\n");
             return i;
@@ -131,10 +133,15 @@ do_dom_mem_op(unsigned long  op,
 {
     struct domain *d;
     unsigned long  rc, start_extent;
+    unsigned int   address_bits_order;
 
     /* Extract @start_extent from @op. */
     start_extent  = op >> START_EXTENT_SHIFT;
     op           &= (1 << START_EXTENT_SHIFT) - 1;
+
+    /* seperate extent_order and address_bits_order */
+    address_bits_order = (extent_order >> 1) & 0xff;
+    extent_order &= 0xff;
 
     if ( unlikely(start_extent > nr_extents) )
         return -EINVAL;
@@ -150,7 +157,8 @@ do_dom_mem_op(unsigned long  op,
     {
     case MEMOP_increase_reservation:
         rc = alloc_dom_mem(
-            d, extent_list, start_extent, nr_extents, extent_order);
+            d, extent_list, start_extent, nr_extents, extent_order,
+            (address_bits_order <= 32) ? ALLOC_DOM_DMA : 0);
         break;
     case MEMOP_decrease_reservation:
         rc = free_dom_mem(
