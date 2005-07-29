@@ -46,9 +46,6 @@
 /* EVTCHN_UNBIND: Unbind from the specified event-channel port. */
 #define EVTCHN_UNBIND _IO('E', 3)
 
-/* Size of a machine page frame. */
-#define PAGE_SIZE 4096
-
 /* Set the close-on-exec flag on a file descriptor.  Doesn't currently bother
  * to check for errors. */
 /*

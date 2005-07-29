@@ -37,7 +37,7 @@
 /* ------[ Other required defines ]----------------------------------------*/
 
 /* Size of a machine page frame. */
-#define PAGE_SIZE 4096
+#define PAGE_SIZE XC_PAGE_SIZE
 
 #ifndef timersub /* XOPEN and __BSD don't cooperate well... */
 #define timersub(a, b, result)                                                \
