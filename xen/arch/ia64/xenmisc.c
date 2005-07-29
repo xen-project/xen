@@ -177,6 +177,22 @@ void show_registers(struct pt_regs *regs)
 	printf("*** ADD REGISTER DUMP HERE FOR DEBUGGING\n");
 }
 
+int is_kernel_text(unsigned long addr)
+{
+	extern char _stext[], _etext[];
+	if (addr >= (unsigned long) _stext &&
+	    addr <= (unsigned long) _etext)
+	    return 1;
+
+	return 0;
+}
+
+unsigned long kernel_text_end(void)
+{
+	extern char _etext[];
+	return (unsigned long) _etext;
+}
+
 ///////////////////////////////
 // from common/keyhandler.c
 ///////////////////////////////
