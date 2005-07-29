@@ -102,7 +102,7 @@ void __init paging_init(void)
         mpt_size = 4*1024*1024;
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
-        if ( (pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0) == NULL )
+        if ( (pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
             panic("Not enough memory to bootstrap Xen.\n");
         idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i] =
             l2e_from_page(pg, PAGE_HYPERVISOR | _PAGE_PSE);
