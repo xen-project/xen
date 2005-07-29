@@ -939,7 +939,7 @@ void check_vtlb_sanity(thash_cb_t *vtlb)
     if ( sanity_check == 0 ) return;
     sanity_check --;
     s_sect.v = 0;
-//    page = alloc_domheap_pages (NULL, VCPU_TLB_ORDER);
+//    page = alloc_domheap_pages (NULL, VCPU_TLB_ORDER, 0);
 //    if ( page == NULL ) {
 //        panic("No enough contiguous memory for init_domain_mm\n");
 //    };

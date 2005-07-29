@@ -145,7 +145,7 @@ static thash_cb_t *init_domain_vhpt(struct vcpu *d)
     thash_cb_t  *vhpt;
     PTA pta_value;
     
-    page = alloc_domheap_pages (NULL, VCPU_TLB_ORDER);
+    page = alloc_domheap_pages (NULL, VCPU_TLB_ORDER, 0);
     if ( page == NULL ) {
         panic("No enough contiguous memory for init_domain_mm\n");
     }
@@ -187,7 +187,7 @@ thash_cb_t *init_domain_tlb(struct vcpu *d)
     tlb_special_t  *ts;
     thash_cb_t  *tlb;
     
-    page = alloc_domheap_pages (NULL, VCPU_TLB_ORDER);
+    page = alloc_domheap_pages (NULL, VCPU_TLB_ORDER, 0);
     if ( page == NULL ) {
         panic("No enough contiguous memory for init_domain_mm\n");
     }
@@ -224,7 +224,7 @@ alloc_pmt(struct domain *d)
     /* Only called once */
     ASSERT(d->arch.pmt);
 
-    page = alloc_domheap_pages(NULL, get_order(d->max_pages));
+    page = alloc_domheap_pages(NULL, get_order(d->max_pages), 0);
     ASSERT(page);
 
     d->arch.pmt = page_to_virt(page);
