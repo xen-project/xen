@@ -61,6 +61,7 @@ extern unsigned int cpu_rev;
     CPU_BASED_INVDPG_EXITING | \
     CPU_BASED_MWAIT_EXITING | \
     CPU_BASED_MOV_DR_EXITING | \
+    CPU_BASED_ACTIVATE_IO_BITMAP | \
     CPU_BASED_UNCOND_IO_EXITING \
     )
 
@@ -446,5 +447,9 @@ static inline int iopacket_port(struct domain *d)
 {
     return get_sp(d)->sp_global.eport;
 }
+
+/* Prototypes */
+void load_cpu_user_regs(struct cpu_user_regs *regs);
+void store_cpu_user_regs(struct cpu_user_regs *regs);
 
 #endif /* __ASM_X86_VMX_H__ */

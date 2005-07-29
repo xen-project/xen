@@ -38,7 +38,7 @@
 #include <asm/vmx_vmcs.h>
 #include <asm/vmx_intercept.h>
 #include <asm/shadow.h>
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
 #include <asm/shadow_64.h>
 #endif
 
@@ -94,12 +94,16 @@ static void vmx_save_init_msrs(void)
     msr_content = msr->msr_items[VMX_INDEX_MSR_ ## address]; \
     break
 
-#define CASE_WRITE_MSR(address)   \
-    case MSR_ ## address:                   \
-    msr->msr_items[VMX_INDEX_MSR_ ## address] = msr_content; \
-    if (!test_bit(VMX_INDEX_MSR_ ## address, &msr->flags)){ \
-    	set_bit(VMX_INDEX_MSR_ ## address, &msr->flags);   \
-    }\
+#define CASE_WRITE_MSR(address)                                     \
+    case MSR_ ## address:                                           \
+    {                                                               \
+        msr->msr_items[VMX_INDEX_MSR_ ## address] = msr_content;    \
+        if (!test_bit(VMX_INDEX_MSR_ ## address, &msr->flags)) {    \
+            set_bit(VMX_INDEX_MSR_ ## address, &msr->flags);        \
+        }                                                           \
+        wrmsrl(MSR_ ## address, msr_content);                       \
+        set_bit(VMX_INDEX_MSR_ ## address, &host_state->flags);     \
+    }                                                               \
     break
 
 #define IS_CANO_ADDRESS(add) 1
@@ -604,11 +608,6 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
         addr = (exit_qualification >> 16) & (0xffff);
     else
         addr = regs->edx & 0xffff;
-
-    if (addr == 0x80) {
-        __update_guest_eip(inst_len);
-        return;
-    }
 
     vio = get_vio(d->domain, d->vcpu_id);
     if (vio == 0) {
@@ -1261,6 +1260,7 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         CASE_SET_REG(EBP, ebp);
         CASE_SET_REG(ESI, esi);
         CASE_SET_REG(EDI, edi);
+        CASE_EXTEND_SET_REG
     case REG_ESP:
         __vmwrite(GUEST_RSP, value);
         regs->esp = value;

@@ -114,7 +114,8 @@ bool transaction_block(struct connection *conn, const char *node)
 	trans = transaction_covering_node(node);
 	if (trans) {
 		start_transaction_timeout(trans);
-		conn->blocked = talloc_strdup(conn, node);
+		conn->state = BLOCKED;
+		conn->blocked_by = talloc_strdup(conn, node);
 		return true;
 	}
 	return false;
@@ -239,20 +240,24 @@ static bool copy_dir(const char *src, const char *dst)
 	return true;
 }
 
-bool do_transaction_start(struct connection *conn, const char *node)
+void do_transaction_start(struct connection *conn, const char *node)
 {
 	struct transaction *transaction;
 	char *dir;
 
-	if (conn->transaction)
-		return send_error(conn, EBUSY);
+	if (conn->transaction) {
+		send_error(conn, EBUSY);
+		return;
+	}
 
 	node = canonicalize(conn, node);
-	if (!check_node_perms(conn, node, XS_PERM_READ))
-		return send_error(conn, errno);
+	if (!check_node_perms(conn, node, XS_PERM_READ)) {
+		send_error(conn, errno);
+		return;
+	}
 
 	if (transaction_block(conn, node))
-		return true;
+		return;
 
 	dir = node_dir_outside_transaction(node);
 
@@ -270,18 +275,19 @@ bool do_transaction_start(struct connection *conn, const char *node)
 	talloc_set_destructor(transaction, destroy_transaction);
 	trace_create(transaction, "transaction");
 
-	if (!copy_dir(dir, transaction->divert))
-		return send_error(conn, errno);
+	if (!copy_dir(dir, transaction->divert)) {
+		send_error(conn, errno);
+		return;
+	}
 
 	talloc_steal(conn, transaction);
 	conn->transaction = transaction;
-	return send_ack(transaction->conn, XS_TRANSACTION_START);
+	send_ack(transaction->conn, XS_TRANSACTION_START);
 }
 
 static bool commit_transaction(struct transaction *trans)
 {
 	char *tmp, *dir;
-	struct changed_node *i;
 
 	/* Move: orig -> .old, repl -> orig.  Cleanup deletes .old. */
 	dir = node_dir_outside_transaction(trans->node);
@@ -294,39 +300,44 @@ static bool commit_transaction(struct transaction *trans)
 			trans->divert, dir);
 
 	trans->divert = tmp;
-
-	/* Fire off the watches for everything that changed. */
-	list_for_each_entry(i, &trans->changes, list)
-		fire_watches(NULL, i->node, i->recurse);
 	return true;
 }
 
-bool do_transaction_end(struct connection *conn, const char *arg)
+void do_transaction_end(struct connection *conn, const char *arg)
 {
-	if (!arg || (!streq(arg, "T") && !streq(arg, "F")))
-		return send_error(conn, EINVAL);
+	struct changed_node *i;
+	struct transaction *trans;
 
-	if (!conn->transaction)
-		return send_error(conn, ENOENT);
-
-	if (streq(arg, "T")) {
-		if (conn->transaction->destined_to_fail) {
-			send_error(conn, ETIMEDOUT);
-			goto failed;
-		}
-		if (!commit_transaction(conn->transaction)) {
-			send_error(conn, errno);
-			goto failed;
-		}
+	if (!arg || (!streq(arg, "T") && !streq(arg, "F"))) {
+		send_error(conn, EINVAL);
+		return;
 	}
 
-	talloc_free(conn->transaction);
-	conn->transaction = NULL;
-	return send_ack(conn, XS_TRANSACTION_END);
+	if (!conn->transaction) {
+		send_error(conn, ENOENT);
+		return;
+	}
 
-failed:
-	talloc_free(conn->transaction);
+	/* Set to NULL so fire_watches sends events. */
+	trans = conn->transaction;
 	conn->transaction = NULL;
-	return false;
+	/* Attach transaction to arg for auto-cleanup */
+	talloc_steal(arg, trans);
+
+	if (streq(arg, "T")) {
+		if (trans->destined_to_fail) {
+			send_error(conn, ETIMEDOUT);
+			return;
+		}
+		if (!commit_transaction(trans)) {
+			send_error(conn, errno);
+			return;
+		}
+
+		/* Fire off the watches for everything that changed. */
+		list_for_each_entry(i, &trans->changes, list)
+			fire_watches(conn, i->node, i->recurse);
+	}
+	send_ack(conn, XS_TRANSACTION_END);
 }
 

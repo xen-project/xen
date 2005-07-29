@@ -82,9 +82,4 @@ clean:
 	rm -f asm-xsi-offsets.s $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 	rm -f lib/*.o
 
-# setup.o contains bits of compile.h so it must be blown away
-delete-unfresh-files:
-	echo any unfresh-files to delete for ia64\?
-#	rm -f setup.o
-
-.PHONY: default clean delete-unfresh-files
+.PHONY: default clean

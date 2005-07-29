@@ -5,7 +5,6 @@
 ###########################################################
 
 import os
-import os.path
 import signal
 import sys
 import threading
@@ -16,6 +15,7 @@ import re
 import StringIO
 import traceback
 import time
+import glob
 
 from xen.lowlevel import xu
 
@@ -25,6 +25,7 @@ from xen.xend import EventServer; eserver = EventServer.instance()
 from xen.xend.XendError import XendError
 from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
+from xen.xend import XendRoot; xroot = XendRoot.instance()
 
 import channel
 import controller
@@ -184,9 +185,13 @@ class Daemon:
             log.info("Started xenstored, pid=%d", pid)
         else:
             # Child
-            if XEND_DAEMONIZE and (not XENSTORED_DEBUG):
+            if XEND_DAEMONIZE:
                 self.daemonize()
-            os.execl("/usr/sbin/xenstored", "xenstored", "--no-fork")
+            if XENSTORED_DEBUG:
+                os.execl("/usr/sbin/xenstored", "xenstored", "--no-fork",
+                         "-T", "/var/log/xenstored-trace.log")
+            else:
+                os.execl("/usr/sbin/xenstored", "xenstored", "--no-fork")
 
     def daemonize(self):
         if not XEND_DAEMONIZE: return
@@ -323,6 +328,7 @@ class Daemon:
         return self.cleanup(kill=True)
 
     def run(self):
+        _enforce_dom0_cpus()
         try:
             log.info("Xend Daemon started")
             self.createFactories()
@@ -358,6 +364,32 @@ class Daemon:
         # way to exit a Python with running threads.
         #sys.exit(rc)
         os._exit(rc)
+
+def _enforce_dom0_cpus():
+    dn = xroot.get_dom0_cpus()
+
+    for d in glob.glob("/sys/devices/system/cpu/cpu*"):
+        cpu = int(os.path.basename(d)[3:])
+        if (dn == 0) or (cpu < dn):
+            v = "1"
+        else:
+            v = "0"
+        try:
+            f = open("%s/online" %d, "r+")
+            c = f.read(1)
+            if (c != v):
+                if v == "0":
+                    log.info("dom0 is trying to give back cpu %d", cpu)
+                else:
+                    log.info("dom0 is trying to take cpu %d", cpu)
+                f.seek(0)
+                f.write(v)
+                f.close()
+                log.info("dom0 successfully enforced cpu %d", cpu)
+            else:
+                f.close()
+        except:
+            pass
 
 def instance():
     global inst

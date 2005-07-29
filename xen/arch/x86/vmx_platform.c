@@ -32,7 +32,7 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <asm/current.h>
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
 #include <asm/shadow_64.h>
 #endif
 #ifdef CONFIG_VMX

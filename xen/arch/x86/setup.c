@@ -197,7 +197,12 @@ static void __init start_of_day(void)
         set_in_cr4(X86_CR4_OSXMMEXCPT);
 
     if ( opt_nosmp )
+    {
         max_cpus = 0;
+        smp_num_siblings = 1;
+        boot_cpu_data.x86_num_cores = 1;
+    }
+
     smp_prepare_cpus(max_cpus);
 
     /* We aren't hotplug-capable yet. */
@@ -245,6 +250,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long firsthole_start, nr_pages;
     unsigned long initial_images_start, initial_images_end;
+    unsigned long _initrd_start = 0, _initrd_len = 0;
+    unsigned int initrdidx = 1;
     struct e820entry e820_raw[E820MAX];
     int i, e820_raw_nr = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
@@ -411,7 +418,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     shadow_mode_init();
 
     /* initialize access control security module */
-    acm_init();
+    acm_init(&initrdidx, mbi, initial_images_start);
 
     /* Create initial domain 0. */
     dom0 = do_createdomain(0, 0);
@@ -450,6 +457,13 @@ void __init __start_xen(multiboot_info_t *mbi)
         }
     }
 
+    if ( (initrdidx > 0) && (initrdidx < mbi->mods_count) )
+    {
+        _initrd_start = initial_images_start +
+            (mod[initrdidx].mod_start - mod[0].mod_start);
+        _initrd_len   = mod[initrdidx].mod_end - mod[initrdidx].mod_start;
+    }
+
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
@@ -457,11 +471,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( construct_dom0(dom0,
                         initial_images_start, 
                         mod[0].mod_end-mod[0].mod_start,
-                        (mbi->mods_count == 1) ? 0 :
-                        initial_images_start + 
-                        (mod[1].mod_start-mod[0].mod_start),
-                        (mbi->mods_count == 1) ? 0 :
-                        mod[mbi->mods_count-1].mod_end - mod[1].mod_start,
+                        _initrd_start,
+                        _initrd_len,
                         cmdline) != 0)
         panic("Could not set up DOM0 guest OS\n");
 

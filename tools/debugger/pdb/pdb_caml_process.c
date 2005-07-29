@@ -66,49 +66,127 @@ send_request (pdb_front_ring_t *pdb_ring, int evtchn, pdb_request_t *request)
 }
 
 /*
- * read a response from a pdb domain backend.
+ * process_handle_response : int32 -> int * int * string
  *
- * grabs the response off a ring.
+ * A backend domain has notified pdb (via an event channel)
+ * that a command has finished.
+ * We read the result from the channel and formulate a response
+ * as a single string.  Also return the domain and process.
  */
-static void
-read_response (pdb_front_ring_t *pdb_ring, pdb_response_p response)
+
+static inline unsigned int
+_flip (unsigned int orig)
 {
-    RING_IDX loop, rp;
-
-    rp = pdb_ring->sring->rsp_prod;
-    rmb(); /* Ensure we see queued responses up to 'rp'. */
-
-    for ( loop = pdb_ring->rsp_cons; loop != rp; loop++ )
-    {
-        pdb_response_p resp;
-
-        resp = RING_GET_RESPONSE(pdb_ring, loop);
-        memcpy(response, resp, sizeof(pdb_response_t));
-
-        /*        
-        printf ("got response %x %x %x\n", response->operation, 
-                response->status, response->value);
-        */
-    }
-    pdb_ring->rsp_cons = loop;
+    return (((orig << 24) & 0xff000000) | ((orig <<  8) & 0x00ff0000) |
+            ((orig >>  8) & 0x0000ff00) | ((orig >> 24) & 0x000000ff));
 }
-
-/*
- * process_handle_response : int32 -> unit
- */
 
 value
 process_handle_response (value ring)
 {
     CAMLparam1(ring);
+    CAMLlocal2(result, str);
 
+    RING_IDX rp;
+    pdb_response_p resp;
     pdb_front_ring_t *my_ring = (pdb_front_ring_t *)Int32_val(ring);
-    pdb_response_t resp;
+    char msg[2048];
+    int msglen;
 
-    if ( my_ring )
-        read_response(my_ring, &resp);
+    memset(msg, 0, sizeof(msg));
 
-    CAMLreturn(Val_unit);
+    rp = my_ring->sring->rsp_prod;
+    rmb();                     /* Ensure we see queued responses up to 'rp'. */
+
+    /* default response is OK unless the command has something 
+       more interesting to say */
+    sprintf(msg, "OK");
+
+    if (my_ring->rsp_cons != rp)
+    {
+        resp = RING_GET_RESPONSE(my_ring, my_ring->rsp_cons);
+
+        switch (resp->operation)
+        {
+        case PDB_OPCODE_PAUSE :
+        case PDB_OPCODE_ATTACH :
+        case PDB_OPCODE_DETACH :
+            break;
+            
+        case PDB_OPCODE_RD_REGS :
+        {
+            int loop;
+            pdb_op_rd_regs_p regs = &resp->u.rd_regs;
+            
+            for (loop = 0; loop < GDB_REGISTER_FRAME_SIZE * 8; loop += 8)
+            {
+                sprintf(&msg[loop], "%08x", _flip(regs->reg[loop >> 3]));
+            }
+                
+            break;
+        }
+        case PDB_OPCODE_WR_REG :
+        {
+            /* should check the return status */
+            break;
+        }
+
+        case PDB_OPCODE_RD_MEM :
+        {
+            int loop;
+            pdb_op_rd_mem_resp_p mem = &resp->u.rd_mem;
+
+            for (loop = 0; loop < mem->length; loop ++)
+            {
+                sprintf(&msg[loop * 2], "%02x", mem->data[loop]);
+            }
+            break;
+        }
+        case PDB_OPCODE_WR_MEM :
+        {
+            /* should check the return status */
+            break;
+        }
+
+        /* this is equivalent to process_xen_virq */
+        case PDB_OPCODE_CONTINUE :
+        {
+            sprintf(msg, "S05");
+            break;
+        }
+        case PDB_OPCODE_STEP :
+        {
+            sprintf(msg, "S05");
+            break;
+        }
+
+        case PDB_OPCODE_SET_BKPT :
+        {
+            break;
+        }
+        case PDB_OPCODE_CLR_BKPT :
+        {
+            break;
+        }
+
+        default :
+            printf("(linux) UNKNOWN MESSAGE TYPE IN RESPONSE\n");
+            break;
+        }
+
+        my_ring->rsp_cons++;
+    }
+
+    msglen = strlen(msg);
+    result = caml_alloc(3,0);
+    str = alloc_string(msglen);
+    memmove(&Byte(str,0), msg, msglen);
+
+    Store_field(result, 0, Val_int(resp->domain));
+    Store_field(result, 1, Val_int(resp->process));
+    Store_field(result, 2, str);
+
+    CAMLreturn(result);
 }
 
 /*
@@ -120,27 +198,14 @@ proc_attach_debugger (value context)
     CAMLparam1(context);
     context_t ctx;
     pdb_request_t req;
-    pdb_response_t resp;
 
     decode_context(&ctx, context);
 
-    printf("(pdb) attach process [%d.%d] %d %p\n", ctx.domain, ctx.process,
-           ctx.evtchn, ctx.ring);
-    fflush(stdout);
-
     req.operation = PDB_OPCODE_ATTACH;
-    req.domain  = ctx.domain;
+    req.u.attach.domain  = ctx.domain;
     req.process = ctx.process;
 
     send_request (ctx.ring, ctx.evtchn, &req);
-
-    printf("awaiting response\n");
-    fflush(stdout);
-
-    read_response (ctx.ring, &resp);
-
-    printf("response %d %d\n", resp.operation, resp.status);
-    fflush(stdout);
 
     CAMLreturn(Val_unit);
 }
@@ -163,7 +228,6 @@ proc_detach_debugger (value context)
     fflush(stdout);
 
     req.operation = PDB_OPCODE_DETACH;
-    req.domain  = ctx.domain;
     req.process = ctx.process;
 
     send_request (ctx.ring, ctx.evtchn, &req);
@@ -180,67 +244,41 @@ proc_pause_target (value context)
 {
     CAMLparam1(context);
     context_t ctx;
+    pdb_request_t req;
 
     decode_context(&ctx, context);
 
     printf("(pdb) pause target %d %d\n", ctx.domain, ctx.process);
     fflush(stdout);
 
+    req.operation = PDB_OPCODE_PAUSE;
+    req.process = ctx.process;
+
+    send_request (ctx.ring, ctx.evtchn, &req);
+
     CAMLreturn(Val_unit);
 }
 
 
 /*
- * proc_read_registers : context_t -> int32
+ * proc_read_registers : context_t -> unit
  */
 value
 proc_read_registers (value context)
 {
     CAMLparam1(context);
-    CAMLlocal1(result);
-
-    u32 regs[REGISTER_FRAME_SIZE];
 
     pdb_request_t req;
     context_t ctx;
-    int loop;
 
     decode_context(&ctx, context);
 
-    req.operation = PDB_OPCODE_RD_REG;
-    req.domain  = ctx.domain;
+    req.operation = PDB_OPCODE_RD_REGS;
     req.process = ctx.process;
 
-    for (loop = 0; loop < REGISTER_FRAME_SIZE; loop++)
-    {
-        pdb_response_t resp;
+    send_request (ctx.ring, ctx.evtchn, &req);
 
-        req.u.rd_reg.reg = loop;
-        send_request(ctx.ring, ctx.evtchn, &req);
-        read_response(ctx.ring, &resp);
-        regs[loop] = resp.value;
-    }
-
-    result = caml_alloc_tuple(16);
-
-    Store_field(result,  0, caml_copy_int32(regs[LINUX_EAX]));
-    Store_field(result,  1, caml_copy_int32(regs[LINUX_ECX]));
-    Store_field(result,  2, caml_copy_int32(regs[LINUX_EDX]));
-    Store_field(result,  3, caml_copy_int32(regs[LINUX_EBX]));
-    Store_field(result,  4, caml_copy_int32(regs[LINUX_ESP]));
-    Store_field(result,  5, caml_copy_int32(regs[LINUX_EBP]));
-    Store_field(result,  6, caml_copy_int32(regs[LINUX_ESI]));
-    Store_field(result,  7, caml_copy_int32(regs[LINUX_EDI]));
-    Store_field(result,  8, caml_copy_int32(regs[LINUX_EIP]));
-    Store_field(result,  9, caml_copy_int32(regs[LINUX_EFL]));
-    Store_field(result, 10, caml_copy_int32(regs[LINUX_CS]));          /* 16 */
-    Store_field(result, 11, caml_copy_int32(regs[LINUX_SS]));          /* 16 */
-    Store_field(result, 12, caml_copy_int32(regs[LINUX_DS]));          /* 16 */
-    Store_field(result, 13, caml_copy_int32(regs[LINUX_ES]));          /* 16 */
-    Store_field(result, 14, caml_copy_int32(regs[LINUX_FS]));          /* 16 */
-    Store_field(result, 15, caml_copy_int32(regs[LINUX_GS]));          /* 16 */
-
-    CAMLreturn(result);
+    CAMLreturn(Val_unit);
 }
 
 
@@ -257,12 +295,10 @@ proc_write_register (value context, value reg, value newval)
 
     context_t ctx;
     pdb_request_t req;
-    pdb_response_t resp;
 
     decode_context(&ctx, context);
 
     req.operation = PDB_OPCODE_WR_REG;
-    req.domain = ctx.domain;
     req.process = ctx.process;
     req.u.wr_reg.value = my_newval;
 
@@ -290,71 +326,34 @@ proc_write_register (value context, value reg, value newval)
     }
 
     send_request(ctx.ring, ctx.evtchn, &req);
-    read_response(ctx.ring, &resp);
 
     CAMLreturn(Val_unit);
 }
 
 
 /*
- * proc_read_memory : context_t -> int32 -> int -> int
+ * proc_read_memory : context_t -> int32 -> int -> unit
  */
 value
 proc_read_memory (value context, value address, value length)
 {
     CAMLparam3(context, address, length);
-    CAMLlocal2(result, temp);
 
     context_t ctx;
-    int loop;
-    char *buffer;
-    /*    memory_t my_address = Int32_val(address); */
-    u32 my_length = Int_val(length);
-
-    printf ("(pdb) read memory\n");
+    pdb_request_t req;
 
     decode_context(&ctx, context);
 
-    buffer = malloc(my_length);
-    if ( buffer == NULL )
-    {
-        printf("(pdb) read memory: malloc failed.\n");  fflush(stdout);
-        failwith("read memory error");
-    }
+    req.operation = PDB_OPCODE_RD_MEM;
+    req.process = ctx.process;
+    req.u.rd_mem.address = Int32_val(address);
+    req.u.rd_mem.length  = Int_val(length);
 
-    /*
-    if ( xendebug_read_memory(xc_handle, ctx.domain, ctx.vcpu, 
-                              my_address, my_length, buffer) )
-    {
-        printf("(pdb) read memory error!\n");  fflush(stdout);
-        failwith("read memory error");
-    }
-    */
-
-    memset(buffer, 0xff, my_length);
-
-    result = caml_alloc(2,0);
-    if ( my_length > 0 )                                              /* car */
-    {
-        Store_field(result, 0, Val_int(buffer[my_length - 1] & 0xff));
-    }
-    else
-
-    {
-        Store_field(result, 0, Val_int(0));                    
-    }
-    Store_field(result, 1, Val_int(0));                               /* cdr */
-
-    for (loop = 1; loop < my_length; loop++)
-    {
-        temp = result;
-        result = caml_alloc(2,0);
-        Store_field(result, 0, Val_int(buffer[my_length - loop - 1] & 0xff));
-        Store_field(result, 1, temp);
-    }
-
-    CAMLreturn(result);
+    send_request(ctx.ring, ctx.evtchn, &req);
+    
+    CAMLreturn(Val_unit);
 }
+
 
 /*
  * proc_write_memory : context_t -> int32 -> int list -> unit
@@ -366,50 +365,37 @@ proc_write_memory (value context, value address, value val_list)
     CAMLlocal1(node);
 
     context_t ctx;
-
-    char buffer[4096];  /* a big buffer */
-    memory_t  my_address;
+    pdb_request_t req;
     u32 length = 0;
 
-    printf ("(pdb) write memory\n");
-
     decode_context(&ctx, context);
+
+    req.operation = PDB_OPCODE_WR_MEM;
+    req.process = ctx.process;
 
     node = val_list;
     if ( Int_val(node) == 0 )       /* gdb functionalty test uses empty list */
     {
-        CAMLreturn(Val_unit);
+        req.u.wr_mem.address = Int32_val(address);
+        req.u.wr_mem.length  = 0;
     }
-
-    while ( Int_val(Field(node,1)) != 0 )
+    else
     {
-        buffer[length++] = Int_val(Field(node, 0));
-        node = Field(node,1);
-    }
-    buffer[length++] = Int_val(Field(node, 0));
-
-    my_address = (memory_t) Int32_val(address);
-
-    /*
-    if ( xendebug_write_memory(xc_handle, ctx.domain, ctx.vcpu,
-                               my_address, length, buffer) )
-    {
-        printf("(pdb) write memory error!\n");  fflush(stdout);
-        failwith("write memory error");
-    }
-    */
-    {
-        int loop;
-        for (loop = 0; loop < length; loop++)
+        while ( Int_val(Field(node,1)) != 0 )
         {
-            printf (" %02x", buffer[loop]);
+            req.u.wr_mem.data[length++] = Int_val(Field(node, 0));
+            node = Field(node,1);
         }
-        printf ("\n");
+        req.u.wr_mem.data[length++] = Int_val(Field(node, 0));
+        
+        req.u.wr_mem.address = Int32_val(address);
+        req.u.wr_mem.length  = length;
     }
-
+ 
+    send_request(ctx.ring, ctx.evtchn, &req);
+   
     CAMLreturn(Val_unit);
 }
-
 
 
 /*
@@ -421,17 +407,14 @@ proc_continue_target (value context)
     CAMLparam1(context);
 
     context_t ctx;
+    pdb_request_t req;
 
     decode_context(&ctx, context);
 
-    /*
-    if ( xendebug_continue(xc_handle, ctx.domain, ctx.vcpu) )
-    {
-        printf("(pdb) continue\n");  fflush(stdout);
-        failwith("continue");
-    }
-    */
-    printf ("CONTINUE\n");
+    req.operation = PDB_OPCODE_CONTINUE;
+    req.process = ctx.process;
+ 
+    send_request(ctx.ring, ctx.evtchn, &req);
 
     CAMLreturn(Val_unit);
 }
@@ -445,17 +428,14 @@ proc_step_target (value context)
     CAMLparam1(context);
 
     context_t ctx;
+    pdb_request_t req;
 
     decode_context(&ctx, context);
 
-    /*
-    if ( xendebug_step(xc_handle, ctx.domain, ctx.vcpu) )
-    {
-        printf("(pdb) step\n");  fflush(stdout);
-        failwith("step");
-    }
-    */
-    printf ("STEP\n");
+    req.operation = PDB_OPCODE_STEP;
+    req.process = ctx.process;
+ 
+    send_request(ctx.ring, ctx.evtchn, &req);
 
     CAMLreturn(Val_unit);
 }
@@ -471,22 +451,16 @@ proc_insert_memory_breakpoint (value context, value address, value length)
     CAMLparam3(context, address, length);
 
     context_t ctx;
-    memory_t my_address = (memory_t) Int32_val(address);
-    int my_length = Int_val(length);
+    pdb_request_t req;
 
     decode_context(&ctx, context);
 
-    printf ("(pdb) insert memory breakpoint 0x%lx %d\n",
-            my_address, my_length);
+    req.operation = PDB_OPCODE_SET_BKPT;
+    req.process = ctx.process;
+    req.u.bkpt.address = (memory_t) Int32_val(address);
+    req.u.bkpt.length  =  Int_val(length);
 
-    /*
-    if ( xendebug_insert_memory_breakpoint(xc_handle, ctx.domain, ctx.vcpu,
-                                           my_address, my_length) )
-    {
-        printf("(pdb) error: insert memory breakpoint\n");  fflush(stdout);
-        failwith("insert memory breakpoint");
-    }
-    */
+    send_request(ctx.ring, ctx.evtchn, &req);
 
     CAMLreturn(Val_unit);
 }
@@ -500,24 +474,16 @@ proc_remove_memory_breakpoint (value context, value address, value length)
     CAMLparam3(context, address, length);
 
     context_t ctx;
-
-    memory_t my_address = (memory_t) Int32_val(address);
-    int my_length = Int_val(length);
-
-    printf ("(pdb) remove memory breakpoint 0x%lx %d\n",
-            my_address, my_length);
+    pdb_request_t req;
 
     decode_context(&ctx, context);
 
-    /*
-    if ( xendebug_remove_memory_breakpoint(xc_handle, 
-                                           ctx.domain, ctx.vcpu,
-                                           my_address, my_length) )
-    {
-        printf("(pdb) error: remove memory breakpoint\n");  fflush(stdout);
-        failwith("remove memory breakpoint");
-    }
-    */
+    req.operation = PDB_OPCODE_CLR_BKPT;
+    req.process = ctx.process;
+    req.u.bkpt.address = (memory_t) Int32_val(address);
+    req.u.bkpt.length  =  Int_val(length);
+
+    send_request(ctx.ring, ctx.evtchn, &req);
 
     CAMLreturn(Val_unit);
 }

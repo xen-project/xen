@@ -369,4 +369,6 @@ extern int iommu_bio_merge;
 
 #endif /* __KERNEL__ */
 
+#define ARCH_HAS_DEV_MEM
+
 #endif

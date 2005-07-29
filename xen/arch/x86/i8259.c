@@ -19,7 +19,7 @@
 #include <asm/bitops.h>
 #include <xen/delay.h>
 #include <asm/apic.h>
-
+#include <io_ports.h>
 
 /*
  * Common place to define all x86 IRQ vectors
@@ -395,9 +395,9 @@ void __init init_IRQ(void)
     /* Set the clock to HZ Hz */
 #define CLOCK_TICK_RATE 1193180 /* crystal freq (Hz) */
 #define LATCH (((CLOCK_TICK_RATE)+(HZ/2))/HZ)
-    outb_p(0x34,0x43);           /* binary, mode 2, LSB/MSB, ch 0 */
-    outb_p(LATCH & 0xff , 0x40); /* LSB */
-    outb(LATCH >> 8 , 0x40);     /* MSB */
+    outb_p(0x34, PIT_MODE);        /* binary, mode 2, LSB/MSB, ch 0 */
+    outb_p(LATCH & 0xff, PIT_CH0); /* LSB */
+    outb(LATCH >> 8, PIT_CH0);     /* MSB */
 
     setup_irq(2, &cascade);
 }

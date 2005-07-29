@@ -11,6 +11,13 @@ warnings.filterwarnings('ignore', category=FutureWarning)
 
 from xen.xend import PrettyPrint
 from xen.xend import sxp
+# this is a nasty place to stick this in, but required because
+# log file access is set up via a 5 deep import chain.  This
+# ensures the user sees a useful message instead of a stack trace
+if os.getuid() != 0:
+    print "xm requires root access to execute, please try again as root"
+    sys.exit(1)
+
 from xen.xend.XendClient import XendError, server
 from xen.xend.XendClient import main as xend_client_main
 from xen.xm import create, destroy, migrate, shutdown, sysrq
@@ -390,7 +397,7 @@ class ProgList(Prog):
             d['dom'] = int(sxp.child_value(info, 'id', '-1'))
             d['name'] = sxp.child_value(info, 'name', '??')
             d['mem'] = int(sxp.child_value(info, 'memory', '0'))
-            d['cpu'] = int(sxp.child_value(info, 'cpu', '0'))
+            d['cpu'] = str(sxp.child_value(info, 'cpu', '0'))
             d['vcpus'] = int(sxp.child_value(info, 'vcpus', '0'))
             d['state'] = sxp.child_value(info, 'state', '??')
             d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
@@ -399,12 +406,14 @@ class ProgList(Prog):
                 d['port'] = sxp.child_value(console, 'console_port')
             else:
                 d['port'] = ''
+            if d['vcpus'] > 1:
+                d['cpu'] = '-'
             if ((int(sxp.child_value(info, 'ssidref', '0'))) != 0):
                 d['ssidref1'] =  int(sxp.child_value(info, 'ssidref', '0')) & 0xffff
                 d['ssidref2'] = (int(sxp.child_value(info, 'ssidref', '0')) >> 16) & 0xffff
-                print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3d  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %(port)4s    s:%(ssidref2)02x/p:%(ssidref1)02x" % d)
+                print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %(port)4s    s:%(ssidref2)02x/p:%(ssidref1)02x" % d)
             else:
-                print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3d  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %(port)4s" % d)
+                print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %(port)4s" % d)
 
     def show_vcpus(self, doms):
         print 'Name              Id  VCPU  CPU  CPUMAP'
@@ -554,9 +563,9 @@ class ProgMaxmem(Prog):
 
 xm.prog(ProgMaxmem)
 
-class ProgBalloon(Prog):
+class ProgSetMem(Prog):
     group = 'domain'
-    name  = 'balloon'
+    name  = 'set-mem'
     info  = """Set the domain's memory footprint using the balloon driver."""
 
     def help(self, args):
@@ -570,7 +579,7 @@ MEMORY_TARGET megabytes"""
         mem_target = int_unit(args[2], 'm')
         server.xend_domain_mem_target_set(dom, mem_target)
 
-xm.prog(ProgBalloon)
+xm.prog(ProgSetMem)
 
 class ProgVcpuhotplug(Prog):
     group = 'domain'

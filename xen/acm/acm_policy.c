@@ -33,7 +33,7 @@
 #include <acm/acm_endian.h>
 
 int
-acm_set_policy(void *buf, u16 buf_size, u16 policy)
+acm_set_policy(void *buf, u16 buf_size, u16 policy, int isuserbuffer)
 {
 	u8 *policy_buffer = NULL;
 	struct acm_policy_buffer *pol;
@@ -53,16 +53,21 @@ acm_set_policy(void *buf, u16 buf_size, u16 policy)
 	/* 1. copy buffer from domain */
 	if ((policy_buffer = xmalloc_array(u8, buf_size)) == NULL)
 	    goto error_free;
-        if (copy_from_user(policy_buffer, buf, buf_size)) {
-		printk("%s: Error copying!\n",__func__);
-		goto error_free;
+	if (isuserbuffer) {
+		if (copy_from_user(policy_buffer, buf, buf_size)) {
+			printk("%s: Error copying!\n",__func__);
+			goto error_free;
+		}
+	} else {
+		memcpy(policy_buffer, buf, buf_size);
 	}
 	/* 2. some sanity checking */
 	pol = (struct acm_policy_buffer *)policy_buffer;
 
 	if ((ntohl(pol->magic) != ACM_MAGIC) || 
 	    (ntohs(pol->primary_policy_code) != acm_bin_pol.primary_policy_code) ||
-	    (ntohs(pol->secondary_policy_code) != acm_bin_pol.secondary_policy_code)) {
+	    (ntohs(pol->secondary_policy_code) != acm_bin_pol.secondary_policy_code) ||
+	    (ntohl(pol->policyversion) != POLICY_INTERFACE_VERSION)) {
 		printkd("%s: Wrong policy magics!\n", __func__);
 		goto error_free;
 	}

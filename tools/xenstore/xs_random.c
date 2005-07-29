@@ -987,6 +987,8 @@ static void setup_file_ops(const char *dir)
 	char *cmd = talloc_asprintf(NULL, "echo -n r0 > %s/.perms", dir);
 	if (mkdir(dir, 0700) != 0)
 		barf_perror("Creating directory %s", dir);
+	if (mkdir(talloc_asprintf(cmd, "%s/tool", dir), 0700) != 0)
+		barf_perror("Creating directory %s/tool", dir);
 	do_command(cmd);
 	talloc_free(cmd);
 }
@@ -1210,6 +1212,10 @@ static bool ops_equal(struct ops *a, void *ah,
 	unsigned int numpermsa, numpermsb;
 	char *nodename;
 	bool ret = false;
+
+	/* Ignore tool/ dir. */
+	if (streq(node, "/tool"))
+		return true;
 
 	/* FILE backend expects talloc'ed pointer. */
 	nodename = talloc_strdup(NULL, node);

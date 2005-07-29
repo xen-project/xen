@@ -32,6 +32,8 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
 	  cp $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION-$(EXTRAVERSION) $(LINUX_DIR)/.config \
 	  || cp $(LINUX_DIR)/arch/xen/configs/$(EXTRAVERSION)_defconfig_$(XEN_TARGET_ARCH) \
 		$(LINUX_DIR)/.config
+	# See if we need to munge config to enable PAE
+	$(MAKE) CONFIG_FILE=$(LINUX_DIR)/.config -f buildconfigs/Rules.mk config-update-pae
 	# Patch kernel Makefile to set EXTRAVERSION
 	( cd $(LINUX_DIR) ; \
 	  sed -e 's/^EXTRAVERSION.*/&$$(XENGUEST)\nXENGUEST = -$(EXTRAVERSION)/' Makefile >Mk.tmp ; \

@@ -373,6 +373,14 @@ static int vmx_final_setup_guest(
 
 out:
     free_vmcs(vmcs);
+    if(v->arch.arch_vmx.io_bitmap_a != 0) {
+        free_xenheap_pages(v->arch.arch_vmx.io_bitmap_a, get_order(0x1000));
+        v->arch.arch_vmx.io_bitmap_a = 0;
+    }
+    if(v->arch.arch_vmx.io_bitmap_b != 0) {
+        free_xenheap_pages(v->arch.arch_vmx.io_bitmap_b, get_order(0x1000));
+        v->arch.arch_vmx.io_bitmap_b = 0;
+    }
     v->arch.arch_vmx.vmcs = 0;
     return error;
 }
@@ -417,12 +425,12 @@ int arch_set_info_guest(
 
         /* Ensure real hardware interrupts are enabled. */
         v->arch.guest_context.user_regs.eflags |= EF_IE;
-    } else {
-        __vmwrite(GUEST_RFLAGS, v->arch.guest_context.user_regs.eflags);
-        if (v->arch.guest_context.user_regs.eflags & EF_TF)
-                __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-        else 
-                __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+    }
+    else if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+    {
+        return modify_vmcs(
+            &v->arch.arch_vmx,
+            &v->arch.guest_context.user_regs);
     }
 
     if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
@@ -926,6 +934,14 @@ static void vmx_relinquish_resources(struct vcpu *v)
 
     BUG_ON(v->arch.arch_vmx.vmcs == NULL);
     free_vmcs(v->arch.arch_vmx.vmcs);
+    if(v->arch.arch_vmx.io_bitmap_a != 0) {
+        free_xenheap_pages(v->arch.arch_vmx.io_bitmap_a, get_order(0x1000));
+        v->arch.arch_vmx.io_bitmap_a = 0;
+    }
+    if(v->arch.arch_vmx.io_bitmap_b != 0) {
+        free_xenheap_pages(v->arch.arch_vmx.io_bitmap_b, get_order(0x1000));
+        v->arch.arch_vmx.io_bitmap_b = 0;
+    }
     v->arch.arch_vmx.vmcs = 0;
     
     free_monitor_pagetable(v);

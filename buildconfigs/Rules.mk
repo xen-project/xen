@@ -101,7 +101,7 @@ ref-%/.valid-ref: pristine-%/.valid-pristine
 	rm -rf tmp-$@
 
 %-mrproper: %-mrproper-extra
-	rm -rf pristine-$* ref-$* $*.tar.bz2
+	rm -rf pristine-$(*)* ref-$(*)* $*.tar.bz2
 	rm -rf $*-xen.patch
 
 netbsd-%-mrproper-extra:
@@ -110,6 +110,13 @@ netbsd-%-mrproper-extra:
 
 %-mrproper-extra:
 	@: # do nothing
+
+config-update-pae:
+ifeq ($(XEN_TARGET_X86_PAE),y)
+	sed -e 's!^CONFIG_HIGHMEM4G=y$$!\# CONFIG_HIGHMEM4G is not set!;s!^\# CONFIG_HIGHMEM64G is not set$$!CONFIG_HIGHMEM64G=y!' $(CONFIG_FILE) > $(CONFIG_FILE)- && mv $(CONFIG_FILE)- $(CONFIG_FILE)
+else
+	@: # do nothing yet
+endif
 
 # never delete any intermediate files.
 .SECONDARY:

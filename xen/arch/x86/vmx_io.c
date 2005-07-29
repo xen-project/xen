@@ -39,14 +39,20 @@
 
 #ifdef CONFIG_VMX
 #if defined (__i386__)
-static void load_cpu_user_regs(struct cpu_user_regs *regs)
+void load_cpu_user_regs(struct cpu_user_regs *regs)
 { 
     /*
      * Write the guest register value into VMCS
      */
     __vmwrite(GUEST_SS_SELECTOR, regs->ss);
     __vmwrite(GUEST_RSP, regs->esp);
+
     __vmwrite(GUEST_RFLAGS, regs->eflags);
+    if (regs->eflags & EF_TF)
+        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+    else 
+        __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+
     __vmwrite(GUEST_CS_SELECTOR, regs->cs);
     __vmwrite(GUEST_RIP, regs->eip);
 }
@@ -175,11 +181,17 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
     }
 }
 #else
-static void load_cpu_user_regs(struct cpu_user_regs *regs)
+void load_cpu_user_regs(struct cpu_user_regs *regs)
 {
     __vmwrite(GUEST_SS_SELECTOR, regs->ss);
     __vmwrite(GUEST_RSP, regs->rsp);
+
     __vmwrite(GUEST_RFLAGS, regs->rflags);
+    if (regs->rflags & EF_TF)
+        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+    else 
+        __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
+
     __vmwrite(GUEST_CS_SELECTOR, regs->cs);
     __vmwrite(GUEST_RIP, regs->rip);
 }

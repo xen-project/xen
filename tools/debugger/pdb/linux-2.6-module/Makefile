@@ -1,4 +1,4 @@
-XEN_ROOT=../../../..
+XEN_ROOT   = ../../../..
 LINUX_DIR  = linux-2.6.12-xenU
 KDIR       = $(XEN_ROOT)/$(LINUX_DIR)
 

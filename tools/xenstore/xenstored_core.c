@@ -51,7 +51,7 @@
 #include "xenstored_domain.h"
 
 static bool verbose;
-static LIST_HEAD(connections);
+LIST_HEAD(connections);
 static int tracefd = -1;
 
 #ifdef TESTING
@@ -111,6 +111,8 @@ void __attribute__((noreturn)) corrupt(struct connection *conn,
 	str = talloc_vasprintf(NULL, fmt, arglist);
 	va_end(arglist);
 
+	trace("xenstored corruption: connection id %i: err %s: %s",
+		conn ? (int)conn->id : -1, strerror(saved_errno), str);
 	eprintf("xenstored corruption: connection id %i: err %s: %s",
 		conn ? (int)conn->id : -1, strerror(saved_errno), str);
 #ifdef TESTING
@@ -230,6 +232,21 @@ static void trace_blocked(const struct connection *conn,
 	write(tracefd, ")\n", 2);
 }
 
+void trace(const char *fmt, ...)
+{
+	va_list arglist;
+	char *str;
+
+	if (tracefd < 0)
+		return;
+
+	va_start(arglist, fmt);
+	str = talloc_vasprintf(NULL, fmt, arglist);
+	va_end(arglist);
+	write(tracefd, str, strlen(str));
+	talloc_free(str);
+}
+
 static bool write_message(struct connection *conn)
 {
 	int ret;
@@ -253,7 +270,7 @@ static bool write_message(struct connection *conn)
 		out->used = 0;
 
 		/* Second write might block if non-zero. */
-		if (out->hdr.msg.len)
+		if (out->hdr.msg.len && !conn->domain)
 			return true;
 	}
 
@@ -318,7 +335,7 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock,
 	list_for_each_entry(i, &connections, list) {
 		if (i->domain)
 			continue;
-		if (!i->blocked)
+		if (i->state == OK)
 			FD_SET(i->fd, inset);
 		if (i->out)
 			FD_SET(i->fd, outset);
@@ -454,8 +471,7 @@ unsigned int get_strings(struct buffered_data *data,
 	return i;
 }
 
-/* Returns "false", meaning "connection is not blocked". */
-bool send_reply(struct connection *conn, enum xsd_sockmsg_type type,
+void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 		const void *data, unsigned int len)
 {
 	struct buffered_data *bdata;
@@ -476,16 +492,15 @@ bool send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 		conn->waiting_reply = bdata;
 	} else
 		conn->out = bdata;
-	return false;
 }
 
 /* Some routines (write, mkdir, etc) just need a non-error return */
-bool send_ack(struct connection *conn, enum xsd_sockmsg_type type)
+void send_ack(struct connection *conn, enum xsd_sockmsg_type type)
 {
-	return send_reply(conn, type, "OK", sizeof("OK"));
+	send_reply(conn, type, "OK", sizeof("OK"));
 }
 
-bool send_error(struct connection *conn, int error)
+void send_error(struct connection *conn, int error)
 {
 	unsigned int i;
 
@@ -494,7 +509,7 @@ bool send_error(struct connection *conn, int error)
 			corrupt(conn, "Unknown error %i (%s)", error,
 				strerror(error));
 
-	return send_reply(conn, XS_ERROR, xsd_errors[i].errstring,
+	send_reply(conn, XS_ERROR, xsd_errors[i].errstring,
 			  strlen(xsd_errors[i].errstring) + 1);
 }
 
@@ -780,7 +795,7 @@ bool check_node_perms(struct connection *conn, const char *node,
 	return false;
 }
 
-static bool send_directory(struct connection *conn, const char *node)
+static void send_directory(struct connection *conn, const char *node)
 {
 	char *path, *reply = talloc_strdup(node, "");
 	unsigned int reply_len = 0;
@@ -788,13 +803,17 @@ static bool send_directory(struct connection *conn, const char *node)
 	struct dirent *dirent;
 
 	node = canonicalize(conn, node);
-	if (!check_node_perms(conn, node, XS_PERM_READ))
-		return send_error(conn, errno);
+	if (!check_node_perms(conn, node, XS_PERM_READ)) {
+		send_error(conn, errno);
+		return;
+	}
 
 	path = node_dir(conn->transaction, node);
 	dir = talloc_opendir(path);
-	if (!dir)
-		return send_error(conn, errno);
+	if (!dir) {
+		send_error(conn, errno);
+		return;
+	}
 
 	while ((dirent = readdir(*dir)) != NULL) {
 		int len = strlen(dirent->d_name) + 1;
@@ -807,32 +826,35 @@ static bool send_directory(struct connection *conn, const char *node)
 		reply_len += len;
 	}
 
-	return send_reply(conn, XS_DIRECTORY, reply, reply_len);
+	send_reply(conn, XS_DIRECTORY, reply, reply_len);
 }
 
-static bool do_read(struct connection *conn, const char *node)
+static void do_read(struct connection *conn, const char *node)
 {
 	char *value;
 	unsigned int size;
 	int *fd;
 
 	node = canonicalize(conn, node);
-	if (!check_node_perms(conn, node, XS_PERM_READ))
-		return send_error(conn, errno);
+	if (!check_node_perms(conn, node, XS_PERM_READ)) {
+		send_error(conn, errno);
+		return;
+	}
 
 	fd = talloc_open(node_datafile(conn->transaction, node), O_RDONLY, 0);
 	if (!fd) {
 		/* Data file doesn't exist?  We call that a directory */
 		if (errno == ENOENT)
 			errno = EISDIR;
-		return send_error(conn, errno);
+		send_error(conn, errno);
+		return;
 	}
 
 	value = read_all(fd, &size);
 	if (!value)
-		return send_error(conn, errno);
-
-	return send_reply(conn, XS_READ, value, size);
+		send_error(conn, errno);
+	else
+		send_reply(conn, XS_READ, value, size);
 }
 
 /* Create a new directory.  Optionally put data in it (if data != NULL) */
@@ -876,7 +898,7 @@ static bool new_directory(struct connection *conn,
 }
 
 /* path, flags, data... */
-static bool do_write(struct connection *conn, struct buffered_data *in)
+static void do_write(struct connection *conn, struct buffered_data *in)
 {
 	unsigned int offset, datalen;
 	char *vec[2];
@@ -885,16 +907,20 @@ static bool do_write(struct connection *conn, struct buffered_data *in)
 	struct stat st;
 
 	/* Extra "strings" can be created by binary data. */
-	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec))
-		return send_error(conn, EINVAL);
+	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
+		send_error(conn, EINVAL);
+		return;
+	}
 
 	node = canonicalize(conn, vec[0]);
 	if (/*suppress error on write outside transaction*/ 0 &&
-            !within_transaction(conn->transaction, node))
-		return send_error(conn, EROFS);
+	    !within_transaction(conn->transaction, node)) {
+		send_error(conn, EROFS);
+		return;
+	}
 
 	if (transaction_block(conn, node))
-		return true;
+		return;
 
 	offset = strlen(vec[0]) + strlen(vec[1]) + 2;
 	datalen = in->used - offset;
@@ -905,196 +931,243 @@ static bool do_write(struct connection *conn, struct buffered_data *in)
 		mode = XS_PERM_WRITE|XS_PERM_CREATE;
 	else if (streq(vec[1], XS_WRITE_CREATE_EXCL))
 		mode = XS_PERM_WRITE|XS_PERM_CREATE;
-	else
-		return send_error(conn, EINVAL);
+	else {
+		send_error(conn, EINVAL);
+		return;
+	}
 
-	if (!check_node_perms(conn, node, mode))
-		return send_error(conn, errno);
+	if (!check_node_perms(conn, node, mode)) {
+		send_error(conn, errno);
+		return;
+	}
 
 	if (lstat(node_dir(conn->transaction, node), &st) != 0) {
 		/* Does not exist... */
-		if (errno != ENOENT)
-			return send_error(conn, errno);
+		if (errno != ENOENT) {
+			send_error(conn, errno);
+			return;
+		}
 
 		/* Not going to create it? */
-		if (!(mode & XS_PERM_CREATE))
-			return send_error(conn, ENOENT);
+		if (!(mode & XS_PERM_CREATE)) {
+			send_error(conn, ENOENT);
+			return;
+		}
 
-		if (!new_directory(conn, node, in->buffer + offset, datalen))
-			return send_error(conn, errno);
+		if (!new_directory(conn, node, in->buffer + offset, datalen)) {
+			send_error(conn, errno);
+			return;
+		}
 	} else {
 		/* Exists... */
-		if (streq(vec[1], XS_WRITE_CREATE_EXCL))
-			return send_error(conn, EEXIST);
+		if (streq(vec[1], XS_WRITE_CREATE_EXCL)) {
+			send_error(conn, EEXIST);
+			return;
+		}
 
 		tmppath = tempfile(node_datafile(conn->transaction, node),
 				   in->buffer + offset, datalen);
-		if (!tmppath)
-			return send_error(conn, errno);
+		if (!tmppath) {
+			send_error(conn, errno);
+			return;
+		}
 
 		commit_tempfile(tmppath);
 	}
 
 	add_change_node(conn->transaction, node, false);
+	fire_watches(conn, node, false);
 	send_ack(conn, XS_WRITE);
-	fire_watches(conn->transaction, node, false);
-	return false;
 }
 
-static bool do_mkdir(struct connection *conn, const char *node)
+static void do_mkdir(struct connection *conn, const char *node)
 {
 	node = canonicalize(conn, node);
-	if (!check_node_perms(conn, node, XS_PERM_WRITE|XS_PERM_CREATE))
-		return send_error(conn, errno);
+	if (!check_node_perms(conn, node, XS_PERM_WRITE|XS_PERM_CREATE)) {
+		send_error(conn, errno);
+		return;
+	}
 
-	if (!within_transaction(conn->transaction, node))
-		return send_error(conn, EROFS);
+	if (!within_transaction(conn->transaction, node)) {
+		send_error(conn, EROFS);
+		return;
+	}
 
 	if (transaction_block(conn, node))
-		return true;
+		return;
 
-	if (!new_directory(conn, node, NULL, 0))
-		return send_error(conn, errno);
+	if (!new_directory(conn, node, NULL, 0)) {
+		send_error(conn, errno);
+		return;
+	}
 
 	add_change_node(conn->transaction, node, false);
+	fire_watches(conn, node, false);
 	send_ack(conn, XS_MKDIR);
-	fire_watches(conn->transaction, node, false);
-	return false;
 }
 
-static bool do_rm(struct connection *conn, const char *node)
+static void do_rm(struct connection *conn, const char *node)
 {
 	char *tmppath, *path;
 
 	node = canonicalize(conn, node);
-	if (!check_node_perms(conn, node, XS_PERM_WRITE))
-		return send_error(conn, errno);
+	if (!check_node_perms(conn, node, XS_PERM_WRITE)) {
+		send_error(conn, errno);
+		return;
+	}
 
-	if (!within_transaction(conn->transaction, node))
-		return send_error(conn, EROFS);
+	if (!within_transaction(conn->transaction, node)) {
+		send_error(conn, EROFS);
+		return;
+	}
 
 	if (transaction_block(conn, node))
-		return true;
+		return;
 
-	if (streq(node, "/"))
-		return send_error(conn, EINVAL);
+	if (streq(node, "/")) {
+		send_error(conn, EINVAL);
+		return;
+	}
 
 	/* We move the directory to temporary name, destructor cleans up. */
 	path = node_dir(conn->transaction, node);
 	tmppath = talloc_asprintf(node, "%s.tmp", path);
 	talloc_set_destructor(tmppath, destroy_path);
 
-	if (rename(path, tmppath) != 0)
-		return send_error(conn, errno);
+	if (rename(path, tmppath) != 0) {
+		send_error(conn, errno);
+		return;
+	}
 
 	add_change_node(conn->transaction, node, true);
+	fire_watches(conn, node, true);
 	send_ack(conn, XS_RM);
-	fire_watches(conn->transaction, node, true);
-	return false;
 }
 
-static bool do_get_perms(struct connection *conn, const char *node)
+static void do_get_perms(struct connection *conn, const char *node)
 {
 	struct xs_permissions *perms;
 	char *strings;
 	unsigned int len, num;
 
 	node = canonicalize(conn, node);
-	if (!check_node_perms(conn, node, XS_PERM_READ))
-		return send_error(conn, errno);
+	if (!check_node_perms(conn, node, XS_PERM_READ)) {
+		send_error(conn, errno);
+		return;
+	}
 
 	perms = get_perms(conn->transaction, node, &num);
-	if (!perms)
-		return send_error(conn, errno);
+	if (!perms) {
+		send_error(conn, errno);
+		return;
+	}
 
 	strings = perms_to_strings(node, perms, num, &len);
 	if (!strings)
-		return send_error(conn, errno);
-
-	return send_reply(conn, XS_GET_PERMS, strings, len);
+		send_error(conn, errno);
+	else
+		send_reply(conn, XS_GET_PERMS, strings, len);
 }
 
-static bool do_set_perms(struct connection *conn, struct buffered_data *in)
+static void do_set_perms(struct connection *conn, struct buffered_data *in)
 {
 	unsigned int num;
 	char *node;
 	struct xs_permissions *perms;
 
 	num = xs_count_strings(in->buffer, in->used);
-	if (num < 2)
-		return send_error(conn, EINVAL);
+	if (num < 2) {
+		send_error(conn, EINVAL);
+		return;
+	}
 
 	/* First arg is node name. */
 	node = canonicalize(conn, in->buffer);
 	in->buffer += strlen(in->buffer) + 1;
 	num--;
 
-	if (!within_transaction(conn->transaction, node))
-		return send_error(conn, EROFS);
+	if (!within_transaction(conn->transaction, node)) {
+		send_error(conn, EROFS);
+		return;
+	}
 
 	if (transaction_block(conn, node))
-		return true;
+		return;
 
 	/* We must own node to do this (tools can do this too). */
-	if (!check_node_perms(conn, node, XS_PERM_WRITE|XS_PERM_OWNER))
-		return send_error(conn, errno);
+	if (!check_node_perms(conn, node, XS_PERM_WRITE|XS_PERM_OWNER)) {
+		send_error(conn, errno);
+		return;
+	}
 
 	perms = talloc_array(node, struct xs_permissions, num);
-	if (!xs_strings_to_perms(perms, num, in->buffer))
-		return send_error(conn, errno);
+	if (!xs_strings_to_perms(perms, num, in->buffer)) {
+		send_error(conn, errno);
+		return;
+	}
 
-	if (!set_perms(conn->transaction, node, perms, num))
-		return send_error(conn, errno);
+	if (!set_perms(conn->transaction, node, perms, num)) {
+		send_error(conn, errno);
+		return;
+	}
+
 	add_change_node(conn->transaction, node, false);
+	fire_watches(conn, node, false);
 	send_ack(conn, XS_SET_PERMS);
-	fire_watches(conn->transaction, node, false);
-	return false;
 }
 
 /* Process "in" for conn: "in" will vanish after this conversation, so
  * we can talloc off it for temporary variables.  May free "conn".
- * Returns true if can't complete due to block.
  */
-static bool process_message(struct connection *conn, struct buffered_data *in)
+static void process_message(struct connection *conn, struct buffered_data *in)
 {
 	switch (in->hdr.msg.type) {
 	case XS_DIRECTORY:
-		return send_directory(conn, onearg(in));
+		send_directory(conn, onearg(in));
+		break;
 
 	case XS_READ:
-		return do_read(conn, onearg(in));
+		do_read(conn, onearg(in));
+		break;
 
 	case XS_WRITE:
-		return do_write(conn, in);
+		do_write(conn, in);
+		break;
 
 	case XS_MKDIR:
-		return do_mkdir(conn, onearg(in));
+		do_mkdir(conn, onearg(in));
+		break;
 
 	case XS_RM:
-		return do_rm(conn, onearg(in));
+		do_rm(conn, onearg(in));
+		break;
 
 	case XS_GET_PERMS:
-		return do_get_perms(conn, onearg(in));
+		do_get_perms(conn, onearg(in));
+		break;
 
 	case XS_SET_PERMS:
-		return do_set_perms(conn, in);
+		do_set_perms(conn, in);
+		break;
 
 	case XS_SHUTDOWN:
 		/* FIXME: Implement gentle shutdown too. */
 		/* Only tools can do this. */
-		if (conn->id != 0)
-			return send_error(conn, EACCES);
-		if (!conn->can_write)
-			return send_error(conn, EROFS);
+		if (conn->id != 0) {
+			send_error(conn, EACCES);
+			break;
+		}
+		if (!conn->can_write) {
+			send_error(conn, EROFS);
+			break;
+		}
 		send_ack(conn, XS_SHUTDOWN);
 		/* Everything hangs off auto-free context, freed at exit. */
 		exit(0);
 
 	case XS_DEBUG:
-		if (streq(in->buffer, "print")) {
+		if (streq(in->buffer, "print"))
 			xprintf("debug: %s", in->buffer + get_string(in, 0));
-			return false;
-		}
 #ifdef TESTING
 		/* For testing, we allow them to set id. */
 		if (streq(in->buffer, "setid")) {
@@ -1107,37 +1180,44 @@ static bool process_message(struct connection *conn, struct buffered_data *in)
 			failtest = true;
 		}
 #endif /* TESTING */
-		return false;
+		break;
 
 	case XS_WATCH:
-		return do_watch(conn, in);
+		do_watch(conn, in);
+		break;
 
 	case XS_WATCH_ACK:
-		return do_watch_ack(conn, onearg(in));
+		do_watch_ack(conn, onearg(in));
+		break;
 
 	case XS_UNWATCH:
-		return do_unwatch(conn, in);
+		do_unwatch(conn, in);
+		break;
 
 	case XS_TRANSACTION_START:
-		return do_transaction_start(conn, onearg(in));
+		do_transaction_start(conn, onearg(in));
+		break;
 
 	case XS_TRANSACTION_END:
-		return do_transaction_end(conn, onearg(in));
+		do_transaction_end(conn, onearg(in));
+		break;
 
 	case XS_INTRODUCE:
-		return do_introduce(conn, in);
+		do_introduce(conn, in);
+		break;
 
 	case XS_RELEASE:
-		return do_release(conn, onearg(in));
+		do_release(conn, onearg(in));
+		break;
 
 	case XS_GETDOMAINPATH:
-		return do_get_domain_path(conn, onearg(in));
+		do_get_domain_path(conn, onearg(in));
+		break;
 
 	case XS_WATCH_EVENT:
 	default:
 		eprintf("Client unknown operation %i", in->hdr.msg.type);
 		send_error(conn, ENOSYS);
-		return false;
 	}
 }
 
@@ -1151,6 +1231,8 @@ static void consider_message(struct connection *conn)
 	struct buffered_data *in = NULL;
 	enum xsd_sockmsg_type type = conn->in->hdr.msg.type;
 	jmp_buf talloc_fail;
+
+	assert(conn->state == OK);
 
 	/* For simplicity, we kill the connection on OOM. */
 	talloc_set_fail_handler(out_of_mem, &talloc_fail);
@@ -1166,7 +1248,7 @@ static void consider_message(struct connection *conn)
 	/* We might get a command while waiting for an ack: this means
 	 * the other end discarded it: we will re-transmit. */
 	if (type != XS_WATCH_ACK)
-		conn->waiting_for_ack = false;
+		conn->waiting_for_ack = NULL;
 
 	/* Careful: process_message may free connection.  We detach
 	 * "in" beforehand and allocate the new buffer to avoid
@@ -1174,7 +1256,9 @@ static void consider_message(struct connection *conn)
 	 */
 	in = talloc_steal(talloc_autofree_context(), conn->in);
 	conn->in = new_buffer(conn);
-	if (process_message(conn, in)) {
+	process_message(conn, in);
+
+	if (conn->state == BLOCKED) {
 		/* Blocked by transaction: queue for re-xmit. */
 		talloc_free(conn->in);
 		conn->in = in;
@@ -1197,7 +1281,7 @@ void handle_input(struct connection *conn)
 	int bytes;
 	struct buffered_data *in;
 
-	assert(!conn->blocked);
+	assert(conn->state == OK);
 	in = conn->in;
 
 	/* Not finished header yet? */
@@ -1254,13 +1338,17 @@ static void unblock_connections(void)
 	struct connection *i, *tmp;
 
 	list_for_each_entry_safe(i, tmp, &connections, list) {
-		if (!i->blocked)
-			continue;
-
-		if (!transaction_covering_node(i->blocked)) {
-			talloc_free(i->blocked);
-			i->blocked = NULL;
-			consider_message(i);
+		switch (i->state) {
+		case BLOCKED:
+			if (!transaction_covering_node(i->blocked_by)) {
+				talloc_free(i->blocked_by);
+				i->blocked_by = NULL;
+				i->state = OK;
+				consider_message(i);
+			}
+			break;
+		case OK:
+			break;
 		}
 	}
 
@@ -1281,7 +1369,8 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	if (!new)
 		return NULL;
 
-	new->blocked = false;
+	new->state = OK;
+	new->blocked_by = NULL;
 	new->out = new->waiting_reply = NULL;
 	new->fd = -1;
 	new->id = 0;
@@ -1290,6 +1379,7 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	new->write = write;
 	new->read = read;
 	new->can_write = true;
+	INIT_LIST_HEAD(&new->watches);
 
 	talloc_set_fail_handler(out_of_mem, &talloc_fail);
 	if (setjmp(talloc_fail)) {
@@ -1358,12 +1448,14 @@ void dump_connection(void)
 
 	list_for_each_entry(i, &connections, list) {
 		printf("Connection %p:\n", i);
+		printf("    state = %s\n",
+		       i->state == OK ? "OK"
+		       : i->state == BLOCKED ? "BLOCKED"
+		       : "INVALID");
 		if (i->id)
 			printf("    id = %i\n", i->id);
-		if (i->blocked)
-			printf("    blocked on = %s\n", i->blocked);
-		if (i->waiting_for_ack)
-			printf("    waiting_for_ack TRUE\n");
+		if (i->blocked_by)
+			printf("    blocked on = %s\n", i->blocked_by);
 		if (!i->in->inhdr || i->in->used)
 			printf("    got %i bytes of %s\n",
 			       i->in->used, i->in->inhdr ? "header" : "data");
@@ -1385,6 +1477,44 @@ void dump_connection(void)
 	}
 }
 #endif
+
+static void setup_structure(void)
+{
+	struct xs_permissions perms = { .id = 0, .perms = XS_PERM_READ };
+	char *root, *dir, *permfile;
+
+	/* Create root directory, with permissions. */
+	if (mkdir(xs_daemon_store(), 0750) != 0) {
+		if (errno != EEXIST)
+			barf_perror("Could not create root %s",
+				    xs_daemon_store());
+		return;
+	}
+	root = talloc_strdup(talloc_autofree_context(), "/");
+	if (!set_perms(NULL, root, &perms, 1))
+		barf_perror("Could not create permissions in root");
+
+	/* Create tool directory, with xenstored subdir. */
+	dir = talloc_asprintf(root, "%s/%s", xs_daemon_store(), "tool");
+	if (mkdir(dir, 0750) != 0)
+		barf_perror("Making dir %s", dir);
+	
+	permfile = talloc_strdup(root, "/tool");
+	if (!set_perms(NULL, permfile, &perms, 1))
+		barf_perror("Could not create permissions on %s", permfile);
+
+	dir = talloc_asprintf(root, "%s/%s", dir, "xenstored");
+	if (mkdir(dir, 0750) != 0)
+		barf_perror("Making dir %s", dir);
+	
+	permfile = talloc_strdup(root, "/tool/xenstored");
+	if (!set_perms(NULL, permfile, &perms, 1))
+		barf_perror("Could not create permissions on %s", permfile);
+	talloc_free(root);
+	if (mkdir(xs_daemon_transactions(), 0750) != 0)
+		barf_perror("Could not create transaction dir %s",
+			    xs_daemon_transactions());
+}
 
 static struct option options[] = { { "no-fork", 0, NULL, 'N' },
 				   { "verbose", 0, NULL, 'V' },
@@ -1461,21 +1591,13 @@ int main(int argc, char *argv[])
 		barf_perror("Could not listen on sockets");
 
 	/* If we're the first, create .perms file for root. */
-	if (mkdir(xs_daemon_store(), 0750) == 0) {
-		struct xs_permissions perms;
-		char *root = talloc_strdup(talloc_autofree_context(), "/");
-
-		perms.id = 0;
-		perms.perms = XS_PERM_READ;
-		if (!set_perms(NULL, root, &perms, 1))
-			barf_perror("Could not create permissions in root");
-		talloc_free(root);
-		mkdir(xs_daemon_transactions(), 0750);
-	} else if (errno != EEXIST)
-		barf_perror("Could not create root %s", xs_daemon_store());
+	setup_structure();
 
 	/* Listen to hypervisor. */
 	event_fd = domain_init();
+
+	/* Restore existing connections. */
+	restore_existing_connections();
 
 	/* Debugging: daemonize() closes standard fds, so dup here. */
 	tmpout = dup(STDOUT_FILENO);

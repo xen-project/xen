@@ -42,7 +42,6 @@ typedef struct bwcpoint                           /* break/watch/catch point */
     struct list_head list;
     memory_t address;
     u32 domain;
-    u16 vcpu;
     u8 old_value;                             /* old value for software bkpt */
 } bwcpoint_t, *bwcpoint_p;
 

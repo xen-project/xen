@@ -393,7 +393,28 @@ static void vnc_process_key(rfbBool down, rfbKeySym keySym, rfbClientPtr cl)
 			keycode>>=8;
 		}
 	} else if(down) {
-		kbd_put_keysym(keySym);
+            int qemu_keysym = 0;
+            if (keySym <= 128) { /* normal ascii */
+                qemu_keysym = keySym;
+            } else {
+                switch(keySym) {
+                    case XK_Up: qemu_keysym = QEMU_KEY_UP; break;
+                    case XK_Down: qemu_keysym = QEMU_KEY_DOWN; break;
+                    case XK_Left: qemu_keysym = QEMU_KEY_LEFT; break;
+                    case XK_Right: qemu_keysym = QEMU_KEY_RIGHT; break;
+                    case XK_Home: qemu_keysym = QEMU_KEY_HOME; break;
+                    case XK_End: qemu_keysym = QEMU_KEY_END; break;
+                    case XK_Page_Up: qemu_keysym = QEMU_KEY_PAGEUP; break;
+                    case XK_Page_Down: qemu_keysym = QEMU_KEY_PAGEDOWN; break;
+                    case XK_BackSpace: qemu_keysym = QEMU_KEY_BACKSPACE; break;
+                    case XK_Delete: qemu_keysym = QEMU_KEY_DELETE; break;
+                    case XK_Return:
+                    case XK_Linefeed: qemu_keysym = keySym; break;
+                    default: break;
+                }
+            }
+            if (qemu_keysym != 0)
+                kbd_put_keysym(qemu_keysym);
 	}
 	if(down) {
 		if(keySym==XK_Control_L)

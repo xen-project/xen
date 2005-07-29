@@ -85,8 +85,10 @@ static inline int  table_offset_64(unsigned long va, int level)
             return  (((va) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1));
         case 3:
             return  (((va) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1));
+#if CONFIG_PAGING_LEVELS >= 4
         case 4:
             return  (((va) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1));
+#endif
         default:
             //printk("<table_offset_64> level %d is too big\n", level);
             return -1;

@@ -401,22 +401,16 @@ unwind:
 /* Watch a node for changes (poll on fd to detect, or call read_watch()).
  * When the node (or any child) changes, fd will become readable.
  * Token is returned when watch is read, to allow matching.
- * Priority indicates order if multiple watchers: higher is first.
  * Returns false on failure.
  */
-bool xs_watch(struct xs_handle *h, const char *path, const char *token,
-	      unsigned int priority)
+bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 {
-	char prio[MAX_STRLEN(priority)];
-	struct iovec iov[3];
+	struct iovec iov[2];
 
-	sprintf(prio, "%u", priority);
 	iov[0].iov_base = (void *)path;
 	iov[0].iov_len = strlen(path) + 1;
 	iov[1].iov_base = (void *)token;
 	iov[1].iov_len = strlen(token) + 1;
-	iov[2].iov_base = prio;
-	iov[2].iov_len = strlen(prio) + 1;
 
 	return xs_bool(xs_talkv(h, XS_WATCH, iov, ARRAY_SIZE(iov), NULL));
 }

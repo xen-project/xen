@@ -63,7 +63,7 @@ static struct pfn_info *alloc_largest(struct domain *d, unsigned long max)
     unsigned int order = get_order(max * PAGE_SIZE);
     if ( (max & (max-1)) != 0 )
         order--;
-    while ( (page = alloc_domheap_pages(d, order)) == NULL )
+    while ( (page = alloc_domheap_pages(d, order, 0)) == NULL )
         if ( order-- == 0 )
             break;
     return page;
@@ -165,6 +165,8 @@ int construct_dom0(struct domain *d,
                xen_pae ? "yes" : "no", dom0_pae ? "yes" : "no");
         return -EINVAL;
     }
+    if (strstr(dsi.xen_section_string, "SHADOW=translate"))
+	opt_dom0_translate = 1;
 
     /* Align load address to 4MB boundary. */
     dsi.v_start &= ~((1UL<<22)-1);
@@ -618,11 +620,13 @@ int construct_dom0(struct domain *d,
 
     if ( opt_dom0_shadow || opt_dom0_translate )
     {
+	printk("dom0: shadow enable\n");
         shadow_mode_enable(d, (opt_dom0_translate
                                ? SHM_enable | SHM_refcounts | SHM_translate
                                : SHM_enable));
         if ( opt_dom0_translate )
         {
+	    printk("dom0: shadow translate\n");
 #if defined(__i386__) && defined(CONFIG_X86_PAE)
             printk("FIXME: PAE code needed here: %s:%d (%s)\n",
                    __FILE__, __LINE__, __FUNCTION__);
@@ -655,6 +659,7 @@ int construct_dom0(struct domain *d,
         }
 
         update_pagetables(v); /* XXX SMP */
+	printk("dom0: shadow setup done\n");
     }
 
     return 0;

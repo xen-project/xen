@@ -930,12 +930,12 @@ memory at the request of the administrator or the user of the domain.
 \subsection{Setting memory footprints from dom0}
 
 The machine administrator can request that a domain alter its memory
-footprint using the \path{xm balloon} command.  For instance, we can
+footprint using the \path{xm set-mem} command.  For instance, we can
 request that our example ttylinux domain reduce its memory footprint
 to 32 megabytes.
 
 \begin{verbatim}
-# xm balloon ttylinux 32
+# xm set-mem ttylinux 32
 \end{verbatim}
 
 We can now see the result of this in the output of \path{xm list}:
@@ -951,16 +951,16 @@ The domain has responded to the request by returning memory to Xen. We
 can restore the domain to its original size using the command line:
 
 \begin{verbatim}
-# xm balloon ttylinux 64
+# xm set-mem ttylinux 64
 \end{verbatim}
 
 \subsection{Setting memory footprints from within a domain}
 
-The virtual file \path{/proc/xen/memory\_target} allows the owner of a
+The virtual file \path{/proc/xen/balloon} allows the owner of a
 domain to adjust their own memory footprint.  Reading the file
-(e.g. \path{cat /proc/xen/memory\_target}) prints out the current
+(e.g. \path{cat /proc/xen/balloon}) prints out the current
 memory footprint of the domain.  Writing the file
-(e.g. \path{echo new\_target > /proc/xen/memory\_target}) requests
+(e.g. \path{echo new\_target > /proc/xen/balloon}) requests
 that the kernel adjust the domain's memory footprint to a new value.
 
 \subsection{Setting memory limits}
@@ -1285,7 +1285,7 @@ custom variables (for instance, the \path{xmdefconfig} file uses a
 The available commands are as follows:
 
 \begin{description}
-\item[balloon] Request a domain to adjust its memory footprint.
+\item[set-mem] Request a domain to adjust its memory footprint.
 \item[create] Create a new domain.
 \item[destroy] Kill a domain immediately.
 \item[list] List running domains.

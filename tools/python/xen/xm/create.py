@@ -1,4 +1,5 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 Nguyen Anh Quynh <aquynh@gmail.com>
 
 """Domain creation.
 """
@@ -7,10 +8,13 @@ import string
 import sys
 import socket
 
+import xen.lowlevel.xc
+
 from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend.XendClient import server, XendError
 from xen.xend.XendBootloader import bootloader
+from xen.xend import XendRoot; xroot = XendRoot.instance()
 from xen.util import blkif
 
 from xen.util import console_client
@@ -644,6 +648,36 @@ def make_domain(opts, config):
               % (dom, console_port))
     return (dom, console_port)
 
+def get_dom0_alloc():
+    """Return current allocation memory of dom0 (in MB). Return 0 on error"""
+    PROC_XEN_BALLOON = "/proc/xen/balloon"
+
+    f = open(PROC_XEN_BALLOON, "r")
+    line = f.readline()
+    for x in line.split():
+        for n in x:
+            if not n.isdigit():
+                break
+        else:
+            f.close()
+            return int(x)/1024
+    f.close()
+    return 0
+
+def balloon_out(dom0_min_mem, opts):
+    """Balloon out to get memory for domU, if necessarily"""
+    SLACK = 4
+
+    xc = xen.lowlevel.xc.new()
+    pinfo = xc.physinfo()
+    free_mem = pinfo['free_pages']/256
+    if free_mem < opts.vals.memory + SLACK:
+        need_mem = opts.vals.memory + SLACK - free_mem
+        cur_alloc = get_dom0_alloc()
+        if cur_alloc - need_mem >= dom0_min_mem:
+            server.xend_domain_mem_target_set(0, cur_alloc - need_mem)
+    del xc
+
 def main(argv):
     opts = gopts
     args = opts.parse(argv)
@@ -671,6 +705,10 @@ def main(argv):
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:
+        dom0_min_mem = xroot.get_dom0_min_mem()
+        if dom0_min_mem != 0:
+            balloon_out(dom0_min_mem, opts)
+
         (dom, console) = make_domain(opts, config)
         if opts.vals.console_autoconnect:
             path = "/var/lib/xend/console-%s" % console

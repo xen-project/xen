@@ -17,7 +17,6 @@ from XendError import XendError
 from XendLogging import log
 
 SIGNATURE = "LinuxGuestRecord"
-PAGE_SIZE = 4096
 PATH_XC_SAVE = "/usr/libexec/xen/xc_save"
 PATH_XC_RESTORE = "/usr/libexec/xen/xc_restore"
 

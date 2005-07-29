@@ -329,12 +329,36 @@ typedef struct vcpu_info {
 #endif
 } vcpu_info_t;
 
+typedef struct vcpu_time_info {
+    /*
+     * The following values are updated periodically (and not necessarily
+     * atomically!). The guest OS detects this because 'time_version1' is
+     * incremented just before updating these values, and 'time_version2' is
+     * incremented immediately after. See the Xen-specific Linux code for an
+     * example of how to read these values safely (arch/xen/kernel/time.c).
+     */
+    u32 time_version1;
+    u32 time_version2;
+    u64 tsc_timestamp;   /* TSC at last update of time vals.  */
+    u64 system_time;     /* Time, in nanosecs, since boot.    */
+    /*
+     * Current system time:
+     *   system_time + ((tsc - tsc_timestamp) << tsc_shift) * tsc_to_system_mul
+     * CPU frequency (Hz):
+     *   ((10^9 << 32) / tsc_to_system_mul) >> tsc_shift
+     */
+    u32 tsc_to_system_mul;
+    s8  tsc_shift;
+} vcpu_time_info_t;
+
 /*
  * Xen/kernel shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.
  */
 typedef struct shared_info {
     vcpu_info_t vcpu_data[MAX_VIRT_CPUS];
+
+    vcpu_time_info_t vcpu_time[MAX_VIRT_CPUS];
 
     u32 n_vcpu;
 
@@ -373,33 +397,11 @@ typedef struct shared_info {
     u32 evtchn_mask[32];
 
     /*
-     * Time: The following abstractions are exposed: System Time, Clock Time,
-     * Domain Virtual Time. Domains can access Cycle counter time directly.
+     * Wallclock time: updated only by control software. Guests should base
+     * their gettimeofday() syscall on this wallclock-base value.
      */
-    u64                cpu_freq;        /* CPU frequency (Hz).          */
-
-    /*
-     * The following values are updated periodically (and not necessarily
-     * atomically!). The guest OS detects this because 'time_version1' is
-     * incremented just before updating these values, and 'time_version2' is
-     * incremented immediately after. See the Xen-specific Linux code for an
-     * example of how to read these values safely (arch/xen/kernel/time.c).
-     */
-    u32                time_version1;
-    u32                time_version2;
-    tsc_timestamp_t    tsc_timestamp;   /* TSC at last update of time vals.  */
-    u64                system_time;     /* Time, in nanosecs, since boot.    */
     u32                wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
     u32                wc_usec;         /* Usecs 00:00:00 UTC, Jan 1, 1970.  */
-    u64                domain_time;     /* Domain virtual time, in nanosecs. */
-
-    /*
-     * Timeout values:
-     * Allow a domain to specify a timeout value in system time and 
-     * domain virtual time.
-     */
-    u64                wall_timeout;
-    u64                domain_timeout;
 
     arch_shared_info_t arch;
 
@@ -444,7 +446,7 @@ typedef struct start_info {
     memory_t mod_start;       /* VIRTUAL address of pre-loaded module.    */
     memory_t mod_len;         /* Size (bytes) of pre-loaded module.       */
     s8 cmd_line[MAX_GUEST_CMDLINE];
-    memory_t store_page;      /* VIRTUAL address of store page.           */
+    memory_t store_mfn;       /* MACHINE page number of shared page.      */
     u16      store_evtchn;    /* Event channel for store communication.   */
 } start_info_t;
 

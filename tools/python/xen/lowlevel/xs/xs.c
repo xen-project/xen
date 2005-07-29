@@ -367,7 +367,7 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, 
                                      &path, &priority, &token))
         goto exit;
-    xsval = xs_watch(xh, path, token, priority);
+    xsval = xs_watch(xh, path, token);
     val = pyvalue_int(xsval);
  exit:
     return val;

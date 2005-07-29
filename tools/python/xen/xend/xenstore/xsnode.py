@@ -350,7 +350,13 @@ class XenStore:
             self.watchThread = None
 
     def introduceDomain(self, dom, page, evtchn, path):
-        self.getxs().introduce_domain(dom, page, evtchn.port1, path)
+        try:
+            self.getxs().introduce_domain(dom, page, evtchn.port1, path)
+        except RuntimeError, ex:
+            if ex.args[0] == errno.EISCONN:
+                return None
+            else:
+                raise
 
     def releaseDomain(self, dom):
         self.getxs().release_domain(dom)

@@ -32,12 +32,6 @@ from xen.xend.XendRoot import get_component
 from xen.xend.uuid import getUuid
 from xen.xend.xenstore import DBVar
 
-"""Flag for a block device backend domain."""
-SIF_BLK_BE_DOMAIN = (1<<4)
-
-"""Flag for a net device backend domain."""
-SIF_NET_BE_DOMAIN = (1<<5)
-
 """Shutdown code for poweroff."""
 DOMAIN_POWEROFF = 0
 
@@ -170,13 +164,13 @@ class XendDomainInfo:
         """
         dom = info['dom']
         vm = cls(db)
+        vm.setdom(dom)
         db.readDB()
         vm.importFromDB()
         config = vm.config
         log.debug('info=' + str(info))
         log.debug('config=' + prettyprintstring(config))
 
-        vm.setdom(dom)
         vm.memory = info['mem_kb']/1024
 
         if config:
@@ -289,6 +283,7 @@ class XendDomainInfo:
 
     def importFromDB(self):
         self.db.importFromDB(self, fields=self.__exports__)
+        self.store_channel = self.eventChannel("store_channel")
 
     def setdom(self, dom):
         """Set the domain id.
@@ -988,6 +983,15 @@ class XendDomainInfo:
         if not self.shutdown_pending:
             return 0
         return timeout - (time.time() - self.shutdown_pending['start'])
+
+    def dom0_init_store(self):
+        if not self.store_channel:
+            self.store_channel = self.eventChannel("store_channel")
+        self.store_mfn = xc.init_store(self.store_channel.port2)
+        if self.store_mfn >= 0:
+            self.db.introduceDomain(self.id, self.store_mfn,
+                                    self.store_channel)
+        self.exportToDB(save=True, sync=True)
 
 def vm_field_ignore(vm, config, val, index):
     """Dummy config field handler used for fields with built-in handling.

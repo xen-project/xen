@@ -97,8 +97,8 @@ void xen_pmd_unpin(unsigned long ptr); /* x86_64 only */
 void xen_pte_pin(unsigned long ptr);
 void xen_pte_unpin(unsigned long ptr);
 #else
-#define xen_l1_entry_update(_p, _v) set_pte((_p), (pte_t){(_v)})
-#define xen_l2_entry_update(_p, _v) set_pgd((_p), (pgd_t){(_v)})
+#define xen_l1_entry_update(_p, _v) set_pte((_p), (_v))
+#define xen_l2_entry_update(_p, _v) set_pgd((_p), (_v))
 #define xen_pgd_pin(_p)   ((void)0)
 #define xen_pgd_unpin(_p) ((void)0)
 #define xen_pte_pin(_p)   ((void)0)
@@ -140,6 +140,14 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages);
 #endif
 
 #include <asm/hypercall.h>
+
+#if defined(CONFIG_X86_64)
+#define MULTI_UVMFLAGS_INDEX 2
+#define MULTI_UVMDOMID_INDEX 3
+#else
+#define MULTI_UVMFLAGS_INDEX 3
+#define MULTI_UVMDOMID_INDEX 4
+#endif
 
 static inline void
 MULTI_update_va_mapping(

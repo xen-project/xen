@@ -263,7 +263,6 @@ skip:
 void fixup_irqs(cpumask_t map)
 {
 	unsigned int irq;
-	static int warned;
 
 	for (irq = 0; irq < NR_IRQS; irq++) {
 		cpumask_t mask;

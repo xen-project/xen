@@ -37,11 +37,6 @@ long do_policy_op(policy_op_t *u_policy_op)
 
 #else
 
-/* function prototypes defined in acm/acm_policy.c */
-int acm_set_policy(void *buf, u16 buf_size, u16 policy);
-int acm_get_policy(void *buf, u16 buf_size);
-int acm_dump_statistics(void *buf, u16 buf_size);
-
 typedef enum policyoperation {
     POLICY,     /* access to policy interface (early drop) */
     GETPOLICY,  /* dump policy cache */
@@ -89,7 +84,8 @@ long do_policy_op(policy_op_t *u_policy_op)
         ret = acm_set_policy(
             op->u.setpolicy.pushcache, 
             op->u.setpolicy.pushcache_size, 
-            op->u.setpolicy.policy_type);
+            op->u.setpolicy.policy_type,
+            1);
         if (ret == ACM_OK)
             ret = 0;
         else

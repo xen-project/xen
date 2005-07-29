@@ -22,8 +22,8 @@
 
 struct transaction;
 
-bool do_transaction_start(struct connection *conn, const char *node);
-bool do_transaction_end(struct connection *conn, const char *arg);
+void do_transaction_start(struct connection *conn, const char *node);
+void do_transaction_end(struct connection *conn, const char *arg);
 
 /* Is node covered by this transaction? */
 bool within_transaction(struct transaction *trans, const char *node);

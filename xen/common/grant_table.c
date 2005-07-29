@@ -809,6 +809,146 @@ gnttab_dump_table(gnttab_dump_table_t *uop)
 }
 #endif
 
+static long
+gnttab_donate(gnttab_donate_t *uop, unsigned int count)
+{
+    struct domain *d = current->domain;
+    struct domain *e;
+    struct pfn_info *page;
+    u32 _d, _nd, x, y;
+    int i;
+    int result = GNTST_okay;
+
+    for (i = 0; i < count; i++) {
+        gnttab_donate_t *gop = &uop[i];
+#if GRANT_DEBUG
+        printk("gnttab_donate: i=%d mfn=%08x domid=%d gref=%08x\n",
+               i, gop->mfn, gop->domid, gop->handle);
+#endif
+        page = &frame_table[gop->mfn];
+
+        if (unlikely(IS_XEN_HEAP_FRAME(page))) { 
+            printk("gnttab_donate: xen heap frame mfn=%lx\n", (unsigned long) gop->mfn);
+            gop->status = GNTST_bad_virt_addr;
+            continue;
+        }
+        if (unlikely(!pfn_valid(page_to_pfn(page)))) {
+            printk("gnttab_donate: invalid pfn for mfn=%lx\n", (unsigned long) gop->mfn);
+            gop->status = GNTST_bad_virt_addr;
+            continue;
+        }
+        if (unlikely((e = find_domain_by_id(gop->domid)) == NULL)) {
+            printk("gnttab_donate: can't find domain %d\n", gop->domid);
+            gop->status = GNTST_bad_domain;
+            continue;
+        }
+
+        spin_lock(&d->page_alloc_lock);
+
+        /*
+         * The tricky bit: atomically release ownership while
+         * there is just one benign reference to the page
+         * (PGC_allocated). If that reference disappears then the
+         * deallocation routine will safely spin.
+         */
+        _d  = pickle_domptr(d);
+        _nd = page->u.inuse._domain;
+        y   = page->count_info;
+        do {
+            x = y;
+            if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
+                         (1 | PGC_allocated)) || unlikely(_nd != _d)) {
+                printk("gnttab_donate: Bad page values %p: ed=%p(%u), sd=%p,"
+                        " caf=%08x, taf=%08x\n", (void *) page_to_pfn(page),
+                        d, d->domain_id, unpickle_domptr(_nd), x, 
+                        page->u.inuse.type_info);
+                spin_unlock(&d->page_alloc_lock);
+                put_domain(e);
+                return 0;
+            }
+            __asm__ __volatile__(
+                LOCK_PREFIX "cmpxchg8b %2"
+                : "=d" (_nd), "=a" (y),
+                "=m" (*(volatile u64 *)(&page->count_info))
+                : "0" (_d), "1" (x), "c" (NULL), "b" (x) );
+        } while (unlikely(_nd != _d) || unlikely(y != x));
+
+        /*
+         * Unlink from 'd'. At least one reference remains (now
+         * anonymous), so noone else is spinning to try to delete
+         * this page from 'd'.
+         */
+        d->tot_pages--;
+        list_del(&page->list);
+
+        spin_unlock(&d->page_alloc_lock);
+
+        spin_lock(&e->page_alloc_lock);
+
+        /*
+         * Check that 'e' will accept the page and has reservation
+         * headroom.  Also, a domain mustn't have PGC_allocated
+         * pages when it is dying.
+         */
+#ifdef GRANT_DEBUG
+        if (unlikely(e->tot_pages >= e->max_pages)) {
+            printk("gnttab_dontate: no headroom tot_pages=%d max_pages=%d\n",
+                   e->tot_pages, e->max_pages);
+            spin_unlock(&e->page_alloc_lock);
+            put_domain(e);
+            result = GNTST_general_error;
+            break;
+        }
+        if (unlikely(test_bit(DOMFLAGS_DYING, &e->domain_flags))) {
+            printk("gnttab_donate: target domain is dying\n");
+            spin_unlock(&e->page_alloc_lock);
+            put_domain(e);
+            result = GNTST_general_error;
+            break;
+        }
+        if (unlikely(!gnttab_prepare_for_transfer(e, d, gop->handle))) {
+            printk("gnttab_donate: gnttab_prepare_for_transfer fails\n");
+            spin_unlock(&e->page_alloc_lock);
+            put_domain(e);
+            result = GNTST_general_error;
+            break;
+        }
+#else
+        ASSERT(e->tot_pages <= e->max_pages);
+        if (unlikely(test_bit(DOMFLAGS_DYING, &e->domain_flags)) ||
+            unlikely(e->tot_pages == e->max_pages) ||
+            unlikely(!gnttab_prepare_for_transfer(e, d, gop->handle))) {
+            printk("gnttab_donate: Transferee has no reservation headroom (%d,%d), or "
+                    "provided a bad grant ref (%08x), or is dying (%p).\n",
+                    e->tot_pages, e->max_pages, gop->handle, e->d_flags);
+            spin_unlock(&e->page_alloc_lock);
+            put_domain(e);
+            result = GNTST_general_error;
+            break;
+        }
+#endif
+        /* Okay, add the page to 'e'. */
+        if (unlikely(e->tot_pages++ == 0)) {
+            get_knownalive_domain(e);
+        }
+        list_add_tail(&page->list, &e->page_list);
+        page_set_owner(page, e);
+
+        spin_unlock(&e->page_alloc_lock);
+
+        /*
+         * Transfer is all done: tell the guest about its new page
+         * frame.
+         */
+        gnttab_notify_transfer(e, d, gop->handle, gop->mfn);
+        
+        put_domain(e);
+
+        gop->status = GNTST_okay;
+    }
+    return result;
+}
+
 long 
 do_grant_table_op(
     unsigned int cmd, void *uop, unsigned int count)
@@ -843,6 +983,11 @@ do_grant_table_op(
         rc = gnttab_dump_table((gnttab_dump_table_t *)uop);
         break;
 #endif
+    case GNTTABOP_donate:
+        if (unlikely(!array_access_ok(uop, count, sizeof(gnttab_donate_t))))
+            goto out;
+        rc = gnttab_donate(uop, count);
+        break;
     default:
         rc = -ENOSYS;
         break;
@@ -902,6 +1047,9 @@ gnttab_check_unmap(
     for ( handle = 0; handle < lgt->maptrack_limit; handle++ )
     {
         map = &lgt->maptrack[handle];
+
+        if ( map->domid != rd->domain_id )
+            continue;
 
         if ( ( map->ref_and_flags & MAPTRACK_GNTMAP_MASK ) &&
              ( readonly ? 1 : (!(map->ref_and_flags & GNTMAP_readonly))))

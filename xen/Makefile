@@ -50,10 +50,10 @@ clean: delete-unfresh-files
 	$(MAKE) -C arch/$(TARGET_ARCH) clean
 	rm -f include/asm *.o $(TARGET)* *~ core
 	rm -f include/asm-*/asm-offsets.h
-	rm -f tools/figlet/*.o tools/figlet/figlet
 	rm -f include/xen/acm_policy.h
 
 $(TARGET): delete-unfresh-files
+	$(MAKE) -C tools
 	$(MAKE) include/xen/compile.h
 	$(MAKE) include/xen/acm_policy.h
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
@@ -71,7 +71,6 @@ endif
 delete-unfresh-files:
 	@if [ ! -r include/xen/compile.h -o -O include/xen/compile.h ]; then \
 		rm -f include/xen/{banner,compile}.h; \
-		$(MAKE) -C arch/$(TARGET_ARCH) delete-unfresh-files; \
 	fi
 
 # acm_policy.h contains security policy for Xen
@@ -96,21 +95,16 @@ include/xen/compile.h: include/xen/compile.h.in include/xen/banner.h
 	    -e 's/@@whoami@@/$(shell whoami)/g' \
 	    -e 's/@@domain@@/$(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))/g' \
 	    -e 's/@@hostname@@/$(shell hostname)/g' \
-	    -e 's/@@compiler@@/$(shell $(CC) $(CFLAGS) -v 2>&1 | tail -1)/g' \
+	    -e 's/@@compiler@@/$(shell $(CC) $(CFLAGS) -v 2>&1 | tail -n 1)/g' \
 	    -e 's/@@version@@/$(XEN_VERSION)/g' \
 	    -e 's/@@subversion@@/$(XEN_SUBVERSION)/g' \
 	    -e 's/@@extraversion@@/$(XEN_EXTRAVERSION)/g' \
-	    -e 's!@@changeset@@!$(shell (hg parents | awk -F: '/^changeset/{CS=$$3};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null || (head -6 ChangeLog | awk -F: '/^changeset/{CS=$$3};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null || echo information unavailable)!g' \
+	    -e 's!@@changeset@@!$(shell (hg parents | awk -F: '/^changeset/{CS=$$3};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null || (head -n 6 ChangeLog | awk -F: '/^changeset/{CS=$$3};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null || echo information unavailable)!g' \
 	    < include/xen/compile.h.in > $@.new
 	@cat include/xen/banner.h >> $@.new
 	@mv -f $@.new $@
 
-tools/figlet/figlet: tools/figlet/figlet.o
-	$(HOSTCC) -o $@ $<
-tools/figlet/figlet.o: tools/figlet/figlet.c
-	$(HOSTCC) -o $@ -c $<
-
-include/xen/banner.h: tools/figlet/figlet tools/figlet/xen.flf
+include/xen/banner.h:
 	tools/figlet/figlet -d tools/figlet Xen $(XEN_FULLVERSION) > $@.new
 	@mv -f $@.new $@
 
@@ -147,4 +141,4 @@ cscope:
 	$(all_sources) > cscope.files
 	cscope -k -b -q
 MAP:
-	nm $(TARGET) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+	$(NM) $(TARGET) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map

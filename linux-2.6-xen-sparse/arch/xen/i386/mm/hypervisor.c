@@ -296,7 +296,7 @@ void xen_contig_memory(unsigned long vstart, unsigned int order)
 
     /* 2. Get a new contiguous memory extent. */
     BUG_ON(HYPERVISOR_dom_mem_op(
-        MEMOP_increase_reservation, &mfn, 1, order) != 1);
+	       MEMOP_increase_reservation, &mfn, 1, order | (32<<8)) != 1);
 
     /* 3. Map the new extent in place of old pages. */
     for (i = 0; i < (1<<order); i++) {

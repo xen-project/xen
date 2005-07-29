@@ -7,7 +7,7 @@
 #if defined(__i386__)
 #define ELFSIZE 32
 #endif
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__ia64__)
 #define ELFSIZE 64
 #endif
 
@@ -122,8 +122,12 @@ static int parseelfimage(char *image,
     }
     if ( guestinfo == NULL )
     {
+#ifdef __ia64__
+        guestinfo = "";
+#else
         ERROR("Not a Xen-ELF image: '__xen_guest' section not found.");
         return -EINVAL;
+#endif
     }
 
     for ( h = 0; h < ehdr->e_phnum; h++ ) 

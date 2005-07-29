@@ -27,6 +27,14 @@ typedef int64_t            s64;
 #include <xen/sched_ctl.h>
 #include <xen/acm.h>
 
+#ifdef __ia64__
+#define XC_PAGE_SHIFT           14
+#else
+#define XC_PAGE_SHIFT           12
+#endif
+#define XC_PAGE_SIZE            (1UL << XC_PAGE_SHIFT)
+#define XC_PAGE_MASK            (~(XC_PAGE_SIZE-1))
+
 /*
  *  DEFINITIONS FOR CPU BARRIERS
  */ 
@@ -39,6 +47,11 @@ typedef int64_t            s64;
 #define mb()  __asm__ __volatile__ ( "mfence" : : : "memory")
 #define rmb() __asm__ __volatile__ ( "lfence" : : : "memory")
 #define wmb() __asm__ __volatile__ ( "" : : : "memory")
+#elif defined(__ia64__)
+/* FIXME */
+#define mb()
+#define rmb()
+#define wmb()
 #else
 #error "Define barriers"
 #endif
@@ -461,6 +474,9 @@ void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
 
 int xc_get_pfn_list(int xc_handle, u32 domid, unsigned long *pfn_buf, 
                     unsigned long max_pfns);
+
+int xc_ia64_get_pfn_list(int xc_handle, u32 domid, unsigned long *pfn_buf, 
+                    unsigned int start_page, unsigned int nr_pages);
 
 /*\
  *  GRANT TABLE FUNCTIONS

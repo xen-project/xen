@@ -22,9 +22,9 @@
 
 #include "xenstored_core.h"
 
-bool do_watch(struct connection *conn, struct buffered_data *in);
-bool do_watch_ack(struct connection *conn, const char *token);
-bool do_unwatch(struct connection *conn, struct buffered_data *in);
+void do_watch(struct connection *conn, struct buffered_data *in);
+void do_watch_ack(struct connection *conn, const char *token);
+void do_unwatch(struct connection *conn, struct buffered_data *in);
 
 /* Is this a watch event message for this connection? */
 bool is_watch_event(struct connection *conn, struct buffered_data *out);
@@ -32,8 +32,9 @@ bool is_watch_event(struct connection *conn, struct buffered_data *out);
 /* Look through our watches: if any of them have an event, queue it. */
 void queue_next_event(struct connection *conn);
 
-/* Fire all watches: recurse means all the children are effected (ie. rm) */
-void fire_watches(struct transaction *trans, const char *node, bool recurse);
+/* Fire all watches: recurse means all the children are effected (ie. rm).
+ */
+void fire_watches(struct connection *conn, const char *node, bool recurse);
 
 /* Find shortest timeout: if any, reduce tv (may already be set). */
 void shortest_watch_ack_timeout(struct timeval *tv);

@@ -50,6 +50,9 @@ typedef struct netif_st {
     /* Private indexes into shared ring. */
     NETIF_RING_IDX rx_req_cons;
     NETIF_RING_IDX rx_resp_prod; /* private version of shared variable */
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+    NETIF_RING_IDX rx_resp_prod_copy; /* private version of shared variable */
+#endif
     NETIF_RING_IDX tx_req_cons;
     NETIF_RING_IDX tx_resp_prod; /* private version of shared variable */
 

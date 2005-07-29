@@ -8,6 +8,12 @@ from xen.xend.xenstore import DBVar
 
 from xen.xend.server import channel
 
+"""Flag for a block device backend domain."""
+SIF_BLK_BE_DOMAIN = (1<<4)
+
+"""Flag for a net device backend domain."""
+SIF_NET_BE_DOMAIN = (1<<5)
+
 class ImageHandler:
     """Abstract base class for image handlers.
 
@@ -130,7 +136,13 @@ class ImageHandler:
         # xc.domain_setuuid(dom, uuid)
         xc.domain_setcpuweight(dom, cpu_weight)
         xc.domain_setmaxmem(dom, mem_kb)
-        xc.domain_memory_increase_reservation(dom, mem_kb)
+
+        try:
+            xc.domain_memory_increase_reservation(dom, mem_kb)
+        except:
+            xc.domain_destroy(dom)
+            raise
+
         if cpu != -1:
             xc.domain_pincpu(dom, 0, 1<<int(cpu))
         return dom
@@ -284,18 +296,19 @@ class VmxImageHandler(ImageHandler):
 		ret.append("%s" % v)
 
         # Handle hd img related options
-        device = sxp.child(self.vm.config, 'device')
-        vbdinfo = sxp.child(device, 'vbd')
-        if not vbdinfo:
-            raise VmError("vmx: missing vbd configuration")
-        uname = sxp.child_value(vbdinfo, 'uname')
-        vbddev = sxp.child_value(vbdinfo, 'dev')
-        (vbdtype, vbdparam) = string.split(uname, ':', 1)
-        vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
-        if vbdtype != 'file' or vbddev not in vbddev_list:
-            raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
-        ret.append("-%s" % vbddev)
-        ret.append("%s" % vbdparam)
+        devices = sxp.children(self.vm.config, 'device')
+        for device in devices:
+            vbdinfo = sxp.child(device, 'vbd')
+            if not vbdinfo:
+                raise VmError("vmx: missing vbd configuration")
+            uname = sxp.child_value(vbdinfo, 'uname')
+            vbddev = sxp.child_value(vbdinfo, 'dev')
+            (vbdtype, vbdparam) = string.split(uname, ':', 1)
+            vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
+            if vbdtype != 'file' or vbddev not in vbddev_list:
+                raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
+            ret.append("-%s" % vbddev)
+            ret.append("%s" % vbdparam)
 
 	# Handle graphics library related options
 	vnc = sxp.child_value(self.vm.config, 'vnc')
@@ -352,8 +365,9 @@ class VmxImageHandler(ImageHandler):
 
     def destroy(self):
         channel.eventChannelClose(self.device_channel)
-        os.system("kill -KILL"
-                + " %d" % self.pid)
+        import signal
+        os.kill(self.pid, signal.SIGKILL)
+        (pid, status) = os.waitpid(self.pid, 0)
 
     def getDomainMemory(self, mem_mb):
         return (mem_mb * 1024) + self.getPageTableSize(mem_mb)

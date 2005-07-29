@@ -1428,8 +1428,9 @@ int __init xlblk_init(void)
     int i;
 
 #ifdef CONFIG_XEN_BLKDEV_GRANT
-    if ( 0 > gnttab_alloc_grant_references( MAXIMUM_OUTSTANDING_BLOCK_REQS,
-                                            &gref_head, &gref_terminal ))
+    /* A grant for every ring slot, plus one for the ring itself. */
+    if ( 0 > gnttab_alloc_grant_references(MAXIMUM_OUTSTANDING_BLOCK_REQS + 1,
+                                           &gref_head, &gref_terminal) )
         return 1;
     printk(KERN_ALERT "Blkif frontend is using grant tables.\n");
 #endif

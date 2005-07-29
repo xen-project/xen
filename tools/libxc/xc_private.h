@@ -55,7 +55,7 @@
 #define L4_PAGETABLE_ENTRIES    512
 #endif
  
-#define PAGE_SHIFT              L1_PAGETABLE_SHIFT
+#define PAGE_SHIFT              XC_PAGE_SHIFT
 #define PAGE_SIZE               (1UL << PAGE_SHIFT)
 #define PAGE_MASK               (~(PAGE_SIZE-1))
 

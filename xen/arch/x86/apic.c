@@ -723,16 +723,8 @@ void __setup_APIC_LVTT(unsigned int clocks)
 static void __init setup_APIC_timer(unsigned int clocks)
 {
     unsigned long flags;
-    
     local_irq_save(flags);
-
-    /*
-     * Wait for IRQ0's slice:
-     */
-    wait_timer_tick();
-
     __setup_APIC_LVTT(clocks);
-
     local_irq_restore(flags);
 }
 

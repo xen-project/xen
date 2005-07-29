@@ -19,18 +19,22 @@ SRCS     += xc_core.c
 SRCS     += xc_domain.c
 SRCS     += xc_evtchn.c
 SRCS     += xc_gnttab.c
-SRCS     += xc_load_aout9.c
 SRCS     += xc_load_bin.c
 SRCS     += xc_load_elf.c
 SRCS     += xc_linux_build.c
-SRCS     += xc_linux_restore.c
-SRCS     += xc_linux_save.c
 SRCS     += xc_misc.c
 SRCS     += xc_physdev.c
 SRCS     += xc_private.c
+ifeq ($(XEN_TARGET_ARCH),ia64)
+SRCS     += xc_ia64_stubs.c
+else
+SRCS     += xc_load_aout9.c
+SRCS     += xc_linux_restore.c
+SRCS     += xc_linux_save.c
+SRCS     += xc_vmx_build.c
 SRCS     += xc_ptrace.c
 SRCS     += xc_ptrace_core.c
-SRCS     += xc_vmx_build.c
+endif
 
 CFLAGS   += -Wall
 CFLAGS   += -Werror

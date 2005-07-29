@@ -11,6 +11,8 @@
 #include <linux/module.h>
 #include <linux/interrupt.h>
 
+#include <asm-i386/kdebug.h>
+
 #include <asm-xen/evtchn.h>
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/hypervisor.h>
@@ -20,17 +22,23 @@
 #include <asm-xen/xen-public/io/ring.h>
 
 #include "pdb_module.h"
+#include "pdb_debug.h"
 
 #define PDB_RING_SIZE __RING_SIZE((pdb_sring_t *)0, PAGE_SIZE)
 
 static pdb_back_ring_t pdb_ring;
 static unsigned int    pdb_evtchn;
 static unsigned int    pdb_irq;
+static unsigned int    pdb_domain;
+
+/* work queue */
+static void pdb_work_handler(void *unused);
+static DECLARE_WORK(pdb_deferred_work, pdb_work_handler, NULL);
 
 /*
  * send response to a pdb request
  */
-static void
+void
 pdb_send_response (pdb_response_t *response)
 {
     pdb_response_t *resp;
@@ -38,6 +46,7 @@ pdb_send_response (pdb_response_t *response)
     resp = RING_GET_RESPONSE(&pdb_ring, pdb_ring.rsp_prod_pvt);
 
     memcpy(resp, response, sizeof(pdb_response_t));
+    resp->domain = pdb_domain;
     
     wmb();                 /* Ensure other side can see the response fields. */
     pdb_ring.rsp_prod_pvt++;
@@ -53,42 +62,98 @@ static void
 pdb_process_request (pdb_request_t *request)
 {
     pdb_response_t resp;
+    struct task_struct *target;
+
+    read_lock(&tasklist_lock);
+    target = find_task_by_pid(request->process);
+    if (target)
+        get_task_struct(target);
+    read_unlock(&tasklist_lock);
+
+    resp.operation = request->operation;
+    resp.process   = request->process;
+
+    if (!target)
+    {
+        printk ("(linux) target not found 0x%x\n", request->process);
+        resp.status = PDB_RESPONSE_ERROR;
+        goto response;
+    }
 
     switch (request->operation)
     {
+    case PDB_OPCODE_PAUSE :
+        pdb_suspend(target);
+        resp.status = PDB_RESPONSE_OKAY;
+        break;
     case PDB_OPCODE_ATTACH :
-        pdb_attach(request->process);
+        pdb_suspend(target);
+        pdb_domain = request->u.attach.domain;
+        printk("(linux) attach  dom:0x%x pid:0x%x\n",
+               pdb_domain, request->process);
         resp.status = PDB_RESPONSE_OKAY;
         break;
     case PDB_OPCODE_DETACH :
-        pdb_detach(request->process);
+        pdb_resume(target);
+        printk("(linux) detach 0x%x\n", request->process);
         resp.status = PDB_RESPONSE_OKAY;
         break;
-    case PDB_OPCODE_RD_REG :
-        pdb_read_register(request->process, &request->u.rd_reg, 
-                          (unsigned long *)&resp.value);
+    case PDB_OPCODE_RD_REGS :
+        pdb_read_registers(target, &resp.u.rd_regs);
         resp.status = PDB_RESPONSE_OKAY;
         break;
     case PDB_OPCODE_WR_REG :
-        pdb_write_register(request->process, &request->u.wr_reg);
+        pdb_write_register(target, &request->u.wr_reg);
+        resp.status = PDB_RESPONSE_OKAY;
+        break;
+    case PDB_OPCODE_RD_MEM :
+        pdb_access_memory(target, request->u.rd_mem.address,
+                          &resp.u.rd_mem.data, request->u.rd_mem.length, 0);
+        resp.u.rd_mem.address = request->u.rd_mem.address;
+        resp.u.rd_mem.length  = request->u.rd_mem.length;
+        resp.status = PDB_RESPONSE_OKAY;
+        break;
+    case PDB_OPCODE_WR_MEM :
+        pdb_access_memory(target, request->u.wr_mem.address,
+                         &request->u.wr_mem.data, request->u.wr_mem.length, 1);
+        resp.status = PDB_RESPONSE_OKAY;
+        break;
+    case PDB_OPCODE_CONTINUE :
+        pdb_continue(target);
+        goto no_response;
+        break;
+    case PDB_OPCODE_STEP :
+        pdb_step(target);
+        resp.status = PDB_RESPONSE_OKAY;
+        goto no_response;
+        break;
+    case PDB_OPCODE_SET_BKPT :
+        pdb_insert_memory_breakpoint(target, request->u.bkpt.address,
+                                     request->u.bkpt.length);
+        resp.status = PDB_RESPONSE_OKAY;
+        break;
+    case PDB_OPCODE_CLR_BKPT :
+        pdb_remove_memory_breakpoint(target, request->u.bkpt.address,
+                                     request->u.bkpt.length);
         resp.status = PDB_RESPONSE_OKAY;
         break;
     default:
         printk("(pdb) unknown request operation %d\n", request->operation);
         resp.status = PDB_RESPONSE_ERROR;
     }
-        
-    resp.operation = request->operation;
-            
+
+ response:        
     pdb_send_response (&resp);
+
+ no_response:
     return;
 }
 
 /*
- * receive a pdb request
+ * work queue
  */
-static irqreturn_t
-pdb_interrupt (int irq, void *dev_id, struct pt_regs *ptregs)
+static void
+pdb_work_handler (void *unused)
 {
     pdb_request_t *req;
     RING_IDX i, rp;
@@ -105,10 +170,18 @@ pdb_interrupt (int irq, void *dev_id, struct pt_regs *ptregs)
 
     }
     pdb_ring.req_cons = i;
+}
+
+/*
+ * receive a pdb request
+ */
+static irqreturn_t
+pdb_interrupt (int irq, void *dev_id, struct pt_regs *ptregs)
+{
+    schedule_work(&pdb_deferred_work);
 
     return IRQ_HANDLED;
 }
-
 
 static void
 pdb_send_connection_status(int status, memory_t ring)
@@ -135,8 +208,6 @@ pdb_send_connection_status(int status, memory_t ring)
 static void
 pdb_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 {
-printk ("pdb ctrlif rx\n");
-
     switch (msg->subtype)
     {
     case CMSG_DEBUG_CONNECTION_STATUS:
@@ -160,17 +231,34 @@ printk ("pdb ctrlif rx\n");
     return;
 }
 
-static int __init 
-pdb_initialize(void)
+
+/********************************************************************/
+
+static struct notifier_block pdb_exceptions_nb =
 {
+    .notifier_call = pdb_exceptions_notify,
+    .priority = 0x1                                          /* low priority */
+};
+
+
+static int __init 
+pdb_initialize (void)
+{
+    int err;
     pdb_sring_t *sring;
 
     printk("----\npdb initialize   %s %s\n", __DATE__, __TIME__);
+
+    pdb_initialize_bwcpoint();
 
     /*
     if ( xen_start_info.flags & SIF_INITDOMAIN )
         return 1;
     */
+
+    pdb_evtchn = 0;
+    pdb_irq    = 0;
+    pdb_domain = 0;
 
     (void)ctrl_if_register_receiver(CMSG_DEBUG, pdb_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);
@@ -184,12 +272,21 @@ pdb_initialize(void)
     pdb_send_connection_status(PDB_CONNECTION_STATUS_UP, 
                                virt_to_machine(pdb_ring.sring) >> PAGE_SHIFT);
 
-    return 0;
+    /* handler for int1 & int3 */
+    err = register_die_notifier(&pdb_exceptions_nb);
+
+    return err;
 }
+
+extern struct notifier_block *i386die_chain;
+extern spinlock_t die_notifier_lock;
 
 static void __exit
 pdb_terminate(void)
 {
+    int err = 0;
+    unsigned long flags;
+
     printk("pdb cleanup\n");
 
     (void)ctrl_if_unregister_receiver(CMSG_DEBUG, pdb_ctrlif_rx);
@@ -207,6 +304,12 @@ pdb_terminate(void)
     }
 
     pdb_send_connection_status(PDB_CONNECTION_STATUS_DOWN, 0);
+
+	spin_lock_irqsave(&die_notifier_lock, flags);
+    err = notifier_chain_unregister(&i386die_chain, &pdb_exceptions_nb);
+	spin_unlock_irqrestore(&die_notifier_lock, flags);
+
+	return;
 }
 
 

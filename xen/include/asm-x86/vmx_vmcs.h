@@ -69,6 +69,8 @@ struct msr_state{
     unsigned long shadow_gs;
 };
 
+#define PC_DEBUG_PORT   0x80 
+
 struct arch_vmx_struct {
     struct vmcs_struct      *vmcs;  /* VMCS pointer in virtual */
     unsigned long           flags;  /* VMCS flags */
@@ -76,6 +78,7 @@ struct arch_vmx_struct {
     unsigned long           cpu_cr3;
     unsigned long           cpu_state;
     struct msr_state        msr_content;
+    void                   *io_bitmap_a, *io_bitmap_b;
 };
 
 #define vmx_schedule_tail(next)         \
@@ -97,6 +100,8 @@ int  load_vmcs(struct arch_vmx_struct *, u64);
 int  store_vmcs(struct arch_vmx_struct *, u64);
 int  construct_vmcs(struct arch_vmx_struct *, struct cpu_user_regs *, 
                     struct vcpu_guest_context *, int);
+int modify_vmcs(struct arch_vmx_struct *arch_vmx,
+                struct cpu_user_regs *regs);
 
 #define VMCS_USE_HOST_ENV       1
 #define VMCS_USE_SEPARATE_ENV   0

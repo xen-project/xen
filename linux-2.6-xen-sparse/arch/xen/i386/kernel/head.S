@@ -10,6 +10,9 @@
 #else
 	.ascii	",PAE=no"
 #endif
+#ifdef CONFIG_XEN_SHADOW_MODE
+	.ascii	",SHADOW=translate"
+#endif
 	.ascii	",LOADER=generic"
 	.byte	0
 

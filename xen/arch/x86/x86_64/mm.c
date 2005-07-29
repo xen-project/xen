@@ -100,7 +100,7 @@ void __init paging_init(void)
      */
     for ( i = 0; i < max_page; i += ((1UL << L2_PAGETABLE_SHIFT) / 8) )
     {
-        pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER);
+        pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0);
         if ( pg == NULL )
             panic("Not enough memory for m2p table\n");
         map_pages_to_xen(

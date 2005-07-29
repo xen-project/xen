@@ -123,7 +123,7 @@ public interface XmlToBinInterface
   final short binaryBufferHeaderSz = (3 * u32Size + 4* u16Size);
 
   /* copied directlty from policy_ops.h */
-  final int POLICY_INTERFACE_VERSION = 0xAAAA0002;
+  final int POLICY_INTERFACE_VERSION = 0xAAAA0003;
 
   /* copied directly from acm.h */
   final int ACM_MAGIC  =  0x0001debc;

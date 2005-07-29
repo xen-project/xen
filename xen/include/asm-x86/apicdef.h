@@ -108,10 +108,11 @@
 
 #define APIC_BASE (fix_to_virt(FIX_APIC_BASE))
 
-#ifdef CONFIG_NUMA
- #define MAX_IO_APICS 32
+/* These limits are dictated by ES7000 hardware. */
+#ifdef __i386__
+ #define MAX_IO_APICS 65
 #else
- #define MAX_IO_APICS 8
+ #define MAX_IO_APICS 129
 #endif
 
 /*

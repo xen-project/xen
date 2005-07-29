@@ -382,7 +382,7 @@ static int __init acpi_parse_hpet(unsigned long phys, unsigned long size)
 		return -1;
 	}
 
-#ifdef	CONFIG_X86_64
+#if 0/*def	CONFIG_X86_64*/
         vxtime.hpet_address = hpet_tbl->addr.addrl |
                 ((long) hpet_tbl->addr.addrh << 32);
 

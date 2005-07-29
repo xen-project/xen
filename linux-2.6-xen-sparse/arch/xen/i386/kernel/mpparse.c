@@ -748,8 +748,10 @@ static int __init smp_scan_config (unsigned long base, unsigned long length)
 				|| (mpf->mpf_specification == 4)) ) {
 
 			smp_found_config = 1;
+#ifndef CONFIG_XEN
 			printk(KERN_INFO "found SMP MP-table at %08lx\n",
 						virt_to_phys(mpf));
+			reserve_bootmem(virt_to_phys(mpf), PAGE_SIZE);
 			if (mpf->mpf_physptr) {
 				/*
 				 * We cannot access to MPC table to compute
@@ -766,6 +768,10 @@ static int __init smp_scan_config (unsigned long base, unsigned long length)
 					size = end - mpf->mpf_physptr;
 				reserve_bootmem(mpf->mpf_physptr, size);
 			}
+#else
+			printk(KERN_INFO "found SMP MP-table at %08lx\n",
+				((unsigned long)bp - (unsigned long)isa_bus_to_virt(base)) + base);
+#endif
 
 			mpf_found = mpf;
 			return 1;
@@ -809,9 +815,11 @@ void __init find_smp_config (void)
 	 * MP1.4 SPEC states to only scan first 1K of 4K EBDA.
 	 */
 
+#ifndef CONFIG_XEN
 	address = get_bios_ebda();
 	if (address)
 		smp_scan_config(address, 0x400);
+#endif
 }
 
 /* --------------------------------------------------------------------------

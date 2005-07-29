@@ -24,10 +24,10 @@
 #include <asm/vmx_virpit.h>
 #include <asm/vmx_intercept.h>
 #include <public/io/ioreq.h>
-
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <asm/current.h>
+#include <io_ports.h>
 
 #ifdef CONFIG_VMX
 
@@ -175,7 +175,7 @@ int intercept_pit_io(ioreq_t *p)
         p->port_mm)
         return 0;
     
-    if (p->addr == 0x43 &&
+    if (p->addr == PIT_MODE &&
 	p->dir == 0 &&				/* write */
         ((p->u.data >> 4) & 0x3) == 0 &&	/* latch command */
         ((p->u.data >> 6) & 0x3) == (vpit->channel)) {/* right channel */
@@ -183,7 +183,7 @@ int intercept_pit_io(ioreq_t *p)
 	return 1;
     }
 
-    if (p->addr == (0x40 + vpit->channel) &&
+    if (p->addr == (PIT_CH0 + vpit->channel) &&
 	p->dir == 1) {	/* read */
         p->u.data = pit_read_io(vpit);
         resume_pit_io(p);
@@ -197,12 +197,23 @@ int intercept_pit_io(ioreq_t *p)
 static void pit_timer_fn(void *data)
 {
     struct vmx_virpit_t *vpit = data;
+    s_time_t   next;
+    int        missed_ticks;
+
+    missed_ticks = (NOW() - vpit->scheduled) / MILLISECS(vpit->period);
 
     /* Set the pending intr bit, and send evtchn notification to myself. */
     if (test_and_set_bit(vpit->vector, vpit->intr_bitmap))
         vpit->pending_intr_nr++; /* already set, then count the pending intr */
 
-    set_ac_timer(&vpit->pit_timer, NOW() + MILLISECS(vpit->period));
+    /* pick up missed timer tick */
+    if ( missed_ticks > 0 ) {
+        vpit->pending_intr_nr+= missed_ticks;
+        vpit->scheduled += missed_ticks * MILLISECS(vpit->period);
+    }
+    next = vpit->scheduled + MILLISECS(vpit->period);
+    set_ac_timer(&vpit->pit_timer, next);
+    vpit->scheduled = next;
 }
 
 
@@ -263,7 +274,8 @@ void vmx_hooks_assist(struct vcpu *d)
 
         vpit->intr_bitmap = intr;
 
-	set_ac_timer(&vpit->pit_timer, NOW() + MILLISECS(vpit->period));
+        vpit->scheduled = NOW() + MILLISECS(vpit->period);
+        set_ac_timer(&vpit->pit_timer, vpit->scheduled);
 
         /*restore the state*/
         p->state = STATE_IORESP_READY;

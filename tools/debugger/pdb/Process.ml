@@ -54,10 +54,10 @@ let attach_debugger proc_ctx dom_ctx =
   proc_ctx.ring   <- Xen_domain.get_ring   dom_ctx;
   _attach_debugger proc_ctx
 
-external read_registers : context_t -> registers = "proc_read_registers"
+external read_registers : context_t -> unit = "proc_read_registers"
 external write_register : context_t -> register -> int32 -> unit =
   "proc_write_register"
-external read_memory : context_t -> int32 -> int -> int list = 
+external read_memory : context_t -> int32 -> int -> unit = 
   "proc_read_memory"
 external write_memory : context_t -> int32 -> int list -> unit = 
   "proc_write_memory"

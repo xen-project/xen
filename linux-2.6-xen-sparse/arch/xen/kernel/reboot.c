@@ -172,8 +172,8 @@ static int shutdown_process(void *__unused)
 {
     static char *envp[] = { "HOME=/", "TERM=linux", 
                             "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
-    static char *restart_argv[]  = { "/sbin/shutdown", "-r", "now", NULL };
-    static char *poweroff_argv[] = { "/sbin/halt",     "-p",        NULL };
+    static char *restart_argv[]  = { "/sbin/reboot", NULL };
+    static char *poweroff_argv[] = { "/sbin/poweroff", NULL };
 
     extern asmlinkage long sys_reboot(int magic1, int magic2,
                                       unsigned int cmd, void *arg);
@@ -187,7 +187,7 @@ static int shutdown_process(void *__unused)
     switch ( shutting_down )
     {
     case CMSG_SHUTDOWN_POWEROFF:
-        if ( execve("/sbin/halt", poweroff_argv, envp) < 0 )
+        if ( execve("/sbin/poweroff", poweroff_argv, envp) < 0 )
         {
             sys_reboot(LINUX_REBOOT_MAGIC1,
                        LINUX_REBOOT_MAGIC2,
@@ -197,7 +197,7 @@ static int shutdown_process(void *__unused)
         break;
 
     case CMSG_SHUTDOWN_REBOOT:
-        if ( execve("/sbin/shutdown", restart_argv, envp) < 0 )
+        if ( execve("/sbin/reboot", restart_argv, envp) < 0 )
         {
             sys_reboot(LINUX_REBOOT_MAGIC1,
                        LINUX_REBOOT_MAGIC2,

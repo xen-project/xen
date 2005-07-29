@@ -8,7 +8,7 @@
 #define ELFSIZE 32
 #endif
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__ia64__)
 #define ELFSIZE 64
 #endif
 
@@ -34,6 +34,10 @@
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
+
+#ifdef __ia64__
+#define probe_aout9(image,image_size,load_funcs) 1
+#endif
 
 static int probeimageformat(char *image,
                             unsigned long image_size,
@@ -258,6 +262,67 @@ static int setup_pg_tables_64(int xc_handle, u32 dom,
 }
 #endif
 
+#ifdef __ia64__
+#include <asm/fpu.h> /* for FPSR_DEFAULT */
+static int setup_guest(int xc_handle,
+                         u32 dom,
+                         char *image, unsigned long image_size,
+                         gzFile initrd_gfd, unsigned long initrd_len,
+                         unsigned long nr_pages,
+                         unsigned long *pvsi, unsigned long *pvke,
+                         unsigned long *pvss, vcpu_guest_context_t *ctxt,
+                         const char *cmdline,
+                         unsigned long shared_info_frame,
+                         unsigned int control_evtchn,
+                         unsigned long flags,
+                         unsigned int vcpus,
+                         unsigned int store_evtchn, unsigned long *store_mfn)
+{
+    unsigned long *page_array = NULL;
+    struct load_funcs load_funcs;
+    struct domain_setup_info dsi;
+    unsigned long start_page;
+    int rc;
+
+    rc = probeimageformat(image, image_size, &load_funcs);
+    if ( rc != 0 )
+        goto error_out;
+
+    memset(&dsi, 0, sizeof(struct domain_setup_info));
+
+    rc = (load_funcs.parseimage)(image, image_size, &dsi);
+    if ( rc != 0 )
+        goto error_out;
+
+    dsi.v_start = round_pgdown(dsi.v_start);
+    dsi.v_end   = round_pgup(dsi.v_end);
+
+    start_page = dsi.v_start >> PAGE_SHIFT;
+    nr_pages = (dsi.v_end - dsi.v_start) >> PAGE_SHIFT;
+    if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
+    {
+        PERROR("Could not allocate memory");
+        goto error_out;
+    }
+
+    if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array, start_page, nr_pages) != nr_pages )
+    {
+        PERROR("Could not get the page frame list");
+        goto error_out;
+    }
+
+    (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
+                           &dsi);
+
+    *pvke = dsi.v_kernentry;
+    return 0;
+
+ error_out:
+    if ( page_array != NULL )
+        free(page_array);
+    return -1;
+}
+#else /* x86 */
 static int setup_guest(int xc_handle,
                        u32 dom,
                        char *image, unsigned long image_size,
@@ -500,6 +565,8 @@ static int setup_guest(int xc_handle,
         goto error_out;
 #endif
 
+    *store_mfn = page_array[(vstoreinfo_start-dsi.v_start) >> PAGE_SHIFT];
+
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
         page_array[(vstartinfo_start-dsi.v_start)>>PAGE_SHIFT]);
@@ -511,7 +578,7 @@ static int setup_guest(int xc_handle,
     start_info->nr_pt_frames = nr_pt_pages;
     start_info->mfn_list     = vphysmap_start;
     start_info->domain_controller_evtchn = control_evtchn;
-    start_info->store_page   = vstoreinfo_start;
+    start_info->store_mfn    = *store_mfn;
     start_info->store_evtchn = store_evtchn;
     if ( initrd_len != 0 )
     {
@@ -521,9 +588,6 @@ static int setup_guest(int xc_handle,
     strncpy((char *)start_info->cmd_line, cmdline, MAX_GUEST_CMDLINE);
     start_info->cmd_line[MAX_GUEST_CMDLINE-1] = '\0';
     munmap(start_info, PAGE_SIZE);
-
-    /* Tell our caller where we told domain store page was. */
-    *store_mfn = page_array[((vstoreinfo_start-dsi.v_start)>>PAGE_SHIFT)];
 
     /* shared_info page starts its life empty. */
     shared_info = xc_map_foreign_range(
@@ -558,6 +622,7 @@ static int setup_guest(int xc_handle,
         free(page_array);
     return -1;
 }
+#endif
 
 int xc_linux_build(int xc_handle,
                    u32 domid,
@@ -628,7 +693,11 @@ int xc_linux_build(int xc_handle,
     }
 
     if ( !(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED) ||
+#ifdef __ia64__
+	0 )
+#else
          (ctxt->ctrlreg[3] != 0) )
+#endif
     {
         ERROR("Domain is already constructed");
         goto error_out;
@@ -653,6 +722,18 @@ int xc_linux_build(int xc_handle,
     if ( image != NULL )
         free(image);
 
+#ifdef __ia64__
+    /* based on new_thread in xen/arch/ia64/domain.c */
+    ctxt->regs.cr_ipsr = 0; /* all necessary bits filled by hypervisor */
+    ctxt->regs.cr_iip = vkern_entry;
+    ctxt->regs.cr_ifs = 1UL << 63;
+    ctxt->regs.ar_fpsr = FPSR_DEFAULT;
+    /* ctxt->regs.r28 = dom_fw_setup(); currently done by hypervisor, should move here */
+    ctxt->vcpu.privregs = 0;
+    ctxt->shared.domain_controller_evtchn = control_evtchn;
+    ctxt->shared.flags = flags;
+    i = 0; /* silence unused variable warning */
+#else /* x86 */
     /*
      * Initial register values:
      *  DS,ES,FS,GS = FLAT_KERNEL_DS
@@ -707,6 +788,7 @@ int xc_linux_build(int xc_handle,
     ctxt->failsafe_callback_eip = 0;
     ctxt->syscall_callback_eip  = 0;
 #endif
+#endif /* x86 */
 
     memset( &launch_op, 0, sizeof(launch_op) );
 

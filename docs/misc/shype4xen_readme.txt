@@ -567,4 +567,22 @@ is that policy files/management should be portable and independent of the platfo
 Our policy interface enables managers to create a single binary policy file in a trusted
 environment and distributed it to multiple systems for enforcement.
 
+5. Booting with a binary policy:
+********************************
+The grub configuration file can be adapted to boot the hypervisor with an
+already active policy. To do this, a binary policy file - this can be
+the same file as used by the policy_tool - should be placed into the boot
+partition. The following entry from the grub configuration file shows how
+a binary policy can be added to the system during boot time. Note that the 
+binary policy must be of the same type that the hypervisor was compiled 
+for. The policy module line should also only be added as the last module
+line if XEN was compiled with the access control module (ACM).
+
+title XEN0 3.0 Devel
+	kernel /xen.gz dom0_mem=400000
+	module /vmlinuz-2.6.12-xen0 root=/dev/hda2 ro console=tty0
+	module /initrd-2.6.12-xen0.img
+	module /xen_sample_policy.bin
+
+
 ====================end-of file=======================================

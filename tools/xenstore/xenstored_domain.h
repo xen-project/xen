@@ -23,18 +23,21 @@
 void handle_event(int event_fd);
 
 /* domid, mfn, eventchn, path */
-bool do_introduce(struct connection *conn, struct buffered_data *in);
+void do_introduce(struct connection *conn, struct buffered_data *in);
 
 /* domid */
-bool do_release(struct connection *conn, const char *domid_str);
+void do_release(struct connection *conn, const char *domid_str);
 
 /* domid */
-bool do_get_domain_path(struct connection *conn, const char *domid_str);
+void do_get_domain_path(struct connection *conn, const char *domid_str);
 
 /* Returns the event channel handle */
 int domain_init(void);
 
 /* Returns the implicit path of a connection (only domains have this) */
 const char *get_implicit_path(const struct connection *conn);
+
+/* Read existing connection information from store. */
+void restore_existing_connections(void);
 
 #endif /* _XENSTORED_DOMAIN_H */

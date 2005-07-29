@@ -131,12 +131,12 @@ extern void shadow_l2_normal_pt_update(struct domain *d,
                                        unsigned long pa, l2_pgentry_t l2e,
                                        struct domain_mmap_cache *cache);
 #if CONFIG_PAGING_LEVELS >= 3
+#include <asm/page-guest32.h>
 extern void shadow_l3_normal_pt_update(struct domain *d,
                                        unsigned long pa, l3_pgentry_t l3e,
                                        struct domain_mmap_cache *cache);
 #endif
 #if CONFIG_PAGING_LEVELS >= 4
-#include <asm/page-guest32.h>
 extern void shadow_l4_normal_pt_update(struct domain *d,
                                        unsigned long pa, l4_pgentry_t l4e,
                                        struct domain_mmap_cache *cache);
@@ -631,82 +631,6 @@ static inline void shadow_sync_and_drop_references(
 }
 #endif
 
-#if CONFIG_PAGING_LEVELS == 3
-/* dummy functions, PAE has no shadow support yet */
-
-static inline void
-__shadow_get_l2e(
-    struct vcpu *v, unsigned long va, l2_pgentry_t *psl2e)
-{
-    BUG();
-}
-
-static inline void
-__shadow_set_l2e(
-    struct vcpu *v, unsigned long va, l2_pgentry_t value)
-{
-    BUG();
-}
-
-static inline void
-__guest_get_l2e(
-    struct vcpu *v, unsigned long va, l2_pgentry_t *pl2e)
-{
-    BUG();
-}
-
-static inline void
-__guest_set_l2e(
-    struct vcpu *v, unsigned long va, l2_pgentry_t value)
-{
-    BUG();
-}
-
-static inline void shadow_drop_references(
-    struct domain *d, struct pfn_info *page)
-{
-    if ( likely(!shadow_mode_refcounts(d)) ||
-         ((page->u.inuse.type_info & PGT_count_mask) == 0) )
-        return;
-    BUG();
-}
-
-static inline void shadow_sync_and_drop_references(
-    struct domain *d, struct pfn_info *page)
-{
-    if ( likely(!shadow_mode_refcounts(d)) )
-        return;
-    BUG();
-}
-
-static inline int l1pte_write_fault(
-    struct vcpu *v, l1_pgentry_t *gpte_p, l1_pgentry_t *spte_p,
-    unsigned long va)
-{
-    BUG();
-    return 42;
-}
-
-static inline int l1pte_read_fault(
-    struct domain *d, l1_pgentry_t *gpte_p, l1_pgentry_t *spte_p)
-{
-    BUG();
-    return 42;
-}
-
-void static inline
-shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
-{
-    BUG();
-}
-
-static inline unsigned long gva_to_gpa(unsigned long gva)
-{
-    BUG();
-    return 42;
-}
-#endif
-    
 /************************************************************************/
 
 /*
@@ -1691,8 +1615,10 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
 /************************************************************************/
 
 static inline int
-shadow_mode_page_writable(struct domain *d, unsigned long gpfn)
+shadow_mode_page_writable(unsigned long va, struct cpu_user_regs *regs, unsigned long gpfn)
 {
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
     unsigned long mfn = __gpfn_to_mfn(d, gpfn);
     u32 type = frame_table[mfn].u.inuse.type_info & PGT_type_mask;
 
@@ -1701,11 +1627,14 @@ shadow_mode_page_writable(struct domain *d, unsigned long gpfn)
         type = shadow_max_pgtable_type(d, gpfn, NULL);
 
     if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
-         (type == PGT_l1_page_table) )
+         (type == PGT_l1_page_table) &&
+         (va < HYPERVISOR_VIRT_START) &&
+         KERNEL_MODE(v, regs) )
         return 1;
 
     if ( shadow_mode_write_all(d) &&
-         type && (type <= PGT_l4_page_table) )
+         type && (type <= PGT_l4_page_table) &&
+         KERNEL_MODE(v, regs) )
         return 1;
 
     return 0;
