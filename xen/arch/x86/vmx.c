@@ -38,7 +38,7 @@
 #include <asm/vmx_vmcs.h>
 #include <asm/vmx_intercept.h>
 #include <asm/shadow.h>
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
 #include <asm/shadow_64.h>
 #endif
 

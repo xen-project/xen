@@ -21,7 +21,7 @@
 
 #ifndef _XEN_SHADOW_PUBLIC_H
 #define _XEN_SHADOW_PUBLIC_H
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
 #define MFN_PINNED(_x) (frame_table[_x].u.inuse.type_info & PGT_pinned)
 
 extern int alloc_p2m_table(struct domain *d);
@@ -30,10 +30,6 @@ extern void shadow_sync_and_drop_references(
       struct domain *d, struct pfn_info *page);
 extern void shadow_drop_references(
       struct domain *d, struct pfn_info *page);
-
-extern void shadow_l4_normal_pt_update(struct domain *d,
-                                       unsigned long pa, l4_pgentry_t l4e,
-                                       struct domain_mmap_cache *cache);
 
 extern int shadow_set_guest_paging_levels(struct domain *d, int levels);
 
@@ -54,6 +50,12 @@ struct shadow_ops {
                               unsigned long mfn);
     int  (*is_out_of_sync)(struct vcpu *v, unsigned long va);
 };
+#endif
+
+#if CONFIG_PAGING_LEVELS >= 4
+extern void shadow_l4_normal_pt_update(struct domain *d,
+                                       unsigned long pa, l4_pgentry_t l4e,
+                                       struct domain_mmap_cache *cache);
 #endif
 
 #endif

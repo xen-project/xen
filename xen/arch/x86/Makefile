@@ -13,11 +13,18 @@ OBJS := $(subst cpu/centaur.o,,$(OBJS))
 OBJS := $(subst cpu/cyrix.o,,$(OBJS))
 OBJS := $(subst cpu/rise.o,,$(OBJS))
 OBJS := $(subst cpu/transmeta.o,,$(OBJS))
-OBJS := $(subst shadow32.o,,$(OBJS))
-else
-OBJS := $(subst shadow.o,,$(OBJS))
-OBJS := $(subst shadow_public.o,,$(OBJS))
-OBJS := $(subst shadow_xxx.o,,$(OBJS))
+endif
+
+OBJS := $(patsubst shadow%.o,,$(OBJS))	# drop all
+ifeq ($(TARGET_SUBARCH),x86_64) 
+ OBJS += shadow.o shadow_public.o	# x86_64: new code
+endif
+ifeq ($(TARGET_SUBARCH),x86_32) 
+ ifneq ($(pae),n)
+  OBJS += shadow.o shadow_public.o	# x86_32p: new code
+ else
+  OBJS += shadow32.o			# x86_32: old code
+ endif
 endif
 
 OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))

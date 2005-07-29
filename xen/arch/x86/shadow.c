@@ -41,7 +41,13 @@ extern void free_shadow_pages(struct domain *d);
 static void mark_shadows_as_reflecting_snapshot(struct domain *d, unsigned long gpfn);
 #endif
 
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS == 3
+#include <asm/shadow_64.h>
+static unsigned long shadow_l3_table(
+    struct domain *d, unsigned long gpfn, unsigned long gmfn);
+#endif
+
+#if CONFIG_PAGING_LEVELS == 4
 #include <asm/shadow_64.h>
 static unsigned long shadow_l4_table(
     struct domain *d, unsigned long gpfn, unsigned long gmfn);
@@ -1833,7 +1839,7 @@ static void shadow_update_pagetables(struct vcpu *v)
     unsigned long gpfn = __mfn_to_gpfn(d, gmfn);
     unsigned long smfn, old_smfn;
 
-#if defined (__i386__)
+#if CONFIG_PAGING_LEVELS == 2
     unsigned long hl2mfn;
 #endif
   
@@ -1890,7 +1896,7 @@ static void shadow_update_pagetables(struct vcpu *v)
         v->arch.shadow_vtable = map_domain_page(smfn);
     }
 
-#if defined (__i386__)
+#if CONFIG_PAGING_LEVELS == 2
     /*
      * arch.hl2_vtable
      */
@@ -1935,6 +1941,10 @@ static void shadow_update_pagetables(struct vcpu *v)
         // XXX - maybe this can be optimized somewhat??
         local_flush_tlb();
     }
+#endif
+
+#if CONFIG_PAGING_LEVELS == 3
+    /* FIXME: PAE code to be written */
 #endif
 }
 
@@ -2427,6 +2437,7 @@ static unsigned long shadow_l3_table(
   struct domain *d, unsigned long gpfn, unsigned long gmfn)
 {
     BUG();                      /* not implemenated yet */
+    return 42;
 }
 #endif
 
