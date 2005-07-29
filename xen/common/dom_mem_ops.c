@@ -140,7 +140,7 @@ do_dom_mem_op(unsigned long  op,
     op           &= (1 << START_EXTENT_SHIFT) - 1;
 
     /* seperate extent_order and address_bits_order */
-    address_bits_order = (extent_order >> 1) & 0xff;
+    address_bits_order = (extent_order >> 8) & 0xff;
     extent_order &= 0xff;
 
     if ( unlikely(start_extent > nr_extents) )
