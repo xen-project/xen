@@ -1075,6 +1075,11 @@ static u32 remove_all_write_access_in_ptpage(
     int is_l1_shadow =
         ((frame_table[pt_mfn].u.inuse.type_info & PGT_type_mask) ==
          PGT_l1_shadow);
+#if CONFIG_PAGING_LEVELS == 4
+    is_l1_shadow |=
+      ((frame_table[pt_mfn].u.inuse.type_info & PGT_type_mask) ==
+                PGT_fl1_shadow);
+#endif
 
     match = l1e_from_pfn(readonly_gmfn, flags);
 
@@ -2592,7 +2597,7 @@ static void shadow_map_into_current(struct vcpu *v,
  * shadow_set_lxe should be put in shadow.h
  */
 static void shadow_set_l2e_64(unsigned long va, l2_pgentry_t sl2e, 
-  int create_l2_shadow)
+  int create_l2_shadow, int put_ref_check)
 {
     struct vcpu *v = current;
     l4_pgentry_t sl4e;
@@ -2619,6 +2624,17 @@ static void shadow_set_l2e_64(unsigned long va, l2_pgentry_t sl2e,
             printk("For non VMX shadow, create_l1_shadow:%d\n", create_l2_shadow);
         }
          shadow_update_min_max(l4e_get_pfn(sl4e), l3_table_offset(va));
+
+    }
+
+    if ( put_ref_check ) {
+        l2_pgentry_t tmp_sl2e;
+        if ( __shadow_get_l2e(v, va, &tmp_sl2e) ) {
+            if ( l2e_get_flags(tmp_sl2e) & _PAGE_PRESENT )
+                if ( l2e_get_pfn(tmp_sl2e) == l2e_get_pfn(sl2e) ) {
+                    put_shadow_ref(l2e_get_pfn(sl2e));
+                }
+        }
 
     }
 
@@ -2692,7 +2708,7 @@ static inline int l2e_rw_fault(
     l1_pgentry_t old_sl1e;
     l2_pgentry_t sl2e;
     unsigned long nx = 0;
-
+    int put_ref_check = 0;
     /* Check if gpfn is 2M aligned */
 
     /* Update guest l2e */
@@ -2723,6 +2739,7 @@ static inline int l2e_rw_fault(
                 l2e_get_pfn(sl2e) == l1_mfn) {
             ESH_LOG("sl2e PRSENT bit is set: %lx, l1_mfn = %lx\n", l2e_get_pfn(sl2e), l1_mfn);
         } else {
+            put_ref_check = 1;
             if (!get_shadow_ref(l1_mfn))
                 BUG();
         }
@@ -2746,7 +2763,7 @@ static inline int l2e_rw_fault(
 
     ESH_LOG("<%s>: sl2e = %lx\n", __func__, l2e_get_intpte(sl2e));
     /* Map the page to l2*/
-    shadow_set_l2e_64(va, sl2e, 1);
+    shadow_set_l2e_64(va, sl2e, 1, put_ref_check);
 
     if (l2e_get_flags(gl2e) & _PAGE_NX)
         l2e_add_flags(tmp_l2e, _PAGE_NX);
@@ -2911,10 +2928,14 @@ fail:
 static void shadow_invlpg_64(struct vcpu *v, unsigned long va)
 {
     struct domain *d = v->domain;
-    //l1_pgentry_64_t  gl1e, sl1e;
-    l1_pgentry_t  sl1e;
+    l1_pgentry_t  sl1e, old_sl1e;
 
     shadow_lock(d);
+
+    if ( __shadow_get_l1e(v, va, &old_sl1e) )
+        if ( l1e_get_flags(old_sl1e) & _PAGE_PRESENT )
+            put_page_from_l1e(old_sl1e, d);
+
 
     sl1e = l1e_empty();
     __shadow_set_l1e(v, va, &sl1e);
