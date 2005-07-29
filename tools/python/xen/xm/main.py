@@ -563,9 +563,9 @@ class ProgMaxmem(Prog):
 
 xm.prog(ProgMaxmem)
 
-class ProgBalloon(Prog):
+class ProgSetMem(Prog):
     group = 'domain'
-    name  = 'balloon'
+    name  = 'set-mem'
     info  = """Set the domain's memory footprint using the balloon driver."""
 
     def help(self, args):
@@ -579,7 +579,7 @@ MEMORY_TARGET megabytes"""
         mem_target = int_unit(args[2], 'm')
         server.xend_domain_mem_target_set(dom, mem_target)
 
-xm.prog(ProgBalloon)
+xm.prog(ProgSetMem)
 
 class ProgVcpuhotplug(Prog):
     group = 'domain'
