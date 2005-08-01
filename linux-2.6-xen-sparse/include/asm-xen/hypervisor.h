@@ -46,6 +46,8 @@
 #  else
 #   include <asm-generic/pgtable-nopmd.h>
 #  endif
+# else
+#  define pud_t pgd_t
 # endif
 #endif
 

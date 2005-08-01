@@ -61,7 +61,7 @@ SUBDIRS += arch/xen/drivers/console
 SUBDIRS += arch/xen/drivers/evtchn
 SUBDIRS += arch/xen/drivers/blkif
 SUBDIRS += arch/xen/drivers/netif
-SUBDIRS += arch/xen/drivers/usbif
+#SUBDIRS += arch/xen/drivers/usbif
 SUBDIRS += arch/xen/drivers/balloon
 ifdef CONFIG_XEN_PRIVILEGED_GUEST
 SUBDIRS += arch/xen/drivers/dom0 

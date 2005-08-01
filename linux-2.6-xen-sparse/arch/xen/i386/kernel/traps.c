@@ -90,9 +90,7 @@ asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
 struct notifier_block *i386die_chain;
-DEFINE_SPINLOCK(die_notifier_lock);
-EXPORT_SYMBOL(die_notifier_lock);
-EXPORT_SYMBOL(i386die_chain);
+static DEFINE_SPINLOCK(die_notifier_lock);
 
 int register_die_notifier(struct notifier_block *nb)
 {

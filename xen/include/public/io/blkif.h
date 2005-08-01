@@ -36,7 +36,7 @@ typedef struct blkif_request {
     blkif_vdev_t   device;       /* only for read/write requests         */
     unsigned long  id;           /* private guest value, echoed in resp  */
     blkif_sector_t sector_number;/* start sector idx on disk (r/w only)  */
-    /* @f_a_s[2:0]=last_sect ; @f_a_s[5:3]=first_sect                        */
+    /* @f_a_s[4:0]=last_sect ; @f_a_s[9:5]=first_sect                        */
 #ifdef CONFIG_XEN_BLKDEV_GRANT
     /* @f_a_s[:16]= grant reference (16 bits)                                */
 #else
@@ -47,10 +47,12 @@ typedef struct blkif_request {
     unsigned long  frame_and_sects[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 } blkif_request_t;
 
-#define blkif_first_sect(_fas) (((_fas)>>3)&7)
-#define blkif_last_sect(_fas)  ((_fas)&7)
+#define blkif_fas(_addr, _fs, _ls) ((addr)|((_fs)<<5)|(_ls))
+#define blkif_first_sect(_fas) (((_fas)>>5)&31)
+#define blkif_last_sect(_fas)  ((_fas)&31)
 
 #ifdef CONFIG_XEN_BLKDEV_GRANT
+#define blkif_fas_from_gref(_gref, _fs, _ls) (((_gref)<<16)|((_fs)<<5)|(_ls))
 #define blkif_gref_from_fas(_fas) ((_fas)>>16)
 #endif
 

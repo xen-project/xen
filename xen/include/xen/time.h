@@ -51,9 +51,9 @@ typedef s64 s_time_t;
 s_time_t get_s_time(void);
 
 #define NOW()           ((s_time_t)get_s_time())
-#define SECONDS(_s)     (((s_time_t)(_s))  * 1000000000ULL )
-#define MILLISECS(_ms)  (((s_time_t)(_ms)) * 1000000ULL )
-#define MICROSECS(_us)  (((s_time_t)(_us)) * 1000ULL )
+#define SECONDS(_s)     ((s_time_t)((_s)  * 1000000000ULL))
+#define MILLISECS(_ms)  ((s_time_t)((_ms) * 1000000ULL))
+#define MICROSECS(_us)  ((s_time_t)((_us) * 1000ULL))
 
 extern void update_dom_time(struct vcpu *v);
 extern void do_settime(

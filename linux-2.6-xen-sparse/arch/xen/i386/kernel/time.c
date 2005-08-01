@@ -295,14 +295,11 @@ static inline int time_values_up_to_date(int cpu)
 	struct vcpu_time_info   *src;
 	struct shadow_time_info *dst;
 
-	src = &HYPERVISOR_shared_info->vcpu_time[smp_processor_id()];
-	dst = &per_cpu(shadow_time, smp_processor_id());
+	src = &HYPERVISOR_shared_info->vcpu_time[cpu]; 
+	dst = &per_cpu(shadow_time, cpu); 
 
 	return (dst->version == src->time_version2);
 }
-
-#define TIME_VALUES_UP_TO_DATE \
- ({ rmb(); (shadow_time_version == HYPERVISOR_shared_info->time_version2); })
 
 /*
  * This is a special lock that is owned by the CPU and holds the index
