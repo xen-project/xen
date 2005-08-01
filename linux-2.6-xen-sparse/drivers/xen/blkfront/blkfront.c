@@ -329,11 +329,11 @@ static int blkif_queue_request(struct request *req)
                 buffer_ma >> PAGE_SHIFT;
 
             ring_req->frame_and_sects[ring_req->nr_segments++] =
-                (((u32) ref) << 16) | (fsect << 3) | lsect;
+                blkif_fas_from_gref(ref, fsect, lsect);
 
 #else
             ring_req->frame_and_sects[ring_req->nr_segments++] =
-                buffer_ma | (fsect << 3) | lsect;
+                blkif_fas(buffer_ma, fsect, lsect);
 #endif
         }
     }
@@ -832,10 +832,10 @@ static int blkif_queue_request(unsigned long   id,
                 buffer_ma >> PAGE_SHIFT;
 
             req->frame_and_sects[req->nr_segments] =
-                (((u32) ref ) << 16) | (fsect << 3) | lsect;
+                blkif_fas_from_gref(ref, fsect, lsect);
 #else
             req->frame_and_sects[req->nr_segments] =
-                buffer_ma | (fsect << 3) | lsect;
+                blkif_fas(buffer_ma, fsect, lsect);
 #endif
             if ( ++req->nr_segments < BLKIF_MAX_SEGMENTS_PER_REQUEST )
                 sg_next_sect += nr_sectors;
@@ -887,9 +887,9 @@ static int blkif_queue_request(unsigned long   id,
 
     blk_shadow[xid].frame[0] = buffer_ma >> PAGE_SHIFT;
 
-    req->frame_and_sects[0] = (((u32) ref)<<16)  | (fsect<<3) | lsect;
+    req->frame_and_sects[0] = blkif_fas_from_gref(ref, fsect, lsect);
 #else
-    req->frame_and_sects[0] = buffer_ma | (fsect<<3) | lsect;
+    req->frame_and_sects[0] = blkif_fas(buffer_ma, fsect, lsect);
 #endif
 
     /* Keep a private copy so we can reissue requests when recovering. */    
@@ -1057,7 +1057,7 @@ void blkif_control_probe_send(blkif_request_t *req, blkif_response_t *rsp,
 
     gnttab_grant_foreign_access_ref( ref, rdomid, address >> PAGE_SHIFT, 0 );
 
-    req->frame_and_sects[0] = (((u32) ref) << 16) | 7;
+    req->frame_and_sects[0] = blkif_fas_from_gref(ref, 0, (PAGE_SIZE/512)-1);
 
     blkif_control_send(req, rsp);
 }
