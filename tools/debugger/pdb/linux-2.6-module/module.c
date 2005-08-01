@@ -278,14 +278,10 @@ pdb_initialize (void)
     return err;
 }
 
-extern struct notifier_block *i386die_chain;
-extern spinlock_t die_notifier_lock;
-
 static void __exit
 pdb_terminate(void)
 {
     int err = 0;
-    unsigned long flags;
 
     printk("pdb cleanup\n");
 
@@ -305,9 +301,8 @@ pdb_terminate(void)
 
     pdb_send_connection_status(PDB_CONNECTION_STATUS_DOWN, 0);
 
-	spin_lock_irqsave(&die_notifier_lock, flags);
-    err = notifier_chain_unregister(&i386die_chain, &pdb_exceptions_nb);
-	spin_unlock_irqrestore(&die_notifier_lock, flags);
+    /* handler for int1 & int3 */
+    err = unregister_die_notifier(&pdb_exceptions_nb);
 
 	return;
 }
