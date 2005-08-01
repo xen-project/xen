@@ -197,8 +197,7 @@ int intercept_pit_io(ioreq_t *p)
 static void pit_timer_fn(void *data)
 {
     struct vmx_virpit_t *vpit = data;
-    s_time_t   next;
-    int        missed_ticks;
+    int missed_ticks;
 
     missed_ticks = (NOW() - vpit->scheduled) / MILLISECS(vpit->period);
 
@@ -208,12 +207,11 @@ static void pit_timer_fn(void *data)
 
     /* pick up missed timer tick */
     if ( missed_ticks > 0 ) {
-        vpit->pending_intr_nr+= missed_ticks;
+        vpit->pending_intr_nr += missed_ticks;
         vpit->scheduled += missed_ticks * MILLISECS(vpit->period);
     }
-    next = vpit->scheduled + MILLISECS(vpit->period);
-    set_ac_timer(&vpit->pit_timer, next);
-    vpit->scheduled = next;
+    vpit->scheduled += MILLISECS(vpit->period);
+    set_ac_timer(&vpit->pit_timer, vpit->scheduled);
 }
 
 
