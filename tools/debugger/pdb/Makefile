@@ -33,7 +33,7 @@ LIBDIRS    += ../libxendebug
 LIBS       += unix str
 
 # bc = byte-code, dc = debug byte-code
-all : dc
+all : patches dc
 
 SOURCES    += pdb_caml_xc.c 
 SOURCES    += pdb_caml_domain.c pdb_caml_process.c
@@ -50,3 +50,6 @@ RESULT      = pdb
 
 include $(OCAMLMAKEFILE)
 
+PATCHDIR    = ./linux-2.6-patches
+patches :
+	make -C $(PATCHDIR) patches

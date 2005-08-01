@@ -225,21 +225,30 @@ static int set_rtc_mmss(unsigned long nowtime)
  */
 static void __get_time_values_from_xen(void)
 {
-    do {
-        shadow_time_version = HYPERVISOR_shared_info->time_version2;
-        rmb();
-        shadow_tv.tv_sec    = HYPERVISOR_shared_info->wc_sec;
-        shadow_tv.tv_usec   = HYPERVISOR_shared_info->wc_usec;
-        shadow_tsc_stamp    = 
-            (u32)(HYPERVISOR_shared_info->tsc_timestamp >> rdtsc_bitshift);
-        shadow_system_time  = HYPERVISOR_shared_info->system_time;
-        rmb();
-    }
-    while ( shadow_time_version != HYPERVISOR_shared_info->time_version1 );
-}
+	shared_info_t           *s = HYPERVISOR_shared_info;
+	struct vcpu_time_info   *src;
+	struct shadow_time_info *dst;
 
-#define TIME_VALUES_UP_TO_DATE \
- ({ rmb(); (shadow_time_version == HYPERVISOR_shared_info->time_version2); })
+	src = &s->vcpu_time[smp_processor_id()];
+	dst = &per_cpu(shadow_time, smp_processor_id());
+
+	do {
+		dst->version = src->time_version2;
+		rmb();
+		dst->tsc_timestamp     = src->tsc_timestamp;
+		dst->system_timestamp  = src->system_time;
+		dst->tsc_to_nsec_mul   = src->tsc_to_system_mul;
+		dst->tsc_shift         = src->tsc_shift;
+		rmb();
+	}
+	while (dst->version != src->time_version1);
+
+	dst->tsc_to_usec_mul = dst->tsc_to_nsec_mul / 1000;
+
+	if ((shadow_tv.tv_sec != s->wc_sec) ||
+	    (shadow_tv.tv_usec != s->wc_usec))
+		update_wallclock();
+}
 
 
 /*
@@ -261,6 +270,17 @@ static inline unsigned long __get_time_delta_usecs(void)
     delta += ((u64)delta_tsc * st_scale_i);
 
     return (unsigned long)delta;
+}
+
+static inline int time_values_up_to_date()
+{
+	struct vcpu_time_info   *src;
+	struct shadow_time_info *dst;
+
+	src = &HYPERVISOR_shared_info->vcpu_time[smp_processor_id()];
+	dst = &per_cpu(shadow_time, smp_processor_id());
+
+	return (dst->version == src->time_version2);
 }
 
 
@@ -286,7 +306,7 @@ void do_gettimeofday(struct timeval *tv)
     __normalize_time(&_tv.tv_sec, &nsec);
     _tv.tv_usec += (long)nsec / 1000L;
 
-    if ( unlikely(!TIME_VALUES_UP_TO_DATE) )
+    if ( unlikely(!time_values_up_to_date()) )
     {
         /*
          * We may have blocked for a long time, rendering our calculations
