@@ -39,4 +39,7 @@ typedef union ia64_rr {
 #define RR_RID(arg) (((arg) & 0x0000000000ffffff) << 8)
 #define RR_RID_MASK 0x00000000ffffff00L
 
+
+int set_one_rr(unsigned long rr, unsigned long val);
+
 #endif		/* !_REGIONREG_H_ */

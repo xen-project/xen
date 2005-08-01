@@ -392,6 +392,21 @@ IA64FAULT vcpu_get_ifa(VCPU *vcpu, UINT64 *pval)
 	return (IA64_NO_FAULT);
 }
 
+unsigned long vcpu_get_rr_ps(VCPU *vcpu,UINT64 vadr)
+{
+	ia64_rr rr;
+
+	rr.rrval = PSCB(vcpu,rrs)[vadr>>61];
+	return(rr.ps);
+}
+
+unsigned long vcpu_get_rr_rid(VCPU *vcpu,UINT64 vadr)
+{
+	ia64_rr rr;
+
+	rr.rrval = PSCB(vcpu,rrs)[vadr>>61];
+	return(rr.rid);
+}
 
 unsigned long vcpu_get_itir_on_fault(VCPU *vcpu, UINT64 ifa)
 {
@@ -884,6 +899,15 @@ IA64FAULT vcpu_set_lrr1(VCPU *vcpu, UINT64 val)
 	return (IA64_NO_FAULT);
 }
 
+// parameter is a time interval specified in cycles
+void vcpu_enable_timer(VCPU *vcpu,UINT64 cycles)
+{
+    PSCBX(vcpu,xen_timer_interval) = cycles;
+    vcpu_set_next_timer(vcpu);
+    printf("vcpu_enable_timer(%d): interval set to %d cycles\n",
+             PSCBX(vcpu,xen_timer_interval));
+    __set_bit(PSCB(vcpu,itv), PSCB(vcpu,delivery_mask));
+}
 
 IA64FAULT vcpu_set_itv(VCPU *vcpu, UINT64 val)
 {
@@ -1010,16 +1034,6 @@ void vcpu_set_next_timer(VCPU *vcpu)
 		vcpu_safe_set_itm(s);
 		//using_xen_as_itm++;
 	}
-}
-
-// parameter is a time interval specified in cycles
-void vcpu_enable_timer(VCPU *vcpu,UINT64 cycles)
-{
-    PSCBX(vcpu,xen_timer_interval) = cycles;
-    vcpu_set_next_timer(vcpu);
-    printf("vcpu_enable_timer(%d): interval set to %d cycles\n",
-             PSCBX(vcpu,xen_timer_interval));
-    __set_bit(PSCB(vcpu,itv), PSCB(vcpu,delivery_mask));
 }
 
 IA64FAULT vcpu_set_itm(VCPU *vcpu, UINT64 val)
@@ -1219,7 +1233,6 @@ IA64FAULT vcpu_cover(VCPU *vcpu)
 
 IA64FAULT vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 {
-	extern unsigned long vcpu_get_rr_ps(VCPU *vcpu,UINT64 vadr);
 	UINT64 pta = PSCB(vcpu,pta);
 	UINT64 pta_sz = (pta & IA64_PTA_SZ(0x3f)) >> IA64_PTA_SZ_BIT;
 	UINT64 pta_base = pta & ~((1UL << IA64_PTA_BASE_BIT)-1);
@@ -1521,28 +1534,8 @@ unsigned long vcpu_get_rr_ve(VCPU *vcpu,UINT64 vadr)
 	return(rr.ve);
 }
 
-
-unsigned long vcpu_get_rr_ps(VCPU *vcpu,UINT64 vadr)
-{
-	ia64_rr rr;
-
-	rr.rrval = PSCB(vcpu,rrs)[vadr>>61];
-	return(rr.ps);
-}
-
-
-unsigned long vcpu_get_rr_rid(VCPU *vcpu,UINT64 vadr)
-{
-	ia64_rr rr;
-
-	rr.rrval = PSCB(vcpu,rrs)[vadr>>61];
-	return(rr.rid);
-}
-
-
 IA64FAULT vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
-	extern void set_one_rr(UINT64, UINT64);
 	PSCB(vcpu,rrs)[reg>>61] = val;
 	// warning: set_one_rr() does it "live"
 	set_one_rr(reg,val);
