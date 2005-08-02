@@ -20,11 +20,19 @@
  			__do_IRQ(local_vector_to_irq(vector), regs);
  
  			/*
-@@ -167,6 +173,95 @@
+@@ -167,6 +173,103 @@
  	irq_exit();
  }
  
 +#ifdef  CONFIG_VTI
++#define vmx_irq_enter()		\
++	add_preempt_count(HARDIRQ_OFFSET);
++
++/* Now softirq will be checked when leaving hypervisor, or else
++ * scheduler irq will be executed too early.
++ */
++#define vmx_irq_exit(void)	\
++	sub_preempt_count(HARDIRQ_OFFSET);
 +/*
 + * That's where the IVT branches when we get an external
 + * interrupt. This branches to the correct hardware IRQ handler via
@@ -72,7 +80,7 @@
 +	 * 16 (without this, it would be ~240, which could easily lead
 +	 * to kernel stack overflows).
 +	 */
-+	irq_enter();
++	vmx_irq_enter();
 +	saved_tpr = ia64_getreg(_IA64_REG_CR_TPR);
 +	ia64_srlz_d();
 +	while (vector != IA64_SPURIOUS_INT_VECTOR) {
@@ -106,7 +114,7 @@
 +	 * handler needs to be able to wait for further keyboard interrupts, which can't
 +	 * come through until ia64_eoi() has been done.
 +	 */
-+	irq_exit();
++	vmx_irq_exit();
 +	if ( wake_dom0 && current != dom0 ) 
 +		domain_wake(dom0->vcpu[0]);
 +}
