@@ -208,22 +208,28 @@ static PyObject *
 ext2_fs_open (Ext2Fs *fs, PyObject *args, PyObject *kwargs)
 {
     static char *kwlist[] = { "name", "flags", "superblock", 
-                              "block_size", NULL };
+                              "block_size", "offset", NULL };
     char * name;
-    int flags = 0, superblock = 0, err;
+    int flags = 0, superblock = 0, offset = 0, err;
     unsigned int block_size = 0;
     ext2_filsys efs;
+    char offsetopt[30];
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|iii", kwlist, 
-                                     &name, &flags, &superblock, &block_size))
-                                     return NULL;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|iiii", kwlist, 
+                                     &name, &flags, &superblock, 
+                                     &block_size, &offset))
+        return NULL;
 
     if (fs->fs != NULL) {
         PyErr_SetString(PyExc_ValueError, "already have an fs object");
         return NULL;
     }
 
-    err = ext2fs_open(name, flags, superblock, block_size, 
+    if (offset != 0) {
+        snprintf(offsetopt, 29, "offset=%d", offset);
+    }
+
+    err = ext2fs_open2(name, offsetopt, flags, superblock, block_size, 
                       unix_io_manager, &efs);
     if (err) {
         PyErr_SetString(PyExc_ValueError, "unable to open file");
@@ -323,14 +329,15 @@ static PyObject *
 ext2_fs_new(PyObject *o, PyObject *args, PyObject *kwargs) 
 {
     static char *kwlist[] = { "name", "flags", "superblock", 
-                              "block_size", NULL };
+                              "block_size", "offset", NULL };
     char * name;
-    int flags = 0, superblock = 0;
+    int flags = 0, superblock = 0, offset;
     unsigned int block_size = 0;
     Ext2Fs *pfs;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|iii", kwlist, 
-                                     &name, &flags, &superblock, &block_size))
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|iiii", kwlist, 
+                                     &name, &flags, &superblock, &block_size,
+                                     &offset))
         return NULL;
 
     pfs = (Ext2Fs *) PyObject_NEW(Ext2Fs, &Ext2FsType);
@@ -339,8 +346,8 @@ ext2_fs_new(PyObject *o, PyObject *args, PyObject *kwargs)
     pfs->fs = NULL;
 
     if (!ext2_fs_open(pfs, 
-                      Py_BuildValue("siii", name, flags, superblock, block_size),
-                      NULL))
+                      Py_BuildValue("siiii", name, flags, superblock, 
+                                    block_size, offset), NULL))
         return NULL;
 
     return (PyObject *)pfs;

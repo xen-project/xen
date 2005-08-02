@@ -23,7 +23,7 @@ if os.path.exists("/usr/include/reiserfs/reiserfs.h"):
     fsys_pkgs.append("grub.fsys.reiser")
 
 setup(name='pygrub',
-      version='0.2',
+      version='0.3',
       description='Boot loader that looks a lot like grub for Xen',
       author='Jeremy Katz',
       author_email='katzj@redhat.com',
