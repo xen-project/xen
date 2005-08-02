@@ -23,6 +23,7 @@
 #define _ASM_IA64_VT_H
 
 #define RR7_SWITCH_SHIFT	12	/* 4k enough */
+#include <public/io/ioreq.h>
 
 extern void identify_vmx_feature(void);
 extern unsigned int vmx_enabled;
@@ -38,4 +39,19 @@ extern void vmx_change_double_mapping(struct vcpu *v, u64 oldrr7, u64 newrr7);
 
 extern void vmx_wait_io(void);
 extern void vmx_io_assist(struct vcpu *v);
+
+static inline vcpu_iodata_t *get_vio(struct domain *d, unsigned long cpu)
+{
+    return &((shared_iopage_t *)d->arch.vmx_platform.shared_page_va)->vcpu_iodata[cpu];
+}
+
+static inline int iopacket_port(struct domain *d)
+{
+    return ((shared_iopage_t *)d->arch.vmx_platform.shared_page_va)->sp_global.eport;
+}
+
+static inline shared_iopage_t *get_sp(struct domain *d)
+{
+    return (shared_iopage_t *)d->arch.vmx_platform.shared_page_va;
+}
 #endif /* _ASM_IA64_VT_H */

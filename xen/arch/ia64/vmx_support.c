@@ -37,18 +37,19 @@ void vmx_wait_io(void)
     struct vcpu *v = current;
     struct domain *d = v->domain;
     extern void do_block();
+    int port = iopacket_port(d);
 
     do {
-	if (!test_bit(IOPACKET_PORT,
+	if (!test_bit(port,
 		&d->shared_info->evtchn_pending[0]))
 	    do_block();
 
 	/* Unblocked when some event is coming. Clear pending indication
 	 * immediately if deciding to go for io assist
 	  */
-	if (test_and_clear_bit(IOPACKET_PORT,
+	if (test_and_clear_bit(port,
 		&d->shared_info->evtchn_pending[0])) {
-	    clear_bit(IOPACKET_PORT>>5, &v->vcpu_info->evtchn_pending_sel);
+	    clear_bit(port>>5, &v->vcpu_info->evtchn_pending_sel);
 	    clear_bit(0, &v->vcpu_info->evtchn_upcall_pending);
 	    vmx_io_assist(v);
 	}
@@ -66,7 +67,7 @@ void vmx_wait_io(void)
 	     * nothing losed. Next loop will check I/O channel to fix this
 	     * window.
 	     */
-	    clear_bit(IOPACKET_PORT>>5, &v->vcpu_info->evtchn_pending_sel);
+	    clear_bit(port>>5, &v->vcpu_info->evtchn_pending_sel);
 	}
 	else
 	    break;
@@ -88,7 +89,7 @@ void vmx_io_assist(struct vcpu *v)
      * This shared page contains I/O request between emulation code
      * and device model.
      */
-    vio = (vcpu_iodata_t *)v->arch.arch_vmx.vmx_platform.shared_page_va;
+    vio = get_vio(v->domain, v->vcpu_id);
     if (!vio)
 	panic("Corruption: bad shared page: %lx\n", (unsigned long)vio);
 
@@ -127,6 +128,7 @@ void vmx_intr_assist(struct vcpu *v)
     struct domain *d = v->domain;
     extern void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu,
 					unsigned long *pend_irr);
+    int port = iopacket_port(d);
 
     /* I/O emulation is atomic, so it's impossible to see execution flow
      * out of vmx_wait_io, when guest is still waiting for response.
@@ -135,10 +137,10 @@ void vmx_intr_assist(struct vcpu *v)
 	panic("!!!Bad resume to guest before I/O emulation is done.\n");
 
     /* Clear indicator specific to interrupt delivered from DM */
-    if (test_and_clear_bit(IOPACKET_PORT,
+    if (test_and_clear_bit(port,
 		&d->shared_info->evtchn_pending[0])) {
-	if (!d->shared_info->evtchn_pending[IOPACKET_PORT >> 5])
-	    clear_bit(IOPACKET_PORT>>5, &v->vcpu_info->evtchn_pending_sel);
+	if (!d->shared_info->evtchn_pending[port >> 5])
+	    clear_bit(port>>5, &v->vcpu_info->evtchn_pending_sel);
 
 	if (!v->vcpu_info->evtchn_pending_sel)
 	    clear_bit(0, &v->vcpu_info->evtchn_upcall_pending);
@@ -149,11 +151,14 @@ void vmx_intr_assist(struct vcpu *v)
      * shares same event channel as I/O emulation, with corresponding
      * indicator possibly cleared when vmx_wait_io().
      */
-    vio = (vcpu_iodata_t *)v->arch.arch_vmx.vmx_platform.shared_page_va;
+    vio = get_vio(v->domain, v->vcpu_id);
     if (!vio)
 	panic("Corruption: bad shared page: %lx\n", (unsigned long)vio);
 
-    vmx_vcpu_pend_batch_interrupt(v, &vio->vp_intr[0]); 
-    memset(&vio->vp_intr[0], 0, sizeof(vio->vp_intr));
+#ifdef V_IOSAPIC_READY
+    vlapic_update_ext_irq(v);
+#else
+    panic("IOSAPIC model is missed in qemu\n");
+#endif
     return;
 }

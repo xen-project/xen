@@ -348,6 +348,7 @@ int arch_set_info_guest(
     struct domain *d = v->domain;
     int i, rc, ret;
     unsigned long progress = 0;
+    shared_iopage_t *sp;
 
     if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
         return 0;
@@ -373,8 +374,17 @@ int arch_set_info_guest(
     /* FIXME: only support PMT table continuously by far */
     d->arch.pmt = __va(c->pt_base);
     d->arch.max_pfn = c->pt_max_pfn;
-    v->arch.arch_vmx.vmx_platform.shared_page_va = __va(c->share_io_pg);
-    memset((char *)__va(c->share_io_pg),0,PAGE_SIZE);
+    d->arch.vmx_platform.shared_page_va = __va(c->share_io_pg);
+    sp = get_sp(d);
+    memset((char *)sp,0,PAGE_SIZE);
+    /* FIXME: temp due to old CP */
+    sp->sp_global.eport = 2;
+#ifdef V_IOSAPIC_READY
+    sp->vcpu_number = 1;
+#endif
+    /* TEMP */
+    d->arch.vmx_platform.pib_base = 0xfee00000UL;
+    
 
     if (c->flags & VGCF_VMX_GUEST) {
 	if (!vmx_enabled)
@@ -393,7 +403,7 @@ int arch_set_info_guest(
     if (v == d->vcpu[0]) {
 	memset(&d->shared_info->evtchn_mask[0], 0xff,
 		sizeof(d->shared_info->evtchn_mask));
-	clear_bit(IOPACKET_PORT, &d->shared_info->evtchn_mask[0]);
+	clear_bit(iopacket_port(d), &d->shared_info->evtchn_mask[0]);
     }
     /* Setup domain context. Actually IA-64 is a bit different with
      * x86, with almost all system resources better managed by HV

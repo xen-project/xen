@@ -8,6 +8,7 @@
 #include <asm/vmmu.h>
 #include <asm/regionreg.h>
 #include <public/arch-ia64.h>
+#include <asm/vmx_platform.h>
 #endif // CONFIG_VTI
 #include <xen/list.h>
 
@@ -42,6 +43,7 @@ struct arch_domain {
      * max_pages in domain struct, which indicates maximum memory size
      */
     unsigned long max_pfn;
+    struct virutal_platform_def     vmx_platform;
 #endif  //CONFIG_VTI
     u64 xen_vastart;
     u64 xen_vaend;

@@ -37,7 +37,9 @@
 #define	IA64_RFI_IN_PROGRESS	0x0002
 #define IA64_RETRY              0x0003
 #ifdef  CONFIG_VTI
-#define IA64_FAULT		0x0002
+#undef  IA64_NO_FAULT
+#define	IA64_NO_FAULT		0x0000
+#define IA64_FAULT		0x0001
 #endif      //CONFIG_VTI
 #define IA64_FORCED_IFA         0x0004
 #define	IA64_ILLOP_FAULT	(IA64_GENEX_VECTOR | 0x00)

@@ -38,6 +38,14 @@
 #include <asm/vmx_pal_vsa.h>
 #include <asm/kregs.h>
 
+#define  SHARED_VLAPIC_INF
+#ifdef V_IOSAPIC_READY
+static inline vl_apic_info* get_psapic(VCPU *vcpu)
+{
+    shared_iopage_t  *sp = get_sp(vcpu->domain);
+    return &(sp->vcpu_iodata[vcpu->vcpu_id].apic_intr);
+}
+#endif
 //u64  fire_itc;
 //u64  fire_itc2;
 //u64  fire_itm;
@@ -216,7 +224,8 @@ void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
  */
 void vtm_domain_out(VCPU *vcpu)
 {
-    rem_ac_timer(&vcpu->arch.arch_vmx.vtm.vtm_timer);
+    if(!is_idle_task(vcpu->domain))
+	rem_ac_timer(&vcpu->arch.arch_vmx.vtm.vtm_timer);
 }
 
 /*
@@ -226,9 +235,11 @@ void vtm_domain_out(VCPU *vcpu)
 void vtm_domain_in(VCPU *vcpu)
 {
     vtime_t     *vtm;
-    
-    vtm=&(vcpu->arch.arch_vmx.vtm);
-    vtm_interruption_update(vcpu, vtm);
+
+    if(!is_idle_task(vcpu->domain)) {
+	vtm=&(vcpu->arch.arch_vmx.vtm);
+	vtm_interruption_update(vcpu, vtm);
+    }
 }
 
 /*
@@ -262,10 +273,50 @@ static void update_vhpi(VCPU *vcpu, int vec)
     }
 }
 
+#ifdef V_IOSAPIC_READY
+void vlapic_update_shared_info(VCPU *vcpu)
+{
+    //int	i;
+    
+    vl_apic_info *ps;
+
+    if (vcpu->domain == dom0)
+	return;
+
+    ps = get_psapic(vcpu);
+    ps->vl_lapic_id = ((VPD_CR(vcpu, lid) >> 16) & 0xffff) << 16; 
+    printf("vl_lapic_id = %x\n", ps->vl_lapic_id);
+    ps->vl_apr = 0;
+    // skip ps->vl_logical_dest && ps->vl_dest_format
+    // IPF support physical destination mode only
+    ps->vl_arb_id = 0;
+    /*
+    for ( i=0; i<4; i++ ) {
+    	ps->tmr[i] = 0;		// edge trigger 
+    }
+    */
+}
+
+void vlapic_update_ext_irq(VCPU *vcpu)
+{
+    int  vec;
+    
+    vl_apic_info *ps = get_psapic(vcpu);
+    while ( (vec = highest_bits(ps->irr)) != NULL_VECTOR ) {
+    	clear_bit (vec, ps->irr);
+        vmx_vcpu_pend_interrupt(vcpu, vec);
+    }
+}
+#endif
+
 void vlsapic_reset(VCPU *vcpu)
 {
     int     i;
-    VPD_CR(vcpu, lid) = 0;
+#ifdef V_IOSAPIC_READY
+    vl_apic_info  *psapic;	// shared lapic inf.
+#endif
+    
+    VPD_CR(vcpu, lid) = ia64_getreg(_IA64_REG_CR_LID);
     VPD_CR(vcpu, ivr) = 0;
     VPD_CR(vcpu,tpr) = 0x10000;
     VPD_CR(vcpu, eoi) = 0;
@@ -281,6 +332,10 @@ void vlsapic_reset(VCPU *vcpu)
     for ( i=0; i<4; i++) {
         VLSAPIC_INSVC(vcpu,i) = 0;
     }
+#ifdef V_IOSAPIC_READY
+    vlapic_update_shared_info(vcpu);
+    //vlapic_update_shared_irr(vcpu);
+#endif
     DPRINTK("VLSAPIC inservice base=%lp\n", &VLSAPIC_INSVC(vcpu,0) );
 }
 
@@ -414,6 +469,7 @@ void vmx_vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
     }
     local_irq_save(spsr);
     VPD_CR(vcpu,irr[vector>>6]) |= 1UL<<(vector&63);
+    //vlapic_update_shared_irr(vcpu);
     local_irq_restore(spsr);
     vcpu->arch.irq_new_pending = 1;
 }
@@ -432,6 +488,7 @@ void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, UINT64 *pend_irr)
     for (i=0 ; i<4; i++ ) {
         VPD_CR(vcpu,irr[i]) |= pend_irr[i];
     }
+    //vlapic_update_shared_irr(vcpu);
     local_irq_restore(spsr);
     vcpu->arch.irq_new_pending = 1;
 }
@@ -518,6 +575,7 @@ uint64_t guest_read_vivr(VCPU *vcpu)
     VLSAPIC_INSVC(vcpu,vec>>6) |= (1UL <<(vec&63));
     VPD_CR(vcpu, irr[vec>>6]) &= ~(1UL <<(vec&63));
     update_vhpi(vcpu, NULL_VECTOR);     // clear VHPI till EOI or IRR write
+    //vlapic_update_shared_irr(vcpu);
     local_irq_restore(spsr);
     return (uint64_t)vec;
 }

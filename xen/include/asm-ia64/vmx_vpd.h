@@ -25,7 +25,6 @@
 #ifndef __ASSEMBLY__
 
 #include <asm/vtm.h>
-#include <asm/vmx_platform.h>
 #include <public/arch-ia64.h>
 
 #define VPD_SHIFT	17	/* 128K requirement */
@@ -84,7 +83,6 @@ struct arch_vmx_struct {
     unsigned long   rfi_ipsr;
     unsigned long   rfi_ifs;
 	unsigned long	in_service[4];	// vLsapic inservice IRQ bits
-	struct virutal_platform_def     vmx_platform;
 	unsigned long   flags;
 };
 
@@ -125,7 +123,6 @@ extern unsigned int opt_vmx_debug_level;
     } while (0)
 
 #endif //__ASSEMBLY__
-
 
 // VPD field offset
 #define VPD_VAC_START_OFFSET		0

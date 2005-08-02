@@ -560,6 +560,21 @@ END(vmx_virtual_exirq)
 	VMX_DBG_FAULT(19)
 	VMX_FAULT(19)
 
+    .org vmx_ia64_ivt+0x5000
+/////////////////////////////////////////////////////////////////////////////////////////
+// 0x5000 Entry 20 (size 16 bundles) Page Not Present
+ENTRY(vmx_page_not_present)
+	VMX_REFLECT(20)
+END(vmx_page_not_present)
+
+    .org vmx_ia64_ivt+0x5100
+/////////////////////////////////////////////////////////////////////////////////////////
+// 0x5100 Entry 21 (size 16 bundles) Key Permission vector
+ENTRY(vmx_key_permission)
+	VMX_REFLECT(21)
+END(vmx_key_permission)
+
+    .org vmx_ia64_ivt+0x5200
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5200 Entry 22 (size 16 bundles) Instruction Access Rights (26)
 ENTRY(vmx_iaccess_rights)

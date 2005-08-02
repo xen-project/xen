@@ -1193,7 +1193,8 @@ IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
         case 23:return vmx_vcpu_set_ifs(vcpu,r2);
         case 24:return vmx_vcpu_set_iim(vcpu,r2);
         case 25:return vmx_vcpu_set_iha(vcpu,r2);
-        case 64:return vmx_vcpu_set_lid(vcpu,r2);
+        case 64:printk("SET LID to 0x%lx\n", r2);
+		return vmx_vcpu_set_lid(vcpu,r2);
         case 65:return IA64_NO_FAULT;
         case 66:return vmx_vcpu_set_tpr(vcpu,r2);
         case 67:return vmx_vcpu_set_eoi(vcpu,r2);
@@ -1253,9 +1254,9 @@ IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
         case 23:return cr_get(ifs);
         case 24:return cr_get(iim);
         case 25:return cr_get(iha);
-	case 64:val = ia64_getreg(_IA64_REG_CR_LID);
-	     return vmx_vcpu_set_gr(vcpu,tgt,val,0);
-//        case 64:return cr_get(lid);
+//	case 64:val = ia64_getreg(_IA64_REG_CR_LID);
+//	     return vmx_vcpu_set_gr(vcpu,tgt,val,0);
+        case 64:return cr_get(lid);
         case 65:
              vmx_vcpu_get_ivr(vcpu,&val);
              return vmx_vcpu_set_gr(vcpu,tgt,val,0);
