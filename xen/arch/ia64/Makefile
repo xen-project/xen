@@ -1,5 +1,7 @@
 include $(BASEDIR)/Rules.mk
 
+VPATH = linux
+
 # libs-y	+= arch/ia64/lib/lib.a
 
 OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
@@ -75,7 +77,7 @@ xen.lds.s: xen.lds.S
 		-o xen.lds.s xen.lds.S
 
 ia64lib.o:
-	$(MAKE) -C lib && cp lib/ia64lib.o .
+	$(MAKE) -C linux/lib && cp linux/lib/ia64lib.o .
 
 clean:
 	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-offsets.s
