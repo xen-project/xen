@@ -253,7 +253,7 @@ typedef struct {
 	int evtchn_vector;
 } arch_vcpu_info_t;
 
-typedef arch_vcpu_info_t vpd_t;
+typedef mapped_regs_t vpd_t;
 
 #define __ARCH_HAS_VCPU_INFO
 

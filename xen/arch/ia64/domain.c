@@ -933,7 +933,6 @@ void build_shared_info(struct domain *d)
 
     /* Set up shared-info area. */
     update_dom_time(d);
-    d->shared_info->domain_time = 0;
 
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
