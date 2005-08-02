@@ -504,11 +504,13 @@ void send_error(struct connection *conn, int error)
 {
 	unsigned int i;
 
-	for (i = 0; error != xsd_errors[i].errnum; i++)
-		if (i == ARRAY_SIZE(xsd_errors) - 1)
-			corrupt(conn, "Unknown error %i (%s)", error,
-				strerror(error));
-
+	for (i = 0; error != xsd_errors[i].errnum; i++) {
+		if (i == ARRAY_SIZE(xsd_errors) - 1) {
+			eprintf("xenstored: error %i untranslatable", error);
+			i = 0; 	/* EINVAL */
+			break;
+		}
+	}
 	send_reply(conn, XS_ERROR, xsd_errors[i].errstring,
 			  strlen(xsd_errors[i].errstring) + 1);
 }
