@@ -155,7 +155,7 @@ def restore(xd, fd):
                                 dominfo.db.introduceDomain(dominfo.id,
                                                            dominfo.store_mfn,
                                                            dominfo.store_channel)
-                            dominfo.exportToDB(save=True, sync=True))
+                            dominfo.exportToDB(save=True, sync=True)
                     log.info(l.rstrip())
                     try:
                         l = child.fromchild.readline()
