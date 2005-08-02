@@ -122,7 +122,7 @@ int reprogram_ac_timer(s_time_t timeout)
 	struct vcpu *v = current;
 
 #ifdef CONFIG_VTI
-	if(VMX_DOMAIN(v))
+//	if(VMX_DOMAIN(v))
 		return 1;
 #endif // CONFIG_VTI
 	if (!domain0_ready) return 1;
