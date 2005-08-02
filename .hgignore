@@ -128,8 +128,8 @@
 ^tools/misc/xc_shadow$
 ^tools/misc/xen_cpuperf$
 ^tools/misc/xenperf$
-^tools/policy/policy_tool$
-^tools/policy/xen/.*$
+^tools/security/secpol_tool$
+^tools/security/xen/.*$
 ^tools/pygrub/build/.*$
 ^tools/python/build/.*$
 ^tools/tests/test_x86_emulator$

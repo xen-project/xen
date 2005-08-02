@@ -10,7 +10,7 @@ SUBDIRS += xentrace
 SUBDIRS += python
 SUBDIRS += xcs
 SUBDIRS += xcutils
-SUBDIRS += pygrub
+#SUBDIRS += pygrub
 SUBDIRS += firmware
 SUBDIRS += security
 
