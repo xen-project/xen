@@ -41,7 +41,7 @@ xc_console: xc_console.o
 
 $(OBJS): $(HDRS)
 
-install: $(BIN)
+install: $(BIN) xc_console
 	$(INSTALL_DIR) -p $(DESTDIR)/$(CONSOLED_INSTALL_DIR)
 	$(INSTALL_PROG) $(BIN) $(DESTDIR)/$(CONSOLED_INSTALL_DIR)
 	$(INSTALL_DIR) -p $(DESTDIR)/$(XC_CONSOLE_INSTALL_DIR)
