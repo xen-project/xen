@@ -30,7 +30,7 @@
 #include <xen/sched.h>
 #include <xen/trace.h>
 
-#if CONFIG_PAGING_LEVELS >= 4 
+#if CONFIG_PAGING_LEVELS >= 3
 #include <asm/shadow_64.h>
 
 extern struct shadow_ops MODE_F_HANDLER;
@@ -233,7 +233,20 @@ void free_monitor_pagetable(struct vcpu *v)
     v->arch.monitor_vtable = 0;
 }
 
+#elif CONFIG_PAGING_LEVELS == 3
+
+static void alloc_monitor_pagetable(struct vcpu *v)
+{
+    BUG(); /* PAE not implemented yet */
+}
+
+void free_monitor_pagetable(struct vcpu *v)
+{
+    BUG(); /* PAE not implemented yet */
+}
+
 #elif CONFIG_PAGING_LEVELS == 2
+
 static void alloc_monitor_pagetable(struct vcpu *v)
 {
     unsigned long mmfn;
