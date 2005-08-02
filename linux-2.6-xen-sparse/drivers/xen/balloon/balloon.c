@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2003, B Dragovic
  * Copyright (c) 2003-2004, M Williamson, K Fraser
+ * Copyright (c) 2005 Dan M. Smith, IBM Corporation
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -42,13 +43,16 @@
 #include <linux/vmalloc.h>
 #include <asm-xen/xen_proc.h>
 #include <asm-xen/hypervisor.h>
-#include <asm-xen/ctrl_if.h>
 #include <asm-xen/balloon.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 #include <linux/list.h>
+
+#include<asm-xen/xenbus.h>
+
+#define PAGES2KB(_p) ((_p)<<(PAGE_SHIFT-10))
 
 static struct proc_dir_entry *balloon_pde;
 
@@ -77,11 +81,17 @@ static void balloon_process(void *unused);
 static DECLARE_WORK(balloon_worker, balloon_process, NULL);
 static struct timer_list balloon_timer;
 
+/* Flag for dom0 xenstore workaround */
+static int balloon_xenbus_init=0;
+
+/* Init Function */
+void balloon_init_watcher(void);
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 /* Use the private and mapping fields of struct page as a list. */
 #define PAGE_TO_LIST(p) ( (struct list_head *)&p->private )
 #define LIST_TO_PAGE(l) ( list_entry( ((unsigned long *)l),   \
-				      struct page, private ) )
+                                      struct page, private ) )
 #define UNLIST_PAGE(p)  do { list_del(PAGE_TO_LIST(p));       \
                              p->mapping = NULL;               \
                              p->private = 0; } while(0)
@@ -297,25 +307,96 @@ static void set_new_target(unsigned long target)
     schedule_work(&balloon_worker);
 }
 
-static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
+static struct xenbus_watch xb_watch =
 {
-    switch ( msg->subtype )
-    {
-    case CMSG_MEM_REQUEST_SET:
-    {
-        mem_request_t *req = (mem_request_t *)&msg->msg[0];
-        set_new_target(req->target);
-        req->status = 0;
-    }
-    break;        
+    .node = "memory"
+};
 
-    default:
-        msg->length = 0;
-        break;
+/* FIXME: This is part of a dom0 sequencing workaround */
+static struct xenbus_watch root_watch =
+{
+    .node = "/"
+};
+
+/* React to a change in the target key */
+static void watch_target(struct xenbus_watch *watch, const char *node)
+{
+    unsigned long new_target;
+    int err;
+
+    if(watch == &root_watch)
+    {
+        /* FIXME: This is part of a dom0 sequencing workaround */
+        if(register_xenbus_watch(&xb_watch) == 0)
+        {
+            /* 
+               We successfully set a watch on memory/target:
+               now we can stop watching root 
+            */
+            unregister_xenbus_watch(&root_watch);
+            balloon_xenbus_init=1;
+        } 
+        else 
+        {
+            return;
+        }
     }
 
-    ctrl_if_send_response(msg);
+    err = xenbus_scanf("memory", "target", "%lu", &new_target);
+        
+    if(err != 1) 
+    {
+        IPRINTK("Unable to read memory/target\n");
+        return;
+    } 
+        
+    set_new_target(new_target >> PAGE_SHIFT);
+    
 }
+
+/* 
+   Try to set up our watcher, if not already set
+   
+*/
+void balloon_init_watcher(void) 
+{
+    int err;
+
+    if(!xen_start_info.store_evtchn)
+    {
+        IPRINTK("Delaying watcher init until xenstore is available\n");
+        return;
+    }
+
+    down(&xenbus_lock);
+
+    if(! balloon_xenbus_init) 
+    {
+        err = register_xenbus_watch(&xb_watch);
+        if(err) 
+        {
+            /* BIG FAT FIXME: dom0 sequencing workaround
+             * dom0 can't set a watch on memory/target until
+             * after the tools create it.  So, we have to watch
+             * the whole store until that happens.
+             *
+             * This will go away when we have the ability to watch
+             * non-existant keys
+             */
+            register_xenbus_watch(&root_watch);
+        } 
+        else
+        {
+            IPRINTK("Balloon xenbus watcher initialized\n");
+            balloon_xenbus_init = 1;
+        }
+    }
+
+    up(&xenbus_lock);
+
+}
+
+EXPORT_SYMBOL(balloon_init_watcher);
 
 static int balloon_write(struct file *file, const char __user *buffer,
                          unsigned long count, void *data)
@@ -346,7 +427,6 @@ static int balloon_read(char *page, char **start, off_t off,
 {
     int len;
 
-#define K(_p) ((_p)<<(PAGE_SHIFT-10))
     len = sprintf(
         page,
         "Current allocation: %8lu kB\n"
@@ -354,13 +434,14 @@ static int balloon_read(char *page, char **start, off_t off,
         "Low-mem balloon:    %8lu kB\n"
         "High-mem balloon:   %8lu kB\n"
         "Xen hard limit:     ",
-        K(current_pages), K(target_pages), K(balloon_low), K(balloon_high));
+        PAGES2KB(current_pages), PAGES2KB(target_pages), 
+        PAGES2KB(balloon_low), PAGES2KB(balloon_high));
 
     if ( hard_limit != ~0UL )
         len += sprintf(
             page + len, 
             "%8lu kB (inc. %8lu kB driver headroom)\n",
-            K(hard_limit), K(driver_pages));
+            PAGES2KB(hard_limit), PAGES2KB(driver_pages));
     else
         len += sprintf(
             page + len,
@@ -396,9 +477,7 @@ static int __init balloon_init(void)
 
     balloon_pde->read_proc  = balloon_read;
     balloon_pde->write_proc = balloon_write;
-
-    (void)ctrl_if_register_receiver(CMSG_MEM_REQUEST, balloon_ctrlif_rx, 0);
-
+    
     /* Initialise the balloon with excess memory space. */
     for ( pfn = xen_start_info.nr_pages; pfn < max_pfn; pfn++ )
     {
@@ -406,6 +485,11 @@ static int __init balloon_init(void)
         if ( !PageReserved(page) )
             balloon_append(page);
     }
+
+    xb_watch.callback = watch_target;
+    root_watch.callback = watch_target;
+
+    balloon_init_watcher();
 
     return 0;
 }
