@@ -707,7 +707,7 @@ static enum xs_perm_type perm_for_id(domid_t id,
 
 	/* Owners and tools get it all... */
 	if (!id || perms[0].id == id)
-		return XS_PERM_READ|XS_PERM_WRITE|XS_PERM_CREATE|XS_PERM_OWNER;
+		return XS_PERM_READ|XS_PERM_WRITE|XS_PERM_OWNER;
 
 	for (i = 1; i < num; i++)
 		if (perms[i].id == id)
@@ -716,19 +716,12 @@ static enum xs_perm_type perm_for_id(domid_t id,
 	return perms[0].perms;
 }
 
-/* We have a weird permissions system.  You can allow someone into a
- * specific node without allowing it in the parents.  If it's going to
- * fail, however, we don't want the errno to indicate any information
- * about the node. */
-static int check_with_parents(struct connection *conn, const char *node,
-			      int errnum)
+/* What do parents say? */
+static enum xs_perm_type ask_parents(struct connection *conn,
+				     const char *node)
 {
 	struct xs_permissions *perms;
 	unsigned int num;
-
-	/* We always tell them about memory failures. */
-	if (errnum == ENOMEM)
-		return errnum;
 
 	do {
 		node = get_parent(node);
@@ -741,10 +734,23 @@ static int check_with_parents(struct connection *conn, const char *node,
 	if (!perms)
 		corrupt(conn, "No permissions file at root");
 
-	if (!(perm_for_id(conn->id, perms, num) & XS_PERM_READ))
-		return EACCES;
+	return perm_for_id(conn->id, perms, num);
+}
 
-	return errnum;
+/* We have a weird permissions system.  You can allow someone into a
+ * specific node without allowing it in the parents.  If it's going to
+ * fail, however, we don't want the errno to indicate any information
+ * about the node. */
+static int errno_from_parents(struct connection *conn, const char *node,
+			      int errnum)
+{
+	/* We always tell them about memory failures. */
+	if (errnum == ENOMEM)
+		return errnum;
+
+	if (ask_parents(conn, node) & XS_PERM_READ)
+		return errnum;
+	return EACCES;
 }
 
 char *canonicalize(struct connection *conn, const char *node)
@@ -776,24 +782,26 @@ bool check_node_perms(struct connection *conn, const char *node,
 	}
 
 	perms = get_perms(conn->transaction, node, &num);
-	/* No permissions.  If we want to create it and
-	 * it doesn't exist, check parent directory. */
-	if (!perms && errno == ENOENT && (perm & XS_PERM_CREATE)) {
-		char *parent = get_parent(node);
-		if (!parent)
-			return false;
 
-		perms = get_perms(conn->transaction, parent, &num);
-	}
-	if (!perms) {
-		errno = check_with_parents(conn, node, errno);
+	if (perms) {
+		if (perm_for_id(conn->id, perms, num) & perm)
+			return true;
+		errno = EACCES;
 		return false;
 	}
 
-	if (perm_for_id(conn->id, perms, num) & perm)
-		return true;
+	/* If it's OK not to exist, we consult parents. */
+	if (errno == ENOENT && (perm & XS_PERM_ENOENT_OK)) {
+		if (ask_parents(conn, node) & perm)
+			return true;
+		/* Parents say they should not know. */
+		errno = EACCES;
+		return false;
+	}
 
-	errno = check_with_parents(conn, node, EACCES);
+	/* They might not have permission to even *see* this node, in
+	 * which case we return EACCES even if it's ENOENT or EIO. */
+	errno = errno_from_parents(conn, node, errno);
 	return false;
 }
 
@@ -930,9 +938,9 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	if (streq(vec[1], XS_WRITE_NONE))
 		mode = XS_PERM_WRITE;
 	else if (streq(vec[1], XS_WRITE_CREATE))
-		mode = XS_PERM_WRITE|XS_PERM_CREATE;
+		mode = XS_PERM_WRITE|XS_PERM_ENOENT_OK;
 	else if (streq(vec[1], XS_WRITE_CREATE_EXCL))
-		mode = XS_PERM_WRITE|XS_PERM_CREATE;
+		mode = XS_PERM_WRITE|XS_PERM_ENOENT_OK;
 	else {
 		send_error(conn, EINVAL);
 		return;
@@ -951,7 +959,7 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 		}
 
 		/* Not going to create it? */
-		if (!(mode & XS_PERM_CREATE)) {
+		if (streq(vec[1], XS_WRITE_NONE)) {
 			send_error(conn, ENOENT);
 			return;
 		}
@@ -985,7 +993,7 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 static void do_mkdir(struct connection *conn, const char *node)
 {
 	node = canonicalize(conn, node);
-	if (!check_node_perms(conn, node, XS_PERM_WRITE|XS_PERM_CREATE)) {
+	if (!check_node_perms(conn, node, XS_PERM_WRITE|XS_PERM_ENOENT_OK)) {
 		send_error(conn, errno);
 		return;
 	}
