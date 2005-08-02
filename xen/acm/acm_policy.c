@@ -6,9 +6,8 @@
  * Author:
  * Reiner Sailer <sailer@watson.ibm.com>
  *
- * Contributions:
+ * Contributors:
  * Stefan Berger <stefanb@watson.ibm.com>
- *	support for network-byte-order binary policies
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -27,29 +26,20 @@
 #include <xen/lib.h>
 #include <xen/delay.h>
 #include <xen/sched.h>
-#include <public/policy_ops.h>
+#include <public/acm_ops.h>
 #include <acm/acm_core.h>
 #include <acm/acm_hooks.h>
 #include <acm/acm_endian.h>
 
 int
-acm_set_policy(void *buf, u16 buf_size, u16 policy, int isuserbuffer)
+acm_set_policy(void *buf, u16 buf_size, int isuserbuffer)
 {
 	u8 *policy_buffer = NULL;
 	struct acm_policy_buffer *pol;
 	
-	if (policy != ACM_USE_SECURITY_POLICY) {
-		printk("%s: Loading incompatible policy (running: %s).\n", __func__,
-		       ACM_POLICY_NAME(ACM_USE_SECURITY_POLICY));
-		return -EFAULT;
-	}
-	/* now check correct buffer sizes for policy combinations */
-	if (policy == ACM_NULL_POLICY) {
-		printkd("%s: NULL Policy, no policy needed.\n", __func__);
-		goto out;
-	}
      	if (buf_size < sizeof(struct acm_policy_buffer))
 		return -EFAULT;
+
 	/* 1. copy buffer from domain */
 	if ((policy_buffer = xmalloc_array(u8, buf_size)) == NULL)
 	    goto error_free;
@@ -58,17 +48,17 @@ acm_set_policy(void *buf, u16 buf_size, u16 policy, int isuserbuffer)
 			printk("%s: Error copying!\n",__func__);
 			goto error_free;
 		}
-	} else {
+	} else
 		memcpy(policy_buffer, buf, buf_size);
-	}
+
 	/* 2. some sanity checking */
 	pol = (struct acm_policy_buffer *)policy_buffer;
 
 	if ((ntohl(pol->magic) != ACM_MAGIC) || 
-	    (ntohs(pol->primary_policy_code) != acm_bin_pol.primary_policy_code) ||
-	    (ntohs(pol->secondary_policy_code) != acm_bin_pol.secondary_policy_code) ||
-	    (ntohl(pol->policyversion) != POLICY_INTERFACE_VERSION)) {
-		printkd("%s: Wrong policy magics!\n", __func__);
+	    (ntohl(pol->policy_version) != ACM_POLICY_VERSION) ||
+	    (ntohl(pol->primary_policy_code) != acm_bin_pol.primary_policy_code) ||
+	    (ntohl(pol->secondary_policy_code) != acm_bin_pol.secondary_policy_code)) {
+		printkd("%s: Wrong policy magics or versions!\n", __func__);
 		goto error_free;
 	}
 	if (buf_size != ntohl(pol->len)) {
@@ -79,21 +69,19 @@ acm_set_policy(void *buf, u16 buf_size, u16 policy, int isuserbuffer)
 	/* get bin_policy lock and rewrite policy (release old one) */
 	write_lock(&acm_bin_pol_rwlock);
 
-	/* 3. now get/set primary policy data */
-	if (acm_primary_ops->set_binary_policy(buf + ntohs(pol->primary_buffer_offset), 
-                                               ntohs(pol->secondary_buffer_offset) -
-					       ntohs(pol->primary_buffer_offset))) {
+	/* 3. set primary policy data */
+	if (acm_primary_ops->set_binary_policy(buf + ntohl(pol->primary_buffer_offset),
+                                               ntohl(pol->secondary_buffer_offset) -
+					       ntohl(pol->primary_buffer_offset))) {
 		goto error_lock_free;
 	}
-	/* 4. now get/set secondary policy data */
-	if (acm_secondary_ops->set_binary_policy(buf + ntohs(pol->secondary_buffer_offset),
+	/* 4. set secondary policy data */
+	if (acm_secondary_ops->set_binary_policy(buf + ntohl(pol->secondary_buffer_offset),
 						 ntohl(pol->len) - 
-						 ntohs(pol->secondary_buffer_offset))) {
+						 ntohl(pol->secondary_buffer_offset))) {
 		goto error_lock_free;
 	}
 	write_unlock(&acm_bin_pol_rwlock);
- out:
-	printk("%s: Done .\n", __func__);
 	if (policy_buffer != NULL)
 		xfree(policy_buffer);
 	return ACM_OK;
@@ -121,26 +109,25 @@ acm_get_policy(void *buf, u16 buf_size)
      /* future: read policy from file and set it */
      bin_pol = (struct acm_policy_buffer *)policy_buffer;
      bin_pol->magic = htonl(ACM_MAGIC);
-     bin_pol->policyversion = htonl(POLICY_INTERFACE_VERSION);
-     bin_pol->primary_policy_code = htons(acm_bin_pol.primary_policy_code);
-     bin_pol->secondary_policy_code = htons(acm_bin_pol.secondary_policy_code);
+     bin_pol->primary_policy_code = htonl(acm_bin_pol.primary_policy_code);
+     bin_pol->secondary_policy_code = htonl(acm_bin_pol.secondary_policy_code);
 
      bin_pol->len = htonl(sizeof(struct acm_policy_buffer));
-     bin_pol->primary_buffer_offset = htons(ntohl(bin_pol->len));
-     bin_pol->secondary_buffer_offset = htons(ntohl(bin_pol->len));
+     bin_pol->primary_buffer_offset = htonl(ntohl(bin_pol->len));
+     bin_pol->secondary_buffer_offset = htonl(ntohl(bin_pol->len));
      
-     ret = acm_primary_ops->dump_binary_policy (policy_buffer + ntohs(bin_pol->primary_buffer_offset),
-				       buf_size - ntohs(bin_pol->primary_buffer_offset));
+     ret = acm_primary_ops->dump_binary_policy (policy_buffer + ntohl(bin_pol->primary_buffer_offset),
+				       buf_size - ntohl(bin_pol->primary_buffer_offset));
      if (ret < 0) {
 	     printk("%s: ERROR creating chwallpolicy buffer.\n", __func__);
 	     read_unlock(&acm_bin_pol_rwlock);
 	     return -1;
      }
      bin_pol->len = htonl(ntohl(bin_pol->len) + ret);
-     bin_pol->secondary_buffer_offset = htons(ntohl(bin_pol->len));
+     bin_pol->secondary_buffer_offset = htonl(ntohl(bin_pol->len));
 
-     ret = acm_secondary_ops->dump_binary_policy(policy_buffer + ntohs(bin_pol->secondary_buffer_offset), 
-				    buf_size - ntohs(bin_pol->secondary_buffer_offset));
+     ret = acm_secondary_ops->dump_binary_policy(policy_buffer + ntohl(bin_pol->secondary_buffer_offset),
+				    buf_size - ntohl(bin_pol->secondary_buffer_offset));
      if (ret < 0) {
 	     printk("%s: ERROR creating chwallpolicy buffer.\n", __func__);
 	     read_unlock(&acm_bin_pol_rwlock);
@@ -178,11 +165,10 @@ acm_dump_statistics(void *buf, u16 buf_size)
 	     goto error_lock_free;
 
      acm_stats.magic = htonl(ACM_MAGIC);
-     acm_stats.policyversion = htonl(POLICY_INTERFACE_VERSION);
-     acm_stats.primary_policy_code = htons(acm_bin_pol.primary_policy_code);
-     acm_stats.secondary_policy_code = htons(acm_bin_pol.secondary_policy_code);
-     acm_stats.primary_stats_offset = htons(sizeof(struct acm_stats_buffer));
-     acm_stats.secondary_stats_offset = htons(sizeof(struct acm_stats_buffer) + len1);
+     acm_stats.primary_policy_code = htonl(acm_bin_pol.primary_policy_code);
+     acm_stats.secondary_policy_code = htonl(acm_bin_pol.secondary_policy_code);
+     acm_stats.primary_stats_offset = htonl(sizeof(struct acm_stats_buffer));
+     acm_stats.secondary_stats_offset = htonl(sizeof(struct acm_stats_buffer) + len1);
      acm_stats.len = htonl(sizeof(struct acm_stats_buffer) + len1 + len2);
      memcpy(stats_buffer, &acm_stats, sizeof(struct acm_stats_buffer));
 

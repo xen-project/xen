@@ -32,7 +32,7 @@ class Ext2FileSystemType(FileSystemType):
     def open_fs(self, fn, offset = 0):
         if not self.sniff_magic(fn, offset):
             raise ValueError, "Not an ext2 filesystem"
-        return Ext2Fs(fn)
+        return Ext2Fs(fn, offset = offset)
 
 register_fstype(Ext2FileSystemType())
 

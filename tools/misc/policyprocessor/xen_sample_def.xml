@@ -37,7 +37,7 @@ xsi:schemaLocation="http://www.ibm.com SecurityPolicySpec.xsd">
    </ConflictSet>
 
    <ConflictSet>
-		 <ChWall>Q-Company</ChWall>
+		 <ChWall>R-Company</ChWall>
 		 <ChWall>V-Company</ChWall>
 		 <ChWall>W-Company</ChWall>
    </ConflictSet>

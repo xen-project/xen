@@ -58,7 +58,7 @@
 #define __HYPERVISOR_boot_vcpu            24
 #define __HYPERVISOR_set_segment_base     25 /* x86/64 only */
 #define __HYPERVISOR_mmuext_op            26
-#define __HYPERVISOR_policy_op            27
+#define __HYPERVISOR_acm_op               27
 
 /* 
  * VIRTUAL INTERRUPTS

@@ -4,6 +4,8 @@ include $(XEN_ROOT)/Config.mk
 
 XEN_XC             = $(XEN_ROOT)/tools/python/xen/lowlevel/xc
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
+XEN_XCS            = $(XEN_ROOT)/tools/xcs
+XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
 
 ifeq ($(XEN_TARGET_ARCH),x86_32)
 CFLAGS  += -m32 -march=i686

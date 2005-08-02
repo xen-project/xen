@@ -152,6 +152,9 @@ class XendDomainInfo:
         vm = cls(db)
         vm.construct(config)
         vm.saveToDB(sync=True)
+        # Flush info to xenstore immediately
+        vm.exportToDB()
+
         return vm
 
     create = classmethod(create)
@@ -172,6 +175,7 @@ class XendDomainInfo:
         log.debug('config=' + prettyprintstring(config))
 
         vm.memory = info['mem_kb']/1024
+        vm.target = info['mem_kb'] * 1024
 
         if config:
             try:
@@ -222,6 +226,7 @@ class XendDomainInfo:
         DBVar('restart_state', ty='str'),
         DBVar('restart_time',  ty='float'),
         DBVar('restart_count', ty='int'),
+        DBVar('target',        ty='long', path="memory/target"),
         ]
     
     def __init__(self, db):
@@ -239,6 +244,8 @@ class XendDomainInfo:
         self.memory = None
         self.ssidref = None
         self.image = None
+
+        self.target = None
 
         self.channel = None
         self.store_channel = None
@@ -315,6 +322,7 @@ class XendDomainInfo:
         self.info = info
         self.memory = self.info['mem_kb'] / 1024
         self.ssidref = self.info['ssidref']
+        self.target = self.info['mem_kb'] * 1024
 
     def state_set(self, state):
         self.state_updated.acquire()
@@ -399,7 +407,8 @@ class XendDomainInfo:
                 ['id', self.id],
                 ['name', self.name],
                 ['memory', self.memory],
-                ['ssidref', self.ssidref] ]
+                ['ssidref', self.ssidref],
+                ['target', self.target] ]
         if self.uuid:
             sxpr.append(['uuid', self.uuid])
         if self.info:
@@ -536,6 +545,7 @@ class XendDomainInfo:
         self.memory = int(sxp.child_value(config, 'memory'))
         if self.memory is None:
             raise VmError('missing memory size')
+        self.target = self.memory * (1 << 20)
         self.ssidref = int(sxp.child_value(config, 'ssidref'))
         cpu = sxp.child_value(config, 'cpu')
         if self.recreate and self.id and cpu is not None and int(cpu) >= 0:
@@ -947,11 +957,12 @@ class XendDomainInfo:
             index[field_name] = field_index + 1
 
     def mem_target_set(self, target):
-        """Set domain memory target in pages.
+        """Set domain memory target in bytes.
         """
-        if self.channel:
-            msg = messages.packMsg('mem_request_t', { 'target' : target * (1 << 8)} )
-            self.channel.writeRequest(msg)
+        if target:
+            self.target = target * (1 << 20)
+            # Commit to XenStore immediately
+            self.exportToDB()
 
     def vcpu_hotplug(self, vcpu, state):
         """Disable or enable VCPU in domain.

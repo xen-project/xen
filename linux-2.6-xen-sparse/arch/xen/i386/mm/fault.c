@@ -204,6 +204,63 @@ static inline int is_prefetch(struct pt_regs *regs, unsigned long addr,
 
 fastcall void do_invalid_op(struct pt_regs *, unsigned long);
 
+#ifdef CONFIG_X86_PAE
+static void dump_fault_path(unsigned long address)
+{
+	unsigned long *p, page;
+
+        page = __pa(per_cpu(cur_pgd, smp_processor_id()));
+	p  = (unsigned long *)__va(page);
+	p += (address >> 30) * 2;
+	printk(KERN_ALERT "%08lx -> *pde = %08lx:%08lx\n", page, p[1], p[0]);
+	if (p[0] & 1) {
+		page = p[0] & PAGE_MASK;
+		address &= 0x3fffffff;
+		page = machine_to_phys(page);
+		p  = (unsigned long *)__va(page);
+		p += (address >> 21) * 2;
+		printk(KERN_ALERT "%08lx -> *pme = %08lx:%08lx\n", page, p[1], p[0]);
+#ifndef CONFIG_HIGHPTE
+		if (p[0] & 1) {
+			page = p[0] & PAGE_MASK;
+			address &= 0x001fffff;
+			page = machine_to_phys(page);
+			p  = (unsigned long *) __va(page);
+			p += (address >> 12) * 2;
+			printk(KERN_ALERT "%08lx -> *pte = %08lx:%08lx\n", page, p[1], p[0]);
+		}
+#endif
+	}
+}
+#else
+static void dump_fault_path(unsigned long address)
+{
+	unsigned long page;
+
+	page = ((unsigned long *) per_cpu(cur_pgd, smp_processor_id()))
+	    [address >> 22];
+	printk(KERN_ALERT "*pde = ma %08lx pa %08lx\n", page,
+	       machine_to_phys(page));
+	/*
+	 * We must not directly access the pte in the highpte
+	 * case, the page table might be allocated in highmem.
+	 * And lets rather not kmap-atomic the pte, just in case
+	 * it's allocated already.
+	 */
+#ifndef CONFIG_HIGHPTE
+	if (page & 1) {
+		page &= PAGE_MASK;
+		address &= 0x003ff000;
+		page = machine_to_phys(page);
+		page = ((unsigned long *) __va(page))[address >> PAGE_SHIFT];
+		printk(KERN_ALERT "*pte = ma %08lx pa %08lx\n", page,
+		       machine_to_phys(page));
+	}
+#endif
+}
+#endif
+
+
 /*
  * This routine handles page faults.  It determines the address,
  * and the problem, and then passes it off to one of the appropriate
@@ -220,7 +277,6 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	struct task_struct *tsk;
 	struct mm_struct *mm;
 	struct vm_area_struct * vma;
-	unsigned long page;
 	int write;
 	siginfo_t info;
 
@@ -454,26 +510,7 @@ no_context:
 	printk(" at virtual address %08lx\n",address);
 	printk(KERN_ALERT " printing eip:\n");
 	printk("%08lx\n", regs->eip);
-	page = ((unsigned long *) per_cpu(cur_pgd, smp_processor_id()))
-	    [address >> 22];
-	printk(KERN_ALERT "*pde = ma %08lx pa %08lx\n", page,
-	       machine_to_phys(page));
-	/*
-	 * We must not directly access the pte in the highpte
-	 * case, the page table might be allocated in highmem.
-	 * And lets rather not kmap-atomic the pte, just in case
-	 * it's allocated already.
-	 */
-#ifndef CONFIG_HIGHPTE
-	if (page & 1) {
-		page &= PAGE_MASK;
-		address &= 0x003ff000;
-		page = machine_to_phys(page);
-		page = ((unsigned long *) __va(page))[address >> PAGE_SHIFT];
-		printk(KERN_ALERT "*pte = ma %08lx pa %08lx\n", page,
-		       machine_to_phys(page));
-	}
-#endif
+	dump_fault_path(address);
 	die("Oops", regs, error_code);
 	bust_spinlocks(0);
 	do_exit(SIGKILL);

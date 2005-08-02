@@ -140,15 +140,15 @@ ste_dump_policy(u8 *buf, u16 buf_size) {
      struct acm_ste_policy_buffer *ste_buf = (struct acm_ste_policy_buffer *)buf;
      int ret = 0;
 
-     ste_buf->ste_max_types = htons(ste_bin_pol.max_types);
-     ste_buf->ste_max_ssidrefs = htons(ste_bin_pol.max_ssidrefs);
-     ste_buf->policy_code = htons(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY);
-     ste_buf->ste_ssid_offset = htons(sizeof(struct acm_ste_policy_buffer));
-     ret = ntohs(ste_buf->ste_ssid_offset) +
+     ste_buf->ste_max_types = htonl(ste_bin_pol.max_types);
+     ste_buf->ste_max_ssidrefs = htonl(ste_bin_pol.max_ssidrefs);
+     ste_buf->policy_code = htonl(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY);
+     ste_buf->ste_ssid_offset = htonl(sizeof(struct acm_ste_policy_buffer));
+     ret = ntohl(ste_buf->ste_ssid_offset) +
 	     sizeof(domaintype_t)*ste_bin_pol.max_ssidrefs*ste_bin_pol.max_types;
 
      /* now copy buffer over */
-     arrcpy(buf + ntohs(ste_buf->ste_ssid_offset),
+     arrcpy(buf + ntohl(ste_buf->ste_ssid_offset),
 	    ste_bin_pol.ssidrefs,
 	    sizeof(domaintype_t),
              ste_bin_pol.max_ssidrefs*ste_bin_pol.max_types);
@@ -276,10 +276,16 @@ ste_set_policy(u8 *buf, u16 buf_size)
      int i;
 
      /* Convert endianess of policy */
-     ste_buf->policy_code = ntohs(ste_buf->policy_code);
-     ste_buf->ste_max_types = ntohs(ste_buf->ste_max_types);
-     ste_buf->ste_max_ssidrefs = ntohs(ste_buf->ste_max_ssidrefs);
-     ste_buf->ste_ssid_offset = ntohs(ste_buf->ste_ssid_offset);
+     ste_buf->policy_code = ntohl(ste_buf->policy_code);
+     ste_buf->policy_version = ntohl(ste_buf->policy_version);
+     ste_buf->ste_max_types = ntohl(ste_buf->ste_max_types);
+     ste_buf->ste_max_ssidrefs = ntohl(ste_buf->ste_max_ssidrefs);
+     ste_buf->ste_ssid_offset = ntohl(ste_buf->ste_ssid_offset);
+
+     /* policy type and version checks */
+     if ((ste_buf->policy_code != ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY) ||
+	 (ste_buf->policy_version != ACM_STE_VERSION))
+	     return -EINVAL;
 
      /* 1. create and copy-in new ssidrefs buffer */
      ssidrefsbuf = xmalloc_array(u8, sizeof(domaintype_t)*ste_buf->ste_max_types*ste_buf->ste_max_ssidrefs);

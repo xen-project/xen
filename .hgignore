@@ -86,6 +86,8 @@
 ^tools/check/\..*$
 ^tools/cmdline/.*$
 ^tools/cmdline/xen/.*$
+^tools/consoled/consoled$
+^tools/consoled/xc_console$
 ^tools/debugger/pdb/pdb$
 ^tools/debugger/pdb/linux-[0-9.]*-module/.*\.ko$
 ^tools/debugger/pdb/linux-[0-9.]*-module/.*\.mod.c$
@@ -128,8 +130,8 @@
 ^tools/misc/xc_shadow$
 ^tools/misc/xen_cpuperf$
 ^tools/misc/xenperf$
-^tools/policy/policy_tool$
-^tools/policy/xen/.*$
+^tools/security/secpol_tool$
+^tools/security/xen/.*$
 ^tools/pygrub/build/.*$
 ^tools/python/build/.*$
 ^tools/tests/test_x86_emulator$

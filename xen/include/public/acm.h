@@ -71,6 +71,14 @@
 	(X == ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY) ? "CHINESE WALL AND SIMPLE TYPE ENFORCEMENT policy" : \
 	"UNDEFINED policy"
 
+/* the following policy versions must be increased
+ * whenever the interpretation of the related
+ * policy's data structure changes
+ */
+#define ACM_POLICY_VERSION	1
+#define ACM_CHWALL_VERSION	1
+#define ACM_STE_VERSION		1
+
 /* defines a ssid reference used by xen */
 typedef u32 ssidref_t;
 
@@ -102,46 +110,53 @@ typedef u16 domaintype_t;
 #define ACM_MAGIC		0x0001debc
 
 /* each offset in bytes from start of the struct they
- *   the are part of */
+ * are part of */
+
 /* each buffer consists of all policy information for
  * the respective policy given in the policy code
+ *
+ * acm_policy_buffer, acm_chwall_policy_buffer,
+ * and acm_ste_policy_buffer need to stay 32-bit aligned
+ * because we create binary policies also with external
+ * tools that assume packed representations (e.g. the java tool)
  */
 struct acm_policy_buffer {
+	u32 policy_version; /* ACM_POLICY_VERSION */
         u32 magic;
-	u32 policyversion;
 	u32 len;
-	u16 primary_policy_code;
-	u16 primary_buffer_offset;
-	u16 secondary_policy_code;
-	u16 secondary_buffer_offset;
+	u32 primary_policy_code;
+	u32 primary_buffer_offset;
+	u32 secondary_policy_code;
+	u32 secondary_buffer_offset;
 };
 
 struct acm_chwall_policy_buffer {
-	u16 policy_code;
-	u16 chwall_max_types;
-	u16 chwall_max_ssidrefs;
-	u16 chwall_max_conflictsets;
-	u16 chwall_ssid_offset;
-	u16 chwall_conflict_sets_offset;
-	u16 chwall_running_types_offset;
-	u16 chwall_conflict_aggregate_offset;
+	u32 policy_version; /* ACM_CHWALL_VERSION */
+	u32 policy_code;
+	u32 chwall_max_types;
+	u32 chwall_max_ssidrefs;
+	u32 chwall_max_conflictsets;
+	u32 chwall_ssid_offset;
+	u32 chwall_conflict_sets_offset;
+	u32 chwall_running_types_offset;
+	u32 chwall_conflict_aggregate_offset;
 };
 
 struct acm_ste_policy_buffer {
-	u16 policy_code;
-	u16 ste_max_types;
-	u16 ste_max_ssidrefs;
-	u16 ste_ssid_offset;
+	u32 policy_version; /* ACM_STE_VERSION */
+	u32 policy_code;
+	u32 ste_max_types;
+	u32 ste_max_ssidrefs;
+	u32 ste_ssid_offset;
 };
 
 struct acm_stats_buffer {
         u32 magic;
-	u32 policyversion;
 	u32 len;
-	u16 primary_policy_code;
-	u16 primary_stats_offset;
-	u16 secondary_policy_code;
-	u16 secondary_stats_offset;
+	u32 primary_policy_code;
+	u32 primary_stats_offset;
+	u32 secondary_policy_code;
+	u32 secondary_stats_offset;
 };
 
 struct acm_ste_stats_buffer {

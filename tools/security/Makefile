@@ -1,7 +1,7 @@
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-SRCS     = policy_tool.c
+SRCS     = secpol_tool.c
 CFLAGS   += -static
 CFLAGS   += -Wall
 CFLAGS   += -Werror
@@ -11,17 +11,17 @@ CFLAGS   += -I.
 
 all: build
 build: mk-symlinks
-	$(MAKE) policy_tool
+	$(MAKE) secpol_tool
 
 default: all
 
 install: all
 
-policy_tool : policy_tool.c
+secpol_tool : secpol_tool.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
 clean:
-	rm -rf policy_tool xen
+	rm -rf secpol_tool xen
 
 
 LINUX_ROOT := $(XEN_ROOT)/linux-2.6-xen-sparse
