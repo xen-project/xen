@@ -84,9 +84,6 @@ static struct timer_list balloon_timer;
 /* Flag for dom0 xenstore workaround */
 static int balloon_xenbus_init=0;
 
-/* Init Function */
-void balloon_init_watcher(void);
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 /* Use the private and mapping fields of struct page as a list. */
 #define PAGE_TO_LIST(p) ( (struct list_head *)&p->private )
@@ -354,27 +351,21 @@ static void watch_target(struct xenbus_watch *watch, const char *node)
     
 }
 
-/* 
-   Try to set up our watcher, if not already set
-   
-*/
-void balloon_init_watcher(void) 
+/* Init Function - Try to set up our watcher, if not already set. */
+void balloon_init_watcher(void)
 {
     int err;
 
-    if(!xen_start_info.store_evtchn)
-    {
+    if (!xen_start_info.store_evtchn) {
         IPRINTK("Delaying watcher init until xenstore is available\n");
         return;
     }
 
     down(&xenbus_lock);
 
-    if(! balloon_xenbus_init) 
-    {
+    if (!balloon_xenbus_init) {
         err = register_xenbus_watch(&xb_watch);
-        if(err) 
-        {
+        if (err) {
             /* BIG FAT FIXME: dom0 sequencing workaround
              * dom0 can't set a watch on memory/target until
              * after the tools create it.  So, we have to watch
@@ -384,16 +375,13 @@ void balloon_init_watcher(void)
              * non-existant keys
              */
             register_xenbus_watch(&root_watch);
-        } 
-        else
-        {
+        } else {
             IPRINTK("Balloon xenbus watcher initialized\n");
             balloon_xenbus_init = 1;
         }
     }
 
     up(&xenbus_lock);
-
 }
 
 EXPORT_SYMBOL(balloon_init_watcher);
