@@ -88,6 +88,7 @@ struct arch_vcpu {
     thash_cb_t *vtlb;
     char irq_new_pending;
     char irq_new_condition;    // vpsr.i/vtpr change, check for pending VHPI
+    char hypercall_continuation;
     //for phycial  emulation
     unsigned long old_rsc;
     int mode_flags;

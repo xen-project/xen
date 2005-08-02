@@ -29,6 +29,7 @@
 #include <asm/regionreg.h>
 #include <asm/page.h>
 #include <xen/mm.h>
+#include <xen/multicall.h>
 
 
 void hyper_not_support(void)
@@ -51,6 +52,42 @@ void hyper_mmu_update(void)
     vmx_vcpu_increment_iip(vcpu);
 }
 
+unsigned long __hypercall_create_continuation(
+    unsigned int op, unsigned int nr_args, ...)
+{
+    struct mc_state *mcs = &mc_state[smp_processor_id()];
+    VCPU *vcpu = current;
+    struct cpu_user_regs *regs = vcpu_regs(vcpu);
+    unsigned int i;
+    va_list args;
+
+    va_start(args, nr_args);
+    if ( test_bit(_MCSF_in_multicall, &mcs->flags) ) {
+	panic("PREEMPT happen in multicall\n");	// Not support yet
+    } else {
+	vmx_vcpu_set_gr(vcpu, 15, op, 0);
+	for ( i = 0; i < nr_args; i++) {
+	    switch (i) {
+	    case 0: vmx_vcpu_set_gr(vcpu, 16, va_arg(args, unsigned long), 0);
+		    break;
+	    case 1: vmx_vcpu_set_gr(vcpu, 17, va_arg(args, unsigned long), 0);
+		    break;
+	    case 2: vmx_vcpu_set_gr(vcpu, 18, va_arg(args, unsigned long), 0);
+		    break;
+	    case 3: vmx_vcpu_set_gr(vcpu, 19, va_arg(args, unsigned long), 0);
+		    break;
+	    case 4: vmx_vcpu_set_gr(vcpu, 20, va_arg(args, unsigned long), 0);
+		    break;
+	    default: panic("Too many args for hypercall continuation\n");
+		    break;
+	    }
+	}
+    }
+    vcpu->arch.hypercall_continuation = 1;
+    va_end(args);
+    return op;
+}
+
 void hyper_dom_mem_op(void)
 {
     VCPU *vcpu=current;
@@ -65,7 +102,13 @@ void hyper_dom_mem_op(void)
     printf("do_dom_mem return value: %lx\n", ret);
     vmx_vcpu_set_gr(vcpu, 8, ret, 0);
 
-    vmx_vcpu_increment_iip(vcpu);
+    /* Hard to define a special return value to indicate hypercall restart.
+     * So just add a new mark, which is SMP safe
+     */
+    if (vcpu->arch.hypercall_continuation == 1)
+	vcpu->arch.hypercall_continuation = 0;
+    else
+	vmx_vcpu_increment_iip(vcpu);
 }
 
 
