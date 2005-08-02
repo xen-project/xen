@@ -24,14 +24,14 @@ SRCS    += main.c utils.c io.c
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(SRCS))
-BIN      = consoled
+BIN      = consoled xc_console
 
-all: $(BIN) xc_console
+all: $(BIN)
 
 clean:
-	$(RM) *.a *.so *.o *.rpm $(BIN) xc_console
+	$(RM) *.a *.so *.o *.rpm $(BIN)
 
-$(BIN): $(OBJS)
+consoled: $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -L$(XEN_XENSTORE) \
               -lxc -lxenstore
 
@@ -41,8 +41,8 @@ xc_console: xc_console.o
 
 $(OBJS): $(HDRS)
 
-install: $(BIN) xc_console
+install: $(BIN)
 	$(INSTALL_DIR) -p $(DESTDIR)/$(CONSOLED_INSTALL_DIR)
-	$(INSTALL_PROG) $(BIN) $(DESTDIR)/$(CONSOLED_INSTALL_DIR)
+	$(INSTALL_PROG) consoled $(DESTDIR)/$(CONSOLED_INSTALL_DIR)
 	$(INSTALL_DIR) -p $(DESTDIR)/$(XC_CONSOLE_INSTALL_DIR)
 	$(INSTALL_PROG) xc_console $(DESTDIR)/$(XC_CONSOLE_INSTALL_DIR)
