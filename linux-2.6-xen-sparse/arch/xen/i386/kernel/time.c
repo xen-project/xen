@@ -860,6 +860,8 @@ void start_hz_timer(void)
 void time_suspend(void)
 {
 	/* nothing */
+	teardown_irq(per_cpu(timer_irq, 0), &irq_timer);
+	unbind_virq_from_irq(VIRQ_TIMER);
 }
 
 /* No locking required. We are only CPU running, and interrupts are off. */
@@ -874,10 +876,25 @@ void time_resume(void)
 	processed_system_time =
 		per_cpu(shadow_time, smp_processor_id()).system_timestamp;
 	per_cpu(processed_system_time, 0) = processed_system_time;
+
+	per_cpu(timer_irq, 0) = bind_virq_to_irq(VIRQ_TIMER);
+	(void)setup_irq(per_cpu(timer_irq, 0), &irq_timer);
 }
 
 #ifdef CONFIG_SMP
 static char timer_name[NR_CPUS][15];
+void local_setup_timer_irq(void)
+{
+	int cpu = smp_processor_id();
+
+	if (cpu == 0)
+		return;
+	per_cpu(timer_irq, cpu) = bind_virq_to_irq(VIRQ_TIMER);
+	sprintf(timer_name[cpu], "timer%d", cpu);
+	BUG_ON(request_irq(per_cpu(timer_irq, cpu), timer_interrupt,
+	                   SA_INTERRUPT, timer_name[cpu], NULL));
+}
+
 void local_setup_timer(void)
 {
 	int seq, cpu = smp_processor_id();
@@ -888,10 +905,17 @@ void local_setup_timer(void)
 			per_cpu(shadow_time, cpu).system_timestamp;
 	} while (read_seqretry(&xtime_lock, seq));
 
-	per_cpu(timer_irq, cpu) = bind_virq_to_irq(VIRQ_TIMER);
-	sprintf(timer_name[cpu], "timer%d", cpu);
-	BUG_ON(request_irq(per_cpu(timer_irq, cpu), timer_interrupt,
-	                   SA_INTERRUPT, timer_name[cpu], NULL));
+	local_setup_timer_irq();
+}
+
+void local_teardown_timer_irq(void)
+{
+	int cpu = smp_processor_id();
+
+	if (cpu == 0)
+		return;
+	free_irq(per_cpu(timer_irq, cpu), NULL);
+	unbind_virq_from_irq(VIRQ_TIMER);
 }
 #endif
 
