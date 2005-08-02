@@ -309,6 +309,9 @@ int do_xenbus_probe(void *unused)
 		return err;
 	}
 
+	/* Initialize non-xenbus drivers */
+	balloon_init_watcher();
+
 	down(&xenbus_lock);
 	/* Enumerate devices in xenstore. */
 	xenbus_probe_devices("device");

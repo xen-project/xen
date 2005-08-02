@@ -10,9 +10,10 @@ SUBDIRS += xentrace
 SUBDIRS += python
 SUBDIRS += xcs
 SUBDIRS += xcutils
-SUBDIRS += pygrub
+#SUBDIRS += pygrub
 SUBDIRS += firmware
-SUBDIRS += policy
+SUBDIRS += security
+#SUBDIRS += consoled
 
 .PHONY: all install clean check check_clean ioemu eioemuinstall ioemuclean
 

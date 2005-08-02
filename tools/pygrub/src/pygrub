@@ -24,7 +24,7 @@ sys.path = [ '/usr/lib/python' ] + sys.path
 import grub.GrubConf
 import grub.fsys
 
-PYGRUB_VER = 0.02
+PYGRUB_VER = 0.3
 
 
 def draw_window():
@@ -77,9 +77,21 @@ def is_disk_image(file):
     buf = os.read(fd, 512)
     os.close(fd)
 
-    if len(buf) >= 512 and struct.unpack("H", buf[0x1fe: 0x200]) == (0xaaff):
+    if len(buf) >= 512 and struct.unpack("H", buf[0x1fe: 0x200]) == (0xaa55,):
         return True
     return False
+
+SECTOR_SIZE=512
+def get_active_offset(file):
+    """Find the offset for the start of the first active partition in the
+    disk image file."""
+    fd = os.open(file, os.O_RDONLY)
+    buf = os.read(fd, 512)
+    for poff in (446, 462, 478, 494): # partition offsets
+        # active partition has 0x80 as the first byte
+        if struct.unpack("<c", buf[p:p+1]) == ('\x80',):
+            return struct.unpack("<", buf[p+8:p+12])[0] * SECTOR_SIZE
+    return -1
 
 def get_config(fn):
     if not os.access(fn, os.R_OK):
@@ -87,14 +99,17 @@ def get_config(fn):
 
     cf = grub.GrubConf.GrubConfigFile()
 
+    offset = 0
     if is_disk_image(fn):
-        raise RuntimeError, "appears to be a full disk image... unable to handle this yet"
+        offset = get_active_offset(fn)
+        if offset == -1:
+            raise RuntimeError, "Unable to find active partition on disk"
 
     # open the image and read the grub config
     fs = None
     for fstype in grub.fsys.fstypes.values():
-        if fstype.sniff_magic(fn):
-            fs = fstype.open_fs(fn)
+        if fstype.sniff_magic(fn, offset):
+            fs = fstype.open_fs(fn, offset)
             break
 
     if fs is not None:
@@ -244,14 +259,17 @@ if __name__ == "__main__":
     if img.initrd:
         print "  initrd: %s" %(img.initrd[1],)
 
+    offset = 0
     if is_disk_image(file):
-        raise RuntimeError, "unable to handle full disk images yet"
+        offset = get_active_offset(fn)
+        if offset == -1:
+            raise RuntimeError, "Unable to find active partition on disk"
 
     # read the kernel and initrd onto the hostfs
     fs = None
     for fstype in grub.fsys.fstypes.values():
-        if fstype.sniff_magic(file):
-            fs = fstype.open_fs(file)
+        if fstype.sniff_magic(file, offset):
+            fs = fstype.open_fs(file, offset)
             break
 
     if fs is None:

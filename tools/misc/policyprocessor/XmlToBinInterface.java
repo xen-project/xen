@@ -19,37 +19,37 @@
  *
  *	policy binary structures
  *
- *	typedef struct {
- *        u32 magic;
+ * struct acm_policy_buffer {
+ *	u32 policy_version; * ACM_POLICY_VERSION *
+ *      u32 magic;
+ *	u32 len;
+ *	u32 primary_policy_code;
+ *	u32 primary_buffer_offset;
+ *	u32 secondary_policy_code;
+ *	u32 secondary_buffer_offset;
+ *      +u32 resource offset (not used yet in Xen)
+ * };
  *
- *        u32 policyversion;
- *        u32 len;
  *
- *        u16 primary_policy_code;
- *        u16 primary_buffer_offset;
- *        u16 secondary_policy_code;
- *        u16 secondary_buffer_offset;
- *	u16 resource_offset;
+ * struct acm_ste_policy_buffer {
+ *	u32 policy_version; * ACM_STE_VERSION *
+ *	u32 policy_code;
+ *	u32 ste_max_types;
+ *	u32 ste_max_ssidrefs;
+ *	u32 ste_ssid_offset;
+ * };
  *
- *	} acm_policy_buffer_t;
- *
- *	typedef struct {
- *        u16 policy_code;
- *        u16 ste_max_types;
- *        u16 ste_max_ssidrefs;
- *        u16 ste_ssid_offset;
- *	} acm_ste_policy_buffer_t;
- *
- *  	typedef struct {
- *        uint16 policy_code;
- *        uint16 chwall_max_types;
- *        uint16 chwall_max_ssidrefs;
- *        uint16 chwall_max_conflictsets;
- *        uint16 chwall_ssid_offset;
- *        uint16 chwall_conflict_sets_offset;
- *        uint16 chwall_running_types_offset;
- *        uint16 chwall_conflict_aggregate_offset;
- *	} acm_chwall_policy_buffer_t;
+ * struct acm_chwall_policy_buffer {
+ *	u32 policy_version; * ACM_CHWALL_VERSION *
+ *	u32 policy_code;
+ *	u32 chwall_max_types;
+ *	u32 chwall_max_ssidrefs;
+ *	u32 chwall_max_conflictsets;
+ *	u32 chwall_ssid_offset;
+ *	u32 chwall_conflict_sets_offset;
+ *	u32 chwall_running_types_offset;
+ *	u32 chwall_conflict_aggregate_offset;
+ * };
  *
  *	typedef struct {
  *	u16 partition_max;
@@ -100,16 +100,17 @@ public interface XmlToBinInterface
   final int u16Size = 2;
 
   /* num of bytes for acm_ste_policy_buffer_t */
-  final short steHeaderSize = (4 * u16Size); 
+  final int steHeaderSize = (5 * u32Size);
+
   /* byte for acm_chinese_wall_policy_buffer_t */
-  final short chwHeaderSize = (8 * u16Size); 
+  final int chwHeaderSize = (9 * u32Size);
 
-  final short primaryPolicyCodeSize = u16Size;
-  final short primaryBufferOffsetSize = u16Size ;
+  final int primaryPolicyCodeSize = u32Size;
+  final int primaryBufferOffsetSize = u32Size ;
 
-  final int secondaryPolicyCodeSz = u16Size;
-  final int secondaryBufferOffsetSz = u16Size;
-  final short resourceOffsetSz = u16Size;
+  final int secondaryPolicyCodeSz = u32Size;
+  final int secondaryBufferOffsetSz = u32Size;
+  final int resourceOffsetSz = u32Size;
 
   final short partitionBufferSz = (2 * u16Size);
   final short partitionEntrySz = (3 * u16Size);
@@ -120,16 +121,18 @@ public interface XmlToBinInterface
   final short vlanBufferSz = (2 * u16Size);
   final short vlanEntrySz = (2 * u16Size);
 
-  final short binaryBufferHeaderSz = (3 * u32Size + 4* u16Size);
-
-  /* copied directlty from policy_ops.h */
-  final int POLICY_INTERFACE_VERSION = 0xAAAA0003;
+  final int binaryBufferHeaderSz = (8 * u32Size); /* 8th not used in Xen */
 
   /* copied directly from acm.h */
   final int ACM_MAGIC  =  0x0001debc;
-  final short ACM_NULL_POLICY = 0;
-  final short ACM_CHINESE_WALL_POLICY = 1;
-  final short ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY = 2;
-  final short ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY = 3;
-  final short ACM_EMPTY_POLICY = 4;
+  final int ACM_NULL_POLICY = 0;
+  final int ACM_CHINESE_WALL_POLICY = 1;
+  final int ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY = 2;
+  final int ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY = 3;
+  final int ACM_EMPTY_POLICY = 4;
+
+  /* version for compatibility check */
+  final int ACM_POLICY_VERSION = 1;
+  final int ACM_STE_VERSION    = 1;
+  final int ACM_CHWALL_VERSION = 1;
 }

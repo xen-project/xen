@@ -21,7 +21,7 @@
 #include <xen/spinlock.h>
 #include <public/acm.h>
 #include <xen/acm_policy.h>
-#include <public/policy_ops.h>
+#include <public/acm_ops.h>
 
 /* Xen-internal representation of the binary policy */
 struct acm_binary_policy {
@@ -113,7 +113,7 @@ struct ste_ssid {
 /* protos */
 int acm_init_domain_ssid(domid_t id, ssidref_t ssidref);
 int acm_free_domain_ssid(struct acm_ssid_domain *ssid);
-int acm_set_policy(void *buf, u16 buf_size, u16 policy, int isuserbuffer);
+int acm_set_policy(void *buf, u16 buf_size, int isuserbuffer);
 int acm_get_policy(void *buf, u16 buf_size);
 int acm_dump_statistics(void *buf, u16 buf_size);
 

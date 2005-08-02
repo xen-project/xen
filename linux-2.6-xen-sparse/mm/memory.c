@@ -1814,12 +1814,12 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		page_add_anon_rmap(page, vma, addr);
 	}
 
-	set_pte_at(vma, addr, page_table, entry);
+	set_pte_at(mm, addr, page_table, entry);
 	pte_unmap(page_table);
 
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, addr, entry);
- 	lazy_mmu_prot_update(entry);
+	lazy_mmu_prot_update(entry);
 	spin_unlock(&mm->page_table_lock);
 out:
 	return VM_FAULT_MINOR;
@@ -1928,7 +1928,7 @@ retry:
 		entry = mk_pte(new_page, vma->vm_page_prot);
 		if (write_access)
 			entry = maybe_mkwrite(pte_mkdirty(entry), vma);
-		set_pte_at(vma, address, page_table, entry);
+		set_pte_at(mm, address, page_table, entry);
 		if (anon) {
 			lru_cache_add_active(new_page);
 			page_add_anon_rmap(new_page, vma, address);
