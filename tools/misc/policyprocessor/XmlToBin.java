@@ -5,6 +5,9 @@
  *
  * Author: Ray Valdez
  *
+ * Contributors:
+ *         Reiner Sailer - adjust type-lengths
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, version 2 of the
@@ -490,175 +493,139 @@ public class XmlToBin
 	
 
   try {
-	/* Write magic */
-	writeIntToStream(binBuffer,ACM_MAGIC,index);
-	index = u32Size;
+	  index = 0;
+	  /* fill in General Policy Version */
+	  writeIntToStream(binBuffer, ACM_POLICY_VERSION, index);
+	  index += u32Size;
 
-	/* Write policy version */
-	writeIntToStream(binBuffer,POLICY_INTERFACE_VERSION,index);
-  	index = index + u32Size;
+	  /* Write magic */
+	  writeIntToStream(binBuffer, ACM_MAGIC, index);
+	  index += u32Size;
 
-	/* write len */
-	writeIntToStream(binBuffer,binBuffer.length,index);
-  	index = index + u32Size;
+	  /* write len */
+	  writeIntToStream(binBuffer, binBuffer.length, index);
+	  index += u32Size;
 
   } catch (IOException ee) {
-    	System.out.println(" GBPB:: got exception : " + ee); 
-	return null;
+	  System.out.println(" GBPB:: got exception : " + ee);
+	  return null;
   }
 
   int offset, address;
   address = index;
 
   if (null != partMap) 
-	offset = binaryBufferHeaderSz + resourceOffsetSz; 
+	  offset = binaryBufferHeaderSz + resourceOffsetSz;
   else
-	offset = binaryBufferHeaderSz; 
+	  offset = binaryBufferHeaderSz;
 
   try {
+	  int skip = 0;
 
-	if (null == chwPolicy || null == stePolicy) 
-	{
-	  writeShortToStream(binBuffer,ACM_NULL_POLICY,index);
-  	  index = index + u16Size;
-
-	  writeShortToStream(binBuffer,(short) 0,index);
-  	  index = index + u16Size;
-
-	  writeShortToStream(binBuffer,ACM_NULL_POLICY,index);
-  	  index = index + u16Size;
-
-	  writeShortToStream(binBuffer,(short) 0,index);
-  	  index = index + u16Size;
-
-	}
-    	index = address;
-	if (null != chwPolicy) 
-	{
+	  /* init with NULL policy setting */
+	  writeIntToStream(binBuffer, ACM_NULL_POLICY, index);
+	  writeIntToStream(binBuffer, 0, index + u32Size);
+	  writeIntToStream(binBuffer, ACM_NULL_POLICY, index + 2*u32Size);
+	  writeIntToStream(binBuffer, 0, index + 3*u32Size);
 	  
-	  /* Write policy name */
-	  writeShortToStream(binBuffer,ACM_CHINESE_WALL_POLICY,index);
-  	  index = index + u16Size;
-
-	  /* Write offset */
-	  writeShortToStream(binBuffer,(short) offset,index);
-  	  index = index + u16Size;
-
-	  /* Write payload. No need increment index */
-	  address = offset;
-	  System.arraycopy(chwPolicy, 0, binBuffer,address, chwPolicy.length);
-	  address = address + chwPolicy.length;
-	  
-	  if (null != stePolicy) 
-	  {	
-	  	/* Write policy name */
-	  	writeShortToStream(binBuffer,ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY,index);
-  	  	index = index + u16Size;
-
-	  	/* Write offset */
-	  	writeShortToStream(binBuffer,(short) address,index);
-  	  	index = index + u16Size;
-
-		/* Copy array */
-	  	System.arraycopy(stePolicy, 0, binBuffer,address, stePolicy.length);
-		/* Update address */
-		address = address + stePolicy.length;
-	  } else {
-	  	/* Skip writing policy name and offset */
-  	  	index = index +  2 * u16Size;
-
-          }
-
-	} else {
-
-	  if (null != stePolicy) 
-	  {	
-	  	/* Write policy name */
-	  	writeShortToStream(binBuffer,ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY,index);
-  	  	index = index + u16Size;
-
-	  	/* Write offset */
-		address = offset;
-	  	writeShortToStream(binBuffer, (short) offset,index);
-  	  	index = index + u16Size;
-		
-		/* Copy array */
-	  	System.arraycopy(stePolicy, 0, binBuffer,address, stePolicy.length);
-		/* Update address */
-		address = address + stePolicy.length;
-
-		/* Increment index, since there is no secondary */
-  	  	index = index + secondaryPolicyCodeSz + secondaryBufferOffsetSz;
-		
-	  } 
-
-	}
-   	int size;
-	/* Assumes that you will always have a partition defined in policy */ 
-	if ( 0 < partMap.length)
-	{
-	  writeShortToStream(binBuffer, (short) address,index);
 	  index = address;
-
-	  /* Compute num of VMs */
-	  size = partMap.length / (3 * u16Size);
-
-	  writeShortToStream(binBuffer, (short)size,index);
-  	  index = index + u16Size;
-
-	  /* part, vlan and slot: each one consists of two entries */
-	  offset = 3 * (2 * u16Size); 
-	  writeShortToStream(binBuffer, (short) offset,index);
-
-	  /* Write partition array at offset */
-	  System.arraycopy(partMap, 0, binBuffer,(offset + address), partMap.length);
-  	  index = index + u16Size;
-	  offset = offset + partMap.length;
-	}
-
-	if ( 0 < vlanMap.length)
-	{
-	  size = vlanMap.length / (2 * u16Size);
-	  writeShortToStream(binBuffer, (short) size,index);
-  	  index = index + u16Size;
-
-	  writeShortToStream(binBuffer, (short) offset,index);
-  	  index = index + u16Size;
-	  System.arraycopy(vlanMap, 0, binBuffer,(offset + address), vlanMap.length);
-	} else {
-	  /* Write vlan max */
-	  writeShortToStream(binBuffer, (short) 0,index);
-  	  index = index + u16Size;
- 
-	  /* Write vlan offset */
-	  writeShortToStream(binBuffer, (short) 0,index);
-  	  index = index + u16Size;
+	  if (null != chwPolicy) {
 	  
-   	}
+		  /* Write policy name */
+		  writeIntToStream(binBuffer, ACM_CHINESE_WALL_POLICY, index);
+		  index += u32Size;
 
-	offset = offset + vlanMap.length;
-	if ( 0 < slotMap.length)
-	{
-	  size = slotMap.length / (3 * u16Size);
-	  writeShortToStream(binBuffer, (short) size,index);
-  	  index = index + u16Size;
+		  /* Write offset */
+		  writeIntToStream(binBuffer, offset, index);
+		  index += u32Size;
 
-	  writeShortToStream(binBuffer, (short) offset,index);
-  	  index = index + u16Size;
-	  System.arraycopy(slotMap, 0, binBuffer,(offset + address), slotMap.length);
-	}
+		  /* Write payload. No need increment index */
+		  address = offset;
+		  System.arraycopy(chwPolicy, 0, binBuffer,address, chwPolicy.length);
+		  address = address + chwPolicy.length;
+	  } else
+		  skip += 2*u32Size;
 
-     } catch (IOException ee)
-    {
-    	System.out.println(" GBPB:: got exception : " + ee); 
-	return null; 
-    }
+	  if (null != stePolicy) 
+	  {	
+	  	/* Write policy name */
+	  	writeIntToStream(binBuffer, ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, index);
+  	  	index += u32Size;
 
-    printDebug(" GBP:: Binary Policy ==> length " + binBuffer.length); 
-    if (debug) 
-   	printHex(binBuffer,binBuffer.length);
+	  	/* Write offset */
+	  	writeIntToStream(binBuffer, address, index);
+  	  	index += u32Size;
 
-   return  binBuffer;   
+		/* Copy array */
+	  	System.arraycopy(stePolicy, 0, binBuffer,address, stePolicy.length);
+		/* Update address */
+		address = address + stePolicy.length;
+	  } else
+		 skip += 2*u32Size;
+
+	  /* Skip writing policy name and offset for each null policy*/
+	  index +=  skip;
+
+	  int size;
+	  /* Assumes that you will always have a partition defined in policy */
+	  if ( 0 < partMap.length) {
+		  writeIntToStream(binBuffer, address, index);
+		  index = address;
+
+		  /* Compute num of VMs */
+		  size = partMap.length / (3 * u16Size);
+
+		  writeShortToStream(binBuffer, (short)size,index);
+		  index = index + u16Size;
+
+		  /* part, vlan and slot: each one consists of two entries */
+		  offset = 3 * (2 * u16Size);
+		  writeShortToStream(binBuffer, (short) offset,index);
+
+		  /* Write partition array at offset */
+		  System.arraycopy(partMap, 0, binBuffer,(offset + address), partMap.length);
+		  index = index + u16Size;
+		  offset = offset + partMap.length;
+	  }
+
+	  if ( 0 < vlanMap.length) {
+		  size = vlanMap.length / (2 * u16Size);
+		  writeShortToStream(binBuffer, (short) size,index);
+		  index = index + u16Size;
+
+		  writeShortToStream(binBuffer, (short) offset,index);
+		  index = index + u16Size;
+		  System.arraycopy(vlanMap, 0, binBuffer,(offset + address), vlanMap.length);
+	  } else {
+		  /* Write vlan max */
+		  writeShortToStream(binBuffer, (short) 0,index);
+		  index = index + u16Size;
+ 
+		  /* Write vlan offset */
+		  writeShortToStream(binBuffer, (short) 0,index);
+		  index = index + u16Size;
+	  }
+
+	  offset = offset + vlanMap.length;
+	  if ( 0 < slotMap.length) {
+		  size = slotMap.length / (3 * u16Size);
+		  writeShortToStream(binBuffer, (short) size,index);
+		  index = index + u16Size;
+
+		  writeShortToStream(binBuffer, (short) offset,index);
+		  index = index + u16Size;
+		  System.arraycopy(slotMap, 0, binBuffer,(offset + address), slotMap.length);
+	  }
+  } catch (IOException ee) {
+	  System.out.println(" GBPB:: got exception : " + ee);
+	  return null;
+  }
+
+  printDebug(" GBP:: Binary Policy ==> length " + binBuffer.length);
+  if (debug)
+	  printHex(binBuffer,binBuffer.length);
+
+  return  binBuffer;
  } 
 
  public  byte[] generateChwBuffer(Vector Ssids, Vector ConflictSsids, Vector ColorTypes)
@@ -668,28 +635,20 @@ public class XmlToBin
   int position = 0;
 
   /* Get number of rTypes */
-  short maxTypes = (short) ColorTypes.size();
+  int maxTypes = ColorTypes.size();
 
   /* Get number of SSids entry */
-  short maxSsids = (short) Ssids.size();
+  int maxSsids = Ssids.size();
 
   /* Get number of conflict sets */
-  short maxConflict = (short) ConflictSsids.size();
+  int maxConflict = ConflictSsids.size();
 
    
   if (maxTypes * maxSsids == 0)
 	return null; 
   /*
-     data structure acm_chwall_policy_buffer_t;
-    
-     uint16 policy_code;
-     uint16 chwall_max_types;
-     uint16 chwall_max_ssidrefs;
-     uint16 chwall_max_conflictsets;
-     uint16 chwall_ssid_offset;
-     uint16 chwall_conflict_sets_offset;
-     uint16 chwall_running_types_offset;
-     uint16 chwall_conflict_aggregate_offset;
+     data structure acm_chwall_policy_buffer
+     se XmlToBinInterface.java
   */
   int totalBytes = chwHeaderSize  + u16Size *(maxTypes * (maxSsids + maxConflict)); 
 
@@ -699,34 +658,38 @@ public class XmlToBin
   printDebug(" gCB:: chwall totalbytes : "+totalBytes); 
 
   try {
-	index = 0;
-	writeShortToStream(chwBuffer,ACM_CHINESE_WALL_POLICY,index);
-	index = u16Size; 
+	  index = 0;
+	  /* fill in General Policy Version */
+	  writeIntToStream(chwBuffer, ACM_CHWALL_VERSION, index);
+	  index += u32Size;
 
-	writeShortToStream(chwBuffer,maxTypes,index);
-	index = index + u16Size; 
+	  writeIntToStream(chwBuffer, ACM_CHINESE_WALL_POLICY, index);
+	  index += u32Size;
 
-	writeShortToStream(chwBuffer,maxSsids,index);
-	index = index + u16Size; 
+	  writeIntToStream(chwBuffer, maxTypes, index);
+	  index += u32Size;
 
-	writeShortToStream(chwBuffer,maxConflict,index);
-	index = index + u16Size; 
+	  writeIntToStream(chwBuffer, maxSsids, index);
+	  index += u32Size;
 
-        /*  Write chwall_ssid_offset */
-	writeShortToStream(chwBuffer,chwHeaderSize,index);
-	index = index + u16Size; 
+	  writeIntToStream(chwBuffer, maxConflict, index);
+	  index += u32Size;
 
-	/* Write chwall_conflict_sets_offset */
-	writeShortToStream(chwBuffer,(short) address,index);
-	index = index + u16Size; 
+	  /*  Write chwall_ssid_offset */
+	  writeIntToStream(chwBuffer, chwHeaderSize, index);
+	  index += u32Size;
 
-	/*  Write chwall_running_types_offset */
-	writeShortToStream(chwBuffer,(short) 0,index);
-	index = index + u16Size; 
+	  /* Write chwall_conflict_sets_offset */
+	  writeIntToStream(chwBuffer, address, index);
+	  index += u32Size;
 
-	/*  Write chwall_conflict_aggregate_offset */
-	writeShortToStream(chwBuffer,(short) 0,index);
-	index = index + u16Size; 
+	  /*  Write chwall_running_types_offset */
+	  writeIntToStream(chwBuffer, 0, index);
+	  index += u32Size;
+
+	  /*  Write chwall_conflict_aggregate_offset */
+	  writeIntToStream(chwBuffer, 0, index);
+	  index += u32Size;
 
   } catch (IOException ee) {
     	System.out.println(" gCB:: got exception : " + ee); 
@@ -737,7 +700,6 @@ public class XmlToBin
   /* Create the SSids entry */
   for (int i = 0; i < maxSsids; i++)
   {
-	
 	SecurityLabel ssidEntry = (SecurityLabel) Ssids.elementAt(i);
    	/* Get chwall types */
 	ssidEntry.chwSsidPosition = i;
@@ -821,22 +783,16 @@ public class XmlToBin
   int position = 0;
 
   /* Get number of colorTypes */
-  short numColorTypes = (short) ColorTypes.size();
+  int numColorTypes = ColorTypes.size();
 
   /* Get number of SSids entry */
-  short numSsids = (short) Ssids.size();
+  int numSsids = Ssids.size();
    
   if (numColorTypes * numSsids == 0)
 	return null; 
 
-  /* data structure: acm_ste_policy_buffer_t
-   * 
-   * policy code  (uint16)    >
-   *  max_types    (uint16)    >
-   * max_ssidrefs (uint16)    >  steHeaderSize
-   * ssid_offset  (uint16)    >
-   * DATA 	(colorTypes(size) * Ssids(size) *unit16)
-   * 
+  /* data structure: acm_ste_policy_buffer
+   * see XmlToBinInterface.java
    * total bytes: steHeaderSize * 2B + colorTypes(size) * Ssids(size)
    * 
   */
@@ -844,18 +800,22 @@ public class XmlToBin
 
   try {
 	
-	index = 0;
-	writeShortToStream(steBuffer,ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY,index);
-	index = u16Size; 
+	  index = 0;
+	  writeIntToStream(steBuffer, ACM_STE_VERSION, index);
+	  index += u32Size;
 
-	writeShortToStream(steBuffer,numColorTypes,index);
-	index = index + u16Size; 
+	  writeIntToStream(steBuffer, ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, index);
+	  index += u32Size;
 
-	writeShortToStream(steBuffer,numSsids,index);
-	index = index + u16Size; 
+	  writeIntToStream(steBuffer, numColorTypes, index);
+	  index += u32Size;
 
-	writeShortToStream(steBuffer,(short)steHeaderSize,index);
-	index = index + u16Size; 
+	  writeIntToStream(steBuffer, numSsids, index);
+	  index += u32Size;
+
+	  writeIntToStream(steBuffer, steHeaderSize, index);
+	  index += u32Size;
+
 
   } catch (IOException ee) {
 	System.out.println(" gSB:: got exception : " + ee); 
@@ -1468,6 +1428,17 @@ public class XmlToBin
   String xenSsidConfOutputFileName = null; 	
 
   XmlToBin genObj = new XmlToBin(); 
+
+  policy_version active_policy = new policy_version();
+
+  if ((active_policy.ACM_POLICY_VERSION != ACM_POLICY_VERSION) ||
+      (active_policy.ACM_CHWALL_VERSION != ACM_CHWALL_VERSION) ||
+      (active_policy.ACM_STE_VERSION != ACM_STE_VERSION)) {
+	  System.out.println("ACM policy versions differ.");
+	  System.out.println("Please verify that data structures are correct");
+	  System.out.println("and then adjust the version numbers in XmlToBinInterface.java.");
+	  return;
+  }
 
 
   for (int i = 0 ; i < args.length ; i++) {

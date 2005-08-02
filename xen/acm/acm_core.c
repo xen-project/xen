@@ -120,7 +120,6 @@ acm_setup(unsigned int *initrdidx,
         if (ntohl(pol->magic) == ACM_MAGIC) {
             rc = acm_set_policy((void *)_policy_start,
                                 (u16)_policy_len,
-                                ACM_USE_SECURITY_POLICY,
                                 0);
             if (rc == ACM_OK) {
                 printf("Policy len  0x%lx, start at %p.\n",_policy_len,_policy_start);

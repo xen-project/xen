@@ -110,45 +110,45 @@ chwall_dump_policy(u8 *buf, u16 buf_size) {
      struct acm_chwall_policy_buffer *chwall_buf = (struct acm_chwall_policy_buffer *)buf;
      int ret = 0;
 
-     chwall_buf->chwall_max_types = htons(chwall_bin_pol.max_types);
-     chwall_buf->chwall_max_ssidrefs = htons(chwall_bin_pol.max_ssidrefs);
-     chwall_buf->policy_code = htons(ACM_CHINESE_WALL_POLICY);
-     chwall_buf->chwall_ssid_offset = htons(sizeof(struct acm_chwall_policy_buffer));
-     chwall_buf->chwall_max_conflictsets = htons(chwall_bin_pol.max_conflictsets);
+     chwall_buf->chwall_max_types = htonl(chwall_bin_pol.max_types);
+     chwall_buf->chwall_max_ssidrefs = htonl(chwall_bin_pol.max_ssidrefs);
+     chwall_buf->policy_code = htonl(ACM_CHINESE_WALL_POLICY);
+     chwall_buf->chwall_ssid_offset = htonl(sizeof(struct acm_chwall_policy_buffer));
+     chwall_buf->chwall_max_conflictsets = htonl(chwall_bin_pol.max_conflictsets);
      chwall_buf->chwall_conflict_sets_offset =
-	     htons(
-		   ntohs(chwall_buf->chwall_ssid_offset) + 
+	     htonl(
+		   ntohl(chwall_buf->chwall_ssid_offset) +
 		   sizeof(domaintype_t) * chwall_bin_pol.max_ssidrefs * 
 		   chwall_bin_pol.max_types);
 
      chwall_buf->chwall_running_types_offset = 
-	     htons(
-		   ntohs(chwall_buf->chwall_conflict_sets_offset) +
+	     htonl(
+		   ntohl(chwall_buf->chwall_conflict_sets_offset) +
 		   sizeof(domaintype_t) * chwall_bin_pol.max_conflictsets *
 		   chwall_bin_pol.max_types);
 
      chwall_buf->chwall_conflict_aggregate_offset =
-	     htons(
-		   ntohs(chwall_buf->chwall_running_types_offset) +
+	     htonl(
+		   ntohl(chwall_buf->chwall_running_types_offset) +
 		   sizeof(domaintype_t) * chwall_bin_pol.max_types);
 
-     ret = ntohs(chwall_buf->chwall_conflict_aggregate_offset) +
+     ret = ntohl(chwall_buf->chwall_conflict_aggregate_offset) +
 	     sizeof(domaintype_t) * chwall_bin_pol.max_types;
 
      /* now copy buffers over */
-     arrcpy16((u16 *)(buf + ntohs(chwall_buf->chwall_ssid_offset)),
+     arrcpy16((u16 *)(buf + ntohl(chwall_buf->chwall_ssid_offset)),
 	      chwall_bin_pol.ssidrefs,
 	      chwall_bin_pol.max_ssidrefs * chwall_bin_pol.max_types);
 
-     arrcpy16((u16 *)(buf + ntohs(chwall_buf->chwall_conflict_sets_offset)),
+     arrcpy16((u16 *)(buf + ntohl(chwall_buf->chwall_conflict_sets_offset)),
 	      chwall_bin_pol.conflict_sets,
 	      chwall_bin_pol.max_conflictsets * chwall_bin_pol.max_types);
 
-     arrcpy16((u16 *)(buf + ntohs(chwall_buf->chwall_running_types_offset)),
+     arrcpy16((u16 *)(buf + ntohl(chwall_buf->chwall_running_types_offset)),
 	      chwall_bin_pol.running_types,
 	      chwall_bin_pol.max_types);
 
-     arrcpy16((u16 *)(buf + ntohs(chwall_buf->chwall_conflict_aggregate_offset)),
+     arrcpy16((u16 *)(buf + ntohl(chwall_buf->chwall_conflict_aggregate_offset)),
 	      chwall_bin_pol.conflict_aggregate_set,
 	      chwall_bin_pol.max_types);
      return ret;
@@ -226,14 +226,20 @@ chwall_set_policy(u8 *buf, u16 buf_size)
 	void *ssids = NULL, *conflict_sets = NULL, *running_types = NULL, *conflict_aggregate_set = NULL;	
 
         /* rewrite the policy due to endianess */
-        chwall_buf->policy_code                      = ntohs(chwall_buf->policy_code);
-        chwall_buf->chwall_max_types                 = ntohs(chwall_buf->chwall_max_types);
-        chwall_buf->chwall_max_ssidrefs              = ntohs(chwall_buf->chwall_max_ssidrefs);
-        chwall_buf->chwall_max_conflictsets          = ntohs(chwall_buf->chwall_max_conflictsets);
-        chwall_buf->chwall_ssid_offset               = ntohs(chwall_buf->chwall_ssid_offset);
-        chwall_buf->chwall_conflict_sets_offset      = ntohs(chwall_buf->chwall_conflict_sets_offset);
-        chwall_buf->chwall_running_types_offset      = ntohs(chwall_buf->chwall_running_types_offset);
-        chwall_buf->chwall_conflict_aggregate_offset = ntohs(chwall_buf->chwall_conflict_aggregate_offset);
+        chwall_buf->policy_code                      = ntohl(chwall_buf->policy_code);
+        chwall_buf->policy_version                   = ntohl(chwall_buf->policy_version);
+        chwall_buf->chwall_max_types                 = ntohl(chwall_buf->chwall_max_types);
+        chwall_buf->chwall_max_ssidrefs              = ntohl(chwall_buf->chwall_max_ssidrefs);
+        chwall_buf->chwall_max_conflictsets          = ntohl(chwall_buf->chwall_max_conflictsets);
+        chwall_buf->chwall_ssid_offset               = ntohl(chwall_buf->chwall_ssid_offset);
+        chwall_buf->chwall_conflict_sets_offset      = ntohl(chwall_buf->chwall_conflict_sets_offset);
+        chwall_buf->chwall_running_types_offset      = ntohl(chwall_buf->chwall_running_types_offset);
+        chwall_buf->chwall_conflict_aggregate_offset = ntohl(chwall_buf->chwall_conflict_aggregate_offset);
+
+	/* policy type and version checks */
+	if ((chwall_buf->policy_code != ACM_CHINESE_WALL_POLICY) ||
+	    (chwall_buf->policy_version != ACM_CHWALL_VERSION))
+		return -EINVAL;
 
 	/* 1. allocate new buffers */
 	ssids = xmalloc_array(domaintype_t, chwall_buf->chwall_max_types*chwall_buf->chwall_max_ssidrefs);
