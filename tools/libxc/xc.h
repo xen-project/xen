@@ -279,9 +279,12 @@ int xc_linux_save(int xc_handle, int fd, u32 dom);
  * @parm fd the file descriptor to restore a domain from
  * @parm dom the id of the domain
  * @parm nr_pfns the number of pages
+ * @parm store_evtchn the store event channel for this domain to use
+ * @parm store_mfn returned with the mfn of the store page
  * @return 0 on success, -1 on failure
  */
-int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns);
+int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
+		     unsigned int store_evtchn, unsigned long *store_mfn);
 
 int xc_linux_build(int xc_handle,
                    u32 domid,

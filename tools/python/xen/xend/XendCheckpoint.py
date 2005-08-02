@@ -6,6 +6,7 @@
 
 import errno
 import os
+import re
 import select
 import sxp
 from string import join
@@ -64,6 +65,13 @@ def save(xd, fd, dominfo):
                 if l.rstrip() == "suspend":
                     log.info("suspending %d" % dominfo.id)
                     xd.domain_shutdown(dominfo.id, reason='suspend')
+                    if dominfo.store_channel:
+                        try:
+                            dominfo.db.releaseDomain(dominfo.id)
+                        except Exception, ex:
+                            log.warning("error in domain release on xenstore: %s",
+                                        ex)
+                            pass
                     dominfo.state_wait("suspended")
                     log.info("suspend %d done" % dominfo.id)
                     child.tochild.write("done\n")
@@ -76,6 +84,11 @@ def save(xd, fd, dominfo):
     if child.wait() != 0:
         raise XendError("xc_save failed: %s" % lasterr)
 
+    if dominfo.store_channel:
+        dominfo.store_channel.close()
+        dominfo.db['store_channel'].delete()
+        dominfo.db.saveDB(save=True)
+        dominfo.store_channel = None
     xd.domain_destroy(dominfo.id)
     return None
 
@@ -107,8 +120,13 @@ def restore(xd, fd):
         raise XendError(
             "not a valid guest state file: pfn count out of range")
 
+    if dominfo.store_channel:
+        evtchn = dominfo.store_channel.port2
+    else:
+        evtchn = 0
+
     cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
-           str(dominfo.id), str(nr_pfns)]
+           str(dominfo.id), str(nr_pfns), str(evtchn)]
     log.info("[xc_restore] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     child.tochild.close()
@@ -128,7 +146,21 @@ def restore(xd, fd):
                 lasterr = l.rstrip()
             if fd == child.fromchild.fileno():
                 l = child.fromchild.readline()
-                log.info(l.rstrip())
+                while l:
+                    m = re.match(r"^(store-mfn) (\d+)\n$", l)
+                    if m:
+                        if dominfo.store_channel:
+                            dominfo.store_mfn = int(m.group(2))
+                            if dominfo.store_mfn >= 0:
+                                dominfo.db.introduceDomain(dominfo.id,
+                                                           dominfo.store_mfn,
+                                                           dominfo.store_channel)
+                            dominfo.exportToDB(save=True, sync=True))
+                    log.info(l.rstrip())
+                    try:
+                        l = child.fromchild.readline()
+                    except:
+                        l = None
         if filter(lambda (fd, event): event & select.POLLHUP, r):
             break
 

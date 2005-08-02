@@ -20,7 +20,7 @@
 #define DEBUG 0
 
 #if 1
-#define ERR(_f, _a...) fprintf ( stderr, _f , ## _a )
+#define ERR(_f, _a...) do { fprintf(stderr, _f , ## _a); fflush(stderr); } while (0)
 #else
 #define ERR(_f, _a...) ((void)0)
 #endif
@@ -643,6 +643,22 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
         goto out;
     }
 
+    /* Map the suspend-record MFN to pin it. The page must be owned by 
+       dom for this to succeed. */
+    p_srec = xc_map_foreign_range(xc_handle, dom,
+                                   sizeof(*p_srec), PROT_READ | PROT_WRITE, 
+                                   ctxt.user_regs.esi);
+    if (!p_srec){
+        ERR("Couldn't map suspend record");
+        goto out;
+    }
+
+    /* Canonicalize store mfn. */
+    if ( !translate_mfn_to_pfn(&p_srec->resume_info.store_mfn) ) {
+	ERR("Store frame is not in range of pseudophys map");
+	goto out;
+    }
+
     print_stats( xc_handle, dom, 0, &stats, 0 );
 
     /* Now write out each data page, canonicalising page tables as we go... */
@@ -981,16 +997,6 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
 		j = 0;
 	    }
 	}
-    }
-
-    /* Map the suspend-record MFN to pin it. The page must be owned by 
-       dom for this to succeed. */
-    p_srec = xc_map_foreign_range(xc_handle, dom,
-                                   sizeof(*p_srec), PROT_READ, 
-                                   ctxt.user_regs.esi);
-    if (!p_srec){
-        ERR("Couldn't map suspend record");
-        goto out;
     }
 
     if (nr_pfns != p_srec->nr_pfns )

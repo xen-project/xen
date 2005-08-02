@@ -16,6 +16,7 @@ static int errno;
 #include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/linux-public/suspend.h>
 #include <asm-xen/queues.h>
+#include <asm-xen/xenbus.h>
 
 void machine_restart(char * __unused)
 {
@@ -114,6 +115,8 @@ static void __do_suspend(void)
 
     time_suspend();
 
+    xenbus_suspend();
+
     ctrl_if_suspend();
 
     irq_suspend();
@@ -152,6 +155,8 @@ static void __do_suspend(void)
     irq_resume();
 
     ctrl_if_resume();
+
+    xenbus_resume();
 
     time_resume();
 
