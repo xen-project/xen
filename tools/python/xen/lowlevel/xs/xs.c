@@ -254,11 +254,11 @@ static PyObject *xspy_get_permissions(PyObject *self, PyObject *args,
     val = PyList_New(perms_n);
     for (i = 0; i < perms_n; i++, perms++) {
         PyObject *p = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i}",
-                                    "dom",    perms->id,
-                                    "read",   (perms->perms & XS_PERM_READ),
-                                    "write",  (perms->perms & XS_PERM_WRITE),
-                                    "create", (perms->perms & XS_PERM_CREATE),
-                                    "owner",  (perms->perms & XS_PERM_OWNER));
+                                    "dom",   perms->id,
+                                    "read",  (perms->perms & XS_PERM_READ),
+                                    "write", (perms->perms & XS_PERM_WRITE),
+                                    "exist", (perms->perms & XS_PERM_ENOENT_OK),
+                                    "owner", (perms->perms & XS_PERM_OWNER));
         PyList_SetItem(val, i, p);
     }
  exit:
