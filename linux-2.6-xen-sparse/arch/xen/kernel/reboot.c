@@ -91,6 +91,10 @@ static void __do_suspend(void)
 #define gnttab_resume()  do{}while(0)
 #endif
 
+#ifdef CONFIG_SMP
+    extern void smp_suspend(void);
+    extern void smp_resume(void);
+#endif
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
@@ -114,6 +118,10 @@ static void __do_suspend(void)
     blkdev_suspend();
 
     time_suspend();
+
+#ifdef CONFIG_SMP
+    smp_suspend();
+#endif
 
     xenbus_suspend();
 
@@ -157,6 +165,10 @@ static void __do_suspend(void)
     ctrl_if_resume();
 
     xenbus_resume();
+
+#ifdef CONFIG_SMP
+    smp_resume();
+#endif
 
     time_resume();
 
