@@ -15,7 +15,12 @@
 #include <xen/serial.h>
 #include <asm/io.h>
 
-/* Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
+/*
+ * Configure serial port with a string <baud>,DPS,<io-base>,<irq>.
+ * The tail of the string can be omitted if platform defaults are sufficient.
+ * If the baud rate is pre-configured, perhaps by a bootloader, then 'auto'
+ * can be specified in place of a numeric baud rate.
+ */
 static char opt_com1[30] = "", opt_com2[30] = "";
 string_param("com1", opt_com1);
 string_param("com2", opt_com2);
@@ -154,7 +159,7 @@ static void ns16550_init_preirq(struct serial_port *port)
     ns_write_reg(uart, IER, 0);
 
     /* Line control and baud-rate generator. */
-    if ( uart->baud != 0 )
+    if ( uart->baud != BAUD_AUTO )
     {
         ns_write_reg(uart, LCR, lcr | LCR_DLAB);
         ns_write_reg(uart, DLL, 115200/uart->baud); /* baud lo */
@@ -244,38 +249,50 @@ static void ns16550_parse_port_config(struct ns16550 *uart, char *conf)
 {
     int baud;
 
+    /* No user-specified configuration? */
     if ( (conf == NULL) || (*conf == '\0') )
-        goto config_parsed;
+    {
+        /* Some platforms may automatically probe the UART configuartion. */
+        if ( uart->baud != 0 )
+            goto config_parsed;
+        return;
+    }
 
-    if ( (baud = simple_strtol(conf, &conf, 10)) != 0 )
+    if ( strncmp(conf, "auto", 4) == 0 )
+    {
+        uart->baud = BAUD_AUTO;
+        conf += 4;
+    }
+    else if ( (baud = simple_strtoul(conf, &conf, 10)) != 0 )
         uart->baud = baud;
 
     if ( *conf != ',' )
         goto config_parsed;
     conf++;
 
-    uart->data_bits = simple_strtol(conf, &conf, 10);
+    uart->data_bits = simple_strtoul(conf, &conf, 10);
 
     uart->parity = parse_parity_char(*conf);
     conf++;
 
-    uart->stop_bits = simple_strtol(conf, &conf, 10);
+    uart->stop_bits = simple_strtoul(conf, &conf, 10);
 
     if ( *conf == ',' )
     {
         conf++;
-        uart->io_base = simple_strtol(conf, &conf, 0);
+        uart->io_base = simple_strtoul(conf, &conf, 0);
 
         if ( *conf == ',' )
         {
             conf++;
-            uart->irq = simple_strtol(conf, &conf, 10);
+            uart->irq = simple_strtoul(conf, &conf, 10);
         }
     }
 
  config_parsed:
     /* Sanity checks. */
-    if ( (uart->baud != 0) && ((uart->baud < 1200) || (uart->baud > 115200)) )
+    if ( (uart->baud != BAUD_AUTO) &&
+         ((uart->baud < 1200) || (uart->baud > 115200)) )
         PARSE_ERR("Baud rate %d outside supported range.", uart->baud);
     if ( (uart->data_bits < 5) || (uart->data_bits > 8) )
         PARSE_ERR("%d data bits are unsupported.", uart->data_bits);

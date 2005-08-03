@@ -113,8 +113,9 @@ void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs);
 /*
  * Initialisers for individual uart drivers.
  */
+/* NB. Any default value can be 0 if it is unknown and must be specified. */
 struct ns16550_defaults {
-    int baud;      /* default baud rate; 0 == pre-configured */
+    int baud;      /* default baud rate; BAUD_AUTO == pre-configured */
     int data_bits; /* default data bits (5, 6, 7 or 8) */
     int parity;    /* default parity (n, o, e, m or s) */
     int stop_bits; /* default stop bits (1 or 2) */
@@ -122,6 +123,9 @@ struct ns16550_defaults {
     unsigned long io_base; /* default io_base address */
 };
 void ns16550_init(int index, struct ns16550_defaults *defaults);
+
+/* Baud rate was pre-configured before invoking the UART driver. */
+#define BAUD_AUTO (-1)
 
 #endif /* __XEN_SERIAL_H__ */
 

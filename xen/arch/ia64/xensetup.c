@@ -131,12 +131,14 @@ void early_cmdline_parse(char **cmdline_p)
 }
 
 struct ns16550_defaults ns16550_com1 = {
+    .baud      = BAUD_AUTO,
     .data_bits = 8,
     .parity    = 'n',
     .stop_bits = 1
 };
 
 struct ns16550_defaults ns16550_com2 = {
+    .baud      = BAUD_AUTO,
     .data_bits = 8,
     .parity    = 'n',
     .stop_bits = 1

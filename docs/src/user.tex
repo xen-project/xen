@@ -1709,8 +1709,11 @@ editing \path{grub.conf}.
  For example: `com1=9600, 8n1, 0x408, 5' maps COM1 to a
  9600-baud port, 8 data bits, no parity, 1 stop bit,
  I/O port base 0x408, IRQ 5.
- If the I/O base and IRQ are standard (com1:0x3f8,4;
- com2:0x2f8,3) then they need not be specified. 
+ If some configuration options are standard (e.g., I/O base and IRQ),
+ then only a prefix of the full configuration string need be
+ specified. If the baud rate is pre-configured (e.g., by the
+ bootloader) then you can specify `auto' in place of a numeric baud
+ rate. 
 
 \item [console=$<$specifier list$>$ ] 
  Specify the destination for Xen console I/O.
