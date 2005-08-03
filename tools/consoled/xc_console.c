@@ -126,7 +126,7 @@ static int console_loop(int xc_handle, domid_t domid, int fd)
 				return 0;
 			} 
 
-			if (len == 0 && len == -1) {
+			if (len == 0 || len == -1) {
 				if (len == -1 &&
 				    (errno == EINTR || errno == EAGAIN)) {
 					continue;

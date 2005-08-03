@@ -48,7 +48,7 @@ struct buffer
 	size_t max_capacity;
 };
 
-void buffer_append(struct buffer *buffer, const void *data, size_t size)
+static void buffer_append(struct buffer *buffer, const void *data, size_t size)
 {
 	if ((buffer->capacity - buffer->size) < size) {
 		buffer->capacity += (size + 1024);
@@ -71,12 +71,12 @@ void buffer_append(struct buffer *buffer, const void *data, size_t size)
 	}
 }
 
-bool buffer_empty(struct buffer *buffer)
+static bool buffer_empty(struct buffer *buffer)
 {
 	return buffer->size == 0;
 }
 
-void buffer_advance(struct buffer *buffer, size_t size)
+static void buffer_advance(struct buffer *buffer, size_t size)
 {
 	size = MIN(size, buffer->size);
 	memmove(buffer->data, buffer + size, buffer->size - size);
@@ -93,7 +93,7 @@ struct domain
 
 static struct domain *dom_head;
 
-bool domain_is_valid(int domid)
+static bool domain_is_valid(int domid)
 {
 	bool ret;
 	xc_dominfo_t info;
@@ -104,18 +104,21 @@ bool domain_is_valid(int domid)
 	return ret;
 }
 
-int domain_create_tty(int domid)
+static int domain_create_tty(struct domain *dom)
 {
 	char path[1024];
 	int master;
 
 	if ((master = getpt()) == -1 ||
 	    grantpt(master) == -1 || unlockpt(master) == -1) {
-		dolog(LOG_ERR, "Failed to create tty for domain-%d", domid);
+		dolog(LOG_ERR, "Failed to create tty for domain-%d",
+		      dom->domid);
 		master = -1;
 	} else {
 		const char *slave = ptsname(master);
 		struct termios term;
+		char *data;
+		unsigned int len;
 
 		if (tcgetattr(master, &term) != -1) {
 			cfmakeraw(&term);
@@ -123,22 +126,26 @@ int domain_create_tty(int domid)
 		}
 
 		xs_mkdir(xs, "/console");
-		snprintf(path, sizeof(path), "/console/%d", domid);
+		snprintf(path, sizeof(path), "/console/%d", dom->domid);
 		xs_mkdir(xs, path);
 		strcat(path, "/tty");
 
 		xs_write(xs, path, slave, strlen(slave), O_CREAT);
+
+		snprintf(path, sizeof(path), "/console/%d/limit", dom->domid);
+		data = xs_read(xs, path, &len);
+		if (data) {
+			dom->buffer.max_capacity = strtoul(data, 0, 0);
+			free(data);
+		}
 	}
 
 	return master;
 }
 
-struct domain *create_domain(int domid)
+static struct domain *create_domain(int domid)
 {
 	struct domain *dom;
-	char *data;
-	unsigned int len;
-	char path[1024];
 
 	dom = (struct domain *)malloc(sizeof(struct domain));
 	if (dom == NULL) {
@@ -148,25 +155,18 @@ struct domain *create_domain(int domid)
 	}
 
 	dom->domid = domid;
-	dom->tty_fd = domain_create_tty(domid);
+	dom->tty_fd = domain_create_tty(dom);
 	dom->buffer.data = 0;
 	dom->buffer.size = 0;
 	dom->buffer.capacity = 0;
 	dom->buffer.max_capacity = 0;
-
-	snprintf(path, sizeof(path), "/console/%d/limit", domid);
-	data = xs_read(xs, path, &len);
-	if (data) {
-		dom->buffer.max_capacity = strtoul(data, 0, 0);
-		free(data);
-	}
 
 	dolog(LOG_DEBUG, "New domain %d", domid);
 
 	return dom;
 }
 
-struct domain *lookup_domain(int domid)
+static struct domain *lookup_domain(int domid)
 {
 	struct domain **pp;
 
@@ -186,7 +186,7 @@ struct domain *lookup_domain(int domid)
 	return *pp;
 }
 
-void remove_domain(struct domain *dom)
+static void remove_domain(struct domain *dom)
 {
 	struct domain **pp;
 
@@ -197,13 +197,16 @@ void remove_domain(struct domain *dom)
 
 		if (dom->domid == d->domid) {
 			*pp = d->next;
+			if (d->buffer.data) {
+				free(d->buffer.data);
+			}
 			free(d);
 			break;
 		}
 	}
 }
 
-void handle_tty_read(struct domain *dom)
+static void handle_tty_read(struct domain *dom)
 {
 	ssize_t len;
 	xcs_msg_t msg;
@@ -219,7 +222,7 @@ void handle_tty_read(struct domain *dom)
 		close(dom->tty_fd);
 
 		if (domain_is_valid(dom->domid)) {
-			dom->tty_fd = domain_create_tty(dom->domid);
+			dom->tty_fd = domain_create_tty(dom);
 		} else {
 			remove_domain(dom);
 		}
@@ -235,7 +238,7 @@ void handle_tty_read(struct domain *dom)
 	}
 }
 
-void handle_tty_write(struct domain *dom)
+static void handle_tty_write(struct domain *dom)
 {
 	ssize_t len;
 
@@ -244,7 +247,7 @@ void handle_tty_write(struct domain *dom)
 		close(dom->tty_fd);
 
 		if (domain_is_valid(dom->domid)) {
-			dom->tty_fd = domain_create_tty(dom->domid);
+			dom->tty_fd = domain_create_tty(dom);
 		} else {
 			remove_domain(dom);
 		}
@@ -253,7 +256,7 @@ void handle_tty_write(struct domain *dom)
 	}
 }
 
-void handle_xcs_msg(int fd)
+static void handle_xcs_msg(int fd)
 {
 	xcs_msg_t msg;
 
