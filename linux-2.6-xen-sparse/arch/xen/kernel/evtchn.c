@@ -284,7 +284,7 @@ void unbind_ipi_from_irq(int ipi)
     evtchn_op_t op;
     int cpu    = smp_processor_id();
     int evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi];
-    int irq    = irq_to_evtchn[evtchn];
+    int irq    = evtchn_to_irq[evtchn];
 
     spin_lock(&irq_mapping_update_lock);
 

@@ -48,7 +48,8 @@ read_exact(int fd, void *buf, size_t count)
     return r;
 }
 
-int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
+int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
+		     unsigned int store_evtchn, unsigned long *store_mfn)
 {
     dom0_op_t op;
     int rc = 1, i, n, k;
@@ -464,10 +465,13 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
     }
     ctxt.user_regs.esi = mfn = pfn_to_mfn_table[pfn];
     p_srec = xc_map_foreign_range(
-        xc_handle, dom, PAGE_SIZE, PROT_WRITE, mfn);
+        xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
     p_srec->resume_info.nr_pages    = nr_pfns;
     p_srec->resume_info.shared_info = shared_info_frame << PAGE_SHIFT;
     p_srec->resume_info.flags       = 0;
+    *store_mfn = p_srec->resume_info.store_mfn   =
+	pfn_to_mfn_table[p_srec->resume_info.store_mfn];
+    p_srec->resume_info.store_evtchn = store_evtchn;
     munmap(p_srec, PAGE_SIZE);
 
     /* Uncanonicalise each GDT frame number. */

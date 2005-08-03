@@ -115,4 +115,8 @@ struct xenbus_watch
 int register_xenbus_watch(struct xenbus_watch *watch);
 void unregister_xenbus_watch(struct xenbus_watch *watch);
 
+/* Called from xen core code. */
+void xenbus_suspend(void);
+void xenbus_resume(void);
+
 #endif /* _ASM_XEN_XENBUS_H */

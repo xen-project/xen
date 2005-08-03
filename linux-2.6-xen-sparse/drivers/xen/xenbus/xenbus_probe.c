@@ -29,6 +29,7 @@
 
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xenbus.h>
+#include <asm-xen/balloon.h>
 #include <linux/kernel.h>
 #include <linux/err.h>
 #include <linux/string.h>
@@ -294,6 +295,19 @@ static struct xenbus_watch dev_watch = {
 	.node = "device",
 	.callback = dev_changed,
 };
+
+void xenbus_suspend(void)
+{
+	/* We keep lock, so no comms can happen as page moves. */
+	down(&xenbus_lock);
+	xb_suspend_comms();
+}
+
+void xenbus_resume(void)
+{
+	xb_init_comms();
+	up(&xenbus_lock);
+}
 
 /* called from a thread in privcmd/privcmd.c */
 int do_xenbus_probe(void *unused)

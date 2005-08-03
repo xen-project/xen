@@ -1529,7 +1529,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
 extern irqreturn_t smp_reschedule_interrupt(int, void *, struct pt_regs *);
 extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
 
-void __init smp_intr_init(void)
+void smp_intr_init(void)
 {
 	int cpu = smp_processor_id();
 
@@ -1545,4 +1545,29 @@ void __init smp_intr_init(void)
 	BUG_ON(request_irq(per_cpu(callfunc_irq, cpu),
 	                   smp_call_function_interrupt,
 	                   SA_INTERRUPT, callfunc_name[cpu], NULL));
+}
+
+static void smp_intr_exit(void)
+{
+	int cpu = smp_processor_id();
+
+	free_irq(per_cpu(resched_irq, cpu), NULL);
+	unbind_ipi_from_irq(RESCHEDULE_VECTOR);
+
+	free_irq(per_cpu(callfunc_irq, cpu), NULL);
+	unbind_ipi_from_irq(CALL_FUNCTION_VECTOR);
+}
+
+void smp_suspend(void)
+{
+	/* XXX todo: take down time and ipi's on all cpus */
+	local_teardown_timer_irq();
+	smp_intr_exit();
+}
+
+void smp_resume(void)
+{
+	/* XXX todo: restore time and ipi's on all cpus */
+	smp_intr_init();
+	local_setup_timer_irq();
 }

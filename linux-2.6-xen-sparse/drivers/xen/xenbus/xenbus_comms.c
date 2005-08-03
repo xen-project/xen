@@ -36,6 +36,8 @@
 #include <linux/err.h>
 #include "xenbus_comms.h"
 
+static unsigned int xb_irq;
+
 #define RINGBUF_DATASIZE ((PAGE_SIZE / 2) - sizeof(struct ringbuf_head))
 struct ringbuf_head
 {
@@ -202,14 +204,17 @@ int xb_read(void *data, unsigned len)
 	return 0;
 }
 
-/* Set up interrpt handler off store event channel. */
+/* Set up interrupt handler off store event channel. */
 int xb_init_comms(void)
 {
-	int err, irq;
+	int err;
 
-	irq = bind_evtchn_to_irq(xen_start_info.store_evtchn);
+	if (!xen_start_info.store_evtchn)
+		return 0;
 
-	err = request_irq(irq, wake_waiting, SA_SHIRQ, "xenbus", &xb_waitq);
+	xb_irq = bind_evtchn_to_irq(xen_start_info.store_evtchn);
+
+	err = request_irq(xb_irq, wake_waiting, 0, "xenbus", &xb_waitq);
 	if (err) {
 		printk(KERN_ERR "XENBUS request irq failed %i\n", err);
 		unbind_evtchn_from_irq(xen_start_info.store_evtchn);
@@ -221,4 +226,14 @@ int xb_init_comms(void)
 	       0, PAGE_SIZE);
 
 	return 0;
+}
+
+void xb_suspend_comms(void)
+{
+
+	if (!xen_start_info.store_evtchn)
+		return;
+
+	free_irq(xb_irq, &xb_waitq);
+	unbind_evtchn_from_irq(xen_start_info.store_evtchn);
 }

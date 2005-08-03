@@ -37,7 +37,7 @@ do {				  					\
  */
 #define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
 do {				  					  \
-	set_pte_at((__vma)>vm_mm, (__address), __ptep, __entry);	  \
+	set_pte_at((__vma)->vm_mm, (__address), __ptep, __entry);	  \
 	flush_tlb_page(__vma, __address);				  \
 } while (0)
 #endif

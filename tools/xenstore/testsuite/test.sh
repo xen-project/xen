@@ -14,7 +14,10 @@ run_test()
 	PID=`cat /tmp/pid`
 	rm /tmp/pid
     else
-	PID=`./xenstored_test --output-pid`
+	./xenstored_test --output-pid --trace-file=testsuite/tmp/trace --no-fork > /tmp/pid 2> testsuite/tmp/xenstored_errors &
+	while [ ! -s /tmp/pid ]; do sleep 0; done
+	PID=`cat /tmp/pid`
+	rm /tmp/pid
     fi
     if sh -e $2 $1; then
 	if [ -s testsuite/tmp/vgout ]; then

@@ -61,7 +61,6 @@ SUBDIRS += arch/xen/drivers/console
 SUBDIRS += arch/xen/drivers/evtchn
 SUBDIRS += arch/xen/drivers/blkif
 SUBDIRS += arch/xen/drivers/netif
-#SUBDIRS += arch/xen/drivers/usbif
 SUBDIRS += arch/xen/drivers/balloon
 ifdef CONFIG_XEN_PRIVILEGED_GUEST
 SUBDIRS += arch/xen/drivers/dom0 
@@ -72,7 +71,6 @@ CORE_FILES += arch/xen/drivers/evtchn/drv.o
 CORE_FILES += arch/xen/drivers/console/drv.o
 DRIVERS += arch/xen/drivers/blkif/drv.o
 DRIVERS += arch/xen/drivers/netif/drv.o
-DRIVERS += arch/xen/drivers/usbif/drv.o
 ifdef CONFIG_XEN_PRIVILEGED_GUEST
 CORE_FILES += arch/xen/drivers/dom0/drv.o
 endif

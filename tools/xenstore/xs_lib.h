@@ -30,7 +30,7 @@ enum xs_perm_type {
 	XS_PERM_READ = 1,
 	XS_PERM_WRITE = 2,
 	/* Internal use. */
-	XS_PERM_CREATE = 4,
+	XS_PERM_ENOENT_OK = 4,
 	XS_PERM_OWNER = 8,
 };
 

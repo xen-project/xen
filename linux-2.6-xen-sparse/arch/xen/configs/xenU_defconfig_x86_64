@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.12-xenU
-# Thu Jul  7 11:43:14 2005
+# Tue Aug  2 23:56:13 2005
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -15,6 +15,8 @@ CONFIG_NO_IDLE_HZ=y
 CONFIG_XEN_BLKDEV_GRANT=y
 CONFIG_XEN_BLKDEV_FRONTEND=y
 CONFIG_XEN_NETDEV_FRONTEND=y
+# CONFIG_XEN_NETDEV_GRANT_TX is not set
+# CONFIG_XEN_NETDEV_GRANT_RX is not set
 # CONFIG_XEN_NETDEV_FRONTEND_PIPELINED_TRANSMITTER is not set
 # CONFIG_XEN_BLKDEV_TAP is not set
 # CONFIG_XEN_SHADOW_MODE is not set

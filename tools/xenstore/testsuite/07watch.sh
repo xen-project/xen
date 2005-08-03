@@ -160,3 +160,22 @@ async 2 write /test3 create contents
 1 waitwatch' | ./xs_test 2>&1`" = "1:/test2/foo:token
 1:contents2
 1:waitwatch timeout" ]
+
+# We can watch something which doesn't exist.
+[ "`echo '1 watch /dir/subdir token
+2 mkdir /dir/subdir
+1 waitwatch' | ./xs_test 2>&1`" = "1:/dir/subdir:token" ]
+
+# If we don't have permission, we won't see event (rm).
+[ "`echo '1 setid 1
+1 watch /dir/subdir token
+setperm /dir 0 NONE
+rm /dir/subdir
+1 waitwatch' | ./xs_test 2>&1`" = "1:waitwatch timeout" ]
+
+# If we don't have permission, we won't see event (create).
+[ "`echo '1 setid 1
+1 watch /dir/subdir token
+mkdir /dir/subdir
+write /dir/subdir/entry create contents
+1 waitwatch' | ./xs_test 2>&1`" = "1:waitwatch timeout" ]
