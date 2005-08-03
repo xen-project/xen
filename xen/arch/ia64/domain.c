@@ -212,6 +212,10 @@ void arch_do_createdomain(struct vcpu *v)
 	 */
 
 	memset(d->shared_info, 0, PAGE_SIZE);
+	d->shared_info->vcpu_data[v->vcpu_id].arch.privregs = 
+			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+	printf("arch_vcpu_info=%p\n", d->shared_info->vcpu_data[0].arch.privregs);
+	memset(d->shared_info->vcpu_data[v->vcpu_id].arch.privregs, 0, PAGE_SIZE);
 	v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
 	/* Mask all events, and specific port will be unmasked
 	 * when customer subscribes to it.
@@ -232,8 +236,8 @@ void arch_do_createdomain(struct vcpu *v)
 	/* FIXME: This is identity mapped address for xenheap. 
 	 * Do we need it at all?
 	 */
-	d->xen_vastart = 0xf000000000000000;
-	d->xen_vaend = 0xf300000000000000;
+	d->xen_vastart = XEN_START_ADDR;
+	d->xen_vaend = XEN_END_ADDR;
 	d->arch.breakimm = 0x1000;
 }
 #else // CONFIG_VTI
@@ -252,12 +256,16 @@ void arch_do_createdomain(struct vcpu *v)
    		while (1);
 	}
 	memset(d->shared_info, 0, PAGE_SIZE);
+	d->shared_info->vcpu_data[0].arch.privregs = 
+			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+	printf("arch_vcpu_info=%p\n", d->shared_info->vcpu_data[0].arch.privregs);
+	memset(d->shared_info->vcpu_data[0].arch.privregs, 0, PAGE_SIZE);
 	v->vcpu_info = &(d->shared_info->vcpu_data[0]);
 
-	d->max_pages = (128*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
+	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
 	if ((d->arch.metaphysical_rr0 = allocate_metaphysical_rr0()) == -1UL)
 		BUG();
-	v->vcpu_info->arch.metaphysical_mode = 1;
+	VCPU(v, metaphysical_mode) = 1;
 	v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
 	v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
 #define DOMAIN_RID_BITS_DEFAULT 18
@@ -266,9 +274,9 @@ void arch_do_createdomain(struct vcpu *v)
 	v->arch.starting_rid = d->arch.starting_rid;
 	v->arch.ending_rid = d->arch.ending_rid;
 	// the following will eventually need to be negotiated dynamically
-	d->xen_vastart = 0xf000000000000000;
-	d->xen_vaend = 0xf300000000000000;
-	d->shared_info_va = 0xf100000000000000;
+	d->xen_vastart = XEN_START_ADDR;
+	d->xen_vaend = XEN_END_ADDR;
+	d->shared_info_va = SHAREDINFO_ADDR;
 	d->arch.breakimm = 0x1000;
 	v->arch.breakimm = d->arch.breakimm;
 
@@ -292,7 +300,15 @@ void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 
 	printf("arch_getdomaininfo_ctxt\n");
 	c->regs = *regs;
-	c->vcpu = v->vcpu_info->arch;
+	c->vcpu.evtchn_vector = v->vcpu_info->arch.evtchn_vector;
+#if 0
+	if (c->vcpu.privregs && copy_to_user(c->vcpu.privregs,
+			v->vcpu_info->arch.privregs, sizeof(mapped_regs_t))) {
+		printk("Bad ctxt address: 0x%lx\n", c->vcpu.privregs);
+		return -EFAULT;
+	}
+#endif
+
 	c->shared = v->domain->shared_info->arch;
 }
 
@@ -307,13 +323,20 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	regs->cr_ipsr |= 2UL << IA64_PSR_CPL0_BIT;
 	regs->ar_rsc |= (2 << 2); /* force PL2/3 */
 
-	v->vcpu_info->arch = c->vcpu;
+ 	v->vcpu_info->arch.evtchn_vector = c->vcpu.evtchn_vector;
+	if ( c->vcpu.privregs && copy_from_user(v->vcpu_info->arch.privregs,
+			   c->vcpu.privregs, sizeof(mapped_regs_t))) {
+	    printk("Bad ctxt address in arch_set_info_guest: 0x%lx\n", c->vcpu.privregs);
+	    return -EFAULT;
+	}
+
 	init_all_rr(v);
 
 	// this should be in userspace
-	regs->r28 = dom_fw_setup(v->domain,"nomca nosmp xencons=ttyS console=ttyS0",256L);  //FIXME
-	v->vcpu_info->arch.banknum = 1;
-	v->vcpu_info->arch.metaphysical_mode = 1;
+	regs->r28 = dom_fw_setup(v->domain,"nomca nosmp xencons=tty0 console=tty0 root=/dev/hda1",256L);  //FIXME
+	v->arch.domain_itm_last = -1L;
+ 	VCPU(v, banknum) = 1;
+ 	VCPU(v, metaphysical_mode) = 1;
 
 	v->domain->shared_info->arch = c->shared;
 	return 0;
@@ -325,6 +348,7 @@ int arch_set_info_guest(
     struct domain *d = v->domain;
     int i, rc, ret;
     unsigned long progress = 0;
+    shared_iopage_t *sp;
 
     if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
         return 0;
@@ -350,8 +374,17 @@ int arch_set_info_guest(
     /* FIXME: only support PMT table continuously by far */
     d->arch.pmt = __va(c->pt_base);
     d->arch.max_pfn = c->pt_max_pfn;
-    v->arch.arch_vmx.vmx_platform.shared_page_va = __va(c->share_io_pg);
-    memset((char *)__va(c->share_io_pg),0,PAGE_SIZE);
+    d->arch.vmx_platform.shared_page_va = __va(c->share_io_pg);
+    sp = get_sp(d);
+    memset((char *)sp,0,PAGE_SIZE);
+    /* FIXME: temp due to old CP */
+    sp->sp_global.eport = 2;
+#ifdef V_IOSAPIC_READY
+    sp->vcpu_number = 1;
+#endif
+    /* TEMP */
+    d->arch.vmx_platform.pib_base = 0xfee00000UL;
+    
 
     if (c->flags & VGCF_VMX_GUEST) {
 	if (!vmx_enabled)
@@ -370,7 +403,7 @@ int arch_set_info_guest(
     if (v == d->vcpu[0]) {
 	memset(&d->shared_info->evtchn_mask[0], 0xff,
 		sizeof(d->shared_info->evtchn_mask));
-	clear_bit(IOPACKET_PORT, &d->shared_info->evtchn_mask[0]);
+	clear_bit(iopacket_port(d), &d->shared_info->evtchn_mask[0]);
     }
     /* Setup domain context. Actually IA-64 is a bit different with
      * x86, with almost all system resources better managed by HV
@@ -380,8 +413,8 @@ int arch_set_info_guest(
     new_thread(v, c->guest_iip, 0, 0);
 
 
-    d->xen_vastart = 0xf000000000000000;
-    d->xen_vaend = 0xf300000000000000;
+    d->xen_vastart = XEN_START_ADDR;
+    d->xen_vaend = XEN_END_ADDR;
     d->arch.breakimm = 0x1000 + d->domain_id;
     v->arch._thread.on_ustack = 0;
 
@@ -394,7 +427,13 @@ int arch_set_info_guest(
 
 void arch_do_boot_vcpu(struct vcpu *v)
 {
+	struct domain *d = v->domain;
 	printf("arch_do_boot_vcpu: not implemented\n");
+
+	d->shared_info->vcpu_data[v->vcpu_id].arch.privregs = 
+			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+	printf("arch_vcpu_info=%p\n", d->shared_info->vcpu_data[v->vcpu_id].arch.privregs);
+	memset(d->shared_info->vcpu_data[v->vcpu_id].arch.privregs, 0, PAGE_SIZE);
 	return;
 }
 
@@ -449,8 +488,8 @@ void new_thread(struct vcpu *v,
 		VPD_CR(v, dcr) = 0;
 	} else {
 		regs->r28 = dom_fw_setup(d,saved_command_line,256L);
-		v->vcpu_info->arch.banknum = 1;
-		v->vcpu_info->arch.metaphysical_mode = 1;
+		VCPU(v, banknum) = 1;
+		VCPU(v, metaphysical_mode) = 1;
 		d->shared_info->arch.flags = (d == dom0) ? (SIF_INITDOMAIN|SIF_PRIVILEGED|SIF_BLK_BE_DOMAIN|SIF_NET_BE_DOMAIN|SIF_USB_BE_DOMAIN) : 0;
 	}
 }
@@ -482,8 +521,8 @@ void new_thread(struct vcpu *v,
 	regs->ar_fpsr = FPSR_DEFAULT;
 	init_all_rr(v);
 	regs->r28 = dom_fw_setup(d,saved_command_line,256L);  //FIXME
-	v->vcpu_info->arch.banknum = 1;
-	v->vcpu_info->arch.metaphysical_mode = 1;
+	VCPU(v, banknum) = 1;
+	VCPU(v, metaphysical_mode) = 1;
 	d->shared_info->arch.flags = (d == dom0) ? (SIF_INITDOMAIN|SIF_PRIVILEGED|SIF_BLK_BE_DOMAIN|SIF_NET_BE_DOMAIN|SIF_USB_BE_DOMAIN) : 0;
 }
 #endif // CONFIG_VTI
@@ -894,7 +933,6 @@ void build_shared_info(struct domain *d)
 
     /* Set up shared-info area. */
     update_dom_time(d);
-    d->shared_info->domain_time = 0;
 
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
@@ -1072,12 +1110,12 @@ if (d == dom0)
 #endif
     serial_input_init();
     if (d == dom0) {
-    	v->vcpu_info->arch.delivery_mask[0] = -1L;
-    	v->vcpu_info->arch.delivery_mask[1] = -1L;
-    	v->vcpu_info->arch.delivery_mask[2] = -1L;
-    	v->vcpu_info->arch.delivery_mask[3] = -1L;
+    	VCPU(v, delivery_mask[0]) = -1L;
+    	VCPU(v, delivery_mask[1]) = -1L;
+    	VCPU(v, delivery_mask[2]) = -1L;
+    	VCPU(v, delivery_mask[3]) = -1L;
     }
-    else __set_bit(0x30,v->vcpu_info->arch.delivery_mask);
+    else __set_bit(0x30,VCPU(v, delivery_mask));
 
     return 0;
 }
@@ -1233,12 +1271,12 @@ if (d == dom0)
 #endif
 	serial_input_init();
 	if (d == dom0) {
-		v->vcpu_info->arch.delivery_mask[0] = -1L;
-		v->vcpu_info->arch.delivery_mask[1] = -1L;
-		v->vcpu_info->arch.delivery_mask[2] = -1L;
-		v->vcpu_info->arch.delivery_mask[3] = -1L;
+		VCPU(v, delivery_mask[0]) = -1L;
+		VCPU(v, delivery_mask[1]) = -1L;
+		VCPU(v, delivery_mask[2]) = -1L;
+		VCPU(v, delivery_mask[3]) = -1L;
 	}
-	else __set_bit(0x30,v->vcpu_info->arch.delivery_mask);
+	else __set_bit(0x30, VCPU(v, delivery_mask));
 
 	return 0;
 }
@@ -1285,7 +1323,7 @@ int construct_domU(struct domain *d,
 #endif
 	new_thread(v, pkern_entry, 0, 0);
 	printk("new_thread returns\n");
-	__set_bit(0x30,v->vcpu_info->arch.delivery_mask);
+	__set_bit(0x30, VCPU(v, delivery_mask));
 
 	return 0;
 }

@@ -27,6 +27,7 @@
 #include <asm/sections.h>
 #include <asm/system.h>
 #ifdef XEN
+#include <asm/vcpu.h>
 #include <linux/jiffies.h>	// not included by xen/sched.h
 #endif
 #include <xen/softirq.h>
@@ -143,8 +144,8 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	if (!(++count & ((HEARTBEAT_FREQ*1024)-1))) {
 		printf("Heartbeat... iip=%p,psr.i=%d,pend=%d\n",
 			regs->cr_iip,
-			current->vcpu_info->arch.interrupt_delivery_enabled,
-			current->vcpu_info->arch.pending_interruption);
+			VCPU(current,interrupt_delivery_enabled),
+			VCPU(current,pending_interruption));
 		count = 0;
 	}
 #endif
@@ -159,7 +160,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		// We have to ensure that domain0 is launched before we
 		// call vcpu_timer_expired on it
 		//domain0_ready = 1; // moved to xensetup.c
-		current->vcpu_info->arch.pending_interruption = 1;
+		VCPU(current,pending_interruption) = 1;
 	}
 	if (domain0_ready && vcpu_timer_expired(dom0->vcpu[0])) {
 		vcpu_pend_timer(dom0->vcpu[0]);

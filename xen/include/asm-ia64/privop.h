@@ -138,14 +138,32 @@ typedef union U_INST64_M47 {
     IA64_INST inst;
     struct { unsigned long qp:6, un14:14, r3:7, x6:6, x3:3, un1:1, major:4; };
 } INST64_M47;
+
 typedef union U_INST64_M1{
     IA64_INST inst;
     struct { unsigned long qp:6, r1:7, un7:7, r3:7, x:1, hint:2, x6:6, m:1, major:4; };
 } INST64_M1;
+
+typedef union U_INST64_M2{
+    IA64_INST inst;
+    struct { unsigned long qp:6, r1:7, r2:7, r3:7, x:1, hint:2, x6:6, m:1, major:4; };
+} INST64_M2;
+
+typedef union U_INST64_M3{
+    IA64_INST inst;
+    struct { unsigned long qp:6, r1:7, imm7:7, r3:7, i:1, hint:2, x6:6, s:1, major:4; };
+} INST64_M3;
+
 typedef union U_INST64_M4 {
     IA64_INST inst;
     struct { unsigned long qp:6, un7:7, r2:7, r3:7, x:1, hint:2, x6:6, m:1, major:4; };
 } INST64_M4;
+
+typedef union U_INST64_M5 {
+    IA64_INST inst;
+    struct { unsigned long qp:6, imm7:7, r2:7, r3:7, i:1, hint:2, x6:6, s:1, major:4; };
+} INST64_M5;
+
 typedef union U_INST64_M6 {
     IA64_INST inst;
     struct { unsigned long qp:6, f1:7, un7:7, r3:7, x:1, hint:2, x6:6, m:1, major:4; };
@@ -166,7 +184,10 @@ typedef union U_INST64 {
     INST64_I28 I28;	// mov from ar (I unit)
 #ifdef CONFIG_VTI
     INST64_M1  M1;  // ld integer
+    INST64_M2  M2;
+    INST64_M3  M3;
     INST64_M4  M4;  // st integer
+    INST64_M5  M5;
     INST64_M6  M6;  // ldfd floating pointer
 #endif // CONFIG_VTI
     INST64_M28 M28;	// purge translation cache entry

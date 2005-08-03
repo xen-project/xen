@@ -21,10 +21,13 @@
 #define XEN_RR7_SWITCH_STUB	 0xb700000000000000
 #endif // CONFIG_VTI
 
+#define XEN_START_ADDR		 0xf000000000000000
 #define KERNEL_START		 0xf000000004000000
 #define PERCPU_ADDR		 0xf100000000000000-PERCPU_PAGE_SIZE
 #define SHAREDINFO_ADDR		 0xf100000000000000
 #define VHPT_ADDR		 0xf200000000000000
+#define SHARED_ARCHINFO_ADDR	 0xf300000000000000
+#define XEN_END_ADDR		 0xf400000000000000
 
 #ifndef __ASSEMBLY__
 
@@ -58,8 +61,9 @@ extern struct task_struct *vmx_ia64_switch_to (void *next_task);
 		ia64_save_extra(prev);								 \
 	if (IA64_HAS_EXTRA_STATE(next))								 \
 		ia64_load_extra(next);								 \
-	ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);			 \
+	/*ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);*/			 \
 	(last) = ia64_switch_to((next));							 \
+	vcpu_set_next_timer(current);								\
 } while (0)
 #endif // CONFIG_VTI
 

@@ -291,6 +291,10 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 	long r11 = 0;
 	long status = -1;
 
+#define USE_PAL_EMULATOR
+#ifdef USE_PAL_EMULATOR
+	return pal_emulator_static(index);
+#endif
 	if (running_on_sim) return pal_emulator_static(index);
 	if (index >= PAL_COPY_PAL) {
 		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %d!!!!\n",
@@ -314,12 +318,10 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 		break;
 	    case PAL_PTCE_INFO:
 		{
-			ia64_ptce_info_t ptce;
-			status = ia64_get_ptce(&ptce);
-			if (status != 0) break;
-			r9 = ptce.base;
-			r10 = (ptce.count[0]<<32)|(ptce.count[1]&0xffffffffL);
-			r11 = (ptce.stride[0]<<32)|(ptce.stride[1]&0xffffffffL);
+			// return hard-coded xen-specific values because ptc.e
+			// is emulated on xen to always flush everything
+			// these values result in only one ptc.e instruction
+			status = 0; r9 = 0; r10 = (1L << 32) | 1L; r11 = 0;
 		}
 		break;
 	    case PAL_VERSION:
@@ -335,7 +337,10 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 		status = ia64_pal_cache_summary(&r9,&r10);
 		break;
 	    case PAL_VM_SUMMARY:
-		status = ia64_pal_vm_summary(&r9,&r10);
+		// FIXME: what should xen return for these, figure out later
+		// For now, linux does the right thing if pal call fails
+		// In particular, rid_size must be set properly!
+		//status = ia64_pal_vm_summary(&r9,&r10);
 		break;
 	    case PAL_RSE_INFO:
 		status = ia64_pal_rse_info(&r9,&r10);

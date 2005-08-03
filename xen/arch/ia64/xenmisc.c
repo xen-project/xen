@@ -103,11 +103,13 @@ while(1);
 }
 #endif
 
+#ifndef CONFIG_VTI
 unsigned long __hypercall_create_continuation(
 	unsigned int op, unsigned int nr_args, ...)
 {
 	printf("__hypercall_create_continuation: not implemented!!!\n");
 }
+#endif
 
 ///////////////////////////////
 
@@ -115,14 +117,17 @@ unsigned long __hypercall_create_continuation(
 // from arch/x86/apic.c
 ///////////////////////////////
 
+extern unsigned long domain0_ready;
+
 int reprogram_ac_timer(s_time_t timeout)
 {
 	struct vcpu *v = current;
 
 #ifdef CONFIG_VTI
-	if(VMX_DOMAIN(v))
+//	if(VMX_DOMAIN(v))
 		return 1;
 #endif // CONFIG_VTI
+	if (!domain0_ready) return 1;
 	local_cpu_data->itm_next = timeout;
 	if (is_idle_task(v->domain)) vcpu_safe_set_itm(timeout);
 	else vcpu_set_next_timer(current);
@@ -175,6 +180,22 @@ void free_page_type(struct pfn_info *page, unsigned int type)
 void show_registers(struct pt_regs *regs)
 {
 	printf("*** ADD REGISTER DUMP HERE FOR DEBUGGING\n");
+}
+
+int is_kernel_text(unsigned long addr)
+{
+	extern char _stext[], _etext[];
+	if (addr >= (unsigned long) _stext &&
+	    addr <= (unsigned long) _etext)
+	    return 1;
+
+	return 0;
+}
+
+unsigned long kernel_text_end(void)
+{
+	extern char _etext[];
+	return (unsigned long) _etext;
 }
 
 ///////////////////////////////
@@ -291,8 +312,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 static long cnt[16] = { 50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
 static int i = 100;
 int id = ((struct vcpu *)current)->domain->domain_id & 0xf;
-if (!cnt[id]--) { printk("%x",id); cnt[id] = 500; }
-if (!i--) { printk("+",id); cnt[id] = 1000; }
+if (!cnt[id]--) { printk("%x",id); cnt[id] = 500000; }
+if (!i--) { printk("+",id); i = 1000000; }
 }
 	clear_bit(_VCPUF_running, &prev->vcpu_flags);
 	//if (!is_idle_task(next->domain) )

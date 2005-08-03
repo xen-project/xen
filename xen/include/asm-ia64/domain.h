@@ -8,6 +8,7 @@
 #include <asm/vmmu.h>
 #include <asm/regionreg.h>
 #include <public/arch-ia64.h>
+#include <asm/vmx_platform.h>
 #endif // CONFIG_VTI
 #include <xen/list.h>
 
@@ -42,6 +43,7 @@ struct arch_domain {
      * max_pages in domain struct, which indicates maximum memory size
      */
     unsigned long max_pfn;
+    struct virutal_platform_def     vmx_platform;
 #endif  //CONFIG_VTI
     u64 xen_vastart;
     u64 xen_vaend;
@@ -88,6 +90,7 @@ struct arch_vcpu {
     thash_cb_t *vtlb;
     char irq_new_pending;
     char irq_new_condition;    // vpsr.i/vtpr change, check for pending VHPI
+    char hypercall_continuation;
     //for phycial  emulation
     unsigned long old_rsc;
     int mode_flags;

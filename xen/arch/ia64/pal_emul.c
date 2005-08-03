@@ -1,7 +1,21 @@
-/* PAL/SAL call delegation
+/*
+ * PAL/SAL call delegation
  *
  * Copyright (c) 2004 Li Susie <susie.li@intel.com>
  * Copyright (c) 2005 Yu Ke <ke.yu@intel.com>
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+ * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
 #include <asm/vmx_vcpu.h>
@@ -98,23 +112,6 @@ pal_halt (VCPU *vcpu) {
 
 static struct ia64_pal_retval
 pal_halt_light (VCPU *vcpu) {
-#if 0	
-	// GVMM will go back to HVMM and ask HVMM to call yield().
-	vmmdata.p_ctlblk->status = VM_OK;
-	vmmdata.p_ctlblk->ctlcode = ExitVM_YIELD;
-
-	vmm_transition((UINT64)&vmmdata.p_gsa->guest,
-    			(UINT64)&vmmdata.p_gsa->host,
-    			(UINT64) vmmdata.p_tramp,0,0);
-
-
-	result.status = 0;
-	result.pal_result[0]=0;
-	result.pal_result[1]=0;
-	result.pal_result[2]=0;
-
-	return result;
-#endif
 	struct ia64_pal_retval result;
 
 	result.status= -1; //unimplemented

@@ -230,6 +230,7 @@ struct screen_info { };
 
 #define FORCE_CRASH()	asm("break 0;;");
 
+void dummy_called(char *function);
 #define dummy()	dummy_called(__FUNCTION__)
 
 // these declarations got moved at some point, find a better place for them

@@ -25,37 +25,10 @@
 #ifndef __ASSEMBLY__
 
 #include <asm/vtm.h>
-#include <asm/vmx_platform.h>
 #include <public/arch-ia64.h>
 
 #define VPD_SHIFT	17	/* 128K requirement */
 #define VPD_SIZE	(1 << VPD_SHIFT)
-typedef union {
-	unsigned long value;
-	struct {
-		int 	a_int:1;
-		int 	a_from_int_cr:1;
-		int	a_to_int_cr:1;
-		int	a_from_psr:1;
-		int	a_from_cpuid:1;
-		int	a_cover:1;
-		int	a_bsw:1;
-		long	reserved:57;
-	};
-} vac_t;
-
-typedef union {
-	unsigned long value;
-	struct {
-		int 	d_vmsw:1;
-		int 	d_extint:1;
-		int	d_ibr_dbr:1;
-		int	d_pmc:1;
-		int	d_to_pmd:1;
-		int	d_itm:1;
-		long	reserved:58;
-	};
-} vdc_t;
 
 typedef struct {
 	unsigned long	dcr;		// CR0
@@ -89,29 +62,6 @@ typedef struct {
 	unsigned long	rsv6[46];
 } cr_t;
 
-typedef struct vpd {
-	vac_t			vac;
-	vdc_t			vdc;
-	unsigned long		virt_env_vaddr;
-	unsigned long		reserved1[29];
-	unsigned long		vhpi;
-	unsigned long		reserved2[95];
-	unsigned long		vgr[16];
-	unsigned long		vbgr[16];
-	unsigned long		vnat;
-	unsigned long		vbnat;
-	unsigned long		vcpuid[5];
-	unsigned long		reserved3[11];
-	unsigned long		vpsr;
-	unsigned long		vpr;
-	unsigned long		reserved4[76];
-	unsigned long		vcr[128];
-	unsigned long		reserved5[128];
-	unsigned long		reserved6[3456];
-	unsigned long		vmm_avail[128];
-	unsigned long		reserved7[4096];
-} vpd_t;
-
 void vmx_enter_scheduler(void);
 
 //FIXME: Map for LID to vcpu, Eddie
@@ -133,7 +83,6 @@ struct arch_vmx_struct {
     unsigned long   rfi_ipsr;
     unsigned long   rfi_ifs;
 	unsigned long	in_service[4];	// vLsapic inservice IRQ bits
-	struct virutal_platform_def     vmx_platform;
 	unsigned long   flags;
 };
 
@@ -174,7 +123,6 @@ extern unsigned int opt_vmx_debug_level;
     } while (0)
 
 #endif //__ASSEMBLY__
-
 
 // VPD field offset
 #define VPD_VAC_START_OFFSET		0

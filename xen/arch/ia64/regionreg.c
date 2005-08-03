@@ -14,6 +14,8 @@
 #include <asm/page.h>
 #include <asm/regionreg.h>
 #include <asm/vhpt.h>
+#include <asm/vcpu.h>
+extern void ia64_new_rr7(unsigned long rid,void *shared_info, void *shared_arch_info);
 
 
 #define	IA64_MIN_IMPL_RID_BITS	(IA64_MIN_IMPL_RID_MSB+1)
@@ -273,7 +275,8 @@ int set_one_rr(unsigned long rr, unsigned long val)
 		newrrv.rid = newrid;
 		newrrv.ve = VHPT_ENABLED_REGION_7;
 		newrrv.ps = IA64_GRANULE_SHIFT;
-		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info);
+		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info,
+				v->vcpu_info->arch.privregs);
 	}
 	else {
 		newrrv.rid = newrid;
@@ -290,7 +293,8 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	newrrv.ve = 1;  // VHPT now enabled for region 7!!
 	newrrv.ps = PAGE_SHIFT;
 	if (rreg == 0) v->arch.metaphysical_saved_rr0 = newrrv.rrval;
-	if (rreg == 7) ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info);
+	if (rreg == 7) ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info,
+				v->vcpu_info->arch.privregs);
 	else set_rr(rr,newrrv.rrval);
 #endif
 	return 1;
@@ -332,14 +336,14 @@ void init_all_rr(struct vcpu *v)
 	rrv.ps = PAGE_SHIFT;
 	rrv.ve = 1;
 if (!v->vcpu_info) { printf("Stopping in init_all_rr\n"); dummy(); }
-	v->vcpu_info->arch.rrs[0] = -1;
-	v->vcpu_info->arch.rrs[1] = rrv.rrval;
-	v->vcpu_info->arch.rrs[2] = rrv.rrval;
-	v->vcpu_info->arch.rrs[3] = rrv.rrval;
-	v->vcpu_info->arch.rrs[4] = rrv.rrval;
-	v->vcpu_info->arch.rrs[5] = rrv.rrval;
+	VCPU(v,rrs[0]) = -1;
+	VCPU(v,rrs[1]) = rrv.rrval;
+	VCPU(v,rrs[2]) = rrv.rrval;
+	VCPU(v,rrs[3]) = rrv.rrval;
+	VCPU(v,rrs[4]) = rrv.rrval;
+	VCPU(v,rrs[5]) = rrv.rrval;
 	rrv.ve = 0; 
-	v->vcpu_info->arch.rrs[6] = rrv.rrval;
+	VCPU(v,rrs[6]) = rrv.rrval;
 //	v->shared_info->arch.rrs[7] = rrv.rrval;
 }
 
@@ -378,7 +382,7 @@ unsigned long load_region_regs(struct vcpu *v)
 	// TODO: These probably should be validated
 	unsigned long bad = 0;
 
-	if (v->vcpu_info->arch.metaphysical_mode) {
+	if (VCPU(v,metaphysical_mode)) {
 		ia64_rr rrv;
 
 		rrv.rrval = 0;
@@ -390,16 +394,16 @@ unsigned long load_region_regs(struct vcpu *v)
 		ia64_srlz_d();
 	}
 	else {
-		rr0 =  v->vcpu_info->arch.rrs[0];
+		rr0 =  VCPU(v,rrs[0]);
 		if (!set_one_rr(0x0000000000000000L, rr0)) bad |= 1;
 	}
-	rr1 =  v->vcpu_info->arch.rrs[1];
-	rr2 =  v->vcpu_info->arch.rrs[2];
-	rr3 =  v->vcpu_info->arch.rrs[3];
-	rr4 =  v->vcpu_info->arch.rrs[4];
-	rr5 =  v->vcpu_info->arch.rrs[5];
-	rr6 =  v->vcpu_info->arch.rrs[6];
-	rr7 =  v->vcpu_info->arch.rrs[7];
+	rr1 =  VCPU(v,rrs[1]);
+	rr2 =  VCPU(v,rrs[2]);
+	rr3 =  VCPU(v,rrs[3]);
+	rr4 =  VCPU(v,rrs[4]);
+	rr5 =  VCPU(v,rrs[5]);
+	rr6 =  VCPU(v,rrs[6]);
+	rr7 =  VCPU(v,rrs[7]);
 	if (!set_one_rr(0x2000000000000000L, rr1)) bad |= 2;
 	if (!set_one_rr(0x4000000000000000L, rr2)) bad |= 4;
 	if (!set_one_rr(0x6000000000000000L, rr3)) bad |= 8;
@@ -410,4 +414,5 @@ unsigned long load_region_regs(struct vcpu *v)
 	if (bad) {
 		panic_domain(0,"load_region_regs: can't set! bad=%lx\n",bad);
 	}
+	return 0;
 }

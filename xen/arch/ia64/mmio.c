@@ -66,7 +66,7 @@ static void pib_write(VCPU *vcpu, void *src, uint64_t pib_off, size_t s, int ma)
     default:
         if ( PIB_LOW_HALF(pib_off) ) {   // lower half
             if ( s != 8 || ma != 0x4 /* UC */ ) {
-                panic("Undefined IPI-LHF write!\n");
+                panic("Undefined IPI-LHF write with s %d, ma %d!\n", s, ma);
             }
             else {
                 write_ipi(vcpu, pib_off, *(uint64_t *)src);
@@ -135,13 +135,13 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     ioreq_t *p;
     unsigned long addr;
 
-    vio = (vcpu_iodata_t *) v->arch.arch_vmx.vmx_platform.shared_page_va;
+    vio = get_vio(v->domain, v->vcpu_id);
     if (vio == 0) {
         panic("bad shared page: %lx", (unsigned long)vio);
     }
     p = &vio->vp_ioreq;
     p->addr = pa;
-    p->size = 1<<s;
+    p->size = s;
     p->count = 1;
     p->dir = dir;
     if(dir==IOREQ_WRITE)     //write;
@@ -152,9 +152,9 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
     set_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
     p->state = STATE_IOREQ_READY;
-    evtchn_send(IOPACKET_PORT);
+    evtchn_send(iopacket_port(v->domain));
     vmx_wait_io();
-    if(dir){ //read
+    if(dir==IOREQ_READ){ //read
         *val=p->u.data;
     }
     return;
@@ -168,13 +168,13 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     ioreq_t *p;
     unsigned long addr;
 
-    vio = (vcpu_iodata_t *) v->arch.arch_vmx.vmx_platform.shared_page_va;
+    vio = get_vio(v->domain, v->vcpu_id);
     if (vio == 0) {
         panic("bad shared page: %lx");
     }
     p = &vio->vp_ioreq;
     p->addr = TO_LEGACY_IO(pa&0x3ffffffUL);
-    p->size = 1<<s;
+    p->size = s;
     p->count = 1;
     p->dir = dir;
     if(dir==IOREQ_WRITE)     //write;
@@ -185,11 +185,20 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 
     set_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
     p->state = STATE_IOREQ_READY;
-    evtchn_send(IOPACKET_PORT);
+    evtchn_send(iopacket_port(v->domain));
+
     vmx_wait_io();
-    if(dir){ //read
+    if(dir==IOREQ_READ){ //read
         *val=p->u.data;
     }
+#ifdef DEBUG_PCI
+    if(dir==IOREQ_WRITE)
+        if(p->addr == 0xcf8UL)
+            printk("Write 0xcf8, with val [0x%lx]\n", p->u.data);
+    else
+        if(p->addr == 0xcfcUL)
+            printk("Read 0xcfc, with val [0x%lx]\n", p->u.data);
+#endif //DEBUG_PCI
     return;
 }
 
@@ -204,12 +213,13 @@ static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int
     switch (iot) {
     case GPFN_PIB:
         if(!dir)
-            pib_write(vcpu, src_pa - v_plat->pib_base, dest, s, ma);
+            pib_write(vcpu, dest, src_pa - v_plat->pib_base, s, ma);
         else
             pib_read(vcpu, src_pa - v_plat->pib_base, dest, s, ma);
         break;
     case GPFN_GFW:
         break;
+    case GPFN_IOSAPIC:
     case GPFN_FRAME_BUFFER:
     case GPFN_LOW_MMIO:
         low_mmio_access(vcpu, src_pa, dest, s, dir);
@@ -217,7 +227,6 @@ static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int
     case GPFN_LEGACY_IO:
         legacy_io_access(vcpu, src_pa, dest, s, dir);
         break;
-    case GPFN_IOSAPIC:
     default:
         panic("Bad I/O access\n");
         break;
@@ -342,6 +351,8 @@ static inline VCPU *lid_2_vcpu (struct domain *d, u64 id, u64 eid)
 	LID	  lid;
 	for (i=0; i<MAX_VIRT_CPUS; i++) {
 		vcpu = d->vcpu[i];
+ 		if (!vcpu)
+ 			continue;
 		lid.val = VPD_CR(vcpu, lid);
 		if ( lid.id == id && lid.eid == eid ) {
 		    return vcpu;
@@ -379,15 +390,16 @@ static int write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value)
     inst_type 0:integer 1:floating point
  */
 extern IA64_BUNDLE __vmx_get_domain_bundle(u64 iip);
-
+#define SL_INTEGER  0        // store/load interger
+#define SL_FLOATING    1       // store/load floating
 
 void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
 {
     REGS *regs;
     IA64_BUNDLE bundle;
-    int slot, dir, inst_type=0;
+    int slot, dir, inst_type;
     size_t size;
-    u64 data, value, slot1a, slot1b;
+    u64 data, value,post_update, slot1a, slot1b, temp;
     INST64 inst;
     regs=vcpu_regs(vcpu);
     bundle = __vmx_get_domain_bundle(regs->cr_iip);
@@ -400,28 +412,70 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
     }
     else if (slot == 2) inst.inst = bundle.slot2;
 
+
+    // Integer Load/Store
     if(inst.M1.major==4&&inst.M1.m==0&&inst.M1.x==0){
-        inst_type=0;  //fp
+        inst_type = SL_INTEGER;  //
         size=(inst.M1.x6&0x3);
         if((inst.M1.x6>>2)>0xb){      // write
-            vmx_vcpu_get_gr(vcpu,inst.M4.r2,&data);
             dir=IOREQ_WRITE;     //write
+            vmx_vcpu_get_gr(vcpu,inst.M4.r2,&data);
         }else if((inst.M1.x6>>2)<0xb){   //  read
-            vmx_vcpu_get_gr(vcpu,inst.M1.r1,&value);
             dir=IOREQ_READ;
-        }else{
-            printf("This memory access instruction can't be emulated one : %lx\n",inst.inst);
-            while(1);
+            vmx_vcpu_get_gr(vcpu,inst.M1.r1,&value);
         }
-    }else if(inst.M6.major==6&&inst.M6.m==0&&inst.M6.x==0&&inst.M6.x6==3){
-        inst_type=1;  //fp
-        dir=IOREQ_READ;
-        size=3;     //ldfd
-    }else{
+    }
+    // Integer Load + Reg update
+    else if(inst.M2.major==4&&inst.M2.m==1&&inst.M2.x==0){
+        inst_type = SL_INTEGER;
+        dir = IOREQ_READ;     //write
+        size = (inst.M2.x6&0x3);
+        vmx_vcpu_get_gr(vcpu,inst.M2.r1,&value);
+        vmx_vcpu_get_gr(vcpu,inst.M2.r3,&temp);
+        vmx_vcpu_get_gr(vcpu,inst.M2.r2,&post_update);
+        temp += post_update;
+        vmx_vcpu_set_gr(vcpu,inst.M2.r3,temp,0);
+    }
+    // Integer Load/Store + Imm update
+    else if(inst.M3.major==5){
+        inst_type = SL_INTEGER;  //
+        size=(inst.M3.x6&0x3);
+        if((inst.M5.x6>>2)>0xb){      // write
+            dir=IOREQ_WRITE;     //write
+            vmx_vcpu_get_gr(vcpu,inst.M5.r2,&data);
+            vmx_vcpu_get_gr(vcpu,inst.M5.r3,&temp);
+            post_update = (inst.M5.i<<7)+inst.M5.imm7;
+            if(inst.M5.s)
+                temp -= post_update;
+            else
+                temp += post_update;
+            vmx_vcpu_set_gr(vcpu,inst.M5.r3,temp,0);
+
+        }else if((inst.M3.x6>>2)<0xb){   //  read
+            dir=IOREQ_READ;
+            vmx_vcpu_get_gr(vcpu,inst.M3.r1,&value);
+            vmx_vcpu_get_gr(vcpu,inst.M3.r3,&temp);
+            post_update = (inst.M3.i<<7)+inst.M3.imm7;
+            if(inst.M3.s)
+                temp -= post_update;
+            else
+                temp += post_update;
+            vmx_vcpu_set_gr(vcpu,inst.M3.r3,temp,0);
+
+        }
+    }
+    // Floating-point Load/Store
+//    else if(inst.M6.major==6&&inst.M6.m==0&&inst.M6.x==0&&inst.M6.x6==3){
+//        inst_type=SL_FLOATING;  //fp
+//        dir=IOREQ_READ;
+//        size=3;     //ldfd
+//    }
+    else{
         printf("This memory access instruction can't be emulated two: %lx\n ",inst.inst);
         while(1);
     }
 
+    size = 1 << size;
     if(dir==IOREQ_WRITE){
         mmio_access(vcpu, padr, &data, size, ma, dir);
     }else{
@@ -433,7 +487,7 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         else if(size==2)
             data = (value & 0xffffffff00000000U) | (data & 0xffffffffU);
 
-        if(inst_type==0){       //gp
+        if(inst_type==SL_INTEGER){       //gp
             vmx_vcpu_set_gr(vcpu,inst.M1.r1,data,0);
         }else{
             panic("Don't support ldfd now !");

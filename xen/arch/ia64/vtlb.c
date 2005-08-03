@@ -23,6 +23,7 @@
 
 #include <linux/sched.h>
 #include <asm/tlb.h>
+#include <asm/mm.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/gcc_intrin.h>
 #include <xen/interrupt.h>
@@ -359,7 +360,10 @@ thash_data_t *__alloc_chain(thash_cb_t *hcb,thash_data_t *entry)
 void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 {
     thash_data_t    *hash_table, *cch;
+    int flag;
     rr_t  vrr;
+    u64 gppn;
+    u64 ppns, ppne;
     
     hash_table = (hcb->hash_func)(hcb->pta,
                         va, entry->rid, entry->ps);
@@ -375,7 +379,18 @@ void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
         *hash_table = *entry;
         hash_table->next = cch;
     }
-    thash_insert (hcb->ts->vhpt, entry, va);
+    if(hcb->vcpu->domain->domain_id==0){
+       thash_insert(hcb->ts->vhpt, entry, va);
+        return;
+    }
+    flag = 1;
+    gppn = (POFFSET(va,entry->ps)|PAGEALIGN((entry->ppn<<12),entry->ps))>>PAGE_SHIFT;
+    ppns = PAGEALIGN((entry->ppn<<12),entry->ps);
+    ppne = ppns + PSIZE(entry->ps);
+    if(((ppns<=0xa0000)&&(ppne>0xa0000))||((ppne>0xc0000)&&(ppns<=0xc0000)))
+        flag = 0;
+    if((__gpfn_is_mem(hcb->vcpu->domain, gppn)&&flag))
+       thash_insert(hcb->ts->vhpt, entry, va);
     return ;
 }
 
@@ -427,18 +442,22 @@ static void rem_thash(thash_cb_t *hcb, thash_data_t *entry)
     thash_data_t    *hash_table, *p, *q;
     thash_internal_t *priv = &hcb->priv;
     int idx;
-    
+
     hash_table = priv->hash_base;
     if ( hash_table == entry ) {
-        __rem_hash_head (hcb, entry);
+//        if ( PURGABLE_ENTRY(hcb, entry) ) {
+            __rem_hash_head (hcb, entry);
+//        }
         return ;
     }
     // remove from collision chain
     p = hash_table;
     for ( q=p->next; q; q = p->next ) {
-        if ( q == entry ) {
-            p->next = q->next;
-            __rem_chain(hcb, entry);
+        if ( q == entry ){
+//            if ( PURGABLE_ENTRY(hcb,q ) ) {
+                p->next = q->next;
+                __rem_chain(hcb, entry);
+//            }
             return ;
         }
         p = q;
@@ -939,7 +958,7 @@ void check_vtlb_sanity(thash_cb_t *vtlb)
     if ( sanity_check == 0 ) return;
     sanity_check --;
     s_sect.v = 0;
-//    page = alloc_domheap_pages (NULL, VCPU_TLB_ORDER);
+//    page = alloc_domheap_pages (NULL, VCPU_TLB_ORDER, 0);
 //    if ( page == NULL ) {
 //        panic("No enough contiguous memory for init_domain_mm\n");
 //    };

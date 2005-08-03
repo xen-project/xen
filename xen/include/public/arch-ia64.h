@@ -140,38 +140,121 @@ struct pt_regs {
 	struct pt_fpreg f11;		/* scratch */
 };
 
+typedef union {
+	unsigned long value;
+	struct {
+		int 	a_int:1;
+		int 	a_from_int_cr:1;
+		int	a_to_int_cr:1;
+		int	a_from_psr:1;
+		int	a_from_cpuid:1;
+		int	a_cover:1;
+		int	a_bsw:1;
+		long	reserved:57;
+	};
+} vac_t;
+
+typedef union {
+	unsigned long value;
+	struct {
+		int 	d_vmsw:1;
+		int 	d_extint:1;
+		int	d_ibr_dbr:1;
+		int	d_pmc:1;
+		int	d_to_pmd:1;
+		int	d_itm:1;
+		long	reserved:58;
+	};
+} vdc_t;
+
 typedef struct {
-	unsigned long ipsr;
-	unsigned long iip;
-	unsigned long ifs;
-	unsigned long precover_ifs;
-	unsigned long isr;
-	unsigned long ifa;
-	unsigned long iipa;
-	unsigned long iim;
-	unsigned long unat;  // not sure if this is needed until NaT arch is done
-	unsigned long tpr;
-	unsigned long iha;
-	unsigned long itir;
-	unsigned long itv;
-	unsigned long pmv;
-	unsigned long cmcv;
-	unsigned long pta;
-	int interrupt_collection_enabled; // virtual psr.ic
-	int interrupt_delivery_enabled; // virtual psr.i
-	int pending_interruption;
-	int incomplete_regframe;	// see SDM vol2 6.8
-	unsigned long delivery_mask[4];
-	int metaphysical_mode;	// 1 = use metaphys mapping, 0 = use virtual
-	int banknum;	// 0 or 1, which virtual register bank is active
-	unsigned long bank0_regs[16]; // bank0 regs (r16-r31) when bank1 active
-	unsigned long bank1_regs[16]; // bank1 regs (r16-r31) when bank0 active
-	unsigned long rrs[8];	// region registers
-	unsigned long krs[8];	// kernel registers
-	unsigned long pkrs[8];	// protection key registers
-	unsigned long tmp[8];	// temp registers (e.g. for hyperprivops)
+	vac_t			vac;
+	vdc_t			vdc;
+	unsigned long		virt_env_vaddr;
+	unsigned long		reserved1[29];
+	unsigned long		vhpi;
+	unsigned long		reserved2[95];
+	union {
+	  unsigned long		vgr[16];
+  	  unsigned long bank1_regs[16]; // bank1 regs (r16-r31) when bank0 active
+	};
+	union {
+	  unsigned long		vbgr[16];
+	  unsigned long bank0_regs[16]; // bank0 regs (r16-r31) when bank1 active
+	};
+	unsigned long		vnat;
+	unsigned long		vbnat;
+	unsigned long		vcpuid[5];
+	unsigned long		reserved3[11];
+	unsigned long		vpsr;
+	unsigned long		vpr;
+	unsigned long		reserved4[76];
+	union {
+	  unsigned long		vcr[128];
+          struct {
+  	    unsigned long	dcr;		// CR0
+	    unsigned long	itm;
+	    unsigned long	iva;
+	    unsigned long	rsv1[5];
+	    unsigned long	pta;		// CR8
+	    unsigned long	rsv2[7];
+	    unsigned long	ipsr;		// CR16
+	    unsigned long	isr;
+	    unsigned long	rsv3;
+	    unsigned long	iip;
+	    unsigned long	ifa;
+	    unsigned long	itir;
+	    unsigned long	iipa;
+	    unsigned long	ifs;
+	    unsigned long	iim;		// CR24
+	    unsigned long	iha;
+	    unsigned long	rsv4[38];
+	    unsigned long	lid;		// CR64
+	    unsigned long	ivr;
+	    unsigned long	tpr;
+	    unsigned long	eoi;
+	    unsigned long	irr[4];
+	    unsigned long	itv;		// CR72
+	    unsigned long	pmv;
+	    unsigned long	cmcv;
+	    unsigned long	rsv5[5];
+	    unsigned long	lrr0;		// CR80
+	    unsigned long	lrr1;
+	    unsigned long	rsv6[46];
+          };
+	};
+	union {
+	  unsigned long		reserved5[128];
+	  struct {
+	    unsigned long precover_ifs;
+	    unsigned long unat;  // not sure if this is needed until NaT arch is done
+	    int interrupt_collection_enabled; // virtual psr.ic
+	    int interrupt_delivery_enabled; // virtual psr.i
+	    int pending_interruption;
+	    int incomplete_regframe;	// see SDM vol2 6.8
+	    unsigned long delivery_mask[4];
+	    int metaphysical_mode;	// 1 = use metaphys mapping, 0 = use virtual
+	    int banknum;	// 0 or 1, which virtual register bank is active
+	    unsigned long rrs[8];	// region registers
+	    unsigned long krs[8];	// kernel registers
+	    unsigned long pkrs[8];	// protection key registers
+	    unsigned long tmp[8];	// temp registers (e.g. for hyperprivops)
+	  };
+        };
+#ifdef CONFIG_VTI
+	unsigned long		reserved6[3456];
+	unsigned long		vmm_avail[128];
+	unsigned long		reserved7[4096];
+#endif
+} mapped_regs_t;
+
+typedef struct {
+	mapped_regs_t *privregs;
 	int evtchn_vector;
 } arch_vcpu_info_t;
+
+typedef mapped_regs_t vpd_t;
+
 #define __ARCH_HAS_VCPU_INFO
 
 typedef struct {

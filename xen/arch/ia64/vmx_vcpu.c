@@ -23,7 +23,7 @@
  *  Xuefei Xu (Anthony Xu) (Anthony.xu@intel.com)
  */
 
-#include <linux/sched.h>
+#include <xen/sched.h>
 #include <public/arch-ia64.h>
 #include <asm/ia64_int.h>
 #include <asm/vmx_vcpu.h>
@@ -201,7 +201,7 @@ vmx_vcpu_get_vtlb(VCPU *vcpu)
 struct virutal_platform_def *
 vmx_vcpu_get_plat(VCPU *vcpu)
 {
-    return &(vcpu->arch.arch_vmx.vmx_platform);
+    return &(vcpu->domain->arch.vmx_platform);
 }
 
 
@@ -213,7 +213,6 @@ ia64_rr vmx_vcpu_rr(VCPU *vcpu,UINT64 vadr)
 
 IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
-    extern void set_one_rr(UINT64, UINT64);
     ia64_rr oldrr,newrr;
     thash_cb_t *hcb;
     oldrr=vmx_vcpu_rr(vcpu,reg);
@@ -375,7 +374,7 @@ IA64FAULT
 vmx_vcpu_get_gr(VCPU *vcpu, unsigned reg, UINT64 * val)
 {
     REGS *regs=vcpu_regs(vcpu);
-    u64 nat;
+    int nat;
     //TODO, Eddie
     if (!regs) return 0;
     if (reg >= 16 && reg < 32) {

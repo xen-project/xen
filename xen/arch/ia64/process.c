@@ -50,7 +50,7 @@ extern unsigned long dom0_start, dom0_size;
 			IA64_PSR_ID | IA64_PSR_DA | IA64_PSR_DD | \
 			IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED | IA64_PSR_IA)
 
-#define PSCB(x,y)	x->vcpu_info->arch.y
+#define PSCB(x,y)	VCPU(x,y)
 #define PSCBX(x,y)	x->arch.y
 
 extern unsigned long vcpu_verbose;
@@ -226,7 +226,7 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,ipsr=%p,iip=%p,ifa=%p,isr=%p
 #ifdef CONFIG_SMP
 #error "sharedinfo doesn't handle smp yet"
 #endif
-	regs->r31 = &((shared_info_t *)SHAREDINFO_ADDR)->vcpu_data[0].arch;
+	regs->r31 = &(((mapped_regs_t *)SHARED_ARCHINFO_ADDR)->ipsr);
 
 	PSCB(v,interrupt_delivery_enabled) = 0;
 	PSCB(v,interrupt_collection_enabled) = 0;

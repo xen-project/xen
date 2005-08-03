@@ -34,8 +34,27 @@ default: $(OBJS) head.o ia64lib.o xen.lds.s
 		 > $(BASEDIR)/System.map
 
 
-asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp
+asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 	$(CC) $(CFLAGS) -S -o $@ $<
+
+asm-xsi-offsets.s: asm-xsi-offsets.c 
+	$(CC) $(CFLAGS) -S -o $@ $<
+	
+$(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h: asm-xsi-offsets.s
+	@(set -e; \
+	  echo "/*"; \
+	  echo " * DO NOT MODIFY."; \
+	  echo " *"; \
+	  echo " * This file was auto-generated from $<"; \
+	  echo " *"; \
+	  echo " */"; \
+	  echo ""; \
+	  echo "#ifndef __ASM_XSI_OFFSETS_H__"; \
+	  echo "#define __ASM_XSI_OFFSETS_H__"; \
+	  echo ""; \
+	  sed -ne "/^->/{s:^->\([^ ]*\) [\$$#]*\([^ ]*\) \(.*\):#define \1 \2 /* \3 */:; s:->::; p;}"; \
+	  echo ""; \
+	  echo "#endif") <$< >$@
 
 $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 # Need such symbol link to make linux headers available
@@ -60,6 +79,7 @@ ia64lib.o:
 
 clean:
 	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-offsets.s
+	rm -f asm-xsi-offsets.s $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 	rm -f lib/*.o
 
 .PHONY: default clean

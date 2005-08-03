@@ -65,7 +65,7 @@ paging_init (void)
 #else // CONFIG_VTI
 
 	/* Allocate and map the machine-to-phys table */
-	if ((pg = alloc_domheap_pages(NULL, 10)) == NULL)
+	if ((pg = alloc_domheap_pages(NULL, 10, 0)) == NULL)
 		panic("Not enough memory to bootstrap Xen.\n");
 	memset(page_to_virt(pg), 0x55, 16UL << 20);
 #endif // CONFIG_VTI
