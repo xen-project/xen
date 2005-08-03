@@ -152,7 +152,6 @@ struct net_private
 
     unsigned int handle;
     unsigned int evtchn;
-    unsigned int irq;
 
     /* What is the status of our connection to the remote backend? */
 #define BEST_CLOSED       0
@@ -887,12 +886,11 @@ static void vif_show(struct net_private *np)
 {
 #if DEBUG
     if (np) {
-        IPRINTK("<vif handle=%u %s(%s) evtchn=%u irq=%u tx=%p rx=%p>\n",
+        IPRINTK("<vif handle=%u %s(%s) evtchn=%u tx=%p rx=%p>\n",
                np->handle,
                be_state_name[np->backend_state],
                np->user_state ? "open" : "closed",
                np->evtchn,
-               np->irq,
                np->tx,
                np->rx);
     } else {
@@ -947,12 +945,11 @@ static void vif_release(struct net_private *np)
     spin_unlock_irq(&np->tx_lock);
     
     /* Free resources. */
-    if(np->tx != NULL){
-        free_irq(np->irq, np->dev);
-        unbind_evtchn_from_irq(np->evtchn);
+    if ( np->tx != NULL )
+    {
+        unbind_evtchn_from_irqhandler(np->evtchn, np->dev);
         free_page((unsigned long)np->tx);
         free_page((unsigned long)np->rx);
-        np->irq = 0;
         np->evtchn = 0;
         np->tx = NULL;
         np->rx = NULL;
@@ -1022,11 +1019,11 @@ vif_connect(struct net_private *np, netif_fe_interface_status_t *status)
     memcpy(dev->dev_addr, status->mac, ETH_ALEN);
     network_connect(dev, status);
     np->evtchn = status->evtchn;
-    np->irq = bind_evtchn_to_irq(np->evtchn);
 #if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
     rdomid = status->domid;
 #endif
-    (void)request_irq(np->irq, netif_int, SA_SAMPLE_RANDOM, dev->name, dev);
+    (void)bind_evtchn_to_irqhandler(
+        np->evtchn, netif_int, SA_SAMPLE_RANDOM, dev->name, dev);
     netctrl_connected_count();
     (void)send_fake_arp(dev);
     vif_show(np);
@@ -1430,8 +1427,7 @@ static void netif_exit(void)
 static void vif_suspend(struct net_private *np)
 {
     /* Avoid having tx/rx stuff happen until we're ready. */
-    free_irq(np->irq, np->dev);
-    unbind_evtchn_from_irq(np->evtchn);
+    unbind_evtchn_from_irqhandler(np->evtchn, np->dev);
 }
 
 static void vif_resume(struct net_private *np)

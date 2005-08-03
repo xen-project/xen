@@ -26,7 +26,6 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-//#define DEBUG
 
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/evtchn.h>
@@ -35,8 +34,6 @@
 #include <linux/sched.h>
 #include <linux/err.h>
 #include "xenbus_comms.h"
-
-static unsigned int xb_irq;
 
 #define RINGBUF_DATASIZE ((PAGE_SIZE / 2) - sizeof(struct ringbuf_head))
 struct ringbuf_head
@@ -212,9 +209,9 @@ int xb_init_comms(void)
 	if (!xen_start_info.store_evtchn)
 		return 0;
 
-	xb_irq = bind_evtchn_to_irq(xen_start_info.store_evtchn);
-
-	err = request_irq(xb_irq, wake_waiting, 0, "xenbus", &xb_waitq);
+	err = bind_evtchn_to_irqhandler(
+		xen_start_info.store_evtchn, wake_waiting,
+		0, "xenbus", &xb_waitq);
 	if (err) {
 		printk(KERN_ERR "XENBUS request irq failed %i\n", err);
 		unbind_evtchn_from_irq(xen_start_info.store_evtchn);
@@ -234,6 +231,5 @@ void xb_suspend_comms(void)
 	if (!xen_start_info.store_evtchn)
 		return;
 
-	free_irq(xb_irq, &xb_waitq);
-	unbind_evtchn_from_irq(xen_start_info.store_evtchn);
+	unbind_evtchn_from_irqhandler(xen_start_info.store_evtchn, &xb_waitq);
 }

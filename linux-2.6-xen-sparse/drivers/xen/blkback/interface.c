@@ -32,29 +32,20 @@ static void __blkif_disconnect_complete(void *arg)
     blkif_t              *blkif = (blkif_t *)arg;
     ctrl_msg_t            cmsg;
     blkif_be_disconnect_t disc;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    struct gnttab_unmap_grant_ref op;
+#endif
 
     /*
      * These can't be done in blkif_disconnect() because at that point there
      * may be outstanding requests at the disc whose asynchronous responses
      * must still be notified to the remote driver.
      */
-    unbind_evtchn_from_irqhandler(blkif->evtchn, blkif);
-
 #ifdef CONFIG_XEN_BLKDEV_GRANT
-    {
-        /*
-         * Release the shared memory page.
-         */
-        struct gnttab_unmap_grant_ref op;
-
-        op.host_virt_addr = blkif->shmem_vaddr;
-        op.handle         = blkif->shmem_handle;
-        op.dev_bus_addr   = 0;
-
-        if(unlikely(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1))) {
-            BUG();
-        }
-    }
+    op.host_virt_addr = blkif->shmem_vaddr;
+    op.handle         = blkif->shmem_handle;
+    op.dev_bus_addr   = 0;
+    BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
 #endif
     vfree(blkif->blk_ring.sring);
 
@@ -76,8 +67,7 @@ static void __blkif_disconnect_complete(void *arg)
      * another CPU doesn't see the status change yet.
      */
     mb();
-    if ( blkif->status != DISCONNECTING )
-        BUG();
+    BUG_ON(blkif->status != DISCONNECTING);
     blkif->status = DISCONNECTED;
     mb();
 
@@ -277,6 +267,7 @@ int blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id)
         blkif->status = DISCONNECTING;
         blkif->disconnect_rspid = rsp_id;
         wmb(); /* Let other CPUs see the status change. */
+        unbind_evtchn_from_irqhandler(blkif->evtchn, blkif);
         blkif_deschedule(blkif);
         blkif_put(blkif);
         return 0; /* Caller should not send response message. */

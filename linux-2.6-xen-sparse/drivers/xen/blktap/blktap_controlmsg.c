@@ -16,16 +16,15 @@ static char *blkif_state_name[] = {
     [BLKIF_STATE_CONNECTED]    = "connected",
 };
 
-static char * blkif_status_name[] = {
+static char *blkif_status_name[] = {
     [BLKIF_INTERFACE_STATUS_CLOSED]       = "closed",
     [BLKIF_INTERFACE_STATUS_DISCONNECTED] = "disconnected",
     [BLKIF_INTERFACE_STATUS_CONNECTED]    = "connected",
     [BLKIF_INTERFACE_STATUS_CHANGED]      = "changed",
 };
 
-static unsigned blktap_be_irq;
-unsigned int    blktap_be_state = BLKIF_STATE_CLOSED;
-unsigned int    blktap_be_evtchn;
+unsigned int blktap_be_state = BLKIF_STATE_CLOSED;
+unsigned int blktap_be_evtchn;
 
 /*-----[ Control Messages to/from Frontend VMs ]--------------------------*/
 
@@ -55,7 +54,6 @@ static void __blkif_disconnect_complete(void *arg)
      * may be outstanding requests at the disc whose asynchronous responses
      * must still be notified to the remote driver.
      */
-    unbind_evtchn_from_irq(blkif->evtchn);
     vfree(blkif->blk_ring.sring);
 
     /* Construct the deferred response message. */
@@ -232,12 +230,12 @@ void blkif_ptfe_connect(blkif_be_connect_t *connect)
     BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
     
     blkif->evtchn        = evtchn;
-    blkif->irq           = bind_evtchn_to_irq(evtchn);
     blkif->shmem_frame   = shmem_frame;
     blkif->status        = CONNECTED;
     blkif_get(blkif);
 
-    request_irq(blkif->irq, blkif_ptfe_int, 0, "blkif-pt-backend", blkif);
+    bind_evtchn_to_irqhandler(
+        evtchn, blkif_ptfe_int, 0, "blkif-pt-backend", blkif);
 
     connect->status = BLKIF_BE_STATUS_OKAY;
 }
@@ -264,7 +262,7 @@ int blkif_ptfe_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id)
         blkif->status = DISCONNECTING;
         blkif->disconnect_rspid = rsp_id;
         wmb(); /* Let other CPUs see the status change. */
-        free_irq(blkif->irq, blkif);
+        unbind_evtchn_from_irqhandler(blkif->evtchn, blkif);
         blkif_deschedule(blkif);
         blkif_put(blkif);
         return 0; /* Caller should not send response message. */
@@ -313,12 +311,11 @@ static void blkif_ptbe_connect(blkif_fe_interface_status_t *status)
     int err = 0;
     
     blktap_be_evtchn = status->evtchn;
-    blktap_be_irq    = bind_evtchn_to_irq(blktap_be_evtchn);
 
-    err = request_irq(blktap_be_irq, blkif_ptbe_int, 
-                      SA_SAMPLE_RANDOM, "blkif", NULL);
+    err = bind_evtchn_to_irqhandler(
+        blktap_be_evtchn, blkif_ptbe_int, SA_SAMPLE_RANDOM, "blkif", NULL);
     if ( err ) {
-	WPRINTK("blkfront request_irq failed (%d)\n", err);
+	WPRINTK("blkfront bind_evtchn_to_irqhandler failed (%d)\n", err);
         return;
     } else {
 	/* transtion to connected in case we need to do a 

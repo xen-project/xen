@@ -42,7 +42,6 @@ typedef struct netif_st {
     unsigned long    tx_shmem_frame;
     unsigned long    rx_shmem_frame;
     unsigned int     evtchn;
-    int              irq;
 
     /* The shared rings and indexes. */
     netif_tx_interface_t *tx;

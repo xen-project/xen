@@ -1536,8 +1536,7 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
             
             /* Clean up resources. */
             free_page((unsigned long)xhci->usb_ring.sring);
-            free_irq(xhci->irq, xhci);
-            unbind_evtchn_from_irq(xhci->evtchn);
+            unbind_evtchn_from_irqhandler(xhci->evtchn, xhci);
 
             /* Plug the ring. */
             xhci->recovery = 1;
@@ -1572,7 +1571,6 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
         }
 
         xhci->evtchn = status->evtchn;
-        xhci->irq = bind_evtchn_to_irq(xhci->evtchn);
 	xhci->bandwidth = status->bandwidth;
 	xhci->rh.numports = status->num_ports;
 
@@ -1595,14 +1593,14 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
  	usb_claim_bandwidth(xhci->rh.dev, xhci->rh.urb,
  			    1000 - xhci->bandwidth, 0);
 
-        if ( (rc = request_irq(xhci->irq, xhci_interrupt, 
+        if ( (rc = bind_evtchn_to_irqhandler(xhci->evtchn, xhci_interrupt, 
                                SA_SAMPLE_RANDOM, "usbif", xhci)) )
                 printk(KERN_ALERT"usbfront request_irq failed (%ld)\n",rc);
 
 	DPRINTK(KERN_INFO __FILE__
-                ": USB XHCI: SHM at %p (0x%lx), EVTCHN %d IRQ %d\n",
+                ": USB XHCI: SHM at %p (0x%lx), EVTCHN %d\n",
                 xhci->usb_ring.sring, virt_to_machine(xhci->usbif),
-                xhci->evtchn, xhci->irq);
+                xhci->evtchn);
 
         xhci->state = USBIF_STATE_CONNECTED;
 

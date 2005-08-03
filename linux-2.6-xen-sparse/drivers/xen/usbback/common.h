@@ -37,7 +37,6 @@ struct usbif_priv_st {
     /* Physical parameters of the comms window. */
     unsigned long    shmem_frame;
     unsigned int     evtchn;
-    int              irq;
     /* Comms Information */
     usbif_back_ring_t usb_ring;
     /* Private fields. */

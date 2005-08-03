@@ -33,7 +33,8 @@ static void __netif_up(netif_t *netif)
     spin_lock_bh(&dev->xmit_lock);
     netif->active = 1;
     spin_unlock_bh(&dev->xmit_lock);
-    (void)request_irq(netif->irq, netif_be_int, 0, dev->name, netif);
+    (void)bind_evtchn_to_irqhandler(
+        netif->evtchn, netif_be_int, 0, dev->name, netif);
     netif_schedule_work(netif);
 }
 
@@ -43,7 +44,7 @@ static void __netif_down(netif_t *netif)
     spin_lock_bh(&dev->xmit_lock);
     netif->active = 0;
     spin_unlock_bh(&dev->xmit_lock);
-    free_irq(netif->irq, netif);
+    unbind_evtchn_from_irqhandler(netif->evtchn, netif);
     netif_deschedule_work(netif);
 }
 
@@ -76,7 +77,6 @@ static void __netif_disconnect_complete(void *arg)
      * may be outstanding requests in the network stack whose asynchronous
      * responses must still be notified to the remote driver.
      */
-    unbind_evtchn_from_irq(netif->evtchn);
     vfree(netif->tx); /* Frees netif->rx as well. */
 
     /* Construct the deferred response message. */
@@ -322,7 +322,6 @@ void netif_connect(netif_be_connect_t *connect)
     }
 
     netif->evtchn         = evtchn;
-    netif->irq            = bind_evtchn_to_irq(evtchn);
     netif->tx_shmem_frame = tx_shmem_frame;
     netif->rx_shmem_frame = rx_shmem_frame;
     netif->tx             = 
