@@ -1040,7 +1040,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
                         unsigned int type)
 {
     l2_pgentry_t ol2e;
-    unsigned long vaddr;
+    unsigned long vaddr = 0;
 
     if ( unlikely(!is_guest_l2_slot(type,pgentry_ptr_to_slot(pl2e))) )
     {
