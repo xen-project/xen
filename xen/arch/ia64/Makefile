@@ -1,6 +1,6 @@
 include $(BASEDIR)/Rules.mk
 
-VPATH = linux
+VPATH = linux linux-xen
 
 # libs-y	+= arch/ia64/lib/lib.a
 
