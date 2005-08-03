@@ -434,7 +434,6 @@ void __init start_secondary(void *unused)
 	unsigned int cpu = cpucount;
 
 	extern void percpu_traps_init(void);
-	extern void cpu_init(void);
 
 	set_current(idle_task[cpu]);
 	set_processor_id(cpu);

@@ -386,6 +386,7 @@ void vcpu_unpause(struct vcpu *v);
 void domain_unpause(struct domain *d);
 void domain_pause_by_systemcontroller(struct domain *d);
 void domain_unpause_by_systemcontroller(struct domain *d);
+void cpu_init(void);
 
 static inline void vcpu_unblock(struct vcpu *v)
 {

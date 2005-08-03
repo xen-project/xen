@@ -1155,7 +1155,6 @@ void set_tss_desc(unsigned int n, void *addr)
 void __init trap_init(void)
 {
     extern void percpu_traps_init(void);
-    extern void cpu_init(void);
 
     /*
      * Note that interrupt gates are always used, rather than trap gates. We 
