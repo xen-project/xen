@@ -38,7 +38,7 @@ static void __blkif_disconnect_complete(void *arg)
      * may be outstanding requests at the disc whose asynchronous responses
      * must still be notified to the remote driver.
      */
-    unbind_evtchn_from_irq(blkif->evtchn);
+    unbind_evtchn_from_irqhandler(blkif->evtchn, blkif);
 
 #ifdef CONFIG_XEN_BLKDEV_GRANT
     {
@@ -247,12 +247,12 @@ void blkif_connect(blkif_be_connect_t *connect)
     BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
     
     blkif->evtchn        = evtchn;
-    blkif->irq           = bind_evtchn_to_irq(evtchn);
     blkif->shmem_frame   = shmem_frame;
     blkif->status        = CONNECTED;
     blkif_get(blkif);
 
-    request_irq(blkif->irq, blkif_be_int, 0, "blkif-backend", blkif);
+    bind_evtchn_to_irqhandler(
+        blkif->evtchn, blkif_be_int, 0, "blkif-backend", blkif);
 
     connect->status = BLKIF_BE_STATUS_OKAY;
 }
@@ -277,7 +277,6 @@ int blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id)
         blkif->status = DISCONNECTING;
         blkif->disconnect_rspid = rsp_id;
         wmb(); /* Let other CPUs see the status change. */
-        free_irq(blkif->irq, blkif);
         blkif_deschedule(blkif);
         blkif_put(blkif);
         return 0; /* Caller should not send response message. */

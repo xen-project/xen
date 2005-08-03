@@ -229,12 +229,13 @@ void unbind_virq_from_irq(int virq)
         if ( HYPERVISOR_event_channel_op(&op) != 0 )
             panic("Failed to unbind virtual IRQ %d\n", virq);
 
-	/* This is a slight hack.  Interdomain ports can be allocated
-	   directly by userspace, and at that point they get bound by
-	   Xen to vcpu 0.  We therefore need to make sure that if we
-	   get an event on an event channel we don't know about vcpu 0
-	   handles it.  Binding channels to vcpu 0 when closing them
-	   achieves this. */
+        /*
+	 * This is a slight hack. Interdomain ports can be allocated directly 
+	 * by userspace, and at that point they get bound by Xen to vcpu 0. We 
+	 * therefore need to make sure that if we get an event on an event 
+	 * channel we don't know about vcpu 0 handles it. Binding channels to 
+	 * vcpu 0 when closing them achieves this.
+         */
 	bind_evtchn_to_cpu(evtchn, 0);
         evtchn_to_irq[evtchn] = -1;
         irq_to_evtchn[irq]    = -1;
@@ -244,7 +245,7 @@ void unbind_virq_from_irq(int virq)
     spin_unlock(&irq_mapping_update_lock);
 }
 
-int bind_ipi_on_cpu_to_irq(int ipi)
+int bind_ipi_to_irq(int ipi)
 {
     evtchn_op_t op;
     int evtchn, irq;
@@ -306,7 +307,7 @@ void unbind_ipi_from_irq(int ipi)
     spin_unlock(&irq_mapping_update_lock);
 }
 
-int bind_evtchn_to_irq(int evtchn)
+int bind_evtchn_to_irq(unsigned int evtchn)
 {
     int irq;
 
@@ -326,7 +327,7 @@ int bind_evtchn_to_irq(int evtchn)
     return irq;
 }
 
-void unbind_evtchn_from_irq(int evtchn)
+void unbind_evtchn_from_irq(unsigned int evtchn)
 {
     int irq = evtchn_to_irq[evtchn];
 
@@ -339,6 +340,33 @@ void unbind_evtchn_from_irq(int evtchn)
     }
 
     spin_unlock(&irq_mapping_update_lock);
+}
+
+int bind_evtchn_to_irqhandler(
+    unsigned int evtchn,
+    irqreturn_t (*handler)(int, void *, struct pt_regs *),
+    unsigned long irqflags,
+    const char *devname,
+    void *dev_id)
+{
+    unsigned int irq;
+    int retval;
+
+    BUG_ON((irqflags & ~SA_SAMPLE_RANDOM) != 0);
+
+    irq = bind_evtchn_to_irq(evtchn);
+    retval = request_irq(irq, handler, irqflags, devname, dev_id);
+    if ( retval != 0 )
+        unbind_evtchn_from_irq(evtchn);
+
+    return retval;
+}
+
+void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id)
+{
+    unsigned int irq = evtchn_to_irq[evtchn];
+    free_irq(irq, dev_id);
+    unbind_evtchn_from_irq(evtchn);
 }
 
 static void do_nothing_function(void *ign)
@@ -358,34 +386,33 @@ static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 	return;
     }
 
-    /* Tell Xen to send future instances of this interrupt to the
-       other vcpu */
+    /* Tell Xen to send future instances of this interrupt to other vcpu. */
     op.cmd = EVTCHNOP_bind_vcpu;
     op.u.bind_vcpu.port = evtchn;
     op.u.bind_vcpu.vcpu = tcpu;
 
-    /* If this fails, it usually just indicates that we're dealing
-       with a virq or IPI channel, which don't actually need to be
-       rebound.  Ignore it, but don't do the xenlinux-level rebind
-       in that case. */
+    /*
+     * If this fails, it usually just indicates that we're dealing with a virq 
+     * or IPI channel, which don't actually need to be rebound. Ignore it, 
+     * but don't do the xenlinux-level rebind in that case.
+     */
     if (HYPERVISOR_event_channel_op(&op) >= 0)
 	bind_evtchn_to_cpu(evtchn, tcpu);
 
     spin_unlock(&irq_mapping_update_lock);
 
-    /* Now send the new target processor a NOP IPI.  When this
-       returns, it will check for any pending interrupts, and so
-       service any that got delivered to the wrong processor by
-       mistake. */
-    /* XXX: The only time this is called with interrupts disabled is
-       from the hotplug/hotunplug path.  In that case, all cpus are
-       stopped with interrupts disabled, and the missed interrupts
-       will be picked up when they start again.  This is kind of a
-       hack.
-    */
-    if (!irqs_disabled()) {
+    /*
+     * Now send the new target processor a NOP IPI. When this returns, it 
+     * will check for any pending interrupts, and so service any that got 
+     * delivered to the wrong processor by mistake.
+     * 
+     * XXX: The only time this is called with interrupts disabled is from the 
+     * hotplug/hotunplug path. In that case, all cpus are stopped with 
+     * interrupts disabled, and the missed interrupts will be picked up when 
+     * they start again. This is kind of a hack.
+     */
+    if (!irqs_disabled())
 	smp_call_function(do_nothing_function, NULL, 0, 0);
-    }
 }
 
 

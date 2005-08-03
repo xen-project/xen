@@ -12,6 +12,7 @@ static int errno;
 #include <asm/irq.h>
 #include <asm/mmu_context.h>
 #include <asm-xen/ctrl_if.h>
+#include <asm-xen/evtchn.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/linux-public/suspend.h>

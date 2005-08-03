@@ -122,18 +122,4 @@
 #define dynirq_to_irq(_x)	((_x) + DYNIRQ_BASE)
 #define irq_to_dynirq(_x)	((_x) - DYNIRQ_BASE)
 
-#ifndef __ASSEMBLY__
-/* Dynamic binding of event channels and VIRQ sources to Linux IRQ space. */
-extern int  bind_virq_to_irq(int virq);
-extern void unbind_virq_from_irq(int virq);
-extern int  bind_ipi_to_irq(int ipi);
-extern int  bind_ipi_on_cpu_to_irq(int ipi);
-extern void unbind_ipi_from_irq(int ipi);
-extern int  bind_evtchn_to_irq(int evtchn);
-extern void unbind_evtchn_from_irq(int evtchn);
-
-extern void irq_suspend(void);
-extern void irq_resume(void);
-#endif /* __ASSEMBLY__ */
-
 #endif /* _ASM_IRQ_VECTORS_H */

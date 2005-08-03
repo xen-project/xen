@@ -15,6 +15,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <asm-xen/ctrl_if.h>
+#include <asm-xen/evtchn.h>
 #include <asm-xen/xen-public/io/netif.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>

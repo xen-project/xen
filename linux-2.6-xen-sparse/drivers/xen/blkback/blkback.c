@@ -12,7 +12,6 @@
  */
 
 #include "common.h"
-#include <asm-xen/evtchn.h>
 #ifdef CONFIG_XEN_BLKDEV_GRANT
 #include <asm-xen/xen-public/grant_table.h>
 #endif

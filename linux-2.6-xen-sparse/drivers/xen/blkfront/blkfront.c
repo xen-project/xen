@@ -78,7 +78,6 @@ static void vbd_update(void){};
 static int blkif_handle = 0;
 static unsigned int blkif_state = BLKIF_STATE_CLOSED;
 static unsigned int blkif_evtchn = 0;
-static unsigned int blkif_irq = 0;
 
 static int blkif_control_rsp_valid;
 static blkif_response_t blkif_control_rsp;
@@ -1159,10 +1158,7 @@ static void blkif_free(void)
         free_page((unsigned long)blk_ring.sring);
         blk_ring.sring = NULL;
     }
-    free_irq(blkif_irq, NULL);
-    blkif_irq = 0;
-    
-    unbind_evtchn_from_irq(blkif_evtchn);
+    unbind_evtchn_from_irqhandler(blkif_evtchn, NULL);
     blkif_evtchn = 0;
 }
 
@@ -1266,12 +1262,12 @@ static void blkif_connect(blkif_fe_interface_status_t *status)
     int err = 0;
 
     blkif_evtchn = status->evtchn;
-    blkif_irq    = bind_evtchn_to_irq(blkif_evtchn);
 
-    err = request_irq(blkif_irq, blkif_int, SA_SAMPLE_RANDOM, "blkif", NULL);
-    if ( err )
+    err = bind_evtchn_to_irqhandler(
+        blkif_evtchn, blkif_int, SA_SAMPLE_RANDOM, "blkif", NULL);
+    if ( err != 0 )
     {
-        WPRINTK("request_irq failed (err=%d)\n", err);
+        WPRINTK("bind_evtchn_to_irqhandler failed (err=%d)\n", err);
         return;
     }
 

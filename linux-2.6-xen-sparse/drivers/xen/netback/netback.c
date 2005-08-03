@@ -12,7 +12,6 @@
 
 #include "common.h"
 #include <asm-xen/balloon.h>
-#include <asm-xen/evtchn.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 #include <linux/delay.h>

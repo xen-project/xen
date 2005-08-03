@@ -70,6 +70,8 @@
 
 #include "io_ports.h"
 
+#include <asm-xen/evtchn.h>
+
 extern spinlock_t i8259A_lock;
 int pit_latch_buggy;              /* extern */
 

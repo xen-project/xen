@@ -13,6 +13,7 @@
 #include <asm/setup.h>
 #include <asm/pgalloc.h>
 #include <asm-xen/ctrl_if.h>
+#include <asm-xen/evtchn.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/io/blkif.h>
 #include <asm-xen/xen-public/io/ring.h>
@@ -42,7 +43,6 @@ typedef struct blkif_st {
     /* Physical parameters of the comms window. */
     unsigned long     shmem_frame;
     unsigned int      evtchn;
-    int               irq;
     /* Comms information. */
     blkif_back_ring_t blk_ring;
     /* VBDs attached to this interface. */
