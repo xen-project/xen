@@ -114,6 +114,14 @@ def stop_xcs():
         xcs_pidfile.close()
     except:
 	return    
+
+def start_xenstored():
+    if os.fork() == 0:
+        os.execvp('/usr/sbin/xenstored', ['/usr/sbin/xenstored']);
+
+def start_consoled():
+    if os.fork() == 0:
+        os.execvp('/usr/sbin/consoled', ['/usr/sbin/consoled']);
             
 def main():
     try:
@@ -130,11 +138,13 @@ def main():
         return status >> 8
     elif sys.argv[1] == 'start':
         start_xcs()
-        if os.fork() == 0:
-            os.execvp('/usr/sbin/consoled', ['/usr/sbin/consoled']);
+        start_xenstored()
+        start_consoled()
         return daemon.start()
     elif sys.argv[1] == 'trace_start':
         start_xcs()
+        start_xenstored()
+        start_consoled()
         return daemon.start(trace=1)
     elif sys.argv[1] == 'stop':
         stop_xcs()
@@ -142,6 +152,8 @@ def main():
     elif sys.argv[1] == 'restart':
         stop_xcs()
         start_xcs()
+        start_xenstored()
+        start_consoled()
         return daemon.stop() or daemon.start()
     elif sys.argv[1] == 'status':
         return daemon.status()
