@@ -824,7 +824,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 	op.cmd             = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = current->thread.io_pl = 1;
+	op.u.set_iopl.iopl = 1;
 	HYPERVISOR_physdev_op(&op);
 
 	if (xen_start_info.flags & SIF_INITDOMAIN) {

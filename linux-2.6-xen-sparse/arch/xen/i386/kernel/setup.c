@@ -1636,7 +1636,7 @@ void __init setup_arch(char **cmdline_p)
 		efi_map_memmap();
 
 	op.cmd             = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = current->thread.io_pl = 1;
+	op.u.set_iopl.iopl = 1;
 	HYPERVISOR_physdev_op(&op);
 
 #ifdef CONFIG_ACPI_BOOT

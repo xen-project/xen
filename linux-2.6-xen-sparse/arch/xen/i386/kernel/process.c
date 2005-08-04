@@ -539,7 +539,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 
 	if (unlikely(prev->io_pl != next->io_pl)) {
 		iopl_op.cmd             = PHYSDEVOP_SET_IOPL;
-		iopl_op.u.set_iopl.iopl = next->io_pl;
+		iopl_op.u.set_iopl.iopl = (next->io_pl == 0) ? 1 : next->io_pl;
 		mcl->op      = __HYPERVISOR_physdev_op;
 		mcl->args[0] = (unsigned long)&iopl_op;
 		mcl++;
