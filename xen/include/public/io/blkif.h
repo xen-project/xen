@@ -47,7 +47,7 @@ typedef struct blkif_request {
     unsigned long  frame_and_sects[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 } blkif_request_t;
 
-#define blkif_fas(_addr, _fs, _ls) ((addr)|((_fs)<<5)|(_ls))
+#define blkif_fas(_addr, _fs, _ls) ((_addr)|((_fs)<<5)|(_ls))
 #define blkif_first_sect(_fas) (((_fas)>>5)&31)
 #define blkif_last_sect(_fas)  ((_fas)&31)
 

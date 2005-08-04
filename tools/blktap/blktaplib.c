@@ -34,7 +34,7 @@
 #else
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
-#define DEBUG_RING_IDXS 0
+#define DEBUG_RING_IDXS 1
 
 #define POLLRDNORM     0x040 
 
