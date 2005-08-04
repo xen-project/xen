@@ -379,7 +379,7 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
 
     /* Make sure the buffer is page-sized. */
     if ( (blkif_first_sect(req->frame_and_sects[0]) != 0) ||
-         (blkif_last_sect(req->frame_and_sects[0]) != 7) )
+         (blkif_last_sect(req->frame_and_sects[0]) != ((PAGE_SIZE/512)-1)) )
         goto out;
 
 #ifdef CONFIG_XEN_BLKDEV_GRANT

@@ -775,7 +775,7 @@ static int blkif_queue_request(unsigned long   id,
     /* Buffer must be sector-aligned. Extent mustn't cross a page boundary. */
     if ( unlikely((buffer_ma & ((1<<9)-1)) != 0) )
         BUG();
-    if ( lsect > 7 )
+    if ( lsect > ((PAGE_SIZE/512)-1) )
         BUG();
 
     buffer_ma &= PAGE_MASK;
