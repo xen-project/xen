@@ -137,7 +137,7 @@ static vdisk_t *xlvbd_probe(int *ret)
     blkif_control_probe_send(&req, &rsp,
                              (unsigned long)(virt_to_machine(buf)));
 #else
-    req.frame_and_sects[0] = blkif_fas(virt_to_machine(buf), 0, ((PAGE_SIZE/512)-1);
+    req.frame_and_sects[0] = blkif_fas(virt_to_machine(buf), 0, (PAGE_SIZE/512)-1);
 
     blkif_control_send(&req, &rsp);
 #endif
