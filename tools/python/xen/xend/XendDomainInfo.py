@@ -268,7 +268,6 @@ class XendDomainInfo:
         self.restart_time = None
         self.restart_count = 0
         
-        self.console_port = None
         self.vcpus = 1
         self.bootloader = None
 
@@ -344,9 +343,6 @@ class XendDomainInfo:
         s += " name=" + self.name
         s += " memory=" + str(self.memory)
         s += " ssidref=" + str(self.ssidref)
-        console = self.getConsole()
-        if console:
-            s += " console=" + str(console.console_port)
         s += ">"
         return s
 
@@ -443,9 +439,6 @@ class XendDomainInfo:
             sxpr.append(self.store_channel.sxpr())
         if self.store_mfn:
             sxpr.append(['store_mfn', self.store_mfn])
-        console = self.getConsole()
-        if console:
-            sxpr.append(console.sxpr())
 
         if self.restart_count:
             sxpr.append(['restart_count', self.restart_count])
@@ -519,7 +512,6 @@ class XendDomainInfo:
 
             # Create domain devices.
             self.configure_backends()
-            self.configure_console()
             self.configure_restart()
             self.construct_image()
             self.configure()
@@ -785,17 +777,6 @@ class XendDomainInfo:
         """
         self.bootloader = sxp.child_value(self.config, "bootloader")
 
-    def configure_console(self):
-        """Configure the vm console port.
-        """
-        x = sxp.child_value(self.config, 'console')
-        if x:
-            try:
-                port = int(x)
-            except:
-                raise VmError('invalid console:' + str(x))
-            self.console_port = port
-
     def configure_restart(self):
         """Configure the vm restart mode.
         """
@@ -855,7 +836,7 @@ class XendDomainInfo:
 
     def restart(self):
         """Restart the domain after it has exited.
-        Reuses the domain id and console port.
+        Reuses the domain id
 
         """
         try:
@@ -910,24 +891,8 @@ class XendDomainInfo:
 
         """
         self.configure_fields()
-        self.create_console()
         self.create_devices()
         self.create_blkif()
-
-    def create_console(self):
-        console = self.getConsole()
-        if not console:
-            config = ['console']
-            if self.console_port:
-                config.append(['console_port', self.console_port])
-            console = self.createDevice('console', config)
-        return console
-
-    def getConsole(self):
-        console_ctrl = self.getDeviceController("console", error=False)
-        if console_ctrl:
-            return console_ctrl.getDevice(0)
-        return None
 
     def create_blkif(self):
         """Create the block device interface (blkif) for the vm.
@@ -1048,7 +1013,6 @@ add_config_handler('memory',     vm_field_ignore)
 add_config_handler('ssidref',    vm_field_ignore)
 add_config_handler('cpu',        vm_field_ignore)
 add_config_handler('cpu_weight', vm_field_ignore)
-add_config_handler('console',    vm_field_ignore)
 add_config_handler('restart',    vm_field_ignore)
 add_config_handler('image',      vm_field_ignore)
 add_config_handler('device',     vm_field_ignore)
@@ -1061,9 +1025,6 @@ add_config_handler('maxmem',     vm_field_maxmem)
 
 #============================================================================
 # Register device controllers and their device config types.
-
-from server import console
-controller.addDevControllerClass("console", console.ConsoleController)
 
 from server import blkif
 controller.addDevControllerClass("vbd", blkif.BlkifController)

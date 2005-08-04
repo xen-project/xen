@@ -15,7 +15,6 @@ class SrvRoot(SrvDir):
     subdirs = [
         ('node',    'SrvNode'       ),
         ('domain',  'SrvDomainDir'  ),
-        ('console', 'SrvConsoleDir' ),
         ('vnet',    'SrvVnetDir'    ),
         ]
 

@@ -4,7 +4,6 @@ from xen.web import http
 
 from xen.xend import sxp
 from xen.xend import XendDomain
-from xen.xend import XendConsole
 from xen.xend import PrettyPrint
 from xen.xend.Args import FormFn
 
@@ -18,7 +17,6 @@ class SrvDomain(SrvDir):
         SrvDir.__init__(self)
         self.dom = dom
         self.xd = XendDomain.instance()
-        self.xconsole = XendConsole.instance()
 
     def op_configure(self, op, req):
         """Configure an existing domain.
@@ -208,14 +206,6 @@ class SrvDomain(SrvDir):
             self.print_path(req)
             #self.ls()
             req.write('<p>%s</p>' % self.dom)
-            if self.dom.console:
-                cinfo = self.dom.console
-                cid = str(cinfo.console_port)
-                #todo: Local xref: need to know server prefix.
-                req.write('<p><a href="/xend/console/%s">Console %s</a></p>'
-                          % (cid, cid))
-                req.write('<p><a href="%s">Connect to console</a></p>'
-                          % cinfo.uri())
             if self.dom.config:
                 req.write("<code><pre>")
                 PrettyPrint.prettyprint(self.dom.config, out=req)

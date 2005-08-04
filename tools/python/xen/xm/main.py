@@ -4,6 +4,7 @@
 import os
 import os.path
 import sys
+import commands
 from getopt import getopt
 import socket
 import warnings
@@ -390,7 +391,7 @@ class ProgList(Prog):
             self.brief_list(doms)
 
     def brief_list(self, doms):
-        print 'Name              Id  Mem(MB)  CPU VCPU(s)  State  Time(s)  Console'
+        print 'Name              Id  Mem(MB)  CPU VCPU(s)  State  Time(s)'
         for dom in doms:
             info = server.xend_domain(dom)
             d = {}
@@ -401,19 +402,14 @@ class ProgList(Prog):
             d['vcpus'] = int(sxp.child_value(info, 'vcpus', '0'))
             d['state'] = sxp.child_value(info, 'state', '??')
             d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
-            console = sxp.child(info, 'console')
-            if console:
-                d['port'] = sxp.child_value(console, 'console_port')
-            else:
-                d['port'] = ''
             if d['vcpus'] > 1:
                 d['cpu'] = '-'
             if ((int(sxp.child_value(info, 'ssidref', '0'))) != 0):
                 d['ssidref1'] =  int(sxp.child_value(info, 'ssidref', '0')) & 0xffff
                 d['ssidref2'] = (int(sxp.child_value(info, 'ssidref', '0')) >> 16) & 0xffff
-                print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %(port)4s    s:%(ssidref2)02x/p:%(ssidref1)02x" % d)
+                print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %s:%(ssidref2)02x/p:%(ssidref1)02x" % d)
             else:
-                print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %(port)4s" % d)
+                print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f" % d)
 
     def show_vcpus(self, doms):
         print 'Name              Id  VCPU  CPU  CPUMAP'
@@ -699,29 +695,6 @@ class ProgInfo(Prog):
 
 xm.prog(ProgInfo)
 
-class ProgConsoles(Prog):
-    group = 'console'
-    name = "consoles"
-    info = """Get information about domain consoles."""
-
-    def main(self, args):
-        l = server.xend_consoles()
-        print "Dom Port  Id Connection"
-        for x in l:
-            info = server.xend_console(x)
-            d = {}
-            d['dom'] = sxp.child(info, 'domain', '?')[1]
-            d['port'] = sxp.child_value(info, 'console_port', '?')
-            d['id'] = sxp.child_value(info, 'id', '?')
-            connected = sxp.child(info, 'connected')
-            if connected:
-                d['conn'] = '%s:%s' % (connected[1], connected[2])
-            else:
-                d['conn'] = ''
-            print "%(dom)3s %(port)4s %(id)3s %(conn)s" % d
-
-xm.prog(ProgConsoles)
-
 class ProgConsole(Prog):
     group = 'console'
     name = "console"
@@ -735,13 +708,9 @@ class ProgConsole(Prog):
         if len(args) < 2: self.err("%s: Missing domain" % args[0])
         dom = args[1]
         info = server.xend_domain(dom)
-        console = sxp.child(info, "console")
-        if not console:
-            self.err("No console information")
-        port = sxp.child_value(console, "console_port")
-        from xen.util import console_client
-        path = "/var/lib/xend/console-%s" % port
-        console_client.connect("localhost", int(port), path=path)
+        domid = int(sxp.child_value(info, 'id', '-1'))
+        cmd = "/usr/libexec/xen/xc_console %d" % domid
+        os.execvp('/usr/libexec/xen/xc_console', cmd.split())
 
 xm.prog(ProgConsole)
 

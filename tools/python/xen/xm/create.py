@@ -7,6 +7,7 @@ import random
 import string
 import sys
 import socket
+import commands
 
 import xen.lowlevel.xc
 
@@ -16,8 +17,6 @@ from xen.xend.XendClient import server, XendError
 from xen.xend.XendBootloader import bootloader
 from xen.xend import XendRoot; xroot = XendRoot.instance()
 from xen.util import blkif
-
-from xen.util import console_client
 
 from xen.xm.opts import *
 
@@ -144,10 +143,6 @@ gopts.var('cpu_weight', val='WEIGHT',
           fn=set_float, default=None,
           use="""Set the new domain's cpu weight.
           WEIGHT is a float that controls the domain's share of the cpu.""")
-
-gopts.var('console', val='PORT',
-          fn=set_int, default=None,
-          use="Console port to use. Default is 9600 + domain id.")
 
 gopts.var('restart', val='onreboot|always|never',
           fn=set_value, default=None,
@@ -471,8 +466,6 @@ def make_config(opts, vals):
         config.append(['backend', ['netif']])
     if vals.restart:
         config.append(['restart', vals.restart])
-    if vals.console:
-        config.append(['console', vals.console])
 
     if vals.bootloader:
         run_bootloader(opts, config, vals)
@@ -620,8 +613,8 @@ def make_domain(opts, config):
 
     @param opts:   options
     @param config: configuration
-    @return: domain id, console port
-    @rtype:  (int, int)
+    @return: domain id
+    @rtype:  int
     """
 
     try:
@@ -634,19 +627,13 @@ def make_domain(opts, config):
         opts.err(str(ex))
 
     dom = sxp.child_value(dominfo, 'name')
-    console_info = sxp.child(dominfo, 'console')
-    if console_info:
-        console_port = int(sxp.child_value(console_info, 'console_port'))
-    else:
-        console_port = None
 
     if not opts.vals.paused:
         if server.xend_domain_unpause(dom) < 0:
             server.xend_domain_destroy(dom)
             opts.err("Failed to unpause domain %s" % dom)
-    opts.info("Started domain %s, console on port %d"
-              % (dom, console_port))
-    return (dom, console_port)
+    opts.info("Started domain %s" % (dom))
+    return int(sxp.child_value(dominfo, 'id'))
 
 def get_dom0_alloc():
     """Return current allocation memory of dom0 (in MB). Return 0 on error"""
@@ -709,10 +696,10 @@ def main(argv):
         if dom0_min_mem != 0:
             balloon_out(dom0_min_mem, opts)
 
-        (dom, console) = make_domain(opts, config)
+        dom = make_domain(opts, config)
         if opts.vals.console_autoconnect:
-            path = "/var/lib/xend/console-%s" % console
-            console_client.connect('localhost', console, path=path)
+            cmd = "/usr/libexec/xen/xc_console %d" % dom
+            os.execvp('/usr/libexec/xen/xc_console', cmd.split())
         
 if __name__ == '__main__':
     main(sys.argv)

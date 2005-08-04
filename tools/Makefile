@@ -13,7 +13,7 @@ SUBDIRS += xcutils
 #SUBDIRS += pygrub
 SUBDIRS += firmware
 SUBDIRS += security
-#SUBDIRS += consoled
+SUBDIRS += consoled
 
 .PHONY: all install clean check check_clean ioemu eioemuinstall ioemuclean
 

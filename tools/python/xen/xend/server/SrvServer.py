@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
-"""Example xend HTTP and console server.
+"""Example xend HTTP
 
    Can be accessed from a browser or from a program.
    Do 'python SrvServer.py' to run the server.

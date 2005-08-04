@@ -128,16 +128,8 @@ class EventProtocol(protocol.Protocol):
     def op_pretty(self, name, req):
         self.pretty = 1
 
-    def op_console_disconnect(self, name, req):
-        id = sxp.child_value(req, 'id')
-        if not id:
-            raise XendError('Missing console id')
-        id = int(id)
-        self.daemon.console_disconnect(id)
-
     def op_info(self, name, req):
         val = ['info']
-        #val += self.daemon.consoles()
         #val += self.daemon.blkifs()
         #val += self.daemon.netifs()
         #val += self.daemon.usbifs()

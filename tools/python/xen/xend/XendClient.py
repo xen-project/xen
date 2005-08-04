@@ -5,9 +5,7 @@ Callable as a script - see main().
 Supports inet or unix connection to xend.
 
 This API is the 'control-plane' for xend.
-The 'data-plane' is done separately. For example, consoles
-are accessed via sockets on xend, but the list of consoles
-is accessible via this API.
+The 'data-plane' is done separately.
 """
 import os
 import sys
@@ -145,9 +143,6 @@ class Xend:
 
     def domainurl(self, id=''):
         return self.url.relative('domain/' + str(id))
-
-    def consoleurl(self, id=''):
-        return self.url.relative('console/' + str(id))
 
     def deviceurl(self, id=''):
         return self.url.relative('device/' + str(id))
@@ -317,16 +312,6 @@ class Xend:
                              {'op'      : 'device_configure',
                               'idx'     : idx,
                               'config'  : fileof(config) })
-
-    def xend_consoles(self):
-        return self.xendGet(self.consoleurl())
-
-    def xend_console(self, id):
-        return self.xendGet(self.consoleurl(id))
-
-    def xend_console_disconnect(self, id):
-        return self.xendPost(self.consoleurl(id),
-                             {'op'      : 'disconnect'})
 
     def xend_vnets(self):
         return self.xendGet(self.vneturl())

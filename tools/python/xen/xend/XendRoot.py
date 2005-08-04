@@ -70,12 +70,6 @@ class XendRoot:
     """Default path the unix-domain server listens at."""
     xend_unix_path_default = '/var/lib/xend/xend-socket'
 
-    """Default interface address xend listens at for consoles."""
-    console_address_default   = 'localhost'
-
-    """Default port xend serves consoles at. """
-    console_port_base_default = '9600'
-
     dom0_min_mem_default = '0'
 
     dom0_cpus_default = '0'
@@ -301,19 +295,6 @@ class XendRoot:
         """Get the path the xend unix-domain server listens at.
         """
         return self.get_config_value("xend-unix-path", self.xend_unix_path_default)
-
-    def get_console_address(self):
-        """Get the address xend listens at for its console ports.
-        This defaults to 'localhost', allowing only the localhost to connect
-        to the console ports.  Setting this to the empty string, allows all
-        hosts to connect.
-        """
-        return self.get_config_value('console-address', self.console_address_default)
-
-    def get_console_port_base(self):
-        """Get the base port number used to generate console ports for domains.
-        """
-        return self.get_config_int('console-port-base', self.console_port_base_default)
 
     def get_block_script(self, type):
         return self.get_config_value('block-%s' % type, '')
