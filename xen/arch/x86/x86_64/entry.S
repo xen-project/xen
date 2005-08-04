@@ -314,7 +314,8 @@ FLT4:   movq  %rax,16(%rsi)             # RFLAGS
         movq  VCPU_vcpu_info(%rbx),%rax
         pushq VCPUINFO_upcall_mask(%rax)
         testb $TBF_INTERRUPT,%cl
-        setnz VCPUINFO_upcall_mask(%rax)# TBF_INTERRUPT -> clear upcall mask
+        setnz %al                       # TBF_INTERRUPT -> set upcall mask
+        orb   %al,VCPUINFO_upcall_mask(%rax)
         popq  %rax
         shlq  $32,%rax                  # Bits 32-39: saved_upcall_mask
         movw  UREGS_cs+8(%rsp),%ax      # Bits  0-15: CS

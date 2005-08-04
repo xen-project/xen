@@ -335,7 +335,8 @@ FLT14:  movl %eax,%gs:(%esi)
         movl VCPU_vcpu_info(%ebx),%eax
         pushl VCPUINFO_upcall_mask(%eax)
         testb $TBF_INTERRUPT,%cl
-        setnz VCPUINFO_upcall_mask(%eax) # TBF_INTERRUPT -> clear upcall mask
+        setnz %al                        # TBF_INTERRUPT -> set upcall mask
+        orb  %al,VCPUINFO_upcall_mask(%eax)
         popl %eax
         shll $16,%eax                    # Bits 16-23: saved_upcall_mask
         movw UREGS_cs+4(%esp),%ax        # Bits  0-15: CS
