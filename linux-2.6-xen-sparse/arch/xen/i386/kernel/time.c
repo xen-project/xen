@@ -233,6 +233,10 @@ static void update_wallclock(void)
 	time_t wtm_sec, xtime_sec;
 	u64 tmp, usec;
 
+	if ((shadow_tv.tv_sec == s->wc_sec) &&
+	    (shadow_tv.tv_usec == s->wc_usec))
+		return;
+
 	shadow_tv.tv_sec  = s->wc_sec;
 	shadow_tv.tv_usec = s->wc_usec;
 
@@ -263,9 +267,9 @@ static void update_wallclock(void)
 
 /*
  * Reads a consistent set of time-base values from Xen, into a shadow data
- * area. Must be called with the xtime_lock held for writing.
+ * area.
  */
-static void __get_time_values_from_xen(void)
+static void get_time_values_from_xen(void)
 {
 	shared_info_t           *s = HYPERVISOR_shared_info;
 	struct vcpu_time_info   *src;
@@ -286,10 +290,6 @@ static void __get_time_values_from_xen(void)
 	while (dst->version != src->time_version1);
 
 	dst->tsc_to_usec_mul = dst->tsc_to_nsec_mul / 1000;
-
-	if ((shadow_tv.tv_sec != s->wc_sec) ||
-	    (shadow_tv.tv_usec != s->wc_usec))
-		update_wallclock();
 }
 
 static inline int time_values_up_to_date(int cpu)
@@ -341,10 +341,10 @@ void do_gettimeofday(struct timeval *tv)
 	unsigned long seq;
 	unsigned long usec, sec;
 	unsigned long max_ntp_tick;
-	unsigned long flags;
 	s64 nsec;
 	unsigned int cpu;
 	struct shadow_time_info *shadow;
+	u32 local_time_version;
 
 	cpu = get_cpu();
 	shadow = &per_cpu(shadow_time, cpu);
@@ -352,6 +352,7 @@ void do_gettimeofday(struct timeval *tv)
 	do {
 		unsigned long lost;
 
+		local_time_version = shadow->version;
 		seq = read_seqbegin(&xtime_lock);
 
 		usec = get_usec_offset(shadow);
@@ -387,12 +388,11 @@ void do_gettimeofday(struct timeval *tv)
 			 * overflowed). Detect that and recalculate
 			 * with fresh values.
 			 */
-			write_seqlock_irqsave(&xtime_lock, flags);
-			__get_time_values_from_xen();
-			write_sequnlock_irqrestore(&xtime_lock, flags);
+			get_time_values_from_xen();
 			continue;
 		}
-	} while (read_seqretry(&xtime_lock, seq));
+	} while (read_seqretry(&xtime_lock, seq) ||
+		 (local_time_version != shadow->version));
 
 	put_cpu();
 
@@ -435,7 +435,7 @@ int do_settimeofday(struct timespec *tv)
  again:
 	nsec = (s64)tv->tv_nsec - (s64)get_nsec_offset(shadow);
 	if (unlikely(!time_values_up_to_date(cpu))) {
-		__get_time_values_from_xen();
+		get_time_values_from_xen();
 		goto again;
 	}
 
@@ -517,21 +517,21 @@ unsigned long long monotonic_clock(void)
 {
 	int cpu = get_cpu();
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
-	s64 off;
-	unsigned long flags;
-	
-	for ( ; ; ) {
-		off = get_nsec_offset(shadow);
-		if (time_values_up_to_date(cpu))
-			break;
-		write_seqlock_irqsave(&xtime_lock, flags);
-		__get_time_values_from_xen();
-		write_sequnlock_irqrestore(&xtime_lock, flags);
-	}
+	u64 time;
+	u32 local_time_version;
+
+	do {
+		local_time_version = shadow->version;
+		smp_rmb();
+		time = shadow->system_timestamp + get_nsec_offset(shadow);
+		if (!time_values_up_to_date(cpu))
+			get_time_values_from_xen();
+		smp_rmb();
+	} while (local_time_version != shadow->version);
 
 	put_cpu();
 
-	return shadow->system_timestamp + off;
+	return time;
 }
 EXPORT_SYMBOL(monotonic_clock);
 
@@ -565,7 +565,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
 
 	do {
-		__get_time_values_from_xen();
+		get_time_values_from_xen();
 
 		delta = delta_cpu = 
 			shadow->system_timestamp + get_nsec_offset(shadow);
@@ -602,6 +602,8 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		update_process_times(user_mode(regs));
 		profile_tick(CPU_PROFILING, regs);
 	}
+
+	update_wallclock();
 }
 
 /*
@@ -788,7 +790,8 @@ void __init time_init(void)
 		return;
 	}
 #endif
-	__get_time_values_from_xen();
+	get_time_values_from_xen();
+	update_wallclock();
 	xtime.tv_sec = shadow_tv.tv_sec;
 	xtime.tv_nsec = shadow_tv.tv_usec * NSEC_PER_USEC;
 	set_normalized_timespec(&wall_to_monotonic,
@@ -872,7 +875,8 @@ void time_resume(void)
 	init_cpu_khz();
 
 	/* Get timebases for new environment. */ 
-	__get_time_values_from_xen();
+	get_time_values_from_xen();
+	update_wallclock();
 
 	/* Reset our own concept of passage of system time. */
 	processed_system_time =
