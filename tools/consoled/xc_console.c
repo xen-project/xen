@@ -78,23 +78,18 @@ static void init_term(int fd, struct termios *old)
 	struct termios new_term;
 
 	if (tcgetattr(fd, old) == -1) {
-		perror("tcgetattr() failed");
 		return;
 	}
 
 	new_term = *old;
 	cfmakeraw(&new_term);
 
-	if (tcsetattr(fd, TCSAFLUSH, &new_term) == -1) {
-		perror("tcsetattr() failed");
-	}
+	tcsetattr(fd, TCSAFLUSH, &new_term);
 }
 
 static void restore_term(int fd, struct termios *old)
 {
-	if (tcsetattr(fd, TCSAFLUSH, old) == -1) {
-		perror("tcsetattr() failed");
-	}
+	tcsetattr(fd, TCSAFLUSH, old);
 }
 
 static int console_loop(int xc_handle, domid_t domid, int fd)
@@ -113,7 +108,6 @@ static int console_loop(int xc_handle, domid_t domid, int fd)
 			if (errno == EINTR || errno == EAGAIN) {
 				continue;
 			}
-			perror("select() failed");
 			return -1;
 		}
 
@@ -131,7 +125,6 @@ static int console_loop(int xc_handle, domid_t domid, int fd)
 				    (errno == EINTR || errno == EAGAIN)) {
 					continue;
 				}
-				perror("select() failed");
 				return -1;
 			}
 
@@ -151,7 +144,6 @@ static int console_loop(int xc_handle, domid_t domid, int fd)
 				    (errno == EINTR || errno == EAGAIN)) {
 					continue;
 				}
-				perror("select() failed");
 				return -1;
 			}
 
