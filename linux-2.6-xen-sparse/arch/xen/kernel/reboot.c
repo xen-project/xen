@@ -1,7 +1,4 @@
-
 #define __KERNEL_SYSCALLS__
-static int errno;
-#include <linux/errno.h>
 #include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -309,7 +306,10 @@ static int setup_shutdown_watcher(struct notifier_block *notifier,
                                   unsigned long event,
                                   void *data)
 {
-    int err1=0, err2=0;
+    int err1 = 0;
+#ifdef CONFIG_MAGIC_SYSRQ
+    int err2 = 0;
+#endif
 
     down(&xenbus_lock);
     err1 = register_xenbus_watch(&shutdown_watch);
