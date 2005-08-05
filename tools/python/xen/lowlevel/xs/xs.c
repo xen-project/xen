@@ -343,7 +343,6 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
 #define xspy_watch_doc "\n"						\
 	"Watch a path, get notifications when it changes.\n"		\
 	" path     [string] : xenstore path.\n"				\
-	" priority [int]    : watch priority (default 0).\n"		\
 	" token    [string] : returned in watch notification.\n"	\
 	"\n"								\
 	"Returns: [int] 0 on success.\n"				\
@@ -352,10 +351,9 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
 
 static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwd_spec[] = { "path", "priority", "token", NULL };
+    static char *kwd_spec[] = { "path", "token", NULL };
     static char *arg_spec = "s|is";
     char *path = NULL;
-    int priority = 0;
     char *token = "";
 
     struct xs_handle *xh = xshandle(self);
@@ -365,7 +363,7 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
     if (!xh)
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, 
-                                     &path, &priority, &token))
+                                     &path, &token))
         goto exit;
     xsval = xs_watch(xh, path, token);
     val = pyvalue_int(xsval);
