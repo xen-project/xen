@@ -288,6 +288,7 @@ void handle_io(void)
 	fd_set readfds, writefds;
 	int ret;
 	int max_fd = -1;
+	int num_of_writes = 0;
 
 	do {
 		struct domain *d;
@@ -312,6 +313,17 @@ void handle_io(void)
 		}
 
 		ret = select(max_fd + 1, &readfds, &writefds, 0, &tv);
+		if (tv.tv_sec == 1 && (++num_of_writes % 100) == 0) {
+			/* FIXME */
+			/* This is a nasty hack.  xcs does not handle the
+			   control channels filling up well at all.  We'll
+			   throttle ourselves here since we do proper
+			   queueing to give the domains a shot at pulling out
+			   the data.  Fixing xcs is not worth it as it's
+			   going away */
+			tv.tv_usec = 1000;
+			select(0, 0, 0, 0, &tv);
+		}
 		enum_domains();
 
 		if (FD_ISSET(xcs_data_fd, &readfds)) {
