@@ -69,10 +69,21 @@ clean: testsuite-clean
 	rm -f xs_test xenstored_test xs_dom0_test
 	-$(RM) $(PROG_DEP)
 
-check: testsuite-run randomcheck stresstest
+print-dir:
+	@echo -n tools/xenstore: 
+
+print-end:
+	@echo
+
+check: print-dir testsuite-fast randomcheck-fast print-end
+
+fullcheck: testsuite-run randomcheck stresstest
 
 testsuite-run: xen xenstored_test xs_test
-	$(TESTENV) testsuite/test.sh
+	$(TESTENV) testsuite/test.sh && echo
+
+testsuite-fast: xen xenstored_test xs_test
+	@$(TESTENV) testsuite/test.sh --fast
 
 testsuite-clean:
 	rm -rf $(TESTDIR)
@@ -81,9 +92,12 @@ testsuite-clean:
 # fail.
 RANDSEED=$(shell date +%s)
 randomcheck: xs_random xenstored_test
-	$(TESTENV) ./xs_random --simple --fast /tmp/xs_random 200000 $(RANDSEED)
-	$(TESTENV) ./xs_random --fast /tmp/xs_random 100000 $(RANDSEED)
+	$(TESTENV) ./xs_random --simple --fast /tmp/xs_random 200000 $(RANDSEED) && echo
+	$(TESTENV) ./xs_random --fast /tmp/xs_random 100000 $(RANDSEED) && echo
 	$(TESTENV) ./xs_random --fail /tmp/xs_random 10000 $(RANDSEED)
+
+randomcheck-fast: xs_random xenstored_test
+	@$(TESTENV) ./xs_random --fast /tmp/xs_random 10000 $(RANDSEED)
 
 stresstest: xs_stress xs_watch_stress xenstored_test
 	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions

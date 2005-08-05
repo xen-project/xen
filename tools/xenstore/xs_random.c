@@ -1112,9 +1112,6 @@ static unsigned int try_simple(const bool *trymap,
 			data->ops->close(pre);
 		}
 	}
-	if (data->print_progress)
-		printf("\n");
-
 out:
 	data->ops->close(h);	
 	return i;
@@ -1192,10 +1189,9 @@ static void simple_test(const char *dir,
 	try = try_simple(NULL, iters, verbose, &data);
 	if (try == iters) {
 		cleanup_xs_ops();
-		printf("Succeeded\n");
 		exit(0);
 	}
-	printf("Failed on iteration %u\n", try + 1);
+	printf("Failed on iteration %u of seed %u\n", try + 1, seed);
 	data.print_progress = false;
 	reduce_problem(try + 1, try_simple, &data);
 }
@@ -1406,8 +1402,6 @@ static unsigned int try_diff(const bool *trymap,
 			talloc_free(fileh_pre);
 		}
 	}
-	if (data->print_progress)
-		printf("\n");
 
 	fail = NULL;
 	if (data->fast)
@@ -1435,10 +1429,9 @@ static void diff_test(const char *dir,
 	try = try_diff(NULL, iters, verbose, &data);
 	if (try == iters) {
 		cleanup_xs_ops();
-		printf("Succeeded\n");
 		exit(0);
 	}
-	printf("Failed on iteration %u\n", try + 1);
+	printf("Failed on iteration %u of seed %u\n", try + 1, seed);
 	data.print_progress = false;
 	reduce_problem(try + 1, try_diff, &data);
 }
@@ -1593,8 +1586,6 @@ static unsigned int try_fail(const bool *trymap,
 		xs_close(tmpxsh);
 		file_close(tmpfileh);
 	}
-
-	printf("Total %u of %u not aborted\n", tried - aborted, tried);
 out:
 	if (xsh)
 		xs_close(xsh);
@@ -1615,10 +1606,9 @@ static void fail_test(const char *dir,
 	try = try_fail(NULL, iters, verbose, &data);
 	if (try == iters) {
 		cleanup_xs_ops();
-		printf("Succeeded\n");
 		exit(0);
 	}
-	printf("Failed on iteration %u\n", try + 1);
+	printf("Failed on iteration %u of seed %u\n", try + 1, seed);
 	fflush(stdout);
 	data.print_progress = false;
 	reduce_problem(try + 1, try_fail, &data);

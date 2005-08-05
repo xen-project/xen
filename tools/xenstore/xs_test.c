@@ -17,6 +17,7 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -27,17 +28,26 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <fnmatch.h>
+#include <stdarg.h>
+#include <string.h>
+#include <getopt.h>
+#include <ctype.h>
+#include <sys/time.h>
 #include <sys/mman.h>
 #include "utils.h"
 #include "xs_lib.h"
+#include "list.h"
 
 #define XSTEST
 
 static struct xs_handle *handles[10] = { NULL };
-static unsigned int children;
 
-static bool timeout = true;
+static unsigned int timeout_ms = 50;
+static bool timeout_suppressed = true;
 static bool readonly = false;
+static bool print_input = false;
+static unsigned int linenum = 0;
 
 struct ringbuf_head
 {
@@ -178,7 +188,7 @@ static bool write_all_choice(int fd, const void *data, unsigned int len)
 static void __attribute__((noreturn)) usage(void)
 {
 	barf("Usage:\n"
-	     "       xs_test [--readonly] [--notimeout]\n"
+	     "       xs_test [--readonly] [--no-timeout] [-x]\n"
 	     "Reads commands from stdin, one per line:"
 	     "  dir <path>\n"
 	     "  read <path>\n"
@@ -190,8 +200,6 @@ static void __attribute__((noreturn)) usage(void)
 	     "  setperm <path> <id> <flags> ...\n"
 	     "  shutdown\n"
 	     "  watch <path> <token>\n"
-	     "  async <command>...\n"
-	     "  asyncwait\n"
 	     "  waitwatch\n"
 	     "  ackwatch <token>\n"
 	     "  unwatch <path> <token>\n"
@@ -200,7 +208,11 @@ static void __attribute__((noreturn)) usage(void)
 	     "  abort\n"
 	     "  introduce <domid> <mfn> <eventchn> <path>\n"
 	     "  commit\n"
-	     "  sleep <seconds>\n"
+	     "  sleep <milliseconds>\n"
+	     "  expect <pattern>\n"
+	     "  notimeout\n"
+	     "  readonly\n"
+	     "  readwrite\n"
 	     "  dump\n");
 }
 
@@ -218,7 +230,7 @@ static int argpos(const char *line, unsigned int num)
 	return off;
 }
 
-static char *arg(char *line, unsigned int num)
+static char *arg(const char *line, unsigned int num)
 {
 	static char *args[10];
 	unsigned int off, len;
@@ -236,12 +248,64 @@ static char *arg(char *line, unsigned int num)
 	return args[num];
 }
 
+struct expect
+{
+	struct list_head list;
+	char *pattern;
+};
+static LIST_HEAD(expects);
+
 static char *command;
-static void __attribute__((noreturn)) failed(int handle)
+
+/* Trim leading and trailing whitespace */
+static void trim(char *str)
+{
+	while (isspace(str[0]))
+		memmove(str, str+1, strlen(str));
+
+	while (strlen(str) && isspace(str[strlen(str)-1]))
+		str[strlen(str)-1] = '\0';
+}
+
+static void output(const char *fmt, ...)
+{
+	char *str;
+	struct expect *i;
+	va_list arglist;
+
+	va_start(arglist, fmt);
+	vasprintf(&str, fmt, arglist);
+	va_end(arglist);
+
+	printf("%s", str);
+	fflush(stdout);
+	trim(str);
+	list_for_each_entry(i, &expects, list) {
+		if (fnmatch(i->pattern, str, 0) == 0) {
+			list_del(&i->list);
+			free(i);
+			return;
+		}
+	}
+	barf("Unexpected output %s\n", str);
+}
+
+static void failed(int handle)
 {
 	if (handle)
-		barf_perror("%i: %s", handle, command);
-	barf_perror("%s", command);
+		output("%i: %s failed: %s\n",
+		       handle, command, strerror(errno));
+	else
+		output("%s failed: %s\n", command, strerror(errno));
+}
+
+static void expect(const char *line)
+{
+	struct expect *e = malloc(sizeof(*e));
+
+	e->pattern = strdup(line + argpos(line, 1));
+	trim(e->pattern);
+	list_add(&e->list, &expects);
 }
 
 static void do_dir(unsigned int handle, char *path)
@@ -250,14 +314,16 @@ static void do_dir(unsigned int handle, char *path)
 	unsigned int i, num;
 
 	entries = xs_directory(handles[handle], path, &num);
-	if (!entries)
+	if (!entries) {
 		failed(handle);
+		return;
+	}
 
 	for (i = 0; i < num; i++)
 		if (handle)
-			printf("%i:%s\n", handle, entries[i]);
+			output("%i:%s\n", handle, entries[i]);
 		else
-			printf("%s\n", entries[i]);
+			output("%s\n", entries[i]);
 	free(entries);
 }
 
@@ -267,15 +333,17 @@ static void do_read(unsigned int handle, char *path)
 	unsigned int len;
 
 	value = xs_read(handles[handle], path, &len);
-	if (!value)
+	if (!value) {
 		failed(handle);
+		return;
+	}
 
 	/* It's supposed to nul terminate for us. */
 	assert(value[len] == '\0');
 	if (handle)
-		printf("%i:%.*s\n", handle, len, value);
+		output("%i:%.*s\n", handle, len, value);
 	else
-		printf("%.*s\n", len, value);
+		output("%.*s\n", len, value);
 }
 
 static void do_write(unsigned int handle, char *path, char *flags, char *data)
@@ -322,8 +390,10 @@ static void do_getperm(unsigned int handle, char *path)
 	struct xs_permissions *perms;
 
 	perms = xs_get_permissions(handles[handle], path, &num);
-	if (!perms)
+	if (!perms) {
 		failed(handle);
+		return;
+	}
 
 	for (i = 0; i < num; i++) {
 		char *permstring;
@@ -346,9 +416,9 @@ static void do_getperm(unsigned int handle, char *path)
 		}
 
 		if (handle)
-			printf("%i:%i %s\n", handle, perms[i].id, permstring);
+			output("%i:%i %s\n", handle, perms[i].id, permstring);
 		else
-			printf("%i %s\n", perms[i].id, permstring);
+			output("%i %s\n", perms[i].id, permstring);
 	}
 	free(perms);
 }
@@ -399,15 +469,31 @@ static void do_watch(unsigned int handle, const char *node, const char *token)
 static void do_waitwatch(unsigned int handle)
 {
 	char **vec;
+	struct timeval tv = {.tv_sec = timeout_ms/1000,
+			     .tv_usec = (timeout_ms*1000)%1000000 };
+	fd_set set;
+
+	if (xs_fileno(handles[handle]) != -2) {
+		FD_ZERO(&set);
+		FD_SET(xs_fileno(handles[handle]), &set);
+		if (select(xs_fileno(handles[handle])+1, &set,
+			   NULL, NULL, &tv) == 0) {
+			errno = ETIMEDOUT;
+			failed(handle);
+			return;
+		}
+	}
 
 	vec = xs_read_watch(handles[handle]);
-	if (!vec)
+	if (!vec) {
 		failed(handle);
+		return;
+	}
 
 	if (handle)
-		printf("%i:%s:%s\n", handle, vec[0], vec[1]);
+		output("%i:%s:%s\n", handle, vec[0], vec[1]);
 	else
-		printf("%s:%s\n", vec[0], vec[1]);
+		output("%s:%s\n", vec[0], vec[1]);
 	free(vec);
 }
 
@@ -415,82 +501,6 @@ static void do_ackwatch(unsigned int handle, const char *token)
 {
 	if (!xs_acknowledge_watch(handles[handle], token))
 		failed(handle);
-}
-
-static bool wait_for_input(unsigned int handle)
-{
-	unsigned int i;
-	for (i = 0; i < ARRAY_SIZE(handles); i++) {
-		int fd;
-
-		if (!handles[i] || i == handle)
-			continue;
-
-		fd = xs_fileno(handles[i]);
-		if (fd == -2) {
-			unsigned int avail;
-			get_input_chunk(in, in->buf, &avail);
-			if (avail != 0)
-				return true;
-		} else {
-			struct timeval tv = {.tv_sec = 0, .tv_usec = 0 };
-			fd_set set;
-
-			FD_ZERO(&set);
-			FD_SET(fd, &set);
-			if (select(fd+1, &set, NULL, NULL,&tv))
-				return true;
-		}
-	}
-	return false;
-}
-
-
-/* Async wait for watch on handle */
-static void do_command(unsigned int default_handle, char *line);
-static void do_async(unsigned int handle, char *line)
-{
-	int child;
-	unsigned int i;
-	children++;
-	if ((child = fork()) != 0) {
-		/* Wait until *something* happens, which indicates
-		 * child has created an event.  V. sloppy, but we can't
-		 * select on fake domain connections.
-		 */
-		while (!wait_for_input(handle));
-		return;
-	}
-
-	/* Don't keep other handles open in parent. */
-	for (i = 0; i < ARRAY_SIZE(handles); i++) {
-		if (handles[i] && i != handle) {
-			xs_daemon_close(handles[i]);
-			handles[i] = NULL;
-		}
-	}
-
-	do_command(handle, line + argpos(line, 1));
-	exit(0);
-}
-
-static void do_asyncwait(unsigned int handle)
-{
-	int status;
-
-	if (handle)
-		barf("handle has no meaning with asyncwait");
-
-	if (children == 0)
-		barf("No children to wait for!");
-
-	if (waitpid(0, &status, 0) > 0) {
-		if (!WIFEXITED(status))
-			barf("async died");
-		if (WEXITSTATUS(status))
-			exit(WEXITSTATUS(status));
-	}
-	children--;
 }
 
 static void do_unwatch(unsigned int handle, const char *node, const char *token)
@@ -538,14 +548,17 @@ static void do_introduce(unsigned int handle,
 	*(int *)((void *)out + 32) = getpid();
 	*(u16 *)((void *)out + 36) = atoi(eventchn);
 
+	if (!xs_introduce_domain(handles[handle], atoi(domid),
+				 atol(mfn), atoi(eventchn), path)) {
+		failed(handle);
+		munmap(out, getpagesize());
+		return;
+	}
+	output("handle is %i\n", i);
+
 	/* Create new handle. */
 	handles[i] = new(struct xs_handle);
 	handles[i]->fd = -2;
-
-	if (!xs_introduce_domain(handles[handle], atoi(domid),
-				 atol(mfn), atoi(eventchn), path))
-		failed(handle);
-	printf("handle is %i\n", i);
 
 	/* Read in daemon pid. */
 	daemon_pid = *(int *)((void *)out + 32);
@@ -593,18 +606,20 @@ static void dump_dir(unsigned int handle,
 		sprintf(subnode, "%s/%s", node, dir[i]);
 
 		perms = xs_get_permissions(handles[handle], subnode,&numperms);
-		if (!perms)
+		if (!perms) {
 			failed(handle);
+			return;
+		}
 
-		printf("%s%s: ", spacing, dir[i]);
+		output("%s%s: ", spacing, dir[i]);
 		for (j = 0; j < numperms; j++) {
 			char buffer[100];
 			if (!xs_perm_to_string(&perms[j], buffer))
 				barf("perm to string");
-			printf("%s ", buffer);
+			output("%s ", buffer);
 		}
 		free(perms);
-		printf("\n");
+		output("\n");
 
 		/* Even directories can have contents. */
 		contents = xs_read(handles[handle], subnode, &len);
@@ -612,14 +627,16 @@ static void dump_dir(unsigned int handle,
 			if (errno != EISDIR)
 				failed(handle);
 		} else {
-			printf(" %s(%.*s)\n", spacing, len, contents);
+			output(" %s(%.*s)\n", spacing, len, contents);
 			free(contents);
 		}			
 
 		/* Every node is a directory. */
 		subdirs = xs_directory(handles[handle], subnode, &subnum);
-		if (!subdirs)
+		if (!subdirs) {
 			failed(handle);
+			return;
+		}
 		dump_dir(handle, subnode, subdirs, subnum, depth+1);
 		free(subdirs);
 	}
@@ -631,8 +648,10 @@ static void dump(int handle)
 	unsigned int subnum;
 
 	subdirs = xs_directory(handles[handle], "/", &subnum);
-	if (!subdirs)
+	if (!subdirs) {
 		failed(handle);
+		return;
+	}
 
 	dump_dir(handle, "", subdirs, subnum, 0);
 	free(subdirs);
@@ -652,9 +671,30 @@ static void alarmed(int sig __attribute__((unused)))
 	exit(1);
 }
 
+static void set_timeout(void)
+{
+	struct itimerval timeout;
+
+	timeout.it_interval.tv_sec = timeout_ms / 1000;
+	timeout.it_interval.tv_usec = (timeout_ms * 1000) % 1000000;
+	setitimer(ITIMER_REAL, &timeout, NULL);
+}
+
+static void disarm_timeout(void)
+{
+	struct itimerval timeout;
+
+	timeout.it_interval.tv_sec = 0;
+	timeout.it_interval.tv_usec = 0;
+	setitimer(ITIMER_REAL, &timeout, NULL);
+}
+
 static void do_command(unsigned int default_handle, char *line)
 {
 	char *endp;
+
+	if (print_input)
+		printf("%i> %s", ++linenum, line);
 
 	if (strspn(line, " \n") == strlen(line))
 		return;
@@ -667,6 +707,7 @@ static void do_command(unsigned int default_handle, char *line)
 	else
 		handle = default_handle;
 
+	command = arg(line, 0);
 	if (!handles[handle]) {
 		if (readonly)
 			handles[handle] = xs_daemon_open_readonly();
@@ -675,10 +716,10 @@ static void do_command(unsigned int default_handle, char *line)
 		if (!handles[handle])
 			barf_perror("Opening connection to daemon");
 	}
-	command = arg(line, 0);
 
-	if (timeout)
-		alarm(1);
+	if (!timeout_suppressed)
+		set_timeout();
+	timeout_suppressed = false;
 
 	if (streq(command, "dir"))
 		do_dir(handle, arg(line, 1));
@@ -703,10 +744,6 @@ static void do_command(unsigned int default_handle, char *line)
 		do_watch(handle, arg(line, 1), arg(line, 2));
 	else if (streq(command, "waitwatch"))
 		do_waitwatch(handle);
-	else if (streq(command, "async"))
-		do_async(handle, line);
-	else if (streq(command, "asyncwait"))
-		do_asyncwait(handle);
 	else if (streq(command, "ackwatch"))
 		do_ackwatch(handle, arg(line, 1));
 	else if (streq(command, "unwatch"))
@@ -727,32 +764,66 @@ static void do_command(unsigned int default_handle, char *line)
 		do_release(handle, arg(line, 1));
 	else if (streq(command, "dump"))
 		dump(handle);
-	else if (streq(command, "sleep"))
-		sleep(atoi(arg(line, 1)));
-	else
+	else if (streq(command, "sleep")) {
+		disarm_timeout();
+		usleep(atoi(arg(line, 1)) * 1000);
+	} else if (streq(command, "expect"))
+		expect(line);
+	else if (streq(command, "notimeout"))
+		timeout_suppressed = true;
+	else if (streq(command, "readonly")) {
+		readonly = true;
+		xs_daemon_close(handles[handle]);
+		handles[handle] = NULL;
+	} else if (streq(command, "readwrite")) {
+		readonly = false;
+		xs_daemon_close(handles[handle]);
+		handles[handle] = NULL;
+	} else
 		barf("Unknown command %s", command);
 	fflush(stdout);
-	alarm(0);
+	disarm_timeout();
+
+	/* Check expectations. */
+	if (!streq(command, "expect")) {
+		struct expect *i = list_top(&expects, struct expect, list);
+
+		if (i)
+			barf("Expected '%s', didn't happen\n", i->pattern);
+	}
 }
+
+static struct option options[] = { { "readonly", 0, NULL, 'r' },
+				   { "no-timeout", 0, NULL, 't' },
+				   { NULL, 0, NULL, 0 } };
 
 int main(int argc, char *argv[])
 {
+	int opt;
 	char line[1024];
 
-	if (argc > 1 && streq(argv[1], "--readonly")) {
-		readonly = true;
-		argc--;
-		argv++;
+	while ((opt = getopt_long(argc, argv, "xrt", options, NULL)) != -1) {
+		switch (opt) {
+		case 'r':
+			readonly = true;
+			break;
+		case 't':
+			timeout_ms = 0;
+			break;
+		case 'x':
+			print_input = true;
+			break;
+		}
 	}
 
-	if (argc > 1 && streq(argv[1], "--no-timeout")) {
-		timeout = false;
-		argc--;
-		argv++;
-	}
-
-	if (argc != 1)
+	if (optind + 1 == argc) {
+		int fd = open(argv[optind], O_RDONLY);
+		if (!fd)
+			barf_perror("Opening %s", argv[optind]);
+		dup2(fd, STDIN_FILENO);
+	} else if (optind != argc)
 		usage();
+	
 
 	/* The size of the ringbuffer: half a page minus head structure. */
 	ringbuf_datasize = getpagesize() / 2 - sizeof(struct ringbuf_head);
@@ -761,7 +832,5 @@ int main(int argc, char *argv[])
 	while (fgets(line, sizeof(line), stdin))
 		do_command(0, line);
 
-	while (children)
-		do_asyncwait(0);
 	return 0;
 }
