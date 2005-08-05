@@ -98,8 +98,10 @@ void __init paging_init(void)
      * installed, but at least 4MB to cover 4GB address space.  This is needed 
      * to make PCI I/O memory address lookups work in guests.
      */
-    if ( (mpt_size = max_page * 4) < (4*1024*1024) )
-        mpt_size = 4*1024*1024;
+    mpt_size  = (max_page * 4) + (1UL << L2_PAGETABLE_SHIFT) - 1UL;
+    mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
+    if ( mpt_size < (4 << 20) )
+        mpt_size = 4 << 20;
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
         if ( (pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
