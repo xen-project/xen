@@ -386,7 +386,7 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
     
-    def domain_shutdown(self, id, reason='poweroff', key=0):
+    def domain_shutdown(self, id, reason='poweroff'):
         """Shutdown domain (nicely).
          - poweroff: restart according to exit code and restart mode
          - reboot:   restart on exit
@@ -402,9 +402,16 @@ class XendDomain:
         eserver.inject('xend.domain.shutdown', [dominfo.name, dominfo.id, reason])
         if reason == 'halt':
             reason = 'poweroff'
-        val = dominfo.shutdown(reason, key=key)
-        if not reason in ['suspend', 'sysrq']:
+        val = dominfo.shutdown(reason)
+        if not reason in ['suspend']:
             self.domain_shutdowns()
+        return val
+
+    def domain_sysrq(self, id, key):
+        """Send a SysRq to a domain
+        """
+        dominfo = self.domain_lookup(id)
+        val = dominfo.send_sysrq(key)
         return val
 
     def domain_shutdowns(self):

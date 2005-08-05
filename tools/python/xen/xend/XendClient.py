@@ -208,11 +208,15 @@ class Xend:
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'pause' })
 
-    def xend_domain_shutdown(self, id, reason, key=0):
+    def xend_domain_shutdown(self, id, reason):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'shutdown',
-                              'reason'  : reason,
-                              'key'     : key })
+                              'reason'  : reason})
+
+    def xend_domain_sysrq(self, id, key):
+        return self.xendPost(self.domainurl(id),
+                             {'op'      : 'sysrq',
+                              'key'     : key})
 
     def xend_domain_destroy(self, id, reason):
         return self.xendPost(self.domainurl(id),

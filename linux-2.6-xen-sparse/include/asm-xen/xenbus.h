@@ -29,6 +29,7 @@
  * IN THE SOFTWARE.
  */
 #include <linux/device.h>
+#include <linux/notifier.h>
 #include <asm/semaphore.h>
 
 /* A xenbus device. */
@@ -111,6 +112,10 @@ struct xenbus_watch
 	char *node;
 	void (*callback)(struct xenbus_watch *, const char *node);
 };
+
+/* notifer routines for when the xenstore comes up */
+int register_xenstore_notifier(struct notifier_block *nb);
+void unregister_xenstore_notifier(struct notifier_block *nb);
 
 int register_xenbus_watch(struct xenbus_watch *watch);
 void unregister_xenbus_watch(struct xenbus_watch *watch);

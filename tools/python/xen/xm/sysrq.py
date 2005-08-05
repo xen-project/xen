@@ -21,9 +21,6 @@ gopts.opt('help', short='h',
          fn=set_true, default=0,
          use="Print this help.")
 
-def sysrq(dom, req):
-    server.xend_domain_shutdown(dom, 'sysrq', req)
-
 def main(argv):
     opts = gopts
     args = opts.parse(argv)
@@ -36,4 +33,4 @@ def main(argv):
     if len(args) < 2: opts.err('Missing sysrq character')
     dom = args[0]
     req = ord(args[1][0])
-    sysrq(dom, req)
+    server.xend_domain_sysrq(dom, req)

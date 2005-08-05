@@ -39,9 +39,17 @@ class SrvDomain(SrvDir):
     def op_shutdown(self, op, req):
         fn = FormFn(self.xd.domain_shutdown,
                     [['dom',    'int'],
-                     ['reason', 'str'],
-                     ['key',    'int']])
+                     ['reason', 'str']])
         val = fn(req.args, {'dom': self.dom.id})
+        req.setResponseCode(http.ACCEPTED)
+        req.setHeader("Location", "%s/.." % req.prePathURL())
+        return val
+
+    def op_sysrq(self, op, req):
+        fn = FormFn(self.xd.domain_sysrq,
+                    [['dom',    'int'],
+                     ['key',    'int']])
+        val = fn(req.args, {'dom' : self.dom.id})
         req.setResponseCode(http.ACCEPTED)
         req.setHeader("Location", "%s/.." % req.prePathURL())
         return val

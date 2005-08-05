@@ -52,13 +52,12 @@ shutdown_reasons = {
     DOMAIN_CRASH   : "crash",
     }
 
-"""Map shutdown reasons to the message type to use.
+"""Map shutdown reasons to codes
 """
-shutdown_messages = {
-    'poweroff' : 'shutdown_poweroff_t',
-    'reboot'   : 'shutdown_reboot_t',
-    'suspend'  : 'shutdown_suspend_t',
-    'sysrq'    : 'shutdown_sysrq_t',
+shutdown_codes = {
+    'poweroff' : DOMAIN_POWEROFF,
+    'reboot'   : DOMAIN_REBOOT,
+    'suspend'  : DOMAIN_SUSPEND,
     }
 
 RESTART_ALWAYS   = 'always'
@@ -152,8 +151,6 @@ class XendDomainInfo:
         vm = cls(db)
         vm.construct(config)
         vm.saveToDB(sync=True)
-        # Flush info to xenstore immediately
-        vm.exportToDB()
 
         return vm
 
@@ -941,19 +938,20 @@ class XendDomainInfo:
 
             self.channel.writeRequest(msg)
 
-    def shutdown(self, reason, key=0):
-        msgtype = shutdown_messages.get(reason)
-        if not msgtype:
+    def shutdown(self, reason):
+        reasonid = shutdown_codes.get(reason)
+        if reasonid == None:
             raise XendError('invalid reason:' + reason)
-        extra = {}
-        if reason == 'sysrq':
-            extra['key'] = key
-        if self.channel:
-            msg = messages.packMsg(msgtype, extra)
-            self.channel.writeRequest(msg)
-        if not reason in ['suspend', 'sysrq']:
-            self.shutdown_pending = {'start':time.time(), 'reason':reason,
-                                     'key':key}
+        db = self.db.addChild("/control");
+        db['shutdown'] = '%i' % reasonid;
+        db.saveDB(save=True);
+        if not reason in ['suspend']:
+            self.shutdown_pending = {'start':time.time(), 'reason':reason}
+
+    def send_sysrq(self, key=0):
+        db = self.db.addChild("/control");
+        db['sysrq'] = '%c' % key;
+        db.saveDB(save=True);        
 
     def shutdown_time_left(self, timeout):
         if not self.shutdown_pending:

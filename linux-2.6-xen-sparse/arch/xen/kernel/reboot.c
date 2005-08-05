@@ -11,13 +11,17 @@ static int errno;
 #include <linux/sysrq.h>
 #include <asm/irq.h>
 #include <asm/mmu_context.h>
-#include <asm-xen/ctrl_if.h>
 #include <asm-xen/evtchn.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/linux-public/suspend.h>
 #include <asm-xen/queues.h>
 #include <asm-xen/xenbus.h>
+
+#define SHUTDOWN_INVALID  -1
+#define SHUTDOWN_POWEROFF  0
+#define SHUTDOWN_REBOOT    1
+#define SHUTDOWN_SUSPEND   2
 
 void machine_restart(char * __unused)
 {
@@ -53,7 +57,7 @@ EXPORT_SYMBOL(machine_power_off);
  */
 
 /* Ignore multiple shutdown requests. */
-static int shutting_down = -1;
+static int shutting_down = SHUTDOWN_INVALID;
 
 static void __do_suspend(void)
 {
@@ -126,8 +130,6 @@ static void __do_suspend(void)
 
     xenbus_suspend();
 
-    ctrl_if_suspend();
-
     irq_suspend();
 
     gnttab_suspend();
@@ -140,7 +142,7 @@ static void __do_suspend(void)
 
     HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
 
-    shutting_down = -1; 
+    shutting_down = SHUTDOWN_INVALID; 
 
     memcpy(&xen_start_info, &suspend_record->resume_info,
            sizeof(xen_start_info));
@@ -162,8 +164,6 @@ static void __do_suspend(void)
     gnttab_resume();
 
     irq_resume();
-
-    ctrl_if_resume();
 
     xenbus_resume();
 
@@ -204,7 +204,7 @@ static int shutdown_process(void *__unused)
 
     switch ( shutting_down )
     {
-    case CMSG_SHUTDOWN_POWEROFF:
+    case SHUTDOWN_POWEROFF:
         if ( execve("/sbin/poweroff", poweroff_argv, envp) < 0 )
         {
             sys_reboot(LINUX_REBOOT_MAGIC1,
@@ -214,7 +214,7 @@ static int shutdown_process(void *__unused)
         }
         break;
 
-    case CMSG_SHUTDOWN_REBOOT:
+    case SHUTDOWN_REBOOT:
         if ( execve("/sbin/reboot", restart_argv, envp) < 0 )
         {
             sys_reboot(LINUX_REBOOT_MAGIC1,
@@ -225,7 +225,7 @@ static int shutdown_process(void *__unused)
         break;
     }
 
-    shutting_down = -1; /* could try again */
+    shutting_down = SHUTDOWN_INVALID; /* could try again */
 
     return 0;
 }
@@ -234,7 +234,7 @@ static void __shutdown_handler(void *unused)
 {
     int err;
 
-    if ( shutting_down != CMSG_SHUTDOWN_SUSPEND )
+    if ( shutting_down != SHUTDOWN_SUSPEND )
     {
         err = kernel_thread(shutdown_process, NULL, CLONE_FS | CLONE_FILES);
         if ( err < 0 )
@@ -246,42 +246,103 @@ static void __shutdown_handler(void *unused)
     }
 }
 
-static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
+static void shutdown_handler(struct xenbus_watch *watch, const char *node)
 {
     static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 
-    if ( msg->subtype == CMSG_SHUTDOWN_SYSRQ )
-    {
-	int sysrq = ((shutdown_sysrq_t *)&msg->msg[0])->key;
-	
-#ifdef CONFIG_MAGIC_SYSRQ
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-	handle_sysrq(sysrq, NULL, NULL);
-#else
-	handle_sysrq(sysrq, NULL, NULL, NULL);
-#endif
-#endif
-    }
-    else if ( (shutting_down == -1) &&
-         ((msg->subtype == CMSG_SHUTDOWN_POWEROFF) ||
-          (msg->subtype == CMSG_SHUTDOWN_REBOOT) ||
-          (msg->subtype == CMSG_SHUTDOWN_SUSPEND)) )
-    {
-        shutting_down = msg->subtype;
+    int type = -1;
+
+    if (!xenbus_scanf("control", "shutdown", "%i", &type)) {
+        printk("Unable to read code in control/shutdown\n");
+        return;
+    };
+
+    xenbus_printf("control", "shutdown", "%i", SHUTDOWN_INVALID);
+
+    if ((type == SHUTDOWN_POWEROFF) ||
+        (type == SHUTDOWN_REBOOT)   ||
+        (type == SHUTDOWN_SUSPEND)) {
+        shutting_down = type;
         schedule_work(&shutdown_work);
     }
-    else
-    {
-        printk("Ignore spurious shutdown request\n");
+
+}
+
+#ifdef CONFIG_MAGIC_SYSRQ
+static void sysrq_handler(struct xenbus_watch *watch, const char *node)
+{
+    char sysrq_key = '\0';
+    
+    if (!xenbus_scanf("control", "sysrq", "%c", &sysrq_key)) {
+        printk("Unable to read sysrq code in control/sysrq\n");
+        return;
     }
 
-    ctrl_if_send_response(msg);
+    xenbus_printf("control", "sysrq", "%c", '\0');
+
+    if (sysrq_key != '\0') {
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+        handle_sysrq(sysrq_key, NULL, NULL);
+#else
+        handle_sysrq(sysrq_key, NULL, NULL, NULL);
+#endif
+    }
+}
+#endif
+
+static struct xenbus_watch shutdown_watch = {
+    .node = "control/shutdown",
+    .callback = shutdown_handler
+};
+
+#ifdef CONFIG_MAGIC_SYSRQ
+static struct xenbus_watch sysrq_watch = {
+    .node ="control/sysrq",
+    .callback = sysrq_handler
+};
+#endif
+
+static struct notifier_block xenstore_notifier;
+
+static int setup_shutdown_watcher(struct notifier_block *notifier,
+                                  unsigned long event,
+                                  void *data)
+{
+    int err1=0, err2=0;
+
+    down(&xenbus_lock);
+    err1 = register_xenbus_watch(&shutdown_watch);
+#ifdef CONFIG_MAGIC_SYSRQ
+    err2 = register_xenbus_watch(&sysrq_watch);
+#endif
+    up(&xenbus_lock);
+
+    if (err1) {
+        printk("Failed to set shutdown watcher\n");
+    }
+    
+#ifdef CONFIG_MAGIC_SYSRQ
+    if (err2) {
+        printk("Failed to set sysrq watcher\n");
+    }
+#endif
+
+    return NOTIFY_STOP;
 }
 
 static int __init setup_shutdown_event(void)
 {
-    ctrl_if_register_receiver(CMSG_SHUTDOWN, shutdown_handler, 0);
+    
+    xenstore_notifier.notifier_call = setup_shutdown_watcher;
+
+    if (xen_start_info.store_evtchn) {
+        setup_shutdown_watcher(&xenstore_notifier, 0, NULL);
+    } else {
+        register_xenstore_notifier(&xenstore_notifier);
+    }
+    
     return 0;
 }
 
-__initcall(setup_shutdown_event);
+subsys_initcall(setup_shutdown_event);

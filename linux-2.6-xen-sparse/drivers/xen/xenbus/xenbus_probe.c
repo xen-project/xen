@@ -36,9 +36,15 @@
 #include <linux/ctype.h>
 #include <linux/fcntl.h>
 #include <stdarg.h>
+#include <linux/notifier.h>
 #include "xenbus_comms.h"
 
 #define streq(a, b) (strcmp((a), (b)) == 0)
+
+/* Protects notifier chain */
+DECLARE_MUTEX(xenstore_control);
+
+static struct notifier_block *xenstore_chain;
 
 /* If something in array of ids matches this device, return it. */
 static const struct xenbus_device_id *
@@ -309,6 +315,26 @@ void xenbus_resume(void)
 	up(&xenbus_lock);
 }
 
+int register_xenstore_notifier(struct notifier_block *nb)
+{
+	int ret;
+
+	if ((ret = down_interruptible(&xenstore_control)) != 0) 
+		return ret;
+	ret = notifier_chain_register(&xenstore_chain, nb);
+	up(&xenstore_control);
+	return ret;
+}
+EXPORT_SYMBOL(register_xenstore_notifier);
+
+void unregister_xenstore_notifier(struct notifier_block *nb)
+{
+	down(&xenstore_control);
+	notifier_chain_unregister(&xenstore_chain, nb);
+	up(&xenstore_control);
+}
+EXPORT_SYMBOL(unregister_xenstore_notifier);
+
 /* called from a thread in privcmd/privcmd.c */
 int do_xenbus_probe(void *unused)
 {
@@ -322,6 +348,15 @@ int do_xenbus_probe(void *unused)
 		       " %i\n", err);
 		return err;
 	}
+
+	err = notifier_call_chain(&xenstore_chain, 0, 0);
+	if (err == NOTIFY_BAD) {
+		printk("%s: calling xenstore notify chain failed\n",
+		       __FUNCTION__);
+		return -EINVAL;
+	}
+
+	err = 0;
 
 	/* Initialize non-xenbus drivers */
 	balloon_init_watcher();
