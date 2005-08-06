@@ -1,5 +1,6 @@
-#ifndef __XEN_PERFC_DEFN_H__
-#define __XEN_PERFC_DEFN_H__
+/* This file is legitimately included multiple times. */
+/*#ifndef __XEN_PERFC_DEFN_H__*/
+/*#define __XEN_PERFC_DEFN_H__*/
 
 #define PERFC_MAX_PT_UPDATES 64
 #define PERFC_PT_UPDATES_BUCKET_SIZE 3
@@ -124,4 +125,4 @@ PERFCOUNTER_CPU(remove_write_predicted, "remove_write predict hit&exit")
 PERFCOUNTER_CPU(remove_write_bad_prediction, "remove_write bad prediction")
 PERFCOUNTER_CPU(update_hl2e_invlpg,     "update_hl2e calls invlpg")
 
-#endif /* __XEN_PERFC_DEFN_H__ */
+/*#endif*/ /* __XEN_PERFC_DEFN_H__ */
