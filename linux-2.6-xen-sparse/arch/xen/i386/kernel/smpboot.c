@@ -1324,14 +1324,132 @@ void __devinit smp_prepare_boot_cpu(void)
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
-#include <asm-xen/ctrl_if.h>
-
+#include <asm-xen/xenbus.h>
 /* hotplug down/up funtion pointer and target vcpu */
 struct vcpu_hotplug_handler_t {
-	void (*fn)(int vcpu);
+	void (*fn) (int vcpu);
 	u32 vcpu;
 };
 static struct vcpu_hotplug_handler_t vcpu_hotplug_handler;
+
+static int vcpu_hotplug_cpu_process(void *unused)
+{
+	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
+
+	if (handler->fn) {
+		(*(handler->fn)) (handler->vcpu);
+		handler->fn = NULL;
+	}
+	return 0;
+}
+
+static void __vcpu_hotplug_handler(void *unused)
+{
+	int err;
+
+	err = kernel_thread(vcpu_hotplug_cpu_process,
+			    NULL, CLONE_FS | CLONE_FILES);
+	if (err < 0)
+		printk(KERN_ALERT "Error creating hotplug_cpu process!\n");
+}
+
+static void handle_cpus_watch(struct xenbus_watch *, const char *);
+static struct notifier_block xsn_cpus;
+
+/* xenbus watch struct */
+static struct xenbus_watch cpus_watch = {
+	.node = "cpus",
+	.callback = handle_cpus_watch,
+};
+
+static int setup_cpus_watcher(struct notifier_block *notifier,
+			      unsigned long event, void *data)
+{
+	int err = 0;
+
+	down(&xenbus_lock);
+	err = register_xenbus_watch(&cpus_watch);
+	up(&xenbus_lock);
+
+	if (err) {
+		printk("Failed to set cpus watcher\n");
+	}
+	return NOTIFY_DONE;
+}
+
+static void handle_cpus_watch(struct xenbus_watch *watch, const char *node)
+{
+	static DECLARE_WORK(vcpu_hotplug_work, __vcpu_hotplug_handler, NULL);
+	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
+	ssize_t ret;
+	int err, cpu, state;
+	char dir[32];
+	char *cpustr;
+
+	/* get a pointer to start of cpus/cpu string */
+	if ((cpustr = strstr(node, "cpus/cpu")) != NULL) {
+
+		/* find which cpu state changed, note vcpu for handler */
+		sscanf(cpustr, "cpus/cpu%d", &cpu);
+		handler->vcpu = cpu;
+
+		/* calc the dir for xenbus read */
+		sprintf(dir, "cpus/cpu%d", cpu);
+
+		/* make sure watch that was triggered is changes to the online key */
+		if ((strcmp(node + strlen(dir), "/online")) != 0)
+			return;
+
+		/* get the state value */
+		xenbus_transaction_start("cpus");
+		err = xenbus_scanf(dir, "online", "%d", &state);
+		xenbus_transaction_end(0);
+
+		if (err != 1) {
+			printk(KERN_ERR
+			       "XENBUS: Unable to read cpu online state\n");
+			return;
+		}
+
+		/* if we detect a state change, take action */
+		switch (state) {
+			/* offline -> online */
+		case 1:
+			if (!cpu_isset(cpu, cpu_online_map)) {
+				handler->fn = (void *)&cpu_up;
+				ret = schedule_work(&vcpu_hotplug_work);
+			}
+			break;
+			/* online -> offline */
+		case 0:
+			if (cpu_isset(cpu, cpu_online_map)) {
+				handler->fn = (void *)&cpu_down;
+				ret = schedule_work(&vcpu_hotplug_work);
+			}
+			break;
+		default:
+			printk(KERN_ERR
+			       "XENBUS: unknown state(%d) on node(%s)\n", state,
+			       node);
+		}
+	}
+	return;
+}
+
+static int __init setup_vcpu_hotplug_event(void)
+{
+	xsn_cpus.notifier_call = setup_cpus_watcher;
+
+	if (xen_start_info.store_evtchn) {
+		setup_cpus_watcher(&xsn_cpus, 0, NULL);
+	} else {
+		register_xenstore_notifier(&xsn_cpus);
+	}
+
+	return 0;
+}
+
+subsys_initcall(setup_vcpu_hotplug_event);
 
 /* must be called with the cpucontrol mutex held */
 static int __devinit cpu_enable(unsigned int cpu)
@@ -1400,77 +1518,6 @@ void __cpu_die(unsigned int cpu)
 	}
  	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
 }
-
-static int vcpu_hotplug_cpu_process(void *unused)
-{
-	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
-
-	if (handler->fn) {
-		(*(handler->fn))(handler->vcpu);
-		handler->fn = NULL;
-	}
-	return 0;
-}
-
-static void __vcpu_hotplug_handler(void *unused)
-{
-	int err;
-
-	err = kernel_thread(vcpu_hotplug_cpu_process, 
-			    NULL, CLONE_FS | CLONE_FILES);
-	if (err < 0)
-		printk(KERN_ALERT "Error creating hotplug_cpu process!\n");
-
-}
-
-static void vcpu_hotplug_event_handler(ctrl_msg_t *msg, unsigned long id)
-{
-	static DECLARE_WORK(vcpu_hotplug_work, __vcpu_hotplug_handler, NULL);
-	vcpu_hotplug_t *req = (vcpu_hotplug_t *)&msg->msg[0];
-	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
-	ssize_t ret;
-
-	if (msg->length != sizeof(vcpu_hotplug_t))
-		goto parse_error;
-
-	/* grab target vcpu from msg */
-	handler->vcpu = req->vcpu;
-
-	/* determine which function to call based on msg subtype */
-	switch (msg->subtype) {
-        case CMSG_VCPU_HOTPLUG_OFF:
-		handler->fn = (void *)&cpu_down;
-		ret = schedule_work(&vcpu_hotplug_work);
-		req->status = (u32) ret;
-		break;
-        case CMSG_VCPU_HOTPLUG_ON:
-		handler->fn = (void *)&cpu_up;
-		ret = schedule_work(&vcpu_hotplug_work);
-		req->status = (u32) ret;
-		break;
-        default:
-		goto parse_error;
-	}
-
-	ctrl_if_send_response(msg);
-	return;
- parse_error:
-	msg->length = 0;
-	ctrl_if_send_response(msg);
-}
-
-static int __init setup_vcpu_hotplug_event(void)
-{
-	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
-
-	handler->fn = NULL;
-	ctrl_if_register_receiver(CMSG_VCPU_HOTPLUG,
-				  vcpu_hotplug_event_handler, 0);
-
-	return 0;
-}
-
-__initcall(setup_vcpu_hotplug_event);
 
 #else /* ... !CONFIG_HOTPLUG_CPU */
 int __cpu_disable(void)

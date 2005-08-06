@@ -258,6 +258,7 @@ class XendDomainInfo:
         self.restart_count = 0
         
         self.vcpus = 1
+        self.vcpusdb = {}
         self.bootloader = None
 
     def setDB(self, db):
@@ -539,6 +540,16 @@ class XendDomainInfo:
         except:
             raise VmError('invalid vcpus value')
 
+    def exportVCPUSToDB(self, vcpus):
+        for v in range(0,vcpus):
+            path = "/cpus/cpu%d"%(v)
+            if not self.vcpusdb.has_key(path):
+                self.vcpusdb[path] = self.db.addChild(path)
+            db = self.vcpusdb[path]
+            log.debug("writing key online=1 to path %s in store"%(path))
+            db['online'] = "1"
+            db.saveDB(save=True)
+
     def init_image(self):
         """Create boot image handler for the domain.
         """
@@ -557,6 +568,8 @@ class XendDomainInfo:
             self.db.introduceDomain(self.id,
                                     self.store_mfn,
                                     self.store_channel)
+        # get the configured value of vcpus and update store
+        self.exportVCPUSToDB(self.vcpus)
 
     def delete(self):
         """Delete the vm's db.
@@ -921,14 +934,20 @@ class XendDomainInfo:
     def vcpu_hotplug(self, vcpu, state):
         """Disable or enable VCPU in domain.
         """
-        log.error("Holly Shit! %d %d\n" % (vcpu, state))
-        if self.channel:
-            if int(state) == 0:
-                msg = messages.packMsg('vcpu_hotplug_off_t', { 'vcpu' : vcpu} )
-            else:
-                msg = messages.packMsg('vcpu_hotplug_on_t',  { 'vcpu' : vcpu} )
+        db = ""
+        try:
+            db = self.vcpusdb['/cpus/cpu%d'%(vcpu)]
+        except:
+            log.error("Invalid VCPU")
+            return
 
-            self.channel.writeRequest(msg)
+        if self.store_channel:
+            if int(state) == 0:
+                db['online'] = "0"
+            else:
+                db['online'] = "1"
+
+        db.saveDB(save=True)
 
     def shutdown(self, reason):
         if not reason in shutdown_reasons.values():
@@ -957,6 +976,8 @@ class XendDomainInfo:
             self.db.introduceDomain(self.id, self.store_mfn,
                                     self.store_channel)
         self.exportToDB(save=True, sync=True)
+        # get run-time value of vcpus and update store
+        self.exportVCPUSToDB(dom_get(self.id)['vcpus'])
 
 def vm_field_ignore(vm, config, val, index):
     """Dummy config field handler used for fields with built-in handling.
