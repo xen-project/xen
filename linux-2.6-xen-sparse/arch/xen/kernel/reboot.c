@@ -248,21 +248,18 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
     static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 
     char *str;
-    unsigned int len;
 
-    str = (char *)xenbus_read("control", "shutdown", &len);
-
-    if (! len) {
+    str = (char *)xenbus_read("control", "shutdown", NULL);
+    if (IS_ERR(str))
         return;
-    }
 
     xenbus_printf("control", "shutdown", "%i", SHUTDOWN_INVALID);
 
-    if (strncmp(str, "poweroff", len) == 0) {
+    if (strcmp(str, "poweroff") == 0) {
         shutting_down = SHUTDOWN_POWEROFF;
-    } else if (strncmp(str, "reboot", len) == 0) {
+    } else if (strcmp(str, "reboot") == 0) {
         shutting_down = SHUTDOWN_REBOOT;
-    } else if (strncmp(str, "suspend", len) == 0) {
+    } else if (strcmp(str, "suspend") == 0) {
         shutting_down = SHUTDOWN_SUSPEND;
     } else {
         printk("Ignoring shutdown request: %s\n", str);
@@ -271,10 +268,8 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
 
     kfree(str);
 
-    if (shutting_down != SHUTDOWN_INVALID) {
+    if (shutting_down != SHUTDOWN_INVALID)
         schedule_work(&shutdown_work);
-    }
-
 }
 
 #ifdef CONFIG_MAGIC_SYSRQ
