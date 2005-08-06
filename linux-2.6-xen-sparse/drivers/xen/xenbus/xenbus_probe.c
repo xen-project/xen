@@ -41,9 +41,6 @@
 
 #define streq(a, b) (strcmp((a), (b)) == 0)
 
-/* Protects notifier chain */
-DECLARE_MUTEX(xenstore_control);
-
 static struct notifier_block *xenstore_chain;
 
 /* If something in array of ids matches this device, return it. */
@@ -317,21 +314,27 @@ void xenbus_resume(void)
 
 int register_xenstore_notifier(struct notifier_block *nb)
 {
-	int ret;
+	int ret = 0;
 
-	if ((ret = down_interruptible(&xenstore_control)) != 0) 
-		return ret;
-	ret = notifier_chain_register(&xenstore_chain, nb);
-	up(&xenstore_control);
+	down(&xenbus_lock);
+
+	if (xen_start_info.store_evtchn) {
+		ret = nb->notifier_call(nb, 0, NULL);
+	} else {
+		notifier_chain_register(&xenstore_chain, nb);
+	}
+
+	up(&xenbus_lock);
+
 	return ret;
 }
 EXPORT_SYMBOL(register_xenstore_notifier);
 
 void unregister_xenstore_notifier(struct notifier_block *nb)
 {
-	down(&xenstore_control);
+	down(&xenbus_lock);
 	notifier_chain_unregister(&xenstore_chain, nb);
-	up(&xenstore_control);
+	up(&xenbus_lock);
 }
 EXPORT_SYMBOL(unregister_xenstore_notifier);
 
@@ -349,7 +352,10 @@ int do_xenbus_probe(void *unused)
 		return err;
 	}
 
+	down(&xenbus_lock);
 	err = notifier_call_chain(&xenstore_chain, 0, 0);
+	up(&xenbus_lock);
+
 	if (err == NOTIFY_BAD) {
 		printk("%s: calling xenstore notify chain failed\n",
 		       __FUNCTION__);
@@ -357,9 +363,6 @@ int do_xenbus_probe(void *unused)
 	}
 
 	err = 0;
-
-	/* Initialize non-xenbus drivers */
-	balloon_init_watcher();
 
 	down(&xenbus_lock);
 	/* Enumerate devices in xenstore. */

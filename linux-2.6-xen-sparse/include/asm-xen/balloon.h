@@ -48,7 +48,4 @@ extern spinlock_t balloon_lock;
 #define balloon_lock(__flags)   spin_lock_irqsave(&balloon_lock, __flags)
 #define balloon_unlock(__flags) spin_unlock_irqrestore(&balloon_lock, __flags)
 
-/* Init Function - Try to set up our watcher, if not already set. */
-void balloon_init_watcher(void);
-
 #endif /* __ASM_BALLOON_H__ */

@@ -81,9 +81,6 @@ static void balloon_process(void *unused);
 static DECLARE_WORK(balloon_worker, balloon_process, NULL);
 static struct timer_list balloon_timer;
 
-/* Flag for dom0 xenstore workaround */
-static int balloon_xenbus_init=0;
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 /* Use the private and mapping fields of struct page as a list. */
 #define PAGE_TO_LIST(p) ( (struct list_head *)&p->private )
@@ -304,15 +301,9 @@ static void set_new_target(unsigned long target)
     schedule_work(&balloon_worker);
 }
 
-static struct xenbus_watch xb_watch =
+static struct xenbus_watch target_watch =
 {
-    .node = "memory"
-};
-
-/* FIXME: This is part of a dom0 sequencing workaround */
-static struct xenbus_watch root_watch =
-{
-    .node = "/"
+    .node = "memory/target"
 };
 
 /* React to a change in the target key */
@@ -321,29 +312,11 @@ static void watch_target(struct xenbus_watch *watch, const char *node)
     unsigned long new_target;
     int err;
 
-    if(watch == &root_watch)
-    {
-        /* FIXME: This is part of a dom0 sequencing workaround */
-        if(register_xenbus_watch(&xb_watch) == 0)
-        {
-            /* 
-               We successfully set a watch on memory/target:
-               now we can stop watching root 
-            */
-            unregister_xenbus_watch(&root_watch);
-            balloon_xenbus_init=1;
-        } 
-        else 
-        {
-            return;
-        }
-    }
-
     err = xenbus_scanf("memory", "target", "%lu", &new_target);
         
     if(err != 1) 
     {
-        IPRINTK("Unable to read memory/target\n");
+        printk(KERN_ERR "Unable to read memory/target\n");
         return;
     } 
         
@@ -351,40 +324,26 @@ static void watch_target(struct xenbus_watch *watch, const char *node)
     
 }
 
-/* Init Function - Try to set up our watcher, if not already set. */
-void balloon_init_watcher(void)
+/* Setup our watcher
+   NB: Assumes xenbus_lock is held!
+*/
+int balloon_init_watcher(struct notifier_block *notifier,
+                         unsigned long event,
+                         void *data)
 {
     int err;
 
-    if (!xen_start_info.store_evtchn) {
-        IPRINTK("Delaying watcher init until xenstore is available\n");
-        return;
+    BUG_ON(down_trylock(&xenbus_lock) == 0);
+
+    err = register_xenbus_watch(&target_watch);
+
+    if (err) {
+        printk(KERN_ERR "Failed to set balloon watcher\n");
     }
 
-    down(&xenbus_lock);
-
-    if (!balloon_xenbus_init) {
-        err = register_xenbus_watch(&xb_watch);
-        if (err) {
-            /* BIG FAT FIXME: dom0 sequencing workaround
-             * dom0 can't set a watch on memory/target until
-             * after the tools create it.  So, we have to watch
-             * the whole store until that happens.
-             *
-             * This will go away when we have the ability to watch
-             * non-existant keys
-             */
-            register_xenbus_watch(&root_watch);
-        } else {
-            IPRINTK("Balloon xenbus watcher initialized\n");
-            balloon_xenbus_init = 1;
-        }
-    }
-
-    up(&xenbus_lock);
+    return NOTIFY_DONE;
+    
 }
-
-EXPORT_SYMBOL(balloon_init_watcher);
 
 static int balloon_write(struct file *file, const char __user *buffer,
                          unsigned long count, void *data)
@@ -439,6 +398,8 @@ static int balloon_read(char *page, char **start, off_t off,
     return len;
 }
 
+static struct notifier_block xenstore_notifier;
+
 static int __init balloon_init(void)
 {
     unsigned long pfn;
@@ -474,11 +435,11 @@ static int __init balloon_init(void)
             balloon_append(page);
     }
 
-    xb_watch.callback = watch_target;
-    root_watch.callback = watch_target;
+    target_watch.callback = watch_target;
+    xenstore_notifier.notifier_call = balloon_init_watcher;
 
-    balloon_init_watcher();
-
+    register_xenstore_notifier(&xenstore_notifier);
+    
     return 0;
 }
 
