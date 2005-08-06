@@ -247,19 +247,31 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
 {
     static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 
-    int type = -1;
+    char *str;
+    unsigned int len;
 
-    if (!xenbus_scanf("control", "shutdown", "%i", &type)) {
-        printk("Unable to read code in control/shutdown\n");
+    str = (char *)xenbus_read("control", "shutdown", &len);
+
+    if (! len) {
         return;
-    };
+    }
 
     xenbus_printf("control", "shutdown", "%i", SHUTDOWN_INVALID);
 
-    if ((type == SHUTDOWN_POWEROFF) ||
-        (type == SHUTDOWN_REBOOT)   ||
-        (type == SHUTDOWN_SUSPEND)) {
-        shutting_down = type;
+    if (strncmp(str, "poweroff", len) == 0) {
+        shutting_down = SHUTDOWN_POWEROFF;
+    } else if (strncmp(str, "reboot", len) == 0) {
+        shutting_down = SHUTDOWN_REBOOT;
+    } else if (strncmp(str, "suspend", len) == 0) {
+        shutting_down = SHUTDOWN_SUSPEND;
+    } else {
+        printk("Ignoring shutdown request: %s\n", str);
+        shutting_down = SHUTDOWN_INVALID;
+    }
+
+    kfree(str);
+
+    if (shutting_down != SHUTDOWN_INVALID) {
         schedule_work(&shutdown_work);
     }
 
@@ -271,7 +283,7 @@ static void sysrq_handler(struct xenbus_watch *watch, const char *node)
     char sysrq_key = '\0';
     
     if (!xenbus_scanf("control", "sysrq", "%c", &sysrq_key)) {
-        printk("Unable to read sysrq code in control/sysrq\n");
+        printk(KERN_ERR "Unable to read sysrq code in control/sysrq\n");
         return;
     }
 
@@ -319,16 +331,16 @@ static int setup_shutdown_watcher(struct notifier_block *notifier,
     up(&xenbus_lock);
 
     if (err1) {
-        printk("Failed to set shutdown watcher\n");
+        printk(KERN_ERR "Failed to set shutdown watcher\n");
     }
     
 #ifdef CONFIG_MAGIC_SYSRQ
     if (err2) {
-        printk("Failed to set sysrq watcher\n");
+        printk(KERN_ERR "Failed to set sysrq watcher\n");
     }
 #endif
 
-    return NOTIFY_STOP;
+    return NOTIFY_DONE;
 }
 
 static int __init setup_shutdown_event(void)

@@ -52,14 +52,6 @@ shutdown_reasons = {
     DOMAIN_CRASH   : "crash",
     }
 
-"""Map shutdown reasons to codes
-"""
-shutdown_codes = {
-    'poweroff' : DOMAIN_POWEROFF,
-    'reboot'   : DOMAIN_REBOOT,
-    'suspend'  : DOMAIN_SUSPEND,
-    }
-
 RESTART_ALWAYS   = 'always'
 RESTART_ONREBOOT = 'onreboot'
 RESTART_NEVER    = 'never'
@@ -939,11 +931,10 @@ class XendDomainInfo:
             self.channel.writeRequest(msg)
 
     def shutdown(self, reason):
-        reasonid = shutdown_codes.get(reason)
-        if reasonid == None:
+        if not reason in shutdown_reasons.values():
             raise XendError('invalid reason:' + reason)
         db = self.db.addChild("/control");
-        db['shutdown'] = '%i' % reasonid;
+        db['shutdown'] = reason;
         db.saveDB(save=True);
         if not reason in ['suspend']:
             self.shutdown_pending = {'start':time.time(), 'reason':reason}
