@@ -12,9 +12,6 @@
  */
 
 #include "common.h"
-#ifdef CONFIG_XEN_BLKDEV_GRANT
-#include <asm-xen/xen-public/grant_table.h>
-#endif
 
 /*
  * These are rather arbitrary. They are fairly large because adjacent requests

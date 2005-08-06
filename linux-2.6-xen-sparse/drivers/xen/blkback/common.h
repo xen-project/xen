@@ -9,6 +9,7 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/blkdev.h>
+#include <linux/vmalloc.h>
 #include <asm/io.h>
 #include <asm/setup.h>
 #include <asm/pgalloc.h>
@@ -17,6 +18,9 @@
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/io/blkif.h>
 #include <asm-xen/xen-public/io/ring.h>
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+#include <asm-xen/gnttab.h>
+#endif
 
 #if 0
 #define ASSERT(_p) \
