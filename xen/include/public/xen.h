@@ -331,14 +331,15 @@ typedef struct vcpu_info {
 
 typedef struct vcpu_time_info {
     /*
-     * The following values are updated periodically (and not necessarily
-     * atomically!). The guest OS detects this because 'time_version1' is
-     * incremented just before updating these values, and 'time_version2' is
-     * incremented immediately after. See the Xen-specific Linux code for an
-     * example of how to read these values safely (arch/xen/kernel/time.c).
+     * Updates to the following values are preceded and followed by an
+     * increment of 'version'. The guest can therefore detect updates by
+     * looking for changes to 'version'. If the least-significant bit of
+     * the version number is set then an update is in progress and the guest
+     * must wait to read a consistent set of values.
+     * The correct way to interact with the version number is similar to
+     * Linux's seqlock: see the implementations of read_seqbegin/read_seqretry.
      */
-    u32 time_version1;
-    u32 time_version2;
+    u32 version;
     u64 tsc_timestamp;   /* TSC at last update of time vals.  */
     u64 system_time;     /* Time, in nanosecs, since boot.    */
     /*
@@ -400,8 +401,9 @@ typedef struct shared_info {
      * Wallclock time: updated only by control software. Guests should base
      * their gettimeofday() syscall on this wallclock-base value.
      */
-    u32                wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
-    u32                wc_usec;         /* Usecs 00:00:00 UTC, Jan 1, 1970.  */
+    u32 wc_version;      /* Version counter: see vcpu_time_info_t. */
+    u32 wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
+    u32 wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
 
     arch_shared_info_t arch;
 

@@ -131,14 +131,14 @@ typedef struct {
 } dom0_debug_t;
 
 /*
- * Set clock such that it would read <secs,usecs> after 00:00:00 UTC,
+ * Set clock such that it would read <secs,nsecs> after 00:00:00 UTC,
  * 1 January, 1970 if the current system time was <system_time>.
  */
 #define DOM0_SETTIME          17
 typedef struct {
     /* IN variables. */
     u32 secs;
-    u32 usecs;
+    u32 nsecs;
     u64 system_time;
 } dom0_settime_t;
 

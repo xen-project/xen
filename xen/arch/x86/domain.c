@@ -279,6 +279,8 @@ void arch_do_createdomain(struct vcpu *v)
     
     shadow_lock_init(d);        
     INIT_LIST_HEAD(&d->arch.free_shadow_frames);
+
+    init_domain_time(d);
 }
 
 void arch_do_boot_vcpu(struct vcpu *v)

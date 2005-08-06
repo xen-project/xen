@@ -115,7 +115,8 @@ struct shadow_time_info {
 	u32 version;
 };
 static DEFINE_PER_CPU(struct shadow_time_info, shadow_time);
-static struct timeval shadow_tv;
+static struct timespec shadow_tv;
+static u32 shadow_tv_version;
 
 /* Keep track of last time we did processing/updating of jiffies and xtime. */
 static u64 processed_system_time;   /* System time (ns) at last processing. */
@@ -123,18 +124,6 @@ static DEFINE_PER_CPU(u64, processed_system_time);
 
 #define NS_PER_TICK (1000000000ULL/HZ)
 
-#define HANDLE_USEC_UNDERFLOW(_tv) do {		\
-	while ((_tv).tv_usec < 0) {		\
-		(_tv).tv_usec += USEC_PER_SEC;	\
-		(_tv).tv_sec--;			\
-	}					\
-} while (0)
-#define HANDLE_USEC_OVERFLOW(_tv) do {		\
-	while ((_tv).tv_usec >= USEC_PER_SEC) {	\
-		(_tv).tv_usec -= USEC_PER_SEC;	\
-		(_tv).tv_sec++;			\
-	}					\
-} while (0)
 static inline void __normalize_time(time_t *sec, s64 *nsec)
 {
 	while (*nsec >= NSEC_PER_SEC) {
@@ -231,14 +220,16 @@ static void update_wallclock(void)
 	shared_info_t *s = HYPERVISOR_shared_info;
 	long wtm_nsec, xtime_nsec;
 	time_t wtm_sec, xtime_sec;
-	u64 tmp, usec;
+	u64 tmp, nsec;
 
-	if ((shadow_tv.tv_sec == s->wc_sec) &&
-	    (shadow_tv.tv_usec == s->wc_usec))
-		return;
-
-	shadow_tv.tv_sec  = s->wc_sec;
-	shadow_tv.tv_usec = s->wc_usec;
+	do {
+		shadow_tv_version = s->wc_version;
+		rmb();
+		shadow_tv.tv_sec  = s->wc_sec;
+		shadow_tv.tv_nsec = s->wc_nsec;
+		rmb();
+	}
+	while ((s->wc_version & 1) | (shadow_tv_version ^ s->wc_version));
 
 	if (INDEPENDENT_WALLCLOCK())
 		return;
@@ -247,15 +238,14 @@ static void update_wallclock(void)
 		return;
 
 	/* Adjust wall-clock time base based on wall_jiffies ticks. */
-	usec = processed_system_time;
-	do_div(usec, 1000);
-	usec += (u64)shadow_tv.tv_sec * 1000000ULL;
-	usec += (u64)shadow_tv.tv_usec;
-	usec -= (jiffies - wall_jiffies) * (USEC_PER_SEC / HZ);
+	nsec = processed_system_time;
+	nsec += (u64)shadow_tv.tv_sec * 1000000000ULL;
+	nsec += (u64)shadow_tv.tv_nsec;
+	nsec -= (jiffies - wall_jiffies) * (u64)(NSEC_PER_SEC / HZ);
 
 	/* Split wallclock base into seconds and nanoseconds. */
-	tmp = usec;
-	xtime_nsec = do_div(tmp, 1000000) * 1000ULL;
+	tmp = nsec;
+	xtime_nsec = do_div(tmp, 1000000000);
 	xtime_sec  = (time_t)tmp;
 
 	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - xtime_sec);
@@ -279,7 +269,7 @@ static void get_time_values_from_xen(void)
 	dst = &per_cpu(shadow_time, smp_processor_id());
 
 	do {
-		dst->version = src->time_version2;
+		dst->version = src->version;
 		rmb();
 		dst->tsc_timestamp     = src->tsc_timestamp;
 		dst->system_timestamp  = src->system_time;
@@ -287,7 +277,7 @@ static void get_time_values_from_xen(void)
 		dst->tsc_shift         = src->tsc_shift;
 		rmb();
 	}
-	while (dst->version != src->time_version1);
+	while ((src->version & 1) | (dst->version ^ src->version));
 
 	dst->tsc_to_usec_mul = dst->tsc_to_nsec_mul / 1000;
 }
@@ -300,7 +290,7 @@ static inline int time_values_up_to_date(int cpu)
 	src = &HYPERVISOR_shared_info->vcpu_time[cpu]; 
 	dst = &per_cpu(shadow_time, cpu); 
 
-	return (dst->version == src->time_version2);
+	return (dst->version == src->version);
 }
 
 /*
@@ -469,7 +459,7 @@ int do_settimeofday(struct timespec *tv)
 		dom0_op_t op;
 		op.cmd = DOM0_SETTIME;
 		op.u.settime.secs        = xentime.tv_sec;
-		op.u.settime.usecs       = xentime.tv_nsec / NSEC_PER_USEC;
+		op.u.settime.nsecs       = xentime.tv_nsec;
 		op.u.settime.system_time = shadow->system_timestamp;
 		write_sequnlock_irq(&xtime_lock);
 		HYPERVISOR_dom0_op(&op);
@@ -574,7 +564,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	}
 	while (!time_values_up_to_date(cpu));
 
-	if (unlikely(delta < 0) || unlikely(delta_cpu < 0)) {
+	if (unlikely(delta < (s64)-1000000) || unlikely(delta_cpu < 0)) {
 		printk("Timer ISR/%d: Time went backwards: "
 		       "delta=%lld cpu_delta=%lld shadow=%lld "
 		       "off=%lld processed=%lld cpu_processed=%lld\n",
@@ -603,7 +593,8 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		profile_tick(CPU_PROFILING, regs);
 	}
 
-	update_wallclock();
+	if (unlikely(shadow_tv_version != HYPERVISOR_shared_info->wc_version))
+		update_wallclock();
 }
 
 /*
@@ -792,8 +783,6 @@ void __init time_init(void)
 #endif
 	get_time_values_from_xen();
 	update_wallclock();
-	xtime.tv_sec = shadow_tv.tv_sec;
-	xtime.tv_nsec = shadow_tv.tv_usec * NSEC_PER_USEC;
 	set_normalized_timespec(&wall_to_monotonic,
 		-xtime.tv_sec, -xtime.tv_nsec);
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;

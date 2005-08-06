@@ -43,7 +43,7 @@ unsigned long hpet_address;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 int timer_ack = 0;
 unsigned long volatile jiffies;
-static unsigned long wc_sec, wc_usec; /* UTC time at last 'time update'. */
+static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
 
 struct time_scale {
     int shift;
@@ -630,25 +630,32 @@ s_time_t get_s_time(void)
     return now;
 }
 
+static inline void version_update_begin(u32 *version)
+{
+    /* Explicitly OR with 1 just in case version number gets out of sync. */
+    *version = (*version + 1) | 1;
+    wmb();
+}
+
+static inline void version_update_end(u32 *version)
+{
+    wmb();
+    (*version)++;
+}
+
 static inline void __update_dom_time(struct vcpu *v)
 {
     struct cpu_time       *t = &cpu_time[smp_processor_id()];
     struct vcpu_time_info *u = &v->domain->shared_info->vcpu_time[v->vcpu_id];
 
-    u->time_version1++;
-    wmb();
+    version_update_begin(&u->version);
 
     u->tsc_timestamp     = t->local_tsc_stamp;
     u->system_time       = t->stime_local_stamp;
     u->tsc_to_system_mul = t->tsc_scale.mul_frac;
     u->tsc_shift         = (s8)t->tsc_scale.shift;
 
-    wmb();
-    u->time_version2++;
-
-    /* Should only do this during do_settime(). */
-    v->domain->shared_info->wc_sec  = wc_sec;
-    v->domain->shared_info->wc_usec = wc_usec;
+    version_update_end(&u->version);
 }
 
 void update_dom_time(struct vcpu *v)
@@ -659,21 +666,39 @@ void update_dom_time(struct vcpu *v)
 }
 
 /* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
-void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
+void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
 {
-    u64 x, base_usecs;
-    u32 y;
+    u64 x;
+    u32 y, _wc_sec, _wc_nsec;
+    struct domain *d;
+    shared_info_t *s;
 
-    base_usecs = system_time_base;
-    do_div(base_usecs, 1000);
+    x = (secs * 1000000000ULL) + (u64)nsecs + system_time_base;
+    y = do_div(x, 1000000000);
 
-    x = (secs * 1000000ULL) + (u64)usecs + base_usecs;
-    y = do_div(x, 1000000);
+    wc_sec  = _wc_sec  = (u32)x;
+    wc_nsec = _wc_nsec = (u32)y;
 
-    wc_sec  = (unsigned long)x;
-    wc_usec = (unsigned long)y;
+    read_lock(&domlist_lock);
 
-    __update_dom_time(current);
+    for_each_domain ( d )
+    {
+        s = d->shared_info;
+        version_update_begin(&s->wc_version);
+        s->wc_sec  = _wc_sec;
+        s->wc_nsec = _wc_nsec;
+        version_update_end(&s->wc_version);
+    }
+
+    read_unlock(&domlist_lock);
+}
+
+void init_domain_time(struct domain *d)
+{
+    version_update_begin(&d->shared_info->wc_version);
+    d->shared_info->wc_sec  = wc_sec;
+    d->shared_info->wc_nsec = wc_nsec;
+    version_update_end(&d->shared_info->wc_version);
 }
 
 static void local_time_calibration(void *unused)

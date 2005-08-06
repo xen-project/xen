@@ -475,7 +475,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_SETTIME:
     {
         do_settime(op->u.settime.secs, 
-                   op->u.settime.usecs, 
+                   op->u.settime.nsecs, 
                    op->u.settime.system_time);
         ret = 0;
     }
