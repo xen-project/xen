@@ -307,24 +307,24 @@ class DBMap(dict):
         db = self.__db__
         if path is None:
             path = db.relPath()
-        print 'DBMap>introduceDomain>', dom, page, evtchn, path
+        log.info("DBMap>introduceDomain> %d %d %s %s" %(dom, page, evtchn, path))
         try:
             db.introduceDomain(dom, page, evtchn, path)
         except Exception, ex:
             import traceback
             traceback.print_exc()
-            print 'DBMap>introduceDomain>', ex
+            log.info("DBMap>introduceDomain> %s" %ex)
             pass # todo: don't ignore
         
     def releaseDomain(self, dom):
         db = self.__db__
-        print 'DBMap>releaseDomain>', dom
+        log.info("DBMap>releaseDomain> %d" %dom)
         try:
             db.releaseDomain(dom)
         except Exception, ex:
             import traceback
             traceback.print_exc()
-            print 'DBMap>releaseDomain>', ex
+            log.info("DBMap>releaseDomain> %s" %ex)
             pass # todo: don't ignore
 
     def watch(self, fn, path=""):
