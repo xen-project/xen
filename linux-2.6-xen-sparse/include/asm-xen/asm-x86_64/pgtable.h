@@ -512,10 +512,10 @@ int __direct_remap_area_pages(struct mm_struct *mm,
                               mmu_update_t *v);
 
 #define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
-		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
+		direct_remap_area_pages((vma)->vm_mm,vaddr,paddr,size,prot,DOMID_IO)
 
 #define io_remap_pfn_range(vma, vaddr, pfn, size, prot)		\
-		remap_pfn_range(vma, vaddr, pfn, size, prot)
+		direct_remap_area_pages((vma)->vm_mm,vaddr,(pfn)<<PAGE_SHIFT,size,prot,DOMID_IO)
 
 #define MK_IOSPACE_PFN(space, pfn)	(pfn)
 #define GET_IOSPACE(pfn)		0
