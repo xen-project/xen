@@ -698,8 +698,8 @@ def main(argv):
 
         dom = make_domain(opts, config)
         if opts.vals.console_autoconnect:
-            cmd = "/usr/libexec/xen/xc_console %d" % dom
-            os.execvp('/usr/libexec/xen/xc_console', cmd.split())
+            cmd = "/usr/libexec/xen/xenconsole %d" % dom
+            os.execvp('/usr/libexec/xen/xenconsole', cmd.split())
         
 if __name__ == '__main__':
     main(sys.argv)

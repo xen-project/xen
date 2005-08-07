@@ -709,8 +709,8 @@ class ProgConsole(Prog):
         dom = args[1]
         info = server.xend_domain(dom)
         domid = int(sxp.child_value(info, 'id', '-1'))
-        cmd = "/usr/libexec/xen/xc_console %d" % domid
-        os.execvp('/usr/libexec/xen/xc_console', cmd.split())
+        cmd = "/usr/libexec/xen/xenconsole %d" % domid
+        os.execvp('/usr/libexec/xen/xenconsole', cmd.split())
 
 xm.prog(ProgConsole)
 

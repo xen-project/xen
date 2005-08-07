@@ -86,8 +86,8 @@
 ^tools/check/\..*$
 ^tools/cmdline/.*$
 ^tools/cmdline/xen/.*$
-^tools/consoled/consoled$
-^tools/consoled/xc_console$
+^tools/console/xenconsoled$
+^tools/console/xenconsole$
 ^tools/debugger/pdb/pdb$
 ^tools/debugger/pdb/linux-[0-9.]*-module/.*\.ko$
 ^tools/debugger/pdb/linux-[0-9.]*-module/.*\.mod.c$

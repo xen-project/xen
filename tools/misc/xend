@@ -121,7 +121,7 @@ def start_xenstored():
 
 def start_consoled():
     if os.fork() == 0:
-        os.execvp('/usr/sbin/consoled', ['/usr/sbin/consoled']);
+        os.execvp('/usr/sbin/xenconsoled', ['/usr/sbin/xenconsoled']);
             
 def main():
     try:
