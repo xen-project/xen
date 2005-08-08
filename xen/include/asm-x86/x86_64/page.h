@@ -42,7 +42,8 @@ typedef l4_pgentry_t root_pgentry_t;
 #endif /* !__ASSEMBLY__ */
 
 /* Given a virtual address, get an entry offset into a linear page table. */
-#define l1_linear_offset(_a) (((_a) & VADDR_MASK) >> PAGE_SHIFT)
+#define l1_linear_offset(_a) (((_a) & VADDR_MASK) >> L1_PAGETABLE_SHIFT)
+#define l2_linear_offset(_a) (((_a) & VADDR_MASK) >> L2_PAGETABLE_SHIFT)
 
 #define is_guest_l1_slot(_s) (1)
 #define is_guest_l2_slot(_t, _s) (1)

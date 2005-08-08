@@ -190,7 +190,7 @@ void dump_pageframe_info(struct domain *d)
     {
         list_for_each_entry ( page, &d->page_list, list )
         {
-            printk("Page %p: caf=%08x, taf=%08x\n",
+            printk("Page %p: caf=%08x, taf=%" PRtype_info "\n",
                    _p(page_to_phys(page)), page->count_info,
                    page->u.inuse.type_info);
         }
@@ -198,14 +198,14 @@ void dump_pageframe_info(struct domain *d)
 
     list_for_each_entry ( page, &d->xenpage_list, list )
     {
-        printk("XenPage %p: caf=%08x, taf=%08x\n",
+        printk("XenPage %p: caf=%08x, taf=%" PRtype_info "\n",
                _p(page_to_phys(page)), page->count_info,
                page->u.inuse.type_info);
     }
 
     
     page = virt_to_page(d->shared_info);
-    printk("Shared_info@%p: caf=%08x, taf=%08x\n",
+    printk("Shared_info@%p: caf=%08x, taf=%" PRtype_info "\n",
            _p(page_to_phys(page)), page->count_info,
            page->u.inuse.type_info);
 }

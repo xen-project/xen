@@ -485,7 +485,7 @@ static inline int __mark_dirty(struct domain *d, unsigned int mfn)
     {
         SH_LOG("mark_dirty OOR! mfn=%x pfn=%lx max=%x (dom %p)",
                mfn, pfn, d->arch.shadow_dirty_bitmap_size, d);
-        SH_LOG("dom=%p caf=%08x taf=%08x", 
+        SH_LOG("dom=%p caf=%08x taf=%" PRtype_info, 
                page_get_owner(&frame_table[mfn]),
                frame_table[mfn].count_info, 
                frame_table[mfn].u.inuse.type_info );
@@ -602,14 +602,14 @@ static inline void shadow_drop_references(
     /* XXX This needs more thought... */
     printk("%s: needing to call shadow_remove_all_access for mfn=%lx\n",
            __func__, page_to_pfn(page));
-    printk("Before: mfn=%lx c=%08x t=%08x\n", page_to_pfn(page),
+    printk("Before: mfn=%lx c=%08x t=%" PRtype_info "\n", page_to_pfn(page),
            page->count_info, page->u.inuse.type_info);
 
     shadow_lock(d);
     shadow_remove_all_access(d, page_to_pfn(page));
     shadow_unlock(d);
 
-    printk("After:  mfn=%lx c=%08x t=%08x\n", page_to_pfn(page),
+    printk("After:  mfn=%lx c=%08x t=%" PRtype_info "\n", page_to_pfn(page),
            page->count_info, page->u.inuse.type_info);
 }
 
@@ -648,7 +648,7 @@ get_shadow_ref(unsigned long smfn)
 
     if ( unlikely(nx == 0) )
     {
-        printk("get_shadow_ref overflow, gmfn=%x smfn=%lx\n",
+        printk("get_shadow_ref overflow, gmfn=%" PRtype_info  " smfn=%lx\n",
                frame_table[smfn].u.inuse.type_info & PGT_mfn_mask,
                smfn);
         BUG();
@@ -678,7 +678,8 @@ put_shadow_ref(unsigned long smfn)
 
     if ( unlikely(x == 0) )
     {
-        printk("put_shadow_ref underflow, smfn=%lx oc=%08x t=%08x\n",
+        printk("put_shadow_ref underflow, smfn=%lx oc=%08x t=%" 
+               PRtype_info "\n",
                smfn,
                frame_table[smfn].count_info,
                frame_table[smfn].u.inuse.type_info);
@@ -1200,7 +1201,7 @@ static inline unsigned long __shadow_status(
 #ifndef NDEBUG
         if ( ___shadow_status(d, gpfn, stype) != 0 )
         {
-            printk("d->id=%d gpfn=%lx gmfn=%lx stype=%lx c=%x t=%x "
+            printk("d->id=%d gpfn=%lx gmfn=%lx stype=%lx c=%x t=%" PRtype_info " "
                    "mfn_out_of_sync(gmfn)=%d mfn_is_page_table(gmfn)=%d\n",
                    d->domain_id, gpfn, gmfn, stype,
                    frame_table[gmfn].count_info,

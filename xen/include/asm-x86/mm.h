@@ -36,7 +36,7 @@ struct pfn_info
             /* Owner of this page (NULL if page is anonymous). */
             u32 _domain; /* pickled format */
             /* Type reference count and various PGT_xxx flags and fields. */
-            u32 type_info;
+            unsigned long type_info;
         } inuse;
 
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
@@ -77,6 +77,7 @@ struct pfn_info
  /* Owning guest has pinned this page to its current type? */
 #define _PGT_pinned         27
 #define PGT_pinned          (1U<<_PGT_pinned)
+#if defined(__i386__)
  /* The 11 most significant bits of virt address if this is a page table. */
 #define PGT_va_shift        16
 #define PGT_va_mask         (((1U<<11)-1)<<PGT_va_shift)
@@ -84,6 +85,19 @@ struct pfn_info
 #define PGT_va_mutable      (((1U<<11)-1)<<PGT_va_shift)
  /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
 #define PGT_va_unknown      (((1U<<11)-2)<<PGT_va_shift)
+#elif defined(__x86_64__)
+ /* The 27 most significant bits of virt address if this is a page table. */
+#define PGT_va_shift        32
+#define PGT_va_mask         ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
+ /* Is the back pointer still mutable (i.e. not fixed yet)? */
+ /* Use PML4 slot for HYPERVISOR_VIRT_START.  
+    18 = L4_PAGETABLE_SHIFT - L2_PAGETABLE_SHIFT */
+#define PGT_va_mutable      ((unsigned long)(256U<<18)<<PGT_va_shift)
+ /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
+ /* Use PML4 slot for HYPERVISOR_VIRT_START + 1 */
+#define PGT_va_unknown      ((unsigned long)(257U<<18)<<PGT_va_shift)
+#endif
+
  /* 16-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1U<<16)-1)
 
@@ -114,11 +128,13 @@ struct pfn_info
 #if defined(__i386__)
 #define pickle_domptr(_d)   ((u32)(unsigned long)(_d))
 #define unpickle_domptr(_d) ((struct domain *)(unsigned long)(_d))
+#define PRtype_info "08lx" /* should only be used for printk's */
 #elif defined(__x86_64__)
 static inline struct domain *unpickle_domptr(u32 _domain)
 { return (_domain == 0) ? NULL : __va(_domain); }
 static inline u32 pickle_domptr(struct domain *domain)
 { return (domain == NULL) ? 0 : (u32)__pa(domain); }
+#define PRtype_info "016lx"/* should only be used for printk's */
 #endif
 
 #define page_get_owner(_p)    (unpickle_domptr((_p)->u.inuse._domain))
@@ -144,8 +160,8 @@ extern struct pfn_info *frame_table;
 extern unsigned long max_page;
 void init_frametable(void);
 
-int alloc_page_type(struct pfn_info *page, unsigned int type);
-void free_page_type(struct pfn_info *page, unsigned int type);
+int alloc_page_type(struct pfn_info *page, unsigned long type);
+void free_page_type(struct pfn_info *page, unsigned long type);
 extern void invalidate_shadow_ldt(struct vcpu *d);
 extern int shadow_remove_all_write_access(
     struct domain *d, unsigned long gpfn, unsigned long gmfn);
@@ -183,7 +199,7 @@ static inline int get_page(struct pfn_info *page,
              unlikely(d != _domain) )                /* Wrong owner? */
         {
             if ( !_shadow_mode_refcounts(domain) )
-                DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%08x\n",
+                DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%" PRtype_info "\n",
                         page_to_pfn(page), domain, unpickle_domptr(d),
                         x, page->u.inuse.type_info);
             return 0;
@@ -200,7 +216,7 @@ static inline int get_page(struct pfn_info *page,
 }
 
 void put_page_type(struct pfn_info *page);
-int  get_page_type(struct pfn_info *page, u32 type);
+int  get_page_type(struct pfn_info *page, unsigned long type);
 int  get_page_from_l1e(l1_pgentry_t l1e, struct domain *d);
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d);
 
@@ -213,7 +229,7 @@ static inline void put_page_and_type(struct pfn_info *page)
 
 static inline int get_page_and_type(struct pfn_info *page,
                                     struct domain *domain,
-                                    u32 type)
+                                    unsigned long type)
 {
     int rc = get_page(page, domain);
 

@@ -859,7 +859,7 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
             if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
                          (1 | PGC_allocated)) || unlikely(_nd != _d)) {
                 printk("gnttab_donate: Bad page values %p: ed=%p(%u), sd=%p,"
-                        " caf=%08x, taf=%08x\n", (void *) page_to_pfn(page),
+                        " caf=%08x, taf=%" PRtype_info "\n", (void *) page_to_pfn(page),
                         d, d->domain_id, unpickle_domptr(_nd), x, 
                         page->u.inuse.type_info);
                 spin_unlock(&d->page_alloc_lock);

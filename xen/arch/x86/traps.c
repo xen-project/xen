@@ -422,7 +422,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
     {
         LOCK_BIGLOCK(d);
         if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
-             unlikely((addr >> L2_PAGETABLE_SHIFT) ==
+             unlikely(l2_linear_offset(addr) ==
                       d->arch.ptwr[PTWR_PT_ACTIVE].l2_idx) )
         {
             ptwr_flush(d, PTWR_PT_ACTIVE);
@@ -430,7 +430,12 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
             return EXCRET_fault_fixed;
         }
 
-        if ( (addr < HYPERVISOR_VIRT_START) &&
+        if ( ((addr < HYPERVISOR_VIRT_START) 
+#if defined(__x86_64__)
+              || (addr >= HYPERVISOR_VIRT_END)
+#endif        
+            )     
+             &&
              KERNEL_MODE(v, regs) &&
              ((regs->error_code & 3) == 3) && /* write-protection fault */
              ptwr_do_page_fault(d, addr) )
@@ -459,7 +464,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
         goto xen_fault;
 
     propagate_page_fault(addr, regs->error_code);
-    return 0; 
+    return 0;
 
  xen_fault:
 

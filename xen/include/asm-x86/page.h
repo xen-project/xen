@@ -208,20 +208,21 @@ typedef struct { u64 pfn; } pagetable_t;
      + DOMAIN_ENTRIES_PER_L4_PAGETABLE)
 #endif
 
-#define linear_l1_table                                                 \
+#define VA_LINEAR_PT_VIRT_START (LINEAR_PT_VIRT_START & VADDR_MASK)
+#define linear_l1_table                                                  \
     ((l1_pgentry_t *)(LINEAR_PT_VIRT_START))
-#define __linear_l2_table                                               \
-    ((l2_pgentry_t *)(LINEAR_PT_VIRT_START +                            \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0))))
-#define __linear_l3_table                                               \
-    ((l3_pgentry_t *)(LINEAR_PT_VIRT_START +                            \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0)) +   \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<1))))
-#define __linear_l4_table                                               \
-    ((l4_pgentry_t *)(LINEAR_PT_VIRT_START +                            \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0)) +   \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<1)) +   \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<2))))
+#define __linear_l2_table                                                \
+    ((l2_pgentry_t *)(LINEAR_PT_VIRT_START +                             \
+                     (VA_LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0))))
+#define __linear_l3_table                                                \
+    ((l3_pgentry_t *)(LINEAR_PT_VIRT_START +                             \
+                     (VA_LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0)) + \
+                     (VA_LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<1))))
+#define __linear_l4_table                                                \
+    ((l4_pgentry_t *)(LINEAR_PT_VIRT_START +                             \
+                     (VA_LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0)) + \
+                     (VA_LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<1)) + \
+                     (VA_LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<2))))
 
 #define linear_pg_table linear_l1_table
 #define linear_l2_table(_ed) ((_ed)->arch.guest_vtable)
