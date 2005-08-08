@@ -70,8 +70,7 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
             flags &= ~DOMFLAGS_BLOCKED;
         if ( v->vcpu_flags & VCPUF_running )
             flags |= DOMFLAGS_RUNNING;
-        if ( v->cpu_time > cpu_time )
-            cpu_time += v->cpu_time;
+        cpu_time += v->cpu_time;
         vcpu_count++;
     }
     
