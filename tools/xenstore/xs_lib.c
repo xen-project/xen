@@ -152,8 +152,9 @@ unsigned int xs_count_strings(const char *strings, unsigned int len)
 	unsigned int num;
 	const char *p;
 
-	for (p = strings, num = 0; p < strings + len; p += strlen(p) + 1)
-		num++;
+	for (p = strings, num = 0; p < strings + len; p++)
+		if (*p == '\0')
+			num++;
 
 	return num;
 }

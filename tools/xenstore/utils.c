@@ -84,9 +84,6 @@ void *malloc_nofail(size_t size)
 void daemonize(void)
 {
 	pid_t pid;
-	int fd;
-	size_t len;
-	char buf[100];
 
 	/* Separate from our parent via fork, so init inherits us. */
 	if ((pid = fork()) < 0)
@@ -104,18 +101,6 @@ void daemonize(void)
 	chdir("/");
 	/* Discard our parent's old-fashioned umask prejudices. */
 	umask(0);
-
-	fd = open("/var/run/xenstored.pid", O_RDWR | O_CREAT);
-	if (fd == -1) {
-		exit(1);
-	}
-
-	if (lockf(fd, F_TLOCK, 0) == -1) {
-		exit(1);
-	}
-
-	len = sprintf(buf, "%d\n", getpid());
-	write(fd, buf, len);
 }
 
 

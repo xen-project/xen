@@ -1,0 +1,20 @@
+# Write without create fails.
+expect write failed: No such file or directory
+write /test none contents
+
+# Exclusive write succeeds
+write /test excl contents
+expect contents
+read /test
+
+# Exclusive write fails to overwrite.
+expect write failed: File exists
+write /test excl contents
+
+# Non-exclusive overwrite succeeds.
+write /test none contents2
+expect contents2
+read /test
+write /test create contents3
+expect contents3
+read /test

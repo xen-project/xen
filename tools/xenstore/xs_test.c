@@ -28,13 +28,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <sys/mman.h>
 #include <fnmatch.h>
 #include <stdarg.h>
 #include <string.h>
 #include <getopt.h>
 #include <ctype.h>
 #include <sys/time.h>
-#include <sys/mman.h>
 #include "utils.h"
 #include "xs_lib.h"
 #include "list.h"
@@ -43,7 +43,7 @@
 
 static struct xs_handle *handles[10] = { NULL };
 
-static unsigned int timeout_ms = 50;
+static unsigned int timeout_ms = 200;
 static bool timeout_suppressed = true;
 static bool readonly = false;
 static bool print_input = false;
@@ -213,6 +213,8 @@ static void __attribute__((noreturn)) usage(void)
 	     "  notimeout\n"
 	     "  readonly\n"
 	     "  readwrite\n"
+	     "  noackwrite <path> <flags> <value>...\n"
+	     "  readack\n"
 	     "  dump\n");
 }
 
@@ -365,6 +367,45 @@ static void do_write(unsigned int handle, char *path, char *flags, char *data)
 		failed(handle);
 }
 
+static void do_noackwrite(unsigned int handle,
+			  char *path, const char *flags, char *data)
+{
+	struct xsd_sockmsg msg;
+
+	/* Format: Flags (as string), path, data. */
+	if (streq(flags, "none"))
+		flags = XS_WRITE_NONE;
+	else if (streq(flags, "create"))
+		flags = XS_WRITE_CREATE;
+	else if (streq(flags, "excl"))
+		flags = XS_WRITE_CREATE_EXCL;
+	else
+		barf("noackwrite flags 'none', 'create' or 'excl' only");
+
+	msg.len = strlen(path) + 1 + strlen(flags) + 1 + strlen(data);
+	msg.type = XS_WRITE;
+	if (!write_all_choice(handles[handle]->fd, &msg, sizeof(msg)))
+		failed(handle);
+	if (!write_all_choice(handles[handle]->fd, path, strlen(path) + 1))
+		failed(handle);
+	if (!write_all_choice(handles[handle]->fd, flags, strlen(flags) + 1))
+		failed(handle);
+	if (!write_all_choice(handles[handle]->fd, data, strlen(data)))
+		failed(handle);
+	/* Do not wait for ack. */
+}
+
+static void do_readack(unsigned int handle)
+{
+	enum xsd_sockmsg_type type;
+	char *ret;
+
+	ret = read_reply(handles[handle]->fd, &type, NULL);
+	if (!ret)
+		failed(handle);
+	free(ret);
+}
+
 static void do_setid(unsigned int handle, char *id)
 {
 	if (!xs_bool(xs_debug_command(handles[handle], "setid", id,
@@ -466,6 +507,25 @@ static void do_watch(unsigned int handle, const char *node, const char *token)
 		failed(handle);
 }
 
+static void set_timeout(void)
+{
+	struct itimerval timeout;
+
+	timeout.it_value.tv_sec = timeout_ms / 1000;
+	timeout.it_value.tv_usec = (timeout_ms * 1000) % 1000000;
+	timeout.it_interval.tv_sec = timeout.it_interval.tv_usec = 0;
+	setitimer(ITIMER_REAL, &timeout, NULL);
+}
+
+static void disarm_timeout(void)
+{
+	struct itimerval timeout;
+
+	timeout.it_value.tv_sec = 0;
+	timeout.it_value.tv_usec = 0;
+	setitimer(ITIMER_REAL, &timeout, NULL);
+}
+
 static void do_waitwatch(unsigned int handle)
 {
 	char **vec;
@@ -474,14 +534,17 @@ static void do_waitwatch(unsigned int handle)
 	fd_set set;
 
 	if (xs_fileno(handles[handle]) != -2) {
+		/* Manually select here so we can time out gracefully. */
 		FD_ZERO(&set);
 		FD_SET(xs_fileno(handles[handle]), &set);
+		disarm_timeout();
 		if (select(xs_fileno(handles[handle])+1, &set,
 			   NULL, NULL, &tv) == 0) {
 			errno = ETIMEDOUT;
 			failed(handle);
 			return;
 		}
+		set_timeout();
 	}
 
 	vec = xs_read_watch(handles[handle]);
@@ -529,6 +592,9 @@ static void do_introduce(unsigned int handle,
 {
 	unsigned int i;
 	int fd;
+
+	/* This mechanism is v. slow w. valgrind running. */
+	timeout_ms = 5000;
 
 	/* We poll, so ignore signal */
 	signal(SIGUSR2, SIG_IGN);
@@ -671,24 +737,6 @@ static void alarmed(int sig __attribute__((unused)))
 	exit(1);
 }
 
-static void set_timeout(void)
-{
-	struct itimerval timeout;
-
-	timeout.it_interval.tv_sec = timeout_ms / 1000;
-	timeout.it_interval.tv_usec = (timeout_ms * 1000) % 1000000;
-	setitimer(ITIMER_REAL, &timeout, NULL);
-}
-
-static void disarm_timeout(void)
-{
-	struct itimerval timeout;
-
-	timeout.it_interval.tv_sec = 0;
-	timeout.it_interval.tv_usec = 0;
-	setitimer(ITIMER_REAL, &timeout, NULL);
-}
-
 static void do_command(unsigned int default_handle, char *line)
 {
 	char *endp;
@@ -779,7 +827,11 @@ static void do_command(unsigned int default_handle, char *line)
 		readonly = false;
 		xs_daemon_close(handles[handle]);
 		handles[handle] = NULL;
-	} else
+	} else if (streq(command, "noackwrite"))
+		do_noackwrite(handle, arg(line,1), arg(line,2), arg(line,3));
+	else if (streq(command, "readack"))
+		do_readack(handle);
+	else
 		barf("Unknown command %s", command);
 	fflush(stdout);
 	disarm_timeout();

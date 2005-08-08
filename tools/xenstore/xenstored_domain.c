@@ -227,32 +227,27 @@ static struct domain *find_domain(u16 port)
 	return NULL;
 }
 
+/* We scan all domains rather than use the information given here. */
 void handle_event(int event_fd)
 {
 	u16 port;
-	struct domain *domain;
 
 	if (read(event_fd, &port, sizeof(port)) != sizeof(port))
 		barf_perror("Failed to read from event fd");
-
-	/* We have to handle *all* the data available before we ack:
-	 * careful that handle_input/handle_output can destroy conn.
-	 */
-	while ((domain = find_domain(port)) != NULL) {
-		if (domain->conn->state == OK
-		    && buffer_has_input(domain->input))
-			handle_input(domain->conn);
-		else if (domain->conn->out
-			 && buffer_has_output_room(domain->output))
-			handle_output(domain->conn);
-		else
-			break;
-	}
-
 #ifndef TESTING
 	if (write(event_fd, &port, sizeof(port)) != sizeof(port))
 		barf_perror("Failed to write to event fd");
 #endif
+}
+
+bool domain_can_read(struct connection *conn)
+{
+	return conn->state == OK && buffer_has_input(conn->domain->input);
+}
+
+bool domain_can_write(struct connection *conn)
+{
+	return conn->out && buffer_has_output_room(conn->domain->output);
 }
 
 static struct domain *new_domain(void *context, domid_t domid,

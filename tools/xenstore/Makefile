@@ -41,9 +41,9 @@ xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_te
 xs_test: xs_test.o xs_lib.o utils.o
 xs_random: xs_random.o xs_test_lib.o xs_lib.o talloc.o utils.o
 xs_stress: xs_stress.o xs_test_lib.o xs_lib.o talloc.o utils.o
-xs_watch_stress: xs_watch_stress.o xs_test_lib.o xs_lib.o talloc.o utils.o
+xs_crashme: xs_crashme.o xs_lib.o talloc.o utils.o
 
-xs_test.o xs_stress.o xs_watch_stress.o xenstored_core_test.o xenstored_watch_test.o xenstored_transaction_test.o xenstored_domain_test.o xs_random.o xs_test_lib.o talloc_test.o fake_libxc.o: CFLAGS=$(BASECFLAGS) $(TESTFLAGS)
+xs_test.o xs_stress.o xenstored_core_test.o xenstored_watch_test.o xenstored_transaction_test.o xenstored_domain_test.o xs_random.o xs_test_lib.o talloc_test.o fake_libxc.o xs_crashme.o: CFLAGS=$(BASECFLAGS) $(TESTFLAGS)
 
 xenstored_%_test.o: xenstored_%.c
 	$(COMPILE.c) -o $@ $<
@@ -65,7 +65,7 @@ libxenstore-pic.a: $(LIB_OBJS_PIC)
 
 clean: testsuite-clean
 	rm -f *.o *.opic *.a
-	rm -f xen xenstored xs_random xs_stress xs_watch_stress
+	rm -f xen xenstored xs_random xs_stress xs_crashme
 	rm -f xs_test xenstored_test xs_dom0_test
 	-$(RM) $(PROG_DEP)
 
@@ -96,14 +96,18 @@ randomcheck: xs_random xenstored_test
 	$(TESTENV) ./xs_random --fast /tmp/xs_random 100000 $(RANDSEED) && echo
 	$(TESTENV) ./xs_random --fail /tmp/xs_random 10000 $(RANDSEED)
 
-randomcheck-fast: xs_random xenstored_test
-	@$(TESTENV) ./xs_random --fast /tmp/xs_random 10000 $(RANDSEED)
+crashme:  xs_crashme xenstored_test
+	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions /tmp/xs_crashme.vglog* /tmp/trace
+	export $(TESTENV); ./xs_crashme 5000 $(RANDSEED) 2>/dev/null
+	if [ -n "`cat /tmp/xs_crashme.vglog*`" ]; then echo Valgrind complained; cat /tmp/xs_crashme.vglog*; exit 1; fi
+	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions /tmp/xs_crashme.vglog* /tmp/trace
 
-stresstest: xs_stress xs_watch_stress xenstored_test
+randomcheck-fast: xs_random xenstored_test
+	@$(TESTENV) ./xs_random --fast /tmp/xs_random 2000 $(RANDSEED)
+
+stresstest: xs_stress xenstored_test
 	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions
 	export $(TESTENV); PID=`./xenstored_test --output-pid --trace-file=/tmp/trace`; ./xs_stress 5000; ret=$$?; kill $$PID; exit $$ret
-	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions
-	export $(TESTENV); PID=`./xenstored_test --output-pid`; ./xs_watch_stress; ret=$$?; kill $$PID; exit $$ret
 
 xs_dom0_test: xs_dom0_test.o utils.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxc -o $@

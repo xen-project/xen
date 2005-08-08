@@ -1,0 +1,34 @@
+# Root directory has only tool dir in it.
+expect tool
+dir /
+
+# Create a file.
+write /test create contents
+
+# Directory shows it.
+expect test
+expect tool
+dir /
+
+# Make a new directory, check it's there
+mkdir /dir
+expect dir
+expect test
+expect tool
+dir /
+
+# Check it's empty.
+dir /dir
+
+# Create a file, check it exists.
+write /dir/test2 create contents2
+expect test2
+dir /dir
+expect contents2
+read /dir/test2
+
+# Creating dir over the top should fail.
+expect mkdir failed: File exists
+mkdir /dir
+expect mkdir failed: File exists
+mkdir /dir/test2

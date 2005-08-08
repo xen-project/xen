@@ -204,13 +204,19 @@ static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
 		return NULL;
 	}
 
-	assert(msg.type == type);
+	if (msg.type != type) {
+		free(ret);
+		saved_errno = EBADF;
+		goto close_fd;
+		
+	}
 	return ret;
 
 fail:
 	/* We're in a bad state, so close fd. */
 	saved_errno = errno;
 	sigaction(SIGPIPE, &oldact, NULL);
+close_fd:
 	close(h->fd);
 	h->fd = -1;
 	errno = saved_errno;

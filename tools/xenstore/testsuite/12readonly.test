@@ -1,0 +1,41 @@
+# Test that read only connection can't alter store.
+
+write /test create contents
+
+readonly
+expect test
+expect tool
+dir /
+
+expect contents
+read /test
+expect 0 READ
+getperm /test
+watch /test token
+unwatch /test token 
+start /
+commit
+start /
+abort
+
+# These don't work
+expect write failed: Read-only file system
+write /test2 create contents
+expect write failed: Read-only file system
+write /test create contents
+expect setperm failed: Read-only file system
+setperm /test 100 NONE
+expect setperm failed: Read-only file system
+setperm /test 100 NONE
+expect shutdown failed: Read-only file system
+shutdown
+expect introduce failed: Read-only file system
+introduce 1 100 7 /home
+
+# Check that watches work like normal.
+watch / token
+1 readwrite
+1 write /test create contents
+expect /test:token
+waitwatch
+ackwatch token

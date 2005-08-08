@@ -349,19 +349,12 @@ static bool file_mkdir(struct file_ops_info *info, const char *path)
 {
 	char *dirname = path_to_name(info, path);
 
-	/* Same effective order as daemon, so error returns are right. */
-	if (mkdir(dirname, 0700) != 0) {
-		if (errno != ENOENT && errno != ENOTDIR)
-			write_ok(info, path);
+	if (!write_ok(info, path))
 		return false;
-	}
 
-	if (!write_ok(info, path)) {
-		int saved_errno = errno;
-		rmdir(dirname);
-		errno = saved_errno;
+	if (mkdir(dirname, 0700) != 0)
 		return false;
-	}
+
 	init_perms(dirname);
 	return true;
 }
@@ -984,13 +977,15 @@ static void cleanup(const char *dir)
 
 static void setup_file_ops(const char *dir)
 {
-	char *cmd = talloc_asprintf(NULL, "echo -n r0 > %s/.perms", dir);
+	struct xs_permissions perm = { .id = 0, .perms = XS_PERM_READ };
+	struct file_ops_info *h = file_handle(dir);
 	if (mkdir(dir, 0700) != 0)
 		barf_perror("Creating directory %s", dir);
-	if (mkdir(talloc_asprintf(cmd, "%s/tool", dir), 0700) != 0)
+	if (mkdir(talloc_asprintf(h, "%s/tool", dir), 0700) != 0)
 		barf_perror("Creating directory %s/tool", dir);
-	do_command(cmd);
-	talloc_free(cmd);
+	if (!file_set_perms(h, talloc_strdup(h, "/"), &perm, 1))
+		barf_perror("Setting root perms in %s", dir);
+	file_close(h);
 }
 
 static void setup_xs_ops(void)

@@ -252,6 +252,7 @@ static bool write_message(struct connection *conn)
 	int ret;
 	struct buffered_data *out = conn->out;
 
+	assert(conn->state != BLOCKED);
 	if (out->inhdr) {
 		if (verbose)
 			xprintf("Writing msg %s (%s) out to %p\n",
@@ -289,6 +290,10 @@ static bool write_message(struct connection *conn)
 	talloc_free(out);
 
 	queue_next_event(conn);
+
+	/* No longer busy? */
+	if (!conn->out)
+		conn->state = OK;
 	return true;
 }
 
@@ -492,6 +497,8 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 		conn->waiting_reply = bdata;
 	} else
 		conn->out = bdata;
+	assert(conn->state != BLOCKED);
+	conn->state = BUSY;
 }
 
 /* Some routines (write, mkdir, etc) just need a non-error return */
@@ -544,7 +551,7 @@ bool is_valid_nodename(const char *node)
 /* We expect one arg in the input: return NULL otherwise. */
 static const char *onearg(struct buffered_data *in)
 {
-	if (get_string(in, 0) != in->used)
+	if (!in->used || get_string(in, 0) != in->used)
 		return NULL;
 	return in->buffer;
 }
@@ -807,7 +814,7 @@ bool check_node_perms(struct connection *conn, const char *node,
 
 static void send_directory(struct connection *conn, const char *node)
 {
-	char *path, *reply = talloc_strdup(node, "");
+	char *path, *reply;
 	unsigned int reply_len = 0;
 	DIR **dir;
 	struct dirent *dirent;
@@ -825,6 +832,7 @@ static void send_directory(struct connection *conn, const char *node)
 		return;
 	}
 
+	reply = talloc_strdup(node, "");
 	while ((dirent = readdir(*dir)) != NULL) {
 		int len = strlen(dirent->d_name) + 1;
 
@@ -1082,7 +1090,7 @@ static void do_get_perms(struct connection *conn, const char *node)
 static void do_set_perms(struct connection *conn, struct buffered_data *in)
 {
 	unsigned int num;
-	char *node;
+	char *node, *permstr;
 	struct xs_permissions *perms;
 
 	num = xs_count_strings(in->buffer, in->used);
@@ -1093,7 +1101,7 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 
 	/* First arg is node name. */
 	node = canonicalize(conn, in->buffer);
-	in->buffer += strlen(in->buffer) + 1;
+	permstr = in->buffer + strlen(in->buffer) + 1;
 	num--;
 
 	if (!within_transaction(conn->transaction, node)) {
@@ -1111,7 +1119,7 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
 	}
 
 	perms = talloc_array(node, struct xs_permissions, num);
-	if (!xs_strings_to_perms(perms, num, in->buffer)) {
+	if (!xs_strings_to_perms(perms, num, permstr)) {
 		send_error(conn, errno);
 		return;
 	}
@@ -1280,8 +1288,10 @@ end:
 	talloc_free(in);
 	talloc_set_fail_handler(NULL, NULL);
 	if (talloc_total_blocks(NULL)
-	    != talloc_total_blocks(talloc_autofree_context()) + 1)
+	    != talloc_total_blocks(talloc_autofree_context()) + 1) {
 		talloc_report_full(NULL, stderr);
+		abort();
+	}
 }
 
 /* Errors in reading or allocating here mean we get out of sync, so we
@@ -1305,8 +1315,10 @@ void handle_input(struct connection *conn)
 			return;
 
 		if (in->hdr.msg.len > PATH_MAX) {
+#ifndef TESTING
 			syslog(LOG_DAEMON, "Client tried to feed us %i",
 			       in->hdr.msg.len);
+#endif
 			goto bad_client;
 		}
 
@@ -1357,6 +1369,7 @@ static void unblock_connections(void)
 				consider_message(i);
 			}
 			break;
+		case BUSY:
 		case OK:
 			break;
 		}
@@ -1382,6 +1395,7 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	new->state = OK;
 	new->blocked_by = NULL;
 	new->out = new->waiting_reply = NULL;
+	new->waiting_for_ack = NULL;
 	new->fd = -1;
 	new->id = 0;
 	new->domain = NULL;
@@ -1461,6 +1475,7 @@ void dump_connection(void)
 		printf("    state = %s\n",
 		       i->state == OK ? "OK"
 		       : i->state == BLOCKED ? "BLOCKED"
+		       : i->state == BUSY ? "BUSY"
 		       : "INVALID");
 		if (i->id)
 			printf("    id = %i\n", i->id);
@@ -1631,6 +1646,7 @@ int main(int argc, char *argv[])
 	max = initialize_set(&inset, &outset, *sock, *ro_sock, event_fd);
 
 	/* Main loop. */
+	/* FIXME: Rewrite so noone can starve. */
 	for (;;) {
 		struct connection *i;
 		struct timeval *tvp = NULL, tv;
@@ -1675,10 +1691,22 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		/* Flush output for domain connections,  */
-		list_for_each_entry(i, &connections, list)
-			if (i->domain && i->out)
+		/* Handle all possible I/O for domain connections. */
+	more:
+		list_for_each_entry(i, &connections, list) {
+			if (!i->domain)
+				continue;
+
+			if (domain_can_read(i)) {
+				handle_input(i);
+				goto more;
+			}
+
+			if (domain_can_write(i)) {
 				handle_output(i);
+				goto more;
+			}
+		}
 
 		if (tvp) {
 			check_transaction_timeout();
