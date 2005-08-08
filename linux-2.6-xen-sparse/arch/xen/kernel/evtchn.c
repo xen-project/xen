@@ -610,6 +610,16 @@ static struct hw_interrupt_type pirq_type = {
     set_affinity_irq
 };
 
+void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
+{
+    int evtchn = irq_to_evtchn[i];
+    shared_info_t *s = HYPERVISOR_shared_info;
+    if ( !VALID_EVTCHN(evtchn) )
+        return;
+    BUG_ON(!synch_test_bit(evtchn, &s->evtchn_mask[0]));
+    synch_set_bit(evtchn, &s->evtchn_pending[0]);
+}
+
 void irq_suspend(void)
 {
     int pirq, virq, irq, evtchn;
