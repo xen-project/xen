@@ -623,7 +623,9 @@ void __init setup_arch(char **cmdline_p)
 	rd_prompt = ((RAMDISK_FLAGS & RAMDISK_PROMPT_FLAG) != 0);
 	rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
 #endif
-/*        register_console(&xen_console); */
+
+	HYPERVISOR_vm_assist(VMASST_CMD_enable,
+			     VMASST_TYPE_writable_pagetables);
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	/* This is drawn from a dump from vgacon:startup in standard Linux. */

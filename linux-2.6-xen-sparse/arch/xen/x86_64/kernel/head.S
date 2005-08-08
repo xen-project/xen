@@ -28,8 +28,6 @@
 #include <asm/page.h>
 #include <asm/msr.h>
 #include <asm/cache.h>
-/* #include <asm/thread_info.h> */
-        
 	
 /* we are not able to switch in one step to the final KERNEL ADRESS SPACE
  * because we need identity-mapped pages on setup so define __START_KERNEL to
@@ -116,15 +114,81 @@ ENTRY(init_level4_pgt)
 ENTRY(init_level4_user_pgt)
 	.fill	512,8,0
 
+	/*
+	 * In Xen the following pre-initialized pgt entries are re-initialized.
+	 */
+.org 0x3000
+ENTRY(level3_kernel_pgt)
+	.fill	510,8,0
+	/* (2^48-(2*1024*1024*1024)-((2^39)*511))/(2^30) = 510 */
+	.quad	0x0000000000105007		/* -> level2_kernel_pgt */
+	.fill	1,8,0
+
+.org 0x4000
+ENTRY(level2_ident_pgt)
+	/* 40MB for bootup. 	*/
+	.quad	0x0000000000000283
+	.quad	0x0000000000200183
+	.quad	0x0000000000400183
+	.quad	0x0000000000600183
+	.quad	0x0000000000800183
+	.quad	0x0000000000A00183
+	.quad	0x0000000000C00183
+	.quad	0x0000000000E00183
+	.quad	0x0000000001000183
+	.quad	0x0000000001200183
+	.quad	0x0000000001400183
+	.quad	0x0000000001600183
+	.quad	0x0000000001800183
+	.quad	0x0000000001A00183
+	.quad	0x0000000001C00183
+	.quad	0x0000000001E00183
+	.quad	0x0000000002000183
+	.quad	0x0000000002200183
+	.quad	0x0000000002400183
+	.quad	0x0000000002600183
+	/* Temporary mappings for the super early allocator in arch/x86_64/mm/init.c */
+	.globl temp_boot_pmds
+temp_boot_pmds:
+	.fill	492,8,0
+
+.org 0x5000
+ENTRY(level2_kernel_pgt)
+	/* 40MB kernel mapping. The kernel code cannot be bigger than that.
+	   When you change this change KERNEL_TEXT_SIZE in page.h too. */
+	/* (2^48-(2*1024*1024*1024)-((2^39)*511)-((2^30)*510)) = 0 */
+	.quad	0x0000000000000183
+	.quad	0x0000000000200183
+	.quad	0x0000000000400183
+	.quad	0x0000000000600183
+	.quad	0x0000000000800183
+	.quad	0x0000000000A00183
+	.quad	0x0000000000C00183
+	.quad	0x0000000000E00183
+	.quad	0x0000000001000183
+	.quad	0x0000000001200183
+	.quad	0x0000000001400183
+	.quad	0x0000000001600183
+	.quad	0x0000000001800183
+	.quad	0x0000000001A00183
+	.quad	0x0000000001C00183
+	.quad	0x0000000001E00183
+	.quad	0x0000000002000183
+	.quad	0x0000000002200183
+	.quad	0x0000000002400183
+	.quad	0x0000000002600183
+	/* Module mapping starts here */
+	.fill	492,8,0
+	
         /*
          * This is used for vsyscall area mapping as we have a different
          * level4 page table for user.
          */
-.org 0x3000
+.org 0x6000
 ENTRY(level3_user_pgt)
         .fill	512,8,0
 
-.org 0x4000
+.org 0x7000
 ENTRY(cpu_gdt_table)
 /* The TLS descriptors are currently at a different place compared to i386.
    Hopefully nobody expects them at a fixed place (Wine?) */
@@ -147,19 +211,24 @@ gdt_end:
 	/* GDTs of other CPUs: */	
 	.fill (GDT_SIZE * NR_CPUS) - (gdt_end - cpu_gdt_table)
 
-.org 0x5000
+.org 0x8000
 ENTRY(empty_zero_page)
 
-.org 0x6000
+.org 0x9000
 ENTRY(empty_bad_page)
 
-.org 0x7000
+.org 0xa000
 ENTRY(empty_bad_pte_table)
 
-.org 0x8000
+.org 0xb000
 ENTRY(empty_bad_pmd_table)
 
-	.org 0x9000
+.org 0xc000
+ENTRY(level3_physmem_pgt)
+	.quad	0x0000000000105007		/* -> level2_kernel_pgt (so that __va works even before pagetable_init) */
+
+	
+	.org 0xd000
 #ifdef CONFIG_ACPI_SLEEP
 ENTRY(wakeup_level4_pgt)
 	.quad	0x0000000000102007		/* -> level3_ident_pgt */

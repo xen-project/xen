@@ -4,31 +4,19 @@
 /*
  * This file contains the functions and defines necessary to modify and use
  * the x86-64 page table tree.
- * 
- * x86-64 has a 4 level table setup. Generic linux MM only supports
- * three levels. The fourth level is currently a single static page that
- * is shared by everybody and just contains a pointer to the current
- * three level page setup on the beginning and some kernel mappings at 
- * the end. For more details see Documentation/x86_64/mm.txt
  */
 #include <asm/processor.h>
 #include <asm/fixmap.h>
 #include <asm/bitops.h>
 #include <linux/threads.h>
 #include <asm/pda.h>
+#ifdef CONFIG_XEN
 #include <asm-xen/hypervisor.h>
+
 extern pud_t level3_user_pgt[512];
-extern pud_t init_level4_pgt[];
 extern pud_t init_level4_user_pgt[];
-extern unsigned long __supported_pte_mask;
 
-#define swapper_pg_dir NULL
-
-extern int nonx_setup(char *str);
-extern void paging_init(void);
-extern void clear_kernel_mapping(unsigned long addr, unsigned long size);
-
-extern unsigned long pgkern_mask;
+extern void xen_init_pt(void);
 
 #define virt_to_ptep(__va)						\
 ({									\
@@ -44,6 +32,22 @@ extern unsigned long pgkern_mask;
 	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
 	__pa | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
 })
+#endif
+
+extern pud_t level3_kernel_pgt[512];
+extern pud_t level3_physmem_pgt[512];
+extern pud_t level3_ident_pgt[512];
+extern pmd_t level2_kernel_pgt[512];
+extern pgd_t init_level4_pgt[];
+extern unsigned long __supported_pte_mask;
+
+#define swapper_pg_dir init_level4_pgt
+
+extern int nonx_setup(char *str);
+extern void paging_init(void);
+extern void clear_kernel_mapping(unsigned long addr, unsigned long size);
+
+extern unsigned long pgkern_mask;
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
@@ -52,11 +56,14 @@ extern unsigned long pgkern_mask;
 extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 #define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 
+/*
+ * PGDIR_SHIFT determines what a top-level page table entry can map
+ */
 #define PGDIR_SHIFT	39
 #define PTRS_PER_PGD	512
 
 /*
- * PUDIR_SHIFT determines what a top-level page table entry can map
+ * 3rd level page
  */
 #define PUD_SHIFT	30
 #define PTRS_PER_PUD	512
@@ -80,7 +87,7 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 #define pud_ERROR(e) \
 	printk("%s:%d: bad pud %p(%016lx).\n", __FILE__, __LINE__, &(e), pud_val(e))
 #define pgd_ERROR(e) \
-        printk("%s:%d: bad pgd %p(%016lx).\n", __FILE__, __LINE__, &(e), pgd_val(e))
+	printk("%s:%d: bad pgd %p(%016lx).\n", __FILE__, __LINE__, &(e), pgd_val(e))
 
 #define pgd_none(x)	(!pgd_val(x))
 #define pud_none(x)	(!pud_val(x))
@@ -90,18 +97,10 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 
 extern inline int pud_present(pud_t pud)	{ return !pud_none(pud); }
 
-#ifdef CONFIG_SMP
-#define set_pte(pteptr, pteval) xen_l1_entry_update(pteptr, (pteval))
-
-#else
-#define set_pte(pteptr, pteval) xen_l1_entry_update(pteptr, (pteval))
-#if 0
 static inline void set_pte(pte_t *dst, pte_t val)
 {
 	*dst = val;
 }
-#endif
-#endif
 
 #define set_pmd(pmdptr, pmdval) xen_l2_entry_update(pmdptr, (pmdval))
 #define set_pud(pudptr, pudval) xen_l3_entry_update(pudptr, (pudval))
@@ -132,6 +131,9 @@ extern inline void pgd_clear (pgd_t * pgd)
  * each domain will have separate page tables, with their own versions of
  * accessed & dirty state.
  */
+#define ptep_get_and_clear(mm,addr,xp)	__pte_ma(xchg(&(xp)->pte, 0))
+
+#if 0
 static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *xp)
 {
         pte_t pte = *xp;
@@ -139,21 +141,22 @@ static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
                 set_pte(xp, __pte_ma(0));
         return pte;
 }
+#endif
 
 #define pte_same(a, b)		((a).pte == (b).pte)
 
-#define PMD_SIZE        (1UL << PMD_SHIFT)
-#define PMD_MASK        (~(PMD_SIZE-1))
-#define PUD_SIZE        (1UL << PUD_SHIFT)
-#define PUD_MASK        (~(PUD_SIZE-1))
-#define PGDIR_SIZE      (1UL << PGDIR_SHIFT)
-#define PGDIR_MASK      (~(PGDIR_SIZE-1))
+#define PMD_SIZE	(1UL << PMD_SHIFT)
+#define PMD_MASK	(~(PMD_SIZE-1))
+#define PUD_SIZE	(1UL << PUD_SHIFT)
+#define PUD_MASK	(~(PUD_SIZE-1))
+#define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
+#define PGDIR_MASK	(~(PGDIR_SIZE-1))
 
-#define USER_PTRS_PER_PGD       (TASK_SIZE/PGDIR_SIZE)
+#define USER_PTRS_PER_PGD	(TASK_SIZE/PGDIR_SIZE)
 #define FIRST_USER_ADDRESS	0
 
 #ifndef __ASSEMBLY__
-#define MAXMEM           0x3fffffffffffUL
+#define MAXMEM		 0x3fffffffffffUL
 #define VMALLOC_START    0xffffc20000000000UL
 #define VMALLOC_END      0xffffe1ffffffffffUL
 #define MODULES_VADDR    0xffffffff88000000UL
@@ -347,7 +350,7 @@ static inline int ptep_test_and_clear_dirty(struct vm_area_struct *vma, unsigned
 	pte_t pte = *ptep;
 	int ret = pte_dirty(pte);
 	if (ret)
-		xen_l1_entry_update(ptep, pte_mkclean(pte));
+		set_pte(ptep, pte_mkclean(pte));
 	return ret;
 }
 
@@ -356,7 +359,7 @@ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned
 	pte_t pte = *ptep;
 	int ret = pte_young(pte);
 	if (ret)
-		xen_l1_entry_update(ptep, pte_mkold(pte));
+		set_pte(ptep, pte_mkold(pte));
 	return ret;
 }
 
@@ -398,7 +401,7 @@ static inline int pmd_large(pmd_t pte) {
 
 /* PUD - Level3 access */
 /* to find an entry in a page-table-directory. */
-#define pud_index(address) ((address >> PUD_SHIFT) & (PTRS_PER_PUD-1))
+#define pud_index(address) (((address) >> PUD_SHIFT) & (PTRS_PER_PUD-1))
 #define pud_offset(pgd, address) ((pud_t *) pgd_page(*(pgd)) + pud_index(address))
 static inline pud_t *__pud_offset_k(pud_t *pud, unsigned long address)
 { 
@@ -413,7 +416,7 @@ static inline pud_t *pud_offset_k(unsigned long address)
 {
 	unsigned long addr;
 
-	addr = pud_val(init_level4_pgt[pud_index(address)]);
+	addr = pgd_val(init_level4_pgt[pud_index(address)]);
 	addr &= PHYSICAL_PAGE_MASK; /* machine physical */
         addr = machine_to_phys(addr);
 	return __pud_offset_k((pud_t *)__va(addr), address);
@@ -427,9 +430,11 @@ static inline pud_t *pud_offset_k(unsigned long address)
 #define pmd_offset(dir, address) ((pmd_t *) pud_page(*(dir)) + \
                                   pmd_index(address))
 #define pmd_none(x)	(!pmd_val(x))
-#define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
+/* pmd_present doesn't just test the _PAGE_PRESENT bit since wr.p.t.
+   can temporarily clear it. */
+#define pmd_present(x)	(pmd_val(x))
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
-#define	pmd_bad(x)	((pmd_val(x) & ~PTE_MASK) != _KERNPG_TABLE )
+#define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 #define pfn_pmd(nr,prot) (__pmd(((nr) << PAGE_SHIFT) | pgprot_val(prot)))
 #define pmd_pfn(x)  ((pmd_val(x) >> PAGE_SHIFT) & __PHYSICAL_MASK)
 
@@ -479,11 +484,24 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
  * race with other CPU's that might be updating the dirty
  * bit at the same time. */
 #define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
+#if 0
 #define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
 	do {								  \
 		if (__dirty) {						  \
 			set_pte(__ptep, __entry);			  \
 			flush_tlb_page(__vma, __address);		  \
+		}							  \
+	} while (0)
+#endif
+#define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
+	do {								  \
+		if (__dirty) {						  \
+		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
+			    HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG|UVMF_MULTI|(unsigned long)((__vma)->vm_mm->cpu_vm_mask.bits)); \
+			} else {                                          \
+                            xen_l1_entry_update((__ptep), (__entry)); \
+			    flush_tlb_page((__vma), (__address));         \
+			}                                                 \
 		}							  \
 	} while (0)
 

@@ -280,7 +280,7 @@ static void set_pte_phys(unsigned long vaddr,
 	if (!pte_none(*pte) &&
 	    pte_val(*pte) != (pte_val(new_pte) & __supported_pte_mask))
 		pte_ERROR(*pte);
-        xen_l1_entry_update(pte, new_pte);
+        set_pte(pte, new_pte);
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -511,6 +511,78 @@ static void __init find_early_table_space(unsigned long end)
 	    		  round_up(ptes * 8, PAGE_SIZE); 
 }
 
+static void xen_copy_pt(void)
+{
+	unsigned long va = __START_KERNEL_map;
+	unsigned long addr, *pte_page;
+	int i;
+	pud_t *pud; pmd_t *pmd; pte_t *pte;
+	unsigned long *page = (unsigned long *) init_level4_pgt;
+
+	addr = (unsigned long) page[pgd_index(va)];
+	addr_to_page(addr, page);
+
+	pud = (pud_t *) &page[pud_index(va)];
+	addr = page[pud_index(va)];
+	addr_to_page(addr, page);
+
+	level3_kernel_pgt[pud_index(va)] = 
+		__pud(__pa_symbol(level2_kernel_pgt) | _KERNPG_TABLE | _PAGE_USER);
+
+	for (;;) {
+		pmd = (pmd_t *) &page[pmd_index(va)];
+		if (pmd_present(*pmd)) {
+			level2_kernel_pgt[pmd_index(va)] = *pmd;
+			/*
+			 * if pmd is valid, check pte.
+			 */
+			addr = page[pmd_index(va)];
+			addr_to_page(addr, pte_page);
+			
+			for (i = 0; i < PTRS_PER_PTE; i++) {
+				pte = (pte_t *) &pte_page[pte_index(va)];
+				if (pte_present(*pte))
+					va += PAGE_SIZE;
+				else
+				    break;
+			}
+
+		} else
+		    break;
+	}
+
+	init_level4_pgt[pgd_index(__START_KERNEL_map)] = 
+		mk_kernel_pgd(__pa_symbol(level3_kernel_pgt));
+}
+
+void __init xen_init_pt(void)
+{
+        pgd_t *old_level4 = (pgd_t *)xen_start_info.pt_base;
+
+	memcpy((void *)init_level4_pgt, 
+	       (void *)xen_start_info.pt_base, PAGE_SIZE);
+
+	memset((void *)level3_kernel_pgt, 0, PAGE_SIZE);
+	memset((void *)level2_kernel_pgt, 0, PAGE_SIZE);
+
+	xen_copy_pt();
+
+	make_page_readonly(init_level4_pgt);
+	make_page_readonly(level3_kernel_pgt);
+	make_page_readonly(level2_kernel_pgt);
+	make_page_readonly(init_level4_user_pgt);
+	make_page_readonly(level3_user_pgt); /* for vsyscall stuff */
+
+	xen_pgd_pin(__pa_symbol(init_level4_pgt));
+	xen_pgd_pin(__pa_symbol(init_level4_user_pgt));
+	xen_pud_pin(__pa_symbol(level3_kernel_pgt));
+	xen_pud_pin(__pa_symbol(level3_user_pgt));
+	xen_pmd_pin(__pa_symbol(level2_kernel_pgt));
+
+	set_pgd((pgd_t *)(init_level4_user_pgt + 511), 
+		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
+
+}
 
 /*
  * Extend kernel mapping to access pages for page tables.  The initial
