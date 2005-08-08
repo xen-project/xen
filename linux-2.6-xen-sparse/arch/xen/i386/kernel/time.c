@@ -122,7 +122,7 @@ static u32 shadow_tv_version;
 static u64 processed_system_time;   /* System time (ns) at last processing. */
 static DEFINE_PER_CPU(u64, processed_system_time);
 
-#define NS_PER_TICK (1000000000ULL/HZ)
+#define NS_PER_TICK (1000000000L/HZ)
 
 static inline void __normalize_time(time_t *sec, s64 *nsec)
 {
