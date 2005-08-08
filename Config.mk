@@ -7,7 +7,7 @@ XEN_TARGET_X86_PAE  ?= n
 
 # Tools to run on system hosting the build
 HOSTCC     = gcc
-HOSTCFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer 
+HOSTCFLAGS = -Wall -Werror -Wstrict-prototypes -O2 -fomit-frame-pointer
 
 AS         = $(CROSS_COMPILE)as
 LD         = $(CROSS_COMPILE)ld

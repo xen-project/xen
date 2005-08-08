@@ -10,4 +10,4 @@ clean:
 	rm -f *.o symbols
 
 symbols: symbols.c
-	$(HOSTCC) -o $@ $<
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
