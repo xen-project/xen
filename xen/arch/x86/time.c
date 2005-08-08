@@ -103,7 +103,7 @@ static inline u32 mul_frac(u32 multiplicand, u32 multiplier)
 static inline u64 scale_delta(u64 delta, struct time_scale *scale)
 {
     u64 product;
-    u32 tmp;
+    u32 tmp1, tmp2;
 
     if ( scale->shift < 0 )
         delta >>= -scale->shift;
@@ -111,17 +111,15 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
         delta <<= scale->shift;
 
     __asm__ (
-        "push %%edx    ; "
-        "mul  %3       ; "
-        "pop  %%eax    ; "
-        "push %%edx    ; "
-        "mul  %3       ; "
-        "pop  %3       ; "
-        "add  %3,%%eax ; "
-        "xor  %3,%3    ; "
-        "adc  %3,%%edx ; "
-        : "=A" (product), "=r" (tmp)
-        : "A" (delta), "1" (scale->mul_frac) );
+        "mul  %5       ; "
+        "mov  %4,%%eax ; "
+        "mov  %%edx,%4 ; "
+        "mul  %5       ; "
+        "add  %4,%%eax ; "
+        "xor  %5,%5    ; "
+        "adc  %5,%%edx ; "
+        : "=A" (product), "=r" (tmp1), "=r" (tmp2)
+        : "a" ((u32)delta), "1" ((u32)(delta >> 32)), "2" (scale->mul_frac) );
 
     return product;
 }
