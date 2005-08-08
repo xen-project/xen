@@ -213,7 +213,6 @@ ia64_rr vmx_vcpu_rr(VCPU *vcpu,UINT64 vadr)
 
 IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
-    extern void set_one_rr(UINT64, UINT64);
     ia64_rr oldrr,newrr;
     thash_cb_t *hcb;
     oldrr=vmx_vcpu_rr(vcpu,reg);
