@@ -67,13 +67,6 @@ static struct time_scale platform_timer_scale;
 static spinlock_t platform_timer_lock = SPIN_LOCK_UNLOCKED;
 static u64 (*read_platform_count)(void);
 
-static inline u32 down_shift(u64 time, int shift)
-{
-    if ( shift < 0 )
-        return (u32)(time >> -shift);
-    return (u32)((u32)time << shift);
-}
-
 /*
  * 32-bit division of integer dividend and integer divisor yielding
  * 32-bit fractional quotient.
@@ -83,7 +76,7 @@ static inline u32 div_frac(u32 dividend, u32 divisor)
     u32 quotient, remainder;
     ASSERT(dividend < divisor);
     __asm__ ( 
-        "div %4"
+        "divl %4"
         : "=a" (quotient), "=d" (remainder)
         : "0" (0), "1" (dividend), "r" (divisor) );
     return quotient;
@@ -101,6 +94,36 @@ static inline u32 mul_frac(u32 multiplicand, u32 multiplier)
         : "=a" (product_frac), "=d" (product_int)
         : "0" (multiplicand), "r" (multiplier) );
     return product_int;
+}
+
+/*
+ * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
+ * yielding a 64-bit result.
+ */
+static inline u64 scale_delta(u64 delta, struct time_scale *scale)
+{
+    u64 product;
+    u32 tmp;
+
+    if ( scale->shift < 0 )
+        delta >>= -scale->shift;
+    else
+        delta <<= scale->shift;
+
+    __asm__ (
+        "pushl %%edx    ; "
+        "mull  %3       ; "
+        "popl  %%eax    ; "
+        "pushl %%edx    ; "
+        "mull  %3       ; "
+        "popl  %3       ; "
+        "addl  %3,%%eax ; "
+        "xorl  %3,%3    ; "
+        "adcl  %3,%%edx ; "
+        : "=A" (product), "=r" (tmp)
+        : "A" (delta), "1" (scale->mul_frac) );
+
+    return product;
 }
 
 void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
@@ -486,11 +509,9 @@ static int init_cyclone(void)
 
 static s_time_t __read_platform_stime(u64 platform_time)
 {
-    u64 diff64 = platform_time - platform_timer_stamp;
-    u32 diff   = down_shift(diff64, platform_timer_scale.shift);
+    u64 diff = platform_time - platform_timer_stamp;
     ASSERT(spin_is_locked(&platform_timer_lock));
-    return (stime_platform_stamp + 
-            (u64)mul_frac(diff, platform_timer_scale.mul_frac));
+    return (stime_platform_stamp + scale_delta(diff, &platform_timer_scale));
 }
 
 static s_time_t read_platform_stime(void)
@@ -619,13 +640,12 @@ static unsigned long get_cmos_time(void)
 s_time_t get_s_time(void)
 {
     struct cpu_time *t = &cpu_time[smp_processor_id()];
-    u64 tsc;
-    u32 delta;
+    u64 tsc, delta;
     s_time_t now;
 
     rdtscll(tsc);
-    delta = down_shift(tsc - t->local_tsc_stamp, t->tsc_scale.shift);
-    now = t->stime_local_stamp + (u64)mul_frac(delta, t->tsc_scale.mul_frac);
+    delta = tsc - t->local_tsc_stamp;
+    now = t->stime_local_stamp + scale_delta(delta, &t->tsc_scale);
 
     return now;
 }

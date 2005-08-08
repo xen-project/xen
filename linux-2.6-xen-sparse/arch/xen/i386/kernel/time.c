@@ -166,25 +166,34 @@ struct timer_opts timer_tsc = {
 	.delay = delay_tsc,
 };
 
-static inline u32 down_shift(u64 time, int shift)
-{
-	if ( shift < 0 )
-		return (u32)(time >> -shift);
-	return (u32)((u32)time << shift);
-}
-
 /*
- * 32-bit multiplication of integer multiplicand and fractional multiplier
- * yielding 32-bit integer product.
+ * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
+ * yielding a 64-bit result.
  */
-static inline u32 mul_frac(u32 multiplicand, u32 multiplier)
+static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 {
-	u32 product_int, product_frac;
+	u64 product;
+	u32 tmp;
+
+	if ( shift < 0 )
+		delta >>= -shift;
+	else
+		delta <<= shift;
+
 	__asm__ (
-		"mul %3"
-		: "=a" (product_frac), "=d" (product_int)
-		: "0" (multiplicand), "r" (multiplier) );
-	return product_int;
+		"pushl %%edx    ; "
+		"mull  %3       ; "
+		"popl  %%eax    ; "
+		"pushl %%edx    ; "
+		"mull  %3       ; "
+		"popl  %3       ; "
+		"addl  %3,%%eax ; "
+		"xorl  %3,%3    ; "
+		"adcl  %3,%%edx ; "
+		: "=A" (product), "=r" (tmp)
+		: "A" (delta), "1" (mul_frac) );
+
+	return product;
 }
 
 void init_cpu_khz(void)
@@ -192,27 +201,28 @@ void init_cpu_khz(void)
 	u64 __cpu_khz = 1000000ULL << 32;
 	struct vcpu_time_info *info = &HYPERVISOR_shared_info->vcpu_time[0];
 	do_div(__cpu_khz, info->tsc_to_system_mul);
-	cpu_khz = down_shift(__cpu_khz, -info->tsc_shift);
+	if ( info->tsc_shift < 0 )
+		cpu_khz = __cpu_khz >> -info->tsc_shift;
+	else
+		cpu_khz = __cpu_khz << info->tsc_shift;
 	printk(KERN_INFO "Xen reported: %lu.%03lu MHz processor.\n",
 	       cpu_khz / 1000, cpu_khz % 1000);
 }
 
 static u64 get_nsec_offset(struct shadow_time_info *shadow)
 {
-	u64 now;
-	u32 delta;
+	u64 now, delta;
 	rdtscll(now);
-	delta = down_shift(now - shadow->tsc_timestamp, shadow->tsc_shift);
-	return mul_frac(delta, shadow->tsc_to_nsec_mul);
+	delta = now - shadow->tsc_timestamp;
+	return scale_delta(delta, shadow->tsc_to_nsec_mul, shadow->tsc_shift);
 }
 
 static unsigned long get_usec_offset(struct shadow_time_info *shadow)
 {
-	u64 now;
-	u32 delta;
+	u64 now, delta;
 	rdtscll(now);
-	delta = down_shift(now - shadow->tsc_timestamp, shadow->tsc_shift);
-	return mul_frac(delta, shadow->tsc_to_usec_mul);
+	delta = now - shadow->tsc_timestamp;
+	return scale_delta(delta, shadow->tsc_to_usec_mul, shadow->tsc_shift);
 }
 
 static void update_wallclock(void)
