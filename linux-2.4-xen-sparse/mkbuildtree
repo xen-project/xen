@@ -103,9 +103,8 @@ relative_lndir ${RS}
 rm -f mkbuildtree
 
 set ${RS}/../linux-2.6-xen-sparse
-[ "$1" == "${RS}/../linux-2.6-xen-parse" ] && { echo "no Linux 2.6 sparse tree at ${RS}/../linux-2.6-xen-sparse"; exit 1; }
+[ "$1" == "${RS}/../linux-2.6-xen-sparse" ] && { echo "no Linux 2.6 sparse tree at ${RS}/../linux-2.6-xen-sparse"; exit 1; }
 LINUX_26="$1"
-
 
 # Create links to the shared definitions of the Xen interfaces.
 rm -rf ${AD}/include/asm-xen/xen-public

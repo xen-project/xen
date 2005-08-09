@@ -30,7 +30,6 @@
 
 #include <linux/errno.h>
 #include <linux/types.h>
-#include "xenstore/xenstored.h"
 #include <linux/uio.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -39,6 +38,7 @@
 #include <linux/fcntl.h>
 #include <linux/kthread.h>
 #include <asm-xen/xenbus.h>
+#include "xenstored.h"
 #include "xenbus_comms.h"
 
 #define streq(a, b) (strcmp((a), (b)) == 0)
