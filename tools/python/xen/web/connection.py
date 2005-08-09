@@ -20,6 +20,7 @@ import sys
 import threading
 import select
 import socket
+import fcntl
 
 from errno import EAGAIN, EINTR, EWOULDBLOCK
 
@@ -151,6 +152,9 @@ class SocketListener:
 
     def createSocket(self):
         raise NotImplementedError()
+
+    def setCloExec(self):
+        fcntl.fcntl(self.sock.fileno(), fcntl.F_SETFD, fcntl.FD_CLOEXEC)
 
     def acceptConnection(self, sock, protocol, addr):
         return SocketServerConnection(sock, protocol, addr, self)

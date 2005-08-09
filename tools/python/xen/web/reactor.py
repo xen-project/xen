@@ -16,4 +16,4 @@
 #============================================================================
 
 from unix import listenUNIX, connectUNIX
-from tcp import listenTCP, connectTCP
+from tcp import listenTCP, connectTCP, SetCloExec

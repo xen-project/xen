@@ -231,6 +231,7 @@ class XendDomainInfo:
         DBVar('restart_time',  ty='float'),
         DBVar('restart_count', ty='int'),
         DBVar('target',        ty='long', path="memory/target"),
+        DBVar('device_model_pid', ty='int'),
         ]
     
     def __init__(self, db):
@@ -275,6 +276,7 @@ class XendDomainInfo:
         self.vcpus = 1
         self.vcpusdb = {}
         self.bootloader = None
+        self.device_model_pid = 0
 
     def setDB(self, db):
         self.db = db
@@ -457,6 +459,8 @@ class XendDomainInfo:
             sxpr.append(devs)
         if self.config:
             sxpr.append(['config', self.config])
+        if self.device_model_pid:
+            sxpr.append(['device_model_pid',self.device_model_pid])
         return sxpr
 
     def sxpr_devices(self):
@@ -739,7 +743,8 @@ class XendDomainInfo:
                 ctrl.initController(reboot=True)
         else:
             self.create_configured_devices()
-        self.image.createDeviceModel()
+        if not self.device_model_pid:
+            self.device_model_pid = self.image.createDeviceModel()
 
     def device_create(self, dev_config):
         """Create a new device.
