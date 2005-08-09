@@ -642,6 +642,7 @@ class XendDomainInfo:
                 pass
         if self.image:
             try:
+                self.device_model_pid = 0
                 self.image.destroy()
                 self.image = None
             except:
