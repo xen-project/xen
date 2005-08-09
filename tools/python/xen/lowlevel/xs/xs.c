@@ -253,12 +253,10 @@ static PyObject *xspy_get_permissions(PyObject *self, PyObject *args,
     }
     val = PyList_New(perms_n);
     for (i = 0; i < perms_n; i++, perms++) {
-        PyObject *p = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i}",
+        PyObject *p = Py_BuildValue("{s:i,s:i,s:i}",
                                     "dom",   perms->id,
                                     "read",  (perms->perms & XS_PERM_READ),
-                                    "write", (perms->perms & XS_PERM_WRITE),
-                                    "exist", (perms->perms & XS_PERM_ENOENT_OK),
-                                    "owner", (perms->perms & XS_PERM_OWNER));
+                                    "write",  (perms->perms & XS_PERM_WRITE));
         PyList_SetItem(val, i, p);
     }
  exit:
@@ -281,8 +279,7 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
     static char *arg_spec = "sO";
     char *path = NULL;
     PyObject *perms = NULL;
-    static char *perm_names[] = { "dom", "read", "write", "create", "owner",
-				  NULL };
+    static char *perm_names[] = { "dom", "read", "write", NULL };
     static char *perm_spec = "i|iiii";
 
     struct xs_handle *xh = xshandle(self);
@@ -315,15 +312,9 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
         int dom = 0;
         /* Read/write perms. Set these. */
         int p_read = 0, p_write = 0;
-        /* Create/owner perms. Ignore them.
-         * This is so the output from get_permissions() can be used
-         * as input to set_permissions().
-         */
-        int p_create = 0, p_owner = 0;
         PyObject *p = PyList_GetItem(perms, i);
         if (!PyArg_ParseTupleAndKeywords(tuple0, p, perm_spec, perm_names,
-					 &dom, &p_read, &p_write, &p_create,
-					 &p_owner))
+					 &dom, &p_read, &p_write))
             goto exit;
         xsperms[i].id = dom;
         if (p_read)
