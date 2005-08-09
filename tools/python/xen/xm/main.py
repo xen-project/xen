@@ -1,28 +1,113 @@
-# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+# (C) Copyright IBM Corp. 2005
+# Copyright (C) 2004 Mike Wray
+#
+# Authors:
+#     Sean Dague <sean at dague dot net>
+#     Mike Wray <mike dot wray at hp dot com>
+#
+# This software may be used and distributed according to the terms
+# of the GNU General Public License v2.  Full details on license
+# terms and conditions are included with this distribution
+
 """Grand unified management application for Xen.
 """
 import os
 import os.path
 import sys
 import commands
+import re
 from getopt import getopt
 import socket
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
-
 from xen.xend import PrettyPrint
 from xen.xend import sxp
-# this is a nasty place to stick this in, but required because
-# log file access is set up via a 5 deep import chain.  This
-# ensures the user sees a useful message instead of a stack trace
-if os.getuid() != 0:
-    print "xm requires root access to execute, please try again as root"
-    sys.exit(1)
-
-from xen.xend.XendClient import XendError, server
-from xen.xend.XendClient import main as xend_client_main
-from xen.xm import create, destroy, migrate, shutdown, sysrq
 from xen.xm.opts import *
+shorthelp = """Usage: xm <subcommand> [args]
+    Control, list, and manipulate Xen guest instances
+
+xm common subcommands:
+    console <DomId>         attach to console of DomId
+    create <CfgFile>        create a domain based on Config File
+    destroy <DomId>         terminate a domain immediately
+    help                    display this message
+    list [DomId, ...]       list information about domains
+    mem-max <DomId> <Mem>   set the maximum memory reservation for a domain
+    mem-set <DomId> <Mem>   adjust the current memory usage for a domain
+    migrate <DomId> <Host>  migrate a domain to another machine
+    pause <DomId>           pause execution of a domain
+    reboot <DomId>          reboot a domain
+    restore <File>          create a domain from a saved state file
+    save <DomId> <File>     save domain state (and config) to file
+    shutdown <DomId>        shutdown a domain
+    unpause <DomId>         unpause a paused domain
+
+For a complete list of subcommands run 'xm help --long'
+For more help on xm see the xm(1) man page
+For more help on xm create, see the xmdomain.cfg(5) man page"""
+
+longhelp = """Usage: xm <subcommand> [args]
+    Control, list, and manipulate Xen guest instances
+
+xm full list of subcommands:
+
+  Domain Commands:
+    console <DomId>         attach to console of DomId
+    cpus-list <DomId> <VCpu>          get the list of cpus for a VCPU
+    cpus-set <DomId> <VCpu> <CPUS>    set which cpus a VCPU can use. 
+    create  <ConfigFile>      create a domain
+    destroy <DomId>           terminate a domain immediately
+    domid   <DomName>         convert a domain name to a domain id
+    domname <DomId>           convert a domain id to a domain name
+    list                      list information about domains
+    mem-max <DomId> <Mem>     set domain maximum memory limit
+    mem-set <DomId> <Mem>     set the domain's memory dynamically
+    migrate <DomId> <Host>    migrate a domain to another machine
+    pause   <DomId>           pause execution of a domain
+    reboot   [-w|-a] <DomId>  reboot a domain
+    restore <File>            create a domain from a saved state file
+    save    <DomId> <File>    save domain state (and config) to file
+    shutdown [-w|-a] <DomId>  shutdown a domain
+    sysrq   <DomId> <letter>  send a sysrq to a domain
+    unpause <DomId>           unpause a paused domain
+    vcpu-enable <DomId> <VCPU>        disable VCPU in a domain
+    vcpu-disable <DomId> <VCPU>       enable VCPU in a domain
+    vcpu-list <DomId>                 get the list of VCPUs for a domain
+
+  Xen Host Commands:
+    dmesg   [--clear]         read or clear Xen's message buffer
+    info                      get information about the xen host
+    log                       print the xend log
+
+  Scheduler Commands:
+    bvt <options>             set BVT scheduler parameters
+    bvt_ctxallow <Allow>      set the BVT scheduler context switch allowance
+    sedf <options>            set simple EDF parameters
+
+  Virtual Device Commands:
+    block-create <DomId> <BackDev> <FrontDev> <Mode> [BackDomId]
+        Create a new virtual block device 
+    block-destroy <DomId> <DevId>  Destroy a domain's virtual block device
+    block-list    <DomId>          List virtual block devices for a domain
+    block-refresh <DomId> <DevId>  Refresh a virtual block device for a domain
+    network-limit   <DomId> <Vif> <Credit> <Period>
+        Limit the transmission rate of a virtual network interface
+    network-list    <DomId>        List virtual network interfaces for a domain
+
+For a short list of subcommands run 'xm help'
+For more help on xm see the xm(1) man page
+For more help on xm create, see the xmdomain.cfg(5) man page"""
+
+####################################################################
+#
+#  Utility functions
+#
+####################################################################
+
+def arg_check(args,num,name):
+    if len(args) < num:
+        err("'xm %s' requires %s argument(s)!\n" % (name, num))
+        usage(name)
 
 def unit(c):
     if not c.isalpha():
@@ -49,692 +134,318 @@ def int_unit(str, dest):
     else:
         return value * (base / dst_base)
 
-class Group:
+def err(msg):
+    print >>sys.stderr, "Error:", msg
 
-    name = ""
-    info = ""
-    
-    def __init__(self, xm):
-        self.xm = xm
-        self.progs = {}
-
-    def addprog(self, prog):
-        self.progs[prog.name] = prog
-
-    def getprog(self, name):
-        return self.progs.get(name)
-
-    def proglist(self):
-        kl = self.progs.keys()
-        kl.sort()
-        return [ self.getprog(k) for k in kl ]
-
-    def help(self, args):
-        if self.info:
-            print 
-            print self.info
-            print
-        else:
-            print
-        
-    def shortHelp(self, args):
-        self.help(args)
-        for p in self.proglist():
-            p.shortHelp(args)
-
-class Prog:
-    """Base class for sub-programs.
-    """
-
-    """Program group it belongs to"""
-    group = 'all'
-    """Program name."""
-    name = '??'
-    """Short program info."""
-    info = ''
-
-    def __init__(self, xm):
-        self.xm = xm
-
-    def err(self, msg):
-        self.xm.err(msg)
-
-    def help(self, args):
-        self.shortHelp(args)
-
-    def shortHelp(self, args):
-        print "%-14s %s" % (self.name, self.info)
-
-    def main(self, args):
-        """Program main entry point.
-        """
-        pass
-
-
-class ProgUnknown(Prog):
-
-    name = 'unknown'
-    info = ''
-    
-    def help(self, args):
-        self.xm.err("Unknown command: %s\nTry '%s help' for more information."
-                    % (args[0], self.xm.name))
-
-    main = help
-
-class Xm:
-    """Main application.
-    """
-
-    def __init__(self):
-        self.name = 'xm'
-        self.unknown = ProgUnknown(self)
-        self.progs = {}
-        self.groups = {}
-
-    def err(self, msg):
-        print >>sys.stderr, "Error:", msg
+def handle_xend_error(cmd, dom, ex):
+    error = str(ex)
+    if error == "Not found" and dom != None:
+        err("Domain '%s' not found when running 'xm %s'" % (dom, cmd))
         sys.exit(1)
-
-    def main(self, args):
-        try:
-            self.main_call(args)
-        except socket.error, ex:
-            print >>sys.stderr, ex
-            self.err("Error connecting to xend, is xend running?")
-        except XendError, ex:
-            self.err(str(ex))
-
-    def main_call(self, args):
-        """Main entry point. Dispatches to the progs.
-        """
-        self.name = args[0]
-        if len(args) < 2:
-        	args.append('help')
-	help = self.helparg(args)
-        p = self.getprog(args[1], self.unknown)
-        if help or len(args) < 2: 
-            p.help(args[1:])
-        else:
-            p.main(args[1:])
-
-    def helparg(self, args):
-        for a in args:
-            if a in ['-h', '--help']:
-                return 1
-        return 0
-
-    def prog(self, pklass):
-        """Add a sub-program.
-
-        pklass  program class (Prog subclass)
-        """
-        p = pklass(self)
-        self.progs[p.name] = p
-        self.getgroup(p.group).addprog(p)
-        return p
-
-    def getprog(self, name, val=None):
-        """Get a sub-program.
-        name  Name of the sub-program (or optionally, an unambiguous
-              prefix of its name)
-        val   Default return value if no (unique) match is found
-        """
-
-        match = None
-        for progname in self.progs.keys():
-            if progname == name:
-                match = progname
-                break
-            if progname.startswith(name):
-                if not match:
-                    match = progname
-                else:
-                    return val # name is ambiguous - bail out
-
-        return self.progs.get(match, val)
-
-    def group(self, klass):
-        g = klass(self)
-        self.groups[g.name] = g
-        return g
-
-    def getgroup(self, name):
-        return self.groups[name]
-
-    def grouplist(self):
-        kl = self.groups.keys()
-        kl.sort()
-        return [ self.getgroup(k) for k in kl ]
-        
-# Create the application object, then add the sub-program classes.
-xm = Xm()
-
-class GroupAll(Group):
-
-    name = "all"
-    info = ""
-
-xm.group(GroupAll)
-
-class GroupDomain(Group):
-
-    name = "domain"
-    info = "Commands on domains:"
+    else:
+        raise ex
     
-xm.group(GroupDomain)
 
-class GroupScheduler(Group):
+#########################################################################
+#
+#  Main xm functions
+#
+#########################################################################
 
-    name = "scheduler"
-    info = "Comands controlling scheduling:"
+def xm_create(args):
+    from xen.xm import create
+    # ugly hack because the opt parser apparently wants
+    # the subcommand name just to throw it away!
+    args.insert(0,"bogus")
+    create.main(args)
 
-xm.group(GroupScheduler)
+def xm_save(args):
+    arg_check(args,2,"save")
 
-class GroupHost(Group):
-
-    name = "host"
-    info = "Commands related to the xen host (node):"
-
-xm.group(GroupHost)
-
-class GroupConsole(Group):
-
-    name = "console"
-    info = "Commands related to consoles:"
-
-xm.group(GroupConsole)
-
-class GroupVbd(Group):
-
-    name = "vbd"
-    info = "Commands related to virtual block devices:"
-
-xm.group(GroupVbd)
-
-class GroupVif(Group):
-
-    name = "vif"
-    info = "Commands related to virtual network interfaces:"
-
-xm.group(GroupVif)
-
-class ProgHelp(Prog):
-
-    name = "help"
-    info = "Print help."
+    dom = args[0] # TODO: should check if this exists
+    savefile = os.path.abspath(args[1])
     
-    def help(self, args):
-        if len(args) == 2:
-            name = args[1]
-            p = self.xm.getprog(name)
-            if p:
-                p.help(args[1:])
-            else:
-                print '%s: Unknown command: %s' % (self.name, name)
-        else:
-            for g in self.xm.grouplist():
-                g.shortHelp(args)
-            print "\nTry '%s help CMD' for help on CMD" % self.xm.name
-
-    main = help
-
-xm.prog(ProgHelp)
-
-class ProgCreate(Prog):
-
-    group = 'domain'
-    name = "create"
-    info = """Create a domain."""
-
-    def help(self, args):
-        create.main([args[0], '-h'])
-
-    def main(self, args):
-        create.main(args)
-
-xm.prog(ProgCreate)
-
-class ProgSave(Prog):
-    group = 'domain'
-    name = "save"
-    info = """Save domain state (and config) to file."""
-
-    def help(self, args):
-        print args[0], "DOM FILE"
-        print """\nSave domain with id DOM to FILE."""
-        
-    def main(self, args):
-        if len(args) < 3: self.err("%s: Missing arguments" % args[0])
-        dom = args[1]
-        savefile = os.path.abspath(args[2])
-        server.xend_domain_save(dom, savefile)
-
-xm.prog(ProgSave)
-
-class ProgRestore(Prog):
-    group = 'domain'
-    name = "restore"
-    info = """Create a domain from a saved state."""
-
-    def help(self, args):
-        print args[0], "FILE"
-        print "\nRestore a domain from FILE."
+    from xen.xend.XendClient import server
+    server.xend_domain_save(dom, savefile)
     
-    def main(self, args):
-        if len(args) < 2: self.err("%s: Missing arguments" % args[0])
-        savefile = os.path.abspath(args[1])
-        info = server.xend_domain_restore(savefile)
-        PrettyPrint.prettyprint(info)
-        id = sxp.child_value(info, 'id')
-        if id is not None:
-            server.xend_domain_unpause(id)
+def xm_restore(args):
+    arg_check(args,1,"restore")
 
-xm.prog(ProgRestore)
+    savefile = os.path.abspath(args[0])
 
-class ProgMigrate(Prog):
-    group = 'domain'
-    name = "migrate"
-    info = """Migrate a domain to another machine."""
+    from xen.xend.XendClient import server
+    info = server.xend_domain_restore(savefile)
+    PrettyPrint.prettyprint(info)
+    id = sxp.child_value(info, 'id')
+    if id is not None:
+        server.xend_domain_unpause(id)
 
-    def help(self, args):
-        migrate.help([self.name] + args)
+def xm_migrate(args):
+    # TODO: arg_check
+    from xen.xm import migrate
+    # ugly hack because the opt parser apparently wants
+    # the subcommand name just to throw it away!
+    args.insert(0,"bogus")
+    migrate.main(args)
+
+def xm_list(args):
+    use_long = 0
+    show_vcpus = 0
+    (options, params) = getopt(args, 'lv', ['long','vcpus'])
     
-    def main(self, args):
-        migrate.main(args)
-
-xm.prog(ProgMigrate)
-
-class ProgList(Prog):
-    group = 'domain'
-    name = "list"
-    info = """List information about domains."""
-
-    short_options = 'lv'
-    long_options = ['long','vcpus']
-
-    def help(self, args):
-        if help:
-            print args[0], '[options] [DOM...]'
-            print """\nGet information about domains.
-            Either all domains or the domains given.
-
-            -l, --long   Get more detailed information.
-            -v, --vcpus  Show VCPU to CPU mapping.
-            """
-            return
-        
-    def main(self, args):
-        use_long = 0
-        show_vcpus = 0
-        (options, params) = getopt(args[1:],
-                                   self.short_options,
-                                   self.long_options)
-        n = len(params)
-        for (k, v) in options:
-            if k in ['-l', '--long']:
-                use_long = 1
-            if k in ['-v', '--vcpus']:
-                show_vcpus = 1
-                
-        if n == 0:
-            doms = server.xend_domains()
-            doms.sort()
-        else:
-            doms = params
-            
-        if use_long:
-            self.long_list(doms)
-        elif show_vcpus:
-            self.show_vcpus(doms)
-        else:
-            self.brief_list(doms)
-
-    def brief_list(self, doms):
-        print 'Name              Id  Mem(MB)  CPU VCPU(s)  State  Time(s)'
-        for dom in doms:
-            info = server.xend_domain(dom)
-            d = {}
-            d['dom'] = int(sxp.child_value(info, 'id', '-1'))
-            d['name'] = sxp.child_value(info, 'name', '??')
-            d['mem'] = int(sxp.child_value(info, 'memory', '0'))
-            d['cpu'] = str(sxp.child_value(info, 'cpu', '0'))
-            d['vcpus'] = int(sxp.child_value(info, 'vcpus', '0'))
-            d['state'] = sxp.child_value(info, 'state', '??')
-            d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
-            if d['vcpus'] > 1:
-                d['cpu'] = '-'
-            if ((int(sxp.child_value(info, 'ssidref', '0'))) != 0):
-                d['ssidref1'] =  int(sxp.child_value(info, 'ssidref', '0')) & 0xffff
-                d['ssidref2'] = (int(sxp.child_value(info, 'ssidref', '0')) >> 16) & 0xffff
-                print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %s:%(ssidref2)02x/p:%(ssidref1)02x" % d)
-            else:
-                print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f" % d)
-
-    def show_vcpus(self, doms):
-        print 'Name              Id  VCPU  CPU  CPUMAP'
-        for dom in doms:
-            info = server.xend_domain(dom)
-            vcpu_to_cpu = sxp.child_value(info, 'vcpu_to_cpu', '-1').split('|')
-            cpumap = sxp.child_value(info, 'cpumap', [])
-            mask = ((int(sxp.child_value(info, 'vcpus', '0')))**2) - 1
-            count = 0
-            for cpu in vcpu_to_cpu:
-                d = {}
-                d['name']   = sxp.child_value(info, 'name', '??')
-                d['dom']    = int(sxp.child_value(info, 'id', '-1'))
-                d['vcpu']   = int(count)
-                d['cpu']    = int(cpu)
-                d['cpumap'] = int(cpumap[count])&mask
-                count = count + 1
-                print ("%(name)-16s %(dom)3d  %(vcpu)4d  %(cpu)3d  0x%(cpumap)x" % d)
-
-    def long_list(self, doms):
-        for dom in doms:
-            info = server.xend_domain(dom)
-            PrettyPrint.prettyprint(info)
-
-xm.prog(ProgList)
-
-class ProgDestroy(Prog):
-    group = 'domain'
-    name = "destroy"
-    info = """Terminate a domain immediately."""
-
-    def help(self, args):
-        destroy.main([args[0], '-h'])
-
-    def main(self, args):
-        destroy.main(args)
-
-xm.prog(ProgDestroy)
-
-class ProgShutdown(Prog):
-    group = 'domain'
-    name = "shutdown"
-    info = """Shutdown a domain."""
-
-    def help(self, args):
-        shutdown.main([args[0], '-h'])
-    
-    def main(self, args):
-        shutdown.main(args)
-
-xm.prog(ProgShutdown)
-
-class ProgSysrq(Prog):
-    group = 'domain'
-    name = "sysrq"
-    info = """Send a sysrq to a domain."""
-
-    def help(self, args):
-        sysrq.main([args[0], '-h'])
-    
-    def main(self, args):
-        sysrq.main(args)
-
-xm.prog(ProgSysrq)
-
-class ProgPause(Prog):
-    group = 'domain'
-    name = "pause"
-    info = """Pause execution of a domain."""
-
-    def help(self, args):
-        print args[0], 'DOM'
-        print '\nPause execution of domain DOM.'
-
-    def main(self, args):
-        if len(args) < 2: self.err("%s: Missing domain" % args[0])
-        dom = args[1]
-        server.xend_domain_pause(dom)
-
-xm.prog(ProgPause)
-
-class ProgUnpause(Prog):
-    group = 'domain'
-    name = "unpause"
-    info = """Unpause a paused domain."""
-
-    def help(self, args):
-        print args[0], 'DOM'
-        print '\nUnpause execution of domain DOM.'
-
-    def main(self, args):
-        if len(args) < 2: self.err("%s: Missing domain" % args[0])
-        dom = args[1]
-        server.xend_domain_unpause(dom)
-
-xm.prog(ProgUnpause)
-
-class ProgPincpu(Prog):
-    group = 'domain'
-    name = "pincpu"
-    info = """Set which cpus a VCPU can use. """
-
-    def help(self, args):
-        print args[0],'DOM VCPU CPUS'
-        print '\nSet which cpus VCPU in domain DOM can use.'
-
-    # convert list of cpus to bitmap integer value
-    def make_map(self, cpulist):
-        cpus = []
-        cpumap = 0
-        for c in cpulist.split(','):
-            if c.find('-') != -1:
-                (x,y) = c.split('-')
-                for i in range(int(x),int(y)+1):
-                    cpus.append(int(i))
-            else:
-                cpus.append(int(c))
-        cpus.sort()
-        for c in cpus:
-            cpumap = cpumap | 1<<c
-
-        return cpumap
-
-    def main(self, args):
-        if len(args) != 4: self.err("%s: Invalid argument(s)" % args[0])
-        dom  = args[1]
-        vcpu = int(args[2])
-        cpumap  = self.make_map(args[3]);
-        server.xend_domain_pincpu(dom, vcpu, cpumap)
-
-xm.prog(ProgPincpu)
-
-class ProgMaxmem(Prog):
-    group = 'domain'
-    name = 'maxmem'
-    info = """Set domain memory limit."""
-
-    def help(self, args):
-        print args[0], "DOM MEMORY"
-        print "\nSet the memory limit for domain DOM to MEMORY megabytes."
-
-    def main(self, args):
-        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        mem = int_unit(args[2], 'm')
-        server.xend_domain_maxmem_set(dom, mem)
-
-xm.prog(ProgMaxmem)
-
-class ProgSetMem(Prog):
-    group = 'domain'
-    name  = 'set-mem'
-    info  = """Set the domain's memory footprint using the balloon driver."""
-
-    def help(self, args):
-        print args[0], "DOM MEMORY_TARGET"
-        print """\nRequest domain DOM to adjust its memory footprint to
-MEMORY_TARGET megabytes"""
-
-    def main(self, args):
-        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        mem_target = int_unit(args[2], 'm')
-        server.xend_domain_mem_target_set(dom, mem_target)
-
-xm.prog(ProgSetMem)
-
-class ProgVcpuhotplug(Prog):
-    group = 'domain'
-    name  = 'vcpu-hotplug'
-    info  = """Enable or disable a VCPU in a domain."""
-
-    def help(self, args):
-        print args[0], "DOM VCPU [0|1]"
-        print """\nRequest virtual processor VCPU to be disabled or enabled in
-domain DOM"""
-
-    def main(self, args):
-        if len(args) != 4: self.err("%s: Invalid arguments(s)" % args[0])
-        name = args[1]
-        vcpu = int(args[2])
-        state = int(args[3])
-        dom = server.xend_domain(name)
-        id = sxp.child_value(dom, 'id')
-        server.xend_domain_vcpu_hotplug(id, vcpu, state)
-
-xm.prog(ProgVcpuhotplug)
-
-class ProgDomid(Prog):
-    group = 'domain'
-    name = 'domid'
-    info = 'Convert a domain name to a domain id.'
-
-    def help(self, args):
-        print args[0], "DOM"
-        print '\nGet the domain id for the domain with name DOM.'
-        
-    def main (self, args):
-        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
-        name = args[1]
-        dom = server.xend_domain(name)
-        print sxp.child_value(dom, 'id')
-
-xm.prog(ProgDomid)
-
-class ProgDomname(Prog):
-    group = 'domain'
-    name = 'domname'
-    info = 'Convert a domain id to a domain name.'
-
-    def help(self, args):
-        print args[0], "DOM"
-        print '\nGet the name for the domain with id DOM.'
-        
-    def main (self, args):
-        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
-        name = args[1]
-        dom = server.xend_domain(name)
-        print sxp.child_value(dom, 'name')
-
-xm.prog(ProgDomname)
-
-class ProgBvt(Prog):
-    group = 'scheduler'
-    name = "bvt"
-    info = """Set BVT scheduler parameters."""
-    
-    def help(self, args):
-        print args[0], "DOM MCUADV WARPBACK WARPVALUE WARPL WARPU"
-        print '\nSet Borrowed Virtual Time scheduler parameters.'
-
-    def main(self, args):
-        if len(args) != 7: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        v = map(long, args[2:7])
-        server.xend_domain_cpu_bvt_set(dom, *v)
-
-xm.prog(ProgBvt)
-
-class ProgBvtslice(Prog):
-    group = 'scheduler'
-    name = "bvt_ctxallow"
-    info = """Set the BVT scheduler context switch allowance."""
-
-    def help(self, args):
-        print args[0], 'CTX_ALLOW'
-        print '\nSet Borrowed Virtual Time scheduler context switch allowance.'
-
-    def main(self, args):
-        if len(args) < 2: self.err('%s: Missing context switch allowance'
-                                                            % args[0])
-        slice = int(args[1])
-        server.xend_node_cpu_bvt_slice_set(slice)
-
-xm.prog(ProgBvtslice)
-
-class ProgSedf(Prog):
-    group = 'scheduler'
-    name= "sedf"
-    info = """Set simple EDF parameters."""
-
-    def help(self, args):
-        print args[0], "DOM PERIOD SLICE LATENCY EXTRATIME WEIGHT"
-        print "\nSet simple EDF parameters."
-
-    def main(self, args):
-	if len(args) != 7: self.err("%s: Invalid argument(s)" % args[0])
-	dom = args[1]
-	v = map(int, args[2:7])
-	server.xend_domain_cpu_sedf_set(dom, *v)
-
-xm.prog(ProgSedf)
-
-class ProgInfo(Prog):
-    group = 'host'
-    name = "info"
-    info = """Get information about the xen host."""
-
-    def main(self, args):
-        info = server.xend_node()
-        for x in info[1:]:
-            print "%-23s:" % x[0], x[1]
-
-xm.prog(ProgInfo)
-
-class ProgConsole(Prog):
-    group = 'console'
-    name = "console"
-    info = """Open a console to a domain."""
-    
-    def help(self, args):
-        print args[0], "DOM"
-        print "\nOpen a console to domain DOM."
-
-    def main(self, args):
-        if len(args) < 2: self.err("%s: Missing domain" % args[0])
-        dom = args[1]
+    n = len(params)
+    for (k, v) in options:
+        if k in ['-l', '--long']:
+            use_long = 1
+        if k in ['-v', '--vcpus']:
+            show_vcpus = 1
+
+    domsinfo = []
+    from xen.xend.XendClient import server
+    if n == 0:
+        doms = server.xend_domains()
+        doms.sort()
+    else:
+        doms = params
+    for dom in doms:
         info = server.xend_domain(dom)
-        domid = int(sxp.child_value(info, 'id', '-1'))
-        cmd = "/usr/libexec/xen/xenconsole %d" % domid
-        os.execvp('/usr/libexec/xen/xenconsole', cmd.split())
+        domsinfo.append(parse_doms_info(info))
+               
+    if use_long:
+        # this actually seems like a bad idea, as it just dumps sexp out
+        PrettyPrint.prettyprint(info)
+    elif show_vcpus:
+        xm_show_vcpus(domsinfo)
+    else:
+        xm_brief_list(domsinfo)
 
-xm.prog(ProgConsole)
+def parse_doms_info(info):
+    dominfo = {}
+    dominfo['dom'] = int(sxp.child_value(info, 'id', '-1'))
+    dominfo['name'] = sxp.child_value(info, 'name', '??')
+    dominfo['mem'] = int(sxp.child_value(info, 'memory', '0'))
+    dominfo['cpu'] = str(sxp.child_value(info, 'cpu', '0'))
+    dominfo['vcpus'] = int(sxp.child_value(info, 'vcpus', '0'))
+    # if there is more than 1 cpu, the value doesn't mean much
+    if dominfo['vcpus'] > 1:
+        dominfo['cpu'] = '-'
+    dominfo['state'] = sxp.child_value(info, 'state', '??')
+    dominfo['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
+    # security identifiers
+    if ((int(sxp.child_value(info, 'ssidref', '0'))) != 0):
+        dominfo['ssidref1'] =  int(sxp.child_value(info, 'ssidref', '0')) & 0xffff
+        dominfo['ssidref2'] = (int(sxp.child_value(info, 'ssidref', '0')) >> 16) & 0xffff
+    # get out the vcpu information
+    dominfo['vcpulist'] = []
+    vcpu_to_cpu = sxp.child_value(info, 'vcpu_to_cpu', '-1').split('|')
+    cpumap = sxp.child_value(info, 'cpumap', [])
+    mask = ((int(sxp.child_value(info, 'vcpus', '0')))**2) - 1
+    count = 0
+    for cpu in vcpu_to_cpu:
+        vcpuinfo = {}
+        vcpuinfo['name']   = sxp.child_value(info, 'name', '??')
+        vcpuinfo['dom']    = int(sxp.child_value(info, 'id', '-1'))
+        vcpuinfo['vcpu']   = int(count)
+        vcpuinfo['cpu']    = int(cpu)
+        vcpuinfo['cpumap'] = int(cpumap[count])&mask
+        count = count + 1
+        dominfo['vcpulist'].append(vcpuinfo)
+    return dominfo
+        
+def xm_brief_list(domsinfo):
+    print 'Name              Id  Mem(MB)  CPU VCPU(s)  State  Time(s)'
+    for dominfo in domsinfo:
+        if dominfo.has_key("ssidref1"):
+            print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %s:%(ssidref2)02x/p:%(ssidref1)02x" % dominfo)
+        else:
+            print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f" % dominfo)
 
-class ProgCall(Prog):
-    name = "call"
-    info = "Call xend api functions."
+def xm_show_vcpus(domsinfo):
+    print 'Name              Id  VCPU  CPU  CPUMAP'
+    for dominfo in domsinfo:
+        for vcpuinfo in dominfo['vcpulist']:
+            print ("%(name)-16s %(dom)3d  %(vcpu)4d  %(cpu)3d  0x%(cpumap)x" %
+                   vcpuinfo)
 
-    def help (self, args):
-        print args[0], "function args..."
-        print """
-        Call a xend HTTP API function. The leading 'xend_' on the function
-can be omitted. See xen.xend.XendClient for the API functions.
-"""
+def xm_vcpu_list(args):
+    args.insert(0,"-v")
+    xm_list(args)
 
-    def main(self, args):
-        xend_client_main(args)
+def xm_destroy(args):
+    arg_check(args,1,"destroy")
 
-xm.prog(ProgCall)
+    from xen.xm import destroy
+    # ugly hack because the opt parser apparently wants
+    # the subcommand name just to throw it away!
+    args.insert(0,"bogus")
+    destroy.main(args)
+            
+# TODO: make reboot do the right thing, right now
+# reboot and shutdown are exactly the same
+def xm_reboot(args):
+    arg_check(args,1,"reboot")
+    # ugly hack because the opt parser apparently wants
+    # the subcommand name just to throw it away!
+    args.insert(0,"bogus")
+    from xen.xm import shutdown
+    shutdown.main(args)
 
-class ProgDmesg(Prog):
-    group = 'host'
-    name  =  "dmesg"
-    info  = """Read or clear Xen's message buffer."""
+def xm_shutdown(args):
+    arg_check(args,1,"shutdown")
 
+    # ugly hack because the opt parser apparently wants
+    # the subcommand name just to throw it away!
+    args.insert(0,"bogus")
+    from xen.xm import shutdown
+    shutdown.main(args)
+
+def xm_sysrq(args):
+    from xen.xm import sysrq
+    # ugly hack because the opt parser apparently wants
+    # the subcommand name just to throw it away!
+    args.insert(0,"bogus")
+    sysrq.main(args)
+
+def xm_pause(args):
+    arg_check(args, 1, "pause")
+    dom = args[0]
+
+    from xen.xend.XendClient import server
+    server.xend_domain_pause(dom)
+
+def xm_unpause(args):
+    arg_check(args, 1, "unpause")
+    dom = args[0]
+
+    from xen.xend.XendClient import server
+    server.xend_domain_unpause(dom)
+
+#############################################################
+
+def cpu_make_map(cpulist):
+    cpus = []
+    cpumap = 0
+    for c in cpulist.split(','):
+        if c.find('-') != -1:
+            (x,y) = c.split('-')
+            for i in range(int(x),int(y)+1):
+                cpus.append(int(i))
+        else:
+            cpus.append(int(c))
+    cpus.sort()
+    for c in cpus:
+        cpumap = cpumap | 1<<c
+
+    return cpumap
+
+def xm_cpus_set(args):
+    arg_check(args, 3, "cpus-set")
+    
+    dom  = args[0]
+    vcpu = int(args[1])
+    cpumap = cpu_make_map(args[2])
+    
+    from xen.xend.XendClient import server
+    server.xend_domain_pincpu(dom, vcpu, cpumap)
+
+def xm_mem_max(args):
+    arg_check(args, 2, "mem-max")
+    
+    dom = args[0]
+    mem = int_unit(args[1], 'm')
+
+    from xen.xend.XendClient import server
+    server.xend_domain_maxmem_set(dom, mem)
+    
+def xm_mem_set(args):
+    arg_check(args, 2, "mem-set")
+    
+    dom = args[0]
+    mem_target = int_unit(args[1], 'm')
+
+    from xen.xend.XendClient import server
+    server.xend_domain_mem_target_set(dom, mem_target)
+    
+# TODO: why does this lookup by name?  and what if that fails!?
+def xm_vcpu_enable(args):
+    arg_check(args, 2, "vcpu-enable")
+    
+    name = args[0]
+    vcpu = int(args[1])
+    
+    from xen.xend.XendClient import server
+    dom = server.xend_domain(name)
+    id = sxp.child_value(dom, 'id')
+    server.xend_domain_vcpu_hotplug(id, vcpu, 1)
+
+def xm_vcpu_disable(args):
+    arg_check(args, 2, "vcpu-disable")
+    
+    name = args[0]
+    vcpu = int(args[1])
+    
+    from xen.xend.XendClient import server
+    dom = server.xend_domain(name)
+    id = sxp.child_value(dom, 'id')
+    server.xend_domain_vcpu_hotplug(id, vcpu, 0)
+
+def xm_domid(args):
+    name = args[0]
+
+    from xen.xend.XendClient import server
+    dom = server.xend_domain(name)
+    print sxp.child_value(dom, 'id')
+    
+def xm_domname(args):
+    name = args[0]
+
+    from xen.xend.XendClient import server
+    dom = server.xend_domain(name)
+    print sxp.child_value(dom, 'name')
+
+def xm_bvt(args):
+    arg_check(args, 6, "bvt")
+    dom = args[0]
+    v = map(long, args[1:6])
+    from xen.xend.XendClient import server
+    server.xend_domain_cpu_bvt_set(dom, *v)
+
+def xm_bvt_ctxallow(args):
+    arg_check(args, 1, "bvt_ctxallow")
+
+    slice = int(args[0])
+    from xen.xend.XendClient import server
+    server.xend_node_cpu_bvt_slice_set(slice)
+
+def xm_sedf(args):
+    arg_check(args, 6, "sedf")
+    
+    dom = args[0]
+    v = map(int, args[1:5])
+    from xen.xend.XendClient import server
+    server.xend_domain_cpu_sedf_set(dom, *v)
+
+def xm_info(args):
+    from xen.xend.XendClient import server
+    info = server.xend_node()
+    
+    for x in info[1:]:
+        print "%-23s:" % x[0], x[1]
+
+# TODO: remove as soon as console server shows up
+def xm_console(args):
+    arg_check(args,1,"console")
+
+    dom = args[0]
+    from xen.xend.XendClient import server
+    info = server.xend_domain(dom)
+    domid = int(sxp.child_value(info, 'id', '-1'))
+    cmd = "/usr/libexec/xen/xenconsole %d" % domid
+    os.execvp('/usr/libexec/xen/xenconsole', cmd.split())
+    console = sxp.child(info, "console")
+
+def xm_dmesg(args):
+    
     gopts = Opts(use="""[-c|--clear]
 
 Read Xen's message buffer (boot output, warning and error messages) or clear
@@ -744,161 +455,212 @@ its contents if the [-c|--clear] flag is specified.
     gopts.opt('clear', short='c',
               fn=set_true, default=0,
               use="Clear the contents of the Xen message buffer.")
+    # Work around for gopts
+    args.insert(0,"bogus")
+    gopts.parse(args)
+    if not (1 <= len(args) <= 2):
+        err('Invalid arguments: ' + str(args))
 
-    short_options = ['-c']
-    long_options = ['--clear']
+    from xen.xend.XendClient import server
+    if not gopts.vals.clear:
+        print server.xend_node_get_dmesg()
+    else:
+        server.xend_node_clear_dmesg()
 
-    def help(self, args):
-        self.gopts.argv = args
-        self.gopts.usage()
+def xm_log(args):
+    from xen.xend.XendClient import server
+    print server.xend_node_log()
 
-    def main(self, args):
-        self.gopts.parse(args)
-        if not (1 <= len(args) <=2):
-            self.gopts.err('Invalid arguments: ' + str(args))
+def xm_network_limit(args):
+    arg_check(args,4,"network-limit")
+    dom = args[0]
+    v = map(int, args[1:4])
+    from xen.xend.XendClient import server
+    server.xend_domain_vif_limit(dom, *v)
 
-        if not self.gopts.vals.clear:
-            print server.xend_node_get_dmesg()
-        else:
-            server.xend_node_clear_dmesg()
+def xm_network_list(args):
+    arg_check(args,1,"network-list")
+    dom = args[0]
+    from xen.xend.XendClient import server
+    for x in server.xend_domain_devices(dom, 'vif'):
+        sxp.show(x)
+        print
 
-xm.prog(ProgDmesg)
+def xm_block_list(args):
+    arg_check(args,1,"block-list")
+    dom = args[0]
+    from xen.xend.XendClient import server
+    for x in server.xend_domain_devices(dom, 'vbd'):
+        sxp.show(x)
+        print
 
-class ProgLog(Prog):
-    group = 'host'
-    name  =  "log"
-    info  = """Print the xend log."""
+def xm_block_create(args):
+    n = len(args)
+    if n < 4 or n > 5:
+        err("%s: Invalid argument(s)" % args[0])
+        usage("block-create")
 
-    def main(self, args):
-        print server.xend_node_log()
+    dom = args[0]
+    vbd = ['vbd',
+           ['uname', args[1]],
+           ['dev',   args[2]],
+           ['mode',  args[3]]]
+    if n == 5:
+        vbd.append(['backend', args[4]])
 
-xm.prog(ProgLog)
+    from xen.xend.XendClient import server
+    server.xend_domain_device_create(dom, vbd)
 
-class ProgVifCreditLimit(Prog):
-    group = 'vif'
-    name= "vif-limit"
-    info = """Limit the transmission rate of a virtual network interface."""
+def xm_block_refresh(args):
+    arg_check(args,2,"block-refresh")
 
-    def help(self, args):
-        print args[0], "DOMAIN VIF CREDIT_IN_BYTES PERIOD_IN_USECS"
-        print "\nSet the credit limit of a virtual network interface."
+    dom = args[0]
+    dev = args[1]
 
-    def main(self, args):
-        if len(args) != 5: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        v = map(int, args[2:5])
-        server.xend_domain_vif_limit(dom, *v)
+    from xen.xend.XendClient import server
+    server.xend_domain_device_refresh(dom, 'vbd', dev)
 
-xm.prog(ProgVifCreditLimit)
+def xm_block_destroy(args):
+    arg_check(args,2,"block-destroy")
 
-class ProgVifList(Prog):
-    group = 'vif'
-    name  = 'vif-list'
-    info  = """List virtual network interfaces for a domain."""
+    dom = args[0]
+    dev = args[1]
 
-    def help(self, args):
-        print args[0], "DOM"
-        print "\nList virtual network interfaces for domain DOM"
+    from xen.xend.XendClient import server
+    server.xend_domain_device_destroy(dom, 'vbd', dev)
 
-    def main(self, args):
-        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        for x in server.xend_domain_devices(dom, 'vif'):
-            sxp.show(x)
+commands = {
+    # console commands
+    "console": xm_console,
+    # domain commands
+    "domid": xm_domid,
+    "domname": xm_domname,
+    "create": xm_create,
+    "destroy": xm_destroy,
+    "restore": xm_restore,
+    "save": xm_save,
+    "shutdown": xm_shutdown,
+    "reboot": xm_reboot,
+    "list": xm_list,
+    # memory commands
+    "mem-max": xm_mem_max,
+    "mem-set": xm_mem_set,
+    # cpu commands
+    "cpus-set": xm_cpus_set,
+#    "cpus-list": xm_cpus_list,
+    "vcpu-enable": xm_vcpu_enable,
+    "vcpu-disable": xm_vcpu_disable,
+    "vcpu-list": xm_vcpu_list,
+    # migration
+    "migrate": xm_migrate,
+    # special
+    "sysrq": xm_sysrq,
+    "pause": xm_pause,
+    "unpause": xm_unpause,
+    # host commands
+    "dmesg": xm_dmesg,
+    "info": xm_info,
+    "log": xm_log,
+    # scheduler
+    "bvt": xm_bvt,
+    "bvt_ctxallow": xm_bvt_ctxallow,
+    "sedf": xm_sedf,
+    # block
+    "block-create": xm_block_create,
+    "block-destroy": xm_block_destroy,
+    "block-list": xm_block_list,
+    "block-refresh": xm_block_refresh,
+    # network
+    "network-limit": xm_network_limit,
+    "network-list": xm_network_list
+    }
+
+aliases = {
+    "balloon": "mem-set",
+    "vif-list": "network-list",
+    "vif-limit": "network-limit",
+    "vbd-create": "block-create",
+    "vbd-destroy": "block-destroy",
+    "vbd-list": "block-list",
+    "vbd-refresh": "block-refresh",
+    }
+
+help = {
+    "--long": longhelp
+   }
+
+def xm_lookup_cmd(cmd):
+    if commands.has_key(cmd):
+        return commands[cmd]
+    elif aliases.has_key(cmd):
+        deprecated(cmd,aliases[cmd])
+        return commands[aliases[cmd]]
+    else:
+        err('Sub Command %s not found!' % cmd)
+        usage()
+
+def deprecated(old,new):
+    err('Option %s is deprecated, and will be removed in future!!!' % old)
+    err('Option %s is the new replacement, see "xm help %s" for more info' % (new, new))
+
+def usage(cmd=None):
+    if cmd == "full":
+        print fullhelp
+    elif help.has_key(cmd):
+        print help[cmd]
+    else:
+        print shorthelp
+    sys.exit(1)
+
+def main(argv=sys.argv):
+    if len(argv) < 2:
+        usage()
+    
+    if re.compile('-*help').match(argv[1]):
+	if len(argv) > 2 and help.has_key(argv[2]):
+	    usage(argv[2])
+	else:
+	    usage()
+	sys.exit(0)
+
+    cmd = xm_lookup_cmd(argv[1])
+
+    # strip off prog name and subcmd
+    args = argv[2:]
+    if cmd:
+        try:
+            from xen.xend.XendClient import XendError
+            rc = cmd(args)
+            if rc:
+                usage()
+        except socket.error, ex:
+            print >>sys.stderr, ex
+            err("Error connecting to xend, is xend running?")
+            sys.exit(1)
+        except IOError:
+            err("Most commands need root access.  Please try again as root")
+            sys.exit(1)
+        except XendError, ex:
+            if len(args) > 0:
+                handle_xend_error(argv[1], args[0], ex)
+            else:
+                print "Unexpected error:", sys.exc_info()[0]
+                print
+                print "Please report to xen-devel@lists.xensource.com"
+                raise
+        except SystemExit:
+            sys.exit(1)
+        except:
+            print "Unexpected error:", sys.exc_info()[0]
             print
+            print "Please report to xen-devel@lists.xensource.com"
+            raise
+                
+    else:
+        usage()
 
-xm.prog(ProgVifList)
-
-class ProgVbdList(Prog):
-    group = 'vbd'
-    name  = 'vbd-list'
-    info  = """List virtual block devices for a domain."""
-
-    def help(self, args):
-        print args[0], "DOM"
-        print "\nList virtual block devices for domain DOM"
-
-    def main(self, args):
-        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        for x in server.xend_domain_devices(dom, 'vbd'):
-            sxp.show(x)
-            print
-
-xm.prog(ProgVbdList)
-
-class ProgVbdCreate(Prog):
-    group = 'vbd'
-    name  = 'vbd-create'
-    info = """Create a new virtual block device for a domain"""
-
-    def help(self, args):
-        print args[0], "DOM UNAME DEV MODE [BACKEND]"
-        print """
-Create a virtual block device for a domain.
-
-  UNAME   - device to export, e.g. phy:hda2
-  DEV     - device name in the domain, e.g. sda1
-  MODE    - access mode: r for read, w for read-write
-  BACKEND - backend driver domain
-"""
-
-    def main(self, args):
-        n = len(args)
-        if n < 5 or n > 6: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        vbd = ['vbd',
-               ['uname', args[2]],
-               ['dev',   args[3]],
-               ['mode',  args[4]]]
-        if n == 6:
-            vbd.append(['backend', args[5]])
-        server.xend_domain_device_create(dom, vbd)
-
-xm.prog(ProgVbdCreate)
-
-class ProgVbdRefresh(Prog):
-    group = 'vbd'
-    name  = 'vbd-refresh'
-    info = """Refresh a virtual block device for a domain"""
-
-    def help(self, args):
-        print args[0], "DOM DEV"
-        print """
-Refresh a virtual block device for a domain.
-
-  DEV     - idx field in the device information
-"""
-
-    def main(self, args):
-        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        dev = args[2]
-        server.xend_domain_device_refresh(dom, 'vbd', dev)
-
-xm.prog(ProgVbdRefresh)
+if __name__ == "__main__":
+    main()
 
 
-class ProgVbdDestroy(Prog):
-    group = 'vbd'
-    name = 'vbd-destroy'
-    info = """Destroy a domain's virtual block device"""
 
-    def help(self, args):
-        print args[0], "DOM DEV"
-        print """
-Destroy vbd DEV attached to domain DOM. Detaches the device
-from the domain, but does not destroy the device contents.
-The device indentifier DEV is the idx field in the device
-information. This is visible in 'xm vbd-list'."""
-
-    def main(self, args):
-        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        dev = args[2]
-        server.xend_domain_device_destroy(dom, 'vbd', dev)
-
-xm.prog(ProgVbdDestroy)
-
-def main(args):
-    xm.main(args)
