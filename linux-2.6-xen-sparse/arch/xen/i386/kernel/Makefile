@@ -92,6 +92,7 @@ $(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-obj-m) $(c-link)) $(patsubst %.o,$(obj)
 
 $(obj)/vsyscall-int80.S: $(obj)/vsyscall-sigreturn.S
 
+EXTRA_AFLAGS	+= -I$(obj)
 $(obj)/entry.o: $(src)/entry.S $(src)/syscall_table.S
 
 obj-y	+= $(c-obj-y) $(s-obj-y)
