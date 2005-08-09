@@ -529,11 +529,17 @@ int store_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr)
 
 void vm_launch_fail(unsigned long eflags)
 {
+    unsigned long error;
+    __vmread(VM_INSTRUCTION_ERROR, &error);
+    printk("<vm_launch_fail> error code %lx\n", error);
     __vmx_bug(guest_cpu_user_regs());
 }
 
 void vm_resume_fail(unsigned long eflags)
 {
+    unsigned long error;
+    __vmread(VM_INSTRUCTION_ERROR, &error);
+    printk("<vm_resume_fail> error code %lx\n", error);
     __vmx_bug(guest_cpu_user_regs());
 }
 
