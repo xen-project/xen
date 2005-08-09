@@ -328,7 +328,16 @@ do_interrupt(CPUState *env, int vector)
 	env->send_event = 1;
 }
 
-//static unsigned long tsc_per_tick = 1; /* XXX: calibrate */
+void
+destroy_vmx_domain(void)
+{
+    extern int domid;
+    extern FILE* logfile;
+    char destroy_cmd[20];
+    sprintf(destroy_cmd, "xm destroy %d", domid);
+    if (system(destroy_cmd) == -1)
+        fprintf(logfile, "%s failed.!\n", destroy_cmd);
+}
 
 int main_loop(void)
 {
@@ -396,6 +405,7 @@ int main_loop(void)
 			}
 		}
 	}
+        destroy_vmx_domain();
 	return 0;
 }
 
