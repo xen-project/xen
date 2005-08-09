@@ -127,6 +127,8 @@ static void __do_suspend(void)
 
     xenbus_suspend();
 
+    ctrl_if_suspend();
+
     irq_suspend();
 
     gnttab_suspend();
@@ -161,6 +163,8 @@ static void __do_suspend(void)
     gnttab_resume();
 
     irq_resume();
+
+    ctrl_if_resume();
 
     xenbus_resume();
 
