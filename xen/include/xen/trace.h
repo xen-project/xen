@@ -67,6 +67,15 @@ static inline int trace(u32 event, unsigned long d1, unsigned long d2,
     if ( (tb_event_mask & event) == 0 )
         return 0;
 
+    /* match class */
+    if ( ((tb_event_mask >> TRC_CLS_SHIFT) & (event >> TRC_CLS_SHIFT)) == 0 )
+        return 0;
+
+    /* then match subclass */
+    if ( (((tb_event_mask >> TRC_SUBCLS_SHIFT) & 0xf )
+                & ((event >> TRC_SUBCLS_SHIFT) & 0xf )) == 0 )
+        return 0;
+
     if ( (tb_cpu_mask & (1UL << smp_processor_id())) == 0 )
         return 0;
 

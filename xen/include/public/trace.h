@@ -9,11 +9,21 @@
 #define __XEN_PUBLIC_TRACE_H__
 
 /* Trace classes */
-#define TRC_GEN     0x00010000    /* General trace            */
-#define TRC_SCHED   0x00020000    /* Xen Scheduler trace      */
-#define TRC_DOM0OP  0x00040000    /* Xen DOM0 operation trace */
-#define TRC_VMX     0x00080000    /* Xen VMX trace            */
-#define TRC_ALL     0xffff0000
+#define TRC_CLS_SHIFT 16
+#define TRC_GEN     0x0001f000    /* General trace            */
+#define TRC_SCHED   0x0002f000    /* Xen Scheduler trace      */
+#define TRC_DOM0OP  0x0004f000    /* Xen DOM0 operation trace */
+#define TRC_VMX     0x0008f000    /* Xen VMX trace            */
+#define TRC_ALL     0xfffff000
+
+/* Trace subclasses */
+#define TRC_SUBCLS_SHIFT 12
+/* trace subclasses for VMX */
+#define TRC_VMXEXIT  0x00081000   /* VMX exit trace            */
+#define TRC_VMXTIMER 0x00082000   /* VMX timer trace           */
+#define TRC_VMXINT   0x00084000   /* VMX interrupt trace       */
+#define TRC_VMXIO    0x00088000   /* VMX io emulation trace  */
+
 
 /* Trace events per class */
 
@@ -31,9 +41,13 @@
 #define TRC_SCHED_T_TIMER_FN    (TRC_SCHED + 12)
 #define TRC_SCHED_DOM_TIMER_FN  (TRC_SCHED + 13)
 
-#define TRC_VMX_VMEXIT          (TRC_VMX + 1)
-#define TRC_VMX_VECTOR          (TRC_VMX + 2)
-#define TRC_VMX_INT             (TRC_VMX + 3)
+/* trace events per subclass */
+#define TRC_VMX_VMEXIT          (TRC_VMXEXIT + 1)
+#define TRC_VMX_VECTOR          (TRC_VMXEXIT + 2)
+
+#define TRC_VMX_TIMER_INTR      (TRC_VMXTIMER + 1)
+
+#define TRC_VMX_INT             (TRC_VMXINT + 1)
 
 /* This structure represents a single trace buffer record. */
 struct t_rec {
