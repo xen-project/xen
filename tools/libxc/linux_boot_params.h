@@ -17,6 +17,7 @@ struct mem_map {
 #define E820_NVS        4
 #define E820_IO         16
 #define E820_SHARED     17
+#define E820_XENSTORE   18
 
         u32 caching_attr;    /* used by hypervisor */
 #define MEMMAP_UC	0

@@ -37,58 +37,70 @@ static void build_e820map(struct mem_map *mem_mapp, unsigned long mem_size)
     int nr_map = 0;
 
     /* XXX: Doesn't work for > 4GB yet */
-    mem_mapp->map[0].addr = 0x0;
-    mem_mapp->map[0].size = 0x9F800;
-    mem_mapp->map[0].type = E820_RAM;
-    mem_mapp->map[0].caching_attr = MEMMAP_WB;
+    mem_mapp->map[nr_map].addr = 0x0;
+    mem_mapp->map[nr_map].size = 0x9F800;
+    mem_mapp->map[nr_map].type = E820_RAM;
+    mem_mapp->map[nr_map].caching_attr = MEMMAP_WB;
     nr_map++;
 
-    mem_mapp->map[1].addr = 0x9F800;
-    mem_mapp->map[1].size = 0x800;
-    mem_mapp->map[1].type = E820_RESERVED;
-    mem_mapp->map[1].caching_attr = MEMMAP_UC;
+    mem_mapp->map[nr_map].addr = 0x9F800;
+    mem_mapp->map[nr_map].size = 0x800;
+    mem_mapp->map[nr_map].type = E820_RESERVED;
+    mem_mapp->map[nr_map].caching_attr = MEMMAP_UC;
     nr_map++;
 
-    mem_mapp->map[2].addr = 0xA0000;
-    mem_mapp->map[2].size = 0x20000;
-    mem_mapp->map[2].type = E820_IO;
-    mem_mapp->map[2].caching_attr = MEMMAP_UC;
+    mem_mapp->map[nr_map].addr = 0xA0000;
+    mem_mapp->map[nr_map].size = 0x20000;
+    mem_mapp->map[nr_map].type = E820_IO;
+    mem_mapp->map[nr_map].caching_attr = MEMMAP_UC;
     nr_map++;
 
-    mem_mapp->map[3].addr = 0xF0000;
-    mem_mapp->map[3].size = 0x10000;
-    mem_mapp->map[3].type = E820_RESERVED;
-    mem_mapp->map[3].caching_attr = MEMMAP_UC;
+    mem_mapp->map[nr_map].addr = 0xF0000;
+    mem_mapp->map[nr_map].size = 0x10000;
+    mem_mapp->map[nr_map].type = E820_RESERVED;
+    mem_mapp->map[nr_map].caching_attr = MEMMAP_UC;
     nr_map++;
 
-    mem_mapp->map[4].addr = 0x100000;
-    mem_mapp->map[4].size = mem_size - 0x100000 - PAGE_SIZE;
-    mem_mapp->map[4].type = E820_RAM;
-    mem_mapp->map[4].caching_attr = MEMMAP_WB;
+#define STATIC_PAGES    2       /* for ioreq_t and store_mfn */
+    /* Most of the ram goes here */
+    mem_mapp->map[nr_map].addr = 0x100000;
+    mem_mapp->map[nr_map].size = mem_size - 0x100000 - STATIC_PAGES*PAGE_SIZE;
+    mem_mapp->map[nr_map].type = E820_RAM;
+    mem_mapp->map[nr_map].caching_attr = MEMMAP_WB;
     nr_map++;
 
-    mem_mapp->map[5].addr = mem_size - PAGE_SIZE;
-    mem_mapp->map[5].size = PAGE_SIZE;
-    mem_mapp->map[5].type = E820_SHARED;
-    mem_mapp->map[5].caching_attr = MEMMAP_WB;
+    /* Statically allocated special pages */
+
+    /* Shared ioreq_t page */
+    mem_mapp->map[nr_map].addr = mem_size - PAGE_SIZE;
+    mem_mapp->map[nr_map].size = PAGE_SIZE;
+    mem_mapp->map[nr_map].type = E820_SHARED;
+    mem_mapp->map[nr_map].caching_attr = MEMMAP_WB;
     nr_map++;
 
-    mem_mapp->map[6].addr = mem_size;
-    mem_mapp->map[6].size = 0x3 * PAGE_SIZE;
-    mem_mapp->map[6].type = E820_NVS;
-    mem_mapp->map[6].caching_attr = MEMMAP_UC;
+    /* For xenstore */
+    mem_mapp->map[nr_map].addr = mem_size - 2*PAGE_SIZE;
+    mem_mapp->map[nr_map].size = PAGE_SIZE;
+    mem_mapp->map[nr_map].type = E820_XENSTORE;
+    mem_mapp->map[nr_map].caching_attr = MEMMAP_WB;
     nr_map++;
 
-    mem_mapp->map[7].addr = mem_size + 0x3 * PAGE_SIZE;
-    mem_mapp->map[7].size = 0xA * PAGE_SIZE;
-    mem_mapp->map[7].type = E820_ACPI;
-    mem_mapp->map[7].caching_attr = MEMMAP_WB;
+    mem_mapp->map[nr_map].addr = mem_size;
+    mem_mapp->map[nr_map].size = 0x3 * PAGE_SIZE;
+    mem_mapp->map[nr_map].type = E820_NVS;
+    mem_mapp->map[nr_map].caching_attr = MEMMAP_UC;
     nr_map++;
 
-    mem_mapp->map[8].addr = 0xFEC00000;
-    mem_mapp->map[8].size = 0x1400000;
-    mem_mapp->map[8].type = E820_IO;
-    mem_mapp->map[8].caching_attr = MEMMAP_UC;
+    mem_mapp->map[nr_map].addr = mem_size + 0x3 * PAGE_SIZE;
+    mem_mapp->map[nr_map].size = 0xA * PAGE_SIZE;
+    mem_mapp->map[nr_map].type = E820_ACPI;
+    mem_mapp->map[nr_map].caching_attr = MEMMAP_WB;
+    nr_map++;
+
+    mem_mapp->map[nr_map].addr = 0xFEC00000;
+    mem_mapp->map[nr_map].size = 0x1400000;
+    mem_mapp->map[nr_map].type = E820_IO;
+    mem_mapp->map[nr_map].caching_attr = MEMMAP_UC;
     nr_map++;
 
     mem_mapp->nr_map = nr_map;
@@ -212,7 +224,11 @@ static int setup_guest(int xc_handle,
                          unsigned long shared_info_frame,
                          unsigned int control_evtchn,
                          unsigned long flags,
-                         struct mem_map * mem_mapp)
+                         unsigned int vcpus,
+                         unsigned int store_evtchn,
+                         unsigned long *store_mfn,
+                         struct mem_map *mem_mapp
+                         )
 {
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
@@ -510,7 +526,10 @@ static int setup_guest(int xc_handle,
     boot_paramsp->drive_info.dummy[14] = 32;
 
     /* memsize is in megabytes */
+    /* If you need to create a special e820map, comment this line
+       and use mem-map.sxp */
     build_e820map(mem_mapp, memsize << 20);
+    *store_mfn = page_array[(v_end-2) >> PAGE_SHIFT];
 #if defined (__i386__)
     if (zap_mmio_ranges(xc_handle, dom, l2tab, mem_mapp) == -1)
 #else
@@ -637,7 +656,10 @@ int xc_vmx_build(int xc_handle,
                    const char *ramdisk_name,
                    const char *cmdline,
                    unsigned int control_evtchn,
-                   unsigned long flags)
+                   unsigned long flags,
+                   unsigned int vcpus,
+                   unsigned int store_evtchn,
+                   unsigned long *store_mfn)
 {
     dom0_op_t launch_op, op;
     int initrd_fd = -1;
@@ -712,7 +734,8 @@ int xc_vmx_build(int xc_handle,
                        initrd_gfd, initrd_size, nr_pages, 
                        ctxt, cmdline,
                        op.u.getdomaininfo.shared_info_frame,
-                       control_evtchn, flags, mem_mapp) < 0 )
+                       control_evtchn, flags, vcpus, store_evtchn, store_mfn,
+                       mem_mapp) < 0 )
     {
         ERROR("Error constructing guest OS");
         goto error_out;
