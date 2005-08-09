@@ -187,25 +187,13 @@ int vmx_setup_platform(struct vcpu *d, struct cpu_user_regs *regs)
     return 0;
 }
 
-void vmx_do_launch(struct vcpu *v) 
+void vmx_set_host_env(struct vcpu *v)
 {
-/* Update CR3, GDT, LDT, TR */
     unsigned int tr, cpu, error = 0;
     struct host_execution_env host_env;
     struct Xgt_desc_struct desc;
-    unsigned long pfn = 0;
-    struct pfn_info *page;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
-
-    vmx_stts();
 
     cpu = smp_processor_id();
-
-    page = (struct pfn_info *) alloc_domheap_page(NULL);
-    pfn = (unsigned long) (page - frame_table);
-
-    vmx_setup_platform(v, regs);
-
     __asm__ __volatile__ ("sidt  (%0) \n" :: "a"(&desc) : "memory");
     host_env.idtr_limit = desc.size;
     host_env.idtr_base = desc.address;
@@ -216,17 +204,36 @@ void vmx_do_launch(struct vcpu *v)
     host_env.gdtr_base = desc.address;
     error |= __vmwrite(HOST_GDTR_BASE, host_env.gdtr_base);
 
-    error |= __vmwrite(GUEST_LDTR_SELECTOR, 0);
-    error |= __vmwrite(GUEST_LDTR_BASE, 0);
-    error |= __vmwrite(GUEST_LDTR_LIMIT, 0);
-        
     __asm__ __volatile__ ("str  (%0) \n" :: "a"(&tr) : "memory");
     host_env.tr_selector = tr;
     host_env.tr_limit = sizeof(struct tss_struct);
     host_env.tr_base = (unsigned long) &init_tss[cpu];
-
     error |= __vmwrite(HOST_TR_SELECTOR, host_env.tr_selector);
     error |= __vmwrite(HOST_TR_BASE, host_env.tr_base);
+
+}
+
+void vmx_do_launch(struct vcpu *v) 
+{
+/* Update CR3, GDT, LDT, TR */
+    unsigned int  error = 0;
+    unsigned long pfn = 0;
+    struct pfn_info *page;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+
+    vmx_stts();
+
+    page = (struct pfn_info *) alloc_domheap_page(NULL);
+    pfn = (unsigned long) (page - frame_table);
+
+    vmx_setup_platform(v, regs);
+
+    vmx_set_host_env(v);
+
+    error |= __vmwrite(GUEST_LDTR_SELECTOR, 0);
+    error |= __vmwrite(GUEST_LDTR_BASE, 0);
+    error |= __vmwrite(GUEST_LDTR_LIMIT, 0);
+        
     error |= __vmwrite(GUEST_TR_BASE, 0);
     error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
 
