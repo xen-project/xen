@@ -57,7 +57,11 @@ struct pt_fpreg {
         } u;
 };
 
+#ifdef XEN_HYPERVISOR
 struct pt_regs {
+#else
+struct xen_pt_regs {
+#endif
 	/* The following registers are saved by SAVE_MIN: */
 	unsigned long b6;		/* scratch */
 	unsigned long b7;		/* scratch */
@@ -274,7 +278,11 @@ typedef struct vcpu_guest_context {
 	unsigned long vm_assist;   /* VMASST_TYPE_* bitmap, now none on IPF */
 	unsigned long guest_iip;   /* Guest entry point */
 
+#ifdef XEN_HYPERVISOR
 	struct pt_regs regs;
+#else
+	struct xen_pt_regs regs;
+#endif
 	arch_vcpu_info_t vcpu;
 	arch_shared_info_t shared;
 } vcpu_guest_context_t;
