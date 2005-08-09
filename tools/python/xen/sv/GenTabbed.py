@@ -1,7 +1,6 @@
 import types
 
 from xen.sv.HTMLBase import HTMLBase
-from xen.sv.TabView import TabView
 from xen.sv.util import getVar
 
 class GenTabbed( HTMLBase ):
@@ -12,39 +11,44 @@ class GenTabbed( HTMLBase ):
         self.tabObjects = tabObjects
         self.urlWriter = urlWriter
         self.title = title
-
-    def write_BODY( self, request, urlWriter = None ):
-        try:
-            tab = int( getVar( 'tab', request, 0 ) )
-        except:
-            tab = 0
+        
+    def write_BODY( self, request ):
+        if not self.__dict__.has_key( "tab" ):
+            try:
+                self.tab = int( getVar( 'tab', request, 0 ) )
+            except:
+                self.tab = 0
             
-        request.write( "<table style='' width='100%' border='0' cellspacing='0' cellpadding='0'>" )
-        request.write( "<tr><td>" )
-        request.write( "<p align='center'><u>%s</u></p>" % self.title )
+        request.write( "\n<div class='title'>%s</div>" % self.title )
         
-        TabView( tab, self.tabStrings, self.urlWriter ).write_BODY( request )
+        TabView( self.tab, self.tabStrings, self.urlWriter ).write_BODY( request )
         
-        request.write( "</td></tr><tr><td>" )
-
         try:
-            render_tab = self.tabObjects[ tab ]
-            render_tab().write_BODY( request )
-        except:
-            request.write( "<p>Error Rendering Tab</p>" )
-       
-        request.write( "</td></tr></table>" )
-       
+            request.write( "\n<div class='tab'>" )
+            render_tab = self.tabObjects[ self.tab ]
+            render_tab( self.urlWriter ).write_BODY( request )
+            request.write( "\n</div>" )
+        except Exception, e:
+            request.write( "\n<p>Error Rendering Tab</p>" )
+            request.write( "\n<p>%s</p>" % str( e ) )
+
+        request.write( "\n<input type=\"hidden\" name=\"tab\" value=\"%d\">" % self.tab )
+
     def perform( self, request ):
+        request.write( "Tab> perform" )
+        request.write( "<br/>op: " + str( getVar( 'op', request ) ) )
+        request.write( "<br/>args: " + str( getVar( 'args', request ) ) )
+        request.write( "<br/>tab: " + str( getVar( 'tab', request ) ) )      
+
         try:
-            tab = int( getVar( 'tab', request, 0 ) )
+            action = getVar( 'op', request, 0 )
+            if action == "tab":
+                self.tab = int( getVar( 'args', request ) )
+            else:
+                this.tab = int( getVar( 'tab', request, 0 ) )
+                self.tabObjects[ self.tab ]( self.urlWriter ).perform( request )
         except:
-            tab = 0;
-            
-        op_tab = self.tabObjects[ tab ]
-        
-        if op_tab:
-            op_tab().perform( request )
+            pass
         
 class PreTab( HTMLBase ):
 
@@ -53,12 +57,9 @@ class PreTab( HTMLBase ):
         self.source = source
     
     def write_BODY( self, request ):
-        
-        request.write( "<div style='display: block; overflow: auto; border: 0px solid black; width: 540px; padding: 5px; z-index:0; align: center'><pre>" )
-        
+        request.write( "\n<pre>" )
         request.write( self.source )
-        
-        request.write( "</pre></div>" )
+        request.write( "\n</pre>" )
 
 class GeneralTab( HTMLBase ):
                         
@@ -69,7 +70,7 @@ class GeneralTab( HTMLBase ):
                         
     def write_BODY( self, request ): 
         
-        request.write( "<table width='100%' cellspacing='0' cellpadding='0' border='0'>" )
+        request.write( "\n<table width='100%' cellspacing='0' cellpadding='0' border='0'>" )
         
         def writeAttr( niceName, attr, formatter=None ):
             if type( attr ) is types.TupleType:
@@ -80,7 +81,7 @@ class GeneralTab( HTMLBase ):
                     temp = formatter( self.dict[ attr ] )
                 else:
                     temp = str( self.dict[ attr ] )
-                request.write( "<tr><td width='50%%'><p>%s:</p></td><td width='50%%'><p>%s</p></td></tr>" % ( niceName, temp ) )
+                request.write( "\n<tr><td width='50%%'><p>%s:</p></td><td width='50%%'><p>%s</p></td></tr>" % ( niceName, temp ) )
         
         for niceName, attr in self.titles.items():
             writeAttr( niceName, attr )
@@ -89,16 +90,12 @@ class GeneralTab( HTMLBase ):
 
 class NullTab( HTMLBase ):
     
-    def __init__( self ):
-        HTMLBase.__init__( self )
-        self.title = "Null Tab"
-
-    def __init__( self, title ):
+    def __init__( self, title="Null Tab" ):
         HTMLBase.__init__( self )
         self.title = title
-        
+
     def write_BODY( self, request ):
-        request.write( "<p>%s</p>" % self.title )
+        request.write( "\n<p>%s</p>" % self.title )
 
 class ActionTab( HTMLBase ):
 
@@ -107,29 +104,44 @@ class ActionTab( HTMLBase ):
         HTMLBase.__init__( self )
         
     def write_BODY( self, request ):
-        request.write( "<p align='center'><table cellspacing='3' cellpadding='2' border='0'><tr>" )
-    
-        for ( command, text ) in self.actions.items():
-            request.write( "<td style='border: 1px solid black; background-color: grey' onmouseover='buttonMouseOver( this )' onmouseout='buttonMouseOut( this )'>" )
-            request.write( "<p><a href='javascript: doOp( \"%s\" );'>%s</a></p></td>" % (command, text) )
- 
-        request.write("</table></p>")        
-        
+        for item in self.actions.items():
+            try:
+                ((op, attr), title) = item
+            except:
+                (op, title) = item
+                attr = ""
+            request.write( "\n<div class='button' onclick=\"doOp2( '%s', '%s' )\">%s</a></div>" % (op, attr, title) )
+
 class CompositeTab( HTMLBase ):
 
-    def __init__( self, tabs ):
+    def __init__( self, tabs, urlWriter ):
     	HTMLBase.__init__( self )
         self.tabs = tabs
+        self.urlWriter = urlWriter
         
     def write_BODY( self, request ):
     	for tab in self.tabs:
-            request.write( "<br/>" )
-            tab().write_BODY( request )
+            tab( self.urlWriter ).write_BODY( request )
             
     def perform( self, request ):
     	for tab in self.tabs:
-            tab().perform( request )
-    
-    
-       
-        
+            tab( self.urlWriter ).perform( request )
+
+class TabView( HTMLBase ):
+
+        # tab - int, id into tabs of selected tab
+        # tabs - list of strings, tab names
+        # urlWriter -
+        def __init__( self, tab, tabs, urlWriter ):
+            HTMLBase.__init__(self)
+            self.tab = tab
+            self.tabs = tabs
+            self.urlWriter = urlWriter
+
+        def write_BODY( self, request ):
+            for i in range( len( self.tabs ) ):
+                if self.tab == i:
+                    at = " id='activeTab'"
+                else:
+                    at = ""
+                request.write( "\n<div%s class='tabButton' onclick=\"doOp2( 'tab', '%d' )\">%s</div>" % ( at, i, self.tabs[ i ] ) )

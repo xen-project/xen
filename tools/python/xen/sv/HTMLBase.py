@@ -12,26 +12,17 @@ class HTMLBase:
         return self.render_GET( request )
         
     def render_GET( self, request ):
-        self.write_TOP( request )
-        self.write_BODY( request )
-        self.write_BOTTOM( request )
-        return ''
-                
+        pass
+    
     def write_BODY( self, request ):
-        request.write( "BODY" )
+        pass
         
     def write_TOP( self, request ):
-        request.write( '<html><head><title>Xen</title><link rel="stylesheet" type="text/css" href="inc/style.css" />' )
-        request.write( '<script src="inc/script.js"></script>' )
-        request.write( '</head><body>' )
-        request.write('<form method="post" action="%s">' % request.uri)
-
+        pass
+    
     def write_BOTTOM( self, request ):
-        request.write('<input type="hidden" name="op" value="">')
-        request.write('<input type="hidden" name="args" value="">')
-        request.write('</form>')
-        request.write( "</body></html>" )
-
+        pass
+    
     def get_op_method(self, op):
         """Get the method for an operation.
         For operation 'foo' looks for 'op_foo'.

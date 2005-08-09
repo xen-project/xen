@@ -1,71 +1,44 @@
 from xen.sv.util import *
 from xen.sv.HTMLBase import HTMLBase
+from xen.sv.GenTabbed import GenTabbed, ActionTab
 from xen.xend import sxp
 
 import re
 
 DEBUG = 0
 
-class Wizard( HTMLBase ):
+class Wizard( GenTabbed ):
 
     def __init__( self, urlWriter, title, sheets ):
-        HTMLBase.__init__( self )
         self.title = title
         self.sheets = sheets
         self.urlWriter = urlWriter
+        self.offset = 0
+        GenTabbed.__init__( self, title, urlWriter, map( lambda x: x.title, sheets ), sheets ) 
         
     def write_MENU( self, request ):
     	request.write( "<p class='small'><a href='%s'>%s</a></p>" % (self.urlWriter( '' ), self.title) ) 
     
     def write_BODY( self, request ):
-        
-   	request.write( "<table width='100%' border='0' cellspacing='0' cellpadding='0'><tr><td>" )
-        request.write( "<p align='center'><u>%s</u></p></td></tr><tr><td>" % self.title )
-        
-        currSheet = getVar( 'sheet', request )
-    
-        if not currSheet is None:
-            currSheet = int( currSheet )
-        else:
-            currSheet = 0
-            
-        sheet = self.sheets[ currSheet ]( self.urlWriter )
-        
-        err = not sheet.validate( request )
-        
-        if not err:    
-            op = getVar( 'op', request )
-        
-            if op == 'next':
-               currSheet += 1
-            elif op == 'prev':
-               currSheet -= 1
-             
-            sheet = self.sheets[ currSheet ]( self.urlWriter )
-        
-        if getVar( 'visited-sheet%s' % currSheet, request ):
-            sheet.write_BODY( request, err )
-        else:
-            sheet.write_BODY( request, False )
+        GenTabbed.write_BODY( self, request )
+        actionTab = ActionTab( { ("tab", str(self.tab-1)) : "< Prev", ("tab", str(self.tab+1)) : "Next >", "finish" : "Finish" } )
+        actionTab.write_BODY( request )
 
-        
-        request.write( "</td></tr><tr><td><table width='100%' border='0' cellspacing='0' cellpadding='0'><tr>" )
-        request.write( "<td width='80%'></td><td width='20%' align='center'><p align='center'>" )
-	if currSheet > 0:
-       	    request.write( "<img src='images/previous.png' onclick='doOp( \"prev\" )' onmouseover='update( \"wizText\", \"Previous\" )' onmouseout='update( \"wizText\", \"&nbsp;\" )'>&nbsp;" )
-        if currSheet < ( len( self.sheets ) - 2 ):        
-            request.write( "<img src='images/next.png' onclick='doOp( \"next\" )' onmouseover='update( \"wizText\", \"Next\" )' onmouseout='update( \"wizText\", \"&nbsp;\" )'>" )
-        elif currSheet == ( len( self.sheets ) - 2 ):
-            request.write( "<img src='images/finish.png' onclick='doOp( \"next\" )' onmouseover='update( \"wizText\", \"Finish\" )' onmouseout='update( \"wizText\", \"&nbsp;\" )'>" )
-        request.write( "</p><p align='center'><span id='wizText'></span></p></td></tr></table>" )
-        request.write( "</td></tr></table>" )
-        
-    def op_next( self, request ):
-    	pass
-        
-    def op_prev( self, request ):
-    	pass
-        
+    def perform( self, request ):
+        try:
+            action = getVar( 'op', request, 0 )
+            if action == "tab":
+                self.tab = int( getVar( 'args', request ) )
+                oldtab = int( getVar( 'tab', request ) )
+                if not self.tabObjects[ oldtab ]( self.urlWriter ).validate( request ):
+                    self.tab = oldtab
+            else:
+                self.tab = int( getVar( 'tab', request, 0 ) )
+                self.tabObjects[ self.tab ]( self.urlWriter ).perform( request )
+                getattr( self, "op_" +  getVar( "op", request ), None )( request )
+        except:
+            pass
+            
     def op_finish( self, request ):
     	pass  
         
@@ -80,7 +53,7 @@ class Sheet( HTMLBase ):
         self.passback = None
         
     def parseForm( self, request ):
-    	do_not_parse = [ 'mod', 'op', 'sheet', 'passback' ] 
+    	do_not_parse = [ 'mod', 'op', 'passback' ] 
     
     	passed_back = request.args
         
@@ -103,7 +76,7 @@ class Sheet( HTMLBase ):
         
         if DEBUG: print self.passback
         
-    def write_BODY( self, request, err ):
+    def write_BODY( self, request ):
     
     	if not self.passback: self.parseForm( request )
         
@@ -115,14 +88,13 @@ class Sheet( HTMLBase ):
         
     	for (feild, control) in self.feilds:
             control.write_Control( request, previous_values.get( feild ) )
-            if err and not control.validate( previous_values.get( feild ) ):
+            if previous_values.get( feild ) is not None and not control.validate( previous_values.get( feild ) ):
             	control.write_Help( request )
             
         request.write( "</table>" )
             
         request.write( "<input type='hidden' name='passback' value=\"%s\"></p>" % self.passback )
-        request.write( "<input type='hidden' name='sheet' value='%s'></p>" % self.location )
-        request.write( "<input type='hidden' name='visited-sheet%s' value='True'></p>" % self.location )
+        #request.write( "<input type='hidden' name='visited-sheet%s' value='True'></p>" % self.location )
                 
     def addControl( self, control ):
     	self.feilds.append( [ control.getName(), control ] )
@@ -133,7 +105,7 @@ class Sheet( HTMLBase ):
             
     	check = True
         
-        previous_values = ssxp2hash( string2sxp( self.passback ) ) #get the hash for quick reference
+        previous_values = ssxp2hash( string2sxp( self.passback ) ) #get the map for quick reference
     	if DEBUG: print previous_values
       
       	for (feild, control) in self.feilds:
@@ -258,12 +230,16 @@ class TickControl( SheetControl ):
         
     def write_Control( self, request, persistedValue ):
         request.write( "<tr><td width='50%%'><p>%s</p></td><td width='50%%'>" % self.humanText )
+
+        #request.write( str( persistedValue ) )
+
+        #TODO: Theres a problem with this: it doesn't persist an untick, because the browsers don't pass it back. Need a fix...
         
         if persistedValue == 'True':
     	    request.write( "<input type='checkbox' name='%s' value='True' checked>" % self.getName() )
         else:
     	    request.write( "<input type='checkbox' name='%s' value='True'>" % self.getName() )
             
-        request.write( "</select></td></tr>" )
+        request.write( "</td></tr>" )
 
       

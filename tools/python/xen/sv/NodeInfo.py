@@ -6,18 +6,18 @@ from xen.sv.GenTabbed import *
 class NodeInfo( GenTabbed ):
 
     def __init__( self, urlWriter ):  
-        GenTabbed.__init__( self, "Node Details", urlWriter, [ 'General', 'Dmesg', ], [ NodeGeneralTab, NodeDmesgTab ] )
+        GenTabbed.__init__( self, "Node Details", urlWriter, [ 'General', 'Dmesg', 'SXP' ], [ NodeGeneralTab, NodeDmesgTab, NodeSXPTab ] )
     
     def write_MENU( self, request ):
         request.write( "<p class='small'><a href='%s'>Node details</a></p>" % self.urlWriter( '' ) )
 
 class NodeGeneralTab( CompositeTab ):
-    def __init__( self ):
-    	CompositeTab.__init__( self, [ NodeInfoTab, NodeActionTab ] )        
+    def __init__( self, urlWriter ):
+    	CompositeTab.__init__( self, [ NodeInfoTab, NodeActionTab ], urlWriter )        
         
 class NodeInfoTab( GeneralTab ):
                         
-    def __init__( self ):
+    def __init__( self, urlWriter ):
          
     	nodeInfo = {}
         try:
@@ -41,7 +41,7 @@ class NodeInfoTab( GeneralTab ):
 
 class NodeDmesgTab( PreTab ):
 
-    def __init__( self ):
+    def __init__( self, urlWriter ):
     	try:
             dmesg = server.xend_node_get_dmesg()
         except:
@@ -50,7 +50,7 @@ class NodeDmesgTab( PreTab ):
   
 class NodeActionTab( ActionTab ):
 
-    def __init__( self ):
+    def __init__( self, urlWriter ):
         ActionTab.__init__( self, { "shutdown" : "shutdown",
         	"reboot" : "reboot" } )    
         
@@ -61,3 +61,13 @@ class NodeActionTab( ActionTab ):
     def op_reboot( self, request ):
         if debug: print ">NodeReboot"
         server.xend_node_reboot()
+
+class NodeSXPTab( PreTab ):
+
+    def __init__( self, urlWriter ):
+        try:
+            nodeSXP = sxp2string( server.xend_node() )
+        except:
+            nodeSXP = 'Error getting node sxp'
+
+        PreTab.__init__( self, nodeSXP )
