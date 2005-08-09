@@ -35,6 +35,7 @@ extern void vmx_intr_assist(struct vcpu *d);
 
 extern void arch_vmx_do_launch(struct vcpu *);
 extern void arch_vmx_do_resume(struct vcpu *);
+extern void arch_vmx_do_relaunch(struct vcpu *);
 
 extern int vmcs_size;
 extern unsigned int cpu_rev;

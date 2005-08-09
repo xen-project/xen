@@ -198,7 +198,7 @@ void vmx_set_host_env(struct vcpu *v)
     host_env.idtr_limit = desc.size;
     host_env.idtr_base = desc.address;
     error |= __vmwrite(HOST_IDTR_BASE, host_env.idtr_base);
- 
+
     __asm__ __volatile__ ("sgdt  (%0) \n" :: "a"(&desc) : "memory");
     host_env.gdtr_limit = desc.size;
     host_env.gdtr_base = desc.address;
@@ -210,7 +210,6 @@ void vmx_set_host_env(struct vcpu *v)
     host_env.tr_base = (unsigned long) &init_tss[cpu];
     error |= __vmwrite(HOST_TR_SELECTOR, host_env.tr_selector);
     error |= __vmwrite(HOST_TR_BASE, host_env.tr_base);
-
 }
 
 void vmx_do_launch(struct vcpu *v) 

@@ -194,39 +194,34 @@ test_all_events:
         pushq %r14; \
         pushq %r15; \
 
+#define VMX_RESTORE_ALL_NOSEGREGS \
+        popq %r15; \
+        popq %r14; \
+        popq %r13; \
+        popq %r12; \
+        popq %rbp; \
+        popq %rbx; \
+        popq %r11; \
+        popq %r10; \
+        popq %r9;  \
+        popq %r8;  \
+        popq %rax; \
+        popq %rcx; \
+        popq %rdx; \
+        popq %rsi; \
+        popq %rdi; \
+        addq $(NR_SKIPPED_REGS*8), %rsp; \
+
 ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */
         VMX_SAVE_ALL_NOSEGREGS
         call vmx_vmexit_handler
         jmp vmx_asm_do_resume
 
-ENTRY(vmx_asm_do_launch)
-        popq %r15
-        popq %r14
-        popq %r13
-        popq %r12
-        popq %rbp
-        popq %rbx
-        popq %r11
-        popq %r10
-        popq %r9
-        popq %r8
-        popq %rax
-        popq %rcx
-        popq %rdx
-        popq %rsi
-        popq %rdi
-        addq $(NR_SKIPPED_REGS*8), %rsp
-        /* VMLUANCH */
-        .byte 0x0f,0x01,0xc2
-        pushfq
-        call vm_launch_fail
-        hlt
-        
-        ALIGN
-        
-ENTRY(vmx_asm_do_resume)
-vmx_test_all_events:
+.macro vmx_asm_common launch initialized 
+1:
+        .if \initialized
+/* vmx_test_all_events */
         GET_CURRENT(%rbx)
 /* test_all_events: */
         cli                             # tests must not race interrupts
@@ -235,42 +230,51 @@ vmx_test_all_events:
         shl   $IRQSTAT_shift,%rax
         leaq  irq_stat(%rip), %rdx
         testl $~0,(%rdx,%rax,1)
-        jnz   vmx_process_softirqs
+        jnz  2f 
 
-vmx_restore_all_guest:
+/* vmx_restore_all_guest */
         call load_cr2
+        .endif
         /* 
          * Check if we are going back to VMX-based VM
          * By this time, all the setups in the VMCS must be complete.
          */
-        popq %r15
-        popq %r14
-        popq %r13
-        popq %r12
-        popq %rbp
-        popq %rbx
-        popq %r11
-        popq %r10
-        popq %r9
-        popq %r8
-        popq %rax
-        popq %rcx
-        popq %rdx
-        popq %rsi
-        popq %rdi
-        addq $(NR_SKIPPED_REGS*8), %rsp
+        VMX_RESTORE_ALL_NOSEGREGS
+        .if \launch
+        /* VMLUANCH */
+        .byte 0x0f,0x01,0xc2
+        pushfq
+        call vm_launch_fail
+        .else
         /* VMRESUME */
         .byte 0x0f,0x01,0xc3
         pushfq
         call vm_resume_fail
+        .endif
         /* Should never reach here */
         hlt
 
         ALIGN
-vmx_process_softirqs:
+
+        .if \initialized
+2:
+/* vmx_process_softirqs */
         sti       
         call do_softirq
-        jmp  vmx_test_all_events
+        jmp 1b
+        ALIGN
+        .endif
+.endm
+
+ENTRY(vmx_asm_do_launch)
+      vmx_asm_common 1 0
+
+ENTRY(vmx_asm_do_resume)
+      vmx_asm_common 0 1
+
+ENTRY(vmx_asm_do_relaunch)
+      vmx_asm_common 1 1
+
 #endif
 
         ALIGN
