@@ -4,7 +4,7 @@ from xen.xend import PrettyPrint
 
 import types
 
-def getDomInfoHash( domain ):
+def getDomInfo( domain ):
     domInfoHash = {}
     try:
         domInfoHash = sxp2hash( server.xend_domain( domain ) )
