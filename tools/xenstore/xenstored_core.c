@@ -931,8 +931,7 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	}
 
 	node = canonicalize(conn, vec[0]);
-	if (/*suppress error on write outside transaction*/ 0 &&
-	    !within_transaction(conn->transaction, node)) {
+	if (!within_transaction(conn->transaction, node)) {
 		send_error(conn, EROFS);
 		return;
 	}
