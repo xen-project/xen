@@ -704,14 +704,14 @@ int spare;
         case AUX_SET_DEFAULT:
             s->mouse_sample_rate = 100;
             s->mouse_resolution = 2;
-            s->mouse_status = 0;
+            s->mouse_status &= MOUSE_STATUS_ENABLED;
        	    s->touchpad.absolute = 0;
             kbd_queue(s, AUX_ACK, 1);
             break;
         case AUX_RESET:
             s->mouse_sample_rate = 100;
             s->mouse_resolution = 2;
-            s->mouse_status = 0;
+            s->mouse_status &= MOUSE_STATUS_ENABLED;
 	    s->touchpad.absolute = 0;
             kbd_queue(s, AUX_ACK, 1);
             kbd_queue(s, 0xaa, 1);
