@@ -295,7 +295,7 @@ class VmxImageHandler(ImageHandler):
     # xm config file
     def parseDeviceModelArgs(self):
 	dmargs = [ 'cdrom', 'boot', 'fda', 'fdb',
-                   'localtime', 'serial', 'macaddr', 'stdvga', 'isa' ] 
+                   'localtime', 'serial', 'stdvga', 'isa' ] 
 	ret = []
 	for a in dmargs:
        	    v = sxp.child_value(self.vm.config, a)
@@ -312,20 +312,25 @@ class VmxImageHandler(ImageHandler):
 		ret.append("-%s" % a)
 		ret.append("%s" % v)
 
-        # Handle hd img related options
+        # Handle disk/network related options
         devices = sxp.children(self.vm.config, 'device')
         for device in devices:
-            vbdinfo = sxp.child(device, 'vbd')
-            if not vbdinfo:
-                raise VmError("vmx: missing vbd configuration")
-            uname = sxp.child_value(vbdinfo, 'uname')
-            vbddev = sxp.child_value(vbdinfo, 'dev')
-            (vbdtype, vbdparam) = string.split(uname, ':', 1)
-            vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
-            if vbdtype != 'file' or vbddev not in vbddev_list:
-                raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
-            ret.append("-%s" % vbddev)
-            ret.append("%s" % vbdparam)
+            name = sxp.name(sxp.child0(device))
+            if name == 'vbd':
+               vbdinfo = sxp.child(device, 'vbd')
+               uname = sxp.child_value(vbdinfo, 'uname')
+               vbddev = sxp.child_value(vbdinfo, 'dev')
+               (vbdtype, vbdparam) = string.split(uname, ':', 1)
+               vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
+               if vbddev not in vbddev_list:
+                  raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
+               ret.append("-%s" % vbddev)
+               ret.append("%s" % vbdparam)
+            if name == 'vif':
+               vifinfo = sxp.child(device, 'vif')
+               mac = sxp.child_value(vifinfo, 'mac')
+               ret.append("-macaddr")
+               ret.append("%s" % mac)
 
 	# Handle graphics library related options
 	vnc = sxp.child_value(self.vm.config, 'vnc')
