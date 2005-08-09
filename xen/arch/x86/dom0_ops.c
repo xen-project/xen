@@ -405,7 +405,7 @@ void arch_getdomaininfo_ctxt(
     memcpy(c, &v->arch.guest_context, sizeof(*c));
 
     /* IOPL privileges are virtualised -- merge back into returned eflags. */
-    BUG_ON((c->user_regs.eflags & EF_IOPL) != 0);
+    BUG_ON(((c->user_regs.eflags & EF_IOPL) != 0) && !(VMX_DOMAIN(v)));
     c->user_regs.eflags |= v->arch.iopl << 12;
 
     if ( VMX_DOMAIN(v) )
