@@ -55,6 +55,7 @@
 #include "vl.h"
 
 shared_iopage_t *shared_page = NULL;
+extern int reset_requested;
 
 CPUX86State *cpu_86_init(void)
 {
@@ -349,6 +350,10 @@ int main_loop(void)
                     if (shutdown_requested) {
                         break;
                     }
+                    if (reset_requested){
+                        qemu_system_reset();
+                        reset_requested = 0;
+                    }
                 }
 
 		/* Wait up to one seconds. */
@@ -394,13 +399,26 @@ int main_loop(void)
 	return 0;
 }
 
+static void
+qemu_vmx_reset(void *unused)
+{
+    char cmd[255];
+    extern int domid;
+
+    /* pause domain first, to avoid repeated reboot request*/ 
+    xc_domain_pause (xc_handle, domid);
+
+    sprintf(cmd,"xm shutdown -R %d", domid);
+    system (cmd);
+}
+
 CPUState *
 cpu_init()
 {
 	CPUX86State *env;
       
         cpu_exec_init();
-
+        qemu_register_reset(qemu_vmx_reset, NULL);
 	env = malloc(sizeof(CPUX86State));
 	if (!env)
 		return NULL;
@@ -427,3 +445,4 @@ cpu_init()
 
 	return env;
 }
+

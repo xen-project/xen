@@ -107,6 +107,7 @@ typedef void QEMUResetHandler(void *opaque);
 
 void qemu_register_reset(QEMUResetHandler *func, void *opaque);
 void qemu_system_reset_request(void);
+void qemu_system_reset(void);
 void qemu_system_shutdown_request(void);
 
 void main_loop_wait(int timeout);
