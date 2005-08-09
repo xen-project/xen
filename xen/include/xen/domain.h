@@ -14,6 +14,8 @@ extern void arch_do_createdomain(struct vcpu *v);
 
 extern void arch_do_boot_vcpu(struct vcpu *v);
 
+void arch_migrate_cpu(struct vcpu *v, int newcpu);
+
 extern int  arch_set_info_guest(
     struct vcpu *d, struct vcpu_guest_context *c);
 

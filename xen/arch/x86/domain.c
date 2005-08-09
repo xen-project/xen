@@ -297,6 +297,15 @@ void arch_do_boot_vcpu(struct vcpu *v)
         l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
 }
 
+void
+arch_migrate_cpu(struct vcpu *v, int newcpu)
+{
+    if ( VMX_DOMAIN(v) && (v->processor != newcpu) ){
+        u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
+        __vmpclear(vmcs_phys_ptr);
+    }
+}
+
 #ifdef CONFIG_VMX
 static int vmx_switch_on;
 
