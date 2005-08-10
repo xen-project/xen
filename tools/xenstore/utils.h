@@ -40,9 +40,6 @@ void barf_perror(const char *fmt, ...) __attribute__((noreturn));
 void *grab_file(const char *filename, unsigned long *size);
 void release_file(void *data, unsigned long size);
 
-/* For writing daemons, based on Stevens. */
-void daemonize(void);
-
 /* Signal handling: returns fd to listen on. */
 int signal_to_fd(int signal);
 void close_signal(int fd);

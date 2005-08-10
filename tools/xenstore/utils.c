@@ -80,30 +80,6 @@ void *malloc_nofail(size_t size)
 	barf("malloc of %zu failed", size);
 }
 
-/* Stevens. */
-void daemonize(void)
-{
-	pid_t pid;
-
-	/* Separate from our parent via fork, so init inherits us. */
-	if ((pid = fork()) < 0)
-		barf_perror("Failed to fork daemon");
-	if (pid != 0)
-		exit(0);
-
-	close(STDIN_FILENO);
-	close(STDOUT_FILENO);
-	close(STDERR_FILENO);
-
-	/* Session leader so ^C doesn't whack us. */
-	setsid();
-	/* Move off any mount points we might be in. */
-	chdir("/");
-	/* Discard our parent's old-fashioned umask prejudices. */
-	umask(0);
-}
-
-
 /* This version adds one byte (for nul term) */
 void *grab_file(const char *filename, unsigned long *size)
 {

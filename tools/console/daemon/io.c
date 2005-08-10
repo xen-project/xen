@@ -231,6 +231,7 @@ static void handle_tty_read(struct domain *dom)
 
 		if (!write_sync(xcs_data_fd, &msg, sizeof(msg))) {
 			dolog(LOG_ERR, "Write to xcs failed: %m");
+			exit(1);
 		}
 	} else {
 		close(dom->tty_fd);
@@ -262,6 +263,7 @@ static void handle_xcs_msg(int fd)
 
 	if (!read_sync(fd, &msg, sizeof(msg))) {
 		dolog(LOG_ERR, "read from xcs failed! %m");
+		exit(1);
 	} else if (msg.type == XCS_REQUEST) {
 		struct domain *dom;
 
