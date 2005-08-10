@@ -1540,10 +1540,49 @@ static void setup_structure(void)
 			    xs_daemon_transactions());
 }
 
+static void write_pidfile(const char *pidfile)
+{
+	char buf[100];
+	int len;
+	int fd;
+
+	fd = open(pidfile, O_RDWR | O_CREAT, 0600);
+	if (fd == -1)
+		barf_perror("Opening pid file %s", pidfile);
+
+	/* We exit silently if daemon already running. */
+	if (lockf(fd, F_TLOCK, 0) == -1)
+		exit(0);
+
+	len = sprintf(buf, "%d\n", getpid());
+	write(fd, buf, len);
+}
+
+/* Stevens. */
+static void daemonize(void)
+{
+	pid_t pid;
+
+	/* Separate from our parent via fork, so init inherits us. */
+	if ((pid = fork()) < 0)
+		barf_perror("Failed to fork daemon");
+	if (pid != 0)
+		exit(0);
+
+	/* Session leader so ^C doesn't whack us. */
+	setsid();
+	/* Move off any mount points we might be in. */
+	chdir("/");
+	/* Discard our parent's old-fashioned umask prejudices. */
+	umask(0);
+}
+
+
 static struct option options[] = { { "no-fork", 0, NULL, 'N' },
 				   { "verbose", 0, NULL, 'V' },
 				   { "output-pid", 0, NULL, 'P' },
 				   { "trace-file", 1, NULL, 'T' },
+				   { "pid-file", 1, NULL, 'F' },
 				   { NULL, 0, NULL, 0 } };
 
 int main(int argc, char *argv[])
@@ -1553,6 +1592,7 @@ int main(int argc, char *argv[])
 	fd_set inset, outset;
 	bool dofork = true;
 	bool outputpid = false;
+	const char *pidfile = NULL;
 
 	while ((opt = getopt_long(argc, argv, "DVT:", options, NULL)) != -1) {
 		switch (opt) {
@@ -1572,10 +1612,19 @@ int main(int argc, char *argv[])
 					    optarg);
                         write(tracefd, "\n***\n", strlen("\n***\n"));
 			break;
+		case 'F':
+			pidfile = optarg;
 		}
 	}
 	if (optind != argc)
 		barf("%s: No arguments desired", argv[0]);
+
+	if (dofork) {
+		openlog("xenstored", 0, LOG_DAEMON);
+		daemonize();
+	}
+	if (pidfile)
+		write_pidfile(pidfile);
 
 	talloc_enable_leak_report_full();
 
@@ -1623,19 +1672,18 @@ int main(int argc, char *argv[])
 	/* Restore existing connections. */
 	restore_existing_connections();
 
-	/* Debugging: daemonize() closes standard fds, so dup here. */
-	tmpout = dup(STDOUT_FILENO);
-	if (dofork) {
-		openlog("xenstored", 0, LOG_DAEMON);
-		daemonize();
-	}
-
 	if (outputpid) {
 		char buffer[20];
 		sprintf(buffer, "%i\n", getpid());
 		write(tmpout, buffer, strlen(buffer));
 	}
-	close(tmpout);
+
+	/* close stdin/stdout now we're ready to accept connections */
+	if (dofork) {
+		close(STDIN_FILENO);
+		close(STDOUT_FILENO);
+		close(STDERR_FILENO);
+	}
 
 #ifdef TESTING
 	signal(SIGUSR1, stop_failtest);

@@ -59,6 +59,8 @@ bool _read_write_sync(int fd, void *data, size_t size, bool do_read)
 
 		if (len < 1) {
 			if (len == -1 && (errno == EAGAIN || errno == EINTR)) {
+				continue;
+			} else {
 				return false;
 			}
 		} else {
