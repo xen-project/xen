@@ -209,8 +209,6 @@ void init_cpu_khz(void)
 		cpu_khz = __cpu_khz >> -info->tsc_shift;
 	else
 		cpu_khz = __cpu_khz << info->tsc_shift;
-	printk(KERN_INFO "Xen reported: %lu.%03lu MHz processor.\n",
-	       cpu_khz / 1000, cpu_khz % 1000);
 }
 
 static u64 get_nsec_offset(struct shadow_time_info *shadow)
@@ -794,13 +792,15 @@ void __init time_init(void)
 	}
 #endif
 	get_time_values_from_xen();
-	update_wallclock();
-	set_normalized_timespec(&wall_to_monotonic,
-		-xtime.tv_sec, -xtime.tv_nsec);
+
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
 	per_cpu(processed_system_time, 0) = processed_system_time;
 
+	update_wallclock();
+
 	init_cpu_khz();
+	printk(KERN_INFO "Xen reported: %lu.%03lu MHz processor.\n",
+	       cpu_khz / 1000, cpu_khz % 1000);
 
 #if defined(__x86_64__)
 	vxtime.mode = VXTIME_TSC;
@@ -875,14 +875,12 @@ void time_resume(void)
 {
 	init_cpu_khz();
 
-	/* Get timebases for new environment. */ 
 	get_time_values_from_xen();
-	update_wallclock();
 
-	/* Reset our own concept of passage of system time. */
-	processed_system_time =
-		per_cpu(shadow_time, smp_processor_id()).system_timestamp;
+	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
 	per_cpu(processed_system_time, 0) = processed_system_time;
+
+	update_wallclock();
 
 	per_cpu(timer_irq, 0) = bind_virq_to_irq(VIRQ_TIMER);
 	(void)setup_irq(per_cpu(timer_irq, 0), &irq_timer);
