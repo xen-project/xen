@@ -38,13 +38,16 @@ typedef signed long long s64;
 typedef unsigned long long u64;
 #if defined(CONFIG_X86_PAE)
 typedef u64 physaddr_t;
+#define PRIphysaddr "016llx"
 #else
-typedef u32 physaddr_t;
+typedef unsigned long physaddr_t;
+#define PRIphysaddr "08lx"
 #endif
 #elif defined(__x86_64__)
 typedef signed long s64;
 typedef unsigned long u64;
-typedef u64 physaddr_t;
+typedef unsigned long physaddr_t;
+#define PRIphysaddr "016lx"
 #endif
 
 typedef unsigned long size_t;

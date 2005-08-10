@@ -144,8 +144,6 @@ static int __init __independent_wallclock(char *str)
 	return 1;
 }
 __setup("independent_wallclock", __independent_wallclock);
-#define INDEPENDENT_WALLCLOCK() \
-    (independent_wallclock || (xen_start_info.flags & SIF_INITDOMAIN))
 
 int tsc_disable __initdata = 0;
 
@@ -173,13 +171,16 @@ struct timer_opts timer_tsc = {
 static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 {
 	u64 product;
+#ifdef __i386__
 	u32 tmp1, tmp2;
+#endif
 
 	if ( shift < 0 )
 		delta >>= -shift;
 	else
 		delta <<= shift;
 
+#ifdef __i386__
 	__asm__ (
 		"mul  %5       ; "
 		"mov  %4,%%eax ; "
@@ -190,6 +191,11 @@ static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 		"adc  %5,%%edx ; "
 		: "=A" (product), "=r" (tmp1), "=r" (tmp2)
 		: "a" ((u32)delta), "1" ((u32)(delta >> 32)), "2" (mul_frac) );
+#else
+	__asm__ (
+		"mul %%rdx ; shrd $32,%%rdx,%%rax"
+		: "=a" (product) : "0" (delta), "d" ((u64)mul_frac) );
+#endif
 
 	return product;
 }
@@ -203,8 +209,6 @@ void init_cpu_khz(void)
 		cpu_khz = __cpu_khz >> -info->tsc_shift;
 	else
 		cpu_khz = __cpu_khz << info->tsc_shift;
-	printk(KERN_INFO "Xen reported: %lu.%03lu MHz processor.\n",
-	       cpu_khz / 1000, cpu_khz % 1000);
 }
 
 static u64 get_nsec_offset(struct shadow_time_info *shadow)
@@ -239,10 +243,7 @@ static void update_wallclock(void)
 	}
 	while ((s->wc_version & 1) | (shadow_tv_version ^ s->wc_version));
 
-	if (INDEPENDENT_WALLCLOCK())
-		return;
-
-	if ((time_status & STA_UNSYNC) != 0)
+	if (independent_wallclock)
 		return;
 
 	/* Adjust wall-clock time base based on wall_jiffies ticks. */
@@ -417,7 +418,7 @@ int do_settimeofday(struct timespec *tv)
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
 
-	if (!INDEPENDENT_WALLCLOCK())
+	if (!independent_wallclock && !(xen_start_info.flags & SIF_INITDOMAIN))
 		return 0; /* Silent failure? */
 
 	cpu = get_cpu();
@@ -463,7 +464,8 @@ int do_settimeofday(struct timespec *tv)
 	time_esterror = NTP_PHASE_LIMIT;
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	if (xen_start_info.flags & SIF_INITDOMAIN) {
+	if ((xen_start_info.flags & SIF_INITDOMAIN) &&
+	    !independent_wallclock) {
 		dom0_op_t op;
 		op.cmd = DOM0_SETTIME;
 		op.u.settime.secs        = xentime.tv_sec;
@@ -790,13 +792,15 @@ void __init time_init(void)
 	}
 #endif
 	get_time_values_from_xen();
-	update_wallclock();
-	set_normalized_timespec(&wall_to_monotonic,
-		-xtime.tv_sec, -xtime.tv_nsec);
+
 	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
 	per_cpu(processed_system_time, 0) = processed_system_time;
 
+	update_wallclock();
+
 	init_cpu_khz();
+	printk(KERN_INFO "Xen reported: %lu.%03lu MHz processor.\n",
+	       cpu_khz / 1000, cpu_khz % 1000);
 
 #if defined(__x86_64__)
 	vxtime.mode = VXTIME_TSC;
@@ -871,14 +875,12 @@ void time_resume(void)
 {
 	init_cpu_khz();
 
-	/* Get timebases for new environment. */ 
 	get_time_values_from_xen();
-	update_wallclock();
 
-	/* Reset our own concept of passage of system time. */
-	processed_system_time =
-		per_cpu(shadow_time, smp_processor_id()).system_timestamp;
+	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
 	per_cpu(processed_system_time, 0) = processed_system_time;
+
+	update_wallclock();
 
 	per_cpu(timer_irq, 0) = bind_virq_to_irq(VIRQ_TIMER);
 	(void)setup_irq(per_cpu(timer_irq, 0), &irq_timer);

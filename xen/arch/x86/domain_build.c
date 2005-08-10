@@ -78,8 +78,8 @@ int construct_dom0(struct domain *d,
     unsigned long pfn, mfn;
     unsigned long nr_pages;
     unsigned long nr_pt_pages;
-    unsigned long alloc_start;
-    unsigned long alloc_end;
+    unsigned long alloc_spfn;
+    unsigned long alloc_epfn;
     unsigned long count;
     struct pfn_info *page = NULL;
     start_info_t *si;
@@ -145,8 +145,8 @@ int construct_dom0(struct domain *d,
             ((image_len  + PAGE_SIZE - 1) >> PAGE_SHIFT);
     if ( (page = alloc_largest(d, nr_pages)) == NULL )
         panic("Not enough RAM for DOM0 reservation.\n");
-    alloc_start = page_to_phys(page);
-    alloc_end   = alloc_start + (d->tot_pages << PAGE_SHIFT);
+    alloc_spfn = page_to_pfn(page);
+    alloc_epfn = alloc_spfn + d->tot_pages;
 
     if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;
@@ -166,7 +166,7 @@ int construct_dom0(struct domain *d,
         return -EINVAL;
     }
     if (strstr(dsi.xen_section_string, "SHADOW=translate"))
-	opt_dom0_translate = 1;
+        opt_dom0_translate = 1;
 
     /* Align load address to 4MB boundary. */
     dsi.v_start &= ~((1UL<<22)-1);
@@ -215,12 +215,12 @@ int construct_dom0(struct domain *d,
 #endif
     }
 
-    if ( (v_end - dsi.v_start) > (alloc_end - alloc_start) )
+    if ( ((v_end - dsi.v_start) >> PAGE_SHIFT) > (alloc_epfn - alloc_spfn) )
         panic("Insufficient contiguous RAM to build kernel image.\n");
 
     printk("PHYSICAL MEMORY ARRANGEMENT:\n"
-           " Dom0 alloc.:   %p->%p",
-           _p(alloc_start), _p(alloc_end));
+           " Dom0 alloc.:   %"PRIphysaddr"->%"PRIphysaddr,
+           pfn_to_phys(alloc_spfn), pfn_to_phys(alloc_epfn));
     if ( d->tot_pages < nr_pages )
         printk(" (%lu pages to be allocated)",
                nr_pages - d->tot_pages);
@@ -249,7 +249,8 @@ int construct_dom0(struct domain *d,
         return -ENOMEM;
     }
 
-    mpt_alloc = (vpt_start - dsi.v_start) + alloc_start;
+    mpt_alloc = (vpt_start - dsi.v_start) + 
+        (unsigned long)pfn_to_phys(alloc_spfn);
 
     /*
      * We're basically forcing default RPLs to 1, so that our "what privilege
@@ -306,7 +307,7 @@ int construct_dom0(struct domain *d,
 #endif
 
     l2tab += l2_linear_offset(dsi.v_start);
-    mfn = alloc_start >> PAGE_SHIFT;
+    mfn = alloc_spfn;
     for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
@@ -428,7 +429,7 @@ int construct_dom0(struct domain *d,
     v->arch.guest_table = mk_pagetable(__pa(l4start));
 
     l4tab += l4_table_offset(dsi.v_start);
-    mfn = alloc_start >> PAGE_SHIFT;
+    mfn = alloc_spfn;
     for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
@@ -563,11 +564,11 @@ int construct_dom0(struct domain *d,
     /* Write the phys->machine and machine->phys table entries. */
     for ( pfn = 0; pfn < d->tot_pages; pfn++ )
     {
-        mfn = pfn + (alloc_start>>PAGE_SHIFT);
+        mfn = pfn + alloc_spfn;
 #ifndef NDEBUG
 #define REVERSE_START ((v_end - dsi.v_start) >> PAGE_SHIFT)
         if ( !opt_dom0_translate && (pfn > REVERSE_START) )
-            mfn = (alloc_end>>PAGE_SHIFT) - (pfn - REVERSE_START);
+            mfn = alloc_epfn - (pfn - REVERSE_START);
 #endif
         ((u32 *)vphysmap_start)[pfn] = mfn;
         machine_to_phys_mapping[mfn] = pfn;
@@ -580,7 +581,7 @@ int construct_dom0(struct domain *d,
         {
             mfn = page_to_pfn(page);
 #ifndef NDEBUG
-#define pfn (nr_pages - 1 - (pfn - ((alloc_end - alloc_start) >> PAGE_SHIFT)))
+#define pfn (nr_pages - 1 - (pfn - (alloc_epfn - alloc_spfn)))
 #endif
             ((u32 *)vphysmap_start)[pfn] = mfn;
             machine_to_phys_mapping[mfn] = pfn;
@@ -620,13 +621,13 @@ int construct_dom0(struct domain *d,
 
     if ( opt_dom0_shadow || opt_dom0_translate )
     {
-	printk("dom0: shadow enable\n");
+        printk("dom0: shadow enable\n");
         shadow_mode_enable(d, (opt_dom0_translate
                                ? SHM_enable | SHM_refcounts | SHM_translate
                                : SHM_enable));
         if ( opt_dom0_translate )
         {
-	    printk("dom0: shadow translate\n");
+            printk("dom0: shadow translate\n");
 #if defined(__i386__) && defined(CONFIG_X86_PAE)
             printk("FIXME: PAE code needed here: %s:%d (%s)\n",
                    __FILE__, __LINE__, __FUNCTION__);
@@ -659,7 +660,7 @@ int construct_dom0(struct domain *d,
         }
 
         update_pagetables(v); /* XXX SMP */
-	printk("dom0: shadow setup done\n");
+        printk("dom0: shadow setup done\n");
     }
 
     return 0;

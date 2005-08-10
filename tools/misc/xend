@@ -24,6 +24,7 @@ import sys
 import socket
 import signal
 import time
+import commands
 
 XCS_PATH    = "/var/lib/xen/xcs_socket"
 XCS_EXEC    = "/usr/sbin/xcs"
@@ -116,8 +117,7 @@ def stop_xcs():
 	return    
 
 def start_xenstored():
-    if os.fork() == 0:
-        os.execvp('/usr/sbin/xenstored', ['/usr/sbin/xenstored']);
+    s,o = commands.getstatusoutput("/usr/sbin/xenstored --pid-file=/var/run/xenstore.pid");
 
 def start_consoled():
     if os.fork() == 0:

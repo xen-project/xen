@@ -182,8 +182,8 @@ dma_map_single(struct device *dev, void *ptr, size_t size,
 	if ((((unsigned int)ptr & ~PAGE_MASK) + size) <= PAGE_SIZE) {
 		dma = virt_to_bus(ptr);
 	} else {
-		BUG_ON((bnc = dma_alloc_coherent(dev, size, &dma, 0)) == NULL);
-		BUG_ON((ent = kmalloc(sizeof(*ent), GFP_KERNEL)) == NULL);
+		BUG_ON((bnc = dma_alloc_coherent(dev, size, &dma, GFP_ATOMIC)) == NULL);
+		BUG_ON((ent = kmalloc(sizeof(*ent), GFP_ATOMIC)) == NULL);
 		if (direction != DMA_FROM_DEVICE)
 			memcpy(bnc, ptr, size);
 		ent->dma    = dma;
