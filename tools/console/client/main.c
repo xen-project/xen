@@ -162,14 +162,11 @@ int main(int argc, char **argv)
 	struct termios attr;
 	int domid;
 	int xc_handle;
-	char *sopt = "hf:pc";
+	char *sopt = "h";
 	int ch;
 	int opt_ind=0;
 	struct option lopt[] = {
 		{ "help",    0, 0, 'h' },
-		{ "file",    1, 0, 'f' },
-		{ "pty",     0, 0, 'p' },
-		{ "ctty",    0, 0, 'c' },
 		{ 0 },
 
 	};
@@ -178,6 +175,7 @@ int main(int argc, char **argv)
 	int spty;
 	unsigned int len = 0;
 	struct xs_handle *xs;
+	char *end;
 
 	while((ch = getopt_long(argc, argv, sopt, lopt, &opt_ind)) != -1) {
 		switch(ch) {
@@ -195,7 +193,13 @@ int main(int argc, char **argv)
 		exit(EINVAL);
 	}
 	
-	domid = atoi(argv[optind]);
+	domid = strtol(argv[optind], &end, 10);
+	if (end && *end) {
+		fprintf(stderr, "Invalid DOMID `%s'\n", argv[optind]);
+		fprintf(stderr, "Try `%s --help' for more information.\n",
+			argv[0]);
+		exit(EINVAL);
+	}
 
 	xs = xs_daemon_open();
 	if (xs == NULL) {
@@ -211,7 +215,11 @@ int main(int argc, char **argv)
 
 	snprintf(path, sizeof(path), "/console/%d/tty", domid);
 	str_pty = xs_read(xs, path, &len);
-	if (str_pty == NULL) {
+	/* FIXME consoled currently does not assume domain-0 doesn't have a
+	   console which is good when we break domain-0 up.  To keep us
+	   user friendly, we'll bail out here since no data will ever show
+	   up on domain-0. */
+	if (domid == 0 || str_pty == NULL) {
 		err(errno, "Could not read tty from store");
 	}
 	spty = open(str_pty, O_RDWR | O_NOCTTY);
