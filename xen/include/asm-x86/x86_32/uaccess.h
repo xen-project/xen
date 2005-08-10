@@ -67,7 +67,7 @@ do {									\
 		"	.long 1b,4b\n"				\
 		"	.long 2b,4b\n"				\
 		".previous"					\
-		: "=r" (retval), "=A" (x)			\
+		: "=r" (retval), "=&A" (x)			\
 		: "r" (addr), "i"(errret), "0"(retval))
 
 #define __get_user_size(x,ptr,size,retval,errret)			\
