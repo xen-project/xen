@@ -189,6 +189,9 @@ typedef struct { u64 pfn; } pagetable_t;
 #define virt_to_page(kaddr) (frame_table + (__pa(kaddr) >> PAGE_SHIFT))
 #define pfn_valid(_pfn)     ((_pfn) < max_page)
 
+#define pfn_to_phys(pfn)    ((physaddr_t)(pfn) << PAGE_SHIFT)
+#define phys_to_pfn(pa)     ((unsigned long)((pa) >> PAGE_SHIFT))
+
 /* High table entries are reserved by the hypervisor. */
 #if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
 #define DOMAIN_ENTRIES_PER_L2_PAGETABLE     \
