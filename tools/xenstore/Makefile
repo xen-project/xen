@@ -1,6 +1,5 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
-LIBDIR = lib
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 
 INSTALL         = install
