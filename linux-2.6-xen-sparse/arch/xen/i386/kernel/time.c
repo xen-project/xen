@@ -173,13 +173,16 @@ struct timer_opts timer_tsc = {
 static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 {
 	u64 product;
+#ifdef __i386__
 	u32 tmp1, tmp2;
+#endif
 
 	if ( shift < 0 )
 		delta >>= -shift;
 	else
 		delta <<= shift;
 
+#ifdef __i386__
 	__asm__ (
 		"mul  %5       ; "
 		"mov  %4,%%eax ; "
@@ -190,6 +193,11 @@ static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 		"adc  %5,%%edx ; "
 		: "=A" (product), "=r" (tmp1), "=r" (tmp2)
 		: "a" ((u32)delta), "1" ((u32)(delta >> 32)), "2" (mul_frac) );
+#else
+	__asm__ (
+		"mul %%rdx ; shrd $32,%%rdx,%%rax"
+		: "=a" (product) : "0" (delta), "d" ((u64)mul_frac) );
+#endif
 
 	return product;
 }
