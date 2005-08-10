@@ -103,7 +103,7 @@ static inline u32 mul_frac(u32 multiplicand, u32 multiplier)
 static inline u64 scale_delta(u64 delta, struct time_scale *scale)
 {
     u64 product;
-#ifdef CONFIG_x86_32
+#ifdef CONFIG_X86_32
     u32 tmp1, tmp2;
 #endif
 
