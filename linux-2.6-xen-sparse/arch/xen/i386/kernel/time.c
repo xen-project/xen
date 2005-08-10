@@ -144,8 +144,6 @@ static int __init __independent_wallclock(char *str)
 	return 1;
 }
 __setup("independent_wallclock", __independent_wallclock);
-#define INDEPENDENT_WALLCLOCK() \
-    (independent_wallclock || (xen_start_info.flags & SIF_INITDOMAIN))
 
 int tsc_disable __initdata = 0;
 
@@ -247,10 +245,7 @@ static void update_wallclock(void)
 	}
 	while ((s->wc_version & 1) | (shadow_tv_version ^ s->wc_version));
 
-	if (INDEPENDENT_WALLCLOCK())
-		return;
-
-	if ((time_status & STA_UNSYNC) != 0)
+	if (independent_wallclock)
 		return;
 
 	/* Adjust wall-clock time base based on wall_jiffies ticks. */
@@ -425,7 +420,7 @@ int do_settimeofday(struct timespec *tv)
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
 
-	if (!INDEPENDENT_WALLCLOCK())
+	if (!independent_wallclock && !(xen_start_info.flags & SIF_INITDOMAIN))
 		return 0; /* Silent failure? */
 
 	cpu = get_cpu();
@@ -471,7 +466,8 @@ int do_settimeofday(struct timespec *tv)
 	time_esterror = NTP_PHASE_LIMIT;
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	if (xen_start_info.flags & SIF_INITDOMAIN) {
+	if ((xen_start_info.flags & SIF_INITDOMAIN) &&
+	    !independent_wallclock) {
 		dom0_op_t op;
 		op.cmd = DOM0_SETTIME;
 		op.u.settime.secs        = xentime.tv_sec;
