@@ -52,7 +52,6 @@ LIST_HEAD(page_scrub_list);
  *  One bit per page of memory. Bit set => page is allocated.
  */
 
-static unsigned long  bitmap_size; /* in bytes */
 static unsigned long *alloc_bitmap;
 #define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
 
@@ -135,10 +134,16 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
 /* Initialise allocator to handle up to @max_page pages. */
 physaddr_t init_boot_allocator(physaddr_t bitmap_start)
 {
+    unsigned long bitmap_size;
+
     bitmap_start = round_pgup(bitmap_start);
 
-    /* Allocate space for the allocation bitmap. */
+    /*
+     * Allocate space for the allocation bitmap. Include an extra longword
+     * of padding for possible overrun in map_alloc and map_free.
+     */
     bitmap_size  = max_page / 8;
+    bitmap_size += sizeof(unsigned long);
     bitmap_size  = round_pgup(bitmap_size);
     alloc_bitmap = (unsigned long *)phys_to_virt(bitmap_start);
 
@@ -171,7 +176,7 @@ void init_boot_pages(physaddr_t ps, physaddr_t pe)
         else if ( *p != '\0' )
             break;
 
-        if ( (bad_pfn < (bitmap_size*8)) && !allocated_in_map(bad_pfn) )
+        if ( (bad_pfn < max_page) && !allocated_in_map(bad_pfn) )
         {
             printk("Marking page %lx as bad\n", bad_pfn);
             map_alloc(bad_pfn, 1);
@@ -183,7 +188,7 @@ unsigned long alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
 {
     unsigned long pg, i;
 
-    for ( pg = 0; (pg + nr_pfns) < (bitmap_size*8); pg += pfn_align )
+    for ( pg = 0; (pg + nr_pfns) < max_page; pg += pfn_align )
     {
         for ( i = 0; i < nr_pfns; i++ )
             if ( allocated_in_map(pg + i) )
@@ -362,7 +367,7 @@ void scrub_heap_pages(void)
 
     printk("Scrubbing Free RAM: ");
 
-    for ( pfn = 0; pfn < (bitmap_size * 8); pfn++ )
+    for ( pfn = 0; pfn < max_page; pfn++ )
     {
         /* Every 100MB, print a progress dot. */
         if ( (pfn % ((100*1024*1024)/PAGE_SIZE)) == 0 )
