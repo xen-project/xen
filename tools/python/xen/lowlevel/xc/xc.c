@@ -297,22 +297,23 @@ static PyObject *pyxc_vmx_build(PyObject *self,
     u32   dom;
     char *image, *ramdisk = NULL, *cmdline = "";
     PyObject *memmap;
-    int   control_evtchn, flags = 0;
+    int   control_evtchn, store_evtchn;
+    int flags = 0, vcpus = 1;
     int numItems, i;
     int memsize;
     struct mem_map mem_map;
+    unsigned long store_mfn = 0;
 
-    static char *kwd_list[] = { "dom", "control_evtchn",
-                                "memsize",
-                                "image", "memmap",
+    static char *kwd_list[] = { "dom", "control_evtchn", "store_evtchn",
+                                "memsize", "image", "memmap",
 				"ramdisk", "cmdline", "flags",
-                                NULL };
+				"vcpus", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiisO!|ssi", kwd_list, 
-                                      &dom, &control_evtchn, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiisO!|ssii", kwd_list, 
+                                      &dom, &control_evtchn, &store_evtchn,
                                       &memsize,
                                       &image, &PyList_Type, &memmap,
-				      &ramdisk, &cmdline, &flags) )
+				      &ramdisk, &cmdline, &flags, &vcpus) )
         return NULL;
 
     memset(&mem_map, 0, sizeof(mem_map));
@@ -321,7 +322,6 @@ static PyObject *pyxc_vmx_build(PyObject *self,
     /* get the number of lines passed to us */
     numItems = PyList_Size(memmap) - 1;	/* removing the line 
 					   containing "memmap" */
-    printf ("numItems: %d\n", numItems);
     mem_map.nr_map = numItems;
    
     /* should raise an error here. */
@@ -365,11 +365,11 @@ static PyObject *pyxc_vmx_build(PyObject *self,
     }
 
     if ( xc_vmx_build(xc->xc_handle, dom, memsize, image, &mem_map,
-                        ramdisk, cmdline, control_evtchn, flags) != 0 )
+                        ramdisk, cmdline, control_evtchn, flags,
+                        vcpus, store_evtchn, &store_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
-    Py_INCREF(zero);
-    return zero;
+    return Py_BuildValue("{s:i}", "store_mfn", store_mfn);
 }
 
 static PyObject *pyxc_bvtsched_global_set(PyObject *self,

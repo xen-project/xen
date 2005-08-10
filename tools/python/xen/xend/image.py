@@ -274,14 +274,24 @@ class VmxImageHandler(ImageHandler):
         # Create an event channel
         self.device_channel = channel.eventChannel(0, self.vm.getDomain())
         log.info("VMX device model port: %d", self.device_channel.port2)
-        return xc.vmx_build(dom            = self.vm.getDomain(),
+        if self.vm.store_channel:
+            store_evtchn = self.vm.store_channel.port2
+        else:
+            store_evtchn = 0
+        ret = xc.vmx_build(dom            = self.vm.getDomain(),
                             image          = self.kernel,
                             control_evtchn = self.device_channel.port2,
+                            store_evtchn   = store_evtchn,
                             memsize        = self.vm.memory,
                             memmap         = self.memmap_value,
                             cmdline        = self.cmdline,
                             ramdisk        = self.ramdisk,
-                            flags          = self.flags)
+                            flags          = self.flags,
+                            vcpus          = self.vm.vcpus)
+        if isinstance(ret, dict):
+            self.vm.store_mfn = ret.get('store_mfn')
+            return 0
+        return ret
 
     def parseMemmap(self):
         self.memmap = sxp.child_value(self.vm.config, "memmap")
@@ -387,7 +397,9 @@ class VmxImageHandler(ImageHandler):
         (pid, status) = os.waitpid(self.pid, 0)
 
     def getDomainMemory(self, mem_mb):
-        return (mem_mb * 1024) + self.getPageTableSize(mem_mb)
+        # for ioreq_t and xenstore
+        static_pages = 2
+        return (mem_mb * 1024) + self.getPageTableSize(mem_mb) + 4 * static_pages
             
     def getPageTableSize(self, mem_mb):
         """Return the size of memory needed for 1:1 page tables for physical
