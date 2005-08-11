@@ -953,6 +953,17 @@ void __init trap_init(void)
 	cpu_init();
 }
 
+void smp_trap_init(trap_info_t *trap_ctxt)
+{
+	trap_info_t *t = trap_table;
+
+	for (t = trap_table; t->address; t++) {
+		trap_ctxt[t->vector].flags = t->flags;
+		trap_ctxt[t->vector].cs = t->cs;
+		trap_ctxt[t->vector].address = t->address;
+	}
+}
+
 
 /* Actual parsing is done early in setup.c. */
 static int __init oops_dummy(char *s)

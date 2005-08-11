@@ -21,6 +21,11 @@
 
 atomic_t irq_err_count;
 
+#ifdef CONFIG_X86_IO_APIC
+#ifdef APIC_MISMATCH_DEBUG
+atomic_t irq_mis_count;
+#endif
+#endif
 
 /*
  * Generic, controller-independent functions:

@@ -41,7 +41,6 @@
 startup_64:
 ENTRY(_start)
         cld                
-	movq init_rsp(%rip),%rsp
 	/* Copy the necessary stuff from xen_start_info structure. */
 	movq  $xen_start_info_union,%rdi
 	movq  $64,%rcx          /* sizeof (union xen_start_info_union) / sizeof (long) */
@@ -52,6 +51,7 @@ ENTRY(_start)
 	cld
 #endif /* CONFIG_SMP */
 
+	movq init_rsp(%rip),%rsp
 	/* zero EFLAGS after setting rsp */
 	pushq $0
 	popfq
@@ -204,6 +204,7 @@ ENTRY(cpu_gdt_table)
 	.quad	0,0			/* TSS */
 	.quad	0,0			/* LDT */
 	.quad   0,0,0			/* three TLS descriptors */ 
+	.quad	0			/* unused now?   __KERNEL16_CS - 16bit PM for S3 wakeup. */
 
 gdt_end:	
 	/* asm/segment.h:GDT_ENTRIES must match this */	

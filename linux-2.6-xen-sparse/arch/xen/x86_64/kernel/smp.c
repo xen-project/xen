@@ -28,7 +28,12 @@
 #include <asm/mmu_context.h>
 #include <asm/proto.h>
 #include <asm/apicdef.h>
+#ifdef CONFIG_XEN
+#include <asm-xen/evtchn.h>
 
+#define xxprint(msg) HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg)
+
+#else
 /*
  *	Smarter SMP flushing macros. 
  *		c/o Linus Torvalds.
@@ -44,6 +49,7 @@ static struct mm_struct * flush_mm;
 static unsigned long flush_va;
 static DEFINE_SPINLOCK(tlbstate_lock);
 #define FLUSH_ALL	-1ULL
+#endif
 
 /*
  * We cannot call mmdrop() because we are in interrupt context, 
@@ -57,6 +63,7 @@ static inline void leave_mm (unsigned long cpu)
 	load_cr3(swapper_pg_dir);
 }
 
+#ifndef CONFIG_XEN
 /*
  *
  * The flush IPI assumes that a thread switch happens in this order:
@@ -250,6 +257,18 @@ void flush_tlb_all(void)
 {
 	on_each_cpu(do_flush_tlb_all, NULL, 1, 1);
 }
+#else
+asmlinkage void smp_invalidate_interrupt (void)
+{ return; }
+void flush_tlb_current_task(void)
+{ xen_tlb_flush_mask(&current->mm->cpu_vm_mask); }
+void flush_tlb_mm (struct mm_struct * mm)
+{ xen_tlb_flush_mask(&mm->cpu_vm_mask); }
+void flush_tlb_page(struct vm_area_struct * vma, unsigned long va)
+{ xen_invlpg_mask(&vma->vm_mm->cpu_vm_mask, va); }
+void flush_tlb_all(void)
+{ xen_tlb_flush_all(); }
+#endif /* Xen */
 
 void smp_kdb_stop(void)
 {
@@ -310,13 +329,21 @@ static void __smp_call_function (void (*func) (void *info), void *info,
 
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
+#ifndef CONFIG_XEN
 		cpu_relax();
+#else
+		barrier();
+#endif
 
 	if (!wait)
 		return;
 
 	while (atomic_read(&data.finished) != cpus)
+#ifndef CONFIG_XEN
 		cpu_relax();
+#else
+		barrier();
+#endif
 }
 
 /*
@@ -350,7 +377,11 @@ void smp_stop_cpu(void)
 	 */
 	cpu_clear(smp_processor_id(), cpu_online_map);
 	local_irq_disable();
+#ifndef CONFIG_XEN
 	disable_local_APIC();
+#else
+	xxprint("stop_this_cpu disable_local_APIC\n");
+#endif
 	local_irq_enable(); 
 }
 
@@ -364,8 +395,10 @@ static void smp_really_stop_cpu(void *dummy)
 void smp_send_stop(void)
 {
 	int nolock = 0;
+#ifndef CONFIG_XEN
 	if (reboot_force)
 		return;
+#endif
 	/* Don't deadlock on the call lock in panic */
 	if (!spin_trylock(&call_lock)) {
 		/* ignore locking because we have paniced anyways */
@@ -376,7 +409,11 @@ void smp_send_stop(void)
 		spin_unlock(&call_lock);
 
 	local_irq_disable();
+#ifdef CONFIG_XEN
+	xxprint("stop_this_cpu disable_local_APIC\n");
+#else
 	disable_local_APIC();
+#endif
 	local_irq_enable();
 }
 
@@ -385,18 +422,32 @@ void smp_send_stop(void)
  * all the work is done automatically when
  * we return from the interrupt.
  */
+#ifndef CONFIG_XEN
 asmlinkage void smp_reschedule_interrupt(void)
+#else
+asmlinkage irqreturn_t smp_reschedule_interrupt(void)
+#endif
 {
+#ifndef CONFIG_XEN
 	ack_APIC_irq();
+#else
+	return IRQ_HANDLED;
+#endif
 }
 
+#ifndef CONFIG_XEN
 asmlinkage void smp_call_function_interrupt(void)
+#else
+asmlinkage irqreturn_t smp_call_function_interrupt(void)
+#endif
 {
 	void (*func) (void *info) = call_data->func;
 	void *info = call_data->info;
 	int wait = call_data->wait;
 
+#ifndef CONFIG_XEN
 	ack_APIC_irq();
+#endif
 	/*
 	 * Notify initiating CPU that I've grabbed the data and am
 	 * about to execute the function
@@ -413,10 +464,16 @@ asmlinkage void smp_call_function_interrupt(void)
 		mb();
 		atomic_inc(&call_data->finished);
 	}
+#ifdef CONFIG_XEN
+	return IRQ_HANDLED;
+#endif
 }
 
 int safe_smp_processor_id(void)
 {
+#ifdef CONFIG_XEN
+	return smp_processor_id();
+#else
 	int apicid, i;
 
 	if (disable_apic)
@@ -437,4 +494,5 @@ int safe_smp_processor_id(void)
 		return 0;
 
 	return 0; /* Should not happen */
+#endif
 }

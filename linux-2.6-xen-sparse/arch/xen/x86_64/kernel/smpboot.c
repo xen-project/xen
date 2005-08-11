@@ -47,6 +47,9 @@
 #include <linux/bootmem.h>
 #include <linux/thread_info.h>
 #include <linux/module.h>
+#ifdef CONFIG_XEN
+#include <linux/interrupt.h>
+#endif
 
 #include <linux/delay.h>
 #include <linux/mc146818rtc.h>
@@ -57,11 +60,20 @@
 #include <asm/tlbflush.h>
 #include <asm/proto.h>
 #include <asm/nmi.h>
+#ifdef CONFIG_XEN
+#include <asm/arch_hooks.h>
+
+#include <asm-xen/evtchn.h>
+#endif
 
 /* Change for real CPU hotplug. Note other files need to be fixed
    first too. */
 #define __cpuinit __init
 #define __cpuinitdata __initdata
+
+#if defined(CONFIG_XEN) && !defined(CONFIG_XEN_PRIVILEGED_GUEST)
+	unsigned int maxcpus = NR_CPUS;
+#endif
 
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
@@ -96,6 +108,7 @@ cpumask_t cpu_sibling_map[NR_CPUS] __cacheline_aligned;
 cpumask_t cpu_core_map[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(cpu_core_map);
 
+#ifndef CONFIG_XEN
 /*
  * Trampoline 80x86 program as an array.
  */
@@ -115,6 +128,7 @@ static unsigned long __cpuinit setup_trampoline(void)
 	memcpy(tramp, trampoline_data, trampoline_end - trampoline_data);
 	return virt_to_phys(tramp);
 }
+#endif
 
 /*
  * The bootstrap kernel entry code has set these up. Save them for
@@ -130,6 +144,7 @@ static void __cpuinit smp_store_cpu_info(int id)
 	print_cpu_info(c);
 }
 
+#ifndef CONFIG_XEN
 /*
  * New Funky TSC sync algorithm borrowed from IA64.
  * Main advantage is that it doesn't reset the TSCs fully and
@@ -331,6 +346,7 @@ static __init int notscsync_setup(char *s)
 	return 0;
 }
 __setup("notscsync", notscsync_setup);
+#endif
 
 static atomic_t init_deasserted __cpuinitdata;
 
@@ -343,6 +359,7 @@ void __cpuinit smp_callin(void)
 	int cpuid, phys_id;
 	unsigned long timeout;
 
+#ifndef CONFIG_XEN
 	/*
 	 * If waken up by an INIT in an 82489DX configuration
 	 * we may get here before an INIT-deassert IPI reaches
@@ -352,10 +369,15 @@ void __cpuinit smp_callin(void)
 	while (!atomic_read(&init_deasserted))
 		cpu_relax();
 
+#endif
 	/*
 	 * (This works even if the APIC is not enabled.)
 	 */
+#ifndef CONFIG_XEN
 	phys_id = GET_APIC_ID(apic_read(APIC_ID));
+#else
+	phys_id = smp_processor_id();
+#endif
 	cpuid = smp_processor_id();
 	if (cpu_isset(cpuid, cpu_callin_map)) {
 		panic("smp_callin: phys CPU#%d, CPU#%d already present??\n",
@@ -389,6 +411,7 @@ void __cpuinit smp_callin(void)
 			cpuid);
 	}
 
+#ifndef CONFIG_XEN
 	/*
 	 * the boot CPU has finished the init stage and is spinning
 	 * on callin_map until we finish. We are free to set up this
@@ -398,6 +421,7 @@ void __cpuinit smp_callin(void)
 
 	Dprintk("CALLIN, before setup_local_APIC().\n");
 	setup_local_APIC();
+#endif
 
 	/*
 	 * Get our bogomips.
@@ -405,7 +429,9 @@ void __cpuinit smp_callin(void)
 	calibrate_delay();
 	Dprintk("Stack at about %p\n",&cpuid);
 
+#ifndef CONFIG_XEN
 	disable_APIC_timer();
+#endif
 
 	/*
 	 * Save our processor parameters
@@ -417,6 +443,29 @@ void __cpuinit smp_callin(void)
 	 */
 	cpu_set(cpuid, cpu_callin_map);
 }
+
+#ifdef CONFIG_XEN
+static irqreturn_t ldebug_interrupt(
+	int irq, void *dev_id, struct pt_regs *regs)
+{
+	return IRQ_HANDLED;
+}
+
+static DEFINE_PER_CPU(int, ldebug_irq);
+static char ldebug_name[NR_CPUS][15];
+
+void ldebug_setup(void)
+{
+	int cpu = smp_processor_id();
+
+	per_cpu(ldebug_irq, cpu) = bind_virq_to_irq(VIRQ_DEBUG);
+	sprintf(ldebug_name[cpu], "ldebug%d", cpu);
+	BUG_ON(request_irq(per_cpu(ldebug_irq, cpu), ldebug_interrupt,
+	                   SA_INTERRUPT, ldebug_name[cpu], NULL));
+}
+
+extern void local_setup_timer(void);
+#endif
 
 /*
  * Setup code on secondary processor (after comming out of the trampoline)
@@ -434,6 +483,7 @@ void __cpuinit start_secondary(void)
 	/* otherwise gcc will move up the smp_processor_id before the cpu_init */
 	barrier();
 
+#ifndef CONFIG_XEN
 	Dprintk("cpu %d: setting up apic clock\n", smp_processor_id()); 	
 	setup_secondary_APIC_clock();
 
@@ -446,6 +496,12 @@ void __cpuinit start_secondary(void)
 	}
 
 	enable_APIC_timer();
+#else
+	local_setup_timer();
+	ldebug_setup();
+	smp_intr_init();
+	local_irq_enable();
+#endif
 
 	/*
 	 * Allow the master to continue.
@@ -453,10 +509,12 @@ void __cpuinit start_secondary(void)
 	cpu_set(smp_processor_id(), cpu_online_map);
 	mb();
 
+#ifndef CONFIG_XEN
 	/* Wait for TSC sync to not schedule things before.
 	   We still process interrupts, which could see an inconsistent
 	   time in that window unfortunately. */
 	tsc_sync_wait();
+#endif
 
 	cpu_idle();
 }
@@ -464,6 +522,7 @@ void __cpuinit start_secondary(void)
 extern volatile unsigned long init_rsp;
 extern void (*initial_code)(void);
 
+#ifndef CONFIG_XEN
 #if APIC_DEBUG
 static void inquire_remote_apic(int apicid)
 {
@@ -627,6 +686,7 @@ static int __cpuinit wakeup_secondary_via_INIT(int phys_apicid, unsigned int sta
 
 	return (send_status | accept_status);
 }
+#endif
 
 /*
  * Boot one CPU.
@@ -637,6 +697,14 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 	unsigned long boot_error;
 	int timeout;
 	unsigned long start_rip;
+#ifdef CONFIG_XEN
+	vcpu_guest_context_t ctxt;
+	extern void startup_64_smp(void);
+	extern void hypervisor_callback(void);
+	extern void failsafe_callback(void);
+	extern void smp_trap_init(trap_info_t *);
+	int i;
+#endif
 	/*
 	 * We can't use kernel_thread since we must avoid to
 	 * reschedule the child.
@@ -649,7 +717,11 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 
 	cpu_pda[cpu].pcurrent = idle;
 
+#ifndef CONFIG_XEN
 	start_rip = setup_trampoline();
+#else
+	start_rip = (unsigned long)startup_64_smp;
+#endif
 
 	init_rsp = idle->thread.rsp;
 	per_cpu(init_tss,cpu).rsp0 = init_rsp;
@@ -666,6 +738,93 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 
 	atomic_set(&init_deasserted, 0);
 
+#ifdef CONFIG_XEN
+	if (cpu_gdt_descr[0].size > PAGE_SIZE)
+		BUG();
+	cpu_gdt_descr[cpu].size = cpu_gdt_descr[0].size;
+	memcpy((void *)cpu_gdt_descr[cpu].address,
+		(void *)cpu_gdt_descr[0].address, cpu_gdt_descr[0].size);
+
+	memset(&ctxt, 0, sizeof(ctxt));
+
+	ctxt.flags = VGCF_IN_KERNEL;
+	ctxt.user_regs.ds = __USER_DS;
+	ctxt.user_regs.es = __USER_DS;
+	ctxt.user_regs.fs = 0;
+	ctxt.user_regs.gs = 0;
+	ctxt.user_regs.ss = __KERNEL_DS|0x3;
+	ctxt.user_regs.cs = __KERNEL_CS|0x3;
+	ctxt.user_regs.rip = start_rip;
+	ctxt.user_regs.rsp = idle->thread.rsp;
+#define X86_EFLAGS_IOPL_RING3 0x3000
+	ctxt.user_regs.eflags = X86_EFLAGS_IF | X86_EFLAGS_IOPL_RING3;
+
+	/* FPU is set up to default initial state. */
+	memset(&ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
+
+	/* Virtual IDT is empty at start-of-day. */
+	for ( i = 0; i < 256; i++ )
+	{
+		ctxt.trap_ctxt[i].vector = i;
+		ctxt.trap_ctxt[i].cs     = FLAT_KERNEL_CS;
+	}
+	smp_trap_init(ctxt.trap_ctxt);
+
+	/* No LDT. */
+	ctxt.ldt_ents = 0;
+
+	{
+		unsigned long va;
+		int f;
+
+		for (va = cpu_gdt_descr[cpu].address, f = 0;
+		     va < cpu_gdt_descr[cpu].address + cpu_gdt_descr[cpu].size;
+		     va += PAGE_SIZE, f++) {
+			ctxt.gdt_frames[f] = virt_to_machine(va) >> PAGE_SHIFT;
+			make_page_readonly((void *)va);
+		}
+		ctxt.gdt_ents = GDT_ENTRIES;
+	}
+
+	/* Ring 1 stack is the initial stack. */
+	ctxt.kernel_ss = __KERNEL_DS;
+	ctxt.kernel_sp = idle->thread.rsp;
+
+	/* Callback handlers. */
+	ctxt.event_callback_eip    = (unsigned long)hypervisor_callback;
+	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
+	ctxt.syscall_callback_eip  = (unsigned long)system_call;
+
+	ctxt.ctrlreg[3] = (unsigned long)virt_to_machine(init_level4_pgt);
+
+	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
+
+	if (!boot_error) {
+		/*
+		 * allow APs to start initializing.
+		 */
+		Dprintk("Before Callout %d.\n", cpu);
+		cpu_set(cpu, cpu_callout_map);
+		Dprintk("After Callout %d.\n", cpu);
+
+		/*
+		 * Wait 5s total for a response
+		 */
+		for (timeout = 0; timeout < 50000; timeout++) {
+			if (cpu_isset(cpu, cpu_callin_map))
+				break;	/* It has booted */
+			udelay(100);
+		}
+
+		if (cpu_isset(cpu, cpu_callin_map)) {
+			/* number CPUs logically, starting from 1 (BSP is 0) */
+			Dprintk("CPU has booted.\n");
+		} else {
+			boot_error= 1;
+		}
+	}
+	x86_cpu_to_apicid[cpu] = apicid;
+#else
 	Dprintk("Setting warm reset code and vector.\n");
 
 	CMOS_WRITE(0xa, 0xf);
@@ -729,6 +888,7 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 #endif
 		}
 	}
+#endif
 	if (boot_error) {
 		cpu_clear(cpu, cpu_callout_map); /* was set here (do_boot_cpu()) */
 		clear_bit(cpu, &cpu_initialized); /* was set by cpu_init() */
@@ -790,6 +950,7 @@ static __cpuinit void detect_siblings(void)
 	}
 }
 
+#ifndef CONFIG_XEN
 /*
  * Cleanup possible dangling ends...
  */
@@ -817,6 +978,7 @@ static __cpuinit void smp_cleanup_boot(void)
 	free_page((unsigned long) __va(SMP_TRAMPOLINE_BASE));
 #endif
 }
+#endif
 
 /*
  * Fall back to non SMP mode after errors.
@@ -827,10 +989,12 @@ static __cpuinit void disable_smp(void)
 {
 	cpu_present_map = cpumask_of_cpu(0);
 	cpu_possible_map = cpumask_of_cpu(0);
+#ifndef CONFIG_XEN
 	if (smp_found_config)
 		phys_cpu_present_map = physid_mask_of_physid(boot_cpu_id);
 	else
 		phys_cpu_present_map = physid_mask_of_physid(0);
+#endif
 	cpu_set(0, cpu_sibling_map[0]);
 	cpu_set(0, cpu_core_map[0]);
 }
@@ -857,6 +1021,7 @@ static __cpuinit void enforce_max_cpus(unsigned max_cpus)
  */
 static int __cpuinit smp_sanity_check(unsigned max_cpus)
 {
+#ifndef CONFIG_XEN
 	if (!physid_isset(hard_smp_processor_id(), phys_cpu_present_map)) {
 		printk("weird, boot CPU (#%d) not listed by the BIOS.\n",
 		       hard_smp_processor_id());
@@ -896,13 +1061,19 @@ static int __cpuinit smp_sanity_check(unsigned max_cpus)
 		nr_ioapics = 0;
 		return -1;
 	}
+#endif
 
 	/*
 	 * If SMP should be disabled, then really disable it!
 	 */
 	if (!max_cpus) {
+#ifdef CONFIG_XEN
+		HYPERVISOR_shared_info->n_vcpu = 1;
+#endif
 		printk(KERN_INFO "SMP mode deactivated, forcing use of dummy APIC emulation.\n");
+#ifndef CONFIG_XEN
 		nr_ioapics = 0;
+#endif
 		return -1;
 	}
 
@@ -917,7 +1088,10 @@ void __cpuinit smp_prepare_cpus(unsigned int max_cpus)
 {
 	int i;
 
+#if defined(CONFIG_XEN) && !defined(CONFIG_XEN_PRIVILEGED_GUEST)
+#else
 	nmi_watchdog_default();
+#endif
 	current_cpu_data = boot_cpu_data;
 	current_thread_info()->cpu = 0;  /* needed? */
 
@@ -927,8 +1101,12 @@ void __cpuinit smp_prepare_cpus(unsigned int max_cpus)
 	 * Fill in cpu_present_mask
 	 */
 	for (i = 0; i < NR_CPUS; i++) {
+#ifndef CONFIG_XEN
 		int apicid = cpu_present_to_apicid(i);
 		if (physid_isset(apicid, phys_cpu_present_map)) {
+#else
+		if (i < HYPERVISOR_shared_info->n_vcpu) {
+#endif
 			cpu_set(i, cpu_present_map);
 			/* possible map would be different if we supported real
 			   CPU hotplug. */
@@ -942,6 +1120,9 @@ void __cpuinit smp_prepare_cpus(unsigned int max_cpus)
 		return;
 	}
 
+#ifdef CONFIG_XEN
+	smp_intr_init();
+#else
 
 	/*
 	 * Switch from PIC to APIC mode.
@@ -954,20 +1135,26 @@ void __cpuinit smp_prepare_cpus(unsigned int max_cpus)
 		      GET_APIC_ID(apic_read(APIC_ID)), boot_cpu_id);
 		/* Or can we switch back to PIC here? */
 	}
+#endif
 
 	/*
 	 * Now start the IO-APICs
 	 */
+#if defined(CONFIG_XEN) && !defined(CONFIG_XEN_PRIVILEGED_GUEST)
+#else
 	if (!skip_ioapic_setup && nr_ioapics)
 		setup_IO_APIC();
 	else
 		nr_ioapics = 0;
+#endif
 
 	/*
 	 * Set up local APIC timer on boot CPU.
 	 */
 
+#ifndef CONFIG_XEN
 	setup_boot_APIC_clock();
+#endif
 }
 
 /*
@@ -989,17 +1176,23 @@ void __init smp_prepare_boot_cpu(void)
 int __cpuinit __cpu_up(unsigned int cpu)
 {
 	int err;
+#ifndef CONFIG_XEN
 	int apicid = cpu_present_to_apicid(cpu);
+#else
+	int apicid = cpu;
+#endif
 
 	WARN_ON(irqs_disabled());
 
 	Dprintk("++++++++++++++++++++=_---CPU UP  %u\n", cpu);
 
+#ifndef CONFIG_XEN
 	if (apicid == BAD_APICID || apicid == boot_cpu_id ||
 	    !physid_isset(apicid, phys_cpu_present_map)) {
 		printk("__cpu_up: bad cpu %d\n", cpu);
 		return -EINVAL;
 	}
+#endif
 
 	/* Boot it! */
 	err = do_boot_cpu(cpu, apicid);
@@ -1021,15 +1214,76 @@ int __cpuinit __cpu_up(unsigned int cpu)
  */
 void __cpuinit smp_cpus_done(unsigned int max_cpus)
 {
+#ifndef CONFIG_XEN
 	zap_low_mappings();
 	smp_cleanup_boot();
 
 #ifdef CONFIG_X86_IO_APIC
 	setup_ioapic_dest();
 #endif
+#endif
 
 	detect_siblings();
+#ifndef CONFIG_XEN
 	time_init_gtod();
 
 	check_nmi_watchdog();
+#endif
 }
+
+#ifdef CONFIG_XEN
+extern int bind_ipi_to_irq(int ipi);
+extern irqreturn_t smp_reschedule_interrupt(int, void *, struct pt_regs *);
+extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
+
+static DEFINE_PER_CPU(int, resched_irq);
+static DEFINE_PER_CPU(int, callfunc_irq);
+static char resched_name[NR_CPUS][15];
+static char callfunc_name[NR_CPUS][15];
+
+void smp_intr_init(void)
+{
+	int cpu = smp_processor_id();
+
+	per_cpu(resched_irq, cpu) =
+		bind_ipi_to_irq(RESCHEDULE_VECTOR);
+	sprintf(resched_name[cpu], "resched%d", cpu);
+	BUG_ON(request_irq(per_cpu(resched_irq, cpu), smp_reschedule_interrupt,
+	                   SA_INTERRUPT, resched_name[cpu], NULL));
+
+	per_cpu(callfunc_irq, cpu) =
+		bind_ipi_to_irq(CALL_FUNCTION_VECTOR);
+	sprintf(callfunc_name[cpu], "callfunc%d", cpu);
+	BUG_ON(request_irq(per_cpu(callfunc_irq, cpu),
+	                   smp_call_function_interrupt,
+	                   SA_INTERRUPT, callfunc_name[cpu], NULL));
+}
+
+static void smp_intr_exit(void)
+{
+	int cpu = smp_processor_id();
+
+	free_irq(per_cpu(resched_irq, cpu), NULL);
+	unbind_ipi_from_irq(RESCHEDULE_VECTOR);
+
+	free_irq(per_cpu(callfunc_irq, cpu), NULL);
+	unbind_ipi_from_irq(CALL_FUNCTION_VECTOR);
+}
+
+extern void local_setup_timer_irq(void);
+extern void local_teardown_timer_irq(void);
+
+void smp_suspend(void)
+{
+	/* XXX todo: take down time and ipi's on all cpus */
+	local_teardown_timer_irq();
+	smp_intr_exit();
+}
+
+void smp_resume(void)
+{
+	/* XXX todo: restore time and ipi's on all cpus */
+	smp_intr_init();
+	local_setup_timer_irq();
+}
+#endif

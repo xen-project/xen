@@ -8,11 +8,14 @@
 #define sizeof_vcpu_shift		3
 
 #ifdef CONFIG_SMP
-#define preempt_disable(reg)	incl threadinfo_preempt_count(reg)
-#define preempt_enable(reg)	decl threadinfo_preempt_count(reg)
+//#define preempt_disable(reg)	incl threadinfo_preempt_count(reg)
+//#define preempt_enable(reg)	decl threadinfo_preempt_count(reg)
+#define preempt_disable(reg)
+#define preempt_enable(reg)
 #define XEN_GET_VCPU_INFO(reg)	preempt_disable(%rbp)			; \
 				movq %gs:pda_cpunumber,reg		; \
-				shl  $sizeof_vcpu_shift,reg		; \
+				shl  $32, reg				; \
+				shr  $32-sizeof_vcpu_shift,reg		; \
 				addq HYPERVISOR_shared_info,reg
 #define XEN_PUT_VCPU_INFO(reg)	preempt_enable(%rbp)			; \
 #define XEN_PUT_VCPU_INFO_fixup .byte 0xff,0xff,0xff

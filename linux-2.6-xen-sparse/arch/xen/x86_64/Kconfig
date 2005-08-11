@@ -126,6 +126,10 @@ config X86_IO_APIC
 	bool
 	default XEN_PRIVILEGED_GUEST
 
+config X86_XEN_GENAPIC
+	bool
+	default XEN_PRIVILEGED_GUEST || SMP
+
 config X86_LOCAL_APIC
 	bool
 	default XEN_PRIVILEGED_GUEST
