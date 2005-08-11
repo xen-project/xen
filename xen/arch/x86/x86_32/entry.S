@@ -108,31 +108,26 @@
         pushl %ecx; \
         pushl %ebx;
 
+#define VMX_RESTORE_ALL_NOSEGREGS   \
+        popl %ebx;  \
+        popl %ecx;  \
+        popl %edx;  \
+        popl %esi;  \
+        popl %edi;  \
+        popl %ebp;  \
+        popl %eax;  \
+        addl $(NR_SKIPPED_REGS*4), %esp
+
 ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */
         VMX_SAVE_ALL_NOSEGREGS
         call vmx_vmexit_handler
         jmp vmx_asm_do_resume
 
-ENTRY(vmx_asm_do_launch)
-        popl %ebx
-        popl %ecx
-        popl %edx
-        popl %esi
-        popl %edi
-        popl %ebp
-        popl %eax
-        addl $(NR_SKIPPED_REGS*4), %esp
-        /* VMLUANCH */
-        .byte 0x0f,0x01,0xc2
-        pushf
-        call vm_launch_fail
-        hlt
-        
-        ALIGN
-        
-ENTRY(vmx_asm_do_resume)
-vmx_test_all_events:
+.macro vmx_asm_common launch initialized
+1:
+/* vmx_test_all_events */
+        .if \initialized
         GET_CURRENT(%ebx)
 /*test_all_events:*/
         xorl %ecx,%ecx
@@ -142,34 +137,50 @@ vmx_test_all_events:
         movl VCPU_processor(%ebx),%eax
         shl  $IRQSTAT_shift,%eax
         test %ecx,irq_stat(%eax,1)
-        jnz  vmx_process_softirqs
+        jnz 2f
 
-vmx_restore_all_guest:
+/* vmx_restore_all_guest */
         call load_cr2
+        .endif
+        VMX_RESTORE_ALL_NOSEGREGS
         /* 
          * Check if we are going back to VMX-based VM
          * By this time, all the setups in the VMCS must be complete.
          */
-        popl %ebx
-        popl %ecx
-        popl %edx
-        popl %esi
-        popl %edi
-        popl %ebp
-        popl %eax
-        addl $(NR_SKIPPED_REGS*4), %esp
+        .if \launch
+        /* VMLUANCH */
+        .byte 0x0f,0x01,0xc2
+        pushf
+        call vm_launch_fail
+        .else
         /* VMRESUME */
         .byte 0x0f,0x01,0xc3
         pushf
         call vm_resume_fail
+        .endif
         /* Should never reach here */
         hlt
 
         ALIGN
-vmx_process_softirqs:
+        .if \initialized
+2:
+/* vmx_process_softirqs */
         sti       
         call do_softirq
-        jmp  vmx_test_all_events
+        jmp 1b
+        ALIGN
+        .endif
+.endm
+
+ENTRY(vmx_asm_do_launch)
+    vmx_asm_common 1 0
+
+ENTRY(vmx_asm_do_resume)
+    vmx_asm_common 0 1
+
+ENTRY(vmx_asm_do_relaunch)
+    vmx_asm_common 1 1
+
 #endif
 
         ALIGN

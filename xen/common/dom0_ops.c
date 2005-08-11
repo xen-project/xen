@@ -293,17 +293,17 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         v->cpumap = cpumap;
 
         if ( cpumap == CPUMAP_RUNANYWHERE )
+        {
             clear_bit(_VCPUF_cpu_pinned, &v->vcpu_flags);
+        }
         else
         {
             /* pick a new cpu from the usable map */
             int new_cpu = (int)find_first_set_bit(cpumap) % num_online_cpus();
 
             vcpu_pause(v);
-            if ( v->processor != new_cpu )
-                set_bit(_VCPUF_cpu_migrated, &v->vcpu_flags);
+            vcpu_migrate_cpu(v, new_cpu);
             set_bit(_VCPUF_cpu_pinned, &v->vcpu_flags);
-            v->processor = new_cpu;
             vcpu_unpause(v);
         }
 

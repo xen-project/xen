@@ -198,7 +198,7 @@ void vmx_set_host_env(struct vcpu *v)
     host_env.idtr_limit = desc.size;
     host_env.idtr_base = desc.address;
     error |= __vmwrite(HOST_IDTR_BASE, host_env.idtr_base);
- 
+
     __asm__ __volatile__ ("sgdt  (%0) \n" :: "a"(&desc) : "memory");
     host_env.gdtr_limit = desc.size;
     host_env.gdtr_base = desc.address;
@@ -210,7 +210,6 @@ void vmx_set_host_env(struct vcpu *v)
     host_env.tr_base = (unsigned long) &init_tss[cpu];
     error |= __vmwrite(HOST_TR_SELECTOR, host_env.tr_selector);
     error |= __vmwrite(HOST_TR_BASE, host_env.tr_base);
-
 }
 
 void vmx_do_launch(struct vcpu *v) 
@@ -542,6 +541,36 @@ void vm_resume_fail(unsigned long eflags)
     __vmread(VM_INSTRUCTION_ERROR, &error);
     printk("<vm_resume_fail> error code %lx\n", error);
     __vmx_bug(guest_cpu_user_regs());
+}
+
+void arch_vmx_do_resume(struct vcpu *v) 
+{
+    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
+
+    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
+    vmx_do_resume(v);
+    reset_stack_and_jump(vmx_asm_do_resume);
+}
+
+void arch_vmx_do_launch(struct vcpu *v) 
+{
+    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
+
+    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
+    vmx_do_launch(v);
+    reset_stack_and_jump(vmx_asm_do_launch);
+}
+
+void arch_vmx_do_relaunch(struct vcpu *v)
+{
+    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
+
+    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
+    vmx_do_resume(v);
+    vmx_set_host_env(v);
+    v->arch.schedule_tail = arch_vmx_do_resume;
+
+    reset_stack_and_jump(vmx_asm_do_relaunch);
 }
 
 #endif /* CONFIG_VMX */

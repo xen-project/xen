@@ -93,6 +93,7 @@ struct arch_vmx_struct {
 
 void vmx_do_launch(struct vcpu *); 
 void vmx_do_resume(struct vcpu *); 
+void vmx_set_host_env(struct vcpu *);
 
 struct vmcs_struct *alloc_vmcs(void);
 void free_vmcs(struct vmcs_struct *);
