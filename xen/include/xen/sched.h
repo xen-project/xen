@@ -297,10 +297,9 @@ unsigned long __hypercall_create_continuation(
         (unsigned long)(_a1), (unsigned long)(_a2), (unsigned long)(_a3), \
         (unsigned long)(_a4), (unsigned long)(_a5), (unsigned long)(_a6))
 
-#define hypercall_preempt_check() (unlikely(            \
-        softirq_pending(smp_processor_id()) |           \
-        (!!current->vcpu_info->evtchn_upcall_pending &  \
-          !current->vcpu_info->evtchn_upcall_mask)      \
+#define hypercall_preempt_check() (unlikely(    \
+        softirq_pending(smp_processor_id()) |   \
+        event_pending(current)                  \
     ))
 
 /* This domain_hash and domain_list are protected by the domlist_lock. */
