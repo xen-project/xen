@@ -2030,7 +2030,7 @@ typedef struct QEMUResetEntry {
 } QEMUResetEntry;
 
 static QEMUResetEntry *first_reset_entry;
-static int reset_requested;
+int reset_requested;
 int shutdown_requested;
 
 void qemu_register_reset(QEMUResetHandler *func, void *opaque)
