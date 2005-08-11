@@ -45,6 +45,8 @@ typedef struct settings_st {
     char *outfile;
     struct timespec poll_sleep;
     unsigned long new_data_thresh;
+    u32 evt_mask;
+    u32 cpu_mask;
 } settings_t;
 
 settings_t opts;
@@ -160,6 +162,41 @@ struct t_buf *map_tbufs(unsigned long tbufs_mach, unsigned int num,
     return tbufs_mapped;
 }
 
+/**
+ * set_mask - set the cpu/event mask in HV
+ * @mask:           the new mask 
+ * @type:           the new mask type,0-event mask, 1-cpu mask
+ *
+ */
+void set_mask(u32 mask, int type)
+{
+    int ret;
+    dom0_op_t op;                        /* dom0 op we'll build             */
+    int xc_handle = xc_interface_open(); /* for accessing control interface */
+
+    op.cmd = DOM0_TBUFCONTROL;
+    op.interface_version = DOM0_INTERFACE_VERSION;
+    if (type == 1) { /* cpu mask */
+        op.u.tbufcontrol.op  = DOM0_TBUF_SET_CPU_MASK;
+        op.u.tbufcontrol.cpu_mask = mask;
+        fprintf(stderr, "change cpumask to 0x%x\n", mask);
+    }else if (type == 0) { /* event mask */
+        op.u.tbufcontrol.op  = DOM0_TBUF_SET_EVT_MASK;
+        op.u.tbufcontrol.evt_mask = mask;
+        fprintf(stderr, "change evtmask to 0x%x\n", mask);
+    }
+
+    ret = do_dom0_op(xc_handle, &op);
+
+    xc_interface_close(xc_handle);
+
+    if ( ret != 0 )
+    {
+        PERROR("Failure to get trace buffer pointer from Xen and set the new mask");
+        exit(EXIT_FAILURE);
+    }
+
+}
 
 /**
  * init_bufs_ptrs - initialises an array of pointers to the trace buffers
@@ -341,6 +378,31 @@ int monitor_tbufs(FILE *logfile)
  * Various declarations / definitions GNU argp needs to do its work
  *****************************************************************************/
 
+int parse_evtmask(char *arg, struct argp_state *state)
+{
+    settings_t *setup = (settings_t *)state->input;
+    char *inval;
+
+    /* search filtering class */
+    if (strcmp(arg, "gen") == 0){ 
+        setup->evt_mask |= TRC_GEN;
+    } else if(strcmp(arg, "sched") == 0){ 
+        setup->evt_mask |= TRC_SCHED;
+    } else if(strcmp(arg, "dom0op") == 0){ 
+        setup->evt_mask |= TRC_DOM0OP;
+    } else if(strcmp(arg, "vmx") == 0){ 
+        setup->evt_mask |= TRC_VMX;
+    } else if(strcmp(arg, "all") == 0){ 
+        setup->evt_mask |= TRC_ALL;
+    } else {
+        setup->evt_mask = strtol(arg, &inval, 0);
+        if ( inval == arg )
+            argp_usage(state);
+    }
+
+    return 0;
+
+}
 
 /* command parser for GNU argp - see GNU docs for more info */
 error_t cmd_parser(int key, char *arg, struct argp_state *state)
@@ -364,6 +426,21 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
         setup->poll_sleep = millis_to_timespec(strtol(arg, &inval, 0));
         if ( inval == arg )
             argp_usage(state);
+    }
+    break;
+
+    case 'c': /* set new cpu mask for filtering*/
+    {
+        char *inval;
+        setup->cpu_mask = strtol(arg, &inval, 0);
+        if ( inval == arg )
+            argp_usage(state);
+    }
+    break;
+    
+    case 'e': /* set new event mask for filtering*/
+    {
+        parse_evtmask(arg, state);
     }
     break;
     
@@ -398,6 +475,14 @@ const struct argp_option cmd_opts[] =
       "Set sleep time, p, in milliseconds between polling the trace buffer "
       "for new data (default " xstr(POLL_SLEEP_MILLIS) ")." },
 
+    { .name = "cpu-mask", .key='c', .arg="c",
+      .doc = 
+      "set cpu-mask " },
+
+    { .name = "evt-mask", .key='e', .arg="e",
+      .doc = 
+      "set evt-mask " },
+
     {0}
 };
 
@@ -430,8 +515,18 @@ int main(int argc, char **argv)
     opts.outfile = 0;
     opts.poll_sleep = millis_to_timespec(POLL_SLEEP_MILLIS);
     opts.new_data_thresh = NEW_DATA_THRESH;
+    opts.evt_mask = 0;
+    opts.cpu_mask = 0;
 
     argp_parse(&parser_def, argc, argv, 0, 0, &opts);
+
+    if (opts.evt_mask != 0) { 
+        set_mask(opts.evt_mask, 0);
+    }
+
+    if (opts.cpu_mask != 0) {
+        set_mask(opts.evt_mask, 1);
+    }
 
     if ( opts.outfile )
         outfd = open(opts.outfile, O_WRONLY | O_CREAT);
