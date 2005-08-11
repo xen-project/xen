@@ -25,6 +25,7 @@
 #include <asm/mmu_context.h>
 
 #include <asm-xen/foreign_page.h>
+#include <asm-xen/hypervisor.h>
 
 void show_mem(void)
 {
@@ -273,6 +274,11 @@ static inline void pgd_list_del(pgd_t *pgd)
 void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags;
+
+#ifdef CONFIG_X86_PAE
+	/* this gives us a page below 4GB */
+	xen_contig_memory((unsigned long)pgd, 0);
+#endif
 
 	if (!HAVE_SHARED_KERNEL_PMD)
 		spin_lock_irqsave(&pgd_lock, flags);

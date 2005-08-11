@@ -856,6 +856,14 @@ static int alloc_l3_table(struct pfn_info *page, unsigned long type)
 
     ASSERT(!shadow_mode_refcounts(d));
 
+#ifdef CONFIG_X86_PAE
+    if ( pfn >= 0x100000 )
+    {
+        MEM_LOG("PAE pgd must be below 4GB (0x%lx >= 0x100000)", pfn);
+        return 0;
+    }
+#endif
+
     pl3e = map_domain_page(pfn);
     for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
     {

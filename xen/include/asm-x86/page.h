@@ -283,13 +283,9 @@ extern void paging_init(void);
 static __inline__ int get_order(unsigned long size)
 {
     int order;
-    
-    size = (size-1) >> (PAGE_SHIFT-1);
-    order = -1;
-    do {
+    size = (size-1) >> PAGE_SHIFT;
+    for ( order = 0; size; order++ )
         size >>= 1;
-        order++;
-    } while (size);
     return order;
 }
 
