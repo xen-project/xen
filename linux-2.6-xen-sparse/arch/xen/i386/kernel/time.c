@@ -227,12 +227,38 @@ static unsigned long get_usec_offset(struct shadow_time_info *shadow)
 	return scale_delta(delta, shadow->tsc_to_usec_mul, shadow->tsc_shift);
 }
 
+static void __update_wallclock(time_t sec, long nsec)
+{
+	long wtm_nsec, xtime_nsec;
+	time_t wtm_sec, xtime_sec;
+	u64 tmp, wc_nsec;
+
+	/* Adjust wall-clock time base based on wall_jiffies ticks. */
+	wc_nsec = processed_system_time;
+	wc_nsec += (u64)sec * 1000000000ULL;
+	wc_nsec += (u64)nsec;
+	wc_nsec -= (jiffies - wall_jiffies) * (u64)(NSEC_PER_SEC / HZ);
+
+	/* Split wallclock base into seconds and nanoseconds. */
+	tmp = wc_nsec;
+	xtime_nsec = do_div(tmp, 1000000000);
+	xtime_sec  = (time_t)tmp;
+
+	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - xtime_sec);
+	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - xtime_nsec);
+
+	set_normalized_timespec(&xtime, xtime_sec, xtime_nsec);
+	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
+
+	time_adjust = 0;		/* stop active adjtime() */
+	time_status |= STA_UNSYNC;
+	time_maxerror = NTP_PHASE_LIMIT;
+	time_esterror = NTP_PHASE_LIMIT;
+}
+
 static void update_wallclock(void)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
-	long wtm_nsec, xtime_nsec;
-	time_t wtm_sec, xtime_sec;
-	u64 tmp, nsec;
 
 	do {
 		shadow_tv_version = s->wc_version;
@@ -243,25 +269,8 @@ static void update_wallclock(void)
 	}
 	while ((s->wc_version & 1) | (shadow_tv_version ^ s->wc_version));
 
-	if (independent_wallclock)
-		return;
-
-	/* Adjust wall-clock time base based on wall_jiffies ticks. */
-	nsec = processed_system_time;
-	nsec += (u64)shadow_tv.tv_sec * 1000000000ULL;
-	nsec += (u64)shadow_tv.tv_nsec;
-	nsec -= (jiffies - wall_jiffies) * (u64)(NSEC_PER_SEC / HZ);
-
-	/* Split wallclock base into seconds and nanoseconds. */
-	tmp = nsec;
-	xtime_nsec = do_div(tmp, 1000000000);
-	xtime_sec  = (time_t)tmp;
-
-	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - xtime_sec);
-	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - xtime_nsec);
-
-	set_normalized_timespec(&xtime, xtime_sec, xtime_nsec);
-	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
+	if (!independent_wallclock)
+		__update_wallclock(shadow_tv.tv_sec, shadow_tv.tv_nsec);
 }
 
 /*
@@ -408,18 +417,14 @@ EXPORT_SYMBOL(do_gettimeofday);
 
 int do_settimeofday(struct timespec *tv)
 {
-	time_t wtm_sec, sec = tv->tv_sec;
-	long wtm_nsec;
+	time_t sec;
 	s64 nsec;
-	struct timespec xentime;
 	unsigned int cpu;
 	struct shadow_time_info *shadow;
+	dom0_op_t op;
 
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
-
-	if (!independent_wallclock && !(xen_start_info.flags & SIF_INITDOMAIN))
-		return 0; /* Silent failure? */
 
 	cpu = get_cpu();
 	shadow = &per_cpu(shadow_time, cpu);
@@ -431,51 +436,30 @@ int do_settimeofday(struct timespec *tv)
 	 * overflows. If that were to happen then our shadow time values would
 	 * be stale, so we can retry with fresh ones.
 	 */
- again:
-	nsec = (s64)tv->tv_nsec - (s64)get_nsec_offset(shadow);
-	if (unlikely(!time_values_up_to_date(cpu))) {
+	for ( ; ; ) {
+		nsec = (s64)tv->tv_nsec - (s64)get_nsec_offset(shadow);
+		if (time_values_up_to_date(cpu))
+			break;
 		get_time_values_from_xen();
-		goto again;
 	}
-
+	sec = tv->tv_sec;
 	__normalize_time(&sec, &nsec);
-	set_normalized_timespec(&xentime, sec, nsec);
 
-	/*
-	 * This is revolting. We need to set "xtime" correctly. However, the
-	 * value in this location is the value at the most recent update of
-	 * wall time.  Discover what correction gettimeofday() would have
-	 * made, and then undo it!
-	 */
-	nsec -= (jiffies - wall_jiffies) * TICK_NSEC;
-
-	nsec -= (shadow->system_timestamp - processed_system_time);
-
-	__normalize_time(&sec, &nsec);
-	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
-	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
-
-	set_normalized_timespec(&xtime, sec, nsec);
-	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
-
-	time_adjust = 0;		/* stop active adjtime() */
-	time_status |= STA_UNSYNC;
-	time_maxerror = NTP_PHASE_LIMIT;
-	time_esterror = NTP_PHASE_LIMIT;
-
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	if ((xen_start_info.flags & SIF_INITDOMAIN) &&
 	    !independent_wallclock) {
-		dom0_op_t op;
 		op.cmd = DOM0_SETTIME;
-		op.u.settime.secs        = xentime.tv_sec;
-		op.u.settime.nsecs       = xentime.tv_nsec;
+		op.u.settime.secs        = sec;
+		op.u.settime.nsecs       = nsec;
 		op.u.settime.system_time = shadow->system_timestamp;
-		write_sequnlock_irq(&xtime_lock);
 		HYPERVISOR_dom0_op(&op);
-	} else
-#endif
-		write_sequnlock_irq(&xtime_lock);
+		update_wallclock();
+	} else if (independent_wallclock) {
+		nsec -= shadow->system_timestamp;
+		__normalize_time(&sec, &nsec);
+		__update_wallclock(sec, nsec);
+	}
+
+	write_sequnlock_irq(&xtime_lock);
 
 	put_cpu();
 
@@ -491,6 +475,9 @@ static int set_rtc_mmss(unsigned long nowtime)
 	int retval;
 
 	WARN_ON(irqs_disabled());
+
+	if (!(xen_start_info.flags & SIF_INITDOMAIN))
+		return 0;
 
 	/* gets recalled with irq locally disabled */
 	spin_lock_irq(&rtc_lock);
@@ -603,8 +590,10 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		profile_tick(CPU_PROFILING, regs);
 	}
 
-	if (unlikely(shadow_tv_version != HYPERVISOR_shared_info->wc_version))
+	if (shadow_tv_version != HYPERVISOR_shared_info->wc_version) {
 		update_wallclock();
+		clock_was_set();
+	}
 }
 
 /*

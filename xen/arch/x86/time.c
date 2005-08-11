@@ -44,6 +44,7 @@ spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 int timer_ack = 0;
 unsigned long volatile jiffies;
 static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
+static spinlock_t wc_lock = SPIN_LOCK_UNLOCKED;
 
 struct time_scale {
     int shift;
@@ -699,13 +700,14 @@ void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
     struct domain *d;
     shared_info_t *s;
 
-    x = (secs * 1000000000ULL) + (u64)nsecs + system_time_base;
+    x = (secs * 1000000000ULL) + (u64)nsecs - system_time_base;
     y = do_div(x, 1000000000);
 
     wc_sec  = _wc_sec  = (u32)x;
     wc_nsec = _wc_nsec = (u32)y;
 
     read_lock(&domlist_lock);
+    spin_lock(&wc_lock);
 
     for_each_domain ( d )
     {
@@ -716,15 +718,18 @@ void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
         version_update_end(&s->wc_version);
     }
 
+    spin_unlock(&wc_lock);
     read_unlock(&domlist_lock);
 }
 
 void init_domain_time(struct domain *d)
 {
+    spin_lock(&wc_lock);
     version_update_begin(&d->shared_info->wc_version);
     d->shared_info->wc_sec  = wc_sec;
     d->shared_info->wc_nsec = wc_nsec;
     version_update_end(&d->shared_info->wc_version);
+    spin_unlock(&wc_lock);
 }
 
 static void local_time_calibration(void *unused)

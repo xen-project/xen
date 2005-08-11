@@ -618,6 +618,8 @@ int construct_dom0(struct domain *d,
     /* DOM0 gets access to everything. */
     physdev_init_dom0(d);
 
+    init_domain_time(d);
+
     set_bit(_DOMF_constructed, &d->domain_flags);
 
     new_thread(v, dsi.v_kernentry, vstack_end, vstartinfo_start);
