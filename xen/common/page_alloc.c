@@ -418,6 +418,8 @@ void init_xenheap_pages(physaddr_t ps, physaddr_t pe)
 
     ps = round_pgup(ps);
     pe = round_pgdown(pe);
+    if ( pe <= ps )
+        return;
 
     memguard_guard_range(phys_to_virt(ps), pe - ps);
 
@@ -487,19 +489,25 @@ void init_domheap_pages(physaddr_t ps, physaddr_t pe)
 
     ps = round_pgup(ps) >> PAGE_SHIFT;
     pe = round_pgdown(pe) >> PAGE_SHIFT;
+    if ( pe <= ps )
+        return;
 
-    if (ps < MAX_DMADOM_PFN && pe > MAX_DMADOM_PFN) {
-        init_heap_pages(MEMZONE_DMADOM, pfn_to_page(ps), MAX_DMADOM_PFN - ps);
-        init_heap_pages(MEMZONE_DOM, pfn_to_page(MAX_DMADOM_PFN),
-                        pe - MAX_DMADOM_PFN);
+    if ( (ps < MAX_DMADOM_PFN) && (pe > MAX_DMADOM_PFN) )
+    {
+        init_heap_pages(
+            MEMZONE_DMADOM, pfn_to_page(ps), MAX_DMADOM_PFN - ps);
+        init_heap_pages(
+            MEMZONE_DOM, pfn_to_page(MAX_DMADOM_PFN), pe - MAX_DMADOM_PFN);
     }
     else
+    {
         init_heap_pages(pfn_dom_zone_type(ps), pfn_to_page(ps), pe - ps);
+    }
 }
 
 
-struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order,
-                                     unsigned int flags)
+struct pfn_info *alloc_domheap_pages(
+    struct domain *d, unsigned int order, unsigned int flags)
 {
     struct pfn_info *pg;
     cpumask_t mask;
