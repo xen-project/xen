@@ -289,13 +289,12 @@ def xm_destroy(args):
     args.insert(0,"bogus")
     destroy.main(args)
             
-# TODO: make reboot do the right thing, right now
-# reboot and shutdown are exactly the same
 def xm_reboot(args):
     arg_check(args,1,"reboot")
     # ugly hack because the opt parser apparently wants
     # the subcommand name just to throw it away!
     args.insert(0,"bogus")
+    args.insert(2,"-R")
     from xen.xm import shutdown
     shutdown.main(args)
 
