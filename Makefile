@@ -101,11 +101,6 @@ mrproper: clean
 	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
 	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-mrproper ; done
 
-install-twisted:
-	wget http://www.twistedmatrix.com/products/get-current.epy
-	tar -zxf Twisted-*.tar.gz
-	cd Twisted-* && python setup.py install
-
 install-logging: LOGGING=logging-0.4.9.2
 install-logging:
 	[ -f $(LOGGING).tar.gz ] || wget http://www.red-dove.com/$(LOGGING).tar.gz
@@ -149,7 +144,6 @@ help:
 	@echo '  kclean           - clean guest kernel build trees'
 	@echo ''
 	@echo 'Dependency installation targets:'
-	@echo '  install-twisted  - install the Twisted Matrix Framework'
 	@echo '  install-logging  - install the Python Logging package'
 	@echo '  install-iptables - install iptables tools'
 	@echo ''
