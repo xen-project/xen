@@ -116,7 +116,6 @@
 ^tools/ioemu/target-.*/Makefile$
 ^tools/ioemu/target-.*/config\..*$
 ^tools/ioemu/target-.*/qemu-dm$
-^tools/ioemu/target-.*/qemu-vgaram-bin$
 ^tools/libxc/xen/.*$
 ^tools/misc/cpuperf/cpuperf-perfcntr$
 ^tools/misc/cpuperf/cpuperf-xen$

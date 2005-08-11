@@ -279,8 +279,6 @@ void arch_do_createdomain(struct vcpu *v)
     
     shadow_lock_init(d);        
     INIT_LIST_HEAD(&d->arch.free_shadow_frames);
-
-    init_domain_time(d);
 }
 
 void arch_do_boot_vcpu(struct vcpu *v)
@@ -503,7 +501,10 @@ int arch_set_info_guest(
     }
 
     update_pagetables(v);
-    
+
+    if ( v->vcpu_id == 0 )
+        init_domain_time(d);
+
     /* Don't redo final setup */
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
 

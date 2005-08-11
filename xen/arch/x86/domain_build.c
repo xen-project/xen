@@ -74,7 +74,7 @@ int construct_dom0(struct domain *d,
                    unsigned long _initrd_start, unsigned long initrd_len,
                    char *cmdline)
 {
-    int i, rc, dom0_pae, xen_pae;
+    int i, rc, dom0_pae, xen_pae, order;
     unsigned long pfn, mfn;
     unsigned long nr_pages;
     unsigned long nr_pt_pages;
@@ -143,10 +143,6 @@ int construct_dom0(struct domain *d,
         nr_pages = avail_domheap_pages() +
             ((initrd_len + PAGE_SIZE - 1) >> PAGE_SHIFT) +
             ((image_len  + PAGE_SIZE - 1) >> PAGE_SHIFT);
-    if ( (page = alloc_largest(d, nr_pages)) == NULL )
-        panic("Not enough RAM for DOM0 reservation.\n");
-    alloc_spfn = page_to_pfn(page);
-    alloc_epfn = alloc_spfn + d->tot_pages;
 
     if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;
@@ -215,8 +211,15 @@ int construct_dom0(struct domain *d,
 #endif
     }
 
-    if ( ((v_end - dsi.v_start) >> PAGE_SHIFT) > (alloc_epfn - alloc_spfn) )
-        panic("Insufficient contiguous RAM to build kernel image.\n");
+    order = get_order(v_end - dsi.v_start);
+    if ( (1UL << order) > nr_pages )
+        panic("Domain 0 allocation is too small for kernel image.\n");
+
+    /* Allocate from DMA pool: PAE L3 table must be below 4GB boundary. */
+    if ( (page = alloc_domheap_pages(d, order, ALLOC_DOM_DMA)) == NULL )
+        panic("Not enough RAM for domain 0 allocation.\n");
+    alloc_spfn = page_to_pfn(page);
+    alloc_epfn = alloc_spfn + d->tot_pages;
 
     printk("PHYSICAL MEMORY ARRANGEMENT:\n"
            " Dom0 alloc.:   %"PRIphysaddr"->%"PRIphysaddr,
@@ -614,6 +617,8 @@ int construct_dom0(struct domain *d,
     
     /* DOM0 gets access to everything. */
     physdev_init_dom0(d);
+
+    init_domain_time(d);
 
     set_bit(_DOMF_constructed, &d->domain_flags);
 

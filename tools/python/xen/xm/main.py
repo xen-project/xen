@@ -265,7 +265,7 @@ def xm_brief_list(domsinfo):
     print 'Name              Id  Mem(MB)  CPU VCPU(s)  State  Time(s)'
     for dominfo in domsinfo:
         if dominfo.has_key("ssidref1"):
-            print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %s:%(ssidref2)02x/p:%(ssidref1)02x" % dominfo)
+            print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     s:%(ssidref2)02x/p:%(ssidref1)02x" % dominfo)
         else:
             print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f" % dominfo)
 
@@ -605,6 +605,10 @@ def xm_lookup_cmd(cmd):
         deprecated(cmd,aliases[cmd])
         return commands[aliases[cmd]]
     else:
+        if len( cmd ) > 1:
+            matched_commands = filter( lambda (command, func): command[ 0:len(cmd) ] == cmd, commands.iteritems() )
+            if len( matched_commands ) == 1:
+		        return matched_commands[0][1]
         err('Sub Command %s not found!' % cmd)
         usage()
 

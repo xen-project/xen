@@ -376,10 +376,10 @@ mixeng.o: mixeng.c mixeng.h mixeng_template.h
 	$(CC) $(DEFINES) -c -o $@ $<
 
 clean:
-	rm -rf *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe slirp qemu-vgaram-bin
+	rm -rf *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe slirp
 
 distclean:
-	rm -rf *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe slirp qemu-vgaram-bin
+	rm -rf *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe slirp
 
 install: all 
 	if [ ! -d $(INSTALL_DIR) ];then mkdir -p $(INSTALL_DIR);fi
@@ -387,8 +387,6 @@ install: all
 	install -m 755 -s $(PROGS) "$(INSTALL_DIR)"
 	install -m 755 qemu-dm.debug "$(INSTALL_DIR)"
 	install -m 755 qemu-ifup "$(DESTDIR)$(configdir)"
-	gunzip -c qemu-vgaram-bin.gz >qemu-vgaram-bin 
-	install -m 755 qemu-vgaram-bin "$(DESTDIR)$(configdir)"
 ifneq ($(wildcard .depend),)
 include .depend
 endif

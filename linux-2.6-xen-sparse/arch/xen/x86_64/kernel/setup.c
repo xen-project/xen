@@ -200,12 +200,14 @@ static struct resource adapter_rom_resources[] = {
 #define ADAPTER_ROM_RESOURCES \
 	(sizeof adapter_rom_resources / sizeof adapter_rom_resources[0])
 
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 static struct resource video_rom_resource = {
 	.name = "Video ROM",
 	.start = 0xc0000,
 	.end = 0xc7fff,
 	.flags = IORESOURCE_ROM,
 };
+#endif
 
 static struct resource video_ram_resource = {
 	.name = "Video RAM area",
@@ -599,6 +601,19 @@ static void __init print_memory_map(char *who)
         }
 }
 
+#ifdef CONFIG_XEN
+void __init smp_alloc_memory(void)
+{
+	int cpu;
+
+	for (cpu = 1; cpu < NR_CPUS; cpu++) {
+		cpu_gdt_descr[cpu].address = (unsigned long)
+			alloc_bootmem_low_pages(PAGE_SIZE);
+		/* XXX free unused pages later */
+	}
+}
+#endif
+
 void __init setup_arch(char **cmdline_p)
 {
 	int i, j;
@@ -739,6 +754,11 @@ void __init setup_arch(char **cmdline_p)
 			initrd_start = 0;
 		}
 	}
+#endif
+#ifdef CONFIG_SMP
+#ifdef CONFIG_XEN
+	smp_alloc_memory();
+#endif
 #endif
 	paging_init();
 #ifdef CONFIG_X86_LOCAL_APIC

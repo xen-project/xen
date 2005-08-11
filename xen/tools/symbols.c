@@ -311,7 +311,7 @@ write_src(void)
 	off = 0;
 	for (i = 0; i < cnt; i++) {
 
-		if (!table[i].flags & SYM_FLAG_VALID)
+		if (!(table[i].flags & SYM_FLAG_VALID))
 			continue;
 
 		if ((valid & 0xFF) == 0)

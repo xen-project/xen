@@ -248,10 +248,11 @@ void __init __start_xen(multiboot_info_t *mbi)
 {
     char *cmdline;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
-    unsigned long firsthole_start, nr_pages;
+    unsigned long nr_pages, modules_length;
     unsigned long initial_images_start, initial_images_end;
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
+    physaddr_t s, e;
     struct e820entry e820_raw[E820MAX];
     int i, e820_raw_nr = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
@@ -330,22 +331,31 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     max_page = init_e820(e820_raw, &e820_raw_nr);
 
-    /* Find the first high-memory RAM hole. */
-    for ( i = 0; i < e820.nr_map; i++ )
-        if ( (e820.map[i].type == E820_RAM) &&
-             (e820.map[i].addr >= 0x100000) )
-            break;
-    firsthole_start = e820.map[i].addr + e820.map[i].size;
+    modules_length = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
 
-    /* Relocate the Multiboot modules. */
-    initial_images_start = xenheap_phys_end;
-    initial_images_end   = initial_images_start + 
-        (mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
-    if ( initial_images_end > firsthole_start )
+    /* Find a large enough RAM extent to stash the DOM0 modules. */
+    for ( i = 0; ; i++ )
     {
-        printk("Not enough memory to stash the DOM0 kernel image.\n");
-        for ( ; ; ) ;
+        if ( (e820.map[i].type == E820_RAM) &&
+             (e820.map[i].size >= modules_length) &&
+             ((e820.map[i].addr + e820.map[i].size) >=
+              (xenheap_phys_end + modules_length)) )
+        {
+            /* Stash as near as possible to the beginning of the RAM extent. */
+            initial_images_start = e820.map[i].addr;
+            if ( initial_images_start < xenheap_phys_end )
+                initial_images_start = xenheap_phys_end;
+            initial_images_end = initial_images_start + modules_length;
+            break;
+        }
+
+        if ( i == e820.nr_map )
+        {
+            printk("Not enough memory to stash the DOM0 kernel image.\n");
+            for ( ; ; ) ;
+        }
     }
+
 #if defined(CONFIG_X86_32)
     memmove((void *)initial_images_start,  /* use low mapping */
             (void *)mod[0].mod_start,      /* use low mapping */
@@ -358,16 +368,23 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     /* Initialise boot-time allocator with all RAM situated after modules. */
     xenheap_phys_start = init_boot_allocator(__pa(&_end));
-    nr_pages   = 0;
+    nr_pages = 0;
     for ( i = 0; i < e820.nr_map; i++ )
     {
         if ( e820.map[i].type != E820_RAM )
             continue;
+
         nr_pages += e820.map[i].size >> PAGE_SHIFT;
-        if ( (e820.map[i].addr + e820.map[i].size) >= initial_images_end )
-            init_boot_pages((e820.map[i].addr < initial_images_end) ?
-                            initial_images_end : e820.map[i].addr,
-                            e820.map[i].addr + e820.map[i].size);
+
+        /* Initialise boot heap, skipping Xen heap and dom0 modules. */
+        s = e820.map[i].addr;
+        e = s + e820.map[i].size;
+        if ( s < xenheap_phys_end )
+            s = xenheap_phys_end;
+        if ( (s < initial_images_end) && (e > initial_images_start) )
+            s = initial_images_end;
+        init_boot_pages(s, e);
+
 #if defined (CONFIG_X86_64)
         /*
          * x86/64 maps all registered RAM. Points to note:
@@ -404,10 +421,30 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     end_boot_allocator();
 
-    init_xenheap_pages(xenheap_phys_start, xenheap_phys_end);
-    printk("Xen heap: %luMB (%lukB)\n",
-           (xenheap_phys_end-xenheap_phys_start) >> 20,
-           (xenheap_phys_end-xenheap_phys_start) >> 10);
+    /* Initialise the Xen heap, skipping RAM holes. */
+    nr_pages = 0;
+    for ( i = 0; i < e820.nr_map; i++ )
+    {
+        if ( e820.map[i].type != E820_RAM )
+            continue;
+
+        s = e820.map[i].addr;
+        e = s + e820.map[i].size;
+        if ( s < xenheap_phys_start )
+            s = xenheap_phys_start;
+        if ( e > xenheap_phys_end )
+            e = xenheap_phys_end;
+ 
+        if ( s < e )
+        {
+            nr_pages += (e - s) >> PAGE_SHIFT;
+            init_xenheap_pages(s, e);
+        }
+    }
+
+    printk("Xen heap: %luMB (%lukB)\n", 
+           nr_pages >> (20 - PAGE_SHIFT),
+           nr_pages << (PAGE_SHIFT - 10));
 
     early_boot = 0;
 
