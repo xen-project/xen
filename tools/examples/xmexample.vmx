@@ -83,8 +83,8 @@ vnc=1
 
 
 #-----------------------------------------------------------------------------
-#    set the real time clock to local time [default=utc]
-#localtime='utc'
+#    set the real time clock to local time [default=0 i.e. set to utc]
+#localtime=1
 
 
 #-----------------------------------------------------------------------------
