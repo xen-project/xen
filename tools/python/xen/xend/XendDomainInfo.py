@@ -557,12 +557,12 @@ class XendDomainInfo:
 
     def exportVCPUSToDB(self, vcpus):
         for v in range(0,vcpus):
-            path = "/cpus/cpu%d"%(v)
+            path = "/cpu/%d"%(v)
             if not self.vcpusdb.has_key(path):
                 self.vcpusdb[path] = self.db.addChild(path)
             db = self.vcpusdb[path]
-            log.debug("writing key online=1 to path %s in store"%(path))
-            db['online'] = "1"
+            log.debug("writing key availability=online to path %s in store"%(path))
+            db['availability'] = "online"
             db.saveDB(save=True)
 
     def init_image(self):
@@ -951,16 +951,16 @@ class XendDomainInfo:
         """
         db = ""
         try:
-            db = self.vcpusdb['/cpus/cpu%d'%(vcpu)]
+            db = self.vcpusdb['/cpu/%d'%(vcpu)]
         except:
             log.error("Invalid VCPU")
             return
 
         if self.store_channel:
             if int(state) == 0:
-                db['online'] = "0"
+                db['availability'] = "offline"
             else:
-                db['online'] = "1"
+                db['availability'] = "online"
 
         db.saveDB(save=True)
 
