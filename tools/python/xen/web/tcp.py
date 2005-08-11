@@ -85,6 +85,9 @@ def listenTCP(port, factory, interface='', backlog=None):
     l.startListening()
     return l
 
+def SetCloExec(SocketListener):
+    SocketListener.SetCloExec()
+
 def connectTCP(host, port, factory, timeout=None, bindAddress=None):
     c = TCPConnector(host, port, factory, timeout=timeout, bindAddress=bindAddress)
     c.connect()

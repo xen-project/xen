@@ -262,7 +262,7 @@ class VmxImageHandler(ImageHandler):
     memmap = None
     memmap_value = []
     device_channel = None
-
+    pid = 0
     def createImage(self):
         """Create a VM for the VMX environment.
         """
@@ -379,6 +379,7 @@ class VmxImageHandler(ImageHandler):
         log.info("spawning device models: %s %s", device_model, args)
         self.pid = os.spawnve(os.P_NOWAIT, device_model, args, env)
         log.info("device model pid: %d", self.pid)
+        return self.pid
 
     def vncParams(self):
         # see if a vncviewer was specified
@@ -398,8 +399,11 @@ class VmxImageHandler(ImageHandler):
     def destroy(self):
         channel.eventChannelClose(self.device_channel)
         import signal
+        if not self.pid:
+            self.pid = self.vm.device_model_pid
         os.kill(self.pid, signal.SIGKILL)
         (pid, status) = os.waitpid(self.pid, 0)
+        self.pid = 0
 
     def getDomainMemory(self, mem_mb):
         # for ioreq_t and xenstore

@@ -140,7 +140,8 @@ def listenRelocation():
     if xroot.get_xend_relocation_server():
         port = xroot.get_xend_relocation_port()
         interface = xroot.get_xend_relocation_address()
-        reactor.listenTCP(port, factory, interface=interface)
+        l = reactor.listenTCP(port, factory, interface=interface)
+        l.setCloExec()
 
 def setupRelocation(dst, port):
     try:
