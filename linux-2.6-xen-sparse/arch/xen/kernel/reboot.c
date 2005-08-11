@@ -6,6 +6,7 @@
 #include <linux/module.h>
 #include <linux/reboot.h>
 #include <linux/sysrq.h>
+#include <linux/stringify.h>
 #include <asm/irq.h>
 #include <asm/mmu_context.h>
 #include <asm-xen/evtchn.h>
@@ -254,7 +255,8 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
     char *str;
 
     str = (char *)xenbus_read("control", "shutdown", NULL);
-    if (IS_ERR(str))
+    /* Ignore read errors and recursive shutdown events. */
+    if (IS_ERR(str) || !strcmp(str, __stringify(SHUTDOWN_INVALID)))
         return;
 
     xenbus_printf("control", "shutdown", "%i", SHUTDOWN_INVALID);
