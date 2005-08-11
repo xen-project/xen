@@ -605,6 +605,10 @@ def xm_lookup_cmd(cmd):
         deprecated(cmd,aliases[cmd])
         return commands[aliases[cmd]]
     else:
+        if len( cmd ) > 1:
+            matched_commands = filter( lambda (command, func): command[ 0:len(cmd) ] == cmd, commands.iteritems() )
+            if len( matched_commands ) == 1:
+		        return matched_commands[0][1]
         err('Sub Command %s not found!' % cmd)
         usage()
 
