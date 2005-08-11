@@ -612,7 +612,7 @@ void usage(char *progname)
 int main(int argc, char **argv)
 {
 
-    int acm_cmd_fd, ret;
+    int acm_cmd_fd, ret = 0;
 
     if (argc < 2)
         usage(argv[0]);

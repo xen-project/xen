@@ -429,7 +429,7 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
        - that should be sent this iteration (unless later marked as skip); 
        - to skip this iteration because already dirty;
        - to fixup by sending at the end if not already resent; */
-    unsigned long *to_send, *to_skip, *to_fix;
+    unsigned long *to_send = NULL, *to_skip = NULL, *to_fix = NULL;
     
     xc_shadow_control_stats_t stats;
 
@@ -1053,6 +1053,18 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
 
     if (pfn_type != NULL) 
         free(pfn_type);
+
+    if (pfn_batch != NULL)
+        free(pfn_batch);
+
+    if (to_send != NULL)
+        free(to_send);
+
+    if (to_fix != NULL)
+        free(to_fix);
+
+    if (to_skip != NULL)
+       free(to_skip);
 
     DPRINTF("Save exit rc=%d\n",rc);
     return !!rc;
