@@ -265,7 +265,7 @@ def xm_brief_list(domsinfo):
     print 'Name              Id  Mem(MB)  CPU VCPU(s)  State  Time(s)'
     for dominfo in domsinfo:
         if dominfo.has_key("ssidref1"):
-            print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     %s:%(ssidref2)02x/p:%(ssidref1)02x" % dominfo)
+            print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     s:%(ssidref2)02x/p:%(ssidref1)02x" % dominfo)
         else:
             print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f" % dominfo)
 
