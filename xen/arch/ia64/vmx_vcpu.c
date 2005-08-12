@@ -111,7 +111,7 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
     }
     new_psr.val=vmx_vcpu_get_psr(vcpu);
     {
-    struct xen_regs *regs = vcpu_regs(vcpu);
+    struct pt_regs *regs = vcpu_regs(vcpu);
     guest_psr_buf[guest_psr_index].ip = regs->cr_iip;
     guest_psr_buf[guest_psr_index].psr = new_psr.val;
     if (++guest_psr_index >= 100)
@@ -141,7 +141,7 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
     return IA64_NO_FAULT;
 }
 
-/* Adjust slot both in xen_regs and vpd, upon vpsr.ri which
+/* Adjust slot both in pt_regs and vpd, upon vpsr.ri which
  * should have sync with ipsr in entry.
  *
  * Clear some bits due to successfully emulation.
