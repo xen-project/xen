@@ -1353,83 +1353,82 @@ static void __vcpu_hotplug_handler(void *unused)
 		printk(KERN_ALERT "Error creating hotplug_cpu process!\n");
 }
 
-static void handle_cpus_watch(struct xenbus_watch *, const char *);
-static struct notifier_block xsn_cpus;
+static void handle_vcpu_hotplug_event(struct xenbus_watch *, const char *);
+static struct notifier_block xsn_cpu;
 
 /* xenbus watch struct */
-static struct xenbus_watch cpus_watch = {
-	.node = "cpus",
-	.callback = handle_cpus_watch,
+static struct xenbus_watch cpu_watch = {
+	.node = "cpu",
+	.callback = handle_vcpu_hotplug_event
 };
 
-static int setup_cpus_watcher(struct notifier_block *notifier,
+/* NB: Assumes xenbus_lock is held! */
+static int setup_cpu_watcher(struct notifier_block *notifier,
 			      unsigned long event, void *data)
 {
 	int err = 0;
 
-	down(&xenbus_lock);
-	err = register_xenbus_watch(&cpus_watch);
-	up(&xenbus_lock);
+	BUG_ON(down_trylock(&xenbus_lock) == 0);
+	err = register_xenbus_watch(&cpu_watch);
 
 	if (err) {
-		printk("Failed to set cpus watcher\n");
+		printk("Failed to register watch on /cpu\n");
 	}
+
 	return NOTIFY_DONE;
 }
 
-static void handle_cpus_watch(struct xenbus_watch *watch, const char *node)
+static void handle_vcpu_hotplug_event(struct xenbus_watch *watch, const char *node)
 {
 	static DECLARE_WORK(vcpu_hotplug_work, __vcpu_hotplug_handler, NULL);
 	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
 	ssize_t ret;
-	int err, cpu, state;
+	int err, cpu;
+	char state[8];
 	char dir[32];
 	char *cpustr;
 
-	/* get a pointer to start of cpus/cpu string */
-	if ((cpustr = strstr(node, "cpus/cpu")) != NULL) {
+	/* get a pointer to start of cpu string */
+	if ((cpustr = strstr(node, "cpu/")) != NULL) {
 
 		/* find which cpu state changed, note vcpu for handler */
-		sscanf(cpustr, "cpus/cpu%d", &cpu);
+		sscanf(cpustr, "cpu/%d", &cpu);
 		handler->vcpu = cpu;
 
 		/* calc the dir for xenbus read */
-		sprintf(dir, "cpus/cpu%d", cpu);
+		sprintf(dir, "cpu/%d", cpu);
 
-		/* make sure watch that was triggered is changes to the online key */
-		if ((strcmp(node + strlen(dir), "/online")) != 0)
+		/* make sure watch that was triggered is changes to the correct key */
+		if ((strcmp(node + strlen(dir), "/availability")) != 0)
 			return;
 
 		/* get the state value */
-		xenbus_transaction_start("cpus");
-		err = xenbus_scanf(dir, "online", "%d", &state);
+		xenbus_transaction_start("cpu");
+		err = xenbus_scanf(dir, "availability", "%s", state);
 		xenbus_transaction_end(0);
 
 		if (err != 1) {
 			printk(KERN_ERR
-			       "XENBUS: Unable to read cpu online state\n");
+			       "XENBUS: Unable to read cpu state\n");
 			return;
 		}
 
 		/* if we detect a state change, take action */
-		switch (state) {
+		if (strcmp(state, "online") == 0) {
 			/* offline -> online */
-		case 1:
 			if (!cpu_isset(cpu, cpu_online_map)) {
 				handler->fn = (void *)&cpu_up;
 				ret = schedule_work(&vcpu_hotplug_work);
-			}
-			break;
+			} 
+		} else if (strcmp(state, "offline") == 0) {
 			/* online -> offline */
-		case 0:
 			if (cpu_isset(cpu, cpu_online_map)) {
 				handler->fn = (void *)&cpu_down;
 				ret = schedule_work(&vcpu_hotplug_work);
-			}
-			break;
-		default:
+			} 
+		} else {
 			printk(KERN_ERR
-			       "XENBUS: unknown state(%d) on node(%s)\n", state,
+			       "XENBUS: unknown state(%s) on node(%s)\n", state,
 			       node);
 		}
 	}
@@ -1438,13 +1437,9 @@ static void handle_cpus_watch(struct xenbus_watch *watch, const char *node)
 
 static int __init setup_vcpu_hotplug_event(void)
 {
-	xsn_cpus.notifier_call = setup_cpus_watcher;
+	xsn_cpu.notifier_call = setup_cpu_watcher;
 
-	if (xen_start_info.store_evtchn) {
-		setup_cpus_watcher(&xsn_cpus, 0, NULL);
-	} else {
-		register_xenstore_notifier(&xsn_cpus);
-	}
+	register_xenstore_notifier(&xsn_cpu);
 
 	return 0;
 }

@@ -133,11 +133,12 @@ typedef struct {
 /*
  * Set clock such that it would read <secs,nsecs> after 00:00:00 UTC,
  * 1 January, 1970 if the current system time was <system_time>.
+ * NB. <secs> can be negative, but <nsecs> must always be non-negative.
  */
 #define DOM0_SETTIME          17
 typedef struct {
     /* IN variables. */
-    u32 secs;
+    s64 secs;
     u32 nsecs;
     u64 system_time;
 } dom0_settime_t;

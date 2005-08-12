@@ -221,7 +221,7 @@ map_domain_va(unsigned long domid, int cpu, void * guest_va, int perm)
     return (void *)(((unsigned long)page_virt[cpu]) | (va & BSD_PAGE_MASK));
 
  error_out:
-    return 0;
+    return NULL;
 }
 
 int 

@@ -295,48 +295,23 @@ void arch_do_boot_vcpu(struct vcpu *v)
         l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
 }
 
-void
-arch_migrate_cpu(struct vcpu *v, int newcpu)
+void vcpu_migrate_cpu(struct vcpu *v, int newcpu)
 {
-    if ( VMX_DOMAIN(v) && (v->processor != newcpu) ){
-        u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
-        __vmpclear(vmcs_phys_ptr);
+    if ( v->processor == newcpu )
+        return;
+
+    set_bit(_VCPUF_cpu_migrated, &v->vcpu_flags);
+    v->processor = newcpu;
+
+    if ( VMX_DOMAIN(v) )
+    {
+        __vmpclear(virt_to_phys(v->arch.arch_vmx.vmcs));
         v->arch.schedule_tail = arch_vmx_do_relaunch;
     }
 }
 
 #ifdef CONFIG_VMX
 static int vmx_switch_on;
-
-void arch_vmx_do_resume(struct vcpu *v) 
-{
-    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
-
-    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
-    vmx_do_resume(v);
-    reset_stack_and_jump(vmx_asm_do_resume);
-}
-
-void arch_vmx_do_launch(struct vcpu *v) 
-{
-    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
-
-    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
-    vmx_do_launch(v);
-    reset_stack_and_jump(vmx_asm_do_launch);
-}
-
-void arch_vmx_do_relaunch(struct vcpu *v)
-{
-    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
-
-    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
-    vmx_do_resume(v);
-    vmx_set_host_env(v);
-    v->arch.schedule_tail = arch_vmx_do_resume;
-
-    reset_stack_and_jump(vmx_asm_do_relaunch);
-}
 
 static int vmx_final_setup_guest(
     struct vcpu *v, struct vcpu_guest_context *ctxt)
@@ -368,7 +343,7 @@ static int vmx_final_setup_guest(
 
     v->arch.schedule_tail = arch_vmx_do_launch;
 
-#if defined (__i386)
+#if defined (__i386__)
     v->domain->arch.vmx_platform.real_mode_data = 
         (unsigned long *) regs->esi;
 #endif

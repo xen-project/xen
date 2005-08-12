@@ -150,7 +150,7 @@ void __init zap_low_mappings(l2_pgentry_t *base)
 void subarch_init_memory(struct domain *dom_xen)
 {
     unsigned long m2p_start_mfn;
-    int i;
+    unsigned int i, j;
 
     /*
      * We are rather picky about the layout of 'struct pfn_info'. The
@@ -174,12 +174,12 @@ void subarch_init_memory(struct domain *dom_xen)
     {
         m2p_start_mfn = l2e_get_pfn(
             idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i]);
-        for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
+        for ( j = 0; j < L2_PAGETABLE_ENTRIES; j++ )
         {
-            frame_table[m2p_start_mfn+i].count_info = PGC_allocated | 1;
+            frame_table[m2p_start_mfn+j].count_info = PGC_allocated | 1;
             /* Ensure it's only mapped read-only by domains. */
-            frame_table[m2p_start_mfn+i].u.inuse.type_info = PGT_gdt_page | 1;
-            page_set_owner(&frame_table[m2p_start_mfn+i], dom_xen);
+            frame_table[m2p_start_mfn+j].u.inuse.type_info = PGT_gdt_page | 1;
+            page_set_owner(&frame_table[m2p_start_mfn+j], dom_xen);
         }
     }
 }

@@ -336,25 +336,24 @@ void __init __start_xen(multiboot_info_t *mbi)
     /* Find a large enough RAM extent to stash the DOM0 modules. */
     for ( i = 0; ; i++ )
     {
-        if ( (e820.map[i].type == E820_RAM) &&
-             (e820.map[i].size >= modules_length) &&
-             ((e820.map[i].addr + e820.map[i].size) >=
-              (xenheap_phys_end + modules_length)) )
-        {
-            /* Stash as near as possible to the beginning of the RAM extent. */
-            initial_images_start = e820.map[i].addr;
-            if ( initial_images_start < xenheap_phys_end )
-                initial_images_start = xenheap_phys_end;
-            initial_images_end = initial_images_start + modules_length;
-            break;
-        }
-
         if ( i == e820.nr_map )
         {
             printk("Not enough memory to stash the DOM0 kernel image.\n");
             for ( ; ; ) ;
         }
+        
+        if ( (e820.map[i].type == E820_RAM) &&
+             (e820.map[i].size >= modules_length) &&
+             ((e820.map[i].addr + e820.map[i].size) >=
+              (xenheap_phys_end + modules_length)) )
+            break;
     }
+
+    /* Stash as near as possible to the beginning of the RAM extent. */
+    initial_images_start = e820.map[i].addr;
+    if ( initial_images_start < xenheap_phys_end )
+        initial_images_start = xenheap_phys_end;
+    initial_images_end = initial_images_start + modules_length;
 
 #if defined(CONFIG_X86_32)
     memmove((void *)initial_images_start,  /* use low mapping */

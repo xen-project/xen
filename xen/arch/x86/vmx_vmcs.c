@@ -543,6 +543,36 @@ void vm_resume_fail(unsigned long eflags)
     __vmx_bug(guest_cpu_user_regs());
 }
 
+void arch_vmx_do_resume(struct vcpu *v) 
+{
+    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
+
+    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
+    vmx_do_resume(v);
+    reset_stack_and_jump(vmx_asm_do_resume);
+}
+
+void arch_vmx_do_launch(struct vcpu *v) 
+{
+    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
+
+    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
+    vmx_do_launch(v);
+    reset_stack_and_jump(vmx_asm_do_launch);
+}
+
+void arch_vmx_do_relaunch(struct vcpu *v)
+{
+    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
+
+    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
+    vmx_do_resume(v);
+    vmx_set_host_env(v);
+    v->arch.schedule_tail = arch_vmx_do_resume;
+
+    reset_stack_and_jump(vmx_asm_do_relaunch);
+}
+
 #endif /* CONFIG_VMX */
 
 /*

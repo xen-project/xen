@@ -43,7 +43,7 @@ xc_domain_dumpcore(int xc_handle,
 		goto error_out;
 	}
 	
-	if ((dump_mem_start = malloc(DUMP_INCREMENT*PAGE_SIZE)) == 0) {
+	if ((dump_mem_start = malloc(DUMP_INCREMENT*PAGE_SIZE)) == NULL) {
 		PERROR("Could not allocate dump_mem");
 		goto error_out;
 	}
@@ -108,9 +108,8 @@ xc_domain_dumpcore(int xc_handle,
 	free(dump_mem_start);
 	return 0;
  error_out:
-	if (dump_fd)
+	if (dump_fd != -1)
 		close(dump_fd);
-	if (dump_mem_start)
-		free(dump_mem_start);
+	free(dump_mem_start);
 	return -1;
 }

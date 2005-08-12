@@ -136,7 +136,7 @@ static long long tv_to_us( struct timeval *new )
     return (new->tv_sec * 1000000) + new->tv_usec;
 }
 
-static long long llgettimeofday()
+static long long llgettimeofday( void )
 {
     struct timeval now;
     gettimeofday(&now, NULL);
@@ -312,9 +312,9 @@ static int analysis_phase( int xc_handle, u32 domid,
 }
 
 
-int suspend_and_state(int xc_handle, int io_fd,	int dom,	      
-                      xc_dominfo_t *info,
-                      vcpu_guest_context_t *ctxt)
+static int suspend_and_state(int xc_handle, int io_fd,	int dom,	      
+                             xc_dominfo_t *info,
+                             vcpu_guest_context_t *ctxt)
 {
     int i=0;
     char ans[30];
@@ -429,7 +429,7 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
        - that should be sent this iteration (unless later marked as skip); 
        - to skip this iteration because already dirty;
        - to fixup by sending at the end if not already resent; */
-    unsigned long *to_send, *to_skip, *to_fix;
+    unsigned long *to_send = NULL, *to_skip = NULL, *to_fix = NULL;
     
     xc_shadow_control_stats_t stats;
 
@@ -1051,8 +1051,11 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
     if(live_mfn_to_pfn_table) 
         munmap(live_mfn_to_pfn_table, PAGE_SIZE*1024);
 
-    if (pfn_type != NULL) 
-        free(pfn_type);
+    free(pfn_type);
+    free(pfn_batch);
+    free(to_send);
+    free(to_fix);
+    free(to_skip);
 
     DPRINTF("Save exit rc=%d\n",rc);
     return !!rc;

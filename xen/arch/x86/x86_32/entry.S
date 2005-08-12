@@ -183,6 +183,7 @@ ENTRY(vmx_asm_do_relaunch)
 
 #endif
 
+        ALIGN
 restore_all_guest:
         testl $X86_EFLAGS_VM,UREGS_eflags(%esp)
         jnz  restore_all_vm86
