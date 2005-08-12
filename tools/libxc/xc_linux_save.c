@@ -1051,20 +1051,11 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
     if(live_mfn_to_pfn_table) 
         munmap(live_mfn_to_pfn_table, PAGE_SIZE*1024);
 
-    if (pfn_type != NULL) 
-        free(pfn_type);
-
-    if (pfn_batch != NULL)
-        free(pfn_batch);
-
-    if (to_send != NULL)
-        free(to_send);
-
-    if (to_fix != NULL)
-        free(to_fix);
-
-    if (to_skip != NULL)
-       free(to_skip);
+    free(pfn_type);
+    free(pfn_batch);
+    free(to_send);
+    free(to_fix);
+    free(to_skip);
 
     DPRINTF("Save exit rc=%d\n",rc);
     return !!rc;
