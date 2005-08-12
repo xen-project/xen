@@ -7,7 +7,7 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 MAJOR    = 3.0
 MINOR    = 0
 
-CC       = sparse
+CC       = gcc
 
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
