@@ -318,8 +318,7 @@ static int setup_guest(int xc_handle,
     return 0;
 
  error_out:
-    if ( page_array != NULL )
-        free(page_array);
+    free(page_array);
     return -1;
 }
 #else /* x86 */
@@ -616,10 +615,8 @@ static int setup_guest(int xc_handle,
     return 0;
 
  error_out:
-    if ( mmu != NULL )
-        free(mmu);
-    if ( page_array != NULL )
-        free(page_array);
+    free(mmu);
+    free(page_array);
     return -1;
 }
 #endif
@@ -719,8 +716,7 @@ int xc_linux_build(int xc_handle,
         close(initrd_fd);
     if ( initrd_gfd )
         gzclose(initrd_gfd);
-    if ( image != NULL )
-        free(image);
+    free(image);
 
 #ifdef __ia64__
     /* based on new_thread in xen/arch/ia64/domain.c */
@@ -806,8 +802,7 @@ int xc_linux_build(int xc_handle,
         gzclose(initrd_gfd);
     else if ( initrd_fd >= 0 )
         close(initrd_fd);
-    if ( image != NULL )
-        free(image);
+    free(image);
 
     return -1;
 }

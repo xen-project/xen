@@ -309,8 +309,7 @@ loadelfsymtab(
     dsi->v_end = round_pgup(maxva);
 
  out:
-    if ( p != NULL )
-        free(p);
+    free(p);
 
     return 0;
 }

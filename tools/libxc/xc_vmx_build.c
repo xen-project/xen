@@ -616,17 +616,15 @@ static int setup_guest(int xc_handle,
     return 0;
 
  error_out:
-    if ( mmu != NULL )
-        free(mmu);
-    if ( page_array != NULL )
-        free(page_array);
+    free(mmu);
+    free(page_array);
     return -1;
 }
 
 
 #define VMX_FEATURE_FLAG 0x20
 
-int vmx_identify(void)
+static int vmx_identify(void)
 {
     int eax, ecx;
 
@@ -745,8 +743,7 @@ int xc_vmx_build(int xc_handle,
         close(initrd_fd);
     if ( initrd_gfd )
         gzclose(initrd_gfd);
-    if ( image != NULL )
-        free(image);
+    free(image);
 
     ctxt->flags = VGCF_VMX_GUEST;
     /* FPU is set up to default initial state. */
@@ -801,8 +798,7 @@ int xc_vmx_build(int xc_handle,
         gzclose(initrd_gfd);
     else if ( initrd_fd >= 0 )
         close(initrd_fd);
-    if ( image != NULL )
-        free(image);
+    free(image);
 
     return -1;
 }

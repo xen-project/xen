@@ -32,7 +32,7 @@
 #define PPRINTF(_f, _a...)
 #endif
 
-ssize_t
+static ssize_t
 read_exact(int fd, void *buf, size_t count)
 {
     int r = 0, s;
@@ -607,12 +607,9 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
  out:
     if ( (rc != 0) && (dom != 0) )
         xc_domain_destroy(xc_handle, dom);
-    if ( mmu != NULL )
-        free(mmu);
-    if ( pfn_to_mfn_table != NULL )
-        free(pfn_to_mfn_table);
-    if ( pfn_type != NULL )
-        free(pfn_type);
+    free(mmu);
+    free(pfn_to_mfn_table);
+    free(pfn_type);
 
     DPRINTF("Restore exit with rc=%d\n", rc);
     return rc;

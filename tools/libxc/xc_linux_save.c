@@ -136,7 +136,7 @@ static long long tv_to_us( struct timeval *new )
     return (new->tv_sec * 1000000) + new->tv_usec;
 }
 
-static long long llgettimeofday()
+static long long llgettimeofday( void )
 {
     struct timeval now;
     gettimeofday(&now, NULL);
@@ -312,9 +312,9 @@ static int analysis_phase( int xc_handle, u32 domid,
 }
 
 
-int suspend_and_state(int xc_handle, int io_fd,	int dom,	      
-                      xc_dominfo_t *info,
-                      vcpu_guest_context_t *ctxt)
+static int suspend_and_state(int xc_handle, int io_fd,	int dom,	      
+                             xc_dominfo_t *info,
+                             vcpu_guest_context_t *ctxt)
 {
     int i=0;
     char ans[30];
@@ -1051,20 +1051,11 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
     if(live_mfn_to_pfn_table) 
         munmap(live_mfn_to_pfn_table, PAGE_SIZE*1024);
 
-    if (pfn_type != NULL) 
-        free(pfn_type);
-
-    if (pfn_batch != NULL)
-        free(pfn_batch);
-
-    if (to_send != NULL)
-        free(to_send);
-
-    if (to_fix != NULL)
-        free(to_fix);
-
-    if (to_skip != NULL)
-       free(to_skip);
+    free(pfn_type);
+    free(pfn_batch);
+    free(to_send);
+    free(to_fix);
+    free(to_skip);
 
     DPRINTF("Save exit rc=%d\n",rc);
     return !!rc;
