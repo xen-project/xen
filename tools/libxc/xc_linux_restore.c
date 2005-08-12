@@ -32,7 +32,7 @@
 #define PPRINTF(_f, _a...)
 #endif
 
-ssize_t
+static ssize_t
 read_exact(int fd, void *buf, size_t count)
 {
     int r = 0, s;

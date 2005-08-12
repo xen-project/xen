@@ -136,7 +136,7 @@ static long long tv_to_us( struct timeval *new )
     return (new->tv_sec * 1000000) + new->tv_usec;
 }
 
-static long long llgettimeofday()
+static long long llgettimeofday( void )
 {
     struct timeval now;
     gettimeofday(&now, NULL);
@@ -312,9 +312,9 @@ static int analysis_phase( int xc_handle, u32 domid,
 }
 
 
-int suspend_and_state(int xc_handle, int io_fd,	int dom,	      
-                      xc_dominfo_t *info,
-                      vcpu_guest_context_t *ctxt)
+static int suspend_and_state(int xc_handle, int io_fd,	int dom,	      
+                             xc_dominfo_t *info,
+                             vcpu_guest_context_t *ctxt)
 {
     int i=0;
     char ans[30];

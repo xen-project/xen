@@ -624,7 +624,7 @@ static int setup_guest(int xc_handle,
 
 #define VMX_FEATURE_FLAG 0x20
 
-int vmx_identify(void)
+static int vmx_identify(void)
 {
     int eax, ecx;
 
