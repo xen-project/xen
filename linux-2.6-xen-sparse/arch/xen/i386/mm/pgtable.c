@@ -222,8 +222,8 @@ void pte_free(struct page *pte)
 	unsigned long va = (unsigned long)__va(page_to_pfn(pte)<<PAGE_SHIFT);
 
 	if (!pte_write(*virt_to_ptep(va)))
-		HYPERVISOR_update_va_mapping(
-			va, pfn_pte(page_to_pfn(pte), PAGE_KERNEL), 0);
+		BUG_ON(HYPERVISOR_update_va_mapping(
+			va, pfn_pte(page_to_pfn(pte), PAGE_KERNEL), 0));
 
 	ClearPageForeign(pte);
 	set_page_count(pte, 1);
@@ -355,10 +355,10 @@ void pgd_free(pgd_t *pgd)
 
 	if (!pte_write(*ptep)) {
 		xen_pgd_unpin(__pa(pgd));
-		HYPERVISOR_update_va_mapping(
+		BUG_ON(HYPERVISOR_update_va_mapping(
 			(unsigned long)pgd,
 			pfn_pte(virt_to_phys(pgd)>>PAGE_SHIFT, PAGE_KERNEL),
-			0);
+			0));
 	}
 
 	/* in the PAE case user pgd entries are overwritten before usage */
@@ -451,9 +451,9 @@ static inline void mm_walk_set_prot(void *pt, pgprot_t flags)
 
 	if (PageHighMem(page))
 		return;
-	HYPERVISOR_update_va_mapping(
+	BUG_ON(HYPERVISOR_update_va_mapping(
 		(unsigned long)__va(pfn << PAGE_SHIFT),
-		pfn_pte(pfn, flags), 0);
+		pfn_pte(pfn, flags), 0));
 }
 
 static void mm_walk(struct mm_struct *mm, pgprot_t flags)
@@ -492,10 +492,10 @@ void mm_pin(struct mm_struct *mm)
     spin_lock(&mm->page_table_lock);
 
     mm_walk(mm, PAGE_KERNEL_RO);
-    HYPERVISOR_update_va_mapping(
+    BUG_ON(HYPERVISOR_update_va_mapping(
         (unsigned long)mm->pgd,
         pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL_RO),
-        UVMF_TLB_FLUSH);
+        UVMF_TLB_FLUSH));
     xen_pgd_pin(__pa(mm->pgd));
     mm->context.pinned = 1;
     spin_lock(&mm_unpinned_lock);
@@ -510,9 +510,9 @@ void mm_unpin(struct mm_struct *mm)
     spin_lock(&mm->page_table_lock);
 
     xen_pgd_unpin(__pa(mm->pgd));
-    HYPERVISOR_update_va_mapping(
+    BUG_ON(HYPERVISOR_update_va_mapping(
         (unsigned long)mm->pgd,
-        pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL), 0);
+        pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL), 0));
     mm_walk(mm, PAGE_KERNEL);
     xen_tlb_flush();
     mm->context.pinned = 0;

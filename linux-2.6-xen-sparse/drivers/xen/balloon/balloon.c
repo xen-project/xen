@@ -211,11 +211,11 @@ static void balloon_process(void *unused)
             /* Link back into the page tables if it's not a highmem page. */
             if ( pfn < max_low_pfn )
             {
-                HYPERVISOR_update_va_mapping(
+                BUG_ON(HYPERVISOR_update_va_mapping(
                     (unsigned long)__va(pfn << PAGE_SHIFT),
                     __pte_ma((mfn_list[i] << PAGE_SHIFT) |
                              pgprot_val(PAGE_KERNEL)),
-                    0);
+                    0));
             }
 
             /* Finally, relinquish the memory back to the system allocator. */
@@ -249,8 +249,8 @@ static void balloon_process(void *unused)
             {
                 v = phys_to_virt(pfn << PAGE_SHIFT);
                 scrub_pages(v, 1);
-                HYPERVISOR_update_va_mapping(
-                    (unsigned long)v, __pte_ma(0), 0);
+                BUG_ON(HYPERVISOR_update_va_mapping(
+                    (unsigned long)v, __pte_ma(0), 0));
             }
 #ifdef CONFIG_XEN_SCRUB_PAGES
             else
