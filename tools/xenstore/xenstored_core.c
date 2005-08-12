@@ -1587,7 +1587,7 @@ static struct option options[] = { { "no-fork", 0, NULL, 'N' },
 
 int main(int argc, char *argv[])
 {
-	int opt, *sock, *ro_sock, event_fd, max, tmpout;
+	int opt, *sock, *ro_sock, event_fd, max;
 	struct sockaddr_un addr;
 	fd_set inset, outset;
 	bool dofork = true;
@@ -1673,9 +1673,8 @@ int main(int argc, char *argv[])
 	restore_existing_connections();
 
 	if (outputpid) {
-		char buffer[20];
-		sprintf(buffer, "%i\n", getpid());
-		write(tmpout, buffer, strlen(buffer));
+		printf("%i\n", getpid());
+		fflush(stdout);
 	}
 
 	/* close stdin/stdout now we're ready to accept connections */
