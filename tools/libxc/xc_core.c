@@ -108,7 +108,7 @@ xc_domain_dumpcore(int xc_handle,
 	free(dump_mem_start);
 	return 0;
  error_out:
-	if (dump_fd)
+	if (dump_fd != -1)
 		close(dump_fd);
 	free(dump_mem_start);
 	return -1;
