@@ -286,8 +286,8 @@ void xen_contig_memory(unsigned long vstart, unsigned int order)
         pmd = pmd_offset(pud, (vstart + (i*PAGE_SIZE)));
         pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
         mfn = pte_mfn(*pte);
-        HYPERVISOR_update_va_mapping(
-            vstart + (i*PAGE_SIZE), __pte_ma(0), 0);
+        BUG_ON(HYPERVISOR_update_va_mapping(
+            vstart + (i*PAGE_SIZE), __pte_ma(0), 0));
         phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
             INVALID_P2M_ENTRY;
         BUG_ON(HYPERVISOR_dom_mem_op(
@@ -300,9 +300,9 @@ void xen_contig_memory(unsigned long vstart, unsigned int order)
 
     /* 3. Map the new extent in place of old pages. */
     for (i = 0; i < (1<<order); i++) {
-        HYPERVISOR_update_va_mapping(
+        BUG_ON(HYPERVISOR_update_va_mapping(
             vstart + (i*PAGE_SIZE),
-            __pte_ma(((mfn+i)<<PAGE_SHIFT)|__PAGE_KERNEL), 0);
+            __pte_ma(((mfn+i)<<PAGE_SHIFT)|__PAGE_KERNEL), 0));
         xen_machphys_update(mfn+i, (__pa(vstart)>>PAGE_SHIFT)+i);
         phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = mfn+i;
     }
@@ -345,7 +345,8 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
 #ifdef CONFIG_X86_64
         xen_l1_entry_update(pte, __pte(0));
 #else
-        HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE), __pte_ma(0), 0);
+        BUG_ON(HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE), 
+					    __pte_ma(0), 0));
 #endif
         phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
             INVALID_P2M_ENTRY;
