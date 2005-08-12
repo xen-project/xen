@@ -306,7 +306,7 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	mov r28=IA64_TIMER_VECTOR;;
 	cmp.ne p6,p0=r28,r30
 (p6)	br.cond.spnt.few rp;;
-	movl r20=(PERCPU_ADDR)+IA64_CPUINFO_ITM_NEXT_OFFSET;;
+	movl r20=THIS_CPU(cpu_info)+IA64_CPUINFO_ITM_NEXT_OFFSET;;
 	ld8 r26=[r20];;
 	mov r27=ar.itc;;
 	adds r27=200,r27;;	// safety margin
@@ -1305,7 +1305,7 @@ ENTRY(hyper_set_itm)
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
 #endif
-	movl r20=(PERCPU_ADDR)+IA64_CPUINFO_ITM_NEXT_OFFSET;;
+	movl r20=THIS_CPU(cpu_info)+IA64_CPUINFO_ITM_NEXT_OFFSET;;
 	ld8 r21=[r20];;
 	mov r20=IA64_KR(CURRENT);;
 	adds r20=IA64_VCPU_DOMAIN_ITM_OFFSET,r20;;
