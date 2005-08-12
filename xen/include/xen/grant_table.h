@@ -61,11 +61,12 @@ typedef struct {
  * table of these, indexes into which are returned as a 'mapping handle'.
  */
 typedef struct {
-    u16      ref_and_flags; /* 0-2: GNTMAP_* ; 3-15: grant ref */
+    u16      ref_and_flags; /* 0-4: GNTMAP_* ; 5-15: grant ref */
     domid_t  domid;         /* granting domain */
 } grant_mapping_t;
-#define MAPTRACK_GNTMAP_MASK 7
-#define MAPTRACK_REF_SHIFT   3
+#define MAPTRACK_GNTMAP_MASK  0x1f
+#define MAPTRACK_REF_SHIFT       5
+#define MAPTRACK_MAX_ENTRIES ( 1 << (16 - MAPTRACK_REF_SHIFT) )
 
 /* Per-domain grant information. */
 typedef struct {

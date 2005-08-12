@@ -365,4 +365,13 @@ int update_grant_va_mapping(unsigned long va,
                             l1_pgentry_t _nl1e, 
                             struct domain *d,
                             struct vcpu *v);
+int update_grant_va_mapping_pte(unsigned long pte_addr,
+                            l1_pgentry_t _nl1e, 
+                            struct domain *d,
+                            struct vcpu *v);
+
+int clear_grant_va_mapping(unsigned long addr, unsigned long frame);
+int clear_grant_va_mapping_pte(unsigned long addr, unsigned long frame,
+                            struct domain *d);
+
 #endif /* __ASM_X86_MM_H__ */

@@ -2268,6 +2268,197 @@ int do_mmu_update(
     return rc;
 }
 
+
+int update_grant_va_mapping_pte(unsigned long pte_addr,
+                            l1_pgentry_t _nl1e, 
+                            struct domain *d,
+                            struct vcpu *v)
+{
+    /* Caller must:
+     * . own d's BIGLOCK 
+     * . already have 'get_page' correctly on the to-be-installed nl1e
+     * . be responsible for flushing the TLB
+     * . check PTE being installed isn't DISALLOWED
+     */
+
+    int rc = GNTST_okay;
+    void *va;
+    unsigned long gpfn, mfn;
+    struct pfn_info *page;
+    struct domain_mmap_cache mapcache, sh_mapcache;
+    u32 type_info;
+    l1_pgentry_t    ol1e;
+
+    /* Grant tables and shadow mode don't currently work together. */
+    ASSERT( !shadow_mode_refcounts(d) );
+
+    /* There shouldn't be any strange bits set on the PTE. */
+    ASSERT( (l1e_get_flags(_nl1e) & L1_DISALLOW_MASK) == 0);
+
+    cleanup_writable_pagetable(d);
+
+    domain_mmap_cache_init(&mapcache);
+    domain_mmap_cache_init(&sh_mapcache);
+
+    gpfn = pte_addr >> PAGE_SHIFT;
+    mfn = __gpfn_to_mfn(d, gpfn);
+
+    if ( unlikely(!get_page_from_pagenr(mfn, current->domain)) )
+    {
+        MEM_LOG("Could not get page for normal update");
+        rc = -EINVAL;
+        goto failed_norefs;
+    }
+    
+    va = map_domain_page_with_cache(mfn, &mapcache);
+    va = (void *)((unsigned long)va +
+                  (unsigned long)(pte_addr & ~PAGE_MASK));
+    page = &frame_table[mfn];
+
+    type_info = page->u.inuse.type_info;
+    if ( (type_info & PGT_type_mask) != PGT_l1_page_table) {
+        DPRINTK("Grant map attempted to update a non-L1 page\n");
+        rc = -EINVAL;
+        goto failed;
+    }
+
+    if ( likely(get_page_type(page, type_info & (PGT_type_mask|PGT_va_mask))) )
+    {
+
+        if ( unlikely(__copy_from_user(&ol1e, (l1_pgentry_t *)va, 
+                                       sizeof(ol1e)) != 0) ) {
+            put_page_type(page);
+            rc = -EINVAL;
+            goto failed;
+        } 
+
+        if ( update_l1e(va, ol1e, _nl1e) )
+        {
+            put_page_from_l1e(ol1e, d);
+
+            if ( l1e_get_flags(ol1e) & _PAGE_PRESENT )
+                rc = GNTST_flush_all; /* We don't know what vaddr to flush */
+            else
+                rc = GNTST_okay; /* Caller need not invalidate TLB entry */
+
+            if (  unlikely(shadow_mode_enabled(d)) )
+                shadow_l1_normal_pt_update(d, pte_addr, _nl1e, &sh_mapcache);
+        }
+        else
+            rc = -EINVAL;
+ 
+        put_page_type(page);
+    }
+
+ failed:
+    unmap_domain_page_with_cache(va, &mapcache);
+    put_page(page);
+
+ failed_norefs:
+    domain_mmap_cache_destroy(&mapcache);
+    domain_mmap_cache_destroy(&sh_mapcache);
+
+    return rc;
+}
+
+
+
+int clear_grant_va_mapping_pte(unsigned long addr, unsigned long frame,
+                               struct domain *d)
+{
+    /* Caller must:
+     * . own d's BIGLOCK 
+     * . already have 'get_page' correctly on the to-be-installed nl1e
+     * . be responsible for flushing the TLB
+     * . check PTE being installed isn't DISALLOWED
+     */
+
+    int rc = GNTST_okay;
+    void *va;
+    unsigned long gpfn, mfn;
+    struct pfn_info *page;
+    struct domain_mmap_cache mapcache, sh_mapcache;
+    u32 type_info;
+    l1_pgentry_t    ol1e;
+
+    /* Grant tables and shadow mode don't work together. */
+    ASSERT( !shadow_mode_refcounts(d) );
+
+    cleanup_writable_pagetable(d);
+
+    domain_mmap_cache_init(&mapcache);
+    domain_mmap_cache_init(&sh_mapcache);
+
+    gpfn = addr >> PAGE_SHIFT;
+    mfn = __gpfn_to_mfn(d, gpfn);
+
+    if ( unlikely(!get_page_from_pagenr(mfn, current->domain)) )
+    {
+        MEM_LOG("Could not get page for normal update");
+        rc = -EINVAL;
+        goto failed_norefs;
+    }
+    
+    va = map_domain_page_with_cache(mfn, &mapcache);
+    va = (void *)((unsigned long)va +
+                  (unsigned long)(addr & ~PAGE_MASK));
+    page = &frame_table[mfn];
+
+    type_info = page->u.inuse.type_info;
+    if ( (type_info & PGT_type_mask) != PGT_l1_page_table) {
+        DPRINTK("Grant map attempted to update a non-L1 page\n");
+        rc = -EINVAL;
+        goto failed;
+    }
+
+    if ( likely(get_page_type(page, type_info & (PGT_type_mask|PGT_va_mask))) )
+    {
+        if ( unlikely(__copy_from_user(&ol1e, (l1_pgentry_t *)va, 
+                                       sizeof(ol1e)) != 0) ) 
+        {
+            rc = -EINVAL;
+            put_page_type(page);
+            goto failed;
+        }
+    
+        /*
+         * Check that the virtual address supplied is actually mapped to frame.
+         */
+        if ( unlikely((l1e_get_intpte(ol1e) >> PAGE_SHIFT) != frame ))
+        {
+            DPRINTK("PTE entry %lx for address %lx doesn't match frame %lx\n",
+                    (unsigned long)l1e_get_intpte(ol1e), addr, frame);
+            rc =  -EINVAL;
+            put_page_type(page);
+            goto failed;
+        }
+
+        /* Delete pagetable entry. */
+        if ( unlikely(__put_user(0, (unsigned long *)va)))
+        {
+            DPRINTK("Cannot delete PTE entry at %p.\n", va);
+            rc = -EINVAL;
+        } else {
+            if ( unlikely(shadow_mode_enabled(d)) )
+                shadow_l1_normal_pt_update(d, addr, l1e_empty(), 
+                                           &sh_mapcache);
+        }
+        put_page_type(page);
+    }
+
+ failed:
+    unmap_domain_page_with_cache(va, &mapcache);
+    put_page(page);
+
+ failed_norefs:
+    domain_mmap_cache_destroy(&mapcache);
+    domain_mmap_cache_destroy(&sh_mapcache);
+
+    return rc;
+}
+
+
+
 /* This function assumes the caller is holding the domain's BIGLOCK
  * and is running in a shadow mode
  */
@@ -2283,7 +2474,7 @@ int update_grant_va_mapping(unsigned long va,
      * . check PTE being installed isn't DISALLOWED
      */
 
-    int             rc = 0;
+    int             rc = GNTST_okay;
     l1_pgentry_t   *pl1e;
     l1_pgentry_t    ol1e;
     
@@ -2305,9 +2496,9 @@ int update_grant_va_mapping(unsigned long va,
         {
             put_page_from_l1e(ol1e, d);
             if ( l1e_get_flags(ol1e) & _PAGE_PRESENT )
-                rc = 0; /* Caller needs to invalidate TLB entry */
+                rc = GNTST_flush_one;
             else
-                rc = 1; /* Caller need not invalidate TLB entry */
+                rc = GNTST_okay; /* Caller need not invalidate TLB entry */
         }
         else
             rc = -EINVAL;
@@ -2322,6 +2513,40 @@ int update_grant_va_mapping(unsigned long va,
         shadow_do_update_va_mapping(va, _nl1e, v);
 
     return rc;
+}
+
+int clear_grant_va_mapping(unsigned long addr, unsigned long frame)
+{
+    l1_pgentry_t   *pl1e;
+    unsigned long   _ol1e;
+    
+    pl1e = &linear_pg_table[l1_linear_offset(addr)];
+
+    if ( unlikely(__get_user(_ol1e, (unsigned long *)pl1e) != 0) )
+    {
+        DPRINTK("Could not find PTE entry for address %lx\n", addr);
+        return -EINVAL;
+    }
+
+    /*
+     * Check that the virtual address supplied is actually mapped to
+     * frame.
+     */
+    if ( unlikely((_ol1e >> PAGE_SHIFT) != frame ))
+    {
+        DPRINTK("PTE entry %lx for address %lx doesn't match frame %lx\n",
+                _ol1e, addr, frame);
+        return -EINVAL;
+    }
+
+    /* Delete pagetable entry. */
+    if ( unlikely(__put_user(0, (unsigned long *)pl1e)))
+    {
+        DPRINTK("Cannot delete PTE entry at %p.\n", (unsigned long *)pl1e);
+        return -EINVAL;
+    }
+    
+    return 0;
 }
 
 

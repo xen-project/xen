@@ -150,7 +150,10 @@ typedef u16 grant_ref_t;
 #define GNTTABOP_map_grant_ref        0
 typedef struct gnttab_map_grant_ref {
     /* IN parameters. */
-    memory_t    host_virt_addr;
+    union {
+        memory_t  pte_addr;
+        memory_t  host_virt_addr;
+    };
     domid_t     dom;
     grant_ref_t ref;
     u16         flags;                /* GNTMAP_* */
@@ -173,7 +176,10 @@ typedef struct gnttab_map_grant_ref {
 #define GNTTABOP_unmap_grant_ref      1
 typedef struct gnttab_unmap_grant_ref {
     /* IN parameters. */
-    memory_t    host_virt_addr;
+    union {
+        memory_t  pte_addr;
+        memory_t  host_virt_addr;
+    };
     memory_t    dev_bus_addr;
     u16         handle;
     /* OUT parameters. */
@@ -247,10 +253,20 @@ typedef struct {
 #define _GNTMAP_application_map (3)
 #define GNTMAP_application_map  (1<<_GNTMAP_application_map)
 
+ /*
+  * GNTMAP_contains_pte subflag:
+  *  0 => This map request contains a host virtual address.
+  *  1 => This map request contains the machine addess of the PTE to update.
+  */ 
+#define _GNTMAP_contains_pte    (4)
+#define GNTMAP_contains_pte     (1<<_GNTMAP_contains_pte)
+
 /*
  * Values for error status returns. All errors are -ve.
  */
-#define GNTST_okay             (0)
+#define GNTST_flush_all        (2)  /* Success, need to flush entire TLB.    */
+#define GNTST_flush_one        (1)  /* Success, need to flush a vaddr.       */
+#define GNTST_okay             (0)  /* Normal return.                        */
 #define GNTST_general_error    (-1) /* General undefined error.              */
 #define GNTST_bad_domain       (-2) /* Unrecognsed domain id.                */
 #define GNTST_bad_gntref       (-3) /* Unrecognised or inappropriate gntref. */
