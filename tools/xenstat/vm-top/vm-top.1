@@ -1,0 +1,88 @@
+.\" Copyright (C) International Business Machines  Corp., 2005
+.\" Author: Josh Triplett <josht@us.ibm.com>
+.\"
+.\" This program is free software; you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation; under version 2 of the License.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program; if not, write to the Free Software
+.\" Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+.TH vm-top 1 "August 2005"
+.SH NAME
+\fBvm-top\fR \- displays real-time information about a Xen system and domains
+
+.SH SYNOPSIS
+.B vm-top
+[\fB\-h\fR]
+[\fB\-V\fR]
+[\fB\-d\fRSECONDS]
+[\fB\-n\fR]
+[\fB\-r\fR]
+[\fB\-v\fR]
+
+.SH DESCRIPTION
+\fBvm-top\fR displays information about the Xen system and domains, in a
+continually-updating manner.  Command-line options and interactive commands
+can change the detail and format of the information displayed by \fBvm-top\fR.
+
+.SH OPTIONS
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+display help and exit
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+output version information and exit
+.TP
+\fB\-d\fR, \fB\-\-delay\fR=\fISECONDS\fR
+seconds between updates (default 1)
+.TP
+\fB\-n\fR, \fB\-\-networks\fR
+output network information
+.TP
+\fB\-r\fR, \fB\-\-repeat\-header\fR
+repeat table header before each domain
+.TP
+\fB\-v\fR, \fB\-\-vcpus\fR
+output VCPU data
+
+.SH "INTERACTIVE COMMANDS"
+All interactive commands are case-insensitive.
+.TP
+.B D
+set delay between updates
+.TP
+.B N
+toggle display of network information
+.TP
+.B Q, Esc
+quit
+.TP
+.B R
+toggle table header before each domain
+.TP
+.B S
+cycle sort order
+.TP
+.B V
+toggle display of VCPU information
+.TP
+.B Arrows
+scroll domain display
+
+.SH AUTHORS
+Written by Judy Fischbach, David Hendricks, and Josh Triplett
+
+.SH "REPORTING BUGS"
+Report bugs to <dsteklof@us.ibm.com>.
+
+.SH COPYRIGHT
+Copyright \(co 2005  International Business Machines  Corp
+.br
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
