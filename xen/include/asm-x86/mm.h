@@ -316,6 +316,9 @@ struct ptwr_info {
     unsigned int prev_nr_updates;
     /* Exec domain which created writable mapping. */
     struct vcpu *vcpu;
+    /* EIP of the address which took the original write fault
+       used for stats collection only */
+    unsigned long eip;
 };
 
 #define PTWR_PT_ACTIVE 0
@@ -327,7 +330,8 @@ struct ptwr_info {
 int  ptwr_init(struct domain *);
 void ptwr_destroy(struct domain *);
 void ptwr_flush(struct domain *, const int);
-int  ptwr_do_page_fault(struct domain *, unsigned long);
+int  ptwr_do_page_fault(struct domain *, unsigned long, 
+			struct cpu_user_regs *);
 int  revalidate_l1(struct domain *, l1_pgentry_t *, l1_pgentry_t *);
 
 void cleanup_writable_pagetable(struct domain *d);
@@ -350,6 +354,18 @@ void audit_domains(void);
 #define _audit_domain(_d, _f) ((void)0)
 #define audit_domain(_d)      ((void)0)
 #define audit_domains()       ((void)0)
+
+#endif
+
+#ifdef PERF_ARRAYS
+
+void ptwr_eip_stat_reset();
+void ptwr_eip_stat_print();
+
+#else
+
+#define ptwr_eip_stat_reset() ((void)0)
+#define ptwr_eip_stat_print() ((void)0)
 
 #endif
 

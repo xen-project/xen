@@ -2,7 +2,7 @@
 # If you change any of these configuration options then you must
 # 'make clean' before rebuilding.
 #
-verbose     ?= n
+verbose     ?= y
 debug       ?= n
 perfc       ?= n
 perfc_arrays?= n

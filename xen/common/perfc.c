@@ -7,6 +7,7 @@
 #include <xen/spinlock.h>
 #include <public/dom0_ops.h>
 #include <asm/uaccess.h>
+#include <xen/mm.h>
 
 #undef  PERFCOUNTER
 #undef  PERFCOUNTER_CPU
@@ -81,6 +82,10 @@ void perfc_printall(unsigned char key)
         }
         printk("\n");
     }
+
+#ifdef PERF_ARRAYS
+    ptwr_eip_stat_print();
+#endif
 }
 
 void perfc_reset(unsigned char key)
@@ -118,6 +123,10 @@ void perfc_reset(unsigned char key)
             break;
         }
     }
+
+#ifdef PERF_ARRAYS
+    ptwr_eip_stat_reset();
+#endif
 }
 
 static dom0_perfc_desc_t perfc_d[NR_PERFCTRS];

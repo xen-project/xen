@@ -438,7 +438,7 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
              &&
              KERNEL_MODE(v, regs) &&
              ((regs->error_code & 3) == 3) && /* write-protection fault */
-             ptwr_do_page_fault(d, addr) )
+             ptwr_do_page_fault(d, addr, regs) )
         {
             UNLOCK_BIGLOCK(d);
             return EXCRET_fault_fixed;

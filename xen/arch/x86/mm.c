@@ -2850,6 +2850,129 @@ int ptwr_debug = 0x0;
 #define PTWR_PRINTK(_f, _a...) ((void)0)
 #endif
 
+
+#ifdef PERF_ARRAYS
+
+/**************** writeable pagetables profiling functions *****************/
+
+#define ptwr_eip_buckets        256
+
+int ptwr_eip_stat_threshold[] = {1, 10, 50, 100, L1_PAGETABLE_ENTRIES};
+
+#define ptwr_eip_stat_thresholdN (sizeof(ptwr_eip_stat_threshold)/sizeof(int))
+
+struct {
+    unsigned long eip;
+    domid_t       id;
+    u32           val[ptwr_eip_stat_thresholdN];
+} typedef ptwr_eip_stat_t;
+
+ptwr_eip_stat_t ptwr_eip_stats[ptwr_eip_buckets];
+
+static inline unsigned int ptwr_eip_stat_hash( unsigned long eip, domid_t id )
+{
+    return (((unsigned long) id) ^ eip ^ (eip>>8) ^ (eip>>16) ^ (eip>24)) % 
+	ptwr_eip_buckets;
+}
+
+static void ptwr_eip_stat_inc(u32 *n)
+{
+    (*n)++;
+    if(*n == 0)
+    {
+	(*n)=~0;
+	/* rescale all buckets */
+	int i;
+	for(i=0;i<ptwr_eip_buckets;i++)
+	{
+	    int j;
+	    for(j=0;j<ptwr_eip_stat_thresholdN;j++)
+		ptwr_eip_stats[i].val[j] = 
+		    (((u64)ptwr_eip_stats[i].val[j])+1)>>1;
+	}
+    }
+}
+
+static void ptwr_eip_stat_update( unsigned long eip, domid_t id, int modified )
+{
+    int i, b;
+
+    i = b = ptwr_eip_stat_hash( eip, id );
+
+    do
+    {
+	if (!ptwr_eip_stats[i].eip)
+	{ /* doesn't exist */
+	    ptwr_eip_stats[i].eip = eip;
+	    ptwr_eip_stats[i].id = id;
+	    memset(ptwr_eip_stats[i].val,0, sizeof(ptwr_eip_stats[i].val));
+	}
+
+	if (ptwr_eip_stats[i].eip == eip)
+	{
+	    int j;
+	    for(j=0;j<ptwr_eip_stat_thresholdN;j++)
+	    {
+		if(modified <= ptwr_eip_stat_threshold[j])
+		{
+		    break;
+		}
+	    }
+	    BUG_ON(j>=ptwr_eip_stat_thresholdN);
+	    ptwr_eip_stat_inc(&(ptwr_eip_stats[i].val[j]));    
+	    return;
+	}
+	i = (i+1) % ptwr_eip_buckets;
+    }
+    while(i!=b);
+   
+    printk("ptwr_eip_stat: too many EIPs in use!\n");
+    
+    ptwr_eip_stat_print();
+    ptwr_eip_stat_reset();
+}
+
+void ptwr_eip_stat_reset()
+{
+    memset( ptwr_eip_stats, 0, sizeof(ptwr_eip_stats));
+}
+
+void ptwr_eip_stat_print()
+{
+    struct domain *e;
+    domid_t d;
+
+    for_each_domain(e)
+    {
+	int i;
+	d = e->domain_id;
+
+	for(i=0;i<ptwr_eip_buckets;i++)
+	{
+	    if ( ptwr_eip_stats[i].eip && ptwr_eip_stats[i].id == d )
+	    {
+		int j;
+		printk("D %d  eip %08lx ",
+		       ptwr_eip_stats[i].id, ptwr_eip_stats[i].eip );
+
+		for(j=0;j<ptwr_eip_stat_thresholdN;j++)
+		    printk("<=%u %4u \t",
+			   ptwr_eip_stat_threshold[j],
+			   ptwr_eip_stats[i].val[j] );
+		printk("\n");
+	    }	
+	}
+    }
+}
+
+#else /* PERF_ARRAYS */
+
+#define ptwr_eip_stat_update( eip, id, modified ) ((void)0)
+
+#endif
+
+/*******************************************************************/
+
 /* Re-validate a given p.t. page, given its prior snapshot */
 int revalidate_l1(
     struct domain *d, l1_pgentry_t *l1page, l1_pgentry_t *snapshot)
@@ -2967,6 +3090,7 @@ void ptwr_flush(struct domain *d, const int which)
     modified = revalidate_l1(d, pl1e, d->arch.ptwr[which].page);
     unmap_domain_page(pl1e);
     perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
+    ptwr_eip_stat_update(  d->arch.ptwr[which].eip, d->domain_id, modified);
     d->arch.ptwr[which].prev_nr_updates  = modified;
 
     /*
@@ -3122,7 +3246,8 @@ static struct x86_mem_emulator ptwr_mem_emulator = {
 };
 
 /* Write page fault handler: check if guest is trying to modify a PTE. */
-int ptwr_do_page_fault(struct domain *d, unsigned long addr)
+int ptwr_do_page_fault(struct domain *d, unsigned long addr, 
+		       struct cpu_user_regs *regs)
 {
     unsigned long    pfn;
     struct pfn_info *page;
@@ -3157,6 +3282,10 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
     {
         return 0;
     }
+
+#if 0 /* Leave this in as useful for debugging */ 
+    goto emulate; 
+#endif
 
     /* Get the L2 index at which this L1 p.t. is always mapped. */
     l2_idx = page->u.inuse.type_info & PGT_va_mask;
@@ -3227,7 +3356,11 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
     d->arch.ptwr[which].l1va   = addr | 1;
     d->arch.ptwr[which].l2_idx = l2_idx;
     d->arch.ptwr[which].vcpu   = current;
-    
+
+#ifdef PERF_ARRAYS
+    d->arch.ptwr[which].eip    = regs->eip;
+#endif
+
     /* For safety, disconnect the L1 p.t. page from current space. */
     if ( which == PTWR_PT_ACTIVE )
     {
