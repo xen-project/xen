@@ -398,7 +398,7 @@ extern void noexec_setup(const char *str);
 	do {								  \
 		if (__dirty) {						  \
 		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
-			    HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG|UVMF_MULTI|(unsigned long)((__vma)->vm_mm->cpu_vm_mask.bits)); \
+			    BUG_ON(HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG|UVMF_MULTI|(unsigned long)((__vma)->vm_mm->cpu_vm_mask.bits))); \
 			} else {                                          \
                             xen_l1_entry_update((__ptep), (__entry)); \
 			    flush_tlb_page((__vma), (__address));         \
@@ -416,8 +416,8 @@ do {				  					\
 #define ptep_establish_new(__vma, __address, __ptep, __entry)		\
 do {				  					\
 	if (likely((__vma)->vm_mm == current->mm)) {			\
-		HYPERVISOR_update_va_mapping((__address),		\
-					     __entry, 0);		\
+		BUG_ON(HYPERVISOR_update_va_mapping((__address),	\
+					     __entry, 0));		\
 	} else {							\
 		xen_l1_entry_update((__ptep), (__entry));	\
 	}								\
