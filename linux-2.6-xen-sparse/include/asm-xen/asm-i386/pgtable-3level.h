@@ -68,7 +68,16 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 		xen_l1_entry_update((pteptr), (pteval))
 # define set_pte_atomic(pteptr,pteval) set_pte(pteptr,pteval)
 #endif
-#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
+
+inline static void set_pte_at(struct mm_struct *mm, unsigned long addr, 
+		       pte_t *ptep, pte_t val )
+{
+    if ( ((mm != current->mm) && (mm != &init_mm)) ||
+	 HYPERVISOR_update_va_mapping( (addr), (val), 0 ) )
+    {
+        set_pte(ptep, val);
+    }
+}
 
 #ifdef CONFIG_XEN_SHADOW_MODE
 # define set_pmd(pmdptr,pmdval) \

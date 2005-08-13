@@ -265,7 +265,16 @@ static inline unsigned long pud_bad(pud_t pud)
        val &= ~(_PAGE_USER | _PAGE_DIRTY); 
        return val & ~(_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED);      
 } 
-#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
+
+inline static void set_pte_at(struct mm_struct *mm, unsigned long addr, 
+		       pte_t *ptep, pte_t val )
+{
+    if ( ((mm != current->mm) && (mm != &init_mm)) ||
+	 HYPERVISOR_update_va_mapping( (addr), (val), 0 ) )
+    {
+        set_pte(ptep, val);
+    }
+}
 
 #define pte_none(x)	(!(x).pte)
 #define pte_present(x)	((x).pte & (_PAGE_PRESENT | _PAGE_PROTNONE))
