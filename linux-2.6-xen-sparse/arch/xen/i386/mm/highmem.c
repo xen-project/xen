@@ -41,8 +41,7 @@ static void *__kmap_atomic(struct page *page, enum km_type type, pgprot_t prot)
 	if (!pte_none(*(kmap_pte-idx)))
 		BUG();
 #endif
-	set_pte(kmap_pte-idx, mk_pte(page, prot));
-	__flush_tlb_one(vaddr);
+	set_pte_at_sync(&init_mm, vaddr, kmap_pte-idx, mk_pte(page, prot));
 
 	return (void*) vaddr;
 }
