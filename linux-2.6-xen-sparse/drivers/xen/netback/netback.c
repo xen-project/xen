@@ -511,9 +511,9 @@ inline static void net_tx_action_dealloc(void)
     gop = unmap_ops;
     while (dc != dp) {
         pending_idx = dealloc_ring[MASK_PEND_IDX(dc++)];
-        gop->host_virt_addr = MMAP_VADDR(pending_idx);
+        gop->host_addr    = MMAP_VADDR(pending_idx);
         gop->dev_bus_addr = 0;
-        gop->handle = grant_tx_ref[pending_idx];
+        gop->handle       = grant_tx_ref[pending_idx];
         grant_tx_ref[pending_idx] = GRANT_INVALID_REF;
         gop++;
     }
@@ -699,7 +699,7 @@ static void net_tx_action(unsigned long unused)
         /* Packets passed to netif_rx() must have some headroom. */
         skb_reserve(skb, 16);
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-        mop->host_virt_addr = MMAP_VADDR(pending_idx);
+        mop->host_addr = MMAP_VADDR(pending_idx);
         mop->dom = netif->domid;
         mop->ref = txreq.addr >> PAGE_SHIFT;
         mop->flags = GNTMAP_host_map | GNTMAP_readonly;

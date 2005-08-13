@@ -42,7 +42,7 @@ static void __blkif_disconnect_complete(void *arg)
      * must still be notified to the remote driver.
      */
 #ifdef CONFIG_XEN_BLKDEV_GRANT
-    op.host_virt_addr = blkif->shmem_vaddr;
+    op.host_addr      = blkif->shmem_vaddr;
     op.handle         = blkif->shmem_handle;
     op.dev_bus_addr   = 0;
     BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
@@ -204,7 +204,7 @@ void blkif_connect(blkif_be_connect_t *connect)
 #else
     { /* Map: Use the Grant table reference */
         struct gnttab_map_grant_ref op;
-        op.host_virt_addr = VMALLOC_VMADDR(vma->addr);
+        op.host_addr      = VMALLOC_VMADDR(vma->addr);
         op.flags          = GNTMAP_host_map;
         op.ref            = ref;
         op.dom            = domid;

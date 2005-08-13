@@ -120,10 +120,10 @@ static void fast_flush_area(int idx, int nr_pages)
     {
         if ( BLKBACK_INVALID_HANDLE != ( handle = pending_handle(idx, i) ) )
         {
-            unmap[i].host_virt_addr = MMAP_VADDR(idx, i);
+            unmap[i].host_addr      = MMAP_VADDR(idx, i);
             unmap[i].dev_bus_addr   = 0;
             unmap[i].handle         = handle;
-            pending_handle(idx, i) = BLKBACK_INVALID_HANDLE;
+            pending_handle(idx, i)  = BLKBACK_INVALID_HANDLE;
             invcount++;
         }
     }
@@ -383,7 +383,7 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
     {
         struct gnttab_map_grant_ref map;
 
-        map.host_virt_addr = MMAP_VADDR(pending_idx, 0);
+        map.host_addr = MMAP_VADDR(pending_idx, 0);
         map.flags = GNTMAP_host_map;
         map.ref = blkif_gref_from_fas(req->frame_and_sects[0]);
         map.dom = blkif->domid;
@@ -480,7 +480,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
             goto bad_descriptor;
         preq.nr_sects += seg[i].nsec;
 
-        map[i].host_virt_addr = MMAP_VADDR(pending_idx, i);
+        map[i].host_addr = MMAP_VADDR(pending_idx, i);
         map[i].dom = blkif->domid;
         map[i].ref = blkif_gref_from_fas(fas);
         map[i].flags = GNTMAP_host_map;

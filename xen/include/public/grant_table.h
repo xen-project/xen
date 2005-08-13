@@ -142,7 +142,10 @@ typedef u16 grant_ref_t;
  *  1. If GNTPIN_map_for_dev is specified then <dev_bus_addr> is the address
  *     via which I/O devices may access the granted frame.
  *  2. If GNTPIN_map_for_host is specified then a mapping will be added at
- *     virtual address <host_virt_addr> in the current address space.
+ *     either a host virtual address in the current address space, or at
+ *     a PTE at the specified machine address.  The type of mapping to
+ *     perform is selected through the GNTMAP_contains_pte flag, and the 
+ *     address is specified in <host_addr>.
  *  3. Mappings should only be destroyed via GNTTABOP_unmap_grant_ref. If a
  *     host mapping is destroyed by other means then it is *NOT* guaranteed
  *     to be accounted to the correct grant reference!
@@ -150,10 +153,7 @@ typedef u16 grant_ref_t;
 #define GNTTABOP_map_grant_ref        0
 typedef struct gnttab_map_grant_ref {
     /* IN parameters. */
-    union {
-        memory_t  pte_addr;
-        memory_t  host_virt_addr;
-    };
+    memory_t    host_addr;
     domid_t     dom;
     grant_ref_t ref;
     u16         flags;                /* GNTMAP_* */
@@ -164,7 +164,7 @@ typedef struct gnttab_map_grant_ref {
 
 /*
  * GNTTABOP_unmap_grant_ref: Destroy one or more grant-reference mappings
- * tracked by <handle>. If <host_virt_addr> or <dev_bus_addr> is zero, that
+ * tracked by <handle>. If <host_addr> or <dev_bus_addr> is zero, that
  * field is ignored. If non-zero, they must refer to a device/host mapping
  * that is tracked by <handle>
  * NOTES:
@@ -176,10 +176,7 @@ typedef struct gnttab_map_grant_ref {
 #define GNTTABOP_unmap_grant_ref      1
 typedef struct gnttab_unmap_grant_ref {
     /* IN parameters. */
-    union {
-        memory_t  pte_addr;
-        memory_t  host_virt_addr;
-    };
+    memory_t    host_addr;
     memory_t    dev_bus_addr;
     u16         handle;
     /* OUT parameters. */
