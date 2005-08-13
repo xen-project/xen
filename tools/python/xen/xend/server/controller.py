@@ -142,7 +142,7 @@ class DevControllerTable:
     def createDevController(self, type, vm, recreate=False):
         cls = self.getDevControllerClass(type)
         if not cls:
-            raise XendError("unknown device type: " + type)
+            raise XendError("unknown device type: " + str(type))
         return cls.createDevController(vm, recreate=recreate)
 
 def getDevControllerTable():
@@ -283,6 +283,8 @@ class DevController:
         dev.attach(recreate=recreate, change=change)
         dev.exportToDB()
 
+        return dev
+
     def configureDevice(self, id, config, change=False):
         """Reconfigure an existing device.
         May be defined in subclass."""
@@ -325,7 +327,7 @@ class DevController:
     def getDevice(self, id, error=False):
         dev = self.devices.get(id)
         if error and not dev:
-            raise XendError("invalid device id: " + id)
+            raise XendError("invalid device id: " + str(id))
         return dev
 
     def getDeviceIds(self):

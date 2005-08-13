@@ -138,7 +138,7 @@ def dom_get(dom):
     if domlist and dom == domlist[0]['dom']:
         return domlist[0]
     return None
-    
+
 class XendDomainInfo:
     """Virtual machine object."""
 
@@ -754,7 +754,7 @@ class XendDomainInfo:
         @param dev_config: device configuration
         """
         dev_type = sxp.name(dev_config)
-        dev = self.createDevice(self, dev_config, change=True)
+        dev = self.createDevice(dev_type, dev_config, change=True)
         self.config.append(['device', dev.getConfig()])
         return dev.sxpr()
 
