@@ -325,7 +325,7 @@ class DevController:
         return self.destroyed
 
     def getDevice(self, id, error=False):
-        dev = self.devices.get(id)
+        dev = self.devices.get(int(id))
         if error and not dev:
             raise XendError("invalid device id: " + str(id))
         return dev
