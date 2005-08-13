@@ -79,6 +79,17 @@ inline static void set_pte_at(struct mm_struct *mm, unsigned long addr,
     }
 }
 
+inline static void set_pte_at_sync(struct mm_struct *mm, unsigned long addr, 
+		       pte_t *ptep, pte_t val )
+{
+    if ( ((mm != current->mm) && (mm != &init_mm)) ||
+	 HYPERVISOR_update_va_mapping( (addr), (val), UVMF_INVLPG ) )
+    {
+        set_pte(ptep, val);
+	xen_invlpg(addr);
+    }
+}
+
 #ifdef CONFIG_XEN_SHADOW_MODE
 # define set_pmd(pmdptr,pmdval) \
 		set_64bit((unsigned long long *)(pmdptr),pmd_val(pmdval))
