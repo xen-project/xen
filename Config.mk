@@ -35,3 +35,8 @@ CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
 
 # Choose the best mirror to download linux kernel
 KERNEL_REPO = http://www.kernel.org
+
+# Optional components
+XENSTAT_PERL_BINDINGS   ?= n
+XENSTAT_PYTHON_BINDINGS ?= y
+XENSTAT_VM_TOP          ?= y

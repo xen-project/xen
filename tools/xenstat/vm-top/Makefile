@@ -10,15 +10,12 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-ifneq (,$(shell [ -e /usr/include/curses.h ] || echo no))
-all vm-top:
-	@echo "***********************************************************"
-	@echo "WARNING: Install ncurses to build vm-top."
-	@echo "***********************************************************"
-else
-
 XEN_ROOT=../../..
 include $(XEN_ROOT)/tools/Rules.mk
+
+ifneq ($(XENSTAT_VM_TOP),y)
+all install vm-top:
+else
 
 INSTALL         = install
 INSTALL_PROG    = $(INSTALL) -m0755 -D
@@ -36,12 +33,11 @@ all: vm-top
 
 vm-top: vm-top.o
 
-endif
-
 install: vm-top vm-top.1
-	[ -f vm-top ] && $(INSTALL_PROG) vm-top $(DESTDIR)$(sbindir)/vm-top
-	[ -f vm-top.1 ] && \
-	    $(INSTALL_DATA) vm-top.1 $(DESTDIR)$(man1dir)/vm-top.1
+	$(INSTALL_PROG) vm-top $(DESTDIR)$(sbindir)/vm-top
+	$(INSTALL_DATA) vm-top.1 $(DESTDIR)$(man1dir)/vm-top.1
+
+endif
 
 clean:
 	rm -f vm-top vm-top.o
