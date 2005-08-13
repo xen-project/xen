@@ -28,7 +28,7 @@
 
 ## Use the following if VIF traffic is bridged.
 # The script used to start/stop networking for xend.
-(network-script    network)
+(network-script    network-bridge)
 # The default bridge that virtual interfaces should be connected to.
 (vif-bridge        xen-br0)
 # The default script used to control virtual interfaces.
