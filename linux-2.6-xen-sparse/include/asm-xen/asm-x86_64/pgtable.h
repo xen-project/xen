@@ -9,6 +9,7 @@
 #include <asm/fixmap.h>
 #include <asm/bitops.h>
 #include <linux/threads.h>
+#include <linux/sched.h>
 #include <asm/pda.h>
 #ifdef CONFIG_XEN
 #include <asm-xen/hypervisor.h>
