@@ -58,7 +58,9 @@ static struct timer_list net_timer;
 static struct sk_buff_head rx_queue;
 static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE*2+1];
 static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE];
-#ifndef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+static gnttab_donate_t grant_rx_op[MAX_PENDING_REQS];
+#else
 static struct mmuext_op rx_mmuext[NETIF_RX_RING_SIZE];
 #endif
 static unsigned char rx_notify[NR_EVENT_CHANNELS];
@@ -90,11 +92,9 @@ static struct sk_buff_head tx_queue;
 
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
 static u16 grant_tx_ref[MAX_PENDING_REQS];
-#endif
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
-static gnttab_donate_t grant_rx_op[MAX_PENDING_REQS];
-#endif
-#ifndef CONFIG_XEN_NETDEV_GRANT_TX
+static gnttab_unmap_grant_ref_t tx_unmap_ops[MAX_PENDING_REQS];
+static gnttab_map_grant_ref_t tx_map_ops[MAX_PENDING_REQS];
+#else
 static multicall_entry_t tx_mcl[MAX_PENDING_REQS];
 #endif
 
@@ -492,7 +492,6 @@ static void tx_credit_callback(unsigned long data)
 inline static void net_tx_action_dealloc(void)
 {
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    gnttab_unmap_grant_ref_t unmap_ops[MAX_PENDING_REQS];
     gnttab_unmap_grant_ref_t *gop;
 #else
     multicall_entry_t *mcl;
@@ -508,8 +507,9 @@ inline static void net_tx_action_dealloc(void)
     /*
      * Free up any grants we have finished using
      */
-    gop = unmap_ops;
-    while (dc != dp) {
+    gop = tx_unmap_ops;
+    while ( dc != dp )
+    {
         pending_idx = dealloc_ring[MASK_PEND_IDX(dc++)];
         gop->host_addr    = MMAP_VADDR(pending_idx);
         gop->dev_bus_addr = 0;
@@ -517,10 +517,8 @@ inline static void net_tx_action_dealloc(void)
         grant_tx_ref[pending_idx] = GRANT_INVALID_REF;
         gop++;
     }
-    if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref,
-                                           unmap_ops, gop - unmap_ops))) {
-        BUG();
-    }
+    BUG_ON(HYPERVISOR_grant_table_op(
+        GNTTABOP_unmap_grant_ref, tx_unmap_ops, gop - tx_unmap_ops));
 #else
     mcl = tx_mcl;
     while ( dc != dp )
@@ -583,7 +581,6 @@ static void net_tx_action(unsigned long unused)
     u16 pending_idx;
     NETIF_RING_IDX i;
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    gnttab_map_grant_ref_t map_ops[MAX_PENDING_REQS];
     gnttab_map_grant_ref_t *mop;
 #else
     multicall_entry_t *mcl;
@@ -594,7 +591,7 @@ static void net_tx_action(unsigned long unused)
         net_tx_action_dealloc();
 
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    mop = map_ops;
+    mop = tx_map_ops;
 #else
     mcl = tx_mcl;
 #endif
@@ -722,7 +719,7 @@ static void net_tx_action(unsigned long unused)
         pending_cons++;
 
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-        if ((mop - map_ops) >= ARRAY_SIZE(map_ops))
+        if ( (mop - tx_map_ops) >= ARRAY_SIZE(tx_map_ops) )
             break;
 #else
         /* Filled the batch queue? */
@@ -732,20 +729,18 @@ static void net_tx_action(unsigned long unused)
     }
 
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    if (mop == map_ops) {
+    if ( mop == tx_map_ops )
         return;
-    }
-    if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
-                                           map_ops, mop - map_ops))) {
-        BUG();
-    }
-    mop = map_ops;
+
+    BUG_ON(HYPERVISOR_grant_table_op(
+        GNTTABOP_map_grant_ref, tx_map_ops, mop - tx_map_ops));
+
+    mop = tx_map_ops;
 #else
     if ( mcl == tx_mcl )
         return;
 
-    if ( unlikely(HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl) != 0) )
-        BUG();
+    BUG_ON(HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl) != 0);
 
     mcl = tx_mcl;
 #endif
@@ -757,7 +752,8 @@ static void net_tx_action(unsigned long unused)
 
         /* Check the remap error code. */
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-        if (unlikely(mop->dev_bus_addr == 0)) {
+        if ( unlikely(mop->dev_bus_addr == 0) )
+        {
             printk(KERN_ALERT "#### netback grant fails\n");
             make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
             netif_put(netif);
