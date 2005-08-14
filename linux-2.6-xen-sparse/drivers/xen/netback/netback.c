@@ -518,7 +518,7 @@ inline static void net_tx_action_dealloc(void)
         gop++;
     }
     BUG_ON(HYPERVISOR_grant_table_op(
-        GNTTABOP_unmap_grant_ref, tx_unmap_ops, gop - tx_unmap_ops));
+               GNTTABOP_unmap_grant_ref, tx_unmap_ops, gop - tx_unmap_ops));
 #else
     mcl = tx_mcl;
     while ( dc != dp )
@@ -697,9 +697,9 @@ static void net_tx_action(unsigned long unused)
         skb_reserve(skb, 16);
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
         mop->host_addr = MMAP_VADDR(pending_idx);
-        mop->dom = netif->domid;
-        mop->ref = txreq.addr >> PAGE_SHIFT;
-        mop->flags = GNTMAP_host_map | GNTMAP_readonly;
+        mop->dom       = netif->domid;
+        mop->ref       = txreq.addr >> PAGE_SHIFT;
+        mop->flags     = GNTMAP_host_map | GNTMAP_readonly;
         mop++;
 #else
 	MULTI_update_va_mapping_otherdomain(
@@ -752,7 +752,12 @@ static void net_tx_action(unsigned long unused)
 
         /* Check the remap error code. */
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-        if ( unlikely(mop->dev_bus_addr == 0) )
+        /* 
+           XXX SMH: error returns from grant operations are pretty poorly
+           specified/thought out, but the below at least conforms with 
+           what the rest of the code uses. 
+        */
+        if ( unlikely(mop->handle < 0) )
         {
             printk(KERN_ALERT "#### netback grant fails\n");
             make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);

@@ -421,7 +421,9 @@ class NetDev(Dev):
                         'netif_handle'   : self.vif,
                         'evtchn'         : self.getEventChannelBackend(),
                         'tx_shmem_frame' : val['tx_shmem_frame'],
-                        'rx_shmem_frame' : val['rx_shmem_frame'] })
+                        'tx_shmem_ref'   : val['tx_shmem_ref'],
+                        'rx_shmem_frame' : val['rx_shmem_frame'],
+                        'rx_shmem_ref'   : val['rx_shmem_ref'] })
         msg = self.backendChannel.requestResponse(msg)
         #todo: check return status
         self.status = NETIF_INTERFACE_STATUS_CONNECTED

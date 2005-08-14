@@ -20,6 +20,13 @@
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 
+#if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
+#include <asm-xen/xen-public/grant_table.h>
+#include <asm-xen/gnttab.h>
+#endif
+
+
+
 #if 0
 #define ASSERT(_p) \
     if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
@@ -40,7 +47,17 @@ typedef struct netif_st {
 
     /* Physical parameters of the comms window. */
     unsigned long    tx_shmem_frame;
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+    u16              tx_shmem_handle;
+    memory_t         tx_shmem_vaddr; 
+    grant_ref_t      tx_shmem_ref; 
+#endif
     unsigned long    rx_shmem_frame;
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+    u16              rx_shmem_handle;
+    memory_t         rx_shmem_vaddr; 
+    grant_ref_t      rx_shmem_ref; 
+#endif
     unsigned int     evtchn;
 
     /* The shared rings and indexes. */

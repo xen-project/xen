@@ -771,9 +771,8 @@ gnttab_dump_table(gnttab_dump_table_t *uop)
         if ( sha_copy.flags )
         {
             DPRINTK("Grant: dom (%hu) SHARED (%d) flags:(%hx) "
-                    "dom:(%hu) frame:(%lx)\n",
-                    op.dom, i, sha_copy.flags, sha_copy.domid, 
-                    (unsigned long) sha_copy.frame);
+                    "dom:(%hu) frame:(%x)\n",
+                    op.dom, i, sha_copy.flags, sha_copy.domid, sha_copy.frame);
         }
     }
 
@@ -826,8 +825,8 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
     for (i = 0; i < count; i++) {
         gnttab_donate_t *gop = &uop[i];
 #if GRANT_DEBUG
-        printk("gnttab_donate: i=%d mfn=%08x domid=%d gref=%08x\n",
-               i, (unsigned int)gop->mfn, gop->domid, gop->handle);
+        printk("gnttab_donate: i=%d mfn=%lx domid=%d gref=%08x\n",
+               i, gop->mfn, gop->domid, gop->handle);
 #endif
         page = &frame_table[gop->mfn];
 
@@ -1033,8 +1032,8 @@ gnttab_check_unmap(
 #if GRANT_DEBUG_VERBOSE
     if ( ld->domain_id != 0 )
     {
-        DPRINTK("Foreign unref rd(%d) ld(%d) frm(%x) flgs(%x).\n",
-                rd->domain_id, ld->domain_id, (unsigned int)frame, readonly);
+        DPRINTK("Foreign unref rd(%d) ld(%d) frm(%lx) flgs(%x).\n",
+                rd->domain_id, ld->domain_id, frame, readonly);
     }
 #endif
 
