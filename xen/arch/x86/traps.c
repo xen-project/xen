@@ -471,8 +471,6 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
         perfc_incrc(copy_user_faults);
-        if ( !shadow_mode_enabled(d) )
-            DPRINTK("Page fault: %p -> %p\n", _p(regs->eip), _p(fixup));
         regs->eip = fixup;
         return 0;
     }
