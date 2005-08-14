@@ -221,8 +221,9 @@ def xm_list(args):
         domsinfo.append(parse_doms_info(info))
                
     if use_long:
-        # this actually seems like a bad idea, as it just dumps sexp out
-        PrettyPrint.prettyprint(info)
+        for dom in doms:
+            info = server.xend_domain(dom)
+            PrettyPrint.prettyprint(info)
     elif show_vcpus:
         xm_show_vcpus(domsinfo)
     else:
