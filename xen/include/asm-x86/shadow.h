@@ -483,9 +483,9 @@ static inline int __mark_dirty(struct domain *d, unsigned int mfn)
 #ifndef NDEBUG
     else if ( mfn < max_page )
     {
-        SH_LOG("mark_dirty OOR! mfn=%x pfn=%lx max=%x (dom %p)",
+        SH_VLOG("mark_dirty OOR! mfn=%x pfn=%lx max=%x (dom %p)",
                mfn, pfn, d->arch.shadow_dirty_bitmap_size, d);
-        SH_LOG("dom=%p caf=%08x taf=%" PRtype_info, 
+        SH_VLOG("dom=%p caf=%08x taf=%" PRtype_info, 
                page_get_owner(&frame_table[mfn]),
                frame_table[mfn].count_info, 
                frame_table[mfn].u.inuse.type_info );
@@ -736,7 +736,7 @@ static inline int l1pte_write_fault(
 
     if ( unlikely(!VALID_MFN(gmfn)) )
     {
-        SH_LOG("l1pte_write_fault: invalid gpfn=%lx", gpfn);
+        SH_VLOG("l1pte_write_fault: invalid gpfn=%lx", gpfn);
         *spte_p = l1e_empty();
         return 0;
     }
@@ -770,7 +770,7 @@ static inline int l1pte_read_fault(
 
     if ( unlikely(!VALID_MFN(mfn)) )
     {
-        SH_LOG("l1pte_read_fault: invalid gpfn=%lx", pfn);
+        SH_VLOG("l1pte_read_fault: invalid gpfn=%lx", pfn);
         *spte_p = l1e_empty();
         return 0;
     }
@@ -1472,7 +1472,7 @@ static inline void set_shadow_status(
     /* We need to allocate a new node. Ensure the quicklist is non-empty. */
     if ( unlikely(d->arch.shadow_ht_free == NULL) )
     {
-        SH_LOG("Allocate more shadow hashtable blocks.");
+        SH_VLOG("Allocate more shadow hashtable blocks.");
 
         extra = xmalloc_bytes(
             sizeof(void *) + (shadow_ht_extra_size * sizeof(*x)));

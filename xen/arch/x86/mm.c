@@ -2771,7 +2771,7 @@ long do_update_descriptor(unsigned long pa, u64 desc)
  * Writable Pagetables
  */
 
-#ifdef VERBOSE
+#ifdef VVERBOSE
 int ptwr_debug = 0x0;
 #define PTWR_PRINTK(_f, _a...) \
  do { if ( unlikely(ptwr_debug) ) printk( _f , ## _a ); } while ( 0 )
