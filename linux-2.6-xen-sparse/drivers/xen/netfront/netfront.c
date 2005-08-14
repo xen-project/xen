@@ -59,7 +59,7 @@
 #include <asm-xen/gnttab.h>
 #ifdef GRANT_DEBUG
 static void
-dump_packet(int tag, u32 addr, u32 ap)
+dump_packet(int tag, void *addr, u32 ap)
 {
     unsigned char *p = (unsigned char *)ap;
     int i;
@@ -200,7 +200,7 @@ static char *be_state_name[] = {
     [BEST_CONNECTED]    = "connected",
 };
 
-#if DEBUG
+#ifdef DEBUG
 #define DPRINTK(fmt, args...) \
     printk(KERN_ALERT "xen_net (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
 #else
@@ -356,8 +356,12 @@ static void network_tx_buf_gc(struct net_device *dev)
             id  = np->tx->ring[MASK_NETIF_TX_IDX(i)].resp.id;
             skb = np->tx_skbs[id];
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-            if (gnttab_query_foreign_access(grant_tx_ref[id]) != 0) {
-                printk(KERN_ALERT "netfront: query foreign access\n");
+            if (unlikey(gnttab_query_foreign_access(grant_tx_ref[id]) != 0)) {
+                /* other domain is still using this grant - shouldn't happen
+                   but if it does, we'll try to reclaim the grant later */
+                printk(KERN_ALERT "network_tx_buf_gc: warning -- grant "
+                       "still in use by backend domain.\n");
+                goto out; 
             }
             gnttab_end_foreign_access(grant_tx_ref[id], GNTMAP_readonly);
             gnttab_release_grant_reference(&gref_tx_head, grant_tx_ref[id]);
@@ -382,6 +386,7 @@ static void network_tx_buf_gc(struct net_device *dev)
         mb();
     } while (prod != np->tx->resp_prod);
 
+  out: 
     if (np->tx_full && ((np->tx->req_prod - prod) < NETIF_TX_RING_SIZE)) {
         np->tx_full = 0;
         if (np->user_state == UST_OPEN)
@@ -433,13 +438,15 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         
         np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.id = id;
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-        if ((ref = gnttab_claim_grant_reference(&gref_rx_head, gref_rx_terminal)) < 0) {
+        if (unlikely((ref = gnttab_claim_grant_reference(&gref_rx_head, 
+                                                gref_rx_terminal)) < 0)) {
             printk(KERN_ALERT "#### netfront can't claim rx reference\n");
             BUG();
         }
         grant_rx_ref[id] = ref;
         gnttab_grant_foreign_transfer_ref(ref, rdomid,
-        virt_to_machine(skb->head) >> PAGE_SHIFT);
+                                          virt_to_machine(
+                                              skb->head) >> PAGE_SHIFT);
         np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.gref = ref;
 #endif
         rx_pfn_array[i] = virt_to_machine(skb->head) >> PAGE_SHIFT;
@@ -528,7 +535,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
     tx->id   = id;
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    if ((ref = gnttab_claim_grant_reference(&gref_tx_head, gref_tx_terminal)) < 0) {
+    if (unlikely((ref = gnttab_claim_grant_reference(&gref_tx_head, 
+                                                     gref_tx_terminal)) < 0)) {
         printk(KERN_ALERT "#### netfront can't claim tx grant reference\n");
         BUG();
     }
@@ -638,7 +646,6 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
         ref = grant_rx_ref[rx->id];
         grant_rx_ref[rx->id] = GRANT_INVALID_REF;
-
         mfn = gnttab_end_foreign_transfer(ref);
         gnttab_release_grant_reference(&gref_rx_head, ref);
 #endif
@@ -674,18 +681,20 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 				pfn_pte_ma(mfn, PAGE_KERNEL), 0);
 #else
 	MULTI_update_va_mapping(mcl, (unsigned long)skb->head,
-				pfn_pte_ma(rx->addr >> PAGE_SHIFT, PAGE_KERNEL), 0);
+				pfn_pte_ma(rx->addr >> PAGE_SHIFT, 
+                                           PAGE_KERNEL), 0);
 #endif
         mcl++;
 
-        phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = 
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-            mfn;
+        phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = mfn;
 #else
+        phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = 
             rx->addr >> PAGE_SHIFT;
 #endif
+
 #ifdef GRANT_DEBUG
-        printk(KERN_ALERT "#### rx_poll     enqueue vdata=%08x mfn=%08x ref=%04x\n",
+        printk(KERN_ALERT "#### rx_poll     enqueue vdata=%p mfn=%lu ref=%x\n",
                skb->data, mfn, ref);
 #endif
         __skb_queue_tail(&rxq, skb);
@@ -707,9 +716,9 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
     while ((skb = __skb_dequeue(&rxq)) != NULL) {
 #ifdef GRANT_DEBUG
-         printk(KERN_ALERT "#### rx_poll     dequeue vdata=%08x mfn=%08x\n",
-                skb->data, virt_to_machine(skb->data)>>PAGE_SHIFT);
-         dump_packet('d', skb->data, (unsigned long)skb->data);
+        printk(KERN_ALERT "#### rx_poll     dequeue vdata=%p mfn=%lu\n",
+               skb->data, virt_to_machine(skb->data)>>PAGE_SHIFT);
+        dump_packet('d', skb->data, (unsigned long)skb->data);
 #endif
         /*
          * Enough room in skbuff for the data we were passed? Also, Linux 
@@ -884,7 +893,7 @@ static void network_connect(struct net_device *dev,
 
 static void vif_show(struct net_private *np)
 {
-#if DEBUG
+#ifdef DEBUG
     if (np) {
         IPRINTK("<vif handle=%u %s(%s) evtchn=%u tx=%p rx=%p>\n",
                np->handle,
@@ -911,8 +920,29 @@ static void send_interface_connect(struct net_private *np)
 
     msg->handle = np->handle;
     msg->tx_shmem_frame = (virt_to_machine(np->tx) >> PAGE_SHIFT);
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+    msg->tx_shmem_ref   = (u32)gnttab_claim_grant_reference(&gref_tx_head, 
+                                                            gref_tx_terminal);
+    if(msg->tx_shmem_ref < 0) { 
+        printk(KERN_ALERT "#### netfront can't claim tx_shmem reference\n");
+        BUG();
+    }
+    gnttab_grant_foreign_access_ref (msg->tx_shmem_ref, rdomid, 
+                                     msg->tx_shmem_frame, 0);
+#endif
+
     msg->rx_shmem_frame = (virt_to_machine(np->rx) >> PAGE_SHIFT);
-        
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+    msg->rx_shmem_ref   = (u32)gnttab_claim_grant_reference(&gref_rx_head, 
+                                                            gref_rx_terminal);
+    if(msg->rx_shmem_ref < 0) {
+        printk(KERN_ALERT "#### netfront can't claim rx_shmem reference\n");
+        BUG();
+    }
+    gnttab_grant_foreign_access_ref (msg->rx_shmem_ref, rdomid, 
+                                     msg->rx_shmem_frame, 0);
+#endif
+
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }
 
@@ -1380,20 +1410,22 @@ static int __init netif_init(void)
     if (xen_start_info.flags & SIF_INITDOMAIN)
         return 0;
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    if (gnttab_alloc_grant_references(NETIF_TX_RING_SIZE,
+    /* A grant for every ring slot, plus one for the ring itself */
+    if (gnttab_alloc_grant_references(NETIF_TX_RING_SIZE + 1,
                                       &gref_tx_head, &gref_tx_terminal) < 0) {
         printk(KERN_ALERT "#### netfront can't alloc tx grant refs\n");
         return 1;
     }
-    printk(KERN_ALERT "#### netfront tx using grant tables\n");
+    printk(KERN_ALERT "Netdev frontend (TX) is using grant tables.\n"); 
 #endif
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    if (gnttab_alloc_grant_references(NETIF_RX_RING_SIZE,
+    /* A grant for every ring slot, plus one for the ring itself */
+    if (gnttab_alloc_grant_references(NETIF_RX_RING_SIZE + 1,
                                       &gref_rx_head, &gref_rx_terminal) < 0) {
         printk(KERN_ALERT "#### netfront can't alloc rx grant refs\n");
         return 1;
     }
-    printk(KERN_ALERT "#### netfront rx using grant tables\n");
+    printk(KERN_ALERT "Netdev frontend (RX) is using grant tables.\n"); 
 #endif
 
     if ((err = xennet_proc_init()) != 0)

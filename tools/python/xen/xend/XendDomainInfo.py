@@ -593,7 +593,7 @@ class XendDomainInfo:
     def delete(self):
         """Delete the vm's db.
         """
-        if self.dom_get(self.id):
+        if dom_get(self.id):
             return
         self.id = None
         self.saveToDB(sync=True)
