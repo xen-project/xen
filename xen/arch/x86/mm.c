@@ -736,7 +736,7 @@ static int create_pae_xen_mappings(l3_pgentry_t *pl3e)
         pl2e[l2_table_offset(LINEAR_PT_VIRT_START) + i] =
             (l3e_get_flags(pl3e[i]) & _PAGE_PRESENT) ?
             l2e_from_pfn(l3e_get_pfn(pl3e[i]), __PAGE_HYPERVISOR) :
-            l2e_empty();
+        l2e_empty();
     unmap_domain_page(pl2e);
 
     return 1;
@@ -764,7 +764,7 @@ static inline int l1_backptr(
     unsigned long l2_backptr = l2_type & PGT_va_mask;
     BUG_ON(l2_backptr == PGT_va_unknown);
 
-     *backptr = ((l2_backptr >> PGT_va_shift) << L3_PAGETABLE_SHIFT) | 
+    *backptr = ((l2_backptr >> PGT_va_shift) << L3_PAGETABLE_SHIFT) | 
         (offset_in_l2 << L2_PAGETABLE_SHIFT);
     return 1;
 }
@@ -872,7 +872,7 @@ static int alloc_l3_table(struct pfn_info *page, unsigned long type)
         if ( !l2_backptr(&vaddr, i, type) )
             goto fail;
 #else
-      vaddr = (unsigned long)i << L3_PAGETABLE_SHIFT;
+        vaddr = (unsigned long)i << L3_PAGETABLE_SHIFT;
 #endif
         if ( is_guest_l3_slot(i) &&
              unlikely(!get_page_from_l3e(pl3e[i], pfn, d, vaddr)) )
@@ -1246,7 +1246,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         if (!l4e_has_changed(ol4e, nl4e, _PAGE_PRESENT))
             return UPDATE_ENTRY(l4, pl4e, ol4e, nl4e);
 
-         if ( unlikely(!l3_backptr(&vaddr, pgentry_ptr_to_slot(pl4e), type)) ||
+        if ( unlikely(!l3_backptr(&vaddr, pgentry_ptr_to_slot(pl4e), type)) ||
              unlikely(!get_page_from_l4e(nl4e, pfn, current->domain, vaddr)) )
             return 0;
 
@@ -2270,9 +2270,9 @@ int do_mmu_update(
 
 
 int update_grant_va_mapping_pte(unsigned long pte_addr,
-                            l1_pgentry_t _nl1e, 
-                            struct domain *d,
-                            struct vcpu *v)
+                                l1_pgentry_t _nl1e, 
+                                struct domain *d,
+                                struct vcpu *v)
 {
     /* Caller must:
      * . own d's BIGLOCK 
@@ -2872,59 +2872,53 @@ ptwr_eip_stat_t ptwr_eip_stats[ptwr_eip_buckets];
 static inline unsigned int ptwr_eip_stat_hash( unsigned long eip, domid_t id )
 {
     return (((unsigned long) id) ^ eip ^ (eip>>8) ^ (eip>>16) ^ (eip>24)) % 
-	ptwr_eip_buckets;
+        ptwr_eip_buckets;
 }
 
 static void ptwr_eip_stat_inc(u32 *n)
 {
-    (*n)++;
-    if(*n == 0)
-    {
-	(*n)=~0;
-	/* rescale all buckets */
-	int i;
-	for(i=0;i<ptwr_eip_buckets;i++)
-	{
-	    int j;
-	    for(j=0;j<ptwr_eip_stat_thresholdN;j++)
-		ptwr_eip_stats[i].val[j] = 
-		    (((u64)ptwr_eip_stats[i].val[j])+1)>>1;
-	}
-    }
+    int i, j;
+
+    if ( ++(*n) != 0 )
+        return;
+
+    *n = ~0;
+
+    /* Re-scale all buckets. */
+    for ( i = 0; i <ptwr_eip_buckets; i++ )
+        for ( j = 0; j < ptwr_eip_stat_thresholdN; j++ )
+            ptwr_eip_stats[i].val[j] >>= 1;
 }
 
-static void ptwr_eip_stat_update( unsigned long eip, domid_t id, int modified )
+static void ptwr_eip_stat_update(unsigned long eip, domid_t id, int modified)
 {
-    int i, b;
+    int i, j, b;
 
-    i = b = ptwr_eip_stat_hash( eip, id );
+    i = b = ptwr_eip_stat_hash(eip, id);
 
     do
     {
-	if (!ptwr_eip_stats[i].eip)
-	{ /* doesn't exist */
-	    ptwr_eip_stats[i].eip = eip;
-	    ptwr_eip_stats[i].id = id;
-	    memset(ptwr_eip_stats[i].val,0, sizeof(ptwr_eip_stats[i].val));
-	}
+        if ( !ptwr_eip_stats[i].eip )
+        {
+            /* doesn't exist */
+            ptwr_eip_stats[i].eip = eip;
+            ptwr_eip_stats[i].id = id;
+            memset(ptwr_eip_stats[i].val,0, sizeof(ptwr_eip_stats[i].val));
+        }
 
-	if (ptwr_eip_stats[i].eip == eip)
-	{
-	    int j;
-	    for(j=0;j<ptwr_eip_stat_thresholdN;j++)
-	    {
-		if(modified <= ptwr_eip_stat_threshold[j])
-		{
-		    break;
-		}
-	    }
-	    BUG_ON(j>=ptwr_eip_stat_thresholdN);
-	    ptwr_eip_stat_inc(&(ptwr_eip_stats[i].val[j]));    
-	    return;
-	}
-	i = (i+1) % ptwr_eip_buckets;
+        if ( ptwr_eip_stats[i].eip == eip )
+        {
+            for ( j = 0; j < ptwr_eip_stat_thresholdN; j++ )
+                if ( modified <= ptwr_eip_stat_threshold[j] )
+                    break;
+            BUG_ON(j >= ptwr_eip_stat_thresholdN);
+            ptwr_eip_stat_inc(&ptwr_eip_stats[i].val[j]);
+            return;
+        }
+
+        i = (i+1) % ptwr_eip_buckets;
     }
-    while(i!=b);
+    while ( i != b );
    
     printk("ptwr_eip_stat: too many EIPs in use!\n");
     
@@ -2932,42 +2926,41 @@ static void ptwr_eip_stat_update( unsigned long eip, domid_t id, int modified )
     ptwr_eip_stat_reset();
 }
 
-void ptwr_eip_stat_reset()
+void ptwr_eip_stat_reset(void)
 {
-    memset( ptwr_eip_stats, 0, sizeof(ptwr_eip_stats));
+    memset(ptwr_eip_stats, 0, sizeof(ptwr_eip_stats));
 }
 
-void ptwr_eip_stat_print()
+void ptwr_eip_stat_print(void)
 {
     struct domain *e;
     domid_t d;
+    int i, j;
 
-    for_each_domain(e)
+    for_each_domain( e )
     {
-	int i;
-	d = e->domain_id;
+        d = e->domain_id;
 
-	for(i=0;i<ptwr_eip_buckets;i++)
-	{
-	    if ( ptwr_eip_stats[i].eip && ptwr_eip_stats[i].id == d )
-	    {
-		int j;
-		printk("D %d  eip %08lx ",
-		       ptwr_eip_stats[i].id, ptwr_eip_stats[i].eip );
+        for ( i = 0; i < ptwr_eip_buckets; i++ )
+        {
+            if ( ptwr_eip_stats[i].eip && ptwr_eip_stats[i].id != d )
+                continue;
 
-		for(j=0;j<ptwr_eip_stat_thresholdN;j++)
-		    printk("<=%u %4u \t",
-			   ptwr_eip_stat_threshold[j],
-			   ptwr_eip_stats[i].val[j] );
-		printk("\n");
-	    }	
-	}
+            printk("D %d  eip %08lx ",
+                   ptwr_eip_stats[i].id, ptwr_eip_stats[i].eip);
+
+            for ( j = 0; j < ptwr_eip_stat_thresholdN; j++ )
+                printk("<=%u %4u \t",
+                       ptwr_eip_stat_threshold[j],
+                       ptwr_eip_stats[i].val[j]);
+            printk("\n");
+        }
     }
 }
 
 #else /* PERF_ARRAYS */
 
-#define ptwr_eip_stat_update( eip, id, modified ) ((void)0)
+#define ptwr_eip_stat_update(eip, id, modified) ((void)0)
 
 #endif
 
@@ -3025,8 +3018,8 @@ int revalidate_l1(
 /* Flush the given writable p.t. page and write-protect it again. */
 void ptwr_flush(struct domain *d, const int which)
 {
-    unsigned long  pte, *ptep, l1va;
-    l1_pgentry_t  *pl1e;
+    unsigned long l1va;
+    l1_pgentry_t  *pl1e, pte, *ptep;
     l2_pgentry_t  *pl2e;
     unsigned int   modified;
 
@@ -3046,13 +3039,13 @@ void ptwr_flush(struct domain *d, const int which)
         TOGGLE_MODE();
 
     l1va = d->arch.ptwr[which].l1va;
-    ptep = (unsigned long *)&linear_pg_table[l1_linear_offset(l1va)];
+    ptep = (l1_pgentry_t *)&linear_pg_table[l1_linear_offset(l1va)];
 
     /*
      * STEP 1. Write-protect the p.t. page so no more updates can occur.
      */
 
-    if ( unlikely(__get_user(pte, ptep)) )
+    if ( unlikely(__get_user(pte.l1, &ptep->l1)) )
     {
         MEM_LOG("ptwr: Could not read pte at %p", ptep);
         /*
@@ -3062,8 +3055,8 @@ void ptwr_flush(struct domain *d, const int which)
         BUG();
     }
     PTWR_PRINTK("[%c] disconnected_l1va at %p is %lx\n",
-                PTWR_PRINT_WHICH, ptep, pte);
-    pte &= ~_PAGE_RW;
+                PTWR_PRINT_WHICH, ptep, pte.l1);
+    l1e_remove_flags(pte, _PAGE_RW);
 
     /* Write-protect the p.t. page in the guest page table. */
     if ( unlikely(__put_user(pte, ptep)) )
@@ -3080,7 +3073,7 @@ void ptwr_flush(struct domain *d, const int which)
     /* NB. INVLPG is a serialising instruction: flushes pending updates. */
     flush_tlb_one_mask(d->cpumask, l1va);
     PTWR_PRINTK("[%c] disconnected_l1va at %p now %lx\n",
-                PTWR_PRINT_WHICH, ptep, pte);
+                PTWR_PRINT_WHICH, ptep, pte.l1);
 
     /*
      * STEP 2. Validate any modified PTEs.
@@ -3247,7 +3240,7 @@ static struct x86_mem_emulator ptwr_mem_emulator = {
 
 /* Write page fault handler: check if guest is trying to modify a PTE. */
 int ptwr_do_page_fault(struct domain *d, unsigned long addr, 
-		       struct cpu_user_regs *regs)
+                       struct cpu_user_regs *regs)
 {
     unsigned long    pfn;
     struct pfn_info *page;
