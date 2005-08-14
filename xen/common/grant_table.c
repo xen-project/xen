@@ -829,14 +829,16 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
                i, gop->mfn, gop->domid, gop->handle);
 #endif
         page = &frame_table[gop->mfn];
-
+        
         if (unlikely(IS_XEN_HEAP_FRAME(page))) { 
-            printk("gnttab_donate: xen heap frame mfn=%lx\n", (unsigned long) gop->mfn);
+            printk("gnttab_donate: xen heap frame mfn=%lx\n", 
+                   (unsigned long) gop->mfn);
             gop->status = GNTST_bad_virt_addr;
             continue;
         }
         if (unlikely(!pfn_valid(page_to_pfn(page)))) {
-            printk("gnttab_donate: invalid pfn for mfn=%lx\n", (unsigned long) gop->mfn);
+            printk("gnttab_donate: invalid pfn for mfn=%lx\n", 
+                   (unsigned long) gop->mfn);
             gop->status = GNTST_bad_virt_addr;
             continue;
         }
@@ -862,7 +864,8 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
             if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
                          (1 | PGC_allocated)) || unlikely(_nd != _d)) {
                 printk("gnttab_donate: Bad page values %p: ed=%p(%u), sd=%p,"
-                        " caf=%08x, taf=%" PRtype_info "\n", (void *) page_to_pfn(page),
+                       " caf=%08x, taf=%" PRtype_info "\n", 
+                       (void *) page_to_pfn(page),
                         d, d->domain_id, unpickle_domptr(_nd), x, 
                         page->u.inuse.type_info);
                 spin_unlock(&d->page_alloc_lock);
@@ -921,9 +924,9 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
         if (unlikely(test_bit(DOMFLAGS_DYING, &e->domain_flags)) ||
             unlikely(e->tot_pages == e->max_pages) ||
             unlikely(!gnttab_prepare_for_transfer(e, d, gop->handle))) {
-            printk("gnttab_donate: Transferee has no reservation headroom (%d,%d), or "
-                    "provided a bad grant ref (%08x), or is dying (%p).\n",
-                    e->tot_pages, e->max_pages, gop->handle, e->d_flags);
+            printk("gnttab_donate: Transferee has no reservation headroom (%d,"
+                   "%d) or provided a bad grant ref (%08x) or is dying (%p)\n",
+                   e->tot_pages, e->max_pages, gop->handle, e->d_flags);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
             result = GNTST_general_error;
@@ -936,9 +939,9 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
         }
         list_add_tail(&page->list, &e->page_list);
         page_set_owner(page, e);
-
+        
         spin_unlock(&e->page_alloc_lock);
-
+        
         /*
          * Transfer is all done: tell the guest about its new page
          * frame.
@@ -946,7 +949,7 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
         gnttab_notify_transfer(e, d, gop->handle, gop->mfn);
         
         put_domain(e);
-
+        
         gop->status = GNTST_okay;
     }
     return result;
@@ -958,50 +961,52 @@ do_grant_table_op(
 {
     long rc;
     struct domain *d = current->domain;
-
+    
     if ( count > 512 )
         return -EINVAL;
-
+    
     LOCK_BIGLOCK(d);
-
+    
     sync_pagetable_state(d);
-
+    
     rc = -EFAULT;
     switch ( cmd )
-    {
-    case GNTTABOP_map_grant_ref:
-        if ( unlikely(!array_access_ok(
-            uop, count, sizeof(gnttab_map_grant_ref_t))) )
-            goto out;
-        rc = gnttab_map_grant_ref((gnttab_map_grant_ref_t *)uop, count);
-        break;
-    case GNTTABOP_unmap_grant_ref:
-        if ( unlikely(!array_access_ok(
-            uop, count, sizeof(gnttab_unmap_grant_ref_t))) )
-            goto out;
-        rc = gnttab_unmap_grant_ref((gnttab_unmap_grant_ref_t *)uop, count);
-        break;
-    case GNTTABOP_setup_table:
-        rc = gnttab_setup_table((gnttab_setup_table_t *)uop, count);
-        break;
+        {
+        case GNTTABOP_map_grant_ref:
+            if ( unlikely(!array_access_ok(
+                              uop, count, sizeof(gnttab_map_grant_ref_t))) )
+                goto out;
+            rc = gnttab_map_grant_ref((gnttab_map_grant_ref_t *)uop, count);
+            break;
+        case GNTTABOP_unmap_grant_ref:
+            if ( unlikely(!array_access_ok(
+                              uop, count, sizeof(gnttab_unmap_grant_ref_t))) )
+                goto out;
+            rc = gnttab_unmap_grant_ref((gnttab_unmap_grant_ref_t *)uop, 
+                                        count);
+            break;
+        case GNTTABOP_setup_table:
+            rc = gnttab_setup_table((gnttab_setup_table_t *)uop, count);
+            break;
 #if GRANT_DEBUG
-    case GNTTABOP_dump_table:
-        rc = gnttab_dump_table((gnttab_dump_table_t *)uop);
-        break;
+        case GNTTABOP_dump_table:
+            rc = gnttab_dump_table((gnttab_dump_table_t *)uop);
+            break;
 #endif
-    case GNTTABOP_donate:
-        if (unlikely(!array_access_ok(uop, count, sizeof(gnttab_donate_t))))
-            goto out;
-        rc = gnttab_donate(uop, count);
-        break;
-    default:
-        rc = -ENOSYS;
-        break;
-    }
-
-out:
+        case GNTTABOP_donate:
+            if (unlikely(!array_access_ok(uop, count, 
+                                          sizeof(gnttab_donate_t))))
+                goto out;
+            rc = gnttab_donate(uop, count);
+            break;
+        default:
+            rc = -ENOSYS;
+            break;
+        }
+    
+  out:
     UNLOCK_BIGLOCK(d);
-
+    
     return rc;
 }
 
@@ -1015,106 +1020,101 @@ gnttab_check_unmap(
      * Called a _lot_ at domain creation because pages mapped by priv domains
      * also traverse this.
      */
-
+    
     /* Note: If the same frame is mapped multiple times, and then one of
      *       the ptes is overwritten, which maptrack handle gets invalidated?
      * Advice: Don't do it. Explicitly unmap.
      */
-
+    
     unsigned int handle, ref, refcount;
     grant_table_t        *lgt, *rgt;
     active_grant_entry_t *act;
     grant_mapping_t      *map;
     int found = 0;
-
+    
     lgt = ld->grant_table;
-
+    
 #if GRANT_DEBUG_VERBOSE
-    if ( ld->domain_id != 0 )
-    {
-        DPRINTK("Foreign unref rd(%d) ld(%d) frm(%lx) flgs(%x).\n",
-                rd->domain_id, ld->domain_id, frame, readonly);
-    }
+    if ( ld->domain_ id != 0 ) {
+            DPRINTK("Foreign unref rd(%d) ld(%d) frm(%lx) flgs(%x).\n",
+                    rd->domain_id, ld->domain_id, frame, readonly);
+      }
 #endif
-
+    
     /* Fast exit if we're not mapping anything using grant tables */
     if ( lgt->map_count == 0 )
         return 0;
-
-    if ( get_domain(rd) == 0 )
-    {
+    
+    if ( get_domain(rd) == 0 ) {
         DPRINTK("gnttab_check_unmap: couldn't get_domain rd(%d)\n",
                 rd->domain_id);
         return 0;
     }
-
+    
     rgt = rd->grant_table;
+    
+    for ( handle = 0; handle < lgt->maptrack_limit; handle++ ) {
 
-    for ( handle = 0; handle < lgt->maptrack_limit; handle++ )
-    {
         map = &lgt->maptrack[handle];
-
+            
         if ( map->domid != rd->domain_id )
             continue;
-
+        
         if ( ( map->ref_and_flags & MAPTRACK_GNTMAP_MASK ) &&
-             ( readonly ? 1 : (!(map->ref_and_flags & GNTMAP_readonly))))
-        {
+             ( readonly ? 1 : (!(map->ref_and_flags & GNTMAP_readonly)))) {
+
             ref = (map->ref_and_flags >> MAPTRACK_REF_SHIFT);
             act = &rgt->active[ref];
-
+                    
             spin_lock(&rgt->lock);
-
-            if ( act->frame != frame )
-            {
+                    
+            if ( act->frame != frame ) {
                 spin_unlock(&rgt->lock);
                 continue;
             }
-
+                    
             refcount = act->pin & ( readonly ? GNTPIN_hstr_mask
-                                             : GNTPIN_hstw_mask );
-            if ( refcount == 0 )
-            {
+                                    : GNTPIN_hstw_mask );
+
+            if ( refcount == 0 ) {
                 spin_unlock(&rgt->lock);
                 continue;
             }
-
+                    
             /* gotcha */
             DPRINTK("Grant unref rd(%d) ld(%d) frm(%lx) flgs(%x).\n",
                     rd->domain_id, ld->domain_id, frame, readonly);
-
+                    
             if ( readonly )
                 act->pin -= GNTPIN_hstr_inc;
-            else
-            {
+            else {
                 act->pin -= GNTPIN_hstw_inc;
-
+                            
                 /* any more granted writable mappings? */
-                if ( (act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) == 0 )
-                {
+                if ( (act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) == 0 ) {
                     clear_bit(_GTF_writing, &rgt->shared[ref].flags);
                     put_page_type(&frame_table[frame]);
                 }
             }
-
-            if ( act->pin == 0 )
-            {
+                
+            if ( act->pin == 0 ) {
                 clear_bit(_GTF_reading, &rgt->shared[ref].flags);
                 put_page(&frame_table[frame]);
             }
+
             spin_unlock(&rgt->lock);
-
+                    
             clear_bit(GNTMAP_host_map, &map->ref_and_flags);
-
+                    
             if ( !(map->ref_and_flags & GNTMAP_device_map) )
                 put_maptrack_handle(lgt, handle);
-
+                    
             found = 1;
             break;
         }
     }
     put_domain(rd);
-
+    
     return found;
 }
 
@@ -1130,8 +1130,10 @@ gnttab_prepare_for_transfer(
     int            retries = 0;
     unsigned long  target_pfn;
 
+#ifdef GRANT_DEBUG_VERBOSE
     DPRINTK("gnttab_prepare_for_transfer rd(%hu) ld(%hu) ref(%hu).\n",
             rd->domain_id, ld->domain_id, ref);
+#endif
 
     if ( unlikely((rgt = rd->grant_table) == NULL) ||
          unlikely(ref >= NR_GRANT_ENTRIES) )
@@ -1209,8 +1211,10 @@ gnttab_notify_transfer(
     grant_entry_t  *sha;
     unsigned long   pfn;
 
+#ifdef GRANT_DEBUG_VERBOSE
     DPRINTK("gnttab_notify_transfer rd(%hu) ld(%hu) ref(%hu).\n",
             rd->domain_id, ld->domain_id, ref);
+#endif
 
     sha = &rd->grant_table->shared[ref];
 
