@@ -383,12 +383,6 @@ void netif_connect(netif_be_connect_t *connect)
             return;
         }
 
-            DPRINTK(" Grant table operation failure !\n");
-            connect->status = NETIF_BE_STATUS_MAPPING_ERROR;
-            vfree(vma->addr);
-            return;
-        }
-
         netif->rx_shmem_ref    = rx_ref;
         netif->rx_shmem_handle = handle;
         netif->rx_shmem_vaddr  = VMALLOC_VMADDR(vma->addr) + PAGE_SIZE;

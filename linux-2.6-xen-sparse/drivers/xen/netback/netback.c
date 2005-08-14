@@ -55,6 +55,8 @@ static DECLARE_TASKLET(net_rx_tasklet, net_rx_action, 0);
 
 static struct timer_list net_timer;
 
+#define MAX_PENDING_REQS 256
+
 static struct sk_buff_head rx_queue;
 static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE*2+1];
 static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE];
@@ -68,7 +70,6 @@ static unsigned char rx_notify[NR_EVENT_CHANNELS];
 /* Don't currently gate addition of an interface to the tx scheduling list. */
 #define tx_work_exists(_if) (1)
 
-#define MAX_PENDING_REQS 256
 static unsigned long mmap_vstart;
 #define MMAP_VADDR(_req) (mmap_vstart + ((_req) * PAGE_SIZE))
 

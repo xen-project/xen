@@ -356,7 +356,7 @@ static void network_tx_buf_gc(struct net_device *dev)
             id  = np->tx->ring[MASK_NETIF_TX_IDX(i)].resp.id;
             skb = np->tx_skbs[id];
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-            if (unlikey(gnttab_query_foreign_access(grant_tx_ref[id]) != 0)) {
+            if (unlikely(gnttab_query_foreign_access(grant_tx_ref[id]) != 0)) {
                 /* other domain is still using this grant - shouldn't happen
                    but if it does, we'll try to reclaim the grant later */
                 printk(KERN_ALERT "network_tx_buf_gc: warning -- grant "
