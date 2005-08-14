@@ -2841,7 +2841,7 @@ long do_update_descriptor(unsigned long pa, u64 desc)
  * Writable Pagetables
  */
 
-#ifdef VERBOSE
+#ifdef VVERBOSE
 int ptwr_debug = 0x0;
 #define PTWR_PRINTK(_f, _a...) \
  do { if ( unlikely(ptwr_debug) ) printk( _f , ## _a ); } while ( 0 )
@@ -3054,7 +3054,7 @@ void ptwr_flush(struct domain *d, const int which)
          */
         BUG();
     }
-    PTWR_PRINTK("[%c] disconnected_l1va at %p is %lx\n",
+    PTWR_PRINTK("[%c] disconnected_l1va at %p is %" PRIpte "\n",
                 PTWR_PRINT_WHICH, ptep, pte.l1);
     l1e_remove_flags(pte, _PAGE_RW);
 
@@ -3072,7 +3072,7 @@ void ptwr_flush(struct domain *d, const int which)
     /* Ensure that there are no stale writable mappings in any TLB. */
     /* NB. INVLPG is a serialising instruction: flushes pending updates. */
     flush_tlb_one_mask(d->cpumask, l1va);
-    PTWR_PRINTK("[%c] disconnected_l1va at %p now %lx\n",
+    PTWR_PRINTK("[%c] disconnected_l1va at %p now %" PRIpte "\n",
                 PTWR_PRINT_WHICH, ptep, pte.l1);
 
     /*
