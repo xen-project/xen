@@ -377,17 +377,14 @@ void propagate_page_fault(unsigned long addr, u16 error_code);
  * Caller must own d's BIGLOCK, is responsible for flushing the TLB, and must 
  * hold a reference to the page.
  */
-int update_grant_va_mapping(unsigned long va,
-                            l1_pgentry_t _nl1e, 
-                            struct domain *d,
-                            struct vcpu *v);
-int update_grant_va_mapping_pte(unsigned long pte_addr,
-                            l1_pgentry_t _nl1e, 
-                            struct domain *d,
-                            struct vcpu *v);
-
+int update_grant_va_mapping(
+    unsigned long va, l1_pgentry_t _nl1e, 
+    struct domain *d, struct vcpu *v);
+int update_grant_pte_mapping(
+    unsigned long pte_addr, l1_pgentry_t _nl1e, 
+    struct domain *d, struct vcpu *v);
 int clear_grant_va_mapping(unsigned long addr, unsigned long frame);
-int clear_grant_va_mapping_pte(unsigned long addr, unsigned long frame,
-                            struct domain *d);
+int clear_grant_pte_mapping(
+    unsigned long addr, unsigned long frame, struct domain *d);
 
 #endif /* __ASM_X86_MM_H__ */

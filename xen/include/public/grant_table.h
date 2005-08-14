@@ -261,8 +261,6 @@ typedef struct {
 /*
  * Values for error status returns. All errors are -ve.
  */
-#define GNTST_flush_all        (2)  /* Success, need to flush entire TLB.    */
-#define GNTST_flush_one        (1)  /* Success, need to flush a vaddr.       */
 #define GNTST_okay             (0)  /* Normal return.                        */
 #define GNTST_general_error    (-1) /* General undefined error.              */
 #define GNTST_bad_domain       (-2) /* Unrecognsed domain id.                */

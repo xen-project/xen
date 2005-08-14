@@ -53,8 +53,8 @@ typedef struct {
 
 #define ORDER_GRANT_FRAMES   2
 #define NR_GRANT_FRAMES      (1U << ORDER_GRANT_FRAMES)
-#define NR_GRANT_ENTRIES     (NR_GRANT_FRAMES * PAGE_SIZE / sizeof(grant_entry_t))
-
+#define NR_GRANT_ENTRIES     \
+    ((NR_GRANT_FRAMES << PAGE_SHIFT) / sizeof(grant_entry_t))
 
 /*
  * Tracks a mapping of another domain's grant reference. Each domain has a
@@ -65,8 +65,8 @@ typedef struct {
     domid_t  domid;         /* granting domain */
 } grant_mapping_t;
 #define MAPTRACK_GNTMAP_MASK  0x1f
-#define MAPTRACK_REF_SHIFT       5
-#define MAPTRACK_MAX_ENTRIES ( 1 << (16 - MAPTRACK_REF_SHIFT) )
+#define MAPTRACK_REF_SHIFT    5
+#define MAPTRACK_MAX_ENTRIES  (1 << (16 - MAPTRACK_REF_SHIFT))
 
 /* Per-domain grant information. */
 typedef struct {
@@ -109,10 +109,15 @@ gnttab_prepare_for_transfer(
 /* Notify 'rd' of a completed transfer via an already-locked grant entry. */
 void 
 gnttab_notify_transfer(
-    struct domain *rd, struct domain *ld, grant_ref_t ref, unsigned long frame);
+    struct domain *rd, struct domain *ld,
+    grant_ref_t ref, unsigned long frame);
 
-/* Pre-domain destruction release of granted device mappings of other domains.*/
+/* Domain death release of granted device mappings of other domains.*/
 void
 gnttab_release_dev_mappings(grant_table_t *gt);
+
+/* Extra GNTST_ values, for internal use only. */
+#define GNTST_flush_all        (2)  /* Success, need to flush entire TLB.    */
+#define GNTST_flush_one        (1)  /* Success, need to flush a vaddr.       */
 
 #endif /* __XEN_GRANT_H__ */

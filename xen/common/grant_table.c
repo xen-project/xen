@@ -266,7 +266,6 @@ __gnttab_activate_grant_ref(
 
     spin_unlock(&granting_d->grant_table->lock);
 
-
     if ( (addr != 0) && (dev_hst_ro_flags & GNTMAP_host_map) )
     {
         /* Write update into the pagetable. */
@@ -278,14 +277,10 @@ __gnttab_activate_grant_ref(
         if ( !(dev_hst_ro_flags & GNTMAP_readonly) )
             l1e_add_flags(pte,_PAGE_RW);
 
-        if (!(dev_hst_ro_flags & GNTMAP_contains_pte))
-        {
-            rc = update_grant_va_mapping( addr, pte, 
-                                          mapping_d, mapping_ed );
-        } else {
-            rc = update_grant_va_mapping_pte( addr, pte, 
-                                              mapping_d, mapping_ed );
-        }
+        if ( dev_hst_ro_flags & GNTMAP_contains_pte )
+            rc = update_grant_pte_mapping(addr, pte, mapping_d, mapping_ed);
+        else
+            rc = update_grant_va_mapping(addr, pte, mapping_d, mapping_ed);
 
         /* IMPORTANT: rc indicates the degree of TLB flush that is required.
          * GNTST_flush_one (1) or GNTST_flush_all (2). This is done in the 
@@ -586,11 +581,13 @@ __gnttab_unmap_grant_ref(
          (flags & GNTMAP_host_map) &&
          ((act->pin & (GNTPIN_hstw_mask | GNTPIN_hstr_mask)) > 0))
     {
-        if (flags & GNTMAP_contains_pte) 
+        if ( flags & GNTMAP_contains_pte )
         {
-            if ( (rc = clear_grant_va_mapping_pte(addr, frame, ld)) < 0 )
+            if ( (rc = clear_grant_pte_mapping(addr, frame, ld)) < 0 )
                 goto unmap_out;
-        } else {
+        }
+        else
+        {
             if ( (rc = clear_grant_va_mapping(addr, frame)) < 0 )
                 goto unmap_out;
         }
@@ -961,11 +958,14 @@ do_grant_table_op(
     unsigned int cmd, void *uop, unsigned int count)
 {
     long rc;
+    struct domain *d = current->domain;
 
     if ( count > 512 )
         return -EINVAL;
 
-    LOCK_BIGLOCK(current->domain);
+    LOCK_BIGLOCK(d);
+
+    sync_pagetable_state(d);
 
     rc = -EFAULT;
     switch ( cmd )
@@ -1001,7 +1001,7 @@ do_grant_table_op(
     }
 
 out:
-    UNLOCK_BIGLOCK(current->domain);
+    UNLOCK_BIGLOCK(d);
 
     return rc;
 }
