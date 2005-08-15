@@ -34,10 +34,10 @@ static inline void __prepare_arch_switch(void)
 	 * are always kernel segments while inside the kernel. Must
 	 * happen before reload of cr3/ldt (i.e., not in __switch_to).
 	 */
-	__asm__ __volatile__ ( "mov %%fs,%0 ; mov %%gs,%1"
+	asm volatile ( "mov %%fs,%0 ; mov %%gs,%1"
 		: "=m" (*(int *)&current->thread.fs),
 		  "=m" (*(int *)&current->thread.gs));
-	__asm__ __volatile__ ( "mov %0,%%fs ; mov %0,%%gs"
+	asm volatile ( "mov %0,%%fs ; mov %0,%%gs"
 		: : "r" (0) );
 }
 
@@ -100,7 +100,7 @@ static inline void switch_mm(struct mm_struct *prev,
 }
 
 #define deactivate_mm(tsk, mm) \
-	asm("mov %0,%%fs ; mov %0,%%gs": :"r" (0))
+	asm("movl %0,%%fs ; movl %0,%%gs": :"r" (0))
 
 #define activate_mm(prev, next) \
 	switch_mm((prev),(next),NULL)
