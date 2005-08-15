@@ -90,12 +90,9 @@ struct pfn_info
 #define PGT_va_shift        32
 #define PGT_va_mask         ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
  /* Is the back pointer still mutable (i.e. not fixed yet)? */
- /* Use PML4 slot for HYPERVISOR_VIRT_START.  
-    18 = L4_PAGETABLE_SHIFT - L2_PAGETABLE_SHIFT */
-#define PGT_va_mutable      ((unsigned long)(256U<<18)<<PGT_va_shift)
+#define PGT_va_mutable      ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
  /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
- /* Use PML4 slot for HYPERVISOR_VIRT_START + 1 */
-#define PGT_va_unknown      ((unsigned long)(257U<<18)<<PGT_va_shift)
+#define PGT_va_unknown      ((unsigned long)((1U<<28)-2)<<PGT_va_shift)
 #endif
 
  /* 16-bit count of uses of this frame as its current type. */
