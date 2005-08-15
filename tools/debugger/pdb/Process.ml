@@ -54,6 +54,7 @@ let attach_debugger proc_ctx dom_ctx =
   proc_ctx.ring   <- Xen_domain.get_ring   dom_ctx;
   _attach_debugger proc_ctx
 
+external read_register : context_t -> int -> unit = "proc_read_register"
 external read_registers : context_t -> unit = "proc_read_registers"
 external write_register : context_t -> register -> int32 -> unit =
   "proc_write_register"
@@ -69,6 +70,10 @@ external insert_memory_breakpoint : context_t -> int32 -> int -> unit =
   "proc_insert_memory_breakpoint"
 external remove_memory_breakpoint : context_t -> int32 -> int -> unit = 
   "proc_remove_memory_breakpoint"
+external insert_watchpoint : context_t -> int -> int32 -> int -> unit =
+  "proc_insert_watchpoint"
+external remove_watchpoint : context_t -> int -> int32 -> int -> unit =
+  "proc_remove_watchpoint"
 
 let pause ctx =
   pause_target ctx

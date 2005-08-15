@@ -43,6 +43,54 @@ typedef struct
 /****************************************************************************/
 
 /*
+ * dom_read_register : context_t -> int -> int32
+ */
+value
+dom_read_register (value context, value reg)
+{
+    CAMLparam2(context, reg);
+    CAMLlocal1(result);
+
+    int my_reg = Int_val(reg);
+    cpu_user_regs_t *regs;
+    context_t ctx;
+
+    decode_context(&ctx, context);
+
+    if ( xendebug_read_registers(xc_handle, ctx.domain, ctx.vcpu, &regs) )
+    {
+        printf("(pdb) read registers error!\n");  fflush(stdout);
+        failwith("read registers error");
+    }
+
+    dump_regs(regs);
+
+    result = caml_alloc_tuple(16);
+
+    switch (my_reg)
+    {
+    case GDB_EAX: result = caml_copy_int32(regs->eax); break;
+    case GDB_ECX: result = caml_copy_int32(regs->ecx); break;
+    case GDB_EDX: result = caml_copy_int32(regs->edx); break;
+    case GDB_EBX: result = caml_copy_int32(regs->ebx); break;
+    case GDB_ESP: result = caml_copy_int32(regs->esp); break;
+    case GDB_EBP: result = caml_copy_int32(regs->ebp); break;
+    case GDB_ESI: result = caml_copy_int32(regs->esi); break;
+    case GDB_EDI: result = caml_copy_int32(regs->edi); break;
+    case GDB_EIP: result = caml_copy_int32(regs->eip); break;
+    case GDB_EFL: result = caml_copy_int32(regs->eflags); break;
+    case GDB_CS:  result = caml_copy_int32(regs->cs);  break;
+    case GDB_SS: result = caml_copy_int32(regs->ss); break;
+    case GDB_DS: result = caml_copy_int32(regs->ds); break;
+    case GDB_ES: result = caml_copy_int32(regs->es); break;
+    case GDB_FS: result = caml_copy_int32(regs->fs); break;
+    case GDB_GS: result = caml_copy_int32(regs->gs); break;
+    }
+
+    CAMLreturn(result);
+}
+
+/*
  * dom_read_registers : context_t -> int32
  */
 value

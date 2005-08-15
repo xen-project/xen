@@ -219,6 +219,17 @@ let add_default_context sock =
 
 (***************************************************************************)
 
+let read_register ctx register =    (* register is int32 because of sscanf *)
+  match ctx with
+  | Void -> 0l                                      (* default for startup *)
+  | Domain d  -> Domain.read_register d register
+  | Process p ->
+      begin
+	Process.read_register p register;
+	raise No_reply
+      end
+  | _ -> raise (Unimplemented "read registers")
+
 let read_registers ctx =
   match ctx with
   | Void -> Intel.null_registers                    (* default for startup *)
@@ -278,14 +289,42 @@ let step ctx =
 let insert_memory_breakpoint ctx addr len =
   match ctx with
   | Domain d  -> Domain.insert_memory_breakpoint d addr len
-  | Process p  -> Process.insert_memory_breakpoint p addr len
+  | Process p  ->
+      begin
+	Process.insert_memory_breakpoint p addr len;
+	raise No_reply
+      end
   | _ -> raise (Unimplemented "insert memory breakpoint")
 
 let remove_memory_breakpoint ctx addr len =
   match ctx with
   | Domain d  -> Domain.remove_memory_breakpoint d addr len
-  | Process p  -> Process.remove_memory_breakpoint p addr len
+  | Process p  ->
+      begin
+	Process.remove_memory_breakpoint p addr len;
+	raise No_reply
+      end
   | _ -> raise (Unimplemented "remove memory breakpoint")
+
+let insert_watchpoint ctx kind addr len =
+  match ctx with
+(*  | Domain d  -> Domain.insert_watchpoint d kind addr len  TODO *)
+  | Process p  ->
+      begin
+	Process.insert_watchpoint p kind addr len;
+	raise No_reply
+      end
+  | _ -> raise (Unimplemented "insert watchpoint")
+
+let remove_watchpoint ctx kind addr len =
+  match ctx with
+(*  | Domain d  -> Domain.remove_watchpoint d kind addr len  TODO *)
+  | Process p  ->
+      begin
+	Process.remove_watchpoint p kind addr len;
+	raise No_reply
+      end
+  | _ -> raise (Unimplemented "remove watchpoint")
 
 
 let pause ctx =
