@@ -188,12 +188,13 @@ op_start () {
 		fi
 	fi
 	ip link set ${netdev} name p${netdev}
-	ip link set veth0 name eth0
+	ip link set veth0 name ${netdev}
 	ifconfig p${netdev} -arp down
 	ifconfig p${netdev} hw ether fe:ff:ff:ff:ff:ff
 	ifconfig ${netdev} hw ether ${mac}
 	add_to_bridge ${bridge} vif0.0
 	add_to_bridge ${bridge} p${netdev}
+	ip link set ${bridge} up
 	ip link set vif0.0 up
 	ip link set p${netdev} up
 	if ! ifup ${netdev} ; then
