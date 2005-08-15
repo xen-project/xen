@@ -954,8 +954,10 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
                         i++;
                         start += PAGE_SIZE;
                         len--;
+printk(KERN_ALERT "HIT  0x%lx\n", start);
                         continue;
-                    }
+                    } 
+else printk(KERN_ALERT "MISS 0x%lx\n", start);
                 }
 
 		if (!vma || (vma->vm_flags & VM_IO)
@@ -1212,6 +1214,104 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 	return err;
 }
 EXPORT_SYMBOL(remap_pfn_range);
+
+static inline int generic_pte_range(struct mm_struct *mm,
+                                    pmd_t *pmd, 
+                                    unsigned long addr, 
+                                    unsigned long end,
+                                    pte_fn_t fn, void *data)
+{
+	pte_t *pte;
+        int err;
+        struct page *pte_page;
+
+        pte = (mm == &init_mm) ? 
+                pte_alloc_kernel(mm, pmd, addr) :
+                pte_alloc_map(mm, pmd, addr);
+        if (!pte)
+                return -ENOMEM;
+
+        pte_page = pmd_page(*pmd);
+
+        do {
+                err = fn(pte, pte_page, addr, data);
+		if (err)
+                        break;
+        } while (pte++, addr += PAGE_SIZE, addr != end);
+
+        if (mm != &init_mm)
+                pte_unmap(pte-1);
+        return err;
+
+}
+
+static inline int generic_pmd_range(struct mm_struct *mm,
+                                    pud_t *pud, 
+                                    unsigned long addr, 
+                                    unsigned long end,
+                                    pte_fn_t fn, void *data)
+{
+	pmd_t *pmd;
+	unsigned long next;
+        int err;
+
+	pmd = pmd_alloc(mm, pud, addr);
+	if (!pmd)
+		return -ENOMEM;
+	do {
+		next = pmd_addr_end(addr, end);
+                err = generic_pte_range(mm, pmd, addr, next, fn, data);
+                if (err)
+                    break;
+	} while (pmd++, addr = next, addr != end);
+	return err;
+}
+
+static inline int generic_pud_range(struct mm_struct *mm, pgd_t *pgd, 
+                                    unsigned long addr,
+                                    unsigned long end,
+                                    pte_fn_t fn, void *data)
+{
+	pud_t *pud;
+	unsigned long next;
+        int err;
+
+	pud = pud_alloc(mm, pgd, addr);
+	if (!pud)
+		return -ENOMEM;
+	do {
+		next = pud_addr_end(addr, end);
+		err = generic_pmd_range(mm, pud, addr, next, fn, data);
+                if (err)
+			break;
+	} while (pud++, addr = next, addr != end);
+	return err;
+}
+
+/*
+ * Scan a region of virtual memory, filling in page tables as necessary
+ * and calling a provided function on each leaf page table.
+ */
+int generic_page_range(struct mm_struct *mm, unsigned long addr, 
+                  unsigned long size, pte_fn_t fn, void *data)
+{
+	pgd_t *pgd;
+	unsigned long next;
+	unsigned long end = addr + size;
+	int err;
+
+	BUG_ON(addr >= end);
+	pgd = pgd_offset(mm, addr);
+	spin_lock(&mm->page_table_lock);
+	do {
+		next = pgd_addr_end(addr, end);
+		err = generic_pud_range(mm, pgd, addr, next, fn, data);
+		if (err)
+			break;
+	} while (pgd++, addr = next, addr != end);
+	spin_unlock(&mm->page_table_lock);
+	return err;
+}
 
 /*
  * Do pte_mkwrite, but only if the vma says VM_WRITE.  We do this when

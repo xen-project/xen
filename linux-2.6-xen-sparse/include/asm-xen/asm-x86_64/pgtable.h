@@ -538,6 +538,12 @@ int __direct_remap_area_pages(struct mm_struct *mm,
                               unsigned long address,
                               unsigned long size,
                               mmu_update_t *v);
+int create_lookup_pte_addr(struct mm_struct *mm,
+                           unsigned long address,
+                           unsigned long *ptep);
+int touch_pte_range(struct mm_struct *mm,
+                    unsigned long address,
+                    unsigned long size);
 
 #define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
 		direct_remap_area_pages((vma)->vm_mm,vaddr,paddr,size,prot,DOMID_IO)

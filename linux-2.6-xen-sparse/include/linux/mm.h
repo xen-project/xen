@@ -817,6 +817,12 @@ extern int check_user_page_readable(struct mm_struct *mm, unsigned long address)
 int remap_pfn_range(struct vm_area_struct *, unsigned long,
 		unsigned long, unsigned long, pgprot_t);
 
+typedef int (*pte_fn_t)(pte_t *pte, struct page *pte_page, unsigned long addr, 
+                        void *data);
+extern int generic_page_range(struct mm_struct *mm, unsigned long address, 
+                              unsigned long size, pte_fn_t fn, void *data);
+
+
 #ifdef CONFIG_PROC_FS
 void __vm_stat_account(struct mm_struct *, unsigned long, struct file *, long);
 #else
