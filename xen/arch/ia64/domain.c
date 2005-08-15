@@ -450,7 +450,7 @@ void new_thread(struct vcpu *v,
                 unsigned long start_info)
 {
 	struct domain *d = v->domain;
-	struct xen_regs *regs;
+	struct pt_regs *regs;
 	struct ia64_boot_param *bp;
 	extern char saved_command_line[];
 	//char *dom0_cmdline = "BOOT_IMAGE=scsi0:\EFI\redhat\xenlinux nomca root=/dev/sdb1 ro";

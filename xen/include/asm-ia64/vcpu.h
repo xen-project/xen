@@ -6,6 +6,7 @@
 
 //#include "thread.h"
 #include <asm/ia64_int.h>
+#include <public/arch-ia64.h>
 
 typedef	unsigned long UINT64;
 typedef	unsigned int UINT;
@@ -13,7 +14,7 @@ typedef	int BOOLEAN;
 struct vcpu;
 typedef	struct vcpu VCPU;
 
-typedef struct pt_regs REGS;
+typedef cpu_user_regs_t REGS;
 
 #define VCPU(_v,_x)	_v->vcpu_info->arch.privregs->_x
 

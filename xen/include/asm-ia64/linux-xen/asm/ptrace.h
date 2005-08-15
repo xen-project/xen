@@ -97,6 +97,7 @@
  */
 #ifdef XEN
 #include <public/arch-ia64.h>
+#define pt_regs cpu_user_regs
 #else
 struct pt_regs {
 	/* The following registers are saved by SAVE_MIN: */

@@ -139,14 +139,14 @@ void foo(void)
 	DEFINE(IA64_PT_REGS_R2_OFFSET, offsetof (struct pt_regs, r2));
 	DEFINE(IA64_PT_REGS_R3_OFFSET, offsetof (struct pt_regs, r3));
 #ifdef CONFIG_VTI
-	DEFINE(IA64_PT_REGS_R4_OFFSET, offsetof (struct xen_regs, r4));
-	DEFINE(IA64_PT_REGS_R5_OFFSET, offsetof (struct xen_regs, r5));
-	DEFINE(IA64_PT_REGS_R6_OFFSET, offsetof (struct xen_regs, r6));
-	DEFINE(IA64_PT_REGS_R7_OFFSET, offsetof (struct xen_regs, r7));
-	DEFINE(IA64_PT_REGS_CR_IIPA_OFFSET, offsetof (struct xen_regs, cr_iipa));
-	DEFINE(IA64_PT_REGS_CR_ISR_OFFSET, offsetof (struct xen_regs, cr_isr));
-	DEFINE(IA64_PT_REGS_EML_UNAT_OFFSET, offsetof (struct xen_regs, eml_unat));
-	DEFINE(IA64_PT_REGS_RFI_PFS_OFFSET, offsetof (struct xen_regs, rfi_pfs));
+	DEFINE(IA64_PT_REGS_R4_OFFSET, offsetof (struct pt_regs, r4));
+	DEFINE(IA64_PT_REGS_R5_OFFSET, offsetof (struct pt_regs, r5));
+	DEFINE(IA64_PT_REGS_R6_OFFSET, offsetof (struct pt_regs, r6));
+	DEFINE(IA64_PT_REGS_R7_OFFSET, offsetof (struct pt_regs, r7));
+	DEFINE(IA64_PT_REGS_CR_IIPA_OFFSET, offsetof (struct pt_regs, cr_iipa));
+	DEFINE(IA64_PT_REGS_CR_ISR_OFFSET, offsetof (struct pt_regs, cr_isr));
+	DEFINE(IA64_PT_REGS_EML_UNAT_OFFSET, offsetof (struct pt_regs, eml_unat));
+	DEFINE(IA64_PT_REGS_RFI_PFS_OFFSET, offsetof (struct pt_regs, rfi_pfs));
 	DEFINE(RFI_IIP_OFFSET, offsetof(struct vcpu, arch.arch_vmx.rfi_iip));
 	DEFINE(RFI_IPSR_OFFSET, offsetof(struct vcpu, arch.arch_vmx.rfi_ipsr));
 	DEFINE(RFI_IFS_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.rfi_ifs));
