@@ -386,7 +386,10 @@ static void network_tx_buf_gc(struct net_device *dev)
         mb();
     } while (prod != np->tx->resp_prod);
 
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
   out: 
+#endif
+
     if (np->tx_full && ((np->tx->req_prod - prod) < NETIF_TX_RING_SIZE)) {
         np->tx_full = 0;
         if (np->user_state == UST_OPEN)

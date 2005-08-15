@@ -15,6 +15,7 @@
 #include <asm-xen/linux-public/suspend.h>
 #include <asm-xen/queues.h>
 #include <asm-xen/xenbus.h>
+#include <asm-xen/ctrl_if.h>
 
 #define SHUTDOWN_INVALID  -1
 #define SHUTDOWN_POWEROFF  0
