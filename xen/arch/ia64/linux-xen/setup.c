@@ -66,6 +66,7 @@ EXPORT_SYMBOL(__per_cpu_offset);
 #endif
 
 DEFINE_PER_CPU(struct cpuinfo_ia64, cpu_info);
+DEFINE_PER_CPU(cpu_kr_ia64_t, cpu_kr);
 DEFINE_PER_CPU(unsigned long, local_per_cpu_offset);
 DEFINE_PER_CPU(unsigned long, ia64_phys_stacked_size_p8);
 unsigned long ia64_cycles_per_usec;
@@ -261,9 +262,9 @@ io_port_init (void)
 	phys_iobase = efi_get_iobase();
 	if (phys_iobase)
 		/* set AR.KR0 since this is all we use it for anyway */
-		ia64_set_kr(IA64_KR_IO_BASE, phys_iobase);
+		__get_cpu_var(cpu_kr)._kr[IA64_KR_IO_BASE]=phys_iobase;
 	else {
-		phys_iobase = ia64_get_kr(IA64_KR_IO_BASE);
+		phys_iobase=__get_cpu_var(cpu_kr)._kr[IA64_KR_IO_BASE];
 		printk(KERN_INFO "No I/O port range found in EFI memory map, falling back "
 		       "to AR.KR0\n");
 		printk(KERN_INFO "I/O port base = 0x%lx\n", phys_iobase);
@@ -610,6 +611,8 @@ void
 setup_per_cpu_areas (void)
 {
 	/* start_kernel() requires this... */
+	__get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT] = current;
+	__get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT_STACK] = -1;
 }
 
 static void
@@ -667,8 +670,8 @@ cpu_init (void)
 	 * physical addresses of per cpu variables with a simple:
 	 *   phys = ar.k3 + &per_cpu_var
 	 */
-	ia64_set_kr(IA64_KR_PER_CPU_DATA,
-		    ia64_tpa(cpu_data) - (long) __per_cpu_start);
+//	ia64_set_kr(IA64_KR_PER_CPU_DATA,
+//		    ia64_tpa(cpu_data) - (long) __per_cpu_start);
 
 	get_max_cacheline_size();
 
@@ -698,7 +701,7 @@ cpu_init (void)
 	/* Clear the stack memory reserved for pt_regs: */
 	memset(ia64_task_regs(current), 0, sizeof(struct pt_regs));
 
-	ia64_set_kr(IA64_KR_FPU_OWNER, 0);
+	__get_cpu_var(cpu_kr)._kr[IA64_KR_FPU_OWNER] = 0;
 
 	/*
 	 * Initialize default control register to defer all speculative faults.  The

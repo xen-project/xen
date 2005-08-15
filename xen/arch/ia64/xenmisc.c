@@ -347,7 +347,8 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
     
 loop:
 	printf("$$$$$ PANIC in domain %d (k6=%p): ",
-		v->domain->domain_id, ia64_get_kr(IA64_KR_CURRENT));
+		v->domain->domain_id, 
+		__get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT]);
 	va_start(args, fmt);
 	(void)vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);

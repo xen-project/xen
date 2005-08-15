@@ -73,7 +73,8 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	ld4 r20=[r20] ;;
 	cmp.eq p7,p0=r0,r20
 (p7)	br.cond.sptk.many 1f
-	mov r20=IA64_KR(CURRENT);;
+	movl r20=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r20=[r20];;
 	adds r21=IA64_VCPU_IRR0_OFFSET,r20;
 	adds r22=IA64_VCPU_IRR0_OFFSET+8,r20;;
 	ld8 r23=[r21],16; ld8 r24=[r22],16;;
@@ -257,7 +258,8 @@ ENTRY(hyper_ssm_i)
 	st8 [r21]=r20 ;;
 	// leave cr.ifs alone for later rfi
 	// set iip to go to domain IVA break instruction vector
-	mov r22=IA64_KR(CURRENT);;
+	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r22=[r22];;
 	adds r22=IA64_VCPU_IVA_OFFSET,r22;;
 	ld8 r23=[r22];;
 	movl r24=0x3000;;
@@ -340,7 +342,8 @@ GLOBAL_ENTRY(fast_tick_reflect)
 (p6)	br.cond.spnt.few fast_tick_reflect_done;;
 	extr.u r27=r20,0,6	// r27 has low 6 bits of itv.vector
 	extr.u r26=r20,6,2;;	// r26 has irr index of itv.vector
-	mov r19=IA64_KR(CURRENT);;
+	movl r19=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r19=[r19];;
 	adds r22=IA64_VCPU_DOMAIN_ITM_LAST_OFFSET,r19
 	adds r23=IA64_VCPU_DOMAIN_ITM_OFFSET,r19;;
 	ld8 r24=[r22];;
@@ -581,7 +584,8 @@ ENTRY(fast_reflect)
 	st8 [r18]=r0;;
 	// FIXME: need to save iipa and isr to be arch-compliant
 	// set iip to go to domain IVA break instruction vector
-	mov r22=IA64_KR(CURRENT);;
+	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r22=[r22];;
 	adds r22=IA64_VCPU_IVA_OFFSET,r22;;
 	ld8 r23=[r22];;
 	add r20=r20,r23;;
@@ -803,7 +807,8 @@ GLOBAL_ENTRY(rfi_check_extint)
 
 	// r18=&vpsr.i|vpsr.ic, r21==vpsr, r22=vcr.iip
 	// make sure none of these get trashed in case going to just_do_rfi
-	mov r30=IA64_KR(CURRENT);;
+	movl r30=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r30=[r30];;
 	adds r24=IA64_VCPU_INSVC3_OFFSET,r30;;
 	mov r25=192
 	adds r16=IA64_VCPU_IRR3_OFFSET,r30;;
@@ -1010,7 +1015,8 @@ ENTRY(hyper_ssm_dt)
 	ld4 r21=[r20];;
 	cmp.eq p7,p0=r21,r0	// meta==0?
 (p7)	br.spnt.many	1f ;;	// already in virtual mode
-	mov r22=IA64_KR(CURRENT);;
+	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r22=[r22];;
 	adds r22=IA64_VCPU_META_SAVED_RR0_OFFSET,r22;;
 	ld4 r23=[r22];;
 	mov rr[r0]=r23;;
@@ -1045,7 +1051,8 @@ ENTRY(hyper_rsm_dt)
 	ld4 r21=[r20];;
 	cmp.ne p7,p0=r21,r0	// meta==0?
 (p7)	br.spnt.many	1f ;;	// already in metaphysical mode
-	mov r22=IA64_KR(CURRENT);;
+	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r22=[r22];;
 	adds r22=IA64_VCPU_META_RR0_OFFSET,r22;;
 	ld4 r23=[r22];;
 	mov rr[r0]=r23;;
@@ -1137,7 +1144,8 @@ ENTRY(hyper_get_ivr)
 (p7)	adds r20=XSI_PEND_OFS-XSI_PSR_IC_OFS,r18 ;;
 (p7)	st4 [r20]=r0;;
 (p7)	br.spnt.many 1f ;;
-	mov r30=IA64_KR(CURRENT);;
+	movl r30=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r30=[r30];;
 	adds r24=IA64_VCPU_INSVC3_OFFSET,r30;;
 	mov r25=192
 	adds r22=IA64_VCPU_IRR3_OFFSET,r30;;
@@ -1242,7 +1250,8 @@ ENTRY(hyper_eoi)
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
 #endif
-	mov r22=IA64_KR(CURRENT);;
+	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r22=[r22];;
 	adds r22=IA64_VCPU_INSVC3_OFFSET,r22;;
 	ld8 r23=[r22];;
 	cmp.eq p6,p0=r23,r0;;
@@ -1307,7 +1316,8 @@ ENTRY(hyper_set_itm)
 #endif
 	movl r20=THIS_CPU(cpu_info)+IA64_CPUINFO_ITM_NEXT_OFFSET;;
 	ld8 r21=[r20];;
-	mov r20=IA64_KR(CURRENT);;
+	movl r20=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r20=[r20];;
 	adds r20=IA64_VCPU_DOMAIN_ITM_OFFSET,r20;;
 	st8 [r20]=r8;;
 	cmp.geu p6,p0=r21,r8;;
@@ -1378,7 +1388,8 @@ ENTRY(hyper_set_rr)
 	st8 [r20]=r21;;
 #endif
 	extr.u r26=r9,8,24	// r26 = r9.rid
-	mov r20=IA64_KR(CURRENT);;
+	movl r20=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r20=[r20];;
 	adds r21=IA64_VCPU_STARTING_RID_OFFSET,r20;;
 	ld4 r22=[r21];;
 	adds r21=IA64_VCPU_ENDING_RID_OFFSET,r20;;
@@ -1544,7 +1555,8 @@ FIXME: ptc.ga instruction requires spinlock for SMP
 	mov ar.lc=r30 ;;
 	mov r29=cr.ipsr
 	mov r30=cr.iip;;
-	mov r27=IA64_KR(CURRENT);;
+	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r27=[r27];;
 	adds r25=IA64_VCPU_DTLB_OFFSET,r27
 	adds r26=IA64_VCPU_ITLB_OFFSET,r27;;
 	ld8 r24=[r25]

@@ -296,4 +296,11 @@ void foo(void)
 	//DEFINE(IA64_TIME_SOURCE_MMIO64, TIME_SOURCE_MMIO64);
 	//DEFINE(IA64_TIME_SOURCE_MMIO32, TIME_SOURCE_MMIO32);
 	//DEFINE(IA64_TIMESPEC_TV_NSEC_OFFSET, offsetof (struct timespec, tv_nsec));
+	DEFINE(IA64_KR_CURRENT_OFFSET, offsetof (cpu_kr_ia64_t, _kr[IA64_KR_CURRENT]));
+	DEFINE(IA64_KR_PT_BASE_OFFSET, offsetof (cpu_kr_ia64_t, _kr[IA64_KR_PT_BASE]));
+	DEFINE(IA64_KR_IO_BASE_OFFSET, offsetof (cpu_kr_ia64_t, _kr[IA64_KR_IO_BASE]));
+	DEFINE(IA64_KR_PERCPU_DATA_OFFSET, offsetof (cpu_kr_ia64_t, _kr[IA64_KR_PER_CPU_DATA]));
+	DEFINE(IA64_KR_IO_BASE_OFFSET, offsetof (cpu_kr_ia64_t, _kr[IA64_KR_IO_BASE]));
+	DEFINE(IA64_KR_CURRENT_STACK_OFFSET, offsetof (cpu_kr_ia64_t, _kr[IA64_KR_CURRENT_STACK]));
+
 }

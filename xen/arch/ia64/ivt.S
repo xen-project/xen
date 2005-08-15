@@ -833,7 +833,9 @@ ENTRY(break_fault)
 	cmp4.eq p7,p0=r0,r19
 (p7)	br.sptk.many fast_hyperprivop
 	;;
-	mov r22=IA64_KR(CURRENT);;
+	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r22 = [r22]
+	;;
 	adds r22=IA64_VCPU_BREAKIMM_OFFSET,r22;;
 	ld4 r23=[r22];;
 	cmp4.eq p6,p7=r23,r17			// Xen-reserved breakimm?
@@ -842,7 +844,8 @@ ENTRY(break_fault)
 	br.sptk.many fast_break_reflect
 	;;
 #endif
-	mov r16=IA64_KR(CURRENT)		// r16 = current task; 12 cycle read lat.
+	movl r16=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r16=[r16]
 	mov r17=cr.iim
 	mov r18=__IA64_BREAK_SYSCALL
 	mov r21=ar.fpsr

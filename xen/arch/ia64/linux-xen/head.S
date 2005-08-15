@@ -226,8 +226,6 @@ start_ap:
 	bsw.1
 	;;
 #else // CONFIG_VTI
-	mov IA64_KR(CURRENT)=r2		// virtual address
-	mov IA64_KR(CURRENT_STACK)=r16
 #endif // CONFIG_VTI
 	mov r13=r2
 	/*
