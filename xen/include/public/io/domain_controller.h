@@ -365,8 +365,10 @@ typedef struct netif_fe_driver_status {
  */
 typedef struct netif_fe_interface_connect {
     u32        handle;
-    memory_t   tx_shmem_frame;
+    memory_t   tx_shmem_frame; 
+    int        tx_shmem_ref;
     memory_t   rx_shmem_frame;
+    int        rx_shmem_ref;
 } netif_fe_interface_connect_t;
 
 /*
@@ -487,7 +489,9 @@ typedef struct netif_be_connect {
     domid_t    domid;          /* Domain attached to new interface.   */
     u32        netif_handle;   /* Domain-specific interface handle.   */
     memory_t   tx_shmem_frame; /* Page cont. tx shared comms window.  */
+    int        tx_shmem_ref;   /* Grant reference for above           */
     memory_t   rx_shmem_frame; /* Page cont. rx shared comms window.  */
+    int        rx_shmem_ref;   /* Grant reference for above           */
     u16        evtchn;         /* Event channel for notifications.    */
     /* OUT */
     u32        status;

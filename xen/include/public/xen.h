@@ -399,12 +399,11 @@ typedef struct shared_info {
 
     /*
      * Wallclock time: updated only by control software. Guests should base
-     * their gettimeofday() syscall on this wallclock-base value, which
-     * indicates UTC when system_time == 0 (i.e., at boot).
+     * their gettimeofday() syscall on this wallclock-base value.
      */
     u32 wc_version;      /* Version counter: see vcpu_time_info_t. */
-    u32 wc_nsec;         /* Nsecs since 00:00:00 UTC, Jan 1, 1970.  */
-    s64 wc_sec;          /* Secs  since 00:00:00 UTC, Jan 1, 1970.  */
+    u32 wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
+    u32 wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
 
     arch_shared_info_t arch;
 

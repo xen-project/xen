@@ -50,7 +50,7 @@ int xc_gnttab_map_grant_ref(int         xc_handle,
     struct gnttab_map_grant_ref op;
     int rc;
 
-    op.host_virt_addr = host_virt_addr;
+    op.host_addr      = host_virt_addr;
     op.dom            = (domid_t)dom;
     op.ref            = ref;
     op.flags          = flags;
@@ -75,7 +75,7 @@ int xc_gnttab_unmap_grant_ref(int       xc_handle,
     struct gnttab_unmap_grant_ref op;
     int rc;
 
-    op.host_virt_addr = host_virt_addr;
+    op.host_addr      = host_virt_addr;
     op.dev_bus_addr   = dev_bus_addr;
     op.handle         = handle;
  

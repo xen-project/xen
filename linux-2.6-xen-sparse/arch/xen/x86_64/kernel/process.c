@@ -148,7 +148,6 @@ void cpu_idle (void)
 			if (cpu_is_offline(cpu))
 				play_dead();
 
-                        __IRQ_STAT(cpu,idle_timestamp) = jiffies;
 			xen_idle();
 		}
 

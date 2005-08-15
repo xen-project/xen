@@ -16,7 +16,7 @@ XEN_CONFIGS += xmexample.vmx
 
 # Xen script dir and scripts to go there.
 XEN_SCRIPT_DIR = /etc/xen/scripts
-XEN_SCRIPTS = network vif-bridge
+XEN_SCRIPTS = network-bridge vif-bridge
 XEN_SCRIPTS += network-route vif-route
 XEN_SCRIPTS += block-file
 XEN_SCRIPTS += block-enbd

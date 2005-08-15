@@ -298,90 +298,20 @@ void __init bt_iounmap(void *addr, unsigned long size)
 #define direct_mk_pte_phys(physpage, pgprot) \
   __direct_mk_pte((physpage) >> PAGE_SHIFT, pgprot)
 
-static inline void direct_remap_area_pte(pte_t *pte, 
-					 unsigned long address, 
-					 unsigned long size,
-					 mmu_update_t **v)
+
+static int direct_remap_area_pte_fn(pte_t *pte, 
+                                    struct page *pte_page,
+                                    unsigned long address, 
+                                    void *data)
 {
-	unsigned long end;
+        mmu_update_t **v = (mmu_update_t **)data;
 
-	address &= ~PMD_MASK;
-	end = address + size;
-	if (end > PMD_SIZE)
-		end = PMD_SIZE;
-	if (address >= end)
-		BUG();
+        (*v)->ptr = (pfn_to_mfn(page_to_pfn(pte_page)) << PAGE_SHIFT)
+                    | ((unsigned long)pte & ~PAGE_MASK);
+        (*v)++;
 
-	do {
-		(*v)->ptr = virt_to_machine(pte);
-		(*v)++;
-		address += PAGE_SIZE;
-		pte++;
-	} while (address && (address < end));
+        return 0;
 }
-
-static inline int direct_remap_area_pmd(struct mm_struct *mm,
-					pmd_t *pmd, 
-					unsigned long address, 
-					unsigned long size,
-					mmu_update_t **v)
-{
-	unsigned long end;
-
-	address &= ~PGDIR_MASK;
-	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
-	if (address >= end)
-		BUG();
-	do {
-		pte_t *pte = (mm == &init_mm) ? 
-			pte_alloc_kernel(mm, pmd, address) :
-			pte_alloc_map(mm, pmd, address);
-		if (!pte)
-			return -ENOMEM;
-		direct_remap_area_pte(pte, address, end - address, v);
-		pte_unmap(pte);
-		address = (address + PMD_SIZE) & PMD_MASK;
-		pmd++;
-	} while (address && (address < end));
-	return 0;
-}
- 
-int __direct_remap_area_pages(struct mm_struct *mm,
-			      unsigned long address, 
-			      unsigned long size, 
-			      mmu_update_t *v)
-{
-	pgd_t * dir;
-	unsigned long end = address + size;
-	int error;
-
-	dir = pgd_offset(mm, address);
-	if (address >= end)
-		BUG();
-	spin_lock(&mm->page_table_lock);
-	do {
-		pud_t *pud;
-		pmd_t *pmd;
-
-		error = -ENOMEM;
-		pud = pud_alloc(mm, dir, address);
-		if (!pud)
-			break;
-		pmd = pmd_alloc(mm, pud, address);
-		if (!pmd)
-			break;
-		error = 0;
-		direct_remap_area_pmd(mm, pmd, address, end - address, &v);
-		address = (address + PGDIR_SIZE) & PGDIR_MASK;
-		dir++;
-
-	} while (address && (address < end));
-	spin_unlock(&mm->page_table_lock);
-	return error;
-}
-
 
 int direct_remap_area_pages(struct mm_struct *mm,
 			    unsigned long address, 
@@ -393,7 +323,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
 	int i;
 	unsigned long start_address;
 #define MAX_DIRECTMAP_MMU_QUEUE 130
-	mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *v = u;
+	mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *v = u, *w = u;
 
 	start_address = address;
 
@@ -402,10 +332,9 @@ int direct_remap_area_pages(struct mm_struct *mm,
 	for (i = 0; i < size; i += PAGE_SIZE) {
 		if ((v - u) == MAX_DIRECTMAP_MMU_QUEUE) {
 			/* Fill in the PTE pointers. */
-			__direct_remap_area_pages(mm,
-						  start_address, 
-						  address-start_address, 
-						  u);
+                        generic_page_range(mm, start_address, 
+                                           address-start_address,
+                                           direct_remap_area_pte_fn, &w);
  
 			if (HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0)
 				return -EFAULT;
@@ -426,10 +355,9 @@ int direct_remap_area_pages(struct mm_struct *mm,
 
 	if (v != u) {
 		/* get the ptep's filled in */
-		__direct_remap_area_pages(mm,
-					  start_address, 
-					  address-start_address, 
-					  u);
+                generic_page_range(mm, start_address, 
+                                   address-start_address,
+                                   direct_remap_area_pte_fn, &w);
 		if (unlikely(HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0))
 			return -EFAULT;
 	}
@@ -440,3 +368,34 @@ int direct_remap_area_pages(struct mm_struct *mm,
 }
 
 EXPORT_SYMBOL(direct_remap_area_pages);
+
+int create_lookup_pte_addr(struct mm_struct *mm, 
+                           unsigned long address,
+                           unsigned long *ptep)
+{
+    int f(pte_t *pte, struct page *pte_page, unsigned long addr, void *data) 
+    {
+        unsigned long *ptep = (unsigned long *)data;
+        if (ptep) *ptep = (pfn_to_mfn(page_to_pfn(pte_page)) << PAGE_SHIFT)
+                       | ((unsigned long)pte & ~PAGE_MASK);
+        return 0;
+    }
+
+    return generic_page_range(mm, address, PAGE_SIZE, f, ptep);
+}
+
+EXPORT_SYMBOL(create_lookup_pte_addr);
+
+int touch_pte_range(struct mm_struct *mm,
+                    unsigned long address,
+                    unsigned long size)
+{
+    int f(pte_t *pte, struct page *pte_page, unsigned long addr, void *data) 
+    {
+        return 0;
+    }
+
+    return generic_page_range(mm, address, size, f, NULL);
+}                 
+
+EXPORT_SYMBOL(touch_pte_range);

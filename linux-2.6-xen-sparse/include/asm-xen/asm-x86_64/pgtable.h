@@ -9,6 +9,7 @@
 #include <asm/fixmap.h>
 #include <asm/bitops.h>
 #include <linux/threads.h>
+#include <linux/sched.h>
 #include <asm/pda.h>
 #ifdef CONFIG_XEN
 #include <asm-xen/hypervisor.h>
@@ -265,7 +266,16 @@ static inline unsigned long pud_bad(pud_t pud)
        val &= ~(_PAGE_USER | _PAGE_DIRTY); 
        return val & ~(_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED);      
 } 
-#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
+
+inline static void set_pte_at(struct mm_struct *mm, unsigned long addr, 
+		       pte_t *ptep, pte_t val )
+{
+    if ( ((mm != current->mm) && (mm != &init_mm)) ||
+	 HYPERVISOR_update_va_mapping( (addr), (val), 0 ) )
+    {
+        set_pte(ptep, val);
+    }
+}
 
 #define pte_none(x)	(!(x).pte)
 #define pte_present(x)	((x).pte & (_PAGE_PRESENT | _PAGE_PROTNONE))
@@ -497,7 +507,7 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 	do {								  \
 		if (__dirty) {						  \
 		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
-			    HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG|UVMF_MULTI|(unsigned long)((__vma)->vm_mm->cpu_vm_mask.bits)); \
+			    BUG_ON(HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG|UVMF_MULTI|(unsigned long)((__vma)->vm_mm->cpu_vm_mask.bits))); \
 			} else {                                          \
                             xen_l1_entry_update((__ptep), (__entry)); \
 			    flush_tlb_page((__vma), (__address));         \
@@ -528,6 +538,12 @@ int __direct_remap_area_pages(struct mm_struct *mm,
                               unsigned long address,
                               unsigned long size,
                               mmu_update_t *v);
+int create_lookup_pte_addr(struct mm_struct *mm,
+                           unsigned long address,
+                           unsigned long *ptep);
+int touch_pte_range(struct mm_struct *mm,
+                    unsigned long address,
+                    unsigned long size);
 
 #define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
 		direct_remap_area_pages((vma)->vm_mm,vaddr,paddr,size,prot,DOMID_IO)

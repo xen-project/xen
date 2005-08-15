@@ -1578,7 +1578,7 @@ static inline int l1pte_write_fault(
 
     if ( unlikely(!VALID_MFN(gmfn)) )
     {
-        SH_LOG("l1pte_write_fault: invalid gpfn=%lx", gpfn);
+        SH_VLOG("l1pte_write_fault: invalid gpfn=%lx", gpfn);
         *spte_p = l1e_empty();
         return 0;
     }
@@ -1612,7 +1612,7 @@ static inline int l1pte_read_fault(
 
     if ( unlikely(!VALID_MFN(mfn)) )
     {
-        SH_LOG("l1pte_read_fault: invalid gpfn=%lx", pfn);
+        SH_VLOG("l1pte_read_fault: invalid gpfn=%lx", pfn);
         *spte_p = l1e_empty();
         return 0;
     }

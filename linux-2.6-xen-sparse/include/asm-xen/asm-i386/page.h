@@ -63,15 +63,20 @@
 extern unsigned int *phys_to_machine_mapping;
 #define pfn_to_mfn(_pfn) ((unsigned long)(phys_to_machine_mapping[(_pfn)]))
 #define mfn_to_pfn(_mfn) ((unsigned long)(machine_to_phys_mapping[(_mfn)]))
-static inline unsigned long phys_to_machine(unsigned long phys)
+#ifdef CONFIG_X86_PAE
+typedef unsigned long long physaddr_t;
+#else
+typedef unsigned long physaddr_t;
+#endif
+static inline physaddr_t phys_to_machine(physaddr_t phys)
 {
-	unsigned long machine = pfn_to_mfn(phys >> PAGE_SHIFT);
+	physaddr_t machine = pfn_to_mfn(phys >> PAGE_SHIFT);
 	machine = (machine << PAGE_SHIFT) | (phys & ~PAGE_MASK);
 	return machine;
 }
-static inline unsigned long machine_to_phys(unsigned long machine)
+static inline physaddr_t machine_to_phys(physaddr_t machine)
 {
-	unsigned long phys = mfn_to_pfn(machine >> PAGE_SHIFT);
+	physaddr_t phys = mfn_to_pfn(machine >> PAGE_SHIFT);
 	phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
 	return phys;
 }
@@ -86,8 +91,9 @@ typedef struct { unsigned long pte_low, pte_high; } pte_t;
 typedef struct { unsigned long long pmd; } pmd_t;
 typedef struct { unsigned long long pgd; } pgd_t;
 typedef struct { unsigned long long pgprot; } pgprot_t;
-#define __pte(x) ({ unsigned long long _x = (x); \
-    (((_x)&1) ? ((pte_t) {phys_to_machine(_x)}) : ((pte_t) {(_x)})); })
+#define __pte(x) ({ unsigned long long _x = (x);        \
+    if (_x & 1) _x = phys_to_machine(_x);               \
+    ((pte_t) {(unsigned long)(_x), (unsigned long)(_x>>32)}); })
 #define __pgd(x) ({ unsigned long long _x = (x); \
     (((_x)&1) ? ((pgd_t) {phys_to_machine(_x)}) : ((pgd_t) {(_x)})); })
 #define __pmd(x) ({ unsigned long long _x = (x); \

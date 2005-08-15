@@ -139,7 +139,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         privcmd_mmapbatch_t m;
         struct vm_area_struct *vma = NULL;
         unsigned long *p, addr;
-        unsigned long mfn;
+        unsigned long mfn, ptep;
         int i;
 
         if ( copy_from_user(&m, (void *)data, sizeof(m)) )
@@ -163,12 +163,12 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
             if ( get_user(mfn, p) )
                 return -EFAULT;
 
-            u.val = (mfn << PAGE_SHIFT) | pgprot_val(vma->vm_page_prot);
+            ret = create_lookup_pte_addr(vma->vm_mm, addr, &ptep);
+            if (ret)
+                goto batch_err;
 
-            __direct_remap_area_pages(vma->vm_mm,
-                                      addr, 
-                                      PAGE_SIZE, 
-                                      &u);
+            u.val = (mfn << PAGE_SHIFT) | pgprot_val(vma->vm_page_prot);
+            u.ptr = ptep;
 
             if ( unlikely(HYPERVISOR_mmu_update(&u, 1, NULL, m.dom) < 0) )
                 put_user(0xF0000000 | mfn, p);

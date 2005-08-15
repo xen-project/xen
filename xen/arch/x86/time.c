@@ -43,10 +43,7 @@ unsigned long hpet_address;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 int timer_ack = 0;
 unsigned long volatile jiffies;
-
-/* UTC time at system boot. */
-static s64 wc_sec;
-static u32 wc_nsec;
+static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
 static spinlock_t wc_lock = SPIN_LOCK_UNLOCKED;
 
 struct time_scale {
@@ -696,33 +693,18 @@ void update_dom_time(struct vcpu *v)
 }
 
 /* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
-void do_settime(s64 secs, u32 nsecs, u64 system_time_base)
+void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
 {
-    s64 x;
-    u32 y;
+    u64 x;
+    u32 y, _wc_sec, _wc_nsec;
     struct domain *d;
     shared_info_t *s;
 
-    x = (secs * 1000000000LL) + (u64)nsecs - system_time_base;
-    if ( x < 0 )
-    {
-        /* -ve UTC offset => -ve seconds, +ve nanoseconds. */
-        x = -x;
-        y = do_div(x, 1000000000);
-        x = -x;
-        if ( y != 0 )
-        {
-            y = 1000000000 - y;
-            x--;
-        }
-    }
-    else
-    {
-        y = do_div(x, 1000000000);
-    }
+    x = (secs * 1000000000ULL) + (u64)nsecs - system_time_base;
+    y = do_div(x, 1000000000);
 
-    wc_sec  = x;
-    wc_nsec = y;
+    wc_sec  = _wc_sec  = (u32)x;
+    wc_nsec = _wc_nsec = (u32)y;
 
     read_lock(&domlist_lock);
     spin_lock(&wc_lock);
@@ -731,8 +713,8 @@ void do_settime(s64 secs, u32 nsecs, u64 system_time_base)
     {
         s = d->shared_info;
         version_update_begin(&s->wc_version);
-        s->wc_sec  = x;
-        s->wc_nsec = y;
+        s->wc_sec  = _wc_sec;
+        s->wc_nsec = _wc_nsec;
         version_update_end(&s->wc_version);
     }
 

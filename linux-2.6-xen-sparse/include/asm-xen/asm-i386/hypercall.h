@@ -386,13 +386,6 @@ HYPERVISOR_update_va_mapping(
 	  "4" (flags)
 	: "memory" );
 
-    if ( unlikely(ret < 0) )
-    {
-        printk(KERN_ALERT "Failed update VA mapping: %08lx, %08lx, %08lx\n",
-               va, (new_val).pte_low, flags);
-        BUG();
-    }
-
     return ret;
 }
 

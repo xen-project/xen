@@ -6,10 +6,63 @@ diff --git a/Makefile b/Makefile
  PATCHLEVEL = 6
  SUBLEVEL = 12
 -EXTRAVERSION =
-+EXTRAVERSION = .3
++EXTRAVERSION = .5
  NAME=Woozy Numbat
  
  # *DOCUMENTATION*
+@@ -1149,7 +1149,7 @@ endif # KBUILD_EXTMOD
+ #(which is the most common case IMHO) to avoid unneeded clutter in the big tags file.
+ #Adding $(srctree) adds about 20M on i386 to the size of the output file!
+ 
+-ifeq ($(KBUILD_OUTPUT),)
++ifeq ($(src),$(obj))
+ __srctree =
+ else
+ __srctree = $(srctree)/
+diff --git a/arch/i386/kernel/cpu/cpufreq/powernow-k8.c b/arch/i386/kernel/cpu/cpufreq/powernow-k8.c
+--- a/arch/i386/kernel/cpu/cpufreq/powernow-k8.c
++++ b/arch/i386/kernel/cpu/cpufreq/powernow-k8.c
+@@ -44,7 +44,7 @@
+ 
+ #define PFX "powernow-k8: "
+ #define BFX PFX "BIOS error: "
+-#define VERSION "version 1.40.2"
++#define VERSION "version 1.40.4"
+ #include "powernow-k8.h"
+ 
+ /* serialize freq changes  */
+@@ -978,7 +978,7 @@ static int __init powernowk8_cpu_init(st
+ {
+ 	struct powernow_k8_data *data;
+ 	cpumask_t oldmask = CPU_MASK_ALL;
+-	int rc;
++	int rc, i;
+ 
+ 	if (!check_supported_cpu(pol->cpu))
+ 		return -ENODEV;
+@@ -1064,7 +1064,9 @@ static int __init powernowk8_cpu_init(st
+ 	printk("cpu_init done, current fid 0x%x, vid 0x%x\n",
+ 	       data->currfid, data->currvid);
+ 
+-	powernow_data[pol->cpu] = data;
++	for_each_cpu_mask(i, cpu_core_map[pol->cpu]) {
++		powernow_data[i] = data;
++	}
+ 
+ 	return 0;
+ 
+diff --git a/arch/i386/kernel/process.c b/arch/i386/kernel/process.c
+--- a/arch/i386/kernel/process.c
++++ b/arch/i386/kernel/process.c
+@@ -827,6 +827,8 @@ asmlinkage int sys_get_thread_area(struc
+ 	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
+ 		return -EINVAL;
+ 
++	memset(&info, 0, sizeof(info));
++
+ 	desc = current->thread.tls_array + idx - GDT_ENTRY_TLS_MIN;
+ 
+ 	info.entry_number = idx;
 diff --git a/arch/ia64/kernel/ptrace.c b/arch/ia64/kernel/ptrace.c
 --- a/arch/ia64/kernel/ptrace.c
 +++ b/arch/ia64/kernel/ptrace.c
@@ -137,6 +190,26 @@ diff --git a/arch/ppc/kernel/time.c b/arch/ppc/kernel/time.c
          }
          set_normalized_timespec(&wall_to_monotonic,
                                  -xtime.tv_sec, -xtime.tv_nsec);
+diff --git a/arch/ppc64/boot/zlib.c b/arch/ppc64/boot/zlib.c
+--- a/arch/ppc64/boot/zlib.c
++++ b/arch/ppc64/boot/zlib.c
+@@ -1307,7 +1307,7 @@ local int huft_build(
+   {
+     *t = (inflate_huft *)Z_NULL;
+     *m = 0;
+-    return Z_OK;
++    return Z_DATA_ERROR;
+   }
+ 
+ 
+@@ -1351,6 +1351,7 @@ local int huft_build(
+     if ((j = *p++) != 0)
+       v[x[j]++] = i;
+   } while (++i < n);
++  n = x[g];			/* set n to length of v */
+ 
+ 
+   /* Generate the Huffman codes and for each, make the table entries */
 diff --git a/arch/um/kernel/process.c b/arch/um/kernel/process.c
 --- a/arch/um/kernel/process.c
 +++ b/arch/um/kernel/process.c
@@ -309,6 +382,177 @@ diff --git a/arch/um/kernel/process.c b/arch/um/kernel/process.c
  
  	return(ret);
  }
+diff --git a/arch/x86_64/ia32/syscall32.c b/arch/x86_64/ia32/syscall32.c
+--- a/arch/x86_64/ia32/syscall32.c
++++ b/arch/x86_64/ia32/syscall32.c
+@@ -57,6 +57,7 @@ int syscall32_setup_pages(struct linux_b
+ 	int npages = (VSYSCALL32_END - VSYSCALL32_BASE) >> PAGE_SHIFT;
+ 	struct vm_area_struct *vma;
+ 	struct mm_struct *mm = current->mm;
++	int ret;
+ 
+ 	vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
+ 	if (!vma)
+@@ -78,7 +79,11 @@ int syscall32_setup_pages(struct linux_b
+ 	vma->vm_mm = mm;
+ 
+ 	down_write(&mm->mmap_sem);
+-	insert_vm_struct(mm, vma);
++	if ((ret = insert_vm_struct(mm, vma))) {
++		up_write(&mm->mmap_sem);
++		kmem_cache_free(vm_area_cachep, vma);
++		return ret;
++	}
+ 	mm->total_vm += npages;
+ 	up_write(&mm->mmap_sem);
+ 	return 0;
+diff --git a/arch/x86_64/kernel/setup.c b/arch/x86_64/kernel/setup.c
+--- a/arch/x86_64/kernel/setup.c
++++ b/arch/x86_64/kernel/setup.c
+@@ -729,8 +729,6 @@ static void __init amd_detect_cmp(struct
+ 	int cpu = smp_processor_id();
+ 	int node = 0;
+ 	unsigned bits;
+-	if (c->x86_num_cores == 1)
+-		return;
+ 
+ 	bits = 0;
+ 	while ((1 << bits) < c->x86_num_cores)
+diff --git a/arch/x86_64/kernel/smp.c b/arch/x86_64/kernel/smp.c
+--- a/arch/x86_64/kernel/smp.c
++++ b/arch/x86_64/kernel/smp.c
+@@ -284,6 +284,71 @@ struct call_data_struct {
+ static struct call_data_struct * call_data;
+ 
+ /*
++ * this function sends a 'generic call function' IPI to one other CPU
++ * in the system.
++ */
++static void __smp_call_function_single (int cpu, void (*func) (void *info), void *info,
++				int nonatomic, int wait)
++{
++	struct call_data_struct data;
++	int cpus = 1;
++
++	data.func = func;
++	data.info = info;
++	atomic_set(&data.started, 0);
++	data.wait = wait;
++	if (wait)
++		atomic_set(&data.finished, 0);
++
++	call_data = &data;
++	wmb();
++	/* Send a message to all other CPUs and wait for them to respond */
++	send_IPI_mask(cpumask_of_cpu(cpu), CALL_FUNCTION_VECTOR);
++
++	/* Wait for response */
++	while (atomic_read(&data.started) != cpus)
++		cpu_relax();
++
++	if (!wait)
++		return;
++
++	while (atomic_read(&data.finished) != cpus)
++		cpu_relax();
++}
++
++/*
++ * Run a function on another CPU
++ *  <func>	The function to run. This must be fast and non-blocking.
++ *  <info>	An arbitrary pointer to pass to the function.
++ *  <nonatomic>	Currently unused.
++ *  <wait>	If true, wait until function has completed on other CPUs.
++ *  [RETURNS]   0 on success, else a negative status code.
++ *
++ * Does not return until the remote CPU is nearly ready to execute <func>
++ * or is or has executed.
++ */
++
++int smp_call_function_single (int cpu, void (*func) (void *info), void *info, 
++	int nonatomic, int wait)
++{
++	
++	int me = get_cpu(); /* prevent preemption and reschedule on another processor */
++
++	if (cpu == me) {
++		printk("%s: trying to call self\n", __func__);
++		put_cpu();
++		return -EBUSY;
++	}
++	spin_lock_bh(&call_lock);
++
++	__smp_call_function_single(cpu, func,info,nonatomic,wait);	
++
++	spin_unlock_bh(&call_lock);
++	put_cpu();
++	return 0;
++}
++
++/*
+  * this function sends a 'generic call function' IPI to all other CPUs
+  * in the system.
+  */
+diff --git a/arch/x86_64/kernel/smpboot.c b/arch/x86_64/kernel/smpboot.c
+--- a/arch/x86_64/kernel/smpboot.c
++++ b/arch/x86_64/kernel/smpboot.c
+@@ -202,9 +202,6 @@ static __cpuinit void sync_master(void *
+ {
+ 	unsigned long flags, i;
+ 
+-	if (smp_processor_id() != boot_cpu_id)
+-		return;
+-
+ 	go[MASTER] = 0;
+ 
+ 	local_irq_save(flags);
+@@ -253,7 +250,7 @@ get_delta(long *rt, long *master)
+ 	return tcenter - best_tm;
+ }
+ 
+-static __cpuinit void sync_tsc(void)
++static __cpuinit void sync_tsc(unsigned int master)
+ {
+ 	int i, done = 0;
+ 	long delta, adj, adjust_latency = 0;
+@@ -267,9 +264,17 @@ static __cpuinit void sync_tsc(void)
+ 	} t[NUM_ROUNDS] __cpuinitdata;
+ #endif
+ 
++	printk(KERN_INFO "CPU %d: Syncing TSC to CPU %u.\n",
++		smp_processor_id(), master);
++
+ 	go[MASTER] = 1;
+ 
+-	smp_call_function(sync_master, NULL, 1, 0);
++	/* It is dangerous to broadcast IPI as cpus are coming up,
++	 * as they may not be ready to accept them.  So since
++	 * we only need to send the ipi to the boot cpu direct
++	 * the message, and avoid the race.
++	 */
++	smp_call_function_single(master, sync_master, NULL, 1, 0);
+ 
+ 	while (go[MASTER])	/* wait for master to be ready */
+ 		no_cpu_relax();
+@@ -313,16 +318,14 @@ static __cpuinit void sync_tsc(void)
+ 	printk(KERN_INFO
+ 	       "CPU %d: synchronized TSC with CPU %u (last diff %ld cycles, "
+ 	       "maxerr %lu cycles)\n",
+-	       smp_processor_id(), boot_cpu_id, delta, rt);
++	       smp_processor_id(), master, delta, rt);
+ }
+ 
+ static void __cpuinit tsc_sync_wait(void)
+ {
+ 	if (notscsync || !cpu_has_tsc)
+ 		return;
+-	printk(KERN_INFO "CPU %d: Syncing TSC to CPU %u.\n", smp_processor_id(),
+-			boot_cpu_id);
+-	sync_tsc();
++	sync_tsc(0);
+ }
+ 
+ static __init int notscsync_setup(char *s)
 diff --git a/drivers/acpi/pci_irq.c b/drivers/acpi/pci_irq.c
 --- a/drivers/acpi/pci_irq.c
 +++ b/drivers/acpi/pci_irq.c
@@ -323,6 +567,26 @@ diff --git a/drivers/acpi/pci_irq.c b/drivers/acpi/pci_irq.c
  			return_VALUE(0);
  		}
  		else {
+diff --git a/drivers/char/rocket.c b/drivers/char/rocket.c
+--- a/drivers/char/rocket.c
++++ b/drivers/char/rocket.c
+@@ -277,7 +277,7 @@ static void rp_do_receive(struct r_port 
+ 		ToRecv = space;
+ 
+ 	if (ToRecv <= 0)
+-		return;
++		goto done;
+ 
+ 	/*
+ 	 * if status indicates there are errored characters in the
+@@ -359,6 +359,7 @@ static void rp_do_receive(struct r_port 
+ 	}
+ 	/*  Push the data up to the tty layer */
+ 	ld->receive_buf(tty, tty->flip.char_buf, tty->flip.flag_buf, count);
++done:
+ 	tty_ldisc_deref(ld);
+ }
+ 
 diff --git a/drivers/char/tpm/tpm.c b/drivers/char/tpm/tpm.c
 --- a/drivers/char/tpm/tpm.c
 +++ b/drivers/char/tpm/tpm.c
@@ -673,6 +937,22 @@ diff --git a/drivers/pci/pci-driver.c b/drivers/pci/pci-driver.c
  	drv->driver.owner = drv->owner;
  	drv->driver.kobj.ktype = &pci_driver_kobj_type;
  	pci_init_dynids(&drv->dynids);
+diff --git a/drivers/scsi/qla2xxx/qla_init.c b/drivers/scsi/qla2xxx/qla_init.c
+--- a/drivers/scsi/qla2xxx/qla_init.c
++++ b/drivers/scsi/qla2xxx/qla_init.c
+@@ -1914,9 +1914,11 @@ qla2x00_reg_remote_port(scsi_qla_host_t 
+ 		rport_ids.roles |= FC_RPORT_ROLE_FCP_TARGET;
+ 
+ 	fcport->rport = rport = fc_remote_port_add(ha->host, 0, &rport_ids);
+-	if (!rport)
++	if (!rport) {
+ 		qla_printk(KERN_WARNING, ha,
+ 		    "Unable to allocate fc remote port!\n");
++		return;
++	}
+ 
+ 	if (rport->scsi_target_id != -1 && rport->scsi_target_id < MAX_TARGETS)
+ 		fcport->os_target_id = rport->scsi_target_id;
 diff --git a/drivers/scsi/qla2xxx/qla_os.c b/drivers/scsi/qla2xxx/qla_os.c
 --- a/drivers/scsi/qla2xxx/qla_os.c
 +++ b/drivers/scsi/qla2xxx/qla_os.c
@@ -812,6 +1092,17 @@ diff --git a/drivers/scsi/qla2xxx/qla_os.c b/drivers/scsi/qla2xxx/qla_os.c
  }
  EXPORT_SYMBOL_GPL(qla2x00_probe_one);
  
+diff --git a/fs/bio.c b/fs/bio.c
+--- a/fs/bio.c
++++ b/fs/bio.c
+@@ -261,6 +261,7 @@ inline void __bio_clone(struct bio *bio,
+ 	 */
+ 	bio->bi_vcnt = bio_src->bi_vcnt;
+ 	bio->bi_size = bio_src->bi_size;
++	bio->bi_idx = bio_src->bi_idx;
+ 	bio_phys_segments(q, bio);
+ 	bio_hw_segments(q, bio);
+ }
 diff --git a/fs/char_dev.c b/fs/char_dev.c
 --- a/fs/char_dev.c
 +++ b/fs/char_dev.c
@@ -835,6 +1126,24 @@ diff --git a/fs/exec.c b/fs/exec.c
  	spin_unlock_irq(lock);
  
  	/*
+diff --git a/fs/isofs/compress.c b/fs/isofs/compress.c
+--- a/fs/isofs/compress.c
++++ b/fs/isofs/compress.c
+@@ -129,8 +129,14 @@ static int zisofs_readpage(struct file *
+ 	cend = le32_to_cpu(*(__le32 *)(bh->b_data + (blockendptr & bufmask)));
+ 	brelse(bh);
+ 
++	if (cstart > cend)
++		goto eio;
++		
+ 	csize = cend-cstart;
+ 
++	if (csize > deflateBound(1UL << zisofs_block_shift))
++		goto eio;
++
+ 	/* Now page[] contains an array of pages, any of which can be NULL,
+ 	   and the locks on which we hold.  We should now read the data and
+ 	   release the pages.  If the pages are NULL the decompressed data
 diff --git a/include/asm-i386/string.h b/include/asm-i386/string.h
 --- a/include/asm-i386/string.h
 +++ b/include/asm-i386/string.h
@@ -933,6 +1242,18 @@ diff --git a/include/asm-i386/string.h b/include/asm-i386/string.h
  	return addr;
  }
  
+diff --git a/include/asm-x86_64/smp.h b/include/asm-x86_64/smp.h
+--- a/include/asm-x86_64/smp.h
++++ b/include/asm-x86_64/smp.h
+@@ -46,6 +46,8 @@ extern int pic_mode;
+ extern int smp_num_siblings;
+ extern void smp_flush_tlb(void);
+ extern void smp_message_irq(int cpl, void *dev_id, struct pt_regs *regs);
++extern int smp_call_function_single (int cpuid, void (*func) (void *info), void *info,
++				     int retry, int wait);
+ extern void smp_send_reschedule(int cpu);
+ extern void smp_invalidate_rcv(void);		/* Process an NMI */
+ extern void zap_low_mappings(void);
 diff --git a/include/linux/if_shaper.h b/include/linux/if_shaper.h
 --- a/include/linux/if_shaper.h
 +++ b/include/linux/if_shaper.h
@@ -945,6 +1266,129 @@ diff --git a/include/linux/if_shaper.h b/include/linux/if_shaper.h
          struct net_device_stats stats;
  	struct net_device *dev;
  	int  (*hard_start_xmit) (struct sk_buff *skb,
+diff --git a/include/linux/skbuff.h b/include/linux/skbuff.h
+--- a/include/linux/skbuff.h
++++ b/include/linux/skbuff.h
+@@ -1192,7 +1192,7 @@ static inline void *skb_header_pointer(c
+ {
+ 	int hlen = skb_headlen(skb);
+ 
+-	if (offset + len <= hlen)
++	if (hlen - offset >= len)
+ 		return skb->data + offset;
+ 
+ 	if (skb_copy_bits(skb, offset, buffer, len) < 0)
+diff --git a/include/linux/zlib.h b/include/linux/zlib.h
+--- a/include/linux/zlib.h
++++ b/include/linux/zlib.h
+@@ -506,6 +506,11 @@ extern int zlib_deflateReset (z_streamp 
+    stream state was inconsistent (such as zalloc or state being NULL).
+ */
+ 
++static inline unsigned long deflateBound(unsigned long s)
++{
++	return s + ((s + 7) >> 3) + ((s + 63) >> 6) + 11;
++}
++
+ extern int zlib_deflateParams (z_streamp strm, int level, int strategy);
+ /*
+      Dynamically update the compression level and compression strategy.  The
+diff --git a/kernel/module.c b/kernel/module.c
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -249,13 +249,18 @@ static inline unsigned int block_size(in
+ /* Created by linker magic */
+ extern char __per_cpu_start[], __per_cpu_end[];
+ 
+-static void *percpu_modalloc(unsigned long size, unsigned long align)
++static void *percpu_modalloc(unsigned long size, unsigned long align,
++			     const char *name)
+ {
+ 	unsigned long extra;
+ 	unsigned int i;
+ 	void *ptr;
+ 
+-	BUG_ON(align > SMP_CACHE_BYTES);
++	if (align > SMP_CACHE_BYTES) {
++		printk(KERN_WARNING "%s: per-cpu alignment %li > %i\n",
++		       name, align, SMP_CACHE_BYTES);
++		align = SMP_CACHE_BYTES;
++	}
+ 
+ 	ptr = __per_cpu_start;
+ 	for (i = 0; i < pcpu_num_used; ptr += block_size(pcpu_size[i]), i++) {
+@@ -347,7 +352,8 @@ static int percpu_modinit(void)
+ }	
+ __initcall(percpu_modinit);
+ #else /* ... !CONFIG_SMP */
+-static inline void *percpu_modalloc(unsigned long size, unsigned long align)
++static inline void *percpu_modalloc(unsigned long size, unsigned long align,
++				    const char *name)
+ {
+ 	return NULL;
+ }
+@@ -1554,7 +1560,8 @@ static struct module *load_module(void _
+ 	if (pcpuindex) {
+ 		/* We have a special allocation for this section. */
+ 		percpu = percpu_modalloc(sechdrs[pcpuindex].sh_size,
+-					 sechdrs[pcpuindex].sh_addralign);
++					 sechdrs[pcpuindex].sh_addralign,
++					 mod->name);
+ 		if (!percpu) {
+ 			err = -ENOMEM;
+ 			goto free_mod;
+diff --git a/lib/inflate.c b/lib/inflate.c
+--- a/lib/inflate.c
++++ b/lib/inflate.c
+@@ -326,7 +326,7 @@ DEBG("huft1 ");
+   {
+     *t = (struct huft *)NULL;
+     *m = 0;
+-    return 0;
++    return 2;
+   }
+ 
+ DEBG("huft2 ");
+@@ -374,6 +374,7 @@ DEBG("huft5 ");
+     if ((j = *p++) != 0)
+       v[x[j]++] = i;
+   } while (++i < n);
++  n = x[g];                   /* set n to length of v */
+ 
+ DEBG("h6 ");
+ 
+@@ -410,12 +411,13 @@ DEBG1("1 ");
+ DEBG1("2 ");
+           f -= a + 1;           /* deduct codes from patterns left */
+           xp = c + k;
+-          while (++j < z)       /* try smaller tables up to z bits */
+-          {
+-            if ((f <<= 1) <= *++xp)
+-              break;            /* enough codes to use up j bits */
+-            f -= *xp;           /* else deduct codes from patterns */
+-          }
++          if (j < z)
++            while (++j < z)       /* try smaller tables up to z bits */
++            {
++              if ((f <<= 1) <= *++xp)
++                break;            /* enough codes to use up j bits */
++              f -= *xp;           /* else deduct codes from patterns */
++            }
+         }
+ DEBG1("3 ");
+         z = 1 << j;             /* table entries for j-bit table */
+diff --git a/lib/zlib_inflate/inftrees.c b/lib/zlib_inflate/inftrees.c
+--- a/lib/zlib_inflate/inftrees.c
++++ b/lib/zlib_inflate/inftrees.c
+@@ -141,7 +141,7 @@ static int huft_build(
+   {
+     *t = NULL;
+     *m = 0;
+-    return Z_OK;
++    return Z_DATA_ERROR;
+   }
+ 
+ 
 diff --git a/mm/memory.c b/mm/memory.c
 --- a/mm/memory.c
 +++ b/mm/memory.c
@@ -957,6 +1401,36 @@ diff --git a/mm/memory.c b/mm/memory.c
  	struct mm_struct *mm = vma->vm_mm;
  	int err;
  
+diff --git a/mm/mempolicy.c b/mm/mempolicy.c
+--- a/mm/mempolicy.c
++++ b/mm/mempolicy.c
+@@ -409,7 +409,7 @@ asmlinkage long sys_set_mempolicy(int mo
+ 	struct mempolicy *new;
+ 	DECLARE_BITMAP(nodes, MAX_NUMNODES);
+ 
+-	if (mode > MPOL_MAX)
++	if (mode < 0 || mode > MPOL_MAX)
+ 		return -EINVAL;
+ 	err = get_nodes(nodes, nmask, maxnode, mode);
+ 	if (err)
+diff --git a/net/8021q/vlan.c b/net/8021q/vlan.c
+--- a/net/8021q/vlan.c
++++ b/net/8021q/vlan.c
+@@ -578,6 +578,14 @@ static int vlan_device_event(struct noti
+ 			if (!vlandev)
+ 				continue;
+ 
++			if (netif_carrier_ok(dev)) {
++				if (!netif_carrier_ok(vlandev))
++					netif_carrier_on(vlandev);
++			} else {
++				if (netif_carrier_ok(vlandev))
++					netif_carrier_off(vlandev);
++			}
++
+ 			if ((vlandev->state & VLAN_LINK_STATE_MASK) != flgs) {
+ 				vlandev->state = (vlandev->state &~ VLAN_LINK_STATE_MASK) 
+ 					| flgs;
 diff --git a/net/ipv4/ip_output.c b/net/ipv4/ip_output.c
 --- a/net/ipv4/ip_output.c
 +++ b/net/ipv4/ip_output.c
@@ -977,6 +1451,19 @@ diff --git a/net/ipv4/ip_output.c b/net/ipv4/ip_output.c
  	if (hh) {
  		int hh_alen;
  
+diff --git a/net/ipv4/netfilter/ip_conntrack_core.c b/net/ipv4/netfilter/ip_conntrack_core.c
+--- a/net/ipv4/netfilter/ip_conntrack_core.c
++++ b/net/ipv4/netfilter/ip_conntrack_core.c
+@@ -1124,6 +1124,9 @@ void ip_conntrack_cleanup(void)
+ 		schedule();
+ 		goto i_see_dead_people;
+ 	}
++	/* wait until all references to ip_conntrack_untracked are dropped */
++	while (atomic_read(&ip_conntrack_untracked.ct_general.use) > 1)
++		schedule();
+ 
+ 	kmem_cache_destroy(ip_conntrack_cachep);
+ 	kmem_cache_destroy(ip_conntrack_expect_cachep);
 diff --git a/net/ipv4/netfilter/ip_conntrack_standalone.c b/net/ipv4/netfilter/ip_conntrack_standalone.c
 --- a/net/ipv4/netfilter/ip_conntrack_standalone.c
 +++ b/net/ipv4/netfilter/ip_conntrack_standalone.c
@@ -994,6 +1481,45 @@ diff --git a/net/ipv4/netfilter/ip_conntrack_standalone.c b/net/ipv4/netfilter/i
  	/* Gather fragments. */
  	if ((*pskb)->nh.iph->frag_off & htons(IP_MF|IP_OFFSET)) {
  		*pskb = ip_ct_gather_frags(*pskb,
+diff --git a/net/ipv4/netfilter/ip_nat_proto_tcp.c b/net/ipv4/netfilter/ip_nat_proto_tcp.c
+--- a/net/ipv4/netfilter/ip_nat_proto_tcp.c
++++ b/net/ipv4/netfilter/ip_nat_proto_tcp.c
+@@ -40,7 +40,8 @@ tcp_unique_tuple(struct ip_conntrack_tup
+ 		 enum ip_nat_manip_type maniptype,
+ 		 const struct ip_conntrack *conntrack)
+ {
+-	static u_int16_t port, *portptr;
++	static u_int16_t port;
++	u_int16_t *portptr;
+ 	unsigned int range_size, min, i;
+ 
+ 	if (maniptype == IP_NAT_MANIP_SRC)
+diff --git a/net/ipv4/netfilter/ip_nat_proto_udp.c b/net/ipv4/netfilter/ip_nat_proto_udp.c
+--- a/net/ipv4/netfilter/ip_nat_proto_udp.c
++++ b/net/ipv4/netfilter/ip_nat_proto_udp.c
+@@ -41,7 +41,8 @@ udp_unique_tuple(struct ip_conntrack_tup
+ 		 enum ip_nat_manip_type maniptype,
+ 		 const struct ip_conntrack *conntrack)
+ {
+-	static u_int16_t port, *portptr;
++	static u_int16_t port;
++	u_int16_t *portptr;
+ 	unsigned int range_size, min, i;
+ 
+ 	if (maniptype == IP_NAT_MANIP_SRC)
+diff --git a/net/ipv6/netfilter/ip6_queue.c b/net/ipv6/netfilter/ip6_queue.c
+--- a/net/ipv6/netfilter/ip6_queue.c
++++ b/net/ipv6/netfilter/ip6_queue.c
+@@ -76,7 +76,9 @@ static DECLARE_MUTEX(ipqnl_sem);
+ static void
+ ipq_issue_verdict(struct ipq_queue_entry *entry, int verdict)
+ {
++	local_bh_disable();
+ 	nf_reinject(entry->skb, entry->info, verdict);
++	local_bh_enable();
+ 	kfree(entry);
+ }
+ 
 diff --git a/net/netlink/af_netlink.c b/net/netlink/af_netlink.c
 --- a/net/netlink/af_netlink.c
 +++ b/net/netlink/af_netlink.c
@@ -1045,3 +1571,44 @@ diff --git a/net/packet/af_packet.c b/net/packet/af_packet.c
  	spin_lock(&sk->sk_receive_queue.lock);
  	po->stats.tp_packets++;
  	__skb_queue_tail(&sk->sk_receive_queue, skb);
+diff --git a/net/xfrm/xfrm_user.c b/net/xfrm/xfrm_user.c
+--- a/net/xfrm/xfrm_user.c
++++ b/net/xfrm/xfrm_user.c
+@@ -1180,6 +1180,9 @@ static struct xfrm_policy *xfrm_compile_
+ 	if (nr > XFRM_MAX_DEPTH)
+ 		return NULL;
+ 
++	if (p->dir > XFRM_POLICY_OUT)
++		return NULL;
++
+ 	xp = xfrm_policy_alloc(GFP_KERNEL);
+ 	if (xp == NULL) {
+ 		*dir = -ENOBUFS;
+diff --git a/security/keys/keyring.c b/security/keys/keyring.c
+--- a/security/keys/keyring.c
++++ b/security/keys/keyring.c
+@@ -188,7 +188,11 @@ static void keyring_destroy(struct key *
+ 
+ 	if (keyring->description) {
+ 		write_lock(&keyring_name_lock);
+-		list_del(&keyring->type_data.link);
++
++		if (keyring->type_data.link.next != NULL &&
++		    !list_empty(&keyring->type_data.link))
++			list_del(&keyring->type_data.link);
++
+ 		write_unlock(&keyring_name_lock);
+ 	}
+ 
+diff --git a/security/keys/process_keys.c b/security/keys/process_keys.c
+--- a/security/keys/process_keys.c
++++ b/security/keys/process_keys.c
+@@ -641,7 +641,7 @@ long join_session_keyring(const char *na
+ 		keyring = keyring_alloc(name, tsk->uid, tsk->gid, 0, NULL);
+ 		if (IS_ERR(keyring)) {
+ 			ret = PTR_ERR(keyring);
+-			goto error;
++			goto error2;
+ 		}
+ 	}
+ 	else if (IS_ERR(keyring)) {

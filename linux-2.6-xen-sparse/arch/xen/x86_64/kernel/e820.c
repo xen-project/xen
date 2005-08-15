@@ -46,7 +46,7 @@ void __init add_memory_region(unsigned long start, unsigned long size, int type)
 	e820.nr_map++;
 }
 
-#if 0
+#ifndef CONFIG_XEN
 extern char _end[];
 
 /* 
@@ -234,7 +234,6 @@ void __init e820_reserve_resources(void)
 		}
 	}
 }
-
 
 void __init e820_print_map(char *who)
 {
@@ -516,9 +515,31 @@ void __init setup_memory_region(void)
 	printk(KERN_INFO "BIOS-provided physical RAM map:\n");
 	e820_print_map(who);
 }
-#endif
 
+#else  /* CONFIX_XEN */
 extern unsigned long xen_override_max_pfn;
+extern union xen_start_info_union xen_start_info_union;
+/*
+ * Guest physical starts from 0.
+ */
+unsigned long __init e820_end_of_ram(void)
+{
+        unsigned long max_end_pfn = xen_start_info.nr_pages;
+
+	if ( xen_override_max_pfn <  max_end_pfn)
+		xen_override_max_pfn = max_end_pfn;
+	
+        return xen_override_max_pfn;
+}
+
+
+
+void __init e820_reserve_resources(void) 
+{
+	return;			/* Xen won't have reserved entries */
+}
+
+#endif
 
 void __init parse_memopt(char *p, char **from) 
 { 

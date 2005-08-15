@@ -90,12 +90,9 @@ struct pfn_info
 #define PGT_va_shift        32
 #define PGT_va_mask         ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
  /* Is the back pointer still mutable (i.e. not fixed yet)? */
- /* Use PML4 slot for HYPERVISOR_VIRT_START.  
-    18 = L4_PAGETABLE_SHIFT - L2_PAGETABLE_SHIFT */
-#define PGT_va_mutable      ((unsigned long)(256U<<18)<<PGT_va_shift)
+#define PGT_va_mutable      ((unsigned long)((1U<<28)-1)<<PGT_va_shift)
  /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
- /* Use PML4 slot for HYPERVISOR_VIRT_START + 1 */
-#define PGT_va_unknown      ((unsigned long)(257U<<18)<<PGT_va_shift)
+#define PGT_va_unknown      ((unsigned long)((1U<<28)-2)<<PGT_va_shift)
 #endif
 
  /* 16-bit count of uses of this frame as its current type. */
@@ -316,6 +313,9 @@ struct ptwr_info {
     unsigned int prev_nr_updates;
     /* Exec domain which created writable mapping. */
     struct vcpu *vcpu;
+    /* EIP of the address which took the original write fault
+       used for stats collection only */
+    unsigned long eip;
 };
 
 #define PTWR_PT_ACTIVE 0
@@ -327,7 +327,8 @@ struct ptwr_info {
 int  ptwr_init(struct domain *);
 void ptwr_destroy(struct domain *);
 void ptwr_flush(struct domain *, const int);
-int  ptwr_do_page_fault(struct domain *, unsigned long);
+int  ptwr_do_page_fault(struct domain *, unsigned long, 
+			struct cpu_user_regs *);
 int  revalidate_l1(struct domain *, l1_pgentry_t *, l1_pgentry_t *);
 
 void cleanup_writable_pagetable(struct domain *d);
@@ -353,6 +354,18 @@ void audit_domains(void);
 
 #endif
 
+#ifdef PERF_ARRAYS
+
+void ptwr_eip_stat_reset();
+void ptwr_eip_stat_print();
+
+#else
+
+#define ptwr_eip_stat_reset() ((void)0)
+#define ptwr_eip_stat_print() ((void)0)
+
+#endif
+
 int new_guest_cr3(unsigned long pfn);
 
 void propagate_page_fault(unsigned long addr, u16 error_code);
@@ -361,8 +374,14 @@ void propagate_page_fault(unsigned long addr, u16 error_code);
  * Caller must own d's BIGLOCK, is responsible for flushing the TLB, and must 
  * hold a reference to the page.
  */
-int update_grant_va_mapping(unsigned long va,
-                            l1_pgentry_t _nl1e, 
-                            struct domain *d,
-                            struct vcpu *v);
+int update_grant_va_mapping(
+    unsigned long va, l1_pgentry_t _nl1e, 
+    struct domain *d, struct vcpu *v);
+int update_grant_pte_mapping(
+    unsigned long pte_addr, l1_pgentry_t _nl1e, 
+    struct domain *d, struct vcpu *v);
+int clear_grant_va_mapping(unsigned long addr, unsigned long frame);
+int clear_grant_pte_mapping(
+    unsigned long addr, unsigned long frame, struct domain *d);
+
 #endif /* __ASM_X86_MM_H__ */

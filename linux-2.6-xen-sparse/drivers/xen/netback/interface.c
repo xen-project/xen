@@ -71,12 +71,31 @@ static void __netif_disconnect_complete(void *arg)
     netif_t              *netif = (netif_t *)arg;
     ctrl_msg_t            cmsg;
     netif_be_disconnect_t disc;
+#if defined(CONFIG_XEN_NETDEV_GRANT_RX) || defined(CONFIG_XEN_NETDEV_GRANT_TX)
+    struct gnttab_unmap_grant_ref op;
+#endif
 
     /*
      * These can't be done in netif_disconnect() because at that point there
      * may be outstanding requests in the network stack whose asynchronous
      * responses must still be notified to the remote driver.
      */
+
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+    op.host_addr    = netif->tx_shmem_vaddr;
+    op.handle       = netif->tx_shmem_handle;
+    op.dev_bus_addr = 0;
+    BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
+#endif
+
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+    op.host_addr    = netif->rx_shmem_vaddr;
+    op.handle       = netif->rx_shmem_handle;
+    op.dev_bus_addr = 0;
+    BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
+#endif
+
+
     vfree(netif->tx); /* Frees netif->rx as well. */
 
     /* Construct the deferred response message. */
@@ -275,37 +294,101 @@ void netif_connect(netif_be_connect_t *connect)
     unsigned long tx_shmem_frame = connect->tx_shmem_frame;
     unsigned long rx_shmem_frame = connect->rx_shmem_frame;
     struct vm_struct *vma;
-    pgprot_t      prot;
+#if !defined(CONFIG_XEN_NETDEV_GRANT_TX)||!defined(CONFIG_XEN_NETDEV_GRANT_RX)
+    pgprot_t      prot = __pgprot(_KERNPG_TABLE);
     int           error;
+#endif
     netif_t      *netif;
 
     netif = netif_find_by_handle(domid, handle);
-    if ( unlikely(netif == NULL) )
-    {
+    if ( unlikely(netif == NULL) ) {
         DPRINTK("netif_connect attempted for non-existent netif (%u,%u)\n", 
                 connect->domid, connect->netif_handle); 
         connect->status = NETIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
     }
 
-    if ( netif->status != DISCONNECTED )
-    {
+    if ( netif->status != DISCONNECTED ) {
         connect->status = NETIF_BE_STATUS_INTERFACE_CONNECTED;
         return;
     }
 
-    if ( (vma = get_vm_area(2*PAGE_SIZE, VM_IOREMAP)) == NULL )
-    {
+    if ( (vma = get_vm_area(2*PAGE_SIZE, VM_IOREMAP)) == NULL ) {
         connect->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
         return;
     }
 
-    prot = __pgprot(_KERNPG_TABLE);
-    error  = direct_remap_area_pages(&init_mm, 
-                                     VMALLOC_VMADDR(vma->addr),
-                                     tx_shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
-                                     prot, domid);
-    error |= direct_remap_area_pages(&init_mm, 
+
+#if defined(CONFIG_XEN_NETDEV_GRANT_TX)
+    {
+        struct gnttab_map_grant_ref op;
+        int tx_ref = connect->tx_shmem_ref; 
+
+        /* Map: Use the Grant table reference */
+        op.host_addr = VMALLOC_VMADDR(vma->addr);
+        op.flags     = GNTMAP_host_map;
+        op.ref       = tx_ref;
+        op.dom       = domid;
+       
+        if ((HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) < 0) || 
+            (op.handle < 0)) { 
+            DPRINTK(" Grant table operation failure !\n");
+            connect->status = NETIF_BE_STATUS_MAPPING_ERROR;
+            vfree(vma->addr);
+            return;
+        }
+
+        netif->tx_shmem_ref    = tx_ref;
+        netif->tx_shmem_handle = op.handle;
+        netif->tx_shmem_vaddr  = VMALLOC_VMADDR(vma->addr);
+    }
+        
+
+#else 
+    error = direct_remap_area_pages(&init_mm, 
+                                    VMALLOC_VMADDR(vma->addr),
+                                    tx_shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
+                                    prot, domid); 
+    if ( error != 0 )
+    {
+        if ( error == -ENOMEM )
+            connect->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
+        else if ( error == -EFAULT )
+            connect->status = NETIF_BE_STATUS_MAPPING_ERROR;
+        else
+            connect->status = NETIF_BE_STATUS_ERROR;
+        vfree(vma->addr);
+        return;
+    }
+#endif
+
+
+#if defined(CONFIG_XEN_NETDEV_GRANT_RX)
+    {
+        struct gnttab_map_grant_ref op;
+        int rx_ref = connect->rx_shmem_ref; 
+
+
+        /* Map: Use the Grant table reference */
+        op.host_addr = VMALLOC_VMADDR(vma->addr) + PAGE_SIZE;
+        op.flags     = GNTMAP_host_map;
+        op.ref       = rx_ref;
+        op.dom       = domid;
+
+        if ((HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) < 0) || 
+            (op.handle < 0)) { 
+            DPRINTK(" Grant table operation failure !\n");
+            connect->status = NETIF_BE_STATUS_MAPPING_ERROR;
+            vfree(vma->addr);
+            return;
+        }
+
+        netif->rx_shmem_ref    = rx_ref;
+        netif->rx_shmem_handle = handle;
+        netif->rx_shmem_vaddr  = VMALLOC_VMADDR(vma->addr) + PAGE_SIZE;
+    }
+#else 
+    error = direct_remap_area_pages(&init_mm, 
                                      VMALLOC_VMADDR(vma->addr) + PAGE_SIZE,
                                      rx_shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
                                      prot, domid);
@@ -320,6 +403,8 @@ void netif_connect(netif_be_connect_t *connect)
         vfree(vma->addr);
         return;
     }
+
+#endif
 
     netif->evtchn         = evtchn;
     netif->tx_shmem_frame = tx_shmem_frame;

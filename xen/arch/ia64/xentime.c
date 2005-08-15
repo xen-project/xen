@@ -103,7 +103,7 @@ void update_dom_time(struct vcpu *v)
 }
 
 /* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
-void do_settime(s64 secs, u32 nsecs, u64 system_time_base)
+void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
 {
 #ifdef  CONFIG_VTI
     u64 _nsecs;

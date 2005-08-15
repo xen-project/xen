@@ -206,9 +206,9 @@ void init_cpu_khz(void)
 	struct vcpu_time_info *info = &HYPERVISOR_shared_info->vcpu_time[0];
 	do_div(__cpu_khz, info->tsc_to_system_mul);
 	if ( info->tsc_shift < 0 )
-		cpu_khz = __cpu_khz >> -info->tsc_shift;
+		cpu_khz = __cpu_khz << -info->tsc_shift;
 	else
-		cpu_khz = __cpu_khz << info->tsc_shift;
+		cpu_khz = __cpu_khz >> info->tsc_shift;
 }
 
 static u64 get_nsec_offset(struct shadow_time_info *shadow)
@@ -231,32 +231,18 @@ static void __update_wallclock(time_t sec, long nsec)
 {
 	long wtm_nsec, xtime_nsec;
 	time_t wtm_sec, xtime_sec;
-	s64 tmp, wc_nsec;
+	u64 tmp, wc_nsec;
 
 	/* Adjust wall-clock time base based on wall_jiffies ticks. */
 	wc_nsec = processed_system_time;
-	wc_nsec += (sec * 1000000000LL) + nsec;
+	wc_nsec += (u64)sec * 1000000000ULL;
+	wc_nsec += (u64)nsec;
 	wc_nsec -= (jiffies - wall_jiffies) * (u64)(NSEC_PER_SEC / HZ);
 
 	/* Split wallclock base into seconds and nanoseconds. */
-	if ( (tmp = wc_nsec) < 0 )
-	{
-		/* -ve UTC offset => -ve seconds, +ve nanoseconds. */
-		tmp = -tmp;
-		xtime_nsec = do_div(tmp, 1000000000);
-		tmp = -tmp;
-		if ( xtime_nsec != 0 )
-		{
-			xtime_nsec = 1000000000 - xtime_nsec;
-			tmp--;
-		}
-	}
-	else
-	{
-		/* +ve UTC offset => +ve seconds, +ve nanoseconds. */
-		xtime_nsec = do_div(tmp, 1000000000);
-	}
-	xtime_sec = (time_t)tmp;
+	tmp = wc_nsec;
+	xtime_nsec = do_div(tmp, 1000000000);
+	xtime_sec  = (time_t)tmp;
 
 	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - xtime_sec);
 	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - xtime_nsec);

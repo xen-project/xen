@@ -24,7 +24,7 @@ TESTDIR  = `pwd`/testsuite/tmp
 TESTFLAGS= -DTESTING
 TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
 
-all: xen xenstored libxenstore.so
+all: xen xenstored libxenstore.a libxenstore-pic.a
 
 testcode: xen xs_test xenstored_test xs_random xs_dom0_test
 
@@ -53,14 +53,20 @@ xs_test_lib.o: xs.c
 talloc_test.o: talloc.c
 	$(COMPILE.c) -o $@ $<
 
-libxenstore.so: xs.opic xs_lib.opic
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenstore.so -shared -o $@ $^
+LIB_OBJS     := xs.o xs_lib.o
+
+LIB_OBJS_A   := $(patsubst %.o,libxenstore.a(%.o),$(LIB_OBJS))
+LIB_OBJS_PIC := $(patsubst %.o,libxenstore-pic.a(%.opic),$(LIB_OBJS))
+
+libxenstore.a: $(LIB_OBJS_A)
+
+libxenstore-pic.a: $(LIB_OBJS_PIC)
 
 clean: testsuite-clean
-	rm -f *.o *.opic *.so
+	rm -f *.o *.opic *.a
 	rm -f xen xenstored xs_random xs_stress xs_crashme
 	rm -f xs_test xenstored_test xs_dom0_test
-	$(RM) $(PROG_DEP)
+	-$(RM) $(PROG_DEP)
 
 print-dir:
 	@echo -n tools/xenstore: 
@@ -111,14 +117,15 @@ TAGS:
 tarball: clean
 	cd .. && tar -c -j -v -h -f xenstore.tar.bz2 xenstore/
 
-install: xenstored libxenstore.so
+install: xenstored libxenstore.a libxenstore-pic.a
 	$(INSTALL_DIR) -p $(DESTDIR)/var/run/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/sbin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/include
 	$(INSTALL_PROG) xenstored $(DESTDIR)/usr/sbin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
-	$(INSTALL_DATA) libxenstore.so $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DATA) libxenstore.a $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DATA) libxenstore-pic.a $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include
 	$(INSTALL_DATA) xs_lib.h $(DESTDIR)/usr/include
 

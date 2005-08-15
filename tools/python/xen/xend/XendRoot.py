@@ -315,7 +315,7 @@ class XendRoot:
         return self.get_config_value('block-%s' % type, '')
 
     def get_network_script(self):
-        return self.get_config_value('network-script', 'network')
+        return self.get_config_value('network-script', '')
 
     def get_enable_dump(self):
         return self.get_config_bool('enable-dump', 'no')

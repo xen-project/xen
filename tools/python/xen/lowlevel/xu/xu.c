@@ -655,7 +655,9 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
     case TYPE(CMSG_NETIF_FE, CMSG_NETIF_FE_INTERFACE_CONNECT):
         C2P(netif_fe_interface_connect_t, handle,         Int, Long);
         C2P(netif_fe_interface_connect_t, tx_shmem_frame, Int, Long);
+        C2P(netif_fe_interface_connect_t, tx_shmem_ref,   Int, Long);
         C2P(netif_fe_interface_connect_t, rx_shmem_frame, Int, Long);
+        C2P(netif_fe_interface_connect_t, rx_shmem_ref,   Int, Long);
         return dict;
     case TYPE(CMSG_NETIF_FE, CMSG_NETIF_FE_INTERFACE_DISCONNECT):
         C2P(netif_fe_interface_disconnect_t, handle, Int, Long);
@@ -681,7 +683,9 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         C2P(netif_be_connect_t, domid,          Int, Long);
         C2P(netif_be_connect_t, netif_handle,   Int, Long);
         C2P(netif_be_connect_t, tx_shmem_frame, Int, Long);
+        C2P(netif_be_connect_t, tx_shmem_ref,   Int, Long);
         C2P(netif_be_connect_t, rx_shmem_frame, Int, Long);
+        C2P(netif_be_connect_t, rx_shmem_ref,   Int, Long);
         C2P(netif_be_connect_t, evtchn,         Int, Long);
         C2P(netif_be_connect_t, status,         Int, Long);
         return dict;
@@ -903,8 +907,10 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
         P2C(netif_be_connect_t, domid,          u32);
         P2C(netif_be_connect_t, netif_handle,   u32);
         P2C(netif_be_connect_t, tx_shmem_frame, memory_t);
+        P2C(netif_be_connect_t, tx_shmem_ref,   u32); 
         P2C(netif_be_connect_t, rx_shmem_frame, memory_t);
-        P2C(netif_be_connect_t, evtchn,         u16);
+        P2C(netif_be_connect_t, rx_shmem_ref,   u32); 
+        P2C(netif_be_connect_t, evtchn,         u16); 
         break;
     case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_DISCONNECT):
         P2C(netif_be_disconnect_t, domid,        u32);
