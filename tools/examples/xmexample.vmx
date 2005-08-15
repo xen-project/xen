@@ -34,7 +34,7 @@ name = "ExampleVMXDomain"
 # and MODE is r for read-only, w for read-write.
 
 #disk = [ 'phy:hda1,hda1,r' ]
-disk = [ 'file:/var/images/min-el3-i386.img,hda,w' ]
+disk = [ 'file:/var/images/min-el3-i386.img,ioemu:hda,w' ]
 
 #----------------------------------------------------------------------------
 # Set according to whether you want the domain restarted when it exits.

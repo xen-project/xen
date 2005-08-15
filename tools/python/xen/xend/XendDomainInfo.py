@@ -743,8 +743,7 @@ class XendDomainInfo:
             for ctrl in self.getDeviceControllers():
                 ctrl.initController(reboot=True)
         else:
-	    if self.image.ostype != 'vmx':
-                self.create_configured_devices()
+            self.create_configured_devices()
         if not self.device_model_pid:
             self.device_model_pid = self.image.createDeviceModel()
 
@@ -916,8 +915,7 @@ class XendDomainInfo:
         """
         self.configure_fields()
         self.create_devices()
-	if self.image.ostype != 'vmx':
-            self.create_blkif()
+        self.create_blkif()
 
     def create_blkif(self):
         """Create the block device interface (blkif) for the vm.
