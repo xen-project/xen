@@ -206,9 +206,9 @@ void init_cpu_khz(void)
 	struct vcpu_time_info *info = &HYPERVISOR_shared_info->vcpu_time[0];
 	do_div(__cpu_khz, info->tsc_to_system_mul);
 	if ( info->tsc_shift < 0 )
-		cpu_khz = __cpu_khz >> -info->tsc_shift;
+		cpu_khz = __cpu_khz << -info->tsc_shift;
 	else
-		cpu_khz = __cpu_khz << info->tsc_shift;
+		cpu_khz = __cpu_khz >> info->tsc_shift;
 }
 
 static u64 get_nsec_offset(struct shadow_time_info *shadow)
