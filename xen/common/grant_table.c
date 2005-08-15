@@ -1130,7 +1130,7 @@ gnttab_prepare_for_transfer(
     int            retries = 0;
     unsigned long  target_pfn;
 
-#ifdef GRANT_DEBUG_VERBOSE
+#if GRANT_DEBUG_VERBOSE
     DPRINTK("gnttab_prepare_for_transfer rd(%hu) ld(%hu) ref(%hu).\n",
             rd->domain_id, ld->domain_id, ref);
 #endif
@@ -1211,7 +1211,7 @@ gnttab_notify_transfer(
     grant_entry_t  *sha;
     unsigned long   pfn;
 
-#ifdef GRANT_DEBUG_VERBOSE
+#if GRANT_DEBUG_VERBOSE
     DPRINTK("gnttab_notify_transfer rd(%hu) ld(%hu) ref(%hu).\n",
             rd->domain_id, ld->domain_id, ref);
 #endif
