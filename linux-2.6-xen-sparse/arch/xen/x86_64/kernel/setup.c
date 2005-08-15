@@ -40,7 +40,6 @@
 #include <linux/acpi.h>
 #include <linux/kallsyms.h>
 #include <linux/edd.h>
-#include <linux/percpu.h>
 #include <asm/mtrr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -58,27 +57,36 @@
 #include <asm/setup.h>
 #include <asm/mach_apic.h>
 #include <asm/numa.h>
+#ifdef CONFIG_XEN
+#include <linux/percpu.h>
 #include <asm-xen/xen-public/physdev.h>
 #include "setup_arch_pre.h"
 #include <asm-xen/hypervisor.h>
-
 #define PFN_UP(x)       (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PFN_PHYS(x)     ((x) << PAGE_SHIFT)
-
+#define end_pfn_map end_pfn
 #include <asm/mach-xen/setup_arch_post.h>
 
 extern unsigned long start_pfn;
-
-#if 0
-struct edid_info {
-        unsigned char dummy[128];
-};
-#endif
-
 extern struct edid_info edid_info;
+
+shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
+EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
 /* Allows setting of maximum possible memory size  */
 unsigned long xen_override_max_pfn;
+
+u32 *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
+
+EXPORT_SYMBOL(phys_to_machine_mapping);
+
+DEFINE_PER_CPU(multicall_entry_t, multicall_list[8]);
+DEFINE_PER_CPU(int, nr_multicall_ents);
+
+/* Raw start-of-day parameters from the hypervisor. */
+union xen_start_info_union xen_start_info_union;
+#endif
+
 /*
  * Machine setup..
  */
@@ -166,7 +174,7 @@ struct resource code_resource = {
 
 #define IORESOURCE_ROM (IORESOURCE_BUSY | IORESOURCE_READONLY | IORESOURCE_MEM)
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 static struct resource system_rom_resource = {
 	.name = "System ROM",
 	.start = 0xf0000,
@@ -200,7 +208,7 @@ static struct resource adapter_rom_resources[] = {
 #define ADAPTER_ROM_RESOURCES \
 	(sizeof adapter_rom_resources / sizeof adapter_rom_resources[0])
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 static struct resource video_rom_resource = {
 	.name = "Video ROM",
 	.start = 0xc0000,
@@ -216,7 +224,7 @@ static struct resource video_ram_resource = {
 	.flags = IORESOURCE_RAM,
 };
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 #define romsignature(x) (*(unsigned short *)(x) == 0xaa55)
 
 static int __init romchecksum(unsigned char *rom, unsigned long length)
@@ -294,33 +302,24 @@ static void __init probe_roms(void)
 }
 #endif
 
-/*
- * Point at the empty zero page to start with. We map the real shared_info
- * page as soon as fixmap is up and running.
- */
-shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
-EXPORT_SYMBOL(HYPERVISOR_shared_info);
-
-u32 *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
-
-EXPORT_SYMBOL(phys_to_machine_mapping);
-
-DEFINE_PER_CPU(multicall_entry_t, multicall_list[8]);
-DEFINE_PER_CPU(int, nr_multicall_ents);
-
-/* Raw start-of-day parameters from the hypervisor. */
-union xen_start_info_union xen_start_info_union;
 
 static __init void parse_cmdline_early (char ** cmdline_p)
 {
 	char c = ' ', *to = command_line, *from = COMMAND_LINE;
-	int len = 0, max_cmdline;
+	int len = 0;
 
+	/* Save unparsed command line copy for /proc/cmdline */
+#ifdef CONFIG_XEN
+	int max_cmdline;
+	
 	if ((max_cmdline = MAX_GUEST_CMDLINE) > COMMAND_LINE_SIZE)
 		max_cmdline = COMMAND_LINE_SIZE;
 	memcpy(saved_command_line, xen_start_info.cmd_line, max_cmdline);
-	/* Save unparsed command line copy for /proc/cmdline */
 	saved_command_line[max_cmdline-1] = '\0';
+#else
+	memcpy(saved_command_line, COMMAND_LINE, COMMAND_LINE_SIZE);
+	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
+#endif
 
 	for (;;) {
 		if (c != ' ') 
@@ -378,8 +377,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			acpi_skip_timer_override = 1;
 #endif
 #endif
-
-#if 0
+#ifndef CONFIG_XEN
 		if (!memcmp(from, "nolapic", 7) ||
 		    !memcmp(from, "disableapic", 11))
 			disable_apic = 1;
@@ -391,8 +389,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 			skip_ioapic_setup = 0;
 			ioapic_force = 1;
 		}
-#endif
-			
+#endif			
 		if (!memcmp(from, "mem=", 4))
 			parse_memopt(from+4, &from); 
 
@@ -426,14 +423,10 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 }
 
 #ifndef CONFIG_DISCONTIGMEM
+#ifdef CONFIG_XEN
 static void __init contig_initmem_init(void)
 {
         unsigned long bootmap_size, bootmap; 
-
-        /*
-	 * partially used pages are not usable - thus
-	 * we are rounding upwards:
-	 */
 
         bootmap_size = bootmem_bootmap_pages(end_pfn)<<PAGE_SHIFT;
         bootmap = start_pfn;
@@ -441,19 +434,22 @@ static void __init contig_initmem_init(void)
         reserve_bootmem(bootmap, bootmap_size);
         
         free_bootmem(start_pfn << PAGE_SHIFT, (end_pfn - start_pfn) << PAGE_SHIFT);   
-        printk("Registering memory for bootmem: from  %lx, size = %lx\n",
-                     start_pfn << PAGE_SHIFT, (end_pfn - start_pfn) << PAGE_SHIFT);
-        /* 
-         * This should cover kernel_end
-         */
-#if 0
-        reserve_bootmem(HIGH_MEMORY, (PFN_PHYS(start_pfn) +
-                                      bootmap_size + PAGE_SIZE-1) - (HIGH_MEMORY));
-#endif
         reserve_bootmem(0, (PFN_PHYS(start_pfn) +
                             bootmap_size + PAGE_SIZE-1));
-
+}
+#else
+static void __init contig_initmem_init(void)
+{
+        unsigned long bootmap_size, bootmap; 
+        bootmap_size = bootmem_bootmap_pages(end_pfn)<<PAGE_SHIFT;
+        bootmap = find_e820_area(0, end_pfn<<PAGE_SHIFT, bootmap_size);
+        if (bootmap == -1L) 
+                panic("Cannot find bootmem map of size %ld\n",bootmap_size);
+        bootmap_size = init_bootmem(bootmap >> PAGE_SHIFT, end_pfn);
+        e820_bootmem_free(&contig_page_data, 0, end_pfn << PAGE_SHIFT); 
+        reserve_bootmem(bootmap, bootmap_size);
 } 
+#endif	/* !CONFIG_XEN */
 #endif
 
 /* Use inline assembly to define this because the nops are defined 
@@ -545,35 +541,8 @@ static inline void copy_edd(void)
 }
 #endif
 
-#if 0
-#define EBDA_ADDR_POINTER 0x40E
-static void __init reserve_ebda_region(void)
-{
-	unsigned int addr;
-	/** 
-	 * there is a real-mode segmented pointer pointing to the 
-	 * 4K EBDA area at 0x40E
-	 */
-	addr = *(unsigned short *)phys_to_virt(EBDA_ADDR_POINTER);
-	addr <<= 4;
-	if (addr)
-		reserve_bootmem_generic(addr, PAGE_SIZE);
-}
-#endif
-
-/*
- * Guest physical starts from 0.
- */
-
-unsigned long __init xen_end_of_ram(void)
-{
-        unsigned long max_end_pfn = xen_start_info.nr_pages;
-
-	if ( xen_override_max_pfn <  max_end_pfn)
-		xen_override_max_pfn = max_end_pfn;
-	
-        return xen_override_max_pfn;
-}
+#ifdef CONFIG_XEN
+#define reserve_ebda_region() void(0)
 
 static void __init print_memory_map(char *who)
 {
@@ -601,7 +570,6 @@ static void __init print_memory_map(char *who)
         }
 }
 
-#ifdef CONFIG_XEN
 void __init smp_alloc_memory(void)
 {
 	int cpu;
@@ -612,22 +580,42 @@ void __init smp_alloc_memory(void)
 		/* XXX free unused pages later */
 	}
 }
+
+
+#else
+#define EBDA_ADDR_POINTER 0x40E
+static void __init reserve_ebda_region(void)
+{
+	unsigned int addr;
+	/** 
+	 * there is a real-mode segmented pointer pointing to the 
+	 * 4K EBDA area at 0x40E
+	 */
+	addr = *(unsigned short *)phys_to_virt(EBDA_ADDR_POINTER);
+	addr <<= 4;
+	if (addr)
+		reserve_bootmem_generic(addr, PAGE_SIZE);
+}
 #endif
 
 void __init setup_arch(char **cmdline_p)
 {
-	int i, j;
-	physdev_op_t op;
+	unsigned long kernel_end;
 
-#if 0
- 	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
-#else
+#ifdef CONFIG_XEN
  	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0); 
-#endif
  	drive_info = DRIVE_INFO;
-
+	kernel_end = 0;		/* dummy */
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
  	screen_info = SCREEN_INFO;
+
+	/* This is drawn from a dump from vgacon:startup in standard Linux. */
+	screen_info.orig_video_mode = 3; 
+	screen_info.orig_video_isVGA = 1;
+	screen_info.orig_video_lines = 25;
+	screen_info.orig_video_cols = 80;
+	screen_info.orig_video_ega_bx = 3;
+	screen_info.orig_video_points = 16;
 #endif
 	edid_info = EDID_INFO;
 	saved_video_mode = SAVED_VIDEO_MODE;
@@ -637,40 +625,48 @@ void __init setup_arch(char **cmdline_p)
 	rd_image_start = RAMDISK_FLAGS & RAMDISK_IMAGE_START_MASK;
 	rd_prompt = ((RAMDISK_FLAGS & RAMDISK_PROMPT_FLAG) != 0);
 	rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
+
+
 #endif
 
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_writable_pagetables);
 
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
-	/* This is drawn from a dump from vgacon:startup in standard Linux. */
-	screen_info.orig_video_mode = 3; 
-	screen_info.orig_video_isVGA = 1;
-	screen_info.orig_video_lines = 25;
-	screen_info.orig_video_cols = 80;
-	screen_info.orig_video_ega_bx = 3;
-	screen_info.orig_video_points = 16;
-#endif       
         ARCH_SETUP
         print_memory_map(machine_specific_memory_setup());
+#else
+ 	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
+ 	drive_info = DRIVE_INFO;
+ 	screen_info = SCREEN_INFO;
+	edid_info = EDID_INFO;
+	saved_video_mode = SAVED_VIDEO_MODE;
+	bootloader_type = LOADER_TYPE;
 
-        /*	copy_edd();  */
+#ifdef CONFIG_BLK_DEV_RAM
+	rd_image_start = RAMDISK_FLAGS & RAMDISK_IMAGE_START_MASK;
+	rd_prompt = ((RAMDISK_FLAGS & RAMDISK_PROMPT_FLAG) != 0);
+	rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
+#endif
+	setup_memory_region();
+	copy_edd();
+#endif	/* !CONFIG_XEN */
 
 	if (!MOUNT_ROOT_RDONLY)
 		root_mountflags &= ~MS_RDONLY;
 	init_mm.start_code = (unsigned long) &_text;
 	init_mm.end_code = (unsigned long) &_etext;
 	init_mm.end_data = (unsigned long) &_edata;
-/*	init_mm.brk = (unsigned long) &_end; */
+#ifdef CONFIG_XEN
         init_mm.brk = start_pfn << PAGE_SHIFT;
+#else
+	init_mm.brk = (unsigned long) &_end;	
 
-
-#if 0  /* XEN: This is nonsense: kernel may not even be contiguous in RAM. */
 	code_resource.start = virt_to_phys(&_text);
 	code_resource.end = virt_to_phys(&_etext)-1;
 	data_resource.start = virt_to_phys(&_etext);
 	data_resource.end = virt_to_phys(&_edata)-1;
 #endif
+
 	parse_cmdline_early(cmdline_p);
 
 	early_identify_cpu(&boot_cpu_data);
@@ -679,15 +675,11 @@ void __init setup_arch(char **cmdline_p)
 	 * partially used pages are not usable - thus
 	 * we are rounding upwards:
 	 */
-#if 0
 	end_pfn = e820_end_of_ram();
-#else
-        end_pfn = xen_end_of_ram();
-#endif
 
 	check_efer();
 
-	init_memory_mapping(0, (end_pfn << PAGE_SHIFT));
+	init_memory_mapping(0, (end_pfn_map << PAGE_SHIFT));
 
 #ifdef CONFIG_ACPI_NUMA
 	/*
@@ -702,24 +694,25 @@ void __init setup_arch(char **cmdline_p)
 	contig_initmem_init(); 
 #endif
 
-	/* Reserve direct mapping and shared info etc. */
-//	reserve_bootmem_generic(table_start << PAGE_SHIFT, (table_end + 1 - table_start) << PAGE_SHIFT);
-
-//	reserve_bootmem_generic(0, (table_end + 1) << PAGE_SHIFT);
+#ifndef CONFIG_XEN
+	/* Reserve direct mapping */
+	reserve_bootmem_generic(table_start << PAGE_SHIFT, 
+				(table_end - table_start) << PAGE_SHIFT);
 
 	/* reserve kernel */
-//	kernel_end = round_up(__pa_symbol(&_end),PAGE_SIZE);
+	kernel_end = round_up(__pa_symbol(&_end),PAGE_SIZE);
+	reserve_bootmem_generic(HIGH_MEMORY, kernel_end - HIGH_MEMORY);
 
-#if 0
 	/*
 	 * reserve physical page 0 - it's a special BIOS page on many boxes,
 	 * enabling clean reboots, SMP operation, laptop functions.
 	 */
 	reserve_bootmem_generic(0, PAGE_SIZE);
-#endif
 
 	/* reserve ebda region */
-/*	reserve_ebda_region(); */
+	reserve_ebda_region();
+#endif
+
 
 #ifdef CONFIG_SMP
 	/*
@@ -739,6 +732,7 @@ void __init setup_arch(char **cmdline_p)
         */
        acpi_reserve_bootmem();
 #endif
+#ifdef CONFIG_XEN
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (xen_start_info.mod_start) {
 		if (INITRD_START + INITRD_SIZE <= (end_pfn << PAGE_SHIFT)) {
@@ -756,10 +750,27 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 #ifdef CONFIG_SMP
-#ifdef CONFIG_XEN
 	smp_alloc_memory();
 #endif
+#else	/* CONFIG_XEN */
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (LOADER_TYPE && INITRD_START) {
+		if (INITRD_START + INITRD_SIZE <= (end_pfn << PAGE_SHIFT)) {
+			reserve_bootmem_generic(INITRD_START, INITRD_SIZE);
+			initrd_start =
+				INITRD_START ? INITRD_START + PAGE_OFFSET : 0;
+			initrd_end = initrd_start+INITRD_SIZE;
+		}
+		else {
+			printk(KERN_ERR "initrd extends beyond end of memory "
+			    "(0x%08lx > 0x%08lx)\ndisabling initrd\n",
+			    (unsigned long)(INITRD_START + INITRD_SIZE),
+			    (unsigned long)(end_pfn << PAGE_SHIFT));
+			initrd_start = 0;
+		}
+	}
 #endif
+#endif	/* !CONFIG_XEN */
 	paging_init();
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
@@ -767,30 +778,36 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	find_smp_config();
 #endif
-	/* Make sure we have a large enough P->M table. */
-	if (end_pfn > xen_start_info.nr_pages) {
-		phys_to_machine_mapping = alloc_bootmem(
-			max_pfn * sizeof(unsigned long));
-		memset(phys_to_machine_mapping, ~0,
-			max_pfn * sizeof(unsigned long));
-		memcpy(phys_to_machine_mapping,
-			(unsigned long *)xen_start_info.mfn_list,
-			xen_start_info.nr_pages * sizeof(unsigned long));
-		free_bootmem(
-			__pa(xen_start_info.mfn_list), 
-			PFN_PHYS(PFN_UP(xen_start_info.nr_pages *
-			sizeof(unsigned long))));
+#ifdef CONFIG_XEN
+	{
+		int i, j;
+		/* Make sure we have a large enough P->M table. */
+		if (end_pfn > xen_start_info.nr_pages) {
+			phys_to_machine_mapping = alloc_bootmem(
+				max_pfn * sizeof(unsigned long));
+			memset(phys_to_machine_mapping, ~0,
+			       max_pfn * sizeof(unsigned long));
+			memcpy(phys_to_machine_mapping,
+			       (unsigned long *)xen_start_info.mfn_list,
+			       xen_start_info.nr_pages * sizeof(unsigned long));
+			free_bootmem(
+				__pa(xen_start_info.mfn_list), 
+				PFN_PHYS(PFN_UP(xen_start_info.nr_pages *
+						sizeof(unsigned long))));
+		}
+
+		pfn_to_mfn_frame_list = alloc_bootmem(PAGE_SIZE);
+
+		for ( i=0, j=0; i < end_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
+		{	
+			pfn_to_mfn_frame_list[j] = 
+				virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
+		}
+
 	}
+#endif
 
-	pfn_to_mfn_frame_list = alloc_bootmem(PAGE_SIZE);
-
-	for ( i=0, j=0; i < end_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
-	{	
-	     pfn_to_mfn_frame_list[j] = 
-		  virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
-	}
-
-#if 0
+#ifndef CONFIG_XEN
 	check_ioapic();
 #endif
 
@@ -806,6 +823,7 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	acpi_boot_init();
 #endif
+
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * get boot-time SMP configuration:
@@ -817,18 +835,14 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 
-        /* XXX Disable irqdebug until we have a way to avoid interrupt
-	 * conflicts. */
-/*	noirqdebug_setup(""); */
-
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || !defined(CONFIG_XEN)
 	/*
 	 * Request address space for all standard RAM and ROM resources
 	 * and also for regions reported as reserved by the e820.
 	 */
 	probe_roms();
+	e820_reserve_resources();
 #endif
-/*	e820_reserve_resources();  */
 
 	request_resource(&iomem_resource, &video_ram_resource);
 
@@ -845,14 +859,40 @@ void __init setup_arch(char **cmdline_p)
        iommu_hole_init();
 #endif
 
-	op.cmd             = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = 1;
-	HYPERVISOR_physdev_op(&op);
+#ifdef CONFIG_XEN
+       {
+	       physdev_op_t op;
 
-	if (xen_start_info.flags & SIF_INITDOMAIN) {
-		if (!(xen_start_info.flags & SIF_PRIVILEGED))
-			panic("Xen granted us console access "
-			      "but not privileged status");
+	       op.cmd             = PHYSDEVOP_SET_IOPL;
+	       op.u.set_iopl.iopl = 1;
+	       HYPERVISOR_physdev_op(&op);
+
+	       if (xen_start_info.flags & SIF_INITDOMAIN) {
+		       if (!(xen_start_info.flags & SIF_PRIVILEGED))
+			       panic("Xen granted us console access "
+				     "but not privileged status");
+		       
+#ifdef CONFIG_VT
+#if defined(CONFIG_VGA_CONSOLE)
+	       conswitchp = &vga_con;
+#elif defined(CONFIG_DUMMY_CONSOLE)
+	       conswitchp = &dummy_con;
+#endif
+#endif
+	       } else {
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+		       extern const struct consw xennull_con;
+		       extern int console_use_vt;
+#if defined(CONFIG_VGA_CONSOLE)
+		/* disable VGA driver */
+		       ORIG_VIDEO_ISVGA = VIDEO_TYPE_VLFB;
+#endif
+		       conswitchp = &xennull_con;
+		       console_use_vt = 0;
+#endif
+	       }
+       }
+#else	/* CONFIG_XEN */
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
@@ -861,18 +901,8 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
-	} else {
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-		extern const struct consw xennull_con;
-		extern int console_use_vt;
-#if defined(CONFIG_VGA_CONSOLE)
-		/* disable VGA driver */
-		ORIG_VIDEO_ISVGA = VIDEO_TYPE_VLFB;
-#endif
-		conswitchp = &xennull_con;
-		console_use_vt = 0;
-#endif
-	}
+
+#endif /* !CONFIG_XEN */
 }
 
 static int __init get_model_name(struct cpuinfo_x86 *c)
