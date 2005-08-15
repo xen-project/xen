@@ -128,7 +128,6 @@
          * #define VGCF_IN_SYSCALL (1<<8) 
          */
         .macro SWITCH_TO_USER flag
-        movl $0,%gs:pda_kernel_mode     # change to user mode
         subq $8*4,%rsp                   # reuse rip, cs, rflags, rsp, ss in the stack
         movq %rax,(%rsp)
         movq %r11,1*8(%rsp)
@@ -139,7 +138,6 @@
         .endm
 
         .macro SWITCH_TO_KERNEL ssoff,adjust=0
-  	btsq $0,%gs:pda_kernel_mode
 	jc  1f
 	orb  $1,\ssoff-\adjust+4(%rsp)
 1:
