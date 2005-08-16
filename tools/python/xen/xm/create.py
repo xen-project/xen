@@ -592,9 +592,14 @@ def choose_vnc_display():
         return d
     return None
 
+vncpid = None
+
 def spawn_vnc(display):
-    os.system("vncviewer -log *:stdout:0 -listen %d &" %
-              (VNC_BASE_PORT + display))
+    vncargs = (["vncviewer" + "-log", "*:stdout:0",
+            "-listen", "%d" % (VNC_BASE_PORT + display) ])
+    global vncpid    
+    vncpid = os.spawnvp(os.P_NOWAIT, "vncviewer", vncargs)
+
     return VNC_BASE_PORT + display
     
 def preprocess_vnc(opts, vals):
@@ -639,6 +644,9 @@ def make_domain(opts, config):
         else:
             dominfo = server.xend_domain_create(config)
     except XendError, ex:
+        import signal
+        if vncpid:
+            os.kill(vncpid, signal.SIGKILL)
         opts.err(str(ex))
 
     dom = sxp.child_value(dominfo, 'name')

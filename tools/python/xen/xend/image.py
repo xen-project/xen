@@ -16,6 +16,7 @@
 #============================================================================
 
 import os, string
+import re
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 from xen.xend import sxp
@@ -329,8 +330,15 @@ class VmxImageHandler(ImageHandler):
             if name == 'vbd':
                vbdinfo = sxp.child(device, 'vbd')
                uname = sxp.child_value(vbdinfo, 'uname')
-               vbddev = sxp.child_value(vbdinfo, 'dev')
+               typedev = sxp.child_value(vbdinfo, 'dev')
                (vbdtype, vbdparam) = string.split(uname, ':', 1)
+               if re.match('^ioemu:', typedev):
+                  (emtype, vbddev) = string.split(typedev, ':', 1)
+               else:
+                  emtype = 'vbd'
+                  vbddev = typedev
+               if emtype != 'ioemu':
+                  continue;
                vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
                if vbddev not in vbddev_list:
                   raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
