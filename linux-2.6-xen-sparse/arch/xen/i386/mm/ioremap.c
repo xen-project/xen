@@ -335,7 +335,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
                         generic_page_range(mm, start_address, 
                                            address-start_address,
                                            direct_remap_area_pte_fn, &w);
- 
+                        w = u;
 			if (HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0)
 				return -EFAULT;
 			v = u;
