@@ -815,6 +815,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     unsigned int cpu = smp_processor_id();
 
+    ASSERT(!local_irq_is_enabled());
+
     set_current(next);
 
     if ( (percpu_ctxt[cpu].curr_vcpu != next) && !is_idle_task(next->domain) )
@@ -827,6 +829,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 void context_switch_finalise(struct vcpu *next)
 {
     unsigned int cpu = smp_processor_id();
+
+    ASSERT(local_irq_is_enabled());
 
     if ( percpu_ctxt[cpu].context_not_finalised )
     {
