@@ -85,6 +85,11 @@ typedef struct blkif_st {
     spinlock_t          blk_ring_lock;
     atomic_t            refcnt;
     struct work_struct work;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    u16 shmem_handle;
+    memory_t shmem_vaddr;
+    grant_ref_t shmem_ref;
+#endif
 } blkif_t;
 
 blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle);

@@ -41,6 +41,12 @@
 #include <asm/sections.h>
 #include <asm-xen/hypervisor.h>
 
+#if defined(CONFIG_SWIOTLB)
+extern void swiotlb_init(void);
+int swiotlb;
+EXPORT_SYMBOL(swiotlb);
+#endif
+
 unsigned int __VMALLOC_RESERVE = 128 << 20;
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
@@ -630,6 +636,10 @@ void __init mem_init(void)
 	int tmp;
 	int bad_ppro;
 	unsigned long pfn;
+
+#if defined(CONFIG_SWIOTLB)
+	swiotlb_init();	
+#endif
 
 #ifndef CONFIG_DISCONTIGMEM
 	if (!mem_map)

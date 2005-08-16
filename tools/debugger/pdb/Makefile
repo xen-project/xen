@@ -33,7 +33,8 @@ LIBDIRS    += ../libxendebug
 LIBS       += unix str
 
 # bc = byte-code, dc = debug byte-code
-all : patches dc
+# patches = patch linux domU source code
+all : dc
 
 SOURCES    += pdb_caml_xc.c 
 SOURCES    += pdb_caml_domain.c pdb_caml_process.c

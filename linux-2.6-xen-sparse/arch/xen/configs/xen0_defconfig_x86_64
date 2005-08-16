@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.12.3-xen0
-# Mon Aug 15 11:36:25 2005
+# Linux kernel version: 2.6.12.4-xen0
+# Mon Aug 15 18:57:19 2005
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -52,6 +52,7 @@ CONFIG_KOBJECT_UEVENT=y
 # CONFIG_IKCONFIG is not set
 # CONFIG_EMBEDDED is not set
 CONFIG_KALLSYMS=y
+# CONFIG_KALLSYMS_ALL is not set
 # CONFIG_KALLSYMS_EXTRA_PASS is not set
 CONFIG_PRINTK=y
 CONFIG_BUG=y
@@ -122,6 +123,7 @@ CONFIG_X86_XEN_GENAPIC=y
 # CONFIG_X86_MSR is not set
 # CONFIG_GART_IOMMU is not set
 CONFIG_DUMMY_IOMMU=y
+CONFIG_SWIOTLB=y
 # CONFIG_X86_MCE is not set
 
 #
@@ -163,6 +165,7 @@ CONFIG_BINFMT_MISC=y
 CONFIG_STANDALONE=y
 # CONFIG_PREVENT_FIRMWARE_BUILD is not set
 # CONFIG_FW_LOADER is not set
+# CONFIG_DEBUG_DRIVER is not set
 
 #
 # Memory Technology Devices (MTD)
@@ -1060,7 +1063,22 @@ CONFIG_ZLIB_INFLATE=y
 # Kernel hacking
 #
 # CONFIG_PRINTK_TIME is not set
-# CONFIG_DEBUG_KERNEL is not set
-CONFIG_LOG_BUF_SHIFT=14
+CONFIG_DEBUG_KERNEL=y
+CONFIG_MAGIC_SYSRQ=y
+CONFIG_LOG_BUF_SHIFT=15
+# CONFIG_SCHEDSTATS is not set
+# CONFIG_DEBUG_SLAB is not set
+# CONFIG_DEBUG_SPINLOCK is not set
+# CONFIG_DEBUG_SPINLOCK_SLEEP is not set
+# CONFIG_DEBUG_KOBJECT is not set
+# CONFIG_DEBUG_INFO is not set
+# CONFIG_DEBUG_FS is not set
+# CONFIG_DEBUG_STACKOVERFLOW is not set
+# CONFIG_KPROBES is not set
+# CONFIG_DEBUG_STACK_USAGE is not set
+# CONFIG_DEBUG_PAGEALLOC is not set
+# CONFIG_4KSTACKS is not set
 CONFIG_X86_FIND_SMP_CONFIG=y
 CONFIG_X86_MPPARSE=y
+# CONFIG_CHECKING is not set
+# CONFIG_INIT_DEBUG is not set

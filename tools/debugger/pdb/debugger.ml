@@ -53,10 +53,20 @@ let gdb_step ctx =
   PDB.step ctx;
   raise No_reply
 
+(**
+   Read Register Command.
+   return register as a 4-byte value.
+ *)
+let gdb_read_register ctx command =
+  let read_reg register =
+    (Printf.sprintf "%08lx" (Util.flip_int32 (PDB.read_register ctx register)))
+  in
+  Scanf.sscanf command "p%x" read_reg
+    
 
 (**
    Read Registers Command.
-   returns 16 4-byte registers in a particular defined by gdb.
+   returns 16 4-byte registers in a particular format defined by gdb.
  *)
 let gdb_read_registers ctx =
   let regs = PDB.read_registers ctx in
@@ -100,7 +110,7 @@ let gdb_read_memory ctx command =
     with
       Failure s -> "E02"
   in
-  Scanf.sscanf command "m%lx,%d" read_mem
+  Scanf.sscanf command "m%lx,%x" read_mem
 
 
 
@@ -218,16 +228,24 @@ let pdb_extensions command sock =
 (**
    Insert Breakpoint or Watchpoint Packet
  *)
+
+let bwc_watch_write  = 102                              (* from pdb_module.h *)
+let bwc_watch_read   = 103
+let bwc_watch_access = 104
+
 let gdb_insert_bwcpoint ctx command =
   let insert cmd addr length =
     try
       match cmd with
       | 0 -> PDB.insert_memory_breakpoint ctx addr length; "OK"
+      | 2 -> PDB.insert_watchpoint ctx bwc_watch_write  addr length; "OK"
+      | 3 -> PDB.insert_watchpoint ctx bwc_watch_read   addr length; "OK"
+      | 4 -> PDB.insert_watchpoint ctx bwc_watch_access addr length; "OK"
       | _ -> ""
     with
       Failure s -> "E03"
   in
-  Scanf.sscanf command "Z%d,%lx,%d" insert
+  Scanf.sscanf command "Z%d,%lx,%x" insert
 
 (**
    Remove Breakpoint or Watchpoint Packet
@@ -237,6 +255,9 @@ let gdb_remove_bwcpoint ctx command =
     try
       match cmd with
       | 0 -> PDB.remove_memory_breakpoint ctx addr length; "OK"
+      | 2 -> PDB.remove_watchpoint ctx bwc_watch_write  addr length; "OK"
+      | 3 -> PDB.remove_watchpoint ctx bwc_watch_read   addr length; "OK"
+      | 4 -> PDB.remove_watchpoint ctx bwc_watch_access addr length; "OK"
       | _ -> ""
     with
       Failure s -> "E04"
@@ -260,6 +281,7 @@ let process_command command sock =
     | 'k' -> gdb_kill ()
     | 'm' -> gdb_read_memory ctx command
     | 'M' -> gdb_write_memory ctx command
+    | 'p' -> gdb_read_register ctx command
     | 'P' -> gdb_write_register ctx command
     | 'q' -> gdb_query command
     | 's' -> gdb_step ctx
@@ -270,7 +292,7 @@ let process_command command sock =
     | 'Z' -> gdb_insert_bwcpoint ctx command
     | _ -> 
 	print_endline (Printf.sprintf "unknown gdb command [%s]" command);
-	"E02"
+	""
   with
     Unimplemented s ->
       print_endline (Printf.sprintf "loser. unimplemented command [%s][%s]" 

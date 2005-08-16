@@ -9,6 +9,7 @@
  */
  
 #include "blktap.h"
+#include <asm-xen/evtchn.h>
 
 static char *blkif_state_name[] = {
     [BLKIF_STATE_CLOSED]       = "closed",
@@ -48,12 +49,21 @@ static void __blkif_disconnect_complete(void *arg)
     blkif_t              *blkif = (blkif_t *)arg;
     ctrl_msg_t            cmsg;
     blkif_be_disconnect_t disc;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    struct gnttab_unmap_grant_ref op;
+#endif
 
     /*
      * These can't be done in blkif_disconnect() because at that point there
      * may be outstanding requests at the disc whose asynchronous responses
      * must still be notified to the remote driver.
      */
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    op.host_addr = blkif->shmem_vaddr;
+    op.handle         = blkif->shmem_handle;
+    op.dev_bus_addr   = 0;
+    BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
+#endif
     vfree(blkif->blk_ring.sring);
 
     /* Construct the deferred response message. */
@@ -177,8 +187,12 @@ void blkif_ptfe_connect(blkif_be_connect_t *connect)
     unsigned int   evtchn = connect->evtchn;
     unsigned long  shmem_frame = connect->shmem_frame;
     struct vm_struct *vma;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    int ref = connect->shmem_ref;
+#else
     pgprot_t       prot;
     int            error;
+#endif
     blkif_t       *blkif;
     blkif_sring_t *sring;
 
@@ -199,24 +213,46 @@ void blkif_ptfe_connect(blkif_be_connect_t *connect)
         return;
     }
 
-    prot = __pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED);
+#ifndef CONFIG_XEN_BLKDEV_GRANT
+    prot = __pgprot(_KERNPG_TABLE);
     error = direct_remap_area_pages(&init_mm, VMALLOC_VMADDR(vma->addr),
                                     shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
                                     prot, domid);
     if ( error != 0 )
     {
-        WPRINTK("BE_CONNECT: error! (%d)\n", error);
         if ( error == -ENOMEM ) 
             connect->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
-        else if ( error == -EFAULT ) {
+        else if ( error == -EFAULT )
             connect->status = BLKIF_BE_STATUS_MAPPING_ERROR;
-            WPRINTK("BE_CONNECT: MAPPING error!\n");
-        }
         else
             connect->status = BLKIF_BE_STATUS_ERROR;
         vfree(vma->addr);
         return;
     }
+#else
+    { /* Map: Use the Grant table reference */
+        struct gnttab_map_grant_ref op;
+        op.host_addr = VMALLOC_VMADDR(vma->addr);
+        op.flags            = GNTMAP_host_map;
+        op.ref              = ref;
+        op.dom              = domid;
+       
+        BUG_ON( HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) );
+       
+        handle = op.handle;
+       
+        if (op.handle < 0) {
+            DPRINTK(" Grant table operation failure !\n");
+            connect->status = BLKIF_BE_STATUS_MAPPING_ERROR;
+            vfree(vma->addr);
+            return;
+        }
+
+        blkif->shmem_ref = ref;
+        blkif->shmem_handle = handle;
+        blkif->shmem_vaddr = VMALLOC_VMADDR(vma->addr);
+    }
+#endif
 
     if ( blkif->status != DISCONNECTED )
     {

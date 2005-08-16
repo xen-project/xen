@@ -43,11 +43,8 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 
 struct pci_dev;
 
-/* The PCI address space does equal the physical memory
- * address space.  The networking and block device layers use
- * this boolean for bounce buffer decisions.
- */
-#define PCI_DMA_BUS_IS_PHYS	(1)
+/* On Xen we use SWIOTLB instead of blk-specific bounce buffers. */
+#define PCI_DMA_BUS_IS_PHYS	(0)
 
 /* pci_unmap_{page,single} is a nop so... */
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)

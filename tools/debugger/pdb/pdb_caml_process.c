@@ -113,6 +113,12 @@ process_handle_response (value ring)
         case PDB_OPCODE_DETACH :
             break;
             
+        case PDB_OPCODE_RD_REG :
+        {
+            sprintf(&msg[0], "%08x", _flip(resp->u.rd_reg.value));
+            break;
+        }
+
         case PDB_OPCODE_RD_REGS :
         {
             int loop;
@@ -161,16 +167,22 @@ process_handle_response (value ring)
         }
 
         case PDB_OPCODE_SET_BKPT :
-        {
-            break;
-        }
         case PDB_OPCODE_CLR_BKPT :
+        case PDB_OPCODE_SET_WATCHPT :
+        case PDB_OPCODE_CLR_WATCHPT :
         {
             break;
         }
 
+        case PDB_OPCODE_WATCHPOINT :
+        {
+            sprintf(msg, "S05");
+            break;
+        }
+
         default :
-            printf("(linux) UNKNOWN MESSAGE TYPE IN RESPONSE\n");
+            printf("(linux) UNKNOWN MESSAGE TYPE IN RESPONSE %d\n",
+                   resp->operation);
             break;
         }
 
@@ -258,6 +270,32 @@ proc_pause_target (value context)
 
     CAMLreturn(Val_unit);
 }
+
+
+/*
+ * proc_read_register : context_t -> int -> unit
+ */
+value
+proc_read_register (value context, value reg)
+{
+    CAMLparam1(context);
+
+    pdb_request_t req;
+    context_t ctx;
+    int my_reg = Int_val(reg);
+
+    decode_context(&ctx, context);
+
+    req.operation = PDB_OPCODE_RD_REG;
+    req.process = ctx.process;
+    req.u.rd_reg.reg = my_reg;
+    req.u.rd_reg.value = 0;
+
+    send_request (ctx.ring, ctx.evtchn, &req);
+
+    CAMLreturn(Val_unit);
+}
+
 
 
 /*
@@ -443,7 +481,7 @@ proc_step_target (value context)
 
 
 /*
- * proc_insert_memory_breakpoint : context_t -> int32 -> int list -> unit
+ * proc_insert_memory_breakpoint : context_t -> int32 -> int -> unit
  */
 value
 proc_insert_memory_breakpoint (value context, value address, value length)
@@ -466,7 +504,7 @@ proc_insert_memory_breakpoint (value context, value address, value length)
 }
 
 /*
- * proc_remove_memory_breakpoint : context_t -> int32 -> int list -> unit
+ * proc_remove_memory_breakpoint : context_t -> int32 -> int -> unit
  */
 value
 proc_remove_memory_breakpoint (value context, value address, value length)
@@ -482,6 +520,54 @@ proc_remove_memory_breakpoint (value context, value address, value length)
     req.process = ctx.process;
     req.u.bkpt.address = (memory_t) Int32_val(address);
     req.u.bkpt.length  =  Int_val(length);
+
+    send_request(ctx.ring, ctx.evtchn, &req);
+
+    CAMLreturn(Val_unit);
+}
+
+/*
+ * proc_insert_watchpoint : context_t -> bwcpoint_t -> int32 -> int -> unit
+ */
+value
+proc_insert_watchpoint (value context, value kind, value address, value length)
+{
+    CAMLparam3(context, address, length);
+
+    context_t ctx;
+    pdb_request_t req;
+
+    decode_context(&ctx, context);
+
+    req.operation = PDB_OPCODE_SET_WATCHPT;
+    req.process = ctx.process;
+    req.u.watchpt.type    =  Int_val(kind);
+    req.u.watchpt.address = (memory_t) Int32_val(address);
+    req.u.watchpt.length  =  Int_val(length);
+
+    send_request(ctx.ring, ctx.evtchn, &req);
+
+    CAMLreturn(Val_unit);
+}
+
+/*
+ * proc_remove_watchpoint : context_t -> bwcpoint_t -> int32 -> int -> unit
+ */
+value
+proc_remove_watchpoint (value context, value kind, value address, value length)
+{
+    CAMLparam3(context, address, length);
+
+    context_t ctx;
+    pdb_request_t req;
+
+    decode_context(&ctx, context);
+
+    req.operation = PDB_OPCODE_CLR_WATCHPT;
+    req.process = ctx.process;
+    req.u.watchpt.type    =  Int_val(kind);
+    req.u.watchpt.address = (memory_t) Int32_val(address);
+    req.u.watchpt.length  =  Int_val(length);
 
     send_request(ctx.ring, ctx.evtchn, &req);
 
