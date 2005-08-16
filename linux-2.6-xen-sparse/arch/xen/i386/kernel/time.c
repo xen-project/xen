@@ -569,7 +569,6 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		for (cpu = 0; cpu < num_online_cpus(); cpu++)
 			printk(" %d: %lld\n", cpu,
 			       per_cpu(processed_system_time, cpu));
-		return;
 	}
 
 	/* System-wide jiffy work. */
