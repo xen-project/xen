@@ -28,10 +28,10 @@ extern int start_vmx(void);
 extern void stop_vmx(void);
 
 #if defined (__x86_64__)
-extern void vmx_load_msrs(struct vcpu *p, struct vcpu *n);
+extern void vmx_load_msrs(struct vcpu *n);
 void vmx_restore_msrs(struct vcpu *d);
 #else
-#define vmx_load_msrs(_p, _n)      ((void)0)
+#define vmx_load_msrs(_n)          ((void)0)
 #define vmx_restore_msrs(_v)       ((void)0)
 #endif
 

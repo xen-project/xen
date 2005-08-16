@@ -474,13 +474,14 @@ static void __enter_scheduler(void)
 
     set_ac_timer(&schedule_data[cpu].s_timer, now + r_time);
 
-    /* Must be protected by the schedule_lock! */
-    set_bit(_VCPUF_running, &next->vcpu_flags);
-
-    spin_unlock_irq(&schedule_data[cpu].schedule_lock);
-
     if ( unlikely(prev == next) )
+    {
+        spin_unlock_irq(&schedule_data[cpu].schedule_lock);
         return continue_running(prev);
+    }
+
+    clear_bit(_VCPUF_running, &prev->vcpu_flags);
+    set_bit(_VCPUF_running, &next->vcpu_flags);
 
     perfc_incrc(sched_ctx);
 
@@ -517,6 +518,10 @@ static void __enter_scheduler(void)
              next->domain->domain_id, next->vcpu_id);
 
     context_switch(prev, next);
+
+    spin_unlock_irq(&schedule_data[cpu].schedule_lock);
+
+    context_switch_finalise(next);
 }
 
 /* No locking needed -- pointer comparison is safe :-) */
