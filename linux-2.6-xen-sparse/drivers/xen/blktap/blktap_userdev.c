@@ -21,6 +21,9 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <asm-xen/xen-public/io/blkif.h> /* for control ring. */
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+#include <asm-xen/xen-public/grant_table.h>
+#endif
 
 #include "blktap.h"
 
@@ -42,6 +45,7 @@ static ctrl_front_ring_t  blktap_uctrl_ring;
 /* local prototypes */
 static int blktap_read_fe_ring(void);
 static int blktap_read_be_ring(void);
+
 
 /* -------[ mmap region ]--------------------------------------------- */
 /*
@@ -73,7 +77,28 @@ unsigned long user_vstart;  /* start of user mappings            */
      ((_req) * MMAP_PAGES_PER_REQUEST * PAGE_SIZE) + \
      ((_seg) * PAGE_SIZE))
 
+/* -------[ grant handles ]------------------------------------------- */
 
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+/* When using grant tables to map a frame for device access then the
+ * handle returned must be used to unmap the frame. This is needed to
+ * drop the ref count on the frame.
+ */
+struct grant_handle_pair
+{
+    u16  kernel;
+    u16  user;
+};
+static struct grant_handle_pair pending_grant_handles[MMAP_PAGES];
+#define pending_handle(_idx, _i) \
+    (pending_grant_handles[((_idx) * BLKIF_MAX_SEGMENTS_PER_REQUEST) + (_i)])
+#define BLKTAP_INVALID_HANDLE(_g) \
+    (((_g->kernel) == 0xFFFF) && ((_g->user) == 0xFFFF))
+#define BLKTAP_INVALIDATE_HANDLE(_g) do {       \
+    (_g)->kernel = 0xFFFF; (_g)->user = 0xFFFF; \
+    } while(0)
+    
+#endif
 
 
 /* -------[ blktap vm ops ]------------------------------------------- */
@@ -348,9 +373,43 @@ static struct file_operations blktap_fops = {
     
 /*-----[ Data to/from user space ]----------------------------------------*/
 
-
 static void fast_flush_area(int idx, int nr_pages)
 {
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
+    unsigned int i, op = 0;
+    struct grant_handle_pair *handle;
+    unsigned long ptep;
+
+    for (i=0; i<nr_pages; i++)
+    {
+        handle = &pending_handle(idx, i);
+        if (!BLKTAP_INVALID_HANDLE(handle))
+        {
+
+            unmap[op].host_addr = MMAP_VADDR(mmap_vstart, idx, i);
+            unmap[op].dev_bus_addr = 0;
+            unmap[op].handle = handle->kernel;
+            op++;
+
+            if (create_lookup_pte_addr(blktap_vma->vm_mm,
+                                       MMAP_VADDR(user_vstart, idx, i), 
+                                       &ptep) !=0) {
+                DPRINTK("Couldn't get a pte addr!\n");
+                return;
+            }
+            unmap[op].host_addr    = ptep;
+            unmap[op].dev_bus_addr = 0;
+            unmap[op].handle       = handle->user;
+            op++;
+            
+            BLKTAP_INVALIDATE_HANDLE(handle);
+        }
+    }
+    if ( unlikely(HYPERVISOR_grant_table_op(
+        GNTTABOP_unmap_grant_ref, unmap, op)))
+        BUG();
+#else
     multicall_entry_t mcl[BLKIF_MAX_SEGMENTS_PER_REQUEST];
     int               i;
 
@@ -363,21 +422,22 @@ static void fast_flush_area(int idx, int nr_pages)
     mcl[nr_pages-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
     if ( unlikely(HYPERVISOR_multicall(mcl, nr_pages) != 0) )
         BUG();
+#endif
 }
 
-
-extern int __direct_remap_area_pages(struct mm_struct *mm,
-                                     unsigned long address,
-                                     unsigned long size,
-                                     mmu_update_t *v);
 
 int blktap_write_fe_ring(blkif_request_t *req)
 {
     blkif_request_t *target;
-    int i;
+    int i, ret = 0;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
+    int op;
+#else
     unsigned long remap_prot;
     multicall_entry_t mcl[BLKIF_MAX_SEGMENTS_PER_REQUEST+1];
     mmu_update_t mmu[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+#endif
 
     /*
      * This is called to pass a request from the real frontend domain's
@@ -394,18 +454,109 @@ int blktap_write_fe_ring(blkif_request_t *req)
         return 0;
     }
 
-    remap_prot = _PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW;
     flush_cache_all(); /* a noop on intel... */
 
     target = RING_GET_REQUEST(&blktap_ufe_ring, blktap_ufe_ring.req_prod_pvt);
     memcpy(target, req, sizeof(*req));
 
     /* Map the foreign pages directly in to the application */
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    op = 0;
+    for (i=0; i<target->nr_segments; i++) {
+
+        unsigned long uvaddr;
+        unsigned long kvaddr;
+        unsigned long ptep;
+
+        uvaddr = MMAP_VADDR(user_vstart, ID_TO_IDX(req->id), i);
+        kvaddr = MMAP_VADDR(mmap_vstart, ID_TO_IDX(req->id), i);
+
+        /* Map the remote page to kernel. */
+        map[op].host_addr = kvaddr;
+        map[op].dom   = ID_TO_DOM(req->id);
+        map[op].ref   = blkif_gref_from_fas(target->frame_and_sects[i]);
+        map[op].flags = GNTMAP_host_map;
+        /* This needs a bit more thought in terms of interposition: 
+         * If we want to be able to modify pages during write using 
+         * grant table mappings, the guest will either need to allow 
+         * it, or we'll need to incur a copy. */
+        if (req->operation == BLKIF_OP_WRITE)
+            map[op].flags |= GNTMAP_readonly;
+        op++;
+
+        /* Now map it to user. */
+        ret = create_lookup_pte_addr(blktap_vma->vm_mm, uvaddr, &ptep);
+        if (ret)
+        {
+            DPRINTK("Couldn't get a pte addr!\n");
+            goto fail;
+        }
+
+        map[op].host_addr = ptep;
+        map[op].dom       = ID_TO_DOM(req->id);
+        map[op].ref       = blkif_gref_from_fas(target->frame_and_sects[i]);
+        map[op].flags     = GNTMAP_host_map | GNTMAP_application_map
+                            | GNTMAP_contains_pte;
+        /* Above interposition comment applies here as well. */
+        if (req->operation == BLKIF_OP_WRITE)
+            map[op].flags |= GNTMAP_readonly;
+        op++;
+    }
+
+    if ( unlikely(HYPERVISOR_grant_table_op(
+            GNTTABOP_map_grant_ref, map, op)))
+        BUG();
+
+    op = 0;
+    for (i=0; i<(target->nr_segments*2); i+=2) {
+        unsigned long uvaddr;
+        unsigned long kvaddr;
+        unsigned long offset;
+        int cancel = 0;
+
+        uvaddr = MMAP_VADDR(user_vstart, ID_TO_IDX(req->id), i/2);
+        kvaddr = MMAP_VADDR(mmap_vstart, ID_TO_IDX(req->id), i/2);
+
+        if ( unlikely(map[i].handle < 0) ) {
+            DPRINTK("Error on kernel grant mapping (%d)\n", map[i].handle);
+            ret = map[i].handle;
+            cancel = 1;
+        }
+
+        if ( unlikely(map[i+1].handle < 0) ) {
+            DPRINTK("Error on user grant mapping (%d)\n", map[i+1].handle);
+            ret = map[i+1].handle;
+            cancel = 1;
+        }
+
+        if (cancel) 
+            goto fail;
+
+        /* Set the necessary mappings in p2m and in the VM_FOREIGN 
+         * vm_area_struct to allow user vaddr -> struct page lookups
+         * to work.  This is needed for direct IO to foreign pages. */
+        phys_to_machine_mapping[__pa(kvaddr)>>PAGE_SHIFT] =
+            FOREIGN_FRAME(map[i].dev_bus_addr);
+
+        offset = (uvaddr - blktap_vma->vm_start) >> PAGE_SHIFT;
+        ((struct page **)blktap_vma->vm_private_data)[offset] =
+            pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+
+        /* Save handles for unmapping later. */
+        pending_handle(ID_TO_IDX(req->id), i/2).kernel = map[i].handle;
+        pending_handle(ID_TO_IDX(req->id), i/2).user   = map[i+1].handle;
+    }
+    
+#else
+
+    remap_prot = _PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW;
+
     for (i=0; i<target->nr_segments; i++) {
         unsigned long buf;
         unsigned long uvaddr;
         unsigned long kvaddr;
         unsigned long offset;
+        unsigned long ptep;
 
         buf   = target->frame_and_sects[i] & PAGE_MASK;
         uvaddr = MMAP_VADDR(user_vstart, ID_TO_IDX(req->id), i);
@@ -421,10 +572,14 @@ int blktap_write_fe_ring(blkif_request_t *req)
         phys_to_machine_mapping[__pa(kvaddr)>>PAGE_SHIFT] =
             FOREIGN_FRAME(buf >> PAGE_SHIFT);
 
-        __direct_remap_area_pages(blktap_vma->vm_mm,
-                                  uvaddr,
-                                  PAGE_SIZE,
-                                  &mmu[i]);
+        ret = create_lookup_pte_addr(blktap_vma->vm_mm, uvaddr, &ptep);
+        if (ret)
+        { 
+            DPRINTK("error getting pte\n");
+            goto fail;
+        }
+
+        mmu[i].ptr = ptep;
         mmu[i].val = (target->frame_and_sects[i] & PAGE_MASK)
             | pgprot_val(blktap_vma->vm_page_prot);
 
@@ -448,16 +603,17 @@ int blktap_write_fe_ring(blkif_request_t *req)
         if ( unlikely(mcl[i].result != 0) )
         {
             DPRINTK("invalid buffer -- could not remap it\n");
-            fast_flush_area(ID_TO_IDX(req->id), target->nr_segments);
-            return -1;
+            ret = mcl[i].result;
+            goto fail;
         }
     }
     if ( unlikely(mcl[i].result != 0) )
     {
         DPRINTK("direct remapping of pages to /dev/blktap failed.\n");
-        return -1;
+        ret = mcl[i].result;
+        goto fail;
     }
-
+#endif /* CONFIG_XEN_BLKDEV_GRANT */
 
     /* Mark mapped pages as reserved: */
     for ( i = 0; i < target->nr_segments; i++ )
@@ -472,6 +628,10 @@ int blktap_write_fe_ring(blkif_request_t *req)
     blktap_ufe_ring.req_prod_pvt++;
     
     return 0;
+
+ fail:
+    fast_flush_area(ID_TO_IDX(req->id), target->nr_segments);
+    return ret;
 }
 
 int blktap_write_be_ring(blkif_response_t *rsp)
@@ -538,11 +698,10 @@ static int blktap_read_fe_ring(void)
                 map[offset] = NULL;
             }
 
-
+            fast_flush_area(ID_TO_IDX(resp_s->id), ar->nr_pages);
             zap_page_range(blktap_vma, 
                     MMAP_VADDR(user_vstart, ID_TO_IDX(resp_s->id), 0), 
                     ar->nr_pages << PAGE_SHIFT, NULL);
-            fast_flush_area(ID_TO_IDX(resp_s->id), ar->nr_pages);
             write_resp_to_fe_ring(blkif, resp_s);
             blktap_ufe_ring.rsp_cons = i + 1;
             kick_fe_domain(blkif);
@@ -616,10 +775,16 @@ static struct miscdevice blktap_miscdev = {
 
 int blktap_init(void)
 {
-    int err;
+    int err, i, j;
 
     if ( (mmap_vstart = allocate_empty_lowmem_region(MMAP_PAGES)) == 0 )
         BUG();
+
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    for (i=0; i<MAX_PENDING_REQS ; i++)
+        for (j=0; j<BLKIF_MAX_SEGMENTS_PER_REQUEST; j++)
+            BLKTAP_INVALIDATE_HANDLE(&pending_handle(i, j));
+#endif
 
     err = misc_register(&blktap_miscdev);
     if ( err != 0 )

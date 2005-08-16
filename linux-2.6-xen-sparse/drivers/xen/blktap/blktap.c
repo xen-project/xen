@@ -23,6 +23,9 @@ int __init xlblktap_init(void)
     blkif_be_driver_status_t be_st;
 
     printk(KERN_INFO "Initialising Xen block tap device\n");
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    printk(KERN_INFO "Block tap is using grant tables.\n");
+#endif
 
     DPRINTK("   tap - Backend connection init:\n");
 
