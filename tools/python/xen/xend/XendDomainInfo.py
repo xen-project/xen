@@ -583,7 +583,7 @@ class XendDomainInfo:
         self.create_channel()
         self.image.createImage()
         self.exportToDB()
-        if self.store_channel:
+        if self.store_channel and self.store_mfn >= 0:
             self.db.introduceDomain(self.id,
                                     self.store_mfn,
                                     self.store_channel)
