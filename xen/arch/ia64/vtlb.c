@@ -26,7 +26,7 @@
 #include <asm/mm.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/gcc_intrin.h>
-#include <xen/interrupt.h>
+#include <linux/interrupt.h>
 #include <asm/vmx_vcpu.h>
 #define  MAX_CCH_LENGTH     40
 

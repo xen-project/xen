@@ -57,7 +57,7 @@ struct pt_fpreg {
         } u;
 };
 
-struct pt_regs {
+typedef struct cpu_user_regs{
 	/* The following registers are saved by SAVE_MIN: */
 	unsigned long b6;		/* scratch */
 	unsigned long b7;		/* scratch */
@@ -138,7 +138,7 @@ struct pt_regs {
 	struct pt_fpreg f9;		/* scratch */
 	struct pt_fpreg f10;		/* scratch */
 	struct pt_fpreg f11;		/* scratch */
-};
+}cpu_user_regs_t;
 
 typedef union {
 	unsigned long value;
@@ -274,7 +274,7 @@ typedef struct vcpu_guest_context {
 	unsigned long vm_assist;   /* VMASST_TYPE_* bitmap, now none on IPF */
 	unsigned long guest_iip;   /* Guest entry point */
 
-	struct pt_regs regs;
+	cpu_user_regs_t regs;
 	arch_vcpu_info_t vcpu;
 	arch_shared_info_t shared;
 } vcpu_guest_context_t;

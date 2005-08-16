@@ -24,7 +24,7 @@
 #include <asm/tlb.h>
 #include <asm/gcc_intrin.h>
 #include <asm/vcpu.h>
-#include <xen/interrupt.h>
+#include <linux/interrupt.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/vmx.h>
