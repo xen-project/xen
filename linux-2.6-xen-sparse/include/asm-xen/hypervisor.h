@@ -134,7 +134,8 @@ void xen_invlpg_mask(cpumask_t *mask, unsigned long ptr);
 #define EXPORT_PER_CPU_SYMBOL_GPL(var) EXPORT_SYMBOL_GPL(per_cpu__##var)
 #endif /* linux < 2.6.0 */
 
-void xen_contig_memory(unsigned long vstart, unsigned int order);
+void xen_create_contiguous_region(unsigned long vstart, unsigned int order);
+void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order);
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 /* Allocate a contiguous empty region of low memory. Return virtual start. */

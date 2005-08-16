@@ -277,7 +277,7 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 
 #ifdef CONFIG_X86_PAE
 	/* this gives us a page below 4GB */
-	xen_contig_memory((unsigned long)pgd, 0);
+	xen_create_contiguous_region((unsigned long)pgd, 0);
 #endif
 
 	if (!HAVE_SHARED_KERNEL_PMD)

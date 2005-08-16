@@ -263,12 +263,9 @@ void xen_set_ldt(unsigned long ptr, unsigned long len)
     BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
-void xen_contig_memory(unsigned long vstart, unsigned int order)
+/* Ensure multi-page extents are contiguous in machine memory. */
+void xen_create_contiguous_region(unsigned long vstart, unsigned int order)
 {
-    /*
-     * Ensure multi-page extents are contiguous in machine memory. This code 
-     * could be cleaned up some, and the number of hypercalls reduced.
-     */
     pgd_t         *pgd; 
     pud_t         *pud; 
     pmd_t         *pmd;
@@ -305,6 +302,49 @@ void xen_contig_memory(unsigned long vstart, unsigned int order)
             __pte_ma(((mfn+i)<<PAGE_SHIFT)|__PAGE_KERNEL), 0));
         xen_machphys_update(mfn+i, (__pa(vstart)>>PAGE_SHIFT)+i);
         phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = mfn+i;
+    }
+
+    flush_tlb_all();
+
+    balloon_unlock(flags);
+}
+
+void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
+{
+    pgd_t         *pgd; 
+    pud_t         *pud; 
+    pmd_t         *pmd;
+    pte_t         *pte;
+    unsigned long  mfn, i, flags;
+
+    scrub_pages(vstart, 1 << order);
+
+    balloon_lock(flags);
+
+    /* 1. Zap current PTEs, giving away the underlying pages. */
+    for (i = 0; i < (1<<order); i++) {
+        pgd = pgd_offset_k(vstart + (i*PAGE_SIZE));
+        pud = pud_offset(pgd, (vstart + (i*PAGE_SIZE)));
+        pmd = pmd_offset(pud, (vstart + (i*PAGE_SIZE)));
+        pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
+        mfn = pte_mfn(*pte);
+        BUG_ON(HYPERVISOR_update_va_mapping(
+            vstart + (i*PAGE_SIZE), __pte_ma(0), 0));
+        phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
+            INVALID_P2M_ENTRY;
+        BUG_ON(HYPERVISOR_dom_mem_op(
+            MEMOP_decrease_reservation, &mfn, 1, 0) != 1);
+    }
+
+    /* 2. Map new pages in place of old pages. */
+    for (i = 0; i < (1<<order); i++) {
+        BUG_ON(HYPERVISOR_dom_mem_op(
+            MEMOP_increase_reservation, &mfn, 1, 0) != 1);
+        BUG_ON(HYPERVISOR_update_va_mapping(
+            vstart + (i*PAGE_SIZE),
+            __pte_ma((mfn<<PAGE_SHIFT)|__PAGE_KERNEL), 0));
+        xen_machphys_update(mfn, (__pa(vstart)>>PAGE_SHIFT)+i);
+        phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = mfn;
     }
 
     flush_tlb_all();

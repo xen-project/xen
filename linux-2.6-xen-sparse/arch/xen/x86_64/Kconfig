@@ -329,12 +329,12 @@ config GART_IOMMU
 # need this always enabled with GART_IOMMU for the VIA workaround
 config SWIOTLB
        bool
-       depends on GART_IOMMU
+       depends on PCI
        default y
 
 config DUMMY_IOMMU
 	bool
-	depends on !GART_IOMMU && !SWIOTLB
+	depends on !GART_IOMMU
 	default y
 	help
 	  Don't use IOMMU code. This will cause problems when you have more than 4GB
