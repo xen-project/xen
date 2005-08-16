@@ -329,6 +329,7 @@ void handle_io(void)
 
 		ret = select(max_fd + 1, &readfds, &writefds, 0, &tv);
 		if (tv.tv_sec == 1 && (++num_of_writes % 100) == 0) {
+#if 0
 			/* FIXME */
 			/* This is a nasty hack.  xcs does not handle the
 			   control channels filling up well at all.  We'll
@@ -338,6 +339,7 @@ void handle_io(void)
 			   going away */
 			tv.tv_usec = 1000;
 			select(0, 0, 0, 0, &tv);
+#endif
 		}
 		enum_domains();
 
