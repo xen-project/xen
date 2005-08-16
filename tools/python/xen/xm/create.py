@@ -380,7 +380,6 @@ def randomMAC():
 
     @return: MAC address string
     """
-    random.seed()
     mac = [ 0xaa, 0x00, 0x00,
             random.randint(0x00, 0x7f),
             random.randint(0x00, 0xff),
@@ -689,6 +688,7 @@ def balloon_out(dom0_min_mem, opts):
     del xc
 
 def main(argv):
+    random.seed()
     opts = gopts
     args = opts.parse(argv)
     if opts.vals.help:
