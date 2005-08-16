@@ -87,6 +87,7 @@ struct domain
 {
 	int domid;
 	int tty_fd;
+	bool is_dead;
 	struct buffer buffer;
 	struct domain *next;
 };
@@ -156,10 +157,12 @@ static struct domain *create_domain(int domid)
 
 	dom->domid = domid;
 	dom->tty_fd = domain_create_tty(dom);
+	dom->is_dead = false;
 	dom->buffer.data = 0;
 	dom->buffer.size = 0;
 	dom->buffer.capacity = 0;
 	dom->buffer.max_capacity = 0;
+	dom->next = 0;
 
 	dolog(LOG_DEBUG, "New domain %d", domid);
 
@@ -206,6 +209,16 @@ static void remove_domain(struct domain *dom)
 	}
 }
 
+static void remove_dead_domains(struct domain *dom)
+{
+	if (dom == NULL) return;
+	remove_dead_domains(dom->next);
+
+	if (dom->is_dead) {
+		remove_domain(dom);
+	}
+}
+
 static void handle_tty_read(struct domain *dom)
 {
 	ssize_t len;
@@ -224,7 +237,7 @@ static void handle_tty_read(struct domain *dom)
 		if (domain_is_valid(dom->domid)) {
 			dom->tty_fd = domain_create_tty(dom);
 		} else {
-			remove_domain(dom);
+			dom->is_dead = true;
 		}
 	} else if (domain_is_valid(dom->domid)) {
 		msg.u.control.msg.length = len;
@@ -235,7 +248,7 @@ static void handle_tty_read(struct domain *dom)
 		}
 	} else {
 		close(dom->tty_fd);
-		remove_domain(dom);
+		dom->is_dead = true;
 	}
 }
 
@@ -250,7 +263,7 @@ static void handle_tty_write(struct domain *dom)
 		if (domain_is_valid(dom->domid)) {
 			dom->tty_fd = domain_create_tty(dom);
 		} else {
-			remove_domain(dom);
+			dom->is_dead = true;
 		}
 	} else {
 		buffer_advance(&dom->buffer, len);
@@ -333,13 +346,15 @@ void handle_io(void)
 		}
 
 		for (d = dom_head; d; d = d->next) {
-			if (FD_ISSET(d->tty_fd, &readfds)) {
+			if (!d->is_dead && FD_ISSET(d->tty_fd, &readfds)) {
 				handle_tty_read(d);
 			}
 
-			if (FD_ISSET(d->tty_fd, &writefds)) {
+			if (!d->is_dead && FD_ISSET(d->tty_fd, &writefds)) {
 				handle_tty_write(d);
 			}
 		}
+
+		remove_dead_domains(dom_head);
 	} while (ret > -1);
 }
