@@ -117,11 +117,15 @@ def stop_xcs():
 	return    
 
 def start_xenstored():
-    s,o = commands.getstatusoutput("/usr/sbin/xenstored --pid-file=/var/run/xenstore.pid");
+    XENSTORED_TRACE = os.getenv("XENSTORED_TRACE")
+    cmd = "/usr/sbin/xenstored --pid-file=/var/run/xenstore.pid"
+    if XENSTORED_TRACE:
+        cmd += " -T /var/log/xenstored-trace.log"
+    s,o = commands.getstatusoutput(cmd)
 
 def start_consoled():
     if os.fork() == 0:
-        os.execvp('/usr/sbin/xenconsoled', ['/usr/sbin/xenconsoled']);
+        os.execvp('/usr/sbin/xenconsoled', ['/usr/sbin/xenconsoled'])
             
 def main():
     try:

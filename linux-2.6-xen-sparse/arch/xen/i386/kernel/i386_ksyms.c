@@ -115,9 +115,6 @@ EXPORT_SYMBOL(__copy_from_user_ll);
 EXPORT_SYMBOL(__copy_to_user_ll);
 EXPORT_SYMBOL(strnlen_user);
 
-EXPORT_SYMBOL(dma_alloc_coherent);
-EXPORT_SYMBOL(dma_free_coherent);
-
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL(pci_mem_start);
 #endif

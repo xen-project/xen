@@ -309,6 +309,7 @@ void xenbus_suspend(void)
 void xenbus_resume(void)
 {
 	xb_init_comms();
+	reregister_xenbus_watches();
 	up(&xenbus_lock);
 }
 

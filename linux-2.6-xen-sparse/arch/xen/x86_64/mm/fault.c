@@ -250,7 +250,11 @@ static int vmalloc_fault(unsigned long address)
 	   happen within a race in page table update. In the later
 	   case just flush. */
 
-	pgd = pgd_offset(current->mm ?: &init_mm, address);
+	/* On Xen the line below does not always work. Needs investigating! */
+	/*pgd = pgd_offset(current->mm ?: &init_mm, address);*/
+	pgd = (pgd_t *)per_cpu(cur_pgd, smp_processor_id());
+	pgd += pgd_index(address);
+
 	pgd_ref = pgd_offset_k(address);
 	if (pgd_none(*pgd_ref))
 		return -1;

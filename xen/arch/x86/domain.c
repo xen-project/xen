@@ -48,6 +48,8 @@ boolean_param("noreboot", opt_noreboot);
 
 struct percpu_ctxt {
     struct vcpu *curr_vcpu;
+    unsigned int context_not_finalised;
+    unsigned int dirty_segment_mask;
 } __cacheline_aligned;
 static struct percpu_ctxt percpu_ctxt[NR_CPUS];
 
@@ -541,51 +543,59 @@ void toggle_guest_mode(struct vcpu *v)
     __r; })
 
 #if CONFIG_VMX
-#define load_msrs(_p, _n)     if (vmx_switch_on) vmx_load_msrs((_p), (_n))
+#define load_msrs(n)     if (vmx_switch_on) vmx_load_msrs(n)
 #else
-#define load_msrs(_p, _n)     ((void)0)
+#define load_msrs(n)     ((void)0)
 #endif 
 
-static void load_segments(struct vcpu *p, struct vcpu *n)
+/*
+ * save_segments() writes a mask of segments which are dirty (non-zero),
+ * allowing load_segments() to avoid some expensive segment loads and
+ * MSR writes.
+ */
+#define DIRTY_DS           0x01
+#define DIRTY_ES           0x02
+#define DIRTY_FS           0x04
+#define DIRTY_GS           0x08
+#define DIRTY_FS_BASE      0x10
+#define DIRTY_GS_BASE_USER 0x20
+
+static void load_segments(struct vcpu *n)
 {
-    struct vcpu_guest_context *pctxt = &p->arch.guest_context;
     struct vcpu_guest_context *nctxt = &n->arch.guest_context;
     int all_segs_okay = 1;
+    unsigned int dirty_segment_mask, cpu = smp_processor_id();
+
+    /* Load and clear the dirty segment mask. */
+    dirty_segment_mask = percpu_ctxt[cpu].dirty_segment_mask;
+    percpu_ctxt[cpu].dirty_segment_mask = 0;
 
     /* Either selector != 0 ==> reload. */
-    if ( unlikely(pctxt->user_regs.ds | nctxt->user_regs.ds) )
+    if ( unlikely((dirty_segment_mask & DIRTY_DS) | nctxt->user_regs.ds) )
         all_segs_okay &= loadsegment(ds, nctxt->user_regs.ds);
 
     /* Either selector != 0 ==> reload. */
-    if ( unlikely(pctxt->user_regs.es | nctxt->user_regs.es) )
+    if ( unlikely((dirty_segment_mask & DIRTY_ES) | nctxt->user_regs.es) )
         all_segs_okay &= loadsegment(es, nctxt->user_regs.es);
 
     /*
      * Either selector != 0 ==> reload.
      * Also reload to reset FS_BASE if it was non-zero.
      */
-    if ( unlikely(pctxt->user_regs.fs |
-                  pctxt->fs_base |
+    if ( unlikely((dirty_segment_mask & (DIRTY_FS | DIRTY_FS_BASE)) |
                   nctxt->user_regs.fs) )
-    {
         all_segs_okay &= loadsegment(fs, nctxt->user_regs.fs);
-        if ( pctxt->user_regs.fs ) /* != 0 selector kills fs_base */
-            pctxt->fs_base = 0;
-    }
 
     /*
      * Either selector != 0 ==> reload.
      * Also reload to reset GS_BASE if it was non-zero.
      */
-    if ( unlikely(pctxt->user_regs.gs |
-                  pctxt->gs_base_user |
+    if ( unlikely((dirty_segment_mask & (DIRTY_GS | DIRTY_GS_BASE_USER)) |
                   nctxt->user_regs.gs) )
     {
         /* Reset GS_BASE with user %gs? */
-        if ( pctxt->user_regs.gs || !nctxt->gs_base_user )
+        if ( (dirty_segment_mask & DIRTY_GS) || !nctxt->gs_base_user )
             all_segs_okay &= loadsegment(gs, nctxt->user_regs.gs);
-        if ( pctxt->user_regs.gs ) /* != 0 selector kills gs_base_user */
-            pctxt->gs_base_user = 0;
     }
 
     /* This can only be non-zero if selector is NULL. */
@@ -650,7 +660,9 @@ static void load_segments(struct vcpu *p, struct vcpu *n)
 
 static void save_segments(struct vcpu *v)
 {
-    struct cpu_user_regs *regs = &v->arch.guest_context.user_regs;
+    struct vcpu_guest_context *ctxt = &v->arch.guest_context;
+    struct cpu_user_regs      *regs = &ctxt->user_regs;
+    unsigned int dirty_segment_mask = 0;
 
     if ( VMX_DOMAIN(v) )
         rdmsrl(MSR_SHADOW_GS_BASE, v->arch.arch_vmx.msr_content.shadow_gs);
@@ -659,18 +671,34 @@ static void save_segments(struct vcpu *v)
     __asm__ __volatile__ ( "movl %%es,%0" : "=m" (regs->es) );
     __asm__ __volatile__ ( "movl %%fs,%0" : "=m" (regs->fs) );
     __asm__ __volatile__ ( "movl %%gs,%0" : "=m" (regs->gs) );
-}
 
-static void clear_segments(void)
-{
-    __asm__ __volatile__ (
-        " movl %0,%%ds; "
-        " movl %0,%%es; "
-        " movl %0,%%fs; "
-        " movl %0,%%gs; "
-        ""safe_swapgs"  "
-        " movl %0,%%gs"
-        : : "r" (0) );
+    if ( regs->ds )
+        dirty_segment_mask |= DIRTY_DS;
+
+    if ( regs->es )
+        dirty_segment_mask |= DIRTY_ES;
+
+    if ( regs->fs )
+    {
+        dirty_segment_mask |= DIRTY_FS;
+        ctxt->fs_base = 0; /* != 0 selector kills fs_base */
+    }
+    else if ( ctxt->fs_base )
+    {
+        dirty_segment_mask |= DIRTY_FS_BASE;
+    }
+
+    if ( regs->gs )
+    {
+        dirty_segment_mask |= DIRTY_GS;
+        ctxt->gs_base_user = 0; /* != 0 selector kills gs_base_user */
+    }
+    else if ( ctxt->gs_base_user )
+    {
+        dirty_segment_mask |= DIRTY_GS_BASE_USER;
+    }
+
+    percpu_ctxt[smp_processor_id()].dirty_segment_mask = dirty_segment_mask;
 }
 
 long do_switch_to_user(void)
@@ -706,10 +734,9 @@ long do_switch_to_user(void)
 
 #elif defined(__i386__)
 
-#define load_segments(_p, _n) ((void)0)
-#define load_msrs(_p, _n)     ((void)0)
-#define save_segments(_p)     ((void)0)
-#define clear_segments()      ((void)0)
+#define load_segments(n) ((void)0)
+#define load_msrs(n)     ((void)0)
+#define save_segments(p) ((void)0)
 
 static inline void switch_kernel_stack(struct vcpu *n, unsigned int cpu)
 {
@@ -726,9 +753,9 @@ static inline void switch_kernel_stack(struct vcpu *n, unsigned int cpu)
 static void __context_switch(void)
 {
     struct cpu_user_regs *stack_regs = guest_cpu_user_regs();
-    unsigned int         cpu = smp_processor_id();
-    struct vcpu  *p = percpu_ctxt[cpu].curr_vcpu;
-    struct vcpu  *n = current;
+    unsigned int          cpu = smp_processor_id();
+    struct vcpu          *p = percpu_ctxt[cpu].curr_vcpu;
+    struct vcpu          *n = current;
 
     if ( !is_idle_task(p->domain) )
     {
@@ -786,23 +813,31 @@ static void __context_switch(void)
 
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
-    struct vcpu *realprev;
+    unsigned int cpu = smp_processor_id();
 
-    local_irq_disable();
+    ASSERT(!local_irq_is_enabled());
 
     set_current(next);
 
-    if ( ((realprev = percpu_ctxt[smp_processor_id()].curr_vcpu) == next) || 
-         is_idle_task(next->domain) )
-    {
-        local_irq_enable();
-    }
-    else
+    if ( (percpu_ctxt[cpu].curr_vcpu != next) && !is_idle_task(next->domain) )
     {
         __context_switch();
+        percpu_ctxt[cpu].context_not_finalised = 1;
+    }
+}
 
-        local_irq_enable();
-        
+void context_switch_finalise(struct vcpu *next)
+{
+    unsigned int cpu = smp_processor_id();
+
+    ASSERT(local_irq_is_enabled());
+
+    if ( percpu_ctxt[cpu].context_not_finalised )
+    {
+        percpu_ctxt[cpu].context_not_finalised = 0;
+
+        BUG_ON(percpu_ctxt[cpu].curr_vcpu != next);
+
         if ( VMX_DOMAIN(next) )
         {
             vmx_restore_msrs(next);
@@ -810,18 +845,10 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         else
         {
             load_LDT(next);
-            load_segments(realprev, next);
-            load_msrs(realprev, next);
+            load_segments(next);
+            load_msrs(next);
         }
     }
-
-    /*
-     * We do this late on because it doesn't need to be protected by the
-     * schedule_lock, and because we want this to be the very last use of
-     * 'prev' (after this point, a dying domain's info structure may be freed
-     * without warning). 
-     */
-    clear_bit(_VCPUF_running, &prev->vcpu_flags);
 
     schedule_tail(next);
     BUG();
@@ -835,12 +862,19 @@ void continue_running(struct vcpu *same)
 
 int __sync_lazy_execstate(void)
 {
-    if ( percpu_ctxt[smp_processor_id()].curr_vcpu == current )
-        return 0;
-    __context_switch();
-    load_LDT(current);
-    clear_segments();
-    return 1;
+    unsigned long flags;
+    int switch_required;
+
+    local_irq_save(flags);
+
+    switch_required = (percpu_ctxt[smp_processor_id()].curr_vcpu != current);
+
+    if ( switch_required )
+        __context_switch();
+
+    local_irq_restore(flags);
+
+    return switch_required;
 }
 
 void sync_lazy_execstate_cpu(unsigned int cpu)
