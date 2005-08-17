@@ -1917,8 +1917,10 @@ static int snapshot_entry_matches(
     snapshot = map_domain_page(smfn);
 
     if (__copy_from_user(&gpte, &guest_pt[index],
-                         sizeof(gpte)))
+                         sizeof(gpte))) {
+        unmap_domain_page(snapshot);
         return 0;
+    }
 
     // This could probably be smarter, but this is sufficent for
     // our current needs.
