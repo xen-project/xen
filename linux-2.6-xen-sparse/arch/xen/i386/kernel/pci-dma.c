@@ -24,13 +24,14 @@ struct dma_coherent_mem {
 	unsigned long	*bitmap;
 };
 
-#define IOMMU_BUG_ON(test) \
-do { \
-	if (unlikely(test)) { \
-		printk(KERN_ALERT "Fatal DMA error! Please use 'swiotlb=force'\n"); \
-		BUG(); \
-	} \
-} while(0)
+#define IOMMU_BUG_ON(test)				\
+do {							\
+	if (unlikely(test)) {				\
+		printk(KERN_ALERT "Fatal DMA error! "	\
+		       "Please use 'swiotlb=force'\n");	\
+		BUG();					\
+	}						\
+} while (0)
 
 int
 dma_map_sg(struct device *hwdev, struct scatterlist *sg, int nents,
