@@ -320,8 +320,7 @@ class XendDomain:
         @param vmconfig: vm configuration
         """
         config = sxp.child_value(vmconfig, 'config')
-        uuid = sxp.child_value(vmconfig, 'uuid')
-        dominfo = XendDomainInfo.restore(self.dbmap, config, uuid=uuid)
+        dominfo = XendDomainInfo.restore(self.dbmap, config)
         return dominfo
 
     def domain_restore(self, src, progress=False):
