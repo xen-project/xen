@@ -208,6 +208,7 @@ class XendDomainInfo:
         log.debug('restoring with ssidref='+str(ssidref))
         id = xc.domain_create(ssidref = ssidref)
         vm.setdom(id)
+        vm.clear_shutdown()
         try:
             vm.restore = True
             vm.construct(config)
@@ -978,6 +979,11 @@ class XendDomainInfo:
         db.saveDB(save=True);
         if not reason in ['suspend']:
             self.shutdown_pending = {'start':time.time(), 'reason':reason}
+
+    def clear_shutdown(self):
+        db = self.db.addChild("/control")
+        db['shutdown'] = ""
+        db.saveDB(save=True)
 
     def send_sysrq(self, key=0):
         db = self.db.addChild("/control");
