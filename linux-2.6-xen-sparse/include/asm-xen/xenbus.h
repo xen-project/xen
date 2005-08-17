@@ -1,5 +1,3 @@
-#ifndef _ASM_XEN_XENBUS_H
-#define _ASM_XEN_XENBUS_H
 /******************************************************************************
  * xenbus.h
  *
@@ -28,6 +26,10 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
+
+#ifndef _ASM_XEN_XENBUS_H
+#define _ASM_XEN_XENBUS_H
+
 #include <linux/device.h>
 #include <linux/notifier.h>
 #include <asm/semaphore.h>
