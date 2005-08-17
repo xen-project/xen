@@ -256,19 +256,23 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
     char *str;
 
     str = (char *)xenbus_read("control", "shutdown", NULL);
-    /* Ignore read errors and recursive shutdown events. */
-    if (IS_ERR(str) || !strcmp(str, __stringify(SHUTDOWN_INVALID)))
+    /* Ignore read errors. */
+    if (IS_ERR(str))
         return;
+    if (strlen(str) == 0) {
+        kfree(str);
+        return;
+    }
 
-    xenbus_printf("control", "shutdown", "%i", SHUTDOWN_INVALID);
+    xenbus_printf("control", "shutdown", "");
 
-    if (strcmp(str, "poweroff") == 0) {
+    if (strcmp(str, "poweroff") == 0)
         shutting_down = SHUTDOWN_POWEROFF;
-    } else if (strcmp(str, "reboot") == 0) {
+    else if (strcmp(str, "reboot") == 0)
         shutting_down = SHUTDOWN_REBOOT;
-    } else if (strcmp(str, "suspend") == 0) {
+    else if (strcmp(str, "suspend") == 0)
         shutting_down = SHUTDOWN_SUSPEND;
-    } else {
+    else {
         printk("Ignoring shutdown request: %s\n", str);
         shutting_down = SHUTDOWN_INVALID;
     }
