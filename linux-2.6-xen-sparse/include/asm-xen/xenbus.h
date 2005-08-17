@@ -121,6 +121,7 @@ void unregister_xenstore_notifier(struct notifier_block *nb);
 
 int register_xenbus_watch(struct xenbus_watch *watch);
 void unregister_xenbus_watch(struct xenbus_watch *watch);
+void reregister_xenbus_watches(void);
 
 /* Called from xen core code. */
 void xenbus_suspend(void);

@@ -496,6 +496,18 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 		       watch->node, err);
 }
 
+/* Re-register callbacks to all watches. */
+void reregister_xenbus_watches(void)
+{
+	struct xenbus_watch *watch;
+	char token[sizeof(watch) * 2 + 1];
+
+	list_for_each_entry(watch, &watches, list) {
+		sprintf(token, "%lX", (long)watch);
+		xs_watch(watch->node, token);
+	}
+}
+
 static int watch_thread(void *unused)
 {
 	for (;;) {
