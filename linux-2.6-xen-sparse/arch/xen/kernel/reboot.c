@@ -264,7 +264,7 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
         return;
     }
 
-    xenbus_printf("control", "shutdown", "");
+    xenbus_write("control", "shutdown", "", O_CREAT);
 
     if (strcmp(str, "poweroff") == 0)
         shutting_down = SHUTDOWN_POWEROFF;
