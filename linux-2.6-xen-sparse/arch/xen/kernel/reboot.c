@@ -16,6 +16,8 @@
 #include <asm-xen/queues.h>
 #include <asm-xen/xenbus.h>
 #include <asm-xen/ctrl_if.h>
+#include <linux/cpu.h>
+#include <linux/kthread.h>
 
 #define SHUTDOWN_INVALID  -1
 #define SHUTDOWN_POWEROFF  0
@@ -58,7 +60,12 @@ EXPORT_SYMBOL(machine_power_off);
 /* Ignore multiple shutdown requests. */
 static int shutting_down = SHUTDOWN_INVALID;
 
-static void __do_suspend(void)
+#ifndef CONFIG_HOTPLUG_CPU
+#define cpu_down(x) (-EOPNOTSUPP)
+#define cpu_up(x) (-EOPNOTSUPP)
+#endif
+
+static int __do_suspend(void *ignore)
 {
     int i, j;
     suspend_record_t *suspend_record;
@@ -104,9 +111,48 @@ static void __do_suspend(void)
     extern unsigned long max_pfn;
     extern unsigned int *pfn_to_mfn_frame_list;
 
+    cpumask_t feasible_cpus;
+    int err = 0;
+
+    BUG_ON(smp_processor_id() != 0);
+    BUG_ON(in_interrupt());
+
+#if defined(CONFIG_SMP) && !defined(CONFIG_HOTPLUG_CPU)
+    if (num_online_cpus() > 1) {
+	printk(KERN_WARNING "Can't suspend SMP guests without CONFIG_HOTPLUG_CPU\n");
+	return -EOPNOTSUPP;
+    }
+#endif
+
     suspend_record = (suspend_record_t *)__get_free_page(GFP_KERNEL);
     if ( suspend_record == NULL )
         goto out;
+
+    /* Take all of the other cpus offline.  We need to be careful not
+       to get preempted between the final test for num_online_cpus()
+       == 1 and disabling interrupts, since otherwise userspace could
+       bring another cpu online, and then we'd be stuffed.  At the
+       same time, cpu_down can reschedule, so we need to enable
+       preemption while doing that.  This kind of sucks, but should be
+       correct. */
+    /* (We don't need to worry about other cpus bringing stuff up,
+       since by the time num_online_cpus() == 1, there aren't any
+       other cpus) */
+    cpus_clear(feasible_cpus);
+    preempt_disable();
+    while (num_online_cpus() > 1) {
+	preempt_enable();
+	for_each_online_cpu(i) {
+	    if (i == 0)
+		continue;
+	    err = cpu_down(i);
+	    if (err != 0) {
+		printk(KERN_CRIT "Failed to take all CPUs down: %d.\n", err);
+		goto out_reenable_cpus;
+	    }
+	    cpu_set(i, feasible_cpus);
+	}
+    }
 
     suspend_record->nr_pfns = max_pfn; /* final number of pfns */
 
@@ -141,7 +187,10 @@ static void __do_suspend(void)
     memcpy(&suspend_record->resume_info, &xen_start_info,
            sizeof(xen_start_info));
 
+    /* We'll stop somewhere inside this hypercall.  When it returns,
+       we'll start resuming after the restore. */
     HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
+
 
     shutting_down = SHUTDOWN_INVALID; 
 
@@ -182,11 +231,26 @@ static void __do_suspend(void)
 
     usbif_resume();
 
+    preempt_enable();
+
     __sti();
+
+ out_reenable_cpus:
+    while (!cpus_empty(feasible_cpus)) {
+	i = first_cpu(feasible_cpus);
+	j = cpu_up(i);
+	if (j != 0) {
+	    printk(KERN_CRIT "Failed to bring cpu %d back up (%d).\n",
+		   i, j);
+	    err = j;
+	}
+	cpu_clear(i, feasible_cpus);
+    }
 
  out:
     if ( suspend_record != NULL )
         free_page((unsigned long)suspend_record);
+    return err;
 }
 
 static int shutdown_process(void *__unused)
@@ -233,6 +297,18 @@ static int shutdown_process(void *__unused)
     return 0;
 }
 
+static struct task_struct *kthread_create_on_cpu(int (*f)(void *arg),
+						 void *arg,
+						 const char *name,
+						 int cpu)
+{
+    struct task_struct *p;
+    p = kthread_create(f, arg, name);
+    kthread_bind(p, cpu);
+    wake_up_process(p);
+    return p;
+}
+
 static void __shutdown_handler(void *unused)
 {
     int err;
@@ -245,7 +321,7 @@ static void __shutdown_handler(void *unused)
     }
     else
     {
-        __do_suspend();
+	kthread_create_on_cpu(__do_suspend, NULL, "suspender", 0);
     }
 }
 
