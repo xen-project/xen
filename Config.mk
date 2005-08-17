@@ -14,6 +14,7 @@ LD         = $(CROSS_COMPILE)ld
 CC         = $(CROSS_COMPILE)gcc
 CPP        = $(CROSS_COMPILE)gcc -E
 AR         = $(CROSS_COMPILE)ar
+RANLIB     = $(CROSS_COMPILE)ranlib
 NM         = $(CROSS_COMPILE)nm
 STRIP      = $(CROSS_COMPILE)strip
 OBJCOPY    = $(CROSS_COMPILE)objcopy
@@ -37,6 +38,4 @@ CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
 KERNEL_REPO = http://www.kernel.org
 
 # Optional components
-XENSTAT_PERL_BINDINGS   ?= n
-XENSTAT_PYTHON_BINDINGS ?= y
-XENSTAT_VM_TOP          ?= y
+XENSTAT_XENTOP ?= y

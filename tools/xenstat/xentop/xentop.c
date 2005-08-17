@@ -30,13 +30,13 @@
 
 #include <xenstat.h>
 
-#define VM_TOP_VERSION "1.0"
+#define XENTOP_VERSION "1.0"
 
-#define VM_TOP_DISCLAIMER \
+#define XENTOP_DISCLAIMER \
 "Copyright (C) 2005  International Business Machines  Corp\n"\
 "This is free software; see the source for copying conditions.There is NO\n"\
 "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"
-#define VM_TOP_BUGSTO "Report bugs to <dsteklof@us.ibm.com>.\n"
+#define XENTOP_BUGSTO "Report bugs to <dsteklof@us.ibm.com>.\n"
 
 #define _GNU_SOURCE
 #include <getopt.h>
@@ -178,7 +178,7 @@ static void usage(const char *program)
 	       "-n, --networks       output vif network data\n"
 	       "-r, --repeat-header  repeat table header before each domain\n"
 	       "-v, --vcpus          output vcpu data\n"
-	       "\n" VM_TOP_BUGSTO,
+	       "\n" XENTOP_BUGSTO,
 	       program);
 	return;
 }
@@ -186,9 +186,9 @@ static void usage(const char *program)
 /* Print program version information */
 static void version(void)
 {
-	printf("vm-top " VM_TOP_VERSION "\n"
+	printf("xentop " XENTOP_VERSION "\n"
 	       "Written by Judy Fischbach, David Hendricks, Josh Triplett\n"
-	       "\n" VM_TOP_DISCLAIMER);
+	       "\n" XENTOP_DISCLAIMER);
 }
 
 /* Clean up any open resources */
@@ -586,7 +586,7 @@ static void print_ssid(xenstat_domain *domain)
 }
 
 /* Section printing functions */
-/* Prints three line summary header */
+/* Prints the top summary, above the domain table */
 void do_summary(void)
 {
 #define TIME_STR_LEN 9
@@ -602,7 +602,7 @@ void do_summary(void)
 	strftime(time_str, TIME_STR_LEN, TIME_STR_FORMAT,
 	         localtime(&curtime.tv_sec));
 	num_domains = xenstat_node_num_domains(cur_node);
-	print("vm-top - %s\n", time_str);
+	print("xentop - %s\n", time_str);
 
 	/* Tabulate what states domains are in for summary */
 	for (i=0; i < num_domains; i++) {
@@ -630,7 +630,7 @@ void do_summary(void)
 	      xenstat_node_cpu_hz(cur_node)/1000000);
 }
 
-/* Display top portion of vm-top */
+/* Display the top header for the domain table */
 void do_header(void)
 {
 	field_id i;
@@ -651,11 +651,7 @@ void do_header(void)
 	print("\n");
 }
 
-/* Displays bottom portion of vm-top, interactive options
- * N toggles network information display, V toggles CPU information
- * display, S toggles sort order of information (ascending/descending),
- * R toggles whether header is repeated for each domain
- */
+/* Displays bottom status line or current prompt */
 void do_bottom_line(void)
 {
 	move(lines()-1, 2);

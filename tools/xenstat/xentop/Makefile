@@ -13,8 +13,8 @@
 XEN_ROOT=../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-ifneq ($(XENSTAT_VM_TOP),y)
-all install vm-top:
+ifneq ($(XENSTAT_XENTOP),y)
+all install xentop:
 else
 
 INSTALL         = install
@@ -29,15 +29,15 @@ sbindir=$(prefix)/sbin
 CFLAGS += -DGCC_PRINTF -Wall -Werror -I$(XEN_LIBXENSTAT)
 LDFLAGS += -L$(XEN_LIBXENSTAT) -lxenstat -lcurses
 
-all: vm-top
+all: xentop
 
-vm-top: vm-top.o
+xentop: xentop.o
 
-install: vm-top vm-top.1
-	$(INSTALL_PROG) vm-top $(DESTDIR)$(sbindir)/vm-top
-	$(INSTALL_DATA) vm-top.1 $(DESTDIR)$(man1dir)/vm-top.1
+install: xentop xentop.1
+	$(INSTALL_PROG) xentop $(DESTDIR)$(sbindir)/xentop
+	$(INSTALL_DATA) xentop.1 $(DESTDIR)$(man1dir)/xentop.1
 
 endif
 
 clean:
-	rm -f vm-top vm-top.o
+	rm -f xentop xentop.o

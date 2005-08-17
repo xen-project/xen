@@ -30,8 +30,9 @@ MAKE_LINK=ln -sf
 MAJOR=0
 MINOR=0
 
-LIB=src/libxenstat.so.$(MAJOR).$(MINOR)
-LINKS=src/libxenstat.so.$(MAJOR) src/libxenstat.so
+LIB=src/libxenstat.a
+SHLIB=src/libxenstat.so.$(MAJOR).$(MINOR)
+SHLIB_LINKS=src/libxenstat.so.$(MAJOR) src/libxenstat.so
 OBJECTS=src/xenstat.o src/xen-interface.o
 SONAME_FLAGS=-Wl,-soname -Wl,libxenstat.so.$(MAJOR)
 
@@ -42,9 +43,13 @@ CFLAGS+=-I$(XEN_ROOT)/xen/include/public
 CFLAGS+=-I$(LINUX_ROOT)/include/asm-xen/linux-public/
 LDFLAGS+=-Lsrc
 
-all: $(LIB) $(LINKS)
+all: $(LIB)
 
 $(LIB): $(OBJECTS)
+	$(AR) rc $@ $^
+	$(RANLIB) $@
+
+$(SHLIB): $(OBJECTS)
 	$(CC) $(LDFLAGS) $(SONAME_FLAGS) -shared -o $@ $(OBJECTS)
 
 src/xenstat.o: src/xenstat.c src/xenstat.h src/xen-interface.h
@@ -59,15 +64,17 @@ src/libxenstat.so.$(MAJOR): $(LIB)
 src/libxenstat.so: src/libxenstat.so.$(MAJOR)
 	$(MAKE_LINK) $(<F) $@
 
-install: all
-	$(INSTALL_DATA) src/xenstat.h $(DESTDIR)$(includedir)/xenstat.h
-	$(INSTALL_PROG) $(LIB) \
-	                $(DESTDIR)$(libdir)/libxenstat.so.$(MAJOR).$(MINOR)
-	$(MAKE_LINK) libxenstat.so.$(MAJOR).$(MINOR) \
-	             $(DESTDIR)$(libdir)/libxenstat.so.$(MAJOR)
-	$(MAKE_LINK) libxenstat.so.$(MAJOR) \
-	             $(DESTDIR)$(libdir)/libxenstat.so
-	-$(LDCONFIG)
+install:
+#install: all
+#	$(INSTALL_DATA) src/xenstat.h $(DESTDIR)$(includedir)/xenstat.h
+#	$(INSTALL_PROG) $(LIB) $(DESTDIR)$(libdir)/libxenstat.a
+#	$(INSTALL_PROG) $(SHLIB) \
+#	                $(DESTDIR)$(libdir)/libxenstat.so.$(MAJOR).$(MINOR)
+#	$(MAKE_LINK) libxenstat.so.$(MAJOR).$(MINOR) \
+#	             $(DESTDIR)$(libdir)/libxenstat.so.$(MAJOR)
+#	$(MAKE_LINK) libxenstat.so.$(MAJOR) \
+#	             $(DESTDIR)$(libdir)/libxenstat.so
+#	-$(LDCONFIG)
 
 PYLIB=bindings/swig/python/_xenstat.so
 PYMOD=bindings/swig/python/xenstat.py
@@ -84,7 +91,7 @@ all-bindings: perl-bindings python-bindings
 # The install-bindings target installs all the language bindings
 install-bindings: install-perl-bindings install-python-bindings
 
-$(BINDINGS): $(LIB) $(LINKS) src/xenstat.h
+$(BINDINGS): $(SHLIB) $(SHLIB_LINKS) src/xenstat.h
 
 SWIG_FLAGS=-module xenstat -Isrc
 
@@ -131,4 +138,5 @@ install: install-perl-bindings
 endif
 
 clean:
-	rm -f $(LIB) $(OBJECTS) $(LINKS) $(BINDINGS) $(BINDINGSRC)
+	rm -f $(LIB) $(SHLIB) $(SHLIB_LINKS) $(OBJECTS) \
+	      $(BINDINGS) $(BINDINGSRC)

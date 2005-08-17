@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS :=
 SUBDIRS += libxenstat
-SUBDIRS += vm-top
+SUBDIRS += xentop
 
 .PHONY: all install clean
 

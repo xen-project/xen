@@ -1,6 +1,3 @@
-Inefficient about how it handles newlines in vm-top 
-for proc/net/dev. Fix.
-
 Display error messages on the help line after bad input at a prompt.
 Fractional delay times
 Use prompting to search for domains
