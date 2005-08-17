@@ -187,10 +187,9 @@ op_start () {
 			ifconfig ${netdev} 0.0.0.0 down
 		fi
 	fi
-	del_addrs ${netdev}
 	ip link set ${netdev} name p${netdev}
 	ip link set veth0 name ${netdev}
-	ifconfig p${netdev} -arp down
+	ifconfig p${netdev} 0.0.0.0 -arp down
 	ifconfig p${netdev} hw ether fe:ff:ff:ff:ff:ff
 	ifconfig ${netdev} hw ether ${mac}
 	add_to_bridge ${bridge} vif0.0
