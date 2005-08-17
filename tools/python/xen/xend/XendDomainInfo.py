@@ -195,13 +195,15 @@ class XendDomainInfo:
 
     recreate = classmethod(recreate)
 
-    def restore(cls, parentdb, config, uuid):
+    def restore(cls, parentdb, config, uuid=None):
         """Create a domain and a VM object to do a restore.
 
         @param parentdb:  parent db
         @param config:    domain configuration
         @param uuid:      uuid to use
         """
+        if not uuid:
+            uuid = getUuid()
         db = parentdb.addChild(uuid)
         vm = cls(db)
         ssidref = int(sxp.child_value(config, 'ssidref'))
