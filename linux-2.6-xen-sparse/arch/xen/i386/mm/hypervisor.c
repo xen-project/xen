@@ -35,6 +35,7 @@
 #include <asm/pgtable.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/balloon.h>
+#include <linux/module.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <linux/percpu.h>
 #include <asm/tlbflush.h>
@@ -352,7 +353,6 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
     balloon_unlock(flags);
 }
 
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 
 unsigned long allocate_empty_lowmem_region(unsigned long pages)
 {
@@ -401,4 +401,4 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
     return vstart;
 }
 
-#endif /* CONFIG_XEN_PHYSDEV_ACCESS */
+EXPORT_SYMBOL(allocate_empty_lowmem_region);

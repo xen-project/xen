@@ -137,10 +137,8 @@ void xen_invlpg_mask(cpumask_t *mask, unsigned long ptr);
 void xen_create_contiguous_region(unsigned long vstart, unsigned int order);
 void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order);
 
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 /* Allocate a contiguous empty region of low memory. Return virtual start. */
 unsigned long allocate_empty_lowmem_region(unsigned long pages);
-#endif
 
 #include <asm/hypercall.h>
 
