@@ -1685,6 +1685,7 @@ void shadow_invlpg(struct vcpu *v, unsigned long va)
     if (__copy_from_user(&gpte, &linear_pg_table[va >> PAGE_SHIFT],
                          sizeof(gpte))) {
         perfc_incrc(shadow_invlpg_faults);
+        shadow_unlock(d);
         return;
     }
     l1pte_propagate_from_guest(d, gpte, &spte);

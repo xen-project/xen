@@ -671,6 +671,7 @@ static void shadow_invlpg_32(struct vcpu *v, unsigned long va)
                          sizeof(gpte))) {*/
     if (unlikely(!__guest_get_l1e(v, va, &gpte))) {
         perfc_incrc(shadow_invlpg_faults);
+        shadow_unlock(d);
         return;
     }
     l1pte_propagate_from_guest(d, gpte, &spte);
