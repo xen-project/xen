@@ -3,7 +3,7 @@
 
 #include <asm/page.h>
 
-#define E820MAX	32
+#define E820MAX	128
 
 #define E820_RAM          1
 #define E820_RESERVED     2
