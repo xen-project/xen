@@ -72,6 +72,7 @@ struct xen_bus_type
 	int (*get_bus_id)(char bus_id[BUS_ID_SIZE], const char *nodename);
 	int (*probe)(const char *type, const char *dir);
 	struct bus_type bus;
+	struct device dev;
 };
 
 /* device/<type>/<id> => <type>-<id> */
@@ -102,6 +103,9 @@ static struct xen_bus_type xenbus_frontend = {
 	.bus = {
 		.name  = "xen",
 		.match = xenbus_match,
+	},
+	.dev = {
+		.bus_id = "xen",
 	},
 };
 
@@ -159,6 +163,9 @@ static struct xen_bus_type xenbus_backend = {
 	.bus = {
 		.name  = "xen-backend",
 		.match = xenbus_match,
+	},
+	.dev = {
+		.bus_id = "xen-backend",
 	},
 };
 
@@ -304,15 +311,16 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 	xendev->subtype = xenbus_read(xendev->nodename, "subtype", NULL);
 	if (IS_ERR(xendev->subtype))
 		xendev->subtype = NULL;
-	
+
+	xendev->dev.parent = &bus->dev;
+	xendev->dev.bus = &bus->bus;
+	xendev->dev.release = xenbus_release_device;
+
 	err = bus->get_bus_id(xendev->dev.bus_id, xendev->nodename);
 	if (err) {
 		kfree(xendev);
 		return err;
 	}
-
-	xendev->dev.bus = &bus->bus;
-	xendev->dev.release = xenbus_release_device;
 
 	/* Register with generic device framework. */
 	err = device_register(&xendev->dev);
@@ -584,6 +592,8 @@ static int __init xenbus_probe_init(void)
 {
 	bus_register(&xenbus_frontend.bus);
 	bus_register(&xenbus_backend.bus);
+	device_register(&xenbus_frontend.dev);
+	device_register(&xenbus_backend.dev);
 	
 	if (!xen_start_info.store_evtchn)
 		return 0;
