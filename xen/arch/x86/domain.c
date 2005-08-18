@@ -217,8 +217,16 @@ struct vcpu *arch_alloc_vcpu_struct(void)
     return xmalloc(struct vcpu);
 }
 
+/* We assume that vcpu 0 is always the last one to be freed in a
+   domain i.e. if v->vcpu_id == 0, the domain should be
+   single-processor. */
 void arch_free_vcpu_struct(struct vcpu *v)
 {
+    struct vcpu *p;
+    for_each_vcpu(v->domain, p) {
+        if (p->next_in_list == v)
+            p->next_in_list = v->next_in_list;
+    }
     xfree(v);
 }
 
@@ -402,8 +410,10 @@ int arch_set_info_guest(
     if ( !(c->flags & VGCF_VMX_GUEST) )
     {
         if ( ((c->user_regs.cs & 3) == 0) ||
-             ((c->user_regs.ss & 3) == 0) )
-                return -EINVAL;
+             ((c->user_regs.ss & 3) == 0) ) {
+            printf("User regs.cs %x, ss %x.\n", c->user_regs.cs, c->user_regs.ss);
+            return -EINVAL;
+        }
     }
 
     clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
@@ -448,8 +458,10 @@ int arch_set_info_guest(
 
     if ( shadow_mode_refcounts(d) )
     {
-        if ( !get_page(&frame_table[phys_basetab>>PAGE_SHIFT], d) )
+        if ( !get_page(&frame_table[phys_basetab>>PAGE_SHIFT], d) ) {
+            printf("Bad phys_basetab %lx.\n", phys_basetab);
             return -EINVAL;
+        }
     }
     else
     {
@@ -457,13 +469,16 @@ int arch_set_info_guest(
         if ( !(c->flags & VGCF_VMX_GUEST) )
 #endif
             if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
-                  PGT_base_page_table) )
+                                    PGT_base_page_table) ) {
+                printf("Bad phys_basetab2 %lx.\n", phys_basetab);
                 return -EINVAL;
+            }
     }
 
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
     {
         put_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT]);
+        printf("Failed to set gdt, %d.\n", rc);
         return rc;
     }
 
@@ -484,6 +499,8 @@ int arch_set_info_guest(
 
     /* Don't redo final setup */
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
+
+    printf("Arch set_info_guest succeeded.\n");
 
     return 0;
 }

@@ -1616,3 +1616,19 @@ void smp_resume(void)
 	smp_intr_init();
 	local_setup_timer_irq();
 }
+
+DECLARE_PER_CPU(int, timer_irq);
+
+void _restore_vcpu(void)
+{
+	int cpu = smp_processor_id();
+	/* We are the first thing the vcpu runs when it comes back,
+	   and we are supposed to restore the IPIs and timer
+	   interrupts etc.  When we return, the vcpu's idle loop will
+	   start up again. */
+	printk("<0>_restore_vcpu %d.\n", cpu);
+	_bind_virq_to_irq(VIRQ_TIMER, cpu, per_cpu(timer_irq, cpu));
+	_bind_virq_to_irq(VIRQ_DEBUG, cpu, per_cpu(ldebug_irq, cpu));
+	_bind_ipi_to_irq(RESCHEDULE_VECTOR, cpu, per_cpu(resched_irq, cpu) );
+	_bind_ipi_to_irq(CALL_FUNCTION_VECTOR, cpu, per_cpu(callfunc_irq, cpu) );
+}

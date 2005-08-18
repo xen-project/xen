@@ -163,7 +163,7 @@ HYPERVISOR_yield(
         TRAP_INSTR
         : "=a" (ret), "=b" (ign)
 	: "0" (__HYPERVISOR_sched_op), "1" (SCHEDOP_yield)
-	: "memory" );
+	: "memory", "ecx" );
 
     return ret;
 }
@@ -178,7 +178,7 @@ HYPERVISOR_block(
         TRAP_INSTR
         : "=a" (ret), "=b" (ign1)
 	: "0" (__HYPERVISOR_sched_op), "1" (SCHEDOP_block)
-	: "memory" );
+	: "memory", "ecx" );
 
     return ret;
 }
@@ -194,7 +194,7 @@ HYPERVISOR_shutdown(
         : "=a" (ret), "=b" (ign1)
 	: "0" (__HYPERVISOR_sched_op),
 	  "1" (SCHEDOP_shutdown | (SHUTDOWN_poweroff << SCHEDOP_reasonshift))
-        : "memory" );
+        : "memory", "ecx" );
 
     return ret;
 }
@@ -210,7 +210,7 @@ HYPERVISOR_reboot(
         : "=a" (ret), "=b" (ign1)
 	: "0" (__HYPERVISOR_sched_op),
 	  "1" (SCHEDOP_shutdown | (SHUTDOWN_reboot << SCHEDOP_reasonshift))
-        : "memory" );
+        : "memory", "ecx" );
 
     return ret;
 }
@@ -228,7 +228,7 @@ HYPERVISOR_suspend(
         : "=a" (ret), "=b" (ign1), "=S" (ign2)
 	: "0" (__HYPERVISOR_sched_op),
         "b" (SCHEDOP_shutdown | (SHUTDOWN_suspend << SCHEDOP_reasonshift)), 
-        "S" (srec) : "memory");
+        "S" (srec) : "memory", "ecx");
 
     return ret;
 }
@@ -244,7 +244,7 @@ HYPERVISOR_crash(
         : "=a" (ret), "=b" (ign1)
 	: "0" (__HYPERVISOR_sched_op),
 	  "1" (SCHEDOP_shutdown | (SHUTDOWN_crash << SCHEDOP_reasonshift))
-        : "memory" );
+        : "memory", "ecx" );
 
     return ret;
 }
@@ -534,7 +534,7 @@ HYPERVISOR_vcpu_down(
         : "=a" (ret), "=b" (ign1)
 	: "0" (__HYPERVISOR_sched_op),
 	  "1" (SCHEDOP_vcpu_down | (vcpu << SCHEDOP_vcpushift))
-        : "memory" );
+        : "memory", "ecx", "edx" );
 
     return ret;
 }
@@ -550,8 +550,26 @@ HYPERVISOR_vcpu_up(
         : "=a" (ret), "=b" (ign1)
 	: "0" (__HYPERVISOR_sched_op),
 	  "1" (SCHEDOP_vcpu_up | (vcpu << SCHEDOP_vcpushift))
+        : "memory", "ecx" );
+
+    return ret;
+}
+
+static inline int
+HYPERVISOR_vcpu_pickle(
+    int vcpu, vcpu_guest_context_t *ctxt)
+{
+    int ret;
+    unsigned long ign1, ign2;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_sched_op),
+	  "1" (SCHEDOP_vcpu_pickle | (vcpu << SCHEDOP_vcpushift)),
+	  "2" (ctxt)
         : "memory" );
 
     return ret;
 }
+
 #endif /* __HYPERCALL_H__ */

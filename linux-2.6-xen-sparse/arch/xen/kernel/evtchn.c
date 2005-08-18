@@ -134,6 +134,8 @@ void force_evtchn_callback(void)
     (void)HYPERVISOR_xen_version(0);
 }
 
+extern unsigned uber_debug;
+
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 {
@@ -145,6 +147,8 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 
     vcpu_info->evtchn_upcall_pending = 0;
     
+    if (uber_debug && cpu != 0)
+	printk("<0>evtchn_do_upcall on %d.\n", cpu);
     /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
     l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
     while ( l1 != 0 )
@@ -158,9 +162,13 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
             l2 &= ~(1 << l2i);
             
             port = (l1i << 5) + l2i;
-            if ( (irq = evtchn_to_irq[port]) != -1 )
+	    if (uber_debug && cpu != 0)
+		printk("<0>Port %d.\n", port);
+            if ( (irq = evtchn_to_irq[port]) != -1 ) {
+		if (uber_debug && cpu != 0)
+		    printk("<0>irq %d.\n", irq);
                 do_IRQ(irq, regs);
-            else
+	    } else
                 evtchn_device_upcall(port);
         }
     }
@@ -243,6 +251,71 @@ void unbind_virq_from_irq(int virq)
     }
 
     spin_unlock(&irq_mapping_update_lock);
+}
+
+/* This is only used when a vcpu from an xm save.  The ipi is expected
+   to have been bound before we suspended, and so all of the xenolinux
+   state is set up; we only need to restore the Xen side of things.
+   The irq number has to be the same, but the evtchn number can
+   change. */
+void _bind_ipi_to_irq(int ipi, int vcpu, int irq)
+{
+    evtchn_op_t op;
+    int evtchn;
+
+    spin_lock(&irq_mapping_update_lock);
+
+    op.cmd = EVTCHNOP_bind_ipi;
+    if ( HYPERVISOR_event_channel_op(&op) != 0 )
+	panic("Failed to bind virtual IPI %d on cpu %d\n", ipi, vcpu);
+    evtchn = op.u.bind_ipi.port;
+
+    printk("<0>IPI %d, old evtchn %d, evtchn %d.\n",
+	   ipi, per_cpu(ipi_to_evtchn, vcpu)[ipi],
+	   evtchn);
+
+    evtchn_to_irq[irq_to_evtchn[irq]] = -1;
+    irq_to_evtchn[irq] = -1;
+
+    evtchn_to_irq[evtchn] = irq;
+    irq_to_evtchn[irq]    = evtchn;
+
+    per_cpu(ipi_to_evtchn, vcpu)[ipi] = evtchn;
+
+    bind_evtchn_to_cpu(evtchn, vcpu);
+
+    spin_unlock(&irq_mapping_update_lock);
+
+    clear_bit(evtchn, HYPERVISOR_shared_info->evtchn_mask);
+}
+
+void _bind_virq_to_irq(int virq, int cpu, int irq)
+{
+    evtchn_op_t op;
+    int evtchn;
+
+    spin_lock(&irq_mapping_update_lock);
+
+    op.cmd              = EVTCHNOP_bind_virq;
+    op.u.bind_virq.virq = virq;
+    if ( HYPERVISOR_event_channel_op(&op) != 0 )
+            panic("Failed to bind virtual IRQ %d\n", virq);
+    evtchn = op.u.bind_virq.port;
+
+
+    evtchn_to_irq[irq_to_evtchn[irq]] = -1;
+    irq_to_evtchn[irq] = -1;
+
+    evtchn_to_irq[evtchn] = irq;
+    irq_to_evtchn[irq]    = evtchn;
+
+    per_cpu(virq_to_irq, cpu)[virq] = irq;
+
+    bind_evtchn_to_cpu(evtchn, cpu);
+
+    spin_unlock(&irq_mapping_update_lock);
+
+    return irq;
 }
 
 int bind_ipi_to_irq(int ipi)

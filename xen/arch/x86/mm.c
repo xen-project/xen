@@ -2631,16 +2631,25 @@ long set_gdt(struct vcpu *v,
     int i, nr_pages = (entries + 511) / 512;
     unsigned long pfn;
 
-    if ( entries > FIRST_RESERVED_GDT_ENTRY )
+    if ( entries > FIRST_RESERVED_GDT_ENTRY ) {
+        printf("Too many entries in gdt (%d).\n", entries);
         return -EINVAL;
+    }
     
     shadow_sync_all(d);
 
     /* Check the pages in the new GDT. */
-    for ( i = 0; i < nr_pages; i++ )
-        if ( ((pfn = frames[i]) >= max_page) ||
-             !get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) )
+    for ( i = 0; i < nr_pages; i++ ) {
+        pfn = frames[i];
+        if (pfn >= max_page) {
+            printf("GDT bad as %ld >= %ld.\n", pfn, max_page);
             goto fail;
+        }
+        if (!get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) ) {
+            printf("Frame %ld looks bad.\n", pfn);
+            goto fail;
+        }
+    }
 
     /* Tear down the old GDT. */
     destroy_gdt(v);

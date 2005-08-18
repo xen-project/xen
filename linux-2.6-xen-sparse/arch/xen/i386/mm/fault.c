@@ -512,6 +512,7 @@ no_context:
 	printk("%08lx\n", regs->eip);
 	dump_fault_path(address);
 	die("Oops", regs, error_code);
+	while(1);
 	bust_spinlocks(0);
 	do_exit(SIGKILL);
 

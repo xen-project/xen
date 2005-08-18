@@ -115,20 +115,12 @@ void xen_idle(void)
 /* We don't actually take CPU down, just spin without interrupts. */
 static inline void play_dead(void)
 {
-	/* Ack it */
-	__get_cpu_var(cpu_state) = CPU_DEAD;
-
-	/* We shouldn't have to disable interrupts while dead, but
-	 * some interrupts just don't seem to go away, and this makes
-	 * it "work" for testing purposes. */
 	/* Death loop */
 	while (__get_cpu_var(cpu_state) != CPU_UP_PREPARE)
 		HYPERVISOR_yield();
 
-	local_irq_disable();
 	__flush_tlb_all();
 	cpu_set(smp_processor_id(), cpu_online_map);
-	local_irq_enable();
 }
 #else
 static inline void play_dead(void)
@@ -156,12 +148,23 @@ void cpu_idle (void)
 			rmb();
 
 			if (cpu_is_offline(cpu)) {
+				printk("<0>Cpu %d going offline.\n",
+				       cpu);
+				local_irq_disable();
+				/* Ack it.  From this point on until
+				   we get woken up, we're not allowed
+				   to take any locks.  In particular,
+				   don't printk. */
+				__get_cpu_var(cpu_state) = CPU_DEAD;
 #if defined(CONFIG_XEN) && defined(CONFIG_HOTPLUG_CPU)
 				/* Tell hypervisor to take vcpu down. */
 				HYPERVISOR_vcpu_down(cpu);
 #endif
 				play_dead();
-         }
+				local_irq_enable();
+				printk("<0>Cpu %d back online.\n",
+				       cpu);
+			}
 
 			__get_cpu_var(irq_stat).idle_timestamp = jiffies;
 			xen_idle();

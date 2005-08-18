@@ -203,6 +203,7 @@ struct mmuext_op {
 #define SCHEDOP_shutdown        2   /* Stop executing this domain.        */
 #define SCHEDOP_vcpu_down       3   /* make target VCPU not-runnable.     */
 #define SCHEDOP_vcpu_up         4   /* make target VCPU runnable.         */
+#define SCHEDOP_vcpu_pickle     5   /* save a vcpu's context to memory.   */
 #define SCHEDOP_cmdmask       255   /* 8-bit command. */
 #define SCHEDOP_reasonshift     8   /* 8-bit reason code. (SCHEDOP_shutdown) */
 #define SCHEDOP_vcpushift       8   /* 8-bit VCPU target. (SCHEDOP_up|down) */
