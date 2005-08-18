@@ -17,7 +17,8 @@ void show_registers(struct cpu_user_regs *regs)
 {
     printk("CPU:    %d\nEIP:    %04x:[<%016lx>]",
            smp_processor_id(), 0xffff & regs->cs, regs->rip);
-    print_symbol(" %s\n", regs->rip);
+    if ( !GUEST_MODE(regs) )
+        print_symbol(" %s\n", regs->rip);
     printk("EFLAGS: %016lx\n", regs->eflags);
     printk("rax: %016lx   rbx: %016lx   rcx: %016lx   rdx: %016lx\n",
            regs->rax, regs->rbx, regs->rcx, regs->rdx);

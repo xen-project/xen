@@ -652,8 +652,9 @@ __initcall(debugtrace_init);
 void panic(const char *fmt, ...)
 {
     va_list args;
-    char buf[128], cpustr[10];
+    char buf[128];
     unsigned long flags;
+    static spinlock_t lock = SPIN_LOCK_UNLOCKED;
     extern void machine_restart(char *);
     
     debugtrace_dump();
@@ -665,16 +666,13 @@ void panic(const char *fmt, ...)
     debugger_trap_immediate();
 
     /* Spit out multiline message in one go. */
-    spin_lock_irqsave(&console_lock, flags);
-    __putstr("\n****************************************\n");
-    __putstr("Panic on CPU");
-    sprintf(cpustr, "%d", smp_processor_id());
-    __putstr(cpustr);
-    __putstr(":\n");
-    __putstr(buf);
-    __putstr("****************************************\n\n");
-    __putstr("Reboot in five seconds...\n");
-    spin_unlock_irqrestore(&console_lock, flags);
+    spin_lock_irqsave(&lock, flags);
+    printk("\n****************************************\n");
+    printk("Panic on CPU %d:\n", smp_processor_id());
+    printk(buf);
+    printk("****************************************\n\n");
+    printk("Reboot in five seconds...\n");
+    spin_unlock_irqrestore(&lock, flags);
 
     watchdog_disable();
     mdelay(5000);

@@ -159,10 +159,8 @@ void show_trace(unsigned long *esp)
         addr = *stack++;
         if ( is_kernel_text(addr) )
         {
-            if ( (i != 0) && ((i % 6) == 0) )
-                printk("\n   ");
             printk("[<%p>]", _p(addr));
-            print_symbol(" %s\n", addr);
+            print_symbol(" %s\n   ", addr);
             i++;
         }
     }
