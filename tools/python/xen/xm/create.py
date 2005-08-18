@@ -23,6 +23,7 @@ import string
 import sys
 import socket
 import commands
+import time
 
 import xen.lowlevel.xc
 
@@ -674,18 +675,33 @@ def get_dom0_alloc():
     return 0
 
 def balloon_out(dom0_min_mem, opts):
-    """Balloon out to get memory for domU, if necessarily"""
+    """Balloon out memory from dom0 if necessary"""
     SLACK = 4
+    timeout = 20 # 2s
+    ret = 0
 
     xc = xen.lowlevel.xc.new()
     pinfo = xc.physinfo()
-    free_mem = pinfo['free_pages']/256
-    if free_mem < opts.vals.memory + SLACK:
-        need_mem = opts.vals.memory + SLACK - free_mem
-        cur_alloc = get_dom0_alloc()
-        if cur_alloc - need_mem >= dom0_min_mem:
-            server.xend_domain_mem_target_set(0, cur_alloc - need_mem)
+    free_mem = pinfo['free_pages'] / 256
+    domU_need_mem = opts.vals.memory + SLACK 
+
+    dom0_cur_alloc = get_dom0_alloc()
+    dom0_new_alloc = dom0_cur_alloc - (domU_need_mem - free_mem)
+
+    if free_mem < domU_need_mem and dom0_new_alloc >= dom0_min_mem:
+
+        server.xend_domain_mem_target_set(0, dom0_new_alloc)
+
+        while dom0_cur_alloc > dom0_new_alloc and timeout > 0:
+            time.sleep(0.1) # sleep 100ms
+            dom0_cur_alloc = get_dom0_alloc()
+            timeout -= 1
+        
+        if dom0_cur_alloc > dom0_new_alloc:
+            ret = 1
+    
     del xc
+    return ret
 
 def main(argv):
     random.seed()
@@ -717,7 +733,8 @@ def main(argv):
     else:
         dom0_min_mem = xroot.get_dom0_min_mem()
         if dom0_min_mem != 0:
-            balloon_out(dom0_min_mem, opts)
+            if balloon_out(dom0_min_mem, opts):
+                return
 
         dom = make_domain(opts, config)
         if opts.vals.console_autoconnect:

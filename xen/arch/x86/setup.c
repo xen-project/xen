@@ -244,6 +244,8 @@ static void __init start_of_day(void)
 
 #define EARLY_FAIL() for ( ; ; ) __asm__ __volatile__ ( "hlt" )
 
+static struct e820entry e820_raw[E820MAX];
+
 void __init __start_xen(multiboot_info_t *mbi)
 {
     char *cmdline;
@@ -253,7 +255,6 @@ void __init __start_xen(multiboot_info_t *mbi)
     unsigned long _initrd_start = 0, _initrd_len = 0;
     unsigned int initrdidx = 1;
     physaddr_t s, e;
-    struct e820entry e820_raw[E820MAX];
     int i, e820_raw_nr = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,

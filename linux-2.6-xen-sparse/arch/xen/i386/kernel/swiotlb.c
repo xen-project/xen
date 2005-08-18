@@ -49,13 +49,14 @@ int swiotlb_force;
  * swiotlb_sync_single_*, to see if the memory was in fact allocated by this
  * API.
  */
-static char *io_tlb_start, *io_tlb_end;
+static char *iotlb_virt_start, *iotlb_virt_end;
+static dma_addr_t iotlb_bus_start, iotlb_bus_end;
 
 /*
- * The number of IO TLB blocks (in groups of 64) betweeen io_tlb_start and
- * io_tlb_end.  This is command line adjustable via setup_io_tlb_npages.
+ * The number of IO TLB blocks (in groups of 64) betweeen iotlb_virt_start and
+ * iotlb_virt_end.  This is command line adjustable via setup_io_tlb_npages.
  */
-static unsigned long io_tlb_nslabs;
+static unsigned long iotlb_nslabs;
 
 /*
  * When the IOMMU overflows we return a fallback buffer. This sets the size.
@@ -88,11 +89,14 @@ static DEFINE_SPINLOCK(io_tlb_lock);
 static int __init
 setup_io_tlb_npages(char *str)
 {
+	/* Unlike ia64, the size is aperture in megabytes, not 'slabs'! */
 	if (isdigit(*str)) {
-		io_tlb_nslabs = simple_strtoul(str, &str, 0) <<
-			(PAGE_SHIFT - IO_TLB_SHIFT);
-		/* avoid tail segment of size < IO_TLB_SEGSIZE */
-		io_tlb_nslabs = ALIGN(io_tlb_nslabs, IO_TLB_SEGSIZE);
+		iotlb_nslabs = simple_strtoul(str, &str, 0) <<
+			(20 - IO_TLB_SHIFT);
+		iotlb_nslabs = ALIGN(iotlb_nslabs, IO_TLB_SEGSIZE);
+		/* Round up to power of two (xen_create_contiguous_region). */
+		while (iotlb_nslabs & (iotlb_nslabs-1))
+			iotlb_nslabs += iotlb_nslabs & ~(iotlb_nslabs-1);
 	}
 	if (*str == ',')
 		++str;
@@ -114,45 +118,55 @@ __setup("swiotlb=", setup_io_tlb_npages);
 void
 swiotlb_init_with_default_size (size_t default_size)
 {
-	unsigned long i;
+	unsigned long i, bytes;
 
-	if (!io_tlb_nslabs) {
-		io_tlb_nslabs = (default_size >> PAGE_SHIFT);
-		io_tlb_nslabs = ALIGN(io_tlb_nslabs, IO_TLB_SEGSIZE);
+	if (!iotlb_nslabs) {
+		iotlb_nslabs = (default_size >> IO_TLB_SHIFT);
+		iotlb_nslabs = ALIGN(iotlb_nslabs, IO_TLB_SEGSIZE);
+		/* Round up to power of two (xen_create_contiguous_region). */
+		while (iotlb_nslabs & (iotlb_nslabs-1))
+			iotlb_nslabs += iotlb_nslabs & ~(iotlb_nslabs-1);
 	}
+
+	bytes = iotlb_nslabs * (1UL << IO_TLB_SHIFT);
 
 	/*
 	 * Get IO TLB memory from the low pages
 	 */
-	io_tlb_start = alloc_bootmem_low_pages(io_tlb_nslabs *
-					       (1 << IO_TLB_SHIFT));
-	if (!io_tlb_start)
+	iotlb_virt_start = alloc_bootmem_low_pages(bytes);
+	if (!iotlb_virt_start)
 		panic("Cannot allocate SWIOTLB buffer");
 
 	xen_create_contiguous_region(
-		(unsigned long)io_tlb_start, 
-		get_order(io_tlb_nslabs * (1 << IO_TLB_SHIFT)));
+		(unsigned long)iotlb_virt_start, get_order(bytes));
 
-	io_tlb_end = io_tlb_start + io_tlb_nslabs * (1 << IO_TLB_SHIFT);
+	iotlb_virt_end = iotlb_virt_start + bytes;
 
 	/*
 	 * Allocate and initialize the free list array.  This array is used
 	 * to find contiguous free memory regions of size up to IO_TLB_SEGSIZE
-	 * between io_tlb_start and io_tlb_end.
+	 * between iotlb_virt_start and iotlb_virt_end.
 	 */
-	io_tlb_list = alloc_bootmem(io_tlb_nslabs * sizeof(int));
-	for (i = 0; i < io_tlb_nslabs; i++)
+	io_tlb_list = alloc_bootmem(iotlb_nslabs * sizeof(int));
+	for (i = 0; i < iotlb_nslabs; i++)
  		io_tlb_list[i] = IO_TLB_SEGSIZE - OFFSET(i, IO_TLB_SEGSIZE);
 	io_tlb_index = 0;
 	io_tlb_orig_addr = alloc_bootmem(
-		io_tlb_nslabs * sizeof(*io_tlb_orig_addr));
+		iotlb_nslabs * sizeof(*io_tlb_orig_addr));
 
 	/*
 	 * Get the overflow emergency buffer
 	 */
 	io_tlb_overflow_buffer = alloc_bootmem_low(io_tlb_overflow);
-	printk(KERN_INFO "Placing software IO TLB between 0x%lx - 0x%lx\n",
-	       virt_to_bus(io_tlb_start), virt_to_bus(io_tlb_end-1));
+	iotlb_bus_start = virt_to_bus(iotlb_virt_start);
+	iotlb_bus_end   = iotlb_bus_start + bytes;
+	printk(KERN_INFO "Software IO TLB enabled: \n"
+	       " Aperture:     %lu megabytes\n"
+	       " Bus range:    0x%016lx - 0x%016lx\n"
+	       " Kernel range: 0x%016lx - 0x%016lx\n",
+	       bytes >> 20,
+	       (unsigned long)iotlb_bus_start, (unsigned long)iotlb_bus_end,
+	       (unsigned long)iotlb_virt_start, (unsigned long)iotlb_virt_end);
 }
 
 void
@@ -240,7 +254,7 @@ map_single(struct device *hwdev, struct phys_addr buffer, size_t size, int dir)
 	{
 		wrap = index = ALIGN(io_tlb_index, stride);
 
-		if (index >= io_tlb_nslabs)
+		if (index >= iotlb_nslabs)
 			wrap = index = 0;
 
 		do {
@@ -260,7 +274,7 @@ map_single(struct device *hwdev, struct phys_addr buffer, size_t size, int dir)
 				      IO_TLB_SEGSIZE -1) && io_tlb_list[i];
 				     i--)
 					io_tlb_list[i] = ++count;
-				dma_addr = io_tlb_start +
+				dma_addr = iotlb_virt_start +
 					(index << IO_TLB_SHIFT);
 
 				/*
@@ -268,13 +282,13 @@ map_single(struct device *hwdev, struct phys_addr buffer, size_t size, int dir)
 				 * the next round.
 				 */
 				io_tlb_index = 
-					((index + nslots) < io_tlb_nslabs
+					((index + nslots) < iotlb_nslabs
 					 ? (index + nslots) : 0);
 
 				goto found;
 			}
 			index += stride;
-			if (index >= io_tlb_nslabs)
+			if (index >= iotlb_nslabs)
 				index = 0;
 		} while (index != wrap);
 
@@ -304,7 +318,7 @@ unmap_single(struct device *hwdev, char *dma_addr, size_t size, int dir)
 {
 	unsigned long flags;
 	int i, count, nslots = ALIGN(size, 1 << IO_TLB_SHIFT) >> IO_TLB_SHIFT;
-	int index = (dma_addr - io_tlb_start) >> IO_TLB_SHIFT;
+	int index = (dma_addr - iotlb_virt_start) >> IO_TLB_SHIFT;
 	struct phys_addr buffer = io_tlb_orig_addr[index];
 
 	/*
@@ -345,7 +359,7 @@ unmap_single(struct device *hwdev, char *dma_addr, size_t size, int dir)
 static void
 sync_single(struct device *hwdev, char *dma_addr, size_t size, int dir)
 {
-	int index = (dma_addr - io_tlb_start) >> IO_TLB_SHIFT;
+	int index = (dma_addr - iotlb_virt_start) >> IO_TLB_SHIFT;
 	struct phys_addr buffer = io_tlb_orig_addr[index];
 	BUG_ON((dir != DMA_FROM_DEVICE) && (dir != DMA_TO_DEVICE));
 	__sync_single(buffer, dma_addr, size, dir);
@@ -431,11 +445,9 @@ void
 swiotlb_unmap_single(struct device *hwdev, dma_addr_t dev_addr, size_t size,
 		     int dir)
 {
-	char *dma_addr = bus_to_virt(dev_addr);
-
 	BUG_ON(dir == DMA_NONE);
-	if (dma_addr >= io_tlb_start && dma_addr < io_tlb_end)
-		unmap_single(hwdev, dma_addr, size, dir);
+	if ((dev_addr >= iotlb_bus_start) && (dev_addr < iotlb_bus_end))
+		unmap_single(hwdev, bus_to_virt(dev_addr), size, dir);
 }
 
 /*
@@ -452,22 +464,18 @@ void
 swiotlb_sync_single_for_cpu(struct device *hwdev, dma_addr_t dev_addr,
 			    size_t size, int dir)
 {
-	char *dma_addr = bus_to_virt(dev_addr);
-
 	BUG_ON(dir == DMA_NONE);
-	if (dma_addr >= io_tlb_start && dma_addr < io_tlb_end)
-		sync_single(hwdev, dma_addr, size, dir);
+	if ((dev_addr >= iotlb_bus_start) && (dev_addr < iotlb_bus_end))
+		sync_single(hwdev, bus_to_virt(dev_addr), size, dir);
 }
 
 void
 swiotlb_sync_single_for_device(struct device *hwdev, dma_addr_t dev_addr,
 			       size_t size, int dir)
 {
-	char *dma_addr = bus_to_virt(dev_addr);
-
 	BUG_ON(dir == DMA_NONE);
-	if (dma_addr >= io_tlb_start && dma_addr < io_tlb_end)
-		sync_single(hwdev, dma_addr, size, dir);
+	if ((dev_addr >= iotlb_bus_start) && (dev_addr < iotlb_bus_end))
+		sync_single(hwdev, bus_to_virt(dev_addr), size, dir);
 }
 
 /*
@@ -603,11 +611,9 @@ void
 swiotlb_unmap_page(struct device *hwdev, dma_addr_t dma_address,
 		   size_t size, enum dma_data_direction direction)
 {
-	char *dma_addr = bus_to_virt(dma_address);
-
 	BUG_ON(direction == DMA_NONE);
-	if (dma_addr >= io_tlb_start && dma_addr < io_tlb_end)
-		unmap_single(hwdev, dma_addr, size, direction);
+	if ((dma_address >= iotlb_bus_start) && (dma_address < iotlb_bus_end))
+		unmap_single(hwdev, bus_to_virt(dma_address), size, direction);
 }
 
 int

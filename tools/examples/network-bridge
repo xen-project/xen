@@ -51,7 +51,7 @@ for arg ; do export "${arg}" ; done
 
 bridge=${bridge:-xen-br0}
 netdev=${netdev:-eth0}
-antispoof=${antispoof:-yes}
+antispoof=${antispoof:-no}
 
 echo "*network $OP bridge=$bridge netdev=$netdev antispoof=$antispoof" >&2
 

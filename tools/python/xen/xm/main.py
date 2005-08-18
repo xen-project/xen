@@ -200,7 +200,11 @@ def xm_migrate(args):
 def xm_list(args):
     use_long = 0
     show_vcpus = 0
-    (options, params) = getopt(args, 'lv', ['long','vcpus'])
+    try:
+        (options, params) = getopt(args, 'lv', ['long','vcpus'])
+    except GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
     
     n = len(params)
     for (k, v) in options:
