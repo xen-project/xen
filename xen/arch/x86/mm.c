@@ -3115,7 +3115,7 @@ static int ptwr_emulated_update(
     if ( do_cmpxchg )
     {
         ol1e = l1e_from_intpte(old);
-        if ( cmpxchg((unsigned long *)pl1e, old, val) != old )
+        if ( cmpxchg((intpte_t *)pl1e, old, val) != old )
         {
             unmap_domain_page(pl1e);
             put_page_from_l1e(nl1e, d);
