@@ -300,17 +300,17 @@ void __init bt_iounmap(void *addr, unsigned long size)
 
 
 static int direct_remap_area_pte_fn(pte_t *pte, 
-                                    struct page *pte_page,
-                                    unsigned long address, 
-                                    void *data)
+				    struct page *pte_page,
+				    unsigned long address, 
+				    void *data)
 {
-        mmu_update_t **v = (mmu_update_t **)data;
+	mmu_update_t **v = (mmu_update_t **)data;
 
-        (*v)->ptr = (pfn_to_mfn(page_to_pfn(pte_page)) << PAGE_SHIFT)
-                    | ((unsigned long)pte & ~PAGE_MASK);
-        (*v)++;
+	(*v)->ptr = ((physaddr_t)pfn_to_mfn(page_to_pfn(pte_page)) <<
+		     PAGE_SHIFT) | ((unsigned long)pte & ~PAGE_MASK);
+	(*v)++;
 
-        return 0;
+	return 0;
 }
 
 int direct_remap_area_pages(struct mm_struct *mm,
@@ -397,6 +397,16 @@ int touch_pte_range(struct mm_struct *mm,
 	}
 
 	return generic_page_range(mm, address, size, f, NULL);
-}                 
+} 
 
 EXPORT_SYMBOL(touch_pte_range);
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */
