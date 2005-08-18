@@ -257,6 +257,34 @@ struct xenbus_device *xenbus_device_find(const char *nodename,
 	return info.dev;
 }
 
+static int cleanup_dev(struct device *dev, void *data)
+{
+	struct xenbus_device *xendev = to_xenbus_device(dev);
+	struct xb_find_info *info = data;
+	int len = strlen(info->nodename);
+
+	if (!strncmp(xendev->nodename, info->nodename, len)) {
+		info->dev = xendev;
+		get_device(dev);
+		return 1;
+	}
+	return 0;
+}
+
+static void xenbus_cleanup_devices(const char *path, struct bus_type *bus)
+{
+	struct xb_find_info info = { .nodename = path };
+
+	do {
+		info.dev = NULL;
+		bus_for_each_dev(bus, NULL, &info, cleanup_dev);
+		if (info.dev) {
+			device_unregister(&info.dev->dev);
+			put_device(&info.dev->dev);
+		}
+	} while (info.dev);
+}
+
 static void xenbus_release_device(struct device *dev)
 {
 	if (dev) {
@@ -443,33 +471,54 @@ static unsigned int char_count(const char *str, char c)
 	return ret;
 }
 
+static int strsep_len(const char *str, char c, unsigned int len)
+{
+	unsigned int i;
+
+	for (i = 0; str[i]; i++)
+		if (str[i] == c) {
+			if (len == 0)
+				return i;
+			len--;
+		}
+	return (len == 0) ? i : -ERANGE;
+}
+
 static void dev_changed(const char *node, struct xen_bus_type *bus)
 {
-	int exists;
+	int exists, rootlen;
 	struct xenbus_device *dev;
 	char type[BUS_ID_SIZE];
-	const char *p;
+	const char *p, *root;
 
-	/* FIXME: wouldn't need this if we could limit watch depth. */
-	if (char_count(node, '/') != bus->levels)
+	if (char_count(node, '/') < 2)
+ 		return;
+
+	exists = xenbus_exists(node, "");
+	if (!exists) {
+		xenbus_cleanup_devices(node, &bus->bus);
 		return;
+	}
 
 	/* backend/<type>/... or device/<type>/... */
 	p = strchr(node, '/') + 1;
 	snprintf(type, BUS_ID_SIZE, "%.*s", strcspn(p, "/"), p);
 	type[BUS_ID_SIZE-1] = '\0';
 
-	/* Created or deleted? */
-	exists = xenbus_exists(node, "");
-	dev = xenbus_device_find(node, &bus->bus);
+	rootlen = strsep_len(node, '/', bus->levels);
+	if (rootlen < 0)
+		return;
+	root = kasprintf("%.*s", rootlen, node);
+	if (!root)
+		return;
 
-	if (dev && !exists) {
-		device_unregister(&dev->dev);
-	} else if (!dev && exists) {
-		xenbus_probe_node(bus, type, node);
-	}
-	if (dev)
+	dev = xenbus_device_find(root, &bus->bus);
+	if (!dev)
+		xenbus_probe_node(bus, type, root);
+	else
 		put_device(&dev->dev);
+
+	kfree(root);
 }
 
 static void frontend_changed(struct xenbus_watch *watch, const char *node)
@@ -484,7 +533,6 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 
 /* We watch for devices appearing and vanishing. */
 static struct xenbus_watch fe_watch = {
-	/* FIXME: Ideally we'd only watch for changes 2 levels deep... */
 	.node = "device",
 	.callback = frontend_changed,
 };
