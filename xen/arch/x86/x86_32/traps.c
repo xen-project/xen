@@ -67,8 +67,8 @@ void show_registers(struct cpu_user_regs *regs)
     printk("CPU:    %d\nEIP:    %04lx:[<%08lx>]",
            smp_processor_id(), (unsigned long)0xffff & regs->cs, eip);
     if ( !GUEST_MODE(regs) )
-        print_symbol(" %s\n", eip);
-    printk("EFLAGS: %08lx   CONTEXT: %s\n", eflags, context);
+        print_symbol(" %s", eip);
+    printk("\nEFLAGS: %08lx   CONTEXT: %s\n", eflags, context);
     printk("eax: %08x   ebx: %08x   ecx: %08x   edx: %08x\n",
            regs->eax, regs->ebx, regs->ecx, regs->edx);
     printk("esi: %08x   edi: %08x   ebp: %08x   esp: %08lx\n",
