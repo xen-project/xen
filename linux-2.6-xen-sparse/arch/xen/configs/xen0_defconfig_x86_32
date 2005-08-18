@@ -689,7 +689,7 @@ CONFIG_E1000=y
 # CONFIG_HAMACHI is not set
 # CONFIG_YELLOWFIN is not set
 # CONFIG_R8169 is not set
-# CONFIG_SK98LIN is not set
+CONFIG_SK98LIN=y
 # CONFIG_VIA_VELOCITY is not set
 CONFIG_TIGON3=y
 # CONFIG_BNX2 is not set
