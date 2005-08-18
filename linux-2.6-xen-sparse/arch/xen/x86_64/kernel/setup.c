@@ -426,16 +426,10 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 #ifdef CONFIG_XEN
 static void __init contig_initmem_init(void)
 {
-        unsigned long bootmap_size, bootmap; 
-
-        bootmap_size = bootmem_bootmap_pages(end_pfn)<<PAGE_SHIFT;
-        bootmap = start_pfn;
-        bootmap_size = init_bootmem(bootmap, end_pfn);
-        reserve_bootmem(bootmap, bootmap_size);
-        
-        free_bootmem(start_pfn << PAGE_SHIFT, (end_pfn - start_pfn) << PAGE_SHIFT);   
-        reserve_bootmem(0, (PFN_PHYS(start_pfn) +
-                            bootmap_size + PAGE_SIZE-1));
+        unsigned long bootmap_size = init_bootmem(start_pfn, end_pfn);
+        free_bootmem(0, end_pfn << PAGE_SHIFT);   
+        /* XXX KAF: Why can't we leave low 1MB of memory free? */
+        reserve_bootmem(0, (PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1));
 }
 #else
 static void __init contig_initmem_init(void)

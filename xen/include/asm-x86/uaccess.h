@@ -125,22 +125,20 @@ extern void __put_user_bad(void);
 	__pu_err;							\
 })							
 
-#define __get_user_nocheck(x,ptr,size)				\
-({								\
-	long __gu_err, __gu_val;				\
-	__get_user_size(__gu_val,(ptr),(size),__gu_err,-EFAULT);\
-	(x) = (__typeof__(*(ptr)))__gu_val;			\
-	__gu_err;						\
+#define __get_user_nocheck(x,ptr,size)                          \
+({                                                              \
+	long __gu_err;                                          \
+	__get_user_size((x),(ptr),(size),__gu_err,-EFAULT);     \
+	__gu_err;                                               \
 })
 
-#define __get_user_check(x,ptr,size)					\
-({									\
-	long __gu_err, __gu_val;					\
-	__typeof__(*(ptr)) __user *__gu_addr = (ptr);			\
-	__get_user_size(__gu_val,__gu_addr,(size),__gu_err,-EFAULT);	\
-	(x) = (__typeof__(*(ptr)))__gu_val;				\
-	if (!__addr_ok(__gu_addr)) __gu_err = -EFAULT;			\
-	__gu_err;							\
+#define __get_user_check(x,ptr,size)                            \
+({                                                              \
+	long __gu_err;                                          \
+	__typeof__(*(ptr)) __user *__gu_addr = (ptr);           \
+	__get_user_size((x),__gu_addr,(size),__gu_err,-EFAULT); \
+	if (!__addr_ok(__gu_addr)) __gu_err = -EFAULT;          \
+	__gu_err;                                               \
 })							
 
 struct __large_struct { unsigned long buf[100]; };
