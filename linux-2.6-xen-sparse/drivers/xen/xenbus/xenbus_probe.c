@@ -100,7 +100,7 @@ static struct xen_bus_type xenbus_frontend = {
 	.get_bus_id = frontend_bus_id,
 	.probe = xenbus_probe_frontend,
 	.bus = {
-		.name  = "xenbus",
+		.name  = "xen",
 		.match = xenbus_match,
 	},
 };
@@ -157,7 +157,7 @@ static struct xen_bus_type xenbus_backend = {
 	.get_bus_id = backend_bus_id,
 	.probe = xenbus_probe_backend,
 	.bus = {
-		.name  = "xenbus-backend",
+		.name  = "xen-backend",
 		.match = xenbus_match,
 	},
 };
