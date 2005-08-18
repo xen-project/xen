@@ -3299,8 +3299,8 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     
     /* Finally, make the p.t. page writable by the guest OS. */
     l1e_add_flags(pte, _PAGE_RW);
-    if ( unlikely(__copy_to_user(&linear_pg_table[l1_linear_offset(addr)],
-                                 &pte, sizeof(pte))) )
+    if ( unlikely(__put_user(pte.l1,
+                             &linear_pg_table[l1_linear_offset(addr)].l1)) )
     {
         MEM_LOG("ptwr: Could not update pte at %p", (unsigned long *)
                 &linear_pg_table[l1_linear_offset(addr)]);
