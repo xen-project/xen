@@ -242,6 +242,7 @@ static int cmp_dev(struct device *dev, void *data)
 
 	if (streq(xendev->nodename, info->nodename)) {
 		info->dev = xendev;
+		get_device(dev);
 		return 1;
 	}
 	return 0;
