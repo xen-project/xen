@@ -262,7 +262,8 @@ static void xenbus_release_device(struct device *dev)
 	if (dev) {
 		struct xenbus_device *xendev = to_xenbus_device(dev);
 
-		kfree(xendev->subtype);
+		if (xendev->subtype)
+			kfree(xendev->subtype);
 		kfree(xendev);
 	}
 }
