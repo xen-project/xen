@@ -41,6 +41,8 @@
 #include <asm/sections.h>
 #include <asm-xen/hypervisor.h>
 
+extern unsigned long *contiguous_bitmap;
+
 #if defined(CONFIG_SWIOTLB)
 extern void swiotlb_init(void);
 int swiotlb;
@@ -636,6 +638,11 @@ void __init mem_init(void)
 	int tmp;
 	int bad_ppro;
 	unsigned long pfn;
+
+	contiguous_bitmap = alloc_bootmem_low_pages(
+		(max_low_pfn + 2*BITS_PER_LONG) >> 3);
+	BUG_ON(!contiguous_bitmap);
+	memset(contiguous_bitmap, 0, (max_low_pfn + 2*BITS_PER_LONG) >> 3);
 
 #if defined(CONFIG_SWIOTLB)
 	swiotlb_init();	
