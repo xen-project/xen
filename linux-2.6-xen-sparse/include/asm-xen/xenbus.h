@@ -126,9 +126,6 @@ int register_xenbus_watch(struct xenbus_watch *watch);
 void unregister_xenbus_watch(struct xenbus_watch *watch);
 void reregister_xenbus_watches(void);
 
-/* For backends, does lookup on uuid (up to /).  Returns domid, or -errno. */
-int xenbus_uuid_to_domid(const char *uuid);
-
 /* Called from xen core code. */
 void xenbus_suspend(void);
 void xenbus_resume(void);

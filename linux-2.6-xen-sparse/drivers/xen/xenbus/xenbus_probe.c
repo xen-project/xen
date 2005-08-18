@@ -109,47 +109,41 @@ static struct xen_bus_type xenbus_frontend = {
 	},
 };
 
-/* For backends, does lookup on uuid (up to /).  Returns domid, or -errno. */
-int xenbus_uuid_to_domid(const char *uuid)
-{
-	int err, domid, len;
-	char path[strlen("/domain/") + 50];
-
-	len = strcspn(uuid, "/");
-	if (snprintf(path, sizeof(path), "/domain/%.*s", len, uuid)
-	    >= sizeof(path))
-		return -ENOSPC;
-	err = xenbus_scanf(path, "id", "%i", &domid);
-	if (err != 1)
-		return err;
-	return domid;
-}
-
 /* backend/<type>/<fe-uuid>/<id> => <type>-<fe-domid>-<id> */
 static int backend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 {
-	unsigned int typelen, uuidlen;
-	int domid;
-	const char *p;
+	int domid, err;
+	const char *devid, *type, *frontend;
+	unsigned int typelen;
 
-	nodename = strchr(nodename, '/');
-	if (!nodename)
+	type = strchr(nodename, '/');
+	if (!type)
 		return -EINVAL;
-	nodename++;
-	typelen = strcspn(nodename, "/");
-	if (!typelen || nodename[typelen] != '/')
+	type++;
+	typelen = strcspn(type, "/");
+	if (!typelen || type[typelen] != '/')
 		return -EINVAL;
-	p = nodename + typelen + 1;
-	uuidlen = strcspn(p, "/");
-	if (!uuidlen || p[uuidlen] != '/')
-		return -EINVAL;
-	domid = xenbus_uuid_to_domid(p);
-	if (domid < 0)
-		return domid;
-	p += uuidlen + 1;
+
+	devid = strrchr(nodename, '/') + 1;
+
+	err = xenbus_gather(nodename, "frontend-id", "%i", &domid,
+			    "frontend", NULL, &frontend,
+			    NULL);
+	if (err)
+		return err;
+	if (strlen(frontend) == 0)
+		err = -ERANGE;
+
+	if (!err && !xenbus_exists(frontend, ""))
+		err = -ENOENT;
+
+	if (err) {
+		kfree(frontend);
+		return err;
+	}
 
 	if (snprintf(bus_id, BUS_ID_SIZE,
-		     "%.*s-%i-%s", typelen, nodename, domid, p) >= BUS_ID_SIZE)
+		     "%.*s-%i-%s", typelen, type, domid, devid) >= BUS_ID_SIZE)
 		return -ENOSPC;
 	return 0;
 }
