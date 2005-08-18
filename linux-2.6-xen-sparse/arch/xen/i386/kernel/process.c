@@ -148,8 +148,6 @@ void cpu_idle (void)
 			rmb();
 
 			if (cpu_is_offline(cpu)) {
-				printk("<0>Cpu %d going offline.\n",
-				       cpu);
 				local_irq_disable();
 				/* Ack it.  From this point on until
 				   we get woken up, we're not allowed
@@ -162,8 +160,6 @@ void cpu_idle (void)
 #endif
 				play_dead();
 				local_irq_enable();
-				printk("<0>Cpu %d back online.\n",
-				       cpu);
 			}
 
 			__get_cpu_var(irq_stat).idle_timestamp = jiffies;

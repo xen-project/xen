@@ -831,7 +831,7 @@ static void local_time_calibration(void *unused)
     tsc_elapsed32 = (u32)tsc_elapsed64;
 
     /* tsc_elapsed > stime_elapsed */
-    //    ASSERT(tsc_elapsed32 != 0);
+    ASSERT(tsc_elapsed32 != 0);
     while ( tsc_elapsed32 <= stime_elapsed32 )
     {
         tsc_elapsed32 <<= 1;

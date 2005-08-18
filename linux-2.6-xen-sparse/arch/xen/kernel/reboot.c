@@ -73,12 +73,13 @@ static void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
     BUG_ON(r != 0);
     gdt_pages = (ctxt->gdt_ents + 511) / 512;
     ctxt->ctrlreg[3] = machine_to_phys(ctxt->ctrlreg[3]);
-    for (r = 0; r < gdt_pages; r++) {
+    for (r = 0; r < gdt_pages; r++)
 	ctxt->gdt_frames[r] = mfn_to_pfn(ctxt->gdt_frames[r]);
-    }
 }
 
 void _restore_vcpu(int cpu);
+
+atomic_t vcpus_rebooting;
 
 static void restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
 {
@@ -88,25 +89,26 @@ static void restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
     /* This is kind of a hack, and implicitly relies on the fact that
        the vcpu stops in a place where all of the call clobbered
        registers are already dead. */
-    printk("<0>regs.esp %x.\n", ctxt->user_regs.esp);
     ctxt->user_regs.esp -= 4;
     ((unsigned long *)ctxt->user_regs.esp)[0] = ctxt->user_regs.eip;
     ctxt->user_regs.eip = (unsigned long)_restore_vcpu;
 
     ctxt->ctrlreg[3] = phys_to_machine(ctxt->ctrlreg[3]);
-    for (r = 0; r < gdt_pages; r++) {
+    for (r = 0; r < gdt_pages; r++)
 	ctxt->gdt_frames[r] = pfn_to_mfn(ctxt->gdt_frames[r]);
-    }
+    atomic_set(&vcpus_rebooting, 1);
     r = HYPERVISOR_boot_vcpu(vcpu, ctxt);
     if (r != 0) {
 	printk(KERN_EMERG "Failed to reboot vcpu %d (%d)\n", vcpu, r);
 	return;
     }
+    /* Hmm... slight hack: make sure the cpus come up in order,
+       because that way they get the same evtchn numbers this time as
+       they did last time, which works around a few bugs. */
+    /* XXX */
+    while (atomic_read(&vcpus_rebooting))
+	barrier();
 }
-
-/* Whoever decided that printk should call into the scheduler needs to
-   be taken out and shot */
-#define msg(x) HYPERVISOR_console_io(CONSOLEIO_write, sizeof(x), x)
 
 extern unsigned uber_debug;
 
@@ -223,9 +225,7 @@ static int __do_suspend(void *ignore)
     smp_suspend();
 #endif
 
-    msg("xenbus going down.\n");
     xenbus_suspend();
-    msg("xenbus gone down.\n");
 
     ctrl_if_suspend();
 
@@ -239,11 +239,9 @@ static int __do_suspend(void *ignore)
     memcpy(&suspend_record->resume_info, &xen_start_info,
            sizeof(xen_start_info));
 
-    msg("Suspending...\n");
     /* We'll stop somewhere inside this hypercall.  When it returns,
        we'll start resuming after the restore. */
     HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
-    msg("Back from suspension\n");
 
     shutting_down = SHUTDOWN_INVALID; 
 
@@ -270,9 +268,7 @@ static int __do_suspend(void *ignore)
 
     ctrl_if_resume();
 
-    msg("Here comes the xenbus...\n");
     xenbus_resume();
-    msg("xenbus resumed.\n");
 
 #ifdef CONFIG_SMP
     smp_resume();
@@ -286,32 +282,26 @@ static int __do_suspend(void *ignore)
 
     usbif_resume();
 
-    msg("Restoring cpu contexts...\n");
     for (i = 0; i < NR_CPUS; i++)
 	if (cpu_isset(i, feasible_cpus))
 	    restore_vcpu_context(i, &suspended_cpu_records[i]);
-    msg("All vcpus rebooted.\n");
 
+    printk("<0>All cpus rebooted...\n");
     __sti();
 
  out_reenable_cpus:
-    msg("Reenabling cpus.\n");
     while (!cpus_empty(feasible_cpus)) {
 	i = first_cpu(feasible_cpus);
-	printk("<0>Bring up %d/%d.\n", i, num_online_cpus());
-	printk("<0>17 preempt_count %x.\n", preempt_count());
+	printk("<0>Bring %d up.\n", i);
 	j = cpu_up(i);
-	printk("<0>18 preempt_count %x.\n", preempt_count());
+	printk("<0>cpu_up(%d) -> %d.\n", i, j);
 	if (j != 0) {
 	    printk(KERN_CRIT "Failed to bring cpu %d back up (%d).\n",
 		   i, j);
 	    err = j;
 	}
-	printk("<0>%d up.\n", i);
 	cpu_clear(i, feasible_cpus);
     }
-    msg("Reenabled cpus.\n");
-    uber_debug = 0;
 
  out:
     if ( suspend_record != NULL )

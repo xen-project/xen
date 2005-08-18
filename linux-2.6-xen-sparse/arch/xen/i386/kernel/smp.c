@@ -129,8 +129,6 @@ static inline int __prepare_ICR2 (unsigned int mask)
 
 DECLARE_PER_CPU(int, ipi_to_evtchn[NR_IPIS]);
 
-unsigned uber_debug;
-
 static inline void __send_IPI_one(unsigned int cpu, int vector)
 {
 	unsigned int evtchn;
@@ -145,11 +143,7 @@ static inline void __send_IPI_one(unsigned int cpu, int vector)
 		       synch_test_bit(evtchn, &s->evtchn_mask[0]))
 			;
 #endif
-		if (uber_debug)
-			printk("<0>Notifying on evtchn %d.\n", evtchn);
-		if ((r = notify_via_evtchn(evtchn)) != 0)
-			printk("<0>Hypervisor stopped us sending an IPI: %d.\n",
-			       r);
+		notify_via_evtchn(evtchn);
 	} else
 		printk("send_IPI to unbound port %d/%d",
 		       cpu, vector);
@@ -168,8 +162,6 @@ void __send_IPI_shortcut(unsigned int shortcut, int vector)
 			if (cpu == smp_processor_id())
 				continue;
 			if (cpu_isset(cpu, cpu_online_map)) {
-				if (uber_debug)
-					printk("<0>Sending ipi to %d.\n", cpu);
 				__send_IPI_one(cpu, vector);
 			}
 		}

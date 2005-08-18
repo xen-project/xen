@@ -178,7 +178,6 @@ void domain_shutdown(u8 reason)
 {
     struct domain *d = current->domain;
     struct vcpu *v;
-    int cntr;
 
     if ( d->domain_id == 0 )
     {
@@ -209,17 +208,8 @@ void domain_shutdown(u8 reason)
     }
 
     /* Put every vcpu to sleep, but don't wait (avoids inter-vcpu deadlock). */
-    cntr = 0;
-    printf("Putting %d to sleep.\n", d->domain_id);
-    for_each_vcpu ( d, v ) {
-        if (test_bit(_VCPUF_down, &v->vcpu_flags)) {
-            printf("vcpu %d is down.\n", v->vcpu_id);
-        } else {
-            printf("vcpu %d is up.\n", v->vcpu_id);
-        }
+    for_each_vcpu ( d, v )
         domain_sleep_nosync(v);
-    }
-    printf("Put %d vcpus to sleep for domain shutdown.\n", cntr);
 }
 
 

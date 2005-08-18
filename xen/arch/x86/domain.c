@@ -410,10 +410,8 @@ int arch_set_info_guest(
     if ( !(c->flags & VGCF_VMX_GUEST) )
     {
         if ( ((c->user_regs.cs & 3) == 0) ||
-             ((c->user_regs.ss & 3) == 0) ) {
-            printf("User regs.cs %x, ss %x.\n", c->user_regs.cs, c->user_regs.ss);
+             ((c->user_regs.ss & 3) == 0) )
             return -EINVAL;
-        }
     }
 
     clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
@@ -458,10 +456,8 @@ int arch_set_info_guest(
 
     if ( shadow_mode_refcounts(d) )
     {
-        if ( !get_page(&frame_table[phys_basetab>>PAGE_SHIFT], d) ) {
-            printf("Bad phys_basetab %lx.\n", phys_basetab);
+        if ( !get_page(&frame_table[phys_basetab>>PAGE_SHIFT], d) )
             return -EINVAL;
-        }
     }
     else
     {
@@ -469,16 +465,13 @@ int arch_set_info_guest(
         if ( !(c->flags & VGCF_VMX_GUEST) )
 #endif
             if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
-                                    PGT_base_page_table) ) {
-                printf("Bad phys_basetab2 %lx.\n", phys_basetab);
+                                    PGT_base_page_table) )
                 return -EINVAL;
-            }
     }
 
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
     {
         put_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT]);
-        printf("Failed to set gdt, %d.\n", rc);
         return rc;
     }
 
@@ -499,8 +492,6 @@ int arch_set_info_guest(
 
     /* Don't redo final setup */
     set_bit(_VCPUF_initialised, &v->vcpu_flags);
-
-    printf("Arch set_info_guest succeeded.\n");
 
     return 0;
 }

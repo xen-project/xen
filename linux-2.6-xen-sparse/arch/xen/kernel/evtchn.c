@@ -134,8 +134,6 @@ void force_evtchn_callback(void)
     (void)HYPERVISOR_xen_version(0);
 }
 
-extern unsigned uber_debug;
-
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 {
@@ -147,8 +145,6 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 
     vcpu_info->evtchn_upcall_pending = 0;
     
-    if (uber_debug && cpu != 0)
-	printk("<0>evtchn_do_upcall on %d.\n", cpu);
     /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
     l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
     while ( l1 != 0 )
@@ -162,13 +158,9 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
             l2 &= ~(1 << l2i);
             
             port = (l1i << 5) + l2i;
-	    if (uber_debug && cpu != 0)
-		printk("<0>Port %d.\n", port);
-            if ( (irq = evtchn_to_irq[port]) != -1 ) {
-		if (uber_debug && cpu != 0)
-		    printk("<0>irq %d.\n", irq);
+            if ( (irq = evtchn_to_irq[port]) != -1 )
                 do_IRQ(irq, regs);
-	    } else
+	    else
                 evtchn_device_upcall(port);
         }
     }
@@ -286,7 +278,7 @@ void _bind_ipi_to_irq(int ipi, int vcpu, int irq)
 
     spin_unlock(&irq_mapping_update_lock);
 
-    clear_bit(evtchn, HYPERVISOR_shared_info->evtchn_mask);
+    clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_mask);
 }
 
 void _bind_virq_to_irq(int virq, int cpu, int irq)
@@ -314,8 +306,6 @@ void _bind_virq_to_irq(int virq, int cpu, int irq)
     bind_evtchn_to_cpu(evtchn, cpu);
 
     spin_unlock(&irq_mapping_update_lock);
-
-    return irq;
 }
 
 int bind_ipi_to_irq(int ipi)

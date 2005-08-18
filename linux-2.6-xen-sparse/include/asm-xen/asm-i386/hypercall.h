@@ -529,6 +529,9 @@ HYPERVISOR_vcpu_down(
 {
     int ret;
     unsigned long ign1;
+    /* Yes, I really do want to clobber edx here: when we resume a
+       vcpu after unpickling a multi-processor domain, it returns
+       here, but clobbers all of the call clobbered registers. */
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret), "=b" (ign1)

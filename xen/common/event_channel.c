@@ -292,8 +292,6 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
         chn = evtchn_from_port(d, port);
         chn->state          = ECS_IPI;
         chn->notify_vcpu_id = current->vcpu_id;
-        printf("Bound ipi on vcpu %d to port %d.\n", current->vcpu_id,
-               port);
     }
 
     spin_unlock(&d->evtchn_lock);
@@ -499,24 +497,9 @@ long evtchn_send(int lport)
         evtchn_set_pending(rd->vcpu[rchn->notify_vcpu_id], rport);
         break;
     case ECS_IPI:
-        if (current->domain->domain_id != 0) {
-            printf("Set %d pending on %d.\n", lport,
-                   lchn->notify_vcpu_id);
-            if (lport == 7) {
-                struct vcpu *v = ld->vcpu[lchn->notify_vcpu_id];
-                struct domain *d = v->domain;
-                shared_info_t *s = d->shared_info;
-                printf("pending %x, mask %x, pending_sel %x, upcall_pending %x.\n",
-                       s->evtchn_pending[0],
-                       s->evtchn_mask[0],
-                       v->vcpu_info->evtchn_pending_sel,
-                       v->vcpu_info->evtchn_upcall_pending);
-            }
-        }
         evtchn_set_pending(ld->vcpu[lchn->notify_vcpu_id], lport);
         break;
     default:
-        printf("Failed to set %d pending: state %d.\n", lport, lchn->state);
         ret = -EINVAL;
     }
 
