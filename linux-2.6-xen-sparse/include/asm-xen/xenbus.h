@@ -61,9 +61,11 @@ struct xenbus_driver {
 	char *name;
 	struct module *owner;
 	const struct xenbus_device_id *ids;
-	int  (*probe)    (struct xenbus_device * dev,
-			  const struct xenbus_device_id * id);
-	int  (*remove)   (struct xenbus_device * dev);
+	int (*probe)(struct xenbus_device *dev,
+		     const struct xenbus_device_id *id);
+	int (*remove)(struct xenbus_device *dev);
+	int (*suspend)(struct xenbus_device *dev);
+	int (*resume)(struct xenbus_device *dev);
 	struct device_driver driver;
 };
 
@@ -72,7 +74,8 @@ static inline struct xenbus_driver *to_xenbus_driver(struct device_driver *drv)
 	return container_of(drv, struct xenbus_driver, driver);
 }
 
-int xenbus_register_driver(struct xenbus_driver *drv);
+int xenbus_register_device(struct xenbus_driver *drv);
+int xenbus_register_backend(struct xenbus_driver *drv);
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 
 /* Caller must hold this lock to call these functions: it's also held
@@ -122,6 +125,9 @@ void unregister_xenstore_notifier(struct notifier_block *nb);
 int register_xenbus_watch(struct xenbus_watch *watch);
 void unregister_xenbus_watch(struct xenbus_watch *watch);
 void reregister_xenbus_watches(void);
+
+/* For backends, does lookup on uuid (up to /).  Returns domid, or -errno. */
+int xenbus_uuid_to_domid(const char *uuid);
 
 /* Called from xen core code. */
 void xenbus_suspend(void);
