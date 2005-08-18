@@ -3059,7 +3059,7 @@ static int ptwr_emulated_update(
     }
 
     /* Turn a sub-word access into a full-word access. */
-    if (bytes != sizeof(physaddr_t))
+    if ( bytes != sizeof(physaddr_t) )
     {
         int           rc;
         physaddr_t    full;
@@ -3076,6 +3076,10 @@ static int ptwr_emulated_update(
         val  &= (((physaddr_t)1 << (bytes*8)) - 1);
         val <<= (offset)*8;
         val  |= full;
+        /* Also fill in missing parts of the cmpxchg old value. */
+        old  &= (((physaddr_t)1 << (bytes*8)) - 1);
+        old <<= (offset)*8;
+        old  |= full;
     }
 
     /* Read the PTE that maps the page being updated. */
