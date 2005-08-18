@@ -307,8 +307,6 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 	
 	err = bus->get_bus_id(xendev->dev.bus_id, xendev->nodename);
 	if (err) {
-		printk("XENBUS: Failed to get bus id for %s: error %i\n",
-		       xendev->nodename, err);
 		kfree(xendev);
 		return err;
 	}
@@ -454,16 +452,11 @@ static void dev_changed(const char *node, struct xen_bus_type *bus)
 	exists = xenbus_exists(node, "");
 	dev = xenbus_device_find(node, &bus->bus);
 
-	printk("xenbus: device %s %s\n", node, dev ? "exists" : "new");
 	if (dev && !exists) {
-		printk("xenbus: Unregistering device %s\n", node);
 		device_unregister(&dev->dev);
 	} else if (!dev && exists) {
-		printk("xenbus: Adding device %s\n", node);
 		xenbus_probe_node(bus, type, node);
-	} else
-		printk("xenbus: strange, %s already %s\n", node,
-		       exists ? "exists" : "gone");
+	}
 	if (dev)
 		put_device(&dev->dev);
 }
