@@ -48,8 +48,7 @@ static const struct xenbus_device_id *
 match_device(const struct xenbus_device_id *arr, struct xenbus_device *dev)
 {
 	for (; !streq(arr->devicetype, ""); arr++) {
-		if (streq(arr->devicetype, dev->devicetype) &&
-		    streq(arr->subtype, dev->subtype ?: ""))
+		if (streq(arr->devicetype, dev->devicetype))
 			return arr;
 	}
 	return NULL;
@@ -284,8 +283,6 @@ static void xenbus_release_device(struct device *dev)
 	if (dev) {
 		struct xenbus_device *xendev = to_xenbus_device(dev);
 
-		if (xendev->subtype)
-			kfree(xendev->subtype);
 		kfree(xendev);
 	}
 }
@@ -330,11 +327,6 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 	strcpy(xendev->nodename, nodename);
 	xendev->devicetype = xendev->nodename + strlen(xendev->nodename) + 1;
 	strcpy(xendev->devicetype, type);
-
-	/* This might not exist, but that's OK. */
-	xendev->subtype = xenbus_read(xendev->nodename, "subtype", NULL);
-	if (IS_ERR(xendev->subtype))
-		xendev->subtype = NULL;
 
 	xendev->dev.parent = &bus->dev;
 	xendev->dev.bus = &bus->bus;

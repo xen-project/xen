@@ -37,7 +37,6 @@
 /* A xenbus device. */
 struct xenbus_device {
 	char *devicetype;
-	char *subtype;
 	char *nodename;
 	struct device dev;
 	int has_error;
@@ -53,7 +52,6 @@ struct xenbus_device_id
 {
 	/* .../device/<device_type>/<identifier> */
 	char devicetype[32]; 	/* General class of device. */
-	char subtype[32];	/* Contents of "subtype" for this device */
 };
 
 /* A xenbus driver. */
