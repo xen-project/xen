@@ -389,6 +389,7 @@ static int xenbus_probe_backend(const char *type, const char *uuid)
 		if (err)
 			break;
 	}
+	kfree(dir);
 	kfree(nodename);
 	return err;
 }
