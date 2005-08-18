@@ -348,7 +348,7 @@ void xen_create_contiguous_region(unsigned long vstart, unsigned int order)
 	for (i = 0; i < (1<<order); i++) {
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			vstart + (i*PAGE_SIZE),
-			__pte_ma(((mfn+i)<<PAGE_SHIFT)|__PAGE_KERNEL), 0));
+			pfn_pte_ma(mfn+i, PAGE_KERNEL), 0));
 		xen_machphys_update(mfn+i, (__pa(vstart)>>PAGE_SHIFT)+i);
 		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = mfn+i;
 	}
@@ -395,7 +395,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 			MEMOP_increase_reservation, &mfn, 1, 0) != 1);
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			vstart + (i*PAGE_SIZE),
-			__pte_ma((mfn<<PAGE_SHIFT)|__PAGE_KERNEL), 0));
+			pfn_pte_ma(mfn, PAGE_KERNEL), 0));
 		xen_machphys_update(mfn, (__pa(vstart)>>PAGE_SHIFT)+i);
 		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = mfn;
 	}

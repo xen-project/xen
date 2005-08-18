@@ -213,9 +213,7 @@ static void balloon_process(void *unused)
             {
                 BUG_ON(HYPERVISOR_update_va_mapping(
                     (unsigned long)__va(pfn << PAGE_SHIFT),
-                    __pte_ma((mfn_list[i] << PAGE_SHIFT) |
-                             pgprot_val(PAGE_KERNEL)),
-                    0));
+                    pfn_pte_ma(mfn_list[i], PAGE_KERNEL), 0));
             }
 
             /* Finally, relinquish the memory back to the system allocator. */

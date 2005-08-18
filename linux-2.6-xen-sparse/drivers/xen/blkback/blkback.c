@@ -406,21 +406,15 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
 #endif
 
 
+    if ( HYPERVISOR_update_va_mapping_otherdomain(
+        MMAP_VADDR(pending_idx, 0),
+        pfn_pte_ma(req->frame_and_sects[0] >> PAGE_SHIFT, PAGE_KERNEL),
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
-    if ( HYPERVISOR_update_va_mapping_otherdomain(
-        MMAP_VADDR(pending_idx, 0),
-        (pte_t) { (req->frame_and_sects[0] & PAGE_MASK) | __PAGE_KERNEL },
         0, (blkif->is_blktap ? ID_TO_DOM(req->id) : blkif->domid) ) )
-        
-        goto out;
 #else
-    if ( HYPERVISOR_update_va_mapping_otherdomain(
-        MMAP_VADDR(pending_idx, 0),
-        (pte_t) { (req->frame_and_sects[0] & PAGE_MASK) | __PAGE_KERNEL },
-        0, blkif->domid) ) 
-        
-        goto out;
+        0, blkif->domid) )
 #endif
+        goto out;
 #endif /* endif CONFIG_XEN_BLKDEV_GRANT */
    
     rsp = vbd_probe(blkif, (vdisk_t *)MMAP_VADDR(pending_idx, 0), 
