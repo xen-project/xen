@@ -64,7 +64,7 @@ src/libxenstat.so.$(MAJOR): $(LIB)
 src/libxenstat.so: src/libxenstat.so.$(MAJOR)
 	$(MAKE_LINK) $(<F) $@
 
-install:
+install: all
 #install: all
 #	$(INSTALL_DATA) src/xenstat.h $(DESTDIR)$(includedir)/xenstat.h
 #	$(INSTALL_PROG) $(LIB) $(DESTDIR)$(libdir)/libxenstat.a
