@@ -171,9 +171,9 @@ struct mmuext_op {
     unsigned int cmd;
     union {
         /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR, REASSIGN_PAGE */
-        memory_t mfn;
+        unsigned long mfn;
         /* INVLPG_LOCAL, INVLPG_ALL, SET_LDT */
-        memory_t linear_addr;
+        unsigned long linear_addr;
     };
     union {
         /* SET_LDT */
@@ -438,18 +438,18 @@ typedef struct shared_info {
 #define MAX_GUEST_CMDLINE 1024
 typedef struct start_info {
     /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
-    memory_t nr_pages;        /* Total pages allocated to this domain.    */
-    memory_t shared_info;     /* MACHINE address of shared info struct.   */
+    unsigned long nr_pages;   /* Total pages allocated to this domain.    */
+    unsigned long shared_info;/* MACHINE address of shared info struct.   */
     u32      flags;           /* SIF_xxx flags.                           */
     u16      domain_controller_evtchn;
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).     */
-    memory_t pt_base;         /* VIRTUAL address of page directory.       */
-    memory_t nr_pt_frames;    /* Number of bootstrap p.t. frames.         */
-    memory_t mfn_list;        /* VIRTUAL address of page-frame list.      */
-    memory_t mod_start;       /* VIRTUAL address of pre-loaded module.    */
-    memory_t mod_len;         /* Size (bytes) of pre-loaded module.       */
+    unsigned long pt_base;    /* VIRTUAL address of page directory.       */
+    unsigned long nr_pt_frames;/* Number of bootstrap p.t. frames.        */
+    unsigned long mfn_list;   /* VIRTUAL address of page-frame list.      */
+    unsigned long mod_start;  /* VIRTUAL address of pre-loaded module.    */
+    unsigned long mod_len;    /* Size (bytes) of pre-loaded module.       */
     s8 cmd_line[MAX_GUEST_CMDLINE];
-    memory_t store_mfn;       /* MACHINE page number of shared page.      */
+    unsigned long store_mfn;  /* MACHINE page number of shared page.      */
     u16      store_evtchn;    /* Event channel for store communication.   */
 } start_info_t;
 

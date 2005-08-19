@@ -199,7 +199,7 @@ pdb_interrupt (int irq, void *dev_id, struct pt_regs *ptregs)
 }
 
 static void
-pdb_send_connection_status(int status, memory_t ring)
+pdb_send_connection_status(int status, unsigned long ring)
 {
     ctrl_msg_t cmsg = 
     {

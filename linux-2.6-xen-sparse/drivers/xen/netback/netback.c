@@ -43,7 +43,7 @@ static void make_tx_response(netif_t *netif,
 static int  make_rx_response(netif_t *netif, 
                              u16      id, 
                              s8       st,
-                             memory_t addr,
+                             unsigned long addr,
                              u16      size,
                              u16      csum_valid);
 
@@ -887,7 +887,7 @@ static void make_tx_response(netif_t *netif,
 static int make_rx_response(netif_t *netif, 
                             u16      id, 
                             s8       st,
-                            memory_t addr,
+                            unsigned long addr,
                             u16      size,
                             u16      csum_valid)
 {

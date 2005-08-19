@@ -106,7 +106,7 @@ long do_physdev_op(physdev_op_t *uop)
              (op.u.set_iobitmap.nr_ports > 65536) )
             break;
         ret = 0;
-        current->arch.iobmp       = (u8 *)op.u.set_iobitmap.bitmap;
+        current->arch.iobmp       = op.u.set_iobitmap.bitmap;
         current->arch.iobmp_limit = op.u.set_iobitmap.nr_ports;
         break;
     default:
