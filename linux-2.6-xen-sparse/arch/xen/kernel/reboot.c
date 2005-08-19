@@ -16,6 +16,8 @@
 #include <asm-xen/queues.h>
 #include <asm-xen/xenbus.h>
 #include <asm-xen/ctrl_if.h>
+#include <linux/cpu.h>
+#include <linux/kthread.h>
 
 #define SHUTDOWN_INVALID  -1
 #define SHUTDOWN_POWEROFF  0
@@ -58,10 +60,71 @@ EXPORT_SYMBOL(machine_power_off);
 /* Ignore multiple shutdown requests. */
 static int shutting_down = SHUTDOWN_INVALID;
 
-static void __do_suspend(void)
+#ifndef CONFIG_HOTPLUG_CPU
+#define cpu_down(x) (-EOPNOTSUPP)
+#define cpu_up(x) (-EOPNOTSUPP)
+#endif
+
+static void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
+{
+    int r;
+    int gdt_pages;
+    r = HYPERVISOR_vcpu_pickle(vcpu, ctxt);
+    if (r != 0)
+	panic("pickling vcpu %d -> %d!\n", vcpu, r);
+
+    /* Translate from machine to physical addresses where necessary,
+       so that they can be translated to our new machine address space
+       after resume.  libxc is responsible for doing this to vcpu0,
+       but we do it to the others. */
+    gdt_pages = (ctxt->gdt_ents + 511) / 512;
+    ctxt->ctrlreg[3] = machine_to_phys(ctxt->ctrlreg[3]);
+    for (r = 0; r < gdt_pages; r++)
+	ctxt->gdt_frames[r] = mfn_to_pfn(ctxt->gdt_frames[r]);
+}
+
+void _restore_vcpu(int cpu);
+
+atomic_t vcpus_rebooting;
+
+static int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
+{
+    int r;
+    int gdt_pages = (ctxt->gdt_ents + 511) / 512;
+
+    /* This is kind of a hack, and implicitly relies on the fact that
+       the vcpu stops in a place where all of the call clobbered
+       registers are already dead. */
+    ctxt->user_regs.esp -= 4;
+    ((unsigned long *)ctxt->user_regs.esp)[0] = ctxt->user_regs.eip;
+    ctxt->user_regs.eip = (unsigned long)_restore_vcpu;
+
+    /* De-canonicalise.  libxc handles this for vcpu 0, but we need
+       to do it for the other vcpus. */
+    ctxt->ctrlreg[3] = phys_to_machine(ctxt->ctrlreg[3]);
+    for (r = 0; r < gdt_pages; r++)
+	ctxt->gdt_frames[r] = pfn_to_mfn(ctxt->gdt_frames[r]);
+
+    atomic_set(&vcpus_rebooting, 1);
+    r = HYPERVISOR_boot_vcpu(vcpu, ctxt);
+    if (r != 0) {
+	printk(KERN_EMERG "Failed to reboot vcpu %d (%d)\n", vcpu, r);
+	return -1;
+    }
+
+    /* Make sure we wait for the new vcpu to come up before trying to do
+       anything with it or starting the next one. */
+    while (atomic_read(&vcpus_rebooting))
+	barrier();
+
+    return 0;
+}
+
+static int __do_suspend(void *ignore)
 {
     int i, j;
     suspend_record_t *suspend_record;
+    static vcpu_guest_context_t suspended_cpu_records[NR_CPUS];
 
     /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
 	/* XXX SMH: yes it would :-( */	
@@ -97,13 +160,63 @@ static void __do_suspend(void)
     extern unsigned long max_pfn;
     extern unsigned int *pfn_to_mfn_frame_list;
 
+    cpumask_t prev_online_cpus, prev_present_cpus;
+    int err = 0;
+
+    BUG_ON(smp_processor_id() != 0);
+    BUG_ON(in_interrupt());
+
+#if defined(CONFIG_SMP) && !defined(CONFIG_HOTPLUG_CPU)
+    if (num_online_cpus() > 1) {
+	printk(KERN_WARNING "Can't suspend SMP guests without CONFIG_HOTPLUG_CPU\n");
+	return -EOPNOTSUPP;
+    }
+#endif
+
     suspend_record = (suspend_record_t *)__get_free_page(GFP_KERNEL);
     if ( suspend_record == NULL )
         goto out;
 
+    /* Take all of the other cpus offline.  We need to be careful not
+       to get preempted between the final test for num_online_cpus()
+       == 1 and disabling interrupts, since otherwise userspace could
+       bring another cpu online, and then we'd be stuffed.  At the
+       same time, cpu_down can reschedule, so we need to enable
+       preemption while doing that.  This kind of sucks, but should be
+       correct. */
+    /* (We don't need to worry about other cpus bringing stuff up,
+       since by the time num_online_cpus() == 1, there aren't any
+       other cpus) */
+    cpus_clear(prev_online_cpus);
+    preempt_disable();
+    while (num_online_cpus() > 1) {
+	preempt_enable();
+	for_each_online_cpu(i) {
+	    if (i == 0)
+		continue;
+	    err = cpu_down(i);
+	    if (err != 0) {
+		printk(KERN_CRIT "Failed to take all CPUs down: %d.\n", err);
+		goto out_reenable_cpus;
+	    }
+	    cpu_set(i, prev_online_cpus);
+	}
+	preempt_disable();
+    }
+
     suspend_record->nr_pfns = max_pfn; /* final number of pfns */
 
     __cli();
+
+    preempt_enable();
+
+    cpus_clear(prev_present_cpus);
+    for_each_present_cpu(i) {
+	if (i == 0)
+	    continue;
+	save_vcpu_context(i, &suspended_cpu_records[i]);
+	cpu_set(i, prev_present_cpus);
+    }
 
 #ifdef __i386__
     mm_pin_all();
@@ -132,6 +245,8 @@ static void __do_suspend(void)
     memcpy(&suspend_record->resume_info, &xen_start_info,
            sizeof(xen_start_info));
 
+    /* We'll stop somewhere inside this hypercall.  When it returns,
+       we'll start resuming after the restore. */
     HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
 
     shutting_down = SHUTDOWN_INVALID; 
@@ -171,11 +286,26 @@ static void __do_suspend(void)
 
     usbif_resume();
 
+    for_each_cpu_mask(i, prev_present_cpus) {
+	restore_vcpu_context(i, &suspended_cpu_records[i]);
+    }
+
     __sti();
+
+ out_reenable_cpus:
+    for_each_cpu_mask(i, prev_online_cpus) {
+	j = cpu_up(i);
+	if (j != 0) {
+	    printk(KERN_CRIT "Failed to bring cpu %d back up (%d).\n",
+		   i, j);
+	    err = j;
+	}
+    }
 
  out:
     if ( suspend_record != NULL )
         free_page((unsigned long)suspend_record);
+    return err;
 }
 
 static int shutdown_process(void *__unused)
@@ -222,6 +352,18 @@ static int shutdown_process(void *__unused)
     return 0;
 }
 
+static struct task_struct *kthread_create_on_cpu(int (*f)(void *arg),
+						 void *arg,
+						 const char *name,
+						 int cpu)
+{
+    struct task_struct *p;
+    p = kthread_create(f, arg, name);
+    kthread_bind(p, cpu);
+    wake_up_process(p);
+    return p;
+}
+
 static void __shutdown_handler(void *unused)
 {
     int err;
@@ -234,7 +376,7 @@ static void __shutdown_handler(void *unused)
     }
     else
     {
-        __do_suspend();
+	kthread_create_on_cpu(__do_suspend, NULL, "suspender", 0);
     }
 }
 

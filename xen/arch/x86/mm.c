@@ -2633,14 +2633,16 @@ long set_gdt(struct vcpu *v,
 
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
-    
+
     shadow_sync_all(d);
 
     /* Check the pages in the new GDT. */
-    for ( i = 0; i < nr_pages; i++ )
-        if ( ((pfn = frames[i]) >= max_page) ||
-             !get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) )
+    for ( i = 0; i < nr_pages; i++ ) {
+        pfn = frames[i];
+        if ((pfn >= max_page) ||
+            !get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) )
             goto fail;
+    }
 
     /* Tear down the old GDT. */
     destroy_gdt(v);

@@ -745,7 +745,7 @@ static void __init hpet_time_init(void)
 #endif
 
 /* Dynamically-mapped IRQ. */
-static DEFINE_PER_CPU(int, timer_irq);
+DEFINE_PER_CPU(int, timer_irq);
 
 static struct irqaction irq_timer = {
 	timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "timer0",

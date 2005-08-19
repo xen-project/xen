@@ -38,6 +38,8 @@
 #include <xen/mm.h>
 #include <public/sched_ctl.h>
 
+extern void arch_getdomaininfo_ctxt(struct vcpu *,
+                                    struct vcpu_guest_context *);
 /* opt_sched: scheduler - default to SEDF */
 static char opt_sched[10] = "sedf";
 string_param("sched", opt_sched);
@@ -82,7 +84,8 @@ void free_domain_struct(struct domain *d)
     int i;
 
     SCHED_OP(free_task, d);
-    for (i = 0; i < MAX_VIRT_CPUS; i++)
+    /* vcpu 0 has to be the last one destructed. */
+    for (i = MAX_VIRT_CPUS-1; i >= 0; i--)
         if ( d->vcpu[i] )
             arch_free_vcpu_struct(d->vcpu[i]);
 
@@ -295,10 +298,36 @@ static long do_vcpu_up(int vcpu)
     return 0;
 }
 
+static long do_vcpu_pickle(int vcpu, unsigned long arg)
+{
+    struct vcpu *v;
+    vcpu_guest_context_t *c;
+    int ret = 0;
+
+    if (vcpu >= MAX_VIRT_CPUS)
+        return -EINVAL;
+    v = current->domain->vcpu[vcpu];
+    if (!v)
+        return -ESRCH;
+    /* Don't pickle vcpus which are currently running */
+    if (!test_bit(_VCPUF_down, &v->vcpu_flags)) {
+        return -EBUSY;
+    }
+    c = xmalloc(vcpu_guest_context_t);
+    if (!c)
+        return -ENOMEM;
+    arch_getdomaininfo_ctxt(v, c);
+    if (copy_to_user((vcpu_guest_context_t *)arg,
+                     (const vcpu_guest_context_t *)c, sizeof(*c)))
+        ret = -EFAULT;
+    xfree(c);
+    return ret;
+}
+
 /*
  * Demultiplex scheduler-related hypercalls.
  */
-long do_sched_op(unsigned long op)
+long do_sched_op(unsigned long op, unsigned long arg)
 {
     long ret = 0;
 
@@ -332,6 +361,11 @@ long do_sched_op(unsigned long op)
     case SCHEDOP_vcpu_up:
     {
         ret = do_vcpu_up((int)(op >> SCHEDOP_vcpushift));
+        break;
+    }
+    case SCHEDOP_vcpu_pickle:
+    {
+        ret = do_vcpu_pickle((int)(op >> SCHEDOP_vcpushift), arg);
         break;
     }
 

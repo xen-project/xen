@@ -1286,4 +1286,10 @@ void smp_resume(void)
 	smp_intr_init();
 	local_setup_timer_irq();
 }
+
+void _restore_vcpu(void)
+{
+	/* XXX need to write this */
+}
+
 #endif
