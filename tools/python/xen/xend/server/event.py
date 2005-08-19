@@ -50,7 +50,7 @@ class EventProtocol(protocol.Protocol):
     def dataReceived(self, data):
         try:
             self.parser.input(data)
-            if self.parser.ready():
+            while(self.parser.ready()):
                 val = self.parser.get_val()
                 res = self.dispatch(val)
                 self.send_result(res)
