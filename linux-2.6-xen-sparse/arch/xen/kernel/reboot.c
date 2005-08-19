@@ -70,7 +70,13 @@ static void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
     int r;
     int gdt_pages;
     r = HYPERVISOR_vcpu_pickle(vcpu, ctxt);
-    BUG_ON(r != 0);
+    if (r != 0)
+	panic("pickling vcpu %d -> %d!\n", vcpu, r);
+
+    /* Translate from machine to physical addresses where necessary,
+       so that they can be translated to our new machine address space
+       after resume.  libxc is responsible for doing this to vcpu0,
+       but we do it to the others. */
     gdt_pages = (ctxt->gdt_ents + 511) / 512;
     ctxt->ctrlreg[3] = machine_to_phys(ctxt->ctrlreg[3]);
     for (r = 0; r < gdt_pages; r++)
@@ -81,7 +87,7 @@ void _restore_vcpu(int cpu);
 
 atomic_t vcpus_rebooting;
 
-static void restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
+static int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
 {
     int r;
     int gdt_pages = (ctxt->gdt_ents + 511) / 512;
@@ -93,21 +99,25 @@ static void restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
     ((unsigned long *)ctxt->user_regs.esp)[0] = ctxt->user_regs.eip;
     ctxt->user_regs.eip = (unsigned long)_restore_vcpu;
 
+    /* De-canonicalise.  libxc handles this for vcpu 0, but we need
+       to do it for the other vcpus. */
     ctxt->ctrlreg[3] = phys_to_machine(ctxt->ctrlreg[3]);
     for (r = 0; r < gdt_pages; r++)
 	ctxt->gdt_frames[r] = pfn_to_mfn(ctxt->gdt_frames[r]);
+
     atomic_set(&vcpus_rebooting, 1);
     r = HYPERVISOR_boot_vcpu(vcpu, ctxt);
     if (r != 0) {
 	printk(KERN_EMERG "Failed to reboot vcpu %d (%d)\n", vcpu, r);
-	return;
+	return -1;
     }
-    /* Hmm... slight hack: make sure the cpus come up in order,
-       because that way they get the same evtchn numbers this time as
-       they did last time, which works around a few bugs. */
-    /* XXX */
+
+    /* Make sure we wait for the new vcpu to come up before trying to do
+       anything with it or starting the next one. */
     while (atomic_read(&vcpus_rebooting))
 	barrier();
+
+    return 0;
 }
 
 extern unsigned uber_debug;
@@ -159,7 +169,7 @@ static int __do_suspend(void *ignore)
     extern unsigned long max_pfn;
     extern unsigned int *pfn_to_mfn_frame_list;
 
-    cpumask_t feasible_cpus;
+    cpumask_t prev_online_cpus, prev_present_cpus;
     int err = 0;
 
     BUG_ON(smp_processor_id() != 0);
@@ -186,7 +196,7 @@ static int __do_suspend(void *ignore)
     /* (We don't need to worry about other cpus bringing stuff up,
        since by the time num_online_cpus() == 1, there aren't any
        other cpus) */
-    cpus_clear(feasible_cpus);
+    cpus_clear(prev_online_cpus);
     preempt_disable();
     while (num_online_cpus() > 1) {
 	preempt_enable();
@@ -198,17 +208,24 @@ static int __do_suspend(void *ignore)
 		printk(KERN_CRIT "Failed to take all CPUs down: %d.\n", err);
 		goto out_reenable_cpus;
 	    }
-	    cpu_set(i, feasible_cpus);
+	    cpu_set(i, prev_online_cpus);
 	}
+	preempt_disable();
     }
 
     suspend_record->nr_pfns = max_pfn; /* final number of pfns */
 
     __cli();
 
-    for (i = 0; i < NR_CPUS; i++)
-	if (cpu_isset(i, feasible_cpus))
-	    save_vcpu_context(i, &suspended_cpu_records[i]);
+    preempt_enable();
+
+    cpus_clear(prev_present_cpus);
+    for_each_present_cpu(i) {
+	if (i == 0)
+	    continue;
+	save_vcpu_context(i, &suspended_cpu_records[i]);
+	cpu_set(i, prev_present_cpus);
+    }
 
 #ifdef __i386__
     mm_pin_all();
@@ -282,26 +299,23 @@ static int __do_suspend(void *ignore)
 
     usbif_resume();
 
-    for (i = 0; i < NR_CPUS; i++)
-	if (cpu_isset(i, feasible_cpus))
-	    restore_vcpu_context(i, &suspended_cpu_records[i]);
+    for_each_cpu_mask(i, prev_present_cpus) {
+	restore_vcpu_context(i, &suspended_cpu_records[i]);
+    }
 
-    printk("<0>All cpus rebooted...\n");
     __sti();
 
  out_reenable_cpus:
-    while (!cpus_empty(feasible_cpus)) {
-	i = first_cpu(feasible_cpus);
-	printk("<0>Bring %d up.\n", i);
+    for_each_cpu_mask(i, prev_online_cpus) {
 	j = cpu_up(i);
-	printk("<0>cpu_up(%d) -> %d.\n", i, j);
 	if (j != 0) {
 	    printk(KERN_CRIT "Failed to bring cpu %d back up (%d).\n",
 		   i, j);
 	    err = j;
 	}
-	cpu_clear(i, feasible_cpus);
     }
+
+    uber_debug = 0;
 
  out:
     if ( suspend_record != NULL )

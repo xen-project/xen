@@ -129,10 +129,11 @@ static inline int __prepare_ICR2 (unsigned int mask)
 
 DECLARE_PER_CPU(int, ipi_to_evtchn[NR_IPIS]);
 
+extern unsigned uber_debug;
+
 static inline void __send_IPI_one(unsigned int cpu, int vector)
 {
 	unsigned int evtchn;
-	int r;
 
 	evtchn = per_cpu(ipi_to_evtchn, cpu)[vector];
 	// printk("send_IPI_mask_bitmask cpu %d vector %d evtchn %d\n", cpu, vector, evtchn);
@@ -143,6 +144,9 @@ static inline void __send_IPI_one(unsigned int cpu, int vector)
 		       synch_test_bit(evtchn, &s->evtchn_mask[0]))
 			;
 #endif
+		if (uber_debug)
+			printk("<0>Send ipi %d to %d evtchn %d.\n",
+			       vector, cpu, evtchn);
 		notify_via_evtchn(evtchn);
 	} else
 		printk("send_IPI to unbound port %d/%d",
@@ -601,6 +605,7 @@ irqreturn_t smp_call_function_interrupt(int irq, void *dev_id,
 	void (*func) (void *info) = call_data->func;
 	void *info = call_data->info;
 	int wait = call_data->wait;
+	extern unsigned uber_debug;
 
 	/*
 	 * Notify initiating CPU that I've grabbed the data and am
@@ -612,6 +617,9 @@ irqreturn_t smp_call_function_interrupt(int irq, void *dev_id,
 	 * At this point the info structure may be out of scope unless wait==1
 	 */
 	irq_enter();
+	if (uber_debug && smp_processor_id())
+		printk("<0>Processor %d calling %p.\n", smp_processor_id(),
+		       func);
 	(*func)(info);
 	irq_exit();
 

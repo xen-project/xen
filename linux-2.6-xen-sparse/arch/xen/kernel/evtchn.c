@@ -124,6 +124,8 @@ extern asmlinkage unsigned int do_IRQ(struct pt_regs *regs);
 
 #define VALID_EVTCHN(_chn) ((_chn) >= 0)
 
+unsigned uber_debug;
+
 /*
  * Force a proper event-channel callback from Xen after clearing the
  * callback mask. We do this in a very simple manner, by making a call
@@ -144,7 +146,7 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
     vcpu_info_t   *vcpu_info = &s->vcpu_data[cpu];
 
     vcpu_info->evtchn_upcall_pending = 0;
-    
+
     /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
     l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
     while ( l1 != 0 )
@@ -158,9 +160,13 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
             l2 &= ~(1 << l2i);
             
             port = (l1i << 5) + l2i;
-            if ( (irq = evtchn_to_irq[port]) != -1 )
+	    if (uber_debug && cpu)
+		printk("<0>Upcall to %d on %d.\n", port, cpu);
+            if ( (irq = evtchn_to_irq[port]) != -1 ) {
+		if (uber_debug && cpu)
+		    printk("<0>IRQ %d.\n", irq);
                 do_IRQ(irq, regs);
-	    else
+	    } else
                 evtchn_device_upcall(port);
         }
     }
@@ -272,6 +278,8 @@ void _bind_ipi_to_irq(int ipi, int vcpu, int irq)
     evtchn_to_irq[evtchn] = irq;
     irq_to_evtchn[irq]    = evtchn;
 
+    printk("<0>evtchn_to_irq[%d] = %d.\n", evtchn,
+	   evtchn_to_irq[evtchn]);
     per_cpu(ipi_to_evtchn, vcpu)[ipi] = evtchn;
 
     bind_evtchn_to_cpu(evtchn, vcpu);
@@ -279,6 +287,7 @@ void _bind_ipi_to_irq(int ipi, int vcpu, int irq)
     spin_unlock(&irq_mapping_update_lock);
 
     clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_mask);
+    clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_pending);
 }
 
 void _bind_virq_to_irq(int virq, int cpu, int irq)
@@ -294,7 +303,6 @@ void _bind_virq_to_irq(int virq, int cpu, int irq)
             panic("Failed to bind virtual IRQ %d\n", virq);
     evtchn = op.u.bind_virq.port;
 
-
     evtchn_to_irq[irq_to_evtchn[irq]] = -1;
     irq_to_evtchn[irq] = -1;
 
@@ -306,6 +314,9 @@ void _bind_virq_to_irq(int virq, int cpu, int irq)
     bind_evtchn_to_cpu(evtchn, cpu);
 
     spin_unlock(&irq_mapping_update_lock);
+
+    clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_mask);
+    clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_pending);
 }
 
 int bind_ipi_to_irq(int ipi)
