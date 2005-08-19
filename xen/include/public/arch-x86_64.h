@@ -103,9 +103,6 @@ struct switch_to_user {
     /* Bottom of switch_to_user stack frame. */
 };
 
-/* NB. Both the following are 64 bits each. */
-typedef unsigned long memory_t;   /* Full-sized pointer/address/memory-size. */
-
 /*
  * Send an array of these to HYPERVISOR_set_trap_table().
  * N.B. As in x86/32 mode, the privilege level specifies which modes may enter
@@ -121,10 +118,10 @@ typedef unsigned long memory_t;   /* Full-sized pointer/address/memory-size. */
 #define TI_SET_DPL(_ti,_dpl) ((_ti)->flags |= (_dpl))
 #define TI_SET_IF(_ti,_if)   ((_ti)->flags |= ((!!(_if))<<2))
 typedef struct trap_info {
-    u8       vector;  /* exception vector                              */
-    u8       flags;   /* 0-3: privilege level; 4: clear event enable?  */
-    u16      cs;      /* code selector                                 */
-    memory_t address; /* code address                                  */
+    u8       vector;       /* exception vector                              */
+    u8       flags;        /* 0-3: privilege level; 4: clear event enable?  */
+    u16      cs;           /* code selector                                 */
+    unsigned long address; /* code offset                                   */
 } trap_info_t;
 
 typedef struct cpu_user_regs {

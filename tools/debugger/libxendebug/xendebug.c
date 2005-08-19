@@ -40,7 +40,7 @@ typedef int boolean;
 typedef struct bwcpoint                           /* break/watch/catch point */
 {
     struct list_head list;
-    memory_t address;
+    unsigned long address;
     u32 domain;
     u8 old_value;                             /* old value for software bkpt */
 } bwcpoint_t, *bwcpoint_p;
@@ -311,7 +311,7 @@ xendebug_continue(int xc_handle,
 /* access to one page */
 static int
 xendebug_memory_page (domain_context_p ctxt, int xc_handle, u32 vcpu,
-                      int protection, memory_t address, int length, u8 *buffer)
+                      int protection, unsigned long address, int length, u8 *buffer)
 {
     vcpu_guest_context_t *vcpu_ctxt = &ctxt->context[vcpu];
     unsigned long pde, page;
@@ -407,7 +407,7 @@ xendebug_memory_page (domain_context_p ctxt, int xc_handle, u32 vcpu,
 /* divide a memory operation into accesses to individual pages */
 static int
 xendebug_memory_op (domain_context_p ctxt, int xc_handle, u32 vcpu,
-                    int protection, memory_t address, int length, u8 *buffer)
+                    int protection, unsigned long address, int length, u8 *buffer)
 {
     int      remain;              /* number of bytes to touch past this page */
     int      bytes   = 0;
@@ -431,7 +431,7 @@ int
 xendebug_read_memory(int xc_handle,
                      u32 domid,
                      u32 vcpu,
-                     memory_t address,
+                     unsigned long address,
                      u32 length,
                      u8 *data)
 {
@@ -451,7 +451,7 @@ int
 xendebug_write_memory(int xc_handle,
                       u32 domid,
                       u32 vcpu,
-                      memory_t address,
+                      unsigned long address,
                       u32 length,
                       u8 *data)
 {
@@ -471,7 +471,7 @@ int
 xendebug_insert_memory_breakpoint(int xc_handle,
                                   u32 domid,
                                   u32 vcpu,
-                                  memory_t address,
+                                  unsigned long address,
                                   u32 length)
 {
     bwcpoint_p bkpt;
@@ -517,7 +517,7 @@ int
 xendebug_remove_memory_breakpoint(int xc_handle,
                                   u32 domid,
                                   u32 vcpu,
-                                  memory_t address,
+                                  unsigned long address,
                                   u32 length)
 {
     bwcpoint_p bkpt = NULL;

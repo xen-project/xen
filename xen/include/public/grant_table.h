@@ -153,13 +153,13 @@ typedef u16 grant_ref_t;
 #define GNTTABOP_map_grant_ref        0
 typedef struct gnttab_map_grant_ref {
     /* IN parameters. */
-    memory_t    host_addr;
+    u64         host_addr;
     domid_t     dom;
     grant_ref_t ref;
     u16         flags;                /* GNTMAP_* */
     /* OUT parameters. */
     s16         handle;               /* +ve: handle; -ve: GNTST_* */
-    memory_t    dev_bus_addr;
+    u64         dev_bus_addr;
 } gnttab_map_grant_ref_t;
 
 /*
@@ -176,8 +176,8 @@ typedef struct gnttab_map_grant_ref {
 #define GNTTABOP_unmap_grant_ref      1
 typedef struct gnttab_unmap_grant_ref {
     /* IN parameters. */
-    memory_t    host_addr;
-    memory_t    dev_bus_addr;
+    u64         host_addr;
+    u64         dev_bus_addr;
     u16         handle;
     /* OUT parameters. */
     s16         status;               /* GNTST_* */
@@ -223,7 +223,7 @@ typedef struct gnttab_dump_table {
  */
 #define GNTTABOP_donate                4
 typedef struct {
-    memory_t    mfn;		      /*  0 */
+    unsigned long mfn;		      /*  0 */
     domid_t     domid;		      /*  4 */
     u16         handle;               /*  8 */
     s16         status;               /*  10: GNTST_* */

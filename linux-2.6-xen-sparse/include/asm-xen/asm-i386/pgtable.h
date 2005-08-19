@@ -32,7 +32,7 @@
  */
 #define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 extern unsigned long empty_zero_page[1024];
-extern pgd_t swapper_pg_dir[1024];
+extern pgd_t *swapper_pg_dir;
 extern kmem_cache_t *pgd_cache;
 extern kmem_cache_t *pmd_cache;
 extern spinlock_t pgd_lock;

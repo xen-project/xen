@@ -49,13 +49,13 @@ typedef struct netif_st {
     unsigned long    tx_shmem_frame;
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
     u16              tx_shmem_handle;
-    memory_t         tx_shmem_vaddr; 
+    unsigned long    tx_shmem_vaddr; 
     grant_ref_t      tx_shmem_ref; 
 #endif
     unsigned long    rx_shmem_frame;
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
     u16              rx_shmem_handle;
-    memory_t         rx_shmem_vaddr; 
+    unsigned long    rx_shmem_vaddr; 
     grant_ref_t      rx_shmem_ref; 
 #endif
     unsigned int     evtchn;
