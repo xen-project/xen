@@ -502,4 +502,21 @@ HYPERVISOR_set_segment_base(
     return ret;
 }
 
+static inline int
+HYPERVISOR_vcpu_pickle(
+    int vcpu, vcpu_guest_context_t *ctxt)
+{
+    int ret;
+    unsigned long ign1, ign2;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_sched_op),
+	  "1" (SCHEDOP_vcpu_pickle | (vcpu << SCHEDOP_vcpushift)),
+	  "2" (ctxt)
+        : "memory" );
+
+    return ret;
+}
+
 #endif /* __HYPERCALL_H__ */
