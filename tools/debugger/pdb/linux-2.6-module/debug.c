@@ -26,7 +26,7 @@ static int pdb_page_fault_fn (struct pt_regs *regs, long error_code,
 typedef struct bwcpoint                           /* break/watch/catch point */
 {
     struct list_head list;
-    memory_t address;
+    unsigned long address;
     int length;
 
     u8  type;                                                     /* BWC_??? */
@@ -109,7 +109,7 @@ pdb_bwc_print_list (void)
 }
 
 bwcpoint_p
-pdb_search_watchpoint (u32 process, memory_t address)
+pdb_search_watchpoint (u32 process, unsigned long address)
 {
     bwcpoint_p bwc_watch = (bwcpoint_p) 0;
     bwcpoint_p bwc_entry = (bwcpoint_p) 0;
@@ -364,7 +364,7 @@ pdb_step (struct task_struct *target)
 
 int
 pdb_insert_memory_breakpoint (struct task_struct *target, 
-                              memory_t address, u32 length)
+                              unsigned long address, u32 length)
 {
     int rc = 0;
     bwcpoint_p bkpt;
@@ -399,7 +399,7 @@ pdb_insert_memory_breakpoint (struct task_struct *target,
 
 int
 pdb_remove_memory_breakpoint (struct task_struct *target,
-                              memory_t address, u32 length)
+                              unsigned long address, u32 length)
 {
     int rc = 0;
     bwcpoint_p bkpt = NULL;
@@ -760,7 +760,7 @@ pdb_int3_fn (struct pt_regs *regs, long error_code)
 {
     pdb_response_t resp;
     bwcpoint_p bkpt = NULL;
-    memory_t address = regs->eip - 1;
+    unsigned long address = regs->eip - 1;
 
     struct list_head *entry;
     list_for_each(entry, &bwcpoint_list)

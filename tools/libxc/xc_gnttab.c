@@ -40,12 +40,12 @@ do_gnttab_op(int xc_handle,
 
 
 int xc_gnttab_map_grant_ref(int         xc_handle,
-                            memory_t    host_virt_addr,
+                            u64    host_virt_addr,
                             u32         dom,
                             u16         ref,
                             u16         flags,
                             s16        *handle,
-                            memory_t   *dev_bus_addr)
+                            u64   *dev_bus_addr)
 {
     struct gnttab_map_grant_ref op;
     int rc;
@@ -67,8 +67,8 @@ int xc_gnttab_map_grant_ref(int         xc_handle,
 
 
 int xc_gnttab_unmap_grant_ref(int       xc_handle,
-                              memory_t  host_virt_addr,
-                              memory_t  dev_bus_addr,
+                              u64  host_virt_addr,
+                              u64  dev_bus_addr,
                               u16       handle,
                               s16      *status)
 {
@@ -92,7 +92,7 @@ int xc_gnttab_setup_table(int        xc_handle,
                           u32        dom,
                           u16        nr_frames,
                           s16       *status,
-                          memory_t **frame_list)
+                          unsigned long **frame_list)
 {
     struct gnttab_setup_table op;
     int rc, i;

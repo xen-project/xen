@@ -80,7 +80,7 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 		t->io_bitmap_ptr = bitmap;
 
 		op.cmd = PHYSDEVOP_SET_IOBITMAP;
-		op.u.set_iobitmap.bitmap   = (unsigned long)bitmap;
+		op.u.set_iobitmap.bitmap   = (char *)bitmap;
 		op.u.set_iobitmap.nr_ports = IO_BITMAP_BITS;
 		HYPERVISOR_physdev_op(&op);
 	}

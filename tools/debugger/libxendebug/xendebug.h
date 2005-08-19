@@ -45,7 +45,7 @@ int xendebug_continue(int xc_handle,
 int xendebug_read_memory(int xc_handle,
 			 u32 domid,
 			 u32 vcpu,
-			 memory_t address,
+			 unsigned long address,
 			 u32 length,
 			 u8 *data);
 
@@ -53,7 +53,7 @@ int xendebug_read_memory(int xc_handle,
 int xendebug_write_memory(int xc_handle,
 			  u32 domid,
 			  u32 vcpu,
-			  memory_t address,
+			  unsigned long address,
 			  u32 length,
 			  u8 *data);
 
@@ -61,13 +61,13 @@ int xendebug_write_memory(int xc_handle,
 int xendebug_insert_memory_breakpoint(int xc_handle,
 				      u32 domid,
 				      u32 vcpu,
-				      memory_t address,
+				      unsigned long address,
 				      u32 length);
 
 int xendebug_remove_memory_breakpoint(int xc_handle,
 				      u32 domid,
 				      u32 vcpu,
-				      memory_t address,
+				      unsigned long address,
 				      u32 length);
 
 int xendebug_query_domain_stop(int xc_handle,

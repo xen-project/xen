@@ -1134,25 +1134,24 @@ static void watch_for_status(struct xenbus_watch *watch, const char *node)
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,
 			    NULL);
-
-	if (err)
+	if (err) {
 		xenbus_dev_error(info->dev, err, "reading backend fields");
-	else {
-		xlvbd_add(sectors, info->vdevice, info->handle, binfo,
-			  sector_size);
-		info->connected = 1;
-
-		/* First to connect?  blkif is now connected. */
-		if (blkif_vbds_connected++ == 0)
-			blkif_state = BLKIF_STATE_CONNECTED;
-
-		xenbus_dev_ok(info->dev);
-
-		/* Kick pending requests. */
-		spin_lock_irq(&blkif_io_lock);
-		kick_pending_request_queues();
-		spin_unlock_irq(&blkif_io_lock);
+		return;
 	}
+
+	xlvbd_add(sectors, info->vdevice, info->handle, binfo, sector_size);
+	info->connected = 1;
+
+	/* First to connect?  blkif is now connected. */
+	if (blkif_vbds_connected++ == 0)
+		blkif_state = BLKIF_STATE_CONNECTED;
+
+	xenbus_dev_ok(info->dev);
+
+	/* Kick pending requests. */
+	spin_lock_irq(&blkif_io_lock);
+	kick_pending_request_queues();
+	spin_unlock_irq(&blkif_io_lock);
 }
 
 static int setup_blkring(struct xenbus_device *dev, unsigned int backend_id)
@@ -1199,36 +1198,28 @@ static int talk_to_backend(struct xenbus_device *dev,
 	const char *message;
 	int err, backend_id;
 
-	backend = xenbus_read(dev->nodename, "backend", NULL);
-	if (IS_ERR(backend)) {
-		err = PTR_ERR(backend);
-		if (err == -ENOENT)
-			goto out;
-		xenbus_dev_error(dev, err, "reading %s/backend",
+	backend = NULL;
+	err = xenbus_gather(dev->nodename,
+			    "backend-id", "%i", &backend_id,
+			    "backend", NULL, &backend,
+			    NULL);
+	if (XENBUS_EXIST_ERR(err))
+		goto out;
+	if (backend && strlen(backend) == 0) {
+		err = -ENOENT;
+		goto out;
+	}
+	if (err < 0) {
+		xenbus_dev_error(dev, err, "reading %s/backend or backend-id",
 				 dev->nodename);
 		goto out;
 	}
-	if (strlen(backend) == 0) {
-		err = -ENOENT;
-		goto free_backend;
-	}
-
-	/* FIXME: This driver can't handle backends on different
-	 * domains.  Check and fail gracefully. */
-	err = xenbus_scanf(dev->nodename, "backend-id", "%i", &backend_id);
-	if (err == -ENOENT)
-		goto free_backend;
- 	if (err < 0) {
-		xenbus_dev_error(dev, err, "reading %s/backend-id",
-				 dev->nodename);
- 		goto free_backend;
- 	}
 
 	/* First device?  We create shared ring, alloc event channel. */
 	if (blkif_vbds == 0) {
 		err = setup_blkring(dev, backend_id);
 		if (err)
-			goto free_backend;
+			goto out;
 	}
 
 	err = xenbus_transaction_start(dev->nodename);
@@ -1258,9 +1249,11 @@ static int talk_to_backend(struct xenbus_device *dev,
 		goto abort_transaction;
 	}
 
-	info->watch.node = info->backend = backend;
-	info->watch.callback = watch_for_status;
+	info->backend = backend;
+	backend = NULL;
 
+	info->watch.node = info->backend;
+	info->watch.callback = watch_for_status;
 	err = register_xenbus_watch(&info->watch);
 	if (err) {
 		message = "registering watch on backend";
@@ -1272,20 +1265,20 @@ static int talk_to_backend(struct xenbus_device *dev,
 		xenbus_dev_error(dev, err, "completing transaction");
 		goto destroy_blkring;
 	}
-	return 0;
 
-abort_transaction:
+ out:
+	if (backend)
+		kfree(backend);
+	return err;
+
+ abort_transaction:
 	xenbus_transaction_end(1);
 	/* Have to do this *outside* transaction.  */
 	xenbus_dev_error(dev, err, "%s", message);
-destroy_blkring:
+ destroy_blkring:
 	if (blkif_vbds == 0)
 		blkif_free();
-free_backend:
-	kfree(backend);
-out:
-	printk("%s:%u = %i\n", __FILE__, __LINE__, err);
-	return err;
+	goto out;
 }
 
 /* Setup supplies the backend dir, virtual device.
@@ -1301,7 +1294,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 
 	/* FIXME: Use dynamic device id if this is not set. */
 	err = xenbus_scanf(dev->nodename, "virtual-device", "%i", &vdevice);
-	if (err == -ENOENT)
+	if (XENBUS_EXIST_ERR(err))
 		return err;
 	if (err < 0) {
 		xenbus_dev_error(dev, err, "reading virtual-device");
@@ -1316,6 +1309,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 	info->dev = dev;
 	info->vdevice = vdevice;
 	info->connected = 0;
+
 	/* Front end dir is a number, which is used as the id. */
 	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
 	dev->data = info;
@@ -1427,8 +1421,8 @@ static int __init xlblk_init(void)
 
 #ifdef CONFIG_XEN_BLKDEV_GRANT
     /* A grant for every ring slot, plus one for the ring itself. */
-    if ( 0 > gnttab_alloc_grant_references(MAXIMUM_OUTSTANDING_BLOCK_REQS + 1,
-                                           &gref_head, &gref_terminal) )
+    if (gnttab_alloc_grant_references(MAXIMUM_OUTSTANDING_BLOCK_REQS + 1,
+				      &gref_head, &gref_terminal) < 0)
         return 1;
     printk(KERN_ALERT "Blkif frontend is using grant tables.\n");
 #endif

@@ -547,7 +547,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		iobmp_op.cmd                     =
 			PHYSDEVOP_SET_IOBITMAP;
 		iobmp_op.u.set_iobitmap.bitmap   =
-			(unsigned long)next->io_bitmap_ptr;
+			(char *)next->io_bitmap_ptr;
 		iobmp_op.u.set_iobitmap.nr_ports =
 			next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
 		mcl->op      = __HYPERVISOR_physdev_op;

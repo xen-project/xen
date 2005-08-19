@@ -203,7 +203,7 @@ dom_read_memory (value context, value address, value length)
     context_t ctx;
     int loop;
     char *buffer;
-    memory_t my_address = Int32_val(address);
+    unsigned long my_address = Int32_val(address);
     u32 my_length = Int_val(length);
 
     printf ("(pdb) read memory\n");
@@ -259,7 +259,7 @@ dom_write_memory (value context, value address, value val_list)
     context_t ctx;
 
     char buffer[4096];  /* a big buffer */
-    memory_t  my_address;
+    unsigned long  my_address;
     u32 length = 0;
 
     printf ("(pdb) write memory\n");
@@ -279,7 +279,7 @@ dom_write_memory (value context, value address, value val_list)
     }
     buffer[length++] = Int_val(Field(node, 0));
 
-    my_address = (memory_t) Int32_val(address);
+    my_address = (unsigned long) Int32_val(address);
 
     if ( xendebug_write_memory(xc_handle, ctx.domain, ctx.vcpu,
                                my_address, length, buffer) )
@@ -344,7 +344,7 @@ dom_insert_memory_breakpoint (value context, value address, value length)
     CAMLparam3(context, address, length);
 
     context_t ctx;
-    memory_t my_address = (memory_t) Int32_val(address);
+    unsigned long my_address = (unsigned long) Int32_val(address);
     int my_length = Int_val(length);
 
     decode_context(&ctx, context);
@@ -373,7 +373,7 @@ dom_remove_memory_breakpoint (value context, value address, value length)
 
     context_t ctx;
 
-    memory_t my_address = (memory_t) Int32_val(address);
+    unsigned long my_address = (unsigned long) Int32_val(address);
     int my_length = Int_val(length);
 
     printf ("(pdb) remove memory breakpoint 0x%lx %d\n",

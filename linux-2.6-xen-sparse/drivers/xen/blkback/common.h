@@ -71,7 +71,7 @@ typedef struct blkif_st {
     struct work_struct work;
 #ifdef CONFIG_XEN_BLKDEV_GRANT
     u16 shmem_handle;
-    memory_t shmem_vaddr;
+    unsigned long shmem_vaddr;
     grant_ref_t shmem_ref;
 #endif
 } blkif_t;

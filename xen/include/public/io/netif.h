@@ -10,7 +10,7 @@
 #define __XEN_PUBLIC_IO_NETIF_H__
 
 typedef struct netif_tx_request {
-    memory_t addr;   /* Machine address of packet.  */
+    unsigned long addr;   /* Machine address of packet.  */
     u16      csum_blank:1; /* Proto csum field blank?   */
     u16      id:15;  /* Echoed in response message. */
     u16      size;   /* Packet size in bytes.       */
@@ -32,7 +32,7 @@ typedef struct {
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
     u32      addr;   /*  0: Offset in page of start of received packet  */
 #else
-    memory_t addr;   /* Machine address of packet.              */
+    unsigned long addr; /* Machine address of packet.              */
 #endif
     u16      csum_valid:1; /* Protocol checksum is validated?       */
     u16      id:15;
