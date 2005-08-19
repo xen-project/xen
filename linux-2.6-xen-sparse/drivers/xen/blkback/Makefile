@@ -1,2 +1,2 @@
 
-obj-y	:= blkback.o control.o interface.o vbd.o
+obj-y	:= blkback.o xenbus.o interface.o vbd.o

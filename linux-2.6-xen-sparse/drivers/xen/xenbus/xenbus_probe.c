@@ -168,6 +168,8 @@ static int xenbus_dev_probe(struct device *_dev)
 	struct xenbus_driver *drv = to_xenbus_driver(_dev->driver);
 	const struct xenbus_device_id *id;
 
+	BUG_ON(!dev->driver);
+
 	if (!drv->probe)
 		return -ENODEV;
 
@@ -531,10 +533,13 @@ static struct xenbus_watch be_watch = {
 static int suspend_dev(struct device *dev, void *data)
 {
 	int err = 0;
-	struct xenbus_driver *drv = to_xenbus_driver(dev->driver);
-	struct xenbus_device *xdev
-		= container_of(dev, struct xenbus_device, dev);
+	struct xenbus_driver *drv;
+	struct xenbus_device *xdev;
 
+	if (dev->driver == NULL)
+		return 0;
+	drv = to_xenbus_driver(dev->driver);
+	xdev = container_of(dev, struct xenbus_device, dev);
 	if (drv->suspend)
 		err = drv->suspend(xdev);
 	if (err)
@@ -545,10 +550,13 @@ static int suspend_dev(struct device *dev, void *data)
 static int resume_dev(struct device *dev, void *data)
 {
 	int err = 0;
-	struct xenbus_driver *drv = to_xenbus_driver(dev->driver);
-	struct xenbus_device *xdev
-		= container_of(dev, struct xenbus_device, dev);
+	struct xenbus_driver *drv;
+	struct xenbus_device *xdev;
 
+	if (dev->driver == NULL)
+		return 0;
+	drv = to_xenbus_driver(dev->driver);
+	xdev = container_of(dev, struct xenbus_device, dev);
 	if (drv->resume)
 		err = drv->resume(xdev);
 	if (err)

@@ -104,7 +104,6 @@ static inline domid_t ID_TO_DOM(unsigned long id) { return (id >> 16); }
 #endif
 
 static int do_block_io_op(blkif_t *blkif, int max_to_do);
-static void dispatch_probe(blkif_t *blkif, blkif_request_t *req);
 static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req);
 static void make_response(blkif_t *blkif, unsigned long id, 
                           unsigned short op, int st);
@@ -349,10 +348,6 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
             dispatch_rw_block_io(blkif, req);
             break;
 
-        case BLKIF_OP_PROBE:
-            dispatch_probe(blkif, req);
-            break;
-
         default:
             DPRINTK("error: unknown block io operation [%d]\n",
                     req->operation);
@@ -363,66 +358,6 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
 
     blk_ring->req_cons = i;
     return more_to_do;
-}
-
-static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
-{
-    int rsp = BLKIF_RSP_ERROR;
-    int pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
-
-    /* We expect one buffer only. */
-    if ( unlikely(req->nr_segments != 1) )
-        goto out;
-
-    /* Make sure the buffer is page-sized. */
-    if ( (blkif_first_sect(req->frame_and_sects[0]) != 0) ||
-         (blkif_last_sect(req->frame_and_sects[0]) != ((PAGE_SIZE/512)-1)) )
-        goto out;
-
-#ifdef CONFIG_XEN_BLKDEV_GRANT
-    {
-        struct gnttab_map_grant_ref map;
-
-        map.host_addr = MMAP_VADDR(pending_idx, 0);
-        map.flags = GNTMAP_host_map;
-        map.ref = blkif_gref_from_fas(req->frame_and_sects[0]);
-        map.dom = blkif->domid;
-
-        if ( unlikely(HYPERVISOR_grant_table_op(
-                        GNTTABOP_map_grant_ref, &map, 1)))
-            BUG();
-
-        if ( map.handle < 0 )
-            goto out;
-
-        pending_handle(pending_idx, 0) = map.handle;
-    }
-#else /* else CONFIG_XEN_BLKDEV_GRANT */
-
-#ifdef CONFIG_XEN_BLKDEV_TAP_BE
-    /* Grab the real frontend out of the probe message. */
-    if (req->frame_and_sects[1] == BLKTAP_COOKIE) 
-        blkif->is_blktap = 1;
-#endif
-
-
-    if ( HYPERVISOR_update_va_mapping_otherdomain(
-        MMAP_VADDR(pending_idx, 0),
-        pfn_pte_ma(req->frame_and_sects[0] >> PAGE_SHIFT, PAGE_KERNEL),
-#ifdef CONFIG_XEN_BLKDEV_TAP_BE
-        0, (blkif->is_blktap ? ID_TO_DOM(req->id) : blkif->domid) ) )
-#else
-        0, blkif->domid) )
-#endif
-        goto out;
-#endif /* endif CONFIG_XEN_BLKDEV_GRANT */
-   
-    rsp = vbd_probe(blkif, (vdisk_t *)MMAP_VADDR(pending_idx, 0), 
-                    PAGE_SIZE / sizeof(vdisk_t));
-
- out:
-    fast_flush_area(pending_idx, 1);
-    make_response(blkif, req->id, req->operation, rsp);
 }
 
 static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
@@ -460,7 +395,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         goto bad_descriptor;
     }
 
-    preq.dev           = req->device;
+    preq.dev           = req->handle;
     preq.sector_number = req->sector_number;
     preq.nr_sects      = 0;
 
@@ -730,8 +665,8 @@ static int __init blkif_init(void)
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);
 #endif
 
-    blkif_ctrlif_init();
-    
+    blkif_xenbus_init();
+
 #ifdef CONFIG_XEN_BLKDEV_GRANT
     memset( pending_grant_handles,  BLKBACK_INVALID_HANDLE, MMAP_PAGES );
     printk(KERN_ALERT "Blkif backend is using grant tables.\n");

@@ -36,8 +36,10 @@ from xen.xend.server import controller
 from xen.xend.server import SrvDaemon; xend = SrvDaemon.instance()
 from xen.xend.server import messages
 from xen.xend.server.channel import EventChannel, channelFactory
+from xen.util.blkif import blkdev_name_to_number, expand_dev_name
 
 from xen.xend import sxp
+from xen.xend import Blkctl
 from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendBootloader import bootloader
 from xen.xend.XendLogging import log
@@ -380,6 +382,39 @@ class XendDomainInfo:
         return ctrl
 
     def createDevice(self, type, devconfig, change=False):
+        if type == 'vbd':
+
+            backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
+
+            devnum = blkdev_name_to_number(sxp.child_value(devconfig, 'dev'))
+
+            # create backend db
+            backdb = backdom.db.addChild("/backend/%s/%s/%d" %
+                                         (type, self.uuid, devnum))
+
+            # create frontend db
+            db = self.db.addChild("/device/%s/%d" % (type, devnum))
+            
+            db['virtual-device'] = "%i" % devnum
+            #db['backend'] = sxp.child_value(devconfig, 'backend', '0')
+            db['backend'] = backdb.getPath()
+            db['backend-id'] = "%i" % int(sxp.child_value(devconfig,
+                                                          'backend', '0'))
+
+            backdb['frontend'] = db.getPath()
+            (type, params) = string.split(sxp.child_value(devconfig, 'uname'), ':', 1)
+            node = Blkctl.block('bind', type, params)
+            backdb['frontend-id'] = "%i" % self.id
+            backdb['physical-device'] = "%li" % blkdev_name_to_number(node)
+            backdb.saveDB(save=True)
+
+            # Ok, super gross, this really doesn't belong in the frontend db...
+            db['type'] = type
+            db['node'] = node
+            db['params'] = params
+            db.saveDB(save=True)
+            
+            return
         ctrl = self.findDeviceController(type)
         return ctrl.createDevice(devconfig, recreate=self.recreate,
                                  change=change)
@@ -671,6 +706,16 @@ class XendDomainInfo:
         for ctrl in self.getDeviceControllers():
             if ctrl.isDestroyed(): continue
             ctrl.destroyController(reboot=reboot)
+        ddb = self.db.addChild("/device")
+        for type in ddb.keys():
+            if type == 'vbd':
+                typedb = ddb.addChild(type)
+                for dev in typedb.keys():
+                    devdb = typedb.addChild(str(dev))
+                    Blkctl.block('unbind', devdb['type'].getData(),
+                                 devdb['node'].getData())
+                    typedb[dev].delete()
+                typedb.saveDB(save=True)
 
     def show(self):
         """Print virtual machine info.
@@ -926,6 +971,7 @@ class XendDomainInfo:
         at creation time, for example when it uses NFS root.
 
         """
+        return
         blkif = self.getDeviceController("vbd", error=False)
         if not blkif:
             blkif = self.createDeviceController("vbd")

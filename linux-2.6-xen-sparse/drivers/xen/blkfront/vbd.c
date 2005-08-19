@@ -46,8 +46,9 @@
 struct lvdisk
 {
     blkif_sector_t capacity; /*  0: Size in terms of 512-byte sectors.   */
-    blkif_vdev_t   device;   /*  8: Device number (opaque 16 bit value). */
-    u16            info; 
+    blkif_vdev_t   handle;   /*  8: Device number (opaque 16 bit value). */
+    u16            info;
+    dev_t          dev;
     struct list_head list;
 };
 
@@ -85,7 +86,7 @@ static struct xlbd_major_info *major_info[NUM_IDE_MAJORS + NUM_SCSI_MAJORS +
 
 /* Information about our VBDs. */
 #define MAX_VBDS 64
-struct list_head vbds_list;
+static LIST_HEAD(vbds_list);
 
 #define MAJOR_XEN(dev) ((dev)>>8)
 #define MINOR_XEN(dev) ((dev) & 0xff)
@@ -118,49 +119,6 @@ static void xlvbd_device_free(struct lvdisk *disk)
     kfree(disk);
 }
 
-static vdisk_t *xlvbd_probe(int *ret)
-{
-    blkif_response_t rsp;
-    blkif_request_t req;
-    vdisk_t *disk_info = NULL;
-    unsigned long buf;
-    int nr;
-
-    buf = __get_free_page(GFP_KERNEL);
-    if ((void *)buf == NULL)
-        goto out;
-
-    memset(&req, 0, sizeof(req));
-    req.operation = BLKIF_OP_PROBE;
-    req.nr_segments = 1;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
-    blkif_control_probe_send(&req, &rsp,
-                             (unsigned long)(virt_to_machine(buf)));
-#else
-    req.frame_and_sects[0] = blkif_fas(virt_to_machine(buf), 0, (PAGE_SIZE/512)-1);
-
-    blkif_control_send(&req, &rsp);
-#endif
-    if ( rsp.status <= 0 ) {
-        WPRINTK("Could not probe disks (%d)\n", rsp.status);
-        goto out;
-    }
-    nr = rsp.status;
-    if ( nr > MAX_VBDS )
-        nr = MAX_VBDS;
-
-    disk_info = kmalloc(nr * sizeof(vdisk_t), GFP_KERNEL);
-    if (disk_info != NULL)
-        memcpy(disk_info, (void *) buf, nr * sizeof(vdisk_t));
-
-    if (ret != NULL)
-        *ret = nr;
-
-out:
-    free_page(buf);
-    return disk_info;
-}
-
 static struct xlbd_major_info *xlbd_alloc_major_info(
     int major, int minor, int index)
 {
@@ -189,6 +147,7 @@ static struct xlbd_major_info *xlbd_alloc_major_info(
         break;
     }
     
+    printk("Registering block device major %i\n", ptr->major);
     if (register_blkdev(ptr->major, ptr->type->devname)) {
         WPRINTK("can't get major %d with name %s\n",
                 ptr->major, ptr->type->devname);
@@ -231,7 +190,7 @@ static struct xlbd_major_info *xlbd_get_major_info(int device)
             xlbd_alloc_major_info(major, minor, index));
 }
 
-static int xlvbd_init_blk_queue(struct gendisk *gd, vdisk_t *disk)
+static int xlvbd_init_blk_queue(struct gendisk *gd, u16 sector_size)
 {
     request_queue_t *rq;
 
@@ -242,7 +201,7 @@ static int xlvbd_init_blk_queue(struct gendisk *gd, vdisk_t *disk)
     elevator_init(rq, "noop");
 
     /* Hard sector size and max sectors impersonate the equiv. hardware. */
-    blk_queue_hardsect_size(rq, disk->sector_size);
+    blk_queue_hardsect_size(rq, sector_size);
     blk_queue_max_sectors(rq, 512);
 
     /* Each segment in a request is up to an aligned page in size. */
@@ -261,8 +220,9 @@ static int xlvbd_init_blk_queue(struct gendisk *gd, vdisk_t *disk)
     return 0;
 }
 
-struct gendisk *xlvbd_alloc_gendisk(
-    struct xlbd_major_info *mi, int minor, vdisk_t *disk)
+static struct gendisk *xlvbd_alloc_gendisk(
+    struct xlbd_major_info *mi, int minor, blkif_sector_t capacity,
+    int device, blkif_vdev_t handle, u16 info, u16 sector_size)
 {
     struct gendisk *gd;
     struct xlbd_disk_info *di;
@@ -273,7 +233,8 @@ struct gendisk *xlvbd_alloc_gendisk(
         return NULL;
     memset(di, 0, sizeof(*di));
     di->mi = mi;
-    di->xd_device = disk->device;
+    di->xd_device = device;
+    di->handle = handle;
 
     if ((minor & ((1 << mi->type->partn_shift) - 1)) == 0)
         nr_minors = 1 << mi->type->partn_shift;
@@ -296,22 +257,22 @@ struct gendisk *xlvbd_alloc_gendisk(
     gd->first_minor = minor;
     gd->fops = &xlvbd_block_fops;
     gd->private_data = di;
-    set_capacity(gd, disk->capacity);
+    set_capacity(gd, capacity);
 
-    if (xlvbd_init_blk_queue(gd, disk)) {
+    if (xlvbd_init_blk_queue(gd, sector_size)) {
         del_gendisk(gd);
         goto out;
     }
 
     di->rq = gd->queue;
 
-    if (disk->info & VDISK_READONLY)
+    if (info & VDISK_READONLY)
         set_disk_ro(gd, 1);
 
-    if (disk->info & VDISK_REMOVABLE)
+    if (info & VDISK_REMOVABLE)
         gd->flags |= GENHD_FL_REMOVABLE;
 
-    if (disk->info & VDISK_CDROM)
+    if (info & VDISK_CDROM)
         gd->flags |= GENHD_FL_CD;
 
     add_disk(gd);
@@ -323,38 +284,36 @@ out:
     return NULL;
 }
 
-static int xlvbd_device_add(struct list_head *list, vdisk_t *disk)
+int xlvbd_add(blkif_sector_t capacity, int device, blkif_vdev_t handle,
+	      u16 info, u16 sector_size)
 {
     struct lvdisk *new;
-    int minor;
-    dev_t device;
     struct block_device *bd;
     struct gendisk *gd;
     struct xlbd_major_info *mi;
 
-    mi = xlbd_get_major_info(disk->device);
+    mi = xlbd_get_major_info(device);
     if (mi == NULL)
         return -EPERM;
 
     new = xlvbd_device_alloc();
     if (new == NULL)
-        return -1;
-    new->capacity = disk->capacity;
-    new->device = disk->device;
-    new->info = disk->info;
-    
-    minor = MINOR_XEN(disk->device);
-    device = MKDEV(mi->major, minor);
-    
-    bd = bdget(device);
+        return -ENOMEM;
+    new->capacity = capacity;
+    new->info = info;
+    new->handle = handle;
+    new->dev = MKDEV(MAJOR_XEN(device), MINOR_XEN(device));
+
+    bd = bdget(new->dev);
     if (bd == NULL)
         goto out;
     
-    gd = xlvbd_alloc_gendisk(mi, minor, disk);
+    gd = xlvbd_alloc_gendisk(mi, MINOR_XEN(device), capacity, device, handle,
+			     info, sector_size);
     if (gd == NULL)
         goto out_bd;
 
-    list_add(&new->list, list);
+    list_add(&new->list, &vbds_list);
 out_bd:
     bdput(bd);
 out:
@@ -363,27 +322,26 @@ out:
 
 static int xlvbd_device_del(struct lvdisk *disk)
 {
-    dev_t device;
     struct block_device *bd;
     struct gendisk *gd;
     struct xlbd_disk_info *di;
     int ret = 0, unused;
     request_queue_t *rq;
 
-    device = MKDEV(MAJOR_XEN(disk->device), MINOR_XEN(disk->device));
-
-    bd = bdget(device);
+    bd = bdget(disk->dev);
     if (bd == NULL)
         return -1;
 
-    gd = get_gendisk(device, &unused);
+    gd = get_gendisk(disk->dev, &unused);
     di = gd->private_data;
 
+#if 0 /* This is wrong: hda and hdb share same major, for example. */
     if (di->mi->usage != 0) {
-        WPRINTK("disk removal failed: used [dev=%x]\n", device);
+        WPRINTK("disk removal failed: used [dev=%x]\n", disk->dev);
         ret = -1;
         goto out;
     }
+#endif
 
     rq = gd->queue;
     del_gendisk(gd);
@@ -391,110 +349,19 @@ static int xlvbd_device_del(struct lvdisk *disk)
     blk_cleanup_queue(rq);
 
     xlvbd_device_free(disk);
-out:
     bdput(bd);
     return ret;
 }
 
-static int xlvbd_device_update(struct lvdisk *ldisk, vdisk_t *disk)
+void xlvbd_del(blkif_vdev_t handle)
 {
-    dev_t device;
-    struct block_device *bd;
-    struct gendisk *gd;
-    int unused;
+	struct lvdisk *i;
 
-    if ((ldisk->capacity == disk->capacity) && (ldisk->info == disk->info))
-        return 0;    
-
-    device = MKDEV(MAJOR_XEN(ldisk->device), MINOR_XEN(ldisk->device));
-
-    bd = bdget(device);
-    if (bd == NULL)
-        return -1;
-
-    gd = get_gendisk(device, &unused);
-    set_capacity(gd, disk->capacity);    
-    ldisk->capacity = disk->capacity;
-
-    bdput(bd);
-
-    return 0;
-}
-
-void xlvbd_refresh(void)
-{
-    vdisk_t *newdisks;
-    struct list_head *tmp, *tmp2;
-    struct lvdisk *disk;
-    int i, nr;
-
-    newdisks = xlvbd_probe(&nr);
-    if (newdisks == NULL) {
-        WPRINTK("failed to probe\n");
-        return;
-    }
-    
-    i = 0;
-    list_for_each_safe(tmp, tmp2, &vbds_list) {
-        disk = list_entry(tmp, struct lvdisk, list);
-        
-        for (i = 0; i < nr; i++) {
-            if ( !newdisks[i].device )
-                continue;
-            if ( disk->device == newdisks[i].device ) {
-                xlvbd_device_update(disk, &newdisks[i]);
-                newdisks[i].device = 0;
-                break;
-            }
-        }
-        if (i == nr) {
-            xlvbd_device_del(disk);
-            newdisks[i].device = 0;
-        }
-    }
-    for (i = 0; i < nr; i++)
-        if ( newdisks[i].device )
-            xlvbd_device_add(&vbds_list, &newdisks[i]);
-    kfree(newdisks);
-}
-
-/*
- * xlvbd_update_vbds - reprobes the VBD status and performs updates driver
- * state. The VBDs need to be updated in this way when the domain is
- * initialised and also each time we receive an XLBLK_UPDATE event.
- */
-void xlvbd_update_vbds(void)
-{
-    xlvbd_refresh();
-}
-
-/*
- * Set up all the linux device goop for the virtual block devices
- * (vbd's) that we know about. Note that although from the backend
- * driver's p.o.v. VBDs are addressed simply an opaque 16-bit device
- * number, the domain creation tools conventionally allocate these
- * numbers to correspond to those used by 'real' linux -- this is just
- * for convenience as it means e.g. that the same /etc/fstab can be
- * used when booting with or without Xen.
- */
-int xlvbd_init(void)
-{
-    int i, nr;
-    vdisk_t *disks;
-
-    INIT_LIST_HEAD(&vbds_list);
-
-    memset(major_info, 0, sizeof(major_info));
-    
-    disks = xlvbd_probe(&nr);
-    if (disks == NULL) {
-        WPRINTK("failed to probe\n");
-        return -1;
-    }
-
-    for (i = 0; i < nr; i++)
-        xlvbd_device_add(&vbds_list, &disks[i]);
-
-    kfree(disks);
-    return 0;
+	list_for_each_entry(i, &vbds_list, list) {
+		if (i->handle == handle) {
+			xlvbd_device_del(i);
+			return;
+		}
+	}
+	BUG();
 }

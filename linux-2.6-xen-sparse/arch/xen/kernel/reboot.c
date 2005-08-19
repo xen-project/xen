@@ -120,8 +120,6 @@ static int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
     return 0;
 }
 
-extern unsigned uber_debug;
-
 static int __do_suspend(void *ignore)
 {
     int i, j;
@@ -130,13 +128,6 @@ static int __do_suspend(void *ignore)
 
     /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
 	/* XXX SMH: yes it would :-( */	
-#ifdef CONFIG_XEN_BLKDEV_FRONTEND
-    extern void blkdev_suspend(void);
-    extern void blkdev_resume(void);
-#else
-#define blkdev_suspend() do{}while(0)
-#define blkdev_resume()  do{}while(0)
-#endif
 
 #ifdef CONFIG_XEN_NETDEV_FRONTEND
     extern void netif_suspend(void);
@@ -234,8 +225,6 @@ static int __do_suspend(void *ignore)
 
     netif_suspend();
 
-    blkdev_suspend();
-
     time_suspend();
 
 #ifdef CONFIG_SMP
@@ -293,8 +282,6 @@ static int __do_suspend(void *ignore)
 
     time_resume();
 
-    blkdev_resume();
-
     netif_resume();
 
     usbif_resume();
@@ -314,8 +301,6 @@ static int __do_suspend(void *ignore)
 	    err = j;
 	}
     }
-
-    uber_debug = 0;
 
  out:
     if ( suspend_record != NULL )
