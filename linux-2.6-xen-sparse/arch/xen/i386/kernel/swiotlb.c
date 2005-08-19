@@ -94,9 +94,6 @@ setup_io_tlb_npages(char *str)
 		iotlb_nslabs = simple_strtoul(str, &str, 0) <<
 			(20 - IO_TLB_SHIFT);
 		iotlb_nslabs = ALIGN(iotlb_nslabs, IO_TLB_SEGSIZE);
-		/* Round up to power of two (xen_create_contiguous_region). */
-		while (iotlb_nslabs & (iotlb_nslabs-1))
-			iotlb_nslabs += iotlb_nslabs & ~(iotlb_nslabs-1);
 	}
 	if (*str == ',')
 		++str;
@@ -123,9 +120,6 @@ swiotlb_init_with_default_size (size_t default_size)
 	if (!iotlb_nslabs) {
 		iotlb_nslabs = (default_size >> IO_TLB_SHIFT);
 		iotlb_nslabs = ALIGN(iotlb_nslabs, IO_TLB_SEGSIZE);
-		/* Round up to power of two (xen_create_contiguous_region). */
-		while (iotlb_nslabs & (iotlb_nslabs-1))
-			iotlb_nslabs += iotlb_nslabs & ~(iotlb_nslabs-1);
 	}
 
 	bytes = iotlb_nslabs * (1UL << IO_TLB_SHIFT);
@@ -139,8 +133,10 @@ swiotlb_init_with_default_size (size_t default_size)
 		      "Use dom0_mem Xen boot parameter to reserve\n"
 		      "some DMA memory (e.g., dom0_mem=-128M).\n");
 
-	xen_create_contiguous_region(
-		(unsigned long)iotlb_virt_start, get_order(bytes));
+	for (i = 0; i < iotlb_nslabs; i += IO_TLB_SEGSIZE)
+		xen_create_contiguous_region(
+			(unsigned long)iotlb_virt_start + (i << IO_TLB_SHIFT),
+			get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT));
 
 	iotlb_virt_end = iotlb_virt_start + bytes;
 
