@@ -84,6 +84,7 @@ static grant_ref_t gref_head, gref_terminal;
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
 #define GRANTREF_INVALID (1<<15)
+static int shmem_ref;
 #endif
 
 static struct blk_shadow {
@@ -1168,6 +1169,16 @@ static int setup_blkring(struct xenbus_device *dev, unsigned int backend_id)
 	SHARED_RING_INIT(sring);
 	FRONT_RING_INIT(&blk_ring, sring, PAGE_SIZE);
 
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+	shmem_ref = gnttab_claim_grant_reference(&gref_head,
+						 gref_terminal);
+	ASSERT(shmem_ref != -ENOSPC);
+	gnttab_grant_foreign_access_ref(shmem_ref,
+					backend_id,
+					virt_to_machine(blk_ring.sring)
+					>> PAGE_SHIFT, 0);
+#endif
+
 	op.u.alloc_unbound.dom = backend_id;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
@@ -1191,14 +1202,22 @@ static int talk_to_backend(struct xenbus_device *dev,
 	backend = xenbus_read(dev->nodename, "backend", NULL);
 	if (IS_ERR(backend)) {
 		err = PTR_ERR(backend);
+		if (err == -ENOENT)
+			goto out;
 		xenbus_dev_error(dev, err, "reading %s/backend",
 				 dev->nodename);
 		goto out;
+	}
+	if (strlen(backend) == 0) {
+		err = -ENOENT;
+		goto free_backend;
 	}
 
 	/* FIXME: This driver can't handle backends on different
 	 * domains.  Check and fail gracefully. */
 	err = xenbus_scanf(dev->nodename, "backend-id", "%i", &backend_id);
+	if (err == -ENOENT)
+		goto free_backend;
  	if (err < 0) {
 		xenbus_dev_error(dev, err, "reading %s/backend-id",
 				 dev->nodename);
@@ -1219,20 +1238,10 @@ static int talk_to_backend(struct xenbus_device *dev,
 	}
 
 #ifdef CONFIG_XEN_BLKDEV_GRANT
-	{
-		int shmem_ref;
-		shmem_ref = gnttab_claim_grant_reference(&gref_head,
-							 gref_terminal);
-		ASSERT(shmem_ref != -ENOSPC);
-		gnttab_grant_foreign_access_ref(shmem_ref,
-						backend_id,
-						virt_to_machine(blk_ring.sring)
-						>> PAGE_SHIFT, 0);
-		err = xenbus_printf(dev->nodename, "grant-id","%u", shmem_ref);
-		if (err) {
-			message = "writing grant-id";
-			goto abort_transaction;
-		}
+	err = xenbus_printf(dev->nodename, "grant-id","%u", shmem_ref);
+	if (err) {
+		message = "writing grant-id";
+		goto abort_transaction;
 	}
 #else
 	err = xenbus_printf(dev->nodename, "shared-frame", "%lu",
@@ -1292,6 +1301,8 @@ static int blkfront_probe(struct xenbus_device *dev,
 
 	/* FIXME: Use dynamic device id if this is not set. */
 	err = xenbus_scanf(dev->nodename, "virtual-device", "%i", &vdevice);
+	if (err == -ENOENT)
+		return err;
 	if (err < 0) {
 		xenbus_dev_error(dev, err, "reading virtual-device");
 		return err;
@@ -1325,7 +1336,6 @@ static int blkfront_remove(struct xenbus_device *dev)
 {
 	struct blkfront_info *info = dev->data;
 
-	printk("blkfront_remove %s\n", dev->dev.bus_id);
 	if (info->backend)
 		unregister_xenbus_watch(&info->watch);
 
@@ -1339,7 +1349,6 @@ static int blkfront_remove(struct xenbus_device *dev)
 	if (--blkif_vbds == 0)
 		blkif_free();
 
-	printk("blkfront_remove done\n");
 	return 0;
 }
 
