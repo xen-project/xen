@@ -22,16 +22,11 @@
 #include <asm/i387.h>
 #include <asm/shadow.h>
 
-/* opt_dom0_mem: memory allocated to domain 0. */
-static unsigned int opt_dom0_mem;
+static unsigned long dom0_nrpages;
 static void parse_dom0_mem(char *s)
 {
     unsigned long long bytes = parse_size_and_unit(s);
-    /* If no unit is specified we default to kB units, not bytes. */
-    if ( isdigit(s[strlen(s)-1]) )
-        opt_dom0_mem = (unsigned int)bytes;
-    else
-        opt_dom0_mem = (unsigned int)(bytes >> 10);
+    dom0_nrpages = bytes >> PAGE_SHIFT;
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
@@ -139,7 +134,7 @@ int construct_dom0(struct domain *d,
 
     /* By default DOM0 is allocated all available memory. */
     d->max_pages = ~0U;
-    if ( (nr_pages = opt_dom0_mem >> (PAGE_SHIFT - 10)) == 0 )
+    if ( (nr_pages = dom0_nrpages) == 0 )
         nr_pages = avail_domheap_pages() +
             ((initrd_len + PAGE_SIZE - 1) >> PAGE_SHIFT) +
             ((image_len  + PAGE_SIZE - 1) >> PAGE_SHIFT);
