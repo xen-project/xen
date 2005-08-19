@@ -311,7 +311,6 @@ static long do_vcpu_pickle(int vcpu, unsigned long arg)
         return -ESRCH;
     /* Don't pickle vcpus which are currently running */
     if (!test_bit(_VCPUF_down, &v->vcpu_flags)) {
-        printf("Pickling a live vcpu?\n");
         return -EBUSY;
     }
     c = xmalloc(vcpu_guest_context_t);
@@ -367,7 +366,6 @@ long do_sched_op(unsigned long op, unsigned long arg)
     case SCHEDOP_vcpu_pickle:
     {
         ret = do_vcpu_pickle((int)(op >> SCHEDOP_vcpushift), arg);
-        printf("Pickle result %ld.\n", ret);
         break;
     }
 

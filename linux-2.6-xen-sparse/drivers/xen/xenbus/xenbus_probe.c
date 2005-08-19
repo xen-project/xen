@@ -168,8 +168,6 @@ static int xenbus_dev_probe(struct device *_dev)
 	struct xenbus_driver *drv = to_xenbus_driver(_dev->driver);
 	const struct xenbus_device_id *id;
 
-	BUG_ON(!dev->driver);
-
 	if (!drv->probe)
 		return -ENODEV;
 
