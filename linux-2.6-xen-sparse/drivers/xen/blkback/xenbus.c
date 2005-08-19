@@ -44,11 +44,15 @@ static int blkback_remove(struct xenbus_device *dev)
 {
 	struct backend_info *be = dev->data;
 
-	unregister_xenbus_watch(&be->watch);
+	if (be->watch.node)
+		unregister_xenbus_watch(&be->watch);
 	unregister_xenbus_watch(&be->backend_watch);
-	vbd_free(be->blkif, be->vbd);
-	blkif_put(be->blkif);
-	kfree(be->frontpath);
+	if (be->vbd)
+		vbd_free(be->blkif, be->vbd);
+	if (be->blkif)
+		blkif_put(be->blkif);
+	if (be->frontpath)
+		kfree(be->frontpath);
 	kfree(be);
 	return 0;
 }
@@ -62,17 +66,14 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 	struct backend_info *be
 		= container_of(watch, struct backend_info, watch);
 
-	// printk("Got front end event on %s (%s)\n", node, be->frontpath);
-
-	if (vbd_is_active(be->vbd)) {
-		/* If other end is gone, delete ourself. */
-		if (!xenbus_exists(be->frontpath, "")) {
-			// printk("Removing...\n");
-			xenbus_rm(be->dev->nodename, "");
-			device_unregister(&be->dev->dev);
-		}
+	/* If other end is gone, delete ourself. */
+	if (!xenbus_exists(be->frontpath, "")) {
+		xenbus_rm(be->dev->nodename, "");
+		device_unregister(&be->dev->dev);
 		return;
 	}
+	if (vbd_is_active(be->vbd))
+		return;
 
 #ifndef CONFIG_XEN_BLKDEV_GRANT
 	err = xenbus_gather(be->frontpath, "shared-frame", "%lu", &sharedmfn,
@@ -176,42 +177,20 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
 
-	err = xenbus_scanf(dev->nodename, "frontend-id", "%li",
-			   &be->frontend_id);
-	if (err == -ENOENT || err == -ERANGE)
-		goto out;
-	if (err < 0) {
-		xenbus_dev_error(dev, err, "Reading frontend-id");
-		goto out;
-	}
-
-	err = xenbus_scanf(dev->nodename, "physical-device", "%li", &pdev);
-	if (err == -ENOENT || err == -ERANGE)
-		goto out;
-	if (err < 0) {
-		xenbus_dev_error(dev, err, "Reading physical-device");
-		goto out;
-	}
-	if (be->pdev && be->pdev != pdev) {
-		printk(KERN_WARNING
-		       "changing physical-device not supported\n");
-		return;
-	}
-	be->pdev = pdev;
-
-	frontend = xenbus_read(dev->nodename, "frontend", NULL);
-	if (IS_ERR(frontend))
-		return;
-	if (strlen(frontend) == 0) {
-		kfree(frontend);
-		return;
-	}
-
-	/* If there's a read-only node, we're read only. */
-	p = xenbus_read(dev->nodename, "read-only", NULL);
-	if (!IS_ERR(p)) {
-		be->readonly = 1;
-		kfree(p);
+	frontend = NULL;
+	err = xenbus_gather(dev->nodename,
+			    "frontend-id", "%li", &be->frontend_id,
+			    "frontend", NULL, &frontend,
+			    NULL);
+	if (err == -ENOENT || err == -ERANGE ||
+	    strlen(frontend) == 0 || !xenbus_exists(frontend, "")) {
+		if (frontend)
+			kfree(frontend);
+		/* If we can't get a frontend path and a frontend-id,
+		 * then our bus-id is no longer valid and we need to
+		 * destroy the backend device.
+		 */
+		goto device_fail;
 	}
 
 	if (!be->frontpath || strcmp(frontend, be->frontpath)) {
@@ -223,9 +202,35 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		be->watch.node = be->frontpath;
 		be->watch.callback = frontend_changed;
 		err = register_xenbus_watch(&be->watch);
-		if (err)
-			goto out;
+		if (err) {
+			be->watch.node = NULL;
+			goto device_fail;
+		}
+	} else
+		kfree(frontend);
 
+	err = xenbus_scanf(dev->nodename, "physical-device", "%li", &pdev);
+	if (err == -ENOENT || err == -ERANGE)
+		goto out;
+	if (err < 0) {
+		xenbus_dev_error(dev, err, "Reading physical-device");
+		goto device_fail;
+	}
+	if (be->pdev && be->pdev != pdev) {
+		printk(KERN_WARNING
+		       "changing physical-device not supported\n");
+		goto device_fail;
+	}
+	be->pdev = pdev;
+
+	/* If there's a read-only node, we're read only. */
+	p = xenbus_read(dev->nodename, "read-only", NULL);
+	if (!IS_ERR(p)) {
+		be->readonly = 1;
+		kfree(p);
+	}
+
+	if (be->blkif == NULL) {
 		/* Front end dir is a number, which is used as the handle. */
 		p = strrchr(be->frontpath, '/') + 1;
 		handle = simple_strtoul(p, NULL, 0);
@@ -234,30 +239,24 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		if (IS_ERR(be->blkif)) {
 			err = PTR_ERR(be->blkif);
 			be->blkif = NULL;
-			goto free_watch;
+			goto device_fail;
 		}
 
 		be->vbd = vbd_create(be->blkif, handle, be->pdev,
 				     be->readonly);
 		if (IS_ERR(be->vbd)) {
 			err = PTR_ERR(be->vbd);
-			blkif_put(be->blkif);
-			be->blkif = NULL;
 			be->vbd = NULL;
-			goto free_watch;
+			goto device_fail;
 		}
 
 		frontend_changed(&be->watch, be->frontpath);
-	} else
-		kfree(frontend);
+	}
 
 	return;
 
- free_watch:
-	unregister_xenbus_watch(&be->watch);
-	be->watch.node = NULL;
-	kfree(be->frontpath);
-	be->frontpath = NULL;
+ device_fail:
+	device_unregister(&be->dev->dev);
  out:
 	return;
 }
@@ -296,7 +295,7 @@ static struct xenbus_device_id blkback_ids[] = {
 };
 
 static struct xenbus_driver blkback = {
-	.name = __stringify(KBUILD_MODNAME),
+	.name = "vbd",
 	.owner = THIS_MODULE,
 	.ids = blkback_ids,
 	.probe = blkback_probe,
