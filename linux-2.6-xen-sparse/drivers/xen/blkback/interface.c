@@ -199,8 +199,10 @@ void free_blkif(blkif_t *blkif)
     if (blkif->evtchn)
         unbind_evtchn_from_irqhandler(blkif->evtchn, blkif);
 
-    if (blkif->blk_ring.sring)
-	    vfree(blkif->blk_ring.sring);
+    if (blkif->blk_ring.sring) {
+	unmap_frontend_page(blkif);
+	vfree(blkif->blk_ring.sring);
+    }
 
     pblkif = &blkif_hash[BLKIF_HASH(blkif->domid)];
     while ( *pblkif != blkif )

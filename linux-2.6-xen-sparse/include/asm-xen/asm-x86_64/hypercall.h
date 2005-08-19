@@ -514,7 +514,7 @@ HYPERVISOR_vcpu_pickle(
 	: "0" (__HYPERVISOR_sched_op),
 	  "1" (SCHEDOP_vcpu_pickle | (vcpu << SCHEDOP_vcpushift)),
 	  "2" (ctxt)
-        : "memory" );
+        : __syscall_clobber );
 
     return ret;
 }
