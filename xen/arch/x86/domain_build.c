@@ -22,11 +22,28 @@
 #include <asm/i387.h>
 #include <asm/shadow.h>
 
-static unsigned long dom0_nrpages;
+static long dom0_nrpages;
+
+/*
+ * dom0_mem:
+ *  If +ve:
+ *   * The specified amount of memory is allocated to domain 0.
+ *  If -ve:
+ *   * All of memory is allocated to domain 0, minus the specified amount.
+ *  If not specified: 
+ *   * All of memory is allocated to domain 0, minus 1/16th which is reserved
+ *     for uses such as DMA buffers (the reservation is clamped to 128MB).
+ */
 static void parse_dom0_mem(char *s)
 {
-    unsigned long long bytes = parse_size_and_unit(s);
+    unsigned long long bytes;
+    char *t = s;
+    if ( *s == '-' )
+        t++;
+    bytes = parse_size_and_unit(t);
     dom0_nrpages = bytes >> PAGE_SHIFT;
+    if ( *s == '-' )
+        dom0_nrpages = -dom0_nrpages;
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
@@ -132,12 +149,30 @@ int construct_dom0(struct domain *d,
 
     printk("*** LOADING DOMAIN 0 ***\n");
 
-    /* By default DOM0 is allocated all available memory. */
     d->max_pages = ~0U;
-    if ( (nr_pages = dom0_nrpages) == 0 )
-        nr_pages = avail_domheap_pages() +
+
+    /*
+     * If domain 0 allocation isn't specified, reserve 1/16th of available
+     * memory for things like DMA buffers. This reservation is clamped to 
+     * a maximum of 128MB.
+     */
+    if ( dom0_nrpages == 0 )
+    {
+        dom0_nrpages = avail_domheap_pages() +
             ((initrd_len + PAGE_SIZE - 1) >> PAGE_SHIFT) +
             ((image_len  + PAGE_SIZE - 1) >> PAGE_SHIFT);
+        dom0_nrpages = min(dom0_nrpages / 16, 128L << (20 - PAGE_SHIFT));
+        dom0_nrpages = -dom0_nrpages;
+    }
+
+    /* Negative memory specification means "all memory - specified amount". */
+    if ( dom0_nrpages < 0 )
+        nr_pages = avail_domheap_pages() +
+            ((initrd_len + PAGE_SIZE - 1) >> PAGE_SHIFT) +
+            ((image_len  + PAGE_SIZE - 1) >> PAGE_SHIFT) +
+            dom0_nrpages;
+    else
+        nr_pages = dom0_nrpages;
 
     if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;

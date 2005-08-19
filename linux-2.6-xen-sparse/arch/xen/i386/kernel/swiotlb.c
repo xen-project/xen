@@ -135,7 +135,9 @@ swiotlb_init_with_default_size (size_t default_size)
 	 */
 	iotlb_virt_start = alloc_bootmem_low_pages(bytes);
 	if (!iotlb_virt_start)
-		panic("Cannot allocate SWIOTLB buffer");
+		panic("Cannot allocate SWIOTLB buffer!\n"
+		      "Use dom0_mem Xen boot parameter to reserve\n"
+		      "some DMA memory (e.g., dom0_mem=-128M).\n");
 
 	xen_create_contiguous_region(
 		(unsigned long)iotlb_virt_start, get_order(bytes));
