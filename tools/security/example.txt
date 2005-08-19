@@ -1,0 +1,269 @@
+##
+# example.txt <description to the xen access control architecture>
+#
+# Author:
+# Reiner Sailer 08/15/2005 <sailer@watson.ibm.com>
+#
+#
+# This file introduces into the tools to manage policies
+# and to label domains and resources.
+##
+
+We will show how to install and use the chwall_ste policy.
+Other policies work similarly. Feedback welcome!
+
+
+
+1. Using secpol_xml2bin to translate the chwall_ste policy:
+===========================================================
+
+#tools/security/secpol_xml2bin chwall_ste
+
+Successful execution should print:
+
+    [root@laptopxn security]# ./secpol_xml2bin chwall_ste
+    Validating label file policies/chwall_ste/chwall_ste-security_label_template.xml...
+    XML Schema policies/security_policy.xsd valid.
+    Validating policy file policies/chwall_ste/chwall_ste-security_policy.xml...
+    XML Schema policies/security_policy.xsd valid.
+    Creating ssid mappings ...
+    Creating label mappings ...
+    Max chwall labels:  7
+    Max chwall-types:   4
+    Max chwall-ssids:   5
+    Max ste labels:     14
+    Max ste-types:      6
+    Max ste-ssids:      10
+
+The tool looks in directory policies/chwall_ste for
+the label and policy files.
+
+The default policy directory structure under tools/security looks like:
+
+policies
+|-- security_policy.xsd
+|-- chwall
+|   |-- chwall-security_label_template.xml
+|   `-- chwall-security_policy.xml
+|-- chwall_ste
+|   |-- chwall_ste-security_label_template.xml
+|   `-- chwall_ste-security_policy.xml
+|-- null
+|   |-- null-security_label_template.xml
+|   `-- null-security_policy.xml
+`-- ste
+    |-- ste-security_label_template.xml
+    `-- ste-security_policy.xml
+
+policies/security_policy.xsd contains the schema against which both the
+label-template and the policy files must validate during translation.
+
+policies/chwall_ste/chwall_ste-security_policy.xml defines the
+policies and the types known to the policies.
+
+policies/chwall_ste/chwall_ste-security_label_template.xml contains
+label definitions that group chwall and ste types together and make
+them easier to use for users
+
+After executing the above secpol_xml2bin command, you will find 2 new
+files in the policies/chwall_ste sub-directory:
+
+policies/chwall_ste/chwall_ste.map ... this file includes the mapping
+of names from the xml files into their binary code representation.
+
+policies/chwall_ste/chwall_ste.bin ... this is the binary policy file,
+the result of parsing the xml files and using the mapping to extract a
+binary version that can be loaded into the hypervisor.
+
+
+
+2. Loading and activating the policy:
+=====================================
+
+We assume that xen is already configured to use the chwall_ste policy;
+please refer to install.txt for instructions.
+
+To activate the policy from the command line (assuming that the
+currently established policy is the minimal boot-policy that is
+hard-coded into the hypervisor:
+
+# ./secpol_tool loadpolicy policies/chwall_ste/chwall_ste.bin
+
+To activate the policy at next reboot:
+
+# cp policies/chwall_ste/chwall_ste.bin /boot
+
+Add a module line to your /boot/grub/grub.conf Xen entry.
+My boot entry with chwall_ste enabled looks like this:
+
+    title Xen (2.6.12)
+        root (hd0,5)
+        kernel /boot/xen.gz dom0_mem=1200000 console=vga
+        module /boot/vmlinuz-2.6.12-xen0 ro root=/dev/hda6 rhgb
+        module /boot/initrd-2.6.12-xen0.img
+        module /boot/chwall_ste.bin
+
+This tells the grub boot-loader to load the binary policy, which
+the hypervisor will recognize. The hypervisor will then establish
+this binary policy during boot instead of the minimal policy that
+is hardcoded as default.
+
+If you have any trouble here, maks sure you have the access control
+framework enabled (see: install.txt).
+
+
+
+3. Labeling domains:
+====================
+
+a) Labeling Domain0:
+
+The chwall_ste-security_label_template.xml file includes an attribute
+"bootstrap", which is set to the label name that will be assigned to
+Dom0 (this label will be mapped to ssidref 1/1, the default for Dom0).
+
+b) Labeling User Domains:
+
+Use the script tools/security/setlabel.sh to choose a label and to
+assign labels to user domains.
+
+To show available labels for the chwall_ste policy:
+
+#tools/security/setlabel.sh -l
+
+lists all available labels. For the default chwall_ste it should print
+the following:
+
+    [root@laptopxn security]# ./setlabel.sh -l chwall_ste
+    The following labels are available:
+    dom_SystemManagement
+    dom_HomeBanking
+    dom_Fun
+    dom_BoincClient
+    dom_StorageDomain
+    dom_NetworkDomain
+
+You need to have compiled the policy beforehand so that a .map file
+exists. Setlabel.sh uses the mapping file created throughout the
+policy translation to translate a user-friendly label string into a
+ssidref-number that is eventually used by the Xen hypervisor.
+
+We distinguish two kinds of labels: a) VM labels (for domains) and RES
+Labels (for resources). We are currently working on support for
+resource labeling but will focus here on VM labels.
+
+Setlabel.sh only prints VM labels (which we have prefixed with "dom_")
+since only those are used at this time.
+
+If you would like to assign the dom_HomeBanking label to one of your
+user domains (which you hopefully keep clean), look at an example
+domain configuration homebanking.xm:
+
+    #------HOMEBANKING---------
+    kernel = "/boot/vmlinuz-2.6.12-xenU"
+    ramdisk="/boot/U1_ramdisk.img"
+    memory = 65
+    name = "test34"
+    cpu = -1   # leave to Xen to pick
+    # Number of network interfaces. Default is 1.
+    nics=1
+    dhcp="dhcp"
+    #-------------------------
+
+Now we label this domain
+
+[root@laptopxn security]# ./setlabel.sh homebanking.xm dom_HomeBanking chwall_ste
+Mapped label 'dom_HomeBanking' to ssidref '0x00020002'.
+
+The domain configuration my look now like:
+
+    [root@laptopxn security]# cat homebanking.xm
+    #------HOMEBANKING---------
+    kernel = "/boot/vmlinuz-2.6.12-xenU"
+    ramdisk="/boot/U1_ramdisk.img"
+    memory = 65
+    name = "test34"
+    cpu = -1   # leave to Xen to pick
+    # Number of network interfaces. Default is 1.
+    nics=1
+    dhcp="dhcp"
+    #-------------------------
+    #ACM_POLICY=chwall_ste-security_policy.xml
+    #ACM_LABEL=dom_HomeBanking
+    ssidref = 0x00020002
+
+You can see 3 new entries, two of which are comments.  The only value
+that the hypervisor cares about is the ssidref that will reference
+those types assigned to this label. You can look them up in the
+xml label-template file for the chwall_ste policy.
+
+This script will eventually move into the domain management and will
+be called when the domain is instantiated. For now, the setlabel
+script must be run on domains whenever the policy files change since
+the mapping between label names and ssidrefs can change in this case.
+
+
+4. Starting a labeled domain
+============================
+
+Now, start the domain:
+    #xm create -c homebanking.xm
+
+
+If you label another domain configuration as dom_Fun and try to start
+it afterwards, its start will fail. Why?
+
+Because the running homebanking domain has the chinese wall type
+"cw_Sensitive". The new domain dom_Fun has the chinese wall label
+"cw_Distrusted". This domain is not allowed to run simultaneously
+because of the defined conflict set
+
+			<conflictset name="Protection1">
+				<type>cw_Sensitive</type>
+				<type>cw_Distrusted</type>
+			</conflictset>
+
+(in policies/chwall_ste/chwall_ste-security_policy.xml), which says
+that only one of the types cw_sensitive and cw_Distrusted can run at a
+time.
+
+If you save or shutdown the HomeBanking domain, you will be able to
+start the "Fun" domain. You can look into the Xen log to see if a
+domain was denied to start because of the access control framework
+with the command 'xm dmesg'.
+
+It is important (and usually non-trivial) to define the labels in a
+way that the semantics of the labels are enforced and supported by the
+types and the conflict sets.
+
+Note: While the chinese wall policy enforcement is complete, the type
+enforcement is currently enforced in the Xen hypervisor
+only. Therefore, only point-to-point sharing with regard to the type
+enforcement is currently controlled. We are working on enhancements to
+Dom0 that enforce types also for network traffic that is routed
+through Dom0 and on the enforcement of resource labeling when binding
+resources to domains (e.g., enforcing types between domains and
+hardware resources, such as disk partitions).
+
+
+4. Adding your own policies
+===========================
+
+Writing your own policy (e.g. "mypolicy") requires the following:
+
+a) the policy definition (types etc.) file
+b) the label template definition (labels etc.) file
+
+If your policy name is "mypolicy", you need to create a
+subdirectory mypolicy in tools/security/policies.
+
+Then you create
+tools/security/policies/mypolicy/mypolicy-security_policy.xml and
+tools/security/policies/mypolicy/mypolicy-security_label_template.xml.
+
+You need to keep to the schema as defined in
+tools/security/security_policy.xsd since the translation tool
+secpol_xml2bin is written against this schema.
+
+If you keep to the security policy schema, then you can use all the
+tools described above. Refer to install.txt to install it.

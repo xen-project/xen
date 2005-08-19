@@ -450,8 +450,10 @@ unsigned long long parse_size_and_unit(char *s)
 		ret <<= 10;
 	case 'M': case 'm':
 		ret <<= 10;
-	case 'K': case 'k':
+	case 'K': case 'k': default:
 		ret <<= 10;
+	case 'B': case 'b':
+		break;
 	}
 
 	return ret;

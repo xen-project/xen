@@ -35,3 +35,11 @@ CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
 
 # Choose the best mirror to download linux kernel
 KERNEL_REPO = http://www.kernel.org
+
+# ACM_USE_SECURITY_POLICY is set to security policy of Xen
+# Supported models are:
+#	ACM_NULL_POLICY (ACM will not be built with this policy)
+#	ACM_CHINESE_WALL_POLICY
+#	ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY
+#	ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY
+ACM_USE_SECURITY_POLICY ?= ACM_NULL_POLICY

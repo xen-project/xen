@@ -1,0 +1,29 @@
+
+##
+# readme.txt <description to the xen access control architecture>
+#
+# Author:
+# Reiner Sailer 08/15/2005 <sailer@watson.ibm.com>
+#
+#
+# This file is a toc for information regarding
+# the access control policy and tools in Xen.
+##
+
+1. policy.txt:
+
+   describes the general reasoning and examples for access
+   control policies in Xen
+
+
+2. install.txt
+
+   describes the activation of the access control framework
+   in Xen
+
+3. example.txt
+
+   describes the available tools for managing security policies
+   in Xen and the tools to label domains
+
+
