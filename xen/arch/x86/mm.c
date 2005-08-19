@@ -3061,7 +3061,7 @@ static int ptwr_emulated_update(
     }
 
     /* Turn a sub-word access into a full-word access. */
-    if (bytes != sizeof(physaddr_t))
+    if ( bytes != sizeof(physaddr_t) )
     {
         int           rc;
         physaddr_t    full;
@@ -3078,6 +3078,10 @@ static int ptwr_emulated_update(
         val  &= (((physaddr_t)1 << (bytes*8)) - 1);
         val <<= (offset)*8;
         val  |= full;
+        /* Also fill in missing parts of the cmpxchg old value. */
+        old  &= (((physaddr_t)1 << (bytes*8)) - 1);
+        old <<= (offset)*8;
+        old  |= full;
     }
 
     /* Read the PTE that maps the page being updated. */
@@ -3113,7 +3117,7 @@ static int ptwr_emulated_update(
     if ( do_cmpxchg )
     {
         ol1e = l1e_from_intpte(old);
-        if ( cmpxchg((unsigned long *)pl1e, old, val) != old )
+        if ( cmpxchg((intpte_t *)pl1e, old, val) != old )
         {
             unmap_domain_page(pl1e);
             put_page_from_l1e(nl1e, d);
@@ -3301,8 +3305,8 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     
     /* Finally, make the p.t. page writable by the guest OS. */
     l1e_add_flags(pte, _PAGE_RW);
-    if ( unlikely(__copy_to_user(&linear_pg_table[l1_linear_offset(addr)],
-                                 &pte, sizeof(pte))) )
+    if ( unlikely(__put_user(pte.l1,
+                             &linear_pg_table[l1_linear_offset(addr)].l1)) )
     {
         MEM_LOG("ptwr: Could not update pte at %p", (unsigned long *)
                 &linear_pg_table[l1_linear_offset(addr)]);

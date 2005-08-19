@@ -280,19 +280,16 @@ void __init cpu_init (void)
 	if (cpu) {
 		memcpy(cpu_gdt_table[cpu], cpu_gdt_table[0], GDT_SIZE);
 	}	
-#endif
 
 	cpu_gdt_descr[cpu].size = GDT_SIZE;
 	cpu_gdt_descr[cpu].address = (unsigned long)cpu_gdt_table[cpu];
 
-        cpu_gdt_init(&cpu_gdt_descr[cpu]);
-
-#ifndef CONFIG_XEN 
 	memcpy(me->thread.tls_array, cpu_gdt_table[cpu], GDT_ENTRY_TLS_ENTRIES * 8);
-
 #else
  	memcpy(me->thread.tls_array, &get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN],
 	    GDT_ENTRY_TLS_ENTRIES * 8);
+
+    cpu_gdt_init(&cpu_gdt_descr[cpu]);
 #endif
        
 	/*

@@ -124,8 +124,6 @@ extern asmlinkage unsigned int do_IRQ(struct pt_regs *regs);
 
 #define VALID_EVTCHN(_chn) ((_chn) >= 0)
 
-unsigned uber_debug;
-
 /*
  * Force a proper event-channel callback from Xen after clearing the
  * callback mask. We do this in a very simple manner, by making a call
@@ -160,11 +158,7 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
             l2 &= ~(1 << l2i);
             
             port = (l1i << 5) + l2i;
-	    if (uber_debug && cpu)
-		printk("<0>Upcall to %d on %d.\n", port, cpu);
             if ( (irq = evtchn_to_irq[port]) != -1 ) {
-		if (uber_debug && cpu)
-		    printk("<0>IRQ %d.\n", irq);
                 do_IRQ(irq, regs);
 	    } else
                 evtchn_device_upcall(port);

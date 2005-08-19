@@ -31,18 +31,8 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <string.h>
-#include <stdint.h>
 #include <netinet/in.h>
-
-typedef uint8_t u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-typedef int8_t s8;
-typedef int16_t s16;
-typedef int32_t s32;
-typedef int64_t s64;
-
+#include "secpol_compat.h"
 #include <xen/acm.h>
 #include <xen/acm_ops.h>
 #include <xen/linux/privcmd.h>
@@ -270,171 +260,6 @@ void acm_dump_policy_buffer(void *buf, int buflen)
     }
 }
 
-/*************************** set policy ****************************/
-
-int acm_domain_set_chwallpolicy(void *bufstart, int buflen)
-{
-#define CWALL_MAX_SSIDREFS      	6
-#define CWALL_MAX_TYPES             10
-#define CWALL_MAX_CONFLICTSETS		2
-
-    struct acm_chwall_policy_buffer *chwall_bin_pol =
-        (struct acm_chwall_policy_buffer *) bufstart;
-    domaintype_t *ssidrefs, *conflicts;
-    int ret = 0;
-    int j;
-
-    chwall_bin_pol->chwall_max_types = htonl(CWALL_MAX_TYPES);
-    chwall_bin_pol->chwall_max_ssidrefs = htonl(CWALL_MAX_SSIDREFS);
-    chwall_bin_pol->policy_code = htonl(ACM_CHINESE_WALL_POLICY);
-    chwall_bin_pol->policy_version = htonl(ACM_CHWALL_VERSION);
-    chwall_bin_pol->chwall_ssid_offset =
-        htonl(sizeof(struct acm_chwall_policy_buffer));
-    chwall_bin_pol->chwall_max_conflictsets =
-        htonl(CWALL_MAX_CONFLICTSETS);
-    chwall_bin_pol->chwall_conflict_sets_offset =
-        htonl(ntohl(chwall_bin_pol->chwall_ssid_offset) +
-              sizeof(domaintype_t) * CWALL_MAX_SSIDREFS * CWALL_MAX_TYPES);
-    chwall_bin_pol->chwall_running_types_offset = 0;    /* not set */
-    chwall_bin_pol->chwall_conflict_aggregate_offset = 0;       /* not set */
-    ret += sizeof(struct acm_chwall_policy_buffer);
-    /* now push example ssids into the buffer (max_ssidrefs x max_types entries) */
-    /* check buffer size */
-    if ((buflen - ret) <
-        (CWALL_MAX_TYPES * CWALL_MAX_SSIDREFS * sizeof(domaintype_t)))
-        return -1;              /* not enough space */
-
-    ssidrefs = (domaintype_t *) (bufstart +
-                          ntohl(chwall_bin_pol->chwall_ssid_offset));
-    memset(ssidrefs, 0,
-           CWALL_MAX_TYPES * CWALL_MAX_SSIDREFS * sizeof(domaintype_t));
-
-    /* now set type j-1 for ssidref i+1 */
-    for (j = 0; j <= CWALL_MAX_SSIDREFS; j++)
-        if ((0 < j) && (j <= CWALL_MAX_TYPES))
-            ssidrefs[j * CWALL_MAX_TYPES + j - 1] = htons(1);
-
-    ret += CWALL_MAX_TYPES * CWALL_MAX_SSIDREFS * sizeof(domaintype_t);
-    if ((buflen - ret) <
-        (CWALL_MAX_CONFLICTSETS * CWALL_MAX_TYPES * sizeof(domaintype_t)))
-        return -1;              /* not enough space */
-
-    /* now the chinese wall policy conflict sets */
-    conflicts = (domaintype_t *) (bufstart +
-                                  ntohl(chwall_bin_pol->
-                                        chwall_conflict_sets_offset));
-    memset((void *) conflicts, 0,
-           CWALL_MAX_CONFLICTSETS * CWALL_MAX_TYPES *
-           sizeof(domaintype_t));
-    /* just 1 conflict set [0]={2,3}, [1]={1,5,6} */
-    if (CWALL_MAX_TYPES > 3)
-    {
-        conflicts[2] = htons(1);
-        conflicts[3] = htons(1);        /* {2,3} */
-        conflicts[CWALL_MAX_TYPES + 1] = htons(1);
-        conflicts[CWALL_MAX_TYPES + 5] = htons(1);
-        conflicts[CWALL_MAX_TYPES + 6] = htons(1);      /* {0,5,6} */
-    }
-    ret += sizeof(domaintype_t) * CWALL_MAX_CONFLICTSETS * CWALL_MAX_TYPES;
-    return ret;
-}
-
-int acm_domain_set_stepolicy(void *bufstart, int buflen)
-{
-#define STE_MAX_SSIDREFS        6
-#define STE_MAX_TYPES  	        5
-
-    struct acm_ste_policy_buffer *ste_bin_pol =
-        (struct acm_ste_policy_buffer *) bufstart;
-    domaintype_t *ssidrefs;
-    int j, ret = 0;
-
-    ste_bin_pol->ste_max_types = htonl(STE_MAX_TYPES);
-    ste_bin_pol->ste_max_ssidrefs = htonl(STE_MAX_SSIDREFS);
-    ste_bin_pol->policy_code = htonl(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY);
-    ste_bin_pol->policy_version = htonl(ACM_STE_VERSION);
-    ste_bin_pol->ste_ssid_offset =
-        htonl(sizeof(struct acm_ste_policy_buffer));
-    ret += sizeof(struct acm_ste_policy_buffer);
-    /* check buffer size */
-    if ((buflen - ret) <
-        (STE_MAX_TYPES * STE_MAX_SSIDREFS * sizeof(domaintype_t)))
-        return -1;              /* not enough space */
-
-    ssidrefs =
-        (domaintype_t *) (bufstart + ntohl(ste_bin_pol->ste_ssid_offset));
-    memset(ssidrefs, 0,
-           STE_MAX_TYPES * STE_MAX_SSIDREFS * sizeof(domaintype_t));
-    /* all types 1 for ssidref 1 */
-    for (j = 0; j < STE_MAX_TYPES; j++)
-        ssidrefs[1 * STE_MAX_TYPES + j] = htons(1);
-    /* now set type j-1 for ssidref j */
-    for (j = 0; j < STE_MAX_SSIDREFS; j++)
-        if ((0 < j) && (j <= STE_MAX_TYPES))
-            ssidrefs[j * STE_MAX_TYPES + j - 1] = htons(1);
-    ret += STE_MAX_TYPES * STE_MAX_SSIDREFS * sizeof(domaintype_t);
-    return ret;
-}
-
-#define MAX_PUSH_BUFFER 	16384
-u8 push_buffer[MAX_PUSH_BUFFER];
-
-int acm_domain_setpolicy(int xc_handle)
-{
-    int ret;
-    struct acm_policy_buffer *bin_pol;
-    acm_op_t op;
-
-    /* future: read policy from file and set it */
-    bin_pol = (struct acm_policy_buffer *) push_buffer;
-    bin_pol->policy_version = htonl(ACM_POLICY_VERSION);
-    bin_pol->magic = htonl(ACM_MAGIC);
-    bin_pol->primary_policy_code = htonl(ACM_CHINESE_WALL_POLICY);
-    bin_pol->secondary_policy_code =
-        htonl(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY);
-
-    bin_pol->len = htonl(sizeof(struct acm_policy_buffer));
-    bin_pol->primary_buffer_offset = htonl(ntohl(bin_pol->len));
-    ret =
-        acm_domain_set_chwallpolicy(push_buffer +
-                                    ntohl(bin_pol->primary_buffer_offset),
-                                    MAX_PUSH_BUFFER -
-                                    ntohl(bin_pol->primary_buffer_offset));
-    if (ret < 0)
-    {
-        printf("ERROR creating chwallpolicy buffer.\n");
-        return -1;
-    }
-    bin_pol->len = htonl(ntohl(bin_pol->len) + ret);
-    bin_pol->secondary_buffer_offset = htonl(ntohl(bin_pol->len));
-    ret = acm_domain_set_stepolicy(push_buffer +
-                                 ntohl(bin_pol->secondary_buffer_offset),
-                                 MAX_PUSH_BUFFER -
-                                 ntohl(bin_pol->secondary_buffer_offset));
-    if (ret < 0)
-    {
-        printf("ERROR creating chwallpolicy buffer.\n");
-        return -1;
-    }
-    bin_pol->len = htonl(ntohl(bin_pol->len) + ret);
-
-    /* dump it and then push it down into xen/acm */
-    acm_dump_policy_buffer(push_buffer, ntohl(bin_pol->len));
-
-    op.cmd = ACM_SETPOLICY;
-    op.interface_version = ACM_INTERFACE_VERSION;
-    op.u.setpolicy.pushcache = (void *) push_buffer;
-    op.u.setpolicy.pushcache_size = ntohl(bin_pol->len);
-    ret = do_acm_op(xc_handle, &op);
-
-    if (ret)
-        printf("ERROR setting policy. Use 'xm dmesg' to see details.\n");
-    else
-        printf("Successfully changed policy.\n");
-
-    return ret;
-}
-
 /******************************* get policy ******************************/
 
 #define PULL_CACHE_SIZE		8192
@@ -602,7 +427,6 @@ int acm_domain_dumpstats(int xc_handle)
 void usage(char *progname)
 {
     printf("Use: %s \n"
-           "\t setpolicy\n"
            "\t getpolicy\n"
            "\t dumpstats\n"
            "\t loadpolicy <binary policy file>\n", progname);
@@ -623,12 +447,7 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
-    if (!strcmp(argv[1], "setpolicy"))
-    {
-        if (argc != 2)
-            usage(argv[0]);
-        ret = acm_domain_setpolicy(acm_cmd_fd);
-    } else if (!strcmp(argv[1], "getpolicy")) {
+    if (!strcmp(argv[1], "getpolicy")) {
         if (argc != 2)
             usage(argv[0]);
         ret = acm_domain_getpolicy(acm_cmd_fd);
