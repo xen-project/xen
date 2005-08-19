@@ -187,6 +187,7 @@ static char *join(const char *dir, const char *name)
 	static char buffer[4096];
 
 	BUG_ON(down_trylock(&xenbus_lock) == 0);
+	/* XXX FIXME: might not be correct if name == "" */
 	BUG_ON(strlen(dir) + strlen("/") + strlen(name) + 1 > sizeof(buffer));
 
 	strcpy(buffer, dir);
@@ -399,9 +400,12 @@ int xenbus_gather(const char *dir, ...)
 			ret = PTR_ERR(p);
 			break;
 		}
-		if (sscanf(p, fmt, result) == 0)
-			ret = -EINVAL;
-		kfree(p);
+		if (fmt) {
+			if (sscanf(p, fmt, result) == 0)
+				ret = -EINVAL;
+			kfree(p);
+		} else
+			*(char **)result = p;
 	}
 	va_end(ap);
 	return ret;

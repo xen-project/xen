@@ -657,8 +657,8 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
             FOREIGN_FRAME((buffer_mach + offset) >> PAGE_SHIFT);
 
-        ASSERT(virt_to_machine(MMAP_VADDR(pending_idx, i))
-               == buffer_mach + i << PAGE_SHIFT);
+        ASSERT(virt_to_mfn(MMAP_VADDR(pending_idx, i))
+               == ((buffer_mach >> PAGE_SHIFT) + i));
     }
 
     if ( req->pipe_type == 0 && req->num_iso > 0 ) /* Maybe schedule ISO... */

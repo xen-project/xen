@@ -217,8 +217,16 @@ struct vcpu *arch_alloc_vcpu_struct(void)
     return xmalloc(struct vcpu);
 }
 
+/* We assume that vcpu 0 is always the last one to be freed in a
+   domain i.e. if v->vcpu_id == 0, the domain should be
+   single-processor. */
 void arch_free_vcpu_struct(struct vcpu *v)
 {
+    struct vcpu *p;
+    for_each_vcpu(v->domain, p) {
+        if (p->next_in_list == v)
+            p->next_in_list = v->next_in_list;
+    }
     xfree(v);
 }
 
@@ -403,7 +411,7 @@ int arch_set_info_guest(
     {
         if ( ((c->user_regs.cs & 3) == 0) ||
              ((c->user_regs.ss & 3) == 0) )
-                return -EINVAL;
+            return -EINVAL;
     }
 
     clear_bit(_VCPUF_fpu_initialised, &v->vcpu_flags);
@@ -457,7 +465,7 @@ int arch_set_info_guest(
         if ( !(c->flags & VGCF_VMX_GUEST) )
 #endif
             if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
-                  PGT_base_page_table) )
+                                    PGT_base_page_table) )
                 return -EINVAL;
     }
 

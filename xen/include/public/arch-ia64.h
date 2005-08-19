@@ -13,9 +13,6 @@
 
 #ifndef __ASSEMBLY__
 
-/* NB. Both the following are 64 bits each. */
-typedef unsigned long memory_t;   /* Full-sized pointer/address/memory-size. */
-
 #define MAX_NR_SECTION  32  // at most 32 memory holes
 typedef struct {
     unsigned long	start; 	/* start of memory hole */

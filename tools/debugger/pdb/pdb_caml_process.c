@@ -495,7 +495,7 @@ proc_insert_memory_breakpoint (value context, value address, value length)
 
     req.operation = PDB_OPCODE_SET_BKPT;
     req.process = ctx.process;
-    req.u.bkpt.address = (memory_t) Int32_val(address);
+    req.u.bkpt.address = (unsigned long) Int32_val(address);
     req.u.bkpt.length  =  Int_val(length);
 
     send_request(ctx.ring, ctx.evtchn, &req);
@@ -518,7 +518,7 @@ proc_remove_memory_breakpoint (value context, value address, value length)
 
     req.operation = PDB_OPCODE_CLR_BKPT;
     req.process = ctx.process;
-    req.u.bkpt.address = (memory_t) Int32_val(address);
+    req.u.bkpt.address = (unsigned long) Int32_val(address);
     req.u.bkpt.length  =  Int_val(length);
 
     send_request(ctx.ring, ctx.evtchn, &req);
@@ -542,7 +542,7 @@ proc_insert_watchpoint (value context, value kind, value address, value length)
     req.operation = PDB_OPCODE_SET_WATCHPT;
     req.process = ctx.process;
     req.u.watchpt.type    =  Int_val(kind);
-    req.u.watchpt.address = (memory_t) Int32_val(address);
+    req.u.watchpt.address = (unsigned long) Int32_val(address);
     req.u.watchpt.length  =  Int_val(length);
 
     send_request(ctx.ring, ctx.evtchn, &req);
@@ -566,7 +566,7 @@ proc_remove_watchpoint (value context, value kind, value address, value length)
     req.operation = PDB_OPCODE_CLR_WATCHPT;
     req.process = ctx.process;
     req.u.watchpt.type    =  Int_val(kind);
-    req.u.watchpt.address = (memory_t) Int32_val(address);
+    req.u.watchpt.address = (unsigned long) Int32_val(address);
     req.u.watchpt.length  =  Int_val(length);
 
     send_request(ctx.ring, ctx.evtchn, &req);

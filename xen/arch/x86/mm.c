@@ -2633,14 +2633,16 @@ long set_gdt(struct vcpu *v,
 
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
-    
+
     shadow_sync_all(d);
 
     /* Check the pages in the new GDT. */
-    for ( i = 0; i < nr_pages; i++ )
-        if ( ((pfn = frames[i]) >= max_page) ||
-             !get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) )
+    for ( i = 0; i < nr_pages; i++ ) {
+        pfn = frames[i];
+        if ((pfn >= max_page) ||
+            !get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) )
             goto fail;
+    }
 
     /* Tear down the old GDT. */
     destroy_gdt(v);
@@ -2687,22 +2689,24 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
 }
 
 
-long do_update_descriptor(unsigned long pa, u64 desc)
+long do_update_descriptor(u64 pa, u64 desc)
 {
     struct domain *dom = current->domain;
     unsigned long gpfn = pa >> PAGE_SHIFT;
     unsigned long mfn;
-    unsigned int  offset = (pa & ~PAGE_MASK) / sizeof(struct desc_struct);
+    unsigned int  offset;
     struct desc_struct *gdt_pent, d;
     struct pfn_info *page;
     long ret = -EINVAL;
+
+    offset = ((unsigned int)pa & ~PAGE_MASK) / sizeof(struct desc_struct);
 
     *(u64 *)&d = desc;
 
     LOCK_BIGLOCK(dom);
 
     if ( !VALID_MFN(mfn = __gpfn_to_mfn(dom, gpfn)) ||
-         ((pa % sizeof(struct desc_struct)) != 0) ||
+         (((unsigned int)pa % sizeof(struct desc_struct)) != 0) ||
          (mfn >= max_page) ||
          !check_descriptor(&d) )
     {

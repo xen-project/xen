@@ -27,8 +27,8 @@ typedef struct physdevop_set_iopl {
 
 typedef struct physdevop_set_iobitmap {
     /* IN */
-    memory_t bitmap;
-    u32      nr_ports;
+    char *bitmap;
+    u32   nr_ports;
 } physdevop_set_iobitmap_t;
 
 typedef struct physdevop_apic {

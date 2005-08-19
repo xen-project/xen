@@ -32,7 +32,7 @@
  */
 #define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 extern unsigned long empty_zero_page[1024];
-extern pgd_t swapper_pg_dir[1024];
+extern pgd_t *swapper_pg_dir;
 extern kmem_cache_t *pgd_cache;
 extern kmem_cache_t *pmd_cache;
 extern spinlock_t pgd_lock;
@@ -450,7 +450,7 @@ void make_pages_writable(void *va, unsigned int nr);
 #define arbitrary_virt_to_machine(__va)					\
 ({									\
 	pte_t *__pte = virt_to_ptep(__va);				\
-	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
+	maddr_t __pa = (maddr_t)pte_mfn(*__pte) << PAGE_SHIFT;		\
 	__pa | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
 })
 

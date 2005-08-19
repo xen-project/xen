@@ -904,7 +904,7 @@ static int __init do_boot_cpu(int apicid)
 		for (va = cpu_gdt_descr[cpu].address, f = 0;
 		     va < cpu_gdt_descr[cpu].address + cpu_gdt_descr[cpu].size;
 		     va += PAGE_SIZE, f++) {
-			ctxt.gdt_frames[f] = virt_to_machine(va) >> PAGE_SHIFT;
+			ctxt.gdt_frames[f] = virt_to_mfn(va);
 			make_page_readonly((void *)va);
 		}
 		ctxt.gdt_ents = cpu_gdt_descr[cpu].size / 8;
@@ -920,7 +920,7 @@ static int __init do_boot_cpu(int apicid)
 	ctxt.failsafe_callback_cs  = __KERNEL_CS;
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 
-	ctxt.ctrlreg[3] = (unsigned long)virt_to_machine(swapper_pg_dir);
+	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 
 	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
 	printk("boot error: %ld\n", boot_error);
@@ -1615,4 +1615,22 @@ void smp_resume(void)
 	/* XXX todo: restore time and ipi's on all cpus */
 	smp_intr_init();
 	local_setup_timer_irq();
+}
+
+DECLARE_PER_CPU(int, timer_irq);
+
+void _restore_vcpu(void)
+{
+	int cpu = smp_processor_id();
+	extern atomic_t vcpus_rebooting;
+
+	/* We are the first thing the vcpu runs when it comes back,
+	   and we are supposed to restore the IPIs and timer
+	   interrupts etc.  When we return, the vcpu's idle loop will
+	   start up again. */
+	_bind_virq_to_irq(VIRQ_TIMER, cpu, per_cpu(timer_irq, cpu));
+	_bind_virq_to_irq(VIRQ_DEBUG, cpu, per_cpu(ldebug_irq, cpu));
+	_bind_ipi_to_irq(RESCHEDULE_VECTOR, cpu, per_cpu(resched_irq, cpu) );
+	_bind_ipi_to_irq(CALL_FUNCTION_VECTOR, cpu, per_cpu(callfunc_irq, cpu) );
+	atomic_dec(&vcpus_rebooting);
 }

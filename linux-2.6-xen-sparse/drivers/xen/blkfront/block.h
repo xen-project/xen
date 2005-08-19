@@ -100,6 +100,7 @@ struct xlbd_major_info {
 
 struct xlbd_disk_info {
     int xd_device;
+    blkif_vdev_t handle;
     struct xlbd_major_info *mi;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     struct xlbd_disk_info  *next_waiting;
@@ -119,17 +120,10 @@ extern int blkif_ioctl(struct inode *inode, struct file *filep,
                        unsigned command, unsigned long argument);
 extern int blkif_check(dev_t dev);
 extern int blkif_revalidate(dev_t dev);
-extern void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp);
-#ifdef CONFIG_XEN_BLKDEV_GRANT
-extern void blkif_control_probe_send(
-    blkif_request_t *req, blkif_response_t *rsp, unsigned long address);
-#endif
 extern void do_blkif_request (request_queue_t *rq); 
 
-extern void xlvbd_update_vbds(void);
-
 /* Virtual block-device subsystem. */
-extern int  xlvbd_init(void);
-extern void xlvbd_cleanup(void); 
-
+int xlvbd_add(blkif_sector_t capacity, int device, blkif_vdev_t handle,
+	      u16 info, u16 sector_size);
+void xlvbd_del(blkif_vdev_t handle);
 #endif /* __XEN_DRIVERS_BLOCK_H__ */

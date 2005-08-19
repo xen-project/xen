@@ -37,7 +37,6 @@
 /* A xenbus device. */
 struct xenbus_device {
 	char *devicetype;
-	char *subtype;
 	char *nodename;
 	struct device dev;
 	int has_error;
@@ -53,7 +52,6 @@ struct xenbus_device_id
 {
 	/* .../device/<device_type>/<identifier> */
 	char devicetype[32]; 	/* General class of device. */
-	char subtype[32];	/* Contents of "subtype" for this device */
 };
 
 /* A xenbus driver. */
@@ -61,9 +59,11 @@ struct xenbus_driver {
 	char *name;
 	struct module *owner;
 	const struct xenbus_device_id *ids;
-	int  (*probe)    (struct xenbus_device * dev,
-			  const struct xenbus_device_id * id);
-	int  (*remove)   (struct xenbus_device * dev);
+	int (*probe)(struct xenbus_device *dev,
+		     const struct xenbus_device_id *id);
+	int (*remove)(struct xenbus_device *dev);
+	int (*suspend)(struct xenbus_device *dev);
+	int (*resume)(struct xenbus_device *dev);
 	struct device_driver driver;
 };
 
@@ -72,7 +72,8 @@ static inline struct xenbus_driver *to_xenbus_driver(struct device_driver *drv)
 	return container_of(drv, struct xenbus_driver, driver);
 }
 
-int xenbus_register_driver(struct xenbus_driver *drv);
+int xenbus_register_device(struct xenbus_driver *drv);
+int xenbus_register_backend(struct xenbus_driver *drv);
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 
 /* Caller must hold this lock to call these functions: it's also held

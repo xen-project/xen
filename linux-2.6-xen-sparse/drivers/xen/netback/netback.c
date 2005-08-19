@@ -43,7 +43,7 @@ static void make_tx_response(netif_t *netif,
 static int  make_rx_response(netif_t *netif, 
                              u16      id, 
                              s8       st,
-                             memory_t addr,
+                             unsigned long addr,
                              u16      size,
                              u16      csum_valid);
 
@@ -251,7 +251,7 @@ static void net_rx_action(unsigned long unused)
 #else
     struct mmuext_op *mmuext;
 #endif
-    unsigned long vdata, mdata, new_mfn;
+    unsigned long vdata, old_mfn, new_mfn;
     struct sk_buff_head rxq;
     struct sk_buff *skb;
     u16 notify_list[NETIF_RX_RING_SIZE];
@@ -271,7 +271,7 @@ static void net_rx_action(unsigned long unused)
     {
         netif   = netdev_priv(skb->dev);
         vdata   = (unsigned long)skb->data;
-        mdata   = virt_to_machine(vdata);
+        old_mfn = virt_to_mfn(vdata);
 
         /* Memory squeeze? Back off for an arbitrary while. */
         if ( (new_mfn = alloc_mfn()) == 0 )
@@ -293,7 +293,7 @@ static void net_rx_action(unsigned long unused)
         mcl++;
 
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-        gop->mfn = mdata >> PAGE_SHIFT;
+        gop->mfn = old_mfn;
         gop->domid = netif->domid;
         gop->handle = netif->rx->ring[
         MASK_NETIF_RX_IDX(netif->rx_resp_prod_copy)].req.gref;
@@ -308,7 +308,7 @@ static void net_rx_action(unsigned long unused)
         mcl++;
 
         mmuext->cmd = MMUEXT_REASSIGN_PAGE;
-        mmuext->mfn = mdata >> PAGE_SHIFT;
+        mmuext->mfn = old_mfn;
         mmuext++;
 #endif
         mmu->ptr = (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
@@ -318,7 +318,7 @@ static void net_rx_action(unsigned long unused)
         __skb_queue_tail(&rxq, skb);
 
 #ifdef DEBUG_GRANT
-        dump_packet('a', mdata, vdata);
+        dump_packet('a', old_mfn, vdata);
 #endif
         /* Filled the batch queue? */
         if ( (mcl - rx_mcl) == ARRAY_SIZE(rx_mcl) )
@@ -345,10 +345,8 @@ static void net_rx_action(unsigned long unused)
 
     mcl = rx_mcl;
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_donate,
-                                           grant_rx_op, gop - grant_rx_op))) {
-        BUG();
-    }
+    BUG_ON(HYPERVISOR_grant_table_op(
+        GNTTABOP_donate, grant_rx_op, gop - grant_rx_op));
     gop = grant_rx_op;
 #else
     mmuext = rx_mmuext;
@@ -361,10 +359,9 @@ static void net_rx_action(unsigned long unused)
         /* Rederive the machine addresses. */
         new_mfn = mcl[0].args[1] >> PAGE_SHIFT;
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-        mdata = (unsigned long)skb->data & ~PAGE_MASK;
+        old_mfn = 0; /* XXX Fix this so we can free_mfn() on error! */
 #else
-        mdata   = ((mmuext[0].mfn << PAGE_SHIFT) |
-                   ((unsigned long)skb->data & ~PAGE_MASK));
+        old_mfn = mmuext[0].mfn;
 #endif
         atomic_set(&(skb_shinfo(skb)->dataref), 1);
         skb_shinfo(skb)->nr_frags = 0;
@@ -379,18 +376,20 @@ static void net_rx_action(unsigned long unused)
         /* Check the reassignment error code. */
         status = NETIF_RSP_OKAY;
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-        BUG_ON(gop->status != 0);
+        BUG_ON(gop->status != 0); /* XXX */
 #else
         if ( unlikely(mcl[1].result != 0) )
         {
             DPRINTK("Failed MMU update transferring to DOM%u\n", netif->domid);
-            free_mfn(mdata >> PAGE_SHIFT);
+            free_mfn(old_mfn);
             status = NETIF_RSP_ERROR;
         }
 #endif
         evtchn = netif->evtchn;
         id = netif->rx->ring[MASK_NETIF_RX_IDX(netif->rx_resp_prod)].req.id;
-        if ( make_rx_response(netif, id, status, mdata,
+        if ( make_rx_response(netif, id, status,
+                              (old_mfn << PAGE_SHIFT) | /* XXX */
+                              ((unsigned long)skb->data & ~PAGE_MASK),
                               size, skb->proto_csum_valid) &&
              (rx_notify[evtchn] == 0) )
         {
@@ -888,7 +887,7 @@ static void make_tx_response(netif_t *netif,
 static int make_rx_response(netif_t *netif, 
                             u16      id, 
                             s8       st,
-                            memory_t addr,
+                            unsigned long addr,
                             u16      size,
                             u16      csum_valid)
 {

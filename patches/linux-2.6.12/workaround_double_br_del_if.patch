@@ -1,0 +1,11 @@
+--- linux-2.6.12/net/bridge/br_if.c	2005-06-17 14:48:29.000000000 -0500
++++ linux-2.6.12-xen0-smp/net/bridge/br_if.c	2005-08-18 15:17:27.302615846 -0500
+@@ -382,7 +382,7 @@
+ {
+ 	struct net_bridge_port *p = dev->br_port;
+ 	
+-	if (!p || p->br != br) 
++	if (!p || p->br != br || p->state == BR_STATE_DISABLED)
+ 		return -EINVAL;
+ 
+ 	br_sysfs_removeif(p);

@@ -320,7 +320,7 @@ static void blkif_ptbe_send_interface_connect(void)
     };
     blkif_fe_interface_connect_t *msg = (void*)cmsg.msg;
     msg->handle      = 0;
-    msg->shmem_frame = virt_to_machine(blktap_be_ring.sring) >> PAGE_SHIFT;
+    msg->shmem_frame = virt_to_mfn(blktap_be_ring.sring);
     
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }

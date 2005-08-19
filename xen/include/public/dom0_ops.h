@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA100E
+#define DOM0_INTERFACE_VERSION   0xAAAA100F
 
 /************************************************************************/
 
@@ -27,10 +27,10 @@
 typedef struct {
     /* IN variables. */
     domid_t       domain;
-    memory_t      max_pfns;
+    unsigned long max_pfns;
     void         *buffer;
     /* OUT variables. */
-    memory_t      num_pfns;
+    unsigned long num_pfns;
 } dom0_getmemlist_t;
 
 #define DOM0_SCHEDCTL          6
@@ -83,9 +83,9 @@ typedef struct {
 #define DOMFLAGS_SHUTDOWNMASK 255 /* DOMFLAGS_SHUTDOWN guest-supplied code.  */
 #define DOMFLAGS_SHUTDOWNSHIFT 16
     u32      flags;
-    memory_t tot_pages;
-    memory_t max_pages;
-    memory_t shared_info_frame;       /* MFN of shared_info struct */
+    unsigned long tot_pages;
+    unsigned long max_pages;
+    unsigned long shared_info_frame;       /* MFN of shared_info struct */
     u64      cpu_time;
     u32      n_vcpu;
     s32      vcpu_to_cpu[MAX_VIRT_CPUS];  /* current mapping   */
@@ -155,7 +155,7 @@ typedef struct {
 
 typedef struct {
     /* IN variables. */
-    memory_t pfn;          /* Machine page frame number to query.       */
+    unsigned long pfn;     /* Machine page frame number to query.       */
     domid_t domain;        /* To which domain does the frame belong?    */
     /* OUT variables. */
     /* Is the page PINNED to a type? */
@@ -197,7 +197,7 @@ typedef struct {
     unsigned long cpu_mask;
     u32           evt_mask;
     /* OUT variables */
-    memory_t mach_addr;
+    unsigned long buffer_mfn;
     u32      size;
 } dom0_tbufcontrol_t;
 
@@ -211,8 +211,8 @@ typedef struct {
     u32      sockets_per_node;
     u32      nr_nodes;
     u32      cpu_khz;
-    memory_t total_pages;
-    memory_t free_pages;
+    unsigned long total_pages;
+    unsigned long free_pages;
 } dom0_physinfo_t;
 
 /*
@@ -252,7 +252,7 @@ typedef struct {
     u32            op;
     unsigned long *dirty_bitmap; /* pointer to locked buffer */
     /* IN/OUT variables. */
-    memory_t       pages;        /* size of buffer, updated with actual size */
+    unsigned long  pages;        /* size of buffer, updated with actual size */
     /* OUT variables. */
     dom0_shadow_control_stats_t stats;
 } dom0_shadow_control_t;
@@ -260,15 +260,15 @@ typedef struct {
 #define DOM0_SETDOMAINMAXMEM   28
 typedef struct {
     /* IN variables. */
-    domid_t     domain;
-    memory_t    max_memkb;
+    domid_t       domain;
+    unsigned long max_memkb;
 } dom0_setdomainmaxmem_t;
 
 #define DOM0_GETPAGEFRAMEINFO2 29   /* batched interface */
 typedef struct {
     /* IN variables. */
-    domid_t  domain;
-    memory_t num;
+    domid_t        domain;
+    unsigned long  num;
     /* IN/OUT variables. */
     unsigned long *array;
 } dom0_getpageframeinfo2_t;
@@ -283,12 +283,12 @@ typedef struct {
 #define DOM0_ADD_MEMTYPE         31
 typedef struct {
     /* IN variables. */
-    memory_t pfn;
-    memory_t nr_pfns;
-    u32      type;
+    unsigned long pfn;
+    unsigned long nr_pfns;
+    u32           type;
     /* OUT variables. */
-    u32      handle;
-    u32      reg;
+    u32           handle;
+    u32           reg;
 } dom0_add_memtype_t;
 
 /*
@@ -311,8 +311,8 @@ typedef struct {
     /* IN variables. */
     u32      reg;
     /* OUT variables. */
-    memory_t pfn;
-    memory_t nr_pfns;
+    unsigned long pfn;
+    unsigned long nr_pfns;
     u32      type;
 } dom0_read_memtype_t;
 
@@ -361,10 +361,10 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t               first_domain;
-    memory_t              max_domains;
+    unsigned int          max_domains;
     dom0_getdomaininfo_t *buffer;
     /* OUT variables. */
-    memory_t              num_domains;
+    unsigned int          num_domains;
 } dom0_getdomaininfolist_t;
 
 #define DOM0_PLATFORM_QUIRK      39  

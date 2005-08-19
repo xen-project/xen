@@ -14,8 +14,7 @@ obj-y	:= process.o signal.o entry.o traps.o \
 
 c-obj-y	:= semaphore.o vm86.o \
 		ptrace.o sys_i386.o \
-		i387.o dmi_scan.o bootflag.o \
-		doublefault.o
+		i387.o dmi_scan.o bootflag.o
 s-obj-y	:=
 
 obj-y				+= cpu/
@@ -85,7 +84,7 @@ $(obj)/vsyscall-syms.o: $(src)/vsyscall.lds \
 			$(obj)/vsyscall-sysenter.o FORCE
 	$(call if_changed,syscall)
 
-c-link	:= init_task.o
+c-link	:=
 s-link	:= vsyscall-int80.o vsyscall-sysenter.o vsyscall-sigreturn.o vsyscall.lds.o syscall_table.o
 
 $(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-obj-m) $(c-link)) $(patsubst %.o,$(obj)/%.S,$(s-obj-y) $(s-link)):

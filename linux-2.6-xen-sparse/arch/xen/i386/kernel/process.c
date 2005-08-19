@@ -115,20 +115,12 @@ void xen_idle(void)
 /* We don't actually take CPU down, just spin without interrupts. */
 static inline void play_dead(void)
 {
-	/* Ack it */
-	__get_cpu_var(cpu_state) = CPU_DEAD;
-
-	/* We shouldn't have to disable interrupts while dead, but
-	 * some interrupts just don't seem to go away, and this makes
-	 * it "work" for testing purposes. */
 	/* Death loop */
 	while (__get_cpu_var(cpu_state) != CPU_UP_PREPARE)
 		HYPERVISOR_yield();
 
-	local_irq_disable();
 	__flush_tlb_all();
 	cpu_set(smp_processor_id(), cpu_online_map);
-	local_irq_enable();
 }
 #else
 static inline void play_dead(void)
@@ -156,12 +148,19 @@ void cpu_idle (void)
 			rmb();
 
 			if (cpu_is_offline(cpu)) {
+				local_irq_disable();
+				/* Ack it.  From this point on until
+				   we get woken up, we're not allowed
+				   to take any locks.  In particular,
+				   don't printk. */
+				__get_cpu_var(cpu_state) = CPU_DEAD;
 #if defined(CONFIG_XEN) && defined(CONFIG_HOTPLUG_CPU)
 				/* Tell hypervisor to take vcpu down. */
 				HYPERVISOR_vcpu_down(cpu);
 #endif
 				play_dead();
-         }
+				local_irq_enable();
+			}
 
 			__get_cpu_var(irq_stat).idle_timestamp = jiffies;
 			xen_idle();
@@ -523,16 +522,15 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	 * Load the per-thread Thread-Local Storage descriptor.
 	 * This is load_TLS(next, cpu) with multicalls.
 	 */
-#define C(i) do {                                                       \
-	if (unlikely(next->tls_array[i].a != prev->tls_array[i].a ||    \
-		     next->tls_array[i].b != prev->tls_array[i].b)) {   \
-		mcl->op      = __HYPERVISOR_update_descriptor;          \
-		mcl->args[0] = virt_to_machine(&get_cpu_gdt_table(cpu)  \
-					 [GDT_ENTRY_TLS_MIN + i]);      \
-		mcl->args[1] = ((u32 *)&next->tls_array[i])[0];         \
-		mcl->args[2] = ((u32 *)&next->tls_array[i])[1];         \
-		mcl++;                                                  \
-	}                                                               \
+#define C(i) do {							\
+	if (unlikely(next->tls_array[i].a != prev->tls_array[i].a ||	\
+		     next->tls_array[i].b != prev->tls_array[i].b)) {	\
+		mcl->op = __HYPERVISOR_update_descriptor;		\
+		*(u64 *)&mcl->args[0] =	virt_to_machine(		\
+			&get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN + i]);\
+		*(u64 *)&mcl->args[2] = *(u64 *)&next->tls_array[i];	\
+		mcl++;							\
+	}								\
 } while (0)
 	C(0); C(1); C(2);
 #undef C
@@ -549,7 +547,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		iobmp_op.cmd                     =
 			PHYSDEVOP_SET_IOBITMAP;
 		iobmp_op.u.set_iobitmap.bitmap   =
-			(unsigned long)next->io_bitmap_ptr;
+			(char *)next->io_bitmap_ptr;
 		iobmp_op.u.set_iobitmap.nr_ports =
 			next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
 		mcl->op      = __HYPERVISOR_physdev_op;
@@ -791,3 +789,10 @@ unsigned long arch_align_stack(unsigned long sp)
 		sp -= get_random_int() % 8192;
 	return sp & ~0xf;
 }
+
+
+#ifndef CONFIG_X86_SMP
+void _restore_vcpu(void)
+{
+}
+#endif

@@ -113,10 +113,10 @@ int tb_control(dom0_tbufcontrol_t *tbc)
     switch ( tbc->op)
     {
     case DOM0_TBUF_GET_INFO:
-        tbc->cpu_mask  = tb_cpu_mask;
-        tbc->evt_mask  = tb_event_mask;
-        tbc->mach_addr = __pa(t_bufs[0]);
-        tbc->size      = opt_tbuf_size * PAGE_SIZE;
+        tbc->cpu_mask   = tb_cpu_mask;
+        tbc->evt_mask   = tb_event_mask;
+        tbc->buffer_mfn = __pa(t_bufs[0]) >> PAGE_SHIFT;
+        tbc->size       = opt_tbuf_size * PAGE_SIZE;
         break;
     case DOM0_TBUF_SET_CPU_MASK:
         tb_cpu_mask = tbc->cpu_mask;

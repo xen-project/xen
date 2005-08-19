@@ -53,8 +53,8 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <scsi/scsi.h>
-#include <asm-xen/ctrl_if.h>
 #include <asm-xen/evtchn.h>
+#include <asm-xen/xenbus.h>
 #ifdef CONFIG_XEN_BLKDEV_GRANT
 #include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/gnttab.h>
@@ -65,22 +65,14 @@ typedef unsigned char byte; /* from linux/ide.h */
 /* Control whether runtime update of vbds is enabled. */
 #define ENABLE_VBD_UPDATE 1
 
-#if ENABLE_VBD_UPDATE
-static void vbd_update(void);
-#else
-static void vbd_update(void){};
-#endif
-
 #define BLKIF_STATE_CLOSED       0
 #define BLKIF_STATE_DISCONNECTED 1
 #define BLKIF_STATE_CONNECTED    2
 
-static int blkif_handle = 0;
 static unsigned int blkif_state = BLKIF_STATE_CLOSED;
 static unsigned int blkif_evtchn = 0;
-
-static int blkif_control_rsp_valid;
-static blkif_response_t blkif_control_rsp;
+static unsigned int blkif_vbds = 0;
+static unsigned int blkif_vbds_connected = 0;
 
 static blkif_front_ring_t blk_ring;
 
@@ -92,6 +84,7 @@ static grant_ref_t gref_head, gref_terminal;
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
 #define GRANTREF_INVALID (1<<15)
+static int shmem_ref;
 #endif
 
 static struct blk_shadow {
@@ -105,7 +98,7 @@ static int recovery = 0; /* Recovery in progress: protected by blkif_io_lock */
 
 static void kick_pending_request_queues(void);
 
-int __init xlblk_init(void);
+static int __init xlblk_init(void);
 
 static void blkif_completion(struct blk_shadow *s);
 
@@ -179,19 +172,6 @@ static inline void flush_requests(void)
 
 module_init(xlblk_init);
 
-#if ENABLE_VBD_UPDATE
-static void update_vbds_task(void *unused)
-{ 
-    xlvbd_update_vbds();
-}
-
-static void vbd_update(void)
-{
-    static DECLARE_WORK(update_tq, update_vbds_task, NULL);
-    schedule_work(&update_tq);
-}
-#endif /* ENABLE_VBD_UPDATE */
-
 static struct xlbd_disk_info *head_waiting = NULL;
 static void kick_pending_request_queues(void)
 {
@@ -221,16 +201,7 @@ int blkif_open(struct inode *inode, struct file *filep)
 
 int blkif_release(struct inode *inode, struct file *filep)
 {
-    struct gendisk *gd = inode->i_bdev->bd_disk;
-    struct xlbd_disk_info *di = (struct xlbd_disk_info *)gd->private_data;
-
-    /*
-     * When usage drops to zero it may allow more VBD updates to occur.
-     * Update of usage count is protected by a per-device semaphore.
-     */
-    if ( --di->mi->usage == 0 )
-        vbd_update();
-
+    /* FIXME: This is where we can actually free up majors, etc. --RR */
     return 0;
 }
 
@@ -301,7 +272,7 @@ static int blkif_queue_request(struct request *req)
     ring_req->operation = rq_data_dir(req) ? BLKIF_OP_WRITE :
         BLKIF_OP_READ;
     ring_req->sector_number = (blkif_sector_t)req->sector;
-    ring_req->device = di->xd_device;
+    ring_req->handle = di->handle;
 
     ring_req->nr_segments = 0;
     rq_for_each_bio(bio, req)
@@ -446,10 +417,6 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
             end_that_request_last(req);
 
             break;
-        case BLKIF_OP_PROBE:
-            memcpy(&blkif_control_rsp, bret, sizeof(*bret));
-            blkif_control_rsp_valid = 1;
-            break;
         default:
             BUG();
         }
@@ -483,28 +450,6 @@ static int nr_pending;
 #define blkif_io_lock io_request_lock
 
 /*============================================================================*/
-#if ENABLE_VBD_UPDATE
-
-/*
- * blkif_update_int/update-vbds_task - handle VBD update events.
- *  Schedule a task for keventd to run, which will update the VBDs and perform 
- *  the corresponding updates to our view of VBD state.
- */
-static void update_vbds_task(void *unused)
-{ 
-    xlvbd_update_vbds();
-}
-
-static void vbd_update(void)
-{
-    static struct tq_struct update_tq;
-    update_tq.routine = update_vbds_task;
-    schedule_task(&update_tq);
-}
-
-#endif /* ENABLE_VBD_UPDATE */
-/*============================================================================*/
-
 static void kick_pending_request_queues(void)
 {
     /* We kick pending request queues if the ring is reasonably empty. */
@@ -757,7 +702,8 @@ static int blkif_queue_request(unsigned long   id,
                                char *          buffer,
                                unsigned long   sector_number,
                                unsigned short  nr_sectors,
-                               kdev_t          device)
+                               kdev_t          device,
+			       blkif_vdev_t    handle)
 {
     unsigned long       buffer_ma = virt_to_bus(buffer);
     unsigned long       xid;
@@ -871,7 +817,7 @@ static int blkif_queue_request(unsigned long   id,
     req->id            = xid;
     req->operation     = operation;
     req->sector_number = (blkif_sector_t)sector_number;
-    req->device        = device; 
+    req->handle        = handle; 
     req->nr_segments   = 1;
 #ifdef CONFIG_XEN_BLKDEV_GRANT
     /* install a grant reference. */
@@ -1047,108 +993,10 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 /*****************************  COMMON CODE  *******************************/
 
-#ifdef CONFIG_XEN_BLKDEV_GRANT
-void blkif_control_probe_send(blkif_request_t *req, blkif_response_t *rsp,
-                              unsigned long address)
-{
-    int ref = gnttab_claim_grant_reference(&gref_head, gref_terminal);
-    ASSERT( ref != -ENOSPC );
-
-    gnttab_grant_foreign_access_ref( ref, rdomid, address >> PAGE_SHIFT, 0 );
-
-    req->frame_and_sects[0] = blkif_fas_from_gref(ref, 0, (PAGE_SIZE/512)-1);
-
-    blkif_control_send(req, rsp);
-}
-#endif
-
-void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
-{
-    unsigned long flags, id;
-    blkif_request_t *req_d;
-
- retry:
-    while ( RING_FULL(&blk_ring) )
-    {
-        set_current_state(TASK_INTERRUPTIBLE);
-        schedule_timeout(1);
-    }
-
-    spin_lock_irqsave(&blkif_io_lock, flags);
-    if ( RING_FULL(&blk_ring) )
-    {
-        spin_unlock_irqrestore(&blkif_io_lock, flags);
-        goto retry;
-    }
-
-    DISABLE_SCATTERGATHER();
-    req_d = RING_GET_REQUEST(&blk_ring, blk_ring.req_prod_pvt);
-    *req_d = *req;    
-
-    id = GET_ID_FROM_FREELIST();
-    req_d->id = id;
-    blk_shadow[id].request = (unsigned long)req;
-
-    pickle_request(&blk_shadow[id], req);
-
-    blk_ring.req_prod_pvt++;
-    flush_requests();
-
-    spin_unlock_irqrestore(&blkif_io_lock, flags);
-
-    while ( !blkif_control_rsp_valid )
-    {
-        set_current_state(TASK_INTERRUPTIBLE);
-        schedule_timeout(1);
-    }
-
-    memcpy(rsp, &blkif_control_rsp, sizeof(*rsp));
-    blkif_control_rsp_valid = 0;
-}
-
-
-/* Send a driver status notification to the domain controller. */
-static void send_driver_status(int ok)
-{
-    ctrl_msg_t cmsg = {
-        .type    = CMSG_BLKIF_FE,
-        .subtype = CMSG_BLKIF_FE_DRIVER_STATUS,
-        .length  = sizeof(blkif_fe_driver_status_t),
-    };
-    blkif_fe_driver_status_t *msg = (void*)cmsg.msg;
-    
-    msg->status = (ok ? BLKIF_DRIVER_STATUS_UP : BLKIF_DRIVER_STATUS_DOWN);
-
-    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
-}
-
-/* Tell the controller to bring up the interface. */
-static void blkif_send_interface_connect(void)
-{
-    ctrl_msg_t cmsg = {
-        .type    = CMSG_BLKIF_FE,
-        .subtype = CMSG_BLKIF_FE_INTERFACE_CONNECT,
-        .length  = sizeof(blkif_fe_interface_connect_t),
-    };
-    blkif_fe_interface_connect_t *msg = (void*)cmsg.msg;
-    
-    msg->handle      = 0;
-    msg->shmem_frame = (virt_to_machine(blk_ring.sring) >> PAGE_SHIFT);
-    
-#ifdef CONFIG_XEN_BLKDEV_GRANT
-    msg->shmem_ref   = gnttab_claim_grant_reference( &gref_head, gref_terminal );
-    ASSERT( msg->shmem_ref != -ENOSPC );
-    gnttab_grant_foreign_access_ref ( msg->shmem_ref , rdomid, msg->shmem_frame, 0 );
-#endif
-
-    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
-}
-
 static void blkif_free(void)
 {
     /* Prevent new requests being issued until we fix things up. */
     spin_lock_irq(&blkif_io_lock);
-    recovery = 1;
     blkif_state = BLKIF_STATE_DISCONNECTED;
     spin_unlock_irq(&blkif_io_lock);
 
@@ -1160,31 +1008,6 @@ static void blkif_free(void)
     }
     unbind_evtchn_from_irqhandler(blkif_evtchn, NULL);
     blkif_evtchn = 0;
-}
-
-static void blkif_close(void)
-{
-}
-
-/* Move from CLOSED to DISCONNECTED state. */
-static void blkif_disconnect(void)
-{
-    blkif_sring_t *sring;
-    
-    if ( blk_ring.sring != NULL )
-        free_page((unsigned long)blk_ring.sring);
-    
-    sring = (blkif_sring_t *)__get_free_page(GFP_KERNEL);
-    SHARED_RING_INIT(sring);
-    FRONT_RING_INIT(&blk_ring, sring, PAGE_SIZE);
-    blkif_state  = BLKIF_STATE_DISCONNECTED;
-    blkif_send_interface_connect();
-}
-
-static void blkif_reset(void)
-{
-    blkif_free();
-    blkif_disconnect();
 }
 
 static void blkif_recover(void)
@@ -1257,11 +1080,14 @@ static void blkif_recover(void)
     blkif_state = BLKIF_STATE_CONNECTED;
 }
 
-static void blkif_connect(blkif_fe_interface_status_t *status)
+static void blkif_connect(u16 evtchn, domid_t domid)
 {
     int err = 0;
 
-    blkif_evtchn = status->evtchn;
+    blkif_evtchn = evtchn;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    rdomid       = domid;
+#endif
 
     err = bind_evtchn_to_irqhandler(
         blkif_evtchn, blkif_int, SA_SAMPLE_RANDOM, "blkif", NULL);
@@ -1270,142 +1096,318 @@ static void blkif_connect(blkif_fe_interface_status_t *status)
         WPRINTK("bind_evtchn_to_irqhandler failed (err=%d)\n", err);
         return;
     }
-
-    if ( recovery ) 
-    {
-        blkif_recover();
-    } 
-    else 
-    {
-        /* Transition to connected in case we need to do 
-         *  a partition probe on a whole disk. */
-        blkif_state = BLKIF_STATE_CONNECTED;
-        
-        /* Probe for discs attached to the interface. */
-        xlvbd_init();
-    }
-    
-    /* Kick pending requests. */
-    spin_lock_irq(&blkif_io_lock);
-    kick_pending_request_queues();
-    spin_unlock_irq(&blkif_io_lock);
 }
 
-static void unexpected(blkif_fe_interface_status_t *status)
+
+static struct xenbus_device_id blkfront_ids[] = {
+	{ "vbd" },
+	{ "" }
+};
+
+struct blkfront_info
 {
-    DPRINTK(" Unexpected blkif status %u in state %u\n", 
-            status->status, blkif_state);
+	/* We watch the backend */
+	struct xenbus_watch watch;
+	int vdevice;
+	u16 handle;
+	int connected;
+	struct xenbus_device *dev;
+	char *backend;
+};
+
+static void watch_for_status(struct xenbus_watch *watch, const char *node)
+{
+	struct blkfront_info *info;
+	unsigned int binfo;
+	unsigned long sectors, sector_size;
+	int err;
+
+	info = container_of(watch, struct blkfront_info, watch);
+	node += strlen(watch->node);
+
+	/* FIXME: clean up when error on the other end. */
+	if (info->connected)
+		return;
+
+	err = xenbus_gather(watch->node, 
+			    "sectors", "%lu", &sectors,
+			    "info", "%u", &binfo,
+			    "sector-size", "%lu", &sector_size,
+			    NULL);
+
+	if (err)
+		xenbus_dev_error(info->dev, err, "reading backend fields");
+	else {
+		xlvbd_add(sectors, info->vdevice, info->handle, binfo,
+			  sector_size);
+		info->connected = 1;
+
+		/* First to connect?  blkif is now connected. */
+		if (blkif_vbds_connected++ == 0)
+			blkif_state = BLKIF_STATE_CONNECTED;
+
+		xenbus_dev_ok(info->dev);
+
+		/* Kick pending requests. */
+		spin_lock_irq(&blkif_io_lock);
+		kick_pending_request_queues();
+		spin_unlock_irq(&blkif_io_lock);
+	}
 }
 
-static void blkif_status(blkif_fe_interface_status_t *status)
+static int setup_blkring(struct xenbus_device *dev, unsigned int backend_id)
 {
+	blkif_sring_t *sring;
+	evtchn_op_t op = { .cmd = EVTCHNOP_alloc_unbound };
+	int err;
+
+	sring = (void *)__get_free_page(GFP_KERNEL);
+	if (!sring) {
+		xenbus_dev_error(dev, -ENOMEM, "allocating shared ring");
+		return -ENOMEM;
+	}
+	SHARED_RING_INIT(sring);
+	FRONT_RING_INIT(&blk_ring, sring, PAGE_SIZE);
+
 #ifdef CONFIG_XEN_BLKDEV_GRANT
-    rdomid       = status->domid; /* need to set rdomid early */
+	shmem_ref = gnttab_claim_grant_reference(&gref_head,
+						 gref_terminal);
+	ASSERT(shmem_ref != -ENOSPC);
+	gnttab_grant_foreign_access_ref(shmem_ref,
+					backend_id,
+					virt_to_mfn(blk_ring.sring),
+					0);
 #endif
 
-    if ( status->handle != blkif_handle )
-    {
-        WPRINTK(" Invalid blkif: handle=%u\n", status->handle);
-        unexpected(status);
-        return;
-    }
-
-    switch ( status->status ) 
-    {
-    case BLKIF_INTERFACE_STATUS_CLOSED:
-        switch ( blkif_state )
-        {
-        case BLKIF_STATE_CLOSED:
-            unexpected(status);
-            break;
-        case BLKIF_STATE_DISCONNECTED:
-        case BLKIF_STATE_CONNECTED:
-            unexpected(status);
-            blkif_close();
-            break;
-        }
-        break;
-
-    case BLKIF_INTERFACE_STATUS_DISCONNECTED:
-        switch ( blkif_state )
-        {
-        case BLKIF_STATE_CLOSED:
-            blkif_disconnect();
-            break;
-        case BLKIF_STATE_DISCONNECTED:
-        case BLKIF_STATE_CONNECTED:
-            /* unexpected(status); */ /* occurs during suspend/resume */
-            blkif_reset();
-            break;
-        }
-        break;
-
-    case BLKIF_INTERFACE_STATUS_CONNECTED:
-        switch ( blkif_state )
-        {
-        case BLKIF_STATE_CLOSED:
-            unexpected(status);
-            blkif_disconnect();
-            blkif_connect(status);
-            break;
-        case BLKIF_STATE_DISCONNECTED:
-            blkif_connect(status);
-            break;
-        case BLKIF_STATE_CONNECTED:
-            unexpected(status);
-            blkif_connect(status);
-            break;
-        }
-        break;
-
-    case BLKIF_INTERFACE_STATUS_CHANGED:
-        switch ( blkif_state )
-        {
-        case BLKIF_STATE_CLOSED:
-        case BLKIF_STATE_DISCONNECTED:
-            unexpected(status);
-            break;
-        case BLKIF_STATE_CONNECTED:
-            vbd_update();
-            break;
-        }
-        break;
-
-    default:
-        WPRINTK(" Invalid blkif status: %d\n", status->status);
-        break;
-    }
+	op.u.alloc_unbound.dom = backend_id;
+	err = HYPERVISOR_event_channel_op(&op);
+	if (err) {
+		free_page((unsigned long)blk_ring.sring);
+		blk_ring.sring = 0;
+		xenbus_dev_error(dev, err, "allocating event channel");
+		return err;
+	}
+	blkif_connect(op.u.alloc_unbound.port, backend_id);
+	return 0;
 }
 
-
-static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
+/* Common code used when first setting up, and when resuming. */
+static int talk_to_backend(struct xenbus_device *dev,
+			   struct blkfront_info *info)
 {
-    switch ( msg->subtype )
-    {
-    case CMSG_BLKIF_FE_INTERFACE_STATUS:
-        blkif_status((blkif_fe_interface_status_t *)
-                     &msg->msg[0]);
-        break;
-    default:
-        msg->length = 0;
-        break;
-    }
+	char *backend;
+	const char *message;
+	int err, backend_id;
 
-    ctrl_if_send_response(msg);
+	backend = xenbus_read(dev->nodename, "backend", NULL);
+	if (IS_ERR(backend)) {
+		err = PTR_ERR(backend);
+		if (err == -ENOENT)
+			goto out;
+		xenbus_dev_error(dev, err, "reading %s/backend",
+				 dev->nodename);
+		goto out;
+	}
+	if (strlen(backend) == 0) {
+		err = -ENOENT;
+		goto free_backend;
+	}
+
+	/* FIXME: This driver can't handle backends on different
+	 * domains.  Check and fail gracefully. */
+	err = xenbus_scanf(dev->nodename, "backend-id", "%i", &backend_id);
+	if (err == -ENOENT)
+		goto free_backend;
+ 	if (err < 0) {
+		xenbus_dev_error(dev, err, "reading %s/backend-id",
+				 dev->nodename);
+ 		goto free_backend;
+ 	}
+
+	/* First device?  We create shared ring, alloc event channel. */
+	if (blkif_vbds == 0) {
+		err = setup_blkring(dev, backend_id);
+		if (err)
+			goto free_backend;
+	}
+
+	err = xenbus_transaction_start(dev->nodename);
+	if (err) {
+		xenbus_dev_error(dev, err, "starting transaction");
+		goto destroy_blkring;
+	}
+
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+	err = xenbus_printf(dev->nodename, "grant-id","%u", shmem_ref);
+	if (err) {
+		message = "writing grant-id";
+		goto abort_transaction;
+	}
+#else
+	err = xenbus_printf(dev->nodename, "shared-frame", "%lu",
+			    virt_to_mfn(blk_ring.sring));
+	if (err) {
+		message = "writing shared-frame";
+		goto abort_transaction;
+	}
+#endif
+	err = xenbus_printf(dev->nodename,
+			    "event-channel", "%u", blkif_evtchn);
+	if (err) {
+		message = "writing event-channel";
+		goto abort_transaction;
+	}
+
+	info->watch.node = info->backend = backend;
+	info->watch.callback = watch_for_status;
+
+	err = register_xenbus_watch(&info->watch);
+	if (err) {
+		message = "registering watch on backend";
+		goto abort_transaction;
+	}
+
+	err = xenbus_transaction_end(0);
+	if (err) {
+		xenbus_dev_error(dev, err, "completing transaction");
+		goto destroy_blkring;
+	}
+	return 0;
+
+abort_transaction:
+	xenbus_transaction_end(1);
+	/* Have to do this *outside* transaction.  */
+	xenbus_dev_error(dev, err, "%s", message);
+destroy_blkring:
+	if (blkif_vbds == 0)
+		blkif_free();
+free_backend:
+	kfree(backend);
+out:
+	printk("%s:%u = %i\n", __FILE__, __LINE__, err);
+	return err;
 }
 
-int wait_for_blkif(void)
+/* Setup supplies the backend dir, virtual device.
+
+   We place an event channel and shared frame entries.
+   We watch backend to wait if it's ok. */
+static int blkfront_probe(struct xenbus_device *dev,
+			  const struct xenbus_device_id *id)
+{
+	int err;
+	struct blkfront_info *info;
+	int vdevice;
+
+	/* FIXME: Use dynamic device id if this is not set. */
+	err = xenbus_scanf(dev->nodename, "virtual-device", "%i", &vdevice);
+	if (err == -ENOENT)
+		return err;
+	if (err < 0) {
+		xenbus_dev_error(dev, err, "reading virtual-device");
+		return err;
+	}
+
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	if (!info) {
+		xenbus_dev_error(dev, err, "allocating info structure");
+		return err;
+	}
+	info->dev = dev;
+	info->vdevice = vdevice;
+	info->connected = 0;
+	/* Front end dir is a number, which is used as the id. */
+	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
+	dev->data = info;
+
+	err = talk_to_backend(dev, info);
+	if (err) {
+		kfree(info);
+		return err;
+	}
+
+	/* Call once in case entries already there. */
+	watch_for_status(&info->watch, info->watch.node);
+	blkif_vbds++;
+	return 0;
+}
+
+static int blkfront_remove(struct xenbus_device *dev)
+{
+	struct blkfront_info *info = dev->data;
+
+	if (info->backend)
+		unregister_xenbus_watch(&info->watch);
+
+	if (info->connected) {
+		xlvbd_del(info->handle);
+		blkif_vbds_connected--;
+	}
+	kfree(info->backend);
+	kfree(info);
+
+	if (--blkif_vbds == 0)
+		blkif_free();
+
+	return 0;
+}
+
+static int blkfront_suspend(struct xenbus_device *dev)
+{
+	struct blkfront_info *info = dev->data;
+
+	unregister_xenbus_watch(&info->watch);
+	kfree(info->backend);
+	info->backend = NULL;
+
+	if (--blkif_vbds == 0) {
+		recovery = 1;
+		blkif_free();
+	}
+
+	return 0;
+}
+
+static int blkfront_resume(struct xenbus_device *dev)
+{
+	struct blkfront_info *info = dev->data;
+	int err;
+
+	/* FIXME: Check geometry hasn't changed here... */
+	err = talk_to_backend(dev, info);
+	if (!err) {
+		if (blkif_vbds++ == 0)
+			blkif_recover();
+	}
+	return err;
+}
+
+static struct xenbus_driver blkfront = {
+	.name = "vbd",
+	.owner = THIS_MODULE,
+	.ids = blkfront_ids,
+	.probe = blkfront_probe,
+	.remove = blkfront_remove,
+	.resume = blkfront_resume,
+	.suspend = blkfront_suspend,
+};
+
+static void __init init_blk_xenbus(void)
+{
+	xenbus_register_device(&blkfront);
+}
+
+static int wait_for_blkif(void)
 {
     int err = 0;
     int i;
-    send_driver_status(1);
 
     /*
      * We should read 'nr_interfaces' from response message and wait
      * for notifications before proceeding. For now we assume that we
      * will be notified of exactly one interface.
      */
-    for ( i=0; (blkif_state != BLKIF_STATE_CONNECTED) && (i < 10*HZ); i++ )
+    for ( i=0; blkif_state != BLKIF_STATE_CONNECTED && (i < 10*HZ); i++ )
     {
         set_current_state(TASK_INTERRUPTIBLE);
         schedule_timeout(1);
@@ -1419,7 +1421,7 @@ int wait_for_blkif(void)
     return err;
 }
 
-int __init xlblk_init(void)
+static int __init xlblk_init(void)
 {
     int i;
 
@@ -1443,27 +1445,11 @@ int __init xlblk_init(void)
         blk_shadow[i].req.id = i+1;
     blk_shadow[BLK_RING_SIZE-1].req.id = 0x0fffffff;
 
-    (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx,
-                                    CALLBACK_IN_BLOCKING_CONTEXT);
+    init_blk_xenbus();
 
     wait_for_blkif();
 
     return 0;
-}
-
-void blkdev_suspend(void)
-{
-}
-
-void blkdev_resume(void)
-{
-#ifdef CONFIG_XEN_BLKDEV_GRANT
-    int i, j;
-    for ( i = 0; i < BLK_RING_SIZE; i++ )
-        for ( j = 0; j < BLKIF_MAX_SEGMENTS_PER_REQUEST; j++ )
-            blk_shadow[i].req.frame_and_sects[j] |= GRANTREF_INVALID;
-#endif
-    send_driver_status(1);
 }
 
 static void blkif_completion(struct blk_shadow *s)

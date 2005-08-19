@@ -453,8 +453,8 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 #define C(i) do {							\
 	if (unlikely(next->tls_array[i] != prev->tls_array[i])) {	\
 		mcl->op      = __HYPERVISOR_update_descriptor;		\
-		mcl->args[0] = virt_to_machine(&get_cpu_gdt_table(cpu)	\
-					       [GDT_ENTRY_TLS_MIN + i]); \
+		mcl->args[0] = virt_to_machine(				\
+			&get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN + i]);\
 		mcl->args[1] = next->tls_array[i];			\
 		mcl++;							\
 	}								\
@@ -474,7 +474,7 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 		iobmp_op.cmd                     =
 			PHYSDEVOP_SET_IOBITMAP;
 		iobmp_op.u.set_iobitmap.bitmap   =
-			(unsigned long)next->io_bitmap_ptr;
+			(char *)next->io_bitmap_ptr;
 		iobmp_op.u.set_iobitmap.nr_ports =
 			next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
 		mcl->op      = __HYPERVISOR_physdev_op;
@@ -743,3 +743,9 @@ unsigned long arch_align_stack(unsigned long sp)
 		sp -= get_random_int() % 8192;
 	return sp & ~0xf;
 }
+
+#ifndef CONFIG_SMP
+void _restore_vcpu(void)
+{
+}
+#endif
