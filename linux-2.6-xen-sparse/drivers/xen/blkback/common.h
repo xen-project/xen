@@ -13,7 +13,6 @@
 #include <asm/io.h>
 #include <asm/setup.h>
 #include <asm/pgalloc.h>
-#include <asm-xen/ctrl_if.h>
 #include <asm-xen/evtchn.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/io/blkif.h>
@@ -47,6 +46,7 @@ typedef struct blkif_st {
     /* Physical parameters of the comms window. */
     unsigned long     shmem_frame;
     unsigned int      evtchn;
+    unsigned int      remote_evtchn;
     /* Comms information. */
     blkif_back_ring_t blk_ring;
     /* VBDs attached to this interface. */
@@ -81,17 +81,29 @@ void blkif_destroy(blkif_be_destroy_t *destroy);
 void blkif_connect(blkif_be_connect_t *connect);
 int  blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id);
 void blkif_disconnect_complete(blkif_t *blkif);
-blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle);
+blkif_t *blkif_find(domid_t domid);
+void free_blkif(blkif_t *blkif);
+int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn);
+
 #define blkif_get(_b) (atomic_inc(&(_b)->refcnt))
 #define blkif_put(_b)                             \
     do {                                          \
         if ( atomic_dec_and_test(&(_b)->refcnt) ) \
-            blkif_disconnect_complete(_b);        \
+            free_blkif(_b);			  \
     } while (0)
 
-void vbd_create(blkif_be_vbd_create_t *create); 
+struct vbd;
+void vbd_free(blkif_t *blkif, struct vbd *vbd);
+
+/* Creates inactive vbd. */
+struct vbd *vbd_create(blkif_t *blkif, blkif_vdev_t vdevice, blkif_pdev_t pdevice, int readonly);
+int vbd_is_active(struct vbd *vbd);
+void vbd_activate(blkif_t *blkif, struct vbd *vbd);
+
+unsigned long vbd_size(struct vbd *vbd);
+unsigned int vbd_info(struct vbd *vbd);
+unsigned long vbd_secsize(struct vbd *vbd);
 void vbd_destroy(blkif_be_vbd_destroy_t *delete); 
-int vbd_probe(blkif_t *blkif, vdisk_t *vbd_info, int max_vbds);
 void destroy_all_vbds(blkif_t *blkif);
 
 struct phys_req {
@@ -104,9 +116,10 @@ struct phys_req {
 int vbd_translate(struct phys_req *req, blkif_t *blkif, int operation); 
 
 void blkif_interface_init(void);
-void blkif_ctrlif_init(void);
 
 void blkif_deschedule(blkif_t *blkif);
+
+void blkif_xenbus_init(void);
 
 irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 

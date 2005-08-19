@@ -65,13 +65,6 @@ static void __do_suspend(void)
 
     /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
 	/* XXX SMH: yes it would :-( */	
-#ifdef CONFIG_XEN_BLKDEV_FRONTEND
-    extern void blkdev_suspend(void);
-    extern void blkdev_resume(void);
-#else
-#define blkdev_suspend() do{}while(0)
-#define blkdev_resume()  do{}while(0)
-#endif
 
 #ifdef CONFIG_XEN_NETDEV_FRONTEND
     extern void netif_suspend(void);
@@ -118,8 +111,6 @@ static void __do_suspend(void)
 #endif
 
     netif_suspend();
-
-    blkdev_suspend();
 
     time_suspend();
 
@@ -175,8 +166,6 @@ static void __do_suspend(void)
 #endif
 
     time_resume();
-
-    blkdev_resume();
 
     netif_resume();
 
