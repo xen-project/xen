@@ -434,7 +434,7 @@ def xm_sedf(args):
     arg_check(args, 6, "sedf")
     
     dom = args[0]
-    v = map(int, args[1:5])
+    v = map(int, args[1:6])
     from xen.xend.XendClient import server
     server.xend_domain_cpu_sedf_set(dom, *v)
 
