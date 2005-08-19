@@ -182,14 +182,18 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 			    "frontend-id", "%li", &be->frontend_id,
 			    "frontend", NULL, &frontend,
 			    NULL);
-	if (err == -ENOENT || err == -ERANGE ||
+	if (XENBUS_EXIST_ERR(err) ||
 	    strlen(frontend) == 0 || !xenbus_exists(frontend, "")) {
-		if (frontend)
-			kfree(frontend);
 		/* If we can't get a frontend path and a frontend-id,
 		 * then our bus-id is no longer valid and we need to
 		 * destroy the backend device.
 		 */
+		goto device_fail;
+	}
+	if (err < 0) {
+		xenbus_dev_error(dev, err,
+				 "reading %s/frontend or frontend-id",
+				 dev->nodename);
 		goto device_fail;
 	}
 
@@ -199,6 +203,7 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		if (be->frontpath)
 			kfree(be->frontpath);
 		be->frontpath = frontend;
+		frontend = NULL;
 		be->watch.node = be->frontpath;
 		be->watch.callback = frontend_changed;
 		err = register_xenbus_watch(&be->watch);
@@ -206,14 +211,13 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 			be->watch.node = NULL;
 			goto device_fail;
 		}
-	} else
-		kfree(frontend);
+	}
 
 	err = xenbus_scanf(dev->nodename, "physical-device", "%li", &pdev);
-	if (err == -ENOENT || err == -ERANGE)
+	if (XENBUS_EXIST_ERR(err))
 		goto out;
 	if (err < 0) {
-		xenbus_dev_error(dev, err, "Reading physical-device");
+		xenbus_dev_error(dev, err, "reading physical-device");
 		goto device_fail;
 	}
 	if (be->pdev && be->pdev != pdev) {
@@ -253,12 +257,14 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		frontend_changed(&be->watch, be->frontpath);
 	}
 
+ out:
+	if (frontend)
+		kfree(frontend);
 	return;
 
  device_fail:
 	device_unregister(&be->dev->dev);
- out:
-	return;
+	goto out;
 }
 
 static int blkback_probe(struct xenbus_device *dev,

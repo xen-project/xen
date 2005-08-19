@@ -128,4 +128,14 @@ void reregister_xenbus_watches(void);
 void xenbus_suspend(void);
 void xenbus_resume(void);
 
+#define XENBUS_IS_ERR_READ(str) ({			\
+	if (!IS_ERR(str) && strlen(str) == 0) {		\
+		kfree(str);				\
+		str = ERR_PTR(-ERANGE);			\
+	}						\
+	IS_ERR(str);					\
+})
+
+#define XENBUS_EXIST_ERR(err) ((err) == -ENOENT || (err) == -ERANGE)
+
 #endif /* _ASM_XEN_XENBUS_H */
