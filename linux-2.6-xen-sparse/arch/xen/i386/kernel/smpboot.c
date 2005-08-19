@@ -904,7 +904,7 @@ static int __init do_boot_cpu(int apicid)
 		for (va = cpu_gdt_descr[cpu].address, f = 0;
 		     va < cpu_gdt_descr[cpu].address + cpu_gdt_descr[cpu].size;
 		     va += PAGE_SIZE, f++) {
-			ctxt.gdt_frames[f] = virt_to_machine(va) >> PAGE_SHIFT;
+			ctxt.gdt_frames[f] = virt_to_mfn(va);
 			make_page_readonly((void *)va);
 		}
 		ctxt.gdt_ents = cpu_gdt_descr[cpu].size / 8;
@@ -920,7 +920,7 @@ static int __init do_boot_cpu(int apicid)
 	ctxt.failsafe_callback_cs  = __KERNEL_CS;
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 
-	ctxt.ctrlreg[3] = (unsigned long)virt_to_machine(swapper_pg_dir);
+	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 
 	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
 	printk("boot error: %ld\n", boot_error);

@@ -450,7 +450,7 @@ void make_pages_writable(void *va, unsigned int nr);
 #define arbitrary_virt_to_machine(__va)					\
 ({									\
 	pte_t *__pte = virt_to_ptep(__va);				\
-	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
+	maddr_t __pa = (maddr_t)pte_mfn(*__pte) << PAGE_SHIFT;		\
 	__pa | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
 })
 

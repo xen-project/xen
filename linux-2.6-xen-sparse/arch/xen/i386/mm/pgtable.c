@@ -170,7 +170,7 @@ void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 	__flush_tlb_one(vaddr);
 }
 
-void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
+void __set_fixmap (enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 {
 	unsigned long address = __fix_to_virt(idx);
 

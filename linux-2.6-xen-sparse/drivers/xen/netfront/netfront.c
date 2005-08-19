@@ -448,11 +448,10 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         }
         grant_rx_ref[id] = ref;
         gnttab_grant_foreign_transfer_ref(ref, rdomid,
-                                          virt_to_machine(
-                                              skb->head) >> PAGE_SHIFT);
+                                          virt_to_mfn(skb->head));
         np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.gref = ref;
 #endif
-        rx_pfn_array[i] = virt_to_machine(skb->head) >> PAGE_SHIFT;
+        rx_pfn_array[i] = virt_to_mfn(skb->head);
 
 	/* Remove this page from pseudo phys map before passing back to Xen. */
 	phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] 
@@ -543,13 +542,14 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
         printk(KERN_ALERT "#### netfront can't claim tx grant reference\n");
         BUG();
     }
-    mfn = virt_to_machine(skb->data) >> PAGE_SHIFT;
+    mfn = virt_to_mfn(skb->data);
     gnttab_grant_foreign_access_ref(ref, rdomid, mfn, GNTMAP_readonly);
-    tx->addr = (ref << PAGE_SHIFT) | ((unsigned long)skb->data & ~PAGE_MASK);
+    tx->addr = ref << PAGE_SHIFT;
     grant_tx_ref[id] = ref;
 #else
-    tx->addr = virt_to_machine(skb->data);
+    tx->addr = virt_to_mfn(skb->data) << PAGE_SHIFT;
 #endif
+    tx->addr |= (unsigned long)skb->data & ~PAGE_MASK;
     tx->size = skb->len;
     tx->csum_blank = (skb->ip_summed == CHECKSUM_HW);
 
@@ -720,7 +720,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
     while ((skb = __skb_dequeue(&rxq)) != NULL) {
 #ifdef GRANT_DEBUG
         printk(KERN_ALERT "#### rx_poll     dequeue vdata=%p mfn=%lu\n",
-               skb->data, virt_to_machine(skb->data)>>PAGE_SHIFT);
+               skb->data, virt_to_mfn(skb->data));
         dump_packet('d', skb->data, (unsigned long)skb->data);
 #endif
         /*
@@ -854,18 +854,23 @@ static void network_connect(struct net_device *dev,
      * interface has been down.
      */
     for (requeue_idx = 0, i = 1; i <= NETIF_TX_RING_SIZE; i++) {
-            if ((unsigned long)np->tx_skbs[i] >= __PAGE_OFFSET) {
-                struct sk_buff *skb = np->tx_skbs[i];
-                
-                tx = &np->tx->ring[requeue_idx++].req;
-                
-                tx->id   = i;
-                tx->addr = virt_to_machine(skb->data);
-                tx->size = skb->len;
-                
-                np->stats.tx_bytes += skb->len;
-                np->stats.tx_packets++;
-            }
+        if ((unsigned long)np->tx_skbs[i] >= __PAGE_OFFSET) {
+            struct sk_buff *skb = np->tx_skbs[i];
+
+            tx = &np->tx->ring[requeue_idx++].req;
+
+            tx->id   = i;
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+            tx->addr = 0; /*(ref << PAGE_SHIFT) |*/
+#else
+            tx->addr = virt_to_mfn(skb->data) << PAGE_SHIFT;
+#endif
+            tx->addr |= (unsigned long)skb->data & ~PAGE_MASK;
+            tx->size = skb->len;
+
+            np->stats.tx_bytes += skb->len;
+            np->stats.tx_packets++;
+        }
     }
     wmb();
     np->tx->req_prod = requeue_idx;
@@ -922,7 +927,7 @@ static void send_interface_connect(struct net_private *np)
     netif_fe_interface_connect_t *msg = (void*)cmsg.msg;
 
     msg->handle = np->handle;
-    msg->tx_shmem_frame = (virt_to_machine(np->tx) >> PAGE_SHIFT);
+    msg->tx_shmem_frame = virt_to_mfn(np->tx);
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
     msg->tx_shmem_ref   = (u32)gnttab_claim_grant_reference(&gref_tx_head, 
                                                             gref_tx_terminal);
@@ -934,7 +939,7 @@ static void send_interface_connect(struct net_private *np)
                                      msg->tx_shmem_frame, 0);
 #endif
 
-    msg->rx_shmem_frame = (virt_to_machine(np->rx) >> PAGE_SHIFT);
+    msg->rx_shmem_frame = virt_to_mfn(np->rx);
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
     msg->rx_shmem_ref   = (u32)gnttab_claim_grant_reference(&gref_rx_head, 
                                                             gref_rx_terminal);

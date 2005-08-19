@@ -453,8 +453,8 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 #define C(i) do {							\
 	if (unlikely(next->tls_array[i] != prev->tls_array[i])) {	\
 		mcl->op      = __HYPERVISOR_update_descriptor;		\
-		mcl->args[0] = virt_to_machine(&get_cpu_gdt_table(cpu)	\
-					       [GDT_ENTRY_TLS_MIN + i]); \
+		mcl->args[0] = virt_to_machine(				\
+			&get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN + i]);\
 		mcl->args[1] = next->tls_array[i];			\
 		mcl++;							\
 	}								\

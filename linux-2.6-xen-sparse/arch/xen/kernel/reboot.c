@@ -247,7 +247,7 @@ static int __do_suspend(void *ignore)
 
     /* We'll stop somewhere inside this hypercall.  When it returns,
        we'll start resuming after the restore. */
-    HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
+    HYPERVISOR_suspend(virt_to_mfn(suspend_record));
 
     shutting_down = SHUTDOWN_INVALID; 
 
@@ -263,10 +263,10 @@ static int __do_suspend(void *ignore)
     for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
     {
         pfn_to_mfn_frame_list[j] = 
-            virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
+            virt_to_mfn(&phys_to_machine_mapping[i]);
     }
     HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
-        virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
+        virt_to_mfn(pfn_to_mfn_frame_list);
 
     gnttab_resume();
 

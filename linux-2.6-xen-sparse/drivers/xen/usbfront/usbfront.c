@@ -195,7 +195,7 @@ static int xhci_construct_isoc(usbif_request_t *req, struct urb *urb)
         }
 
         urb_priv->schedule = schedule;
-	req->iso_schedule = virt_to_machine(schedule);
+	req->iso_schedule = virt_to_mfn(schedule) << PAGE_SHIFT;
 
         return 0;
 }
@@ -212,7 +212,7 @@ static int xhci_queue_req(struct urb *urb)
 #if DEBUG
         printk(KERN_DEBUG
                "usbif = %p, req_prod = %d (@ 0x%lx), resp_prod = %d, resp_cons = %d\n",
-               usbif, usbif->req_prod, virt_to_machine(&usbif->req_prod),
+               usbif, usbif->req_prod, virt_to_mfn(&usbif->req_prod),
                usbif->resp_prod, xhci->usb_resp_cons);
 #endif
         
@@ -232,7 +232,7 @@ static int xhci_queue_req(struct urb *urb)
         req->operation       = USBIF_OP_IO;
         req->port            = 0; /* We don't care what the port is. */
         req->id              = (unsigned long) urb->hcpriv;
-        req->transfer_buffer = virt_to_machine(urb->transfer_buffer);
+        req->transfer_buffer = virt_to_mfn(urb->transfer_buffer) << PAGE_SHIFT;
 	req->devnum          = usb_pipedevice(urb->pipe);
         req->direction       = usb_pipein(urb->pipe);
 	req->speed           = usb_pipeslow(urb->pipe);
@@ -280,7 +280,7 @@ static inline usbif_request_t *xhci_queue_probe(usbif_vdev_t port)
 	printk(KERN_DEBUG
                "queuing probe: req_prod = %d (@ 0x%lx), resp_prod = %d, "
                "resp_cons = %d\n", usbif->req_prod,
-               virt_to_machine(&usbif->req_prod),
+               virt_to_mfn(&usbif->req_prod),
 	       usbif->resp_prod, xhci->usb_resp_cons);
 #endif
  
@@ -1555,7 +1555,7 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
         cmsg.type      = CMSG_USBIF_FE;
         cmsg.subtype   = CMSG_USBIF_FE_INTERFACE_CONNECT;
         cmsg.length    = sizeof(usbif_fe_interface_connect_t);
-        up.shmem_frame = virt_to_machine(sring) >> PAGE_SHIFT;
+        up.shmem_frame = virt_to_mfn(sring);
         memcpy(cmsg.msg, &up, sizeof(up));
         
         /* Tell the controller to bring up the interface. */
@@ -1599,7 +1599,7 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
 
 	DPRINTK(KERN_INFO __FILE__
                 ": USB XHCI: SHM at %p (0x%lx), EVTCHN %d\n",
-                xhci->usb_ring.sring, virt_to_machine(xhci->usbif),
+                xhci->usb_ring.sring, virt_to_mfn(xhci->usbif),
                 xhci->evtchn);
 
         xhci->state = USBIF_STATE_CONNECTED;

@@ -795,7 +795,7 @@ void __init setup_arch(char **cmdline_p)
 		for ( i=0, j=0; i < end_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
 		{	
 			pfn_to_mfn_frame_list[j] = 
-				virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
+				virt_to_mfn(&phys_to_machine_mapping[i]);
 		}
 
 	}

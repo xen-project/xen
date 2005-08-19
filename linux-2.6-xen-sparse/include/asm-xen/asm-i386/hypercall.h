@@ -316,16 +316,17 @@ HYPERVISOR_get_debugreg(
 
 static inline int
 HYPERVISOR_update_descriptor(
-    unsigned long ma, unsigned long word1, unsigned long word2)
+    u64 ma, u64 desc)
 {
     int ret;
-    unsigned long ign1, ign2, ign3;
+    unsigned long ign1, ign2, ign3, ign4;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3)
-	: "0" (__HYPERVISOR_update_descriptor), "1" (ma), "2" (word1),
-	  "3" (word2)
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
+	: "0" (__HYPERVISOR_update_descriptor),
+	  "1" ((unsigned long)ma), "2" ((unsigned long)(ma>>32)),
+	  "3" ((unsigned long)desc), "4" ((unsigned long)(desc>>32))
 	: "memory" );
 
     return ret;

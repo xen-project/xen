@@ -1175,8 +1175,8 @@ static int setup_blkring(struct xenbus_device *dev, unsigned int backend_id)
 	ASSERT(shmem_ref != -ENOSPC);
 	gnttab_grant_foreign_access_ref(shmem_ref,
 					backend_id,
-					virt_to_machine(blk_ring.sring)
-					>> PAGE_SHIFT, 0);
+					virt_to_mfn(blk_ring.sring),
+					0);
 #endif
 
 	op.u.alloc_unbound.dom = backend_id;
@@ -1245,7 +1245,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 	}
 #else
 	err = xenbus_printf(dev->nodename, "shared-frame", "%lu",
-			    virt_to_machine(blk_ring.sring) >> PAGE_SHIFT);
+			    virt_to_mfn(blk_ring.sring));
 	if (err) {
 		message = "writing shared-frame";
 		goto abort_transaction;

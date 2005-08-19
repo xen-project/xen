@@ -1604,11 +1604,10 @@ void __init setup_arch(char **cmdline_p)
 	for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
 	{	
 	     pfn_to_mfn_frame_list[j] = 
-		  virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
+		  virt_to_mfn(&phys_to_machine_mapping[i]);
 	}
 	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
-	     virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
-
+	     virt_to_mfn(pfn_to_mfn_frame_list);
 
 	/*
 	 * NOTE: at this point the bootmem allocator is fully available.

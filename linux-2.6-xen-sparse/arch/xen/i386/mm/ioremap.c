@@ -306,7 +306,7 @@ static int direct_remap_area_pte_fn(pte_t *pte,
 {
 	mmu_update_t **v = (mmu_update_t **)data;
 
-	(*v)->ptr = ((physaddr_t)pfn_to_mfn(page_to_pfn(pte_page)) <<
+	(*v)->ptr = ((maddr_t)pfn_to_mfn(page_to_pfn(pte_page)) <<
 		     PAGE_SHIFT) | ((unsigned long)pte & ~PAGE_MASK);
 	(*v)++;
 

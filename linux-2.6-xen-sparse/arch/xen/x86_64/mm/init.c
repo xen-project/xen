@@ -742,7 +742,7 @@ void __init paging_init(void)
 				set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 			else
 				__set_fixmap(FIX_ISAMAP_BEGIN - i,
-					     virt_to_machine(empty_zero_page),
+					     virt_to_mfn(empty_zero_page) << PAGE_SHIFT,
 					     PAGE_KERNEL_RO);
 	}
 #endif
