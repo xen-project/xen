@@ -1383,7 +1383,7 @@ static int blkfront_resume(struct xenbus_device *dev)
 }
 
 static struct xenbus_driver blkfront = {
-	.name = __stringify(KBUILD_MODNAME),
+	.name = "vbd",
 	.owner = THIS_MODULE,
 	.ids = blkfront_ids,
 	.probe = blkfront_probe,
