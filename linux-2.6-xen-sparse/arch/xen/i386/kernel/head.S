@@ -136,9 +136,6 @@ cpu_gdt_descr:
 ENTRY(empty_zero_page)
 
 .org 0x2000
-ENTRY(swapper_pg_dir)
-
-.org 0x3000
 ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x0000000000000000	/* 0x0b reserved */
@@ -190,10 +187,10 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0xf8 - GDT entry 31: double-fault TSS */
 	.fill GDT_ENTRIES-32,8,0
 
-.org 0x4000
+.org 0x3000
 ENTRY(default_ldt)
 
-.org 0x5000
+.org 0x4000
 /*
  * Real beginning of normal "text" segment
  */
