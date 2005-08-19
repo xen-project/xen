@@ -1,0 +1,67 @@
+##
+# install.txt <description to the xen access control architecture>
+#
+# Author:
+# Reiner Sailer 08/15/2005 <sailer@watson.ibm.com>
+#
+#
+# This file shows how to activate and install the access control
+# framework.
+##
+
+
+INSTALLING A SECURITY POLICY IN XEN
+===================================
+
+By default, the access control architecture is disabled in Xen. To
+enable the access control architecture in Xen follow the steps below.
+This description assumes that you want to install the Chinese Wall and
+Simple Type Enforcement policy. Some file names need to be replaced
+below to activate the Chinese Wall OR the Type Enforcement policy
+exclusively (chwall_ste --> {chwall, ste}).
+
+1. enable access control in Xen
+       # cd "xen_root"
+       # edit/xemacs/vi Config.mk
+
+       change the line:
+       ACM_USE_SECURITY_POLICY ?= ACM_NULL_POLICY
+
+       to:
+       ACM_USE_SECURITY_POLICY ?= ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY
+
+       # make all
+       # ./install.sh
+
+2. compile the policy from xml to a binary format that can be loaded
+   into the hypervisor for enforcement
+       # cd tools/security
+       # make
+
+       manual steps (alternative to make boot_install):
+       #./secpol_xml2bin chwall_ste
+       #cp policies/chwall_ste/chwall_ste.bin /boot
+       #edit /boot/grub/grub.conf
+        add the follwoing line to your xen boot entry:
+       "module chwall_ste.bin"
+
+       alternatively, you can try our automatic translation and
+       installation of the policy:
+       # make boot_install
+
+       [we try hard to do the right thing to the right boot entry but
+        please verify boot entry in /boot/grub/grub.conf afterwards;
+        your xen boot entry should have an additional module line
+        specifying a chwall_ste.bin file with the correct directory
+        (e.g. "/" or "/boot").]
+
+
+3. reboot into the newly compiled hypervisor
+
+        after boot
+	#xm dmesg should show an entry about the policy being loaded
+            during the boot process
+
+        #tools/security/secpol_tool getpolicy
+            should print the new chwall_ste binary policy representation
+

@@ -2,27 +2,71 @@ XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 SRCS     = secpol_tool.c
-CFLAGS   += -static
 CFLAGS   += -Wall
 CFLAGS   += -Werror
 CFLAGS   += -O3
 CFLAGS   += -fno-strict-aliasing
-CFLAGS   += -I.
+CFLAGS   += -I. -I/usr/include/libxml2
+CFLAGS_XML2BIN += $(shell xml2-config --cflags --libs )
+#if above does not work, try  -L/usr/lib -lxml2 -lz -lpthread -lm
+XML2VERSION = $(shell xml2-config --version )
+VALIDATE_SCHEMA=$(shell if [[ $(XML2VERSION) < 2.6.20 ]]; then echo ""; else echo "-DVALIDATE_SCHEMA"; fi; )
 
+ifeq ($(ACM_USE_SECURITY_POLICY),ACM_NULL_POLICY)
+POLICY=null
+endif
+ifeq ($(ACM_USE_SECURITY_POLICY),ACM_CHINESE_WALL_POLICY)
+POLICY=chwall
+endif
+ifeq ($(ACM_USE_SECURITY_POLICY),ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)
+POLICY=ste
+endif
+ifeq ($(ACM_USE_SECURITY_POLICY),ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY)
+POLICY=chwall_ste
+endif
+POLICYFILE=./policies/$(POLICY)/$(POLICY).bin
+
+ifneq ($(ACM_USE_SECURITY_POLICY), ACM_NULL_POLICY)
 all: build
+
+install:all
+
+default:all
+else
+all:
+
+install:
+
+default:
+endif
+
 build: mk-symlinks
 	$(MAKE) secpol_tool
+	$(MAKE) secpol_xml2bin
+	chmod 700 ./setlabel.sh
+	chmod 700 ./updategrub.sh
 
-default: all
-
-install: all
-
-secpol_tool : secpol_tool.c
+secpol_tool : secpol_tool.c secpol_compat.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
-clean:
-	rm -rf secpol_tool xen
+secpol_xml2bin : secpol_xml2bin.c secpol_xml2bin.h secpol_compat.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_XML2BIN) $(VALIDATE_SCHEMA) -o $@ $<
 
+clean:
+	rm -rf secpol_tool secpol_xml2bin xen
+
+policy_clean:
+	rm -rf policies/*/*.bin policies/*/*.map
+
+mrproper: clean policy_clean
+
+
+$(POLICYFILE) : build
+	@./secpol_xml2bin $(POLICY) > /dev/null
+
+boot_install: $(POLICYFILE)
+	@cp $(POLICYFILE) /boot
+	@./updategrub.sh $(POLICY) $(PWD)/$(XEN_ROOT)
 
 LINUX_ROOT := $(XEN_ROOT)/linux-2.6-xen-sparse
 mk-symlinks:
