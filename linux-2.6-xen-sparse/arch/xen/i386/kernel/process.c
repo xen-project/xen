@@ -790,3 +790,10 @@ unsigned long arch_align_stack(unsigned long sp)
 		sp -= get_random_int() % 8192;
 	return sp & ~0xf;
 }
+
+
+#ifndef CONFIG_X86_SMP
+void _restore_vcpu(void)
+{
+}
+#endif
