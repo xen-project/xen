@@ -352,13 +352,6 @@ static void __init pagetable_init (void)
 	swapper_pg_dir = pgd_base;
 	init_mm.pgd    = pgd_base;
 
-#ifdef CONFIG_X86_PAE
-	int i;
-	/* Init entries of the first-level page table to the zero page */
-	for (i = 0; i < PTRS_PER_PGD; i++)
-		set_pgd(pgd_base + i, __pgd(__pa(empty_zero_page) | _PAGE_PRESENT));
-#endif
-
 	/* Enable PSE if available */
 	if (cpu_has_pse) {
 		set_in_cr4(X86_CR4_PSE);
@@ -383,17 +376,6 @@ static void __init pagetable_init (void)
 	page_table_range_init(vaddr, 0, pgd_base);
 
 	permanent_kmaps_init(pgd_base);
-
-#if 0 /* def CONFIG_X86_PAE */
-	/*
-	 * Add low memory identity-mappings - SMP needs it when
-	 * starting up on an AP from real-mode. In the non-PAE
-	 * case we already have these mappings through head.S.
-	 * All user-space mappings are explicitly cleared after
-	 * SMP startup.
-	 */
-	set_pgd(&pgd_base[0], pgd_base[USER_PTRS_PER_PGD]);
-#endif
 }
 
 #if defined(CONFIG_PM_DISK) || defined(CONFIG_SOFTWARE_SUSPEND)
