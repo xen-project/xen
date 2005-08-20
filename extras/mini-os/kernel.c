@@ -132,20 +132,6 @@ void start_kernel(start_info_t *si)
     i = 0;
     for ( ; ; ) 
     {      
-        if(i >= 1000)         
-        {
-            {
-                unsigned long saved;
-                __asm__ ("movl %%esp, %0"
-                         :"=r"(saved)  /* y is output operand */
-                            /* x is input operand */);
-//                        :"a"); /* %eax is clobbered register */
-                printk("ESP=0x%lx\n", saved);
-            }
-            
-            printk("1000 bloks\n");
-            i=0;            
-        }
 //        HYPERVISOR_yield();
         block(1);
         i++;
