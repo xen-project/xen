@@ -23,10 +23,11 @@
 #ifndef XEN_TLBthash_H
 #define XEN_TLBthash_H
 
-#include "xen/config.h"
-#include "xen/types.h"
-#include "public/xen.h"
-#include "asm/tlb.h"
+#include <xen/config.h>
+#include <xen/types.h>
+#include <public/xen.h>
+#include <asm/tlb.h>
+#include <asm/regionreg.h>
 
 //#define         THASH_TLB_TR            0
 //#define         THASH_TLB_TC            1
@@ -152,7 +153,7 @@ typedef u64 *(TTAG_FN)(PTA pta, u64 va, u64 rid, u64 ps);
 typedef u64 *(GET_MFN_FN)(domid_t d, u64 gpfn, u64 pages);
 typedef void *(REM_NOTIFIER_FN)(struct hash_cb *hcb, thash_data_t *entry);
 typedef void (RECYCLE_FN)(struct hash_cb *hc, u64 para);
-typedef rr_t (GET_RR_FN)(struct vcpu *vcpu, u64 reg);
+typedef ia64_rr (GET_RR_FN)(struct vcpu *vcpu, u64 reg);
 typedef thash_data_t *(FIND_OVERLAP_FN)(struct thash_cb *hcb, 
         u64 va, u64 ps, int rid, char cl, search_section_t s_sect);
 typedef thash_data_t *(FIND_NEXT_OVL_FN)(struct thash_cb *hcb);
@@ -329,7 +330,7 @@ extern u64 machine_ttag(PTA pta, u64 va, u64 rid, u64 ps);
 extern u64 machine_thash(PTA pta, u64 va, u64 rid, u64 ps);
 extern void purge_machine_tc_by_domid(domid_t domid);
 extern void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb);
-extern rr_t vmmu_get_rr(struct vcpu *vcpu, u64 va);
+extern ia64_rr vmmu_get_rr(struct vcpu *vcpu, u64 va);
 extern thash_cb_t *init_domain_tlb(struct vcpu *d);
 
 #define   VTLB_DEBUG

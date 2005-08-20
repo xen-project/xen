@@ -104,22 +104,8 @@ physical_mode_init(VCPU *vcpu)
     UINT64 psr;
     struct domain * d = vcpu->domain;
 
-    vcpu->domain->arch.emul_phy_rr0.rid = XEN_RR7_RID+((d->domain_id)<<3);
-    /* FIXME */
-#if 0
-    vcpu->domain->arch.emul_phy_rr0.ps = 28;  /* set page size to 256M */
-#endif
-	vcpu->domain->arch.emul_phy_rr0.ps = EMUL_PHY_PAGE_SHIFT;  /* set page size to 4k */
-    vcpu->domain->arch.emul_phy_rr0.ve = 1; /* enable VHPT walker on this region */
-
-    vcpu->domain->arch.emul_phy_rr4.rid = XEN_RR7_RID + ((d->domain_id)<<3) + 4;
-    vcpu->domain->arch.emul_phy_rr4.ps = EMUL_PHY_PAGE_SHIFT;  /* set page size to 4k */
-    vcpu->domain->arch.emul_phy_rr4.ve = 1; /* enable VHPT walker on this region */
-
     vcpu->arch.old_rsc = 0;
     vcpu->arch.mode_flags = GUEST_IN_PHY;
-
-    return;
 }
 
 extern u64 get_mfn(domid_t domid, u64 gpfn, u64 pages);
@@ -246,8 +232,12 @@ void
 vmx_load_all_rr(VCPU *vcpu)
 {
 	unsigned long psr;
+	ia64_rr phy_rr;
 
 	psr = ia64_clear_ic();
+
+	phy_rr.ps = EMUL_PHY_PAGE_SHIFT; 
+	phy_rr.ve = 1;
 
 	/* WARNING: not allow co-exist of both virtual mode and physical
 	 * mode in same region
@@ -255,10 +245,10 @@ vmx_load_all_rr(VCPU *vcpu)
 	if (is_physical_mode(vcpu)) {
 		if (vcpu->arch.mode_flags & GUEST_PHY_EMUL)
 			panic("Unexpected domain switch in phy emul\n");
-		ia64_set_rr((VRN0 << VRN_SHIFT),
-			     vcpu->domain->arch.emul_phy_rr0.rrval);
-		ia64_set_rr((VRN4 << VRN_SHIFT),
-			     vcpu->domain->arch.emul_phy_rr4.rrval);
+		phy_rr.rid = vcpu->domain->arch.metaphysical_rr0;
+		ia64_set_rr((VRN0 << VRN_SHIFT), phy_rr.rrval);
+		phy_rr.rid = vcpu->domain->arch.metaphysical_rr4;
+		ia64_set_rr((VRN4 << VRN_SHIFT), phy_rr.rrval);
 	} else {
 		ia64_set_rr((VRN0 << VRN_SHIFT),
 			     vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN0])));
@@ -284,13 +274,18 @@ void
 switch_to_physical_rid(VCPU *vcpu)
 {
     UINT64 psr;
+    ia64_rr phy_rr;
+
+    phy_rr.ps = EMUL_PHY_PAGE_SHIFT; 
+    phy_rr.ve = 1;
 
     /* Save original virtual mode rr[0] and rr[4] */
-
     psr=ia64_clear_ic();
-    ia64_set_rr(VRN0<<VRN_SHIFT, vcpu->domain->arch.emul_phy_rr0.rrval);
+    phy_rr.rid = vcpu->domain->arch.metaphysical_rr0;
+    ia64_set_rr(VRN0<<VRN_SHIFT, phy_rr.rrval);
     ia64_srlz_d();
-    ia64_set_rr(VRN4<<VRN_SHIFT, vcpu->domain->arch.emul_phy_rr4.rrval);
+    phy_rr.rid = vcpu->domain->arch.metaphysical_rr4;
+    ia64_set_rr(VRN4<<VRN_SHIFT, phy_rr.rrval);
     ia64_srlz_d();
 
     ia64_set_psr(psr);

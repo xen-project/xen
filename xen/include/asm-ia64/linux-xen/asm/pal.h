@@ -1559,9 +1559,7 @@ ia64_pal_prefetch_visibility (s64 trans_type)
 	return iprv.status;
 }
 
-#ifdef CONFIG_VTI
 #include <asm/vmx_pal.h>
-#endif // CONFIG_VTI
 #endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_IA64_PAL_H */

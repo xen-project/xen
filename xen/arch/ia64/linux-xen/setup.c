@@ -51,9 +51,7 @@
 #include <asm/smp.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
-#ifdef CONFIG_VTI
 #include <asm/vmx.h>
-#endif // CONFIG_VTI
 #include <asm/io.h>
 
 #if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
@@ -402,9 +400,9 @@ late_setup_arch (char **cmdline_p)
 	cpu_physical_id(0) = hard_smp_processor_id();
 #endif
 
-#ifdef CONFIG_VTI
+#ifdef XEN
 	identify_vmx_feature();
-#endif // CONFIG_VTI
+#endif
 
 	cpu_init();	/* initialize the bootstrap CPU */
 
@@ -600,7 +598,7 @@ identify_cpu (struct cpuinfo_ia64 *c)
 	c->unimpl_va_mask = ~((7L<<61) | ((1L << (impl_va_msb + 1)) - 1));
 	c->unimpl_pa_mask = ~((1L<<63) | ((1L << phys_addr_size) - 1));
 
-#ifdef CONFIG_VTI
+#ifdef XEN
 	/* If vmx feature is on, do necessary initialization for vmx */
 	if (vmx_enabled)
 		vmx_init_env();

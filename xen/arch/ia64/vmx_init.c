@@ -22,6 +22,9 @@
  */
 
 /*
+ * 05/08/16 Kun tian (Kevin Tian) <kevin.tian@intel.com>:
+ * Disable doubling mapping
+ *
  * 05/03/23 Kun Tian (Kevin Tian) <kevin.tian@intel.com>:
  * Simplied design in first step:
  *	- One virtual environment
@@ -39,6 +42,7 @@
 #include <xen/lib.h>
 #include <asm/vmmu.h>
 #include <public/arch-ia64.h>
+#include <public/io/ioreq.h>
 #include <asm/vmx_phy_mode.h>
 #include <asm/processor.h>
 #include <asm/vmx.h>
@@ -126,8 +130,43 @@ vmx_init_env(void)
 	else
 		ASSERT(tmp_base != __vsa_base);
 
+#ifdef XEN_DBL_MAPPING
 	/* Init stub for rr7 switch */
 	vmx_init_double_mapping_stub();
+#endif 
+}
+
+void vmx_setup_platform(struct vcpu *v, struct vcpu_guest_context *c)
+{
+	struct domain *d = v->domain;
+	shared_iopage_t *sp;
+
+	ASSERT(d != dom0); /* only for non-privileged vti domain */
+	d->arch.vmx_platform.shared_page_va = __va(c->share_io_pg);
+	sp = get_sp(d);
+	memset((char *)sp,0,PAGE_SIZE);
+	/* FIXME: temp due to old CP */
+	sp->sp_global.eport = 2;
+#ifdef V_IOSAPIC_READY
+	sp->vcpu_number = 1;
+#endif
+	/* TEMP */
+	d->arch.vmx_platform.pib_base = 0xfee00000UL;
+
+	/* One more step to enable interrupt assist */
+	set_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags);
+	/* Only open one port for I/O and interrupt emulation */
+	if (v == d->vcpu[0]) {
+	    memset(&d->shared_info->evtchn_mask[0], 0xff,
+		sizeof(d->shared_info->evtchn_mask));
+	    clear_bit(iopacket_port(d), &d->shared_info->evtchn_mask[0]);
+	}
+
+	/* FIXME: only support PMT table continuously by far */
+	d->arch.pmt = __va(c->pt_base);
+	d->arch.max_pfn = c->pt_max_pfn;
+
+	vmx_final_setup_domain(d);
 }
 
 typedef union {
@@ -171,7 +210,7 @@ static vpd_t *alloc_vpd(void)
 }
 
 
-
+#ifdef CONFIG_VTI
 /*
  * Create a VP on intialized VMX environment.
  */
@@ -190,6 +229,7 @@ vmx_create_vp(struct vcpu *v)
 		panic("ia64_pal_vp_create failed. \n");
 }
 
+#ifdef XEN_DBL_MAPPING
 void vmx_init_double_mapping_stub(void)
 {
 	u64 base, psr;
@@ -206,6 +246,7 @@ void vmx_init_double_mapping_stub(void)
 	ia64_srlz_i();
 	printk("Add TR mapping for rr7 switch stub, with physical: 0x%lx\n", (u64)(__pa(base)));
 }
+#endif
 
 /* Other non-context related tasks can be done in context switch */
 void
@@ -219,12 +260,14 @@ vmx_save_state(struct vcpu *v)
 	if (status != PAL_STATUS_SUCCESS)
 		panic("Save vp status failed\n");
 
+#ifdef XEN_DBL_MAPPING
 	/* FIXME: Do we really need purge double mapping for old vcpu?
 	 * Since rid is completely different between prev and next,
 	 * it's not overlap and thus no MCA possible... */
 	dom_rr7 = vmx_vrrtomrr(v, VMX(v, vrr[7]));
         vmx_purge_double_mapping(dom_rr7, KERNEL_START,
 				 (u64)v->arch.vtlb->ts->vhpt->hash);
+#endif
 
 	/* Need to save KR when domain switch, though HV itself doesn;t
 	 * use them.
@@ -252,12 +295,14 @@ vmx_load_state(struct vcpu *v)
 	if (status != PAL_STATUS_SUCCESS)
 		panic("Restore vp status failed\n");
 
+#ifdef XEN_DBL_MAPPING
 	dom_rr7 = vmx_vrrtomrr(v, VMX(v, vrr[7]));
 	pte_xen = pte_val(pfn_pte((xen_pstart >> PAGE_SHIFT), PAGE_KERNEL));
 	pte_vhpt = pte_val(pfn_pte((__pa(v->arch.vtlb->ts->vhpt->hash) >> PAGE_SHIFT), PAGE_KERNEL));
 	vmx_insert_double_mapping(dom_rr7, KERNEL_START,
 				  (u64)v->arch.vtlb->ts->vhpt->hash,
 				  pte_xen, pte_vhpt);
+#endif
 
 	ia64_set_kr(0, v->arch.arch_vmx.vkr[0]);
 	ia64_set_kr(1, v->arch.arch_vmx.vkr[1]);
@@ -271,6 +316,7 @@ vmx_load_state(struct vcpu *v)
 	 * anchored in vcpu */
 }
 
+#ifdef XEN_DBL_MAPPING
 /* Purge old double mapping and insert new one, due to rr7 change */
 void
 vmx_change_double_mapping(struct vcpu *v, u64 oldrr7, u64 newrr7)
@@ -287,6 +333,8 @@ vmx_change_double_mapping(struct vcpu *v, u64 oldrr7, u64 newrr7)
 				  vhpt_base,
 				  pte_xen, pte_vhpt);
 }
+#endif // XEN_DBL_MAPPING
+#endif // CONFIG_VTI
 
 /*
  * Initialize VMX envirenment for guest. Only the 1st vp/vcpu
@@ -307,12 +355,21 @@ vmx_final_setup_domain(struct domain *d)
 	v->arch.arch_vmx.vpd = vpd;
 	vpd->virt_env_vaddr = vm_buffer;
 
+#ifdef CONFIG_VTI
 	/* v->arch.schedule_tail = arch_vmx_do_launch; */
 	vmx_create_vp(v);
 
 	/* Set this ed to be vmx */
 	set_bit(ARCH_VMX_VMCS_LOADED, &v->arch.arch_vmx.flags);
 
+	/* Physical mode emulation initialization, including
+	* emulation ID allcation and related memory request
+	*/
+	physical_mode_init(v);
+
+	vlsapic_reset(v);
+	vtm_init(v);
+#endif
+
 	/* Other vmx specific initialization work */
 }
-

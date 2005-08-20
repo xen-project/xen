@@ -133,7 +133,6 @@ typedef union U_INST64_M46 {
     struct { unsigned long qp:6, r1:7, un7:7, r3:7, x6:6, x3:3, un1:1, major:4; };
 } INST64_M46;
 
-#ifdef CONFIG_VTI
 typedef union U_INST64_M47 {
     IA64_INST inst;
     struct { unsigned long qp:6, un14:14, r3:7, x6:6, x3:3, un1:1, major:4; };
@@ -169,8 +168,6 @@ typedef union U_INST64_M6 {
     struct { unsigned long qp:6, f1:7, un7:7, r3:7, x:1, hint:2, x6:6, m:1, major:4; };
 } INST64_M6;
 
-#endif // CONFIG_VTI
-
 typedef union U_INST64 {
     IA64_INST inst;
     struct { unsigned long :37, major:4; } generic;
@@ -182,14 +179,12 @@ typedef union U_INST64 {
     INST64_I26 I26;	// mov register to ar (I unit)
     INST64_I27 I27;	// mov immediate to ar (I unit)
     INST64_I28 I28;	// mov from ar (I unit)
-#ifdef CONFIG_VTI
-    INST64_M1  M1;  // ld integer
+    INST64_M1  M1;	// ld integer
     INST64_M2  M2;
     INST64_M3  M3;
-    INST64_M4  M4;  // st integer
+    INST64_M4  M4;	// st integer
     INST64_M5  M5;
-    INST64_M6  M6;  // ldfd floating pointer
-#endif // CONFIG_VTI
+    INST64_M6  M6;	// ldfd floating pointer
     INST64_M28 M28;	// purge translation cache entry
     INST64_M29 M29;	// mov register to ar (M unit)
     INST64_M30 M30;	// mov immediate to ar (M unit)
@@ -204,9 +199,7 @@ typedef union U_INST64 {
     INST64_M44 M44;	// set/reset system mask
     INST64_M45 M45;	// translation purge
     INST64_M46 M46;	// translation access (tpa,tak)
-#ifdef CONFIG_VTI
     INST64_M47 M47;	// purge translation entry
-#endif // CONFIG_VTI
 } INST64;
 
 #define MASK_41 ((UINT64)0x1ffffffffff)

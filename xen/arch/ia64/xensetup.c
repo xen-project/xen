@@ -181,11 +181,6 @@ void start_kernel(void)
     printk("xen image pstart: 0x%lx, xenheap pend: 0x%lx\n",
 	    xen_pstart, xenheap_phys_end);
 
-#ifdef CONFIG_VTI
-    /* If we want to enable vhpt for all regions, related initialization
-     * for HV TLB must be done earlier before first TLB miss
-     */
-#endif // CONFIG_VTI
     /* Find next hole */
     firsthole_start = 0;
     efi_memmap_walk(xen_find_first_hole, &firsthole_start);

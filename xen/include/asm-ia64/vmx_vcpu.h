@@ -308,7 +308,9 @@ vmx_vcpu_set_itm(VCPU *vcpu, u64 val)
     
     vtm=&(vcpu->arch.arch_vmx.vtm);
     VPD_CR(vcpu,itm)=val;
+#ifdef CONFIG_VTI
     vtm_interruption_update(vcpu, vtm);
+#endif
     return IA64_NO_FAULT;
 }
 static inline
@@ -414,7 +416,9 @@ static inline
 IA64FAULT
 vmx_vcpu_set_eoi(VCPU *vcpu, u64 val)
 {
+#ifdef CONFIG_VTI
     guest_write_eoi(vcpu);
+#endif
     return IA64_NO_FAULT;
 }
 
@@ -424,7 +428,9 @@ vmx_vcpu_set_itv(VCPU *vcpu, u64 val)
 {
 
     VPD_CR(vcpu,itv)=val;
+#ifdef CONFIG_VTI
     vtm_set_itv(vcpu);
+#endif
     return IA64_NO_FAULT;
 }
 static inline
@@ -465,13 +471,17 @@ vmx_vcpu_set_lrr1(VCPU *vcpu, u64 val)
 static inline
 IA64FAULT vmx_vcpu_set_itc(VCPU *vcpu, UINT64 val)
 {
+#ifdef CONFIG_VTI
     vtm_set_itc(vcpu, val);
+#endif
     return  IA64_NO_FAULT;
 }
 static inline
 IA64FAULT vmx_vcpu_get_itc(VCPU *vcpu,UINT64 *val)
 {
+#ifdef CONFIG_VTI
     *val = vtm_get_itc(vcpu);
+#endif
     return  IA64_NO_FAULT;
 }
 static inline
@@ -584,15 +594,22 @@ IA64FAULT vmx_vcpu_bsw1(VCPU *vcpu)
     return (IA64_NO_FAULT);
 }
 
+/* Another hash performance algorithm */
 #define redistribute_rid(rid)	(((rid) & ~0xffff) | (((rid) << 8) & 0xff00) | (((rid) >> 8) & 0xff))
 static inline unsigned long
-vmx_vrrtomrr(VCPU *vcpu,unsigned long val)
+vmx_vrrtomrr(VCPU *v, unsigned long val)
 {
     ia64_rr rr;
     u64	  rid;
+
     rr.rrval=val;
+    rr.rid = vmMangleRID(v->arch.starting_rid  + rr.rid);
+/* Disable this rid allocation algorithm for now */
+#if 0
     rid=(((u64)vcpu->domain->domain_id)<<DOMAIN_RID_SHIFT) + rr.rid;
     rr.rid = redistribute_rid(rid);
+#endif 
+
     rr.ve=1;
     return rr.rrval;
 }

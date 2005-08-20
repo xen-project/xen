@@ -283,7 +283,7 @@ int __tlb_to_vhpt(thash_cb_t *hcb,
             thash_data_t *vhpt)
 {
     u64 pages,mfn;
-    rr_t vrr;
+    ia64_rr vrr;
 
     ASSERT ( hcb->ht == THASH_VHPT );
     vrr = (hcb->get_rr_fn)(hcb->vcpu,va);
@@ -361,7 +361,7 @@ void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 {
     thash_data_t    *hash_table, *cch;
     int flag;
-    rr_t  vrr;
+    ia64_rr vrr;
     u64 gppn;
     u64 ppns, ppne;
     
@@ -397,7 +397,7 @@ void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 static void vhpt_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 {
     thash_data_t    *hash_table, *cch;
-    rr_t  vrr;
+    ia64_rr vrr;
     
     hash_table = (hcb->hash_func)(hcb->pta,
                         va, entry->rid, entry->ps);
@@ -425,7 +425,7 @@ static void vhpt_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 void thash_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 {
     thash_data_t    *hash_table;
-    rr_t  vrr;
+    ia64_rr vrr;
     
     vrr = (hcb->get_rr_fn)(hcb->vcpu,entry->vadr);
     if ( entry->ps != vrr.ps && entry->tc ) {
@@ -556,7 +556,7 @@ static thash_data_t *vtlb_find_overlap(thash_cb_t *hcb,
     thash_data_t    *hash_table;
     thash_internal_t *priv = &hcb->priv;
     u64     tag;
-    rr_t    vrr;
+    ia64_rr vrr;
 
     priv->_curva = va & ~(size-1);
     priv->_eva = priv->_curva + size;
@@ -580,7 +580,7 @@ static thash_data_t *vhpt_find_overlap(thash_cb_t *hcb,
     thash_data_t    *hash_table;
     thash_internal_t *priv = &hcb->priv;
     u64     tag;
-    rr_t    vrr;
+    ia64_rr vrr;
 
     priv->_curva = va & ~(size-1);
     priv->_eva = priv->_curva + size;
@@ -633,7 +633,7 @@ static thash_data_t *vtlb_next_overlap(thash_cb_t *hcb)
     thash_data_t    *ovl;
     thash_internal_t *priv = &hcb->priv;
     u64 addr,rr_psize;
-    rr_t  vrr;
+    ia64_rr vrr;
 
     if ( priv->s_sect.tr ) {
         ovl = vtr_find_next_overlap (hcb);
@@ -665,7 +665,7 @@ static thash_data_t *vhpt_next_overlap(thash_cb_t *hcb)
     thash_data_t    *ovl;
     thash_internal_t *priv = &hcb->priv;
     u64 addr,rr_psize;
-    rr_t  vrr;
+    ia64_rr vrr;
 
     vrr = (hcb->get_rr_fn)(hcb->vcpu,priv->_curva);
     rr_psize = PSIZE(vrr.ps);
@@ -800,7 +800,7 @@ thash_data_t *vtlb_lookup_ex(thash_cb_t *hcb,
 {
     thash_data_t    *hash_table, *cch;
     u64     tag;
-    rr_t    vrr;
+    ia64_rr vrr;
    
     ASSERT ( hcb->ht == THASH_VTLB );
     
