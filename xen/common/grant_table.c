@@ -75,8 +75,8 @@ __gnttab_activate_grant_ref(
     struct domain          *granting_d,
     grant_ref_t             ref,
     u16                     dev_hst_ro_flags,
-    unsigned long           addr,
-    unsigned long          *pframe )            /* OUT */
+    u64           addr,
+    u64          *pframe )            /* OUT */
 {
     domid_t               sdom;
     u16                   sflags;
@@ -342,7 +342,7 @@ __gnttab_map_grant_ref(
     struct vcpu          *led;
     u16                   dev_hst_ro_flags;
     int                   handle;
-    unsigned long         frame = 0, addr;
+    u64 frame = 0, addr;
     int                   rc;
 
     led = current;
@@ -363,7 +363,7 @@ __gnttab_map_grant_ref(
            (!(dev_hst_ro_flags & GNTMAP_contains_pte) && 
             unlikely(!__addr_ok(addr))) ) )
     {
-        DPRINTK("Bad virtual address (%lx) or flags (%x).\n",
+        DPRINTK("Bad virtual address (%llx) or flags (%x).\n",
                 addr, dev_hst_ro_flags);
         (void)__put_user(GNTST_bad_virt_addr, &uop->handle);
         return GNTST_bad_gntref;
@@ -502,7 +502,7 @@ __gnttab_unmap_grant_ref(
     grant_mapping_t *map;
     u16            flags;
     s16            rc = 1;
-    unsigned long  frame, addr;
+    u64 frame, addr;
 
     ld = current->domain;
 
