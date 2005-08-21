@@ -53,7 +53,7 @@ typedef struct blkif_st {
     rb_root_t         vbd_rb;        /* Mapping from 16-bit vdevices to VBDs.*/
     spinlock_t        vbd_lock;      /* Protects VBD mapping. */
     /* Private fields. */
-    enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
+    enum { DISCONNECTED, CONNECTED } status;
     /*
      * DISCONNECT response is deferred until pending requests are ack'ed.
      * We therefore need to store the id from the original request.

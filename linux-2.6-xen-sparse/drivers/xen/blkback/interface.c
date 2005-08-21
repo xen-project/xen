@@ -7,7 +7,6 @@
  */
 
 #include "common.h"
-#include <asm-xen/ctrl_if.h>
 #include <asm-xen/evtchn.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
@@ -136,52 +135,6 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
     blkif->shmem_frame   = shared_page;
 
     return 0;
-}
-
-static void __blkif_disconnect_complete(void *arg)
-{
-    blkif_t              *blkif = (blkif_t *)arg;
-    ctrl_msg_t            cmsg;
-    blkif_be_disconnect_t disc;
-
-    /*
-     * These can't be done in blkif_disconnect() because at that point there
-     * may be outstanding requests at the disc whose asynchronous responses
-     * must still be notified to the remote driver.
-     */
-    unmap_frontend_page(blkif);
-    vfree(blkif->blk_ring.sring);
-
-    /* Construct the deferred response message. */
-    cmsg.type         = CMSG_BLKIF_BE;
-    cmsg.subtype      = CMSG_BLKIF_BE_DISCONNECT;
-    cmsg.id           = blkif->disconnect_rspid;
-    cmsg.length       = sizeof(blkif_be_disconnect_t);
-    disc.domid        = blkif->domid;
-    disc.blkif_handle = blkif->handle;
-    disc.status       = BLKIF_BE_STATUS_OKAY;
-    memcpy(cmsg.msg, &disc, sizeof(disc));
-
-    /*
-     * Make sure message is constructed /before/ status change, because
-     * after the status change the 'blkif' structure could be deallocated at
-     * any time. Also make sure we send the response /after/ status change,
-     * as otherwise a subsequent CONNECT request could spuriously fail if
-     * another CPU doesn't see the status change yet.
-     */
-    mb();
-    BUG_ON(blkif->status != DISCONNECTING);
-    blkif->status = DISCONNECTED;
-    mb();
-
-    /* Send the successful response. */
-    ctrl_if_send_response(&cmsg);
-}
-
-void blkif_disconnect_complete(blkif_t *blkif)
-{
-    INIT_WORK(&blkif->work, __blkif_disconnect_complete, (void *)blkif);
-    schedule_work(&blkif->work);
 }
 
 void free_blkif(blkif_t *blkif)
