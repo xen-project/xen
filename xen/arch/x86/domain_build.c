@@ -72,7 +72,7 @@ boolean_param("dom0_translate", opt_dom0_translate);
 static struct pfn_info *alloc_largest(struct domain *d, unsigned long max)
 {
     struct pfn_info *page;
-    unsigned int order = get_order(max * PAGE_SIZE);
+    unsigned int order = get_order(max)+PAGE_SHIFT-1;
     if ( (max & (max-1)) != 0 )
         order--;
     while ( (page = alloc_domheap_pages(d, order, 0)) == NULL )
