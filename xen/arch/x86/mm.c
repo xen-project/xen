@@ -2176,7 +2176,7 @@ int do_mmu_update(
                         }
                     }
 
-                    *(unsigned long *)va = req.val;
+                    *(intpte_t *)va = req.val;
                     okay = 1;
 
                     if ( shadow_mode_enabled(d) )
@@ -2386,7 +2386,7 @@ int clear_grant_pte_mapping(
     }
 
     /* Delete pagetable entry. */
-    if ( unlikely(__put_user(0, (unsigned long *)va)))
+    if ( unlikely(__put_user(0, (intpte_t *)va)))
     {
         DPRINTK("Cannot delete PTE entry at %p.\n", va);
         put_page_type(page);
@@ -2446,12 +2446,11 @@ int update_grant_va_mapping(
 
 int clear_grant_va_mapping(unsigned long addr, unsigned long frame)
 {
-    l1_pgentry_t *pl1e;
-    unsigned long _ol1e;
+    l1_pgentry_t *pl1e, ol1e;
     
     pl1e = &linear_pg_table[l1_linear_offset(addr)];
 
-    if ( unlikely(__get_user(_ol1e, (unsigned long *)pl1e) != 0) )
+    if ( unlikely(__get_user(ol1e.l1, &pl1e->l1) != 0) )
     {
         DPRINTK("Could not find PTE entry for address %lx\n", addr);
         return GNTST_general_error;
@@ -2461,15 +2460,15 @@ int clear_grant_va_mapping(unsigned long addr, unsigned long frame)
      * Check that the virtual address supplied is actually mapped to
      * frame.
      */
-    if ( unlikely((_ol1e >> PAGE_SHIFT) != frame ))
+    if ( unlikely(l1e_get_pfn(ol1e) != frame) )
     {
         DPRINTK("PTE entry %lx for address %lx doesn't match frame %lx\n",
-                _ol1e, addr, frame);
+                l1e_get_pfn(ol1e), addr, frame);
         return GNTST_general_error;
     }
 
     /* Delete pagetable entry. */
-    if ( unlikely(__put_user(0, (unsigned long *)pl1e)))
+    if ( unlikely(__put_user(0, &pl1e->l1)) )
     {
         DPRINTK("Cannot delete PTE entry at %p.\n", (unsigned long *)pl1e);
         return GNTST_general_error;

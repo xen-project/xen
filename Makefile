@@ -172,6 +172,12 @@ uninstall:
 	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/miniterm
 	rm -rf $(D)/boot/*xen*
 	rm -rf $(D)/lib/modules/*xen*
+	rm -rf $(D)/usr/bin/cpuperf-perfcntr $(D)/usr/bin/cpuperf-xen
+	rm -rf $(D)/usr/bin/xc_shadow
+	rm -rf $(D)/usr/share/xen $(D)/usr/libexec/xen
+	rm -rf $(D)/usr/share/man/man1/xen*
+	rm -rf $(D)/usr/share/man/man8/xen*
+	rm -rf $(D)/usr/lib/xen
 
 # Legacy targets for compatibility
 linux24:

@@ -18,7 +18,6 @@
 """Support for virtual block devices.
 """
 import string
-import re
 
 from xen.util import blkif
 from xen.xend.XendError import XendError, VmError
@@ -200,7 +199,6 @@ class BlkDev(Dev):
         self.vdev = None
         self.mode = None
         self.type = None
-        self.emtype = None
         self.params = None
         self.node = None
         self.device = None
@@ -239,12 +237,7 @@ class BlkDev(Dev):
         # Split into type and type-specific params (which are passed to the
         # type-specific control script).
         (self.type, self.params) = string.split(self.uname, ':', 1)
-        typedev = sxp.child_value(config, 'dev')
-        if re.match( '^ioemu:', typedev):
-            (self.emtype, self.dev) = string.split(typedev, ':', 1)
-        else:
-            self.emtype = 'vbd'
-            self.dev = typedev
+        self.dev = sxp.child_value(config, 'dev')
         if not self.dev:
             raise VmError('vbd: Missing dev')
         self.mode = sxp.child_value(config, 'mode', 'r')
@@ -265,8 +258,6 @@ class BlkDev(Dev):
         if recreate:
             pass
         else:
-            if self.emtype == 'ioemu':
-                return
             node = Blkctl.block('bind', self.type, self.params)
             self.setNode(node)
             self.attachBackend()

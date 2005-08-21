@@ -23,7 +23,7 @@ Author: Mike Wray <mike.wray@hp.com>
 
 """
 
-import string
+import string, re
 import os
 import time
 import threading
@@ -383,7 +383,9 @@ class XendDomainInfo:
 
     def createDevice(self, type, devconfig, change=False):
         if type == 'vbd':
-
+            typedev = sxp.child_value(devconfig, 'dev')
+            if re.match('^ioemu:', typedev):
+	        return;
             backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
 
             devnum = blkdev_name_to_number(sxp.child_value(devconfig, 'dev'))
