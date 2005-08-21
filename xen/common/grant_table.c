@@ -76,7 +76,7 @@ __gnttab_activate_grant_ref(
     grant_ref_t      ref,
     u16              dev_hst_ro_flags,
     u64              addr,
-    u64             *pframe )            /* OUT */
+    unsigned long   *pframe )            /* OUT */
 {
     domid_t               sdom;
     u16                   sflags;
@@ -336,14 +336,15 @@ __gnttab_map_grant_ref(
     gnttab_map_grant_ref_t *uop,
     unsigned long *va)
 {
-    domid_t               dom;
-    grant_ref_t           ref;
-    struct domain        *ld, *rd;
-    struct vcpu          *led;
-    u16                   dev_hst_ro_flags;
-    int                   handle;
-    u64                   frame = 0, addr;
-    int                   rc;
+    domid_t        dom;
+    grant_ref_t    ref;
+    struct domain *ld, *rd;
+    struct vcpu   *led;
+    u16            dev_hst_ro_flags;
+    int            handle;
+    u64            addr;
+    unsigned long  frame = 0;
+    int            rc;
 
     led = current;
     ld = led->domain;
@@ -450,7 +451,7 @@ __gnttab_map_grant_ref(
             = (ref << MAPTRACK_REF_SHIFT) |
               (dev_hst_ro_flags & MAPTRACK_GNTMAP_MASK);
 
-        (void)__put_user(frame, &uop->dev_bus_addr);
+        (void)__put_user((u64)frame << PAGE_SHIFT, &uop->dev_bus_addr);
 
         if ( ( dev_hst_ro_flags & GNTMAP_host_map ) &&
              !( dev_hst_ro_flags & GNTMAP_contains_pte) )
@@ -492,27 +493,30 @@ __gnttab_unmap_grant_ref(
     gnttab_unmap_grant_ref_t *uop,
     unsigned long *va)
 {
-    domid_t        dom;
-    grant_ref_t    ref;
-    u16            handle;
-    struct domain *ld, *rd;
+    domid_t          dom;
+    grant_ref_t      ref;
+    u16              handle;
+    struct domain   *ld, *rd;
     active_grant_entry_t *act;
-    grant_entry_t *sha;
+    grant_entry_t   *sha;
     grant_mapping_t *map;
-    u16            flags;
-    s16            rc = 1;
-    u64            frame, addr;
+    u16              flags;
+    s16              rc = 1;
+    u64              addr, dev_bus_addr;
+    unsigned long    frame;
 
     ld = current->domain;
 
     /* Bitwise-OR avoids short-circuiting which screws control flow. */
     if ( unlikely(__get_user(addr, &uop->host_addr) |
-                  __get_user(frame, &uop->dev_bus_addr) |
+                  __get_user(dev_bus_addr, &uop->dev_bus_addr) |
                   __get_user(handle, &uop->handle)) )
     {
         DPRINTK("Fault while reading gnttab_unmap_grant_ref_t.\n");
         return -EFAULT; /* don't set status */
     }
+
+    frame = (unsigned long)(dev_bus_addr >> PAGE_SHIFT);
 
     map = &ld->grant_table->maptrack[handle];
 
@@ -552,15 +556,6 @@ __gnttab_unmap_grant_ref(
     {
         frame = act->frame;
     }
-    else if ( frame == GNTUNMAP_DEV_FROM_VIRT )
-    {
-        if ( !( flags & GNTMAP_device_map ) )
-            PIN_FAIL(unmap_out, GNTST_bad_dev_addr,
-                     "Bad frame number: frame not mapped for dev access.\n");
-        frame = act->frame;
-
-        /* Frame will be unmapped for device access below if virt addr okay. */
-    }
     else
     {
         if ( unlikely(frame != act->frame) )
@@ -595,15 +590,6 @@ __gnttab_unmap_grant_ref(
 
         act->pin -= (flags & GNTMAP_readonly) ? GNTPIN_hstr_inc
                                               : GNTPIN_hstw_inc;
-
-        if ( frame == GNTUNMAP_DEV_FROM_VIRT )
-        {
-            act->pin -= (flags & GNTMAP_readonly) ? GNTPIN_devr_inc
-                                                  : GNTPIN_devw_inc;
-
-            map->ref_and_flags &= ~GNTMAP_device_map;
-            (void)__put_user(0, &uop->dev_bus_addr);
-        }
 
         rc = 0;
         if ( !( flags & GNTMAP_contains_pte) )

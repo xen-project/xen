@@ -768,7 +768,7 @@ static void net_tx_action(unsigned long unused)
             continue;
         }
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT] =
-                             FOREIGN_FRAME(mop->dev_bus_addr);
+                             FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT);
         grant_tx_ref[pending_idx] = mop->handle;
 #else
         if ( unlikely(mcl[0].result != 0) )

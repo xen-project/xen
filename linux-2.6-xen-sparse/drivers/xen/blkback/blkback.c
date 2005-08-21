@@ -431,7 +431,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         }
 
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
-            FOREIGN_FRAME(map[i].dev_bus_addr);
+            FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT);
 
         pending_handle(pending_idx, i) = map[i].handle;
     }
@@ -441,8 +441,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     {
         fas         = req->frame_and_sects[i];
 #ifdef CONFIG_XEN_BLKDEV_GRANT
-        seg[i].buf  = (map[i].dev_bus_addr << PAGE_SHIFT) |
-                      (blkif_first_sect(fas) << 9);
+        seg[i].buf  = map[i].dev_bus_addr | (blkif_first_sect(fas) << 9);
 #else
         seg[i].buf  = (fas & PAGE_MASK) | (blkif_first_sect(fas) << 9);
         seg[i].nsec = blkif_last_sect(fas) - blkif_first_sect(fas) + 1;
