@@ -688,7 +688,9 @@ def balloon_out(dom0_min_mem, opts):
     dom0_cur_alloc = get_dom0_alloc()
     dom0_new_alloc = dom0_cur_alloc - (domU_need_mem - free_mem)
 
-    if free_mem < domU_need_mem and dom0_new_alloc >= dom0_min_mem:
+    if free_mem < domU_need_mem and dom0_new_alloc < dom0_min_mem:
+        ret = 1
+    if free_mem < domU_need_mem and ret == 0:
 
         server.xend_domain_mem_target_set(0, dom0_new_alloc)
 
@@ -734,7 +736,8 @@ def main(argv):
         dom0_min_mem = xroot.get_dom0_min_mem()
         if dom0_min_mem != 0:
             if balloon_out(dom0_min_mem, opts):
-                return
+                print >>sys.stderr, "error: cannot allocate enough memory for domain"
+                sys.exit(1)
 
         dom = make_domain(opts, config)
         if opts.vals.console_autoconnect:
