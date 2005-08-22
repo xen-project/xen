@@ -639,7 +639,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     inst_decoder_regs = mpci_p->inst_decoder_regs;
 
     __vmread(GUEST_RIP, &eip);
-    __vmread(INSTRUCTION_LEN, &inst_len);
+    __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
     __vmread(GUEST_RFLAGS, &eflags);
     vm86 = eflags & X86_EFLAGS_VM;
 

@@ -351,7 +351,7 @@ void stop_vmx(void)
  * Not all cases receive valid value in the VM-exit instruction length field.
  */
 #define __get_instruction_length(len) \
-    __vmread(INSTRUCTION_LEN, &(len)); \
+    __vmread(VM_EXIT_INSTRUCTION_LEN, &(len)); \
      if ((len) < 1 || (len) > 15) \
         __vmx_bug(&regs);
 
@@ -389,7 +389,7 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
     if ( mmio_space(gpa) ){
         if (gpa >= 0xFEE00000) { /* workaround for local APIC */
             u32 inst_len;
-            __vmread(INSTRUCTION_LEN, &(inst_len));
+            __vmread(VM_EXIT_INSTRUCTION_LEN, &(inst_len));
             __update_guest_eip(inst_len);
             return 1;
         }
@@ -542,7 +542,7 @@ static int check_for_null_selector(unsigned long eip)
     int i, inst_len;
     int inst_copy_from_guest(unsigned char *, unsigned long, int);
 
-    __vmread(INSTRUCTION_LEN, &inst_len);
+    __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
     memset(inst, 0, MAX_INST_LEN);
     if (inst_copy_from_guest(inst, eip, inst_len) != inst_len) {
         printf("check_for_null_selector: get guest instruction failed\n");
@@ -712,7 +712,7 @@ vmx_world_save(struct vcpu *d, struct vmx_assist_context *c)
     unsigned long inst_len;
     int error = 0;
 
-    error |= __vmread(INSTRUCTION_LEN, &inst_len);
+    error |= __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
     error |= __vmread(GUEST_RIP, &c->eip);
     c->eip += inst_len; /* skip transition instruction */
     error |= __vmread(GUEST_RSP, &c->esp);
