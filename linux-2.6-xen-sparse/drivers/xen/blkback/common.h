@@ -17,9 +17,7 @@
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/io/blkif.h>
 #include <asm-xen/xen-public/io/ring.h>
-#ifdef CONFIG_XEN_BLKDEV_GRANT
 #include <asm-xen/gnttab.h>
-#endif
 
 #if 0
 #define ASSERT(_p) \
@@ -53,7 +51,7 @@ typedef struct blkif_st {
     rb_root_t         vbd_rb;        /* Mapping from 16-bit vdevices to VBDs.*/
     spinlock_t        vbd_lock;      /* Protects VBD mapping. */
     /* Private fields. */
-    enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
+    enum { DISCONNECTED, CONNECTED } status;
     /*
      * DISCONNECT response is deferred until pending requests are ack'ed.
      * We therefore need to store the id from the original request.
@@ -69,11 +67,9 @@ typedef struct blkif_st {
     atomic_t         refcnt;
 
     struct work_struct work;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     u16 shmem_handle;
     unsigned long shmem_vaddr;
     grant_ref_t shmem_ref;
-#endif
 } blkif_t;
 
 void blkif_create(blkif_be_create_t *create);

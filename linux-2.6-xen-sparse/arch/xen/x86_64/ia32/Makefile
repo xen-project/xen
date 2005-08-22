@@ -36,8 +36,8 @@ $(obj)/vsyscall-%.so: $(obj)/vsyscall.lds $(obj)/vsyscall-%.o FORCE
 	$(call if_changed,syscall)
 
 AFLAGS_vsyscall-int80.o = -m32 -I$(obj)
-AFLAGS_vsyscall-sysenter.o = -m32
-AFLAGS_vsyscall-syscall.o = -m32
+AFLAGS_vsyscall-sysenter.o = -m32 -I$(obj)
+AFLAGS_vsyscall-syscall.o = -m32 -I$(obj)
 CFLAGS_ia32_ioctl.o += -Ifs/
 
 s-link	:= vsyscall-syscall.o vsyscall-sysenter.o vsyscall-sigreturn.o
@@ -48,13 +48,11 @@ $(obj)/vsyscall.lds:
 $(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-link)) $(patsubst %.o,$(obj)/%.S,$(s-obj-y) $(s-link)):
 	@ln -fsn $(srctree)/arch/x86_64/ia32/$(notdir $@) $@
 
-$(obj)/vsyscall-int80.S: $(obj)/vsyscall-sigreturn.S ../../i386/kernel/vsyscall-note.S
-$(obj)/vsyscall-sysenter.S: $(obj)/vsyscall-sigreturn.S
-$(obj)/vsyscall-syscall.S: $(obj)/vsyscall-sigreturn.S
+$(obj)/vsyscall-int80.o $(obj)/vsyscall-sysenter.o $(obj)/vsyscall-syscall.o: \
+	$(obj)/vsyscall-sigreturn.S $(obj)/../../i386/kernel/vsyscall-note.S
 
-../../i386/kernel/vsyscall-note.S:
-	@ln -fsn $(srctree)/arch/i386/kernel/$(notdir $@) $(srctree)/arch/xen/i386/kernel/$(notdir $@)
-	make -C arch/xen/i386/kernel vsyscall-note.S
+$(obj)/../../i386/kernel/vsyscall-note.S:
+	@ln -fsn $(srctree)/arch/i386/kernel/$(notdir $@) $@
 
 obj-y	+= $(c-obj-y) $(s-obj-y)
 

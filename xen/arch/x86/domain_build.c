@@ -69,11 +69,21 @@ boolean_param("dom0_translate", opt_dom0_translate);
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 
-static struct pfn_info *alloc_largest(struct domain *d, unsigned long max)
+static struct pfn_info *alloc_chunk(struct domain *d, unsigned long max_pages)
 {
     struct pfn_info *page;
-    unsigned int order = get_order(max * PAGE_SIZE);
-    if ( (max & (max-1)) != 0 )
+    unsigned int order;
+    /*
+     * Allocate up to 2MB at a time:
+     *  1. This prevents overflow of get_order() when allocating more than
+     *     4GB to domain 0 on a PAE machine.
+     *  2. It prevents allocating very large chunks from DMA pools before
+     *     the >4GB pool is fully depleted.
+     */
+    if ( max_pages > (2UL << (20 - PAGE_SHIFT)) )
+        max_pages = 2UL << (20 - PAGE_SHIFT);
+    order = get_order(max_pages << PAGE_SHIFT);
+    if ( (max_pages & (max_pages-1)) != 0 )
         order--;
     while ( (page = alloc_domheap_pages(d, order, 0)) == NULL )
         if ( order-- == 0 )
@@ -608,7 +618,7 @@ int construct_dom0(struct domain *d,
     }
     while ( pfn < nr_pages )
     {
-        if ( (page = alloc_largest(d, nr_pages - d->tot_pages)) == NULL )
+        if ( (page = alloc_chunk(d, nr_pages - d->tot_pages)) == NULL )
             panic("Not enough RAM for DOM0 reservation.\n");
         while ( pfn < d->tot_pages )
         {

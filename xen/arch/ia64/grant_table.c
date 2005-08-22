@@ -546,15 +546,6 @@ __gnttab_unmap_grant_ref(
     {
         frame = act->frame;
     }
-    else if ( frame == GNTUNMAP_DEV_FROM_VIRT )
-    {
-        if ( !( flags & GNTMAP_device_map ) )
-            PIN_FAIL(unmap_out, GNTST_bad_dev_addr,
-                     "Bad frame number: frame not mapped for dev access.\n");
-        frame = act->frame;
-
-        /* Frame will be unmapped for device access below if virt addr okay. */
-    }
     else
     {
         if ( unlikely(frame != act->frame) )
@@ -615,15 +606,6 @@ __gnttab_unmap_grant_ref(
 
         act->pin -= (flags & GNTMAP_readonly) ? GNTPIN_hstr_inc
                                               : GNTPIN_hstw_inc;
-
-        if ( frame == GNTUNMAP_DEV_FROM_VIRT )
-        {
-            act->pin -= (flags & GNTMAP_readonly) ? GNTPIN_devr_inc
-                                                  : GNTPIN_devw_inc;
-
-            map->ref_and_flags &= ~GNTMAP_device_map;
-            (void)__put_user(0, &uop->dev_bus_addr);
-        }
 
         rc = 0;
         *va = virt;

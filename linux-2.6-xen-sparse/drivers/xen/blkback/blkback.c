@@ -80,7 +80,6 @@ static inline void flush_plugged_queue(void)
 }
 #endif
 
-#ifdef CONFIG_XEN_BLKDEV_GRANT
 /* When using grant tables to map a frame for device access then the
  * handle returned must be used to unmap the frame. This is needed to
  * drop the ref count on the frame.
@@ -89,7 +88,6 @@ static u16 pending_grant_handles[MMAP_PAGES];
 #define pending_handle(_idx, _i) \
     (pending_grant_handles[((_idx) * BLKIF_MAX_SEGMENTS_PER_REQUEST) + (_i)])
 #define BLKBACK_INVALID_HANDLE (0xFFFF)
-#endif
 
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
 /*
@@ -110,7 +108,6 @@ static void make_response(blkif_t *blkif, unsigned long id,
 
 static void fast_flush_area(int idx, int nr_pages)
 {
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST];
     unsigned int i, invcount = 0;
     u16 handle;
@@ -129,21 +126,6 @@ static void fast_flush_area(int idx, int nr_pages)
     if ( unlikely(HYPERVISOR_grant_table_op(
                     GNTTABOP_unmap_grant_ref, unmap, invcount)))
         BUG();
-#else
-
-    multicall_entry_t mcl[BLKIF_MAX_SEGMENTS_PER_REQUEST];
-    int               i;
-
-    for ( i = 0; i < nr_pages; i++ )
-    {
-	MULTI_update_va_mapping(mcl+i, MMAP_VADDR(idx, i),
-				__pte(0), 0);
-    }
-
-    mcl[nr_pages-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
-    if ( unlikely(HYPERVISOR_multicall(mcl, nr_pages) != 0) )
-        BUG();
-#endif
 }
 
 
@@ -367,12 +349,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     unsigned long fas = 0;
     int i, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
     pending_req_t *pending_req;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST];
-#else
-    unsigned long remap_prot;
-    multicall_entry_t mcl[BLKIF_MAX_SEGMENTS_PER_REQUEST];
-#endif
     struct phys_req preq;
     struct { 
         unsigned long buf; unsigned int nsec;
@@ -399,7 +376,6 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     preq.sector_number = req->sector_number;
     preq.nr_sects      = 0;
 
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     for ( i = 0; i < nseg; i++ )
     {
         fas         = req->frame_and_sects[i];
@@ -431,25 +407,15 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         }
 
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
-            FOREIGN_FRAME(map[i].dev_bus_addr);
+            FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT);
 
         pending_handle(pending_idx, i) = map[i].handle;
     }
-#endif
 
     for ( i = 0; i < nseg; i++ )
     {
         fas         = req->frame_and_sects[i];
-#ifdef CONFIG_XEN_BLKDEV_GRANT
-        seg[i].buf  = (map[i].dev_bus_addr << PAGE_SHIFT) |
-                      (blkif_first_sect(fas) << 9);
-#else
-        seg[i].buf  = (fas & PAGE_MASK) | (blkif_first_sect(fas) << 9);
-        seg[i].nsec = blkif_last_sect(fas) - blkif_first_sect(fas) + 1;
-        if ( seg[i].nsec <= 0 )
-            goto bad_descriptor;
-        preq.nr_sects += seg[i].nsec;
-#endif
+        seg[i].buf  = map[i].dev_bus_addr | (blkif_first_sect(fas) << 9);
     }
 
     if ( vbd_translate(&preq, blkif, operation) != 0 )
@@ -459,40 +425,6 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
                 preq.sector_number + preq.nr_sects, preq.dev); 
         goto bad_descriptor;
     }
-
-#ifndef CONFIG_XEN_BLKDEV_GRANT
-    if ( operation == READ )
-        remap_prot = _PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW;
-    else
-        remap_prot = _PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED;
-
-
-    for ( i = 0; i < nseg; i++ )
-    {
-	MULTI_update_va_mapping_otherdomain(
-	    mcl+i, MMAP_VADDR(pending_idx, i),
-	    pfn_pte_ma(seg[i].buf >> PAGE_SHIFT, __pgprot(remap_prot)),
-	    0, blkif->domid);
-#ifdef CONFIG_XEN_BLKDEV_TAP_BE
-        if ( blkif->is_blktap )
-            mcl[i].args[MULTI_UVMDOMID_INDEX] = ID_TO_DOM(req->id);
-#endif
-        phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
-            FOREIGN_FRAME(seg[i].buf >> PAGE_SHIFT);
-    }
-
-    BUG_ON(HYPERVISOR_multicall(mcl, nseg) != 0);
-
-    for ( i = 0; i < nseg; i++ )
-    {
-        if ( unlikely(mcl[i].result != 0) )
-        {
-            DPRINTK("invalid buffer -- could not remap it\n");
-            fast_flush_area(pending_idx, nseg);
-            goto bad_descriptor;
-        }
-    }
-#endif /* end ifndef CONFIG_XEN_BLKDEV_GRANT */
 
     pending_req = &pending_reqs[pending_idx];
     pending_req->blkif     = blkif;
@@ -637,6 +569,7 @@ void blkif_deschedule(blkif_t *blkif)
 static int __init blkif_init(void)
 {
     int i;
+    struct page *page;
 
     if ( !(xen_start_info.flags & SIF_INITDOMAIN) &&
          !(xen_start_info.flags & SIF_BLK_BE_DOMAIN) )
@@ -644,8 +577,9 @@ static int __init blkif_init(void)
 
     blkif_interface_init();
 
-    if ( (mmap_vstart = allocate_empty_lowmem_region(MMAP_PAGES)) == 0 )
-        BUG();
+    page = balloon_alloc_empty_page_range(MMAP_PAGES);
+    BUG_ON(page == NULL);
+    mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
 
     pending_cons = 0;
     pending_prod = MAX_PENDING_REQS;
@@ -667,10 +601,7 @@ static int __init blkif_init(void)
 
     blkif_xenbus_init();
 
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     memset( pending_grant_handles,  BLKBACK_INVALID_HANDLE, MMAP_PAGES );
-    printk(KERN_ALERT "Blkif backend is using grant tables.\n");
-#endif
 
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
     printk(KERN_ALERT "NOTE: Blkif backend is running with tap support on!\n");

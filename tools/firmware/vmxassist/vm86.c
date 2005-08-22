@@ -38,7 +38,7 @@ unsigned prev_eip = 0;
 enum vm86_mode mode;
 
 #ifdef DEBUG
-int traceset = 0;
+int traceset = 0xff;
 
 char *states[] = {
 	"<VM86_REAL>",
@@ -446,6 +446,8 @@ movcr(struct regs *regs, unsigned prefix, unsigned opc)
 #endif
 			if (getreg(regs, modrm) & CR0_PE)
 				set_mode(regs, VM86_REAL_TO_PROTECTED);
+                        else
+				set_mode(regs, VM86_REAL);
 
 			break;
 		case 3:
@@ -603,7 +605,9 @@ set_mode(struct regs *regs, enum vm86_mode newmode)
 {
 	switch (newmode) {
 	case VM86_REAL:
-		if (mode == VM86_PROTECTED_TO_REAL) {
+		if ((mode == VM86_PROTECTED_TO_REAL) ||
+                    (mode == VM86_REAL_TO_PROTECTED)) {
+			regs->eflags &= ~EFLAGS_TF;
 			real_mode(regs);
 			break;
 		} else if (mode == VM86_REAL) {

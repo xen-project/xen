@@ -43,20 +43,18 @@
 #define IO_TLB_SHIFT 11
 
 int swiotlb_force;
+static char *iotlb_virt_start;
+static unsigned long iotlb_nslabs;
 
 /*
  * Used to do a quick range check in swiotlb_unmap_single and
  * swiotlb_sync_single_*, to see if the memory was in fact allocated by this
  * API.
  */
-static char *iotlb_virt_start, *iotlb_virt_end;
-static dma_addr_t iotlb_bus_start, iotlb_bus_end;
+static dma_addr_t iotlb_bus_start, iotlb_bus_mask;
 
-/*
- * The number of IO TLB blocks (in groups of 64) betweeen iotlb_virt_start and
- * iotlb_virt_end.  This is command line adjustable via setup_io_tlb_npages.
- */
-static unsigned long iotlb_nslabs;
+/* Does the given dma address reside within the swiotlb aperture? */
+#define in_swiotlb_aperture(a) (!(((a) ^ iotlb_bus_start) & iotlb_bus_mask))
 
 /*
  * When the IOMMU overflows we return a fallback buffer. This sets the size.
@@ -94,6 +92,9 @@ setup_io_tlb_npages(char *str)
 		iotlb_nslabs = simple_strtoul(str, &str, 0) <<
 			(20 - IO_TLB_SHIFT);
 		iotlb_nslabs = ALIGN(iotlb_nslabs, IO_TLB_SEGSIZE);
+		/* Round up to power of two (xen_create_contiguous_region). */
+		while (iotlb_nslabs & (iotlb_nslabs-1))
+			iotlb_nslabs += iotlb_nslabs & ~(iotlb_nslabs-1);
 	}
 	if (*str == ',')
 		++str;
@@ -120,6 +121,9 @@ swiotlb_init_with_default_size (size_t default_size)
 	if (!iotlb_nslabs) {
 		iotlb_nslabs = (default_size >> IO_TLB_SHIFT);
 		iotlb_nslabs = ALIGN(iotlb_nslabs, IO_TLB_SEGSIZE);
+		/* Round up to power of two (xen_create_contiguous_region). */
+		while (iotlb_nslabs & (iotlb_nslabs-1))
+			iotlb_nslabs += iotlb_nslabs & ~(iotlb_nslabs-1);
 	}
 
 	bytes = iotlb_nslabs * (1UL << IO_TLB_SHIFT);
@@ -133,17 +137,12 @@ swiotlb_init_with_default_size (size_t default_size)
 		      "Use dom0_mem Xen boot parameter to reserve\n"
 		      "some DMA memory (e.g., dom0_mem=-128M).\n");
 
-	for (i = 0; i < iotlb_nslabs; i += IO_TLB_SEGSIZE)
-		xen_create_contiguous_region(
-			(unsigned long)iotlb_virt_start + (i << IO_TLB_SHIFT),
-			get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT));
-
-	iotlb_virt_end = iotlb_virt_start + bytes;
+	xen_create_contiguous_region(
+		(unsigned long)iotlb_virt_start, get_order(bytes));
 
 	/*
 	 * Allocate and initialize the free list array.  This array is used
-	 * to find contiguous free memory regions of size up to IO_TLB_SEGSIZE
-	 * between iotlb_virt_start and iotlb_virt_end.
+	 * to find contiguous free memory regions of size up to IO_TLB_SEGSIZE.
 	 */
 	io_tlb_list = alloc_bootmem(iotlb_nslabs * sizeof(int));
 	for (i = 0; i < iotlb_nslabs; i++)
@@ -156,15 +155,19 @@ swiotlb_init_with_default_size (size_t default_size)
 	 * Get the overflow emergency buffer
 	 */
 	io_tlb_overflow_buffer = alloc_bootmem_low(io_tlb_overflow);
+
 	iotlb_bus_start = virt_to_bus(iotlb_virt_start);
-	iotlb_bus_end   = iotlb_bus_start + bytes;
+	iotlb_bus_mask  = ~(dma_addr_t)(bytes - 1);
+
 	printk(KERN_INFO "Software IO TLB enabled: \n"
 	       " Aperture:     %lu megabytes\n"
 	       " Bus range:    0x%016lx - 0x%016lx\n"
 	       " Kernel range: 0x%016lx - 0x%016lx\n",
 	       bytes >> 20,
-	       (unsigned long)iotlb_bus_start, (unsigned long)iotlb_bus_end,
-	       (unsigned long)iotlb_virt_start, (unsigned long)iotlb_virt_end);
+	       (unsigned long)iotlb_bus_start,
+	       (unsigned long)iotlb_bus_start + bytes,
+	       (unsigned long)iotlb_virt_start,
+	       (unsigned long)iotlb_virt_start + bytes);
 }
 
 void
@@ -444,7 +447,7 @@ swiotlb_unmap_single(struct device *hwdev, dma_addr_t dev_addr, size_t size,
 		     int dir)
 {
 	BUG_ON(dir == DMA_NONE);
-	if ((dev_addr >= iotlb_bus_start) && (dev_addr < iotlb_bus_end))
+	if (in_swiotlb_aperture(dev_addr))
 		unmap_single(hwdev, bus_to_virt(dev_addr), size, dir);
 }
 
@@ -463,7 +466,7 @@ swiotlb_sync_single_for_cpu(struct device *hwdev, dma_addr_t dev_addr,
 			    size_t size, int dir)
 {
 	BUG_ON(dir == DMA_NONE);
-	if ((dev_addr >= iotlb_bus_start) && (dev_addr < iotlb_bus_end))
+	if (in_swiotlb_aperture(dev_addr))
 		sync_single(hwdev, bus_to_virt(dev_addr), size, dir);
 }
 
@@ -472,7 +475,7 @@ swiotlb_sync_single_for_device(struct device *hwdev, dma_addr_t dev_addr,
 			       size_t size, int dir)
 {
 	BUG_ON(dir == DMA_NONE);
-	if ((dev_addr >= iotlb_bus_start) && (dev_addr < iotlb_bus_end))
+	if (in_swiotlb_aperture(dev_addr))
 		sync_single(hwdev, bus_to_virt(dev_addr), size, dir);
 }
 
@@ -610,7 +613,7 @@ swiotlb_unmap_page(struct device *hwdev, dma_addr_t dma_address,
 		   size_t size, enum dma_data_direction direction)
 {
 	BUG_ON(direction == DMA_NONE);
-	if ((dma_address >= iotlb_bus_start) && (dma_address < iotlb_bus_end))
+	if (in_swiotlb_aperture(dma_address))
 		unmap_single(hwdev, bus_to_virt(dma_address), size, direction);
 }
 

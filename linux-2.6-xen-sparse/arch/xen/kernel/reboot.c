@@ -143,13 +143,8 @@ static int __do_suspend(void *ignore)
 #define usbif_resume() do{}while(0)
 #endif
 
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     extern int gnttab_suspend(void);
     extern int gnttab_resume(void);
-#else
-#define gnttab_suspend() do{}while(0)
-#define gnttab_resume()  do{}while(0)
-#endif
 
 #ifdef CONFIG_SMP
     extern void smp_suspend(void);

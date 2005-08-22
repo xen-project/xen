@@ -183,8 +183,6 @@ typedef struct gnttab_unmap_grant_ref {
     s16         status;               /* GNTST_* */
 } gnttab_unmap_grant_ref_t;
 
-#define GNTUNMAP_DEV_FROM_VIRT (~0U)
-
 /*
  * GNTTABOP_setup_table: Set up a grant table for <dom> comprising at least
  * <nr_frames> pages. The frame addresses are written to the <frame_list>.

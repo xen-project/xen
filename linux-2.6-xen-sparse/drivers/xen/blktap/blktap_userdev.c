@@ -5,7 +5,6 @@
  * Control interface between the driver and a character device.
  * 
  * Copyright (c) 2004, Andrew Warfield
- *
  */
 
 #include <linux/config.h>
@@ -535,8 +534,8 @@ int blktap_write_fe_ring(blkif_request_t *req)
         /* Set the necessary mappings in p2m and in the VM_FOREIGN 
          * vm_area_struct to allow user vaddr -> struct page lookups
          * to work.  This is needed for direct IO to foreign pages. */
-        phys_to_machine_mapping[__pa(kvaddr)>>PAGE_SHIFT] =
-            FOREIGN_FRAME(map[i].dev_bus_addr);
+        phys_to_machine_mapping[__pa(kvaddr) >> PAGE_SHIFT] =
+            FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT);
 
         offset = (uvaddr - blktap_vma->vm_start) >> PAGE_SHIFT;
         ((struct page **)blktap_vma->vm_private_data)[offset] =
@@ -776,9 +775,11 @@ static struct miscdevice blktap_miscdev = {
 int blktap_init(void)
 {
     int err, i, j;
+    struct page *page;
 
-    if ( (mmap_vstart = allocate_empty_lowmem_region(MMAP_PAGES)) == 0 )
-        BUG();
+    page = balloon_alloc_empty_page_range(MMAP_PAGES);
+    BUG_ON(page == NULL);
+    mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
 
 #ifdef CONFIG_XEN_BLKDEV_GRANT
     for (i=0; i<MAX_PENDING_REQS ; i++)

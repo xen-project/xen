@@ -55,10 +55,8 @@
 #include <scsi/scsi.h>
 #include <asm-xen/evtchn.h>
 #include <asm-xen/xenbus.h>
-#ifdef CONFIG_XEN_BLKDEV_GRANT
 #include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/gnttab.h>
-#endif
 
 typedef unsigned char byte; /* from linux/ide.h */
 
@@ -78,14 +76,12 @@ static blkif_front_ring_t blk_ring;
 
 #define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, PAGE_SIZE)
 
-#ifdef CONFIG_XEN_BLKDEV_GRANT
 static domid_t rdomid = 0;
 static grant_ref_t gref_head, gref_terminal;
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
 #define GRANTREF_INVALID (1<<15)
 static int shmem_ref;
-#endif
 
 static struct blk_shadow {
     blkif_request_t req;
@@ -131,30 +127,14 @@ static int sg_operation = -1;
 
 static inline void pickle_request(struct blk_shadow *s, blkif_request_t *r)
 {
-#ifndef CONFIG_XEN_BLKDEV_GRANT
-    int i;
-#endif
 
     s->req = *r;
-
-#ifndef CONFIG_XEN_BLKDEV_GRANT
-    for ( i = 0; i < r->nr_segments; i++ )
-        s->req.frame_and_sects[i] = machine_to_phys(r->frame_and_sects[i]);
-#endif
 }
 
 static inline void unpickle_request(blkif_request_t *r, struct blk_shadow *s)
 {
-#ifndef CONFIG_XEN_BLKDEV_GRANT
-    int i;
-#endif
 
     *r = s->req;
-
-#ifndef CONFIG_XEN_BLKDEV_GRANT
-    for ( i = 0; i < s->req.nr_segments; i++ )
-        r->frame_and_sects[i] = phys_to_machine(s->req.frame_and_sects[i]);
-#endif
 }
 
 
@@ -256,9 +236,7 @@ static int blkif_queue_request(struct request *req)
     int idx;
     unsigned long id;
     unsigned int fsect, lsect;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     int ref;
-#endif
 
     if ( unlikely(blkif_state != BLKIF_STATE_CONNECTED) )
         return 1;
@@ -284,7 +262,6 @@ static int blkif_queue_request(struct request *req)
             buffer_ma = page_to_phys(bvec->bv_page);
             fsect = bvec->bv_offset >> 9;
             lsect = fsect + (bvec->bv_len >> 9) - 1;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
             /* install a grant reference. */
             ref = gnttab_claim_grant_reference(&gref_head, gref_terminal);
             ASSERT( ref != -ENOSPC );
@@ -300,11 +277,6 @@ static int blkif_queue_request(struct request *req)
 
             ring_req->frame_and_sects[ring_req->nr_segments++] =
                 blkif_fas_from_gref(ref, fsect, lsect);
-
-#else
-            ring_req->frame_and_sects[ring_req->nr_segments++] =
-                blkif_fas(buffer_ma, fsect, lsect);
-#endif
         }
     }
 
@@ -711,9 +683,7 @@ static int blkif_queue_request(unsigned long   id,
     blkif_request_t    *req;
     struct buffer_head *bh;
     unsigned int        fsect, lsect;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     int ref;
-#endif
 
     fsect = (buffer_ma & ~PAGE_MASK) >> 9;
     lsect = fsect + nr_sectors - 1;
@@ -762,7 +732,6 @@ static int blkif_queue_request(unsigned long   id,
             bh->b_reqnext = (struct buffer_head *)blk_shadow[req->id].request;
             blk_shadow[req->id].request = (unsigned long)id;
 
-#ifdef CONFIG_XEN_BLKDEV_GRANT
             /* install a grant reference. */
             ref = gnttab_claim_grant_reference(&gref_head, gref_terminal);
             ASSERT( ref != -ENOSPC );
@@ -778,10 +747,6 @@ static int blkif_queue_request(unsigned long   id,
 
             req->frame_and_sects[req->nr_segments] =
                 blkif_fas_from_gref(ref, fsect, lsect);
-#else
-            req->frame_and_sects[req->nr_segments] =
-                blkif_fas(buffer_ma, fsect, lsect);
-#endif
             if ( ++req->nr_segments < BLKIF_MAX_SEGMENTS_PER_REQUEST )
                 sg_next_sect += nr_sectors;
             else
@@ -819,7 +784,6 @@ static int blkif_queue_request(unsigned long   id,
     req->sector_number = (blkif_sector_t)sector_number;
     req->handle        = handle; 
     req->nr_segments   = 1;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     /* install a grant reference. */
     ref = gnttab_claim_grant_reference(&gref_head, gref_terminal);
     ASSERT( ref != -ENOSPC );
@@ -833,9 +797,6 @@ static int blkif_queue_request(unsigned long   id,
     blk_shadow[xid].frame[0] = buffer_ma >> PAGE_SHIFT;
 
     req->frame_and_sects[0] = blkif_fas_from_gref(ref, fsect, lsect);
-#else
-    req->frame_and_sects[0] = blkif_fas(buffer_ma, fsect, lsect);
-#endif
 
     /* Keep a private copy so we can reissue requests when recovering. */    
     pickle_request(&blk_shadow[xid], req);
@@ -1015,9 +976,7 @@ static void blkif_recover(void)
     int i;
     blkif_request_t *req;
     struct blk_shadow *copy;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     int j;
-#endif
 
     /* Stage 1: Make a safe copy of the shadow state. */
     copy = (struct blk_shadow *)kmalloc(sizeof(blk_shadow), GFP_KERNEL);
@@ -1047,7 +1006,6 @@ static void blkif_recover(void)
         req->id = GET_ID_FROM_FREELIST();
         memcpy(&blk_shadow[req->id], &copy[i], sizeof(copy[i]));
 
-#ifdef CONFIG_XEN_BLKDEV_GRANT
         /* Rewrite any grant references invalidated by suspend/resume. */
         for ( j = 0; j < req->nr_segments; j++ )
         {
@@ -1061,7 +1019,6 @@ static void blkif_recover(void)
             req->frame_and_sects[j] &= ~GRANTREF_INVALID;
         }
         blk_shadow[req->id].req = *req;
-#endif
 
         blk_ring.req_prod_pvt++;
     }
@@ -1085,9 +1042,7 @@ static void blkif_connect(u16 evtchn, domid_t domid)
     int err = 0;
 
     blkif_evtchn = evtchn;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     rdomid       = domid;
-#endif
 
     err = bind_evtchn_to_irqhandler(
         blkif_evtchn, blkif_int, SA_SAMPLE_RANDOM, "blkif", NULL);
@@ -1134,25 +1089,24 @@ static void watch_for_status(struct xenbus_watch *watch, const char *node)
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,
 			    NULL);
-
-	if (err)
+	if (err) {
 		xenbus_dev_error(info->dev, err, "reading backend fields");
-	else {
-		xlvbd_add(sectors, info->vdevice, info->handle, binfo,
-			  sector_size);
-		info->connected = 1;
-
-		/* First to connect?  blkif is now connected. */
-		if (blkif_vbds_connected++ == 0)
-			blkif_state = BLKIF_STATE_CONNECTED;
-
-		xenbus_dev_ok(info->dev);
-
-		/* Kick pending requests. */
-		spin_lock_irq(&blkif_io_lock);
-		kick_pending_request_queues();
-		spin_unlock_irq(&blkif_io_lock);
+		return;
 	}
+
+	xlvbd_add(sectors, info->vdevice, info->handle, binfo, sector_size);
+	info->connected = 1;
+
+	/* First to connect?  blkif is now connected. */
+	if (blkif_vbds_connected++ == 0)
+		blkif_state = BLKIF_STATE_CONNECTED;
+
+	xenbus_dev_ok(info->dev);
+
+	/* Kick pending requests. */
+	spin_lock_irq(&blkif_io_lock);
+	kick_pending_request_queues();
+	spin_unlock_irq(&blkif_io_lock);
 }
 
 static int setup_blkring(struct xenbus_device *dev, unsigned int backend_id)
@@ -1169,7 +1123,6 @@ static int setup_blkring(struct xenbus_device *dev, unsigned int backend_id)
 	SHARED_RING_INIT(sring);
 	FRONT_RING_INIT(&blk_ring, sring, PAGE_SIZE);
 
-#ifdef CONFIG_XEN_BLKDEV_GRANT
 	shmem_ref = gnttab_claim_grant_reference(&gref_head,
 						 gref_terminal);
 	ASSERT(shmem_ref != -ENOSPC);
@@ -1177,7 +1130,6 @@ static int setup_blkring(struct xenbus_device *dev, unsigned int backend_id)
 					backend_id,
 					virt_to_mfn(blk_ring.sring),
 					0);
-#endif
 
 	op.u.alloc_unbound.dom = backend_id;
 	err = HYPERVISOR_event_channel_op(&op);
@@ -1199,36 +1151,28 @@ static int talk_to_backend(struct xenbus_device *dev,
 	const char *message;
 	int err, backend_id;
 
-	backend = xenbus_read(dev->nodename, "backend", NULL);
-	if (IS_ERR(backend)) {
-		err = PTR_ERR(backend);
-		if (err == -ENOENT)
-			goto out;
-		xenbus_dev_error(dev, err, "reading %s/backend",
+	backend = NULL;
+	err = xenbus_gather(dev->nodename,
+			    "backend-id", "%i", &backend_id,
+			    "backend", NULL, &backend,
+			    NULL);
+	if (XENBUS_EXIST_ERR(err))
+		goto out;
+	if (backend && strlen(backend) == 0) {
+		err = -ENOENT;
+		goto out;
+	}
+	if (err < 0) {
+		xenbus_dev_error(dev, err, "reading %s/backend or backend-id",
 				 dev->nodename);
 		goto out;
 	}
-	if (strlen(backend) == 0) {
-		err = -ENOENT;
-		goto free_backend;
-	}
-
-	/* FIXME: This driver can't handle backends on different
-	 * domains.  Check and fail gracefully. */
-	err = xenbus_scanf(dev->nodename, "backend-id", "%i", &backend_id);
-	if (err == -ENOENT)
-		goto free_backend;
- 	if (err < 0) {
-		xenbus_dev_error(dev, err, "reading %s/backend-id",
-				 dev->nodename);
- 		goto free_backend;
- 	}
 
 	/* First device?  We create shared ring, alloc event channel. */
 	if (blkif_vbds == 0) {
 		err = setup_blkring(dev, backend_id);
 		if (err)
-			goto free_backend;
+			goto out;
 	}
 
 	err = xenbus_transaction_start(dev->nodename);
@@ -1237,20 +1181,11 @@ static int talk_to_backend(struct xenbus_device *dev,
 		goto destroy_blkring;
 	}
 
-#ifdef CONFIG_XEN_BLKDEV_GRANT
 	err = xenbus_printf(dev->nodename, "grant-id","%u", shmem_ref);
 	if (err) {
 		message = "writing grant-id";
 		goto abort_transaction;
 	}
-#else
-	err = xenbus_printf(dev->nodename, "shared-frame", "%lu",
-			    virt_to_mfn(blk_ring.sring));
-	if (err) {
-		message = "writing shared-frame";
-		goto abort_transaction;
-	}
-#endif
 	err = xenbus_printf(dev->nodename,
 			    "event-channel", "%u", blkif_evtchn);
 	if (err) {
@@ -1258,9 +1193,11 @@ static int talk_to_backend(struct xenbus_device *dev,
 		goto abort_transaction;
 	}
 
-	info->watch.node = info->backend = backend;
-	info->watch.callback = watch_for_status;
+	info->backend = backend;
+	backend = NULL;
 
+	info->watch.node = info->backend;
+	info->watch.callback = watch_for_status;
 	err = register_xenbus_watch(&info->watch);
 	if (err) {
 		message = "registering watch on backend";
@@ -1272,20 +1209,20 @@ static int talk_to_backend(struct xenbus_device *dev,
 		xenbus_dev_error(dev, err, "completing transaction");
 		goto destroy_blkring;
 	}
-	return 0;
 
-abort_transaction:
+ out:
+	if (backend)
+		kfree(backend);
+	return err;
+
+ abort_transaction:
 	xenbus_transaction_end(1);
 	/* Have to do this *outside* transaction.  */
 	xenbus_dev_error(dev, err, "%s", message);
-destroy_blkring:
+ destroy_blkring:
 	if (blkif_vbds == 0)
 		blkif_free();
-free_backend:
-	kfree(backend);
-out:
-	printk("%s:%u = %i\n", __FILE__, __LINE__, err);
-	return err;
+	goto out;
 }
 
 /* Setup supplies the backend dir, virtual device.
@@ -1301,7 +1238,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 
 	/* FIXME: Use dynamic device id if this is not set. */
 	err = xenbus_scanf(dev->nodename, "virtual-device", "%i", &vdevice);
-	if (err == -ENOENT)
+	if (XENBUS_EXIST_ERR(err))
 		return err;
 	if (err < 0) {
 		xenbus_dev_error(dev, err, "reading virtual-device");
@@ -1316,6 +1253,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 	info->dev = dev;
 	info->vdevice = vdevice;
 	info->connected = 0;
+
 	/* Front end dir is a number, which is used as the id. */
 	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
 	dev->data = info;
@@ -1425,13 +1363,10 @@ static int __init xlblk_init(void)
 {
     int i;
 
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     /* A grant for every ring slot, plus one for the ring itself. */
-    if ( 0 > gnttab_alloc_grant_references(MAXIMUM_OUTSTANDING_BLOCK_REQS + 1,
-                                           &gref_head, &gref_terminal) )
+    if (gnttab_alloc_grant_references(MAXIMUM_OUTSTANDING_BLOCK_REQS + 1,
+				      &gref_head, &gref_terminal) < 0)
         return 1;
-    printk(KERN_ALERT "Blkif frontend is using grant tables.\n");
-#endif
 
     if ( (xen_start_info.flags & SIF_INITDOMAIN) ||
          (xen_start_info.flags & SIF_BLK_BE_DOMAIN) )
@@ -1455,20 +1390,7 @@ static int __init xlblk_init(void)
 static void blkif_completion(struct blk_shadow *s)
 {
     int i;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     for ( i = 0; i < s->req.nr_segments; i++ )
         gnttab_release_grant_reference(
             &gref_head, blkif_gref_from_fas(s->req.frame_and_sects[i]));
-#else
-    /* This is a hack to get the dirty logging bits set */
-    if ( s->req.operation == BLKIF_OP_READ )
-    {
-        for ( i = 0; i < s->req.nr_segments; i++ )
-        {
-            unsigned long pfn = s->req.frame_and_sects[i] >> PAGE_SHIFT;
-            unsigned long mfn = phys_to_machine_mapping[pfn];
-            xen_machphys_update(mfn, pfn);
-        }
-    }
-#endif
 }
