@@ -405,54 +405,6 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	balloon_unlock(flags);
 }
 
-
-unsigned long allocate_empty_lowmem_region(unsigned long pages)
-{
-	pgd_t         *pgd;
-	pud_t         *pud; 
-	pmd_t         *pmd;
-	pte_t         *pte;
-	unsigned long *pfn_array;
-	unsigned long  vstart;
-	unsigned long  i;
-	unsigned int   order = get_order(pages*PAGE_SIZE);
-
-	vstart = __get_free_pages(GFP_KERNEL, order);
-	if (vstart == 0)
-		return 0UL;
-
-	scrub_pages(vstart, 1 << order);
-
-	pfn_array = vmalloc((1<<order) * sizeof(*pfn_array));
-	BUG_ON(pfn_array == NULL);
-
-	for (i = 0; i < (1<<order); i++) {
-		pgd = pgd_offset_k(   (vstart + (i*PAGE_SIZE)));
-		pud = pud_offset(pgd, (vstart + (i*PAGE_SIZE)));
-		pmd = pmd_offset(pud, (vstart + (i*PAGE_SIZE)));
-		pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE))); 
-		pfn_array[i] = pte_mfn(*pte);
-#ifdef CONFIG_X86_64
-		xen_l1_entry_update(pte, __pte(0));
-#else
-		BUG_ON(HYPERVISOR_update_va_mapping(vstart + (i*PAGE_SIZE), 
-						    __pte_ma(0), 0));
-#endif
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
-			INVALID_P2M_ENTRY;
-	}
-
-	flush_tlb_all();
-
-	balloon_put_pages(pfn_array, 1 << order);
-
-	vfree(pfn_array);
-
-	return vstart;
-}
-
-EXPORT_SYMBOL(allocate_empty_lowmem_region);
-
 /*
  * Local variables:
  *  c-file-style: "linux"

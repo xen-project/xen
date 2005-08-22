@@ -968,8 +968,9 @@ static int __init netback_init(void)
     
     netif_interface_init();
 
-    mmap_vstart = allocate_empty_lowmem_region(MAX_PENDING_REQS);
-    BUG_ON(mmap_vstart == 0);
+    page = balloon_alloc_empty_page_range(MAX_PENDING_REQS);
+    BUG_ON(page == NULL);
+    mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
 
     for ( i = 0; i < MAX_PENDING_REQS; i++ )
     {
