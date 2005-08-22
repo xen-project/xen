@@ -435,9 +435,11 @@ void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id)
     unbind_evtchn_from_irq(evtchn);
 }
 
+#ifdef CONFIG_SMP
 static void do_nothing_function(void *ign)
 {
 }
+#endif
 
 /* Rebind an evtchn so that it gets delivered to a specific cpu */
 static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)

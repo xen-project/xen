@@ -1604,6 +1604,9 @@ static void smp_intr_exit(void)
 	unbind_ipi_from_irq(CALL_FUNCTION_VECTOR);
 }
 
+extern void local_setup_timer_irq(void);
+extern void local_teardown_timer_irq(void);
+
 void smp_suspend(void)
 {
 	/* XXX todo: take down time and ipi's on all cpus */
