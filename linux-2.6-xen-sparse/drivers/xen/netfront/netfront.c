@@ -1457,10 +1457,10 @@ static int __init netif_init(void)
 static void netif_exit(void)
 {
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    gnttab_free_grant_references(NETIF_TX_RING_SIZE + 1, gref_tx_head);
+    gnttab_free_grant_references(gref_tx_head, gref_tx_terminal);
 #endif
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    gnttab_free_grant_references(NETIF_RX_RING_SIZE + 1, gref_rx_head);
+    gnttab_free_grant_references(gref_rx_head, gref_rx_terminal);
 #endif
 }
 
