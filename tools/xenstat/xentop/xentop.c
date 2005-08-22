@@ -254,7 +254,7 @@ static void attr_addstr(int attr, const char *str)
 static void set_delay(char *value)
 {
 	int new_delay;
-	new_delay = atoi(prompt_val);
+	new_delay = atoi(value);
 	if(new_delay > 0)
 		delay = new_delay;
 }
