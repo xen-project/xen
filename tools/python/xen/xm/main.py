@@ -49,6 +49,7 @@ xm common subcommands:
     restore <File>          create a domain from a saved state file
     save <DomId> <File>     save domain state (and config) to file
     shutdown <DomId>        shutdown a domain
+    top                     monitor system and domains in real-time
     unpause <DomId>         unpause a paused domain
 
 For a complete list of subcommands run 'xm help --long'
@@ -87,6 +88,7 @@ xm full list of subcommands:
     dmesg   [--clear]         read or clear Xen's message buffer
     info                      get information about the xen host
     log                       print the xend log
+    top                       monitor system and domains in real-time
 
   Scheduler Commands:
     bvt <options>             set BVT scheduler parameters
@@ -457,6 +459,9 @@ def xm_console(args):
     os.execvp('/usr/libexec/xen/xenconsole', cmd.split())
     console = sxp.child(info, "console")
 
+def xm_top(args):
+    os.execv('/usr/sbin/xentop', ['/usr/sbin/xentop'])
+
 def xm_dmesg(args):
     
     gopts = Opts(use="""[-c|--clear]
@@ -545,6 +550,8 @@ def xm_block_destroy(args):
 commands = {
     # console commands
     "console": xm_console,
+    # xenstat commands
+    "top": xm_top,
     # domain commands
     "domid": xm_domid,
     "domname": xm_domname,
