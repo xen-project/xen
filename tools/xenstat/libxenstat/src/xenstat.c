@@ -505,7 +505,7 @@ static int xenstat_collect_networks(xenstat_handle * handle,
 		unsigned int domid;
 		int ret = fscanf(handle->procnetdev,
 				 "vif%u.%u:%llu%llu%llu%llu%*u%*u%*u%*u"
-				 "%llu%llu%llu%llu%*u%*u%*u%*u",
+				 "%llu%llu%llu%llu%*u%*u%*u%*u\n",
 				 &domid, &net.id,
 				 &net.tbytes, &net.tpackets, &net.terrs,
 				 &net.tdrop,
