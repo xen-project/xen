@@ -1713,7 +1713,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __vmx_bug(&regs);       /* should not happen */
     }
 
-    vmx_intr_assist(v);
     return;
 }
 

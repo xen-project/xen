@@ -233,6 +233,7 @@ ENTRY(vmx_asm_vmexit_handler)
         jnz  2f 
 
 /* vmx_restore_all_guest */
+        call vmx_intr_assist
         call load_cr2
         .endif
         /* 
