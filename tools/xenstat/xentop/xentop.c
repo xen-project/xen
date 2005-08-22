@@ -151,7 +151,7 @@ xenstat_node *prev_node = NULL;
 xenstat_node *cur_node = NULL;
 field_id sort_field = FIELD_DOMID;
 unsigned int first_domain_index = 0;
-unsigned int delay = 1;
+unsigned int delay = 3;
 int show_vcpus = 0;
 int show_networks = 0;
 int repeat_header = 0;
@@ -174,7 +174,7 @@ static void usage(const char *program)
 	       "Displays ongoing information about xen vm resources \n\n"
 	       "-h, --help           display this help and exit\n"
 	       "-V, --version        output version information and exit\n"
-	       "-d, --delay=SECONDS  seconds between updates (default 1)\n"
+	       "-d, --delay=SECONDS  seconds between updates (default 3)\n"
 	       "-n, --networks       output vif network data\n"
 	       "-r, --repeat-header  repeat table header before each domain\n"
 	       "-v, --vcpus          output vcpu data\n"
