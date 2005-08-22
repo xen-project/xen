@@ -222,7 +222,8 @@ static int xlvbd_init_blk_queue(struct gendisk *gd, u16 sector_size)
 
 static struct gendisk *xlvbd_alloc_gendisk(
     struct xlbd_major_info *mi, int minor, blkif_sector_t capacity,
-    int device, blkif_vdev_t handle, u16 info, u16 sector_size)
+    int device, blkif_vdev_t handle, u16 vdisk_info, u16 sector_size,
+    struct blkfront_info *info)
 {
     struct gendisk *gd;
     struct xlbd_disk_info *di;
@@ -235,6 +236,7 @@ static struct gendisk *xlvbd_alloc_gendisk(
     di->mi = mi;
     di->xd_device = device;
     di->handle = handle;
+    di->info = info;
 
     if ((minor & ((1 << mi->type->partn_shift) - 1)) == 0)
         nr_minors = 1 << mi->type->partn_shift;
@@ -266,13 +268,13 @@ static struct gendisk *xlvbd_alloc_gendisk(
 
     di->rq = gd->queue;
 
-    if (info & VDISK_READONLY)
+    if (vdisk_info & VDISK_READONLY)
         set_disk_ro(gd, 1);
 
-    if (info & VDISK_REMOVABLE)
+    if (vdisk_info & VDISK_REMOVABLE)
         gd->flags |= GENHD_FL_REMOVABLE;
 
-    if (info & VDISK_CDROM)
+    if (vdisk_info & VDISK_CDROM)
         gd->flags |= GENHD_FL_CD;
 
     add_disk(gd);
@@ -285,7 +287,7 @@ out:
 }
 
 int xlvbd_add(blkif_sector_t capacity, int device, blkif_vdev_t handle,
-	      u16 info, u16 sector_size)
+	      u16 vdisk_info, u16 sector_size, struct blkfront_info *info)
 {
     struct lvdisk *new;
     struct block_device *bd;
@@ -300,7 +302,7 @@ int xlvbd_add(blkif_sector_t capacity, int device, blkif_vdev_t handle,
     if (new == NULL)
         return -ENOMEM;
     new->capacity = capacity;
-    new->info = info;
+    new->info = vdisk_info;
     new->handle = handle;
     new->dev = MKDEV(MAJOR_XEN(device), MINOR_XEN(device));
 
@@ -309,7 +311,7 @@ int xlvbd_add(blkif_sector_t capacity, int device, blkif_vdev_t handle,
         goto out;
     
     gd = xlvbd_alloc_gendisk(mi, MINOR_XEN(device), capacity, device, handle,
-			     info, sector_size);
+			     vdisk_info, sector_size, info);
     if (gd == NULL)
         goto out_bd;
 

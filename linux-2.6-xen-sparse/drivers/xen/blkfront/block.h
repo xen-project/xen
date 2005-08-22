@@ -79,6 +79,8 @@
 #define DPRINTK_IOCTL(_f, _a...) ((void)0)
 #endif
 
+struct blkfront_info;
+
 struct xlbd_type_info {
     int partn_shift;
     int disks_per_major;
@@ -106,6 +108,7 @@ struct xlbd_disk_info {
     struct xlbd_disk_info  *next_waiting;
     request_queue_t        *rq;
 #endif
+    struct blkfront_info *info;
 };
 
 typedef struct xen_block {
@@ -124,6 +127,6 @@ extern void do_blkif_request (request_queue_t *rq);
 
 /* Virtual block-device subsystem. */
 int xlvbd_add(blkif_sector_t capacity, int device, blkif_vdev_t handle,
-	      u16 info, u16 sector_size);
+	      u16 vdisk_info, u16 sector_size, struct blkfront_info *info);
 void xlvbd_del(blkif_vdev_t handle);
 #endif /* __XEN_DRIVERS_BLOCK_H__ */
