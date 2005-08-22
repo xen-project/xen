@@ -58,39 +58,21 @@
 #include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/gnttab.h>
 
-struct blkfront_info
-{
-	/* We watch the backend */
-	struct xenbus_watch watch;
-	int vdevice;
-	u16 handle;
-	int connected;
-	struct xenbus_device *dev;
-	char *backend;
-	int backend_id;
-	int grant_id;
-	blkif_front_ring_t ring;
-	unsigned int evtchn;
-};
-
 typedef unsigned char byte; /* from linux/ide.h */
 
 /* Control whether runtime update of vbds is enabled. */
 #define ENABLE_VBD_UPDATE 1
 
-#define BLKIF_STATE_CLOSED       0
-#define BLKIF_STATE_DISCONNECTED 1
-#define BLKIF_STATE_CONNECTED    2
+#define BLKIF_STATE_DISCONNECTED 0
+#define BLKIF_STATE_CONNECTED    1
 
-static unsigned int blkif_state = BLKIF_STATE_CLOSED;
-static unsigned int blkif_vbds_connected = 0;
+static unsigned int blkif_state = BLKIF_STATE_DISCONNECTED;
 
 #define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, PAGE_SIZE)
 
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
 #define GRANTREF_INVALID (1<<15)
-static grant_ref_t gref_head, gref_terminal;
 
 static struct blk_shadow {
     blkif_request_t req;
@@ -101,7 +83,7 @@ unsigned long blk_shadow_free;
 
 static int recovery = 0; /* Recovery in progress: protected by blkif_io_lock */
 
-static void kick_pending_request_queues(void);
+static void kick_pending_request_queues(struct blkfront_info *info);
 
 static int __init xlblk_init(void);
 
@@ -128,7 +110,7 @@ static inline void ADD_ID_TO_FREELIST(unsigned long id)
 
 /* Kernel-specific definitions used in the common code */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#define DISABLE_SCATTERGATHER() 
+#define DISABLE_SCATTERGATHER()
 #else
 static int sg_operation = -1;
 #define DISABLE_SCATTERGATHER() (sg_operation = -1)
@@ -161,30 +143,34 @@ static inline void flush_requests(struct blkfront_info *info)
 
 module_init(xlblk_init);
 
-static struct xlbd_disk_info *head_waiting = NULL;
-static void kick_pending_request_queues(void)
+static void kick_pending_request_queues(struct blkfront_info *info)
 {
-    struct xlbd_disk_info *di;
-    while ( ((di = head_waiting) != NULL) && !RING_FULL(&di->info->ring) )
-    {
-        head_waiting = di->next_waiting;
-        di->next_waiting = NULL;
-        /* Re-enable calldowns. */
-        blk_start_queue(di->rq);
-        /* Kick things off immediately. */
-        do_blkif_request(di->rq);
-    }
+	if (!RING_FULL(&info->ring)) {
+		/* Re-enable calldowns. */
+		blk_start_queue(info->rq);
+		/* Kick things off immediately. */
+		do_blkif_request(info->rq);
+	}
+}
+
+static void blkif_restart_queue(void *arg)
+{
+	struct blkfront_info *info = (struct blkfront_info *)arg;
+	spin_lock_irq(&blkif_io_lock);
+	info->callback.work = NULL;
+	kick_pending_request_queues(info);
+	spin_unlock_irq(&blkif_io_lock);
 }
 
 int blkif_open(struct inode *inode, struct file *filep)
 {
-    struct gendisk *gd = inode->i_bdev->bd_disk;
-    struct xlbd_disk_info *di = (struct xlbd_disk_info *)gd->private_data;
+	// struct gendisk *gd = inode->i_bdev->bd_disk;
+	// struct xlbd_disk_info *di = (struct xlbd_disk_info *)gd->private_data;
 
-    /* Update of usage count is protected by per-device semaphore. */
-    di->mi->usage++;
-    
-    return 0;
+	/* Update of usage count is protected by per-device semaphore. */
+	// di->mi->usage++;
+
+	return 0;
 }
 
 
@@ -201,8 +187,8 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
     int i;
 
     DPRINTK_IOCTL("command: 0x%x, argument: 0x%lx, dev: 0x%04x\n",
-                  command, (long)argument, inode->i_rdev); 
-  
+                  command, (long)argument, inode->i_rdev);
+
     switch ( command )
     {
     case HDIO_GETGEO:
@@ -228,7 +214,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 /*
  * blkif_queue_request
  *
- * request block io 
+ * request block io
  * 
  * id: for guest use only.
  * operation: BLKIF_OP_{READ,WRITE,PROBE}
@@ -237,7 +223,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
  */
 static int blkif_queue_request(struct request *req)
 {
-    struct xlbd_disk_info *di = req->rq_disk->private_data;
+    struct blkfront_info *info = req->rq_disk->private_data;
     unsigned long buffer_ma;
     blkif_request_t *ring_req;
     struct bio *bio;
@@ -246,20 +232,29 @@ static int blkif_queue_request(struct request *req)
     unsigned long id;
     unsigned int fsect, lsect;
     int ref;
+    grant_ref_t gref_head, gref_terminal;
 
-    if ( unlikely(blkif_state != BLKIF_STATE_CONNECTED) )
+    if (unlikely(info->connected != BLKIF_STATE_CONNECTED))
         return 1;
 
+    if (gnttab_alloc_grant_references(BLKIF_MAX_SEGMENTS_PER_REQUEST,
+				      &gref_head, &gref_terminal) < 0) {
+	    if (info->callback.work)
+		    return 1;
+	    INIT_WORK(&info->work, blkif_restart_queue, (void *)info);
+	    gnttab_request_free_callback(&info->callback, &info->work);
+	    return 1;
+    }
+
     /* Fill out a communications ring structure. */
-    ring_req = RING_GET_REQUEST(&di->info->ring, di->info->ring.req_prod_pvt);
+    ring_req = RING_GET_REQUEST(&info->ring, info->ring.req_prod_pvt);
     id = GET_ID_FROM_FREELIST();
     blk_shadow[id].request = (unsigned long)req;
 
     ring_req->id = id;
-    ring_req->operation = rq_data_dir(req) ? BLKIF_OP_WRITE :
-        BLKIF_OP_READ;
+    ring_req->operation = rq_data_dir(req) ? BLKIF_OP_WRITE : BLKIF_OP_READ;
     ring_req->sector_number = (blkif_sector_t)req->sector;
-    ring_req->handle = di->handle;
+    ring_req->handle = info->handle;
 
     ring_req->nr_segments = 0;
     rq_for_each_bio(bio, req)
@@ -277,26 +272,29 @@ static int blkif_queue_request(struct request *req)
 
             gnttab_grant_foreign_access_ref(
                         ref,
-                        di->info->backend_id,
+                        info->backend_id,
                         buffer_ma >> PAGE_SHIFT,
                         rq_data_dir(req) );
 
             blk_shadow[id].frame[ring_req->nr_segments] =
                 buffer_ma >> PAGE_SHIFT;
 
-            ring_req->frame_and_sects[ring_req->nr_segments++] =
+            ring_req->frame_and_sects[ring_req->nr_segments] =
                 blkif_fas_from_gref(ref, fsect, lsect);
+
+	    ring_req->nr_segments++;
         }
     }
 
-    di->info->ring.req_prod_pvt++;
-    
+    info->ring.req_prod_pvt++;
+
     /* Keep a private copy so we can reissue requests when recovering. */
     pickle_request(&blk_shadow[id], ring_req);
 
+    gnttab_free_grant_references(&gref_head, gref_terminal);
+
     return 0;
 }
-
 
 /*
  * do_blkif_request
@@ -304,17 +302,17 @@ static int blkif_queue_request(struct request *req)
  */
 void do_blkif_request(request_queue_t *rq)
 {
-    struct xlbd_disk_info *di = NULL;
+    struct blkfront_info *info = NULL;
     struct request *req;
     int queued;
 
-    DPRINTK("Entered do_blkif_request\n"); 
+    DPRINTK("Entered do_blkif_request\n");
 
     queued = 0;
 
     while ( (req = elv_next_request(rq)) != NULL )
     {
-	di = req->rq_disk->private_data;
+	info = req->rq_disk->private_data;
 
         if ( !blk_fs_request(req) )
         {
@@ -322,8 +320,8 @@ void do_blkif_request(request_queue_t *rq)
             continue;
         }
 
-        if ( RING_FULL(&di->info->ring) )
-            goto wait;
+	if (RING_FULL(&info->ring))
+		goto wait;
 
         DPRINTK("do_blk_req %p: cmd %p, sec %lx, (%u/%li) buffer:%p [%s]\n",
                 req, req->cmd, req->sector, req->current_nr_sectors,
@@ -331,24 +329,19 @@ void do_blkif_request(request_queue_t *rq)
                 rq_data_dir(req) ? "write" : "read");
 
         blkdev_dequeue_request(req);
-        if ( blkif_queue_request(req) )
-        {
+        if (blkif_queue_request(req)) {
+		blk_requeue_request(rq, req);
         wait:
-            if ( di->next_waiting == NULL )
-            {
-                di->next_waiting = head_waiting;
-                head_waiting = di;
-                /* Avoid pointless unplugs. */
-                blk_stop_queue(rq);
-            }
-            break;
+		/* Avoid pointless unplugs. */
+		blk_stop_queue(rq);
+		break;
         }
 
         queued++;
     }
 
     if ( queued != 0 )
-        flush_requests(di->info);
+        flush_requests(info);
 }
 
 
@@ -359,16 +352,14 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     RING_IDX i, rp;
     unsigned long flags;
     struct blkfront_info *info = (struct blkfront_info *)dev_id;
-    
-    spin_lock_irqsave(&blkif_io_lock, flags);     
 
-    if ( unlikely(blkif_state == BLKIF_STATE_CLOSED) || 
-         unlikely(recovery) )
-    {
+    spin_lock_irqsave(&blkif_io_lock, flags);
+
+    if (unlikely(info->connected != BLKIF_STATE_CONNECTED || recovery)) {
         spin_unlock_irqrestore(&blkif_io_lock, flags);
         return IRQ_HANDLED;
     }
-    
+
     rp = info->ring.sring->rsp_prod;
     rmb(); /* Ensure we see queued responses up to 'rp'. */
 
@@ -393,7 +384,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
                         bret->status);
 
             if ( unlikely(end_that_request_first
-                          (req, 
+                          (req,
                            (bret->status == BLKIF_RSP_OKAY),
                            req->hard_nr_sectors)) )
                 BUG();
@@ -407,7 +398,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
     info->ring.rsp_cons = i;
 
-    kick_pending_request_queues();
+    kick_pending_request_queues(info);
 
     spin_unlock_irqrestore(&blkif_io_lock, flags);
 
@@ -436,7 +427,7 @@ static int nr_pending;
 static void kick_pending_request_queues(void)
 {
     /* We kick pending request queues if the ring is reasonably empty. */
-    if ( (nr_pending != 0) && 
+    if ( (nr_pending != 0) &&
          (RING_PENDING_REQUESTS(&info->ring) < (BLK_RING_SIZE >> 1)) )
     {
         /* Attempt to drain the queue, but bail if the ring becomes full. */
@@ -447,20 +438,20 @@ static void kick_pending_request_queues(void)
 
 int blkif_open(struct inode *inode, struct file *filep)
 {
-    short xldev = inode->i_rdev; 
+    short xldev = inode->i_rdev;
     struct gendisk *gd = get_gendisk(xldev);
     xl_disk_t *disk = xldev_to_xldisk(inode->i_rdev);
-    short minor = MINOR(xldev); 
+    short minor = MINOR(xldev);
 
     if ( gd->part[minor].nr_sects == 0 )
-    { 
+    {
         /*
          * Device either doesn't exist, or has zero capacity; we use a few
          * cheesy heuristics to return the relevant error code
          */
         if ( (gd->sizes[minor >> gd->minor_shift] != 0) ||
              ((minor & (gd->max_p - 1)) != 0) )
-        { 
+        {
             /*
              * We have a real device, but no such partition, or we just have a
              * partition number so guess this is the problem.
@@ -469,16 +460,16 @@ int blkif_open(struct inode *inode, struct file *filep)
         }
         else if ( gd->flags[minor >> gd->minor_shift] & GENHD_FL_REMOVABLE )
         {
-            /* This is a removable device => assume that media is missing. */ 
+            /* This is a removable device => assume that media is missing. */
             return -ENOMEDIUM; /* media not present (this is a guess) */
-        } 
+        }
         else
-        { 
+        {
             /* Just go for the general 'no such device' error. */
             return -ENODEV;    /* no such device */
         }
     }
-    
+
     /* Update of usage count is protected by per-device semaphore. */
     disk->usage++;
 
@@ -507,24 +498,24 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 {
     kdev_t dev = inode->i_rdev;
     struct hd_geometry *geo = (struct hd_geometry *)argument;
-    struct gendisk *gd;     
-    struct hd_struct *part; 
+    struct gendisk *gd;
+    struct hd_struct *part;
     int i;
     unsigned short cylinders;
     byte heads, sectors;
 
     /* NB. No need to check permissions. That is done for us. */
-    
+
     DPRINTK_IOCTL("command: 0x%x, argument: 0x%lx, dev: 0x%04x\n",
-                  command, (long) argument, dev); 
-  
+                  command, (long) argument, dev);
+
     gd = get_gendisk(dev);
-    part = &gd->part[MINOR(dev)]; 
+    part = &gd->part[MINOR(dev)];
 
     switch ( command )
     {
     case BLKGETSIZE:
-        DPRINTK_IOCTL("   BLKGETSIZE: %x %lx\n", BLKGETSIZE, part->nr_sects); 
+        DPRINTK_IOCTL("   BLKGETSIZE: %x %lx\n", BLKGETSIZE, part->nr_sects);
         return put_user(part->nr_sects, (unsigned long *) argument);
 
     case BLKGETSIZE64:
@@ -537,7 +528,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
         return blkif_revalidate(dev);
 
     case BLKSSZGET:
-        return hardsect_size[MAJOR(dev)][MINOR(dev)]; 
+        return hardsect_size[MAJOR(dev)][MINOR(dev)];
 
     case BLKBSZGET:                                        /* get block size */
         DPRINTK_IOCTL("   BLKBSZGET: %x\n", BLKBSZGET);
@@ -563,7 +554,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
            values consistent with the size of the device */
 
         heads = 0xff;
-        sectors = 0x3f; 
+        sectors = 0x3f;
         cylinders = part->nr_sects / (heads * sectors);
 
         if (put_user(0x00,  (unsigned long *) &geo->start)) return -EFAULT;
@@ -573,7 +564,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 
         return 0;
 
-    case HDIO_GETGEO_BIG: 
+    case HDIO_GETGEO_BIG:
         DPRINTK_IOCTL("   HDIO_GETGEO_BIG: %x\n", HDIO_GETGEO_BIG);
         if (!argument) return -EINVAL;
 
@@ -581,7 +572,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
            values consistent with the size of the device */
 
         heads = 0xff;
-        sectors = 0x3f; 
+        sectors = 0x3f;
         cylinders = part->nr_sects / (heads * sectors);
 
         if (put_user(0x00,  (unsigned long *) &geo->start))  return -EFAULT;
@@ -605,7 +596,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
         WPRINTK("ioctl %08x not supported by XL blkif\n", command);
         return -ENOSYS;
     }
-    
+
     return 0;
 }
 
@@ -625,7 +616,7 @@ int blkif_revalidate(kdev_t dev)
     xl_disk_t *disk;
     unsigned long capacity;
     int i, rc = 0;
-    
+
     if ( (bd = bdget(dev)) == NULL )
         return -EINVAL;
 
@@ -673,7 +664,7 @@ int blkif_revalidate(kdev_t dev)
 /*
  * blkif_queue_request
  *
- * request block io 
+ * request block io
  * 
  * id: for guest use only.
  * operation: BLKIF_OP_{READ,WRITE,PROBE}
@@ -707,7 +698,7 @@ static int blkif_queue_request(unsigned long   id,
 
     buffer_ma &= PAGE_MASK;
 
-    if ( unlikely(blkif_state != BLKIF_STATE_CONNECTED) )
+    if (unlikely(info->connected != BLKIF_STATE_CONNECTED))
         return 1;
 
     switch ( operation )
@@ -715,7 +706,7 @@ static int blkif_queue_request(unsigned long   id,
 
     case BLKIF_OP_READ:
     case BLKIF_OP_WRITE:
-        gd = get_gendisk(device); 
+        gd = get_gendisk(device);
 
         /*
          * Update the sector_number we'll pass down as appropriate; note that
@@ -725,10 +716,10 @@ static int blkif_queue_request(unsigned long   id,
         sector_number += gd->part[MINOR(device)].start_sect;
 
         /*
-         * If this unit doesn't consist of virtual partitions then we clear 
+         * If this unit doesn't consist of virtual partitions then we clear
          * the partn bits from the device number.
          */
-        if ( !(gd->flags[MINOR(device)>>gd->minor_shift] & 
+        if ( !(gd->flags[MINOR(device)>>gd->minor_shift] &
                GENHD_FL_VIRT_PARTNS) )
             device &= ~(gd->max_p - 1);
 
@@ -736,10 +727,10 @@ static int blkif_queue_request(unsigned long   id,
              (sg_dev == device) &&
              (sg_next_sect == sector_number) )
         {
-            req = RING_GET_REQUEST(&info->ring, 
+            req = RING_GET_REQUEST(&info->ring,
                                    info->ring.req_prod_pvt - 1);
             bh = (struct buffer_head *)id;
-     
+
             bh->b_reqnext = (struct buffer_head *)blk_shadow[req->id].request;
             blk_shadow[req->id].request = (unsigned long)id;
 
@@ -793,7 +784,7 @@ static int blkif_queue_request(unsigned long   id,
     req->id            = xid;
     req->operation     = operation;
     req->sector_number = (blkif_sector_t)sector_number;
-    req->handle        = handle; 
+    req->handle        = handle;
     req->nr_segments   = 1;
     /* install a grant reference. */
     ref = gnttab_claim_grant_reference(&gref_head, gref_terminal);
@@ -809,11 +800,11 @@ static int blkif_queue_request(unsigned long   id,
 
     req->frame_and_sects[0] = blkif_fas_from_gref(ref, fsect, lsect);
 
-    /* Keep a private copy so we can reissue requests when recovering. */    
+    /* Keep a private copy so we can reissue requests when recovering. */
     pickle_request(&blk_shadow[xid], req);
 
     info->ring.req_prod_pvt++;
-    
+
     return 0;
 }
 
@@ -828,13 +819,13 @@ void do_blkif_request(request_queue_t *rq)
     struct buffer_head *bh, *next_bh;
     int rw, nsect, full, queued = 0;
 
-    DPRINTK("Entered do_blkif_request\n"); 
+    DPRINTK("Entered do_blkif_request\n");
 
     while ( !rq->plugged && !list_empty(&rq->queue_head))
     {
-        if ( (req = blkdev_entry_next_request(&rq->queue_head)) == NULL ) 
+        if ( (req = blkdev_entry_next_request(&rq->queue_head)) == NULL )
             goto out;
-  
+
         DPRINTK("do_blkif_request %p: cmd %i, sec %lx, (%li/%li) bh:%p\n",
                 req, req->cmd, req->sector,
                 req->current_nr_sectors, req->nr_sectors, req->bh);
@@ -855,16 +846,16 @@ void do_blkif_request(request_queue_t *rq)
 
             full = blkif_queue_request(
                 (unsigned long)bh,
-                (rw == READ) ? BLKIF_OP_READ : BLKIF_OP_WRITE, 
+                (rw == READ) ? BLKIF_OP_READ : BLKIF_OP_WRITE,
                 bh->b_data, bh->b_rsector, bh->b_size>>9, bh->b_rdev);
 
             if ( full )
-            { 
+            {
                 bh->b_reqnext = next_bh;
                 pending_queues[nr_pending++] = rq;
                 if ( unlikely(nr_pending >= MAX_PENDING) )
                     BUG();
-                goto out; 
+                goto out;
             }
 
             queued++;
@@ -872,7 +863,7 @@ void do_blkif_request(request_queue_t *rq)
             /* Dequeue the buffer head from the request. */
             nsect = bh->b_size >> 9;
             bh = req->bh = next_bh;
-            
+
             if ( bh != NULL )
             {
                 /* There's another buffer head to do. Update the request. */
@@ -902,13 +893,13 @@ void do_blkif_request(request_queue_t *rq)
 
 static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
-    RING_IDX i, rp; 
-    unsigned long flags; 
+    RING_IDX i, rp;
+    unsigned long flags;
     struct buffer_head *bh, *next_bh;
-    
-    spin_lock_irqsave(&io_request_lock, flags);     
 
-    if ( unlikely(blkif_state == BLKIF_STATE_CLOSED || recovery) )
+    spin_lock_irqsave(&io_request_lock, flags);
+
+    if ( unlikely(info->connected != BLKIF_STATE_CONNECTED || recovery) )
     {
         spin_unlock_irqrestore(&io_request_lock, flags);
         return;
@@ -921,7 +912,7 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     {
         unsigned long id;
         blkif_response_t *bret;
-        
+
         bret = RING_GET_RESPONSE(&info->ring, i);
         id = bret->id;
         bh = (struct buffer_head *)blk_shadow[id].request;
@@ -955,7 +946,7 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
     }
     info->ring.rsp_cons = i;
-    
+
     kick_pending_request_queues();
 
     spin_unlock_irqrestore(&io_request_lock, flags);
@@ -969,7 +960,7 @@ static void blkif_free(struct blkfront_info *info)
 {
     /* Prevent new requests being issued until we fix things up. */
     spin_lock_irq(&blkif_io_lock);
-    blkif_state = BLKIF_STATE_DISCONNECTED;
+    info->connected = BLKIF_STATE_DISCONNECTED;
     spin_unlock_irq(&blkif_io_lock);
 
     /* Free resources associated with old device channel. */
@@ -1045,7 +1036,7 @@ static void blkif_recover(struct blkfront_info *info)
     flush_requests(info);
 
     /* Now safe to left other people use the interface. */
-    blkif_state = BLKIF_STATE_CONNECTED;
+    info->connected = BLKIF_STATE_CONNECTED;
 }
 
 static void blkif_connect(struct blkfront_info *info, u16 evtchn)
@@ -1080,31 +1071,29 @@ static void watch_for_status(struct xenbus_watch *watch, const char *node)
 	node += strlen(watch->node);
 
 	/* FIXME: clean up when error on the other end. */
-	if (info->connected)
+	if (info->connected == BLKIF_STATE_CONNECTED)
 		return;
 
-	err = xenbus_gather(watch->node, 
+	err = xenbus_gather(watch->node,
 			    "sectors", "%lu", &sectors,
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,
 			    NULL);
 	if (err) {
-		xenbus_dev_error(info->dev, err, "reading backend fields");
+		xenbus_dev_error(info->xbdev, err, "reading backend fields");
 		return;
 	}
 
-	xlvbd_add(sectors, info->vdevice, info->handle, binfo, sector_size, info);
-	info->connected = 1;
+	xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
+	info->connected = BLKIF_STATE_CONNECTED;
 
-	/* First to connect?  blkif is now connected. */
-	if (blkif_vbds_connected++ == 0)
-		blkif_state = BLKIF_STATE_CONNECTED;
+	blkif_state = BLKIF_STATE_CONNECTED;
 
-	xenbus_dev_ok(info->dev);
+	xenbus_dev_ok(info->xbdev);
 
 	/* Kick pending requests. */
 	spin_lock_irq(&blkif_io_lock);
-	kick_pending_request_queues();
+	kick_pending_request_queues(info);
 	spin_unlock_irq(&blkif_io_lock);
 }
 
@@ -1122,17 +1111,20 @@ static int setup_blkring(struct xenbus_device *dev, struct blkfront_info *info)
 	SHARED_RING_INIT(sring);
 	FRONT_RING_INIT(&info->ring, sring, PAGE_SIZE);
 
-	info->grant_id = gnttab_claim_grant_reference(&gref_head,
-						      gref_terminal);
-	ASSERT(info->grant_id != -ENOSPC);
-	gnttab_grant_foreign_access_ref(info->grant_id,
-					info->backend_id,
-					virt_to_mfn(info->ring.sring),
-					0);
+	err = gnttab_grant_foreign_access(info->backend_id,
+					  virt_to_mfn(info->ring.sring), 0);
+	if (err == -ENOSPC) {
+		free_page((unsigned long)info->ring.sring);
+		info->ring.sring = 0;
+		xenbus_dev_error(dev, err, "granting access to ring page");
+		return err;
+	}
+	info->grant_id = err;
 
 	op.u.alloc_unbound.dom = info->backend_id;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
+		gnttab_end_foreign_access(info->grant_id, 0);
 		free_page((unsigned long)info->ring.sring);
 		info->ring.sring = 0;
 		xenbus_dev_error(dev, err, "allocating event channel");
@@ -1246,9 +1238,10 @@ static int blkfront_probe(struct xenbus_device *dev,
 		xenbus_dev_error(dev, err, "allocating info structure");
 		return err;
 	}
-	info->dev = dev;
+	info->xbdev = dev;
 	info->vdevice = vdevice;
-	info->connected = 0;
+	info->connected = BLKIF_STATE_DISCONNECTED;
+	info->mi = NULL;
 
 	/* Front end dir is a number, which is used as the id. */
 	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
@@ -1272,10 +1265,8 @@ static int blkfront_remove(struct xenbus_device *dev)
 	if (info->backend)
 		unregister_xenbus_watch(&info->watch);
 
-	if (info->connected) {
-		xlvbd_del(info->handle);
-		blkif_vbds_connected--;
-	}
+	if (info->mi)
+		xlvbd_del(info);
 
 	blkif_free(info);
 
@@ -1359,11 +1350,6 @@ static int __init xlblk_init(void)
          (xen_start_info.flags & SIF_BLK_BE_DOMAIN) )
         return 0;
 
-    /* A grant for every ring slot, plus one for the ring itself. */
-    if (gnttab_alloc_grant_references(MAXIMUM_OUTSTANDING_BLOCK_REQS + 1,
-				      &gref_head, &gref_terminal) < 0)
-        return 1;
-
     IPRINTK("Initialising virtual block device driver\n");
 
     blk_shadow_free = 0;
@@ -1383,6 +1369,6 @@ static void blkif_completion(struct blk_shadow *s)
 {
     int i;
     for ( i = 0; i < s->req.nr_segments; i++ )
-        gnttab_release_grant_reference(
-            &gref_head, blkif_gref_from_fas(s->req.frame_and_sects[i]));
+        gnttab_free_grant_reference(
+		blkif_gref_from_fas(s->req.frame_and_sects[i]));
 }
