@@ -66,6 +66,7 @@ pristine-%/.valid-pristine: %.tar.bz2
 
 PATCHDIRS := $(wildcard patches/*-*)
 
+ifneq ($(PATCHDIRS),)
 -include $(patsubst %,%/.makedep,$(PATCHDIRS))
 
 $(patsubst patches/%,patches/%/.makedep,$(PATCHDIRS)): patches/%/.makedep: 
@@ -80,6 +81,7 @@ ref-%/.valid-ref: pristine-%/.valid-pristine
 	([ -d patches/$* ] && \
 	  for i in patches/$*/*.patch ; do ( cd $(@D) ; patch -p1 <../$$i || exit 1 ) ; done) || true
 	touch $@ # update timestamp to avoid rebuild
+endif
 
 %-build:
 	$(MAKE) -f buildconfigs/mk.$* build
