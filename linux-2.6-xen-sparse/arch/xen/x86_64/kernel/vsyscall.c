@@ -210,15 +210,16 @@ static void __init map_vsyscall(void)
 	__set_fixmap(VSYSCALL_FIRST_PAGE, physaddr_page0, PAGE_KERNEL_VSYSCALL);
 }
 
-extern void __set_fixmap_user (enum fixed_addresses, unsigned long, pgprot_t);
-
+#ifdef CONFIG_XEN
 static void __init map_vsyscall_user(void)
 {
+	extern void __set_fixmap_user(enum fixed_addresses, unsigned long, pgprot_t);
 	extern char __vsyscall_0;
 	unsigned long physaddr_page0 = __pa_symbol(&__vsyscall_0);
 
 	__set_fixmap_user(VSYSCALL_FIRST_PAGE, physaddr_page0, PAGE_KERNEL_VSYSCALL);
 }
+#endif
 
 static int __init vsyscall_init(void)
 {
@@ -227,7 +228,10 @@ static int __init vsyscall_init(void)
 	BUG_ON((unsigned long) &vtime != VSYSCALL_ADDR(__NR_vtime));
 	BUG_ON((VSYSCALL_ADDR(0) != __fix_to_virt(VSYSCALL_FIRST_PAGE)));
 	map_vsyscall();
-        map_vsyscall_user();    /* establish tranlation for user address space */
+#ifdef CONFIG_XEN
+	map_vsyscall_user();
+	sysctl_vsyscall = 0; /* disable vgettimeofay() */
+#endif
 #ifdef CONFIG_SYSCTL
 	register_sysctl_table(kernel_root_table2, 0);
 #endif
