@@ -461,4 +461,14 @@ int cpu_memory_rw_debug(CPUState *env, target_ulong addr,
 
 void cpu_physical_memory_reset_dirty(target_ulong start, target_ulong end)
 {
+	uint8_t *p;
+	int len;
+
+	if ((len = (end - start)) <= 0)
+		return;
+	p = phys_ram_dirty + (start >> TARGET_PAGE_BITS);
+	len = len >> TARGET_PAGE_BITS;
+	while (len > 0)
+		p[--len] &= ~VGA_DIRTY_FLAG;
+	return;
 }

@@ -1620,7 +1620,6 @@ static CPUWriteMemoryFunc *vga_mem_write[3] = {
 static void vga_save(QEMUFile *f, void *opaque)
 {
     VGAState *s = opaque;
-    int i;
 
     qemu_put_be32s(f, &s->latch);
     qemu_put_8s(f, &s->sr_index);
@@ -1661,7 +1660,7 @@ static void vga_save(QEMUFile *f, void *opaque)
 static int vga_load(QEMUFile *f, void *opaque, int version_id)
 {
     VGAState *s = opaque;
-    int is_vbe, i;
+    int is_vbe;
 
     if (version_id != 1)
         return -EINVAL;
