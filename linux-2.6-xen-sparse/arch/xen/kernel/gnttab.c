@@ -50,6 +50,8 @@ static grant_ref_t gnttab_free_head;
 
 static grant_entry_t *shared;
 
+static struct gnttab_free_callback *gnttab_free_callback_list = NULL;
+
 /*
  * Lock-free grant-entry allocator
  */
@@ -65,6 +67,16 @@ get_free_entry(
     return fh;
 }
 
+static void do_free_callbacks(void)
+{
+    struct gnttab_free_callback *callback = gnttab_free_callback_list;
+    gnttab_free_callback_list = NULL;
+    while (callback) {
+	schedule_work(callback->work);
+	callback = callback->next;
+    }
+}
+
 static inline void
 put_free_entry(
     grant_ref_t ref)
@@ -72,6 +84,8 @@ put_free_entry(
     grant_ref_t fh, nfh = gnttab_free_head;
     do { gnttab_free_list[ref] = fh = nfh; wmb(); }
     while ( unlikely((nfh = cmpxchg(&gnttab_free_head, fh, ref)) != fh) );
+    if ( unlikely(gnttab_free_callback_list) )
+	do_free_callbacks();
 }
 
 /*
@@ -189,17 +203,23 @@ gnttab_end_foreign_transfer(
 }
 
 void
-gnttab_free_grant_references( u16 count, grant_ref_t head )
+gnttab_free_grant_reference( grant_ref_t ref )
+{
+
+    put_free_entry(ref);
+}
+
+void
+gnttab_free_grant_references( grant_ref_t *head,
+                              grant_ref_t terminal )
 {
     /* TODO: O(N)...? */
-    grant_ref_t to_die = 0, next = head;
-    int i;
+    grant_ref_t ref;
 
-    for ( i = 0; i < count; i++ )
-    {
-        to_die = next;
-        next = gnttab_free_list[next];
-        put_free_entry( to_die );
+    while (*head != terminal) {
+	ref = *head;
+	*head = gnttab_free_list[*head];
+	put_free_entry(ref);
     }
 }
 
@@ -242,6 +262,15 @@ gnttab_release_grant_reference( grant_ref_t *private_head,
 {
     gnttab_free_list[release] = *private_head;
     *private_head = release;
+}
+
+void
+gnttab_request_free_callback(struct gnttab_free_callback *callback,
+			     struct work_struct *work)
+{
+    callback->work = work;
+    callback->next = gnttab_free_callback_list;
+    gnttab_free_callback_list = callback;
 }
 
 /*

@@ -21,6 +21,13 @@
 #define NR_GRANT_FRAMES 4
 #define NR_GRANT_ENTRIES (NR_GRANT_FRAMES * PAGE_SIZE / sizeof(grant_entry_t))
 
+struct work_struct;
+
+struct gnttab_free_callback {
+    struct gnttab_free_callback *next;
+    struct work_struct *work;
+};
+
 int
 gnttab_grant_foreign_access(
     domid_t domid, unsigned long frame, int readonly);
@@ -49,8 +56,12 @@ gnttab_alloc_grant_references(
     u16 count, grant_ref_t *pprivate_head, grant_ref_t *private_terminal );
 
 void
+gnttab_free_grant_reference(
+    grant_ref_t ref );
+
+void
 gnttab_free_grant_references(
-    u16 count, grant_ref_t private_head );
+    grant_ref_t *head, grant_ref_t terminal );
 
 int
 gnttab_claim_grant_reference( grant_ref_t *pprivate_head, grant_ref_t terminal
@@ -59,6 +70,10 @@ gnttab_claim_grant_reference( grant_ref_t *pprivate_head, grant_ref_t terminal
 void
 gnttab_release_grant_reference(
     grant_ref_t *private_head, grant_ref_t release );
+
+void
+gnttab_request_free_callback(
+    struct gnttab_free_callback *callback, struct work_struct *work );
 
 void
 gnttab_grant_foreign_access_ref(
