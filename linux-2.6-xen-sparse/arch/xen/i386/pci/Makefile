@@ -17,7 +17,7 @@ l-pci-y				+= irq.o
 c-pci-$(CONFIG_X86_VISWS)	:= visws.o fixup.o
 pci-$(CONFIG_X86_VISWS)		:=
 c-pci-$(CONFIG_X86_NUMAQ)	:= numa.o
-pci-$(CONFIG_X86_NUMAQ)		:= irq.o
+l-pci-$(CONFIG_X86_NUMAQ)	:= irq.o
 
 obj-y				+= $(pci-y)
 c-obj-y				+= $(c-pci-y) common.o
@@ -27,6 +27,7 @@ c-link	:=
 $(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-link)):
 	@ln -fsn $(srctree)/arch/i386/pci/$(notdir $@) $@
 
-obj-y	+= $(c-obj-y) $(l-pci-y)
+# Make sure irq.o gets linked in before common.o
+obj-y	+= $(patsubst common.o,$(l-pci-y) common.o,$(c-obj-y))
 
 clean-files += $(patsubst %.o,%.c,$(c-obj-y) $(c-obj-) $(c-link))

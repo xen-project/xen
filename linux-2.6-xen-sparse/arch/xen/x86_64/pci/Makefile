@@ -30,8 +30,9 @@ $(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-link)):
 $(patsubst %.o,$(obj)/%.c,$(c-i386-obj-y)):
 	@ln -fsn $(srctree)/arch/i386/pci/$(notdir $@) $@
 
-obj-y	+= $(c-i386-obj-y) $(c-obj-y)
-obj-y	+= $(c-xen-obj-y)
+# Make sure irq.o gets linked in before common.o
+obj-y	+= $(patsubst common.o,$(c-xen-obj-y) common.o,$(c-i386-obj-y))
+obj-y	+= $(c-obj-y)
 
 clean-files += $(patsubst %.o,%.c,$(c-obj-y) $(c-obj-) $(c-link))
 clean-files += $(patsubst %.o,%.c,$(c-i386-obj-y) $(c-i386-obj-))
