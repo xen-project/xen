@@ -75,16 +75,6 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 	if (vbd_is_active(be->vbd))
 		return;
 
-#ifndef CONFIG_XEN_BLKDEV_GRANT
-	err = xenbus_gather(be->frontpath, "shared-frame", "%lu", &sharedmfn,
-			    "event-channel", "%u", &evtchn, NULL);
-	if (err) {
-		xenbus_dev_error(be->dev, err, 
-				 "reading %s/shared-frame and event-channel",
-				 be->frontpath);
-		return;
-	}
-#else
 	err = xenbus_gather(be->frontpath, "grant-id", "%lu", &sharedmfn,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
@@ -93,7 +83,6 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 				 be->frontpath);
 		return;
 	}
-#endif
 
 	/* Domains must use same shared frame for all vbds. */
 	if (be->blkif->status == CONNECTED &&

@@ -17,9 +17,7 @@
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/io/blkif.h>
 #include <asm-xen/xen-public/io/ring.h>
-#ifdef CONFIG_XEN_BLKDEV_GRANT
 #include <asm-xen/gnttab.h>
-#endif
 
 #if 0
 #define ASSERT(_p) \
@@ -69,11 +67,9 @@ typedef struct blkif_st {
     atomic_t         refcnt;
 
     struct work_struct work;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
     u16 shmem_handle;
     unsigned long shmem_vaddr;
     grant_ref_t shmem_ref;
-#endif
 } blkif_t;
 
 void blkif_create(blkif_be_create_t *create);

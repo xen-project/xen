@@ -47,19 +47,6 @@ blkif_t *blkif_find(domid_t domid)
     return blkif;
 }
 
-#ifndef CONFIG_XEN_BLKDEV_GRANT
-static int map_frontend_page(blkif_t *blkif, unsigned long localaddr,
-			     unsigned long shared_page)
-{
-    return direct_remap_area_pages(&init_mm, localaddr,
-				   shared_page<<PAGE_SHIFT, PAGE_SIZE,
-				   __pgprot(_KERNPG_TABLE), blkif->domid);
-}
-
-static void unmap_frontend_page(blkif_t *blkif)
-{
-}
-#else
 static int map_frontend_page(blkif_t *blkif, unsigned long localaddr,
 			     unsigned long shared_page)
 {
@@ -91,7 +78,6 @@ static void unmap_frontend_page(blkif_t *blkif)
     op.dev_bus_addr = 0;
     BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
 }
-#endif /* CONFIG_XEN_BLKDEV_GRANT */
 
 int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 {
