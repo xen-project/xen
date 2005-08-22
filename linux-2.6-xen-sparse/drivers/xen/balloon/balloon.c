@@ -434,20 +434,20 @@ void balloon_update_driver_allowance(long delta)
 	balloon_unlock(flags);
 }
 
+static int dealloc_pte_fn(
+	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
+{
+	unsigned long mfn = pte_mfn(*pte);
+	set_pte(pte, __pte_ma(0));
+	phys_to_machine_mapping[__pa(addr) >> PAGE_SHIFT] =
+		INVALID_P2M_ENTRY;
+	BUG_ON(HYPERVISOR_dom_mem_op(
+		MEMOP_decrease_reservation, &mfn, 1, 0) != 1);
+	return 0;
+}
+
 struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 {
-	int f(pte_t *pte, struct page *pte_page,
-	      unsigned long addr, void *data)
-	{
-		unsigned long mfn = pte_mfn(*pte);
-		set_pte(pte, __pte_ma(0));
-		phys_to_machine_mapping[__pa(addr) >> PAGE_SHIFT] =
-			INVALID_P2M_ENTRY;
-		BUG_ON(HYPERVISOR_dom_mem_op(
-			MEMOP_decrease_reservation, &mfn, 1, 0) != 1);
-		return 0;
-        }
-
 	unsigned long vstart, flags;
 	unsigned int  order = get_order(nr_pages * PAGE_SIZE);
 
@@ -459,7 +459,7 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 
 	balloon_lock(flags);
 	BUG_ON(generic_page_range(
-		&init_mm, vstart, PAGE_SIZE << order, f, NULL) != 0);
+		&init_mm, vstart, PAGE_SIZE << order, dealloc_pte_fn, NULL));
 	current_pages -= 1UL << order;
 	balloon_unlock(flags);
 

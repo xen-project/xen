@@ -465,33 +465,35 @@ int direct_remap_area_pages(struct mm_struct *mm,
 
 EXPORT_SYMBOL(direct_remap_area_pages);
 
+static int lookup_pte_fn(
+    pte_t *pte, struct page *pte_page, unsigned long addr, void *data) 
+{
+    unsigned long *ptep = (unsigned long *)data;
+    if (ptep) *ptep = (pfn_to_mfn(page_to_pfn(pte_page)) << PAGE_SHIFT)
+                  | ((unsigned long)pte & ~PAGE_MASK);
+    return 0;
+}
+
 int create_lookup_pte_addr(struct mm_struct *mm, 
                            unsigned long address,
                            unsigned long *ptep)
 {
-    int f(pte_t *pte, struct page *pte_page, unsigned long addr, void *data) 
-    {
-        unsigned long *ptep = (unsigned long *)data;
-        if (ptep) *ptep = (pfn_to_mfn(page_to_pfn(pte_page)) << PAGE_SHIFT)
-                       | ((unsigned long)pte & ~PAGE_MASK);
-        return 0;
-    }
-
-    return generic_page_range(mm, address, PAGE_SIZE, f, ptep);
+    return generic_page_range(mm, address, PAGE_SIZE, lookup_pte_fn, ptep);
 }
 
 EXPORT_SYMBOL(create_lookup_pte_addr);
+
+static int noop_fn(
+    pte_t *pte, struct page *pte_page, unsigned long addr, void *data) 
+{
+    return 0;
+}
 
 int touch_pte_range(struct mm_struct *mm,
                     unsigned long address,
                     unsigned long size)
 {
-    int f(pte_t *pte, struct page *pte_page, unsigned long addr, void *data) 
-    {
-        return 0;
-    }
-
-    return generic_page_range(mm, address, size, f, NULL);
-}                 
+    return generic_page_range(mm, address, size, noop_fn, NULL);
+}
 
 EXPORT_SYMBOL(touch_pte_range);
