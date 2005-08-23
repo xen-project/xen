@@ -69,11 +69,13 @@ get_free_entry(
 
 static void do_free_callbacks(void)
 {
-    struct gnttab_free_callback *callback = gnttab_free_callback_list;
+    struct gnttab_free_callback *callback = gnttab_free_callback_list, *next;
     gnttab_free_callback_list = NULL;
     while (callback) {
-	schedule_work(callback->work);
-	callback = callback->next;
+	next = callback->next;
+	callback->next = NULL;
+	callback->fn(callback->arg);
+	callback = next;
     }
 }
 
@@ -266,9 +268,12 @@ gnttab_release_grant_reference( grant_ref_t *private_head,
 
 void
 gnttab_request_free_callback(struct gnttab_free_callback *callback,
-			     struct work_struct *work)
+			     void (*fn)(void *), void *arg)
 {
-    callback->work = work;
+    if (callback->next)
+	return;
+    callback->fn = fn;
+    callback->arg = arg;
     callback->next = gnttab_free_callback_list;
     gnttab_free_callback_list = callback;
 }

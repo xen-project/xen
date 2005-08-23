@@ -157,9 +157,14 @@ static void blkif_restart_queue(void *arg)
 {
 	struct blkfront_info *info = (struct blkfront_info *)arg;
 	spin_lock_irq(&blkif_io_lock);
-	info->callback.work = NULL;
 	kick_pending_request_queues(info);
 	spin_unlock_irq(&blkif_io_lock);
+}
+
+static void blkif_restart_queue_callback(void *arg)
+{
+	struct blkfront_info *info = (struct blkfront_info *)arg;
+	schedule_work(&info->work);
 }
 
 int blkif_open(struct inode *inode, struct file *filep)
@@ -239,10 +244,8 @@ static int blkif_queue_request(struct request *req)
 
     if (gnttab_alloc_grant_references(BLKIF_MAX_SEGMENTS_PER_REQUEST,
 				      &gref_head, &gref_terminal) < 0) {
-	    if (info->callback.work)
-		    return 1;
-	    INIT_WORK(&info->work, blkif_restart_queue, (void *)info);
-	    gnttab_request_free_callback(&info->callback, &info->work);
+	    gnttab_request_free_callback(&info->callback,
+					 blkif_restart_queue_callback, info);
 	    return 1;
     }
 
@@ -1242,6 +1245,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 	info->vdevice = vdevice;
 	info->connected = BLKIF_STATE_DISCONNECTED;
 	info->mi = NULL;
+	INIT_WORK(&info->work, blkif_restart_queue, (void *)info);
 
 	/* Front end dir is a number, which is used as the id. */
 	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);

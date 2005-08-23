@@ -25,7 +25,8 @@ struct work_struct;
 
 struct gnttab_free_callback {
     struct gnttab_free_callback *next;
-    struct work_struct *work;
+    void (*fn)(void *);
+    void *arg;
 };
 
 int
@@ -73,7 +74,7 @@ gnttab_release_grant_reference(
 
 void
 gnttab_request_free_callback(
-    struct gnttab_free_callback *callback, struct work_struct *work );
+    struct gnttab_free_callback *callback, void (*fn)(void *), void *arg);
 
 void
 gnttab_grant_foreign_access_ref(
