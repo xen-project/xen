@@ -348,9 +348,12 @@ static void __init pagetable_init (void)
 {
 	unsigned long vaddr;
 	pgd_t *pgd_base = (pgd_t *)xen_start_info.pt_base;
+	int i;
 
 	swapper_pg_dir = pgd_base;
 	init_mm.pgd    = pgd_base;
+	for (i = 0; i < NR_CPUS; i++)
+		per_cpu(cur_pgd, i) = pgd_base;
 
 	/* Enable PSE if available */
 	if (cpu_has_pse) {
