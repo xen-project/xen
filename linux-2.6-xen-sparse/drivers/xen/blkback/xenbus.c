@@ -81,18 +81,6 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		return;
 	}
 
-	/* Domains must use same shared frame for all vbds. */
-	if (evtchn != be->blkif->remote_evtchn ||
-	    sharedmfn != be->blkif->shmem_frame) {
-		xenbus_dev_error(be->dev, err,
-				 "Shared frame/evtchn %li/%u not same as"
-				 " old %li/%u",
-				 sharedmfn, evtchn,
-				 be->blkif->shmem_frame,
-				 be->blkif->remote_evtchn);
-		return;
-	}
-
 	/* Supply the information about the device the frontend needs */
 	err = xenbus_transaction_start(be->dev->nodename);
 	if (err) {
