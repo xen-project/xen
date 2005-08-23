@@ -9,10 +9,6 @@
 #include "common.h"
 #include <asm-xen/evtchn.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#endif
-
 static kmem_cache_t *blkif_cachep;
 
 blkif_t *alloc_blkif(domid_t domid)
@@ -76,7 +72,7 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
     if ( (vma = get_vm_area(PAGE_SIZE, VM_IOREMAP)) == NULL )
 	return -ENOMEM;
 
-    err = map_frontend_page(blkif, VMALLOC_VMADDR(vma->addr), shared_page);
+    err = map_frontend_page(blkif, (unsigned long)vma->addr, shared_page);
     if (err) {
         vfree(vma->addr);
 	return err;

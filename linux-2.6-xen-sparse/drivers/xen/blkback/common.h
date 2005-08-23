@@ -29,10 +29,6 @@
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-struct block_device;
-#endif
-
 struct vbd {
     blkif_vdev_t   handle;      /* what the domain refers to this vbd as */
     unsigned char  readonly;    /* Non-zero -> read-only */

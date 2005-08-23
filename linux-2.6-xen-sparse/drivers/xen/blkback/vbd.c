@@ -9,7 +9,6 @@
 #include "common.h"
 #include <asm-xen/xenbus.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static inline dev_t vbd_map_devnum(blkif_pdev_t cookie)
 {
     return MKDEV(BLKIF_MAJOR(cookie), BLKIF_MINOR(cookie));
@@ -17,11 +16,6 @@ static inline dev_t vbd_map_devnum(blkif_pdev_t cookie)
 #define vbd_sz(_v)   ((_v)->bdev->bd_part ? \
     (_v)->bdev->bd_part->nr_sects : (_v)->bdev->bd_disk->capacity)
 #define bdev_put(_b) blkdev_put(_b)
-#else
-#define vbd_sz(_v)   (blk_size[MAJOR((_v)->pdevice)][MINOR((_v)->pdevice)]*2)
-#define bdev_put(_b) ((void)0)
-#define bdev_hardsect_size(_b) 512
-#endif
 
 unsigned long vbd_size(struct vbd *vbd)
 {
@@ -56,7 +50,6 @@ int vbd_create(blkif_t *blkif, blkif_vdev_t handle,
 
     vbd->pdevice  = pdevice;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     vbd->bdev = open_by_devnum(
         vbd_map_devnum(vbd->pdevice),
         vbd->readonly ? FMODE_READ : FMODE_WRITE);
@@ -77,13 +70,6 @@ int vbd_create(blkif_t *blkif, blkif_vdev_t handle,
         vbd->type |= VDISK_CDROM;
     if ( vbd->bdev->bd_disk->flags & GENHD_FL_REMOVABLE )
         vbd->type |= VDISK_REMOVABLE;
-#else
-    if ( (blk_size[MAJOR(vbd->pdevice)] == NULL) || (vbd_sz(vbd) == 0) )
-    {
-        DPRINTK("vbd_creat: device %08x doesn't exist.\n", vbd->pdevice);
-        return -ENOENT;
-    }
-#endif
 
     DPRINTK("Successful creation of handle=%04x (dom=%u)\n",
             handle, blkif->domid);
