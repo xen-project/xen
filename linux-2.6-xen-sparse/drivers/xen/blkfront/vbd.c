@@ -79,9 +79,6 @@ static struct xlbd_major_info *major_info[NUM_IDE_MAJORS + NUM_SCSI_MAJORS +
 #define MAX_VBDS 64
 static LIST_HEAD(vbds_list);
 
-#define MAJOR_XEN(dev) ((dev)>>8)
-#define MINOR_XEN(dev) ((dev) & 0xff)
-
 static struct block_device_operations xlvbd_block_fops =
 {
 	.owner = THIS_MODULE,
@@ -139,8 +136,8 @@ xlbd_get_major_info(int vdevice)
 	struct xlbd_major_info *mi;
 	int major, minor, index;
 
-	major = MAJOR_XEN(vdevice);
-	minor = MINOR_XEN(vdevice);
+	major = BLKIF_MAJOR(vdevice);
+	minor = BLKIF_MINOR(vdevice);
 
 	switch (major) {
 	case IDE0_MAJOR: index = 0; break;
@@ -276,13 +273,13 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 	struct block_device *bd;
 	int err = 0;
 
-	info->dev = MKDEV(MAJOR_XEN(vdevice), MINOR_XEN(vdevice));
+	info->dev = MKDEV(BLKIF_MAJOR(vdevice), BLKIF_MINOR(vdevice));
 
 	bd = bdget(info->dev);
 	if (bd == NULL)
 		return -ENODEV;
 
-	err = xlvbd_alloc_gendisk(MINOR_XEN(vdevice), capacity, vdevice,
+	err = xlvbd_alloc_gendisk(BLKIF_MINOR(vdevice), capacity, vdevice,
 				  vdisk_info, sector_size, info);
 
 	bdput(bd);
