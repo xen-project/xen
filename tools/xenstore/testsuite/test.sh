@@ -52,11 +52,10 @@ for f in testsuite/[0-9]*.test $SLOWTESTS; do
     case `basename $f` in $MATCH) RUN=1;; esac
     [ -n "$RUN" ] || continue
 
-    if run_test $f > /dev/null; then
+    if run_test $f -x >/tmp/out; then
 	echo -n .
     else
-	echo Test $f failed, running verbosely...
-	run_test $f -x || true
+	cat /tmp/out
 	# That will have filled the screen, repeat message.
 	echo Test $f failed
 	exit 1
