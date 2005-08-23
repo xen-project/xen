@@ -63,17 +63,15 @@ inline static void set_pte_at_sync(struct mm_struct *mm, unsigned long addr,
  * 
  * NB2. When deliberately mapping foreign pages into the p2m table, you *must*
  *      use FOREIGN_FRAME(). This will cause pte_pfn() to choke on it, as we
- *      require. In all the cases we care about, the high bit gets shifted out
- *      (e.g., phys_to_machine()) so behaviour there is correct.
+ *      require. In all the cases we care about, the FOREIGN_FRAME bit is
+ *      masked (e.g., pfn_to_mfn()) so behaviour there is correct.
  */
-#define INVALID_P2M_ENTRY (~0U)
-#define FOREIGN_FRAME(_m) ((_m) | (1UL<<((sizeof(unsigned long)*8)-1)))
 #define pte_mfn(_pte) ((_pte).pte_low >> PAGE_SHIFT)
 #define pte_pfn(_pte)							\
 ({									\
 	unsigned long mfn = pte_mfn(_pte);				\
 	unsigned long pfn = mfn_to_pfn(mfn);				\
-	if ((pfn >= max_mapnr) || (pfn_to_mfn(pfn) != mfn))		\
+	if ((pfn >= max_mapnr) || (phys_to_machine_mapping[pfn] != mfn))\
 		pfn = max_mapnr; /* special: force !pfn_valid() */	\
 	pfn;								\
 })

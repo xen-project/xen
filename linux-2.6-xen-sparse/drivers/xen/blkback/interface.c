@@ -9,27 +9,11 @@
 #include "common.h"
 #include <asm-xen/evtchn.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#endif
-
-#define BLKIF_HASHSZ 1024
-#define BLKIF_HASH(_d) (((int)(_d))&(BLKIF_HASHSZ-1))
-
 static kmem_cache_t *blkif_cachep;
-static blkif_t      *blkif_hash[BLKIF_HASHSZ];
 
-blkif_t *blkif_find(domid_t domid)
+blkif_t *alloc_blkif(domid_t domid)
 {
-    blkif_t *blkif = blkif_hash[BLKIF_HASH(domid)];
-
-    while (blkif) {
-	if (blkif->domid == domid) {
-	    blkif_get(blkif);
-	    return blkif;
-	}
-        blkif = blkif->hash_next;
-    }
+    blkif_t *blkif;
 
     blkif = kmem_cache_alloc(blkif_cachep, GFP_KERNEL);
     if (!blkif)
@@ -38,12 +22,9 @@ blkif_t *blkif_find(domid_t domid)
     memset(blkif, 0, sizeof(*blkif));
     blkif->domid = domid;
     blkif->status = DISCONNECTED;
-    spin_lock_init(&blkif->vbd_lock);
     spin_lock_init(&blkif->blk_ring_lock);
     atomic_set(&blkif->refcnt, 1);
 
-    blkif->hash_next = blkif_hash[BLKIF_HASH(domid)];
-    blkif_hash[BLKIF_HASH(domid)] = blkif;
     return blkif;
 }
 
@@ -55,7 +36,7 @@ static int map_frontend_page(blkif_t *blkif, unsigned long localaddr,
     op.flags = GNTMAP_host_map;
     op.ref = shared_page;
     op.dom = blkif->domid;
-       
+
     BUG_ON( HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) );
 
     if (op.handle < 0) {
@@ -91,7 +72,7 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
     if ( (vma = get_vm_area(PAGE_SIZE, VM_IOREMAP)) == NULL )
 	return -ENOMEM;
 
-    err = map_frontend_page(blkif, VMALLOC_VMADDR(vma->addr), shared_page);
+    err = map_frontend_page(blkif, (unsigned long)vma->addr, shared_page);
     if (err) {
         vfree(vma->addr);
 	return err;
@@ -123,10 +104,10 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
     return 0;
 }
 
-void free_blkif(blkif_t *blkif)
+static void free_blkif(void *arg)
 {
-    blkif_t     **pblkif;
     evtchn_op_t op = { .cmd = EVTCHNOP_close };
+    blkif_t *blkif = (blkif_t *)arg;
 
     op.u.close.port = blkif->evtchn;
     op.u.close.dom = DOMID_SELF;
@@ -134,6 +115,8 @@ void free_blkif(blkif_t *blkif)
     op.u.close.port = blkif->remote_evtchn;
     op.u.close.dom = blkif->domid;
     HYPERVISOR_event_channel_op(&op);
+
+    vbd_free(&blkif->vbd);
 
     if (blkif->evtchn)
         unbind_evtchn_from_irqhandler(blkif->evtchn, blkif);
@@ -143,20 +126,17 @@ void free_blkif(blkif_t *blkif)
 	vfree(blkif->blk_ring.sring);
     }
 
-    pblkif = &blkif_hash[BLKIF_HASH(blkif->domid)];
-    while ( *pblkif != blkif )
-    {
-	BUG_ON(!*pblkif);
-        pblkif = &(*pblkif)->hash_next;
-    }
-    *pblkif = blkif->hash_next;
-    destroy_all_vbds(blkif);
     kmem_cache_free(blkif_cachep, blkif);
+}
+
+void free_blkif_callback(blkif_t *blkif)
+{
+    INIT_WORK(&blkif->free_work, free_blkif, (void *)blkif);
+    schedule_work(&blkif->free_work);
 }
 
 void __init blkif_interface_init(void)
 {
     blkif_cachep = kmem_cache_create("blkif_cache", sizeof(blkif_t), 
                                      0, 0, NULL, NULL);
-    memset(blkif_hash, 0, sizeof(blkif_hash));
 }

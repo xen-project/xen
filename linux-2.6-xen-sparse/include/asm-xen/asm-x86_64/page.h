@@ -62,9 +62,13 @@ void copy_page(void *, void *);
 #define __HAVE_ARCH_ALLOC_ZEROED_USER_HIGHPAGE
 
 /**** MACHINE <-> PHYSICAL CONVERSION MACROS ****/
+#define INVALID_P2M_ENTRY	(~0U)
+#define FOREIGN_FRAME(m)	((m) | 0x80000000U)
 extern u32 *phys_to_machine_mapping;
-#define pfn_to_mfn(_pfn) ((unsigned long) phys_to_machine_mapping[(unsigned int)(_pfn)])
-#define mfn_to_pfn(_mfn) ((unsigned long) machine_to_phys_mapping[(unsigned int)(_mfn)])
+#define pfn_to_mfn(pfn)	\
+((unsigned long)phys_to_machine_mapping[(unsigned int)(pfn)] & 0x7FFFFFFFUL)
+#define mfn_to_pfn(mfn)	\
+((unsigned long)machine_to_phys_mapping[(unsigned int)(mfn)])
 
 /* Definitions for machine and pseudophysical addresses. */
 typedef unsigned long paddr_t;

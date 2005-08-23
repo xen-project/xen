@@ -65,9 +65,6 @@ typedef unsigned int PEND_RING_IDX;
 static PEND_RING_IDX pending_prod, pending_cons;
 #define NR_PENDING_REQS (MAX_PENDING_REQS - pending_prod + pending_cons)
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-static kmem_cache_t *buffer_head_cachep;
-#else
 static request_queue_t *plugged_queue;
 static inline void flush_plugged_queue(void)
 {
@@ -80,7 +77,6 @@ static inline void flush_plugged_queue(void)
         plugged_queue = NULL;
     }
 }
-#endif
 
 /* When using grant tables to map a frame for device access then the
  * handle returned must be used to unmap the frame. This is needed to
@@ -184,11 +180,7 @@ static int blkio_schedule(void *arg)
     blkif_t          *blkif;
     struct list_head *ent;
 
-    daemonize(
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-        "xenblkd"
-#endif
-        );
+    daemonize("xenblkd");
 
     for ( ; ; )
     {
@@ -215,11 +207,7 @@ static int blkio_schedule(void *arg)
         }
 
         /* Push the batch through to disc. */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-        run_task_queue(&tq_disk);
-#else
         flush_plugged_queue();
-#endif
     }
 }
 
@@ -268,13 +256,6 @@ static void __end_block_io_op(pending_req_t *pending_req, int uptodate)
     }
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-static void end_block_io_op(struct buffer_head *bh, int uptodate)
-{
-    __end_block_io_op(bh->b_private, uptodate);
-    kmem_cache_free(buffer_head_cachep, bh);
-}
-#else
 static int end_block_io_op(struct bio *bio, unsigned int done, int error)
 {
     if ( bio->bi_size != 0 )
@@ -283,7 +264,6 @@ static int end_block_io_op(struct bio *bio, unsigned int done, int error)
     bio_put(bio);
     return error;
 }
-#endif
 
 
 /******************************************************************************
@@ -357,13 +337,9 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         unsigned long buf; unsigned int nsec;
     } seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
     unsigned int nseg;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-    struct buffer_head *bh;
-#else
     struct bio *bio = NULL, *biolist[BLKIF_MAX_SEGMENTS_PER_REQUEST];
     int nbio = 0;
     request_queue_t *q;
-#endif
 
     /* Check that number of segments is sane. */
     nseg = req->nr_segments;
@@ -435,49 +411,6 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     pending_req->status    = BLKIF_RSP_OKAY;
     pending_req->nr_pages  = nseg;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-
-    atomic_set(&pending_req->pendcnt, nseg);
-    pending_cons++;
-    blkif_get(blkif);
-
-    for ( i = 0; i < nseg; i++ )
-    {
-        bh = kmem_cache_alloc(buffer_head_cachep, GFP_KERNEL);
-        if ( unlikely(bh == NULL) )
-        {
-            __end_block_io_op(pending_req, 0);
-            continue;
-        }
-
-        memset(bh, 0, sizeof (struct buffer_head));
-
-        init_waitqueue_head(&bh->b_wait);
-        bh->b_size          = seg[i].nsec << 9;
-        bh->b_dev           = preq.dev;
-        bh->b_rdev          = preq.dev;
-        bh->b_rsector       = (unsigned long)preq.sector_number;
-        bh->b_data          = (char *)MMAP_VADDR(pending_idx, i) +
-            (seg[i].buf & ~PAGE_MASK);
-        bh->b_page          = virt_to_page(MMAP_VADDR(pending_idx, i));
-        bh->b_end_io        = end_block_io_op;
-        bh->b_private       = pending_req;
-
-        bh->b_state = (1 << BH_Mapped) | (1 << BH_Lock) | 
-            (1 << BH_Req) | (1 << BH_Launder);
-        if ( operation == WRITE )
-            bh->b_state |= (1 << BH_JBD) | (1 << BH_Req) | (1 << BH_Uptodate);
-
-        atomic_set(&bh->b_count, 1);
-
-        /* Dispatch a single request. We'll flush it to disc later. */
-        generic_make_request(operation, bh);
-
-        preq.sector_number += seg[i].nsec;
-    }
-
-#else
-
     for ( i = 0; i < nseg; i++ )
     {
         if ( ((int)preq.sector_number|(int)seg[i].nsec) &
@@ -525,8 +458,6 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 
     for ( i = 0; i < nbio; i++ )
         submit_bio(operation, biolist[i]);
-
-#endif
 
     return;
 
@@ -594,12 +525,6 @@ static int __init blkif_init(void)
 
     if ( kernel_thread(blkio_schedule, 0, CLONE_FS | CLONE_FILES) < 0 )
         BUG();
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-    buffer_head_cachep = kmem_cache_create(
-        "buffer_head_cache", sizeof(struct buffer_head),
-        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-#endif
 
     blkif_xenbus_init();
 

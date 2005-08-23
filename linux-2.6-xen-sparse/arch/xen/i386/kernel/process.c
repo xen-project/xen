@@ -149,12 +149,12 @@ void cpu_idle (void)
 
 			if (cpu_is_offline(cpu)) {
 				local_irq_disable();
+#if defined(CONFIG_XEN) && defined(CONFIG_HOTPLUG_CPU)
 				/* Ack it.  From this point on until
 				   we get woken up, we're not allowed
 				   to take any locks.  In particular,
 				   don't printk. */
 				__get_cpu_var(cpu_state) = CPU_DEAD;
-#if defined(CONFIG_XEN) && defined(CONFIG_HOTPLUG_CPU)
 				/* Tell hypervisor to take vcpu down. */
 				HYPERVISOR_vcpu_down(cpu);
 #endif

@@ -44,7 +44,7 @@ obj-$(CONFIG_X86_PM_TIMER)	+= pmtimer.o
 
 c-obj-$(CONFIG_MODULES)		+= module.o
 
-#obj-y				+= topology.o
+obj-y				+= topology.o
 c-obj-y				+= intel_cacheinfo.o
 
 bootflag-y			+= ../../../i386/kernel/bootflag.o

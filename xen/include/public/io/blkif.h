@@ -58,6 +58,9 @@ typedef struct blkif_response {
 #define BLKIF_RSP_ERROR  -1 /* non-specific 'error' */
 #define BLKIF_RSP_OKAY    0 /* non-specific 'okay'  */
 
+#define BLKIF_MAJOR(dev) ((dev)>>8)
+#define BLKIF_MINOR(dev) ((dev) & 0xff)
+
 /*
  * Generate blkif ring structures and types.
  */

@@ -28,7 +28,7 @@ sbindir=$(prefix)/sbin
 
 CFLAGS += -DGCC_PRINTF -Wall -Werror -I$(XEN_LIBXENSTAT)
 LDFLAGS += -L$(XEN_LIBXENSTAT)
-LDLIBS += -lxenstat -lcurses
+LDLIBS += -lxenstat -lncurses
 
 all: xentop
 
