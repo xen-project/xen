@@ -228,7 +228,7 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		p = strrchr(be->frontpath, '/') + 1;
 		handle = simple_strtoul(p, NULL, 0);
 
-		be->blkif = blkif_find(be->frontend_id);
+		be->blkif = alloc_blkif(be->frontend_id);
 		if (IS_ERR(be->blkif)) {
 			err = PTR_ERR(be->blkif);
 			be->blkif = NULL;

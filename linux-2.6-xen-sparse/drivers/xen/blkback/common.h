@@ -48,8 +48,7 @@ typedef struct blkif_st {
     /* Comms information. */
     blkif_back_ring_t blk_ring;
     /* VBDs attached to this interface. */
-    rb_root_t         vbd_rb;        /* Mapping from 16-bit vdevices to VBDs.*/
-    spinlock_t        vbd_lock;      /* Protects VBD mapping. */
+    struct vbd *vbd;
     /* Private fields. */
     enum { DISCONNECTED, CONNECTED } status;
     /*
@@ -61,7 +60,6 @@ typedef struct blkif_st {
     /* Is this a blktap frontend */
     unsigned int     is_blktap;
 #endif
-    struct blkif_st *hash_next;
     struct list_head blkdev_list;
     spinlock_t       blk_ring_lock;
     atomic_t         refcnt;
@@ -77,7 +75,7 @@ void blkif_destroy(blkif_be_destroy_t *destroy);
 void blkif_connect(blkif_be_connect_t *connect);
 int  blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id);
 void blkif_disconnect_complete(blkif_t *blkif);
-blkif_t *blkif_find(domid_t domid);
+blkif_t *alloc_blkif(domid_t domid);
 void free_blkif(blkif_t *blkif);
 int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn);
 
