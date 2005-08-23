@@ -8,7 +8,7 @@ run_test()
     rm -rf $XENSTORED_ROOTDIR
     mkdir $XENSTORED_ROOTDIR
     if [ $VALGRIND -eq 1 ]; then
-	valgrind -q --logfile-fd=3 ./xenstored_test --output-pid --trace-file=testsuite/tmp/trace --no-fork 3>testsuite/tmp/vgout > /tmp/pid 2> testsuite/tmp/xenstored_errors &
+	valgrind --suppressions=testsuite/vg-suppressions -q ./xenstored_test --output-pid --trace-file=testsuite/tmp/trace --no-fork > /tmp/pid 2> testsuite/tmp/xenstored_errors &
 	while [ ! -s /tmp/pid ]; do sleep 0; done
 	PID=`cat /tmp/pid`
 	rm /tmp/pid
@@ -17,10 +17,10 @@ run_test()
 	PID=`./xenstored_test --output-pid --trace-file=testsuite/tmp/trace`
     fi
     if ./xs_test $2 $1; then
-	if [ -s testsuite/tmp/vgout ]; then
+	if [ -s testsuite/tmp/xenstored_errors ]; then
 	    kill $PID
-	    echo VALGRIND errors:
-	    cat testsuite/tmp/vgout
+	    echo Errors:
+	    cat testsuite/tmp/xenstored_errors
 	    return 1
 	fi
 	echo shutdown | ./xs_test
