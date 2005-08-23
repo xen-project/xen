@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <xen-interface.h>
 #include "xenstat.h"
+#include "version.h"
 
 /*
  * Types
@@ -32,6 +33,9 @@ struct xenstat_handle {
 	FILE *procnetdev;
 };
 
+#define SHORT_ASC_LEN 5 		/* length of 65535 */
+#define VERSION_SIZE (2 * SHORT_ASC_LEN + 1 + sizeof(xen_extraversion_t) + 1)
+
 struct xenstat_node {
 	unsigned int flags;
 	unsigned long long cpu_hz;
@@ -39,6 +43,7 @@ struct xenstat_node {
 	unsigned long long tot_mem;
 	unsigned long long free_mem;
 	unsigned int num_domains;
+	char xen_version[VERSION_SIZE]; /* xen version running on this node */
 	xenstat_domain *domains;	/* Array of length num_domains */
 };
 
@@ -47,7 +52,7 @@ struct xenstat_domain {
 	unsigned int state;
 	unsigned long long cpu_ns;
 	unsigned int num_vcpus;
-	xenstat_vcpu *vcpus;	/* Array of length num_vcpus */
+	xenstat_vcpu *vcpus;		/* Array of length num_vcpus */
 	unsigned long long cur_mem;	/* Current memory reservation */
 	unsigned long long max_mem;	/* Total memory allowed */
 	unsigned int ssid;
@@ -164,6 +169,8 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 #define DOMAIN_CHUNK_SIZE 256
 	xenstat_node *node;
 	dom0_physinfo_t physinfo;
+	xen_extraversion_t version;
+	long vnum = 0; 
 	dom0_getdomaininfo_t domaininfo[DOMAIN_CHUNK_SIZE];
 	unsigned int num_domains, new_domains;
 	unsigned int i;
@@ -178,6 +185,14 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 		free(node);
 		return NULL;
 	}
+
+	/* Get the xen version number and xen version tag */
+	if (xi_get_xen_version(handle->xihandle, &vnum, &version) < 0) {
+		free(node); 
+		return NULL;
+	} 
+	snprintf(node->xen_version, VERSION_SIZE,
+		"%ld.%ld%s\n", ((vnum >> 16) & 0xFFFF), vnum & 0xFFFF, (char *)version); 
 
 	node->cpu_hz = ((unsigned long long)physinfo.cpu_khz) * 1000ULL;
 	node->num_cpus =
@@ -247,8 +262,8 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 			if(collectors[i].collect(handle, node) == 0) {
 				xenstat_free_node(node);
 				return NULL;
-                        }
-                }
+			}
+		}
 	}
 
 	return node;
@@ -289,6 +304,11 @@ xenstat_domain *xenstat_node_domain_by_index(xenstat_node * node,
 	if (0 <= index && index < node->num_domains)
 		return &(node->domains[index]);
 	return NULL;
+}
+
+const char *xenstat_node_xen_ver(xenstat_node * node)
+{
+	return node->xen_version;
 }
 
 unsigned long long xenstat_node_tot_mem(xenstat_node * node)
