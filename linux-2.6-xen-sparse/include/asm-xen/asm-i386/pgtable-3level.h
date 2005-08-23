@@ -150,15 +150,13 @@ static inline int pte_none(pte_t pte)
 	return !pte.pte_low && !pte.pte_high;
 }
 
-#define INVALID_P2M_ENTRY (~0U)
-#define FOREIGN_FRAME(_m) ((_m) | (1UL<<((sizeof(unsigned long)*8)-1)))
 #define pte_mfn(_pte) ( ((_pte).pte_low >> PAGE_SHIFT) |\
 		        (((_pte).pte_high & 0xfff) << (32-PAGE_SHIFT)) )
 #define pte_pfn(_pte)                                                  \
 ({                                                                     \
        unsigned long mfn = pte_mfn(_pte);                              \
        unsigned long pfn = mfn_to_pfn(mfn);                            \
-       if ((pfn >= max_mapnr) || (pfn_to_mfn(pfn) != mfn))             \
+       if ((pfn >= max_mapnr) || (phys_to_machine_mapping[pfn] != mfn))\
                pfn = max_mapnr; /* special: force !pfn_valid() */      \
        pfn;                                                            \
 })

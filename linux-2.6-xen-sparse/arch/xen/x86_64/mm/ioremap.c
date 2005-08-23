@@ -62,7 +62,7 @@ static inline int is_local_lowmem(unsigned long address)
 	extern unsigned long max_low_pfn;
 	unsigned long mfn = address >> PAGE_SHIFT;
 	unsigned long pfn = mfn_to_pfn(mfn);
-	return ((pfn < max_low_pfn) && (pfn_to_mfn(pfn) == mfn));
+	return ((pfn < max_low_pfn) && (phys_to_machine_mapping[pfn] == mfn));
 }
 #elif defined(__x86_64__)
 /*
