@@ -11,6 +11,8 @@
  * Copyright (c) 2005, Christopher Clark
  */
 
+#include <linux/spinlock.h>
+#include <asm-xen/balloon.h>
 #include "common.h"
 
 /*
