@@ -27,6 +27,7 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 
 #include "dom0_ops.h"
+#include "version.h"
 
 /* Opaque handles */
 typedef struct xi_handle xi_handle;
@@ -37,6 +38,9 @@ xi_handle *xi_init();
 
 /* Release the handle to libxc, free resources, etc. */
 void xi_uninit(xi_handle *handle);
+
+/* Obtain xen version information from hypervisor */
+int xi_get_xen_version(xi_handle *, long *vnum, xen_extraversion_t *ver);
 
 /* Obtain physinfo data from dom0 */
 int xi_get_physinfo(xi_handle *, dom0_physinfo_t *);

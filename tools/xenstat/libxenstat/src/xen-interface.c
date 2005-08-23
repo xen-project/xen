@@ -21,7 +21,9 @@
 #include <sys/mman.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include "version.h"
 #include "privcmd.h"
 #include "xen.h"
 
@@ -56,24 +58,69 @@ void xi_uninit(xi_handle *handle)
 	free (handle);
 }
 
-/* Make Xen hypervisor call */
-int xi_make_dom0_op(xi_handle *handle, dom0_op_t *op, int opcode)
+/* Make simple xen version hypervisor calls */
+static int xi_make_xen_version_hypercall(xi_handle *handle, long *vnum, xen_extraversion_t *ver)
 {
 	privcmd_hypercall_t privcmd;
+	multicall_entry_t multicall[2];
 	int ret = 0;
 
 	/* set up for doing hypercall */
-	privcmd.op = __HYPERVISOR_dom0_op;
-	privcmd.arg[0] = (unsigned long)op;
-	op->cmd = opcode;
-	op->interface_version = DOM0_INTERFACE_VERSION;
+	privcmd.op = __HYPERVISOR_multicall; 
+	privcmd.arg[0] = (unsigned long)multicall;
+	privcmd.arg[1] = 2;
+
+	/* first one to get xen version number */
+	multicall[0].op = __HYPERVISOR_xen_version;
+	multicall[0].args[0] = (unsigned long)XENVER_version;
+
+	/* second to get xen version flag */
+	multicall[1].op = __HYPERVISOR_xen_version; 
+	multicall[1].args[0] = (unsigned long)XENVER_extraversion;
+	multicall[1].args[1] = (unsigned long)ver;
 
 	if (mlock( &privcmd, sizeof(privcmd_hypercall_t)) < 0) {
 		perror("Failed to mlock privcmd structure");
 		return -1;
 	}
 
-	if (mlock( op, sizeof(dom0_op_t)) < 0) {
+	if (mlock( multicall, sizeof(multicall_entry_t)) < 0) {
+		perror("Failed to mlock multicall_entry structure");
+		munlock( &multicall, sizeof(multicall_entry_t));
+		return -1;
+	}
+
+	if (ioctl( handle->fd, IOCTL_PRIVCMD_HYPERCALL, &privcmd) < 0) {
+		perror("Hypercall failed");
+		ret = -1;
+	}
+
+	*vnum = multicall[0].result;
+
+	munlock( &privcmd, sizeof(privcmd_hypercall_t));
+	munlock( &multicall, sizeof(multicall_entry_t));
+
+	return ret;
+}
+
+/* Make Xen Dom0 op hypervisor call */
+static int xi_make_dom0_op(xi_handle *handle, dom0_op_t *dom_op, int dom_opcode)
+{
+	privcmd_hypercall_t privcmd;
+	int ret = 0;
+
+	/* set up for doing hypercall */
+	privcmd.op = __HYPERVISOR_dom0_op;
+	privcmd.arg[0] = (unsigned long)dom_op;
+	dom_op->cmd = dom_opcode;
+	dom_op->interface_version = DOM0_INTERFACE_VERSION;
+
+	if (mlock( &privcmd, sizeof(privcmd_hypercall_t)) < 0) {
+		perror("Failed to mlock privcmd structure");
+		return -1;
+	}
+
+	if (mlock( dom_op, sizeof(dom0_op_t)) < 0) {
 		perror("Failed to mlock dom0_op structure");
 		munlock( &privcmd, sizeof(privcmd_hypercall_t));
 		return -1;
@@ -85,7 +132,7 @@ int xi_make_dom0_op(xi_handle *handle, dom0_op_t *op, int opcode)
 	}
 
 	munlock( &privcmd, sizeof(privcmd_hypercall_t));
-	munlock( op, sizeof(dom0_op_t));
+	munlock( dom_op, sizeof(dom0_op_t));
 
 	return ret;
 }
@@ -141,4 +188,17 @@ long long xi_get_vcpu_usage(xi_handle *handle, unsigned int domain,
 	}
 
 	return op.u.getvcpucontext.cpu_time;
+}
+
+/* gets xen version information from hypervisor */
+int xi_get_xen_version(xi_handle *handle, long *vnum, xen_extraversion_t *ver) 
+{
+
+        /* gets the XENVER_version and XENVER_extraversion */
+	if (xi_make_xen_version_hypercall( handle, vnum, ver) < 0) {; 
+		perror("XEN VERSION Hypercall failed");
+		return -1;
+	}
+
+	return 0;
 }
