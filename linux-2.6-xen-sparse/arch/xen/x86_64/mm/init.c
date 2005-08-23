@@ -559,6 +559,11 @@ static void xen_copy_pt(void)
 
 void __init xen_init_pt(void)
 {
+	int i;
+
+	for (i = 0; i < NR_CPUS; i++)
+		per_cpu(cur_pgd, i) = init_mm.pgd;
+
 	memcpy((void *)init_level4_pgt, 
 	       (void *)xen_start_info.pt_base, PAGE_SIZE);
 

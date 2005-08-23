@@ -631,7 +631,7 @@ static inline int irq_masked(unsigned long eflags)
     return ((eflags & X86_EFLAGS_IF) == 0);
 }
 
-asmlinkage void vmx_intr_assist() 
+asmlinkage void vmx_intr_assist(void) 
 {
     int intr_type = 0;
     int highest_vector;
@@ -714,8 +714,6 @@ void vmx_do_resume(struct vcpu *d)
 
     /* We can't resume the guest if we're waiting on I/O */
     ASSERT(!test_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags));
-
-    /* We always check for interrupts before resuming guest */
 }
 
 #endif /* CONFIG_VMX */

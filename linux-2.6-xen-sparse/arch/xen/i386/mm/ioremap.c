@@ -36,6 +36,8 @@ void iounmap(volatile void __iomem *addr)
 {
 }
 
+#ifdef __i386__
+
 void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 {
 	return NULL;
@@ -44,6 +46,8 @@ void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 void __init bt_iounmap(void *addr, unsigned long size)
 {
 }
+
+#endif /* __i386__ */
 
 #else
 
@@ -58,7 +62,7 @@ static inline int is_local_lowmem(unsigned long address)
 	extern unsigned long max_low_pfn;
 	unsigned long mfn = address >> PAGE_SHIFT;
 	unsigned long pfn = mfn_to_pfn(mfn);
-	return ((pfn < max_low_pfn) && (pfn_to_mfn(pfn) == mfn));
+	return ((pfn < max_low_pfn) && (phys_to_machine_mapping[pfn] == mfn));
 }
 
 /*
@@ -126,10 +130,12 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 		return NULL;
 	area->phys_addr = phys_addr;
 	addr = (void __iomem *) area->addr;
+	flags |= _PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED;
+#ifdef __x86_64__
+	flags |= _PAGE_USER;
+#endif
 	if (direct_remap_area_pages(&init_mm, (unsigned long) addr, phys_addr,
-				    size, __pgprot(_PAGE_PRESENT | _PAGE_RW |
-						   _PAGE_DIRTY | _PAGE_ACCESSED
-						   | flags), domid)) {
+				    size, __pgprot(flags), domid)) {
 		vunmap((void __force *) addr);
 		return NULL;
 	}
@@ -218,6 +224,8 @@ void iounmap(volatile void __iomem *addr)
 	kfree(p); 
 }
 
+#ifdef __i386__
+
 void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 {
 	unsigned long offset, last_addr;
@@ -289,6 +297,8 @@ void __init bt_iounmap(void *addr, unsigned long size)
 	}
 }
 
+#endif /* __i386__ */
+
 #endif /* CONFIG_XEN_PHYSDEV_ACCESS */
 
 /* These hacky macros avoid phys->machine translations. */
@@ -346,7 +356,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
 		 * Fill in the machine address: PTE ptr is done later by
 		 * __direct_remap_area_pages(). 
 		 */
-		v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot);
+		v->val = pte_val_ma(pfn_pte_ma(machine_addr >> PAGE_SHIFT, prot));
 
 		machine_addr += PAGE_SIZE;
 		address += PAGE_SIZE; 
@@ -368,35 +378,37 @@ int direct_remap_area_pages(struct mm_struct *mm,
 
 EXPORT_SYMBOL(direct_remap_area_pages);
 
+static int lookup_pte_fn(
+	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
+{
+	unsigned long *ptep = (unsigned long *)data;
+	if (ptep)
+		*ptep = (pfn_to_mfn(page_to_pfn(pte_page)) <<
+			 PAGE_SHIFT) |
+			((unsigned long)pte & ~PAGE_MASK);
+	return 0;
+}
+
 int create_lookup_pte_addr(struct mm_struct *mm, 
 			   unsigned long address,
 			   unsigned long *ptep)
 {
-	int f(pte_t *pte, struct page *pte_page, unsigned long addr,
-	      void *data) {
-		unsigned long *ptep = (unsigned long *)data;
-		if (ptep)
-			*ptep = (pfn_to_mfn(page_to_pfn(pte_page)) <<
-				 PAGE_SHIFT) |
-				((unsigned long)pte & ~PAGE_MASK);
-		return 0;
-	}
-
-	return generic_page_range(mm, address, PAGE_SIZE, f, ptep);
+	return generic_page_range(mm, address, PAGE_SIZE, lookup_pte_fn, ptep);
 }
 
 EXPORT_SYMBOL(create_lookup_pte_addr);
+
+static int noop_fn(
+	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
+{
+	return 0;
+}
 
 int touch_pte_range(struct mm_struct *mm,
 		    unsigned long address,
 		    unsigned long size)
 {
-	int f(pte_t *pte, struct page *pte_page, unsigned long addr,
-	      void *data) {
-		return 0;
-	}
-
-	return generic_page_range(mm, address, size, f, NULL);
+	return generic_page_range(mm, address, size, noop_fn, NULL);
 } 
 
 EXPORT_SYMBOL(touch_pte_range);

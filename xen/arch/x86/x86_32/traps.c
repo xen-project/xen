@@ -1,5 +1,6 @@
 
 #include <xen/config.h>
+#include <xen/domain_page.h>
 #include <xen/init.h>
 #include <xen/sched.h>
 #include <xen/lib.h>
@@ -86,24 +87,33 @@ void show_registers(struct cpu_user_regs *regs)
 
 void show_page_walk(unsigned long addr)
 {
-    l2_pgentry_t pmd;
-    l1_pgentry_t *pte;
-
-    if ( addr < PAGE_OFFSET )
-        return;
+    unsigned long pfn = read_cr3() >> PAGE_SHIFT;
+    intpte_t *ptab, ent;
 
     printk("Pagetable walk from %08lx:\n", addr);
-    
-    pmd = idle_pg_table_l2[l2_linear_offset(addr)];
-    printk(" L2 = %"PRIpte" %s\n", l2e_get_intpte(pmd),
-           (l2e_get_flags(pmd) & _PAGE_PSE) ? "(2/4MB)" : "");
-    if ( !(l2e_get_flags(pmd) & _PAGE_PRESENT) ||
-         (l2e_get_flags(pmd) & _PAGE_PSE) )
-        return;
 
-    pte  = __va(l2e_get_paddr(pmd));
-    pte += l1_table_offset(addr);
-    printk("  L1 = %"PRIpte"\n", l1e_get_intpte(*pte));
+#ifdef CONFIG_X86_PAE
+    ptab = map_domain_page(pfn);
+    ent = ptab[l3_table_offset(addr)];
+    printk(" L3 = %"PRIpte"\n", ent);
+    unmap_domain_page(ptab);
+    if ( !(ent & _PAGE_PRESENT) )
+        return;
+    pfn = ent >> PAGE_SHIFT;
+#endif
+
+    ptab = map_domain_page(pfn);
+    ent = ptab[l2_table_offset(addr)];
+    printk("  L2 = %"PRIpte" %s\n", ent, (ent & _PAGE_PSE) ? "(PSE)" : "");
+    unmap_domain_page(ptab);
+    if ( !(ent & _PAGE_PRESENT) || (ent & _PAGE_PSE) )
+        return;
+    pfn = ent >> PAGE_SHIFT;
+
+    ptab = map_domain_page(ent >> PAGE_SHIFT);
+    ent = ptab[l2_table_offset(addr)];
+    printk("   L1 = %"PRIpte"\n", ent);
+    unmap_domain_page(ptab);
 }
 
 #define DOUBLEFAULT_STACK_SIZE 1024

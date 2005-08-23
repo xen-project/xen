@@ -778,21 +778,21 @@ void __init setup_arch(char **cmdline_p)
 		/* Make sure we have a large enough P->M table. */
 		if (end_pfn > xen_start_info.nr_pages) {
 			phys_to_machine_mapping = alloc_bootmem(
-				max_pfn * sizeof(unsigned long));
+				max_pfn * sizeof(u32));
 			memset(phys_to_machine_mapping, ~0,
-			       max_pfn * sizeof(unsigned long));
+			       max_pfn * sizeof(u32));
 			memcpy(phys_to_machine_mapping,
-			       (unsigned long *)xen_start_info.mfn_list,
-			       xen_start_info.nr_pages * sizeof(unsigned long));
+			       (u32 *)xen_start_info.mfn_list,
+			       xen_start_info.nr_pages * sizeof(u32));
 			free_bootmem(
 				__pa(xen_start_info.mfn_list), 
 				PFN_PHYS(PFN_UP(xen_start_info.nr_pages *
-						sizeof(unsigned long))));
+						sizeof(u32))));
 		}
 
 		pfn_to_mfn_frame_list = alloc_bootmem(PAGE_SIZE);
 
-		for ( i=0, j=0; i < end_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
+		for ( i=0, j=0; i < end_pfn; i+=(PAGE_SIZE/sizeof(u32)), j++ )
 		{	
 			pfn_to_mfn_frame_list[j] = 
 				virt_to_mfn(&phys_to_machine_mapping[i]);

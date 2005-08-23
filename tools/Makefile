@@ -14,6 +14,7 @@ SUBDIRS += xcutils
 SUBDIRS += firmware
 SUBDIRS += security
 SUBDIRS += console
+SUBDIRS += xenstat
 
 .PHONY: all install clean check check_clean ioemu eioemuinstall ioemuclean
 

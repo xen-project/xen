@@ -40,38 +40,82 @@ EXPORT_SYMBOL(gnttab_grant_foreign_transfer);
 EXPORT_SYMBOL(gnttab_end_foreign_transfer);
 EXPORT_SYMBOL(gnttab_alloc_grant_references);
 EXPORT_SYMBOL(gnttab_free_grant_references);
+EXPORT_SYMBOL(gnttab_free_grant_reference);
 EXPORT_SYMBOL(gnttab_claim_grant_reference);
 EXPORT_SYMBOL(gnttab_release_grant_reference);
 EXPORT_SYMBOL(gnttab_grant_foreign_access_ref);
 EXPORT_SYMBOL(gnttab_grant_foreign_transfer_ref);
 
-static grant_ref_t gnttab_free_list[NR_GRANT_ENTRIES];
+#define NR_GRANT_ENTRIES (NR_GRANT_FRAMES * PAGE_SIZE / sizeof(grant_entry_t))
+#define GNTTAB_LIST_END (NR_GRANT_ENTRIES + 1)
+
+static grant_ref_t gnttab_list[NR_GRANT_ENTRIES];
+static int gnttab_free_count = NR_GRANT_ENTRIES;
 static grant_ref_t gnttab_free_head;
+static spinlock_t gnttab_list_lock = SPIN_LOCK_UNLOCKED;
 
 static grant_entry_t *shared;
 
-/*
- * Lock-free grant-entry allocator
- */
+static struct gnttab_free_callback *gnttab_free_callback_list = NULL;
 
-static inline int
-get_free_entry(
-    void)
+static int
+get_free_entries(int count)
 {
-    grant_ref_t fh, nfh = gnttab_free_head;
-    do { if ( unlikely((fh = nfh) == NR_GRANT_ENTRIES) ) return -1; }
-    while ( unlikely((nfh = cmpxchg(&gnttab_free_head, fh,
-                                    gnttab_free_list[fh])) != fh) );
-    return fh;
+    unsigned long flags;
+    int ref;
+    grant_ref_t head;
+    spin_lock_irqsave(&gnttab_list_lock, flags);
+    if (gnttab_free_count < count) {
+	spin_unlock_irqrestore(&gnttab_list_lock, flags);
+	return -1;
+    }
+    ref = head = gnttab_free_head;
+    gnttab_free_count -= count;
+    while (count-- > 1)
+	head = gnttab_list[head];
+    gnttab_free_head = gnttab_list[head];
+    gnttab_list[head] = GNTTAB_LIST_END;
+    spin_unlock_irqrestore(&gnttab_list_lock, flags);
+    return ref;
+}
+
+#define get_free_entry() get_free_entries(1)
+
+static void
+do_free_callbacks(void)
+{
+    struct gnttab_free_callback *callback = gnttab_free_callback_list, *next;
+    gnttab_free_callback_list = NULL;
+    while (callback) {
+	next = callback->next;
+	if (gnttab_free_count >= callback->count) {
+	    callback->next = NULL;
+	    callback->fn(callback->arg);
+	} else {
+	    callback->next = gnttab_free_callback_list;
+	    gnttab_free_callback_list = callback;
+	}
+	callback = next;
+    }
 }
 
 static inline void
-put_free_entry(
-    grant_ref_t ref)
+check_free_callbacks(void)
 {
-    grant_ref_t fh, nfh = gnttab_free_head;
-    do { gnttab_free_list[ref] = fh = nfh; wmb(); }
-    while ( unlikely((nfh = cmpxchg(&gnttab_free_head, fh, ref)) != fh) );
+    if (unlikely(gnttab_free_callback_list))
+	do_free_callbacks();
+}
+
+static void
+put_free_entry(grant_ref_t ref)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&gnttab_list_lock, flags);
+    gnttab_list[ref] = gnttab_free_head;
+    gnttab_free_head = ref;
+    gnttab_free_count++;
+    check_free_callbacks();
+    spin_unlock_irqrestore(&gnttab_list_lock, flags);
 }
 
 /*
@@ -79,8 +123,7 @@ put_free_entry(
  */
 
 int
-gnttab_grant_foreign_access(
-    domid_t domid, unsigned long frame, int readonly)
+gnttab_grant_foreign_access(domid_t domid, unsigned long frame, int readonly)
 {
     int ref;
     
@@ -96,8 +139,8 @@ gnttab_grant_foreign_access(
 }
 
 void
-gnttab_grant_foreign_access_ref(
-    grant_ref_t ref, domid_t domid, unsigned long frame, int readonly)
+gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
+				unsigned long frame, int readonly)
 {
     shared[ref].frame = frame;
     shared[ref].domid = domid;
@@ -107,7 +150,7 @@ gnttab_grant_foreign_access_ref(
 
 
 int
-gnttab_query_foreign_access( grant_ref_t ref )
+gnttab_query_foreign_access(grant_ref_t ref)
 {
     u16 nflags;
 
@@ -117,7 +160,7 @@ gnttab_query_foreign_access( grant_ref_t ref )
 }
 
 void
-gnttab_end_foreign_access( grant_ref_t ref, int readonly )
+gnttab_end_foreign_access(grant_ref_t ref, int readonly)
 {
     u16 flags, nflags;
 
@@ -132,8 +175,7 @@ gnttab_end_foreign_access( grant_ref_t ref, int readonly )
 }
 
 int
-gnttab_grant_foreign_transfer(
-    domid_t domid, unsigned long pfn )
+gnttab_grant_foreign_transfer(domid_t domid, unsigned long pfn)
 {
     int ref;
 
@@ -149,8 +191,8 @@ gnttab_grant_foreign_transfer(
 }
 
 void
-gnttab_grant_foreign_transfer_ref(
-    grant_ref_t ref, domid_t domid, unsigned long pfn )
+gnttab_grant_foreign_transfer_ref(grant_ref_t ref, domid_t domid,
+				  unsigned long pfn)
 {
     shared[ref].frame = pfn;
     shared[ref].domid = domid;
@@ -159,8 +201,7 @@ gnttab_grant_foreign_transfer_ref(
 }
 
 unsigned long
-gnttab_end_foreign_transfer(
-    grant_ref_t ref)
+gnttab_end_foreign_transfer(grant_ref_t ref)
 {
     unsigned long frame = 0;
     u16           flags;
@@ -189,59 +230,79 @@ gnttab_end_foreign_transfer(
 }
 
 void
-gnttab_free_grant_references( u16 count, grant_ref_t head )
+gnttab_free_grant_reference(grant_ref_t ref)
 {
-    /* TODO: O(N)...? */
-    grant_ref_t to_die = 0, next = head;
-    int i;
 
-    for ( i = 0; i < count; i++ )
-    {
-        to_die = next;
-        next = gnttab_free_list[next];
-        put_free_entry( to_die );
+    put_free_entry(ref);
+}
+
+void
+gnttab_free_grant_references(grant_ref_t head)
+{
+    grant_ref_t ref;
+    unsigned long flags;
+    int count = 1;
+    if (head == GNTTAB_LIST_END)
+	return;
+    spin_lock_irqsave(&gnttab_list_lock, flags);
+    ref = head;
+    while (gnttab_list[ref] != GNTTAB_LIST_END) {
+	ref = gnttab_list[ref];
+	count++;
     }
+    gnttab_list[ref] = gnttab_free_head;
+    gnttab_free_head = head;
+    gnttab_free_count += count;
+    check_free_callbacks();
+    spin_unlock_irqrestore(&gnttab_list_lock, flags);
 }
 
 int
-gnttab_alloc_grant_references( u16 count,
-                               grant_ref_t *head,
-                               grant_ref_t *terminal )
+gnttab_alloc_grant_references(u16 count, grant_ref_t *head)
 {
-    int i;
-    grant_ref_t h = gnttab_free_head;
+    int h = get_free_entries(count);
 
-    for ( i = 0; i < count; i++ )
-        if ( unlikely(get_free_entry() == -1) )
-            goto not_enough_refs;
+    if (h == -1)
+	return -ENOSPC;
 
     *head = h;
-    *terminal = gnttab_free_head;
 
     return 0;
-
-not_enough_refs:
-    gnttab_free_head = h;
-    return -ENOSPC;
 }
 
 int
-gnttab_claim_grant_reference( grant_ref_t *private_head,
-                              grant_ref_t  terminal )
+gnttab_claim_grant_reference(grant_ref_t *private_head)
 {
-    grant_ref_t g;
-    if ( unlikely((g = *private_head) == terminal) )
+    grant_ref_t g = *private_head;
+    if (unlikely(g == GNTTAB_LIST_END))
         return -ENOSPC;
-    *private_head = gnttab_free_list[g];
+    *private_head = gnttab_list[g];
     return g;
 }
 
 void
-gnttab_release_grant_reference( grant_ref_t *private_head,
-                                grant_ref_t  release )
+gnttab_release_grant_reference(grant_ref_t *private_head, grant_ref_t  release)
 {
-    gnttab_free_list[release] = *private_head;
+    gnttab_list[release] = *private_head;
     *private_head = release;
+}
+
+void
+gnttab_request_free_callback(struct gnttab_free_callback *callback,
+			     void (*fn)(void *), void *arg, u16 count)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&gnttab_list_lock, flags);
+    if (callback->next)
+	goto out;
+    callback->fn = fn;
+    callback->arg = arg;
+    callback->count = count;
+    callback->next = gnttab_free_callback_list;
+    gnttab_free_callback_list = callback;
+    check_free_callbacks();
+ out:
+    spin_unlock_irqrestore(&gnttab_list_lock, flags);
 }
 
 /*
@@ -252,8 +313,9 @@ gnttab_release_grant_reference( grant_ref_t *private_head,
 
 static struct proc_dir_entry *grant_pde;
 
-static int grant_ioctl(struct inode *inode, struct file *file,
-                       unsigned int cmd, unsigned long data)
+static int
+grant_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+	    unsigned long data)
 {
     int                     ret;
     privcmd_hypercall_t     hypercall;
@@ -291,8 +353,9 @@ static struct file_operations grant_file_ops = {
     ioctl:  grant_ioctl,
 };
 
-static int grant_read(char *page, char **start, off_t off,
-                      int count, int *eof, void *data)
+static int
+grant_read(char *page, char **start, off_t off, int count, int *eof,
+	   void *data)
 {
     int             len;
     unsigned int    i;
@@ -321,8 +384,9 @@ static int grant_read(char *page, char **start, off_t off,
     return len;
 }
 
-static int grant_write(struct file *file, const char __user *buffer,
-                       unsigned long count, void *data)
+static int
+grant_write(struct file *file, const char __user *buffer, unsigned long count,
+	    void *data)
 {
     /* TODO: implement this */
     return -ENOSYS;
@@ -330,7 +394,8 @@ static int grant_write(struct file *file, const char __user *buffer,
 
 #endif /* CONFIG_PROC_FS */
 
-int gnttab_resume(void)
+int
+gnttab_resume(void)
 {
     gnttab_setup_table_t setup;
     unsigned long        frames[NR_GRANT_FRAMES];
@@ -349,7 +414,8 @@ int gnttab_resume(void)
     return 0;
 }
 
-int gnttab_suspend(void)
+int
+gnttab_suspend(void)
 {
     int i;
 
@@ -359,7 +425,8 @@ int gnttab_suspend(void)
     return 0;
 }
 
-static int __init gnttab_init(void)
+static int __init
+gnttab_init(void)
 {
     int i;
 
@@ -368,7 +435,7 @@ static int __init gnttab_init(void)
     shared = (grant_entry_t *)fix_to_virt(FIX_GNTTAB_END);
 
     for ( i = 0; i < NR_GRANT_ENTRIES; i++ )
-        gnttab_free_list[i] = i + 1;
+        gnttab_list[i] = i + 1;
     
 #ifdef CONFIG_PROC_FS
     /*

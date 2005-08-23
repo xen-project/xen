@@ -1712,8 +1712,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     default:
         __vmx_bug(&regs);       /* should not happen */
     }
-
-    return;
 }
 
 asmlinkage void load_cr2(void)

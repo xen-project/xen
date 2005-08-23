@@ -31,7 +31,7 @@
 extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_resume(void);
 extern void vmx_asm_do_launch(void);
-extern void vmx_intr_assist();
+extern void vmx_intr_assist(void);
 
 extern void arch_vmx_do_launch(struct vcpu *);
 extern void arch_vmx_do_resume(struct vcpu *);
@@ -355,7 +355,7 @@ static inline int __vmxon (u64 addr)
 }
 
 /* Make sure that xen intercepts any FP accesses from current */
-static inline void vmx_stts()
+static inline void vmx_stts(void)
 {
     unsigned long cr0;
 
