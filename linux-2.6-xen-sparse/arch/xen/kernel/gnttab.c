@@ -40,6 +40,7 @@ EXPORT_SYMBOL(gnttab_grant_foreign_transfer);
 EXPORT_SYMBOL(gnttab_end_foreign_transfer);
 EXPORT_SYMBOL(gnttab_alloc_grant_references);
 EXPORT_SYMBOL(gnttab_free_grant_references);
+EXPORT_SYMBOL(gnttab_free_grant_reference);
 EXPORT_SYMBOL(gnttab_claim_grant_reference);
 EXPORT_SYMBOL(gnttab_release_grant_reference);
 EXPORT_SYMBOL(gnttab_grant_foreign_access_ref);
