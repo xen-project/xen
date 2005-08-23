@@ -21,8 +21,6 @@
 #define NR_GRANT_FRAMES 4
 #define NR_GRANT_ENTRIES (NR_GRANT_FRAMES * PAGE_SIZE / sizeof(grant_entry_t))
 
-struct work_struct;
-
 struct gnttab_free_callback {
     struct gnttab_free_callback *next;
     void (*fn)(void *);
