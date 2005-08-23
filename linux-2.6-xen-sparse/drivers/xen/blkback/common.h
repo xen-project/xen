@@ -57,11 +57,6 @@ typedef struct blkif_st {
     struct vbd        vbd;
     /* Private fields. */
     enum { DISCONNECTED, CONNECTED } status;
-    /*
-     * DISCONNECT response is deferred until pending requests are ack'ed.
-     * We therefore need to store the id from the original request.
-     */
-    u8               disconnect_rspid;
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
     /* Is this a blktap frontend */
     unsigned int     is_blktap;
@@ -102,8 +97,6 @@ void vbd_free(struct vbd *vbd);
 unsigned long vbd_size(struct vbd *vbd);
 unsigned int vbd_info(struct vbd *vbd);
 unsigned long vbd_secsize(struct vbd *vbd);
-void vbd_destroy(blkif_be_vbd_destroy_t *delete); 
-void destroy_all_vbds(blkif_t *blkif);
 
 struct phys_req {
     unsigned short       dev;
