@@ -68,13 +68,11 @@ get_free_entry(
     return fh;
 }
 
-static void do_free_callbacks(void)
+static void do_free_callbacks(unsigned long flags)
 {
-    struct gnttab_free_callback *callback, *next;
-    spin_lock_irq(&gnttab_free_callback_list_lock);
-    callback = gnttab_free_callback_list;
+    struct gnttab_free_callback *callback = gnttab_free_callback_list, *next;
     gnttab_free_callback_list = NULL;
-    spin_unlock_irq(&gnttab_free_callback_list_lock);
+    spin_unlock_irqrestore(&gnttab_free_callback_list_lock, flags);
     while (callback) {
 	next = callback->next;
 	callback->next = NULL;
@@ -88,12 +86,14 @@ put_free_entry(
     grant_ref_t ref)
 {
     grant_ref_t fh, nfh = gnttab_free_head;
+    unsigned long flags;
     do { gnttab_free_list[ref] = fh = nfh; wmb(); }
     while ( unlikely((nfh = cmpxchg(&gnttab_free_head, fh, ref)) != fh) );
-    spin_lock_irq(&gnttab_free_callback_list_lock);
+    spin_lock_irqsave(&gnttab_free_callback_list_lock, flags);
     if ( unlikely(gnttab_free_callback_list) )
-	do_free_callbacks();
-    spin_unlock_irq(&gnttab_free_callback_list_lock);
+	do_free_callbacks(flags);
+    else
+	spin_unlock_irqrestore(&gnttab_free_callback_list_lock, flags);
 }
 
 /*
@@ -276,14 +276,15 @@ void
 gnttab_request_free_callback(struct gnttab_free_callback *callback,
 			     void (*fn)(void *), void *arg)
 {
+    unsigned long flags;
     if (callback->next)
 	return;
     callback->fn = fn;
     callback->arg = arg;
-    spin_lock_irq(&gnttab_free_callback_list_lock);
+    spin_lock_irqsave(&gnttab_free_callback_list_lock, flags);
     callback->next = gnttab_free_callback_list;
     gnttab_free_callback_list = callback;
-    spin_unlock_irq(&gnttab_free_callback_list_lock);
+    spin_unlock_irqrestore(&gnttab_free_callback_list_lock, flags);
 }
 
 /*
