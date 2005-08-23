@@ -423,14 +423,24 @@ static char *node_dir(struct transaction *trans, const char *node)
 	return node_dir_inside_transaction(trans, node);
 }
 
+static char *datafile(const char *dir)
+{
+	return talloc_asprintf(dir, "%s/.data", dir);
+}
+
 static char *node_datafile(struct transaction *trans, const char *node)
 {
-	return talloc_asprintf(node, "%s/.data", node_dir(trans, node));
+	return datafile(node_dir(trans, node));
+}
+
+static char *permfile(const char *dir)
+{
+	return talloc_asprintf(dir, "%s/.perms", dir);
 }
 
 static char *node_permfile(struct transaction *trans, const char *node)
 {
-	return talloc_asprintf(node, "%s/.perms", node_dir(trans, node));
+	return permfile(node_dir(trans, node));
 }
 
 struct buffered_data *new_buffer(void *ctx)
@@ -557,15 +567,14 @@ static const char *onearg(struct buffered_data *in)
 }
 
 /* If it fails, returns NULL and sets errno. */
-static struct xs_permissions *get_perms(struct transaction *transaction,
-					const char *node, unsigned int *num)
+static struct xs_permissions *get_perms(const char *dir, unsigned int *num)
 {
 	unsigned int size;
 	char *strings;
 	struct xs_permissions *ret;
 	int *fd;
 
-	fd = talloc_open(node_permfile(transaction, node), O_RDONLY, 0);
+	fd = talloc_open(permfile(dir), O_RDONLY, 0);
 	if (!fd)
 		return NULL;
 	strings = read_all(fd, &size);
@@ -573,14 +582,14 @@ static struct xs_permissions *get_perms(struct transaction *transaction,
 		return NULL;
 
 	*num = xs_count_strings(strings, size);
-	ret = talloc_array(node, struct xs_permissions, *num);
+	ret = talloc_array(dir, struct xs_permissions, *num);
 	if (!xs_strings_to_perms(ret, *num, strings))
-		corrupt(NULL, "Permissions corrupt for %s", node);
+		corrupt(NULL, "Permissions corrupt for %s", dir);
 
 	return ret;
 }
 
-static char *perms_to_strings(const char *node,
+static char *perms_to_strings(const void *ctx,
 			      struct xs_permissions *perms, unsigned int num,
 			      unsigned int *len)
 {
@@ -592,7 +601,7 @@ static char *perms_to_strings(const char *node,
 		if (!xs_perm_to_string(&perms[i], buffer))
 			return NULL;
 
-		strings = talloc_realloc(node, strings, char,
+		strings = talloc_realloc(ctx, strings, char,
 					 *len + strlen(buffer) + 1);
 		strcpy(strings + *len, buffer);
 		*len += strlen(buffer) + 1;
@@ -625,16 +634,23 @@ int destroy_path(void *path)
 	return 0;
 }
 
+/* Create a self-destructing temporary path */
+static char *temppath(const char *path)
+{
+	char *tmppath = talloc_asprintf(path, "%s.tmp", path);
+	talloc_set_destructor(tmppath, destroy_path);
+	return tmppath;
+}
+
 /* Create a self-destructing temporary file */
 static char *tempfile(const char *path, void *contents, unsigned int len)
 {
 	int *fd;
-	char *tmppath = talloc_asprintf(path, "%s.tmp", path);
+	char *tmppath = temppath(path);
 
 	fd = talloc_open(tmppath, O_WRONLY|O_CREAT|O_EXCL, 0640);
 	if (!fd)
 		return NULL;
-	talloc_set_destructor(tmppath, destroy_path);
 	if (!xs_write_all(*fd, contents, len))
 		return NULL;
 
@@ -732,7 +748,7 @@ static enum xs_perm_type ask_parents(struct connection *conn,
 
 	do {
 		node = get_parent(node);
-		perms = get_perms(conn->transaction, node, &num);
+		perms = get_perms(node_dir(conn->transaction, node), &num);
 		if (perms)
 			break;
 	} while (!streq(node, "/"));
@@ -788,7 +804,7 @@ bool check_node_perms(struct connection *conn, const char *node,
 		return false;
 	}
 
-	perms = get_perms(conn->transaction, node, &num);
+	perms = get_perms(node_dir(conn->transaction, node), &num);
 
 	if (perms) {
 		if (perm_for_id(conn->id, perms, num) & perm)
@@ -875,44 +891,64 @@ static void do_read(struct connection *conn, const char *node)
 		send_reply(conn, XS_READ, value, size);
 }
 
-/* Create a new directory.  Optionally put data in it (if data != NULL) */
-static bool new_directory(struct connection *conn,
-			  const char *node, void *data, unsigned int datalen)
+/* Commit this directory, eg. comitting a/b.tmp/c causes a/b.tmp -> a.b */
+static bool commit_dir(char *dir)
+{
+	char *dot, *slash, *dest;
+
+	dot = strrchr(dir, '.');
+	slash = strchr(dot, '/');
+	if (slash)
+		*slash = '\0';
+
+	dest = talloc_asprintf(dir, "%.*s", dot - dir, dir);
+	return rename(dir, dest) == 0;
+}
+
+/* Create a temporary directory.  Put data in it (if data != NULL) */
+static char *tempdir(struct connection *conn,
+		     const char *node, void *data, unsigned int datalen)
 {
 	struct xs_permissions *perms;
 	char *permstr;
 	unsigned int num, len;
 	int *fd;
-	char *dir = node_dir(conn->transaction, node);
+	char *dir;
 
-	if (mkdir(dir, 0750) != 0)
-		return false;
+	dir = temppath(node_dir(conn->transaction, node));
+	if (mkdir(dir, 0750) != 0) {
+		if (errno != ENOENT)
+			return NULL;
 
-	/* Set destructor so we clean up if neccesary. */
-	talloc_set_destructor(dir, destroy_path);
+		dir = tempdir(conn, get_parent(node), NULL, 0);
+		if (!dir)
+			return NULL;
 
-	perms = get_perms(conn->transaction, get_parent(node), &num);
+		dir = talloc_asprintf(dir, "%s%s", dir, strrchr(node, '/'));
+		if (mkdir(dir, 0750) != 0)
+			return NULL;
+		talloc_set_destructor(dir, destroy_path);
+	}
+
+	perms = get_perms(get_parent(dir), &num);
+	assert(perms);
 	/* Domains own what they create. */
 	if (conn->id)
 		perms->id = conn->id;
 
 	permstr = perms_to_strings(dir, perms, num, &len);
-	fd = talloc_open(node_permfile(conn->transaction, node),
-			 O_WRONLY|O_CREAT|O_EXCL, 0640);
+	fd = talloc_open(permfile(dir), O_WRONLY|O_CREAT|O_EXCL, 0640);
 	if (!fd || !xs_write_all(*fd, permstr, len))
-		return false;
+		return NULL;
 
 	if (data) {
-		char *datapath = node_datafile(conn->transaction, node);
+		char *datapath = datafile(dir);
 
 		fd = talloc_open(datapath, O_WRONLY|O_CREAT|O_EXCL, 0640);
 		if (!fd || !xs_write_all(*fd, data, datalen))
-			return false;
+			return NULL;
 	}
-
-	/* Finished! */
-	talloc_set_destructor(dir, NULL);
-	return true;
+	return dir;
 }
 
 /* path, flags, data... */
@@ -959,6 +995,8 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	}
 
 	if (lstat(node_dir(conn->transaction, node), &st) != 0) {
+		char *dir;
+
 		/* Does not exist... */
 		if (errno != ENOENT) {
 			send_error(conn, errno);
@@ -971,10 +1009,12 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 			return;
 		}
 
-		if (!new_directory(conn, node, in->buffer + offset, datalen)) {
+		dir = tempdir(conn, node, in->buffer + offset, datalen);
+		if (!dir || !commit_dir(dir)) {
 			send_error(conn, errno);
 			return;
 		}
+		
 	} else {
 		/* Exists... */
 		if (streq(vec[1], XS_WRITE_CREATE_EXCL)) {
@@ -999,6 +1039,9 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 
 static void do_mkdir(struct connection *conn, const char *node)
 {
+	char *dir;
+	struct stat st;
+
 	node = canonicalize(conn, node);
 	if (!check_node_perms(conn, node, XS_PERM_WRITE|XS_PERM_ENOENT_OK)) {
 		send_error(conn, errno);
@@ -1013,7 +1056,14 @@ static void do_mkdir(struct connection *conn, const char *node)
 	if (transaction_block(conn, node))
 		return;
 
-	if (!new_directory(conn, node, NULL, 0)) {
+	/* Must not already exist. */
+	if (lstat(node_dir(conn->transaction, node), &st) == 0) {
+		send_error(conn, EEXIST);
+		return;
+	}
+
+	dir = tempdir(conn, node, NULL, 0);
+	if (!dir || !commit_dir(dir)) {
 		send_error(conn, errno);
 		return;
 	}
@@ -1073,7 +1123,7 @@ static void do_get_perms(struct connection *conn, const char *node)
 		return;
 	}
 
-	perms = get_perms(conn->transaction, node, &num);
+	perms = get_perms(node_dir(conn->transaction, node), &num);
 	if (!perms) {
 		send_error(conn, errno);
 		return;

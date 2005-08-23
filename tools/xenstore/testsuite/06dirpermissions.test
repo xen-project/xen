@@ -117,3 +117,11 @@ setid 3
 write /dir/subdir/subfile excl contents
 expect 3 READ/WRITE
 getperm /dir/subdir/subfile
+
+# Inheritence works through multiple directories, too.
+write /dir/subdir/1/2/3/4 excl contents
+expect 3 READ/WRITE
+getperm /dir/subdir/1/2/3/4
+mkdir /dir/subdir/a/b/c/d
+expect 3 READ/WRITE
+getperm /dir/subdir/a/b/c/d
