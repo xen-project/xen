@@ -36,6 +36,8 @@ void iounmap(volatile void __iomem *addr)
 {
 }
 
+#ifdef __i386__
+
 void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 {
 	return NULL;
@@ -44,6 +46,8 @@ void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 void __init bt_iounmap(void *addr, unsigned long size)
 {
 }
+
+#endif /* __i386__ */
 
 #else
 
@@ -126,10 +130,12 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 		return NULL;
 	area->phys_addr = phys_addr;
 	addr = (void __iomem *) area->addr;
+	flags |= _PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED;
+#ifdef __x86_64__
+	flags |= _PAGE_USER;
+#endif
 	if (direct_remap_area_pages(&init_mm, (unsigned long) addr, phys_addr,
-				    size, __pgprot(_PAGE_PRESENT | _PAGE_RW |
-						   _PAGE_DIRTY | _PAGE_ACCESSED
-						   | flags), domid)) {
+				    size, __pgprot(flags), domid)) {
 		vunmap((void __force *) addr);
 		return NULL;
 	}
@@ -218,6 +224,8 @@ void iounmap(volatile void __iomem *addr)
 	kfree(p); 
 }
 
+#ifdef __i386__
+
 void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 {
 	unsigned long offset, last_addr;
@@ -288,6 +296,8 @@ void __init bt_iounmap(void *addr, unsigned long size)
 		--nrpages;
 	}
 }
+
+#endif /* __i386__ */
 
 #endif /* CONFIG_XEN_PHYSDEV_ACCESS */
 
