@@ -51,6 +51,7 @@ static grant_ref_t gnttab_free_head;
 static grant_entry_t *shared;
 
 static struct gnttab_free_callback *gnttab_free_callback_list = NULL;
+static spinlock_t gnttab_free_callback_list_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Lock-free grant-entry allocator
@@ -69,8 +70,11 @@ get_free_entry(
 
 static void do_free_callbacks(void)
 {
-    struct gnttab_free_callback *callback = gnttab_free_callback_list, *next;
+    struct gnttab_free_callback *callback, *next;
+    spin_lock_irq(&gnttab_free_callback_list_lock);
+    callback = gnttab_free_callback_list;
     gnttab_free_callback_list = NULL;
+    spin_unlock_irq(&gnttab_free_callback_list_lock);
     while (callback) {
 	next = callback->next;
 	callback->next = NULL;
@@ -86,8 +90,10 @@ put_free_entry(
     grant_ref_t fh, nfh = gnttab_free_head;
     do { gnttab_free_list[ref] = fh = nfh; wmb(); }
     while ( unlikely((nfh = cmpxchg(&gnttab_free_head, fh, ref)) != fh) );
+    spin_lock_irq(&gnttab_free_callback_list_lock);
     if ( unlikely(gnttab_free_callback_list) )
 	do_free_callbacks();
+    spin_unlock_irq(&gnttab_free_callback_list_lock);
 }
 
 /*
@@ -274,8 +280,10 @@ gnttab_request_free_callback(struct gnttab_free_callback *callback,
 	return;
     callback->fn = fn;
     callback->arg = arg;
+    spin_lock_irq(&gnttab_free_callback_list_lock);
     callback->next = gnttab_free_callback_list;
     gnttab_free_callback_list = callback;
+    spin_unlock_irq(&gnttab_free_callback_list_lock);
 }
 
 /*
