@@ -35,8 +35,6 @@ struct vbd {
     unsigned char  type;        /* VDISK_xxx */
     blkif_pdev_t   pdevice;     /* phys device that this vbd maps to */
     struct block_device *bdev;
-
-    int active;
 }; 
 
 typedef struct blkif_st {
@@ -83,11 +81,9 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn);
             free_blkif_callback(_b);		  \
     } while (0)
 
-/* Creates inactive vbd. */
+/* Create a vbd. */
 int vbd_create(blkif_t *blkif, blkif_vdev_t vdevice, blkif_pdev_t pdevice,
 	       int readonly);
-int vbd_is_active(struct vbd *vbd);
-void vbd_activate(struct vbd *vbd);
 void vbd_free(struct vbd *vbd);
 
 unsigned long vbd_size(struct vbd *vbd);

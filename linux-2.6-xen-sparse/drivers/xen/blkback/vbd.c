@@ -32,11 +32,6 @@ unsigned long vbd_secsize(struct vbd *vbd)
 	return bdev_hardsect_size(vbd->bdev);
 }
 
-int vbd_is_active(struct vbd *vbd)
-{
-	return vbd->active;
-}
-
 int vbd_create(blkif_t *blkif, blkif_vdev_t handle,
 	       blkif_pdev_t pdevice, int readonly)
 {
@@ -46,7 +41,6 @@ int vbd_create(blkif_t *blkif, blkif_vdev_t handle,
     vbd->handle   = handle; 
     vbd->readonly = readonly;
     vbd->type     = 0;
-    vbd->active   = 0;
 
     vbd->pdevice  = pdevice;
 
@@ -62,7 +56,7 @@ int vbd_create(blkif_t *blkif, blkif_vdev_t handle,
     if ( (vbd->bdev->bd_disk == NULL) )
     {
         DPRINTK("vbd_creat: device %08x doesn't exist.\n", vbd->pdevice);
-        bdev_put(vbd->bdev);
+	vbd_free(vbd);
         return -ENOENT;
     }
 
@@ -76,19 +70,11 @@ int vbd_create(blkif_t *blkif, blkif_vdev_t handle,
     return 0;
 }
 
-void vbd_activate(struct vbd *vbd)
-{
-    BUG_ON(vbd_is_active(vbd));
-
-    /* Now we're active. */
-    vbd->active = 1;
-}
-
 void vbd_free(struct vbd *vbd)
 {
-    if (vbd_is_active(vbd))
-	vbd->active = 0;
-    bdev_put(vbd->bdev);
+    if (vbd->bdev)
+	bdev_put(vbd->bdev);
+    vbd->bdev = NULL;
 }
 
 int vbd_translate(struct phys_req *req, blkif_t *blkif, int operation)

@@ -116,8 +116,7 @@ static void free_blkif(void *arg)
     op.u.close.dom = blkif->domid;
     HYPERVISOR_event_channel_op(&op);
 
-    if (vbd_is_active(&blkif->vbd))
-	vbd_free(&blkif->vbd);
+    vbd_free(&blkif->vbd);
 
     if (blkif->evtchn)
         unbind_evtchn_from_irqhandler(blkif->evtchn, blkif);

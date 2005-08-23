@@ -69,7 +69,7 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		device_unregister(&be->dev->dev);
 		return;
 	}
-	if (vbd_is_active(&be->blkif->vbd))
+	if (be->blkif->status == CONNECTED)
 		return;
 
 	err = xenbus_gather(be->frontpath, "grant-id", "%lu", &sharedmfn,
@@ -82,9 +82,8 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 	}
 
 	/* Domains must use same shared frame for all vbds. */
-	if (be->blkif->status == CONNECTED &&
-	    (evtchn != be->blkif->remote_evtchn ||
-	     sharedmfn != be->blkif->shmem_frame)) {
+	if (evtchn != be->blkif->remote_evtchn ||
+	    sharedmfn != be->blkif->shmem_frame) {
 		xenbus_dev_error(be->dev, err,
 				 "Shared frame/evtchn %li/%u not same as"
 				 " old %li/%u",
@@ -125,19 +124,14 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		goto abort;
 	}
 
-	/* First vbd?  We need to map the shared frame, irq etc. */
-	if (be->blkif->status != CONNECTED) {
-		err = blkif_map(be->blkif, sharedmfn, evtchn);
-		if (err) {
-			xenbus_dev_error(be->dev, err,
-					 "mapping shared-frame %lu port %u",
-					 sharedmfn, evtchn);
-			goto abort;
-		}
+	/* Map the shared frame, irq etc. */
+	err = blkif_map(be->blkif, sharedmfn, evtchn);
+	if (err) {
+		xenbus_dev_error(be->dev, err,
+				 "mapping shared-frame %lu port %u",
+				 sharedmfn, evtchn);
+		goto abort;
 	}
-
-	/* We're ready, activate. */
-	vbd_activate(&be->blkif->vbd);
 
 	xenbus_transaction_end(0);
 	xenbus_dev_ok(be->dev);
