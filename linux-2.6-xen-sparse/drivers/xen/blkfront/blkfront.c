@@ -237,15 +237,16 @@ static int blkif_queue_request(struct request *req)
     unsigned long id;
     unsigned int fsect, lsect;
     int ref;
-    grant_ref_t gref_head, gref_terminal;
+    grant_ref_t gref_head;
 
     if (unlikely(info->connected != BLKIF_STATE_CONNECTED))
         return 1;
 
     if (gnttab_alloc_grant_references(BLKIF_MAX_SEGMENTS_PER_REQUEST,
-				      &gref_head, &gref_terminal) < 0) {
+				      &gref_head) < 0) {
 	    gnttab_request_free_callback(&info->callback,
-					 blkif_restart_queue_callback, info);
+					 blkif_restart_queue_callback, info,
+					 BLKIF_MAX_SEGMENTS_PER_REQUEST);
 	    return 1;
     }
 
@@ -270,7 +271,7 @@ static int blkif_queue_request(struct request *req)
             fsect = bvec->bv_offset >> 9;
             lsect = fsect + (bvec->bv_len >> 9) - 1;
             /* install a grant reference. */
-            ref = gnttab_claim_grant_reference(&gref_head, gref_terminal);
+            ref = gnttab_claim_grant_reference(&gref_head);
             ASSERT( ref != -ENOSPC );
 
             gnttab_grant_foreign_access_ref(
@@ -294,7 +295,7 @@ static int blkif_queue_request(struct request *req)
     /* Keep a private copy so we can reissue requests when recovering. */
     pickle_request(&blk_shadow[id], ring_req);
 
-    gnttab_free_grant_references(&gref_head, gref_terminal);
+    gnttab_free_grant_references(gref_head);
 
     return 0;
 }
@@ -738,7 +739,7 @@ static int blkif_queue_request(unsigned long   id,
             blk_shadow[req->id].request = (unsigned long)id;
 
             /* install a grant reference. */
-            ref = gnttab_claim_grant_reference(&gref_head, gref_terminal);
+            ref = gnttab_claim_grant_reference(&gref_head);
             ASSERT( ref != -ENOSPC );
 
             gnttab_grant_foreign_access_ref(
@@ -790,7 +791,7 @@ static int blkif_queue_request(unsigned long   id,
     req->handle        = handle;
     req->nr_segments   = 1;
     /* install a grant reference. */
-    ref = gnttab_claim_grant_reference(&gref_head, gref_terminal);
+    ref = gnttab_claim_grant_reference(&gref_head);
     ASSERT( ref != -ENOSPC );
 
     gnttab_grant_foreign_access_ref(
