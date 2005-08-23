@@ -1,0 +1,34 @@
+Display error messages on the help line after bad input at a prompt.
+Fractional delay times
+Use prompting to search for domains
+Better line editing?
+
+* Make CPU in % more accurate
+* Domain total network TX % and RX %
+
+Like Top, f feature, field select of domain columns, toggle the display of
+field by typing the letter associated with field, if displayed it shows in
+bold and the letter is Capitalized along with a leading asterisk for the
+field, if not selected for display letter is lowercase, no leading asterisk
+and field is not bolded.
+
+Like Top, ordering of domain columns, o feature Capital letter shifts left,
+lowercase letter shifts right?
+
+Color
+Full management: pause, destroy, create domains
+
+Add support for Virtual Block Devices (vbd)
+
+To think about:
+Support for one than one node display (distributed monitoring 
+from any node of all other nodes in a cluster)
+Bottom line option (Switch node, Search node [tab completion?])
+
+Capture/Logging of resource information generated during a time interval.
+-b batch mode dump snapshots to standard output (used with -n)
+-n number of iterations to dump to standard output (unlimited if not specified)
+-d monitor DomIDs as -dD1,-dD2 or -dD1,D2...
+   Monitor only domains with specified domain IDs
+-m monitor nodeIDs as -mN1,-mN2 or -mN1,N2...
+   Monitor only domains with specified node IDs
