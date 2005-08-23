@@ -147,6 +147,7 @@
 ^tools/xcs/xcsdump$
 ^tools/xcutils/xc_restore$
 ^tools/xcutils/xc_save$
+^tools/xenstat/xentop/xentop$
 ^tools/xenstore/testsuite/tmp/.*$
 ^tools/xenstore/xen$
 ^tools/xenstore/xenstored$

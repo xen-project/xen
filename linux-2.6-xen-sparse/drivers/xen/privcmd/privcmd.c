@@ -167,7 +167,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
             if (ret)
                 goto batch_err;
 
-            u.val = (mfn << PAGE_SHIFT) | pgprot_val(vma->vm_page_prot);
+            u.val = pte_val_ma(pfn_pte_ma(mfn, vma->vm_page_prot));
             u.ptr = ptep;
 
             if ( unlikely(HYPERVISOR_mmu_update(&u, 1, NULL, m.dom) < 0) )

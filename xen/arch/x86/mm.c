@@ -444,7 +444,7 @@ get_page_from_l1e(
 
     if ( unlikely(l1e_get_flags(l1e) & L1_DISALLOW_MASK) )
     {
-        MEM_LOG("Bad L1 flags %x\n", l1e_get_flags(l1e) & L1_DISALLOW_MASK);
+        MEM_LOG("Bad L1 flags %x", l1e_get_flags(l1e) & L1_DISALLOW_MASK);
         return 0;
     }
 
@@ -490,7 +490,7 @@ get_page_from_l2e(
 
     if ( unlikely((l2e_get_flags(l2e) & L2_DISALLOW_MASK)) )
     {
-        MEM_LOG("Bad L2 flags %x\n", l2e_get_flags(l2e) & L2_DISALLOW_MASK);
+        MEM_LOG("Bad L2 flags %x", l2e_get_flags(l2e) & L2_DISALLOW_MASK);
         return 0;
     }
 
@@ -523,7 +523,7 @@ get_page_from_l3e(
 
     if ( unlikely((l3e_get_flags(l3e) & L3_DISALLOW_MASK)) )
     {
-        MEM_LOG("Bad L3 flags %x\n", l3e_get_flags(l3e) & L3_DISALLOW_MASK);
+        MEM_LOG("Bad L3 flags %x", l3e_get_flags(l3e) & L3_DISALLOW_MASK);
         return 0;
     }
 
@@ -557,7 +557,7 @@ get_page_from_l4e(
 
     if ( unlikely((l4e_get_flags(l4e) & L4_DISALLOW_MASK)) )
     {
-        MEM_LOG("Bad L4 flags %x\n", l4e_get_flags(l4e) & L4_DISALLOW_MASK);
+        MEM_LOG("Bad L4 flags %x", l4e_get_flags(l4e) & L4_DISALLOW_MASK);
         return 0;
     }
 
@@ -1025,7 +1025,7 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
          unlikely(o != l1e_get_intpte(ol1e)) )
     {
         MEM_LOG("Failed to update %" PRIpte " -> %" PRIpte
-                ": saw %" PRIpte "\n",
+                ": saw %" PRIpte,
                 l1e_get_intpte(ol1e),
                 l1e_get_intpte(nl1e),
                 o);
@@ -1051,7 +1051,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
     {
         if ( unlikely(l1e_get_flags(nl1e) & L1_DISALLOW_MASK) )
         {
-            MEM_LOG("Bad L1 flags %x\n",
+            MEM_LOG("Bad L1 flags %x",
                     l1e_get_flags(nl1e) & L1_DISALLOW_MASK);
             return 0;
         }
@@ -1113,7 +1113,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
     {
         if ( unlikely(l2e_get_flags(nl2e) & L2_DISALLOW_MASK) )
         {
-            MEM_LOG("Bad L2 flags %x\n",
+            MEM_LOG("Bad L2 flags %x",
                     l2e_get_flags(nl2e) & L2_DISALLOW_MASK);
             return 0;
         }
@@ -1175,7 +1175,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     {
         if ( unlikely(l3e_get_flags(nl3e) & L3_DISALLOW_MASK) )
         {
-            MEM_LOG("Bad L3 flags %x\n",
+            MEM_LOG("Bad L3 flags %x",
                     l3e_get_flags(nl3e) & L3_DISALLOW_MASK);
             return 0;
         }
@@ -1237,7 +1237,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
     {
         if ( unlikely(l4e_get_flags(nl4e) & L4_DISALLOW_MASK) )
         {
-            MEM_LOG("Bad L4 flags %x\n",
+            MEM_LOG("Bad L4 flags %x",
                     l4e_get_flags(nl4e) & L4_DISALLOW_MASK);
             return 0;
         }
@@ -1598,7 +1598,7 @@ static int set_foreigndom(unsigned int cpu, domid_t domid)
             percpu_info[cpu].foreign = dom_io;
             break;
         default:
-            MEM_LOG("Dom %u cannot set foreign dom\n", d->domain_id);
+            MEM_LOG("Dom %u cannot set foreign dom", d->domain_id);
             okay = 0;
             break;
         }
@@ -1831,7 +1831,7 @@ int do_mmuext_op(
         case MMUEXT_FLUSH_CACHE:
             if ( unlikely(!IS_CAPABLE_PHYSDEV(d)) )
             {
-                MEM_LOG("Non-physdev domain tried to FLUSH_CACHE.\n");
+                MEM_LOG("Non-physdev domain tried to FLUSH_CACHE.");
                 okay = 0;
             }
             else
@@ -1845,7 +1845,7 @@ int do_mmuext_op(
             if ( shadow_mode_external(d) )
             {
                 MEM_LOG("ignoring SET_LDT hypercall from external "
-                        "domain %u\n", d->domain_id);
+                        "domain %u", d->domain_id);
                 okay = 0;
                 break;
             }
@@ -1916,7 +1916,7 @@ int do_mmuext_op(
                  unlikely(IS_XEN_HEAP_FRAME(page)) )
             {
                 MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
-                        "page is in Xen heap (%lx), or dom is dying (%ld).\n",
+                        "page is in Xen heap (%lx), or dom is dying (%ld).",
                         e->tot_pages, e->max_pages, op.mfn, e->domain_flags);
                 okay = 0;
                 goto reassign_fail;
@@ -1937,7 +1937,7 @@ int do_mmuext_op(
                      unlikely(_nd != _d) )
                 {
                     MEM_LOG("Bad page values %lx: ed=%p(%u), sd=%p,"
-                            " caf=%08x, taf=%" PRtype_info "\n",
+                            " caf=%08x, taf=%" PRtype_info,
                             page_to_pfn(page), d, d->domain_id,
                             unpickle_domptr(_nd), x, page->u.inuse.type_info);
                     okay = 0;
@@ -2301,7 +2301,7 @@ int update_grant_pte_mapping(
     if ( ((type_info & PGT_type_mask) != PGT_l1_page_table) ||
          !get_page_type(page, type_info & (PGT_type_mask|PGT_va_mask)) )
     {
-        DPRINTK("Grant map attempted to update a non-L1 page\n");
+        MEM_LOG("Grant map attempted to update a non-L1 page");
         rc = GNTST_general_error;
         goto failed;
     }
@@ -2363,7 +2363,7 @@ int clear_grant_pte_mapping(
     if ( ((type_info & PGT_type_mask) != PGT_l1_page_table) ||
          !get_page_type(page, type_info & (PGT_type_mask|PGT_va_mask)) )
     {
-        DPRINTK("Grant map attempted to update a non-L1 page\n");
+        MEM_LOG("Grant map attempted to update a non-L1 page");
         rc = GNTST_general_error;
         goto failed;
     }
@@ -2378,7 +2378,7 @@ int clear_grant_pte_mapping(
     /* Check that the virtual address supplied is actually mapped to frame. */
     if ( unlikely((l1e_get_intpte(ol1e) >> PAGE_SHIFT) != frame) )
     {
-        DPRINTK("PTE entry %lx for address %lx doesn't match frame %lx\n",
+        MEM_LOG("PTE entry %lx for address %lx doesn't match frame %lx",
                 (unsigned long)l1e_get_intpte(ol1e), addr, frame);
         put_page_type(page);
         rc = GNTST_general_error;
@@ -2388,7 +2388,7 @@ int clear_grant_pte_mapping(
     /* Delete pagetable entry. */
     if ( unlikely(__put_user(0, (intpte_t *)va)))
     {
-        DPRINTK("Cannot delete PTE entry at %p.\n", va);
+        MEM_LOG("Cannot delete PTE entry at %p", va);
         put_page_type(page);
         rc = GNTST_general_error;
         goto failed;
@@ -2452,7 +2452,7 @@ int clear_grant_va_mapping(unsigned long addr, unsigned long frame)
 
     if ( unlikely(__get_user(ol1e.l1, &pl1e->l1) != 0) )
     {
-        DPRINTK("Could not find PTE entry for address %lx\n", addr);
+        MEM_LOG("Could not find PTE entry for address %lx", addr);
         return GNTST_general_error;
     }
 
@@ -2462,7 +2462,7 @@ int clear_grant_va_mapping(unsigned long addr, unsigned long frame)
      */
     if ( unlikely(l1e_get_pfn(ol1e) != frame) )
     {
-        DPRINTK("PTE entry %lx for address %lx doesn't match frame %lx\n",
+        MEM_LOG("PTE entry %lx for address %lx doesn't match frame %lx",
                 l1e_get_pfn(ol1e), addr, frame);
         return GNTST_general_error;
     }
@@ -2470,7 +2470,7 @@ int clear_grant_va_mapping(unsigned long addr, unsigned long frame)
     /* Delete pagetable entry. */
     if ( unlikely(__put_user(0, &pl1e->l1)) )
     {
-        DPRINTK("Cannot delete PTE entry at %p.\n", (unsigned long *)pl1e);
+        MEM_LOG("Cannot delete PTE entry at %p", (unsigned long *)pl1e);
         return GNTST_general_error;
     }
     
@@ -2930,7 +2930,7 @@ int revalidate_l1(
 
         if ( unlikely(!get_page_from_l1e(nl1e, d)) )
         {
-            MEM_LOG("ptwr: Could not re-validate l1 page\n");
+            MEM_LOG("ptwr: Could not re-validate l1 page");
             /*
              * Make the remaining p.t's consistent before crashing, so the
              * reference counts are correct.
@@ -3056,7 +3056,7 @@ static int ptwr_emulated_update(
     /* Aligned access only, thank you. */
     if ( !access_ok(addr, bytes) || ((addr & (bytes-1)) != 0) )
     {
-        MEM_LOG("ptwr_emulate: Unaligned or bad size ptwr access (%d, %lx)\n",
+        MEM_LOG("ptwr_emulate: Unaligned or bad size ptwr access (%d, %lx)",
                 bytes, addr);
         return X86EMUL_UNHANDLEABLE;
     }
@@ -3089,7 +3089,7 @@ static int ptwr_emulated_update(
     if (__copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
                          sizeof(pte)))
     {
-        MEM_LOG("ptwr_emulate: Cannot read thru linear_pg_table\n");
+        MEM_LOG("ptwr_emulate: Cannot read thru linear_pg_table");
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -3102,7 +3102,7 @@ static int ptwr_emulated_update(
          (page_get_owner(page) != d) )
     {
         MEM_LOG("ptwr_emulate: Page is mistyped or bad pte "
-                "(%lx, %" PRtype_info ")\n",
+                "(%lx, %" PRtype_info ")",
                 l1e_get_pfn(pte), page->u.inuse.type_info);
         return X86EMUL_UNHANDLEABLE;
     }
