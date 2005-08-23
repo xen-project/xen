@@ -50,7 +50,6 @@ void __init bt_iounmap(void *addr, unsigned long size)
 
 #else
 
-#if defined(__i386__)
 /*
  * Does @address reside within a non-highmem page that is local to this virtual
  * machine (i.e., not an I/O page, nor a memory page belonging to another VM).
@@ -64,14 +63,7 @@ static inline int is_local_lowmem(unsigned long address)
 	unsigned long pfn = mfn_to_pfn(mfn);
 	return ((pfn < max_low_pfn) && (phys_to_machine_mapping[pfn] == mfn));
 }
-#elif defined(__x86_64__)
-/*
- * 
- */
-static inline int is_local_lowmem(unsigned long address)
-{
-        return 0;
-}
+
 #endif
 
 /*
@@ -142,9 +134,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	if (direct_remap_area_pages(&init_mm, (unsigned long) addr, phys_addr,
 				    size, __pgprot(_PAGE_PRESENT | _PAGE_RW |
 						   _PAGE_DIRTY | _PAGE_ACCESSED
-#if defined(__x86_64__)
                                                    | _PAGE_USER
-#endif
 						   | flags), domid)) {
 		vunmap((void __force *) addr);
 		return NULL;
@@ -441,7 +431,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
 		 * Fill in the machine address: PTE ptr is done later by
 		 * __direct_remap_area_pages(). 
 		 */
-		v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot);
+		v->val = pte_val_ma(pfn_pte_ma(machine_addr >> PAGE_SHIFT, prot));
 
 		machine_addr += PAGE_SIZE;
 		address += PAGE_SIZE; 

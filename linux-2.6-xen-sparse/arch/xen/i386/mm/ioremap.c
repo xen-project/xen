@@ -346,7 +346,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
 		 * Fill in the machine address: PTE ptr is done later by
 		 * __direct_remap_area_pages(). 
 		 */
-		v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot);
+		v->val = pte_val_ma(pfn_pte_ma(machine_addr >> PAGE_SHIFT, prot));
 
 		machine_addr += PAGE_SIZE;
 		address += PAGE_SIZE; 
