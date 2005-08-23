@@ -627,6 +627,8 @@ int do_xenbus_probe(void *unused)
 	/* Watch for changes. */
 	register_xenbus_watch(&fe_watch);
 	register_xenbus_watch(&be_watch);
+	/* Notify others that xenstore is up */
+	notifier_call_chain(&xenstore_chain, 0, 0);
 	up(&xenbus_lock);
 	return 0;
 }
