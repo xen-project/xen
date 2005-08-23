@@ -108,9 +108,10 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
     return 0;
 }
 
-void free_blkif(blkif_t *blkif)
+static void free_blkif(void *arg)
 {
     evtchn_op_t op = { .cmd = EVTCHNOP_close };
+    blkif_t *blkif = (blkif_t *)arg;
 
     op.u.close.port = blkif->evtchn;
     op.u.close.dom = DOMID_SELF;
@@ -118,6 +119,9 @@ void free_blkif(blkif_t *blkif)
     op.u.close.port = blkif->remote_evtchn;
     op.u.close.dom = blkif->domid;
     HYPERVISOR_event_channel_op(&op);
+
+    if (vbd_is_active(&blkif->vbd))
+	vbd_free(&blkif->vbd);
 
     if (blkif->evtchn)
         unbind_evtchn_from_irqhandler(blkif->evtchn, blkif);
@@ -128,6 +132,12 @@ void free_blkif(blkif_t *blkif)
     }
 
     kmem_cache_free(blkif_cachep, blkif);
+}
+
+void free_blkif_callback(blkif_t *blkif)
+{
+    INIT_WORK(&blkif->free_work, free_blkif, (void *)blkif);
+    schedule_work(&blkif->free_work);
 }
 
 void __init blkif_interface_init(void)

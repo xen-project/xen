@@ -26,7 +26,6 @@ struct backend_info
 
 	/* our communications channel */
 	blkif_t *blkif;
-	struct vbd *vbd;
 
 	long int frontend_id;
 	long int pdev;
@@ -47,8 +46,6 @@ static int blkback_remove(struct xenbus_device *dev)
 	if (be->watch.node)
 		unregister_xenbus_watch(&be->watch);
 	unregister_xenbus_watch(&be->backend_watch);
-	if (be->vbd)
-		vbd_free(be->blkif, be->vbd);
 	if (be->blkif)
 		blkif_put(be->blkif);
 	if (be->frontpath)
@@ -72,7 +69,7 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		device_unregister(&be->dev->dev);
 		return;
 	}
-	if (vbd_is_active(be->vbd))
+	if (vbd_is_active(&be->blkif->vbd))
 		return;
 
 	err = xenbus_gather(be->frontpath, "grant-id", "%lu", &sharedmfn,
@@ -105,7 +102,7 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 	}
 
 	err = xenbus_printf(be->dev->nodename, "sectors", "%lu",
-			    vbd_size(be->vbd));
+			    vbd_size(&be->blkif->vbd));
 	if (err) {
 		xenbus_dev_error(be->dev, err, "writing %s/sectors",
 				 be->dev->nodename);
@@ -114,14 +111,14 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 
 	/* FIXME: use a typename instead */
 	err = xenbus_printf(be->dev->nodename, "info", "%u",
-			    vbd_info(be->vbd));
+			    vbd_info(&be->blkif->vbd));
 	if (err) {
 		xenbus_dev_error(be->dev, err, "writing %s/info",
 				 be->dev->nodename);
 		goto abort;
 	}
 	err = xenbus_printf(be->dev->nodename, "sector-size", "%lu",
-			    vbd_secsize(be->vbd));
+			    vbd_secsize(&be->blkif->vbd));
 	if (err) {
 		xenbus_dev_error(be->dev, err, "writing %s/sector-size",
 				 be->dev->nodename);
@@ -140,7 +137,7 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 	}
 
 	/* We're ready, activate. */
-	vbd_activate(be->blkif, be->vbd);
+	vbd_activate(&be->blkif->vbd);
 
 	xenbus_transaction_end(0);
 	xenbus_dev_ok(be->dev);
@@ -235,13 +232,9 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 			goto device_fail;
 		}
 
-		be->vbd = vbd_create(be->blkif, handle, be->pdev,
-				     be->readonly);
-		if (IS_ERR(be->vbd)) {
-			err = PTR_ERR(be->vbd);
-			be->vbd = NULL;
+		err = vbd_create(be->blkif, handle, be->pdev, be->readonly);
+		if (err)
 			goto device_fail;
-		}
 
 		frontend_changed(&be->watch, be->frontpath);
 	}

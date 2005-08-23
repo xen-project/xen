@@ -9,16 +9,6 @@
 #include "common.h"
 #include <asm-xen/xenbus.h>
 
-struct vbd {
-    blkif_vdev_t   handle;      /* what the domain refers to this vbd as */
-    unsigned char  readonly;    /* Non-zero -> read-only */
-    unsigned char  type;        /* VDISK_xxx */
-    blkif_pdev_t   pdevice;     /* phys device that this vbd maps to */
-    struct block_device *bdev;
-
-    int active;
-}; 
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static inline dev_t vbd_map_devnum(blkif_pdev_t cookie)
 {
@@ -53,18 +43,12 @@ int vbd_is_active(struct vbd *vbd)
 	return vbd->active;
 }
 
-struct vbd *vbd_create(blkif_t *blkif, blkif_vdev_t handle,
-		       blkif_pdev_t pdevice, int readonly)
+int vbd_create(blkif_t *blkif, blkif_vdev_t handle,
+	       blkif_pdev_t pdevice, int readonly)
 {
-    struct vbd *vbd, *err; 
+    struct vbd *vbd;
 
-    if ( unlikely((vbd = kmalloc(sizeof(struct vbd), GFP_KERNEL)) == NULL) )
-    {
-        DPRINTK("vbd_create: out of memory\n");
-	return ERR_PTR(-ENOMEM);
-    }
-
-    blkif->vbd = vbd;
+    vbd = &blkif->vbd;
     vbd->handle   = handle; 
     vbd->readonly = readonly;
     vbd->type     = 0;
@@ -79,16 +63,14 @@ struct vbd *vbd_create(blkif_t *blkif, blkif_vdev_t handle,
     if ( IS_ERR(vbd->bdev) )
     {
         DPRINTK("vbd_creat: device %08x doesn't exist.\n", vbd->pdevice);
-        err = ERR_PTR(-ENOENT);
-	goto out;
+        return -ENOENT;
     }
 
     if ( (vbd->bdev->bd_disk == NULL) )
     {
         DPRINTK("vbd_creat: device %08x doesn't exist.\n", vbd->pdevice);
         bdev_put(vbd->bdev);
-        err = ERR_PTR(-ENOENT);
-	goto out;
+        return -ENOENT;
     }
 
     if ( vbd->bdev->bd_disk->flags & GENHD_FL_CD )
@@ -99,41 +81,33 @@ struct vbd *vbd_create(blkif_t *blkif, blkif_vdev_t handle,
     if ( (blk_size[MAJOR(vbd->pdevice)] == NULL) || (vbd_sz(vbd) == 0) )
     {
         DPRINTK("vbd_creat: device %08x doesn't exist.\n", vbd->pdevice);
-        err = ERR_PTR(-ENOENT);
-	goto out;
+        return -ENOENT;
     }
 #endif
 
     DPRINTK("Successful creation of handle=%04x (dom=%u)\n",
             handle, blkif->domid);
-    return vbd;
-
- out:
-    kfree(vbd);
-    return err;
+    return 0;
 }
 
-void vbd_activate(blkif_t *blkif, struct vbd *vbd)
+void vbd_activate(struct vbd *vbd)
 {
     BUG_ON(vbd_is_active(vbd));
 
     /* Now we're active. */
     vbd->active = 1;
-    blkif_get(blkif);
 }
 
-void vbd_free(blkif_t *blkif, struct vbd *vbd)
+void vbd_free(struct vbd *vbd)
 {
-    if (vbd_is_active(vbd)) {
-	blkif_put(blkif);
-    }
+    if (vbd_is_active(vbd))
+	vbd->active = 0;
     bdev_put(vbd->bdev);
-    kfree(vbd);
 }
 
 int vbd_translate(struct phys_req *req, blkif_t *blkif, int operation)
 {
-    struct vbd *vbd = blkif->vbd;
+    struct vbd *vbd = &blkif->vbd;
     int rc = -EACCES;
 
     if ((operation == WRITE) && vbd->readonly)

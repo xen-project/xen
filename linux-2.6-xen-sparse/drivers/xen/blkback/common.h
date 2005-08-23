@@ -5,7 +5,6 @@
 #include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
-#include <linux/rbtree.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/blkdev.h>
@@ -30,12 +29,19 @@
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-typedef struct rb_root rb_root_t;
-typedef struct rb_node rb_node_t;
-#else
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 struct block_device;
 #endif
+
+struct vbd {
+    blkif_vdev_t   handle;      /* what the domain refers to this vbd as */
+    unsigned char  readonly;    /* Non-zero -> read-only */
+    unsigned char  type;        /* VDISK_xxx */
+    blkif_pdev_t   pdevice;     /* phys device that this vbd maps to */
+    struct block_device *bdev;
+
+    int active;
+}; 
 
 typedef struct blkif_st {
     /* Unique identifier for this interface. */
@@ -48,7 +54,7 @@ typedef struct blkif_st {
     /* Comms information. */
     blkif_back_ring_t blk_ring;
     /* VBDs attached to this interface. */
-    struct vbd *vbd;
+    struct vbd        vbd;
     /* Private fields. */
     enum { DISCONNECTED, CONNECTED } status;
     /*
@@ -64,7 +70,7 @@ typedef struct blkif_st {
     spinlock_t       blk_ring_lock;
     atomic_t         refcnt;
 
-    struct work_struct work;
+    struct work_struct free_work;
     u16 shmem_handle;
     unsigned long shmem_vaddr;
     grant_ref_t shmem_ref;
@@ -76,23 +82,22 @@ void blkif_connect(blkif_be_connect_t *connect);
 int  blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id);
 void blkif_disconnect_complete(blkif_t *blkif);
 blkif_t *alloc_blkif(domid_t domid);
-void free_blkif(blkif_t *blkif);
+void free_blkif_callback(blkif_t *blkif);
 int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn);
 
 #define blkif_get(_b) (atomic_inc(&(_b)->refcnt))
 #define blkif_put(_b)                             \
     do {                                          \
         if ( atomic_dec_and_test(&(_b)->refcnt) ) \
-            free_blkif(_b);			  \
+            free_blkif_callback(_b);		  \
     } while (0)
 
-struct vbd;
-void vbd_free(blkif_t *blkif, struct vbd *vbd);
-
 /* Creates inactive vbd. */
-struct vbd *vbd_create(blkif_t *blkif, blkif_vdev_t vdevice, blkif_pdev_t pdevice, int readonly);
+int vbd_create(blkif_t *blkif, blkif_vdev_t vdevice, blkif_pdev_t pdevice,
+	       int readonly);
 int vbd_is_active(struct vbd *vbd);
-void vbd_activate(blkif_t *blkif, struct vbd *vbd);
+void vbd_activate(struct vbd *vbd);
+void vbd_free(struct vbd *vbd);
 
 unsigned long vbd_size(struct vbd *vbd);
 unsigned int vbd_info(struct vbd *vbd);
