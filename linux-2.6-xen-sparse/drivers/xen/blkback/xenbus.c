@@ -201,20 +201,7 @@ static int blkback_probe(struct xenbus_device *dev,
 		xenbus_dev_error(dev, -ENOMEM, "allocating backend structure");
 		return -ENOMEM;
 	}
-
 	memset(be, 0, sizeof(*be));
-
-	be->dev = dev;
-	be->backend_watch.node = dev->nodename;
-	be->backend_watch.callback = backend_changed;
-	err = register_xenbus_watch(&be->backend_watch);
-	if (err) {
-		xenbus_dev_error(dev, err, "adding backend watch on %s",
-				 dev->nodename);
-		goto free_be;
-	}
-
-	dev->data = be;
 
 	frontend = NULL;
 	err = xenbus_gather(dev->nodename,
@@ -223,17 +210,28 @@ static int blkback_probe(struct xenbus_device *dev,
 			    NULL);
 	if (XENBUS_EXIST_ERR(err))
 		goto free_be;
-	if (frontend &&
-	    (strlen(frontend) == 0 || !xenbus_exists(frontend, ""))) {
+	if (err < 0) {
+		xenbus_dev_error(dev, err,
+				 "reading %s/frontend or frontend-id",
+				 dev->nodename);
+		goto free_be;
+	}
+	if (strlen(frontend) == 0 || !xenbus_exists(frontend, "")) {
 		/* If we can't get a frontend path and a frontend-id,
 		 * then our bus-id is no longer valid and we need to
 		 * destroy the backend device.
 		 */
+		err = -ENOENT;
 		goto free_be;
 	}
-	if (err < 0) {
-		xenbus_dev_error(dev, err,
-				 "reading %s/frontend or frontend-id",
+
+	be->dev = dev;
+	be->backend_watch.node = dev->nodename;
+	be->backend_watch.callback = backend_changed;
+	err = register_xenbus_watch(&be->backend_watch);
+	if (err) {
+		be->backend_watch.node = NULL;
+		xenbus_dev_error(dev, err, "adding backend watch on %s",
 				 dev->nodename);
 		goto free_be;
 	}
@@ -250,10 +248,14 @@ static int blkback_probe(struct xenbus_device *dev,
 		goto free_be;
 	}
 
+	dev->data = be;
+
 	backend_changed(&be->backend_watch, dev->nodename);
-	return err;
+	return 0;
 
  free_be:
+	if (be->backend_watch.node)
+		unregister_xenbus_watch(&be->backend_watch);
 	if (frontend)
 		kfree(frontend);
 	kfree(be);
