@@ -112,7 +112,7 @@ struct blkfront_info
 	int connected;
 	char *backend;
 	int backend_id;
-	int grant_id;
+	int ring_ref;
 	blkif_front_ring_t ring;
 	unsigned int evtchn;
 	struct xlbd_major_info *mi;

@@ -1123,12 +1123,12 @@ static int setup_blkring(struct xenbus_device *dev, struct blkfront_info *info)
 		xenbus_dev_error(dev, err, "granting access to ring page");
 		return err;
 	}
-	info->grant_id = err;
+	info->ring_ref = err;
 
 	op.u.alloc_unbound.dom = info->backend_id;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
-		gnttab_end_foreign_access(info->grant_id, 0);
+		gnttab_end_foreign_access(info->ring_ref, 0);
 		free_page((unsigned long)info->ring.sring);
 		info->ring.sring = 0;
 		xenbus_dev_error(dev, err, "allocating event channel");
@@ -1176,9 +1176,9 @@ static int talk_to_backend(struct xenbus_device *dev,
 		goto destroy_blkring;
 	}
 
-	err = xenbus_printf(dev->nodename, "grant-id","%u", info->grant_id);
+	err = xenbus_printf(dev->nodename, "ring-ref","%u", info->ring_ref);
 	if (err) {
-		message = "writing grant-id";
+		message = "writing ring-ref";
 		goto abort_transaction;
 	}
 	err = xenbus_printf(dev->nodename,

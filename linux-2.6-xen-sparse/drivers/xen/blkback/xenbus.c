@@ -57,7 +57,7 @@ static int blkback_remove(struct xenbus_device *dev)
 /* Front end tells us frame. */
 static void frontend_changed(struct xenbus_watch *watch, const char *node)
 {
-	unsigned long sharedmfn;
+	unsigned long ring_ref;
 	unsigned int evtchn;
 	int err;
 	struct backend_info *be
@@ -72,11 +72,11 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 	if (be->blkif == NULL || be->blkif->status == CONNECTED)
 		return;
 
-	err = xenbus_gather(be->frontpath, "grant-id", "%lu", &sharedmfn,
+	err = xenbus_gather(be->frontpath, "ring-ref", "%lu", &ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
 		xenbus_dev_error(be->dev, err,
-				 "reading %s/grant-id and event-channel",
+				 "reading %s/ring-ref and event-channel",
 				 be->frontpath);
 		return;
 	}
@@ -113,11 +113,10 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 	}
 
 	/* Map the shared frame, irq etc. */
-	err = blkif_map(be->blkif, sharedmfn, evtchn);
+	err = blkif_map(be->blkif, ring_ref, evtchn);
 	if (err) {
-		xenbus_dev_error(be->dev, err,
-				 "mapping shared-frame %lu port %u",
-				 sharedmfn, evtchn);
+		xenbus_dev_error(be->dev, err, "mapping ring-ref %lu port %u",
+				 ring_ref, evtchn);
 		goto abort;
 	}
 
