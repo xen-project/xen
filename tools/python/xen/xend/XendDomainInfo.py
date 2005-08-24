@@ -265,6 +265,8 @@ class XendDomainInfo:
         self.info = None
         self.blkif_backend = False
         self.netif_backend = False
+        self.netif_idx = 0
+        
         #todo: state: running, suspended
         self.state = STATE_VM_OK
         self.state_updated = threading.Condition()
@@ -400,8 +402,7 @@ class XendDomainInfo:
             db['virtual-device'] = "%i" % devnum
             #db['backend'] = sxp.child_value(devconfig, 'backend', '0')
             db['backend'] = backdb.getPath()
-            db['backend-id'] = "%i" % int(sxp.child_value(devconfig,
-                                                          'backend', '0'))
+            db['backend-id'] = "%i" % backdom.id
 
             backdb['frontend'] = db.getPath()
             (type, params) = string.split(sxp.child_value(devconfig, 'uname'), ':', 1)
@@ -417,6 +418,37 @@ class XendDomainInfo:
             db.saveDB(save=True)
             
             return
+
+        if type == 'vif':
+            backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
+
+            log.error(devconfig)
+            
+            devnum = self.netif_idx
+            self.netif_idx += 1
+
+            # create backend db
+            backdb = backdom.db.addChild("/backend/%s/%s/%d" %
+                                         (type, self.uuid, devnum))
+
+            # create frontend db
+            db = self.db.addChild("/device/%s/%d" % (type, devnum))
+            
+            backdb['frontend'] = db.getPath()
+            backdb['frontend-id'] = "%i" % self.id
+            backdb['handle'] = "%i" % devnum
+            backdb.saveDB(save=True)
+
+            db['backend'] = backdb.getPath()
+            db['backend-id'] = "%i" % backdom.id
+            db['handle'] = "%i" % devnum
+            log.error(sxp.child_value(devconfig, 'mac'))
+            db['mac'] = sxp.child_value(devconfig, 'mac')
+
+            db.saveDB(save=True)
+
+            return
+        
         ctrl = self.findDeviceController(type)
         return ctrl.createDevice(devconfig, recreate=self.recreate,
                                  change=change)

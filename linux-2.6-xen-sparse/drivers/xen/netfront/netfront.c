@@ -48,7 +48,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm-xen/evtchn.h>
-#include <asm-xen/ctrl_if.h>
+#include <asm-xen/xenbus.h>
 #include <asm-xen/xen-public/io/netif.h>
 #include <asm-xen/balloon.h>
 #include <asm/page.h>
@@ -112,7 +112,6 @@ static grant_ref_t grant_rx_ref[NETIF_RX_RING_SIZE + 1];
 #endif
 
 #if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
-static domid_t rdomid = 0;
 #define GRANT_INVALID_REF	(0xFFFF)
 #endif
 
@@ -135,10 +134,11 @@ static void xennet_proc_delif(struct net_device *dev);
 
 static struct list_head dev_list;
 
+#define netfront_info net_private
 struct net_private
 {
     struct list_head list;
-    struct net_device *dev;
+    struct net_device *netdev;
 
     struct net_device_stats stats;
     NETIF_RING_IDX rx_resp_cons, tx_resp_cons;
@@ -176,6 +176,14 @@ struct net_private
      */
     struct sk_buff *tx_skbs[NETIF_TX_RING_SIZE+1];
     struct sk_buff *rx_skbs[NETIF_RX_RING_SIZE+1];
+
+	struct xenbus_device *xbdev;
+	char *backend;
+	int backend_id;
+	struct xenbus_watch watch;
+	int tx_ring_ref;
+	int rx_ring_ref;
+	u8 mac[ETH_ALEN];
 };
 
 /* Access macros for acquiring freeing slots in {tx,rx}_skbs[]. */
@@ -186,13 +194,6 @@ struct net_private
  ({ unsigned long _id = (unsigned long)(_list)[0]; \
     (_list)[0]  = (_list)[_id];                    \
     (unsigned short)_id; })
-
-static char *status_name[] = {
-    [NETIF_INTERFACE_STATUS_CLOSED]       = "closed",
-    [NETIF_INTERFACE_STATUS_DISCONNECTED] = "disconnected",
-    [NETIF_INTERFACE_STATUS_CONNECTED]    = "connected",
-    [NETIF_INTERFACE_STATUS_CHANGED]      = "changed",
-};
 
 static char *be_state_name[] = {
     [BEST_CLOSED]       = "closed",
@@ -219,7 +220,7 @@ static struct net_device *find_dev_by_handle(unsigned int handle)
     list_for_each (ent, &dev_list) {
         np = list_entry(ent, struct net_private, list);
         if (np->handle == handle)
-            return np->dev;
+            return np->netdev;
     }
     return NULL;
 }
@@ -448,7 +449,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
             BUG();
         }
         grant_rx_ref[id] = ref;
-        gnttab_grant_foreign_transfer_ref(ref, rdomid,
+        gnttab_grant_foreign_transfer_ref(ref, np->backend_id,
                                           virt_to_mfn(skb->head));
         np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.gref = ref;
 #endif
@@ -544,7 +545,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
         BUG();
     }
     mfn = virt_to_mfn(skb->data);
-    gnttab_grant_foreign_access_ref(ref, rdomid, mfn, GNTMAP_readonly);
+    gnttab_grant_foreign_access_ref(ref, np->backend_id, mfn, GNTMAP_readonly);
     tx->addr = ref << PAGE_SHIFT;
     grant_tx_ref[id] = ref;
 #else
@@ -809,7 +810,7 @@ static int network_close(struct net_device *dev)
 {
     struct net_private *np = netdev_priv(dev);
     np->user_state = UST_CLOSED;
-    netif_stop_queue(np->dev);
+    netif_stop_queue(np->netdev);
     return 0;
 }
 
@@ -821,8 +822,7 @@ static struct net_device_stats *network_get_stats(struct net_device *dev)
 }
 
 
-static void network_connect(struct net_device *dev,
-                            netif_fe_interface_status_t *status)
+static void network_connect(struct net_device *dev)
 {
     struct net_private *np;
     int i, requeue_idx;
@@ -890,7 +890,7 @@ static void network_connect(struct net_device *dev,
      */
     np->backend_state = BEST_CONNECTED;
     wmb();
-    notify_via_evtchn(status->evtchn);  
+    notify_via_evtchn(np->evtchn);  
     network_tx_buf_gc(dev);
 
     if (np->user_state == UST_OPEN)
@@ -900,108 +900,57 @@ static void network_connect(struct net_device *dev,
     spin_unlock_irq(&np->tx_lock);
 }
 
-static void vif_show(struct net_private *np)
+static void show_device(struct net_private *np)
 {
 #ifdef DEBUG
-    if (np) {
-        IPRINTK("<vif handle=%u %s(%s) evtchn=%u tx=%p rx=%p>\n",
-               np->handle,
-               be_state_name[np->backend_state],
-               np->user_state ? "open" : "closed",
-               np->evtchn,
-               np->tx,
-               np->rx);
-    } else {
-        IPRINTK("<vif NULL>\n");
-    }
+	if (np) {
+		IPRINTK("<vif handle=%u %s(%s) evtchn=%u tx=%p rx=%p>\n",
+			np->handle,
+			be_state_name[np->backend_state],
+			np->user_state ? "open" : "closed",
+			np->evtchn,
+			np->tx,
+			np->rx);
+	} else {
+		IPRINTK("<vif NULL>\n");
+	}
 #endif
-}
-
-/* Send a connect message to xend to tell it to bring up the interface. */
-static void send_interface_connect(struct net_private *np)
-{
-    int err;
-    ctrl_msg_t cmsg = {
-        .type    = CMSG_NETIF_FE,
-        .subtype = CMSG_NETIF_FE_INTERFACE_CONNECT,
-        .length  = sizeof(netif_fe_interface_connect_t),
-    };
-    netif_fe_interface_connect_t *msg = (void*)cmsg.msg;
-
-    msg->handle = np->handle;
-    msg->tx_shmem_frame = virt_to_mfn(np->tx);
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    err = gnttab_grant_foreign_access(rdomid, msg->tx_shmem_frame, 0);
-    if (err < 0) {
-        printk(KERN_ALERT "#### netfront can't grant access to tx_shmem\n");
-        BUG();
-    }
-    msg->tx_shmem_ref = err;
-#endif
-
-    msg->rx_shmem_frame = virt_to_mfn(np->rx);
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    err = gnttab_grant_foreign_access(rdomid, msg->rx_shmem_frame, 0);
-    if (err < 0) {
-        printk(KERN_ALERT "#### netfront can't grant access to rx_shmem\n");
-        BUG();
-    }
-    msg->rx_shmem_ref = err;
-#endif
-
-    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
-}
-
-/* Send a driver status notification to the domain controller. */
-static int send_driver_status(int ok)
-{
-    int err = 0;
-    ctrl_msg_t cmsg = {
-        .type    = CMSG_NETIF_FE,
-        .subtype = CMSG_NETIF_FE_DRIVER_STATUS,
-        .length  = sizeof(netif_fe_driver_status_t),
-    };
-    netif_fe_driver_status_t *msg = (void*)cmsg.msg;
-
-    msg->status = (ok ? NETIF_DRIVER_STATUS_UP : NETIF_DRIVER_STATUS_DOWN);
-    err = ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
-    return err;
 }
 
 /* Stop network device and free tx/rx queues and irq.
  */
-static void vif_release(struct net_private *np)
+static void shutdown_device(struct net_private *np)
 {
-    /* Stop old i/f to prevent errors whilst we rebuild the state. */
-    spin_lock_irq(&np->tx_lock);
-    spin_lock(&np->rx_lock);
-    netif_stop_queue(np->dev);
-    /* np->backend_state = BEST_DISCONNECTED; */
-    spin_unlock(&np->rx_lock);
-    spin_unlock_irq(&np->tx_lock);
+	/* Stop old i/f to prevent errors whilst we rebuild the state. */
+	spin_lock_irq(&np->tx_lock);
+	spin_lock(&np->rx_lock);
+	netif_stop_queue(np->netdev);
+	/* np->backend_state = BEST_DISCONNECTED; */
+	spin_unlock(&np->rx_lock);
+	spin_unlock_irq(&np->tx_lock);
     
-    /* Free resources. */
-    if ( np->tx != NULL )
-    {
-        unbind_evtchn_from_irqhandler(np->evtchn, np->dev);
-        free_page((unsigned long)np->tx);
-        free_page((unsigned long)np->rx);
-        np->evtchn = 0;
-        np->tx = NULL;
-        np->rx = NULL;
-    }
+	/* Free resources. */
+	if (np->tx) {
+		unbind_evtchn_from_irqhandler(np->evtchn, np->netdev);
+		np->evtchn = 0;
+		free_page((unsigned long)np->tx);
+		free_page((unsigned long)np->rx);
+		np->tx = NULL;
+		np->rx = NULL;
+	}
 }
 
 /* Release vif resources and close it down completely.
  */
 static void vif_close(struct net_private *np)
 {
+	BUG();
     WPRINTK("Unexpected netif-CLOSED message in state %s\n",
             be_state_name[np->backend_state]);
-    vif_release(np);
+    shutdown_device(np);
     np->backend_state = BEST_CLOSED;
     /* todo: take dev down and free. */
-    vif_show(np);
+    show_device(np);
 }
 
 /* Move the vif into disconnected state.
@@ -1010,6 +959,7 @@ static void vif_close(struct net_private *np)
  */
 static void vif_disconnect(struct net_private *np)
 {
+	BUG();
     if(np->tx) free_page((unsigned long)np->tx);
     if(np->rx) free_page((unsigned long)np->rx);
     // Before this np->tx and np->rx had better be null.
@@ -1018,8 +968,8 @@ static void vif_disconnect(struct net_private *np)
     memset(np->tx, 0, PAGE_SIZE);
     memset(np->rx, 0, PAGE_SIZE);
     np->backend_state = BEST_DISCONNECTED;
-    send_interface_connect(np);
-    vif_show(np);
+    // send_interface_connect(np);
+    show_device(np);
 }
 
 /* Begin interface recovery.
@@ -1037,11 +987,12 @@ static void vif_disconnect(struct net_private *np)
  */
 static void vif_reset(struct net_private *np)
 {
+	BUG();
     IPRINTK("Attempting to reconnect network interface: handle=%u\n",
             np->handle);    
-    vif_release(np);
+    shutdown_device(np);
     vif_disconnect(np);
-    vif_show(np);
+    show_device(np);
 }
 
 /* Move the vif into connected state.
@@ -1049,20 +1000,17 @@ static void vif_reset(struct net_private *np)
  * Binds the irq to the event channel.
  */
 static void 
-vif_connect(struct net_private *np, netif_fe_interface_status_t *status)
+connect_device(struct net_private *np, unsigned int evtchn)
 {
-    struct net_device *dev = np->dev;
-    memcpy(dev->dev_addr, status->mac, ETH_ALEN);
-    network_connect(dev, status);
-    np->evtchn = status->evtchn;
-#if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
-    rdomid = status->domid;
-#endif
+    struct net_device *dev = np->netdev;
+    memcpy(dev->dev_addr, np->mac, ETH_ALEN);
+    np->evtchn = evtchn;
+    network_connect(dev);
     (void)bind_evtchn_to_irqhandler(
         np->evtchn, netif_int, SA_SAMPLE_RANDOM, dev->name, dev);
     netctrl_connected_count();
     (void)send_fake_arp(dev);
-    vif_show(np);
+    show_device(np);
 }
 
 static struct ethtool_ops network_ethtool_ops =
@@ -1076,22 +1024,24 @@ static struct ethtool_ops network_ethtool_ops =
  * @param val return parameter for created device
  * @return 0 on success, error code otherwise
  */
-static int create_netdev(int handle, struct net_device **val)
+static int create_netdev(int handle, struct xenbus_device *dev,
+			 struct net_device **val)
 {
     int i, err = 0;
-    struct net_device *dev = NULL;
+    struct net_device *netdev = NULL;
     struct net_private *np = NULL;
 
-    if ((dev = alloc_etherdev(sizeof(struct net_private))) == NULL) {
+    if ((netdev = alloc_etherdev(sizeof(struct net_private))) == NULL) {
         printk(KERN_WARNING "%s> alloc_etherdev failed.\n", __FUNCTION__);
         err = -ENOMEM;
         goto exit;
     }
 
-    np                = netdev_priv(dev);
+    np                = netdev_priv(netdev);
     np->backend_state = BEST_CLOSED;
     np->user_state    = UST_CLOSED;
     np->handle        = handle;
+    np->xbdev         = dev;
     
     spin_lock_init(&np->tx_lock);
     spin_lock_init(&np->rx_lock);
@@ -1115,149 +1065,53 @@ static int create_netdev(int handle, struct net_device **val)
 #endif
     }
 
-    dev->open            = network_open;
-    dev->hard_start_xmit = network_start_xmit;
-    dev->stop            = network_close;
-    dev->get_stats       = network_get_stats;
-    dev->poll            = netif_poll;
-    dev->weight          = 64;
-    dev->features        = NETIF_F_IP_CSUM;
+    netdev->open            = network_open;
+    netdev->hard_start_xmit = network_start_xmit;
+    netdev->stop            = network_close;
+    netdev->get_stats       = network_get_stats;
+    netdev->poll            = netif_poll;
+    netdev->weight          = 64;
+    netdev->features        = NETIF_F_IP_CSUM;
 
-    SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
+    SET_ETHTOOL_OPS(netdev, &network_ethtool_ops);
 
-    if ((err = register_netdev(dev)) != 0) {
+    if ((err = register_netdev(netdev)) != 0) {
         printk(KERN_WARNING "%s> register_netdev err=%d\n", __FUNCTION__, err);
         goto exit;
     }
 
-    if ((err = xennet_proc_addif(dev)) != 0) {
-        unregister_netdev(dev);
+    if ((err = xennet_proc_addif(netdev)) != 0) {
+        unregister_netdev(netdev);
         goto exit;
     }
 
-    np->dev = dev;
+    np->netdev = netdev;
     list_add(&np->list, &dev_list);
 
   exit:
-    if ((err != 0) && (dev != NULL))
-        kfree(dev);
+    if ((err != 0) && (netdev != NULL))
+        kfree(netdev);
     else if (val != NULL)
-        *val = dev;
+        *val = netdev;
     return err;
 }
 
-/* Get the target interface for a status message.
- * Creates the interface when it makes sense.
- * The returned interface may be null when there is no error.
- *
- * @param status status message
- * @param np return parameter for interface state
- * @return 0 on success, error code otherwise
- */
-static int 
-target_vif(netif_fe_interface_status_t *status, struct net_private **np)
+static int destroy_netdev(struct net_device *netdev)
 {
-    int err = 0;
-    struct net_device *dev;
+	struct net_private *np = NULL;
 
-    DPRINTK("> handle=%d\n", status->handle);
-    if (status->handle < 0) {
-        err = -EINVAL;
-        goto exit;
-    }
+#ifdef CONFIG_PROC_FS
+	xennet_proc_delif(netdev);
+#endif
 
-    if ((dev = find_dev_by_handle(status->handle)) != NULL)
-        goto exit;
+        unregister_netdev(netdev);
 
-    if (status->status == NETIF_INTERFACE_STATUS_CLOSED)
-        goto exit;
-    if (status->status == NETIF_INTERFACE_STATUS_CHANGED)
-        goto exit;
+	np = netdev_priv(netdev);
+	list_del(&np->list);
 
-    /* It's a new interface in a good state - create it. */
-    DPRINTK("> create device...\n");
-    if ((err = create_netdev(status->handle, &dev)) != 0)
-        goto exit;
+	kfree(netdev);
 
-    netctrl.interface_n++;
-
-  exit:
-    if (np != NULL)
-        *np = ((dev && !err) ? netdev_priv(dev) : NULL);
-    DPRINTK("< err=%d\n", err);
-    return err;
-}
-
-/* Handle an interface status message. */
-static void netif_interface_status(netif_fe_interface_status_t *status)
-{
-    int err = 0;
-    struct net_private *np = NULL;
-    
-    DPRINTK("> status=%s handle=%d\n",
-            status_name[status->status], status->handle);
-
-    if ((err = target_vif(status, &np)) != 0) {
-        WPRINTK("Invalid netif: handle=%u\n", status->handle);
-        return;
-    }
-
-    if (np == NULL) {
-        DPRINTK("> no vif\n");
-        return;
-    }
-
-    switch (status->status) {
-    case NETIF_INTERFACE_STATUS_CLOSED:
-        switch (np->backend_state) {
-        case BEST_CLOSED:
-        case BEST_DISCONNECTED:
-        case BEST_CONNECTED:
-            vif_close(np);
-            break;
-        }
-        break;
-
-    case NETIF_INTERFACE_STATUS_DISCONNECTED:
-        switch (np->backend_state) {
-        case BEST_CLOSED:
-            vif_disconnect(np);
-            break;
-        case BEST_DISCONNECTED:
-        case BEST_CONNECTED:
-            vif_reset(np);
-            break;
-        }
-        break;
-
-    case NETIF_INTERFACE_STATUS_CONNECTED:
-        switch (np->backend_state) {
-        case BEST_CLOSED:
-            WPRINTK("Unexpected netif status %s in state %s\n",
-                    status_name[status->status],
-                    be_state_name[np->backend_state]);
-            vif_disconnect(np);
-            vif_connect(np, status);
-            break;
-        case BEST_DISCONNECTED:
-            vif_connect(np, status);
-            break;
-        }
-        break;
-
-    case NETIF_INTERFACE_STATUS_CHANGED:
-        /*
-         * The domain controller is notifying us that a device has been
-         * added or removed.
-         */
-        break;
-
-    default:
-        WPRINTK("Invalid netif status code %d\n", status->status);
-        break;
-    }
-
-    vif_show(np);
+	return 0;
 }
 
 /*
@@ -1268,115 +1122,6 @@ static void netif_driver_status(netif_fe_driver_status_t *status)
     netctrl.up = status->status;
     netctrl_connected_count();
 }
-
-/* Receive handler for control messages. */
-static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
-{
-
-    switch (msg->subtype) {
-    case CMSG_NETIF_FE_INTERFACE_STATUS:
-        netif_interface_status((netif_fe_interface_status_t *) &msg->msg[0]);
-        break;
-
-    case CMSG_NETIF_FE_DRIVER_STATUS:
-        netif_driver_status((netif_fe_driver_status_t *) &msg->msg[0]);
-        break;
-
-    default:
-        msg->length = 0;
-        break;
-    }
-
-    ctrl_if_send_response(msg);
-}
-
-
-#if 1
-/* Wait for all interfaces to be connected.
- *
- * This works OK, but we'd like to use the probing mode (see below).
- */
-static int probe_interfaces(void)
-{
-    int err = 0, conn = 0;
-    int wait_i, wait_n = 100;
-
-    DPRINTK(">\n");
-
-    for (wait_i = 0; wait_i < wait_n; wait_i++) { 
-        DPRINTK("> wait_i=%d\n", wait_i);
-        conn = netctrl_connected();
-        if(conn) break;
-        DPRINTK("> schedule_timeout...\n");
-        set_current_state(TASK_INTERRUPTIBLE);
-        schedule_timeout(10);
-    }
-
-    DPRINTK("> wait finished...\n");
-    if (conn <= 0) {
-        err = netctrl_err(-ENETDOWN);
-        WPRINTK("Failed to connect all virtual interfaces: err=%d\n", err);
-    }
-
-    DPRINTK("< err=%d\n", err);
-
-    return err;
-}
-#else
-/* Probe for interfaces until no more are found.
- *
- * This is the mode we'd like to use, but at the moment it panics the kernel.
-*/
-static int probe_interfaces(void)
-{
-    int err = 0;
-    int wait_i, wait_n = 100;
-    ctrl_msg_t cmsg = {
-        .type    = CMSG_NETIF_FE,
-        .subtype = CMSG_NETIF_FE_INTERFACE_STATUS,
-        .length  = sizeof(netif_fe_interface_status_t),
-    };
-    netif_fe_interface_status_t msg = {};
-    ctrl_msg_t rmsg = {};
-    netif_fe_interface_status_t *reply = (void*)rmsg.msg;
-    int state = TASK_UNINTERRUPTIBLE;
-    u32 query = -1;
-
-    DPRINTK(">\n");
-
-    netctrl.interface_n = 0;
-    for (wait_i = 0; wait_i < wait_n; wait_i++) { 
-        DPRINTK("> wait_i=%d query=%d\n", wait_i, query);
-        msg.handle = query;
-        memcpy(cmsg.msg, &msg, sizeof(msg));
-        DPRINTK("> set_current_state...\n");
-        set_current_state(state);
-        DPRINTK("> rmsg=%p msg=%p, reply=%p\n", &rmsg, rmsg.msg, reply);
-        DPRINTK("> sending...\n");
-        err = ctrl_if_send_message_and_get_response(&cmsg, &rmsg, state);
-        DPRINTK("> err=%d\n", err);
-        if(err) goto exit;
-        DPRINTK("> rmsg=%p msg=%p, reply=%p\n", &rmsg, rmsg.msg, reply);
-        if((int)reply->handle < 0) {
-            // No more interfaces.
-            break;
-        }
-        query = -reply->handle - 2;
-        DPRINTK(">netif_interface_status ...\n");
-        netif_interface_status(reply);
-    }
-
-  exit:
-    if (err) {
-        err = netctrl_err(-ENETDOWN);
-        WPRINTK("Connecting virtual network interfaces failed: err=%d\n", err);
-    }
-
-    DPRINTK("< err=%d\n", err);
-    return err;
-}
-
-#endif
 
 /*
  * We use this notifier to send out a fake ARP reply to reset switches and
@@ -1395,7 +1140,7 @@ inetdev_notify(struct notifier_block *this, unsigned long event, void *ptr)
 
     list_for_each (ent, &dev_list) {
         np = list_entry(ent, struct net_private, list);
-        if (np->dev == dev)
+        if (np->netdev == dev)
             (void)send_fake_arp(dev);
     }
         
@@ -1409,12 +1154,377 @@ static struct notifier_block notifier_inetdev = {
     .priority       = 0
 };
 
+static struct xenbus_device_id netfront_ids[] = {
+	{ "vif" },
+	{ "" }
+};
+
+static void watch_for_status(struct xenbus_watch *watch, const char *node)
+{
+#if 0
+	struct netfront_info *info;
+	unsigned int binfo;
+	unsigned long sectors, sector_size;
+	int err;
+
+	info = container_of(watch, struct netfront_info, watch);
+	node += strlen(watch->node);
+
+	/* FIXME: clean up when error on the other end. */
+	if (info->connected == BLKIF_STATE_CONNECTED)
+		return;
+
+	err = xenbus_gather(watch->node,
+			    "sectors", "%lu", &sectors,
+			    "info", "%u", &binfo,
+			    "sector-size", "%lu", &sector_size,
+			    NULL);
+	if (err) {
+		xenbus_dev_error(info->xbdev, err, "reading backend fields");
+		return;
+	}
+
+	xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
+	info->connected = BLKIF_STATE_CONNECTED;
+
+	blkif_state = BLKIF_STATE_CONNECTED;
+
+	xenbus_dev_ok(info->xbdev);
+
+	/* Kick pending requests. */
+	spin_lock_irq(&blkif_io_lock);
+	kick_pending_request_queues(info);
+	spin_unlock_irq(&blkif_io_lock);
+#endif
+}
+
+static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
+{
+	evtchn_op_t op = { .cmd = EVTCHNOP_alloc_unbound };
+	int err;
+
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+	info->tx_ring_ref = GRANT_INVALID_REF;
+#endif
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+	info->rx_ring_ref = GRANT_INVALID_REF;
+#endif
+
+	info->tx = (netif_tx_interface_t *)__get_free_page(GFP_KERNEL);
+	if (info->tx == 0) {
+		err = -ENOMEM;
+		xenbus_dev_error(dev, err, "allocating tx ring page");
+		goto out;
+	}
+	info->rx = (netif_rx_interface_t *)__get_free_page(GFP_KERNEL);
+	if (info->rx == 0) {
+		err = -ENOMEM;
+		xenbus_dev_error(dev, err, "allocating rx ring page");
+		goto out;
+	}
+	memset(info->tx, 0, PAGE_SIZE);
+	memset(info->rx, 0, PAGE_SIZE);
+	info->backend_state = BEST_DISCONNECTED;
+
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+	err = gnttab_grant_foreign_access(info->backend_id,
+					  virt_to_mfn(info->tx), 0);
+	if (err < 0) {
+		xenbus_dev_error(dev, err, "granting access to tx ring page");
+		goto out;
+	}
+	info->tx_ring_ref = err;
+#else
+	info->tx_ring_ref = virt_to_mfn(info->tx);
+#endif
+
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+	err = gnttab_grant_foreign_access(info->backend_id,
+					  virt_to_mfn(info->rx), 0);
+	if (err < 0) {
+		xenbus_dev_error(dev, err, "granting access to rx ring page");
+		goto out;
+	}
+	info->rx_ring_ref = err;
+#else
+	info->rx_ring_ref = virt_to_mfn(info->rx);
+#endif
+
+	op.u.alloc_unbound.dom = info->backend_id;
+	err = HYPERVISOR_event_channel_op(&op);
+	if (err) {
+		xenbus_dev_error(dev, err, "allocating event channel");
+		goto out;
+	}
+	connect_device(info, op.u.alloc_unbound.port);
+	return 0;
+
+ out:
+	if (info->tx)
+		free_page((unsigned long)info->tx);
+	info->tx = 0;
+	if (info->rx)
+		free_page((unsigned long)info->rx);
+	info->rx = 0;
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+	if (info->tx_ring_ref != GRANT_INVALID_REF)
+		gnttab_end_foreign_access(info->tx_ring_ref, 0);
+	info->tx_ring_ref = GRANT_INVALID_REF;
+#endif
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+	if (info->rx_ring_ref != GRANT_INVALID_REF)
+		gnttab_end_foreign_access(info->rx_ring_ref, 0);
+	info->rx_ring_ref = GRANT_INVALID_REF;
+#endif
+	return err;
+}
+
+/* Common code used when first setting up, and when resuming. */
+static int talk_to_backend(struct xenbus_device *dev,
+			   struct netfront_info *info)
+{
+	char *backend, *mac, *e, *s;
+	const char *message;
+	int err, i;
+
+	backend = NULL;
+	err = xenbus_gather(dev->nodename,
+			    "backend-id", "%i", &info->backend_id,
+			    "backend", NULL, &backend,
+			    NULL);
+	if (XENBUS_EXIST_ERR(err))
+		goto out;
+	if (backend && strlen(backend) == 0) {
+		err = -ENOENT;
+		goto out;
+	}
+	if (err < 0) {
+		xenbus_dev_error(dev, err, "reading %s/backend or backend-id",
+				 dev->nodename);
+		goto out;
+	}
+
+	mac = xenbus_read(dev->nodename, "mac", NULL);
+	if (IS_ERR(mac)) {
+		err = PTR_ERR(mac);
+		xenbus_dev_error(dev, err, "reading %s/mac",
+				 dev->nodename);
+		goto out;
+	}
+	s = mac;
+	for (i = 0; i < ETH_ALEN; i++) {
+		info->mac[i] = simple_strtoul(s, &e, 16);
+		if (s == e || (e[0] != ':' && e[0] != 0)) {
+			kfree(mac);
+			err = -ENOENT;
+			xenbus_dev_error(dev, err, "parsing %s/mac",
+					 dev->nodename);
+			goto out;
+		}
+		s = &e[1];
+	}
+	kfree(mac);
+
+	/* Create shared ring, alloc event channel. */
+	err = setup_device(dev, info);
+	if (err) {
+		xenbus_dev_error(dev, err, "setting up ring");
+		goto out;
+	}
+
+	err = xenbus_transaction_start(dev->nodename);
+	if (err) {
+		xenbus_dev_error(dev, err, "starting transaction");
+		goto destroy_ring;
+	}
+
+	err = xenbus_printf(dev->nodename, "tx-ring-ref","%u",
+			    info->tx_ring_ref);
+	if (err) {
+		message = "writing tx ring-ref";
+		goto abort_transaction;
+	}
+	err = xenbus_printf(dev->nodename, "rx-ring-ref","%u",
+			    info->rx_ring_ref);
+	if (err) {
+		message = "writing rx ring-ref";
+		goto abort_transaction;
+	}
+	err = xenbus_printf(dev->nodename,
+			    "event-channel", "%u", info->evtchn);
+	if (err) {
+		message = "writing event-channel";
+		goto abort_transaction;
+	}
+
+	info->backend = backend;
+	backend = NULL;
+
+	info->watch.node = info->backend;
+	info->watch.callback = watch_for_status;
+	err = register_xenbus_watch(&info->watch);
+	if (err) {
+		message = "registering watch on backend";
+		goto abort_transaction;
+	}
+
+	err = xenbus_transaction_end(0);
+	if (err) {
+		xenbus_dev_error(dev, err, "completing transaction");
+		goto destroy_ring;
+	}
+
+ out:
+	if (backend)
+		kfree(backend);
+	return err;
+
+ abort_transaction:
+	xenbus_transaction_end(1);
+	/* Have to do this *outside* transaction.  */
+	xenbus_dev_error(dev, err, "%s", message);
+ destroy_ring:
+	shutdown_device(info);
+	goto out;
+}
+
+/* Setup supplies the backend dir, virtual device.
+
+   We place an event channel and shared frame entries.
+   We watch backend to wait if it's ok. */
+static int netfront_probe(struct xenbus_device *dev,
+			  const struct xenbus_device_id *id)
+{
+	int err;
+	struct net_device *netdev;
+	unsigned int handle;
+
+	printk("netfront_probe %p\n", dev);
+	err = xenbus_scanf(dev->nodename, "handle", "%u", &handle);
+	if (XENBUS_EXIST_ERR(err))
+		return err;
+	if (err < 0) {
+		xenbus_dev_error(dev, err, "reading handle");
+		return err;
+	}
+
+	printk("netfront_probe handle %d\n", handle);
+	netdev = find_dev_by_handle(handle);
+	printk("netfront_probe found netdev %p\n", netdev);
+	if (netdev)
+		return 0;
+
+	err = create_netdev(handle, dev, &netdev);
+	if (err) {
+		xenbus_dev_error(dev, err, "creating netdev");
+		return err;
+	}
+
+	printk("netfront_probe netdev %p\n", netdev);
+	err = talk_to_backend(dev, netdev_priv(netdev));
+	if (err) {
+		destroy_netdev(netdev);
+		return err;
+	}
+
+#if 0
+	/* Call once in case entries already there. */
+	watch_for_status(&info->watch, info->watch.node);
+#endif
+	return 0;
+}
+
+static int netfront_remove(struct xenbus_device *dev)
+{
+	struct netfront_info *info = dev->data;
+
+#if 0
+	if (info->backend)
+		unregister_xenbus_watch(&info->watch);
+
+	if (info->mi)
+		xlvbd_del(info);
+
+	blkif_free(info);
+
+	kfree(info->backend);
+#endif
+	kfree(info);
+
+	return 0;
+}
+
+static int netfront_suspend(struct xenbus_device *dev)
+{
+    struct net_private *np = dev->data;
+    /* Avoid having tx/rx stuff happen until we're ready. */
+    unbind_evtchn_from_irqhandler(np->evtchn, np->netdev);
+    return 0;
+}
+
+static int netfront_resume(struct xenbus_device *dev)
+{
+    struct net_private *np = dev->data;
+    /*
+     * Connect regardless of whether IFF_UP flag set.
+     * Stop bad things from happening until we're back up.
+     */
+    np->backend_state = BEST_DISCONNECTED;
+    memset(np->tx, 0, PAGE_SIZE);
+    memset(np->rx, 0, PAGE_SIZE);
+    
+    // send_interface_connect(np);
+    return 0;
+}
+
+static struct xenbus_driver netfront = {
+	.name = "vif",
+	.owner = THIS_MODULE,
+	.ids = netfront_ids,
+	.probe = netfront_probe,
+	.remove = netfront_remove,
+	.resume = netfront_resume,
+	.suspend = netfront_suspend,
+};
+
+static void __init init_net_xenbus(void)
+{
+	xenbus_register_device(&netfront);
+}
+
+static int wait_for_netif(void)
+{
+    int err = 0, conn = 0;
+    int i;
+
+    /*
+     * We should figure out how many and which devices we need to
+     * proceed and only wait for those.  For now, continue once the
+     * first device is around.
+     */
+    for ( i=0; i < 10*HZ; i++ )
+    {
+        conn = netctrl_connected();
+        if (conn)
+	    break;
+        set_current_state(TASK_INTERRUPTIBLE);
+        schedule_timeout(1);
+    }
+
+    if (conn <= 0) {
+        err = netctrl_err(-ENETDOWN);
+        WPRINTK("Timeout connecting to device!\n");
+    }
+    return err;
+}
+
 static int __init netif_init(void)
 {
     int err = 0;
 
     if (xen_start_info.flags & SIF_INITDOMAIN)
         return 0;
+
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
     /* A grant for every ring slot */
     if (gnttab_alloc_grant_references(NETIF_TX_RING_SIZE,
@@ -1438,17 +1548,15 @@ static int __init netif_init(void)
         return err;
 
     IPRINTK("Initialising virtual ethernet driver.\n");
+
     INIT_LIST_HEAD(&dev_list);
     (void)register_inetaddr_notifier(&notifier_inetdev);
     netctrl_init();
-    (void)ctrl_if_register_receiver(CMSG_NETIF_FE, netif_ctrlif_rx,
-                                    CALLBACK_IN_BLOCKING_CONTEXT);
-    send_driver_status(1);
-    err = probe_interfaces();
-    if (err)
-        ctrl_if_unregister_receiver(CMSG_NETIF_FE, netif_ctrlif_rx);
 
-    DPRINTK("< err=%d\n", err);
+    init_net_xenbus();
+
+    wait_for_netif();
+
     return err;
 }
 
@@ -1460,47 +1568,6 @@ static void netif_exit(void)
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
     gnttab_free_grant_references(gref_rx_head);
 #endif
-}
-
-static void vif_suspend(struct net_private *np)
-{
-    /* Avoid having tx/rx stuff happen until we're ready. */
-    unbind_evtchn_from_irqhandler(np->evtchn, np->dev);
-}
-
-static void vif_resume(struct net_private *np)
-{
-    /*
-     * Connect regardless of whether IFF_UP flag set.
-     * Stop bad things from happening until we're back up.
-     */
-    np->backend_state = BEST_DISCONNECTED;
-    memset(np->tx, 0, PAGE_SIZE);
-    memset(np->rx, 0, PAGE_SIZE);
-    
-    send_interface_connect(np);
-}
-
-void netif_suspend(void)
-{
-    struct list_head *ent;
-    struct net_private *np;
-    
-    list_for_each (ent, &dev_list) {
-        np = list_entry(ent, struct net_private, list);
-        vif_suspend(np);
-    }
-}
-
-void netif_resume(void)
-{
-    struct list_head *ent;
-    struct net_private *np;
-
-    list_for_each (ent, &dev_list) {
-        np = list_entry(ent, struct net_private, list);
-        vif_resume(np);
-    }
 }
 
 #ifdef CONFIG_PROC_FS

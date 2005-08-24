@@ -987,7 +987,7 @@ static int __init netback_init(void)
     spin_lock_init(&net_schedule_list_lock);
     INIT_LIST_HEAD(&net_schedule_list);
 
-    netif_ctrlif_init();
+    netif_xenbus_init();
 
     (void)request_irq(bind_virq_to_irq(VIRQ_DEBUG),
                       netif_be_dbg, SA_SHIRQ, 

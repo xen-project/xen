@@ -9,10 +9,6 @@
 #include "common.h"
 #include <linux/rtnetlink.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#endif
-
 #define NETIF_HASHSZ 1024
 #define NETIF_HASH(_d,_h) (((int)(_d)^(int)(_h))&(NETIF_HASHSZ-1))
 
@@ -66,87 +62,20 @@ static int net_close(struct net_device *dev)
     return 0;
 }
 
-static void __netif_disconnect_complete(void *arg)
+netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 {
-    netif_t              *netif = (netif_t *)arg;
-    ctrl_msg_t            cmsg;
-    netif_be_disconnect_t disc;
-#if defined(CONFIG_XEN_NETDEV_GRANT_RX) || defined(CONFIG_XEN_NETDEV_GRANT_TX)
-    struct gnttab_unmap_grant_ref op;
-#endif
-
-    /*
-     * These can't be done in netif_disconnect() because at that point there
-     * may be outstanding requests in the network stack whose asynchronous
-     * responses must still be notified to the remote driver.
-     */
-
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    op.host_addr    = netif->tx_shmem_vaddr;
-    op.handle       = netif->tx_shmem_handle;
-    op.dev_bus_addr = 0;
-    BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
-#endif
-
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    op.host_addr    = netif->rx_shmem_vaddr;
-    op.handle       = netif->rx_shmem_handle;
-    op.dev_bus_addr = 0;
-    BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
-#endif
-
-
-    vfree(netif->tx); /* Frees netif->rx as well. */
-
-    /* Construct the deferred response message. */
-    cmsg.type         = CMSG_NETIF_BE;
-    cmsg.subtype      = CMSG_NETIF_BE_DISCONNECT;
-    cmsg.id           = netif->disconnect_rspid;
-    cmsg.length       = sizeof(netif_be_disconnect_t);
-    disc.domid        = netif->domid;
-    disc.netif_handle = netif->handle;
-    disc.status       = NETIF_BE_STATUS_OKAY;
-    memcpy(cmsg.msg, &disc, sizeof(disc));
-
-    /*
-     * Make sure message is constructed /before/ status change, because
-     * after the status change the 'netif' structure could be deallocated at
-     * any time. Also make sure we send the response /after/ status change,
-     * as otherwise a subsequent CONNECT request could spuriously fail if
-     * another CPU doesn't see the status change yet.
-     */
-    mb();
-    if ( netif->status != DISCONNECTING )
-        BUG();
-    netif->status = DISCONNECTED;
-    mb();
-
-    /* Send the successful response. */
-    ctrl_if_send_response(&cmsg);
-}
-
-void netif_disconnect_complete(netif_t *netif)
-{
-    INIT_WORK(&netif->work, __netif_disconnect_complete, (void *)netif);
-    schedule_work(&netif->work);
-}
-
-void netif_create(netif_be_create_t *create)
-{
-    int                err = 0;
-    domid_t            domid  = create->domid;
-    unsigned int       handle = create->netif_handle;
+    int err = 0, i;
     struct net_device *dev;
-    netif_t          **pnetif, *netif;
-    char               name[IFNAMSIZ] = {};
+    netif_t **pnetif, *netif;
+    char name[IFNAMSIZ] = {};
 
     snprintf(name, IFNAMSIZ - 1, "vif%u.%u", domid, handle);
     dev = alloc_netdev(sizeof(netif_t), name, ether_setup);
     if ( dev == NULL )
     {
         DPRINTK("Could not create netif: out of memory\n");
-        create->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
-        return;
+        // create->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
+        return NULL;
     }
 
     netif = netdev_priv(dev);
@@ -167,9 +96,9 @@ void netif_create(netif_be_create_t *create)
         if ( ((*pnetif)->domid == domid) && ((*pnetif)->handle == handle) )
         {
             DPRINTK("Could not create netif: already exists\n");
-            create->status = NETIF_BE_STATUS_INTERFACE_EXISTS;
+            // create->status = NETIF_BE_STATUS_INTERFACE_EXISTS;
             free_netdev(dev);
-            return;
+            return NULL;
         }
         pnetif = &(*pnetif)->hash_next;
     }
@@ -183,9 +112,10 @@ void netif_create(netif_be_create_t *create)
     /* Disable queuing. */
     dev->tx_queue_len = 0;
 
-    if ( (create->be_mac[0] == 0) && (create->be_mac[1] == 0) &&
-         (create->be_mac[2] == 0) && (create->be_mac[3] == 0) &&
-         (create->be_mac[4] == 0) && (create->be_mac[5] == 0) )
+    for (i = 0; i < ETH_ALEN; i++)
+	if (be_mac[i] != 0)
+	    break;
+    if (i == ETH_ALEN)
     {
         /*
          * Initialise a dummy MAC address. We choose the numerically largest
@@ -197,10 +127,8 @@ void netif_create(netif_be_create_t *create)
     }
     else
     {
-        memcpy(dev->dev_addr, create->be_mac, ETH_ALEN);
+        memcpy(dev->dev_addr, be_mac, ETH_ALEN);
     }
-
-    memcpy(netif->fe_dev_addr, create->mac, ETH_ALEN);
 
     rtnl_lock();
     err = register_netdevice(dev);
@@ -210,16 +138,187 @@ void netif_create(netif_be_create_t *create)
     {
         DPRINTK("Could not register new net device %s: err=%d\n",
                 dev->name, err);
-        create->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
+        // create->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
         free_netdev(dev);
-        return;
+        return NULL;
     }
 
     netif->hash_next = *pnetif;
     *pnetif = netif;
 
     DPRINTK("Successfully created netif\n");
-    create->status = NETIF_BE_STATUS_OKAY;
+    // create->status = NETIF_BE_STATUS_OKAY;
+    return netif;
+}
+
+static int map_frontend_page(netif_t *netif, unsigned long localaddr,
+			     unsigned long tx_ring_ref, unsigned long rx_ring_ref)
+{
+#if !defined(CONFIG_XEN_NETDEV_GRANT_TX)||!defined(CONFIG_XEN_NETDEV_GRANT_RX)
+    pgprot_t      prot = __pgprot(_KERNPG_TABLE);
+    int           err;
+#endif
+#if defined(CONFIG_XEN_NETDEV_GRANT_TX)
+    {
+        struct gnttab_map_grant_ref op;
+
+        /* Map: Use the Grant table reference */
+        op.host_addr = localaddr;
+        op.flags     = GNTMAP_host_map;
+        op.ref       = tx_ring_ref;
+        op.dom       = netif->domid;
+       
+	BUG_ON( HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) );
+        if (op.handle < 0) { 
+            DPRINTK(" Grant table operation failure !\n");
+            return op.handle;
+        }
+
+        netif->tx_shmem_ref    = tx_ring_ref;
+        netif->tx_shmem_handle = op.handle;
+        netif->tx_shmem_vaddr  = localaddr;
+    }
+#else 
+    err = direct_remap_area_pages(&init_mm, localaddr,
+				  tx_ring_ref<<PAGE_SHIFT, PAGE_SIZE,
+				  prot, netif->domid); 
+    if (err)
+	return err;
+#endif
+
+#if defined(CONFIG_XEN_NETDEV_GRANT_RX)
+    {
+        struct gnttab_map_grant_ref op;
+
+        /* Map: Use the Grant table reference */
+        op.host_addr = localaddr + PAGE_SIZE;
+        op.flags     = GNTMAP_host_map;
+        op.ref       = rx_ring_ref;
+        op.dom       = netif->domid;
+
+	BUG_ON( HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) );
+        if (op.handle < 0) { 
+            DPRINTK(" Grant table operation failure !\n");
+            return op.handle;
+        }
+
+        netif->rx_shmem_ref    = rx_ring_ref;
+        netif->rx_shmem_handle = op.handle;
+        netif->rx_shmem_vaddr  = localaddr + PAGE_SIZE;
+    }
+#else 
+    err = direct_remap_area_pages(&init_mm, localaddr + PAGE_SIZE,
+				  rx_ring_ref<<PAGE_SHIFT, PAGE_SIZE,
+				  prot, netif->domid);
+    if (err)
+	return err;
+#endif
+
+    return 0;
+}
+
+static void unmap_frontend_page(netif_t *netif)
+{
+#if defined(CONFIG_XEN_NETDEV_GRANT_RX) || defined(CONFIG_XEN_NETDEV_GRANT_TX)
+    struct gnttab_unmap_grant_ref op;
+#endif
+
+#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+    op.host_addr    = netif->tx_shmem_vaddr;
+    op.handle       = netif->tx_shmem_handle;
+    op.dev_bus_addr = 0;
+    BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
+#endif
+
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+    op.host_addr    = netif->rx_shmem_vaddr;
+    op.handle       = netif->rx_shmem_handle;
+    op.dev_bus_addr = 0;
+    BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
+#endif
+}
+
+int netif_map(netif_t *netif, unsigned long tx_ring_ref,
+	      unsigned long rx_ring_ref, unsigned int evtchn)
+{
+    struct vm_struct *vma;
+    evtchn_op_t op = { .cmd = EVTCHNOP_bind_interdomain };
+    int err;
+
+#if 0
+    if ( netif->status != DISCONNECTED ) {
+        connect->status = NETIF_BE_STATUS_INTERFACE_CONNECTED;
+        return;
+    }
+#endif
+
+    if ( (vma = get_vm_area(2*PAGE_SIZE, VM_IOREMAP)) == NULL ) {
+        // connect->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
+        return -ENOMEM;
+    }
+
+    err = map_frontend_page(netif, (unsigned long)vma->addr, tx_ring_ref,
+			    rx_ring_ref);
+    if (err) {
+        vfree(vma->addr);
+	return err;
+    }
+
+    op.u.bind_interdomain.dom1 = DOMID_SELF;
+    op.u.bind_interdomain.dom2 = netif->domid;
+    op.u.bind_interdomain.port1 = 0;
+    op.u.bind_interdomain.port2 = evtchn;
+    err = HYPERVISOR_event_channel_op(&op);
+    if (err) {
+	unmap_frontend_page(netif);
+	vfree(vma->addr);
+	return err;
+    }
+
+    netif->evtchn = op.u.bind_interdomain.port1;
+    netif->remote_evtchn = evtchn;
+
+    netif->tx_shmem_frame = tx_ring_ref;
+    netif->rx_shmem_frame = rx_ring_ref;
+    netif->tx             = 
+        (netif_tx_interface_t *)vma->addr;
+    netif->rx             = 
+        (netif_rx_interface_t *)((char *)vma->addr + PAGE_SIZE);
+    netif->tx->resp_prod = netif->rx->resp_prod = 0;
+    netif_get(netif);
+    wmb(); /* Other CPUs see new state before interface is started. */
+
+    rtnl_lock();
+    netif->status = CONNECTED;
+    wmb();
+    if ( netif_running(netif->dev) )
+        __netif_up(netif);
+    rtnl_unlock();
+
+    // connect->status = NETIF_BE_STATUS_OKAY;
+    return 0;
+}
+
+static void free_netif(void *arg)
+{
+    netif_t              *netif = (netif_t *)arg;
+
+    /*
+     * These can't be done in netif_disconnect() because at that point there
+     * may be outstanding requests in the network stack whose asynchronous
+     * responses must still be notified to the remote driver.
+     */
+
+    unmap_frontend_page(netif);
+    vfree(netif->tx); /* Frees netif->rx as well. */
+
+    netif->status = DISCONNECTED;
+}
+
+void free_netif_callback(netif_t *netif)
+{
+    INIT_WORK(&netif->free_work, free_netif, (void *)netif);
+    schedule_work(&netif->free_work);
 }
 
 void netif_destroy(netif_be_destroy_t *destroy)
@@ -284,147 +383,6 @@ void netif_creditlimit(netif_be_creditlimit_t *creditlimit)
     }
     
     creditlimit->status = NETIF_BE_STATUS_OKAY;
-}
-
-void netif_connect(netif_be_connect_t *connect)
-{
-    domid_t       domid  = connect->domid;
-    unsigned int  handle = connect->netif_handle;
-    unsigned int  evtchn = connect->evtchn;
-    unsigned long tx_shmem_frame = connect->tx_shmem_frame;
-    unsigned long rx_shmem_frame = connect->rx_shmem_frame;
-    struct vm_struct *vma;
-#if !defined(CONFIG_XEN_NETDEV_GRANT_TX)||!defined(CONFIG_XEN_NETDEV_GRANT_RX)
-    pgprot_t      prot = __pgprot(_KERNPG_TABLE);
-    int           error;
-#endif
-    netif_t      *netif;
-
-    netif = netif_find_by_handle(domid, handle);
-    if ( unlikely(netif == NULL) ) {
-        DPRINTK("netif_connect attempted for non-existent netif (%u,%u)\n", 
-                connect->domid, connect->netif_handle); 
-        connect->status = NETIF_BE_STATUS_INTERFACE_NOT_FOUND;
-        return;
-    }
-
-    if ( netif->status != DISCONNECTED ) {
-        connect->status = NETIF_BE_STATUS_INTERFACE_CONNECTED;
-        return;
-    }
-
-    if ( (vma = get_vm_area(2*PAGE_SIZE, VM_IOREMAP)) == NULL ) {
-        connect->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
-        return;
-    }
-
-
-#if defined(CONFIG_XEN_NETDEV_GRANT_TX)
-    {
-        struct gnttab_map_grant_ref op;
-        int tx_ref = connect->tx_shmem_ref; 
-
-        /* Map: Use the Grant table reference */
-        op.host_addr = VMALLOC_VMADDR(vma->addr);
-        op.flags     = GNTMAP_host_map;
-        op.ref       = tx_ref;
-        op.dom       = domid;
-       
-        if ((HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) < 0) || 
-            (op.handle < 0)) { 
-            DPRINTK(" Grant table operation failure !\n");
-            connect->status = NETIF_BE_STATUS_MAPPING_ERROR;
-            vfree(vma->addr);
-            return;
-        }
-
-        netif->tx_shmem_ref    = tx_ref;
-        netif->tx_shmem_handle = op.handle;
-        netif->tx_shmem_vaddr  = VMALLOC_VMADDR(vma->addr);
-    }
-        
-
-#else 
-    error = direct_remap_area_pages(&init_mm, 
-                                    VMALLOC_VMADDR(vma->addr),
-                                    tx_shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
-                                    prot, domid); 
-    if ( error != 0 )
-    {
-        if ( error == -ENOMEM )
-            connect->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
-        else if ( error == -EFAULT )
-            connect->status = NETIF_BE_STATUS_MAPPING_ERROR;
-        else
-            connect->status = NETIF_BE_STATUS_ERROR;
-        vfree(vma->addr);
-        return;
-    }
-#endif
-
-
-#if defined(CONFIG_XEN_NETDEV_GRANT_RX)
-    {
-        struct gnttab_map_grant_ref op;
-        int rx_ref = connect->rx_shmem_ref; 
-
-
-        /* Map: Use the Grant table reference */
-        op.host_addr = VMALLOC_VMADDR(vma->addr) + PAGE_SIZE;
-        op.flags     = GNTMAP_host_map;
-        op.ref       = rx_ref;
-        op.dom       = domid;
-
-        if ((HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) < 0) || 
-            (op.handle < 0)) { 
-            DPRINTK(" Grant table operation failure !\n");
-            connect->status = NETIF_BE_STATUS_MAPPING_ERROR;
-            vfree(vma->addr);
-            return;
-        }
-
-        netif->rx_shmem_ref    = rx_ref;
-        netif->rx_shmem_handle = handle;
-        netif->rx_shmem_vaddr  = VMALLOC_VMADDR(vma->addr) + PAGE_SIZE;
-    }
-#else 
-    error = direct_remap_area_pages(&init_mm, 
-                                     VMALLOC_VMADDR(vma->addr) + PAGE_SIZE,
-                                     rx_shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
-                                     prot, domid);
-    if ( error != 0 )
-    {
-        if ( error == -ENOMEM )
-            connect->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
-        else if ( error == -EFAULT )
-            connect->status = NETIF_BE_STATUS_MAPPING_ERROR;
-        else
-            connect->status = NETIF_BE_STATUS_ERROR;
-        vfree(vma->addr);
-        return;
-    }
-
-#endif
-
-    netif->evtchn         = evtchn;
-    netif->tx_shmem_frame = tx_shmem_frame;
-    netif->rx_shmem_frame = rx_shmem_frame;
-    netif->tx             = 
-        (netif_tx_interface_t *)vma->addr;
-    netif->rx             = 
-        (netif_rx_interface_t *)((char *)vma->addr + PAGE_SIZE);
-    netif->tx->resp_prod = netif->rx->resp_prod = 0;
-    netif_get(netif);
-    wmb(); /* Other CPUs see new state before interface is started. */
-
-    rtnl_lock();
-    netif->status = CONNECTED;
-    wmb();
-    if ( netif_running(netif->dev) )
-        __netif_up(netif);
-    rtnl_unlock();
-
-    connect->status = NETIF_BE_STATUS_OKAY;
 }
 
 int netif_disconnect(netif_be_disconnect_t *disconnect, u8 rsp_id)
