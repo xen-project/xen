@@ -128,8 +128,12 @@ static int __init init_syscall32(void)
 #endif
 	return 0;
 } 
-	
-__initcall(init_syscall32); 
+
+/*
+ * This must be done early in case we have an initrd containing 32-bit
+ * binaries (e.g., hotplug). This could be pushed upstream to arch/x86_64.
+ */	
+core_initcall(init_syscall32); 
 
 /* May not be __init: called during resume */
 void syscall32_cpu_init(void)

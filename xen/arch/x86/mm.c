@@ -1449,8 +1449,10 @@ int get_page_type(struct pfn_info *page, unsigned long type)
                     if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
                          ((type & PGT_type_mask) != PGT_l1_page_table) )
                         MEM_LOG("Bad type (saw %" PRtype_info
-                                "!= exp %" PRtype_info ") for pfn %lx",
-                                x, type, page_to_pfn(page));
+                                "!= exp %" PRtype_info ") "
+                                "for mfn %lx (pfn %x)",
+                                x, type, page_to_pfn(page),
+                                machine_to_phys_mapping[page_to_pfn(page)]);
                     return 0;
                 }
                 else if ( (x & PGT_va_mask) == PGT_va_mutable )

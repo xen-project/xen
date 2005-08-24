@@ -303,6 +303,34 @@ static bool file_set_perms(struct file_ops_info *info,
 	return true;
 }
 
+static char *parent_filename(const char *name)
+{
+	char *slash = strrchr(name + 1, '/');
+	if (!slash)
+		return talloc_strdup(name, "/");
+	return talloc_asprintf(name, "%.*s", slash-name, name);
+}
+
+static void make_dirs(const char *filename)
+{
+	struct stat st;
+
+	if (lstat(filename, &st) == 0 && S_ISREG(st.st_mode))
+		convert_to_dir(filename);
+
+	if (mkdir(filename, 0700) == 0) {
+		init_perms(filename);
+		return;
+	}
+	if (errno == EEXIST)
+		return;
+
+	make_dirs(parent_filename(filename));
+	if (mkdir(filename, 0700) != 0)
+		barf_perror("Failed to mkdir %s", filename);
+	init_perms(filename);
+}
+
 static bool file_write(struct file_ops_info *info,
 		       const char *path, const void *data,
 		       unsigned int len, int createflags)
@@ -329,6 +357,9 @@ static bool file_write(struct file_ops_info *info,
 		}
 	}
 
+	if (createflags & O_CREAT)
+		make_dirs(parent_filename(filename));
+
 	fd = open(filename, createflags|O_TRUNC|O_WRONLY, 0600);
 	if (fd < 0) {
 		/* FIXME: Another hack. */
@@ -352,6 +383,7 @@ static bool file_mkdir(struct file_ops_info *info, const char *path)
 	if (!write_ok(info, path))
 		return false;
 
+	make_dirs(parent_filename(dirname));
 	if (mkdir(dirname, 0700) != 0)
 		return false;
 
@@ -420,7 +452,7 @@ static bool file_transaction_end(struct file_ops_info *info, bool abort)
 	}
 
 	if (abort) {
-		cmd = talloc_asprintf(NULL, "rm -r %s", info->transact_base);
+		cmd = talloc_asprintf(NULL, "rm -rf %s", info->transact_base);
 		do_command(cmd);
 		goto success;
 	}
@@ -1004,8 +1036,8 @@ static void setup_xs_ops(void)
 	} else {
 		dup2(fds[1], STDOUT_FILENO);
 		close(fds[0]);
-#if 0
-		execlp("valgrind", "valgrind", "xenstored_test", "--output-pid",
+#if 1
+		execlp("valgrind", "valgrind", "-q", "--suppressions=testsuite/vg-suppressions", "xenstored_test", "--output-pid",
 		       "--no-fork", NULL);
 #else
 		execlp("./xenstored_test", "xenstored_test", "--output-pid",

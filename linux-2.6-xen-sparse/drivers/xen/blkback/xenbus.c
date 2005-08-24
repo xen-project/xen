@@ -75,21 +75,9 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 	err = xenbus_gather(be->frontpath, "grant-id", "%lu", &sharedmfn,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
-		xenbus_dev_error(be->dev, err, 
+		xenbus_dev_error(be->dev, err,
 				 "reading %s/grant-id and event-channel",
 				 be->frontpath);
-		return;
-	}
-
-	/* Domains must use same shared frame for all vbds. */
-	if (evtchn != be->blkif->remote_evtchn ||
-	    sharedmfn != be->blkif->shmem_frame) {
-		xenbus_dev_error(be->dev, err,
-				 "Shared frame/evtchn %li/%u not same as"
-				 " old %li/%u",
-				 sharedmfn, evtchn,
-				 be->blkif->shmem_frame,
-				 be->blkif->remote_evtchn);
 		return;
 	}
 
@@ -189,6 +177,9 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		err = register_xenbus_watch(&be->watch);
 		if (err) {
 			be->watch.node = NULL;
+			xenbus_dev_error(dev, err,
+					 "adding frontend watch on %s",
+					 be->frontpath);
 			goto device_fail;
 		}
 	}
@@ -223,12 +214,15 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		if (IS_ERR(be->blkif)) {
 			err = PTR_ERR(be->blkif);
 			be->blkif = NULL;
+			xenbus_dev_error(dev, err, "creating block interface");
 			goto device_fail;
 		}
 
 		err = vbd_create(be->blkif, handle, be->pdev, be->readonly);
-		if (err)
+		if (err) {
+			xenbus_dev_error(dev, err, "creating vbd structure");
 			goto device_fail;
+		}
 
 		frontend_changed(&be->watch, be->frontpath);
 	}
@@ -250,8 +244,10 @@ static int blkback_probe(struct xenbus_device *dev,
 	int err;
 
 	be = kmalloc(sizeof(*be), GFP_KERNEL);
-	if (!be)
+	if (!be) {
+		xenbus_dev_error(dev, -ENOMEM, "allocating backend structure");
 		return -ENOMEM;
+	}
 
 	memset(be, 0, sizeof(*be));
 
@@ -259,8 +255,11 @@ static int blkback_probe(struct xenbus_device *dev,
 	be->backend_watch.node = dev->nodename;
 	be->backend_watch.callback = backend_changed;
 	err = register_xenbus_watch(&be->backend_watch);
-	if (err)
+	if (err) {
+		xenbus_dev_error(dev, err, "adding backend watch on %s",
+				 dev->nodename);
 		goto free_be;
+	}
 
 	dev->data = be;
 

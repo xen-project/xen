@@ -8,7 +8,7 @@ run_test()
     rm -rf $XENSTORED_ROOTDIR
     mkdir $XENSTORED_ROOTDIR
     if [ $VALGRIND -eq 1 ]; then
-	valgrind -q --logfile-fd=3 ./xenstored_test --output-pid --trace-file=testsuite/tmp/trace --no-fork 3>testsuite/tmp/vgout > /tmp/pid 2> testsuite/tmp/xenstored_errors &
+	valgrind --suppressions=testsuite/vg-suppressions -q ./xenstored_test --output-pid --trace-file=testsuite/tmp/trace --no-fork > /tmp/pid 2> testsuite/tmp/xenstored_errors &
 	while [ ! -s /tmp/pid ]; do sleep 0; done
 	PID=`cat /tmp/pid`
 	rm /tmp/pid
@@ -17,10 +17,10 @@ run_test()
 	PID=`./xenstored_test --output-pid --trace-file=testsuite/tmp/trace`
     fi
     if ./xs_test $2 $1; then
-	if [ -s testsuite/tmp/vgout ]; then
+	if [ -s testsuite/tmp/xenstored_errors ]; then
 	    kill $PID
-	    echo VALGRIND errors:
-	    cat testsuite/tmp/vgout
+	    echo Errors:
+	    cat testsuite/tmp/xenstored_errors
 	    return 1
 	fi
 	echo shutdown | ./xs_test
@@ -52,11 +52,10 @@ for f in testsuite/[0-9]*.test $SLOWTESTS; do
     case `basename $f` in $MATCH) RUN=1;; esac
     [ -n "$RUN" ] || continue
 
-    if run_test $f > /dev/null; then
+    if run_test $f -x >/tmp/out; then
 	echo -n .
     else
-	echo Test $f failed, running verbosely...
-	run_test $f -x || true
+	cat /tmp/out
 	# That will have filled the screen, repeat message.
 	echo Test $f failed
 	exit 1

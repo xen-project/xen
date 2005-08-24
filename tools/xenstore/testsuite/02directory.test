@@ -32,3 +32,16 @@ expect mkdir failed: File exists
 mkdir /dir
 expect mkdir failed: File exists
 mkdir /dir/test2
+
+# Mkdir implicitly creates directories.
+mkdir /dir/1/2/3/4
+expect test2
+expect 1
+dir /dir
+expect 2
+dir /dir/1
+expect 3
+dir /dir/1/2
+expect 4
+dir /dir/1/2/3
+dir /dir/1/2/3/4

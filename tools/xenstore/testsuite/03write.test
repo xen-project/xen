@@ -18,3 +18,22 @@ read /test
 write /test create contents3
 expect contents3
 read /test
+
+# Write should implicitly create directories
+write /dir/test create contents
+expect test
+dir /dir
+expect contents
+read /dir/test
+write /dir/1/2/3/4 excl contents4
+expect test
+expect 1
+dir /dir
+expect 2
+dir /dir/1
+expect 3
+dir /dir/1/2
+expect 4
+dir /dir/1/2/3
+expect contents4
+read /dir/1/2/3/4
