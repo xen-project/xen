@@ -1165,8 +1165,10 @@ static int talk_to_backend(struct xenbus_device *dev,
 
 	/* Create shared ring, alloc event channel. */
 	err = setup_blkring(dev, info);
-	if (err)
+	if (err) {
+		xenbus_dev_error(dev, err, "setting up block ring");
 		goto out;
+	}
 
 	err = xenbus_transaction_start(dev->nodename);
 	if (err) {
