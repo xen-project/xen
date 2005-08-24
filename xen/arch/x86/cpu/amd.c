@@ -9,6 +9,20 @@
 
 #include "cpu.h"
 
+/*
+ * amd_flush_filter={on,off}. Forcibly Enable or disable the TLB flush
+ * filter on AMD 64-bit processors.
+ */
+static int flush_filter_force;
+static void flush_filter(char *s)
+{
+	if (!strcmp(s, "off"))
+		flush_filter_force = -1;
+	if (!strcmp(s, "on"))
+		flush_filter_force = 1;
+}
+custom_param("amd_flush_filter", flush_filter);
+
 #define num_physpages 0
 
 /*
@@ -190,6 +204,21 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 	case 6:
 		set_bit(X86_FEATURE_K7, c->x86_capability); 
 		break;
+	}
+
+	if (c->x86 == 15) {
+		rdmsr(MSR_K7_HWCR, l, h);
+		printk(KERN_INFO "CPU%d: AMD Flush Filter %sabled",
+		       smp_processor_id(), (l & (1<<6)) ? "dis" : "en");
+		if ((flush_filter_force > 0) && (l & (1<<6))) {
+			l &= ~(1<<6);
+			printk(" -> Forcibly enabled");
+		} else if ((flush_filter_force < 0) && !(l & (1<<6))) {
+			l |= 1<<6;
+			printk(" -> Forcibly disabled");
+		}
+		wrmsr(MSR_K7_HWCR, l, h);
+		printk("\n");
 	}
 
 	display_cacheinfo(c);
