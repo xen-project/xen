@@ -43,7 +43,7 @@ ENTRY(_start)
         cld                
 	/* Copy the necessary stuff from xen_start_info structure. */
 	movq  $xen_start_info_union,%rdi
-	movq  $64,%rcx          /* sizeof (union xen_start_info_union) / sizeof (long) */
+	movq  $256,%rcx
 	rep movsq
 
 #ifdef CONFIG_SMP
