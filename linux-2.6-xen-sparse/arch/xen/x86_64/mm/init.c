@@ -441,6 +441,31 @@ static inline void __set_pte(pte_t *dst, pte_t val)
 	*dst = val;
 }
 
+static inline int make_readonly(unsigned long paddr)
+{
+    int readonly = 0;
+
+    /* Make new page tables read-only. */
+    if ((paddr < ((table_start << PAGE_SHIFT) + tables_space)) &&
+        (paddr >= (table_start << PAGE_SHIFT)))
+        readonly = 1;
+
+    /* Make old page tables read-only. */
+    if ((paddr < ((xen_start_info.pt_base - __START_KERNEL_map) +
+                  (xen_start_info.nr_pt_frames << PAGE_SHIFT))) &&
+        (paddr >= (xen_start_info.pt_base - __START_KERNEL_map)))
+        readonly = 1;
+
+    /*
+     * No need for writable mapping of kernel image. This also ensures that
+     * page and descriptor tables embedded inside don't have writable mappings.
+     */
+    if ((paddr >= __pa_symbol(&_text)) && (paddr < __pa_symbol(&_end)))
+        readonly = 1;
+
+    return readonly;
+}
+
 void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
 { 
         long i, j, k; 
@@ -477,9 +502,7 @@ void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
                         pte = alloc_low_page(&pte_phys);
                         pte_save = pte;
                         for (k = 0; k < PTRS_PER_PTE; pte++, k++, paddr += PTE_SIZE) {
-                                if (paddr < (table_start << PAGE_SHIFT) 
-                                    + tables_space)
-                                {
+                                if (make_readonly(paddr)) {
                                         __set_pte(pte, 
                                                 __pte(paddr | (_KERNPG_TABLE & ~_PAGE_RW)));
                                         continue;
