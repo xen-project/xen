@@ -46,7 +46,7 @@ void cmdline_parse(char *cmdline)
         if ( optval != NULL )
             *optval++ = '\0';
 
-        for ( param = &__setup_start; param != &__setup_end; param++ )
+        for ( param = &__setup_start; param <= &__setup_end; param++ )
         {
             if ( strcmp(param->name, opt ) != 0 )
                 continue;
