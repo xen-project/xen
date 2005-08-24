@@ -1331,9 +1331,9 @@ static int wait_for_blkif(void)
     int i;
 
     /*
-     * We should read 'nr_interfaces' from response message and wait
-     * for notifications before proceeding. For now we assume that we
-     * will be notified of exactly one interface.
+     * We should figure out how many and which devices we need to
+     * proceed and only wait for those.  For now, continue once the
+     * first device is around.
      */
     for ( i=0; blkif_state != BLKIF_STATE_CONNECTED && (i < 10*HZ); i++ )
     {
