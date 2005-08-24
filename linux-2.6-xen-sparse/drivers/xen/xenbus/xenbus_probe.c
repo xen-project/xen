@@ -639,7 +639,7 @@ static int __init xenbus_probe_init(void)
 	bus_register(&xenbus_backend.bus);
 	device_register(&xenbus_frontend.dev);
 	device_register(&xenbus_backend.dev);
-	
+
 	if (!xen_start_info.store_evtchn)
 		return 0;
 

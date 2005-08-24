@@ -428,8 +428,9 @@ static void __init contig_initmem_init(void)
 {
         unsigned long bootmap_size = init_bootmem(start_pfn, end_pfn);
         free_bootmem(0, end_pfn << PAGE_SHIFT);   
-        /* XXX KAF: Why can't we leave low 1MB of memory free? */
-        reserve_bootmem(0, (PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1));
+        reserve_bootmem(HIGH_MEMORY,
+                        (PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1)
+                        - HIGH_MEMORY);
 }
 #else
 static void __init contig_initmem_init(void)

@@ -8,23 +8,12 @@
 
 static char * __init machine_specific_memory_setup(void)
 {
-	char *who;
-	unsigned long start_pfn, max_pfn;
-
-	who = "Xen";
-
-	/* In dom0, we have to start the fake e820 map above the first
-	 * 1MB, in other domains, it can start at 0. */
-	if (xen_start_info.flags & SIF_INITDOMAIN)
-		start_pfn = 0x100;
-	else
-		start_pfn = 0;
-	max_pfn = xen_start_info.nr_pages;
+	unsigned long max_pfn = xen_start_info.nr_pages;
 
 	e820.nr_map = 0;
-	add_memory_region(PFN_PHYS(start_pfn), PFN_PHYS(max_pfn) - PFN_PHYS(start_pfn), E820_RAM);
+	add_memory_region(0, PFN_PHYS(max_pfn), E820_RAM);
 
-	return who;
+	return "Xen";
 }
 
 void __init machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c)
