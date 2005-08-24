@@ -3,7 +3,7 @@
 #include <sys/ioctl.h>
 #include "xs.h"
 #include "utils.h"
-#include <xc.h>
+#include <xenctrl.h>
 #include <xen/linux/privcmd.h>
 #include <stdio.h>
 #include <unistd.h>

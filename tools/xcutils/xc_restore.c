@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <err.h>
 
-#include <xc.h>
+#include <xenctrl.h>
 
 int
 main(int argc, char **argv)

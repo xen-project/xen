@@ -14,7 +14,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include "xc.h"
+#include "xenctrl.h"
 
 #include <xen/linux/privcmd.h>
 

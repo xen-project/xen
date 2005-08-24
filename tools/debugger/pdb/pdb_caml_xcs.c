@@ -17,7 +17,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <errno.h>
-#include <xc.h>
+#include <xenctrl.h>
 
 #include <xen/xen.h>
 #include <xen/io/domain_controller.h>

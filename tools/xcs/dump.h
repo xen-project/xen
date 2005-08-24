@@ -20,7 +20,7 @@
 #define XENCTLD_ERROR_H
 
 #include <stdint.h>
-#include <xc.h>
+#include <xenctrl.h>
 #include <xen/io/domain_controller.h>
 
 void dump_msg(const control_msg_t *msg, uint64_t flags);

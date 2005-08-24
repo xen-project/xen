@@ -5,7 +5,7 @@
  */
 
 #include <Python.h>
-#include <xc.h>
+#include <xenctrl.h>
 #include <zlib.h>
 #include <fcntl.h>
 #include <netinet/in.h>

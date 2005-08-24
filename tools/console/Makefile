@@ -26,11 +26,11 @@ clean:
 
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
 	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -L$(XEN_XENSTORE) \
-              -lxc -lxenstore
+              -lxenctrl -lxenstore
 
 xenconsole: $(patsubst %.c,%.o,$(wildcard client/*.c))
 	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -L$(XEN_XENSTORE) \
-	      -lxc -lxenstore
+	      -lxenctrl -lxenstore
 
 install: $(BIN)
 	$(INSTALL_DIR) -p $(DESTDIR)/$(DAEMON_INSTALL_DIR)

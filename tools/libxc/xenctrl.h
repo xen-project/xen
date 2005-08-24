@@ -1,5 +1,5 @@
 /******************************************************************************
- * xc.h
+ * xenctrl.h
  * 
  * A library for low-level access to the Xen control interfaces.
  * 

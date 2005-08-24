@@ -36,7 +36,7 @@
 #include <errno.h>
 #include <pty.h>
 
-#include "xc.h"
+#include "xenctrl.h"
 #include "xs.h"
 
 #define ESCAPE_CHARACTER 0x1d

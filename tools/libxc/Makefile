@@ -48,8 +48,8 @@ DEPS     = .*.d
 LIB_OBJS := $(patsubst %.c,%.o,$(SRCS))
 PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
 
-LIB      := libxc.a libxc-pic.a
-LIB      += libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
+LIB      := libxenctrl.a libxenctrl-pic.a
+LIB      += libxenctrl.so libxenctrl.so.$(MAJOR) libxenctrl.so.$(MAJOR).$(MINOR)
 
 all: build
 build: check-for-zlib mk-symlinks
@@ -77,11 +77,11 @@ mk-symlinks:
 install: build
 	[ -d $(DESTDIR)/usr/$(LIBDIR) ] || $(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
 	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
-	$(INSTALL_PROG) libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
-	$(INSTALL_DATA) libxc.a $(DESTDIR)/usr/$(LIBDIR)
-	ln -sf libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxc.so.$(MAJOR)
-	ln -sf libxc.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxc.so
-	$(INSTALL_DATA) xc.h $(DESTDIR)/usr/include
+	$(INSTALL_PROG) libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DATA) libxenctrl.a $(DESTDIR)/usr/$(LIBDIR)
+	ln -sf libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxenctrl.so.$(MAJOR)
+	ln -sf libxenctrl.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenctrl.so
+	$(INSTALL_DATA) xenctrl.h $(DESTDIR)/usr/include/xen
 
 .PHONY: TAGS clean rpm install all
 
@@ -100,18 +100,18 @@ rpm: build
 	mv staging/i386/*.rpm .
 	rm -rf staging
 
-libxc.a: $(LIB_OBJS)
+libxenctrl.a: $(LIB_OBJS)
 	$(AR) rc $@ $^
 
-libxc-pic.a: $(PIC_OBJS)
+libxenctrl-pic.a: $(PIC_OBJS)
 	$(AR) rc $@ $^
 
-libxc.so: libxc.so.$(MAJOR)
+libxenctrl.so: libxenctrl.so.$(MAJOR)
 	ln -sf $< $@
-libxc.so.$(MAJOR): libxc.so.$(MAJOR).$(MINOR)
+libxenctrl.so.$(MAJOR): libxenctrl.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
-libxc.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxc.so.$(MAJOR) -shared -o $@ $^ -lz
+libxenctrl.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenctrl.so.$(MAJOR) -shared -o $@ $^ -lz
 
 -include $(DEPS)

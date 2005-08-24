@@ -32,7 +32,7 @@ xen:
 	ln -sf $(XEN_ROOT)/xen/include/public $@
 
 xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o
-	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxc -o $@
+	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
 
 xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_test.o xenstored_transaction_test.o xs_lib.o talloc_test.o fake_libxc.o utils.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
@@ -103,7 +103,7 @@ stresstest: xs_stress xenstored_test
 	export $(TESTENV); PID=`./xenstored_test --output-pid --trace-file=/tmp/trace`; ./xs_stress 5000; ret=$$?; kill $$PID; exit $$ret
 
 xs_dom0_test: xs_dom0_test.o utils.o
-	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxc -o $@
+	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
 
 TAGS:
 	etags `find . -name '*.[ch]'`
