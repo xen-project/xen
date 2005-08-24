@@ -666,7 +666,7 @@ def main(argv=sys.argv):
             sys.exit(1)
         except XendError, ex:
             if len(args) > 0:
-                handle_xend_error(argv[1], args[0], ex)
+                handle_xend_error(argv[1], args[1], ex)
             else:
                 print "Unexpected error:", sys.exc_info()[0]
                 print
