@@ -136,7 +136,11 @@ ENTRY(vhpt_miss)
 	;;
 	rsm psr.dt				// use physical addressing for data
 	mov r31=pr				// save the predicate registers
+#ifdef XEN
+	movl r19=THIS_CPU(cpu_kr)+IA64_KR_PT_BASE_OFFSET;;
+#else
 	mov r19=IA64_KR(PT_BASE)		// get page table base address
+#endif
 	shl r21=r16,3				// shift bit 60 into sign bit
 	shr.u r17=r16,61			// get the region number into r17
 	;;
@@ -503,7 +507,11 @@ ENTRY(nested_dtlb_miss)
 	 * Clobbered:	b0, r18, r19, r21, psr.dt (cleared)
 	 */
 	rsm psr.dt				// switch to using physical data addressing
+#ifdef XEN
+	movl r19=THIS_CPU(cpu_kr)+IA64_KR_PT_BASE_OFFSET;;
+#else
 	mov r19=IA64_KR(PT_BASE)		// get the page table base address
+#endif
 	shl r21=r16,3				// shift bit 60 into sign bit
 	;;
 	shr.u r17=r16,61			// get the region number into r17

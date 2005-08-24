@@ -261,6 +261,14 @@ printk("About to call ac_timer_init()\n");
 printk("About to call sort_main_extable()\n");
     sort_main_extable();
 
+    /* surrender usage of kernel registers to domain, use percpu area instead */
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_IO_BASE] = ia64_get_kr(IA64_KR_IO_BASE);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_PER_CPU_DATA] = ia64_get_kr(IA64_KR_PER_CPU_DATA);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT_STACK] = ia64_get_kr(IA64_KR_CURRENT_STACK);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_FPU_OWNER] = ia64_get_kr(IA64_KR_FPU_OWNER);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT] = ia64_get_kr(IA64_KR_CURRENT);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_PT_BASE] = ia64_get_kr(IA64_KR_PT_BASE);
+
     /* Create initial domain 0. */
 printk("About to call do_createdomain()\n");
     dom0 = do_createdomain(0, 0);
