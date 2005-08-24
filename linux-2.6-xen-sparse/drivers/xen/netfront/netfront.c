@@ -200,7 +200,6 @@ static char *be_state_name[] = {
     [BEST_CONNECTED]    = "connected",
 };
 
-#define DEBUG
 #ifdef DEBUG
 #define DPRINTK(fmt, args...) \
     printk(KERN_ALERT "xen_net (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
