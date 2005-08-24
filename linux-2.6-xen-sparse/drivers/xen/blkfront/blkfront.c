@@ -1084,7 +1084,8 @@ static void watch_for_status(struct xenbus_watch *watch, const char *node)
 			    "sector-size", "%lu", &sector_size,
 			    NULL);
 	if (err) {
-		xenbus_dev_error(info->xbdev, err, "reading backend fields");
+		xenbus_dev_error(info->xbdev, err,
+				 "reading backend fields at %s", watch->node);
 		return;
 	}
 
