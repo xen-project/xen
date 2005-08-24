@@ -69,7 +69,7 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		device_unregister(&be->dev->dev);
 		return;
 	}
-	if (be->blkif->status == CONNECTED)
+	if (be->blkif == NULL || be->blkif->status == CONNECTED)
 		return;
 
 	err = xenbus_gather(be->frontpath, "grant-id", "%lu", &sharedmfn,
