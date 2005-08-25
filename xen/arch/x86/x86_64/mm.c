@@ -74,7 +74,7 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
 
 void __init paging_init(void)
 {
-    unsigned long i;
+    unsigned long i, mpt_size;
     l3_pgentry_t *l3_ro_mpt;
     l2_pgentry_t *l2_ro_mpt;
     struct pfn_info *pg;
@@ -98,16 +98,17 @@ void __init paging_init(void)
      * Allocate and map the machine-to-phys table.
      * This also ensures L3 is present for fixmaps.
      */
-    for ( i = 0; i < max_page; i += ((1UL << L2_PAGETABLE_SHIFT) / 4) )
+    mpt_size  = (max_page * 4) + (1UL << L2_PAGETABLE_SHIFT) - 1UL;
+    mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
+    for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
-        pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0);
-        if ( pg == NULL )
+        if ( (pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
             panic("Not enough memory for m2p table\n");
         map_pages_to_xen(
-            RDWR_MPT_VIRT_START + i*8, page_to_pfn(pg), 
+            RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT), page_to_pfn(pg), 
             1UL << PAGETABLE_ORDER,
             PAGE_HYPERVISOR);
-        memset((void *)(RDWR_MPT_VIRT_START + i*8), 0x55,
+        memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)), 0x55,
                1UL << L2_PAGETABLE_SHIFT);
         *l2_ro_mpt++ = l2e_from_page(
             pg, _PAGE_GLOBAL|_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT);

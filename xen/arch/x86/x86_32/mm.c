@@ -93,15 +93,10 @@ void __init paging_init(void)
 
     /*
      * Allocate and map the machine-to-phys table and create read-only mapping 
-     * of MPT for guest-OS use.  Without PAE we'll end up with one 4MB page, 
-     * with PAE we'll allocate 2MB pages depending on the amount of memory 
-     * installed, but at least 4MB to cover 4GB address space.  This is needed 
-     * to make PCI I/O memory address lookups work in guests.
+     * of MPT for guest-OS use.
      */
     mpt_size  = (max_page * 4) + (1UL << L2_PAGETABLE_SHIFT) - 1UL;
     mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
-    if ( mpt_size < (4 << 20) )
-        mpt_size = 4 << 20;
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
         if ( (pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
