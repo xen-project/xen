@@ -25,7 +25,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 
-#include "xc.h"
+#include "xenctrl.h"
 #include "xen/io/domain_controller.h"
 #include "xcs_proto.h"
 

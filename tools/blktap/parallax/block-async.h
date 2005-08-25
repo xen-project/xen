@@ -7,7 +7,7 @@
 #define _BLOCKASYNC_H_
 
 #include <assert.h>
-#include <xc.h>
+#include <xenctrl.h>
 #include "vdi.h"
 
 struct io_ret

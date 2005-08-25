@@ -16,7 +16,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <ctype.h>
-#include <xc.h>
+#include <xenctrl.h>
 #include <xen/xen.h>
 #include <xen/io/domain_controller.h>
 #include <getopt.h>

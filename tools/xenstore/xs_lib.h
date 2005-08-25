@@ -22,7 +22,7 @@
 
 #include <stdbool.h>
 #include <limits.h>
-#include <xc.h>
+#include <xenctrl.h>
 
 /* Bitmask of permissions. */
 enum xs_perm_type {

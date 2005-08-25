@@ -266,7 +266,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
     int err;
     unsigned int npages = mem_kb / (PAGE_SIZE/1024);
 
-    err = do_dom_mem_op(xc_handle, MEMOP_increase_reservation, NULL,
+    err = xc_dom_mem_op(xc_handle, MEMOP_increase_reservation, NULL,
                         npages, 0, domid);
     if (err == npages)
         return 0;

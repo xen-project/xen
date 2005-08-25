@@ -15,7 +15,7 @@
 #include <caml/memory.h>
 #include <caml/mlvalues.h>
 
-#include <xc.h>
+#include <xenctrl.h>
 #include <xen/xen.h>
 #include <xen/io/domain_controller.h>
 #include <xen/linux/privcmd.h>

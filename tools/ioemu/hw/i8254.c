@@ -22,7 +22,7 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
-#include "xc.h"
+#include "xenctrl.h"
 #include <io/ioreq.h>
 
 //#define DEBUG_PIT

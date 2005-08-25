@@ -66,7 +66,7 @@
  * Free Software Foundation, Inc.
  */
 
-#include "xc_private.h"
+#include "xg_private.h"
 #include <stdlib.h>
 
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)

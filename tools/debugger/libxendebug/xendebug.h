@@ -9,7 +9,7 @@
 #ifndef _XENDEBUG_H_DEFINED
 #define _XENDEBUG_H_DEFINED
 
-#include <xc.h>
+#include <xenctrl.h>
 
 int xendebug_attach(int xc_handle,
 		    u32 domid,

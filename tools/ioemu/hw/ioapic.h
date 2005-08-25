@@ -26,7 +26,7 @@
 #ifndef __IOAPIC_H
 #define __IOAPIC_H
 
-#include "xc.h"
+#include "xenctrl.h"
 #include <io/ioreq.h>
 #include <io/vmx_vlapic.h>
 

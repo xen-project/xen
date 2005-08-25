@@ -12,7 +12,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/mman.h>
-#include <xc.h>
+#include <xenctrl.h>
 #include "list.h"
 
 #if defined(__i386__)

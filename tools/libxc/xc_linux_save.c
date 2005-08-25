@@ -7,11 +7,15 @@
  */
 
 #include <inttypes.h>
+#include <time.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <sys/time.h>
-#include "xc_private.h"
+
+#include "xg_private.h"
+
 #include <xen/linux/suspend.h>
 #include <xen/io/domain_controller.h>
-#include <time.h>
 
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
 
@@ -772,7 +776,7 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
                 goto out;
             }
      
-            if ( get_pfn_type_batch(xc_handle, dom, batch, pfn_type) ){
+            if ( xc_get_pfn_type_batch(xc_handle, dom, batch, pfn_type) ){
                 ERR("get_pfn_type_batch failed");
                 goto out;
             }

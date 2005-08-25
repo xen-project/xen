@@ -72,7 +72,7 @@
 #endif
 #endif /* CONFIG_SDL */
 
-#include "xc.h"
+#include "xenctrl.h"
 #include "exec-all.h"
 
 //#define DO_TB_FLUSH

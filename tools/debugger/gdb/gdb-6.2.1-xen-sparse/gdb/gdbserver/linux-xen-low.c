@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <xc.h>
+#include <xenctrl.h>
 #define TRACE_ENTER /* printf("enter %s\n", __FUNCTION__) */
 long (*myptrace)(enum __ptrace_request, pid_t, long, long);
 int (*myxcwait)(int domain, int *status, int options) ;

@@ -20,7 +20,7 @@ CFLAGS   += $(INCLUDES) -I. -I$(XEN_ROOT)/tools/libxc
 CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS     = .*.d
 
-LDFLAGS  += -L$(XEN_ROOT)/tools/libxc -lxc
+LDFLAGS  += -L$(XEN_ROOT)/tools/libxc -lxenctrl
 
 LIB_OBJS := $(patsubst %.c,%.o,$(SRCS))
 PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
