@@ -258,12 +258,32 @@ extern void sync_lazy_execstate_mask(cpumask_t mask);
 extern void sync_lazy_execstate_all(void);
 extern int __sync_lazy_execstate(void);
 
-/* Called by the scheduler to switch to another vcpu. */
+/*
+ * Called by the scheduler to switch to another VCPU. On entry, although
+ * VCPUF_running is no longer asserted for @prev, its context is still running
+ * on the local CPU and is not committed to memory. The local scheduler lock
+ * is therefore still held, and interrupts are disabled, because the local CPU
+ * is in an inconsistent state.
+ * 
+ * The callee must ensure that the local CPU is no longer running in @prev's
+ * context, and that the context is saved to memory, before returning.
+ * Alternatively, if implementing lazy context switching, it suffices to ensure
+ * that invoking __sync_lazy_execstate() will switch and commit @prev's state.
+ */
 extern void context_switch(
     struct vcpu *prev, 
     struct vcpu *next);
 
-/* Called by the scheduler to continue running the current vcpu. */
+/*
+ * On some architectures (notably x86) it is not possible to entirely load
+ * @next's context with interrupts disabled. These may implement a function to
+ * finalise loading the new context after interrupts are re-enabled. This
+ * function is not given @prev and is not permitted to access it.
+ */
+extern void context_switch_finalise(
+    struct vcpu *next);
+
+/* Called by the scheduler to continue running the current VCPU. */
 extern void continue_running(
     struct vcpu *same);
 
@@ -297,10 +317,9 @@ unsigned long __hypercall_create_continuation(
         (unsigned long)(_a1), (unsigned long)(_a2), (unsigned long)(_a3), \
         (unsigned long)(_a4), (unsigned long)(_a5), (unsigned long)(_a6))
 
-#define hypercall_preempt_check() (unlikely(            \
-        softirq_pending(smp_processor_id()) |           \
-        (!!current->vcpu_info->evtchn_upcall_pending &  \
-          !current->vcpu_info->evtchn_upcall_mask)      \
+#define hypercall_preempt_check() (unlikely(    \
+        softirq_pending(smp_processor_id()) |   \
+        event_pending(current)                  \
     ))
 
 /* This domain_hash and domain_list are protected by the domlist_lock. */
@@ -386,6 +405,7 @@ void vcpu_unpause(struct vcpu *v);
 void domain_unpause(struct domain *d);
 void domain_pause_by_systemcontroller(struct domain *d);
 void domain_unpause_by_systemcontroller(struct domain *d);
+void cpu_init(void);
 
 static inline void vcpu_unblock(struct vcpu *v)
 {

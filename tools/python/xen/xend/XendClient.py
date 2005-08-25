@@ -1,13 +1,27 @@
 #!/usr/bin/env python
-# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+#============================================================================
+
 """Client API for the HTTP interface on xend.
 Callable as a script - see main().
 Supports inet or unix connection to xend.
 
 This API is the 'control-plane' for xend.
-The 'data-plane' is done separately. For example, consoles
-are accessed via sockets on xend, but the list of consoles
-is accessible via this API.
+The 'data-plane' is done separately.
 """
 import os
 import sys
@@ -146,9 +160,6 @@ class Xend:
     def domainurl(self, id=''):
         return self.url.relative('domain/' + str(id))
 
-    def consoleurl(self, id=''):
-        return self.url.relative('console/' + str(id))
-
     def deviceurl(self, id=''):
         return self.url.relative('device/' + str(id))
 
@@ -213,11 +224,15 @@ class Xend:
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'pause' })
 
-    def xend_domain_shutdown(self, id, reason, key=0):
+    def xend_domain_shutdown(self, id, reason):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'shutdown',
-                              'reason'  : reason,
-                              'key'     : key })
+                              'reason'  : reason})
+
+    def xend_domain_sysrq(self, id, key):
+        return self.xendPost(self.domainurl(id),
+                             {'op'      : 'sysrq',
+                              'key'     : key})
 
     def xend_domain_destroy(self, id, reason):
         return self.xendPost(self.domainurl(id),
@@ -317,16 +332,6 @@ class Xend:
                              {'op'      : 'device_configure',
                               'idx'     : idx,
                               'config'  : fileof(config) })
-
-    def xend_consoles(self):
-        return self.xendGet(self.consoleurl())
-
-    def xend_console(self, id):
-        return self.xendGet(self.consoleurl(id))
-
-    def xend_console_disconnect(self, id):
-        return self.xendPost(self.consoleurl(id),
-                             {'op'      : 'disconnect'})
 
     def xend_vnets(self):
         return self.xendGet(self.vneturl())

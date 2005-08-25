@@ -6,6 +6,7 @@
 void pdb_initialize_bwcpoint (void);
 int pdb_suspend (struct task_struct *target);
 int pdb_resume (struct task_struct *target);
+int pdb_read_register (struct task_struct *target, pdb_op_rd_reg_p op);
 int pdb_read_registers (struct task_struct *target, pdb_op_rd_regs_p op);
 int pdb_write_register (struct task_struct *target, pdb_op_wr_reg_p op);
 int pdb_read_memory (struct task_struct *target, pdb_op_rd_mem_req_p req, 
@@ -17,16 +18,16 @@ int pdb_continue (struct task_struct *target);
 int pdb_step (struct task_struct *target);
 
 int pdb_insert_memory_breakpoint (struct task_struct *target, 
-                                  memory_t address, u32 length);
+                                  unsigned long address, u32 length);
 int pdb_remove_memory_breakpoint (struct task_struct *target,
-                                  memory_t address, u32 length);
+                                  unsigned long address, u32 length);
+int pdb_insert_watchpoint (struct task_struct *target,
+                           pdb_op_watchpt_p watchpt);
+int pdb_remove_watchpoint (struct task_struct *target,
+                           pdb_op_watchpt_p watchpt);
 
 int pdb_exceptions_notify (struct notifier_block *self, unsigned long val,
                            void *data);
-
-int pdb_debug_fn (struct pt_regs *regs, long error_code,
-                  unsigned int condition);
-int pdb_int3_fn (struct pt_regs *regs, long error_code);
 
 /* module.c */
 void pdb_send_response (pdb_response_t *response);

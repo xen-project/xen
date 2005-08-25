@@ -33,6 +33,7 @@
 #define __XEN_DRIVERS_BLOCK_H__
 
 #include <linux/config.h>
+#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -44,6 +45,8 @@
 #include <linux/blkdev.h>
 #include <linux/major.h>
 #include <linux/devfs_fs_kernel.h>
+#include <asm-xen/hypervisor.h>
+#include <asm-xen/xenbus.h>
 #include <asm-xen/xen-public/xen.h>
 #include <asm-xen/xen-public/io/blkif.h>
 #include <asm-xen/xen-public/io/ring.h>
@@ -77,11 +80,20 @@
 #define DPRINTK_IOCTL(_f, _a...) ((void)0)
 #endif
 
-struct xlbd_type_info {
-    int partn_shift;
-    int disks_per_major;
-    char *devname;
-    char *diskname;
+struct xlbd_type_info
+{
+	int partn_shift;
+	int disks_per_major;
+	char *devname;
+	char *diskname;
+};
+
+struct xlbd_major_info
+{
+	int major;
+	int index;
+	int usage;
+	struct xlbd_type_info *type;
 };
 
 /*
@@ -89,25 +101,27 @@ struct xlbd_type_info {
  * hang in private_data off the gendisk structure. We may end up
  * putting all kinds of interesting stuff here :-)
  */
-struct xlbd_major_info {
-    int major;
-    int index;
-    int usage;
-    struct xlbd_type_info *type;
-};
-
-struct xlbd_disk_info {
-    int xd_device;
-    struct xlbd_major_info *mi;
+struct blkfront_info
+{
+	struct xenbus_device *xbdev;
+	/* We watch the backend */
+	struct xenbus_watch watch;
+	dev_t dev;
+	int vdevice;
+	blkif_vdev_t handle;
+	int connected;
+	char *backend;
+	int backend_id;
+	int ring_ref;
+	blkif_front_ring_t ring;
+	unsigned int evtchn;
+	struct xlbd_major_info *mi;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-    struct xlbd_disk_info  *next_waiting;
-    request_queue_t        *rq;
+	request_queue_t *rq;
 #endif
+	struct work_struct work;
+	struct gnttab_free_callback callback;
 };
-
-typedef struct xen_block {
-    int usage;
-} xen_block_t;
 
 extern spinlock_t blkif_io_lock;
 
@@ -117,17 +131,10 @@ extern int blkif_ioctl(struct inode *inode, struct file *filep,
                        unsigned command, unsigned long argument);
 extern int blkif_check(dev_t dev);
 extern int blkif_revalidate(dev_t dev);
-extern void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp);
-#ifdef CONFIG_XEN_BLKDEV_GRANT
-extern void blkif_control_probe_send(
-    blkif_request_t *req, blkif_response_t *rsp, unsigned long address);
-#endif
 extern void do_blkif_request (request_queue_t *rq); 
 
-extern void xlvbd_update_vbds(void);
-
 /* Virtual block-device subsystem. */
-extern int  xlvbd_init(void);
-extern void xlvbd_cleanup(void); 
-
+int xlvbd_add(blkif_sector_t capacity, int device,
+	      u16 vdisk_info, u16 sector_size, struct blkfront_info *info);
+void xlvbd_del(struct blkfront_info *info);
 #endif /* __XEN_DRIVERS_BLOCK_H__ */

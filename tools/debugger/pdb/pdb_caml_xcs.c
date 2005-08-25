@@ -17,7 +17,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <errno.h>
-#include <xc.h>
+#include <xenctrl.h>
 
 #include <xen/xen.h>
 #include <xen/io/domain_controller.h>
@@ -50,7 +50,7 @@ xcs_initialize_ring (value domain, value ring)
 {
     CAMLparam2(domain, ring);
     int my_domain = Int_val(domain);
-    memory_t my_ring = Int32_val(ring);
+    unsigned long my_ring = Int32_val(ring);
 
     pdb_front_ring_t *front_ring;
     pdb_sring_t *sring;

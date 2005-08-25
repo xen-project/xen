@@ -14,9 +14,9 @@
 do {									\
 	if (unlikely((mm)->context.pinned)) {				\
 		if (!PageHighMem(pte))					\
-			HYPERVISOR_update_va_mapping(			\
+			BUG_ON(HYPERVISOR_update_va_mapping(		\
 			  (unsigned long)__va(page_to_pfn(pte)<<PAGE_SHIFT),\
-			  pfn_pte(page_to_pfn(pte), PAGE_KERNEL_RO), 0);\
+			  pfn_pte(page_to_pfn(pte), PAGE_KERNEL_RO), 0));\
 		set_pmd(pmd, __pmd(_PAGE_TABLE +			\
 			((unsigned long long)page_to_pfn(pte) <<	\
 				(unsigned long long) PAGE_SHIFT)));	\

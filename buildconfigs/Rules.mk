@@ -66,6 +66,7 @@ pristine-%/.valid-pristine: %.tar.bz2
 
 PATCHDIRS := $(wildcard patches/*-*)
 
+ifneq ($(PATCHDIRS),)
 -include $(patsubst %,%/.makedep,$(PATCHDIRS))
 
 $(patsubst patches/%,patches/%/.makedep,$(PATCHDIRS)): patches/%/.makedep: 
@@ -80,6 +81,7 @@ ref-%/.valid-ref: pristine-%/.valid-pristine
 	([ -d patches/$* ] && \
 	  for i in patches/$*/*.patch ; do ( cd $(@D) ; patch -p1 <../$$i || exit 1 ) ; done) || true
 	touch $@ # update timestamp to avoid rebuild
+endif
 
 %-build:
 	$(MAKE) -f buildconfigs/mk.$* build
@@ -115,7 +117,7 @@ config-update-pae:
 ifeq ($(XEN_TARGET_X86_PAE),y)
 	sed -e 's!^CONFIG_HIGHMEM4G=y$$!\# CONFIG_HIGHMEM4G is not set!;s!^\# CONFIG_HIGHMEM64G is not set$$!CONFIG_HIGHMEM64G=y!' $(CONFIG_FILE) > $(CONFIG_FILE)- && mv $(CONFIG_FILE)- $(CONFIG_FILE)
 else
-	@: # do nothing yet
+	grep '^CONFIG_HIGHMEM64G=y' $(CONFIG_FILE) >/dev/null && ( sed -e 's!^CONFIG_HIGHMEM64G=y$$!\# CONFIG_HIGHMEM64G is not set!;s!^\# CONFIG_HIGHMEM4G is not set$$!CONFIG_HIGHMEM4G=y!' $(CONFIG_FILE) > $(CONFIG_FILE)- && mv $(CONFIG_FILE)- $(CONFIG_FILE) ) || true
 endif
 
 # never delete any intermediate files.

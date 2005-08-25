@@ -26,7 +26,6 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-//#define DEBUG
 
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/evtchn.h>
@@ -49,13 +48,12 @@ DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
 
 static inline struct ringbuf_head *outbuf(void)
 {
-	return machine_to_virt(xen_start_info.store_mfn << PAGE_SHIFT);
+	return mfn_to_virt(xen_start_info.store_mfn);
 }
 
 static inline struct ringbuf_head *inbuf(void)
 {
-	return machine_to_virt(xen_start_info.store_mfn << PAGE_SHIFT)
-		+ PAGE_SIZE/2;
+	return mfn_to_virt(xen_start_info.store_mfn) + PAGE_SIZE/2;
 }
 
 static irqreturn_t wake_waiting(int irq, void *unused, struct pt_regs *regs)
@@ -202,14 +200,17 @@ int xb_read(void *data, unsigned len)
 	return 0;
 }
 
-/* Set up interrpt handler off store event channel. */
+/* Set up interrupt handler off store event channel. */
 int xb_init_comms(void)
 {
-	int err, irq;
+	int err;
 
-	irq = bind_evtchn_to_irq(xen_start_info.store_evtchn);
+	if (!xen_start_info.store_evtchn)
+		return 0;
 
-	err = request_irq(irq, wake_waiting, SA_SHIRQ, "xenbus", &xb_waitq);
+	err = bind_evtchn_to_irqhandler(
+		xen_start_info.store_evtchn, wake_waiting,
+		0, "xenbus", &xb_waitq);
 	if (err) {
 		printk(KERN_ERR "XENBUS request irq failed %i\n", err);
 		unbind_evtchn_from_irq(xen_start_info.store_evtchn);
@@ -217,8 +218,16 @@ int xb_init_comms(void)
 	}
 
 	/* FIXME zero out page -- domain builder should probably do this*/
-	memset(machine_to_virt(xen_start_info.store_mfn << PAGE_SHIFT),
-	       0, PAGE_SIZE);
+	memset(mfn_to_virt(xen_start_info.store_mfn), 0, PAGE_SIZE);
 
 	return 0;
+}
+
+void xb_suspend_comms(void)
+{
+
+	if (!xen_start_info.store_evtchn)
+		return;
+
+	unbind_evtchn_from_irqhandler(xen_start_info.store_evtchn, &xb_waitq);
 }

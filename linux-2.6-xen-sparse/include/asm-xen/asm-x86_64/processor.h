@@ -154,6 +154,20 @@ static inline void set_in_cr4 (unsigned long mask)
 	}
 }
 
+
+static inline void clear_in_cr4 (unsigned long mask)
+{
+#ifndef CONFIG_XEN
+	mmu_cr4_features &= ~mask;
+	__asm__("movq %%cr4,%%rax\n\t"
+		"andq %0,%%rax\n\t"
+		"movq %%rax,%%cr4\n"
+		: : "irg" (~mask)
+		:"ax");
+#endif
+}
+
+
 #define load_cr3(pgdir) do {				\
 	xen_pt_switch(__pa(pgdir));			\
 	per_cpu(cur_pgd, smp_processor_id()) = pgdir;	\
@@ -283,9 +297,9 @@ struct thread_struct {
 	load_gs_index(0);							\
 	(regs)->rip = (new_rip);						 \
 	(regs)->rsp = (new_rsp);						 \
-	write_pda(oldrsp, (new_rsp)); 						 \
-	(regs)->cs = __USER_CS;                                                  \
-	(regs)->ss = __USER_DS;                                                  \
+	write_pda(oldrsp, (new_rsp));						 \
+	(regs)->cs = __USER_CS;							 \
+	(regs)->ss = __USER_DS;							 \
 	(regs)->eflags = 0x200;							 \
 	set_fs(USER_DS);							 \
 } while(0) 

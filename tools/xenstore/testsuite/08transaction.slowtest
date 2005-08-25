@@ -1,0 +1,21 @@
+# Test transaction timeouts.  Take a second each.
+
+mkdir /test
+write /test/entry1 create contents
+
+# Transactions can take as long as the want...
+start /test
+sleep 1100
+rm /test/entry1
+commit
+dir /test
+
+# ... as long as noone is waiting.
+1 start /test
+notimeout
+2 mkdir /test/dir
+1 mkdir /test/dir
+expect 1:dir
+1 dir /test
+expect 1: commit failed: Connection timed out
+1 commit

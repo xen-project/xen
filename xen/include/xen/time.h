@@ -57,7 +57,7 @@ s_time_t get_s_time(void);
 
 extern void update_dom_time(struct vcpu *v);
 extern void do_settime(
-    unsigned long secs, unsigned long usecs, u64 system_time_base);
+    unsigned long secs, unsigned long nsecs, u64 system_time_base);
 
 #endif /* __XEN_TIME_H__ */
 

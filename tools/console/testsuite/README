@@ -1,0 +1,29 @@
+ABOUT
+
+This tool uses two programs, one that lives in dom0 and one that lives in domU
+to verify that no data is lost.  dom0 and domU share a handshake with each
+other that they use to exchange a random seed.
+
+Both programs then generate a series of random numbers and then writes and
+reads the numbers via the console.  Because each side starts with the same seed
+they know what data the other side is generating and therefore what should be
+expected.
+
+RUNNNING
+
+console-domU should be installed within the guest image.  It must be launched
+from the client automatically.  I use a custom initrd image and put it in the
+/linuxrc.
+
+console-dom0 and console-domU will communicate with each other and stress the
+console code.  You can verify it at various levels by invoking it in different
+ways.  procpipe is used to connect the two.  I use the following command for
+testing:
+
+./procpipe ./console-dom0 'xm create -c /etc/xen/xmexample1'
+
+xmexample1 has no devices and no root set (this is what triggers /linuxrc).
+
+If it freezes, it probably means that console-domU is expecting more data from
+console-dom0 (which means that some data got dropped).  I'd like to add
+timeouts in the future to handle this more gracefully.

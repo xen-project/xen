@@ -32,7 +32,7 @@
  */
 #define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 extern unsigned long empty_zero_page[1024];
-extern pgd_t swapper_pg_dir[1024];
+extern pgd_t *swapper_pg_dir;
 extern kmem_cache_t *pgd_cache;
 extern kmem_cache_t *pmd_cache;
 extern spinlock_t pgd_lock;
@@ -398,7 +398,7 @@ extern void noexec_setup(const char *str);
 	do {								  \
 		if (__dirty) {						  \
 		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
-			    HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG|UVMF_MULTI|(unsigned long)((__vma)->vm_mm->cpu_vm_mask.bits)); \
+			    BUG_ON(HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG|UVMF_MULTI|(unsigned long)((__vma)->vm_mm->cpu_vm_mask.bits))); \
 			} else {                                          \
                             xen_l1_entry_update((__ptep), (__entry)); \
 			    flush_tlb_page((__vma), (__address));         \
@@ -416,8 +416,8 @@ do {				  					\
 #define ptep_establish_new(__vma, __address, __ptep, __entry)		\
 do {				  					\
 	if (likely((__vma)->vm_mm == current->mm)) {			\
-		HYPERVISOR_update_va_mapping((__address),		\
-					     __entry, 0);		\
+		BUG_ON(HYPERVISOR_update_va_mapping((__address),	\
+					     __entry, 0));		\
 	} else {							\
 		xen_l1_entry_update((__ptep), (__entry));	\
 	}								\
@@ -450,7 +450,7 @@ void make_pages_writable(void *va, unsigned int nr);
 #define arbitrary_virt_to_machine(__va)					\
 ({									\
 	pte_t *__pte = virt_to_ptep(__va);				\
-	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
+	maddr_t __pa = (maddr_t)pte_mfn(*__pte) << PAGE_SHIFT;		\
 	__pa | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
 })
 
@@ -466,10 +466,12 @@ int direct_remap_area_pages(struct mm_struct *mm,
                             unsigned long size, 
                             pgprot_t prot,
                             domid_t  domid);
-int __direct_remap_area_pages(struct mm_struct *mm,
-			      unsigned long address, 
-			      unsigned long size, 
-			      mmu_update_t *v);
+int create_lookup_pte_addr(struct mm_struct *mm,
+                           unsigned long address,
+                           unsigned long *ptep);
+int touch_pte_range(struct mm_struct *mm,
+                    unsigned long address,
+                    unsigned long size);
 
 #define io_remap_page_range(vma,from,phys,size,prot) \
 direct_remap_area_pages(vma->vm_mm,from,phys,size,prot,DOMID_IO)

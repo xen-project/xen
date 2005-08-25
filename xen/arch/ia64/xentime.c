@@ -48,7 +48,7 @@ static inline u64 get_time_delta(void)
 static s_time_t        stime_irq = 0x0;       /* System time at last 'time update' */
 unsigned long itc_scale;
 unsigned long itc_at_irq;
-static unsigned long   wc_sec, wc_usec; /* UTC time at last 'time update'.   */
+static unsigned long   wc_sec, wc_nsec; /* UTC time at last 'time update'.   */
 //static rwlock_t        time_lock = RW_LOCK_UNLOCKED;
 static irqreturn_t vmx_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs);
 
@@ -103,25 +103,22 @@ void update_dom_time(struct vcpu *v)
 }
 
 /* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
-void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
+void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
 {
 #ifdef  CONFIG_VTI
-    s64 delta;
-    long _usecs = (long)usecs;
+    u64 _nsecs;
 
     write_lock_irq(&xtime_lock);
 
-    delta = (s64)(stime_irq - system_time_base);
-
-    _usecs += (long)(delta/1000);
-    while ( _usecs >= 1000000 ) 
+    _nsecs = (u64)nsecs + (s64)(stime_irq - system_time_base);
+    while ( _nsecs >= 1000000000 ) 
     {
-        _usecs -= 1000000;
+        _nsecs -= 1000000000;
         secs++;
     }
 
     wc_sec  = secs;
-    wc_usec = _usecs;
+    wc_nsec = (unsigned long)_nsecs;
 
     write_unlock_irq(&xtime_lock);
 
@@ -290,13 +287,13 @@ int __init init_xen_time()
     /* Wallclock time starts as the initial RTC time. */
     efi_gettimeofday(&tm);
     wc_sec  = tm.tv_sec;
-    wc_usec = tm.tv_nsec/1000;
+    wc_nsec = tm.tv_nsec;
 
 
     printk("Time init:\n");
     printk(".... System Time: %ldns\n", NOW());
     printk(".... scale:       %16lX\n", itc_scale);
-    printk(".... Wall Clock:  %lds %ldus\n", wc_sec, wc_usec);
+    printk(".... Wall Clock:  %lds %ldus\n", wc_sec, wc_nsec/1000);
 
     return 0;
 }
@@ -338,10 +335,10 @@ vmx_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
             (*(unsigned long *)&jiffies_64)++;
 
             /* Update wall time. */
-            wc_usec += 1000000/HZ;
-            if ( wc_usec >= 1000000 )
+            wc_nsec += 1000000000/HZ;
+            if ( wc_nsec >= 1000000000 )
             {
-                wc_usec -= 1000000;
+                wc_nsec -= 1000000000;
                 wc_sec++;
             }
 

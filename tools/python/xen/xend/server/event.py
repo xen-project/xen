@@ -1,3 +1,20 @@
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+#============================================================================
+
 import sys
 import StringIO
 
@@ -33,7 +50,7 @@ class EventProtocol(protocol.Protocol):
     def dataReceived(self, data):
         try:
             self.parser.input(data)
-            if self.parser.ready():
+            while(self.parser.ready()):
                 val = self.parser.get_val()
                 res = self.dispatch(val)
                 self.send_result(res)
@@ -128,16 +145,8 @@ class EventProtocol(protocol.Protocol):
     def op_pretty(self, name, req):
         self.pretty = 1
 
-    def op_console_disconnect(self, name, req):
-        id = sxp.child_value(req, 'id')
-        if not id:
-            raise XendError('Missing console id')
-        id = int(id)
-        self.daemon.console_disconnect(id)
-
     def op_info(self, name, req):
         val = ['info']
-        #val += self.daemon.consoles()
         #val += self.daemon.blkifs()
         #val += self.daemon.netifs()
         #val += self.daemon.usbifs()

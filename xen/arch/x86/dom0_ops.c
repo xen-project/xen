@@ -404,15 +404,17 @@ void arch_getdomaininfo_ctxt(
 
     memcpy(c, &v->arch.guest_context, sizeof(*c));
 
-    /* IOPL privileges are virtualised -- merge back into returned eflags. */
-    BUG_ON((c->user_regs.eflags & EF_IOPL) != 0);
-    c->user_regs.eflags |= v->arch.iopl << 12;
-
     if ( VMX_DOMAIN(v) )
     {
         save_vmx_cpu_user_regs(&c->user_regs);
         __vmread(CR0_READ_SHADOW, &c->ctrlreg[0]);
         __vmread(CR4_READ_SHADOW, &c->ctrlreg[4]);
+    }
+    else
+    {
+        /* IOPL privileges are virtualised: merge back into returned eflags. */
+        BUG_ON((c->user_regs.eflags & EF_IOPL) != 0);
+        c->user_regs.eflags |= v->arch.iopl << 12;
     }
 
     c->flags = 0;

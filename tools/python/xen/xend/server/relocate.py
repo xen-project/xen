@@ -1,3 +1,19 @@
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+#============================================================================
 
 import socket
 import sys
@@ -26,7 +42,7 @@ class RelocationProtocol(protocol.Protocol):
     def dataReceived(self, data):
         try:
             self.parser.input(data)
-            if self.parser.ready():
+            while(self.parser.ready()):
                 val = self.parser.get_val()
                 res = self.dispatch(val)
                 self.send_result(res)
@@ -124,7 +140,8 @@ def listenRelocation():
     if xroot.get_xend_relocation_server():
         port = xroot.get_xend_relocation_port()
         interface = xroot.get_xend_relocation_address()
-        reactor.listenTCP(port, factory, interface=interface)
+        l = reactor.listenTCP(port, factory, interface=interface)
+        l.setCloExec()
 
 def setupRelocation(dst, port):
     try:

@@ -1,6 +1,5 @@
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
-LIBDIR = lib
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
 
 INSTALL         = install
@@ -25,7 +24,7 @@ TESTDIR  = `pwd`/testsuite/tmp
 TESTFLAGS= -DTESTING
 TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
 
-all: xen xenstored libxenstore.a libxenstore-pic.a
+all: xen xenstored libxenstore.so
 
 testcode: xen xs_test xenstored_test xs_random xs_dom0_test
 
@@ -33,7 +32,7 @@ xen:
 	ln -sf $(XEN_ROOT)/xen/include/public $@
 
 xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o
-	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxc -o $@
+	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
 
 xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_test.o xenstored_transaction_test.o xs_lib.o talloc_test.o fake_libxc.o utils.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
@@ -41,9 +40,9 @@ xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_te
 xs_test: xs_test.o xs_lib.o utils.o
 xs_random: xs_random.o xs_test_lib.o xs_lib.o talloc.o utils.o
 xs_stress: xs_stress.o xs_test_lib.o xs_lib.o talloc.o utils.o
-xs_watch_stress: xs_watch_stress.o xs_test_lib.o xs_lib.o talloc.o utils.o
+xs_crashme: xs_crashme.o xs_lib.o talloc.o utils.o
 
-xs_test.o xs_stress.o xs_watch_stress.o xenstored_core_test.o xenstored_watch_test.o xenstored_transaction_test.o xenstored_domain_test.o xs_random.o xs_test_lib.o talloc_test.o fake_libxc.o: CFLAGS=$(BASECFLAGS) $(TESTFLAGS)
+xs_test.o xs_stress.o xenstored_core_test.o xenstored_watch_test.o xenstored_transaction_test.o xenstored_domain_test.o xs_random.o xs_test_lib.o talloc_test.o fake_libxc.o xs_crashme.o: CFLAGS=$(BASECFLAGS) $(TESTFLAGS)
 
 xenstored_%_test.o: xenstored_%.c
 	$(COMPILE.c) -o $@ $<
@@ -54,25 +53,30 @@ xs_test_lib.o: xs.c
 talloc_test.o: talloc.c
 	$(COMPILE.c) -o $@ $<
 
-LIB_OBJS     := xs.o xs_lib.o
-
-LIB_OBJS_A   := $(patsubst %.o,libxenstore.a(%.o),$(LIB_OBJS))
-LIB_OBJS_PIC := $(patsubst %.o,libxenstore-pic.a(%.opic),$(LIB_OBJS))
-
-libxenstore.a: $(LIB_OBJS_A)
-
-libxenstore-pic.a: $(LIB_OBJS_PIC)
+libxenstore.so: xs.opic xs_lib.opic
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenstore.so -shared -o $@ $^
 
 clean: testsuite-clean
-	rm -f *.o *.opic *.a
-	rm -f xen xenstored xs_random xs_stress xs_watch_stress
+	rm -f *.o *.opic *.so
+	rm -f xen xenstored xs_random xs_stress xs_crashme
 	rm -f xs_test xenstored_test xs_dom0_test
-	-$(RM) $(PROG_DEP)
+	$(RM) $(PROG_DEP)
 
-check: testsuite-run randomcheck stresstest
+print-dir:
+	@echo -n tools/xenstore: 
+
+print-end:
+	@echo
+
+check: print-dir testsuite-fast randomcheck-fast print-end
+
+fullcheck: testsuite-run randomcheck stresstest
 
 testsuite-run: xen xenstored_test xs_test
-	$(TESTENV) testsuite/test.sh
+	$(TESTENV) testsuite/test.sh && echo
+
+testsuite-fast: xen xenstored_test xs_test
+	@$(TESTENV) testsuite/test.sh --fast
 
 testsuite-clean:
 	rm -rf $(TESTDIR)
@@ -81,18 +85,25 @@ testsuite-clean:
 # fail.
 RANDSEED=$(shell date +%s)
 randomcheck: xs_random xenstored_test
-	$(TESTENV) ./xs_random --simple --fast /tmp/xs_random 200000 $(RANDSEED)
-	$(TESTENV) ./xs_random --fast /tmp/xs_random 100000 $(RANDSEED)
+	$(TESTENV) ./xs_random --simple --fast /tmp/xs_random 200000 $(RANDSEED) && echo
+	$(TESTENV) ./xs_random --fast /tmp/xs_random 100000 $(RANDSEED) && echo
 	$(TESTENV) ./xs_random --fail /tmp/xs_random 10000 $(RANDSEED)
 
-stresstest: xs_stress xs_watch_stress xenstored_test
+crashme:  xs_crashme xenstored_test
+	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions /tmp/xs_crashme.vglog* /tmp/trace
+	export $(TESTENV); ./xs_crashme 5000 $(RANDSEED) 2>/dev/null
+	if [ -n "`cat /tmp/xs_crashme.vglog*`" ]; then echo Valgrind complained; cat /tmp/xs_crashme.vglog*; exit 1; fi
+	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions /tmp/xs_crashme.vglog* /tmp/trace
+
+randomcheck-fast: xs_random xenstored_test
+	@$(TESTENV) ./xs_random --fast /tmp/xs_random 2000 $(RANDSEED)
+
+stresstest: xs_stress xenstored_test
 	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions
 	export $(TESTENV); PID=`./xenstored_test --output-pid --trace-file=/tmp/trace`; ./xs_stress 5000; ret=$$?; kill $$PID; exit $$ret
-	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions
-	export $(TESTENV); PID=`./xenstored_test --output-pid`; ./xs_watch_stress; ret=$$?; kill $$PID; exit $$ret
 
 xs_dom0_test: xs_dom0_test.o utils.o
-	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxc -o $@
+	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
 
 TAGS:
 	etags `find . -name '*.[ch]'`
@@ -100,15 +111,14 @@ TAGS:
 tarball: clean
 	cd .. && tar -c -j -v -h -f xenstore.tar.bz2 xenstore/
 
-install: xenstored libxenstore.a libxenstore-pic.a
+install: xenstored libxenstore.so
 	$(INSTALL_DIR) -p $(DESTDIR)/var/run/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/sbin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/include
 	$(INSTALL_PROG) xenstored $(DESTDIR)/usr/sbin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
-	$(INSTALL_DATA) libxenstore.a $(DESTDIR)/usr/$(LIBDIR)
-	$(INSTALL_DATA) libxenstore-pic.a $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DATA) libxenstore.so $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include
 	$(INSTALL_DATA) xs_lib.h $(DESTDIR)/usr/include
 

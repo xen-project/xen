@@ -1751,8 +1751,30 @@ int ioapic_guest_write(int apicid, int address, u32 val)
     
     pin = (address - 0x10) >> 1;
 
+    *(u32 *)&rte = val;
     rte.dest.logical.logical_dest = cpu_mask_to_apicid(TARGET_CPUS);
-    *(int *)&rte = val;
+
+    /*
+     * What about weird destination types?
+     *  SMI:    Ignore? Ought to be set up by the BIOS.
+     *  NMI:    Ignore? Watchdog functionality is Xen's concern.
+     *  INIT:   Definitely ignore: probably a guest OS bug.
+     *  ExtINT: Ignore? Linux only asserts this at start of day.
+     * For now, print a message and return an error. We can fix up on demand.
+     */
+    if ( rte.delivery_mode > dest_LowestPrio )
+    {
+        printk("ERROR: Attempt to write weird IOAPIC destination mode!\n");
+        printk("       APIC=%d/%d, lo-reg=%x\n", apicid, pin, val);
+        return -EINVAL;
+    }
+
+    /*
+     * The guest does not know physical APIC arrangement (flat vs. cluster).
+     * Apply genapic conventions for this platform.
+     */
+    rte.delivery_mode = INT_DELIVERY_MODE;
+    rte.dest_mode     = INT_DEST_MODE;
 
     if ( rte.vector >= FIRST_DEVICE_VECTOR )
     {

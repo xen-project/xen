@@ -102,10 +102,11 @@ for i in `find . -type l`; do rm -f $i; done
 relative_lndir ${RS}
 rm -f mkbuildtree
 
-
 # Create links to the shared definitions of the Xen interfaces.
 rm -rf ${AD}/include/asm-xen/xen-public
 mkdir  ${AD}/include/asm-xen/xen-public
 cd     ${AD}/include/asm-xen/xen-public
 relative_lndir ../../../${RS}/../xen/include/public
 
+cd ${AD}/drivers/xen/xenbus
+ln -sf ../../../${RS}/../tools/xenstore/xenstored.h

@@ -6,6 +6,8 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 
+#ifndef CONFIG_XEN
+
 /* Simple VGA output */
 
 #ifdef __i386__
@@ -59,7 +61,6 @@ static struct console early_vga_console = {
 	.index =	-1,
 };
 
-#ifndef CONFIG_XEN
 /* Serial functions loosely based on a similar package from Klaus P. Gerlicher */ 
 
 static int early_serial_base = 0x3f8;  /* ttyS0 */
@@ -148,7 +149,8 @@ static __init void early_serial_init(char *s)
 	outb((divisor >> 8) & 0xff, early_serial_base + DLH); 
 	outb(c & ~DLAB, early_serial_base + LCR);
 }
-#else
+
+#else /* CONFIG_XEN */
 
 static void
 early_serial_write(struct console *con, const char *s, unsigned count)
@@ -167,6 +169,13 @@ early_serial_write(struct console *con, const char *s, unsigned count)
 static __init void early_serial_init(char *s)
 {
 }
+
+/*
+ * No early VGA console on Xen, as we do not have convenient ISA-space
+ * mappings. Someone should fix this for domain 0. For now, use fake serial.
+ */
+#define early_vga_console early_serial_console
+
 #endif
 
 static struct console early_serial_console = {

@@ -657,8 +657,8 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
             FOREIGN_FRAME((buffer_mach + offset) >> PAGE_SHIFT);
 
-        ASSERT(virt_to_machine(MMAP_VADDR(pending_idx, i))
-               == buffer_mach + i << PAGE_SHIFT);
+        ASSERT(virt_to_mfn(MMAP_VADDR(pending_idx, i))
+               == ((buffer_mach >> PAGE_SHIFT) + i));
     }
 
     if ( req->pipe_type == 0 && req->num_iso > 0 ) /* Maybe schedule ISO... */
@@ -1027,13 +1027,15 @@ void usbif_release_ports(usbif_priv_t *up)
 static int __init usbif_init(void)
 {
     int i;
+    struct page *page;
 
     if ( !(xen_start_info.flags & SIF_INITDOMAIN) &&
          !(xen_start_info.flags & SIF_USB_BE_DOMAIN) )
         return 0;
-    
-    if ( (mmap_vstart = allocate_empty_lowmem_region(MMAP_PAGES)) == 0 )
-        BUG();
+
+    page = balloon_alloc_empty_page_range(MMAP_PAGES);
+    BUG_ON(page == NULL);
+    mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
 
     pending_cons = 0;
     pending_prod = MAX_PENDING_REQS;

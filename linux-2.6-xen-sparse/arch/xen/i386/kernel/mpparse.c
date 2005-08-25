@@ -784,7 +784,9 @@ static int __init smp_scan_config (unsigned long base, unsigned long length)
 
 void __init find_smp_config (void)
 {
+#ifndef CONFIG_XEN
 	unsigned int address;
+#endif
 
 	/*
 	 * FIXME: Linux assumes you have 640K of base ram..

@@ -1,3 +1,19 @@
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2005 Mike Wray <mike.wray@hp.com>
+#============================================================================
 import string
 import types
 
@@ -307,24 +323,24 @@ class DBMap(dict):
         db = self.__db__
         if path is None:
             path = db.relPath()
-        print 'DBMap>introduceDomain>', dom, page, evtchn, path
+        log.info("DBMap>introduceDomain> %d %d %s %s" %(dom, page, evtchn, path))
         try:
             db.introduceDomain(dom, page, evtchn, path)
         except Exception, ex:
             import traceback
             traceback.print_exc()
-            print 'DBMap>introduceDomain>', ex
+            log.info("DBMap>introduceDomain> %s" %ex)
             pass # todo: don't ignore
         
     def releaseDomain(self, dom):
         db = self.__db__
-        print 'DBMap>releaseDomain>', dom
+        log.info("DBMap>releaseDomain> %d" %dom)
         try:
             db.releaseDomain(dom)
         except Exception, ex:
             import traceback
             traceback.print_exc()
-            print 'DBMap>releaseDomain>', ex
+            log.info("DBMap>releaseDomain> %s" %ex)
             pass # todo: don't ignore
 
     def watch(self, fn, path=""):

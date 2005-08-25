@@ -2,6 +2,7 @@
 #define _ASM_IO_H
 
 #include <xen/config.h>
+#include <xen/types.h>
 #include <asm/page.h>
 
 #define IO_SPACE_LIMIT 0xffff
@@ -45,11 +46,7 @@ static inline void * phys_to_virt(unsigned long address)
 /*
  * Change "struct pfn_info" to physical address.
  */
-#ifdef CONFIG_HIGHMEM64G
-#define page_to_phys(page)  ((u64)(page - frame_table) << PAGE_SHIFT)
-#else
-#define page_to_phys(page)  ((page - frame_table) << PAGE_SHIFT)
-#endif
+#define page_to_phys(page)  ((physaddr_t)(page - frame_table) << PAGE_SHIFT)
 
 #define page_to_pfn(_page)  ((unsigned long)((_page) - frame_table))
 #define page_to_virt(_page) phys_to_virt(page_to_phys(_page))

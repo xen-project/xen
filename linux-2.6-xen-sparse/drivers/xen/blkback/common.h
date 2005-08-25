@@ -5,17 +5,18 @@
 #include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
-#include <linux/rbtree.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/blkdev.h>
+#include <linux/vmalloc.h>
 #include <asm/io.h>
 #include <asm/setup.h>
 #include <asm/pgalloc.h>
-#include <asm-xen/ctrl_if.h>
+#include <asm-xen/evtchn.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/io/blkif.h>
 #include <asm-xen/xen-public/io/ring.h>
+#include <asm-xen/gnttab.h>
 
 #if 0
 #define ASSERT(_p) \
@@ -28,12 +29,13 @@
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-typedef struct rb_root rb_root_t;
-typedef struct rb_node rb_node_t;
-#else
-struct block_device;
-#endif
+struct vbd {
+    blkif_vdev_t   handle;      /* what the domain refers to this vbd as */
+    unsigned char  readonly;    /* Non-zero -> read-only */
+    unsigned char  type;        /* VDISK_xxx */
+    blkif_pdev_t   pdevice;     /* phys device that this vbd maps to */
+    struct block_device *bdev;
+}; 
 
 typedef struct blkif_st {
     /* Unique identifier for this interface. */
@@ -42,34 +44,25 @@ typedef struct blkif_st {
     /* Physical parameters of the comms window. */
     unsigned long     shmem_frame;
     unsigned int      evtchn;
-    int               irq;
+    unsigned int      remote_evtchn;
     /* Comms information. */
     blkif_back_ring_t blk_ring;
     /* VBDs attached to this interface. */
-    rb_root_t         vbd_rb;        /* Mapping from 16-bit vdevices to VBDs.*/
-    spinlock_t        vbd_lock;      /* Protects VBD mapping. */
+    struct vbd        vbd;
     /* Private fields. */
-    enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
-    /*
-     * DISCONNECT response is deferred until pending requests are ack'ed.
-     * We therefore need to store the id from the original request.
-     */
-    u8               disconnect_rspid;
+    enum { DISCONNECTED, CONNECTED } status;
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
     /* Is this a blktap frontend */
     unsigned int     is_blktap;
 #endif
-    struct blkif_st *hash_next;
     struct list_head blkdev_list;
     spinlock_t       blk_ring_lock;
     atomic_t         refcnt;
 
-    struct work_struct work;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
+    struct work_struct free_work;
     u16 shmem_handle;
-    memory_t shmem_vaddr;
+    unsigned long shmem_vaddr;
     grant_ref_t shmem_ref;
-#endif
 } blkif_t;
 
 void blkif_create(blkif_be_create_t *create);
@@ -77,18 +70,25 @@ void blkif_destroy(blkif_be_destroy_t *destroy);
 void blkif_connect(blkif_be_connect_t *connect);
 int  blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id);
 void blkif_disconnect_complete(blkif_t *blkif);
-blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle);
+blkif_t *alloc_blkif(domid_t domid);
+void free_blkif_callback(blkif_t *blkif);
+int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn);
+
 #define blkif_get(_b) (atomic_inc(&(_b)->refcnt))
 #define blkif_put(_b)                             \
     do {                                          \
         if ( atomic_dec_and_test(&(_b)->refcnt) ) \
-            blkif_disconnect_complete(_b);        \
+            free_blkif_callback(_b);		  \
     } while (0)
 
-void vbd_create(blkif_be_vbd_create_t *create); 
-void vbd_destroy(blkif_be_vbd_destroy_t *delete); 
-int vbd_probe(blkif_t *blkif, vdisk_t *vbd_info, int max_vbds);
-void destroy_all_vbds(blkif_t *blkif);
+/* Create a vbd. */
+int vbd_create(blkif_t *blkif, blkif_vdev_t vdevice, blkif_pdev_t pdevice,
+	       int readonly);
+void vbd_free(struct vbd *vbd);
+
+unsigned long vbd_size(struct vbd *vbd);
+unsigned int vbd_info(struct vbd *vbd);
+unsigned long vbd_secsize(struct vbd *vbd);
 
 struct phys_req {
     unsigned short       dev;
@@ -100,9 +100,10 @@ struct phys_req {
 int vbd_translate(struct phys_req *req, blkif_t *blkif, int operation); 
 
 void blkif_interface_init(void);
-void blkif_ctrlif_init(void);
 
 void blkif_deschedule(blkif_t *blkif);
+
+void blkif_xenbus_init(void);
 
 irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 

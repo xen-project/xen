@@ -61,6 +61,7 @@ void dma_free_coherent(struct device *hwdev, size_t size,
 EXPORT_SYMBOL(dma_free_coherent);
 #endif
 
+#if 0
 int dma_supported(struct device *hwdev, u64 mask)
 {
         /*
@@ -76,6 +77,7 @@ int dma_supported(struct device *hwdev, u64 mask)
 	return 1;
 } 
 EXPORT_SYMBOL(dma_supported);
+#endif
 
 int dma_get_cache_alignment(void)
 {

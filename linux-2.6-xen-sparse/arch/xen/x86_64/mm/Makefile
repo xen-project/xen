@@ -6,10 +6,10 @@ XENARCH	:= $(subst ",,$(CONFIG_XENARCH))
 
 CFLAGS	+= -Iarch/$(XENARCH)/mm
 
-obj-y	:= init.o fault.o ioremap.o pageattr.o
+obj-y	:= init.o fault.o pageattr.o
 c-obj-y	:= extable.o
 
-i386-obj-y := hypervisor.o
+i386-obj-y := hypervisor.o ioremap.o
 
 #obj-y	 := init.o fault.o ioremap.o extable.o pageattr.o
 #c-obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o

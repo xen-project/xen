@@ -418,7 +418,7 @@ void free_shadow_page(unsigned long smfn)
         break;
 
     default:
-        printk("Free shadow weird page type mfn=%lx type=%08x\n",
+        printk("Free shadow weird page type mfn=%lx type=%" PRtype_info "\n",
                page_to_pfn(page), page->u.inuse.type_info);
         break;
     }
@@ -665,7 +665,7 @@ static void free_shadow_pages(struct domain *d)
 
     shadow_audit(d, 0);
 
-    SH_LOG("Free shadow table.");
+    SH_VLOG("Free shadow table.");
 }
 
 void shadow_mode_init(void)
@@ -1137,7 +1137,7 @@ static void free_shadow_ht_entries(struct domain *d)
     d->arch.shadow_ht_free = NULL;
 
     ASSERT(d->arch.shadow_extras_count == 0);
-    SH_LOG("freed extras, now %d", d->arch.shadow_extras_count);
+    SH_VLOG("freed extras, now %d", d->arch.shadow_extras_count);
 
     if ( d->arch.shadow_dirty_bitmap != NULL )
     {

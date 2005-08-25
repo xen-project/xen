@@ -355,7 +355,7 @@ __gnttab_map_grant_ref(
     /* Bitwise-OR avoids short-circuiting which screws control flow. */
     if ( unlikely(__get_user(dom, &uop->dom) |
                   __get_user(ref, &uop->ref) |
-                  __get_user(host_virt_addr, &uop->host_virt_addr) |
+                  __get_user(host_virt_addr, &uop->host_addr) |
                   __get_user(dev_hst_ro_flags, &uop->flags)) )
     {
         DPRINTK("Fault while reading gnttab_map_grant_ref_t.\n");
@@ -500,7 +500,7 @@ __gnttab_unmap_grant_ref(
     ld = current->domain;
 
     /* Bitwise-OR avoids short-circuiting which screws control flow. */
-    if ( unlikely(__get_user(virt, &uop->host_virt_addr) |
+    if ( unlikely(__get_user(virt, &uop->host_addr) |
                   __get_user(frame, &uop->dev_bus_addr) |
                   __get_user(handle, &uop->handle)) )
     {
@@ -545,15 +545,6 @@ __gnttab_unmap_grant_ref(
     if ( frame == 0 )
     {
         frame = act->frame;
-    }
-    else if ( frame == GNTUNMAP_DEV_FROM_VIRT )
-    {
-        if ( !( flags & GNTMAP_device_map ) )
-            PIN_FAIL(unmap_out, GNTST_bad_dev_addr,
-                     "Bad frame number: frame not mapped for dev access.\n");
-        frame = act->frame;
-
-        /* Frame will be unmapped for device access below if virt addr okay. */
     }
     else
     {
@@ -615,15 +606,6 @@ __gnttab_unmap_grant_ref(
 
         act->pin -= (flags & GNTMAP_readonly) ? GNTPIN_hstr_inc
                                               : GNTPIN_hstw_inc;
-
-        if ( frame == GNTUNMAP_DEV_FROM_VIRT )
-        {
-            act->pin -= (flags & GNTMAP_readonly) ? GNTPIN_devr_inc
-                                                  : GNTPIN_devw_inc;
-
-            map->ref_and_flags &= ~GNTMAP_device_map;
-            (void)__put_user(0, &uop->dev_bus_addr);
-        }
 
         rc = 0;
         *va = virt;

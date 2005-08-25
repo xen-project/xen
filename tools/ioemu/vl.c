@@ -72,7 +72,7 @@
 #endif
 #endif /* CONFIG_SDL */
 
-#include "xc.h"
+#include "xenctrl.h"
 #include "exec-all.h"
 
 //#define DO_TB_FLUSH
@@ -2030,7 +2030,7 @@ typedef struct QEMUResetEntry {
 } QEMUResetEntry;
 
 static QEMUResetEntry *first_reset_entry;
-static int reset_requested;
+int reset_requested;
 int shutdown_requested;
 
 void qemu_register_reset(QEMUResetHandler *func, void *opaque)

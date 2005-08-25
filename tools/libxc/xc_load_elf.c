@@ -2,7 +2,7 @@
  * xc_elf_load.c
  */
 
-#include "xc_private.h"
+#include "xg_private.h"
 
 #if defined(__i386__)
 #define ELFSIZE 32
@@ -309,8 +309,7 @@ loadelfsymtab(
     dsi->v_end = round_pgup(maxva);
 
  out:
-    if ( p != NULL )
-        free(p);
+    free(p);
 
     return 0;
 }

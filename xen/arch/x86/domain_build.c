@@ -22,16 +22,28 @@
 #include <asm/i387.h>
 #include <asm/shadow.h>
 
-/* opt_dom0_mem: memory allocated to domain 0. */
-static unsigned int opt_dom0_mem;
+static long dom0_nrpages;
+
+/*
+ * dom0_mem:
+ *  If +ve:
+ *   * The specified amount of memory is allocated to domain 0.
+ *  If -ve:
+ *   * All of memory is allocated to domain 0, minus the specified amount.
+ *  If not specified: 
+ *   * All of memory is allocated to domain 0, minus 1/16th which is reserved
+ *     for uses such as DMA buffers (the reservation is clamped to 128MB).
+ */
 static void parse_dom0_mem(char *s)
 {
-    unsigned long long bytes = parse_size_and_unit(s);
-    /* If no unit is specified we default to kB units, not bytes. */
-    if ( isdigit(s[strlen(s)-1]) )
-        opt_dom0_mem = (unsigned int)bytes;
-    else
-        opt_dom0_mem = (unsigned int)(bytes >> 10);
+    unsigned long long bytes;
+    char *t = s;
+    if ( *s == '-' )
+        t++;
+    bytes = parse_size_and_unit(t);
+    dom0_nrpages = bytes >> PAGE_SHIFT;
+    if ( *s == '-' )
+        dom0_nrpages = -dom0_nrpages;
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
@@ -57,11 +69,21 @@ boolean_param("dom0_translate", opt_dom0_translate);
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 
-static struct pfn_info *alloc_largest(struct domain *d, unsigned long max)
+static struct pfn_info *alloc_chunk(struct domain *d, unsigned long max_pages)
 {
     struct pfn_info *page;
-    unsigned int order = get_order(max * PAGE_SIZE);
-    if ( (max & (max-1)) != 0 )
+    unsigned int order;
+    /*
+     * Allocate up to 2MB at a time:
+     *  1. This prevents overflow of get_order() when allocating more than
+     *     4GB to domain 0 on a PAE machine.
+     *  2. It prevents allocating very large chunks from DMA pools before
+     *     the >4GB pool is fully depleted.
+     */
+    if ( max_pages > (2UL << (20 - PAGE_SHIFT)) )
+        max_pages = 2UL << (20 - PAGE_SHIFT);
+    order = get_order(max_pages << PAGE_SHIFT);
+    if ( (max_pages & (max_pages-1)) != 0 )
         order--;
     while ( (page = alloc_domheap_pages(d, order, 0)) == NULL )
         if ( order-- == 0 )
@@ -74,12 +96,12 @@ int construct_dom0(struct domain *d,
                    unsigned long _initrd_start, unsigned long initrd_len,
                    char *cmdline)
 {
-    int i, rc, dom0_pae, xen_pae;
+    int i, rc, dom0_pae, xen_pae, order;
     unsigned long pfn, mfn;
     unsigned long nr_pages;
     unsigned long nr_pt_pages;
-    unsigned long alloc_start;
-    unsigned long alloc_end;
+    unsigned long alloc_spfn;
+    unsigned long alloc_epfn;
     unsigned long count;
     struct pfn_info *page = NULL;
     start_info_t *si;
@@ -137,16 +159,30 @@ int construct_dom0(struct domain *d,
 
     printk("*** LOADING DOMAIN 0 ***\n");
 
-    /* By default DOM0 is allocated all available memory. */
     d->max_pages = ~0U;
-    if ( (nr_pages = opt_dom0_mem >> (PAGE_SHIFT - 10)) == 0 )
-        nr_pages = avail_domheap_pages() +
+
+    /*
+     * If domain 0 allocation isn't specified, reserve 1/16th of available
+     * memory for things like DMA buffers. This reservation is clamped to 
+     * a maximum of 128MB.
+     */
+    if ( dom0_nrpages == 0 )
+    {
+        dom0_nrpages = avail_domheap_pages() +
             ((initrd_len + PAGE_SIZE - 1) >> PAGE_SHIFT) +
             ((image_len  + PAGE_SIZE - 1) >> PAGE_SHIFT);
-    if ( (page = alloc_largest(d, nr_pages)) == NULL )
-        panic("Not enough RAM for DOM0 reservation.\n");
-    alloc_start = page_to_phys(page);
-    alloc_end   = alloc_start + (d->tot_pages << PAGE_SHIFT);
+        dom0_nrpages = min(dom0_nrpages / 16, 128L << (20 - PAGE_SHIFT));
+        dom0_nrpages = -dom0_nrpages;
+    }
+
+    /* Negative memory specification means "all memory - specified amount". */
+    if ( dom0_nrpages < 0 )
+        nr_pages = avail_domheap_pages() +
+            ((initrd_len + PAGE_SIZE - 1) >> PAGE_SHIFT) +
+            ((image_len  + PAGE_SIZE - 1) >> PAGE_SHIFT) +
+            dom0_nrpages;
+    else
+        nr_pages = dom0_nrpages;
 
     if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;
@@ -166,7 +202,7 @@ int construct_dom0(struct domain *d,
         return -EINVAL;
     }
     if (strstr(dsi.xen_section_string, "SHADOW=translate"))
-	opt_dom0_translate = 1;
+        opt_dom0_translate = 1;
 
     /* Align load address to 4MB boundary. */
     dsi.v_start &= ~((1UL<<22)-1);
@@ -215,12 +251,19 @@ int construct_dom0(struct domain *d,
 #endif
     }
 
-    if ( (v_end - dsi.v_start) > (alloc_end - alloc_start) )
-        panic("Insufficient contiguous RAM to build kernel image.\n");
+    order = get_order(v_end - dsi.v_start);
+    if ( (1UL << order) > nr_pages )
+        panic("Domain 0 allocation is too small for kernel image.\n");
+
+    /* Allocate from DMA pool: PAE L3 table must be below 4GB boundary. */
+    if ( (page = alloc_domheap_pages(d, order, ALLOC_DOM_DMA)) == NULL )
+        panic("Not enough RAM for domain 0 allocation.\n");
+    alloc_spfn = page_to_pfn(page);
+    alloc_epfn = alloc_spfn + d->tot_pages;
 
     printk("PHYSICAL MEMORY ARRANGEMENT:\n"
-           " Dom0 alloc.:   %p->%p",
-           _p(alloc_start), _p(alloc_end));
+           " Dom0 alloc.:   %"PRIphysaddr"->%"PRIphysaddr,
+           pfn_to_phys(alloc_spfn), pfn_to_phys(alloc_epfn));
     if ( d->tot_pages < nr_pages )
         printk(" (%lu pages to be allocated)",
                nr_pages - d->tot_pages);
@@ -249,7 +292,8 @@ int construct_dom0(struct domain *d,
         return -ENOMEM;
     }
 
-    mpt_alloc = (vpt_start - dsi.v_start) + alloc_start;
+    mpt_alloc = (vpt_start - dsi.v_start) + 
+        (unsigned long)pfn_to_phys(alloc_spfn);
 
     /*
      * We're basically forcing default RPLs to 1, so that our "what privilege
@@ -306,7 +350,7 @@ int construct_dom0(struct domain *d,
 #endif
 
     l2tab += l2_linear_offset(dsi.v_start);
-    mfn = alloc_start >> PAGE_SHIFT;
+    mfn = alloc_spfn;
     for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
@@ -428,7 +472,7 @@ int construct_dom0(struct domain *d,
     v->arch.guest_table = mk_pagetable(__pa(l4start));
 
     l4tab += l4_table_offset(dsi.v_start);
-    mfn = alloc_start >> PAGE_SHIFT;
+    mfn = alloc_spfn;
     for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
@@ -563,24 +607,24 @@ int construct_dom0(struct domain *d,
     /* Write the phys->machine and machine->phys table entries. */
     for ( pfn = 0; pfn < d->tot_pages; pfn++ )
     {
-        mfn = pfn + (alloc_start>>PAGE_SHIFT);
+        mfn = pfn + alloc_spfn;
 #ifndef NDEBUG
 #define REVERSE_START ((v_end - dsi.v_start) >> PAGE_SHIFT)
         if ( !opt_dom0_translate && (pfn > REVERSE_START) )
-            mfn = (alloc_end>>PAGE_SHIFT) - (pfn - REVERSE_START);
+            mfn = alloc_epfn - (pfn - REVERSE_START);
 #endif
         ((u32 *)vphysmap_start)[pfn] = mfn;
         machine_to_phys_mapping[mfn] = pfn;
     }
     while ( pfn < nr_pages )
     {
-        if ( (page = alloc_largest(d, nr_pages - d->tot_pages)) == NULL )
+        if ( (page = alloc_chunk(d, nr_pages - d->tot_pages)) == NULL )
             panic("Not enough RAM for DOM0 reservation.\n");
         while ( pfn < d->tot_pages )
         {
             mfn = page_to_pfn(page);
 #ifndef NDEBUG
-#define pfn (nr_pages - 1 - (pfn - ((alloc_end - alloc_start) >> PAGE_SHIFT)))
+#define pfn (nr_pages - 1 - (pfn - (alloc_epfn - alloc_spfn)))
 #endif
             ((u32 *)vphysmap_start)[pfn] = mfn;
             machine_to_phys_mapping[mfn] = pfn;
@@ -614,19 +658,21 @@ int construct_dom0(struct domain *d,
     /* DOM0 gets access to everything. */
     physdev_init_dom0(d);
 
+    init_domain_time(d);
+
     set_bit(_DOMF_constructed, &d->domain_flags);
 
     new_thread(v, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
     if ( opt_dom0_shadow || opt_dom0_translate )
     {
-	printk("dom0: shadow enable\n");
+        printk("dom0: shadow enable\n");
         shadow_mode_enable(d, (opt_dom0_translate
                                ? SHM_enable | SHM_refcounts | SHM_translate
                                : SHM_enable));
         if ( opt_dom0_translate )
         {
-	    printk("dom0: shadow translate\n");
+            printk("dom0: shadow translate\n");
 #if defined(__i386__) && defined(CONFIG_X86_PAE)
             printk("FIXME: PAE code needed here: %s:%d (%s)\n",
                    __FILE__, __LINE__, __FUNCTION__);
@@ -659,7 +705,7 @@ int construct_dom0(struct domain *d,
         }
 
         update_pagetables(v); /* XXX SMP */
-	printk("dom0: shadow setup done\n");
+        printk("dom0: shadow setup done\n");
     }
 
     return 0;

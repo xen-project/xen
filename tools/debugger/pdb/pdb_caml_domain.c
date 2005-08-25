@@ -6,7 +6,7 @@
  * PDB's OCaml interface library for debugging domains
  */
 
-#include <xc.h>
+#include <xenctrl.h>
 #include <xendebug.h>
 #include <errno.h>
 #include <stdio.h>
@@ -41,6 +41,54 @@ typedef struct
 
 
 /****************************************************************************/
+
+/*
+ * dom_read_register : context_t -> int -> int32
+ */
+value
+dom_read_register (value context, value reg)
+{
+    CAMLparam2(context, reg);
+    CAMLlocal1(result);
+
+    int my_reg = Int_val(reg);
+    cpu_user_regs_t *regs;
+    context_t ctx;
+
+    decode_context(&ctx, context);
+
+    if ( xendebug_read_registers(xc_handle, ctx.domain, ctx.vcpu, &regs) )
+    {
+        printf("(pdb) read registers error!\n");  fflush(stdout);
+        failwith("read registers error");
+    }
+
+    dump_regs(regs);
+
+    result = caml_alloc_tuple(16);
+
+    switch (my_reg)
+    {
+    case GDB_EAX: result = caml_copy_int32(regs->eax); break;
+    case GDB_ECX: result = caml_copy_int32(regs->ecx); break;
+    case GDB_EDX: result = caml_copy_int32(regs->edx); break;
+    case GDB_EBX: result = caml_copy_int32(regs->ebx); break;
+    case GDB_ESP: result = caml_copy_int32(regs->esp); break;
+    case GDB_EBP: result = caml_copy_int32(regs->ebp); break;
+    case GDB_ESI: result = caml_copy_int32(regs->esi); break;
+    case GDB_EDI: result = caml_copy_int32(regs->edi); break;
+    case GDB_EIP: result = caml_copy_int32(regs->eip); break;
+    case GDB_EFL: result = caml_copy_int32(regs->eflags); break;
+    case GDB_CS:  result = caml_copy_int32(regs->cs);  break;
+    case GDB_SS: result = caml_copy_int32(regs->ss); break;
+    case GDB_DS: result = caml_copy_int32(regs->ds); break;
+    case GDB_ES: result = caml_copy_int32(regs->es); break;
+    case GDB_FS: result = caml_copy_int32(regs->fs); break;
+    case GDB_GS: result = caml_copy_int32(regs->gs); break;
+    }
+
+    CAMLreturn(result);
+}
 
 /*
  * dom_read_registers : context_t -> int32
@@ -155,7 +203,7 @@ dom_read_memory (value context, value address, value length)
     context_t ctx;
     int loop;
     char *buffer;
-    memory_t my_address = Int32_val(address);
+    unsigned long my_address = Int32_val(address);
     u32 my_length = Int_val(length);
 
     printf ("(pdb) read memory\n");
@@ -211,7 +259,7 @@ dom_write_memory (value context, value address, value val_list)
     context_t ctx;
 
     char buffer[4096];  /* a big buffer */
-    memory_t  my_address;
+    unsigned long  my_address;
     u32 length = 0;
 
     printf ("(pdb) write memory\n");
@@ -231,7 +279,7 @@ dom_write_memory (value context, value address, value val_list)
     }
     buffer[length++] = Int_val(Field(node, 0));
 
-    my_address = (memory_t) Int32_val(address);
+    my_address = (unsigned long) Int32_val(address);
 
     if ( xendebug_write_memory(xc_handle, ctx.domain, ctx.vcpu,
                                my_address, length, buffer) )
@@ -296,7 +344,7 @@ dom_insert_memory_breakpoint (value context, value address, value length)
     CAMLparam3(context, address, length);
 
     context_t ctx;
-    memory_t my_address = (memory_t) Int32_val(address);
+    unsigned long my_address = (unsigned long) Int32_val(address);
     int my_length = Int_val(length);
 
     decode_context(&ctx, context);
@@ -325,7 +373,7 @@ dom_remove_memory_breakpoint (value context, value address, value length)
 
     context_t ctx;
 
-    memory_t my_address = (memory_t) Int32_val(address);
+    unsigned long my_address = (unsigned long) Int32_val(address);
     int my_length = Int_val(length);
 
     printf ("(pdb) remove memory breakpoint 0x%lx %d\n",

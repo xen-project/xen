@@ -24,6 +24,7 @@ import sys
 import socket
 import signal
 import time
+import commands
 
 XCS_PATH    = "/var/lib/xen/xcs_socket"
 XCS_EXEC    = "/usr/sbin/xcs"
@@ -114,6 +115,17 @@ def stop_xcs():
         xcs_pidfile.close()
     except:
 	return    
+
+def start_xenstored():
+    XENSTORED_TRACE = os.getenv("XENSTORED_TRACE")
+    cmd = "/usr/sbin/xenstored --pid-file=/var/run/xenstore.pid"
+    if XENSTORED_TRACE:
+        cmd += " -T /var/log/xenstored-trace.log"
+    s,o = commands.getstatusoutput(cmd)
+
+def start_consoled():
+    if os.fork() == 0:
+        os.execvp('/usr/sbin/xenconsoled', ['/usr/sbin/xenconsoled'])
             
 def main():
     try:
@@ -130,9 +142,13 @@ def main():
         return status >> 8
     elif sys.argv[1] == 'start':
         start_xcs()
+        start_xenstored()
+        start_consoled()
         return daemon.start()
     elif sys.argv[1] == 'trace_start':
         start_xcs()
+        start_xenstored()
+        start_consoled()
         return daemon.start(trace=1)
     elif sys.argv[1] == 'stop':
         stop_xcs()
@@ -140,6 +156,8 @@ def main():
     elif sys.argv[1] == 'restart':
         stop_xcs()
         start_xcs()
+        start_xenstored()
+        start_consoled()
         return daemon.stop() or daemon.start()
     elif sys.argv[1] == 'status':
         return daemon.status()

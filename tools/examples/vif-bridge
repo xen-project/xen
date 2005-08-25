@@ -74,8 +74,10 @@ if [ "${bridge}" == "null" ] ; then
     exit
 fi
 
-# Add/remove vif to/from bridge.
-brctl ${brcmd} ${bridge} ${vif}
+# Add vif to bridge. vifs are auto-removed from bridge.
+if [ "${brcmd}" == "addif" ] ; then
+    brctl ${brcmd} ${bridge} ${vif}
+fi
 ifconfig ${vif} $OP
 
 if [ ${ip} ] ; then

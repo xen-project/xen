@@ -2,7 +2,7 @@
 # If you change any of these configuration options then you must
 # 'make clean' before rebuilding.
 #
-verbose     ?= n
+verbose     ?= y
 debug       ?= n
 perfc       ?= n
 perfc_arrays?= n
@@ -10,14 +10,6 @@ trace       ?= n
 optimize    ?= y
 domu_debug  ?= n
 crash_debug ?= n
-
-# ACM_USE_SECURITY_POLICY is set to security policy of Xen
-# Supported models are:
-#	ACM_NULL_POLICY (ACM will not be built with this policy)
-#	ACM_CHINESE_WALL_POLICY
-#	ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY
-#	ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY
-ACM_USE_SECURITY_POLICY ?= ACM_NULL_POLICY
 
 include $(BASEDIR)/../Config.mk
 

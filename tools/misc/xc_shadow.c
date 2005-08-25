@@ -11,7 +11,7 @@
  */
 
 
-#include <xc.h>
+#include <xenctrl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>

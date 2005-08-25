@@ -19,11 +19,13 @@
 
 #include "cpu.h"
 
+#ifndef CONFIG_XEN
 DEFINE_PER_CPU(struct desc_struct, cpu_gdt_table[GDT_ENTRIES]);
 EXPORT_PER_CPU_SYMBOL(cpu_gdt_table);
 
 DEFINE_PER_CPU(unsigned char, cpu_16bit_stack[CPU_16BIT_STACK_SIZE]);
 EXPORT_PER_CPU_SYMBOL(cpu_16bit_stack);
+#endif
 
 static int cachesize_override __initdata = -1;
 static int disable_x86_fxsr __initdata = 0;
@@ -569,7 +571,7 @@ void __init cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
 	for (va = gdt_descr->address, f = 0;
 	     va < gdt_descr->address + gdt_descr->size;
 	     va += PAGE_SIZE, f++) {
-		frames[f] = virt_to_machine(va) >> PAGE_SHIFT;
+		frames[f] = virt_to_mfn(va);
 		make_page_readonly((void *)va);
 	}
 	if (HYPERVISOR_set_gdt(frames, gdt_descr->size / 8))

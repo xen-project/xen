@@ -7,7 +7,7 @@
  * PDB interface library for accessing Xen
  */
 
-#include <xc.h>
+#include <xenctrl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>

@@ -101,11 +101,6 @@ mrproper: clean
 	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
 	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-mrproper ; done
 
-install-twisted:
-	wget http://www.twistedmatrix.com/products/get-current.epy
-	tar -zxf Twisted-*.tar.gz
-	cd Twisted-* && python setup.py install
-
 install-logging: LOGGING=logging-0.4.9.2
 install-logging:
 	[ -f $(LOGGING).tar.gz ] || wget http://www.red-dove.com/$(LOGGING).tar.gz
@@ -149,7 +144,6 @@ help:
 	@echo '  kclean           - clean guest kernel build trees'
 	@echo ''
 	@echo 'Dependency installation targets:'
-	@echo '  install-twisted  - install the Twisted Matrix Framework'
 	@echo '  install-logging  - install the Python Logging package'
 	@echo '  install-iptables - install iptables tools'
 	@echo ''
@@ -178,6 +172,12 @@ uninstall:
 	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/miniterm
 	rm -rf $(D)/boot/*xen*
 	rm -rf $(D)/lib/modules/*xen*
+	rm -rf $(D)/usr/bin/cpuperf-perfcntr $(D)/usr/bin/cpuperf-xen
+	rm -rf $(D)/usr/bin/xc_shadow
+	rm -rf $(D)/usr/share/xen $(D)/usr/libexec/xen
+	rm -rf $(D)/usr/share/man/man1/xen*
+	rm -rf $(D)/usr/share/man/man8/xen*
+	rm -rf $(D)/usr/lib/xen
 
 # Legacy targets for compatibility
 linux24:

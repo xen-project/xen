@@ -1,9 +1,9 @@
 
-PDB 0.3 
+PDB 0.3.3
 http://www.cl.cam.ac.uk/netos/pdb
 
 Alex Ho  
-June 2005
+August 2005
 
 
 This is the latest incarnation of the pervasive debugger.
@@ -79,6 +79,11 @@ Usage
 Process
 
   PDB can also debug a process running in a Linux 2.6 domain. 
+  You will need to patch the Linux 2.6 domain U tree to export some
+  additional symbols for the pdb module
+
+  % make -C linux-2.6-patches
+
   After running PDB in domain 0, insert the pdb module in dom u:
   
   % insmod linux-2.6-module/pdb.ko
@@ -87,7 +92,14 @@ Process
 
   (gdb) maint packet x context = process <domid> <pid>
 
+  Read, write, and access watchpoint should also work for processes, 
+  use the "rwatch", "watch" and "awatch" gdb commands respectively.
+
+  If you are having trouble with GDB 5.3 (i386-redhat-linux-gnu),
+  try GDB 6.3 (configured with --target=i386-linux-gnu).
+
+  
 To Do
 
-- watchpoints
+- watchpoints for domains
 - support for SMP

@@ -45,6 +45,8 @@ typedef struct settings_st {
     char *outfile;
     struct timespec poll_sleep;
     unsigned long new_data_thresh;
+    u32 evt_mask;
+    u32 cpu_mask;
 } settings_t;
 
 settings_t opts;
@@ -93,13 +95,13 @@ void write_rec(unsigned int cpu, struct t_rec *rec, FILE *out)
 
 /**
  * get_tbufs - get pointer to and size of the trace buffers
- * @mach_addr: location to store machine address if the trace buffers to
- * @size:      location to store the size of a trace buffer to
+ * @mfn:  location to store mfn of the trace buffers to
+ * @size: location to store the size of a trace buffer to
  *
  * Gets the machine address of the trace pointer area and the size of the
  * per CPU buffers.
  */
-void get_tbufs(unsigned long *mach_addr, unsigned long *size)
+void get_tbufs(unsigned long *mfn, unsigned long *size)
 {
     int ret;
     dom0_op_t op;                        /* dom0 op we'll build             */
@@ -119,19 +121,19 @@ void get_tbufs(unsigned long *mach_addr, unsigned long *size)
         exit(EXIT_FAILURE);
     }
 
-    *mach_addr = op.u.tbufcontrol.mach_addr;
-    *size      = op.u.tbufcontrol.size;
+    *mfn  = op.u.tbufcontrol.buffer_mfn;
+    *size = op.u.tbufcontrol.size;
 }
 
 /**
  * map_tbufs - memory map Xen trace buffers into user space
- * @tbufs:     machine address of the trace buffers
+ * @tbufs_mfn: mfn of the trace buffers
  * @num:       number of trace buffers to map
  * @size:      size of each trace buffer
  *
  * Maps the Xen trace buffers them into process address space.
  */
-struct t_buf *map_tbufs(unsigned long tbufs_mach, unsigned int num,
+struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
                         unsigned long size)
 {
     int xc_handle;                  /* file descriptor for /proc/xen/privcmd */
@@ -147,7 +149,7 @@ struct t_buf *map_tbufs(unsigned long tbufs_mach, unsigned int num,
 
     tbufs_mapped = xc_map_foreign_range(xc_handle, 0 /* Dom 0 ID */,
                                         size * num, PROT_READ,
-                                        tbufs_mach >> PAGE_SHIFT);
+                                        tbufs_mfn);
 
     xc_interface_close(xc_handle);
 
@@ -160,6 +162,41 @@ struct t_buf *map_tbufs(unsigned long tbufs_mach, unsigned int num,
     return tbufs_mapped;
 }
 
+/**
+ * set_mask - set the cpu/event mask in HV
+ * @mask:           the new mask 
+ * @type:           the new mask type,0-event mask, 1-cpu mask
+ *
+ */
+void set_mask(u32 mask, int type)
+{
+    int ret;
+    dom0_op_t op;                        /* dom0 op we'll build             */
+    int xc_handle = xc_interface_open(); /* for accessing control interface */
+
+    op.cmd = DOM0_TBUFCONTROL;
+    op.interface_version = DOM0_INTERFACE_VERSION;
+    if (type == 1) { /* cpu mask */
+        op.u.tbufcontrol.op  = DOM0_TBUF_SET_CPU_MASK;
+        op.u.tbufcontrol.cpu_mask = mask;
+        fprintf(stderr, "change cpumask to 0x%x\n", mask);
+    }else if (type == 0) { /* event mask */
+        op.u.tbufcontrol.op  = DOM0_TBUF_SET_EVT_MASK;
+        op.u.tbufcontrol.evt_mask = mask;
+        fprintf(stderr, "change evtmask to 0x%x\n", mask);
+    }
+
+    ret = do_dom0_op(xc_handle, &op);
+
+    xc_interface_close(xc_handle);
+
+    if ( ret != 0 )
+    {
+        PERROR("Failure to get trace buffer pointer from Xen and set the new mask");
+        exit(EXIT_FAILURE);
+    }
+
+}
 
 /**
  * init_bufs_ptrs - initialises an array of pointers to the trace buffers
@@ -194,7 +231,7 @@ struct t_buf **init_bufs_ptrs(void *bufs_mapped, unsigned int num,
 
 /**
  * init_rec_ptrs - initialises data area pointers to locations in user space
- * @tbufs_mach:    machine base address of the trace buffer area
+ * @tbufs_mfn:     base mfn of the trace buffer area
  * @tbufs_mapped:  user virtual address of base of trace buffer area
  * @meta:          array of user-space pointers to struct t_buf's of metadata
  * @num:           number of trace buffers
@@ -203,7 +240,7 @@ struct t_buf **init_bufs_ptrs(void *bufs_mapped, unsigned int num,
  * mapped in user space.  Note that the trace buffer metadata contains machine
  * pointers - the array returned allows more convenient access to them.
  */
-struct t_rec **init_rec_ptrs(unsigned long tbufs_mach,
+struct t_rec **init_rec_ptrs(unsigned long tbufs_mfn,
                              struct t_buf *tbufs_mapped,
                              struct t_buf **meta,
                              unsigned int num)
@@ -219,7 +256,7 @@ struct t_rec **init_rec_ptrs(unsigned long tbufs_mach,
     }
 
     for ( i = 0; i < num; i++ )
-        data[i] = (struct t_rec *)(meta[i]->rec_addr - tbufs_mach
+        data[i] = (struct t_rec *)(meta[i]->rec_addr - (tbufs_mfn<<XC_PAGE_SHIFT) /* XXX */
                                    + (unsigned long)tbufs_mapped);
 
     return data;
@@ -293,7 +330,7 @@ int monitor_tbufs(FILE *logfile)
     struct t_rec **data;         /* pointers to the trace buffer data areas
                                   * where they are mapped into user space.   */
     unsigned long *cons;         /* store tail indexes for the trace buffers */
-    unsigned long tbufs_mach;    /* machine address of the tbufs             */
+    unsigned long tbufs_mfn;     /* mfn of the tbufs                         */
     unsigned int  num;           /* number of trace buffers / logical CPUS   */
     unsigned long size;          /* size of a single trace buffer            */
 
@@ -303,14 +340,14 @@ int monitor_tbufs(FILE *logfile)
     num = get_num_cpus();
 
     /* setup access to trace buffers */
-    get_tbufs(&tbufs_mach, &size);
-    tbufs_mapped = map_tbufs(tbufs_mach, num, size);
+    get_tbufs(&tbufs_mfn, &size);
+    tbufs_mapped = map_tbufs(tbufs_mfn, num, size);
 
     size_in_recs = (size - sizeof(struct t_buf)) / sizeof(struct t_rec);
 
     /* build arrays of convenience ptrs */
     meta  = init_bufs_ptrs (tbufs_mapped, num, size);
-    data  = init_rec_ptrs  (tbufs_mach, tbufs_mapped, meta, num);
+    data  = init_rec_ptrs  (tbufs_mfn, tbufs_mapped, meta, num);
     cons  = init_tail_idxs (meta, num);
 
     /* now, scan buffers for events */
@@ -341,6 +378,31 @@ int monitor_tbufs(FILE *logfile)
  * Various declarations / definitions GNU argp needs to do its work
  *****************************************************************************/
 
+int parse_evtmask(char *arg, struct argp_state *state)
+{
+    settings_t *setup = (settings_t *)state->input;
+    char *inval;
+
+    /* search filtering class */
+    if (strcmp(arg, "gen") == 0){ 
+        setup->evt_mask |= TRC_GEN;
+    } else if(strcmp(arg, "sched") == 0){ 
+        setup->evt_mask |= TRC_SCHED;
+    } else if(strcmp(arg, "dom0op") == 0){ 
+        setup->evt_mask |= TRC_DOM0OP;
+    } else if(strcmp(arg, "vmx") == 0){ 
+        setup->evt_mask |= TRC_VMX;
+    } else if(strcmp(arg, "all") == 0){ 
+        setup->evt_mask |= TRC_ALL;
+    } else {
+        setup->evt_mask = strtol(arg, &inval, 0);
+        if ( inval == arg )
+            argp_usage(state);
+    }
+
+    return 0;
+
+}
 
 /* command parser for GNU argp - see GNU docs for more info */
 error_t cmd_parser(int key, char *arg, struct argp_state *state)
@@ -364,6 +426,21 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
         setup->poll_sleep = millis_to_timespec(strtol(arg, &inval, 0));
         if ( inval == arg )
             argp_usage(state);
+    }
+    break;
+
+    case 'c': /* set new cpu mask for filtering*/
+    {
+        char *inval;
+        setup->cpu_mask = strtol(arg, &inval, 0);
+        if ( inval == arg )
+            argp_usage(state);
+    }
+    break;
+    
+    case 'e': /* set new event mask for filtering*/
+    {
+        parse_evtmask(arg, state);
     }
     break;
     
@@ -398,6 +475,14 @@ const struct argp_option cmd_opts[] =
       "Set sleep time, p, in milliseconds between polling the trace buffer "
       "for new data (default " xstr(POLL_SLEEP_MILLIS) ")." },
 
+    { .name = "cpu-mask", .key='c', .arg="c",
+      .doc = 
+      "set cpu-mask " },
+
+    { .name = "evt-mask", .key='e', .arg="e",
+      .doc = 
+      "set evt-mask " },
+
     {0}
 };
 
@@ -430,8 +515,18 @@ int main(int argc, char **argv)
     opts.outfile = 0;
     opts.poll_sleep = millis_to_timespec(POLL_SLEEP_MILLIS);
     opts.new_data_thresh = NEW_DATA_THRESH;
+    opts.evt_mask = 0;
+    opts.cpu_mask = 0;
 
     argp_parse(&parser_def, argc, argv, 0, 0, &opts);
+
+    if (opts.evt_mask != 0) { 
+        set_mask(opts.evt_mask, 0);
+    }
+
+    if (opts.cpu_mask != 0) {
+        set_mask(opts.evt_mask, 1);
+    }
 
     if ( opts.outfile )
         outfd = open(opts.outfile, O_WRONLY | O_CREAT);

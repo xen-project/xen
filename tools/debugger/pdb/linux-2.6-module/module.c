@@ -98,6 +98,11 @@ pdb_process_request (pdb_request_t *request)
         printk("(linux) detach 0x%x\n", request->process);
         resp.status = PDB_RESPONSE_OKAY;
         break;
+    case PDB_OPCODE_RD_REG :
+        resp.u.rd_reg.reg = request->u.rd_reg.reg;
+        pdb_read_register(target, &resp.u.rd_reg);
+        resp.status = PDB_RESPONSE_OKAY;
+        break;
     case PDB_OPCODE_RD_REGS :
         pdb_read_registers(target, &resp.u.rd_regs);
         resp.status = PDB_RESPONSE_OKAY;
@@ -108,14 +113,16 @@ pdb_process_request (pdb_request_t *request)
         break;
     case PDB_OPCODE_RD_MEM :
         pdb_access_memory(target, request->u.rd_mem.address,
-                          &resp.u.rd_mem.data, request->u.rd_mem.length, 0);
+                          &resp.u.rd_mem.data, request->u.rd_mem.length, 
+                          PDB_MEM_READ);
         resp.u.rd_mem.address = request->u.rd_mem.address;
         resp.u.rd_mem.length  = request->u.rd_mem.length;
         resp.status = PDB_RESPONSE_OKAY;
         break;
     case PDB_OPCODE_WR_MEM :
         pdb_access_memory(target, request->u.wr_mem.address,
-                         &request->u.wr_mem.data, request->u.wr_mem.length, 1);
+                         &request->u.wr_mem.data, request->u.wr_mem.length, 
+                          PDB_MEM_WRITE);
         resp.status = PDB_RESPONSE_OKAY;
         break;
     case PDB_OPCODE_CONTINUE :
@@ -135,6 +142,14 @@ pdb_process_request (pdb_request_t *request)
     case PDB_OPCODE_CLR_BKPT :
         pdb_remove_memory_breakpoint(target, request->u.bkpt.address,
                                      request->u.bkpt.length);
+        resp.status = PDB_RESPONSE_OKAY;
+        break;
+    case PDB_OPCODE_SET_WATCHPT :
+        pdb_insert_watchpoint(target, &request->u.watchpt);
+        resp.status = PDB_RESPONSE_OKAY;
+        break;
+    case PDB_OPCODE_CLR_WATCHPT :
+        pdb_remove_watchpoint(target, &request->u.watchpt);
         resp.status = PDB_RESPONSE_OKAY;
         break;
     default:
@@ -184,7 +199,7 @@ pdb_interrupt (int irq, void *dev_id, struct pt_regs *ptregs)
 }
 
 static void
-pdb_send_connection_status(int status, memory_t ring)
+pdb_send_connection_status(int status, unsigned long ring)
 {
     ctrl_msg_t cmsg = 
     {
@@ -248,8 +263,6 @@ pdb_initialize (void)
     pdb_sring_t *sring;
 
     printk("----\npdb initialize   %s %s\n", __DATE__, __TIME__);
-
-    pdb_initialize_bwcpoint();
 
     /*
     if ( xen_start_info.flags & SIF_INITDOMAIN )

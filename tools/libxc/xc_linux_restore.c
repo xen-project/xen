@@ -6,7 +6,12 @@
  * Copyright (c) 2003, K A Fraser.
  */
 
-#include "xc_private.h"
+#include <stdlib.h>
+#include <unistd.h>
+
+#include "xg_private.h"
+#include <xenctrl.h>
+
 #include <xen/linux/suspend.h>
 
 #define MAX_BATCH_SIZE 1024
@@ -32,7 +37,7 @@
 #define PPRINTF(_f, _a...)
 #endif
 
-ssize_t
+static ssize_t
 read_exact(int fd, void *buf, size_t count)
 {
     int r = 0, s;
@@ -48,7 +53,8 @@ read_exact(int fd, void *buf, size_t count)
     return r;
 }
 
-int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
+int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
+		     unsigned int store_evtchn, unsigned long *store_mfn)
 {
     dom0_op_t op;
     int rc = 1, i, n, k;
@@ -88,7 +94,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
 
     char *region_base;
 
-    mmu_t *mmu = NULL;
+    xc_mmu_t *mmu = NULL;
 
     /* used by debug verify code */
     unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
@@ -131,7 +137,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
     /* Get the domain's shared-info frame. */
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)dom;
-    if (do_dom0_op(xc_handle, &op) < 0) {
+    if (xc_dom0_op(xc_handle, &op) < 0) {
         ERR("Could not get information on new domain");
         goto out;
     }
@@ -157,7 +163,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
         goto out;
     }
 
-    mmu = init_mmu_updates(xc_handle, dom);
+    mmu = xc_init_mmu_updates(xc_handle, dom);
     if (mmu == NULL) {
         ERR("Could not initialise for MMU updates");
         goto out;
@@ -354,8 +360,9 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
                 }
             }
 
-            if ( add_mmu_update(xc_handle, mmu,
-                                (mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, pfn) )
+            if ( xc_add_mmu_update(xc_handle, mmu,
+				   (mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE,
+				   pfn) )
             {
                 printf("machpys mfn=%ld pfn=%ld\n",mfn,pfn);
                 goto out;
@@ -369,7 +376,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
 
     DPRINTF("Received all pages\n");
 
-    if ( finish_mmu_updates(xc_handle, mmu) )
+    if ( xc_finish_mmu_updates(xc_handle, mmu) )
         goto out;
 
     /*
@@ -387,14 +394,14 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
         pin[nr_pins].mfn = pfn_to_mfn_table[i];
         if ( ++nr_pins == MAX_PIN_BATCH )
         {
-            if ( do_mmuext_op(xc_handle, pin, nr_pins, dom) < 0 )
+            if ( xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0 )
                 goto out;
             nr_pins = 0;
         }
     }
 
     if ( (nr_pins != 0) &&
-         (do_mmuext_op(xc_handle, pin, nr_pins, dom) < 0) )
+         (xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0) )
         goto out;
 
     DPRINTF("\b\b\b\b100%%\n");
@@ -434,7 +441,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
 
 	if ( count > 0 )
 	{
-	    if ( (rc = do_dom_mem_op( xc_handle,
+	    if ( (rc = xc_dom_mem_op( xc_handle,
 				       MEMOP_decrease_reservation,
 				       pfntab, count, 0, dom )) <0 )
 	    {
@@ -464,10 +471,13 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
     }
     ctxt.user_regs.esi = mfn = pfn_to_mfn_table[pfn];
     p_srec = xc_map_foreign_range(
-        xc_handle, dom, PAGE_SIZE, PROT_WRITE, mfn);
+        xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
     p_srec->resume_info.nr_pages    = nr_pfns;
     p_srec->resume_info.shared_info = shared_info_frame << PAGE_SHIFT;
     p_srec->resume_info.flags       = 0;
+    *store_mfn = p_srec->resume_info.store_mfn   =
+	pfn_to_mfn_table[p_srec->resume_info.store_mfn];
+    p_srec->resume_info.store_evtchn = store_evtchn;
     munmap(p_srec, PAGE_SIZE);
 
     /* Uncanonicalise each GDT frame number. */
@@ -582,7 +592,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
     op.u.setdomaininfo.domain = (domid_t)dom;
     op.u.setdomaininfo.vcpu   = 0;
     op.u.setdomaininfo.ctxt   = &ctxt;
-    rc = do_dom0_op(xc_handle, &op);
+    rc = xc_dom0_op(xc_handle, &op);
 
     if ( rc != 0 )
     {
@@ -593,7 +603,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
     DPRINTF("Domain ready to be unpaused\n");
     op.cmd = DOM0_UNPAUSEDOMAIN;
     op.u.unpausedomain.domain = (domid_t)dom;
-    rc = do_dom0_op(xc_handle, &op);
+    rc = xc_dom0_op(xc_handle, &op);
     if (rc == 0) {
         /* Success: print the domain id. */
         DPRINTF("DOM=%u\n", dom);
@@ -603,12 +613,9 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns)
  out:
     if ( (rc != 0) && (dom != 0) )
         xc_domain_destroy(xc_handle, dom);
-    if ( mmu != NULL )
-        free(mmu);
-    if ( pfn_to_mfn_table != NULL )
-        free(pfn_to_mfn_table);
-    if ( pfn_type != NULL )
-        free(pfn_type);
+    free(mmu);
+    free(pfn_to_mfn_table);
+    free(pfn_type);
 
     DPRINTF("Restore exit with rc=%d\n", rc);
     return rc;

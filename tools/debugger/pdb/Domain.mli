@@ -22,6 +22,7 @@ val get_vcpu : context_t -> int
 
 val string_of_context : context_t -> string
 
+val read_register : context_t -> int -> int32
 val read_registers : context_t -> registers
 val write_register : context_t -> register -> int32 -> unit
 val read_memory : context_t -> int32 -> int -> int list

@@ -10,6 +10,7 @@
 
 #include <xen/spinlock.h>
 #include <xen/time.h>
+#include <xen/string.h>
 
 struct ac_timer {
     /* System time expiry value (nanoseconds since boot). */

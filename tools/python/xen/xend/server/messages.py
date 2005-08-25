@@ -1,3 +1,20 @@
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+#============================================================================
+
 import sys
 import struct
 import types
@@ -16,16 +33,6 @@ Added to incrementally for the various message types.
 See below.
 """
 msg_formats = {}
-
-#============================================================================
-# Console message types.
-#============================================================================
-
-CMSG_CONSOLE  = 0
-
-console_formats = { 'console_data': (CMSG_CONSOLE, 0) }
-
-msg_formats.update(console_formats)
 
 #============================================================================
 # Block interface message types.

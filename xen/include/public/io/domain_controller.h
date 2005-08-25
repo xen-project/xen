@@ -139,7 +139,7 @@ typedef struct blkif_fe_driver_status {
  */
 typedef struct blkif_fe_interface_connect {
     u32      handle;
-    memory_t shmem_frame;
+    unsigned long shmem_frame;
     int      shmem_ref;
 } blkif_fe_interface_connect_t;
 
@@ -249,7 +249,7 @@ typedef struct blkif_be_connect {
     /* IN */
     domid_t    domid;         /* Domain attached to new interface.   */
     u32        blkif_handle;  /* Domain-specific interface handle.   */
-    memory_t   shmem_frame;   /* Page cont. shared comms window.     */
+    unsigned long shmem_frame;/* Page cont. shared comms window.     */
     int        shmem_ref;     /* Grant table reference.              */
     u32        evtchn;        /* Event channel for notifications.    */
     /* OUT */
@@ -364,9 +364,11 @@ typedef struct netif_fe_driver_status {
  *  STATUS_CONNECTED message.
  */
 typedef struct netif_fe_interface_connect {
-    u32        handle;
-    memory_t   tx_shmem_frame;
-    memory_t   rx_shmem_frame;
+    u32           handle;
+    unsigned long tx_shmem_frame; 
+    int           tx_shmem_ref;
+    unsigned long rx_shmem_frame;
+    int           rx_shmem_ref;
 } netif_fe_interface_connect_t;
 
 /*
@@ -484,11 +486,13 @@ typedef struct netif_be_creditlimit {
  */
 typedef struct netif_be_connect { 
     /* IN */
-    domid_t    domid;          /* Domain attached to new interface.   */
-    u32        netif_handle;   /* Domain-specific interface handle.   */
-    memory_t   tx_shmem_frame; /* Page cont. tx shared comms window.  */
-    memory_t   rx_shmem_frame; /* Page cont. rx shared comms window.  */
-    u16        evtchn;         /* Event channel for notifications.    */
+    domid_t    domid;            /* Domain attached to new interface.   */
+    u32        netif_handle;     /* Domain-specific interface handle.   */
+    unsigned long tx_shmem_frame;/* Page cont. tx shared comms window.  */
+    int        tx_shmem_ref;     /* Grant reference for above           */
+    unsigned long rx_shmem_frame;/* Page cont. rx shared comms window.  */
+    int        rx_shmem_ref;     /* Grant reference for above           */
+    u16        evtchn;           /* Event channel for notifications.    */
     /* OUT */
     u32        status;
 } netif_be_connect_t;
@@ -573,7 +577,7 @@ typedef struct usbif_fe_driver_status_changed {
  *  STATUS_CONNECTED message.
  */
 typedef struct usbif_fe_interface_connect {
-    memory_t shmem_frame;
+    unsigned long shmem_frame;
 } usbif_fe_interface_connect_t;
 
 /*
@@ -656,7 +660,7 @@ typedef struct usbif_be_destroy {
 typedef struct usbif_be_connect { 
     /* IN */
     domid_t    domid;         /* Domain attached to new interface.   */
-    memory_t   shmem_frame;   /* Page cont. shared comms window.     */
+    unsigned long shmem_frame;/* Page cont. shared comms window.     */
     u32        evtchn;        /* Event channel for notifications.    */
     u32        bandwidth;     /* Bandwidth allocated for isoch / int - us
                                * per 1ms frame (ie between 0 and 900 or 800
@@ -776,7 +780,7 @@ typedef struct pdb_Connection {
 #define PDB_CONNECTION_STATUS_UP   1
 #define PDB_CONNECTION_STATUS_DOWN 2
     u32      status;
-    memory_t ring;       /* status: UP */
+    unsigned long ring;  /* status: UP */
     u32      evtchn;     /* status: UP */
 } pdb_connection_t, *pdb_connection_p;
 

@@ -16,6 +16,8 @@ class RestoreDomain( Wizard ):
 
 
 class ChooseRestoreDomain( Sheet ):
+    title = "Configure Restore"
+
     def __init__( self, urlWriter ):
         Sheet.__init__( self, urlWriter, "Configure Restore", 0)
         
@@ -24,6 +26,8 @@ class ChooseRestoreDomain( Sheet ):
                                        ".*") )
 
 class DoRestore( Sheet ):
+    title = "Restore Done"
+    
     def __init__(self, urlWriter ):
         Sheet.__init__(self, urlWriter, "Restore Done", 1)
 

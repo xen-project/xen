@@ -14,7 +14,28 @@
  * hook is made available.
  */
 #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
-#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
+
+inline static void set_pte_at(struct mm_struct *mm, unsigned long addr, 
+		       pte_t *ptep, pte_t val )
+{
+    if ( ((mm != current->mm) && (mm != &init_mm)) ||
+	 HYPERVISOR_update_va_mapping( (addr), (val), 0 ) )
+    {
+        set_pte(ptep, val);
+    }
+}
+
+inline static void set_pte_at_sync(struct mm_struct *mm, unsigned long addr, 
+		       pte_t *ptep, pte_t val )
+{
+    if ( ((mm != current->mm) && (mm != &init_mm)) ||
+	 HYPERVISOR_update_va_mapping( (addr), (val), UVMF_INVLPG ) )
+    {
+        set_pte(ptep, val);
+	xen_invlpg(addr);
+    }
+}
+
 #define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
 
 #ifndef CONFIG_XEN_SHADOW_MODE
@@ -42,17 +63,15 @@
  * 
  * NB2. When deliberately mapping foreign pages into the p2m table, you *must*
  *      use FOREIGN_FRAME(). This will cause pte_pfn() to choke on it, as we
- *      require. In all the cases we care about, the high bit gets shifted out
- *      (e.g., phys_to_machine()) so behaviour there is correct.
+ *      require. In all the cases we care about, the FOREIGN_FRAME bit is
+ *      masked (e.g., pfn_to_mfn()) so behaviour there is correct.
  */
-#define INVALID_P2M_ENTRY (~0U)
-#define FOREIGN_FRAME(_m) ((_m) | (1UL<<((sizeof(unsigned long)*8)-1)))
 #define pte_mfn(_pte) ((_pte).pte_low >> PAGE_SHIFT)
 #define pte_pfn(_pte)							\
 ({									\
 	unsigned long mfn = pte_mfn(_pte);				\
 	unsigned long pfn = mfn_to_pfn(mfn);				\
-	if ((pfn >= max_mapnr) || (pfn_to_mfn(pfn) != mfn))		\
+	if ((pfn >= max_mapnr) || (phys_to_machine_mapping[pfn] != mfn))\
 		pfn = max_mapnr; /* special: force !pfn_valid() */	\
 	pfn;								\
 })

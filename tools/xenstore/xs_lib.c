@@ -1,3 +1,22 @@
+/* 
+    Common routines between Xen store user library and daemon.
+    Copyright (C) 2005 Rusty Russell IBM Corporation
+
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+
 #include "xs_lib.h"
 #include <unistd.h>
 #include <stdio.h>
@@ -133,8 +152,9 @@ unsigned int xs_count_strings(const char *strings, unsigned int len)
 	unsigned int num;
 	const char *p;
 
-	for (p = strings, num = 0; p < strings + len; p += strlen(p) + 1)
-		num++;
+	for (p = strings, num = 0; p < strings + len; p++)
+		if (*p == '\0')
+			num++;
 
 	return num;
 }

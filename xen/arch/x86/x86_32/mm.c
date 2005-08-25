@@ -93,13 +93,10 @@ void __init paging_init(void)
 
     /*
      * Allocate and map the machine-to-phys table and create read-only mapping 
-     * of MPT for guest-OS use.  Without PAE we'll end up with one 4MB page, 
-     * with PAE we'll allocate 2MB pages depending on the amount of memory 
-     * installed, but at least 4MB to cover 4GB address space.  This is needed 
-     * to make PCI I/O memory address lookups work in guests.
+     * of MPT for guest-OS use.
      */
-    if ( (mpt_size = max_page * 4) < (4*1024*1024) )
-        mpt_size = 4*1024*1024;
+    mpt_size  = (max_page * 4) + (1UL << L2_PAGETABLE_SHIFT) - 1UL;
+    mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
         if ( (pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
@@ -148,7 +145,7 @@ void __init zap_low_mappings(l2_pgentry_t *base)
 void subarch_init_memory(struct domain *dom_xen)
 {
     unsigned long m2p_start_mfn;
-    int i;
+    unsigned int i, j;
 
     /*
      * We are rather picky about the layout of 'struct pfn_info'. The
@@ -172,12 +169,12 @@ void subarch_init_memory(struct domain *dom_xen)
     {
         m2p_start_mfn = l2e_get_pfn(
             idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i]);
-        for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
+        for ( j = 0; j < L2_PAGETABLE_ENTRIES; j++ )
         {
-            frame_table[m2p_start_mfn+i].count_info = PGC_allocated | 1;
+            frame_table[m2p_start_mfn+j].count_info = PGC_allocated | 1;
             /* Ensure it's only mapped read-only by domains. */
-            frame_table[m2p_start_mfn+i].u.inuse.type_info = PGT_gdt_page | 1;
-            page_set_owner(&frame_table[m2p_start_mfn+i], dom_xen);
+            frame_table[m2p_start_mfn+j].u.inuse.type_info = PGT_gdt_page | 1;
+            page_set_owner(&frame_table[m2p_start_mfn+j], dom_xen);
         }
     }
 }

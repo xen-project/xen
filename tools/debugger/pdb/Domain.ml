@@ -36,6 +36,7 @@ let string_of_context ctx =
       Printf.sprintf "{domain} domain: %d, vcpu: %d"
                       ctx.domain  ctx.vcpu
 
+external read_register : context_t -> int -> int32 = "dom_read_register"
 external read_registers : context_t -> registers = "dom_read_registers"
 external write_register : context_t -> register -> int32 -> unit =
   "dom_write_register"

@@ -26,30 +26,14 @@ static inline void evtchn_set_pending(struct vcpu *v, int port)
 {
     struct domain *d = v->domain;
     shared_info_t *s = d->shared_info;
-    int            running;
 
-    /* These three operations must happen in strict order. */
+    /* These four operations must happen in strict order. */
     if ( !test_and_set_bit(port,    &s->evtchn_pending[0]) &&
          !test_bit        (port,    &s->evtchn_mask[0])    &&
-         !test_and_set_bit(port>>5, &v->vcpu_info->evtchn_pending_sel) )
+         !test_and_set_bit(port>>5, &v->vcpu_info->evtchn_pending_sel) &&
+         !test_and_set_bit(0,       &v->vcpu_info->evtchn_upcall_pending) )
     {
-        /* The VCPU pending flag must be set /after/ update to evtchn-pend. */
-        set_bit(0, &v->vcpu_info->evtchn_upcall_pending);
         evtchn_notify(v);
-
-        /*
-         * NB1. 'vcpu_flags' and 'processor' must be checked /after/ update of
-         * pending flag. These values may fluctuate (after all, we hold no
-         * locks) but the key insight is that each change will cause
-         * evtchn_upcall_pending to be polled.
-         * 
-         * NB2. We save VCPUF_running across the unblock to avoid a needless
-         * IPI for domains that we IPI'd to unblock.
-         */
-        running = test_bit(_VCPUF_running, &v->vcpu_flags);
-        vcpu_unblock(v);
-        if ( running )
-            smp_send_event_check_cpu(v->processor);
     }
 }
 
@@ -73,8 +57,9 @@ static inline void send_guest_virq(struct vcpu *v, int virq)
  */
 extern void send_guest_pirq(struct domain *d, int pirq);
 
-#define event_pending(_d)                                     \
-    ((_d)->vcpu_info->evtchn_upcall_pending && \
-     !(_d)->vcpu_info->evtchn_upcall_mask)
+/* Note: Bitwise operations result in fast code with no branches. */
+#define event_pending(v)                        \
+    ((v)->vcpu_info->evtchn_upcall_pending &    \
+     ~(v)->vcpu_info->evtchn_upcall_mask)
 
 #endif /* __XEN_EVENT_H__ */

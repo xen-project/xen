@@ -79,14 +79,15 @@ xenflags-y += -Iinclude/asm-xen/asm-x86_64/mach-xen
 CFLAGS += $(xenflags-y)
 AFLAGS += $(xenflags-y)
 
-prepare: include/asm-$(XENARCH)/asm_offset.h
-CLEAN_FILES += include/asm-$(XENARCH)/asm_offset.h
+prepare: include/asm-$(XENARCH)/asm_offsets.h
+CLEAN_FILES += include/asm-$(XENARCH)/asm_offsets.h
 
 arch/$(XENARCH)/kernel/asm-offsets.s: include/asm include/.asm-ignore \
 	include/linux/version.h include/config/MARKER
 
-
-include/asm-$(XENARCH)/asm_offset.h: arch/xen/x86_64/kernel/asm-offsets.s
+include/asm-$(XENARCH)/offset.h: arch/$(XENARCH)/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
-	ln -fsn asm_offset.h include/asm-$(XENARCH)/offset.h
 
+include/asm-$(XENARCH)/asm_offsets.h: include/asm-$(XENARCH)/offset.h
+	ln -fsn offset.h include/asm-$(XENARCH)/asm_offsets.h
+	ln -fsn offset.h include/asm-$(XENARCH)/asm_offset.h

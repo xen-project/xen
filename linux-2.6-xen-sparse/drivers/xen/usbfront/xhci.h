@@ -54,7 +54,6 @@ struct xhci {
 #endif
 
         int evtchn;                        /* Interdom channel to backend */
-        int irq;                           /* Bound to evtchn */
         enum { 
                 USBIF_STATE_CONNECTED    = 2,
                 USBIF_STATE_DISCONNECTED = 1,

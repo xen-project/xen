@@ -71,7 +71,6 @@ typedef struct blkif_st {
     /* Physical parameters of the comms window. */
     unsigned long       shmem_frame;
     unsigned int        evtchn;
-    int                 irq;
     /* Comms information. */
     blkif_back_ring_t   blk_ring;
     
@@ -86,6 +85,11 @@ typedef struct blkif_st {
     spinlock_t          blk_ring_lock;
     atomic_t            refcnt;
     struct work_struct work;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    u16 shmem_handle;
+    unsigned long shmem_vaddr;
+    grant_ref_t shmem_ref;
+#endif
 } blkif_t;
 
 blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle);
@@ -104,8 +108,6 @@ typedef struct {
     blkif_t       *blkif;
     unsigned long  id;
     int            nr_pages;
-    unsigned long  mach_fas[BLKIF_MAX_SEGMENTS_PER_REQUEST];
-    unsigned long  virt_fas[BLKIF_MAX_SEGMENTS_PER_REQUEST];
     int            next_free;
 } active_req_t;
 
@@ -173,32 +175,7 @@ static inline int BLKTAP_MODE_VALID(unsigned long arg)
 
 
 /* -------[ Mappings to User VMA ]------------------------------------ */
-#define MAX_PENDING_REQS 64
 #define BATCH_PER_DOMAIN 16
-extern struct vm_area_struct *blktap_vma;
-
-/* The following are from blkback.c and should probably be put in a
- * header and included from there.
- * The mmap area described here is where attached data pages eill be mapped.
- */
- 
-extern unsigned long mmap_vstart;
-#define MMAP_PAGES_PER_REQUEST \
-    (BLKIF_MAX_SEGMENTS_PER_REQUEST + 1)
-#define MMAP_PAGES             \
-    (MAX_PENDING_REQS * MMAP_PAGES_PER_REQUEST)
-#define MMAP_VADDR(_req,_seg)                        \
-    (mmap_vstart +                                   \
-     ((_req) * MMAP_PAGES_PER_REQUEST * PAGE_SIZE) + \
-     ((_seg) * PAGE_SIZE))
-
-/* immediately before the mmap area, we have a bunch of pages reserved
- * for shared memory rings.
- */
-
-#define RING_PAGES 3 /* Ctrl, Front, and Back */ 
-extern unsigned long rings_vstart;
-
 
 /* -------[ Here be globals ]----------------------------------------- */
 extern unsigned long blktap_mode;

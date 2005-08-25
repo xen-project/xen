@@ -47,7 +47,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
-#include "xc.h"
+#include "xenctrl.h"
 #include <io/ioreq.h>
 
 #include "cpu.h"
@@ -55,6 +55,7 @@
 #include "vl.h"
 
 shared_iopage_t *shared_page = NULL;
+extern int reset_requested;
 
 CPUX86State *cpu_86_init(void)
 {
@@ -327,7 +328,16 @@ do_interrupt(CPUState *env, int vector)
 	env->send_event = 1;
 }
 
-//static unsigned long tsc_per_tick = 1; /* XXX: calibrate */
+void
+destroy_vmx_domain(void)
+{
+    extern int domid;
+    extern FILE* logfile;
+    char destroy_cmd[20];
+    sprintf(destroy_cmd, "xm destroy %d", domid);
+    if (system(destroy_cmd) == -1)
+        fprintf(logfile, "%s failed.!\n", destroy_cmd);
+}
 
 int main_loop(void)
 {
@@ -348,6 +358,10 @@ int main_loop(void)
                 if (vm_running) {
                     if (shutdown_requested) {
                         break;
+                    }
+                    if (reset_requested){
+                        qemu_system_reset();
+                        reset_requested = 0;
                     }
                 }
 
@@ -391,7 +405,21 @@ int main_loop(void)
 			}
 		}
 	}
+        destroy_vmx_domain();
 	return 0;
+}
+
+static void
+qemu_vmx_reset(void *unused)
+{
+    char cmd[255];
+    extern int domid;
+
+    /* pause domain first, to avoid repeated reboot request*/ 
+    xc_domain_pause (xc_handle, domid);
+
+    sprintf(cmd,"xm shutdown -R %d", domid);
+    system (cmd);
 }
 
 CPUState *
@@ -400,7 +428,7 @@ cpu_init()
 	CPUX86State *env;
       
         cpu_exec_init();
-
+        qemu_register_reset(qemu_vmx_reset, NULL);
 	env = malloc(sizeof(CPUX86State));
 	if (!env)
 		return NULL;
@@ -427,3 +455,4 @@ cpu_init()
 
 	return env;
 }
+

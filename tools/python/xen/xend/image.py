@@ -1,4 +1,22 @@
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2005 Mike Wray <mike.wray@hp.com>
+#============================================================================
+
 import os, string
+import re
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 from xen.xend import sxp
@@ -245,7 +263,7 @@ class VmxImageHandler(ImageHandler):
     memmap = None
     memmap_value = []
     device_channel = None
-
+    pid = 0
     def createImage(self):
         """Create a VM for the VMX environment.
         """
@@ -257,14 +275,24 @@ class VmxImageHandler(ImageHandler):
         # Create an event channel
         self.device_channel = channel.eventChannel(0, self.vm.getDomain())
         log.info("VMX device model port: %d", self.device_channel.port2)
-        return xc.vmx_build(dom            = self.vm.getDomain(),
+        if self.vm.store_channel:
+            store_evtchn = self.vm.store_channel.port2
+        else:
+            store_evtchn = 0
+        ret = xc.vmx_build(dom            = self.vm.getDomain(),
                             image          = self.kernel,
                             control_evtchn = self.device_channel.port2,
+                            store_evtchn   = store_evtchn,
                             memsize        = self.vm.memory,
                             memmap         = self.memmap_value,
                             cmdline        = self.cmdline,
                             ramdisk        = self.ramdisk,
-                            flags          = self.flags)
+                            flags          = self.flags,
+                            vcpus          = self.vm.vcpus)
+        if isinstance(ret, dict):
+            self.vm.store_mfn = ret.get('store_mfn')
+            return 0
+        return ret
 
     def parseMemmap(self):
         self.memmap = sxp.child_value(self.vm.config, "memmap")
@@ -278,7 +306,7 @@ class VmxImageHandler(ImageHandler):
     # xm config file
     def parseDeviceModelArgs(self):
 	dmargs = [ 'cdrom', 'boot', 'fda', 'fdb',
-                   'localtime', 'serial', 'macaddr', 'stdvga', 'isa' ] 
+                   'localtime', 'serial', 'stdvga', 'isa' ] 
 	ret = []
 	for a in dmargs:
        	    v = sxp.child_value(self.vm.config, a)
@@ -295,20 +323,32 @@ class VmxImageHandler(ImageHandler):
 		ret.append("-%s" % a)
 		ret.append("%s" % v)
 
-        # Handle hd img related options
+        # Handle disk/network related options
         devices = sxp.children(self.vm.config, 'device')
         for device in devices:
-            vbdinfo = sxp.child(device, 'vbd')
-            if not vbdinfo:
-                raise VmError("vmx: missing vbd configuration")
-            uname = sxp.child_value(vbdinfo, 'uname')
-            vbddev = sxp.child_value(vbdinfo, 'dev')
-            (vbdtype, vbdparam) = string.split(uname, ':', 1)
-            vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
-            if vbdtype != 'file' or vbddev not in vbddev_list:
-                raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
-            ret.append("-%s" % vbddev)
-            ret.append("%s" % vbdparam)
+            name = sxp.name(sxp.child0(device))
+            if name == 'vbd':
+               vbdinfo = sxp.child(device, 'vbd')
+               uname = sxp.child_value(vbdinfo, 'uname')
+               typedev = sxp.child_value(vbdinfo, 'dev')
+               (vbdtype, vbdparam) = string.split(uname, ':', 1)
+               if re.match('^ioemu:', typedev):
+                  (emtype, vbddev) = string.split(typedev, ':', 1)
+               else:
+                  emtype = 'vbd'
+                  vbddev = typedev
+               if emtype != 'ioemu':
+                  continue;
+               vbddev_list = ['hda', 'hdb', 'hdc', 'hdd']
+               if vbddev not in vbddev_list:
+                  raise VmError("vmx: for qemu vbd type=file&dev=hda~hdd")
+               ret.append("-%s" % vbddev)
+               ret.append("%s" % vbdparam)
+            if name == 'vif':
+               vifinfo = sxp.child(device, 'vif')
+               mac = sxp.child_value(vifinfo, 'mac')
+               ret.append("-macaddr")
+               ret.append("%s" % mac)
 
 	# Handle graphics library related options
 	vnc = sxp.child_value(self.vm.config, 'vnc')
@@ -347,6 +387,7 @@ class VmxImageHandler(ImageHandler):
         log.info("spawning device models: %s %s", device_model, args)
         self.pid = os.spawnve(os.P_NOWAIT, device_model, args, env)
         log.info("device model pid: %d", self.pid)
+        return self.pid
 
     def vncParams(self):
         # see if a vncviewer was specified
@@ -366,11 +407,16 @@ class VmxImageHandler(ImageHandler):
     def destroy(self):
         channel.eventChannelClose(self.device_channel)
         import signal
+        if not self.pid:
+            self.pid = self.vm.device_model_pid
         os.kill(self.pid, signal.SIGKILL)
         (pid, status) = os.waitpid(self.pid, 0)
+        self.pid = 0
 
     def getDomainMemory(self, mem_mb):
-        return (mem_mb * 1024) + self.getPageTableSize(mem_mb)
+        # for ioreq_t and xenstore
+        static_pages = 2
+        return (mem_mb * 1024) + self.getPageTableSize(mem_mb) + 4 * static_pages
             
     def getPageTableSize(self, mem_mb):
         """Return the size of memory needed for 1:1 page tables for physical

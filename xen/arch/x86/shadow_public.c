@@ -571,7 +571,7 @@ void free_shadow_page(unsigned long smfn)
         break;
 
     default:
-        printk("Free shadow weird page type mfn=%lx type=%08x\n",
+        printk("Free shadow weird page type mfn=%lx type=%" PRtype_info "\n",
                page_to_pfn(page), page->u.inuse.type_info);
         break;
     }
@@ -1638,14 +1638,14 @@ void shadow_drop_references(
     /* XXX This needs more thought... */
     printk("%s: needing to call __shadow_remove_all_access for mfn=%lx\n",
       __func__, page_to_pfn(page));
-    printk("Before: mfn=%lx c=%08x t=%08x\n", page_to_pfn(page),
+    printk("Before: mfn=%lx c=%08x t=%" PRtype_info "\n", page_to_pfn(page),
       page->count_info, page->u.inuse.type_info);
 
     shadow_lock(d);
     __shadow_remove_all_access(d, page_to_pfn(page));
     shadow_unlock(d);
 
-    printk("After:  mfn=%lx c=%08x t=%08x\n", page_to_pfn(page),
+    printk("After:  mfn=%lx c=%08x t=%" PRtype_info "\n", page_to_pfn(page),
       page->count_info, page->u.inuse.type_info);
 }
 

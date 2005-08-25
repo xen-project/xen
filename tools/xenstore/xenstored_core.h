@@ -51,6 +51,8 @@ enum state
 {
 	/* Blocked by transaction. */
 	BLOCKED,
+	/* Doing action, not listening */
+	BUSY,
 	/* Completed */
 	OK,
 };
@@ -65,7 +67,7 @@ struct connection
 	/* Who am I?  0 for socket connections. */
 	domid_t id;
 
-	/* Blocked on transaction? */
+	/* Blocked on transaction?  Busy? */
 	enum state state;
 
 	/* Node we are waiting for (if state == BLOCKED) */

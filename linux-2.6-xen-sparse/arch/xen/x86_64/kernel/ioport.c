@@ -30,7 +30,6 @@ asmlinkage long sys_iopl(unsigned int new_io_pl, struct pt_regs *regs)
         unsigned int old_io_pl = current->thread.io_pl;
         physdev_op_t op;
 
-
 	if (new_io_pl > 3)
 		return -EINVAL;
 
@@ -38,16 +37,12 @@ asmlinkage long sys_iopl(unsigned int new_io_pl, struct pt_regs *regs)
 	if ((new_io_pl > old_io_pl) && !capable(CAP_SYS_RAWIO))
 		return -EPERM;
 
-	/* Maintain OS privileges even if user attempts to relinquish them. */
-	if (new_io_pl == 0)
-		new_io_pl = 1;
-
 	/* Change our version of the privilege levels. */
 	current->thread.io_pl = new_io_pl;
 
 	/* Force the change at ring 0. */
 	op.cmd             = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = new_io_pl;
+	op.u.set_iopl.iopl = (new_io_pl == 0) ? 1 : new_io_pl;
 	HYPERVISOR_physdev_op(&op);
 
 	return 0;

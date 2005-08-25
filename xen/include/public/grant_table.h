@@ -142,7 +142,10 @@ typedef u16 grant_ref_t;
  *  1. If GNTPIN_map_for_dev is specified then <dev_bus_addr> is the address
  *     via which I/O devices may access the granted frame.
  *  2. If GNTPIN_map_for_host is specified then a mapping will be added at
- *     virtual address <host_virt_addr> in the current address space.
+ *     either a host virtual address in the current address space, or at
+ *     a PTE at the specified machine address.  The type of mapping to
+ *     perform is selected through the GNTMAP_contains_pte flag, and the 
+ *     address is specified in <host_addr>.
  *  3. Mappings should only be destroyed via GNTTABOP_unmap_grant_ref. If a
  *     host mapping is destroyed by other means then it is *NOT* guaranteed
  *     to be accounted to the correct grant reference!
@@ -150,18 +153,18 @@ typedef u16 grant_ref_t;
 #define GNTTABOP_map_grant_ref        0
 typedef struct gnttab_map_grant_ref {
     /* IN parameters. */
-    memory_t    host_virt_addr;
+    u64         host_addr;
     domid_t     dom;
     grant_ref_t ref;
     u16         flags;                /* GNTMAP_* */
     /* OUT parameters. */
     s16         handle;               /* +ve: handle; -ve: GNTST_* */
-    memory_t    dev_bus_addr;
+    u64         dev_bus_addr;
 } gnttab_map_grant_ref_t;
 
 /*
  * GNTTABOP_unmap_grant_ref: Destroy one or more grant-reference mappings
- * tracked by <handle>. If <host_virt_addr> or <dev_bus_addr> is zero, that
+ * tracked by <handle>. If <host_addr> or <dev_bus_addr> is zero, that
  * field is ignored. If non-zero, they must refer to a device/host mapping
  * that is tracked by <handle>
  * NOTES:
@@ -173,14 +176,12 @@ typedef struct gnttab_map_grant_ref {
 #define GNTTABOP_unmap_grant_ref      1
 typedef struct gnttab_unmap_grant_ref {
     /* IN parameters. */
-    memory_t    host_virt_addr;
-    memory_t    dev_bus_addr;
+    u64         host_addr;
+    u64         dev_bus_addr;
     u16         handle;
     /* OUT parameters. */
     s16         status;               /* GNTST_* */
 } gnttab_unmap_grant_ref_t;
-
-#define GNTUNMAP_DEV_FROM_VIRT (~0U)
 
 /*
  * GNTTABOP_setup_table: Set up a grant table for <dom> comprising at least
@@ -220,7 +221,7 @@ typedef struct gnttab_dump_table {
  */
 #define GNTTABOP_donate                4
 typedef struct {
-    memory_t    mfn;		      /*  0 */
+    unsigned long mfn;		      /*  0 */
     domid_t     domid;		      /*  4 */
     u16         handle;               /*  8 */
     s16         status;               /*  10: GNTST_* */
@@ -247,10 +248,18 @@ typedef struct {
 #define _GNTMAP_application_map (3)
 #define GNTMAP_application_map  (1<<_GNTMAP_application_map)
 
+ /*
+  * GNTMAP_contains_pte subflag:
+  *  0 => This map request contains a host virtual address.
+  *  1 => This map request contains the machine addess of the PTE to update.
+  */ 
+#define _GNTMAP_contains_pte    (4)
+#define GNTMAP_contains_pte     (1<<_GNTMAP_contains_pte)
+
 /*
  * Values for error status returns. All errors are -ve.
  */
-#define GNTST_okay             (0)
+#define GNTST_okay             (0)  /* Normal return.                        */
 #define GNTST_general_error    (-1) /* General undefined error.              */
 #define GNTST_bad_domain       (-2) /* Unrecognsed domain id.                */
 #define GNTST_bad_gntref       (-3) /* Unrecognised or inappropriate gntref. */

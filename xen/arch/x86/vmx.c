@@ -65,7 +65,7 @@ static u32 msr_data_index[VMX_MSR_COUNT] =
  * are not modified once set for generic domains, we don't save them, 
  * but simply reset them to the values set at percpu_traps_init().
  */
-void vmx_load_msrs(struct vcpu *p, struct vcpu *n)
+void vmx_load_msrs(struct vcpu *n)
 {
     struct msr_state *host_state;
     host_state = &percpu_msr[smp_processor_id()];
@@ -1712,9 +1712,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
     default:
         __vmx_bug(&regs);       /* should not happen */
     }
-
-    vmx_intr_assist(v);
-    return;
 }
 
 asmlinkage void load_cr2(void)

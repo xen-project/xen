@@ -163,7 +163,7 @@ HYPERVISOR_yield(
         TRAP_INSTR
         : "=a" (ret), "=b" (ign)
 	: "0" (__HYPERVISOR_sched_op), "1" (SCHEDOP_yield)
-	: "memory" );
+	: "memory", "ecx" );
 
     return ret;
 }
@@ -178,7 +178,7 @@ HYPERVISOR_block(
         TRAP_INSTR
         : "=a" (ret), "=b" (ign1)
 	: "0" (__HYPERVISOR_sched_op), "1" (SCHEDOP_block)
-	: "memory" );
+	: "memory", "ecx" );
 
     return ret;
 }
@@ -194,7 +194,7 @@ HYPERVISOR_shutdown(
         : "=a" (ret), "=b" (ign1)
 	: "0" (__HYPERVISOR_sched_op),
 	  "1" (SCHEDOP_shutdown | (SHUTDOWN_poweroff << SCHEDOP_reasonshift))
-        : "memory" );
+        : "memory", "ecx" );
 
     return ret;
 }
@@ -210,7 +210,7 @@ HYPERVISOR_reboot(
         : "=a" (ret), "=b" (ign1)
 	: "0" (__HYPERVISOR_sched_op),
 	  "1" (SCHEDOP_shutdown | (SHUTDOWN_reboot << SCHEDOP_reasonshift))
-        : "memory" );
+        : "memory", "ecx" );
 
     return ret;
 }
@@ -228,7 +228,7 @@ HYPERVISOR_suspend(
         : "=a" (ret), "=b" (ign1), "=S" (ign2)
 	: "0" (__HYPERVISOR_sched_op),
         "b" (SCHEDOP_shutdown | (SHUTDOWN_suspend << SCHEDOP_reasonshift)), 
-        "S" (srec) : "memory");
+        "S" (srec) : "memory", "ecx");
 
     return ret;
 }
@@ -244,7 +244,7 @@ HYPERVISOR_crash(
         : "=a" (ret), "=b" (ign1)
 	: "0" (__HYPERVISOR_sched_op),
 	  "1" (SCHEDOP_shutdown | (SHUTDOWN_crash << SCHEDOP_reasonshift))
-        : "memory" );
+        : "memory", "ecx" );
 
     return ret;
 }
@@ -316,16 +316,17 @@ HYPERVISOR_get_debugreg(
 
 static inline int
 HYPERVISOR_update_descriptor(
-    unsigned long ma, unsigned long word1, unsigned long word2)
+    u64 ma, u64 desc)
 {
     int ret;
-    unsigned long ign1, ign2, ign3;
+    unsigned long ign1, ign2, ign3, ign4;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3)
-	: "0" (__HYPERVISOR_update_descriptor), "1" (ma), "2" (word1),
-	  "3" (word2)
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
+	: "0" (__HYPERVISOR_update_descriptor),
+	  "1" ((unsigned long)ma), "2" ((unsigned long)(ma>>32)),
+	  "3" ((unsigned long)desc), "4" ((unsigned long)(desc>>32))
 	: "memory" );
 
     return ret;
@@ -385,13 +386,6 @@ HYPERVISOR_update_va_mapping(
 #endif
 	  "4" (flags)
 	: "memory" );
-
-    if ( unlikely(ret < 0) )
-    {
-        printk(KERN_ALERT "Failed update VA mapping: %08lx, %08lx, %08lx\n",
-               va, (new_val).pte_low, flags);
-        BUG();
-    }
 
     return ret;
 }
@@ -536,12 +530,15 @@ HYPERVISOR_vcpu_down(
 {
     int ret;
     unsigned long ign1;
+    /* Yes, I really do want to clobber edx here: when we resume a
+       vcpu after unpickling a multi-processor domain, it returns
+       here, but clobbers all of the call clobbered registers. */
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret), "=b" (ign1)
 	: "0" (__HYPERVISOR_sched_op),
 	  "1" (SCHEDOP_vcpu_down | (vcpu << SCHEDOP_vcpushift))
-        : "memory" );
+        : "memory", "ecx", "edx" );
 
     return ret;
 }
@@ -557,8 +554,26 @@ HYPERVISOR_vcpu_up(
         : "=a" (ret), "=b" (ign1)
 	: "0" (__HYPERVISOR_sched_op),
 	  "1" (SCHEDOP_vcpu_up | (vcpu << SCHEDOP_vcpushift))
+        : "memory", "ecx" );
+
+    return ret;
+}
+
+static inline int
+HYPERVISOR_vcpu_pickle(
+    int vcpu, vcpu_guest_context_t *ctxt)
+{
+    int ret;
+    unsigned long ign1, ign2;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_sched_op),
+	  "1" (SCHEDOP_vcpu_pickle | (vcpu << SCHEDOP_vcpushift)),
+	  "2" (ctxt)
         : "memory" );
 
     return ret;
 }
+
 #endif /* __HYPERCALL_H__ */

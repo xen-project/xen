@@ -7,289 +7,137 @@
  */
 
 #include "common.h"
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#endif
-
-#define BLKIF_HASHSZ 1024
-#define BLKIF_HASH(_d,_h) (((int)(_d)^(int)(_h))&(BLKIF_HASHSZ-1))
+#include <asm-xen/evtchn.h>
 
 static kmem_cache_t *blkif_cachep;
-static blkif_t      *blkif_hash[BLKIF_HASHSZ];
 
-blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle)
+blkif_t *alloc_blkif(domid_t domid)
 {
-    blkif_t *blkif = blkif_hash[BLKIF_HASH(domid, handle)];
-    while ( (blkif != NULL) && 
-            ((blkif->domid != domid) || (blkif->handle != handle)) )
-        blkif = blkif->hash_next;
+    blkif_t *blkif;
+
+    blkif = kmem_cache_alloc(blkif_cachep, GFP_KERNEL);
+    if (!blkif)
+	    return ERR_PTR(-ENOMEM);
+
+    memset(blkif, 0, sizeof(*blkif));
+    blkif->domid = domid;
+    blkif->status = DISCONNECTED;
+    spin_lock_init(&blkif->blk_ring_lock);
+    atomic_set(&blkif->refcnt, 1);
+
     return blkif;
 }
 
-static void __blkif_disconnect_complete(void *arg)
+static int map_frontend_page(blkif_t *blkif, unsigned long localaddr,
+			     unsigned long shared_page)
 {
-    blkif_t              *blkif = (blkif_t *)arg;
-    ctrl_msg_t            cmsg;
-    blkif_be_disconnect_t disc;
+    struct gnttab_map_grant_ref op;
+    op.host_addr = localaddr;
+    op.flags = GNTMAP_host_map;
+    op.ref = shared_page;
+    op.dom = blkif->domid;
 
-    /*
-     * These can't be done in blkif_disconnect() because at that point there
-     * may be outstanding requests at the disc whose asynchronous responses
-     * must still be notified to the remote driver.
-     */
-    unbind_evtchn_from_irq(blkif->evtchn);
+    BUG_ON( HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) );
 
-#ifdef CONFIG_XEN_BLKDEV_GRANT
-    {
-        /*
-         * Release the shared memory page.
-         */
-        struct gnttab_unmap_grant_ref op;
-
-        op.host_virt_addr = blkif->shmem_vaddr;
-        op.handle         = blkif->shmem_handle;
-        op.dev_bus_addr   = 0;
-
-        if(unlikely(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1))) {
-            BUG();
-        }
-    }
-#endif
-    vfree(blkif->blk_ring.sring);
-
-    /* Construct the deferred response message. */
-    cmsg.type         = CMSG_BLKIF_BE;
-    cmsg.subtype      = CMSG_BLKIF_BE_DISCONNECT;
-    cmsg.id           = blkif->disconnect_rspid;
-    cmsg.length       = sizeof(blkif_be_disconnect_t);
-    disc.domid        = blkif->domid;
-    disc.blkif_handle = blkif->handle;
-    disc.status       = BLKIF_BE_STATUS_OKAY;
-    memcpy(cmsg.msg, &disc, sizeof(disc));
-
-    /*
-     * Make sure message is constructed /before/ status change, because
-     * after the status change the 'blkif' structure could be deallocated at
-     * any time. Also make sure we send the response /after/ status change,
-     * as otherwise a subsequent CONNECT request could spuriously fail if
-     * another CPU doesn't see the status change yet.
-     */
-    mb();
-    if ( blkif->status != DISCONNECTING )
-        BUG();
-    blkif->status = DISCONNECTED;
-    mb();
-
-    /* Send the successful response. */
-    ctrl_if_send_response(&cmsg);
-}
-
-void blkif_disconnect_complete(blkif_t *blkif)
-{
-    INIT_WORK(&blkif->work, __blkif_disconnect_complete, (void *)blkif);
-    schedule_work(&blkif->work);
-}
-
-void blkif_create(blkif_be_create_t *create)
-{
-    domid_t       domid  = create->domid;
-    unsigned int  handle = create->blkif_handle;
-    blkif_t     **pblkif, *blkif;
-
-    if ( (blkif = kmem_cache_alloc(blkif_cachep, GFP_KERNEL)) == NULL )
-    {
-        DPRINTK("Could not create blkif: out of memory\n");
-        create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
-        return;
+    if (op.handle < 0) {
+	DPRINTK(" Grant table operation failure !\n");
+	return op.handle;
     }
 
-    memset(blkif, 0, sizeof(*blkif));
-    blkif->domid  = domid;
-    blkif->handle = handle;
-    blkif->status = DISCONNECTED;
-    spin_lock_init(&blkif->vbd_lock);
-    spin_lock_init(&blkif->blk_ring_lock);
-    atomic_set(&blkif->refcnt, 0);
-
-    pblkif = &blkif_hash[BLKIF_HASH(domid, handle)];
-    while ( *pblkif != NULL )
-    {
-        if ( ((*pblkif)->domid == domid) && ((*pblkif)->handle == handle) )
-        {
-            DPRINTK("Could not create blkif: already exists\n");
-            create->status = BLKIF_BE_STATUS_INTERFACE_EXISTS;
-            kmem_cache_free(blkif_cachep, blkif);
-            return;
-        }
-        pblkif = &(*pblkif)->hash_next;
-    }
-
-    blkif->hash_next = *pblkif;
-    *pblkif = blkif;
-
-    DPRINTK("Successfully created blkif\n");
-    create->status = BLKIF_BE_STATUS_OKAY;
+    blkif->shmem_ref = shared_page;
+    blkif->shmem_handle = op.handle;
+    blkif->shmem_vaddr = localaddr;
+    return 0;
 }
 
-void blkif_destroy(blkif_be_destroy_t *destroy)
+static void unmap_frontend_page(blkif_t *blkif)
 {
-    domid_t       domid  = destroy->domid;
-    unsigned int  handle = destroy->blkif_handle;
-    blkif_t     **pblkif, *blkif;
+    struct gnttab_unmap_grant_ref op;
 
-    pblkif = &blkif_hash[BLKIF_HASH(domid, handle)];
-    while ( (blkif = *pblkif) != NULL )
-    {
-        if ( (blkif->domid == domid) && (blkif->handle == handle) )
-        {
-            if ( blkif->status != DISCONNECTED )
-                goto still_connected;
-            goto destroy;
-        }
-        pblkif = &blkif->hash_next;
-    }
-
-    destroy->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
-    return;
-
- still_connected:
-    destroy->status = BLKIF_BE_STATUS_INTERFACE_CONNECTED;
-    return;
-
- destroy:
-    *pblkif = blkif->hash_next;
-    destroy_all_vbds(blkif);
-    kmem_cache_free(blkif_cachep, blkif);
-    destroy->status = BLKIF_BE_STATUS_OKAY;
+    op.host_addr = blkif->shmem_vaddr;
+    op.handle = blkif->shmem_handle;
+    op.dev_bus_addr = 0;
+    BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
 }
 
-void blkif_connect(blkif_be_connect_t *connect)
+int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 {
-    domid_t        domid  = connect->domid;
-    unsigned int   handle = connect->blkif_handle;
-    unsigned int   evtchn = connect->evtchn;
-    unsigned long  shmem_frame = connect->shmem_frame;
     struct vm_struct *vma;
-#ifdef CONFIG_XEN_BLKDEV_GRANT
-    int ref = connect->shmem_ref;
-#else
-    pgprot_t       prot;
-    int            error;
-#endif
-    blkif_t       *blkif;
     blkif_sring_t *sring;
+    evtchn_op_t op = { .cmd = EVTCHNOP_bind_interdomain };
+    int err;
 
-    blkif = blkif_find_by_handle(domid, handle);
-    if ( unlikely(blkif == NULL) )
-    {
-        DPRINTK("blkif_connect attempted for non-existent blkif (%u,%u)\n", 
-                connect->domid, connect->blkif_handle); 
-        connect->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
-        return;
-    }
+    BUG_ON(blkif->remote_evtchn);
 
     if ( (vma = get_vm_area(PAGE_SIZE, VM_IOREMAP)) == NULL )
-    {
-        connect->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
-        return;
-    }
+	return -ENOMEM;
 
-#ifndef CONFIG_XEN_BLKDEV_GRANT
-    prot = __pgprot(_KERNPG_TABLE);
-    error = direct_remap_area_pages(&init_mm, VMALLOC_VMADDR(vma->addr),
-                                    shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
-                                    prot, domid);
-    if ( error != 0 )
-    {
-        if ( error == -ENOMEM )
-            connect->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
-        else if ( error == -EFAULT )
-            connect->status = BLKIF_BE_STATUS_MAPPING_ERROR;
-        else
-            connect->status = BLKIF_BE_STATUS_ERROR;
+    err = map_frontend_page(blkif, (unsigned long)vma->addr, shared_page);
+    if (err) {
         vfree(vma->addr);
-        return;
+	return err;
     }
-#else
-    { /* Map: Use the Grant table reference */
-        struct gnttab_map_grant_ref op;
-        op.host_virt_addr = VMALLOC_VMADDR(vma->addr);
-        op.flags          = GNTMAP_host_map;
-        op.ref            = ref;
-        op.dom            = domid;
-       
-        BUG_ON( HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) );
-       
-        handle = op.handle;
-       
-        if (op.handle < 0) {
-            DPRINTK(" Grant table operation failure !\n");
-            connect->status = BLKIF_BE_STATUS_MAPPING_ERROR;
-            vfree(vma->addr);
-            return;
-        }
 
-        blkif->shmem_ref = ref;
-        blkif->shmem_handle = handle;
-        blkif->shmem_vaddr = VMALLOC_VMADDR(vma->addr);
+    op.u.bind_interdomain.dom1 = DOMID_SELF;
+    op.u.bind_interdomain.dom2 = blkif->domid;
+    op.u.bind_interdomain.port1 = 0;
+    op.u.bind_interdomain.port2 = evtchn;
+    err = HYPERVISOR_event_channel_op(&op);
+    if (err) {
+	unmap_frontend_page(blkif);
+	vfree(vma->addr);
+	return err;
     }
-#endif
 
-    if ( blkif->status != DISCONNECTED )
-    {
-        connect->status = BLKIF_BE_STATUS_INTERFACE_CONNECTED;
-        vfree(vma->addr);
-        return;
-    }
+    blkif->evtchn = op.u.bind_interdomain.port1;
+    blkif->remote_evtchn = evtchn;
+
     sring = (blkif_sring_t *)vma->addr;
     SHARED_RING_INIT(sring);
     BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
-    
-    blkif->evtchn        = evtchn;
-    blkif->irq           = bind_evtchn_to_irq(evtchn);
-    blkif->shmem_frame   = shmem_frame;
+
+    bind_evtchn_to_irqhandler(blkif->evtchn, blkif_be_int, 0, "blkif-backend",
+			      blkif);
     blkif->status        = CONNECTED;
-    blkif_get(blkif);
+    blkif->shmem_frame   = shared_page;
 
-    request_irq(blkif->irq, blkif_be_int, 0, "blkif-backend", blkif);
-
-    connect->status = BLKIF_BE_STATUS_OKAY;
+    return 0;
 }
 
-int blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id)
+static void free_blkif(void *arg)
 {
-    domid_t       domid  = disconnect->domid;
-    unsigned int  handle = disconnect->blkif_handle;
-    blkif_t      *blkif;
+    evtchn_op_t op = { .cmd = EVTCHNOP_close };
+    blkif_t *blkif = (blkif_t *)arg;
 
-    blkif = blkif_find_by_handle(domid, handle);
-    if ( unlikely(blkif == NULL) )
-    {
-        DPRINTK("blkif_disconnect attempted for non-existent blkif"
-                " (%u,%u)\n", disconnect->domid, disconnect->blkif_handle); 
-        disconnect->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
-        return 1; /* Caller will send response error message. */
+    op.u.close.port = blkif->evtchn;
+    op.u.close.dom = DOMID_SELF;
+    HYPERVISOR_event_channel_op(&op);
+    op.u.close.port = blkif->remote_evtchn;
+    op.u.close.dom = blkif->domid;
+    HYPERVISOR_event_channel_op(&op);
+
+    vbd_free(&blkif->vbd);
+
+    if (blkif->evtchn)
+        unbind_evtchn_from_irqhandler(blkif->evtchn, blkif);
+
+    if (blkif->blk_ring.sring) {
+	unmap_frontend_page(blkif);
+	vfree(blkif->blk_ring.sring);
+	blkif->blk_ring.sring = NULL;
     }
 
-    if ( blkif->status == CONNECTED )
-    {
-        blkif->status = DISCONNECTING;
-        blkif->disconnect_rspid = rsp_id;
-        wmb(); /* Let other CPUs see the status change. */
-        free_irq(blkif->irq, blkif);
-        blkif_deschedule(blkif);
-        blkif_put(blkif);
-        return 0; /* Caller should not send response message. */
-    }
+    kmem_cache_free(blkif_cachep, blkif);
+}
 
-    disconnect->status = BLKIF_BE_STATUS_OKAY;
-    return 1;
+void free_blkif_callback(blkif_t *blkif)
+{
+    INIT_WORK(&blkif->free_work, free_blkif, (void *)blkif);
+    schedule_work(&blkif->free_work);
 }
 
 void __init blkif_interface_init(void)
 {
     blkif_cachep = kmem_cache_create("blkif_cache", sizeof(blkif_t), 
                                      0, 0, NULL, NULL);
-    memset(blkif_hash, 0, sizeof(blkif_hash));
 }

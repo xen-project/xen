@@ -430,6 +430,7 @@ static void ide_identify(IDEState *s)
         put_le16(p + 59, 0x100 | s->mult_sectors);
     put_le16(p + 60, s->nb_sectors);
     put_le16(p + 61, s->nb_sectors >> 16);
+    put_le16(p + 63, 0x07);
     put_le16(p + 80, (1 << 1) | (1 << 2));
     put_le16(p + 82, (1 << 14));
     put_le16(p + 83, (1 << 14));
@@ -460,7 +461,7 @@ static void ide_atapi_identify(IDEState *s)
     put_le16(p + 48, 1); /* dword I/O (XXX: should not be set on CDROM) */
     put_le16(p + 49, 1 << 9); /* LBA supported, no DMA */
     put_le16(p + 53, 3); /* words 64-70, 54-58 valid */
-    put_le16(p + 63, 0x103); /* DMA modes XXX: may be incorrect */
+    put_le16(p + 63, 0x07); /* Multi-word DMA mode 2 */ 
     put_le16(p + 64, 1); /* PIO modes */
     put_le16(p + 65, 0xb4); /* minimum DMA multiword tx cycle time */
     put_le16(p + 66, 0xb4); /* recommended DMA multiword tx cycle time */

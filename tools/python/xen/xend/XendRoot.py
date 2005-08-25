@@ -1,4 +1,19 @@
-# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+#============================================================================
 
 """Xend root class.
 Creates the event server and handles configuration.
@@ -69,12 +84,6 @@ class XendRoot:
 
     """Default path the unix-domain server listens at."""
     xend_unix_path_default = '/var/lib/xend/xend-socket'
-
-    """Default interface address xend listens at for consoles."""
-    console_address_default   = 'localhost'
-
-    """Default port xend serves consoles at. """
-    console_port_base_default = '9600'
 
     dom0_min_mem_default = '0'
 
@@ -302,24 +311,11 @@ class XendRoot:
         """
         return self.get_config_value("xend-unix-path", self.xend_unix_path_default)
 
-    def get_console_address(self):
-        """Get the address xend listens at for its console ports.
-        This defaults to 'localhost', allowing only the localhost to connect
-        to the console ports.  Setting this to the empty string, allows all
-        hosts to connect.
-        """
-        return self.get_config_value('console-address', self.console_address_default)
-
-    def get_console_port_base(self):
-        """Get the base port number used to generate console ports for domains.
-        """
-        return self.get_config_int('console-port-base', self.console_port_base_default)
-
     def get_block_script(self, type):
         return self.get_config_value('block-%s' % type, '')
 
     def get_network_script(self):
-        return self.get_config_value('network-script', 'network')
+        return self.get_config_value('network-script', '')
 
     def get_enable_dump(self):
         return self.get_config_bool('enable-dump', 'no')

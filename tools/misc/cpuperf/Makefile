@@ -37,7 +37,7 @@ clean:
 	$(CC) $(CFLAGS) -o $@ $<
 
 cpuperf-xen: cpuperf.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -I $(XEN_LIBXC) -L$(XEN_LIBXC) -lxc -DXENO -o $@ $<
+	$(CC) $(CFLAGS) -I $(XEN_LIBXC) -L$(XEN_LIBXC) -lxenctrl -DXENO -o $@ $<
 
 cpuperf-perfcntr: cpuperf.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -DPERFCNTR -o $@ $<

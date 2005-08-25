@@ -225,14 +225,10 @@ static void do_info_history (void)
     }
 }
 
+extern void destroy_vmx_domain(void);
 static void do_quit(void)
 {
-    extern int domid;
-    extern FILE* logfile;
-    char destroy_cmd[20];
-    sprintf(destroy_cmd, "xm destroy %d", domid);
-    if (system(destroy_cmd) == -1)
-        fprintf(logfile, "%s failed.!\n", destroy_cmd);
+    destroy_vmx_domain();
     exit(0);
 }
 

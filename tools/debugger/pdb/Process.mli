@@ -26,7 +26,7 @@ val attach_debugger : context_t -> Xen_domain.context_t -> unit
 val detach_debugger : context_t -> unit
 val pause : context_t -> unit
 
-
+val read_register : context_t -> int -> unit
 val read_registers : context_t -> unit
 val write_register : context_t -> register -> int32 -> unit
 val read_memory : context_t -> int32 -> int -> unit
@@ -37,3 +37,5 @@ val step : context_t -> unit
 
 val insert_memory_breakpoint : context_t -> int32 -> int -> unit
 val remove_memory_breakpoint : context_t -> int32 -> int -> unit
+val insert_watchpoint : context_t -> int -> int32 -> int -> unit
+val remove_watchpoint : context_t -> int -> int32 -> int -> unit

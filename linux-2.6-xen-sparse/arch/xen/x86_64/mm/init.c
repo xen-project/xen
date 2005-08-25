@@ -40,12 +40,14 @@
 #include <asm/proto.h>
 #include <asm/smp.h>
 
-#ifndef Dprintk
-#define Dprintk(x...)
+extern unsigned long *contiguous_bitmap;
+
+#if defined(CONFIG_SWIOTLB)
+extern void swiotlb_init(void);
 #endif
 
-#ifdef CONFIG_GART_IOMMU
-extern int swiotlb;
+#ifndef Dprintk
+#define Dprintk(x...)
 #endif
 
 extern char _stext[];
@@ -280,7 +282,7 @@ static void set_pte_phys(unsigned long vaddr,
 	if (!pte_none(*pte) &&
 	    pte_val(*pte) != (pte_val(new_pte) & __supported_pte_mask))
 		pte_ERROR(*pte);
-        xen_l1_entry_update(pte, new_pte);
+        set_pte(pte, new_pte);
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -439,6 +441,31 @@ static inline void __set_pte(pte_t *dst, pte_t val)
 	*dst = val;
 }
 
+static inline int make_readonly(unsigned long paddr)
+{
+    int readonly = 0;
+
+    /* Make new page tables read-only. */
+    if ((paddr < ((table_start << PAGE_SHIFT) + tables_space)) &&
+        (paddr >= (table_start << PAGE_SHIFT)))
+        readonly = 1;
+
+    /* Make old page tables read-only. */
+    if ((paddr < ((xen_start_info.pt_base - __START_KERNEL_map) +
+                  (xen_start_info.nr_pt_frames << PAGE_SHIFT))) &&
+        (paddr >= (xen_start_info.pt_base - __START_KERNEL_map)))
+        readonly = 1;
+
+    /*
+     * No need for writable mapping of kernel image. This also ensures that
+     * page and descriptor tables embedded inside don't have writable mappings.
+     */
+    if ((paddr >= __pa_symbol(&_text)) && (paddr < __pa_symbol(&_end)))
+        readonly = 1;
+
+    return readonly;
+}
+
 void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
 { 
         long i, j, k; 
@@ -475,9 +502,7 @@ void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
                         pte = alloc_low_page(&pte_phys);
                         pte_save = pte;
                         for (k = 0; k < PTRS_PER_PTE; pte++, k++, paddr += PTE_SIZE) {
-                                if (paddr < (table_start << PAGE_SHIFT) 
-                                    + tables_space)
-                                {
+                                if (make_readonly(paddr)) {
                                         __set_pte(pte, 
                                                 __pte(paddr | (_KERNPG_TABLE & ~_PAGE_RW)));
                                         continue;
@@ -511,75 +536,106 @@ static void __init find_early_table_space(unsigned long end)
 	    		  round_up(ptes * 8, PAGE_SIZE); 
 }
 
+void __init xen_init_pt(void)
+{
+	unsigned long addr, *page;
+	int i;
+
+	for (i = 0; i < NR_CPUS; i++)
+		per_cpu(cur_pgd, i) = init_mm.pgd;
+
+	memset((void *)init_level4_pgt,   0, PAGE_SIZE);
+	memset((void *)level3_kernel_pgt, 0, PAGE_SIZE);
+	memset((void *)level2_kernel_pgt, 0, PAGE_SIZE);
+
+	/* Find the initial pte page that was built for us. */
+	page = (unsigned long *)xen_start_info.pt_base;
+	addr = page[pgd_index(__START_KERNEL_map)];
+	addr_to_page(addr, page);
+	addr = page[pud_index(__START_KERNEL_map)];
+	addr_to_page(addr, page);
+
+	/* Construct mapping of initial pte page in our own directories. */
+	init_level4_pgt[pgd_index(__START_KERNEL_map)] = 
+		mk_kernel_pgd(__pa_symbol(level3_kernel_pgt));
+	level3_kernel_pgt[pud_index(__START_KERNEL_map)] = 
+		__pud(__pa_symbol(level2_kernel_pgt) |
+		      _KERNPG_TABLE | _PAGE_USER);
+        memcpy((void *)level2_kernel_pgt, page, PAGE_SIZE);
+
+	make_page_readonly(init_level4_pgt);
+	make_page_readonly(init_level4_user_pgt);
+	make_page_readonly(level3_kernel_pgt);
+	make_page_readonly(level3_user_pgt);
+	make_page_readonly(level2_kernel_pgt);
+
+	xen_pgd_pin(__pa_symbol(init_level4_pgt));
+	xen_pgd_pin(__pa_symbol(init_level4_user_pgt));
+	xen_pud_pin(__pa_symbol(level3_kernel_pgt));
+	xen_pud_pin(__pa_symbol(level3_user_pgt));
+	xen_pmd_pin(__pa_symbol(level2_kernel_pgt));
+
+	set_pgd((pgd_t *)(init_level4_user_pgt + 511), 
+		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
+}
 
 /*
  * Extend kernel mapping to access pages for page tables.  The initial
  * mapping done by Xen is minimal (e.g. 8MB) and we need to extend the
  * mapping for early initialization.
  */
-
-#define MIN_INIT_SIZE	0x800000
 static unsigned long current_size, extended_size;
 
 void __init extend_init_mapping(void) 
 {
 	unsigned long va = __START_KERNEL_map;
-	unsigned long addr, *pte_page;
-
-	unsigned long phys;
+	unsigned long phys, addr, *pte_page;
         pmd_t *pmd;
 	pte_t *pte, new_pte;
 	unsigned long *page = (unsigned long *) init_level4_pgt;
 	int i;
 
-	addr = (unsigned long) page[pgd_index(va)];
+	addr = page[pgd_index(va)];
 	addr_to_page(addr, page);
-
 	addr = page[pud_index(va)];
 	addr_to_page(addr, page);
 
 	for (;;) {
-		pmd = (pmd_t *) &page[pmd_index(va)];
-		if (pmd_present(*pmd)) {
-			/*
-			 * if pmd is valid, check pte.
-			 */
-			addr = page[pmd_index(va)];
-			addr_to_page(addr, pte_page);
-			
-			for (i = 0; i < PTRS_PER_PTE; i++) {
-				pte = (pte_t *) &pte_page[pte_index(va)];
-				
-				if (pte_present(*pte)) {
-					va += PAGE_SIZE;
-					current_size += PAGE_SIZE;
-				} else
-				    break;
-			}
-
-		} else
-		    break;
+		pmd = (pmd_t *)&page[pmd_index(va)];
+		if (!pmd_present(*pmd))
+			break;
+		addr = page[pmd_index(va)];
+		addr_to_page(addr, pte_page);
+		for (i = 0; i < PTRS_PER_PTE; i++) {
+			pte = (pte_t *) &pte_page[pte_index(va)];
+			if (!pte_present(*pte))
+				break;
+			va += PAGE_SIZE;
+			current_size += PAGE_SIZE;
+		}
 	}
 
-	for (; va < __START_KERNEL_map + current_size + tables_space; ) {
+	while (va < __START_KERNEL_map + current_size + tables_space) {
 		pmd = (pmd_t *) &page[pmd_index(va)];
-
-		if (pmd_none(*pmd)) {
-			pte_page = (unsigned long *) alloc_static_page(&phys);
-			make_page_readonly(pte_page);
-			xen_pte_pin(phys);
-			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
-
-			for (i = 0; i < PTRS_PER_PTE; i++, va += PAGE_SIZE) {
-				new_pte = pfn_pte((va -  __START_KERNEL_map) >> PAGE_SHIFT, 
-						  __pgprot(_KERNPG_TABLE | _PAGE_USER));
-
-				pte = (pte_t *) &pte_page[pte_index(va)];
-				xen_l1_entry_update(pte, new_pte);
-				extended_size += PAGE_SIZE;
-			}
-		} 
+		if (!pmd_none(*pmd))
+			continue;
+		pte_page = (unsigned long *) alloc_static_page(&phys);
+		make_page_readonly(pte_page);
+		xen_pte_pin(phys);
+		set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
+		for (i = 0; i < PTRS_PER_PTE; i++, va += PAGE_SIZE) {
+			new_pte = pfn_pte(
+				(va - __START_KERNEL_map) >> PAGE_SHIFT, 
+				__pgprot(_KERNPG_TABLE | _PAGE_USER));
+			pte = (pte_t *)&pte_page[pte_index(va)];
+			xen_l1_entry_update(pte, new_pte);
+			extended_size += PAGE_SIZE;
+		}
 	}
+
+	/* Kill mapping of low 1MB. */
+	for (va = __START_KERNEL_map; va < (unsigned long)&_text; va += PAGE_SIZE)
+		HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
 }
 
 
@@ -619,10 +675,6 @@ void __init init_memory_mapping(unsigned long start, unsigned long end)
 	       table_end<<PAGE_SHIFT);
 
         start_pfn = ((current_size + extended_size) >> PAGE_SHIFT);
-
-        /*
-         * TBD: Need to calculate at runtime
-         */
 
 	__flush_tlb_all();
         init_mapping_done = 1;
@@ -670,7 +722,7 @@ void __init paging_init(void)
 				set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 			else
 				__set_fixmap(FIX_ISAMAP_BEGIN - i,
-					     virt_to_machine(empty_zero_page),
+					     virt_to_mfn(empty_zero_page) << PAGE_SHIFT,
 					     PAGE_KERNEL_RO);
 	}
 #endif
@@ -720,8 +772,6 @@ static inline int page_is_ram (unsigned long pagenr)
         return 1;
 }
 
-extern int swiotlb_force;
-
 static struct kcore_list kcore_mem, kcore_vmalloc, kcore_kernel, kcore_modules,
 			 kcore_vsyscall;
 
@@ -730,14 +780,13 @@ void __init mem_init(void)
 	int codesize, reservedpages, datasize, initsize;
 	int tmp;
 
-#ifdef CONFIG_SWIOTLB
-	if (swiotlb_force)
-		swiotlb = 1;
-	if (!iommu_aperture &&
-	    (end_pfn >= 0xffffffff>>PAGE_SHIFT || force_iommu))
-	       swiotlb = 1;
-	if (swiotlb)
-		swiotlb_init();	
+	contiguous_bitmap = alloc_bootmem_low_pages(
+		(end_pfn + 2*BITS_PER_LONG) >> 3);
+	BUG_ON(!contiguous_bitmap);
+	memset(contiguous_bitmap, 0, (end_pfn + 2*BITS_PER_LONG) >> 3);
+
+#if defined(CONFIG_SWIOTLB)
+	swiotlb_init();	
 #endif
 
 	/* How many end-of-memory variables you have, grandma! */

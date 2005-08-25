@@ -1,5 +1,20 @@
-# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
 # Copyright (C) 2005 Christian Limpach <Christian.Limpach@cl.cam.ac.uk>
+#============================================================================
 
 """Handler for domain operations.
  Nothing here is persistent (across reboots).
@@ -305,8 +320,7 @@ class XendDomain:
         @param vmconfig: vm configuration
         """
         config = sxp.child_value(vmconfig, 'config')
-        uuid = sxp.child_value(vmconfig, 'uuid')
-        dominfo = XendDomainInfo.restore(self.dbmap, config, uuid=uuid)
+        dominfo = XendDomainInfo.restore(self.dbmap, config)
         return dominfo
 
     def domain_restore(self, src, progress=False):
@@ -386,7 +400,7 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
     
-    def domain_shutdown(self, id, reason='poweroff', key=0):
+    def domain_shutdown(self, id, reason='poweroff'):
         """Shutdown domain (nicely).
          - poweroff: restart according to exit code and restart mode
          - reboot:   restart on exit
@@ -402,9 +416,16 @@ class XendDomain:
         eserver.inject('xend.domain.shutdown', [dominfo.name, dominfo.id, reason])
         if reason == 'halt':
             reason = 'poweroff'
-        val = dominfo.shutdown(reason, key=key)
-        if not reason in ['suspend', 'sysrq']:
+        val = dominfo.shutdown(reason)
+        if not reason in ['suspend']:
             self.domain_shutdowns()
+        return val
+
+    def domain_sysrq(self, id, key):
+        """Send a SysRq to a domain
+        """
+        dominfo = self.domain_lookup(id)
+        val = dominfo.send_sysrq(key)
         return val
 
     def domain_shutdowns(self):

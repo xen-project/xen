@@ -62,6 +62,8 @@
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
 
+#include <asm-xen/evtchn.h>
+
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
 
@@ -129,15 +131,7 @@ static void map_cpu_to_logical_apicid(void);
  */
 void __init smp_alloc_memory(void)
 {
-#if 1
-	int cpu;
-
-	for (cpu = 1; cpu < NR_CPUS; cpu++) {
-		cpu_gdt_descr[cpu].address = (unsigned long)
-			alloc_bootmem_low_pages(PAGE_SIZE);
-		/* XXX free unused pages later */
-	}
-#else
+#if 0
 	trampoline_base = (void *) alloc_bootmem_low_pages(PAGE_SIZE);
 	/*
 	 * Has to be in very low memory so we can execute
@@ -859,8 +853,8 @@ static int __init do_boot_cpu(int apicid)
 	atomic_set(&init_deasserted, 0);
 
 #if 1
-	if (cpu_gdt_descr[0].size > PAGE_SIZE)
-		BUG();
+	cpu_gdt_descr[cpu].address = __get_free_page(GFP_KERNEL);
+	BUG_ON(cpu_gdt_descr[0].size > PAGE_SIZE);
 	cpu_gdt_descr[cpu].size = cpu_gdt_descr[0].size;
 	printk("GDT: copying %d bytes from %lx to %lx\n",
 		cpu_gdt_descr[0].size, cpu_gdt_descr[0].address,
@@ -878,7 +872,8 @@ static int __init do_boot_cpu(int apicid)
 	ctxt.user_regs.cs = __KERNEL_CS;
 	ctxt.user_regs.eip = start_eip;
 	ctxt.user_regs.esp = idle->thread.esp;
-	ctxt.user_regs.eflags = (1<<9) | (1<<2) | (idle->thread.io_pl<<12);
+#define X86_EFLAGS_IOPL_RING1 0x1000
+	ctxt.user_regs.eflags = X86_EFLAGS_IF | X86_EFLAGS_IOPL_RING1;
 
 	/* FPU is set up to default initial state. */
 	memset(&ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
@@ -901,7 +896,7 @@ static int __init do_boot_cpu(int apicid)
 		for (va = cpu_gdt_descr[cpu].address, f = 0;
 		     va < cpu_gdt_descr[cpu].address + cpu_gdt_descr[cpu].size;
 		     va += PAGE_SIZE, f++) {
-			ctxt.gdt_frames[f] = virt_to_machine(va) >> PAGE_SHIFT;
+			ctxt.gdt_frames[f] = virt_to_mfn(va);
 			make_page_readonly((void *)va);
 		}
 		ctxt.gdt_ents = cpu_gdt_descr[cpu].size / 8;
@@ -917,10 +912,11 @@ static int __init do_boot_cpu(int apicid)
 	ctxt.failsafe_callback_cs  = __KERNEL_CS;
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 
-	ctxt.ctrlreg[3] = (unsigned long)virt_to_machine(swapper_pg_dir);
+	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 
 	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
-	printk("boot error: %ld\n", boot_error);
+	if (boot_error)
+		printk("boot error: %ld\n", boot_error);
 
 	if (!boot_error) {
 		/*
@@ -1321,14 +1317,127 @@ void __devinit smp_prepare_boot_cpu(void)
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
-#include <asm-xen/ctrl_if.h>
-
+#include <asm-xen/xenbus.h>
 /* hotplug down/up funtion pointer and target vcpu */
 struct vcpu_hotplug_handler_t {
-	void (*fn)(int vcpu);
+	void (*fn) (int vcpu);
 	u32 vcpu;
 };
 static struct vcpu_hotplug_handler_t vcpu_hotplug_handler;
+
+static int vcpu_hotplug_cpu_process(void *unused)
+{
+	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
+
+	if (handler->fn) {
+		(*(handler->fn)) (handler->vcpu);
+		handler->fn = NULL;
+	}
+	return 0;
+}
+
+static void __vcpu_hotplug_handler(void *unused)
+{
+	int err;
+
+	err = kernel_thread(vcpu_hotplug_cpu_process,
+			    NULL, CLONE_FS | CLONE_FILES);
+	if (err < 0)
+		printk(KERN_ALERT "Error creating hotplug_cpu process!\n");
+}
+
+static void handle_vcpu_hotplug_event(struct xenbus_watch *, const char *);
+static struct notifier_block xsn_cpu;
+
+/* xenbus watch struct */
+static struct xenbus_watch cpu_watch = {
+	.node = "cpu",
+	.callback = handle_vcpu_hotplug_event
+};
+
+/* NB: Assumes xenbus_lock is held! */
+static int setup_cpu_watcher(struct notifier_block *notifier,
+			      unsigned long event, void *data)
+{
+	int err = 0;
+
+	BUG_ON(down_trylock(&xenbus_lock) == 0);
+	err = register_xenbus_watch(&cpu_watch);
+
+	if (err) {
+		printk("Failed to register watch on /cpu\n");
+	}
+
+	return NOTIFY_DONE;
+}
+
+static void handle_vcpu_hotplug_event(struct xenbus_watch *watch, const char *node)
+{
+	static DECLARE_WORK(vcpu_hotplug_work, __vcpu_hotplug_handler, NULL);
+	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
+	ssize_t ret;
+	int err, cpu;
+	char state[8];
+	char dir[32];
+	char *cpustr;
+
+	/* get a pointer to start of cpu string */
+	if ((cpustr = strstr(node, "cpu/")) != NULL) {
+
+		/* find which cpu state changed, note vcpu for handler */
+		sscanf(cpustr, "cpu/%d", &cpu);
+		handler->vcpu = cpu;
+
+		/* calc the dir for xenbus read */
+		sprintf(dir, "cpu/%d", cpu);
+
+		/* make sure watch that was triggered is changes to the correct key */
+		if ((strcmp(node + strlen(dir), "/availability")) != 0)
+			return;
+
+		/* get the state value */
+		xenbus_transaction_start("cpu");
+		err = xenbus_scanf(dir, "availability", "%s", state);
+		xenbus_transaction_end(0);
+
+		if (err != 1) {
+			printk(KERN_ERR
+			       "XENBUS: Unable to read cpu state\n");
+			return;
+		}
+
+		/* if we detect a state change, take action */
+		if (strcmp(state, "online") == 0) {
+			/* offline -> online */
+			if (!cpu_isset(cpu, cpu_online_map)) {
+				handler->fn = (void *)&cpu_up;
+				ret = schedule_work(&vcpu_hotplug_work);
+			} 
+		} else if (strcmp(state, "offline") == 0) {
+			/* online -> offline */
+			if (cpu_isset(cpu, cpu_online_map)) {
+				handler->fn = (void *)&cpu_down;
+				ret = schedule_work(&vcpu_hotplug_work);
+			} 
+		} else {
+			printk(KERN_ERR
+			       "XENBUS: unknown state(%s) on node(%s)\n", state,
+			       node);
+		}
+	}
+	return;
+}
+
+static int __init setup_vcpu_hotplug_event(void)
+{
+	xsn_cpu.notifier_call = setup_cpu_watcher;
+
+	register_xenstore_notifier(&xsn_cpu);
+
+	return 0;
+}
+
+subsys_initcall(setup_vcpu_hotplug_event);
 
 /* must be called with the cpucontrol mutex held */
 static int __devinit cpu_enable(unsigned int cpu)
@@ -1398,77 +1507,6 @@ void __cpu_die(unsigned int cpu)
  	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
 }
 
-static int vcpu_hotplug_cpu_process(void *unused)
-{
-	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
-
-	if (handler->fn) {
-		(*(handler->fn))(handler->vcpu);
-		handler->fn = NULL;
-	}
-	return 0;
-}
-
-static void __vcpu_hotplug_handler(void *unused)
-{
-	int err;
-
-	err = kernel_thread(vcpu_hotplug_cpu_process, 
-			    NULL, CLONE_FS | CLONE_FILES);
-	if (err < 0)
-		printk(KERN_ALERT "Error creating hotplug_cpu process!\n");
-
-}
-
-static void vcpu_hotplug_event_handler(ctrl_msg_t *msg, unsigned long id)
-{
-	static DECLARE_WORK(vcpu_hotplug_work, __vcpu_hotplug_handler, NULL);
-	vcpu_hotplug_t *req = (vcpu_hotplug_t *)&msg->msg[0];
-	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
-	ssize_t ret;
-
-	if (msg->length != sizeof(vcpu_hotplug_t))
-		goto parse_error;
-
-	/* grab target vcpu from msg */
-	handler->vcpu = req->vcpu;
-
-	/* determine which function to call based on msg subtype */
-	switch (msg->subtype) {
-        case CMSG_VCPU_HOTPLUG_OFF:
-		handler->fn = (void *)&cpu_down;
-		ret = schedule_work(&vcpu_hotplug_work);
-		req->status = (u32) ret;
-		break;
-        case CMSG_VCPU_HOTPLUG_ON:
-		handler->fn = (void *)&cpu_up;
-		ret = schedule_work(&vcpu_hotplug_work);
-		req->status = (u32) ret;
-		break;
-        default:
-		goto parse_error;
-	}
-
-	ctrl_if_send_response(msg);
-	return;
- parse_error:
-	msg->length = 0;
-	ctrl_if_send_response(msg);
-}
-
-static int __init setup_vcpu_hotplug_event(void)
-{
-	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
-
-	handler->fn = NULL;
-	ctrl_if_register_receiver(CMSG_VCPU_HOTPLUG,
-				  vcpu_hotplug_event_handler, 0);
-
-	return 0;
-}
-
-__initcall(setup_vcpu_hotplug_event);
-
 #else /* ... !CONFIG_HOTPLUG_CPU */
 int __cpu_disable(void)
 {
@@ -1529,20 +1567,66 @@ void __init smp_cpus_done(unsigned int max_cpus)
 extern irqreturn_t smp_reschedule_interrupt(int, void *, struct pt_regs *);
 extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
 
-void __init smp_intr_init(void)
+void smp_intr_init(void)
 {
 	int cpu = smp_processor_id();
 
 	per_cpu(resched_irq, cpu) =
-		bind_ipi_on_cpu_to_irq(RESCHEDULE_VECTOR);
+		bind_ipi_to_irq(RESCHEDULE_VECTOR);
 	sprintf(resched_name[cpu], "resched%d", cpu);
 	BUG_ON(request_irq(per_cpu(resched_irq, cpu), smp_reschedule_interrupt,
 	                   SA_INTERRUPT, resched_name[cpu], NULL));
 
 	per_cpu(callfunc_irq, cpu) =
-		bind_ipi_on_cpu_to_irq(CALL_FUNCTION_VECTOR);
+		bind_ipi_to_irq(CALL_FUNCTION_VECTOR);
 	sprintf(callfunc_name[cpu], "callfunc%d", cpu);
 	BUG_ON(request_irq(per_cpu(callfunc_irq, cpu),
 	                   smp_call_function_interrupt,
 	                   SA_INTERRUPT, callfunc_name[cpu], NULL));
+}
+
+static void smp_intr_exit(void)
+{
+	int cpu = smp_processor_id();
+
+	free_irq(per_cpu(resched_irq, cpu), NULL);
+	unbind_ipi_from_irq(RESCHEDULE_VECTOR);
+
+	free_irq(per_cpu(callfunc_irq, cpu), NULL);
+	unbind_ipi_from_irq(CALL_FUNCTION_VECTOR);
+}
+
+extern void local_setup_timer_irq(void);
+extern void local_teardown_timer_irq(void);
+
+void smp_suspend(void)
+{
+	/* XXX todo: take down time and ipi's on all cpus */
+	local_teardown_timer_irq();
+	smp_intr_exit();
+}
+
+void smp_resume(void)
+{
+	/* XXX todo: restore time and ipi's on all cpus */
+	smp_intr_init();
+	local_setup_timer_irq();
+}
+
+DECLARE_PER_CPU(int, timer_irq);
+
+void _restore_vcpu(void)
+{
+	int cpu = smp_processor_id();
+	extern atomic_t vcpus_rebooting;
+
+	/* We are the first thing the vcpu runs when it comes back,
+	   and we are supposed to restore the IPIs and timer
+	   interrupts etc.  When we return, the vcpu's idle loop will
+	   start up again. */
+	_bind_virq_to_irq(VIRQ_TIMER, cpu, per_cpu(timer_irq, cpu));
+	_bind_virq_to_irq(VIRQ_DEBUG, cpu, per_cpu(ldebug_irq, cpu));
+	_bind_ipi_to_irq(RESCHEDULE_VECTOR, cpu, per_cpu(resched_irq, cpu) );
+	_bind_ipi_to_irq(CALL_FUNCTION_VECTOR, cpu, per_cpu(callfunc_irq, cpu) );
+	atomic_dec(&vcpus_rebooting);
 }

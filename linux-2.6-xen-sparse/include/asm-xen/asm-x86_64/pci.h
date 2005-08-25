@@ -79,7 +79,9 @@ extern int iommu_sac_force;
 #else
 /* No IOMMU */
 
-#define PCI_DMA_BUS_IS_PHYS	1
+/* On Xen we use SWIOTLB instead of blk-specific bounce buffers. */
+#define PCI_DMA_BUS_IS_PHYS	(0)
+
 #define pci_dac_dma_supported(pci_dev, mask)    1
 
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)

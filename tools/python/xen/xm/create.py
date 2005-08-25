@@ -1,5 +1,20 @@
-# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
 # Copyright (C) 2005 Nguyen Anh Quynh <aquynh@gmail.com>
+#============================================================================
 
 """Domain creation.
 """
@@ -7,6 +22,8 @@ import random
 import string
 import sys
 import socket
+import commands
+import time
 
 import xen.lowlevel.xc
 
@@ -16,8 +33,6 @@ from xen.xend.XendClient import server, XendError
 from xen.xend.XendBootloader import bootloader
 from xen.xend import XendRoot; xroot = XendRoot.instance()
 from xen.util import blkif
-
-from xen.util import console_client
 
 from xen.xm.opts import *
 
@@ -144,10 +159,6 @@ gopts.var('cpu_weight', val='WEIGHT',
           fn=set_float, default=None,
           use="""Set the new domain's cpu weight.
           WEIGHT is a float that controls the domain's share of the cpu.""")
-
-gopts.var('console', val='PORT',
-          fn=set_int, default=None,
-          use="Console port to use. Default is 9600 + domain id.")
 
 gopts.var('restart', val='onreboot|always|never',
           fn=set_value, default=None,
@@ -370,7 +381,6 @@ def randomMAC():
 
     @return: MAC address string
     """
-    random.seed()
     mac = [ 0xaa, 0x00, 0x00,
             random.randint(0x00, 0x7f),
             random.randint(0x00, 0xff),
@@ -471,8 +481,6 @@ def make_config(opts, vals):
         config.append(['backend', ['netif']])
     if vals.restart:
         config.append(['restart', vals.restart])
-    if vals.console:
-        config.append(['console', vals.console])
 
     if vals.bootloader:
         run_bootloader(opts, config, vals)
@@ -584,9 +592,14 @@ def choose_vnc_display():
         return d
     return None
 
+vncpid = None
+
 def spawn_vnc(display):
-    os.system("vncviewer -log *:stdout:0 -listen %d &" %
-              (VNC_BASE_PORT + display))
+    vncargs = (["vncviewer" + "-log", "*:stdout:0",
+            "-listen", "%d" % (VNC_BASE_PORT + display) ])
+    global vncpid    
+    vncpid = os.spawnvp(os.P_NOWAIT, "vncviewer", vncargs)
+
     return VNC_BASE_PORT + display
     
 def preprocess_vnc(opts, vals):
@@ -620,8 +633,8 @@ def make_domain(opts, config):
 
     @param opts:   options
     @param config: configuration
-    @return: domain id, console port
-    @rtype:  (int, int)
+    @return: domain id
+    @rtype:  int
     """
 
     try:
@@ -631,22 +644,19 @@ def make_domain(opts, config):
         else:
             dominfo = server.xend_domain_create(config)
     except XendError, ex:
+        import signal
+        if vncpid:
+            os.kill(vncpid, signal.SIGKILL)
         opts.err(str(ex))
 
     dom = sxp.child_value(dominfo, 'name')
-    console_info = sxp.child(dominfo, 'console')
-    if console_info:
-        console_port = int(sxp.child_value(console_info, 'console_port'))
-    else:
-        console_port = None
 
     if not opts.vals.paused:
         if server.xend_domain_unpause(dom) < 0:
             server.xend_domain_destroy(dom)
             opts.err("Failed to unpause domain %s" % dom)
-    opts.info("Started domain %s, console on port %d"
-              % (dom, console_port))
-    return (dom, console_port)
+    opts.info("Started domain %s" % (dom))
+    return int(sxp.child_value(dominfo, 'id'))
 
 def get_dom0_alloc():
     """Return current allocation memory of dom0 (in MB). Return 0 on error"""
@@ -665,20 +675,38 @@ def get_dom0_alloc():
     return 0
 
 def balloon_out(dom0_min_mem, opts):
-    """Balloon out to get memory for domU, if necessarily"""
+    """Balloon out memory from dom0 if necessary"""
     SLACK = 4
+    timeout = 20 # 2s
+    ret = 0
 
     xc = xen.lowlevel.xc.new()
     pinfo = xc.physinfo()
-    free_mem = pinfo['free_pages']/256
-    if free_mem < opts.vals.memory + SLACK:
-        need_mem = opts.vals.memory + SLACK - free_mem
-        cur_alloc = get_dom0_alloc()
-        if cur_alloc - need_mem >= dom0_min_mem:
-            server.xend_domain_mem_target_set(0, cur_alloc - need_mem)
+    free_mem = pinfo['free_pages'] / 256
+    domU_need_mem = opts.vals.memory + SLACK 
+
+    dom0_cur_alloc = get_dom0_alloc()
+    dom0_new_alloc = dom0_cur_alloc - (domU_need_mem - free_mem)
+
+    if free_mem < domU_need_mem and dom0_new_alloc < dom0_min_mem:
+        ret = 1
+    if free_mem < domU_need_mem and ret == 0:
+
+        server.xend_domain_mem_target_set(0, dom0_new_alloc)
+
+        while dom0_cur_alloc > dom0_new_alloc and timeout > 0:
+            time.sleep(0.1) # sleep 100ms
+            dom0_cur_alloc = get_dom0_alloc()
+            timeout -= 1
+        
+        if dom0_cur_alloc > dom0_new_alloc:
+            ret = 1
+    
     del xc
+    return ret
 
 def main(argv):
+    random.seed()
     opts = gopts
     args = opts.parse(argv)
     if opts.vals.help:
@@ -707,12 +735,14 @@ def main(argv):
     else:
         dom0_min_mem = xroot.get_dom0_min_mem()
         if dom0_min_mem != 0:
-            balloon_out(dom0_min_mem, opts)
+            if balloon_out(dom0_min_mem, opts):
+                print >>sys.stderr, "error: cannot allocate enough memory for domain"
+                sys.exit(1)
 
-        (dom, console) = make_domain(opts, config)
+        dom = make_domain(opts, config)
         if opts.vals.console_autoconnect:
-            path = "/var/lib/xend/console-%s" % console
-            console_client.connect('localhost', console, path=path)
+            cmd = "/usr/libexec/xen/xenconsole %d" % dom
+            os.execvp('/usr/libexec/xen/xenconsole', cmd.split())
         
 if __name__ == '__main__':
     main(sys.argv)

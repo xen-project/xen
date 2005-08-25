@@ -32,6 +32,7 @@
 #define __ASM_EVTCHN_H__
 
 #include <linux/config.h>
+#include <linux/interrupt.h>
 #include <asm-xen/hypervisor.h>
 #include <asm/ptrace.h>
 #include <asm-xen/synch_bitops.h>
@@ -41,6 +42,34 @@
 /*
  * LOW-LEVEL DEFINITIONS
  */
+
+/* Dynamically bind a VIRQ source to Linux IRQ space. */
+extern int  bind_virq_to_irq(int virq);
+extern void unbind_virq_from_irq(int virq);
+
+/* Dynamically bind an IPI source to Linux IRQ space. */
+extern int  bind_ipi_to_irq(int ipi);
+extern void unbind_ipi_from_irq(int ipi);
+
+/* Dynamically bind an event-channel port to Linux IRQ space. */
+extern int  bind_evtchn_to_irq(unsigned int evtchn);
+extern void unbind_evtchn_from_irq(unsigned int evtchn);
+
+/*
+ * Dynamically bind an event-channel port to an IRQ-like callback handler.
+ * On some platforms this may not be implemented via the Linux IRQ subsystem.
+ * You *cannot* trust the irq argument passed to the callback handler.
+ */
+extern int  bind_evtchn_to_irqhandler(
+    unsigned int evtchn,
+    irqreturn_t (*handler)(int, void *, struct pt_regs *),
+    unsigned long irqflags,
+    const char *devname,
+    void *dev_id);
+extern void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id);
+
+extern void irq_suspend(void);
+extern void irq_resume(void);
 
 /* Entry point for notifications into Linux subsystems. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs);

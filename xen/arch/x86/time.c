@@ -43,7 +43,8 @@ unsigned long hpet_address;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 int timer_ack = 0;
 unsigned long volatile jiffies;
-static unsigned long wc_sec, wc_usec; /* UTC time at last 'time update'. */
+static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
+static spinlock_t wc_lock = SPIN_LOCK_UNLOCKED;
 
 struct time_scale {
     int shift;
@@ -67,13 +68,6 @@ static struct time_scale platform_timer_scale;
 static spinlock_t platform_timer_lock = SPIN_LOCK_UNLOCKED;
 static u64 (*read_platform_count)(void);
 
-static inline u32 down_shift(u64 time, int shift)
-{
-    if ( shift < 0 )
-        return (u32)(time >> -shift);
-    return (u32)((u32)time << shift);
-}
-
 /*
  * 32-bit division of integer dividend and integer divisor yielding
  * 32-bit fractional quotient.
@@ -83,7 +77,7 @@ static inline u32 div_frac(u32 dividend, u32 divisor)
     u32 quotient, remainder;
     ASSERT(dividend < divisor);
     __asm__ ( 
-        "div %4"
+        "divl %4"
         : "=a" (quotient), "=d" (remainder)
         : "0" (0), "1" (dividend), "r" (divisor) );
     return quotient;
@@ -101,6 +95,42 @@ static inline u32 mul_frac(u32 multiplicand, u32 multiplier)
         : "=a" (product_frac), "=d" (product_int)
         : "0" (multiplicand), "r" (multiplier) );
     return product_int;
+}
+
+/*
+ * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
+ * yielding a 64-bit result.
+ */
+static inline u64 scale_delta(u64 delta, struct time_scale *scale)
+{
+    u64 product;
+#ifdef CONFIG_X86_32
+    u32 tmp1, tmp2;
+#endif
+
+    if ( scale->shift < 0 )
+        delta >>= -scale->shift;
+    else
+        delta <<= scale->shift;
+
+#ifdef CONFIG_X86_32
+    __asm__ (
+        "mul  %5       ; "
+        "mov  %4,%%eax ; "
+        "mov  %%edx,%4 ; "
+        "mul  %5       ; "
+        "add  %4,%%eax ; "
+        "xor  %5,%5    ; "
+        "adc  %5,%%edx ; "
+        : "=A" (product), "=r" (tmp1), "=r" (tmp2)
+        : "a" ((u32)delta), "1" ((u32)(delta >> 32)), "2" (scale->mul_frac) );
+#else
+    __asm__ (
+        "mul %%rdx ; shrd $32,%%rdx,%%rax"
+        : "=a" (product) : "0" (delta), "d" ((u64)scale->mul_frac) );
+#endif
+
+    return product;
 }
 
 void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
@@ -486,11 +516,9 @@ static int init_cyclone(void)
 
 static s_time_t __read_platform_stime(u64 platform_time)
 {
-    u64 diff64 = platform_time - platform_timer_stamp;
-    u32 diff   = down_shift(diff64, platform_timer_scale.shift);
+    u64 diff = platform_time - platform_timer_stamp;
     ASSERT(spin_is_locked(&platform_timer_lock));
-    return (stime_platform_stamp + 
-            (u64)mul_frac(diff, platform_timer_scale.mul_frac));
+    return (stime_platform_stamp + scale_delta(diff, &platform_timer_scale));
 }
 
 static s_time_t read_platform_stime(void)
@@ -619,15 +647,27 @@ static unsigned long get_cmos_time(void)
 s_time_t get_s_time(void)
 {
     struct cpu_time *t = &cpu_time[smp_processor_id()];
-    u64 tsc;
-    u32 delta;
+    u64 tsc, delta;
     s_time_t now;
 
     rdtscll(tsc);
-    delta = down_shift(tsc - t->local_tsc_stamp, t->tsc_scale.shift);
-    now = t->stime_local_stamp + (u64)mul_frac(delta, t->tsc_scale.mul_frac);
+    delta = tsc - t->local_tsc_stamp;
+    now = t->stime_local_stamp + scale_delta(delta, &t->tsc_scale);
 
     return now;
+}
+
+static inline void version_update_begin(u32 *version)
+{
+    /* Explicitly OR with 1 just in case version number gets out of sync. */
+    *version = (*version + 1) | 1;
+    wmb();
+}
+
+static inline void version_update_end(u32 *version)
+{
+    wmb();
+    (*version)++;
 }
 
 static inline void __update_dom_time(struct vcpu *v)
@@ -635,20 +675,14 @@ static inline void __update_dom_time(struct vcpu *v)
     struct cpu_time       *t = &cpu_time[smp_processor_id()];
     struct vcpu_time_info *u = &v->domain->shared_info->vcpu_time[v->vcpu_id];
 
-    u->time_version1++;
-    wmb();
+    version_update_begin(&u->version);
 
     u->tsc_timestamp     = t->local_tsc_stamp;
     u->system_time       = t->stime_local_stamp;
     u->tsc_to_system_mul = t->tsc_scale.mul_frac;
     u->tsc_shift         = (s8)t->tsc_scale.shift;
 
-    wmb();
-    u->time_version2++;
-
-    /* Should only do this during do_settime(). */
-    v->domain->shared_info->wc_sec  = wc_sec;
-    v->domain->shared_info->wc_usec = wc_usec;
+    version_update_end(&u->version);
 }
 
 void update_dom_time(struct vcpu *v)
@@ -659,21 +693,43 @@ void update_dom_time(struct vcpu *v)
 }
 
 /* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
-void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
+void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
 {
-    u64 x, base_usecs;
-    u32 y;
+    u64 x;
+    u32 y, _wc_sec, _wc_nsec;
+    struct domain *d;
+    shared_info_t *s;
 
-    base_usecs = system_time_base;
-    do_div(base_usecs, 1000);
+    x = (secs * 1000000000ULL) + (u64)nsecs - system_time_base;
+    y = do_div(x, 1000000000);
 
-    x = (secs * 1000000ULL) + (u64)usecs + base_usecs;
-    y = do_div(x, 1000000);
+    wc_sec  = _wc_sec  = (u32)x;
+    wc_nsec = _wc_nsec = (u32)y;
 
-    wc_sec  = (unsigned long)x;
-    wc_usec = (unsigned long)y;
+    read_lock(&domlist_lock);
+    spin_lock(&wc_lock);
 
-    __update_dom_time(current);
+    for_each_domain ( d )
+    {
+        s = d->shared_info;
+        version_update_begin(&s->wc_version);
+        s->wc_sec  = _wc_sec;
+        s->wc_nsec = _wc_nsec;
+        version_update_end(&s->wc_version);
+    }
+
+    spin_unlock(&wc_lock);
+    read_unlock(&domlist_lock);
+}
+
+void init_domain_time(struct domain *d)
+{
+    spin_lock(&wc_lock);
+    version_update_begin(&d->shared_info->wc_version);
+    d->shared_info->wc_sec  = wc_sec;
+    d->shared_info->wc_nsec = wc_nsec;
+    version_update_end(&d->shared_info->wc_version);
+    spin_unlock(&wc_lock);
 }
 
 static void local_time_calibration(void *unused)

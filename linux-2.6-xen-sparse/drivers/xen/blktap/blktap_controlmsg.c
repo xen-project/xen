@@ -9,6 +9,7 @@
  */
  
 #include "blktap.h"
+#include <asm-xen/evtchn.h>
 
 static char *blkif_state_name[] = {
     [BLKIF_STATE_CLOSED]       = "closed",
@@ -16,16 +17,15 @@ static char *blkif_state_name[] = {
     [BLKIF_STATE_CONNECTED]    = "connected",
 };
 
-static char * blkif_status_name[] = {
+static char *blkif_status_name[] = {
     [BLKIF_INTERFACE_STATUS_CLOSED]       = "closed",
     [BLKIF_INTERFACE_STATUS_DISCONNECTED] = "disconnected",
     [BLKIF_INTERFACE_STATUS_CONNECTED]    = "connected",
     [BLKIF_INTERFACE_STATUS_CHANGED]      = "changed",
 };
 
-static unsigned blktap_be_irq;
-unsigned int    blktap_be_state = BLKIF_STATE_CLOSED;
-unsigned int    blktap_be_evtchn;
+unsigned int blktap_be_state = BLKIF_STATE_CLOSED;
+unsigned int blktap_be_evtchn;
 
 /*-----[ Control Messages to/from Frontend VMs ]--------------------------*/
 
@@ -49,13 +49,21 @@ static void __blkif_disconnect_complete(void *arg)
     blkif_t              *blkif = (blkif_t *)arg;
     ctrl_msg_t            cmsg;
     blkif_be_disconnect_t disc;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    struct gnttab_unmap_grant_ref op;
+#endif
 
     /*
      * These can't be done in blkif_disconnect() because at that point there
      * may be outstanding requests at the disc whose asynchronous responses
      * must still be notified to the remote driver.
      */
-    unbind_evtchn_from_irq(blkif->evtchn);
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    op.host_addr = blkif->shmem_vaddr;
+    op.handle         = blkif->shmem_handle;
+    op.dev_bus_addr   = 0;
+    BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
+#endif
     vfree(blkif->blk_ring.sring);
 
     /* Construct the deferred response message. */
@@ -179,8 +187,12 @@ void blkif_ptfe_connect(blkif_be_connect_t *connect)
     unsigned int   evtchn = connect->evtchn;
     unsigned long  shmem_frame = connect->shmem_frame;
     struct vm_struct *vma;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    int ref = connect->shmem_ref;
+#else
     pgprot_t       prot;
     int            error;
+#endif
     blkif_t       *blkif;
     blkif_sring_t *sring;
 
@@ -201,24 +213,46 @@ void blkif_ptfe_connect(blkif_be_connect_t *connect)
         return;
     }
 
-    prot = __pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED);
+#ifndef CONFIG_XEN_BLKDEV_GRANT
+    prot = __pgprot(_KERNPG_TABLE);
     error = direct_remap_area_pages(&init_mm, VMALLOC_VMADDR(vma->addr),
                                     shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
                                     prot, domid);
     if ( error != 0 )
     {
-        WPRINTK("BE_CONNECT: error! (%d)\n", error);
         if ( error == -ENOMEM ) 
             connect->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
-        else if ( error == -EFAULT ) {
+        else if ( error == -EFAULT )
             connect->status = BLKIF_BE_STATUS_MAPPING_ERROR;
-            WPRINTK("BE_CONNECT: MAPPING error!\n");
-        }
         else
             connect->status = BLKIF_BE_STATUS_ERROR;
         vfree(vma->addr);
         return;
     }
+#else
+    { /* Map: Use the Grant table reference */
+        struct gnttab_map_grant_ref op;
+        op.host_addr = VMALLOC_VMADDR(vma->addr);
+        op.flags            = GNTMAP_host_map;
+        op.ref              = ref;
+        op.dom              = domid;
+       
+        BUG_ON( HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) );
+       
+        handle = op.handle;
+       
+        if (op.handle < 0) {
+            DPRINTK(" Grant table operation failure !\n");
+            connect->status = BLKIF_BE_STATUS_MAPPING_ERROR;
+            vfree(vma->addr);
+            return;
+        }
+
+        blkif->shmem_ref = ref;
+        blkif->shmem_handle = handle;
+        blkif->shmem_vaddr = VMALLOC_VMADDR(vma->addr);
+    }
+#endif
 
     if ( blkif->status != DISCONNECTED )
     {
@@ -232,12 +266,12 @@ void blkif_ptfe_connect(blkif_be_connect_t *connect)
     BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
     
     blkif->evtchn        = evtchn;
-    blkif->irq           = bind_evtchn_to_irq(evtchn);
     blkif->shmem_frame   = shmem_frame;
     blkif->status        = CONNECTED;
     blkif_get(blkif);
 
-    request_irq(blkif->irq, blkif_ptfe_int, 0, "blkif-pt-backend", blkif);
+    bind_evtchn_to_irqhandler(
+        evtchn, blkif_ptfe_int, 0, "blkif-pt-backend", blkif);
 
     connect->status = BLKIF_BE_STATUS_OKAY;
 }
@@ -264,7 +298,7 @@ int blkif_ptfe_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id)
         blkif->status = DISCONNECTING;
         blkif->disconnect_rspid = rsp_id;
         wmb(); /* Let other CPUs see the status change. */
-        free_irq(blkif->irq, blkif);
+        unbind_evtchn_from_irqhandler(blkif->evtchn, blkif);
         blkif_deschedule(blkif);
         blkif_put(blkif);
         return 0; /* Caller should not send response message. */
@@ -286,7 +320,7 @@ static void blkif_ptbe_send_interface_connect(void)
     };
     blkif_fe_interface_connect_t *msg = (void*)cmsg.msg;
     msg->handle      = 0;
-    msg->shmem_frame = virt_to_machine(blktap_be_ring.sring) >> PAGE_SHIFT;
+    msg->shmem_frame = virt_to_mfn(blktap_be_ring.sring);
     
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }
@@ -313,12 +347,11 @@ static void blkif_ptbe_connect(blkif_fe_interface_status_t *status)
     int err = 0;
     
     blktap_be_evtchn = status->evtchn;
-    blktap_be_irq    = bind_evtchn_to_irq(blktap_be_evtchn);
 
-    err = request_irq(blktap_be_irq, blkif_ptbe_int, 
-                      SA_SAMPLE_RANDOM, "blkif", NULL);
+    err = bind_evtchn_to_irqhandler(
+        blktap_be_evtchn, blkif_ptbe_int, SA_SAMPLE_RANDOM, "blkif", NULL);
     if ( err ) {
-	WPRINTK("blkfront request_irq failed (%d)\n", err);
+	WPRINTK("blkfront bind_evtchn_to_irqhandler failed (%d)\n", err);
         return;
     } else {
 	/* transtion to connected in case we need to do a 

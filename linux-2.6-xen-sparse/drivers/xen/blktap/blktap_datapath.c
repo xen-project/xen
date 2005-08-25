@@ -280,8 +280,6 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
     int more_to_do = 0;
     int notify_be = 0, notify_user = 0;
     
-    if (NR_ACTIVE_REQS == MAX_ACTIVE_REQS) return 1;
-    
     /* lock both rings */
     spin_lock_irqsave(&blkif_io_lock, flags);
 

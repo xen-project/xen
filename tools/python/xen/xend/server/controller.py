@@ -1,4 +1,20 @@
-# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+#============================================================================
+
 """General support for controllers, which handle devices
 for a domain.
 """
@@ -126,7 +142,7 @@ class DevControllerTable:
     def createDevController(self, type, vm, recreate=False):
         cls = self.getDevControllerClass(type)
         if not cls:
-            raise XendError("unknown device type: " + type)
+            raise XendError("unknown device type: " + str(type))
         return cls.createDevController(vm, recreate=recreate)
 
 def getDevControllerTable():
@@ -267,6 +283,8 @@ class DevController:
         dev.attach(recreate=recreate, change=change)
         dev.exportToDB()
 
+        return dev
+
     def configureDevice(self, id, config, change=False):
         """Reconfigure an existing device.
         May be defined in subclass."""
@@ -307,9 +325,9 @@ class DevController:
         return self.destroyed
 
     def getDevice(self, id, error=False):
-        dev = self.devices.get(id)
+        dev = self.devices.get(int(id))
         if error and not dev:
-            raise XendError("invalid device id: " + id)
+            raise XendError("invalid device id: " + str(id))
         return dev
 
     def getDeviceIds(self):

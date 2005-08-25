@@ -1,5 +1,5 @@
 
-#include "xc_private.h"
+#include "xg_private.h"
 #include "xc_aout9.h"
 
 #if defined(__i386__)

@@ -1,4 +1,19 @@
-# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+#============================================================================
 
 """Representation of a single domain.
 Includes support for domain construction, using
@@ -8,7 +23,7 @@ Author: Mike Wray <mike.wray@hp.com>
 
 """
 
-import string
+import string, re
 import os
 import time
 import threading
@@ -21,8 +36,10 @@ from xen.xend.server import controller
 from xen.xend.server import SrvDaemon; xend = SrvDaemon.instance()
 from xen.xend.server import messages
 from xen.xend.server.channel import EventChannel, channelFactory
+from xen.util.blkif import blkdev_name_to_number, expand_dev_name
 
 from xen.xend import sxp
+from xen.xend import Blkctl
 from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendBootloader import bootloader
 from xen.xend.XendLogging import log
@@ -50,15 +67,6 @@ shutdown_reasons = {
     DOMAIN_REBOOT  : "reboot",
     DOMAIN_SUSPEND : "suspend",
     DOMAIN_CRASH   : "crash",
-    }
-
-"""Map shutdown reasons to the message type to use.
-"""
-shutdown_messages = {
-    'poweroff' : 'shutdown_poweroff_t',
-    'reboot'   : 'shutdown_reboot_t',
-    'suspend'  : 'shutdown_suspend_t',
-    'sysrq'    : 'shutdown_sysrq_t',
     }
 
 RESTART_ALWAYS   = 'always'
@@ -132,7 +140,7 @@ def dom_get(dom):
     if domlist and dom == domlist[0]['dom']:
         return domlist[0]
     return None
-    
+
 class XendDomainInfo:
     """Virtual machine object."""
 
@@ -152,8 +160,6 @@ class XendDomainInfo:
         vm = cls(db)
         vm.construct(config)
         vm.saveToDB(sync=True)
-        # Flush info to xenstore immediately
-        vm.exportToDB()
 
         return vm
 
@@ -191,19 +197,22 @@ class XendDomainInfo:
 
     recreate = classmethod(recreate)
 
-    def restore(cls, parentdb, config, uuid):
+    def restore(cls, parentdb, config, uuid=None):
         """Create a domain and a VM object to do a restore.
 
         @param parentdb:  parent db
         @param config:    domain configuration
         @param uuid:      uuid to use
         """
+        if not uuid:
+            uuid = getUuid()
         db = parentdb.addChild(uuid)
         vm = cls(db)
         ssidref = int(sxp.child_value(config, 'ssidref'))
         log.debug('restoring with ssidref='+str(ssidref))
         id = xc.domain_create(ssidref = ssidref)
         vm.setdom(id)
+        vm.clear_shutdown()
         try:
             vm.restore = True
             vm.construct(config)
@@ -227,6 +236,7 @@ class XendDomainInfo:
         DBVar('restart_time',  ty='float'),
         DBVar('restart_count', ty='int'),
         DBVar('target',        ty='long', path="memory/target"),
+        DBVar('device_model_pid', ty='int'),
         ]
     
     def __init__(self, db):
@@ -255,6 +265,8 @@ class XendDomainInfo:
         self.info = None
         self.blkif_backend = False
         self.netif_backend = False
+        self.netif_idx = 0
+        
         #todo: state: running, suspended
         self.state = STATE_VM_OK
         self.state_updated = threading.Condition()
@@ -268,9 +280,10 @@ class XendDomainInfo:
         self.restart_time = None
         self.restart_count = 0
         
-        self.console_port = None
         self.vcpus = 1
+        self.vcpusdb = {}
         self.bootloader = None
+        self.device_model_pid = 0
 
     def setDB(self, db):
         self.db = db
@@ -344,9 +357,6 @@ class XendDomainInfo:
         s += " name=" + self.name
         s += " memory=" + str(self.memory)
         s += " ssidref=" + str(self.ssidref)
-        console = self.getConsole()
-        if console:
-            s += " console=" + str(console.console_port)
         s += ">"
         return s
 
@@ -374,6 +384,71 @@ class XendDomainInfo:
         return ctrl
 
     def createDevice(self, type, devconfig, change=False):
+        if type == 'vbd':
+            typedev = sxp.child_value(devconfig, 'dev')
+            if re.match('^ioemu:', typedev):
+	        return;
+            backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
+
+            devnum = blkdev_name_to_number(sxp.child_value(devconfig, 'dev'))
+
+            # create backend db
+            backdb = backdom.db.addChild("/backend/%s/%s/%d" %
+                                         (type, self.uuid, devnum))
+
+            # create frontend db
+            db = self.db.addChild("/device/%s/%d" % (type, devnum))
+            
+            db['virtual-device'] = "%i" % devnum
+            #db['backend'] = sxp.child_value(devconfig, 'backend', '0')
+            db['backend'] = backdb.getPath()
+            db['backend-id'] = "%i" % backdom.id
+
+            backdb['frontend'] = db.getPath()
+            (type, params) = string.split(sxp.child_value(devconfig, 'uname'), ':', 1)
+            node = Blkctl.block('bind', type, params)
+            backdb['frontend-id'] = "%i" % self.id
+            backdb['physical-device'] = "%li" % blkdev_name_to_number(node)
+            backdb.saveDB(save=True)
+
+            # Ok, super gross, this really doesn't belong in the frontend db...
+            db['type'] = type
+            db['node'] = node
+            db['params'] = params
+            db.saveDB(save=True)
+            
+            return
+
+        if type == 'vif':
+            backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
+
+            log.error(devconfig)
+            
+            devnum = self.netif_idx
+            self.netif_idx += 1
+
+            # create backend db
+            backdb = backdom.db.addChild("/backend/%s/%s/%d" %
+                                         (type, self.uuid, devnum))
+
+            # create frontend db
+            db = self.db.addChild("/device/%s/%d" % (type, devnum))
+            
+            backdb['frontend'] = db.getPath()
+            backdb['frontend-id'] = "%i" % self.id
+            backdb['handle'] = "%i" % devnum
+            backdb.saveDB(save=True)
+
+            db['backend'] = backdb.getPath()
+            db['backend-id'] = "%i" % backdom.id
+            db['handle'] = "%i" % devnum
+            log.error(sxp.child_value(devconfig, 'mac'))
+            db['mac'] = sxp.child_value(devconfig, 'mac')
+
+            db.saveDB(save=True)
+
+            return
+        
         ctrl = self.findDeviceController(type)
         return ctrl.createDevice(devconfig, recreate=self.recreate,
                                  change=change)
@@ -443,9 +518,6 @@ class XendDomainInfo:
             sxpr.append(self.store_channel.sxpr())
         if self.store_mfn:
             sxpr.append(['store_mfn', self.store_mfn])
-        console = self.getConsole()
-        if console:
-            sxpr.append(console.sxpr())
 
         if self.restart_count:
             sxpr.append(['restart_count', self.restart_count])
@@ -459,6 +531,8 @@ class XendDomainInfo:
             sxpr.append(devs)
         if self.config:
             sxpr.append(['config', self.config])
+        if self.device_model_pid:
+            sxpr.append(['device_model_pid',self.device_model_pid])
         return sxpr
 
     def sxpr_devices(self):
@@ -519,7 +593,6 @@ class XendDomainInfo:
 
             # Create domain devices.
             self.configure_backends()
-            self.configure_console()
             self.configure_restart()
             self.construct_image()
             self.configure()
@@ -558,6 +631,16 @@ class XendDomainInfo:
         except:
             raise VmError('invalid vcpus value')
 
+    def exportVCPUSToDB(self, vcpus):
+        for v in range(0,vcpus):
+            path = "/cpu/%d"%(v)
+            if not self.vcpusdb.has_key(path):
+                self.vcpusdb[path] = self.db.addChild(path)
+            db = self.vcpusdb[path]
+            log.debug("writing key availability=online to path %s in store"%(path))
+            db['availability'] = "online"
+            db.saveDB(save=True)
+
     def init_image(self):
         """Create boot image handler for the domain.
         """
@@ -572,15 +655,17 @@ class XendDomainInfo:
         self.create_channel()
         self.image.createImage()
         self.exportToDB()
-        if self.store_channel:
+        if self.store_channel and self.store_mfn >= 0:
             self.db.introduceDomain(self.id,
                                     self.store_mfn,
                                     self.store_channel)
+        # get the configured value of vcpus and update store
+        self.exportVCPUSToDB(self.vcpus)
 
     def delete(self):
         """Delete the vm's db.
         """
-        if self.dom_get(self.id):
+        if dom_get(self.id):
             return
         self.id = None
         self.saveToDB(sync=True)
@@ -629,6 +714,7 @@ class XendDomainInfo:
                 pass
         if self.image:
             try:
+                self.device_model_pid = 0
                 self.image.destroy()
                 self.image = None
             except:
@@ -654,6 +740,21 @@ class XendDomainInfo:
         for ctrl in self.getDeviceControllers():
             if ctrl.isDestroyed(): continue
             ctrl.destroyController(reboot=reboot)
+        ddb = self.db.addChild("/device")
+        for type in ddb.keys():
+            if type == 'vbd':
+                typedb = ddb.addChild(type)
+                for dev in typedb.keys():
+                    devdb = typedb.addChild(str(dev))
+                    Blkctl.block('unbind', devdb['type'].getData(),
+                                 devdb['node'].getData())
+                    typedb[dev].delete()
+                typedb.saveDB(save=True)
+            if type == 'vif':
+                typedb = ddb.addChild(type)
+                for dev in typedb.keys():
+                    typedb[dev].delete()
+                typedb.saveDB(save=True)
 
     def show(self):
         """Print virtual machine info.
@@ -730,7 +831,8 @@ class XendDomainInfo:
                 ctrl.initController(reboot=True)
         else:
             self.create_configured_devices()
-        self.image.createDeviceModel()
+        if not self.device_model_pid:
+            self.device_model_pid = self.image.createDeviceModel()
 
     def device_create(self, dev_config):
         """Create a new device.
@@ -738,7 +840,7 @@ class XendDomainInfo:
         @param dev_config: device configuration
         """
         dev_type = sxp.name(dev_config)
-        dev = self.createDevice(self, dev_config, change=True)
+        dev = self.createDevice(dev_type, dev_config, change=True)
         self.config.append(['device', dev.getConfig()])
         return dev.sxpr()
 
@@ -784,17 +886,6 @@ class XendDomainInfo:
         """Configure boot loader.
         """
         self.bootloader = sxp.child_value(self.config, "bootloader")
-
-    def configure_console(self):
-        """Configure the vm console port.
-        """
-        x = sxp.child_value(self.config, 'console')
-        if x:
-            try:
-                port = int(x)
-            except:
-                raise VmError('invalid console:' + str(x))
-            self.console_port = port
 
     def configure_restart(self):
         """Configure the vm restart mode.
@@ -855,7 +946,7 @@ class XendDomainInfo:
 
     def restart(self):
         """Restart the domain after it has exited.
-        Reuses the domain id and console port.
+        Reuses the domain id
 
         """
         try:
@@ -910,24 +1001,8 @@ class XendDomainInfo:
 
         """
         self.configure_fields()
-        self.create_console()
         self.create_devices()
         self.create_blkif()
-
-    def create_console(self):
-        console = self.getConsole()
-        if not console:
-            config = ['console']
-            if self.console_port:
-                config.append(['console_port', self.console_port])
-            console = self.createDevice('console', config)
-        return console
-
-    def getConsole(self):
-        console_ctrl = self.getDeviceController("console", error=False)
-        if console_ctrl:
-            return console_ctrl.getDevice(0)
-        return None
 
     def create_blkif(self):
         """Create the block device interface (blkif) for the vm.
@@ -935,6 +1010,7 @@ class XendDomainInfo:
         at creation time, for example when it uses NFS root.
 
         """
+        return
         blkif = self.getDeviceController("vbd", error=False)
         if not blkif:
             blkif = self.createDeviceController("vbd")
@@ -967,28 +1043,39 @@ class XendDomainInfo:
     def vcpu_hotplug(self, vcpu, state):
         """Disable or enable VCPU in domain.
         """
-        log.error("Holly Shit! %d %d\n" % (vcpu, state))
-        if self.channel:
+        db = ""
+        try:
+            db = self.vcpusdb['/cpu/%d'%(vcpu)]
+        except:
+            log.error("Invalid VCPU")
+            return
+
+        if self.store_channel:
             if int(state) == 0:
-                msg = messages.packMsg('vcpu_hotplug_off_t', { 'vcpu' : vcpu} )
+                db['availability'] = "offline"
             else:
-                msg = messages.packMsg('vcpu_hotplug_on_t',  { 'vcpu' : vcpu} )
+                db['availability'] = "online"
 
-            self.channel.writeRequest(msg)
+        db.saveDB(save=True)
 
-    def shutdown(self, reason, key=0):
-        msgtype = shutdown_messages.get(reason)
-        if not msgtype:
+    def shutdown(self, reason):
+        if not reason in shutdown_reasons.values():
             raise XendError('invalid reason:' + reason)
-        extra = {}
-        if reason == 'sysrq':
-            extra['key'] = key
-        if self.channel:
-            msg = messages.packMsg(msgtype, extra)
-            self.channel.writeRequest(msg)
-        if not reason in ['suspend', 'sysrq']:
-            self.shutdown_pending = {'start':time.time(), 'reason':reason,
-                                     'key':key}
+        db = self.db.addChild("/control");
+        db['shutdown'] = reason;
+        db.saveDB(save=True);
+        if not reason in ['suspend']:
+            self.shutdown_pending = {'start':time.time(), 'reason':reason}
+
+    def clear_shutdown(self):
+        db = self.db.addChild("/control")
+        db['shutdown'] = ""
+        db.saveDB(save=True)
+
+    def send_sysrq(self, key=0):
+        db = self.db.addChild("/control");
+        db['sysrq'] = '%c' % key;
+        db.saveDB(save=True);        
 
     def shutdown_time_left(self, timeout):
         if not self.shutdown_pending:
@@ -1003,6 +1090,8 @@ class XendDomainInfo:
             self.db.introduceDomain(self.id, self.store_mfn,
                                     self.store_channel)
         self.exportToDB(save=True, sync=True)
+        # get run-time value of vcpus and update store
+        self.exportVCPUSToDB(dom_get(self.id)['vcpus'])
 
 def vm_field_ignore(vm, config, val, index):
     """Dummy config field handler used for fields with built-in handling.
@@ -1048,7 +1137,6 @@ add_config_handler('memory',     vm_field_ignore)
 add_config_handler('ssidref',    vm_field_ignore)
 add_config_handler('cpu',        vm_field_ignore)
 add_config_handler('cpu_weight', vm_field_ignore)
-add_config_handler('console',    vm_field_ignore)
 add_config_handler('restart',    vm_field_ignore)
 add_config_handler('image',      vm_field_ignore)
 add_config_handler('device',     vm_field_ignore)
@@ -1061,9 +1149,6 @@ add_config_handler('maxmem',     vm_field_maxmem)
 
 #============================================================================
 # Register device controllers and their device config types.
-
-from server import console
-controller.addDevControllerClass("console", console.ConsoleController)
 
 from server import blkif
 controller.addDevControllerClass("vbd", blkif.BlkifController)

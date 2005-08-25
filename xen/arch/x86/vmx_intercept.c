@@ -74,10 +74,10 @@ int register_io_handler(unsigned long addr, unsigned long offset,
 
 static void pit_cal_count(struct vmx_virpit_t *vpit)
 {
-    unsigned int usec_delta = (unsigned int)((NOW() - vpit->inject_point) / 1000);
-    if (usec_delta > vpit->period * 1000)
+    u64 nsec_delta = (unsigned int)((NOW() - vpit->inject_point));
+    if (nsec_delta > vpit->period)
         VMX_DBG_LOG(DBG_LEVEL_1, "VMX_PIT:long time has passed from last injection!");
-    vpit->count = vpit->init_val - ((usec_delta * PIT_FREQ / 1000000) % vpit->init_val );
+    vpit->count = vpit->init_val - ((nsec_delta * PIT_FREQ / 1000000000ULL) % vpit->init_val );
 }
 
 static void pit_latch_io(struct vmx_virpit_t *vpit)
@@ -197,9 +197,10 @@ int intercept_pit_io(ioreq_t *p)
 static void pit_timer_fn(void *data)
 {
     struct vmx_virpit_t *vpit = data;
-    int missed_ticks;
+    s_time_t   next;
+    int        missed_ticks;
 
-    missed_ticks = (NOW() - vpit->scheduled) / MILLISECS(vpit->period);
+    missed_ticks = (NOW() - vpit->scheduled)/(s_time_t) vpit->period;
 
     /* Set the pending intr bit, and send evtchn notification to myself. */
     if (test_and_set_bit(vpit->vector, vpit->intr_bitmap))
@@ -208,12 +209,12 @@ static void pit_timer_fn(void *data)
     /* pick up missed timer tick */
     if ( missed_ticks > 0 ) {
         vpit->pending_intr_nr += missed_ticks;
-        vpit->scheduled += missed_ticks * MILLISECS(vpit->period);
+        vpit->scheduled += missed_ticks * vpit->period;
     }
-    vpit->scheduled += MILLISECS(vpit->period);
-    set_ac_timer(&vpit->pit_timer, vpit->scheduled);
+    next = vpit->scheduled + vpit->period;
+    set_ac_timer(&vpit->pit_timer, next);
+    vpit->scheduled = next;
 }
-
 
 /* Only some PIT operations such as load init counter need a hypervisor hook.
  * leave all other operations in user space DM
@@ -236,16 +237,17 @@ void vmx_hooks_assist(struct vcpu *d)
             reinit = 1;
         }
         else
-            init_ac_timer(&vpit->pit_timer, pit_timer_fn, vpit, 0);
+            init_ac_timer(&vpit->pit_timer, pit_timer_fn, vpit, d->processor);
 
         /* init count for this channel */
         vpit->init_val = (p->u.data & 0xFFFF) ; 
-        /* frequency(ms) of pit */
-        vpit->period = DIV_ROUND(((vpit->init_val) * 1000), PIT_FREQ); 
-        if (vpit->period < 1) {
+        /* frequency(ns) of pit */
+        vpit->period = DIV_ROUND(((vpit->init_val) * 1000000000ULL), PIT_FREQ); 
+        VMX_DBG_LOG(DBG_LEVEL_1,"VMX_PIT: guest set init pit freq:%u ns, initval:0x%x\n", vpit->period, vpit->init_val);
+        if (vpit->period < 900000) { /* < 0.9 ms */
             printk("VMX_PIT: guest programmed too small an init_val: %x\n",
                    vpit->init_val);
-            vpit->period = 1;
+            vpit->period = 1000000;
         }
         vpit->vector = ((p->u.data >> 16) & 0xFF);
         vpit->channel = ((p->u.data >> 24) & 0x3);
@@ -272,7 +274,7 @@ void vmx_hooks_assist(struct vcpu *d)
 
         vpit->intr_bitmap = intr;
 
-        vpit->scheduled = NOW() + MILLISECS(vpit->period);
+        vpit->scheduled = NOW() + vpit->period;
         set_ac_timer(&vpit->pit_timer, vpit->scheduled);
 
         /*restore the state*/

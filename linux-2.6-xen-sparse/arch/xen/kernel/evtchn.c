@@ -116,9 +116,9 @@ extern asmlinkage unsigned int do_IRQ(struct pt_regs *regs);
 #elif defined (__x86_64__)
 #define IRQ_REG orig_rax
 #endif
-#define do_IRQ(irq, regs) do {		\
-    (regs)->IRQ_REG = (irq);		\
-    do_IRQ((regs));			\
+#define do_IRQ(irq, regs) do {                  \
+    (regs)->IRQ_REG = (irq);                    \
+    do_IRQ((regs));                             \
 } while (0)
 #endif
 
@@ -137,14 +137,14 @@ void force_evtchn_callback(void)
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 {
-    u32 	   l1, l2;
+    u32     l1, l2;
     unsigned int   l1i, l2i, port;
     int            irq, cpu = smp_processor_id();
     shared_info_t *s = HYPERVISOR_shared_info;
     vcpu_info_t   *vcpu_info = &s->vcpu_data[cpu];
 
     vcpu_info->evtchn_upcall_pending = 0;
-    
+
     /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
     l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
     while ( l1 != 0 )
@@ -158,9 +158,9 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
             l2 &= ~(1 << l2i);
             
             port = (l1i << 5) + l2i;
-            if ( (irq = evtchn_to_irq[port]) != -1 )
+            if ( (irq = evtchn_to_irq[port]) != -1 ) {
                 do_IRQ(irq, regs);
-            else
+	    } else
                 evtchn_device_upcall(port);
         }
     }
@@ -229,13 +229,14 @@ void unbind_virq_from_irq(int virq)
         if ( HYPERVISOR_event_channel_op(&op) != 0 )
             panic("Failed to unbind virtual IRQ %d\n", virq);
 
-	/* This is a slight hack.  Interdomain ports can be allocated
-	   directly by userspace, and at that point they get bound by
-	   Xen to vcpu 0.  We therefore need to make sure that if we
-	   get an event on an event channel we don't know about vcpu 0
-	   handles it.  Binding channels to vcpu 0 when closing them
-	   achieves this. */
-	bind_evtchn_to_cpu(evtchn, 0);
+        /*
+         * This is a slight hack. Interdomain ports can be allocated directly 
+         * by userspace, and at that point they get bound by Xen to vcpu 0. We 
+         * therefore need to make sure that if we get an event on an event 
+         * channel we don't know about vcpu 0 handles it. Binding channels to 
+         * vcpu 0 when closing them achieves this.
+         */
+        bind_evtchn_to_cpu(evtchn, 0);
         evtchn_to_irq[evtchn] = -1;
         irq_to_evtchn[irq]    = -1;
         per_cpu(virq_to_irq, cpu)[virq]     = -1;
@@ -244,7 +245,75 @@ void unbind_virq_from_irq(int virq)
     spin_unlock(&irq_mapping_update_lock);
 }
 
-int bind_ipi_on_cpu_to_irq(int ipi)
+/* This is only used when a vcpu from an xm save.  The ipi is expected
+   to have been bound before we suspended, and so all of the xenolinux
+   state is set up; we only need to restore the Xen side of things.
+   The irq number has to be the same, but the evtchn number can
+   change. */
+void _bind_ipi_to_irq(int ipi, int vcpu, int irq)
+{
+    evtchn_op_t op;
+    int evtchn;
+
+    spin_lock(&irq_mapping_update_lock);
+
+    op.cmd = EVTCHNOP_bind_ipi;
+    if ( HYPERVISOR_event_channel_op(&op) != 0 )
+	panic("Failed to bind virtual IPI %d on cpu %d\n", ipi, vcpu);
+    evtchn = op.u.bind_ipi.port;
+
+    printk("<0>IPI %d, old evtchn %d, evtchn %d.\n",
+	   ipi, per_cpu(ipi_to_evtchn, vcpu)[ipi],
+	   evtchn);
+
+    evtchn_to_irq[irq_to_evtchn[irq]] = -1;
+    irq_to_evtchn[irq] = -1;
+
+    evtchn_to_irq[evtchn] = irq;
+    irq_to_evtchn[irq]    = evtchn;
+
+    printk("<0>evtchn_to_irq[%d] = %d.\n", evtchn,
+	   evtchn_to_irq[evtchn]);
+    per_cpu(ipi_to_evtchn, vcpu)[ipi] = evtchn;
+
+    bind_evtchn_to_cpu(evtchn, vcpu);
+
+    spin_unlock(&irq_mapping_update_lock);
+
+    clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_mask);
+    clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_pending);
+}
+
+void _bind_virq_to_irq(int virq, int cpu, int irq)
+{
+    evtchn_op_t op;
+    int evtchn;
+
+    spin_lock(&irq_mapping_update_lock);
+
+    op.cmd              = EVTCHNOP_bind_virq;
+    op.u.bind_virq.virq = virq;
+    if ( HYPERVISOR_event_channel_op(&op) != 0 )
+            panic("Failed to bind virtual IRQ %d\n", virq);
+    evtchn = op.u.bind_virq.port;
+
+    evtchn_to_irq[irq_to_evtchn[irq]] = -1;
+    irq_to_evtchn[irq] = -1;
+
+    evtchn_to_irq[evtchn] = irq;
+    irq_to_evtchn[irq]    = evtchn;
+
+    per_cpu(virq_to_irq, cpu)[virq] = irq;
+
+    bind_evtchn_to_cpu(evtchn, cpu);
+
+    spin_unlock(&irq_mapping_update_lock);
+
+    clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_mask);
+    clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_pending);
+}
+
+int bind_ipi_to_irq(int ipi)
 {
     evtchn_op_t op;
     int evtchn, irq;
@@ -269,7 +338,7 @@ int bind_ipi_on_cpu_to_irq(int ipi)
     } 
     else
     {
-	irq = evtchn_to_irq[evtchn];
+        irq = evtchn_to_irq[evtchn];
     }
 
     irq_bindcount[irq]++;
@@ -284,29 +353,29 @@ void unbind_ipi_from_irq(int ipi)
     evtchn_op_t op;
     int cpu    = smp_processor_id();
     int evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi];
-    int irq    = irq_to_evtchn[evtchn];
+    int irq    = evtchn_to_irq[evtchn];
 
     spin_lock(&irq_mapping_update_lock);
 
     if ( --irq_bindcount[irq] == 0 )
     {
-	op.cmd          = EVTCHNOP_close;
-	op.u.close.dom  = DOMID_SELF;
-	op.u.close.port = evtchn;
-	if ( HYPERVISOR_event_channel_op(&op) != 0 )
-	    panic("Failed to unbind virtual IPI %d on cpu %d\n", ipi, cpu);
+        op.cmd          = EVTCHNOP_close;
+        op.u.close.dom  = DOMID_SELF;
+        op.u.close.port = evtchn;
+        if ( HYPERVISOR_event_channel_op(&op) != 0 )
+            panic("Failed to unbind virtual IPI %d on cpu %d\n", ipi, cpu);
 
-	/* See comments in unbind_virq_from_irq */
-	bind_evtchn_to_cpu(evtchn, 0);
+        /* See comments in unbind_virq_from_irq */
+        bind_evtchn_to_cpu(evtchn, 0);
         evtchn_to_irq[evtchn] = -1;
         irq_to_evtchn[irq]    = -1;
-	per_cpu(ipi_to_evtchn, cpu)[ipi] = 0;
+        per_cpu(ipi_to_evtchn, cpu)[ipi] = 0;
     }
 
     spin_unlock(&irq_mapping_update_lock);
 }
 
-int bind_evtchn_to_irq(int evtchn)
+int bind_evtchn_to_irq(unsigned int evtchn)
 {
     int irq;
 
@@ -326,7 +395,7 @@ int bind_evtchn_to_irq(int evtchn)
     return irq;
 }
 
-void unbind_evtchn_from_irq(int evtchn)
+void unbind_evtchn_from_irq(unsigned int evtchn)
 {
     int irq = evtchn_to_irq[evtchn];
 
@@ -341,9 +410,36 @@ void unbind_evtchn_from_irq(int evtchn)
     spin_unlock(&irq_mapping_update_lock);
 }
 
+int bind_evtchn_to_irqhandler(
+    unsigned int evtchn,
+    irqreturn_t (*handler)(int, void *, struct pt_regs *),
+    unsigned long irqflags,
+    const char *devname,
+    void *dev_id)
+{
+    unsigned int irq;
+    int retval;
+
+    irq = bind_evtchn_to_irq(evtchn);
+    retval = request_irq(irq, handler, irqflags, devname, dev_id);
+    if ( retval != 0 )
+        unbind_evtchn_from_irq(evtchn);
+
+    return retval;
+}
+
+void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id)
+{
+    unsigned int irq = evtchn_to_irq[evtchn];
+    free_irq(irq, dev_id);
+    unbind_evtchn_from_irq(evtchn);
+}
+
+#ifdef CONFIG_SMP
 static void do_nothing_function(void *ign)
 {
 }
+#endif
 
 /* Rebind an evtchn so that it gets delivered to a specific cpu */
 static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
@@ -354,38 +450,37 @@ static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
     spin_lock(&irq_mapping_update_lock);
     evtchn = irq_to_evtchn[irq];
     if (!VALID_EVTCHN(evtchn)) {
-	spin_unlock(&irq_mapping_update_lock);
-	return;
+        spin_unlock(&irq_mapping_update_lock);
+        return;
     }
 
-    /* Tell Xen to send future instances of this interrupt to the
-       other vcpu */
+    /* Tell Xen to send future instances of this interrupt to other vcpu. */
     op.cmd = EVTCHNOP_bind_vcpu;
     op.u.bind_vcpu.port = evtchn;
     op.u.bind_vcpu.vcpu = tcpu;
 
-    /* If this fails, it usually just indicates that we're dealing
-       with a virq or IPI channel, which don't actually need to be
-       rebound.  Ignore it, but don't do the xenlinux-level rebind
-       in that case. */
+    /*
+     * If this fails, it usually just indicates that we're dealing with a virq 
+     * or IPI channel, which don't actually need to be rebound. Ignore it, 
+     * but don't do the xenlinux-level rebind in that case.
+     */
     if (HYPERVISOR_event_channel_op(&op) >= 0)
-	bind_evtchn_to_cpu(evtchn, tcpu);
+        bind_evtchn_to_cpu(evtchn, tcpu);
 
     spin_unlock(&irq_mapping_update_lock);
 
-    /* Now send the new target processor a NOP IPI.  When this
-       returns, it will check for any pending interrupts, and so
-       service any that got delivered to the wrong processor by
-       mistake. */
-    /* XXX: The only time this is called with interrupts disabled is
-       from the hotplug/hotunplug path.  In that case, all cpus are
-       stopped with interrupts disabled, and the missed interrupts
-       will be picked up when they start again.  This is kind of a
-       hack.
-    */
-    if (!irqs_disabled()) {
-	smp_call_function(do_nothing_function, NULL, 0, 0);
-    }
+    /*
+     * Now send the new target processor a NOP IPI. When this returns, it 
+     * will check for any pending interrupts, and so service any that got 
+     * delivered to the wrong processor by mistake.
+     * 
+     * XXX: The only time this is called with interrupts disabled is from the 
+     * hotplug/hotunplug path. In that case, all cpus are stopped with 
+     * interrupts disabled, and the missed interrupts will be picked up when 
+     * they start again. This is kind of a hack.
+     */
+    if (!irqs_disabled())
+        smp_call_function(do_nothing_function, NULL, 0, 0);
 }
 
 
@@ -585,6 +680,16 @@ static struct hw_interrupt_type pirq_type = {
     set_affinity_irq
 };
 
+void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
+{
+    int evtchn = irq_to_evtchn[i];
+    shared_info_t *s = HYPERVISOR_shared_info;
+    if ( !VALID_EVTCHN(evtchn) )
+        return;
+    BUG_ON(!synch_test_bit(evtchn, &s->evtchn_mask[0]));
+    synch_set_bit(evtchn, &s->evtchn_pending[0]);
+}
+
 void irq_suspend(void)
 {
     int pirq, virq, irq, evtchn;
@@ -631,7 +736,7 @@ void irq_resume(void)
         evtchn = op.u.bind_virq.port;
         
         /* Record the new mapping. */
-	bind_evtchn_to_cpu(evtchn, 0);
+        bind_evtchn_to_cpu(evtchn, 0);
         evtchn_to_irq[evtchn] = irq;
         irq_to_evtchn[irq]    = evtchn;
 
@@ -655,9 +760,9 @@ void __init init_IRQ(void)
 #endif
 
     for ( cpu = 0; cpu < NR_CPUS; cpu++ ) {
-	/* No VIRQ -> IRQ mappings. */
-	for ( i = 0; i < NR_VIRQS; i++ )
-	    per_cpu(virq_to_irq, cpu)[i] = -1;
+        /* No VIRQ -> IRQ mappings. */
+        for ( i = 0; i < NR_VIRQS; i++ )
+            per_cpu(virq_to_irq, cpu)[i] = -1;
     }
 
     /* No event-channel -> IRQ mappings. */

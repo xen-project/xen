@@ -1,11 +1,35 @@
 #ifndef _ASM_I386_DMA_MAPPING_H
 #define _ASM_I386_DMA_MAPPING_H
 
-#include <linux/mm.h>
+/*
+ * IOMMU interface. See Documentation/DMA-mapping.txt and DMA-API.txt for
+ * documentation.
+ */
 
+#include <linux/config.h>
+#include <linux/mm.h>
 #include <asm/cache.h>
 #include <asm/io.h>
 #include <asm/scatterlist.h>
+#include <asm-i386/swiotlb.h>
+
+static inline int
+address_needs_mapping(struct device *hwdev, dma_addr_t addr)
+{
+	dma_addr_t mask = 0xffffffff;
+	/* If the device has a mask, use it, otherwise default to 32 bits */
+	if (hwdev && hwdev->dma_mask)
+		mask = *hwdev->dma_mask;
+	return (addr & ~mask) != 0;
+}
+
+static inline int
+range_straddles_page_boundary(void *p, size_t size)
+{
+	extern unsigned long *contiguous_bitmap;
+	return (((((unsigned long)p & ~PAGE_MASK) + size) > PAGE_SIZE) &&
+		!test_bit(__pa(p) >> PAGE_SHIFT, contiguous_bitmap));
+}
 
 #define dma_alloc_noncoherent(d, s, h, f) dma_alloc_coherent(d, s, h, f)
 #define dma_free_noncoherent(d, s, v, h) dma_free_coherent(d, s, v, h)
@@ -24,46 +48,18 @@ extern void
 dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
 		 enum dma_data_direction direction);
 
-static inline int
-dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
-	   enum dma_data_direction direction)
-{
-	int i;
+extern int dma_map_sg(struct device *hwdev, struct scatterlist *sg,
+		      int nents, enum dma_data_direction direction);
+extern void dma_unmap_sg(struct device *hwdev, struct scatterlist *sg,
+			 int nents, enum dma_data_direction direction);
 
-	BUG_ON(direction == DMA_NONE);
-
-	for (i = 0; i < nents; i++ ) {
-		BUG_ON(!sg[i].page);
-
-		sg[i].dma_address = page_to_phys(sg[i].page) + sg[i].offset;
-	}
-
-	flush_write_buffers();
-	return nents;
-}
-
-static inline dma_addr_t
+extern dma_addr_t
 dma_map_page(struct device *dev, struct page *page, unsigned long offset,
-	     size_t size, enum dma_data_direction direction)
-{
-	BUG_ON(direction == DMA_NONE);
-	return page_to_phys(page) + offset;
-}
+	     size_t size, enum dma_data_direction direction);
 
-static inline void
+extern void
 dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
-	       enum dma_data_direction direction)
-{
-	BUG_ON(direction == DMA_NONE);
-}
-
-
-static inline void
-dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
-	     enum dma_data_direction direction)
-{
-	BUG_ON(direction == DMA_NONE);
-}
+	       enum dma_data_direction direction);
 
 extern void
 dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
@@ -93,34 +89,25 @@ static inline void
 dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
 		    enum dma_data_direction direction)
 {
+	if (swiotlb)
+		swiotlb_sync_sg_for_cpu(dev,sg,nelems,direction);
+	flush_write_buffers();
 }
 
 static inline void
 dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
 		    enum dma_data_direction direction)
 {
+	if (swiotlb)
+		swiotlb_sync_sg_for_device(dev,sg,nelems,direction);
 	flush_write_buffers();
 }
 
-static inline int
-dma_mapping_error(dma_addr_t dma_addr)
-{
-	return 0;
-}
+extern int
+dma_mapping_error(dma_addr_t dma_addr);
 
-static inline int
-dma_supported(struct device *dev, u64 mask)
-{
-        /*
-         * we fall back to GFP_DMA when the mask isn't all 1s,
-         * so we can't guarantee allocations that must be
-         * within a tighter range than GFP_DMA..
-         */
-        if(mask < 0x00ffffff)
-                return 0;
-
-	return 1;
-}
+extern int
+dma_supported(struct device *dev, u64 mask);
 
 static inline int
 dma_set_mask(struct device *dev, u64 mask)
@@ -133,6 +120,7 @@ dma_set_mask(struct device *dev, u64 mask)
 	return 0;
 }
 
+#ifdef __i386__
 static inline int
 dma_get_cache_alignment(void)
 {
@@ -140,6 +128,9 @@ dma_get_cache_alignment(void)
 	 * maximum possible, to be safe */
 	return (1 << L1_CACHE_SHIFT_MAX);
 }
+#else
+extern int dma_get_cache_alignment(void);
+#endif
 
 #define dma_is_consistent(d)	(1)
 

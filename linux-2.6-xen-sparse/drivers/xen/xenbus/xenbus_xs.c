@@ -30,7 +30,6 @@
 
 #include <linux/errno.h>
 #include <linux/types.h>
-#include "xenstore/xenstored.h"
 #include <linux/uio.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -39,6 +38,7 @@
 #include <linux/fcntl.h>
 #include <linux/kthread.h>
 #include <asm-xen/xenbus.h>
+#include "xenstored.h"
 #include "xenbus_comms.h"
 
 #define streq(a, b) (strcmp((a), (b)) == 0)
@@ -187,6 +187,7 @@ static char *join(const char *dir, const char *name)
 	static char buffer[4096];
 
 	BUG_ON(down_trylock(&xenbus_lock) == 0);
+	/* XXX FIXME: might not be correct if name == "" */
 	BUG_ON(strlen(dir) + strlen("/") + strlen(name) + 1 > sizeof(buffer));
 
 	strcpy(buffer, dir);
@@ -399,9 +400,12 @@ int xenbus_gather(const char *dir, ...)
 			ret = PTR_ERR(p);
 			break;
 		}
-		if (sscanf(p, fmt, result) == 0)
-			ret = -EINVAL;
-		kfree(p);
+		if (fmt) {
+			if (sscanf(p, fmt, result) == 0)
+				ret = -EINVAL;
+			kfree(p);
+		} else
+			*(char **)result = p;
 	}
 	va_end(ap);
 	return ret;
@@ -494,6 +498,18 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 		printk(KERN_WARNING
 		       "XENBUS Failed to release watch %s: %i\n",
 		       watch->node, err);
+}
+
+/* Re-register callbacks to all watches. */
+void reregister_xenbus_watches(void)
+{
+	struct xenbus_watch *watch;
+	char token[sizeof(watch) * 2 + 1];
+
+	list_for_each_entry(watch, &watches, list) {
+		sprintf(token, "%lX", (long)watch);
+		xs_watch(watch->node, token);
+	}
 }
 
 static int watch_thread(void *unused)

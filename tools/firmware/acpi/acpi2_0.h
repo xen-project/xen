@@ -18,7 +18,7 @@
 #ifndef _ACPI_2_0_H_
 #define _ACPI_2_0_H_
 
-#include "xc.h"  // for u8, u16, u32, u64 definition
+#include "xenctrl.h"  // for u8, u16, u32, u64 definition
 
 #pragma pack (1)
 

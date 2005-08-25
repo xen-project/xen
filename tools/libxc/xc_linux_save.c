@@ -7,11 +7,15 @@
  */
 
 #include <inttypes.h>
+#include <time.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <sys/time.h>
-#include "xc_private.h"
+
+#include "xg_private.h"
+
 #include <xen/linux/suspend.h>
 #include <xen/io/domain_controller.h>
-#include <time.h>
 
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
 
@@ -20,7 +24,7 @@
 #define DEBUG 0
 
 #if 1
-#define ERR(_f, _a...) fprintf ( stderr, _f , ## _a )
+#define ERR(_f, _a...) do { fprintf(stderr, _f , ## _a); fflush(stderr); } while (0)
 #else
 #define ERR(_f, _a...) ((void)0)
 #endif
@@ -136,7 +140,7 @@ static long long tv_to_us( struct timeval *new )
     return (new->tv_sec * 1000000) + new->tv_usec;
 }
 
-static long long llgettimeofday()
+static long long llgettimeofday( void )
 {
     struct timeval now;
     gettimeofday(&now, NULL);
@@ -312,9 +316,9 @@ static int analysis_phase( int xc_handle, u32 domid,
 }
 
 
-int suspend_and_state(int xc_handle, int io_fd,	int dom,	      
-                      xc_dominfo_t *info,
-                      vcpu_guest_context_t *ctxt)
+static int suspend_and_state(int xc_handle, int io_fd,	int dom,	      
+                             xc_dominfo_t *info,
+                             vcpu_guest_context_t *ctxt)
 {
     int i=0;
     char ans[30];
@@ -429,7 +433,7 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
        - that should be sent this iteration (unless later marked as skip); 
        - to skip this iteration because already dirty;
        - to fixup by sending at the end if not already resent; */
-    unsigned long *to_send, *to_skip, *to_fix;
+    unsigned long *to_send = NULL, *to_skip = NULL, *to_fix = NULL;
     
     xc_shadow_control_stats_t stats;
 
@@ -643,6 +647,22 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
         goto out;
     }
 
+    /* Map the suspend-record MFN to pin it. The page must be owned by 
+       dom for this to succeed. */
+    p_srec = xc_map_foreign_range(xc_handle, dom,
+                                   sizeof(*p_srec), PROT_READ | PROT_WRITE, 
+                                   ctxt.user_regs.esi);
+    if (!p_srec){
+        ERR("Couldn't map suspend record");
+        goto out;
+    }
+
+    /* Canonicalize store mfn. */
+    if ( !translate_mfn_to_pfn(&p_srec->resume_info.store_mfn) ) {
+	ERR("Store frame is not in range of pseudophys map");
+	goto out;
+    }
+
     print_stats( xc_handle, dom, 0, &stats, 0 );
 
     /* Now write out each data page, canonicalising page tables as we go... */
@@ -756,7 +776,7 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
                 goto out;
             }
      
-            if ( get_pfn_type_batch(xc_handle, dom, batch, pfn_type) ){
+            if ( xc_get_pfn_type_batch(xc_handle, dom, batch, pfn_type) ){
                 ERR("get_pfn_type_batch failed");
                 goto out;
             }
@@ -983,16 +1003,6 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
 	}
     }
 
-    /* Map the suspend-record MFN to pin it. The page must be owned by 
-       dom for this to succeed. */
-    p_srec = xc_map_foreign_range(xc_handle, dom,
-                                   sizeof(*p_srec), PROT_READ, 
-                                   ctxt.user_regs.esi);
-    if (!p_srec){
-        ERR("Couldn't map suspend record");
-        goto out;
-    }
-
     if (nr_pfns != p_srec->nr_pfns )
     {
 	ERR("Suspend record nr_pfns unexpected (%ld != %ld)",
@@ -1045,8 +1055,11 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
     if(live_mfn_to_pfn_table) 
         munmap(live_mfn_to_pfn_table, PAGE_SIZE*1024);
 
-    if (pfn_type != NULL) 
-        free(pfn_type);
+    free(pfn_type);
+    free(pfn_batch);
+    free(to_send);
+    free(to_fix);
+    free(to_skip);
 
     DPRINTF("Save exit rc=%d\n",rc);
     return !!rc;

@@ -34,10 +34,10 @@ clean:
 
 xcsdump: xcsdump.c dump.c
 	$(CC) $(CFLAGS) -o xcsdump xcsdump.c -L$(XEN_LIBXC) \
-              ctrl_interface.c evtchn.c dump.c -lxc
+              ctrl_interface.c evtchn.c dump.c -lxenctrl
 
 $(BIN): $(OBJS)
-	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -lxc 
+	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -lxenctrl 
 
 $(OBJS): $(HDRS)
 

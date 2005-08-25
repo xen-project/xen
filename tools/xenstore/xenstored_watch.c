@@ -95,9 +95,18 @@ static int destroy_watch_event(void *_event)
 	return 0;
 }
 
-static void add_event(struct watch *watch, const char *node)
+static void add_event(struct connection *conn,
+		      struct watch *watch, const char *node)
 {
 	struct watch_event *event;
+
+	/* Check read permission: no permission, no watch event.
+	 * If it doesn't exist, we need permission to read parent.
+	 */
+	if (!check_node_perms(conn, node, XS_PERM_READ|XS_PERM_ENOENT_OK)) {
+		fprintf(stderr, "No permission for %s\n", node);
+		return;
+	}
 
 	if (watch->relative_path) {
 		node += strlen(watch->relative_path);
@@ -132,9 +141,9 @@ void fire_watches(struct connection *conn, const char *node, bool recurse)
 
 		list_for_each_entry(watch, &i->watches, list) {
 			if (is_child(node, watch->node))
-				add_event(watch, node);
+				add_event(i, watch, node);
 			else if (recurse && is_child(watch->node, node))
-				add_event(watch, watch->node);
+				add_event(i, watch, watch->node);
 			else
 				continue;
 			/* If connection not doing anything, queue this. */
@@ -206,7 +215,7 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 
 	relative = !strstarts(vec[0], "/");
 	vec[0] = canonicalize(conn, vec[0]);
-	if (!check_node_perms(conn, vec[0], XS_PERM_READ)) {
+	if (!is_valid_nodename(vec[0])) {
 		send_error(conn, errno);
 		return;
 	}

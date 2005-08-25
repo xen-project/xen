@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.12-xen0
-# Wed Jun 29 10:01:20 2005
+# Linux kernel version: 2.6.12.4-xen0
+# Mon Aug 15 18:57:19 2005
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -14,10 +14,11 @@ CONFIG_XEN_PRIVILEGED_GUEST=y
 CONFIG_XEN_PHYSDEV_ACCESS=y
 CONFIG_XEN_BLKDEV_BACKEND=y
 # CONFIG_XEN_BLKDEV_TAP_BE is not set
-CONFIG_XEN_BLKDEV_GRANT=y
 CONFIG_XEN_NETDEV_BACKEND=y
 CONFIG_XEN_BLKDEV_FRONTEND=y
 CONFIG_XEN_NETDEV_FRONTEND=y
+CONFIG_XEN_NETDEV_GRANT_TX=y
+CONFIG_XEN_NETDEV_GRANT_RX=y
 # CONFIG_XEN_NETDEV_FRONTEND_PIPELINED_TRANSMITTER is not set
 # CONFIG_XEN_BLKDEV_TAP is not set
 # CONFIG_XEN_SHADOW_MODE is not set
@@ -50,6 +51,7 @@ CONFIG_KOBJECT_UEVENT=y
 # CONFIG_IKCONFIG is not set
 # CONFIG_EMBEDDED is not set
 CONFIG_KALLSYMS=y
+# CONFIG_KALLSYMS_ALL is not set
 # CONFIG_KALLSYMS_EXTRA_PASS is not set
 CONFIG_PRINTK=y
 CONFIG_BUG=y
@@ -116,9 +118,11 @@ CONFIG_EARLY_PRINTK=y
 CONFIG_GENERIC_CPU=y
 CONFIG_X86_L1_CACHE_BYTES=128
 # CONFIG_X86_TSC is not set
+CONFIG_X86_XEN_GENAPIC=y
 # CONFIG_X86_MSR is not set
 # CONFIG_GART_IOMMU is not set
 CONFIG_DUMMY_IOMMU=y
+CONFIG_SWIOTLB=y
 # CONFIG_X86_MCE is not set
 
 #
@@ -160,6 +164,7 @@ CONFIG_BINFMT_MISC=y
 CONFIG_STANDALONE=y
 # CONFIG_PREVENT_FIRMWARE_BUILD is not set
 # CONFIG_FW_LOADER is not set
+# CONFIG_DEBUG_DRIVER is not set
 
 #
 # Memory Technology Devices (MTD)
@@ -369,7 +374,23 @@ CONFIG_SCSI_QLA2XXX=y
 #
 # Multi-device support (RAID and LVM)
 #
-# CONFIG_MD is not set
+CONFIG_MD=y
+CONFIG_BLK_DEV_MD=y
+CONFIG_MD_LINEAR=y
+CONFIG_MD_RAID0=y
+CONFIG_MD_RAID1=y
+# CONFIG_MD_RAID10 is not set
+# CONFIG_MD_RAID5 is not set
+# CONFIG_MD_RAID6 is not set
+CONFIG_MD_MULTIPATH=y
+# CONFIG_MD_FAULTY is not set
+CONFIG_BLK_DEV_DM=y
+CONFIG_DM_CRYPT=y
+CONFIG_DM_SNAPSHOT=y
+CONFIG_DM_MIRROR=y
+# CONFIG_DM_ZERO is not set
+CONFIG_DM_MULTIPATH=y
+CONFIG_DM_MULTIPATH_EMC=y
 
 #
 # Fusion MPT device support
@@ -458,7 +479,7 @@ CONFIG_IP_NF_MATCH_IPRANGE=m
 # CONFIG_IP_NF_MATCH_STATE is not set
 # CONFIG_IP_NF_MATCH_CONNTRACK is not set
 # CONFIG_IP_NF_MATCH_OWNER is not set
-# CONFIG_IP_NF_MATCH_PHYSDEV is not set
+CONFIG_IP_NF_MATCH_PHYSDEV=y
 # CONFIG_IP_NF_MATCH_ADDRTYPE is not set
 # CONFIG_IP_NF_MATCH_REALM is not set
 # CONFIG_IP_NF_MATCH_SCTP is not set
@@ -589,7 +610,7 @@ CONFIG_E1000=y
 # CONFIG_HAMACHI is not set
 # CONFIG_YELLOWFIN is not set
 # CONFIG_R8169 is not set
-# CONFIG_SK98LIN is not set
+CONFIG_SK98LIN=y
 # CONFIG_VIA_VELOCITY is not set
 CONFIG_TIGON3=y
 # CONFIG_BNX2 is not set
@@ -786,7 +807,107 @@ CONFIG_DUMMY_CONSOLE=y
 #
 CONFIG_USB_ARCH_HAS_HCD=y
 CONFIG_USB_ARCH_HAS_OHCI=y
-# CONFIG_USB is not set
+CONFIG_USB=y
+# CONFIG_USB_DEBUG is not set
+
+#
+# Miscellaneous USB options
+#
+# CONFIG_USB_DEVICEFS is not set
+# CONFIG_USB_BANDWIDTH is not set
+# CONFIG_USB_DYNAMIC_MINORS is not set
+# CONFIG_USB_OTG is not set
+
+#
+# USB Host Controller Drivers
+#
+# CONFIG_USB_EHCI_HCD is not set
+CONFIG_USB_OHCI_HCD=y
+# CONFIG_USB_OHCI_BIG_ENDIAN is not set
+CONFIG_USB_OHCI_LITTLE_ENDIAN=y
+CONFIG_USB_UHCI_HCD=y
+# CONFIG_USB_SL811_HCD is not set
+
+#
+# USB Device Class drivers
+#
+# CONFIG_USB_BLUETOOTH_TTY is not set
+# CONFIG_USB_ACM is not set
+# CONFIG_USB_PRINTER is not set
+
+#
+# NOTE: USB_STORAGE enables SCSI, and 'SCSI disk support' may also be needed; see USB_STORAGE Help for more information
+#
+# CONFIG_USB_STORAGE is not set
+
+#
+# USB Input Devices
+#
+CONFIG_USB_HID=y
+CONFIG_USB_HIDINPUT=y
+# CONFIG_HID_FF is not set
+# CONFIG_USB_HIDDEV is not set
+# CONFIG_USB_AIPTEK is not set
+# CONFIG_USB_WACOM is not set
+# CONFIG_USB_KBTAB is not set
+# CONFIG_USB_POWERMATE is not set
+# CONFIG_USB_MTOUCH is not set
+# CONFIG_USB_EGALAX is not set
+# CONFIG_USB_XPAD is not set
+# CONFIG_USB_ATI_REMOTE is not set
+
+#
+# USB Imaging devices
+#
+# CONFIG_USB_MDC800 is not set
+# CONFIG_USB_MICROTEK is not set
+
+#
+# USB Multimedia devices
+#
+# CONFIG_USB_DABUSB is not set
+
+#
+# Video4Linux support is needed for USB Multimedia device support
+#
+
+#
+# USB Network Adapters
+#
+# CONFIG_USB_CATC is not set
+# CONFIG_USB_KAWETH is not set
+# CONFIG_USB_PEGASUS is not set
+# CONFIG_USB_RTL8150 is not set
+# CONFIG_USB_USBNET is not set
+CONFIG_USB_MON=y
+
+#
+# USB port drivers
+#
+
+#
+# USB Serial Converter support
+#
+# CONFIG_USB_SERIAL is not set
+
+#
+# USB Miscellaneous drivers
+#
+# CONFIG_USB_EMI62 is not set
+# CONFIG_USB_EMI26 is not set
+# CONFIG_USB_AUERSWALD is not set
+# CONFIG_USB_RIO500 is not set
+# CONFIG_USB_LEGOTOWER is not set
+# CONFIG_USB_LCD is not set
+# CONFIG_USB_LED is not set
+# CONFIG_USB_CYTHERM is not set
+# CONFIG_USB_PHIDGETKIT is not set
+# CONFIG_USB_PHIDGETSERVO is not set
+# CONFIG_USB_IDMOUSE is not set
+
+#
+# USB ATM/DSL drivers
+#
 
 #
 # USB Gadget Support
@@ -801,7 +922,12 @@ CONFIG_USB_ARCH_HAS_OHCI=y
 #
 # InfiniBand support
 #
-# CONFIG_INFINIBAND is not set
+CONFIG_INFINIBAND=y
+CONFIG_INFINIBAND_MTHCA=y
+CONFIG_INFINIBAND_MTHCA_DEBUG=y
+CONFIG_INFINIBAND_IPOIB=y
+CONFIG_INFINIBAND_IPOIB_DEBUG=y
+CONFIG_INFINIBAND_IPOIB_DEBUG_DATA=y
 
 #
 # Power management options
@@ -1036,7 +1162,22 @@ CONFIG_ZLIB_INFLATE=y
 # Kernel hacking
 #
 # CONFIG_PRINTK_TIME is not set
-# CONFIG_DEBUG_KERNEL is not set
-CONFIG_LOG_BUF_SHIFT=14
+CONFIG_DEBUG_KERNEL=y
+CONFIG_MAGIC_SYSRQ=y
+CONFIG_LOG_BUF_SHIFT=15
+# CONFIG_SCHEDSTATS is not set
+# CONFIG_DEBUG_SLAB is not set
+# CONFIG_DEBUG_SPINLOCK is not set
+# CONFIG_DEBUG_SPINLOCK_SLEEP is not set
+# CONFIG_DEBUG_KOBJECT is not set
+# CONFIG_DEBUG_INFO is not set
+# CONFIG_DEBUG_FS is not set
+# CONFIG_DEBUG_STACKOVERFLOW is not set
+# CONFIG_KPROBES is not set
+# CONFIG_DEBUG_STACK_USAGE is not set
+# CONFIG_DEBUG_PAGEALLOC is not set
+# CONFIG_4KSTACKS is not set
 CONFIG_X86_FIND_SMP_CONFIG=y
 CONFIG_X86_MPPARSE=y
+# CONFIG_CHECKING is not set
+# CONFIG_INIT_DEBUG is not set

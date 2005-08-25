@@ -189,6 +189,9 @@ typedef struct { u64 pfn; } pagetable_t;
 #define virt_to_page(kaddr) (frame_table + (__pa(kaddr) >> PAGE_SHIFT))
 #define pfn_valid(_pfn)     ((_pfn) < max_page)
 
+#define pfn_to_phys(pfn)    ((physaddr_t)(pfn) << PAGE_SHIFT)
+#define phys_to_pfn(pa)     ((unsigned long)((pa) >> PAGE_SHIFT))
+
 /* High table entries are reserved by the hypervisor. */
 #if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
 #define DOMAIN_ENTRIES_PER_L2_PAGETABLE     \
@@ -208,20 +211,21 @@ typedef struct { u64 pfn; } pagetable_t;
      + DOMAIN_ENTRIES_PER_L4_PAGETABLE)
 #endif
 
-#define linear_l1_table                                                 \
+#define LINEAR_PT_OFFSET (LINEAR_PT_VIRT_START & VADDR_MASK)
+#define linear_l1_table                                             \
     ((l1_pgentry_t *)(LINEAR_PT_VIRT_START))
-#define __linear_l2_table                                               \
-    ((l2_pgentry_t *)(LINEAR_PT_VIRT_START +                            \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0))))
-#define __linear_l3_table                                               \
-    ((l3_pgentry_t *)(LINEAR_PT_VIRT_START +                            \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0)) +   \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<1))))
-#define __linear_l4_table                                               \
-    ((l4_pgentry_t *)(LINEAR_PT_VIRT_START +                            \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0)) +   \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<1)) +   \
-                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<2))))
+#define __linear_l2_table                                           \
+    ((l2_pgentry_t *)(LINEAR_PT_VIRT_START +                        \
+                     (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<0))))
+#define __linear_l3_table                                           \
+    ((l3_pgentry_t *)(LINEAR_PT_VIRT_START +                        \
+                     (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<0)) +   \
+                     (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<1))))
+#define __linear_l4_table                                           \
+    ((l4_pgentry_t *)(LINEAR_PT_VIRT_START +                        \
+                     (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<0)) +   \
+                     (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<1)) +   \
+                     (LINEAR_PT_OFFSET >> (PAGETABLE_ORDER<<2))))
 
 #define linear_pg_table linear_l1_table
 #define linear_l2_table(_ed) ((_ed)->arch.guest_vtable)
@@ -279,13 +283,9 @@ extern void paging_init(void);
 static __inline__ int get_order(unsigned long size)
 {
     int order;
-    
-    size = (size-1) >> (PAGE_SHIFT-1);
-    order = -1;
-    do {
+    size = (size-1) >> PAGE_SHIFT;
+    for ( order = 0; size; order++ )
         size >>= 1;
-        order++;
-    } while (size);
     return order;
 }
 

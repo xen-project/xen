@@ -631,12 +631,14 @@ static inline int irq_masked(unsigned long eflags)
     return ((eflags & X86_EFLAGS_IF) == 0);
 }
 
-void vmx_intr_assist(struct vcpu *v) 
+asmlinkage void vmx_intr_assist(void) 
 {
     int intr_type = 0;
-    int highest_vector = find_highest_pending_irq(v, &intr_type);
+    int highest_vector;
     unsigned long intr_fields, eflags, interruptibility, cpu_exec_control;
+    struct vcpu *v = current;
 
+    highest_vector = find_highest_pending_irq(v, &intr_type);
     __vmread(CPU_BASED_VM_EXEC_CONTROL, &cpu_exec_control);
 
     if (highest_vector == -1) {
@@ -712,9 +714,6 @@ void vmx_do_resume(struct vcpu *d)
 
     /* We can't resume the guest if we're waiting on I/O */
     ASSERT(!test_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags));
-
-    /* We always check for interrupts before resuming guest */
-    vmx_intr_assist(d);
 }
 
 #endif /* CONFIG_VMX */

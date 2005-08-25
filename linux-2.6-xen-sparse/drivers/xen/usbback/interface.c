@@ -6,15 +6,6 @@
  * by Mark Williamson, Copyright (c) 2004
  */
 
-
-/******************************************************************************
- * arch/xen/drivers/blkif/backend/interface.c
- * 
- * Block-device interface management.
- * 
- * Copyright (c) 2004, Keir Fraser
- */
-
 #include "common.h"
 
 #define USBIF_HASHSZ 1024
@@ -42,7 +33,6 @@ static void __usbif_disconnect_complete(void *arg)
      * may be outstanding requests at the device whose asynchronous responses
      * must still be notified to the remote driver.
      */
-    unbind_evtchn_from_irq(usbif->evtchn);
     vfree(usbif->usb_ring.sring);
 
     /* Construct the deferred response message. */
@@ -198,12 +188,12 @@ void usbif_connect(usbif_be_connect_t *connect)
     BACK_RING_INIT(&up->usb_ring, sring, PAGE_SIZE);
 
     up->evtchn        = evtchn;
-    up->irq           = bind_evtchn_to_irq(evtchn);
     up->shmem_frame   = shmem_frame;
     up->status        = CONNECTED;
     usbif_get(up);
 
-    request_irq(up->irq, usbif_be_int, 0, "usbif-backend", up);
+    (void)bind_evtchn_to_irqhandler(
+        evtchn, usbif_be_int, 0, "usbif-backend", up);
 
     connect->status = USBIF_BE_STATUS_OKAY;
 }
@@ -233,7 +223,7 @@ int usbif_disconnect(usbif_be_disconnect_t *disconnect, u8 rsp_id)
         up->status = DISCONNECTING;
         up->disconnect_rspid = rsp_id;
         wmb(); /* Let other CPUs see the status change. */
-        free_irq(up->irq, up);
+        unbind_evtchn_from_irqhandler(up->evtchn, up);
 	usbif_deschedule(up);
         usbif_put(up);
         return 0; /* Caller should not send response message. */

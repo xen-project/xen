@@ -1,6 +1,21 @@
 /* 
  * Python interface to the Xen Store Daemon.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of version 2.1 of the GNU Lesser General Public
+ * License as published by the Free Software Foundation.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
  * Copyright (C) 2005 Mike Wray Hewlett-Packard
+ *
  */
 
 #include <Python.h>
@@ -253,12 +268,10 @@ static PyObject *xspy_get_permissions(PyObject *self, PyObject *args,
     }
     val = PyList_New(perms_n);
     for (i = 0; i < perms_n; i++, perms++) {
-        PyObject *p = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i}",
-                                    "dom",    perms->id,
-                                    "read",   (perms->perms & XS_PERM_READ),
-                                    "write",  (perms->perms & XS_PERM_WRITE),
-                                    "create", (perms->perms & XS_PERM_CREATE),
-                                    "owner",  (perms->perms & XS_PERM_OWNER));
+        PyObject *p = Py_BuildValue("{s:i,s:i,s:i}",
+                                    "dom",   perms->id,
+                                    "read",  (perms->perms & XS_PERM_READ),
+                                    "write",  (perms->perms & XS_PERM_WRITE));
         PyList_SetItem(val, i, p);
     }
  exit:
@@ -281,8 +294,7 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
     static char *arg_spec = "sO";
     char *path = NULL;
     PyObject *perms = NULL;
-    static char *perm_names[] = { "dom", "read", "write", "create", "owner",
-				  NULL };
+    static char *perm_names[] = { "dom", "read", "write", NULL };
     static char *perm_spec = "i|iiii";
 
     struct xs_handle *xh = xshandle(self);
@@ -315,15 +327,9 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
         int dom = 0;
         /* Read/write perms. Set these. */
         int p_read = 0, p_write = 0;
-        /* Create/owner perms. Ignore them.
-         * This is so the output from get_permissions() can be used
-         * as input to set_permissions().
-         */
-        int p_create = 0, p_owner = 0;
         PyObject *p = PyList_GetItem(perms, i);
         if (!PyArg_ParseTupleAndKeywords(tuple0, p, perm_spec, perm_names,
-					 &dom, &p_read, &p_write, &p_create,
-					 &p_owner))
+					 &dom, &p_read, &p_write))
             goto exit;
         xsperms[i].id = dom;
         if (p_read)
@@ -343,7 +349,6 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
 #define xspy_watch_doc "\n"						\
 	"Watch a path, get notifications when it changes.\n"		\
 	" path     [string] : xenstore path.\n"				\
-	" priority [int]    : watch priority (default 0).\n"		\
 	" token    [string] : returned in watch notification.\n"	\
 	"\n"								\
 	"Returns: [int] 0 on success.\n"				\
@@ -352,10 +357,9 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
 
 static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwd_spec[] = { "path", "priority", "token", NULL };
+    static char *kwd_spec[] = { "path", "token", NULL };
     static char *arg_spec = "s|is";
     char *path = NULL;
-    int priority = 0;
     char *token = "";
 
     struct xs_handle *xh = xshandle(self);
@@ -365,7 +369,7 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
     if (!xh)
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, 
-                                     &path, &priority, &token))
+                                     &path, &token))
         goto exit;
     xsval = xs_watch(xh, path, token);
     val = pyvalue_int(xsval);

@@ -62,19 +62,46 @@ void copy_page(void *, void *);
 #define __HAVE_ARCH_ALLOC_ZEROED_USER_HIGHPAGE
 
 /**** MACHINE <-> PHYSICAL CONVERSION MACROS ****/
+#define INVALID_P2M_ENTRY	(~0U)
+#define FOREIGN_FRAME(m)	((m) | 0x80000000U)
 extern u32 *phys_to_machine_mapping;
-#define pfn_to_mfn(_pfn) ((unsigned long) phys_to_machine_mapping[(unsigned int)(_pfn)])
-#define mfn_to_pfn(_mfn) ((unsigned long) machine_to_phys_mapping[(unsigned int)(_mfn)])
-static inline unsigned long phys_to_machine(unsigned long phys)
+#define pfn_to_mfn(pfn)	\
+((unsigned long)phys_to_machine_mapping[(unsigned int)(pfn)] & 0x7FFFFFFFUL)
+static inline unsigned long mfn_to_pfn(unsigned long mfn)
 {
-	unsigned long machine = pfn_to_mfn(phys >> PAGE_SHIFT);
+	unsigned int pfn;
+
+	/*
+	 * The array access can fail (e.g., device space beyond end of RAM).
+	 * In such cases it doesn't matter what we return (we return garbage),
+	 * but we must handle the fault without crashing!
+	 */
+	asm (
+		"1:	movl %1,%k0\n"
+		"2:\n"
+		".section __ex_table,\"a\"\n"
+		"	.align 8\n"
+		"	.quad 1b,2b\n"
+		".previous"
+		: "=r" (pfn) : "m" (machine_to_phys_mapping[mfn]) );
+
+	return (unsigned long)pfn;
+}
+
+/* Definitions for machine and pseudophysical addresses. */
+typedef unsigned long paddr_t;
+typedef unsigned long maddr_t;
+
+static inline maddr_t phys_to_machine(paddr_t phys)
+{
+	maddr_t machine = pfn_to_mfn(phys >> PAGE_SHIFT);
 	machine = (machine << PAGE_SHIFT) | (phys & ~PAGE_MASK);
 	return machine;
 }
 
-static inline unsigned long machine_to_phys(unsigned long machine)
+static inline paddr_t machine_to_phys(maddr_t machine)
 {
-	unsigned long phys = mfn_to_pfn(machine >> PAGE_SHIFT);
+	paddr_t phys = mfn_to_pfn(machine >> PAGE_SHIFT);
 	phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
 	return phys;
 }
@@ -211,8 +238,10 @@ extern __inline__ int get_order(unsigned long size)
 #define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)
 
 /* VIRT <-> MACHINE conversion */
-#define virt_to_machine(_a)	(phys_to_machine(__pa(_a)))
-#define machine_to_virt(_m)	(__va(machine_to_phys(_m)))
+#define virt_to_machine(v)	(phys_to_machine(__pa(v)))
+#define machine_to_virt(m)	(__va(machine_to_phys(m)))
+#define virt_to_mfn(v)		(pfn_to_mfn(__pa(v) >> PAGE_SHIFT))
+#define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
 
 #define VM_DATA_DEFAULT_FLAGS \
 	(((current->personality & READ_IMPLIES_EXEC) ? VM_EXEC : 0 ) | \

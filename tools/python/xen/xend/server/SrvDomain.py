@@ -1,10 +1,24 @@
-# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+#============================================================================
 
 from xen.web import http
 
 from xen.xend import sxp
 from xen.xend import XendDomain
-from xen.xend import XendConsole
 from xen.xend import PrettyPrint
 from xen.xend.Args import FormFn
 
@@ -18,7 +32,6 @@ class SrvDomain(SrvDir):
         SrvDir.__init__(self)
         self.dom = dom
         self.xd = XendDomain.instance()
-        self.xconsole = XendConsole.instance()
 
     def op_configure(self, op, req):
         """Configure an existing domain.
@@ -41,9 +54,17 @@ class SrvDomain(SrvDir):
     def op_shutdown(self, op, req):
         fn = FormFn(self.xd.domain_shutdown,
                     [['dom',    'int'],
-                     ['reason', 'str'],
-                     ['key',    'int']])
+                     ['reason', 'str']])
         val = fn(req.args, {'dom': self.dom.id})
+        req.setResponseCode(http.ACCEPTED)
+        req.setHeader("Location", "%s/.." % req.prePathURL())
+        return val
+
+    def op_sysrq(self, op, req):
+        fn = FormFn(self.xd.domain_sysrq,
+                    [['dom',    'int'],
+                     ['key',    'int']])
+        val = fn(req.args, {'dom' : self.dom.id})
         req.setResponseCode(http.ACCEPTED)
         req.setHeader("Location", "%s/.." % req.prePathURL())
         return val
@@ -208,14 +229,6 @@ class SrvDomain(SrvDir):
             self.print_path(req)
             #self.ls()
             req.write('<p>%s</p>' % self.dom)
-            if self.dom.console:
-                cinfo = self.dom.console
-                cid = str(cinfo.console_port)
-                #todo: Local xref: need to know server prefix.
-                req.write('<p><a href="/xend/console/%s">Console %s</a></p>'
-                          % (cid, cid))
-                req.write('<p><a href="%s">Connect to console</a></p>'
-                          % cinfo.uri())
             if self.dom.config:
                 req.write("<code><pre>")
                 PrettyPrint.prettyprint(self.dom.config, out=req)

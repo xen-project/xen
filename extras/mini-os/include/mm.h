@@ -43,13 +43,27 @@
 #define PADDR_MASK              ((1UL << PADDR_BITS)-1)
 #define VADDR_MASK              ((1UL << VADDR_BITS)-1)
 
-#define pte_to_mfn(_pte) (((_pte) & (PADDR_MASK&PAGE_MASK)) >> PAGE_SHIFT)
+#define pte_to_mfn(_pte) (((_pte) & (PADDR_MASK&PAGE_MASK)) >> L1_PAGETABLE_SHIFT)
+
+#endif
+
+
+
+#ifdef __i386__
+
+#define L1_PAGETABLE_SHIFT      12
+#define L2_PAGETABLE_SHIFT      22
+
+#define L1_PAGETABLE_ENTRIES    1024
+#define L2_PAGETABLE_ENTRIES    1024
+#endif
 
 /* Given a virtual address, get an entry offset into a page table. */
 #define l1_table_offset(_a) \
   (((_a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1))
 #define l2_table_offset(_a) \
   (((_a) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1))
+#ifdef __x86_64__
 #define l3_table_offset(_a) \
   (((_a) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1))
 #define l4_table_offset(_a) \
@@ -67,13 +81,16 @@
 #define _PAGE_PSE      0x080UL
 #define _PAGE_GLOBAL   0x100UL
 
-#define PAGE_SHIFT      12
-#define PAGE_SIZE       (1UL << PAGE_SHIFT)
+#define L1_PROT (_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED)
+#define L2_PROT (_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_USER)
+
+#define PAGE_SIZE       (1UL << L1_PAGETABLE_SHIFT)
+#define PAGE_SHIFT      L1_PAGETABLE_SHIFT
 #define PAGE_MASK       (~(PAGE_SIZE-1))
 
-#define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
-#define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
-#define PFN_PHYS(x)	((x) << PAGE_SHIFT)
+#define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> L1_PAGETABLE_SHIFT)
+#define PFN_DOWN(x)	((x) >> L1_PAGETABLE_SHIFT)
+#define PFN_PHYS(x)	((x) << L1_PAGETABLE_SHIFT)
 
 /* to align the pointer to the (next) page boundary */
 #define PAGE_ALIGN(addr)        (((addr)+PAGE_SIZE-1)&PAGE_MASK)
@@ -83,14 +100,14 @@ extern unsigned long *phys_to_machine_mapping;
 #define mfn_to_pfn(_mfn) (machine_to_phys_mapping[(_mfn)])
 static __inline__ unsigned long phys_to_machine(unsigned long phys)
 {
-    unsigned long machine = pfn_to_mfn(phys >> PAGE_SHIFT);
-    machine = (machine << PAGE_SHIFT) | (phys & ~PAGE_MASK);
+    unsigned long machine = pfn_to_mfn(phys >> L1_PAGETABLE_SHIFT);
+    machine = (machine << L1_PAGETABLE_SHIFT) | (phys & ~PAGE_MASK);
     return machine;
 }
 static __inline__ unsigned long machine_to_phys(unsigned long machine)
 {
-    unsigned long phys = mfn_to_pfn(machine >> PAGE_SHIFT);
-    phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
+    unsigned long phys = mfn_to_pfn(machine >> L1_PAGETABLE_SHIFT);
+    phys = (phys << L1_PAGETABLE_SHIFT) | (machine & ~PAGE_MASK);
     return phys;
 }
 
@@ -105,7 +122,10 @@ static __inline__ unsigned long machine_to_phys(unsigned long machine)
 #define __va to_virt
 #define __pa to_phys
 
+#define virt_to_pfn(_virt)         (PFN_DOWN(to_phys(_virt)))
+
 void init_mm(void);
 unsigned long alloc_pages(int order);
+int is_mfn_mapped(unsigned long mfn);
 
 #endif /* _MM_H_ */

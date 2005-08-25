@@ -1575,19 +1575,20 @@ void __init setup_arch(char **cmdline_p)
 	/* Make sure we have a correctly sized P->M table. */
 	if (max_pfn != xen_start_info.nr_pages) {
 		phys_to_machine_mapping = alloc_bootmem_low_pages(
-			max_pfn * sizeof(unsigned long));
+			max_pfn * sizeof(unsigned int));
 
 		if (max_pfn > xen_start_info.nr_pages) {
 			/* set to INVALID_P2M_ENTRY */
 			memset(phys_to_machine_mapping, ~0,
-				max_pfn * sizeof(unsigned long));
+				max_pfn * sizeof(unsigned int));
 			memcpy(phys_to_machine_mapping,
-				(unsigned long *)xen_start_info.mfn_list,
-				xen_start_info.nr_pages * sizeof(unsigned long));
+				(unsigned int *)xen_start_info.mfn_list,
+				xen_start_info.nr_pages * sizeof(unsigned int));
 		} else {
 			memcpy(phys_to_machine_mapping,
-				(unsigned long *)xen_start_info.mfn_list,
-				max_pfn * sizeof(unsigned long));
+				(unsigned int *)xen_start_info.mfn_list,
+				max_pfn * sizeof(unsigned int));
+			/* N.B. below relies on sizeof(int) == sizeof(long). */
 			if (HYPERVISOR_dom_mem_op(
 				MEMOP_decrease_reservation,
 				(unsigned long *)xen_start_info.mfn_list + max_pfn,
@@ -1597,18 +1598,17 @@ void __init setup_arch(char **cmdline_p)
 		free_bootmem(
 			__pa(xen_start_info.mfn_list), 
 			PFN_PHYS(PFN_UP(xen_start_info.nr_pages *
-			sizeof(unsigned long))));
+			sizeof(unsigned int))));
 	}
 
 	pfn_to_mfn_frame_list = alloc_bootmem_low_pages(PAGE_SIZE);
-	for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
+	for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned int)), j++ )
 	{	
 	     pfn_to_mfn_frame_list[j] = 
-		  virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
+		  virt_to_mfn(&phys_to_machine_mapping[i]);
 	}
 	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
-	     virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
-
+	     virt_to_mfn(pfn_to_mfn_frame_list);
 
 	/*
 	 * NOTE: at this point the bootmem allocator is fully available.
@@ -1636,7 +1636,7 @@ void __init setup_arch(char **cmdline_p)
 		efi_map_memmap();
 
 	op.cmd             = PHYSDEVOP_SET_IOPL;
-	op.u.set_iopl.iopl = current->thread.io_pl = 1;
+	op.u.set_iopl.iopl = 1;
 	HYPERVISOR_physdev_op(&op);
 
 #ifdef CONFIG_ACPI_BOOT

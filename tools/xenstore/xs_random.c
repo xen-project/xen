@@ -303,6 +303,34 @@ static bool file_set_perms(struct file_ops_info *info,
 	return true;
 }
 
+static char *parent_filename(const char *name)
+{
+	char *slash = strrchr(name + 1, '/');
+	if (!slash)
+		return talloc_strdup(name, "/");
+	return talloc_asprintf(name, "%.*s", slash-name, name);
+}
+
+static void make_dirs(const char *filename)
+{
+	struct stat st;
+
+	if (lstat(filename, &st) == 0 && S_ISREG(st.st_mode))
+		convert_to_dir(filename);
+
+	if (mkdir(filename, 0700) == 0) {
+		init_perms(filename);
+		return;
+	}
+	if (errno == EEXIST)
+		return;
+
+	make_dirs(parent_filename(filename));
+	if (mkdir(filename, 0700) != 0)
+		barf_perror("Failed to mkdir %s", filename);
+	init_perms(filename);
+}
+
 static bool file_write(struct file_ops_info *info,
 		       const char *path, const void *data,
 		       unsigned int len, int createflags)
@@ -329,6 +357,9 @@ static bool file_write(struct file_ops_info *info,
 		}
 	}
 
+	if (createflags & O_CREAT)
+		make_dirs(parent_filename(filename));
+
 	fd = open(filename, createflags|O_TRUNC|O_WRONLY, 0600);
 	if (fd < 0) {
 		/* FIXME: Another hack. */
@@ -349,19 +380,13 @@ static bool file_mkdir(struct file_ops_info *info, const char *path)
 {
 	char *dirname = path_to_name(info, path);
 
-	/* Same effective order as daemon, so error returns are right. */
-	if (mkdir(dirname, 0700) != 0) {
-		if (errno != ENOENT && errno != ENOTDIR)
-			write_ok(info, path);
+	if (!write_ok(info, path))
 		return false;
-	}
 
-	if (!write_ok(info, path)) {
-		int saved_errno = errno;
-		rmdir(dirname);
-		errno = saved_errno;
+	make_dirs(parent_filename(dirname));
+	if (mkdir(dirname, 0700) != 0)
 		return false;
-	}
+
 	init_perms(dirname);
 	return true;
 }
@@ -427,7 +452,7 @@ static bool file_transaction_end(struct file_ops_info *info, bool abort)
 	}
 
 	if (abort) {
-		cmd = talloc_asprintf(NULL, "rm -r %s", info->transact_base);
+		cmd = talloc_asprintf(NULL, "rm -rf %s", info->transact_base);
 		do_command(cmd);
 		goto success;
 	}
@@ -984,13 +1009,15 @@ static void cleanup(const char *dir)
 
 static void setup_file_ops(const char *dir)
 {
-	char *cmd = talloc_asprintf(NULL, "echo -n r0 > %s/.perms", dir);
+	struct xs_permissions perm = { .id = 0, .perms = XS_PERM_READ };
+	struct file_ops_info *h = file_handle(dir);
 	if (mkdir(dir, 0700) != 0)
 		barf_perror("Creating directory %s", dir);
-	if (mkdir(talloc_asprintf(cmd, "%s/tool", dir), 0700) != 0)
+	if (mkdir(talloc_asprintf(h, "%s/tool", dir), 0700) != 0)
 		barf_perror("Creating directory %s/tool", dir);
-	do_command(cmd);
-	talloc_free(cmd);
+	if (!file_set_perms(h, talloc_strdup(h, "/"), &perm, 1))
+		barf_perror("Setting root perms in %s", dir);
+	file_close(h);
 }
 
 static void setup_xs_ops(void)
@@ -1009,8 +1036,8 @@ static void setup_xs_ops(void)
 	} else {
 		dup2(fds[1], STDOUT_FILENO);
 		close(fds[0]);
-#if 0
-		execlp("valgrind", "valgrind", "xenstored_test", "--output-pid",
+#if 1
+		execlp("valgrind", "valgrind", "-q", "--suppressions=testsuite/vg-suppressions", "xenstored_test", "--output-pid",
 		       "--no-fork", NULL);
 #else
 		execlp("./xenstored_test", "xenstored_test", "--output-pid",
@@ -1112,9 +1139,6 @@ static unsigned int try_simple(const bool *trymap,
 			data->ops->close(pre);
 		}
 	}
-	if (data->print_progress)
-		printf("\n");
-
 out:
 	data->ops->close(h);	
 	return i;
@@ -1192,10 +1216,9 @@ static void simple_test(const char *dir,
 	try = try_simple(NULL, iters, verbose, &data);
 	if (try == iters) {
 		cleanup_xs_ops();
-		printf("Succeeded\n");
 		exit(0);
 	}
-	printf("Failed on iteration %u\n", try + 1);
+	printf("Failed on iteration %u of seed %u\n", try + 1, seed);
 	data.print_progress = false;
 	reduce_problem(try + 1, try_simple, &data);
 }
@@ -1406,8 +1429,6 @@ static unsigned int try_diff(const bool *trymap,
 			talloc_free(fileh_pre);
 		}
 	}
-	if (data->print_progress)
-		printf("\n");
 
 	fail = NULL;
 	if (data->fast)
@@ -1435,10 +1456,9 @@ static void diff_test(const char *dir,
 	try = try_diff(NULL, iters, verbose, &data);
 	if (try == iters) {
 		cleanup_xs_ops();
-		printf("Succeeded\n");
 		exit(0);
 	}
-	printf("Failed on iteration %u\n", try + 1);
+	printf("Failed on iteration %u of seed %u\n", try + 1, seed);
 	data.print_progress = false;
 	reduce_problem(try + 1, try_diff, &data);
 }
@@ -1593,8 +1613,6 @@ static unsigned int try_fail(const bool *trymap,
 		xs_close(tmpxsh);
 		file_close(tmpfileh);
 	}
-
-	printf("Total %u of %u not aborted\n", tried - aborted, tried);
 out:
 	if (xsh)
 		xs_close(xsh);
@@ -1615,10 +1633,9 @@ static void fail_test(const char *dir,
 	try = try_fail(NULL, iters, verbose, &data);
 	if (try == iters) {
 		cleanup_xs_ops();
-		printf("Succeeded\n");
 		exit(0);
 	}
-	printf("Failed on iteration %u\n", try + 1);
+	printf("Failed on iteration %u of seed %u\n", try + 1, seed);
 	fflush(stdout);
 	data.print_progress = false;
 	reduce_problem(try + 1, try_fail, &data);

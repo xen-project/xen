@@ -22,7 +22,11 @@
 #define array_access_ok(addr,count,size) \
     (likely(count < (~0UL/size)) && access_ok(addr,count*size))
 
+/* Undefined function to catch size mismatches on 64-bit get_user/put_user. */
+extern void __uaccess_var_not_u64(void);
+
 #define __put_user_u64(x, addr, retval, errret)			\
+	if (sizeof(x) != 8) __uaccess_var_not_u64();		\
 	__asm__ __volatile__(					\
 		"1:	movl %%eax,0(%2)\n"			\
 		"2:	movl %%edx,4(%2)\n"			\
@@ -52,6 +56,7 @@ do {									\
 } while (0)
 
 #define __get_user_u64(x, addr, retval, errret)			\
+	if (sizeof(x) != 8) __uaccess_var_not_u64();		\
 	__asm__ __volatile__(					\
 		"1:	movl 0(%2),%%eax\n"			\
 		"2:	movl 4(%2),%%edx\n"			\
@@ -67,7 +72,7 @@ do {									\
 		"	.long 1b,4b\n"				\
 		"	.long 2b,4b\n"				\
 		".previous"					\
-		: "=r" (retval), "=A" (x)			\
+		: "=r" (retval), "=&A" (x)			\
 		: "r" (addr), "i"(errret), "0"(retval))
 
 #define __get_user_size(x,ptr,size,retval,errret)			\
