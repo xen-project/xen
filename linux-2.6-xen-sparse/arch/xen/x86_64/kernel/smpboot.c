@@ -739,8 +739,8 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 	atomic_set(&init_deasserted, 0);
 
 #ifdef CONFIG_XEN
-	if (cpu_gdt_descr[0].size > PAGE_SIZE)
-		BUG();
+	cpu_gdt_descr[cpu].address = __get_free_page(GFP_KERNEL);
+	BUG_ON(cpu_gdt_descr[0].size > PAGE_SIZE);
 	cpu_gdt_descr[cpu].size = cpu_gdt_descr[0].size;
 	memcpy((void *)cpu_gdt_descr[cpu].address,
 		(void *)cpu_gdt_descr[0].address, cpu_gdt_descr[0].size);
@@ -798,6 +798,8 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 	ctxt.ctrlreg[3] = virt_to_mfn(init_level4_pgt) << PAGE_SHIFT;
 
 	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
+	if (boot_error)
+		printk("boot error: %ld\n", boot_error);
 
 	if (!boot_error) {
 		/*

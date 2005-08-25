@@ -871,6 +871,7 @@ fastcall void do_simd_coprocessor_error(struct pt_regs * regs,
 	}
 }
 
+#ifndef CONFIG_XEN
 fastcall void setup_x86_bogus_stack(unsigned char * stk)
 {
 	unsigned long *switch16_ptr, *switch32_ptr;
@@ -915,6 +916,7 @@ fastcall unsigned char * fixup_x86_bogus_stack(unsigned short sp)
 	memcpy(stack32, stack16, len);
 	return stack32;
 }
+#endif
 
 /*
  *  'math_state_restore()' saves the current math information in the

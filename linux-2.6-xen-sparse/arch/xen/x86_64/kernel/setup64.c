@@ -286,10 +286,10 @@ void __init cpu_init (void)
 
 	memcpy(me->thread.tls_array, cpu_gdt_table[cpu], GDT_ENTRY_TLS_ENTRIES * 8);
 #else
- 	memcpy(me->thread.tls_array, &get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN],
+	memcpy(me->thread.tls_array, &get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN],
 	    GDT_ENTRY_TLS_ENTRIES * 8);
 
-    cpu_gdt_init(&cpu_gdt_descr[cpu]);
+	cpu_gdt_init(&cpu_gdt_descr[cpu]);
 #endif
        
 	/*

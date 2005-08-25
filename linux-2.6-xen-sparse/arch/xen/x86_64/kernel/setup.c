@@ -536,48 +536,7 @@ static inline void copy_edd(void)
 }
 #endif
 
-#ifdef CONFIG_XEN
-#define reserve_ebda_region() void(0)
-
-static void __init print_memory_map(char *who)
-{
-        int i;
-
-        for (i = 0; i < e820.nr_map; i++) {
-                early_printk(" %s: %016Lx - %016Lx ", who,
-                        e820.map[i].addr,
-                        e820.map[i].addr + e820.map[i].size);
-                switch (e820.map[i].type) {
-                case E820_RAM:  early_printk("(usable)\n");
-                                break;
-                case E820_RESERVED:
-                                early_printk("(reserved)\n");
-                                break;
-                case E820_ACPI:
-                                early_printk("(ACPI data)\n");
-                                break;
-                case E820_NVS:
-                                early_printk("(ACPI NVS)\n");
-                                break;
-                default:        early_printk("type %u\n", e820.map[i].type);
-                                break;
-                }
-        }
-}
-
-void __init smp_alloc_memory(void)
-{
-	int cpu;
-
-	for (cpu = 1; cpu < NR_CPUS; cpu++) {
-		cpu_gdt_descr[cpu].address = (unsigned long)
-			alloc_bootmem_low_pages(PAGE_SIZE);
-		/* XXX free unused pages later */
-	}
-}
-
-
-#else
+#ifndef CONFIG_XEN
 #define EBDA_ADDR_POINTER 0x40E
 static void __init reserve_ebda_region(void)
 {
@@ -628,7 +587,6 @@ void __init setup_arch(char **cmdline_p)
 			     VMASST_TYPE_writable_pagetables);
 
         ARCH_SETUP
-        print_memory_map(machine_specific_memory_setup());
 #else
  	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
  	drive_info = DRIVE_INFO;
@@ -743,9 +701,6 @@ void __init setup_arch(char **cmdline_p)
 			initrd_start = 0;
 		}
 	}
-#endif
-#ifdef CONFIG_SMP
-	smp_alloc_memory();
 #endif
 #else	/* CONFIG_XEN */
 #ifdef CONFIG_BLK_DEV_INITRD

@@ -19,11 +19,13 @@
 
 #include "cpu.h"
 
+#ifndef CONFIG_XEN
 DEFINE_PER_CPU(struct desc_struct, cpu_gdt_table[GDT_ENTRIES]);
 EXPORT_PER_CPU_SYMBOL(cpu_gdt_table);
 
 DEFINE_PER_CPU(unsigned char, cpu_16bit_stack[CPU_16BIT_STACK_SIZE]);
 EXPORT_PER_CPU_SYMBOL(cpu_16bit_stack);
+#endif
 
 static int cachesize_override __initdata = -1;
 static int disable_x86_fxsr __initdata = 0;
