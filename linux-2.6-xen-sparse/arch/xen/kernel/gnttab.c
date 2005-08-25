@@ -34,9 +34,11 @@
 
 
 EXPORT_SYMBOL(gnttab_grant_foreign_access);
+EXPORT_SYMBOL(gnttab_end_foreign_access_ref);
 EXPORT_SYMBOL(gnttab_end_foreign_access);
 EXPORT_SYMBOL(gnttab_query_foreign_access);
 EXPORT_SYMBOL(gnttab_grant_foreign_transfer);
+EXPORT_SYMBOL(gnttab_end_foreign_transfer_ref);
 EXPORT_SYMBOL(gnttab_end_foreign_transfer);
 EXPORT_SYMBOL(gnttab_alloc_grant_references);
 EXPORT_SYMBOL(gnttab_free_grant_references);
@@ -160,7 +162,7 @@ gnttab_query_foreign_access(grant_ref_t ref)
 }
 
 void
-gnttab_end_foreign_access(grant_ref_t ref, int readonly)
+gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
 {
     u16 flags, nflags;
 
@@ -170,7 +172,12 @@ gnttab_end_foreign_access(grant_ref_t ref, int readonly)
             printk(KERN_ALERT "WARNING: g.e. still in use!\n");
     }
     while ( (nflags = synch_cmpxchg(&shared[ref].flags, flags, 0)) != flags );
+}
 
+void
+gnttab_end_foreign_access(grant_ref_t ref, int readonly)
+{
+    gnttab_end_foreign_access_ref(ref, readonly);
     put_free_entry(ref);
 }
 
@@ -201,20 +208,13 @@ gnttab_grant_foreign_transfer_ref(grant_ref_t ref, domid_t domid,
 }
 
 unsigned long
-gnttab_end_foreign_transfer(grant_ref_t ref)
+gnttab_end_foreign_transfer_ref(grant_ref_t ref)
 {
     unsigned long frame = 0;
     u16           flags;
 
     flags = shared[ref].flags;
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    /*
-     * But can't flags == (GTF_accept_transfer | GTF_transfer_completed)
-     * if gnttab_donate executes without interruption???
-     */
-#else
-    ASSERT(flags == (GTF_accept_transfer | GTF_transfer_committed));
-#endif
+
     /*
      * If a transfer is committed then wait for the frame address to appear.
      * Otherwise invalidate the grant entry against future use.
@@ -224,8 +224,14 @@ gnttab_end_foreign_transfer(grant_ref_t ref)
         while ( unlikely((frame = shared[ref].frame) == 0) )
             cpu_relax();
 
-    put_free_entry(ref);
+    return frame;
+}
 
+unsigned long
+gnttab_end_foreign_transfer(grant_ref_t ref)
+{
+    unsigned long frame = gnttab_end_foreign_transfer_ref(ref);
+    put_free_entry(ref);
     return frame;
 }
 
