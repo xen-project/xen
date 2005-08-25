@@ -13,10 +13,6 @@
 #include "common.h"
 #include <asm-xen/balloon.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#include <linux/delay.h>
-#endif
-
 #if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
 #include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/gnttab.h>
@@ -153,11 +149,7 @@ static inline void maybe_schedule_tx_action(void)
 static inline int is_xen_skb(struct sk_buff *skb)
 {
     extern kmem_cache_t *skbuff_cachep;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     kmem_cache_t *cp = (kmem_cache_t *)virt_to_page(skb->head)->lru.next;
-#else
-    kmem_cache_t *cp = (kmem_cache_t *)virt_to_page(skb->head)->list.next;
-#endif
     return (cp == skbuff_cachep);
 }
 
@@ -642,11 +634,7 @@ static void net_tx_action(unsigned long unused)
                 netif->credit_timeout.expires  = next_credit;
                 netif->credit_timeout.data     = (unsigned long)netif;
                 netif->credit_timeout.function = tx_credit_callback;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
                 add_timer_on(&netif->credit_timeout, smp_processor_id());
-#else
-                add_timer(&netif->credit_timeout); 
-#endif
                 break;
             }
         }
