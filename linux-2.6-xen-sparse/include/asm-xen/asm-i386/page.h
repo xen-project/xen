@@ -65,8 +65,26 @@
 extern unsigned int *phys_to_machine_mapping;
 #define pfn_to_mfn(pfn)	\
 ((unsigned long)phys_to_machine_mapping[(unsigned int)(pfn)] & 0x7FFFFFFFUL)
-#define mfn_to_pfn(mfn)	\
-((unsigned long)machine_to_phys_mapping[(unsigned int)(mfn)])
+static inline unsigned long mfn_to_pfn(unsigned long mfn)
+{
+	unsigned int pfn;
+
+	/*
+	 * The array access can fail (e.g., device space beyond end of RAM).
+	 * In such cases it doesn't matter what we return (we return garbage),
+	 * but we must handle the fault without crashing!
+	 */
+	asm (
+		"1:	movl %1,%0\n"
+		"2:\n"
+		".section __ex_table,\"a\"\n"
+		"	.align 4\n"
+		"	.long 1b,2b\n"
+		".previous"
+		: "=r" (pfn) : "m" (machine_to_phys_mapping[mfn]) );
+
+	return (unsigned long)pfn;
+}
 
 /* Definitions for machine and pseudophysical addresses. */
 #ifdef CONFIG_X86_PAE
