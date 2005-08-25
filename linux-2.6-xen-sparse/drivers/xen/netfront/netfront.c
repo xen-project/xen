@@ -939,18 +939,12 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 
 static int destroy_netdev(struct net_device *netdev)
 {
-	struct net_private *np = NULL;
 
 #ifdef CONFIG_PROC_FS
 	xennet_proc_delif(netdev);
 #endif
 
         unregister_netdev(netdev);
-
-	np = netdev_priv(netdev);
-	list_del(&np->list);
-
-	kfree(netdev);
 
 	return 0;
 }
@@ -1244,11 +1238,16 @@ static int netfront_probe(struct xenbus_device *dev,
 	}
 
 	info = netdev_priv(netdev);
+	dev->data = info;
+
 	err = talk_to_backend(dev, info);
 	if (err) {
 		destroy_netdev(netdev);
+		kfree(netdev);
+		dev->data = NULL;
 		return err;
 	}
+
 
 	/* Call once in case entries already there. */
 	watch_for_status(&info->watch, info->watch.node);
