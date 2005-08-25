@@ -39,7 +39,7 @@ custom_param("amd_flush_filter", flush_filter);
  */
  
 extern void vide(void);
-__asm__(".align 4\nvide: ret");
+__asm__(".text\n.align 4\nvide: ret");
 
 static void __init init_amd(struct cpuinfo_x86 *c)
 {

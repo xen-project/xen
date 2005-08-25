@@ -665,8 +665,10 @@ def main(argv=sys.argv):
             err("Most commands need root access.  Please try again as root")
             sys.exit(1)
         except XendError, ex:
+            if args[0] == "bogus":
+                args.remove("bogus")
             if len(args) > 0:
-                handle_xend_error(argv[1], args[1], ex)
+                handle_xend_error(argv[1], args[0], ex)
             else:
                 print "Unexpected error:", sys.exc_info()[0]
                 print
