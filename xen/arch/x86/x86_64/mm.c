@@ -98,7 +98,7 @@ void __init paging_init(void)
      * Allocate and map the machine-to-phys table.
      * This also ensures L3 is present for fixmaps.
      */
-    for ( i = 0; i < max_page; i += ((1UL << L2_PAGETABLE_SHIFT) / 8) )
+    for ( i = 0; i < max_page; i += ((1UL << L2_PAGETABLE_SHIFT) / 4) )
     {
         pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0);
         if ( pg == NULL )
