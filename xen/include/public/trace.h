@@ -23,7 +23,7 @@
 #define TRC_VMXTIMER 0x00082000   /* VMX timer trace           */
 #define TRC_VMXINT   0x00084000   /* VMX interrupt trace       */
 #define TRC_VMXIO    0x00088000   /* VMX io emulation trace  */
-
+#define TRC_VMEXIT_HANDLER    0x00090000   /* VMX handler trace  */
 
 /* Trace events per class */
 
@@ -48,6 +48,10 @@
 #define TRC_VMX_TIMER_INTR      (TRC_VMXTIMER + 1)
 
 #define TRC_VMX_INT             (TRC_VMXINT + 1)
+
+#define TRC_VMEXIT              (TRC_VMEXIT_HANDLER + 1)
+#define TRC_VMENTRY             (TRC_VMEXIT_HANDLER + 2)
+
 
 /* This structure represents a single trace buffer record. */
 struct t_rec {

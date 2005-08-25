@@ -50,6 +50,13 @@ int vmcs_size;
 unsigned int opt_vmx_debug_level = 0;
 integer_param("vmx_debug", opt_vmx_debug_level);
 
+#ifdef TRACE_BUFFER
+static unsigned long trace_values[NR_CPUS][4];
+#define TRACE_VMEXIT(index,value) trace_values[current->processor][index]=value
+#else
+#define TRACE_VMEXIT(index,value) ((void)0)
+#endif
+
 #ifdef __x86_64__
 static struct msr_state percpu_msr[NR_CPUS];
 
@@ -381,6 +388,7 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
 
     if (!vmx_paging_enabled(current)){
         handle_mmio(va, va);
+        TRACE_VMEXIT (2,2);
         return 1;
     }
     gpa = gva_to_gpa(va);
@@ -393,12 +401,13 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
             __update_guest_eip(inst_len);
             return 1;
         }
+        TRACE_VMEXIT (2,2);
         handle_mmio(va, gpa);
         return 1;
     }
 
     result = shadow_fault(va, regs);
-
+    TRACE_VMEXIT (2,result);
 #if 0
     if ( !result )
     {
@@ -608,6 +617,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
         addr = (exit_qualification >> 16) & (0xffff);
     else
         addr = regs->edx & 0xffff;
+    TRACE_VMEXIT (2,addr);
 
     vio = get_vio(d->domain, d->vcpu_id);
     if (vio == 0) {
@@ -1282,13 +1292,20 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
     case TYPE_MOV_TO_CR:
         gp = exit_qualification & CONTROL_REG_ACCESS_REG;
         cr = exit_qualification & CONTROL_REG_ACCESS_NUM;
+        TRACE_VMEXIT(1,TYPE_MOV_TO_CR);
+        TRACE_VMEXIT(2,cr);
+        TRACE_VMEXIT(3,gp);
         return mov_to_cr(gp, cr, regs);
     case TYPE_MOV_FROM_CR:
         gp = exit_qualification & CONTROL_REG_ACCESS_REG;
         cr = exit_qualification & CONTROL_REG_ACCESS_NUM;
+        TRACE_VMEXIT(1,TYPE_MOV_FROM_CR);
+        TRACE_VMEXIT(2,cr);
+        TRACE_VMEXIT(3,gp);
         mov_from_cr(cr, gp, regs);
         break;
     case TYPE_CLTS:
+        TRACE_VMEXIT(1,TYPE_CLTS);
         clts();
         setup_fpu(current);
 
@@ -1301,6 +1318,7 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
         __vmwrite(CR0_READ_SHADOW, value);
         break;
     case TYPE_LMSW:
+        TRACE_VMEXIT(1,TYPE_LMSW);
         __vmread(CR0_READ_SHADOW, &value);
 	value = (value & ~0xF) |
 		(((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
@@ -1544,6 +1562,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
     __vmread(GUEST_RIP, &eip);
     TRACE_3D(TRC_VMX_VMEXIT, v->domain->domain_id, eip, exit_reason);
+    TRACE_VMEXIT(0,exit_reason);
 
     switch (exit_reason) {
     case EXIT_REASON_EXCEPTION_NMI:
@@ -1562,6 +1581,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             __vmx_bug(&regs);
         vector &= 0xff;
 
+	 TRACE_VMEXIT(1,vector);
         perfc_incra(cause_vector, vector);
 
         TRACE_3D(TRC_VMX_VECTOR, v->domain->domain_id, eip, vector);
@@ -1606,6 +1626,10 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         {
             __vmread(EXIT_QUALIFICATION, &va);
             __vmread(VM_EXIT_INTR_ERROR_CODE, &regs.error_code);
+            
+	    TRACE_VMEXIT(3,regs.error_code);
+	    TRACE_VMEXIT(4,va);
+
             VMX_DBG_LOG(DBG_LEVEL_VMMU, 
                         "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
                         (unsigned long)regs.eax, (unsigned long)regs.ebx,
@@ -1680,6 +1704,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                 eip, inst_len, exit_qualification);
         if (vmx_cr_access(exit_qualification, &regs))
 	    __update_guest_eip(inst_len);
+	 TRACE_VMEXIT(3,regs.error_code);
+        TRACE_VMEXIT(4,exit_qualification);
         break;
     }
     case EXIT_REASON_DR_ACCESS:
@@ -1692,6 +1718,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
         __get_instruction_length(inst_len);
         vmx_io_instruction(&regs, exit_qualification, inst_len);
+        TRACE_VMEXIT(4,exit_qualification);
         break;
     case EXIT_REASON_MSR_READ:
         __get_instruction_length(inst_len);
@@ -1726,6 +1753,25 @@ asmlinkage void load_cr2(void)
 #endif
 }
 
+#ifdef TRACE_BUFFER
+asmlinkage void trace_vmentry (void)
+{
+    TRACE_5D(TRC_VMENTRY,trace_values[current->processor][0],
+          trace_values[current->processor][1],trace_values[current->processor][2],
+          trace_values[current->processor][3],trace_values[current->processor][4]);
+    TRACE_VMEXIT(0,9);
+    TRACE_VMEXIT(1,9);
+    TRACE_VMEXIT(2,9);
+    TRACE_VMEXIT(3,9);
+    TRACE_VMEXIT(4,9);
+    return;
+}
+asmlinkage void trace_vmexit (void)
+{
+    TRACE_3D(TRC_VMEXIT,0,0,0);
+    return;
+}
+#endif 
 #endif /* CONFIG_VMX */
 
 /*
