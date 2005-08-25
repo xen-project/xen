@@ -24,10 +24,14 @@ XEN_SCRIPTS += block-enbd
 XEN_BOOT_DIR = /usr/lib/xen/boot
 XEN_BOOT = mem-map.sxp
 
+XEN_HOTPLUG_DIR = /etc/hotplug.d/xen-backend
+XEN_HOTPLUG_SCRIPTS = backend.hotplug
+
 all: 
 build:
 
-install: all install-initd install-configs install-scripts install-boot
+install: all install-initd install-configs install-scripts install-boot \
+	 install-hotplug
 
 install-initd:
 	[ -d $(DESTDIR)/etc/init.d ] || $(INSTALL_DIR) $(DESTDIR)/etc/init.d
@@ -58,6 +62,14 @@ install-boot:
 	for i in $(XEN_BOOT); \
 	    do [ -a $(DESTDIR)$(XEN_BOOT_DIR)/$$i ] || \
 	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_BOOT_DIR); \
+	done
+
+install-hotplug:
+	[ -d $(DESTDIR)$(XEN_HOTPLUG_DIR) ] || \
+		$(INSTALL_DIR) $(DESTDIR)$(XEN_HOTPLUG_DIR)
+	for i in $(XEN_HOTPLUG_SCRIPTS); \
+	    do [ -a $(DESTDIR)$(XEN_HOTPLUG_DIR)/$$i ] || \
+	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_HOTPLUG_DIR); \
 	done
 
 clean:

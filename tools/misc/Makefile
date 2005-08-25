@@ -50,4 +50,4 @@ clean:
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 $(TARGETS): %: %.o Makefile
-	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxc
+	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxenctrl

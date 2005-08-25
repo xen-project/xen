@@ -21,7 +21,7 @@
 #include <argp.h>
 #include <signal.h>
 
-#include "xc.h"
+#include "xenctrl.h"
 
 #ifdef __i386__
 void print_ctx(vcpu_guest_context_t *ctx1)

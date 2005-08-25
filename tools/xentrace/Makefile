@@ -36,4 +36,4 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN)
 
 %: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxc
+	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxenctrl

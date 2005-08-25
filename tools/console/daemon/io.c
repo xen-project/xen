@@ -23,7 +23,7 @@
 #include "utils.h"
 #include "io.h"
 
-#include "xc.h"
+#include "xenctrl.h"
 #include "xs.h"
 #include "xen/io/domain_controller.h"
 #include "xcs_proto.h"

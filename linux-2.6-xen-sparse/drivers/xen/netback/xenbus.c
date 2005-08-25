@@ -1,4 +1,4 @@
-/*  Xenbus code for blkif backend
+/*  Xenbus code for netif backend
     Copyright (C) 2005 Rusty Russell <rusty@rustcorp.com.au>
 
     This program is free software; you can redistribute it and/or modify
@@ -25,11 +25,13 @@ struct backend_info
 	struct xenbus_device *dev;
 
 	/* our communications channel */
-	blkif_t *blkif;
+	netif_t *netif;
 
 	long int frontend_id;
+#if 0
 	long int pdev;
 	long int readonly;
+#endif
 
 	/* watch back end for changes */
 	struct xenbus_watch backend_watch;
@@ -39,15 +41,15 @@ struct backend_info
 	char *frontpath;
 };
 
-static int blkback_remove(struct xenbus_device *dev)
+static int netback_remove(struct xenbus_device *dev)
 {
 	struct backend_info *be = dev->data;
 
 	if (be->watch.node)
 		unregister_xenbus_watch(&be->watch);
 	unregister_xenbus_watch(&be->backend_watch);
-	if (be->blkif)
-		blkif_put(be->blkif);
+	if (be->netif)
+		netif_disconnect(be->netif);
 	if (be->frontpath)
 		kfree(be->frontpath);
 	kfree(be);
@@ -57,11 +59,13 @@ static int blkback_remove(struct xenbus_device *dev)
 /* Front end tells us frame. */
 static void frontend_changed(struct xenbus_watch *watch, const char *node)
 {
-	unsigned long ring_ref;
+	unsigned long tx_ring_ref, rx_ring_ref;
 	unsigned int evtchn;
 	int err;
 	struct backend_info *be
 		= container_of(watch, struct backend_info, watch);
+	char *mac, *e, *s;
+	int i;
 
 	/* If other end is gone, delete ourself. */
 	if (node && !xenbus_exists(be->frontpath, "")) {
@@ -69,10 +73,32 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		device_unregister(&be->dev->dev);
 		return;
 	}
-	if (be->blkif == NULL || be->blkif->status == CONNECTED)
+	if (be->netif == NULL || be->netif->status == CONNECTED)
 		return;
 
-	err = xenbus_gather(be->frontpath, "ring-ref", "%lu", &ring_ref,
+	mac = xenbus_read(be->frontpath, "mac", NULL);
+	if (IS_ERR(mac)) {
+		err = PTR_ERR(mac);
+		xenbus_dev_error(be->dev, err, "reading %s/mac",
+				 be->dev->nodename);
+		return;
+	}
+	s = mac;
+	for (i = 0; i < ETH_ALEN; i++) {
+		be->netif->fe_dev_addr[i] = simple_strtoul(s, &e, 16);
+		if (s == e || (e[0] != ':' && e[0] != 0)) {
+			kfree(mac);
+			err = -ENOENT;
+			xenbus_dev_error(be->dev, err, "parsing %s/mac",
+					 be->dev->nodename);
+			return;
+		}
+		s = &e[1];
+	}
+	kfree(mac);
+
+	err = xenbus_gather(be->frontpath, "tx-ring-ref", "%lu", &tx_ring_ref,
+			    "rx-ring-ref", "%lu", &rx_ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
 		xenbus_dev_error(be->dev, err,
@@ -81,52 +107,18 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		return;
 	}
 
-	/* Supply the information about the device the frontend needs */
-	err = xenbus_transaction_start(be->dev->nodename);
+	/* Map the shared frame, irq etc. */
+	err = netif_map(be->netif, tx_ring_ref, rx_ring_ref, evtchn);
 	if (err) {
-		xenbus_dev_error(be->dev, err, "starting transaction");
+		xenbus_dev_error(be->dev, err,
+				 "mapping shared-frames %lu/%lu port %u",
+				 tx_ring_ref, rx_ring_ref, evtchn);
 		return;
 	}
 
-	err = xenbus_printf(be->dev->nodename, "sectors", "%lu",
-			    vbd_size(&be->blkif->vbd));
-	if (err) {
-		xenbus_dev_error(be->dev, err, "writing %s/sectors",
-				 be->dev->nodename);
-		goto abort;
-	}
-
-	/* FIXME: use a typename instead */
-	err = xenbus_printf(be->dev->nodename, "info", "%u",
-			    vbd_info(&be->blkif->vbd));
-	if (err) {
-		xenbus_dev_error(be->dev, err, "writing %s/info",
-				 be->dev->nodename);
-		goto abort;
-	}
-	err = xenbus_printf(be->dev->nodename, "sector-size", "%lu",
-			    vbd_secsize(&be->blkif->vbd));
-	if (err) {
-		xenbus_dev_error(be->dev, err, "writing %s/sector-size",
-				 be->dev->nodename);
-		goto abort;
-	}
-
-	/* Map the shared frame, irq etc. */
-	err = blkif_map(be->blkif, ring_ref, evtchn);
-	if (err) {
-		xenbus_dev_error(be->dev, err, "mapping ring-ref %lu port %u",
-				 ring_ref, evtchn);
-		goto abort;
-	}
-
-	xenbus_transaction_end(0);
 	xenbus_dev_ok(be->dev);
 
 	return;
-
-abort:
-	xenbus_transaction_end(1);
 }
 
 /* 
@@ -137,58 +129,43 @@ abort:
 static void backend_changed(struct xenbus_watch *watch, const char *node)
 {
 	int err;
-	char *p;
-	long int handle, pdev;
+	long int handle;
 	struct backend_info *be
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
+	u8 be_mac[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
 
-	err = xenbus_scanf(dev->nodename, "physical-device", "%li", &pdev);
+	err = xenbus_scanf(dev->nodename, "handle", "%li", &handle);
 	if (XENBUS_EXIST_ERR(err))
 		return;
 	if (err < 0) {
-		xenbus_dev_error(dev, err, "reading physical-device");
+		xenbus_dev_error(dev, err, "reading handle");
 		return;
 	}
-	if (be->pdev && be->pdev != pdev) {
-		printk(KERN_WARNING
-		       "changing physical-device not supported\n");
-		return;
-	}
-	be->pdev = pdev;
 
-	/* If there's a read-only node, we're read only. */
-	p = xenbus_read(dev->nodename, "read-only", NULL);
-	if (!IS_ERR(p)) {
-		be->readonly = 1;
-		kfree(p);
-	}
-
-	if (be->blkif == NULL) {
-		/* Front end dir is a number, which is used as the handle. */
-		p = strrchr(be->frontpath, '/') + 1;
-		handle = simple_strtoul(p, NULL, 0);
-
-		be->blkif = alloc_blkif(be->frontend_id);
-		if (IS_ERR(be->blkif)) {
-			err = PTR_ERR(be->blkif);
-			be->blkif = NULL;
-			xenbus_dev_error(dev, err, "creating block interface");
+	if (be->netif == NULL) {
+		be->netif = alloc_netif(be->frontend_id, handle, be_mac);
+		if (IS_ERR(be->netif)) {
+			err = PTR_ERR(be->netif);
+			be->netif = NULL;
+			xenbus_dev_error(dev, err, "creating interface");
 			return;
 		}
 
-		err = vbd_create(be->blkif, handle, be->pdev, be->readonly);
+#if 0
+		err = vbd_create(be->netif, handle, be->pdev, be->readonly);
 		if (err) {
 			xenbus_dev_error(dev, err, "creating vbd structure");
 			return;
 		}
+#endif
 
 		/* Pass in NULL node to skip exist test. */
 		frontend_changed(&be->watch, NULL);
 	}
 }
 
-static int blkback_probe(struct xenbus_device *dev,
+static int netback_probe(struct xenbus_device *dev,
 			 const struct xenbus_device_id *id)
 {
 	struct backend_info *be;
@@ -261,20 +238,20 @@ static int blkback_probe(struct xenbus_device *dev,
 	return err;
 }
 
-static struct xenbus_device_id blkback_ids[] = {
-	{ "vbd" },
+static struct xenbus_device_id netback_ids[] = {
+	{ "vif" },
 	{ "" }
 };
 
-static struct xenbus_driver blkback = {
-	.name = "vbd",
+static struct xenbus_driver netback = {
+	.name = "vif",
 	.owner = THIS_MODULE,
-	.ids = blkback_ids,
-	.probe = blkback_probe,
-	.remove = blkback_remove,
+	.ids = netback_ids,
+	.probe = netback_probe,
+	.remove = netback_remove,
 };
 
-void blkif_xenbus_init(void)
+void netif_xenbus_init(void)
 {
-	xenbus_register_backend(&blkback);
+	xenbus_register_backend(&netback);
 }

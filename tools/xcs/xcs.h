@@ -11,7 +11,7 @@
 #define __XCS_H__
 
 #include <pthread.h>
-#include <xc.h>
+#include <xenctrl.h>
 #include <xen/xen.h>
 #include <xen/io/domain_controller.h>
 #include <xen/linux/privcmd.h>

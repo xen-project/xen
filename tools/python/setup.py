@@ -17,7 +17,7 @@ library_dirs = [ XEN_ROOT + "/tools/libxc",
                  XEN_ROOT + "/tools/xenstore",
                  ]
 
-libraries = [ "xc", "xenstore-pic" ]
+libraries = [ "xenctrl", "xenguest", "xenstore" ]
 
 xc = Extension("xc",
                extra_compile_args = extra_compile_args,
@@ -41,7 +41,7 @@ xs = Extension("xs",
                sources            = [ "xen/lowlevel/xs/xs.c" ])
 
 setup(name            = 'xen',
-      version         = '2.0',
+      version         = '3.0',
       description     = 'Xen',
       packages        = ['xen',
                          'xen.lowlevel',

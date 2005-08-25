@@ -133,7 +133,7 @@ void start_kernel(start_info_t *si)
     for ( ; ; ) 
     {      
 //        HYPERVISOR_yield();
-        block(1);
+        block(100);
         i++;
     }
 }

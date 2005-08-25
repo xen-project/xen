@@ -7,7 +7,7 @@
 #ifndef __BLKTAPLIB_H__
 #define __BLKTAPLIB_H__
 
-#include <xc.h>
+#include <xenctrl.h>
 #include <sys/user.h>
 #include <xen/xen.h>
 #include <xen/io/blkif.h>

@@ -64,8 +64,8 @@ void *xc_map_foreign_range(int xc_handle, u32 dom,
 /*******************/
 
 /* NB: arr must be mlock'ed */
-int get_pfn_type_batch(int xc_handle, 
-                       u32 dom, int num, unsigned long *arr)
+int xc_get_pfn_type_batch(int xc_handle, 
+			  u32 dom, int num, unsigned long *arr)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO2;
@@ -92,25 +92,40 @@ unsigned int get_pfn_type(int xc_handle,
     return op.u.getpageframeinfo.type;
 }
 
-
-
-/*******************/
-
-int pin_table(
-    int xc_handle, unsigned int type, unsigned long mfn, domid_t dom)
+int xc_mmuext_op(
+    int xc_handle,
+    struct mmuext_op *op,
+    unsigned int nr_ops,
+    domid_t dom)
 {
-    struct mmuext_op op;
+    privcmd_hypercall_t hypercall;
+    long ret = -EINVAL;
 
-    op.cmd = type;
-    op.mfn = mfn;
+    hypercall.op     = __HYPERVISOR_mmuext_op;
+    hypercall.arg[0] = (unsigned long)op;
+    hypercall.arg[1] = (unsigned long)nr_ops;
+    hypercall.arg[2] = (unsigned long)0;
+    hypercall.arg[3] = (unsigned long)dom;
 
-    if ( do_mmuext_op(xc_handle, &op, 1, dom) < 0 )
-        return 1;
+    if ( mlock(op, nr_ops*sizeof(*op)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out1;
+    }
 
-    return 0;
-}
+    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
+    {
+	fprintf(stderr, "Dom_mem operation failed (rc=%ld errno=%d)-- need to"
+                    " rebuild the user-space tool set?\n",ret,errno);
+    }
 
-static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
+    safe_munlock(op, nr_ops*sizeof(*op));
+
+ out1:
+    return ret;
+}    
+
+static int flush_mmu_updates(int xc_handle, xc_mmu_t *mmu)
 {
     int err = 0;
     privcmd_hypercall_t hypercall;
@@ -145,9 +160,9 @@ static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
     return err;
 }
 
-mmu_t *init_mmu_updates(int xc_handle, domid_t dom)
+xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom)
 {
-    mmu_t *mmu = malloc(sizeof(mmu_t));
+    xc_mmu_t *mmu = malloc(sizeof(xc_mmu_t));
     if ( mmu == NULL )
         return mmu;
     mmu->idx     = 0;
@@ -155,8 +170,8 @@ mmu_t *init_mmu_updates(int xc_handle, domid_t dom)
     return mmu;
 }
 
-int add_mmu_update(int xc_handle, mmu_t *mmu, 
-                   unsigned long ptr, unsigned long val)
+int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu, 
+		      unsigned long ptr, unsigned long val)
 {
     mmu->updates[mmu->idx].ptr = ptr;
     mmu->updates[mmu->idx].val = val;
@@ -167,10 +182,47 @@ int add_mmu_update(int xc_handle, mmu_t *mmu,
     return 0;
 }
 
-int finish_mmu_updates(int xc_handle, mmu_t *mmu)
+int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu)
 {
     return flush_mmu_updates(xc_handle, mmu);
 }
+
+int xc_dom_mem_op(int xc_handle,
+		  unsigned int memop, 
+		  unsigned int *extent_list, 
+		  unsigned int nr_extents,
+		  unsigned int extent_order,
+		  domid_t domid)
+{
+    privcmd_hypercall_t hypercall;
+    long ret = -EINVAL;
+
+    hypercall.op     = __HYPERVISOR_dom_mem_op;
+    hypercall.arg[0] = (unsigned long)memop;
+    hypercall.arg[1] = (unsigned long)extent_list;
+    hypercall.arg[2] = (unsigned long)nr_extents;
+    hypercall.arg[3] = (unsigned long)extent_order;
+    hypercall.arg[4] = (unsigned long)domid;
+
+    if ( (extent_list != NULL) && 
+         (mlock(extent_list, nr_extents*sizeof(unsigned long)) != 0) )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out1;
+    }
+
+    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
+    {
+	fprintf(stderr, "Dom_mem operation failed (rc=%ld errno=%d)-- need to"
+                " rebuild the user-space tool set?\n",ret,errno);
+    }
+
+    if ( extent_list != NULL )
+        safe_munlock(extent_list, nr_extents*sizeof(unsigned long));
+
+ out1:
+    return ret;
+}    
 
 
 long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
@@ -189,19 +241,6 @@ long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
     return op.u.getvcpucontext.cpu_time;
 }
 
-
-/* This is shared between save and restore, and may generally be useful. */
-unsigned long csum_page (void * page)
-{
-    int i;
-    unsigned long *p = page;
-    unsigned long long sum=0;
-
-    for ( i = 0; i < (PAGE_SIZE/sizeof(unsigned long)); i++ )
-        sum += p[i];
-
-    return sum ^ (sum>>32);
-}
 
 unsigned long xc_get_m2p_start_mfn ( int xc_handle )
 {
@@ -330,53 +369,6 @@ unsigned long xc_get_filesz(int fd)
     lseek(fd, 0, SEEK_SET);
 
     return sz;
-}
-
-char *xc_read_kernel_image(const char *filename, unsigned long *size)
-{
-    int kernel_fd = -1;
-    gzFile kernel_gfd = NULL;
-    char *image = NULL;
-    unsigned int bytes;
-
-    if ( (kernel_fd = open(filename, O_RDONLY)) < 0 )
-    {
-        PERROR("Could not open kernel image");
-        goto out;
-    }
-
-    if ( (*size = xc_get_filesz(kernel_fd)) == 0 )
-    {
-        PERROR("Could not read kernel image");
-        goto out;
-    }
-
-    if ( (kernel_gfd = gzdopen(kernel_fd, "rb")) == NULL )
-    {
-        PERROR("Could not allocate decompression state for state file");
-        goto out;
-    }
-
-    if ( (image = malloc(*size)) == NULL )
-    {
-        PERROR("Could not allocate memory for kernel image");
-        goto out;
-    }
-
-    if ( (bytes = gzread(kernel_gfd, image, *size)) != *size )
-    {
-        PERROR("Error reading kernel image, could not"
-               " read the whole image (%d != %ld).", bytes, *size);
-        free(image);
-        image = NULL;
-    }
-
- out:
-    if ( kernel_gfd != NULL )
-        gzclose(kernel_gfd);
-    else if ( kernel_fd >= 0 )
-        close(kernel_fd);
-    return image;
 }
 
 void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,

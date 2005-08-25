@@ -59,6 +59,7 @@ typedef struct netif_st {
     grant_ref_t      rx_shmem_ref; 
 #endif
     unsigned int     evtchn;
+    unsigned int     remote_evtchn;
 
     /* The shared rings and indexes. */
     netif_tx_interface_t *tx;
@@ -82,36 +83,30 @@ typedef struct netif_st {
     /* Miscellaneous private stuff. */
     enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
     int active;
-    /*
-     * DISCONNECT response is deferred until pending requests are ack'ed.
-     * We therefore need to store the id from the original request.
-     */
-    u8               disconnect_rspid;
-    struct netif_st *hash_next;
     struct list_head list;  /* scheduling list */
     atomic_t         refcnt;
     struct net_device *dev;
     struct net_device_stats stats;
 
-    struct work_struct work;
+    struct work_struct free_work;
 } netif_t;
 
-void netif_create(netif_be_create_t *create);
-void netif_destroy(netif_be_destroy_t *destroy);
-void netif_creditlimit(netif_be_creditlimit_t *creditlimit);
-void netif_connect(netif_be_connect_t *connect);
-int  netif_disconnect(netif_be_disconnect_t *disconnect, u8 rsp_id);
-void netif_disconnect_complete(netif_t *netif);
-netif_t *netif_find_by_handle(domid_t domid, unsigned int handle);
+void netif_creditlimit(netif_t *netif);
+int  netif_disconnect(netif_t *netif);
+
+netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN]);
+void free_netif_callback(netif_t *netif);
+int netif_map(netif_t *netif, unsigned long tx_ring_ref,
+	      unsigned long rx_ring_ref, unsigned int evtchn);
+
 #define netif_get(_b) (atomic_inc(&(_b)->refcnt))
 #define netif_put(_b)                             \
     do {                                          \
         if ( atomic_dec_and_test(&(_b)->refcnt) ) \
-            netif_disconnect_complete(_b);        \
+            free_netif_callback(_b);              \
     } while (0)
 
-void netif_interface_init(void);
-void netif_ctrlif_init(void);
+void netif_xenbus_init(void);
 
 void netif_schedule_work(netif_t *netif);
 void netif_deschedule_work(netif_t *netif);

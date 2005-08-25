@@ -206,11 +206,13 @@ ENTRY(cpu_gdt_table)
 	.quad   0,0,0			/* three TLS descriptors */ 
 	.quad	0			/* unused now?   __KERNEL16_CS - 16bit PM for S3 wakeup. */
 
-gdt_end:	
+gdt_end:
+#if 0
 	/* asm/segment.h:GDT_ENTRIES must match this */	
 	/* This should be a multiple of the cache line size */
 	/* GDTs of other CPUs: */	
 	.fill (GDT_SIZE * NR_CPUS) - (gdt_end - cpu_gdt_table)
+#endif
 
 .org 0x8000
 ENTRY(empty_zero_page)

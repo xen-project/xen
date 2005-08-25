@@ -10,7 +10,7 @@
 #define __BLOCKSTORE_H__
 
 #include <netinet/in.h>
-#include <xc.h>
+#include <xenctrl.h>
 
 #define BLOCK_SIZE  4096
 #define BLOCK_SHIFT   12

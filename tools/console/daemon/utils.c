@@ -33,7 +33,7 @@
 #include <sys/un.h>
 #include <string.h>
 
-#include "xc.h"
+#include "xenctrl.h"
 #include "xen/io/domain_controller.h"
 #include "xcs_proto.h"
 

@@ -2,7 +2,8 @@
  * xc_linux_build.c
  */
 
-#include "xc_private.h"
+#include "xg_private.h"
+#include <xenctrl.h>
 
 #if defined(__i386__)
 #define ELFSIZE 32
@@ -340,7 +341,7 @@ static int setup_guest(int xc_handle,
     unsigned long count, i;
     start_info_t *start_info;
     shared_info_t *shared_info;
-    mmu_t *mmu = NULL;
+    xc_mmu_t *mmu = NULL;
     int rc;
 
     unsigned long nr_pt_pages;
@@ -490,7 +491,7 @@ static int setup_guest(int xc_handle,
         }
     }
 
-    if ( (mmu = init_mmu_updates(xc_handle, dom)) == NULL )
+    if ( (mmu = xc_init_mmu_updates(xc_handle, dom)) == NULL )
         goto error_out;
 
     /* setup page tables */
@@ -520,9 +521,9 @@ static int setup_guest(int xc_handle,
         page_array[physmap_pfn++]);
     for ( count = 0; count < nr_pages; count++ )
     {
-        if ( add_mmu_update(xc_handle, mmu,
-                            (page_array[count] << PAGE_SHIFT) | 
-                            MMU_MACHPHYS_UPDATE, count) )
+        if ( xc_add_mmu_update(xc_handle, mmu,
+			       (page_array[count] << PAGE_SHIFT) | 
+			       MMU_MACHPHYS_UPDATE, count) )
         {
             munmap(physmap, PAGE_SIZE);
             goto error_out;
@@ -602,7 +603,7 @@ static int setup_guest(int xc_handle,
     munmap(shared_info, PAGE_SIZE);
 
     /* Send the page update requests down to the hypervisor. */
-    if ( finish_mmu_updates(xc_handle, mmu) )
+    if ( xc_finish_mmu_updates(xc_handle, mmu) )
         goto error_out;
 
     free(mmu);
@@ -676,7 +677,7 @@ int xc_linux_build(int xc_handle,
 
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
-    if ( (do_dom0_op(xc_handle, &op) < 0) || 
+    if ( (xc_dom0_op(xc_handle, &op) < 0) || 
          ((u16)op.u.getdomaininfo.domain != domid) )
     {
         PERROR("Could not get info on domain");
@@ -793,7 +794,7 @@ int xc_linux_build(int xc_handle,
     launch_op.u.setdomaininfo.ctxt   = ctxt;
 
     launch_op.cmd = DOM0_SETDOMAININFO;
-    rc = do_dom0_op(xc_handle, &launch_op);
+    rc = xc_dom0_op(xc_handle, &launch_op);
     
     return rc;
 

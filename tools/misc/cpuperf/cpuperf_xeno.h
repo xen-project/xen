@@ -9,7 +9,7 @@
  *
  */
 
-#include <xc.h>
+#include <xenctrl.h>
 
 static int xc_handle;
 

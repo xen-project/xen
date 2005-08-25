@@ -6,7 +6,7 @@
  * PDB's OCaml interface library for debugging domains
  */
 
-#include <xc.h>
+#include <xenctrl.h>
 #include <xendebug.h>
 #include <errno.h>
 #include <stdio.h>
