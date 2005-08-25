@@ -17,7 +17,7 @@ library_dirs = [ XEN_ROOT + "/tools/libxc",
                  XEN_ROOT + "/tools/xenstore",
                  ]
 
-libraries = [ "xenctrl", "xenstore" ]
+libraries = [ "xenctrl", "xenguest", "xenstore" ]
 
 xc = Extension("xc",
                extra_compile_args = extra_compile_args,

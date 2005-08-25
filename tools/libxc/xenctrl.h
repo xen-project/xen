@@ -6,8 +6,8 @@
  * Copyright (c) 2003-2004, K A Fraser.
  */
 
-#ifndef __XC_H__
-#define __XC_H__
+#ifndef XENCTRL_H
+#define XENCTRL_H
 
 #include <stdint.h>
 
@@ -254,63 +254,6 @@ int xc_shadow_control(int xc_handle,
                       unsigned long pages,
                       xc_shadow_control_stats_t *stats);
 
-
-#define XCFLAGS_VERBOSE   1
-#define XCFLAGS_LIVE      2
-#define XCFLAGS_DEBUG     4
-#define XCFLAGS_CONFIGURE 8
-
-struct XcIOContext;
-
-/**
- * This function will save a domain running Linux.
- *
- * @parm xc_handle a handle to an open hypervisor interface
- * @parm fd the file descriptor to save a domain to
- * @parm dom the id of the domain
- * @return 0 on success, -1 on failure
- */
-int xc_linux_save(int xc_handle, int fd, u32 dom);
-
-/**
- * This function will restore a saved domain running Linux.
- *
- * @parm xc_handle a handle to an open hypervisor interface
- * @parm fd the file descriptor to restore a domain from
- * @parm dom the id of the domain
- * @parm nr_pfns the number of pages
- * @parm store_evtchn the store event channel for this domain to use
- * @parm store_mfn returned with the mfn of the store page
- * @return 0 on success, -1 on failure
- */
-int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
-		     unsigned int store_evtchn, unsigned long *store_mfn);
-
-int xc_linux_build(int xc_handle,
-                   u32 domid,
-                   const char *image_name,
-                   const char *ramdisk_name,
-                   const char *cmdline,
-                   unsigned int control_evtchn,
-                   unsigned long flags,
-                   unsigned int vcpus,
-                   unsigned int store_evtchn,
-                   unsigned long *store_mfn);
-
-struct mem_map;
-int xc_vmx_build(int xc_handle,
-                 u32 domid,
-                 int memsize,
-                 const char *image_name,
-                 struct mem_map *memmap,
-                 const char *ramdisk_name,
-                 const char *cmdline,
-                 unsigned int control_evtchn,
-                 unsigned long flags,
-                 unsigned int vcpus,
-                 unsigned int store_evtchn,
-                 unsigned long *store_mfn);
-
 int xc_bvtsched_global_set(int xc_handle,
                            unsigned long ctx_allow);
 
@@ -484,6 +427,16 @@ int xc_get_pfn_list(int xc_handle, u32 domid, unsigned long *pfn_buf,
 int xc_ia64_get_pfn_list(int xc_handle, u32 domid, unsigned long *pfn_buf, 
                     unsigned int start_page, unsigned int nr_pages);
 
+int xc_mmuext_op(int xc_handle, struct mmuext_op *op, unsigned int nr_ops,
+		 domid_t dom);
+
+int xc_dom_mem_op(int xc_handle, unsigned int memop, unsigned int *extent_list,
+		  unsigned int nr_extents, unsigned int extent_order,
+		  domid_t domid);
+
+int xc_get_pfn_type_batch(int xc_handle, u32 dom, int num, unsigned long *arr);
+
+
 /*\
  *  GRANT TABLE FUNCTIONS
 \*/ 
@@ -555,4 +508,19 @@ int xc_dom0_op(int xc_handle, dom0_op_t *op);
  */
 long xc_init_store(int xc_handle, int remote_port);
 
-#endif /* __XC_H__ */
+/*
+ * MMU updates.
+ */
+#define MAX_MMU_UPDATES 1024
+struct xc_mmu {
+    mmu_update_t updates[MAX_MMU_UPDATES];
+    int          idx;
+    domid_t      subject;
+};
+typedef struct xc_mmu xc_mmu_t;
+xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom);
+int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu, 
+                   unsigned long ptr, unsigned long val);
+int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
+
+#endif

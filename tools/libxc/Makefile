@@ -12,28 +12,32 @@ CC       = gcc
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-SRCS     :=
-SRCS     += xc_sedf.c
-SRCS     += xc_bvtsched.c
-SRCS     += xc_core.c
-SRCS     += xc_domain.c
-SRCS     += xc_evtchn.c
-SRCS     += xc_gnttab.c
-SRCS     += xc_load_bin.c
-SRCS     += xc_load_elf.c
-SRCS     += xc_linux_build.c
-SRCS     += xc_misc.c
-SRCS     += xc_physdev.c
-SRCS     += xc_private.c
+SRCS       :=
+BUILD_SRCS :=
+SRCS       += xc_bvtsched.c
+SRCS       += xc_core.c
+SRCS       += xc_domain.c
+SRCS       += xc_evtchn.c
+SRCS       += xc_gnttab.c
+SRCS       += xc_misc.c
+SRCS       += xc_physdev.c
+SRCS       += xc_private.c
+SRCS       += xc_sedf.c
+
 ifeq ($(XEN_TARGET_ARCH),ia64)
-SRCS     += xc_ia64_stubs.c
+BUILD_SRCS += xc_ia64_stubs.c
 else
-SRCS     += xc_load_aout9.c
-SRCS     += xc_linux_restore.c
-SRCS     += xc_linux_save.c
-SRCS     += xc_vmx_build.c
-SRCS     += xc_ptrace.c
-SRCS     += xc_ptrace_core.c
+SRCS       += xc_ptrace.c
+SRCS       += xc_ptrace_core.c
+
+BUILD_SRCS := xc_load_aout9.c
+BUILD_SRCS += xc_load_bin.c
+BUILD_SRCS += xc_load_elf.c
+BUILD_SRCS += xc_linux_build.c
+BUILD_SRCS += xc_linux_restore.c
+BUILD_SRCS += xc_linux_save.c
+BUILD_SRCS += xc_vmx_build.c
+BUILD_SRCS += xg_private.c
 endif
 
 CFLAGS   += -Wall
@@ -43,13 +47,20 @@ CFLAGS   += -fno-strict-aliasing
 CFLAGS   += $(INCLUDES) -I.
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d
+LDFLAGS  += -L.
 DEPS     = .*.d
 
 LIB_OBJS := $(patsubst %.c,%.o,$(SRCS))
 PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
 
-LIB      := libxenctrl.a libxenctrl-pic.a
-LIB      += libxenctrl.so libxenctrl.so.$(MAJOR) libxenctrl.so.$(MAJOR).$(MINOR)
+LIB_BUILD_OBJS := $(patsubst %.c,%.o,$(BUILD_SRCS))
+PIC_BUILD_OBJS := $(patsubst %.c,%.opic,$(BUILD_SRCS))
+
+LIB := libxenctrl.a
+LIB += libxenctrl.so libxenctrl.so.$(MAJOR) libxenctrl.so.$(MAJOR).$(MINOR)
+
+LIB += libxenguest.a
+LIB += libxenguest.so libxenguest.so.$(MAJOR) libxenguest.so.$(MAJOR).$(MINOR)
 
 all: build
 build: check-for-zlib mk-symlinks
@@ -83,6 +94,11 @@ install: build
 	ln -sf libxenctrl.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenctrl.so
 	$(INSTALL_DATA) xenctrl.h $(DESTDIR)/usr/include/xen
 
+	$(INSTALL_PROG) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
+	$(INSTALL_DATA) libxenguest.a $(DESTDIR)/usr/$(LIBDIR)
+	ln -sf libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxenguest.so.$(MAJOR)
+	ln -sf libxenguest.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenguest.so
+
 .PHONY: TAGS clean rpm install all
 
 TAGS:
@@ -100,10 +116,9 @@ rpm: build
 	mv staging/i386/*.rpm .
 	rm -rf staging
 
-libxenctrl.a: $(LIB_OBJS)
-	$(AR) rc $@ $^
+# libxenctrl
 
-libxenctrl-pic.a: $(PIC_OBJS)
+libxenctrl.a: $(LIB_OBJS)
 	$(AR) rc $@ $^
 
 libxenctrl.so: libxenctrl.so.$(MAJOR)
@@ -112,6 +127,19 @@ libxenctrl.so.$(MAJOR): libxenctrl.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libxenctrl.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenctrl.so.$(MAJOR) -shared -o $@ $^ -lz
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenctrl.so.$(MAJOR) -shared -o $@ $^
+
+# libxenguest
+
+libxenguest.a: $(LIB_BUILD_OBJS)
+	$(AR) rc $@ $^
+
+libxenguest.so: libxenguest.so.$(MAJOR)
+	ln -sf $< $@
+libxenguest.so.$(MAJOR): libxenguest.so.$(MAJOR).$(MINOR)
+	ln -sf $< $@
+
+libxenguest.so.$(MAJOR).$(MINOR): $(PIC_BUILD_OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenguest.so.$(MAJOR) -shared -o $@ $^ -lz -lxenctrl
 
 -include $(DEPS)

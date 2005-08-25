@@ -7,11 +7,12 @@
  *
  */
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <err.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
 
-#include <xenctrl.h>
+#include <xenguest.h>
 
 int
 main(int argc, char **argv)

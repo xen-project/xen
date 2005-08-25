@@ -6,6 +6,7 @@
 
 #include <Python.h>
 #include <xenctrl.h>
+#include <xenguest.h>
 #include <zlib.h>
 #include <fcntl.h>
 #include <netinet/in.h>
