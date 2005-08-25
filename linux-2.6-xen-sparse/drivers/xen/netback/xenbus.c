@@ -171,8 +171,7 @@ abort:
 static void backend_changed(struct xenbus_watch *watch, const char *node)
 {
 	int err;
-	char *p;
-	long int handle, pdev;
+	long int handle;
 	struct backend_info *be
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
@@ -185,29 +184,6 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		xenbus_dev_error(dev, err, "reading handle");
 		return;
 	}
-
-#if 0
-	err = xenbus_scanf(dev->nodename, "physical-device", "%li", &pdev);
-	if (XENBUS_EXIST_ERR(err))
-		return;
-	if (err < 0) {
-		xenbus_dev_error(dev, err, "reading physical-device");
-		return;
-	}
-	if (be->pdev && be->pdev != pdev) {
-		printk(KERN_WARNING
-		       "changing physical-device not supported\n");
-		return;
-	}
-	be->pdev = pdev;
-
-	/* If there's a read-only node, we're read only. */
-	p = xenbus_read(dev->nodename, "read-only", NULL);
-	if (!IS_ERR(p)) {
-		be->readonly = 1;
-		kfree(p);
-	}
-#endif
 
 	if (be->netif == NULL) {
 		be->netif = alloc_netif(be->frontend_id, handle, be_mac);
