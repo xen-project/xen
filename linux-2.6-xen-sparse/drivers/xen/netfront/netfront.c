@@ -364,7 +364,7 @@ static void network_tx_buf_gc(struct net_device *dev)
                        "still in use by backend domain.\n");
                 goto out; 
             }
-            gnttab_end_foreign_access(grant_tx_ref[id], GNTMAP_readonly);
+            gnttab_end_foreign_access_ref(grant_tx_ref[id], GNTMAP_readonly);
             gnttab_release_grant_reference(&gref_tx_head, grant_tx_ref[id]);
             grant_tx_ref[id] = GRANT_INVALID_REF;
 #endif
@@ -650,7 +650,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
         ref = grant_rx_ref[rx->id];
         grant_rx_ref[rx->id] = GRANT_INVALID_REF;
-        mfn = gnttab_end_foreign_transfer(ref);
+        mfn = gnttab_end_foreign_transfer_ref(ref);
         gnttab_release_grant_reference(&gref_rx_head, ref);
 #endif
 
