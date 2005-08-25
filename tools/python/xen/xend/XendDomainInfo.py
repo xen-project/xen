@@ -750,6 +750,11 @@ class XendDomainInfo:
                                  devdb['node'].getData())
                     typedb[dev].delete()
                 typedb.saveDB(save=True)
+            if type == 'vif':
+                typedb = ddb.addChild(type)
+                for dev in typedb.keys():
+                    typedb[dev].delete()
+                typedb.saveDB(save=True)
 
     def show(self):
         """Print virtual machine info.
