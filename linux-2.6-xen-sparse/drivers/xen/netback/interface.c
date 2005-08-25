@@ -384,7 +384,7 @@ void netif_connect(netif_be_connect_t *connect)
         }
 
         netif->rx_shmem_ref    = rx_ref;
-        netif->rx_shmem_handle = handle;
+        netif->rx_shmem_handle = op.handle;
         netif->rx_shmem_vaddr  = VMALLOC_VMADDR(vma->addr) + PAGE_SIZE;
     }
 #else 
