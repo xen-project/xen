@@ -48,10 +48,8 @@ static int netback_remove(struct xenbus_device *dev)
 	if (be->watch.node)
 		unregister_xenbus_watch(&be->watch);
 	unregister_xenbus_watch(&be->backend_watch);
-#if 0
-	if (be->blkif)
-		blkif_put(be->blkif);
-#endif
+	if (be->netif)
+		netif_disconnect(be->netif);
 	if (be->frontpath)
 		kfree(be->frontpath);
 	kfree(be);
