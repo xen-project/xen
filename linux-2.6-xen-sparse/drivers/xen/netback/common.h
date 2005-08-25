@@ -83,12 +83,6 @@ typedef struct netif_st {
     /* Miscellaneous private stuff. */
     enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
     int active;
-    /*
-     * DISCONNECT response is deferred until pending requests are ack'ed.
-     * We therefore need to store the id from the original request.
-     */
-    u8               disconnect_rspid;
-    struct netif_st *hash_next;
     struct list_head list;  /* scheduling list */
     atomic_t         refcnt;
     struct net_device *dev;
@@ -97,12 +91,8 @@ typedef struct netif_st {
     struct work_struct free_work;
 } netif_t;
 
-int netif_create(netif_t *netif);
-void netif_destroy(netif_be_destroy_t *destroy);
-void netif_creditlimit(netif_be_creditlimit_t *creditlimit);
-int  netif_disconnect(netif_be_disconnect_t *disconnect, u8 rsp_id);
-void netif_disconnect_complete(netif_t *netif);
-netif_t *netif_find_by_handle(domid_t domid, unsigned int handle);
+void netif_creditlimit(netif_t *netif);
+int  netif_disconnect(netif_t *netif);
 
 netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN]);
 void free_netif_callback(netif_t *netif);
@@ -116,8 +106,7 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
             free_netif_callback(_b);              \
     } while (0)
 
-void netif_interface_init(void);
-void netif_ctrlif_init(void);
+void netif_xenbus_init(void);
 
 void netif_schedule_work(netif_t *netif);
 void netif_deschedule_work(netif_t *netif);

@@ -966,8 +966,6 @@ static int __init netback_init(void)
     net_timer.data = 0;
     net_timer.function = net_alarm;
     
-    netif_interface_init();
-
     page = balloon_alloc_empty_page_range(MAX_PENDING_REQS);
     BUG_ON(page == NULL);
     mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));

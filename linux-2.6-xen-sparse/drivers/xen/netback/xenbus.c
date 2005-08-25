@@ -109,58 +109,18 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		return;
 	}
 
-#if 0
-	/* Supply the information about the device the frontend needs */
-	err = xenbus_transaction_start(be->dev->nodename);
-	if (err) {
-		xenbus_dev_error(be->dev, err, "starting transaction");
-		return;
-	}
-
-	err = xenbus_printf(be->dev->nodename, "sectors", "%lu",
-			    vbd_size(&be->blkif->vbd));
-	if (err) {
-		xenbus_dev_error(be->dev, err, "writing %s/sectors",
-				 be->dev->nodename);
-		goto abort;
-	}
-
-	/* FIXME: use a typename instead */
-	err = xenbus_printf(be->dev->nodename, "info", "%u",
-			    vbd_info(&be->blkif->vbd));
-	if (err) {
-		xenbus_dev_error(be->dev, err, "writing %s/info",
-				 be->dev->nodename);
-		goto abort;
-	}
-	err = xenbus_printf(be->dev->nodename, "sector-size", "%lu",
-			    vbd_secsize(&be->blkif->vbd));
-	if (err) {
-		xenbus_dev_error(be->dev, err, "writing %s/sector-size",
-				 be->dev->nodename);
-		goto abort;
-	}
-#endif
-
 	/* Map the shared frame, irq etc. */
 	err = netif_map(be->netif, tx_ring_ref, rx_ring_ref, evtchn);
 	if (err) {
 		xenbus_dev_error(be->dev, err,
 				 "mapping shared-frames %lu/%lu port %u",
 				 tx_ring_ref, rx_ring_ref, evtchn);
-		goto abort;
+		return;
 	}
 
-#if 0
-	xenbus_transaction_end(0);
-#endif
 	xenbus_dev_ok(be->dev);
 
 	return;
-
-abort:
-	// xenbus_transaction_end(1);
-	;
 }
 
 /* 
