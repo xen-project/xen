@@ -131,15 +131,7 @@ static void map_cpu_to_logical_apicid(void);
  */
 void __init smp_alloc_memory(void)
 {
-#if 1
-	int cpu;
-
-	for (cpu = 1; cpu < NR_CPUS; cpu++) {
-		cpu_gdt_descr[cpu].address = (unsigned long)
-			alloc_bootmem_low_pages(PAGE_SIZE);
-		/* XXX free unused pages later */
-	}
-#else
+#if 0
 	trampoline_base = (void *) alloc_bootmem_low_pages(PAGE_SIZE);
 	/*
 	 * Has to be in very low memory so we can execute
@@ -861,8 +853,8 @@ static int __init do_boot_cpu(int apicid)
 	atomic_set(&init_deasserted, 0);
 
 #if 1
-	if (cpu_gdt_descr[0].size > PAGE_SIZE)
-		BUG();
+	cpu_gdt_descr[cpu].address = __get_free_page(GFP_KERNEL);
+	BUG_ON(cpu_gdt_descr[0].size > PAGE_SIZE);
 	cpu_gdt_descr[cpu].size = cpu_gdt_descr[0].size;
 	printk("GDT: copying %d bytes from %lx to %lx\n",
 		cpu_gdt_descr[0].size, cpu_gdt_descr[0].address,

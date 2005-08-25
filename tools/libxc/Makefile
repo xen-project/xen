@@ -92,7 +92,7 @@ install: build
 	$(INSTALL_DATA) libxenctrl.a $(DESTDIR)/usr/$(LIBDIR)
 	ln -sf libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxenctrl.so.$(MAJOR)
 	ln -sf libxenctrl.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenctrl.so
-	$(INSTALL_DATA) xenctrl.h $(DESTDIR)/usr/include/xen
+	$(INSTALL_DATA) xenctrl.h $(DESTDIR)/usr/include
 
 	$(INSTALL_PROG) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) libxenguest.a $(DESTDIR)/usr/$(LIBDIR)

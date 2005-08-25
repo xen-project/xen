@@ -536,70 +536,38 @@ static void __init find_early_table_space(unsigned long end)
 	    		  round_up(ptes * 8, PAGE_SIZE); 
 }
 
-static void xen_copy_pt(void)
-{
-	unsigned long va = __START_KERNEL_map;
-	unsigned long addr, *pte_page;
-	int i;
-	pud_t *pud; pmd_t *pmd; pte_t *pte;
-	unsigned long *page = (unsigned long *) init_level4_pgt;
-
-	addr = (unsigned long) page[pgd_index(va)];
-	addr_to_page(addr, page);
-
-	pud = (pud_t *) &page[pud_index(va)];
-	addr = page[pud_index(va)];
-	addr_to_page(addr, page);
-
-	level3_kernel_pgt[pud_index(va)] = 
-		__pud(__pa_symbol(level2_kernel_pgt) | _KERNPG_TABLE | _PAGE_USER);
-
-	for (;;) {
-		pmd = (pmd_t *) &page[pmd_index(va)];
-		if (pmd_present(*pmd)) {
-			level2_kernel_pgt[pmd_index(va)] = *pmd;
-			/*
-			 * if pmd is valid, check pte.
-			 */
-			addr = page[pmd_index(va)];
-			addr_to_page(addr, pte_page);
-			
-			for (i = 0; i < PTRS_PER_PTE; i++) {
-				pte = (pte_t *) &pte_page[pte_index(va)];
-				if (pte_present(*pte))
-					va += PAGE_SIZE;
-				else
-				    break;
-			}
-
-		} else
-		    break;
-	}
-
-	init_level4_pgt[pgd_index(__START_KERNEL_map)] = 
-		mk_kernel_pgd(__pa_symbol(level3_kernel_pgt));
-}
-
 void __init xen_init_pt(void)
 {
+	unsigned long addr, *page;
 	int i;
 
 	for (i = 0; i < NR_CPUS; i++)
 		per_cpu(cur_pgd, i) = init_mm.pgd;
 
-	memcpy((void *)init_level4_pgt, 
-	       (void *)xen_start_info.pt_base, PAGE_SIZE);
-
+	memset((void *)init_level4_pgt,   0, PAGE_SIZE);
 	memset((void *)level3_kernel_pgt, 0, PAGE_SIZE);
 	memset((void *)level2_kernel_pgt, 0, PAGE_SIZE);
 
-	xen_copy_pt();
+	/* Find the initial pte page that was built for us. */
+	page = (unsigned long *)xen_start_info.pt_base;
+	addr = page[pgd_index(__START_KERNEL_map)];
+	addr_to_page(addr, page);
+	addr = page[pud_index(__START_KERNEL_map)];
+	addr_to_page(addr, page);
+
+	/* Construct mapping of initial pte page in our own directories. */
+	init_level4_pgt[pgd_index(__START_KERNEL_map)] = 
+		mk_kernel_pgd(__pa_symbol(level3_kernel_pgt));
+	level3_kernel_pgt[pud_index(__START_KERNEL_map)] = 
+		__pud(__pa_symbol(level2_kernel_pgt) |
+		      _KERNPG_TABLE | _PAGE_USER);
+        memcpy((void *)level2_kernel_pgt, page, PAGE_SIZE);
 
 	make_page_readonly(init_level4_pgt);
-	make_page_readonly(level3_kernel_pgt);
-	make_page_readonly(level2_kernel_pgt);
 	make_page_readonly(init_level4_user_pgt);
-	make_page_readonly(level3_user_pgt); /* for vsyscall stuff */
+	make_page_readonly(level3_kernel_pgt);
+	make_page_readonly(level3_user_pgt);
+	make_page_readonly(level2_kernel_pgt);
 
 	xen_pgd_pin(__pa_symbol(init_level4_pgt));
 	xen_pgd_pin(__pa_symbol(init_level4_user_pgt));
@@ -609,7 +577,6 @@ void __init xen_init_pt(void)
 
 	set_pgd((pgd_t *)(init_level4_user_pgt + 511), 
 		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
-
 }
 
 /*
@@ -617,69 +584,58 @@ void __init xen_init_pt(void)
  * mapping done by Xen is minimal (e.g. 8MB) and we need to extend the
  * mapping for early initialization.
  */
-
-#define MIN_INIT_SIZE	0x800000
 static unsigned long current_size, extended_size;
 
 void __init extend_init_mapping(void) 
 {
 	unsigned long va = __START_KERNEL_map;
-	unsigned long addr, *pte_page;
-
-	unsigned long phys;
+	unsigned long phys, addr, *pte_page;
         pmd_t *pmd;
 	pte_t *pte, new_pte;
 	unsigned long *page = (unsigned long *) init_level4_pgt;
 	int i;
 
-	addr = (unsigned long) page[pgd_index(va)];
+	addr = page[pgd_index(va)];
 	addr_to_page(addr, page);
-
 	addr = page[pud_index(va)];
 	addr_to_page(addr, page);
 
 	for (;;) {
-		pmd = (pmd_t *) &page[pmd_index(va)];
-		if (pmd_present(*pmd)) {
-			/*
-			 * if pmd is valid, check pte.
-			 */
-			addr = page[pmd_index(va)];
-			addr_to_page(addr, pte_page);
-			
-			for (i = 0; i < PTRS_PER_PTE; i++) {
-				pte = (pte_t *) &pte_page[pte_index(va)];
-				
-				if (pte_present(*pte)) {
-					va += PAGE_SIZE;
-					current_size += PAGE_SIZE;
-				} else
-				    break;
-			}
-
-		} else
-		    break;
+		pmd = (pmd_t *)&page[pmd_index(va)];
+		if (!pmd_present(*pmd))
+			break;
+		addr = page[pmd_index(va)];
+		addr_to_page(addr, pte_page);
+		for (i = 0; i < PTRS_PER_PTE; i++) {
+			pte = (pte_t *) &pte_page[pte_index(va)];
+			if (!pte_present(*pte))
+				break;
+			va += PAGE_SIZE;
+			current_size += PAGE_SIZE;
+		}
 	}
 
-	for (; va < __START_KERNEL_map + current_size + tables_space; ) {
+	while (va < __START_KERNEL_map + current_size + tables_space) {
 		pmd = (pmd_t *) &page[pmd_index(va)];
-
-		if (pmd_none(*pmd)) {
-			pte_page = (unsigned long *) alloc_static_page(&phys);
-			make_page_readonly(pte_page);
-			xen_pte_pin(phys);
-			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
-
-			for (i = 0; i < PTRS_PER_PTE; i++, va += PAGE_SIZE) {
-				new_pte = pfn_pte((va -  __START_KERNEL_map) >> PAGE_SHIFT, 
-						  __pgprot(_KERNPG_TABLE | _PAGE_USER));
-
-				pte = (pte_t *) &pte_page[pte_index(va)];
-				xen_l1_entry_update(pte, new_pte);
-				extended_size += PAGE_SIZE;
-			}
-		} 
+		if (!pmd_none(*pmd))
+			continue;
+		pte_page = (unsigned long *) alloc_static_page(&phys);
+		make_page_readonly(pte_page);
+		xen_pte_pin(phys);
+		set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
+		for (i = 0; i < PTRS_PER_PTE; i++, va += PAGE_SIZE) {
+			new_pte = pfn_pte(
+				(va - __START_KERNEL_map) >> PAGE_SHIFT, 
+				__pgprot(_KERNPG_TABLE | _PAGE_USER));
+			pte = (pte_t *)&pte_page[pte_index(va)];
+			xen_l1_entry_update(pte, new_pte);
+			extended_size += PAGE_SIZE;
+		}
 	}
+
+	/* Kill mapping of low 1MB. */
+	for (va = __START_KERNEL_map; va < (unsigned long)&_text; va += PAGE_SIZE)
+		HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
 }
 
 
@@ -719,10 +675,6 @@ void __init init_memory_mapping(unsigned long start, unsigned long end)
 	       table_end<<PAGE_SHIFT);
 
         start_pfn = ((current_size + extended_size) >> PAGE_SHIFT);
-
-        /*
-         * TBD: Need to calculate at runtime
-         */
 
 	__flush_tlb_all();
         init_mapping_done = 1;
