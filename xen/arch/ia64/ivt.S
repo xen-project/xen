@@ -136,7 +136,11 @@ ENTRY(vhpt_miss)
 	;;
 	rsm psr.dt				// use physical addressing for data
 	mov r31=pr				// save the predicate registers
+#ifdef XEN
+	movl r19=THIS_CPU(cpu_kr)+IA64_KR_PT_BASE_OFFSET;;
+#else
 	mov r19=IA64_KR(PT_BASE)		// get page table base address
+#endif
 	shl r21=r16,3				// shift bit 60 into sign bit
 	shr.u r17=r16,61			// get the region number into r17
 	;;
@@ -503,7 +507,11 @@ ENTRY(nested_dtlb_miss)
 	 * Clobbered:	b0, r18, r19, r21, psr.dt (cleared)
 	 */
 	rsm psr.dt				// switch to using physical data addressing
+#ifdef XEN
+	movl r19=THIS_CPU(cpu_kr)+IA64_KR_PT_BASE_OFFSET;;
+#else
 	mov r19=IA64_KR(PT_BASE)		// get the page table base address
+#endif
 	shl r21=r16,3				// shift bit 60 into sign bit
 	;;
 	shr.u r17=r16,61			// get the region number into r17
@@ -833,7 +841,9 @@ ENTRY(break_fault)
 	cmp4.eq p7,p0=r0,r19
 (p7)	br.sptk.many fast_hyperprivop
 	;;
-	mov r22=IA64_KR(CURRENT);;
+	movl r22=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r22 = [r22]
+	;;
 	adds r22=IA64_VCPU_BREAKIMM_OFFSET,r22;;
 	ld4 r23=[r22];;
 	cmp4.eq p6,p7=r23,r17			// Xen-reserved breakimm?
@@ -842,7 +852,8 @@ ENTRY(break_fault)
 	br.sptk.many fast_break_reflect
 	;;
 #endif
-	mov r16=IA64_KR(CURRENT)		// r16 = current task; 12 cycle read lat.
+	movl r16=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r16=[r16]
 	mov r17=cr.iim
 	mov r18=__IA64_BREAK_SYSCALL
 	mov r21=ar.fpsr
@@ -934,7 +945,7 @@ ENTRY(interrupt)
 	// FIXME: this is a hack... use cpuinfo.ksoftirqd because its
 	// not used anywhere else and we need a place to stash ivr and
 	// there's no registers available unused by SAVE_MIN/REST
-	movl r29=(PERCPU_ADDR)+IA64_CPUINFO_KSOFTIRQD_OFFSET;;
+	movl r29=THIS_CPU(cpu_info)+IA64_CPUINFO_KSOFTIRQD_OFFSET;;
 	st8 [r29]=r30;;
 	movl r28=slow_interrupt;;
 	mov r29=rp;;
@@ -954,7 +965,7 @@ slow_interrupt:
 	;;
 	alloc r14=ar.pfs,0,0,2,0 // must be first in an insn group
 #ifdef XEN
-	movl out0=(PERCPU_ADDR)+IA64_CPUINFO_KSOFTIRQD_OFFSET;;
+	movl out0=THIS_CPU(cpu_info)+IA64_CPUINFO_KSOFTIRQD_OFFSET;;
 	ld8 out0=[out0];;
 #else
 	mov out0=cr.ivr		// pass cr.ivr as first arg

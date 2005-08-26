@@ -50,16 +50,11 @@ struct ia64_psr {
 	__u64 ri : 2;
 	__u64 ed : 1;
 	__u64 bn : 1;
-#ifdef CONFIG_VTI
 	__u64 ia : 1;
 	__u64 vm : 1;
 	__u64 reserved5 : 17;
-#else // CONFIG_VTI
-	__u64 reserved4 : 19;
-#endif // CONFIG_VTI
 };
 
-#ifdef  CONFIG_VTI
 /* vmx like above but expressed as bitfields for more efficient access: */
 typedef  union{
     __u64 val;
@@ -217,7 +212,5 @@ enum {
           "M" (len) );                  \
         ret;                            \
 })
-
-#endif  //  CONFIG_VTI
 
 #endif // _ASM_IA64_XENPROCESSOR_H

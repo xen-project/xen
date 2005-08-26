@@ -29,9 +29,6 @@ extern void ia64_new_rr7(unsigned long rid,void *shared_info, void *shared_arch_
 #define	MAX_RID_BLOCKS	(1 << (IA64_MAX_IMPL_RID_BITS-IA64_MIN_IMPL_RID_BITS))
 #define RIDS_PER_RIDBLOCK MIN_RIDS
 
-// This is the one global memory representation of the default Xen region reg
-ia64_rr xen_rr;
-
 #if 0
 // following already defined in include/asm-ia64/gcc_intrin.h
 // it should probably be ifdef'd out from there to ensure all region
@@ -65,7 +62,7 @@ unsigned long allocate_reserved_rid(void)
 
 
 // returns -1 if none available
-unsigned long allocate_metaphysical_rr0(void)
+unsigned long allocate_metaphysical_rr(void)
 {
 	ia64_rr rrv;
 
@@ -79,17 +76,6 @@ int deallocate_metaphysical_rid(unsigned long rid)
 {
 	// fix this when the increment allocation mechanism is fixed.
 	return 1;
-}
-
-
-void init_rr(void)
-{
-	xen_rr.rrval = 0;
-	xen_rr.ve = 0;
-	xen_rr.rid = allocate_reserved_rid();
-	xen_rr.ps = PAGE_SHIFT;
-
-	printf("initialized xen_rr.rid=0x%lx\n", xen_rr.rid);
 }
 
 /*************************************
@@ -186,34 +172,6 @@ int deallocate_rid_range(struct domain *d)
 	return 1;
 }
 
-
-// This function is purely for performance... apparently scrambling
-//  bits in the region id makes for better hashing, which means better
-//  use of the VHPT, which means better performance
-// Note that the only time a RID should be mangled is when it is stored in
-//  a region register; anytime it is "viewable" outside of this module,
-//  it should be unmangled
-
-// NOTE: this function is also implemented in assembly code in hyper_set_rr!!
-// Must ensure these two remain consistent!
-static inline unsigned long
-vmMangleRID(unsigned long RIDVal)
-{
-	union bits64 { unsigned char bytes[4]; unsigned long uint; };
-
-	union bits64 t;
-	unsigned char tmp;
-
-	t.uint = RIDVal;
-	tmp = t.bytes[1];
-	t.bytes[1] = t.bytes[3];
-	t.bytes[3] = tmp;
-
-	return t.uint;
-}
-
-// since vmMangleRID is symmetric, use it for unmangling also
-#define vmUnmangleRID(x)	vmMangleRID(x)
 
 static inline void
 set_rr_no_srlz(unsigned long rr, unsigned long rrval)

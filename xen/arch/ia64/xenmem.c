@@ -30,8 +30,8 @@ static unsigned long num_dma_physpages;
  */
 #ifdef CONFIG_VTI
 unsigned long *mpt_table;
-unsigned long *mpt_table_size;
-#endif
+unsigned long mpt_table_size;
+#endif // CONFIG_VTI
 
 void
 paging_init (void)
@@ -53,21 +53,6 @@ paging_init (void)
 
 	printk("machine to physical table: 0x%lx\n", (u64)mpt_table);
 	memset(mpt_table, INVALID_M2P_ENTRY, mpt_table_size);
-
-	/* Any more setup here? On VMX enabled platform,
-	 * there's no need to keep guest linear pg table,
-	 * and read only mpt table. MAP cache is not used
-	 * in this stage, and later it will be in region 5.
-	 * IO remap is in region 6 with identity mapping.
-	 */
-	/* HV_tlb_init(); */
-
-#else // CONFIG_VTI
-
-	/* Allocate and map the machine-to-phys table */
-	if ((pg = alloc_domheap_pages(NULL, 10, 0)) == NULL)
-		panic("Not enough memory to bootstrap Xen.\n");
-	memset(page_to_virt(pg), 0x55, 16UL << 20);
 #endif // CONFIG_VTI
 
 	/* Other mapping setup */

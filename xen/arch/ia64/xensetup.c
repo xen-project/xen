@@ -183,11 +183,6 @@ void start_kernel(void)
     printk("xen image pstart: 0x%lx, xenheap pend: 0x%lx\n",
 	    xen_pstart, xenheap_phys_end);
 
-#ifdef CONFIG_VTI
-    /* If we want to enable vhpt for all regions, related initialization
-     * for HV TLB must be done earlier before first TLB miss
-     */
-#endif // CONFIG_VTI
     /* Find next hole */
     firsthole_start = 0;
     efi_memmap_walk(xen_find_first_hole, &firsthole_start);
@@ -267,6 +262,14 @@ printk("About to call ac_timer_init()\n");
     do_initcalls();
 printk("About to call sort_main_extable()\n");
     sort_main_extable();
+
+    /* surrender usage of kernel registers to domain, use percpu area instead */
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_IO_BASE] = ia64_get_kr(IA64_KR_IO_BASE);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_PER_CPU_DATA] = ia64_get_kr(IA64_KR_PER_CPU_DATA);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT_STACK] = ia64_get_kr(IA64_KR_CURRENT_STACK);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_FPU_OWNER] = ia64_get_kr(IA64_KR_FPU_OWNER);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT] = ia64_get_kr(IA64_KR_CURRENT);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_PT_BASE] = ia64_get_kr(IA64_KR_PT_BASE);
 
     /* Create initial domain 0. */
 printk("About to call do_createdomain()\n");

@@ -24,7 +24,7 @@
 #include <asm/tlb.h>
 #include <asm/gcc_intrin.h>
 #include <asm/vcpu.h>
-#include <xen/interrupt.h>
+#include <linux/interrupt.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/vmx_mm_def.h>
 #include <asm/vmx.h>
@@ -81,10 +81,10 @@ u64 get_mfn(domid_t domid, u64 gpfn, u64 pages)
 /*
  * The VRN bits of va stand for which rr to get.
  */
-rr_t vmmu_get_rr(VCPU *vcpu, u64 va)
+ia64_rr vmmu_get_rr(VCPU *vcpu, u64 va)
 {
-    rr_t   vrr;
-    vmx_vcpu_get_rr(vcpu, va, &vrr.value);
+    ia64_rr   vrr;
+    vmx_vcpu_get_rr(vcpu, va, &vrr.rrval);
     return vrr;
 }
 
@@ -240,7 +240,7 @@ void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb)
     u64     saved_itir, saved_ifa, saved_rr;
     u64     pages;
     thash_data_t    mtlb;
-    rr_t    vrr;
+    ia64_rr vrr;
     unsigned int    cl = tlb->cl;
 
     mtlb.ifa = tlb->vadr;
@@ -264,7 +264,7 @@ void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb)
     /* Only access memory stack which is mapped by TR,
      * after rr is switched.
      */
-    ia64_set_rr(mtlb.ifa, vmx_vrrtomrr(d, vrr.value));
+    ia64_set_rr(mtlb.ifa, vmx_vrrtomrr(d, vrr.rrval));
     ia64_srlz_d();
     if ( cl == ISIDE_TLB ) {
         ia64_itci(mtlb.page_flags);
@@ -287,12 +287,12 @@ u64 machine_thash(PTA pta, u64 va, u64 rid, u64 ps)
     u64     hash_addr, tag;
     unsigned long psr;
     struct vcpu *v = current;
-    rr_t    vrr;
+    ia64_rr vrr;
 
     
     saved_pta = ia64_getreg(_IA64_REG_CR_PTA);
     saved_rr0 = ia64_get_rr(0);
-    vrr.value = saved_rr0;
+    vrr.rrval = saved_rr0;
     vrr.rid = rid;
     vrr.ps = ps;
 
@@ -300,7 +300,7 @@ u64 machine_thash(PTA pta, u64 va, u64 rid, u64 ps)
     // TODO: Set to enforce lazy mode
     local_irq_save(psr);
     ia64_setreg(_IA64_REG_CR_PTA, pta.val);
-    ia64_set_rr(0, vmx_vrrtomrr(v, vrr.value));
+    ia64_set_rr(0, vmx_vrrtomrr(v, vrr.rrval));
     ia64_srlz_d();
 
     hash_addr = ia64_thash(va);
@@ -318,19 +318,19 @@ u64 machine_ttag(PTA pta, u64 va, u64 rid, u64 ps)
     u64     hash_addr, tag;
     u64     psr;
     struct vcpu *v = current;
-    rr_t    vrr;
+    ia64_rr vrr;
 
     // TODO: Set to enforce lazy mode    
     saved_pta = ia64_getreg(_IA64_REG_CR_PTA);
     saved_rr0 = ia64_get_rr(0);
-    vrr.value = saved_rr0;
+    vrr.rrval = saved_rr0;
     vrr.rid = rid;
     vrr.ps = ps;
 
     va = (va << 3) >> 3;    // set VRN to 0.
     local_irq_save(psr);
     ia64_setreg(_IA64_REG_CR_PTA, pta.val);
-    ia64_set_rr(0, vmx_vrrtomrr(v, vrr.value));
+    ia64_set_rr(0, vmx_vrrtomrr(v, vrr.rrval));
     ia64_srlz_d();
 
     tag = ia64_ttag(va);
@@ -354,15 +354,15 @@ void machine_tlb_purge(u64 rid, u64 va, u64 ps)
 {
     u64       saved_rr0;
     u64       psr;
-    rr_t      vrr;
+    ia64_rr vrr;
 
     va = (va << 3) >> 3;    // set VRN to 0.
     saved_rr0 = ia64_get_rr(0);
-    vrr.value = saved_rr0;
+    vrr.rrval = saved_rr0;
     vrr.rid = rid;
     vrr.ps = ps;
     local_irq_save(psr);
-    ia64_set_rr( 0, vmx_vrrtomrr(current,vrr.value) );
+    ia64_set_rr( 0, vmx_vrrtomrr(current,vrr.rrval) );
     ia64_srlz_d();
     ia64_ptcl(va, ps << 2);
     ia64_set_rr( 0, saved_rr0 );
@@ -421,14 +421,14 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code)
     u64     gpip;   // guest physical IP
     u64     mpa;
     thash_data_t    *tlb;
-    rr_t    vrr;
+    ia64_rr vrr;
     u64     mfn;
     
     if ( !(VMX_VPD(vcpu, vpsr) & IA64_PSR_IT) ) {   // I-side physical mode
         gpip = gip;
     }
     else {
-        vmx_vcpu_get_rr(vcpu, gip, &vrr.value);
+        vmx_vcpu_get_rr(vcpu, gip, &vrr.rrval);
         tlb = vtlb_lookup_ex (vmx_vcpu_get_vtlb(vcpu), 
                 vrr.rid, gip, ISIDE_TLB );
         if ( tlb == NULL ) panic("No entry found in ITLB\n");
@@ -448,7 +448,7 @@ IA64FAULT vmx_vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     thash_data_t data, *ovl;
     thash_cb_t  *hcb;
     search_section_t sections;
-    rr_t    vrr;
+    ia64_rr vrr;
 
     hcb = vmx_vcpu_get_vtlb(vcpu);
     data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
@@ -481,7 +481,7 @@ IA64FAULT vmx_vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
     thash_data_t data, *ovl;
     thash_cb_t  *hcb;
     search_section_t sections;
-    rr_t    vrr;
+    ia64_rr vrr;
 
     hcb = vmx_vcpu_get_vtlb(vcpu);
     data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
@@ -511,7 +511,7 @@ int vmx_lock_guest_dtc (VCPU *vcpu, UINT64 va, int lock)
 {
 
     thash_cb_t  *hcb;
-    rr_t  vrr;
+    ia64_rr vrr;
     u64	  preferred_size;
 
     vmx_vcpu_get_rr(vcpu, va, &vrr);
@@ -527,7 +527,7 @@ IA64FAULT vmx_vcpu_itr_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64
     thash_data_t data, *ovl;
     thash_cb_t  *hcb;
     search_section_t sections;
-    rr_t    vrr;
+    ia64_rr vrr;
 
     hcb = vmx_vcpu_get_vtlb(vcpu);
     data.page_flags=pte & ~PAGE_FLAGS_RV_MASK;
@@ -559,7 +559,7 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa, UINT64
     thash_data_t data, *ovl;
     thash_cb_t  *hcb;
     search_section_t sections;
-    rr_t    vrr;
+    ia64_rr    vrr;
 
 
     hcb = vmx_vcpu_get_vtlb(vcpu);

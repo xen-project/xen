@@ -14,9 +14,7 @@
 #include <asm/tlb.h>
 #include <asm/processor.h>
 #include <asm/delay.h>
-#ifdef CONFIG_VTI
 #include <asm/vmx_vcpu.h>
-#endif // CONFIG_VTI
 
 typedef	union {
 	struct ia64_psr ia64_psr;
