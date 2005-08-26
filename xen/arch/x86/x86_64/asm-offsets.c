@@ -71,6 +71,9 @@ void __dummy__(void)
     OFFSET(VCPUINFO_upcall_mask, vcpu_info_t, evtchn_upcall_mask);
     BLANK();
 
+    DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));
+    BLANK();
+
     OFFSET(TRAPBOUNCE_error_code, struct trap_bounce, error_code);
     OFFSET(TRAPBOUNCE_cr2, struct trap_bounce, cr2);
     OFFSET(TRAPBOUNCE_flags, struct trap_bounce, flags);

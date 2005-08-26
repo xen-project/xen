@@ -12,6 +12,11 @@
 #include <asm/page.h>
 #include <public/xen.h>
 
+#define GET_GUEST_REGS(reg)                     \
+        movq $~(STACK_SIZE-1),reg;              \
+        andq %rsp,reg;                          \
+        orq  $(STACK_SIZE-CPUINFO_sizeof),reg;
+
 #define GET_CURRENT(reg)         \
         movq $STACK_SIZE-8, reg; \
         orq  %rsp, reg;          \
@@ -120,10 +125,42 @@ ENTRY(syscall_enter)
 /*hypercall:*/
         movq  %r10,%rcx
         andq  $(NR_hypercalls-1),%rax
+#ifndef NDEBUG
+        /* Deliberately corrupt parameter regs not used by this hypercall. */
+        pushq %rdi; pushq %rsi; pushq %rdx; pushq %rcx; pushq %r8 ; pushq %r9 
+        leaq  hypercall_args_table(%rip),%r10
+        movq  $6,%rcx
+        sub   (%r10,%rax,1),%cl
+        movq  %rsp,%rdi
+        movl  $0xDEADBEEF,%eax
+        rep   stosq
+        popq  %r9 ; popq  %r8 ; popq  %rcx; popq  %rdx; popq  %rsi; popq  %rdi
+        movq  UREGS_rax(%rsp),%rax
+        andq  $(NR_hypercalls-1),%rax
+        pushq %rax
+        pushq UREGS_rip+8(%rsp)
+#endif
         leaq  hypercall_table(%rip),%r10
         PERFC_INCR(PERFC_hypercalls, %rax)
         callq *(%r10,%rax,8)
-        movq %rax,UREGS_rax(%rsp)       # save the return value
+#ifndef NDEBUG
+        /* Deliberately corrupt parameter regs used by this hypercall. */
+        popq  %r10         # Shadow RIP
+        cmpq  %r10,UREGS_rip(%rsp)
+        popq  %rcx         # Shadow hypercall index
+        jne   skip_clobber /* If RIP has changed then don't clobber. */
+        leaq  hypercall_args_table(%rip),%r10
+        movb  (%r10,%rcx,1),%cl
+        movl  $0xDEADBEEF,%r10d
+        cmpb  $1,%cl; jb skip_clobber; movq %r10,UREGS_rdi(%rsp)
+        cmpb  $2,%cl; jb skip_clobber; movq %r10,UREGS_rsi(%rsp)
+        cmpb  $3,%cl; jb skip_clobber; movq %r10,UREGS_rdx(%rsp)
+        cmpb  $4,%cl; jb skip_clobber; movq %r10,UREGS_r10(%rsp)
+        cmpb  $5,%cl; jb skip_clobber; movq %r10,UREGS_r8(%rsp)
+        cmpb  $6,%cl; jb skip_clobber; movq %r10,UREGS_r9(%rsp)
+skip_clobber:
+#endif
+        movq  %rax,UREGS_rax(%rsp)       # save the return value
 
 /* %rbx: struct vcpu */
 test_all_events:
@@ -538,7 +575,8 @@ ENTRY(nmi)
 do_arch_sched_op:
         # Ensure we return success even if we return via schedule_tail()
         xorl  %eax,%eax
-        movq  %rax,UREGS_rax+8(%rsp)
+        GET_GUEST_REGS(%r10)
+        movq  %rax,UREGS_rax(%r10)
         jmp   do_sched_op
 
 .data
@@ -596,4 +634,37 @@ ENTRY(hypercall_table)
         .quad do_acm_op
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .quad do_ni_hypercall
+        .endr
+
+ENTRY(hypercall_args_table)
+        .byte 1 /* do_set_trap_table    */  /*  0 */
+        .byte 4 /* do_mmu_update        */
+        .byte 2 /* do_set_gdt           */
+        .byte 2 /* do_stack_switch      */
+        .byte 3 /* do_set_callbacks     */
+        .byte 1 /* do_fpu_taskswitch    */  /*  5 */
+        .byte 2 /* do_arch_sched_op     */
+        .byte 1 /* do_dom0_op           */
+        .byte 2 /* do_set_debugreg      */
+        .byte 1 /* do_get_debugreg      */
+        .byte 2 /* do_update_descriptor */  /* 10 */
+        .byte 0 /* do_ni_hypercall      */
+        .byte 5 /* do_dom_mem_op        */
+        .byte 2 /* do_multicall         */
+        .byte 3 /* do_update_va_mapping */
+        .byte 1 /* do_set_timer_op      */  /* 15 */
+        .byte 1 /* do_event_channel_op  */
+        .byte 1 /* do_xen_version       */
+        .byte 3 /* do_console_io        */
+        .byte 1 /* do_physdev_op        */
+        .byte 3 /* do_grant_table_op    */  /* 20 */
+        .byte 2 /* do_vm_assist         */
+        .byte 4 /* do_update_va_mapping_otherdomain */
+        .byte 0 /* do_switch_to_user    */
+        .byte 2 /* do_boot_vcpu         */
+        .byte 2 /* do_set_segment_base  */  /* 25 */
+        .byte 4 /* do_mmuext_op         */
+        .byte 1 /* do_acm_op            */
+        .rept NR_hypercalls-(.-hypercall_args_table)
+        .byte 0 /* do_ni_hypercall      */
         .endr
