@@ -105,6 +105,11 @@ xm full list of subcommands:
         Limit the transmission rate of a virtual network interface
     network-list    <DomId>        List virtual network interfaces for a domain
 
+  Vnet commands:
+    vnet-list   [-l|--long]    list vnets
+    vnet-create <config>       create a vnet from a config file
+    vnet-delete <vnetid>       delete a vnet
+
 For a short list of subcommands run 'xm help'
 For more help on xm see the xm(1) man page
 For more help on xm create, see the xmdomain.cfg(5) man page"""
@@ -547,6 +552,47 @@ def xm_block_destroy(args):
     from xen.xend.XendClient import server
     server.xend_domain_device_destroy(dom, 'vbd', dev)
 
+def xm_vnet_list(args):
+    from xen.xend.XendClient import server
+    try:
+        (options, params) = getopt(args, 'l', ['long'])
+    except GetoptError, opterr:
+        err(opterr)
+        sys.exit(1)
+    
+    use_long = 0
+    for (k, v) in options:
+        if k in ['-l', '--long']:
+            use_long = 1
+            
+    if params:
+        use_long = 1
+        vnets = params
+    else:
+        vnets = server.xend_vnets()
+    
+    for vnet in vnets:
+        try:
+            if use_long:
+                info = server.xend_vnet(vnet)
+                PrettyPrint.prettyprint(info)
+            else:
+                print vnet
+        except Exception, ex:
+            print vnet, ex
+
+def xm_vnet_create(args):
+    arg_check(args, 1, "vnet-create")
+    conf = args[0]
+    from xen.xend.XendClient import server
+    server.xend_vnet_create(conf)
+
+def xm_vnet_delete(args):
+    arg_check(args, 1, "vnet-delete")
+    vnet = args[0]
+    from xen.xend.XendClient import server
+    server.xend_vnet_delete(vnet)
+
 commands = {
     # console commands
     "console": xm_console,
@@ -592,7 +638,11 @@ commands = {
     "block-refresh": xm_block_refresh,
     # network
     "network-limit": xm_network_limit,
-    "network-list": xm_network_list
+    "network-list": xm_network_list,
+    # vnet
+    "vnet-list": xm_vnet_list,
+    "vnet-create": xm_vnet_create,
+    "vnet-delete": xm_vnet_delete,
     }
 
 aliases = {

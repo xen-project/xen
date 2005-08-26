@@ -712,6 +712,7 @@ void __init paging_init(void)
         HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 
         memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	init_mm.context.pinned = 1;
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	{

@@ -152,10 +152,7 @@ static void domain_shutdown_finalise(void)
 
     /* Make sure that every vcpu is descheduled before we finalise. */
     for_each_vcpu ( d, v )
-        while ( test_bit(_VCPUF_running, &v->vcpu_flags) )
-            cpu_relax();
-
-    sync_lazy_execstate_mask(d->cpumask);
+        vcpu_sleep_sync(v);
     BUG_ON(!cpus_empty(d->cpumask));
 
     sync_pagetable_state(d);
@@ -209,7 +206,7 @@ void domain_shutdown(u8 reason)
 
     /* Put every vcpu to sleep, but don't wait (avoids inter-vcpu deadlock). */
     for_each_vcpu ( d, v )
-        domain_sleep_nosync(v);
+        vcpu_sleep_nosync(v);
 }
 
 
@@ -226,7 +223,7 @@ void domain_pause_for_debugger(void)
     for_each_vcpu ( d, v )
     {
         set_bit(_VCPUF_ctrl_pause, &v->vcpu_flags);
-        domain_sleep_nosync(v);
+        vcpu_sleep_nosync(v);
     }
 
     send_guest_virq(dom0->vcpu[0], VIRQ_DEBUGGER);
@@ -275,7 +272,7 @@ void vcpu_pause(struct vcpu *v)
 {
     BUG_ON(v == current);
     atomic_inc(&v->pausecnt);
-    domain_sleep_sync(v);
+    vcpu_sleep_sync(v);
 }
 
 void domain_pause(struct domain *d)
@@ -286,7 +283,7 @@ void domain_pause(struct domain *d)
     {
         BUG_ON(v == current);
         atomic_inc(&v->pausecnt);
-        domain_sleep_sync(v);
+        vcpu_sleep_sync(v);
     }
 }
 
@@ -294,7 +291,7 @@ void vcpu_unpause(struct vcpu *v)
 {
     BUG_ON(v == current);
     if ( atomic_dec_and_test(&v->pausecnt) )
-        domain_wake(v);
+        vcpu_wake(v);
 }
 
 void domain_unpause(struct domain *d)
@@ -313,7 +310,7 @@ void domain_pause_by_systemcontroller(struct domain *d)
     {
         BUG_ON(v == current);
         if ( !test_and_set_bit(_VCPUF_ctrl_pause, &v->vcpu_flags) )
-            domain_sleep_sync(v);
+            vcpu_sleep_sync(v);
     }
 }
 
@@ -324,7 +321,7 @@ void domain_unpause_by_systemcontroller(struct domain *d)
     for_each_vcpu ( d, v )
     {
         if ( test_and_clear_bit(_VCPUF_ctrl_pause, &v->vcpu_flags) )
-            domain_wake(v);
+            vcpu_wake(v);
     }
 }
 
@@ -413,7 +410,7 @@ long do_boot_vcpu(unsigned long vcpu, struct vcpu_guest_context *ctxt)
 
     /* domain_unpause_by_systemcontroller */
     if ( test_and_clear_bit(_VCPUF_ctrl_pause, &v->vcpu_flags) )
-        domain_wake(v);
+        vcpu_wake(v);
 
     xfree(c);
     return 0;

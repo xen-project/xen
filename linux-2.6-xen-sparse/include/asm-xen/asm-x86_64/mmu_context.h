@@ -58,6 +58,9 @@ static inline void __prepare_arch_switch(void)
 	}
 }
 
+extern void mm_pin(struct mm_struct *mm);
+extern void mm_unpin(struct mm_struct *mm);
+void mm_pin_all(void);
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, 
 			     struct task_struct *tsk)
@@ -66,6 +69,9 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	struct mmuext_op _op[3], *op = _op;
 
 	if (likely(prev != next)) {
+		if (!next->context.pinned)
+			mm_pin(next);
+
 		/* stop flush ipis for the previous mm */
 		clear_bit(cpu, &prev->cpu_vm_mask);
 #if 0  /* XEN: no lazy tlb */

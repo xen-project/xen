@@ -472,7 +472,14 @@ int Parser_intern(Parser *p){
 }
 
 int Parser_atom(Parser *p){
-    Sxpr obj = atom_new(peek_token(p));
+    Sxpr obj;
+    long v;
+    if(Parser_flags(p, PARSE_INT) &&
+       convert_atol(peek_token(p), &v) == 0){
+        obj = OINT(v);
+    } else {
+        obj = atom_new(peek_token(p));
+    }
     return Parser_set_value(p, obj);
 }
 

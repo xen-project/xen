@@ -1,20 +1,33 @@
 Vnet Module Command Interface
 Mike Wray <mike.wray@hp.com>
-2004/09/17
+2005/08/25
 
 When insmod the vnet-module creates /proc/vnet/policy which
 can be used to control the module by writing commands into it.
 The return code from the command should be returned by close.
+Xend uses these commands to implement its vnet interface.
 
 The commands are:
 
-(vnet.add (id <id>) [(security { none | auth | conf } )] )
+(vnet.add (id <id>) [(vnetif <ifname>)] [(security { none | auth | conf } )] )
 
 Create the vnet with id <id> and the given security level (default none).
+Vnet ids are 128-bit and can be specified as 8 fields of 1 to 4 hex digits
+separated by colons. A vnet id with no colons is treated as one with the first
+7 fields zero. Examples:
+
+1500 - equivalent to 0:0:0:0:0:0:0:1500
+aaff:0:0:0:0:0:77:88
+
 Security levels:
 - none: no security
 - auth: message authentication (IPSEC hmac)
 - conf: message confidentiality (IPSEC hmac and encryption)
+
+The <ifname> is the name of the network device created for the vnet.
+If not given it defaults to vnif<N>, where <N> is the hex for the
+8-th field in the id. Note that network device names can have a
+maximum of 14 characters.
 
 (vnet.del (id <id>))
 
@@ -31,11 +44,17 @@ on vnet <vnetid>.
 Remove the vif with MAC address <macaddr> from the vnet with id <vnetid>.
 The vnet module will stop responding to VARP for the vif.
 
+(vif.print)
+
+Print the known vnets, vifs and varp cache on the console.
+
 Examples:
 
 To create vnet 10 with no security:
 
 echo '(vnet.add (id 10))' > /proc/vnet/policy
+
+This creates a device vnif0010.
 
 To create vnet 11 with message authentication:
 

@@ -1,18 +1,21 @@
+# -*- mode: Makefile; -*-
 
-export LINUX_SERIES ?=2.6
+ifndef VNET_ROOT
+export VNET_ROOT = $(shell pwd)
+include $(VNET_ROOT)/Make.env
+endif
 
-# Root path to install in.
-# Set to '/' to install relative to filesystem root.
-export prefix?=$(shell cd ../../dist/install && pwd)
+.PHONY: all compile install dist clean pristine
+.PHONY: gc-all gc-install gc-clean
 
-.PHONY: all compile
-.PHONY: gc-install gc-clean gc-prstine
-.PHONY: libxutil vnetd vnet-module install dist clean pristine
+SUBDIRS:=
+SUBDIRS+= examples
+SUBDIRS+= gc
+SUBDIRS+= libxutil
+SUBDIRS+= vnetd
+SUBDIRS+= vnet-module
 
 all: compile
-
-compile: libxutil vnetd vnet-module
-#compile: vnet-module
 
 gc.tar.gz:
 	wget http://www.hpl.hp.com/personal/Hans_Boehm/gc/gc_source/$@
@@ -21,36 +24,39 @@ gc: gc.tar.gz
 	tar xfz gc.tar.gz
 	ln -sf gc?.? gc
 
-gc-install: gc 
-	(cd gc && make test && ./configure --prefix=`pwd`/install)
+$(GC_LIB_A): gc
+	(cd gc && ./configure --prefix=$(GC_DIR) )
 	make -C gc
-	make -C gc install
+	DESTDIR="" make -C gc install
+
+gc-all: $(GC_LIB_A)
+
+gc-install:
 
 gc-clean:
-	-$(MAKE) -C gc clean
+	-@$(RM) -r gc?.? gc
 
-gc-pristine:
-	-rm -rf gc?.? gc
+submak = $(MAKE) -C $(patsubst %-$(1),%,$(@)) $(1)
+subtgt = $(patsubst %,%-$(1),$(SUBDIRS))
 
-libxutil:
-	$(MAKE) -C libxutil
+%-all:
+	$(call submak,all)
 
-vnetd: gc-install
-	$(MAKE) -C vnetd
+%-clean:
+	-$(call submak,clean)
 
-vnet-module:
-	$(MAKE) -C vnet-module
+%-install:
+	$(call submak,install)
 
-install: compile
-	$(MAKE) -C libxutil install
-	$(MAKE) -C vnetd install
-	$(MAKE) -C vnet-module install
-	$(MAKE) -C examples install
+compile: $(call subtgt,all)
 
-clean:
-	-$(MAKE) -C libxutil clean
-	-$(MAKE) -C vnetd clean
-	-$(MAKE) -C vnet-module clean
-	-rm -rf gc?.? gc
+install: DESTDIR=
+install: dist
 
-pristine: clean gc-pristine
+dist: compile $(call subtgt,install)
+
+clean: $(call subtgt,clean)
+	-@$(RM) -r build
+
+pristine: clean
+	-@$(RM) gc.tar.gz

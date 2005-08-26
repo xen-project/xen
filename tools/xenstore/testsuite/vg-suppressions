@@ -1,0 +1,9 @@
+{
+   Glibc goes boom from _start (Debian glibc 2.3.5-3)
+   Memcheck:Cond
+   obj:/lib/ld-2.3.5.so
+   obj:/lib/ld-2.3.5.so
+   obj:/lib/ld-2.3.5.so
+   obj:/lib/ld-2.3.5.so
+   obj:/lib/ld-2.3.5.so
+}

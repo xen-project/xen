@@ -93,7 +93,7 @@ typedef struct IPMessageQueue {
 /** Key for varp cache entries. */
 typedef struct VCKey {
     /** Vnet id (network order). */
-    uint32_t vnet;
+    VnetId vnet;
     /** Virtual MAC address. */
     Vmac vmac;
 } VCKey;
@@ -103,7 +103,7 @@ typedef struct VCEntry {
     VCKey key;
 
     /** Care-of address for the key. */
-    uint32_t addr;
+    VarpAddr addr;
 
     /** Alias coa if we are a gateway. */
     //uint32_t gateway;
@@ -111,7 +111,7 @@ typedef struct VCEntry {
     //uint32_t encaps;
 
     /** Where this entry came from. */
-    uint32_t source;
+    VarpAddr source;
 
     /** Last-updated timestamp. */
     double timestamp;

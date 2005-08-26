@@ -49,4 +49,6 @@ typedef long                quad_t;
 typedef unsigned long       u_quad_t;
 typedef unsigned long       uintptr_t;
 #endif
+
+#define UINT_MAX            (~0U)
 #endif /* _TYPES_H_ */

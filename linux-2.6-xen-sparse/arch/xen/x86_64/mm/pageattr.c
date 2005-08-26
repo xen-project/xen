@@ -12,19 +12,145 @@
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 #include <asm/tlbflush.h>
-#include <asm/pgalloc.h>
 #include <asm/io.h>
+
+#ifdef CONFIG_XEN
+#include <asm/pgalloc.h>
+#include <asm/mmu_context.h>
+
+LIST_HEAD(mm_unpinned);
+DEFINE_SPINLOCK(mm_unpinned_lock);
+
+static inline void mm_walk_set_prot(void *pt, pgprot_t flags)
+{
+	struct page *page = virt_to_page(pt);
+	unsigned long pfn = page_to_pfn(page);
+
+	BUG_ON(HYPERVISOR_update_va_mapping(
+		       (unsigned long)__va(pfn << PAGE_SHIFT),
+		       pfn_pte(pfn, flags), 0));
+}
+
+static void mm_walk(struct mm_struct *mm, pgprot_t flags)
+{
+	pgd_t       *pgd;
+	pud_t       *pud;
+	pmd_t       *pmd;
+	pte_t       *pte;
+	int          g,u,m;
+
+	pgd = mm->pgd;
+	for (g = 0; g <= USER_PTRS_PER_PGD; g++, pgd++) {
+		if (pgd_none(*pgd))
+			continue;
+		pud = pud_offset(pgd, 0);
+		if (PTRS_PER_PUD > 1) /* not folded */ 
+			mm_walk_set_prot(pud,flags);
+		for (u = 0; u < PTRS_PER_PUD; u++, pud++) {
+			if (pud_none(*pud))
+				continue;
+			pmd = pmd_offset(pud, 0);
+			if (PTRS_PER_PMD > 1) /* not folded */ 
+				mm_walk_set_prot(pmd,flags);
+			for (m = 0; m < PTRS_PER_PMD; m++, pmd++) {
+				if (pmd_none(*pmd))
+					continue;
+				pte = pte_offset_kernel(pmd,0);
+				mm_walk_set_prot(pte,flags);
+			}
+		}
+	}
+}
+
+void mm_pin(struct mm_struct *mm)
+{
+	spin_lock(&mm->page_table_lock);
+
+	mm_walk(mm, PAGE_KERNEL_RO);
+	BUG_ON(HYPERVISOR_update_va_mapping(
+		       (unsigned long)mm->pgd,
+		       pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL_RO),
+		       UVMF_TLB_FLUSH));
+	BUG_ON(HYPERVISOR_update_va_mapping(
+		       (unsigned long)__user_pgd(mm->pgd),
+		       pfn_pte(virt_to_phys(__user_pgd(mm->pgd))>>PAGE_SHIFT, PAGE_KERNEL_RO),
+		       UVMF_TLB_FLUSH));
+	xen_pgd_pin(__pa(mm->pgd)); /* kernel */
+	xen_pgd_pin(__pa(__user_pgd(mm->pgd))); /* user */
+	mm->context.pinned = 1;
+	spin_lock(&mm_unpinned_lock);
+	list_del(&mm->context.unpinned);
+	spin_unlock(&mm_unpinned_lock);
+
+	spin_unlock(&mm->page_table_lock);
+}
+
+void mm_unpin(struct mm_struct *mm)
+{
+	spin_lock(&mm->page_table_lock);
+
+	xen_pgd_unpin(__pa(mm->pgd));
+	xen_pgd_unpin(__pa(__user_pgd(mm->pgd)));
+	BUG_ON(HYPERVISOR_update_va_mapping(
+		       (unsigned long)mm->pgd,
+		       pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL), 0));
+	BUG_ON(HYPERVISOR_update_va_mapping(
+		       (unsigned long)__user_pgd(mm->pgd),
+		       pfn_pte(virt_to_phys(__user_pgd(mm->pgd))>>PAGE_SHIFT, PAGE_KERNEL), 0));
+	mm_walk(mm, PAGE_KERNEL);
+	xen_tlb_flush();
+	mm->context.pinned = 0;
+	spin_lock(&mm_unpinned_lock);
+	list_add(&mm->context.unpinned, &mm_unpinned);
+	spin_unlock(&mm_unpinned_lock);
+
+	spin_unlock(&mm->page_table_lock);
+}
+
+void mm_pin_all(void)
+{
+	while (!list_empty(&mm_unpinned))	
+		mm_pin(list_entry(mm_unpinned.next, struct mm_struct,
+				  context.unpinned));
+}
+
+void _arch_exit_mmap(struct mm_struct *mm)
+{
+    struct task_struct *tsk = current;
+
+    task_lock(tsk);
+
+    /*
+     * We aggressively remove defunct pgd from cr3. We execute unmap_vmas()
+     * *much* faster this way, as no tlb flushes means bigger wrpt batches.
+     */
+    if ( tsk->active_mm == mm )
+    {
+        tsk->active_mm = &init_mm;
+        atomic_inc(&init_mm.mm_count);
+
+        switch_mm(mm, &init_mm, tsk);
+
+        atomic_dec(&mm->mm_count);
+        BUG_ON(atomic_read(&mm->mm_count) == 0);
+    }
+
+    task_unlock(tsk);
+
+    if ( mm->context.pinned && (atomic_read(&mm->mm_count) == 1) )
+        mm_unpin(mm);
+}
 
 void pte_free(struct page *pte)
 {
-        pte_t *ptep;
+	unsigned long va = (unsigned long)__va(page_to_pfn(pte)<<PAGE_SHIFT);
 
-        ptep = pfn_to_kaddr(page_to_pfn(pte));
-
-        xen_pte_unpin(__pa(ptep));
-        make_page_writable(ptep);
-	__free_page(pte); 
+	if (!pte_write(*virt_to_ptep(va)))
+		BUG_ON(HYPERVISOR_update_va_mapping(
+			va, pfn_pte(page_to_pfn(pte), PAGE_KERNEL), 0));
+	__free_page(pte);
 }
+#endif	/* CONFIG_XEN */
 
 static inline pte_t *lookup_address(unsigned long address) 
 { 
@@ -78,7 +204,7 @@ static void flush_kernel_map(void *address)
 	} else
 		asm volatile("wbinvd":::"memory"); 
 	if (address)
-                __flush_tlb_one((unsigned long) address);
+		__flush_tlb_one(address);
 	else
 		__flush_tlb_all();
 }
@@ -166,14 +292,17 @@ __change_page_attr(unsigned long address, unsigned long pfn, pgprot_t prot,
 		BUG();
 
 	/* on x86-64 the direct mapping set at boot is not using 4k pages */
-// 	BUG_ON(PageReserved(kpte_page));
 	/*
 	 * ..., but the XEN guest kernels (currently) do:
 	 * If the pte was reserved, it means it was created at boot
 	 * time (not via split_large_page) and in turn we must not
 	 * replace it with a large page.
 	 */
-	if (!PageReserved(kpte_page)) {
+#ifndef CONFIG_XEN
+ 	BUG_ON(PageReserved(kpte_page));
+#else
+	if (!PageReserved(kpte_page))
+#endif
 		switch (page_count(kpte_page)) {
 		case 1:
 			save_page(address, kpte_page); 		     
@@ -182,7 +311,6 @@ __change_page_attr(unsigned long address, unsigned long pfn, pgprot_t prot,
 		case 0:
 			BUG(); /* memleak and failed 2M page regeneration */
 	 	}
-	}
 	return 0;
 } 
 

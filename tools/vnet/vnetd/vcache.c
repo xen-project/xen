@@ -44,6 +44,8 @@
 #undef DEBUG
 #include "debug.h"
 
+#include "varp_util.c"
+
 static VarpCache *vcache = NULL;
 
 void IPMessageQueue_init(IPMessageQueue *queue, int maxlen){
@@ -97,16 +99,20 @@ void VarpCache_sweep(VarpCache *z, int all);
  * @param vmac vmac (in network order)
  * @return 0 on success, error code otherwise
  */
-int varp_send(Conn *conn, uint16_t opcode, uint32_t vnet, Vmac *vmac, uint32_t addr){
+int varp_send(Conn *conn, uint16_t opcode, VnetId *vnet, Vmac *vmac, VarpAddr *addr){
     int err = 0;
     int varp_n = sizeof(VarpHdr);
     VarpHdr varph = {};
+#ifdef DEBUG
+    char vnetbuf[VNET_ID_BUF];
+    char addrbuf[VARP_ADDR_BUF];
+#endif
 
-    varph.vnetmsghdr.id     = htons(VARP_ID);
-    varph.vnetmsghdr.opcode = htons(opcode);
-    varph.vnet              = vnet;
-    varph.vmac              = *vmac;
-    varph.addr              = addr;
+    varph.hdr.id = htons(VARP_ID);
+    varph.hdr.opcode = htons(opcode);
+    varph.vnet = *vnet;
+    varph.vmac = *vmac;
+    varph.addr = *addr;
 
     if(0){
         struct sockaddr_in self;
@@ -117,8 +123,10 @@ int varp_send(Conn *conn, uint16_t opcode, uint32_t vnet, Vmac *vmac, uint32_t a
     }
     dprintf("> addr=%s opcode=%d\n",
             inet_ntoa(conn->addr.sin_addr), opcode);
-    dprintf("> vnet=%d vmac=" MACFMT " addr=" IPFMT "\n",
-            ntohl(vnet), MAC6TUPLE(vmac->mac), NIPQUAD(addr));
+    dprintf("> vnet=%s vmac=" MACFMT " addr=%s\n",
+            VnetId_ntoa(vnet, vnetbuf),
+            MAC6TUPLE(vmac->mac),
+            VarpAddr_ntoa(addr, addrbuf));
     err = marshal_bytes(conn->out, &varph, varp_n);
     marshal_flush(conn->out);
     dprintf("< err=%d\n", err);
@@ -157,21 +165,24 @@ int VCEntry_set_flags(VCEntry *z, int flags, int set){
  */
 void VCEntry_print(VCEntry *ventry){
     if(ventry){
-        char *c, *d;
-        switch(ventry->state){
-        case VCACHE_STATE_INCOMPLETE: c = "INC"; break;
-        case VCACHE_STATE_REACHABLE:  c = "RCH"; break;
-        case VCACHE_STATE_FAILED:     c = "FLD"; break;
-        default:                      c = "UNK"; break;
-        }
-        d = (VCEntry_get_flags(ventry, VCACHE_FLAG_PROBING) ? "P" : " ");
+        char *state, *flags;
+        char vnetbuf[VNET_ID_BUF];
+        char addrbuf[VARP_ADDR_BUF];
 
-        printf("VENTRY(%p %s %s vnet=%d vmac=" MACFMT " addr=" IPFMT " time=%g)\n",
+        switch(ventry->state){
+        case VCACHE_STATE_INCOMPLETE: state = "INC"; break;
+        case VCACHE_STATE_REACHABLE:  state = "RCH"; break;
+        case VCACHE_STATE_FAILED:     state = "FLD"; break;
+        default:                      state = "UNK"; break;
+        }
+        flags = (VCEntry_get_flags(ventry, VCACHE_FLAG_PROBING) ? "P" : " ");
+
+        printf("VENTRY(%p %s %s vnet=%s vmac=" MACFMT " addr=%s time=%g)\n",
                ventry,
-               c, d,
-               ntohl(ventry->key.vnet),
+               state, flags,
+               VnetId_ntoa(&ventry->key.vnet, vnetbuf),
                MAC6TUPLE(ventry->key.vmac.mac),
-               NIPQUAD(ventry->addr),
+               VarpAddr_ntoa(&ventry->addr, addrbuf),
                ventry->timestamp);
     } else {
         printf("VENTRY: Null!\n");
@@ -239,11 +250,11 @@ int VCEntry_schedule(VCEntry *ventry){
  * @param vmac virtual MAC address (copied)
  * @return ventry or null
  */
-VCEntry * VCEntry_new(uint32_t vnet, Vmac *vmac){
+VCEntry * VCEntry_new(VnetId *vnet, Vmac *vmac){
     VCEntry *z = ALLOCATE(VCEntry);
     z->state = VCACHE_STATE_INCOMPLETE;
     z->timestamp = time_now();
-    z->key.vnet = vnet;
+    z->key.vnet = *vnet;
     z->key.vmac = *vmac;
     return z;
 }
@@ -256,15 +267,9 @@ VCEntry * VCEntry_new(uint32_t vnet, Vmac *vmac){
  */
 Hashcode vcache_key_hash_fn(void *k){
     VCKey *key = k;
-    Hashcode h;
-    h = hash_2ul(key->vnet,
-                 (key->vmac.mac[0] << 24) |
-                 (key->vmac.mac[1] << 16) |
-                 (key->vmac.mac[2] <<  8) |
-                 (key->vmac.mac[3]      ));
-    h = hash_hul(h, 
-                 (key->vmac.mac[4] <<   8) |
-                 (key->vmac.mac[5]       ));
+    Hashcode h = 0;
+    h = VnetId_hash(h, &key->vnet);
+    h = Vmac_hash(h, &key->vmac);
     return h;
 }
 
@@ -278,8 +283,8 @@ Hashcode vcache_key_hash_fn(void *k){
 int vcache_key_equal_fn(void *k1, void *k2){
     VCKey *key1 = k1;
     VCKey *key2 = k2;
-    return (key1->vnet == key2->vnet)
-        && (memcmp(key1->vmac.mac, key2->vmac.mac, ETH_ALEN) == 0);
+    return (VnetId_eq(&key1->vnet , &key2->vnet) &&
+            Vmac_eq(&key1->vmac, &key2->vmac));
 }
 
 void VarpCache_schedule(VarpCache *z);
@@ -351,7 +356,7 @@ VarpCache * VarpCache_new(void){
  * @param vmac virtual MAC address (copied)
  * @return new entry or null
  */
-VCEntry * VarpCache_add(VarpCache *z, uint32_t vnet, Vmac *vmac){
+VCEntry * VarpCache_add(VarpCache *z, VnetId *vnet, Vmac *vmac){
     VCEntry *ventry;
     HTEntry *entry;
 
@@ -378,8 +383,8 @@ int VarpCache_remove(VarpCache *z, VCEntry *ventry){
  * @param vmac virtual MAC addres
  * @return entry found or null
  */
-VCEntry * VarpCache_lookup(VarpCache *z, uint32_t vnet, Vmac *vmac){
-    VCKey key = { .vnet = vnet, .vmac = *vmac };
+VCEntry * VarpCache_lookup(VarpCache *z, VnetId *vnet, Vmac *vmac){
+    VCKey key = { .vnet = *vnet, .vmac = *vmac };
     VCEntry *ventry;
     ventry = HashTable_get(z->table, &key);
     return ventry;
@@ -389,13 +394,15 @@ void VCEntry_solicit(VCEntry *ventry){
     dprintf(">\n");
     if(VCEntry_get_flags(ventry, VCACHE_FLAG_LOCAL_PROBE)){
         dprintf("> local probe\n");
-        varp_send(vnetd->bcast_conn, VARP_OP_REQUEST, ventry->key.vnet, &ventry->key.vmac, ventry->addr);
+        varp_send(vnetd->bcast_conn, VARP_OP_REQUEST,
+                  &ventry->key.vnet, &ventry->key.vmac, &ventry->addr);
     }
     if(VCEntry_get_flags(ventry, VCACHE_FLAG_REMOTE_PROBE)){
         ConnList *l;
         dprintf("> remote probe\n");
         for(l = vnetd->connections; l; l = l->next){
-            varp_send(l->conn, VARP_OP_REQUEST, ventry->key.vnet, &ventry->key.vmac, ventry->addr); 
+            varp_send(l->conn, VARP_OP_REQUEST,
+                      &ventry->key.vnet, &ventry->key.vmac, &ventry->addr); 
         }
                 
     }
@@ -440,7 +447,8 @@ int VCEntry_update(VCEntry *ventry, IPMessage *msg, VarpHdr *varph, int state){
         IPMessage *msg;
         while((msg = IPMessageQueue_pop(&ventry->queue))){
             dprintf("> announce\n");
-            varp_send(msg->conn, VARP_OP_ANNOUNCE, ventry->key.vnet, &ventry->key.vmac, ventry->addr);
+            varp_send(msg->conn, VARP_OP_ANNOUNCE,
+                      &ventry->key.vnet, &ventry->key.vmac, &ventry->addr);
         }
     }
   exit:
@@ -459,7 +467,7 @@ int VarpCache_update(VarpCache *z, IPMessage *msg, VarpHdr *varph, int state){
     VCEntry *ventry;
 
     dprintf(">\n");
-    ventry = VarpCache_lookup(z, varph->vnet, &varph->vmac);
+    ventry = VarpCache_lookup(z, &varph->vnet, &varph->vmac);
     if(ventry){
         err = VCEntry_update(ventry, msg, varph, state);
     } else {
@@ -503,14 +511,14 @@ void VarpCache_sweep(VarpCache *z, int all){
  * @param local whether it's local or not
  */
 void vcache_forward_varp(VarpHdr *varph, int local){
-    uint16_t opcode = ntohs(varph->vnetmsghdr.opcode);
+    uint16_t opcode = ntohs(varph->hdr.opcode);
     if(local){
         ConnList *l;
         for(l = vnetd->connections; l; l = l->next){
-            varp_send(l->conn, opcode, varph->vnet, &varph->vmac, varph->addr); 
+            varp_send(l->conn, opcode, &varph->vnet, &varph->vmac, &varph->addr); 
         }
     } else {
-        varp_send(vnetd->bcast_conn, opcode, varph->vnet, &varph->vmac, varph->addr);
+        varp_send(vnetd->bcast_conn, opcode, &varph->vnet, &varph->vmac, &varph->addr);
     }
 }
 
@@ -531,13 +539,13 @@ int vcache_handle_request(IPMessage *msg, VarpHdr *varph, int local){
 #else
 int vcache_handle_request(IPMessage *msg, VarpHdr *varph, int local){
     int err = -ENOENT;
-    uint32_t vnet;
+    VnetId *vnet;
     Vmac *vmac;
     VCEntry *ventry = NULL;
     int reply = 0;
 
     dprintf(">\n");
-    vnet = htonl(varph->vnet);
+    vnet = &varph->vnet;
     vmac = &varph->vmac;
     ventry = VarpCache_lookup(vcache, vnet, vmac);
     if(!ventry){
@@ -605,13 +613,18 @@ int vcache_handle_message(IPMessage *msg, int local){
     VarpHdr *varph = &vmsg->varp.varph;
 
     dprintf(">\n");
-    if(1){
+#ifdef DEBUG
+    {
+        char vnetbuf[VNET_ID_BUF];
         dprintf("> src=%s:%d\n", inet_ntoa(msg->saddr.sin_addr), ntohs(msg->saddr.sin_port));
         dprintf("> dst=%s:%d\n", inet_ntoa(msg->daddr.sin_addr), ntohs(msg->daddr.sin_port));
-        dprintf("> opcode=%d vnet=%u vmac=" MACFMT "\n",
-                ntohs(varph->opcode), ntohl(varph->vnet), MAC6TUPLE(varph->vmac.mac));
+        dprintf("> opcode=%d vnet=%s vmac=" MACFMT "\n",
+                ntohs(varph->opcode),
+                VnetId_ntoa(&varph->vnet, vnetbuf),
+                MAC6TUPLE(varph->vmac.mac));
     }
-    switch(ntohs(varph->vnetmsghdr.opcode)){
+#endif
+    switch(ntohs(varph->hdr.opcode)){
     case VARP_OP_REQUEST:
         err = vcache_handle_request(msg, varph, local);
         break;

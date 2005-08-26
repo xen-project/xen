@@ -5,6 +5,10 @@
  * 
  * Copyright (c) 2002-2004, K A Fraser
  * 
+ * 64-bit updates:
+ *   Benjamin Liu <benjamin.liu@intel.com>
+ *   Jun Nakajima <jun.nakajima@intel.com>
+ * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
  * 
@@ -26,497 +30,331 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-/*
- * Benjamin Liu <benjamin.liu@intel.com>
- * Jun Nakajima <jun.nakajima@intel.com>
- *   Ported to x86-64.
- * 
- */
 
 #ifndef __HYPERCALL_H__
 #define __HYPERCALL_H__
+
 #include <asm-xen/xen-public/xen.h>
 
 #define __syscall_clobber "r11","rcx","memory"
 
-/*
- * Assembler stubs for hyper-calls.
- */
+#define _hypercall0(type, name)			\
+({						\
+	long __res;				\
+	asm volatile (				\
+		TRAP_INSTR			\
+		: "=a" (__res)			\
+		: "0" (__HYPERVISOR_##name)	\
+		: __syscall_clobber );		\
+	(type)__res;				\
+})
+
+#define _hypercall1(type, name, a1)				\
+({								\
+	long __res, __ign1;					\
+	asm volatile (						\
+		TRAP_INSTR					\
+		: "=a" (__res), "=D" (__ign1)			\
+		: "0" (__HYPERVISOR_##name), "1" ((long)(a1))	\
+		: __syscall_clobber );				\
+	(type)__res;						\
+})
+
+#define _hypercall2(type, name, a1, a2)				\
+({								\
+	long __res, __ign1, __ign2;				\
+	asm volatile (						\
+		TRAP_INSTR					\
+		: "=a" (__res), "=D" (__ign1), "=S" (__ign2)	\
+		: "0" (__HYPERVISOR_##name), "1" ((long)(a1)),	\
+		"2" ((long)(a2))				\
+		: __syscall_clobber );				\
+	(type)__res;						\
+})
+
+#define _hypercall3(type, name, a1, a2, a3)			\
+({								\
+	long __res, __ign1, __ign2, __ign3;			\
+	asm volatile (						\
+		TRAP_INSTR					\
+		: "=a" (__res), "=D" (__ign1), "=S" (__ign2), 	\
+		"=d" (__ign3)					\
+		: "0" (__HYPERVISOR_##name), "1" ((long)(a1)),	\
+		"2" ((long)(a2)), "3" ((long)(a3))		\
+		: __syscall_clobber );				\
+	(type)__res;						\
+})
+
+#define _hypercall4(type, name, a1, a2, a3, a4)			\
+({								\
+	long __res, __ign1, __ign2, __ign3;			\
+	asm volatile (						\
+		"movq %8,%%r10; " TRAP_INSTR			\
+		: "=a" (__res), "=D" (__ign1), "=S" (__ign2),	\
+		"=d" (__ign3)					\
+		: "0" (__HYPERVISOR_##name), "1" ((long)(a1)),	\
+		"2" ((long)(a2)), "3" ((long)(a3)),		\
+		"g" ((long)(a4))				\
+		: __syscall_clobber, "r10" );			\
+	(type)__res;						\
+})
+
+#define _hypercall5(type, name, a1, a2, a3, a4, a5)		\
+({								\
+	long __res, __ign1, __ign2, __ign3;			\
+	asm volatile (						\
+		"movq %8,%%r10; movq %9,%%r8; " TRAP_INSTR	\
+		: "=a" (__res), "=D" (__ign1), "=S" (__ign2),	\
+		"=d" (__ign3)					\
+		: "0" (__HYPERVISOR_##name), "1" ((long)(a1)),	\
+		"2" ((long)(a2)), "3" ((long)(a3)),		\
+		"g" ((long)(a4)), "g" ((long)(a5))		\
+		: __syscall_clobber, "r10", "r8" );		\
+	(type)__res;						\
+})
+
 static inline int
 HYPERVISOR_set_trap_table(
-    trap_info_t *table)
+	trap_info_t *table)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_trap_table), "D" (table)
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall1(int, set_trap_table, table);
 }
 
 static inline int
 HYPERVISOR_mmu_update(
-    mmu_update_t *req, int count, int *success_count, domid_t domid)
+	mmu_update_t *req, int count, int *success_count, domid_t domid)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        "movq %5, %%r10;" TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_mmu_update), "D" (req), "S" ((long)count),
-	  "d" (success_count), "g" ((unsigned long)domid)
-	: __syscall_clobber, "r10" );
-
-    return ret;
+	return _hypercall4(int, mmu_update, req, count, success_count, domid);
 }
 
 static inline int
 HYPERVISOR_mmuext_op(
-    struct mmuext_op *op, int count, int *success_count, domid_t domid)
+	struct mmuext_op *op, int count, int *success_count, domid_t domid)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        "movq %5, %%r10;" TRAP_INSTR
-        : "=a" (ret)
-        : "0" (__HYPERVISOR_mmuext_op), "D" (op), "S" ((long)count), 
-          "d" (success_count), "g" ((unsigned long)domid)
-        : __syscall_clobber, "r10" );
-
-    return ret;
+	return _hypercall4(int, mmuext_op, op, count, success_count, domid);
 }
 
 static inline int
 HYPERVISOR_set_gdt(
-    unsigned long *frame_list, int entries)
+	unsigned long *frame_list, int entries)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_gdt), "D" (frame_list), "S" ((long)entries)
-	: __syscall_clobber );
-
-
-    return ret;
+	return _hypercall2(int, set_gdt, frame_list, entries);
 }
+
 static inline int
 HYPERVISOR_stack_switch(
-    unsigned long ss, unsigned long esp)
+	unsigned long ss, unsigned long esp)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_stack_switch), "D" (ss), "S" (esp)
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall2(int, stack_switch, ss, esp);
 }
 
 static inline int
 HYPERVISOR_set_callbacks(
-    unsigned long event_address, unsigned long failsafe_address, 
-    unsigned long syscall_address)
+	unsigned long event_address, unsigned long failsafe_address, 
+	unsigned long syscall_address)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_callbacks), "D" (event_address),
-	  "S" (failsafe_address), "d" (syscall_address)
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall3(int, set_callbacks,
+			   event_address, failsafe_address, syscall_address);
 }
 
 static inline int
 HYPERVISOR_fpu_taskswitch(
-    int set)
+	int set)
 {
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret) : "0" ((unsigned long)__HYPERVISOR_fpu_taskswitch),
-          "D" ((unsigned long) set) : __syscall_clobber );
-
-    return ret;
+	return _hypercall1(int, fpu_taskswitch, set);
 }
 
 static inline int
 HYPERVISOR_yield(
-    void)
+	void)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_sched_op), "D" ((unsigned long)SCHEDOP_yield)
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall2(int, sched_op, SCHEDOP_yield, 0);
 }
 
 static inline int
 HYPERVISOR_block(
-    void)
+	void)
 {
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_sched_op), "D" ((unsigned long)SCHEDOP_block)
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall2(int, sched_op, SCHEDOP_block, 0);
 }
 
 static inline int
 HYPERVISOR_shutdown(
-    void)
+	void)
 {
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_sched_op),
-	  "D" ((unsigned long)(SCHEDOP_shutdown | (SHUTDOWN_poweroff << SCHEDOP_reasonshift)))
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall2(int, sched_op, SCHEDOP_shutdown |
+			   (SHUTDOWN_poweroff << SCHEDOP_reasonshift), 0);
 }
 
 static inline int
 HYPERVISOR_reboot(
-    void)
+	void)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_sched_op),
-	  "D" ((unsigned long)(SCHEDOP_shutdown | (SHUTDOWN_reboot << SCHEDOP_reasonshift)))
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall2(int, sched_op, SCHEDOP_shutdown |
+			   (SHUTDOWN_reboot << SCHEDOP_reasonshift), 0);
 }
 
-static inline int
-HYPERVISOR_suspend(
-    unsigned long srec)
-{
-    int ret;
-
-    /* NB. On suspend, control software expects a suspend record in %esi. */
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_sched_op),
-        "D" ((unsigned long)(SCHEDOP_shutdown | (SHUTDOWN_suspend << SCHEDOP_reasonshift))), 
-        "S" (srec)
-	: __syscall_clobber );
-
-    return ret;
-}
-
-/*
- * We can have the timeout value in a single argument for the hypercall, but
- * that will break the common code. 
- */
 static inline long
 HYPERVISOR_set_timer_op(
-    u64 timeout)
+	u64 timeout)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_timer_op),
-	  "D" (timeout)
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall1(long, set_timer_op, timeout);
 }
 
 static inline int
 HYPERVISOR_dom0_op(
-    dom0_op_t *dom0_op)
+	dom0_op_t *dom0_op)
 {
-    int ret;
-
-    dom0_op->interface_version = DOM0_INTERFACE_VERSION;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_dom0_op), "D" (dom0_op)
-	: __syscall_clobber );
-
-    return ret;
+	dom0_op->interface_version = DOM0_INTERFACE_VERSION;
+	return _hypercall1(int, dom0_op, dom0_op);
 }
 
 static inline int
 HYPERVISOR_set_debugreg(
-    int reg, unsigned long value)
+	int reg, unsigned long value)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_debugreg), "D" ((unsigned long)reg), "S" (value)
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall2(int, set_debugreg, reg, value);
 }
 
 static inline unsigned long
 HYPERVISOR_get_debugreg(
-    int reg)
+	int reg)
 {
-    unsigned long ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_get_debugreg), "D" ((unsigned long)reg)
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall1(unsigned long, get_debugreg, reg);
 }
 
 static inline int
 HYPERVISOR_update_descriptor(
-    unsigned long ma, unsigned long word)
+	unsigned long ma, unsigned long word)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_update_descriptor), "D" (ma),
-	  "S" (word)
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall2(int, update_descriptor, ma, word);
 }
 
 static inline int
 HYPERVISOR_dom_mem_op(
-    unsigned int op, unsigned long *extent_list,
-    unsigned long nr_extents, unsigned int extent_order)
+	unsigned int op, unsigned long *extent_list,
+	unsigned long nr_extents, unsigned int extent_order)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        "movq %5,%%r10; movq %6,%%r8;" TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_dom_mem_op), "D" ((unsigned long)op), "S" (extent_list),
-	  "d" (nr_extents), "g" ((unsigned long) extent_order), "g" ((unsigned long) DOMID_SELF)
-	: __syscall_clobber,"r8","r10");
-
-    return ret;
+	return _hypercall5(int, dom_mem_op, op, extent_list,
+			   nr_extents, extent_order, DOMID_SELF);
 }
 
 static inline int
 HYPERVISOR_multicall(
-    void *call_list, int nr_calls)
+	void *call_list, int nr_calls)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_multicall), "D" (call_list), "S" ((unsigned long)nr_calls)
-	: __syscall_clobber);
-
-    return ret;
+	return _hypercall2(int, multicall, call_list, nr_calls);
 }
 
 static inline int
 HYPERVISOR_update_va_mapping(
-    unsigned long page_nr, pte_t new_val, unsigned long flags)
+	unsigned long va, pte_t new_val, unsigned long flags)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_update_va_mapping), 
-          "D" (page_nr), "S" (new_val.pte), "d" (flags)
-	: __syscall_clobber);
-
-    return ret;
+	return _hypercall3(int, update_va_mapping, va, new_val.pte, flags);
 }
 
 static inline int
 HYPERVISOR_event_channel_op(
-    void *op)
+	void *op)
 {
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_event_channel_op), "D" (op)
-	: __syscall_clobber);
-
-    return ret;
+	return _hypercall1(int, event_channel_op, op);
 }
 
 static inline int
 HYPERVISOR_xen_version(
-    int cmd)
+	int cmd)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_xen_version), "D" ((unsigned long)cmd)
-	: __syscall_clobber);
-
-    return ret;
+	return _hypercall1(int, xen_version, cmd);
 }
 
 static inline int
 HYPERVISOR_console_io(
-    int cmd, int count, char *str)
+	int cmd, int count, char *str)
 {
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_console_io), "D" ((unsigned long)cmd), "S" ((unsigned long)count), "d" (str)
-	: __syscall_clobber);
-
-    return ret;
+	return _hypercall3(int, console_io, cmd, count, str);
 }
 
 static inline int
 HYPERVISOR_physdev_op(
-    void *physdev_op)
+	void *physdev_op)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_physdev_op), "D" (physdev_op)
-	: __syscall_clobber);
-
-    return ret;
+	return _hypercall1(int, physdev_op, physdev_op);
 }
 
 static inline int
 HYPERVISOR_grant_table_op(
-    unsigned int cmd, void *uop, unsigned int count)
+	unsigned int cmd, void *uop, unsigned int count)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_grant_table_op), "D" ((unsigned long)cmd), "S" ((unsigned long)uop), "d" (count)
-	: __syscall_clobber);
-
-    return ret;
+	return _hypercall3(int, grant_table_op, cmd, uop, count);
 }
 
 static inline int
 HYPERVISOR_update_va_mapping_otherdomain(
-    unsigned long page_nr, pte_t new_val, unsigned long flags, domid_t domid)
+	unsigned long va, pte_t new_val, unsigned long flags, domid_t domid)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        "movq %5, %%r10;" TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_update_va_mapping_otherdomain),
-          "D" (page_nr), "S" (new_val.pte), "d" (flags), "g" ((unsigned long)domid)
-	: __syscall_clobber,"r10");
-    
-    return ret;
+	return _hypercall4(int, update_va_mapping_otherdomain, va,
+			   new_val.pte, flags, domid);
 }
 
 static inline int
 HYPERVISOR_vm_assist(
-    unsigned int cmd, unsigned int type)
+	unsigned int cmd, unsigned int type)
 {
-    int ret;
+	return _hypercall2(int, vm_assist, cmd, type);
+}
 
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_vm_assist), "D" ((unsigned long)cmd), "S" ((unsigned long)type)
-	: __syscall_clobber);
+static inline int
+HYPERVISOR_boot_vcpu(
+	unsigned long vcpu, vcpu_guest_context_t *ctxt)
+{
+	return _hypercall2(int, boot_vcpu, vcpu, ctxt);
+}
 
-    return ret;
+static inline int
+HYPERVISOR_vcpu_up(
+	int vcpu)
+{
+	return _hypercall2(int, sched_op, SCHEDOP_vcpu_up |
+			   (vcpu << SCHEDOP_vcpushift), 0);
+}
+
+static inline int
+HYPERVISOR_vcpu_pickle(
+	int vcpu, vcpu_guest_context_t *ctxt)
+{
+	return _hypercall2(int, sched_op, SCHEDOP_vcpu_pickle |
+			   (vcpu << SCHEDOP_vcpushift), ctxt);
 }
 
 static inline int
 HYPERVISOR_switch_to_user(void)
 {
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret) : "0" ((unsigned long)__HYPERVISOR_switch_to_user) : __syscall_clobber );
-
-    return ret;
-}
-
-static inline int
-HYPERVISOR_boot_vcpu(
-    unsigned long vcpu, vcpu_guest_context_t *ctxt)
-{
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" (__HYPERVISOR_boot_vcpu), "D" (vcpu), "S" (ctxt)
-	: __syscall_clobber);
-
-    return ret;
+	return _hypercall0(int, switch_to_user);
 }
 
 static inline int
 HYPERVISOR_set_segment_base(
-    int reg, unsigned long value)
+	int reg, unsigned long value)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_segment_base), "D" ((unsigned long)reg), "S" (value)
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall2(int, set_segment_base, reg, value);
 }
 
 static inline int
-HYPERVISOR_vcpu_pickle(
-    int vcpu, vcpu_guest_context_t *ctxt)
+HYPERVISOR_suspend(
+	unsigned long srec)
 {
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_sched_op),
-	"D" ((unsigned long)SCHEDOP_vcpu_pickle | (vcpu << SCHEDOP_vcpushift)),
-	"S" ((unsigned long)ctxt)
-	: __syscall_clobber );
-
-    return ret;
+	return _hypercall2(int, sched_op, SCHEDOP_shutdown |
+			   (SHUTDOWN_suspend << SCHEDOP_reasonshift), srec);
 }
 
 #endif /* __HYPERCALL_H__ */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

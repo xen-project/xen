@@ -19,6 +19,7 @@ from xen.xend import sxp
 from xen.xend.Args import FormFn
 from xen.xend import PrettyPrint
 from xen.xend import XendVnet
+from xen.xend.XendError import XendError
 
 from xen.web.SrvDir import SrvDir
 

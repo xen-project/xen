@@ -20,6 +20,7 @@
 #include <asm/types.h>
 #include <linux/if_ether.h>
 #include "if_varp.h"
+#include "varp_util.h"
 
 #include "connection.h"
 #include "sxpr.h"

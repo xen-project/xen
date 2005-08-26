@@ -1,12 +1,6 @@
 #ifndef		_REGIONREG_H_
 #define		_REGIONREG_H_
-#ifdef  CONFIG_VTI
-#define XEN_DEFAULT_RID     0xf00000
-#define DOMAIN_RID_SHIFT    20
-#define DOMAIN_RID_MASK     (~(1U<<DOMAIN_RID_SHIFT -1))
-#else //CONFIG_VTI
 #define XEN_DEFAULT_RID		7
-#endif // CONFIG_VTI
 #define	IA64_MIN_IMPL_RID_MSB	17
 #define _REGION_ID(x)   ({ia64_rr _v; _v.rrval = (long) (x); _v.rid;})
 #define _REGION_PAGE_SIZE(x)    ({ia64_rr _v; _v.rrval = (long) (x); _v.ps;})
@@ -41,5 +35,33 @@ typedef union ia64_rr {
 
 
 int set_one_rr(unsigned long rr, unsigned long val);
+
+// This function is purely for performance... apparently scrambling
+//  bits in the region id makes for better hashing, which means better
+//  use of the VHPT, which means better performance
+// Note that the only time a RID should be mangled is when it is stored in
+//  a region register; anytime it is "viewable" outside of this module,
+//  it should be unmangled
+
+// NOTE: this function is also implemented in assembly code in hyper_set_rr!!
+// Must ensure these two remain consistent!
+static inline unsigned long
+vmMangleRID(unsigned long RIDVal)
+{
+	union bits64 { unsigned char bytes[4]; unsigned long uint; };
+
+	union bits64 t;
+	unsigned char tmp;
+
+	t.uint = RIDVal;
+	tmp = t.bytes[1];
+	t.bytes[1] = t.bytes[3];
+	t.bytes[3] = tmp;
+
+	return t.uint;
+}
+
+// since vmMangleRID is symmetric, use it for unmangling also
+#define vmUnmangleRID(x)	vmMangleRID(x)
 
 #endif		/* !_REGIONREG_H_ */

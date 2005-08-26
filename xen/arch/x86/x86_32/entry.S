@@ -61,6 +61,11 @@
 #include <asm/page.h>
 #include <public/xen.h>
 
+#define GET_GUEST_REGS(reg)                     \
+        movl $~(STACK_SIZE-1),reg;              \
+        andl %esp,reg;                          \
+        orl  $(STACK_SIZE-CPUINFO_sizeof),reg;
+
 #define GET_CURRENT(reg)         \
         movl $STACK_SIZE-4, reg; \
         orl  %esp, reg;          \
@@ -279,7 +284,41 @@ ENTRY(hypercall)
         GET_CURRENT(%ebx)
         andl $(NR_hypercalls-1),%eax
         PERFC_INCR(PERFC_hypercalls, %eax)
+#ifndef NDEBUG
+        /* Deliberately corrupt parameter regs not used by this hypercall. */
+        pushl %eax
+        pushl UREGS_eip+4(%esp)
+        pushl 28(%esp) # EBP
+        pushl 28(%esp) # EDI
+        pushl 28(%esp) # ESI
+        pushl 28(%esp) # EDX
+        pushl 28(%esp) # ECX
+        pushl 28(%esp) # EBX
+        movzb hypercall_args_table(,%eax,1),%ecx
+        leal  (%esp,%ecx,4),%edi
+        subl  $6,%ecx
+        negl  %ecx
+        movl  %eax,%esi
+        movl  $0xDEADBEEF,%eax
+        rep   stosl
+        movl  %esi,%eax
+#endif
         call *hypercall_table(,%eax,4)
+#ifndef NDEBUG
+        /* Deliberately corrupt parameter regs used by this hypercall. */
+        addl  $24,%esp     # Shadow parameters
+        popl  %ecx         # Shadow EIP
+        cmpl  %ecx,UREGS_eip(%esp)
+        popl  %ecx         # Shadow hypercall index
+        jne   skip_clobber # If EIP has changed then don't clobber
+        movzb hypercall_args_table(,%ecx,1),%ecx
+        movl  %esp,%edi
+        movl  %eax,%esi
+        movl  $0xDEADBEEF,%eax
+        rep   stosl
+        movl  %esi,%eax
+skip_clobber:
+#endif
         movl %eax,UREGS_eax(%esp)       # save the return value
 
 test_all_events:
@@ -680,12 +719,14 @@ ENTRY(setup_vm86_frame)
 do_arch_sched_op:
         # Ensure we return success even if we return via schedule_tail()
         xorl %eax,%eax
-        movl %eax,UREGS_eax+4(%esp)
+        GET_GUEST_REGS(%ecx)
+        movl %eax,UREGS_eax(%ecx)
         jmp  do_sched_op
 
 do_switch_vm86:
-        # Discard the return address
-        addl $4,%esp
+        # Reset the stack pointer
+        GET_GUEST_REGS(%ecx)
+        movl %ecx,%esp
 
         # GS:ESI == Ring-1 stack activation
         movl UREGS_esp(%esp),%esi
@@ -773,4 +814,37 @@ ENTRY(hypercall_table)
         .long do_acm_op             /* 27 */
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .long do_ni_hypercall
+        .endr
+
+ENTRY(hypercall_args_table)
+        .byte 1 /* do_set_trap_table    */  /*  0 */
+        .byte 4 /* do_mmu_update        */
+        .byte 2 /* do_set_gdt           */
+        .byte 2 /* do_stack_switch      */
+        .byte 4 /* do_set_callbacks     */
+        .byte 1 /* do_fpu_taskswitch    */  /*  5 */
+        .byte 2 /* do_arch_sched_op     */
+        .byte 1 /* do_dom0_op           */
+        .byte 2 /* do_set_debugreg      */
+        .byte 1 /* do_get_debugreg      */
+        .byte 4 /* do_update_descriptor */  /* 10 */
+        .byte 0 /* do_ni_hypercall      */
+        .byte 5 /* do_dom_mem_op        */
+        .byte 2 /* do_multicall         */
+        .byte 4 /* do_update_va_mapping */
+        .byte 2 /* do_set_timer_op      */  /* 15 */
+        .byte 1 /* do_event_channel_op  */
+        .byte 1 /* do_xen_version       */
+        .byte 3 /* do_console_io        */
+        .byte 1 /* do_physdev_op        */
+        .byte 3 /* do_grant_table_op    */  /* 20 */
+        .byte 2 /* do_vm_assist         */
+        .byte 5 /* do_update_va_mapping_otherdomain */
+        .byte 0 /* do_switch_vm86       */
+        .byte 2 /* do_boot_vcpu         */
+        .byte 0 /* do_ni_hypercall      */  /* 25 */
+        .byte 4 /* do_mmuext_op         */
+        .byte 1 /* do_acm_op            */
+        .rept NR_hypercalls-(.-hypercall_args_table)
+        .byte 0 /* do_ni_hypercall      */
         .endr

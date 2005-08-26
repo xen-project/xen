@@ -49,9 +49,9 @@
 #ifdef DEBUG
 
 #define dprintf(fmt, args...) fprintf(stdout, "%d [DBG] " MODULE_NAME ">%s" fmt, getpid(), __FUNCTION__, ##args)
-#define wprintf(fmt, args...) fprintf(stderr, "%d [WRN] " MODULE_NAME ">%s" fmt, getpid(),__FUNCTION__, ##args)
-#define iprintf(fmt, args...) fprintf(stderr, "%d [INF] " MODULE_NAME ">%s" fmt, getpid(),__FUNCTION__, ##args)
-#define eprintf(fmt, args...) fprintf(stderr, "%d [ERR] " MODULE_NAME ">%s" fmt, getpid(),__FUNCTION__, ##args)
+#define wprintf(fmt, args...) fprintf(stderr, "%d [WRN] " MODULE_NAME ">%s" fmt, getpid(), __FUNCTION__, ##args)
+#define iprintf(fmt, args...) fprintf(stderr, "%d [INF] " MODULE_NAME ">%s" fmt, getpid(), __FUNCTION__, ##args)
+#define eprintf(fmt, args...) fprintf(stderr, "%d [ERR] " MODULE_NAME ">%s" fmt, getpid(), __FUNCTION__, ##args)
 
 #else
 

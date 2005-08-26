@@ -27,23 +27,24 @@
 /*
  * Types
  */
+#define SHORT_ASC_LEN 5                 /* length of 65535 */
+#define VERSION_SIZE (2 * SHORT_ASC_LEN + 1 + sizeof(xen_extraversion_t) + 1)
+
 struct xenstat_handle {
 	xi_handle *xihandle;
 	int page_size;
 	FILE *procnetdev;
+	char xen_version[VERSION_SIZE]; /* xen version running on this node */
 };
 
-#define SHORT_ASC_LEN 5 		/* length of 65535 */
-#define VERSION_SIZE (2 * SHORT_ASC_LEN + 1 + sizeof(xen_extraversion_t) + 1)
-
 struct xenstat_node {
+	xenstat_handle *handle;
 	unsigned int flags;
 	unsigned long long cpu_hz;
 	unsigned int num_cpus;
 	unsigned long long tot_mem;
 	unsigned long long free_mem;
 	unsigned int num_domains;
-	char xen_version[VERSION_SIZE]; /* xen version running on this node */
 	xenstat_domain *domains;	/* Array of length num_domains */
 };
 
@@ -83,8 +84,7 @@ struct xenstat_network {
  */
 /* Called to collect the information for the node and all the domains on
  * it. When called, the domain information has already been collected. */
-typedef int (*xenstat_collect_func)(xenstat_handle * handle,
-				    xenstat_node * node);
+typedef int (*xenstat_collect_func)(xenstat_node * node);
 /* Called to free the information collected by the collect function.  The free
  * function will only be called on a xenstat_node if that node includes
  * information collected by the corresponding collector. */
@@ -101,20 +101,23 @@ typedef struct xenstat_collector {
 	xenstat_uninit_func uninit;
 } xenstat_collector;
 
-static int  xenstat_collect_vcpus(xenstat_handle * handle,
-				  xenstat_node * node);
-static int  xenstat_collect_networks(xenstat_handle * handle,
-				    xenstat_node * node);
+static int  xenstat_collect_vcpus(xenstat_node * node);
+static int  xenstat_collect_networks(xenstat_node * node);
+static int  xenstat_collect_xen_version(xenstat_node * node);
 static void xenstat_free_vcpus(xenstat_node * node);
 static void xenstat_free_networks(xenstat_node * node);
+static void xenstat_free_xen_version(xenstat_node * node);
 static void xenstat_uninit_vcpus(xenstat_handle * handle);
 static void xenstat_uninit_networks(xenstat_handle * handle);
+static void xenstat_uninit_xen_version(xenstat_handle * handle);
 
 static xenstat_collector collectors[] = {
 	{ XENSTAT_VCPU, xenstat_collect_vcpus,
 	  xenstat_free_vcpus, xenstat_uninit_vcpus },
 	{ XENSTAT_NETWORK, xenstat_collect_networks,
-	  xenstat_free_networks, xenstat_uninit_networks }
+	  xenstat_free_networks, xenstat_uninit_networks },
+	{ XENSTAT_XEN_VERSION, xenstat_collect_xen_version,
+	  xenstat_free_xen_version, xenstat_uninit_xen_version }
 };
 
 #define NUM_COLLECTORS (sizeof(collectors)/sizeof(xenstat_collector))
@@ -169,8 +172,6 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 #define DOMAIN_CHUNK_SIZE 256
 	xenstat_node *node;
 	dom0_physinfo_t physinfo;
-	xen_extraversion_t version;
-	long vnum = 0; 
 	dom0_getdomaininfo_t domaininfo[DOMAIN_CHUNK_SIZE];
 	unsigned int num_domains, new_domains;
 	unsigned int i;
@@ -180,19 +181,14 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 	if (node == NULL)
 		return NULL;
 
+	/* Store the handle in the node for later access */
+	node->handle = handle;
+
 	/* Get information about the physical system */
 	if (xi_get_physinfo(handle->xihandle, &physinfo) < 0) {
 		free(node);
 		return NULL;
 	}
-
-	/* Get the xen version number and xen version tag */
-	if (xi_get_xen_version(handle->xihandle, &vnum, &version) < 0) {
-		free(node); 
-		return NULL;
-	} 
-	snprintf(node->xen_version, VERSION_SIZE,
-		"%ld.%ld%s\n", ((vnum >> 16) & 0xFFFF), vnum & 0xFFFF, (char *)version); 
 
 	node->cpu_hz = ((unsigned long long)physinfo.cpu_khz) * 1000ULL;
 	node->num_cpus =
@@ -259,7 +255,7 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 	for (i = 0; i < NUM_COLLECTORS; i++) {
 		if ((flags & collectors[i].flag) == collectors[i].flag) {
 			node->flags |= collectors[i].flag;
-			if(collectors[i].collect(handle, node) == 0) {
+			if(collectors[i].collect(node) == 0) {
 				xenstat_free_node(node);
 				return NULL;
 			}
@@ -306,9 +302,9 @@ xenstat_domain *xenstat_node_domain_by_index(xenstat_node * node,
 	return NULL;
 }
 
-const char *xenstat_node_xen_ver(xenstat_node * node)
+const char *xenstat_node_xen_version(xenstat_node * node)
 {
-	return node->xen_version;
+	return node->handle->xen_version;
 }
 
 unsigned long long xenstat_node_tot_mem(xenstat_node * node)
@@ -434,7 +430,7 @@ xenstat_network *xenstat_domain_network(xenstat_domain * domain,
  * VCPU functions
  */
 /* Collect information about VCPUs */
-static int xenstat_collect_vcpus(xenstat_handle * handle, xenstat_node * node)
+static int xenstat_collect_vcpus(xenstat_node * node)
 {
 	unsigned int i, vcpu;
 	/* Fill in VCPU information */
@@ -447,10 +443,9 @@ static int xenstat_collect_vcpus(xenstat_handle * handle, xenstat_node * node)
 		for (vcpu = 0; vcpu < node->domains[i].num_vcpus; vcpu++) {
 			/* FIXME: need to be using a more efficient mechanism*/
 			long long vcpu_time;
-			vcpu_time =
-			    xi_get_vcpu_usage(handle->xihandle,
-					      node->domains[i].id,
-					      vcpu);
+			vcpu_time = xi_get_vcpu_usage(node->handle->xihandle,
+						      node->domains[i].id,
+						      vcpu);
 			if (vcpu_time < 0)
 				return 0;
 			node->domains[i].vcpus[vcpu].ns = vcpu_time;
@@ -490,40 +485,40 @@ static const char PROCNETDEV_HEADER[] =
     "bytes    packets errs drop fifo colls carrier compressed\n";
 
 /* Collect information about networks */
-static int xenstat_collect_networks(xenstat_handle * handle,
-				    xenstat_node * node)
+static int xenstat_collect_networks(xenstat_node * node)
 {
 	/* Open and validate /proc/net/dev if we haven't already */
-	if (handle->procnetdev == NULL) {
+	if (node->handle->procnetdev == NULL) {
 		char header[sizeof(PROCNETDEV_HEADER)];
-		handle->procnetdev = fopen("/proc/net/dev", "r");
-		if (handle->procnetdev == NULL) {
+		node->handle->procnetdev = fopen("/proc/net/dev", "r");
+		if (node->handle->procnetdev == NULL) {
 			perror("Error opening /proc/net/dev");
-			return 1;
+			return 0;
 		}
 
 		/* Validate the format of /proc/net/dev */
 		if (fread(header, sizeof(PROCNETDEV_HEADER) - 1, 1,
-			  handle->procnetdev) != 1) {
+			  node->handle->procnetdev) != 1) {
 			perror("Error reading /proc/net/dev header");
-			return 1;
+			return 0;
 		}
 		header[sizeof(PROCNETDEV_HEADER) - 1] = '\0';
 		if (strcmp(header, PROCNETDEV_HEADER) != 0) {
 			fprintf(stderr,
 				"Unexpected /proc/net/dev format\n");
-			return 1;
+			return 0;
 		}
 	}
 
 	/* Fill in networks */
 	/* FIXME: optimize this */
-	fseek(handle->procnetdev, sizeof(PROCNETDEV_HEADER) - 1, SEEK_SET);
+	fseek(node->handle->procnetdev, sizeof(PROCNETDEV_HEADER) - 1,
+	      SEEK_SET);
 	while (1) {
 		xenstat_domain *domain;
 		xenstat_network net;
 		unsigned int domid;
-		int ret = fscanf(handle->procnetdev,
+		int ret = fscanf(node->handle->procnetdev,
 				 "vif%u.%u:%llu%llu%llu%llu%*u%*u%*u%*u"
 				 "%llu%llu%llu%llu%*u%*u%*u%*u\n",
 				 &domid, &net.id,
@@ -536,7 +531,7 @@ static int xenstat_collect_networks(xenstat_handle * handle,
 		if (ret != 10) {
 			unsigned int c;
 			do {
-				c = fgetc(handle->procnetdev);
+				c = fgetc(node->handle->procnetdev);
 			} while (c != '\n' && c != EOF);
 			if (c == EOF)
 				break;
@@ -563,7 +558,7 @@ static int xenstat_collect_networks(xenstat_handle * handle,
 				    sizeof(xenstat_network));
 		}
 		if (domain->networks == NULL)
-			return 1;
+			return 0;
 		domain->networks[domain->num_networks - 1] = net;
 	}
 
@@ -637,4 +632,38 @@ unsigned long long xenstat_network_terrs(xenstat_network * network)
 unsigned long long xenstat_network_tdrop(xenstat_network * network)
 {
 	return network->tdrop;
+}
+
+/*
+ * Xen version functions
+ */
+
+/* Collect Xen version information */
+static int xenstat_collect_xen_version(xenstat_node * node)
+{
+	long vnum = 0;
+	xen_extraversion_t version;
+
+	/* Collect Xen version information if not already collected */
+	if (node->handle->xen_version[0] == '\0') {
+		/* Get the Xen version number and extraversion string */
+		if (xi_get_xen_version(node->handle->xihandle,
+				       &vnum, &version) < 0)
+			return 0;
+		/* Format the version information as a string and store it */
+		snprintf(node->handle->xen_version, VERSION_SIZE, "%ld.%ld%s",
+			 ((vnum >> 16) & 0xFFFF), vnum & 0xFFFF, version);
+	}
+
+	return 1;
+}
+
+/* Free Xen version information in node - nothing to do */
+static void xenstat_free_xen_version(xenstat_node * node)
+{
+}
+
+/* Free Xen version information in handle - nothing to do */
+static void xenstat_uninit_xen_version(xenstat_handle * handle)
+{
 }

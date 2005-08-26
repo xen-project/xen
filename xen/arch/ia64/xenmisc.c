@@ -58,9 +58,7 @@ platform_is_hp_ski(void)
 
 /* calls in xen/common code that are unused on ia64 */
 
-void sync_lazy_execstate_cpu(unsigned int cpu) {}
-void sync_lazy_execstate_mask(cpumask_t mask) {}
-void sync_lazy_execstate_all(void) {}
+void sync_vcpu_execstate(struct vcpu *v) {}
 
 #ifdef CONFIG_VTI
 int grant_table_create(struct domain *d) { return 0; }
@@ -340,7 +338,8 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
     
 loop:
 	printf("$$$$$ PANIC in domain %d (k6=%p): ",
-		v->domain->domain_id, ia64_get_kr(IA64_KR_CURRENT));
+		v->domain->domain_id, 
+		__get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT]);
 	va_start(args, fmt);
 	(void)vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);

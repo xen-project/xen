@@ -22,6 +22,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/string.h>
+#include <linux/version.h>
 
 #include <linux/net.h>
 #include <linux/in.h>
@@ -33,11 +34,14 @@
 #include <net/protocol.h>
 #include <net/route.h>
 #include <linux/skbuff.h>
+#include <linux/spinlock.h>
 
 #include <etherip.h>
 #include <if_varp.h>
 #include <vnet_dev.h>
 #include <vif.h>
+#include <varp.h>
+
 #include "allocate.h"
 #include "hash_table.h"
 #include "sys_net.h"
@@ -50,6 +54,27 @@
 
 /** Table of vifs indexed by VifKey. */
 HashTable *vif_table = NULL;
+rwlock_t vif_table_lock = RW_LOCK_UNLOCKED;
+
+#define vif_read_lock(flags)    read_lock_irqsave(&vif_table_lock, (flags))
+#define vif_read_unlock(flags)  read_unlock_irqrestore(&vif_table_lock, (flags))
+#define vif_write_lock(flags)   write_lock_irqsave(&vif_table_lock, (flags))
+#define vif_write_unlock(flags) write_unlock_irqrestore(&vif_table_lock, (flags))
+
+void vif_print(void){
+    HashTable_for_decl(entry);
+    Vif *vif;
+    unsigned long flags;
+    char vnetbuf[VNET_ID_BUF];
+
+    vif_read_lock(flags);
+    HashTable_for_each(entry, vif_table){
+        vif = entry->value;
+        printk(KERN_INFO "VIF(vnet=%s vmac=" MACFMT ")\n",
+               VnetId_ntoa(&vif->vnet, vnetbuf), MAC6TUPLE(vif->vmac.mac));
+    }
+    vif_read_unlock(flags);
+}
 
 void vif_decref(Vif *vif){
     if(!vif) return;
@@ -71,18 +96,11 @@ void vif_incref(Vif *vif){
  */
 Hashcode vif_key_hash_fn(void *k){
     VifKey *key = k;
-    Hashcode h;
-    h = hash_2ul(key->vnet,
-                 (key->vmac.mac[0] << 24) |
-                 (key->vmac.mac[1] << 16) |
-                 (key->vmac.mac[2] <<  8) |
-                 (key->vmac.mac[3]      ));
-    h = hash_hul(h, 
-                 (key->vmac.mac[4] <<   8) |
-                 (key->vmac.mac[5]       ));
+    Hashcode h = 0;
+    h = VnetId_hash(h, &key->vnet);
+    h = Vmac_hash(h, &key->vmac);
     return h;
 }
-
 
 /** Test equality for keys in the vif table.
  * Compares vnet and mac.
@@ -94,7 +112,8 @@ Hashcode vif_key_hash_fn(void *k){
 int vif_key_equal_fn(void *k1, void *k2){
     VifKey *key1 = k1;
     VifKey *key2 = k2;
-    return (key1->vnet == key2->vnet) && (memcmp(key1->vmac.mac, key2->vmac.mac, ETH_ALEN) == 0);
+    return (VnetId_eq(&key1->vnet , &key2->vnet) &&
+            Vmac_eq(&key1->vmac, &key2->vmac));
 }
 
 /** Free an entry in the vif table.
@@ -118,13 +137,13 @@ static void vif_entry_free_fn(HashTable *table, HTEntry *entry){
  * @param mac MAC address
  * @return 0 on success, -ENOENT otherwise
  */
-int vif_lookup(int vnet, Vmac *vmac, Vif **vif){
+int vif_lookup(VnetId *vnet, Vmac *vmac, Vif **vif){
     int err = 0;
-    VifKey key = {};
+    VifKey key = { .vnet = *vnet, .vmac = *vmac };
     HTEntry *entry = NULL;
+    unsigned long flags;
     
-    key.vnet = vnet;
-    key.vmac = *vmac;
+    vif_read_lock(flags);
     entry = HashTable_get_entry(vif_table, &key);
     if(entry){
         *vif = entry->value;
@@ -133,7 +152,7 @@ int vif_lookup(int vnet, Vmac *vmac, Vif **vif){
         *vif = NULL;
         err = -ENOENT;
     }
-    //dprintf("< err=%d addr=" IPFMT "\n", err, NIPQUAD(*coaddr));
+    vif_read_unlock(flags);
     return err;
 }
 
@@ -143,10 +162,12 @@ int vif_lookup(int vnet, Vmac *vmac, Vif **vif){
  * @param mac MAC address
  * @return 0 on success, negative error code otherwise
  */
-int vif_add(int vnet, Vmac *vmac, Vif **val){
+int vif_add(VnetId *vnet, Vmac *vmac, Vif **val){
     int err = 0;
     Vif *vif = NULL;
     HTEntry *entry;
+    unsigned long flags;
+
     dprintf("> vnet=%d\n", vnet);
     vif = ALLOCATE(Vif);
     if(!vif){
@@ -154,9 +175,11 @@ int vif_add(int vnet, Vmac *vmac, Vif **val){
         goto exit;
     }
     atomic_set(&vif->refcount, 1);
-    vif->vnet = vnet;
+    vif->vnet = *vnet;
     vif->vmac = *vmac;
+    vif_write_lock(flags);
     entry = HashTable_add(vif_table, vif, vif);
+    vif_write_unlock(flags);
     if(!entry){
         err = -ENOMEM;
         deallocate(vif);
@@ -177,22 +200,14 @@ int vif_add(int vnet, Vmac *vmac, Vif **val){
  * @param coaddr return parameter for care-of address
  * @return number of entries deleted, or negative error code
  */
-int vif_remove(int vnet, Vmac *vmac){
+int vif_remove(VnetId *vnet, Vmac *vmac){
     int err = 0;
-    VifKey key = { .vnet = vnet, .vmac = *vmac };
-    //dprintf("> vnet=%d addr=%u.%u.%u.%u\n", vnet, NIPQUAD(coaddr));
+    VifKey key = { .vnet = *vnet, .vmac = *vmac };
+    unsigned long flags;
+
+    vif_write_lock(flags);
     err = HashTable_remove(vif_table, &key);
-    //dprintf("< err=%d\n", err);
-    return err;
-}
-
-int vif_find(int vnet, Vmac *vmac, int create, Vif **vif){
-    int err = 0;
-
-    err = vif_lookup(vnet, vmac, vif);
-    if(err && create){
-        err = vif_add(vnet, vmac, vif);
-    }
+    vif_write_unlock(flags);
     return err;
 }
 
@@ -200,39 +215,20 @@ void vif_purge(void){
     HashTable_clear(vif_table);
 }
 
-int vif_create(int vnet, Vmac *vmac, Vif **vif){
+int vif_create(VnetId *vnet, Vmac *vmac, Vif **vif){
     int err = 0;
 
     dprintf(">\n");
-    if(!vif_lookup(vnet, vmac, vif)){
+    if(vif_lookup(vnet, vmac, vif) == 0){
+        vif_decref(*vif);
         err = -EEXIST;
         goto exit;
     }
-    dprintf("> vif_add...\n");
     err = vif_add(vnet, vmac, vif);
   exit:
     if(err){
         *vif = NULL;
     }
-    dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Create a vif.
- *
- * @param vnet vnet id
- * @param mac mac address (as a string)
- * @return 0 on success, error code otherwise
- */
-int mkvif(int vnet, char *mac){
-    int err = 0;
-    Vmac vmac = {};
-    Vif *vif = NULL;
-    dprintf("> vnet=%d mac=%s\n", vnet, mac);
-    err = mac_aton(mac, vmac.mac);
-    if(err) goto exit;
-    err = vif_create(vnet, &vmac, &vif);
-  exit:
     dprintf("< err=%d\n", err);
     return err;
 }
@@ -250,12 +246,9 @@ int vif_init(void){
         goto exit;
     }
     vif_table->entry_free_fn = vif_entry_free_fn;
-    vif_table->key_hash_fn = vif_key_hash_fn;
-    vif_table->key_equal_fn = vif_key_equal_fn;
+    vif_table->key_hash_fn   = vif_key_hash_fn;
+    vif_table->key_equal_fn  = vif_key_equal_fn;
 
-    // Some vifs for testing.
-    //mkvif(1, "aa:00:00:00:20:11");
-    //mkvif(2, "aa:00:00:00:20:12");
   exit:
     if(err < 0) wprintf("< err=%d\n", err);
     dprintf("< err=%d\n", err);

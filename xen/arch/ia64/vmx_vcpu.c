@@ -234,9 +234,11 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
     case VRN7:
         VMX(vcpu,mrr7)=vmx_vrrtomrr(vcpu,val);
         /* Change double mapping for this domain */
+#ifdef XEN_DBL_MAPPING
         vmx_change_double_mapping(vcpu,
                       vmx_vrrtomrr(vcpu,oldrr.rrval),
                       vmx_vrrtomrr(vcpu,newrr.rrval));
+#endif
         break;
     default:
         ia64_set_rr(reg,vmx_vrrtomrr(vcpu,val));

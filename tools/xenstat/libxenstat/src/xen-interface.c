@@ -59,14 +59,15 @@ void xi_uninit(xi_handle *handle)
 }
 
 /* Make simple xen version hypervisor calls */
-static int xi_make_xen_version_hypercall(xi_handle *handle, long *vnum, xen_extraversion_t *ver)
+static int xi_make_xen_version_hypercall(xi_handle *handle, long *vnum,
+					 xen_extraversion_t *ver)
 {
 	privcmd_hypercall_t privcmd;
 	multicall_entry_t multicall[2];
 	int ret = 0;
 
 	/* set up for doing hypercall */
-	privcmd.op = __HYPERVISOR_multicall; 
+	privcmd.op = __HYPERVISOR_multicall;
 	privcmd.arg[0] = (unsigned long)multicall;
 	privcmd.arg[1] = 2;
 
@@ -75,7 +76,7 @@ static int xi_make_xen_version_hypercall(xi_handle *handle, long *vnum, xen_extr
 	multicall[0].args[0] = (unsigned long)XENVER_version;
 
 	/* second to get xen version flag */
-	multicall[1].op = __HYPERVISOR_xen_version; 
+	multicall[1].op = __HYPERVISOR_xen_version;
 	multicall[1].args[0] = (unsigned long)XENVER_extraversion;
 	multicall[1].args[1] = (unsigned long)ver;
 
@@ -104,7 +105,8 @@ static int xi_make_xen_version_hypercall(xi_handle *handle, long *vnum, xen_extr
 }
 
 /* Make Xen Dom0 op hypervisor call */
-static int xi_make_dom0_op(xi_handle *handle, dom0_op_t *dom_op, int dom_opcode)
+static int xi_make_dom0_op(xi_handle *handle, dom0_op_t *dom_op,
+			   int dom_opcode)
 {
 	privcmd_hypercall_t privcmd;
 	int ret = 0;
@@ -191,11 +193,10 @@ long long xi_get_vcpu_usage(xi_handle *handle, unsigned int domain,
 }
 
 /* gets xen version information from hypervisor */
-int xi_get_xen_version(xi_handle *handle, long *vnum, xen_extraversion_t *ver) 
+int xi_get_xen_version(xi_handle *handle, long *vnum, xen_extraversion_t *ver)
 {
-
-        /* gets the XENVER_version and XENVER_extraversion */
-	if (xi_make_xen_version_hypercall( handle, vnum, ver) < 0) {; 
+	/* gets the XENVER_version and XENVER_extraversion */
+	if (xi_make_xen_version_hypercall( handle, vnum, ver) < 0) {
 		perror("XEN VERSION Hypercall failed");
 		return -1;
 	}

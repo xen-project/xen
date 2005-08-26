@@ -19,6 +19,10 @@
 
 #ifndef _VNET_VARP_H
 #define _VNET_VARP_H
+#include "hash_table.h"
+#include "if_varp.h"
+#include "varp_util.h"
+
 
 #define CONFIG_VARP_GRATUITOUS 1
 
@@ -26,29 +30,26 @@ struct net_device;
 struct sk_buff;
 struct Vif;
 
-#define DEVICE "xen-br0"
-
 extern int vnet_get_device(const char *name, struct net_device **dev);
 extern int vnet_get_device_address(struct net_device *dev, u32 *addr);
 
 extern int varp_handle_message(struct sk_buff *skb);
-extern int varp_output(struct sk_buff *skb, u32 vnet);
-extern int varp_update(int vnet, unsigned char *vmac, u32 addr);
+extern int varp_output(struct sk_buff *skb, struct VnetId *vnet);
+extern int varp_update(struct VnetId *vnet, unsigned char *vmac, struct VarpAddr *addr);
 
 extern int varp_init(void);
 extern void varp_exit(void);
 
-extern int varp_open(u32 mcaddr, u32 addr, u16 port);
+extern int varp_open(u32 mcaddr, u16 port);
 extern void varp_close(void);
 extern int varp_set_mcast_addr(u32 addr);
 
 extern void varp_print(void);
+extern void varp_flush(void);
 
 extern int varp_announce_vif(struct net_device *dev, struct Vif *vif);
-//extern int varp_announce_vifs(struct net_device *dev, struct task_struct *domain);
 
 extern u32 varp_mcast_addr;
-
 
 /* MAC broadcast addr is ff-ff-ff-ff-ff-ff (all 1's).
  * MAC multicast addr has low bit 1, i.e. 01-00-00-00-00-00.

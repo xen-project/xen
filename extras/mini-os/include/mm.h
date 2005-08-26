@@ -126,6 +126,18 @@ static __inline__ unsigned long machine_to_phys(unsigned long machine)
 
 void init_mm(void);
 unsigned long alloc_pages(int order);
-int is_mfn_mapped(unsigned long mfn);
+#define alloc_page()    alloc_pages(0);
+void free_pages(void *pointer, int order);
+//int is_mfn_mapped(unsigned long mfn);
+
+static __inline__ int get_order(unsigned long size)
+{
+    int order;
+    size = (size-1) >> PAGE_SHIFT;
+    for ( order = 0; size; order++ )
+        size >>= 1;
+    return order;
+}
+
 
 #endif /* _MM_H_ */

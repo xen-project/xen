@@ -124,6 +124,7 @@ static void free_blkif(void *arg)
     if (blkif->blk_ring.sring) {
 	unmap_frontend_page(blkif);
 	vfree(blkif->blk_ring.sring);
+	blkif->blk_ring.sring = NULL;
     }
 
     kmem_cache_free(blkif_cachep, blkif);

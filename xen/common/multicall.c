@@ -45,6 +45,18 @@ long do_multicall(multicall_entry_t *call_list, unsigned int nr_calls)
 
         do_multicall_call(&mcs->call);
 
+#ifndef NDEBUG
+        {
+            /*
+             * Deliberately corrupt the contents of the multicall structure.
+             * The caller must depend only on the 'result' field on return.
+             */
+            multicall_entry_t corrupt;
+            memset(&corrupt, 0xAA, sizeof(corrupt));
+            (void)__copy_to_user(&call_list[i], &corrupt, sizeof(corrupt));
+        }
+#endif
+
         if ( unlikely(__put_user(mcs->call.result, &call_list[i].result)) )
         {
             DPRINTK("Error writing result back to multicall block.\n");

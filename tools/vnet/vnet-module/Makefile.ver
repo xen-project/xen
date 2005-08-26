@@ -18,22 +18,11 @@
 # 59 Temple Place, suite 330, Boston, MA 02111-1307 USA
 #============================================================================
 
-#----------------------------------------------------------------------------
-# Xeno/xen.
-
-# Root of xen tree.
-XEN_ROOT ?=../../..
-
-# Path to relativize the install. Set to /
-# to install relative to filesystem root.
-prefix ?=$(XEN_ROOT)/install/
-#----------------------------------------------------------------------------
-
 LINUX_SERIES ?=2.6
 KERNEL_MINOR ?=-xen0
 
-LINUX_VERSION ?= $(shell ( /bin/ls -ld $(XEN_ROOT)/linux-$(LINUX_SERIES).*-xen-sparse ) 2>/dev/null | \
-                      sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!' )
+LINUX_VERSION ?= $(shell ( /bin/ls -ld $(XEN_ROOT)/linux-$(LINUX_SERIES).*-xen0 ) 2>/dev/null | \
+                      sed -e 's!^.*linux-\(.\+\)-xen0!\1!' )
 
 ifeq ($(LINUX_VERSION),)
 $(error Kernel source for linux $(LINUX_SERIES) not found)

@@ -61,7 +61,9 @@
 	;;
 
 #ifdef MINSTATE_VIRT
-# define MINSTATE_GET_CURRENT(reg)	mov reg=IA64_KR(CURRENT)
+# define MINSTATE_GET_CURRENT(reg)	\
+		movl reg=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;\
+		ld8 reg=[reg]
 # define MINSTATE_START_SAVE_MIN	MINSTATE_START_SAVE_MIN_VIRT
 # define MINSTATE_END_SAVE_MIN		MINSTATE_END_SAVE_MIN_VIRT
 #endif
@@ -170,7 +172,8 @@
 	;;											\
 .mem.offset 0,0; st8.spill [r16]=r13,16;							\
 .mem.offset 8,0; st8.spill [r17]=r21,16;	/* save ar.fpsr */				\
-	mov r13=IA64_KR(CURRENT);	/* establish `current' */				\
+	movl r13=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;					\
+	ld8 r13=[r13];			/* establish 'current' */				\
 	;;											\
 .mem.offset 0,0; st8.spill [r16]=r15,16;							\
 .mem.offset 8,0; st8.spill [r17]=r14,16;							\

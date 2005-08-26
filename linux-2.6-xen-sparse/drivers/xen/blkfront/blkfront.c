@@ -1258,6 +1258,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 	err = talk_to_backend(dev, info);
 	if (err) {
 		kfree(info);
+		dev->data = NULL;
 		return err;
 	}
 

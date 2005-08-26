@@ -36,7 +36,7 @@
 #include "hash_table.h"
 
 #define MODULE_NAME "VNET"
-//#define DEBUG 1
+#define DEBUG 1
 #undef DEBUG
 #include "debug.h"
 
@@ -56,11 +56,9 @@ void Tunnel_print(Tunnel *tunnel){
     }
 }
 
-int Tunnel_create(TunnelType *type, u32 vnet, u32 addr, Tunnel *base, Tunnel **val){
+int Tunnel_create(TunnelType *type, VnetId *vnet, VarpAddr *addr, Tunnel *base, Tunnel **val){
     int err = 0;
     Tunnel *tunnel = NULL;
-    dprintf("> type=%s vnet=%d addr=" IPFMT " base=%s\n",
-            type->name, vnet, NIPQUAD(addr), (base ? base->type->name : "ip"));
     if(!type || !type->open || !type->send || !type->close){
         err = -EINVAL;
         goto exit;
@@ -71,8 +69,8 @@ int Tunnel_create(TunnelType *type, u32 vnet, u32 addr, Tunnel *base, Tunnel **v
         goto exit;
     }
     atomic_set(&tunnel->refcount, 1);
-    tunnel->key.vnet = vnet;
-    tunnel->key.addr = addr;
+    tunnel->key.vnet = *vnet;
+    tunnel->key.addr = *addr;
     tunnel->type = type;
     tunnel->data = NULL;
     tunnel->send_stats = (TunnelStats){};
@@ -89,7 +87,7 @@ int Tunnel_create(TunnelType *type, u32 vnet, u32 addr, Tunnel *base, Tunnel **v
     return err;
 }
 
-int Tunnel_open(TunnelType *type, u32 vnet, u32 addr, Tunnel *base, Tunnel **tunnel){
+int Tunnel_open(TunnelType *type, VnetId *vnet, VarpAddr *addr, Tunnel *base, Tunnel **tunnel){
     int err = 0;
 
     dprintf(">\n");
@@ -123,15 +121,16 @@ HashTable *tunnel_table = NULL;
 static inline Hashcode tunnel_table_key_hash_fn(void *k){
     TunnelKey *key = k;
     Hashcode h = 0;
-    h = hash_2ul(key->vnet, key->addr);
+    h = VnetId_hash(h, &key->vnet);
+    h = VarpAddr_hash(h, &key->addr);
     return h;
 }
 
 static int tunnel_table_key_equal_fn(void *k1, void *k2){
     TunnelKey *key1 = k1;
     TunnelKey *key2 = k2;
-    return (key1->vnet == key2->vnet)
-        && (key1->addr == key2->addr);
+    return VnetId_eq(&key1->vnet, &key2->vnet) &&
+           VarpAddr_eq(&key1->addr, &key2->addr);
 }
 
 static void tunnel_table_entry_free_fn(HashTable *table, HTEntry *entry){
@@ -165,9 +164,9 @@ int Tunnel_init(void){
  * @param addr destination address
  * @return tunnel state or NULL
  */
-Tunnel * Tunnel_lookup(u32 vnet, u32 addr){
+Tunnel * Tunnel_lookup(VnetId *vnet, VarpAddr *addr){
     Tunnel *tunnel = NULL;
-    TunnelKey key = {.vnet = vnet, .addr = addr };
+    TunnelKey key = {.vnet = *vnet, .addr = *addr };
     dprintf(">\n");
     tunnel = HashTable_get(tunnel_table, &key);
     Tunnel_incref(tunnel);
@@ -199,23 +198,16 @@ int Tunnel_del(Tunnel *tunnel){
  */
 int Tunnel_send(Tunnel *tunnel, struct sk_buff *skb){
     int err = 0;
-    int len;
     dprintf("> tunnel=%p skb=%p\n", tunnel, skb);
-    len = skb->len;
     if(tunnel){
+        int len = skb->len;
         dprintf("> type=%s type->send...\n", tunnel->type->name);
-        err = tunnel->type->send(tunnel, skb);
         // Must not refer to skb after sending - might have been freed.
+        err = tunnel->type->send(tunnel, skb);
         TunnelStats_update(&tunnel->send_stats, len, err);
     } else {
-        struct net_device *dev = NULL;
-        err = vnet_get_device(DEVICE, &dev);
-        if(err) goto exit;
-        skb->dev = dev;
         err = skb_xmit(skb);
-        dev_put(dev);
     }
-  exit:
     dprintf("< err=%d\n", err);
     return err;
 }
@@ -225,4 +217,8 @@ int __init tunnel_module_init(void){
 }
 
 void __exit tunnel_module_exit(void){
+    if(tunnel_table){
+        HashTable_free(tunnel_table);
+        tunnel_table = NULL;
+    }
 }

@@ -370,6 +370,8 @@ int new_guest_cr3(unsigned long pfn);
 
 void propagate_page_fault(unsigned long addr, u16 error_code);
 
+extern int __sync_lazy_execstate(void);
+
 /*
  * Caller must own d's BIGLOCK, is responsible for flushing the TLB, and must 
  * hold a reference to the page.

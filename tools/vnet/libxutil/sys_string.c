@@ -28,6 +28,31 @@
 #include "allocate.h"
 #include "sys_string.h"
 
+#ifdef __KERNEL__
+
+#define deferr(_err) case _err: return #_err
+
+extern char *strerror(int err)
+{
+    switch(err){
+        deferr(EPERM);
+        deferr(ENOENT);
+        deferr(ESRCH);
+        deferr(EINTR);
+        deferr(EIO);
+        deferr(EINVAL);
+        deferr(ENOMEM);
+        deferr(EACCES);
+        deferr(EFAULT);
+        deferr(EBUSY);
+        
+    default:
+        return "ERROR";
+    }
+}
+
+#endif
+
 /** Set the base to use for converting a string to a number.  Base is
  * hex if starts with 0x, otherwise decimal.
  *

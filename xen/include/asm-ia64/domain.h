@@ -3,39 +3,28 @@
 
 #include <linux/thread_info.h>
 #include <asm/tlb.h>
-#ifdef CONFIG_VTI
 #include <asm/vmx_vpd.h>
 #include <asm/vmmu.h>
 #include <asm/regionreg.h>
 #include <public/arch-ia64.h>
 #include <asm/vmx_platform.h>
-#endif // CONFIG_VTI
 #include <xen/list.h>
 
 extern void arch_do_createdomain(struct vcpu *);
 
 extern void domain_relinquish_resources(struct domain *);
 
-#ifdef CONFIG_VTI
-struct trap_bounce {
-	// TO add, FIXME Eddie
-};
-
-#define	 PMT_SIZE	(32L*1024*1024)		// 32M for PMT
-#endif // CONFIG_VTI
-
 struct arch_domain {
     struct mm_struct *active_mm;
     struct mm_struct *mm;
     int metaphysical_rr0;
+    int metaphysical_rr4;
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */
     int rid_bits;		/* number of virtual rid bits (default: 18) */
     int breakimm;
-#ifdef  CONFIG_VTI
+
     int imp_va_msb;
-    ia64_rr emul_phy_rr0;
-    ia64_rr emul_phy_rr4;
     unsigned long *pmt;	/* physical to machine table */
     /*
      * max_pfn is the maximum page frame in guest physical space, including
@@ -44,7 +33,7 @@ struct arch_domain {
      */
     unsigned long max_pfn;
     struct virutal_platform_def     vmx_platform;
-#endif  //CONFIG_VTI
+
     u64 xen_vastart;
     u64 xen_vaend;
     u64 shared_info_va;
@@ -78,15 +67,15 @@ struct arch_vcpu {
 #endif
     void *regs;	/* temporary until find a better way to do privops */
     int metaphysical_rr0;		// from arch_domain (so is pinned)
+    int metaphysical_rr4;		// from arch_domain (so is pinned)
     int metaphysical_saved_rr0;		// from arch_domain (so is pinned)
+    int metaphysical_saved_rr4;		// from arch_domain (so is pinned)
     int breakimm;			// from arch_domain (so is pinned)
     int starting_rid;		/* first RID assigned to domain */
     int ending_rid;		/* one beyond highest RID assigned to domain */
     struct mm_struct *active_mm;
     struct thread_struct _thread;	// this must be last
-#ifdef CONFIG_VTI
-    void (*schedule_tail) (struct vcpu *);
-    struct trap_bounce trap_bounce;
+
     thash_cb_t *vtlb;
     char irq_new_pending;
     char irq_new_condition;    // vpsr.i/vtpr change, check for pending VHPI
@@ -94,9 +83,7 @@ struct arch_vcpu {
     //for phycial  emulation
     unsigned long old_rsc;
     int mode_flags;
-
     struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
-#endif	// CONFIG_VTI
 };
 
 #define active_mm arch.active_mm

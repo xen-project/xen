@@ -32,6 +32,8 @@
 #include <stdarg.h>
 #include "allocate.h"
 
+extern char *strerror(int err);
+
 #if 0
 static inline int tolower(int c){
     return (c>='A' && c<='Z' ? (c-'A')+'a' : c);

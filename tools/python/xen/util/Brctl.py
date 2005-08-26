@@ -76,6 +76,7 @@ def bridge_set(bridge, hello=None, fd=None, stp=None):
 def bridge_del(bridge):
     """Delete a bridge.
     """
+    cmd(CMD_IFCONFIG, '%s down' % bridge)
     cmd(CMD_BRCTL, 'delbr %s' % bridge)
 
 def routes():

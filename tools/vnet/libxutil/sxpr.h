@@ -228,7 +228,9 @@ static inline Sxpr OBJP(int ty, void *val){
  *
  * @param val pointer
  */
-#define PTR(val) OBJP(T_UINT, (void*)(val))
+static inline Sxpr PTR(void *val){
+    return OBJP(T_UINT, (void*)(val));
+}
 
 /** Allocate some memory and return an sxpr containing it.
  * Returns ONOMEM if allocation failed.
@@ -237,7 +239,9 @@ static inline Sxpr OBJP(int ty, void *val){
  * @param ty typecode
  * @return sxpr
  */
-#define halloc(_n, _ty) OBJP(_ty, allocate(_n))
+static inline Sxpr halloc(int n, int ty){
+    return OBJP(ty, allocate(n));
+}
 
 /** Allocate an sxpr containing a pointer to the given type.
  *

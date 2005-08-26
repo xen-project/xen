@@ -62,12 +62,6 @@ typedef struct {
 	unsigned long	rsv6[46];
 } cr_t;
 
-void vmx_enter_scheduler(void);
-
-//FIXME: Map for LID to vcpu, Eddie
-#define	MAX_NUM_LPS		(1UL<<16)
-extern struct vcpu	*lid_edt[MAX_NUM_LPS];
-
 struct arch_vmx_struct {
 //    struct virutal_platform_def     vmx_platform;
 	vpd_t       *vpd;

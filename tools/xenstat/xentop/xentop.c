@@ -519,8 +519,8 @@ static void print_nets(xenstat_domain *domain)
 	print("%4u", xenstat_domain_num_networks(domain));
 }
 
-/* Compares number of total network tx bytes of two domains, returning -1,0,1 for
- * <,=,> */
+/* Compares number of total network tx bytes of two domains, returning -1,0,1
+ * for <,=,> */
 static int compare_net_tx(xenstat_domain *domain1, xenstat_domain *domain2)
 {
 	return -compare(tot_net_bytes(domain1, FALSE),
@@ -533,8 +533,8 @@ static void print_net_tx(xenstat_domain *domain)
 	print("%8llu", tot_net_bytes(domain, FALSE)/1024);
 }
 
-/* Compares number of total network rx bytes of two domains, returning -1,0,1 for
- * <,=,> */
+/* Compares number of total network rx bytes of two domains, returning -1,0,1
+ * for <,=,> */
 static int compare_net_rx(xenstat_domain *domain1, xenstat_domain *domain2)
 {
 	return -compare(tot_net_bytes(domain1, TRUE),
@@ -555,7 +555,7 @@ static unsigned long long tot_net_bytes(xenstat_domain *domain, int rx_flag)
 	int i = 0;
 	xenstat_network *network;
 	unsigned num_networks = 0;
-        unsigned long long total = 0;
+	unsigned long long total = 0;
 
 	/* How many networks? */
 	num_networks = xenstat_domain_num_networks(domain);
@@ -564,12 +564,13 @@ static unsigned long long tot_net_bytes(xenstat_domain *domain, int rx_flag)
 	for (i=0; i < num_networks; i++) {
 		/* Next get the network information */
 		network = xenstat_domain_network(domain,i);
-                if (rx_flag) 
+		if (rx_flag)
 			total += xenstat_network_rbytes(network);
-                else 
+		else
 			total += xenstat_network_tbytes(network);
 	}
-        return (total);
+
+	return total;
 }
 
 /* Compares security id (ssid) of two domains, returning -1,0,1 for <,=,> */
@@ -592,6 +593,7 @@ void do_summary(void)
 #define TIME_STR_LEN 9
 	const char *TIME_STR_FORMAT = "%H:%M:%S";
 	char time_str[TIME_STR_LEN];
+	const char *ver_str;
 	unsigned run = 0, block = 0, pause = 0,
 	         crash = 0, dying = 0, shutdown = 0;
 	unsigned i, num_domains = 0;
@@ -602,7 +604,8 @@ void do_summary(void)
 	strftime(time_str, TIME_STR_LEN, TIME_STR_FORMAT,
 	         localtime(&curtime.tv_sec));
 	num_domains = xenstat_node_num_domains(cur_node);
-	print("xentop - %s\n", time_str);
+	ver_str = xenstat_node_xen_version(cur_node);
+	print("xentop - %s   Xen %s\n", time_str, ver_str);
 
 	/* Tabulate what states domains are in for summary */
 	for (i=0; i < num_domains; i++) {

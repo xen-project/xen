@@ -21,7 +21,7 @@
 #============================================================================
 # Vnet module makefile for 2.4 series kernels.
 
-LINUX_SERIES ?=2.4
+LINUX_SERIES =2.4
 include Makefile.ver
 
 KERNEL_MODULE := vnet_module.o
@@ -37,9 +37,9 @@ VNET_OBJ += $(VNET_LIB_OBJ)
 vpath %.h $(KERNEL_SRC)/include
 INCLUDES+= -I $(KERNEL_SRC)/include
 
-vpath %.h $(LIB_DIR)
-vpath %.c $(LIB_DIR)
-INCLUDES += -I $(LIB_DIR)
+vpath %.h $(LIBXUTIL_DIR)
+vpath %.c $(LIBXUTIL_DIR)
+INCLUDES += -I $(LIBXUTIL_DIR)
 
 INCLUDES+= -I .
 
@@ -61,6 +61,7 @@ CFLAGS += -Wno-trigraphs
 CFLAGS += -Wno-unused-function
 CFLAGS += -Wno-unused-parameter 
 
+CFLAGS += -g
 CFLAGS += -O2
 CFLAGS += -fno-strict-aliasing 
 CFLAGS += -fno-common 
@@ -90,8 +91,8 @@ TAGS:
 
 .PHONY: clean
 clean:
-	@rm -f *.a *.o *.ko *~
-	@rm -f $(VNET_DEP) .*.cmd *.mod.?
-	@rm -rf .tmp_versions
+	-@$(RM) *.a *.o *.ko *~
+	-@$(RM) $(VNET_DEP) .*.cmd *.mod.?
+	-@$(RM) -r .tmp_versions
 
 -include $(VNET_DEP)

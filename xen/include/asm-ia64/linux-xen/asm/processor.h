@@ -183,6 +183,22 @@ struct cpuinfo_ia64 {
 
 DECLARE_PER_CPU(struct cpuinfo_ia64, cpu_info);
 
+typedef union {
+	struct {
+		__u64 kr0;
+		__u64 kr1;
+		__u64 kr2;
+		__u64 kr3;
+		__u64 kr4;
+		__u64 kr5;
+		__u64 kr6;
+		__u64 kr7;
+	};
+	__u64 _kr[8];
+} cpu_kr_ia64_t;
+
+DECLARE_PER_CPU(cpu_kr_ia64_t, cpu_kr);
+
 /*
  * The "local" data variable.  It refers to the per-CPU data of the currently executing
  * CPU, much like "current" points to the per-task data of the currently executing task.

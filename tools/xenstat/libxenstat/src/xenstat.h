@@ -31,10 +31,13 @@ xenstat_handle *xenstat_init();
 /* Release the handle to libxc, free resources, etc. */
 void xenstat_uninit(xenstat_handle * handle);
 
-/* Get all available information about a node */
+/* Flags for types of information to collect in xenstat_get_node */
 #define XENSTAT_VCPU 0x1
 #define XENSTAT_NETWORK 0x2
-#define XENSTAT_ALL (XENSTAT_VCPU|XENSTAT_NETWORK)
+#define XENSTAT_XEN_VERSION 0x4
+#define XENSTAT_ALL (XENSTAT_VCPU|XENSTAT_NETWORK|XENSTAT_XEN_VERSION)
+
+/* Get all available information about a node */
 xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags);
 
 /* Free the information */
@@ -51,8 +54,9 @@ xenstat_domain *xenstat_node_domain(xenstat_node * node,
 /* Get the domain with the given index; used to loop over all domains. */
 xenstat_domain *xenstat_node_domain_by_index(xenstat_node * node,
 					     unsigned index);
+
 /* Get xen version of the node */
-const char *xenstat_node_xen_ver(xenstat_node * node);
+const char *xenstat_node_xen_version(xenstat_node * node);
 
 /* Get amount of total memory on a node */
 unsigned long long xenstat_node_tot_mem(xenstat_node * node);

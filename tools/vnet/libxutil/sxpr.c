@@ -405,7 +405,6 @@ Sxpr setf(Sxpr k, Sxpr v, Sxpr l){
 #endif /* USE_GC */
 
 /** Create a new atom with the given name.
- * Makes an integer sxpr if the name can be parsed as an int.
  *
  * @param name the name
  * @return new atom
@@ -414,7 +413,8 @@ Sxpr atom_new(char *name){
     Sxpr n, obj = ONOMEM;
     long v;
 
-    if(convert_atol(name, &v) == 0){
+    // Don't always want to do this.
+    if(0 && convert_atol(name, &v) == 0){
         obj = OINT(v);
     } else {
         n = string_new(name);
