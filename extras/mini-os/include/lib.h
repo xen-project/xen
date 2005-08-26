@@ -79,36 +79,4 @@ char  *strchr(const char *s, int c);
 char  *strstr(const char *s1, const char *s2);
 
 
-/* dlmalloc functions */
-struct mallinfo {
-  int arena;    /* non-mmapped space allocated from system */
-  int ordblks;  /* number of free chunks */
-  int smblks;   /* number of fastbin blocks */
-  int hblks;    /* number of mmapped regions */
-  int hblkhd;   /* space in mmapped regions */
-  int usmblks;  /* maximum total allocated space */
-  int fsmblks;  /* space available in freed fastbin blocks */
-  int uordblks; /* total allocated space */
-  int fordblks; /* total free space */
-  int keepcost; /* top-most, releasable (via malloc_trim) space */
-};
-
-void *malloc(size_t n);
-void *calloc(size_t n_elements, size_t element_size);
-void  free(void* p);
-void *realloc(void* p, size_t n);
-void *memalign(size_t alignment, size_t n);
-void *valloc(size_t n);
-struct mallinfo mallinfo(void);
-int  mallopt(int parameter_number, int parameter_value);
-
-void **independent_calloc(size_t n_elements, size_t size, void* chunks[]);
-void **independent_comalloc(size_t n_elements, size_t sizes[], void* chunks[]);
-void *pvalloc(size_t n);
-void cfree(void* p);
-int malloc_trim(size_t pad);
-size_t malloc_usable_size(void* p);
-void malloc_stats(void);
-
-
 #endif /* _LIB_H_ */

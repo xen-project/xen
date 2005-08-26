@@ -1,6 +1,7 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
+/* 
  ****************************************************************************
  * (C) 2003 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2005 - Grzegorz Milos - Intel Research Cambridge
  ****************************************************************************
  *
  *        File: mm.c
@@ -13,8 +14,6 @@
  * Description: memory management related functions
  *              contains buddy page allocator from Xen.
  *
- ****************************************************************************
- * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
  ****************************************************************************
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -40,7 +39,7 @@
 #include <mm.h>
 #include <types.h>
 #include <lib.h>
-
+#include <xmalloc.h>
 
 #ifdef MM_DEBUG
 #define DEBUG(_f, _a...) \
@@ -505,6 +504,6 @@ void init_mm(void)
            (u_long)to_virt(PFN_PHYS(max_pfn)), PFN_PHYS(max_pfn));
     init_page_allocator(PFN_PHYS(start_pfn), PFN_PHYS(max_pfn));   
 #endif
-
+    
     printk("MM: done\n");
 }
