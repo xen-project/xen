@@ -21,12 +21,27 @@ static inline void pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmd, pte_t *
 
 static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
 {
-	set_pmd(pmd, __pmd(_PAGE_TABLE | (page_to_pfn(pte) << PAGE_SHIFT)));
+	if (unlikely((mm)->context.pinned)) {
+		BUG_ON(HYPERVISOR_update_va_mapping(
+			       (unsigned long)__va(page_to_pfn(pte) << PAGE_SHIFT),
+			       pfn_pte(page_to_pfn(pte), PAGE_KERNEL_RO), 0));
+		set_pmd(pmd, __pmd(_PAGE_TABLE | (page_to_pfn(pte) << PAGE_SHIFT)));
+	} else {
+		*(pmd) = __pmd(_PAGE_TABLE | (page_to_pfn(pte) << PAGE_SHIFT));
+	}
 }
 
 static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
 {
-	set_pud(pud, __pud(_PAGE_TABLE | __pa(pmd)));
+	if (unlikely((mm)->context.pinned)) {
+		BUG_ON(HYPERVISOR_update_va_mapping(
+			       (unsigned long)pmd,
+			       pfn_pte(virt_to_phys(pmd)>>PAGE_SHIFT, 
+				       PAGE_KERNEL_RO), 0));
+		set_pud(pud, __pud(_PAGE_TABLE | __pa(pmd)));
+	} else {
+		*(pud) =  __pud(_PAGE_TABLE | __pa(pmd));
+	}
 }
 
 /*
@@ -35,53 +50,54 @@ static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
  */
 static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
 {
-        set_pgd(pgd, __pgd(_PAGE_TABLE | __pa(pud)));
-        set_pgd(__user_pgd(pgd), __pgd(_PAGE_TABLE | __pa(pud)));
-}
-
-extern __inline__ pmd_t *get_pmd(void)
-{
-        pmd_t *pmd = (pmd_t *)get_zeroed_page(GFP_KERNEL);
-        if (!pmd)
-		return NULL;
-        make_page_readonly(pmd);
-        xen_pmd_pin(__pa(pmd));
-	return pmd;
+	if (unlikely((mm)->context.pinned)) {
+		BUG_ON(HYPERVISOR_update_va_mapping(
+			       (unsigned long)pud,
+			       pfn_pte(virt_to_phys(pud)>>PAGE_SHIFT, 
+				       PAGE_KERNEL_RO), 0));
+		set_pgd(pgd, __pgd(_PAGE_TABLE | __pa(pud)));
+		set_pgd(__user_pgd(pgd), __pgd(_PAGE_TABLE | __pa(pud)));
+	} else {
+		*(pgd) =  __pgd(_PAGE_TABLE | __pa(pud));
+		*(__user_pgd(pgd)) = *(pgd);
+	}
 }
 
 extern __inline__ void pmd_free(pmd_t *pmd)
 {
-	BUG_ON((unsigned long)pmd & (PAGE_SIZE-1));
-        xen_pmd_unpin(__pa(pmd));
-        make_page_writable(pmd);
+	pte_t *ptep = virt_to_ptep(pmd);
+
+	if (!pte_write(*ptep)) {
+		BUG_ON(HYPERVISOR_update_va_mapping(
+			(unsigned long)pmd,
+			pfn_pte(virt_to_phys(pmd)>>PAGE_SHIFT, PAGE_KERNEL),
+			0));
+	}
 	free_page((unsigned long)pmd);
 }
 
 static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
         pmd_t *pmd = (pmd_t *) get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
-        if (!pmd)
-		return NULL;
-        make_page_readonly(pmd);
-        xen_pmd_pin(__pa(pmd)); 
         return pmd;
 }
 
 static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
         pud_t *pud = (pud_t *) get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
-        if (!pud)
-		return NULL;
-        make_page_readonly(pud);
-        xen_pud_pin(__pa(pud)); 
         return pud;
 }
 
 static inline void pud_free(pud_t *pud)
 {
-	BUG_ON((unsigned long)pud & (PAGE_SIZE-1));
-        xen_pud_unpin(__pa(pud));
-        make_page_writable(pud);
+	pte_t *ptep = virt_to_ptep(pud);
+
+	if (!pte_write(*ptep)) {
+		BUG_ON(HYPERVISOR_update_va_mapping(
+			(unsigned long)pud,
+			pfn_pte(virt_to_phys(pud)>>PAGE_SHIFT, PAGE_KERNEL),
+			0));
+	}
 	free_page((unsigned long)pud);
 }
 
@@ -107,10 +123,6 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 	       (PTRS_PER_PGD - boundary) * sizeof(pgd_t));
 
 	memset(__user_pgd(pgd), 0, PAGE_SIZE); /* clean up user pgd */
-        make_pages_readonly(pgd, 2);
-
-        xen_pgd_pin(__pa(pgd)); /* kernel */
-        xen_pgd_pin(__pa(__user_pgd(pgd))); /* user */
         /*
          * Set level3_user_pgt for vsyscall area
          */
@@ -121,31 +133,45 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 
 static inline void pgd_free(pgd_t *pgd)
 {
-	BUG_ON((unsigned long)pgd & (PAGE_SIZE-1));
-        xen_pgd_unpin(__pa(pgd));
-        xen_pgd_unpin(__pa(__user_pgd(pgd)));
-        make_pages_writable(pgd, 2);
+	pte_t *ptep = virt_to_ptep(pgd);
+
+	if (!pte_write(*ptep)) {
+		xen_pgd_unpin(__pa(pgd));
+		BUG_ON(HYPERVISOR_update_va_mapping(
+			       (unsigned long)pgd,
+			       pfn_pte(virt_to_phys(pgd)>>PAGE_SHIFT, PAGE_KERNEL),
+			       0));
+	}
+
+	ptep = virt_to_ptep(__user_pgd(pgd));
+
+	if (!pte_write(*ptep)) {
+		xen_pgd_unpin(__pa(__user_pgd(pgd)));
+		BUG_ON(HYPERVISOR_update_va_mapping(
+			       (unsigned long)__user_pgd(pgd),
+			       pfn_pte(virt_to_phys(__user_pgd(pgd))>>PAGE_SHIFT, 
+				       PAGE_KERNEL),
+			       0));
+	}
+
 	free_pages((unsigned long)pgd, 1);
 }
 
 static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
         pte_t *pte = (pte_t *)get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
-        if (!pte)
-		return NULL;
-        make_page_readonly(pte);
-        xen_pte_pin(__pa(pte));
+        if (pte)
+		make_page_readonly(pte);
+
 	return pte;
 }
 
 static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	pte_t *pte = (void *)get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
-	if (!pte)
-		return NULL;
-        make_page_readonly(pte);
-        xen_pte_pin(__pa(pte));
-	return virt_to_page((unsigned long)pte);
+	struct page *pte;
+
+	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO, 0);
+	return pte;
 }
 
 /* Should really implement gc for free page table pages. This could be
