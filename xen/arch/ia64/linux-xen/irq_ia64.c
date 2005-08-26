@@ -265,7 +265,7 @@ vmx_ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 	 */
 	vmx_irq_exit();
 	if ( wake_dom0 && current != dom0 ) 
-		domain_wake(dom0->vcpu[0]);
+		vcpu_wake(dom0->vcpu[0]);
 }
 #endif
 

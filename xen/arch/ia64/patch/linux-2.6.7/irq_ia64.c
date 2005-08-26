@@ -73,7 +73,7 @@
 +#endif
 +		//FIXME: TEMPORARY HACK!!!!
 +		vcpu_pend_interrupt(dom0->vcpu[0],vector);
-+		domain_wake(dom0->vcpu[0]);
++		vcpu_wake(dom0->vcpu[0]);
 +	}
 +	else
 +#endif

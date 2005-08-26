@@ -116,7 +116,7 @@
 +	 */
 +	vmx_irq_exit();
 +	if ( wake_dom0 && current != dom0 ) 
-+		domain_wake(dom0->vcpu[0]);
++		vcpu_wake(dom0->vcpu[0]);
 +}
 +#endif
 +

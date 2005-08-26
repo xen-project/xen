@@ -888,24 +888,14 @@ int __sync_lazy_execstate(void)
 void sync_lazy_execstate_cpu(unsigned int cpu)
 {
     if ( cpu == smp_processor_id() )
+    {
         (void)__sync_lazy_execstate();
+    }
     else
+    {
+        /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
         flush_tlb_mask(cpumask_of_cpu(cpu));
-}
-
-void sync_lazy_execstate_mask(cpumask_t mask)
-{
-    if ( cpu_isset(smp_processor_id(), mask) )
-        (void)__sync_lazy_execstate();
-    /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
-    flush_tlb_mask(mask);
-}
-
-void sync_lazy_execstate_all(void)
-{
-    __sync_lazy_execstate();
-    /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
-    flush_tlb_mask(cpu_online_map);
+    }
 }
 
 unsigned long __hypercall_create_continuation(

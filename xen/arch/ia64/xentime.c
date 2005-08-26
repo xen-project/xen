@@ -162,14 +162,14 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	if (domain0_ready && vcpu_timer_expired(dom0->vcpu[0])) {
 		vcpu_pend_timer(dom0->vcpu[0]);
 		//vcpu_set_next_timer(dom0->vcpu[0]);
-		domain_wake(dom0->vcpu[0]);
+		vcpu_wake(dom0->vcpu[0]);
 	}
 	if (!is_idle_task(current->domain) && current->domain != dom0) {
 		if (vcpu_timer_expired(current)) {
 			vcpu_pend_timer(current);
 			// ensure another timer interrupt happens even if domain doesn't
 			vcpu_set_next_timer(current);
-			domain_wake(current);
+			vcpu_wake(current);
 		}
 	}
 	raise_actimer_softirq();

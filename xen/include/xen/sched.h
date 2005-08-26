@@ -245,18 +245,15 @@ void sched_rem_domain(struct vcpu *);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);
 int  sched_id();
-void domain_wake(struct vcpu *d);
-void domain_sleep_nosync(struct vcpu *d);
-void domain_sleep_sync(struct vcpu *d);
+void vcpu_wake(struct vcpu *d);
+void vcpu_sleep_nosync(struct vcpu *d);
+void vcpu_sleep_sync(struct vcpu *d);
 
 /*
- * Force loading of currently-executing domain state on the specified set
- * of CPUs. This is used to counteract lazy state switching where required.
+ * Force loading of currently-executing domain state on the specified CPU.
+ * This is used to counteract lazy state switching where required.
  */
 extern void sync_lazy_execstate_cpu(unsigned int cpu);
-extern void sync_lazy_execstate_mask(cpumask_t mask);
-extern void sync_lazy_execstate_all(void);
-extern int __sync_lazy_execstate(void);
 
 /*
  * Called by the scheduler to switch to another VCPU. On entry, although
@@ -268,7 +265,7 @@ extern int __sync_lazy_execstate(void);
  * The callee must ensure that the local CPU is no longer running in @prev's
  * context, and that the context is saved to memory, before returning.
  * Alternatively, if implementing lazy context switching, it suffices to ensure
- * that invoking __sync_lazy_execstate() will switch and commit @prev's state.
+ * that invoking sync_lazy_execstate() will switch and commit @prev's state.
  */
 extern void context_switch(
     struct vcpu *prev, 
@@ -287,7 +284,8 @@ extern void context_switch_finalise(
 extern void continue_running(
     struct vcpu *same);
 
-int idle_cpu(int cpu); /* Is CPU 'cpu' idle right now? */
+/* Is CPU 'cpu' idle right now? */
+int idle_cpu(int cpu);
 
 void startup_cpu_idle_loop(void);
 
@@ -410,7 +408,7 @@ void cpu_init(void);
 static inline void vcpu_unblock(struct vcpu *v)
 {
     if ( test_and_clear_bit(_VCPUF_blocked, &v->vcpu_flags) )
-        domain_wake(v);
+        vcpu_wake(v);
 }
 
 #define IS_PRIV(_d)                                         \

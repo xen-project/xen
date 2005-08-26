@@ -193,7 +193,7 @@ void sched_rem_domain(struct vcpu *v)
     TRACE_2D(TRC_SCHED_DOM_REM, v->domain->domain_id, v->vcpu_id);
 }
 
-void domain_sleep_nosync(struct vcpu *v)
+void vcpu_sleep_nosync(struct vcpu *v)
 {
     unsigned long flags;
 
@@ -205,18 +205,25 @@ void domain_sleep_nosync(struct vcpu *v)
     TRACE_2D(TRC_SCHED_SLEEP, v->domain->domain_id, v->vcpu_id);
 } 
 
-void domain_sleep_sync(struct vcpu *v)
+void vcpu_sleep_sync(struct vcpu *v)
 {
-    domain_sleep_nosync(v);
+    vcpu_sleep_nosync(v);
 
-    while ( test_bit(_VCPUF_running, &v->vcpu_flags) && !domain_runnable(v) )
+    /*
+     * We can be sure that the VCPU is finally descheduled after the running
+     * flag is cleared and the scheduler lock is released.
+     */
+    while ( test_bit(_VCPUF_running, &v->vcpu_flags)
+            && !domain_runnable(v)
+            && spin_is_locked(&schedule_data[v->processor].schedule_lock) )
         cpu_relax();
 
+    /* Counteract lazy context switching. */
     if ( cpu_isset(v->processor, v->domain->cpumask) )
         sync_lazy_execstate_cpu(v->processor);
 }
 
-void domain_wake(struct vcpu *v)
+void vcpu_wake(struct vcpu *v)
 {
     unsigned long flags;
 
@@ -293,7 +300,7 @@ static long do_vcpu_up(int vcpu)
         return -ESRCH;
     clear_bit(_VCPUF_down, &target->vcpu_flags);
     /* wake vcpu */
-    domain_wake(target);
+    vcpu_wake(target);
 
     return 0;
 }
@@ -457,10 +464,10 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
                 }
             }
         }
-    } while (!succ);
-    //spin_lock_irq(&schedule_data[d->vcpu[0]->processor].schedule_lock);
+    } while ( !succ );
+
     SCHED_OP(adjdom, d, cmd);
-    //spin_unlock_irq(&schedule_data[d->vcpu[0]->processor].schedule_lock);
+
     for (cpu = 0; cpu < NR_CPUS; cpu++)
         if (__get_cpu_bit(cpu, have_lock))
             spin_unlock(&schedule_data[cpu].schedule_lock);
@@ -520,7 +527,8 @@ static void __enter_scheduler(void)
     perfc_incrc(sched_ctx);
 
 #if defined(WAKE_HISTO)
-    if ( !is_idle_task(next->domain) && next->wokenup ) {
+    if ( !is_idle_task(next->domain) && next->wokenup )
+    {
         ulong diff = (ulong)(now - next->wokenup);
         diff /= (ulong)MILLISECS(1);
         if (diff <= BUCKETS-2)  schedule_data[cpu].hist[diff]++;
