@@ -853,7 +853,7 @@ static int __init do_boot_cpu(int apicid)
 	atomic_set(&init_deasserted, 0);
 
 #if 1
-	cpu_gdt_descr[cpu].address = __get_free_page(GFP_KERNEL);
+	cpu_gdt_descr[cpu].address = __get_free_page(GFP_KERNEL|__GFP_ZERO);
 	BUG_ON(cpu_gdt_descr[0].size > PAGE_SIZE);
 	cpu_gdt_descr[cpu].size = cpu_gdt_descr[0].size;
 	printk("GDT: copying %d bytes from %lx to %lx\n",
