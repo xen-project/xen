@@ -42,6 +42,7 @@
 #include <vnet.h>
 #include <varp.h>
 #include <if_varp.h>
+#include <varp.h>
 #include <skb_util.h>
 
 #define MODULE_NAME "VNET"
@@ -53,22 +54,18 @@
  * The etherip protocol is used to transport Ethernet frames in IP packets.
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#define MAC_ETH(_skb) ((struct ethhdr *)(_skb)->mac.raw)
-#else
-#define MAC_ETH(_skb) ((_skb)->mac.ethernet)
-#endif
-
 /** Get the vnet label from an etherip header.
  *
  * @param hdr header
- * @return vnet (in host order)
+ * @@param vnet (in net order)
  */
-int etheriphdr_get_vnet(struct etheriphdr *hdr){
+void etheriphdr_get_vnet(struct etheriphdr *hdr, VnetId *vnet){
 #ifdef CONFIG_ETHERIP_EXT
-    return ntohl(hdr->vnet);
+    *vnet = *(VnetId*)hdr->vnet;
 #else
-    return hdr->reserved;
+    *vnet = (VnetId){};
+    vnet->u.vnet16[7] = (unsigned short)hdr->reserved;
+    
 #endif
 }
 
@@ -76,15 +73,15 @@ int etheriphdr_get_vnet(struct etheriphdr *hdr){
  * Also sets the etherip version.
  *
  * @param hdr header
- * @param vnet vnet label (in host order)
+ * @param vnet vnet label (in net order)
  */
-void etheriphdr_set_vnet(struct etheriphdr *hdr, int vnet){
+void etheriphdr_set_vnet(struct etheriphdr *hdr, VnetId *vnet){
 #ifdef CONFIG_ETHERIP_EXT
-    hdr->version = 4;
-    hdr->vnet = htonl(vnet);
+    hdr->version = ETHERIP_VERSION;
+    *(VnetId*)hdr->vnet = *vnet;
 #else
-    hdr->version = 3;
-    hdr->reserved = vnet & 0x0fff;
+    hdr->version = ETHERIP_VERSION;
+    hdr->reserved = (vnet->u.vnet16[7] & 0x0fff);
 #endif
 }
 
@@ -119,12 +116,12 @@ static int etherip_tunnel_send(Tunnel *tunnel, struct sk_buff *skb){
     const int ip_n = sizeof(struct iphdr);
     const int eth_n = ETH_HLEN;
     int head_n = 0;
-    int vnet = tunnel->key.vnet;
+    VnetId *vnet = &tunnel->key.vnet;
     struct etheriphdr *etheriph;
     struct ethhdr *ethh;
     u32 saddr = 0;
 
-    dprintf("> skb=%p vnet=%d\n", skb, vnet);
+    //dprintf("> skb=%p vnet=%d\n", skb, vnet);
     head_n = etherip_n + ip_n + eth_n;
     err = skb_make_room(&skb, skb, head_n, 0);
     if(err) goto exit;
@@ -133,7 +130,7 @@ static int etherip_tunnel_send(Tunnel *tunnel, struct sk_buff *skb){
     //if(err) goto exit;
     
     // The original ethernet header.
-    ethh = MAC_ETH(skb);
+    ethh = eth_hdr(skb);
     //print_skb_data(__FUNCTION__, 0, skb, skb->mac.raw, skb->len);
     // Null the pointer as we are pushing a new IP header.
     skb->mac.raw = NULL;
@@ -155,7 +152,7 @@ static int etherip_tunnel_send(Tunnel *tunnel, struct sk_buff *skb){
     skb->nh.iph->ttl      = 64;			// Linux default time-to-live.
     skb->nh.iph->protocol = IPPROTO_ETHERIP;    // IP protocol number.
     skb->nh.iph->saddr    = saddr;		// Source address.
-    skb->nh.iph->daddr    = tunnel->key.addr;	// Destination address.
+    skb->nh.iph->daddr    = tunnel->key.addr.u.ip4.s_addr;	// Destination address.
     skb->nh.iph->check    = 0;
 
     // Ethernet header will be filled-in by device.
@@ -213,15 +210,18 @@ static int etherip_protocol_recv(struct sk_buff *skb){
     struct etheriphdr *etheriph;
     struct ethhdr *ethhdr;
     Vnet *vinfo = NULL;
-    u32 vnet;
+    VnetId vnet = {};
+    u32 saddr, daddr;
+    char vnetbuf[VNET_ID_BUF];
 
-    ethhdr = MAC_ETH(skb);
-    if(MULTICAST(skb->nh.iph->daddr) &&
-       (skb->nh.iph->daddr != varp_mcast_addr)){
+    saddr = skb->nh.iph->saddr;
+    daddr = skb->nh.iph->daddr;
+    ethhdr = eth_hdr(skb);
+    if(MULTICAST(daddr) && (daddr != varp_mcast_addr)){
         // Ignore multicast packets not addressed to us.
-        dprintf("> dst=%u.%u.%u.%u varp_mcast_addr=%u.%u.%u.%u\n",
-                NIPQUAD(skb->nh.iph->daddr),
-                NIPQUAD(varp_mcast_addr));
+        dprintf("> Ignoring mcast skb: src=%u.%u.%u.%u dst=%u.%u.%u.%u"
+                " varp_mcast_addr=%u.%u.%u.%u\n",
+                NIPQUAD(saddr), NIPQUAD(daddr), NIPQUAD(varp_mcast_addr));
         goto exit;
     }
     ip_n = (skb->nh.iph->ihl << 2);
@@ -229,7 +229,8 @@ static int etherip_protocol_recv(struct sk_buff *skb){
         // skb->data points at ethernet header.
         //dprintf("> len=%d\n", skb->len);
         if (!pskb_may_pull(skb, eth_n + ip_n)){
-            wprintf("> Malformed skb\n");
+            wprintf("> Malformed skb (eth+ip) src=%u.%u.%u.%u\n",
+                    NIPQUAD(saddr));
             err = -EINVAL;
             goto exit;
         }
@@ -237,18 +238,30 @@ static int etherip_protocol_recv(struct sk_buff *skb){
     }
     // Assume skb->data points at etherip header.
     etheriph = (void*)skb->data;
-    if(!pskb_may_pull(skb, etherip_n)){
-        wprintf("> Malformed skb\n");
+    if(etheriph->version != ETHERIP_VERSION){
+        wprintf("> Bad etherip version=%d src=%u.%u.%u.%u\n",
+                etheriph->version,
+                NIPQUAD(saddr));
         err = -EINVAL;
         goto exit;
     }
-    vnet = etheriphdr_get_vnet(etheriph);
-    dprintf("> Rcvd skb=%p vnet=%d\n", skb, vnet);
+    if(!pskb_may_pull(skb, etherip_n)){
+        wprintf("> Malformed skb (etherip) src=%u.%u.%u.%u\n",
+                NIPQUAD(saddr));
+        err = -EINVAL;
+        goto exit;
+    }
+    etheriphdr_get_vnet(etheriph, &vnet);
+    dprintf("> Rcvd skb vnet=%s src=%u.%u.%u.%u\n",
+            VnetId_ntoa(&vnet, vnetbuf),
+            NIPQUAD(saddr));
     // If vnet is secure, context must include IPSEC ESP.
-    err = vnet_check_context(vnet, SKB_CONTEXT(skb), &vinfo);
+    err = vnet_check_context(&vnet, SKB_CONTEXT(skb), &vinfo);
     Vnet_decref(vinfo);
     if(err){
-        wprintf("> Failed security check\n");
+        wprintf("> Failed security check vnet=%s src=%u.%u.%u.%u\n",
+                VnetId_ntoa(&vnet, vnetbuf),
+                NIPQUAD(saddr));
         goto exit;
     }
     mine = 1;
@@ -258,19 +271,29 @@ static int etherip_protocol_recv(struct sk_buff *skb){
     // Know source ip, vnet, vmac, so could update varp cache.
     // But if traffic comes to us over a vnetd tunnel this points the coa
     // at the vnetd rather than the endpoint. So don't do it.
-    //varp_update(htonl(vnet), MAC_ETH(skb)->h_source, skb->nh.iph->saddr);
+    //varp_update(vnet, eth_hdr(skb)->h_source, skb->nh.iph->saddr);
 
     // Assuming a standard Ethernet frame.
+    // Should check for protocol? Support ETH_P_8021Q too.
     skb->nh.raw = skb_pull(skb, ETH_HLEN);
+
+    dprintf("> Unpacked vnet=%s srcmac=" MACFMT " dstmac=" MACFMT "\n",
+            VnetId_ntoa(&vnet, vnetbuf),
+            MAC6TUPLE(eth_hdr(skb)->h_source),
+            MAC6TUPLE(eth_hdr(skb)->h_dest));
 
 #ifdef CONFIG_NETFILTER
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
     // This stops our new pkt header being clobbered by a subsequent
-    // call to nf_bridge_maybe_copy_header. Just replicate the
-    // corresponding nf_bridge_save_header.
+    // call to nf_bridge_maybe_copy_header.
+    // Code from nf_bridge_save_header() modidifed to use h_proto
+    // instead of skb->protocol.
     if(skb->nf_bridge){
+        // Hmm. Standard ethernet header is ETH_HLEN (14),
+        // VLAN header (802.1q) is VLAN_ETH_HLEN (18).
+        // Where does 16 come from?
         int header_size = 16;
-        if(MAC_ETH(skb)->h_proto == __constant_htons(ETH_P_8021Q)) {
+        if(eth_hdr(skb)->h_proto == __constant_htons(ETH_P_8021Q)) {
             header_size = 18;
         }
         memcpy(skb->nf_bridge->data, skb->data - header_size, header_size);
@@ -279,7 +302,7 @@ static int etherip_protocol_recv(struct sk_buff *skb){
 #endif
     
     if(1){
-	struct ethhdr *eth = MAC_ETH(skb);
+	struct ethhdr *eth = eth_hdr(skb);
         // Devices use eth_type_trans() to set skb->pkt_type and skb->protocol.
         // Set them from contained ethhdr, or leave as received?
         // 'Ware use of hard_header_len in eth_type_trans().
@@ -310,6 +333,7 @@ static int etherip_protocol_recv(struct sk_buff *skb){
         }
         dst_release(skb->dst);
         skb->dst = NULL;
+
 #ifdef CONFIG_NETFILTER
         nf_conntrack_put(skb->nfct);
         skb->nfct = NULL;
@@ -321,7 +345,7 @@ static int etherip_protocol_recv(struct sk_buff *skb){
 
     //print_skb_data(__FUNCTION__, 0, skb, skb->mac.raw, skb->len + ETH_HLEN);
 
-    err = vnet_skb_recv(skb, vnet, (Vmac*)MAC_ETH(skb)->h_dest);
+    err = vnet_skb_recv(skb, &vnet, (Vmac*)eth_hdr(skb)->h_dest);
   exit:
     if(mine) err = 1;
     dprintf("< skb=%p err=%d\n", skb, err);

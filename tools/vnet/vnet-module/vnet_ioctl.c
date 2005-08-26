@@ -59,7 +59,7 @@ Have to rely on ethernet bridging being configured - but we can't rely
 on the kernel interface being available to us (it's not exported @!$"%!).
 
 Create a vnet N:
-- create the vnet device vnetifN: using commands to /proc, kernel api
+- create the vnet device vnifN: using commands to /proc, kernel api
 - create the vnet bridge vnetN: using brctl in user-space
 - for best results something should keep track of the mapping vnet id <-> bridge name
 
@@ -312,7 +312,6 @@ static int proc_release_fn(Inode *inode, File *file){
     err = Parser_input(parser, NULL, 0);
     if(err) goto exit;
     obj = parser->val;
-    objprint(iostdout, obj, 0); IOStream_print(iostdout, "\n");
     for(l = obj; CONSP(l); l = CDR(l)){
         err = eval(CAR(l));
         if(err) break;
@@ -451,6 +450,7 @@ static int child_string(Sxpr exp, Sxpr key, char **s){
     return err;
 }
 
+#if 0
 static int intof(Sxpr exp, int *v){
     int err = 0;
     char *s;
@@ -471,6 +471,24 @@ static int child_int(Sxpr exp, Sxpr key, int *v){
     int err = 0;
     Sxpr val = sxpr_child_value(exp, key, ONONE);
     err = intof(val, v);
+    return err;
+}
+#endif
+
+static int vnetof(Sxpr exp, VnetId *v){
+    int err = 0;
+    char *s;
+    err = stringof(exp, &s);
+    if(err) goto exit;
+    err = VnetId_aton(s, v);
+  exit:
+    return err;
+}
+
+static int child_vnet(Sxpr exp, Sxpr key, VnetId *v){
+    int err = 0;
+    Sxpr val = sxpr_child_value(exp, key, ONONE);
+    err = vnetof(val, v);
     return err;
 }
 
@@ -515,20 +533,27 @@ static int child_addr(Sxpr exp, Sxpr key, uint32_t *v){
  * It is an error if a vnet with the same id exists.
  *
  * @param vnet vnet id
+ * @param device vnet device name
  * @param security security level
  * @return 0 on success, error code otherwise
  */
-static int ctrl_vnet_add(int vnet, int security){
+static int ctrl_vnet_add(VnetId *vnet, char *device, int security){
     int err = 0;
     Vnet *vnetinfo = NULL;
+
+    if(strlen(device) >= IFNAMSIZ){
+        err = -EINVAL;
+        goto exit;
+    }
     if(Vnet_lookup(vnet, &vnetinfo) == 0){
         err = -EEXIST;
         goto exit;
     }
     err = Vnet_alloc(&vnetinfo);
     if(err) goto exit;
-    vnetinfo->vnet = vnet;
+    vnetinfo->vnet = *vnet;
     vnetinfo->security = security;
+    strcpy(vnetinfo->device, device);
     err = Vnet_create(vnetinfo);
   exit:
     if(vnetinfo) Vnet_decref(vnetinfo);
@@ -540,9 +565,15 @@ static int ctrl_vnet_add(int vnet, int security){
  * @param vnet vnet id
  * @return 0 on success, error code otherwise
  */
-static int ctrl_vnet_del(int vnet){
+static int ctrl_vnet_del(VnetId *vnet){
     int err = -ENOSYS;
     // Can't delete if there are any vifs on the vnet.
+
+    // Need to flush vif entries for the deleted vnet.
+    // Need to flush varp entries for the deleted vnet.
+    // Note that (un)register_netdev() hold rtnl_lock() around
+    // (un)register_netdevice().
+
     //Vnet_del(vnet);
     return err;
 }
@@ -553,7 +584,7 @@ static int ctrl_vnet_del(int vnet){
  * @param vmac mac address
  * @return 0 on success, error code otherwise
  */
-static int ctrl_vif_add(int vnet, Vmac *vmac){
+static int ctrl_vif_add(VnetId *vnet, Vmac *vmac){
     int err = 0;
     Vnet *vnetinfo = NULL;
     Vif *vif = NULL;
@@ -561,43 +592,10 @@ static int ctrl_vif_add(int vnet, Vmac *vmac){
     dprintf(">\n");
     err = Vnet_lookup(vnet, &vnetinfo);
     if(err) goto exit;
-    err = vif_add(vnet, vmac, &vif);
+    err = vif_create(vnet, vmac, &vif);
   exit:
     if(vnetinfo) Vnet_decref(vnetinfo);
     if(vif) vif_decref(vif);
-    dprintf("< err=%d\n", err);
-    return err;
-}
-
-/** Add net device 'vifname' to the bridge for 'vnet' and
- * create an entry for a vif with the given vnet and vmac.
- * This is used when device 'vifname' is a virtual device
- * connected to a vif in a vm.
- *
- * @param vifname name of device to bridge
- * @param vnet vnet id
- * @param vmac mac address
- * @return 0 on success, error code otherwise
- */
-static int ctrl_vif_conn(char *vifname, int vnet, Vmac *vmac){
-    int err = 0;
-    Vnet *vnetinfo = NULL;
-    struct net_device *vifdev = NULL;
-    Vif *vif = NULL;
-
-    dprintf("> %s\n", vifname);
-    err = Vnet_lookup(vnet, &vnetinfo);
-    if(err) goto exit;
-    err = vif_add(vnet, vmac, &vif);
-    if(err) goto exit;
-    err = vnet_get_device(vifname, &vifdev);
-    if(err) goto exit;
-    vif->dev = vifdev;
-    err = vnet_add_if(vnetinfo, vifdev);
-  exit:
-    if(vnetinfo) Vnet_decref(vnetinfo);
-    if(vif) vif_decref(vif);
-    if(vifdev) dev_put(vifdev);
     dprintf("< err=%d\n", err);
     return err;
 }
@@ -608,7 +606,7 @@ static int ctrl_vif_conn(char *vifname, int vnet, Vmac *vmac){
  * @param vmac mac address
  * @return 0 on success, error code otherwise
  */
-static int ctrl_vif_del(int vnet, Vmac *vmac){
+static int ctrl_vif_del(VnetId *vnet, Vmac *vmac){
     int err = 0;
     Vnet *vnetinfo = NULL;
     Vif *vif = NULL;
@@ -618,10 +616,6 @@ static int ctrl_vif_del(int vnet, Vmac *vmac){
     if(err) goto exit;
     err = vif_lookup(vnet, vmac, &vif);
     if(err) goto exit;
-    if(vif->dev){
-        vnet_del_if(vnetinfo, vif->dev);
-        vif->dev = NULL;
-    }
     vif_remove(vnet, vmac);
   exit:
     if(vnetinfo) Vnet_decref(vnetinfo);
@@ -652,21 +646,37 @@ static int eval_varp_mcaddr(Sxpr exp){
     return err;
 }
 
-/** (vnet.add (id <id>) [(security { none | auth | conf } )] )
+/** (varp.flush)
+ */
+static int eval_varp_flush(Sxpr exp){
+    int err = 0;
+    varp_flush();
+    return err;
+}
+
+/** (vnet.add (id <id>)
+ *            [(vnetif <name>)]
+ *            [(security { none | auth | conf } )]
+ *  )
  */
 static int eval_vnet_add(Sxpr exp){
     int err = 0;
     Sxpr oid = intern("id");
     Sxpr osecurity = intern("security");
+    Sxpr ovnetif = intern("vnetif");
     Sxpr csecurity;
-    int id;
-    char *security;
+    VnetId vnet = {};
+    char *device = NULL;
+    char dev[IFNAMSIZ] = {};
+    char *security = NULL;
     int sec;
-    err = child_int(exp, oid, &id);
+
+    err = child_vnet(exp, oid, &vnet);
     if(err) goto exit;
-    if(id < VNET_VIF){ 
-        err = -EINVAL;
-        goto exit;
+    child_string(exp, ovnetif, &device);
+    if(!device){
+        snprintf(dev, IFNAMSIZ-1, "vnif%04x", ntohs(vnet.u.vnet16[7]));
+        device = dev;
     }
     csecurity = sxpr_child_value(exp, osecurity, intern("none"));
     err = stringof(csecurity, &security);
@@ -681,8 +691,7 @@ static int eval_vnet_add(Sxpr exp){
         err = -EINVAL;
         goto exit;
     }
-    dprintf("> vnet id=%d\n", id);
-    err = ctrl_vnet_add(id, sec);
+    err = ctrl_vnet_add(&vnet, device, sec);
  exit:
     dprintf("< err=%d\n", err);
     return err;
@@ -698,11 +707,11 @@ static int eval_vnet_add(Sxpr exp){
 static int eval_vnet_del(Sxpr exp){
     int err = 0;
     Sxpr oid = intern("id");
-    int id;
+    VnetId vnet = {};
 
-    err = child_int(exp, oid, &id);
+    err = child_vnet(exp, oid, &vnet);
     if(err) goto exit;
-    err = ctrl_vnet_del(id);
+    err = ctrl_vnet_del(&vnet);
   exit:
     return err;
 }
@@ -713,38 +722,15 @@ static int eval_vif_add(Sxpr exp){
     int err = 0;
     Sxpr ovnet = intern("vnet");
     Sxpr ovmac = intern("vmac");
-    int vnet;
+    VnetId vnet = {};
     Vmac vmac = {};
 
-    err = child_int(exp, ovnet, &vnet);
+    err = child_vnet(exp, ovnet, &vnet);
     if(err) goto exit;
     err = child_mac(exp, ovmac, vmac.mac);
     if(err) goto exit;
-    err = ctrl_vif_add(vnet, &vmac);
+    err = ctrl_vif_add(&vnet, &vmac);
   exit:
-    return err;
-}
-
-/** (vif.conn (vif <name>) (vnet <id>) (vmac <mac>))
- */
-static int eval_vif_conn(Sxpr exp){
-    int err = 0;
-    Sxpr ovif = intern("vif");
-    Sxpr ovnet = intern("vnet");
-    Sxpr ovmac = intern("vmac");
-    char *vif = NULL;
-    int vnet = 0;
-    Vmac vmac = {};
-
-    err = child_string(exp, ovif, &vif);
-    if(err) goto exit;
-    err = child_int(exp, ovnet, &vnet);
-    if(err) goto exit;
-    err = child_mac(exp, ovmac, vmac.mac);
-    dprintf("> connect vif=%s vnet=%d\n", vif, vnet);
-    err = ctrl_vif_conn(vif, vnet, &vmac);
- exit:
-    dprintf("< err=%d\n", err);
     return err;
 }
 
@@ -754,14 +740,14 @@ static int eval_vif_del(Sxpr exp){
     int err = 0;
     Sxpr ovnet = intern("vnet");
     Sxpr ovmac = intern("vmac");
-    int vnet;
+    VnetId vnet = {};
     Vmac vmac = {};
 
-    err = child_int(exp, ovnet, &vnet);
+    err = child_vnet(exp, ovnet, &vnet);
     if(err) goto exit;
     err = child_mac(exp, ovmac, vmac.mac);
     if(err) goto exit;
-    err = ctrl_vif_del(vnet, &vmac);
+    err = ctrl_vif_del(&vnet, &vmac);
   exit:
     return err;
 }
@@ -776,23 +762,23 @@ static int eval(Sxpr exp){
     SxprEval defs[] = {
         { intern("varp.print"),   eval_varp_print   },
         { intern("varp.mcaddr"),  eval_varp_mcaddr  },
+        { intern("varp.flush"),   eval_varp_flush   },
         { intern("vif.add"),      eval_vif_add      },
-        { intern("vif.conn"),     eval_vif_conn     },
         { intern("vif.del"),      eval_vif_del      },
         { intern("vnet.add"),     eval_vnet_add     },
         { intern("vnet.del"),     eval_vnet_del     },
         { ONONE, NULL } };
     SxprEval *def;
 
-    dprintf(">\n");
-    err = -EINVAL;
+    iprintf("> "); objprint(iostdout, exp, 0); IOStream_print(iostdout, "\n");
+    err = -ENOSYS;
     for(def = defs; !NONEP(def->elt); def++){
         if(sxpr_elementp(exp, def->elt)){
             err = def->fn(exp);
             break;
         }
     }
-    dprintf("< err=%d\n", err);
+    iprintf("< err=%d\n", err);
     return err;
 }
 

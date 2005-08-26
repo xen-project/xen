@@ -16,32 +16,29 @@
 # Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 #----------------------------------------------------------------------------
 
+VNET_ROOT = $(shell cd .. && pwd)
+include $(VNET_ROOT)/Make.env
+
 all: vnetd
 
 #----------------------------------------------------------------------------
 
-XEN_ROOT  = ../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 VNETD_INSTALL_DIR = /usr/sbin
 
-LIB_DIR = ../libxutil
-VNET_DIR = ../vnet-module
-
-INCLUDES += -I$(LIB_DIR)
-INCLUDES += -I$(VNET_DIR)
+INCLUDES += -I$(LIBXUTIL_DIR)
+INCLUDES += -I$(VNET_MODULE_DIR)
 
 #----------------------------------------------------------------------------
 # GC.
-GC_DIR:=../gc/install
-GC_INCLUDE:= $(GC_DIR)/include
-GC_LIB_DIR:=$(GC_DIR)/lib
 
 INCLUDES += -I$(GC_INCLUDE)
 #LIBS += -L$(GC_LIB_DIR)
 CPPFLAGS += -D USE_GC
 
 #----------------------------------------------------------------------------
+CFLAGS += -g
 CFLAGS += -Wall
 CFLAGS += $(INCLUDES) $(LIBS)
 
@@ -51,7 +48,7 @@ LDFLAGS += $(LIBS)
 CFLAGS += -Wp,-MD,.$(@F).d
 PROG_DEP = .*.d
 
-vpath %.c $(LIB_DIR)
+vpath %.c $(LIBXUTIL_DIR)
 
 IPATHS:=$(INCLUDES:-I=)
 vpath %.h $(IPATHS)
@@ -83,9 +80,9 @@ VNETD_SRC+=$(LIB_SRC)
 
 VNETD_OBJ := $(VNETD_SRC:.c=.o)
 
-#VNETD_LIBS:= $(GC_LIB_DIR)/libgc.so.1.0.2
+#VNETD_LIBS:= $(GC_LIB_SO)
 #VNETD_LIBS:= -lgc
-VNETD_LIBS:= $(GC_LIB_DIR)/libgc.a
+VNETD_LIBS:= $(GC_LIB_A)
 
 vnetd: $(VNETD_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(VNETD_LIBS) -ldl -lpthread
@@ -95,8 +92,8 @@ install: vnetd
 	install -m 0755 vnetd $(DESTDIR)$(VNETD_INSTALL_DIR)
 
 clean:
-	-rm -f *.a *.o *~
-	-rm -f vnetd
-	-rm -f $(PROG_DEP)
+	-@$(RM) *.a *.o *~
+	-@$(RM) vnetd
+	-@$(RM) $(PROG_DEP)
 
 -include $(PROG_DEP)

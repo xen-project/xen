@@ -18,9 +18,13 @@
 # 59 Temple Place, suite 330, Boston, MA 02111-1307 USA
 #============================================================================
 
+ifndef VNET_ROOT
+export VNET_ROOT = $(shell cd .. && pwd)
+include $(VNET_ROOT)/Make.env
+endif
+
 #============================================================================
 ifeq ($(src),)
-LINUX_SERIES ?=2.6
 
 include Makefile-$(LINUX_SERIES)
 
@@ -45,7 +49,7 @@ vnet_module-objs += $(VNET_LIB_OBJ)
 # Setup explicit rules for them using the kbuild C compile rule.
 
 # File names in the lib dir.
-remote_srcs = $(foreach file,$(VNET_LIB_SRC),$(LIB_DIR)/$(file))
+remote_srcs = $(foreach file,$(VNET_LIB_SRC),$(LIBXUTIL_DIR)/$(file))
 
 # Equivalent file names here.
 local_srcs = $(foreach file,$(VNET_LIB_SRC),$(src)/$(file))
@@ -54,12 +58,12 @@ local_srcs = $(foreach file,$(VNET_LIB_SRC),$(src)/$(file))
 local_objs = $(local_srcs:.c=.o)
 
 # Make the local objects depend on compiling the remote sources.
-$(local_objs): $(src)/%.o: $(LIB_DIR)/%.c
+$(local_objs): $(src)/%.o: $(LIBXUTIL_DIR)/%.c
 	$(call if_changed_rule,cc_o_c)
 #----------------------------------------------------------------------------
 
-vpath %.h $(LIB_DIR)
-EXTRA_CFLAGS += -I $(LIB_DIR)
+vpath %.h $(LIBXUTIL_DIR)
+EXTRA_CFLAGS += -I $(LIBXUTIL_DIR)
 EXTRA_CFLAGS += -I $(src)
 
 endif

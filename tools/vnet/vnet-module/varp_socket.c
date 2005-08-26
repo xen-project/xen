@@ -177,7 +177,7 @@ int getsockname(int fd, struct sockaddr *usockaddr, int *usockaddr_len){
 
 /*============================================================================*/
 /** Socket flags. */
-enum {
+enum VsockFlag {
     VSOCK_REUSE     =  1,
     VSOCK_BIND      =  2,
     VSOCK_CONNECT   =  4,
@@ -256,28 +256,13 @@ int setsock_broadcast(int sock, int bcast){
  */
 int setsock_multicast(int sock, uint32_t saddr){
     int err = 0;
-    struct net_device *dev = NULL;
-    u32 addr = 0;
     struct ip_mreqn mreq = {};
     int mloop = 0;
 
-    err = vnet_get_device(DEVICE, &dev);
-    if(err){
-        eprintf("> error getting device: %d %d\n", err, errno);
-        goto exit;
-    }
-    err = vnet_get_device_address(dev, &addr);
-    if(err){
-        eprintf("> error getting device address: %d %d\n", err, errno);
-        goto exit;
-    }
     // See 'man 7 ip' for these options.
     mreq.imr_multiaddr.s_addr = saddr;       // IP multicast address.
-    //mreq.imr_address.s_addr   = addr;        // Interface IP address.
     mreq.imr_address.s_addr   = INADDR_ANY;  // Interface IP address.
     mreq.imr_ifindex = 0;                    // Interface index (0 means any).
-    dprintf("> saddr=%u.%u.%u.%u addr=%u.%u.%u.%u ifindex=%d\n",
-            NIPQUAD(saddr), NIPQUAD(addr), mreq.imr_ifindex);
     err = setsockopt(sock, SOL_IP, IP_MULTICAST_LOOP, &mloop, sizeof(mloop));
     if(err < 0){
         eprintf("> setsockopt IP_MULTICAST_LOOP: %d %d\n", err, errno);
@@ -305,7 +290,7 @@ int setsock_multicast_ttl(int sock, uint8_t ttl){
 }
 
 /** Create a socket.
- * The flags can include VSOCK_REUSE, VSOCK_BROADCAST, VSOCK_CONNECT.
+ * The flags can include values from enum VsockFlag.
  *
  * @param socktype socket type
  * @param saddr address
@@ -368,19 +353,15 @@ int create_socket(int socktype, uint32_t saddr, uint32_t port, int flags, int *v
 /** Open the varp multicast socket.
  *
  * @param mcaddr multicast address 
- * @param saddr address 
  * @param port port
  * @param val return parameter for the socket
  * @return 0 on success, error code otherwise
  */
-int varp_mcast_open(uint32_t mcaddr, uint32_t saddr, uint16_t port, int *val){
+int varp_mcast_open(uint32_t mcaddr, uint16_t port, int *val){
     int err = 0;
     int flags = VSOCK_REUSE;
     int multicast = MULTICAST(mcaddr);
     int sock = 0;
-    struct sockaddr_in addr_in;
-    struct sockaddr *addr = (struct sockaddr *)&addr_in;
-    int addr_n = sizeof(addr_in);
     
     dprintf(">\n");
     flags |= VSOCK_MULTICAST;
@@ -391,23 +372,6 @@ int varp_mcast_open(uint32_t mcaddr, uint32_t saddr, uint16_t port, int *val){
     if(multicast){
         err = setsock_multicast_ttl(sock, 1);
         if(err < 0) goto exit;
-    }
-    if(0){
-        addr_in.sin_family      = AF_INET;
-        addr_in.sin_addr.s_addr = saddr;
-        addr_in.sin_port        = port;
-        err = bind(sock, addr, addr_n);
-        if(err < 0){
-            eprintf("> bind: %d %d\n", err, errno);
-            goto exit;
-        }
-    }
-    if(0){
-        struct sockaddr_in self = {};
-        int self_n;
-        getsockname(sock, (struct sockaddr *)&self, &self_n);
-        dprintf("> sockname sock=%d addr=%u.%u.%u.%u port=%d\n",
-                sock, NIPQUAD(saddr), ntohs(port));
     }
   exit:
     if(err){
@@ -427,7 +391,7 @@ int varp_mcast_open(uint32_t mcaddr, uint32_t saddr, uint16_t port, int *val){
  */
 int varp_ucast_open(uint32_t addr, u16 port, int *val){
     int err = 0;
-    int flags = VSOCK_BIND | VSOCK_REUSE;
+    int flags = (VSOCK_BIND | VSOCK_REUSE);
     dprintf(">\n");
     err = create_socket(SOCK_DGRAM, addr, port, flags, val);
     dprintf("< err=%d val=%d\n", err, *val);
@@ -536,7 +500,6 @@ int varp_main(void *arg){
     err = sock_add_wait_queue(varp_mcast_sock, &mcast_wait);
     err = sock_add_wait_queue(varp_ucast_sock, &ucast_wait);
     for(n = 1; atomic_read(&varp_run) == 1; n++){
-        //dprintf("> n=%d\n", n);
         count = 0;
         count += handle_sock_skb(varp_mcast_sock);
         count += handle_sock_skb(varp_ucast_sock);
@@ -609,20 +572,18 @@ void varp_close(void){
 /** Open the varp sockets and start the thread handling them.
  *
  * @param mcaddr multicast address
- * @param addr unicast address
  * @param port port
  * @return 0 on success, error code otherwise
  */
-int varp_open(u32 mcaddr, u32 addr, u16 port){
+int varp_open(u32 mcaddr, u16 port){
     int err = 0;
     mm_segment_t oldfs;
 
     //MOD_INC_USE_COUNT;
-    dprintf("> mcaddr=%u.%u.%u.%u addr=%u.%u.%u.%u port=%u\n",
-            NIPQUAD(mcaddr), NIPQUAD(addr), ntohs(port));
-    //MOD_INC_USE_COUNT;
+    dprintf("> mcaddr=%u.%u.%u.%u port=%u\n",
+            NIPQUAD(mcaddr), ntohs(port));
     oldfs = change_fs(KERNEL_DS);
-    err = varp_mcast_open(mcaddr, addr, port, &varp_mcast_sock);
+    err = varp_mcast_open(mcaddr, port, &varp_mcast_sock);
     if(err < 0 ) goto exit;
     err = varp_ucast_open(INADDR_ANY, port, &varp_ucast_sock);
     if(err < 0 ) goto exit;

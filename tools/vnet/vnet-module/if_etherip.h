@@ -18,15 +18,30 @@
  */
 #ifndef _VNET_IF_ETHERIP_H_
 #define _VNET_IF_ETHERIP_H_
-/*----------------------------------------------------------------------------*/
+
+#define CONFIG_ETHERIP_EXT
+
 #ifdef CONFIG_ETHERIP_EXT
+
+#define ETHERIP_VERSION 4
+
 struct etheriphdr {
-    __u8 version;
-    __u32 vnet;
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+    __u16    reserved:12,
+             version:4;
+#elif defined (__BIG_ENDIAN_BITFIELD)
+    __u16    version:4,
+            reserved:12;
+#else
+#error  "Please fix <asm/byteorder.h>"
+#endif
+    __u8 vnet[16];
 } __attribute__ ((packed));
 
-/*----------------------------------------------------------------------------*/
 #else
+
+#define ETHERIP_VERSION 3
+
 struct etheriphdr
 {
 #if defined(__LITTLE_ENDIAN_BITFIELD)
@@ -42,10 +57,9 @@ struct etheriphdr
 };
 #endif
 
+
 #ifndef IPPROTO_ETHERIP
 #define IPPROTO_ETHERIP 97
 #endif
-
-/*----------------------------------------------------------------------------*/
 
 #endif /* ! _VNET_IF_ETHERIP_H_ */

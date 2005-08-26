@@ -89,15 +89,17 @@ typedef enum {
 
 
 /** Parser flags. */
-//enum {
-//};
+enum {
+    /** Convert integer atoms to ints. */
+    PARSE_INT=1,
+};
 
 /** Raise some parser flags.
  *
  * @param in parser
  * @param flags flags mask
  */
-inline static void Parser_flags_raise(Parser *in, int flags){
+static inline void Parser_flags_raise(Parser *in, int flags){
     in->flags |= flags;
 }
 
@@ -106,7 +108,7 @@ inline static void Parser_flags_raise(Parser *in, int flags){
  * @param in parser
  * @param flags flags mask
  */
-inline static void Parser_flags_lower(Parser *in, int flags){
+static inline void Parser_flags_lower(Parser *in, int flags){
     in->flags &= ~flags;
 }
 
@@ -114,8 +116,12 @@ inline static void Parser_flags_lower(Parser *in, int flags){
  *
  * @param in parser
  */
-inline static void Parser_flags_clear(Parser *in){
+static inline void Parser_flags_clear(Parser *in){
     in->flags = 0;
+}
+
+static inline int Parser_flags(Parser *in, int flags){
+    return in->flags & flags;
 }
 
 extern void Parser_free(Parser *z);

@@ -1,5 +1,8 @@
+ifndef VNET_ROOT
+export VNET_ROOT = $(shell cd .. && pwd)
+include $(VNET_ROOT)/Make.env
+endif
 
-XEN_ROOT = ../../..
 INSTALL		= install
 INSTALL_DATA	= $(INSTALL) -m0644
 INSTALL_PROG	= $(INSTALL) -m0755
@@ -15,6 +18,7 @@ LIB_SRCS += gzip_stream.c
 LIB_SRCS += hash_table.c
 LIB_SRCS += iostream.c
 LIB_SRCS += lexis.c
+LIB_SRCS += mem_stream.c
 LIB_SRCS += string_stream.c
 LIB_SRCS += sxpr.c
 LIB_SRCS += sxpr_parser.c
@@ -26,6 +30,7 @@ LIB_OBJS := $(LIB_SRCS:.c=.o)
 PIC_OBJS := $(LIB_SRCS:.c=.opic)
 
 CFLAGS   += -Wall -Werror -O3 -fno-strict-aliasing
+CFLAGS   += -g
 
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d
@@ -39,6 +44,7 @@ LIB      += libxutil.so.$(MAJOR).$(MINOR)
 LIB      += libxutil.a
 
 all: build
+
 build: check-for-zlib
 	$(MAKE) $(LIB)
 
@@ -70,8 +76,8 @@ install: build
 	ln -sf libxutil.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxutil.so
 
 clean:
-	$(RM) *.a *.so* *.o *.opic *.rpm 
-	$(RM) *~
-	$(RM) $(DEPS)
+	-@$(RM) *.a *.so* *.o *.opic *.rpm 
+	-@$(RM) *~
+	-@$(RM) $(DEPS)
 
 -include $(DEPS)

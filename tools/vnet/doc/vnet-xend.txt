@@ -3,11 +3,13 @@ Vnets: Virtual Networks for Virtual Machines
 
 Mike Wray <mike.wray@hp.com>
 
+2005/08/25
+
 0) Introduction
 ---------------
 
 Vnets provide virtual private LANs for virtual machines.
-This is done using bridging and tunneling. A virtual interface
+This is done using bridging and multipoint tunneling. A virtual interface
 on a vnet can only see other interfaces on the same vnet - it cannot
 see the real network, and the real network cannot see it either.
 
@@ -32,13 +34,16 @@ Configure the network script:
 
 Restart xend.
 
+Alternatively insert the vnet module using vnet-insert,
+preferably before xend starts.
+
 2) Creating vnets
 -----------------
 
 Xend already implements commands to add/remove vnets and
 bridge to them. To add a vnet use
 
-xm call vnet_add <vnet config file>
+xm vnet-create <vnet config file>
 
 For example, if vnet97.sxp contains:
 
@@ -46,7 +51,7 @@ For example, if vnet97.sxp contains:
 
 do
 
-xm call vnet_add vnet97.sxp
+xm vnet-create vnet97.sxp
 
 This will define a vnet with id 97 and no security. The bridge for the
 vnet is called vnet97 and the virtual interface for it is vnetif97.
@@ -64,31 +69,35 @@ In sxp:
 Once configured, vnets are persistent in the xend database.
 To remove a vnet use
 
-xm call vnet_delete <vnet id>
+xm vnet-delete <vnet id>
 
 To list vnets use
 
-xm call vnets
+xm vnet-list
 
 To get information on a vnet id use
 
-xm call vnet <vnet id>
+xm vnet-list <vnet id>
 
 3) Troubleshooting
 ------------------
 
 The vnet module should appear in 'lsmod'.
-If a vnet has been configured it should appear in the output of 'xm call vnets'.
+If a vnet has been configured it should appear in the output of 'xm vnet-list'.
 Its bridge and interface should appear in 'ifconfig'.
 It should also show in 'brctl show', with its attached interfaces.
 
-You can 'see into' a vnet from dom0 if you put an IP address on the bridge.
+You can 'see into' a vnet from dom0 if you put an IP address on the bridge
+and configure its MAC address as a vif.
 For example, if you have vnet97 with a vm with ip addr 10.0.0.12 on it,
-then
+and <mac> is the MAC address of vnet97 (use ifconfig), then
 
+echo '(vif.add (vnet 97) (vmac <mac>))' >/proc/vnet/policy
 ifconfig vnet97 10.0.0.20 up
 
 should let you ping 10.0.0.12 via the vnet97 bridge.
+This works even if the vm with vif 10.0.0.12 is on another
+machine (it only works locally if you don't use vif.add).
 
 4) Examples
 -----------
@@ -104,11 +113,11 @@ Here's the full config for a vm on vnet 97, using ip addr 10.0.0.12:
   (linux
    (kernel /boot/vmlinuz-2.6-xenU)
    (ip 10.0.0.12:1.2.3.4::::eth0:off)
-   (root /dev/hda1)
+   (root /dev/sda1)
    (args 'rw fastboot 4')
   )
  )
- (device (vbd (uname phy:hda2) (dev hda1) (mode w)))
+ (device (vbd (uname phy:hda2) (dev sda1) (mode w)))
  (device (vif (mac aa:00:00:11:00:12) (bridge vnet97)))
 )
 
@@ -123,11 +132,11 @@ If you run another vm on the same vnet:
   (linux
    (kernel /boot/vmlinuz-2.6-xenU)
    (ip 10.0.0.11:1.2.3.4::::eth0:off)
-   (root /dev/hda1)
+   (root /dev/sda1)
    (args 'rw fastboot 4')
   )
  )
- (device (vbd (uname phy:hda3) (dev hda1) (mode w)))
+ (device (vbd (uname phy:hda3) (dev sda1) (mode w)))
  (device (vif (mac aa:00:00:11:00:11) (bridge vnet97)))
 )
 

@@ -24,12 +24,12 @@ struct net_device;
 
 /** Key for entries in the vif table. */
 typedef struct VifKey {
-    int vnet;
+    VnetId vnet;
     Vmac vmac;
 } VifKey;
 
 typedef struct Vif {
-    int vnet;
+    VnetId vnet;
     Vmac vmac;
     struct net_device *dev;
     atomic_t refcount;
@@ -38,15 +38,17 @@ typedef struct Vif {
 struct HashTable;
 extern struct HashTable *vif_table;
 
+extern void vif_print(void);
+
 extern void vif_decref(Vif *vif);
 extern void vif_incref(Vif *vif);
 
-extern int vif_create(int vnet, Vmac *vmac, Vif **vif);
+extern int vif_create(struct VnetId *vnet, Vmac *vmac, Vif **vif);
 
-extern int vif_add(int vnet, Vmac *vmac, Vif **vif);
-extern int vif_lookup(int vnet, Vmac *vmac, Vif **vif);
-extern int vif_remove(int vnet, Vmac *vmac);
-extern int vif_find(int vnet, Vmac *vmac, int create, Vif **vif);
+extern int vif_create(VnetId *vnet, Vmac *vmac, Vif **vif);
+extern int vif_add(struct VnetId *vnet, Vmac *vmac, Vif **vif);
+extern int vif_lookup(struct VnetId *vnet, Vmac *vmac, Vif **vif);
+extern int vif_remove(struct VnetId *vnet, Vmac *vmac);
 extern void vif_purge(void);
 
 extern int vif_init(void);

@@ -112,7 +112,6 @@
 #include <sys/wait.h>
 #include <sys/select.h>
 
-//#include </usr/include/linux/ip.h> // For struct iphdr;
 #include <linux/ip.h> // For struct iphdr;
 
 #include <linux/if_ether.h>
@@ -492,22 +491,16 @@ int vnetd_forward_peer(Conn *conn, int protocol, void *data, int data_n){
     dprintf("> addr=%s protocol=%d n=%d\n",
             inet_ntoa(conn->addr.sin_addr), protocol, data_n);
     string_stream_init(io, &sdata, buf, sizeof(buf));
-    dprintf("> 10\n");
     err = marshal_uint16(io, VNET_FWD_ID);
     if(err < 0) goto exit;
-    dprintf("> 20\n");
     err = marshal_uint16(io, 0);
     if(err < 0) goto exit;
-    dprintf("> 30\n");
     err = marshal_uint16(io, protocol);
     if(err < 0) goto exit;
-    dprintf("> 40\n");
     err = marshal_uint16(io, data_n);
     if(err < 0) goto exit;
-    dprintf("> 50\n");
     err = marshal_bytes(io, data, data_n);
     if(err < 0) goto exit;
-    dprintf("> 60 bytes=%d\n", IOStream_get_written(io));
     err = IOStream_write(conn->out, buf, IOStream_get_written(io));
     IOStream_flush(conn->out);
   exit:
@@ -978,7 +971,7 @@ int vnetd_udp_conn(Vnetd *vnetd, Conn **val){
     int err = 0;
     uint32_t addr = INADDR_ANY;
     uint16_t port = vnetd->port;
-    int flags = VSOCK_BIND | VSOCK_REUSE;
+    int flags = (VSOCK_BIND | VSOCK_REUSE);
     err = create_socket(SOCK_DGRAM, addr, port, flags, val);
     return err;
 }
@@ -1162,7 +1155,7 @@ int vnetd_main(Vnetd *vnetd){
     err = vnetd_broadcast_conn(vnetd, &vnetd->bcast_conn);
     if(err < 0) goto exit;
     { 
-        int flags = VSOCK_BROADCAST | VSOCK_MULTICAST;
+        int flags = (VSOCK_BROADCAST | VSOCK_MULTICAST);
         uint32_t mcaddr = vnetd->mcast_addr.sin_addr.s_addr;
 
         err = vnetd_raw_socket(IPPROTO_ETHERIP, flags, mcaddr, &vnetd->etherip_sock);

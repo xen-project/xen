@@ -47,6 +47,7 @@
 #include <random.h>
 #include <tunnel.h>
 
+#include <skb_util.h>
 #include <vnet_dev.h>
 #include <vnet.h>
 #include <vif.h>
@@ -70,7 +71,7 @@ int vnet_security_default = SA_AUTH ; //| SA_CONF;
 /** Key for entries in the vnet address table. */
 typedef struct VnetAddrKey {
     /** Vnet id. */
-    int vnet;
+    VnetId vnet;
     /** MAC address. */
     unsigned char mac[ETH_ALEN];
 } VnetAddrKey;
@@ -88,7 +89,6 @@ static HashTable *vnet_table = NULL;
 void Vnet_decref(Vnet *info){
     if(!info) return;
     if(atomic_dec_and_test(&info->refcount)){
-        dprintf("> free vnet=%u\n", info->vnet);
         vnet_dev_remove(info);
         deallocate(info);
     }
@@ -101,6 +101,28 @@ void Vnet_decref(Vnet *info){
 void Vnet_incref(Vnet *info){
     if(!info) return;
     atomic_inc(&info->refcount);
+}
+
+void Vnet_print(Vnet *info)
+{
+    char vnetbuf[VNET_ID_BUF];
+
+    printk(KERN_INFO "VNET(vnet=%s device=%s security=%c%c)\n",
+           VnetId_ntoa(&info->vnet, vnetbuf),
+           info->device,
+           ((info->security & SA_AUTH) ? 'a' : '-'),
+           ((info->security & SA_CONF) ? 'c' : '-'));
+}
+
+void vnet_print(void)
+{
+    HashTable_for_decl(entry);
+    Vnet *info;
+    
+    HashTable_for_each(entry, vnet_table){
+        info = entry->value;
+        Vnet_print(info);
+    }
 }
 
 /** Allocate a vnet, setting reference count to 1.
@@ -129,7 +151,7 @@ int Vnet_add(Vnet *info){
     HTEntry *entry = NULL;
     // Vnet_del(info->vnet); //todo: Delete existing vnet info?
     Vnet_incref(info);
-    entry = HashTable_add(vnet_table, HKEY(info->vnet), info);
+    entry = HashTable_add(vnet_table, &info->vnet, info);
     if(!entry){
         err = -ENOMEM;
         Vnet_decref(info);
@@ -142,8 +164,8 @@ int Vnet_add(Vnet *info){
  * @param vnet id of vnet to remove
  * @return number of vnets removed
  */
-int Vnet_del(vnetid_t vnet){
-    return HashTable_remove(vnet_table, HKEY(vnet));
+int Vnet_del(VnetId *vnet){
+    return HashTable_remove(vnet_table, vnet);
 }
 
 /** Lookup a vnet by id.
@@ -153,17 +175,14 @@ int Vnet_del(vnetid_t vnet){
  * @param info return parameter for vnet
  * @return 0 on sucess, -ENOENT if no vnet found
  */
-int Vnet_lookup(vnetid_t vnet, Vnet **info){
+int Vnet_lookup(VnetId *vnet, Vnet **info){
     int err = 0;
-    dprintf("> vnet=%u info=%p\n", vnet, info);
-    dprintf("> vnet_table=%p\n",vnet_table); 
-    *info = HashTable_get(vnet_table, HKEY(vnet));
+    *info = HashTable_get(vnet_table, vnet);
     if(*info){
         Vnet_incref(*info);
     } else {
         err = -ENOENT;
     }
-    dprintf("< err=%d\n", err);
     return err;
 }
 
@@ -191,22 +210,33 @@ static void vnet_entry_free_fn(HashTable *table, HTEntry *entry){
  */
 static int vnet_setup(void){
     int err = 0;
-    int i, n = 5; //20;
+    int i, n = 3;
     int security = vnet_security_default;
+    uint32_t vnetid;
     Vnet *vnet;
 
-    dprintf(">\n");
     for(i=0; i<n; i++){
         err = Vnet_alloc(&vnet);
         if(err) break;
-        vnet->vnet = VNET_VIF + i;
-        vnet->security = (vnet->vnet > 10 ? security : 0);
-        //err = Vnet_add(vnet);
+        vnetid = VNET_VIF + i;
+        vnet->vnet = toVnetId(vnetid);
+        sprintf(vnet->device, "vnif%04x", vnetid);
+        vnet->security = (vnetid > 10 ? security : 0);
         err = Vnet_create(vnet);
         if(err) break;
     }
-    dprintf("< err=%d\n", err);
     return err;
+}
+
+int vnet_key_equal_fn(void *k1, void *k2){
+    VnetId *key1 = k1;
+    VnetId *key2 = k2;
+    return VnetId_eq(key1, key2);
+}
+
+Hashcode vnet_key_hash_fn(void *k){
+    VnetId *key = k;
+    return VnetId_hash(0, key);
 }
 
 /** Initialize the vnet table and the physical vnet.
@@ -216,18 +246,18 @@ static int vnet_setup(void){
 int vnet_init(void){
     int err = 0;
 
-    dprintf(">\n");
     vnet_table = HashTable_new(0);
-    dprintf("> vnet_table=%p\n", vnet_table);
     if(!vnet_table){
         err = -ENOMEM;
         goto exit;
     }
+    vnet_table->key_equal_fn = vnet_key_equal_fn;
+    vnet_table->key_hash_fn = vnet_key_hash_fn;
     vnet_table->entry_free_fn = vnet_entry_free_fn;
 
     err = Vnet_alloc(&vnet_physical);
     if(err) goto exit;
-    vnet_physical->vnet = VNET_PHYS;
+    vnet_physical->vnet = toVnetId(VNET_PHYS);
     vnet_physical->security = 0;
     err = Vnet_add(vnet_physical);
     if(err) goto exit;
@@ -237,7 +267,6 @@ int vnet_init(void){
     if(err) goto exit;
     err = vif_init();
   exit:
-    if(err < 0) wprintf("< err=%d\n", err);
     return err;
 }
 
@@ -248,50 +277,28 @@ void vnet_exit(void){
     vnet_table = NULL;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-
-static inline int skb_route(struct sk_buff *skb, struct rtable **prt){
-    int err = 0;
-    struct flowi fl = {
-        .oif = skb->dev->ifindex,
-        .nl_u = {
-            .ip4_u = {
-                .daddr = skb->nh.iph->daddr,
-                .saddr = skb->nh.iph->saddr,
-                .tos   = skb->nh.iph->tos,
-            }
-        }
-    };
-    
-    err = ip_route_output_key(prt, &fl);
-    return err;
-}
-
-#else
-
-static inline int skb_route(struct sk_buff *skb, struct rtable **prt){
-    int err = 0;
-    struct rt_key key = { };
-    key.dst = skb->nh.iph->daddr;
-    key.src = skb->nh.iph->saddr;
-    key.tos = skb->nh.iph->tos;
-    key.oif = skb->dev->ifindex;
-    err = ip_route_output_key(prt, &key);
-    return err;
-}
-
-#endif
-
 inline int skb_xmit(struct sk_buff *skb){
     int err = 0;
     struct rtable *rt = NULL;
 
-    dprintf("> skb=%p dev=%s\n", skb, skb->dev->name);
-
+    dprintf(">\n");
     skb->protocol = htons(ETH_P_IP);
     err = skb_route(skb, &rt);
-    if(err) goto exit;
+    if(err){
+        wprintf("> skb_route=%d\n", err);
+        wprintf("> dev=%s idx=%d src=%u.%u.%u.%u dst=%u.%u.%u.%u tos=%d\n",
+                (skb->dev ? skb->dev->name : "???"),
+                (skb->dev ? skb->dev->ifindex : -1),
+                NIPQUAD(skb->nh.iph->saddr),
+                NIPQUAD(skb->nh.iph->daddr),
+                skb->nh.iph->tos);
+                
+        goto exit;
+    }
     skb->dst = &rt->u.dst;
+    if(!skb->dev){
+        skb->dev = rt->u.dst.dev;
+    }
 
     ip_select_ident(skb->nh.iph, &rt->u.dst, NULL);
 
@@ -317,39 +324,27 @@ inline int skb_xmit(struct sk_buff *skb){
  *
  * @todo fixme
  */
-int vnet_skb_send(struct sk_buff *skb, u32 vnet){
+int vnet_skb_send(struct sk_buff *skb, VnetId *vnet){
     int err = 0;
-    Vif *vif = NULL;
+    VnetId vnet_phys = toVnetId(VNET_PHYS);
 
-    dprintf("> skb=%p vnet=%u\n", skb, vnet);
-    if(vnet == VNET_PHYS || !vnet){
-        // For completeness, send direct to the network.
-        if(skb->dev){
-            err = skb_xmit(skb);
-        } else {
-            // Can't assume eth0 - might be nbe-br or other. Need to route.
-            struct net_device *dev = NULL;
-            err = vnet_get_device(DEVICE, &dev);
-            if(err) goto exit;
-            skb->dev = dev;
-            err = skb_xmit(skb);
-            dev_put(dev);
-        }
+    dprintf(">\n");
+    skb->dev = NULL;
+    if(!vnet || VnetId_eq(vnet, &vnet_phys)){
+        // No vnet or physical vnet, send direct to the network. 
+        skb_xmit(skb);
     } else {
-        dprintf("> varp_output\n");
         err = varp_output(skb, vnet);
     }
-    //dprintf("< err=%d\n", err);
-  exit:
-    if(vif) vif_decref(vif);
     dprintf("< err=%d\n", err);
     return err;
 }
 
 /** Receive an skb for a vnet.
+ * We make the skb come out of the vif for the vnet, and
+ * let ethernet bridging forward it to related interfaces.
  * If the dest is broadcast, goes to all vifs on the vnet.
- * If the dest is unicast, goes to addressed vif on vnet.
- * For each vif we set the packet dev and receive the packet.
+ * If the dest is unicast, goes to the addressed vif on the vnet.
  *
  * The packet must have skb->mac.raw set and skb->data must point
  * after the device (ethernet) header.
@@ -359,139 +354,19 @@ int vnet_skb_send(struct sk_buff *skb, u32 vnet){
  * @param vmac packet vmac
  * @return 0 on success, error code otherwise
  */
-#if 1
-int vnet_skb_recv(struct sk_buff *skb, u32 vnet, Vmac *vmac){
-    // Receive the skb for a vnet.
-    // We make the skb come out of the vif for the vnet, and
-    // let ethernet bridging forward it to related interfaces.
+int vnet_skb_recv(struct sk_buff *skb, VnetId *vnet, Vmac *vmac){
     int err = 0;
     Vnet *info = NULL;
 
-    dprintf("> vnet=%u mac=%s\n", vnet, mac_ntoa(vmac->mac));
     err = Vnet_lookup(vnet, &info);
     if(err) goto exit;
     skb->dev = info->dev;
-    dprintf("> netif_rx dev=%s\n", skb->dev->name);
     netif_rx(skb);
   exit:
     if(info) Vnet_decref(info);
     if(err){
-      kfree_skb(skb);
-    }
-    dprintf("< err=%d\n", err);
-    return err;
-}
-
-#else
-int vnet_skb_recv(struct sk_buff *skb, u32 vnet, Vmac *vmac){
-    int err = 0;
-    Vif *vif = NULL;
-
-    dprintf("> vnet=%u mac=%s\n", vnet, mac_ntoa(vmac->mac));
-    if(mac_is_multicast(vmac->mac)){
-        HashTable_for_decl(entry);
-        int count = 0;
-        struct sk_buff *new_skb;
-
-        HashTable_for_each(entry, vif_table){
-            vif = entry->value;
-            if(vif->vnet != vnet) continue;
-            count++;
-            new_skb = skb_copy(skb, GFP_ATOMIC);
-            if(!new_skb) break;
-            new_skb->dev = vif->dev;
-            dprintf("> %d] netif_rx dev=%s\n", count, new_skb->dev->name);
-            netif_rx(new_skb);
-        }
         kfree_skb(skb);
-    } else {
-        err = vif_lookup(vnet, vmac, &vif);
-        if(err){
-            kfree_skb(skb);
-            goto exit;
-        }
-        skb->dev = vif->dev;
-        dprintf("> netif_rx dev=%s\n", skb->dev->name);
-        netif_rx(skb);
     }
-  exit:
-    dprintf("< err=%d\n", err);
-    return err;
-}
-#endif
-   
-/** Check validity of an incoming IP frame.
- *
- * @param skb frame
- * @return 0 if ok, error code otherwise
- *
- * @todo fixme Can prob skip most of this because linux will have done it.
- * @todo Only need the vnet skb context check.
- */
-int check_ip_frame(struct sk_buff *skb){
-    int err = -EINVAL;
-    struct iphdr* iph;
-    struct net_device *dev;
-    __u32  len;
-    __u16  check;
-
-#if 0
-    if(skb->context){
-        // Todo: After ESP want to skip most checks (including checksum),
-        // Todo: but in general may not want to skip all checks on detunnel.
-        //dprintf("> Skip check, has context\n");
-        err = 0;
-        goto exit;
-    }
-#endif
-    // Check we have enough for an ip header - the skb passed should
-    // have data pointing at the eth header and skb->len should include
-    // that. skb->nh should already have been set. Let the indvidual
-    // protocol handlers worry about the exact ip header len
-    // (i.e. whether any ip options are set).
-    dev = skb->dev;
-    
-    if(skb->len <  ETH_HLEN + sizeof(struct iphdr)){
-        wprintf("> packet too short for ip header\n");
-        goto exit;
-    }
-
-    iph = skb->nh.iph;
-    /*
-     *	RFC1122: 3.1.2.2 MUST silently discard any IP frame that fails the checksum.
-     *
-     *	Is the datagram acceptable?
-     *
-     *	1.	Length at least the size of an ip header
-     *	2.	Version of 4
-     *	3.	Checksums correctly. [Speed optimisation for later, skip loopback checksums]
-     *	4.	Doesn't have a bogus length
-     */
-    if (iph->ihl < 5 || iph->version != 4){
-        wprintf("> len and version check failed\n");
-        goto exit;
-    }
-    if(skb->len < ETH_HLEN + (iph->ihl << 2)){
-        wprintf("> packet too short for given ihl\n");
-        goto exit;
-    }
-
-    check = iph->check;
-    //iph->check = 0;
-    //iph->check = compute_cksum((__u16 *)iph, (iph->ihl << 1));
-    if(iph->check != check){
-        wprintf("> invalid checksum\n");
-        goto exit;
-    }
-
-    len = ntohs(iph->tot_len); 
-    if (skb->len < len + ETH_HLEN || len < (iph->ihl << 2)){
-        wprintf("> packet too short for tot_len\n");
-        goto exit;
-    }
-    skb->h.raw = skb->nh.raw + (iph->ihl << 2);
-    err = 0;
-  exit:
     return err;
 }
 
@@ -539,14 +414,13 @@ int vnet_sa_create(u32 spi, int protocol, u32 addr, SAState **sa){
  *
  * @todo Need to check that the sa provides the correct security level.
  */
-int vnet_check_context(int vnet, SkbContext *context, Vnet **val){
+int vnet_check_context(VnetId *vnet, SkbContext *context, Vnet **val){
     int err = 0;
     Vnet *info = NULL;
     SAState *sa = NULL;
     
     err = Vnet_lookup(vnet, &info);
     if(err){
-        wprintf("> No vnet %d\n", vnet);
         goto exit;
     }
     if(!info->security) goto exit;
@@ -556,7 +430,8 @@ int vnet_check_context(int vnet, SkbContext *context, Vnet **val){
         goto exit;
     }
     if(context->protocol != IPPROTO_ESP){
-        wprintf("> Invalid protocol: wanted %d, got %d\n", IPPROTO_ESP, context->protocol);
+        wprintf("> Invalid protocol: wanted %d, got %d\n",
+                IPPROTO_ESP, context->protocol);
         goto exit;
     }
     sa = context->data;
@@ -586,13 +461,11 @@ static int sa_tunnel_open(Tunnel *tunnel){
  */
 static void sa_tunnel_close(Tunnel *tunnel){
     SAState *sa;
-    dprintf(">\n");
     if(!tunnel) return;
     sa = tunnel->data;
     if(!sa) return;
     SAState_decref(sa);
     tunnel->data = NULL;
-    dprintf("<\n");
 }
 
 /** Packet send function for SA tunnels.
@@ -604,7 +477,6 @@ static void sa_tunnel_close(Tunnel *tunnel){
 static int sa_tunnel_send(Tunnel *tunnel, struct sk_buff *skb){
     int err = -EINVAL;
     SAState *sa;
-    //dprintf("> tunnel=%p\n", tunnel);
     if(!tunnel){
         wprintf("> Null tunnel!\n");
         goto exit;
@@ -616,7 +488,6 @@ static int sa_tunnel_send(Tunnel *tunnel, struct sk_buff *skb){
     }
     err = SAState_send(sa, skb, tunnel->base);
   exit:
-    //dprintf("< err=%d\n", err);
     return err;
 }
 
@@ -638,7 +509,7 @@ TunnelType *sa_tunnel_type = &_sa_tunnel_type;
  * @param tunnel return parameter
  * @return 0 on success, error code otherwise
  */
-int vnet_tunnel_open(u32 vnet, u32 addr, Tunnel **tunnel){
+int vnet_tunnel_open(VnetId *vnet, VarpAddr *addr, Tunnel **tunnel){
     extern TunnelType *etherip_tunnel_type;
     int err = 0;
     Vnet *info = NULL;
@@ -646,20 +517,17 @@ int vnet_tunnel_open(u32 vnet, u32 addr, Tunnel **tunnel){
     Tunnel *sa_tunnel = NULL;
     Tunnel *etherip_tunnel = NULL;
 
-    dprintf("> vnet=%u addr=" IPFMT "\n", vnet, NIPQUAD(addr));
     err = Vnet_lookup(vnet, &info);
-    dprintf("> Vnet_lookup=%d\n", err);
     if(err) goto exit;
     if(info->security){
         SAState *sa = NULL;
-        dprintf("> security=%d\n", info->security);
+        //FIXME: Assuming IPv4 for now.
+        u32 ipaddr = addr->u.ip4.s_addr;
         err = Tunnel_create(sa_tunnel_type, vnet, addr, base_tunnel, &sa_tunnel);
         if(err) goto exit;
-        dprintf("> sa_tunnel=%p\n", sa_tunnel);
-        err = sa_create(info->security, 0, IPPROTO_ESP, addr, &sa);
+        err = sa_create(info->security, 0, IPPROTO_ESP, ipaddr, &sa);
         if(err) goto exit;
         sa_tunnel->data = sa;
-        dprintf("> sa=%p\n", sa);
         base_tunnel = sa_tunnel;
     }
     err = Tunnel_create(etherip_tunnel_type, vnet, addr, base_tunnel, &etherip_tunnel);
@@ -673,7 +541,6 @@ int vnet_tunnel_open(u32 vnet, u32 addr, Tunnel **tunnel){
     } else {
         *tunnel = etherip_tunnel;
     }
-    dprintf("< err=%d\n", err);
     return err;
 }
 
@@ -685,14 +552,12 @@ int vnet_tunnel_open(u32 vnet, u32 addr, Tunnel **tunnel){
  * @param tunnel return parameter
  * @return 0 on success, error code otherwise
  */
-int vnet_tunnel_lookup(u32 vnet, u32 addr, Tunnel **tunnel){
+int vnet_tunnel_lookup(VnetId *vnet, VarpAddr *addr, Tunnel **tunnel){
     int err = 0;
-    dprintf("> vnet=%d addr=" IPFMT "\n", vnet, NIPQUAD(addr));
     *tunnel = Tunnel_lookup(vnet, addr);
     if(!*tunnel){
         err = vnet_tunnel_open(vnet, addr, tunnel);
     }
-    dprintf("< err=%d\n", err);
     return err;
 }
 
@@ -703,16 +568,14 @@ int vnet_tunnel_lookup(u32 vnet, u32 addr, Tunnel **tunnel){
  * @param skb packet
  * @return 0 on success, error code otherwise
  */
-int vnet_tunnel_send(vnetid_t vnet, vnetaddr_t addr, struct sk_buff *skb){
+int vnet_tunnel_send(VnetId *vnet, VarpAddr *addr, struct sk_buff *skb){
     int err = 0;
     Tunnel *tunnel = NULL;
-    dprintf("> vnet=%u addr=" IPFMT "\n", vnet, NIPQUAD(addr));
     err = vnet_tunnel_lookup(vnet, addr, &tunnel);
     if(err) goto exit;
     err = Tunnel_send(tunnel, skb);
     Tunnel_decref(tunnel);
   exit:
-    dprintf("< err=%d\n", err);
     return err;
 }
 
@@ -722,7 +585,7 @@ static void __exit vnet_module_exit(void){
     vnet_exit();
     esp_module_exit();
     etherip_module_exit();
-    tunnel_module_init();
+    tunnel_module_exit();
     random_module_exit();
 }
 
@@ -753,12 +616,13 @@ static int __init vnet_module_init(void){
     sa_algorithm_probe_all();
     err = sa_table_init();
     if(err) wprintf("> sa_table_init err=%d\n", err);
+    if(err) goto exit;
     ProcFS_init();
   exit:
     if(err < 0){
         vnet_module_exit();
+        wprintf("< err=%d\n", err);
     }
-    if(err < 0) wprintf("< err=%d\n", err);
     return err;
 }
 

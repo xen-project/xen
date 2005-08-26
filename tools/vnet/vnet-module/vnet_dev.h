@@ -20,12 +20,9 @@
 #define _VNET_VNET_DEV_H_
 
 struct Vnet;
-struct net_device;
 
 extern int vnet_dev_add(struct Vnet *vnet);
 extern void vnet_dev_remove(struct Vnet *vnet);
 extern int Vnet_create(struct Vnet *info);
-extern int vnet_add_if(struct Vnet *vnet, struct net_device *dev);
-extern int vnet_del_if(struct Vnet *vnet, struct net_device *dev);
 
 #endif

@@ -22,6 +22,7 @@
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <asm/atomic.h>
+#include <if_varp.h>
 
 struct sk_buff;
 struct Tunnel;
@@ -41,8 +42,8 @@ typedef struct TunnelStats {
 } TunnelStats;
 
 typedef struct TunnelKey {
-    u32 vnet;
-    u32 addr;
+    VnetId vnet;
+    VarpAddr addr;
 } TunnelKey;
 
 typedef struct Tunnel {
@@ -87,13 +88,15 @@ static inline void Tunnel_incref(Tunnel *tunnel){
 }
 
 extern int Tunnel_init(void);
-extern Tunnel * Tunnel_lookup(u32 vnet, u32 addr);
+extern Tunnel * Tunnel_lookup(struct VnetId *vnet, struct VarpAddr *addr);
 extern int Tunnel_add(Tunnel *tunnel);
 extern int Tunnel_del(Tunnel *tunnel);
 extern int Tunnel_send(Tunnel *tunnel, struct sk_buff *skb);
 
-extern int Tunnel_create(TunnelType *type, u32 vnet, u32 addr, Tunnel *base, Tunnel **tunnelp);
-extern int Tunnel_open(TunnelType *type, u32 vnet, u32 addr, Tunnel *base, Tunnel **tunnelp);
+extern int Tunnel_create(TunnelType *type, struct VnetId *vnet, struct VarpAddr *addr,
+                         Tunnel *base, Tunnel **tunnelp);
+extern int Tunnel_open(TunnelType *type, struct VnetId *vnet, struct VarpAddr *addr,
+                       Tunnel *base, Tunnel **tunnelp);
 
 extern int tunnel_module_init(void);
 extern void tunnel_module_exit(void);

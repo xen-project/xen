@@ -29,17 +29,15 @@ struct Vmac;
 struct Vif;
 struct net_device;
 
-typedef uint32_t vnetid_t;
-typedef uint32_t vnetaddr_t;
-
 /** Vnet property record. */
 typedef struct Vnet {
     /** Reference count. */
     atomic_t refcount;
     /** Vnet id. */
-    vnetid_t vnet;
+    struct VnetId vnet;
     /** Security flag. If true the vnet requires ESP. */
     int security;
+    char device[IFNAMSIZ];
 
     struct net_device *dev;
     struct net_device *bridge;
@@ -51,30 +49,28 @@ typedef struct Vnet {
     int recursion;
 } Vnet;
 
-extern int Vnet_lookup(vnetid_t id, Vnet **vnet);
-extern int Vnet_add(Vnet *vnet);
-extern int Vnet_del(vnetid_t vnet);
-extern void Vnet_incref(Vnet *);
-extern void Vnet_decref(Vnet *);
-extern int Vnet_alloc(Vnet **vnet);
+extern void vnet_print(void);
+extern void Vnet_print(Vnet *info);
+
+extern int Vnet_lookup(struct VnetId *vnet, struct Vnet **info);
+extern int Vnet_add(struct Vnet *info);
+extern int Vnet_del(struct VnetId *vnet);
+extern void Vnet_incref(struct Vnet *info);
+extern void Vnet_decref(struct Vnet *info);
+extern int Vnet_alloc(struct Vnet **info);
 extern Vnet *vnet_physical;
 
 extern int skb_xmit(struct sk_buff *skb);
-extern int vnet_skb_send(struct sk_buff *skb, u32 vnet);
-extern int vnet_skb_recv(struct sk_buff *skb, u32 vnet, struct Vmac *vmac);
+extern int vnet_skb_send(struct sk_buff *skb, struct VnetId *vnet);
+extern int vnet_skb_recv(struct sk_buff *skb, struct VnetId *vnet, struct Vmac *vmac);
 
-extern int vnet_check_context(int vnet, SkbContext *context, Vnet **vinfo);
+extern int vnet_check_context(struct VnetId *vnet, SkbContext *context, Vnet **vinfo);
 
-extern int vnet_tunnel_open(vnetid_t vnet, vnetaddr_t addr, Tunnel **tunnel);
-extern int vnet_tunnel_lookup(vnetid_t vnet, vnetaddr_t addr, Tunnel **tunnel);
-extern int vnet_tunnel_send(vnetid_t vnet, vnetaddr_t addr, struct sk_buff *skb);
+extern int vnet_tunnel_open(struct VnetId *vnet, struct VarpAddr *addr, Tunnel **tunnel);
+extern int vnet_tunnel_lookup(struct VnetId *vnet, struct VarpAddr *addr, Tunnel **tunnel);
+extern int vnet_tunnel_send(struct VnetId *vnet, struct VarpAddr *addr, struct sk_buff *skb);
 
 extern int vnet_init(void);
-
-enum {
-    HANDLE_OK = 1,
-    HANDLE_NO = 0,
-};
 
 extern int vnet_sa_security(u32 spi, int protocol, u32 addr);
 struct SAState;
