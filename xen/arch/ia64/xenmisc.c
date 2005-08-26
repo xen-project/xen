@@ -58,7 +58,7 @@ platform_is_hp_ski(void)
 
 /* calls in xen/common code that are unused on ia64 */
 
-void sync_lazy_execstate_cpu(unsigned int cpu) {}
+void sync_vcpu_execstate(struct vcpu *v) {}
 
 #ifdef CONFIG_VTI
 int grant_table_create(struct domain *d) { return 0; }

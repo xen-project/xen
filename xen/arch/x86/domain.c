@@ -885,8 +885,13 @@ int __sync_lazy_execstate(void)
     return switch_required;
 }
 
-void sync_lazy_execstate_cpu(unsigned int cpu)
+void sync_vcpu_execstate(struct vcpu *v)
 {
+    unsigned int cpu = v->processor;
+
+    if ( !cpu_isset(cpu, v->domain->cpumask) )
+        return;
+
     if ( cpu == smp_processor_id() )
     {
         (void)__sync_lazy_execstate();

@@ -250,10 +250,11 @@ void vcpu_sleep_nosync(struct vcpu *d);
 void vcpu_sleep_sync(struct vcpu *d);
 
 /*
- * Force loading of currently-executing domain state on the specified CPU.
- * This is used to counteract lazy state switching where required.
+ * Force synchronisation of given VCPU's state. If it is currently descheduled,
+ * this call will ensure that all its state is committed to memory and that
+ * no CPU is using critical state (e.g., page tables) belonging to the VCPU.
  */
-extern void sync_lazy_execstate_cpu(unsigned int cpu);
+extern void sync_vcpu_execstate(struct vcpu *v);
 
 /*
  * Called by the scheduler to switch to another VCPU. On entry, although
@@ -265,7 +266,7 @@ extern void sync_lazy_execstate_cpu(unsigned int cpu);
  * The callee must ensure that the local CPU is no longer running in @prev's
  * context, and that the context is saved to memory, before returning.
  * Alternatively, if implementing lazy context switching, it suffices to ensure
- * that invoking sync_lazy_execstate() will switch and commit @prev's state.
+ * that invoking sync_vcpu_execstate() will switch and commit @prev's state.
  */
 extern void context_switch(
     struct vcpu *prev, 

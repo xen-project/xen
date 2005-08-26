@@ -218,9 +218,7 @@ void vcpu_sleep_sync(struct vcpu *v)
             && spin_is_locked(&schedule_data[v->processor].schedule_lock) )
         cpu_relax();
 
-    /* Counteract lazy context switching. */
-    if ( cpu_isset(v->processor, v->domain->cpumask) )
-        sync_lazy_execstate_cpu(v->processor);
+    sync_vcpu_execstate(v);
 }
 
 void vcpu_wake(struct vcpu *v)
