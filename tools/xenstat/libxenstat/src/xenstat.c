@@ -493,20 +493,20 @@ static int xenstat_collect_networks(xenstat_node * node)
 		node->handle->procnetdev = fopen("/proc/net/dev", "r");
 		if (node->handle->procnetdev == NULL) {
 			perror("Error opening /proc/net/dev");
-			return 1;
+			return 0;
 		}
 
 		/* Validate the format of /proc/net/dev */
 		if (fread(header, sizeof(PROCNETDEV_HEADER) - 1, 1,
 			  node->handle->procnetdev) != 1) {
 			perror("Error reading /proc/net/dev header");
-			return 1;
+			return 0;
 		}
 		header[sizeof(PROCNETDEV_HEADER) - 1] = '\0';
 		if (strcmp(header, PROCNETDEV_HEADER) != 0) {
 			fprintf(stderr,
 				"Unexpected /proc/net/dev format\n");
-			return 1;
+			return 0;
 		}
 	}
 
@@ -558,7 +558,7 @@ static int xenstat_collect_networks(xenstat_node * node)
 				    sizeof(xenstat_network));
 		}
 		if (domain->networks == NULL)
-			return 1;
+			return 0;
 		domain->networks[domain->num_networks - 1] = net;
 	}
 
