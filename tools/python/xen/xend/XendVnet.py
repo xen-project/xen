@@ -22,7 +22,7 @@ from xen.util import Brctl
 from xen.xend import sxp
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
-from xen.xend.xenstore import XenNode, DBMap
+from xen.xend.xenstore import XenNode, DBMap, DBVar
 
 def vnet_cmd(cmd):
     out = None
@@ -38,17 +38,40 @@ def vnet_cmd(cmd):
 class XendVnetInfo:
     
     vifctl_ops = {'up': 'vif.add', 'down': 'vif.del'}
+
+    __exports__ = [
+        DBVar('id',     ty='str'),
+        DBVar('dbid',   ty='str'),
+        DBVar('config', ty='sxpr'),
+       ]
     
-    def __init__(self, config):
-        self.config = config
-        self.id = sxp.child_value(config, 'id')
-        self.id = str(self.id)
+    def __init__(self, db, config=None):
+        if config:
+            self.id = sxp.child_value(config, 'id')
+            self.id = str(self.id)
+            self.dbid = self.id.replace(':', '-')
+            self.db = db.addChild(self.dbid)
+            self.config = config
+        else:
+            self.db = db
+            self.importFromDB()
+            config = self.config
+            
         self.bridge = sxp.child_value(config, 'bridge')
         if not self.bridge:
             self.bridge = "vnet%s" % self.id
         self.vnetif = sxp.child_value(config, 'vnetif')
         if not self.vnetif:
-            self.vnetif = "vnetif%s" % self.id
+            self.vnetif = "vnif%s" % self.id
+
+    def saveToDB(self, save=False, sync=False):
+        self.db.saveDB(save=save, sync=sync)
+
+    def exportToDB(self, save=False, sync=False):
+        self.db.exportToDB(self, fields=self.__exports__, save=save, sync=sync)
+
+    def importFromDB(self):
+        self.db.importFromDB(self, fields=self.__exports__)
 
     def sxpr(self):
         return self.config
@@ -64,7 +87,9 @@ class XendVnetInfo:
         log.info("Deleting vnet %s", self.id)
         Brctl.vif_bridge_rem({'bridge': self.bridge, 'vif': self.vnetif})
         Brctl.bridge_del(self.bridge)
-        return vnet_cmd(['vnet.del', self.id])
+        val = vnet_cmd(['vnet.del', self.id])
+        self.db.delete()
+        return val
 
     def vifctl(self, op, vif, vmac):
         try:
@@ -82,16 +107,18 @@ class XendVnet:
     def __init__(self):
         # Table of vnet info indexed by vnet id.
         self.vnet = {}
-        self.dbmap = DBMap(db=XenNode(self.dbpath))
-        self.dbmap.readDB()
-        for vnetdb in self.dbmap.values():
-            config = vnetdb.config
-            info = XendVnetInfo(config)
-            self.vnet[info.id] = info
+        self.db = DBMap(db=XenNode(self.dbpath))
+        self.db.readDB()
+        for vnetdb in self.db.values():
             try:
+                info = XendVnetInfo(vnetdb)
+                self.vnet[info.id] = info
                 info.configure()
             except XendError, ex:
                 log.warning("Failed to configure vnet %s: %s", str(info.id), str(ex))
+            except Exception, ex:
+                log.exception("Vnet error")
+                vnetdb.delete()
 
     def vnet_of_bridge(self, bridge):
         """Get the vnet for a bridge (if any).
@@ -128,9 +155,9 @@ class XendVnet:
 
         @param config: config
         """
-        info = XendVnetInfo(config)
+        info = XendVnetInfo(self.db, config=config)
         self.vnet[info.id] = info
-        self.dbmap["%s/config" % info.id] = info.sxpr()
+        info.saveToDB()
         info.configure()
 
     def vnet_delete(self, id):
@@ -141,7 +168,6 @@ class XendVnet:
         info = self.vnet_get(id)
         if info:
             del self.vnet[id]
-            self.dbmap.delete(id)
             info.delete()
 
 def instance():
