@@ -33,7 +33,7 @@ struct xenstat_handle {
 	FILE *procnetdev;
 };
 
-#define SHORT_ASC_LEN 5 		/* length of 65535 */
+#define SHORT_ASC_LEN 5                 /* length of 65535 */
 #define VERSION_SIZE (2 * SHORT_ASC_LEN + 1 + sizeof(xen_extraversion_t) + 1)
 
 struct xenstat_node {
@@ -170,7 +170,7 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 	xenstat_node *node;
 	dom0_physinfo_t physinfo;
 	xen_extraversion_t version;
-	long vnum = 0; 
+	long vnum = 0;
 	dom0_getdomaininfo_t domaininfo[DOMAIN_CHUNK_SIZE];
 	unsigned int num_domains, new_domains;
 	unsigned int i;
@@ -188,11 +188,11 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 
 	/* Get the xen version number and xen version tag */
 	if (xi_get_xen_version(handle->xihandle, &vnum, &version) < 0) {
-		free(node); 
+		free(node);
 		return NULL;
-	} 
-	snprintf(node->xen_version, VERSION_SIZE,
-		"%ld.%ld%s\n", ((vnum >> 16) & 0xFFFF), vnum & 0xFFFF, (char *)version); 
+	}
+	snprintf(node->xen_version, VERSION_SIZE, "%ld.%ld%s\n",
+		 ((vnum >> 16) & 0xFFFF), vnum & 0xFFFF, version);
 
 	node->cpu_hz = ((unsigned long long)physinfo.cpu_khz) * 1000ULL;
 	node->num_cpus =

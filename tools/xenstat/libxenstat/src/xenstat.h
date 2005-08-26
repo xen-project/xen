@@ -51,6 +51,7 @@ xenstat_domain *xenstat_node_domain(xenstat_node * node,
 /* Get the domain with the given index; used to loop over all domains. */
 xenstat_domain *xenstat_node_domain_by_index(xenstat_node * node,
 					     unsigned index);
+
 /* Get xen version of the node */
 const char *xenstat_node_xen_ver(xenstat_node * node);
 
