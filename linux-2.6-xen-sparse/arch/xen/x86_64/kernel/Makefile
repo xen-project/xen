@@ -40,7 +40,7 @@ obj-$(CONFIG_DUMMY_IOMMU)	+= pci-nommu.o
 i386-obj-$(CONFIG_DUMMY_IOMMU)	+= pci-dma.o
 i386-obj-$(CONFIG_SWIOTLB)	+= swiotlb.o
 obj-$(CONFIG_KPROBES)		+= kprobes.o
-obj-$(CONFIG_X86_PM_TIMER)	+= pmtimer.o
+#obj-$(CONFIG_X86_PM_TIMER)	+= pmtimer.o
 
 c-obj-$(CONFIG_MODULES)		+= module.o
 
