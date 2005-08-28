@@ -116,9 +116,7 @@ struct blkfront_info
 	blkif_front_ring_t ring;
 	unsigned int evtchn;
 	struct xlbd_major_info *mi;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	request_queue_t *rq;
-#endif
 	struct work_struct work;
 	struct gnttab_free_callback callback;
 };
