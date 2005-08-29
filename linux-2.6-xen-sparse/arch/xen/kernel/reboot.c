@@ -66,60 +66,6 @@ static int shutting_down = SHUTDOWN_INVALID;
 #endif
 
 #ifdef CONFIG_SMP
-static void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
-{
-    int r;
-    int gdt_pages;
-    r = HYPERVISOR_vcpu_pickle(vcpu, ctxt);
-    if (r != 0)
-	panic("pickling vcpu %d -> %d!\n", vcpu, r);
-
-    /* Translate from machine to physical addresses where necessary,
-       so that they can be translated to our new machine address space
-       after resume.  libxc is responsible for doing this to vcpu0,
-       but we do it to the others. */
-    gdt_pages = (ctxt->gdt_ents + 511) / 512;
-    ctxt->ctrlreg[3] = machine_to_phys(ctxt->ctrlreg[3]);
-    for (r = 0; r < gdt_pages; r++)
-	ctxt->gdt_frames[r] = mfn_to_pfn(ctxt->gdt_frames[r]);
-}
-
-void _restore_vcpu(int cpu);
-
-atomic_t vcpus_rebooting;
-
-static int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
-{
-    int r;
-    int gdt_pages = (ctxt->gdt_ents + 511) / 512;
-
-    /* This is kind of a hack, and implicitly relies on the fact that
-       the vcpu stops in a place where all of the call clobbered
-       registers are already dead. */
-    ctxt->user_regs.esp -= 4;
-    ((unsigned long *)ctxt->user_regs.esp)[0] = ctxt->user_regs.eip;
-    ctxt->user_regs.eip = (unsigned long)_restore_vcpu;
-
-    /* De-canonicalise.  libxc handles this for vcpu 0, but we need
-       to do it for the other vcpus. */
-    ctxt->ctrlreg[3] = phys_to_machine(ctxt->ctrlreg[3]);
-    for (r = 0; r < gdt_pages; r++)
-	ctxt->gdt_frames[r] = pfn_to_mfn(ctxt->gdt_frames[r]);
-
-    atomic_set(&vcpus_rebooting, 1);
-    r = HYPERVISOR_boot_vcpu(vcpu, ctxt);
-    if (r != 0) {
-	printk(KERN_EMERG "Failed to reboot vcpu %d (%d)\n", vcpu, r);
-	return -1;
-    }
-
-    /* Make sure we wait for the new vcpu to come up before trying to do
-       anything with it or starting the next one. */
-    while (atomic_read(&vcpus_rebooting))
-	barrier();
-
-    return 0;
-}
 #endif
 
 static int __do_suspend(void *ignore)
@@ -139,18 +85,20 @@ static int __do_suspend(void *ignore)
     extern int gnttab_suspend(void);
     extern int gnttab_resume(void);
 
-#ifdef CONFIG_SMP
-    extern void smp_suspend(void);
-    extern void smp_resume(void);
-#endif
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
     extern unsigned int *pfn_to_mfn_frame_list;
 
 #ifdef CONFIG_SMP
+    extern void smp_suspend(void);
+    extern void smp_resume(void);
+
     static vcpu_guest_context_t suspended_cpu_records[NR_CPUS];
     cpumask_t prev_online_cpus, prev_present_cpus;
+
+    void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt);
+    int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt);
 #endif
 
     int err = 0;

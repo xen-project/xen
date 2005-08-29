@@ -1277,21 +1277,23 @@ extern void local_teardown_timer_irq(void);
 
 void smp_suspend(void)
 {
-	/* XXX todo: take down time and ipi's on all cpus */
 	local_teardown_timer_irq();
 	smp_intr_exit();
 }
 
 void smp_resume(void)
 {
-	/* XXX todo: restore time and ipi's on all cpus */
 	smp_intr_init();
 	local_setup_timer_irq();
 }
 
-void _restore_vcpu(void)
+void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
 {
-	/* XXX need to write this */
+}
+
+int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
+{
+	return 0;
 }
 
 #endif
