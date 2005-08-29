@@ -610,7 +610,7 @@ static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 	acpi_fadt.force_apic_physical_destination_mode = fadt->force_apic_physical_destination_mode;
 #endif
 
-#ifdef CONFIG_X86_PM_TIMER
+#if defined(CONFIG_X86_PM_TIMER) && !defined(CONFIG_XEN)
 	/* detect the location of the ACPI PM Timer */
 	if (fadt->revision >= FADT2_REVISION_ID) {
 		/* FADT rev. 2 */

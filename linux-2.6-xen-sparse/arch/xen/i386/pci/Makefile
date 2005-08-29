@@ -4,7 +4,7 @@ CFLAGS	+= -Iarch/$(XENARCH)/pci
 
 c-obj-y				:= i386.o
 
-c-obj-$(CONFIG_PCI_BIOS)		+= pcbios.o
+#c-obj-$(CONFIG_PCI_BIOS)		+= pcbios.o
 c-obj-$(CONFIG_PCI_MMCONFIG)	+= mmconfig.o
 c-obj-$(CONFIG_PCI_DIRECT)	+= direct.o
 

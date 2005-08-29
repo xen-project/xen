@@ -1272,25 +1272,24 @@ static int netfront_remove(struct xenbus_device *dev)
 
 static int netfront_suspend(struct xenbus_device *dev)
 {
-    struct net_private *np = dev->data;
-    /* Avoid having tx/rx stuff happen until we're ready. */
-    unbind_evtchn_from_irqhandler(np->evtchn, np->netdev);
-    return 0;
+	struct netfront_info *info = dev->data;
+
+	unregister_xenbus_watch(&info->watch);
+	kfree(info->backend);
+	info->backend = NULL;
+
+	netif_free(info);
+
+	return 0;
 }
 
 static int netfront_resume(struct xenbus_device *dev)
 {
-    struct net_private *np = dev->data;
-    /*
-     * Connect regardless of whether IFF_UP flag set.
-     * Stop bad things from happening until we're back up.
-     */
-    np->backend_state = BEST_DISCONNECTED;
-    memset(np->tx, 0, PAGE_SIZE);
-    memset(np->rx, 0, PAGE_SIZE);
-    
-    // send_interface_connect(np);
-    return 0;
+	struct net_private *np = dev->data;
+	int err;
+
+	err = talk_to_backend(dev, np);
+	return err;
 }
 
 static struct xenbus_driver netfront = {

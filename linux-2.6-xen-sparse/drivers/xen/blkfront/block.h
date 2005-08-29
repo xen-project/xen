@@ -96,6 +96,14 @@ struct xlbd_major_info
 	struct xlbd_type_info *type;
 };
 
+struct blk_shadow {
+	blkif_request_t req;
+	unsigned long request;
+	unsigned long frame[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+};
+
+#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, PAGE_SIZE)
+
 /*
  * We have one of these per vbd, whether ide, scsi or 'other'.  They
  * hang in private_data off the gendisk structure. We may end up
@@ -116,11 +124,11 @@ struct blkfront_info
 	blkif_front_ring_t ring;
 	unsigned int evtchn;
 	struct xlbd_major_info *mi;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	request_queue_t *rq;
-#endif
 	struct work_struct work;
 	struct gnttab_free_callback callback;
+	struct blk_shadow shadow[BLK_RING_SIZE];
+	unsigned long shadow_free;
 };
 
 extern spinlock_t blkif_io_lock;

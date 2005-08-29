@@ -1601,32 +1601,71 @@ extern void local_teardown_timer_irq(void);
 
 void smp_suspend(void)
 {
-	/* XXX todo: take down time and ipi's on all cpus */
 	local_teardown_timer_irq();
 	smp_intr_exit();
 }
 
 void smp_resume(void)
 {
-	/* XXX todo: restore time and ipi's on all cpus */
 	smp_intr_init();
 	local_setup_timer_irq();
 }
 
-DECLARE_PER_CPU(int, timer_irq);
+static atomic_t vcpus_rebooting;
 
-void _restore_vcpu(void)
+static void restore_vcpu_ready(void)
 {
-	int cpu = smp_processor_id();
-	extern atomic_t vcpus_rebooting;
 
-	/* We are the first thing the vcpu runs when it comes back,
-	   and we are supposed to restore the IPIs and timer
-	   interrupts etc.  When we return, the vcpu's idle loop will
-	   start up again. */
-	_bind_virq_to_irq(VIRQ_TIMER, cpu, per_cpu(timer_irq, cpu));
-	_bind_virq_to_irq(VIRQ_DEBUG, cpu, per_cpu(ldebug_irq, cpu));
-	_bind_ipi_to_irq(RESCHEDULE_VECTOR, cpu, per_cpu(resched_irq, cpu) );
-	_bind_ipi_to_irq(CALL_FUNCTION_VECTOR, cpu, per_cpu(callfunc_irq, cpu) );
 	atomic_dec(&vcpus_rebooting);
+}
+
+void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
+{
+	int r;
+	int gdt_pages;
+	r = HYPERVISOR_vcpu_pickle(vcpu, ctxt);
+	if (r != 0)
+		panic("pickling vcpu %d -> %d!\n", vcpu, r);
+
+	/* Translate from machine to physical addresses where necessary,
+	   so that they can be translated to our new machine address space
+	   after resume.  libxc is responsible for doing this to vcpu0,
+	   but we do it to the others. */
+	gdt_pages = (ctxt->gdt_ents + 511) / 512;
+	ctxt->ctrlreg[3] = machine_to_phys(ctxt->ctrlreg[3]);
+	for (r = 0; r < gdt_pages; r++)
+		ctxt->gdt_frames[r] = mfn_to_pfn(ctxt->gdt_frames[r]);
+}
+
+int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
+{
+	int r;
+	int gdt_pages = (ctxt->gdt_ents + 511) / 512;
+
+	/* This is kind of a hack, and implicitly relies on the fact that
+	   the vcpu stops in a place where all of the call clobbered
+	   registers are already dead. */
+	ctxt->user_regs.esp -= 4;
+	((unsigned long *)ctxt->user_regs.esp)[0] = ctxt->user_regs.eip;
+	ctxt->user_regs.eip = (unsigned long)restore_vcpu_ready;
+
+	/* De-canonicalise.  libxc handles this for vcpu 0, but we need
+	   to do it for the other vcpus. */
+	ctxt->ctrlreg[3] = phys_to_machine(ctxt->ctrlreg[3]);
+	for (r = 0; r < gdt_pages; r++)
+		ctxt->gdt_frames[r] = pfn_to_mfn(ctxt->gdt_frames[r]);
+
+	atomic_set(&vcpus_rebooting, 1);
+	r = HYPERVISOR_boot_vcpu(vcpu, ctxt);
+	if (r != 0) {
+		printk(KERN_EMERG "Failed to reboot vcpu %d (%d)\n", vcpu, r);
+		return -1;
+	}
+
+	/* Make sure we wait for the new vcpu to come up before trying to do
+	   anything with it or starting the next one. */
+	while (atomic_read(&vcpus_rebooting))
+		barrier();
+
+	return 0;
 }

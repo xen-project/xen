@@ -65,66 +65,13 @@ static int shutting_down = SHUTDOWN_INVALID;
 #define cpu_up(x) (-EOPNOTSUPP)
 #endif
 
-static void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
-{
-    int r;
-    int gdt_pages;
-    r = HYPERVISOR_vcpu_pickle(vcpu, ctxt);
-    if (r != 0)
-	panic("pickling vcpu %d -> %d!\n", vcpu, r);
-
-    /* Translate from machine to physical addresses where necessary,
-       so that they can be translated to our new machine address space
-       after resume.  libxc is responsible for doing this to vcpu0,
-       but we do it to the others. */
-    gdt_pages = (ctxt->gdt_ents + 511) / 512;
-    ctxt->ctrlreg[3] = machine_to_phys(ctxt->ctrlreg[3]);
-    for (r = 0; r < gdt_pages; r++)
-	ctxt->gdt_frames[r] = mfn_to_pfn(ctxt->gdt_frames[r]);
-}
-
-void _restore_vcpu(int cpu);
-
-atomic_t vcpus_rebooting;
-
-static int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
-{
-    int r;
-    int gdt_pages = (ctxt->gdt_ents + 511) / 512;
-
-    /* This is kind of a hack, and implicitly relies on the fact that
-       the vcpu stops in a place where all of the call clobbered
-       registers are already dead. */
-    ctxt->user_regs.esp -= 4;
-    ((unsigned long *)ctxt->user_regs.esp)[0] = ctxt->user_regs.eip;
-    ctxt->user_regs.eip = (unsigned long)_restore_vcpu;
-
-    /* De-canonicalise.  libxc handles this for vcpu 0, but we need
-       to do it for the other vcpus. */
-    ctxt->ctrlreg[3] = phys_to_machine(ctxt->ctrlreg[3]);
-    for (r = 0; r < gdt_pages; r++)
-	ctxt->gdt_frames[r] = pfn_to_mfn(ctxt->gdt_frames[r]);
-
-    atomic_set(&vcpus_rebooting, 1);
-    r = HYPERVISOR_boot_vcpu(vcpu, ctxt);
-    if (r != 0) {
-	printk(KERN_EMERG "Failed to reboot vcpu %d (%d)\n", vcpu, r);
-	return -1;
-    }
-
-    /* Make sure we wait for the new vcpu to come up before trying to do
-       anything with it or starting the next one. */
-    while (atomic_read(&vcpus_rebooting))
-	barrier();
-
-    return 0;
-}
+#ifdef CONFIG_SMP
+#endif
 
 static int __do_suspend(void *ignore)
 {
     int i, j;
     suspend_record_t *suspend_record;
-    static vcpu_guest_context_t suspended_cpu_records[NR_CPUS];
 
     /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
 	/* XXX SMH: yes it would :-( */	
@@ -138,16 +85,22 @@ static int __do_suspend(void *ignore)
     extern int gnttab_suspend(void);
     extern int gnttab_resume(void);
 
-#ifdef CONFIG_SMP
-    extern void smp_suspend(void);
-    extern void smp_resume(void);
-#endif
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
     extern unsigned int *pfn_to_mfn_frame_list;
 
+#ifdef CONFIG_SMP
+    extern void smp_suspend(void);
+    extern void smp_resume(void);
+
+    static vcpu_guest_context_t suspended_cpu_records[NR_CPUS];
     cpumask_t prev_online_cpus, prev_present_cpus;
+
+    void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt);
+    int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt);
+#endif
+
     int err = 0;
 
     BUG_ON(smp_processor_id() != 0);
@@ -164,6 +117,8 @@ static int __do_suspend(void *ignore)
     if ( suspend_record == NULL )
         goto out;
 
+    preempt_disable();
+#ifdef CONFIG_SMP
     /* Take all of the other cpus offline.  We need to be careful not
        to get preempted between the final test for num_online_cpus()
        == 1 and disabling interrupts, since otherwise userspace could
@@ -175,7 +130,6 @@ static int __do_suspend(void *ignore)
        since by the time num_online_cpus() == 1, there aren't any
        other cpus) */
     cpus_clear(prev_online_cpus);
-    preempt_disable();
     while (num_online_cpus() > 1) {
 	preempt_enable();
 	for_each_online_cpu(i) {
@@ -190,6 +144,7 @@ static int __do_suspend(void *ignore)
 	}
 	preempt_disable();
     }
+#endif
 
     suspend_record->nr_pfns = max_pfn; /* final number of pfns */
 
@@ -197,6 +152,7 @@ static int __do_suspend(void *ignore)
 
     preempt_enable();
 
+#ifdef CONFIG_SMP
     cpus_clear(prev_present_cpus);
     for_each_present_cpu(i) {
 	if (i == 0)
@@ -204,6 +160,7 @@ static int __do_suspend(void *ignore)
 	save_vcpu_context(i, &suspended_cpu_records[i]);
 	cpu_set(i, prev_present_cpus);
     }
+#endif
 
 #ifdef __i386__
     mm_pin_all();
@@ -269,12 +226,14 @@ static int __do_suspend(void *ignore)
 
     usbif_resume();
 
-    for_each_cpu_mask(i, prev_present_cpus) {
+#ifdef CONFIG_SMP
+    for_each_cpu_mask(i, prev_present_cpus)
 	restore_vcpu_context(i, &suspended_cpu_records[i]);
-    }
+#endif
 
     __sti();
 
+#ifdef CONFIG_SMP
  out_reenable_cpus:
     for_each_cpu_mask(i, prev_online_cpus) {
 	j = cpu_up(i);
@@ -284,6 +243,7 @@ static int __do_suspend(void *ignore)
 	    err = j;
 	}
     }
+#endif
 
  out:
     if ( suspend_record != NULL )

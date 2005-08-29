@@ -135,6 +135,10 @@ static inline void play_dead(void)
  * low exit latency (ie sit in a loop waiting for
  * somebody to say that they'd like to reschedule)
  */
+#ifdef CONFIG_SMP
+extern void smp_suspend(void);
+extern void smp_resume(void);
+#endif
 void cpu_idle (void)
 {
 	int cpu = _smp_processor_id();
@@ -149,6 +153,9 @@ void cpu_idle (void)
 
 			if (cpu_is_offline(cpu)) {
 				local_irq_disable();
+#ifdef CONFIG_SMP
+				smp_suspend();
+#endif
 #if defined(CONFIG_XEN) && defined(CONFIG_HOTPLUG_CPU)
 				/* Ack it.  From this point on until
 				   we get woken up, we're not allowed
@@ -159,6 +166,9 @@ void cpu_idle (void)
 				HYPERVISOR_vcpu_down(cpu);
 #endif
 				play_dead();
+#ifdef CONFIG_SMP
+				smp_resume();
+#endif
 				local_irq_enable();
 			}
 
@@ -789,10 +799,3 @@ unsigned long arch_align_stack(unsigned long sp)
 		sp -= get_random_int() % 8192;
 	return sp & ~0xf;
 }
-
-
-#ifndef CONFIG_X86_SMP
-void _restore_vcpu(void)
-{
-}
-#endif

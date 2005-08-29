@@ -295,10 +295,10 @@ static struct xenbus_watch target_watch =
 /* React to a change in the target key */
 static void watch_target(struct xenbus_watch *watch, const char *node)
 {
-	unsigned long new_target;
+	unsigned long long new_target;
 	int err;
 
-	err = xenbus_scanf("memory", "target", "%lu", &new_target);
+	err = xenbus_scanf("memory", "target", "%llu", &new_target);
 	if (err != 1) {
 		printk(KERN_ERR "Unable to read memory/target\n");
 		return;

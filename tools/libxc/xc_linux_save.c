@@ -763,8 +763,6 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
                 batch++;
             }
      
-//            DPRINTF("batch %d:%d (n=%d)\n", iter, batch, n);
-
             if ( batch == 0 )
                 goto skip; /* vanishingly unlikely... */
       
@@ -915,7 +913,7 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
             continue;
         }
 
-        if ( last_iter ) break;
+        if ( last_iter ) break; 
 
         if ( live )
         {

@@ -807,8 +807,8 @@ choice
 	  direct access method and falls back to the BIOS if that doesn't
 	  work. If unsure, go with the default, which is "Any".
 
-config PCI_GOBIOS
-	bool "BIOS"
+#config PCI_GOBIOS
+#	bool "BIOS"
 
 config PCI_GOMMCONFIG
 	bool "MMConfig"
@@ -821,10 +821,10 @@ config PCI_GOANY
 
 endchoice
 
-config PCI_BIOS
-	bool
-	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
-	default y
+#config PCI_BIOS
+#	bool
+#	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
+#	default y
 
 config PCI_DIRECT
 	bool
