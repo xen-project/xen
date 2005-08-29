@@ -219,6 +219,8 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 	}
 }
 
+#ifndef CONFIG_XEN
+
 static inline int page_kills_ppro(unsigned long pagenr)
 {
 	if (pagenr >= 0x70000 && pagenr <= 0x7003F)
@@ -265,6 +267,13 @@ static inline int page_is_ram(unsigned long pagenr)
 	}
 	return 0;
 }
+
+#else /* CONFIG_XEN */
+
+#define page_kills_ppro(p)	0
+#define page_is_ram(p)		1
+
+#endif
 
 #ifdef CONFIG_HIGHMEM
 pte_t *kmap_pte;

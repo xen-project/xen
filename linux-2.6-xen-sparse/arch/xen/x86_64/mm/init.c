@@ -767,9 +767,6 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 
 static inline int page_is_ram (unsigned long pagenr)
 {
-        if (pagenr < start_pfn || pagenr >= end_pfn)
-                return 0;
-
         return 1;
 }
 
