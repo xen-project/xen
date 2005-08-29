@@ -42,7 +42,8 @@ class Daemon:
         self.traceon = 0
         self.tracefile = None
         self.traceindent = 0
-
+        self.child = 0 
+        
     def daemon_pids(self):
         pids = []
         pidex = '(?P<pid>\d+)'
@@ -140,15 +141,12 @@ class Daemon:
         else:
             return 0
 
-    def install_child_reaper(self):
-        #signal.signal(signal.SIGCHLD, self.onSIGCHLD)
-        # Ensure that zombie children are automatically reaped.
-        xu.autoreap()
-
     def onSIGCHLD(self, signum, frame):
-        code = 1
-        while code > 0:
-            code = os.waitpid(-1, os.WNOHANG)
+        if self.child > 0: 
+            try: 
+                pid, sts = os.waitpid(self.child, os.WNOHANG)
+            except os.error, ex:
+                pass
 
     def fork_pid(self, pidfile):
         """Fork and write the pid of the child to 'pidfile'.
@@ -156,13 +154,16 @@ class Daemon:
         @param pidfile: pid file
         @return: pid of child in parent, 0 in child
         """
-        pid = os.fork()
-        if pid:
+
+        self.child = os.fork()
+
+        if self.child:
             # Parent
             pidfile = open(pidfile, 'w')
-            pidfile.write(str(pid))
+            pidfile.write(str(self.child))
             pidfile.close()
-        return pid
+
+        return self.child
 
     def daemonize(self):
         if not XEND_DAEMONIZE: return
@@ -203,8 +204,7 @@ class Daemon:
             # Trying to run an already-running service is a success.
             return 0
 
-        self.install_child_reaper()
-
+        signal.signal(signal.SIGCHLD, self.onSIGCHLD)
         if self.fork_pid(XEND_PID_FILE):
             #Parent. Sleep to give child time to start.
             time.sleep(1)
@@ -309,7 +309,7 @@ class Daemon:
             print >>sys.stderr, 'Exception starting xend:', ex
             if XEND_DEBUG:
                 traceback.print_exc()
-            log.exception("Exception starting xend")
+            log.exception("Exception starting xend (%s)" % ex)
             self.exit(1)
             
     def createFactories(self):

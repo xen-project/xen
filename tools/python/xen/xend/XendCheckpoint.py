@@ -51,7 +51,7 @@ def save(xd, fd, dominfo):
     p = select.poll()
     p.register(child.fromchild.fileno())
     p.register(child.childerr.fileno())
-    while True:
+    while True: 
         r = p.poll()
         for (fd, event) in r:
             if not event & select.POLLIN:
@@ -69,8 +69,9 @@ def save(xd, fd, dominfo):
                         try:
                             dominfo.db.releaseDomain(dominfo.id)
                         except Exception, ex:
-                            log.warning("error in domain release on xenstore: %s",
-                                        ex)
+                            log.warning(
+                                "error in domain release on xenstore: %s",
+                                ex)
                             pass
                     dominfo.state_wait("suspended")
                     log.info("suspend %d done" % dominfo.id)
