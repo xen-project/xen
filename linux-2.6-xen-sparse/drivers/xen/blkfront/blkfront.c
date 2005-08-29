@@ -55,18 +55,9 @@
 
 static unsigned int blkif_state = BLKIF_STATE_DISCONNECTED;
 
-#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, PAGE_SIZE)
-
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
 #define GRANTREF_INVALID (1<<15)
-
-static struct blk_shadow {
-	blkif_request_t req;
-	unsigned long request;
-	unsigned long frame[BLKIF_MAX_SEGMENTS_PER_REQUEST];
-} blk_shadow[BLK_RING_SIZE];
-unsigned long blk_shadow_free;
 
 static int recovery = 0; /* Recovery in progress: protected by blkif_io_lock */
 
@@ -74,20 +65,22 @@ static void kick_pending_request_queues(struct blkfront_info *info);
 
 static void blkif_completion(struct blk_shadow *s);
 
-static inline int GET_ID_FROM_FREELIST(void)
+static inline int GET_ID_FROM_FREELIST(
+	struct blkfront_info *info)
 {
-	unsigned long free = blk_shadow_free;
+	unsigned long free = info->shadow_free;
 	BUG_ON(free > BLK_RING_SIZE);
-	blk_shadow_free = blk_shadow[free].req.id;
-	blk_shadow[free].req.id = 0x0fffffee; /* debug */
+	info->shadow_free = info->shadow[free].req.id;
+	info->shadow[free].req.id = 0x0fffffee; /* debug */
 	return free;
 }
 
-static inline void ADD_ID_TO_FREELIST(unsigned long id)
+static inline void ADD_ID_TO_FREELIST(
+	struct blkfront_info *info, unsigned long id)
 {
-	blk_shadow[id].req.id  = blk_shadow_free;
-	blk_shadow[id].request = 0;
-	blk_shadow_free = id;
+	info->shadow[id].req.id  = info->shadow_free;
+	info->shadow[id].request = 0;
+	info->shadow_free = id;
 }
 
 static inline void pickle_request(struct blk_shadow *s, blkif_request_t *r)
@@ -213,8 +206,8 @@ static int blkif_queue_request(struct request *req)
 
 	/* Fill out a communications ring structure. */
 	ring_req = RING_GET_REQUEST(&info->ring, info->ring.req_prod_pvt);
-	id = GET_ID_FROM_FREELIST();
-	blk_shadow[id].request = (unsigned long)req;
+	id = GET_ID_FROM_FREELIST(info);
+	info->shadow[id].request = (unsigned long)req;
 
 	ring_req->id = id;
 	ring_req->operation = rq_data_dir(req) ?
@@ -240,7 +233,7 @@ static int blkif_queue_request(struct request *req)
 				buffer_ma >> PAGE_SHIFT,
 				rq_data_dir(req) );
 
-			blk_shadow[id].frame[ring_req->nr_segments] =
+			info->shadow[id].frame[ring_req->nr_segments] =
 				buffer_ma >> PAGE_SHIFT;
 
 			ring_req->frame_and_sects[ring_req->nr_segments] =
@@ -253,7 +246,7 @@ static int blkif_queue_request(struct request *req)
 	info->ring.req_prod_pvt++;
 
 	/* Keep a private copy so we can reissue requests when recovering. */
-	pickle_request(&blk_shadow[id], ring_req);
+	pickle_request(&info->shadow[id], ring_req);
 
 	gnttab_free_grant_references(gref_head);
 
@@ -331,11 +324,11 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 		bret = RING_GET_RESPONSE(&info->ring, i);
 		id   = bret->id;
-		req  = (struct request *)blk_shadow[id].request;
+		req  = (struct request *)info->shadow[id].request;
 
-		blkif_completion(&blk_shadow[id]);
+		blkif_completion(&info->shadow[id]);
 
-		ADD_ID_TO_FREELIST(id);
+		ADD_ID_TO_FREELIST(info, id);
 
 		switch (bret->operation) {
 		case BLKIF_OP_READ:
@@ -387,16 +380,16 @@ static void blkif_recover(struct blkfront_info *info)
 	int j;
 
 	/* Stage 1: Make a safe copy of the shadow state. */
-	copy = (struct blk_shadow *)kmalloc(sizeof(blk_shadow), GFP_KERNEL);
+	copy = (struct blk_shadow *)kmalloc(sizeof(info->shadow), GFP_KERNEL);
 	BUG_ON(copy == NULL);
-	memcpy(copy, blk_shadow, sizeof(blk_shadow));
+	memcpy(copy, info->shadow, sizeof(info->shadow));
 
 	/* Stage 2: Set up free list. */
-	memset(&blk_shadow, 0, sizeof(blk_shadow));
+	memset(&info->shadow, 0, sizeof(info->shadow));
 	for (i = 0; i < BLK_RING_SIZE; i++)
-		blk_shadow[i].req.id = i+1;
-	blk_shadow_free = info->ring.req_prod_pvt;
-	blk_shadow[BLK_RING_SIZE-1].req.id = 0x0fffffff;
+		info->shadow[i].req.id = i+1;
+	info->shadow_free = info->ring.req_prod_pvt;
+	info->shadow[BLK_RING_SIZE-1].req.id = 0x0fffffff;
 
 	/* Stage 3: Find pending requests and requeue them. */
 	for (i = 0; i < BLK_RING_SIZE; i++) {
@@ -410,8 +403,8 @@ static void blkif_recover(struct blkfront_info *info)
 		unpickle_request(req, &copy[i]);
 
 		/* We get a new request id, and must reset the shadow state. */
-		req->id = GET_ID_FROM_FREELIST();
-		memcpy(&blk_shadow[req->id], &copy[i], sizeof(copy[i]));
+		req->id = GET_ID_FROM_FREELIST(info);
+		memcpy(&info->shadow[req->id], &copy[i], sizeof(copy[i]));
 
 		/* Rewrite any grant references invalidated by susp/resume. */
 		for (j = 0; j < req->nr_segments; j++) {
@@ -420,13 +413,13 @@ static void blkif_recover(struct blkfront_info *info)
 					blkif_gref_from_fas(
 						req->frame_and_sects[j]),
 					info->backend_id,
-					blk_shadow[req->id].frame[j],
+					info->shadow[req->id].frame[j],
 					rq_data_dir(
 						(struct request *)
-						blk_shadow[req->id].request));
+						info->shadow[req->id].request));
 			req->frame_and_sects[j] &= ~GRANTREF_INVALID;
 		}
-		blk_shadow[req->id].req = *req;
+		info->shadow[req->id].req = *req;
 
 		info->ring.req_prod_pvt++;
 	}
@@ -628,9 +621,8 @@ static int talk_to_backend(struct xenbus_device *dev,
 static int blkfront_probe(struct xenbus_device *dev,
 			  const struct xenbus_device_id *id)
 {
-	int err;
+	int err, vdevice, i;
 	struct blkfront_info *info;
-	int vdevice;
 
 	/* FIXME: Use dynamic device id if this is not set. */
 	err = xenbus_scanf(dev->nodename, "virtual-device", "%i", &vdevice);
@@ -651,6 +643,12 @@ static int blkfront_probe(struct xenbus_device *dev,
 	info->connected = BLKIF_STATE_DISCONNECTED;
 	info->mi = NULL;
 	INIT_WORK(&info->work, blkif_restart_queue, (void *)info);
+
+	info->shadow_free = 0;
+	memset(info->shadow, 0, sizeof(info->shadow));
+	for (i = 0; i < BLK_RING_SIZE; i++)
+		info->shadow[i].req.id = i+1;
+	info->shadow[BLK_RING_SIZE-1].req.id = 0x0fffffff;
 
 	/* Front end dir is a number, which is used as the id. */
 	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
@@ -752,19 +750,11 @@ static int wait_for_blkif(void)
 
 static int __init xlblk_init(void)
 {
-	int i;
-
 	if ((xen_start_info.flags & SIF_INITDOMAIN)
 	    || (xen_start_info.flags & SIF_BLK_BE_DOMAIN) )
 		return 0;
 
 	IPRINTK("Initialising virtual block device driver\n");
-
-	blk_shadow_free = 0;
-	memset(blk_shadow, 0, sizeof(blk_shadow));
-	for (i = 0; i < BLK_RING_SIZE; i++)
-		blk_shadow[i].req.id = i+1;
-	blk_shadow[BLK_RING_SIZE-1].req.id = 0x0fffffff;
 
 	init_blk_xenbus();
 
