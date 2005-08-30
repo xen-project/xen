@@ -252,20 +252,21 @@ static address_t load_kernel(const char *filename)
     for (i = 0; i <= MIN(len - 12, MULTIBOOT_SEARCH - 12); i += 4)
     {
         mbh = (struct multiboot_header *)(headerbuf + i);
-        if (mbh->magic != MULTIBOOT_MAGIC 
-            || ((mbh->magic+mbh->flags+mbh->checksum) & 0xffffffff))
+        if (eswap(mbh->magic) != MULTIBOOT_MAGIC 
+            || ((eswap(mbh->magic)+eswap(mbh->flags)+eswap(mbh->checksum)) 
+				& 0xffffffff))
         {
             /* Not a multiboot header */
             continue;
         }
-        if (mbh->flags & MULTIBOOT_UNSUPPORTED) {
+        if (eswap(mbh->flags) & MULTIBOOT_UNSUPPORTED) {
             /* Requires options we don't support */
             printf("Fatal: found a multiboot header, but it "
                     "requires multiboot options that I\n"
                     "don't understand.  Sorry.\n");
             exit(1);
         } 
-        if (mbh->flags & MULTIBOOT_VIDEO_MODE) { 
+        if (eswap(mbh->flags) & MULTIBOOT_VIDEO_MODE) { 
             /* Asked for screen mode information */
             /* XXX carry on regardless */
             printf("Warning: found a multiboot header which asks "
@@ -275,22 +276,22 @@ static address_t load_kernel(const char *filename)
         }
         /* This kernel will do: place and load it */
 
-        if (mbh->flags & MULTIBOOT_AOUT_KLUDGE) {
+        if (eswap(mbh->flags) & MULTIBOOT_AOUT_KLUDGE) {
 
             /* Load using the offsets in the multiboot header */
             if(!quiet) 
                 printf("Loading %s using multiboot header.\n", filename);
 
             /* How much is there? */
-            start = mbh->load_addr;            
-            if (mbh->load_end_addr != 0) 
-                loadsize = mbh->load_end_addr - mbh->load_addr;
+            start = eswap(mbh->load_addr);            
+            if (eswap(mbh->load_end_addr) != 0) 
+                loadsize = eswap(mbh->load_end_addr) - eswap(mbh->load_addr);
             else 
                 loadsize = sb.st_size;
             
             /* How much memory will it take up? */ 
-            if (mbh->bss_end_addr != 0)
-                size = mbh->bss_end_addr - mbh->load_addr;
+            if (eswap(mbh->bss_end_addr) != 0)
+                size = eswap(mbh->bss_end_addr) - eswap(mbh->load_addr);
             else
                 size = loadsize;
             
@@ -335,32 +336,34 @@ static address_t load_kernel(const char *filename)
             
             /* Done. */
             if (!quiet) printf("Loaded kernel from %s\n", filename);
-            return mbh->entry_addr;
+            return eswap(mbh->entry_addr);
             
         } else {
 
             /* Now look for an ELF32 header */    
             ehdr = (Elf32_Ehdr *)headerbuf;
-            if (*(unsigned long *)ehdr != 0x464c457f 
+            if (*(unsigned long *)ehdr != eswap(0x464c457f)
                 || ehdr->e_ident[EI_DATA] != ELFDATA2LSB
                 || ehdr->e_ident[EI_CLASS] != ELFCLASS32
-                || ehdr->e_machine != EM_386)
+                || eswap(ehdr->e_machine) != EM_386)
             {
                 printf("Fatal: kernel has neither ELF32/x86 nor multiboot load"
                        " headers.\n");
                 exit(1);
             }
-            if (ehdr->e_phoff + ehdr->e_phnum*sizeof(*phdr) > HEADERBUF_SIZE) {
+            if (eswap(ehdr->e_phoff) + eswap(ehdr->e_phnum)*sizeof(*phdr) 
+				> HEADERBUF_SIZE) {
                 /* Don't expect this will happen with sane kernels */
                 printf("Fatal: too much ELF for me.  Try increasing "
                        "HEADERBUF_SIZE in mbootpack.\n");
                 exit(1);
             }
-            if (ehdr->e_phoff + ehdr->e_phnum*sizeof (*phdr) > len) {
+            if (eswap(ehdr->e_phoff) + eswap(ehdr->e_phnum)*sizeof (*phdr) 
+				> len) {
                 printf("Fatal: malformed ELF header overruns EOF.\n");
                 exit(1);
             }
-            if (ehdr->e_phnum <= 0) {
+            if (eswap(ehdr->e_phnum) <= 0) {
                 printf("Fatal: ELF kernel has no program headers.\n");
                 exit(1);
             }
@@ -368,22 +371,22 @@ static address_t load_kernel(const char *filename)
             if(!quiet) 
                 printf("Loading %s using ELF header.\n", filename);
 
-            if (ehdr->e_type != ET_EXEC 
-                || ehdr->e_version != EV_CURRENT
-                || ehdr->e_phentsize != sizeof (Elf32_Phdr)) {
+            if (eswap(ehdr->e_type) != ET_EXEC 
+                || eswap(ehdr->e_version) != EV_CURRENT
+                || eswap(ehdr->e_phentsize) != sizeof (Elf32_Phdr)) {
                 printf("Warning: funny-looking ELF header.\n");
             }
-            phdr = (Elf32_Phdr *)(headerbuf + ehdr->e_phoff);
+            phdr = (Elf32_Phdr *)(headerbuf + eswap(ehdr->e_phoff));
 
             /* Obey the program headers to load the kernel */
-            for(i = 0; i < ehdr->e_phnum; i++) {
+            for(i = 0; i < eswap(ehdr->e_phnum); i++) {
 
-                start = phdr[i].p_paddr;
-                size = phdr[i].p_memsz;
-                if (phdr[i].p_type != PT_LOAD) 
+                start = eswap(phdr[i].p_paddr);
+                size = eswap(phdr[i].p_memsz);
+                if (eswap(phdr[i].p_type) != PT_LOAD) 
                     loadsize = 0;
                 else 
-                    loadsize = MIN((long int)phdr[i].p_filesz, size);
+                    loadsize = MIN((long int)eswap(phdr[i].p_filesz), size);
 
                 if ((buffer = malloc(size)) == NULL) {
                     printf("Fatal: malloc() for kernel load failed: %s\n",
@@ -396,7 +399,7 @@ static address_t load_kernel(const char *filename)
 
                 /* Load section from file */ 
                 if (loadsize > 0) {
-                    if (fseek(fp, phdr[i].p_offset, SEEK_SET) != 0) {
+                    if (fseek(fp, eswap(phdr[i].p_offset), SEEK_SET) != 0) {
                         printf("Fatal: seek failed in %s\n",
                                 strerror(errno));
                         exit(1);
@@ -452,7 +455,7 @@ static address_t load_kernel(const char *filename)
          
             /* Done! */
             if (!quiet) printf("Loaded kernel from %s\n", filename);
-            return ehdr->e_entry;
+            return eswap(ehdr->e_entry);
         }
 
     }
@@ -568,12 +571,12 @@ int main(int argc, char **argv)
     /* Command line */
     p = (char *)(mbi + 1);
     sprintf(p, "%s %s", imagename, command_line);
-    mbi->cmdline = ((address_t)p) + mbi_reloc_offset;
+    mbi->cmdline = eswap(((address_t)p) + mbi_reloc_offset);
     p += command_line_len;
 
     /* Bootloader ID */
     sprintf(p, version_string);
-    mbi->boot_loader_name = ((address_t)p) + mbi_reloc_offset;
+    mbi->boot_loader_name = eswap(((address_t)p) + mbi_reloc_offset);
     p += strlen(version_string) + 1;
 
     /* Next is space for the module command lines */
@@ -582,17 +585,17 @@ int main(int argc, char **argv)
     /* Last come the module info structs */
     modp = (struct mod_list *)
         ((((address_t)p + mod_command_line_space) + 3) & ~3);
-    mbi->mods_count = modules;
-    mbi->mods_addr = ((address_t)modp) + mbi_reloc_offset;
+    mbi->mods_count = eswap(modules);
+    mbi->mods_addr = eswap(((address_t)modp) + mbi_reloc_offset);
 
     /* Memory information will be added at boot time, by setup.S 
      * or trampoline.S. */
-    mbi->flags = MB_INFO_CMDLINE | MB_INFO_BOOT_LOADER_NAME;
+    mbi->flags = eswap(MB_INFO_CMDLINE | MB_INFO_BOOT_LOADER_NAME);
 
 
     /* Load the modules */
     if (modules) {
-        mbi->flags |= MB_INFO_MODS;
+        mbi->flags = eswap(eswap(mbi->flags) | MB_INFO_MODS);
                 
         /* Go back and parse the module command lines */
         optind = opterr = 1;
@@ -652,10 +655,10 @@ int main(int argc, char **argv)
             if (p != NULL) *p = ' ';
 
             /* Fill in the module info struct */
-            modp->mod_start = start;
-            modp->mod_end = start + size;
-            modp->cmdline = (address_t)mod_clp + mbi_reloc_offset;
-            modp->pad = 0;
+            modp->mod_start = eswap(start);
+            modp->mod_end = eswap(start + size);
+            modp->cmdline = eswap((address_t)mod_clp + mbi_reloc_offset);
+            modp->pad = eswap(0);
             modp++;
 
             /* Store the module command line */

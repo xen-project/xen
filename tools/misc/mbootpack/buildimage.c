@@ -43,6 +43,7 @@
 #include "mbootpack.h"
 #include "mb_header.h"
 
+
 /*  We will build an image that a bzImage-capable bootloader will load like 
  *  this:
  * 
@@ -105,8 +106,8 @@ void make_bzImage(section_t *sections,
     section_t *s;
 
     /* Patch the kernel and mbi addresses into the setup code */
-    *(address_t *)(bzimage_setup + BZ_ENTRY_OFFSET) = entry;
-    *(address_t *)(bzimage_setup + BZ_MBI_OFFSET) = mbi;
+    *(address_t *)(bzimage_setup + BZ_ENTRY_OFFSET) = eswap(entry);
+    *(address_t *)(bzimage_setup + BZ_MBI_OFFSET) = eswap(mbi);
     if (!quiet) printf("Kernel entry is %p, MBI is %p.\n", entry, mbi);
 
     /* Write out header and trampoline */
