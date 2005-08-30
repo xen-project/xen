@@ -66,7 +66,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         {
             long ign1, ign2, ign3;
             __asm__ __volatile__ (
-                "movq   %5,%%r10; movq %6,%%r8;" TRAP_INSTR
+                "movq %8,%%r10; movq %9,%%r8;" TRAP_INSTR
                 : "=a" (ret), "=D" (ign1), "=S" (ign2), "=d" (ign3)
                 : "0" ((unsigned long)hypercall.op), 
                 "1" ((unsigned long)hypercall.arg[0]), 
