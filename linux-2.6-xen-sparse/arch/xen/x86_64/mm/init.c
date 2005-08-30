@@ -466,7 +466,7 @@ static inline int make_readonly(unsigned long paddr)
     return readonly;
 }
 
-void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
+static void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
 { 
         long i, j, k; 
         unsigned long paddr;
@@ -502,15 +502,16 @@ void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
                         pte = alloc_low_page(&pte_phys);
                         pte_save = pte;
                         for (k = 0; k < PTRS_PER_PTE; pte++, k++, paddr += PTE_SIZE) {
+                                if ((paddr >= end) ||
+                                    ((paddr >> PAGE_SHIFT)
+                                     >= xen_start_info.nr_pages)) { 
+                                        __set_pte(pte, __pte(0)); 
+                                        continue;
+                                }
                                 if (make_readonly(paddr)) {
                                         __set_pte(pte, 
                                                 __pte(paddr | (_KERNPG_TABLE & ~_PAGE_RW)));
                                         continue;
-                                }
-                                if (paddr >= end) { 
-                                        for (; k < PTRS_PER_PTE; k++, pte++)
-                                                __set_pte(pte, __pte(0)); 
-                                        break;
                                 }
                                 __set_pte(pte, __pte(paddr | _KERNPG_TABLE));
                         }

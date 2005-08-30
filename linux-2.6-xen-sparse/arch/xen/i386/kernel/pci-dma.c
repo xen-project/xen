@@ -115,9 +115,9 @@ dma_supported(struct device *dev, u64 mask)
 	if (swiotlb)
 		return swiotlb_dma_supported(dev, mask);
 	/*
-         * By default we'll BUG when an infeasible DMA is requested, and
-         * request swiotlb=force (see IOMMU_BUG_ON).
-         */
+	 * By default we'll BUG when an infeasible DMA is requested, and
+	 * request swiotlb=force (see IOMMU_BUG_ON).
+	 */
 	return 1;
 }
 EXPORT_SYMBOL(dma_supported);

@@ -616,7 +616,7 @@ ENTRY(hypercall_table)
         .quad do_get_debugreg
         .quad do_update_descriptor  /* 10 */
         .quad do_ni_hypercall
-        .quad do_dom_mem_op
+        .quad do_memory_op
         .quad do_multicall
         .quad do_update_va_mapping
         .quad do_set_timer_op       /* 15 */
@@ -649,7 +649,7 @@ ENTRY(hypercall_args_table)
         .byte 1 /* do_get_debugreg      */
         .byte 2 /* do_update_descriptor */  /* 10 */
         .byte 0 /* do_ni_hypercall      */
-        .byte 5 /* do_dom_mem_op        */
+        .byte 2 /* do_memory_op         */
         .byte 2 /* do_multicall         */
         .byte 3 /* do_update_va_mapping */
         .byte 1 /* do_set_timer_op      */  /* 15 */

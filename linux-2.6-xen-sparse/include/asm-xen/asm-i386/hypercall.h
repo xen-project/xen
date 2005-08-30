@@ -236,12 +236,10 @@ HYPERVISOR_update_descriptor(
 }
 
 static inline int
-HYPERVISOR_dom_mem_op(
-	unsigned int op, unsigned long *extent_list,
-	unsigned long nr_extents, unsigned int extent_order)
+HYPERVISOR_memory_op(
+	unsigned int cmd, void *arg)
 {
-	return _hypercall5(int, dom_mem_op, op, extent_list,
-			   nr_extents, extent_order, DOMID_SELF);
+	return _hypercall2(int, memory_op, cmd, arg);
 }
 
 static inline int

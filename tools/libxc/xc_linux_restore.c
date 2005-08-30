@@ -8,11 +8,10 @@
 
 #include <stdlib.h>
 #include <unistd.h>
-
 #include "xg_private.h"
 #include <xenctrl.h>
-
 #include <xen/linux/suspend.h>
+#include <xen/memory.h>
 
 #define MAX_BATCH_SIZE 1024
 
@@ -411,7 +410,8 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
 
     /* Get the list of PFNs that are not in the psuedo-phys map */
     {
-	unsigned int count, *pfntab;
+	unsigned int count;
+        unsigned long *pfntab;
 	int rc;
 
 	if ( read_exact(io_fd, &count, sizeof(count)) != sizeof(count) )
@@ -443,9 +443,15 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
 
 	if ( count > 0 )
 	{
-	    if ( (rc = xc_dom_mem_op( xc_handle,
-				       MEMOP_decrease_reservation,
-				       pfntab, count, 0, dom )) <0 )
+            struct xen_memory_reservation reservation = {
+                .extent_start = pfntab,
+                .nr_extents   = count,
+                .extent_order = 0,
+                .domid        = DOMID_SELF
+            };
+	    if ( (rc = xc_memory_op(xc_handle,
+                                    XENMEM_decrease_reservation,
+                                    &reservation)) != count )
 	    {
 		ERR("Could not decrease reservation : %d",rc);
 		goto out;

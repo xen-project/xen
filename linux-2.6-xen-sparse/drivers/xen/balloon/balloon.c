@@ -44,6 +44,7 @@
 #include <asm-xen/xen_proc.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/balloon.h>
+#include <asm-xen/xen-public/memory.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -168,6 +169,11 @@ static void balloon_process(void *unused)
 	struct page   *page;
 	long           credit, debt, rc;
 	void          *v;
+	struct xen_memory_reservation reservation = {
+		.address_bits = 0,
+		.extent_order = 0,
+		.domid        = DOMID_SELF
+	};
 
 	down(&balloon_mutex);
 
@@ -180,14 +186,18 @@ static void balloon_process(void *unused)
 			goto out;
 
 		balloon_lock(flags);
-		rc = HYPERVISOR_dom_mem_op(
-			MEMOP_increase_reservation, mfn_list, credit, 0);
+		reservation.extent_start = mfn_list;
+		reservation.nr_extents   = credit;
+		rc = HYPERVISOR_memory_op(
+			XENMEM_increase_reservation, &reservation);
 		balloon_unlock(flags);
 		if (rc < credit) {
 			/* We hit the Xen hard limit: reprobe. */
-			BUG_ON(HYPERVISOR_dom_mem_op(
-				MEMOP_decrease_reservation,
-				mfn_list, rc, 0) != rc);
+			reservation.extent_start = mfn_list;
+			reservation.nr_extents   = rc;
+			BUG_ON(HYPERVISOR_memory_op(
+				XENMEM_decrease_reservation,
+				&reservation) != rc);
 			hard_limit = current_pages + rc - driver_pages;
 			vfree(mfn_list);
 			goto retry;
@@ -261,8 +271,10 @@ static void balloon_process(void *unused)
 			balloon_append(pfn_to_page(pfn));
 		}
 
-		BUG_ON(HYPERVISOR_dom_mem_op(
-			MEMOP_decrease_reservation,mfn_list, debt, 0) != debt);
+		reservation.extent_start = mfn_list;
+		reservation.nr_extents   = debt;
+		BUG_ON(HYPERVISOR_memory_op(
+			XENMEM_decrease_reservation, &reservation) != debt);
 
 		current_pages -= debt;
 	}
@@ -438,11 +450,17 @@ static int dealloc_pte_fn(
 	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
 {
 	unsigned long mfn = pte_mfn(*pte);
+	struct xen_memory_reservation reservation = {
+		.extent_start = &mfn,
+		.nr_extents   = 1,
+		.extent_order = 0,
+		.domid        = DOMID_SELF
+	};
 	set_pte(pte, __pte_ma(0));
 	phys_to_machine_mapping[__pa(addr) >> PAGE_SHIFT] =
 		INVALID_P2M_ENTRY;
-	BUG_ON(HYPERVISOR_dom_mem_op(
-		MEMOP_decrease_reservation, &mfn, 1, 0) != 1);
+	BUG_ON(HYPERVISOR_memory_op(
+		XENMEM_decrease_reservation, &reservation) != 1);
 	return 0;
 }
 

@@ -55,6 +55,7 @@
 #include <asm/io.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/physdev.h>
+#include <asm-xen/xen-public/memory.h>
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
@@ -1585,15 +1586,21 @@ void __init setup_arch(char **cmdline_p)
 				(unsigned int *)xen_start_info.mfn_list,
 				xen_start_info.nr_pages * sizeof(unsigned int));
 		} else {
+			struct xen_memory_reservation reservation = {
+				.extent_start = (unsigned long *)xen_start_info.mfn_list + max_pfn,
+				.nr_extents   = xen_start_info.nr_pages - max_pfn,
+				.extent_order = 0,
+				.domid        = DOMID_SELF
+			};
+
 			memcpy(phys_to_machine_mapping,
 				(unsigned int *)xen_start_info.mfn_list,
 				max_pfn * sizeof(unsigned int));
 			/* N.B. below relies on sizeof(int) == sizeof(long). */
-			if (HYPERVISOR_dom_mem_op(
-				MEMOP_decrease_reservation,
-				(unsigned long *)xen_start_info.mfn_list + max_pfn,
-				xen_start_info.nr_pages - max_pfn, 0) !=
-			    (xen_start_info.nr_pages - max_pfn)) BUG();
+			BUG_ON(HYPERVISOR_memory_op(
+				XENMEM_decrease_reservation,
+				&reservation) !=
+			    (xen_start_info.nr_pages - max_pfn));
 		}
 		free_bootmem(
 			__pa(xen_start_info.mfn_list), 
