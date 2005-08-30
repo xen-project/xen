@@ -1045,7 +1045,6 @@ class XendDomainInfo:
 
     def publish_console(self):
         db = DBMap(db=XenNode("/console/%d" % self.id))
-        db.clear()
         db['domain'] = self.db.getPath()
         db.saveDB(save=True)
         
