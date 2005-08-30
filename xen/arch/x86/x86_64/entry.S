@@ -339,7 +339,8 @@ create_bounce_frame:
 1:      /* In kernel context already: push new frame at existing %rsp. */
         movq  UREGS_rsp+8(%rsp),%rsi
         andb  $0xfc,UREGS_cs+8(%rsp)    # Indicate kernel context to guest.
-2:      movq  $HYPERVISOR_VIRT_START,%rax
+2:      andq  $~0xf,%rsi                # Stack frames are 16-byte aligned.
+        movq  $HYPERVISOR_VIRT_START,%rax
         cmpq  %rax,%rsi
         jb    1f                        # In +ve address space? Then okay.
         movq  $HYPERVISOR_VIRT_END+60,%rax
