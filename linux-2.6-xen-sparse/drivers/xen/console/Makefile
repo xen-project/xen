@@ -1,2 +1,2 @@
 
-obj-y	:= console.o
+obj-y	:= console.o xencons_ring.o

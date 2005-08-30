@@ -335,7 +335,8 @@ static int setup_guest(int xc_handle,
                        unsigned int control_evtchn,
                        unsigned long flags,
                        unsigned int vcpus,
-		       unsigned int store_evtchn, unsigned long *store_mfn)
+		       unsigned int store_evtchn, unsigned long *store_mfn,
+		       unsigned int console_evtchn, unsigned long *console_mfn)
 {
     unsigned long *page_array = NULL;
     unsigned long count, i;
@@ -358,6 +359,8 @@ static int setup_guest(int xc_handle,
     unsigned long vstartinfo_end;
     unsigned long vstoreinfo_start;
     unsigned long vstoreinfo_end;
+    unsigned long vconsole_start;
+    unsigned long vconsole_end;
     unsigned long vstack_start;
     unsigned long vstack_end;
     unsigned long vpt_start;
@@ -393,7 +396,9 @@ static int setup_guest(int xc_handle,
     vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
     vstoreinfo_start = round_pgup(vphysmap_end);
     vstoreinfo_end   = vstoreinfo_start + PAGE_SIZE;
-    vpt_start        = vstoreinfo_end; 
+    vconsole_start   = vstoreinfo_end;
+    vconsole_end     = vstoreinfo_end + PAGE_SIZE;
+    vpt_start        = vconsole_end; 
 
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
@@ -437,6 +442,7 @@ static int setup_guest(int xc_handle,
            " Init. ramdisk: %p->%p\n"
            " Phys-Mach map: %p->%p\n"
            " Store page:    %p->%p\n"
+           " Console page:  %p->%p\n"
            " Page tables:   %p->%p\n"
            " Start info:    %p->%p\n"
            " Boot stack:    %p->%p\n"
@@ -445,6 +451,7 @@ static int setup_guest(int xc_handle,
            _p(vinitrd_start), _p(vinitrd_end),
            _p(vphysmap_start), _p(vphysmap_end),
            _p(vstoreinfo_start), _p(vstoreinfo_end),
+           _p(vconsole_start), _p(vconsole_end),
            _p(vpt_start), _p(vpt_end),
            _p(vstartinfo_start), _p(vstartinfo_end),
            _p(vstack_start), _p(vstack_end),
@@ -566,6 +573,8 @@ static int setup_guest(int xc_handle,
 #endif
 
     *store_mfn = page_array[(vstoreinfo_start-dsi.v_start) >> PAGE_SHIFT];
+    *console_mfn = page_array[(vconsole_start-dsi.v_start) >> PAGE_SHIFT];
+
 
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
@@ -580,6 +589,8 @@ static int setup_guest(int xc_handle,
     start_info->domain_controller_evtchn = control_evtchn;
     start_info->store_mfn    = *store_mfn;
     start_info->store_evtchn = store_evtchn;
+    start_info->console_mfn   = *console_mfn;
+    start_info->console_evtchn = console_evtchn;
     if ( initrd_len != 0 )
     {
         start_info->mod_start    = vinitrd_start;
@@ -631,7 +642,9 @@ int xc_linux_build(int xc_handle,
                    unsigned long flags,
                    unsigned int vcpus,
                    unsigned int store_evtchn,
-                   unsigned long *store_mfn)
+                   unsigned long *store_mfn,
+                   unsigned int console_evtchn,
+                   unsigned long *console_mfn)
 {
     dom0_op_t launch_op, op;
     int initrd_fd = -1;
@@ -707,7 +720,8 @@ int xc_linux_build(int xc_handle,
                      &vstack_start, ctxt, cmdline,
                      op.u.getdomaininfo.shared_info_frame,
                      control_evtchn, flags, vcpus,
-                     store_evtchn, store_mfn) < 0 )
+                     store_evtchn, store_mfn,
+		     console_evtchn, console_mfn) < 0 )
     {
         ERROR("Error constructing guest OS");
         goto error_out;
