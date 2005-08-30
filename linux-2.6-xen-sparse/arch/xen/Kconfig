@@ -70,6 +70,27 @@ config XEN_NETDEV_BACKEND
 	  network devices to other guests via a high-performance shared-memory
 	  interface.
 
+config XEN_TPMDEV_FRONTEND
+        bool "TPM-device frontend driver"
+        default y
+        help
+          The TPM-device frontend driver.
+
+config XEN_TPMDEV_BACKEND
+        bool "TPM-device backend driver"
+        default n
+        help
+          The TPM-device backend driver
+
+config XEN_TPMDEV_CLOSE_IF_VTPM_FAILS
+        bool "TPM backend closes upon vTPM failure"
+        depends on XEN_TPMDEV_BACKEND
+        default n
+        help
+          The TPM backend closes the channel if the vTPM in userspace indicates
+          a failure. The corresponding domain's channel will be closed.
+          Say Y if you want this feature.
+
 config XEN_BLKDEV_FRONTEND
 	bool "Block-device frontend driver"
 	default y

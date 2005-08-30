@@ -455,6 +455,7 @@ typedef struct start_info {
 #define SIF_BLK_BE_DOMAIN (1<<4)  /* Is this a block backend domain? */
 #define SIF_NET_BE_DOMAIN (1<<5)  /* Is this a net backend domain? */
 #define SIF_USB_BE_DOMAIN (1<<6)  /* Is this a usb backend domain? */
+#define SIF_TPM_BE_DOMAIN (1<<7)  /* Is this a TPM backend domain? */
 /* For use in guest OSes. */
 extern shared_info_t *HYPERVISOR_shared_info;
 
