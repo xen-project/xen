@@ -35,6 +35,7 @@
 #include <asm/pgtable.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/balloon.h>
+#include <asm-xen/xen-public/memory.h>
 #include <linux/module.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <linux/percpu.h>
@@ -320,6 +321,12 @@ void xen_create_contiguous_region(unsigned long vstart, unsigned int order)
 	pmd_t         *pmd;
 	pte_t         *pte;
 	unsigned long  mfn, i, flags;
+	struct xen_memory_reservation reservation = {
+		.extent_start = &mfn,
+		.nr_extents   = 1,
+		.extent_order = 0,
+		.domid        = DOMID_SELF
+	};
 
 	scrub_pages(vstart, 1 << order);
 
@@ -336,13 +343,15 @@ void xen_create_contiguous_region(unsigned long vstart, unsigned int order)
 			vstart + (i*PAGE_SIZE), __pte_ma(0), 0));
 		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
 			INVALID_P2M_ENTRY;
-		BUG_ON(HYPERVISOR_dom_mem_op(
-			MEMOP_decrease_reservation, &mfn, 1, 0) != 1);
+		BUG_ON(HYPERVISOR_memory_op(
+			XENMEM_decrease_reservation, &reservation) != 1);
 	}
 
 	/* 2. Get a new contiguous memory extent. */
-	BUG_ON(HYPERVISOR_dom_mem_op(
-		MEMOP_increase_reservation, &mfn, 1, order | (32<<8)) != 1);
+	reservation.extent_order = order;
+	reservation.address_bits = 31; /* aacraid limitation */
+	BUG_ON(HYPERVISOR_memory_op(
+		XENMEM_increase_reservation, &reservation) != 1);
 
 	/* 3. Map the new extent in place of old pages. */
 	for (i = 0; i < (1<<order); i++) {
@@ -367,6 +376,12 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	pmd_t         *pmd;
 	pte_t         *pte;
 	unsigned long  mfn, i, flags;
+	struct xen_memory_reservation reservation = {
+		.extent_start = &mfn,
+		.nr_extents   = 1,
+		.extent_order = 0,
+		.domid        = DOMID_SELF
+	};
 
 	scrub_pages(vstart, 1 << order);
 
@@ -385,14 +400,14 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 			vstart + (i*PAGE_SIZE), __pte_ma(0), 0));
 		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
 			INVALID_P2M_ENTRY;
-		BUG_ON(HYPERVISOR_dom_mem_op(
-			MEMOP_decrease_reservation, &mfn, 1, 0) != 1);
+		BUG_ON(HYPERVISOR_memory_op(
+			XENMEM_decrease_reservation, &reservation) != 1);
 	}
 
 	/* 2. Map new pages in place of old pages. */
 	for (i = 0; i < (1<<order); i++) {
-		BUG_ON(HYPERVISOR_dom_mem_op(
-			MEMOP_increase_reservation, &mfn, 1, 0) != 1);
+		BUG_ON(HYPERVISOR_memory_op(
+			XENMEM_increase_reservation, &reservation) != 1);
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			vstart + (i*PAGE_SIZE),
 			pfn_pte_ma(mfn, PAGE_KERNEL), 0));

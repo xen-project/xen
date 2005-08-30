@@ -42,7 +42,7 @@
 #define __HYPERVISOR_set_debugreg          8
 #define __HYPERVISOR_get_debugreg          9
 #define __HYPERVISOR_update_descriptor    10
-#define __HYPERVISOR_dom_mem_op           12
+#define __HYPERVISOR_memory_op            12
 #define __HYPERVISOR_multicall            13
 #define __HYPERVISOR_update_va_mapping    14
 #define __HYPERVISOR_set_timer_op         15
@@ -223,12 +223,6 @@ struct mmuext_op {
  */
 #define CONSOLEIO_write         0
 #define CONSOLEIO_read          1
-
-/*
- * Commands to HYPERVISOR_dom_mem_op().
- */
-#define MEMOP_increase_reservation 0
-#define MEMOP_decrease_reservation 1
 
 /*
  * Commands to HYPERVISOR_vm_assist().

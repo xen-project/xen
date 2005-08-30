@@ -19,8 +19,6 @@ PROGRAMS_INSTALL_DIR	= /usr/libexec/xen
 
 INCLUDES += -I $(XEN_LIBXC)
 
-CC := gcc
-
 CFLAGS += -Wall -Werror -O3 -fno-strict-aliasing
 CFLAGS += $(INCLUDES)
 

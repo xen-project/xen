@@ -10,8 +10,7 @@ INSTALL         = install
 INSTALL_PROG    = $(INSTALL) -m0755
 INSTALL_DIR     = $(INSTALL) -d -m0755
 
-CC       = gcc
-CFLAGS   = -Wall -Werror -g3 -D _XOPEN_SOURCE=600
+CFLAGS   += -Wall -Werror -g3 -D _XOPEN_SOURCE=600
 
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)

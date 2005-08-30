@@ -430,9 +430,7 @@ int xc_ia64_get_pfn_list(int xc_handle, u32 domid, unsigned long *pfn_buf,
 int xc_mmuext_op(int xc_handle, struct mmuext_op *op, unsigned int nr_ops,
 		 domid_t dom);
 
-int xc_dom_mem_op(int xc_handle, unsigned int memop, unsigned int *extent_list,
-		  unsigned int nr_extents, unsigned int extent_order,
-		  domid_t domid);
+int xc_memory_op(int xc_handle, int cmd, void *arg);
 
 int xc_get_pfn_type_batch(int xc_handle, u32 dom, int num, unsigned long *arr);
 

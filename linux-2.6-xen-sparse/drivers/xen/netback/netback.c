@@ -12,6 +12,7 @@
 
 #include "common.h"
 #include <asm-xen/balloon.h>
+#include <asm-xen/xen-public/memory.h>
 
 #if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
 #include <asm-xen/xen-public/grant_table.h>
@@ -110,10 +111,16 @@ static spinlock_t mfn_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long alloc_mfn(void)
 {
     unsigned long mfn = 0, flags;
+    struct xen_memory_reservation reservation = {
+        .extent_start = mfn_list,
+        .nr_extents   = MAX_MFN_ALLOC,
+        .extent_order = 0,
+        .domid        = DOMID_SELF
+    };
     spin_lock_irqsave(&mfn_lock, flags);
     if ( unlikely(alloc_index == 0) )
-        alloc_index = HYPERVISOR_dom_mem_op(
-            MEMOP_increase_reservation, mfn_list, MAX_MFN_ALLOC, 0);
+        alloc_index = HYPERVISOR_memory_op(
+            XENMEM_increase_reservation, &reservation);
     if ( alloc_index != 0 )
         mfn = mfn_list[--alloc_index];
     spin_unlock_irqrestore(&mfn_lock, flags);
@@ -124,11 +131,17 @@ static unsigned long alloc_mfn(void)
 static void free_mfn(unsigned long mfn)
 {
     unsigned long flags;
+    struct xen_memory_reservation reservation = {
+        .extent_start = &mfn,
+        .nr_extents   = 1,
+        .extent_order = 0,
+        .domid        = DOMID_SELF
+    };
     spin_lock_irqsave(&mfn_lock, flags);
     if ( alloc_index != MAX_MFN_ALLOC )
         mfn_list[alloc_index++] = mfn;
-    else if ( HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation,
-                                    &mfn, 1, 0) != 1 )
+    else if ( HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation)
+              != 1 )
         BUG();
     spin_unlock_irqrestore(&mfn_lock, flags);
 }
