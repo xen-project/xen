@@ -15,19 +15,22 @@
 
 void show_registers(struct cpu_user_regs *regs)
 {
-    printk("CPU:    %d\nEIP:    %04x:[<%016lx>]",
+    printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
            smp_processor_id(), 0xffff & regs->cs, regs->rip);
     if ( !GUEST_MODE(regs) )
         print_symbol(" %s", regs->rip);
-    printk("\nEFLAGS: %016lx\n", regs->eflags);
-    printk("rax: %016lx   rbx: %016lx   rcx: %016lx   rdx: %016lx\n",
-           regs->rax, regs->rbx, regs->rcx, regs->rdx);
-    printk("rsi: %016lx   rdi: %016lx   rbp: %016lx   rsp: %016lx\n",
-           regs->rsi, regs->rdi, regs->rbp, regs->rsp);
-    printk("r8:  %016lx   r9:  %016lx   r10: %016lx   r11: %016lx\n",
-           regs->r8,  regs->r9,  regs->r10, regs->r11);
-    printk("r12: %016lx   r13: %016lx   r14: %016lx   r15: %016lx\n",
-           regs->r12, regs->r13, regs->r14, regs->r15);
+    printk("\nRFLAGS: %016lx\n", regs->eflags);
+    printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",
+           regs->rax, regs->rbx, regs->rcx);
+    printk("rdx: %016lx   rsi: %016lx   rdi: %016lx\n",
+           regs->rdx, regs->rsi, regs->rdi);
+    printk("rbp: %016lx   rsp: %016lx   r8:  %016lx\n",
+           regs->rbp, regs->rsp, regs->r8);
+    printk("r9:  %016lx   r10: %016lx   r11: %016lx\n",
+           regs->r9,  regs->r10, regs->r11);
+    printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
+           regs->r12, regs->r13, regs->r14);
+    printk("r15: %016lx\n", regs->r15);
 
     if ( GUEST_MODE(regs) )
         show_guest_stack();
