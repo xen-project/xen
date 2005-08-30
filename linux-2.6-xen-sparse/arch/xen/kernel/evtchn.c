@@ -44,13 +44,6 @@
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/evtchn.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-EXPORT_SYMBOL(force_evtchn_callback);
-EXPORT_SYMBOL(evtchn_do_upcall);
-EXPORT_SYMBOL(bind_evtchn_to_irq);
-EXPORT_SYMBOL(unbind_evtchn_from_irq);
-#endif
-
 /*
  * This lock protects updates to the following mapping and reference-count
  * arrays. The lock does not need to be acquired to read the mapping tables.
@@ -133,6 +126,7 @@ void force_evtchn_callback(void)
 {
     (void)HYPERVISOR_xen_version(0);
 }
+EXPORT_SYMBOL(force_evtchn_callback);
 
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
@@ -165,6 +159,7 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
         }
     }
 }
+EXPORT_SYMBOL(evtchn_do_upcall);
 
 static int find_unbound_irq(void)
 {
@@ -211,6 +206,7 @@ int bind_virq_to_irq(int virq)
     
     return irq;
 }
+EXPORT_SYMBOL(bind_virq_to_irq);
 
 void unbind_virq_from_irq(int virq)
 {
@@ -244,6 +240,7 @@ void unbind_virq_from_irq(int virq)
 
     spin_unlock(&irq_mapping_update_lock);
 }
+EXPORT_SYMBOL(unbind_virq_from_irq);
 
 int bind_ipi_to_irq(int ipi)
 {
@@ -279,6 +276,7 @@ int bind_ipi_to_irq(int ipi)
 
     return irq;
 }
+EXPORT_SYMBOL(bind_ipi_to_irq);
 
 void unbind_ipi_from_irq(int ipi)
 {
@@ -306,6 +304,7 @@ void unbind_ipi_from_irq(int ipi)
 
     spin_unlock(&irq_mapping_update_lock);
 }
+EXPORT_SYMBOL(unbind_ipi_from_irq);
 
 int bind_evtchn_to_irq(unsigned int evtchn)
 {
@@ -326,6 +325,7 @@ int bind_evtchn_to_irq(unsigned int evtchn)
     
     return irq;
 }
+EXPORT_SYMBOL(bind_evtchn_to_irq);
 
 void unbind_evtchn_from_irq(unsigned int evtchn)
 {
@@ -341,6 +341,7 @@ void unbind_evtchn_from_irq(unsigned int evtchn)
 
     spin_unlock(&irq_mapping_update_lock);
 }
+EXPORT_SYMBOL(unbind_evtchn_from_irq);
 
 int bind_evtchn_to_irqhandler(
     unsigned int evtchn,
@@ -359,6 +360,7 @@ int bind_evtchn_to_irqhandler(
 
     return retval;
 }
+EXPORT_SYMBOL(bind_evtchn_to_irqhandler);
 
 void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id)
 {
@@ -366,6 +368,7 @@ void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id)
     free_irq(irq, dev_id);
     unbind_evtchn_from_irq(evtchn);
 }
+EXPORT_SYMBOL(unbind_evtchn_from_irqhandler);
 
 #ifdef CONFIG_SMP
 static void do_nothing_function(void *ign)
