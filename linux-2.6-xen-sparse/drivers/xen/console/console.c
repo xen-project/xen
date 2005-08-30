@@ -51,8 +51,8 @@
 #include <asm-xen/xen-public/event_channel.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/evtchn.h>
-#include <asm-xen/ctrl_if.h>
 
+#include "xencons_ring.h"
 /*
  * Modes:
  *  'xencons=off'  [XC_OFF]:     Console is disabled.
@@ -117,13 +117,6 @@ static spinlock_t xencons_lock = SPIN_LOCK_UNLOCKED;
 
 /* Common transmit-kick routine. */
 static void __xencons_tx_flush(void);
-
-/* This task is used to defer sending console data until there is space. */
-static void xencons_tx_flush_task_routine(void *data);
-
-static DECLARE_TQUEUE(xencons_tx_flush_task, 
-                      xencons_tx_flush_task_routine,
-                      NULL);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static struct tty_driver *xencons_driver;
@@ -264,39 +257,22 @@ asmlinkage int xprintk(const char *fmt, ...)
 /*** Forcibly flush console data before dying. ***/
 void xencons_force_flush(void)
 {
-    ctrl_msg_t msg;
     int        sz;
 
     /* Emergency console is synchronous, so there's nothing to flush. */
     if ( xen_start_info.flags & SIF_INITDOMAIN )
         return;
 
-    /*
-     * We use dangerous control-interface functions that require a quiescent
-     * system and no interrupts. Try to ensure this with a global cli().
-     */
-    local_irq_disable(); /* XXXsmp */
 
     /* Spin until console data is flushed through to the domain controller. */
-    while ( (wc != wp) && !ctrl_if_transmitter_empty() )
+    while ( (wc != wp) )
     {
-        /* Interrupts are disabled -- we must manually reap responses. */
-        ctrl_if_discard_responses();
-
+	int sent = 0;
         if ( (sz = wp - wc) == 0 )
             continue;
-        if ( sz > sizeof(msg.msg) )
-            sz = sizeof(msg.msg);
-        if ( sz > (wbuf_size - WBUF_MASK(wc)) )
-            sz = wbuf_size - WBUF_MASK(wc);
-
-        msg.type    = CMSG_CONSOLE;
-        msg.subtype = CMSG_CONSOLE_DATA;
-        msg.length  = sz;
-        memcpy(msg.msg, &wbuf[WBUF_MASK(wc)], sz);
-            
-        if ( ctrl_if_send_message_noblock(&msg, NULL, 0) == 0 )
-            wc += sz;
+	sent = xencons_ring_send(&wbuf[WBUF_MASK(wc)], sz);
+	if (sent > 0)
+	    wc += sent;
     }
 }
 
@@ -320,7 +296,7 @@ static int xencons_priv_irq;
 static char x_char;
 
 /* Non-privileged receive callback. */
-static void xencons_rx(ctrl_msg_t *msg, unsigned long id)
+static void xencons_rx(char *buf, unsigned len)
 {
     int           i;
     unsigned long flags;
@@ -328,21 +304,18 @@ static void xencons_rx(ctrl_msg_t *msg, unsigned long id)
     spin_lock_irqsave(&xencons_lock, flags);
     if ( xencons_tty != NULL )
     {
-        for ( i = 0; i < msg->length; i++ )
-            tty_insert_flip_char(xencons_tty, msg->msg[i], 0);
+        for ( i = 0; i < len; i++ )
+            tty_insert_flip_char(xencons_tty, buf[i], 0);
         tty_flip_buffer_push(xencons_tty);
     }
     spin_unlock_irqrestore(&xencons_lock, flags);
 
-    msg->length = 0;
-    ctrl_if_send_response(msg);
 }
 
 /* Privileged and non-privileged transmit worker. */
 static void __xencons_tx_flush(void)
 {
     int        sz, work_done = 0;
-    ctrl_msg_t msg;
 
     if ( xen_start_info.flags & SIF_INITDOMAIN )
     {
@@ -367,38 +340,23 @@ static void __xencons_tx_flush(void)
     {
         while ( x_char )
         {
-            msg.type    = CMSG_CONSOLE;
-            msg.subtype = CMSG_CONSOLE_DATA;
-            msg.length  = 1;
-            msg.msg[0]  = x_char;
-
-            if ( ctrl_if_send_message_noblock(&msg, NULL, 0) == 0 )
-                x_char = 0;
-            else if ( ctrl_if_enqueue_space_callback(&xencons_tx_flush_task) )
-                break;
-
-            work_done = 1;
+	    if (xencons_ring_send(&x_char, 1) == 1) {
+		x_char = 0;
+		work_done = 1;
+	    }
         }
 
         while ( wc != wp )
         {
+	    int sent;
             sz = wp - wc;
-            if ( sz > sizeof(msg.msg) )
-                sz = sizeof(msg.msg);
-            if ( sz > (wbuf_size - WBUF_MASK(wc)) )
-                sz = wbuf_size - WBUF_MASK(wc);
-
-            msg.type    = CMSG_CONSOLE;
-            msg.subtype = CMSG_CONSOLE_DATA;
-            msg.length  = sz;
-            memcpy(msg.msg, &wbuf[WBUF_MASK(wc)], sz);
-            
-            if ( ctrl_if_send_message_noblock(&msg, NULL, 0) == 0 )
-                wc += sz;
-            else if ( ctrl_if_enqueue_space_callback(&xencons_tx_flush_task) )
-                break;
-
-            work_done = 1;
+	    if ( sz > (wbuf_size - WBUF_MASK(wc)) )
+		sz = wbuf_size - WBUF_MASK(wc);
+	    sent = xencons_ring_send(&wbuf[WBUF_MASK(wc)], sz);
+	    if ( sent > 0 ) {
+		wc += sent;
+		work_done = 1;
+	    }
         }
     }
 
@@ -409,15 +367,6 @@ static void __xencons_tx_flush(void)
              (xencons_tty->ldisc.write_wakeup != NULL) )
             (xencons_tty->ldisc.write_wakeup)(xencons_tty);
     }
-}
-
-/* Non-privileged transmit kicker. */
-static void xencons_tx_flush_task_routine(void *data)
-{
-    unsigned long flags;
-    spin_lock_irqsave(&xencons_lock, flags);
-    __xencons_tx_flush();
-    spin_unlock_irqrestore(&xencons_lock, flags);
 }
 
 /* Privileged receive callback and transmit kicker. */
@@ -726,6 +675,8 @@ static int __init xencons_init(void)
     if ( xc_mode == XC_OFF )
         return 0;
 
+    xencons_ring_init();
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     xencons_driver = alloc_tty_driver((xc_mode == XC_SERIAL) ? 
                                       1 : MAX_NR_CONSOLES);
@@ -802,7 +753,8 @@ static int __init xencons_init(void)
     }
     else
     {
-        (void)ctrl_if_register_receiver(CMSG_CONSOLE, xencons_rx, 0);
+	
+	xencons_ring_register_receiver(xencons_rx);
     }
 
     printk("Xen virtual console successfully installed as %s%d\n",

@@ -148,7 +148,7 @@ int vmx_setup_platform(struct vcpu *d, struct cpu_user_regs *regs)
     offset = (addr & ~PAGE_MASK);
     addr = round_pgdown(addr);
 
-    mpfn = phys_to_machine_mapping(addr >> PAGE_SHIFT);
+    mpfn = get_mfn_from_pfn(addr >> PAGE_SHIFT);
     p = map_domain_page(mpfn);
 
     e820p = (struct e820entry *) ((unsigned long) p + offset); 
@@ -175,7 +175,7 @@ int vmx_setup_platform(struct vcpu *d, struct cpu_user_regs *regs)
     unmap_domain_page(p);        
 
     /* Initialise shared page */
-    mpfn = phys_to_machine_mapping(gpfn);
+    mpfn = get_mfn_from_pfn(gpfn);
     p = map_domain_page(mpfn);
     d->domain->arch.vmx_platform.shared_page_va = (unsigned long)p;
 

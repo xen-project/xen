@@ -592,8 +592,7 @@ int construct_dom0(struct domain *d,
     if ( opt_dom0_translate )
     {
         si->shared_info  = d->next_io_page << PAGE_SHIFT;
-        set_machinetophys(virt_to_phys(d->shared_info) >> PAGE_SHIFT,
-                          d->next_io_page);
+        set_pfn_from_mfn(virt_to_phys(d->shared_info) >> PAGE_SHIFT, d->next_io_page);
         d->next_io_page++;
     }
     else
@@ -614,7 +613,7 @@ int construct_dom0(struct domain *d,
             mfn = alloc_epfn - (pfn - REVERSE_START);
 #endif
         ((u32 *)vphysmap_start)[pfn] = mfn;
-        machine_to_phys_mapping[mfn] = pfn;
+        set_pfn_from_mfn(mfn, pfn);
     }
     while ( pfn < nr_pages )
     {
@@ -627,7 +626,7 @@ int construct_dom0(struct domain *d,
 #define pfn (nr_pages - 1 - (pfn - (alloc_epfn - alloc_spfn)))
 #endif
             ((u32 *)vphysmap_start)[pfn] = mfn;
-            machine_to_phys_mapping[mfn] = pfn;
+            set_pfn_from_mfn(mfn, pfn);
 #undef pfn
             page++; pfn++;
         }

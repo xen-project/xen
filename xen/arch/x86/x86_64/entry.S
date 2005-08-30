@@ -339,7 +339,8 @@ create_bounce_frame:
 1:      /* In kernel context already: push new frame at existing %rsp. */
         movq  UREGS_rsp+8(%rsp),%rsi
         andb  $0xfc,UREGS_cs+8(%rsp)    # Indicate kernel context to guest.
-2:      movq  $HYPERVISOR_VIRT_START,%rax
+2:      andq  $~0xf,%rsi                # Stack frames are 16-byte aligned.
+        movq  $HYPERVISOR_VIRT_START,%rax
         cmpq  %rax,%rsi
         jb    1f                        # In +ve address space? Then okay.
         movq  $HYPERVISOR_VIRT_END+60,%rax
@@ -616,7 +617,7 @@ ENTRY(hypercall_table)
         .quad do_get_debugreg
         .quad do_update_descriptor  /* 10 */
         .quad do_ni_hypercall
-        .quad do_dom_mem_op
+        .quad do_memory_op
         .quad do_multicall
         .quad do_update_va_mapping
         .quad do_set_timer_op       /* 15 */
@@ -649,7 +650,7 @@ ENTRY(hypercall_args_table)
         .byte 1 /* do_get_debugreg      */
         .byte 2 /* do_update_descriptor */  /* 10 */
         .byte 0 /* do_ni_hypercall      */
-        .byte 5 /* do_dom_mem_op        */
+        .byte 2 /* do_memory_op         */
         .byte 2 /* do_multicall         */
         .byte 3 /* do_update_va_mapping */
         .byte 1 /* do_set_timer_op      */  /* 15 */

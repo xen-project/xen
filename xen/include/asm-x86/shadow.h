@@ -269,14 +269,14 @@ static inline void shadow_mode_disable(struct domain *d)
 
 #define __mfn_to_gpfn(_d, mfn)                         \
     ( (shadow_mode_translate(_d))                      \
-      ? machine_to_phys_mapping[(mfn)]                 \
+      ? get_pfn_from_mfn(mfn)                                   \
       : (mfn) )
 
 #define __gpfn_to_mfn(_d, gpfn)                        \
     ({                                                 \
         ASSERT(current->domain == (_d));               \
         (shadow_mode_translate(_d))                    \
-        ? phys_to_machine_mapping(gpfn)                \
+        ? get_mfn_from_pfn(gpfn)                \
         : (gpfn);                                      \
     })
 
@@ -461,7 +461,7 @@ static inline int __mark_dirty(struct domain *d, unsigned int mfn)
     // This wants the nice compact set of PFNs from 0..domain's max,
     // which __mfn_to_gpfn() only returns for translated domains.
     //
-    pfn = machine_to_phys_mapping[mfn];
+    pfn = get_pfn_from_mfn(mfn);
 
     /*
      * Values with the MSB set denote MFNs that aren't really part of the 
@@ -562,7 +562,7 @@ update_hl2e(struct vcpu *v, unsigned long va)
     old_hl2e = v->arch.hl2_vtable[index];
 
     if ( (l2e_get_flags(gl2e) & _PAGE_PRESENT) &&
-         VALID_MFN(mfn = phys_to_machine_mapping(l2e_get_pfn(gl2e))) )
+         VALID_MFN(mfn = get_mfn_from_pfn(l2e_get_pfn(gl2e))) )
         new_hl2e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
     else
         new_hl2e = l1e_empty();

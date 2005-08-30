@@ -36,6 +36,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <termios.h>
+#include <stdarg.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
@@ -48,26 +51,67 @@ struct buffer
 	size_t max_capacity;
 };
 
-static void buffer_append(struct buffer *buffer, const void *data, size_t size)
+struct domain
 {
-	if ((buffer->capacity - buffer->size) < size) {
-		buffer->capacity += (size + 1024);
-		buffer->data = realloc(buffer->data, buffer->capacity);
-		if (buffer->data == NULL) {
-			dolog(LOG_ERR, "Memory allocation failed");
-			exit(ENOMEM);
+	int domid;
+	int tty_fd;
+	bool is_dead;
+	struct buffer buffer;
+	struct domain *next;
+	unsigned long mfn;
+	int local_port;
+	int remote_port;
+	char *page;
+	int evtchn_fd;
+};
+
+static struct domain *dom_head;
+
+struct ring_head
+{
+	u32 cons;
+	u32 prod;
+	char buf[0];
+} __attribute__((packed));
+
+#define PAGE_SIZE (getpagesize())
+#define XENCONS_RING_SIZE (PAGE_SIZE/2 - sizeof (struct ring_head))
+#define XENCONS_IDX(cnt) ((cnt) % XENCONS_RING_SIZE)
+#define XENCONS_FULL(ring) (((ring)->prod - (ring)->cons) == XENCONS_RING_SIZE)
+#define XENCONS_SPACE(ring) (XENCONS_RING_SIZE - ((ring)->prod - (ring)->cons))
+
+static void buffer_append(struct domain *dom)
+{
+	struct buffer *buffer = &dom->buffer;
+	struct ring_head *ring = (struct ring_head *)dom->page;
+	size_t size;
+
+	while ((size = ring->prod - ring->cons) != 0) {
+		if ((buffer->capacity - buffer->size) < size) {
+			buffer->capacity += (size + 1024);
+			buffer->data = realloc(buffer->data, buffer->capacity);
+			if (buffer->data == NULL) {
+				dolog(LOG_ERR, "Memory allocation failed");
+				exit(ENOMEM);
+			}
 		}
-	}
 
-	memcpy(buffer->data + buffer->size, data, size);
-	buffer->size += size;
+		while (ring->cons < ring->prod) {
+			buffer->data[buffer->size] =
+				ring->buf[XENCONS_IDX(ring->cons)];
+			buffer->size++;
+			ring->cons++;
+		}
 
-	if (buffer->max_capacity &&
-	    buffer->size > buffer->max_capacity) {
-		memmove(buffer->data + (buffer->size - buffer->max_capacity),
-			buffer->data, buffer->max_capacity);
-		buffer->data = realloc(buffer->data, buffer->max_capacity);
-		buffer->capacity = buffer->max_capacity;
+		if (buffer->max_capacity &&
+		    buffer->size > buffer->max_capacity) {
+			memmove(buffer->data + (buffer->size -
+						buffer->max_capacity),
+				buffer->data, buffer->max_capacity);
+			buffer->data = realloc(buffer->data,
+					       buffer->max_capacity);
+			buffer->capacity = buffer->max_capacity;
+		}
 	}
 }
 
@@ -83,17 +127,6 @@ static void buffer_advance(struct buffer *buffer, size_t size)
 	buffer->size -= size;
 }
 
-struct domain
-{
-	int domid;
-	int tty_fd;
-	bool is_dead;
-	struct buffer buffer;
-	struct domain *next;
-};
-
-static struct domain *dom_head;
-
 static bool domain_is_valid(int domid)
 {
 	bool ret;
@@ -107,7 +140,7 @@ static bool domain_is_valid(int domid)
 
 static int domain_create_tty(struct domain *dom)
 {
-	char path[1024];
+	char *path;
 	int master;
 
 	if ((master = getpt()) == -1 ||
@@ -126,22 +159,106 @@ static int domain_create_tty(struct domain *dom)
 			tcsetattr(master, TCSAFLUSH, &term);
 		}
 
-		xs_mkdir(xs, "/console");
-		snprintf(path, sizeof(path), "/console/%d", dom->domid);
-		xs_mkdir(xs, path);
-		strcat(path, "/tty");
-
+		asprintf(&path, "/console/%d/tty", dom->domid);
 		xs_write(xs, path, slave, strlen(slave), O_CREAT);
+		free(path);
 
-		snprintf(path, sizeof(path), "/console/%d/limit", dom->domid);
+		asprintf(&path, "/console/%d/limit", dom->domid);
 		data = xs_read(xs, path, &len);
 		if (data) {
 			dom->buffer.max_capacity = strtoul(data, 0, 0);
 			free(data);
 		}
+		free(path);
 	}
 
 	return master;
+}
+
+/* Takes tuples of names, scanf-style args, and void **, NULL terminated. */
+int xs_gather(struct xs_handle *xs, const char *dir, ...)
+{
+	va_list ap;
+	const char *name;
+	char *path;
+	int ret = 0;
+
+	va_start(ap, dir);
+	while (ret == 0 && (name = va_arg(ap, char *)) != NULL) {
+		const char *fmt = va_arg(ap, char *);
+		void *result = va_arg(ap, void *);
+		char *p;
+
+		asprintf(&path, "%s/%s", dir, name);
+		p = xs_read(xs, path, NULL);
+		free(path);
+		if (p == NULL) {
+			ret = ENOENT;
+			break;
+		}
+		if (fmt) {
+			if (sscanf(p, fmt, result) == 0)
+				ret = EINVAL;
+			free(p);
+		} else
+			*(char **)result = p;
+	}
+	va_end(ap);
+	return ret;
+}
+
+#define EVENTCHN_BIND		_IO('E', 2)
+#define EVENTCHN_UNBIND 	_IO('E', 3)
+
+static int domain_create_ring(struct domain *dom)
+{
+	char *dompath, *path;
+	int err;
+
+	dom->page = NULL;
+	dom->evtchn_fd = -1;
+
+	asprintf(&path, "/console/%d/domain", dom->domid);
+	dompath = xs_read(xs, path, NULL);
+	free(path);
+	if (!dompath)
+		return ENOENT;
+
+	err = xs_gather(xs, dompath,
+			"console_mfn", "%li", &dom->mfn,
+			"console_channel/port1", "%i", &dom->local_port,
+			"console_channel/port2", "%i", &dom->remote_port,
+			NULL);
+	if (err)
+		goto out;
+
+	dom->page = xc_map_foreign_range(xc, dom->domid, getpagesize(),
+					 PROT_READ|PROT_WRITE, dom->mfn);
+	if (dom->page == NULL) {
+		err = EINVAL;
+		goto out;
+	}
+
+	/* Opening evtchn independently for each console is a bit
+	 * wastefule, but that's how the code is structured... */
+	err = open("/dev/xen/evtchn", O_RDWR);
+	if (err == -1) {
+		err = errno;
+		goto out;
+	}
+	dom->evtchn_fd = err;
+
+	if (ioctl(dom->evtchn_fd, EVENTCHN_BIND, dom->local_port) == -1) {
+		err = errno;
+		munmap(dom->page, getpagesize());
+		close(dom->evtchn_fd);
+		dom->evtchn_fd = -1;
+		goto out;
+	}
+
+ out:
+	free(dompath);
+	return err;
 }
 
 static struct domain *create_domain(int domid)
@@ -162,7 +279,9 @@ static struct domain *create_domain(int domid)
 	dom->buffer.size = 0;
 	dom->buffer.capacity = 0;
 	dom->buffer.max_capacity = 0;
-	dom->next = 0;
+	dom->next = NULL;
+
+	domain_create_ring(dom);
 
 	dolog(LOG_DEBUG, "New domain %d", domid);
 
@@ -200,9 +319,14 @@ static void remove_domain(struct domain *dom)
 
 		if (dom->domid == d->domid) {
 			*pp = d->next;
-			if (d->buffer.data) {
+			if (d->buffer.data)
 				free(d->buffer.data);
-			}
+			if (d->page)
+				munmap(d->page, getpagesize());
+			if (d->evtchn_fd != -1)
+				close(d->evtchn_fd);
+			if (d->tty_fd != -1)
+				close(d->tty_fd);
 			free(d);
 			break;
 		}
@@ -211,28 +335,28 @@ static void remove_domain(struct domain *dom)
 
 static void remove_dead_domains(struct domain *dom)
 {
-	if (dom == NULL) return;
-	remove_dead_domains(dom->next);
+	struct domain *n;
 
-	if (dom->is_dead) {
-		remove_domain(dom);
+	while (dom != NULL) {
+		n = dom->next;
+		if (dom->is_dead)
+			remove_domain(dom);
+		dom = n;
 	}
 }
 
 static void handle_tty_read(struct domain *dom)
 {
 	ssize_t len;
-	xcs_msg_t msg;
+	char msg[80];
+	struct ring_head *inring =
+		(struct ring_head *)(dom->page + PAGE_SIZE/2);
+	int i;
 
-	msg.type = XCS_REQUEST;
-	msg.u.control.remote_dom = dom->domid;
-	msg.u.control.msg.type = CMSG_CONSOLE;
-	msg.u.control.msg.subtype = CMSG_CONSOLE_DATA;
-	msg.u.control.msg.id = 1;
-
-	len = read(dom->tty_fd, msg.u.control.msg.msg, 60);
+	len = read(dom->tty_fd, msg, MAX(XENCONS_SPACE(inring), sizeof(msg)));
 	if (len < 1) {
 		close(dom->tty_fd);
+		dom->tty_fd = -1;
 
 		if (domain_is_valid(dom->domid)) {
 			dom->tty_fd = domain_create_tty(dom);
@@ -240,14 +364,14 @@ static void handle_tty_read(struct domain *dom)
 			dom->is_dead = true;
 		}
 	} else if (domain_is_valid(dom->domid)) {
-		msg.u.control.msg.length = len;
-
-		if (!write_sync(xcs_data_fd, &msg, sizeof(msg))) {
-			dolog(LOG_ERR, "Write to xcs failed: %m");
-			exit(1);
+		for (i = 0; i < len; i++) {
+			inring->buf[XENCONS_IDX(inring->prod)] = msg[i];
+			inring->prod++;
 		}
+		xc_evtchn_send(xc, dom->local_port);
 	} else {
 		close(dom->tty_fd);
+		dom->tty_fd = -1;
 		dom->is_dead = true;
 	}
 }
@@ -259,6 +383,7 @@ static void handle_tty_write(struct domain *dom)
 	len = write(dom->tty_fd, dom->buffer.data, dom->buffer.size);
 	if (len < 1) {
 		close(dom->tty_fd);
+		dom->tty_fd = -1;
 
 		if (domain_is_valid(dom->domid)) {
 			dom->tty_fd = domain_create_tty(dom);
@@ -270,6 +395,18 @@ static void handle_tty_write(struct domain *dom)
 	}
 }
 
+static void handle_ring_read(struct domain *dom)
+{
+	u16 v;
+
+	if (!read_sync(dom->evtchn_fd, &v, sizeof(v)))
+		return;
+
+	buffer_append(dom);
+
+	(void)write_sync(dom->evtchn_fd, &v, sizeof(v));
+}
+
 static void handle_xcs_msg(int fd)
 {
 	xcs_msg_t msg;
@@ -277,13 +414,6 @@ static void handle_xcs_msg(int fd)
 	if (!read_sync(fd, &msg, sizeof(msg))) {
 		dolog(LOG_ERR, "read from xcs failed! %m");
 		exit(1);
-	} else if (msg.type == XCS_REQUEST) {
-		struct domain *dom;
-
-		dom = lookup_domain(msg.u.control.remote_dom);
-		buffer_append(&dom->buffer,
-			      msg.u.control.msg.msg,
-			      msg.u.control.msg.length);
 	}
 }
 
@@ -291,9 +421,12 @@ static void enum_domains(void)
 {
 	int domid = 0;
 	xc_dominfo_t dominfo;
+	struct domain *dom;
 
 	while (xc_domain_getinfo(xc, domid, 1, &dominfo) == 1) {
-		lookup_domain(dominfo.domid);
+		dom = lookup_domain(dominfo.domid);
+		if (dominfo.dying || dominfo.crashed || dominfo.shutdown)
+			dom->is_dead = true;
 		domid = dominfo.domid + 1;
 	}
 }
@@ -302,12 +435,11 @@ void handle_io(void)
 {
 	fd_set readfds, writefds;
 	int ret;
-	int max_fd = -1;
-	int num_of_writes = 0;
 
 	do {
 		struct domain *d;
 		struct timeval tv = { 1, 0 };
+		int max_fd = -1;
 
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
@@ -319,42 +451,36 @@ void handle_io(void)
 			if (d->tty_fd != -1) {
 				FD_SET(d->tty_fd, &readfds);
 			}
+			if (d->evtchn_fd != -1)
+				FD_SET(d->evtchn_fd, &readfds);
 
 			if (d->tty_fd != -1 && !buffer_empty(&d->buffer)) {
 				FD_SET(d->tty_fd, &writefds);
 			}
 
 			max_fd = MAX(d->tty_fd, max_fd);
+			max_fd = MAX(d->evtchn_fd, max_fd);
 		}
 
 		ret = select(max_fd + 1, &readfds, &writefds, 0, &tv);
-		if (tv.tv_sec == 1 && (++num_of_writes % 100) == 0) {
-#if 0
-			/* FIXME */
-			/* This is a nasty hack.  xcs does not handle the
-			   control channels filling up well at all.  We'll
-			   throttle ourselves here since we do proper
-			   queueing to give the domains a shot at pulling out
-			   the data.  Fixing xcs is not worth it as it's
-			   going away */
-			tv.tv_usec = 1000;
-			select(0, 0, 0, 0, &tv);
-#endif
-		}
 		enum_domains();
 
-		if (FD_ISSET(xcs_data_fd, &readfds)) {
+		if (FD_ISSET(xcs_data_fd, &readfds))
 			handle_xcs_msg(xcs_data_fd);
-		}
 
 		for (d = dom_head; d; d = d->next) {
-			if (!d->is_dead && FD_ISSET(d->tty_fd, &readfds)) {
-				handle_tty_read(d);
-			}
+			if (d->is_dead || d->tty_fd == -1 ||
+			    d->evtchn_fd == -1)
+				continue;
 
-			if (!d->is_dead && FD_ISSET(d->tty_fd, &writefds)) {
+			if (FD_ISSET(d->tty_fd, &readfds))
+				handle_tty_read(d);
+
+			if (FD_ISSET(d->evtchn_fd, &readfds))
+				handle_ring_read(d);
+
+			if (FD_ISSET(d->tty_fd, &writefds))
 				handle_tty_write(d);
-			}
 		}
 
 		remove_dead_domains(dom_head);

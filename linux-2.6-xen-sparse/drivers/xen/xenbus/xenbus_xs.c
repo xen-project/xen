@@ -45,7 +45,9 @@
 
 static char printf_buffer[4096];
 static LIST_HEAD(watches);
+
 DECLARE_MUTEX(xenbus_lock);
+EXPORT_SYMBOL(xenbus_lock);
 
 static int get_error(const char *errorstring)
 {
@@ -224,6 +226,7 @@ char **xenbus_directory(const char *dir, const char *node, unsigned int *num)
 		ret[(*num)++] = p;
 	return ret;
 }
+EXPORT_SYMBOL(xenbus_directory);
 
 /* Check if a path exists. Return 1 if it does. */
 int xenbus_exists(const char *dir, const char *node)
@@ -237,6 +240,7 @@ int xenbus_exists(const char *dir, const char *node)
 	kfree(d);
 	return 1;
 }
+EXPORT_SYMBOL(xenbus_exists);
 
 /* Get the value of a single file.
  * Returns a kmalloced value: call free() on it after use.
@@ -246,6 +250,7 @@ void *xenbus_read(const char *dir, const char *node, unsigned int *len)
 {
 	return xs_single(XS_READ, join(dir, node), len);
 }
+EXPORT_SYMBOL(xenbus_read);
 
 /* Write the value of a single file.
  * Returns -err on failure.  createflags can be 0, O_CREAT, or O_CREAT|O_EXCL.
@@ -276,18 +281,21 @@ int xenbus_write(const char *dir, const char *node,
 
 	return xs_error(xs_talkv(XS_WRITE, iovec, ARRAY_SIZE(iovec), NULL));
 }
+EXPORT_SYMBOL(xenbus_write);
 
 /* Create a new directory. */
 int xenbus_mkdir(const char *dir, const char *node)
 {
 	return xs_error(xs_single(XS_MKDIR, join(dir, node), NULL));
 }
+EXPORT_SYMBOL(xenbus_mkdir);
 
 /* Destroy a file or directory (directories must be empty). */
 int xenbus_rm(const char *dir, const char *node)
 {
 	return xs_error(xs_single(XS_RM, join(dir, node), NULL));
 }
+EXPORT_SYMBOL(xenbus_rm);
 
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
@@ -298,6 +306,7 @@ int xenbus_transaction_start(const char *subtree)
 {
 	return xs_error(xs_single(XS_TRANSACTION_START, subtree, NULL));
 }
+EXPORT_SYMBOL(xenbus_transaction_start);
 
 /* End a transaction.
  * If abandon is true, transaction is discarded instead of committed.
@@ -312,6 +321,7 @@ int xenbus_transaction_end(int abort)
 		strcpy(abortstr, "T");
 	return xs_error(xs_single(XS_TRANSACTION_END, abortstr, NULL));
 }
+EXPORT_SYMBOL(xenbus_transaction_end);
 
 /* Single read and scanf: returns -errno or num scanned. */
 int xenbus_scanf(const char *dir, const char *node, const char *fmt, ...)
@@ -333,6 +343,7 @@ int xenbus_scanf(const char *dir, const char *node, const char *fmt, ...)
 		return -ERANGE;
 	return ret;
 }
+EXPORT_SYMBOL(xenbus_scanf);
 
 /* Single printf and write: returns -errno or 0. */
 int xenbus_printf(const char *dir, const char *node, const char *fmt, ...)
@@ -348,6 +359,7 @@ int xenbus_printf(const char *dir, const char *node, const char *fmt, ...)
 	BUG_ON(ret > sizeof(printf_buffer)-1);
 	return xenbus_write(dir, node, printf_buffer, O_CREAT);
 }
+EXPORT_SYMBOL(xenbus_printf);
 
 /* Report a (negative) errno into the store, with explanation. */
 void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt, ...)
@@ -369,6 +381,7 @@ void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt, ...)
 		printk("xenbus: failed to write error node for %s (%s)\n",
 		       dev->nodename, printf_buffer);
 }
+EXPORT_SYMBOL(xenbus_dev_error);
 
 /* Clear any error. */
 void xenbus_dev_ok(struct xenbus_device *dev)
@@ -381,6 +394,7 @@ void xenbus_dev_ok(struct xenbus_device *dev)
 			dev->has_error = 0;
 	}
 }
+EXPORT_SYMBOL(xenbus_dev_ok);
 	
 /* Takes tuples of names, scanf-style args, and void **, NULL terminated. */
 int xenbus_gather(const char *dir, ...)
@@ -410,6 +424,7 @@ int xenbus_gather(const char *dir, ...)
 	va_end(ap);
 	return ret;
 }
+EXPORT_SYMBOL(xenbus_gather);
 
 static int xs_watch(const char *path, const char *token)
 {
@@ -482,6 +497,7 @@ int register_xenbus_watch(struct xenbus_watch *watch)
 		list_add(&watch->list, &watches);
 	return err;
 }
+EXPORT_SYMBOL(register_xenbus_watch);
 
 void unregister_xenbus_watch(struct xenbus_watch *watch)
 {
@@ -499,6 +515,7 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 		       "XENBUS Failed to release watch %s: %i\n",
 		       watch->node, err);
 }
+EXPORT_SYMBOL(unregister_xenbus_watch);
 
 /* Re-register callbacks to all watches. */
 void reregister_xenbus_watches(void)

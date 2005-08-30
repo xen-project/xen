@@ -62,14 +62,16 @@ static int init_mapping_done;
  * avaialble in init_memory_mapping().
  */
 
-#define addr_to_page(addr, page)                                             \
-        (addr) &= PHYSICAL_PAGE_MASK;                                   \
-        (page) = ((unsigned long *) ((unsigned long)(((mfn_to_pfn((addr) >> PAGE_SHIFT)) << PAGE_SHIFT) + __START_KERNEL_map)))
+#define addr_to_page(addr, page)				\
+	(addr) &= PHYSICAL_PAGE_MASK;				\
+	(page) = ((unsigned long *) ((unsigned long)		\
+	(((mfn_to_pfn((addr) >> PAGE_SHIFT)) << PAGE_SHIFT) +	\
+	__START_KERNEL_map)))
 
 static void __make_page_readonly(unsigned long va)
 {
-        unsigned long addr;
-        pte_t pte, *ptep;
+	unsigned long addr;
+	pte_t pte, *ptep;
 	unsigned long *page = (unsigned long *) init_level4_pgt;
 
 	addr = (unsigned long) page[pgd_index(va)];
@@ -89,22 +91,22 @@ static void __make_page_readonly(unsigned long va)
 
 static void __make_page_writable(unsigned long va)
 {
-        unsigned long addr;
-        pte_t pte, *ptep;
-        unsigned long *page = (unsigned long *) init_level4_pgt;
+	unsigned long addr;
+	pte_t pte, *ptep;
+	unsigned long *page = (unsigned long *) init_level4_pgt;
 
-        addr = (unsigned long) page[pgd_index(va)];
-        addr_to_page(addr, page);
+	addr = (unsigned long) page[pgd_index(va)];
+	addr_to_page(addr, page);
 
-        addr = page[pud_index(va)];
-        addr_to_page(addr, page);
-        
-        addr = page[pmd_index(va)];
-        addr_to_page(addr, page);
+	addr = page[pud_index(va)];
+	addr_to_page(addr, page);
+ 
+	addr = page[pmd_index(va)];
+	addr_to_page(addr, page);
 
-        ptep = (pte_t *) &page[pte_index(va)];
+	ptep = (pte_t *) &page[pte_index(va)];
 	pte.pte = (ptep->pte | _PAGE_RW);
-        xen_l1_entry_update(ptep, pte);
+	xen_l1_entry_update(ptep, pte);
 	__flush_tlb_one(addr);
 }
 
@@ -115,55 +117,55 @@ static void __make_page_writable(unsigned long va)
 void make_page_readonly(void *va)
 {
 	pgd_t* pgd; pud_t *pud; pmd_t* pmd; pte_t pte, *ptep;
-        unsigned long addr = (unsigned long) va;
+	unsigned long addr = (unsigned long) va;
 
-        if (!init_mapping_done) {
-                __make_page_readonly(addr);
-                return;
-        }
-                
-        pgd = pgd_offset_k(addr);
-        pud = pud_offset(pgd, addr);
-        pmd = pmd_offset(pud, addr);
-        ptep = pte_offset_kernel(pmd, addr);
+	if (!init_mapping_done) {
+		__make_page_readonly(addr);
+		return;
+	}
+  
+	pgd = pgd_offset_k(addr);
+	pud = pud_offset(pgd, addr);
+	pmd = pmd_offset(pud, addr);
+	ptep = pte_offset_kernel(pmd, addr);
 	pte.pte = (ptep->pte & ~_PAGE_RW);
-        xen_l1_entry_update(ptep, pte);
+	xen_l1_entry_update(ptep, pte);
 	__flush_tlb_one(addr);
 }
 
 void make_page_writable(void *va)
 {
-        pgd_t* pgd; pud_t *pud; pmd_t* pmd; pte_t pte, *ptep;
-        unsigned long addr = (unsigned long) va;
+	pgd_t* pgd; pud_t *pud; pmd_t* pmd; pte_t pte, *ptep;
+	unsigned long addr = (unsigned long) va;
 
-        if (!init_mapping_done) {
-                __make_page_writable(addr);
-                return;
-        }
+	if (!init_mapping_done) {
+		__make_page_writable(addr);
+		return;
+	}
 
-        pgd = pgd_offset_k(addr);
-        pud = pud_offset(pgd, addr);
-        pmd = pmd_offset(pud, addr);
-        ptep = pte_offset_kernel(pmd, addr);
+	pgd = pgd_offset_k(addr);
+	pud = pud_offset(pgd, addr);
+	pmd = pmd_offset(pud, addr);
+	ptep = pte_offset_kernel(pmd, addr);
 	pte.pte = (ptep->pte | _PAGE_RW);
-        xen_l1_entry_update(ptep, pte);
+	xen_l1_entry_update(ptep, pte);
 	__flush_tlb_one(addr);
 }
 
 void make_pages_readonly(void* va, unsigned nr)
 {
-        while ( nr-- != 0 ) {
-                make_page_readonly(va);
-                va = (void*)((unsigned long)va + PAGE_SIZE);
-        }
+	while (nr-- != 0) {
+		make_page_readonly(va);
+		va = (void*)((unsigned long)va + PAGE_SIZE);
+	}
 }
 
 void make_pages_writable(void* va, unsigned nr)
 {
-        while ( nr-- != 0 ) {
-                make_page_writable(va);
-                va = (void*)((unsigned long)va + PAGE_SIZE);
-        }
+	while (nr-- != 0) {
+		make_page_writable(va);
+		va = (void*)((unsigned long)va + PAGE_SIZE);
+	}
 }
 
 /*
@@ -389,7 +391,7 @@ void __set_fixmap_user (enum fixed_addresses idx, unsigned long phys, pgprot_t p
         set_pte_phys(address, phys, prot, SET_FIXMAP_USER); 
 }
 
-unsigned long __initdata table_start, table_end, tables_space; 
+unsigned long __initdata table_start, tables_space; 
 
 unsigned long get_machine_pfn(unsigned long addr)
 {
@@ -400,38 +402,13 @@ unsigned long get_machine_pfn(unsigned long addr)
         return pte_mfn(*pte);
 } 
 
-#define ALIGN_TO_4K __attribute__((section(".data.page_aligned")))
-#define MAX_LOW_PAGES	0x20
-static unsigned long __init_pgt[MAX_LOW_PAGES][512]  ALIGN_TO_4K;
-static int __init_pgt_index;
-
-/*
- * We start using from start_pfn
- */
 static __init void *alloc_static_page(unsigned long *phys)
 {
-	int i = __init_pgt_index++;
-
-	if (__init_pgt_index >= MAX_LOW_PAGES) {
-		printk("Need to increase MAX_LOW_PAGES");
-		BUG();
-	}
-		
-	*phys = __pa(__init_pgt[i]);
-
-	return (void *) __init_pgt[i];
-} 
-
-/*
- * Get RO page
- */
-static void __init *alloc_low_page(unsigned long *phys)
-{ 
-        unsigned long pfn = table_end++;
-    
-        *phys = (pfn << PAGE_SHIFT);
-        memset((void *) ((pfn << PAGE_SHIFT) + __START_KERNEL_map), 0, PAGE_SIZE);
-        return (void *)((pfn << PAGE_SHIFT) + __START_KERNEL_map);
+	unsigned long va = (start_pfn << PAGE_SHIFT) + __START_KERNEL_map;
+	*phys = start_pfn << PAGE_SHIFT;
+	start_pfn++;
+	memset((void *)va, 0, PAGE_SIZE);
+	return (void *)va;
 } 
 
 #define PTE_SIZE PAGE_SIZE
@@ -443,30 +420,24 @@ static inline void __set_pte(pte_t *dst, pte_t val)
 
 static inline int make_readonly(unsigned long paddr)
 {
-    int readonly = 0;
+	int readonly = 0;
 
-    /* Make new page tables read-only. */
-    if ((paddr < ((table_start << PAGE_SHIFT) + tables_space)) &&
-        (paddr >= (table_start << PAGE_SHIFT)))
-        readonly = 1;
+	/* Make old and new page tables read-only. */
+	if ((paddr >= (xen_start_info.pt_base - __START_KERNEL_map))
+	    && (paddr < ((table_start << PAGE_SHIFT) + tables_space)))
+		readonly = 1;
+	/*
+	 * No need for writable mapping of kernel image. This also ensures that
+	 * page and descriptor tables embedded inside don't have writable
+	 * mappings. 
+	 */
+	if ((paddr >= __pa_symbol(&_text)) && (paddr < __pa_symbol(&_end)))
+		readonly = 1;
 
-    /* Make old page tables read-only. */
-    if ((paddr < ((xen_start_info.pt_base - __START_KERNEL_map) +
-                  (xen_start_info.nr_pt_frames << PAGE_SHIFT))) &&
-        (paddr >= (xen_start_info.pt_base - __START_KERNEL_map)))
-        readonly = 1;
-
-    /*
-     * No need for writable mapping of kernel image. This also ensures that
-     * page and descriptor tables embedded inside don't have writable mappings.
-     */
-    if ((paddr >= __pa_symbol(&_text)) && (paddr < __pa_symbol(&_end)))
-        readonly = 1;
-
-    return readonly;
+	return readonly;
 }
 
-void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
+static void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
 { 
         long i, j, k; 
         unsigned long paddr;
@@ -485,7 +456,7 @@ void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
 			break;
 		} 
 
-		pmd = alloc_low_page(&pmd_phys);
+		pmd = alloc_static_page(&pmd_phys);
                 make_page_readonly(pmd);
                 xen_pmd_pin(pmd_phys);
 		set_pud(pud, __pud(pmd_phys | _KERNPG_TABLE));
@@ -499,18 +470,19 @@ void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
 					set_pmd(pmd,  __pmd(0)); 
 				break;
 			}
-                        pte = alloc_low_page(&pte_phys);
+                        pte = alloc_static_page(&pte_phys);
                         pte_save = pte;
                         for (k = 0; k < PTRS_PER_PTE; pte++, k++, paddr += PTE_SIZE) {
+                                if ((paddr >= end) ||
+                                    ((paddr >> PAGE_SHIFT)
+                                     >= xen_start_info.nr_pages)) { 
+                                        __set_pte(pte, __pte(0)); 
+                                        continue;
+                                }
                                 if (make_readonly(paddr)) {
                                         __set_pte(pte, 
                                                 __pte(paddr | (_KERNPG_TABLE & ~_PAGE_RW)));
                                         continue;
-                                }
-                                if (paddr >= end) { 
-                                        for (; k < PTRS_PER_PTE; k++, pte++)
-                                                __set_pte(pte, __pte(0)); 
-                                        break;
                                 }
                                 __set_pte(pte, __pte(paddr | _KERNPG_TABLE));
                         }
@@ -525,15 +497,16 @@ void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
 
 static void __init find_early_table_space(unsigned long end)
 {
-        unsigned long puds, pmds, ptes; 
+	unsigned long puds, pmds, ptes; 
 
 	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
 	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
-        ptes = (end + PTE_SIZE - 1) >> PAGE_SHIFT;
+	ptes = (end + PTE_SIZE - 1) >> PAGE_SHIFT;
 
-        tables_space = round_up(puds * 8, PAGE_SIZE) + 
-	    		  round_up(pmds * 8, PAGE_SIZE) + 
-	    		  round_up(ptes * 8, PAGE_SIZE); 
+	tables_space =
+		round_up(puds * 8, PAGE_SIZE) + 
+		round_up(pmds * 8, PAGE_SIZE) + 
+		round_up(ptes * 8, PAGE_SIZE); 
 }
 
 void __init xen_init_pt(void)
@@ -579,65 +552,58 @@ void __init xen_init_pt(void)
 		mk_kernel_pgd(__pa_symbol(level3_user_pgt)));
 }
 
-/*
- * Extend kernel mapping to access pages for page tables.  The initial
- * mapping done by Xen is minimal (e.g. 8MB) and we need to extend the
- * mapping for early initialization.
- */
-static unsigned long current_size, extended_size;
-
 void __init extend_init_mapping(void) 
 {
 	unsigned long va = __START_KERNEL_map;
 	unsigned long phys, addr, *pte_page;
-        pmd_t *pmd;
+	pmd_t *pmd;
 	pte_t *pte, new_pte;
-	unsigned long *page = (unsigned long *) init_level4_pgt;
-	int i;
+	unsigned long *page = (unsigned long *)init_level4_pgt;
 
 	addr = page[pgd_index(va)];
 	addr_to_page(addr, page);
 	addr = page[pud_index(va)];
 	addr_to_page(addr, page);
 
-	for (;;) {
-		pmd = (pmd_t *)&page[pmd_index(va)];
-		if (!pmd_present(*pmd))
-			break;
-		addr = page[pmd_index(va)];
-		addr_to_page(addr, pte_page);
-		for (i = 0; i < PTRS_PER_PTE; i++) {
-			pte = (pte_t *) &pte_page[pte_index(va)];
-			if (!pte_present(*pte))
-				break;
-			va += PAGE_SIZE;
-			current_size += PAGE_SIZE;
-		}
+	/* Kill mapping of low 1MB. */
+	while (va < (unsigned long)&_text) {
+		HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
+		va += PAGE_SIZE;
 	}
 
-	while (va < __START_KERNEL_map + current_size + tables_space) {
-		pmd = (pmd_t *) &page[pmd_index(va)];
-		if (!pmd_none(*pmd))
-			continue;
-		pte_page = (unsigned long *) alloc_static_page(&phys);
-		make_page_readonly(pte_page);
-		xen_pte_pin(phys);
-		set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
-		for (i = 0; i < PTRS_PER_PTE; i++, va += PAGE_SIZE) {
+	/* Ensure init mappings cover kernel text/data and initial tables. */
+	while (va < (__START_KERNEL_map
+		     + (start_pfn << PAGE_SHIFT)
+		     + tables_space)) {
+		pmd = (pmd_t *)&page[pmd_index(va)];
+		if (pmd_none(*pmd)) {
+			pte_page = alloc_static_page(&phys);
+			make_page_readonly(pte_page);
+			xen_pte_pin(phys);
+			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
+		} else {
+			addr = page[pmd_index(va)];
+			addr_to_page(addr, pte_page);
+		}
+		pte = (pte_t *)&pte_page[pte_index(va)];
+		if (pte_none(*pte)) {
 			new_pte = pfn_pte(
 				(va - __START_KERNEL_map) >> PAGE_SHIFT, 
 				__pgprot(_KERNPG_TABLE | _PAGE_USER));
-			pte = (pte_t *)&pte_page[pte_index(va)];
 			xen_l1_entry_update(pte, new_pte);
-			extended_size += PAGE_SIZE;
 		}
+		va += PAGE_SIZE;
 	}
 
-	/* Kill mapping of low 1MB. */
-	for (va = __START_KERNEL_map; va < (unsigned long)&_text; va += PAGE_SIZE)
+	/* Finally, blow away any spurious initial mappings. */
+	while (1) {
+		pmd = (pmd_t *)&page[pmd_index(va)];
+		if (pmd_none(*pmd))
+			break;
 		HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0);
+		va += PAGE_SIZE;
+	}
 }
-
 
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
    This runs before bootmem is initialized and gets pages directly from the 
@@ -650,34 +616,31 @@ void __init init_memory_mapping(unsigned long start, unsigned long end)
 
 	find_early_table_space(end);
 	extend_init_mapping();
-	start_pfn = current_size >> PAGE_SHIFT;
 
 	table_start = start_pfn;
-	table_end = table_start;
 
 	start = (unsigned long)__va(start);
 	end = (unsigned long)__va(end);
 
 	for (; start < end; start = next) {
 		unsigned long pud_phys; 
-                pud_t *pud = alloc_low_page(&pud_phys);
-                make_page_readonly(pud);
-                xen_pud_pin(pud_phys);
+		pud_t *pud = alloc_static_page(&pud_phys);
+		make_page_readonly(pud);
+		xen_pud_pin(pud_phys);
 		next = start + PGDIR_SIZE;
 		if (next > end) 
 			next = end; 
 		phys_pud_init(pud, __pa(start), __pa(next));
 		set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
-	} 
+	}
 
-	printk("kernel direct mapping tables upto %lx @ %lx-%lx\n", end, 
-	       table_start<<PAGE_SHIFT, 
-	       table_end<<PAGE_SHIFT);
+	printk("kernel direct mapping tables upto %lx @ %lx-%lx\n",
+	       __pa(end), table_start<<PAGE_SHIFT, start_pfn<<PAGE_SHIFT);
 
-        start_pfn = ((current_size + extended_size) >> PAGE_SHIFT);
+	BUG_ON(start_pfn != (table_start + (tables_space >> PAGE_SHIFT)));
 
 	__flush_tlb_all();
-        init_mapping_done = 1;
+	init_mapping_done = 1;
 }
 
 extern struct x8664_pda cpu_pda[NR_CPUS];
@@ -1002,3 +965,13 @@ int in_gate_area_no_task(unsigned long addr)
 {
 	return (addr >= VSYSCALL_START) && (addr < VSYSCALL_END);
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

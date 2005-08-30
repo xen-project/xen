@@ -42,7 +42,7 @@
 #define __HYPERVISOR_set_debugreg          8
 #define __HYPERVISOR_get_debugreg          9
 #define __HYPERVISOR_update_descriptor    10
-#define __HYPERVISOR_dom_mem_op           12
+#define __HYPERVISOR_memory_op            12
 #define __HYPERVISOR_multicall            13
 #define __HYPERVISOR_update_va_mapping    14
 #define __HYPERVISOR_set_timer_op         15
@@ -223,12 +223,6 @@ struct mmuext_op {
  */
 #define CONSOLEIO_write         0
 #define CONSOLEIO_read          1
-
-/*
- * Commands to HYPERVISOR_dom_mem_op().
- */
-#define MEMOP_increase_reservation 0
-#define MEMOP_decrease_reservation 1
 
 /*
  * Commands to HYPERVISOR_vm_assist().
@@ -438,19 +432,21 @@ typedef struct shared_info {
 #define MAX_GUEST_CMDLINE 1024
 typedef struct start_info {
     /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
-    unsigned long nr_pages;   /* Total pages allocated to this domain.    */
-    unsigned long shared_info;/* MACHINE address of shared info struct.   */
-    u32      flags;           /* SIF_xxx flags.                           */
+    unsigned long nr_pages;     /* Total pages allocated to this domain.  */
+    unsigned long shared_info;  /* MACHINE address of shared info struct. */
+    u32      flags;             /* SIF_xxx flags.                         */
     u16      domain_controller_evtchn;
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).     */
-    unsigned long pt_base;    /* VIRTUAL address of page directory.       */
-    unsigned long nr_pt_frames;/* Number of bootstrap p.t. frames.        */
-    unsigned long mfn_list;   /* VIRTUAL address of page-frame list.      */
-    unsigned long mod_start;  /* VIRTUAL address of pre-loaded module.    */
-    unsigned long mod_len;    /* Size (bytes) of pre-loaded module.       */
+    unsigned long pt_base;      /* VIRTUAL address of page directory.     */
+    unsigned long nr_pt_frames; /* Number of bootstrap p.t. frames.       */
+    unsigned long mfn_list;     /* VIRTUAL address of page-frame list.    */
+    unsigned long mod_start;    /* VIRTUAL address of pre-loaded module.  */
+    unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
     s8 cmd_line[MAX_GUEST_CMDLINE];
-    unsigned long store_mfn;  /* MACHINE page number of shared page.      */
-    u16      store_evtchn;    /* Event channel for store communication.   */
+    unsigned long store_mfn;    /* MACHINE page number of shared page.    */
+    u16      store_evtchn;      /* Event channel for store communication. */
+    unsigned long console_mfn;  /* MACHINE address of console page.       */
+    u16      console_evtchn;    /* Event channel for console messages.    */
 } start_info_t;
 
 /* These flags are passed in the 'flags' field of start_info_t. */

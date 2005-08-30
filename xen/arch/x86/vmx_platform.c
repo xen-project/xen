@@ -521,7 +521,7 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
     if ( vmx_paging_enabled(current) )
     {
         gpa = gva_to_gpa(guest_eip);
-        mfn = phys_to_machine_mapping(gpa >> PAGE_SHIFT);
+        mfn = get_mfn_from_pfn(gpa >> PAGE_SHIFT);
 
         /* Does this cross a page boundary ? */
         if ( (guest_eip & PAGE_MASK) != ((guest_eip + inst_len) & PAGE_MASK) )
@@ -532,7 +532,7 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
     }
     else
     {
-        mfn = phys_to_machine_mapping(guest_eip >> PAGE_SHIFT);
+        mfn = get_mfn_from_pfn(guest_eip >> PAGE_SHIFT);
     }
 
     inst_start = map_domain_page(mfn);
@@ -542,7 +542,7 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
     if ( remaining )
     {
         gpa = gva_to_gpa(guest_eip+inst_len+remaining);
-        mfn = phys_to_machine_mapping(gpa >> PAGE_SHIFT);
+        mfn = get_mfn_from_pfn(gpa >> PAGE_SHIFT);
 
         inst_start = map_domain_page(mfn);
         memcpy((char *)buf+inst_len, inst_start, remaining);

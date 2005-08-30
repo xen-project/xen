@@ -209,6 +209,7 @@ int xenbus_register_device(struct xenbus_driver *drv)
 {
 	return xenbus_register_driver(drv, &xenbus_frontend);
 }
+EXPORT_SYMBOL(xenbus_register_device);
 
 int xenbus_register_backend(struct xenbus_driver *drv)
 {

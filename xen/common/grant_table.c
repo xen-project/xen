@@ -1211,13 +1211,13 @@ gnttab_notify_transfer(
         DPRINTK("Bad pfn (%lx)\n", pfn);
     else
     {
-        machine_to_phys_mapping[frame] = pfn;
+        set_pfn_from_mfn(frame, pfn);
 
         if ( unlikely(shadow_mode_log_dirty(ld)))
              mark_dirty(ld, frame);
 
         if (shadow_mode_translate(ld))
-            __phys_to_machine_mapping[pfn] = frame;
+            set_mfn_from_pfn(pfn, frame);
     }
     sha->frame = __mfn_to_gpfn(rd, frame);
     sha->domid = rd->domain_id;
@@ -1268,8 +1268,7 @@ grant_table_create(
     {
         SHARE_PFN_WITH_DOMAIN(
             virt_to_page((char *)(t->shared)+(i*PAGE_SIZE)), d);
-        machine_to_phys_mapping[(virt_to_phys(t->shared) >> PAGE_SHIFT) + i] =
-            INVALID_M2P_ENTRY;
+        set_pfn_from_mfn((virt_to_phys(t->shared) >> PAGE_SHIFT) + i, INVALID_M2P_ENTRY);
     }
 
     /* Okay, install the structure. */

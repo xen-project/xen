@@ -32,6 +32,24 @@
 #undef NDEBUG
 #include <stdio.h>
 
+#include <endian.h>
+#include <byteswap.h>
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+#define eswap(x) (x)
+#else 
+#define eswap(x)                                               \
+        ({                                                      \
+               typeof(x) y = (x);                              \
+               switch(sizeof(y))                               \
+               {                                               \
+               case 2: y = __bswap_16(y); break;               \
+               case 4: y = __bswap_32(y); break;               \
+               case 8: y = __bswap_64(y); break;               \
+               }                                               \
+               y;                                              \
+        })	
+#endif			
+
 /* Flags */
 extern int quiet;
 

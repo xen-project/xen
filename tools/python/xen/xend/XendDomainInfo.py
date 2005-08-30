@@ -47,7 +47,7 @@ from xen.xend.XendError import XendError, VmError
 from xen.xend.XendRoot import get_component
 
 from xen.xend.uuid import getUuid
-from xen.xend.xenstore import DBVar
+from xen.xend.xenstore import DBVar, XenNode, DBMap
 
 """Shutdown code for poweroff."""
 DOMAIN_POWEROFF = 0
@@ -231,6 +231,7 @@ class XendDomainInfo:
         DBVar('start_time',    ty='float'),
         DBVar('state',         ty='str'),
         DBVar('store_mfn',     ty='long'),
+        DBVar('console_mfn',     ty='long'),
         DBVar('restart_mode',  ty='str'),
         DBVar('restart_state', ty='str'),
         DBVar('restart_time',  ty='float'),
@@ -260,6 +261,8 @@ class XendDomainInfo:
         self.channel = None
         self.store_channel = None
         self.store_mfn = None
+        self.console_channel = None
+        self.console_mfn = None
         self.controllers = {}
         
         self.info = None
@@ -297,6 +300,9 @@ class XendDomainInfo:
         if self.store_channel:
             self.store_channel.saveToDB(self.db.addChild("store_channel"),
                                         save=save)
+        if self.console_channel:
+            self.console_channel.saveToDB(self.db.addChild("console_channel"),
+                                        save=save)
         if self.image:
             self.image.exportToDB(save=save, sync=sync)
         self.db.exportToDB(self, fields=self.__exports__, save=save, sync=sync)
@@ -328,6 +334,9 @@ class XendDomainInfo:
 
     def getStoreChannel(self):
         return self.store_channel
+
+    def getConsoleChannel(self):
+        return self.console_channel
 
     def update(self, info):
         """Update with  info from xc.domain_getinfo().
@@ -518,6 +527,14 @@ class XendDomainInfo:
             sxpr.append(self.store_channel.sxpr())
         if self.store_mfn:
             sxpr.append(['store_mfn', self.store_mfn])
+        if self.console_channel:
+            sxpr.append(['console_channel', self.console_channel.sxpr()])
+        if self.console_mfn:
+            sxpr.append(['console_mfn', self.console_mfn])
+# already in (devices)
+#        console = self.getConsole()
+#        if console:
+#            sxpr.append(console.sxpr())
 
         if self.restart_count:
             sxpr.append(['restart_count', self.restart_count])
@@ -712,6 +729,13 @@ class XendDomainInfo:
             except Exception, ex:
                 log.warning("error in domain release on xenstore: %s", ex)
                 pass
+        if self.console_channel:
+            # notify processes using this cosole?
+            try:
+                self.console_channel.close()
+                self.console_channel = None
+            except:
+                pass
         if self.image:
             try:
                 self.device_model_pid = 0
@@ -808,6 +832,7 @@ class XendDomainInfo:
         """
         self.channel = self.openChannel("channel", 0, 1)
         self.store_channel = self.eventChannel("store_channel")
+        self.console_channel = self.eventChannel("console_channel")
 
     def create_configured_devices(self):
         devices = sxp.children(self.config, 'device')
@@ -1003,6 +1028,7 @@ class XendDomainInfo:
         self.configure_fields()
         self.create_devices()
         self.create_blkif()
+        self.publish_console()
 
     def create_blkif(self):
         """Create the block device interface (blkif) for the vm.
@@ -1017,6 +1043,12 @@ class XendDomainInfo:
             backend = blkif.getBackend(0)
             backend.connect(recreate=self.recreate)
 
+    def publish_console(self):
+        db = DBMap(db=XenNode("/console/%d" % self.id))
+        db.clear()
+        db['domain'] = self.db.getPath()
+        db.saveDB(save=True)
+        
     def configure_fields(self):
         """Process the vm configuration fields using the registered handlers.
         """

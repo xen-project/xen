@@ -50,6 +50,7 @@
 #include <asm-xen/evtchn.h>
 #include <asm-xen/xenbus.h>
 #include <asm-xen/xen-public/io/netif.h>
+#include <asm-xen/xen-public/memory.h>
 #include <asm-xen/balloon.h>
 #include <asm/page.h>
 #include <asm/uaccess.h>
@@ -328,6 +329,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     struct sk_buff *skb;
     int i, batch_target;
     NETIF_RING_IDX req_prod = np->rx->req_prod;
+    struct xen_memory_reservation reservation;
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
     int ref;
 #endif
@@ -388,12 +390,15 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     rx_mcl[i-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
 
     /* Give away a batch of pages. */
-    rx_mcl[i].op = __HYPERVISOR_dom_mem_op;
-    rx_mcl[i].args[0] = MEMOP_decrease_reservation;
-    rx_mcl[i].args[1] = (unsigned long)rx_pfn_array;
-    rx_mcl[i].args[2] = (unsigned long)i;
-    rx_mcl[i].args[3] = 0;
-    rx_mcl[i].args[4] = DOMID_SELF;
+    rx_mcl[i].op = __HYPERVISOR_memory_op;
+    rx_mcl[i].args[0] = XENMEM_decrease_reservation;
+    rx_mcl[i].args[1] = (unsigned long)&reservation;
+
+    reservation.extent_start = rx_pfn_array;
+    reservation.nr_extents   = i;
+    reservation.extent_order = 0;
+    reservation.address_bits = 0;
+    reservation.domid        = DOMID_SELF;
 
     /* Tell the ballon driver what is going on. */
     balloon_update_driver_allowance(i);
@@ -401,7 +406,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     /* Zap PTEs and give away pages in one big multicall. */
     (void)HYPERVISOR_multicall(rx_mcl, i+1);
 
-    /* Check return status of HYPERVISOR_dom_mem_op(). */
+    /* Check return status of HYPERVISOR_memory_op(). */
     if (unlikely(rx_mcl[i].result != i))
         panic("Unable to reduce memory reservation\n");
 

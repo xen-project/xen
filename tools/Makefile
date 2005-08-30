@@ -7,14 +7,18 @@ SUBDIRS += xenstore
 SUBDIRS += misc
 SUBDIRS += examples
 SUBDIRS += xentrace
-SUBDIRS += python
 SUBDIRS += xcs
 SUBDIRS += xcutils
-#SUBDIRS += pygrub
 SUBDIRS += firmware
 SUBDIRS += security
 SUBDIRS += console
 SUBDIRS += xenstat
+
+# These don't cross-compile
+ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
+SUBDIRS += python
+#SUBDIRS += pygrub
+endif
 
 .PHONY: all install clean check check_clean ioemu eioemuinstall ioemuclean
 

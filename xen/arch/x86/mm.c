@@ -1452,7 +1452,7 @@ int get_page_type(struct pfn_info *page, unsigned long type)
                                 "!= exp %" PRtype_info ") "
                                 "for mfn %lx (pfn %x)",
                                 x, type, page_to_pfn(page),
-                                machine_to_phys_mapping[page_to_pfn(page)]);
+                                get_pfn_from_mfn(page_to_pfn(page)));
                     return 0;
                 }
                 else if ( (x & PGT_va_mask) == PGT_va_mutable )
@@ -2206,7 +2206,7 @@ int do_mmu_update(
                 printk("privileged guest dom%d requests pfn=%lx to "
                        "map mfn=%lx for dom%d\n",
                        d->domain_id, gpfn, mfn, FOREIGNDOM->domain_id);
-                set_machinetophys(mfn, gpfn);
+                set_pfn_from_mfn(mfn, gpfn);
                 set_p2m_entry(FOREIGNDOM, gpfn, mfn, &sh_mapcache, &mapcache);
                 okay = 1;
                 shadow_unlock(FOREIGNDOM);
@@ -2225,7 +2225,7 @@ int do_mmu_update(
                 break;
             }
 
-            set_machinetophys(mfn, gpfn);
+            set_pfn_from_mfn(mfn, gpfn);
             okay = 1;
 
             /*

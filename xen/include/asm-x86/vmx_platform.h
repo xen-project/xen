@@ -91,6 +91,6 @@ extern int vmx_setup_platform(struct vcpu *, struct cpu_user_regs *);
 extern void vmx_io_assist(struct vcpu *v);
 
 // XXX - think about this -- maybe use bit 30 of the mfn to signify an MMIO frame.
-#define mmio_space(gpa) (!VALID_MFN(phys_to_machine_mapping((gpa) >> PAGE_SHIFT)))
+#define mmio_space(gpa) (!VALID_MFN(get_mfn_from_pfn((gpa) >> PAGE_SHIFT)))
 
 #endif

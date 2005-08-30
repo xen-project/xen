@@ -8,24 +8,23 @@
 
 #include <stdlib.h>
 #include <unistd.h>
-
 #include "xg_private.h"
 #include <xenctrl.h>
-
 #include <xen/linux/suspend.h>
+#include <xen/memory.h>
 
 #define MAX_BATCH_SIZE 1024
 
 #define DEBUG 0
 
 #if 1
-#define ERR(_f, _a...) fprintf ( stderr, _f , ## _a ); fflush(stderr)
+#define ERR(_f, _a...) do { fprintf ( stderr, _f , ## _a ); fflush(stderr); } while(0)
 #else
 #define ERR(_f, _a...) ((void)0)
 #endif
 
 #if DEBUG
-#define DPRINTF(_f, _a...) fprintf ( stdout, _f , ## _a ); fflush(stdout)
+#define DPRINTF(_f, _a...) do { fprintf ( stdout, _f , ## _a ); fflush(stdout); } while (0)
 #else
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
@@ -103,7 +102,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     struct mmuext_op pin[MAX_PIN_BATCH];
     unsigned int nr_pins = 0;
 
-    DPRINTF("xc_linux_restore start\n");
+    DPRINTF("xc_linux_restore start: nr_pfns = %lx\n", nr_pfns);
 
     if (mlock(&ctxt, sizeof(ctxt))) {
         /* needed for when we do the build dom0 op, 
@@ -152,6 +151,8 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     err = xc_domain_memory_increase_reservation(xc_handle, dom,
                                                 nr_pfns * PAGE_SIZE / 1024);
     if (err != 0) {
+        ERR("Failed to increate reservation by %lx\n", 
+            nr_pfns * PAGE_SIZE / 1024); 
         errno = ENOMEM;
         goto out;
     }
@@ -409,7 +410,8 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
 
     /* Get the list of PFNs that are not in the psuedo-phys map */
     {
-	unsigned int count, *pfntab;
+	unsigned int count;
+        unsigned long *pfntab;
 	int rc;
 
 	if ( read_exact(io_fd, &count, sizeof(count)) != sizeof(count) )
@@ -441,9 +443,15 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
 
 	if ( count > 0 )
 	{
-	    if ( (rc = xc_dom_mem_op( xc_handle,
-				       MEMOP_decrease_reservation,
-				       pfntab, count, 0, dom )) <0 )
+            struct xen_memory_reservation reservation = {
+                .extent_start = pfntab,
+                .nr_extents   = count,
+                .extent_order = 0,
+                .domid        = dom
+            };
+	    if ( (rc = xc_memory_op(xc_handle,
+                                    XENMEM_decrease_reservation,
+                                    &reservation)) != count )
 	    {
 		ERR("Could not decrease reservation : %d",rc);
 		goto out;

@@ -7,6 +7,7 @@
  */
 
 #include "xc_private.h"
+#include <xen/memory.h>
 
 int xc_domain_create(int xc_handle,
                      u32 ssidref,
@@ -265,9 +266,13 @@ int xc_domain_memory_increase_reservation(int xc_handle,
 {
     int err;
     unsigned int npages = mem_kb / (PAGE_SIZE/1024);
+    struct xen_memory_reservation reservation = {
+        .nr_extents   = npages,
+        .extent_order = 0,
+        .domid        = domid
+    };
 
-    err = xc_dom_mem_op(xc_handle, MEMOP_increase_reservation, NULL,
-                        npages, 0, domid);
+    err = xc_memory_op(xc_handle, XENMEM_increase_reservation, &reservation);
     if (err == npages)
         return 0;
 

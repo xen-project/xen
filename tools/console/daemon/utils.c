@@ -226,14 +226,10 @@ bool xen_setup(void)
 		goto out_close_data;
 	}
 
-	/* Since the vast majority of control messages are console messages
-	   it's just easier to ignore other messages that try to bind to 
-	   a specific type. */
-	msg.type = XCS_MSG_BIND;
-	msg.u.bind.port = PORT_WILDCARD;
-	msg.u.bind.type = TYPE_WILDCARD;
+	msg.type = XCS_VIRQ_BIND;
+	msg.u.virq.virq = VIRQ_DOM_EXC;
 	if (!xcs_send_recv(xcs_ctrl_fd, &msg) || msg.result != XCS_RSLT_OK) {
-		dolog(LOG_ERR, "xcs vind failed.  Possible bug.");
+		dolog(LOG_ERR, "xcs virq bind failed.  Possible bug.");
 		goto out_close_data;
 	}
 	

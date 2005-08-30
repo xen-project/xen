@@ -238,16 +238,33 @@ class LinuxImageHandler(ImageHandler):
             store_evtchn = self.vm.store_channel.port2
         else:
             store_evtchn = 0
+        if self.vm.console_channel:
+            console_evtchn = self.vm.console_channel.port2
+        else:
+            console_evtchn = 0
+
+        log.debug("dom            = %d", self.vm.getDomain())
+        log.debug("image          = %s", self.kernel)
+        log.debug("control_evtchn = %s", self.vm.channel.getRemotePort())
+        log.debug("store_evtchn   = %d", store_evtchn)
+        log.debug("console_evtchn = %d", console_evtchn)
+        log.debug("cmdline        = %s", self.cmdline)
+        log.debug("ramdisk        = %s", self.ramdisk)
+        log.debug("flags          = %d", self.flags)
+        log.debug("vcpus          = %d", self.vm.vcpus)
+
         ret = xc.linux_build(dom            = self.vm.getDomain(),
                              image          = self.kernel,
                              control_evtchn = self.vm.channel.getRemotePort(),
                              store_evtchn   = store_evtchn,
+                             console_evtchn = console_evtchn,
                              cmdline        = self.cmdline,
                              ramdisk        = self.ramdisk,
                              flags          = self.flags,
                              vcpus          = self.vm.vcpus)
         if isinstance(ret, dict):
             self.vm.store_mfn = ret.get('store_mfn')
+            self.vm.console_mfn = ret.get('console_mfn')
             return 0
         return ret
 

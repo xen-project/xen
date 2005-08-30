@@ -47,7 +47,9 @@ int xc_linux_build(int xc_handle,
                    unsigned long flags,
                    unsigned int vcpus,
                    unsigned int store_evtchn,
-                   unsigned long *store_mfn);
+                   unsigned long *store_mfn,
+                   unsigned int console_evtchn,
+                   unsigned long *console_mfn);
 
 struct mem_map;
 int xc_vmx_build(int xc_handle,

@@ -268,25 +268,33 @@ static PyObject *pyxc_linux_build(PyObject *self,
     u32 dom;
     char *image, *ramdisk = NULL, *cmdline = "";
     int flags = 0, vcpus = 1;
-    int control_evtchn, store_evtchn;
+    int control_evtchn, store_evtchn, console_evtchn;
     unsigned long store_mfn = 0;
+    unsigned long console_mfn = 0;
 
     static char *kwd_list[] = { "dom", "control_evtchn", "store_evtchn", 
-                                "image", "ramdisk", "cmdline", "flags",
+                                "console_evtchn", "image", 
+				/* optional */
+				"ramdisk", "cmdline", "flags",
 				"vcpus", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssii", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiis|ssii", kwd_list,
                                       &dom, &control_evtchn, &store_evtchn,
-                                      &image, &ramdisk, &cmdline, &flags,
+				      &console_evtchn, &image, 
+				      /* optional */
+				      &ramdisk, &cmdline, &flags,
                                       &vcpus) )
         return NULL;
 
     if ( xc_linux_build(xc->xc_handle, dom, image,
                         ramdisk, cmdline, control_evtchn, flags, vcpus,
-                        store_evtchn, &store_mfn) != 0 )
+                        store_evtchn, &store_mfn, 
+			console_evtchn, &console_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
-    return Py_BuildValue("{s:i}", "store_mfn", store_mfn);
+    return Py_BuildValue("{s:i,s:i}", 
+			 "store_mfn", store_mfn,
+			 "console_mfn", console_mfn);
 }
 
 static PyObject *pyxc_vmx_build(PyObject *self,

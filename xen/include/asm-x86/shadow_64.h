@@ -138,7 +138,7 @@ static inline pgentry_64_t *__entry(
             return NULL;
         mfn = entry_get_value(*le_e) >> PAGE_SHIFT;
         if ((flag & GUEST_ENTRY) && shadow_mode_translate(d))
-            mfn = phys_to_machine_mapping(mfn);
+            mfn = get_mfn_from_pfn(mfn);
         le_p = (pgentry_64_t *)phys_to_virt(mfn << PAGE_SHIFT);
         index = table_offset_64(va, (level + i - 1));
         le_e = &le_p[index];
@@ -257,7 +257,7 @@ static inline void *  __guest_set_l1e(
                 if (unlikely(!(l2e_get_flags_32(gl2e) & _PAGE_PRESENT)))
                     return NULL;
 
-                l1mfn = phys_to_machine_mapping(
+                l1mfn = get_mfn_from_pfn(
                   l2e_get_pfn(gl2e));
 
                 l1va = (l1_pgentry_32_t *)
@@ -299,7 +299,7 @@ static inline void *  __guest_get_l1e(
                     return NULL;
 
 
-                l1mfn = phys_to_machine_mapping(
+                l1mfn = get_mfn_from_pfn(
                   l2e_get_pfn(gl2e));
                 l1va = (l1_pgentry_32_t *) phys_to_virt(
                   l1mfn << L1_PAGETABLE_SHIFT);
