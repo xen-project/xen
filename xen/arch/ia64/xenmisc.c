@@ -28,7 +28,12 @@ void ia64_mca_init(void) { printf("ia64_mca_init() skipped (Machine check abort 
 void ia64_mca_cpu_init(void *x) { }
 void ia64_patch_mckinley_e9(unsigned long a, unsigned long b) { }
 void ia64_patch_vtop(unsigned long a, unsigned long b) { }
-void hpsim_setup(char **x) { }
+void hpsim_setup(char **x)
+{
+#ifdef CONFIG_SMP
+	init_smp_config();
+#endif
+}
 
 // called from mem_init... don't think s/w I/O tlb is needed in Xen
 //void swiotlb_init(void) { }  ...looks like it IS needed

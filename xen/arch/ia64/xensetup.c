@@ -260,6 +260,41 @@ printk("About to call xen_time_init()\n");
 printk("About to call ac_timer_init()\n");
     ac_timer_init();
 // init_xen_time(); ???
+
+#ifdef CONFIG_SMP
+    if ( opt_nosmp )
+    {
+        max_cpus = 0;
+        smp_num_siblings = 1;
+        //boot_cpu_data.x86_num_cores = 1;
+    }
+
+    smp_prepare_cpus(max_cpus);
+
+    /* We aren't hotplug-capable yet. */
+    //BUG_ON(!cpus_empty(cpu_present_map));
+    for_each_cpu ( i )
+        cpu_set(i, cpu_present_map);
+
+    //BUG_ON(!local_irq_is_enabled());
+
+printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
+    for_each_present_cpu ( i )
+    {
+        if ( num_online_cpus() >= max_cpus )
+            break;
+        if ( !cpu_online(i) ) {
+printk("About to call __cpu_up(%d)\n",i);
+            __cpu_up(i);
+	}
+    }
+
+    printk("Brought up %ld CPUs\n", (long)num_online_cpus());
+    smp_cpus_done(max_cpus);
+#endif
+
+
+	// FIXME: Should the following be swapped and moved later?
     schedulers_start();
     do_initcalls();
 printk("About to call sort_main_extable()\n");

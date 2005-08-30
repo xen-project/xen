@@ -68,7 +68,8 @@ int ht_per_core = 1;
 
 #ifdef CONFIG_SMP /* ifdef XEN */
 
-#define SMP_DEBUG 0
+//#define SMP_DEBUG 0
+#define SMP_DEBUG 1
 
 #if SMP_DEBUG
 #define Dprintk(x...)  printk(x)

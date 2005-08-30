@@ -63,7 +63,8 @@ void flush_tlb_mask(cpumask_t mask)
 //Huh? This seems to be used on ia64 even if !CONFIG_SMP
 void smp_send_event_check_mask(cpumask_t mask)
 {
-	dummy();
+	printf("smp_send_event_check_mask called\n");
+	//dummy();
 	//send_IPI_mask(cpu_mask, EVENT_CHECK_VECTOR);
 }
 
@@ -378,7 +379,11 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 
 	/* Can deadlock when called with interrupts disabled */
 #ifdef XEN
-	if (irqs_disabled()) panic("smp_call_function called with interrupts disabled\n");
+	if (irqs_disabled()) {
+		printk("smp_call_function called with interrupts disabled...");
+		printk("enabling interrupts\n");
+		local_irq_enable();
+	}
 #else
 	WARN_ON(irqs_disabled());
 #endif
@@ -390,11 +395,15 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 	if (wait)
 		atomic_set(&data.finished, 0);
 
+	printk("smp_call_function: about to spin_lock \n");
 	spin_lock(&call_lock);
+	printk("smp_call_function: done with spin_lock \n");
 
 	call_data = &data;
 	mb();	/* ensure store to call_data precedes setting of IPI_CALL_FUNC */
+	printk("smp_call_function: about to send_IPI \n");
 	send_IPI_allbutself(IPI_CALL_FUNC);
+	printk("smp_call_function: done with send_IPI \n");
 
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
@@ -405,7 +414,9 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 			cpu_relax();
 	call_data = NULL;
 
+	printk("smp_call_function: about to spin_unlock \n");
 	spin_unlock(&call_lock);
+	printk("smp_call_function: DONE WITH spin_unlock, returning \n");
 	return 0;
 }
 EXPORT_SYMBOL(smp_call_function);

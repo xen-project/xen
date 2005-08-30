@@ -586,6 +586,7 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 	PSCB(vcpu,pending_interruption) = 1;
     }
 
+#if 0
     /* Keir: I think you should unblock when an interrupt is pending. */
     {
         int running = test_bit(_VCPUF_running, &vcpu->vcpu_flags);
@@ -593,6 +594,7 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
         if ( running )
             smp_send_event_check_cpu(vcpu->processor);
     }
+#endif
 }
 
 void early_tick(VCPU *vcpu)
