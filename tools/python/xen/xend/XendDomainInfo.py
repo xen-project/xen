@@ -269,6 +269,7 @@ class XendDomainInfo:
         self.blkif_backend = False
         self.netif_backend = False
         self.netif_idx = 0
+        self.tpmif_backend = False
         
         #todo: state: running, suspended
         self.state = STATE_VM_OK
@@ -458,6 +459,31 @@ class XendDomainInfo:
 
             return
         
+        if type == 'vtpm':
+            backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
+
+            devnum = int(sxp.child_value(devconfig, 'instance', '0'))
+            log.error("The domain has a TPM with instance %d." % devnum)
+
+            # create backend db
+            backdb = backdom.db.addChild("/backend/%s/%s/%d" %
+                                         (type, self.uuid, devnum))
+            # create frontend db
+            db = self.db.addChild("/device/%s/%d" % (type, devnum))
+
+            backdb['frontend'] = db.getPath()
+            backdb['frontend-id'] = "%i" % self.id
+            backdb['instance'] = sxp.child_value(devconfig, 'instance', '0')
+            backdb.saveDB(save=True)
+
+            db['handle'] = "%i" % devnum
+            db['backend'] = backdb.getPath()
+            db['backend-id'] = "%i" % int(sxp.child_value(devconfig,
+                                                          'backend', '0'))
+            db.saveDB(save=True)
+
+            return
+
         ctrl = self.findDeviceController(type)
         return ctrl.createDevice(devconfig, recreate=self.recreate,
                                  change=change)
@@ -779,6 +805,11 @@ class XendDomainInfo:
                 for dev in typedb.keys():
                     typedb[dev].delete()
                 typedb.saveDB(save=True)
+            if type == 'vtpm':
+                typedb = ddb.addChild(type)
+                for dev in typedb.keys():
+                    typedb[dev].delete()
+                typedb.saveDB(save=True)
 
     def show(self):
         """Print virtual machine info.
@@ -1018,6 +1049,8 @@ class XendDomainInfo:
                 self.netif_backend = True
             elif name == 'usbif':
                 self.usbif_backend = True
+            elif name == 'tpmif':
+                self.tpmif_backend = True
             else:
                 raise VmError('invalid backend type:' + str(name))
 
@@ -1189,6 +1222,10 @@ add_device_handler("vbd", "vbd")
 from server import netif
 controller.addDevControllerClass("vif", netif.NetifController)
 add_device_handler("vif", "vif")
+
+from server import tpmif
+controller.addDevControllerClass("vtpm", tpmif.TPMifController)
+add_device_handler("vtpm", "vtpm")
 
 from server import pciif
 controller.addDevControllerClass("pci", pciif.PciController)
