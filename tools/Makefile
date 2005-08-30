@@ -12,6 +12,8 @@ SUBDIRS += xcutils
 SUBDIRS += firmware
 SUBDIRS += security
 SUBDIRS += console
+SUBDIRS += vtpm_manager
+SUBDIRS += vtpm
 SUBDIRS += xenstat
 
 # These don't cross-compile
