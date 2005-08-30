@@ -368,7 +368,7 @@ static void blkif_free(struct blkfront_info *info)
 		free_page((unsigned long)info->ring.sring);
 		info->ring.sring = NULL;
 	}
-	unbind_evtchn_from_irqhandler(info->evtchn, NULL);
+	unbind_evtchn_from_irqhandler(info->evtchn, info); 
 	info->evtchn = 0;
 }
 

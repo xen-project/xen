@@ -19,13 +19,13 @@
 #define DEBUG 0
 
 #if 1
-#define ERR(_f, _a...) fprintf ( stderr, _f , ## _a ); fflush(stderr)
+#define ERR(_f, _a...) do { fprintf ( stderr, _f , ## _a ); fflush(stderr); } while(0)
 #else
 #define ERR(_f, _a...) ((void)0)
 #endif
 
 #if DEBUG
-#define DPRINTF(_f, _a...) fprintf ( stdout, _f , ## _a ); fflush(stdout)
+#define DPRINTF(_f, _a...) do { fprintf ( stdout, _f , ## _a ); fflush(stdout); } while (0)
 #else
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
@@ -103,7 +103,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     struct mmuext_op pin[MAX_PIN_BATCH];
     unsigned int nr_pins = 0;
 
-    DPRINTF("xc_linux_restore start\n");
+    DPRINTF("xc_linux_restore start: nr_pfns = %lx\n", nr_pfns);
 
     if (mlock(&ctxt, sizeof(ctxt))) {
         /* needed for when we do the build dom0 op, 
@@ -152,6 +152,8 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     err = xc_domain_memory_increase_reservation(xc_handle, dom,
                                                 nr_pfns * PAGE_SIZE / 1024);
     if (err != 0) {
+        ERR("Failed to increate reservation by %lx\n", 
+            nr_pfns * PAGE_SIZE / 1024); 
         errno = ENOMEM;
         goto out;
     }

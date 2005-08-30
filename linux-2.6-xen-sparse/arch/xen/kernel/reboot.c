@@ -65,16 +65,11 @@ static int shutting_down = SHUTDOWN_INVALID;
 #define cpu_up(x) (-EOPNOTSUPP)
 #endif
 
-#ifdef CONFIG_SMP
-#endif
 
 static int __do_suspend(void *ignore)
 {
     int i, j;
     suspend_record_t *suspend_record;
-
-    /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
-	/* XXX SMH: yes it would :-( */	
 
 #ifdef CONFIG_XEN_USB_FRONTEND
     extern void usbif_resume();
@@ -108,7 +103,8 @@ static int __do_suspend(void *ignore)
 
 #if defined(CONFIG_SMP) && !defined(CONFIG_HOTPLUG_CPU)
     if (num_online_cpus() > 1) {
-	printk(KERN_WARNING "Can't suspend SMP guests without CONFIG_HOTPLUG_CPU\n");
+	printk(KERN_WARNING 
+               "Can't suspend SMP guests without CONFIG_HOTPLUG_CPU\n");
 	return -EOPNOTSUPP;
     }
 #endif
