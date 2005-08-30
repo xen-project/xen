@@ -2,6 +2,7 @@
 #define ELFSIZE 32
 #include "xc_elf.h"
 #include <stdlib.h>
+#include <unistd.h>
 #include <zlib.h>
 
 /* number of pages to write at a time */

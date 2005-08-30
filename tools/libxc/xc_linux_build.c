@@ -17,6 +17,7 @@
 #include "xc_elf.h"
 #include "xc_aout9.h"
 #include <stdlib.h>
+#include <unistd.h>
 #include <zlib.h>
 
 #if defined(__i386__)
