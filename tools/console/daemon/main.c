@@ -85,6 +85,8 @@ int main(int argc, char **argv)
 
 	xen_setup();
 
+	enum_domains();
+
 	handle_io();
 
 	closelog();
