@@ -45,7 +45,9 @@
 
 static char printf_buffer[4096];
 static LIST_HEAD(watches);
+
 DECLARE_MUTEX(xenbus_lock);
+EXPORT_SYMBOL(xenbus_lock);
 
 static int get_error(const char *errorstring)
 {
@@ -224,6 +226,7 @@ char **xenbus_directory(const char *dir, const char *node, unsigned int *num)
 		ret[(*num)++] = p;
 	return ret;
 }
+EXPORT_SYMBOL(xenbus_directory);
 
 /* Check if a path exists. Return 1 if it does. */
 int xenbus_exists(const char *dir, const char *node)
@@ -237,6 +240,7 @@ int xenbus_exists(const char *dir, const char *node)
 	kfree(d);
 	return 1;
 }
+EXPORT_SYMBOL(xenbus_exists);
 
 /* Get the value of a single file.
  * Returns a kmalloced value: call free() on it after use.
@@ -277,18 +281,21 @@ int xenbus_write(const char *dir, const char *node,
 
 	return xs_error(xs_talkv(XS_WRITE, iovec, ARRAY_SIZE(iovec), NULL));
 }
+EXPORT_SYMBOL(xenbus_write);
 
 /* Create a new directory. */
 int xenbus_mkdir(const char *dir, const char *node)
 {
 	return xs_error(xs_single(XS_MKDIR, join(dir, node), NULL));
 }
+EXPORT_SYMBOL(xenbus_mkdir);
 
 /* Destroy a file or directory (directories must be empty). */
 int xenbus_rm(const char *dir, const char *node)
 {
 	return xs_error(xs_single(XS_RM, join(dir, node), NULL));
 }
+EXPORT_SYMBOL(xenbus_rm);
 
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.

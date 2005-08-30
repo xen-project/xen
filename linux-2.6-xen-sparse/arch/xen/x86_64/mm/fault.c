@@ -149,7 +149,7 @@ void dump_pagetable(unsigned long address)
 	pmd_t *pmd;
 	pte_t *pte;
 
-        pgd = (pgd_t *)per_cpu(cur_pgd, smp_processor_id());
+	pgd = (pgd_t *)per_cpu(cur_pgd, smp_processor_id());
 	pgd += pgd_index(address);
 
 	printk("PGD %lx ", pgd_val(*pgd));
@@ -296,9 +296,9 @@ int exception_trace = 1;
 #define MEM_VERBOSE 1
 
 #ifdef MEM_VERBOSE
-#define MEM_LOG(_f, _a...)                           \
-  printk("fault.c:[%d]-> " _f "\n", \
-          __LINE__ , ## _a )
+#define MEM_LOG(_f, _a...)			\
+	printk("fault.c:[%d]-> " _f "\n",	\
+	__LINE__ , ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
 #endif
@@ -325,7 +325,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	siginfo_t info;
 
 	if (!user_mode(regs))
-                error_code &= ~4; /* means kernel */
+		error_code &= ~4; /* means kernel */
 
 #ifdef CONFIG_CHECKING
 	{ 

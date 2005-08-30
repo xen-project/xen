@@ -405,7 +405,7 @@ extern unsigned long *mpt_table;
 /* If pmt table is provided by control pannel later, we need __get_user
 * here. However if it's allocated by HV, we should access it directly
 */
-#define phys_to_machine_mapping(d, gpfn)			\
+#define get_mfn_from_pfn(d, gpfn)			\
     ((d) == dom0 ? gpfn : 					\
 	(gpfn <= d->arch.max_pfn ? (d)->arch.pmt[(gpfn)] :	\
 		INVALID_MFN))
@@ -414,7 +414,7 @@ extern unsigned long *mpt_table;
     machine_to_phys_mapping[(mfn)]
 
 #define __gpfn_to_mfn(_d, gpfn)			\
-    phys_to_machine_mapping((_d), (gpfn))
+    get_mfn_from_pfn((_d), (gpfn))
 
 #define __gpfn_invalid(_d, gpfn)			\
 	(__gpfn_to_mfn((_d), (gpfn)) & GPFN_INV_MASK)

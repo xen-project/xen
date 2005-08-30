@@ -100,6 +100,7 @@ unsigned long do_get_debugreg(int reg);
 
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
+#define stack_words_per_line (32 / BYTES_PER_LONG)
 
 int is_kernel_text(unsigned long addr)
 {
@@ -125,7 +126,7 @@ void show_guest_stack(void)
 
     printk("Guest stack trace from "__OP"sp=%p:\n   ", stack);
 
-    for ( i = 0; i < (debug_stack_lines*8); i++ )
+    for ( i = 0; i < (debug_stack_lines*stack_words_per_line); i++ )
     {
         if ( ((long)stack & (STACK_SIZE-1)) == 0 )
             break;
@@ -137,7 +138,7 @@ void show_guest_stack(void)
             i = 1;
             break;
         }
-        if ( (i != 0) && ((i % 8) == 0) )
+        if ( (i != 0) && ((i % stack_words_per_line) == 0) )
             printk("\n   ");
         printk("%p ", _p(addr));
         stack++;
@@ -176,11 +177,11 @@ void show_stack(unsigned long *esp)
 
     printk("Xen stack trace from "__OP"sp=%p:\n   ", stack);
 
-    for ( i = 0; i < (debug_stack_lines*8); i++ )
+    for ( i = 0; i < (debug_stack_lines*stack_words_per_line); i++ )
     {
         if ( ((long)stack & (STACK_SIZE-1)) == 0 )
             break;
-        if ( (i != 0) && ((i % 8) == 0) )
+        if ( (i != 0) && ((i % stack_words_per_line) == 0) )
             printk("\n   ");
         addr = *stack++;
         printk("%p ", _p(addr));

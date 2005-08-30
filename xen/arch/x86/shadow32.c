@@ -827,7 +827,7 @@ alloc_p2m_table(struct domain *d)
     {
         page = list_entry(list_ent, struct pfn_info, list);
         mfn = page_to_pfn(page);
-        pfn = machine_to_phys_mapping[mfn];
+        pfn = get_pfn_from_mfn(mfn);
         ASSERT(pfn != INVALID_M2P_ENTRY);
         ASSERT(pfn < (1u<<20));
 
@@ -841,7 +841,7 @@ alloc_p2m_table(struct domain *d)
     {
         page = list_entry(list_ent, struct pfn_info, list);
         mfn = page_to_pfn(page);
-        pfn = machine_to_phys_mapping[mfn];
+        pfn = get_pfn_from_mfn(mfn);
         if ( (pfn != INVALID_M2P_ENTRY) &&
              (pfn < (1u<<20)) )
         {
