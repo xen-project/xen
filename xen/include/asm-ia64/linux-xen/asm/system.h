@@ -247,9 +247,9 @@ extern void ia64_load_extra (struct task_struct *task);
  */
 # define switch_to(prev,next,last) do {						\
 	if (ia64_psr(ia64_task_regs(prev))->mfh && ia64_is_local_fpu_owner(prev)) {				\
-		ia64_psr(ia64_task_regs(prev))->mfh = 0;			\
-		(prev)->thread.flags |= IA64_THREAD_FPH_VALID;			\
-		__ia64_save_fpu((prev)->thread.fph);				\
+		/* ia64_psr(ia64_task_regs(prev))->mfh = 0; */			\
+		/* (prev)->thread.flags |= IA64_THREAD_FPH_VALID; */			\
+		/* __ia64_save_fpu((prev)->thread.fph); */				\
 	}									\
 	__switch_to(prev, next, last);						\
 } while (0)

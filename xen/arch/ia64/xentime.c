@@ -32,6 +32,10 @@
 #endif
 #include <xen/softirq.h>
 
+#ifdef XEN
+seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
+#endif
+
 #define TIME_KEEPER_ID  0
 extern unsigned long wall_jiffies;
 

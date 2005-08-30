@@ -266,8 +266,12 @@ skip:
 #ifdef CONFIG_SMP
 inline void synchronize_irq(unsigned int irq)
 {
-	while (irq_descp(irq)->status & IRQ_INPROGRESS)
+#ifndef XEN
+	struct irq_desc *desc = irq_desc + irq;
+
+	while (desc->status & IRQ_INPROGRESS)
 		cpu_relax();
+#endif
 }
 EXPORT_SYMBOL(synchronize_irq);
 #endif
@@ -1012,6 +1016,8 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	return 0;
 }
 
+#ifndef XEN
+
 static struct proc_dir_entry * root_irq_dir;
 static struct proc_dir_entry * irq_dir [NR_IRQS];
 
@@ -1121,6 +1127,7 @@ void move_irq(int irq)
 
 
 #endif /* CONFIG_SMP */
+#endif
 
 #ifdef CONFIG_HOTPLUG_CPU
 unsigned int vectors_in_migration[NR_IRQS];

@@ -27,6 +27,11 @@
 #undef RFI_TO_INTERRUPT // not working yet
 #endif
 
+#ifdef CONFIG_SMP
+#warning "FIXME: ptc.ga instruction requires spinlock for SMP"
+#undef FAST_PTC_GA
+#endif
+
 // FIXME: turn off for now... but NaTs may crash Xen so re-enable soon!
 //#define HANDLE_AR_UNAT
 
@@ -1506,9 +1511,6 @@ GLOBAL_ENTRY(hyper_thash)
 END(hyper_thash)
 
 ENTRY(hyper_ptc_ga)
-#ifdef CONFIG_SMP
-FIXME: ptc.ga instruction requires spinlock for SMP
-#endif
 #ifndef FAST_PTC_GA
 	br.spnt.few dispatch_break_fault ;;
 #endif

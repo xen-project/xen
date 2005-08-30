@@ -129,7 +129,7 @@ struct vhpt_lf_entry {
 #define VHPT_CCHAIN_LOOKUP(Name, i_or_d)
 #else
 #ifdef CONFIG_SMP
-#error "VHPT_CCHAIN_LOOKUP needs a semaphore on the VHPT!"
+#warning "FIXME SMP: VHPT_CCHAIN_LOOKUP needs a semaphore on the VHPT!"
 #endif
 
 // VHPT_CCHAIN_LOOKUP is intended to run with psr.i+ic off

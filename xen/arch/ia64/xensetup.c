@@ -27,6 +27,8 @@ char saved_command_line[COMMAND_LINE_SIZE];
 
 struct vcpu *idle_task[NR_CPUS] = { &idle0_vcpu };
 
+cpumask_t cpu_present_map;
+
 #ifdef CLONE_DOMAIN0
 struct domain *clones[CLONE_DOMAIN0];
 #endif

@@ -191,8 +191,13 @@ per_cpu_init (void)
 	 * get_zeroed_page().
 	 */
 	if (smp_processor_id() == 0) {
+#ifdef XEN
+		cpu_data = alloc_xenheap_pages(PERCPU_PAGE_SIZE -
+			PAGE_SIZE + get_order(NR_CPUS));
+#else
 		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
 					   PERCPU_PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
+#endif
 		for (cpu = 0; cpu < NR_CPUS; cpu++) {
 			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
@@ -204,6 +209,7 @@ per_cpu_init (void)
 }
 #endif /* CONFIG_SMP */
 
+#ifndef XEN
 static int
 count_pages (u64 start, u64 end, void *arg)
 {
@@ -229,7 +235,6 @@ count_dma_pages (u64 start, u64 end, void *arg)
  * Set up the page tables.
  */
 
-#ifndef XEN
 void
 paging_init (void)
 {

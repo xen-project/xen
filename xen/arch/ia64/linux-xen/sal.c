@@ -17,6 +17,9 @@
 #include <asm/page.h>
 #include <asm/sal.h>
 #include <asm/pal.h>
+#ifdef XEN
+#include <linux/smp.h>
+#endif
 
  __cacheline_aligned DEFINE_SPINLOCK(sal_lock);
 unsigned long sal_platform_features;

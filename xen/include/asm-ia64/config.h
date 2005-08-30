@@ -21,6 +21,22 @@
 #define CONFIG_EFI_PCDP
 #define CONFIG_SERIAL_SGI_L1_CONSOLE
 
+#undef CONFIG_XEN_SMP
+
+#ifdef CONFIG_XEN_SMP
+#define CONFIG_SMP 1
+#define NR_CPUS 2
+#define CONFIG_NR_CPUS 2
+#else
+#undef CONFIG_SMP
+#define NR_CPUS 1
+#define CONFIG_NR_CPUS 1
+#endif
+//#define NR_CPUS 16
+//#define CONFIG_NR_CPUS 16
+//leave SMP for a later time
+//#undef CONFIG_SMP
+
 #ifndef __ASSEMBLY__
 
 // can't find where this typedef was before?!?
@@ -75,13 +91,16 @@ extern char _end[]; /* standard ELF symbol */
 //#define __cond_lock(x) (x)
 #define __must_check
 #define __deprecated
+#ifndef RELOC_HIDE
+# define RELOC_HIDE(ptr, off)					\
+  ({ unsigned long __ptr;					\
+     __ptr = (unsigned long) (ptr);				\
+    (typeof(ptr)) (__ptr + (off)); })
+#endif
 
 // xen/include/asm/config.h
 #define HZ 100
-// leave SMP for a later time
-#define NR_CPUS 1
-//#define NR_CPUS 16
-//#define CONFIG_NR_CPUS 16
+// FIXME SMP: leave SMP for a later time
 #define barrier() __asm__ __volatile__("": : :"memory")
 
 ///////////////////////////////////////////////////////////////
@@ -99,13 +118,18 @@ extern char _end[]; /* standard ELF symbol */
 
 // from include/asm-ia64/smp.h
 #ifdef CONFIG_SMP
-#error "Lots of things to fix to enable CONFIG_SMP!"
+#warning "Lots of things to fix to enable CONFIG_SMP!"
 #endif
+// FIXME SMP
 #define	get_cpu()	0
 #define put_cpu()	do {} while(0)
 
 // needed for common/dom0_ops.c until hyperthreading is supported
+#ifdef CONFIG_SMP
+extern int smp_num_siblings;
+#else
 #define smp_num_siblings 1
+#endif
 
 // from linux/include/linux/mm.h
 struct page;
@@ -253,10 +277,6 @@ extern int ht_per_core;
 
 #define CONFIG_MCKINLEY
 
-//#define CONFIG_SMP 1
-//#define CONFIG_NR_CPUS 2
-//leave SMP for a later time
-#undef CONFIG_SMP
 #undef CONFIG_X86_LOCAL_APIC
 #undef CONFIG_X86_IO_APIC
 #undef CONFIG_X86_L1_CACHE_SHIFT

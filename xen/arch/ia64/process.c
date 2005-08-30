@@ -224,7 +224,7 @@ panic_domain(regs,"psr.ic off, delivering fault=%lx,ipsr=%p,iip=%p,ifa=%p,isr=%p
 	regs->cr_iip = ((unsigned long) PSCBX(v,iva) + vector) & ~0xffUL;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
 #ifdef CONFIG_SMP
-#error "sharedinfo doesn't handle smp yet"
+#warning "SMP FIXME: sharedinfo doesn't handle smp yet, need page per vcpu"
 #endif
 	regs->r31 = &(((mapped_regs_t *)SHARED_ARCHINFO_ADDR)->ipsr);
 
