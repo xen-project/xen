@@ -694,7 +694,7 @@ vmx_copy(void *buf, unsigned long laddr, int size, int dir)
         return 0;
     }
 
-    mfn = phys_to_machine_mapping(laddr >> PAGE_SHIFT);
+    mfn = get_mfn_from_pfn(laddr >> PAGE_SHIFT);
     addr = (char *)map_domain_page(mfn) + (laddr & ~PAGE_MASK);
 
     if (dir == COPY_IN)
@@ -795,7 +795,7 @@ vmx_world_restore(struct vcpu *d, struct vmx_assist_context *c)
 	 * removed some translation or changed page attributes.
 	 * We simply invalidate the shadow.
 	 */
-	mfn = phys_to_machine_mapping(c->cr3 >> PAGE_SHIFT);
+	mfn = get_mfn_from_pfn(c->cr3 >> PAGE_SHIFT);
 	if (mfn != pagetable_get_pfn(d->arch.guest_table)) {
 	    printk("Invalid CR3 value=%x", c->cr3);
 	    domain_crash_synchronous();
@@ -813,7 +813,7 @@ vmx_world_restore(struct vcpu *d, struct vmx_assist_context *c)
 	    domain_crash_synchronous(); 
 	    return 0;
 	}
-	mfn = phys_to_machine_mapping(c->cr3 >> PAGE_SHIFT);
+	mfn = get_mfn_from_pfn(c->cr3 >> PAGE_SHIFT);
 	d->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
 	update_pagetables(d);
 	/* 
@@ -968,7 +968,7 @@ static int vmx_set_cr0(unsigned long value)
         /*
          * The guest CR3 must be pointing to the guest physical.
          */
-        if ( !VALID_MFN(mfn = phys_to_machine_mapping(
+        if ( !VALID_MFN(mfn = get_mfn_from_pfn(
                             d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT)) ||
              !get_page(pfn_to_page(mfn), d->domain) )
         {
@@ -1164,7 +1164,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
              * removed some translation or changed page attributes.
              * We simply invalidate the shadow.
              */
-            mfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
+            mfn = get_mfn_from_pfn(value >> PAGE_SHIFT);
             if (mfn != pagetable_get_pfn(d->arch.guest_table))
                 __vmx_bug(regs);
             shadow_sync_all(d->domain);
@@ -1175,7 +1175,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
              */
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             if ( ((value >> PAGE_SHIFT) > d->domain->max_pages ) ||
-                 !VALID_MFN(mfn = phys_to_machine_mapping(value >> PAGE_SHIFT)) ||
+                 !VALID_MFN(mfn = get_mfn_from_pfn(value >> PAGE_SHIFT)) ||
                  !get_page(pfn_to_page(mfn), d->domain) )
             {
                 printk("Invalid CR3 value=%lx", value);

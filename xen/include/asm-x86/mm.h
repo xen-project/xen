@@ -255,10 +255,13 @@ int check_descriptor(struct desc_struct *d);
  * contiguous (or near contiguous) physical memory.
  */
 #undef  machine_to_phys_mapping
-#define machine_to_phys_mapping ((u32 *)RDWR_MPT_VIRT_START)
+#define machine_to_phys_mapping  ((u32 *)RDWR_MPT_VIRT_START)
 #define INVALID_M2P_ENTRY        (~0U)
 #define VALID_M2P(_e)            (!((_e) & (1U<<31)))
 #define IS_INVALID_M2P_ENTRY(_e) (!VALID_M2P(_e))
+
+#define set_pfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))
+#define get_pfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
 
 /*
  * The phys_to_machine_mapping is the reversed mapping of MPT for full
@@ -266,17 +269,17 @@ int check_descriptor(struct desc_struct *d);
  * guests, so we steal the address space that would have normally
  * been used by the read-only MPT map.
  */
-#define __phys_to_machine_mapping ((unsigned long *)RO_MPT_VIRT_START)
-#define INVALID_MFN               (~0UL)
-#define VALID_MFN(_mfn)           (!((_mfn) & (1U<<31)))
+#define phys_to_machine_mapping ((unsigned long *)RO_MPT_VIRT_START)
+#define INVALID_MFN             (~0UL)
+#define VALID_MFN(_mfn)         (!((_mfn) & (1U<<31)))
 
-/* Returns the machine physical */
-static inline unsigned long phys_to_machine_mapping(unsigned long pfn) 
+#define set_mfn_from_pfn(pfn, mfn) (phys_to_machine_mapping[(pfn)] = (mfn))
+static inline unsigned long get_mfn_from_pfn(unsigned long pfn) 
 {
     unsigned long mfn;
     l1_pgentry_t pte;
 
-    if ( (__copy_from_user(&pte, &__phys_to_machine_mapping[pfn],
+    if ( (__copy_from_user(&pte, &phys_to_machine_mapping[pfn],
                            sizeof(pte)) == 0) &&
          (l1e_get_flags(pte) & _PAGE_PRESENT) )
 	mfn = l1e_get_pfn(pte);
@@ -285,7 +288,6 @@ static inline unsigned long phys_to_machine_mapping(unsigned long pfn)
     
     return mfn; 
 }
-#define set_machinetophys(_mfn, _pfn) machine_to_phys_mapping[(_mfn)] = (_pfn)
 
 #ifdef MEMORY_GUARD
 void memguard_init(void);

@@ -255,13 +255,13 @@ void arch_do_createdomain(struct vcpu *v)
     v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
     v->cpumap = CPUMAP_RUNANYWHERE;
     SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
-    machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
-                           PAGE_SHIFT] = INVALID_M2P_ENTRY;
+    set_pfn_from_mfn(virt_to_phys(d->shared_info) >> PAGE_SHIFT,
+            INVALID_M2P_ENTRY);
     
     d->arch.mm_perdomain_pt = alloc_xenheap_page();
     memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE);
-    machine_to_phys_mapping[virt_to_phys(d->arch.mm_perdomain_pt) >> 
-                           PAGE_SHIFT] = INVALID_M2P_ENTRY;
+    set_pfn_from_mfn(virt_to_phys(d->arch.mm_perdomain_pt) >> PAGE_SHIFT,
+            INVALID_M2P_ENTRY);
     v->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
     v->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
         l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
