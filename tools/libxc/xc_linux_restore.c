@@ -447,7 +447,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
                 .extent_start = pfntab,
                 .nr_extents   = count,
                 .extent_order = 0,
-                .domid        = DOMID_SELF
+                .domid        = dom
             };
 	    if ( (rc = xc_memory_op(xc_handle,
                                     XENMEM_decrease_reservation,

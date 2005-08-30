@@ -269,7 +269,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
     struct xen_memory_reservation reservation = {
         .nr_extents   = npages,
         .extent_order = 0,
-        .domid        = DOMID_SELF
+        .domid        = domid
     };
 
     err = xc_memory_op(xc_handle, XENMEM_increase_reservation, &reservation);
