@@ -4,6 +4,7 @@
 
 #ifdef PERF_COUNTERS
 
+#include <xen/lib.h>
 #include <asm/atomic.h>
 
 /* 
@@ -87,7 +88,7 @@ extern struct perfcounter perfcounters;
  * Histogram: special treatment for 0 and 1 count. After that equally spaced 
  * with last bucket taking the rest.
  */
-#ifdef PERFC_ARRAYS
+#ifdef PERF_ARRAYS
 #define perfc_incr_histo(_x,_v,_n)                                          \
     do {                                                                    \
         if ( (_v) == 0 )                                                    \
