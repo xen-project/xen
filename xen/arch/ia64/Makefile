@@ -1,18 +1,21 @@
 include $(BASEDIR)/Rules.mk
 
-VPATH = linux linux-xen
+VPATH = linux linux-xen linux/lib
+#VPATH = linux-xen linux/lib
 
 # libs-y	+= arch/ia64/lib/lib.a
 
 OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
-	xenmisc.o pdb-stub.o acpi.o hypercall.o \
+	xenmisc.o acpi.o hypercall.o \
 	machvec.o dom0_ops.o domain.o hpsimserial.o pcdp.o \
 	idle0_task.o pal.o hpsim.o efi.o efi_stub.o ivt.o mm_contig.o \
 	xenmem.o sal.o cmdline.o mm_init.o tlb.o smpboot.o \
-	extable.o linuxextable.o xenirq.o xentime.o \
+	extable.o linuxextable.o sort.o xenirq.o xentime.o \
 	regionreg.o entry.o unaligned.o privop.o vcpu.o \
 	irq_ia64.o irq_lsapic.o vhpt.o xenasm.o hyperprivop.o dom_fw.o \
 	grant_table.o sn_console.o
+
+#OBJS += idiv64.o idiv32.o			\
 
 # TMP holder to contain *.0 moved out of CONFIG_VTI
 OBJS += vmx_init.o
@@ -22,6 +25,13 @@ OBJS += vmx_virt.o vmx_vcpu.o vmx_process.o vmx_vsa.o vmx_ivt.o\
 	vmx_phy_mode.o vmx_utility.o vmx_interrupt.o vmx_entry.o vmmu.o \
 	vtlb.o mmio.o vlsapic.o vmx_hypercall.o mm.o vmx_support.o pal_emul.o
 endif
+
+# files from xen/arch/ia64/linux/lib (linux/arch/ia64/lib)
+OBJS +=	bitop.o clear_page.o flush.o copy_page_mck.o			\
+	memset.o strlen.o memcpy_mck.o 					\
+	__divsi3.o __udivsi3.o __modsi3.o __umodsi3.o			\
+	__divdi3.o __udivdi3.o __moddi3.o __umoddi3.o
+
 # perfmon.o
 # unwind.o needed for kernel unwinding (rare)
 
@@ -30,8 +40,8 @@ OBJS := $(subst $(TARGET_ARCH)/asm-offsets.o,,$(OBJS))
 # remove following line if not privifying in memory
 # OBJS += privify.o
 
-default: $(OBJS) head.o ia64lib.o xen.lds.s
-	$(LD) -r -o arch.o $(OBJS) ia64lib.o
+default: $(OBJS) head.o xen.lds.s
+	$(LD) -r -o arch.o $(OBJS)
 	$(LD) $(LDFLAGS) -T $(BASEDIR)/arch/$(TARGET_ARCH)/xen.lds.s -N \
 		-Map map.out head.o $(ALL_OBJS) -o $(TARGET)-syms
 	$(OBJCOPY) -R .note -R .comment -S $(TARGET)-syms $(TARGET)
@@ -79,12 +89,29 @@ xen.lds.s: xen.lds.S
 	$(CC) -E $(CPPFLAGS) -P -DXEN -D__ASSEMBLY__ \
 		-o xen.lds.s xen.lds.S
 
-ia64lib.o:
-	$(MAKE) -C linux/lib && cp linux/lib/ia64lib.o .
+# variants of divide/modulo
+# see files in xen/arch/ia64/linux/lib (linux/arch/ia64/lib)
+__divdi3.o: idiv64.S
+	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $@ $<
+__udivdi3.o: idiv64.S
+	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -DUNSIGNED -c -o $@ $<
+__moddi3.o: idiv64.S
+	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -DMODULO -c -o $@ $<
+__umoddi3.o: idiv64.S
+	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -DMODULO -DUNSIGNED -c -o $@ $<
+__divsi3.o: idiv32.S
+	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $@ $<
+__udivsi3.o: idiv32.S
+	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -DUNSIGNED -c -o $@ $<
+__modsi3.o: idiv32.S
+	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -DMODULO -c -o $@ $<
+__umodsi3.o: idiv32.S
+	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -DMODULO -DUNSIGNED -c -o $@ $<
+
 
 clean:
 	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-offsets.s
 	rm -f asm-xsi-offsets.s $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
-	rm -f lib/*.o
+	rm -f linux/lib/*.o
 
 .PHONY: default clean

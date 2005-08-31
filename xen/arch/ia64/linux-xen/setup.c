@@ -4,10 +4,15 @@
  * Copyright (C) 1998-2001, 2003-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
- * Copyright (C) 2000, Rohit Seth <rohit.seth@intel.com>
+ * Copyright (C) 2000, 2004 Intel Corp
+ * 	Rohit Seth <rohit.seth@intel.com>
+ * 	Suresh Siddha <suresh.b.siddha@intel.com>
+ * 	Gordon Jin <gordon.jin@intel.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  *
+ * 12/26/04 S.Siddha, G.Jin, R.Seth
+ *			Add multi-threading and multi-core detection
  * 11/12/01 D.Mosberger Convert get_cpuinfo() to seq_file based show_cpuinfo().
  * 04/04/00 D.Mosberger renamed cpu_initialized to cpu_online_map
  * 03/31/00 R.Seth	cpu_initialized and current->processor fixes
@@ -15,6 +20,7 @@
  * 02/01/00 R.Seth	fixed get_cpuinfo for SMP
  * 01/07/99 S.Eranian	added the support for command line argument
  * 06/24/99 W.Drummond	added boot_cpu_data.
+ * 05/28/05 Z. Menyhart	Dynamic stride size for "flush_icache_range()"
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -35,6 +41,10 @@
 #include <linux/serial_core.h>
 #include <linux/efi.h>
 #include <linux/initrd.h>
+#ifndef XEN
+#include <linux/platform.h>
+#include <linux/pm.h>
+#endif
 
 #include <asm/ia32.h>
 #include <asm/machvec.h>
@@ -51,8 +61,10 @@
 #include <asm/smp.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
+#ifdef XEN
 #include <asm/vmx.h>
 #include <asm/io.h>
+#endif
 
 #if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
 # error "struct cpuinfo_ia64 too big!"
@@ -64,12 +76,16 @@ EXPORT_SYMBOL(__per_cpu_offset);
 #endif
 
 DEFINE_PER_CPU(struct cpuinfo_ia64, cpu_info);
+#ifdef XEN
 DEFINE_PER_CPU(cpu_kr_ia64_t, cpu_kr);
+#endif
 DEFINE_PER_CPU(unsigned long, local_per_cpu_offset);
 DEFINE_PER_CPU(unsigned long, ia64_phys_stacked_size_p8);
 unsigned long ia64_cycles_per_usec;
 struct ia64_boot_param *ia64_boot_param;
 struct screen_info screen_info;
+unsigned long vga_console_iobase;
+unsigned long vga_console_membase;
 
 unsigned long ia64_max_cacheline_size;
 unsigned long ia64_iobase;	/* virtual address for I/O accesses */
@@ -78,7 +94,12 @@ struct io_space io_space[MAX_IO_SPACES];
 EXPORT_SYMBOL(io_space);
 unsigned int num_io_spaces;
 
-unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I/O is gone */
+/*
+ * "flush_icache_range()" needs to know what processor dependent stride size to use
+ * when it makes i-cache(s) coherent with d-caches.
+ */
+#define	I_CACHE_STRIDE_SHIFT	5	/* Safest way to go: 32 bytes by 32 bytes */
+unsigned long ia64_i_cache_stride_shift = ~0;
 
 /*
  * The merge_mask variable needs to be set to (max(iommu_page_size(iommu)) - 1).  This
@@ -287,23 +308,25 @@ io_port_init (void)
 static inline int __init
 early_console_setup (char *cmdline)
 {
+	int earlycons = 0;
+
 #ifdef CONFIG_SERIAL_SGI_L1_CONSOLE
 	{
 		extern int sn_serial_console_early_setup(void);
 		if (!sn_serial_console_early_setup())
-			return 0;
+			earlycons++;
 	}
 #endif
 #ifdef CONFIG_EFI_PCDP
 	if (!efi_setup_pcdp_console(cmdline))
-		return 0;
+		earlycons++;
 #endif
 #ifdef CONFIG_SERIAL_8250_CONSOLE
 	if (!early_serial_console_init(cmdline))
-		return 0;
+		earlycons++;
 #endif
 
-	return -1;
+	return (earlycons) ? 0 : -1;
 }
 
 static inline void
@@ -315,7 +338,34 @@ mark_bsp_online (void)
 #endif
 }
 
-void __init
+#ifdef CONFIG_SMP
+static void
+check_for_logical_procs (void)
+{
+	pal_logical_to_physical_t info;
+	s64 status;
+
+	status = ia64_pal_logical_to_phys(0, &info);
+	if (status == -1) {
+		printk(KERN_INFO "No logical to physical processor mapping "
+		       "available\n");
+		return;
+	}
+	if (status) {
+		printk(KERN_ERR "ia64_pal_logical_to_phys failed with %ld\n",
+		       status);
+		return;
+	}
+	/*
+	 * Total number of siblings that BSP has.  Though not all of them 
+	 * may have booted successfully. The correct number of siblings 
+	 * booted is in info.overview_num_log.
+	 */
+	smp_num_siblings = info.overview_tpc;
+	smp_num_cpucores = info.overview_cpp;
+}
+#endif
+
 #ifdef XEN
 early_setup_arch (char **cmdline_p)
 #else
@@ -398,6 +448,19 @@ late_setup_arch (char **cmdline_p)
 
 #ifdef CONFIG_SMP
 	cpu_physical_id(0) = hard_smp_processor_id();
+
+	cpu_set(0, cpu_sibling_map[0]);
+	cpu_set(0, cpu_core_map[0]);
+
+	check_for_logical_procs();
+	if (smp_num_cpucores > 1)
+		printk(KERN_INFO
+		       "cpu package is Multi-Core capable: number of cores=%d\n",
+		       smp_num_cpucores);
+	if (smp_num_siblings > 1)
+		printk(KERN_INFO
+		       "cpu package is Multi-Threading capable: number of siblings=%d\n",
+		       smp_num_siblings);
 #endif
 
 #ifdef XEN
@@ -505,12 +568,23 @@ show_cpuinfo (struct seq_file *m, void *v)
 		   "cpu regs   : %u\n"
 		   "cpu MHz    : %lu.%06lu\n"
 		   "itc MHz    : %lu.%06lu\n"
-		   "BogoMIPS   : %lu.%02lu\n\n",
+		   "BogoMIPS   : %lu.%02lu\n",
 		   cpunum, c->vendor, family, c->model, c->revision, c->archrev,
 		   features, c->ppn, c->number,
 		   c->proc_freq / 1000000, c->proc_freq % 1000000,
 		   c->itc_freq / 1000000, c->itc_freq % 1000000,
 		   lpj*HZ/500000, (lpj*HZ/5000) % 100);
+#ifdef CONFIG_SMP
+	seq_printf(m, "siblings   : %u\n", c->num_log);
+	if (c->threads_per_core > 1 || c->cores_per_socket > 1)
+		seq_printf(m,
+		   	   "physical id: %u\n"
+		   	   "core id    : %u\n"
+		   	   "thread id  : %u\n",
+		   	   c->socket_id, c->core_id, c->thread_id);
+#endif
+	seq_printf(m,"\n");
+
 	return 0;
 }
 
@@ -581,6 +655,14 @@ identify_cpu (struct cpuinfo_ia64 *c)
 	memcpy(c->vendor, cpuid.field.vendor, 16);
 #ifdef CONFIG_SMP
 	c->cpu = smp_processor_id();
+
+	/* below default values will be overwritten  by identify_siblings() 
+	 * for Multi-Threading/Multi-Core capable cpu's
+	 */
+	c->threads_per_core = c->cores_per_socket = c->num_log = 1;
+	c->socket_id = -1;
+
+	identify_siblings(c);
 #endif
 	c->ppn = cpuid.field.ppn;
 	c->number = cpuid.field.number;
@@ -611,6 +693,12 @@ setup_per_cpu_areas (void)
 	/* start_kernel() requires this... */
 }
 
+/*
+ * Calculate the max. cache line size.
+ *
+ * In addition, the minimum of the i-cache stride sizes is calculated for
+ * "flush_icache_range()".
+ */
 static void
 get_max_cacheline_size (void)
 {
@@ -624,6 +712,8 @@ get_max_cacheline_size (void)
                 printk(KERN_ERR "%s: ia64_pal_cache_summary() failed (status=%ld)\n",
                        __FUNCTION__, status);
                 max = SMP_CACHE_BYTES;
+		/* Safest setup for "flush_icache_range()" */
+		ia64_i_cache_stride_shift = I_CACHE_STRIDE_SHIFT;
 		goto out;
         }
 
@@ -632,14 +722,31 @@ get_max_cacheline_size (void)
 						    &cci);
 		if (status != 0) {
 			printk(KERN_ERR
-			       "%s: ia64_pal_cache_config_info(l=%lu) failed (status=%ld)\n",
+			       "%s: ia64_pal_cache_config_info(l=%lu, 2) failed (status=%ld)\n",
 			       __FUNCTION__, l, status);
 			max = SMP_CACHE_BYTES;
+			/* The safest setup for "flush_icache_range()" */
+			cci.pcci_stride = I_CACHE_STRIDE_SHIFT;
+			cci.pcci_unified = 1;
 		}
 		line_size = 1 << cci.pcci_line_size;
 		if (line_size > max)
 			max = line_size;
-        }
+		if (!cci.pcci_unified) {
+			status = ia64_pal_cache_config_info(l,
+						    /* cache_type (instruction)= */ 1,
+						    &cci);
+			if (status != 0) {
+				printk(KERN_ERR
+				"%s: ia64_pal_cache_config_info(l=%lu, 1) failed (status=%ld)\n",
+					__FUNCTION__, l, status);
+				/* The safest setup for "flush_icache_range()" */
+				cci.pcci_stride = I_CACHE_STRIDE_SHIFT;
+			}
+		}
+		if (cci.pcci_stride < ia64_i_cache_stride_shift)
+			ia64_i_cache_stride_shift = cci.pcci_stride;
+	}
   out:
 	if (max > ia64_max_cacheline_size)
 		ia64_max_cacheline_size = max;
@@ -700,7 +807,17 @@ cpu_init (void)
 	ia64_set_kr(IA64_KR_FPU_OWNER, 0);
 
 	/*
-	 * Initialize default control register to defer all speculative faults.  The
+	 * Initialize the page-table base register to a global
+	 * directory with all zeroes.  This ensure that we can handle
+	 * TLB-misses to user address-space even before we created the
+	 * first user address-space.  This may happen, e.g., due to
+	 * aggressive use of lfetch.fault.
+	 */
+	ia64_set_kr(IA64_KR_PT_BASE, __pa(ia64_imva(empty_zero_page)));
+
+	/*
+	 * Initialize default control register to defer speculative faults except
+	 * for those arising from TLB misses, which are not deferred.  The
 	 * kernel MUST NOT depend on a particular setting of these bits (in other words,
 	 * the kernel must have recovery code for all speculative accesses).  Turn on
 	 * dcr.lc as per recommendation by the architecture team.  Most IA-32 apps
@@ -762,6 +879,9 @@ cpu_init (void)
 	/* size of physical stacked register partition plus 8 bytes: */
 	__get_cpu_var(ia64_phys_stacked_size_p8) = num_phys_stacked*8 + 8;
 	platform_cpu_init();
+#ifndef XEN
+	pm_idle = default_idle;
+#endif
 }
 
 void
