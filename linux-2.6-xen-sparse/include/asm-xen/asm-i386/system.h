@@ -561,8 +561,9 @@ do {									\
 #define local_irq_disable()	__cli()
 #define local_irq_enable()	__sti()
 
+/* Don't use smp_processor_id: this is called in debug versions of that fn. */
 #define irqs_disabled()			\
-    HYPERVISOR_shared_info->vcpu_data[smp_processor_id()].evtchn_upcall_mask
+    HYPERVISOR_shared_info->vcpu_data[__smp_processor_id()].evtchn_upcall_mask
 
 /*
  * disable hlt during certain critical i/o operations
