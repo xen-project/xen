@@ -371,7 +371,7 @@ static void handle_tty_read(struct domain *dom)
 		(struct ring_head *)(dom->page + PAGE_SIZE/2);
 	int i;
 
-	len = read(dom->tty_fd, msg, MAX(XENCONS_SPACE(inring), sizeof(msg)));
+	len = read(dom->tty_fd, msg, MIN(XENCONS_SPACE(inring), sizeof(msg)));
 	if (len < 1) {
 		close(dom->tty_fd);
 		dom->tty_fd = -1;
