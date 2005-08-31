@@ -23,7 +23,8 @@ OBJS += vmx_init.o
 ifeq ($(CONFIG_VTI),y)
 OBJS += vmx_virt.o vmx_vcpu.o vmx_process.o vmx_vsa.o vmx_ivt.o\
 	vmx_phy_mode.o vmx_utility.o vmx_interrupt.o vmx_entry.o vmmu.o \
-	vtlb.o mmio.o vlsapic.o vmx_hypercall.o mm.o vmx_support.o pal_emul.o
+	vtlb.o mmio.o vlsapic.o vmx_hypercall.o mm.o vmx_support.o \
+	pal_emul.o vmx_irq_ia64.o
 endif
 
 # files from xen/arch/ia64/linux/lib (linux/arch/ia64/lib)

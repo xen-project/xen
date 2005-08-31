@@ -175,7 +175,7 @@ GLOBAL_ENTRY(sys_clone)
 	mov rp=loc0
 	br.ret.sptk.many rp
 END(sys_clone)
-#endif /* !XEN */
+#endif
 
 /*
  * prev_task <- ia64_switch_to(struct task_struct *next)
@@ -191,12 +191,14 @@ GLOBAL_ENTRY(ia64_switch_to)
 
 	adds r22=IA64_TASK_THREAD_KSP_OFFSET,r13
 	movl r25=init_task
+#ifdef XEN
 	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_STACK_OFFSET;;
 	ld8 r27=[r27]
 	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
-#ifdef XEN
 	dep r20=0,in0,60,4		// physical address of "next"
 #else
+	mov r27=IA64_KR(CURRENT_STACK)
+	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
 	dep r20=0,in0,61,3		// physical address of "next"
 #endif
 	;;
@@ -215,8 +217,12 @@ GLOBAL_ENTRY(ia64_switch_to)
 	;;
 (p6)	srlz.d
 	ld8 sp=[r21]			// load kernel stack pointer of new task
+#ifdef XEN
 	movl r8=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 	st8 [r8]=in0
+#else
+	mov IA64_KR(CURRENT)=in0	// update "current" application register
+#endif
 	mov r8=r13			// return pointer to previously running task
 	mov r13=in0			// set "current" pointer
 	;;
@@ -250,8 +256,14 @@ GLOBAL_ENTRY(ia64_switch_to)
 	mov cr.ifa=in0			// VA of next task...
 	;;
 	mov r25=IA64_TR_CURRENT_STACK
+#ifdef XEN
 	movl r8=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_STACK_OFFSET;;
 	st8 [r8]=r26
+	
+#else
+	mov IA64_KR(CURRENT_STACK)=r26	// remember last page we mapped...
+#endif
+	;;
 	itr.d dtr[r25]=r23		// wire in new mapping...
 	br.cond.sptk .done
 END(ia64_switch_to)
@@ -494,18 +506,6 @@ ENTRY(load_switch_stack)
 END(load_switch_stack)
 
 #ifndef XEN
-GLOBAL_ENTRY(__ia64_syscall)
-	.regstk 6,0,0,0
-	mov r15=in5				// put syscall number in place
-	break __BREAK_SYSCALL
-	movl r2=errno
-	cmp.eq p6,p7=-1,r10
-	;;
-(p6)	st4 [r2]=r8
-(p6)	mov r8=-1
-	br.ret.sptk.many rp
-END(__ia64_syscall)
-
 GLOBAL_ENTRY(execve)
 	mov r15=__NR_execve			// put syscall number in place
 	break __BREAK_SYSCALL
@@ -672,7 +672,7 @@ END(ia64_ret_from_syscall)
  *	      r8-r11: restored (syscall return value(s))
  *		 r12: restored (user-level stack pointer)
  *		 r13: restored (user-level thread pointer)
- *		 r14: cleared
+ *		 r14: set to __kernel_syscall_via_epc
  *		 r15: restored (syscall #)
  *	     r16-r17: cleared
  *		 r18: user-level b6
@@ -693,7 +693,7 @@ END(ia64_ret_from_syscall)
  *		  pr: restored (user-level pr)
  *		  b0: restored (user-level rp)
  *	          b6: restored
- *		  b7: cleared
+ *		  b7: set to __kernel_syscall_via_epc
  *	     ar.unat: restored (user-level ar.unat)
  *	      ar.pfs: restored (user-level ar.pfs)
  *	      ar.rsc: restored (user-level ar.rsc)
@@ -743,15 +743,15 @@ ENTRY(ia64_leave_syscall)
 (p6)	ld4 r31=[r18]				// load current_thread_info()->flags
 #endif
 	ld8 r19=[r2],PT(B6)-PT(LOADRS)		// load ar.rsc value for "loadrs"
-	mov b7=r0		// clear b7
+	nop.i 0
 	;;
-	ld8 r23=[r3],PT(R11)-PT(AR_BSPSTORE)	// load ar.bspstore (may be garbage)
+	mov r16=ar.bsp				// M2  get existing backing store pointer
 	ld8 r18=[r2],PT(R9)-PT(B6)		// load b6
 #ifndef XEN
 (p6)	and r15=TIF_WORK_MASK,r31		// any work other than TIF_SYSCALL_TRACE?
 #endif
 	;;
-	mov r16=ar.bsp				// M2  get existing backing store pointer
+	ld8 r23=[r3],PT(R11)-PT(AR_BSPSTORE)	// load ar.bspstore (may be garbage)
 #ifndef XEN
 (p6)	cmp4.ne.unc p6,p0=r15, r0		// any special work pending?
 (p6)	br.cond.spnt .work_pending_syscall
@@ -760,63 +760,74 @@ ENTRY(ia64_leave_syscall)
 	// start restoring the state saved on the kernel stack (struct pt_regs):
 	ld8 r9=[r2],PT(CR_IPSR)-PT(R9)
 	ld8 r11=[r3],PT(CR_IIP)-PT(R11)
-	mov f6=f0		// clear f6
+(pNonSys) break 0		//      bug check: we shouldn't be here if pNonSys is TRUE!
 	;;
 	invala			// M0|1 invalidate ALAT
-	rsm psr.i | psr.ic	// M2 initiate turning off of interrupt and interruption collection
-	mov f9=f0		// clear f9
+	rsm psr.i | psr.ic	// M2   turn off interrupts and interruption collection
+	cmp.eq p9,p0=r0,r0	// A    set p9 to indicate that we should restore cr.ifs
 
-	ld8 r29=[r2],16		// load cr.ipsr
-	ld8 r28=[r3],16			// load cr.iip
-	mov f8=f0		// clear f8
+	ld8 r29=[r2],16		// M0|1 load cr.ipsr
+	ld8 r28=[r3],16		// M0|1 load cr.iip
+	mov r22=r0		// A    clear r22
 	;;
 	ld8 r30=[r2],16		// M0|1 load cr.ifs
-	mov.m ar.ssd=r0		// M2 clear ar.ssd
-	cmp.eq p9,p0=r0,r0	// set p9 to indicate that we should restore cr.ifs
-	;;
 	ld8 r25=[r3],16		// M0|1 load ar.unat
-	mov.m ar.csd=r0		// M2 clear ar.csd
-	mov r22=r0		// clear r22
-	;;
-	ld8 r26=[r2],PT(B0)-PT(AR_PFS)	// M0|1 load ar.pfs
-(pKStk)	mov r22=psr		// M2 read PSR now that interrupts are disabled
-	mov f10=f0		// clear f10
-	;;
-	ld8 r21=[r2],PT(AR_RNAT)-PT(B0) // load b0
-	ld8 r27=[r3],PT(PR)-PT(AR_RSC)	// load ar.rsc
-	mov f11=f0		// clear f11
-	;;
-	ld8 r24=[r2],PT(AR_FPSR)-PT(AR_RNAT)	// load ar.rnat (may be garbage)
-	ld8 r31=[r3],PT(R1)-PT(PR)		// load predicates
 (pUStk) add r14=IA64_TASK_THREAD_ON_USTACK_OFFSET,r13
 	;;
-	ld8 r20=[r2],PT(R12)-PT(AR_FPSR)	// load ar.fpsr
-	ld8.fill r1=[r3],16	// load r1
-(pUStk) mov r17=1
+	ld8 r26=[r2],PT(B0)-PT(AR_PFS)	// M0|1 load ar.pfs
+(pKStk)	mov r22=psr			// M2   read PSR now that interrupts are disabled
+	nop 0
 	;;
-	srlz.d			// M0  ensure interruption collection is off
-	ld8.fill r13=[r3],16
-	mov f7=f0		// clear f7
+	ld8 r21=[r2],PT(AR_RNAT)-PT(B0) // M0|1 load b0
+	ld8 r27=[r3],PT(PR)-PT(AR_RSC)	// M0|1 load ar.rsc
+	mov f6=f0			// F    clear f6
 	;;
-	ld8.fill r12=[r2]	// restore r12 (sp)
-	ld8.fill r15=[r3]	// restore r15
+	ld8 r24=[r2],PT(AR_FPSR)-PT(AR_RNAT)	// M0|1 load ar.rnat (may be garbage)
+	ld8 r31=[r3],PT(R1)-PT(PR)		// M0|1 load predicates
+	mov f7=f0				// F    clear f7
+	;;
+	ld8 r20=[r2],PT(R12)-PT(AR_FPSR)	// M0|1 load ar.fpsr
+	ld8.fill r1=[r3],16			// M0|1 load r1
+(pUStk) mov r17=1				// A
+	;;
+(pUStk) st1 [r14]=r17				// M2|3
+	ld8.fill r13=[r3],16			// M0|1
+	mov f8=f0				// F    clear f8
+	;;
+	ld8.fill r12=[r2]			// M0|1 restore r12 (sp)
+	ld8.fill r15=[r3]			// M0|1 restore r15
+	mov b6=r18				// I0   restore b6
+
 #ifdef XEN
-	movl r3=THIS_CPU(ia64_phys_stacked_size_p8)
+	movl r17=THIS_CPU(ia64_phys_stacked_size_p8)    // A
 #else
-	addl r3=THIS_CPU(ia64_phys_stacked_size_p8),r0
+	addl r17=THIS_CPU(ia64_phys_stacked_size_p8),r0 // A
+#endif
+	mov f9=f0					// F    clear f9
+(pKStk) br.cond.dpnt.many skip_rbs_switch		// B
+
+	srlz.d				// M0   ensure interruption collection is off (for cover)
+	shr.u r18=r19,16		// I0|1 get byte size of existing "dirty" partition
+	cover				// B    add current frame into dirty partition & set cr.ifs
+	;;
+(pUStk) ld4 r17=[r17]			// M0|1 r17 = cpu_data->phys_stacked_size_p8
+	mov r19=ar.bsp			// M2   get new backing store pointer
+	mov f10=f0			// F    clear f10
+
+	nop.m 0
+#ifdef XEN
+	mov r14=r0
+#else
+	movl r14=__kernel_syscall_via_epc // X
 #endif
 	;;
-(pUStk)	ld4 r3=[r3]		// r3 = cpu_data->phys_stacked_size_p8
-(pUStk) st1 [r14]=r17
-	mov b6=r18		// I0  restore b6
-	;;
-	mov r14=r0		// clear r14
-	shr.u r18=r19,16	// I0|1 get byte size of existing "dirty" partition
-(pKStk) br.cond.dpnt.many skip_rbs_switch
+	mov.m ar.csd=r0			// M2   clear ar.csd
+	mov.m ar.ccv=r0			// M2   clear ar.ccv
+	mov b7=r14			// I0   clear b7 (hint with __kernel_syscall_via_epc)
 
-	mov.m ar.ccv=r0		// clear ar.ccv
-(pNonSys) br.cond.dpnt.many dont_preserve_current_frame
-	br.cond.sptk.many rbs_switch
+	mov.m ar.ssd=r0			// M2   clear ar.ssd
+	mov f11=f0			// F    clear f11
+	br.cond.sptk.many rbs_switch	// B
 END(ia64_leave_syscall)
 
 #ifdef CONFIG_IA32_SUPPORT
@@ -829,7 +840,7 @@ GLOBAL_ENTRY(ia64_ret_from_ia32_execve)
 	st8.spill [r2]=r8	// store return value in slot for r8 and set unat bit
 	.mem.offset 8,0
 	st8.spill [r3]=r0	// clear error indication in slot for r10 and set unat bit
-END(ia64_ret_from_ia32_execve_syscall)
+END(ia64_ret_from_ia32_execve)
 	// fall through
 #endif /* CONFIG_IA32_SUPPORT */
 GLOBAL_ENTRY(ia64_leave_kernel)
@@ -884,11 +895,15 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	ld8 r28=[r2],8		// load b6
 	adds r29=PT(R24)+16,r12
 
+#ifdef XEN
 	ld8.fill r16=[r3]
+	adds r3=PT(AR_CSD)-PT(R16),r3
+#else
+	ld8.fill r16=[r3],PT(AR_CSD)-PT(R16)
+#endif
 	adds r30=PT(AR_CCV)+16,r12
 (p6)	and r19=TIF_WORK_MASK,r31		// any work other than TIF_SYSCALL_TRACE?
 	;;
-	adds r3=PT(AR_CSD)-PT(R16),r3
 	ld8.fill r24=[r29]
 	ld8 r15=[r30]		// load ar.ccv
 (p6)	cmp4.ne.unc p6,p0=r19, r0		// any special work pending?
@@ -944,14 +959,18 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	ldf.fill f7=[r2],PT(F11)-PT(F7)
 	ldf.fill f8=[r3],32
 	;;
-	srlz.i			// ensure interruption collection is off
+	srlz.d	// ensure that inter. collection is off (VHPT is don't care, since text is pinned)
 	mov ar.ccv=r15
 	;;
 	ldf.fill f11=[r2]
 	bsw.0			// switch back to bank 0 (no stop bit required beforehand...)
 	;;
+#ifdef XEN
 (pUStk) movl r18=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 (pUStk) ld8 r18=[r18]
+#else
+(pUStk)	mov r18=IA64_KR(CURRENT)// M2 (12 cycle read latency)
+#endif
 	adds r16=PT(CR_IPSR)+16,r12
 	adds r17=PT(CR_IIP)+16,r12
 
@@ -1009,11 +1028,10 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	 * NOTE: alloc, loadrs, and cover can't be predicated.
 	 */
 (pNonSys) br.cond.dpnt dont_preserve_current_frame
-
-rbs_switch:
 	cover				// add current frame into dirty partition and set cr.ifs
 	;;
 	mov r19=ar.bsp			// get new backing store pointer
+rbs_switch:
 	sub r16=r16,r18			// krbs = old bsp - size of dirty partition
 	cmp.ne p9,p0=r0,r0		// clear p9 to skip restore of cr.ifs
 	;;
@@ -1088,14 +1106,14 @@ rse_clear_invalid:
 	mov loc5=0
 	mov loc6=0
 	mov loc7=0
-(pRecurse) br.call.sptk.few b0=rse_clear_invalid
+(pRecurse) br.call.dptk.few b0=rse_clear_invalid
 	;;
 	mov loc8=0
 	mov loc9=0
 	cmp.ne pReturn,p0=r0,in1	// if recursion count != 0, we need to do a br.ret
 	mov loc10=0
 	mov loc11=0
-(pReturn) br.ret.sptk.many b0
+(pReturn) br.ret.dptk.many b0
 #endif /* !CONFIG_ITANIUM */
 #	undef pRecurse
 #	undef pReturn
@@ -1249,7 +1267,7 @@ ENTRY(notify_resume_user)
 	;;
 (pNonSys) mov out2=0				// out2==0 => not a syscall
 	.fframe 16
-	.spillpsp ar.unat, 16			// (note that offset is relative to psp+0x10!)
+	.spillsp ar.unat, 16
 	st8 [sp]=r9,-16				// allocate space for ar.unat and save it
 	st8 [out1]=loc1,-8			// save ar.pfs, out1=&sigscratch
 	.body
@@ -1275,7 +1293,7 @@ GLOBAL_ENTRY(sys_rt_sigsuspend)
 	adds out2=8,sp				// out2=&sigscratch->ar_pfs
 	;;
 	.fframe 16
-	.spillpsp ar.unat, 16			// (note that offset is relative to psp+0x10!)
+	.spillsp ar.unat, 16
 	st8 [sp]=r9,-16				// allocate space for ar.unat and save it
 	st8 [out2]=loc1,-8			// save ar.pfs, out2=&sigscratch
 	.body
@@ -1322,7 +1340,7 @@ ENTRY(sys_rt_sigreturn)
  	stf.spill [r17]=f11
 	adds out0=16,sp				// out0 = &sigscratch
 	br.call.sptk.many rp=ia64_rt_sigreturn
-.ret19:	.restore sp 0
+.ret19:	.restore sp,0
 	adds sp=16,sp
 	;;
 	ld8 r9=[sp]				// load new ar.unat
@@ -1486,7 +1504,7 @@ sys_call_table:
 	data8 sys_msgrcv
 	data8 sys_msgctl
 	data8 sys_shmget
-	data8 ia64_shmat
+	data8 sys_shmat
 	data8 sys_shmdt				// 1115
 	data8 sys_shmctl
 	data8 sys_syslog
@@ -1646,12 +1664,12 @@ sys_call_table:
 	data8 sys_add_key
 	data8 sys_request_key
 	data8 sys_keyctl
+	data8 sys_ioprio_set
+	data8 sys_ioprio_get			// 1275
 	data8 sys_ni_syscall
-	data8 sys_ni_syscall			// 1275
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
+	data8 sys_inotify_init
+	data8 sys_inotify_add_watch
+	data8 sys_inotify_rm_watch
 
 	.org sys_call_table + 8*NR_syscalls	// guard against failures to increase NR_syscalls
 #endif

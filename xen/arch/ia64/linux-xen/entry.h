@@ -7,12 +7,6 @@
 #define PRED_LEAVE_SYSCALL	1 /* TRUE iff leave from syscall */
 #define PRED_KERNEL_STACK	2 /* returning to kernel-stacks? */
 #define PRED_USER_STACK		3 /* returning to user-stacks? */
-#ifdef CONFIG_VTI
-#define PRED_EMUL		2 /* Need to save r4-r7 for inst emulation */
-#define PRED_NON_EMUL		3 /* No need to save r4-r7 for normal path */
-#define PRED_BN0		6 /* Guest is in bank 0 */
-#define PRED_BN1		7 /* Guest is in bank 1 */
-#endif // CONFIG_VTI
 #define PRED_SYSCALL		4 /* inside a system call? */
 #define PRED_NON_SYSCALL	5 /* complement of PRED_SYSCALL */
 
@@ -23,21 +17,26 @@
 # define pLvSys		PASTE(p,PRED_LEAVE_SYSCALL)
 # define pKStk		PASTE(p,PRED_KERNEL_STACK)
 # define pUStk		PASTE(p,PRED_USER_STACK)
-#ifdef CONFIG_VTI
-# define pEml		PASTE(p,PRED_EMUL)
-# define pNonEml	PASTE(p,PRED_NON_EMUL)
-# define pBN0		PASTE(p,PRED_BN0)
-# define pBN1		PASTE(p,PRED_BN1)
-#endif // CONFIG_VTI
 # define pSys		PASTE(p,PRED_SYSCALL)
 # define pNonSys	PASTE(p,PRED_NON_SYSCALL)
 #endif
 
 #define PT(f)		(IA64_PT_REGS_##f##_OFFSET)
 #define SW(f)		(IA64_SWITCH_STACK_##f##_OFFSET)
+
+#ifdef XEN
 #ifdef CONFIG_VTI
+#define PRED_EMUL		2 /* Need to save r4-r7 for inst emulation */
+#define PRED_NON_EMUL		3 /* No need to save r4-r7 for normal path */
+#define PRED_BN0		6 /* Guest is in bank 0 */
+#define PRED_BN1		7 /* Guest is in bank 1 */
+# define pEml		PASTE(p,PRED_EMUL)
+# define pNonEml	PASTE(p,PRED_NON_EMUL)
+# define pBN0		PASTE(p,PRED_BN0)
+# define pBN1		PASTE(p,PRED_BN1)
 #define VPD(f)      (VPD_##f##_START_OFFSET)
 #endif // CONFIG_VTI
+#endif
 
 #define PT_REGS_SAVES(off)			\
 	.unwabi 3, 'i';				\
@@ -75,7 +74,7 @@
 	.spillsp @priunat,SW(AR_UNAT)+16+(off);					\
 	.spillsp ar.rnat,SW(AR_RNAT)+16+(off);					\
 	.spillsp ar.bspstore,SW(AR_BSPSTORE)+16+(off);				\
-	.spillsp pr,SW(PR)+16+(off))
+	.spillsp pr,SW(PR)+16+(off)
 
 #define DO_SAVE_SWITCH_STACK			\
 	movl r28=1f;				\
