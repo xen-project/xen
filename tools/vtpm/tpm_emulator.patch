@@ -18,7 +18,7 @@ diff -uprN orig/tpm_emulator-0.2/ChangeLog tpm_emulator-0.2/ChangeLog
 diff -uprN orig/tpm_emulator-0.2/Makefile tpm_emulator-0.2/Makefile
 --- orig/tpm_emulator-0.2/Makefile	2005-08-17 10:58:36.000000000 -0700
 +++ tpm_emulator-0.2/Makefile	2005-08-17 10:55:52.000000000 -0700
-@@ -1,15 +1,18 @@
+@@ -1,15 +1,19 @@
  # Software-Based Trusted Platform Module (TPM) Emulator for Linux
  # Copyright (C) 2004 Mario Strasser <mast@gmx.net>
 +# Copyright (C) 2005 INTEL Corp.
@@ -26,6 +26,7 @@ diff -uprN orig/tpm_emulator-0.2/Makefile tpm_emulator-0.2/Makefile
  # $Id: Makefile 10 2005-04-26 20:59:50Z mast $
  
 +XEN_ROOT       := ../../..
++EUID           := $(shell id -u)
 +
  # kernel settings
  KERNEL_RELEASE := $(shell uname -r)
@@ -53,7 +54,7 @@ diff -uprN orig/tpm_emulator-0.2/Makefile tpm_emulator-0.2/Makefile
  
  EXTRA_CFLAGS   += -I$(src) -I$(src)/crypto -I$(src)/tpm 
  
-@@ -42,23 +43,16 @@ all:	$(src)/crypto/gmp.h $(src)/crypto/l
+@@ -42,23 +43,17 @@ all:	$(src)/crypto/gmp.h $(src)/crypto/l
  	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) modules
  
  install:
@@ -64,8 +65,9 @@ diff -uprN orig/tpm_emulator-0.2/Makefile tpm_emulator-0.2/Makefile
 -	depmod -a
 +	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) INSTALL_MOD_PATH=$(DESTDIR) modules_install
 +	test -d $(DESTDIR)/var/tpm || mkdir $(DESTDIR)/var/tpm
-+	test -c /dev/tpm0 || mknod /dev/tpm0 c 10 224
-+	chmod 666 /dev/tpm0
++	test -d $(DESTDIR)/dev || mkdir $(DESTDIR)/dev
++	test -c $(DESTDIR)/dev/tpm0 || [ $(EUID) -ne 0 ] || mknod $(DESTDIR)/dev/tpm0 c 10 224
++	[ $(EUID) -ne 0 ] || chmod 666 $(DESTDIR)/dev/tpm0
  
  clean:
  	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) clean

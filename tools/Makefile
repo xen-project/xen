@@ -16,6 +16,8 @@ SUBDIRS += vtpm_manager
 SUBDIRS += vtpm
 SUBDIRS += xenstat
 
+.PHONY: all install clean check check_clean ioemu eioemuinstall ioemuclean
+
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 SUBDIRS += python

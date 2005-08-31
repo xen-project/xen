@@ -141,6 +141,9 @@
 ^tools/vnet/vnet-module/\.tmp_versions/.*$
 ^tools/vnet/vnet-module/vnet_module\.mod\..*$
 ^tools/vnetd/vnetd$
+^tools/vtpm/vtpm*
+^tools/vtpm/tpm_emulator-*
+^tools/vtpm_manager/manager/vtpm_managerd
 ^tools/web-shutdown\.tap$
 ^tools/x2d2/minixend$
 ^tools/xcs/xcs$
