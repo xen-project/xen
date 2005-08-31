@@ -176,6 +176,7 @@ int main(int argc, char **argv)
 	unsigned int len = 0;
 	struct xs_handle *xs;
 	char *end;
+	time_t now;
 
 	while((ch = getopt_long(argc, argv, sopt, lopt, &opt_ind)) != -1) {
 		switch(ch) {
@@ -215,13 +216,37 @@ int main(int argc, char **argv)
 
 	snprintf(path, sizeof(path), "/console/%d/tty", domid);
 	str_pty = xs_read(xs, path, &len);
+
 	/* FIXME consoled currently does not assume domain-0 doesn't have a
 	   console which is good when we break domain-0 up.  To keep us
 	   user friendly, we'll bail out here since no data will ever show
 	   up on domain-0. */
-	if (domid == 0 || str_pty == NULL) {
+	if (domid == 0) {
 		err(errno, "Could not read tty from store");
 	}
+
+	/* Wait a little bit for tty to appear.  There is a race
+	   condition that occurs after xend creates a domain.  This
+	   code might be running before consoled has noticed the new
+	   domain and setup a pty for it.
+
+	   A xenstore watch would slightly improve responsiveness but
+	   a timeout would still be needed since we don't want to
+	   block forever if given an invalid domain or worse yet, a
+	   domain that someone else has connected to. */
+
+	now = time(0);
+	while (str_pty == NULL && (now + 5) > time(0)) {
+		struct timeval tv = { 0, 500 };
+		select(0, NULL, NULL, NULL, &tv); /* pause briefly */
+
+		str_pty = xs_read(xs, path, &len);
+	}
+
+	if (str_pty == NULL) {
+		err(errno, "Could not read tty from store");
+	}
+
 	spty = open(str_pty, O_RDWR | O_NOCTTY);
 	if (spty == -1) {
 		err(errno, "Could not open tty `%s'", str_pty);
