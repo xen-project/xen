@@ -28,4 +28,13 @@ typedef struct xen_compile_info {
     char compile_date[32];
 } xen_compile_info_t;
 
+#define XENVER_capabilities 3
+typedef struct xen_capabilities_info {
+    int pae;
+    int arch;
+} xen_capabilities_info_t;
+
+#define XENVER_changeset 4
+typedef char xen_changeset_info_t[64];
+
 #endif /* __XEN_PUBLIC_VERSION_H__ */
