@@ -232,11 +232,16 @@ bool xen_setup(void)
 		dolog(LOG_ERR, "xcs virq bind failed.  Possible bug.");
 		goto out_close_data;
 	}
-	
+
+	if (!xs_watch(xs, "/console", "console")) {
+		dolog(LOG_ERR, "xenstore watch on /console failes.");
+		goto out_close_data;
+	}
+
 	return true;
 
  out_close_data:
-	close(xcs_ctrl_fd);
+	close(xcs_data_fd);
 	xcs_data_fd = -1;
  out_close_ctrl:
 	close(xcs_ctrl_fd);

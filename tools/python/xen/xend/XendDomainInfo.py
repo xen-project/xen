@@ -1045,10 +1045,9 @@ class XendDomainInfo:
 
     def publish_console(self):
         db = DBMap(db=XenNode("/console/%d" % self.id))
-        db.clear()
         db['domain'] = self.db.getPath()
         db.saveDB(save=True)
-        
+
     def configure_fields(self):
         """Process the vm configuration fields using the registered handlers.
         """

@@ -215,9 +215,6 @@ static int domain_create_ring(struct domain *dom)
 	char *dompath, *path;
 	int err;
 
-	dom->page = NULL;
-	dom->evtchn_fd = -1;
-
 	asprintf(&path, "/console/%d/domain", dom->domid);
 	dompath = xs_read(xs, path, NULL);
 	free(path);
@@ -232,28 +229,35 @@ static int domain_create_ring(struct domain *dom)
 	if (err)
 		goto out;
 
-	dom->page = xc_map_foreign_range(xc, dom->domid, getpagesize(),
-					 PROT_READ|PROT_WRITE, dom->mfn);
 	if (dom->page == NULL) {
-		err = EINVAL;
-		goto out;
+		dom->page = xc_map_foreign_range(xc, dom->domid, getpagesize(),
+						 PROT_READ|PROT_WRITE,
+						 dom->mfn);
+		if (dom->page == NULL) {
+			err = EINVAL;
+			goto out;
+		}
 	}
 
-	/* Opening evtchn independently for each console is a bit
-	 * wastefule, but that's how the code is structured... */
-	err = open("/dev/xen/evtchn", O_RDWR);
-	if (err == -1) {
-		err = errno;
-		goto out;
-	}
-	dom->evtchn_fd = err;
-
-	if (ioctl(dom->evtchn_fd, EVENTCHN_BIND, dom->local_port) == -1) {
-		err = errno;
-		munmap(dom->page, getpagesize());
-		close(dom->evtchn_fd);
-		dom->evtchn_fd = -1;
-		goto out;
+	if (dom->evtchn_fd == -1) {
+		/* Opening evtchn independently for each console is a bit
+		 * wastefule, but that's how the code is structured... */
+		err = open("/dev/xen/evtchn", O_RDWR);
+		if (err == -1) {
+			err = errno;
+			goto out;
+		}
+		dom->evtchn_fd = err;
+ 
+		if (ioctl(dom->evtchn_fd, EVENTCHN_BIND,
+			  dom->local_port) == -1) {
+			err = errno;
+			munmap(dom->page, getpagesize());
+			dom->page = NULL;
+			close(dom->evtchn_fd);
+			dom->evtchn_fd = -1;
+			goto out;
+		}
 	}
 
  out:
@@ -281,6 +285,9 @@ static struct domain *create_domain(int domid)
 	dom->buffer.max_capacity = 0;
 	dom->next = NULL;
 
+	dom->page = NULL;
+	dom->evtchn_fd = -1;
+
 	domain_create_ring(dom);
 
 	dolog(LOG_DEBUG, "New domain %d", domid);
@@ -290,22 +297,19 @@ static struct domain *create_domain(int domid)
 
 static struct domain *lookup_domain(int domid)
 {
-	struct domain **pp;
+	struct domain *dom;
 
-	for (pp = &dom_head; *pp; pp = &(*pp)->next) {
-		struct domain *dom = *pp;
-
-		if (dom->domid == domid) {
+	for (dom = dom_head; dom; dom = dom->next)
+		if (dom->domid == domid)
 			return dom;
-		} else if (dom->domid > domid) {
-			*pp = create_domain(domid);
-			(*pp)->next = dom;
-			return *pp;
-		}
-	}
 
-	*pp = create_domain(domid);
-	return *pp;
+	dom = create_domain(domid);
+	if (!dom)
+		return NULL;
+	dom->next = dom_head;
+	dom_head = dom;
+
+	return dom;
 }
 
 static void remove_domain(struct domain *dom)
@@ -342,6 +346,20 @@ static void remove_dead_domains(struct domain *dom)
 		if (dom->is_dead)
 			remove_domain(dom);
 		dom = n;
+	}
+}
+
+void enum_domains(void)
+{
+	int domid = 1;
+	xc_dominfo_t dominfo;
+	struct domain *dom;
+
+	while (xc_domain_getinfo(xc, domid, 1, &dominfo) == 1) {
+		dom = lookup_domain(dominfo.domid);
+		if (dominfo.dying || dominfo.crashed || dominfo.shutdown)
+			dom->is_dead = true;
+		domid = dominfo.domid + 1;
 	}
 }
 
@@ -415,20 +433,28 @@ static void handle_xcs_msg(int fd)
 		dolog(LOG_ERR, "read from xcs failed! %m");
 		exit(1);
 	}
+
+	enum_domains();
 }
 
-static void enum_domains(void)
+static void handle_xs(int fd)
 {
-	int domid = 0;
-	xc_dominfo_t dominfo;
+	char **vec;
+	int domid;
 	struct domain *dom;
 
-	while (xc_domain_getinfo(xc, domid, 1, &dominfo) == 1) {
-		dom = lookup_domain(dominfo.domid);
-		if (dominfo.dying || dominfo.crashed || dominfo.shutdown)
-			dom->is_dead = true;
-		domid = dominfo.domid + 1;
+	vec = xs_read_watch(xs);
+	if (!vec)
+		return;
+
+	if (sscanf(vec[0], "/console/%d", &domid) == 1) {
+		dom = lookup_domain(domid);
+		if (dom && (dom->evtchn_fd == -1 || dom->page == NULL))
+			domain_create_ring(dom);
 	}
+
+	xs_acknowledge_watch(xs, vec[1]);
+	free(vec);
 }
 
 void handle_io(void)
@@ -438,7 +464,7 @@ void handle_io(void)
 
 	do {
 		struct domain *d;
-		struct timeval tv = { 1, 0 };
+		struct timeval tv = { 100, 0 };
 		int max_fd = -1;
 
 		FD_ZERO(&readfds);
@@ -446,6 +472,9 @@ void handle_io(void)
 
 		FD_SET(xcs_data_fd, &readfds);
 		max_fd = MAX(xcs_data_fd, max_fd);
+
+		FD_SET(xs_fileno(xs), &readfds);
+		max_fd = MAX(xs_fileno(xs), max_fd);
 
 		for (d = dom_head; d; d = d->next) {
 			if (d->tty_fd != -1) {
@@ -463,7 +492,9 @@ void handle_io(void)
 		}
 
 		ret = select(max_fd + 1, &readfds, &writefds, 0, &tv);
-		enum_domains();
+
+		if (FD_ISSET(xs_fileno(xs), &readfds))
+			handle_xs(xs_fileno(xs));
 
 		if (FD_ISSET(xcs_data_fd, &readfds))
 			handle_xcs_msg(xcs_data_fd);
