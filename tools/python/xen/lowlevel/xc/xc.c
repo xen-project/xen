@@ -707,6 +707,39 @@ static PyObject *pyxc_physinfo(PyObject *self,
                          "cpu_khz",          info.cpu_khz);
 }
 
+static PyObject *pyxc_xeninfo(PyObject *self,
+                              PyObject *args,
+                              PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    xen_extraversion_t xen_extra;
+    xen_compile_info_t xen_cc;
+    xen_changeset_info_t xen_chgset;
+    long xen_version;
+
+    xen_version = xc_version(xc->xc_handle, XENVER_version, NULL);
+
+    if ( xc_version(xc->xc_handle, XENVER_extraversion, &xen_extra) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    if ( xc_version(xc->xc_handle, XENVER_compile_info, &xen_cc) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    if ( xc_version(xc->xc_handle, XENVER_changeset, &xen_chgset) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    return Py_BuildValue("{s:i,s:i,s:s,s:s,s:s,s:s,s:s,s:s}",
+                         "xen_major", xen_version >> 16,
+                         "xen_minor", (xen_version & 0xffff),
+                         "xen_extra", xen_extra,
+                         "xen_changeset", xen_chgset,
+                         "cc_compiler", xen_cc.compiler,
+                         "cc_compile_by", xen_cc.compile_by,
+                         "cc_compile_domain", xen_cc.compile_domain,
+                         "cc_compile_date", xen_cc.compile_date);
+}
+
+
 static PyObject *pyxc_sedf_domain_set(PyObject *self,
                                          PyObject *args,
                                          PyObject *kwds)
@@ -1087,6 +1120,13 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS, "\n"
       "Get information about the physical host machine\n"
       "Returns [dict]: information about the hardware"
+      "        [None]: on failure.\n" },
+
+    { "xeninfo",
+      (PyCFunction)pyxc_xeninfo,
+      METH_VARARGS, "\n"
+      "Get information about the Xen host\n"
+      "Returns [dict]: information about Xen"
       "        [None]: on failure.\n" },
 
     { "shadow_control", 

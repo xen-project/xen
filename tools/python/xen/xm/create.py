@@ -103,12 +103,13 @@ gopts.opt('console_autoconnect', short='c',
           fn=set_true, default=0,
           use="Connect to the console after the domain is created.")
 
-gopts.var('vnc', val='no|yes',
+gopts.var('vncviewer', val='no|yes',
           fn=set_bool, default=None,
           use="""Spawn a vncviewer listening for a vnc server in the domain.
           The address of the vncviewer is passed to the domain on the kernel command
           line using 'VNC_SERVER=<host>:<port>'. The port used by vnc is 5500 + DISPLAY.
           A display value with a free port is chosen if possible.
+	  Only valid when vnc=1.
           """)
 
 gopts.var('name', val='NAME',
@@ -321,6 +322,10 @@ gopts.var('nographic', val='no|yes',
           fn=set_bool, default=0,
           use="Should device models use graphics?")
 
+gopts.var('vnc', val='',
+          fn=set_value, default=None,
+          use="""Should the device model use VNC?""")
+
 gopts.var('sdl', val='',
           fn=set_value, default=None,
           use="""Should the device model use SDL?""")
@@ -494,7 +499,7 @@ def configure_vmx(opts, config_devs, vals):
     """
     args = [ 'memmap', 'device_model', 'cdrom',
  	     'boot', 'fda', 'fdb', 'localtime', 'serial', 'macaddr', 'stdvga', 
-             'isa', 'nographic', 'vnc', 'sdl', 'display']	  
+             'isa', 'nographic', 'vnc', 'vncviewer', 'sdl', 'display']	  
     for a in args:
 	if (vals.__dict__[a]):
     	    config_devs.append([a, vals.__dict__[a]])
@@ -693,7 +698,7 @@ def preprocess_vnc(opts, vals):
     """If vnc was specified, spawn a vncviewer in listen mode
     and pass its address to the domain on the kernel command line.
     """
-    if not vals.vnc or vals.dryrun: return
+    if not (vals.vnc and vals.vncviewer) or vals.dryrun: return
     vnc_display = choose_vnc_display()
     if not vnc_display:
         opts.warn("No free vnc display")

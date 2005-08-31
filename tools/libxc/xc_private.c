@@ -422,3 +422,8 @@ int xc_dom0_op(int xc_handle, dom0_op_t *op)
 {
     return do_dom0_op(xc_handle, op);
 }
+
+int xc_version(int xc_handle, int cmd, void *arg)
+{
+    return do_xen_version(xc_handle, cmd, arg);
+}

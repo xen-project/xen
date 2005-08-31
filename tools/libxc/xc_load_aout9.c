@@ -15,6 +15,8 @@
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
+#define KZERO             0x80000000
+#define KOFFSET(_p)       ((_p)&~KZERO)
 
 static int parseaout9image(char *, unsigned long, struct domain_setup_info *);
 static int loadaout9image(char *, unsigned long, int, u32, unsigned long *, struct domain_setup_info *);
@@ -63,7 +65,7 @@ parseaout9image(
     txtsz = round_pgup(ehdr.text);
     end = start + txtsz + ehdr.data + ehdr.bss;
 
-    dsi->v_start	= start;
+    dsi->v_start	= KZERO;
     dsi->v_kernstart	= start;
     dsi->v_kernend	= end;
     dsi->v_kernentry	= ehdr.entry;
@@ -83,19 +85,19 @@ loadaout9image(
     struct domain_setup_info *dsi)
 {
     struct Exec ehdr;
-    unsigned long txtsz;
+    unsigned long start, txtsz;
 
     if (!get_header(image, image_size, &ehdr)) {
         ERROR("Kernel image does not have a a.out9 header.");
         return -EINVAL;
     }
 
+    start = round_pgdown(ehdr.entry);
     txtsz = round_pgup(ehdr.text);
     copyout(xch, dom, parray, 
-            0, image, sizeof ehdr + ehdr.text);
+            start, image, sizeof ehdr + ehdr.text);
     copyout(xch, dom, parray, 
-            txtsz, image + sizeof ehdr + ehdr.text, ehdr.data);
-    /* XXX zeroing of BSS needed? */
+            start+txtsz, image + sizeof ehdr + ehdr.text, ehdr.data);
 
     /* XXX load symbols */
 
@@ -110,13 +112,14 @@ static void
 copyout(
     int xch, u32 dom,
     unsigned long *parray,
-    unsigned long off,
+    unsigned long addr,
     void *buf,
     int sz)
 {
-    unsigned long pgoff, chunksz;
+    unsigned long pgoff, chunksz, off;
     void *pg;
 
+    off = KOFFSET(addr);
     while (sz > 0) {
         pgoff = off & (PAGE_SIZE-1);
         chunksz = sz;

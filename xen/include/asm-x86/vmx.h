@@ -275,7 +275,9 @@ static inline int __vmpclear (u64 addr)
     return 0;
 }
 
-static inline int __vmread (unsigned long field, void *value)
+#define __vmread(x, ptr) ___vmread((x), (ptr), sizeof(*(ptr)))
+
+static always_inline int ___vmread (const unsigned long field,  void *ptr, const int size)
 {
     unsigned long eflags;
     unsigned long ecx = 0;
@@ -286,7 +288,23 @@ static inline int __vmread (unsigned long field, void *value)
                            : "a" (field)
                            : "memory");
 
-    *((long *) value) = ecx;
+    switch (size) {
+    case 1:
+        *((u8 *) (ptr)) = ecx;
+        break;
+    case 2:
+        *((u16 *) (ptr)) = ecx;
+        break;
+    case 4:
+        *((u32 *) (ptr)) = ecx;
+        break;
+    case 8:
+        *((u64 *) (ptr)) = ecx;
+        break;
+    default:
+        domain_crash_synchronous();
+        break;
+    }
 
     __save_flags(eflags);
     if (eflags & X86_EFLAGS_ZF || eflags & X86_EFLAGS_CF)

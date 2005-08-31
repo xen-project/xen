@@ -23,6 +23,7 @@ typedef int64_t            s64;
 #include <sys/ptrace.h>
 #include <xen/xen.h>
 #include <xen/dom0_ops.h>
+#include <xen/version.h>
 #include <xen/event_channel.h>
 #include <xen/sched_ctl.h>
 #include <xen/acm.h>
@@ -496,6 +497,8 @@ long xc_get_tot_pages(int xc_handle, u32 domid);
 
 /* Execute a privileged dom0 operation. */
 int xc_dom0_op(int xc_handle, dom0_op_t *op);
+
+int xc_version(int xc_handle, int cmd, void *arg);
 
 /* Initializes the store (for dom0)
    remote_port should be the remote end of a bound interdomain channel between

@@ -1685,6 +1685,7 @@ void shadow_invlpg(struct vcpu *v, unsigned long va)
     if (__copy_from_user(&gpte, &linear_pg_table[va >> PAGE_SHIFT],
                          sizeof(gpte))) {
         perfc_incrc(shadow_invlpg_faults);
+        shadow_unlock(d);
         return;
     }
     l1pte_propagate_from_guest(d, gpte, &spte);
@@ -1917,8 +1918,10 @@ static int snapshot_entry_matches(
     snapshot = map_domain_page(smfn);
 
     if (__copy_from_user(&gpte, &guest_pt[index],
-                         sizeof(gpte)))
+                         sizeof(gpte))) {
+        unmap_domain_page(snapshot);
         return 0;
+    }
 
     // This could probably be smarter, but this is sufficent for
     // our current needs.

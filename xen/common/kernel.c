@@ -46,7 +46,7 @@ void cmdline_parse(char *cmdline)
         if ( optval != NULL )
             *optval++ = '\0';
 
-        for ( param = &__setup_start; param != &__setup_end; param++ )
+        for ( param = &__setup_start; param <= &__setup_end; param++ )
         {
             if ( strcmp(param->name, opt ) != 0 )
                 continue;
@@ -107,6 +107,27 @@ long do_xen_version(int cmd, void *arg)
         safe_strcpy(info.compile_domain, XEN_COMPILE_DOMAIN);
         safe_strcpy(info.compile_date,   XEN_COMPILE_DATE);
         if ( copy_to_user(arg, &info, sizeof(info)) )
+            return -EFAULT;
+        return 0;
+    }
+
+    case XENVER_capabilities:
+    {
+        struct xen_capabilities_info info;
+        
+        /* FIXME */
+        info.arch = 0;
+        info.pae = 0;
+        if ( copy_to_user(arg, &info, sizeof(info)) )
+            return -EFAULT;
+        return 0;
+    }
+    
+    case XENVER_changeset:
+    {
+        xen_changeset_info_t chgset;
+        safe_strcpy(chgset, XEN_CHANGESET);
+        if ( copy_to_user(arg, chgset, sizeof(chgset)) )
             return -EFAULT;
         return 0;
     }
