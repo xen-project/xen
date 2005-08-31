@@ -9,6 +9,7 @@ AFLAGS  += -D__ASSEMBLY__
 CPPFLAGS  += -I$(BASEDIR)/include -I$(BASEDIR)/include/asm-ia64 	\
              -I$(BASEDIR)/include/asm-ia64/linux 			\
 	     -I$(BASEDIR)/include/asm-ia64/linux-xen 			\
+	     -I$(BASEDIR)/include/asm-ia64/linux-null 			\
              -I$(BASEDIR)/arch/ia64/linux -I$(BASEDIR)/arch/ia64/linux-xen
 
 CFLAGS  := -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
@@ -20,6 +21,7 @@ CFLAGS  += -fomit-frame-pointer -I$(BASEDIR)/include -D__KERNEL__
 CFLAGS  += -I$(BASEDIR)/include/asm-ia64 -I$(BASEDIR)/include/asm-ia64/linux \
            -I$(BASEDIR)/include/asm-ia64/linux 				\
            -I$(BASEDIR)/include/asm-ia64/linux-xen 			\
+	   -I$(BASEDIR)/include/asm-ia64/linux-null 			\
            -I$(BASEDIR)/arch/ia64/linux -I$(BASEDIR)/arch/ia64/linux-xen
 CFLAGS  += -Wno-pointer-arith -Wredundant-decls
 CFLAGS  += -DIA64 -DXEN -DLINUX_2_6
