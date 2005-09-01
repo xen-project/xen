@@ -82,7 +82,7 @@ static irqreturn_t handle_input(int irq, void *unused, struct pt_regs *regs)
 	while (ring->cons < ring->prod) {
 		if (xencons_receiver != NULL) {
 			xencons_receiver(ring->buf + XENCONS_IDX(ring->cons),
-					 1);
+					 1, regs);
 		}
 		ring->cons++;
 	}

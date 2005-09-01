@@ -45,6 +45,7 @@
 #include <linux/init.h>
 #include <linux/console.h>
 #include <linux/bootmem.h>
+#include <linux/sysrq.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -65,6 +66,11 @@
  */
 static enum { XC_OFF, XC_DEFAULT, XC_TTY, XC_SERIAL } xc_mode = XC_DEFAULT;
 static int xc_num = -1;
+
+#ifdef CONFIG_MAGIC_SYSRQ
+static unsigned long sysrq_requested;
+extern int sysrq_enabled;
+#endif
 
 static int __init xencons_setup(char *str)
 {
@@ -296,7 +302,7 @@ static int xencons_priv_irq;
 static char x_char;
 
 /* Non-privileged receive callback. */
-static void xencons_rx(char *buf, unsigned len)
+static void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
 {
     int           i;
     unsigned long flags;
@@ -304,8 +310,27 @@ static void xencons_rx(char *buf, unsigned len)
     spin_lock_irqsave(&xencons_lock, flags);
     if ( xencons_tty != NULL )
     {
-        for ( i = 0; i < len; i++ )
+        for ( i = 0; i < len; i++ ) {
+#ifdef CONFIG_MAGIC_SYSRQ
+            if (sysrq_enabled) {
+                if (buf[i] == '\x0f') { /* ^O */
+                    sysrq_requested = jiffies;
+                    continue; /* don't print the sysrq key */
+                } else if (sysrq_requested) {
+                    unsigned long sysrq_timeout = sysrq_requested + HZ*2;
+                    sysrq_requested = 0;
+                    /* if it's been less than a timeout, do the sysrq */
+                    if (time_before(jiffies, sysrq_timeout)) {
+                        spin_unlock_irqrestore(&xencons_lock, flags);
+                        handle_sysrq(buf[i], regs, xencons_tty);
+                        spin_lock_irqsave(&xencons_lock, flags);
+                        continue;
+                    }
+                }
+            }
+#endif
             tty_insert_flip_char(xencons_tty, buf[i], 0);
+        }
         tty_flip_buffer_push(xencons_tty);
     }
     spin_unlock_irqrestore(&xencons_lock, flags);
