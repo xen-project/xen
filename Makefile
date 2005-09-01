@@ -178,6 +178,8 @@ uninstall:
 	rm -rf $(D)/usr/share/man/man1/xen*
 	rm -rf $(D)/usr/share/man/man8/xen*
 	rm -rf $(D)/usr/lib/xen
+	rm -rf $(D)/etc/hotplug.d/xen-backend
+	rm -rf $(D)/etc/hotplug/xen-backend.agent
 
 # Legacy targets for compatibility
 linux24:

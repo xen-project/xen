@@ -27,8 +27,8 @@ XEN_SCRIPTS += block-enbd
 XEN_BOOT_DIR = /usr/lib/xen/boot
 XEN_BOOT = mem-map.sxp
 
-XEN_HOTPLUG_DIR = /etc/hotplug.d/xen-backend
-XEN_HOTPLUG_SCRIPTS = backend.hotplug
+XEN_HOTPLUG_DIR = /etc/hotplug
+XEN_HOTPLUG_SCRIPTS = xen-backend.agent
 
 all: 
 build:
