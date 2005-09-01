@@ -203,6 +203,7 @@ void sort_main_extable(void);
 #endif // CONFIG_VTI
 
 #define __attribute_used__	__attribute__ ((unused))
+#define __nocast
 
 // see include/asm-x86/atomic.h (different from standard linux)
 #define _atomic_set(v,i) (((v).counter) = (i))
@@ -262,9 +263,6 @@ void dummy_called(char *function);
 // these declarations got moved at some point, find a better place for them
 extern int ht_per_core;
 
-// needed for include/xen/smp.h
-#define __smp_processor_id()	0
-
 // xen/include/asm/config.h
 /******************************************************************************
  * config.h
@@ -296,6 +294,10 @@ extern int ht_per_core;
 #define CONFIG_XEN_ATTENTION_KEY 1
 #endif /* __ASSEMBLY__ */
 #endif /* __XEN_IA64_CONFIG_H__ */
+
+// needed for include/xen/smp.h
+#define __smp_processor_id()	0
+
 
 // FOLLOWING ADDED FOR XEN POST-NGIO and/or LINUX 2.6.7
 

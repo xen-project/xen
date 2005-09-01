@@ -41,7 +41,9 @@
  * bitmap_shift_right(dst, src, n, nbits)	*dst = *src >> n
  * bitmap_shift_left(dst, src, n, nbits)	*dst = *src << n
  * bitmap_scnprintf(buf, len, src, nbits)	Print bitmap src to buf
- * bitmap_parse(ubuf, ulen, dst, nbits)		Parse bitmap dst from buf
+ * bitmap_parse(ubuf, ulen, dst, nbits)		Parse bitmap dst from user buf
+ * bitmap_scnlistprintf(buf, len, src, nbits)	Print bitmap src as list to buf
+ * bitmap_parselist(buf, dst, nbits)		Parse bitmap dst from list
  */
 
 /*
@@ -98,6 +100,10 @@ extern int bitmap_scnprintf(char *buf, unsigned int len,
 			const unsigned long *src, int nbits);
 extern int bitmap_parse(const char __user *ubuf, unsigned int ulen,
 			unsigned long *dst, int nbits);
+extern int bitmap_scnlistprintf(char *buf, unsigned int len,
+			const unsigned long *src, int nbits);
+extern int bitmap_parselist(const char *buf, unsigned long *maskp,
+			int nmaskbits);
 extern int bitmap_find_free_region(unsigned long *bitmap, int bits, int order);
 extern void bitmap_release_region(unsigned long *bitmap, int pos, int order);
 extern int bitmap_allocate_region(unsigned long *bitmap, int pos, int order);

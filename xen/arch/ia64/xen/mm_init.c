@@ -196,6 +196,7 @@ out:
 /////////////////////////////////////////////
 #endif /* XEN */
 
+#if 0
 void
 update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
 {
@@ -215,6 +216,7 @@ update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
 	flush_icache_range(addr, addr + PAGE_SIZE);
 	set_bit(PG_arch_1, &page->flags);	/* mark page as clean */
 }
+#endif
 
 inline void
 ia64_set_rbs_bot (void)

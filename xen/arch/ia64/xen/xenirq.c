@@ -8,6 +8,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/hw_irq.h>
+#include <asm/delay.h>
 
 
 void

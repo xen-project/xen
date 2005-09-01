@@ -316,6 +316,7 @@ struct vm_area_struct {
 #define VM_STACK_FLAGS	(VM_GROWSDOWN | VM_STACK_DEFAULT_FLAGS | VM_ACCOUNT)
 #endif
 
+#if 0	/* removed when rebasing to 2.6.13 */
 /*
  * The zone field is never updated after free_area_init_core()
  * sets it, so none of the operations on it need to be atomic.
@@ -347,6 +348,7 @@ static inline void set_page_zone(struct page *page, unsigned long nodezone_num)
 	page->flags &= ~(~0UL << NODEZONE_SHIFT);
 	page->flags |= nodezone_num << NODEZONE_SHIFT;
 }
+#endif
 
 #ifndef CONFIG_DISCONTIGMEM          /* Don't use mapnrs, do it properly */
 extern unsigned long max_mapnr;

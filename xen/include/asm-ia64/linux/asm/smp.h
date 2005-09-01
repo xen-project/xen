@@ -3,16 +3,14 @@
  *
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 2001-2003 Hewlett-Packard Co
+ * (c) Copyright 2001-2003, 2005 Hewlett-Packard Development Company, L.P.
  *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *	Bjorn Helgaas <bjorn.helgaas@hp.com>
  */
 #ifndef _ASM_IA64_SMP_H
 #define _ASM_IA64_SMP_H
 
 #include <linux/config.h>
-
-#ifdef CONFIG_SMP
-
 #include <linux/init.h>
 #include <linux/threads.h>
 #include <linux/kernel.h>
@@ -24,12 +22,31 @@
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 
+static inline unsigned int
+ia64_get_lid (void)
+{
+	union {
+		struct {
+			unsigned long reserved : 16;
+			unsigned long eid : 8;
+			unsigned long id : 8;
+			unsigned long ignored : 32;
+		} f;
+		unsigned long bits;
+	} lid;
+
+	lid.bits = ia64_getreg(_IA64_REG_CR_LID);
+	return lid.f.id << 8 | lid.f.eid;
+}
+
+#ifdef CONFIG_SMP
+
 #define XTP_OFFSET		0x1e0008
 
 #define SMP_IRQ_REDIRECTION	(1 << 0)
 #define SMP_IPI_REDIRECTION	(1 << 1)
 
-#define smp_processor_id()	(current_thread_info()->cpu)
+#define raw_smp_processor_id() (current_thread_info()->cpu)
 
 extern struct smp_boot_data {
 	int cpu_count;
@@ -39,6 +56,10 @@ extern struct smp_boot_data {
 extern char no_int_routing __devinitdata;
 
 extern cpumask_t cpu_online_map;
+extern cpumask_t cpu_core_map[NR_CPUS];
+extern cpumask_t cpu_sibling_map[NR_CPUS];
+extern int smp_num_siblings;
+extern int smp_num_cpucores;
 extern void __iomem *ipi_base_addr;
 extern unsigned char smp_int_redirect;
 
@@ -90,22 +111,7 @@ max_xtp (void)
 		writeb(0x0f, ipi_base_addr + XTP_OFFSET); /* Set XTP to max */
 }
 
-static inline unsigned int
-hard_smp_processor_id (void)
-{
-	union {
-		struct {
-			unsigned long reserved : 16;
-			unsigned long eid : 8;
-			unsigned long id : 8;
-			unsigned long ignored : 32;
-		} f;
-		unsigned long bits;
-	} lid;
-
-	lid.bits = ia64_getreg(_IA64_REG_CR_LID);
-	return lid.f.id << 8 | lid.f.eid;
-}
+#define hard_smp_processor_id()		ia64_get_lid()
 
 /* Upping and downing of CPUs */
 extern int __cpu_disable (void);
@@ -122,10 +128,12 @@ extern int smp_call_function_single (int cpuid, void (*func) (void *info), void 
 extern void smp_send_reschedule (int cpu);
 extern void lock_ipi_calllock(void);
 extern void unlock_ipi_calllock(void);
+extern void identify_siblings (struct cpuinfo_ia64 *);
 
 #else
 
-#define cpu_logical_id(cpuid)		0
+#define cpu_logical_id(i)		0
+#define cpu_physical_id(i)		ia64_get_lid()
 
 #endif /* CONFIG_SMP */
 #endif /* _ASM_IA64_SMP_H */

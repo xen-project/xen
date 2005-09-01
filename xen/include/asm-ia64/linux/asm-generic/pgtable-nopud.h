@@ -3,6 +3,8 @@
 
 #ifndef __ASSEMBLY__
 
+#define __PAGETABLE_PUD_FOLDED
+
 /*
  * Having the pud type consist of a pgd gets the size right, and allows
  * us to conceptually access the pgd entry that this pud is folded into
@@ -51,6 +53,9 @@ static inline pud_t * pud_offset(pgd_t * pgd, unsigned long address)
 #define pud_alloc_one(mm, address)		NULL
 #define pud_free(x)				do { } while (0)
 #define __pud_free_tlb(tlb, x)			do { } while (0)
+
+#undef  pud_addr_end
+#define pud_addr_end(addr, end)			(end)
 
 #endif /* __ASSEMBLY__ */
 #endif /* _PGTABLE_NOPUD_H */

@@ -8,7 +8,7 @@
  * This hopefully works with any (fixed) IA-64 page-size, as defined
  * in <asm/page.h>.
  *
- * Copyright (C) 1998-2004 Hewlett-Packard Co
+ * Copyright (C) 1998-2005 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -19,6 +19,11 @@
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/types.h>
+#ifdef XEN
+#ifndef __ASSEMBLY__
+#include <xen/sched.h> /* needed for mm_struct (via asm/domain.h) */
+#endif
+#endif
 
 #define IA64_MAX_PHYS_BITS	50	/* max. number of physical address bits (architected) */
 
@@ -93,7 +98,7 @@
 #define PGDIR_MASK		(~(PGDIR_SIZE-1))
 #define PTRS_PER_PGD		(1UL << (PAGE_SHIFT-3))
 #define USER_PTRS_PER_PGD	(5*PTRS_PER_PGD/8)	/* regions 0-4 are user regions */
-#define FIRST_USER_PGD_NR	0
+#define FIRST_USER_ADDRESS	0
 
 /*
  * Definitions for second level:
@@ -202,6 +207,7 @@ ia64_phys_addr_valid (unsigned long addr)
  * the PTE in a page table.  Nothing special needs to be on IA-64.
  */
 #define set_pte(ptep, pteval)	(*(ptep) = (pteval))
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
 
 #define RGN_SIZE	(1UL << 61)
 #define RGN_KERNEL	7
@@ -243,7 +249,7 @@ ia64_phys_addr_valid (unsigned long addr)
 
 #define pte_none(pte) 			(!pte_val(pte))
 #define pte_present(pte)		(pte_val(pte) & (_PAGE_P | _PAGE_PROTNONE))
-#define pte_clear(pte)			(pte_val(*(pte)) = 0UL)
+#define pte_clear(mm,addr,pte)		(pte_val(*(pte)) = 0UL)
 /* pte_page() returns the "struct page *" corresponding to the PTE: */
 #define pte_page(pte)			virt_to_page(((pte_val(pte) & _PFN_MASK) + PAGE_OFFSET))
 
@@ -282,6 +288,7 @@ ia64_phys_addr_valid (unsigned long addr)
 #define pte_mkyoung(pte)	(__pte(pte_val(pte) | _PAGE_A))
 #define pte_mkclean(pte)	(__pte(pte_val(pte) & ~_PAGE_D))
 #define pte_mkdirty(pte)	(__pte(pte_val(pte) | _PAGE_D))
+#define pte_mkhuge(pte)		(__pte(pte_val(pte) | _PAGE_P))
 
 /*
  * Macro to a page protection value as "uncacheable".  Note that "protection" is really a
@@ -345,7 +352,7 @@ pgd_offset (struct mm_struct *mm, unsigned long address)
 /* atomic versions of the some PTE manipulations: */
 
 static inline int
-ptep_test_and_clear_young (pte_t *ptep)
+ptep_test_and_clear_young (struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
 {
 #ifdef CONFIG_SMP
 	if (!pte_young(*ptep))
@@ -355,13 +362,13 @@ ptep_test_and_clear_young (pte_t *ptep)
 	pte_t pte = *ptep;
 	if (!pte_young(pte))
 		return 0;
-	set_pte(ptep, pte_mkold(pte));
+	set_pte_at(vma->vm_mm, addr, ptep, pte_mkold(pte));
 	return 1;
 #endif
 }
 
 static inline int
-ptep_test_and_clear_dirty (pte_t *ptep)
+ptep_test_and_clear_dirty (struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
 {
 #ifdef CONFIG_SMP
 	if (!pte_dirty(*ptep))
@@ -371,25 +378,25 @@ ptep_test_and_clear_dirty (pte_t *ptep)
 	pte_t pte = *ptep;
 	if (!pte_dirty(pte))
 		return 0;
-	set_pte(ptep, pte_mkclean(pte));
+	set_pte_at(vma->vm_mm, addr, ptep, pte_mkclean(pte));
 	return 1;
 #endif
 }
 
 static inline pte_t
-ptep_get_and_clear (pte_t *ptep)
+ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 #ifdef CONFIG_SMP
 	return __pte(xchg((long *) ptep, 0));
 #else
 	pte_t pte = *ptep;
-	pte_clear(ptep);
+	pte_clear(mm, addr, ptep);
 	return pte;
 #endif
 }
 
 static inline void
-ptep_set_wrprotect (pte_t *ptep)
+ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 #ifdef CONFIG_SMP
 	unsigned long new, old;
@@ -400,18 +407,7 @@ ptep_set_wrprotect (pte_t *ptep)
 	} while (cmpxchg((unsigned long *) ptep, old, new) != old);
 #else
 	pte_t old_pte = *ptep;
-	set_pte(ptep, pte_wrprotect(old_pte));
-#endif
-}
-
-static inline void
-ptep_mkdirty (pte_t *ptep)
-{
-#ifdef CONFIG_SMP
-	set_bit(_PAGE_D_BIT, ptep);
-#else
-	pte_t old_pte = *ptep;
-	set_pte(ptep, pte_mkdirty(old_pte));
+	set_pte_at(mm, addr, ptep, pte_wrprotect(old_pte));
 #endif
 }
 
@@ -420,6 +416,8 @@ pte_same (pte_t a, pte_t b)
 {
 	return pte_val(a) == pte_val(b);
 }
+
+#define update_mmu_cache(vma, address, pte) do { } while (0)
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern void paging_init (void);
@@ -457,6 +455,13 @@ extern void paging_init (void);
 #define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
 		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
 
+#define io_remap_pfn_range(vma, vaddr, pfn, size, prot)		\
+		remap_pfn_range(vma, vaddr, pfn, size, prot)
+
+#define MK_IOSPACE_PFN(space, pfn)	(pfn)
+#define GET_IOSPACE(pfn)		0
+#define GET_PFN(pfn)			(pfn)
+
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
  * for zero-mapped memory areas etc..
@@ -473,8 +478,8 @@ extern struct page *zero_page_memmap_ptr;
 #define HUGETLB_PGDIR_SIZE	(__IA64_UL(1) << HUGETLB_PGDIR_SHIFT)
 #define HUGETLB_PGDIR_MASK	(~(HUGETLB_PGDIR_SIZE-1))
 struct mmu_gather;
-extern void hugetlb_free_pgtables(struct mmu_gather *tlb,
-	struct vm_area_struct * prev, unsigned long start, unsigned long end);
+void hugetlb_free_pgd_range(struct mmu_gather **tlb, unsigned long addr,
+		unsigned long end, unsigned long floor, unsigned long ceiling);
 #endif
 
 /*
@@ -482,7 +487,7 @@ extern void hugetlb_free_pgtables(struct mmu_gather *tlb,
  * information.  However, we use this routine to take care of any (delayed) i-cache
  * flushing that may be necessary.
  */
-extern void update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte);
+extern void lazy_mmu_prot_update (pte_t pte);
 
 #define __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
 /*
@@ -552,16 +557,21 @@ do {											\
 
 /* These tell get_user_pages() that the first gate page is accessible from user-level.  */
 #define FIXADDR_USER_START	GATE_ADDR
-#define FIXADDR_USER_END	(GATE_ADDR + 2*PERCPU_PAGE_SIZE)
+#ifdef HAVE_BUGGY_SEGREL
+# define FIXADDR_USER_END	(GATE_ADDR + 2*PAGE_SIZE)
+#else
+# define FIXADDR_USER_END	(GATE_ADDR + 2*PERCPU_PAGE_SIZE)
+#endif
 
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
-#define __HAVE_ARCH_PTEP_MKDIRTY
 #define __HAVE_ARCH_PTE_SAME
 #define __HAVE_ARCH_PGD_OFFSET_GATE
-#include <asm-generic/pgtable.h>
+#define __HAVE_ARCH_LAZY_MMU_PROT_UPDATE
+
 #include <asm-generic/pgtable-nopud.h>
+#include <asm-generic/pgtable.h>
 
 #endif /* _ASM_IA64_PGTABLE_H */

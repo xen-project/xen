@@ -143,7 +143,7 @@ int reprogram_ac_timer(s_time_t timeout)
 DEFINE_PER_CPU(struct page_state, page_states) = {0};
 unsigned long totalram_pages;
 
-void __mod_page_state(unsigned offset, unsigned long delta)
+void __mod_page_state(unsigned long offset, unsigned long delta)
 {
 	unsigned long flags;
 	void* ptr;

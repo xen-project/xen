@@ -301,7 +301,6 @@ extern u64 efi_mem_attributes (unsigned long phys_addr);
 extern int __init efi_uart_console_only (void);
 extern void efi_initialize_iomem_resources(struct resource *code_resource,
 					struct resource *data_resource);
-extern efi_status_t phys_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc);
 extern unsigned long __init efi_get_time(void);
 extern int __init efi_set_rtc_mmss(unsigned long nowtime);
 extern struct efi_memory_map memmap;
@@ -316,7 +315,7 @@ extern struct efi_memory_map memmap;
  */
 static inline int efi_range_is_wc(unsigned long start, unsigned long len)
 {
-	int i;
+	unsigned long i;
 
 	for (i = 0; i < len; i += (1UL << EFI_PAGE_SHIFT)) {
 		unsigned long paddr = __pa(start + i);

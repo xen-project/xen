@@ -1,1 +1,1 @@
-#include <xen/linuxtime.h>
+#include <asm/linux/time.h>

@@ -1,9 +1,6 @@
 include $(BASEDIR)/Rules.mk
 
-VPATH = linux linux-xen linux/lib
-#VPATH = linux-xen linux/lib
-
-# libs-y	+= arch/ia64/lib/lib.a
+VPATH = xen vmx linux linux-xen
 
 OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
 	xenmisc.o acpi.o hypercall.o \
@@ -15,8 +12,6 @@ OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
 	irq_ia64.o irq_lsapic.o vhpt.o xenasm.o hyperprivop.o dom_fw.o \
 	grant_table.o sn_console.o
 
-#OBJS += idiv64.o idiv32.o			\
-
 # TMP holder to contain *.0 moved out of CONFIG_VTI
 OBJS += vmx_init.o
 
@@ -27,7 +22,7 @@ OBJS += vmx_virt.o vmx_vcpu.o vmx_process.o vmx_vsa.o vmx_ivt.o\
 	pal_emul.o vmx_irq_ia64.o
 endif
 
-# files from xen/arch/ia64/linux/lib (linux/arch/ia64/lib)
+# lib files from xen/arch/ia64/linux/ (linux/arch/ia64/lib)
 OBJS +=	bitop.o clear_page.o flush.o copy_page_mck.o			\
 	memset.o strlen.o memcpy_mck.o 					\
 	__divsi3.o __udivsi3.o __modsi3.o __umodsi3.o			\
@@ -86,9 +81,9 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 	 touch $@
 
 # I'm sure a Makefile wizard would know a better way to do this
-xen.lds.s: xen.lds.S
+xen.lds.s: xen/xen.lds.S
 	$(CC) -E $(CPPFLAGS) -P -DXEN -D__ASSEMBLY__ \
-		-o xen.lds.s xen.lds.S
+		-o xen.lds.s xen/xen.lds.S
 
 # variants of divide/modulo
 # see files in xen/arch/ia64/linux/lib (linux/arch/ia64/lib)
@@ -111,7 +106,7 @@ __umodsi3.o: idiv32.S
 
 
 clean:
-	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-offsets.s
+	rm -f *.o *~ core  xen.lds.s $(BASEDIR)/include/asm-ia64/.offsets.h.stamp asm-offsets.s map.out
 	rm -f asm-xsi-offsets.s $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 	rm -f linux/lib/*.o
 

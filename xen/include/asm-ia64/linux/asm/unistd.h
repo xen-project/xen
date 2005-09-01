@@ -263,6 +263,12 @@
 #define __NR_add_key			1271
 #define __NR_request_key		1272
 #define __NR_keyctl			1273
+#define __NR_ioprio_set			1274
+#define __NR_ioprio_get			1275
+#define __NR_set_zone_reclaim		1276
+#define __NR_inotify_init		1277
+#define __NR_inotify_add_watch		1278
+#define __NR_inotify_rm_watch		1279
 
 #ifdef __KERNEL__
 
@@ -392,7 +398,7 @@ asmlinkage long sys_rt_sigaction(int sig,
  * proper prototype, but we can't use __typeof__ either, because not all cond_syscall()
  * declarations have prototypes at the moment.
  */
-#define cond_syscall(x) asmlinkage long x (void) __attribute__((weak,alias("sys_ni_syscall")));
+#define cond_syscall(x) asmlinkage long x (void) __attribute__((weak,alias("sys_ni_syscall")))
 
 #endif /* !__ASSEMBLY__ */
 #endif /* __KERNEL__ */

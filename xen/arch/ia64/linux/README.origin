@@ -13,12 +13,13 @@ linuxextable.c		-> linux/kernel/extable.c
 machvec.c		-> linux/arch/ia64/kernel/machvec.c
 patch.c			-> linux/arch/ia64/kernel/patch.c
 pcdp.h			-> drivers/firmware/pcdp.h
-lib/bitop.c		-> linux/arch/ia64/lib/bitop.c
-lib/clear_page.S	-> linux/arch/ia64/lib/clear_page.S
-lib/copy_page_mck.S	-> linux/arch/ia64/lib/copy_page_mck.S
-lib/flush.S		-> linux/arch/ia64/lib/flush.S
-lib/idiv32.S		-> linux/arch/ia64/lib/idiv32.S
-lib/idiv64.S		-> linux/arch/ia64/lib/idiv64.S
-lib/memcpy_mck.S	-> linux/arch/ia64/lib/memcpy_mck.S
-lib/memset.S		-> linux/arch/ia64/lib/memset.S
-lib/strlen.S		-> linux/arch/ia64/lib/strlen.S
+
+bitop.c			-> linux/arch/ia64/lib/bitop.c
+clear_page.S		-> linux/arch/ia64/lib/clear_page.S
+copy_page_mck.S		-> linux/arch/ia64/lib/copy_page_mck.S
+flush.S			-> linux/arch/ia64/lib/flush.S
+idiv32.S		-> linux/arch/ia64/lib/idiv32.S
+idiv64.S		-> linux/arch/ia64/lib/idiv64.S
+memcpy_mck.S		-> linux/arch/ia64/lib/memcpy_mck.S
+memset.S		-> linux/arch/ia64/lib/memset.S
+strlen.S		-> linux/arch/ia64/lib/strlen.S
