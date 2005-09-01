@@ -100,7 +100,14 @@ unsigned long do_get_debugreg(int reg);
 
 static int debug_stack_lines = 20;
 integer_param("debug_stack_lines", debug_stack_lines);
-#define stack_words_per_line (32 / BYTES_PER_LONG)
+
+#ifdef CONFIG_X86_32
+#define stack_words_per_line 8
+#define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)&regs->esp)
+#else
+#define stack_words_per_line 4
+#define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->esp)
+#endif
 
 int is_kernel_text(unsigned long addr)
 {
@@ -118,17 +125,16 @@ unsigned long kernel_text_end(void)
     return (unsigned long) &_etext;
 }
 
-void show_guest_stack(void)
+static void show_guest_stack(struct cpu_user_regs *regs)
 {
     int i;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
     unsigned long *stack = (unsigned long *)regs->esp, addr;
 
     printk("Guest stack trace from "__OP"sp=%p:\n   ", stack);
 
     for ( i = 0; i < (debug_stack_lines*stack_words_per_line); i++ )
     {
-        if ( ((long)stack & (STACK_SIZE-1)) == 0 )
+        if ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) == 0 )
             break;
         if ( get_user(addr, stack) )
         {
@@ -148,38 +154,98 @@ void show_guest_stack(void)
     printk("\n");
 }
 
-void show_trace(unsigned long *esp)
+#ifdef NDEBUG
+
+static void show_trace(struct cpu_user_regs *regs)
 {
-    unsigned long *stack = esp, addr;
-    int i = 0;
+    unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), addr;
 
-    printk("Xen call trace from "__OP"sp=%p:\n   ", stack);
+    printk("Xen call trace:\n   ");
 
-    while ( ((long) stack & (STACK_SIZE-1)) != 0 )
+    printk("[<%p>]", _p(regs->eip));
+    print_symbol(" %s\n   ", regs->eip);
+
+    while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
     {
         addr = *stack++;
         if ( is_kernel_text(addr) )
         {
             printk("[<%p>]", _p(addr));
             print_symbol(" %s\n   ", addr);
-            i++;
         }
     }
-    if ( i == 0 )
-        printk("Trace empty.");
+
     printk("\n");
 }
 
-void show_stack(unsigned long *esp)
+#else
+
+static void show_trace(struct cpu_user_regs *regs)
 {
-    unsigned long *stack = esp, addr;
+    unsigned long *frame, next, addr, low, high;
+
+    printk("Xen call trace:\n   ");
+
+    printk("[<%p>]", _p(regs->eip));
+    print_symbol(" %s\n   ", regs->eip);
+
+    /* Bounds for range of valid frame pointer. */
+    low  = (unsigned long)(ESP_BEFORE_EXCEPTION(regs) - 2);
+    high = (low & ~(STACK_SIZE - 1)) + (STACK_SIZE - sizeof(struct cpu_info));
+
+    /* The initial frame pointer. */
+    next = regs->ebp;
+
+    for ( ; ; )
+    {
+        /* Valid frame pointer? */
+        if ( (next < low) || (next > high) )
+        {
+            /*
+             * Exception stack frames have a different layout, denoted by an
+             * inverted frame pointer.
+             */
+            next = ~next;
+            if ( (next < low) || (next > high) )
+                break;
+            frame = (unsigned long *)next;
+            next  = frame[0];
+            addr  = frame[(offsetof(struct cpu_user_regs, eip) -
+                           offsetof(struct cpu_user_regs, ebp))
+                         / BYTES_PER_LONG];
+        }
+        else
+        {
+            /* Ordinary stack frame. */
+            frame = (unsigned long *)next;
+            next  = frame[0];
+            addr  = frame[1];
+        }
+
+        printk("[<%p>]", _p(addr));
+        print_symbol(" %s\n   ", addr);
+
+        low = (unsigned long)&frame[2];
+    }
+
+    printk("\n");
+}
+
+#endif
+
+void show_stack(struct cpu_user_regs *regs)
+{
+    unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), addr;
     int i;
+
+    if ( GUEST_MODE(regs) )
+        return show_guest_stack(regs);
 
     printk("Xen stack trace from "__OP"sp=%p:\n   ", stack);
 
     for ( i = 0; i < (debug_stack_lines*stack_words_per_line); i++ )
     {
-        if ( ((long)stack & (STACK_SIZE-1)) == 0 )
+        if ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) == 0 )
             break;
         if ( (i != 0) && ((i % stack_words_per_line) == 0) )
             printk("\n   ");
@@ -190,7 +256,7 @@ void show_stack(unsigned long *esp)
         printk("Stack empty.");
     printk("\n");
 
-    show_trace(esp);
+    show_trace(regs);
 }
 
 /*

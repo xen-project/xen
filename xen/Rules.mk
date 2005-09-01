@@ -7,7 +7,6 @@ debug       ?= n
 perfc       ?= n
 perfc_arrays?= n
 trace       ?= n
-optimize    ?= y
 domu_debug  ?= n
 crash_debug ?= n
 

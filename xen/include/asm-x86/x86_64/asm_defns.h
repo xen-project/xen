@@ -1,6 +1,15 @@
 #ifndef __X86_64_ASM_DEFNS_H__
 #define __X86_64_ASM_DEFNS_H__
 
+#ifndef NDEBUG
+/* Indicate special exception stack frame by inverting the frame pointer. */
+#define SETUP_EXCEPTION_FRAME_POINTER           \
+        movq  %rsp,%rbp;                        \
+        notq  %rbp
+#else
+#define SETUP_EXCEPTION_FRAME_POINTER
+#endif
+
 #define SAVE_ALL                                \
         cld;                                    \
         pushq %rdi;                             \
@@ -14,6 +23,7 @@
         pushq %r11;                             \
         pushq %rbx;                             \
         pushq %rbp;                             \
+        SETUP_EXCEPTION_FRAME_POINTER;          \
         pushq %r12;                             \
         pushq %r13;                             \
         pushq %r14;                             \

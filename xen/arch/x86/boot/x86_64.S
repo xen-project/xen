@@ -10,6 +10,8 @@
         .code32
 
 ENTRY(start)
+ENTRY(stext)
+ENTRY(_stext)
         jmp __start
 
         .org    0x004
@@ -267,5 +269,3 @@ ENTRY(idle_pg_table_l2)
 
         .org 0x4000 + STACK_SIZE + PAGE_SIZE
         .code64
-ENTRY(stext)
-ENTRY(_stext)
