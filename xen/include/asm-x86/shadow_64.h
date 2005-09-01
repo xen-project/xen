@@ -450,7 +450,9 @@ static inline int guest_page_fault(struct vcpu *v,
 	/*
 	 * If it's not external mode, then mfn should be machine physical.
 	 */
-	mfn = __gpfn_to_mfn(d, (entry_get_value(gle) >> PAGE_SHIFT));
+	mfn = __gpfn_to_mfn(d, (entry_get_paddr(gle) >> PAGE_SHIFT));
+        if (mfn == -1)
+            return 1;
 
         lva = (pgentry_64_t *) phys_to_virt(
 	    mfn << PAGE_SHIFT);
