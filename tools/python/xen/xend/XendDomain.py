@@ -75,8 +75,26 @@ class XendDomain:
 
         @return: domain objects
         """
+        self.refresh()
         return self.domains.values()
-    
+
+    def list_sorted(self):
+        """Get list of domain objects, sorted by name.
+
+        @return: domain objects
+        """
+        doms = self.list()
+        doms.sort(lambda x, y: cmp(x.name, y.name))
+        return doms
+
+    def list_names(self):
+        """Get list of domain names.
+
+        @return: domain names
+        """
+        doms = self.list_sorted()
+        return map(lambda x: x.name, doms)
+
     def onVirq(self, event, val):
         """Event handler for virq.
         """
@@ -264,24 +282,6 @@ class XendDomain:
                 d.update(dominfo)
         else:
             self._delete_domain(id)
-
-    def domain_ls(self):
-        """Get list of domain names.
-
-        @return: domain names
-        """
-        self.refresh()
-        doms = self.domains.values()
-        doms.sort(lambda x, y: cmp(x.name, y.name))
-        return map(lambda x: x.name, doms)
-
-    def domain_ls_ids(self):
-        """Get list of domain ids.
-
-        @return: domain names
-        """
-        self.refresh()
-        return self.domains.keys()
 
     def domain_create(self, config):
         """Create a domain from a configuration.
