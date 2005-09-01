@@ -21,7 +21,7 @@
    debugger. so avoid it. */
 #define dbg_printk(...)
 
-static unsigned char opt_cdb[30] = "none";
+static char opt_cdb[30] = "none";
 string_param("cdb", opt_cdb);
 
 struct xendbg_context {
