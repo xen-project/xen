@@ -34,6 +34,8 @@ typedef unsigned long page_flags_t;
  */
 #define PFN_ORDER(_pfn)	((_pfn)->u.free.order)
 
+#define PRtype_info "08x"
+
 struct page
 {
     /* Each frame can be threaded onto a doubly-linked list. */

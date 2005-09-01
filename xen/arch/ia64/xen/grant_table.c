@@ -8,6 +8,8 @@
  * 
  * Copyright (c) 2005 Christopher Clark
  * Copyright (c) 2004 K A Fraser
+ * Copyright (c) 2005 Andrew Warfield
+ * Modifications by Geoffrey Lefebvre are (c) Intel Research Cambridge
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,13 +36,18 @@
 #include <xen/mm.h>
 #ifdef __ia64__
 #define __addr_ok(a) 1	// FIXME-ia64: a variant of access_ok??
-// FIXME-ia64: need to implement real cmpxchg_user on ia64
-//#define cmpxchg_user(_p,_o,_n) ((*_p == _o) ? ((*_p = _n), 0) : ((_o = *_p), 0))
 // FIXME-ia64: these belong in an asm/grant_table.h... PAGE_SIZE different
 #undef ORDER_GRANT_FRAMES
 //#undef NUM_GRANT_FRAMES
 #define ORDER_GRANT_FRAMES 0
 //#define NUM_GRANT_FRAMES  (1U << ORDER_GRANT_FRAMES)
+#endif
+#include <acm/acm_hooks.h>
+
+#if defined(CONFIG_X86_64)
+#define GRANT_PTE_FLAGS (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#else
+#define GRANT_PTE_FLAGS (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY)
 #endif
 
 #define PIN_FAIL(_lbl, _rc, _f, _a...)   \
@@ -55,7 +62,7 @@ get_maptrack_handle(
     grant_table_t *t)
 {
     unsigned int h;
-    if ( unlikely((h = t->maptrack_head) == t->maptrack_limit) )
+    if ( unlikely((h = t->maptrack_head) == (t->maptrack_limit - 1)) )
         return -1;
     t->maptrack_head = t->maptrack[h].ref_and_flags >> MAPTRACK_REF_SHIFT;
     t->map_count++;
@@ -73,13 +80,13 @@ put_maptrack_handle(
 
 static int
 __gnttab_activate_grant_ref(
-    struct domain          *mapping_d,          /* IN */
+    struct domain   *mapping_d,          /* IN */
     struct vcpu     *mapping_ed,
-    struct domain          *granting_d,
-    grant_ref_t             ref,
-    u16                     dev_hst_ro_flags,
-    unsigned long           host_virt_addr,
-    unsigned long          *pframe )            /* OUT */
+    struct domain   *granting_d,
+    grant_ref_t      ref,
+    u16              dev_hst_ro_flags,
+    u64              addr,
+    unsigned long   *pframe )            /* OUT */
 {
     domid_t               sdom;
     u16                   sflags;
@@ -100,7 +107,7 @@ __gnttab_activate_grant_ref(
      * Returns:
      * .  -ve: error
      * .    1: ok
-     * .    0: ok and TLB invalidate of host_virt_addr needed.
+     * .    0: ok and TLB invalidate of host_addr needed.
      *
      * On success, *pframe contains mfn.
      */
@@ -126,6 +133,10 @@ __gnttab_activate_grant_ref(
         sflags = sha->flags;
         sdom   = sha->domid;
 
+        /* This loop attempts to set the access (reading/writing) flags
+         * in the grant table entry.  It tries a cmpxchg on the field
+         * up to five times, and then fails under the assumption that 
+         * the guest is misbehaving. */
         for ( ; ; )
         {
             u32 scombo, prev_scombo, new_scombo;
@@ -188,7 +199,7 @@ __gnttab_activate_grant_ref(
             PIN_FAIL(unlock_out, GNTST_general_error,
                      "Could not pin the granted frame (%lx)!\n", frame);
         }
-#endif
+#endif 
 
         if ( dev_hst_ro_flags & GNTMAP_device_map )
             act->pin += (dev_hst_ro_flags & GNTMAP_readonly) ?
@@ -266,7 +277,7 @@ __gnttab_activate_grant_ref(
 
     /*
      * At this point:
-     * act->pin updated to reflect mapping.
+     * act->pin updated to reference count mappings.
      * sha->flags updated to indicate to granting domain mapping done.
      * frame contains the mfn.
      */
@@ -276,21 +287,25 @@ __gnttab_activate_grant_ref(
 #ifdef __ia64__
 // FIXME-ia64: any error checking need to be done here?
 #else
-    if ( (host_virt_addr != 0) && (dev_hst_ro_flags & GNTMAP_host_map) )
+    if ( (addr != 0) && (dev_hst_ro_flags & GNTMAP_host_map) )
     {
         /* Write update into the pagetable. */
         l1_pgentry_t pte;
-        pte = l1e_from_pfn(frame, _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_DIRTY);
+        pte = l1e_from_pfn(frame, GRANT_PTE_FLAGS);
+        
+        if ( (dev_hst_ro_flags & GNTMAP_application_map) )
+            l1e_add_flags(pte,_PAGE_USER);
         if ( !(dev_hst_ro_flags & GNTMAP_readonly) )
             l1e_add_flags(pte,_PAGE_RW);
-        rc = update_grant_va_mapping( host_virt_addr, pte, 
-                       mapping_d, mapping_ed );
 
-        /*
-         * IMPORTANT: (rc == 0) => must flush / invalidate entry in TLB.
-         * This is done in the outer gnttab_map_grant_ref.
-         */
+        if ( dev_hst_ro_flags & GNTMAP_contains_pte )
+            rc = update_grant_pte_mapping(addr, pte, mapping_d, mapping_ed);
+        else
+            rc = update_grant_va_mapping(addr, pte, mapping_d, mapping_ed);
 
+        /* IMPORTANT: rc indicates the degree of TLB flush that is required.
+         * GNTST_flush_one (1) or GNTST_flush_all (2). This is done in the 
+         * outer gnttab_map_grant_ref. */
         if ( rc < 0 )
         {
             /* Failure: undo and abort. */
@@ -334,20 +349,24 @@ __gnttab_activate_grant_ref(
 /*
  * Returns 0 if TLB flush / invalidate required by caller.
  * va will indicate the address to be invalidated.
+ * 
+ * addr is _either_ a host virtual address, or the address of the pte to
+ * update, as indicated by the GNTMAP_contains_pte flag.
  */
 static int
 __gnttab_map_grant_ref(
     gnttab_map_grant_ref_t *uop,
     unsigned long *va)
 {
-    domid_t               dom;
-    grant_ref_t           ref;
-    struct domain        *ld, *rd;
+    domid_t        dom;
+    grant_ref_t    ref;
+    struct domain *ld, *rd;
     struct vcpu   *led;
-    u16                   dev_hst_ro_flags;
-    int                   handle;
-    unsigned long         frame = 0, host_virt_addr;
-    int                   rc;
+    u16            dev_hst_ro_flags;
+    int            handle;
+    u64            addr;
+    unsigned long  frame = 0;
+    int            rc;
 
     led = current;
     ld = led->domain;
@@ -355,19 +374,20 @@ __gnttab_map_grant_ref(
     /* Bitwise-OR avoids short-circuiting which screws control flow. */
     if ( unlikely(__get_user(dom, &uop->dom) |
                   __get_user(ref, &uop->ref) |
-                  __get_user(host_virt_addr, &uop->host_addr) |
+                  __get_user(addr, &uop->host_addr) |
                   __get_user(dev_hst_ro_flags, &uop->flags)) )
     {
         DPRINTK("Fault while reading gnttab_map_grant_ref_t.\n");
         return -EFAULT; /* don't set status */
     }
 
-
-    if ( ((host_virt_addr != 0) || (dev_hst_ro_flags & GNTMAP_host_map)) &&
-         unlikely(!__addr_ok(host_virt_addr)))
+    if ( (dev_hst_ro_flags & GNTMAP_host_map) &&
+         ( (addr == 0) ||
+           (!(dev_hst_ro_flags & GNTMAP_contains_pte) && 
+            unlikely(!__addr_ok(addr))) ) )
     {
-        DPRINTK("Bad virtual address (%lx) or flags (%x).\n",
-                host_virt_addr, dev_hst_ro_flags);
+        DPRINTK("Bad virtual address (%"PRIx64") or flags (%"PRIx16").\n",
+                addr, dev_hst_ro_flags);
         (void)__put_user(GNTST_bad_virt_addr, &uop->handle);
         return GNTST_bad_gntref;
     }
@@ -379,6 +399,11 @@ __gnttab_map_grant_ref(
         DPRINTK("Bad ref (%d) or flags (%x).\n", ref, dev_hst_ro_flags);
         (void)__put_user(GNTST_bad_gntref, &uop->handle);
         return GNTST_bad_gntref;
+    }
+
+    if (acm_pre_grant_map_ref(dom)) {
+        (void)__put_user(GNTST_permission_denied, &uop->handle);
+        return GNTST_permission_denied;
     }
 
     if ( unlikely((rd = find_domain_by_id(dom)) == NULL) ||
@@ -398,12 +423,20 @@ __gnttab_map_grant_ref(
         grant_mapping_t *new_mt;
         grant_table_t   *lgt      = ld->grant_table;
 
+        if ( (lgt->maptrack_limit << 1) > MAPTRACK_MAX_ENTRIES )
+        {
+            put_domain(rd);
+            DPRINTK("Maptrack table is at maximum size.\n");
+            (void)__put_user(GNTST_no_device_space, &uop->handle);
+            return GNTST_no_device_space;
+        }
+
         /* Grow the maptrack table. */
         new_mt = alloc_xenheap_pages(lgt->maptrack_order + 1);
         if ( new_mt == NULL )
         {
             put_domain(rd);
-            DPRINTK("No more map handles available\n");
+            DPRINTK("No more map handles available.\n");
             (void)__put_user(GNTST_no_device_space, &uop->handle);
             return GNTST_no_device_space;
         }
@@ -417,7 +450,7 @@ __gnttab_map_grant_ref(
         lgt->maptrack_order   += 1;
         lgt->maptrack_limit  <<= 1;
 
-        printk("Doubled maptrack size\n");
+        DPRINTK("Doubled maptrack size\n");
         handle = get_maptrack_handle(ld->grant_table);
     }
 
@@ -428,7 +461,7 @@ __gnttab_map_grant_ref(
 
     if ( 0 <= ( rc = __gnttab_activate_grant_ref( ld, led, rd, ref,
                                                   dev_hst_ro_flags,
-                                                  host_virt_addr, &frame)))
+                                                  addr, &frame)))
     {
         /*
          * Only make the maptrack live _after_ writing the pte, in case we 
@@ -440,10 +473,11 @@ __gnttab_map_grant_ref(
             = (ref << MAPTRACK_REF_SHIFT) |
               (dev_hst_ro_flags & MAPTRACK_GNTMAP_MASK);
 
-        (void)__put_user(frame, &uop->dev_bus_addr);
+        (void)__put_user((u64)frame << PAGE_SHIFT, &uop->dev_bus_addr);
 
-        if ( dev_hst_ro_flags & GNTMAP_host_map )
-            *va = host_virt_addr;
+        if ( ( dev_hst_ro_flags & GNTMAP_host_map ) &&
+             !( dev_hst_ro_flags & GNTMAP_contains_pte) )
+            *va = addr;
 
         (void)__put_user(handle, &uop->handle);
     }
@@ -461,12 +495,12 @@ static long
 gnttab_map_grant_ref(
     gnttab_map_grant_ref_t *uop, unsigned int count)
 {
-    int i, flush = 0;
+    int i, rc, flush = 0;
     unsigned long va = 0;
 
     for ( i = 0; i < count; i++ )
-        if ( __gnttab_map_grant_ref(&uop[i], &va) == 0 )
-            flush++;
+        if ( (rc =__gnttab_map_grant_ref(&uop[i], &va)) >= 0 )
+            flush += rc;
 
 #ifdef __ia64__
 // FIXME-ia64: probably need to do something here to avoid stale mappings?
@@ -485,28 +519,30 @@ __gnttab_unmap_grant_ref(
     gnttab_unmap_grant_ref_t *uop,
     unsigned long *va)
 {
-    domid_t        dom;
-    grant_ref_t    ref;
-    u16            handle;
-    struct domain *ld, *rd;
-
+    domid_t          dom;
+    grant_ref_t      ref;
+    u16              handle;
+    struct domain   *ld, *rd;
     active_grant_entry_t *act;
-    grant_entry_t *sha;
+    grant_entry_t   *sha;
     grant_mapping_t *map;
-    u16            flags;
-    s16            rc = 1;
-    unsigned long  frame, virt;
+    u16              flags;
+    s16              rc = 1;
+    u64              addr, dev_bus_addr;
+    unsigned long    frame;
 
     ld = current->domain;
 
     /* Bitwise-OR avoids short-circuiting which screws control flow. */
-    if ( unlikely(__get_user(virt, &uop->host_addr) |
-                  __get_user(frame, &uop->dev_bus_addr) |
+    if ( unlikely(__get_user(addr, &uop->host_addr) |
+                  __get_user(dev_bus_addr, &uop->dev_bus_addr) |
                   __get_user(handle, &uop->handle)) )
     {
         DPRINTK("Fault while reading gnttab_unmap_grant_ref_t.\n");
         return -EFAULT; /* don't set status */
     }
+
+    frame = (unsigned long)(dev_bus_addr >> PAGE_SHIFT);
 
     map = &ld->grant_table->maptrack[handle];
 
@@ -561,44 +597,22 @@ __gnttab_unmap_grant_ref(
         /* Frame is now unmapped for device access. */
     }
 
-    if ( (virt != 0) &&
+    if ( (addr != 0) &&
          (flags & GNTMAP_host_map) &&
          ((act->pin & (GNTPIN_hstw_mask | GNTPIN_hstr_mask)) > 0))
     {
 #ifdef __ia64__
 // FIXME-ia64: any error checking need to be done here?
 #else
-        l1_pgentry_t   *pl1e;
-        unsigned long   _ol1e;
-
-        pl1e = &linear_pg_table[l1_linear_offset(virt)];
-
-        if ( unlikely(__get_user(_ol1e, (unsigned long *)pl1e) != 0) )
+        if ( flags & GNTMAP_contains_pte )
         {
-            DPRINTK("Could not find PTE entry for address %lx\n", virt);
-            rc = -EINVAL;
-            goto unmap_out;
+            if ( (rc = clear_grant_pte_mapping(addr, frame, ld)) < 0 )
+                goto unmap_out;
         }
-
-        /*
-         * Check that the virtual address supplied is actually mapped to 
-         * act->frame.
-         */
-        if ( unlikely((_ol1e >> PAGE_SHIFT) != frame ))
+        else
         {
-            DPRINTK("PTE entry %lx for address %lx doesn't match frame %lx\n",
-                    _ol1e, virt, frame);
-            rc = -EINVAL;
-            goto unmap_out;
-        }
-
-        /* Delete pagetable entry. */
-        if ( unlikely(__put_user(0, (unsigned long *)pl1e)))
-        {
-            DPRINTK("Cannot delete PTE entry at %p for virtual address %lx\n",
-                    pl1e, virt);
-            rc = -EINVAL;
-            goto unmap_out;
+            if ( (rc = clear_grant_va_mapping(addr, frame)) < 0 )
+                goto unmap_out;
         }
 #endif
 
@@ -608,7 +622,8 @@ __gnttab_unmap_grant_ref(
                                               : GNTPIN_hstw_inc;
 
         rc = 0;
-        *va = virt;
+        if ( !( flags & GNTMAP_contains_pte) )
+            *va = addr;
     }
 
     if ( (map->ref_and_flags & (GNTMAP_device_map|GNTMAP_host_map)) == 0)
@@ -637,6 +652,7 @@ __gnttab_unmap_grant_ref(
 
     if ( act->pin == 0 )
     {
+        act->frame = 0xdeadbeef;
         clear_bit(_GTF_reading, &sha->flags);
         put_page(&frame_table[frame]);
     }
@@ -678,7 +694,6 @@ gnttab_setup_table(
     gnttab_setup_table_t  op;
     struct domain        *d;
     int                   i;
-    unsigned long addr;
 
     if ( count != 1 )
         return -EINVAL;
@@ -726,7 +741,7 @@ gnttab_setup_table(
                     &uop->frame_list[i]);
 	} else {
             /* IA64 hack - need to map it somewhere */
-            addr = (1UL << 40);
+            unsigned long addr = (1UL << 40);
             map_domain_page(d, addr, virt_to_phys(d->grant_table->shared));
             (void)put_user(addr >> PAGE_SHIFT, &uop->frame_list[0]);
         }
@@ -794,7 +809,7 @@ gnttab_dump_table(gnttab_dump_table_t *uop)
         if ( sha_copy.flags )
         {
             DPRINTK("Grant: dom (%hu) SHARED (%d) flags:(%hx) "
-                    "dom:(%hu) frame:(%lx)\n",
+                    "dom:(%hu) frame:(%x)\n",
                     op.dom, i, sha_copy.flags, sha_copy.domid, sha_copy.frame);
         }
     }
@@ -835,48 +850,208 @@ gnttab_dump_table(gnttab_dump_table_t *uop)
 }
 #endif
 
+static long
+gnttab_donate(gnttab_donate_t *uop, unsigned int count)
+{
+    struct domain *d = current->domain;
+    struct domain *e;
+    struct pfn_info *page;
+    u32 _d, _nd, x, y;
+    int i;
+    int result = GNTST_okay;
+
+#ifdef __ia64__
+//FIXME-IA64: not support for now?
+    return GNTST_general_error;
+#else
+    for (i = 0; i < count; i++) {
+        gnttab_donate_t *gop = &uop[i];
+#if GRANT_DEBUG
+        printk("gnttab_donate: i=%d mfn=%lx domid=%d gref=%08x\n",
+               i, gop->mfn, gop->domid, gop->handle);
+#endif
+        page = &frame_table[gop->mfn];
+        
+        if (unlikely(IS_XEN_HEAP_FRAME(page))) { 
+            printk("gnttab_donate: xen heap frame mfn=%lx\n", 
+                   (unsigned long) gop->mfn);
+            gop->status = GNTST_bad_virt_addr;
+            continue;
+        }
+        if (unlikely(!pfn_valid(page_to_pfn(page)))) {
+            printk("gnttab_donate: invalid pfn for mfn=%lx\n", 
+                   (unsigned long) gop->mfn);
+            gop->status = GNTST_bad_virt_addr;
+            continue;
+        }
+        if (unlikely((e = find_domain_by_id(gop->domid)) == NULL)) {
+            printk("gnttab_donate: can't find domain %d\n", gop->domid);
+            gop->status = GNTST_bad_domain;
+            continue;
+        }
+
+        spin_lock(&d->page_alloc_lock);
+
+        /*
+         * The tricky bit: atomically release ownership while
+         * there is just one benign reference to the page
+         * (PGC_allocated). If that reference disappears then the
+         * deallocation routine will safely spin.
+         */
+        _d  = pickle_domptr(d);
+        _nd = page->u.inuse._domain;
+        y   = page->count_info;
+        do {
+            x = y;
+            if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
+                         (1 | PGC_allocated)) || unlikely(_nd != _d)) {
+                printk("gnttab_donate: Bad page values %p: ed=%p(%u), sd=%p,"
+                       " caf=%08x, taf=%" PRtype_info "\n", 
+                       (void *) page_to_pfn(page),
+                        d, d->domain_id, unpickle_domptr(_nd), x, 
+                        page->u.inuse.type_info);
+                spin_unlock(&d->page_alloc_lock);
+                put_domain(e);
+                return 0;
+            }
+            __asm__ __volatile__(
+                LOCK_PREFIX "cmpxchg8b %2"
+                : "=d" (_nd), "=a" (y),
+                "=m" (*(volatile u64 *)(&page->count_info))
+                : "0" (_d), "1" (x), "c" (NULL), "b" (x) );
+        } while (unlikely(_nd != _d) || unlikely(y != x));
+
+        /*
+         * Unlink from 'd'. At least one reference remains (now
+         * anonymous), so noone else is spinning to try to delete
+         * this page from 'd'.
+         */
+        d->tot_pages--;
+        list_del(&page->list);
+
+        spin_unlock(&d->page_alloc_lock);
+
+        spin_lock(&e->page_alloc_lock);
+
+        /*
+         * Check that 'e' will accept the page and has reservation
+         * headroom.  Also, a domain mustn't have PGC_allocated
+         * pages when it is dying.
+         */
+#ifdef GRANT_DEBUG
+        if (unlikely(e->tot_pages >= e->max_pages)) {
+            printk("gnttab_dontate: no headroom tot_pages=%d max_pages=%d\n",
+                   e->tot_pages, e->max_pages);
+            spin_unlock(&e->page_alloc_lock);
+            put_domain(e);
+            result = GNTST_general_error;
+            break;
+        }
+        if (unlikely(test_bit(DOMFLAGS_DYING, &e->domain_flags))) {
+            printk("gnttab_donate: target domain is dying\n");
+            spin_unlock(&e->page_alloc_lock);
+            put_domain(e);
+            result = GNTST_general_error;
+            break;
+        }
+        if (unlikely(!gnttab_prepare_for_transfer(e, d, gop->handle))) {
+            printk("gnttab_donate: gnttab_prepare_for_transfer fails\n");
+            spin_unlock(&e->page_alloc_lock);
+            put_domain(e);
+            result = GNTST_general_error;
+            break;
+        }
+#else
+        ASSERT(e->tot_pages <= e->max_pages);
+        if (unlikely(test_bit(DOMFLAGS_DYING, &e->domain_flags)) ||
+            unlikely(e->tot_pages == e->max_pages) ||
+            unlikely(!gnttab_prepare_for_transfer(e, d, gop->handle))) {
+            printk("gnttab_donate: Transferee has no reservation headroom (%d,"
+                   "%d) or provided a bad grant ref (%08x) or is dying (%p)\n",
+                   e->tot_pages, e->max_pages, gop->handle, e->d_flags);
+            spin_unlock(&e->page_alloc_lock);
+            put_domain(e);
+            result = GNTST_general_error;
+            break;
+        }
+#endif
+        /* Okay, add the page to 'e'. */
+        if (unlikely(e->tot_pages++ == 0)) {
+            get_knownalive_domain(e);
+        }
+        list_add_tail(&page->list, &e->page_list);
+        page_set_owner(page, e);
+        
+        spin_unlock(&e->page_alloc_lock);
+        
+        /*
+         * Transfer is all done: tell the guest about its new page
+         * frame.
+         */
+        gnttab_notify_transfer(e, d, gop->handle, gop->mfn);
+        
+        put_domain(e);
+        
+        gop->status = GNTST_okay;
+    }
+    return result;
+#endif
+}
+
 long 
 do_grant_table_op(
     unsigned int cmd, void *uop, unsigned int count)
 {
     long rc;
-
+    struct domain *d = current->domain;
+    
     if ( count > 512 )
         return -EINVAL;
-
-    LOCK_BIGLOCK(current->domain);
-
+    
+    LOCK_BIGLOCK(d);
+    
+#ifndef __ia64__
+    sync_pagetable_state(d);
+#endif
+    
     rc = -EFAULT;
     switch ( cmd )
-    {
-    case GNTTABOP_map_grant_ref:
-        if ( unlikely(!array_access_ok(
-            uop, count, sizeof(gnttab_map_grant_ref_t))) )
-            goto out;
-        rc = gnttab_map_grant_ref((gnttab_map_grant_ref_t *)uop, count);
-        break;
-    case GNTTABOP_unmap_grant_ref:
-        if ( unlikely(!array_access_ok(
-            uop, count, sizeof(gnttab_unmap_grant_ref_t))) )
-            goto out;
-        rc = gnttab_unmap_grant_ref((gnttab_unmap_grant_ref_t *)uop, count);
-        break;
-    case GNTTABOP_setup_table:
-        rc = gnttab_setup_table((gnttab_setup_table_t *)uop, count);
-        break;
+        {
+        case GNTTABOP_map_grant_ref:
+            if ( unlikely(!array_access_ok(
+                              uop, count, sizeof(gnttab_map_grant_ref_t))) )
+                goto out;
+            rc = gnttab_map_grant_ref((gnttab_map_grant_ref_t *)uop, count);
+            break;
+        case GNTTABOP_unmap_grant_ref:
+            if ( unlikely(!array_access_ok(
+                              uop, count, sizeof(gnttab_unmap_grant_ref_t))) )
+                goto out;
+            rc = gnttab_unmap_grant_ref((gnttab_unmap_grant_ref_t *)uop, 
+                                        count);
+            break;
+        case GNTTABOP_setup_table:
+            rc = gnttab_setup_table((gnttab_setup_table_t *)uop, count);
+            break;
 #if GRANT_DEBUG
-    case GNTTABOP_dump_table:
-        rc = gnttab_dump_table((gnttab_dump_table_t *)uop);
-        break;
+        case GNTTABOP_dump_table:
+            rc = gnttab_dump_table((gnttab_dump_table_t *)uop);
+            break;
 #endif
-    default:
-        rc = -ENOSYS;
-        break;
-    }
-
-out:
-    UNLOCK_BIGLOCK(current->domain);
-
+        case GNTTABOP_donate:
+            if (unlikely(!array_access_ok(uop, count, 
+                                          sizeof(gnttab_donate_t))))
+                goto out;
+            rc = gnttab_donate(uop, count);
+            break;
+        default:
+            rc = -ENOSYS;
+            break;
+        }
+    
+  out:
+    UNLOCK_BIGLOCK(d);
+    
     return rc;
 }
 
@@ -890,103 +1065,101 @@ gnttab_check_unmap(
      * Called a _lot_ at domain creation because pages mapped by priv domains
      * also traverse this.
      */
-
+    
     /* Note: If the same frame is mapped multiple times, and then one of
      *       the ptes is overwritten, which maptrack handle gets invalidated?
      * Advice: Don't do it. Explicitly unmap.
      */
-
+    
     unsigned int handle, ref, refcount;
     grant_table_t        *lgt, *rgt;
     active_grant_entry_t *act;
     grant_mapping_t      *map;
     int found = 0;
-
+    
     lgt = ld->grant_table;
-
+    
 #if GRANT_DEBUG_VERBOSE
-    if ( ld->domain_id != 0 )
-    {
-        DPRINTK("Foreign unref rd(%d) ld(%d) frm(%x) flgs(%x).\n",
-                rd->domain_id, ld->domain_id, frame, readonly);
-    }
+    if ( ld->domain_ id != 0 ) {
+            DPRINTK("Foreign unref rd(%d) ld(%d) frm(%lx) flgs(%x).\n",
+                    rd->domain_id, ld->domain_id, frame, readonly);
+      }
 #endif
-
+    
     /* Fast exit if we're not mapping anything using grant tables */
     if ( lgt->map_count == 0 )
         return 0;
-
-    if ( get_domain(rd) == 0 )
-    {
+    
+    if ( get_domain(rd) == 0 ) {
         DPRINTK("gnttab_check_unmap: couldn't get_domain rd(%d)\n",
                 rd->domain_id);
         return 0;
     }
-
+    
     rgt = rd->grant_table;
+    
+    for ( handle = 0; handle < lgt->maptrack_limit; handle++ ) {
 
-    for ( handle = 0; handle < lgt->maptrack_limit; handle++ )
-    {
         map = &lgt->maptrack[handle];
-
+            
+        if ( map->domid != rd->domain_id )
+            continue;
+        
         if ( ( map->ref_and_flags & MAPTRACK_GNTMAP_MASK ) &&
-             ( readonly ? 1 : (!(map->ref_and_flags & GNTMAP_readonly))))
-        {
+             ( readonly ? 1 : (!(map->ref_and_flags & GNTMAP_readonly)))) {
+
             ref = (map->ref_and_flags >> MAPTRACK_REF_SHIFT);
             act = &rgt->active[ref];
-
+                    
             spin_lock(&rgt->lock);
-
-            if ( act->frame != frame )
-            {
+                    
+            if ( act->frame != frame ) {
                 spin_unlock(&rgt->lock);
                 continue;
             }
-
+                    
             refcount = act->pin & ( readonly ? GNTPIN_hstr_mask
-                                             : GNTPIN_hstw_mask );
-            if ( refcount == 0 )
-            {
+                                    : GNTPIN_hstw_mask );
+
+            if ( refcount == 0 ) {
                 spin_unlock(&rgt->lock);
                 continue;
             }
-
+                    
             /* gotcha */
             DPRINTK("Grant unref rd(%d) ld(%d) frm(%lx) flgs(%x).\n",
                     rd->domain_id, ld->domain_id, frame, readonly);
-
+                    
             if ( readonly )
                 act->pin -= GNTPIN_hstr_inc;
-            else
-            {
+            else {
                 act->pin -= GNTPIN_hstw_inc;
-
+                            
                 /* any more granted writable mappings? */
-                if ( (act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) == 0 )
-                {
+                if ( (act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) == 0 ) {
                     clear_bit(_GTF_writing, &rgt->shared[ref].flags);
                     put_page_type(&frame_table[frame]);
                 }
             }
-
-            if ( act->pin == 0 )
-            {
+                
+            if ( act->pin == 0 ) {
                 clear_bit(_GTF_reading, &rgt->shared[ref].flags);
                 put_page(&frame_table[frame]);
             }
+
             spin_unlock(&rgt->lock);
-
+                    
             clear_bit(GNTMAP_host_map, &map->ref_and_flags);
-
+                    
             if ( !(map->ref_and_flags & GNTMAP_device_map) )
                 put_maptrack_handle(lgt, handle);
-
+                    
             found = 1;
             break;
         }
     }
     put_domain(rd);
-
+    
     return found;
 }
 
@@ -1002,8 +1175,10 @@ gnttab_prepare_for_transfer(
     int            retries = 0;
     unsigned long  target_pfn;
 
+#if GRANT_DEBUG_VERBOSE
     DPRINTK("gnttab_prepare_for_transfer rd(%hu) ld(%hu) ref(%hu).\n",
             rd->domain_id, ld->domain_id, ref);
+#endif
 
     if ( unlikely((rgt = rd->grant_table) == NULL) ||
          unlikely(ref >= NR_GRANT_ENTRIES) )
@@ -1081,8 +1256,10 @@ gnttab_notify_transfer(
     grant_entry_t  *sha;
     unsigned long   pfn;
 
+#if GRANT_DEBUG_VERBOSE
     DPRINTK("gnttab_notify_transfer rd(%hu) ld(%hu) ref(%hu).\n",
             rd->domain_id, ld->domain_id, ref);
+#endif
 
     sha = &rd->grant_table->shared[ref];
 

@@ -257,6 +257,8 @@ typedef mapped_regs_t vpd_t;
 typedef struct {
 	int domain_controller_evtchn;
 	unsigned int flags;
+	unsigned short store_evtchn;
+	unsigned long store_mfn;
 //} arch_shared_info_t;
 } arch_shared_info_t;		// DON'T PACK 
 
