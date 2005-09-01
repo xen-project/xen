@@ -1,0 +1,7 @@
+TPM FE/BE code using xenbus (some control message stuff still there; to 
+be removed soon). 
+
+Signed-off-by: Stefan Berger <stefanb@us.ibm.com>
+Signed-off-by: Kylene Hall <kjhall@us.ibm.com>
+Signed-off-by: Mahadevan Gomathisankaran <gmdev@iastate.edu>
+Signed-off-by: Steven Hand <steven@xensource.com>

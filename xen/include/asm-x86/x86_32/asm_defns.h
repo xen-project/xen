@@ -1,46 +1,6 @@
 #ifndef __X86_32_ASM_DEFNS_H__
 #define __X86_32_ASM_DEFNS_H__
 
-/* Maybe auto-generate the following two cases (quoted vs. unquoted). */
-#ifndef __ASSEMBLY__
-
-#define __SAVE_ALL_PRE                                                  \
-        "cld;"                                                          \
-        "pushl %eax;"                                                   \
-        "pushl %ebp;"                                                   \
-        "pushl %edi;"                                                   \
-        "pushl %esi;"                                                   \
-        "pushl %edx;"                                                   \
-        "pushl %ecx;"                                                   \
-        "pushl %ebx;"                                                   \
-        "testl $"STR(X86_EFLAGS_VM)","STR(UREGS_eflags)"(%esp);"        \
-        "jz 2f;"                                                        \
-        "call setup_vm86_frame;"                                        \
-        "jmp 3f;"                                                       \
-        "2:testb $3,"STR(UREGS_cs)"(%esp);"                             \
-        "jz 1f;"                                                        \
-        "mov %ds,"STR(UREGS_ds)"(%esp);"                                \
-        "mov %es,"STR(UREGS_es)"(%esp);"                                \
-        "mov %fs,"STR(UREGS_fs)"(%esp);"                                \
-        "mov %gs,"STR(UREGS_gs)"(%esp);"                                \
-        "3:"
-
-#define SAVE_ALL_NOSEGREGS(_reg)                \
-        __SAVE_ALL_PRE                          \
-        "1:"
-
-#define SET_XEN_SEGMENTS(_reg)                                  \
-        "movl $("STR(__HYPERVISOR_DS)"),%e"STR(_reg)"x;"        \
-        "mov %e"STR(_reg)"x,%ds;"                              \
-        "mov %e"STR(_reg)"x,%es;"
-
-#define SAVE_ALL(_reg)                          \
-        __SAVE_ALL_PRE                          \
-        SET_XEN_SEGMENTS(_reg)                  \
-        "1:"
-
-#else
-
 #define __SAVE_ALL_PRE                                  \
         cld;                                            \
         pushl %eax;                                     \
@@ -50,7 +10,7 @@
         pushl %edx;                                     \
         pushl %ecx;                                     \
         pushl %ebx;                                     \
-        testl $X86_EFLAGS_VM,UREGS_eflags(%esp);        \
+        testl $(X86_EFLAGS_VM),UREGS_eflags(%esp);      \
         jz 2f;                                          \
         call setup_vm86_frame;                          \
         jmp 3f;                                         \
@@ -83,8 +43,6 @@
 #define PERFC_INCR(_name,_idx)
 #endif
 
-#endif
-
 #define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)
 #define XBUILD_SMP_INTERRUPT(x,v)               \
 asmlinkage void x(void);                        \
@@ -92,7 +50,7 @@ __asm__(                                        \
     "\n"__ALIGN_STR"\n"                         \
     STR(x) ":\n\t"                              \
     "pushl $"#v"<<16\n\t"                       \
-    SAVE_ALL(a)                                 \
+    STR(SAVE_ALL(a))                            \
     "call "STR(smp_##x)"\n\t"                   \
     "jmp ret_from_intr\n");
 
@@ -103,7 +61,7 @@ __asm__(                                        \
 "\n"__ALIGN_STR"\n"                             \
 STR(x) ":\n\t"                                  \
     "pushl $"#v"<<16\n\t"                       \
-    SAVE_ALL(a)                                 \
+    STR(SAVE_ALL(a))                            \
     "movl %esp,%eax\n\t"                        \
     "pushl %eax\n\t"                            \
     "call "STR(smp_##x)"\n\t"                   \
@@ -114,7 +72,7 @@ STR(x) ":\n\t"                                  \
 __asm__(                                        \
     "\n" __ALIGN_STR"\n"                        \
     "common_interrupt:\n\t"                     \
-    SAVE_ALL(a)                                 \
+    STR(SAVE_ALL(a))                            \
     "movl %esp,%eax\n\t"                        \
     "pushl %eax\n\t"                            \
     "call " STR(do_IRQ) "\n\t"                  \

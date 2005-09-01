@@ -110,6 +110,27 @@ long do_xen_version(int cmd, void *arg)
             return -EFAULT;
         return 0;
     }
+
+    case XENVER_capabilities:
+    {
+        struct xen_capabilities_info info;
+        
+        /* FIXME */
+        info.arch = 0;
+        info.pae = 0;
+        if ( copy_to_user(arg, &info, sizeof(info)) )
+            return -EFAULT;
+        return 0;
+    }
+    
+    case XENVER_changeset:
+    {
+        xen_changeset_info_t chgset;
+        safe_strcpy(chgset, XEN_CHANGESET);
+        if ( copy_to_user(arg, chgset, sizeof(chgset)) )
+            return -EFAULT;
+        return 0;
+    }
     }
 
     return -ENOSYS;

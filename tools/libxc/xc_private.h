@@ -59,6 +59,17 @@ static inline int do_xen_hypercall(int xc_handle,
                       (unsigned long)hypercall);
 }
 
+static inline int do_xen_version(int xc_handle, int cmd, void *dest)
+{
+    privcmd_hypercall_t hypercall;
+
+    hypercall.op     = __HYPERVISOR_xen_version;
+    hypercall.arg[0] = (unsigned long) cmd;
+    hypercall.arg[1] = (unsigned long) dest;
+    
+    return do_xen_hypercall(xc_handle, &hypercall);
+}
+
 static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
 {
     int ret = -1;

@@ -40,4 +40,7 @@
 #include <xen/compiler.h>
 #endif
 
+#define __STR(...) #__VA_ARGS__
+#define STR(...) __STR(__VA_ARGS__)
+
 #endif /* __XEN_CONFIG_H__ */

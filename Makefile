@@ -35,11 +35,11 @@ ifeq ($(XEN_TARGET_X86_PAE),y)
 export pae=y
 endif
 
-.PHONY:	all dist install xen tools kernels docs world clean mkpatches mrproper
+.PHONY:	all dist install xen kernels tools docs world clean mkpatches mrproper
 .PHONY:	kbuild kdelete kclean
 
 # build and install everything into the standard system directories
-install: install-xen install-tools install-kernels install-docs
+install: install-xen install-kernels install-tools install-docs
 
 build: kernels
 	$(MAKE) -C xen build
@@ -47,7 +47,7 @@ build: kernels
 	$(MAKE) -C docs build
 
 # build and install everything into local dist directory
-dist: xen tools kernels docs
+dist: xen kernels tools docs
 	$(INSTALL_DIR) $(DISTDIR)/check
 	$(INSTALL_DATA) ./COPYING $(DISTDIR)
 	$(INSTALL_DATA) ./README $(DISTDIR)

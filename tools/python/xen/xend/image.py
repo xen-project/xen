@@ -32,6 +32,9 @@ SIF_BLK_BE_DOMAIN = (1<<4)
 """Flag for a net device backend domain."""
 SIF_NET_BE_DOMAIN = (1<<5)
 
+"""Flag for a TPM device backend domain."""
+SIF_TPM_BE_DOMAIN = (1<<7)
+
 class ImageHandler:
     """Abstract base class for image handlers.
 
@@ -194,6 +197,7 @@ class ImageHandler:
         self.flags = 0
         if self.vm.netif_backend: self.flags |= SIF_NET_BE_DOMAIN
         if self.vm.blkif_backend: self.flags |= SIF_BLK_BE_DOMAIN
+        if self.vm.tpmif_backend: self.flags |= SIF_TPM_BE_DOMAIN
 
         if self.vm.recreate or self.vm.restore:
             return
@@ -366,6 +370,11 @@ class VmxImageHandler(ImageHandler):
                mac = sxp.child_value(vifinfo, 'mac')
                ret.append("-macaddr")
                ret.append("%s" % mac)
+            if name == 'vtpm':
+               vtpminfo = sxp.child(device, 'vtpm')
+               instance = sxp.child_value(vtpminfo, 'instance')
+               ret.append("-instance")
+               ret.append("%s" % instance)
 
 	# Handle graphics library related options
 	vnc = sxp.child_value(self.vm.config, 'vnc')

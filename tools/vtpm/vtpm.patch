@@ -1,0 +1,1645 @@
+diff -uprN orig/tpm_emulator-0.2/AUTHORS vtpm/AUTHORS
+--- orig/tpm_emulator-0.2/AUTHORS	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/AUTHORS	2005-08-17 10:55:52.000000000 -0700
+@@ -1 +1,2 @@
+ Mario Strasser <mast@gmx.net>
++INTEL Corp <>
+diff -uprN orig/tpm_emulator-0.2/ChangeLog vtpm/ChangeLog
+--- orig/tpm_emulator-0.2/ChangeLog	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/ChangeLog	2005-08-17 10:55:52.000000000 -0700
+@@ -1,3 +1,7 @@
++2005-08-16 Intel Corp
++	Moved module out of kernel to run as a ring 3 app
++	Modified save_to_file and load_from_file to call a xen backend driver to call a VTPM manager
++
+ 2005-08-15  Mario Strasser <mast@gmx.net>
+ 	* all: some typos corrected
+ 	* tpm_integrity.c: bug in TPM_Extend fixed
+diff -uprN orig/tpm_emulator-0.2/Makefile vtpm/Makefile
+--- orig/tpm_emulator-0.2/Makefile	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/Makefile	2005-08-17 10:55:52.000000000 -0700
+@@ -1,21 +1,29 @@
+ # Software-Based Trusted Platform Module (TPM) Emulator for Linux
+ # Copyright (C) 2004 Mario Strasser <mast@gmx.net>
++# Copyright (C) 2005 INTEL Corp.
+ #
+ # $Id: Makefile 10 2005-04-26 20:59:50Z mast $
+ 
+-# kernel settings
+-KERNEL_RELEASE := $(shell uname -r)
+-KERNEL_BUILD   := /lib/modules/$(KERNEL_RELEASE)/build
+-MOD_SUBDIR     := misc
+-
+ # module settings
+-MODULE_NAME    := tpm_emulator
++BIN            := vtpmd
+ VERSION_MAJOR  := 0
+ VERSION_MINOR  := 2
+ VERSION_BUILD  := $(shell date +"%s")
+ 
+-# enable/disable DEBUG messages
+-EXTRA_CFLAGS   += -DDEBUG -g  
++# Installation program and options
++INSTALL         = install
++INSTALL_PROG    = $(INSTALL) -m0755
++INSTALL_DIR     = $(INSTALL) -d -m0755
++
++# Xen tools installation directory
++TOOLS_INSTALL_DIR = $(DESTDIR)/usr/bin
++
++CC      := gcc
++CFLAGS  += -g -Wall $(INCLUDE) -DDEBUG
++CFLAGS  += -I. -Itpm
++
++# Is the simulator running in it's own vm?
++#CFLAGS += -DVTPM_MULTI_VM
+ 
+ # GNU MP configuration
+ GMP_LIB        := /usr/lib/libgmp.a
+@@ -27,38 +35,31 @@ DIRS           := . crypto tpm 
+ SRCS           := $(foreach dir, $(DIRS), $(wildcard $(src)/$(dir)/*.c))
+ OBJS           := $(patsubst %.c, %.o, $(SRCS))
+ SRCS           += $(foreach dir, $(DIRS), $(wildcard $(src)/$(dir)/*.h))
+-DISTSRC        := ./README ./AUTHORS ./ChangeLog ./Makefile $(SRCS)
+-DISTDIR        := tpm_emulator-$(VERSION_MAJOR).$(VERSION_MINOR)
+ 
+-obj-m               := $(MODULE_NAME).o
+-$(MODULE_NAME)-objs := $(patsubst $(src)/%.o, %.o, $(OBJS)) crypto/libgmp.a
++obj-m               := $(BIN)
++$(BIN)-objs := $(patsubst $(src)/%.o, %.o, $(OBJS)) crypto/libgmp.a
+ 
+ EXTRA_CFLAGS   += -I$(src) -I$(src)/crypto -I$(src)/tpm 
+ 
+ # do not print "Entering directory ..."
+ MAKEFLAGS      += --no-print-directory
+ 
+-all:	$(src)/crypto/gmp.h $(src)/crypto/libgmp.a version
+-	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) modules
++all: $(BIN)
++
++$(BIN):	$(src)/crypto/gmp.h $(src)/crypto/libgmp.a version $(SRCS) $(OBJS)
++	$(CC) $(CFLAGS) $(OBJS) $(src)/crypto/libgmp.a -o $(BIN)
++
++%.o: %.c
++	$(CC) $(CFLAGS) -c $< -o $@
+ 
+ install:
+-	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) modules_install
+-	test -d /var/tpm || mkdir /var/tpm
+-	test -c /dev/tpm || mknod /dev/tpm c 10 224
+-	chmod 666 /dev/tpm
+-	depmod -a
++	$(INSTALL_PROG) $(BIN) $(TOOLS_INSTALL_DIR)
+ 
+ clean:
+-	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) clean
+-	rm -f $(src)/crypto/gmp.h $(src)/crypto/libgmp.a
++	rm -f $(src)/crypto/gmp.h $(src)/crypto/libgmp.a $(OBJS)
+ 
+-dist:	$(DISTSRC)
+-	rm -rf $(DISTDIR)
+-	mkdir $(DISTDIR)
+-	cp --parents $(DISTSRC) $(DISTDIR)/
+-	rm -f $(DISTDIR)/crypto/gmp.h 
+-	tar -chzf $(DISTDIR).tar.gz $(DISTDIR)
+-	rm -rf $(DISTDIR)
++mrproper: clean
++	rm -f $(BIN)
+ 
+ $(src)/crypto/libgmp.a:
+ 	test -f $(src)/crypto/libgmp.a || ln -s $(GMP_LIB) $(src)/crypto/libgmp.a
+diff -uprN orig/tpm_emulator-0.2/README vtpm/README
+--- orig/tpm_emulator-0.2/README	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/README	2005-08-17 10:55:52.000000000 -0700
+@@ -13,7 +13,8 @@ $Id: README 8 2005-01-25 21:11:45Z jmoli
+ Copyright
+ --------------------------------------------------------------------------
+ Copyright (C) 2004 Mario Strasser <mast@gmx.net> and Swiss Federal 
+-Institute of Technology (ETH) Zurich.
++                   Institute of Technology (ETH) Zurich.
++Copyright (C) 2005 INTEL Corp 
+               
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+diff -uprN orig/tpm_emulator-0.2/crypto/gmp_kernel_wrapper.c vtpm/crypto/gmp_kernel_wrapper.c
+--- orig/tpm_emulator-0.2/crypto/gmp_kernel_wrapper.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/crypto/gmp_kernel_wrapper.c	2005-08-17 10:55:52.000000000 -0700
+@@ -1,5 +1,6 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -24,15 +25,10 @@ int __gmp_junk;
+ void __attribute__ ((regparm(0))) __gmp_assert_fail(const char *filename, 
+   int linenum, const char *expr) 
+ {
+-  panic(KERN_CRIT TPM_MODULE_NAME "%s:%d: GNU MP assertion failed: %s\n", 
++  error("%s:%d: GNU MP assertion failed: %s\n", 
+     filename, linenum, expr);
+ }
+ 
+-void __attribute__ ((regparm(0))) abort(void)
+-{
+-  panic(KERN_CRIT TPM_MODULE_NAME "GNU MP abort() was called\n");
+-}
+-
+ /* overwrite GNU MP random functions (used by mpz/millerrabin.c) */ 
+ 
+ void __attribute__ ((regparm(0))) gmp_randinit(gmp_randstate_t rstate, 
+@@ -77,20 +73,19 @@ void __attribute__ ((regparm(0))) mpz_ur
+ 
+ void __attribute__ ((regparm(0))) *kernel_allocate(size_t size)
+ {
+-  void *ret  = (void*)kmalloc(size, GFP_KERNEL);
+-  if (!ret) panic(KERN_CRIT TPM_MODULE_NAME 
+-    "GMP: cannot allocate memory (size=%u)\n", size);
++  void *ret  = (void*)malloc(size);
++  if (!ret) error("GMP: cannot allocate memory (size=%u)\n", size);
+   return ret;
+ }
+ 
+ void __attribute__ ((regparm(0))) *kernel_reallocate(void *oldptr, 
+   size_t old_size, size_t new_size)
+ {
+-  void *ret = (void*)kmalloc(new_size, GFP_KERNEL);
+-  if (!ret) panic(KERN_CRIT TPM_MODULE_NAME "GMP: Cannot reallocate memory "
++  void *ret = (void*)malloc(new_size);
++  if (!ret) error("GMP: Cannot reallocate memory "
+     "(old_size=%u new_size=%u)\n", old_size, new_size);
+   memcpy(ret, oldptr, old_size);
+-  kfree(oldptr);
++  free(oldptr);
+   return ret;
+ }
+ 
+@@ -99,7 +94,7 @@ void __attribute__ ((regparm(0))) kernel
+   /* overwrite used memory */
+   if (blk_ptr != NULL) { 
+     memset(blk_ptr, 0, blk_size);
+-    kfree(blk_ptr);
++    free(blk_ptr);
+   }
+ }
+ 
+diff -uprN orig/tpm_emulator-0.2/crypto/rsa.c vtpm/crypto/rsa.c
+--- orig/tpm_emulator-0.2/crypto/rsa.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/crypto/rsa.c	2005-08-17 10:55:52.000000000 -0700
+@@ -1,5 +1,6 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -363,7 +364,7 @@ static int encode_message(int type, uint
+       msg[0] = 0x00;
+       get_random_bytes(&msg[1], SHA1_DIGEST_LENGTH);
+       sha1_init(&ctx);
+-      sha1_update(&ctx, "TCPA", 4);
++      sha1_update(&ctx, (uint8_t *) "TCPA", 4);
+       sha1_final(&ctx, &msg[1 + SHA1_DIGEST_LENGTH]);
+       memset(&msg[1 + 2 * SHA1_DIGEST_LENGTH], 0x00, 
+         msg_len - data_len - 2 * SHA1_DIGEST_LENGTH - 2);
+@@ -411,7 +412,7 @@ static int decode_message(int type, uint
+       mask_generation(&msg[1], SHA1_DIGEST_LENGTH,
+         &msg[1 + SHA1_DIGEST_LENGTH], msg_len - SHA1_DIGEST_LENGTH - 1);
+       sha1_init(&ctx);
+-      sha1_update(&ctx, "TCPA", 4);
++      sha1_update(&ctx, (uint8_t *) "TCPA", 4);
+       sha1_final(&ctx, &msg[1]);
+       if (memcmp(&msg[1], &msg[1 + SHA1_DIGEST_LENGTH], 
+           SHA1_DIGEST_LENGTH) != 0) return -1;
+diff -uprN orig/tpm_emulator-0.2/linux_module.c vtpm/linux_module.c
+--- orig/tpm_emulator-0.2/linux_module.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/linux_module.c	1969-12-31 16:00:00.000000000 -0800
+@@ -1,163 +0,0 @@
+-/* Software-Based Trusted Platform Module (TPM) Emulator for Linux 
+- * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
+- *
+- * This module is free software; you can redistribute it and/or modify 
+- * it under the terms of the GNU General Public License as published 
+- * by the Free Software Foundation; either version 2 of the License, 
+- * or (at your option) any later version.  
+- *
+- * This module is distributed in the hope that it will be useful, 
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of 
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+- * GNU General Public License for more details.
+- *
+- * $Id: linux_module.c 19 2005-05-18 08:29:37Z mast $
+- */
+-
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/miscdevice.h>
+-#include <linux/poll.h>
+-#include "linux_module.h"
+-#include "tpm/tpm_emulator.h"
+-
+-MODULE_LICENSE("GPL");
+-MODULE_AUTHOR("Mario Strasser <mast@gmx.net>");
+-MODULE_DESCRIPTION("Trusted Platform Module (TPM) Emulator");
+-MODULE_SUPPORTED_DEVICE(TPM_DEVICE_NAME);
+-
+-/* module startup parameters */
+-char *startup = "save";
+-MODULE_PARM(startup, "s");
+-MODULE_PARM_DESC(startup, " Sets the startup mode of the TPM. "
+-  "Possible values are 'clear', 'save' (default) and 'deactivated.");
+-char *storage_file = "/var/tpm/tpm_emulator-1.2.0.1";
+-MODULE_PARM(storage_file, "s");
+-MODULE_PARM_DESC(storage_file, " Sets the persistent-data storage " 
+-  "file of the TPM.");
+-
+-/* TPM lock */
+-static struct semaphore tpm_mutex;
+-
+-/* TPM command response */
+-static struct {
+-  uint8_t *data;
+-  uint32_t size;
+-} tpm_response;
+-
+-/* module state */
+-#define STATE_IS_OPEN 0
+-static uint32_t module_state;
+-
+-static int tpm_open(struct inode *inode, struct file *file)
+-{
+-  debug("%s()", __FUNCTION__);
+-  if (test_and_set_bit(STATE_IS_OPEN, (void*)&module_state)) return -EBUSY;
+-  return 0;
+-}
+-
+-static int tpm_release(struct inode *inode, struct file *file)
+-{
+-  debug("%s()", __FUNCTION__);
+-  clear_bit(STATE_IS_OPEN, (void*)&module_state);
+-  return 0;
+-}
+-
+-static ssize_t tpm_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+-{
+-  debug("%s(%d)", __FUNCTION__, count);
+-  down(&tpm_mutex);
+-  if (tpm_response.data != NULL) {
+-    count = min(count, (size_t)tpm_response.size - (size_t)*ppos);
+-    count -= copy_to_user(buf, &tpm_response.data[*ppos], count);
+-    *ppos += count;
+-  } else {
+-    count = 0;
+-  }
+-  up(&tpm_mutex);
+-  return count;
+-}
+-
+-static ssize_t tpm_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+-{
+-  debug("%s(%d)", __FUNCTION__, count);
+-  down(&tpm_mutex);
+-  *ppos = 0;
+-  if (tpm_response.data != NULL) kfree(tpm_response.data);
+-  if (tpm_handle_command(buf, count, &tpm_response.data, 
+-                         &tpm_response.size) != 0) { 
+-    count = -EILSEQ;
+-    tpm_response.data = NULL;
+-  }
+-  up(&tpm_mutex);
+-  return count;
+-}
+-
+-static int tpm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+-{
+-  debug("%s(%d, %ld)", __FUNCTION__, cmd, arg);
+-  return -1;
+-}
+-
+-struct file_operations fops = {
+-  .owner   = THIS_MODULE,
+-  .open    = tpm_open,
+-  .release = tpm_release,
+-  .read    = tpm_read,
+-  .write   = tpm_write,
+-  .ioctl   = tpm_ioctl,
+-};
+-
+-static struct miscdevice tpm_dev = {
+-  .minor      = TPM_DEVICE_MINOR, 
+-  .name       = TPM_DEVICE_NAME, 
+-  .fops       = &fops,
+-};
+-
+-int __init init_tpm_module(void)
+-{
+-  int res = misc_register(&tpm_dev);
+-  if (res != 0) {
+-    error("misc_register() failed for minor %d\n", TPM_DEVICE_MINOR);
+-    return res;
+-  }
+-  /* initialize variables */
+-  sema_init(&tpm_mutex, 1);
+-  module_state = 0;
+-  tpm_response.data = NULL;    
+-  /* initialize TPM emulator */
+-  if (!strcmp(startup, "clear")) {
+-    tpm_emulator_init(1);
+-  } else if (!strcmp(startup, "save")) { 
+-    tpm_emulator_init(2);
+-  } else if (!strcmp(startup, "deactivated")) {
+-    tpm_emulator_init(3);
+-  } else {
+-    error("invalid startup mode '%s'; must be 'clear', "
+-      "'save' (default) or 'deactivated", startup);
+-    misc_deregister(&tpm_dev);
+-    return -EINVAL;
+-  }
+-  return 0;
+-}
+-
+-void __exit cleanup_tpm_module(void)
+-{
+-  tpm_emulator_shutdown();
+-  misc_deregister(&tpm_dev);
+-}
+-
+-module_init(init_tpm_module);
+-module_exit(cleanup_tpm_module);
+-
+-uint64_t tpm_get_ticks(void)
+-{
+-  static struct timespec old_time = {0, 0}; 
+-  struct timespec new_time = current_kernel_time();
+-  uint64_t ticks = (uint64_t)(old_time.tv_sec - new_time.tv_sec) * 1000000
+-                   + (old_time.tv_nsec - new_time.tv_nsec) / 1000;
+-  old_time = new_time;
+-  return (ticks > 0) ? ticks : 1;
+-}
+-
+diff -uprN orig/tpm_emulator-0.2/linux_module.h vtpm/linux_module.h
+--- orig/tpm_emulator-0.2/linux_module.h	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/linux_module.h	2005-08-17 10:55:52.000000000 -0700
+@@ -1,5 +1,6 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -17,17 +18,22 @@
+ #ifndef _LINUX_MODULE_H_
+ #define _LINUX_MODULE_H_
+ 
+-#include <linux/version.h>
+-#include <linux/kernel.h>
+-#include <linux/slab.h>
++#include <malloc.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
+ #include <linux/types.h>
+-#include <linux/string.h>
+-#include <linux/random.h>
+-#include <linux/time.h>
+-#include <asm/byteorder.h>
+ 
+-/* module settings */
++#include <endian.h>
++#define __BYTEORDER_HAS_U64__
++#ifdef LITTLE_ENDIAN
++ #include <linux/byteorder/little_endian.h>
++#else
++ #include <linux/byteorder/big_endian.h>
++#endif
+ 
++/* module settings */
++#define min(A,B) ((A)<(B)?(A):(B))
+ #define STR(s) __STR__(s)
+ #define __STR__(s) #s
+ #include "tpm_version.h"
+@@ -39,32 +45,35 @@
+ /* debug and log output functions */
+ 
+ #ifdef DEBUG
+-#define debug(fmt, ...) printk(KERN_DEBUG "%s %s:%d: Debug: " fmt "\n", \
+-                        TPM_MODULE_NAME, __FILE__, __LINE__, ## __VA_ARGS__)
++#define debug(fmt, ...) printf("%s:%d: Debug: " fmt "\n", \
++                        __FILE__, __LINE__, ## __VA_ARGS__)
+ #else
+ #define debug(fmt, ...) 
+ #endif
+-#define info(fmt, ...)  printk(KERN_INFO "%s %s:%d: Info: " fmt "\n", \
+-                        TPM_MODULE_NAME, __FILE__, __LINE__, ## __VA_ARGS__)
+-#define error(fmt, ...) printk(KERN_ERR "%s %s:%d: Error: " fmt "\n", \
+-                        TPM_MODULE_NAME, __FILE__, __LINE__, ## __VA_ARGS__)
+-#define alert(fmt, ...) printk(KERN_ALERT "%s %s:%d: Alert: " fmt "\n", \
+-                        TPM_MODULE_NAME, __FILE__, __LINE__, ## __VA_ARGS__)
++#define info(fmt, ...)  printf("%s:%d: Info: " fmt "\n", \
++                        __FILE__, __LINE__, ## __VA_ARGS__)
++#define error(fmt, ...) printf("%s:%d: Error: " fmt "\n", \
++                        __FILE__, __LINE__, ## __VA_ARGS__)
++#define alert(fmt, ...) printf("%s:%d: Alert: " fmt "\n", \
++                        __FILE__, __LINE__, ## __VA_ARGS__)
+ 
+ /* memory allocation */
+ 
+ static inline void *tpm_malloc(size_t size) 
+ {
+-  return kmalloc(size, GFP_KERNEL);  
++  return malloc(size);  
+ }
+ 
+ static inline void tpm_free(const void *ptr)
+ {
+-  if (ptr != NULL) kfree(ptr);
++  if (ptr != NULL) free( (void *) ptr);
+ }
+ 
+ /* random numbers */
+ 
++//FIXME;
++void get_random_bytes(void *buf, int nbytes);
++
+ static inline void tpm_get_random_bytes(void *buf, int nbytes)
+ {
+   get_random_bytes(buf, nbytes);
+@@ -84,9 +93,9 @@ uint64_t tpm_get_ticks(void);
+ #define CPU_TO_LE16(x) __cpu_to_le16(x)
+ 
+ #define BE64_TO_CPU(x) __be64_to_cpu(x)
+-#define LE64_TO_CPU(x) __be64_to_cpu(x)
++#define LE64_TO_CPU(x) __le64_to_cpu(x)
+ #define BE32_TO_CPU(x) __be32_to_cpu(x)
+-#define LE32_TO_CPU(x) __be32_to_cpu(x)
++#define LE32_TO_CPU(x) __le32_to_cpu(x)
+ #define BE16_TO_CPU(x) __be16_to_cpu(x)
+ #define LE16_TO_CPU(x) __le16_to_cpu(x)
+ 
+diff -uprN orig/tpm_emulator-0.2/tpm/tpm_audit.c vtpm/tpm/tpm_audit.c
+--- orig/tpm_emulator-0.2/tpm/tpm_audit.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/tpm/tpm_audit.c	2005-08-17 10:55:52.000000000 -0700
+@@ -1,6 +1,7 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
+  *                    Swiss Federal Institute of Technology (ETH) Zurich
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -45,14 +46,14 @@ void tpm_audit_request(TPM_COMMAND_CODE 
+       tpmData.permanent.data.auditMonotonicCounter++;
+     }
+     /* update audit digest */
+-    *((UINT16*)&buf[0])  = cpu_to_be16(TPM_TAG_AUDIT_EVENT_IN);
+-    *((UINT32*)&buf[2]) = cpu_to_be32(ordinal);
++    *((UINT16*)&buf[0])  = CPU_TO_BE16(TPM_TAG_AUDIT_EVENT_IN);
++    *((UINT32*)&buf[2]) = CPU_TO_BE32(ordinal);
+     sha1_init(&sha1_ctx);
+     sha1_update(&sha1_ctx, req->param, req->paramSize);
+     sha1_final(&sha1_ctx, &buf[6]);
+-    *((UINT16*)&buf[26])  = cpu_to_be16(TPM_TAG_COUNTER_VALUE);
++    *((UINT16*)&buf[26])  = CPU_TO_BE16(TPM_TAG_COUNTER_VALUE);
+     memset(&buf[30], 0, 4);
+-    *((UINT32*)&buf[34]) = cpu_to_be32(tpmData.permanent.data.auditMonotonicCounter);
++    *((UINT32*)&buf[34]) = CPU_TO_BE32(tpmData.permanent.data.auditMonotonicCounter);
+     sha1_init(&sha1_ctx);
+     sha1_update(&sha1_ctx, tpmData.stany.data.auditDigest.digest, 
+       sizeof(TPM_DIGEST));
+@@ -70,15 +71,15 @@ void tpm_audit_response(TPM_COMMAND_CODE
+       && (AUDIT_STATUS[ord / 8] & (1 << (ord & 0x07)))) {
+     info("tpm_audit_response()");
+     /* update audit digest */
+-    *((UINT16*)&buf[0])  = cpu_to_be16(TPM_TAG_AUDIT_EVENT_OUT);
+-    *((UINT32*)&buf[2]) = cpu_to_be32(ordinal);
++    *((UINT16*)&buf[0])  = CPU_TO_BE16(TPM_TAG_AUDIT_EVENT_OUT);
++    *((UINT32*)&buf[2]) = CPU_TO_BE32(ordinal);
+     sha1_init(&sha1_ctx);
+     sha1_update(&sha1_ctx, rsp->param, rsp->paramSize);
+     sha1_final(&sha1_ctx, &buf[6]);
+-    *((UINT16*)&buf[26])  = cpu_to_be16(TPM_TAG_COUNTER_VALUE);
++    *((UINT16*)&buf[26])  = CPU_TO_BE16(TPM_TAG_COUNTER_VALUE);
+     memset(&buf[30], 0, 4);
+-    *((UINT32*)&buf[34]) = cpu_to_be32(tpmData.permanent.data.auditMonotonicCounter);
+-    *((UINT32*)&buf[34]) = cpu_to_be32(rsp->result);
++    *((UINT32*)&buf[34]) = CPU_TO_BE32(tpmData.permanent.data.auditMonotonicCounter);
++    *((UINT32*)&buf[34]) = CPU_TO_BE32(rsp->result);
+     sha1_init(&sha1_ctx);
+     sha1_update(&sha1_ctx, tpmData.stany.data.auditDigest.digest, 
+       sizeof(TPM_DIGEST));
+@@ -158,7 +159,7 @@ TPM_RESULT TPM_GetAuditDigestSigned(TPM_
+   }
+   memcpy(&buf[0], "\x05\x00ADIG", 6);
+   memcpy(&buf[6], antiReplay->nonce, 20);
+-  *(UINT32*)&buf[26] = cpu_to_be32(buf_size - 30);
++  *(UINT32*)&buf[26] = CPU_TO_BE32(buf_size - 30);
+   memcpy(&buf[30], auditDigest->digest, 20);
+   ptr = &buf[50];
+   len = buf_size - 50;
+@@ -198,4 +199,3 @@ TPM_RESULT TPM_SetOrdinalAuditStatus(TPM
+   }
+   return TPM_SUCCESS;
+ }
+-
+diff -uprN orig/tpm_emulator-0.2/tpm/tpm_authorization.c vtpm/tpm/tpm_authorization.c
+--- orig/tpm_emulator-0.2/tpm/tpm_authorization.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/tpm/tpm_authorization.c	2005-08-17 10:55:52.000000000 -0700
+@@ -1,6 +1,7 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
+  *                    Swiss Federal Institute of Technology (ETH) Zurich
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -268,7 +269,7 @@ TPM_RESULT tpm_verify_auth(TPM_AUTH *aut
+ {
+   hmac_ctx_t ctx;
+   TPM_SESSION_DATA *session;
+-  UINT32 auth_handle = cpu_to_be32(auth->authHandle);
++  UINT32 auth_handle = CPU_TO_BE32(auth->authHandle);
+   
+   info("tpm_verify_auth(%08x)", auth->authHandle);
+   /* get dedicated authorization session */
+@@ -316,5 +317,3 @@ void tpm_decrypt_auth_secret(TPM_ENCAUTH
+   for (i = 0; i < sizeof(TPM_SECRET); i++)
+     plainAuth[i] ^= encAuth[i];
+ }
+-
+-
+diff -uprN orig/tpm_emulator-0.2/tpm/tpm_capability.c vtpm/tpm/tpm_capability.c
+--- orig/tpm_emulator-0.2/tpm/tpm_capability.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/tpm/tpm_capability.c	2005-08-17 10:55:52.000000000 -0700
+@@ -1,6 +1,7 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
+  *                    Swiss Federal Institute of Technology (ETH) Zurich
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -398,7 +399,7 @@ TPM_RESULT TPM_GetCapability(TPM_CAPABIL
+ 
+     case TPM_CAP_KEY_HANDLE:
+       debug("[TPM_CAP_KEY_HANDLE]");
+-      subCapSize = cpu_to_be32(TPM_RT_KEY);
++      subCapSize = CPU_TO_BE32(TPM_RT_KEY);
+       return cap_handle(4, (BYTE*)&subCapSize, respSize, resp);
+ 
+     case TPM_CAP_CHECK_LOADED:
+@@ -472,4 +473,3 @@ TPM_RESULT TPM_GetCapability(TPM_CAPABIL
+       return TPM_BAD_MODE;
+   }
+ }
+-
+diff -uprN orig/tpm_emulator-0.2/tpm/tpm_cmd_handler.c vtpm/tpm/tpm_cmd_handler.c
+--- orig/tpm_emulator-0.2/tpm/tpm_cmd_handler.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/tpm/tpm_cmd_handler.c	2005-08-17 10:55:52.000000000 -0700
+@@ -1,6 +1,7 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
+  *                    Swiss Federal Institute of Technology (ETH) Zurich
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -26,7 +27,7 @@ static void tpm_compute_in_param_digest(
+ {
+   sha1_ctx_t sha1;
+   UINT32 offset;
+-  UINT32 ord = cpu_to_be32(req->ordinal);
++  UINT32 ord = CPU_TO_BE32(req->ordinal);
+ 
+   /* skip all key-handles at the beginning */
+   switch (req->ordinal) {
+@@ -82,8 +83,8 @@ static void tpm_compute_in_param_digest(
+ static void tpm_compute_out_param_digest(TPM_COMMAND_CODE ordinal, TPM_RESPONSE *rsp)
+ {
+   sha1_ctx_t sha1;
+-  UINT32 res = cpu_to_be32(rsp->result);
+-  UINT32 ord = cpu_to_be32(ordinal);
++  UINT32 res = CPU_TO_BE32(rsp->result);
++  UINT32 ord = CPU_TO_BE32(ordinal);
+ 
+   /* compute SHA1 hash */
+   sha1_init(&sha1);
+@@ -3081,7 +3082,7 @@ static void tpm_setup_rsp_auth(TPM_COMMA
+       hmac_update(&hmac, rsp->auth2->digest, sizeof(rsp->auth2->digest));
+ #if 0
+       if (tpm_get_auth(rsp->auth2->authHandle)->type == TPM_ST_OIAP) {
+-        UINT32 handle = cpu_to_be32(rsp->auth2->authHandle);
++        UINT32 handle = CPU_TO_BE32(rsp->auth2->authHandle);
+         hmac_update(&hmac, (BYTE*)&handle, 4);
+       }
+ #endif
+@@ -3096,7 +3097,7 @@ static void tpm_setup_rsp_auth(TPM_COMMA
+       hmac_update(&hmac, rsp->auth1->digest, sizeof(rsp->auth1->digest));
+ #if 0
+       if (tpm_get_auth(rsp->auth1->authHandle)->type == TPM_ST_OIAP) {
+-        UINT32 handle = cpu_to_be32(rsp->auth1->authHandle);
++        UINT32 handle = CPU_TO_BE32(rsp->auth1->authHandle);
+         hmac_update(&hmac, (BYTE*)&handle, 4);
+       }
+ #endif
+@@ -3179,7 +3180,9 @@ extern const char *tpm_error_to_string(T
+ static void tpm_execute_command(TPM_REQUEST *req, TPM_RESPONSE *rsp)
+ {
+   TPM_RESULT res;
+-  
++
++  req->tag = (BYTE) req->tag;  // VIN HACK!!! 
++
+   /* setup authorisation as well as response tag and size */
+   memset(rsp, 0, sizeof(*rsp));
+   switch (req->tag) {
+@@ -3878,4 +3881,3 @@ int tpm_handle_command(const uint8_t *in
+   tpm_free(rsp.param);
+   return 0;
+ }
+-
+diff -uprN orig/tpm_emulator-0.2/tpm/tpm_crypto.c vtpm/tpm/tpm_crypto.c
+--- orig/tpm_emulator-0.2/tpm/tpm_crypto.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/tpm/tpm_crypto.c	2005-08-17 10:55:52.000000000 -0700
+@@ -1,6 +1,7 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
+  *                    Swiss Federal Institute of Technology (ETH) Zurich
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -106,7 +107,7 @@ TPM_RESULT tpm_sign(TPM_KEY_DATA *key, T
+     /* setup TPM_SIGN_INFO structure */
+     memcpy(&buf[0], "\x05\x00SIGN", 6);
+     memcpy(&buf[6], auth->nonceOdd.nonce, 20);
+-    *(UINT32*)&buf[26] = cpu_to_be32(areaToSignSize);
++    *(UINT32*)&buf[26] = CPU_TO_BE32(areaToSignSize);
+     memcpy(&buf[30], areaToSign, areaToSignSize);
+     if (rsa_sign(&key->key, RSA_SSA_PKCS1_SHA1, 
+         buf, areaToSignSize + 30, *sig)) {
+@@ -379,4 +380,3 @@ TPM_RESULT TPM_CertifyKey2(TPM_KEY_HANDL
+   }  
+   return TPM_SUCCESS;
+ }
+-
+diff -uprN orig/tpm_emulator-0.2/tpm/tpm_data.c vtpm/tpm/tpm_data.c
+--- orig/tpm_emulator-0.2/tpm/tpm_data.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/tpm/tpm_data.c	2005-08-17 10:55:52.000000000 -0700
+@@ -1,6 +1,7 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
+  *                    Swiss Federal Institute of Technology (ETH) Zurich
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -15,9 +16,15 @@
+  * $Id: tpm_data.c 9 2005-04-26 18:15:31Z mast $
+  */
+ 
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <unistd.h>
++
+ #include "tpm_emulator.h"
+ #include "tpm_structures.h"
+ #include "tpm_marshalling.h"
++#include "vtpm_manager.h"
+ 
+ TPM_DATA tpmData;
+ 
+@@ -28,6 +35,7 @@ BOOL tpm_get_physical_presence(void)
+ 
+ void tpm_init_data(void)
+ {
++#ifndef TPM_GENERATE_EK
+   /* endorsement key */
+   uint8_t ek_n[] =  "\xa8\xdb\xa9\x42\xa8\xf3\xb8\x06\x85\x90\x76\x93\xad\xf7"
+     "\x74\xec\x3f\xd3\x3d\x9d\xe8\x2e\xff\x15\xed\x0e\xce\x5f\x93"
+@@ -66,6 +74,8 @@ void tpm_init_data(void)
+     "\xd1\xc0\x8b\x5b\xa2\x2e\xa7\x15\xca\x50\x75\x10\x48\x9c\x2b"
+     "\x18\xb9\x67\x8f\x5d\x64\xc3\x28\x9f\x2f\x16\x2f\x08\xda\x47"
+     "\xec\x86\x43\x0c\x80\x99\x07\x34\x0f";
++#endif
++
+   int i;
+   /* reset all data to NULL, FALSE or 0 */
+   memset(&tpmData, 0, sizeof(tpmData));
+@@ -85,6 +95,10 @@ void tpm_init_data(void)
+   tpmData.permanent.data.version.revMinor = VERSION_MINOR;
+   /* setup PCR attributes */
+   for (i = 0; i < TPM_NUM_PCR; i++) {
++    int j;
++    for (j=0; j < TPM_NUM_LOCALITY; j++) {
++      tpmData.permanent.data.pcrAttrib[i].pcrExtendLocal[j] = TRUE;
++    }
+     tpmData.permanent.data.pcrAttrib[i].pcrReset = TRUE;
+   }
+   /* set tick type */
+@@ -115,49 +129,235 @@ void tpm_release_data(void)
+ 
+ #ifdef TPM_STORE_TO_FILE
+ 
+-#include <linux/fs.h>
+-#include <linux/unistd.h>
+-#include <asm/uaccess.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++
++ static int vtpm_tx_fh=-1, vtpm_rx_fh=-1;
+ 
+-#define TPM_STORAGE_FILE "/var/tpm/tpm_emulator-1.2." STR(VERSION_MAJOR) "." STR(VERSION_MINOR) 
++#ifdef VTPM_MUTLI_VM
++ #define DEV_FE "/dev/tpm"
++#else
++ #define VTPM_RX_FIFO_D  "/var/vtpm/fifos/vtpm-to-%d.fifo"
++ #define VTPM_TX_FIFO  "/var/vtpm/fifos/vtpm-from-all.fifo"
++
++ extern int dmi_id;
++ static char *vtpm_rx_name=NULL; 
++#endif
+ 
+ static int write_to_file(uint8_t *data, size_t data_length)
+ {
+-  int res;
+-  struct file *fp;
+-  mm_segment_t old_fs = get_fs();
+-  fp = filp_open(TPM_STORAGE_FILE, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
+-  if (IS_ERR(fp)) return -1;
+-  set_fs(get_ds());
+-  res = fp->f_op->write(fp, data, data_length, &fp->f_pos);
+-  set_fs(old_fs);
+-  filp_close(fp, NULL);
+-  return (res == data_length) ? 0 : -1;
++  int res, out_data_size, in_header_size;
++  BYTE *ptr, *out_data, *in_header;
++  UINT32 result, len, in_rsp_size;
++  UINT16 tag = VTPM_TAG_REQ;
++	
++  printf("Saving NVM\n");
++  if (vtpm_tx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++    vtpm_tx_fh = open(DEV_FE, O_RDWR);
++#else
++	vtpm_tx_fh = open(VTPM_TX_FIFO, O_WRONLY);
++#endif
++  }
++
++  if (vtpm_tx_fh < 0) {
++		return -1;
++  }
++ 
++  // Send request to VTPM Manager to encrypt data
++#ifdef VTPM_MUTLI_VM
++  out_data_size = len = VTPM_COMMAND_HEADER_SIZE_CLT + data_length;
++#else
++  out_data_size = len = VTPM_COMMAND_HEADER_SIZE_SRV + data_length;
++#endif
++  
++  out_data = ptr = (BYTE *) malloc(len);
++
++  if (ptr == NULL
++#ifndef VTPM_MUTLI_VM
++      || tpm_marshal_UINT32(&ptr, &len, dmi_id)
++#endif
++	  || tpm_marshal_UINT16(&ptr, &len, tag)
++#ifdef VTPM_MUTLI_VM
++	  || tpm_marshal_UINT32(&ptr, &len, out_data_size)
++#else
++	  || tpm_marshal_UINT32(&ptr, &len, out_data_size - sizeof(uint32_t))
++#endif  
++	  || tpm_marshal_UINT32(&ptr, &len, VTPM_ORD_SAVENVM)
++	  || tpm_marshal_BYTE_ARRAY(&ptr, &len, data, data_length)) {
++	free(out_data);
++	return -1;
++  }
++  
++  printf("\tSending SaveNVM Command.\n");
++  res = write(vtpm_tx_fh, out_data, out_data_size);
++  free(out_data);
++  if (res != out_data_size) return -1;
++
++  if (vtpm_rx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++    vtpm_rx_fh = vtpm_tx_fh
++#else
++    if (vtpm_rx_name == NULL) {
++      vtpm_rx_name = malloc(10 + strlen(VTPM_RX_FIFO_D));
++      sprintf(vtpm_rx_name, VTPM_RX_FIFO_D, (uint32_t) dmi_id);
++    }
++	vtpm_rx_fh = open(vtpm_rx_name, O_RDONLY);
++#endif
++  }
++
++  if (vtpm_rx_fh < 0) {
++		return -1;
++  }
++  
++  // Read Header of response so we can get the size & status
++#ifdef VTPM_MUTLI_VM
++  in_header_size = len = VTPM_COMMAND_HEADER_SIZE_CLT;
++#else
++  in_header_size = len = VTPM_COMMAND_HEADER_SIZE_SRV;
++#endif
++  in_header = ptr = malloc(in_header_size);
++  
++  printf("\tReading SaveNVM header.\n");
++  res = read(vtpm_rx_fh, in_header, in_header_size);
++
++  if ( (res != in_header_size)
++#ifndef VTPM_MUTLI_VM
++       || tpm_unmarshal_UINT32(&ptr, &len, (UINT32*)&dmi_id)
++#endif
++	   || tpm_unmarshal_UINT16(&ptr, &len, &tag)
++	   || tpm_unmarshal_UINT32(&ptr, &len, &in_rsp_size)
++	   || tpm_unmarshal_UINT32(&ptr, &len, &result) ) {
++	  free(in_header);
++	  return -1;
++  }
++  free(in_header);
++  
++  if (result != VTPM_SUCCESS) {
++      return -1;  
++  }
++
++#ifdef VTPM_MUTLI_VM
++  close(vtpm_tx_fh); close(vtpm_rx_fh);
++#endif
++	  
++  printf("\tFinishing up SaveNVM\n");
++  return (0);
+ }
+ 
+ static int read_from_file(uint8_t **data, size_t *data_length)
+ {
+-  int res;
+-  struct file *fp;
+-  mm_segment_t old_fs = get_fs();
+-  fp = filp_open(TPM_STORAGE_FILE, O_RDONLY, 0);
+-  if (IS_ERR(fp)) return -1;
+-  *data_length = (size_t)fp->f_dentry->d_inode->i_size;
+-  /* *data_length = i_size_read(fp->f_dentry->d_inode); */
+-  *data = tpm_malloc(*data_length);
+-  if (*data == NULL) {
+-    filp_close(fp, NULL);
++  int res, out_data_size, in_header_size;
++  uint8_t *ptr, *out_data, *in_header;
++  UINT16 tag = VTPM_TAG_REQ;
++  UINT32 len, in_rsp_size, result;
++#ifdef VTPM_MUTLI_VM
++	int vtpm_rx_fh, vtpm_tx_fh;
++#endif
++	
++  printf("Loading NVM.\n");
++  if (vtpm_tx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++    vtpm_tx_fh = open(DEV_FE, O_RDWR);
++#else
++	vtpm_tx_fh = open(VTPM_TX_FIFO, O_WRONLY);
++#endif
++  }
++
++  if (vtpm_tx_fh < 0) {
++		return -1;
++  }
++ 
++  // Send request to VTPM Manager to encrypt data
++#ifdef VTPM_MUTLI_VM
++  out_data_size = len = VTPM_COMMAND_HEADER_SIZE_CLT;
++#else
++  out_data_size = len = VTPM_COMMAND_HEADER_SIZE_SRV;
++#endif
++  out_data = ptr = (BYTE *) malloc(len);
++
++  if (ptr == NULL
++#ifndef VTPM_MUTLI_VM
++      || tpm_marshal_UINT32(&ptr, &len, dmi_id)
++#endif  
++      || tpm_marshal_UINT16(&ptr, &len, tag)
++#ifdef VTPM_MUTLI_VM
++      || tpm_marshal_UINT32(&ptr, &len, out_data_size)
++#else
++      || tpm_marshal_UINT32(&ptr, &len, out_data_size - sizeof(uint32_t))
++#endif
++      || tpm_marshal_UINT32(&ptr, &len, VTPM_ORD_LOADNVM)) {
++    free(out_data);
+     return -1;
+   }
+-  set_fs(get_ds());
+-  res = fp->f_op->read(fp, *data, *data_length, &fp->f_pos);
+-  set_fs(old_fs);
+-  filp_close(fp, NULL);
++
++  printf("\tSending LoadNVM command\n");
++  res = write(vtpm_tx_fh, out_data, out_data_size);
++  free(out_data);
++  if (res != out_data_size) return -1;
++
++    if (vtpm_rx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++    vtpm_rx_fh = vtpm_tx_fh;
++#else
++    if (vtpm_rx_name == NULL) {
++      vtpm_rx_name = malloc(10 + strlen(VTPM_RX_FIFO_D));
++      sprintf(vtpm_rx_name, VTPM_RX_FIFO_D, (uint32_t) dmi_id);
++    }
++	vtpm_rx_fh = open(vtpm_rx_name, O_RDONLY);
++#endif
++  }
++
++  if (vtpm_rx_fh < 0) {
++		return -1;
++  }
++  
++  // Read Header of response so we can get the size & status
++#ifdef VTPM_MUTLI_VM
++  in_header_size = len = VTPM_COMMAND_HEADER_SIZE_CLT;
++#else
++  in_header_size = len = VTPM_COMMAND_HEADER_SIZE_SRV;
++#endif
++  in_header = ptr = malloc(in_header_size);
++  
++  printf("\tReading LoadNVM header\n");
++  res = read(vtpm_rx_fh, in_header, in_header_size);
++
++  if ( (res != in_header_size)
++#ifndef VTPM_MUTLI_VM
++       || tpm_unmarshal_UINT32(&ptr, &len, (UINT32*)&dmi_id)
++#endif
++       || tpm_unmarshal_UINT16(&ptr, &len, &tag)
++       || tpm_unmarshal_UINT32(&ptr, &len, &in_rsp_size)
++       || tpm_unmarshal_UINT32(&ptr, &len, &result) ) {
++      free(in_header);
++      return -1;
++  }
++  free(in_header);
++  
++  if (result != VTPM_SUCCESS) {
++      return -1;  
++  }
++
++  // Read Encrypted data from VTPM Manager
++  *data_length = in_rsp_size - VTPM_COMMAND_HEADER_SIZE_CLT;
++  *data = (uint8_t *) malloc(*data_length);
++
++  printf("\tReading clear data from LoadNVM.\n");
++  res = read(vtpm_rx_fh, *data, *data_length);
++#ifdef VTPM_MUTLI_VM
++  close(vtpm_rx_fh);close(vtpm_tx_fh);
++#endif 
++	
++  printf("\tReturing from loading NVM\n");
+   if (res != *data_length) {
+-    tpm_free(*data);
+-    return -1;
++      free(*data);
++      return -1;
++  } else {
++      return 0;
+   }
+-  return 0;
++
+ }
+ 
+ #else
+@@ -231,7 +431,6 @@ int tpm_restore_permanent_data(void)
+ 
+ int tpm_erase_permanent_data(void)
+ {
+-  int res = write_to_file("", 0);
++  int res = write_to_file((uint8_t*)"", 0);
+   return res;
+ }
+-
+diff -uprN orig/tpm_emulator-0.2/tpm/tpm_deprecated.c vtpm/tpm/tpm_deprecated.c
+--- orig/tpm_emulator-0.2/tpm/tpm_deprecated.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/tpm/tpm_deprecated.c	2005-08-17 10:55:52.000000000 -0700
+@@ -1,6 +1,7 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
+  *                    Swiss Federal Institute of Technology (ETH) Zurich
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -50,7 +51,7 @@ TPM_RESULT TPM_SaveKeyContext(TPM_KEY_HA
+   BYTE *ptr;
+   UINT32 len;
+   info("TPM_SaveKeyContext()");
+-  res = TPM_SaveContext(keyHandle, TPM_RT_KEY, "SaveKeyContext..", 
++  res = TPM_SaveContext(keyHandle, TPM_RT_KEY, (BYTE*)"SaveKeyContext..", 
+                         keyContextSize, &contextBlob);
+   if (res != TPM_SUCCESS) return res;
+   len = *keyContextSize;
+@@ -82,7 +83,7 @@ TPM_RESULT TPM_SaveAuthContext(TPM_AUTHH
+   BYTE *ptr;
+   UINT32 len;
+   info("TPM_SaveAuthContext()");
+-  res = TPM_SaveContext(authHandle, TPM_RT_KEY, "SaveAuthContext.", 
++  res = TPM_SaveContext(authHandle, TPM_RT_KEY, (BYTE*)"SaveAuthContext.", 
+                         authContextSize, &contextBlob);
+   if (res != TPM_SUCCESS) return res;
+   len = *authContextSize;
+diff -uprN orig/tpm_emulator-0.2/tpm/tpm_emulator.h vtpm/tpm/tpm_emulator.h
+--- orig/tpm_emulator-0.2/tpm/tpm_emulator.h	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/tpm/tpm_emulator.h	2005-08-17 10:55:52.000000000 -0700
+@@ -1,5 +1,6 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -22,7 +23,8 @@
+ /* TPM configuration */
+ #define TPM_STORE_TO_FILE       1
+ #undef  TPM_STRONG_PERSISTENCE
+-#undef  TPM_GENERATE_EK
++//#undef  TPM_GENERATE_EK
++#define  TPM_GENERATE_EK
+ 
+ /**
+  * tpm_emulator_init - initialises and starts the TPM emulator
+diff -uprN orig/tpm_emulator-0.2/tpm/tpm_integrity.c vtpm/tpm/tpm_integrity.c
+--- orig/tpm_emulator-0.2/tpm/tpm_integrity.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/tpm/tpm_integrity.c	2005-08-17 10:55:52.000000000 -0700
+@@ -1,6 +1,7 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
+  *                    Swiss Federal Institute of Technology (ETH) Zurich
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -194,4 +195,3 @@ TPM_RESULT tpm_verify_pcr(TPM_KEY_DATA *
+   }
+   return TPM_SUCCESS;
+ }
+-
+diff -uprN orig/tpm_emulator-0.2/tpm/tpm_structures.h vtpm/tpm/tpm_structures.h
+--- orig/tpm_emulator-0.2/tpm/tpm_structures.h	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/tpm/tpm_structures.h	2005-08-17 10:55:52.000000000 -0700
+@@ -1,6 +1,7 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
+  *                    Swiss Federal Institute of Technology (ETH) Zurich
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -18,7 +19,7 @@
+ #ifndef _TPM_STRUCTURES_H_
+ #define _TPM_STRUCTURES_H_
+ 
+-#include <linux/types.h>
++//#include <linux/types.h>
+ #include "crypto/rsa.h"
+ 
+ /*
+diff -uprN orig/tpm_emulator-0.2/tpm/tpm_testing.c vtpm/tpm/tpm_testing.c
+--- orig/tpm_emulator-0.2/tpm/tpm_testing.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/tpm/tpm_testing.c	2005-08-17 10:55:52.000000000 -0700
+@@ -1,6 +1,7 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
+  *                    Swiss Federal Institute of Technology (ETH) Zurich
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -95,24 +96,24 @@ static int tpm_test_sha1(void)
+   struct {
+     uint8_t *data; uint32_t repetitions; uint8_t *digest;
+   } test_cases[] =  {{
+-    "abc", 1,
+-    "\xA9\x99\x3E\x36\x47\x06\x81\x6A\xBA\x3E\x25\x71\x78\x50\xC2\x6C\x9C\xD0\xD8\x9D"
++	(uint8_t*)"abc", 1,
++    (uint8_t*)"\xA9\x99\x3E\x36\x47\x06\x81\x6A\xBA\x3E\x25\x71\x78\x50\xC2\x6C\x9C\xD0\xD8\x9D"
+   }, {
+-    "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", 1,
+-    "\x84\x98\x3E\x44\x1C\x3B\xD2\x6E\xBA\xAE\x4A\xA1\xF9\x51\x29\xE5\xE5\x46\x70\xF1"
++    (uint8_t*)"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", 1,
++    (uint8_t*)"\x84\x98\x3E\x44\x1C\x3B\xD2\x6E\xBA\xAE\x4A\xA1\xF9\x51\x29\xE5\xE5\x46\x70\xF1"
+   }, {
+-    "a", 1000000,
+-    "\x34\xAA\x97\x3C\xD4\xC4\xDA\xA4\xF6\x1E\xEB\x2B\xDB\xAD\x27\x31\x65\x34\x01\x6F"
++    (uint8_t*)"a", 1000000,
++    (uint8_t*)"\x34\xAA\x97\x3C\xD4\xC4\xDA\xA4\xF6\x1E\xEB\x2B\xDB\xAD\x27\x31\x65\x34\x01\x6F"
+   }, {
+-    "0123456701234567012345670123456701234567012345670123456701234567", 10,
+-    "\xDE\xA3\x56\xA2\xCD\xDD\x90\xC7\xA7\xEC\xED\xC5\xEB\xB5\x63\x93\x4F\x46\x04\x52"
++    (uint8_t*)"0123456701234567012345670123456701234567012345670123456701234567", 10,
++    (uint8_t*)"\xDE\xA3\x56\xA2\xCD\xDD\x90\xC7\xA7\xEC\xED\xC5\xEB\xB5\x63\x93\x4F\x46\x04\x52"
+   }};
+ 
+   debug("tpm_test_sha1()");
+   for (i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); i++) {
+     sha1_init(&ctx);
+     for (j = 0; j < test_cases[i].repetitions; j++)
+-      sha1_update(&ctx, test_cases[i].data, strlen(test_cases[i].data));
++      sha1_update(&ctx, test_cases[i].data, strlen((char*)test_cases[i].data));
+     sha1_final(&ctx, digest);
+     if (memcmp(digest, test_cases[i].digest, SHA1_DIGEST_LENGTH) != 0) return -1;
+   }
+@@ -128,41 +129,41 @@ static int tpm_test_hmac(void)
+   struct {
+     uint8_t *key, key_len, *data, data_len, *digest;
+   } test_cases[] = {{
+-    "\x0b", 20, "Hi There", 8,
+-    "\xb6\x17\x31\x86\x55\x05\x72\x64\xe2\x8b\xc0\xb6\xfb\x37\x8c\x8e\xf1\x46\xbe\x00"
++    (uint8_t*)"\x0b", 20, (uint8_t*)"Hi There", 8,
++    (uint8_t*)"\xb6\x17\x31\x86\x55\x05\x72\x64\xe2\x8b\xc0\xb6\xfb\x37\x8c\x8e\xf1\x46\xbe\x00"
+   }, {
+-    "Jefe", 4, "what do ya want for nothing?", 28,
+-    "\xef\xfc\xdf\x6a\xe5\xeb\x2f\xa2\xd2\x74\x16\xd5\xf1\x84\xdf\x9c\x25\x9a\x7c\x79"
++    (uint8_t*)"Jefe", 4, (uint8_t*)"what do ya want for nothing?", 28,
++    (uint8_t*)"\xef\xfc\xdf\x6a\xe5\xeb\x2f\xa2\xd2\x74\x16\xd5\xf1\x84\xdf\x9c\x25\x9a\x7c\x79"
+   }, {
+-    "\xaa", 20, "\xdd", 50,
+-    "\x12\x5d\x73\x42\xb9\xac\x11\xcd\x91\xa3\x9a\xf4\x8a\xa1\x7b\x4f\x63\xf1\x75\xd3"
++    (uint8_t*)"\xaa", 20, (uint8_t*)"\xdd", 50,
++    (uint8_t*)"\x12\x5d\x73\x42\xb9\xac\x11\xcd\x91\xa3\x9a\xf4\x8a\xa1\x7b\x4f\x63\xf1\x75\xd3"
+   }, {
+-    "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14"
+-    "\x15\x16\x17\x18\x19", 25, "\xcd", 50,
+-    "\x4c\x90\x07\xf4\x02\x62\x50\xc6\xbc\x84\x14\xf9\xbf\x50\xc8\x6c\x2d\x72\x35\xda"
++    (uint8_t*)"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14"
++    "\x15\x16\x17\x18\x19", 25, (uint8_t*)"\xcd", 50,
++    (uint8_t*)"\x4c\x90\x07\xf4\x02\x62\x50\xc6\xbc\x84\x14\xf9\xbf\x50\xc8\x6c\x2d\x72\x35\xda"
+   }, {
+-    "\x0c", 20, "Test With Truncation", 20,
+-    "\x4c\x1a\x03\x42\x4b\x55\xe0\x7f\xe7\xf2\x7b\xe1\xd5\x8b\xb9\x32\x4a\x9a\x5a\x04"
++    (uint8_t*)"\x0c", 20, (uint8_t*)"Test With Truncation", 20,
++    (uint8_t*)"\x4c\x1a\x03\x42\x4b\x55\xe0\x7f\xe7\xf2\x7b\xe1\xd5\x8b\xb9\x32\x4a\x9a\x5a\x04"
+   }, {
+-    "\xaa", 80, "Test Using Larger Than Block-Size Key - Hash Key First", 54,
+-    "\xaa\x4a\xe5\xe1\x52\x72\xd0\x0e\x95\x70\x56\x37\xce\x8a\x3b\x55\xed\x40\x21\x12"
++    (uint8_t*)"\xaa", 80, (uint8_t*)"Test Using Larger Than Block-Size Key - Hash Key First", 54,
++    (uint8_t*)"\xaa\x4a\xe5\xe1\x52\x72\xd0\x0e\x95\x70\x56\x37\xce\x8a\x3b\x55\xed\x40\x21\x12"
+   }, {
+-    "\xaa", 80,
+-    "Test Using Larger Than Block-Size Key and Larger Than One Block-Size Data", 73,
+-    "\xe8\xe9\x9d\x0f\x45\x23\x7d\x78\x6d\x6b\xba\xa7\x96\x5c\x78\x08\xbb\xff\x1a\x91"
++    (uint8_t*)"\xaa", 80,
++    (uint8_t*)"Test Using Larger Than Block-Size Key and Larger Than One Block-Size Data", 73,
++    (uint8_t*)"\xe8\xe9\x9d\x0f\x45\x23\x7d\x78\x6d\x6b\xba\xa7\x96\x5c\x78\x08\xbb\xff\x1a\x91"
+   }};
+ 
+   debug("tpm_test_hmac()");
+   for (i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); i++) {
+-    if (strlen(test_cases[i].key) < test_cases[i].key_len) {
++    if (strlen((char*)test_cases[i].key) < test_cases[i].key_len) {
+       uint8_t key[test_cases[i].key_len];
+       memset(key, test_cases[i].key[0], test_cases[i].key_len);
+       hmac_init(&ctx, key, test_cases[i].key_len);
+     } else {
+       hmac_init(&ctx, test_cases[i].key, test_cases[i].key_len);
+     }
+-    for (j = 0; j < test_cases[i].data_len; j += strlen(test_cases[i].data)) {
+-      hmac_update(&ctx, test_cases[i].data, strlen(test_cases[i].data));
++    for (j = 0; j < test_cases[i].data_len; j += strlen((char*)test_cases[i].data)) {
++      hmac_update(&ctx, test_cases[i].data, strlen((char*)test_cases[i].data));
+     }
+     hmac_final(&ctx, digest);
+     if (memcmp(digest, test_cases[i].digest, SHA1_DIGEST_LENGTH) != 0) return -1;
+@@ -173,9 +174,9 @@ static int tpm_test_hmac(void)
+ static int tpm_test_rsa_EK(void)
+ {
+   int res = 0;
+-  char *data = "RSA PKCS #1 v1.5 Test-String";
++  uint8_t *data = (uint8_t*)"RSA PKCS #1 v1.5 Test-String";
+   uint8_t buf[256];
+-  size_t buf_len, data_len = strlen(data);
++  size_t buf_len, data_len = strlen((char*)data);
+   rsa_private_key_t priv_key;
+   rsa_public_key_t pub_key;
+ 
+diff -uprN orig/tpm_emulator-0.2/tpm/tpm_ticks.c vtpm/tpm/tpm_ticks.c
+--- orig/tpm_emulator-0.2/tpm/tpm_ticks.c	2005-08-17 10:58:36.000000000 -0700
++++ vtpm/tpm/tpm_ticks.c	2005-08-17 10:55:52.000000000 -0700
+@@ -1,6 +1,7 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
+  *                    Swiss Federal Institute of Technology (ETH) Zurich
++ * Copyright (C) 2005 INTEL Corp
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -37,9 +38,7 @@ TPM_RESULT TPM_SetTickType(TPM_TICKTYPE 
+ TPM_RESULT TPM_GetTicks(TPM_CURRENT_TICKS *currentTime)
+ {
+   info("TPM_GetTicks()");
+-  memcpy(currentTime, &tpmData.stany.data.currentTicks, 
+-    sizeof(TPM_CURRENT_TICKS));
+-  return TPM_SUCCESS;
++  return TPM_DISABLED_CMD;
+ }
+ 
+ TPM_RESULT TPM_TickStampBlob(TPM_KEY_HANDLE keyHandle, TPM_NONCE *antiReplay,
+@@ -47,61 +46,12 @@ TPM_RESULT TPM_TickStampBlob(TPM_KEY_HAN
+                              TPM_CURRENT_TICKS *currentTicks, 
+                              UINT32 *sigSize, BYTE **sig)
+ {
+-  TPM_RESULT res;
+-  TPM_KEY_DATA *key;
+-  BYTE *info, *p;
+-  UINT32 info_length, length;
+   info("TPM_TickStampBlob()");
+-  /* get key */
+-  key = tpm_get_key(keyHandle);
+-  if (key == NULL) return TPM_INVALID_KEYHANDLE;
+-  /* verify authorization */ 
+-  res = tpm_verify_auth(auth1, key->usageAuth, keyHandle);
+-  if (res != TPM_SUCCESS) return res;
+-  if (key->keyUsage != TPM_KEY_SIGNING && key->keyUsage != TPM_KEY_LEGACY
+-      && key->keyUsage != TPM_KEY_IDENTITY) return TPM_INVALID_KEYUSAGE;
+-  /* get current ticks */
+-  TPM_GetTicks(currentTicks);
+-  /* sign data using signature scheme PKCS1_SHA1 and TPM_SIGN_INFO container */
+-  *sigSize = key->key.size >> 3;
+-  *sig = tpm_malloc(*sigSize);
+-  if (*sig == NULL) return TPM_FAIL; 
+-  /* setup TPM_SIGN_INFO structure */
+-  info_length = 30 + sizeof(TPM_DIGEST) + sizeof_TPM_CURRENT_TICKS(currentTicks);
+-  info = tpm_malloc(info_length);
+-  if (info == NULL) {
+-    tpm_free(*sig);
+-    return TPM_FAIL;
+-  }
+-  memcpy(&info[0], "\x05\x00TSTP", 6);
+-  memcpy(&info[6], antiReplay->nonce, 20);
+-  *(UINT32*)&info[26] = cpu_to_be32(20
+-                        + sizeof_TPM_CURRENT_TICKS(currentTicks));
+-  memcpy(&info[30], digestToStamp->digest, sizeof(TPM_DIGEST));
+-  p = &info[30 + sizeof(TPM_DIGEST)]; 
+-  length = sizeof_TPM_CURRENT_TICKS(currentTicks);
+-  if (tpm_marshal_TPM_CURRENT_TICKS(&p, &length, currentTicks)
+-      || rsa_sign(&key->key, RSA_SSA_PKCS1_SHA1, info, info_length, *sig)) {   
+-    tpm_free(*sig);
+-    tpm_free(info);
+-    return TPM_FAIL;
+-  } 
+-  return TPM_SUCCESS;
++  return TPM_DISABLED_CMD;
+ }
+ 
+ void tpm_update_ticks(void)
+ {
+-  if (tpmData.stany.data.currentTicks.tag == 0) {
+-    tpmData.stany.data.currentTicks.tag = TPM_TAG_CURRENT_TICKS;
+-    tpmData.stany.data.currentTicks.currentTicks += tpm_get_ticks();
+-    tpmData.stany.data.currentTicks.tickType = tpmData.permanent.data.tickType;
+-    tpm_get_random_bytes(tpmData.stany.data.currentTicks.tickNonce.nonce, 
+-      sizeof(TPM_NONCE));
+-    tpmData.stany.data.currentTicks.tickRate = 1;
+-    tpmData.stany.data.currentTicks.tickSecurity = TICK_SEC_NO_CHECK;
+-  } else {
+-    tpmData.stany.data.currentTicks.currentTicks += tpm_get_ticks();   
+-  }
+ }
+   
+ 
+diff -uprN orig/tpm_emulator-0.2/tpm/vtpm_manager.h vtpm/tpm/vtpm_manager.h
+--- orig/tpm_emulator-0.2/tpm/vtpm_manager.h	1969-12-31 16:00:00.000000000 -0800
++++ vtpm/tpm/vtpm_manager.h	2005-08-17 10:55:52.000000000 -0700
+@@ -0,0 +1,126 @@
++// ===================================================================
++// 
++// Copyright (c) 2005, Intel Corp.
++// All rights reserved.
++//
++// Redistribution and use in source and binary forms, with or without 
++// modification, are permitted provided that the following conditions 
++// are met:
++//
++//   * Redistributions of source code must retain the above copyright 
++//     notice, this list of conditions and the following disclaimer.
++//   * Redistributions in binary form must reproduce the above 
++//     copyright notice, this list of conditions and the following 
++//     disclaimer in the documentation and/or other materials provided 
++//     with the distribution.
++//   * Neither the name of Intel Corporation nor the names of its 
++//     contributors may be used to endorse or promote products derived
++//     from this software without specific prior written permission.
++//
++// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
++// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
++// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
++// FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE 
++// COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++// INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR 
++// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++// HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
++// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
++// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++// OF THE POSSIBILITY OF SUCH DAMAGE.
++// ===================================================================
++// 
++// vtpm_manager.h
++// 
++//  Public Interface header for VTPM Manager
++//
++// ==================================================================
++
++#ifndef __VTPM_MANAGER_H__
++#define __VTPM_MANAGER_H__
++
++#define VTPM_TAG_REQ 0x01c1
++#define VTPM_TAG_RSP 0x01c4
++#define COMMAND_BUFFER_SIZE 4096
++
++// Header sizes. Note Header MAY include the DMI
++#define VTPM_COMMAND_HEADER_SIZE_SRV ( sizeof(UINT32) + sizeof(TPM_TAG) + sizeof(UINT32) + sizeof(TPM_COMMAND_CODE))
++#define VTPM_COMMAND_HEADER_SIZE_CLT (                  sizeof(TPM_TAG) + sizeof(UINT32) + sizeof(TPM_COMMAND_CODE))
++
++//************************ Command Codes ****************************
++#define VTPM_ORD_OPEN              1   // ULM Creates New DMI
++#define VTPM_ORD_CLOSE             2   // ULM Closes a DMI
++#define VTPM_ORD_DELETE            3   // ULM Permemently Deletes DMI
++#define VTPM_ORD_SAVENVM          4   // DMI requests Secrets Unseal
++#define VTPM_ORD_LOADNVM          5   // DMI requests Secrets Saved
++#define VTPM_ORD_TPMCOMMAND       6   // DMI issues HW TPM Command
++
++//************************ Return Codes ****************************
++#define VTPM_SUCCESS               0
++#define VTPM_FAIL                  1
++#define VTPM_UNSUPPORTED           2
++#define VTPM_FORBIDDEN             3
++#define VTPM_RESTORE_CONTEXT_FAILED    4
++#define VTPM_INVALID_REQUEST       5
++
++/******************* Command Parameter API *************************
++
++VTPM Command Format
++  dmi: 4 bytes                  // Source of message. 
++                                // WARNING: This is prepended by the channel. 
++                                // Thus it is received by VTPM Manager, 
++                                // but not sent by DMI
++  tpm tag: 2 bytes
++  command size: 4 bytes         // Size of command including header but not DMI
++  ord: 4 bytes                  // Command ordinal above
++  parameters: size - 10 bytes   // Command Parameter
++
++VTPM Response Format
++  tpm tag: 2 bytes
++  response_size: 4 bytes
++  status: 4 bytes         
++  parameters: size - 10 bytes
++
++
++VTPM_Open:
++  Input Parameters:
++    Domain_type: 1 byte
++    domain_id: 4 bytes
++    instance_id: 4 bytes
++  Output Parameters:
++    None
++    
++VTPM_Close
++  Input Parameters:
++    instance_id: 4 bytes
++  Output Parameters:
++    None
++
++VTPM_Delete
++  Input Parameters:
++    instance_id: 4 bytes
++  Output Parameters:
++    None
++
++VTPM_SaveNVM
++  Input Parameters:
++    data: n bytes (Header indicates size of data)
++  Output Parameters:
++    None
++
++VTPM_LoadNVM
++  Input Parameters:
++    None
++  Output Parameters:
++    data: n bytes (Header indicates size of data)
++
++VTPM_TPMCommand
++  Input Parameters:
++    TPM Command Byte Stream: n bytes 
++  Output Parameters:
++    TPM Reponse Byte Stream: n bytes 
++
++*********************************************************************/
++
++#endif //_VTPM_MANAGER_H_
+diff -uprN orig/tpm_emulator-0.2/tpmd.c vtpm/tpmd.c
+--- orig/tpm_emulator-0.2/tpmd.c	1969-12-31 16:00:00.000000000 -0800
++++ vtpm/tpmd.c	2005-08-17 10:55:52.000000000 -0700
+@@ -0,0 +1,207 @@
++/* Software-Based Trusted Platform Module (TPM) Emulator for Linux
++ * Copyright (C) 2005 INTEL Corp
++ *
++ * This module is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published
++ * by the Free Software Foundation; either version 2 of the License,
++ * or (at your option) any later version.
++ *
++ * This module is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <string.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <sys/time.h>
++
++#include "tpm_emulator.h"
++#include "vtpm_manager.h"
++
++#ifdef VTPM_MULTI_VM
++ #define DEV_BE "/dev/vtpm"
++#else
++ #define GUEST_RX_FIFO_D "/var/vtpm/fifos/guest-to-%d.fifo"
++ #define GUEST_TX_FIFO "/var/vtpm/fifos/guest-from-all.fifo"
++
++ int dmi_id;
++#endif
++						
++#define BUFFER_SIZE 2048
++
++static uint8_t ctrl_msg[] = { 0, 0, 0, 0,   // destination
++                              1, 193,       // VTPM_TAG
++                              0, 0, 0, 10,  // Size
++                              0, 0, 0, 0};  // TPM_SUCCESS
++                            
++
++static int devurandom=0;
++
++	  
++void get_random_bytes(void *buf, int nbytes) {
++  
++  if (devurandom == 0) {
++    devurandom = open("/dev/urandom", O_RDONLY);
++  }
++
++  if (read(devurandom, buf, nbytes) != nbytes) {
++      printf("Can't get random number.\n");
++      exit(-1);
++  }
++}
++
++uint64_t tpm_get_ticks(void)
++{
++  //struct timeval tv;
++  //int gettimeofday(&tv, struct timezone *tz);
++  return 0;
++}
++
++int main(int argc, char **argv)
++{
++  uint8_t in[BUFFER_SIZE], *out, *addressed_out;
++  uint32_t out_size;
++  int in_size, written ;
++  int i, guest_id=-1;
++ 
++  int vtpm_tx_fh=-1, vtpm_rx_fh=-1;
++#ifdef VTPM_MULTI_VM
++  if (argc < 2) {
++    printf("Usage: tpmd clear|save|deactivated\n" );
++#else
++  if (argc < 3) {
++    printf("Usage: tpmd clear|save|deactivated vtpmid\n" );
++#endif
++	  return -1;
++  }
++
++#ifndef VTPM_MULTI_VM
++  dmi_id = atoi(argv[2]);
++#endif
++
++  /* initialize TPM emulator */
++  if (!strcmp(argv[1], "clear")) {
++    printf("Initializing tpm: %s\n", argv[1]);
++    tpm_emulator_init(1);
++  } else if (!strcmp(argv[1], "save")) { 
++    printf("Initializing tpm: %s\n", argv[1]);
++    tpm_emulator_init(2);
++  } else if (!strcmp(argv[1], "deactivated")) {
++    printf("Initializing tpm: %s\n", argv[1]);
++    tpm_emulator_init(3);
++  } else {
++    printf("invalid startup mode '%s'; must be 'clear', "
++      "'save' (default) or 'deactivated", argv[1]);
++    return -1;
++  }
++
++  char *guest_rx_file = malloc(10 + strlen(GUEST_RX_FIFO_D));
++  sprintf(guest_rx_file, GUEST_RX_FIFO_D, (uint32_t) dmi_id);
++  
++  while (1) {
++abort_command:
++    if (vtpm_rx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++	  vtpm_rx_fh = open(DEV_BE, O_RDWR);
++#else
++      vtpm_rx_fh = open(guest_rx_file, O_RDONLY);
++#endif
++    }
++    
++    if (vtpm_rx_fh < 0) {
++      printf("ERROR: failed to open devices to listen to guest.\n");
++      return -1;
++    }
++    
++    in_size = read(vtpm_rx_fh, in, BUFFER_SIZE);
++    if (in_size < 6) { // Magic size of minium TPM command
++      printf("Recv[%d] to small: 0x", in_size);
++      if (in_size <= 0) {
++          close(vtpm_rx_fh);
++          vtpm_rx_fh = -1;
++          goto abort_command;
++      }
++    } else { 
++      printf("Recv[%d]: 0x", in_size);
++      for (i=0; i< in_size; i++) 
++        printf("%x ", in[i]);
++      printf("\n");
++    }
++
++    if (guest_id == -1) {
++        guest_id = *((uint32_t *) in);
++        *((uint32_t *) ctrl_msg) = *((uint32_t *) in);
++    } else {
++        if (guest_id != *((uint32_t *) in) ) {
++            printf("WARNING: More than one guest attached\n");
++        }
++    }
++
++    if (vtpm_tx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++	  vtpm_tx_fh = open(DEV_BE, O_RDWR);
++	  vtpm_rx_fh = vtpm_tx_fh;
++#else
++      vtpm_tx_fh = open(GUEST_TX_FIFO, O_WRONLY);
++#endif
++    }
++
++    if (vtpm_tx_fh < 0) {
++      printf("ERROR: failed to open devices to respond to guest.\n");
++      return -1;
++    }
++    
++    // Handle command, but we need to skip the identifier
++    if (  BE16_TO_CPU( ((uint16_t *) in)[2] ) == VTPM_TAG_REQ ) { // Control message from xend
++      // This DM doesn't really care about ctrl messages. Just ACK the message
++      written = write(vtpm_tx_fh, ctrl_msg, sizeof(ctrl_msg));
++
++      if (written != sizeof(ctrl_msg)) {
++        printf("ERROR: Part of response not written %d/%d.\n", written, sizeof(ctrl_msg));
++      } else {
++        printf("Send Ctrl Message confermation\n");
++      }
++    } else { // Message from Guest
++      if (tpm_handle_command(in + sizeof(uint32_t), in_size - sizeof(uint32_t), &out, &out_size) != 0) { 
++        printf("ERROR: Handler Failed.\n");
++      }
++
++      addressed_out = (uint8_t *) tpm_malloc(sizeof(uint32_t) + out_size);
++      *(uint32_t *) addressed_out = *(uint32_t *) in;
++      memcpy(addressed_out + sizeof(uint32_t), out, out_size);
++
++      written = write(vtpm_tx_fh, addressed_out, out_size + sizeof(uint32_t));
++
++      if (written != out_size + sizeof(uint32_t)) {
++        printf("ERROR: Part of response not written %d/%d.\n", written, out_size);
++        for (i=0; i< out_size+ sizeof(uint32_t); i++)
++          printf("%x ", addressed_out[i]);
++        printf("\n");
++      } else {
++        printf("Sent[%d]: ", out_size + sizeof(uint32_t));
++        for (i=0; i< out_size+ sizeof(uint32_t); i++)
++          printf("%x ", addressed_out[i]);
++        printf("\n");
++      }
++      tpm_free(out);
++      tpm_free(addressed_out);
++    }
++
++  } // loop
++
++  tpm_emulator_shutdown();
++
++  close(vtpm_tx_fh);
++#ifndef VTPM_MUTLI_VM
++  close(vtpm_rx_fh);
++  free (guest_rx_file);
++#endif
++
++}

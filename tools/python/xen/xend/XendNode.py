@@ -46,7 +46,7 @@ class XendNode:
         return self.xc.bvtsched_global_get()
     
     def info(self):
-        return self.nodeinfo() + self.physinfo()
+        return self.nodeinfo() + self.physinfo() + self.xeninfo()
 
     def nodeinfo(self):
         (sys, host, rel, ver, mch) = os.uname()
@@ -65,7 +65,16 @@ class XendNode:
                 ['free_memory', pinfo['free_pages']/256]]
         return info
         
-        
+    def xeninfo(self):
+        xinfo = self.xc.xeninfo()
+	return [['xen_major', xinfo['xen_major']],
+	        ['xen_minor', xinfo['xen_minor']],
+	        ['xen_extra', xinfo['xen_extra']],
+		['xen_changeset', xinfo['xen_changeset']],
+		['cc_compiler', xinfo['cc_compiler']],
+                ['cc_compile_by', xinfo['cc_compile_by']],
+                ['cc_compile_domain', xinfo['cc_compile_domain']],
+                ['cc_compile_date', xinfo['cc_compile_date']]]
 
 def instance():
     global inst

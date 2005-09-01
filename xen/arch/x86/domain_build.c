@@ -20,6 +20,7 @@
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/i387.h>
+#include <asm/physdev.h>
 #include <asm/shadow.h>
 
 static long dom0_nrpages;
@@ -706,6 +707,18 @@ int construct_dom0(struct domain *d,
         update_pagetables(v); /* XXX SMP */
         printk("dom0: shadow setup done\n");
     }
+
+    /*
+     * Modify I/O port access permissions.
+     */
+    /* Master Interrupt Controller (PIC). */
+    physdev_modify_ioport_access_range(dom0, 0, 0x20, 2);
+    /* Slave Interrupt Controller (PIC). */
+    physdev_modify_ioport_access_range(dom0, 0, 0xA0, 2);
+    /* Interval Timer (PIT). */
+    physdev_modify_ioport_access_range(dom0, 0, 0x40, 4);
+    /* PIT Channel 2 / PC Speaker Control. */
+    physdev_modify_ioport_access_range(dom0, 0, 0x61, 1);
 
     return 0;
 }
