@@ -7,11 +7,6 @@
 
 #include <xen/config.h>
 
-#ifndef STR
-#define __STR(x) #x
-#define STR(x) __STR(x)
-#endif
-
 /*
  * These have to be done with inline assembly: that way the bit-setting
  * is guaranteed to be atomic. All bit operations return 0 if the bit
