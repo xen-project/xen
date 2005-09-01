@@ -65,6 +65,7 @@ vmlinuz: vmlinux
 
 XINSTALL_NAME ?= $(KERNELRELEASE)
 install: vmlinuz
+install kernel_install:
 	mkdir -p $(INSTALL_PATH)/boot
 	ln -f -s vmlinuz-$(XINSTALL_NAME)$(INSTALL_SUFFIX) $(INSTALL_PATH)/boot/vmlinuz-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(XENGUEST)$(INSTALL_SUFFIX)
 	rm -f $(INSTALL_PATH)/boot/vmlinuz-$(XINSTALL_NAME)$(INSTALL_SUFFIX)

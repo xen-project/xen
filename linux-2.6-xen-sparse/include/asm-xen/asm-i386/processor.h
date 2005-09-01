@@ -517,8 +517,8 @@ static inline void load_esp0(struct tss_struct *tss, struct thread_struct *threa
  * This special macro can be used to load a debugging register
  */
 #define loaddebug(thread,register) \
-	HYPERVISOR_set_debugreg((register),     \
-			((thread)->debugreg[register]))
+		HYPERVISOR_set_debugreg((register), \
+					((thread)->debugreg[register]))
 
 /* Forward declaration, a strange C thing */
 struct task_struct;

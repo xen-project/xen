@@ -856,9 +856,6 @@ static int __init do_boot_cpu(int apicid)
 	cpu_gdt_descr[cpu].address = __get_free_page(GFP_KERNEL|__GFP_ZERO);
 	BUG_ON(cpu_gdt_descr[0].size > PAGE_SIZE);
 	cpu_gdt_descr[cpu].size = cpu_gdt_descr[0].size;
-	printk("GDT: copying %d bytes from %lx to %lx\n",
-		cpu_gdt_descr[0].size, cpu_gdt_descr[0].address,
-		cpu_gdt_descr[cpu].address); 
 	memcpy((void *)cpu_gdt_descr[cpu].address,
 	       (void *)cpu_gdt_descr[0].address, cpu_gdt_descr[0].size);
 
@@ -1274,6 +1271,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 			printk(KERN_WARNING "WARNING: %d siblings found for CPU%d, should be %d\n", siblings, cpu, smp_num_siblings);
 			smp_num_siblings = siblings;
 		}
+
 		if (c->x86_num_cores > 1) {
 			for (i = 0; i < NR_CPUS; i++) {
 				if (!cpu_isset(i, cpu_callout_map))

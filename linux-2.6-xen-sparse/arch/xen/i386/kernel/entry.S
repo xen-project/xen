@@ -47,6 +47,7 @@
 #include <asm/segment.h>
 #include <asm/smp.h>
 #include <asm/page.h>
+#include <asm/desc.h>
 #include "irq_vectors.h"
 #include <asm-xen/xen-public/xen.h>
 
@@ -112,7 +113,7 @@ VM_MASK		= 0x00020000
 				XEN_BLOCK_EVENTS(%esi)
 #else
 #define preempt_stop
-#define resume_kernel		restore_all
+#define resume_kernel		restore_nocheck
 #endif
 
 #define SAVE_ALL \
@@ -161,11 +162,9 @@ VM_MASK		= 0x00020000
 	addl $4, %esp;	\
 1:	iret;		\
 .section .fixup,"ax";   \
-2:	movl $(__USER_DS), %edx; \
-	movl %edx, %ds; \
-	movl %edx, %es; \
-	movl $11,%eax;	\
-	call do_exit;	\
+2:	pushl $0;	\
+	pushl $do_iret_error;	\
+	jmp error_code;	\
 .previous;		\
 .section __ex_table,"a";\
 	.align 4;	\
@@ -196,7 +195,7 @@ ret_from_intr:
 	movl EFLAGS(%esp), %eax		# mix EFLAGS and CS
 	movb CS(%esp), %al
 	testl $(VM_MASK | 2), %eax
-	jz resume_kernel		# returning to kernel or vm86-space
+	jz resume_kernel
 ENTRY(resume_userspace)
 	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
@@ -211,7 +210,7 @@ ENTRY(resume_userspace)
 ENTRY(resume_kernel)
 	XEN_BLOCK_EVENTS(%esi)
 	cmpl $0,TI_preempt_count(%ebp)	# non-zero preempt_count ?
-	jnz restore_all
+	jnz restore_nocheck
 need_resched:
 	movl TI_flags(%ebp), %ecx	# need_resched set ?
 	testb $_TIF_NEED_RESCHED, %cl
@@ -252,7 +251,8 @@ sysenter_past_esp:
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
 
-	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
+	/* Note, _TIF_SECCOMP is bit number 8, and so it needs testw and not testb */
+	testw $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SECCOMP),TI_flags(%ebp)
 	jnz syscall_trace_entry
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
@@ -276,7 +276,8 @@ ENTRY(system_call)
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
 					# system call tracing in operation
-	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
+	/* Note, _TIF_SECCOMP is bit number 8, and so it needs testw and not testb */
+	testw $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SECCOMP),TI_flags(%ebp)
 	jnz syscall_trace_entry
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
@@ -290,7 +291,20 @@ syscall_exit:
 	movl TI_flags(%ebp), %ecx
 	testw $_TIF_ALLWORK_MASK, %cx	# current->work
 	jne syscall_exit_work
+
 restore_all:
+#if 0 /* XEN */
+	movl EFLAGS(%esp), %eax		# mix EFLAGS, SS and CS
+	# Warning: OLDSS(%esp) contains the wrong/random values if we
+	# are returning to the kernel.
+	# See comments in process.c:copy_thread() for details.
+	movb OLDSS(%esp), %ah
+	movb CS(%esp), %al
+	andl $(VM_MASK | (4 << 8) | 3), %eax
+	cmpl $((4 << 8) | 3), %eax
+	je ldt_ss			# returning to user-space with LDT SS
+#endif /* XEN */
+restore_nocheck:
 	testl $VM_MASK, EFLAGS(%esp)
 	jnz resume_vm86
 	movb EVENT_MASK(%esp), %al
@@ -300,7 +314,19 @@ restore_all:
 	andb $1,%al			# %al == mask & ~saved_mask
 	jnz restore_all_enable_events	#     != 0 => reenable event delivery
 	XEN_PUT_VCPU_INFO(%esi)
-	RESTORE_ALL
+	RESTORE_REGS
+	addl $4, %esp
+1:	iret
+.section .fixup,"ax"
+iret_exc:
+	pushl $0			# no error code
+	pushl $do_iret_error
+	jmp error_code
+.previous
+.section __ex_table,"a"
+	.align 4
+	.long 1b,iret_exc
+.previous
 
 resume_vm86:
 	XEN_UNBLOCK_EVENTS(%esi)
@@ -309,6 +335,33 @@ resume_vm86:
 	movl $__HYPERVISOR_switch_vm86,%eax
 	int $0x82
 	ud2
+
+#if 0 /* XEN */
+ldt_ss:
+	larl OLDSS(%esp), %eax
+	jnz restore_nocheck
+	testl $0x00400000, %eax		# returning to 32bit stack?
+	jnz restore_nocheck		# allright, normal return
+	/* If returning to userspace with 16bit stack,
+	 * try to fix the higher word of ESP, as the CPU
+	 * won't restore it.
+	 * This is an "official" bug of all the x86-compatible
+	 * CPUs, which we can try to work around to make
+	 * dosemu and wine happy. */
+	subl $8, %esp		# reserve space for switch16 pointer
+	cli
+	movl %esp, %eax
+	/* Set up the 16bit stack frame with switch32 pointer on top,
+	 * and a switch16 pointer on top of the current frame. */
+	call setup_x86_bogus_stack
+	RESTORE_REGS
+	lss 20+4(%esp), %esp	# switch to 16bit stack
+1:	iret
+.section __ex_table,"a"
+	.align 4
+	.long 1b,iret_exc
+.previous
+#endif /* XEN */
 
 	# perform work that needs to be done immediately before resumption
 	ALIGN
@@ -385,6 +438,27 @@ syscall_badsys:
 	jmp resume_userspace
 
 #if 0 /* XEN */
+#define FIXUP_ESPFIX_STACK \
+	movl %esp, %eax; \
+	/* switch to 32bit stack using the pointer on top of 16bit stack */ \
+	lss %ss:CPU_16BIT_STACK_SIZE-8, %esp; \
+	/* copy data from 16bit stack to 32bit stack */ \
+	call fixup_x86_bogus_stack; \
+	/* put ESP to the proper location */ \
+	movl %eax, %esp;
+#define UNWIND_ESPFIX_STACK \
+	pushl %eax; \
+	movl %ss, %eax; \
+	/* see if on 16bit stack */ \
+	cmpw $__ESPFIX_SS, %ax; \
+	jne 28f; \
+	movl $__KERNEL_DS, %edx; \
+	movl %edx, %ds; \
+	movl %edx, %es; \
+	/* switch to 32bit stack */ \
+	FIXUP_ESPFIX_STACK \
+28:	popl %eax;
+
 /*
  * Build the entry stubs and pointer table with
  * some assembler magic.
@@ -440,7 +514,9 @@ error_code:
 	pushl %ecx
 	pushl %ebx
 	cld
-	movl %es, %ecx
+	pushl %es
+#	UNWIND_ESPFIX_STACK
+	popl %ecx
 	movl ES(%esp), %edi		# get the function address
 	movl ORIG_EAX(%esp), %edx	# get the error code
 	movl %eax, ORIG_EAX(%esp)
@@ -625,6 +701,11 @@ debug_stack_correct:
  * fault happened on the sysenter path.
  */
 ENTRY(nmi)
+	pushl %eax
+	movl %ss, %eax
+	cmpw $__ESPFIX_SS, %ax
+	popl %eax
+	je nmi_16bit_stack
 	cmpl $sysenter_entry,(%esp)
 	je nmi_stack_fixup
 	pushl %eax
@@ -644,7 +725,7 @@ nmi_stack_correct:
 	xorl %edx,%edx		# zero error code
 	movl %esp,%eax		# pt_regs pointer
 	call do_nmi
-	RESTORE_ALL
+	jmp restore_all
 
 nmi_stack_fixup:
 	FIX_STACK(12,nmi_stack_correct, 1)
@@ -659,6 +740,29 @@ nmi_debug_stack_check:
 nmi_debug_stack_fixup:
 	FIX_STACK(24,nmi_stack_correct, 1)
 	jmp nmi_stack_correct
+
+nmi_16bit_stack:
+	/* create the pointer to lss back */
+	pushl %ss
+	pushl %esp
+	movzwl %sp, %esp
+	addw $4, (%esp)
+	/* copy the iret frame of 12 bytes */
+	.rept 3
+	pushl 16(%esp)
+	.endr
+	pushl %eax
+	SAVE_ALL
+	FIXUP_ESPFIX_STACK		# %eax == %esp
+	xorl %edx,%edx			# zero error code
+	call do_nmi
+	RESTORE_REGS
+	lss 12+4(%esp), %esp		# back to 16bit stack
+1:	iret
+.section __ex_table,"a"
+	.align 4
+	.long 1b,iret_exc
+.previous
 #endif /* XEN */
 
 ENTRY(int3)
@@ -725,7 +829,9 @@ ENTRY(page_fault)
 	pushl %ecx
 	pushl %ebx
 	cld
-	movl %es,%edi
+	pushl %es
+#	UNWIND_ESPFIX_STACK
+	popl %edi
 	movl ES(%esp), %ecx		/* get the faulting address */
 	movl ORIG_EAX(%esp), %edx	/* get the error code */
 	movl %eax, ORIG_EAX(%esp)

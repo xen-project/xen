@@ -231,7 +231,7 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 }
 #endif
 
-static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
+static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
 #if defined(__HAVE_PHYS_MEM_ACCESS_PROT)
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
@@ -258,7 +258,6 @@ static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 	return 0;
 }
 
-#if 0
 static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 {
         unsigned long long val;
@@ -275,7 +274,6 @@ static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 	vma->vm_pgoff = __pa(val) >> PAGE_SHIFT;
 	return mmap_mem(file, vma);
 }
-#endif
 
 extern long vread(char *buf, char *addr, unsigned long count);
 extern long vwrite(char *buf, char *addr, unsigned long count);
@@ -731,7 +729,7 @@ static struct file_operations mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
 	.write		= write_mem,
-	.mmap		= mmap_kmem,
+	.mmap		= mmap_mem,
 	.open		= open_mem,
 };
 #else

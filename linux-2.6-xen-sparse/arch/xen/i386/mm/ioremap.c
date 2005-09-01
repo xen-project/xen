@@ -19,287 +19,8 @@
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 
-#ifndef CONFIG_XEN_PHYSDEV_ACCESS
-
-void * __ioremap(unsigned long phys_addr, unsigned long size,
-		 unsigned long flags)
-{
-	return NULL;
-}
-
-void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
-{
-	return NULL;
-}
-
-void iounmap(volatile void __iomem *addr)
-{
-}
-
-#ifdef __i386__
-
-void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
-{
-	return NULL;
-}
-
-void __init bt_iounmap(void *addr, unsigned long size)
-{
-}
-
-#endif /* __i386__ */
-
-#else
-
-/*
- * Does @address reside within a non-highmem page that is local to this virtual
- * machine (i.e., not an I/O page, nor a memory page belonging to another VM).
- * See the comment that accompanies pte_pfn() in pgtable-2level.h to understand
- * why this works.
- */
-static inline int is_local_lowmem(unsigned long address)
-{
-	extern unsigned long max_low_pfn;
-	unsigned long mfn = address >> PAGE_SHIFT;
-	unsigned long pfn = mfn_to_pfn(mfn);
-	return ((pfn < max_low_pfn) && (phys_to_machine_mapping[pfn] == mfn));
-}
-
-/*
- * Generic mapping function (not visible outside):
- */
-
-/*
- * Remap an arbitrary physical address space into the kernel virtual
- * address space. Needed when the kernel wants to access high addresses
- * directly.
- *
- * NOTE! We need to allow non-page-aligned mappings too: we will obviously
- * have to convert them into an offset in a page-aligned mapping, but the
- * caller shouldn't need to know that small detail.
- */
-void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
-{
-	void __iomem * addr;
-	struct vm_struct * area;
-	unsigned long offset, last_addr;
-	domid_t domid = DOMID_IO;
-
-	/* Don't allow wraparound or zero size */
-	last_addr = phys_addr + size - 1;
-	if (!size || last_addr < phys_addr)
-		return NULL;
-
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	/*
-	 * Don't remap the low PCI/ISA area, it's always mapped..
-	 */
-	if (phys_addr >= 0x0 && last_addr < 0x100000)
-		return isa_bus_to_virt(phys_addr);
-#endif
-
-	/*
-	 * Don't allow anybody to remap normal RAM that we're using..
-	 */
-	if (is_local_lowmem(phys_addr)) {
-		char *t_addr, *t_end;
-		struct page *page;
-
-		t_addr = bus_to_virt(phys_addr);
-		t_end = t_addr + (size - 1);
-	   
-		for(page = virt_to_page(t_addr); page <= virt_to_page(t_end); page++)
-			if(!PageReserved(page))
-				return NULL;
-
-		domid = DOMID_SELF;
-	}
-
-	/*
-	 * Mappings have to be page-aligned
-	 */
-	offset = phys_addr & ~PAGE_MASK;
-	phys_addr &= PAGE_MASK;
-	size = PAGE_ALIGN(last_addr+1) - phys_addr;
-
-	/*
-	 * Ok, go for it..
-	 */
-	area = get_vm_area(size, VM_IOREMAP | (flags << 20));
-	if (!area)
-		return NULL;
-	area->phys_addr = phys_addr;
-	addr = (void __iomem *) area->addr;
-	flags |= _PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED;
-#ifdef __x86_64__
-	flags |= _PAGE_USER;
-#endif
-	if (direct_remap_area_pages(&init_mm, (unsigned long) addr, phys_addr,
-				    size, __pgprot(flags), domid)) {
-		vunmap((void __force *) addr);
-		return NULL;
-	}
-	return (void __iomem *) (offset + (char __iomem *)addr);
-}
-
-
-/**
- * ioremap_nocache     -   map bus memory into CPU space
- * @offset:    bus address of the memory
- * @size:      size of the resource to map
- *
- * ioremap_nocache performs a platform specific sequence of operations to
- * make bus memory CPU accessible via the readb/readw/readl/writeb/
- * writew/writel functions and the other mmio helpers. The returned
- * address is not guaranteed to be usable directly as a virtual
- * address. 
- *
- * This version of ioremap ensures that the memory is marked uncachable
- * on the CPU as well as honouring existing caching rules from things like
- * the PCI bus. Note that there are other caches and buffers on many 
- * busses. In particular driver authors should read up on PCI writes
- *
- * It's useful if some control registers are in such an area and
- * write combining or read caching is not desirable:
- * 
- * Must be freed with iounmap.
- */
-
-void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
-{
-	unsigned long last_addr;
-	void __iomem *p = __ioremap(phys_addr, size, _PAGE_PCD);
-	if (!p) 
-		return p; 
-
-	/* Guaranteed to be > phys_addr, as per __ioremap() */
-	last_addr = phys_addr + size - 1;
-
-	if (is_local_lowmem(last_addr)) { 
-		struct page *ppage = virt_to_page(bus_to_virt(phys_addr));
-		unsigned long npages;
-
-		phys_addr &= PAGE_MASK;
-
-		/* This might overflow and become zero.. */
-		last_addr = PAGE_ALIGN(last_addr);
-
-		/* .. but that's ok, because modulo-2**n arithmetic will make
-	 	* the page-aligned "last - first" come out right.
-	 	*/
-		npages = (last_addr - phys_addr) >> PAGE_SHIFT;
-
-		if (change_page_attr(ppage, npages, PAGE_KERNEL_NOCACHE) < 0) { 
-			iounmap(p); 
-			p = NULL;
-		}
-		global_flush_tlb();
-	}
-
-	return p;					
-}
-
-void iounmap(volatile void __iomem *addr)
-{
-	struct vm_struct *p;
-	if ((void __force *) addr <= high_memory) 
-		return; 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	if ((unsigned long) addr >= fix_to_virt(FIX_ISAMAP_BEGIN))
-		return;
-#endif
-	p = remove_vm_area((void *) (PAGE_MASK & (unsigned long __force) addr));
-	if (!p) { 
-		printk("__iounmap: bad address %p\n", addr);
-		return;
-	}
-
-	if ((p->flags >> 20) && is_local_lowmem(p->phys_addr)) {
-		/* p->size includes the guard page, but cpa doesn't like that */
-		change_page_attr(virt_to_page(bus_to_virt(p->phys_addr)),
-				 (p->size - PAGE_SIZE) >> PAGE_SHIFT,
-				 PAGE_KERNEL); 				 
-		global_flush_tlb();
-	} 
-	kfree(p); 
-}
-
-#ifdef __i386__
-
-void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
-{
-	unsigned long offset, last_addr;
-	unsigned int nrpages;
-	enum fixed_addresses idx;
-
-	/* Don't allow wraparound or zero size */
-	last_addr = phys_addr + size - 1;
-	if (!size || last_addr < phys_addr)
-		return NULL;
-
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	/*
-	 * Don't remap the low PCI/ISA area, it's always mapped..
-	 */
-	if (phys_addr >= 0x0 && last_addr < 0x100000)
-		return isa_bus_to_virt(phys_addr);
-#endif
-
-	/*
-	 * Mappings have to be page-aligned
-	 */
-	offset = phys_addr & ~PAGE_MASK;
-	phys_addr &= PAGE_MASK;
-	size = PAGE_ALIGN(last_addr) - phys_addr;
-
-	/*
-	 * Mappings have to fit in the FIX_BTMAP area.
-	 */
-	nrpages = size >> PAGE_SHIFT;
-	if (nrpages > NR_FIX_BTMAPS)
-		return NULL;
-
-	/*
-	 * Ok, go for it..
-	 */
-	idx = FIX_BTMAP_BEGIN;
-	while (nrpages > 0) {
-		set_fixmap(idx, phys_addr);
-		phys_addr += PAGE_SIZE;
-		--idx;
-		--nrpages;
-	}
-	return (void*) (offset + fix_to_virt(FIX_BTMAP_BEGIN));
-}
-
-void __init bt_iounmap(void *addr, unsigned long size)
-{
-	unsigned long virt_addr;
-	unsigned long offset;
-	unsigned int nrpages;
-	enum fixed_addresses idx;
-
-	virt_addr = (unsigned long)addr;
-	if (virt_addr < fix_to_virt(FIX_BTMAP_BEGIN))
-		return;
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	if (virt_addr >= fix_to_virt(FIX_ISAMAP_BEGIN))
-		return;
-#endif
-	offset = virt_addr & ~PAGE_MASK;
-	nrpages = PAGE_ALIGN(offset + size - 1) >> PAGE_SHIFT;
-
-	idx = FIX_BTMAP_BEGIN;
-	while (nrpages > 0) {
-		clear_fixmap(idx);
-		--idx;
-		--nrpages;
-	}
-}
-
-#endif /* __i386__ */
-
-#endif /* CONFIG_XEN_PHYSDEV_ACCESS */
+#define ISA_START_ADDRESS	0x0
+#define ISA_END_ADDRESS		0x100000
 
 /* These hacky macros avoid phys->machine translations. */
 #define __direct_pte(x) ((pte_t) { (x) } )
@@ -412,6 +133,292 @@ int touch_pte_range(struct mm_struct *mm,
 } 
 
 EXPORT_SYMBOL(touch_pte_range);
+
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
+
+/*
+ * Does @address reside within a non-highmem page that is local to this virtual
+ * machine (i.e., not an I/O page, nor a memory page belonging to another VM).
+ * See the comment that accompanies pte_pfn() in pgtable-2level.h to understand
+ * why this works.
+ */
+static inline int is_local_lowmem(unsigned long address)
+{
+	extern unsigned long max_low_pfn;
+	unsigned long mfn = address >> PAGE_SHIFT;
+	unsigned long pfn = mfn_to_pfn(mfn);
+	return ((pfn < max_low_pfn) && (phys_to_machine_mapping[pfn] == mfn));
+}
+
+/*
+ * Generic mapping function (not visible outside):
+ */
+
+/*
+ * Remap an arbitrary physical address space into the kernel virtual
+ * address space. Needed when the kernel wants to access high addresses
+ * directly.
+ *
+ * NOTE! We need to allow non-page-aligned mappings too: we will obviously
+ * have to convert them into an offset in a page-aligned mapping, but the
+ * caller shouldn't need to know that small detail.
+ */
+void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
+{
+	void __iomem * addr;
+	struct vm_struct * area;
+	unsigned long offset, last_addr;
+	domid_t domid = DOMID_IO;
+
+	/* Don't allow wraparound or zero size */
+	last_addr = phys_addr + size - 1;
+	if (!size || last_addr < phys_addr)
+		return NULL;
+
+	/*
+	 * Don't remap the low PCI/ISA area, it's always mapped..
+	 */
+	if (xen_start_info.flags & SIF_PRIVILEGED &&
+	    phys_addr >= ISA_START_ADDRESS && last_addr < ISA_END_ADDRESS)
+		return (void __iomem *) isa_bus_to_virt(phys_addr);
+
+	/*
+	 * Don't allow anybody to remap normal RAM that we're using..
+	 */
+	if (is_local_lowmem(phys_addr)) {
+		char *t_addr, *t_end;
+		struct page *page;
+
+		t_addr = bus_to_virt(phys_addr);
+		t_end = t_addr + (size - 1);
+	   
+		for(page = virt_to_page(t_addr); page <= virt_to_page(t_end); page++)
+			if(!PageReserved(page))
+				return NULL;
+
+		domid = DOMID_SELF;
+	}
+
+	/*
+	 * Mappings have to be page-aligned
+	 */
+	offset = phys_addr & ~PAGE_MASK;
+	phys_addr &= PAGE_MASK;
+	size = PAGE_ALIGN(last_addr+1) - phys_addr;
+
+	/*
+	 * Ok, go for it..
+	 */
+	area = get_vm_area(size, VM_IOREMAP | (flags << 20));
+	if (!area)
+		return NULL;
+	area->phys_addr = phys_addr;
+	addr = (void __iomem *) area->addr;
+	flags |= _PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED;
+#ifdef __x86_64__
+	flags |= _PAGE_USER;
+#endif
+	if (direct_remap_area_pages(&init_mm, (unsigned long) addr, phys_addr,
+				    size, __pgprot(flags), domid)) {
+		vunmap((void __force *) addr);
+		return NULL;
+	}
+	return (void __iomem *) (offset + (char __iomem *)addr);
+}
+
+
+/**
+ * ioremap_nocache     -   map bus memory into CPU space
+ * @offset:    bus address of the memory
+ * @size:      size of the resource to map
+ *
+ * ioremap_nocache performs a platform specific sequence of operations to
+ * make bus memory CPU accessible via the readb/readw/readl/writeb/
+ * writew/writel functions and the other mmio helpers. The returned
+ * address is not guaranteed to be usable directly as a virtual
+ * address. 
+ *
+ * This version of ioremap ensures that the memory is marked uncachable
+ * on the CPU as well as honouring existing caching rules from things like
+ * the PCI bus. Note that there are other caches and buffers on many 
+ * busses. In particular driver authors should read up on PCI writes
+ *
+ * It's useful if some control registers are in such an area and
+ * write combining or read caching is not desirable:
+ * 
+ * Must be freed with iounmap.
+ */
+
+void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
+{
+	unsigned long last_addr;
+	void __iomem *p = __ioremap(phys_addr, size, _PAGE_PCD);
+	if (!p) 
+		return p; 
+
+	/* Guaranteed to be > phys_addr, as per __ioremap() */
+	last_addr = phys_addr + size - 1;
+
+	if (is_local_lowmem(last_addr)) { 
+		struct page *ppage = virt_to_page(bus_to_virt(phys_addr));
+		unsigned long npages;
+
+		phys_addr &= PAGE_MASK;
+
+		/* This might overflow and become zero.. */
+		last_addr = PAGE_ALIGN(last_addr);
+
+		/* .. but that's ok, because modulo-2**n arithmetic will make
+	 	* the page-aligned "last - first" come out right.
+	 	*/
+		npages = (last_addr - phys_addr) >> PAGE_SHIFT;
+
+		if (change_page_attr(ppage, npages, PAGE_KERNEL_NOCACHE) < 0) { 
+			iounmap(p); 
+			p = NULL;
+		}
+		global_flush_tlb();
+	}
+
+	return p;					
+}
+
+void iounmap(volatile void __iomem *addr)
+{
+	struct vm_struct *p;
+	if ((void __force *) addr <= high_memory) 
+		return;
+
+	/*
+	 * __ioremap special-cases the PCI/ISA range by not instantiating a
+	 * vm_area and by simply returning an address into the kernel mapping
+	 * of ISA space.   So handle that here.
+	 */
+	if ((unsigned long) addr >= fix_to_virt(FIX_ISAMAP_BEGIN))
+		return;
+
+	write_lock(&vmlist_lock);
+	p = __remove_vm_area((void *) (PAGE_MASK & (unsigned long __force) addr));
+	if (!p) { 
+		printk("iounmap: bad address %p\n", addr);
+		goto out_unlock;
+	}
+
+	if ((p->flags >> 20) && is_local_lowmem(p->phys_addr)) {
+		/* p->size includes the guard page, but cpa doesn't like that */
+		change_page_attr(virt_to_page(bus_to_virt(p->phys_addr)),
+				 (p->size - PAGE_SIZE) >> PAGE_SHIFT,
+				 PAGE_KERNEL);
+		global_flush_tlb();
+	} 
+out_unlock:
+	write_unlock(&vmlist_lock);
+	kfree(p); 
+}
+
+#ifdef __i386__
+
+void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
+{
+	unsigned long offset, last_addr;
+	unsigned int nrpages;
+	enum fixed_addresses idx;
+
+	/* Don't allow wraparound or zero size */
+	last_addr = phys_addr + size - 1;
+	if (!size || last_addr < phys_addr)
+		return NULL;
+
+	/*
+	 * Don't remap the low PCI/ISA area, it's always mapped..
+	 */
+	if (xen_start_info.flags & SIF_PRIVILEGED &&
+	    phys_addr >= ISA_START_ADDRESS && last_addr < ISA_END_ADDRESS)
+		return isa_bus_to_virt(phys_addr);
+
+	/*
+	 * Mappings have to be page-aligned
+	 */
+	offset = phys_addr & ~PAGE_MASK;
+	phys_addr &= PAGE_MASK;
+	size = PAGE_ALIGN(last_addr) - phys_addr;
+
+	/*
+	 * Mappings have to fit in the FIX_BTMAP area.
+	 */
+	nrpages = size >> PAGE_SHIFT;
+	if (nrpages > NR_FIX_BTMAPS)
+		return NULL;
+
+	/*
+	 * Ok, go for it..
+	 */
+	idx = FIX_BTMAP_BEGIN;
+	while (nrpages > 0) {
+		set_fixmap(idx, phys_addr);
+		phys_addr += PAGE_SIZE;
+		--idx;
+		--nrpages;
+	}
+	return (void*) (offset + fix_to_virt(FIX_BTMAP_BEGIN));
+}
+
+void __init bt_iounmap(void *addr, unsigned long size)
+{
+	unsigned long virt_addr;
+	unsigned long offset;
+	unsigned int nrpages;
+	enum fixed_addresses idx;
+
+	virt_addr = (unsigned long)addr;
+	if (virt_addr < fix_to_virt(FIX_BTMAP_BEGIN))
+		return;
+	if (virt_addr >= fix_to_virt(FIX_ISAMAP_BEGIN))
+		return;
+	offset = virt_addr & ~PAGE_MASK;
+	nrpages = PAGE_ALIGN(offset + size - 1) >> PAGE_SHIFT;
+
+	idx = FIX_BTMAP_BEGIN;
+	while (nrpages > 0) {
+		clear_fixmap(idx);
+		--idx;
+		--nrpages;
+	}
+}
+
+#endif /* __i386__ */
+
+#else /* CONFIG_XEN_PHYSDEV_ACCESS */
+
+void __iomem * __ioremap(unsigned long phys_addr, unsigned long size,
+			 unsigned long flags)
+{
+	return NULL;
+}
+
+void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
+{
+	return NULL;
+}
+
+void iounmap(volatile void __iomem *addr)
+{
+}
+
+#ifdef __i386__
+
+void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
+{
+	return NULL;
+}
+
+void __init bt_iounmap(void *addr, unsigned long size)
+{
+}
+
+#endif /* __i386__ */
+
+#endif /* CONFIG_XEN_PHYSDEV_ACCESS */
 
 /*
  * Local variables:

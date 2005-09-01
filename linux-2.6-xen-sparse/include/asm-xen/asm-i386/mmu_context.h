@@ -35,9 +35,9 @@ static inline void __prepare_arch_switch(void)
 	 * happen before reload of cr3/ldt (i.e., not in __switch_to).
 	 */
 	asm volatile ( "mov %%fs,%0 ; mov %%gs,%1"
-		: "=m" (*(int *)&current->thread.fs),
-		  "=m" (*(int *)&current->thread.gs));
-	asm volatile ( "mov %0,%%fs ; mov %0,%%gs"
+		: "=m" (current->thread.fs),
+		  "=m" (current->thread.gs));
+	asm volatile ( "movl %0,%%fs ; movl %0,%%gs"
 		: : "r" (0) );
 }
 

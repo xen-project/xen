@@ -467,7 +467,6 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 	return 1;
 }
 
-
 /*
  *	switch_to(x,yn) should switch tasks from x to y.
  *

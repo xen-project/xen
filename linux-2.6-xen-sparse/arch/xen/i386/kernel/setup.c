@@ -1078,12 +1078,12 @@ static void __init reserve_ebda_region(void)
 void __init setup_bootmem_allocator(void);
 static unsigned long __init setup_memory(void)
 {
-
 	/*
 	 * partially used pages are not usable - thus
 	 * we are rounding upwards:
 	 */
- 	min_low_pfn = PFN_UP(__pa(xen_start_info.pt_base)) + xen_start_info.nr_pt_frames;
+ 	min_low_pfn = PFN_UP(__pa(xen_start_info.pt_base)) +
+		xen_start_info.nr_pt_frames;
 
 	find_max_pfn();
 
