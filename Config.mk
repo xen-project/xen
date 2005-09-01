@@ -48,3 +48,4 @@ ACM_USE_SECURITY_POLICY ?= ACM_NULL_POLICY
 # Optional components
 XENSTAT_XENTOP ?= y
 
+VTPM_TOOLS ?= n

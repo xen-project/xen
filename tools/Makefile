@@ -12,8 +12,10 @@ SUBDIRS += xcutils
 SUBDIRS += firmware
 SUBDIRS += security
 SUBDIRS += console
+ifeq ($(VTPM_TOOLS),y)
 SUBDIRS += vtpm_manager
 SUBDIRS += vtpm
+endif
 SUBDIRS += xenstat
 
 .PHONY: all install clean check check_clean ioemu eioemuinstall ioemuclean
