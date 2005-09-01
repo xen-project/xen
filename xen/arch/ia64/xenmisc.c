@@ -177,6 +177,34 @@ void free_page_type(struct pfn_info *page, unsigned int type)
 }
 
 ///////////////////////////////
+//// misc memory stuff
+///////////////////////////////
+
+unsigned long __get_free_pages(unsigned int mask, unsigned int order)
+{
+	void *p = alloc_xenheap_pages(order);
+
+	memset(p,0,PAGE_SIZE<<order);
+	return (unsigned long)p;
+}
+
+void __free_pages(struct page *page, unsigned int order)
+{
+	if (order) BUG();
+	free_xenheap_page(page);
+}
+
+void *pgtable_quicklist_alloc(void)
+{
+	return alloc_xenheap_pages(0);
+}
+
+void pgtable_quicklist_free(void *pgtable_entry)
+{
+	free_xenheap_page(pgtable_entry);
+}
+
+///////////////////////////////
 // from arch/ia64/traps.c
 ///////////////////////////////
 

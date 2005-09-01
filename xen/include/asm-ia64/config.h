@@ -168,7 +168,9 @@ struct page;
 #define ____cacheline_aligned_in_smp
 #define ____cacheline_maxaligned_in_smp
 
+#ifndef __ASSEMBLY__
 #include "asm/types.h"	// for u64
+#endif
 
 // warning: unless search_extable is declared, the return value gets
 // truncated to 32-bits, causing a very strange error in privop handling

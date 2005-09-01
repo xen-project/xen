@@ -120,35 +120,6 @@ do {											\
 #define _raw_spin_trylock(x)	(cmpxchg_acq(&(x)->lock, 0, 1) == 0)
 #define spin_unlock_wait(x)	do { barrier(); } while ((x)->lock)
 
-#ifdef XEN
-/*
- * spin_[un]lock_recursive(): Use these forms when the lock can (safely!) be
- * reentered recursively on the same CPU. All critical regions that may form
- * part of a recursively-nested set must be protected by these forms. If there
- * are any critical regions that cannot form part of such a set, they can use
- * standard spin_[un]lock().
- */
-#define _raw_spin_lock_recursive(_lock)            \
-    do {                                           \
-        int cpu = smp_processor_id();              \
-        if ( likely((_lock)->recurse_cpu != cpu) ) \
-        {                                          \
-            spin_lock(_lock);                      \
-            (_lock)->recurse_cpu = cpu;            \
-        }                                          \
-        (_lock)->recurse_cnt++;                    \
-    } while ( 0 )
-
-#define _raw_spin_unlock_recursive(_lock)          \
-    do {                                           \
-        if ( likely(--(_lock)->recurse_cnt == 0) ) \
-        {                                          \
-            (_lock)->recurse_cpu = -1;             \
-            spin_unlock(_lock);                    \
-        }                                          \
-    } while ( 0 )
-#endif
-
 typedef struct {
 	volatile unsigned int read_counter	: 31;
 	volatile unsigned int write_lock	:  1;
@@ -238,4 +209,7 @@ do {										\
 	clear_bit(31, (x));								\
 })
 
+#ifdef XEN
+#include <asm/xenspinlock.h>
+#endif
 #endif /*  _ASM_IA64_SPINLOCK_H */

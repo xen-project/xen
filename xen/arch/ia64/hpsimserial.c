@@ -8,7 +8,7 @@
 #include <linux/config.h>
 #include <xen/sched.h>
 #include <xen/serial.h>
-#include <asm/hpsim_ssc.h>
+#include "hpsim_ssc.h"
 
 static void hp_ski_putc(struct serial_port *port, char c)
 {

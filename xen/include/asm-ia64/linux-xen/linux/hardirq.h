@@ -2,6 +2,7 @@
 #define LINUX_HARDIRQ_H
 
 #include <linux/config.h>
+#include <linux/preempt.h>
 #include <linux/smp_lock.h>
 #include <asm/hardirq.h>
 #include <asm/system.h>
@@ -43,12 +44,18 @@
 #define __IRQ_MASK(x)	((1UL << (x))-1)
 
 #define PREEMPT_MASK	(__IRQ_MASK(PREEMPT_BITS) << PREEMPT_SHIFT)
-#define HARDIRQ_MASK	(__IRQ_MASK(HARDIRQ_BITS) << HARDIRQ_SHIFT)
 #define SOFTIRQ_MASK	(__IRQ_MASK(SOFTIRQ_BITS) << SOFTIRQ_SHIFT)
+#define HARDIRQ_MASK	(__IRQ_MASK(HARDIRQ_BITS) << HARDIRQ_SHIFT)
 
 #define PREEMPT_OFFSET	(1UL << PREEMPT_SHIFT)
 #define SOFTIRQ_OFFSET	(1UL << SOFTIRQ_SHIFT)
 #define HARDIRQ_OFFSET	(1UL << HARDIRQ_SHIFT)
+
+#if PREEMPT_ACTIVE < (1 << (HARDIRQ_SHIFT + HARDIRQ_BITS))
+#ifndef XEN
+#error PREEMPT_ACTIVE is too low!
+#endif
+#endif
 
 #define hardirq_count()	(preempt_count() & HARDIRQ_MASK)
 #define softirq_count()	(preempt_count() & SOFTIRQ_MASK)
@@ -60,10 +67,10 @@
  */
 #define in_irq()		(hardirq_count())
 #define in_softirq()		(softirq_count())
-#ifndef XEN
-#define in_interrupt()		(irq_count())
+#ifdef XEN
+#define in_interrupt()		0 		// FIXME SMP LATER
 #else
-#define in_interrupt()		0		// FIXME LATER
+#define in_interrupt()		(irq_count())
 #endif
 
 #if defined(CONFIG_PREEMPT) && !defined(CONFIG_PREEMPT_BKL)

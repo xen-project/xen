@@ -87,35 +87,6 @@
 #define _IA64_REG_CR_LRR0	4176
 #define _IA64_REG_CR_LRR1	4177
 
-#ifdef  CONFIG_VTI
-#define IA64_REG_CR_DCR   0
-#define IA64_REG_CR_ITM   1
-#define IA64_REG_CR_IVA   2
-#define IA64_REG_CR_PTA   8
-#define IA64_REG_CR_IPSR  16
-#define IA64_REG_CR_ISR   17
-#define IA64_REG_CR_IIP   19
-#define IA64_REG_CR_IFA   20
-#define IA64_REG_CR_ITIR  21
-#define IA64_REG_CR_IIPA  22
-#define IA64_REG_CR_IFS   23
-#define IA64_REG_CR_IIM   24
-#define IA64_REG_CR_IHA   25
-#define IA64_REG_CR_LID   64
-#define IA64_REG_CR_IVR   65
-#define IA64_REG_CR_TPR   66
-#define IA64_REG_CR_EOI   67
-#define IA64_REG_CR_IRR0  68
-#define IA64_REG_CR_IRR1  69
-#define IA64_REG_CR_IRR2  70
-#define IA64_REG_CR_IRR3  71
-#define IA64_REG_CR_ITV   72
-#define IA64_REG_CR_PMV   73
-#define IA64_REG_CR_CMCV  74
-#define IA64_REG_CR_LRR0  80
-#define IA64_REG_CR_LRR1  81
-#endif  //  CONFIG_VTI
-
 /* Indirect Registers for getindreg() and setindreg() */
 
 #define _IA64_REG_INDR_CPUID	9000	/* getindreg only */
@@ -125,5 +96,9 @@
 #define _IA64_REG_INDR_PMC	9004
 #define _IA64_REG_INDR_PMD	9005
 #define _IA64_REG_INDR_RR	9006
+
+#ifdef XEN
+#include <asm/xenia64regs.h>
+#endif
 
 #endif /* _ASM_IA64_IA64REGS_H */

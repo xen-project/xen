@@ -43,14 +43,6 @@
 #define TASK_SIZE		(current->thread.task_size)
 
 /*
- * MM_VM_SIZE(mm) gives the maximum address (plus 1) which may contain a mapping for
- * address-space MM.  Note that with 32-bit tasks, this is still DEFAULT_TASK_SIZE,
- * because the kernel may have installed helper-mappings above TASK_SIZE.  For example,
- * for x86 emulation, the LDT and GDT are mapped above TASK_SIZE.
- */
-#define MM_VM_SIZE(mm)		DEFAULT_TASK_SIZE
-
-/*
  * This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
@@ -94,11 +86,10 @@
 #ifdef CONFIG_NUMA
 #include <asm/nodedata.h>
 #endif
+
 #ifdef XEN
 #include <asm/xenprocessor.h>
-#endif
-
-#ifndef XEN
+#else
 /* like above but expressed as bitfields for more efficient access: */
 struct ia64_psr {
 	__u64 reserved0 : 1;
@@ -150,9 +141,6 @@ struct cpuinfo_ia64 {
 	__u64 nsec_per_cyc;	/* (1000000000<<IA64_NSEC_PER_CYC_SHIFT)/itc_freq */
 	__u64 unimpl_va_mask;	/* mask of unimplemented virtual address bits (from PAL) */
 	__u64 unimpl_pa_mask;	/* mask of unimplemented physical address bits (from PAL) */
-	__u64 *pgd_quick;
-	__u64 *pmd_quick;
-	__u64 pgtable_cache_sz;
 	__u64 itc_freq;		/* frequency of ITC counter */
 	__u64 proc_freq;	/* frequency of processor */
 	__u64 cyc_per_usec;	/* itc_freq/1000000 */
@@ -189,22 +177,6 @@ struct cpuinfo_ia64 {
 };
 
 DECLARE_PER_CPU(struct cpuinfo_ia64, cpu_info);
-
-typedef union {
-	struct {
-		__u64 kr0;
-		__u64 kr1;
-		__u64 kr2;
-		__u64 kr3;
-		__u64 kr4;
-		__u64 kr5;
-		__u64 kr6;
-		__u64 kr7;
-	};
-	__u64 _kr[8];
-} cpu_kr_ia64_t;
-
-DECLARE_PER_CPU(cpu_kr_ia64_t, cpu_kr);
 
 /*
  * The "local" data variable.  It refers to the per-CPU data of the currently executing
@@ -435,7 +407,10 @@ extern void ia64_setreg_unknown_kr (void);
  * task_struct at this point.
  */
 
-/* Return TRUE if task T owns the fph partition of the CPU we're running on. */
+/*
+ * Return TRUE if task T owns the fph partition of the CPU we're running on.
+ * Must be called from code that has preemption disabled.
+ */
 #ifndef XEN
 #define ia64_is_local_fpu_owner(t)								\
 ({												\
@@ -445,7 +420,10 @@ extern void ia64_setreg_unknown_kr (void);
 })
 #endif
 
-/* Mark task T as owning the fph partition of the CPU we're running on. */
+/*
+ * Mark task T as owning the fph partition of the CPU we're running on.
+ * Must be called from code that has preemption disabled.
+ */
 #define ia64_set_local_fpu_owner(t) do {						\
 	struct task_struct *__ia64_slfo_task = (t);					\
 	__ia64_slfo_task->thread.last_fph_cpu = smp_processor_id();			\

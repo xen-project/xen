@@ -28,8 +28,8 @@
 #include <asm/privop.h>
 #include <asm/vcpu.h>
 #include <asm/ia64_int.h>
-#include <asm/hpsim_ssc.h>
 #include <asm/dom_fw.h>
+#include "hpsim_ssc.h"
 
 extern unsigned long vcpu_get_itir_on_fault(struct vcpu *, UINT64);
 extern struct ia64_sal_retval pal_emulator_static(UINT64);

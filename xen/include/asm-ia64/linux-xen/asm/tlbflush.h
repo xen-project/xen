@@ -37,6 +37,7 @@ static inline void
 local_finish_flush_tlb_mm (struct mm_struct *mm)
 {
 #ifndef XEN
+// FIXME SMP?
 	if (mm == current->active_mm)
 		activate_context(mm);
 #endif
@@ -54,6 +55,7 @@ flush_tlb_mm (struct mm_struct *mm)
 		return;
 
 #ifndef XEN
+// FIXME SMP?
 	mm->context = 0;
 #endif
 
@@ -81,6 +83,7 @@ flush_tlb_page (struct vm_area_struct *vma, unsigned long addr)
 	if (vma->vm_mm == current->active_mm)
 		ia64_ptcl(addr, (PAGE_SHIFT << 2));
 #ifndef XEN
+// FIXME SMP?
 	else
 		vma->vm_mm->context = 0;
 #endif

@@ -32,16 +32,15 @@
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
-#ifdef CONFIG_VTI
-#include <asm/vmx_uaccess.h>
-#else // CONFIG_VTI
-
 #include <linux/compiler.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
+#include <linux/page-flags.h>
+#include <linux/mm.h>
 
 #include <asm/intrinsics.h>
 #include <asm/pgtable.h>
+#include <asm/io.h>
 
 /*
  * For historical reasons, the following macros are grossly misnamed:
@@ -65,7 +64,6 @@
  * point inside the virtually mapped linear page table.
  */
 #ifdef XEN
-/* VT-i reserves bit 60 for the VMM; guest addresses have bit 60 = bit 59 */
 #define IS_VMM_ADDRESS(addr) ((((addr) >> 60) ^ ((addr) >> 59)) & 1)
 #define __access_ok(addr, size, segment) (!IS_VMM_ADDRESS((unsigned long)(addr)))
 #else
@@ -79,7 +77,8 @@
 #endif
 #define access_ok(type, addr, size)	__access_ok((addr), (size), get_fs())
 
-static inline int
+/* this function will go away soon - use access_ok() instead */
+static inline int __deprecated
 verify_area (int type, const void __user *addr, unsigned long size)
 {
 	return access_ok(type, addr, size) ? 0 : -EFAULT;
@@ -353,7 +352,6 @@ extern unsigned long __strnlen_user (const char __user *, long);
 	__su_ret;						\
 })
 
-#endif // CONFIG_VTI
 /* Generic code can't deal with the location-relative format that we use for compactness.  */
 #define ARCH_HAS_SORT_EXTABLE
 #define ARCH_HAS_SEARCH_EXTABLE
@@ -377,5 +375,41 @@ ia64_done_with_exception (struct pt_regs *regs)
 	}
 	return 0;
 }
+
+#ifndef XEN
+#define ARCH_HAS_TRANSLATE_MEM_PTR	1
+static __inline__ char *
+xlate_dev_mem_ptr (unsigned long p)
+{
+	struct page *page;
+	char * ptr;
+
+	page = pfn_to_page(p >> PAGE_SHIFT);
+	if (PageUncached(page))
+		ptr = (char *)p + __IA64_UNCACHED_OFFSET;
+	else
+		ptr = __va(p);
+
+	return ptr;
+}
+
+/*
+ * Convert a virtual cached kernel memory pointer to an uncached pointer
+ */
+static __inline__ char *
+xlate_dev_kmem_ptr (char * p)
+{
+	struct page *page;
+	char * ptr;
+
+	page = virt_to_page((unsigned long)p >> PAGE_SHIFT);
+	if (PageUncached(page))
+		ptr = (char *)__pa(p) + __IA64_UNCACHED_OFFSET;
+	else
+		ptr = p;
+
+	return ptr;
+}
+#endif
 
 #endif /* _ASM_IA64_UACCESS_H */

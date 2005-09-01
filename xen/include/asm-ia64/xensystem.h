@@ -22,7 +22,9 @@
 #endif // CONFIG_VTI
 
 #define XEN_START_ADDR		 0xf000000000000000
+#undef KERNEL_START
 #define KERNEL_START		 0xf000000004000000
+#undef PERCPU_ADDR
 #define PERCPU_ADDR		 0xf100000000000000-PERCPU_PAGE_SIZE
 #define SHAREDINFO_ADDR		 0xf100000000000000
 #define VHPT_ADDR		 0xf200000000000000
@@ -31,8 +33,10 @@
 
 #ifndef __ASSEMBLY__
 
+#undef IA64_HAS_EXTRA_STATE
 #define IA64_HAS_EXTRA_STATE(t) 0
 
+#undef __switch_to
 #ifdef CONFIG_VTI
 extern struct task_struct *vmx_ia64_switch_to (void *next_task);
 #define __switch_to(prev,next,last) do {	\
