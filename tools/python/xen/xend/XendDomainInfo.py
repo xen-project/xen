@@ -338,10 +338,10 @@ class XendDomainInfo:
     def getConsoleChannel(self):
         return self.console_channel
 
-    def update(self, info):
+    def update(self, info=None):
         """Update with  info from xc.domain_getinfo().
         """
-        self.info = info
+        self.info = info or dom_get(self.id)
         self.memory = self.info['mem_kb'] / 1024
         self.ssidref = self.info['ssidref']
         self.target = self.info['mem_kb'] * 1024
