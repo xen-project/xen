@@ -169,133 +169,217 @@ ioreq_t* cpu_get_ioreq(void)
 unsigned long
 do_inp(CPUState *env, unsigned long addr, unsigned long size)
 {
-  switch(size) {
-      case 1:
-        return cpu_inb(env, addr);
-      case 2:
-        return cpu_inw(env, addr);
-      case 4:
-        return cpu_inl(env, addr);
-      default:
-	fprintf(logfile, "inp: bad size: %lx %lx\n", addr, size);
-        exit(-1);
-  }
+	switch(size) {
+	case 1:
+		return cpu_inb(env, addr);
+	case 2:
+		return cpu_inw(env, addr);
+	case 4:
+		return cpu_inl(env, addr);
+	default:
+		fprintf(logfile, "inp: bad size: %lx %lx\n", addr, size);
+		exit(-1);
+	}
 }
 
 void
 do_outp(CPUState *env, unsigned long addr, unsigned long size, 
         unsigned long val)
 {
-  switch(size) {
-      case 1:
-        return cpu_outb(env, addr, val);
-      case 2:
-        return cpu_outw(env, addr, val);
-      case 4:
-        return cpu_outl(env, addr, val);
-      default:
-	fprintf(logfile, "outp: bad size: %lx %lx\n", addr, size);
-        exit(-1);
-  }
+	switch(size) {
+	case 1:
+		return cpu_outb(env, addr, val);
+	case 2:
+		return cpu_outw(env, addr, val);
+	case 4:
+		return cpu_outl(env, addr, val);
+	default:
+		fprintf(logfile, "outp: bad size: %lx %lx\n", addr, size);
+		exit(-1);
+	}
 }
 
 extern void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
                                    int len, int is_write);
 
 static inline void
-read_physical(target_phys_addr_t addr, unsigned long size, void *val)
+read_physical(u64 addr, unsigned long size, void *val)
 {
-        return cpu_physical_memory_rw(addr, val, size, 0);
+        return cpu_physical_memory_rw((target_phys_addr_t)addr, val, size, 0);
 }
 
 static inline void
-write_physical(target_phys_addr_t addr, unsigned long size, void *val)
+write_physical(u64 addr, unsigned long size, void *val)
 {
-        return cpu_physical_memory_rw(addr, val, size, 1);
+        return cpu_physical_memory_rw((target_phys_addr_t)addr, val, size, 1);
 }
 
-//send the ioreq to device model
-void cpu_dispatch_ioreq(CPUState *env, ioreq_t *req)
+void
+cpu_ioreq_pio(CPUState *env, ioreq_t *req)
 {
-	int i;
-	int sign;
+	int i, sign;
 
-	sign = (req->df) ? -1 : 1;
+	sign = req->df ? -1 : 1;
 
-	if ((!req->pdata_valid) && (req->dir == IOREQ_WRITE)) {
-		if (req->size != 4) {
-			// Bochs expects higher bits to be 0
-			req->u.data &= (1UL << (8 * req->size))-1;
-		}
-	}
-
-	if (req->port_mm == 0){//port io
-		if(req->dir == IOREQ_READ){//read
-			if (!req->pdata_valid) {
-				req->u.data = do_inp(env, req->addr, req->size);
-			} else {
-				unsigned long tmp; 
-
-				for (i = 0; i < req->count; i++) {
-					tmp = do_inp(env, req->addr, req->size);
-					write_physical((target_phys_addr_t)req->u.pdata + (sign * i * req->size), 
-						       req->size, &tmp);
-				}
-			}
-		} else if(req->dir == IOREQ_WRITE) {
-			if (!req->pdata_valid) {
-				do_outp(env, req->addr, req->size, req->u.data);
-			} else {
-				for (i = 0; i < req->count; i++) {
-					unsigned long tmp;
-
-					read_physical((target_phys_addr_t)req->u.pdata + (sign * i * req->size), req->size, 
-						      &tmp);
-					do_outp(env, req->addr, req->size, tmp);
-				}
-			}
-			
-		}
-	} else if (req->port_mm == 1){//memory map io
+	if (req->dir == IOREQ_READ) {
 		if (!req->pdata_valid) {
-			//handle stos
-			if(req->dir == IOREQ_READ) { //read
-				for (i = 0; i < req->count; i++) {
-					read_physical((target_phys_addr_t)req->addr + (sign * i * req->size), req->size, &req->u.data);
-				}
-			} else if(req->dir == IOREQ_WRITE) { //write
-				for (i = 0; i < req->count; i++) {
-					write_physical((target_phys_addr_t)req->addr + (sign * i * req->size), req->size, &req->u.data);
-				}
-			}
+			req->u.data = do_inp(env, req->addr, req->size);
 		} else {
-			//handle movs
-			unsigned long tmp;
-			if (req->dir == IOREQ_READ) {
-				for (i = 0; i < req->count; i++) {
-					read_physical((target_phys_addr_t)req->addr + (sign * i * req->size), req->size, &tmp);
-					write_physical((target_phys_addr_t)req->u.pdata + (sign * i * req->size), req->size, &tmp);
-				}
-			} else if (req->dir == IOREQ_WRITE) {
-				for (i = 0; i < req->count; i++) {
-					read_physical((target_phys_addr_t)req->u.pdata + (sign * i * req->size), req->size, &tmp);
-					write_physical((target_phys_addr_t)req->addr + (sign * i * req->size), req->size, &tmp);
-				}
+			unsigned long tmp; 
+
+			for (i = 0; i < req->count; i++) {
+				tmp = do_inp(env, req->addr, req->size);
+				write_physical((target_phys_addr_t) req->u.pdata
+						+ (sign * i * req->size), 
+					req->size, &tmp);
+			}
+		}
+	} else if (req->dir == IOREQ_WRITE) {
+		if (!req->pdata_valid) {
+			do_outp(env, req->addr, req->size, req->u.data);
+		} else {
+			for (i = 0; i < req->count; i++) {
+				unsigned long tmp;
+
+				read_physical((target_phys_addr_t) req->u.pdata
+						+ (sign * i * req->size),
+					req->size, &tmp);
+				do_outp(env, req->addr, req->size, tmp);
 			}
 		}
 	}
-        /* No state change if state = STATE_IORESP_HOOK */
-        if (req->state == STATE_IOREQ_INPROCESS)
-                req->state = STATE_IORESP_READY;
-	env->send_event = 1;
+}
+
+void
+cpu_ioreq_move(CPUState *env, ioreq_t *req)
+{
+	int i, sign;
+
+	sign = req->df ? -1 : 1;
+
+	if (!req->pdata_valid) {
+		if (req->dir == IOREQ_READ) {
+			for (i = 0; i < req->count; i++) {
+				read_physical(req->addr
+						+ (sign * i * req->size),
+					req->size, &req->u.data);
+			}
+		} else if (req->dir == IOREQ_WRITE) {
+			for (i = 0; i < req->count; i++) {
+				write_physical(req->addr
+						+ (sign * i * req->size),
+					req->size, &req->u.data);
+			}
+		}
+	} else {
+		unsigned long tmp;
+
+		if (req->dir == IOREQ_READ) {
+			for (i = 0; i < req->count; i++) {
+				read_physical(req->addr
+						+ (sign * i * req->size),
+					req->size, &tmp);
+				write_physical((target_phys_addr_t )req->u.pdata
+						+ (sign * i * req->size),
+					req->size, &tmp);
+			}
+		} else if (req->dir == IOREQ_WRITE) {
+			for (i = 0; i < req->count; i++) {
+				read_physical((target_phys_addr_t) req->u.pdata
+						+ (sign * i * req->size),
+					req->size, &tmp);
+				write_physical(req->addr
+						+ (sign * i * req->size),
+					req->size, &tmp);
+			}
+		}
+	}
+}
+
+void
+cpu_ioreq_and(CPUState *env, ioreq_t *req)
+{
+	unsigned long tmp1, tmp2;
+
+	if (req->pdata_valid != 0)
+		hw_error("expected scalar value");
+
+	read_physical(req->addr, req->size, &tmp1);
+	if (req->dir == IOREQ_WRITE) {
+		tmp2 = tmp1 & (unsigned long) req->u.data;
+		write_physical(req->addr, req->size, &tmp2);
+	}
+	req->u.data = tmp1;
+}
+
+void
+cpu_ioreq_or(CPUState *env, ioreq_t *req)
+{
+	unsigned long tmp1, tmp2;
+
+	if (req->pdata_valid != 0)
+		hw_error("expected scalar value");
+
+	read_physical(req->addr, req->size, &tmp1);
+	if (req->dir == IOREQ_WRITE) {
+		tmp2 = tmp1 | (unsigned long) req->u.data;
+		write_physical(req->addr, req->size, &tmp2);
+	}
+	req->u.data = tmp1;
+}
+
+void
+cpu_ioreq_xor(CPUState *env, ioreq_t *req)
+{
+	unsigned long tmp1, tmp2;
+
+	if (req->pdata_valid != 0)
+		hw_error("expected scalar value");
+
+	read_physical(req->addr, req->size, &tmp1);
+	if (req->dir == IOREQ_WRITE) {
+		tmp2 = tmp1 ^ (unsigned long) req->u.data;
+		write_physical(req->addr, req->size, &tmp2);
+	}
+	req->u.data = tmp1;
 }
 
 void
 cpu_handle_ioreq(CPUState *env)
 {
 	ioreq_t *req = cpu_get_ioreq();
-	if (req)
-		cpu_dispatch_ioreq(env, req);
+
+	if (req) {
+		if ((!req->pdata_valid) && (req->dir == IOREQ_WRITE)) {
+			if (req->size != 4)
+				req->u.data &= (1UL << (8 * req->size))-1;
+		}
+
+		switch (req->type) {
+		case IOREQ_TYPE_PIO:
+			cpu_ioreq_pio(env, req);
+			break;
+		case IOREQ_TYPE_COPY:
+			cpu_ioreq_move(env, req);
+			break;
+		case IOREQ_TYPE_AND:
+			cpu_ioreq_and(env, req);
+			break;
+		case IOREQ_TYPE_OR:
+			cpu_ioreq_or(env, req);
+			break;
+		case IOREQ_TYPE_XOR:
+			cpu_ioreq_xor(env, req);
+			break;
+		default:
+			hw_error("Invalid ioreq type 0x%x", req->type);
+		}
+
+		/* No state change if state = STATE_IORESP_HOOK */
+		if (req->state == STATE_IOREQ_INPROCESS)
+			req->state = STATE_IORESP_READY;
+		env->send_event = 1;
+	}
 }
 
 void
@@ -321,7 +405,7 @@ do_interrupt(CPUState *env, int vector)
 
 	// Send a message on the event channel. Add the vector to the shared mem
 	// page.
-	intr = &(shared_page->sp_global.pic_intr[0]);
+	intr = (unsigned long *) &(shared_page->sp_global.pic_intr[0]);
 	atomic_set_bit(vector, intr);
         if (loglevel & CPU_LOG_INT)
                 fprintf(logfile, "injecting vector: %x\n", vector);
