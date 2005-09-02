@@ -9,6 +9,8 @@
        	.text
 
 ENTRY(start)
+ENTRY(stext)
+ENTRY(_stext)
         jmp __start
 
         .align	4
@@ -260,6 +262,3 @@ ENTRY(idle_pg_table_l2) # Initial page directory is 4kB
         .org 0x2000 + STACK_SIZE + PAGE_SIZE
 
 #endif /* CONFIG_X86_PAE */
-
-ENTRY(stext)
-ENTRY(_stext)

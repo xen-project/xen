@@ -14,13 +14,13 @@
 #include <acm/acm_hooks.h>
 
 static int
-null_init_domain_ssid(void **chwall_ssid, ssidref_t ssidref)
+null_init_domain_ssid(void **ssid, ssidref_t ssidref)
 {
 	return ACM_OK;
 }
 
 static void
-null_free_domain_ssid(void *chwall_ssid)
+null_free_domain_ssid(void *ssid)
 {
 	return;
 }
@@ -44,6 +44,14 @@ null_dump_stats(u8 *buf, u16 buf_size)
 	return 0;
 }
 
+static int
+null_dump_ssid_types(ssidref_t ssidref, u8 *buffer, u16 buf_size)
+{
+    /* no types */
+    return 0;
+}
+
+
 /* now define the hook structure similarly to LSM */
 struct acm_operations acm_null_ops = {
 	.init_domain_ssid		= null_init_domain_ssid,
@@ -51,6 +59,7 @@ struct acm_operations acm_null_ops = {
 	.dump_binary_policy           	= null_dump_binary_policy,
 	.set_binary_policy		= null_set_binary_policy,
 	.dump_statistics	        = null_dump_stats,
+    .dump_ssid_types        = null_dump_ssid_types,
 	/* domain management control hooks */
 	.pre_domain_create     		= NULL,
 	.post_domain_create		= NULL,

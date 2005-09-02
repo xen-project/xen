@@ -1028,6 +1028,7 @@ class XendDomainInfo:
 
         """
         try:
+            self.clear_shutdown()
             self.state = STATE_VM_OK
             self.shutdown_pending = None
             self.restart_check()

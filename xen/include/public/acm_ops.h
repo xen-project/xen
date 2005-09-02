@@ -1,3 +1,4 @@
+
 /******************************************************************************
  * acm_ops.h
  *
@@ -27,7 +28,7 @@
  * This makes sure that old versions of acm tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define ACM_INTERFACE_VERSION   0xAAAA0003
+#define ACM_INTERFACE_VERSION   0xAAAA0004
 
 /************************************************************************/
 
@@ -46,12 +47,25 @@ typedef struct acm_getpolicy {
     u16 pullcache_size;
 } acm_getpolicy_t;
 
+
 #define ACM_DUMPSTATS        	6
 typedef struct acm_dumpstats {
     void *pullcache;
     u16 pullcache_size;
 } acm_dumpstats_t;
 
+
+#define ACM_GETSSID          	7
+enum get_type {UNSET, SSIDREF, DOMAINID};
+typedef struct acm_getssid {
+	enum get_type get_ssid_by;
+	union {
+		domaintype_t domainid;
+		ssidref_t    ssidref;
+	} id;
+    void *ssidbuf;
+    u16 ssidbuf_size;
+} acm_getssid_t;
 
 typedef struct acm_op {
     u32 cmd;
@@ -60,6 +74,7 @@ typedef struct acm_op {
         acm_setpolicy_t setpolicy;
         acm_getpolicy_t getpolicy;
         acm_dumpstats_t dumpstats;
+        acm_getssid_t getssid;
     } u;
 } acm_op_t;
 

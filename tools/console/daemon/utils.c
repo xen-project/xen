@@ -234,7 +234,7 @@ bool xen_setup(void)
 	}
 
 	if (!xs_watch(xs, "/console", "console")) {
-		dolog(LOG_ERR, "xenstore watch on /console failes.");
+		dolog(LOG_ERR, "xenstore watch on /console fails.");
 		goto out_close_data;
 	}
 

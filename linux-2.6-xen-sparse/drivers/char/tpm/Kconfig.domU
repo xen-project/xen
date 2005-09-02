@@ -19,7 +19,7 @@ config TCG_TPM
 
 config TCG_XEN
 	tristate "XEN TPM Interface"
-	depends on TCG_TPM && ARCH_XEN
+	depends on TCG_TPM && ARCH_XEN && XEN_TPMDEV_FRONTEND
 	---help---
 	  If you want to make TPM support available to a Xen
 	  user domain, say Yes and it will

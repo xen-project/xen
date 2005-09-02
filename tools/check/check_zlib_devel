@@ -2,7 +2,8 @@
 # CHECK-BUILD
 
 function error {
-    echo 'Check for zlib includes failed.'
+    echo
+    echo "  *** Check for zlib headers FAILED"
     exit 1
 }
 

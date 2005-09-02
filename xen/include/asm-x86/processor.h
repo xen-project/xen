@@ -496,9 +496,7 @@ extern inline void prefetchw(const void *x)
 
 #endif
 
-void show_guest_stack();
-void show_trace(unsigned long *esp);
-void show_stack(unsigned long *esp);
+void show_stack(struct cpu_user_regs *regs);
 void show_registers(struct cpu_user_regs *regs);
 void show_page_walk(unsigned long addr);
 asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs);

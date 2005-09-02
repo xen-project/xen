@@ -2,8 +2,9 @@
 # CHECK-INSTALL
 
 function error {
-   echo 'Check for the bridge control utils (brctl) failed.'
+   echo
+   echo '  *** Check for the bridge control utils (brctl) FAILED'
    exit 1
 }
 
-brctl show || error
+which brctl 1>/dev/null 2>&1 || error

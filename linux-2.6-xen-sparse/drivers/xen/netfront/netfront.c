@@ -55,9 +55,18 @@
 #include <asm/page.h>
 #include <asm/uaccess.h>
 
-#if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
+#ifdef CONFIG_XEN_NETDEV_GRANT
 #include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/gnttab.h>
+
+static grant_ref_t gref_tx_head;
+static grant_ref_t grant_tx_ref[NETIF_TX_RING_SIZE + 1]; 
+
+static grant_ref_t gref_rx_head;
+static grant_ref_t grant_rx_ref[NETIF_RX_RING_SIZE + 1];
+
+#define GRANT_INVALID_REF	(0xFFFF)
+
 #ifdef GRANT_DEBUG
 static void
 dump_packet(int tag, void *addr, u32 ap)
@@ -71,8 +80,17 @@ dump_packet(int tag, void *addr, u32 ap)
     }
     printk("\n");
 }
+
+#define GDPRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
+                           __FILE__ , __LINE__ , ## _a )
+#else 
+#define dump_packet(x,y,z)  ((void)0)  
+#define GDPRINTK(_f, _a...) ((void)0)
 #endif
+
 #endif
+
+
 
 #ifndef __GFP_NOWARN
 #define __GFP_NOWARN 0
@@ -102,22 +120,10 @@ dump_packet(int tag, void *addr, u32 ap)
 #define TX_TEST_IDX req_cons  /* conservative: not seen all our requests? */
 #endif
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
-static grant_ref_t gref_tx_head;
-static grant_ref_t grant_tx_ref[NETIF_TX_RING_SIZE + 1];
-#endif
-
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
-static grant_ref_t gref_rx_head;
-static grant_ref_t grant_rx_ref[NETIF_RX_RING_SIZE + 1];
-#endif
-
-#if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
-#define GRANT_INVALID_REF	(0xFFFF)
-#endif
 
 #define NETIF_STATE_DISCONNECTED 0
 #define NETIF_STATE_CONNECTED    1
+
 
 static unsigned int netif_state = NETIF_STATE_DISCONNECTED;
 
@@ -279,7 +285,7 @@ static void network_tx_buf_gc(struct net_device *dev)
         for (i = np->tx_resp_cons; i != prod; i++) {
             id  = np->tx->ring[MASK_NETIF_TX_IDX(i)].resp.id;
             skb = np->tx_skbs[id];
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
             if (unlikely(gnttab_query_foreign_access(grant_tx_ref[id]) != 0)) {
                 /* other domain is still using this grant - shouldn't happen
                    but if it does, we'll try to reclaim the grant later */
@@ -310,7 +316,7 @@ static void network_tx_buf_gc(struct net_device *dev)
         mb();
     } while (prod != np->tx->resp_prod);
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
   out: 
 #endif
 
@@ -330,8 +336,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     int i, batch_target;
     NETIF_RING_IDX req_prod = np->rx->req_prod;
     struct xen_memory_reservation reservation;
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    int ref;
+#ifdef CONFIG_XEN_NETDEV_GRANT
+    grant_ref_t ref;
 #endif
 
     if (unlikely(np->backend_state != BEST_CONNECTED))
@@ -365,9 +371,9 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         np->rx_skbs[id] = skb;
         
         np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.id = id;
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
 	ref = gnttab_claim_grant_reference(&gref_rx_head);
-        if (unlikely(ref < 0)) {
+        if (unlikely((signed short)ref < 0)) {
             printk(KERN_ALERT "#### netfront can't claim rx reference\n");
             BUG();
         }
@@ -426,8 +432,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     struct net_private *np = netdev_priv(dev);
     netif_tx_request_t *tx;
     NETIF_RING_IDX i;
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    unsigned int ref;
+#ifdef CONFIG_XEN_NETDEV_GRANT
+    grant_ref_t ref;
     unsigned long mfn;
 #endif
 
@@ -464,9 +470,9 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     tx = &np->tx->ring[MASK_NETIF_TX_IDX(i)].req;
 
     tx->id   = id;
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     ref = gnttab_claim_grant_reference(&gref_tx_head);
-    if (unlikely(ref < 0)) {
+    if (unlikely((signed short)ref < 0)) {
         printk(KERN_ALERT "#### netfront can't claim tx grant reference\n");
         BUG();
     }
@@ -519,7 +525,7 @@ static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     network_tx_buf_gc(dev);
     spin_unlock_irqrestore(&np->tx_lock, flags);
 
-    if ((np->rx_resp_cons != np->rx->resp_prod) && (np->user_state == UST_OPEN))
+    if((np->rx_resp_cons != np->rx->resp_prod) && (np->user_state == UST_OPEN))
         netif_rx_schedule(dev);
 
     return IRQ_HANDLED;
@@ -537,7 +543,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
     int work_done, budget, more_to_do = 1;
     struct sk_buff_head rxq;
     unsigned long flags;
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     unsigned long mfn;
     grant_ref_t ref;
 #endif
@@ -574,8 +580,19 @@ static int netif_poll(struct net_device *dev, int *pbudget)
             continue;
         }
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
-        ref = grant_rx_ref[rx->id];
+#ifdef CONFIG_XEN_NETDEV_GRANT
+        ref = grant_rx_ref[rx->id]; 
+
+        if(ref == GRANT_INVALID_REF) { 
+            printk(KERN_WARNING "Bad rx grant reference %d from dom %d.\n",
+                   ref, np->backend_id);
+            np->rx->ring[MASK_NETIF_RX_IDX(np->rx->req_prod)].req.id = rx->id;
+            wmb();
+            np->rx->req_prod++;
+            work_done--;
+            continue;
+        }
+
         grant_rx_ref[rx->id] = GRANT_INVALID_REF;
         mfn = gnttab_end_foreign_transfer_ref(ref);
         gnttab_release_grant_reference(&gref_rx_head, ref);
@@ -585,7 +602,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
 
         /* NB. We handle skb overflow later. */
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
         skb->data = skb->head + rx->addr;
 #else
         skb->data = skb->head + (rx->addr & ~PAGE_MASK);
@@ -600,14 +617,14 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         np->stats.rx_bytes += rx->status;
 
         /* Remap the page. */
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
         mmu->ptr = mfn << PAGE_SHIFT | MMU_MACHPHYS_UPDATE;
 #else
         mmu->ptr  = (rx->addr & PAGE_MASK) | MMU_MACHPHYS_UPDATE;
 #endif
         mmu->val  = __pa(skb->head) >> PAGE_SHIFT;
         mmu++;
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
 	MULTI_update_va_mapping(mcl, (unsigned long)skb->head,
 				pfn_pte_ma(mfn, PAGE_KERNEL), 0);
 #else
@@ -617,19 +634,19 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 #endif
         mcl++;
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
         phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = mfn;
+        GDPRINTK("#### rx_poll     enqueue vdata=%p mfn=%lu ref=%x\n",
+                skb->data, mfn, ref);
 #else
         phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = 
             rx->addr >> PAGE_SHIFT;
-#endif
+#endif 
 
-#ifdef GRANT_DEBUG
-        printk(KERN_ALERT "#### rx_poll     enqueue vdata=%p mfn=%lu ref=%x\n",
-               skb->data, mfn, ref);
-#endif
+
         __skb_queue_tail(&rxq, skb);
     }
+
 
     /* Some pages are no longer absent... */
     balloon_update_driver_allowance(-work_done);
@@ -646,9 +663,9 @@ static int netif_poll(struct net_device *dev, int *pbudget)
     }
 
     while ((skb = __skb_dequeue(&rxq)) != NULL) {
-#ifdef GRANT_DEBUG
-        printk(KERN_ALERT "#### rx_poll     dequeue vdata=%p mfn=%lu\n",
-               skb->data, virt_to_mfn(skb->data));
+#ifdef CONFIG_XEN_NETDEV_GRANT
+        GDPRINTK("#### rx_poll     dequeue vdata=%p mfn=%lu\n",
+                skb->data, virt_to_mfn(skb->data));
         dump_packet('d', skb->data, (unsigned long)skb->data);
 #endif
         /*
@@ -747,7 +764,6 @@ static struct net_device_stats *network_get_stats(struct net_device *dev)
     return &np->stats;
 }
 
-
 static void network_connect(struct net_device *dev)
 {
     struct net_private *np;
@@ -787,8 +803,11 @@ static void network_connect(struct net_device *dev)
             tx = &np->tx->ring[requeue_idx++].req;
 
             tx->id   = i;
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
-            tx->addr = 0; /*(ref << PAGE_SHIFT) |*/
+#ifdef CONFIG_XEN_NETDEV_GRANT
+            gnttab_grant_foreign_access_ref(grant_tx_ref[i], np->backend_id, 
+                                            virt_to_mfn(np->tx_skbs[i]->data),
+                                            GNTMAP_readonly); 
+            tx->addr = grant_tx_ref[i] << PAGE_SHIFT; 
 #else
             tx->addr = virt_to_mfn(skb->data) << PAGE_SHIFT;
 #endif
@@ -803,9 +822,20 @@ static void network_connect(struct net_device *dev)
     np->tx->req_prod = requeue_idx;
 
     /* Rebuild the RX buffer freelist and the RX ring itself. */
-    for (requeue_idx = 0, i = 1; i <= NETIF_RX_RING_SIZE; i++)
-        if ((unsigned long)np->rx_skbs[i] >= __PAGE_OFFSET)
-            np->rx->ring[requeue_idx++].req.id = i;
+    for (requeue_idx = 0, i = 1; i <= NETIF_RX_RING_SIZE; i++) { 
+        if ((unsigned long)np->rx_skbs[i] >= __PAGE_OFFSET) {
+#ifdef CONFIG_XEN_NETDEV_GRANT 
+            /* Reinstate the grant ref so backend can 'donate' mfn to us. */
+            gnttab_grant_foreign_transfer_ref(grant_rx_ref[i], np->backend_id,
+                                              virt_to_mfn(np->rx_skbs[i]->head)
+                );
+            np->rx->ring[requeue_idx].req.gref = grant_rx_ref[i];
+#endif
+            np->rx->ring[requeue_idx].req.id   = i;
+            requeue_idx++; 
+        }
+    }
+
     wmb();                
     np->rx->req_prod = requeue_idx;
 
@@ -901,13 +931,14 @@ static int create_netdev(int handle, struct xenbus_device *dev,
     /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
     for (i = 0; i <= NETIF_TX_RING_SIZE; i++) {
         np->tx_skbs[i] = (void *)((unsigned long) i+1);
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
         grant_tx_ref[i] = GRANT_INVALID_REF;
 #endif
     }
+
     for (i = 0; i <= NETIF_RX_RING_SIZE; i++) {
         np->rx_skbs[i] = (void *)((unsigned long) i+1);
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
         grant_rx_ref[i] = GRANT_INVALID_REF;
 #endif
     }
@@ -991,10 +1022,8 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	evtchn_op_t op = { .cmd = EVTCHNOP_alloc_unbound };
 	int err;
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
 	info->tx_ring_ref = GRANT_INVALID_REF;
-#endif
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
 	info->rx_ring_ref = GRANT_INVALID_REF;
 #endif
 
@@ -1014,7 +1043,7 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	memset(info->rx, 0, PAGE_SIZE);
 	info->backend_state = BEST_DISCONNECTED;
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
 	err = gnttab_grant_foreign_access(info->backend_id,
 					  virt_to_mfn(info->tx), 0);
 	if (err < 0) {
@@ -1022,11 +1051,7 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 		goto out;
 	}
 	info->tx_ring_ref = err;
-#else
-	info->tx_ring_ref = virt_to_mfn(info->tx);
-#endif
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
 	err = gnttab_grant_foreign_access(info->backend_id,
 					  virt_to_mfn(info->rx), 0);
 	if (err < 0) {
@@ -1034,7 +1059,9 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 		goto out;
 	}
 	info->rx_ring_ref = err;
+
 #else
+	info->tx_ring_ref = virt_to_mfn(info->tx);
 	info->rx_ring_ref = virt_to_mfn(info->rx);
 #endif
 
@@ -1054,16 +1081,17 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	if (info->rx)
 		free_page((unsigned long)info->rx);
 	info->rx = 0;
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+
+#ifdef CONFIG_XEN_NETDEV_GRANT
 	if (info->tx_ring_ref != GRANT_INVALID_REF)
 		gnttab_end_foreign_access(info->tx_ring_ref, 0);
 	info->tx_ring_ref = GRANT_INVALID_REF;
-#endif
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+
 	if (info->rx_ring_ref != GRANT_INVALID_REF)
 		gnttab_end_foreign_access(info->rx_ring_ref, 0);
 	info->rx_ring_ref = GRANT_INVALID_REF;
 #endif
+
 	return err;
 }
 
@@ -1075,16 +1103,17 @@ static void netif_free(struct netfront_info *info)
 	if (info->rx)
 		free_page((unsigned long)info->rx);
 	info->rx = 0;
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+
+#ifdef CONFIG_XEN_NETDEV_GRANT
 	if (info->tx_ring_ref != GRANT_INVALID_REF)
 		gnttab_end_foreign_access(info->tx_ring_ref, 0);
 	info->tx_ring_ref = GRANT_INVALID_REF;
-#endif
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+
 	if (info->rx_ring_ref != GRANT_INVALID_REF)
 		gnttab_end_foreign_access(info->rx_ring_ref, 0);
 	info->rx_ring_ref = GRANT_INVALID_REF;
 #endif
+
 	unbind_evtchn_from_irqhandler(info->evtchn, info->netdev);
 	info->evtchn = 0;
 }
@@ -1294,6 +1323,7 @@ static int netfront_resume(struct xenbus_device *dev)
 	int err;
 
 	err = talk_to_backend(dev, np);
+
 	return err;
 }
 
@@ -1342,29 +1372,28 @@ static int __init netif_init(void)
     if (xen_start_info.flags & SIF_INITDOMAIN)
         return 0;
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    /* A grant for every ring slot */
+    if ((err = xennet_proc_init()) != 0)
+        return err;
+
+    IPRINTK("Initialising virtual ethernet driver.\n");
+
+#ifdef CONFIG_XEN_NETDEV_GRANT
+    IPRINTK("Using grant tables.\n"); 
+
+    /* A grant for every tx ring slot */
     if (gnttab_alloc_grant_references(NETIF_TX_RING_SIZE,
                                       &gref_tx_head) < 0) {
         printk(KERN_ALERT "#### netfront can't alloc tx grant refs\n");
         return 1;
     }
-    printk(KERN_ALERT "Netdev frontend (TX) is using grant tables.\n"); 
-#endif
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    /* A grant for every ring slot */
+    /* A grant for every rx ring slot */
     if (gnttab_alloc_grant_references(NETIF_RX_RING_SIZE,
                                       &gref_rx_head) < 0) {
         printk(KERN_ALERT "#### netfront can't alloc rx grant refs\n");
         return 1;
     }
-    printk(KERN_ALERT "Netdev frontend (RX) is using grant tables.\n"); 
 #endif
 
-    if ((err = xennet_proc_init()) != 0)
-        return err;
-
-    IPRINTK("Initialising virtual ethernet driver.\n");
 
     (void)register_inetaddr_notifier(&notifier_inetdev);
 
@@ -1377,10 +1406,8 @@ static int __init netif_init(void)
 
 static void netif_exit(void)
 {
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     gnttab_free_grant_references(gref_tx_head);
-#endif
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
     gnttab_free_grant_references(gref_rx_head);
 #endif
 }

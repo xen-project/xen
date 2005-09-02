@@ -18,11 +18,12 @@ def check_logging():
         import logging
     except ImportError:
         hline()
-        msg("Python logging is not installed.")
-        msg("Use 'make install-logging' at the xen root to install.")
         msg("")
-        msg("Alternatively download and install from")
-        msg("http://www.red-dove.com/python_logging.html")
+        msg("  *** Python logging is not installed.")
+        msg("  *** Use 'make install-logging' at the xen root to install.")
+        msg("  *** ")
+        msg("  *** Alternatively download and install from")
+        msg("  *** http://www.red-dove.com/python_logging.html")
         hline()
         sys.exit(1)
 

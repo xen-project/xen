@@ -20,9 +20,12 @@
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 
-#if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
+#ifdef CONFIG_XEN_NETDEV_GRANT
 #include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/gnttab.h>
+
+#define GRANT_INVALID_REF (0xFFFF)
+
 #endif
 
 
@@ -37,6 +40,11 @@
 #define ASSERT(_p) ((void)0)
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
+#define IPRINTK(fmt, args...) \
+    printk(KERN_INFO "xen_net: " fmt, ##args)
+#define WPRINTK(fmt, args...) \
+    printk(KERN_WARNING "xen_net: " fmt, ##args)
+
 
 typedef struct netif_st {
     /* Unique identifier for this interface. */
@@ -47,13 +55,13 @@ typedef struct netif_st {
 
     /* Physical parameters of the comms window. */
     unsigned long    tx_shmem_frame;
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     u16              tx_shmem_handle;
     unsigned long    tx_shmem_vaddr; 
     grant_ref_t      tx_shmem_ref; 
 #endif
     unsigned long    rx_shmem_frame;
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     u16              rx_shmem_handle;
     unsigned long    rx_shmem_vaddr; 
     grant_ref_t      rx_shmem_ref; 
@@ -68,7 +76,7 @@ typedef struct netif_st {
     /* Private indexes into shared ring. */
     NETIF_RING_IDX rx_req_cons;
     NETIF_RING_IDX rx_resp_prod; /* private version of shared variable */
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     NETIF_RING_IDX rx_resp_prod_copy; /* private version of shared variable */
 #endif
     NETIF_RING_IDX tx_req_cons;

@@ -27,6 +27,7 @@
 #ifndef _XEN_SHADOW_64_H
 #define _XEN_SHADOW_64_H
 #include <asm/shadow.h>
+#include <asm/shadow_ops.h>
 
 #define READ_FAULT  0
 #define WRITE_FAULT 1
@@ -42,14 +43,14 @@
 #define ESH_LOG(_f, _a...) ((void)0)
 #endif
 
-#define L4      4UL
-#define L3      3UL
-#define L2      2UL
-#define L1      1UL
+#define PAGING_L4      4UL
+#define PAGING_L3      3UL
+#define PAGING_L2      2UL
+#define PAGING_L1      1UL
 #define L_MASK  0xff
 
-#define ROOT_LEVEL_64   L4
-#define ROOT_LEVEL_32   L2
+#define ROOT_LEVEL_64   PAGING_L4
+#define ROOT_LEVEL_32   PAGING_L2
 
 #define SHADOW_ENTRY    (2UL << 16)
 #define GUEST_ENTRY     (1UL << 16)
@@ -58,6 +59,10 @@
 #define SET_ENTRY   (1UL << 8)
 
 #define PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
+
+/* For 32-bit VMX guest to allocate shadow L1 & L2*/
+#define SL1_ORDER   1
+#define SL2_ORDER   2
 
 typedef struct { intpte_t lo; } pgentry_64_t;
 #define shadow_level_to_type(l)    (l << 29)
@@ -76,6 +81,10 @@ typedef struct { intpte_t lo; } pgentry_64_t;
 #define entry_remove_flags(x, flags) ((x).lo &= ~put_pte_flags(flags))
 #define entry_has_changed(x,y,flags) \
         ( !!(((x).lo ^ (y).lo) & ((PADDR_MASK&PAGE_MASK)|put_pte_flags(flags))) )
+
+#define PAE_SHADOW_SELF_ENTRY   259
+#define PDP_ENTRIES   4
+
 static inline int  table_offset_64(unsigned long va, int level)
 {
     switch(level) {
@@ -86,8 +95,13 @@ static inline int  table_offset_64(unsigned long va, int level)
         case 3:
             return  (((va) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1));
 #if CONFIG_PAGING_LEVELS >= 4
+#ifndef GUEST_PGENTRY_32
         case 4:
             return  (((va) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1));
+#else
+        case 4:
+            return PAE_SHADOW_SELF_ENTRY; 
+#endif
 #endif
         default:
             //printk("<table_offset_64> level %d is too big\n", level);
@@ -165,30 +179,30 @@ static inline pgentry_64_t *__rw_entry(
     return le_e;
 }
 #define __shadow_set_l4e(v, va, value) \
-  __rw_entry(v, va, value, SHADOW_ENTRY | SET_ENTRY | L4)
+  __rw_entry(v, va, value, SHADOW_ENTRY | SET_ENTRY | PAGING_L4)
 #define __shadow_get_l4e(v, va, sl4e) \
-  __rw_entry(v, va, sl4e, SHADOW_ENTRY | GET_ENTRY | L4)
+  __rw_entry(v, va, sl4e, SHADOW_ENTRY | GET_ENTRY | PAGING_L4)
 #define __shadow_set_l3e(v, va, value) \
-  __rw_entry(v, va, value, SHADOW_ENTRY | SET_ENTRY | L3)
+  __rw_entry(v, va, value, SHADOW_ENTRY | SET_ENTRY | PAGING_L3)
 #define __shadow_get_l3e(v, va, sl3e) \
-  __rw_entry(v, va, sl3e, SHADOW_ENTRY | GET_ENTRY | L3)
+  __rw_entry(v, va, sl3e, SHADOW_ENTRY | GET_ENTRY | PAGING_L3)
 #define __shadow_set_l2e(v, va, value) \
-  __rw_entry(v, va, value, SHADOW_ENTRY | SET_ENTRY | L2)
+  __rw_entry(v, va, value, SHADOW_ENTRY | SET_ENTRY | PAGING_L2)
 #define __shadow_get_l2e(v, va, sl2e) \
-  __rw_entry(v, va, sl2e, SHADOW_ENTRY | GET_ENTRY | L2)
+  __rw_entry(v, va, sl2e, SHADOW_ENTRY | GET_ENTRY | PAGING_L2)
 #define __shadow_set_l1e(v, va, value) \
-  __rw_entry(v, va, value, SHADOW_ENTRY | SET_ENTRY | L1)
+  __rw_entry(v, va, value, SHADOW_ENTRY | SET_ENTRY | PAGING_L1)
 #define __shadow_get_l1e(v, va, sl1e) \
-  __rw_entry(v, va, sl1e, SHADOW_ENTRY | GET_ENTRY | L1)
+  __rw_entry(v, va, sl1e, SHADOW_ENTRY | GET_ENTRY | PAGING_L1)
 
 #define __guest_set_l4e(v, va, value) \
-  __rw_entry(v, va, value, GUEST_ENTRY | SET_ENTRY | L4)
+  __rw_entry(v, va, value, GUEST_ENTRY | SET_ENTRY | PAGING_L4)
 #define __guest_get_l4e(v, va, gl4e) \
-  __rw_entry(v, va, gl4e, GUEST_ENTRY | GET_ENTRY | L4)
+  __rw_entry(v, va, gl4e, GUEST_ENTRY | GET_ENTRY | PAGING_L4)
 #define __guest_set_l3e(v, va, value) \
-  __rw_entry(v, va, value, GUEST_ENTRY | SET_ENTRY | L3)
+  __rw_entry(v, va, value, GUEST_ENTRY | SET_ENTRY | PAGING_L3)
 #define __guest_get_l3e(v, va, sl3e) \
-  __rw_entry(v, va, gl3e, GUEST_ENTRY | GET_ENTRY | L3)
+  __rw_entry(v, va, gl3e, GUEST_ENTRY | GET_ENTRY | PAGING_L3)
 
 static inline void *  __guest_set_l2e(
     struct vcpu *v, u64 va, void *value, int size)
@@ -205,7 +219,7 @@ static inline void *  __guest_set_l2e(
                 return &l2va[l2_table_offset_32(va)];
             }
         case 8:
-            return __rw_entry(v, va, value, GUEST_ENTRY | SET_ENTRY | L2);
+            return __rw_entry(v, va, value, GUEST_ENTRY | SET_ENTRY | PAGING_L2);
         default:
             BUG();
             return NULL;
@@ -230,7 +244,7 @@ static inline void * __guest_get_l2e(
                 return &l2va[l2_table_offset_32(va)];
             }
         case 8:
-            return __rw_entry(v, va, gl2e, GUEST_ENTRY | GET_ENTRY | L2);
+            return __rw_entry(v, va, gl2e, GUEST_ENTRY | GET_ENTRY | PAGING_L2);
         default:
             BUG();
             return NULL;
@@ -269,7 +283,7 @@ static inline void *  __guest_set_l1e(
             }
 
         case 8:
-            return __rw_entry(v, va, value, GUEST_ENTRY | SET_ENTRY | L1);
+            return __rw_entry(v, va, value, GUEST_ENTRY | SET_ENTRY | PAGING_L1);
         default:
             BUG();
             return NULL;
@@ -310,7 +324,7 @@ static inline void *  __guest_get_l1e(
             }
         case 8:
             // 64-bit guest
-            return __rw_entry(v, va, gl1e, GUEST_ENTRY | GET_ENTRY | L1);
+            return __rw_entry(v, va, gl1e, GUEST_ENTRY | GET_ENTRY | PAGING_L1);
         default:
             BUG();
             return NULL;
@@ -334,7 +348,7 @@ static inline void entry_general(
     sle = entry_empty();
     if ( (entry_get_flags(gle) & _PAGE_PRESENT) && (smfn != 0) )
     {
-        if ((entry_get_flags(gle) & _PAGE_PSE) && level == L2) {
+        if ((entry_get_flags(gle) & _PAGE_PSE) && level == PAGING_L2) {
             sle = entry_from_pfn(smfn, entry_get_flags(gle));
             entry_remove_flags(sle, _PAGE_PSE);
 
@@ -376,7 +390,7 @@ static inline void entry_propagate_from_guest(
     unsigned long smfn = 0;
 
     if ( entry_get_flags(gle) & _PAGE_PRESENT ) {
-        if ((entry_get_flags(gle) & _PAGE_PSE) && level == L2) {
+        if ((entry_get_flags(gle) & _PAGE_PSE) && level == PAGING_L2) {
             smfn =  __shadow_status(d, entry_get_value(gle) >> PAGE_SHIFT, PGT_fl1_shadow);
         } else {
             smfn =  __shadow_status(d, entry_get_pfn(gle), 
@@ -421,88 +435,6 @@ validate_entry_change(
     return 1;
 }
 
-/*
- * Check P, R/W, U/S bits in the guest page table.
- * If the fault belongs to guest return 1,
- * else return 0.
- */
-static inline int guest_page_fault(struct vcpu *v,
-  unsigned long va, unsigned int error_code, pgentry_64_t *gpl2e, pgentry_64_t *gpl1e)
-{
-    struct domain *d = v->domain;
-    pgentry_64_t gle, *lva;
-    unsigned long mfn;
-    int i;
-
-    __rw_entry(v, va, &gle, GUEST_ENTRY | GET_ENTRY | L4);
-    if (unlikely(!(entry_get_flags(gle) & _PAGE_PRESENT)))
-        return 1;
-
-    if (error_code & ERROR_W) {
-        if (unlikely(!(entry_get_flags(gle) & _PAGE_RW)))
-            return 1;
-    }
-    if (error_code & ERROR_U) {
-        if (unlikely(!(entry_get_flags(gle) & _PAGE_USER)))
-            return 1;
-    }
-    for (i = L3; i >= L1; i--) {
-	/*
-	 * If it's not external mode, then mfn should be machine physical.
-	 */
-	mfn = __gpfn_to_mfn(d, (entry_get_paddr(gle) >> PAGE_SHIFT));
-        if (mfn == -1)
-            return 1;
-
-        lva = (pgentry_64_t *) phys_to_virt(
-	    mfn << PAGE_SHIFT);
-        gle = lva[table_offset_64(va, i)];
-
-        if (unlikely(!(entry_get_flags(gle) & _PAGE_PRESENT)))
-            return 1;
-
-        if (error_code & ERROR_W) {
-            if (unlikely(!(entry_get_flags(gle) & _PAGE_RW)))
-                return 1;
-        }
-        if (error_code & ERROR_U) {
-            if (unlikely(!(entry_get_flags(gle) & _PAGE_USER)))
-                return 1;
-        }
-
-        if (i == L2) {
-            if (gpl2e)
-                *gpl2e = gle;
-
-            if (likely(entry_get_flags(gle) & _PAGE_PSE))
-                return 0;
-
-        }
-
-        if (i == L1)
-            if (gpl1e)
-                *gpl1e = gle;
-    }
-    return 0;
-}
-
-static inline unsigned long gva_to_gpa(unsigned long gva)
-{
-    struct vcpu *v = current;
-    pgentry_64_t gl1e = {0};
-    pgentry_64_t gl2e = {0};
-    unsigned long gpa;
-
-    if (guest_page_fault(v, gva, 0, &gl2e, &gl1e))
-        return 0;
-    if (entry_get_flags(gl2e) & _PAGE_PSE)
-        gpa = entry_get_paddr(gl2e) + (gva & ((1 << L2_PAGETABLE_SHIFT) - 1));
-    else
-        gpa = entry_get_paddr(gl1e) + (gva & ~PAGE_MASK);
-
-    return gpa;
-
-}
 #endif
 
 

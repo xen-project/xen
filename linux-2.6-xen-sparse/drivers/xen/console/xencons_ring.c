@@ -105,7 +105,7 @@ int xencons_ring_init(void)
 		xen_start_info.console_evtchn, handle_input,
 		0, "xencons", inring());
 	if (err) {
-		xprintk(KERN_ERR "XEN console request irq failed %i\n", err);
+		xprintk("XEN console request irq failed %i\n", err);
 		unbind_evtchn_from_irq(xen_start_info.console_evtchn);
 		return err;
 	}

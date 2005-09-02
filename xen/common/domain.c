@@ -178,6 +178,9 @@ void domain_shutdown(u8 reason)
     struct domain *d = current->domain;
     struct vcpu *v;
 
+    if(reason == SHUTDOWN_crash) 
+        printk("Domain %d crash detected.\n", d->domain_id); 
+
     if ( d->domain_id == 0 )
     {
         extern void machine_restart(char *);

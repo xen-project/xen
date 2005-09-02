@@ -53,6 +53,9 @@ static unsigned long shadow_l4_table(
     struct domain *d, unsigned long gpfn, unsigned long gmfn);
 static void shadow_map_into_current(struct vcpu *v,
     unsigned long va, unsigned int from, unsigned int to);
+static inline void validate_bl2e_change( struct domain *d,
+	guest_root_pgentry_t *new_gle_p, pgentry_64_t *shadow_l3, int index);
+
 #endif
 
 /********
@@ -217,10 +220,38 @@ alloc_shadow_page(struct domain *d,
         }
         else
         {
-            page = alloc_domheap_page(NULL);
-            void *l1 = map_domain_page(page_to_pfn(page));
-            memset(l1, 0, PAGE_SIZE);
-            unmap_domain_page(l1);
+            if (d->arch.ops->guest_paging_levels == PAGING_L2)
+            {
+#if CONFIG_PAGING_LEVELS >= 4
+                /* For 32-bit VMX guest, 2 shadow L1s to simulate 1 guest L1
+                 * So need allocate 2 continues shadow L1 each time.
+                 */
+                page = alloc_domheap_pages(NULL, SL1_ORDER, 0);
+                if (!page)
+                    domain_crash_synchronous();
+
+                void *l1_0 = map_domain_page(page_to_pfn(page));
+                memset(l1_0,0,PAGE_SIZE);
+                unmap_domain_page(l1_0);
+                void *l1_1 = map_domain_page(page_to_pfn(page+1));
+                memset(l1_1,0,PAGE_SIZE);
+                unmap_domain_page(l1_1);
+#else
+                page = alloc_domheap_page(NULL);
+                if (!page)
+                    domain_crash_synchronous();
+                void *l1 = map_domain_page(page_to_pfn(page));
+                memset(l1, 0, PAGE_SIZE);
+                unmap_domain_page(l1);
+#endif
+            }
+            else
+            {
+                page = alloc_domheap_page(NULL);
+                void *l1 = map_domain_page(page_to_pfn(page));
+                memset(l1, 0, PAGE_SIZE);
+                unmap_domain_page(l1);
+            }
         }
     }
     else {
@@ -331,7 +362,21 @@ alloc_shadow_page(struct domain *d,
   fail:
     FSH_LOG("promotion of pfn=%lx mfn=%lx failed!  external gnttab refs?",
             gpfn, gmfn);
-    free_domheap_page(page);
+    if (psh_type == PGT_l1_shadow)
+    {
+        if (d->arch.ops->guest_paging_levels == PAGING_L2)
+        {
+#if CONFIG_PAGING_LEVELS >=4
+            free_domheap_pages(page, SL1_ORDER);
+#else
+            free_domheap_page(page);
+#endif
+        }
+        else
+            free_domheap_page(page);
+    }
+    else
+        free_domheap_page(page);
     return 0;
 }
 
@@ -478,8 +523,10 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
 { 
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    l1_pgentry_t *gpl1e, *spl1e;
-    l2_pgentry_t gl2e, sl2e;
+    l1_pgentry_t *spl1e;
+    l2_pgentry_t sl2e;
+    guest_l1_pgentry_t *gpl1e;
+    guest_l2_pgentry_t gl2e;
     unsigned long gl1pfn, gl1mfn, sl1mfn;
     int i, init_table = 0;
 
@@ -523,28 +570,49 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
     ASSERT( !(l2e_get_flags(old_sl2e) & _PAGE_PRESENT) );
 #endif
 
-    if ( !get_shadow_ref(sl1mfn) )
-        BUG();
-    l2pde_general(d, &gl2e, &sl2e, sl1mfn);
-    __guest_set_l2e(v, va, &gl2e);
-    __shadow_set_l2e(v, va, &sl2e);
+#if CONFIG_PAGING_LEVELS >=4
+    if (d->arch.ops->guest_paging_levels == PAGING_L2)
+    {
+        /* for 32-bit VMX guest on 64-bit host, 
+         * need update two L2 entries each time
+         */
+        if ( !get_shadow_ref(sl1mfn))
+                BUG();
+        l2pde_general(d, &gl2e, &sl2e, sl1mfn);
+        __guest_set_l2e(v, va, &gl2e);
+        __shadow_set_l2e(v, va & ~((1<<L2_PAGETABLE_SHIFT_32) - 1), &sl2e);
+        if ( !get_shadow_ref(sl1mfn+1))
+            BUG();
+        sl2e = l2e_empty();
+        l2pde_general(d, &gl2e, &sl2e, sl1mfn+1);
+        __shadow_set_l2e(v,((va & ~((1<<L2_PAGETABLE_SHIFT_32) - 1)) + (1 << L2_PAGETABLE_SHIFT)) , &sl2e);
+    } else
+#endif
+    {
+        if ( !get_shadow_ref(sl1mfn) )
+            BUG();
+        l2pde_general(d, &gl2e, &sl2e, sl1mfn);
+        __guest_set_l2e(v, va, &gl2e);
+        __shadow_set_l2e(v, va , &sl2e);
+    }
 
     if ( init_table )
     {
         l1_pgentry_t sl1e;
-        int index = l1_table_offset(va);
+        int index = guest_l1_table_offset(va);
         int min = 1, max = 0;
         
         unsigned long entries, pt_va;
         l1_pgentry_t tmp_sl1e;
-        l1_pgentry_t tmp_gl1e;//Prepare for double compile
+        guest_l1_pgentry_t tmp_gl1e;//Prepare for double compile
 
 
-        entries = PAGE_SIZE / sizeof(l1_pgentry_t);
+        entries = PAGE_SIZE / sizeof(guest_l1_pgentry_t);
         pt_va = ((va >> L1_PAGETABLE_SHIFT) & ~(entries - 1)) << L1_PAGETABLE_SHIFT;
-        gpl1e = (l1_pgentry_t *) __guest_get_l1e(v, pt_va, &tmp_gl1e);
+        gpl1e = (guest_l1_pgentry_t *) __guest_get_l1e(v, pt_va, &tmp_gl1e);
 
-        entries = PAGE_SIZE / sizeof(l1_pgentry_t);
+        /* If the PGT_l1_shadow has two continual pages */
+        entries = PAGE_SIZE / sizeof(guest_l1_pgentry_t); //1024 entry!!!
         pt_va = ((va >> L1_PAGETABLE_SHIFT) & ~(entries - 1)) << L1_PAGETABLE_SHIFT;
         spl1e = (l1_pgentry_t *) __shadow_get_l1e(v, pt_va, &tmp_sl1e);
 
@@ -555,7 +623,7 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
         spl1e = &(shadow_linear_pg_table[l1_linear_offset(va) &
                                      ~(L1_PAGETABLE_ENTRIES-1)]);*/
 
-        for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+        for ( i = 0; i < GUEST_L1_PAGETABLE_ENTRIES; i++ )
         {
             l1pte_propagate_from_guest(d, gpl1e[i], &sl1e);
             if ( (l1e_get_flags(sl1e) & _PAGE_PRESENT) &&
@@ -584,7 +652,7 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
     }
 }
 
-static void 
+static void
 shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
 {
     struct vcpu *v = current;
@@ -616,7 +684,7 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
                 perfc_incrc(shadow_set_l1e_unlinked);
                 if ( !get_shadow_ref(sl1mfn) )
                     BUG();
-                l2pde_general(d, &gpde, &sl2e, sl1mfn);
+                l2pde_general(d, (guest_l2_pgentry_t *)&gpde, &sl2e, sl1mfn);
                 __guest_set_l2e(v, va, &gpde);
                 __shadow_set_l2e(v, va, &sl2e);
             }
@@ -651,6 +719,7 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
     shadow_update_min_max(l2e_get_pfn(sl2e), l1_table_offset(va));
 }
 
+#if CONFIG_PAGING_LEVELS <= 3
 static void shadow_invlpg_32(struct vcpu *v, unsigned long va)
 {
     struct domain *d = v->domain;
@@ -679,6 +748,7 @@ static void shadow_invlpg_32(struct vcpu *v, unsigned long va)
 
     shadow_unlock(d);
 }
+#endif
 
 static struct out_of_sync_entry *
 shadow_alloc_oos_entry(struct domain *d)
@@ -759,8 +829,8 @@ shadow_make_snapshot(
     length = max - min + 1;
     perfc_incr_histo(snapshot_copies, length, PT_UPDATES);
 
-    min *= sizeof(l1_pgentry_t);
-    length *= sizeof(l1_pgentry_t);
+    min *= sizeof(guest_l1_pgentry_t);
+    length *= sizeof(guest_l1_pgentry_t);
 
     original = map_domain_page(gmfn);
     snapshot = map_domain_page(smfn);
@@ -841,7 +911,7 @@ static void shadow_mark_va_out_of_sync(
 
         __shadow_get_l4e(v, va, &sl4e);
         if ( !(l4e_get_flags(sl4e) & _PAGE_PRESENT)) {
-            shadow_map_into_current(v, va, L3, L4);
+            shadow_map_into_current(v, va, PAGING_L3, PAGING_L4);
         }
 
         if (!__shadow_get_l3e(v, va, &sl3e)) {
@@ -849,7 +919,7 @@ static void shadow_mark_va_out_of_sync(
         }
 
         if ( !(l3e_get_flags(sl3e) & _PAGE_PRESENT)) {
-            shadow_map_into_current(v, va, L2, L3);
+            shadow_map_into_current(v, va, PAGING_L2, PAGING_L3);
         }
     }
 #endif
@@ -887,11 +957,11 @@ static void shadow_mark_va_out_of_sync(
  * Returns 0 otherwise.
  */
 static int snapshot_entry_matches(
-    struct domain *d, l1_pgentry_t *guest_pt,
+    struct domain *d, guest_l1_pgentry_t *guest_pt,
     unsigned long gpfn, unsigned index)
 {
     unsigned long smfn = __shadow_status(d, gpfn, PGT_snapshot);
-    l1_pgentry_t *snapshot, gpte; // could be L1s or L2s or ...
+    guest_l1_pgentry_t *snapshot, gpte; // could be L1s or L2s or ...
     int entries_match;
 
     perfc_incrc(snapshot_entry_matches_calls);
@@ -908,7 +978,7 @@ static int snapshot_entry_matches(
     // This could probably be smarter, but this is sufficent for
     // our current needs.
     //
-    entries_match = !l1e_has_changed(gpte, snapshot[index],
+    entries_match = !guest_l1e_has_changed(gpte, snapshot[index],
                                      PAGE_FLAG_MASK);
 
     unmap_domain_page(snapshot);
@@ -936,10 +1006,10 @@ static int is_out_of_sync(struct vcpu *v, unsigned long va) /* __shadow_out_of_s
     unsigned long l2mfn = pagetable_get_pfn(v->arch.guest_table);
 #endif
     unsigned long l2pfn = __mfn_to_gpfn(d, l2mfn);
-    l2_pgentry_t l2e;
+    guest_l2_pgentry_t l2e;
     unsigned long l1pfn, l1mfn;
-    l1_pgentry_t *guest_pt;
-    l1_pgentry_t tmp_gle;
+    guest_l1_pgentry_t *guest_pt;
+    guest_l1_pgentry_t tmp_gle;
     unsigned long pt_va;
 
     ASSERT(shadow_lock_is_acquired(d));
@@ -948,7 +1018,7 @@ static int is_out_of_sync(struct vcpu *v, unsigned long va) /* __shadow_out_of_s
     perfc_incrc(shadow_out_of_sync_calls);
 
 #if CONFIG_PAGING_LEVELS >= 4
-    if (d->arch.ops->guest_paging_levels == L4) { /* Mode F */
+    if (d->arch.ops->guest_paging_levels == PAGING_L4) { /* Mode F */
         pgentry_64_t le;
         unsigned long gmfn;
         unsigned long gpfn;
@@ -956,9 +1026,9 @@ static int is_out_of_sync(struct vcpu *v, unsigned long va) /* __shadow_out_of_s
 
         gmfn = l2mfn;
         gpfn = l2pfn;
-        guest_pt = (l1_pgentry_t *)v->arch.guest_vtable;
+        guest_pt = (guest_l1_pgentry_t *)v->arch.guest_vtable;
 
-        for (i = L4; i >= L3; i--) {
+        for (i = PAGING_L4; i >= PAGING_L3; i--) {
             if ( page_out_of_sync(&frame_table[gmfn]) &&
               !snapshot_entry_matches(
                   d, guest_pt, gpfn, table_offset_64(va, i)) )
@@ -972,7 +1042,7 @@ static int is_out_of_sync(struct vcpu *v, unsigned long va) /* __shadow_out_of_s
             if ( !VALID_MFN(gmfn) )
                 return 0;
             /* Todo: check!*/
-            guest_pt = (l1_pgentry_t *)map_domain_page(gmfn);
+            guest_pt = (guest_l1_pgentry_t *)map_domain_page(gmfn);
 
         }
 
@@ -986,13 +1056,13 @@ static int is_out_of_sync(struct vcpu *v, unsigned long va) /* __shadow_out_of_s
 #endif
 
     if ( page_out_of_sync(&frame_table[l2mfn]) &&
-         !snapshot_entry_matches(d, (l1_pgentry_t *)v->arch.guest_vtable,
-                                 l2pfn, l2_table_offset(va)) )
+         !snapshot_entry_matches(d, (guest_l1_pgentry_t *)v->arch.guest_vtable,
+                                 l2pfn, guest_l2_table_offset(va)) )
         return 1;
 
     __guest_get_l2e(v, va, &l2e);
-    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) || 
-         (l2e_get_flags(l2e) & _PAGE_PSE))
+    if ( !(guest_l2e_get_flags(l2e) & _PAGE_PRESENT) || 
+         (guest_l2e_get_flags(l2e) & _PAGE_PSE))
         return 0;
 
     l1pfn = l2e_get_pfn(l2e);
@@ -1001,20 +1071,20 @@ static int is_out_of_sync(struct vcpu *v, unsigned long va) /* __shadow_out_of_s
     // If the l1 pfn is invalid, it can't be out of sync...
     if ( !VALID_MFN(l1mfn) )
         return 0;
-    
-    pt_va = ((va >> L1_PAGETABLE_SHIFT) & ~(L1_PAGETABLE_ENTRIES - 1))
+
+    pt_va = ((va >> L1_PAGETABLE_SHIFT) & ~(GUEST_L1_PAGETABLE_ENTRIES - 1))
       << L1_PAGETABLE_SHIFT;
-    guest_pt = (l1_pgentry_t *) __guest_get_l1e(v, pt_va, &tmp_gle);
+    guest_pt = (guest_l1_pgentry_t *) __guest_get_l1e(v, pt_va, &tmp_gle);
 
     if ( page_out_of_sync(&frame_table[l1mfn]) &&
          !snapshot_entry_matches(
-             d, guest_pt, l1pfn, l1_table_offset(va)) )
+             d, guest_pt, l1pfn, guest_l1_table_offset(va)) )
         return 1;
 
     return 0;
 }
 
-#define GPFN_TO_GPTEPAGE(_gpfn) ((_gpfn) / (PAGE_SIZE / sizeof(l1_pgentry_t)))
+#define GPFN_TO_GPTEPAGE(_gpfn) ((_gpfn) / (PAGE_SIZE / sizeof(guest_l1_pgentry_t)))
 static inline unsigned long
 predict_writable_pte_page(struct domain *d, unsigned long gpfn)
 {
@@ -1108,7 +1178,7 @@ static u32 remove_all_write_access_in_ptpage(
         return (found == max_refs_to_find);
     }
 
-    i = readonly_gpfn & (L1_PAGETABLE_ENTRIES - 1);
+    i = readonly_gpfn & (GUEST_L1_PAGETABLE_ENTRIES - 1);
     if ( !l1e_has_changed(pt[i], match, flags) && fix_entry(i) )
     {
         perfc_incrc(remove_write_fast_exit);
@@ -1117,7 +1187,7 @@ static u32 remove_all_write_access_in_ptpage(
         return found;
     }
  
-    for (i = 0; i < L1_PAGETABLE_ENTRIES; i++)
+    for (i = 0; i < GUEST_L1_PAGETABLE_ENTRIES; i++)
     {
         if ( unlikely(!l1e_has_changed(pt[i], match, flags)) && fix_entry(i) )
             break;
@@ -1282,15 +1352,15 @@ static int resync_all(struct domain *d, u32 stype)
         switch ( stype ) {
         case PGT_l1_shadow:
         {
-            l1_pgentry_t *guest1 = guest;
+            guest_l1_pgentry_t *guest1 = guest;
             l1_pgentry_t *shadow1 = shadow;
-            l1_pgentry_t *snapshot1 = snapshot;
+            guest_l1_pgentry_t *snapshot1 = snapshot;
 
             ASSERT(VM_ASSIST(d, VMASST_TYPE_writable_pagetables) ||
                    shadow_mode_write_all(d));
 
             if ( !shadow_mode_refcounts(d) )
-                revalidate_l1(d, guest1, snapshot1);
+                revalidate_l1(d, (l1_pgentry_t *)guest1, (l1_pgentry_t *)snapshot1);
 
             if ( !smfn )
                 break;
@@ -1301,7 +1371,7 @@ static int resync_all(struct domain *d, u32 stype)
             for ( i = min_shadow; i <= max_shadow; i++ )
             {
                 if ( (i < min_snapshot) || (i > max_snapshot) ||
-                     l1e_has_changed(guest1[i], snapshot1[i], PAGE_FLAG_MASK) )
+                     guest_l1e_has_changed(guest1[i], snapshot1[i], PAGE_FLAG_MASK) )
                 {
                     need_flush |= validate_pte_change(d, guest1[i], &shadow1[i]);
 
@@ -1431,32 +1501,36 @@ static int resync_all(struct domain *d, u32 stype)
         {
             int max = -1;
 
-            l4_pgentry_t *guest4 = guest;
+            guest_root_pgentry_t *guest_root = guest;
             l4_pgentry_t *shadow4 = shadow;
-            l4_pgentry_t *snapshot4 = snapshot;
+            guest_root_pgentry_t *snapshot_root = snapshot;
 
             changed = 0;
-            for ( i = 0; i < L4_PAGETABLE_ENTRIES; i++ )
+            for ( i = 0; i < GUEST_ROOT_PAGETABLE_ENTRIES; i++ )
             {
                 if ( !is_guest_l4_slot(i) && !external )
                     continue;
-                l4_pgentry_t new_l4e = guest4[i];
-                if ( l4e_has_changed(new_l4e, snapshot4[i], PAGE_FLAG_MASK))
+                guest_root_pgentry_t new_root_e = guest_root[i];
+                if ( root_entry_has_changed(
+                        new_root_e, snapshot_root[i], PAGE_FLAG_MASK))
                 {
-                    need_flush |= validate_entry_change(
-                      d, (pgentry_64_t *)&new_l4e,
-                      (pgentry_64_t *)&shadow4[i], shadow_type_to_level(stype));
-
+                    if (d->arch.ops->guest_paging_levels == PAGING_L4) {
+                        need_flush |= validate_entry_change(
+                          d, (pgentry_64_t *)&new_root_e,
+                          (pgentry_64_t *)&shadow4[i], shadow_type_to_level(stype));
+                    } else {
+                        validate_bl2e_change(d, &new_root_e, shadow, i);
+                    }
                     changed++;
                     ESH_LOG("%d: shadow4 mfn: %lx, shadow root: %lx\n", i,
                       smfn, pagetable_get_paddr(current->arch.shadow_table));
                 }
-                if ( l4e_get_intpte(new_l4e) != 0 ) /* FIXME: check flags? */
+                if ( guest_root_get_intpte(new_root_e) != 0 ) /* FIXME: check flags? */
                     max = i;
 
                 //  Need a better solution in the long term.
-                if ( !(l4e_get_flags(new_l4e) & _PAGE_PRESENT) &&
-                  unlikely(l4e_get_intpte(new_l4e) != 0) &&
+                if ( !(guest_root_get_flags(new_root_e) & _PAGE_PRESENT) &&
+                  unlikely(guest_root_get_intpte(new_root_e) != 0) &&
                   !unshadow &&
                   (frame_table[smfn].u.inuse.type_info & PGT_pinned) )
                     unshadow = 1;
@@ -1555,8 +1629,14 @@ static void sync_all(struct domain *d)
     if ( shadow_mode_translate(d) )
         need_flush |= resync_all(d, PGT_hl2_shadow);
 #endif
-    need_flush |= resync_all(d, PGT_l2_shadow);
-    need_flush |= resync_all(d, PGT_l3_shadow);
+
+    /*
+     * Fixme: for i386 host
+     */
+    if (d->arch.ops->guest_paging_levels == PAGING_L4) {
+        need_flush |= resync_all(d, PGT_l2_shadow);
+        need_flush |= resync_all(d, PGT_l3_shadow);
+    }
     need_flush |= resync_all(d, PGT_l4_shadow);
 
     if ( need_flush && !unlikely(shadow_mode_external(d)) )
@@ -1566,11 +1646,11 @@ static void sync_all(struct domain *d)
 }
 
 static inline int l1pte_write_fault(
-    struct vcpu *v, l1_pgentry_t *gpte_p, l1_pgentry_t *spte_p,
+    struct vcpu *v, guest_l1_pgentry_t *gpte_p, l1_pgentry_t *spte_p,
     unsigned long va)
 {
     struct domain *d = v->domain;
-    l1_pgentry_t gpte = *gpte_p;
+    guest_l1_pgentry_t gpte = *gpte_p;
     l1_pgentry_t spte;
     unsigned long gpfn = l1e_get_pfn(gpte);
     unsigned long gmfn = __gpfn_to_mfn(d, gpfn);
@@ -1585,8 +1665,8 @@ static inline int l1pte_write_fault(
     }
 
     ASSERT(l1e_get_flags(gpte) & _PAGE_RW);
-    l1e_add_flags(gpte, _PAGE_DIRTY | _PAGE_ACCESSED);
-    spte = l1e_from_pfn(gmfn, l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
+    guest_l1e_add_flags(gpte, _PAGE_DIRTY | _PAGE_ACCESSED);
+    spte = l1e_from_pfn(gmfn, guest_l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
 
     SH_VVLOG("l1pte_write_fault: updating spte=0x%" PRIpte " gpte=0x%" PRIpte,
              l1e_get_intpte(spte), l1e_get_intpte(gpte));
@@ -1604,9 +1684,9 @@ static inline int l1pte_write_fault(
 }
 
 static inline int l1pte_read_fault(
-    struct domain *d, l1_pgentry_t *gpte_p, l1_pgentry_t *spte_p)
+    struct domain *d, guest_l1_pgentry_t *gpte_p, l1_pgentry_t *spte_p)
 { 
-    l1_pgentry_t gpte = *gpte_p;
+    guest_l1_pgentry_t gpte = *gpte_p;
     l1_pgentry_t spte = *spte_p;
     unsigned long pfn = l1e_get_pfn(gpte);
     unsigned long mfn = __gpfn_to_mfn(d, pfn);
@@ -1618,10 +1698,10 @@ static inline int l1pte_read_fault(
         return 0;
     }
 
-    l1e_add_flags(gpte, _PAGE_ACCESSED);
-    spte = l1e_from_pfn(mfn, l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
+    guest_l1e_add_flags(gpte, _PAGE_ACCESSED);
+    spte = l1e_from_pfn(mfn, guest_l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
 
-    if ( shadow_mode_log_dirty(d) || !(l1e_get_flags(gpte) & _PAGE_DIRTY) ||
+    if ( shadow_mode_log_dirty(d) || !(guest_l1e_get_flags(gpte) & _PAGE_DIRTY) ||
          mfn_is_page_table(mfn) )
     {
         l1e_remove_flags(spte, _PAGE_RW);
@@ -1634,7 +1714,7 @@ static inline int l1pte_read_fault(
 
     return 1;
 }
-
+#if CONFIG_PAGING_LEVELS <= 3
 static int shadow_fault_32(unsigned long va, struct cpu_user_regs *regs)
 {
     l1_pgentry_t gpte, spte, orig_gpte;
@@ -1768,6 +1848,7 @@ static int shadow_fault_32(unsigned long va, struct cpu_user_regs *regs)
     shadow_unlock(d);
     return 0;
 }
+#endif
 
 static int do_update_va_mapping(unsigned long va,
                                 l1_pgentry_t val,
@@ -1787,7 +1868,7 @@ static int do_update_va_mapping(unsigned long va,
     //
     __shadow_sync_va(v, va);
 
-    l1pte_propagate_from_guest(d, val, &spte);
+    l1pte_propagate_from_guest(d, *(guest_l1_pgentry_t *)&val, &spte);
     shadow_set_l1e(va, spte, 0);
 
     /*
@@ -1848,7 +1929,7 @@ static void shadow_update_pagetables(struct vcpu *v)
 #if CONFIG_PAGING_LEVELS == 2
     unsigned long hl2mfn;
 #endif
-  
+
     int max_mode = ( shadow_mode_external(d) ? SHM_external
                      : shadow_mode_translate(d) ? SHM_translate
                      : shadow_mode_enabled(d) ? SHM_enable
@@ -1954,17 +2035,6 @@ static void shadow_update_pagetables(struct vcpu *v)
 #endif
 }
 
-struct shadow_ops MODE_A_HANDLER = {
-    .guest_paging_levels        = 2,
-    .invlpg                     = shadow_invlpg_32,
-    .fault                      = shadow_fault_32,
-    .update_pagetables          = shadow_update_pagetables,
-    .sync_all                   = sync_all,
-    .remove_all_write_access    = remove_all_write_access,
-    .do_update_va_mapping       = do_update_va_mapping,
-    .mark_mfn_out_of_sync       = mark_mfn_out_of_sync,
-    .is_out_of_sync             = is_out_of_sync,
-};
 
 /************************************************************************/
 /************************************************************************/
@@ -2445,12 +2515,90 @@ static unsigned long shadow_l3_table(
     BUG();                      /* not implemenated yet */
     return 42;
 }
+static unsigned long gva_to_gpa_pae(unsigned long gva)
+{
+    BUG();
+    return 43;
+}
 #endif
 
 #if CONFIG_PAGING_LEVELS >= 4
 /****************************************************************************/
 /* 64-bit shadow-mode code testing */
 /****************************************************************************/
+/*
+ * validate_bl2e_change()
+ * The code is for 32-bit VMX gues on 64-bit host.
+ * To sync guest L2.
+ */
+
+static inline void
+validate_bl2e_change(
+  struct domain *d,
+  guest_root_pgentry_t *new_gle_p,
+  pgentry_64_t *shadow_l3,
+  int index)
+{
+    int sl3_idx, sl2_idx;
+    unsigned long sl2mfn, sl1mfn;
+    pgentry_64_t *sl2_p;
+
+    /* Using guest l2 pte index to get shadow l3&l2 index
+     * index: 0 ~ 1023, PAGETABLE_ENTRIES: 512
+     */
+    sl3_idx = index / (PAGETABLE_ENTRIES / 2);
+    sl2_idx = (index % (PAGETABLE_ENTRIES / 2)) * 2;
+
+    sl2mfn = entry_get_pfn(shadow_l3[sl3_idx]);
+    sl2_p = (pgentry_64_t *)map_domain_page(sl2mfn);
+
+    validate_pde_change(
+        d, *(guest_l2_pgentry_t *)new_gle_p, (l2_pgentry_t *)&sl2_p[sl2_idx]);
+
+    /* Mapping the second l1 shadow page */
+    if (entry_get_flags(sl2_p[sl2_idx]) & _PAGE_PRESENT) {
+       sl1mfn = entry_get_pfn(sl2_p[sl2_idx]);
+       sl2_p[sl2_idx + 1] =
+            entry_from_pfn(sl1mfn + 1, entry_get_flags(sl2_p[sl2_idx]));
+    }
+    unmap_domain_page(sl2_p);
+
+}
+
+/*
+ * init_bl2() is for 32-bit VMX guest on 64-bit host
+ * Using 1 shadow L4(l3) and 4 shadow L2s to simulate guest L2
+ */
+static inline unsigned long init_bl2(l4_pgentry_t *spl4e, unsigned long smfn)
+{
+    unsigned int count;
+    unsigned long sl2mfn;
+    struct pfn_info *page;
+
+    memset(spl4e, 0, PAGE_SIZE);
+
+    /* Map the self entry, L4&L3 share the same page */
+    spl4e[PAE_SHADOW_SELF_ENTRY] = l4e_from_pfn(smfn, __PAGE_HYPERVISOR);
+
+    /* Allocate 4 shadow L2s */
+    page = alloc_domheap_pages(NULL, SL2_ORDER, 0);
+    if (!page)
+        domain_crash_synchronous();
+
+    for (count = 0; count < PDP_ENTRIES; count++)
+    {
+        sl2mfn = page_to_pfn(page+count);
+        void *l2 = map_domain_page(sl2mfn);
+        memset(l2, 0, PAGE_SIZE);
+        unmap_domain_page(l2);
+        spl4e[count] = l4e_from_pfn(sl2mfn, _PAGE_PRESENT);
+    }
+
+    unmap_domain_page(spl4e);
+    return smfn;
+
+
+}
 
 static unsigned long shadow_l4_table(
   struct domain *d, unsigned long gpfn, unsigned long gmfn)
@@ -2464,11 +2612,16 @@ static unsigned long shadow_l4_table(
 
     if ( unlikely(!(smfn = alloc_shadow_page(d, gpfn, gmfn, PGT_l4_shadow))) )
     {
-        printk("Couldn't alloc an L2 shadow for pfn=%lx mfn=%lx\n", gpfn, gmfn);
+        printk("Couldn't alloc an L4 shadow for pfn=%lx mfn=%lx\n", gpfn, gmfn);
         BUG(); /* XXX Deal gracefully with failure. */
     }
 
     spl4e = (l4_pgentry_t *)map_domain_page(smfn);
+
+    if (d->arch.ops->guest_paging_levels == PAGING_L2) {
+        return init_bl2(spl4e, smfn);
+    }
+
     /* Install hypervisor and 4x linear p.t. mapings. */
     if ( (PGT_base_page_table == PGT_l4_page_table) &&
       !shadow_mode_external(d) )
@@ -2576,7 +2729,7 @@ static void shadow_map_into_current(struct vcpu *v,
     pgentry_64_t gle, sle;
     unsigned long gpfn, smfn;
 
-    if (from == L1 && to == L2) {
+    if (from == PAGING_L1 && to == PAGING_L2) {
         shadow_map_l1_into_current_l2(va);
         return;
     }
@@ -2608,7 +2761,7 @@ static void shadow_set_l2e_64(unsigned long va, l2_pgentry_t sl2e,
     if (!(l4e_get_flags(sl4e) & _PAGE_PRESENT)) {
         if (create_l2_shadow) {
             perfc_incrc(shadow_set_l3e_force_map);
-            shadow_map_into_current(v, va, L3, L4);
+            shadow_map_into_current(v, va, PAGING_L3, PAGING_L4);
             __shadow_get_l4e(v, va, &sl4e);
         } else {
             printk("For non VMX shadow, create_l1_shadow:%d\n", create_l2_shadow);
@@ -2619,7 +2772,7 @@ static void shadow_set_l2e_64(unsigned long va, l2_pgentry_t sl2e,
     if (!(l3e_get_flags(sl3e) & _PAGE_PRESENT)) {
          if (create_l2_shadow) {
             perfc_incrc(shadow_set_l2e_force_map);
-            shadow_map_into_current(v, va, L2, L3);
+            shadow_map_into_current(v, va, PAGING_L2, PAGING_L3);
             __shadow_get_l3e(v, va, &sl3e);
         } else {
             printk("For non VMX shadow, create_l1_shadow:%d\n", create_l2_shadow);
@@ -2655,8 +2808,15 @@ static void shadow_set_l1e_64(unsigned long va, pgentry_64_t *sl1e_p,
     l1_pgentry_t old_spte;
     l1_pgentry_t sl1e = *(l1_pgentry_t *)sl1e_p;
     int i;
+    unsigned long orig_va = 0;
 
-    for (i = L4; i >= L2; i--) {
+    if (d->arch.ops->guest_paging_levels == PAGING_L2) {
+        /* This is for 32-bit VMX guest on 64-bit host */
+        orig_va = va;
+        va = va & (~((1<<L2_PAGETABLE_SHIFT_32)-1));
+    }
+
+    for (i = PAGING_L4; i >= PAGING_L2; i--) {
         if (!__rw_entry(v, va, &sle, SHADOW_ENTRY | GET_ENTRY | i)) {
             printk("<%s> i = %d\n", __func__, i);
             BUG();
@@ -2672,9 +2832,13 @@ static void shadow_set_l1e_64(unsigned long va, pgentry_64_t *sl1e_p,
 #endif
             }
         }
-        if(i < L4)
+        if(i < PAGING_L4)
             shadow_update_min_max(entry_get_pfn(sle_up), table_offset_64(va, i));
         sle_up = sle;
+    }
+
+    if (d->arch.ops->guest_paging_levels == PAGING_L2) {
+        va = orig_va;
     }
 
     if ( shadow_mode_refcounts(d) )
@@ -2692,9 +2856,13 @@ static void shadow_set_l1e_64(unsigned long va, pgentry_64_t *sl1e_p,
     }
 
     __shadow_set_l1e(v, va, &sl1e);
-    shadow_update_min_max(entry_get_pfn(sle_up), table_offset_64(va, L1));
+
+    shadow_update_min_max(entry_get_pfn(sle_up), guest_l1_table_offset(va));
 }
 
+/* As 32-bit guest don't support 4M page yet,
+ * we don't concern double compile for this function
+ */
 static inline int l2e_rw_fault(
     struct vcpu *v, l2_pgentry_t *gl2e_p, unsigned long va, int rw)
 {
@@ -2825,12 +2993,120 @@ static inline int l2e_rw_fault(
 
 }
 
+/*
+ * Check P, R/W, U/S bits in the guest page table.
+ * If the fault belongs to guest return 1,
+ * else return 0.
+ */
+#if defined( GUEST_PGENTRY_32 )
+static inline int guest_page_fault(struct vcpu *v,
+  unsigned long va, unsigned int error_code, 
+  guest_l2_pgentry_t *gpl2e, guest_l1_pgentry_t *gpl1e)
+{
+    /* The following check for 32-bit guest on 64-bit host */
+
+    __guest_get_l2e(v, va, gpl2e);
+
+    /* Check the guest L2 page-table entry first*/
+    if (unlikely(!(guest_l2e_get_flags(*gpl2e) & _PAGE_PRESENT)))
+        return 1;
+
+    if (error_code & ERROR_W) {
+        if (unlikely(!(guest_l2e_get_flags(*gpl2e) & _PAGE_RW)))
+            return 1;
+    }
+    if (error_code & ERROR_U) {
+        if (unlikely(!(guest_l2e_get_flags(*gpl2e) & _PAGE_USER)))
+            return 1;
+    }
+
+    if (guest_l2e_get_flags(*gpl2e) & _PAGE_PSE)
+        return 0;
+
+    __guest_get_l1e(v, va, gpl1e);
+
+    /* Then check the guest L1 page-table entry */
+    if (unlikely(!(guest_l1e_get_flags(*gpl1e) & _PAGE_PRESENT)))
+        return 1;
+
+    if (error_code & ERROR_W) {
+        if (unlikely(!(guest_l1e_get_flags(*gpl1e) & _PAGE_RW)))
+            return 1;
+    }
+    if (error_code & ERROR_U) {
+        if (unlikely(!(guest_l1e_get_flags(*gpl1e) & _PAGE_USER)))
+            return 1;
+    }
+
+    return 0;
+}
+#else
+static inline int guest_page_fault(struct vcpu *v,
+  unsigned long va, unsigned int error_code, 
+  guest_l2_pgentry_t *gpl2e, guest_l1_pgentry_t *gpl1e)
+{
+    struct domain *d = v->domain;
+    pgentry_64_t gle, *lva;
+    unsigned long mfn;
+    int i;
+
+    __rw_entry(v, va, &gle, GUEST_ENTRY | GET_ENTRY | PAGING_L4);
+    if (unlikely(!(entry_get_flags(gle) & _PAGE_PRESENT)))
+        return 1;
+
+    if (error_code & ERROR_W) {
+        if (unlikely(!(entry_get_flags(gle) & _PAGE_RW)))
+            return 1;
+    }
+    if (error_code & ERROR_U) {
+        if (unlikely(!(entry_get_flags(gle) & _PAGE_USER)))
+            return 1;
+    }
+    for (i = PAGING_L3; i >= PAGING_L1; i--) {
+        /*
+         * If it's not external mode, then mfn should be machine physical.
+         */
+        mfn = __gpfn_to_mfn(d, (entry_get_value(gle) >> PAGE_SHIFT));
+
+        lva = (pgentry_64_t *) phys_to_virt(
+          mfn << PAGE_SHIFT);
+        gle = lva[table_offset_64(va, i)];
+
+        if (unlikely(!(entry_get_flags(gle) & _PAGE_PRESENT)))
+            return 1;
+
+        if (error_code & ERROR_W) {
+            if (unlikely(!(entry_get_flags(gle) & _PAGE_RW)))
+                return 1;
+        }
+        if (error_code & ERROR_U) {
+            if (unlikely(!(entry_get_flags(gle) & _PAGE_USER)))
+                return 1;
+        }
+
+        if (i == PAGING_L2) {
+            if (gpl2e)
+                gpl2e->l2 = gle.lo;
+
+            if (likely(entry_get_flags(gle) & _PAGE_PSE))
+                return 0;
+
+        }
+
+        if (i == PAGING_L1)
+            if (gpl1e)
+                gpl1e->l1 = gle.lo;
+    }
+    return 0;
+}
+#endif
 static int shadow_fault_64(unsigned long va, struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    l2_pgentry_t gl2e;
-    l1_pgentry_t sl1e, gl1e;
+    guest_l2_pgentry_t gl2e;
+    guest_l1_pgentry_t gl1e;
+    l1_pgentry_t sl1e;
 
     perfc_incrc(shadow_fault_calls);
 
@@ -2853,12 +3129,11 @@ static int shadow_fault_64(unsigned long va, struct cpu_user_regs *regs)
      * STEP 2. Check if the fault belongs to guest
      */
     if ( guest_page_fault(
-            v, va, regs->error_code, 
-            (pgentry_64_t *)&gl2e, (pgentry_64_t *)&gl1e) ) {
+            v, va, regs->error_code, &gl2e, &gl1e) ) {
         goto fail;
     }
     
-    if ( unlikely(!(l2e_get_flags(gl2e) & _PAGE_PSE)) ) {
+    if ( unlikely(!(guest_l2e_get_flags(gl2e) & _PAGE_PSE)) ) {
         /*
          * Handle 4K pages here
          */
@@ -2892,11 +3167,11 @@ static int shadow_fault_64(unsigned long va, struct cpu_user_regs *regs)
          */
         /* Write fault? */
         if ( regs->error_code & 2 ) {
-            if ( !l2e_rw_fault(v, &gl2e, va, WRITE_FAULT) ) {
+            if ( !l2e_rw_fault(v, (l2_pgentry_t *)&gl2e, va, WRITE_FAULT) ) {
                 goto fail;
             }
         } else {
-            l2e_rw_fault(v, &gl2e, va, READ_FAULT);
+            l2e_rw_fault(v, (l2_pgentry_t *)&gl2e, va, READ_FAULT);
         }
 
         /*
@@ -2944,7 +3219,27 @@ static void shadow_invlpg_64(struct vcpu *v, unsigned long va)
     shadow_unlock(d);
 }
 
-#ifndef PGENTRY_32
+static unsigned long gva_to_gpa_64(unsigned long gva)
+{
+    struct vcpu *v = current;
+    guest_l1_pgentry_t gl1e = {0};
+    guest_l2_pgentry_t gl2e = {0};
+    unsigned long gpa;
+
+    if (guest_page_fault(v, gva, 0, &gl2e, &gl1e))
+        return 0;
+    
+    if (guest_l2e_get_flags(gl2e) & _PAGE_PSE)
+        gpa = guest_l2e_get_paddr(gl2e) + (gva & ((1 << GUEST_L2_PAGETABLE_SHIFT) - 1));
+    else
+        gpa = guest_l1e_get_paddr(gl1e) + (gva & ~PAGE_MASK);
+
+    return gpa;
+
+}
+
+#ifndef GUEST_PGENTRY_32
+
 struct shadow_ops MODE_F_HANDLER = {
     .guest_paging_levels              = 4,
     .invlpg                     = shadow_invlpg_64,
@@ -2955,10 +3250,42 @@ struct shadow_ops MODE_F_HANDLER = {
     .do_update_va_mapping       = do_update_va_mapping,
     .mark_mfn_out_of_sync       = mark_mfn_out_of_sync,
     .is_out_of_sync             = is_out_of_sync,
+    .gva_to_gpa                 = gva_to_gpa_64,
 };
 #endif
 
 #endif
+
+#if CONFIG_PAGING_LEVELS == 2
+struct shadow_ops MODE_A_HANDLER = {
+    .guest_paging_levels        = 2,
+    .invlpg                     = shadow_invlpg_32,
+    .fault                      = shadow_fault_32,
+    .update_pagetables          = shadow_update_pagetables,
+    .sync_all                   = sync_all,
+    .remove_all_write_access    = remove_all_write_access,
+    .do_update_va_mapping       = do_update_va_mapping,
+    .mark_mfn_out_of_sync       = mark_mfn_out_of_sync,
+    .is_out_of_sync             = is_out_of_sync,
+    .gva_to_gpa                 = gva_to_gpa_64,
+};
+
+#elif CONFIG_PAGING_LEVELS == 3
+struct shadow_ops MODE_B_HANDLER = {
+    .guest_paging_levels              = 3,
+    .invlpg                     = shadow_invlpg_32,
+    .fault                      = shadow_fault_32,
+    .update_pagetables          = shadow_update_pagetables,
+    .sync_all                   = sync_all,
+    .remove_all_write_access    = remove_all_write_access,
+    .do_update_va_mapping       = do_update_va_mapping,
+    .mark_mfn_out_of_sync       = mark_mfn_out_of_sync,
+    .is_out_of_sync             = is_out_of_sync,
+    .gva_to_gpa                 = gva_to_gpa_pae,
+};
+
+#endif
+
 
 /*
  * Local variables:

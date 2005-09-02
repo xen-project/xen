@@ -32,10 +32,7 @@ void show_registers(struct cpu_user_regs *regs)
            regs->r12, regs->r13, regs->r14);
     printk("r15: %016lx\n", regs->r15);
 
-    if ( GUEST_MODE(regs) )
-        show_guest_stack();
-    else
-        show_stack((unsigned long *)regs->rsp);
+    show_stack(regs);
 }
 
 void show_page_walk(unsigned long addr)
