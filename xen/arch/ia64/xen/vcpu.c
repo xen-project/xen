@@ -1315,7 +1315,8 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 	/* check 1-entry TLB */
 	if ((trp = match_dtlb(vcpu,address))) {
 		dtlb_translate_count++;
-		*pteval = trp->page_flags;
+		//*pteval = trp->page_flags;
+		*pteval = vcpu->arch.dtlb_pte;
 		*itir = trp->itir;
 		return IA64_NO_FAULT;
 	}

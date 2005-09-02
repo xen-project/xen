@@ -71,6 +71,10 @@ extern struct task_struct *vmx_ia64_switch_to (void *next_task);
 } while (0)
 #endif // CONFIG_VTI
 
+#undef switch_to
+// FIXME SMP... see system.h, does this need to be different?
+#define switch_to(prev,next,last)	__switch_to(prev, next, last)
+
 #define __cmpxchg_user(ptr, new, old, _size)				\
 ({									\
 	register long __gu_r8 asm ("r8");				\
