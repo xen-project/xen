@@ -19,6 +19,7 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
+#include <public/acm.h>
 #include <public/acm_ops.h>
 #include <xen/sched.h>
 #include <xen/event.h>
@@ -41,7 +42,8 @@ typedef enum acm_operation {
     POLICY,                     /* access to policy interface (early drop) */
     GETPOLICY,                  /* dump policy cache */
     SETPOLICY,                  /* set policy cache (controls security) */
-    DUMPSTATS                   /* dump policy statistics */
+    DUMPSTATS,                  /* dump policy statistics */
+    GETSSID                     /* retrieve ssidref for domain id */
 } acm_operation_t;
 
 int acm_authorize_acm_ops(struct domain *d, acm_operation_t pops)
@@ -110,6 +112,35 @@ long do_acm_op(acm_op_t * u_acm_op)
             printkd("%s: dumping statistics.\n", __func__);
             ret = acm_dump_statistics(op->u.dumpstats.pullcache,
                                       op->u.dumpstats.pullcache_size);
+            if (ret == ACM_OK)
+                ret = 0;
+            else
+                ret = -ESRCH;
+        }
+        break;
+
+    case ACM_GETSSID:
+        {
+			ssidref_t ssidref;
+
+            if (acm_authorize_acm_ops(current->domain, GETSSID))
+                return -EACCES;
+
+			if (op->u.getssid.get_ssid_by == SSIDREF)
+				ssidref = op->u.getssid.id.ssidref;
+			else if (op->u.getssid.get_ssid_by == DOMAINID) {
+				struct domain *subj = find_domain_by_id(op->u.getssid.id.domainid);
+				if (!subj)
+					return -ESRCH; /* domain not found */
+
+				ssidref = ((struct acm_ssid_domain *)(subj->ssid))->ssidref;
+				put_domain(subj);
+			} else
+				return -ESRCH;
+
+            ret = acm_get_ssid(ssidref,
+                               op->u.getssid.ssidbuf,
+                               op->u.getssid.ssidbuf_size);
             if (ret == ACM_OK)
                 ret = 0;
             else

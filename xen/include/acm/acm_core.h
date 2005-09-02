@@ -101,9 +101,15 @@ struct ste_ssid {
  *	primary ssidref   = lower 16 bit
  *      secondary ssidref = higher 16 bit
  */
+#define ACM_PRIMARY(ssidref) \
+	((ssidref) & 0xffff)
+
+#define ACM_SECONDARY(ssidref) \
+	((ssidref) >> 16)
+
 #define GET_SSIDREF(POLICY, ssidref) \
 	((POLICY) == acm_bin_pol.primary_policy_code) ? \
-	((ssidref) & 0xffff) : ((ssidref) >> 16)
+	ACM_PRIMARY(ssidref) : ACM_SECONDARY(ssidref)
 
 /* macros to access ssid pointer for primary / secondary policy */
 #define GET_SSIDP(POLICY, ssid) \
@@ -116,6 +122,7 @@ int acm_free_domain_ssid(struct acm_ssid_domain *ssid);
 int acm_set_policy(void *buf, u16 buf_size, int isuserbuffer);
 int acm_get_policy(void *buf, u16 buf_size);
 int acm_dump_statistics(void *buf, u16 buf_size);
+int acm_get_ssid(ssidref_t ssidref, u8 *buf, u16 buf_size);
 
 #endif
 

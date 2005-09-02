@@ -383,6 +383,27 @@ ste_dump_stats(u8 *buf, u16 buf_len)
     return sizeof(struct acm_ste_stats_buffer);
 }
 
+static int
+ste_dump_ssid_types(ssidref_t ssidref, u8 *buf, u16 len)
+{
+    int i;
+
+    /* fill in buffer */
+    if (ste_bin_pol.max_types > len)
+        return -EFAULT;
+
+	if (ssidref >= ste_bin_pol.max_ssidrefs)
+		return -EFAULT;
+
+    /* read types for chwall ssidref */
+    for(i=0; i< ste_bin_pol.max_types; i++) {
+		if (ste_bin_pol.ssidrefs[ssidref * ste_bin_pol.max_types + i])
+            buf[i] = 1;
+        else
+            buf[i] = 0;
+    }
+    return ste_bin_pol.max_types;
+}
 
 /* we need to go through this before calling the hooks,
  * returns 1 == cache hit */
@@ -625,22 +646,23 @@ struct acm_operations acm_simple_type_enforcement_ops = {
 	/* policy management services */
 	.init_domain_ssid		= ste_init_domain_ssid,
 	.free_domain_ssid		= ste_free_domain_ssid,
-	.dump_binary_policy    	       	= ste_dump_policy,
-	.set_binary_policy     		= ste_set_policy,
+	.dump_binary_policy     = ste_dump_policy,
+	.set_binary_policy      = ste_set_policy,
 	.dump_statistics		= ste_dump_stats,
+    .dump_ssid_types        = ste_dump_ssid_types,
 	/* domain management control hooks */
 	.pre_domain_create     		= ste_pre_domain_create,
-	.post_domain_create		= NULL,
-	.fail_domain_create		= NULL,
-	.post_domain_destroy		= ste_post_domain_destroy,
+	.post_domain_create	    = NULL,
+	.fail_domain_create     = NULL,
+	.post_domain_destroy    = ste_post_domain_destroy,
 	/* event channel control hooks */
-	.pre_eventchannel_unbound      	= ste_pre_eventchannel_unbound,
+	.pre_eventchannel_unbound   = ste_pre_eventchannel_unbound,
 	.fail_eventchannel_unbound	= NULL,
 	.pre_eventchannel_interdomain	= ste_pre_eventchannel_interdomain,
 	.fail_eventchannel_interdomain  = NULL,
 	/* grant table control hooks */
-	.pre_grant_map_ref       	= ste_pre_grant_map_ref,
-	.fail_grant_map_ref		= NULL,
-	.pre_grant_setup	       	= ste_pre_grant_setup,
-	.fail_grant_setup		= NULL,
+	.pre_grant_map_ref      = ste_pre_grant_map_ref,
+	.fail_grant_map_ref     = NULL,
+	.pre_grant_setup        = ste_pre_grant_setup,
+	.fail_grant_setup       = NULL,
 };

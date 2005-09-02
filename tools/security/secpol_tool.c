@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -40,6 +41,17 @@
 #define PERROR(_m, _a...) \
 fprintf(stderr, "ERROR: " _m " (%d = %s)\n" , ## _a ,	\
                 errno, strerror(errno))
+
+void usage(char *progname)
+{
+    printf("Use: %s \n"
+           "\t getpolicy\n"
+           "\t dumpstats\n"
+           "\t loadpolicy <binary policy file>\n"
+           "\t getssid -d <domainid> [-f]\n"
+		   "\t getssid -s <ssidref> [-f]\n", progname);
+    exit(-1);
+}
 
 static inline int do_policycmd(int xc_handle, unsigned int cmd,
                                unsigned long data)
@@ -320,7 +332,7 @@ int acm_domain_loadpolicy(int xc_handle, const char *filename)
 
         if (ret)
             printf
-                ("ERROR setting policy. Use 'xm dmesg' to see details.\n");
+                ("ERROR setting policy. Try 'xm dmesg' to see details.\n");
         else
             printf("Successfully changed policy.\n");
 
@@ -370,7 +382,7 @@ int acm_domain_dumpstats(int xc_handle)
 
     if (ret < 0)
     {
-        printf("ERROR dumping policy stats. Use 'xm dmesg' to see details.\n");
+        printf("ERROR dumping policy stats. Try 'xm dmesg' to see details.\n");
         return ret;
     }
     stats = (struct acm_stats_buffer *) stats_buffer;
@@ -421,17 +433,121 @@ int acm_domain_dumpstats(int xc_handle)
     }
     return ret;
 }
+/************************ get ssidref & types ******************************/
+/*
+ * the ssid (types) can be looked up either by domain id or by ssidref
+ */
+int acm_domain_getssid(int xc_handle, int argc, char * const argv[])
+{
+    /* this includes header and a set of types */
+    #define MAX_SSIDBUFFER  2000
+    int ret, i;
+    acm_op_t op;
+    struct acm_ssid_buffer *hdr;
+    unsigned char *buf;
+	int nice_print = 1;
+
+    op.cmd = ACM_GETSSID;
+    op.interface_version = ACM_INTERFACE_VERSION;
+	op.u.getssid.get_ssid_by = UNSET;
+	/* arguments
+	   -d ... domain id to look up
+	   -s ... ssidref number to look up
+	   -f ... formatted print (scripts depend on this format)
+	*/
+	while (1)
+    {
+		int c = getopt(argc, argv, "d:s:f");
+		if (c == -1)
+			break;
+		if (c == 'd')
+        {
+			if (op.u.getssid.get_ssid_by != UNSET)
+				usage(argv[0]);
+			op.u.getssid.get_ssid_by = DOMAINID;
+			op.u.getssid.id.domainid = strtoul(optarg, NULL, 0);
+		}
+		else if (c== 's')
+        {
+			if (op.u.getssid.get_ssid_by != UNSET)
+				usage(argv[0]);
+			op.u.getssid.get_ssid_by = SSIDREF;
+			op.u.getssid.id.ssidref = strtoul(optarg, NULL, 0);
+		}
+		else if (c== 'f')
+		{
+			nice_print = 0;
+		}
+		else
+			usage(argv[0]);
+	}
+	if (op.u.getssid.get_ssid_by == UNSET)
+		usage(argv[0]);
+
+	buf = malloc(MAX_SSIDBUFFER);
+    if (!buf)
+        return -ENOMEM;
+
+    /* dump it and then push it down into xen/acm */
+    op.u.getssid.ssidbuf = buf;   /* out */
+    op.u.getssid.ssidbuf_size = MAX_SSIDBUFFER;
+    ret = do_acm_op(xc_handle, &op);
+
+    if (ret)
+    {
+        printf("ERROR getting ssidref. Try 'xm dmesg' to see details.\n");
+        goto out;
+    }
+    hdr = (struct acm_ssid_buffer *)buf;
+    if (hdr->len > MAX_SSIDBUFFER)
+    {
+        printf("ERROR: Buffer length inconsistent (ret=%d, hdr->len=%d)!\n",
+               ret, hdr->len);
+            return -EIO;
+    }
+	if (nice_print)
+    {
+		printf("SSID: ssidref = 0x%08x \n", hdr->ssidref);
+		printf("      P: %s, max_types = %d\n",
+			   ACM_POLICY_NAME(hdr->primary_policy_code), hdr->primary_max_types);
+		printf("	  Types: ");
+		for (i=0; i< hdr->primary_max_types; i++)
+			if (buf[hdr->primary_types_offset + i])
+				printf("%02x ", i);
+			else
+				printf("-- ");
+		printf("\n");
+
+		printf("      S: %s, max_types = %d\n",
+			   ACM_POLICY_NAME(hdr->secondary_policy_code), hdr->secondary_max_types);
+		printf("	  Types: ");
+		for (i=0; i< hdr->secondary_max_types; i++)
+			if (buf[hdr->secondary_types_offset + i])
+				printf("%02x ", i);
+			else
+				printf("-- ");
+		printf("\n");
+	}
+	else
+    {
+		/* formatted print for use with scripts (.sh)
+		 *  update scripts when updating here (usually
+		 *  used in combination with -d to determine a
+		 *  running domain's label
+		 */
+		printf("SSID: ssidref = 0x%08x \n", hdr->ssidref);
+	}
+
+    /* return ste ssidref */
+    if (hdr->primary_policy_code == ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)
+        ret = (hdr->ssidref) & 0xffff;
+    else if (hdr->secondary_policy_code == ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)
+        ret = (hdr->ssidref) >> 16;
+ out:
+    return ret;
+}
 
 /***************************** main **************************************/
-
-void usage(char *progname)
-{
-    printf("Use: %s \n"
-           "\t getpolicy\n"
-           "\t dumpstats\n"
-           "\t loadpolicy <binary policy file>\n", progname);
-    exit(-1);
-}
 
 int main(int argc, char **argv)
 {
@@ -459,6 +575,8 @@ int main(int argc, char **argv)
         if (argc != 2)
             usage(argv[0]);
         ret = acm_domain_dumpstats(acm_cmd_fd);
+    } else if (!strcmp(argv[1], "getssid")) {
+        ret = acm_domain_getssid(acm_cmd_fd, argc, argv);
     } else
         usage(argv[0]);
 

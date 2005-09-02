@@ -45,6 +45,7 @@ build: mk-symlinks
 	$(MAKE) secpol_xml2bin
 	chmod 700 ./setlabel.sh
 	chmod 700 ./updategrub.sh
+	chmod 700 ./getlabel.sh
 
 secpol_tool : secpol_tool.c secpol_compat.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $<

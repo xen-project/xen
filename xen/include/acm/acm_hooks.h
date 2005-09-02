@@ -92,6 +92,7 @@ struct acm_operations {
     int  (*dump_binary_policy)         (u8 *buffer, u16 buf_size);
     int  (*set_binary_policy)          (u8 *buffer, u16 buf_size);
     int  (*dump_statistics)            (u8 *buffer, u16 buf_size);
+    int  (*dump_ssid_types)            (ssidref_t ssidref, u8 *buffer, u16 buf_size);
     /* domain management control hooks (can be NULL) */
     int  (*pre_domain_create)          (void *subject_ssid, ssidref_t ssidref);
     void (*post_domain_create)         (domid_t domid, ssidref_t ssidref);
