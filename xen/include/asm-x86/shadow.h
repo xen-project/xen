@@ -34,6 +34,8 @@
 #include <asm/vmx.h>
 #include <public/dom0_ops.h>
 #include <asm/shadow_public.h>
+#include <asm/page-guest32.h>
+#include <asm/shadow_ops.h>
 
 /* Shadow PT operation mode : shadow-mode variable in arch_domain. */
 
@@ -104,9 +106,9 @@ do {                                            \
 } while (0)
 #endif
 
-#define SHADOW_ENCODE_MIN_MAX(_min, _max) ((((L1_PAGETABLE_ENTRIES - 1) - (_max)) << 16) | (_min))
+#define SHADOW_ENCODE_MIN_MAX(_min, _max) ((((GUEST_L1_PAGETABLE_ENTRIES - 1) - (_max)) << 16) | (_min))
 #define SHADOW_MIN(_encoded) ((_encoded) & ((1u<<16) - 1))
-#define SHADOW_MAX(_encoded) ((L1_PAGETABLE_ENTRIES - 1) - ((_encoded) >> 16))
+#define SHADOW_MAX(_encoded) ((GUEST_L1_PAGETABLE_ENTRIES - 1) - ((_encoded) >> 16))
 
 extern void shadow_mode_init(void);
 extern int shadow_mode_control(struct domain *p, dom0_shadow_control_t *sc);
@@ -132,6 +134,7 @@ extern void shadow_l2_normal_pt_update(struct domain *d,
                                        struct domain_mmap_cache *cache);
 #if CONFIG_PAGING_LEVELS >= 3
 #include <asm/page-guest32.h>
+extern unsigned long gva_to_gpa(unsigned long gva);
 extern void shadow_l3_normal_pt_update(struct domain *d,
                                        unsigned long pa, l3_pgentry_t l3e,
                                        struct domain_mmap_cache *cache);
@@ -794,22 +797,22 @@ static inline int l1pte_read_fault(
 #endif
 
 static inline void l1pte_propagate_from_guest(
-    struct domain *d, l1_pgentry_t gpte, l1_pgentry_t *spte_p)
+    struct domain *d, guest_l1_pgentry_t gpte, l1_pgentry_t *spte_p)
 { 
     unsigned long mfn;
     l1_pgentry_t spte;
 
     spte = l1e_empty();
 
-    if ( ((l1e_get_flags(gpte) & (_PAGE_PRESENT|_PAGE_ACCESSED) ) ==
+    if ( ((guest_l1e_get_flags(gpte) & (_PAGE_PRESENT|_PAGE_ACCESSED) ) ==
           (_PAGE_PRESENT|_PAGE_ACCESSED)) &&
          VALID_MFN(mfn = __gpfn_to_mfn(d, l1e_get_pfn(gpte))) )
     {
         spte = l1e_from_pfn(
-            mfn, l1e_get_flags(gpte) & ~(_PAGE_GLOBAL | _PAGE_AVAIL));
+            mfn, guest_l1e_get_flags(gpte) & ~(_PAGE_GLOBAL | _PAGE_AVAIL));
 
         if ( shadow_mode_log_dirty(d) ||
-             !(l1e_get_flags(gpte) & _PAGE_DIRTY) ||
+             !(guest_l1e_get_flags(gpte) & _PAGE_DIRTY) ||
              mfn_is_page_table(mfn) )
         {
             l1e_remove_flags(spte, _PAGE_RW);
@@ -859,22 +862,22 @@ static inline void hl2e_propagate_from_guest(
 
 static inline void l2pde_general(
     struct domain *d,
-    l2_pgentry_t *gpde_p,
+    guest_l2_pgentry_t *gpde_p,
     l2_pgentry_t *spde_p,
     unsigned long sl1mfn)
 {
-    l2_pgentry_t gpde = *gpde_p;
+    guest_l2_pgentry_t gpde = *gpde_p;
     l2_pgentry_t spde;
 
     spde = l2e_empty();
-    if ( (l2e_get_flags(gpde) & _PAGE_PRESENT) && (sl1mfn != 0) )
+    if ( (guest_l2e_get_flags(gpde) & _PAGE_PRESENT) && (sl1mfn != 0) )
     {
         spde = l2e_from_pfn(
-            sl1mfn, 
-            (l2e_get_flags(gpde) | _PAGE_RW | _PAGE_ACCESSED) & ~_PAGE_AVAIL);
+            sl1mfn,
+            (guest_l2e_get_flags(gpde) | _PAGE_RW | _PAGE_ACCESSED) & ~_PAGE_AVAIL);
 
         /* N.B. PDEs do not have a dirty bit. */
-        l2e_add_flags(gpde, _PAGE_ACCESSED);
+        guest_l2e_add_flags(gpde, _PAGE_ACCESSED);
 
         *gpde_p = gpde;
     }
@@ -887,12 +890,12 @@ static inline void l2pde_general(
 }
 
 static inline void l2pde_propagate_from_guest(
-    struct domain *d, l2_pgentry_t *gpde_p, l2_pgentry_t *spde_p)
+    struct domain *d, guest_l2_pgentry_t *gpde_p, l2_pgentry_t *spde_p)
 {
-    l2_pgentry_t gpde = *gpde_p;
+    guest_l2_pgentry_t gpde = *gpde_p;
     unsigned long sl1mfn = 0;
 
-    if ( l2e_get_flags(gpde) & _PAGE_PRESENT )
+    if ( guest_l2e_get_flags(gpde) & _PAGE_PRESENT )
         sl1mfn =  __shadow_status(d, l2e_get_pfn(gpde), PGT_l1_shadow);
     l2pde_general(d, gpde_p, spde_p, sl1mfn);
 }
@@ -904,7 +907,7 @@ static inline void l2pde_propagate_from_guest(
 static int inline
 validate_pte_change(
     struct domain *d,
-    l1_pgentry_t new_pte,
+    guest_l1_pgentry_t new_pte,
     l1_pgentry_t *shadow_pte_p)
 {
     l1_pgentry_t old_spte, new_spte;
@@ -1004,7 +1007,7 @@ validate_hl2e_change(
 static int inline
 validate_pde_change(
     struct domain *d,
-    l2_pgentry_t new_gpde,
+    guest_l2_pgentry_t new_gpde,
     l2_pgentry_t *shadow_pde_p)
 {
     l2_pgentry_t old_spde, new_spde;

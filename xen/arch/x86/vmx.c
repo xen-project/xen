@@ -412,7 +412,7 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
     if ( !result )
     {
         __vmread(GUEST_RIP, &eip);
-        printk("vmx pgfault to guest va=%p eip=%p\n", va, eip);
+        printk("vmx pgfault to guest va=%lx eip=%lx\n", va, eip);
     }
 #endif
 
@@ -456,7 +456,16 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
         clear_bit(X86_FEATURE_PSE, &edx);
         clear_bit(X86_FEATURE_PAE, &edx);
         clear_bit(X86_FEATURE_PSE36, &edx);
+#else
+        struct vcpu *d = current;
+        if (d->domain->arch.ops->guest_paging_levels == PAGING_L2)
+        {
+            clear_bit(X86_FEATURE_PSE, &edx);
+            clear_bit(X86_FEATURE_PAE, &edx);
+            clear_bit(X86_FEATURE_PSE36, &edx);
+        }
 #endif
+
     }
 
     regs->eax = (unsigned long) eax;
@@ -650,7 +659,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
         p->df = (eflags & X86_EFLAGS_DF) ? 1 : 0;
 
         if (test_bit(5, &exit_qualification)) /* "rep" prefix */
-	    p->count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
+            p->count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
 
         /*
          * Split up string I/O operations that cross page boundaries. Don't
@@ -1006,6 +1015,15 @@ static int vmx_set_cr0(unsigned long value)
 
 #if CONFIG_PAGING_LEVELS >= 4 
             if(!shadow_set_guest_paging_levels(d->domain, 4)) {
+                printk("Unsupported guest paging levels\n");
+                domain_crash_synchronous(); /* need to take a clean path */
+            }
+#endif
+        }
+        else
+        {
+#if CONFIG_PAGING_LEVELS >= 4
+            if(!shadow_set_guest_paging_levels(d->domain, 2)) {
                 printk("Unsupported guest paging levels\n");
                 domain_crash_synchronous(); /* need to take a clean path */
             }

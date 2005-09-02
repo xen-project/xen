@@ -33,11 +33,15 @@
 #if CONFIG_PAGING_LEVELS >= 3
 #include <asm/shadow_64.h>
 
+#endif
+#if CONFIG_PAGING_LEVELS == 4
 extern struct shadow_ops MODE_F_HANDLER;
+extern struct shadow_ops MODE_D_HANDLER;
 #endif
 
 extern struct shadow_ops MODE_A_HANDLER;
 
+#define SHADOW_MAX_GUEST32(_encoded) ((L1_PAGETABLE_ENTRIES_32 - 1) - ((_encoded) >> 16))
 /****************************************************************************/
 /************* export interface functions ***********************************/
 /****************************************************************************/
@@ -48,7 +52,7 @@ int shadow_set_guest_paging_levels(struct domain *d, int levels)
     shadow_lock(d);
 
     switch(levels) {
-#if CONFIG_PAGING_LEVELS >= 4 
+#if CONFIG_PAGING_LEVELS >= 4
     case 4:
 	if ( d->arch.ops != &MODE_F_HANDLER )
 	    d->arch.ops = &MODE_F_HANDLER;
@@ -56,9 +60,14 @@ int shadow_set_guest_paging_levels(struct domain *d, int levels)
         return 1;
 #endif
     case 3:
-    case 2:                     
+    case 2:
+#if CONFIG_PAGING_LEVELS == 2
 	if ( d->arch.ops != &MODE_A_HANDLER )
 	    d->arch.ops = &MODE_A_HANDLER;
+#elif CONFIG_PAGING_LEVELS == 4
+	if ( d->arch.ops != &MODE_D_HANDLER )
+	    d->arch.ops = &MODE_D_HANDLER;
+#endif
 	shadow_unlock(d);
         return 1;
    default:
@@ -122,13 +131,17 @@ int __shadow_out_of_sync(struct vcpu *v, unsigned long va)
     return d->arch.ops->is_out_of_sync(v, va);
 }
 
+unsigned long gva_to_gpa(unsigned long gva)
+{
+    struct domain *d = current->domain;
+    return d->arch.ops->gva_to_gpa(gva);
+}
 /****************************************************************************/
 /****************************************************************************/
 #if CONFIG_PAGING_LEVELS >= 4
 /*
  * Convert PAE 3-level page-table to 4-level page-table
  */
-#define PDP_ENTRIES   4
 static pagetable_t page_table_convert(struct domain *d)
 {
     struct pfn_info *l4page, *l3page;
@@ -203,19 +216,41 @@ free_shadow_fl1_table(struct domain *d, unsigned long smfn)
 /*
  * Free l2, l3, l4 shadow tables
  */
+
+void free_fake_shadow_l2(struct domain *d,unsigned long smfn);
+
 static void inline
 free_shadow_tables(struct domain *d, unsigned long smfn, u32 level)
 {
     pgentry_64_t *ple = map_domain_page(smfn);
     int i, external = shadow_mode_external(d);
+    struct pfn_info *page = &frame_table[smfn];
 
-    for ( i = 0; i < PAGETABLE_ENTRIES; i++ )
-        if ( external || is_guest_l4_slot(i) )
-            if ( entry_get_flags(ple[i]) & _PAGE_PRESENT )
-                put_shadow_ref(entry_get_pfn(ple[i]));
+    if (d->arch.ops->guest_paging_levels == PAGING_L2)
+    {
+#if CONFIG_PAGING_LEVELS >=4
+        for ( i = 0; i < PDP_ENTRIES; i++ )
+        {
+            if (entry_get_flags(ple[i]) & _PAGE_PRESENT )
+                free_fake_shadow_l2(d,entry_get_pfn(ple[i]));
+        }
+   
+        page = &frame_table[entry_get_pfn(ple[0])];
+        free_domheap_pages(page, SL2_ORDER);
+        unmap_domain_page(ple);
+#endif
+    }
+    else
+    {
+        for ( i = 0; i < PAGETABLE_ENTRIES; i++ )
+            if ( external || is_guest_l4_slot(i) )
+                if ( entry_get_flags(ple[i]) & _PAGE_PRESENT )
+                        put_shadow_ref(entry_get_pfn(ple[i]));
 
-    unmap_domain_page(ple);
+        unmap_domain_page(ple);
+    }
 }
+
 
 void free_monitor_pagetable(struct vcpu *v)
 {
@@ -453,7 +488,12 @@ free_shadow_l1_table(struct domain *d, unsigned long smfn)
     struct pfn_info *spage = pfn_to_page(smfn);
     u32 min_max = spage->tlbflush_timestamp;
     int min = SHADOW_MIN(min_max);
-    int max = SHADOW_MAX(min_max);
+    int max;
+    
+    if (d->arch.ops->guest_paging_levels == PAGING_L2)
+        max = SHADOW_MAX_GUEST32(min_max);
+    else
+        max = SHADOW_MAX(min_max);
 
     for ( i = min; i <= max; i++ )
     {
@@ -512,9 +552,24 @@ free_shadow_l2_table(struct domain *d, unsigned long smfn, unsigned int type)
     unmap_domain_page(pl2e);
 }
 
+void free_fake_shadow_l2(struct domain *d, unsigned long smfn)
+{
+    pgentry_64_t *ple = map_domain_page(smfn);
+    int i;
+
+    for ( i = 0; i < PAGETABLE_ENTRIES; i = i + 2 )
+    {
+        if ( entry_get_flags(ple[i]) & _PAGE_PRESENT )
+            put_shadow_ref(entry_get_pfn(ple[i]));
+    }
+
+    unmap_domain_page(ple);
+}
+
 void free_shadow_page(unsigned long smfn)
 {
     struct pfn_info *page = &frame_table[smfn];
+
     unsigned long gmfn = page->u.inuse.type_info & PGT_mfn_mask;
     struct domain *d = page_get_owner(pfn_to_page(gmfn));
     unsigned long gpfn = __mfn_to_gpfn(d, gmfn);
@@ -531,6 +586,7 @@ void free_shadow_page(unsigned long smfn)
             gpfn |= (1UL << 63);
     }
 #endif
+
     delete_shadow_status(d, gpfn, gmfn, type);
 
     switch ( type )
@@ -687,7 +743,7 @@ void free_shadow_pages(struct domain *d)
     int                   i;
     struct shadow_status *x;
     struct vcpu          *v;
- 
+
     /*
      * WARNING! The shadow page table must not currently be in use!
      * e.g., You are expected to have paused the domain and synchronized CR3.
@@ -794,7 +850,16 @@ void free_shadow_pages(struct domain *d)
         perfc_decr(free_l1_pages);
 
         struct pfn_info *page = list_entry(list_ent, struct pfn_info, list);
-        free_domheap_page(page);
+	if (d->arch.ops->guest_paging_levels == PAGING_L2)
+	{
+#if CONFIG_PAGING_LEVELS >=4
+        free_domheap_pages(page, SL1_ORDER);
+#else
+	free_domheap_page(page);
+#endif
+	}
+	else
+	free_domheap_page(page);
     }
 
     shadow_audit(d, 0);
@@ -1191,7 +1256,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     {
         DPRINTK("Don't try to do a shadow op on yourself!\n");
         return -EINVAL;
-    }   
+    }
 
     domain_pause(d);
 

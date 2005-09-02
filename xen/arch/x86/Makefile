@@ -17,7 +17,7 @@ endif
 
 OBJS := $(patsubst shadow%.o,,$(OBJS))	# drop all
 ifeq ($(TARGET_SUBARCH),x86_64) 
- OBJS += shadow.o shadow_public.o	# x86_64: new code
+ OBJS += shadow.o shadow_public.o shadow_guest32.o	# x86_64: new code
 endif
 ifeq ($(TARGET_SUBARCH),x86_32) 
  ifneq ($(pae),n)
