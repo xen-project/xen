@@ -329,7 +329,7 @@ static __inline__ int HYPERVISOR_dom_mem_op(void *dom_mem_op)
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_dom_mem_op),
+        : "=a" (ret) : "0" (__HYPERVISOR_memory_op),
         _a1 (dom_mem_op) : "memory" );
 
     return ret;
