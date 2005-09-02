@@ -25,7 +25,8 @@ increase_reservation(
     unsigned long *extent_list, 
     unsigned int   nr_extents,
     unsigned int   extent_order,
-    unsigned int   flags)
+    unsigned int   flags,
+    int           *preempted)
 {
     struct pfn_info *page;
     unsigned long    i;
@@ -43,7 +44,10 @@ increase_reservation(
     for ( i = 0; i < nr_extents; i++ )
     {
         if ( hypercall_preempt_check() )
+        {
+            *preempted = 1;
             return i;
+        }
 
         if ( unlikely((page = alloc_domheap_pages(
             d, extent_order, flags)) == NULL) )
@@ -67,7 +71,8 @@ decrease_reservation(
     unsigned long *extent_list, 
     unsigned int   nr_extents,
     unsigned int   extent_order,
-    unsigned int   flags)
+    unsigned int   flags,
+    int           *preempted)
 {
     struct pfn_info *page;
     unsigned long    i, j, mpfn;
@@ -78,7 +83,10 @@ decrease_reservation(
     for ( i = 0; i < nr_extents; i++ )
     {
         if ( hypercall_preempt_check() )
+        {
+            *preempted = 1;
             return i;
+        }
 
         if ( unlikely(__get_user(mpfn, &extent_list[i]) != 0) )
             return i;
@@ -124,7 +132,7 @@ decrease_reservation(
 long do_memory_op(int cmd, void *arg)
 {
     struct domain *d;
-    int rc, start_extent, op, flags = 0;
+    int rc, start_extent, op, flags = 0, preempted = 0;
     struct xen_memory_reservation reservation;
 
     op = cmd & ((1 << START_EXTENT_SHIFT) - 1);
@@ -165,19 +173,18 @@ long do_memory_op(int cmd, void *arg)
                   reservation.extent_start,
                   reservation.nr_extents,
                   reservation.extent_order,
-                  flags);
+                  flags,
+                  &preempted);
 
         if ( unlikely(reservation.domid != DOMID_SELF) )
             put_domain(d);
 
         rc += start_extent;
 
-        if ( (rc != reservation.nr_extents) && hypercall_preempt_check() )
+        if ( preempted )
             return hypercall2_create_continuation(
-                __HYPERVISOR_memory_op,
-                op | (rc << START_EXTENT_SHIFT),
-                arg);
-        
+                __HYPERVISOR_memory_op, op | (rc << START_EXTENT_SHIFT), arg);
+
         break;
 
     case XENMEM_maximum_ram_page:
