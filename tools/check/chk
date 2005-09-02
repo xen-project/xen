@@ -17,14 +17,14 @@ export PATH=${PATH}:/sbin:/usr/sbin
 case $1 in
     build)
         check="CHECK-BUILD"
-        info=".chkbuild"
+        info="/tmp/xen.chkbuild"
         ;;
     install)
         check="CHECK-INSTALL"
-        info=".chkinstall"
+        info="/tmp/xen.chkinstall"
         ;;
     clean)
-        rm -f .chkbuild .chkinstall
+        rm -f /tmp/xen.chkbuild /tmp/xen.chkinstall
         exit 0
         ;;
     *)
