@@ -71,7 +71,7 @@ install-hotplug:
 	[ -d $(DESTDIR)$(XEN_HOTPLUG_DIR) ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(XEN_HOTPLUG_DIR)
 	for i in $(XEN_HOTPLUG_SCRIPTS); \
-	    do [ -a $(DESTDIR)$(XEN_HOTPLUG_DIR)/$$i ] || \
+	    do \
 	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_HOTPLUG_DIR); \
 	done
 
