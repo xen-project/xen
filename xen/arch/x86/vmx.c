@@ -602,15 +602,66 @@ static int check_for_null_selector(unsigned long eip)
     return 0;
 }
 
+void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
+       unsigned long count, int size, long value, int dir, int pvalid)
+{
+    struct vcpu *v = current;
+    vcpu_iodata_t *vio;
+    ioreq_t *p;
+
+    vio = get_vio(v->domain, v->vcpu_id);
+    if (vio == NULL) {
+        printk("bad shared page: %lx\n", (unsigned long) vio);
+        domain_crash_synchronous();
+    }
+
+    if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags)) {
+       printf("VMX I/O has not yet completed\n");
+       domain_crash_synchronous();
+    }
+    set_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
+
+    p = &vio->vp_ioreq;
+    p->dir = dir;
+    p->pdata_valid = pvalid;
+
+    p->type = IOREQ_TYPE_PIO;
+    p->size = size;
+    p->addr = port;
+    p->count = count;
+    p->df = regs->eflags & EF_DF ? 1 : 0;
+
+    if (pvalid) {
+        if (vmx_paging_enabled(current))
+            p->u.pdata = (void *) gva_to_gpa(value);
+        else
+            p->u.pdata = (void *) value; /* guest VA == guest PA */
+    } else
+        p->u.data = value;
+
+    p->state = STATE_IOREQ_READY;
+
+    if (vmx_portio_intercept(p)) {
+        /* no blocking & no evtchn notification */
+        clear_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
+        return;
+    }
+
+    evtchn_send(iopacket_port(v->domain));
+    vmx_wait_io();
+}
+
 static void vmx_io_instruction(struct cpu_user_regs *regs, 
                    unsigned long exit_qualification, unsigned long inst_len) 
 {
-    struct vcpu *d = current;
-    vcpu_iodata_t *vio;
-    ioreq_t *p;
-    unsigned long addr;
+    struct mi_per_cpu_info *mpcip;
     unsigned long eip, cs, eflags;
+    unsigned long port, size, dir;
     int vm86;
+
+    mpcip = &current->domain->arch.vmx_platform.mpci;
+    mpcip->instr = INSTR_PIO;
+    mpcip->flags = 0;
 
     __vmread(GUEST_RIP, &eip);
     __vmread(GUEST_CS_SELECTOR, &cs);
@@ -623,80 +674,57 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
                 vm86, cs, eip, exit_qualification);
 
     if (test_bit(6, &exit_qualification))
-        addr = (exit_qualification >> 16) & (0xffff);
+        port = (exit_qualification >> 16) & 0xFFFF;
     else
-        addr = regs->edx & 0xffff;
-    TRACE_VMEXIT (2,addr);
-
-    vio = get_vio(d->domain, d->vcpu_id);
-    if (vio == 0) {
-        printk("bad shared page: %lx", (unsigned long) vio);
-        domain_crash_synchronous(); 
-    }
-    p = &vio->vp_ioreq;
-    p->dir = test_bit(3, &exit_qualification); /* direction */
-
-    p->pdata_valid = 0;
-    p->count = 1;
-    p->size = (exit_qualification & 7) + 1;
+        port = regs->edx & 0xffff;
+    TRACE_VMEXIT(2, port);
+    size = (exit_qualification & 7) + 1;
+    dir = test_bit(3, &exit_qualification); /* direction */
 
     if (test_bit(4, &exit_qualification)) { /* string instruction */
-	unsigned long laddr;
+	unsigned long addr, count = 1;
+	int sign = regs->eflags & EF_DF ? -1 : 1;
 
-	__vmread(GUEST_LINEAR_ADDRESS, &laddr);
+	__vmread(GUEST_LINEAR_ADDRESS, &addr);
+
         /*
          * In protected mode, guest linear address is invalid if the
          * selector is null.
          */
-        if (!vm86 && check_for_null_selector(eip)) {
-            laddr = (p->dir == IOREQ_WRITE) ? regs->esi : regs->edi;
-        }
-        p->pdata_valid = 1;
+        if (!vm86 && check_for_null_selector(eip))
+            addr = dir == IOREQ_WRITE ? regs->esi : regs->edi;
 
-        p->u.data = laddr;
-        if (vmx_paging_enabled(d))
-                p->u.pdata = (void *) gva_to_gpa(p->u.data);
-        p->df = (eflags & X86_EFLAGS_DF) ? 1 : 0;
+        if (test_bit(5, &exit_qualification)) { /* "rep" prefix */
+	    mpcip->flags |= REPZ;
+	    count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
+	}
 
-        if (test_bit(5, &exit_qualification)) /* "rep" prefix */
-            p->count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
+	/*
+	 * Handle string pio instructions that cross pages or that
+	 * are unaligned. See the comments in vmx_platform.c/handle_mmio()
+	 */
+	if ((addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK)) {
+	    unsigned long value = 0;
 
-        /*
-         * Split up string I/O operations that cross page boundaries. Don't
-         * advance %eip so that "rep insb" will restart at the next page.
-         */
-        if ((p->u.data & PAGE_MASK) != 
-		((p->u.data + p->count * p->size - 1) & PAGE_MASK)) {
-	    VMX_DBG_LOG(DBG_LEVEL_2,
-		"String I/O crosses page boundary (cs:eip=0x%lx:0x%lx)\n",
-		cs, eip);
-            if (p->u.data & (p->size - 1)) {
-		printf("Unaligned string I/O operation (cs:eip=0x%lx:0x%lx)\n",
-			cs, eip);
-                domain_crash_synchronous();     
-            }
-            p->count = (PAGE_SIZE - (p->u.data & ~PAGE_MASK)) / p->size;
-        } else {
-            __update_guest_eip(inst_len);
-        }
-    } else if (p->dir == IOREQ_WRITE) {
-        p->u.data = regs->eax;
+	    mpcip->flags |= OVERLAP;
+	    if (dir == IOREQ_WRITE)
+		vmx_copy(&value, addr, size, VMX_COPY_IN);
+	    send_pio_req(regs, port, 1, size, value, dir, 0);
+	} else {
+	    if ((addr & PAGE_MASK) != ((addr + count * size - 1) & PAGE_MASK)) {
+                if (sign > 0)
+                    count = (PAGE_SIZE - (addr & ~PAGE_MASK)) / size;
+                else
+                    count = (addr & ~PAGE_MASK) / size;
+	    } else
+		__update_guest_eip(inst_len);
+
+	    send_pio_req(regs, port, count, size, addr, dir, 1);
+	}
+    } else {
         __update_guest_eip(inst_len);
-    } else
-        __update_guest_eip(inst_len);
-
-    p->addr = addr;
-    p->port_mm = 0;
-
-    /* Check if the packet needs to be intercepted */
-    if (vmx_portio_intercept(p))
-	/* no blocking & no evtchn notification */
-        return;
-
-    set_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags);
-    p->state = STATE_IOREQ_READY;
-    evtchn_send(iopacket_port(d->domain));
-    vmx_wait_io();
+	send_pio_req(regs, port, 1, size, regs->eax, dir, 0);
+    }
 }
 
 int

@@ -29,9 +29,17 @@
 #define STATE_IORESP_READY      3
 #define STATE_IORESP_HOOK       4
 
-/* VMExit dispatcher should cooperate with instruction decoder to
-   prepare this structure and notify service OS and DM by sending
-   virq */
+#define IOREQ_TYPE_PIO		0	/* pio */
+#define IOREQ_TYPE_COPY		1	/* mmio ops */
+#define IOREQ_TYPE_AND		2
+#define IOREQ_TYPE_OR		3
+#define IOREQ_TYPE_XOR		4
+
+/*
+ * VMExit dispatcher should cooperate with instruction decoder to
+ * prepare this structure and notify service OS and DM by sending
+ * virq 
+ */
 typedef struct {
     u64     addr;               /*  physical address            */
     u64     size;               /*  size in bytes               */
@@ -43,8 +51,8 @@ typedef struct {
     u8      state:4;
     u8      pdata_valid:1;	/* if 1, use pdata above        */
     u8      dir:1;		/*  1=read, 0=write             */
-    u8      port_mm:1;		/*  0=portio, 1=mmio            */
     u8      df:1;
+    u8      type;		/* I/O type			*/
 } ioreq_t;
 
 #define MAX_VECTOR    256
