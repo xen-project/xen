@@ -17,14 +17,11 @@ export PATH=${PATH}:/sbin:/usr/sbin
 case $1 in
     build)
         check="CHECK-BUILD"
-        info="/tmp/xen.chkbuild"
         ;;
     install)
         check="CHECK-INSTALL"
-        info="/tmp/xen.chkinstall"
         ;;
     clean)
-        rm -f /tmp/xen.chkbuild /tmp/xen.chkinstall
         exit 0
         ;;
     *)
@@ -34,7 +31,7 @@ esac
 
 failed=0
 
-echo "Xen ${check} " $(date) > ${info}
+echo "Xen ${check} " $(date)
 for f in check_* ; do
     case $f in
         *~)
@@ -49,24 +46,12 @@ for f in check_* ; do
     if ! grep -q ${check} $f ; then
         continue
     fi
-    echo ' ' >> ${info}
-    echo "Checking $f" >> ${info}
-    if ./$f 1>>${info} 2>&1 ; then
-        echo OK >> ${info}
+    echo -n "Checking $f: "
+    if ./$f 2>&1 ; then
+        echo OK
     else
         failed=1
-        echo "FAILED $f"
-        echo FAILED >> ${info}
     fi
 done
 
-echo >> ${info}
-
-if [ "$failed" == "1" ] ; then
-    echo "Checks failed. See `pwd`/${info} for details."
-    echo "FAILED" >> ${info}
-    exit 1
-else
-    echo "OK" >> ${info}
-    exit 0
-fi
+exit $failed
