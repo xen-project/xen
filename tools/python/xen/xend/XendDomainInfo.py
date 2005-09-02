@@ -430,12 +430,29 @@ class XendDomainInfo:
             return
 
         if type == 'vif':
+            from xen.xend import XendRoot
+            xroot = XendRoot.instance()
+
+            def _get_config_ipaddr(config):
+                val = []
+                for ipaddr in sxp.children(config, elt='ip'):
+                    val.append(sxp.child0(ipaddr))
+                return val
+
             backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
 
             log.error(devconfig)
             
             devnum = self.netif_idx
             self.netif_idx += 1
+
+            script = sxp.child_value(devconfig, 'script',
+                                     xroot.get_vif_script())
+            script = os.path.join(xroot.network_script_dir, script)
+            bridge = sxp.child_value(devconfig, 'bridge',
+                                     xroot.get_vif_bridge())
+            mac = sxp.child_value(devconfig, 'mac')
+            ipaddr = _get_config_ipaddr(devconfig)
 
             # create backend db
             backdb = backdom.db.addChild("/backend/%s/%s/%d" %
@@ -444,6 +461,12 @@ class XendDomainInfo:
             # create frontend db
             db = self.db.addChild("/device/%s/%d" % (type, devnum))
             
+            backdb['script'] = script
+            backdb['domain'] = self.name
+            backdb['mac'] = mac
+            backdb['bridge'] = bridge
+            if ipaddr:
+                backdb['ip'] = ' '.join(ipaddr)
             backdb['frontend'] = db.getPath()
             backdb['frontend-id'] = "%i" % self.id
             backdb['handle'] = "%i" % devnum
@@ -452,8 +475,7 @@ class XendDomainInfo:
             db['backend'] = backdb.getPath()
             db['backend-id'] = "%i" % backdom.id
             db['handle'] = "%i" % devnum
-            log.error(sxp.child_value(devconfig, 'mac'))
-            db['mac'] = sxp.child_value(devconfig, 'mac')
+            db['mac'] = mac
 
             db.saveDB(save=True)
 

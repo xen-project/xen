@@ -147,6 +147,39 @@ static int backend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 	return 0;
 }
 
+static int xenbus_hotplug_backend(struct device *dev, char **envp,
+				  int num_envp, char *buffer, int buffer_size)
+{
+	struct xenbus_device *xdev;
+	int i = 0;
+	int length = 0;
+
+	if (dev == NULL)
+		return -ENODEV;
+
+	xdev = to_xenbus_device(dev);
+	if (xdev == NULL)
+		return -ENODEV;
+
+	/* stuff we want to pass to /sbin/hotplug */
+	add_hotplug_env_var(envp, num_envp, &i,
+			    buffer, buffer_size, &length,
+			    "XENBUS_TYPE=%s", xdev->devicetype);
+
+	/* terminate, set to next free slot, shrink available space */
+	envp[i] = NULL;
+	envp = &envp[i];
+	num_envp -= i;
+	buffer = &buffer[length];
+	buffer_size -= length;
+
+	if (dev->driver && to_xenbus_driver(dev->driver)->hotplug)
+		return to_xenbus_driver(dev->driver)->hotplug
+			(xdev, envp, num_envp, buffer, buffer_size);
+
+	return 0;
+}
+
 static int xenbus_probe_backend(const char *type, const char *uuid);
 static struct xen_bus_type xenbus_backend = {
 	.root = "backend",
@@ -156,6 +189,7 @@ static struct xen_bus_type xenbus_backend = {
 	.bus = {
 		.name  = "xen-backend",
 		.match = xenbus_match,
+		.hotplug = xenbus_hotplug_backend,
 	},
 	.dev = {
 		.bus_id = "xen-backend",
