@@ -1559,15 +1559,18 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
     __vmread(IDT_VECTORING_INFO_FIELD, &idtv_info_field);
     if (idtv_info_field & INTR_INFO_VALID_MASK) {
-	if ((idtv_info_field & 0x0700) != 0x400) { /* exclude soft ints */
-            __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
+	__vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
 
-	    if (idtv_info_field & 0x800) { /* valid error code */
-		unsigned long error_code;
-		__vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
-		__vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
-	    } 
-	}
+	__vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
+	if (inst_len >= 1 && inst_len <= 15) 
+	    __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
+
+	if (idtv_info_field & 0x800) { /* valid error code */
+	    unsigned long error_code;
+	    __vmread(IDT_VECTORING_ERROR_CODE, &error_code);
+	    __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
+	} 
+
         VMX_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
     }
 
