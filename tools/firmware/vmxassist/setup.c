@@ -353,7 +353,7 @@ main()
 #endif
 	setup_gdt();
 	setup_idt();
-#ifdef	ENABLE_VME
+#ifndef	TEST
 	set_cr4(get_cr4() | CR4_VME); 
 #endif
 	setup_ctx();
