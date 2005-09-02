@@ -212,7 +212,7 @@ int xb_init_comms(void)
 		xen_start_info.store_evtchn, wake_waiting,
 		0, "xenbus", &xb_waitq);
 	if (err) {
-		printk(KERN_ERR "XENBUS request irq failed %i\n", err);
+		xprintk("XENBUS request irq failed %i\n", err);
 		unbind_evtchn_from_irq(xen_start_info.store_evtchn);
 		return err;
 	}

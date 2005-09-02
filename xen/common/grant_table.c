@@ -887,21 +887,21 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
                    e->tot_pages, e->max_pages);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
-            result = GNTST_general_error;
+            gop->status = result = GNTST_general_error;
             break;
         }
         if (unlikely(test_bit(DOMFLAGS_DYING, &e->domain_flags))) {
             printk("gnttab_donate: target domain is dying\n");
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
-            result = GNTST_general_error;
+            gop->status = result = GNTST_general_error;
             break;
         }
         if (unlikely(!gnttab_prepare_for_transfer(e, d, gop->handle))) {
-            printk("gnttab_donate: gnttab_prepare_for_transfer fails\n");
+            printk("gnttab_donate: gnttab_prepare_for_transfer fails.\n");
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
-            result = GNTST_general_error;
+            gop->status = result = GNTST_general_error;
             break;
         }
 #else
@@ -914,7 +914,8 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
                    e->tot_pages, e->max_pages, gop->handle, e->d_flags);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
-            result = GNTST_general_error;
+            /* XXX SMH: better error return here would be useful */
+            gop->status = result = GNTST_general_error;
             break;
         }
 #endif
@@ -1020,7 +1021,7 @@ gnttab_check_unmap(
     lgt = ld->grant_table;
     
 #if GRANT_DEBUG_VERBOSE
-    if ( ld->domain_ id != 0 ) {
+    if ( ld->domain_id != 0 ) {
             DPRINTK("Foreign unref rd(%d) ld(%d) frm(%lx) flgs(%x).\n",
                     rd->domain_id, ld->domain_id, frame, readonly);
       }

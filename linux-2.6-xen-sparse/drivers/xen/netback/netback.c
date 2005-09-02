@@ -14,23 +14,6 @@
 #include <asm-xen/balloon.h>
 #include <asm-xen/xen-public/memory.h>
 
-#if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
-#include <asm-xen/xen-public/grant_table.h>
-#include <asm-xen/gnttab.h>
-#ifdef GRANT_DEBUG
-static void
-dump_packet(int tag, u32 addr, unsigned char *p)
-{
-	int i;
-
-	printk(KERN_ALERT "#### rx_action %c %08x ", tag & 0xff, addr);
-	for (i = 0; i < 20; i++) {
-		printk("%02x", p[i]);
-	}
-	printk("\n");
-}
-#endif
-#endif
 
 static void netif_idx_release(u16 pending_idx);
 static void netif_page_release(struct page *page);
@@ -57,7 +40,8 @@ static struct timer_list net_timer;
 static struct sk_buff_head rx_queue;
 static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE*2+1];
 static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE];
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+
+#ifdef CONFIG_XEN_NETDEV_GRANT
 static gnttab_donate_t grant_rx_op[MAX_PENDING_REQS];
 #else
 static struct mmuext_op rx_mmuext[NETIF_RX_RING_SIZE];
@@ -88,16 +72,13 @@ static PEND_RING_IDX dealloc_prod, dealloc_cons;
 
 static struct sk_buff_head tx_queue;
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
 static u16 grant_tx_ref[MAX_PENDING_REQS];
 static gnttab_unmap_grant_ref_t tx_unmap_ops[MAX_PENDING_REQS];
 static gnttab_map_grant_ref_t tx_map_ops[MAX_PENDING_REQS];
+
 #else
 static multicall_entry_t tx_mcl[MAX_PENDING_REQS];
-#endif
-
-#if defined(CONFIG_XEN_NETDEV_GRANT_TX) || defined(CONFIG_XEN_NETDEV_GRANT_RX)
-#define GRANT_INVALID_REF (0xFFFF)
 #endif
 
 static struct list_head net_schedule_list;
@@ -127,7 +108,7 @@ static unsigned long alloc_mfn(void)
     return mfn;
 }
 
-#ifndef CONFIG_XEN_NETDEV_GRANT_RX
+#ifndef CONFIG_XEN_NETDEV_GRANT
 static void free_mfn(unsigned long mfn)
 {
     unsigned long flags;
@@ -200,7 +181,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
         dev_kfree_skb(skb);
         skb = nskb;
     }
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
 #ifdef DEBUG_GRANT
     printk(KERN_ALERT "#### be_xmit: req_prod=%d req_cons=%d id=%04x gr=%04x\n",
            netif->rx->req_prod,
@@ -246,12 +227,12 @@ int xen_network_done(void)
 
 static void net_rx_action(unsigned long unused)
 {
-    netif_t *netif;
+    netif_t *netif = NULL; 
     s8 status;
     u16 size, id, evtchn;
     multicall_entry_t *mcl;
     mmu_update_t *mmu;
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     gnttab_donate_t *gop;
 #else
     struct mmuext_op *mmuext;
@@ -266,7 +247,7 @@ static void net_rx_action(unsigned long unused)
 
     mcl = rx_mcl;
     mmu = rx_mmu;
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     gop = grant_rx_op;
 #else
     mmuext = rx_mmuext;
@@ -282,7 +263,7 @@ static void net_rx_action(unsigned long unused)
         if ( (new_mfn = alloc_mfn()) == 0 )
         {
             if ( net_ratelimit() )
-                printk(KERN_WARNING "Memory squeeze in netback driver.\n");
+                WPRINTK("Memory squeeze in netback driver.\n");
             mod_timer(&net_timer, jiffies + HZ);
             skb_queue_head(&rx_queue, skb);
             break;
@@ -297,7 +278,7 @@ static void net_rx_action(unsigned long unused)
 				pfn_pte_ma(new_mfn, PAGE_KERNEL), 0);
         mcl++;
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
         gop->mfn = old_mfn;
         gop->domid = netif->domid;
         gop->handle = netif->rx->ring[
@@ -340,7 +321,7 @@ static void net_rx_action(unsigned long unused)
     mcl->args[3] = DOMID_SELF;
     mcl++;
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     mcl[-2].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
 #else
     mcl[-3].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
@@ -349,9 +330,17 @@ static void net_rx_action(unsigned long unused)
         BUG();
 
     mcl = rx_mcl;
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    BUG_ON(HYPERVISOR_grant_table_op(
-        GNTTABOP_donate, grant_rx_op, gop - grant_rx_op));
+#ifdef CONFIG_XEN_NETDEV_GRANT
+    if(HYPERVISOR_grant_table_op(GNTTABOP_donate, grant_rx_op, 
+                                 gop - grant_rx_op)) { 
+        /* 
+        ** The other side has given us a bad grant ref, or has no headroom, 
+        ** or has gone away. Unfortunately the current grant table code 
+        ** doesn't inform us which is the case, so not much we can do. 
+        */
+        DPRINTK("net_rx: donate to DOM%u failed; dropping (up to) %d "
+                "packets.\n", grant_rx_op[0].domid, gop - grant_rx_op); 
+    }
     gop = grant_rx_op;
 #else
     mmuext = rx_mmuext;
@@ -363,7 +352,7 @@ static void net_rx_action(unsigned long unused)
 
         /* Rederive the machine addresses. */
         new_mfn = mcl[0].args[1] >> PAGE_SHIFT;
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
         old_mfn = 0; /* XXX Fix this so we can free_mfn() on error! */
 #else
         old_mfn = mmuext[0].mfn;
@@ -380,8 +369,13 @@ static void net_rx_action(unsigned long unused)
 
         /* Check the reassignment error code. */
         status = NETIF_RSP_OKAY;
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
-        BUG_ON(gop->status != 0); /* XXX */
+#ifdef CONFIG_XEN_NETDEV_GRANT
+        if(gop->status != 0) { 
+            DPRINTK("Bad status %d from grant donate to DOM%u\n", 
+                    gop->status, netif->domid);
+            /* XXX SMH: should free 'old_mfn' here */
+            status = NETIF_RSP_ERROR; 
+        } 
 #else
         if ( unlikely(mcl[1].result != 0) )
         {
@@ -404,7 +398,7 @@ static void net_rx_action(unsigned long unused)
 
         netif_put(netif);
         dev_kfree_skb(skb);
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
         mcl++;
         gop++;
 #else
@@ -420,6 +414,7 @@ static void net_rx_action(unsigned long unused)
         notify_via_evtchn(evtchn);
     }
 
+  out: 
     /* More work to do? */
     if ( !skb_queue_empty(&rx_queue) && !timer_pending(&net_timer) )
         tasklet_schedule(&net_rx_tasklet);
@@ -496,7 +491,7 @@ static void tx_credit_callback(unsigned long data)
 
 inline static void net_tx_action_dealloc(void)
 {
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     gnttab_unmap_grant_ref_t *gop;
 #else
     multicall_entry_t *mcl;
@@ -508,7 +503,7 @@ inline static void net_tx_action_dealloc(void)
     dc = dealloc_cons;
     dp = dealloc_prod;
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     /*
      * Free up any grants we have finished using
      */
@@ -542,7 +537,7 @@ inline static void net_tx_action_dealloc(void)
 #endif
     while ( dealloc_cons != dp )
     {
-#ifndef CONFIG_XEN_NETDEV_GRANT_TX
+#ifndef CONFIG_XEN_NETDEV_GRANT
         /* The update_va_mapping() must not fail. */
         BUG_ON(mcl[0].result != 0);
 #endif
@@ -569,7 +564,7 @@ inline static void net_tx_action_dealloc(void)
         
         netif_put(netif);
 
-#ifndef CONFIG_XEN_NETDEV_GRANT_TX
+#ifndef CONFIG_XEN_NETDEV_GRANT
         mcl++;
 #endif
     }
@@ -585,7 +580,7 @@ static void net_tx_action(unsigned long unused)
     netif_tx_request_t txreq;
     u16 pending_idx;
     NETIF_RING_IDX i;
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     gnttab_map_grant_ref_t *mop;
 #else
     multicall_entry_t *mcl;
@@ -595,7 +590,7 @@ static void net_tx_action(unsigned long unused)
     if ( dealloc_cons != dealloc_prod )
         net_tx_action_dealloc();
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     mop = tx_map_ops;
 #else
     mcl = tx_mcl;
@@ -696,7 +691,7 @@ static void net_tx_action(unsigned long unused)
 
         /* Packets passed to netif_rx() must have some headroom. */
         skb_reserve(skb, 16);
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
         mop->host_addr = MMAP_VADDR(pending_idx);
         mop->dom       = netif->domid;
         mop->ref       = txreq.addr >> PAGE_SHIFT;
@@ -719,7 +714,7 @@ static void net_tx_action(unsigned long unused)
 
         pending_cons++;
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
         if ( (mop - tx_map_ops) >= ARRAY_SIZE(tx_map_ops) )
             break;
 #else
@@ -729,7 +724,7 @@ static void net_tx_action(unsigned long unused)
 #endif
     }
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     if ( mop == tx_map_ops )
         return;
 
@@ -752,7 +747,7 @@ static void net_tx_action(unsigned long unused)
         memcpy(&txreq, &pending_tx_info[pending_idx].req, sizeof(txreq));
 
         /* Check the remap error code. */
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
         /* 
            XXX SMH: error returns from grant operations are pretty poorly
            specified/thought out, but the below at least conforms with 
@@ -826,7 +821,7 @@ static void net_tx_action(unsigned long unused)
         netif_rx(skb);
         netif->dev->last_rx = jiffies;
 
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
         mop++;
 #else
         mcl++;
@@ -949,12 +944,9 @@ static int __init netback_init(void)
          !(xen_start_info.flags & SIF_INITDOMAIN) )
         return 0;
 
-    printk("Initialising Xen netif backend\n");
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    printk("#### netback tx using grant tables\n");
-#endif
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    printk("#### netback rx using grant tables\n");
+    IPRINTK("Initialising Xen netif backend.\n");
+#ifdef CONFIG_XEN_NETDEV_GRANT
+    IPRINTK("Using grant tables.\n");
 #endif
 
     /* We can increase reservation by this much in net_rx_action(). */
