@@ -212,6 +212,12 @@ void memguard_unguard_range(void *p, unsigned long l);
 #define memguard_unguard_range(_p,_l)  ((void)0)
 #endif
 
+// prototype of misc memory stuff
+unsigned long __get_free_pages(unsigned int mask, unsigned int order);
+void __free_pages(struct page *page, unsigned int order);
+void *pgtable_quicklist_alloc(void);
+void pgtable_quicklist_free(void *pgtable_entry);
+
 // FOLLOWING FROM linux-2.6.7/include/mm.h
 
 /*

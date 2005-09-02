@@ -116,7 +116,7 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 	ridbits = IA64_MIN_IMPL_RID_BITS;
 
 	// convert to rid_blocks and find one
-	n_rid_blocks = ridbits - IA64_MIN_IMPL_RID_BITS + 1;
+	n_rid_blocks = 1UL << (ridbits - IA64_MIN_IMPL_RID_BITS);
 	
 	// skip over block 0, reserved for "meta-physical mappings (and Xen)"
 	for (i = n_rid_blocks; i < MAX_RID_BLOCKS; i += n_rid_blocks) {
