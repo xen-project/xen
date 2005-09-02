@@ -1367,20 +1367,15 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	struct page *old_page, *new_page;
 	unsigned long pfn = pte_pfn(pte);
 	pte_t entry;
+	struct page invalid_page;
 
 	if (unlikely(!pfn_valid(pfn))) {
-		/*
-		 * This should really halt the system so it can be debugged or
-		 * at least the kernel stops what it's doing before it corrupts
-		 * data, but for the moment just pretend this is OOM.
-		 */
-		pte_unmap(page_table);
-		printk(KERN_ERR "do_wp_page: bogus page at address %08lx\n",
-				address);
-		spin_unlock(&mm->page_table_lock);
-		return VM_FAULT_OOM;
+		/* This can happen with /dev/mem (PROT_WRITE, MAP_PRIVATE). */
+		invalid_page.flags = (1<<PG_reserved) | (1<<PG_locked);
+		old_page = &invalid_page;
+	} else {
+		old_page = pfn_to_page(pfn);
 	}
-	old_page = pfn_to_page(pfn);
 
 	if (!TestSetPageLocked(old_page)) {
 		int reuse = can_share_swap_page(old_page);
@@ -1416,7 +1411,13 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		new_page = alloc_page_vma(GFP_HIGHUSER, vma, address);
 		if (!new_page)
 			goto no_new_page;
-		copy_user_highpage(new_page, old_page, address);
+		if (old_page == &invalid_page) {
+			char *vto = kmap_atomic(new_page, KM_USER1);
+			copy_page(vto, (void *)(address & PAGE_MASK));
+			kunmap_atomic(vto, KM_USER1);
+		} else {
+			copy_user_highpage(new_page, old_page, address);
+		}
 	}
 	/*
 	 * Re-check the pte - we dropped the lock
