@@ -699,29 +699,34 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
     vmx_wait_io();
 }
 
-enum { COPY_IN = 0, COPY_OUT };
-
-static inline int
+int
 vmx_copy(void *buf, unsigned long laddr, int size, int dir)
 {
-    char *addr;
     unsigned long mfn;
+    char *addr;
+    int count;
 
-    if ( (size + (laddr & (PAGE_SIZE - 1))) >= PAGE_SIZE )
-    {
-    	printf("vmx_copy exceeds page boundary\n");
-        return 0;
+    while (size > 0) {
+	count = PAGE_SIZE - (laddr & ~PAGE_MASK);
+	if (count > size)
+	    count = size;
+
+	mfn = get_mfn_from_pfn(laddr >> PAGE_SHIFT);
+	/* XXX check whether laddr is valid */
+	addr = (char *)map_domain_page(mfn) + (laddr & ~PAGE_MASK);
+
+	if (dir == VMX_COPY_IN)
+	    memcpy(buf, addr, count);
+	else
+	    memcpy(addr, buf, count);
+
+	unmap_domain_page(addr);
+
+	laddr += count;
+	buf += count;
+	size -= count;
     }
 
-    mfn = get_mfn_from_pfn(laddr >> PAGE_SHIFT);
-    addr = (char *)map_domain_page(mfn) + (laddr & ~PAGE_MASK);
-
-    if (dir == COPY_IN)
-	    memcpy(buf, addr, size);
-    else
-	    memcpy(addr, buf, size);
-
-    unmap_domain_page(addr);
     return 1;
 }
 
@@ -908,7 +913,7 @@ vmx_assist(struct vcpu *d, int mode)
     u32 cp;
 
     /* make sure vmxassist exists (this is not an error) */
-    if (!vmx_copy(&magic, VMXASSIST_MAGIC_OFFSET, sizeof(magic), COPY_IN))
+    if (!vmx_copy(&magic, VMXASSIST_MAGIC_OFFSET, sizeof(magic), VMX_COPY_IN))
     	return 0;
     if (magic != VMXASSIST_MAGIC)
     	return 0;
@@ -922,20 +927,20 @@ vmx_assist(struct vcpu *d, int mode)
      */
     case VMX_ASSIST_INVOKE:
 	/* save the old context */
-	if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), COPY_IN))
+	if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), VMX_COPY_IN))
     	    goto error;
 	if (cp != 0) {
     	    if (!vmx_world_save(d, &c))
 		goto error;
-	    if (!vmx_copy(&c, cp, sizeof(c), COPY_OUT))
+	    if (!vmx_copy(&c, cp, sizeof(c), VMX_COPY_OUT))
 		goto error;
 	}
 
 	/* restore the new context, this should activate vmxassist */
-	if (!vmx_copy(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp), COPY_IN))
+	if (!vmx_copy(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp), VMX_COPY_IN))
 	    goto error;
 	if (cp != 0) {
-            if (!vmx_copy(&c, cp, sizeof(c), COPY_IN))
+            if (!vmx_copy(&c, cp, sizeof(c), VMX_COPY_IN))
 		goto error;
     	    if (!vmx_world_restore(d, &c))
 		goto error;
@@ -949,10 +954,10 @@ vmx_assist(struct vcpu *d, int mode)
      */
     case VMX_ASSIST_RESTORE:
 	/* save the old context */
-	if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), COPY_IN))
+	if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), VMX_COPY_IN))
     	    goto error;
 	if (cp != 0) {
-            if (!vmx_copy(&c, cp, sizeof(c), COPY_IN))
+            if (!vmx_copy(&c, cp, sizeof(c), VMX_COPY_IN))
 		goto error;
     	    if (!vmx_world_restore(d, &c))
 		goto error;
