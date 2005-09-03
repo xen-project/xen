@@ -1633,8 +1633,8 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 
-
-	dmi_scan_machine();
+	if (xen_start_info.flags & SIF_INITDOMAIN)
+		dmi_scan_machine();
 
 #ifdef CONFIG_X86_GENERICARCH
 	generic_apic_probe(*cmdline_p);
