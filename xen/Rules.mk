@@ -3,7 +3,7 @@
 # 'make clean' before rebuilding.
 #
 verbose     ?= y
-debug       ?= y
+debug       ?= n
 perfc       ?= n
 perfc_arrays?= n
 trace       ?= n
