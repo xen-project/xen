@@ -106,10 +106,10 @@ void xenbus_debug_write(const char *str, unsigned int count)
 }
 
 /* Send message to xs, get kmalloc'ed reply.  ERR_PTR() on error. */
-static void *xs_talkv(enum xsd_sockmsg_type type,
-		      const struct kvec *iovec,
-		      unsigned int num_vecs,
-		      unsigned int *len)
+void *xs_talkv(enum xsd_sockmsg_type type,
+	       const struct kvec *iovec,
+	       unsigned int num_vecs,
+	       unsigned int *len)
 {
 	struct xsd_sockmsg msg;
 	void *ret = NULL;
@@ -557,7 +557,7 @@ static int watch_thread(void *unused)
 			BUG_ON(!w);
 			w->callback(w, node);
 			kfree(node);
-		} else
+		} else if (node)
 			printk(KERN_WARNING "XENBUS xs_read_watch: %li\n",
 			       PTR_ERR(node));
 		up(&xenbus_lock);
