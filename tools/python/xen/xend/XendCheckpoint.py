@@ -34,7 +34,7 @@ def read_exact(fd, size, errmsg):
         raise XendError(errmsg)
     return buf
 
-def save(xd, fd, dominfo):
+def save(xd, fd, dominfo, live):
     write_exact(fd, SIGNATURE, "could not write guest state file: signature")
 
     config = sxp.to_string(dominfo.sxpr())
@@ -42,8 +42,13 @@ def save(xd, fd, dominfo):
                 "could not write guest state file: config len")
     write_exact(fd, config, "could not write guest state file: config")
 
+    # xc_save takes three customization parameters: maxit, max_f, and flags
+    # the last controls whether or not save is 'live', while the first two
+    # further customize behaviour when 'live' save is enabled. Passing "0"
+    # simply uses the defaults compiled into libxenguest; see the comments 
+    # and/or code in xc_linux_save() for more information. 
     cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
-           str(dominfo.id)]
+           str(dominfo.id), "0", "0", str(live) ]
     log.info("[xc_save] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     

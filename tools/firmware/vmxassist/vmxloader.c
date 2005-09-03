@@ -110,8 +110,8 @@ main()
 	}
 #ifdef _ACPI_
 	puts("Loading ACPI ...\n");
-    if (ACPI_PHYSICAL_ADDRESS+sizeof(acpi) <= 0xF0000 ){
-        /* make sure acpi table does not overlap rombios
+	if (ACPI_PHYSICAL_ADDRESS+sizeof(acpi) <= 0xF0000 ){
+		/* make sure acpi table does not overlap rombios
  		 * currently acpi less than 8K will be OK.
 		 */
 		 memcpy((void *)ACPI_PHYSICAL_ADDRESS, acpi, sizeof(acpi));
@@ -122,5 +122,6 @@ main()
 	memcpy((void *)TEXTADDR, vmxassist, sizeof(vmxassist));
 	puts("Go ...\n");
 	((void (*)())TEXTADDR)();
+	return 0;
 }
 

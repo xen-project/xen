@@ -542,7 +542,7 @@ class XendDomain:
             dominfo.name = "tmp-" + dominfo.name
 
         try:
-            XendCheckpoint.save(self, sock.fileno(), dominfo)
+            XendCheckpoint.save(self, sock.fileno(), dominfo, live)
         except:
             if dst == "localhost":
                 dominfo.name = string.replace(dominfo.name, "tmp-", "", 1)
@@ -563,7 +563,8 @@ class XendDomain:
 
             fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
 
-            return XendCheckpoint.save(self, fd, dominfo)
+            # For now we don't support 'live checkpoint' 
+            return XendCheckpoint.save(self, fd, dominfo, False)
 
         except OSError, ex:
             raise XendError("can't write guest state file %s: %s" %

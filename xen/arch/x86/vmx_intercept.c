@@ -172,7 +172,7 @@ int intercept_pit_io(ioreq_t *p)
 
     if (p->size != 1 ||
         p->pdata_valid ||
-        p->port_mm)
+	p->type != IOREQ_TYPE_PIO)
         return 0;
     
     if (p->addr == PIT_MODE &&
@@ -284,7 +284,5 @@ void vmx_hooks_assist(struct vcpu *d)
         if (!reinit)
 	    register_portio_handler(0x40, 4, intercept_pit_io); 
     }
-
 }
-
 #endif /* CONFIG_VMX */

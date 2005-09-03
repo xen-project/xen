@@ -6,13 +6,12 @@
  * Copyright (c) 2003-2004, K A Fraser.
  */
 
-#ifndef XENBUILD_H
-#define XENBUILD_H
+#ifndef XENGUEST_H
+#define XENGUEST_H
 
-#define XCFLAGS_VERBOSE   1
-#define XCFLAGS_LIVE      2
-#define XCFLAGS_DEBUG     4
-#define XCFLAGS_CONFIGURE 8
+#define XCFLAGS_LIVE      1
+#define XCFLAGS_DEBUG     2
+
 
 /**
  * This function will save a domain running Linux.
@@ -22,7 +21,8 @@
  * @parm dom the id of the domain
  * @return 0 on success, -1 on failure
  */
-int xc_linux_save(int xc_handle, int fd, uint32_t dom);
+int xc_linux_save(int xc_handle, int fd, uint32_t dom, uint32_t max_iters, 
+                  uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */);
 
 /**
  * This function will restore a saved domain running Linux.
@@ -35,8 +35,9 @@ int xc_linux_save(int xc_handle, int fd, uint32_t dom);
  * @parm store_mfn returned with the mfn of the store page
  * @return 0 on success, -1 on failure
  */
-int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pfns,
-		     unsigned int store_evtchn, unsigned long *store_mfn);
+int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, 
+                     unsigned long nr_pfns, unsigned int store_evtchn, 
+                     unsigned long *store_mfn);
 
 int xc_linux_build(int xc_handle,
                    uint32_t domid,
@@ -65,4 +66,4 @@ int xc_vmx_build(int xc_handle,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn);
 
-#endif
+#endif // XENGUEST_H

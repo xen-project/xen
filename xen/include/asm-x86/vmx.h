@@ -471,4 +471,7 @@ static inline int iopacket_port(struct domain *d)
 void load_cpu_user_regs(struct cpu_user_regs *regs);
 void store_cpu_user_regs(struct cpu_user_regs *regs);
 
+enum { VMX_COPY_IN = 0, VMX_COPY_OUT };
+int vmx_copy(void *buf, unsigned long laddr, int size, int dir);
+
 #endif /* __ASM_X86_VMX_H__ */

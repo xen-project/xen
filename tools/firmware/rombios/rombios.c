@@ -31,7 +31,7 @@
 
 // Xen full virtualization does not handle unaligned IO with page crossing.
 // Disable 32-bit PIO as a workaround.
-#define NO_PIO32
+#undef NO_PIO32
 
 
 // ROM BIOS compatability entry points:

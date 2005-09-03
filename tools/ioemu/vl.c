@@ -413,6 +413,11 @@ void hw_error(const char *fmt, ...)
     fprintf(stderr, "qemu: hardware error: ");
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
+    if (logfile) {
+	fprintf(logfile, "qemu: hardware error: ");
+	vfprintf(logfile, fmt, ap);
+	fprintf(logfile, "\n");
+    }
     va_end(ap);
     abort();
 }

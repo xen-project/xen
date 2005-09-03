@@ -24,8 +24,7 @@
 #include <asm/vmx_virpit.h>
 #include <asm/vmx_intercept.h>
 
-#define MAX_OPERAND_NUM 3
-#define I_NAME_LEN  16
+#define MAX_OPERAND_NUM 2
 
 #define mk_operand(size, index, seg, flag) \
     (((size) << 24) | ((index) << 16) | ((seg) << 8) | (flag))
@@ -35,54 +34,60 @@
 
 #define operand_index(operand)  \
       ((operand >> 16) & 0xFF)
-      //For instruction.operand[].size
+
+/* for instruction.operand[].size */
 #define BYTE    1
 #define WORD    2
 #define LONG    4
 #define QUAD    8
 #define BYTE_64 16
 
-      //For instruction.operand[].flag
+/* for instruction.operand[].flag */
 #define REGISTER    0x1
 #define MEMORY      0x2
 #define IMMEDIATE   0x4
-#define WZEROEXTEND 0x8
 
-      //For instruction.flags
+/* for instruction.flags */
 #define REPZ    0x1
 #define REPNZ   0x2
+#define OVERLAP 0x4
+
+#define	INSTR_PIO	1
+#define INSTR_OR	2
+#define INSTR_AND	3
+#define INSTR_XOR	4
+#define INSTR_CMP	5
+#define INSTR_MOV	6
+#define INSTR_MOVS	7
+#define INSTR_MOVZ	8
+#define INSTR_STOS	9
+#define INSTR_TEST	10
 
 struct instruction {
-    __s8    i_name[I_NAME_LEN];  //Instruction's name
-    __s16   op_size;    //The operand's bit size, e.g. 16-bit or 32-bit.
-
-    __u64   offset;     //The effective address
-          //offset = Base + (Index * Scale) + Displacement
-
+    __s8    instr;	/* instruction type */
+    __s16   op_size;    /* the operand's bit size, e.g. 16-bit or 32-bit */
     __u64   immediate;
-
-    __u16   seg_sel;    //Segmentation selector
-
-    __u32   operand[MAX_OPERAND_NUM];   //The order of operand is from AT&T Assembly
-    __s16   op_num; //The operand numbers
-
-    __u32   flags; //
+    __u16   seg_sel;    /* segmentation selector */
+    __u32   operand[MAX_OPERAND_NUM];   /* order is AT&T assembly */
+    __u32   flags;
 };
 
 #define MAX_INST_LEN      32
 
-struct mi_per_cpu_info
-{
-    unsigned long          mmio_target;
-    struct cpu_user_regs        *inst_decoder_regs;
+struct mi_per_cpu_info {
+    int                    flags;
+    int			   instr;		/* instruction */
+    unsigned long          operand[2];		/* operands */
+    unsigned long          immediate;		/* immediate portion */
+    struct cpu_user_regs   *inst_decoder_regs;	/* current context */
 };
 
 struct virtual_platform_def {
-    unsigned long          *real_mode_data; /* E820, etc. */
+    unsigned long          *real_mode_data;	/* E820, etc. */
     unsigned long          shared_page_va;
     struct vmx_virpit_t    vmx_pit;
     struct vmx_handler_t   vmx_handler;
-    struct mi_per_cpu_info mpci;            /* MMIO */
+    struct mi_per_cpu_info mpci;		/* MMIO */
 };
 
 extern void handle_mmio(unsigned long, unsigned long);

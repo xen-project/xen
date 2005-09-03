@@ -21,6 +21,24 @@
 
 #define MAX_MBIT_RATE 500
 
+
+/*
+** Default values for important tuning parameters. Can override by passing
+** non-zero replacement values to xc_linux_save().  
+**
+** XXX SMH: should consider if want to be able to override MAX_MBIT_RATE too. 
+** 
+*/
+#define DEF_MAX_ITERS   29   /* limit us to 30 times round loop */ 
+#define DEF_MAX_FACTOR   3   /* never send more than 3x nr_pfns */
+
+
+
+/* Flags to control behaviour of xc_linux_save */
+#define XCFLAGS_LIVE      1
+#define XCFLAGS_DEBUG     2
+
+
 #define DEBUG 0
 
 #if 1
@@ -320,18 +338,18 @@ static int suspend_and_state(int xc_handle, int io_fd,	int dom,
                              xc_dominfo_t *info,
                              vcpu_guest_context_t *ctxt)
 {
-    int i=0;
+    int i = 0;
     char ans[30];
 
     printf("suspend\n");
     fflush(stdout);
     if (fgets(ans, sizeof(ans), stdin) == NULL) {
-	ERR("failed reading suspend reply");
-	return -1;
+        ERR("failed reading suspend reply");
+        return -1;
     }
     if (strncmp(ans, "done\n", 5)) {
-	ERR("suspend reply incorrect: %s", ans);
-	return -1;
+        ERR("suspend reply incorrect: %s", ans);
+        return -1;
     }
 
 retry:
@@ -377,19 +395,16 @@ retry:
     return -1;
 }
 
-int xc_linux_save(int xc_handle, int io_fd, u32 dom)
+int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters, 
+                  u32 max_factor, u32 flags)
 {
     xc_dominfo_t info;
 
     int rc = 1, i, j, k, last_iter, iter = 0;
     unsigned long mfn;
-    int live =  0; // (ioctxt->flags & XCFLAGS_LIVE);
-    int debug = 0; // (ioctxt->flags & XCFLAGS_DEBUG);
+    int live  = (flags & XCFLAGS_LIVE); 
+    int debug = (flags & XCFLAGS_DEBUG); 
     int sent_last_iter, skip_this_iter;
-
-    /* Important tuning parameters */
-    int max_iters  = 29; /* limit us to 30 times round loop */
-    int max_factor = 3;  /* never send more than 3x nr_pfns */
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
@@ -442,8 +457,16 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
 
     MBIT_RATE = START_MBIT_RATE;
 
-    DPRINTF("xc_linux_save start %d\n", dom);
-    
+
+    /* If no explicit control parameters given, use defaults */
+    if(!max_iters) 
+        max_iters = DEF_MAX_ITERS; 
+    if(!max_factor) 
+        max_factor = DEF_MAX_FACTOR; 
+
+
+    DPRINTF("xc_linux_save start DOM%u live=%s\n", dom, live?"true":"false"); 
+
     if (mlock(&ctxt, sizeof(ctxt))) {
         ERR("Unable to mlock ctxt");
         return 1;

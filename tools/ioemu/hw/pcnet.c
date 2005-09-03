@@ -569,6 +569,10 @@ static void pcnet_transmit(PCNetState *s)
             cpu_physical_memory_read(PHYSADDR(s, tmd.tmd0.tbadr),
                     s->buffer + s->xmit_pos, 4096 - tmd.tmd1.bcnt);
             s->xmit_pos += 4096 - tmd.tmd1.bcnt;
+
+	    tmd.tmd1.own = 0;
+	    TMDSTORE(&tmd, PHYSADDR(s,CSR_CXDA(s)));
+
 #ifdef PCNET_DEBUG
             printf("pcnet_transmit size=%d\n", s->xmit_pos);
 #endif            
@@ -580,10 +584,10 @@ static void pcnet_transmit(PCNetState *s)
             s->csr[0] &= ~0x0008;   /* clear TDMD */
             s->csr[4] |= 0x0004;    /* set TXSTRT */
             s->xmit_pos = -1;
-        }
-
-        tmd.tmd1.own = 0;
-        TMDSTORE(&tmd, PHYSADDR(s,CSR_CXDA(s)));
+        } else {
+	    tmd.tmd1.own = 0;
+	    TMDSTORE(&tmd, PHYSADDR(s,CSR_CXDA(s)));
+	}
         if (!CSR_TOKINTD(s) || (CSR_LTINTEN(s) && tmd.tmd1.ltint))
             s->csr[0] |= 0x0200;    /* set TINT */
 

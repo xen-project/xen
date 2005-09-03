@@ -64,37 +64,37 @@ static inline long __get_reg_value(unsigned long reg, int size)
         case QUAD:
             return (long)(reg);
         default:
-            printk("Error: <__get_reg_value>Invalid reg size\n");
+	printf("Error: (__get_reg_value) Invalid reg size\n");
             domain_crash_synchronous();
     }
 }
 
-static long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs) 
+long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs) 
 {
     if (size == BYTE) {
         switch (index) { 
-            case 0: //%al
+	case 0: /* %al */
                 return (char)(regs->rax & 0xFF);
-            case 1: //%cl  
+	case 1: /* %cl */
                 return (char)(regs->rcx & 0xFF);
-            case 2: //%dl
+	case 2: /* %dl */
                 return (char)(regs->rdx & 0xFF); 
-            case 3: //%bl
+	case 3: /* %bl */
                 return (char)(regs->rbx & 0xFF);
-            case 4: //%ah
+	case 4: /* %ah */
                 return (char)((regs->rax & 0xFF00) >> 8);
-            case 5: //%ch 
+	case 5: /* %ch */
                 return (char)((regs->rcx & 0xFF00) >> 8);
-            case 6: //%dh
+	case 6: /* %dh */
                 return (char)((regs->rdx & 0xFF00) >> 8);
-            case 7: //%bh
+	case 7: /* %bh */
                 return (char)((regs->rbx & 0xFF00) >> 8);
             default:
-                printk("Error: (get_reg_value)Invalid index value\n"); 
+	    printf("Error: (get_reg_value) Invalid index value\n"); 
                 domain_crash_synchronous();
         }
-
     }
+
     switch (index) {
         case 0: return __get_reg_value(regs->rax, size);
         case 1: return __get_reg_value(regs->rcx, size);
@@ -113,7 +113,7 @@ static long get_reg_value(int size, int index, int seg, struct cpu_user_regs *re
         case 14: return __get_reg_value(regs->r14, size);
         case 15: return __get_reg_value(regs->r15, size);
         default:
-            printk("Error: (get_reg_value)Invalid index value\n"); 
+	printf("Error: (get_reg_value) Invalid index value\n"); 
             domain_crash_synchronous();
     }
 }
@@ -129,117 +129,91 @@ void store_cpu_user_regs(struct cpu_user_regs *regs)
     __vmread(GUEST_RIP, &regs->eip);
 }
 
-static long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
+static inline long __get_reg_value(unsigned long reg, int size)
 {                    
-    /*               
-     * Reference the db_reg[] table
-     */              
-    switch (size) {  
-    case BYTE: 
+    switch(size) {
+    case WORD:
+	return (short)(reg & 0xFFFF);
+    case LONG:
+	return (int)(reg & 0xFFFFFFFF);
+    default:
+	printf("Error: (__get_reg_value) Invalid reg size\n");
+	domain_crash_synchronous();
+    }
+}
+
+long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
+{                    
+    if (size == BYTE) {
         switch (index) { 
-        case 0: //%al
+	case 0: /* %al */
             return (char)(regs->eax & 0xFF);
-        case 1: //%cl  
+	case 1: /* %cl */
             return (char)(regs->ecx & 0xFF);
-        case 2: //%dl
+	case 2: /* %dl */
             return (char)(regs->edx & 0xFF); 
-        case 3: //%bl
+	case 3: /* %bl */
             return (char)(regs->ebx & 0xFF);
-        case 4: //%ah
+	case 4: /* %ah */
             return (char)((regs->eax & 0xFF00) >> 8);
-        case 5: //%ch 
+	case 5: /* %ch */
             return (char)((regs->ecx & 0xFF00) >> 8);
-        case 6: //%dh
+	case 6: /* %dh */
             return (char)((regs->edx & 0xFF00) >> 8);
-        case 7: //%bh
+	case 7: /* %bh */
             return (char)((regs->ebx & 0xFF00) >> 8);
         default:
-            printk("Error: (get_reg_value)size case 0 error\n"); 
+	    printf("Error: (get_reg_value) Invalid index value\n"); 
             domain_crash_synchronous();
         }
-    case WORD:
-        switch (index) {
-        case 0: //%ax
-            return (short)(regs->eax & 0xFFFF);
-        case 1: //%cx
-            return (short)(regs->ecx & 0xFFFF);
-        case 2: //%dx
-            return (short)(regs->edx & 0xFFFF);
-        case 3: //%bx
-            return (short)(regs->ebx & 0xFFFF);
-        case 4: //%sp
-            return (short)(regs->esp & 0xFFFF);
-            break;
-        case 5: //%bp
-            return (short)(regs->ebp & 0xFFFF);
-        case 6: //%si
-            return (short)(regs->esi & 0xFFFF);
-        case 7: //%di
-            return (short)(regs->edi & 0xFFFF);
-        default:
-            printk("Error: (get_reg_value)size case 1 error\n");
-            domain_crash_synchronous();
         }
-    case LONG:
-        switch (index) {
-        case 0: //%eax
-            return regs->eax;
-        case 1: //%ecx
-            return regs->ecx;
-        case 2: //%edx
-            return regs->edx;
 
-        case 3: //%ebx
-            return regs->ebx;
-        case 4: //%esp
-            return regs->esp;
-        case 5: //%ebp
-            return regs->ebp;
-        case 6: //%esi
-            return regs->esi;
-        case 7: //%edi
-            return regs->edi;
-        default:
-            printk("Error: (get_reg_value)size case 2 error\n");
-            domain_crash_synchronous();
-        }
+        switch (index) {
+    case 0: return __get_reg_value(regs->eax, size);
+    case 1: return __get_reg_value(regs->ecx, size);
+    case 2: return __get_reg_value(regs->edx, size);
+    case 3: return __get_reg_value(regs->ebx, size);
+    case 4: return __get_reg_value(regs->esp, size);
+    case 5: return __get_reg_value(regs->ebp, size);
+    case 6: return __get_reg_value(regs->esi, size);
+    case 7: return __get_reg_value(regs->edi, size);
     default:
-        printk("Error: (get_reg_value)size case error\n");
+	printf("Error: (get_reg_value) Invalid index value\n"); 
         domain_crash_synchronous();
     }
 }
 #endif
 
-static inline const unsigned char *check_prefix(const unsigned char *inst, struct instruction *thread_inst, unsigned char *rex_p)
+static inline unsigned char *check_prefix(unsigned char *inst,
+		struct instruction *thread_inst, unsigned char *rex_p)
 {
     while (1) {
         switch (*inst) {
-            /* rex prefix for em64t instructions*/
+        /* rex prefix for em64t instructions */
             case 0x40 ... 0x4e:
                 *rex_p = *inst;
                 break;
-
-            case 0xf3: //REPZ
+        case 0xf3: /* REPZ */
     	    	thread_inst->flags = REPZ;
-	        	break;
-            case 0xf2: //REPNZ
+        	break;
+        case 0xf2: /* REPNZ */
     	    	thread_inst->flags = REPNZ;
-	        	break;
-            case 0xf0: //LOCK
+        	break;
+        case 0xf0: /* LOCK */
     	    	break;
-            case 0x2e: //CS
-            case 0x36: //SS
-            case 0x3e: //DS
-            case 0x26: //ES
-            case 0x64: //FS
-            case 0x65: //GS
-		        thread_inst->seg_sel = *inst;
+        case 0x2e: /* CS */
+        case 0x36: /* SS */
+        case 0x3e: /* DS */
+        case 0x26: /* ES */
+        case 0x64: /* FS */
+        case 0x65: /* GS */
+	        thread_inst->seg_sel = *inst;
                 break;
-            case 0x66: //32bit->16bit
+        case 0x66: /* 32bit->16bit */
                 thread_inst->op_size = WORD;
                 break;
             case 0x67:
-	        	printf("Error: Not handling 0x67 (yet)\n");
+        	printf("Error: Not handling 0x67 (yet)\n");
                 domain_crash_synchronous();
                 break;
             default:
@@ -249,7 +223,7 @@ static inline const unsigned char *check_prefix(const unsigned char *inst, struc
     }
 }
 
-static inline unsigned long get_immediate(int op16, const unsigned char *inst, int op_size)
+static inline unsigned long get_immediate(int op16,const unsigned char *inst, int op_size)
 {
     int mod, reg, rm;
     unsigned long val = 0;
@@ -317,197 +291,299 @@ static inline int get_index(const unsigned char *inst, unsigned char rex)
 
 static void init_instruction(struct instruction *mmio_inst)
 {
-    memset(mmio_inst->i_name, '0', I_NAME_LEN);
-    mmio_inst->op_size =  0;
-    mmio_inst->offset = 0;
+    mmio_inst->instr = 0;
+    mmio_inst->op_size = 0;
     mmio_inst->immediate = 0;
     mmio_inst->seg_sel = 0;
-    mmio_inst->op_num = 0;
 
     mmio_inst->operand[0] = 0;
     mmio_inst->operand[1] = 0;
-    mmio_inst->operand[2] = 0;
         
     mmio_inst->flags = 0;
 }
 
 #define GET_OP_SIZE_FOR_BYTE(op_size)   \
-    do {if (rex) op_size = BYTE_64;else op_size = BYTE;} while(0)
+    do {				\
+    	if (rex)			\
+	    op_size = BYTE_64;		\
+	else				\
+	    op_size = BYTE;		\
+    } while(0)
 
 #define GET_OP_SIZE_FOR_NONEBYTE(op_size)   \
-    do {if (rex & 0x8) op_size = QUAD; else if (op_size != WORD) op_size = LONG;} while(0)
+    do {				\
+    	if (rex & 0x8)			\
+	    op_size = QUAD;		\
+	else if (op_size != WORD)	\
+	    op_size = LONG;		\
+    } while(0)
 
-static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst)
+
+/*
+ * Decode mem,accumulator operands (as in <opcode> m8/m16/m32, al,ax,eax)
+ */
+static int mem_acc(unsigned char size, struct instruction *instr)
+{
+    instr->operand[0] = mk_operand(size, 0, 0, MEMORY);
+    instr->operand[1] = mk_operand(size, 0, 0, REGISTER);
+    return DECODE_success;
+}
+
+/*
+ * Decode accumulator,mem operands (as in <opcode> al,ax,eax, m8/m16/m32)
+ */
+static int acc_mem(unsigned char size, struct instruction *instr)
+{
+    instr->operand[0] = mk_operand(size, 0, 0, REGISTER);
+    instr->operand[1] = mk_operand(size, 0, 0, MEMORY);
+    return DECODE_success;
+}
+
+/*
+ * Decode mem,reg operands (as in <opcode> r32/16, m32/16)
+ */
+static int mem_reg(unsigned char size, unsigned char *opcode,
+			struct instruction *instr, unsigned char rex)
+{
+    int index = get_index(opcode + 1, rex);
+
+    instr->operand[0] = mk_operand(size, 0, 0, MEMORY);
+    instr->operand[1] = mk_operand(size, index, 0, REGISTER);
+    return DECODE_success;
+}
+
+/*
+ * Decode reg,mem operands (as in <opcode> m32/16, r32/16)
+ */
+static int reg_mem(unsigned char size, unsigned char *opcode,
+			struct instruction *instr, unsigned char rex)
+{
+    int index = get_index(opcode + 1, rex);
+
+    instr->operand[0] = mk_operand(size, index, 0, REGISTER);
+    instr->operand[1] = mk_operand(size, 0, 0, MEMORY);
+    return DECODE_success;
+}
+
+static int vmx_decode(unsigned char *opcode, struct instruction *instr)
 {
     unsigned long eflags;
     int index, vm86 = 0;
     unsigned char rex = 0;
     unsigned char tmp_size = 0;
 
+    init_instruction(instr);
 
-    init_instruction(thread_inst);
-
-    inst = check_prefix(inst, thread_inst, &rex);
+    opcode = check_prefix(opcode, instr, &rex);
 
     __vmread(GUEST_RFLAGS, &eflags);
     if (eflags & X86_EFLAGS_VM)
         vm86 = 1;
 
     if (vm86) { /* meaning is reversed */
-       if (thread_inst->op_size == WORD)
-           thread_inst->op_size = LONG;
-       else if (thread_inst->op_size == LONG)
-           thread_inst->op_size = WORD;
-       else if (thread_inst->op_size == 0)
-           thread_inst->op_size = WORD;
+       if (instr->op_size == WORD)
+           instr->op_size = LONG;
+       else if (instr->op_size == LONG)
+           instr->op_size = WORD;
+       else if (instr->op_size == 0)
+           instr->op_size = WORD;
     }
 
-    switch(*inst) {
-        case 0x81:
-            /* This is only a workaround for cmpl instruction*/
-            strcpy((char *)thread_inst->i_name, "cmp");
-            return DECODE_success;
+    switch (*opcode) {
+    case 0x0B: /* or m32/16, r32/16 */
+	instr->instr = INSTR_OR;
+	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	return mem_reg(instr->op_size, opcode, instr, rex);
 
-        case 0x88:
-            /* mov r8 to m8 */
-            thread_inst->op_size = BYTE;
-            index = get_index((inst + 1), rex);
-            GET_OP_SIZE_FOR_BYTE(tmp_size);
-            thread_inst->operand[0] = mk_operand(tmp_size, index, 0, REGISTER);
+    case 0x20: /* and r8, m8 */
+	instr->instr = INSTR_AND;
+	GET_OP_SIZE_FOR_BYTE(instr->op_size);
+	return reg_mem(instr->op_size, opcode, instr, rex);
 
-            break;
-        case 0x89:
-            /* mov r32/16 to m32/16 */
-            index = get_index((inst + 1), rex);
-            GET_OP_SIZE_FOR_NONEBYTE(thread_inst->op_size);
-            thread_inst->operand[0] = mk_operand(thread_inst->op_size, index, 0, REGISTER);
+    case 0x21: /* and r32/16, m32/16 */
+	instr->instr = INSTR_AND;
+	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	return reg_mem(instr->op_size, opcode, instr, rex);
 
-            break;
-        case 0x8a:
-            /* mov m8 to r8 */
-            thread_inst->op_size = BYTE;
-            index = get_index((inst + 1), rex);
-            GET_OP_SIZE_FOR_BYTE(tmp_size);
-            thread_inst->operand[1] = mk_operand(tmp_size, index, 0, REGISTER);
-            break;
-        case 0x8b:
-            /* mov r32/16 to m32/16 */
-            index = get_index((inst + 1), rex);
-            GET_OP_SIZE_FOR_NONEBYTE(thread_inst->op_size);
-            thread_inst->operand[1] = mk_operand(thread_inst->op_size, index, 0, REGISTER);
-            break;
-        case 0x8c:
-        case 0x8e:
-            printk("%x, This opcode hasn't been handled yet!", *inst);
-            return DECODE_failure;
-            /* Not handle it yet. */
-        case 0xa0:
-            /* mov byte to al */
-            thread_inst->op_size = BYTE;
-            GET_OP_SIZE_FOR_BYTE(tmp_size);
-            thread_inst->operand[1] = mk_operand(tmp_size, 0, 0, REGISTER);
-            break;
-        case 0xa1:
-            /* mov word/doubleword to ax/eax */
-	    GET_OP_SIZE_FOR_NONEBYTE(thread_inst->op_size);
-	    thread_inst->operand[1] = mk_operand(thread_inst->op_size, 0, 0, REGISTER);
+    case 0x23: /* and m32/16, r32/16 */
+	instr->instr = INSTR_AND;
+	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	return mem_reg(instr->op_size, opcode, instr, rex);
 
-            break;
-        case 0xa2:
-            /* mov al to (seg:offset) */
-            thread_inst->op_size = BYTE;
-            GET_OP_SIZE_FOR_BYTE(tmp_size);
-            thread_inst->operand[0] = mk_operand(tmp_size, 0, 0, REGISTER);
-            break;
-        case 0xa3:
-            /* mov ax/eax to (seg:offset) */
-            GET_OP_SIZE_FOR_NONEBYTE(thread_inst->op_size);
-            thread_inst->operand[0] = mk_operand(thread_inst->op_size, 0, 0, REGISTER);
-            break;
-        case 0xa4:
-            /* movsb */
-            thread_inst->op_size = BYTE;
-            strcpy((char *)thread_inst->i_name, "movs");
+    case 0x30: /* xor r8, m8 */
+	instr->instr = INSTR_XOR;
+	GET_OP_SIZE_FOR_BYTE(instr->op_size);
+	return reg_mem(instr->op_size, opcode, instr, rex);
+
+    case 0x31: /* xor r32/16, m32/16 */
+	instr->instr = INSTR_XOR;
+	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	return reg_mem(instr->op_size, opcode, instr, rex);
+
+    case 0x39: /* cmp r32/16, m32/16 */
+	instr->instr = INSTR_CMP;
+	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	return reg_mem(instr->op_size, opcode, instr, rex);
+
+    case 0x81:
+	if (((opcode[1] >> 3) & 7) == 7) { /* cmp $imm, m32/16 */
+	    instr->instr = INSTR_CMP;
+	    GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+
+	    instr->operand[0] = mk_operand(instr->op_size, 0, 0, IMMEDIATE);
+	    instr->immediate = get_immediate(vm86, opcode+1, BYTE);
+	    instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
+
             return DECODE_success;
-        case 0xa5:
-            /* movsw/movsl */
-            GET_OP_SIZE_FOR_NONEBYTE(thread_inst->op_size);
-	    strcpy((char *)thread_inst->i_name, "movs");
-            return DECODE_success;
-        case 0xaa:
-            /* stosb */
-            thread_inst->op_size = BYTE;
-            strcpy((char *)thread_inst->i_name, "stosb");
-            return DECODE_success;
-       case 0xab:
-            /* stosw/stosl */
-            if (thread_inst->op_size == WORD) {
-                strcpy((char *)thread_inst->i_name, "stosw");
-            } else {
-                thread_inst->op_size = LONG;
-                strcpy((char *)thread_inst->i_name, "stosl");
-            }
-            return DECODE_success;
-        case 0xc6:
-            /* mov imm8 to m8 */
-            thread_inst->op_size = BYTE;
-            thread_inst->operand[0] = mk_operand(BYTE, 0, 0, IMMEDIATE);
-            thread_inst->immediate = get_immediate(vm86,
-					(inst+1), thread_inst->op_size);
-            break;
-        case 0xc7:
-            /* mov imm16/32 to m16/32 */
-            GET_OP_SIZE_FOR_NONEBYTE(thread_inst->op_size);
-            thread_inst->operand[0] = mk_operand(thread_inst->op_size, 0, 0, IMMEDIATE);
-            thread_inst->immediate = get_immediate(vm86, (inst+1), thread_inst->op_size);
-            
-            break;
-        case 0x0f:
-            break;
-        default:
-            printk("%x, This opcode hasn't been handled yet!", *inst);
-            return DECODE_failure;
-    }
-    
-    strcpy((char *)thread_inst->i_name, "mov");
-    if (*inst != 0x0f) {
+	} else
+	    return DECODE_failure;
+
+    case 0x84:  /* test m8, r8 */
+	instr->instr = INSTR_TEST;
+	instr->op_size = BYTE;
+	GET_OP_SIZE_FOR_BYTE(tmp_size);
+	return mem_reg(tmp_size, opcode, instr, rex);
+
+    case 0x88: /* mov r8, m8 */
+	instr->instr = INSTR_MOV;
+	instr->op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(tmp_size);
+	return reg_mem(tmp_size, opcode, instr, rex);
+
+    case 0x89: /* mov r32/16, m32/16 */
+	instr->instr = INSTR_MOV;
+	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	return reg_mem(instr->op_size, opcode, instr, rex);
+
+    case 0x8A: /* mov m8, r8 */
+	instr->instr = INSTR_MOV;
+	instr->op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(tmp_size);
+	return mem_reg(tmp_size, opcode, instr, rex);
+
+    case 0x8B: /* mov m32/16, r32/16 */
+	instr->instr = INSTR_MOV;
+	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	return mem_reg(instr->op_size, opcode, instr, rex);
+
+    case 0xA0: /* mov <addr>, al */
+	instr->instr = INSTR_MOV;
+	instr->op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(tmp_size);
+	return mem_acc(tmp_size, instr);
+
+    case 0xA1: /* mov <addr>, ax/eax */
+	instr->instr = INSTR_MOV;
+	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	return mem_acc(instr->op_size, instr);
+
+    case 0xA2: /* mov al, <addr> */
+	instr->instr = INSTR_MOV;
+	instr->op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(tmp_size);
+	return acc_mem(tmp_size, instr);
+
+    case 0xA3: /* mov ax/eax, <addr> */
+	instr->instr = INSTR_MOV;
+	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	return acc_mem(instr->op_size, instr);
+
+    case 0xA4: /* movsb */
+	instr->instr = INSTR_MOVS;
+	instr->op_size = BYTE;
         return DECODE_success;
-    }
+            
+    case 0xA5: /* movsw/movsl */
+	instr->instr = INSTR_MOVS;
+	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	return DECODE_success;
+    
+    case 0xAA: /* stosb */
+	instr->instr = INSTR_STOS;
+	instr->op_size = BYTE;
+        return DECODE_success;
 
-    inst++;
-    switch (*inst) {
+    case 0xAB: /* stosw/stosl */
+	instr->instr = INSTR_STOS;
+	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	return DECODE_success;
                     
-        /* movz */
-        case 0xb6:
-            index = get_index((inst + 1), rex);
-            GET_OP_SIZE_FOR_NONEBYTE(thread_inst->op_size);
-            thread_inst->operand[1] = mk_operand(thread_inst->op_size, index, 0, REGISTER);
-            thread_inst->op_size = BYTE;
-            strcpy((char *)thread_inst->i_name, "movzb");
+    case 0xC6:
+	if (((opcode[1] >> 3) & 7) == 0) { /* mov $imm8, m8 */
+	    instr->instr = INSTR_MOV;
+	    instr->op_size = BYTE;
+
+	    instr->operand[0] = mk_operand(instr->op_size, 0, 0, IMMEDIATE);
+	    instr->immediate = get_immediate(vm86, opcode+1, instr->op_size);
+	    instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
             
             return DECODE_success;
-        case 0xb7:
-	    index = get_index((inst + 1), rex);
-	    if (rex & 0x8) {
-		    thread_inst->op_size = LONG;
-		    thread_inst->operand[1] = mk_operand(QUAD, index, 0, REGISTER);
-	    } else {
-		    thread_inst->op_size = WORD;
-		    thread_inst->operand[1] = mk_operand(LONG, index, 0, REGISTER);
-	    }
+	} else
+	    return DECODE_failure;
             
-            strcpy((char *)thread_inst->i_name, "movzw");
+    case 0xC7:
+	if (((opcode[1] >> 3) & 7) == 0) { /* mov $imm16/32, m16/32 */
+	    instr->instr = INSTR_MOV;
+	    GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+
+	    instr->operand[0] = mk_operand(instr->op_size, 0, 0, IMMEDIATE);
+	    instr->immediate = get_immediate(vm86, opcode+1, instr->op_size);
+	    instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
             
             return DECODE_success;
-        default:
-            printk("0f %x, This opcode hasn't been handled yet!", *inst);
-            return DECODE_failure;
+	} else
+	    return DECODE_failure;
+
+    case 0xF6:
+	if (((opcode[1] >> 3) & 7) == 0) { /* testb $imm8, m8 */
+	    instr->instr = INSTR_TEST;
+	    instr->op_size = BYTE;
+
+	    instr->operand[0] = mk_operand(instr->op_size, 0, 0, IMMEDIATE);
+	    instr->immediate = get_immediate(vm86, opcode+1, instr->op_size);
+	    instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
+
+	    return DECODE_success;
+	} else
+	    return DECODE_failure;
+
+    case 0x0F:
+	break;
+
+    default:
+	printf("%x, This opcode isn't handled yet!\n", *opcode);
+        return DECODE_failure;
     }
 
-    /* will never reach here */
-    return DECODE_failure;
+    switch (*++opcode) {
+    case 0xB6: /* movz m8, r16/r32 */
+	instr->instr = INSTR_MOVZ;
+	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	index = get_index(opcode + 1, rex);
+	instr->operand[0] = mk_operand(BYTE, 0, 0, MEMORY);
+	instr->operand[1] = mk_operand(instr->op_size, index, 0, REGISTER);
+	return DECODE_success;
+
+    case 0xB7: /* movz m16, r32 */
+	instr->instr = INSTR_MOVZ;
+	index = get_index(opcode + 1, rex);
+	if (rex & 0x8) {
+	   instr->op_size = LONG;
+	   instr->operand[1] = mk_operand(QUAD, index, 0, REGISTER);
+	} else {
+	   instr->op_size = WORD;
+	   instr->operand[1] = mk_operand(LONG, index, 0, REGISTER);
+	}
+	instr->operand[0] = mk_operand(instr->op_size, 0, 0, MEMORY);
+	return DECODE_success;
+
+    default:
+	printf("0f %x, This opcode isn't handled yet\n", *opcode);
+	return DECODE_failure;
+    }
 }
 
+/* XXX use vmx_copy instead */
 int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_len)
 {
     unsigned long gpa;
@@ -552,40 +628,27 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
     return inst_len+remaining;
 }
 
-static int read_from_mmio(struct instruction *inst_p)
-{
-    // Only for mov instruction now!!!
-    if (inst_p->operand[1] & REGISTER)
-        return 1;
-
-    return 0;
-}
-
-// dir:  1 read from mmio
-//       0 write to mmio
-static void send_mmio_req(unsigned long gpa, 
-                   struct instruction *inst_p, long value, int dir, int pvalid)
+void send_mmio_req(unsigned char type, unsigned long gpa, 
+	   unsigned long count, int size, long value, int dir, int pvalid)
 {
     struct vcpu *d = current;
     vcpu_iodata_t *vio;
     ioreq_t *p;
     int vm86;
-    struct mi_per_cpu_info *mpci_p;
-    struct cpu_user_regs *inst_decoder_regs;
+    struct cpu_user_regs *regs;
     extern long evtchn_send(int lport);
 
-    mpci_p = &current->domain->arch.vmx_platform.mpci;
-    inst_decoder_regs = mpci_p->inst_decoder_regs;
+    regs = current->domain->arch.vmx_platform.mpci.inst_decoder_regs;
 
     vio = get_vio(d->domain, d->vcpu_id);
-
     if (vio == NULL) {
-        printk("bad shared page\n");
+        printf("bad shared page\n");
         domain_crash_synchronous(); 
     }
+
     p = &vio->vp_ioreq;
 
-    vm86 = inst_decoder_regs->eflags & X86_EFLAGS_VM;
+    vm86 = regs->eflags & X86_EFLAGS_VM;
 
     if (test_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags)) {
         printf("VMX I/O has not yet completed\n");
@@ -596,24 +659,21 @@ static void send_mmio_req(unsigned long gpa,
     p->dir = dir;
     p->pdata_valid = pvalid;
 
-    p->port_mm = 1;
-    p->size = inst_p->op_size;
+    p->type = type;
+    p->size = size;
     p->addr = gpa;
-    p->u.data = value;
+    p->count = count;
+    p->df = regs->eflags & EF_DF ? 1 : 0;
+
+    if (pvalid) {
+	if (vmx_paging_enabled(current))
+	    p->u.pdata = (void *) gva_to_gpa(value);
+        else
+	    p->u.pdata = (void *) value; /* guest VA == guest PA */
+    } else
+	p->u.data = value;
 
     p->state = STATE_IOREQ_READY;
-
-    if (inst_p->flags & REPZ) {
-        if (vm86)
-            p->count = inst_decoder_regs->ecx & 0xFFFF;
-        else
-            p->count = inst_decoder_regs->ecx;
-        p->df = (inst_decoder_regs->eflags & EF_DF) ? 1 : 0;
-    } else
-        p->count = 1;
-
-    if ((pvalid) && vmx_paging_enabled(current))
-        p->u.pdata = (void *) gva_to_gpa(p->u.data);
 
     if (vmx_mmio_intercept(p)){
         p->state = STATE_IORESP_READY;
@@ -625,18 +685,50 @@ static void send_mmio_req(unsigned long gpa,
     vmx_wait_io();
 }
 
+static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
+		struct mi_per_cpu_info *mpcip, struct cpu_user_regs *regs)
+{
+    unsigned long value = 0;
+    int index, size;
+    
+    size = operand_size(inst->operand[0]);
+
+    mpcip->flags = inst->flags;
+    mpcip->instr = inst->instr;
+    mpcip->operand[0] = inst->operand[0]; /* source */
+    mpcip->operand[1] = inst->operand[1]; /* destination */
+
+    if (inst->operand[0] & REGISTER) { /* dest is memory */
+	index = operand_index(inst->operand[0]);
+	value = get_reg_value(size, index, 0, regs);
+	send_mmio_req(type, gpa, 1, size, value, IOREQ_WRITE, 0);
+    } else if (inst->operand[0] & IMMEDIATE) { /* dest is memory */
+	value = inst->immediate;
+	send_mmio_req(type, gpa, 1, size, value, IOREQ_WRITE, 0);
+    } else if (inst->operand[0] & MEMORY) { /* dest is register */
+	/* send the request and wait for the value */
+	send_mmio_req(type, gpa, 1, size, 0, IOREQ_READ, 0);
+    } else {
+	printf("mmio_operands: invalid operand\n");
+	domain_crash_synchronous();
+    }
+}
+
+#define GET_REPEAT_COUNT() \
+     (mmio_inst.flags & REPZ ? (vm86 ? regs->ecx & 0xFFFF : regs->ecx) : 1)
+	
 void handle_mmio(unsigned long va, unsigned long gpa)
 {
     unsigned long eip, eflags, cs;
     unsigned long inst_len, inst_addr;
-    struct mi_per_cpu_info *mpci_p;
-    struct cpu_user_regs *inst_decoder_regs;
+    struct mi_per_cpu_info *mpcip;
+    struct cpu_user_regs *regs;
     struct instruction mmio_inst;
     unsigned char inst[MAX_INST_LEN];
-    int vm86, ret;
+    int i, vm86, ret;
      
-    mpci_p = &current->domain->arch.vmx_platform.mpci;
-    inst_decoder_regs = mpci_p->inst_decoder_regs;
+    mpcip = &current->domain->arch.vmx_platform.mpci;
+    regs = mpcip->inst_decoder_regs;
 
     __vmread(GUEST_RIP, &eip);
     __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
@@ -647,108 +739,142 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         __vmread(GUEST_CS_SELECTOR, &cs);
         inst_addr = (cs << 4) + eip;
     } else
-        inst_addr = eip; /* XXX should really look at GDT[cs].base too */
+        inst_addr = eip;
 
-    memset(inst, '0', MAX_INST_LEN);
+    memset(inst, 0, MAX_INST_LEN);
     ret = inst_copy_from_guest(inst, inst_addr, inst_len);
     if (ret != inst_len) {
-        printk("handle_mmio - EXIT: get guest instruction fault\n");
+        printf("handle_mmio - EXIT: get guest instruction fault\n");
         domain_crash_synchronous();
     }
-
 
     init_instruction(&mmio_inst);
     
     if (vmx_decode(inst, &mmio_inst) == DECODE_failure) {
-        printk("vmx decode failure: eip=%lx, va=%lx\n %x %x %x %x\n", eip, va, 
-               inst[0], inst[1], inst[2], inst[3]);
+	printf("mmio opcode: va 0x%lx, gpa 0x%lx, len %ld:",
+		va, gpa, inst_len);
+	for (i = 0; i < inst_len; i++)
+	    printf(" %02x", inst[i] & 0xFF);
+	printf("\n");
         domain_crash_synchronous();
     }
 
-    __vmwrite(GUEST_RIP, eip + inst_len);
-    store_cpu_user_regs(inst_decoder_regs);
+    store_cpu_user_regs(regs);
+    regs->eip += inst_len; /* advance %eip */
 
-    // Only handle "mov" and "movs" instructions!
-    if (!strncmp((char *)mmio_inst.i_name, "movz", 4)) {
-        if (read_from_mmio(&mmio_inst)) {
-            // Send the request and waiting for return value.
-            mpci_p->mmio_target = mmio_inst.operand[1] | WZEROEXTEND;
-            send_mmio_req(gpa, &mmio_inst, 0, IOREQ_READ, 0);
-            return ;
-        } else {
-            printk("handle_mmio - EXIT: movz error!\n");
-            domain_crash_synchronous();
-        }
-    }
+    switch (mmio_inst.instr) {
+    case INSTR_MOV:
+	mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mpcip, regs);
+	break;
 
-    if (!strncmp((char *)mmio_inst.i_name, "movs", 4)) {
+    case INSTR_MOVS:
+    {
+	unsigned long count = GET_REPEAT_COUNT();
+	unsigned long size = mmio_inst.op_size;
+	int sign = regs->eflags & EF_DF ? -1 : 1;
 	unsigned long addr = 0;
 	int dir;
 
+	/* determine non-MMIO address */
 	if (vm86) {
 	    unsigned long seg;
 
 	    __vmread(GUEST_ES_SELECTOR, &seg);
-	    if (((seg << 4) + (inst_decoder_regs->edi & 0xFFFF)) == va) {
+	    if (((seg << 4) + (regs->edi & 0xFFFF)) == va) {
 		dir = IOREQ_WRITE;
 		__vmread(GUEST_DS_SELECTOR, &seg);
-		addr = (seg << 4) + (inst_decoder_regs->esi & 0xFFFF);
+		addr = (seg << 4) + (regs->esi & 0xFFFF);
 	    } else {
 		dir = IOREQ_READ;
-		addr = (seg << 4) + (inst_decoder_regs->edi & 0xFFFF);
+		addr = (seg << 4) + (regs->edi & 0xFFFF);
 	    }
-	} else { /* XXX should really look at GDT[ds/es].base too */
-	    if (va == inst_decoder_regs->edi) {
+	} else {
+	    if (va == regs->edi) {
 		dir = IOREQ_WRITE;
-		addr = inst_decoder_regs->esi;
+		addr = regs->esi;
 	    } else {
 		dir = IOREQ_READ;
-		addr = inst_decoder_regs->edi;
+		addr = regs->edi;
 	    }
 	}
 
-	send_mmio_req(gpa, &mmio_inst, addr, dir, 1);
-        return;
+	mpcip->flags = mmio_inst.flags;
+	mpcip->instr = mmio_inst.instr;
+
+	/*
+	 * In case of a movs spanning multiple pages, we break the accesses
+	 * up into multiple pages (the device model works with non-continguous
+	 * physical guest pages). To copy just one page, we adjust %ecx and
+	 * do not advance %eip so that the next "rep movs" copies the next page.
+	 * Unaligned accesses, for example movsl starting at PGSZ-2, are
+	 * turned into a single copy where we handle the overlapping memory
+	 * copy ourself. After this copy succeeds, "rep movs" is executed
+	 * again.
+	 */
+	if ((addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK)) {
+	    unsigned long value = 0;
+
+	    mpcip->flags |= OVERLAP;
+
+	    regs->eip -= inst_len; /* do not advance %eip */
+
+	    if (dir == IOREQ_WRITE)
+		vmx_copy(&value, addr, size, VMX_COPY_IN);
+	    send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, size, value, dir, 0);
+	} else {
+	    if ((addr & PAGE_MASK) != ((addr + count * size - 1) & PAGE_MASK)) {
+	        regs->eip -= inst_len; /* do not advance %eip */
+
+		if (sign > 0)
+		    count = (PAGE_SIZE - (addr & ~PAGE_MASK)) / size;
+		else
+		    count = (addr & ~PAGE_MASK) / size;
+	    }
+
+	    send_mmio_req(IOREQ_TYPE_COPY, gpa, count, size, addr, dir, 1);
+	}
+        break;
     }
 
-    if (!strncmp((char *)mmio_inst.i_name, "mov", 3)) {
-        long value = 0;
-        int size, index;
+    case INSTR_MOVZ:
+	mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mpcip, regs);
+	break;
 
-        if (read_from_mmio(&mmio_inst)) {
-            // Send the request and waiting for return value.
-            mpci_p->mmio_target = mmio_inst.operand[1];
-            send_mmio_req(gpa, &mmio_inst, value, IOREQ_READ, 0);
-            return;
-        } else {
-            // Write to MMIO
-            if (mmio_inst.operand[0] & IMMEDIATE) {
-                value = mmio_inst.immediate;
-            } else if (mmio_inst.operand[0] & REGISTER) {
-                size = operand_size(mmio_inst.operand[0]);
-                index = operand_index(mmio_inst.operand[0]);
-                value = get_reg_value(size, index, 0, inst_decoder_regs);
-            } else {
-                domain_crash_synchronous();
-            }
-            send_mmio_req(gpa, &mmio_inst, value, IOREQ_WRITE, 0);
-            return;
-        }
-    }
+    case INSTR_STOS:
+	/*
+	 * Since the destination is always in (contiguous) mmio space we don't
+	 * need to break it up into pages.
+	 */
+	mpcip->flags = mmio_inst.flags;
+	mpcip->instr = mmio_inst.instr;
+        send_mmio_req(IOREQ_TYPE_COPY, gpa,
+	    GET_REPEAT_COUNT(), mmio_inst.op_size, regs->eax, IOREQ_WRITE, 0);
+	break;
 
-    if (!strncmp((char *)mmio_inst.i_name, "stos", 4)) {
-        send_mmio_req(gpa, &mmio_inst,
-            inst_decoder_regs->eax, IOREQ_WRITE, 0);
-        return;
-    }
-    /* Workaround for cmp instruction */
-    if (!strncmp((char *)mmio_inst.i_name, "cmp", 3)) {
-        inst_decoder_regs->eflags &= ~X86_EFLAGS_ZF;
-        __vmwrite(GUEST_RFLAGS, inst_decoder_regs->eflags);
-        return;
-    }
+    case INSTR_OR:
+	mmio_operands(IOREQ_TYPE_OR, gpa, &mmio_inst, mpcip, regs);
+	break;
 
-    domain_crash_synchronous();
+    case INSTR_AND:
+	mmio_operands(IOREQ_TYPE_AND, gpa, &mmio_inst, mpcip, regs);
+	break;
+
+    case INSTR_XOR:
+	mmio_operands(IOREQ_TYPE_XOR, gpa, &mmio_inst, mpcip, regs);
+	break;
+
+    case INSTR_CMP:
+	mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mpcip, regs);
+	break;
+
+    case INSTR_TEST:
+	mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mpcip, regs);
+    	break;
+
+    default:
+	printf("Unhandled MMIO instruction\n");
+	domain_crash_synchronous();
+    }
 }
 
 #endif /* CONFIG_VMX */

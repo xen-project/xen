@@ -17,14 +17,17 @@
 int
 main(int argc, char **argv)
 {
-    unsigned int xc_fd, io_fd, domid;
+    unsigned int xc_fd, io_fd, domid, maxit, max_f, flags; 
 
-    if (argc != 4)
-	errx(1, "usage: %s xcfd iofd domid", argv[0]);
+    if (argc != 7)
+	errx(1, "usage: %s xcfd iofd domid maxit maxf flags", argv[0]);
 
     xc_fd = atoi(argv[1]);
     io_fd = atoi(argv[2]);
     domid = atoi(argv[3]);
+    maxit = atoi(argv[4]);
+    max_f = atoi(argv[5]);
+    flags = atoi(argv[6]);
 
-    return xc_linux_save(xc_fd, io_fd, domid);
+    return xc_linux_save(xc_fd, io_fd, domid, maxit, max_f, flags);
 }

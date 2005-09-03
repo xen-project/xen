@@ -531,7 +531,7 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
     int i, init_table = 0;
 
     __guest_get_l2e(v, va, &gl2e);
-    ASSERT(l2e_get_flags(gl2e) & _PAGE_PRESENT);
+    ASSERT(guest_l2e_get_flags(gl2e) & _PAGE_PRESENT);
     gl1pfn = l2e_get_pfn(gl2e);
 
     if ( !(sl1mfn = __shadow_status(d, gl1pfn, PGT_l1_shadow)) )
@@ -1664,7 +1664,7 @@ static inline int l1pte_write_fault(
         return 0;
     }
 
-    ASSERT(l1e_get_flags(gpte) & _PAGE_RW);
+    ASSERT(guest_l1e_get_flags(gpte) & _PAGE_RW);
     guest_l1e_add_flags(gpte, _PAGE_DIRTY | _PAGE_ACCESSED);
     spte = l1e_from_pfn(gmfn, guest_l1e_get_flags(gpte) & ~_PAGE_GLOBAL);
 

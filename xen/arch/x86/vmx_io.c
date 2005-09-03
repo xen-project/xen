@@ -33,6 +33,7 @@
 #include <asm/vmx_platform.h>
 #include <asm/vmx_virpit.h>
 #include <asm/apic.h>
+#include <asm/shadow.h>
 
 #include <public/io/ioreq.h>
 #include <public/io/vmx_vlapic.h>
@@ -123,7 +124,6 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
             regs->esp &= 0xFFFF0000;
             regs->esp |= (value & 0xFFFF);
             break;
-
         case 5:
             regs->ebp &= 0xFFFF0000;
             regs->ebp |= (value & 0xFFFF);
@@ -207,7 +207,6 @@ static inline void __set_reg_value(unsigned long *reg, int size, long value)
             *reg &= ~0xFFFF;
             *reg |= (value & 0xFFFF);
             break;
-
         case LONG:
             *reg &= ~0xFFFFFFFF;
             *reg |= (value & 0xFFFFFFFF);
@@ -322,13 +321,319 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
 }
 #endif
 
+extern long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs);
+
+static inline void set_eflags_CF(int size, unsigned long v1,
+	unsigned long v2, struct cpu_user_regs *regs)
+{
+    unsigned long mask = (1 << (8 * size)) - 1;
+
+    if ((v1 & mask) > (v2 & mask))
+	regs->eflags |= X86_EFLAGS_CF;
+    else
+	regs->eflags &= ~X86_EFLAGS_CF;
+}
+
+static inline void set_eflags_OF(int size, unsigned long v1,
+	unsigned long v2, unsigned long v3, struct cpu_user_regs *regs)
+{
+    if ((v3 ^ v2) & (v3 ^ v1) & (1 << ((8 * size) - 1)))
+	regs->eflags |= X86_EFLAGS_OF;
+}
+
+static inline void set_eflags_AF(int size, unsigned long v1,
+	unsigned long v2, unsigned long v3, struct cpu_user_regs *regs)
+{
+    if ((v1 ^ v2 ^ v3) & 0x10)
+	regs->eflags |= X86_EFLAGS_AF;
+}
+
+static inline void set_eflags_ZF(int size, unsigned long v1,
+	struct cpu_user_regs *regs)
+{
+    unsigned long mask = (1 << (8 * size)) - 1;
+
+    if ((v1 & mask) == 0)
+	regs->eflags |= X86_EFLAGS_ZF;
+}
+
+static inline void set_eflags_SF(int size, unsigned long v1,
+	struct cpu_user_regs *regs)
+{
+    if (v1 & (1 << ((8 * size) - 1)))
+	regs->eflags |= X86_EFLAGS_SF;
+}
+
+static char parity_table[256] = {
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1
+};
+
+static inline void set_eflags_PF(int size, unsigned long v1,
+	struct cpu_user_regs *regs)
+{
+    if (parity_table[v1 & 0xFF])
+	regs->eflags |= X86_EFLAGS_PF;
+}
+
+static void vmx_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
+					struct mi_per_cpu_info *mpcip)
+{
+    unsigned long old_eax;
+    int sign = p->df ? -1 : 1;
+
+    if (p->dir == IOREQ_WRITE) {
+        if (p->pdata_valid) {
+            regs->esi += sign * p->count * p->size;
+	    if (mpcip->flags & REPZ)
+		regs->ecx -= p->count;
+        }
+    } else {
+	if (mpcip->flags & OVERLAP) {
+	    unsigned long addr;
+
+            regs->edi += sign * p->count * p->size;
+	    if (mpcip->flags & REPZ)
+		regs->ecx -= p->count;
+
+	    addr = regs->edi;
+	    if (sign > 0)
+		addr -= p->size;
+	    vmx_copy(&p->u.data, addr, p->size, VMX_COPY_OUT);
+	} else if (p->pdata_valid) {
+            regs->edi += sign * p->count * p->size;
+	    if (mpcip->flags & REPZ)
+		regs->ecx -= p->count;
+        } else {
+	    old_eax = regs->eax;
+	    switch (p->size) {
+            case 1:
+                regs->eax = (old_eax & 0xffffff00) | (p->u.data & 0xff);
+                break;
+            case 2:
+                regs->eax = (old_eax & 0xffff0000) | (p->u.data & 0xffff);
+                break;
+            case 4:
+                regs->eax = (p->u.data & 0xffffffff);
+                break;
+            default:
+		printk("Error: %s unknown port size\n", __FUNCTION__);
+		domain_crash_synchronous();
+	    }
+    	}
+    }
+}
+
+static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
+					struct mi_per_cpu_info *mpcip)
+{
+    int sign = p->df ? -1 : 1;
+    int size = -1, index = -1;
+    unsigned long value = 0, diff = 0;
+    unsigned long src, dst;
+
+    src = mpcip->operand[0];
+    dst = mpcip->operand[1];
+    size = operand_size(src);
+
+    switch (mpcip->instr) {
+    case INSTR_MOV:
+	if (dst & REGISTER) {
+	    index = operand_index(dst);
+	    set_reg_value(size, index, 0, regs, p->u.data);
+	}
+	break;
+
+    case INSTR_MOVZ:
+	if (dst & REGISTER) {
+	    index = operand_index(dst);
+	    switch (size) {
+	    case BYTE: p->u.data = p->u.data & 0xFFULL; break;
+	    case WORD: p->u.data = p->u.data & 0xFFFFULL; break;
+	    case LONG: p->u.data = p->u.data & 0xFFFFFFFFULL; break;
+	    }
+	    set_reg_value(operand_size(dst), index, 0, regs, p->u.data);
+	}
+	break;
+
+    case INSTR_MOVS:
+	sign = p->df ? -1 : 1;
+	regs->esi += sign * p->count * p->size;
+	regs->edi += sign * p->count * p->size;
+
+	if ((mpcip->flags & OVERLAP) && p->dir == IOREQ_READ) {
+	    unsigned long addr = regs->edi;
+
+	    if (sign > 0)
+		addr -= p->size;
+	    vmx_copy(&p->u.data, addr, p->size, VMX_COPY_OUT);
+	}
+
+	if (mpcip->flags & REPZ)
+	    regs->ecx -= p->count;
+	break;
+
+    case INSTR_STOS:
+	sign = p->df ? -1 : 1;
+	regs->edi += sign * p->count * p->size;
+	if (mpcip->flags & REPZ)
+	    regs->ecx -= p->count;
+	break;
+
+    case INSTR_AND:
+	if (src & REGISTER) {
+	    index = operand_index(src);
+	    value = get_reg_value(size, index, 0, regs);
+	    diff = (unsigned long) p->u.data & value;
+	} else if (src & IMMEDIATE) {
+	    value = mpcip->immediate;
+	    diff = (unsigned long) p->u.data & value;
+	} else if (src & MEMORY) {
+	    index = operand_index(dst);
+	    value = get_reg_value(size, index, 0, regs);
+	    diff = (unsigned long) p->u.data & value;
+	    set_reg_value(size, index, 0, regs, diff);
+	}
+
+	/*
+	 * The OF and CF flags are cleared; the SF, ZF, and PF
+	 * flags are set according to the result. The state of
+	 * the AF flag is undefined.
+	 */
+	regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+			  X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+	set_eflags_ZF(size, diff, regs);
+	set_eflags_SF(size, diff, regs);
+	set_eflags_PF(size, diff, regs);
+	break;
+
+    case INSTR_OR:
+	if (src & REGISTER) {
+	    index = operand_index(src);
+	    value = get_reg_value(size, index, 0, regs);
+	    diff = (unsigned long) p->u.data | value;
+	} else if (src & IMMEDIATE) {
+	    value = mpcip->immediate;
+	    diff = (unsigned long) p->u.data | value;
+	} else if (src & MEMORY) {
+	    index = operand_index(dst);
+	    value = get_reg_value(size, index, 0, regs);
+	    diff = (unsigned long) p->u.data | value;
+	    set_reg_value(size, index, 0, regs, diff);
+	}
+
+	/*
+	 * The OF and CF flags are cleared; the SF, ZF, and PF
+	 * flags are set according to the result. The state of
+	 * the AF flag is undefined.
+	 */
+	regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+			  X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+	set_eflags_ZF(size, diff, regs);
+	set_eflags_SF(size, diff, regs);
+	set_eflags_PF(size, diff, regs);
+	break;
+
+    case INSTR_XOR:
+	if (src & REGISTER) {
+	    index = operand_index(src);
+	    value = get_reg_value(size, index, 0, regs);
+	    diff = (unsigned long) p->u.data ^ value;
+	} else if (src & IMMEDIATE) {
+	    value = mpcip->immediate;
+	    diff = (unsigned long) p->u.data ^ value;
+	} else if (src & MEMORY) {
+	    index = operand_index(dst);
+	    value = get_reg_value(size, index, 0, regs);
+	    diff = (unsigned long) p->u.data ^ value;
+	    set_reg_value(size, index, 0, regs, diff);
+	}
+
+	/*
+	 * The OF and CF flags are cleared; the SF, ZF, and PF
+	 * flags are set according to the result. The state of
+	 * the AF flag is undefined.
+	 */
+	regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+			  X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+	set_eflags_ZF(size, diff, regs);
+	set_eflags_SF(size, diff, regs);
+	set_eflags_PF(size, diff, regs);
+	break;
+
+    case INSTR_CMP:
+	if (src & REGISTER) {
+	    index = operand_index(src);
+	    value = get_reg_value(size, index, 0, regs);
+	    diff = (unsigned long) p->u.data - value;
+	} else if (src & IMMEDIATE) {
+	    value = mpcip->immediate;
+	    diff = (unsigned long) p->u.data - value;
+	} else if (src & MEMORY) {
+	    index = operand_index(dst);
+	    value = get_reg_value(size, index, 0, regs);
+	    diff = value - (unsigned long) p->u.data;
+	}
+
+	/*
+	 * The CF, OF, SF, ZF, AF, and PF flags are set according
+	 * to the result
+	 */
+	regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|X86_EFLAGS_AF|
+			  X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+	set_eflags_CF(size, value, (unsigned long) p->u.data, regs);
+	set_eflags_OF(size, diff, value, (unsigned long) p->u.data, regs);
+	set_eflags_AF(size, diff, value, (unsigned long) p->u.data, regs);
+	set_eflags_ZF(size, diff, regs);
+	set_eflags_SF(size, diff, regs);
+	set_eflags_PF(size, diff, regs);
+	break;
+
+    case INSTR_TEST:
+	if (src & REGISTER) {
+	    index = operand_index(src);
+	    value = get_reg_value(size, index, 0, regs);
+	} else if (src & IMMEDIATE) {
+	    value = mpcip->immediate;
+	} else if (src & MEMORY) {
+	    index = operand_index(dst);
+	    value = get_reg_value(size, index, 0, regs);
+	}
+	diff = (unsigned long) p->u.data & value;
+
+	/*
+	 * Sets the SF, ZF, and PF status flags. CF and OF are set to 0
+	 */
+	regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+			  X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+	set_eflags_ZF(size, diff, regs);
+	set_eflags_SF(size, diff, regs);
+	set_eflags_PF(size, diff, regs);
+	break;
+    }
+
+    load_cpu_user_regs(regs);
+}
+
 void vmx_io_assist(struct vcpu *v) 
 {
     vcpu_iodata_t *vio;
     ioreq_t *p;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
-    unsigned long old_eax;
-    int sign;
     struct mi_per_cpu_info *mpci_p;
     struct cpu_user_regs *inst_decoder_regs;
 
@@ -340,80 +645,26 @@ void vmx_io_assist(struct vcpu *v)
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, 
                     "bad shared page: %lx", (unsigned long) vio);
+	printf("bad shared page: %lx\n", (unsigned long) vio);
         domain_crash_synchronous();
     }
-    p = &vio->vp_ioreq;
 
-    if (p->state == STATE_IORESP_HOOK){
+    p = &vio->vp_ioreq;
+    if (p->state == STATE_IORESP_HOOK)
         vmx_hooks_assist(v);
-    }
 
     /* clear IO wait VMX flag */
     if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags)) {
-        if (p->state != STATE_IORESP_READY) {
-                /* An interrupt send event raced us */
-                return;
-        } else {
-            p->state = STATE_INVALID;
-        }
-        clear_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
-    } else {
-        return;
-    }
+        if (p->state == STATE_IORESP_READY) {
+	    p->state = STATE_INVALID;
+            clear_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
 
-    sign = (p->df) ? -1 : 1;
-    if (p->port_mm) {
-        if (p->pdata_valid) {
-            regs->esi += sign * p->count * p->size;
-            regs->edi += sign * p->count * p->size;
-        } else {
-            if (p->dir == IOREQ_WRITE) {
-                return;
-            }
-            int size = -1, index = -1;
-
-            size = operand_size(v->domain->arch.vmx_platform.mpci.mmio_target);
-            index = operand_index(v->domain->arch.vmx_platform.mpci.mmio_target);
-
-            if (v->domain->arch.vmx_platform.mpci.mmio_target & WZEROEXTEND) {
-                p->u.data = p->u.data & 0xffff;
-            }        
-            set_reg_value(size, index, 0, regs, p->u.data);
-
-        }
-        load_cpu_user_regs(regs);
-        return;
-    }
-
-    if (p->dir == IOREQ_WRITE) {
-        if (p->pdata_valid) {
-            regs->esi += sign * p->count * p->size;
-            regs->ecx -= p->count;
-        }
-        return;
-    } else {
-        if (p->pdata_valid) {
-            regs->edi += sign * p->count * p->size;
-            regs->ecx -= p->count;
-            return;
-        }
-    }
-
-    old_eax = regs->eax;
-
-    switch(p->size) {
-    case 1:
-        regs->eax = (old_eax & 0xffffff00) | (p->u.data & 0xff);
-        break;
-    case 2:
-        regs->eax = (old_eax & 0xffff0000) | (p->u.data & 0xffff);
-        break;
-    case 4:
-        regs->eax = (p->u.data & 0xffffffff);
-        break;
-    default:
-        printk("Error: %s unknwon port size\n", __FUNCTION__);
-        domain_crash_synchronous();
+	    if (p->type == IOREQ_TYPE_PIO)
+		vmx_pio_assist(regs, p, mpci_p);
+	    else
+		vmx_mmio_assist(regs, p, mpci_p);
+	}
+	/* else an interrupt send event raced us */
     }
 }
 
@@ -456,8 +707,9 @@ void vmx_wait_io()
     int port = iopacket_port(current->domain);
 
     do {
-        if(!test_bit(port, &current->domain->shared_info->evtchn_pending[0]))
+        if (!test_bit(port, &current->domain->shared_info->evtchn_pending[0]))
             do_block();
+
         vmx_check_events(current);
         if (!test_bit(ARCH_VMX_IO_WAIT, &current->arch.arch_vmx.flags))
             break;
