@@ -153,8 +153,12 @@
 ^tools/xenstat/xentop/xentop$
 ^tools/xenstore/testsuite/tmp/.*$
 ^tools/xenstore/xen$
+^tools/xenstore/xenbus_dev.h$
 ^tools/xenstore/xenstored$
 ^tools/xenstore/xenstored_test$
+^tools/xenstore/xenstore-read$
+^tools/xenstore/xenstore-rm$
+^tools/xenstore/xenstore-write$
 ^tools/xenstore/xs_dom0_test$
 ^tools/xenstore/xs_random$
 ^tools/xenstore/xs_stress$

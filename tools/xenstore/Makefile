@@ -24,15 +24,27 @@ TESTDIR  = `pwd`/testsuite/tmp
 TESTFLAGS= -DTESTING
 TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
 
-all: xen xenstored libxenstore.so
+CLIENTS := xenstore-read xenstore-rm xenstore-write
+CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
+
+all: xen xenbus_dev.h libxenstore.so xenstored $(CLIENTS)
 
 testcode: xen xs_test xenstored_test xs_random xs_dom0_test
 
 xen:
 	ln -sf $(XEN_ROOT)/xen/include/public $@
 
+xenbus_dev.h:
+	ln -sf $(XEN_ROOT)/linux-2.6-xen-sparse/include/asm-xen/linux-public/xenbus_dev.h $@
+
 xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
+
+$(CLIENTS): xenstore-%: xenstore_%.o
+	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -L. -lxenstore -o $@
+
+$(CLIENTS_OBJS): xenstore_%.o: xenstore_client.c
+	$(COMPILE.c) -DCLIENT_$(*F) -o $@ $<
 
 xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_test.o xenstored_transaction_test.o xs_lib.o talloc_test.o fake_libxc.o utils.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
@@ -111,12 +123,13 @@ TAGS:
 tarball: clean
 	cd .. && tar -c -j -v -h -f xenstore.tar.bz2 xenstore/
 
-install: xenstored libxenstore.so
+install: libxenstore.so xenstored $(CLIENTS)
 	$(INSTALL_DIR) -p $(DESTDIR)/var/run/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/sbin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/include
 	$(INSTALL_PROG) xenstored $(DESTDIR)/usr/sbin
+	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)/usr/bin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) libxenstore.so $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include
