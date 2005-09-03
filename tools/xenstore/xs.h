@@ -30,6 +30,7 @@ struct xs_handle;
  * Returns a handle or NULL.
  */
 struct xs_handle *xs_daemon_open(void);
+struct xs_handle *xs_domain_open(void);
 
 /* Connect to the xs daemon (readonly for non-root clients).
  * Returns a handle or NULL.

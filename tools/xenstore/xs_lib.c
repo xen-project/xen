@@ -66,6 +66,12 @@ const char *xs_daemon_transactions(void)
 	return buf;
 }
 
+const char *xs_domain_dev(void)
+{
+	char *s = getenv("XENSTORED_DOMAIN_DEV");
+	return (s ? s : "/proc/xen/xenbus");
+}
+
 /* Simple routines for writing to sockets, etc. */
 bool xs_write_all(int fd, const void *data, unsigned int len)
 {

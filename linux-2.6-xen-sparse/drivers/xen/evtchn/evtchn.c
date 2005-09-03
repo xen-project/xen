@@ -350,6 +350,8 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 
     spin_unlock_irq(&port_user_lock);
 
+    kfree(u);
+
     return 0;
 }
 
