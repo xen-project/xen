@@ -53,7 +53,8 @@ read_exact(int fd, void *buf, size_t count)
 }
 
 int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
-		     unsigned int store_evtchn, unsigned long *store_mfn)
+		     unsigned int store_evtchn, unsigned long *store_mfn,
+		     unsigned int console_evtchn, unsigned long *console_mfn)
 {
     dom0_op_t op;
     int rc = 1, i, n, k;
@@ -486,6 +487,9 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     *store_mfn = p_srec->resume_info.store_mfn   =
 	pfn_to_mfn_table[p_srec->resume_info.store_mfn];
     p_srec->resume_info.store_evtchn = store_evtchn;
+    *console_mfn = p_srec->resume_info.console_mfn   =
+	pfn_to_mfn_table[p_srec->resume_info.console_mfn];
+    p_srec->resume_info.console_evtchn = console_evtchn;
     munmap(p_srec, PAGE_SIZE);
 
     /* Uncanonicalise each GDT frame number. */

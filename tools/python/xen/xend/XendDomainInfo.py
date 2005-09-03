@@ -661,6 +661,7 @@ class XendDomainInfo:
             self.configure_restart()
             self.construct_image()
             self.configure()
+            self.publish_console()
             self.exportToDB(save=True)
         except Exception, ex:
             # Catch errors, cleanup and re-raise.
@@ -1084,7 +1085,6 @@ class XendDomainInfo:
         self.configure_fields()
         self.create_devices()
         self.create_blkif()
-        self.publish_console()
 
     def create_blkif(self):
         """Create the block device interface (blkif) for the vm.

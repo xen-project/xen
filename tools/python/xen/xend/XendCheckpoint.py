@@ -127,12 +127,18 @@ def restore(xd, fd):
             "not a valid guest state file: pfn count out of range")
 
     if dominfo.store_channel:
-        evtchn = dominfo.store_channel.port2
+        store_evtchn = dominfo.store_channel.port2
     else:
-        evtchn = 0
+        store_evtchn = 0
+
+    if dominfo.console_channel:
+        console_evtchn = dominfo.console_channel.port2
+    else:
+        console_evtchn = 0
 
     cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
-           str(dominfo.id), str(nr_pfns), str(evtchn)]
+           str(dominfo.id), str(nr_pfns),
+           str(store_evtchn), str(console_evtchn)]
     log.info("[xc_restore] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     child.tochild.close()
@@ -153,6 +159,7 @@ def restore(xd, fd):
             if fd == child.fromchild.fileno():
                 l = child.fromchild.readline()
                 while l:
+                    log.info(l.rstrip())
                     m = re.match(r"^(store-mfn) (\d+)\n$", l)
                     if m:
                         if dominfo.store_channel:
@@ -162,7 +169,11 @@ def restore(xd, fd):
                                                            dominfo.store_mfn,
                                                            dominfo.store_channel)
                             dominfo.exportToDB(save=True, sync=True)
-                    log.info(l.rstrip())
+                    m = re.match(r"^(console-mfn) (\d+)\n$", l)
+                    if m:
+                        dominfo.console_mfn = int(m.group(2))
+                        dominfo.exportToDB(save=True, sync=True)
+                        dominfo.publish_console()
                     try:
                         l = child.fromchild.readline()
                     except:

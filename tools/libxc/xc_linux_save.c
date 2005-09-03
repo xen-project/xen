@@ -686,6 +686,12 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters,
 	goto out;
     }
 
+    /* Canonicalize console mfn. */
+    if ( !translate_mfn_to_pfn(&p_srec->resume_info.console_mfn) ) {
+	ERR("Console frame is not in range of pseudophys map");
+	goto out;
+    }
+
     print_stats( xc_handle, dom, 0, &stats, 0 );
 
     /* Now write out each data page, canonicalising page tables as we go... */

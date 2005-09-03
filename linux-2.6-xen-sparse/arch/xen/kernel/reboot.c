@@ -96,6 +96,9 @@ static int __do_suspend(void *ignore)
     int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt);
 #endif
 
+    extern void xencons_suspend(void);
+    extern void xencons_resume(void);
+
     int err = 0;
 
     BUG_ON(smp_processor_id() != 0);
@@ -169,6 +172,8 @@ static int __do_suspend(void *ignore)
     smp_suspend();
 #endif
 
+    xencons_suspend();
+
     xenbus_suspend();
 
     ctrl_if_suspend();
@@ -213,6 +218,8 @@ static int __do_suspend(void *ignore)
     ctrl_if_resume();
 
     xenbus_resume();
+
+    xencons_resume();
 
 #ifdef CONFIG_SMP
     smp_resume();

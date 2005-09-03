@@ -17,22 +17,27 @@
 int
 main(int argc, char **argv)
 {
-    unsigned int xc_fd, io_fd, domid, nr_pfns, evtchn;
+    unsigned int xc_fd, io_fd, domid, nr_pfns, store_evtchn, console_evtchn;
     int ret;
-    unsigned long mfn;
+    unsigned long store_mfn, console_mfn;
 
-    if (argc != 6)
-	errx(1, "usage: %s xcfd iofd domid nr_pfns evtchn", argv[0]);
+    if (argc != 7)
+	errx(1,
+	     "usage: %s xcfd iofd domid nr_pfns store_evtchn console_evtchn",
+	     argv[0]);
 
     xc_fd = atoi(argv[1]);
     io_fd = atoi(argv[2]);
     domid = atoi(argv[3]);
     nr_pfns = atoi(argv[4]);
-    evtchn = atoi(argv[5]);
+    store_evtchn = atoi(argv[5]);
+    console_evtchn = atoi(argv[6]);
 
-    ret = xc_linux_restore(xc_fd, io_fd, domid, nr_pfns, evtchn, &mfn);
+    ret = xc_linux_restore(xc_fd, io_fd, domid, nr_pfns, store_evtchn,
+			   &store_mfn, console_evtchn, &console_mfn);
     if (ret == 0) {
-	printf("store-mfn %li\n", mfn);
+	printf("store-mfn %li\n", store_mfn);
+	printf("console-mfn %li\n", console_mfn);
 	fflush(stdout);
     }
     return ret;

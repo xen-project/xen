@@ -101,19 +101,17 @@ int xencons_ring_init(void)
 	if (!xen_start_info.console_evtchn)
 		return 0;
 
-	err = bind_evtchn_to_irqhandler(
-		xen_start_info.console_evtchn, handle_input,
-		0, "xencons", inring());
+	err = bind_evtchn_to_irqhandler(xen_start_info.console_evtchn,
+					handle_input, 0, "xencons", inring());
 	if (err) {
 		xprintk("XEN console request irq failed %i\n", err);
-		unbind_evtchn_from_irq(xen_start_info.console_evtchn);
 		return err;
 	}
 
 	return 0;
 }
 
-void xencons_suspend_comms(void)
+void xencons_suspend(void)
 {
 
 	if (!xen_start_info.console_evtchn)
@@ -122,3 +120,8 @@ void xencons_suspend_comms(void)
 	unbind_evtchn_from_irqhandler(xen_start_info.console_evtchn, inring());
 }
 
+void xencons_resume(void)
+{
+
+	(void)xencons_ring_init();
+}
