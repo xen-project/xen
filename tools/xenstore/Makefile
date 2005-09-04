@@ -16,7 +16,8 @@ PROG_DEP = .*.d
 #BASECFLAGS+= -I$(XEN_ROOT)/tools
 BASECFLAGS+= -I$(XEN_ROOT)/tools/libxc
 BASECFLAGS+= -I$(XEN_ROOT)/xen/include/public
-BASECFLAGS+= -I.
+BASECFLAGS+= -I$(XEN_ROOT)/xen/include/public
+BASECFLAGS+= -I$(XEN_ROOT)/linux-2.6-xen-sparse/include/asm-xen/linux-public
 
 CFLAGS  += $(BASECFLAGS)
 LDFLAGS += $(PROFILE) -L$(XEN_LIBXC)
@@ -27,15 +28,9 @@ TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
 CLIENTS := xenstore-read xenstore-rm xenstore-write
 CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
 
-all: xen xenbus_dev.h libxenstore.so xenstored $(CLIENTS)
+all: libxenstore.so xenstored $(CLIENTS)
 
-testcode: xen xs_test xenstored_test xs_random xs_dom0_test
-
-xen:
-	ln -sf $(XEN_ROOT)/xen/include/public $@
-
-xenbus_dev.h:
-	ln -sf $(XEN_ROOT)/linux-2.6-xen-sparse/include/asm-xen/linux-public/xenbus_dev.h $@
+testcode: xs_test xenstored_test xs_random xs_dom0_test
 
 xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
@@ -70,7 +65,7 @@ libxenstore.so: xs.opic xs_lib.opic
 
 clean: testsuite-clean
 	rm -f *.o *.opic *.so
-	rm -f xen xenstored xs_random xs_stress xs_crashme
+	rm -f xenstored xs_random xs_stress xs_crashme
 	rm -f xs_test xenstored_test xs_dom0_test
 	$(RM) $(PROG_DEP)
 
@@ -84,10 +79,10 @@ check: print-dir testsuite-fast randomcheck-fast print-end
 
 fullcheck: testsuite-run randomcheck stresstest
 
-testsuite-run: xen xenstored_test xs_test
+testsuite-run: xenstored_test xs_test
 	$(TESTENV) testsuite/test.sh && echo
 
-testsuite-fast: xen xenstored_test xs_test
+testsuite-fast: xenstored_test xs_test
 	@$(TESTENV) testsuite/test.sh --fast
 
 testsuite-clean:
