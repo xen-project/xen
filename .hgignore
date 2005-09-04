@@ -82,6 +82,7 @@
 ^tools/blktap/parallax/vdi_validate$
 ^tools/blktap/parallax/parallax$
 ^tools/blktap/parallax/blockstored$
+^tools/blktap/ublkback/ublkback$
 ^tools/blktap/xen/.*$
 ^tools/check/\..*$
 ^tools/cmdline/.*$

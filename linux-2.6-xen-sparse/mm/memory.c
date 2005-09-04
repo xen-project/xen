@@ -954,10 +954,8 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
                         i++;
                         start += PAGE_SIZE;
                         len--;
-printk(KERN_ALERT "HIT  0x%lx\n", start);
                         continue;
                     } 
-else printk(KERN_ALERT "MISS 0x%lx\n", start);
                 }
 
 		if (!vma || (vma->vm_flags & VM_IO)
