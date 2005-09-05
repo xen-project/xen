@@ -8,7 +8,7 @@ INSTALL_PROG    = $(INSTALL) -m0755
 INSTALL_DIR     = $(INSTALL) -d -m0755
 
 PROFILE=#-pg
-BASECFLAGS=-Wall -W -g 
+BASECFLAGS=-Wall -W -g -Werror
 # Make gcc generate dependencies.
 BASECFLAGS += -Wp,-MD,.$(@F).d
 PROG_DEP = .*.d

@@ -216,17 +216,6 @@ static int destroy_domain(void *_domain)
 	return 0;
 }
 
-static struct domain *find_domain(u16 port)
-{
-	struct domain *i;
-
-	list_for_each_entry(i, &domains, list) {
-		if (i->port == port)
-			return i;
-	}
-	return NULL;
-}
-
 /* We scan all domains rather than use the information given here. */
 void handle_event(int event_fd)
 {
