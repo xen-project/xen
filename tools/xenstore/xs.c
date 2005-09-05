@@ -613,6 +613,15 @@ bool xs_release_domain(struct xs_handle *h, domid_t domid)
 	return xs_bool(xs_single(h, XS_RELEASE, domid_str, NULL));
 }
 
+char *xs_get_domain_path(struct xs_handle *h, domid_t domid)
+{
+	char domid_str[MAX_STRLEN(domid)];
+
+	sprintf(domid_str, "%u", domid);
+
+	return xs_single(h, XS_GET_DOMAIN_PATH, domid_str, NULL);
+}
+
 bool xs_shutdown(struct xs_handle *h)
 {
 	bool ret = xs_bool(xs_single(h, XS_SHUTDOWN, "", NULL));

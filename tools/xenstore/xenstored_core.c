@@ -140,7 +140,7 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 	case XS_TRANSACTION_END: return "TRANSACTION_END";
 	case XS_INTRODUCE: return "INTRODUCE";
 	case XS_RELEASE: return "RELEASE";
-	case XS_GETDOMAINPATH: return "GETDOMAINPATH";
+	case XS_GET_DOMAIN_PATH: return "GET_DOMAIN_PATH";
 	case XS_WRITE: return "WRITE";
 	case XS_MKDIR: return "MKDIR";
 	case XS_RM: return "RM";
@@ -1277,7 +1277,7 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		do_release(conn, onearg(in));
 		break;
 
-	case XS_GETDOMAINPATH:
+	case XS_GET_DOMAIN_PATH:
 		do_get_domain_path(conn, onearg(in));
 		break;
 

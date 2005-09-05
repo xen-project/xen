@@ -134,6 +134,10 @@ bool xs_introduce_domain(struct xs_handle *h, domid_t domid, unsigned long mfn,
  */
 bool xs_release_domain(struct xs_handle *h, domid_t domid);
 
+/* Query the home path of a domain.
+ */
+char *xs_get_domain_path(struct xs_handle *h, domid_t domid);
+
 /* Only useful for DEBUG versions */
 char *xs_debug_command(struct xs_handle *h, const char *cmd,
 		       void *data, unsigned int len);

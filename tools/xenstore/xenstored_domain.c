@@ -389,7 +389,7 @@ void do_get_domain_path(struct connection *conn, const char *domid_str)
 	if (!domain) 
 		send_error(conn, ENOENT);
 	else
-		send_reply(conn, XS_GETDOMAINPATH, domain->path,
+		send_reply(conn, XS_GET_DOMAIN_PATH, domain->path,
 			   strlen(domain->path) + 1);
 }
 
