@@ -35,6 +35,7 @@ testcode: xs_test xenstored_test xs_random xs_dom0_test
 xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
 
+$(CLIENTS): libxenstore.so
 $(CLIENTS): xenstore-%: xenstore_%.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -L. -lxenstore -o $@
 
