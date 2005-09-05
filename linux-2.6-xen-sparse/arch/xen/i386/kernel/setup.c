@@ -1235,10 +1235,64 @@ static void __init
 legacy_init_iomem_resources(struct resource *code_resource, struct resource *data_resource)
 {
 	int i;
+#ifdef CONFIG_XEN
+	dom0_op_t op;
+	struct dom0_memory_map_entry *map;
+	unsigned long gapstart, gapsize;
+	unsigned long long last;
+#endif
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	probe_roms();
 #endif
+
+#ifdef CONFIG_XEN
+	map = alloc_bootmem_low_pages(PAGE_SIZE);
+	op.cmd = DOM0_PHYSICAL_MEMORY_MAP;
+	op.u.physical_memory_map.memory_map = map;
+	op.u.physical_memory_map.max_map_entries =
+		PAGE_SIZE / sizeof(struct dom0_memory_map_entry);
+	BUG_ON(HYPERVISOR_dom0_op(&op));
+
+	last = 0x100000000ULL;
+	gapstart = 0x10000000;
+	gapsize = 0x400000;
+
+	for (i = op.u.physical_memory_map.nr_map_entries - 1; i >= 0; i--) {
+		struct resource *res;
+
+		if ((last > map[i].end) && ((last - map[i].end) > gapsize)) {
+			gapsize = last - map[i].end;
+			gapstart = map[i].end;
+		}
+		if (map[i].start < last)
+			last = map[i].start;
+
+		if (map[i].end > 0x100000000ULL)
+			continue;
+		res = alloc_bootmem_low(sizeof(struct resource));
+		res->name = map[i].is_ram ? "System RAM" : "reserved";
+		res->start = map[i].start;
+		res->end = map[i].end - 1;
+		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+		request_resource(&iomem_resource, res);
+	}
+
+	free_bootmem(__pa(map), PAGE_SIZE);
+
+	/*
+	 * Start allocating dynamic PCI memory a bit into the gap,
+	 * aligned up to the nearest megabyte.
+	 *
+	 * Question: should we try to pad it up a bit (do something
+	 * like " + (gapsize >> 3)" in there too?). We now have the
+	 * technology.
+	 */
+	pci_mem_start = (gapstart + 0xfffff) & ~0xfffff;
+
+	printk("Allocating PCI resources starting at %08lx (gap: %08lx:%08lx)\n",
+		pci_mem_start, gapstart, gapsize);
+#else
 	for (i = 0; i < e820.nr_map; i++) {
 		struct resource *res;
 		if (e820.map[i].addr + e820.map[i].size > 0x100000000ULL)
@@ -1264,6 +1318,7 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
 			request_resource(res, data_resource);
 		}
 	}
+#endif
 }
 
 /*
@@ -1271,23 +1326,29 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
  */
 static void __init register_memory(void)
 {
+#ifndef CONFIG_XEN
 	unsigned long gapstart, gapsize;
 	unsigned long long last;
+#endif
 	int	      i;
+
+	/* Nothing to do if not running in dom0. */
+	if (!(xen_start_info->flags & SIF_INITDOMAIN))
+		return;
 
 	if (efi_enabled)
 		efi_initialize_iomem_resources(&code_resource, &data_resource);
 	else
 		legacy_init_iomem_resources(&code_resource, &data_resource);
 
-	if (xen_start_info->flags & SIF_INITDOMAIN)
-		/* EFI systems may still have VGA */
-		request_resource(&iomem_resource, &video_ram_resource);
+	/* EFI systems may still have VGA */
+	request_resource(&iomem_resource, &video_ram_resource);
 
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
 		request_resource(&ioport_resource, &standard_io_resources[i]);
 
+#ifndef CONFIG_XEN
 	/*
 	 * Search for the bigest gap in the low 32 bits of the e820
 	 * memory space.
@@ -1328,6 +1389,7 @@ static void __init register_memory(void)
 
 	printk("Allocating PCI resources starting at %08lx (gap: %08lx:%08lx)\n",
 		pci_mem_start, gapstart, gapsize);
+#endif
 }
 
 /* Use inline assembly to define this because the nops are defined 

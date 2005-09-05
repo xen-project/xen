@@ -190,7 +190,7 @@ long do_memory_op(int cmd, void *arg)
     case XENMEM_maximum_ram_page:
         if ( put_user(max_page, (unsigned long *)arg) )
             return -EFAULT;
-        rc = -ENOSYS;
+        rc = 0;
         break;
 
     default:

@@ -176,10 +176,7 @@ __initcall(domain_shutdown_finaliser_init);
 void domain_shutdown(u8 reason)
 {
     struct domain *d = current->domain;
-    struct vcpu *v;
-
-    if(reason == SHUTDOWN_crash) 
-        printk("Domain %d crash detected.\n", d->domain_id); 
+    struct vcpu   *v;
 
     if ( d->domain_id == 0 )
     {

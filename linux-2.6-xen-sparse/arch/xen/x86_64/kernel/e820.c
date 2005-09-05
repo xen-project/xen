@@ -517,11 +517,10 @@ void __init setup_memory_region(void)
 }
 
 #else  /* CONFIX_XEN */
+
 extern unsigned long xen_override_max_pfn;
 extern union xen_start_info_union xen_start_info_union;
-/*
- * Guest physical starts from 0.
- */
+
 unsigned long __init e820_end_of_ram(void)
 {
         unsigned long max_end_pfn = xen_start_info->nr_pages;
@@ -532,11 +531,69 @@ unsigned long __init e820_end_of_ram(void)
         return xen_override_max_pfn;
 }
 
-
-
 void __init e820_reserve_resources(void) 
 {
-	return;			/* Xen won't have reserved entries */
+	dom0_op_t op;
+	struct dom0_memory_map_entry *map;
+	unsigned long gapstart, gapsize, last;
+	int i, found = 0;
+
+	if (!(xen_start_info->flags & SIF_INITDOMAIN))
+		return;
+
+	map = alloc_bootmem_low_pages(PAGE_SIZE);
+	op.cmd = DOM0_PHYSICAL_MEMORY_MAP;
+	op.u.physical_memory_map.memory_map = map;
+	op.u.physical_memory_map.max_map_entries =
+		PAGE_SIZE / sizeof(struct dom0_memory_map_entry);
+	BUG_ON(HYPERVISOR_dom0_op(&op));
+
+	last = 0x100000000ULL;
+	gapstart = 0x10000000;
+	gapsize = 0x400000;
+
+	for (i = op.u.physical_memory_map.nr_map_entries - 1; i >= 0; i--) {
+		struct resource *res;
+
+		if ((last > map[i].end) && ((last - map[i].end) > gapsize)) {
+			gapsize = last - map[i].end;
+			gapstart = map[i].end;
+			found = 1;
+		}
+		if (map[i].start < last)
+			last = map[i].start;
+
+		if (map[i].end > 0x100000000ULL)
+			continue;
+		res = alloc_bootmem_low(sizeof(struct resource));
+		res->name = map[i].is_ram ? "System RAM" : "reserved";
+		res->start = map[i].start;
+		res->end = map[i].end - 1;
+		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+		request_resource(&iomem_resource, res);
+	}
+
+	free_bootmem(__pa(map), PAGE_SIZE);
+
+	if (!found) {
+		HYPERVISOR_memory_op(XENMEM_maximum_ram_page, &gapstart);
+		gapstart = (gapstart << PAGE_SHIFT) + 1024*1024;
+		printk(KERN_ERR "PCI: Warning: Cannot find a gap in the 32bit address range\n"
+		       KERN_ERR "PCI: Unassigned devices with 32bit resource registers may break!\n");
+	}
+
+	/*
+	 * Start allocating dynamic PCI memory a bit into the gap,
+	 * aligned up to the nearest megabyte.
+	 *
+	 * Question: should we try to pad it up a bit (do something
+	 * like " + (gapsize >> 3)" in there too?). We now have the
+	 * technology.
+	 */
+	pci_mem_start = (gapstart + 0xfffff) & ~0xfffff;
+
+	printk(KERN_INFO "Allocating PCI resources starting at %lx (gap: %lx:%lx)\n",
+		pci_mem_start, gapstart, gapsize);
 }
 
 #endif
@@ -558,6 +615,7 @@ unsigned long pci_mem_start = 0xaeedbabe;
  */
 __init void e820_setup_gap(void)
 {
+#ifndef CONFIG_XEN
 	unsigned long gapstart, gapsize;
 	unsigned long last;
 	int i;
@@ -606,4 +664,5 @@ __init void e820_setup_gap(void)
 
 	printk(KERN_INFO "Allocating PCI resources starting at %lx (gap: %lx:%lx)\n",
 		pci_mem_start, gapstart, gapsize);
+#endif
 }
