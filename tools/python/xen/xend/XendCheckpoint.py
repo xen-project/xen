@@ -48,7 +48,7 @@ def save(xd, fd, dominfo, live):
     # simply uses the defaults compiled into libxenguest; see the comments 
     # and/or code in xc_linux_save() for more information. 
     cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
-           str(dominfo.id), "0", "0", str(live) ]
+           str(dominfo.id), "0", "0", str(int(live)) ]
     log.info("[xc_save] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     
