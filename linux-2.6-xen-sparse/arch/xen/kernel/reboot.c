@@ -172,9 +172,9 @@ static int __do_suspend(void *ignore)
     smp_suspend();
 #endif
 
-    xencons_suspend();
-
     xenbus_suspend();
+
+    xencons_suspend();
 
     ctrl_if_suspend();
 
@@ -217,9 +217,9 @@ static int __do_suspend(void *ignore)
 
     ctrl_if_resume();
 
-    xenbus_resume();
-
     xencons_resume();
+
+    xenbus_resume();
 
 #ifdef CONFIG_SMP
     smp_resume();
