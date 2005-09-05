@@ -14,7 +14,6 @@
 
 #include "xg_private.h"
 
-#include <xen/linux/suspend.h>
 #include <xen/io/domain_controller.h>
 
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
@@ -435,8 +434,8 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters,
     /* base of the region in which domain memory is mapped */
     unsigned char *region_base = NULL;
 
-    /* A temporary mapping, and a copy, of the guest's suspend record. */
-    suspend_record_t *p_srec = NULL;
+    /* A temporary mapping of the guest's start_info page. */
+    start_info_t *start_info = NULL;
 
     /* number of pages we're dealing with */
     unsigned long nr_pfns;
@@ -672,22 +671,22 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters,
 
     /* Map the suspend-record MFN to pin it. The page must be owned by 
        dom for this to succeed. */
-    p_srec = xc_map_foreign_range(xc_handle, dom,
-                                   sizeof(*p_srec), PROT_READ | PROT_WRITE, 
-                                   ctxt.user_regs.esi);
-    if (!p_srec){
-        ERR("Couldn't map suspend record");
+    start_info = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+				      PROT_READ | PROT_WRITE, 
+				      ctxt.user_regs.esi);
+    if (!start_info){
+        ERR("Couldn't map start_info page");
         goto out;
     }
 
     /* Canonicalize store mfn. */
-    if ( !translate_mfn_to_pfn(&p_srec->resume_info.store_mfn) ) {
+    if ( !translate_mfn_to_pfn(&start_info->store_mfn) ) {
 	ERR("Store frame is not in range of pseudophys map");
 	goto out;
     }
 
     /* Canonicalize console mfn. */
-    if ( !translate_mfn_to_pfn(&p_srec->resume_info.console_mfn) ) {
+    if ( !translate_mfn_to_pfn(&start_info->console_mfn) ) {
 	ERR("Console frame is not in range of pseudophys map");
 	goto out;
     }
@@ -1030,13 +1029,6 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters,
 	}
     }
 
-    if (nr_pfns != p_srec->nr_pfns )
-    {
-	ERR("Suspend record nr_pfns unexpected (%ld != %ld)",
-		   p_srec->nr_pfns, nr_pfns);
-        goto out;
-    }
-
     /* Canonicalise the suspend-record frame number. */
     if ( !translate_mfn_to_pfn(&ctxt.user_regs.esi) ){
         ERR("Suspend record is not in range of pseudophys map");
@@ -1070,8 +1062,8 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters,
     if(live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);
 
-    if(p_srec) 
-        munmap(p_srec, sizeof(*p_srec));
+    if(start_info) 
+        munmap(start_info, PAGE_SIZE);
 
     if(live_pfn_to_mfn_frame_list) 
         munmap(live_pfn_to_mfn_frame_list, PAGE_SIZE);

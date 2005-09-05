@@ -12,7 +12,6 @@
 #include <asm-xen/evtchn.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/dom0_ops.h>
-#include <asm-xen/linux-public/suspend.h>
 #include <asm-xen/queues.h>
 #include <asm-xen/xenbus.h>
 #include <asm-xen/ctrl_if.h>
@@ -69,7 +68,6 @@ static int shutting_down = SHUTDOWN_INVALID;
 static int __do_suspend(void *ignore)
 {
     int i, j;
-    suspend_record_t *suspend_record;
 
 #ifdef CONFIG_XEN_USB_FRONTEND
     extern void usbif_resume();
@@ -112,10 +110,6 @@ static int __do_suspend(void *ignore)
     }
 #endif
 
-    suspend_record = (suspend_record_t *)__get_free_page(GFP_KERNEL);
-    if ( suspend_record == NULL )
-        goto out;
-
     preempt_disable();
 #ifdef CONFIG_SMP
     /* Take all of the other cpus offline.  We need to be careful not
@@ -144,8 +138,6 @@ static int __do_suspend(void *ignore)
 	preempt_disable();
     }
 #endif
-
-    suspend_record->nr_pfns = max_pfn; /* final number of pfns */
 
     __cli();
 
@@ -185,17 +177,11 @@ static int __do_suspend(void *ignore)
     HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
     clear_fixmap(FIX_SHARED_INFO);
 
-    memcpy(&suspend_record->resume_info, xen_start_info,
-           sizeof(*xen_start_info));
-
     /* We'll stop somewhere inside this hypercall.  When it returns,
        we'll start resuming after the restore. */
-    HYPERVISOR_suspend(virt_to_mfn(suspend_record));
+    HYPERVISOR_suspend(virt_to_mfn(xen_start_info));
 
     shutting_down = SHUTDOWN_INVALID; 
-
-    memcpy(xen_start_info, &suspend_record->resume_info,
-           sizeof(*xen_start_info));
 
     set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
 
@@ -248,9 +234,6 @@ static int __do_suspend(void *ignore)
     }
 #endif
 
- out:
-    if ( suspend_record != NULL )
-        free_page((unsigned long)suspend_record);
     return err;
 }
 

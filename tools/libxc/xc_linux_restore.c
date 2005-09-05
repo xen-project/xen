@@ -10,7 +10,6 @@
 #include <unistd.h>
 #include "xg_private.h"
 #include <xenctrl.h>
-#include <xen/linux/suspend.h>
 #include <xen/memory.h>
 
 #define MAX_BATCH_SIZE 1024
@@ -89,8 +88,8 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     /* used by mapper for updating the domain's copy of the table */
     unsigned long *live_pfn_to_mfn_table = NULL;
 
-    /* A temporary mapping of the guest's suspend record. */
-    suspend_record_t *p_srec;
+    /* A temporary mapping of the guest's start_info page. */
+    start_info_t *start_info;
 
     char *region_base;
 
@@ -479,18 +478,18 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
         goto out;
     }
     ctxt.user_regs.esi = mfn = pfn_to_mfn_table[pfn];
-    p_srec = xc_map_foreign_range(
+    start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
-    p_srec->resume_info.nr_pages    = nr_pfns;
-    p_srec->resume_info.shared_info = shared_info_frame << PAGE_SHIFT;
-    p_srec->resume_info.flags       = 0;
-    *store_mfn = p_srec->resume_info.store_mfn   =
-	pfn_to_mfn_table[p_srec->resume_info.store_mfn];
-    p_srec->resume_info.store_evtchn = store_evtchn;
-    *console_mfn = p_srec->resume_info.console_mfn   =
-	pfn_to_mfn_table[p_srec->resume_info.console_mfn];
-    p_srec->resume_info.console_evtchn = console_evtchn;
-    munmap(p_srec, PAGE_SIZE);
+    start_info->nr_pages    = nr_pfns;
+    start_info->shared_info = shared_info_frame << PAGE_SHIFT;
+    start_info->flags       = 0;
+    *store_mfn = start_info->store_mfn   =
+	pfn_to_mfn_table[start_info->store_mfn];
+    start_info->store_evtchn = store_evtchn;
+    *console_mfn = start_info->console_mfn   =
+	pfn_to_mfn_table[start_info->console_mfn];
+    start_info->console_evtchn = console_evtchn;
+    munmap(start_info, PAGE_SIZE);
 
     /* Uncanonicalise each GDT frame number. */
     if ( ctxt.gdt_ents > 8192 )
