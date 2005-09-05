@@ -177,8 +177,8 @@ static int __do_suspend(void *ignore)
     HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
     clear_fixmap(FIX_SHARED_INFO);
 
-    xen_start_info.store_mfn = mfn_to_pfn(xen_start_info.store_mfn);
-    xen_start_info.console_mfn = mfn_to_pfn(xen_start_info.console_mfn);
+    xen_start_info->store_mfn = mfn_to_pfn(xen_start_info->store_mfn);
+    xen_start_info->console_mfn = mfn_to_pfn(xen_start_info->console_mfn);
 
     /* We'll stop somewhere inside this hypercall.  When it returns,
        we'll start resuming after the restore. */
