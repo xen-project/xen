@@ -20,6 +20,9 @@
 #include <asm/e820.h>
 #include <asm/proto.h>
 #include <asm/bootsetup.h>
+#include <asm-xen/xen-public/memory.h>
+
+unsigned long pci_mem_start = 0xaeedbabe;
 
 /* 
  * PFN of last memory page.
@@ -604,8 +607,6 @@ void __init parse_memopt(char *p, char **from)
 	end_user_pfn >>= PAGE_SHIFT;	
         xen_override_max_pfn = (unsigned long) end_user_pfn;
 } 
-
-unsigned long pci_mem_start = 0xaeedbabe;
 
 /*
  * Search for the biggest gap in the low 32 bits of the e820

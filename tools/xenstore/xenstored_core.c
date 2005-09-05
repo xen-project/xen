@@ -719,7 +719,7 @@ static char *get_parent(const char *node)
 	char *slash = strrchr(node + 1, '/');
 	if (!slash)
 		return talloc_strdup(node, "/");
-	return talloc_asprintf(node, "%.*s", slash - node, node);
+	return talloc_asprintf(node, "%.*s", (int)(slash - node), node);
 }
 
 static enum xs_perm_type perm_for_id(domid_t id,
@@ -910,7 +910,7 @@ static bool commit_dir(char *dir)
 	if (slash)
 		*slash = '\0';
 
-	dest = talloc_asprintf(dir, "%.*s", dot - dir, dir);
+	dest = talloc_asprintf(dir, "%.*s", (int)(dot - dir), dir);
 	return rename(dir, dest) == 0;
 }
 
