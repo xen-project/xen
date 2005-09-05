@@ -58,6 +58,12 @@
 static struct proc_dir_entry *balloon_pde;
 
 static DECLARE_MUTEX(balloon_mutex);
+
+/*
+ * Protects atomic reservation decrease/increase against concurrent increases.
+ * Also protects non-atomic updates of current_pages and driver_pages, and
+ * balloon lists.
+ */
 spinlock_t balloon_lock = SPIN_LOCK_UNLOCKED;
 
 /* We aim for 'current allocation' == 'target allocation'. */
@@ -157,6 +163,146 @@ static unsigned long current_target(void)
 	return target;
 }
 
+static int increase_reservation(unsigned long nr_pages)
+{
+	unsigned long *mfn_list, pfn, i, flags;
+	struct page   *page;
+	long           rc;
+	struct xen_memory_reservation reservation = {
+		.address_bits = 0,
+		.extent_order = 0,
+		.domid        = DOMID_SELF
+	};
+
+	if (nr_pages > (PAGE_SIZE / sizeof(unsigned long)))
+		nr_pages = PAGE_SIZE / sizeof(unsigned long);
+
+	mfn_list = (unsigned long *)__get_free_page(GFP_KERNEL);
+	if (mfn_list == NULL)
+		return -ENOMEM;
+
+	balloon_lock(flags);
+
+	reservation.extent_start = mfn_list;
+	reservation.nr_extents   = nr_pages;
+	rc = HYPERVISOR_memory_op(
+		XENMEM_increase_reservation, &reservation);
+	if (rc < nr_pages) {
+		/* We hit the Xen hard limit: reprobe. */
+		reservation.extent_start = mfn_list;
+		reservation.nr_extents   = rc;
+		BUG_ON(HYPERVISOR_memory_op(
+			XENMEM_decrease_reservation,
+			&reservation) != rc);
+		hard_limit = current_pages + rc - driver_pages;
+		goto out;
+	}
+
+	for (i = 0; i < nr_pages; i++) {
+		page = balloon_retrieve();
+		BUG_ON(page == NULL);
+
+		pfn = page - mem_map;
+		BUG_ON(phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY);
+
+		/* Update P->M and M->P tables. */
+		phys_to_machine_mapping[pfn] = mfn_list[i];
+		xen_machphys_update(mfn_list[i], pfn);
+            
+		/* Link back into the page tables if not highmem. */
+		if (pfn < max_low_pfn)
+			BUG_ON(HYPERVISOR_update_va_mapping(
+				(unsigned long)__va(pfn << PAGE_SHIFT),
+				pfn_pte_ma(mfn_list[i], PAGE_KERNEL),
+				0));
+
+		/* Relinquish the page back to the allocator. */
+		ClearPageReserved(page);
+		set_page_count(page, 1);
+		__free_page(page);
+	}
+
+	current_pages += nr_pages;
+
+ out:
+	balloon_unlock(flags);
+
+	free_page((unsigned long)mfn_list);
+
+	return 0;
+}
+
+static int decrease_reservation(unsigned long nr_pages)
+{
+	unsigned long *mfn_list, pfn, i, flags;
+	struct page   *page;
+	void          *v;
+	int            need_sleep = 0;
+	struct xen_memory_reservation reservation = {
+		.address_bits = 0,
+		.extent_order = 0,
+		.domid        = DOMID_SELF
+	};
+
+	if (nr_pages > (PAGE_SIZE / sizeof(unsigned long)))
+		nr_pages = PAGE_SIZE / sizeof(unsigned long);
+
+	mfn_list = (unsigned long *)__get_free_page(GFP_KERNEL);
+	if (mfn_list == NULL)
+		return -ENOMEM;
+
+	for (i = 0; i < nr_pages; i++) {
+		if ((page = alloc_page(GFP_HIGHUSER)) == NULL) {
+			nr_pages = i;
+			need_sleep = 1;
+			break;
+		}
+
+		pfn = page - mem_map;
+		mfn_list[i] = phys_to_machine_mapping[pfn];
+
+		if (!PageHighMem(page)) {
+			v = phys_to_virt(pfn << PAGE_SHIFT);
+			scrub_pages(v, 1);
+			BUG_ON(HYPERVISOR_update_va_mapping(
+				(unsigned long)v, __pte_ma(0), 0));
+		}
+#ifdef CONFIG_XEN_SCRUB_PAGES
+		else {
+			v = kmap(page);
+			scrub_pages(v, 1);
+			kunmap(page);
+		}
+#endif
+	}
+
+	/* Ensure that ballooned highmem pages don't have kmaps. */
+	kmap_flush_unused();
+	flush_tlb_all();
+
+	balloon_lock(flags);
+
+	/* No more mappings: invalidate P2M and add to balloon. */
+	for (i = 0; i < nr_pages; i++) {
+		pfn = mfn_to_pfn(mfn_list[i]);
+		phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
+		balloon_append(pfn_to_page(pfn));
+	}
+
+	reservation.extent_start = mfn_list;
+	reservation.nr_extents   = nr_pages;
+	BUG_ON(HYPERVISOR_memory_op(
+		XENMEM_decrease_reservation, &reservation) != nr_pages);
+
+	current_pages -= nr_pages;
+
+	balloon_unlock(flags);
+
+	free_page((unsigned long)mfn_list);
+
+	return need_sleep;
+}
+
 /*
  * We avoid multiple worker processes conflicting via the balloon mutex.
  * We may of course race updates of the target counts (which are protected
@@ -165,123 +311,23 @@ static unsigned long current_target(void)
  */
 static void balloon_process(void *unused)
 {
-	unsigned long *mfn_list, pfn, i, flags;
-	struct page   *page;
-	long           credit, debt, rc;
-	void          *v;
-	struct xen_memory_reservation reservation = {
-		.address_bits = 0,
-		.extent_order = 0,
-		.domid        = DOMID_SELF
-	};
+	int need_sleep = 0;
+	long credit;
 
 	down(&balloon_mutex);
 
- retry:
-	mfn_list = NULL;
+	do {
+		credit = current_target() - current_pages;
+		if (credit > 0)
+			need_sleep = (increase_reservation(credit) != 0);
+		if (credit < 0)
+			need_sleep = (decrease_reservation(-credit) != 0);
 
-	if ((credit = current_target() - current_pages) > 0) {
-		mfn_list = vmalloc(credit * sizeof(*mfn_list));
-		if (mfn_list == NULL)
-			goto out;
-
-		balloon_lock(flags);
-		reservation.extent_start = mfn_list;
-		reservation.nr_extents   = credit;
-		rc = HYPERVISOR_memory_op(
-			XENMEM_increase_reservation, &reservation);
-		balloon_unlock(flags);
-		if (rc < credit) {
-			/* We hit the Xen hard limit: reprobe. */
-			reservation.extent_start = mfn_list;
-			reservation.nr_extents   = rc;
-			BUG_ON(HYPERVISOR_memory_op(
-				XENMEM_decrease_reservation,
-				&reservation) != rc);
-			hard_limit = current_pages + rc - driver_pages;
-			vfree(mfn_list);
-			goto retry;
-		}
-
-		for (i = 0; i < credit; i++) {
-			page = balloon_retrieve();
-			BUG_ON(page == NULL);
-
-			pfn = page - mem_map;
-			if (phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY)
-				BUG();
-
-			/* Update P->M and M->P tables. */
-			phys_to_machine_mapping[pfn] = mfn_list[i];
-			xen_machphys_update(mfn_list[i], pfn);
-            
-			/* Link back into the page tables if not highmem. */
-			if (pfn < max_low_pfn)
-				BUG_ON(HYPERVISOR_update_va_mapping(
-					(unsigned long)__va(pfn << PAGE_SHIFT),
-					pfn_pte_ma(mfn_list[i], PAGE_KERNEL),
-					0));
-
-			/* Relinquish the page back to the allocator. */
-			ClearPageReserved(page);
-			set_page_count(page, 1);
-			__free_page(page);
-		}
-
-		current_pages += credit;
-	} else if (credit < 0) {
-		debt = -credit;
-
-		mfn_list = vmalloc(debt * sizeof(*mfn_list));
-		if (mfn_list == NULL)
-			goto out;
-
-		for (i = 0; i < debt; i++) {
-			if ((page = alloc_page(GFP_HIGHUSER)) == NULL) {
-				debt = i;
-				break;
-			}
-
-			pfn = page - mem_map;
-			mfn_list[i] = phys_to_machine_mapping[pfn];
-
-			if (!PageHighMem(page)) {
-				v = phys_to_virt(pfn << PAGE_SHIFT);
-				scrub_pages(v, 1);
-				BUG_ON(HYPERVISOR_update_va_mapping(
-					(unsigned long)v, __pte_ma(0), 0));
-			}
-#ifdef CONFIG_XEN_SCRUB_PAGES
-			else {
-				v = kmap(page);
-				scrub_pages(v, 1);
-				kunmap(page);
-			}
+#ifndef CONFIG_PREEMPT
+		if (need_resched())
+			schedule();
 #endif
-		}
-
-		/* Ensure that ballooned highmem pages don't have kmaps. */
-		kmap_flush_unused();
-		flush_tlb_all();
-
-		/* No more mappings: invalidate P2M and add to balloon. */
-		for (i = 0; i < debt; i++) {
-			pfn = mfn_to_pfn(mfn_list[i]);
-			phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
-			balloon_append(pfn_to_page(pfn));
-		}
-
-		reservation.extent_start = mfn_list;
-		reservation.nr_extents   = debt;
-		BUG_ON(HYPERVISOR_memory_op(
-			XENMEM_decrease_reservation, &reservation) != debt);
-
-		current_pages -= debt;
-	}
-
- out:
-	if (mfn_list != NULL)
-		vfree(mfn_list);
+	} while ((credit != 0) && !need_sleep);
 
 	/* Schedule more work if there is some still to be done. */
 	if (current_target() != current_pages)
@@ -441,8 +487,9 @@ subsys_initcall(balloon_init);
 void balloon_update_driver_allowance(long delta)
 {
 	unsigned long flags;
+
 	balloon_lock(flags);
-	driver_pages += delta; /* non-atomic update */
+	driver_pages += delta;
 	balloon_unlock(flags);
 }
 
@@ -475,9 +522,10 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 
 	scrub_pages(vstart, 1 << order);
 
-	balloon_lock(flags);
 	BUG_ON(generic_page_range(
 		&init_mm, vstart, PAGE_SIZE << order, dealloc_pte_fn, NULL));
+
+	balloon_lock(flags);
 	current_pages -= 1UL << order;
 	balloon_unlock(flags);
 
