@@ -233,8 +233,8 @@ bool xen_setup(void)
 		goto out_close_data;
 	}
 
-	if (!xs_watch(xs, "/console", "console")) {
-		dolog(LOG_ERR, "xenstore watch on /console fails.");
+	if (!xs_watch(xs, "@introduceDomain", "console")) {
+		dolog(LOG_ERR, "xenstore watch on @introduceDomain fails.");
 		goto out_close_data;
 	}
 

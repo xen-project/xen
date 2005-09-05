@@ -33,6 +33,7 @@
 #include "talloc.h"
 #include "xenstored_core.h"
 #include "xenstored_domain.h"
+#include "xenstored_watch.h"
 #include "xenstored_test.h"
 
 static int *xc_handle;
@@ -308,6 +309,9 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 
 	/* Now domain belongs to its connection. */
 	talloc_steal(domain->conn, domain);
+
+	fire_watches(conn, "@introduceDomain", false);
+
 	send_ack(conn, XS_INTRODUCE);
 }
 

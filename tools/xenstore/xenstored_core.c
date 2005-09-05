@@ -828,6 +828,15 @@ bool check_node_perms(struct connection *conn, const char *node,
 	return false;
 }
 
+bool check_event_node(const char *node)
+{
+	if (!node || !strstarts(node, "@")) {
+		errno = EINVAL;
+		return false;
+	}
+	return true;
+}
+
 static void send_directory(struct connection *conn, const char *node)
 {
 	char *path, *reply;

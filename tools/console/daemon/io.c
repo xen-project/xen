@@ -212,12 +212,10 @@ int xs_gather(struct xs_handle *xs, const char *dir, ...)
 
 static int domain_create_ring(struct domain *dom)
 {
-	char *dompath, *path;
+	char *dompath;
 	int err;
 
-	asprintf(&path, "/console/%d/domain", dom->domid);
-	dompath = xs_read(xs, path, NULL);
-	free(path);
+	dompath = xs_get_domain_path(xs, dom->domid);
 	if (!dompath)
 		return ENOENT;
 
@@ -452,6 +450,7 @@ static void handle_xs(int fd)
 		if (dom && (dom->evtchn_fd == -1 || dom->page == NULL))
 			domain_create_ring(dom);
 	}
+	enum_domains();
 
 	xs_acknowledge_watch(xs, vec[1]);
 	free(vec);
