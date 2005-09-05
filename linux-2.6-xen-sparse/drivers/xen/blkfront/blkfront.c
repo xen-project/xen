@@ -58,6 +58,7 @@ static unsigned int blkif_state = BLKIF_STATE_DISCONNECTED;
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
 #define GRANTREF_INVALID (1<<15)
+#define GRANT_INVALID_REF	(0xFFFF)
 
 static int recovery = 0; /* Recovery in progress: protected by blkif_io_lock */
 
@@ -368,6 +369,9 @@ static void blkif_free(struct blkfront_info *info)
 		free_page((unsigned long)info->ring.sring);
 		info->ring.sring = NULL;
 	}
+	if (info->ring_ref != GRANT_INVALID_REF)
+		gnttab_end_foreign_access(info->ring_ref, 0);
+	info->ring_ref = GRANT_INVALID_REF;
 	unbind_evtchn_from_irqhandler(info->evtchn, info); 
 	info->evtchn = 0;
 }
@@ -502,6 +506,8 @@ static int setup_blkring(struct xenbus_device *dev, struct blkfront_info *info)
 	evtchn_op_t op = { .cmd = EVTCHNOP_alloc_unbound };
 	int err;
 
+	info->ring_ref = GRANT_INVALID_REF;
+
 	sring = (void *)__get_free_page(GFP_KERNEL);
 	if (!sring) {
 		xenbus_dev_error(dev, -ENOMEM, "allocating shared ring");
@@ -524,6 +530,7 @@ static int setup_blkring(struct xenbus_device *dev, struct blkfront_info *info)
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		gnttab_end_foreign_access(info->ring_ref, 0);
+		info->ring_ref = GRANT_INVALID_REF;
 		free_page((unsigned long)info->ring.sring);
 		info->ring.sring = 0;
 		xenbus_dev_error(dev, err, "allocating event channel");
