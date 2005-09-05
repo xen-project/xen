@@ -1628,12 +1628,13 @@ static void daemonize(void)
 }
 
 
-static struct option options[] = { { "no-fork", 0, NULL, 'N' },
-				   { "verbose", 0, NULL, 'V' },
-				   { "output-pid", 0, NULL, 'P' },
-				   { "trace-file", 1, NULL, 'T' },
-				   { "pid-file", 1, NULL, 'F' },
-				   { NULL, 0, NULL, 0 } };
+static struct option options[] = {
+	{ "pid-file", 1, NULL, 'F' },
+	{ "no-fork", 0, NULL, 'N' },
+	{ "output-pid", 0, NULL, 'P' },
+	{ "trace-file", 1, NULL, 'T' },
+	{ "verbose", 0, NULL, 'V' },
+	{ NULL, 0, NULL, 0 } };
 
 int main(int argc, char *argv[])
 {
@@ -1644,13 +1645,14 @@ int main(int argc, char *argv[])
 	bool outputpid = false;
 	const char *pidfile = NULL;
 
-	while ((opt = getopt_long(argc, argv, "DVT:", options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "F:NPT:V", options,
+				  NULL)) != -1) {
 		switch (opt) {
+		case 'F':
+			pidfile = optarg;
+			break;
 		case 'N':
 			dofork = false;
-			break;
-		case 'V':
-			verbose = true;
 			break;
 		case 'P':
 			outputpid = true;
@@ -1662,8 +1664,9 @@ int main(int argc, char *argv[])
 					    optarg);
                         write(tracefd, "\n***\n", strlen("\n***\n"));
 			break;
-		case 'F':
-			pidfile = optarg;
+		case 'V':
+			verbose = true;
+			break;
 		}
 	}
 	if (optind != argc)
