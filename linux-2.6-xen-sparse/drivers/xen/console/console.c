@@ -195,7 +195,7 @@ static int __init xen_console_init(void)
 void xen_console_init(void)
 #endif
 {
-    if ( xen_start_info.flags & SIF_INITDOMAIN )
+    if ( xen_start_info->flags & SIF_INITDOMAIN )
     {
         if ( xc_mode == XC_DEFAULT )
             xc_mode = XC_SERIAL;
@@ -266,7 +266,7 @@ void xencons_force_flush(void)
     int        sz;
 
     /* Emergency console is synchronous, so there's nothing to flush. */
-    if ( xen_start_info.flags & SIF_INITDOMAIN )
+    if ( xen_start_info->flags & SIF_INITDOMAIN )
         return;
 
 
@@ -342,7 +342,7 @@ static void __xencons_tx_flush(void)
 {
     int        sz, work_done = 0;
 
-    if ( xen_start_info.flags & SIF_INITDOMAIN )
+    if ( xen_start_info->flags & SIF_INITDOMAIN )
     {
         if ( x_char )
         {
@@ -770,7 +770,7 @@ static int __init xencons_init(void)
     tty_register_device(xencons_driver, 0, NULL);
 #endif
 
-    if ( xen_start_info.flags & SIF_INITDOMAIN )
+    if ( xen_start_info->flags & SIF_INITDOMAIN )
     {
         xencons_priv_irq = bind_virq_to_irq(VIRQ_CONSOLE);
         (void)request_irq(xencons_priv_irq,

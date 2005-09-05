@@ -1369,7 +1369,7 @@ static int __init netif_init(void)
 {
     int err = 0;
 
-    if (xen_start_info.flags & SIF_INITDOMAIN)
+    if (xen_start_info->flags & SIF_INITDOMAIN)
         return 0;
 
     if ((err = xennet_proc_init()) != 0)

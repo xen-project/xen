@@ -524,7 +524,7 @@ extern union xen_start_info_union xen_start_info_union;
  */
 unsigned long __init e820_end_of_ram(void)
 {
-        unsigned long max_end_pfn = xen_start_info.nr_pages;
+        unsigned long max_end_pfn = xen_start_info->nr_pages;
 
 	if ( xen_override_max_pfn <  max_end_pfn)
 		xen_override_max_pfn = max_end_pfn;

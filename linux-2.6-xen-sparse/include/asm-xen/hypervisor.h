@@ -52,13 +52,7 @@
 #endif
 
 /* arch/xen/i386/kernel/setup.c */
-union xen_start_info_union
-{
-    start_info_t xen_start_info;
-    char padding[2048];
-};
-extern union xen_start_info_union xen_start_info_union;
-#define xen_start_info (xen_start_info_union.xen_start_info)
+extern start_info_t *xen_start_info;
 
 /* arch/xen/kernel/evtchn.c */
 /* Force a proper event-channel callback from Xen. */

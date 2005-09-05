@@ -757,8 +757,8 @@ static int wait_for_blkif(void)
 
 static int __init xlblk_init(void)
 {
-	if ((xen_start_info.flags & SIF_INITDOMAIN)
-	    || (xen_start_info.flags & SIF_BLK_BE_DOMAIN) )
+	if ((xen_start_info->flags & SIF_INITDOMAIN) ||
+	    (xen_start_info->flags & SIF_BLK_BE_DOMAIN) )
 		return 0;
 
 	IPRINTK("Initialising virtual block device driver\n");

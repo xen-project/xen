@@ -38,17 +38,13 @@
 #define X86_VENDOR_ID	new_cpu_data+CPUINFO_x86_vendor_id
 
 ENTRY(startup_32)
-	cld
-
-	/* Copy the necessary stuff from xen_start_info structure. */
-	mov  $xen_start_info_union,%edi
-	mov  $512,%ecx
-	rep movsl
+	movl %esi,xen_start_info
 
 #ifdef CONFIG_SMP
 ENTRY(startup_32_smp)
-	cld
 #endif /* CONFIG_SMP */
+
+	cld
 
 	/* Set up the stack pointer */
 	lss stack_start,%esp

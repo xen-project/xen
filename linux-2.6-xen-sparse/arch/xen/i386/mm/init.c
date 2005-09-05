@@ -159,7 +159,7 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 	pte_t *pte;
 	int pgd_idx, pmd_idx, pte_ofs;
 
-	unsigned long max_ram_pfn = xen_start_info.nr_pages;
+	unsigned long max_ram_pfn = xen_start_info->nr_pages;
 	if (max_ram_pfn > max_low_pfn)
 		max_ram_pfn = max_low_pfn;
 
@@ -317,7 +317,7 @@ void __init one_highpage_init(struct page *page, int pfn, int bad_ppro)
 		ClearPageReserved(page);
 		set_bit(PG_highmem, &page->flags);
 		set_page_count(page, 1);
-		if (pfn < xen_start_info.nr_pages)
+		if (pfn < xen_start_info->nr_pages)
 			__free_page(page);
 		totalhigh_pages++;
 	} else
@@ -356,7 +356,7 @@ pgd_t *swapper_pg_dir;
 static void __init pagetable_init (void)
 {
 	unsigned long vaddr;
-	pgd_t *pgd_base = (pgd_t *)xen_start_info.pt_base;
+	pgd_t *pgd_base = (pgd_t *)xen_start_info->pt_base;
 	int i;
 
 	swapper_pg_dir = pgd_base;
@@ -535,14 +535,14 @@ void __init paging_init(void)
 	kmap_init();
 
 	/* Switch to the real shared_info page, and clear the dummy page. */
-	set_fixmap(FIX_SHARED_INFO, xen_start_info.shared_info);
+	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
-		if (xen_start_info.flags & SIF_PRIVILEGED)
+		if (xen_start_info->flags & SIF_PRIVILEGED)
 			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 		else
 			__set_fixmap(FIX_ISAMAP_BEGIN - i,
@@ -639,7 +639,7 @@ void __init mem_init(void)
 	/* this will put all low memory onto the freelists */
 	totalram_pages += free_all_bootmem();
 	/* XEN: init and count low-mem pages outside initial allocation. */
-	for (pfn = xen_start_info.nr_pages; pfn < max_low_pfn; pfn++) {
+	for (pfn = xen_start_info->nr_pages; pfn < max_low_pfn; pfn++) {
 		ClearPageReserved(&mem_map[pfn]);
 		set_page_count(&mem_map[pfn], 1);
 		totalram_pages++;

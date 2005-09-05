@@ -483,7 +483,7 @@ void ctrl_if_resume(void)
 {
     control_if_t *ctrl_if = get_ctrl_if();
 
-    if ( xen_start_info.flags & SIF_INITDOMAIN )
+    if ( xen_start_info->flags & SIF_INITDOMAIN )
     {
         /*
          * The initial domain must create its own domain-controller link.
@@ -500,7 +500,7 @@ void ctrl_if_resume(void)
         op.u.bind_interdomain.port2 = 0;
         if ( HYPERVISOR_event_channel_op(&op) != 0 )
             BUG();
-        xen_start_info.domain_controller_evtchn = op.u.bind_interdomain.port1;
+        xen_start_info->domain_controller_evtchn = op.u.bind_interdomain.port1;
         initdom_ctrlif_domcontroller_port   = op.u.bind_interdomain.port2;
 	bind_evtchn_to_cpu(op.u.bind_interdomain.port1, 0);
     }
@@ -509,7 +509,7 @@ void ctrl_if_resume(void)
     FRONT_RING_ATTACH(&ctrl_if_tx_ring, &ctrl_if->tx_ring, CONTROL_RING_MEM);
     BACK_RING_ATTACH(&ctrl_if_rx_ring, &ctrl_if->rx_ring, CONTROL_RING_MEM);
 
-    ctrl_if_evtchn = xen_start_info.domain_controller_evtchn;
+    ctrl_if_evtchn = xen_start_info->domain_controller_evtchn;
     ctrl_if_irq    = bind_evtchn_to_irq(ctrl_if_evtchn);
 
     memset(&ctrl_if_irq_action, 0, sizeof(ctrl_if_irq_action));

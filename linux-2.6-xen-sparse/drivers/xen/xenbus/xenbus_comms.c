@@ -48,12 +48,12 @@ DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
 
 static inline struct ringbuf_head *outbuf(void)
 {
-	return mfn_to_virt(xen_start_info.store_mfn);
+	return mfn_to_virt(xen_start_info->store_mfn);
 }
 
 static inline struct ringbuf_head *inbuf(void)
 {
-	return mfn_to_virt(xen_start_info.store_mfn) + PAGE_SIZE/2;
+	return mfn_to_virt(xen_start_info->store_mfn) + PAGE_SIZE/2;
 }
 
 static irqreturn_t wake_waiting(int irq, void *unused, struct pt_regs *regs)
@@ -145,7 +145,7 @@ int xb_write(const void *data, unsigned len)
 		data += avail;
 		len -= avail;
 		update_output_chunk(out, avail);
-		notify_via_evtchn(xen_start_info.store_evtchn);
+		notify_via_evtchn(xen_start_info->store_evtchn);
 	} while (len != 0);
 
 	return 0;
@@ -190,7 +190,7 @@ int xb_read(void *data, unsigned len)
 		pr_debug("Finished read of %i bytes (%i to go)\n", avail, len);
 		/* If it was full, tell them we've taken some. */
 		if (was_full)
-			notify_via_evtchn(xen_start_info.store_evtchn);
+			notify_via_evtchn(xen_start_info->store_evtchn);
 	}
 
 	/* If we left something, wake watch thread to deal with it. */
@@ -205,20 +205,20 @@ int xb_init_comms(void)
 {
 	int err;
 
-	if (!xen_start_info.store_evtchn)
+	if (!xen_start_info->store_evtchn)
 		return 0;
 
 	err = bind_evtchn_to_irqhandler(
-		xen_start_info.store_evtchn, wake_waiting,
+		xen_start_info->store_evtchn, wake_waiting,
 		0, "xenbus", &xb_waitq);
 	if (err) {
 		printk(KERN_ERR "XENBUS request irq failed %i\n", err);
-		unbind_evtchn_from_irq(xen_start_info.store_evtchn);
+		unbind_evtchn_from_irq(xen_start_info->store_evtchn);
 		return err;
 	}
 
 	/* FIXME zero out page -- domain builder should probably do this*/
-	memset(mfn_to_virt(xen_start_info.store_mfn), 0, PAGE_SIZE);
+	memset(mfn_to_virt(xen_start_info->store_mfn), 0, PAGE_SIZE);
 
 	return 0;
 }
@@ -226,8 +226,8 @@ int xb_init_comms(void)
 void xb_suspend_comms(void)
 {
 
-	if (!xen_start_info.store_evtchn)
+	if (!xen_start_info->store_evtchn)
 		return;
 
-	unbind_evtchn_from_irqhandler(xen_start_info.store_evtchn, &xb_waitq);
+	unbind_evtchn_from_irqhandler(xen_start_info->store_evtchn, &xb_waitq);
 }

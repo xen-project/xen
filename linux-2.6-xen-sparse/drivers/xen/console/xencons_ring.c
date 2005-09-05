@@ -36,12 +36,12 @@ struct ring_head
 
 static inline struct ring_head *outring(void)
 {
-	return machine_to_virt(xen_start_info.console_mfn << PAGE_SHIFT);
+	return machine_to_virt(xen_start_info->console_mfn << PAGE_SHIFT);
 }
 
 static inline struct ring_head *inring(void)
 {
-	return machine_to_virt(xen_start_info.console_mfn << PAGE_SHIFT)
+	return machine_to_virt(xen_start_info->console_mfn << PAGE_SHIFT)
 		+ PAGE_SIZE/2;
 }
 
@@ -68,7 +68,7 @@ int xencons_ring_send(const char *data, unsigned len)
 	int sent = 0;
 	
 	sent = __xencons_ring_send(out, data, len);
-	notify_via_evtchn(xen_start_info.console_evtchn);
+	notify_via_evtchn(xen_start_info->console_evtchn);
 	return sent;
 
 }	
@@ -98,10 +98,10 @@ int xencons_ring_init(void)
 {
 	int err;
 
-	if (!xen_start_info.console_evtchn)
+	if (!xen_start_info->console_evtchn)
 		return 0;
 
-	err = bind_evtchn_to_irqhandler(xen_start_info.console_evtchn,
+	err = bind_evtchn_to_irqhandler(xen_start_info->console_evtchn,
 					handle_input, 0, "xencons", inring());
 	if (err) {
 		xprintk("XEN console request irq failed %i\n", err);
@@ -114,10 +114,11 @@ int xencons_ring_init(void)
 void xencons_suspend(void)
 {
 
-	if (!xen_start_info.console_evtchn)
+	if (!xen_start_info->console_evtchn)
 		return;
 
-	unbind_evtchn_from_irqhandler(xen_start_info.console_evtchn, inring());
+	unbind_evtchn_from_irqhandler(xen_start_info->console_evtchn,
+				      inring());
 }
 
 void xencons_resume(void)

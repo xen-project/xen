@@ -181,7 +181,7 @@ swiotlb_init(void)
          * Otherwise, enable for domain 0 if the machine has 'lots of memory',
          * which we take to mean more than 2GB.
          */
-	if (xen_start_info.flags & SIF_INITDOMAIN) {
+	if (xen_start_info->flags & SIF_INITDOMAIN) {
 		dom0_op_t op;
 		op.cmd = DOM0_PHYSINFO;
 		if ((HYPERVISOR_dom0_op(&op) == 0) &&

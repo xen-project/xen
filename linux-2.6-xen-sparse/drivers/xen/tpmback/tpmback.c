@@ -1047,8 +1047,8 @@ static int __init
 tpmback_init(void)
 {
 	int rc;
-	if (!(xen_start_info.flags & SIF_TPM_BE_DOMAIN) &&
-	    !(xen_start_info.flags & SIF_INITDOMAIN)) {
+	if (!(xen_start_info->flags & SIF_TPM_BE_DOMAIN) &&
+	    !(xen_start_info->flags & SIF_INITDOMAIN)) {
 	    	printk(KERN_ALERT "Neither TPM-BE Domain nor INIT domain!\n");
 		return 0;
 	}

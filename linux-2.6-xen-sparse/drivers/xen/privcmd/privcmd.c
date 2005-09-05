@@ -205,8 +205,8 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         extern int do_xenbus_probe(void*);
         unsigned long page;
 
-        if (xen_start_info.store_evtchn != 0) {
-            ret = xen_start_info.store_mfn;
+        if (xen_start_info->store_evtchn != 0) {
+            ret = xen_start_info->store_mfn;
             break;
         }
 
@@ -222,10 +222,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         SetPageReserved(virt_to_page(page));
 
         /* Initial connect. Setup channel and page. */
-        xen_start_info.store_evtchn = data;
-        xen_start_info.store_mfn = pfn_to_mfn(virt_to_phys((void *)page) >>
+        xen_start_info->store_evtchn = data;
+        xen_start_info->store_mfn = pfn_to_mfn(virt_to_phys((void *)page) >>
                                               PAGE_SHIFT);
-        ret = xen_start_info.store_mfn;
+        ret = xen_start_info->store_mfn;
 
         /* We'll return then this will wait for daemon to answer */
         kthread_run(do_xenbus_probe, NULL, "xenbus_probe");

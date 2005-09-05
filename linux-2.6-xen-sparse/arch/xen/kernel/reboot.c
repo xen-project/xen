@@ -185,8 +185,8 @@ static int __do_suspend(void *ignore)
     HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
     clear_fixmap(FIX_SHARED_INFO);
 
-    memcpy(&suspend_record->resume_info, &xen_start_info,
-           sizeof(xen_start_info));
+    memcpy(&suspend_record->resume_info, xen_start_info,
+           sizeof(*xen_start_info));
 
     /* We'll stop somewhere inside this hypercall.  When it returns,
        we'll start resuming after the restore. */
@@ -194,10 +194,10 @@ static int __do_suspend(void *ignore)
 
     shutting_down = SHUTDOWN_INVALID; 
 
-    memcpy(&xen_start_info, &suspend_record->resume_info,
-           sizeof(xen_start_info));
+    memcpy(xen_start_info, &suspend_record->resume_info,
+           sizeof(*xen_start_info));
 
-    set_fixmap(FIX_SHARED_INFO, xen_start_info.shared_info);
+    set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
 
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 

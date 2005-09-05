@@ -402,7 +402,7 @@ static int __init balloon_init(void)
 
 	IPRINTK("Initialising balloon driver.\n");
 
-	current_pages = min(xen_start_info.nr_pages, max_pfn);
+	current_pages = min(xen_start_info->nr_pages, max_pfn);
 	target_pages  = current_pages;
 	balloon_low   = 0;
 	balloon_high  = 0;
@@ -422,7 +422,7 @@ static int __init balloon_init(void)
 	balloon_pde->write_proc = balloon_write;
     
 	/* Initialise the balloon with excess memory space. */
-	for (pfn = xen_start_info.nr_pages; pfn < max_pfn; pfn++) {
+	for (pfn = xen_start_info->nr_pages; pfn < max_pfn; pfn++) {
 		page = &mem_map[pfn];
 		if (!PageReserved(page))
 			balloon_append(page);

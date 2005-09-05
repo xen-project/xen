@@ -423,7 +423,7 @@ static inline int make_readonly(unsigned long paddr)
 	int readonly = 0;
 
 	/* Make old and new page tables read-only. */
-	if ((paddr >= (xen_start_info.pt_base - __START_KERNEL_map))
+	if ((paddr >= (xen_start_info->pt_base - __START_KERNEL_map))
 	    && (paddr < ((table_start << PAGE_SHIFT) + tables_space)))
 		readonly = 1;
 	/*
@@ -474,8 +474,8 @@ static void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned lon
                         pte_save = pte;
                         for (k = 0; k < PTRS_PER_PTE; pte++, k++, paddr += PTE_SIZE) {
                                 if ((paddr >= end) ||
-                                    ((paddr >> PAGE_SHIFT)
-                                     >= xen_start_info.nr_pages)) { 
+                                    ((paddr >> PAGE_SHIFT) >=
+                                     xen_start_info->nr_pages)) { 
                                         __set_pte(pte, __pte(0)); 
                                         continue;
                                 }
@@ -522,7 +522,7 @@ void __init xen_init_pt(void)
 	memset((void *)level2_kernel_pgt, 0, PAGE_SIZE);
 
 	/* Find the initial pte page that was built for us. */
-	page = (unsigned long *)xen_start_info.pt_base;
+	page = (unsigned long *)xen_start_info->pt_base;
 	addr = page[pgd_index(__START_KERNEL_map)];
 	addr_to_page(addr, page);
 	addr = page[pud_index(__START_KERNEL_map)];
@@ -671,7 +671,7 @@ void __init paging_init(void)
 		free_area_init(zones_size);
 	}
 
-        set_fixmap(FIX_SHARED_INFO, xen_start_info.shared_info);
+        set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
         HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 
         memset(empty_zero_page, 0, sizeof(empty_zero_page));
@@ -682,7 +682,7 @@ void __init paging_init(void)
 		int i;
         /* Setup mapping of lower 1st MB */
 		for (i = 0; i < NR_FIX_ISAMAPS; i++)
-			if (xen_start_info.flags & SIF_PRIVILEGED)
+			if (xen_start_info->flags & SIF_PRIVILEGED)
 				set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 			else
 				__set_fixmap(FIX_ISAMAP_BEGIN - i,

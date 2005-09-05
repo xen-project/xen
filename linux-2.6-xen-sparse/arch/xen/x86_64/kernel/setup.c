@@ -84,7 +84,7 @@ DEFINE_PER_CPU(multicall_entry_t, multicall_list[8]);
 DEFINE_PER_CPU(int, nr_multicall_ents);
 
 /* Raw start-of-day parameters from the hypervisor. */
-union xen_start_info_union xen_start_info_union;
+start_info_t *xen_start_info;
 #endif
 
 /*
@@ -314,7 +314,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 	
 	if ((max_cmdline = MAX_GUEST_CMDLINE) > COMMAND_LINE_SIZE)
 		max_cmdline = COMMAND_LINE_SIZE;
-	memcpy(saved_command_line, xen_start_info.cmd_line, max_cmdline);
+	memcpy(saved_command_line, xen_start_info->cmd_line, max_cmdline);
 	saved_command_line[max_cmdline-1] = '\0';
 #else
 	memcpy(saved_command_line, COMMAND_LINE, COMMAND_LINE_SIZE);
@@ -687,7 +687,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #ifdef CONFIG_XEN
 #ifdef CONFIG_BLK_DEV_INITRD
-	if (xen_start_info.mod_start) {
+	if (xen_start_info->mod_start) {
 		if (INITRD_START + INITRD_SIZE <= (end_pfn << PAGE_SHIFT)) {
 			/*reserve_bootmem_generic(INITRD_START, INITRD_SIZE);*/
 			initrd_start = INITRD_START + PAGE_OFFSET;
@@ -732,17 +732,17 @@ void __init setup_arch(char **cmdline_p)
 	{
 		int i, j;
 		/* Make sure we have a large enough P->M table. */
-		if (end_pfn > xen_start_info.nr_pages) {
+		if (end_pfn > xen_start_info->nr_pages) {
 			phys_to_machine_mapping = alloc_bootmem(
 				end_pfn * sizeof(u32));
 			memset(phys_to_machine_mapping, ~0,
 			       end_pfn * sizeof(u32));
 			memcpy(phys_to_machine_mapping,
-			       (u32 *)xen_start_info.mfn_list,
-			       xen_start_info.nr_pages * sizeof(u32));
+			       (u32 *)xen_start_info->mfn_list,
+			       xen_start_info->nr_pages * sizeof(u32));
 			free_bootmem(
-				__pa(xen_start_info.mfn_list), 
-				PFN_PHYS(PFN_UP(xen_start_info.nr_pages *
+				__pa(xen_start_info->mfn_list), 
+				PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
 						sizeof(u32))));
 		}
 
@@ -814,8 +814,8 @@ void __init setup_arch(char **cmdline_p)
 	       op.u.set_iopl.iopl = 1;
 	       HYPERVISOR_physdev_op(&op);
 
-	       if (xen_start_info.flags & SIF_INITDOMAIN) {
-		       if (!(xen_start_info.flags & SIF_PRIVILEGED))
+	       if (xen_start_info->flags & SIF_INITDOMAIN) {
+		       if (!(xen_start_info->flags & SIF_PRIVILEGED))
 			       panic("Xen granted us console access "
 				     "but not privileged status");
 		       

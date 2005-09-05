@@ -289,7 +289,7 @@ static void __init probe_roms(void)
 	int	      i;
 
 	/* Nothing to do if not running in dom0. */
-	if (!(xen_start_info.flags & SIF_INITDOMAIN))
+	if (!(xen_start_info->flags & SIF_INITDOMAIN))
 		return;
 
 	/* video rom */
@@ -363,7 +363,7 @@ unsigned int *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
 EXPORT_SYMBOL(phys_to_machine_mapping);
 
 /* Raw start-of-day parameters from the hypervisor. */
-union xen_start_info_union xen_start_info_union;
+start_info_t *xen_start_info;
 
 static void __init limit_regions(unsigned long long size)
 {
@@ -703,7 +703,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 
 	if ((max_cmdline = MAX_GUEST_CMDLINE) > COMMAND_LINE_SIZE)
 		max_cmdline = COMMAND_LINE_SIZE;
-	memcpy(saved_command_line, xen_start_info.cmd_line, max_cmdline);
+	memcpy(saved_command_line, xen_start_info->cmd_line, max_cmdline);
 	/* Save unparsed command line copy for /proc/cmdline */
 	saved_command_line[max_cmdline-1] = '\0';
 
@@ -934,8 +934,8 @@ void __init find_max_pfn(void)
 /* We don't use the fake e820 because we need to respond to user override. */
 void __init find_max_pfn(void)
 {
-	if ( xen_override_max_pfn < xen_start_info.nr_pages )
-		xen_override_max_pfn = xen_start_info.nr_pages;
+	if ( xen_override_max_pfn < xen_start_info->nr_pages )
+		xen_override_max_pfn = xen_start_info->nr_pages;
 	max_pfn = xen_override_max_pfn;
 }
 #endif /* XEN */
@@ -1082,8 +1082,8 @@ static unsigned long __init setup_memory(void)
 	 * partially used pages are not usable - thus
 	 * we are rounding upwards:
 	 */
- 	min_low_pfn = PFN_UP(__pa(xen_start_info.pt_base)) +
-		xen_start_info.nr_pt_frames;
+ 	min_low_pfn = PFN_UP(__pa(xen_start_info->pt_base)) +
+		xen_start_info->nr_pt_frames;
 
 	find_max_pfn();
 
@@ -1189,7 +1189,7 @@ void __init setup_bootmem_allocator(void)
 #endif /* !CONFIG_XEN */
 
 #ifdef CONFIG_BLK_DEV_INITRD
-	if (xen_start_info.mod_start) {
+	if (xen_start_info->mod_start) {
 		if (INITRD_START + INITRD_SIZE <= (max_low_pfn << PAGE_SHIFT)) {
 			/*reserve_bootmem(INITRD_START, INITRD_SIZE);*/
 			initrd_start = INITRD_START + PAGE_OFFSET;
@@ -1206,7 +1206,7 @@ void __init setup_bootmem_allocator(void)
 	}
 #endif
 
-	phys_to_machine_mapping = (unsigned int *)xen_start_info.mfn_list;
+	phys_to_machine_mapping = (unsigned int *)xen_start_info->mfn_list;
 }
 
 /*
@@ -1280,7 +1280,7 @@ static void __init register_memory(void)
 	else
 		legacy_init_iomem_resources(&code_resource, &data_resource);
 
-	if (xen_start_info.flags & SIF_INITDOMAIN)
+	if (xen_start_info->flags & SIF_INITDOMAIN)
 		/* EFI systems may still have VGA */
 		request_resource(&iomem_resource, &video_ram_resource);
 
@@ -1536,8 +1536,8 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code = (unsigned long) _etext;
 	init_mm.end_data = (unsigned long) _edata;
-	init_mm.brk = (PFN_UP(__pa(xen_start_info.pt_base)) +
-		       xen_start_info.nr_pt_frames) << PAGE_SHIFT;
+	init_mm.brk = (PFN_UP(__pa(xen_start_info->pt_base)) +
+		       xen_start_info->nr_pt_frames) << PAGE_SHIFT;
 
 	/* XEN: This is nonsense: kernel may not even be contiguous in RAM. */
 	/*code_resource.start = virt_to_phys(_text);*/
@@ -1574,37 +1574,37 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 	/* Make sure we have a correctly sized P->M table. */
-	if (max_pfn != xen_start_info.nr_pages) {
+	if (max_pfn != xen_start_info->nr_pages) {
 		phys_to_machine_mapping = alloc_bootmem_low_pages(
 			max_pfn * sizeof(unsigned int));
 
-		if (max_pfn > xen_start_info.nr_pages) {
+		if (max_pfn > xen_start_info->nr_pages) {
 			/* set to INVALID_P2M_ENTRY */
 			memset(phys_to_machine_mapping, ~0,
 				max_pfn * sizeof(unsigned int));
 			memcpy(phys_to_machine_mapping,
-				(unsigned int *)xen_start_info.mfn_list,
-				xen_start_info.nr_pages * sizeof(unsigned int));
+				(unsigned int *)xen_start_info->mfn_list,
+				xen_start_info->nr_pages * sizeof(unsigned int));
 		} else {
 			struct xen_memory_reservation reservation = {
-				.extent_start = (unsigned long *)xen_start_info.mfn_list + max_pfn,
-				.nr_extents   = xen_start_info.nr_pages - max_pfn,
+				.extent_start = (unsigned long *)xen_start_info->mfn_list + max_pfn,
+				.nr_extents   = xen_start_info->nr_pages - max_pfn,
 				.extent_order = 0,
 				.domid        = DOMID_SELF
 			};
 
 			memcpy(phys_to_machine_mapping,
-				(unsigned int *)xen_start_info.mfn_list,
+				(unsigned int *)xen_start_info->mfn_list,
 				max_pfn * sizeof(unsigned int));
 			/* N.B. below relies on sizeof(int) == sizeof(long). */
 			BUG_ON(HYPERVISOR_memory_op(
 				XENMEM_decrease_reservation,
 				&reservation) !=
-			    (xen_start_info.nr_pages - max_pfn));
+			    (xen_start_info->nr_pages - max_pfn));
 		}
 		free_bootmem(
-			__pa(xen_start_info.mfn_list), 
-			PFN_PHYS(PFN_UP(xen_start_info.nr_pages *
+			__pa(xen_start_info->mfn_list), 
+			PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
 			sizeof(unsigned int))));
 	}
 
@@ -1633,7 +1633,7 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 
-	if (xen_start_info.flags & SIF_INITDOMAIN)
+	if (xen_start_info->flags & SIF_INITDOMAIN)
 		dmi_scan_machine();
 
 #ifdef CONFIG_X86_GENERICARCH
@@ -1647,7 +1647,7 @@ void __init setup_arch(char **cmdline_p)
 	HYPERVISOR_physdev_op(&op);
 
 #ifdef CONFIG_ACPI_BOOT
-	if (!(xen_start_info.flags & SIF_INITDOMAIN)) {
+	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
 		printk(KERN_INFO "ACPI in unprivileged domain disabled\n");
 		acpi_disabled = 1;
 		acpi_ht = 0;
@@ -1673,8 +1673,8 @@ void __init setup_arch(char **cmdline_p)
 
 	register_memory();
 
-	if (xen_start_info.flags & SIF_INITDOMAIN) {
-		if (!(xen_start_info.flags & SIF_PRIVILEGED))
+	if (xen_start_info->flags & SIF_INITDOMAIN) {
+		if (!(xen_start_info->flags & SIF_PRIVILEGED))
 			panic("Xen granted us console access "
 			      "but not privileged status");
 

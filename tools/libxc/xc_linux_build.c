@@ -395,18 +395,18 @@ static int setup_guest(int xc_handle,
     vinitrd_end      = vinitrd_start + initrd_len;
     vphysmap_start   = round_pgup(vinitrd_end);
     vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
-    vstoreinfo_start = round_pgup(vphysmap_end);
+    vstartinfo_start = round_pgup(vphysmap_end);
+    vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
+    vstoreinfo_start = vstartinfo_end;
     vstoreinfo_end   = vstoreinfo_start + PAGE_SIZE;
     vconsole_start   = vstoreinfo_end;
-    vconsole_end     = vstoreinfo_end + PAGE_SIZE;
+    vconsole_end     = vconsole_start + PAGE_SIZE;
     vpt_start        = vconsole_end; 
 
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
         vpt_end          = vpt_start + (nr_pt_pages * PAGE_SIZE);
-        vstartinfo_start = vpt_end;
-        vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
-        vstack_start     = vstartinfo_end;
+        vstack_start     = vpt_end;
         vstack_end       = vstack_start + PAGE_SIZE;
         v_end            = (vstack_end + (1UL<<22)-1) & ~((1UL<<22)-1);
         if ( (v_end - vstack_end) < (512UL << 10) )
@@ -442,19 +442,19 @@ static int setup_guest(int xc_handle,
            " Loaded kernel: %p->%p\n"
            " Init. ramdisk: %p->%p\n"
            " Phys-Mach map: %p->%p\n"
+           " Start info:    %p->%p\n"
            " Store page:    %p->%p\n"
            " Console page:  %p->%p\n"
            " Page tables:   %p->%p\n"
-           " Start info:    %p->%p\n"
            " Boot stack:    %p->%p\n"
            " TOTAL:         %p->%p\n",
            _p(dsi.v_kernstart), _p(dsi.v_kernend), 
            _p(vinitrd_start), _p(vinitrd_end),
            _p(vphysmap_start), _p(vphysmap_end),
+           _p(vstartinfo_start), _p(vstartinfo_end),
            _p(vstoreinfo_start), _p(vstoreinfo_end),
            _p(vconsole_start), _p(vconsole_end),
            _p(vpt_start), _p(vpt_end),
-           _p(vstartinfo_start), _p(vstartinfo_end),
            _p(vstack_start), _p(vstack_end),
            _p(dsi.v_start), _p(v_end));
     printf(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));

@@ -1675,8 +1675,8 @@ static int __init xhci_hcd_init(void)
 {
 	int retval = -ENOMEM, i;
 
-	if ( (xen_start_info.flags & SIF_INITDOMAIN)
-	     || (xen_start_info.flags & SIF_USB_BE_DOMAIN) )
+	if ( (xen_start_info->flags & SIF_INITDOMAIN) ||
+	     (xen_start_info->flags & SIF_USB_BE_DOMAIN) )
                 return 0;
 
 	info(DRIVER_DESC " " DRIVER_VERSION);

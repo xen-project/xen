@@ -40,16 +40,13 @@
 	.globl startup_64
 startup_64:
 ENTRY(_start)
-        cld                
-	/* Copy the necessary stuff from xen_start_info structure. */
-	movq  $xen_start_info_union,%rdi
-	movq  $256,%rcx
-	rep movsq
+	movq %rsi,xen_start_info(%rip)
 
 #ifdef CONFIG_SMP
-        ENTRY(startup_64_smp)
-	cld
+ENTRY(startup_64_smp)
 #endif /* CONFIG_SMP */
+
+	cld
 
 	movq init_rsp(%rip),%rsp
 	/* zero EFLAGS after setting rsp */
