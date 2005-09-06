@@ -1304,8 +1304,12 @@ static int out_of_mem(void *data)
 
 static void consider_message(struct connection *conn)
 {
-	struct buffered_data *in = NULL;
-	enum xsd_sockmsg_type type = conn->in->hdr.msg.type;
+	/*
+	 * 'volatile' qualifier prevents register allocation which fixes:
+	 *   warning: variable 'xxx' might be clobbered by 'longjmp' or 'vfork'
+	 */
+	struct buffered_data *volatile in = NULL;
+	enum xsd_sockmsg_type volatile type = conn->in->hdr.msg.type;
 	jmp_buf talloc_fail;
 
 	assert(conn->state == OK);
@@ -1443,7 +1447,11 @@ static void unblock_connections(void)
 
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 {
-	struct connection *new;
+	/*
+	 * 'volatile' qualifier prevents register allocation which fixes:
+	 *   warning: variable 'xxx' might be clobbered by 'longjmp' or 'vfork'
+	 */
+	struct connection *volatile new;
 	jmp_buf talloc_fail;
 
 	new = talloc(talloc_autofree_context(), struct connection);
