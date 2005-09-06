@@ -363,6 +363,21 @@ void do_release(struct connection *conn, const char *domid_str)
 	send_ack(conn, XS_RELEASE);
 }
 
+void domain_cleanup(void)
+{
+	xc_dominfo_t dominfo;
+	struct domain *domain, *tmp;
+
+	list_for_each_entry_safe(domain, tmp, &domains, list) {
+		if (xc_domain_getinfo(*xc_handle, domain->domid, 1,
+				      &dominfo) == 1 &&
+		    dominfo.domid == domain->domid &&
+		    !dominfo.dying && !dominfo.crashed && !dominfo.shutdown)
+			continue;
+		talloc_free(domain->conn);
+	}
+}
+
 void do_get_domain_path(struct connection *conn, const char *domid_str)
 {
 	struct domain *domain;

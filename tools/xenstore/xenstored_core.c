@@ -49,6 +49,9 @@
 #include "xenstored_watch.h"
 #include "xenstored_transaction.h"
 #include "xenstored_domain.h"
+#include "xenctrl.h"
+#include "xen/io/domain_controller.h"
+#include "xcs_proto.h"
 
 static bool verbose;
 LIST_HEAD(connections);
@@ -322,7 +325,7 @@ static int destroy_conn(void *_conn)
 }
 
 static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock,
-			  int event_fd)
+			  int event_fd, int xcs_fd)
 {
 	struct connection *i;
 	int max;
@@ -337,6 +340,9 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock,
 	FD_SET(event_fd, inset);
 	if (event_fd > max)
 		max = event_fd;
+	FD_SET(xcs_fd, inset);
+	if (xcs_fd > max)
+		max = xcs_fd;
 	list_for_each_entry(i, &connections, list) {
 		if (i->domain)
 			continue;
@@ -1636,6 +1642,125 @@ static void daemonize(void)
 	umask(0);
 }
 
+static int open_domain_socket(const char *path)
+{
+	struct sockaddr_un addr;
+	int sock;
+	size_t addr_len;
+
+	if ((sock = socket(PF_UNIX, SOCK_STREAM, 0)) == -1) {
+		goto out;
+	}
+
+	addr.sun_family = AF_UNIX;
+	strcpy(addr.sun_path, path);
+	addr_len = sizeof(addr.sun_family) + strlen(XCS_SUN_PATH) + 1;
+
+	if (connect(sock, (struct sockaddr *)&addr, addr_len) == -1) {
+		goto out_close_sock;
+	}
+
+	return sock;
+
+ out_close_sock:
+	close(sock);
+ out:
+	return -1;
+}
+
+bool _read_write_sync(int fd, void *data, size_t size, bool do_read)
+{
+	size_t offset = 0;
+	ssize_t len;
+
+	while (offset < size) {
+		if (do_read) {
+			len = read(fd, data + offset, size - offset);
+		} else {
+			len = write(fd, data + offset, size - offset);
+		}
+
+		if (len < 1) {
+			if (len == -1 && (errno == EAGAIN || errno == EINTR)) {
+				continue;
+			} else {
+				return false;
+			}
+		} else {
+			offset += len;
+		}
+	}
+
+	return true;
+}
+
+#define read_sync(fd, buffer, size) _read_write_sync(fd, buffer, size, true)
+#define write_sync(fd, buffer, size) _read_write_sync(fd, buffer, size, false)
+
+/* synchronized send/recv strictly for setting up xcs */
+/* always use asychronize callbacks any other time */
+static bool xcs_send_recv(int fd, xcs_msg_t *msg)
+{
+	bool ret = false;
+
+	if (!write_sync(fd, msg, sizeof(*msg))) {
+		eprintf("Write failed at %s:%s():L%d?  Possible bug.",
+			__FILE__, __FUNCTION__, __LINE__);
+		goto out;
+	}
+
+	if (!read_sync(fd, msg, sizeof(*msg))) {
+		eprintf("Read failed at %s:%s():L%d?  Possible bug.",
+			__FILE__, __FUNCTION__, __LINE__);
+		goto out;
+	}
+
+	ret = true;
+
+ out:
+	return ret;
+}
+
+static void handle_xcs(int xcs_fd)
+{
+	xcs_msg_t msg;
+
+	if (!read_sync(xcs_fd, &msg, sizeof(msg)))
+		barf_perror("read from xcs failed!");
+
+	domain_cleanup();
+}
+
+static int xcs_init(void)
+{
+	int ctrl_fd, data_fd;
+	xcs_msg_t msg;
+
+	ctrl_fd = open_domain_socket(XCS_SUN_PATH);
+	if (ctrl_fd == -1)
+		barf_perror("Failed to contact xcs.  Is it running?");
+
+	data_fd = open_domain_socket(XCS_SUN_PATH);
+	if (data_fd == -1)
+		barf_perror("Failed to contact xcs.  Is it running?");
+	
+	memset(&msg, 0, sizeof(msg));
+	msg.type = XCS_CONNECT_CTRL;
+	if (!xcs_send_recv(ctrl_fd, &msg) || msg.result != XCS_RSLT_OK)
+		barf_perror("xcs control connect failed.");
+
+	msg.type = XCS_CONNECT_DATA;
+	if (!xcs_send_recv(data_fd, &msg) || msg.result != XCS_RSLT_OK)
+		barf_perror("xcs data connect failed.");
+
+	msg.type = XCS_VIRQ_BIND;
+	msg.u.virq.virq = VIRQ_DOM_EXC;
+	if (!xcs_send_recv(ctrl_fd, &msg) || msg.result != XCS_RSLT_OK)
+		barf_perror("xcs virq bind failed.");
+
+	return data_fd;
+}
+
 
 static struct option options[] = {
 	{ "pid-file", 1, NULL, 'F' },
@@ -1647,7 +1772,7 @@ static struct option options[] = {
 
 int main(int argc, char *argv[])
 {
-	int opt, *sock, *ro_sock, event_fd, max;
+	int opt, *sock, *ro_sock, event_fd, xcs_fd, max;
 	struct sockaddr_un addr;
 	fd_set inset, outset;
 	bool dofork = true;
@@ -1731,6 +1856,9 @@ int main(int argc, char *argv[])
 	/* Listen to hypervisor. */
 	event_fd = domain_init();
 
+	/* Listen to hypervisor - more. */
+	xcs_fd = xcs_init();
+
 	/* Restore existing connections. */
 	restore_existing_connections();
 
@@ -1751,7 +1879,8 @@ int main(int argc, char *argv[])
 #endif
 
 	/* Get ready to listen to the tools. */
-	max = initialize_set(&inset, &outset, *sock, *ro_sock, event_fd);
+	max = initialize_set(&inset, &outset, *sock, *ro_sock, event_fd,
+			     xcs_fd);
 
 	/* Main loop. */
 	/* FIXME: Rewrite so noone can starve. */
@@ -1781,6 +1910,9 @@ int main(int argc, char *argv[])
 
 		if (FD_ISSET(event_fd, &inset))
 			handle_event(event_fd);
+
+		if (FD_ISSET(xcs_fd, &inset))
+			handle_xcs(xcs_fd);
 
 		list_for_each_entry(i, &connections, list) {
 			if (i->domain)
@@ -1824,6 +1956,7 @@ int main(int argc, char *argv[])
 		/* If transactions ended, we might be able to do more work. */
 		unblock_connections();
 
-		max = initialize_set(&inset, &outset, *sock,*ro_sock,event_fd);
+		max = initialize_set(&inset, &outset, *sock, *ro_sock,
+				     event_fd, xcs_fd);
 	}
 }

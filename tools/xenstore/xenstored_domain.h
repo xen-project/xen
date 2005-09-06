@@ -28,6 +28,10 @@ void do_introduce(struct connection *conn, struct buffered_data *in);
 /* domid */
 void do_release(struct connection *conn, const char *domid_str);
 
+/* Enumerate domains and release connections for non-existant or dying
+ * domains. */
+void domain_cleanup(void);
+
 /* domid */
 void do_get_domain_path(struct connection *conn, const char *domid_str);
 
