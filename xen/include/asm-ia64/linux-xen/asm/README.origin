@@ -1,0 +1,23 @@
+# Source files in this directory are near-identical copies of linux-2.6.13
+# files:
+
+# NOTE: ALL changes to these files should be clearly marked
+# (e.g. with #ifdef XEN or XEN in a comment) so that they can be
+# easily updated to future versions of the corresponding Linux files.
+
+gcc_intrin.h		-> linux/include/asm-ia64/gcc_intrin.h
+ia64regs.h		-> linux/include/asm-ia64/ia64regs.h
+io.h			-> linux/include/asm-ia64/io.h
+kregs.h			-> linux/include/asm-ia64/kregs.h
+mca_asm.h		-> linux/include/asm-ia64/mca_asm.h
+page.h			-> linux/include/asm-ia64/page.h
+pal.h			-> linux/include/asm-ia64/pal.h
+pgalloc.h		-> linux/include/asm-ia64/pgalloc.h
+pgtable.h		-> linux/include/asm-ia64/pgtable.h
+processor.h		-> linux/include/asm-ia64/processor.h
+ptrace.h		-> linux/include/asm-ia64/ptrace.h
+spinlock.h		-> linux/include/asm-ia64/spinlock.h
+system.h		-> linux/include/asm-ia64/system.h
+tlbflush.h		-> linux/include/asm-ia64/tlbflush.h
+types.h			-> linux/include/asm-ia64/types.h
+uaccess.h		-> linux/include/asm-ia64/uaccess.h
