@@ -360,6 +360,9 @@ void do_release(struct connection *conn, const char *domid_str)
 	}
 
 	talloc_free(domain->conn);
+
+	fire_watches(NULL, "@releaseDomain", false);
+
 	send_ack(conn, XS_RELEASE);
 }
 
@@ -367,6 +370,7 @@ void domain_cleanup(void)
 {
 	xc_dominfo_t dominfo;
 	struct domain *domain, *tmp;
+	int released = 0;
 
 	list_for_each_entry_safe(domain, tmp, &domains, list) {
 		if (xc_domain_getinfo(*xc_handle, domain->domid, 1,
@@ -375,7 +379,11 @@ void domain_cleanup(void)
 		    !dominfo.dying && !dominfo.crashed && !dominfo.shutdown)
 			continue;
 		talloc_free(domain->conn);
+		released++;
 	}
+
+	if (released)
+		fire_watches(NULL, "@releaseDomain", false);
 }
 
 void do_get_domain_path(struct connection *conn, const char *domid_str)

@@ -132,7 +132,7 @@ void fire_watches(struct connection *conn, const char *node, bool recurse)
 	struct watch *watch;
 
 	/* During transactions, don't fire watches. */
-	if (conn->transaction)
+	if (conn && conn->transaction)
 		return;
 
 	/* Create an event for each watch.  Don't send to self. */
