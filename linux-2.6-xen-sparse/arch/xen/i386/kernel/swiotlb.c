@@ -192,10 +192,8 @@ swiotlb_init(void)
 
 	if (swiotlb)
 		swiotlb_init_with_default_size(64 * (1<<20));
-
-	printk(KERN_INFO "swiotlb is %sabled%s\n", 
-	       (swiotlb ? "en" : "dis"), 
-	       (swiotlb_force ? " (forced)" : ""));
+	else
+		printk(KERN_INFO "Software IO TLB disabled\n");
 }
 
 static void
