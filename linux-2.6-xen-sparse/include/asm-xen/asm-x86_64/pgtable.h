@@ -307,7 +307,7 @@ inline static void set_pte_at(struct mm_struct *mm, unsigned long addr,
 #define pte_pfn(_pte)							\
 ({									\
 	unsigned long mfn = pte_mfn(_pte);                              \
-	unsigned pfn = mfn_to_pfn(mfn);                                 \
+	unsigned long pfn = mfn_to_pfn(mfn);                            \
 	if ((pfn >= max_mapnr) || (phys_to_machine_mapping[pfn] != mfn))\
 		pfn = max_mapnr; /* special: force !pfn_valid() */	\
 	pfn;								\

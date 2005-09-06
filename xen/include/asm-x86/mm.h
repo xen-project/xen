@@ -255,9 +255,9 @@ int check_descriptor(struct desc_struct *d);
  * contiguous (or near contiguous) physical memory.
  */
 #undef  machine_to_phys_mapping
-#define machine_to_phys_mapping  ((u32 *)RDWR_MPT_VIRT_START)
-#define INVALID_M2P_ENTRY        (~0U)
-#define VALID_M2P(_e)            (!((_e) & (1U<<31)))
+#define machine_to_phys_mapping  ((unsigned long *)RDWR_MPT_VIRT_START)
+#define INVALID_M2P_ENTRY        (~0UL)
+#define VALID_M2P(_e)            (!((_e) & (1UL<<(BITS_PER_LONG-1))))
 #define IS_INVALID_M2P_ENTRY(_e) (!VALID_M2P(_e))
 
 #define set_pfn_from_mfn(mfn, pfn) (machine_to_phys_mapping[(mfn)] = (pfn))

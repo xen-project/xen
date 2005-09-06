@@ -81,7 +81,7 @@ static int __do_suspend(void *ignore)
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
-    extern unsigned int *pfn_to_mfn_frame_list;
+    extern unsigned long *pfn_to_mfn_frame_list;
 
 #ifdef CONFIG_SMP
     extern void smp_suspend(void);

@@ -51,7 +51,7 @@ static unsigned long iotlb_nslabs;
  * swiotlb_sync_single_*, to see if the memory was in fact allocated by this
  * API.
  */
-static dma_addr_t iotlb_bus_start, iotlb_bus_mask;
+static dma_addr_t iotlb_bus_start, iotlb_bus_end, iotlb_bus_mask;
 
 /* Does the given dma address reside within the swiotlb aperture? */
 #define in_swiotlb_aperture(a) (!(((a) ^ iotlb_bus_start) & iotlb_bus_mask))
@@ -157,6 +157,7 @@ swiotlb_init_with_default_size (size_t default_size)
 	io_tlb_overflow_buffer = alloc_bootmem_low(io_tlb_overflow);
 
 	iotlb_bus_start = virt_to_bus(iotlb_virt_start);
+	iotlb_bus_end   = iotlb_bus_start + bytes;
 	iotlb_bus_mask  = ~(dma_addr_t)(bytes - 1);
 
 	printk(KERN_INFO "Software IO TLB enabled: \n"
@@ -165,7 +166,7 @@ swiotlb_init_with_default_size (size_t default_size)
 	       " Kernel range: 0x%016lx - 0x%016lx\n",
 	       bytes >> 20,
 	       (unsigned long)iotlb_bus_start,
-	       (unsigned long)iotlb_bus_start + bytes,
+	       (unsigned long)iotlb_bus_end,
 	       (unsigned long)iotlb_virt_start,
 	       (unsigned long)iotlb_virt_start + bytes);
 }
@@ -191,6 +192,8 @@ swiotlb_init(void)
 
 	if (swiotlb)
 		swiotlb_init_with_default_size(64 * (1<<20));
+	else
+		printk(KERN_INFO "Software IO TLB disabled\n");
 }
 
 static void
@@ -424,13 +427,6 @@ swiotlb_map_single(struct device *hwdev, void *ptr, size_t size, int dir)
 	}
 
 	dev_addr = virt_to_bus(map);
-
-	/*
-	 * Ensure that the address returned is DMA'ble
-	 */
-	if (address_needs_mapping(hwdev, dev_addr))
-		panic("map_single: bounce buffer is not DMA'ble");
-
 	return dev_addr;
 }
 
@@ -632,7 +628,7 @@ swiotlb_dma_mapping_error(dma_addr_t dma_addr)
 int
 swiotlb_dma_supported (struct device *hwdev, u64 mask)
 {
-	return (mask >= 0xffffffffUL);
+	return (mask >= (iotlb_bus_end - 1));
 }
 
 EXPORT_SYMBOL(swiotlb_init);

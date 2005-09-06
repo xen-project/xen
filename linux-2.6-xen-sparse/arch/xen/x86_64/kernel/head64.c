@@ -90,7 +90,7 @@ void __init x86_64_start_kernel(char * real_mode_data)
 {
 	int i;
 
-        phys_to_machine_mapping = (u32 *)xen_start_info->mfn_list;
+        phys_to_machine_mapping = (unsigned long *)xen_start_info->mfn_list;
         start_pfn = (__pa(xen_start_info->pt_base) >> PAGE_SHIFT) + 
 		xen_start_info->nr_pt_frames;
 

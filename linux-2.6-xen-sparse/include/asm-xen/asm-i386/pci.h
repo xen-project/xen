@@ -43,8 +43,32 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 
 struct pci_dev;
 
+#ifdef CONFIG_SWIOTLB
+
+
 /* On Xen we use SWIOTLB instead of blk-specific bounce buffers. */
 #define PCI_DMA_BUS_IS_PHYS	(0)
+
+#define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)	\
+	dma_addr_t ADDR_NAME;
+#define DECLARE_PCI_UNMAP_LEN(LEN_NAME)		\
+	__u32 LEN_NAME;
+#define pci_unmap_addr(PTR, ADDR_NAME)			\
+	((PTR)->ADDR_NAME)
+#define pci_unmap_addr_set(PTR, ADDR_NAME, VAL)		\
+	(((PTR)->ADDR_NAME) = (VAL))
+#define pci_unmap_len(PTR, LEN_NAME)			\
+	((PTR)->LEN_NAME)
+#define pci_unmap_len_set(PTR, LEN_NAME, VAL)		\
+	(((PTR)->LEN_NAME) = (VAL))
+
+#else
+
+/* The PCI address space does equal the physical memory
+ * address space.  The networking and block device layers use
+ * this boolean for bounce buffer decisions.
+ */
+#define PCI_DMA_BUS_IS_PHYS	(1)
 
 /* pci_unmap_{page,single} is a nop so... */
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)
@@ -53,6 +77,8 @@ struct pci_dev;
 #define pci_unmap_addr_set(PTR, ADDR_NAME, VAL)	do { } while (0)
 #define pci_unmap_len(PTR, LEN_NAME)		(0)
 #define pci_unmap_len_set(PTR, LEN_NAME, VAL)	do { } while (0)
+
+#endif
 
 /* This is always fine. */
 #define pci_dac_dma_supported(pci_dev, mask)	(1)

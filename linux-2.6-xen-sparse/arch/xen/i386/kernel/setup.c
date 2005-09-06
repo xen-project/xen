@@ -359,7 +359,7 @@ static void __init probe_roms(void)
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
-unsigned int *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
+unsigned long *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
 EXPORT_SYMBOL(phys_to_machine_mapping);
 
 /* Raw start-of-day parameters from the hypervisor. */
@@ -1206,7 +1206,7 @@ void __init setup_bootmem_allocator(void)
 	}
 #endif
 
-	phys_to_machine_mapping = (unsigned int *)xen_start_info->mfn_list;
+	phys_to_machine_mapping = (unsigned long *)xen_start_info->mfn_list;
 }
 
 /*
@@ -1638,15 +1638,15 @@ void __init setup_arch(char **cmdline_p)
 	/* Make sure we have a correctly sized P->M table. */
 	if (max_pfn != xen_start_info->nr_pages) {
 		phys_to_machine_mapping = alloc_bootmem_low_pages(
-			max_pfn * sizeof(unsigned int));
+			max_pfn * sizeof(unsigned long));
 
 		if (max_pfn > xen_start_info->nr_pages) {
 			/* set to INVALID_P2M_ENTRY */
 			memset(phys_to_machine_mapping, ~0,
-				max_pfn * sizeof(unsigned int));
+				max_pfn * sizeof(unsigned long));
 			memcpy(phys_to_machine_mapping,
-				(unsigned int *)xen_start_info->mfn_list,
-				xen_start_info->nr_pages * sizeof(unsigned int));
+				(unsigned long *)xen_start_info->mfn_list,
+				xen_start_info->nr_pages * sizeof(unsigned long));
 		} else {
 			struct xen_memory_reservation reservation = {
 				.extent_start = (unsigned long *)xen_start_info->mfn_list + max_pfn,
@@ -1656,9 +1656,8 @@ void __init setup_arch(char **cmdline_p)
 			};
 
 			memcpy(phys_to_machine_mapping,
-				(unsigned int *)xen_start_info->mfn_list,
-				max_pfn * sizeof(unsigned int));
-			/* N.B. below relies on sizeof(int) == sizeof(long). */
+				(unsigned long *)xen_start_info->mfn_list,
+				max_pfn * sizeof(unsigned long));
 			BUG_ON(HYPERVISOR_memory_op(
 				XENMEM_decrease_reservation,
 				&reservation) !=
@@ -1667,11 +1666,11 @@ void __init setup_arch(char **cmdline_p)
 		free_bootmem(
 			__pa(xen_start_info->mfn_list), 
 			PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
-			sizeof(unsigned int))));
+			sizeof(unsigned long))));
 	}
 
 	pfn_to_mfn_frame_list = alloc_bootmem_low_pages(PAGE_SIZE);
-	for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned int)), j++ )
+	for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
 	{	
 	     pfn_to_mfn_frame_list[j] = 
 		  virt_to_mfn(&phys_to_machine_mapping[i]);
