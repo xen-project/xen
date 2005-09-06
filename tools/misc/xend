@@ -151,10 +151,8 @@ def main():
         start_consoled()
         return daemon.start(trace=1)
     elif sys.argv[1] == 'stop':
-        stop_xcs()
         return daemon.stop()
     elif sys.argv[1] == 'restart':
-        stop_xcs()
         start_xcs()
         start_xenstored()
         start_consoled()
