@@ -43,6 +43,9 @@
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
+/* Each 10 bits takes ~ 3 digits, plus one, plus one for nul terminator. */
+#define MAX_STRLEN(x) ((sizeof(x) * CHAR_BIT + CHAR_BIT-1) / 10 * 3 + 2)
+
 struct buffer
 {
 	char *data;
@@ -58,9 +61,9 @@ struct domain
 	bool is_dead;
 	struct buffer buffer;
 	struct domain *next;
-	unsigned long mfn;
+	char *conspath;
+	int ring_ref;
 	int local_port;
-	int remote_port;
 	char *page;
 	int evtchn_fd;
 };
@@ -212,55 +215,66 @@ int xs_gather(struct xs_handle *xs, const char *dir, ...)
 
 static int domain_create_ring(struct domain *dom)
 {
-	char *dompath;
-	int err;
+	int err, local_port, ring_ref;
 
-	dompath = xs_get_domain_path(xs, dom->domid);
-	if (!dompath)
-		return ENOENT;
-
-	err = xs_gather(xs, dompath,
-			"console_mfn", "%li", &dom->mfn,
-			"console_channel/port1", "%i", &dom->local_port,
-			"console_channel/port2", "%i", &dom->remote_port,
+	err = xs_gather(xs, dom->conspath,
+			"ring-ref", "%u", &ring_ref,
+			"console_channel/port1", "%i", &local_port,
 			NULL);
 	if (err)
 		goto out;
 
-	if (dom->page == NULL) {
+	if (ring_ref != dom->ring_ref) {
+		if (dom->page)
+			munmap(dom->page, getpagesize());
 		dom->page = xc_map_foreign_range(xc, dom->domid, getpagesize(),
 						 PROT_READ|PROT_WRITE,
-						 dom->mfn);
+						 (unsigned long)ring_ref);
 		if (dom->page == NULL) {
 			err = EINVAL;
 			goto out;
 		}
+		dom->ring_ref = ring_ref;
 	}
 
-	if (dom->evtchn_fd == -1) {
+	if (local_port != dom->local_port) {
+		dom->local_port = -1;
+		if (dom->evtchn_fd != -1)
+			close(dom->evtchn_fd);
 		/* Opening evtchn independently for each console is a bit
 		 * wastefule, but that's how the code is structured... */
-		err = open("/dev/xen/evtchn", O_RDWR);
-		if (err == -1) {
+		dom->evtchn_fd = open("/dev/xen/evtchn", O_RDWR);
+		if (dom->evtchn_fd == -1) {
 			err = errno;
 			goto out;
 		}
-		dom->evtchn_fd = err;
  
-		if (ioctl(dom->evtchn_fd, EVENTCHN_BIND,
-			  dom->local_port) == -1) {
+		if (ioctl(dom->evtchn_fd, EVENTCHN_BIND, local_port) == -1) {
 			err = errno;
-			munmap(dom->page, getpagesize());
-			dom->page = NULL;
 			close(dom->evtchn_fd);
 			dom->evtchn_fd = -1;
 			goto out;
 		}
+		dom->local_port = local_port;
 	}
 
  out:
-	free(dompath);
 	return err;
+}
+
+static bool watch_domain(struct domain *dom, bool watch)
+{
+	char domid_str[3 + MAX_STRLEN(dom->domid)];
+	bool success;
+
+	sprintf(domid_str, "dom%u", dom->domid);
+	if (watch)
+		success = xs_watch(xs, dom->conspath, domid_str);
+	else
+		success = xs_unwatch(xs, dom->conspath, domid_str);
+	if (success)
+		domain_create_ring(dom);
+	return success;
 }
 
 static struct domain *create_domain(int domid)
@@ -283,14 +297,36 @@ static struct domain *create_domain(int domid)
 	dom->buffer.max_capacity = 0;
 	dom->next = NULL;
 
+	dom->ring_ref = -1;
+	dom->local_port = -1;
 	dom->page = NULL;
 	dom->evtchn_fd = -1;
 
-	domain_create_ring(dom);
+	dom->conspath = NULL;
+
+	dom->conspath = xs_get_domain_path(xs, dom->domid);
+	if (dom->conspath == NULL)
+		goto out;
+	dom->conspath = realloc(dom->conspath, strlen(dom->conspath) +
+				strlen("/console") + 1);
+	if (dom->conspath == NULL)
+		goto out;
+	strcat(dom->conspath, "/console");
+
+	if (!watch_domain(dom, true))
+		goto out;
+
+	dom->next = dom_head;
+	dom_head = dom;
 
 	dolog(LOG_DEBUG, "New domain %d", domid);
 
 	return dom;
+ out:
+	if (dom->conspath)
+		free(dom->conspath);
+	free(dom);
+	return NULL;
 }
 
 static struct domain *lookup_domain(int domid)
@@ -300,14 +336,7 @@ static struct domain *lookup_domain(int domid)
 	for (dom = dom_head; dom; dom = dom->next)
 		if (dom->domid == domid)
 			return dom;
-
-	dom = create_domain(domid);
-	if (!dom)
-		return NULL;
-	dom->next = dom_head;
-	dom_head = dom;
-
-	return dom;
+	return NULL;
 }
 
 static void remove_domain(struct domain *dom)
@@ -317,34 +346,39 @@ static void remove_domain(struct domain *dom)
 	dolog(LOG_DEBUG, "Removing domain-%d", dom->domid);
 
 	for (pp = &dom_head; *pp; pp = &(*pp)->next) {
-		struct domain *d = *pp;
-
-		if (dom->domid == d->domid) {
-			*pp = d->next;
-			if (d->buffer.data)
-				free(d->buffer.data);
-			if (d->page)
-				munmap(d->page, getpagesize());
-			if (d->evtchn_fd != -1)
-				close(d->evtchn_fd);
-			if (d->tty_fd != -1)
-				close(d->tty_fd);
-			free(d);
+		if (dom == *pp) {
+			*pp = dom->next;
+			free(dom);
 			break;
 		}
 	}
 }
 
-static void remove_dead_domains(struct domain *dom)
+static void cleanup_domain(struct domain *d)
 {
-	struct domain *n;
+	if (!buffer_empty(&d->buffer))
+		return;
 
-	while (dom != NULL) {
-		n = dom->next;
-		if (dom->is_dead)
-			remove_domain(dom);
-		dom = n;
-	}
+	if (d->buffer.data)
+		free(d->buffer.data);
+	d->buffer.data = NULL;
+	if (d->tty_fd != -1)
+		close(d->tty_fd);
+	d->tty_fd = -1;
+	remove_domain(d);
+}
+
+static void shutdown_domain(struct domain *d)
+{
+	d->is_dead = true;
+	watch_domain(d, false);
+	if (d->page)
+		munmap(d->page, getpagesize());
+	d->page = NULL;
+	if (d->evtchn_fd != -1)
+		close(d->evtchn_fd);
+	d->evtchn_fd = -1;
+	cleanup_domain(d);
 }
 
 void enum_domains(void)
@@ -355,8 +389,13 @@ void enum_domains(void)
 
 	while (xc_domain_getinfo(xc, domid, 1, &dominfo) == 1) {
 		dom = lookup_domain(dominfo.domid);
-		if (dominfo.dying || dominfo.crashed || dominfo.shutdown)
-			dom->is_dead = true;
+		if (dominfo.dying || dominfo.crashed || dominfo.shutdown) {
+			if (dom)
+				shutdown_domain(dom);
+		} else {
+			if (dom == NULL)
+				create_domain(dominfo.domid);
+		}
 		domid = dominfo.domid + 1;
 	}
 }
@@ -377,7 +416,7 @@ static void handle_tty_read(struct domain *dom)
 		if (domain_is_valid(dom->domid)) {
 			dom->tty_fd = domain_create_tty(dom);
 		} else {
-			dom->is_dead = true;
+			shutdown_domain(dom);
 		}
 	} else if (domain_is_valid(dom->domid)) {
 		for (i = 0; i < len; i++) {
@@ -388,7 +427,7 @@ static void handle_tty_read(struct domain *dom)
 	} else {
 		close(dom->tty_fd);
 		dom->tty_fd = -1;
-		dom->is_dead = true;
+		shutdown_domain(dom);
 	}
 }
 
@@ -404,7 +443,7 @@ static void handle_tty_write(struct domain *dom)
 		if (domain_is_valid(dom->domid)) {
 			dom->tty_fd = domain_create_tty(dom);
 		} else {
-			dom->is_dead = true;
+			shutdown_domain(dom);
 		}
 	} else {
 		buffer_advance(&dom->buffer, len);
@@ -445,12 +484,13 @@ static void handle_xs(int fd)
 	if (!vec)
 		return;
 
-	if (sscanf(vec[0], "/console/%d", &domid) == 1) {
+	if (!strcmp(vec[1], "introduceDomain"))
+		enum_domains();
+	else if (sscanf(vec[1], "dom%u", &domid) == 1) {
 		dom = lookup_domain(domid);
-		if (dom && (dom->evtchn_fd == -1 || dom->page == NULL))
+		if (dom->is_dead == false)
 			domain_create_ring(dom);
 	}
-	enum_domains();
 
 	xs_acknowledge_watch(xs, vec[1]);
 	free(vec);
@@ -462,7 +502,7 @@ void handle_io(void)
 	int ret;
 
 	do {
-		struct domain *d;
+		struct domain *d, *n;
 		struct timeval tv = { 100, 0 };
 		int max_fd = -1;
 
@@ -476,18 +516,19 @@ void handle_io(void)
 		max_fd = MAX(xs_fileno(xs), max_fd);
 
 		for (d = dom_head; d; d = d->next) {
-			if (d->tty_fd != -1) {
-				FD_SET(d->tty_fd, &readfds);
-			}
-			if (d->evtchn_fd != -1)
+			if (d->evtchn_fd != -1) {
 				FD_SET(d->evtchn_fd, &readfds);
-
-			if (d->tty_fd != -1 && !buffer_empty(&d->buffer)) {
-				FD_SET(d->tty_fd, &writefds);
+				max_fd = MAX(d->evtchn_fd, max_fd);
 			}
 
-			max_fd = MAX(d->tty_fd, max_fd);
-			max_fd = MAX(d->evtchn_fd, max_fd);
+			if (d->tty_fd != -1) {
+				if (!d->is_dead)
+					FD_SET(d->tty_fd, &readfds);
+
+				if (!buffer_empty(&d->buffer))
+					FD_SET(d->tty_fd, &writefds);
+				max_fd = MAX(d->tty_fd, max_fd);
+			}
 		}
 
 		ret = select(max_fd + 1, &readfds, &writefds, 0, &tv);
@@ -498,21 +539,22 @@ void handle_io(void)
 		if (FD_ISSET(xcs_data_fd, &readfds))
 			handle_xcs_msg(xcs_data_fd);
 
-		for (d = dom_head; d; d = d->next) {
-			if (d->is_dead || d->tty_fd == -1 ||
-			    d->evtchn_fd == -1)
-				continue;
-
-			if (FD_ISSET(d->tty_fd, &readfds))
-				handle_tty_read(d);
-
-			if (FD_ISSET(d->evtchn_fd, &readfds))
+		for (d = dom_head; d; d = n) {
+			n = d->next;
+			if (d->evtchn_fd != -1 &&
+			    FD_ISSET(d->evtchn_fd, &readfds))
 				handle_ring_read(d);
 
-			if (FD_ISSET(d->tty_fd, &writefds))
-				handle_tty_write(d);
-		}
+			if (d->tty_fd != -1) {
+				if (FD_ISSET(d->tty_fd, &readfds))
+					handle_tty_read(d);
 
-		remove_dead_domains(dom_head);
+				if (FD_ISSET(d->tty_fd, &writefds))
+					handle_tty_write(d);
+
+				if (d->is_dead)
+					cleanup_domain(d);
+			}
+		}
 	} while (ret > -1);
 }

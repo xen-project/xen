@@ -231,7 +231,7 @@ class XendDomainInfo:
         DBVar('start_time',    ty='float'),
         DBVar('state',         ty='str'),
         DBVar('store_mfn',     ty='long'),
-        DBVar('console_mfn',     ty='long'),
+        DBVar('console_mfn',   ty='long', path="console/ring-ref"),
         DBVar('restart_mode',  ty='str'),
         DBVar('restart_state', ty='str'),
         DBVar('restart_time',  ty='float'),
@@ -302,7 +302,7 @@ class XendDomainInfo:
             self.store_channel.saveToDB(self.db.addChild("store_channel"),
                                         save=save)
         if self.console_channel:
-            self.console_channel.saveToDB(self.db.addChild("console_channel"),
+            self.console_channel.saveToDB(self.db.addChild("console/console_channel"),
                                         save=save)
         if self.image:
             self.image.exportToDB(save=save, sync=sync)
@@ -886,7 +886,7 @@ class XendDomainInfo:
         """
         self.channel = self.openChannel("channel", 0, 1)
         self.store_channel = self.eventChannel("store_channel")
-        self.console_channel = self.eventChannel("console_channel")
+        self.console_channel = self.eventChannel("console/console_channel")
 
     def create_configured_devices(self):
         devices = sxp.children(self.config, 'device')

@@ -39,7 +39,11 @@ extern struct xs_handle *xs;
 extern int xc;
 
 #if 1
-#define dolog(val, fmt, ...) syslog(val, fmt, ## __VA_ARGS__)
+#define dolog(val, fmt, ...) do {				\
+	if ((val) == LOG_ERR)					\
+		fprintf(stderr, fmt "\n", ## __VA_ARGS__);	\
+	syslog(val, fmt, ## __VA_ARGS__);			\
+} while (/* CONSTCOND */0)
 #else
 #define dolog(val, fmt, ...) fprintf(stderr, fmt "\n", ## __VA_ARGS__)
 #endif
