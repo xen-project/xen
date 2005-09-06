@@ -252,11 +252,8 @@ void start_kernel(void)
 printk("About to call scheduler_init()\n");
     scheduler_init();
     local_irq_disable();
-printk("About to call xen_time_init()\n");
-    xen_time_init();
-#ifdef CONFIG_VTI
+printk("About to call init_xen_time()\n");
     init_xen_time(); /* initialise the time */
-#endif // CONFIG_VTI 
 printk("About to call ac_timer_init()\n");
     ac_timer_init();
 // init_xen_time(); ???

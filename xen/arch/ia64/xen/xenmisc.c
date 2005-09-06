@@ -115,29 +115,6 @@ unsigned long __hypercall_create_continuation(
 #endif
 
 ///////////////////////////////
-
-///////////////////////////////
-// from arch/x86/apic.c
-///////////////////////////////
-
-extern unsigned long domain0_ready;
-
-int reprogram_ac_timer(s_time_t timeout)
-{
-	struct vcpu *v = current;
-
-#ifdef CONFIG_VTI
-//	if(VMX_DOMAIN(v))
-		return 1;
-#endif // CONFIG_VTI
-	if (!domain0_ready) return 1;
-	local_cpu_data->itm_next = timeout;
-	if (is_idle_task(v->domain)) vcpu_safe_set_itm(timeout);
-	else vcpu_set_next_timer(current);
-	return 1;
-}
-
-///////////////////////////////
 // from arch/ia64/page_alloc.c
 ///////////////////////////////
 DEFINE_PER_CPU(struct page_state, page_states) = {0};

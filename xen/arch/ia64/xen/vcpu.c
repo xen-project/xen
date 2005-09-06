@@ -1032,6 +1032,8 @@ void vcpu_set_next_timer(VCPU *vcpu)
 
 	if (is_idle_task(vcpu->domain)) {
 		printf("****** vcpu_set_next_timer called during idle!!\n");
+		vcpu_safe_set_itm(s);
+		return;
 	}
 	//s = PSCBX(vcpu,xen_itm);
 	if (d && (d > now) && (d < s)) {

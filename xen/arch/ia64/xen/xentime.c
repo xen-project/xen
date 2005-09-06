@@ -26,118 +26,78 @@
 #include <asm/sal.h>
 #include <asm/sections.h>
 #include <asm/system.h>
-#ifdef XEN
 #include <asm/vcpu.h>
 #include <linux/jiffies.h>	// not included by xen/sched.h
-#endif
 #include <xen/softirq.h>
 
-#ifdef XEN
 seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
-#endif
 
 #define TIME_KEEPER_ID  0
-extern unsigned long wall_jiffies;
-
-static s_time_t        stime_irq;       /* System time at last 'time update' */
-
 unsigned long domain0_ready = 0;
-
-#ifndef CONFIG_VTI
-static inline u64 get_time_delta(void)
-{
-	return ia64_get_itc();
-}
-#else // CONFIG_VTI
 static s_time_t        stime_irq = 0x0;       /* System time at last 'time update' */
-unsigned long itc_scale;
+unsigned long itc_scale, ns_scale;
 unsigned long itc_at_irq;
-static unsigned long   wc_sec, wc_nsec; /* UTC time at last 'time update'.   */
-//static rwlock_t        time_lock = RW_LOCK_UNLOCKED;
-static irqreturn_t vmx_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs);
 
 static inline u64 get_time_delta(void)
 {
     s64      delta_itc;
-    u64      delta, cur_itc;
+    u64      cur_itc;
     
     cur_itc = ia64_get_itc();
 
     delta_itc = (s64)(cur_itc - itc_at_irq);
+
+    /* Ensure that the returned system time is monotonically increasing. */
     if ( unlikely(delta_itc < 0) ) delta_itc = 0;
-    delta = ((u64)delta_itc) * itc_scale;
-    delta = delta >> 32;
-
-    return delta;
+    return cycle_to_ns(delta_itc);
 }
 
-u64 tick_to_ns(u64 tick)
+/* We don't expect an absolute cycle value here, since then no way
+ * to prevent overflow for large norminator. Normally this conversion
+ * is used for relative offset.
+ */
+u64 cycle_to_ns(u64 cycle)
 {
-    return (tick * itc_scale) >> 32;
+    return (cycle * itc_scale) >> 32;
 }
-#endif // CONFIG_VTI
+
+u64 ns_to_cycle(u64 ns)
+{
+    return (ns * ns_scale) >> 32;
+}
 
 s_time_t get_s_time(void)
 {
     s_time_t now;
-    unsigned long flags;
+    unsigned long flags, seq;
 
-    read_lock_irqsave(&xtime_lock, flags);
-
-    now = stime_irq + get_time_delta();
-
-    /* Ensure that the returned system time is monotonically increasing. */
-    {
-        static s_time_t prev_now = 0;
-        if ( unlikely(now < prev_now) )
-            now = prev_now;
-        prev_now = now;
-    }
-
-    read_unlock_irqrestore(&xtime_lock, flags);
+    do {
+	seq = read_seqbegin(&xtime_lock);
+	now = stime_irq + get_time_delta();
+    } while (unlikely(read_seqretry(&xtime_lock, seq)));
 
     return now; 
 }
 
 void update_dom_time(struct vcpu *v)
 {
-// FIXME: implement this?
-//	printf("update_dom_time: called, not implemented, skipping\n");
-	return;
+    /* N-op here, and let dom0 to manage system time directly */
+    return;
 }
 
 /* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
 void do_settime(unsigned long secs, unsigned long nsecs, u64 system_time_base)
 {
-#ifdef  CONFIG_VTI
-    u64 _nsecs;
-
-    write_lock_irq(&xtime_lock);
-
-    _nsecs = (u64)nsecs + (s64)(stime_irq - system_time_base);
-    while ( _nsecs >= 1000000000 ) 
-    {
-        _nsecs -= 1000000000;
-        secs++;
-    }
-
-    wc_sec  = secs;
-    wc_nsec = (unsigned long)_nsecs;
-
-    write_unlock_irq(&xtime_lock);
-
-    update_dom_time(current->domain);
-#else
-// FIXME: Should this be do_settimeofday (from linux)???
-	printf("do_settime: called, not implemented, stopping\n");
-	dummy();
-#endif
+    /* If absolute system time is managed by dom0, there's no need for such
+     * action since only virtual itc/itm service is provided.
+     */
+    return;
 }
 
 irqreturn_t
 xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
-	unsigned long new_itm;
+	unsigned long new_itm, old_itc;
 
 #define HEARTBEAT_FREQ 16	// period in seconds
 #ifdef HEARTBEAT_FREQ
@@ -150,12 +110,6 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		count = 0;
 	}
 #endif
-#ifndef XEN
-	if (unlikely(cpu_is_offline(smp_processor_id()))) {
-		return IRQ_HANDLED;
-	}
-#endif
-#ifdef XEN
 	if (current->domain == dom0) {
 		// FIXME: there's gotta be a better way of doing this...
 		// We have to ensure that domain0 is launched before we
@@ -176,35 +130,12 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 			vcpu_wake(current);
 		}
 	}
-	raise_actimer_softirq();
-#endif
-
-#ifndef XEN
-	platform_timer_interrupt(irq, dev_id, regs);
-#endif
-
 	new_itm = local_cpu_data->itm_next;
 
 	if (!time_after(ia64_get_itc(), new_itm))
-#ifdef XEN
 		return;
-#else
-		printk(KERN_ERR "Oops: timer tick before it's due (itc=%lx,itm=%lx)\n",
-		       ia64_get_itc(), new_itm);
-#endif
-
-#ifdef XEN
-//	printf("GOT TO HERE!!!!!!!!!!!\n");
-	//while(1);
-#else
-	profile_tick(CPU_PROFILING, regs);
-#endif
 
 	while (1) {
-#ifndef XEN
-		update_process_times(user_mode(regs));
-#endif
-
 		new_itm += local_cpu_data->itm_delta;
 
 		if (smp_processor_id() == TIME_KEEPER_ID) {
@@ -221,6 +152,12 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 			do_timer(regs);
 #endif
 			local_cpu_data->itm_next = new_itm;
+
+		 	/* Updates system time (nanoseconds since boot). */
+			old_itc = itc_at_irq;
+			itc_at_irq = ia64_get_itc();
+			stime_irq += cycle_to_ns(itc_at_irq - old_itc);
+
 #ifdef TURN_ME_OFF_FOR_NOW_IA64_XEN
 			write_sequnlock(&xtime_lock);
 #endif
@@ -251,132 +188,65 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 //#endif
 		/* double check, in case we got hit by a (slow) PMI: */
 	} while (time_after_eq(ia64_get_itc(), new_itm));
+	raise_softirq(AC_TIMER_SOFTIRQ);
+
 	return IRQ_HANDLED;
 }
 
 static struct irqaction xen_timer_irqaction = {
-#ifdef CONFIG_VTI
-	.handler =	vmx_timer_interrupt,
-#else // CONFIG_VTI
 	.handler =	xen_timer_interrupt,
-#endif // CONFIG_VTI
-#ifndef XEN
-	.flags =	SA_INTERRUPT,
-#endif
 	.name =		"timer"
 };
 
 void __init
-xen_time_init (void)
+ia64_time_init (void)
 {
 	register_percpu_irq(IA64_TIMER_VECTOR, &xen_timer_irqaction);
 	ia64_init_itm();
 }
 
 
-#ifdef CONFIG_VTI
-
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time()
 {
     struct timespec tm;
 
+    ia64_time_init();
     itc_scale  = 1000000000UL << 32 ;
     itc_scale /= local_cpu_data->itc_freq;
+    ns_scale = (local_cpu_data->itc_freq << 32) / 1000000000UL;
 
     /* System time ticks from zero. */
     stime_irq = (s_time_t)0;
     itc_at_irq = ia64_get_itc();
 
-    /* Wallclock time starts as the initial RTC time. */
-    efi_gettimeofday(&tm);
-    wc_sec  = tm.tv_sec;
-    wc_nsec = tm.tv_nsec;
-
-
     printk("Time init:\n");
     printk(".... System Time: %ldns\n", NOW());
     printk(".... scale:       %16lX\n", itc_scale);
-    printk(".... Wall Clock:  %lds %ldus\n", wc_sec, wc_nsec/1000);
 
     return 0;
 }
 
-static irqreturn_t
-vmx_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
+int reprogram_ac_timer(s_time_t timeout)
 {
-    unsigned long new_itm;
-    struct vcpu *v = current;
+	struct vcpu *v = current;
+	s_time_t expire;
+	unsigned long seq, cur_itc, itm_next;
 
+	if (!domain0_ready) return 1;
 
-    new_itm = local_cpu_data->itm_next;
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		if ((expire = timeout - NOW()) < 0)
+			return 0;
 
-    if (!time_after(ia64_get_itc(), new_itm))
-        return;
+		cur_itc = ia64_get_itc();
+		itm_next = cur_itc + ns_to_cycle(expire);
+	} while (unlikely(read_seqretry(&xtime_lock, seq)));
 
-    while (1) {
-#ifdef CONFIG_SMP
-        /*
-         * For UP, this is done in do_timer().  Weird, but
-         * fixing that would require updates to all
-         * platforms.
-         */
-        update_process_times(user_mode(v, regs));
-#endif
-        new_itm += local_cpu_data->itm_delta;
-
-        if (smp_processor_id() == TIME_KEEPER_ID) {
-            /*
-             * Here we are in the timer irq handler. We have irqs locally
-             * disabled, but we don't know if the timer_bh is running on
-             * another CPU. We need to avoid to SMP race by acquiring the
-             * xtime_lock.
-             */
-            local_cpu_data->itm_next = new_itm;
-            
-            write_lock_irq(&xtime_lock);
-            /* Update jiffies counter. */
-            (*(unsigned long *)&jiffies_64)++;
-
-            /* Update wall time. */
-            wc_nsec += 1000000000/HZ;
-            if ( wc_nsec >= 1000000000 )
-            {
-                wc_nsec -= 1000000000;
-                wc_sec++;
-            }
-
-            /* Updates system time (nanoseconds since boot). */
-            stime_irq += MILLISECS(1000/HZ);
-            itc_at_irq = ia64_get_itc();
-
-            write_unlock_irq(&xtime_lock);
-            
-        } else
-            local_cpu_data->itm_next = new_itm;
-
-        if (time_after(new_itm, ia64_get_itc()))
-            break;
-    }
-
-    do {
-        /*
-         * If we're too close to the next clock tick for
-         * comfort, we increase the safety margin by
-         * intentionally dropping the next tick(s).  We do NOT
-         * update itm.next because that would force us to call
-         * do_timer() which in turn would let our clock run
-         * too fast (with the potentially devastating effect
-         * of losing monotony of time).
-         */
-        while (!time_after(new_itm, ia64_get_itc() + local_cpu_data->itm_delta/2))
-            new_itm += local_cpu_data->itm_delta;
-        ia64_set_itm(new_itm);
-        /* double check, in case we got hit by a (slow) PMI: */
-    } while (time_after_eq(ia64_get_itc(), new_itm));
-    raise_softirq(AC_TIMER_SOFTIRQ);
-    
-    return IRQ_HANDLED;
+	local_cpu_data->itm_next = itm_next;
+	vcpu_set_next_timer(current);
+	return 1;
 }
-#endif // CONFIG_VTI
+
 
