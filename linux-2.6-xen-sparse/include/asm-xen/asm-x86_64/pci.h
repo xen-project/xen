@@ -76,12 +76,29 @@ extern int iommu_sac_force;
 #define pci_unmap_len_set(PTR, LEN_NAME, VAL)		\
 	(((PTR)->LEN_NAME) = (VAL))
 
+#elif defined(CONFIG_SWIOTLB)
+
+#define PCI_DMA_BUS_IS_PHYS	0
+
+#define pci_dac_dma_supported(pci_dev, mask)    1
+
+#define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)	\
+	dma_addr_t ADDR_NAME;
+#define DECLARE_PCI_UNMAP_LEN(LEN_NAME)		\
+	__u32 LEN_NAME;
+#define pci_unmap_addr(PTR, ADDR_NAME)			\
+	((PTR)->ADDR_NAME)
+#define pci_unmap_addr_set(PTR, ADDR_NAME, VAL)		\
+	(((PTR)->ADDR_NAME) = (VAL))
+#define pci_unmap_len(PTR, LEN_NAME)			\
+	((PTR)->LEN_NAME)
+#define pci_unmap_len_set(PTR, LEN_NAME, VAL)		\
+	(((PTR)->LEN_NAME) = (VAL))
+
 #else
 /* No IOMMU */
 
-/* On Xen we use SWIOTLB instead of blk-specific bounce buffers. */
-#define PCI_DMA_BUS_IS_PHYS	(0)
-
+#define PCI_DMA_BUS_IS_PHYS	1
 #define pci_dac_dma_supported(pci_dev, mask)    1
 
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)
