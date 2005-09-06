@@ -588,7 +588,15 @@ vmalloc_fault:
 		pmd_k = pmd_offset(pud_k, address);
 		if (!pmd_present(*pmd_k))
 			goto no_context;
+#ifndef CONFIG_XEN
 		set_pmd(pmd, *pmd_k);
+#else
+		/*
+		 * When running on Xen we must launder *pmd_k through
+		 * pmd_val() to ensure that _PAGE_PRESENT is correctly set.
+		 */
+		set_pmd(pmd, __pmd(pmd_val(*pmd_k)));
+#endif
 
 		pte_k = pte_offset_kernel(pmd_k, address);
 		if (!pte_present(*pte_k))
