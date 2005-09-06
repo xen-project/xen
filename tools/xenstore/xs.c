@@ -628,7 +628,8 @@ bool xs_shutdown(struct xs_handle *h)
 	if (ret) {
 		char c;
 		/* Wait for it to actually shutdown. */
-		read(h->fd, &c, 1);
+		while ((read(h->fd, &c, 1) < 0) && (errno == EINTR))
+			continue;
 	}
 	return ret;
 }
