@@ -62,14 +62,14 @@ void copy_page(void *, void *);
 #define __HAVE_ARCH_ALLOC_ZEROED_USER_HIGHPAGE
 
 /**** MACHINE <-> PHYSICAL CONVERSION MACROS ****/
-#define INVALID_P2M_ENTRY	(~0U)
-#define FOREIGN_FRAME(m)	((m) | 0x80000000U)
-extern u32 *phys_to_machine_mapping;
+#define INVALID_P2M_ENTRY	(~0UL)
+#define FOREIGN_FRAME(m)	((m) | (1UL<<63))
+extern unsigned long *phys_to_machine_mapping;
 #define pfn_to_mfn(pfn)	\
-((unsigned long)phys_to_machine_mapping[(unsigned int)(pfn)] & 0x7FFFFFFFUL)
+(phys_to_machine_mapping[(unsigned int)(pfn)] & ~(1UL << 63))
 static inline unsigned long mfn_to_pfn(unsigned long mfn)
 {
-	unsigned int pfn;
+	unsigned long pfn;
 
 	/*
 	 * The array access can fail (e.g., device space beyond end of RAM).
@@ -77,7 +77,7 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
 	 * but we must handle the fault without crashing!
 	 */
 	asm (
-		"1:	movl %1,%k0\n"
+		"1:	movq %1,%0\n"
 		"2:\n"
 		".section __ex_table,\"a\"\n"
 		"	.align 8\n"
@@ -85,7 +85,7 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
 		".previous"
 		: "=r" (pfn) : "m" (machine_to_phys_mapping[mfn]) );
 
-	return (unsigned long)pfn;
+	return pfn;
 }
 
 /* Definitions for machine and pseudophysical addresses. */

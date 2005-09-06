@@ -348,7 +348,7 @@ static int setup_guest(int xc_handle,
 
     unsigned long nr_pt_pages;
     unsigned long physmap_pfn;
-    u32 *physmap, *physmap_e;
+    unsigned long *physmap, *physmap_e;
 
     struct load_funcs load_funcs;
     struct domain_setup_info dsi;

@@ -218,7 +218,7 @@ int construct_dom0(struct domain *d,
     vinitrd_start    = round_pgup(dsi.v_end);
     vinitrd_end      = vinitrd_start + initrd_len;
     vphysmap_start   = round_pgup(vinitrd_end);
-    vphysmap_end     = vphysmap_start + (nr_pages * sizeof(u32));
+    vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
     vstartinfo_start = round_pgup(vphysmap_end);
     vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
     vpt_start        = vstartinfo_end;
@@ -613,7 +613,7 @@ int construct_dom0(struct domain *d,
         if ( !opt_dom0_translate && (pfn > REVERSE_START) )
             mfn = alloc_epfn - (pfn - REVERSE_START);
 #endif
-        ((u32 *)vphysmap_start)[pfn] = mfn;
+        ((unsigned long *)vphysmap_start)[pfn] = mfn;
         set_pfn_from_mfn(mfn, pfn);
     }
     while ( pfn < nr_pages )
@@ -626,7 +626,7 @@ int construct_dom0(struct domain *d,
 #ifndef NDEBUG
 #define pfn (nr_pages - 1 - (pfn - (alloc_epfn - alloc_spfn)))
 #endif
-            ((u32 *)vphysmap_start)[pfn] = mfn;
+            ((unsigned long *)vphysmap_start)[pfn] = mfn;
             set_pfn_from_mfn(mfn, pfn);
 #undef pfn
             page++; pfn++;

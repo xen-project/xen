@@ -1450,7 +1450,7 @@ int get_page_type(struct pfn_info *page, unsigned long type)
                          ((type & PGT_type_mask) != PGT_l1_page_table) )
                         MEM_LOG("Bad type (saw %" PRtype_info
                                 "!= exp %" PRtype_info ") "
-                                "for mfn %lx (pfn %x)",
+                                "for mfn %lx (pfn %lx)",
                                 x, type, page_to_pfn(page),
                                 get_pfn_from_mfn(page_to_pfn(page)));
                     return 0;
