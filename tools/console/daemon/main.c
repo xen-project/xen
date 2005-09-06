@@ -26,8 +26,6 @@
 #include <sys/types.h>
 
 #include "xenctrl.h"
-#include "xen/io/domain_controller.h"
-#include "xcs_proto.h"
 
 #include "utils.h"
 #include "io.h"
@@ -83,7 +81,8 @@ int main(int argc, char **argv)
 		daemonize("/var/run/xenconsoled.pid");
 	}
 
-	xen_setup();
+	if (!xen_setup())
+		exit(1);
 
 	enum_domains();
 
