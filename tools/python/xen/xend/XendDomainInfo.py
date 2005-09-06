@@ -796,8 +796,8 @@ class XendDomainInfo:
     def destroy(self):
         """Clenup vm and destroy domain.
         """
-        self.cleanup()
         self.destroy_domain()
+        self.cleanup()
         self.saveToDB()
         return 0
 
