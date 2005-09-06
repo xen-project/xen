@@ -26,7 +26,6 @@
 #include "xenctrl.h"
 #include "xs.h"
 #include "xen/io/domain_controller.h"
-#include "xcs_proto.h"
 
 #include <malloc.h>
 #include <stdlib.h>
@@ -462,18 +461,6 @@ static void handle_ring_read(struct domain *dom)
 	(void)write_sync(dom->evtchn_fd, &v, sizeof(v));
 }
 
-static void handle_xcs_msg(int fd)
-{
-	xcs_msg_t msg;
-
-	if (!read_sync(fd, &msg, sizeof(msg))) {
-		dolog(LOG_ERR, "read from xcs failed! %m");
-		exit(1);
-	}
-
-	enum_domains();
-}
-
 static void handle_xs(int fd)
 {
 	char **vec;
@@ -484,7 +471,7 @@ static void handle_xs(int fd)
 	if (!vec)
 		return;
 
-	if (!strcmp(vec[1], "introduceDomain"))
+	if (!strcmp(vec[1], "domlist"))
 		enum_domains();
 	else if (sscanf(vec[1], "dom%u", &domid) == 1) {
 		dom = lookup_domain(domid);
@@ -509,9 +496,6 @@ void handle_io(void)
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
 
-		FD_SET(xcs_data_fd, &readfds);
-		max_fd = MAX(xcs_data_fd, max_fd);
-
 		FD_SET(xs_fileno(xs), &readfds);
 		max_fd = MAX(xs_fileno(xs), max_fd);
 
@@ -535,9 +519,6 @@ void handle_io(void)
 
 		if (FD_ISSET(xs_fileno(xs), &readfds))
 			handle_xs(xs_fileno(xs));
-
-		if (FD_ISSET(xcs_data_fd, &readfds))
-			handle_xcs_msg(xcs_data_fd);
 
 		for (d = dom_head; d; d = n) {
 			n = d->next;

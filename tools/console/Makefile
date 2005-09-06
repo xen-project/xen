@@ -11,7 +11,6 @@ INSTALL_DIR     = $(INSTALL) -d -m0755
 
 CFLAGS  += -Wall -Werror -g3
 
-CFLAGS  += -I $(XEN_XCS)
 CFLAGS  += -I $(XEN_LIBXC)
 CFLAGS  += -I $(XEN_XENSTORE)
 

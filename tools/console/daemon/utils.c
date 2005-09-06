@@ -35,15 +35,11 @@
 
 #include "xenctrl.h"
 #include "xen/io/domain_controller.h"
-#include "xcs_proto.h"
 
 #include "utils.h"
 
 struct xs_handle *xs;
 int xc;
-
-int xcs_ctrl_fd = -1;
-int xcs_data_fd = -1;
 
 bool _read_write_sync(int fd, void *data, size_t size, bool do_read)
 {
@@ -69,32 +65,6 @@ bool _read_write_sync(int fd, void *data, size_t size, bool do_read)
 	}
 
 	return true;
-}
-
-static int open_domain_socket(const char *path)
-{
-	struct sockaddr_un addr;
-	int sock;
-	size_t addr_len;
-
-	if ((sock = socket(PF_UNIX, SOCK_STREAM, 0)) == -1) {
-		goto out;
-	}
-
-	addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path, path);
-	addr_len = sizeof(addr.sun_family) + strlen(XCS_SUN_PATH) + 1;
-
-	if (connect(sock, (struct sockaddr *)&addr, addr_len) == -1) {
-		goto out_close_sock;
-	}
-
-	return sock;
-
- out_close_sock:
-	close(sock);
- out:
-	return -1;
 }
 
 static void child_exit(int sig)
@@ -155,34 +125,8 @@ void daemonize(const char *pidfile)
 	signal(SIGTTIN, SIG_IGN);
 }
 
-/* synchronized send/recv strictly for setting up xcs */
-/* always use asychronize callbacks any other time */
-static bool xcs_send_recv(int fd, xcs_msg_t *msg)
-{
-	bool ret = false;
-
-	if (!write_sync(fd, msg, sizeof(*msg))) {
-		dolog(LOG_ERR, "Write failed at %s:%s():L%d?  Possible bug.",
-		       __FILE__, __FUNCTION__, __LINE__);
-		goto out;
-	}
-
-	if (!read_sync(fd, msg, sizeof(*msg))) {
-		dolog(LOG_ERR, "Read failed at %s:%s():L%d?  Possible bug.",
-		       __FILE__, __FUNCTION__, __LINE__);
-		goto out;
-	}
-
-	ret = true;
-
- out:
-	return ret;
-}
-
 bool xen_setup(void)
 {
-	int sock;
-	xcs_msg_t msg;
 	
 	xs = xs_daemon_open();
 	if (xs == NULL) {
@@ -197,58 +141,23 @@ bool xen_setup(void)
 		goto out;
 	}
 
-	sock = open_domain_socket(XCS_SUN_PATH);
-	if (sock == -1) {
-		dolog(LOG_ERR, "Failed to contact xcs (%m).  Is it running?");
-		goto out_close_store;
-	}
-
-	xcs_ctrl_fd = sock;
-
-	sock = open_domain_socket(XCS_SUN_PATH);
-	if (sock == -1) {
-		dolog(LOG_ERR, "Failed to contact xcs (%m).  Is it running?");
-		goto out_close_ctrl;
-	}
-	
-	xcs_data_fd = sock;
-
-	memset(&msg, 0, sizeof(msg));
-	msg.type = XCS_CONNECT_CTRL;
-	if (!xcs_send_recv(xcs_ctrl_fd, &msg) || msg.result != XCS_RSLT_OK) {
-		dolog(LOG_ERR, "xcs control connect failed.  Possible bug.");
-		goto out_close_data;
-	}
-
-	msg.type = XCS_CONNECT_DATA;
-	if (!xcs_send_recv(xcs_data_fd, &msg) || msg.result != XCS_RSLT_OK) {
-		dolog(LOG_ERR, "xcs data connect failed.  Possible bug.");
-		goto out_close_data;
-	}
-
-	msg.type = XCS_VIRQ_BIND;
-	msg.u.virq.virq = VIRQ_DOM_EXC;
-	if (!xcs_send_recv(xcs_ctrl_fd, &msg) || msg.result != XCS_RSLT_OK) {
-		dolog(LOG_ERR, "xcs virq bind failed.  Possible bug.");
-		goto out_close_data;
-	}
-
-	if (!xs_watch(xs, "@introduceDomain", "introduceDomain")) {
+	if (!xs_watch(xs, "@introduceDomain", "domlist")) {
 		dolog(LOG_ERR, "xenstore watch on @introduceDomain fails.");
-		goto out_close_data;
+		goto out;
+	}
+
+	if (!xs_watch(xs, "@releaseDomain", "domlist")) {
+		dolog(LOG_ERR, "xenstore watch on @releaseDomain fails.");
+		goto out;
 	}
 
 	return true;
 
- out_close_data:
-	close(xcs_data_fd);
-	xcs_data_fd = -1;
- out_close_ctrl:
-	close(xcs_ctrl_fd);
-	xcs_ctrl_fd = -1;
- out_close_store:
-	xs_daemon_close(xs);
  out:
+	if (xs)
+		xs_daemon_close(xs);
+	if (xc != -1)
+		xc_interface_close(xc);
 	return false;
 }
 
