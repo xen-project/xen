@@ -583,49 +583,13 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
     }
 }
 
-/* XXX use vmx_copy instead */
 int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_len)
 {
-    unsigned long gpa;
-    unsigned long mfn;
-    unsigned char *inst_start;
-    int remaining = 0;
-        
-    if ( (inst_len > MAX_INST_LEN) || (inst_len <= 0) )
+    if (inst_len > MAX_INST_LEN || inst_len <= 0)
         return 0;
-
-    if ( vmx_paging_enabled(current) )
-    {
-        gpa = gva_to_gpa(guest_eip);
-        mfn = get_mfn_from_pfn(gpa >> PAGE_SHIFT);
-
-        /* Does this cross a page boundary ? */
-        if ( (guest_eip & PAGE_MASK) != ((guest_eip + inst_len) & PAGE_MASK) )
-        {
-            remaining = (guest_eip + inst_len) & ~PAGE_MASK;
-            inst_len -= remaining;
-        }
-    }
-    else
-    {
-        mfn = get_mfn_from_pfn(guest_eip >> PAGE_SHIFT);
-    }
-
-    inst_start = map_domain_page(mfn);
-    memcpy((char *)buf, inst_start + (guest_eip & ~PAGE_MASK), inst_len);
-    unmap_domain_page(inst_start);
-
-    if ( remaining )
-    {
-        gpa = gva_to_gpa(guest_eip+inst_len+remaining);
-        mfn = get_mfn_from_pfn(gpa >> PAGE_SHIFT);
-
-        inst_start = map_domain_page(mfn);
-        memcpy((char *)buf+inst_len, inst_start, remaining);
-        unmap_domain_page(inst_start);
-    }
-
-    return inst_len+remaining;
+    if (!vmx_copy(buf, guest_eip, inst_len, VMX_COPY_IN))
+        return 0;
+    return inst_len;
 }
 
 void send_mmio_req(unsigned char type, unsigned long gpa, 

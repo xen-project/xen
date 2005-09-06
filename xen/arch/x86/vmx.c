@@ -730,7 +730,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
 int
 vmx_copy(void *buf, unsigned long laddr, int size, int dir)
 {
-    unsigned long mfn;
+    unsigned long gpa, mfn;
     char *addr;
     int count;
 
@@ -739,8 +739,14 @@ vmx_copy(void *buf, unsigned long laddr, int size, int dir)
 	if (count > size)
 	    count = size;
 
-	mfn = get_mfn_from_pfn(laddr >> PAGE_SHIFT);
-	/* XXX check whether laddr is valid */
+	if (vmx_paging_enabled(current)) {
+		gpa = gva_to_gpa(laddr);
+		mfn = get_mfn_from_pfn(gpa >> PAGE_SHIFT);
+	} else
+		mfn = get_mfn_from_pfn(laddr >> PAGE_SHIFT);
+	if (mfn == INVALID_MFN)
+		return 0;
+
 	addr = (char *)map_domain_page(mfn) + (laddr & ~PAGE_MASK);
 
 	if (dir == VMX_COPY_IN)
