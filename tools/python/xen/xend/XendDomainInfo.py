@@ -34,8 +34,7 @@ from xen.util.blkif import blkdev_uname_to_file
 
 from xen.xend.server import controller
 from xen.xend.server import SrvDaemon; xend = SrvDaemon.instance()
-from xen.xend.server import messages
-from xen.xend.server.channel import EventChannel, channelFactory
+from xen.xend.server.channel import EventChannel
 from xen.util.blkif import blkdev_name_to_number, expand_dev_name
 
 from xen.xend import sxp
@@ -258,7 +257,6 @@ class XendDomainInfo:
 
         self.target = None
 
-        self.channel = None
         self.store_channel = None
         self.store_mfn = None
         self.console_channel = None
@@ -296,8 +294,6 @@ class XendDomainInfo:
         self.db.saveDB(save=save, sync=sync)
 
     def exportToDB(self, save=False, sync=False):
-        if self.channel:
-            self.channel.saveToDB(self.db.addChild("channel"), save=save)
         if self.store_channel:
             self.store_channel.saveToDB(self.db.addChild("store_channel"),
                                         save=save)
@@ -329,9 +325,6 @@ class XendDomainInfo:
 
     def getName(self):
         return self.name
-
-    def getChannel(self):
-        return self.channel
 
     def getStoreChannel(self):
         return self.store_channel
@@ -569,8 +562,6 @@ class XendDomainInfo:
             sxpr.append(['up_time', str(up_time) ])
             sxpr.append(['start_time', str(self.start_time) ])
 
-        if self.channel:
-            sxpr.append(self.channel.sxpr())
         if self.store_channel:
             sxpr.append(self.store_channel.sxpr())
         if self.store_mfn:
@@ -761,12 +752,6 @@ class XendDomainInfo:
         """
         self.state = STATE_VM_TERMINATED
         self.release_devices()
-        if self.channel:
-            try:
-                self.channel.close()
-                self.channel = None
-            except:
-                pass
         if self.store_channel:
             try:
                 self.store_channel.close()
@@ -858,20 +843,6 @@ class XendDomainInfo:
                   id, self.name, self.memory)
         self.setdom(id)
 
-    def openChannel(self, key, local, remote):
-        """Create a control channel to the domain.
-        If saved info is available recreate the channel.
-        
-        @param key db key for the saved data (if any)
-        @param local default local port
-        @param remote default remote port
-        """
-        db = self.db.addChild(key)
-        chan = channelFactory().restoreFromDB(db, self.id, local, remote)
-        #todo: save here?
-        #chan.saveToDB(db)
-        return chan
-
     def eventChannel(self, key):
         """Create an event channel to the domain.
         If saved info is available recreate the channel.
@@ -884,7 +855,6 @@ class XendDomainInfo:
     def create_channel(self):
         """Create the channels to the domain.
         """
-        self.channel = self.openChannel("channel", 0, 1)
         self.store_channel = self.eventChannel("store_channel")
         self.console_channel = self.eventChannel("console/console_channel")
 

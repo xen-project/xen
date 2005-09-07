@@ -17,8 +17,6 @@ import traceback
 import time
 import glob
 
-from xen.lowlevel import xu
-
 from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend import EventServer; eserver = EventServer.instance()
@@ -27,7 +25,6 @@ from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
 from xen.xend import XendRoot; xroot = XendRoot.instance()
 
-import channel
 import controller
 import event
 import relocate
@@ -37,7 +34,6 @@ class Daemon:
     """The xend daemon.
     """
     def __init__(self):
-        self.channelF = None
         self.shutdown = 0
         self.traceon = 0
         self.tracefile = None
@@ -298,10 +294,8 @@ class Daemon:
         _enforce_dom0_cpus()
         try:
             log.info("Xend Daemon started")
-            self.createFactories()
             event.listenEvent(self)
             relocate.listenRelocation()
-            self.listenChannels()
             servers = SrvServer.create()
             self.daemonize()
             servers.start()
@@ -312,15 +306,7 @@ class Daemon:
             log.exception("Exception starting xend (%s)" % ex)
             self.exit(1)
             
-    def createFactories(self):
-        self.channelF = channel.channelFactory()
-
-    def listenChannels(self):
-        self.channelF.start()
-
     def exit(self, rc=0):
-        if self.channelF:
-            self.channelF.stop()
         # Calling sys.exit() raises a SystemExit exception, which only
         # kills the current thread. Calling os._exit() makes the whole
         # Python process exit immediately. There doesn't seem to be another

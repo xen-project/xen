@@ -13,9 +13,7 @@ from xen.xend.XendLogging import log
 from xen.xend.XendRoot import get_component
 from xen.xend.xenstore import DBVar
 
-from xen.xend.server import channel
-from xen.xend.server.controller import CtrlMsgRcvr, Dev, DevController
-from xen.xend.server.messages import *
+from xen.xend.server.controller import Dev, DevController
 
 class TPMifController(DevController):
     """TPM interface controller. Handles all TPM devices for a domain.
@@ -23,20 +21,15 @@ class TPMifController(DevController):
 
     def __init__(self, vm, recreate=False):
         DevController.__init__(self, vm, recreate=recreate)
-        self.rcvr = None
-        self.channel = None
 
     def initController(self, recreate=False, reboot=False):
         self.destroyed = False
-        self.channel = self.getChannel()
 
     def destroyController(self, reboot=False):
         """Destroy the controller and all devices.
         """
         self.destroyed = True
         self.destroyDevices(reboot=reboot)
-        if self.rcvr:
-            self.rcvr.deregisterChannel()
 
     def sxpr(self):
         val = ['tpmif', ['dom', self.getDomain()]]

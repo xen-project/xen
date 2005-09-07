@@ -174,11 +174,6 @@ class EventProtocol(protocol.Protocol):
         else:
             logging.removeLogStderr()
 
-    def op_debug_msg(self, name, v):
-        mode = v[1]
-        import messages
-        messages.DEBUG = (mode == 'on')
-
     def op_debug_controller(self, name, v):
         mode = v[1]
         import controller

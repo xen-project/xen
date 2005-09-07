@@ -36,7 +36,6 @@ from xen.xend import EventServer; eserver = EventServer.instance()
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 from xen.xend import scheduler
-from xen.xend.server import channel
 from xen.xend.server import relocate
 from xen.xend.uuid import getUuid
 from xen.xend.xenstore import XenNode, DBMap
