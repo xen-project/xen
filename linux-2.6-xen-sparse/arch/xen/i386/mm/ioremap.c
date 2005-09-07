@@ -22,13 +22,14 @@
 #define ISA_START_ADDRESS	0x0
 #define ISA_END_ADDRESS		0x100000
 
+#if 0 /* not PAE safe */
 /* These hacky macros avoid phys->machine translations. */
 #define __direct_pte(x) ((pte_t) { (x) } )
 #define __direct_mk_pte(page_nr,pgprot) \
   __direct_pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))
 #define direct_mk_pte_phys(physpage, pgprot) \
   __direct_mk_pte((physpage) >> PAGE_SHIFT, pgprot)
-
+#endif
 
 static int direct_remap_area_pte_fn(pte_t *pte, 
 				    struct page *pte_page,
@@ -37,16 +38,16 @@ static int direct_remap_area_pte_fn(pte_t *pte,
 {
 	mmu_update_t **v = (mmu_update_t **)data;
 
-	(*v)->ptr = ((maddr_t)pfn_to_mfn(page_to_pfn(pte_page)) <<
+	(*v)->ptr = ((u64)pfn_to_mfn(page_to_pfn(pte_page)) <<
 		     PAGE_SHIFT) | ((unsigned long)pte & ~PAGE_MASK);
 	(*v)++;
 
 	return 0;
 }
 
-int direct_remap_area_pages(struct mm_struct *mm,
+int direct_remap_pfn_range(struct mm_struct *mm,
 			    unsigned long address, 
-			    unsigned long machine_addr,
+			    unsigned long mfn,
 			    unsigned long size, 
 			    pgprot_t prot,
 			    domid_t  domid)
@@ -77,9 +78,9 @@ int direct_remap_area_pages(struct mm_struct *mm,
 		 * Fill in the machine address: PTE ptr is done later by
 		 * __direct_remap_area_pages(). 
 		 */
-		v->val = pte_val_ma(pfn_pte_ma(machine_addr >> PAGE_SHIFT, prot));
+		v->val = pte_val_ma(pfn_pte_ma(mfn, prot));
 
-		machine_addr += PAGE_SIZE;
+		mfn++;
 		address += PAGE_SIZE; 
 		v++;
 	}
@@ -97,8 +98,10 @@ int direct_remap_area_pages(struct mm_struct *mm,
 	return 0;
 }
 
-EXPORT_SYMBOL(direct_remap_area_pages);
+EXPORT_SYMBOL(direct_remap_pfn_range);
 
+
+/* FIXME: This is horribly broken on PAE */ 
 static int lookup_pte_fn(
 	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
 {
@@ -218,7 +221,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 #ifdef __x86_64__
 	flags |= _PAGE_USER;
 #endif
-	if (direct_remap_area_pages(&init_mm, (unsigned long) addr, phys_addr,
+	if (direct_remap_pfn_range(&init_mm, (unsigned long) addr, phys_addr>>PAGE_SHIFT,
 				    size, __pgprot(flags), domid)) {
 		vunmap((void __force *) addr);
 		return NULL;
