@@ -38,6 +38,7 @@
 
 static int *xc_handle;
 static int eventchn_fd;
+static int virq_port;
 static unsigned int ringbuf_datasize;
 
 struct domain
@@ -224,6 +225,10 @@ void handle_event(int event_fd)
 
 	if (read(event_fd, &port, sizeof(port)) != sizeof(port))
 		barf_perror("Failed to read from event fd");
+
+	if (port == virq_port)
+		domain_cleanup();
+
 #ifndef TESTING
 	if (write(event_fd, &port, sizeof(port)) != sizeof(port))
 		barf_perror("Failed to write to event fd");
@@ -449,5 +454,12 @@ int domain_init(void)
 #endif
 	if (eventchn_fd < 0)
 		barf_perror("Failed to open connection to hypervisor");
+
+	if (xc_evtchn_bind_virq(*xc_handle, VIRQ_DOM_EXC, &virq_port))
+		barf_perror("Failed to bind to domain exception virq");
+
+	if (ioctl(eventchn_fd, EVENTCHN_BIND, virq_port) != 0)
+		barf_perror("Failed to bind to domain exception virq port");
+
 	return eventchn_fd;
 }
