@@ -316,10 +316,6 @@ class Daemon:
         self.channelF = channel.channelFactory()
 
     def listenChannels(self):
-        def virqReceived(virq):
-            eserver.inject('xend.virq', virq)
-
-        self.channelF.setVirqHandler(virqReceived)
         self.channelF.start()
 
     def exit(self, rc=0):

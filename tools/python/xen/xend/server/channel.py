@@ -145,22 +145,10 @@ class ChannelFactory:
 
     notifier = None
 
-    """Map of ports to the virq they signal."""
-    virqPorts = None
-
     def __init__(self):
         """Constructor - do not use. Use the channelFactory function."""
         self.channels = {}
-        self.virqPorts = {}
         self.notifier = xu.notifier()
-        # Register interest in virqs.
-        self.bind_virq(xen.lowlevel.xc.VIRQ_DOM_EXC)
-        self.virqHandler = None
-
-    def bind_virq(self, virq):
-        port = self.notifier.bind_virq(virq)
-        self.virqPorts[port] = virq
-        log.info("Virq %s on port %s", virq, port)
 
     def start(self):
         """Fork a thread to read messages.
@@ -184,11 +172,7 @@ class ChannelFactory:
             if self.thread == None: return
             port = self.notifier.read()
             if port:
-                virq = self.virqPorts.get(port)
-                if virq is not None:
-                    self.virqReceived(virq)
-                else:
-                    self.msgReceived(port)
+                self.msgReceived(port)
             else:
                 select.select([self.notifier], [], [], 1.0)
 
@@ -217,15 +201,6 @@ class ChannelFactory:
         thread = threading.Thread(target = thunk)
         thread.setDaemon(True)
         thread.start()
-
-    def setVirqHandler(self, virqHandler):
-        self.virqHandler = virqHandler
-
-    def virqReceived(self, virq):
-        if DEBUG:
-            print 'virqReceived>', virq
-        if not self.virqHandler: return
-        self.runInThread(lambda virq=virq: self.virqHandler(virq))
 
     def newChannel(self, dom, local_port, remote_port):
         """Create a new channel.
@@ -546,9 +521,6 @@ class Channel:
             print 'Channel>responseReceived>', self,
             printMsg(msg)
         self.queue.response(getMessageId(msg), msg)
-
-    def virq(self):
-        self.factory.virq()
 
 class Response:
     """Entry in the response queue.
