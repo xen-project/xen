@@ -359,7 +359,8 @@ static void __init probe_roms(void)
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
-unsigned long *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
+unsigned long *phys_to_machine_mapping;
+unsigned long *pfn_to_mfn_frame_list_list, *pfn_to_mfn_frame_list[16];
 EXPORT_SYMBOL(phys_to_machine_mapping);
 
 /* Raw start-of-day parameters from the hypervisor. */
@@ -1519,7 +1520,7 @@ static void set_mca_bus(int x) { }
  */
 void __init setup_arch(char **cmdline_p)
 {
-	int i, j;
+	int i, j, k, fpp;
 	physdev_op_t op;
 	unsigned long max_low_pfn;
 
@@ -1669,14 +1670,31 @@ void __init setup_arch(char **cmdline_p)
 			sizeof(unsigned long))));
 	}
 
-	pfn_to_mfn_frame_list = alloc_bootmem_low_pages(PAGE_SIZE);
-	for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
-	{	
-	     pfn_to_mfn_frame_list[j] = 
-		  virt_to_mfn(&phys_to_machine_mapping[i]);
+
+	/* 
+	 * Initialise the list of the frames that specify the list of 
+	 * frames that make up the p2m table. Used by save/restore
+	 */
+	pfn_to_mfn_frame_list_list = alloc_bootmem_low_pages(PAGE_SIZE);
+	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
+	  virt_to_mfn(pfn_to_mfn_frame_list_list);
+	       
+	fpp = PAGE_SIZE/sizeof(unsigned long);
+	for ( i=0, j=0, k=-1; i< max_pfn; i+=fpp, j++ )
+	{
+	    if ( (j % fpp) == 0 )
+	    {
+	        k++;
+		BUG_ON(k>=16);
+		pfn_to_mfn_frame_list[k] = alloc_bootmem_low_pages(PAGE_SIZE);
+		pfn_to_mfn_frame_list_list[k] = 
+		    virt_to_mfn(pfn_to_mfn_frame_list[k]);
+		j=0;
+	    }
+	    pfn_to_mfn_frame_list[k][j] = 
+	        virt_to_mfn(&phys_to_machine_mapping[i]);
 	}
-	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
-	     virt_to_mfn(pfn_to_mfn_frame_list);
+	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
 
 	/*
 	 * NOTE: at this point the bootmem allocator is fully available.

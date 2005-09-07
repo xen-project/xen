@@ -419,6 +419,7 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters,
     unsigned long page[1024];
 
     /* A copy of the pfn-to-mfn table frame list. */
+    unsigned long *live_pfn_to_mfn_frame_list_list = NULL;
     unsigned long *live_pfn_to_mfn_frame_list = NULL;
     unsigned long pfn_to_mfn_frame_list[1024];
 
@@ -506,11 +507,20 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters,
         goto out;
     }
 
-    /* the pfn_to_mfn_frame_list fits in a single page */
+    live_pfn_to_mfn_frame_list_list = xc_map_foreign_range(xc_handle, dom,
+                                        PAGE_SIZE, PROT_READ,
+                                        live_shinfo->arch.pfn_to_mfn_frame_list_list);
+
+    if (!live_pfn_to_mfn_frame_list_list){
+        ERR("Couldn't map pfn_to_mfn_frame_list_list");
+        goto out;
+    }
+
     live_pfn_to_mfn_frame_list = 
-        xc_map_foreign_range(xc_handle, dom, 
-                              PAGE_SIZE, PROT_READ, 
-                              live_shinfo->arch.pfn_to_mfn_frame_list );
+	xc_map_foreign_batch(xc_handle, dom, 
+			     PROT_READ,
+			     live_pfn_to_mfn_frame_list_list,
+			     (nr_pfns+(1024*1024)-1)/(1024*1024) );
 
     if (!live_pfn_to_mfn_frame_list){
         ERR("Couldn't map pfn_to_mfn_frame_list");

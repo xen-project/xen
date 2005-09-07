@@ -76,7 +76,8 @@ EXPORT_SYMBOL(HYPERVISOR_shared_info);
 /* Allows setting of maximum possible memory size  */
 unsigned long xen_override_max_pfn;
 
-unsigned long *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
+unsigned long *phys_to_machine_mapping;
+unsigned long *pfn_to_mfn_frame_list_list, *pfn_to_mfn_frame_list[512];
 
 EXPORT_SYMBOL(phys_to_machine_mapping);
 
@@ -730,7 +731,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #ifdef CONFIG_XEN
 	{
-		int i, j;
+		int i, j, k, fpp;
 		/* Make sure we have a large enough P->M table. */
 		if (end_pfn > xen_start_info->nr_pages) {
 			phys_to_machine_mapping = alloc_bootmem(
@@ -746,11 +747,35 @@ void __init setup_arch(char **cmdline_p)
 						sizeof(unsigned long))));
 		}
 
-		pfn_to_mfn_frame_list = alloc_bootmem(PAGE_SIZE);
-
-		for ( i=0, j=0; i < end_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
-			pfn_to_mfn_frame_list[j] =
+		/* 
+		 * Initialise the list of the frames that specify the list of 
+		 * frames that make up the p2m table. Used by save/restore
+		 */
+		pfn_to_mfn_frame_list_list = alloc_bootmem(PAGE_SIZE);
+		HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
+		  virt_to_mfn(pfn_to_mfn_frame_list_list);
+	       
+		fpp = PAGE_SIZE/sizeof(unsigned long);
+		for ( i=0, j=0, k=-1; i< max_pfn; i+=fpp, j++ )
+		{
+			if ( (j % fpp) == 0 )
+			{
+				k++;
+				BUG_ON(k>=fpp);
+				pfn_to_mfn_frame_list[k] = alloc_bootmem(PAGE_SIZE);
+				pfn_to_mfn_frame_list_list[k] = 
+					virt_to_mfn(pfn_to_mfn_frame_list[k]);
+				j=0;
+			}
+			pfn_to_mfn_frame_list[k][j] = 
 				virt_to_mfn(&phys_to_machine_mapping[i]);
+		}
+		HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
+		
+		
+
+
+
 	}
 #endif
 

@@ -128,8 +128,11 @@ typedef struct vcpu_guest_context {
 } vcpu_guest_context_t;
 
 typedef struct arch_shared_info {
-    /* MFN of a table of MFNs that make up p2m table */
-    u64 pfn_to_mfn_frame_list;
+    unsigned long max_pfn;                  /* max pfn that appears in table */
+    unsigned long pfn_to_mfn_frame_list_list; 
+                                            /* frame containing list of mfns
+					       containing list of mfns 
+					       containing the p2m table. */
 } arch_shared_info_t;
 
 #endif
