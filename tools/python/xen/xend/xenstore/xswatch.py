@@ -1,3 +1,8 @@
+# Copyright (C) 2005 Christian Limpach <Christian.Limpach@cl.cam.ac.uk>
+
+# This file is subject to the terms and conditions of the GNU General
+# Public License.  See the file "COPYING" in the main directory of
+# this archive for more details.
 
 import select
 import threading
@@ -9,7 +14,6 @@ class xswatch:
     threadcond = threading.Condition()
     xs = None
     xslock = threading.Lock()
-    watches = []
     
     def __init__(self, path, fn, args=(), kwargs={}):
         self.fn = fn
@@ -19,7 +23,6 @@ class xswatch:
         xswatch.xslock.acquire()
         xswatch.xs.watch(path, self)
         xswatch.xslock.release()
-        xswatch.watches.append(self)
 
     def watchStart(cls):
         cls.threadcond.acquire()
