@@ -387,6 +387,8 @@ class XendDomainInfo:
         return ctrl
 
     def createDevice(self, type, devconfig, change=False):
+        if self.recreate:
+            return
         if type == 'vbd':
             typedev = sxp.child_value(devconfig, 'dev')
             if re.match('^ioemu:', typedev):
