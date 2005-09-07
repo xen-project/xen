@@ -353,7 +353,7 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
 	" path     [string] : xenstore path.\n"				\
 	" token    [string] : returned in watch notification.\n"	\
 	"\n"								\
-	"Returns: [int] 0 on success.\n"				\
+	"Returns None on success.\n"					\
 	"Raises RuntimeError on error.\n"				\
 	"\n"
 
@@ -382,18 +382,22 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
     Py_INCREF(token);
     sprintf(token_str, "%li", (unsigned long)token);
     xsval = xs_watch(xh, path, token_str);
-    val = pyvalue_int(xsval);
-    if (xsval) {
-	for (i = 0; i < PyList_Size(xsh->watches); i++) {
-	    if (PyList_GetItem(xsh->watches, i) == Py_None) {
-		PyList_SetItem(xsh->watches, i, token);
-		break;
-	    }
-	}
-	if (i == PyList_Size(xsh->watches))
-	    PyList_Append(xsh->watches, token);
-    } else
+    if (!xsval) {
+	val = PyErr_SetFromErrno(PyExc_RuntimeError);
 	Py_DECREF(token);
+	goto exit;
+    }
+
+    for (i = 0; i < PyList_Size(xsh->watches); i++) {
+	if (PyList_GetItem(xsh->watches, i) == Py_None) {
+	    PyList_SetItem(xsh->watches, i, token);
+	    break;
+	}
+    }
+    if (i == PyList_Size(xsh->watches))
+	PyList_Append(xsh->watches, token);
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -454,7 +458,7 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
 	"Acknowledge a watch notification that has been read.\n"	\
 	" token [string] : from the watch notification\n"		\
 	"\n"								\
-	"Returns: [int] 0 on success.\n"				\
+	"Returns None on success.\n"					\
 	"Raises RuntimeError on error.\n"				\
 	"\n"
 
@@ -476,7 +480,12 @@ static PyObject *xspy_acknowledge_watch(PyObject *self, PyObject *args,
         goto exit;
     sprintf(token_str, "%li", (unsigned long)token);
     xsval = xs_acknowledge_watch(xh, token_str);
-    val = pyvalue_int(xsval);
+    if (!xsval) {
+	val = PyErr_SetFromErrno(PyExc_RuntimeError);
+	goto exit;
+    }
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -486,7 +495,7 @@ static PyObject *xspy_acknowledge_watch(PyObject *self, PyObject *args,
 	" path  [string] : xenstore path.\n"		\
 	" token [string] : token from the watch.\n"	\
 	"\n"						\
-	"Returns: [int] 0 on success.\n"		\
+	"Returns None on success.\n"			\
 	"Raises RuntimeError on error.\n"		\
 	"\n"
 
@@ -511,7 +520,12 @@ static PyObject *xspy_unwatch(PyObject *self, PyObject *args, PyObject *kwds)
         goto exit;
     sprintf(token_str, "%li", (unsigned long)token);
     xsval = xs_unwatch(xh, path, token_str);
-    val = pyvalue_int(xsval);
+    if (!xsval)
+	val = PyErr_SetFromErrno(PyExc_RuntimeError);
+    else {
+	Py_INCREF(Py_None);
+	val = Py_None;
+    }
     for (i = 0; i < PyList_Size(xsh->watches); i++) {
 	if (token == PyList_GetItem(xsh->watches, i)) {
 	    Py_INCREF(Py_None);
