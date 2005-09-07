@@ -512,6 +512,10 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 		return 0;
 	}
 */
+       /* Last page is for xenstore, and not exported to domain */
+       if (d != dom0)
+               maxmem = (d->max_pages - 1) * PAGE_SIZE;
+
 	memset(fw_mem, 0, fw_mem_size);
 
 #ifdef XEN
