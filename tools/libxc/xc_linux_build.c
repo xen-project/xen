@@ -57,7 +57,7 @@ static int probeimageformat(char *image,
 }
 
 #define alloc_pt(ltab, vltab) \
-        ltab = page_array[ppt_alloc++] << PAGE_SHIFT; \
+        ltab = (unsigned long long)(page_array[ppt_alloc++]) << PAGE_SHIFT; \
         if (vltab != NULL) { \
             munmap(vltab, PAGE_SIZE); \
         } \
@@ -128,9 +128,9 @@ static int setup_pg_tables_pae(int xc_handle, u32 dom,
     l1_pgentry_64_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_64_t *vl2tab=NULL, *vl2e=NULL;
     l3_pgentry_64_t *vl3tab=NULL, *vl3e=NULL;
-    unsigned long l1tab = 0;
-    unsigned long l2tab = 0;
-    unsigned long l3tab = 0;
+    unsigned long long l1tab = 0;
+    unsigned long long l2tab = 0;
+    unsigned long long l3tab = 0;
     unsigned long ppt_alloc;
     unsigned long count;
 
@@ -139,7 +139,13 @@ static int setup_pg_tables_pae(int xc_handle, u32 dom,
     alloc_pt(l3tab, vl3tab);
     vl3e = &vl3tab[l3_table_offset_pae(dsi_v_start)];
     ctxt->ctrlreg[3] = l3tab;
-    
+
+    if(l3tab>0xfffff000)
+    {
+        fprintf(stderr,"L3TAB = %llx above 4GB!\n",l3tab);
+        goto error_out;
+    }
+ 
     for ( count = 0; count < ((v_end-dsi_v_start)>>PAGE_SHIFT); count++)
     {
         if ( !((unsigned long)vl1e & (PAGE_SIZE-1)) )
@@ -525,12 +531,14 @@ static int setup_guest(int xc_handle,
     physmap = physmap_e = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
         page_array[physmap_pfn++]);
+
     for ( count = 0; count < nr_pages; count++ )
     {
         if ( xc_add_mmu_update(xc_handle, mmu,
-			       (page_array[count] << PAGE_SHIFT) | 
+			       ((unsigned long long)page_array[count] << PAGE_SHIFT) | 
 			       MMU_MACHPHYS_UPDATE, count) )
         {
+            fprintf(stderr,"m2p update failure p=%lx m=%lx\n",count,page_array[count] ); 
             munmap(physmap, PAGE_SIZE);
             goto error_out;
         }

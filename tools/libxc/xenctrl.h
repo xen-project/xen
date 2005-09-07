@@ -521,7 +521,7 @@ struct xc_mmu {
 typedef struct xc_mmu xc_mmu_t;
 xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom);
 int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu, 
-                   unsigned long ptr, unsigned long val);
+                   unsigned long long ptr, unsigned long long val);
 int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
 
 #endif

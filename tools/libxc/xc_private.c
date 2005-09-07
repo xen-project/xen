@@ -116,7 +116,7 @@ int xc_mmuext_op(
 
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
-	fprintf(stderr, "Dom_mem operation failed (rc=%ld errno=%d)-- need to"
+	fprintf(stderr, "Dom_mmuext operation failed (rc=%ld errno=%d)-- need to"
                     " rebuild the user-space tool set?\n",ret,errno);
     }
 
@@ -172,7 +172,7 @@ xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom)
 }
 
 int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu, 
-		      unsigned long ptr, unsigned long val)
+		      unsigned long long ptr, unsigned long long val)
 {
     mmu->updates[mmu->idx].ptr = ptr;
     mmu->updates[mmu->idx].val = val;
@@ -229,7 +229,7 @@ int xc_memory_op(int xc_handle,
 
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
-	fprintf(stderr, "Dom_mem operation failed (rc=%ld errno=%d)-- need to"
+	fprintf(stderr, "hypercall failed (rc=%ld errno=%d)-- need to"
                 " rebuild the user-space tool set?\n",ret,errno);
     }
 
