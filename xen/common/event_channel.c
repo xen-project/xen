@@ -251,6 +251,9 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
     if ( virq >= ARRAY_SIZE(v->virq_to_evtchn) )
         return -EINVAL;
 
+    if ( d->domain_id == 0 && virq >= VIRQ_CONSOLE )
+        v = d->vcpu[0];
+
     spin_lock(&d->evtchn_lock);
 
     /*
@@ -271,6 +274,7 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
  out:
     spin_unlock(&d->evtchn_lock);
 
+    printk("evtchn_bind_virq %d port %d\n", virq, port);
     if ( port < 0 )
         return port;
 
