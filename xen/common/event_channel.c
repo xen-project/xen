@@ -274,7 +274,6 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
  out:
     spin_unlock(&d->evtchn_lock);
 
-    printk("evtchn_bind_virq %d port %d\n", virq, port);
     if ( port < 0 )
         return port;
 
