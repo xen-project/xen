@@ -19,7 +19,6 @@ import threading
 import select
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
-from xen.lowlevel import xu
 
 from xen.xend.XendLogging import log
 
