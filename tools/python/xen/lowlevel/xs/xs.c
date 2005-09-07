@@ -15,6 +15,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Copyright (C) 2005 Mike Wray Hewlett-Packard
+ * Copyright (C) 2005 Christian Limpach <Christian.Limpach@cl.cam.ac.uk>
  *
  */
 
