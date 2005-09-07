@@ -144,6 +144,7 @@ static int domain_create_tty(struct domain *dom)
 {
 	char *path;
 	int master;
+	bool success;
 
 	if ((master = getpt()) == -1 ||
 	    grantpt(master) == -1 || unlockpt(master) == -1) {
@@ -161,11 +162,17 @@ static int domain_create_tty(struct domain *dom)
 			tcsetattr(master, TCSAFLUSH, &term);
 		}
 
-		asprintf(&path, "/console/%d/tty", dom->domid);
-		xs_write(xs, path, slave, strlen(slave), O_CREAT);
+		success = asprintf(&path, "%s/tty", dom->conspath) != -1;
+		if (!success)
+			goto out;
+		success = xs_write(xs, path, slave, strlen(slave), O_CREAT);
 		free(path);
+		if (!success)
+			goto out;
 
-		asprintf(&path, "/console/%d/limit", dom->domid);
+		success = asprintf(&path, "%s/limit", dom->conspath) != -1;
+		if (!success)
+			goto out;
 		data = xs_read(xs, path, &len);
 		if (data) {
 			dom->buffer.max_capacity = strtoul(data, 0, 0);
@@ -175,6 +182,9 @@ static int domain_create_tty(struct domain *dom)
 	}
 
 	return master;
+ out:
+	close(master);
+	return -1;
 }
 
 /* Takes tuples of names, scanf-style args, and void **, NULL terminated. */
@@ -218,7 +228,7 @@ static int domain_create_ring(struct domain *dom)
 
 	err = xs_gather(xs, dom->conspath,
 			"ring-ref", "%u", &ring_ref,
-			"console_channel/port1", "%i", &local_port,
+			"port", "%i", &local_port,
 			NULL);
 	if (err)
 		goto out;
@@ -289,6 +299,17 @@ static struct domain *create_domain(int domid)
 	}
 
 	dom->domid = domid;
+
+	dom->conspath = xs_get_domain_path(xs, dom->domid);
+	if (dom->conspath == NULL)
+		goto out;
+	s = realloc(dom->conspath, strlen(dom->conspath) +
+		    strlen("/console") + 1);
+	if (s == NULL)
+		goto out;
+	dom->conspath = s;
+	strcat(dom->conspath, "/console");
+
 	dom->tty_fd = domain_create_tty(dom);
 	dom->is_dead = false;
 	dom->buffer.data = 0;
@@ -301,18 +322,6 @@ static struct domain *create_domain(int domid)
 	dom->local_port = -1;
 	dom->page = NULL;
 	dom->evtchn_fd = -1;
-
-	dom->conspath = NULL;
-
-	dom->conspath = xs_get_domain_path(xs, dom->domid);
-	if (dom->conspath == NULL)
-		goto out;
-	s = realloc(dom->conspath, strlen(dom->conspath) +
-		    strlen("/console") + 1);
-	if (s == NULL)
-		goto out;
-	dom->conspath = s;
-	strcat(dom->conspath, "/console");
 
 	if (!watch_domain(dom, true))
 		goto out;

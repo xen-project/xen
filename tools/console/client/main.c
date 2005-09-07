@@ -170,8 +170,7 @@ int main(int argc, char **argv)
 		{ 0 },
 
 	};
-	char *str_pty;
-	char path[1024];
+	char *str_pty, *path;
 	int spty;
 	unsigned int len = 0;
 	struct xs_handle *xs;
@@ -214,7 +213,13 @@ int main(int argc, char **argv)
 	
 	signal(SIGTERM, sighandler);
 
-	snprintf(path, sizeof(path), "/console/%d/tty", domid);
+	path = xs_get_domain_path(xs, domid);
+	if (path == NULL)
+		err(errno, "xs_get_domain_path()");
+	path = realloc(path, strlen(path) + strlen("/console/tty") + 1);
+	if (path == NULL)
+		err(ENOMEM, "realloc");
+	strcat(path, "/console/tty");
 	str_pty = xs_read(xs, path, &len);
 
 	/* FIXME consoled currently does not assume domain-0 doesn't have a
@@ -252,6 +257,7 @@ int main(int argc, char **argv)
 		err(errno, "Could not open tty `%s'", str_pty);
 	}
 	free(str_pty);
+	free(path);
 
 	init_term(STDIN_FILENO, &attr);
 	console_loop(xc_handle, domid, spty);

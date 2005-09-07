@@ -298,15 +298,14 @@ class XendDomainInfo:
             self.store_channel.saveToDB(self.db.addChild("store_channel"),
                                         save=save)
         if self.console_channel:
-            self.console_channel.saveToDB(self.db.addChild("console/console_channel"),
-                                        save=save)
+            self.db['console/port'] = "%i" % self.console_channel.port1
         if self.image:
             self.image.exportToDB(save=save, sync=sync)
         self.db.exportToDB(self, fields=self.__exports__, save=save, sync=sync)
 
     def importFromDB(self):
         self.db.importFromDB(self, fields=self.__exports__)
-        self.store_channel = self.eventChannel("store_channel")
+        self.store_channel = self.eventChannelOld("store_channel")
 
     def setdom(self, dom):
         """Set the domain id.
@@ -654,7 +653,6 @@ class XendDomainInfo:
             self.configure_restart()
             self.construct_image()
             self.configure()
-            self.publish_console()
             self.exportToDB(save=True)
         except Exception, ex:
             # Catch errors, cleanup and re-raise.
@@ -845,7 +843,7 @@ class XendDomainInfo:
                   id, self.name, self.memory)
         self.setdom(id)
 
-    def eventChannel(self, key):
+    def eventChannelOld(self, key):
         """Create an event channel to the domain.
         If saved info is available recreate the channel.
         
@@ -854,11 +852,27 @@ class XendDomainInfo:
         db = self.db.addChild(key)
         return EventChannel.restoreFromDB(db, 0, self.id)
         
+    def eventChannel(self, path=None, key=None):
+        """Create an event channel to the domain.
+        
+        @param path under which port is stored in db
+        """
+        port = 0
+        try:
+            if path and key:
+                if path:
+                    db = self.db.addChild(path)
+                else:
+                    db = self.db
+                port = int(db[key].getData())
+        except: pass
+        return EventChannel.interdomain(0, self.id, port1=port, port2=0)
+        
     def create_channel(self):
         """Create the channels to the domain.
         """
-        self.store_channel = self.eventChannel("store_channel")
-        self.console_channel = self.eventChannel("console/console_channel")
+        self.store_channel = self.eventChannelOld("store_channel")
+        self.console_channel = self.eventChannel("console", "port")
 
     def create_configured_devices(self):
         devices = sxp.children(self.config, 'device')
@@ -1071,11 +1085,6 @@ class XendDomainInfo:
             backend = blkif.getBackend(0)
             backend.connect(recreate=self.recreate)
 
-    def publish_console(self):
-        db = DBMap(db=XenNode("/console/%d" % self.id))
-        db['domain'] = self.db.getPath()
-        db.saveDB(save=True)
-
     def configure_fields(self):
         """Process the vm configuration fields using the registered handlers.
         """
@@ -1143,7 +1152,7 @@ class XendDomainInfo:
 
     def dom0_init_store(self):
         if not self.store_channel:
-            self.store_channel = self.eventChannel("store_channel")
+            self.store_channel = self.eventChannelOld("store_channel")
         self.store_mfn = xc.init_store(self.store_channel.port2)
         if self.store_mfn >= 0:
             self.db.introduceDomain(self.id, self.store_mfn,

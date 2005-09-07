@@ -173,7 +173,6 @@ def restore(xd, fd):
                     if m:
                         dominfo.console_mfn = int(m.group(2))
                         dominfo.exportToDB(save=True, sync=True)
-                        dominfo.publish_console()
                     try:
                         l = child.fromchild.readline()
                     except:
