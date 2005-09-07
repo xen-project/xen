@@ -67,7 +67,7 @@ class XendDomain:
         xroot.add_component("xen.xend.XendDomain", self)
         self.domains = XendDomainDict()
         self.dbmap = DBMap(db=XenNode("/domain"))
-        eserver.subscribe('xend.virq', self.onVirq)
+        self.watchReleaseDomain()
         self.initial_refresh()
 
     def list(self):
@@ -95,10 +95,12 @@ class XendDomain:
         doms = self.list_sorted()
         return map(lambda x: x.name, doms)
 
-    def onVirq(self, event, val):
-        """Event handler for virq.
-        """
+    def onReleaseDomain(self):
         self.refresh(cleanup=True)
+
+    def watchReleaseDomain(self):
+        from xen.xend.xenstore.xswatch import xswatch
+        self.releaseDomain = xswatch("@releaseDomain", self.onReleaseDomain)
 
     def xen_domains(self):
         """Get table of domains indexed by id from xc.
