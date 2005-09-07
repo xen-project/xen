@@ -26,11 +26,6 @@ import signal
 import time
 import commands
 
-XCS_PATH    = "/var/lib/xen/xcs_socket"
-XCS_EXEC    = "/usr/sbin/xcs"
-XCS_PIDFILE = "/var/run/xcs.pid"
-XCS_ARGS    = (XCS_EXEC, "-p", XCS_PIDFILE)
-
 # add fallback path for non-native python path installs if needed
 sys.path.append('/usr/lib/python')
 sys.path.append('/usr/lib64/python')
@@ -70,52 +65,6 @@ def check_user():
         hline()
         raise CheckError("invalid user")
 
-def xcs_running():
-    """ See if the control switch is running.
-    """	
-    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    try:
-        s.connect( (XCS_PATH) )
-        s.close()
-    except:
-        try:
-            os.remove(XCS_PIDFILE)
-        except:
-            pass
-	return 0
-    return 1
-    
-def start_xcs():
-    if (not xcs_running()):
-        if os.fork() == 0 :
-            if not os.path.isdir(os.path.dirname(XCS_PATH)):
-                os.makedirs(os.path.dirname(XCS_PATH))
-            try:
-                os.execvp(XCS_EXEC, XCS_ARGS)
-            except:
-                hline()
-                msg("Tried to start xcs, but failed. Is it installed?")
-                hline()
-                raise CheckError("couldn't start xcs")
-        for n in range(10) :
-            if (xcs_running()):
-                break
-            time.sleep(0.1)
-        else :
-                hline()
-                msg("Failed to start the control interface switch.")
-                hline()
-                raise CheckError("xcs not running")
-            
-def stop_xcs():
-    try:
-	xcs_pidfile = open(XCS_PIDFILE)
-        xcs_pid = int(xcs_pidfile.read().strip())
-        os.kill(xcs_pid, signal.SIGTERM)
-        xcs_pidfile.close()
-    except:
-	return    
-
 def start_xenstored():
     XENSTORED_TRACE = os.getenv("XENSTORED_TRACE")
     cmd = "/usr/sbin/xenstored --pid-file=/var/run/xenstore.pid"
@@ -141,19 +90,16 @@ def main():
         pid, status = os.wait()
         return status >> 8
     elif sys.argv[1] == 'start':
-        start_xcs()
         start_xenstored()
         start_consoled()
         return daemon.start()
     elif sys.argv[1] == 'trace_start':
-        start_xcs()
         start_xenstored()
         start_consoled()
         return daemon.start(trace=1)
     elif sys.argv[1] == 'stop':
         return daemon.stop()
     elif sys.argv[1] == 'restart':
-        start_xcs()
         start_xenstored()
         start_consoled()
         return daemon.stop() or daemon.start()

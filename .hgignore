@@ -147,8 +147,6 @@
 ^tools/vtpm_manager/manager/vtpm_managerd
 ^tools/web-shutdown\.tap$
 ^tools/x2d2/minixend$
-^tools/xcs/xcs$
-^tools/xcs/xcsdump$
 ^tools/xcutils/xc_restore$
 ^tools/xcutils/xc_save$
 ^tools/xenstat/xentop/xentop$
@@ -166,7 +164,6 @@
 ^tools/xenstore/xs_test$
 ^tools/xenstore/xs_watch_stress$
 ^tools/xentrace/xentrace$
-^tools/xfrd/xfrd$
 ^xen/BLOG$
 ^xen/TAGS$
 ^xen/arch/x86/asm-offsets\.s$

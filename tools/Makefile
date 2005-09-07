@@ -7,7 +7,6 @@ SUBDIRS += xenstore
 SUBDIRS += misc
 SUBDIRS += examples
 SUBDIRS += xentrace
-SUBDIRS += xcs
 SUBDIRS += xcutils
 SUBDIRS += firmware
 SUBDIRS += security

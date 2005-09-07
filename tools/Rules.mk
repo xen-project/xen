@@ -4,7 +4,6 @@ include $(XEN_ROOT)/Config.mk
 
 XEN_XC             = $(XEN_ROOT)/tools/python/xen/lowlevel/xc
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
-XEN_XCS            = $(XEN_ROOT)/tools/xcs
 XEN_XENSTORE       = $(XEN_ROOT)/tools/xenstore
 XEN_LIBXENSTAT     = $(XEN_ROOT)/tools/xenstat/libxenstat/src
 

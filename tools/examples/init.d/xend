@@ -11,7 +11,7 @@ if ! [ -e /proc/xen/privcmd ]; then
 	exit 0
 fi
 
-# Wait for Xend and xcs to be up
+# Wait for Xend to be up
 function await_daemons_up
 {
 	i=1
