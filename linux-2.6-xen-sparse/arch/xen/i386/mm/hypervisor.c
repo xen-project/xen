@@ -106,7 +106,7 @@ void xen_l4_entry_update(pgd_t *ptr, pgd_t val)
 void xen_machphys_update(unsigned long mfn, unsigned long pfn)
 {
 	mmu_update_t u;
-	u.ptr = (mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+	u.ptr = ((unsigned long long)mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
 	u.val = pfn;
 	BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
 }
