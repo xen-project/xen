@@ -475,7 +475,7 @@ int domain_init(void)
 	}
 #endif
 	if (eventchn_fd < 0)
-		barf_perror("Failed to open connection evtchn device");
+		barf_perror("Failed to open evtchn device");
 
 	if (xc_evtchn_bind_virq(*xc_handle, VIRQ_DOM_EXC, &virq_port))
 		barf_perror("Failed to bind to domain exception virq");
