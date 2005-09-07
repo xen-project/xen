@@ -14,7 +14,6 @@
 
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
-#define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define KZERO             0x80000000
 #define KOFFSET(_p)       ((_p)&~KZERO)
 
@@ -49,7 +48,7 @@ parseaout9image(
     struct domain_setup_info *dsi)
 {
     struct Exec ehdr;
-    unsigned long start, txtsz, end;
+    unsigned long start, dstart, end;
 
     if (!get_header(image, image_size, &ehdr)) {
         ERROR("Kernel image does not have a a.out9 header.");
@@ -61,9 +60,9 @@ parseaout9image(
         return -EINVAL;
     }
 
-    start = round_pgdown(ehdr.entry);
-    txtsz = round_pgup(ehdr.text);
-    end = start + txtsz + ehdr.data + ehdr.bss;
+    start = ehdr.entry;
+    dstart = round_pgup(start + ehdr.text);
+    end = dstart + ehdr.data + ehdr.bss;
 
     dsi->v_start	= KZERO;
     dsi->v_kernstart	= start;
@@ -85,19 +84,18 @@ loadaout9image(
     struct domain_setup_info *dsi)
 {
     struct Exec ehdr;
-    unsigned long start, txtsz;
+    unsigned long start, dstart;
 
     if (!get_header(image, image_size, &ehdr)) {
         ERROR("Kernel image does not have a a.out9 header.");
         return -EINVAL;
     }
 
-    start = round_pgdown(ehdr.entry);
-    txtsz = round_pgup(ehdr.text);
-    copyout(xch, dom, parray, 
-            start, image, sizeof ehdr + ehdr.text);
-    copyout(xch, dom, parray, 
-            start+txtsz, image + sizeof ehdr + ehdr.text, ehdr.data);
+    start = ehdr.entry;
+    dstart = round_pgup(start + ehdr.text);
+    copyout(xch, dom, parray, start, image + sizeof ehdr, ehdr.text);
+    copyout(xch, dom, parray, dstart,
+            image + sizeof ehdr + ehdr.text, ehdr.data);
 
     /* XXX load symbols */
 
