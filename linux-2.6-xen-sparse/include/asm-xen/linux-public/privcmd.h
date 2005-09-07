@@ -70,14 +70,6 @@ typedef struct privcmd_blkmsg
 #define IOCTL_PRIVCMD_HYPERCALL         \
     _IOC(_IOC_NONE, 'P', 0, sizeof(privcmd_hypercall_t))
 
-/*
- * @cmd: IOCTL_PRIVCMD_INITDOMAIN_EVTCHN
- * @arg: n/a
- * Return: Port associated with domain-controller end of control event channel
- *         for the initial domain.
- */
-#define IOCTL_PRIVCMD_INITDOMAIN_EVTCHN \
-    _IOC(_IOC_NONE, 'P', 1, 0)
 #define IOCTL_PRIVCMD_MMAP             \
     _IOC(_IOC_NONE, 'P', 2, sizeof(privcmd_mmap_t))
 #define IOCTL_PRIVCMD_MMAPBATCH             \

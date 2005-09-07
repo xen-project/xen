@@ -275,7 +275,6 @@ static int setup_guest(int xc_handle,
                          unsigned long *pvss, vcpu_guest_context_t *ctxt,
                          const char *cmdline,
                          unsigned long shared_info_frame,
-                         unsigned int control_evtchn,
                          unsigned long flags,
                          unsigned int vcpus,
                          unsigned int store_evtchn, unsigned long *store_mfn)
@@ -333,7 +332,6 @@ static int setup_guest(int xc_handle,
                        unsigned long *pvss, vcpu_guest_context_t *ctxt,
                        const char *cmdline,
                        unsigned long shared_info_frame,
-                       unsigned int control_evtchn,
                        unsigned long flags,
                        unsigned int vcpus,
 		       unsigned int store_evtchn, unsigned long *store_mfn,
@@ -587,7 +585,6 @@ static int setup_guest(int xc_handle,
     start_info->pt_base      = vpt_start;
     start_info->nr_pt_frames = nr_pt_pages;
     start_info->mfn_list     = vphysmap_start;
-    start_info->domain_controller_evtchn = control_evtchn;
     start_info->store_mfn    = *store_mfn;
     start_info->store_evtchn = store_evtchn;
     start_info->console_mfn   = *console_mfn;
@@ -639,7 +636,6 @@ int xc_linux_build(int xc_handle,
                    const char *image_name,
                    const char *ramdisk_name,
                    const char *cmdline,
-                   unsigned int control_evtchn,
                    unsigned long flags,
                    unsigned int vcpus,
                    unsigned int store_evtchn,
@@ -720,7 +716,7 @@ int xc_linux_build(int xc_handle,
                      &vstartinfo_start, &vkern_entry,
                      &vstack_start, ctxt, cmdline,
                      op.u.getdomaininfo.shared_info_frame,
-                     control_evtchn, flags, vcpus,
+                     flags, vcpus,
                      store_evtchn, store_mfn,
 		     console_evtchn, console_mfn) < 0 )
     {
@@ -742,7 +738,6 @@ int xc_linux_build(int xc_handle,
     ctxt->regs.ar_fpsr = FPSR_DEFAULT;
     /* ctxt->regs.r28 = dom_fw_setup(); currently done by hypervisor, should move here */
     ctxt->vcpu.privregs = 0;
-    ctxt->shared.domain_controller_evtchn = control_evtchn;
     ctxt->shared.flags = flags;
     i = 0; /* silence unused variable warning */
 #else /* x86 */

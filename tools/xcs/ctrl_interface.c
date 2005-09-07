@@ -214,18 +214,7 @@ control_channel_t *ctrl_chan_new(u32 dom, int local_port, int remote_port)
 
     if ( dom == 0 )
     {
-        /*
-         * The control-interface event channel for DOM0 is already set up.
-         * We use an ioctl to discover the port at our end of the channel.
-         */
-        local_port  = ioctl(xc_handle, IOCTL_PRIVCMD_INITDOMAIN_EVTCHN, 
-                            NULL);
-        remote_port = -1; /* We don't need the remote end of the DOM0 link. */
-        if ( local_port < 0 )
-        {
-            DPRINTF("Could not open channel to DOM0");
-            goto fail;
-        }
+	goto fail;
     }
     else if ( xc_evtchn_bind_interdomain(xc_handle, 
                                          DOMID_SELF, dom, 

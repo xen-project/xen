@@ -14,7 +14,6 @@
 #include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/queues.h>
 #include <asm-xen/xenbus.h>
-#include <asm-xen/ctrl_if.h>
 #include <linux/cpu.h>
 #include <linux/kthread.h>
 
@@ -168,8 +167,6 @@ static int __do_suspend(void *ignore)
 
     xencons_suspend();
 
-    ctrl_if_suspend();
-
     irq_suspend();
 
     gnttab_suspend();
@@ -213,8 +210,6 @@ static int __do_suspend(void *ignore)
     gnttab_resume();
 
     irq_resume();
-
-    ctrl_if_resume();
 
     xencons_resume();
 

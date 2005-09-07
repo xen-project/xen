@@ -10,7 +10,6 @@
 #include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
-#include <asm-xen/ctrl_if.h>
 #include <asm-xen/evtchn.h>
 #include <asm-xen/xen-public/io/tpmif.h>
 #include <asm/io.h>

@@ -40,7 +40,6 @@
 #include <asm-xen/synch_bitops.h>
 #include <asm-xen/xen-public/event_channel.h>
 #include <asm-xen/xen-public/physdev.h>
-#include <asm-xen/ctrl_if.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/evtchn.h>
 
@@ -732,7 +731,4 @@ void __init init_IRQ(void)
         irq_desc[pirq_to_irq(i)].depth   = 1;
         irq_desc[pirq_to_irq(i)].handler = &pirq_type;
     }
-
-    /* This needs to be done early, but after the IRQ subsystem is alive. */
-    ctrl_if_init();
 }

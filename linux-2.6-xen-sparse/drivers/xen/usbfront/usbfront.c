@@ -70,7 +70,6 @@
 #include "../../../../../drivers/usb/hcd.h"
 
 #include <asm-xen/xen-public/io/usbif.h>
-#include <asm/ctrl_if.h>
 #include <asm/xen-public/io/domain_controller.h>
 
 /*

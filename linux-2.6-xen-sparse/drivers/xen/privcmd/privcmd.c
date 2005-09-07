@@ -80,13 +80,6 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     }
     break;
 
-    case IOCTL_PRIVCMD_INITDOMAIN_EVTCHN:
-    {
-        extern int initdom_ctrlif_domcontroller_port;
-        ret = initdom_ctrlif_domcontroller_port;
-    }
-    break;
-    
 #if defined(CONFIG_XEN_PRIVILEGED_GUEST)
     case IOCTL_PRIVCMD_MMAP:
     {

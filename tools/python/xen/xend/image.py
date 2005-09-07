@@ -249,7 +249,6 @@ class LinuxImageHandler(ImageHandler):
 
         log.debug("dom            = %d", self.vm.getDomain())
         log.debug("image          = %s", self.kernel)
-        log.debug("control_evtchn = %s", self.vm.channel.getRemotePort())
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("console_evtchn = %d", console_evtchn)
         log.debug("cmdline        = %s", self.cmdline)
@@ -259,7 +258,6 @@ class LinuxImageHandler(ImageHandler):
 
         ret = xc.linux_build(dom            = self.vm.getDomain(),
                              image          = self.kernel,
-                             control_evtchn = self.vm.channel.getRemotePort(),
                              store_evtchn   = store_evtchn,
                              console_evtchn = console_evtchn,
                              cmdline        = self.cmdline,
