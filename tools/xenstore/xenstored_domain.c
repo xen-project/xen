@@ -433,33 +433,57 @@ void restore_existing_connections(void)
 {
 }
 
+#define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
+#define EVTCHN_DEV_MAJOR 10
+#define EVTCHN_DEV_MINOR 201
+
 /* Returns the event channel handle. */
 int domain_init(void)
 {
-	/* The size of the ringbuffer: half a page minus head structure. */
-	ringbuf_datasize = getpagesize() / 2 - sizeof(struct ringbuf_head);
+    /* The size of the ringbuffer: half a page minus head structure. */
+    ringbuf_datasize = getpagesize() / 2 - sizeof(struct ringbuf_head);
+    
+    xc_handle = talloc(talloc_autofree_context(), int);
+    if (!xc_handle)
+        barf_perror("Failed to allocate domain handle");
 
-	xc_handle = talloc(talloc_autofree_context(), int);
-	if (!xc_handle)
-		barf_perror("Failed to allocate domain handle");
-	*xc_handle = xc_interface_open();
-	if (*xc_handle < 0)
-		barf_perror("Failed to open connection to hypervisor");
-	talloc_set_destructor(xc_handle, close_xc_handle);
+    *xc_handle = xc_interface_open();
+    if (*xc_handle < 0)
+        barf_perror("Failed to open connection to hypervisor (privcmd)");
 
+    talloc_set_destructor(xc_handle, close_xc_handle);
+    
 #ifdef TESTING
-	eventchn_fd = fake_open_eventchn();
+    eventchn_fd = fake_open_eventchn();
 #else
-	eventchn_fd = open("/dev/xen/evtchn", O_RDWR);
+    {
+        struct stat st;
+        
+        /* Make sure any existing device file links to correct device. */
+        if ( (lstat(EVTCHN_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||
+             (st.st_rdev != makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)) )
+            (void)unlink(EVTCHN_DEV_NAME);
+        
+      reopen:
+        eventchn_fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
+        if (eventchn_fd == -1) {
+            if ((errno == ENOENT) && (
+                    (mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) 
+                && (mknod(EVTCHN_DEV_NAME, S_IFCHR|0600,
+                          makedev(EVTCHN_DEV_MAJOR,EVTCHN_DEV_MINOR)) == 0))
+                goto reopen;
+            return -errno;
+        }
+    }
 #endif
-	if (eventchn_fd < 0)
-		barf_perror("Failed to open connection to hypervisor");
-
-	if (xc_evtchn_bind_virq(*xc_handle, VIRQ_DOM_EXC, &virq_port))
-		barf_perror("Failed to bind to domain exception virq");
-
-	if (ioctl(eventchn_fd, EVENTCHN_BIND, virq_port) != 0)
-		barf_perror("Failed to bind to domain exception virq port");
-
-	return eventchn_fd;
+    if (eventchn_fd < 0)
+        barf_perror("Failed to open connection to hypervisor (evtchn)");
+    
+    if (xc_evtchn_bind_virq(*xc_handle, VIRQ_DOM_EXC, &virq_port))
+        barf_perror("Failed to bind to domain exception virq");
+    
+    if (ioctl(eventchn_fd, EVENTCHN_BIND, virq_port) != 0)
+        barf_perror("Failed to bind to domain exception virq port");
+    
+    return eventchn_fd;
 }
