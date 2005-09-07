@@ -279,6 +279,7 @@ static bool watch_domain(struct domain *dom, bool watch)
 static struct domain *create_domain(int domid)
 {
 	struct domain *dom;
+	char *s;
 
 	dom = (struct domain *)malloc(sizeof(struct domain));
 	if (dom == NULL) {
@@ -306,10 +307,11 @@ static struct domain *create_domain(int domid)
 	dom->conspath = xs_get_domain_path(xs, dom->domid);
 	if (dom->conspath == NULL)
 		goto out;
-	dom->conspath = realloc(dom->conspath, strlen(dom->conspath) +
-				strlen("/console") + 1);
-	if (dom->conspath == NULL)
+	s = realloc(dom->conspath, strlen(dom->conspath) +
+		    strlen("/console") + 1);
+	if (s == NULL)
 		goto out;
+	dom->conspath = s;
 	strcat(dom->conspath, "/console");
 
 	if (!watch_domain(dom, true))
