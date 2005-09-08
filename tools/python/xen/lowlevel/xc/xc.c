@@ -842,6 +842,7 @@ static PyObject *pyxc_domain_memory_increase_reservation(PyObject *self,
     u32 dom;
     unsigned long mem_kb;
     unsigned int extent_order = 0 , address_bits = 0;
+    unsigned long nr_extents;
 
     static char *kwd_list[] = { "dom", "mem_kb", "extent_order", "address_bits", NULL };
 
@@ -849,8 +850,12 @@ static PyObject *pyxc_domain_memory_increase_reservation(PyObject *self,
                                       &dom, &mem_kb, &extent_order, &address_bits) )
         return NULL;
 
+    /* round down to nearest power of 2. Assume callers using extent_order>0
+       know what they are doing */
+    nr_extents = (mem_kb / (XC_PAGE_SIZE/1024)) >> extent_order;
     if ( xc_domain_memory_increase_reservation(xc->xc_handle, dom, 
-                                     mem_kb, extent_order, address_bits) )
+					       nr_extents, extent_order, 
+					       address_bits, NULL) )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);

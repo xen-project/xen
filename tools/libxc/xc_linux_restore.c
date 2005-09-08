@@ -149,7 +149,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     }
 
     err = xc_domain_memory_increase_reservation(xc_handle, dom,
-                                                nr_pfns * PAGE_SIZE / 1024, 0, 0); //FIX ME
+                                                nr_pfns, 0, 0, NULL);
     if (err != 0) {
         ERR("Failed to increase reservation by %lx\n", 
             nr_pfns * PAGE_SIZE / 1024); 

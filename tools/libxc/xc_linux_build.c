@@ -136,11 +136,24 @@ static int setup_pg_tables_pae(int xc_handle, u32 dom,
 
     /* First allocate page for page dir. */
     ppt_alloc = (vpt_start - dsi_v_start) >> PAGE_SHIFT;
+
+    if ( page_array[ppt_alloc] > 0xfffff )
+    {
+	unsigned long nmfn;
+	nmfn = xc_make_page_below_4G( xc_handle, dom, page_array[ppt_alloc] );
+	if ( nmfn == 0 )
+	{
+	    fprintf(stderr, "Couldn't get a page below 4GB :-(\n");
+	    goto error_out;
+	}
+	page_array[ppt_alloc] = nmfn;
+    }
+
     alloc_pt(l3tab, vl3tab);
     vl3e = &vl3tab[l3_table_offset_pae(dsi_v_start)];
     ctxt->ctrlreg[3] = l3tab;
 
-    if(l3tab>0xfffff000)
+    if(l3tab>0xfffff000ULL)
     {
         fprintf(stderr,"L3TAB = %llx above 4GB!\n",l3tab);
         goto error_out;
