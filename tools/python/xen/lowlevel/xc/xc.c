@@ -846,7 +846,7 @@ static PyObject *pyxc_domain_memory_increase_reservation(PyObject *self,
 
     static char *kwd_list[] = { "dom", "mem_kb", "extent_order", "address_bits", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii|ii", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "il|ii", kwd_list, 
                                       &dom, &mem_kb, &extent_order, &address_bits) )
         return NULL;
 
