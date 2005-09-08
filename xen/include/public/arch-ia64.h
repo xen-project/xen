@@ -280,22 +280,4 @@ typedef struct vcpu_guest_context {
 
 #endif /* !__ASSEMBLY__ */
 
-#define	XEN_HYPER_RFI			0x1
-#define	XEN_HYPER_RSM_DT		0x2
-#define	XEN_HYPER_SSM_DT		0x3
-#define	XEN_HYPER_COVER			0x4
-#define	XEN_HYPER_ITC_D			0x5
-#define	XEN_HYPER_ITC_I			0x6
-#define	XEN_HYPER_SSM_I			0x7
-#define	XEN_HYPER_GET_IVR		0x8
-#define	XEN_HYPER_GET_TPR		0x9
-#define	XEN_HYPER_SET_TPR		0xa
-#define	XEN_HYPER_EOI			0xb
-#define	XEN_HYPER_SET_ITM		0xc
-#define	XEN_HYPER_THASH			0xd
-#define	XEN_HYPER_PTC_GA		0xe
-#define	XEN_HYPER_ITR_D			0xf
-#define	XEN_HYPER_GET_RR		0x10
-#define	XEN_HYPER_SET_RR		0x11
-
 #endif /* __HYPERVISOR_IF_IA64_H__ */

@@ -343,7 +343,7 @@ thash_data_t *__alloc_chain(thash_cb_t *hcb,thash_data_t *entry)
                 hcb->recycle_notifier(hcb,(u64)entry);
         }
         thash_purge_all(hcb);
-        cch = cch_alloc(hcb);
+//        cch = cch_alloc(hcb);
     }
     return cch;
 }
@@ -364,7 +364,7 @@ void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
     ia64_rr vrr;
     u64 gppn;
     u64 ppns, ppne;
-    
+
     hash_table = (hcb->hash_func)(hcb->pta,
                         va, entry->rid, entry->ps);
     if( INVALID_ENTRY(hcb, hash_table) ) {
@@ -374,10 +374,14 @@ void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
     else {
         // TODO: Add collision chain length limitation.
         cch = __alloc_chain(hcb,entry);
-        
-        *cch = *hash_table;
-        *hash_table = *entry;
-        hash_table->next = cch;
+        if(cch == NULL){
+            *hash_table = *entry;
+            hash_table->next = 0;
+        }else{
+            *cch = *hash_table;
+            *hash_table = *entry;
+            hash_table->next = cch;
+        }
     }
     if(hcb->vcpu->domain->domain_id==0){
        thash_insert(hcb->ts->vhpt, entry, va);
@@ -396,26 +400,29 @@ void vtlb_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 
 static void vhpt_insert(thash_cb_t *hcb, thash_data_t *entry, u64 va)
 {
-    thash_data_t    *hash_table, *cch;
+    thash_data_t   vhpt_entry, *hash_table, *cch;
     ia64_rr vrr;
-    
+    if ( !__tlb_to_vhpt(hcb, entry, va, &vhpt_entry) ) {
+        panic("Can't convert to machine VHPT entry\n");
+    }
     hash_table = (hcb->hash_func)(hcb->pta,
                         va, entry->rid, entry->ps);
     if( INVALID_ENTRY(hcb, hash_table) ) {
-        if ( !__tlb_to_vhpt(hcb, entry, va, hash_table) ) {
-            panic("Can't convert to machine VHPT entry\n");
-        }
+        *hash_table = vhpt_entry;
         hash_table->next = 0;
     }
     else {
         // TODO: Add collision chain length limitation.
         cch = __alloc_chain(hcb,entry);
-        
-        *cch = *hash_table;
-        if ( !__tlb_to_vhpt(hcb, entry, va, hash_table) ) {
-            panic("Can't convert to machine VHPT entry\n");
+        if(cch == NULL){
+            *hash_table = vhpt_entry;
+            hash_table->next = 0;
+        }else{
+            *cch = *hash_table;
+            *hash_table = vhpt_entry;
+            hash_table->next = cch;
         }
-        hash_table->next = cch;
+
         if(hash_table->tag==hash_table->next->tag)
             while(1);
     }
@@ -488,10 +495,10 @@ static thash_data_t *thash_rem_cch(thash_cb_t *hcb, thash_data_t *cch)
 {
     thash_data_t *next;
 
-    if ( ++cch_depth > MAX_CCH_LENGTH ) {
-        printf ("cch length > MAX_CCH_LENGTH, exceed the expected length\n");
-        while(1);
-   }
+//    if ( ++cch_depth > MAX_CCH_LENGTH ) {
+//        printf ("cch length > MAX_CCH_LENGTH, exceed the expected length\n");
+//        while(1);
+//   }
     if ( cch -> next ) {
         next = thash_rem_cch(hcb, cch->next);
     }
@@ -914,7 +921,7 @@ void thash_init(thash_cb_t *hcb, u64 sz)
         INVALIDATE_HASH(hcb,hash_table);
     }
 }
-
+#define VTLB_DEBUG
 #ifdef  VTLB_DEBUG
 static  u64 cch_length_statistics[MAX_CCH_LENGTH+1];
 u64  sanity_check=0;

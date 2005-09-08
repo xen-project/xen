@@ -51,7 +51,7 @@ ia64_set_rr (unsigned long rr, unsigned long rrv)
 // use this to allocate a rid out of the "Xen reserved rid block"
 unsigned long allocate_reserved_rid(void)
 {
-	static unsigned long currentrid = XEN_DEFAULT_RID;
+	static unsigned long currentrid = XEN_DEFAULT_RID+1;
 	unsigned long t = currentrid;
 
 	unsigned long max = RIDS_PER_RIDBLOCK;

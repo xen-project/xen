@@ -215,6 +215,7 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
     ia64_rr oldrr,newrr;
     thash_cb_t *hcb;
+    extern void * pal_vaddr;
     oldrr=vmx_vcpu_rr(vcpu,reg);
     newrr.rrval=val;
 #if 1
@@ -224,7 +225,9 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
     }
 #endif
     VMX(vcpu,vrr[reg>>61]) = val;
+
     switch((u64)(reg>>61)) {
+#ifdef XEN_DBL_MAPPING
     case VRN5:
         VMX(vcpu,mrr5)=vmx_vrrtomrr(vcpu,val);
         break;
@@ -234,12 +237,17 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
     case VRN7:
         VMX(vcpu,mrr7)=vmx_vrrtomrr(vcpu,val);
         /* Change double mapping for this domain */
-#ifdef XEN_DBL_MAPPING
         vmx_change_double_mapping(vcpu,
                       vmx_vrrtomrr(vcpu,oldrr.rrval),
                       vmx_vrrtomrr(vcpu,newrr.rrval));
-#endif
         break;
+#else
+    case VRN7:
+       vmx_switch_rr7(vmx_vrrtomrr(vcpu,val),vcpu->domain->shared_info,
+        (void *)vcpu->vcpu_info->arch.privregs,
+       ( void *)vcpu->arch.vtlb->ts->vhpt->hash, pal_vaddr );
+       break;
+#endif
     default:
         ia64_set_rr(reg,vmx_vrrtomrr(vcpu,val));
         break;

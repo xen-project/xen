@@ -33,7 +33,7 @@
 #include <asm/processor.h>
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
-
+#include <asm/vhpt.h>
 #include "vmx_minstate.h"
 
 /*
@@ -401,8 +401,9 @@ vmx_dorfirfi_back:
     mov b0=r16
     br.cond.sptk b0         // call the service
     ;;
-// switch rr7 and rr5
 switch_rr7:
+#ifdef XEN_DBL_MAPPING
+// switch rr7 and rr5
     adds r24=SWITCH_MRR5_OFFSET, r21
     adds r26=SWITCH_MRR6_OFFSET, r21
     adds r16=SWITCH_MRR7_OFFSET ,r21
@@ -428,6 +429,7 @@ switch_rr7:
     ;;
     srlz.i
     ;;
+#endif
 // fall through
 GLOBAL_ENTRY(ia64_vmm_entry)
 /*
@@ -470,6 +472,7 @@ GLOBAL_ENTRY(vmx_dorfirfi)
 	;;
 END(vmx_dorfirfi)
 
+#ifdef XEN_DBL_MAPPING  /* will be removed */
 
 #define VMX_PURGE_RR7	0
 #define VMX_INSERT_RR7	1
@@ -609,3 +612,180 @@ GLOBAL_ENTRY(vmx_switch_rr7)
     br.sptk rp
 END(vmx_switch_rr7)
     .align PAGE_SIZE
+
+#else
+/*
+ * in0: new rr7
+ * in1: virtual address of shared_info
+ * in2: virtual address of shared_arch_info (VPD)
+ * in3: virtual address of guest_vhpt
+ * in4: virtual address of pal code segment
+ * r8: will contain old rid value
+ */
+
+
+#define PSR_BITS_TO_CLEAR                      \
+   (IA64_PSR_I | IA64_PSR_IT | IA64_PSR_DT | IA64_PSR_DB |IA64_PSR_RT |     \
+    IA64_PSR_DD | IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED |    \
+    IA64_PSR_DFL | IA64_PSR_DFH)
+#define PSR_BITS_TO_SET    IA64_PSR_BN
+
+//extern void vmx_switch_rr7(unsigned long rid,void *shared_info, void *shared_arch_info, void *guest_vhpt, void * pal_vaddr );
+
+GLOBAL_ENTRY(vmx_switch_rr7)
+   // not sure this unwind statement is correct...
+   .prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
+   alloc loc1 = ar.pfs, 5, 9, 0, 0
+1: {
+     mov r28  = in0        // copy procedure index
+     mov r8   = ip         // save ip to compute branch
+     mov loc0 = rp         // save rp
+    };;
+    .body
+    movl loc2=PERCPU_ADDR
+    ;;
+    tpa loc2 = loc2         // get physical address of per cpu date
+    ;;
+    dep loc3 = 0,in1,60,4          // get physical address of shared_info
+    dep loc4 = 0,in2,60,4          // get physical address of shared_arch_info
+    dep loc5 = 0,in3,60,4          // get physical address of guest_vhpt
+    dep loc6 = 0,in4,60,4          // get physical address of pal code
+    ;;
+    mov loc7 = psr          // save psr
+    ;;
+    mov loc8 = ar.rsc           // save RSE configuration
+    ;;
+    mov ar.rsc = 0          // put RSE in enforced lazy, LE mode
+    movl r16=PSR_BITS_TO_CLEAR
+    movl r17=PSR_BITS_TO_SET
+    ;;
+    or loc7 = loc7,r17      // add in psr the bits to set
+    ;;
+    andcm r16=loc7,r16      // removes bits to clear from psr
+    br.call.sptk.many rp=ia64_switch_mode_phys
+1:
+   // now in physical mode with psr.i/ic off so do rr7 switch
+    dep r16=-1,r0,61,3
+    ;;
+    mov rr[r16]=in0
+    srlz.d
+    ;;
+    rsm 0x6000
+    ;;
+    srlz.d
+
+    // re-pin mappings for kernel text and data
+    mov r18=KERNEL_TR_PAGE_SHIFT<<2
+    movl r17=KERNEL_START
+    ;;
+    ptr.i   r17,r18
+    ptr.d   r17,r18
+    ;;
+    mov cr.itir=r18
+    mov cr.ifa=r17
+    mov r16=IA64_TR_KERNEL
+    //mov r3=ip
+    movl r25 = PAGE_KERNEL
+    ;;
+    dep r2=0,r3,0,KERNEL_TR_PAGE_SHIFT
+    ;;
+    or r18=r2,r25
+    ;;
+   srlz.i
+   ;;
+   itr.i itr[r16]=r18
+   ;;
+   itr.d dtr[r16]=r18
+   ;;
+
+   // re-pin mappings for per-cpu data
+
+   movl r22 = PERCPU_ADDR
+   ;;
+   mov r24=IA64_TR_PERCPU_DATA
+   or loc2 = r25,loc2          // construct PA | page properties
+   mov r23=PERCPU_PAGE_SHIFT<<2
+   ;;
+   ptr.d   r22,r23
+   ;;
+   mov cr.itir=r23
+   mov cr.ifa=r22
+   ;;
+   itr.d dtr[r24]=loc2     // wire in new mapping...
+   ;;
+
+
+#if    0
+   // re-pin mappings for shared_info
+
+   mov r24=IA64_TR_SHARED_INFO
+   movl r25=__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RW)
+   ;;
+   or loc3 = r25,loc3          // construct PA | page properties
+   mov r23 = PAGE_SHIFT<<2
+   ;;
+   ptr.d   in1,r23
+   ;;
+   mov cr.itir=r23
+   mov cr.ifa=in1
+   ;;
+   itr.d dtr[r24]=loc3     // wire in new mapping...
+   ;;
+   // re-pin mappings for shared_arch_info
+
+   mov r24=IA64_TR_ARCH_INFO
+   or loc4 = r25,loc4          // construct PA | page properties
+   mov r23 = PAGE_SHIFT<<2
+   ;;
+   ptr.d   in2,r23
+   ;;
+   mov cr.itir=r23
+   mov cr.ifa=in2
+   ;;
+   itr.d dtr[r24]=loc4     // wire in new mapping...
+   ;;
+#endif
+
+
+   // re-pin mappings for guest_vhpt
+
+   mov r24=IA64_TR_VHPT
+   movl r25=PAGE_KERNEL
+   ;;
+   or loc5 = r25,loc5          // construct PA | page properties
+   mov r23 = VCPU_TLB_SHIFT<<2
+   ;;
+   ptr.d   in3,r23
+   ;;
+   mov cr.itir=r23
+   mov cr.ifa=in3
+   ;;
+   itr.d dtr[r24]=loc5     // wire in new mapping...
+   ;;
+
+   // re-pin mappings for PAL code section
+
+   mov r24=IA64_TR_PALCODE
+   or loc6 = r25,loc6          // construct PA | page properties
+   mov r23 = IA64_GRANULE_SHIFT<<2
+   ;;
+   ptr.i   in4,r23
+   ;;
+   mov cr.itir=r23
+   mov cr.ifa=in4
+   ;;
+   itr.i itr[r24]=loc6     // wire in new mapping...
+   ;;
+
+   // done, switch back to virtual and return
+   mov r16=loc7            // r16= original psr
+   br.call.sptk.many rp=ia64_switch_mode_virt // return to virtual mode
+   mov ar.pfs = loc1
+   mov rp = loc0
+   ;;
+   mov ar.rsc=loc8         // restore RSE configuration
+   srlz.d              // seralize restoration of psr.l
+   br.ret.sptk.many rp
+END(vmx_switch_rr7)
+#endif
+

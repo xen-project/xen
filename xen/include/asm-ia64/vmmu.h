@@ -225,8 +225,8 @@ typedef struct thash_cb {
            INVALID_ENTRY(hcb, hash) = 1;        \
            hash->next = NULL; }
 
-#define PURGABLE_ENTRY(hcb,en)  \
-		((hcb)->ht == THASH_VHPT || ( (en)->tc && !(en->locked)) )
+#define PURGABLE_ENTRY(hcb,en)  1
+//		((hcb)->ht == THASH_VHPT || ( (en)->tc && !(en->locked)) )
 
 
 /*

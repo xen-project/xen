@@ -125,7 +125,7 @@ int do_mmu_update(mmu_update_t *ureqs,u64 count,u64 *pdone,u64 foreigndom)
             entry.cl = DSIDE_TLB;
             rr = vmx_vcpu_rr(vcpu, req.ptr);
             entry.ps = rr.ps;
-            entry.key = redistribute_rid(rr.rid);
+            entry.key = rr.rid;
             entry.rid = rr.rid;
             entry.vadr = PAGEALIGN(req.ptr,entry.ps);
             sections.tr = 1;

@@ -91,6 +91,10 @@ ia64_rr vmmu_get_rr(VCPU *vcpu, u64 va)
 
 void recycle_message(thash_cb_t *hcb, u64 para)
 {
+    if(hcb->ht == THASH_VHPT)
+    {
+        printk("ERROR : vhpt recycle happenning!!!\n");
+    }
     printk("hcb=%p recycled with %lx\n",hcb,para);
 }
 
@@ -237,8 +241,12 @@ alloc_pmt(struct domain *d)
  */
 void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb)
 {
-    u64     saved_itir, saved_ifa, saved_rr;
+#if 0
+    u64     saved_itir, saved_ifa;
+#endif
+    u64      saved_rr;
     u64     pages;
+    u64     psr;
     thash_data_t    mtlb;
     ia64_rr vrr;
     unsigned int    cl = tlb->cl;
@@ -253,12 +261,12 @@ void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb)
     if (mtlb.ppn == INVALID_MFN)
     panic("Machine tlb insert with invalid mfn number.\n");
 
-    __asm __volatile("rsm   psr.ic|psr.i;; srlz.i" );
-    
+    psr = ia64_clear_ic();
+#if 0
     saved_itir = ia64_getreg(_IA64_REG_CR_ITIR);
     saved_ifa = ia64_getreg(_IA64_REG_CR_IFA);
+#endif
     saved_rr = ia64_get_rr(mtlb.ifa);
-
     ia64_setreg(_IA64_REG_CR_ITIR, mtlb.itir);
     ia64_setreg(_IA64_REG_CR_IFA, mtlb.ifa);
     /* Only access memory stack which is mapped by TR,
@@ -268,18 +276,22 @@ void machine_tlb_insert(struct vcpu *d, thash_data_t *tlb)
     ia64_srlz_d();
     if ( cl == ISIDE_TLB ) {
         ia64_itci(mtlb.page_flags);
-    ia64_srlz_i();
+        ia64_srlz_i();
     }
     else {
         ia64_itcd(mtlb.page_flags);
-    ia64_srlz_d();
+        ia64_srlz_d();
     }
     ia64_set_rr(mtlb.ifa,saved_rr);
     ia64_srlz_d();
+#if 0
     ia64_setreg(_IA64_REG_CR_IFA, saved_ifa);
     ia64_setreg(_IA64_REG_CR_ITIR, saved_itir);
-    __asm __volatile("ssm   psr.ic|psr.i;; srlz.i" );
+#endif
+    ia64_set_psr(psr);
+    ia64_srlz_i();
 }
+
 
 u64 machine_thash(PTA pta, u64 va, u64 rid, u64 ps)
 {
@@ -289,7 +301,6 @@ u64 machine_thash(PTA pta, u64 va, u64 rid, u64 ps)
     struct vcpu *v = current;
     ia64_rr vrr;
 
-    
     saved_pta = ia64_getreg(_IA64_REG_CR_PTA);
     saved_rr0 = ia64_get_rr(0);
     vrr.rrval = saved_rr0;
@@ -308,7 +319,7 @@ u64 machine_thash(PTA pta, u64 va, u64 rid, u64 ps)
 
     ia64_set_rr(0, saved_rr0);
     ia64_srlz_d();
-    local_irq_restore(psr);
+    ia64_set_psr(psr);
     return hash_addr;
 }
 
@@ -320,7 +331,7 @@ u64 machine_ttag(PTA pta, u64 va, u64 rid, u64 ps)
     struct vcpu *v = current;
     ia64_rr vrr;
 
-    // TODO: Set to enforce lazy mode    
+    // TODO: Set to enforce lazy mode
     saved_pta = ia64_getreg(_IA64_REG_CR_PTA);
     saved_rr0 = ia64_get_rr(0);
     vrr.rrval = saved_rr0;
@@ -341,7 +352,6 @@ u64 machine_ttag(PTA pta, u64 va, u64 rid, u64 ps)
     local_irq_restore(psr);
     return tag;
 }
-
 /*
  *  Purge machine tlb.
  *  INPUT

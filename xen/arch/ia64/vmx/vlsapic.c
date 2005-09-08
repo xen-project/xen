@@ -181,7 +181,7 @@ void vtm_set_itv(VCPU *vcpu)
  */
 /* Interrupt must be disabled at this point */
 
-extern u64 tick_to_ns(u64 tick);
+extern u64 cycle_to_ns(u64 cyle);
 #define TIMER_SLOP (50*1000) /* ns */  /* copy from ac_timer.c */
 void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
 {
@@ -212,7 +212,7 @@ void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
     }
     /* Both last_itc & cur_itc < itm, wait for fire condition */
     else {
-        expires = NOW() + tick_to_ns(0-diff_now) + TIMER_SLOP;
+        expires = NOW() + cycle_to_ns(0-diff_now) + TIMER_SLOP;
         set_ac_timer(&vtm->vtm_timer, expires);
     }
     local_irq_restore(spsr);

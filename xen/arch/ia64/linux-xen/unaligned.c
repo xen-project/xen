@@ -296,7 +296,7 @@ rotate_reg (unsigned long sor, unsigned long rrb, unsigned long reg)
 }
 
 #if defined(XEN) && defined(CONFIG_VTI)
-static void
+void
 set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, unsigned long nat)
 {
 	struct switch_stack *sw = (struct switch_stack *) regs - 1;
@@ -359,6 +359,57 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, unsigned
     }
     ia64_set_rsc(old_rsc);
 }
+
+
+static void
+get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, unsigned long *nat)
+{
+    struct switch_stack *sw = (struct switch_stack *) regs - 1;
+    unsigned long *bsp, *addr, *rnat_addr, *ubs_end, *bspstore;
+    unsigned long *kbs = (void *) current + IA64_RBS_OFFSET;
+    unsigned long rnats, nat_mask;
+    unsigned long on_kbs;
+    unsigned long old_rsc, new_rsc;
+    long sof = (regs->cr_ifs) & 0x7f;
+    long sor = 8 * ((regs->cr_ifs >> 14) & 0xf);
+    long rrb_gr = (regs->cr_ifs >> 18) & 0x7f;
+    long ridx = r1 - 32;
+
+    if (ridx >= sof) {
+        /* read of out-of-frame register returns an undefined value; 0 in our case.  */
+        DPRINT("ignoring read from r%lu; only %lu registers are allocated!\n", r1, sof);
+        panic("wrong stack register number");
+    }
+
+    if (ridx < sor)
+        ridx = rotate_reg(sor, rrb_gr, ridx);
+
+    old_rsc=ia64_get_rsc();
+    new_rsc=old_rsc&(~(0x3));
+    ia64_set_rsc(new_rsc);
+
+    bspstore = ia64_get_bspstore();
+    bsp =kbs + (regs->loadrs >> 19); //16+3;
+
+    addr = ia64_rse_skip_regs(bsp, -sof + ridx);
+    nat_mask = 1UL << ia64_rse_slot_num(addr);
+    rnat_addr = ia64_rse_rnat_addr(addr);
+
+    if(addr >= bspstore){
+
+        ia64_flushrs ();
+        ia64_mf ();
+        bspstore = ia64_get_bspstore();
+    }
+    *val=*addr;
+    if(bspstore < rnat_addr){
+        *nat=!!(ia64_get_rnat()&nat_mask);
+    }else{
+        *nat = !!((*rnat_addr)&nat_mask);
+    }
+    ia64_set_rsc(old_rsc);
+}
+
 #else // CONFIG_VTI
 static void
 set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, int nat)

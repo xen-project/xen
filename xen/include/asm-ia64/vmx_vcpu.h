@@ -593,9 +593,10 @@ IA64FAULT vmx_vcpu_bsw1(VCPU *vcpu)
     VMX_VPD(vcpu,vpsr) |= IA64_PSR_BN;
     return (IA64_NO_FAULT);
 }
-
+#if 0
 /* Another hash performance algorithm */
 #define redistribute_rid(rid)	(((rid) & ~0xffff) | (((rid) << 8) & 0xff00) | (((rid) >> 8) & 0xff))
+#endif
 static inline unsigned long
 vmx_vrrtomrr(VCPU *v, unsigned long val)
 {
@@ -603,14 +604,14 @@ vmx_vrrtomrr(VCPU *v, unsigned long val)
     u64	  rid;
 
     rr.rrval=val;
-    rr.rid = vmMangleRID(v->arch.starting_rid  + rr.rid);
+    rr.rid = rr.rid + v->arch.starting_rid;
+    rr.ve = 1;
+    return  vmMangleRID(rr.rrval);
 /* Disable this rid allocation algorithm for now */
 #if 0
     rid=(((u64)vcpu->domain->domain_id)<<DOMAIN_RID_SHIFT) + rr.rid;
     rr.rid = redistribute_rid(rid);
 #endif 
 
-    rr.ve=1;
-    return rr.rrval;
 }
 #endif

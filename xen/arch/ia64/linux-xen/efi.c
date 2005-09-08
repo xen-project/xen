@@ -523,11 +523,21 @@ efi_get_pal_addr (void)
 	return NULL;
 }
 
+
+#ifdef XEN
+void *pal_vaddr;
+#endif
+
 void
 efi_map_pal_code (void)
 {
+#ifdef XEN
+	u64 psr;
+	pal_vaddr = efi_get_pal_addr ();
+#else
 	void *pal_vaddr = efi_get_pal_addr ();
 	u64 psr;
+#endif
 
 	if (!pal_vaddr)
 		return;

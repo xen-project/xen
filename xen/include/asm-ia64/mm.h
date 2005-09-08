@@ -163,8 +163,8 @@ static inline int get_page(struct pfn_info *page,
 	    unlikely((nx & PGC_count_mask) == 0) ||	/* Count overflow? */
 	    unlikely((x >> 32) != _domain)) {		/* Wrong owner? */
 	    DPRINTK("Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%08x\n",
-		page_to_pfn(page), domain, unpickle_domptr(d),
-		x, page->u.inuse.typeinfo);
+		page_to_pfn(page), domain, unpickle_domptr(domain),
+		x, page->u.inuse.type_info);
 	    return 0;
 	}
     }

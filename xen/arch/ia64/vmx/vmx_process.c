@@ -41,7 +41,7 @@
 #include <asm/regionreg.h>
 #include <asm/privop.h>
 #include <asm/ia64_int.h>
-#include <asm/hpsim_ssc.h>
+//#include <asm/hpsim_ssc.h>
 #include <asm/dom_fw.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/kregs.h>

@@ -24,6 +24,12 @@
 #include <asm/pgtable.h>
 #include <asm/system.h>
 
+#ifdef CONFIG_SMP
+#   define IS_RESCHEDULE(vec)   (vec == IA64_IPI_RESCHEDULE)
+#else
+#   define IS_RESCHEDULE(vec)   (0)
+#endif
+
 #ifdef CONFIG_PERFMON
 # include <asm/perfmon.h>
 #endif

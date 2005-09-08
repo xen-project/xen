@@ -118,10 +118,12 @@ ENTRY(vmx_itlb_miss)
     mov r29=cr.ipsr;
     ;;
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
-(p6) br.sptk vmx_fault_1
+(p6) br.sptk vmx_alt_itlb_miss_1
+//(p6) br.sptk vmx_fault_1
     mov r16 = cr.ifa
     ;;
     thash r17 = r16
+    ;;
     ttag r20 = r16
     ;;
 vmx_itlb_loop:
@@ -180,10 +182,12 @@ ENTRY(vmx_dtlb_miss)
     mov r29=cr.ipsr;
     ;;
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
-(p6)br.sptk vmx_fault_2
+    (p6)br.sptk vmx_alt_dtlb_miss_1
+//(p6)br.sptk vmx_fault_2
     mov r16 = cr.ifa
     ;;
     thash r17 = r16
+    ;;
     ttag r20 = r16
     ;;
 vmx_dtlb_loop:
@@ -243,6 +247,7 @@ ENTRY(vmx_alt_itlb_miss)
     ;;
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
 (p7)br.sptk vmx_fault_3
+vmx_alt_itlb_miss_1:
 	mov r16=cr.ifa		// get address that caused the TLB miss
 	movl r17=PAGE_KERNEL
 	mov r24=cr.ipsr
@@ -272,6 +277,7 @@ ENTRY(vmx_alt_dtlb_miss)
     ;;
     tbit.z p6,p7=r29,IA64_PSR_VM_BIT;
 (p7)br.sptk vmx_fault_4
+vmx_alt_dtlb_miss_1:
 	mov r16=cr.ifa		// get address that caused the TLB miss
 	movl r17=PAGE_KERNEL
 	mov r20=cr.isr
