@@ -815,19 +815,24 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
 #endif
         page = &frame_table[gop->mfn];
         
-        if (unlikely(IS_XEN_HEAP_FRAME(page))) { 
+        if ( unlikely(IS_XEN_HEAP_FRAME(page)))
+        { 
             printk("gnttab_donate: xen heap frame mfn=%lx\n", 
                    (unsigned long) gop->mfn);
             gop->status = GNTST_bad_virt_addr;
             continue;
         }
-        if (unlikely(!pfn_valid(page_to_pfn(page)))) {
+        
+        if ( unlikely(!pfn_valid(page_to_pfn(page))) )
+        {
             printk("gnttab_donate: invalid pfn for mfn=%lx\n", 
                    (unsigned long) gop->mfn);
             gop->status = GNTST_bad_virt_addr;
             continue;
         }
-        if (unlikely((e = find_domain_by_id(gop->domid)) == NULL)) {
+
+        if ( unlikely((e = find_domain_by_id(gop->domid)) == NULL) )
+        {
             printk("gnttab_donate: can't find domain %d\n", gop->domid);
             gop->status = GNTST_bad_domain;
             continue;
@@ -881,13 +886,14 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
          * headroom.  Also, a domain mustn't have PGC_allocated
          * pages when it is dying.
          */
-        ASSERT(e->tot_pages <= e->max_pages);
-        if (unlikely(test_bit(DOMFLAGS_DYING, &e->domain_flags)) ||
-            unlikely(e->tot_pages == e->max_pages) ||
-            unlikely(!gnttab_prepare_for_transfer(e, d, gop->handle))) {
-            printk("gnttab_donate: Transferee has no reservation headroom (%d,"
-                   "%d) or provided a bad grant ref (%08x) or is dying (%p)\n",
-                   e->tot_pages, e->max_pages, gop->handle, e->d_flags);
+        if ( unlikely(test_bit(DOMFLAGS_DYING, &e->domain_flags)) ||
+             unlikely(e->tot_pages >= e->max_pages) ||
+             unlikely(!gnttab_prepare_for_transfer(e, d, gop->handle)) )
+        {
+            DPRINTK("gnttab_donate: Transferee has no reservation headroom "
+                    "(%d,%d) or provided a bad grant ref (%08x) or "
+                    "is dying (%lx)\n",
+                    e->tot_pages, e->max_pages, gop->handle, e->domain_flags);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
             gop->status = result = GNTST_general_error;
@@ -895,9 +901,8 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
         }
 
         /* Okay, add the page to 'e'. */
-        if (unlikely(e->tot_pages++ == 0)) {
+        if ( unlikely(e->tot_pages++ == 0) )
             get_knownalive_domain(e);
-        }
         list_add_tail(&page->list, &e->page_list);
         page_set_owner(page, e);
         
@@ -913,6 +918,7 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
         
         gop->status = GNTST_okay;
     }
+
     return result;
 }
 
