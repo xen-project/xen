@@ -283,11 +283,6 @@ static int setup_pg_tables_64(int xc_handle, u32 dom,
 }
 #endif
 
-static int compare (const void * a, const void * b)
-{
-  return ( *(long*)a - *(long*)b );
-}
-
 #ifdef __ia64__
 #include <asm/fpu.h> /* for FPSR_DEFAULT */
 static int setup_guest(int xc_handle,
@@ -500,9 +495,6 @@ static int setup_guest(int xc_handle,
         PERROR("Could not get the page frame list");
         goto error_out;
     }
-
-    qsort( page_array, nr_pages, sizeof(*page_array), compare );
-
 
     (load_funcs.loadimage)(image, image_size, xc_handle, dom, page_array,
                            &dsi);
