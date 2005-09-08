@@ -75,15 +75,12 @@ static struct pfn_info *alloc_chunk(struct domain *d, unsigned long max_pages)
     struct pfn_info *page;
     unsigned int order;
     /*
-     * Allocate up to 2MB at a time:
-     *  1. This prevents overflow of get_order() when allocating more than
-     *     4GB to domain 0 on a PAE machine.
-     *  2. It prevents allocating very large chunks from DMA pools before
-     *     the >4GB pool is fully depleted.
+     * Allocate up to 2MB at a time: It prevents allocating very large chunks
+     * from DMA pools before the >4GB pool is fully depleted.
      */
     if ( max_pages > (2UL << (20 - PAGE_SHIFT)) )
         max_pages = 2UL << (20 - PAGE_SHIFT);
-    order = get_order(max_pages << PAGE_SHIFT);
+    order = get_order_from_pages(max_pages);
     if ( (max_pages & (max_pages-1)) != 0 )
         order--;
     while ( (page = alloc_domheap_pages(d, order, 0)) == NULL )
@@ -252,7 +249,7 @@ int construct_dom0(struct domain *d,
 #endif
     }
 
-    order = get_order(v_end - dsi.v_start);
+    order = get_order_from_bytes(v_end - dsi.v_start);
     if ( (1UL << order) > nr_pages )
         panic("Domain 0 allocation is too small for kernel image.\n");
 

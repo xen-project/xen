@@ -298,8 +298,6 @@ static inline int get_order_from_pages(unsigned long nr_pages)
     return order;
 }
 
-#define get_order(s) get_order_from_bytes(s)
-
 /* Allocator functions for Xen pagetables. */
 struct pfn_info *alloc_xen_pagetable(void);
 void free_xen_pagetable(struct pfn_info *pg);

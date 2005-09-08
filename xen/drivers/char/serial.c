@@ -366,8 +366,9 @@ void serial_register_uart(int idx, struct uart_driver *driver, void *uart)
 void serial_async_transmit(struct serial_port *port)
 {
     BUG_ON(!port->driver->tx_empty);
-    if ( !port->txbuf )
-        port->txbuf = alloc_xenheap_pages(get_order(SERIAL_TXBUFSZ));
+    if ( port->txbuf == NULL )
+        port->txbuf = alloc_xenheap_pages(
+            get_order_from_bytes(SERIAL_TXBUFSZ));
 }
 
 /*
