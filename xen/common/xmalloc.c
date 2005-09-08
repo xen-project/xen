@@ -86,7 +86,7 @@ static void *xmalloc_new_page(size_t size)
 static void *xmalloc_whole_pages(size_t size)
 {
     struct xmalloc_hdr *hdr;
-    unsigned int pageorder = get_order(size);
+    unsigned int pageorder = get_order_from_bytes(size);
 
     hdr = alloc_xenheap_pages(pageorder);
     if ( hdr == NULL )
@@ -159,7 +159,7 @@ void xfree(const void *p)
     /* Big allocs free directly. */
     if ( hdr->size >= PAGE_SIZE )
     {
-        free_xenheap_pages(hdr, get_order(hdr->size));
+        free_xenheap_pages(hdr, get_order_from_bytes(hdr->size));
         return;
     }
 

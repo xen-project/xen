@@ -66,7 +66,7 @@ void init_trace_bufs(void)
     }
 
     nr_pages = num_online_cpus() * opt_tbuf_size;
-    order    = get_order(nr_pages * PAGE_SIZE);
+    order    = get_order_from_pages(nr_pages);
     
     if ( (rawbuf = alloc_xenheap_pages(order)) == NULL )
     {

@@ -44,7 +44,7 @@ struct vmcs_struct *alloc_vmcs(void)
 
     rdmsr(MSR_IA32_VMX_BASIC_MSR, vmx_msr_low, vmx_msr_high);
     vmcs_size = vmx_msr_high & 0x1fff;
-    vmcs = alloc_xenheap_pages(get_order(vmcs_size)); 
+    vmcs = alloc_xenheap_pages(get_order_from_bytes(vmcs_size)); 
     memset((char *)vmcs, 0, vmcs_size); /* don't remove this */
 
     vmcs->vmcs_revision_id = vmx_msr_low;
@@ -55,7 +55,7 @@ void free_vmcs(struct vmcs_struct *vmcs)
 {
     int order;
 
-    order = get_order(vmcs_size);
+    order = get_order_from_bytes(vmcs_size);
     free_xenheap_pages(vmcs, order);
 }
 
@@ -76,8 +76,8 @@ static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
     error |= __vmwrite(VM_ENTRY_CONTROLS, MONITOR_VM_ENTRY_CONTROLS);
 
     /* need to use 0x1000 instead of PAGE_SIZE */
-    io_bitmap_a = (void*) alloc_xenheap_pages(get_order(0x1000)); 
-    io_bitmap_b = (void*) alloc_xenheap_pages(get_order(0x1000)); 
+    io_bitmap_a = (void*) alloc_xenheap_pages(get_order_from_bytes(0x1000)); 
+    io_bitmap_b = (void*) alloc_xenheap_pages(get_order_from_bytes(0x1000)); 
     memset(io_bitmap_a, 0xff, 0x1000);
     /* don't bother debug port access */
     clear_bit(PC_DEBUG_PORT, io_bitmap_a);
