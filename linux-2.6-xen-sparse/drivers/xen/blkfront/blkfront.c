@@ -182,7 +182,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 static int blkif_queue_request(struct request *req)
 {
 	struct blkfront_info *info = req->rq_disk->private_data;
-	unsigned long buffer_ma;
+	unsigned long buffer_mfn;
 	blkif_request_t *ring_req;
 	struct bio *bio;
 	struct bio_vec *bvec;
@@ -221,7 +221,7 @@ static int blkif_queue_request(struct request *req)
 		bio_for_each_segment (bvec, bio, idx) {
 			BUG_ON(ring_req->nr_segments
 			       == BLKIF_MAX_SEGMENTS_PER_REQUEST);
-			buffer_ma = page_to_phys(bvec->bv_page);
+			buffer_mfn = page_to_phys(bvec->bv_page) >> PAGE_SHIFT;
 			fsect = bvec->bv_offset >> 9;
 			lsect = fsect + (bvec->bv_len >> 9) - 1;
 			/* install a grant reference. */
@@ -231,11 +231,11 @@ static int blkif_queue_request(struct request *req)
 			gnttab_grant_foreign_access_ref(
 				ref,
 				info->backend_id,
-				buffer_ma >> PAGE_SHIFT,
+				buffer_mfn,
 				rq_data_dir(req) );
 
 			info->shadow[id].frame[ring_req->nr_segments] =
-				buffer_ma >> PAGE_SHIFT;
+				buffer_mfn;
 
 			ring_req->frame_and_sects[ring_req->nr_segments] =
 				blkif_fas_from_gref(ref, fsect, lsect);

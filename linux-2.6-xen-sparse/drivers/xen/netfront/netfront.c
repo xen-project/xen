@@ -618,7 +618,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
         /* Remap the page. */
 #ifdef CONFIG_XEN_NETDEV_GRANT
-        mmu->ptr = mfn << PAGE_SHIFT | MMU_MACHPHYS_UPDATE;
+        mmu->ptr = ((unsigned long long)mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
 #else
         mmu->ptr  = (rx->addr & PAGE_MASK) | MMU_MACHPHYS_UPDATE;
 #endif

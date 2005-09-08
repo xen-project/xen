@@ -297,7 +297,7 @@ static void net_rx_action(unsigned long unused)
         mmuext->mfn = old_mfn;
         mmuext++;
 #endif
-        mmu->ptr = (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+        mmu->ptr = ((unsigned long long)new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
         mmu->val = __pa(vdata) >> PAGE_SHIFT;  
         mmu++;
 
