@@ -31,8 +31,8 @@ increase_reservation(
     struct pfn_info *page;
     unsigned long    i;
 
-    if ( (extent_list != NULL)
-         && !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
+    if ( (extent_list != NULL) &&
+         !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
         return 0;
 
     if ( (extent_order != 0) && !IS_CAPABLE_PHYSDEV(current->domain) )
@@ -52,13 +52,14 @@ increase_reservation(
         if ( unlikely((page = alloc_domheap_pages(
             d, extent_order, flags)) == NULL) )
         {
-            DPRINTK("Could not allocate a frame id=%d %d flags=%x\n", d->domain_id, extent_order, flags);
+            DPRINTK("Could not allocate order=%d extent: id=%d flags=%x\n",
+                    extent_order, d->domain_id, flags);
             return i;
         }
 
         /* Inform the domain of the new page's machine address. */ 
-        if ( (extent_list != NULL)
-             && (__put_user(page_to_pfn(page), &extent_list[i]) != 0) )
+        if ( (extent_list != NULL) &&
+             (__put_user(page_to_pfn(page), &extent_list[i]) != 0) )
             return i;
     }
 
@@ -152,8 +153,8 @@ long do_memory_op(int cmd, void *arg)
             reservation.extent_start += start_extent;
         reservation.nr_extents -= start_extent;
 
-        if ( unlikely(reservation.address_bits != 0)
-             && (reservation.address_bits > (get_order(max_page)+PAGE_SHIFT)) )
+        if ( (reservation.address_bits != 0) &&
+             (reservation.address_bits < (get_order(max_page) + PAGE_SHIFT)) )
         {
             if ( reservation.address_bits < 31 )
                 return -ENOMEM;
