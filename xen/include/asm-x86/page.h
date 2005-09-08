@@ -280,7 +280,7 @@ extern void paging_init(void);
 
 #ifndef __ASSEMBLY__
 
-static __inline__ int get_order(unsigned long size)
+static inline int get_order_from_bytes(physaddr_t size)
 {
     int order;
     size = (size-1) >> PAGE_SHIFT;
@@ -288,6 +288,17 @@ static __inline__ int get_order(unsigned long size)
         size >>= 1;
     return order;
 }
+
+static inline int get_order_from_pages(unsigned long nr_pages)
+{
+    int order;
+    nr_pages--;
+    for ( order = 0; nr_pages; order++ )
+        nr_pages >>= 1;
+    return order;
+}
+
+#define get_order(s) get_order_from_bytes(s)
 
 /* Allocator functions for Xen pagetables. */
 struct pfn_info *alloc_xen_pagetable(void);

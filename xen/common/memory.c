@@ -154,7 +154,8 @@ long do_memory_op(int cmd, void *arg)
         reservation.nr_extents -= start_extent;
 
         if ( (reservation.address_bits != 0) &&
-             (reservation.address_bits < (get_order(max_page) + PAGE_SHIFT)) )
+             (reservation.address_bits <
+              (get_order_from_pages(max_page) + PAGE_SHIFT)) )
         {
             if ( reservation.address_bits < 31 )
                 return -ENOMEM;
