@@ -387,7 +387,9 @@ int xc_domain_setmaxmem(int xc_handle,
 
 int xc_domain_memory_increase_reservation(int xc_handle,
                                           u32 domid, 
-                                          unsigned int mem_kb);
+                                          unsigned long mem_kb,
+                                          unsigned int extent_order,
+                                          unsigned int address_bits);
 
 typedef dom0_perfc_desc_t xc_perfc_desc_t;
 /* IMPORTANT: The caller is responsible for mlock()'ing the @desc array. */

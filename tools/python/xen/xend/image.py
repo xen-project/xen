@@ -159,7 +159,11 @@ class ImageHandler:
         xc.domain_setmaxmem(dom, mem_kb)
 
         try:
-            xc.domain_memory_increase_reservation(dom, mem_kb)
+            # Give the domain some memory below 4GB
+            lmem_kb = 4096
+            xc.domain_memory_increase_reservation(dom, min(lmem_kb,mem_kb), 0, 32)
+            if mem_kb > lmem_kb:
+                xc.domain_memory_increase_reservation(dom, mem_kb-lmem_kb, 0, 0)
         except:
             xc.domain_destroy(dom)
             raise

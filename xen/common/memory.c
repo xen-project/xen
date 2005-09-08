@@ -52,7 +52,7 @@ increase_reservation(
         if ( unlikely((page = alloc_domheap_pages(
             d, extent_order, flags)) == NULL) )
         {
-            DPRINTK("Could not allocate a frame\n");
+            DPRINTK("Could not allocate a frame id=%d %d flags=%x\n", d->domain_id, extent_order, flags);
             return i;
         }
 

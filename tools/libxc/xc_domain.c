@@ -262,13 +262,16 @@ int xc_domain_setmaxmem(int xc_handle,
 
 int xc_domain_memory_increase_reservation(int xc_handle,
                                           u32 domid, 
-                                          unsigned int mem_kb)
+                                          unsigned long mem_kb,
+                                          unsigned int extent_order,
+                                          unsigned int address_bits)
 {
     int err;
     unsigned int npages = mem_kb / (PAGE_SIZE/1024);
     struct xen_memory_reservation reservation = {
         .nr_extents   = npages,
-        .extent_order = 0,
+        .extent_order = extent_order,
+        .address_bits = address_bits,
         .domid        = domid
     };
 
@@ -277,6 +280,8 @@ int xc_domain_memory_increase_reservation(int xc_handle,
         return 0;
 
     if (err > 0) {
+        fprintf(stderr,"Failed alocation for dom %d : %d pages order %d addr_bits %d\n",
+                                 domid, npages, extent_order, address_bits);
         errno = ENOMEM;
         err = -1;
     }

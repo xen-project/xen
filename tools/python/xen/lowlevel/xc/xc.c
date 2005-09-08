@@ -841,14 +841,16 @@ static PyObject *pyxc_domain_memory_increase_reservation(PyObject *self,
 
     u32 dom;
     unsigned long mem_kb;
+    unsigned int extent_order = 0 , address_bits = 0;
 
-    static char *kwd_list[] = { "dom", "mem_kb", NULL };
+    static char *kwd_list[] = { "dom", "mem_kb", "extent_order", "address_bits", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
-                                      &dom, &mem_kb) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii|ii", kwd_list, 
+                                      &dom, &mem_kb, &extent_order, &address_bits) )
         return NULL;
 
-    if ( xc_domain_memory_increase_reservation(xc->xc_handle, dom, mem_kb) )
+    if ( xc_domain_memory_increase_reservation(xc->xc_handle, dom, 
+                                     mem_kb, extent_order, address_bits) )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
