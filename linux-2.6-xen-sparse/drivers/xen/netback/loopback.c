@@ -29,136 +29,163 @@
 #include <linux/skbuff.h>
 #include <net/dst.h>
 
+static int nloopbacks = 1;
+module_param(nloopbacks, int, 0);
+MODULE_PARM_DESC(nloopbacks, "Number of netback-loopback devices to create");
+
 struct net_private {
-    struct net_device *loopback_dev;
-    struct net_device_stats stats;
+	struct net_device *loopback_dev;
+	struct net_device_stats stats;
 };
 
 static int loopback_open(struct net_device *dev)
 {
-    struct net_private *np = netdev_priv(dev);
-    memset(&np->stats, 0, sizeof(np->stats));
-    netif_start_queue(dev);
-    return 0;
+	struct net_private *np = netdev_priv(dev);
+	memset(&np->stats, 0, sizeof(np->stats));
+	netif_start_queue(dev);
+	return 0;
 }
 
 static int loopback_close(struct net_device *dev)
 {
-    netif_stop_queue(dev);
-    return 0;
+	netif_stop_queue(dev);
+	return 0;
 }
 
 static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-    struct net_private *np = netdev_priv(dev);
+	struct net_private *np = netdev_priv(dev);
 
-    dst_release(skb->dst);
-    skb->dst = NULL;
+	dst_release(skb->dst);
+	skb->dst = NULL;
 
-    skb_orphan(skb);
+	skb_orphan(skb);
 
-    np->stats.tx_bytes += skb->len;
-    np->stats.tx_packets++;
+	np->stats.tx_bytes += skb->len;
+	np->stats.tx_packets++;
 
-    /* Switch to loopback context. */
-    dev = np->loopback_dev;
-    np  = netdev_priv(dev);
+	/* Switch to loopback context. */
+	dev = np->loopback_dev;
+	np  = netdev_priv(dev);
 
-    np->stats.rx_bytes += skb->len;
-    np->stats.rx_packets++;
+	np->stats.rx_bytes += skb->len;
+	np->stats.rx_packets++;
 
-    if ( skb->ip_summed == CHECKSUM_HW )
-    {
-        /* Defer checksum calculation. */
-        skb->proto_csum_blank = 1;
-        /* Must be a local packet: assert its integrity. */
-        skb->proto_csum_valid = 1;
-    }
+	if (skb->ip_summed == CHECKSUM_HW) {
+		/* Defer checksum calculation. */
+		skb->proto_csum_blank = 1;
+		/* Must be a local packet: assert its integrity. */
+		skb->proto_csum_valid = 1;
+	}
 
-    skb->ip_summed = skb->proto_csum_valid ?
-        CHECKSUM_UNNECESSARY : CHECKSUM_NONE;
+	skb->ip_summed = skb->proto_csum_valid ?
+		CHECKSUM_UNNECESSARY : CHECKSUM_NONE;
 
-    skb->pkt_type = PACKET_HOST; /* overridden by eth_type_trans() */
-    skb->protocol = eth_type_trans(skb, dev);
-    skb->dev      = dev;
-    dev->last_rx  = jiffies;
-    netif_rx(skb);
+	skb->pkt_type = PACKET_HOST; /* overridden by eth_type_trans() */
+	skb->protocol = eth_type_trans(skb, dev);
+	skb->dev      = dev;
+	dev->last_rx  = jiffies;
+	netif_rx(skb);
 
-    return 0;
+	return 0;
 }
 
 static struct net_device_stats *loopback_get_stats(struct net_device *dev)
 {
-    struct net_private *np = netdev_priv(dev);
-    return &np->stats;
+	struct net_private *np = netdev_priv(dev);
+	return &np->stats;
 }
 
 static void loopback_construct(struct net_device *dev, struct net_device *lo)
 {
-    struct net_private *np = netdev_priv(dev);
+	struct net_private *np = netdev_priv(dev);
 
-    np->loopback_dev     = lo;
+	np->loopback_dev     = lo;
 
-    dev->open            = loopback_open;
-    dev->stop            = loopback_close;
-    dev->hard_start_xmit = loopback_start_xmit;
-    dev->get_stats       = loopback_get_stats;
+	dev->open            = loopback_open;
+	dev->stop            = loopback_close;
+	dev->hard_start_xmit = loopback_start_xmit;
+	dev->get_stats       = loopback_get_stats;
 
-    dev->tx_queue_len    = 0;
+	dev->tx_queue_len    = 0;
 
-    dev->features        = NETIF_F_HIGHDMA | NETIF_F_LLTX;
+	dev->features        = NETIF_F_HIGHDMA | NETIF_F_LLTX;
 
-    /*
-     * We do not set a jumbo MTU on the interface. Otherwise the network
-     * stack will try to send large packets that will get dropped by the
-     * Ethernet bridge (unless the physical Ethernet interface is configured
-     * to transfer jumbo packets). If a larger MTU is desired then the system
-     * administrator can specify it using the 'ifconfig' command.
-     */
-    /*dev->mtu             = 16*1024;*/
+	/*
+	 * We do not set a jumbo MTU on the interface. Otherwise the network
+	 * stack will try to send large packets that will get dropped by the
+	 * Ethernet bridge (unless the physical Ethernet interface is
+	 * configured to transfer jumbo packets). If a larger MTU is desired
+	 * then the system administrator can specify it using the 'ifconfig'
+	 * command.
+	 */
+	/*dev->mtu             = 16*1024;*/
+}
+
+static int __init make_loopback(int i)
+{
+	struct net_device *dev1, *dev2;
+	char dev_name[IFNAMSIZ];
+	int err = -ENOMEM;
+
+	sprintf(dev_name, "vif0.%d", i);
+	dev1 = alloc_netdev(sizeof(struct net_private), dev_name, ether_setup);
+	sprintf(dev_name, "veth%d", i);
+	dev2 = alloc_netdev(sizeof(struct net_private), dev_name, ether_setup);
+	if ((dev1 == NULL) || (dev2 == NULL))
+		goto fail;
+
+	loopback_construct(dev1, dev2);
+	loopback_construct(dev2, dev1);
+
+	dev1->features |= NETIF_F_NO_CSUM;
+	dev2->features |= NETIF_F_IP_CSUM;
+
+	/*
+	 * Initialise a dummy MAC address for the 'dummy backend' interface. We
+	 * choose the numerically largest non-broadcast address to prevent the
+	 * address getting stolen by an Ethernet bridge for STP purposes.
+	 */
+	memset(dev1->dev_addr, 0xFF, ETH_ALEN);
+	dev1->dev_addr[0] &= ~0x01;
+
+	if ((err = register_netdev(dev1)) != 0)
+		goto fail;
+
+	if ((err = register_netdev(dev2)) != 0) {
+		unregister_netdev(dev1);
+		goto fail;
+	}
+
+	return 0;
+
+ fail:
+	if (dev1 != NULL)
+		kfree(dev1);
+	if (dev2 != NULL)
+		kfree(dev2);
+	return err;
 }
 
 static int __init loopback_init(void)
 {
-    struct net_device *dev1, *dev2;
-    int err = -ENOMEM;
+	int i, err = 0;
 
-    dev1 = alloc_netdev(sizeof(struct net_private), "vif0.0", ether_setup);
-    dev2 = alloc_netdev(sizeof(struct net_private), "veth0", ether_setup);
-    if ( (dev1 == NULL) || (dev2 == NULL) )
-        goto fail;
+	for (i = 0; i < nloopbacks; i++)
+		if ((err = make_loopback(i)) != 0)
+			break;
 
-    loopback_construct(dev1, dev2);
-    loopback_construct(dev2, dev1);
-
-    dev1->features |= NETIF_F_NO_CSUM;
-    dev2->features |= NETIF_F_IP_CSUM;
-
-    /*
-     * Initialise a dummy MAC address for the 'dummy backend' interface. We
-     * choose the numerically largest non-broadcast address to prevent the
-     * address getting stolen by an Ethernet bridge for STP purposes.
-     */
-    memset(dev1->dev_addr, 0xFF, ETH_ALEN);
-    dev1->dev_addr[0] &= ~0x01;
-
-    if ( (err = register_netdev(dev1)) != 0 )
-        goto fail;
-
-    if ( (err = register_netdev(dev2)) != 0 )
-    {
-        unregister_netdev(dev1);
-        goto fail;
-    }
-
-    return 0;
-
- fail:
-    if ( dev1 != NULL )
-        kfree(dev1);
-    if ( dev2 != NULL )
-        kfree(dev2);
-    return err;
+	return err;
 }
 
 module_init(loopback_init);
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */
