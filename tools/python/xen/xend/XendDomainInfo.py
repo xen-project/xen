@@ -156,7 +156,8 @@ class XendDomainInfo:
         """
         uuid = getUuid()
         db = parentdb.addChild(uuid)
-        vm = cls(db)
+        path = parentdb.getPath()
+        vm = cls(uuid, path, db)
         vm.construct(config)
         vm.saveToDB(sync=True)
 
@@ -171,7 +172,8 @@ class XendDomainInfo:
         @param info:      domain info from xc
         """
         dom = info['dom']
-        vm = cls(db)
+        path = "/".join(db.getPath().split("/")[0:-1])
+        vm = cls(db.getName(), path, db)
         vm.setdom(dom)
         db.readDB()
         vm.importFromDB()
@@ -206,7 +208,8 @@ class XendDomainInfo:
         if not uuid:
             uuid = getUuid()
         db = parentdb.addChild(uuid)
-        vm = cls(db)
+        path = parentdb.getPath()
+        vm = cls(uuid, path, db)
         ssidref = int(sxp.child_value(config, 'ssidref'))
         log.debug('restoring with ssidref='+str(ssidref))
         id = xc.domain_create(ssidref = ssidref)
@@ -239,9 +242,10 @@ class XendDomainInfo:
         DBVar('device_model_pid', ty='int'),
         ]
     
-    def __init__(self, db):
+    def __init__(self, uuid, path, db):
+        self.uuid = uuid
+        self.path = path + "/" + uuid
         self.db = db
-        self.uuid = db.getName()
 
         self.recreate = 0
         self.restore = 0
