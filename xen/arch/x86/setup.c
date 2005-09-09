@@ -568,7 +568,7 @@ void arch_get_xen_caps(xen_capabilities_info_t info)
     
     *(p-1) = 0;
 
-    BUG_ON((p - info) > sizeof(info));
+    BUG_ON((p - info) > sizeof(xen_capabilities_info_t));
 }
 
 /*
