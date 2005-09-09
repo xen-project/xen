@@ -88,40 +88,81 @@ class xstransact:
         else:
             raise TypeError
 
+    def _remove(self, key):
+        path = "%s/%s" % (self.path, key)
+        return xshandle().rm(path)
+
+    def remove(self, *args):
+        if len(args) == 0:
+            raise TypeError
+        for key in args:
+            self._remove(key)
+
+    def _list(self, key):
+        path = "%s/%s" % (self.path, key)
+        return map(lambda x: key + "/" + x, xshandle().ls(path))
+
+    def list(self, *args):
+        if len(args) == 0:
+            raise TypeError
+        ret = []
+        for key in args:
+            ret.extend(self._list(key))
+        return ret
+
+
     def Read(cls, path, *args):
-        t = cls(path)
-        v = t.read(*args)
-        t.commit()
-        return v
-
-    Read = classmethod(Read)
-
-    def Write(cls, path, *args, **opts):
-        t = cls(path)
-        t.write(*args, **opts)
-        t.commit()
-
-    Write = classmethod(Write)
-
-    def SafeRead(cls, path, *args):
         while True:
             try:
-                return cls.Read(path, *args)
+                t = cls(path)
+                v = t.read(*args)
+                t.commit()
+                return v
             except RuntimeError, ex:
                 if ex.args[0] == errno.ETIMEDOUT:
                     pass
                 raise
 
-    SafeRead = classmethod(SafeRead)
+    Read = classmethod(Read)
 
-    def SafeWrite(cls, path, *args, **opts):
+    def Write(cls, path, *args, **opts):
         while True:
             try:
-                cls.Write(path, *args, **opts)
+                t = cls(path)
+                t.write(*args, **opts)
+                t.commit()
                 return
             except RuntimeError, ex:
                 if ex.args[0] == errno.ETIMEDOUT:
                     pass
                 raise
 
-    SafeWrite = classmethod(SafeWrite)
+    Write = classmethod(Write)
+
+    def Remove(cls, *args):
+        while True:
+            try:
+                t = cls(path)
+                t.remove(*args)
+                t.commit()
+                return
+            except RuntimeError, ex:
+                if ex.args[0] == errno.ETIMEDOUT:
+                    pass
+                raise
+
+    Remove = classmethod(Remove)
+
+    def List(cls, path, *args):
+        while True:
+            try:
+                t = cls(path)
+                v = t.list(*args)
+                t.commit()
+                return v
+            except RuntimeError, ex:
+                if ex.args[0] == errno.ETIMEDOUT:
+                    pass
+                raise
+
+    List = classmethod(List)
