@@ -203,7 +203,7 @@ static void print_current_time(void)
 }
 
 
-void block(u32 millisecs)
+void block_domain(u32 millisecs)
 {
     struct timeval tv;
     gettimeofday(&tv);
@@ -232,5 +232,6 @@ static void timer_handler(int ev, struct pt_regs *regs)
 
 void init_time(void)
 {
+    printk("Initialising timer interface\n");
     bind_virq(VIRQ_TIMER, &timer_handler);
 }

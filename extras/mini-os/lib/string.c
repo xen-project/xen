@@ -107,6 +107,19 @@ size_t strnlen(const char * s, size_t count)
         return sc - s;
 }
 
+
+char * strcat(char * dest, const char * src)
+{
+    char *tmp = dest;
+    
+    while (*dest)
+        dest++;
+    
+    while ((*dest++ = *src++) != '\0');
+    
+    return tmp;
+}
+
 size_t strlen(const char * s)
 {
 	const char *sc;

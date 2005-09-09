@@ -60,10 +60,22 @@
 /* printing */
 #define printk  printf
 #define kprintf printf
-int printf(const char *fmt, ...);
-int vprintf(const char *fmt, va_list ap);
-int sprintf(char *buf, const char *cfmt, ...);
-int vsprintf(char *buf, const char *cfmt, va_list ap);
+#define _p(_x) ((void *)(unsigned long)(_x))
+void printf(const char *fmt, ...);
+int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
+int vscnprintf(char *buf, size_t size, const char *fmt, va_list args);
+int snprintf(char * buf, size_t size, const char *fmt, ...);
+int scnprintf(char * buf, size_t size, const char *fmt, ...);
+int vsprintf(char *buf, const char *fmt, va_list args);
+int sprintf(char * buf, const char *fmt, ...);
+int vsscanf(const char * buf, const char * fmt, va_list args);
+int sscanf(const char * buf, const char * fmt, ...);
+
+long simple_strtol(const char *cp,char **endp,unsigned int base);
+unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base);
+long long simple_strtoll(const char *cp,char **endp,unsigned int base);
+unsigned long long simple_strtoull(const char *cp,char **endp,unsigned int base);
+
 
 /* string and memory manipulation */
 int    memcmp(const void *cs, const void *ct, size_t count);
@@ -77,6 +89,16 @@ size_t strnlen(const char *s, size_t count);
 size_t strlen(const char *s);
 char  *strchr(const char *s, int c);
 char  *strstr(const char *s1, const char *s2);
+char * strcat(char * dest, const char * src);
+
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+struct kvec {
+    void *iov_base;
+    size_t iov_len;
+};
+
 
 
 #endif /* _LIB_H_ */
