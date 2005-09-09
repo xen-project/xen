@@ -470,20 +470,32 @@ static int handle_perdomain_mapping_fault(
     return EXCRET_fault_fixed;
 }
 
-asmlinkage int do_page_fault(struct cpu_user_regs *regs)
+#ifdef HYPERVISOR_VIRT_END
+#define IN_HYPERVISOR_RANGE(va) \
+    (((va) >= HYPERVISOR_VIRT_START) && ((va) < HYPERVISOR_VIRT_END))
+#else
+#define IN_HYPERVISOR_RANGE(va) \
+    (((va) >= HYPERVISOR_VIRT_START))
+#endif
+
+static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 {
-    unsigned long addr, fixup;
-    struct vcpu *v = current;
+    struct vcpu   *v = current;
     struct domain *d = v->domain;
 
-    __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (addr) : );
-
-    DEBUGGER_trap_entry(TRAP_page_fault, regs);
-
-    perfc_incrc(page_faults);
-
-    if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
-                !shadow_mode_enabled(d)) )
+    if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
+    {
+        if ( shadow_mode_external(d) && GUEST_CONTEXT(v, regs) )
+            return shadow_fault(addr, regs);
+        if ( (addr >= PERDOMAIN_VIRT_START) && (addr < PERDOMAIN_VIRT_END) )
+            return handle_perdomain_mapping_fault(
+                addr - PERDOMAIN_VIRT_START, regs);
+    }
+    else if ( unlikely(shadow_mode_enabled(d)) )
+    {
+        return shadow_fault(addr, regs);
+    }
+    else if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
     {
         LOCK_BIGLOCK(d);
         if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
@@ -495,14 +507,9 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
             return EXCRET_fault_fixed;
         }
 
-        if ( ((addr < HYPERVISOR_VIRT_START) 
-#if defined(__x86_64__)
-              || (addr >= HYPERVISOR_VIRT_END)
-#endif        
-            )     
-             &&
-             KERNEL_MODE(v, regs) &&
-             ((regs->error_code & 3) == 3) && /* write-protection fault */
+        if ( KERNEL_MODE(v, regs) &&
+             /* Protection violation on write? No reserved-bit violation? */
+             ((regs->error_code & 0xb) == 0x3) &&
              ptwr_do_page_fault(d, addr, regs) )
         {
             UNLOCK_BIGLOCK(d);
@@ -511,43 +518,51 @@ asmlinkage int do_page_fault(struct cpu_user_regs *regs)
         UNLOCK_BIGLOCK(d);
     }
 
-    if ( unlikely(shadow_mode_enabled(d)) &&
-         ((addr < HYPERVISOR_VIRT_START) ||
-#if defined(__x86_64__)
-          (addr >= HYPERVISOR_VIRT_END) ||
-#endif
-          (shadow_mode_external(d) && GUEST_CONTEXT(v, regs))) &&
-         shadow_fault(addr, regs) )
-        return EXCRET_fault_fixed;
-
-    if ( unlikely(addr >= PERDOMAIN_VIRT_START) &&
-         unlikely(addr < PERDOMAIN_VIRT_END) &&
-         handle_perdomain_mapping_fault(addr - PERDOMAIN_VIRT_START, regs) )
-        return EXCRET_fault_fixed;
-
-    if ( !GUEST_MODE(regs) )
-        goto xen_fault;
-
-    propagate_page_fault(addr, regs->error_code);
     return 0;
+}
 
- xen_fault:
+/*
+ * #PF error code:
+ *  Bit 0: Protection violation (=1) ; Page not present (=0)
+ *  Bit 1: Write access
+ *  Bit 2: Supervisor mode
+ *  Bit 3: Reserved bit violation
+ *  Bit 4: Instruction fetch
+ */
+asmlinkage int do_page_fault(struct cpu_user_regs *regs)
+{
+    unsigned long addr, fixup;
+    int rc;
 
-    if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
+    __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (addr) : );
+
+    DEBUGGER_trap_entry(TRAP_page_fault, regs);
+
+    perfc_incrc(page_faults);
+
+    if ( unlikely((rc = fixup_page_fault(addr, regs)) != 0) )
+        return rc;
+
+    if ( unlikely(!GUEST_MODE(regs)) )
     {
-        perfc_incrc(copy_user_faults);
-        regs->eip = fixup;
-        return 0;
+        if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
+        {
+            perfc_incrc(copy_user_faults);
+            regs->eip = fixup;
+            return 0;
+        }
+
+        DEBUGGER_trap_fatal(TRAP_page_fault, regs);
+
+        show_registers(regs);
+        show_page_walk(addr);
+        panic("CPU%d FATAL PAGE FAULT\n"
+              "[error_code=%04x]\n"
+              "Faulting linear address: %p\n",
+              smp_processor_id(), regs->error_code, addr);
     }
 
-    DEBUGGER_trap_fatal(TRAP_page_fault, regs);
-
-    show_registers(regs);
-    show_page_walk(addr);
-    panic("CPU%d FATAL PAGE FAULT\n"
-          "[error_code=%04x]\n"
-          "Faulting linear address: %p\n",
-          smp_processor_id(), regs->error_code, addr);
+    propagate_page_fault(addr, regs->error_code);
     return 0;
 }
 
