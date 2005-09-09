@@ -108,7 +108,9 @@ class xstransact:
             try:
                 return cls.Read(path, *args)
             except RuntimeError, ex:
-                pass
+                if ex.args[0] == errno.ETIMEDOUT:
+                    pass
+                raise
 
     SafeRead = classmethod(SafeRead)
 
@@ -118,6 +120,8 @@ class xstransact:
                 cls.Write(path, *args, **opts)
                 return
             except RuntimeError, ex:
-                pass
+                if ex.args[0] == errno.ETIMEDOUT:
+                    pass
+                raise
 
     SafeWrite = classmethod(SafeWrite)
