@@ -40,7 +40,6 @@ struct packet {
 	u8 req_tag;
 	u32 last_read;
 	u8 flags;
-	ctrl_msg_t ctrl_msg;
 	struct timer_list processing_timer;
 };
 

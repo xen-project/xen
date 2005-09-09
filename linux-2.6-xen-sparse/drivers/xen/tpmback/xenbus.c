@@ -83,7 +83,7 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
 		xenbus_dev_error(be->dev, err,
-				 "reading %s/grant-id and event-channel",
+				 "reading %s/ring-ref and event-channel",
 				 be->frontpath);
 		return;
 	}
