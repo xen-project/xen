@@ -4,6 +4,7 @@
 # Public License.  See the file "COPYING" in the main directory of
 # this archive for more details.
 
+import errno
 import threading
 from xen.lowlevel import xs
 
@@ -18,9 +19,18 @@ def xshandle():
 class xstransact:
 
     def __init__(self, path):
+        self.in_transaction = False
         self.path = path.rstrip("/")
-        xshandle().transaction_start(path)
-        self.in_transaction = True
+        while True:
+            try:
+                xshandle().transaction_start(path)
+                self.in_transaction = True
+                return
+            except RuntimeError, ex:
+                if ex.args[0] == errno.ENOENT and path != "/":
+                    path = "/".join(path.split("/")[0:-1]) or "/"
+                else:
+                    raise
 
     def __del__(self):
         if self.in_transaction:
