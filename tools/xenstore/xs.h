@@ -30,6 +30,7 @@ struct xs_handle;
  * Returns a handle or NULL.
  */
 struct xs_handle *xs_daemon_open(void);
+struct xs_handle *xs_domain_open(void);
 
 /* Connect to the xs daemon (readonly for non-root clients).
  * Returns a handle or NULL.
@@ -132,6 +133,10 @@ bool xs_introduce_domain(struct xs_handle *h, domid_t domid, unsigned long mfn,
  * Tells the store domain to release the memory page to the domain.
  */
 bool xs_release_domain(struct xs_handle *h, domid_t domid);
+
+/* Query the home path of a domain.
+ */
+char *xs_get_domain_path(struct xs_handle *h, domid_t domid);
 
 /* Only useful for DEBUG versions */
 char *xs_debug_command(struct xs_handle *h, const char *cmd,

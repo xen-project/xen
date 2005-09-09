@@ -543,10 +543,10 @@ class DBMap(dict):
             if not isinstance(node, DBMap): continue
             node.saveDB(sync=sync, save=save)
         # Remove db nodes not in children.
-        if sync:
-            for name in self.__db__.ls():
-                if name not in self:
-                    self.__db__.delete(name)
+        ###if sync:
+        ###    for name in self.__db__.ls():
+        ###        if name not in self:
+        ###            self.__db__.delete(name)
 
     def importFromDB(self, obj, fields):
         """Set fields in obj from db fields.

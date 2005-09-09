@@ -114,6 +114,8 @@ void domain_kill(struct domain *d)
             sched_rem_domain(v);
         domain_relinquish_resources(d);
         put_domain(d);
+
+        send_guest_virq(dom0->vcpu[0], VIRQ_DOM_EXC);
     }
 }
 
@@ -174,7 +176,7 @@ __initcall(domain_shutdown_finaliser_init);
 void domain_shutdown(u8 reason)
 {
     struct domain *d = current->domain;
-    struct vcpu *v;
+    struct vcpu   *v;
 
     if ( d->domain_id == 0 )
     {

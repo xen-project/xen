@@ -600,6 +600,12 @@ int fdctrl_get_drive_type(fdctrl_t *fdctrl, int drive_num);
 void isa_ne2000_init(int base, int irq, NetDriverState *nd);
 void pci_ne2000_init(PCIBus *bus, NetDriverState *nd);
 
+/* pcnet.c */
+
+extern int nic_pcnet;
+
+void pci_pcnet_init(PCIBus *bus, NetDriverState *nd);
+
 /* pckbd.c */
 
 void kbd_init(void);

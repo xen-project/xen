@@ -60,14 +60,14 @@
 #define copy_user_page(to, from, vaddr, pg)	copy_page(to, from)
 
 /**** MACHINE <-> PHYSICAL CONVERSION MACROS ****/
-#define INVALID_P2M_ENTRY	(~0U)
-#define FOREIGN_FRAME(m)	((m) | 0x80000000U)
-extern unsigned int *phys_to_machine_mapping;
+#define INVALID_P2M_ENTRY	(~0UL)
+#define FOREIGN_FRAME(m)	((m) | (1UL<<31))
+extern unsigned long *phys_to_machine_mapping;
 #define pfn_to_mfn(pfn)	\
-((unsigned long)phys_to_machine_mapping[(unsigned int)(pfn)] & 0x7FFFFFFFUL)
+(phys_to_machine_mapping[(unsigned int)(pfn)] & ~(1UL<<31))
 static inline unsigned long mfn_to_pfn(unsigned long mfn)
 {
-	unsigned int pfn;
+	unsigned long pfn;
 
 	/*
 	 * The array access can fail (e.g., device space beyond end of RAM).
@@ -83,7 +83,7 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
 		".previous"
 		: "=r" (pfn) : "m" (machine_to_phys_mapping[mfn]) );
 
-	return (unsigned long)pfn;
+	return pfn;
 }
 
 /* Definitions for machine and pseudophysical addresses. */

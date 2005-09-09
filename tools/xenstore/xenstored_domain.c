@@ -1,4 +1,4 @@
-/* 
+/*
     Domain communications for Xen Store Daemon.
     Copyright (C) 2005 Rusty Russell IBM Corporation
 
@@ -33,10 +33,12 @@
 #include "talloc.h"
 #include "xenstored_core.h"
 #include "xenstored_domain.h"
+#include "xenstored_watch.h"
 #include "xenstored_test.h"
 
 static int *xc_handle;
 static int eventchn_fd;
+static int virq_port;
 static unsigned int ringbuf_datasize;
 
 struct domain
@@ -216,17 +218,6 @@ static int destroy_domain(void *_domain)
 	return 0;
 }
 
-static struct domain *find_domain(u16 port)
-{
-	struct domain *i;
-
-	list_for_each_entry(i, &domains, list) {
-		if (i->port == port)
-			return i;
-	}
-	return NULL;
-}
-
 /* We scan all domains rather than use the information given here. */
 void handle_event(int event_fd)
 {
@@ -234,6 +225,10 @@ void handle_event(int event_fd)
 
 	if (read(event_fd, &port, sizeof(port)) != sizeof(port))
 		barf_perror("Failed to read from event fd");
+
+	if (port == virq_port)
+		domain_cleanup();
+
 #ifndef TESTING
 	if (write(event_fd, &port, sizeof(port)) != sizeof(port))
 		barf_perror("Failed to write to event fd");
@@ -319,6 +314,9 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 
 	/* Now domain belongs to its connection. */
 	talloc_steal(domain->conn, domain);
+
+	fire_watches(conn, "@introduceDomain", false);
+
 	send_ack(conn, XS_INTRODUCE);
 }
 
@@ -367,7 +365,30 @@ void do_release(struct connection *conn, const char *domid_str)
 	}
 
 	talloc_free(domain->conn);
+
+	fire_watches(NULL, "@releaseDomain", false);
+
 	send_ack(conn, XS_RELEASE);
+}
+
+void domain_cleanup(void)
+{
+	xc_dominfo_t dominfo;
+	struct domain *domain, *tmp;
+	int released = 0;
+
+	list_for_each_entry_safe(domain, tmp, &domains, list) {
+		if (xc_domain_getinfo(*xc_handle, domain->domid, 1,
+				      &dominfo) == 1 &&
+		    dominfo.domid == domain->domid &&
+		    !dominfo.dying && !dominfo.crashed && !dominfo.shutdown)
+			continue;
+		talloc_free(domain->conn);
+		released++;
+	}
+
+	if (released)
+		fire_watches(NULL, "@releaseDomain", false);
 }
 
 void do_get_domain_path(struct connection *conn, const char *domid_str)
@@ -386,10 +407,10 @@ void do_get_domain_path(struct connection *conn, const char *domid_str)
 	else
 		domain = find_domain_by_domid(domid);
 
-	if (!domain) 
+	if (!domain)
 		send_error(conn, ENOENT);
 	else
-		send_reply(conn, XS_GETDOMAINPATH, domain->path,
+		send_reply(conn, XS_GET_DOMAIN_PATH, domain->path,
 			   strlen(domain->path) + 1);
 }
 
@@ -412,26 +433,55 @@ void restore_existing_connections(void)
 {
 }
 
+#define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
+#define EVTCHN_DEV_MAJOR 10
+#define EVTCHN_DEV_MINOR 201
+
 /* Returns the event channel handle. */
 int domain_init(void)
 {
+	struct stat st;
+
 	/* The size of the ringbuffer: half a page minus head structure. */
 	ringbuf_datasize = getpagesize() / 2 - sizeof(struct ringbuf_head);
 
 	xc_handle = talloc(talloc_autofree_context(), int);
 	if (!xc_handle)
 		barf_perror("Failed to allocate domain handle");
+
 	*xc_handle = xc_interface_open();
 	if (*xc_handle < 0)
 		barf_perror("Failed to open connection to hypervisor");
+
 	talloc_set_destructor(xc_handle, close_xc_handle);
 
 #ifdef TESTING
 	eventchn_fd = fake_open_eventchn();
 #else
-	eventchn_fd = open("/dev/xen/evtchn", O_RDWR);
+	/* Make sure any existing device file links to correct device. */
+	if ((lstat(EVTCHN_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||
+	    (st.st_rdev != makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)))
+		(void)unlink(EVTCHN_DEV_NAME);
+
+ reopen:
+	eventchn_fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
+	if (eventchn_fd == -1) {
+		if ((errno == ENOENT) &&
+		    ((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
+		    (mknod(EVTCHN_DEV_NAME, S_IFCHR|0600,
+			   makedev(EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR)) == 0))
+			goto reopen;
+		return -errno;
+	}
 #endif
 	if (eventchn_fd < 0)
-		barf_perror("Failed to open connection to hypervisor");
+		barf_perror("Failed to open evtchn device");
+
+	if (xc_evtchn_bind_virq(*xc_handle, VIRQ_DOM_EXC, &virq_port))
+		barf_perror("Failed to bind to domain exception virq");
+
+	if (ioctl(eventchn_fd, EVENTCHN_BIND, virq_port) != 0)
+		barf_perror("Failed to bind to domain exception virq port");
+
 	return eventchn_fd;
 }

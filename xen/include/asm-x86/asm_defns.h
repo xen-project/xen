@@ -6,11 +6,6 @@
 #include <asm/asm-offsets.h>
 #include <asm/processor.h>
 
-#ifndef STR
-#define __STR(x) #x
-#define STR(x) __STR(x)
-#endif
-
 #ifdef __x86_64__
 #include <asm/x86_64/asm_defns.h>
 #else

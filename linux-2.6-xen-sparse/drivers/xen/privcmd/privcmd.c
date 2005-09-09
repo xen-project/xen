@@ -63,27 +63,23 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
             "popl %%edi; popl %%esi; popl %%edx; popl %%ecx; popl %%ebx"
             : "=a" (ret) : "0" (&hypercall) : "memory" );
 #elif defined (__x86_64__)
-	__asm__ __volatile__ (
-	    "movq   %5,%%r10; movq %6,%%r8;" TRAP_INSTR
-	    : "=a" (ret)
-	    : "a" ((unsigned long)hypercall.op), 
-	      "D" ((unsigned long)hypercall.arg[0]), 
-	      "S" ((unsigned long)hypercall.arg[1]),
-	      "d" ((unsigned long)hypercall.arg[2]), 
-	      "g" ((unsigned long)hypercall.arg[3]),
-	      "g" ((unsigned long)hypercall.arg[4])
-	    : "r11","rcx","r8","r10","memory");
+        {
+            long ign1, ign2, ign3;
+            __asm__ __volatile__ (
+                "movq %8,%%r10; movq %9,%%r8;" TRAP_INSTR
+                : "=a" (ret), "=D" (ign1), "=S" (ign2), "=d" (ign3)
+                : "0" ((unsigned long)hypercall.op), 
+                "1" ((unsigned long)hypercall.arg[0]), 
+                "2" ((unsigned long)hypercall.arg[1]),
+                "3" ((unsigned long)hypercall.arg[2]), 
+                "g" ((unsigned long)hypercall.arg[3]),
+                "g" ((unsigned long)hypercall.arg[4])
+                : "r11","rcx","r8","r10","memory");
+        }
 #endif
     }
     break;
 
-    case IOCTL_PRIVCMD_INITDOMAIN_EVTCHN:
-    {
-        extern int initdom_ctrlif_domcontroller_port;
-        ret = initdom_ctrlif_domcontroller_port;
-    }
-    break;
-    
 #if defined(CONFIG_XEN_PRIVILEGED_GUEST)
     case IOCTL_PRIVCMD_MMAP:
     {
@@ -120,9 +116,9 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
                 if ( (msg[j].va + (msg[j].npages<<PAGE_SHIFT)) > vma->vm_end )
                     return -EINVAL;
 
-                if ( (rc = direct_remap_area_pages(vma->vm_mm, 
+                if ( (rc = direct_remap_pfn_range(vma->vm_mm, 
                                                    msg[j].va&PAGE_MASK, 
-                                                   msg[j].mfn<<PAGE_SHIFT, 
+                                                   msg[j].mfn, 
                                                    msg[j].npages<<PAGE_SHIFT, 
                                                    vma->vm_page_prot,
                                                    mmapcmd.dom)) < 0 )
@@ -202,8 +198,8 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         extern int do_xenbus_probe(void*);
         unsigned long page;
 
-        if (xen_start_info.store_evtchn != 0) {
-            ret = xen_start_info.store_mfn;
+        if (xen_start_info->store_evtchn != 0) {
+            ret = xen_start_info->store_mfn;
             break;
         }
 
@@ -219,10 +215,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         SetPageReserved(virt_to_page(page));
 
         /* Initial connect. Setup channel and page. */
-        xen_start_info.store_evtchn = data;
-        xen_start_info.store_mfn = pfn_to_mfn(virt_to_phys((void *)page) >>
+        xen_start_info->store_evtchn = data;
+        xen_start_info->store_mfn = pfn_to_mfn(virt_to_phys((void *)page) >>
                                               PAGE_SHIFT);
-        ret = xen_start_info.store_mfn;
+        ret = xen_start_info->store_mfn;
 
         /* We'll return then this will wait for daemon to answer */
         kthread_run(do_xenbus_probe, NULL, "xenbus_probe");

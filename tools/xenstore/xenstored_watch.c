@@ -103,7 +103,8 @@ static void add_event(struct connection *conn,
 	/* Check read permission: no permission, no watch event.
 	 * If it doesn't exist, we need permission to read parent.
 	 */
-	if (!check_node_perms(conn, node, XS_PERM_READ|XS_PERM_ENOENT_OK)) {
+	if (!check_node_perms(conn, node, XS_PERM_READ|XS_PERM_ENOENT_OK) &&
+	    !check_event_node(node)) {
 		fprintf(stderr, "No permission for %s\n", node);
 		return;
 	}
@@ -131,7 +132,7 @@ void fire_watches(struct connection *conn, const char *node, bool recurse)
 	struct watch *watch;
 
 	/* During transactions, don't fire watches. */
-	if (conn->transaction)
+	if (conn && conn->transaction)
 		return;
 
 	/* Create an event for each watch.  Don't send to self. */
@@ -213,11 +214,16 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
-	relative = !strstarts(vec[0], "/");
-	vec[0] = canonicalize(conn, vec[0]);
-	if (!is_valid_nodename(vec[0])) {
-		send_error(conn, errno);
-		return;
+	if (strstarts(vec[0], "@")) {
+		relative = false;
+		/* check if valid event */
+	} else {
+		relative = !strstarts(vec[0], "/");
+		vec[0] = canonicalize(conn, vec[0]);
+		if (!is_valid_nodename(vec[0])) {
+			send_error(conn, errno);
+			return;
+		}
 	}
 
 	watch = talloc(conn, struct watch);

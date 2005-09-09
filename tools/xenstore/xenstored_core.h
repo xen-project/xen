@@ -133,6 +133,9 @@ char *canonicalize(struct connection *conn, const char *node);
 bool check_node_perms(struct connection *conn, const char *node,
 		      enum xs_perm_type perm);
 
+/* Check if node is an event node. */
+bool check_event_node(const char *node);
+
 /* Path to this node outside transaction. */
 char *node_dir_outside_transaction(const char *node);
 

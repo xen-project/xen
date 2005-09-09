@@ -34,7 +34,7 @@ def read_exact(fd, size, errmsg):
         raise XendError(errmsg)
     return buf
 
-def save(xd, fd, dominfo):
+def save(xd, fd, dominfo, live):
     write_exact(fd, SIGNATURE, "could not write guest state file: signature")
 
     config = sxp.to_string(dominfo.sxpr())
@@ -42,8 +42,13 @@ def save(xd, fd, dominfo):
                 "could not write guest state file: config len")
     write_exact(fd, config, "could not write guest state file: config")
 
+    # xc_save takes three customization parameters: maxit, max_f, and flags
+    # the last controls whether or not save is 'live', while the first two
+    # further customize behaviour when 'live' save is enabled. Passing "0"
+    # simply uses the defaults compiled into libxenguest; see the comments 
+    # and/or code in xc_linux_save() for more information. 
     cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
-           str(dominfo.id)]
+           str(dominfo.id), "0", "0", str(int(live)) ]
     log.info("[xc_save] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     
@@ -51,7 +56,7 @@ def save(xd, fd, dominfo):
     p = select.poll()
     p.register(child.fromchild.fileno())
     p.register(child.childerr.fileno())
-    while True:
+    while True: 
         r = p.poll()
         for (fd, event) in r:
             if not event & select.POLLIN:
@@ -65,15 +70,16 @@ def save(xd, fd, dominfo):
                 if l.rstrip() == "suspend":
                     log.info("suspending %d" % dominfo.id)
                     xd.domain_shutdown(dominfo.id, reason='suspend')
+                    dominfo.state_wait("suspended")
+                    log.info("suspend %d done" % dominfo.id)
                     if dominfo.store_channel:
                         try:
                             dominfo.db.releaseDomain(dominfo.id)
                         except Exception, ex:
-                            log.warning("error in domain release on xenstore: %s",
-                                        ex)
+                            log.warning(
+                                "error in domain release on xenstore: %s",
+                                ex)
                             pass
-                    dominfo.state_wait("suspended")
-                    log.info("suspend %d done" % dominfo.id)
                     child.tochild.write("done\n")
                     child.tochild.flush()
         if filter(lambda (fd, event): event & select.POLLHUP, r):
@@ -121,12 +127,18 @@ def restore(xd, fd):
             "not a valid guest state file: pfn count out of range")
 
     if dominfo.store_channel:
-        evtchn = dominfo.store_channel.port2
+        store_evtchn = dominfo.store_channel.port2
     else:
-        evtchn = 0
+        store_evtchn = 0
+
+    if dominfo.console_channel:
+        console_evtchn = dominfo.console_channel.port2
+    else:
+        console_evtchn = 0
 
     cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
-           str(dominfo.id), str(nr_pfns), str(evtchn)]
+           str(dominfo.id), str(nr_pfns),
+           str(store_evtchn), str(console_evtchn)]
     log.info("[xc_restore] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     child.tochild.close()
@@ -147,6 +159,7 @@ def restore(xd, fd):
             if fd == child.fromchild.fileno():
                 l = child.fromchild.readline()
                 while l:
+                    log.info(l.rstrip())
                     m = re.match(r"^(store-mfn) (\d+)\n$", l)
                     if m:
                         if dominfo.store_channel:
@@ -156,7 +169,10 @@ def restore(xd, fd):
                                                            dominfo.store_mfn,
                                                            dominfo.store_channel)
                             dominfo.exportToDB(save=True, sync=True)
-                    log.info(l.rstrip())
+                    m = re.match(r"^(console-mfn) (\d+)\n$", l)
+                    if m:
+                        dominfo.console_mfn = int(m.group(2))
+                        dominfo.exportToDB(save=True, sync=True)
                     try:
                         l = child.fromchild.readline()
                     except:

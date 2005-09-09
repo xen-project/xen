@@ -95,7 +95,7 @@ void __init paging_init(void)
      * Allocate and map the machine-to-phys table and create read-only mapping 
      * of MPT for guest-OS use.
      */
-    mpt_size  = (max_page * 4) + (1UL << L2_PAGETABLE_SHIFT) - 1UL;
+    mpt_size  = (max_page * BYTES_PER_LONG) + (1UL << L2_PAGETABLE_SHIFT) - 1;
     mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
@@ -118,7 +118,8 @@ void __init paging_init(void)
     }
 
     /* Set up mapping cache for domain pages. */
-    mapcache_order = get_order(MAPCACHE_MBYTES << (20 - PAGETABLE_ORDER));
+    mapcache_order = get_order_from_bytes(
+        MAPCACHE_MBYTES << (20 - PAGETABLE_ORDER));
     mapcache = alloc_xenheap_pages(mapcache_order);
     memset(mapcache, 0, PAGE_SIZE << mapcache_order);
     for ( i = 0; i < (MAPCACHE_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )

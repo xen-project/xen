@@ -56,20 +56,22 @@
 #define ACM_ACCESS_DENIED		-111
 #define ACM_NULL_POINTER_ERROR		-200
 
-#define ACM_MAX_POLICY  3
-
+/* primary policy in lower 4 bits */
 #define ACM_NULL_POLICY	0
 #define ACM_CHINESE_WALL_POLICY	1
 #define ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY 2
-#define ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY 3
+
+/* combinations have secondary policy component in higher 4bit */
+#define ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY \
+    ((ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY << 4) | ACM_CHINESE_WALL_POLICY)
 
 /* policy: */
 #define ACM_POLICY_NAME(X) \
-	(X == ACM_NULL_POLICY) ? "NULL policy" : \
-	(X == ACM_CHINESE_WALL_POLICY) ? "CHINESE WALL policy" : \
-	(X == ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY) ? "SIMPLE TYPE ENFORCEMENT policy" : \
-	(X == ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY) ? "CHINESE WALL AND SIMPLE TYPE ENFORCEMENT policy" : \
-	"UNDEFINED policy"
+	((X) == (ACM_NULL_POLICY)) ? "NULL policy" :                        \
+    ((X) == (ACM_CHINESE_WALL_POLICY)) ? "CHINESE WALL policy" :        \
+    ((X) == (ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)) ? "SIMPLE TYPE ENFORCEMENT policy" : \
+    ((X) == (ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY)) ? "CHINESE WALL AND SIMPLE TYPE ENFORCEMENT policy" : \
+     "UNDEFINED policy"
 
 /* the following policy versions must be increased
  * whenever the interpretation of the related
@@ -122,7 +124,7 @@ typedef u16 domaintype_t;
  */
 struct acm_policy_buffer {
 	u32 policy_version; /* ACM_POLICY_VERSION */
-        u32 magic;
+    u32 magic;
 	u32 len;
 	u32 primary_policy_code;
 	u32 primary_buffer_offset;
@@ -151,7 +153,7 @@ struct acm_ste_policy_buffer {
 };
 
 struct acm_stats_buffer {
-        u32 magic;
+    u32 magic;
 	u32 len;
 	u32 primary_policy_code;
 	u32 primary_stats_offset;
@@ -168,5 +170,15 @@ struct acm_ste_stats_buffer {
 	u32 gt_cachehit_count;
 };
 
+struct acm_ssid_buffer {
+	u32 len;
+    ssidref_t ssidref;
+	u32 primary_policy_code;
+	u32 primary_max_types;
+    u32 primary_types_offset;
+	u32 secondary_policy_code;
+    u32 secondary_max_types;
+	u32 secondary_types_offset;
+};
 
 #endif

@@ -25,8 +25,8 @@ extern char x86_boot_params[BOOT_PARAM_SIZE];
 #define LOADER_TYPE (*(unsigned char *) (PARAM+0x210))
 #define KERNEL_START (*(unsigned int *) (PARAM+0x214))
 
-#define INITRD_START (__pa(xen_start_info.mod_start))
-#define INITRD_SIZE (xen_start_info.mod_len)
+#define INITRD_START (__pa(xen_start_info->mod_start))
+#define INITRD_SIZE (xen_start_info->mod_len)
 #define EDID_INFO   (*(struct edid_info *) (PARAM+0x440))
 
 #define EDD_NR     (*(unsigned char *) (PARAM+EDDNR))

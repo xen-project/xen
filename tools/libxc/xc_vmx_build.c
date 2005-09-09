@@ -7,6 +7,7 @@
 #define ELFSIZE 32
 #include "xc_elf.h"
 #include <stdlib.h>
+#include <unistd.h>
 #include <zlib.h>
 #include <xen/io/ioreq.h>
 #include "linux_boot_params.h"

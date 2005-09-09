@@ -33,6 +33,11 @@ typedef l2_pgentry_t root_pgentry_32_t;
 #define l1e_get_flags_32(x)           (get_pte_flags_32((x).l1))
 #define l2e_get_flags_32(x)           (get_pte_flags_32((x).l2))
 
+#define l1e_get_paddr_32(x)           \
+    ((physaddr_t)(((x).l1 & (PADDR_MASK&PAGE_MASK))))
+#define l2e_get_paddr_32(x)           \
+    ((physaddr_t)(((x).l2 & (PADDR_MASK&PAGE_MASK))))
+
 /* Construct an empty pte. */
 #define l1e_empty_32()                ((l1_pgentry_32_t) { 0 })
 #define l2e_empty_32()                ((l2_pgentry_32_t) { 0 })

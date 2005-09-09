@@ -20,6 +20,7 @@
 #define _EVENTS_H_
 
 #include<traps.h>
+#include <xen/event_channel.h>
 
 #define NR_EVS 1024
 
@@ -39,6 +40,16 @@ typedef struct _ev_action_t {
 /* prototypes */
 int do_event(u32 port, struct pt_regs *regs);
 int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *) );
+void bind_evtchn( u32 virq, void (*handler)(int, struct pt_regs *) );
 void init_events(void);
+
+static inline int notify_via_evtchn(int port)
+{
+    evtchn_op_t op;
+    op.cmd = EVTCHNOP_send;
+    op.u.send.local_port = port;
+    return HYPERVISOR_event_channel_op(&op);
+}
+
 
 #endif /* _EVENTS_H_ */

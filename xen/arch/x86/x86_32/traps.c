@@ -79,11 +79,8 @@ void show_registers(struct cpu_user_regs *regs)
            "ss: %04lx   cs: %04lx\n",
            ds, es, fs, gs, ss, cs);
 
-    if ( GUEST_MODE(regs) )
-        show_guest_stack();
-    else
-        show_stack((unsigned long *)&regs->esp);
-} 
+    show_stack(regs);
+}
 
 void show_page_walk(unsigned long addr)
 {

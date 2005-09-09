@@ -8,15 +8,16 @@ INSTALL_PROG    = $(INSTALL) -m0755
 INSTALL_DIR     = $(INSTALL) -d -m0755
 
 PROFILE=#-pg
-BASECFLAGS=-Wall -W -g 
+BASECFLAGS=-Wall -W -g -Werror
 # Make gcc generate dependencies.
 BASECFLAGS += -Wp,-MD,.$(@F).d
 PROG_DEP = .*.d
-#BASECFLAGS+= -O3 $(PROFILE)
+BASECFLAGS+= -O3 $(PROFILE)
 #BASECFLAGS+= -I$(XEN_ROOT)/tools
 BASECFLAGS+= -I$(XEN_ROOT)/tools/libxc
 BASECFLAGS+= -I$(XEN_ROOT)/xen/include/public
 BASECFLAGS+= -I.
+BASECFLAGS+= -I$(XEN_ROOT)/linux-2.6-xen-sparse/include/asm-xen/linux-public
 
 CFLAGS  += $(BASECFLAGS)
 LDFLAGS += $(PROFILE) -L$(XEN_LIBXC)
@@ -24,15 +25,22 @@ TESTDIR  = `pwd`/testsuite/tmp
 TESTFLAGS= -DTESTING
 TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
 
-all: xen xenstored libxenstore.so
+CLIENTS := xenstore-read xenstore-rm xenstore-write
+CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
 
-testcode: xen xs_test xenstored_test xs_random xs_dom0_test
+all: libxenstore.so xenstored $(CLIENTS)
 
-xen:
-	ln -sf $(XEN_ROOT)/xen/include/public $@
+testcode: xs_test xenstored_test xs_random xs_dom0_test
 
 xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
+
+$(CLIENTS): libxenstore.so
+$(CLIENTS): xenstore-%: xenstore_%.o
+	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -L. -lxenstore -o $@
+
+$(CLIENTS_OBJS): xenstore_%.o: xenstore_client.c
+	$(COMPILE.c) -DCLIENT_$(*F) -o $@ $<
 
 xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_test.o xenstored_transaction_test.o xs_lib.o talloc_test.o fake_libxc.o utils.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
@@ -58,7 +66,7 @@ libxenstore.so: xs.opic xs_lib.opic
 
 clean: testsuite-clean
 	rm -f *.o *.opic *.so
-	rm -f xen xenstored xs_random xs_stress xs_crashme
+	rm -f xenstored xs_random xs_stress xs_crashme
 	rm -f xs_test xenstored_test xs_dom0_test
 	$(RM) $(PROG_DEP)
 
@@ -72,10 +80,10 @@ check: print-dir testsuite-fast randomcheck-fast print-end
 
 fullcheck: testsuite-run randomcheck stresstest
 
-testsuite-run: xen xenstored_test xs_test
+testsuite-run: xenstored_test xs_test
 	$(TESTENV) testsuite/test.sh && echo
 
-testsuite-fast: xen xenstored_test xs_test
+testsuite-fast: xenstored_test xs_test
 	@$(TESTENV) testsuite/test.sh --fast
 
 testsuite-clean:
@@ -111,12 +119,14 @@ TAGS:
 tarball: clean
 	cd .. && tar -c -j -v -h -f xenstore.tar.bz2 xenstore/
 
-install: xenstored libxenstore.so
+install: libxenstore.so xenstored $(CLIENTS)
 	$(INSTALL_DIR) -p $(DESTDIR)/var/run/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xenstored
+	$(INSTALL_DIR) -p $(DESTDIR)/usr/bin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/sbin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/include
 	$(INSTALL_PROG) xenstored $(DESTDIR)/usr/sbin
+	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)/usr/bin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) libxenstore.so $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include

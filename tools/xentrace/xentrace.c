@@ -525,7 +525,7 @@ int main(int argc, char **argv)
     }
 
     if (opts.cpu_mask != 0) {
-        set_mask(opts.evt_mask, 1);
+        set_mask(opts.cpu_mask, 1);
     }
 
     if ( opts.outfile )

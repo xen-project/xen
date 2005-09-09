@@ -33,36 +33,7 @@ extern void do_exit(void);
 
 void dump_regs(struct pt_regs *regs)
 {
-    unsigned long esp;
-    unsigned short ss;
-
-#ifdef __x86_64__
-    esp = regs->rsp;
-    ss  = regs->xss;
-#else
-    esp = (unsigned long) (&regs->esp);
-    ss = __KERNEL_DS;
-    if (regs->xcs & 2) {
-printk("CS is true, esp is %x\n", regs->esp);
-        esp = regs->esp;
-        ss = regs->xss & 0xffff;
-    }
-#endif
-    printf("EIP:    %04x:[<%p>]\n",
-           0xffff & regs->xcs , regs->eip);
-    printf("EFLAGS: %p\n",regs->eflags);
-    printf("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
-           regs->eax, regs->ebx, regs->ecx, regs->edx);
-    printf("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
-           regs->esi, regs->edi, regs->ebp, esp);
-#ifdef __x86_64__
-    printf("r8 : %p   r9 : %p   r10: %p   r11: %p\n",
-           regs->r8,  regs->r9,  regs->r10, regs->r11);
-    printf("r12: %p   r13: %p   r14: %p   r15: %p\n",
-           regs->r12, regs->r13, regs->r14, regs->r15);
-#endif
-    printf("ds: %04x   es: %04x   ss: %04x\n",
-           regs->xds & 0xffff, regs->xes & 0xffff, ss);
+    printk("FIXME: proper register dump (with the stack dump)\n");
 }	
 
 
@@ -105,6 +76,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long error_code,
     printk("Page fault at linear address %p\n", addr);
     dump_regs(regs);
 #ifdef __x86_64__
+    /* FIXME: _PAGE_PSE */
     {
         unsigned long *tab = (unsigned long *)start_info.pt_base;
         unsigned long page;
@@ -112,23 +84,16 @@ void do_page_fault(struct pt_regs *regs, unsigned long error_code,
         printk("Pagetable walk from %p:\n", tab);
         
         page = tab[l4_table_offset(addr)];
-        tab = __va(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
+        tab = to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
         printk(" L4 = %p (%p)\n", page, tab);
-        if ( !(page & AGERESENT) )
-            goto out;
 
         page = tab[l3_table_offset(addr)];
-        tab = __va(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
+        tab = to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
         printk("  L3 = %p (%p)\n", page, tab);
-        if ( !(page & AGERESENT) )
-            goto out;
         
         page = tab[l2_table_offset(addr)];
-        tab = __va(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
-        printk("   L2 = %p (%p) %s\n", page, tab,
-               (page & AGESE) ? "(2MB)" : "");
-        if ( !(page & AGERESENT) || (page & AGESE) )
-            goto out;
+        tab =  to_virt(mfn_to_pfn(pte_to_mfn(page)) << PAGE_SHIFT);
+        printk("   L2 = %p (%p)\n", page, tab);
         
         page = tab[l1_table_offset(addr)];
         printk("    L1 = %p\n", page);

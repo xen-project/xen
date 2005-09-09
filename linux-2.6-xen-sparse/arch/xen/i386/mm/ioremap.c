@@ -19,37 +19,125 @@
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 
-#ifndef CONFIG_XEN_PHYSDEV_ACCESS
+#define ISA_START_ADDRESS	0x0
+#define ISA_END_ADDRESS		0x100000
 
-void * __ioremap(unsigned long phys_addr, unsigned long size,
-		 unsigned long flags)
+#if 0 /* not PAE safe */
+/* These hacky macros avoid phys->machine translations. */
+#define __direct_pte(x) ((pte_t) { (x) } )
+#define __direct_mk_pte(page_nr,pgprot) \
+  __direct_pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))
+#define direct_mk_pte_phys(physpage, pgprot) \
+  __direct_mk_pte((physpage) >> PAGE_SHIFT, pgprot)
+#endif
+
+static int direct_remap_area_pte_fn(pte_t *pte, 
+				    struct page *pte_page,
+				    unsigned long address, 
+				    void *data)
 {
-	return NULL;
+	mmu_update_t **v = (mmu_update_t **)data;
+
+	(*v)->ptr = ((u64)pfn_to_mfn(page_to_pfn(pte_page)) <<
+		     PAGE_SHIFT) | ((unsigned long)pte & ~PAGE_MASK);
+	(*v)++;
+
+	return 0;
 }
 
-void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
+int direct_remap_pfn_range(struct mm_struct *mm,
+			    unsigned long address, 
+			    unsigned long mfn,
+			    unsigned long size, 
+			    pgprot_t prot,
+			    domid_t  domid)
 {
-	return NULL;
+	int i;
+	unsigned long start_address;
+#define MAX_DIRECTMAP_MMU_QUEUE 130
+	mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *v = u, *w = u;
+
+	start_address = address;
+
+	flush_cache_all();
+
+	for (i = 0; i < size; i += PAGE_SIZE) {
+		if ((v - u) == MAX_DIRECTMAP_MMU_QUEUE) {
+			/* Fill in the PTE pointers. */
+			generic_page_range(mm, start_address, 
+					   address - start_address,
+					   direct_remap_area_pte_fn, &w);
+			w = u;
+			if (HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0)
+				return -EFAULT;
+			v = u;
+			start_address = address;
+		}
+
+		/*
+		 * Fill in the machine address: PTE ptr is done later by
+		 * __direct_remap_area_pages(). 
+		 */
+		v->val = pte_val_ma(pfn_pte_ma(mfn, prot));
+
+		mfn++;
+		address += PAGE_SIZE; 
+		v++;
+	}
+
+	if (v != u) {
+		/* get the ptep's filled in */
+		generic_page_range(mm, start_address, address - start_address,
+				   direct_remap_area_pte_fn, &w);
+		if (unlikely(HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0))
+			return -EFAULT;
+	}
+
+	flush_tlb_all();
+
+	return 0;
 }
 
-void iounmap(volatile void __iomem *addr)
+EXPORT_SYMBOL(direct_remap_pfn_range);
+
+
+/* FIXME: This is horribly broken on PAE */ 
+static int lookup_pte_fn(
+	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
 {
+	unsigned long *ptep = (unsigned long *)data;
+	if (ptep)
+		*ptep = (pfn_to_mfn(page_to_pfn(pte_page)) <<
+			 PAGE_SHIFT) |
+			((unsigned long)pte & ~PAGE_MASK);
+	return 0;
 }
 
-#ifdef __i386__
-
-void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
+int create_lookup_pte_addr(struct mm_struct *mm, 
+			   unsigned long address,
+			   unsigned long *ptep)
 {
-	return NULL;
+	return generic_page_range(mm, address, PAGE_SIZE, lookup_pte_fn, ptep);
 }
 
-void __init bt_iounmap(void *addr, unsigned long size)
+EXPORT_SYMBOL(create_lookup_pte_addr);
+
+static int noop_fn(
+	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
 {
+	return 0;
 }
 
-#endif /* __i386__ */
+int touch_pte_range(struct mm_struct *mm,
+		    unsigned long address,
+		    unsigned long size)
+{
+	return generic_page_range(mm, address, size, noop_fn, NULL);
+} 
 
-#else
+EXPORT_SYMBOL(touch_pte_range);
+
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 
 /*
  * Does @address reside within a non-highmem page that is local to this virtual
@@ -90,13 +178,12 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	if (!size || last_addr < phys_addr)
 		return NULL;
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	/*
 	 * Don't remap the low PCI/ISA area, it's always mapped..
 	 */
-	if (phys_addr >= 0x0 && last_addr < 0x100000)
-		return isa_bus_to_virt(phys_addr);
-#endif
+	if (xen_start_info->flags & SIF_PRIVILEGED &&
+	    phys_addr >= ISA_START_ADDRESS && last_addr < ISA_END_ADDRESS)
+		return (void __iomem *) isa_bus_to_virt(phys_addr);
 
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
@@ -134,7 +221,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 #ifdef __x86_64__
 	flags |= _PAGE_USER;
 #endif
-	if (direct_remap_area_pages(&init_mm, (unsigned long) addr, phys_addr,
+	if (direct_remap_pfn_range(&init_mm, (unsigned long) addr, phys_addr>>PAGE_SHIFT,
 				    size, __pgprot(flags), domid)) {
 		vunmap((void __force *) addr);
 		return NULL;
@@ -203,24 +290,32 @@ void iounmap(volatile void __iomem *addr)
 {
 	struct vm_struct *p;
 	if ((void __force *) addr <= high_memory) 
-		return; 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+		return;
+
+	/*
+	 * __ioremap special-cases the PCI/ISA range by not instantiating a
+	 * vm_area and by simply returning an address into the kernel mapping
+	 * of ISA space.   So handle that here.
+	 */
 	if ((unsigned long) addr >= fix_to_virt(FIX_ISAMAP_BEGIN))
 		return;
-#endif
-	p = remove_vm_area((void *) (PAGE_MASK & (unsigned long __force) addr));
+
+	write_lock(&vmlist_lock);
+	p = __remove_vm_area((void *) (PAGE_MASK & (unsigned long __force) addr));
 	if (!p) { 
-		printk("__iounmap: bad address %p\n", addr);
-		return;
+		printk("iounmap: bad address %p\n", addr);
+		goto out_unlock;
 	}
 
 	if ((p->flags >> 20) && is_local_lowmem(p->phys_addr)) {
 		/* p->size includes the guard page, but cpa doesn't like that */
 		change_page_attr(virt_to_page(bus_to_virt(p->phys_addr)),
 				 (p->size - PAGE_SIZE) >> PAGE_SHIFT,
-				 PAGE_KERNEL); 				 
+				 PAGE_KERNEL);
 		global_flush_tlb();
 	} 
+out_unlock:
+	write_unlock(&vmlist_lock);
 	kfree(p); 
 }
 
@@ -237,13 +332,12 @@ void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 	if (!size || last_addr < phys_addr)
 		return NULL;
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	/*
 	 * Don't remap the low PCI/ISA area, it's always mapped..
 	 */
-	if (phys_addr >= 0x0 && last_addr < 0x100000)
+	if (xen_start_info->flags & SIF_PRIVILEGED &&
+	    phys_addr >= ISA_START_ADDRESS && last_addr < ISA_END_ADDRESS)
 		return isa_bus_to_virt(phys_addr);
-#endif
 
 	/*
 	 * Mappings have to be page-aligned
@@ -282,10 +376,8 @@ void __init bt_iounmap(void *addr, unsigned long size)
 	virt_addr = (unsigned long)addr;
 	if (virt_addr < fix_to_virt(FIX_BTMAP_BEGIN))
 		return;
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	if (virt_addr >= fix_to_virt(FIX_ISAMAP_BEGIN))
 		return;
-#endif
 	offset = virt_addr & ~PAGE_MASK;
 	nrpages = PAGE_ALIGN(offset + size - 1) >> PAGE_SHIFT;
 
@@ -299,119 +391,37 @@ void __init bt_iounmap(void *addr, unsigned long size)
 
 #endif /* __i386__ */
 
+#else /* CONFIG_XEN_PHYSDEV_ACCESS */
+
+void __iomem * __ioremap(unsigned long phys_addr, unsigned long size,
+			 unsigned long flags)
+{
+	return NULL;
+}
+
+void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
+{
+	return NULL;
+}
+
+void iounmap(volatile void __iomem *addr)
+{
+}
+
+#ifdef __i386__
+
+void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
+{
+	return NULL;
+}
+
+void __init bt_iounmap(void *addr, unsigned long size)
+{
+}
+
+#endif /* __i386__ */
+
 #endif /* CONFIG_XEN_PHYSDEV_ACCESS */
-
-/* These hacky macros avoid phys->machine translations. */
-#define __direct_pte(x) ((pte_t) { (x) } )
-#define __direct_mk_pte(page_nr,pgprot) \
-  __direct_pte(((page_nr) << PAGE_SHIFT) | pgprot_val(pgprot))
-#define direct_mk_pte_phys(physpage, pgprot) \
-  __direct_mk_pte((physpage) >> PAGE_SHIFT, pgprot)
-
-
-static int direct_remap_area_pte_fn(pte_t *pte, 
-				    struct page *pte_page,
-				    unsigned long address, 
-				    void *data)
-{
-	mmu_update_t **v = (mmu_update_t **)data;
-
-	(*v)->ptr = ((maddr_t)pfn_to_mfn(page_to_pfn(pte_page)) <<
-		     PAGE_SHIFT) | ((unsigned long)pte & ~PAGE_MASK);
-	(*v)++;
-
-	return 0;
-}
-
-int direct_remap_area_pages(struct mm_struct *mm,
-			    unsigned long address, 
-			    unsigned long machine_addr,
-			    unsigned long size, 
-			    pgprot_t prot,
-			    domid_t  domid)
-{
-	int i;
-	unsigned long start_address;
-#define MAX_DIRECTMAP_MMU_QUEUE 130
-	mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *v = u, *w = u;
-
-	start_address = address;
-
-	flush_cache_all();
-
-	for (i = 0; i < size; i += PAGE_SIZE) {
-		if ((v - u) == MAX_DIRECTMAP_MMU_QUEUE) {
-			/* Fill in the PTE pointers. */
-			generic_page_range(mm, start_address, 
-					   address - start_address,
-					   direct_remap_area_pte_fn, &w);
-			w = u;
-			if (HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0)
-				return -EFAULT;
-			v = u;
-			start_address = address;
-		}
-
-		/*
-		 * Fill in the machine address: PTE ptr is done later by
-		 * __direct_remap_area_pages(). 
-		 */
-		v->val = pte_val_ma(pfn_pte_ma(machine_addr >> PAGE_SHIFT, prot));
-
-		machine_addr += PAGE_SIZE;
-		address += PAGE_SIZE; 
-		v++;
-	}
-
-	if (v != u) {
-		/* get the ptep's filled in */
-		generic_page_range(mm, start_address, address - start_address,
-				   direct_remap_area_pte_fn, &w);
-		if (unlikely(HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0))
-			return -EFAULT;
-	}
-
-	flush_tlb_all();
-
-	return 0;
-}
-
-EXPORT_SYMBOL(direct_remap_area_pages);
-
-static int lookup_pte_fn(
-	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
-{
-	unsigned long *ptep = (unsigned long *)data;
-	if (ptep)
-		*ptep = (pfn_to_mfn(page_to_pfn(pte_page)) <<
-			 PAGE_SHIFT) |
-			((unsigned long)pte & ~PAGE_MASK);
-	return 0;
-}
-
-int create_lookup_pte_addr(struct mm_struct *mm, 
-			   unsigned long address,
-			   unsigned long *ptep)
-{
-	return generic_page_range(mm, address, PAGE_SIZE, lookup_pte_fn, ptep);
-}
-
-EXPORT_SYMBOL(create_lookup_pte_addr);
-
-static int noop_fn(
-	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
-{
-	return 0;
-}
-
-int touch_pte_range(struct mm_struct *mm,
-		    unsigned long address,
-		    unsigned long size)
-{
-	return generic_page_range(mm, address, size, noop_fn, NULL);
-} 
-
-EXPORT_SYMBOL(touch_pte_range);
 
 /*
  * Local variables:

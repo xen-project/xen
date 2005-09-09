@@ -379,18 +379,18 @@ config SMP
 	  If you don't know what to do here, say N.
 
 config SMP_ALTERNATIVES
-        bool "SMP alternatives support (EXPERIMENTAL)"
-        depends on SMP && EXPERIMENTAL
-        help
-          Try to reduce the overhead of running an SMP kernel on a uniprocessor
-          host slightly by replacing certain key instruction sequences
-          according to whether we currently have more than one CPU available.
-          This should provide a noticeable boost to performance when
-          running SMP kernels on UP machines, and have negligible impact
-          when running on an true SMP host.
+	bool "SMP alternatives support (EXPERIMENTAL)"
+	depends on SMP && EXPERIMENTAL
+	help
+	  Try to reduce the overhead of running an SMP kernel on a uniprocessor
+	  host slightly by replacing certain key instruction sequences
+	  according to whether we currently have more than one CPU available.
+	  This should provide a noticeable boost to performance when
+	  running SMP kernels on UP machines, and have negligible impact
+	  when running on an true SMP host.
 
           If unsure, say N.
-
+	  
 config NR_CPUS
 	int "Maximum number of CPUs (2-255)"
 	range 2 255
@@ -807,8 +807,8 @@ choice
 	  direct access method and falls back to the BIOS if that doesn't
 	  work. If unsure, go with the default, which is "Any".
 
-config PCI_GOBIOS
-	bool "BIOS"
+#config PCI_GOBIOS
+#	bool "BIOS"
 
 config PCI_GOMMCONFIG
 	bool "MMConfig"
@@ -821,10 +821,10 @@ config PCI_GOANY
 
 endchoice
 
-config PCI_BIOS
-	bool
-	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
-	default y
+#config PCI_BIOS
+#	bool
+#	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
+#	default y
 
 config PCI_DIRECT
 	bool

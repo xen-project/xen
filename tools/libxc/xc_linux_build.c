@@ -17,6 +17,7 @@
 #include "xc_elf.h"
 #include "xc_aout9.h"
 #include <stdlib.h>
+#include <unistd.h>
 #include <zlib.h>
 
 #if defined(__i386__)
@@ -56,7 +57,7 @@ static int probeimageformat(char *image,
 }
 
 #define alloc_pt(ltab, vltab) \
-        ltab = page_array[ppt_alloc++] << PAGE_SHIFT; \
+        ltab = (unsigned long long)(page_array[ppt_alloc++]) << PAGE_SHIFT; \
         if (vltab != NULL) { \
             munmap(vltab, PAGE_SIZE); \
         } \
@@ -127,18 +128,37 @@ static int setup_pg_tables_pae(int xc_handle, u32 dom,
     l1_pgentry_64_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_64_t *vl2tab=NULL, *vl2e=NULL;
     l3_pgentry_64_t *vl3tab=NULL, *vl3e=NULL;
-    unsigned long l1tab = 0;
-    unsigned long l2tab = 0;
-    unsigned long l3tab = 0;
+    unsigned long long l1tab = 0;
+    unsigned long long l2tab = 0;
+    unsigned long long l3tab = 0;
     unsigned long ppt_alloc;
     unsigned long count;
 
     /* First allocate page for page dir. */
     ppt_alloc = (vpt_start - dsi_v_start) >> PAGE_SHIFT;
+
+    if ( page_array[ppt_alloc] > 0xfffff )
+    {
+	unsigned long nmfn;
+	nmfn = xc_make_page_below_4G( xc_handle, dom, page_array[ppt_alloc] );
+	if ( nmfn == 0 )
+	{
+	    fprintf(stderr, "Couldn't get a page below 4GB :-(\n");
+	    goto error_out;
+	}
+	page_array[ppt_alloc] = nmfn;
+    }
+
     alloc_pt(l3tab, vl3tab);
     vl3e = &vl3tab[l3_table_offset_pae(dsi_v_start)];
     ctxt->ctrlreg[3] = l3tab;
-    
+
+    if(l3tab>0xfffff000ULL)
+    {
+        fprintf(stderr,"L3TAB = %llx above 4GB!\n",l3tab);
+        goto error_out;
+    }
+ 
     for ( count = 0; count < ((v_end-dsi_v_start)>>PAGE_SHIFT); count++)
     {
         if ( !((unsigned long)vl1e & (PAGE_SIZE-1)) )
@@ -274,7 +294,6 @@ static int setup_guest(int xc_handle,
                          unsigned long *pvss, vcpu_guest_context_t *ctxt,
                          const char *cmdline,
                          unsigned long shared_info_frame,
-                         unsigned int control_evtchn,
                          unsigned long flags,
                          unsigned int vcpus,
                          unsigned int store_evtchn, unsigned long *store_mfn)
@@ -332,10 +351,10 @@ static int setup_guest(int xc_handle,
                        unsigned long *pvss, vcpu_guest_context_t *ctxt,
                        const char *cmdline,
                        unsigned long shared_info_frame,
-                       unsigned int control_evtchn,
                        unsigned long flags,
                        unsigned int vcpus,
-		       unsigned int store_evtchn, unsigned long *store_mfn)
+		       unsigned int store_evtchn, unsigned long *store_mfn,
+		       unsigned int console_evtchn, unsigned long *console_mfn)
 {
     unsigned long *page_array = NULL;
     unsigned long count, i;
@@ -346,7 +365,7 @@ static int setup_guest(int xc_handle,
 
     unsigned long nr_pt_pages;
     unsigned long physmap_pfn;
-    u32 *physmap, *physmap_e;
+    unsigned long *physmap, *physmap_e;
 
     struct load_funcs load_funcs;
     struct domain_setup_info dsi;
@@ -358,6 +377,8 @@ static int setup_guest(int xc_handle,
     unsigned long vstartinfo_end;
     unsigned long vstoreinfo_start;
     unsigned long vstoreinfo_end;
+    unsigned long vconsole_start;
+    unsigned long vconsole_end;
     unsigned long vstack_start;
     unsigned long vstack_end;
     unsigned long vpt_start;
@@ -391,16 +412,18 @@ static int setup_guest(int xc_handle,
     vinitrd_end      = vinitrd_start + initrd_len;
     vphysmap_start   = round_pgup(vinitrd_end);
     vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
-    vstoreinfo_start = round_pgup(vphysmap_end);
+    vstartinfo_start = round_pgup(vphysmap_end);
+    vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
+    vstoreinfo_start = vstartinfo_end;
     vstoreinfo_end   = vstoreinfo_start + PAGE_SIZE;
-    vpt_start        = vstoreinfo_end; 
+    vconsole_start   = vstoreinfo_end;
+    vconsole_end     = vconsole_start + PAGE_SIZE;
+    vpt_start        = vconsole_end; 
 
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
         vpt_end          = vpt_start + (nr_pt_pages * PAGE_SIZE);
-        vstartinfo_start = vpt_end;
-        vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
-        vstack_start     = vstartinfo_end;
+        vstack_start     = vpt_end;
         vstack_end       = vstack_start + PAGE_SIZE;
         v_end            = (vstack_end + (1UL<<22)-1) & ~((1UL<<22)-1);
         if ( (v_end - vstack_end) < (512UL << 10) )
@@ -436,17 +459,19 @@ static int setup_guest(int xc_handle,
            " Loaded kernel: %p->%p\n"
            " Init. ramdisk: %p->%p\n"
            " Phys-Mach map: %p->%p\n"
-           " Store page:    %p->%p\n"
-           " Page tables:   %p->%p\n"
            " Start info:    %p->%p\n"
+           " Store page:    %p->%p\n"
+           " Console page:  %p->%p\n"
+           " Page tables:   %p->%p\n"
            " Boot stack:    %p->%p\n"
            " TOTAL:         %p->%p\n",
            _p(dsi.v_kernstart), _p(dsi.v_kernend), 
            _p(vinitrd_start), _p(vinitrd_end),
            _p(vphysmap_start), _p(vphysmap_end),
-           _p(vstoreinfo_start), _p(vstoreinfo_end),
-           _p(vpt_start), _p(vpt_end),
            _p(vstartinfo_start), _p(vstartinfo_end),
+           _p(vstoreinfo_start), _p(vstoreinfo_end),
+           _p(vconsole_start), _p(vconsole_end),
+           _p(vpt_start), _p(vpt_end),
            _p(vstack_start), _p(vstack_end),
            _p(dsi.v_start), _p(v_end));
     printf(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
@@ -519,12 +544,14 @@ static int setup_guest(int xc_handle,
     physmap = physmap_e = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
         page_array[physmap_pfn++]);
+
     for ( count = 0; count < nr_pages; count++ )
     {
         if ( xc_add_mmu_update(xc_handle, mmu,
-			       (page_array[count] << PAGE_SHIFT) | 
+			       ((unsigned long long)page_array[count] << PAGE_SHIFT) | 
 			       MMU_MACHPHYS_UPDATE, count) )
         {
+            fprintf(stderr,"m2p update failure p=%lx m=%lx\n",count,page_array[count] ); 
             munmap(physmap, PAGE_SIZE);
             goto error_out;
         }
@@ -566,6 +593,8 @@ static int setup_guest(int xc_handle,
 #endif
 
     *store_mfn = page_array[(vstoreinfo_start-dsi.v_start) >> PAGE_SHIFT];
+    *console_mfn = page_array[(vconsole_start-dsi.v_start) >> PAGE_SHIFT];
+
 
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
@@ -577,9 +606,10 @@ static int setup_guest(int xc_handle,
     start_info->pt_base      = vpt_start;
     start_info->nr_pt_frames = nr_pt_pages;
     start_info->mfn_list     = vphysmap_start;
-    start_info->domain_controller_evtchn = control_evtchn;
     start_info->store_mfn    = *store_mfn;
     start_info->store_evtchn = store_evtchn;
+    start_info->console_mfn   = *console_mfn;
+    start_info->console_evtchn = console_evtchn;
     if ( initrd_len != 0 )
     {
         start_info->mod_start    = vinitrd_start;
@@ -627,11 +657,12 @@ int xc_linux_build(int xc_handle,
                    const char *image_name,
                    const char *ramdisk_name,
                    const char *cmdline,
-                   unsigned int control_evtchn,
                    unsigned long flags,
                    unsigned int vcpus,
                    unsigned int store_evtchn,
-                   unsigned long *store_mfn)
+                   unsigned long *store_mfn,
+                   unsigned int console_evtchn,
+                   unsigned long *console_mfn)
 {
     dom0_op_t launch_op, op;
     int initrd_fd = -1;
@@ -706,8 +737,9 @@ int xc_linux_build(int xc_handle,
                      &vstartinfo_start, &vkern_entry,
                      &vstack_start, ctxt, cmdline,
                      op.u.getdomaininfo.shared_info_frame,
-                     control_evtchn, flags, vcpus,
-                     store_evtchn, store_mfn) < 0 )
+                     flags, vcpus,
+                     store_evtchn, store_mfn,
+		     console_evtchn, console_mfn) < 0 )
     {
         ERROR("Error constructing guest OS");
         goto error_out;
@@ -727,7 +759,6 @@ int xc_linux_build(int xc_handle,
     ctxt->regs.ar_fpsr = FPSR_DEFAULT;
     /* ctxt->regs.r28 = dom_fw_setup(); currently done by hypervisor, should move here */
     ctxt->vcpu.privregs = 0;
-    ctxt->shared.domain_controller_evtchn = control_evtchn;
     ctxt->shared.flags = flags;
     i = 0; /* silence unused variable warning */
 #else /* x86 */

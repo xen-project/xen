@@ -460,9 +460,9 @@ void make_pages_writable(void *va, unsigned int nr);
 #define kern_addr_valid(addr)	(1)
 #endif /* !CONFIG_DISCONTIGMEM */
 
-int direct_remap_area_pages(struct mm_struct *mm,
+int direct_remap_pfn_range(struct mm_struct *mm,
                             unsigned long address, 
-                            unsigned long machine_addr,
+                            unsigned long mfn,
                             unsigned long size, 
                             pgprot_t prot,
                             domid_t  domid);
@@ -474,10 +474,10 @@ int touch_pte_range(struct mm_struct *mm,
                     unsigned long size);
 
 #define io_remap_page_range(vma,from,phys,size,prot) \
-direct_remap_area_pages(vma->vm_mm,from,phys,size,prot,DOMID_IO)
+direct_remap_pfn_range(vma->vm_mm,from,phys>>PAGE_SHIFT,size,prot,DOMID_IO)
 
 #define io_remap_pfn_range(vma,from,pfn,size,prot) \
-direct_remap_area_pages(vma->vm_mm,from,pfn<<PAGE_SHIFT,size,prot,DOMID_IO)
+direct_remap_pfn_range(vma->vm_mm,from,pfn,size,prot,DOMID_IO)
 
 #define MK_IOSPACE_PFN(space, pfn)	(pfn)
 #define GET_IOSPACE(pfn)		0

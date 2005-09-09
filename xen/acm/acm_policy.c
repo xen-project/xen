@@ -26,8 +26,8 @@
 #include <xen/lib.h>
 #include <xen/delay.h>
 #include <xen/sched.h>
-#include <public/acm_ops.h>
 #include <acm/acm_core.h>
+#include <public/acm_ops.h>
 #include <acm/acm_hooks.h>
 #include <acm/acm_endian.h>
 
@@ -37,14 +37,16 @@ acm_set_policy(void *buf, u16 buf_size, int isuserbuffer)
 	u8 *policy_buffer = NULL;
 	struct acm_policy_buffer *pol;
 	
-     	if (buf_size < sizeof(struct acm_policy_buffer))
+    if (buf_size < sizeof(struct acm_policy_buffer))
 		return -EFAULT;
 
 	/* 1. copy buffer from domain */
 	if ((policy_buffer = xmalloc_array(u8, buf_size)) == NULL)
-	    goto error_free;
+	    return -ENOMEM;
+
 	if (isuserbuffer) {
-		if (copy_from_user(policy_buffer, buf, buf_size)) {
+		if (copy_from_user(policy_buffer, buf, buf_size))
+        {
 			printk("%s: Error copying!\n",__func__);
 			goto error_free;
 		}
@@ -57,11 +59,13 @@ acm_set_policy(void *buf, u16 buf_size, int isuserbuffer)
 	if ((ntohl(pol->magic) != ACM_MAGIC) || 
 	    (ntohl(pol->policy_version) != ACM_POLICY_VERSION) ||
 	    (ntohl(pol->primary_policy_code) != acm_bin_pol.primary_policy_code) ||
-	    (ntohl(pol->secondary_policy_code) != acm_bin_pol.secondary_policy_code)) {
+	    (ntohl(pol->secondary_policy_code) != acm_bin_pol.secondary_policy_code))
+    {
 		printkd("%s: Wrong policy magics or versions!\n", __func__);
 		goto error_free;
 	}
-	if (buf_size != ntohl(pol->len)) {
+	if (buf_size != ntohl(pol->len))
+    {
 		printk("%s: ERROR in buf size.\n", __func__);
 		goto error_free;
 	}
@@ -72,27 +76,25 @@ acm_set_policy(void *buf, u16 buf_size, int isuserbuffer)
 	/* 3. set primary policy data */
 	if (acm_primary_ops->set_binary_policy(buf + ntohl(pol->primary_buffer_offset),
                                                ntohl(pol->secondary_buffer_offset) -
-					       ntohl(pol->primary_buffer_offset))) {
+					       ntohl(pol->primary_buffer_offset)))
 		goto error_lock_free;
-	}
+
 	/* 4. set secondary policy data */
 	if (acm_secondary_ops->set_binary_policy(buf + ntohl(pol->secondary_buffer_offset),
 						 ntohl(pol->len) - 
-						 ntohl(pol->secondary_buffer_offset))) {
+						 ntohl(pol->secondary_buffer_offset)))
 		goto error_lock_free;
-	}
+
 	write_unlock(&acm_bin_pol_rwlock);
-	if (policy_buffer != NULL)
-		xfree(policy_buffer);
+	xfree(policy_buffer);
 	return ACM_OK;
 
  error_lock_free:
 	write_unlock(&acm_bin_pol_rwlock);
  error_free:
 	printk("%s: Error setting policy.\n", __func__);
-	if (policy_buffer != NULL)
-		xfree(policy_buffer);
-	return -ENOMEM;
+    xfree(policy_buffer);
+	return -EFAULT;
 }
 
 int
@@ -102,11 +104,14 @@ acm_get_policy(void *buf, u16 buf_size)
      int ret;
      struct acm_policy_buffer *bin_pol;
 	
+    if (buf_size < sizeof(struct acm_policy_buffer))
+		return -EFAULT;
+
      if ((policy_buffer = xmalloc_array(u8, buf_size)) == NULL)
 	    return -ENOMEM;
 
      read_lock(&acm_bin_pol_rwlock);
-     /* future: read policy from file and set it */
+
      bin_pol = (struct acm_policy_buffer *)policy_buffer;
      bin_pol->magic = htonl(ACM_MAGIC);
      bin_pol->primary_policy_code = htonl(acm_bin_pol.primary_policy_code);
@@ -118,27 +123,30 @@ acm_get_policy(void *buf, u16 buf_size)
      
      ret = acm_primary_ops->dump_binary_policy (policy_buffer + ntohl(bin_pol->primary_buffer_offset),
 				       buf_size - ntohl(bin_pol->primary_buffer_offset));
-     if (ret < 0) {
-	     printk("%s: ERROR creating chwallpolicy buffer.\n", __func__);
-	     read_unlock(&acm_bin_pol_rwlock);
-	     return -1;
-     }
+     if (ret < 0)
+         goto error_free_unlock;
+
      bin_pol->len = htonl(ntohl(bin_pol->len) + ret);
      bin_pol->secondary_buffer_offset = htonl(ntohl(bin_pol->len));
 
      ret = acm_secondary_ops->dump_binary_policy(policy_buffer + ntohl(bin_pol->secondary_buffer_offset),
 				    buf_size - ntohl(bin_pol->secondary_buffer_offset));
-     if (ret < 0) {
-	     printk("%s: ERROR creating chwallpolicy buffer.\n", __func__);
-	     read_unlock(&acm_bin_pol_rwlock);
-	     return -1;
-     }
+     if (ret < 0)
+         goto error_free_unlock;
+
      bin_pol->len = htonl(ntohl(bin_pol->len) + ret);
-     read_unlock(&acm_bin_pol_rwlock);
      if (copy_to_user(buf, policy_buffer, ntohl(bin_pol->len)))
-	     return -EFAULT;
+	     goto error_free_unlock;
+
+     read_unlock(&acm_bin_pol_rwlock);
      xfree(policy_buffer);
      return ACM_OK;
+
+ error_free_unlock:
+     read_unlock(&acm_bin_pol_rwlock);
+     printk("%s: Error getting policy.\n", __func__);
+     xfree(policy_buffer);
+     return -EFAULT;
 }
 
 int
@@ -183,6 +191,64 @@ acm_dump_statistics(void *buf, u16 buf_size)
      read_unlock(&acm_bin_pol_rwlock);
      xfree(stats_buffer);
      return -EFAULT;
+}
+
+
+int
+acm_get_ssid(ssidref_t ssidref, u8 *buf, u16 buf_size)
+{
+    /* send stats to user space */
+     u8 *ssid_buffer;
+     int ret;
+     struct acm_ssid_buffer *acm_ssid;
+     if (buf_size < sizeof(struct acm_ssid_buffer))
+		return -EFAULT;
+
+     if ((ssid_buffer = xmalloc_array(u8, buf_size)) == NULL)
+	    return -ENOMEM;
+
+     read_lock(&acm_bin_pol_rwlock);
+
+     acm_ssid = (struct acm_ssid_buffer *)ssid_buffer;
+     acm_ssid->len = sizeof(struct acm_ssid_buffer);
+     acm_ssid->ssidref = ssidref;
+     acm_ssid->primary_policy_code = acm_bin_pol.primary_policy_code;
+     acm_ssid->secondary_policy_code = acm_bin_pol.secondary_policy_code;
+     acm_ssid->primary_types_offset = acm_ssid->len;
+
+     /* ret >= 0 --> ret == max_types */
+     ret = acm_primary_ops->dump_ssid_types(ACM_PRIMARY(ssidref),
+                                            ssid_buffer + acm_ssid->primary_types_offset,
+                                            buf_size - acm_ssid->primary_types_offset);
+     if (ret < 0)
+         goto error_free_unlock;
+
+     acm_ssid->len += ret;
+     acm_ssid->primary_max_types = ret;
+
+     acm_ssid->secondary_types_offset = acm_ssid->len;
+
+     ret = acm_secondary_ops->dump_ssid_types(ACM_SECONDARY(ssidref),
+                                              ssid_buffer + acm_ssid->secondary_types_offset,
+                                              buf_size - acm_ssid->secondary_types_offset);
+     if (ret < 0)
+         goto error_free_unlock;
+
+     acm_ssid->len += ret;
+     acm_ssid->secondary_max_types = ret;
+
+     if (copy_to_user(buf, ssid_buffer, acm_ssid->len))
+	     goto error_free_unlock;
+
+     read_unlock(&acm_bin_pol_rwlock);
+     xfree(ssid_buffer);
+     return ACM_OK;
+
+ error_free_unlock:
+     read_unlock(&acm_bin_pol_rwlock);
+     printk("%s: Error getting ssid.\n", __func__);
+     xfree(ssid_buffer);
+     return -ENOMEM;
 }
 
 /*eof*/

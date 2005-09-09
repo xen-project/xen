@@ -49,6 +49,10 @@ source "drivers/infiniband/Kconfig"
 endif
 
 if !XEN_PHYSDEV_ACCESS
+source "drivers/char/tpm/Kconfig.domU"
+endif
+
+if !XEN_PHYSDEV_ACCESS
 
 menu "Character devices"
 

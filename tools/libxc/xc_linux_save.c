@@ -14,12 +14,29 @@
 
 #include "xg_private.h"
 
-#include <xen/linux/suspend.h>
 #include <xen/io/domain_controller.h>
 
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
 
 #define MAX_MBIT_RATE 500
+
+
+/*
+** Default values for important tuning parameters. Can override by passing
+** non-zero replacement values to xc_linux_save().  
+**
+** XXX SMH: should consider if want to be able to override MAX_MBIT_RATE too. 
+** 
+*/
+#define DEF_MAX_ITERS   29   /* limit us to 30 times round loop */ 
+#define DEF_MAX_FACTOR   3   /* never send more than 3x nr_pfns */
+
+
+
+/* Flags to control behaviour of xc_linux_save */
+#define XCFLAGS_LIVE      1
+#define XCFLAGS_DEBUG     2
+
 
 #define DEBUG 0
 
@@ -320,18 +337,18 @@ static int suspend_and_state(int xc_handle, int io_fd,	int dom,
                              xc_dominfo_t *info,
                              vcpu_guest_context_t *ctxt)
 {
-    int i=0;
+    int i = 0;
     char ans[30];
 
     printf("suspend\n");
     fflush(stdout);
     if (fgets(ans, sizeof(ans), stdin) == NULL) {
-	ERR("failed reading suspend reply");
-	return -1;
+        ERR("failed reading suspend reply");
+        return -1;
     }
     if (strncmp(ans, "done\n", 5)) {
-	ERR("suspend reply incorrect: %s", ans);
-	return -1;
+        ERR("suspend reply incorrect: %s", ans);
+        return -1;
     }
 
 retry:
@@ -377,19 +394,16 @@ retry:
     return -1;
 }
 
-int xc_linux_save(int xc_handle, int io_fd, u32 dom)
+int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters, 
+                  u32 max_factor, u32 flags)
 {
     xc_dominfo_t info;
 
     int rc = 1, i, j, k, last_iter, iter = 0;
     unsigned long mfn;
-    int live =  0; // (ioctxt->flags & XCFLAGS_LIVE);
-    int debug = 0; // (ioctxt->flags & XCFLAGS_DEBUG);
+    int live  = (flags & XCFLAGS_LIVE); 
+    int debug = (flags & XCFLAGS_DEBUG); 
     int sent_last_iter, skip_this_iter;
-
-    /* Important tuning parameters */
-    int max_iters  = 29; /* limit us to 30 times round loop */
-    int max_factor = 3;  /* never send more than 3x nr_pfns */
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
@@ -405,6 +419,7 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
     unsigned long page[1024];
 
     /* A copy of the pfn-to-mfn table frame list. */
+    unsigned long *live_pfn_to_mfn_frame_list_list = NULL;
     unsigned long *live_pfn_to_mfn_frame_list = NULL;
     unsigned long pfn_to_mfn_frame_list[1024];
 
@@ -419,9 +434,6 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
 
     /* base of the region in which domain memory is mapped */
     unsigned char *region_base = NULL;
-
-    /* A temporary mapping, and a copy, of the guest's suspend record. */
-    suspend_record_t *p_srec = NULL;
 
     /* number of pages we're dealing with */
     unsigned long nr_pfns;
@@ -442,8 +454,16 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
 
     MBIT_RATE = START_MBIT_RATE;
 
-    DPRINTF("xc_linux_save start %d\n", dom);
-    
+
+    /* If no explicit control parameters given, use defaults */
+    if(!max_iters) 
+        max_iters = DEF_MAX_ITERS; 
+    if(!max_factor) 
+        max_factor = DEF_MAX_FACTOR; 
+
+
+    DPRINTF("xc_linux_save start DOM%u live=%s\n", dom, live?"true":"false"); 
+
     if (mlock(&ctxt, sizeof(ctxt))) {
         ERR("Unable to mlock ctxt");
         return 1;
@@ -487,11 +507,20 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
         goto out;
     }
 
-    /* the pfn_to_mfn_frame_list fits in a single page */
+    live_pfn_to_mfn_frame_list_list = xc_map_foreign_range(xc_handle, dom,
+                                        PAGE_SIZE, PROT_READ,
+                                        live_shinfo->arch.pfn_to_mfn_frame_list_list);
+
+    if (!live_pfn_to_mfn_frame_list_list){
+        ERR("Couldn't map pfn_to_mfn_frame_list_list");
+        goto out;
+    }
+
     live_pfn_to_mfn_frame_list = 
-        xc_map_foreign_range(xc_handle, dom, 
-                              PAGE_SIZE, PROT_READ, 
-                              live_shinfo->arch.pfn_to_mfn_frame_list );
+	xc_map_foreign_batch(xc_handle, dom, 
+			     PROT_READ,
+			     live_pfn_to_mfn_frame_list_list,
+			     (nr_pfns+(1024*1024)-1)/(1024*1024) );
 
     if (!live_pfn_to_mfn_frame_list){
         ERR("Couldn't map pfn_to_mfn_frame_list");
@@ -647,22 +676,6 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
         goto out;
     }
 
-    /* Map the suspend-record MFN to pin it. The page must be owned by 
-       dom for this to succeed. */
-    p_srec = xc_map_foreign_range(xc_handle, dom,
-                                   sizeof(*p_srec), PROT_READ | PROT_WRITE, 
-                                   ctxt.user_regs.esi);
-    if (!p_srec){
-        ERR("Couldn't map suspend record");
-        goto out;
-    }
-
-    /* Canonicalize store mfn. */
-    if ( !translate_mfn_to_pfn(&p_srec->resume_info.store_mfn) ) {
-	ERR("Store frame is not in range of pseudophys map");
-	goto out;
-    }
-
     print_stats( xc_handle, dom, 0, &stats, 0 );
 
     /* Now write out each data page, canonicalising page tables as we go... */
@@ -763,8 +776,6 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
                 batch++;
             }
      
-//            DPRINTF("batch %d:%d (n=%d)\n", iter, batch, n);
-
             if ( batch == 0 )
                 goto skip; /* vanishingly unlikely... */
       
@@ -915,7 +926,7 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
             continue;
         }
 
-        if ( last_iter ) break;
+        if ( last_iter ) break; 
 
         if ( live )
         {
@@ -1003,13 +1014,6 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
 	}
     }
 
-    if (nr_pfns != p_srec->nr_pfns )
-    {
-	ERR("Suspend record nr_pfns unexpected (%ld != %ld)",
-		   p_srec->nr_pfns, nr_pfns);
-        goto out;
-    }
-
     /* Canonicalise the suspend-record frame number. */
     if ( !translate_mfn_to_pfn(&ctxt.user_regs.esi) ){
         ERR("Suspend record is not in range of pseudophys map");
@@ -1042,9 +1046,6 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom)
 
     if(live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);
-
-    if(p_srec) 
-        munmap(p_srec, sizeof(*p_srec));
 
     if(live_pfn_to_mfn_frame_list) 
         munmap(live_pfn_to_mfn_frame_list, PAGE_SIZE);

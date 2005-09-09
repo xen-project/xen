@@ -6,6 +6,7 @@
 
 #include <zlib.h>
 #include "xc_private.h"
+#include <xen/memory.h>
 
 void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
                            unsigned long *arr, int num )
@@ -115,7 +116,7 @@ int xc_mmuext_op(
 
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
-	fprintf(stderr, "Dom_mem operation failed (rc=%ld errno=%d)-- need to"
+	fprintf(stderr, "Dom_mmuext operation failed (rc=%ld errno=%d)-- need to"
                     " rebuild the user-space tool set?\n",ret,errno);
     }
 
@@ -171,7 +172,7 @@ xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom)
 }
 
 int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu, 
-		      unsigned long ptr, unsigned long val)
+		      unsigned long long ptr, unsigned long long val)
 {
     mmu->updates[mmu->idx].ptr = ptr;
     mmu->updates[mmu->idx].val = val;
@@ -187,38 +188,64 @@ int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu)
     return flush_mmu_updates(xc_handle, mmu);
 }
 
-int xc_dom_mem_op(int xc_handle,
-		  unsigned int memop, 
-		  unsigned int *extent_list, 
-		  unsigned int nr_extents,
-		  unsigned int extent_order,
-		  domid_t domid)
+int xc_memory_op(int xc_handle,
+                 int cmd,
+                 void *arg)
 {
     privcmd_hypercall_t hypercall;
+    struct xen_memory_reservation *reservation = arg;
     long ret = -EINVAL;
 
-    hypercall.op     = __HYPERVISOR_dom_mem_op;
-    hypercall.arg[0] = (unsigned long)memop;
-    hypercall.arg[1] = (unsigned long)extent_list;
-    hypercall.arg[2] = (unsigned long)nr_extents;
-    hypercall.arg[3] = (unsigned long)extent_order;
-    hypercall.arg[4] = (unsigned long)domid;
+    hypercall.op     = __HYPERVISOR_memory_op;
+    hypercall.arg[0] = (unsigned long)cmd;
+    hypercall.arg[1] = (unsigned long)arg;
 
-    if ( (extent_list != NULL) && 
-         (mlock(extent_list, nr_extents*sizeof(unsigned long)) != 0) )
+    switch ( cmd )
     {
-        PERROR("Could not lock memory for Xen hypercall");
-        goto out1;
+    case XENMEM_increase_reservation:
+    case XENMEM_decrease_reservation:
+        if ( mlock(reservation, sizeof(*reservation)) != 0 )
+        {
+            PERROR("Could not mlock");
+            goto out1;
+        }
+        if ( (reservation->extent_start != NULL) &&
+             (mlock(reservation->extent_start,
+                    reservation->nr_extents * sizeof(unsigned long)) != 0) )
+        {
+            PERROR("Could not mlock");
+            safe_munlock(reservation, sizeof(*reservation));
+            goto out1;
+        }
+        break;
+    case XENMEM_maximum_ram_page:
+        if ( mlock(arg, sizeof(unsigned long)) != 0 )
+        {
+            PERROR("Could not mlock");
+            goto out1;
+        }
+        break;
     }
 
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
-	fprintf(stderr, "Dom_mem operation failed (rc=%ld errno=%d)-- need to"
+	fprintf(stderr, "hypercall failed (rc=%ld errno=%d)-- need to"
                 " rebuild the user-space tool set?\n",ret,errno);
     }
 
-    if ( extent_list != NULL )
-        safe_munlock(extent_list, nr_extents*sizeof(unsigned long));
+    switch ( cmd )
+    {
+    case XENMEM_increase_reservation:
+    case XENMEM_decrease_reservation:
+        safe_munlock(reservation, sizeof(*reservation));
+        if ( reservation->extent_start != NULL )
+            safe_munlock(reservation->extent_start,
+                         reservation->nr_extents * sizeof(unsigned long));
+        break;
+    case XENMEM_maximum_ram_page:
+        safe_munlock(arg, sizeof(unsigned long));
+        break;
+    }
 
  out1:
     return ret;
@@ -394,4 +421,27 @@ void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,
 int xc_dom0_op(int xc_handle, dom0_op_t *op)
 {
     return do_dom0_op(xc_handle, op);
+}
+
+int xc_version(int xc_handle, int cmd, void *arg)
+{
+    return do_xen_version(xc_handle, cmd, arg);
+}
+
+unsigned long xc_make_page_below_4G(int xc_handle, u32 domid, 
+				    unsigned long mfn)
+{
+    unsigned long new_mfn;
+    if ( xc_domain_memory_decrease_reservation( 
+	xc_handle, domid, 1, 0, &mfn ) != 1 )
+    {
+	fprintf(stderr,"xc_make_page_below_4G decrease failed. mfn=%lx\n",mfn);
+	return 0;
+    }
+    if ( xc_domain_memory_increase_reservation( xc_handle, domid, 1, 0, 32, &new_mfn ) != 1 )
+    {
+	fprintf(stderr,"xc_make_page_below_4G increase failed. mfn=%lx\n",mfn);
+	return 0;
+    }
+    return new_mfn;
 }

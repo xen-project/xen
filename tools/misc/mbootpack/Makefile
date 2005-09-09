@@ -20,8 +20,7 @@ GDB	:= gdb
 INCS	:= -I. -I-
 DEFS	:= 
 LDFLAGS	:= 
-CC	:= gcc
-CFLAGS 	:= -Wall -Wpointer-arith -Wcast-qual -Wno-unused -Wno-format
+CFLAGS	:= -Wall -Wpointer-arith -Wcast-qual -Wno-unused -Wno-format
 CFLAGS	+= -Wmissing-prototypes
 #CFLAGS	+= -pipe -g -O0 -Wcast-align
 CFLAGS	+= -pipe -O3 
@@ -34,7 +33,7 @@ DEPFLAGS = -Wp,-MD,.$(@F).d
 DEPS     = .*.d
 
 mbootpack: $(OBJS)
-	$(CC) -o $@ $(filter-out %.a, $^) $(LDFLAGS)
+	$(HOSTCC) -o $@ $(filter-out %.a, $^) $(LDFLAGS)
 
 clean:
 	$(RM) mbootpack *.o $(DEPS) bootsect setup bzimage_header.c bin2c
@@ -48,7 +47,7 @@ setup: setup.S
 	$(LD) -m elf_i386 -Ttext 0x0 -s --oformat binary setup.o -o $@
 
 bin2c: bin2c.o 
-	$(CC) -o $@ $^ 
+	$(HOSTCC) -o $@ $^ 
 
 bzimage_header.c: bootsect setup bin2c
 	./bin2c -n 8 -b1 -a bzimage_bootsect bootsect > bzimage_header.c
@@ -58,10 +57,10 @@ buildimage.c: bzimage_header.c
 	@
 
 %.o: %.S
-	$(CC) $(DEPFLAGS) $(CFLAGS) $(INCS) $(DEFS) -c $< -o $@
+	$(HOSTCC) $(DEPFLAGS) $(CFLAGS) $(INCS) $(DEFS) -c $< -o $@
 
 %.o: %.c
-	$(CC) $(DEPFLAGS) $(CFLAGS) $(INCS) $(DEFS) -c $< -o $@
+	$(HOSTCC) $(DEPFLAGS) $(CFLAGS) $(INCS) $(DEFS) -c $< -o $@
 
 .PHONY: all clean gdb
 .PRECIOUS: $(OBJS) $(OBJS:.o=.c) $(DEPS)

@@ -255,13 +255,13 @@ void arch_do_createdomain(struct vcpu *v)
     v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
     v->cpumap = CPUMAP_RUNANYWHERE;
     SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
-    machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
-                           PAGE_SHIFT] = INVALID_M2P_ENTRY;
+    set_pfn_from_mfn(virt_to_phys(d->shared_info) >> PAGE_SHIFT,
+            INVALID_M2P_ENTRY);
     
     d->arch.mm_perdomain_pt = alloc_xenheap_page();
     memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE);
-    machine_to_phys_mapping[virt_to_phys(d->arch.mm_perdomain_pt) >> 
-                           PAGE_SHIFT] = INVALID_M2P_ENTRY;
+    set_pfn_from_mfn(virt_to_phys(d->arch.mm_perdomain_pt) >> PAGE_SHIFT,
+            INVALID_M2P_ENTRY);
     v->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
     v->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
         l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
@@ -381,11 +381,13 @@ static int vmx_final_setup_guest(
 out:
     free_vmcs(vmcs);
     if(v->arch.arch_vmx.io_bitmap_a != 0) {
-        free_xenheap_pages(v->arch.arch_vmx.io_bitmap_a, get_order(0x1000));
+        free_xenheap_pages(
+            v->arch.arch_vmx.io_bitmap_a, get_order_from_bytes(0x1000));
         v->arch.arch_vmx.io_bitmap_a = 0;
     }
     if(v->arch.arch_vmx.io_bitmap_b != 0) {
-        free_xenheap_pages(v->arch.arch_vmx.io_bitmap_b, get_order(0x1000));
+        free_xenheap_pages(
+            v->arch.arch_vmx.io_bitmap_b, get_order_from_bytes(0x1000));
         v->arch.arch_vmx.io_bitmap_b = 0;
     }
     v->arch.arch_vmx.vmcs = 0;
@@ -885,8 +887,13 @@ int __sync_lazy_execstate(void)
     return switch_required;
 }
 
-void sync_lazy_execstate_cpu(unsigned int cpu)
+void sync_vcpu_execstate(struct vcpu *v)
 {
+    unsigned int cpu = v->processor;
+
+    if ( !cpu_isset(cpu, v->domain->cpumask) )
+        return;
+
     if ( cpu == smp_processor_id() )
     {
         (void)__sync_lazy_execstate();
@@ -967,11 +974,13 @@ static void vmx_relinquish_resources(struct vcpu *v)
     BUG_ON(v->arch.arch_vmx.vmcs == NULL);
     free_vmcs(v->arch.arch_vmx.vmcs);
     if(v->arch.arch_vmx.io_bitmap_a != 0) {
-        free_xenheap_pages(v->arch.arch_vmx.io_bitmap_a, get_order(0x1000));
+        free_xenheap_pages(
+            v->arch.arch_vmx.io_bitmap_a, get_order_from_bytes(0x1000));
         v->arch.arch_vmx.io_bitmap_a = 0;
     }
     if(v->arch.arch_vmx.io_bitmap_b != 0) {
-        free_xenheap_pages(v->arch.arch_vmx.io_bitmap_b, get_order(0x1000));
+        free_xenheap_pages(
+            v->arch.arch_vmx.io_bitmap_b, get_order_from_bytes(0x1000));
         v->arch.arch_vmx.io_bitmap_b = 0;
     }
     v->arch.arch_vmx.vmcs = 0;

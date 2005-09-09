@@ -70,6 +70,27 @@ config XEN_NETDEV_BACKEND
 	  network devices to other guests via a high-performance shared-memory
 	  interface.
 
+config XEN_TPMDEV_FRONTEND
+        bool "TPM-device frontend driver"
+        default n
+        help
+          The TPM-device frontend driver.
+
+config XEN_TPMDEV_BACKEND
+        bool "TPM-device backend driver"
+        default n
+        help
+          The TPM-device backend driver
+
+config XEN_TPMDEV_CLOSE_IF_VTPM_FAILS
+        bool "TPM backend closes upon vTPM failure"
+        depends on XEN_TPMDEV_BACKEND
+        default n
+        help
+          The TPM backend closes the channel if the vTPM in userspace indicates
+          a failure. The corresponding domain's channel will be closed.
+          Say Y if you want this feature.
+
 config XEN_BLKDEV_FRONTEND
 	bool "Block-device frontend driver"
 	default y
@@ -88,15 +109,8 @@ config XEN_NETDEV_FRONTEND
 	  dedicated device-driver domain, or your master control domain
 	  (domain 0), then you almost certainly want to say Y here.
 
-config XEN_NETDEV_GRANT_TX
-        bool "Grant table substrate for net drivers tx path (DANGEROUS)"
-        default n
-        help
-          This introduces the use of grant tables as a data exhange mechanism
-          between the frontend and backend network drivers.
-
-config XEN_NETDEV_GRANT_RX
-        bool "Grant table substrate for net drivers rx path (DANGEROUS)"
+config XEN_NETDEV_GRANT
+        bool "Grant table substrate for network drivers (DANGEROUS)"
         default n
         help
           This introduces the use of grant tables as a data exhange mechanism

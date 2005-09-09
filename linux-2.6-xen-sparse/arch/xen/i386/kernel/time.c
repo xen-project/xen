@@ -445,7 +445,7 @@ int do_settimeofday(struct timespec *tv)
 	sec = tv->tv_sec;
 	__normalize_time(&sec, &nsec);
 
-	if ((xen_start_info.flags & SIF_INITDOMAIN) &&
+	if ((xen_start_info->flags & SIF_INITDOMAIN) &&
 	    !independent_wallclock) {
 		op.cmd = DOM0_SETTIME;
 		op.u.settime.secs        = sec;
@@ -476,7 +476,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 
 	WARN_ON(irqs_disabled());
 
-	if (!(xen_start_info.flags & SIF_INITDOMAIN))
+	if (!(xen_start_info->flags & SIF_INITDOMAIN))
 		return 0;
 
 	/* gets recalled with irq locally disabled */

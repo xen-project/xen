@@ -1,3 +1,3 @@
 
-obj-y	:= blktap_userdev.o blktap_datapath.o blktap_controlmsg.o blktap.o 
+obj-y	:= xenbus.o interface.o blktap.o 
 

@@ -44,11 +44,19 @@ typedef unsigned long       u_long;
 typedef long long           quad_t;
 typedef unsigned long long  u_quad_t;
 typedef unsigned int        uintptr_t;
+
+typedef struct { unsigned long pte_low; } pte_t;
 #elif defined(__x86_64__)
 typedef long                quad_t;
 typedef unsigned long       u_quad_t;
 typedef unsigned long       uintptr_t;
+
+typedef struct { unsigned long pte; } pte_t;
 #endif
 
+
+
+
+#define INT_MAX         ((int)(~0U>>1))
 #define UINT_MAX            (~0U)
 #endif /* _TYPES_H_ */

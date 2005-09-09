@@ -142,6 +142,10 @@ void cpu_set_log(int log_flags)
 #else
         setvbuf(logfile, NULL, _IOLBF, 0);
 #endif
+/*
+    	stdout = logfile;
+    	stderr = logfile;
+*/
     }
 }
 
@@ -386,9 +390,6 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                     io_mem_write[io_index][1](io_mem_opaque[io_index], addr, val);
                     l = 2;
                 } else {
-                    if (l!=1){
-                        fprintf(logfile, "ERROR 8 bit mmio\n");
-                    }
                     /* 8 bit access */
                     val = ldub_raw(buf);
                     io_mem_write[io_index][0](io_mem_opaque[io_index], addr, val);
@@ -461,4 +462,14 @@ int cpu_memory_rw_debug(CPUState *env, target_ulong addr,
 
 void cpu_physical_memory_reset_dirty(target_ulong start, target_ulong end)
 {
+	uint8_t *p;
+	int len;
+
+	if ((len = (end - start)) <= 0)
+		return;
+	p = phys_ram_dirty + (start >> TARGET_PAGE_BITS);
+	len = len >> TARGET_PAGE_BITS;
+	while (len > 0)
+		p[--len] &= ~VGA_DIRTY_FLAG;
+	return;
 }

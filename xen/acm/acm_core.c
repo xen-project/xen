@@ -64,16 +64,17 @@ u8 little_endian = 1;
 void acm_set_endian(void)
 {
     u32 test = 1;
-    if (*((u8 *)&test) == 1) {
+    if (*((u8 *)&test) == 1)
+    {
       	printk("ACM module running in LITTLE ENDIAN.\n");
-	little_endian = 1;
-    } else {
-	printk("ACM module running in BIG ENDIAN.\n");
-	little_endian = 0;
+        little_endian = 1;
+    }
+    else
+    {
+        printk("ACM module running in BIG ENDIAN.\n");
+        little_endian = 0;
     }
 }
-
-#if (ACM_USE_SECURITY_POLICY != ACM_NULL_POLICY)
 
 /* initialize global security policy for Xen; policy write-locked already */
 static void
@@ -101,7 +102,8 @@ acm_setup(unsigned int *initrdidx,
      * Try all modules and see whichever could be the binary policy.
      * Adjust the initrdidx if module[1] is the binary policy.
      */
-    for (i = mbi->mods_count-1; i >= 1; i--) {
+    for (i = mbi->mods_count-1; i >= 1; i--)
+    {
         struct acm_policy_buffer *pol;
         char *_policy_start; 
         unsigned long _policy_len;
@@ -117,23 +119,32 @@ acm_setup(unsigned int *initrdidx,
 		continue; /* not a policy */
 
         pol = (struct acm_policy_buffer *)_policy_start;
-        if (ntohl(pol->magic) == ACM_MAGIC) {
+        if (ntohl(pol->magic) == ACM_MAGIC)
+        {
             rc = acm_set_policy((void *)_policy_start,
                                 (u16)_policy_len,
                                 0);
-            if (rc == ACM_OK) {
+            if (rc == ACM_OK)
+            {
                 printf("Policy len  0x%lx, start at %p.\n",_policy_len,_policy_start);
-                if (i == 1) {
-                    if (mbi->mods_count > 2) {
+                if (i == 1)
+                {
+                    if (mbi->mods_count > 2)
+                    {
                         *initrdidx = 2;
-                    } else {
+                    }
+                    else {
                         *initrdidx = 0;
                     }
-                } else {
+                }
+                else
+                {
                     *initrdidx = 1;
                 }
                 break;
-            } else {
+            }
+            else
+            {
             	printk("Invalid policy. %d.th module line.\n", i+1);
             }
         } /* end if a binary policy definition, i.e., (ntohl(pol->magic) == ACM_MAGIC ) */
@@ -147,56 +158,84 @@ acm_init(unsigned int *initrdidx,
          const multiboot_info_t *mbi,
          unsigned long initial_images_start)
 {
-	int ret = -EINVAL;
+	int ret = ACM_OK;
 
-	acm_set_endian();
+    acm_set_endian();
 	write_lock(&acm_bin_pol_rwlock);
+    acm_init_binary_policy(NULL, NULL);
 
-	if (ACM_USE_SECURITY_POLICY == ACM_CHINESE_WALL_POLICY) {
-		acm_init_binary_policy(NULL, NULL);
-		acm_init_chwall_policy();
+    /* set primary policy component */
+    switch ((ACM_USE_SECURITY_POLICY) & 0x0f)
+    {
+
+    case ACM_CHINESE_WALL_POLICY:
+        acm_init_chwall_policy();
 		acm_bin_pol.primary_policy_code = ACM_CHINESE_WALL_POLICY;
 		acm_primary_ops = &acm_chinesewall_ops;
-		acm_bin_pol.secondary_policy_code = ACM_NULL_POLICY;
-		acm_secondary_ops = &acm_null_ops;
-		ret = ACM_OK;
-	} else if (ACM_USE_SECURITY_POLICY == ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY) {
-		acm_init_binary_policy(NULL, NULL);
-		acm_init_ste_policy();
+        break;
+
+    case ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY:
+        acm_init_ste_policy();
 		acm_bin_pol.primary_policy_code = ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY;
 		acm_primary_ops = &acm_simple_type_enforcement_ops;
+        break;
+
+    default:
+        /* NULL or Unknown policy not allowed primary;
+         * NULL/NULL will not compile this code */
+        ret = -EINVAL;
+        goto out;
+    }
+
+    /* secondary policy component part */
+    switch ((ACM_USE_SECURITY_POLICY) >> 4) {
+    case ACM_NULL_POLICY:
 		acm_bin_pol.secondary_policy_code = ACM_NULL_POLICY;
 		acm_secondary_ops = &acm_null_ops;
-		ret = ACM_OK;
-	} else if (ACM_USE_SECURITY_POLICY == ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY) {
-		acm_init_binary_policy(NULL, NULL);
+		break;
+
+    case ACM_CHINESE_WALL_POLICY:
+        if (acm_bin_pol.primary_policy_code == ACM_CHINESE_WALL_POLICY)
+        {   /* not a valid combination */
+            ret = -EINVAL;
+            goto out;
+        }
 		acm_init_chwall_policy();
+        acm_bin_pol.secondary_policy_code = ACM_CHINESE_WALL_POLICY;
+		acm_secondary_ops = &acm_chinesewall_ops;
+        break;
+
+    case ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY:
+        if (acm_bin_pol.primary_policy_code == ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)
+        {   /* not a valid combination */
+            ret = -EINVAL;
+            goto out;
+        }
 		acm_init_ste_policy();
-		acm_bin_pol.primary_policy_code = ACM_CHINESE_WALL_POLICY;
-		acm_primary_ops = &acm_chinesewall_ops;
 		acm_bin_pol.secondary_policy_code = ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY;
 		acm_secondary_ops = &acm_simple_type_enforcement_ops;
-		ret = ACM_OK;
-	} else if (ACM_USE_SECURITY_POLICY == ACM_NULL_POLICY) {
-		acm_init_binary_policy(NULL, NULL);
-		acm_bin_pol.primary_policy_code = ACM_NULL_POLICY;
-		acm_primary_ops = &acm_null_ops;
-		acm_bin_pol.secondary_policy_code = ACM_NULL_POLICY;
-		acm_secondary_ops = &acm_null_ops;
-		ret = ACM_OK;
-	}
+        break;
+
+    default:
+        ret = -EINVAL;
+        goto out;
+    }
+
+ out:
 	write_unlock(&acm_bin_pol_rwlock);
 
 	if (ret != ACM_OK)
-		return -EINVAL;		
+    {
+        printk("%s: Error setting policies.\n", __func__);
+        /* here one could imagine a clean panic */
+		return -EINVAL;
+	}
 	acm_setup(initrdidx, mbi, initial_images_start);
 	printk("%s: Enforcing Primary %s, Secondary %s.\n", __func__, 
-	       ACM_POLICY_NAME(acm_bin_pol.primary_policy_code), ACM_POLICY_NAME(acm_bin_pol.secondary_policy_code));
+	       ACM_POLICY_NAME(acm_bin_pol.primary_policy_code),
+           ACM_POLICY_NAME(acm_bin_pol.secondary_policy_code));
 	return ret;
 }
-
-
-#endif
 
 int
 acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
@@ -205,7 +244,8 @@ acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
 	struct domain *subj = find_domain_by_id(id);
 	int ret1, ret2;
 	
-	if (subj == NULL) {
+	if (subj == NULL)
+    {
 		printk("%s: ACM_NULL_POINTER ERROR (id=%x).\n", __func__, id);
 		return ACM_NULL_POINTER_ERROR;
 	}
@@ -235,14 +275,16 @@ acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
 	else
 		ret2 = ACM_OK;
 
-	if ((ret1 != ACM_OK) || (ret2 != ACM_OK)) {
+	if ((ret1 != ACM_OK) || (ret2 != ACM_OK))
+    {
 		printk("%s: ERROR instantiating individual ssids for domain 0x%02x.\n",
 		       __func__, subj->domain_id);
 		acm_free_domain_ssid(ssid);	
 	        put_domain(subj);
 		return ACM_INIT_SSID_ERROR;
 	}
-	printk("%s: assigned domain %x the ssidref=%x.\n", __func__, id, ssid->ssidref);
+	printk("%s: assigned domain %x the ssidref=%x.\n",
+           __func__, id, ssid->ssidref);
 	put_domain(subj);
 	return ACM_OK;
 }
@@ -254,11 +296,12 @@ acm_free_domain_ssid(struct acm_ssid_domain *ssid)
 	domid_t id;
 
 	/* domain is already gone, just ssid is left */
-	if (ssid == NULL) {
+	if (ssid == NULL)
+    {
 		printk("%s: ACM_NULL_POINTER ERROR.\n", __func__);
 		return ACM_NULL_POINTER_ERROR;
 	}
-       	id = ssid->domainid;
+    id = ssid->domainid;
 	ssid->subject  	     = NULL;
 
 	if (acm_primary_ops->free_domain_ssid != NULL) /* null policy */
@@ -268,6 +311,7 @@ acm_free_domain_ssid(struct acm_ssid_domain *ssid)
 		acm_secondary_ops->free_domain_ssid(ssid->secondary_ssid);
 	ssid->secondary_ssid = NULL;
 	xfree(ssid);
-	printkd("%s: Freed individual domain ssid (domain=%02x).\n",__func__, id);
+	printkd("%s: Freed individual domain ssid (domain=%02x).\n",
+            __func__, id);
 	return ACM_OK;
 }

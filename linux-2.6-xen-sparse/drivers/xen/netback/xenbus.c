@@ -160,9 +160,47 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		}
 #endif
 
+		kobject_hotplug(&dev->dev.kobj, KOBJ_ONLINE);
+
 		/* Pass in NULL node to skip exist test. */
 		frontend_changed(&be->watch, NULL);
 	}
+}
+
+static int netback_hotplug(struct xenbus_device *xdev, char **envp,
+			   int num_envp, char *buffer, int buffer_size)
+{
+	struct backend_info *be;
+	netif_t *netif;
+	char **key, *val;
+	int i = 0, length = 0;
+	static char *env_vars[] = { "script", "domain", "mac", "bridge", "ip",
+				    NULL };
+
+	be = xdev->data;
+	netif = be->netif;
+
+	add_hotplug_env_var(envp, num_envp, &i,
+			    buffer, buffer_size, &length,
+			    "vif=%s", netif->dev->name);
+
+	key = env_vars;
+	while (*key != NULL) {
+		val = xenbus_read(xdev->nodename, *key, NULL);
+		if (!IS_ERR(val)) {
+			char buf[strlen(*key) + 4];
+			sprintf(buf, "%s=%%s", *key);
+			add_hotplug_env_var(envp, num_envp, &i,
+					    buffer, buffer_size, &length,
+					    buf, val);
+			kfree(val);
+		}
+		key++;
+	}
+
+	envp[i] = NULL;
+
+	return 0;
 }
 
 static int netback_probe(struct xenbus_device *dev,
@@ -249,6 +287,7 @@ static struct xenbus_driver netback = {
 	.ids = netback_ids,
 	.probe = netback_probe,
 	.remove = netback_remove,
+	.hotplug = netback_hotplug,
 };
 
 void netif_xenbus_init(void)

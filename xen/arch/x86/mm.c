@@ -1450,9 +1450,9 @@ int get_page_type(struct pfn_info *page, unsigned long type)
                          ((type & PGT_type_mask) != PGT_l1_page_table) )
                         MEM_LOG("Bad type (saw %" PRtype_info
                                 "!= exp %" PRtype_info ") "
-                                "for mfn %lx (pfn %x)",
+                                "for mfn %lx (pfn %lx)",
                                 x, type, page_to_pfn(page),
-                                machine_to_phys_mapping[page_to_pfn(page)]);
+                                get_pfn_from_mfn(page_to_pfn(page)));
                     return 0;
                 }
                 else if ( (x & PGT_va_mask) == PGT_va_mutable )
@@ -2206,7 +2206,7 @@ int do_mmu_update(
                 printk("privileged guest dom%d requests pfn=%lx to "
                        "map mfn=%lx for dom%d\n",
                        d->domain_id, gpfn, mfn, FOREIGNDOM->domain_id);
-                set_machinetophys(mfn, gpfn);
+                set_pfn_from_mfn(mfn, gpfn);
                 set_p2m_entry(FOREIGNDOM, gpfn, mfn, &sh_mapcache, &mapcache);
                 okay = 1;
                 shadow_unlock(FOREIGNDOM);
@@ -2225,7 +2225,7 @@ int do_mmu_update(
                 break;
             }
 
-            set_machinetophys(mfn, gpfn);
+            set_pfn_from_mfn(mfn, gpfn);
             okay = 1;
 
             /*
@@ -3185,7 +3185,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     struct pfn_info *page;
     l1_pgentry_t     pte;
     l2_pgentry_t    *pl2e, l2e;
-    int              which;
+    int              which, flags;
     unsigned long    l2_idx;
 
     if ( unlikely(shadow_mode_enabled(d)) )
@@ -3206,8 +3206,24 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     pfn  = l1e_get_pfn(pte);
     page = &frame_table[pfn];
 
+#ifdef CONFIG_X86_64
+#define WRPT_PTE_FLAGS (_PAGE_RW | _PAGE_PRESENT | _PAGE_USER)
+#else
+#define WRPT_PTE_FLAGS (_PAGE_RW | _PAGE_PRESENT)
+#endif
+
+    /*
+     * Check the required flags for a valid wrpt mapping. If the page is
+     * already writable then we can return straight to the guest (SMP race).
+     * We decide whether or not to propagate the fault by testing for write
+     * permissions in page directories by writing back to the linear mapping.
+     */
+    if ( (flags = l1e_get_flags(pte) & WRPT_PTE_FLAGS) == WRPT_PTE_FLAGS )
+        return !__put_user(
+            pte.l1, &linear_pg_table[l1_linear_offset(addr)].l1);
+
     /* We are looking only for read-only mappings of p.t. pages. */
-    if ( ((l1e_get_flags(pte) & (_PAGE_RW|_PAGE_PRESENT)) != _PAGE_PRESENT) ||
+    if ( ((flags | _PAGE_RW) != WRPT_PTE_FLAGS) ||
          ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
          ((page->u.inuse.type_info & PGT_count_mask) == 0) ||
          (page_get_owner(page) != d) )

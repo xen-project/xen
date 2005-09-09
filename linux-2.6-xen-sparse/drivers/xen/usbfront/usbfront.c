@@ -70,7 +70,6 @@
 #include "../../../../../drivers/usb/hcd.h"
 
 #include <asm-xen/xen-public/io/usbif.h>
-#include <asm/ctrl_if.h>
 #include <asm/xen-public/io/domain_controller.h>
 
 /*
@@ -1675,8 +1674,8 @@ static int __init xhci_hcd_init(void)
 {
 	int retval = -ENOMEM, i;
 
-	if ( (xen_start_info.flags & SIF_INITDOMAIN)
-	     || (xen_start_info.flags & SIF_USB_BE_DOMAIN) )
+	if ( (xen_start_info->flags & SIF_INITDOMAIN) ||
+	     (xen_start_info->flags & SIF_USB_BE_DOMAIN) )
                 return 0;
 
 	info(DRIVER_DESC " " DRIVER_VERSION);

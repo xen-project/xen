@@ -48,6 +48,7 @@ const char *xs_daemon_socket(void);
 const char *xs_daemon_socket_ro(void);
 const char *xs_daemon_store(void);
 const char *xs_daemon_transactions(void);
+const char *xs_domain_dev(void);
 
 /* Simple write function: loops for you. */
 bool xs_write_all(int fd, const void *data, unsigned int len);

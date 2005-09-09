@@ -38,17 +38,13 @@
 #define X86_VENDOR_ID	new_cpu_data+CPUINFO_x86_vendor_id
 
 ENTRY(startup_32)
-	cld
-
-	/* Copy the necessary stuff from xen_start_info structure. */
-	mov  $xen_start_info_union,%edi
-	mov  $512,%ecx
-	rep movsl
+	movl %esi,xen_start_info
 
 #ifdef CONFIG_SMP
 ENTRY(startup_32_smp)
-	cld
 #endif /* CONFIG_SMP */
+
+	cld
 
 	/* Set up the stack pointer */
 	lss stack_start,%esp
@@ -179,7 +175,7 @@ ENTRY(cpu_gdt_table)
 	.quad 0x0000000000000000	/* 0xc0 APM CS 16 code (16 bit) */
 	.quad 0x0000000000000000	/* 0xc8 APM DS    data */
 
-	.quad 0x0000000000000000	/* 0xd0 - unused */
+	.quad 0x0000000000000000	/* 0xd0 - ESPFIX 16-bit SS */
 	.quad 0x0000000000000000	/* 0xd8 - unused */
 	.quad 0x0000000000000000	/* 0xe0 - unused */
 	.quad 0x0000000000000000	/* 0xe8 - unused */

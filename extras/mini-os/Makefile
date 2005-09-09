@@ -31,16 +31,18 @@ TARGET := mini-os
 OBJS := $(TARGET_ARCH).o
 OBJS += $(patsubst %.c,%.o,$(wildcard *.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard lib/*.c))
-
+OBJS += $(patsubst %.c,%.o,$(wildcard xenbus/*.c))
+										   
 HDRS := $(wildcard include/*.h)
 HDRS += $(wildcard include/xen/*.h)
 
 default: $(TARGET)
 
-xen-public:
+links:
 	[ -e include/xen ] || ln -sf ../../../xen/include/public include/xen
-
-$(TARGET): xen-public $(OBJS)
+	[ -e xenbus/xenstored.h ] || ln -sf ../../../tools/xenstore/xenstored.h xenbus/xenstored.h
+	
+$(TARGET): links $(OBJS)
 	$(LD) -N -T minios-$(TARGET_ARCH).lds $(OBJS) -o $@.elf
 	gzip -f -9 -c $@.elf >$@.gz
 
@@ -54,4 +56,5 @@ clean:
 
 %.o: %.S $(HDRS) Makefile
 	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
+
 

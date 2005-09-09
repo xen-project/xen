@@ -21,12 +21,12 @@ config X86_64
 	  classical 32-bit x86 architecture. For details see
 	  <http://www.x86-64.org/>.
 
+config 64BIT
+	def_bool y
+
 config X86
 	bool
 	default y
-
-config 64BIT
-	def_bool y
 
 config MMU
 	bool
@@ -89,10 +89,11 @@ choice
 #	  Optimize for AMD Opteron/Athlon64/Hammer/K8 CPUs.
 
 config MPSC
-       bool "Intel x86-64"
+       bool "Intel EM64T"
        help
-	  Optimize for Intel IA32 with 64bit extension CPUs
-	  (Prescott/Nocona/Potomac)
+	  Optimize for Intel Pentium 4 and Xeon CPUs with Intel
+	  Extended Memory 64 Technology(EM64T). For details see
+	  <http://www.intel.com/technology/64bitextensions/>.
 
 config GENERIC_CPU
 	bool "Generic-x86-64"
@@ -366,7 +367,6 @@ config SECCOMP
 	  defined by each seccomp mode.
 
 	  If unsure, say Y. Only embedded should say N here.
-
 
 endmenu
 

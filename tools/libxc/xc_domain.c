@@ -7,6 +7,7 @@
  */
 
 #include "xc_private.h"
+#include <xen/memory.h>
 
 int xc_domain_create(int xc_handle,
                      u32 ssidref,
@@ -261,19 +262,66 @@ int xc_domain_setmaxmem(int xc_handle,
 
 int xc_domain_memory_increase_reservation(int xc_handle,
                                           u32 domid, 
-                                          unsigned int mem_kb)
+                                          unsigned long nr_extents,
+                                          unsigned int extent_order,
+                                          unsigned int address_bits,
+					  unsigned long *extent_start)
 {
     int err;
-    unsigned int npages = mem_kb / (PAGE_SIZE/1024);
+    struct xen_memory_reservation reservation = {
+        .extent_start = extent_start, /* may be NULL */
+        .nr_extents   = nr_extents,
+        .extent_order = extent_order,  
+        .address_bits = address_bits,
+        .domid        = domid
+    };
 
-    err = xc_dom_mem_op(xc_handle, MEMOP_increase_reservation, NULL,
-                        npages, 0, domid);
-    if (err == npages)
+    err = xc_memory_op(xc_handle, XENMEM_increase_reservation, &reservation);
+    if (err == nr_extents)
         return 0;
 
     if (err > 0) {
+        fprintf(stderr,"Failed alocation for dom %d : %ld pages order %d addr_bits %d\n",
+                                 domid, nr_extents, extent_order, address_bits);
         errno = ENOMEM;
         err = -1;
     }
+    return err;
+}
+
+int xc_domain_memory_decrease_reservation(int xc_handle,
+                                          u32 domid, 
+                                          unsigned long nr_extents,
+                                          unsigned int extent_order,
+					  unsigned long *extent_start)
+{
+    int err;
+    struct xen_memory_reservation reservation = {
+        .extent_start = extent_start, 
+        .nr_extents   = nr_extents,
+        .extent_order = extent_order,  
+        .address_bits = 0,
+        .domid        = domid
+    };
+
+    if (extent_start == NULL)
+    {
+        fprintf(stderr,"decrease_reservation extent_start is NULL!\n");
+        errno = EINVAL;
+        err = -1;
+	goto out;
+    }
+
+    err = xc_memory_op(xc_handle, XENMEM_increase_reservation, &reservation);
+    if (err == nr_extents)
+        return 0;
+
+    if (err > 0) {
+        fprintf(stderr,"Failed de-alocation for dom %d : %ld pages order %d\n",
+                                 domid, nr_extents, extent_order);
+        errno = EBUSY;
+        err = -1;
+    }
+out:
     return err;
 }

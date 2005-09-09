@@ -2,9 +2,10 @@
 # CHECK-INSTALL
 
 function error {
-   echo 'Check for iproute (ip addr) failed.'
+   echo
+   echo '  *** Check for iproute (ip addr) FAILED'
    exit 1
 }
 
-ip addr list || error
+ip addr list 1>/dev/null 2>&1 || error
 

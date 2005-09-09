@@ -103,12 +103,13 @@ gopts.opt('console_autoconnect', short='c',
           fn=set_true, default=0,
           use="Connect to the console after the domain is created.")
 
-gopts.var('vnc', val='no|yes',
+gopts.var('vncviewer', val='no|yes',
           fn=set_bool, default=None,
           use="""Spawn a vncviewer listening for a vnc server in the domain.
           The address of the vncviewer is passed to the domain on the kernel command
           line using 'VNC_SERVER=<host>:<port>'. The port used by vnc is 5500 + DISPLAY.
           A display value with a free port is chosen if possible.
+	  Only valid when vnc=1.
           """)
 
 gopts.var('name', val='NAME',
@@ -175,6 +176,12 @@ gopts.var('netif', val='no|yes',
           fn=set_bool, default=0,
           use="Make the domain a network interface backend.")
 
+gopts.var('tpmif', val='frontend=DOM',
+          fn=append_value, default=[],
+          use="""Make the domain a TPM interface backend. If frontend is given,
+          the frontend in that domain is connected to this backend (not
+          completely implemented, yet)""")
+
 gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
           fn=append_value, default=[],
           use="""Add a disk device to a domain. The physical device is DEV,
@@ -212,6 +219,12 @@ gopts.var('vif', val="mac=MAC,be_mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM
           where D is the domain id and N is the interface id.
           This option may be repeated to add more than one vif.
           Specifying vifs will increase the number of interfaces as needed.""")
+
+gopts.var('vtpm', val="instance=INSTANCE,backend=DOM",
+          fn=append_value, default=[],
+          use="""Add a tpm interface. On the backend side us the the given
+          instance as virtual TPM instance. Use the backend in the given
+          domain.""")
 
 gopts.var('nics', val="NUM",
           fn=set_int, default=1,
@@ -309,6 +322,10 @@ gopts.var('nographic', val='no|yes',
           fn=set_bool, default=0,
           use="Should device models use graphics?")
 
+gopts.var('vnc', val='',
+          fn=set_value, default=None,
+          use="""Should the device model use VNC?""")
+
 gopts.var('sdl', val='',
           fn=set_value, default=None,
           use="""Should the device model use SDL?""")
@@ -368,6 +385,46 @@ def configure_usb(opts, config_devs, vals):
     for path in vals.usb:
         config_usb = ['usb', ['path', path]]
         config_devs.append(['device', config_usb])
+
+def configure_vtpm(opts, config_devs, vals):
+    """Create the config for virtual TPM interfaces.
+    """
+    vtpm = vals.vtpm
+    vtpm_n = 1
+    for idx in range(0, vtpm_n):
+        if idx < len(vtpm):
+            d = vtpm[idx]
+            instance = d.get('instance')
+            if instance == "VTPMD":
+                instance = "0"
+            else:
+                try:
+                    if int(instance) == 0:
+                        opts.err('VM config error: vTPM instance must not be 0.')
+                except ValueError:
+                    opts.err('Vm config error: could not parse instance number.')
+            backend = d.get('backend')
+            config_vtpm = ['vtpm']
+            if instance:
+                config_vtpm.append(['instance', instance])
+            if backend:
+                config_vtpm.append(['backend', backend])
+            config_devs.append(['device', config_vtpm])
+
+def configure_tpmif(opts, config_devs, vals):
+    """Create the config for virtual TPM interfaces.
+    """
+    tpmif = vals.tpmif
+    tpmif_n = 1
+    for idx in range(0, tpmif_n):
+        if idx < len(tpmif):
+            d = tpmif[idx]
+            frontend = d.get('frontend')
+            config_tpmif = ['tpmif']
+            if frontend:
+                config_tpmif.append(['frontend', frontend])
+            config_devs.append(['device', config_tpmif])
+
 
 def randomMAC():
     """Generate a random MAC address.
@@ -442,7 +499,7 @@ def configure_vmx(opts, config_devs, vals):
     """
     args = [ 'memmap', 'device_model', 'cdrom',
  	     'boot', 'fda', 'fdb', 'localtime', 'serial', 'macaddr', 'stdvga', 
-             'isa', 'nographic', 'vnc', 'sdl', 'display']	  
+             'isa', 'nographic', 'vnc', 'vncviewer', 'sdl', 'display']	  
     for a in args:
 	if (vals.__dict__[a]):
     	    config_devs.append([a, vals.__dict__[a]])
@@ -479,6 +536,8 @@ def make_config(opts, vals):
         config.append(['backend', ['blkif']])
     if vals.netif:
         config.append(['backend', ['netif']])
+    if vals.tpmif:
+        config.append(['backend', ['tpmif']])
     if vals.restart:
         config.append(['restart', vals.restart])
 
@@ -491,6 +550,7 @@ def make_config(opts, vals):
     configure_pci(opts, config_devs, vals)
     configure_vifs(opts, config_devs, vals)
     configure_usb(opts, config_devs, vals)
+    configure_vtpm(opts, config_devs, vals)
     configure_vmx(opts, config_devs, vals)
     config += config_devs
 
@@ -538,6 +598,38 @@ def preprocess_vifs(opts, vals):
             d[k] = v
         vifs.append(d)
     vals.vif = vifs
+
+def preprocess_vtpm(opts, vals):
+    if not vals.vtpm: return
+    vtpms = []
+    for vtpm in vals.vtpm:
+        d = {}
+        a = vtpm.split(',')
+        for b in a:
+            (k, v) = b.strip().split('=', 1)
+            k = k.strip()
+            v = v.strip()
+            if k not in ['backend', 'instance']:
+                opts.err('Invalid vtpm specifier: ' + vtpm)
+            d[k] = v
+        vtpms.append(d)
+    vals.vtpm = vtpms
+
+def preprocess_tpmif(opts, vals):
+    if not vals.tpmif: return
+    tpmifs = []
+    for tpmif in vals.tpmif:
+        d = {}
+        a = tpmif.split(',')
+        for b in a:
+            (k, v) = b.strip().split('=', 1)
+            k = k.strip()
+            v = v.strip()
+            if k not in ['frontend']:
+                opts.err('Invalid tpmif specifier: ' + vtpm)
+            d[k] = v
+        tpmifs.append(d)
+    vals.tpmif = tpmifs
 
 def preprocess_ip(opts, vals):
     if vals.ip or vals.dhcp != 'off':
@@ -606,7 +698,7 @@ def preprocess_vnc(opts, vals):
     """If vnc was specified, spawn a vncviewer in listen mode
     and pass its address to the domain on the kernel command line.
     """
-    if not vals.vnc or vals.dryrun: return
+    if not (vals.vnc and vals.vncviewer) or vals.dryrun: return
     vnc_display = choose_vnc_display()
     if not vnc_display:
         opts.warn("No free vnc display")
@@ -627,6 +719,8 @@ def preprocess(opts, vals):
     preprocess_ip(opts, vals)
     preprocess_nfs(opts, vals)
     preprocess_vnc(opts, vals)
+    preprocess_vtpm(opts, vals)
+    preprocess_tpmif(opts, vals)
          
 def make_domain(opts, config):
     """Create, build and start a domain.

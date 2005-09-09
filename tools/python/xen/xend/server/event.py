@@ -174,11 +174,6 @@ class EventProtocol(protocol.Protocol):
         else:
             logging.removeLogStderr()
 
-    def op_debug_msg(self, name, v):
-        mode = v[1]
-        import messages
-        messages.DEBUG = (mode == 'on')
-
     def op_debug_controller(self, name, v):
         mode = v[1]
         import controller
@@ -186,7 +181,7 @@ class EventProtocol(protocol.Protocol):
 
     def op_domain_ls(self, name, v):
         xd = xroot.get_component("xen.xend.XendDomain")
-        return xd.domain_ls()
+        return xd.list_names()
 
     def op_domain_configure(self, name, v):
         domid = sxp.child_value(v, "dom")

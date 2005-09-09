@@ -21,106 +21,8 @@ for a domain.
 
 from xen.xend.XendError import XendError
 from xen.xend.xenstore import DBVar
-from xen.xend.server.messages import msgTypeName, printMsg, getMessageType
 
 DEBUG = 0
-
-class CtrlMsgRcvr:
-    """Utility class to dispatch messages on a control channel.
-    Once I{registerChannel} has been called, our message types are registered
-    with the channel. The channel will call I{requestReceived}
-    when a request arrives if it has one of our message types.
-
-    @ivar channel: channel to a domain
-    @type channel: Channel
-    @ivar majorTypes: major message types we are interested in
-    @type majorTypes: {int:{int:method}}
-    
-    """
-
-    def __init__(self, channel):
-        self.majorTypes = {}
-        self.channel = channel
-
-    def getHandler(self, type, subtype):
-        """Get the method for a type and subtype.
-
-        @param type: major message type
-        @param subtype: minor message type
-        @return: method or None
-        """
-        method = None
-        subtypes = self.majorTypes.get(type)
-        if subtypes:
-            method = subtypes.get(subtype)
-        return method
-
-    def addHandler(self, type, subtype, method):
-        """Add a method to handle a message type and subtype.
-        
-        @param type: major message type
-        @param subtype: minor message type
-        @param method: method
-        """
-        subtypes = self.majorTypes.get(type)
-        if not subtypes:
-            subtypes = {}
-            self.majorTypes[type] = subtypes
-        subtypes[subtype] = method
-
-    def getMajorTypes(self):
-        """Get the list of major message types handled.
-        """
-        return self.majorTypes.keys()
-
-    def requestReceived(self, msg, type, subtype):
-        """Dispatch a request message to handlers.
-        Called by the channel for requests with one of our types.
-
-        @param msg:     message
-        @type  msg:     xu message
-        @param type:    major message type
-        @type  type:    int
-        @param subtype: minor message type
-        @type  subtype: int
-        """
-        if DEBUG:
-            print 'requestReceived>',
-            printMsg(msg, all=True)
-        responded = 0
-        method = self.getHandler(type, subtype)
-        if method:
-            responded = method(msg)
-        elif DEBUG:
-            print ('requestReceived> No handler: Message type %s %d:%d'
-                   % (msgTypeName(type, subtype), type, subtype)), self
-        return responded
-        
-
-    def lostChannel(self):
-        """Called when the channel to the domain is lost.
-        """
-        if DEBUG:
-            print 'CtrlMsgRcvr>lostChannel>',
-        self.channel = None
-    
-    def registerChannel(self):
-        """Register interest in our major message types with the
-        channel to our domain. Once we have registered, the channel
-        will call requestReceived for our messages.
-        """
-        if DEBUG:
-            print 'CtrlMsgRcvr>registerChannel>', self.channel, self.getMajorTypes()
-        if self.channel:
-            self.channel.registerDevice(self.getMajorTypes(), self)
-        
-    def deregisterChannel(self):
-        """Deregister interest in our major message types with the
-        channel to our domain. After this the channel won't call
-        us any more.
-        """
-        if self.channel:
-            self.channel.deregisterDevice(self)
 
 class DevControllerTable:
     """Table of device controller classes, indexed by type name.
@@ -232,10 +134,6 @@ class DevController:
     def getDomainName(self):
         return self.vm.getName()
 
-    def getChannel(self):
-        chan = self.vm.getChannel()
-        return chan
-    
     def getDomainInfo(self):
         return self.vm
 
@@ -433,9 +331,6 @@ class Dev:
     def getDomainName(self):
         return self.controller.getDomainName()
 
-    def getChannel(self):
-        return self.controller.getChannel()
-    
     def getDomainInfo(self):
         return self.controller.getDomainInfo()
     

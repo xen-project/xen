@@ -15,6 +15,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Copyright (C) 2005 Mike Wray Hewlett-Packard
+ * Copyright (C) 2005 Christian Limpach <Christian.Limpach@cl.cam.ac.uk>
  *
  */
 
@@ -45,6 +46,7 @@
 typedef struct XsHandle {
     PyObject_HEAD;
     struct xs_handle *xh;
+    PyObject *watches;
 } XsHandle;
 
 static inline struct xs_handle *xshandle(PyObject *self)
@@ -87,19 +89,21 @@ static PyObject *xspy_read(PyObject *self, PyObject *args, PyObject *kwds)
     PyObject *val = NULL;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_read(xh, path, &xsval_n);
+    Py_END_ALLOW_THREADS
     if (!xsval) {
-        val = pyvalue_int(0);
+        PyErr_SetFromErrno(PyExc_RuntimeError);
         goto exit;
     }
     val = PyString_FromStringAndSize(xsval, xsval_n);
  exit:
     if (xsval)
-	free(xsval);
+        free(xsval);
     return val;
 }
 
@@ -110,7 +114,7 @@ static PyObject *xspy_read(PyObject *self, PyObject *args, PyObject *kwds)
 	" create [int]    : create flag, default 0.\n"		\
 	" excl   [int]    : exclusive flag, default 0.\n"	\
 	"\n"							\
-	"Returns: [int] 0 on success.\n"			\
+	"Returns None on success.\n"				\
 	"Raises RuntimeError on error.\n"			\
 	"\n"
 
@@ -130,16 +134,23 @@ static PyObject *xspy_write(PyObject *self, PyObject *args, PyObject *kwds)
     int xsval = 0;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &path, &data, &data_n, &create, &excl))
         goto exit;
     if (create)
-	flags |= O_CREAT;
+        flags |= O_CREAT;
     if (excl)
-	flags |= O_EXCL;
+        flags |= O_EXCL;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_write(xh, path, data, data_n, flags);
-    val = pyvalue_int(xsval);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        goto exit;
+    }
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -165,12 +176,14 @@ static PyObject *xspy_ls(PyObject *self, PyObject *args, PyObject *kwds)
     int i;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_directory(xh, path, &xsval_n);
+    Py_END_ALLOW_THREADS
     if (!xsval) {
-        val = pyvalue_int(0);
+        PyErr_SetFromErrno(PyExc_RuntimeError);
         goto exit;
     }
     val = PyList_New(xsval_n);
@@ -184,7 +197,7 @@ static PyObject *xspy_ls(PyObject *self, PyObject *args, PyObject *kwds)
 	"Make a directory.\n"					\
 	" path [string]: path to directory to create.\n"	\
 	"\n"							\
-	"Returns: [int] 0 on success.\n"			\
+	"Returns None on success.\n"				\
 	"Raises RuntimeError on error.\n"			\
 	"\n"
 
@@ -199,11 +212,18 @@ static PyObject *xspy_mkdir(PyObject *self, PyObject *args, PyObject *kwds)
     int xsval = 0;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_mkdir(xh, path);
-    val = pyvalue_int(xsval);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        goto exit;
+    }
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -212,7 +232,7 @@ static PyObject *xspy_mkdir(PyObject *self, PyObject *args, PyObject *kwds)
 	"Remove a path.\n"			\
 	" path [string] : path to remove\n"	\
 	"\n"					\
-	"Returns: [int] 0 on success.\n"	\
+	"Returns None on success.\n"		\
 	"Raises RuntimeError on error.\n"	\
 	"\n"
 
@@ -227,11 +247,18 @@ static PyObject *xspy_rm(PyObject *self, PyObject *args, PyObject *kwds)
     int xsval = 0;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_rm(xh, path);
-    val = pyvalue_int(xsval);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        goto exit;
+    }
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -245,7 +272,7 @@ static PyObject *xspy_rm(PyObject *self, PyObject *args, PyObject *kwds)
 	"\n"
 
 static PyObject *xspy_get_permissions(PyObject *self, PyObject *args,
-				      PyObject *kwds)
+                                      PyObject *kwds)
 {
     static char *kwd_spec[] = { "path", NULL };
     static char *arg_spec = "s|";
@@ -258,10 +285,12 @@ static PyObject *xspy_get_permissions(PyObject *self, PyObject *args,
     int i;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     perms = xs_get_permissions(xh, path, &perms_n);
+    Py_END_ALLOW_THREADS
     if (!perms) {
         PyErr_SetFromErrno(PyExc_RuntimeError);
         goto exit;
@@ -283,12 +312,12 @@ static PyObject *xspy_get_permissions(PyObject *self, PyObject *args,
 	" path  [string] : xenstore path.\n"	\
 	" perms          : permissions.\n"	\
 	"\n"					\
-	"Returns: [int] 0 on success.\n"	\
+	"Returns None on success.\n"		\
 	"Raises RuntimeError on error.\n"	\
 	"\n"
 
 static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
-				      PyObject *kwds)
+                                      PyObject *kwds)
 {
     static char *kwd_spec[] = { "path", "perms", NULL };
     static char *arg_spec = "sO";
@@ -321,7 +350,7 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
     }
     tuple0 = PyTuple_New(0);
     if (!tuple0)
-	goto exit;
+        goto exit;
     for (i = 0; i < xsperms_n; i++) {
         /* Domain the permissions apply to. */
         int dom = 0;
@@ -329,20 +358,27 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
         int p_read = 0, p_write = 0;
         PyObject *p = PyList_GetItem(perms, i);
         if (!PyArg_ParseTupleAndKeywords(tuple0, p, perm_spec, perm_names,
-					 &dom, &p_read, &p_write))
+                                         &dom, &p_read, &p_write))
             goto exit;
         xsperms[i].id = dom;
         if (p_read)
-	    xsperms[i].perms |= XS_PERM_READ;
+            xsperms[i].perms |= XS_PERM_READ;
         if (p_write)
-	    xsperms[i].perms |= XS_PERM_WRITE;
+            xsperms[i].perms |= XS_PERM_WRITE;
     }
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_set_permissions(xh, path, xsperms, xsperms_n);
-    val = pyvalue_int(xsval);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        goto exit;
+    }
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     Py_XDECREF(tuple0);
     if (xsperms)
-	free(xsperms);
+        free(xsperms);
     return val;
 }
 
@@ -351,28 +387,53 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
 	" path     [string] : xenstore path.\n"				\
 	" token    [string] : returned in watch notification.\n"	\
 	"\n"								\
-	"Returns: [int] 0 on success.\n"				\
+	"Returns None on success.\n"					\
 	"Raises RuntimeError on error.\n"				\
 	"\n"
+
+/* Each 10 bits takes ~ 3 digits, plus one, plus one for nul terminator. */
+#define MAX_STRLEN(x) ((sizeof(x) * CHAR_BIT + CHAR_BIT-1) / 10 * 3 + 2)
 
 static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
 {
     static char *kwd_spec[] = { "path", "token", NULL };
-    static char *arg_spec = "s|is";
+    static char *arg_spec = "sO";
     char *path = NULL;
-    char *token = "";
+    PyObject *token;
+    char token_str[MAX_STRLEN(unsigned long) + 1];
+    int i;
 
+    XsHandle *xsh = (XsHandle *)self;
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
     int xsval = 0;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, 
                                      &path, &token))
         goto exit;
-    xsval = xs_watch(xh, path, token);
-    val = pyvalue_int(xsval);
+    Py_INCREF(token);
+    sprintf(token_str, "%li", (unsigned long)token);
+    Py_BEGIN_ALLOW_THREADS
+    xsval = xs_watch(xh, path, token_str);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        Py_DECREF(token);
+        goto exit;
+    }
+
+    for (i = 0; i < PyList_Size(xsh->watches); i++) {
+        if (PyList_GetItem(xsh->watches, i) == Py_None) {
+            PyList_SetItem(xsh->watches, i, token);
+            break;
+        }
+    }
+    if (i == PyList_Size(xsh->watches))
+        PyList_Append(xsh->watches, token);
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -388,29 +449,46 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
 	"\n"
 
 static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
-				 PyObject *kwds)
+                                 PyObject *kwds)
 {
     static char *kwd_spec[] = { NULL };
     static char *arg_spec = "";
 
+    XsHandle *xsh = (XsHandle *)self;
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
     char **xsval = NULL;
+    PyObject *token;
+    int i;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_read_watch(xh);
+    Py_END_ALLOW_THREADS
     if (!xsval) {
-            val = PyErr_SetFromErrno(PyExc_RuntimeError);
-            goto exit;
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        goto exit;
+    }
+    if (sscanf(xsval[1], "%li", (unsigned long *)&token) != 1) {
+        PyErr_SetString(PyExc_RuntimeError, "invalid token");
+        goto exit;
+    }
+    for (i = 0; i < PyList_Size(xsh->watches); i++) {
+        if (token == PyList_GetItem(xsh->watches, i))
+            break;
+    }
+    if (i == PyList_Size(xsh->watches)) {
+        PyErr_SetString(PyExc_RuntimeError, "invalid token");
+        goto exit;
     }
     /* Create tuple (path, token). */
-    val = Py_BuildValue("(ss)", xsval[0], xsval[1]);
+    val = Py_BuildValue("(sO)", xsval[0], token);
  exit:
     if (xsval)
-	free(xsval);
+        free(xsval);
     return val;
 }
 
@@ -418,27 +496,36 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
 	"Acknowledge a watch notification that has been read.\n"	\
 	" token [string] : from the watch notification\n"		\
 	"\n"								\
-	"Returns: [int] 0 on success.\n"				\
+	"Returns None on success.\n"					\
 	"Raises RuntimeError on error.\n"				\
 	"\n"
 
 static PyObject *xspy_acknowledge_watch(PyObject *self, PyObject *args,
-					PyObject *kwds)
+                                        PyObject *kwds)
 {
     static char *kwd_spec[] = { "token", NULL };
-    static char *arg_spec = "s";
-    char *token;
+    static char *arg_spec = "O";
+    PyObject *token;
+    char token_str[MAX_STRLEN(unsigned long) + 1];
 
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
     int xsval = 0;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &token))
         goto exit;
-    xsval = xs_acknowledge_watch(xh, token);
-    val = pyvalue_int(xsval);
+    sprintf(token_str, "%li", (unsigned long)token);
+    Py_BEGIN_ALLOW_THREADS
+    xsval = xs_acknowledge_watch(xh, token_str);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        goto exit;
+    }
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -448,28 +535,46 @@ static PyObject *xspy_acknowledge_watch(PyObject *self, PyObject *args,
 	" path  [string] : xenstore path.\n"		\
 	" token [string] : token from the watch.\n"	\
 	"\n"						\
-	"Returns: [int] 0 on success.\n"		\
+	"Returns None on success.\n"			\
 	"Raises RuntimeError on error.\n"		\
 	"\n"
 
 static PyObject *xspy_unwatch(PyObject *self, PyObject *args, PyObject *kwds)
 {
     static char *kwd_spec[] = { "path", "token", NULL };
-    static char *arg_spec = "s|s";
+    static char *arg_spec = "sO";
     char *path = NULL;
-    char *token = "";
+    PyObject *token;
+    char token_str[MAX_STRLEN(unsigned long) + 1];
+    int i;
 
+    XsHandle *xsh = (XsHandle *)self;
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
     int xsval = 0;
 
     if (!xh)
-	goto exit;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path,
-				     &token))
         goto exit;
-    xsval = xs_unwatch(xh, path, token);
-    val = pyvalue_int(xsval);
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path,
+                                     &token))
+        goto exit;
+    sprintf(token_str, "%li", (unsigned long)token);
+    Py_BEGIN_ALLOW_THREADS
+    xsval = xs_unwatch(xh, path, token_str);
+    Py_END_ALLOW_THREADS
+    if (!xsval)
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+    else {
+        Py_INCREF(Py_None);
+        val = Py_None;
+    }
+    for (i = 0; i < PyList_Size(xsh->watches); i++) {
+        if (token == PyList_GetItem(xsh->watches, i)) {
+            Py_INCREF(Py_None);
+            PyList_SetItem(xsh->watches, i, Py_None);
+            break;
+        }
+    }
  exit:
     return val;
 }
@@ -479,12 +584,12 @@ static PyObject *xspy_unwatch(PyObject *self, PyObject *args, PyObject *kwds)
 	"Only one transaction can be active at a time.\n"	\
 	" path [string]: xenstore path.\n"			\
 	"\n"							\
-	"Returns: [int] 0 on success.\n"			\
+	"Returns None on success.\n"				\
 	"Raises RuntimeError on error.\n"			\
 	"\n"
 
 static PyObject *xspy_transaction_start(PyObject *self, PyObject *args,
-					PyObject *kwds)
+                                        PyObject *kwds)
 {
     static char *kwd_spec[] = { "path", NULL };
     static char *arg_spec = "s|";
@@ -495,11 +600,18 @@ static PyObject *xspy_transaction_start(PyObject *self, PyObject *args,
     int xsval = 0;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_transaction_start(xh, path);
-    val = pyvalue_int(xsval);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        goto exit;
+    }
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -509,12 +621,12 @@ static PyObject *xspy_transaction_start(PyObject *self, PyObject *args,
 	"Attempts to commit the transaction unless abort is true.\n"	\
 	" abort [int]: abort flag (default 0).\n"			\
 	"\n"								\
-	"Returns: [int] 0 on success.\n"				\
+	"Returns None on success.\n"					\
 	"Raises RuntimeError on error.\n"				\
 	"\n"
 
 static PyObject *xspy_transaction_end(PyObject *self, PyObject *args,
-				      PyObject *kwds)
+                                      PyObject *kwds)
 {
     static char *kwd_spec[] = { "abort", NULL };
     static char *arg_spec = "|i";
@@ -525,11 +637,18 @@ static PyObject *xspy_transaction_end(PyObject *self, PyObject *args,
     int xsval = 0;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &abort))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_transaction_end(xh, abort);
-    val = pyvalue_int(xsval);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        goto exit;
+    }
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -541,12 +660,12 @@ static PyObject *xspy_transaction_end(PyObject *self, PyObject *args,
 	" port [int]   : port the domain is using for xenstore\n"	\
 	" path [string]: path to the domain's data in xenstore\n"	\
 	"\n"								\
-	"Returns: [int] 0 on success.\n"				\
+	"Returns None on success.\n"					\
 	"Raises RuntimeError on error.\n"				\
 	"\n"
 
 static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
-				       PyObject *kwds)
+                                       PyObject *kwds)
 {
     static char *kwd_spec[] = { "dom", "page", "port", "path", NULL };
     static char *arg_spec = "iiis|";
@@ -560,12 +679,19 @@ static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
     int xsval = 0;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &dom, &page, &port, &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_introduce_domain(xh, dom, page, port, path);
-    val = pyvalue_int(xsval);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        goto exit;
+    }
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -575,12 +701,12 @@ static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
 	"Unless this is done the domain will not be released.\n"	\
 	" dom [int]: domain id\n"					\
 	"\n"								\
-	"Returns: [int] 0 on success.\n"				\
+	"Returns None on success.\n"					\
 	"Raises RuntimeError on error.\n"				\
 	"\n"
 
 static PyObject *xspy_release_domain(PyObject *self, PyObject *args,
-				     PyObject *kwds)
+                                     PyObject *kwds)
 {
     static char *kwd_spec[] = { "dom", NULL };
     static char *arg_spec = "i|";
@@ -591,12 +717,19 @@ static PyObject *xspy_release_domain(PyObject *self, PyObject *args,
     int xsval = 0;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &dom))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_release_domain(xh, dom);
-    val = pyvalue_int(xsval);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        goto exit;
+    }
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -604,7 +737,7 @@ static PyObject *xspy_release_domain(PyObject *self, PyObject *args,
 #define xspy_close_doc "\n"			\
 	"Close the connection to xenstore.\n"	\
 	"\n"					\
-	"Returns: [int] 0 on success.\n"	\
+	"Returns None on success.\n"		\
 	"Raises RuntimeError on error.\n"	\
 	"\n"
 
@@ -612,18 +745,25 @@ static PyObject *xspy_close(PyObject *self, PyObject *args, PyObject *kwds)
 {
     static char *kwd_spec[] = { NULL };
     static char *arg_spec = "";
+    int i;
 
+    XsHandle *xsh = (XsHandle *)self;
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
-    int xsval = 1;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
         goto exit;
+    for (i = 0; i < PyList_Size(xsh->watches); i++) {
+        /* TODO: xs_unwatch watches */
+        Py_INCREF(Py_None);
+        PyList_SetItem(xsh->watches, i, Py_None);
+    }
     xs_daemon_close(xh);
-    ((XsHandle*)self)->xh = NULL;
-    val = pyvalue_int(xsval);
+    xsh->xh = NULL;
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -631,7 +771,7 @@ static PyObject *xspy_close(PyObject *self, PyObject *args, PyObject *kwds)
 #define xspy_shutdown_doc "\n"			\
 	"Shutdown the xenstore daemon.\n"	\
 	"\n"					\
-	"Returns: [int] 0 on success.\n"	\
+	"Returns None on success.\n"		\
 	"Raises RuntimeError on error.\n"	\
 	"\n"
 
@@ -645,11 +785,18 @@ static PyObject *xspy_shutdown(PyObject *self, PyObject *args, PyObject *kwds)
     int xsval = 0;
 
     if (!xh)
-	goto exit;
+        goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_shutdown(xh);
-    val = pyvalue_int(xsval);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        goto exit;
+    }
+    Py_INCREF(Py_None);
+    val = Py_None;
  exit:
     return val;
 }
@@ -750,20 +897,25 @@ static PyObject *xshandle_open(PyObject *self, PyObject *args, PyObject *kwds)
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &readonly))
-        goto exit;
+        return NULL;
 
     xsh = PyObject_New(XsHandle, &xshandle_type);
     if (!xsh)
-	goto exit;
+        return NULL;
+    xsh->watches = PyList_New(0);
+    if (!xsh->watches)
+        goto exit;
     xsh->xh = (readonly ? xs_daemon_open_readonly() : xs_daemon_open());
     if (!xsh->xh) {
-        PyObject_Del(xsh);
-        val = pyvalue_int(0);
+        Py_DECREF(xsh->watches);
+        PyErr_SetFromErrno(PyExc_RuntimeError);
         goto exit;
     }
     val = (PyObject *)xsh;
- exit:
     return val;
+ exit:
+    PyObject_Del(xsh);
+    return NULL;
 }
 
 static PyMethodDef xs_methods[] = {

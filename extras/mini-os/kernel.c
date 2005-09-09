@@ -33,6 +33,8 @@
 #include <time.h>
 #include <types.h>
 #include <lib.h>
+#include <sched.h>
+#include <xenbus.h>
 
 /*
  * Shared page for communicating with the hypervisor.
@@ -59,10 +61,12 @@ void failsafe_callback(void);
 
 extern char shared_info[PAGE_SIZE];
 
+#define __pte(x) ((pte_t) { (0) } )
+
 static shared_info_t *map_shared_info(unsigned long pa)
 {
     if ( HYPERVISOR_update_va_mapping(
-        (unsigned long)shared_info, pa | 7, UVMF_INVLPG) )
+        (unsigned long)shared_info, __pte(pa | 7), UVMF_INVLPG) )
     {
         printk("Failed to map shared_info!!\n");
         *(int*)0=0;
@@ -77,7 +81,6 @@ static shared_info_t *map_shared_info(unsigned long pa)
 void start_kernel(start_info_t *si)
 {
     static char hello[] = "Bootstrapping...\n";
-    int i;
     (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(hello), hello);
 
     /* Copy the start_info struct to a globally-accessible area. */
@@ -96,7 +99,6 @@ void start_kernel(start_info_t *si)
         (unsigned long)hypervisor_callback,
         (unsigned long)failsafe_callback, 0);
 #endif
-
     trap_init();
 
     /* ENABLE EVENT DELIVERY. This is disabled at start of day. */
@@ -119,7 +121,6 @@ void start_kernel(start_info_t *si)
      * If used for porting another OS, start here to figure out your
      * guest os entry point. Otherwise continue below...
      */
-
     /* init memory management */
     init_mm();
 
@@ -127,15 +128,15 @@ void start_kernel(start_info_t *si)
     init_events();
     /* init time and timers */
     init_time();
+    
+    /* init scheduler */
+    init_sched();
 
-    /* do nothing */
-    i = 0;
-    for ( ; ; ) 
-    {      
-//        HYPERVISOR_yield();
-        block(100);
-        i++;
-    }
+    /* init xenbus */
+    xs_init();
+    
+    /* Everything initialised, start idle thread */
+    run_idle_thread();
 }
 
 

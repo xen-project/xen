@@ -20,6 +20,7 @@
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/i387.h>
+#include <asm/physdev.h>
 #include <asm/shadow.h>
 
 static long dom0_nrpages;
@@ -74,15 +75,12 @@ static struct pfn_info *alloc_chunk(struct domain *d, unsigned long max_pages)
     struct pfn_info *page;
     unsigned int order;
     /*
-     * Allocate up to 2MB at a time:
-     *  1. This prevents overflow of get_order() when allocating more than
-     *     4GB to domain 0 on a PAE machine.
-     *  2. It prevents allocating very large chunks from DMA pools before
-     *     the >4GB pool is fully depleted.
+     * Allocate up to 2MB at a time: It prevents allocating very large chunks
+     * from DMA pools before the >4GB pool is fully depleted.
      */
     if ( max_pages > (2UL << (20 - PAGE_SHIFT)) )
         max_pages = 2UL << (20 - PAGE_SHIFT);
-    order = get_order(max_pages << PAGE_SHIFT);
+    order = get_order_from_pages(max_pages);
     if ( (max_pages & (max_pages-1)) != 0 )
         order--;
     while ( (page = alloc_domheap_pages(d, order, 0)) == NULL )
@@ -217,14 +215,14 @@ int construct_dom0(struct domain *d,
     vinitrd_start    = round_pgup(dsi.v_end);
     vinitrd_end      = vinitrd_start + initrd_len;
     vphysmap_start   = round_pgup(vinitrd_end);
-    vphysmap_end     = vphysmap_start + (nr_pages * sizeof(u32));
-    vpt_start        = round_pgup(vphysmap_end);
+    vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
+    vstartinfo_start = round_pgup(vphysmap_end);
+    vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
+    vpt_start        = vstartinfo_end;
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
         vpt_end          = vpt_start + (nr_pt_pages * PAGE_SIZE);
-        vstartinfo_start = vpt_end;
-        vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
-        vstack_start     = vstartinfo_end;
+        vstack_start     = vpt_end;
         vstack_end       = vstack_start + PAGE_SIZE;
         v_end            = (vstack_end + (1UL<<22)-1) & ~((1UL<<22)-1);
         if ( (v_end - vstack_end) < (512UL << 10) )
@@ -251,7 +249,7 @@ int construct_dom0(struct domain *d,
 #endif
     }
 
-    order = get_order(v_end - dsi.v_start);
+    order = get_order_from_bytes(v_end - dsi.v_start);
     if ( (1UL << order) > nr_pages )
         panic("Domain 0 allocation is too small for kernel image.\n");
 
@@ -271,15 +269,15 @@ int construct_dom0(struct domain *d,
            " Loaded kernel: %p->%p\n"
            " Init. ramdisk: %p->%p\n"
            " Phys-Mach map: %p->%p\n"
-           " Page tables:   %p->%p\n"
            " Start info:    %p->%p\n"
+           " Page tables:   %p->%p\n"
            " Boot stack:    %p->%p\n"
            " TOTAL:         %p->%p\n",
            _p(dsi.v_kernstart), _p(dsi.v_kernend), 
            _p(vinitrd_start), _p(vinitrd_end),
            _p(vphysmap_start), _p(vphysmap_end),
-           _p(vpt_start), _p(vpt_end),
            _p(vstartinfo_start), _p(vstartinfo_end),
+           _p(vpt_start), _p(vpt_end),
            _p(vstack_start), _p(vstack_end),
            _p(dsi.v_start), _p(v_end));
     printk(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
@@ -592,8 +590,7 @@ int construct_dom0(struct domain *d,
     if ( opt_dom0_translate )
     {
         si->shared_info  = d->next_io_page << PAGE_SHIFT;
-        set_machinetophys(virt_to_phys(d->shared_info) >> PAGE_SHIFT,
-                          d->next_io_page);
+        set_pfn_from_mfn(virt_to_phys(d->shared_info) >> PAGE_SHIFT, d->next_io_page);
         d->next_io_page++;
     }
     else
@@ -613,8 +610,8 @@ int construct_dom0(struct domain *d,
         if ( !opt_dom0_translate && (pfn > REVERSE_START) )
             mfn = alloc_epfn - (pfn - REVERSE_START);
 #endif
-        ((u32 *)vphysmap_start)[pfn] = mfn;
-        machine_to_phys_mapping[mfn] = pfn;
+        ((unsigned long *)vphysmap_start)[pfn] = mfn;
+        set_pfn_from_mfn(mfn, pfn);
     }
     while ( pfn < nr_pages )
     {
@@ -626,8 +623,8 @@ int construct_dom0(struct domain *d,
 #ifndef NDEBUG
 #define pfn (nr_pages - 1 - (pfn - (alloc_epfn - alloc_spfn)))
 #endif
-            ((u32 *)vphysmap_start)[pfn] = mfn;
-            machine_to_phys_mapping[mfn] = pfn;
+            ((unsigned long *)vphysmap_start)[pfn] = mfn;
+            set_pfn_from_mfn(mfn, pfn);
 #undef pfn
             page++; pfn++;
         }
@@ -707,6 +704,18 @@ int construct_dom0(struct domain *d,
         update_pagetables(v); /* XXX SMP */
         printk("dom0: shadow setup done\n");
     }
+
+    /*
+     * Modify I/O port access permissions.
+     */
+    /* Master Interrupt Controller (PIC). */
+    physdev_modify_ioport_access_range(dom0, 0, 0x20, 2);
+    /* Slave Interrupt Controller (PIC). */
+    physdev_modify_ioport_access_range(dom0, 0, 0xA0, 2);
+    /* Interval Timer (PIT). */
+    physdev_modify_ioport_access_range(dom0, 0, 0x40, 4);
+    /* PIT Channel 2 / PC Speaker Control. */
+    physdev_modify_ioport_access_range(dom0, 0, 0x61, 1);
 
     return 0;
 }

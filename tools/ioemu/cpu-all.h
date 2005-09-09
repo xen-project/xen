@@ -672,6 +672,8 @@ static inline void cpu_physical_memory_write(target_phys_addr_t addr,
 int cpu_memory_rw_debug(CPUState *env, target_ulong addr, 
                         uint8_t *buf, int len, int is_write);
 
+#define VGA_DIRTY_FLAG	0x01
+
 /* read dirty bit (return 0 or 1) */
 static inline int cpu_physical_memory_is_dirty(target_ulong addr)
 {

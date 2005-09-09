@@ -221,6 +221,7 @@ class SrvDomain(SrvDir):
         #
         # if op and op[0] in ['vifs', 'vif', 'vbds', 'vbd', 'mem_target_set']:
         #    return self.perform(req)
+        self.dom.update()
         if self.use_sxp(req):
             req.setHeader("Content-Type", sxp.mime_type)
             sxp.show(self.dom.sxpr(), out=req)

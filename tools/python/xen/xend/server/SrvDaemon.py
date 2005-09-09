@@ -17,8 +17,6 @@ import traceback
 import time
 import glob
 
-from xen.lowlevel import xu
-
 from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend import EventServer; eserver = EventServer.instance()
@@ -27,7 +25,6 @@ from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
 from xen.xend import XendRoot; xroot = XendRoot.instance()
 
-import channel
 import controller
 import event
 import relocate
@@ -37,12 +34,12 @@ class Daemon:
     """The xend daemon.
     """
     def __init__(self):
-        self.channelF = None
         self.shutdown = 0
         self.traceon = 0
         self.tracefile = None
         self.traceindent = 0
-
+        self.child = 0 
+        
     def daemon_pids(self):
         pids = []
         pidex = '(?P<pid>\d+)'
@@ -140,15 +137,12 @@ class Daemon:
         else:
             return 0
 
-    def install_child_reaper(self):
-        #signal.signal(signal.SIGCHLD, self.onSIGCHLD)
-        # Ensure that zombie children are automatically reaped.
-        xu.autoreap()
-
     def onSIGCHLD(self, signum, frame):
-        code = 1
-        while code > 0:
-            code = os.waitpid(-1, os.WNOHANG)
+        if self.child > 0: 
+            try: 
+                pid, sts = os.waitpid(self.child, os.WNOHANG)
+            except os.error, ex:
+                pass
 
     def fork_pid(self, pidfile):
         """Fork and write the pid of the child to 'pidfile'.
@@ -156,13 +150,16 @@ class Daemon:
         @param pidfile: pid file
         @return: pid of child in parent, 0 in child
         """
-        pid = os.fork()
-        if pid:
+
+        self.child = os.fork()
+
+        if self.child:
             # Parent
             pidfile = open(pidfile, 'w')
-            pidfile.write(str(pid))
+            pidfile.write(str(self.child))
             pidfile.close()
-        return pid
+
+        return self.child
 
     def daemonize(self):
         if not XEND_DAEMONIZE: return
@@ -203,8 +200,7 @@ class Daemon:
             # Trying to run an already-running service is a success.
             return 0
 
-        self.install_child_reaper()
-
+        signal.signal(signal.SIGCHLD, self.onSIGCHLD)
         if self.fork_pid(XEND_PID_FILE):
             #Parent. Sleep to give child time to start.
             time.sleep(1)
@@ -298,10 +294,8 @@ class Daemon:
         _enforce_dom0_cpus()
         try:
             log.info("Xend Daemon started")
-            self.createFactories()
             event.listenEvent(self)
             relocate.listenRelocation()
-            self.listenChannels()
             servers = SrvServer.create()
             self.daemonize()
             servers.start()
@@ -309,22 +303,10 @@ class Daemon:
             print >>sys.stderr, 'Exception starting xend:', ex
             if XEND_DEBUG:
                 traceback.print_exc()
-            log.exception("Exception starting xend")
+            log.exception("Exception starting xend (%s)" % ex)
             self.exit(1)
             
-    def createFactories(self):
-        self.channelF = channel.channelFactory()
-
-    def listenChannels(self):
-        def virqReceived(virq):
-            eserver.inject('xend.virq', virq)
-
-        self.channelF.setVirqHandler(virqReceived)
-        self.channelF.start()
-
     def exit(self, rc=0):
-        if self.channelF:
-            self.channelF.stop()
         # Calling sys.exit() raises a SystemExit exception, which only
         # kills the current thread. Calling os._exit() makes the whole
         # Python process exit immediately. There doesn't seem to be another

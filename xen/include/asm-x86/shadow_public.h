@@ -49,6 +49,7 @@ struct shadow_ops {
          (*mark_mfn_out_of_sync)(struct vcpu *v, unsigned long gpfn,
                               unsigned long mfn);
     int  (*is_out_of_sync)(struct vcpu *v, unsigned long va);
+    unsigned long (*gva_to_gpa)(unsigned long gva);
 };
 #endif
 

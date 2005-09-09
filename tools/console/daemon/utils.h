@@ -33,13 +33,15 @@ bool xen_setup(void);
 #define write_sync(fd, buffer, size) _read_write_sync(fd, buffer, size, false)
 bool _read_write_sync(int fd, void *data, size_t size, bool do_read);
 
-extern int xcs_ctrl_fd;
-extern int xcs_data_fd;
 extern struct xs_handle *xs;
 extern int xc;
 
 #if 1
-#define dolog(val, fmt, ...) syslog(val, fmt, ## __VA_ARGS__)
+#define dolog(val, fmt, ...) do {				\
+	if ((val) == LOG_ERR)					\
+		fprintf(stderr, fmt "\n", ## __VA_ARGS__);	\
+	syslog(val, fmt, ## __VA_ARGS__);			\
+} while (/* CONSTCOND */0)
 #else
 #define dolog(val, fmt, ...) fprintf(stderr, fmt "\n", ## __VA_ARGS__)
 #endif

@@ -61,9 +61,14 @@ class XendServers:
 
     def start(self):
         Vifctl.network('start')
+        threads = []
         for server in self.servers:
             thread = Thread(target=server.run)
             thread.start()
+            threads.append(thread)
+
+        for t in threads:
+            t.join()
 
 def create():
     root = SrvDir()

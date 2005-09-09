@@ -58,6 +58,6 @@ void     init_time(void);
 s_time_t get_s_time(void);
 s_time_t get_v_time(void);
 void     gettimeofday(struct timeval *tv);
-void     block(u32 millisecs);
+void     block_domain(u32 millisecs);
 
 #endif /* _TIME_H_ */

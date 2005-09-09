@@ -146,11 +146,10 @@ class SrvDomainDir(SrvDir):
         if not url.endswith('/'):
             url += '/'
         if use_sxp:
-            domains = self.xd.domain_ls()
+            domains = self.xd.list_names()
             sxp.show(domains, out=req)
         else:
-            domains = self.xd.list()
-            domains.sort(lambda x, y: cmp(x.name, y.name))
+            domains = self.xd.list_sorted()
             req.write('<ul>')
             for d in domains:
                req.write('<li><a href="%s%s"> Domain %s</a>'

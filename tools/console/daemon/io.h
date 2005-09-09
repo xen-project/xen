@@ -21,6 +21,7 @@
 #ifndef CONSOLED_IO_H
 #define CONSOLED_IO_H
 
+void enum_domains(void);
 void handle_io(void);
 
 #endif

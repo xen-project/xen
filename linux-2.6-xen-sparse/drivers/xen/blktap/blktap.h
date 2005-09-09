@@ -15,7 +15,6 @@
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
-#include <asm-xen/ctrl_if.h>
 #include <linux/slab.h>
 #include <linux/blkdev.h>
 #include <asm/io.h>

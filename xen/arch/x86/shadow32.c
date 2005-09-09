@@ -827,7 +827,7 @@ alloc_p2m_table(struct domain *d)
     {
         page = list_entry(list_ent, struct pfn_info, list);
         mfn = page_to_pfn(page);
-        pfn = machine_to_phys_mapping[mfn];
+        pfn = get_pfn_from_mfn(mfn);
         ASSERT(pfn != INVALID_M2P_ENTRY);
         ASSERT(pfn < (1u<<20));
 
@@ -841,7 +841,7 @@ alloc_p2m_table(struct domain *d)
     {
         page = list_entry(list_ent, struct pfn_info, list);
         mfn = page_to_pfn(page);
-        pfn = machine_to_phys_mapping[mfn];
+        pfn = get_pfn_from_mfn(mfn);
         if ( (pfn != INVALID_M2P_ENTRY) &&
              (pfn < (1u<<20)) )
         {
@@ -1685,6 +1685,7 @@ void shadow_invlpg(struct vcpu *v, unsigned long va)
     if (__copy_from_user(&gpte, &linear_pg_table[va >> PAGE_SHIFT],
                          sizeof(gpte))) {
         perfc_incrc(shadow_invlpg_faults);
+        shadow_unlock(d);
         return;
     }
     l1pte_propagate_from_guest(d, gpte, &spte);
@@ -1917,8 +1918,10 @@ static int snapshot_entry_matches(
     snapshot = map_domain_page(smfn);
 
     if (__copy_from_user(&gpte, &guest_pt[index],
-                         sizeof(gpte)))
+                         sizeof(gpte))) {
+        unmap_domain_page(snapshot);
         return 0;
+    }
 
     // This could probably be smarter, but this is sufficent for
     // our current needs.

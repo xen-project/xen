@@ -8,24 +8,22 @@
 
 #include <stdlib.h>
 #include <unistd.h>
-
 #include "xg_private.h"
 #include <xenctrl.h>
-
-#include <xen/linux/suspend.h>
+#include <xen/memory.h>
 
 #define MAX_BATCH_SIZE 1024
 
 #define DEBUG 0
 
 #if 1
-#define ERR(_f, _a...) fprintf ( stderr, _f , ## _a ); fflush(stderr)
+#define ERR(_f, _a...) do { fprintf ( stderr, _f , ## _a ); fflush(stderr); } while(0)
 #else
 #define ERR(_f, _a...) ((void)0)
 #endif
 
 #if DEBUG
-#define DPRINTF(_f, _a...) fprintf ( stdout, _f , ## _a ); fflush(stdout)
+#define DPRINTF(_f, _a...) do { fprintf ( stdout, _f , ## _a ); fflush(stdout); } while (0)
 #else
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
@@ -54,7 +52,8 @@ read_exact(int fd, void *buf, size_t count)
 }
 
 int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
-		     unsigned int store_evtchn, unsigned long *store_mfn)
+		     unsigned int store_evtchn, unsigned long *store_mfn,
+		     unsigned int console_evtchn, unsigned long *console_mfn)
 {
     dom0_op_t op;
     int rc = 1, i, n, k;
@@ -89,8 +88,8 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     /* used by mapper for updating the domain's copy of the table */
     unsigned long *live_pfn_to_mfn_table = NULL;
 
-    /* A temporary mapping of the guest's suspend record. */
-    suspend_record_t *p_srec;
+    /* A temporary mapping of the guest's start_info page. */
+    start_info_t *start_info;
 
     char *region_base;
 
@@ -103,7 +102,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     struct mmuext_op pin[MAX_PIN_BATCH];
     unsigned int nr_pins = 0;
 
-    DPRINTF("xc_linux_restore start\n");
+    DPRINTF("xc_linux_restore start: nr_pfns = %lx\n", nr_pfns);
 
     if (mlock(&ctxt, sizeof(ctxt))) {
         /* needed for when we do the build dom0 op, 
@@ -150,8 +149,10 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     }
 
     err = xc_domain_memory_increase_reservation(xc_handle, dom,
-                                                nr_pfns * PAGE_SIZE / 1024);
+                                                nr_pfns, 0, 0, NULL);
     if (err != 0) {
+        ERR("Failed to increase reservation by %lx\n", 
+            nr_pfns * PAGE_SIZE / 1024); 
         errno = ENOMEM;
         goto out;
     }
@@ -409,7 +410,8 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
 
     /* Get the list of PFNs that are not in the psuedo-phys map */
     {
-	unsigned int count, *pfntab;
+	unsigned int count;
+        unsigned long *pfntab;
 	int rc;
 
 	if ( read_exact(io_fd, &count, sizeof(count)) != sizeof(count) )
@@ -441,9 +443,15 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
 
 	if ( count > 0 )
 	{
-	    if ( (rc = xc_dom_mem_op( xc_handle,
-				       MEMOP_decrease_reservation,
-				       pfntab, count, 0, dom )) <0 )
+            struct xen_memory_reservation reservation = {
+                .extent_start = pfntab,
+                .nr_extents   = count,
+                .extent_order = 0,
+                .domid        = dom
+            };
+	    if ( (rc = xc_memory_op(xc_handle,
+                                    XENMEM_decrease_reservation,
+                                    &reservation)) != count )
 	    {
 		ERR("Could not decrease reservation : %d",rc);
 		goto out;
@@ -470,15 +478,18 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
         goto out;
     }
     ctxt.user_regs.esi = mfn = pfn_to_mfn_table[pfn];
-    p_srec = xc_map_foreign_range(
+    start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
-    p_srec->resume_info.nr_pages    = nr_pfns;
-    p_srec->resume_info.shared_info = shared_info_frame << PAGE_SHIFT;
-    p_srec->resume_info.flags       = 0;
-    *store_mfn = p_srec->resume_info.store_mfn   =
-	pfn_to_mfn_table[p_srec->resume_info.store_mfn];
-    p_srec->resume_info.store_evtchn = store_evtchn;
-    munmap(p_srec, PAGE_SIZE);
+    start_info->nr_pages    = nr_pfns;
+    start_info->shared_info = shared_info_frame << PAGE_SHIFT;
+    start_info->flags       = 0;
+    *store_mfn = start_info->store_mfn   =
+	pfn_to_mfn_table[start_info->store_mfn];
+    start_info->store_evtchn = store_evtchn;
+    *console_mfn = start_info->console_mfn   =
+	pfn_to_mfn_table[start_info->console_mfn];
+    start_info->console_evtchn = console_evtchn;
+    munmap(start_info, PAGE_SIZE);
 
     /* Uncanonicalise each GDT frame number. */
     if ( ctxt.gdt_ents > 8192 )

@@ -23,13 +23,8 @@ Stuff it doesn't show:
 
 - to build it just type make.
 
-- copy image.final somewhere where dom0 can access it
+- to start it do the following in domain0 (assuming xend is running)
+  # xm create domain_config
 
-- in dom0
-  # xi_create 16000 test
-    <domid>
-  # xi_build <domid> image.final 0
-  # xi_start <domid>
-
-this prints out a bunch of stuff and then every 1000 timer interrupts the
-system time.
+this starts the kernel and prints out a bunch of stuff and then every
+1000 timer interrupts the system time.

@@ -49,6 +49,8 @@
 #include "xenstored_watch.h"
 #include "xenstored_transaction.h"
 #include "xenstored_domain.h"
+#include "xenctrl.h"
+#include "xen/io/domain_controller.h"
 
 static bool verbose;
 LIST_HEAD(connections);
@@ -140,7 +142,7 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 	case XS_TRANSACTION_END: return "TRANSACTION_END";
 	case XS_INTRODUCE: return "INTRODUCE";
 	case XS_RELEASE: return "RELEASE";
-	case XS_GETDOMAINPATH: return "GETDOMAINPATH";
+	case XS_GET_DOMAIN_PATH: return "GET_DOMAIN_PATH";
 	case XS_WRITE: return "WRITE";
 	case XS_MKDIR: return "MKDIR";
 	case XS_RM: return "RM";
@@ -719,7 +721,7 @@ static char *get_parent(const char *node)
 	char *slash = strrchr(node + 1, '/');
 	if (!slash)
 		return talloc_strdup(node, "/");
-	return talloc_asprintf(node, "%.*s", slash - node, node);
+	return talloc_asprintf(node, "%.*s", (int)(slash - node), node);
 }
 
 static enum xs_perm_type perm_for_id(domid_t id,
@@ -828,6 +830,15 @@ bool check_node_perms(struct connection *conn, const char *node,
 	return false;
 }
 
+bool check_event_node(const char *node)
+{
+	if (!node || !strstarts(node, "@")) {
+		errno = EINVAL;
+		return false;
+	}
+	return true;
+}
+
 static void send_directory(struct connection *conn, const char *node)
 {
 	char *path, *reply;
@@ -901,7 +912,7 @@ static bool commit_dir(char *dir)
 	if (slash)
 		*slash = '\0';
 
-	dest = talloc_asprintf(dir, "%.*s", dot - dir, dir);
+	dest = talloc_asprintf(dir, "%.*s", (int)(dot - dir), dir);
 	return rename(dir, dest) == 0;
 }
 
@@ -1277,7 +1288,7 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		do_release(conn, onearg(in));
 		break;
 
-	case XS_GETDOMAINPATH:
+	case XS_GET_DOMAIN_PATH:
 		do_get_domain_path(conn, onearg(in));
 		break;
 
@@ -1295,8 +1306,12 @@ static int out_of_mem(void *data)
 
 static void consider_message(struct connection *conn)
 {
-	struct buffered_data *in = NULL;
-	enum xsd_sockmsg_type type = conn->in->hdr.msg.type;
+	/*
+	 * 'volatile' qualifier prevents register allocation which fixes:
+	 *   warning: variable 'xxx' might be clobbered by 'longjmp' or 'vfork'
+	 */
+	struct buffered_data *volatile in = NULL;
+	enum xsd_sockmsg_type volatile type = conn->in->hdr.msg.type;
 	jmp_buf talloc_fail;
 
 	assert(conn->state == OK);
@@ -1434,7 +1449,11 @@ static void unblock_connections(void)
 
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 {
-	struct connection *new;
+	/*
+	 * 'volatile' qualifier prevents register allocation which fixes:
+	 *   warning: variable 'xxx' might be clobbered by 'longjmp' or 'vfork'
+	 */
+	struct connection *volatile new;
 	jmp_buf talloc_fail;
 
 	new = talloc(talloc_autofree_context(), struct connection);
@@ -1628,12 +1647,13 @@ static void daemonize(void)
 }
 
 
-static struct option options[] = { { "no-fork", 0, NULL, 'N' },
-				   { "verbose", 0, NULL, 'V' },
-				   { "output-pid", 0, NULL, 'P' },
-				   { "trace-file", 1, NULL, 'T' },
-				   { "pid-file", 1, NULL, 'F' },
-				   { NULL, 0, NULL, 0 } };
+static struct option options[] = {
+	{ "pid-file", 1, NULL, 'F' },
+	{ "no-fork", 0, NULL, 'N' },
+	{ "output-pid", 0, NULL, 'P' },
+	{ "trace-file", 1, NULL, 'T' },
+	{ "verbose", 0, NULL, 'V' },
+	{ NULL, 0, NULL, 0 } };
 
 int main(int argc, char *argv[])
 {
@@ -1644,13 +1664,14 @@ int main(int argc, char *argv[])
 	bool outputpid = false;
 	const char *pidfile = NULL;
 
-	while ((opt = getopt_long(argc, argv, "DVT:", options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "F:NPT:V", options,
+				  NULL)) != -1) {
 		switch (opt) {
+		case 'F':
+			pidfile = optarg;
+			break;
 		case 'N':
 			dofork = false;
-			break;
-		case 'V':
-			verbose = true;
 			break;
 		case 'P':
 			outputpid = true;
@@ -1662,8 +1683,9 @@ int main(int argc, char *argv[])
 					    optarg);
                         write(tracefd, "\n***\n", strlen("\n***\n"));
 			break;
-		case 'F':
-			pidfile = optarg;
+		case 'V':
+			verbose = true;
+			break;
 		}
 	}
 	if (optind != argc)
@@ -1812,6 +1834,7 @@ int main(int argc, char *argv[])
 		/* If transactions ended, we might be able to do more work. */
 		unblock_connections();
 
-		max = initialize_set(&inset, &outset, *sock,*ro_sock,event_fd);
+		max = initialize_set(&inset, &outset, *sock, *ro_sock,
+				     event_fd);
 	}
 }

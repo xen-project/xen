@@ -64,6 +64,7 @@ struct xenbus_driver {
 	int (*remove)(struct xenbus_device *dev);
 	int (*suspend)(struct xenbus_device *dev);
 	int (*resume)(struct xenbus_device *dev);
+	int (*hotplug)(struct xenbus_device *, char **, int, char *, int);
 	struct device_driver driver;
 };
 

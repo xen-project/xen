@@ -1,3 +1,6 @@
+XEN_ROOT = ../../
+include $(XEN_ROOT)/tools/Rules.mk
+
 INSTALL		= install
 INSTALL_DIR	= $(INSTALL) -d -m0755
 INSTALL_PROG	= $(INSTALL) -m0755
@@ -24,8 +27,8 @@ XEN_SCRIPTS += block-enbd
 XEN_BOOT_DIR = /usr/lib/xen/boot
 XEN_BOOT = mem-map.sxp
 
-XEN_HOTPLUG_DIR = /etc/hotplug.d/xen-backend
-XEN_HOTPLUG_SCRIPTS = backend.hotplug
+XEN_HOTPLUG_DIR = /etc/hotplug
+XEN_HOTPLUG_SCRIPTS = xen-backend.agent
 
 all: 
 build:
@@ -68,7 +71,7 @@ install-hotplug:
 	[ -d $(DESTDIR)$(XEN_HOTPLUG_DIR) ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(XEN_HOTPLUG_DIR)
 	for i in $(XEN_HOTPLUG_SCRIPTS); \
-	    do [ -a $(DESTDIR)$(XEN_HOTPLUG_DIR)/$$i ] || \
+	    do \
 	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_HOTPLUG_DIR); \
 	done
 

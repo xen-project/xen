@@ -63,7 +63,7 @@ case $OP in
         ;;
 esac
 
-if [ ${ip} ] ; then
+if [ "${ip}" ] ; then
 
     # If we've been given a list of IP networks, allow pkts with these src addrs.
     for addr in ${ip} ; do

@@ -792,6 +792,13 @@ static void local_time_calibration(void *unused)
     tsc_elapsed64   = curr_tsc - prev_tsc;
 
     /*
+     * Weirdness can happen if we lose sync with the platform timer.
+     * We could be smarter here: resync platform timer with local timer?
+     */
+    if ( ((s64)stime_elapsed64 < (EPOCH / 2)) )
+        goto out;
+
+    /*
      * Calculate error-correction factor. This only slows down a fast local
      * clock (slow clocks are warped forwards). The scale factor is clamped
      * to >= 0.5.
@@ -854,6 +861,7 @@ static void local_time_calibration(void *unused)
     cpu_time[cpu].stime_local_stamp  = curr_local_stime;
     cpu_time[cpu].stime_master_stamp = curr_master_stime;
 
+ out:
     set_ac_timer(&cpu_time[cpu].calibration_timer, NOW() + EPOCH);
 
     if ( cpu == 0 )

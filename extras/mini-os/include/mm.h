@@ -25,6 +25,15 @@
 #ifndef _MM_H_
 #define _MM_H_
 
+#ifdef __i386__
+#include <xen/arch-x86_32.h>
+#endif
+
+#ifdef __x86_64__
+#include <xen/arch-x86_64.h>
+#endif
+
+
 #ifdef __x86_64__
 
 #define L1_PAGETABLE_SHIFT      12
@@ -56,6 +65,8 @@
 
 #define L1_PAGETABLE_ENTRIES    1024
 #define L2_PAGETABLE_ENTRIES    1024
+
+#elif defined(__x86_64__)
 #endif
 
 /* Given a virtual address, get an entry offset into a page table. */
@@ -97,13 +108,15 @@
 
 extern unsigned long *phys_to_machine_mapping;
 #define pfn_to_mfn(_pfn) (phys_to_machine_mapping[(_pfn)])
-#define mfn_to_pfn(_mfn) (machine_to_phys_mapping[(_mfn)])
 static __inline__ unsigned long phys_to_machine(unsigned long phys)
 {
     unsigned long machine = pfn_to_mfn(phys >> L1_PAGETABLE_SHIFT);
     machine = (machine << L1_PAGETABLE_SHIFT) | (phys & ~PAGE_MASK);
     return machine;
 }
+
+
+#define mfn_to_pfn(_mfn) (machine_to_phys_mapping[(_mfn)])
 static __inline__ unsigned long machine_to_phys(unsigned long machine)
 {
     unsigned long phys = mfn_to_pfn(machine >> L1_PAGETABLE_SHIFT);
@@ -119,16 +132,15 @@ static __inline__ unsigned long machine_to_phys(unsigned long machine)
 
 #define to_phys(x)                 ((unsigned long)(x)-VIRT_START)
 #define to_virt(x)                 ((void *)((unsigned long)(x)+VIRT_START))
-#define __va to_virt
-#define __pa to_phys
 
 #define virt_to_pfn(_virt)         (PFN_DOWN(to_phys(_virt)))
+#define mach_to_virt(_mach)        (to_virt(machine_to_phys(_mach)))
+#define mfn_to_virt(_mfn)          (mach_to_virt(_mfn << PAGE_SHIFT))
 
 void init_mm(void);
 unsigned long alloc_pages(int order);
 #define alloc_page()    alloc_pages(0);
 void free_pages(void *pointer, int order);
-//int is_mfn_mapped(unsigned long mfn);
 
 static __inline__ int get_order(unsigned long size)
 {

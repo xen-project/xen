@@ -8,7 +8,7 @@
 
 static char * __init machine_specific_memory_setup(void)
 {
-	unsigned long max_pfn = xen_start_info.nr_pages;
+	unsigned long max_pfn = xen_start_info->nr_pages;
 
 	e820.nr_map = 0;
 	add_memory_region(0, PFN_PHYS(max_pfn), E820_RAM);
@@ -23,7 +23,7 @@ void __init machine_specific_modify_cpu_capabilities(struct cpuinfo_x86 *c)
 	clear_bit(X86_FEATURE_PSE, c->x86_capability);
 	clear_bit(X86_FEATURE_PGE, c->x86_capability);
 	clear_bit(X86_FEATURE_SEP, c->x86_capability);
-	if (!(xen_start_info.flags & SIF_PRIVILEGED))
+	if (!(xen_start_info->flags & SIF_PRIVILEGED))
 		clear_bit(X86_FEATURE_MTRR, c->x86_capability);
 }
 

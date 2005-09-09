@@ -17,13 +17,13 @@
  */
 
 #include <os.h>
+#include <mm.h>
 #include <hypervisor.h>
 #include <events.h>
 #include <lib.h>
 
-#include <xen/event_channel.h>
 static ev_action_t ev_actions[NR_EVS];
-void default_handler(u32 port, struct pt_regs *regs);
+void default_handler(int port, struct pt_regs *regs);
 
 
 /*
@@ -32,7 +32,6 @@ void default_handler(u32 port, struct pt_regs *regs);
 int do_event(u32 port, struct pt_regs *regs)
 {
     ev_action_t  *action;
-
     if (port >= NR_EVS) {
         printk("Port number too large: %d\n", port);
         return 0;
@@ -57,11 +56,23 @@ int do_event(u32 port, struct pt_regs *regs)
 
 }
 
+void bind_evtchn( u32 port, void (*handler)(int, struct pt_regs *) )
+{
+ 	if(ev_actions[port].handler)
+        printk("WARN: Handler for port %d already registered, replacing\n",
+				port);
+
+	ev_actions[port].handler = handler;
+	ev_actions[port].status &= ~EVS_DISABLED;	  
+ 
+	/* Finally unmask the port */
+	unmask_evtchn(port);
+}
+
 int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *) )
 {
 	evtchn_op_t op;
 	int ret = 0;
-	u32 port;
 
 	/* Try to bind the virq to a port */
 	op.cmd = EVTCHNOP_bind_virq;
@@ -73,21 +84,12 @@ int bind_virq( u32 virq, void (*handler)(int, struct pt_regs *) )
 		printk("Failed to bind virtual IRQ %d\n", virq);
 		goto out;
     }
-
-    port = op.u.bind_virq.port;
-	
-	if(ev_actions[port].handler)
-        printk("WARN: Handler for port %d already registered, replacing\n",
-				port);
-
-	ev_actions[port].handler = handler;
-	ev_actions[port].status &= ~EVS_DISABLED;
-	
-	/* Finally unmask the port */
-	unmask_evtchn(port);
+    bind_evtchn(op.u.bind_virq.port, handler);	
 out:
 	return ret;
 }
+
+
 
 /*
  * Initially all events are without a handler and disabled
@@ -100,10 +102,10 @@ void init_events(void)
     for ( i = 0; i < NR_EVS; i++ )
     {
         ev_actions[i].status  = EVS_DISABLED;
-        ev_actions[i].handler = NULL;
+        ev_actions[i].handler = default_handler;
     }
 }
 
-void default_handler(u32 port, struct pt_regs *regs) {
+void default_handler(int port, struct pt_regs *regs) {
     printk("[Port %d] - event received\n", port);
 }

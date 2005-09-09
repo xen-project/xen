@@ -32,6 +32,9 @@ SIF_BLK_BE_DOMAIN = (1<<4)
 """Flag for a net device backend domain."""
 SIF_NET_BE_DOMAIN = (1<<5)
 
+"""Flag for a TPM device backend domain."""
+SIF_TPM_BE_DOMAIN = (1<<7)
+
 class ImageHandler:
     """Abstract base class for image handlers.
 
@@ -156,7 +159,12 @@ class ImageHandler:
         xc.domain_setmaxmem(dom, mem_kb)
 
         try:
-            xc.domain_memory_increase_reservation(dom, mem_kb)
+            # Give the domain some memory below 4GB
+            lmem_kb = 0
+            if lmem_kb > 0:
+                xc.domain_memory_increase_reservation(dom, min(lmem_kb,mem_kb), 0, 32)
+            if mem_kb > lmem_kb:
+                xc.domain_memory_increase_reservation(dom, mem_kb-lmem_kb, 0, 0)
         except:
             xc.domain_destroy(dom)
             raise
@@ -194,6 +202,7 @@ class ImageHandler:
         self.flags = 0
         if self.vm.netif_backend: self.flags |= SIF_NET_BE_DOMAIN
         if self.vm.blkif_backend: self.flags |= SIF_BLK_BE_DOMAIN
+        if self.vm.tpmif_backend: self.flags |= SIF_TPM_BE_DOMAIN
 
         if self.vm.recreate or self.vm.restore:
             return
@@ -238,16 +247,31 @@ class LinuxImageHandler(ImageHandler):
             store_evtchn = self.vm.store_channel.port2
         else:
             store_evtchn = 0
+        if self.vm.console_channel:
+            console_evtchn = self.vm.console_channel.port2
+        else:
+            console_evtchn = 0
+
+        log.debug("dom            = %d", self.vm.getDomain())
+        log.debug("image          = %s", self.kernel)
+        log.debug("store_evtchn   = %d", store_evtchn)
+        log.debug("console_evtchn = %d", console_evtchn)
+        log.debug("cmdline        = %s", self.cmdline)
+        log.debug("ramdisk        = %s", self.ramdisk)
+        log.debug("flags          = %d", self.flags)
+        log.debug("vcpus          = %d", self.vm.vcpus)
+
         ret = xc.linux_build(dom            = self.vm.getDomain(),
                              image          = self.kernel,
-                             control_evtchn = self.vm.channel.getRemotePort(),
                              store_evtchn   = store_evtchn,
+                             console_evtchn = console_evtchn,
                              cmdline        = self.cmdline,
                              ramdisk        = self.ramdisk,
                              flags          = self.flags,
                              vcpus          = self.vm.vcpus)
         if isinstance(ret, dict):
             self.vm.store_mfn = ret.get('store_mfn')
+            self.vm.console_mfn = ret.get('console_mfn')
             return 0
         return ret
 
@@ -349,6 +373,11 @@ class VmxImageHandler(ImageHandler):
                mac = sxp.child_value(vifinfo, 'mac')
                ret.append("-macaddr")
                ret.append("%s" % mac)
+            if name == 'vtpm':
+               vtpminfo = sxp.child(device, 'vtpm')
+               instance = sxp.child_value(vtpminfo, 'instance')
+               ret.append("-instance")
+               ret.append("%s" % instance)
 
 	# Handle graphics library related options
 	vnc = sxp.child_value(self.vm.config, 'vnc')

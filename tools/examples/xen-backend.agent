@@ -1,0 +1,25 @@
+#! /bin/sh
+
+#ACTION=add
+#DEVPATH=/devices/xen-backend/vif-1-0
+#PHYSDEVDRIVER=vif
+#XENBUS_TYPE=vif
+
+PATH=/etc/xen/scripts:$PATH
+
+case "$ACTION" in
+  add)
+    ;;
+  remove)
+    ;;
+  online)
+    case "$PHYSDEVDRIVER" in
+      vif)
+        [ -n "$script" ] && $script up
+        ;;
+    esac
+    ;;
+  offline)
+    ;;
+esac
+

@@ -1,0 +1,122 @@
+Copyright: IBM Corporation (C), Intel Corporation
+17 August 2005
+Authors: Stefan Berger <stefanb@us.ibm.com> (IBM), 
+         Employees of Intel Corp
+
+This document gives a short introduction to the virtual TPM support
+in XEN and goes as far as connecting a user domain to a virtual TPM
+instance and doing a short test to verify success. It is assumed
+that the user is fairly familiar with compiling and installing XEN
+and Linux on a machine. 
+ 
+Production Prerequisites: An x86-based machine machine with an ATMEL or
+National Semiconductor (NSC) TPM on the motherboard.
+Development Prerequisites: An emulator for TESTING ONLY is provided
+
+
+Compiling XEN tree:
+-------------------
+
+Compile the XEN tree as usual.
+
+make uninstall; make mrproper; make install 
+
+After compiling the tree, verify that in the linux-2.6.XX-xen0/.config 
+file at least the following entries are set as below (they should be set
+by default):
+
+CONFIG_XEN_TPMDEV_BACKEND=y
+CONFIG_XEN_TPMDEV_GRANT=y
+
+CONFIG_TCG_TPM=m
+CONFIG_TCG_NSC=m
+CONFIG_TCG_ATMEL=m
+
+
+Verify that in the linux-2.6.XX-xenU/.config file at least the 
+Following entries are set as below (they should be set by default):
+
+CONFIG_XEN_TPMDEV_FRONTEND=y
+CONFIG_XEN_TPMDEV_GRANT=y
+
+CONFIG_TCG_TPM=y
+CONFIG_TCG_XEN=y
+
+
+Reboot the machine with the created XEN-0 kernel.
+
+Note: If you do not want any TPM-related code compiled into your
+kernel or built as module then comment all the above lines like
+this example:
+# CONFIG_TCG_TPM is not set
+
+
+Modifying VM Configuration files:
+---------------------------------
+
+VM configuration files need to be adapted to make a TPM instance
+available to a user domain. The following VM configuration file is
+an example of how a user domain can be configured to have a TPM
+available. It works similar to making a network interface
+available to a domain.
+
+kernel = "/boot/vmlinuz-2.6.12-xenU"
+ramdisk = "/xen/initrd_domU/U1_ramdisk.img"
+memory = 32
+name = "TPMUserDomain0"
+vtpm = ['instance=1,backend=0']
+root = "/dev/ram0 cosole=tty ro"
+vif = ['backend=0']
+
+In the above configuration file the line 'vtpm = ...' provides
+information about the domain where the virtual TPM is running and
+where the TPM backend has been compiled into - this has to be 
+domain 0  at the moment - and which TPM instance the user domain
+is supposed to talk to. Note that each running VM must use a 
+different instance and that using instance 0 is NOT allowed.
+
+Note: If you do not want TPM functionality for your user domain simply
+leave out the 'vtpm' line in the configuration file.
+
+
+Running the TPM:
+----------------
+
+To run the vTPM, dev device /dev/vtpm must be available.
+Verify that 'ls -l /dev/vtpm' shows the following output:
+
+crw-------  1 root root 10, 225 Aug 11 06:58 /dev/vtpm
+
+If it is not available, run the following command as 'root'.
+mknod /dev/vtpm c 10 225
+
+Make sure that the vTPM is running in domain 0. To do this run the
+following
+
+/usr/bin/vtpm_managerd
+
+Start a user domain using the 'xm create' command. Once you are in the
+shell of the user domain, you should be able to do the following:
+
+> cd /sys/devices/vtpm
+> ls
+cancel  caps   pcrs    pubek
+> cat pcrs
+PCR-00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+PCR-01: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+PCR-02: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+PCR-03: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+PCR-04: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+PCR-05: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+PCR-06: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+PCR-07: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+PCR-08: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[...]
+
+At this point the user domain has been sucessfully connected to its
+virtual TPM instance.
+
+For further information please read the documentation in 
+tools/vtpm_manager/README and tools/vtpm/README
+
+Stefan Berger and Employees of the Intel Corp

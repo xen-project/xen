@@ -30,9 +30,7 @@ from xen.xend import XendVnet
 from xen.xend.XendRoot import get_component
 from xen.xend.xenstore import DBVar
 
-from xen.xend.server import channel
-from xen.xend.server.controller import CtrlMsgRcvr, Dev, DevController
-from xen.xend.server.messages import *
+from xen.xend.server.controller import Dev, DevController
 
 class NetDev(Dev):
     """A network device.
@@ -90,12 +88,9 @@ class NetDev(Dev):
     def __init__(self, controller, id, config, recreate=False):
         Dev.__init__(self, controller, id, config, recreate=recreate)
         self.vif = int(self.id)
-        self.evtchn = None
         self.status = None
         self.frontendDomain = self.getDomain()
-        self.frontendChannel = None
         self.backendDomain = None
-        self.backendChannel = None
         self.credit = None
         self.period = None
         self.mac = None
@@ -109,17 +104,11 @@ class NetDev(Dev):
 
     def exportToDB(self, save=False):
         Dev.exportToDB(self, save=save)
-        if self.evtchn:
-            db = self.db.addChild("evtchn")
-            self.evtchn.saveToDB(db, save=save)
 
     def init(self, recreate=False, reboot=False):
         self.destroyed = False
         self.status = NETIF_INTERFACE_STATUS_DISCONNECTED
         self.frontendDomain = self.getDomain()
-        self.frontendChannel = self.getChannel()
-        cf = channel.channelFactory()
-        self.backendChannel = cf.openChannel(self.backendDomain)
 
     def _get_config_mac(self, config):
         vmac = sxp.child_value(config, 'mac')
@@ -287,10 +276,6 @@ class NetDev(Dev):
             val.append(['credit', self.credit])
         if self.period:
             val.append(['period', self.period])
-        if self.evtchn:
-            val.append(['evtchn',
-                        self.evtchn['port1'],
-                        self.evtchn['port2']])
         return val
 
     def get_vifname(self):
@@ -348,42 +333,11 @@ class NetDev(Dev):
         if recreate:
             pass
         else:
-            self.send_be_create()
             if self.credit and self.period:
-                self.send_be_creditlimit(self.credit, self.period)
+                #self.send_be_creditlimit(self.credit, self.period)
+                pass
             self.vifctl('up', vmname=self.getDomainName())
         
-    def closeEvtchn(self):
-        if self.evtchn:
-            channel.eventChannelClose(self.evtchn)
-            self.evtchn = None
-
-    def openEvtchn(self):
-        self.evtchn = channel.eventChannel(self.backendDomain, self.frontendDomain)
-        
-    def getEventChannelBackend(self):
-        val = 0
-        if self.evtchn:
-            val = self.evtchn['port1']
-        return val
-
-    def getEventChannelFrontend(self):
-        val = 0
-        if self.evtchn:
-            val = self.evtchn['port2']
-        return val
-
-    def send_be_create(self):
-        msg = packMsg('netif_be_create_t',
-                      { 'domid'        : self.frontendDomain,
-                        'netif_handle' : self.vif,
-                        'be_mac'       : self.be_mac or [0, 0, 0, 0, 0, 0],
-                        'mac'          : self.mac,
-                        #'vifname'      : self.vifname
-                        })
-        msg = self.backendChannel.requestResponse(msg)
-        # todo: check return status
-
     def destroy(self, change=False, reboot=False):
         """Destroy the device's resources and disconnect from the back-end
         device controller. If 'change' is true notify the front-end interface.
@@ -393,47 +347,14 @@ class NetDev(Dev):
         self.destroyed = True
         self.status = NETIF_INTERFACE_STATUS_CLOSED
         log.debug("Destroying vif domain=%d vif=%d", self.frontendDomain, self.vif)
-        self.closeEvtchn()
         self.vifctl('down')
-        self.send_be_disconnect()
-        self.send_be_destroy()
         if change:
             self.reportStatus()
-
-    def send_be_disconnect(self):
-        msg = packMsg('netif_be_disconnect_t',
-                      { 'domid'        : self.frontendDomain,
-                        'netif_handle' : self.vif })
-        self.backendChannel.requestResponse(msg)
-        #todo: check return status
-
-    def send_be_destroy(self, response=None):
-        msg = packMsg('netif_be_destroy_t',
-                      { 'domid'        : self.frontendDomain,
-                        'netif_handle' : self.vif })
-        self.backendChannel.requestResponse(msg)
-        #todo: check return status
-    
-    def recv_fe_interface_connect(self, val):
-        self.openEvtchn()
-        msg = packMsg('netif_be_connect_t',
-                      { 'domid'          : self.frontendDomain,
-                        'netif_handle'   : self.vif,
-                        'evtchn'         : self.getEventChannelBackend(),
-                        'tx_shmem_frame' : val['tx_shmem_frame'],
-                        'tx_shmem_ref'   : val['tx_shmem_ref'],
-                        'rx_shmem_frame' : val['rx_shmem_frame'],
-                        'rx_shmem_ref'   : val['rx_shmem_ref'] })
-        msg = self.backendChannel.requestResponse(msg)
-        #todo: check return status
-        self.status = NETIF_INTERFACE_STATUS_CONNECTED
-        self.reportStatus()
 
     def setCreditLimit(self, credit, period):
         #todo: these params should be in sxpr and vif config.
         self.credit = credit
         self.period = period
-        self.send_be_creditlimit(credit, period)
 
     def getCredit(self):
         return self.credit
@@ -441,31 +362,10 @@ class NetDev(Dev):
     def getPeriod(self):
         return self.period
         
-    def send_be_creditlimit(self, credit, period):
-        msg = packMsg('netif_be_creditlimit_t',
-                      { 'domid'          : self.frontendDomain,
-                        'netif_handle'   : self.vif,
-                        'credit_bytes'   : credit,
-                        'period_usec'    : period })
-        msg = self.backendChannel.requestResponse(msg)
-        # todo: check return status
-        
-    def reportStatus(self, resp=False):
-        msg = packMsg('netif_fe_interface_status_t',
-                      { 'handle' : self.vif,
-                        'status' : self.status,
-                        'evtchn' : self.getEventChannelFrontend(),
-                        'domid'  : self.backendDomain,
-                        'mac'    : self.mac })
-        if resp:
-            self.frontendChannel.writeResponse(msg)
-        else:
-            self.frontendChannel.writeRequest(msg)
-
     def interfaceChanged(self):
         """Notify the front-end that a device has been added or removed.
         """
-        self.reportStatus()
+        pass
         
 class NetifController(DevController):
     """Network interface controller. Handles all network devices for a domain.
@@ -473,25 +373,9 @@ class NetifController(DevController):
     
     def __init__(self, vm, recreate=False):
         DevController.__init__(self, vm, recreate=recreate)
-        self.channel = None
-        self.rcvr = None
-        self.channel = None
 
     def initController(self, recreate=False, reboot=False):
         self.destroyed = False
-        self.channel = self.getChannel()
-        # Register our handlers for incoming requests.
-        self.rcvr = CtrlMsgRcvr(self.channel)
-        self.rcvr.addHandler(CMSG_NETIF_FE,
-                             CMSG_NETIF_FE_DRIVER_STATUS,
-                             self.recv_fe_driver_status)
-        self.rcvr.addHandler(CMSG_NETIF_FE,
-                             CMSG_NETIF_FE_INTERFACE_STATUS,
-                             self.recv_fe_interface_status)
-        self.rcvr.addHandler(CMSG_NETIF_FE,
-                             CMSG_NETIF_FE_INTERFACE_CONNECT,
-                             self.recv_fe_interface_connect)
-        self.rcvr.registerChannel()
         if reboot:
             self.rebootDevices()
 
@@ -501,8 +385,6 @@ class NetifController(DevController):
         self.destroyed = True
         log.debug("Destroying netif domain=%d", self.getDomain())
         self.destroyDevices(reboot=reboot)
-        if self.rcvr:
-            self.rcvr.deregisterChannel()
 
     def sxpr(self):
         val = ['netif', ['dom', self.getDomain()]]
@@ -524,57 +406,3 @@ class NetifController(DevController):
         
         dev = self.devices[vif]
         return dev.setCreditLimit(credit, period)
-    
-    def recv_fe_driver_status(self, msg):
-        msg = packMsg('netif_fe_driver_status_t',
-                      { 'status'     : NETIF_DRIVER_STATUS_UP,
-                        ## FIXME: max_handle should be max active interface id
-                        'max_handle' : self.getDeviceCount()
-                        #'max_handle' : self.getMaxDeviceId()
-                        })
-        # Two ways of doing it:
-        # 1) front-end requests driver status, we reply with the interface count,
-        #    front-end polls the interfaces,
-        #    front-end checks they are all up
-        # 2) front-end requests driver status, we reply (with anything),
-        #    we notify the interfaces,
-        #    we notify driver status up with the count
-        #    front-end checks they are all up
-        #
-        # We really want to use 1), but at the moment the xenU kernel panics
-        # in that mode, so we're sticking to 2) for now.
-        resp = False
-        if resp:
-            self.channel.writeResponse(msg)
-        else:
-            for dev in self.devices.values():
-                dev.reportStatus()
-            self.channel.writeRequest(msg)
-        return resp
-
-    def recv_fe_interface_status(self, msg):
-        val = unpackMsg('netif_fe_interface_status_t', msg)
-        vif = val['handle']
-        dev = self.findDevice(vif)
-        if dev:
-            dev.reportStatus(resp=True)
-        else:
-            log.error('Received netif_fe_interface_status for unknown vif: dom=%d vif=%d',
-                      self.getDomain(), vif)
-            msg = packMsg('netif_fe_interface_status_t',
-                          { 'handle' : -1,
-                            'status' : NETIF_INTERFACE_STATUS_CLOSED,
-                            });
-            self.channel.writeResponse(msg)
-        return True
-            
-    def recv_fe_interface_connect(self, msg):
-        val = unpackMsg('netif_fe_interface_connect_t', msg)
-        vif = val['handle']
-        dev = self.getDevice(vif)
-        if dev:
-            dev.recv_fe_interface_connect(val)
-        else:
-            log.error('Received netif_fe_interface_connect for unknown vif: dom=%d vif=%d',
-                      self.getDomain(), vif)
-

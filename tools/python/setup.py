@@ -7,10 +7,8 @@ XEN_ROOT = "../.."
 extra_compile_args  = [ "-fno-strict-aliasing", "-Wall", "-Werror" ]
 
 
-include_dirs = [ XEN_ROOT + "/tools/python/xen/lowlevel/xu",
-                 XEN_ROOT + "/tools/libxc",
+include_dirs = [ XEN_ROOT + "/tools/libxc",
                  XEN_ROOT + "/tools/xenstore",
-                 XEN_ROOT + "/tools/xcs",
                  ]
 
 library_dirs = [ XEN_ROOT + "/tools/libxc",
@@ -25,13 +23,6 @@ xc = Extension("xc",
                library_dirs       = library_dirs,
                libraries          = libraries,
                sources            = [ "xen/lowlevel/xc/xc.c" ])
-
-xu = Extension("xu",
-               extra_compile_args = extra_compile_args,
-               include_dirs       = include_dirs + [ "xen/lowlevel/xu" ],
-               library_dirs       = library_dirs,
-               libraries          = libraries,
-               sources            = [ "xen/lowlevel/xu/xu.c" ])
 
 xs = Extension("xs",
                extra_compile_args = extra_compile_args,
@@ -51,10 +42,10 @@ setup(name            = 'xen',
                          'xen.xend.xenstore',
                          'xen.xm',
                          'xen.web',
-						 'xen.sv'
+                         'xen.sv'
                          ],
       ext_package = "xen.lowlevel",
-      ext_modules = [ xc, xu, xs ]
+      ext_modules = [ xc, xs ]
       )
 
 os.chdir('logging')

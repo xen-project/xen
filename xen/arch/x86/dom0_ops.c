@@ -19,6 +19,7 @@
 #include <xen/console.h>
 #include <asm/shadow.h>
 #include <asm/irq.h>
+#include <asm/processor.h>
 #include <public/sched_ctl.h>
 
 #include <asm/mtrr.h>
@@ -188,9 +189,11 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         pi->total_pages      = max_page;
         pi->free_pages       = avail_domheap_pages();
         pi->cpu_khz          = cpu_khz;
-
-        copy_to_user(u_dom0_op, op, sizeof(*op));
+        memset( pi->hw_cap, 0, sizeof(pi->hw_cap) );
+        memcpy( pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4 );
         ret = 0;
+        if( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+	    ret = -EINVAL;
     }
     break;
     
@@ -389,9 +392,31 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     }
     break;
 
+    case DOM0_PHYSICAL_MEMORY_MAP:
+    {
+        struct dom0_memory_map_entry entry;
+        int i;
+
+        for ( i = 0; i < e820.nr_map; i++ )
+        {
+            if ( i >= op->u.physical_memory_map.max_map_entries )
+                break;
+            entry.start  = e820.map[i].addr;
+            entry.end    = e820.map[i].addr + e820.map[i].size;
+            entry.is_ram = (e820.map[i].type == E820_RAM);
+            (void)copy_to_user(
+                &op->u.physical_memory_map.memory_map[i],
+                &entry, sizeof(entry));
+        }
+
+        op->u.physical_memory_map.nr_map_entries = i;
+        (void)copy_to_user(u_dom0_op, op, sizeof(*op));
+    }
+    break;
+
     default:
         ret = -ENOSYS;
-
+        break;
     }
 
     return ret;

@@ -23,13 +23,13 @@ typedef struct netif_tx_response {
 
 typedef struct {
     u16       id;    /* Echoed in response message.        */
-#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     grant_ref_t gref;	/* 2: Reference to incoming granted frame */
 #endif
 } netif_rx_request_t;
 
 typedef struct {
-#ifdef CONFIG_XEN_NETDEV_GRANT_TX
+#ifdef CONFIG_XEN_NETDEV_GRANT
     u32      addr;   /*  0: Offset in page of start of received packet  */
 #else
     unsigned long addr; /* Machine address of packet.              */

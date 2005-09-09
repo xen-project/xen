@@ -213,6 +213,7 @@ typedef struct {
     u32      cpu_khz;
     unsigned long total_pages;
     unsigned long free_pages;
+    u32      hw_cap[8];
 } dom0_physinfo_t;
 
 /*
@@ -374,6 +375,18 @@ typedef struct {
     int quirk_id;
 } dom0_platform_quirk_t;
 
+#define DOM0_PHYSICAL_MEMORY_MAP 40
+typedef struct {
+    /* IN variables. */
+    int max_map_entries;
+    /* OUT variables. */
+    int nr_map_entries;
+    struct dom0_memory_map_entry {
+        u64 start, end;
+        int is_ram;
+    } *memory_map;
+} dom0_physical_memory_map_t;
+
 typedef struct {
     u32 cmd;
     u32 interface_version; /* DOM0_INTERFACE_VERSION */
@@ -408,6 +421,7 @@ typedef struct {
         dom0_getvcpucontext_t    getvcpucontext;
         dom0_getdomaininfolist_t getdomaininfolist;
         dom0_platform_quirk_t    platform_quirk;
+        dom0_physical_memory_map_t physical_memory_map;
     } u;
 } dom0_op_t;
 

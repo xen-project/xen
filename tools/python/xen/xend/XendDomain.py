@@ -36,7 +36,6 @@ from xen.xend import EventServer; eserver = EventServer.instance()
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 from xen.xend import scheduler
-from xen.xend.server import channel
 from xen.xend.server import relocate
 from xen.xend.uuid import getUuid
 from xen.xend.xenstore import XenNode, DBMap
@@ -67,7 +66,7 @@ class XendDomain:
         xroot.add_component("xen.xend.XendDomain", self)
         self.domains = XendDomainDict()
         self.dbmap = DBMap(db=XenNode("/domain"))
-        eserver.subscribe('xend.virq', self.onVirq)
+        self.watchReleaseDomain()
         self.initial_refresh()
 
     def list(self):
@@ -75,12 +74,32 @@ class XendDomain:
 
         @return: domain objects
         """
+        self.refresh()
         return self.domains.values()
-    
-    def onVirq(self, event, val):
-        """Event handler for virq.
+
+    def list_sorted(self):
+        """Get list of domain objects, sorted by name.
+
+        @return: domain objects
         """
+        doms = self.list()
+        doms.sort(lambda x, y: cmp(x.name, y.name))
+        return doms
+
+    def list_names(self):
+        """Get list of domain names.
+
+        @return: domain names
+        """
+        doms = self.list_sorted()
+        return map(lambda x: x.name, doms)
+
+    def onReleaseDomain(self):
         self.refresh(cleanup=True)
+
+    def watchReleaseDomain(self):
+        from xen.xend.xenstore.xswatch import xswatch
+        self.releaseDomain = xswatch("@releaseDomain", self.onReleaseDomain)
 
     def xen_domains(self):
         """Get table of domains indexed by id from xc.
@@ -264,24 +283,6 @@ class XendDomain:
                 d.update(dominfo)
         else:
             self._delete_domain(id)
-
-    def domain_ls(self):
-        """Get list of domain names.
-
-        @return: domain names
-        """
-        self.refresh()
-        doms = self.domains.values()
-        doms.sort(lambda x, y: cmp(x.name, y.name))
-        return map(lambda x: x.name, doms)
-
-    def domain_ls_ids(self):
-        """Get list of domain ids.
-
-        @return: domain names
-        """
-        self.refresh()
-        return self.domains.keys()
 
     def domain_create(self, config):
         """Create a domain from a configuration.
@@ -542,7 +543,7 @@ class XendDomain:
             dominfo.name = "tmp-" + dominfo.name
 
         try:
-            XendCheckpoint.save(self, sock.fileno(), dominfo)
+            XendCheckpoint.save(self, sock.fileno(), dominfo, live)
         except:
             if dst == "localhost":
                 dominfo.name = string.replace(dominfo.name, "tmp-", "", 1)
@@ -563,7 +564,8 @@ class XendDomain:
 
             fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
 
-            return XendCheckpoint.save(self, fd, dominfo)
+            # For now we don't support 'live checkpoint' 
+            return XendCheckpoint.save(self, fd, dominfo, False)
 
         except OSError, ex:
             raise XendError("can't write guest state file %s: %s" %

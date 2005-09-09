@@ -40,16 +40,8 @@
 #include <asm-xen/synch_bitops.h>
 #include <asm-xen/xen-public/event_channel.h>
 #include <asm-xen/xen-public/physdev.h>
-#include <asm-xen/ctrl_if.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/evtchn.h>
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-EXPORT_SYMBOL(force_evtchn_callback);
-EXPORT_SYMBOL(evtchn_do_upcall);
-EXPORT_SYMBOL(bind_evtchn_to_irq);
-EXPORT_SYMBOL(unbind_evtchn_from_irq);
-#endif
 
 /*
  * This lock protects updates to the following mapping and reference-count
@@ -133,6 +125,7 @@ void force_evtchn_callback(void)
 {
     (void)HYPERVISOR_xen_version(0);
 }
+EXPORT_SYMBOL(force_evtchn_callback);
 
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
@@ -165,6 +158,7 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
         }
     }
 }
+EXPORT_SYMBOL(evtchn_do_upcall);
 
 static int find_unbound_irq(void)
 {
@@ -211,6 +205,7 @@ int bind_virq_to_irq(int virq)
     
     return irq;
 }
+EXPORT_SYMBOL(bind_virq_to_irq);
 
 void unbind_virq_from_irq(int virq)
 {
@@ -244,74 +239,7 @@ void unbind_virq_from_irq(int virq)
 
     spin_unlock(&irq_mapping_update_lock);
 }
-
-/* This is only used when a vcpu from an xm save.  The ipi is expected
-   to have been bound before we suspended, and so all of the xenolinux
-   state is set up; we only need to restore the Xen side of things.
-   The irq number has to be the same, but the evtchn number can
-   change. */
-void _bind_ipi_to_irq(int ipi, int vcpu, int irq)
-{
-    evtchn_op_t op;
-    int evtchn;
-
-    spin_lock(&irq_mapping_update_lock);
-
-    op.cmd = EVTCHNOP_bind_ipi;
-    if ( HYPERVISOR_event_channel_op(&op) != 0 )
-	panic("Failed to bind virtual IPI %d on cpu %d\n", ipi, vcpu);
-    evtchn = op.u.bind_ipi.port;
-
-    printk("<0>IPI %d, old evtchn %d, evtchn %d.\n",
-	   ipi, per_cpu(ipi_to_evtchn, vcpu)[ipi],
-	   evtchn);
-
-    evtchn_to_irq[irq_to_evtchn[irq]] = -1;
-    irq_to_evtchn[irq] = -1;
-
-    evtchn_to_irq[evtchn] = irq;
-    irq_to_evtchn[irq]    = evtchn;
-
-    printk("<0>evtchn_to_irq[%d] = %d.\n", evtchn,
-	   evtchn_to_irq[evtchn]);
-    per_cpu(ipi_to_evtchn, vcpu)[ipi] = evtchn;
-
-    bind_evtchn_to_cpu(evtchn, vcpu);
-
-    spin_unlock(&irq_mapping_update_lock);
-
-    clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_mask);
-    clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_pending);
-}
-
-void _bind_virq_to_irq(int virq, int cpu, int irq)
-{
-    evtchn_op_t op;
-    int evtchn;
-
-    spin_lock(&irq_mapping_update_lock);
-
-    op.cmd              = EVTCHNOP_bind_virq;
-    op.u.bind_virq.virq = virq;
-    if ( HYPERVISOR_event_channel_op(&op) != 0 )
-            panic("Failed to bind virtual IRQ %d\n", virq);
-    evtchn = op.u.bind_virq.port;
-
-    evtchn_to_irq[irq_to_evtchn[irq]] = -1;
-    irq_to_evtchn[irq] = -1;
-
-    evtchn_to_irq[evtchn] = irq;
-    irq_to_evtchn[irq]    = evtchn;
-
-    per_cpu(virq_to_irq, cpu)[virq] = irq;
-
-    bind_evtchn_to_cpu(evtchn, cpu);
-
-    spin_unlock(&irq_mapping_update_lock);
-
-    clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_mask);
-    clear_bit(evtchn, (unsigned long *)HYPERVISOR_shared_info->evtchn_pending);
-}
+EXPORT_SYMBOL(unbind_virq_from_irq);
 
 int bind_ipi_to_irq(int ipi)
 {
@@ -347,6 +275,7 @@ int bind_ipi_to_irq(int ipi)
 
     return irq;
 }
+EXPORT_SYMBOL(bind_ipi_to_irq);
 
 void unbind_ipi_from_irq(int ipi)
 {
@@ -374,6 +303,7 @@ void unbind_ipi_from_irq(int ipi)
 
     spin_unlock(&irq_mapping_update_lock);
 }
+EXPORT_SYMBOL(unbind_ipi_from_irq);
 
 int bind_evtchn_to_irq(unsigned int evtchn)
 {
@@ -394,6 +324,7 @@ int bind_evtchn_to_irq(unsigned int evtchn)
     
     return irq;
 }
+EXPORT_SYMBOL(bind_evtchn_to_irq);
 
 void unbind_evtchn_from_irq(unsigned int evtchn)
 {
@@ -409,6 +340,7 @@ void unbind_evtchn_from_irq(unsigned int evtchn)
 
     spin_unlock(&irq_mapping_update_lock);
 }
+EXPORT_SYMBOL(unbind_evtchn_from_irq);
 
 int bind_evtchn_to_irqhandler(
     unsigned int evtchn,
@@ -427,6 +359,7 @@ int bind_evtchn_to_irqhandler(
 
     return retval;
 }
+EXPORT_SYMBOL(bind_evtchn_to_irqhandler);
 
 void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id)
 {
@@ -434,6 +367,7 @@ void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id)
     free_irq(irq, dev_id);
     unbind_evtchn_from_irq(evtchn);
 }
+EXPORT_SYMBOL(unbind_evtchn_from_irqhandler);
 
 #ifdef CONFIG_SMP
 static void do_nothing_function(void *ign)
@@ -797,7 +731,4 @@ void __init init_IRQ(void)
         irq_desc[pirq_to_irq(i)].depth   = 1;
         irq_desc[pirq_to_irq(i)].handler = &pirq_type;
     }
-
-    /* This needs to be done early, but after the IRQ subsystem is alive. */
-    ctrl_if_init();
 }

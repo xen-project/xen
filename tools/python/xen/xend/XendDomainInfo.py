@@ -34,8 +34,7 @@ from xen.util.blkif import blkdev_uname_to_file
 
 from xen.xend.server import controller
 from xen.xend.server import SrvDaemon; xend = SrvDaemon.instance()
-from xen.xend.server import messages
-from xen.xend.server.channel import EventChannel, channelFactory
+from xen.xend.server.channel import EventChannel
 from xen.util.blkif import blkdev_name_to_number, expand_dev_name
 
 from xen.xend import sxp
@@ -47,7 +46,7 @@ from xen.xend.XendError import XendError, VmError
 from xen.xend.XendRoot import get_component
 
 from xen.xend.uuid import getUuid
-from xen.xend.xenstore import DBVar
+from xen.xend.xenstore import DBVar, XenNode, DBMap
 
 """Shutdown code for poweroff."""
 DOMAIN_POWEROFF = 0
@@ -231,6 +230,7 @@ class XendDomainInfo:
         DBVar('start_time',    ty='float'),
         DBVar('state',         ty='str'),
         DBVar('store_mfn',     ty='long'),
+        DBVar('console_mfn',   ty='long', path="console/ring-ref"),
         DBVar('restart_mode',  ty='str'),
         DBVar('restart_state', ty='str'),
         DBVar('restart_time',  ty='float'),
@@ -257,15 +257,17 @@ class XendDomainInfo:
 
         self.target = None
 
-        self.channel = None
         self.store_channel = None
         self.store_mfn = None
+        self.console_channel = None
+        self.console_mfn = None
         self.controllers = {}
         
         self.info = None
         self.blkif_backend = False
         self.netif_backend = False
         self.netif_idx = 0
+        self.tpmif_backend = False
         
         #todo: state: running, suspended
         self.state = STATE_VM_OK
@@ -292,18 +294,18 @@ class XendDomainInfo:
         self.db.saveDB(save=save, sync=sync)
 
     def exportToDB(self, save=False, sync=False):
-        if self.channel:
-            self.channel.saveToDB(self.db.addChild("channel"), save=save)
         if self.store_channel:
             self.store_channel.saveToDB(self.db.addChild("store_channel"),
                                         save=save)
+        if self.console_channel:
+            self.db['console/port'] = "%i" % self.console_channel.port1
         if self.image:
             self.image.exportToDB(save=save, sync=sync)
         self.db.exportToDB(self, fields=self.__exports__, save=save, sync=sync)
 
     def importFromDB(self):
         self.db.importFromDB(self, fields=self.__exports__)
-        self.store_channel = self.eventChannel("store_channel")
+        self.store_channel = self.eventChannelOld("store_channel")
 
     def setdom(self, dom):
         """Set the domain id.
@@ -323,16 +325,16 @@ class XendDomainInfo:
     def getName(self):
         return self.name
 
-    def getChannel(self):
-        return self.channel
-
     def getStoreChannel(self):
         return self.store_channel
 
-    def update(self, info):
+    def getConsoleChannel(self):
+        return self.console_channel
+
+    def update(self, info=None):
         """Update with  info from xc.domain_getinfo().
         """
-        self.info = info
+        self.info = info or dom_get(self.id)
         self.memory = self.info['mem_kb'] / 1024
         self.ssidref = self.info['ssidref']
         self.target = self.info['mem_kb'] * 1024
@@ -384,6 +386,8 @@ class XendDomainInfo:
         return ctrl
 
     def createDevice(self, type, devconfig, change=False):
+        if self.recreate:
+            return
         if type == 'vbd':
             typedev = sxp.child_value(devconfig, 'dev')
             if re.match('^ioemu:', typedev):
@@ -420,12 +424,29 @@ class XendDomainInfo:
             return
 
         if type == 'vif':
+            from xen.xend import XendRoot
+            xroot = XendRoot.instance()
+
+            def _get_config_ipaddr(config):
+                val = []
+                for ipaddr in sxp.children(config, elt='ip'):
+                    val.append(sxp.child0(ipaddr))
+                return val
+
             backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
 
             log.error(devconfig)
             
             devnum = self.netif_idx
             self.netif_idx += 1
+
+            script = sxp.child_value(devconfig, 'script',
+                                     xroot.get_vif_script())
+            script = os.path.join(xroot.network_script_dir, script)
+            bridge = sxp.child_value(devconfig, 'bridge',
+                                     xroot.get_vif_bridge())
+            mac = sxp.child_value(devconfig, 'mac')
+            ipaddr = _get_config_ipaddr(devconfig)
 
             # create backend db
             backdb = backdom.db.addChild("/backend/%s/%s/%d" %
@@ -434,6 +455,12 @@ class XendDomainInfo:
             # create frontend db
             db = self.db.addChild("/device/%s/%d" % (type, devnum))
             
+            backdb['script'] = script
+            backdb['domain'] = self.name
+            backdb['mac'] = mac
+            backdb['bridge'] = bridge
+            if ipaddr:
+                backdb['ip'] = ' '.join(ipaddr)
             backdb['frontend'] = db.getPath()
             backdb['frontend-id'] = "%i" % self.id
             backdb['handle'] = "%i" % devnum
@@ -442,13 +469,37 @@ class XendDomainInfo:
             db['backend'] = backdb.getPath()
             db['backend-id'] = "%i" % backdom.id
             db['handle'] = "%i" % devnum
-            log.error(sxp.child_value(devconfig, 'mac'))
-            db['mac'] = sxp.child_value(devconfig, 'mac')
+            db['mac'] = mac
 
             db.saveDB(save=True)
 
             return
         
+        if type == 'vtpm':
+            backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
+
+            devnum = int(sxp.child_value(devconfig, 'instance', '0'))
+            log.error("The domain has a TPM with instance %d." % devnum)
+
+            # create backend db
+            backdb = backdom.db.addChild("/backend/%s/%s/%d" %
+                                         (type, self.uuid, devnum))
+            # create frontend db
+            db = self.db.addChild("/device/%s/%d" % (type, devnum))
+
+            backdb['frontend'] = db.getPath()
+            backdb['frontend-id'] = "%i" % self.id
+            backdb['instance'] = sxp.child_value(devconfig, 'instance', '0')
+            backdb.saveDB(save=True)
+
+            db['handle'] = "%i" % devnum
+            db['backend'] = backdb.getPath()
+            db['backend-id'] = "%i" % int(sxp.child_value(devconfig,
+                                                          'backend', '0'))
+            db.saveDB(save=True)
+
+            return
+
         ctrl = self.findDeviceController(type)
         return ctrl.createDevice(devconfig, recreate=self.recreate,
                                  change=change)
@@ -512,12 +563,18 @@ class XendDomainInfo:
             sxpr.append(['up_time', str(up_time) ])
             sxpr.append(['start_time', str(self.start_time) ])
 
-        if self.channel:
-            sxpr.append(self.channel.sxpr())
         if self.store_channel:
             sxpr.append(self.store_channel.sxpr())
         if self.store_mfn:
             sxpr.append(['store_mfn', self.store_mfn])
+        if self.console_channel:
+            sxpr.append(['console_channel', self.console_channel.sxpr()])
+        if self.console_mfn:
+            sxpr.append(['console_mfn', self.console_mfn])
+# already in (devices)
+#        console = self.getConsole()
+#        if console:
+#            sxpr.append(console.sxpr())
 
         if self.restart_count:
             sxpr.append(['restart_count', self.restart_count])
@@ -695,12 +752,6 @@ class XendDomainInfo:
         """
         self.state = STATE_VM_TERMINATED
         self.release_devices()
-        if self.channel:
-            try:
-                self.channel.close()
-                self.channel = None
-            except:
-                pass
         if self.store_channel:
             try:
                 self.store_channel.close()
@@ -711,6 +762,13 @@ class XendDomainInfo:
                 self.db.releaseDomain(self.id)
             except Exception, ex:
                 log.warning("error in domain release on xenstore: %s", ex)
+                pass
+        if self.console_channel:
+            # notify processes using this cosole?
+            try:
+                self.console_channel.close()
+                self.console_channel = None
+            except:
                 pass
         if self.image:
             try:
@@ -723,8 +781,8 @@ class XendDomainInfo:
     def destroy(self):
         """Clenup vm and destroy domain.
         """
-        self.cleanup()
         self.destroy_domain()
+        self.cleanup()
         self.saveToDB()
         return 0
 
@@ -755,6 +813,11 @@ class XendDomainInfo:
                 for dev in typedb.keys():
                     typedb[dev].delete()
                 typedb.saveDB(save=True)
+            if type == 'vtpm':
+                typedb = ddb.addChild(type)
+                for dev in typedb.keys():
+                    typedb[dev].delete()
+                typedb.saveDB(save=True)
 
     def show(self):
         """Print virtual machine info.
@@ -780,21 +843,7 @@ class XendDomainInfo:
                   id, self.name, self.memory)
         self.setdom(id)
 
-    def openChannel(self, key, local, remote):
-        """Create a control channel to the domain.
-        If saved info is available recreate the channel.
-        
-        @param key db key for the saved data (if any)
-        @param local default local port
-        @param remote default remote port
-        """
-        db = self.db.addChild(key)
-        chan = channelFactory().restoreFromDB(db, self.id, local, remote)
-        #todo: save here?
-        #chan.saveToDB(db)
-        return chan
-
-    def eventChannel(self, key):
+    def eventChannelOld(self, key):
         """Create an event channel to the domain.
         If saved info is available recreate the channel.
         
@@ -803,11 +852,27 @@ class XendDomainInfo:
         db = self.db.addChild(key)
         return EventChannel.restoreFromDB(db, 0, self.id)
         
+    def eventChannel(self, path=None, key=None):
+        """Create an event channel to the domain.
+        
+        @param path under which port is stored in db
+        """
+        port = 0
+        try:
+            if path and key:
+                if path:
+                    db = self.db.addChild(path)
+                else:
+                    db = self.db
+                port = int(db[key].getData())
+        except: pass
+        return EventChannel.interdomain(0, self.id, port1=port, port2=0)
+        
     def create_channel(self):
         """Create the channels to the domain.
         """
-        self.channel = self.openChannel("channel", 0, 1)
-        self.store_channel = self.eventChannel("store_channel")
+        self.store_channel = self.eventChannelOld("store_channel")
+        self.console_channel = self.eventChannel("console", "port")
 
     def create_configured_devices(self):
         devices = sxp.children(self.config, 'device')
@@ -950,6 +1015,7 @@ class XendDomainInfo:
 
         """
         try:
+            self.clear_shutdown()
             self.state = STATE_VM_OK
             self.shutdown_pending = None
             self.restart_check()
@@ -993,6 +1059,8 @@ class XendDomainInfo:
                 self.netif_backend = True
             elif name == 'usbif':
                 self.usbif_backend = True
+            elif name == 'tpmif':
+                self.tpmif_backend = True
             else:
                 raise VmError('invalid backend type:' + str(name))
 
@@ -1084,7 +1152,7 @@ class XendDomainInfo:
 
     def dom0_init_store(self):
         if not self.store_channel:
-            self.store_channel = self.eventChannel("store_channel")
+            self.store_channel = self.eventChannelOld("store_channel")
         self.store_mfn = xc.init_store(self.store_channel.port2)
         if self.store_mfn >= 0:
             self.db.introduceDomain(self.id, self.store_mfn,
@@ -1157,6 +1225,10 @@ add_device_handler("vbd", "vbd")
 from server import netif
 controller.addDevControllerClass("vif", netif.NetifController)
 add_device_handler("vif", "vif")
+
+from server import tpmif
+controller.addDevControllerClass("vtpm", tpmif.TPMifController)
+add_device_handler("vtpm", "vtpm")
 
 from server import pciif
 controller.addDevControllerClass("pci", pciif.PciController)

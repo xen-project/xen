@@ -23,6 +23,7 @@ typedef int64_t            s64;
 #include <sys/ptrace.h>
 #include <xen/xen.h>
 #include <xen/dom0_ops.h>
+#include <xen/version.h>
 #include <xen/event_channel.h>
 #include <xen/sched_ctl.h>
 #include <xen/acm.h>
@@ -386,7 +387,19 @@ int xc_domain_setmaxmem(int xc_handle,
 
 int xc_domain_memory_increase_reservation(int xc_handle,
                                           u32 domid, 
-                                          unsigned int mem_kb);
+                                          unsigned long nr_extents,
+                                          unsigned int extent_order,
+                                          unsigned int address_bits,
+					  unsigned long *extent_start);
+
+int xc_domain_memory_decrease_reservation(int xc_handle,
+                                          u32 domid, 
+                                          unsigned long nr_extents,
+                                          unsigned int extent_order,
+					  unsigned long *extent_start);
+
+unsigned long xc_make_page_below_4G(int xc_handle, u32 domid, 
+				    unsigned long mfn);
 
 typedef dom0_perfc_desc_t xc_perfc_desc_t;
 /* IMPORTANT: The caller is responsible for mlock()'ing the @desc array. */
@@ -430,9 +443,7 @@ int xc_ia64_get_pfn_list(int xc_handle, u32 domid, unsigned long *pfn_buf,
 int xc_mmuext_op(int xc_handle, struct mmuext_op *op, unsigned int nr_ops,
 		 domid_t dom);
 
-int xc_dom_mem_op(int xc_handle, unsigned int memop, unsigned int *extent_list,
-		  unsigned int nr_extents, unsigned int extent_order,
-		  domid_t domid);
+int xc_memory_op(int xc_handle, int cmd, void *arg);
 
 int xc_get_pfn_type_batch(int xc_handle, u32 dom, int num, unsigned long *arr);
 
@@ -499,6 +510,8 @@ long xc_get_tot_pages(int xc_handle, u32 domid);
 /* Execute a privileged dom0 operation. */
 int xc_dom0_op(int xc_handle, dom0_op_t *op);
 
+int xc_version(int xc_handle, int cmd, void *arg);
+
 /* Initializes the store (for dom0)
    remote_port should be the remote end of a bound interdomain channel between
    the store and dom0.
@@ -520,7 +533,7 @@ struct xc_mmu {
 typedef struct xc_mmu xc_mmu_t;
 xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom);
 int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu, 
-                   unsigned long ptr, unsigned long val);
+                   unsigned long long ptr, unsigned long long val);
 int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
 
 #endif

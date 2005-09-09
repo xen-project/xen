@@ -50,6 +50,15 @@ int vmcs_size;
 unsigned int opt_vmx_debug_level = 0;
 integer_param("vmx_debug", opt_vmx_debug_level);
 
+extern int hvm_enabled;
+
+#ifdef TRACE_BUFFER
+static unsigned long trace_values[NR_CPUS][4];
+#define TRACE_VMEXIT(index,value) trace_values[current->processor][index]=value
+#else
+#define TRACE_VMEXIT(index,value) ((void)0)
+#endif
+
 #ifdef __x86_64__
 static struct msr_state percpu_msr[NR_CPUS];
 
@@ -338,6 +347,8 @@ int start_vmx(void)
 
     vmx_save_init_msrs();
 
+    hvm_enabled = 1;
+
     return 1;
 }
 
@@ -351,7 +362,7 @@ void stop_vmx(void)
  * Not all cases receive valid value in the VM-exit instruction length field.
  */
 #define __get_instruction_length(len) \
-    __vmread(INSTRUCTION_LEN, &(len)); \
+    __vmread(VM_EXIT_INSTRUCTION_LEN, &(len)); \
      if ((len) < 1 || (len) > 15) \
         __vmx_bug(&regs);
 
@@ -381,6 +392,7 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
 
     if (!vmx_paging_enabled(current)){
         handle_mmio(va, va);
+        TRACE_VMEXIT (2,2);
         return 1;
     }
     gpa = gva_to_gpa(va);
@@ -389,21 +401,22 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
     if ( mmio_space(gpa) ){
         if (gpa >= 0xFEE00000) { /* workaround for local APIC */
             u32 inst_len;
-            __vmread(INSTRUCTION_LEN, &(inst_len));
+            __vmread(VM_EXIT_INSTRUCTION_LEN, &(inst_len));
             __update_guest_eip(inst_len);
             return 1;
         }
+        TRACE_VMEXIT (2,2);
         handle_mmio(va, gpa);
         return 1;
     }
 
     result = shadow_fault(va, regs);
-
+    TRACE_VMEXIT (2,result);
 #if 0
     if ( !result )
     {
         __vmread(GUEST_RIP, &eip);
-        printk("vmx pgfault to guest va=%p eip=%p\n", va, eip);
+        printk("vmx pgfault to guest va=%lx eip=%lx\n", va, eip);
     }
 #endif
 
@@ -447,7 +460,16 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
         clear_bit(X86_FEATURE_PSE, &edx);
         clear_bit(X86_FEATURE_PAE, &edx);
         clear_bit(X86_FEATURE_PSE36, &edx);
+#else
+        struct vcpu *d = current;
+        if (d->domain->arch.ops->guest_paging_levels == PAGING_L2)
+        {
+            clear_bit(X86_FEATURE_PSE, &edx);
+            clear_bit(X86_FEATURE_PAE, &edx);
+            clear_bit(X86_FEATURE_PSE36, &edx);
+        }
 #endif
+
     }
 
     regs->eax = (unsigned long) eax;
@@ -542,7 +564,7 @@ static int check_for_null_selector(unsigned long eip)
     int i, inst_len;
     int inst_copy_from_guest(unsigned char *, unsigned long, int);
 
-    __vmread(INSTRUCTION_LEN, &inst_len);
+    __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
     memset(inst, 0, MAX_INST_LEN);
     if (inst_copy_from_guest(inst, eip, inst_len) != inst_len) {
         printf("check_for_null_selector: get guest instruction failed\n");
@@ -584,15 +606,66 @@ static int check_for_null_selector(unsigned long eip)
     return 0;
 }
 
+void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
+       unsigned long count, int size, long value, int dir, int pvalid)
+{
+    struct vcpu *v = current;
+    vcpu_iodata_t *vio;
+    ioreq_t *p;
+
+    vio = get_vio(v->domain, v->vcpu_id);
+    if (vio == NULL) {
+        printk("bad shared page: %lx\n", (unsigned long) vio);
+        domain_crash_synchronous();
+    }
+
+    if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags)) {
+       printf("VMX I/O has not yet completed\n");
+       domain_crash_synchronous();
+    }
+    set_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
+
+    p = &vio->vp_ioreq;
+    p->dir = dir;
+    p->pdata_valid = pvalid;
+
+    p->type = IOREQ_TYPE_PIO;
+    p->size = size;
+    p->addr = port;
+    p->count = count;
+    p->df = regs->eflags & EF_DF ? 1 : 0;
+
+    if (pvalid) {
+        if (vmx_paging_enabled(current))
+            p->u.pdata = (void *) gva_to_gpa(value);
+        else
+            p->u.pdata = (void *) value; /* guest VA == guest PA */
+    } else
+        p->u.data = value;
+
+    p->state = STATE_IOREQ_READY;
+
+    if (vmx_portio_intercept(p)) {
+        /* no blocking & no evtchn notification */
+        clear_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
+        return;
+    }
+
+    evtchn_send(iopacket_port(v->domain));
+    vmx_wait_io();
+}
+
 static void vmx_io_instruction(struct cpu_user_regs *regs, 
                    unsigned long exit_qualification, unsigned long inst_len) 
 {
-    struct vcpu *d = current;
-    vcpu_iodata_t *vio;
-    ioreq_t *p;
-    unsigned long addr;
+    struct mi_per_cpu_info *mpcip;
     unsigned long eip, cs, eflags;
+    unsigned long port, size, dir;
     int vm86;
+
+    mpcip = &current->domain->arch.vmx_platform.mpci;
+    mpcip->instr = INSTR_PIO;
+    mpcip->flags = 0;
 
     __vmread(GUEST_RIP, &eip);
     __vmread(GUEST_CS_SELECTOR, &cs);
@@ -605,104 +678,93 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
                 vm86, cs, eip, exit_qualification);
 
     if (test_bit(6, &exit_qualification))
-        addr = (exit_qualification >> 16) & (0xffff);
+        port = (exit_qualification >> 16) & 0xFFFF;
     else
-        addr = regs->edx & 0xffff;
-
-    vio = get_vio(d->domain, d->vcpu_id);
-    if (vio == 0) {
-        printk("bad shared page: %lx", (unsigned long) vio);
-        domain_crash_synchronous(); 
-    }
-    p = &vio->vp_ioreq;
-    p->dir = test_bit(3, &exit_qualification); /* direction */
-
-    p->pdata_valid = 0;
-    p->count = 1;
-    p->size = (exit_qualification & 7) + 1;
+        port = regs->edx & 0xffff;
+    TRACE_VMEXIT(2, port);
+    size = (exit_qualification & 7) + 1;
+    dir = test_bit(3, &exit_qualification); /* direction */
 
     if (test_bit(4, &exit_qualification)) { /* string instruction */
-	unsigned long laddr;
+	unsigned long addr, count = 1;
+	int sign = regs->eflags & EF_DF ? -1 : 1;
 
-	__vmread(GUEST_LINEAR_ADDRESS, &laddr);
+	__vmread(GUEST_LINEAR_ADDRESS, &addr);
+
         /*
          * In protected mode, guest linear address is invalid if the
          * selector is null.
          */
-        if (!vm86 && check_for_null_selector(eip)) {
-            laddr = (p->dir == IOREQ_WRITE) ? regs->esi : regs->edi;
-        }
-        p->pdata_valid = 1;
+        if (!vm86 && check_for_null_selector(eip))
+            addr = dir == IOREQ_WRITE ? regs->esi : regs->edi;
 
-        p->u.data = laddr;
-        if (vmx_paging_enabled(d))
-                p->u.pdata = (void *) gva_to_gpa(p->u.data);
-        p->df = (eflags & X86_EFLAGS_DF) ? 1 : 0;
+        if (test_bit(5, &exit_qualification)) { /* "rep" prefix */
+	    mpcip->flags |= REPZ;
+	    count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
+	}
 
-        if (test_bit(5, &exit_qualification)) /* "rep" prefix */
-	    p->count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
+	/*
+	 * Handle string pio instructions that cross pages or that
+	 * are unaligned. See the comments in vmx_platform.c/handle_mmio()
+	 */
+	if ((addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK)) {
+	    unsigned long value = 0;
 
-        /*
-         * Split up string I/O operations that cross page boundaries. Don't
-         * advance %eip so that "rep insb" will restart at the next page.
-         */
-        if ((p->u.data & PAGE_MASK) != 
-		((p->u.data + p->count * p->size - 1) & PAGE_MASK)) {
-	    VMX_DBG_LOG(DBG_LEVEL_2,
-		"String I/O crosses page boundary (cs:eip=0x%lx:0x%lx)\n",
-		cs, eip);
-            if (p->u.data & (p->size - 1)) {
-		printf("Unaligned string I/O operation (cs:eip=0x%lx:0x%lx)\n",
-			cs, eip);
-                domain_crash_synchronous();     
-            }
-            p->count = (PAGE_SIZE - (p->u.data & ~PAGE_MASK)) / p->size;
-        } else {
-            __update_guest_eip(inst_len);
-        }
-    } else if (p->dir == IOREQ_WRITE) {
-        p->u.data = regs->eax;
+	    mpcip->flags |= OVERLAP;
+	    if (dir == IOREQ_WRITE)
+		vmx_copy(&value, addr, size, VMX_COPY_IN);
+	    send_pio_req(regs, port, 1, size, value, dir, 0);
+	} else {
+	    if ((addr & PAGE_MASK) != ((addr + count * size - 1) & PAGE_MASK)) {
+                if (sign > 0)
+                    count = (PAGE_SIZE - (addr & ~PAGE_MASK)) / size;
+                else
+                    count = (addr & ~PAGE_MASK) / size;
+	    } else
+		__update_guest_eip(inst_len);
+
+	    send_pio_req(regs, port, count, size, addr, dir, 1);
+	}
+    } else {
         __update_guest_eip(inst_len);
-    } else
-        __update_guest_eip(inst_len);
-
-    p->addr = addr;
-    p->port_mm = 0;
-
-    /* Check if the packet needs to be intercepted */
-    if (vmx_portio_intercept(p))
-	/* no blocking & no evtchn notification */
-        return;
-
-    set_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags);
-    p->state = STATE_IOREQ_READY;
-    evtchn_send(iopacket_port(d->domain));
-    vmx_wait_io();
+	send_pio_req(regs, port, 1, size, regs->eax, dir, 0);
+    }
 }
 
-enum { COPY_IN = 0, COPY_OUT };
-
-static inline int
+int
 vmx_copy(void *buf, unsigned long laddr, int size, int dir)
 {
+    unsigned long gpa, mfn;
     char *addr;
-    unsigned long mfn;
+    int count;
 
-    if ( (size + (laddr & (PAGE_SIZE - 1))) >= PAGE_SIZE )
-    {
-    	printf("vmx_copy exceeds page boundary\n");
-        return 0;
+    while (size > 0) {
+	count = PAGE_SIZE - (laddr & ~PAGE_MASK);
+	if (count > size)
+	    count = size;
+
+	if (vmx_paging_enabled(current)) {
+		gpa = gva_to_gpa(laddr);
+		mfn = get_mfn_from_pfn(gpa >> PAGE_SHIFT);
+	} else
+		mfn = get_mfn_from_pfn(laddr >> PAGE_SHIFT);
+	if (mfn == INVALID_MFN)
+		return 0;
+
+	addr = (char *)map_domain_page(mfn) + (laddr & ~PAGE_MASK);
+
+	if (dir == VMX_COPY_IN)
+	    memcpy(buf, addr, count);
+	else
+	    memcpy(addr, buf, count);
+
+	unmap_domain_page(addr);
+
+	laddr += count;
+	buf += count;
+	size -= count;
     }
 
-    mfn = phys_to_machine_mapping(laddr >> PAGE_SHIFT);
-    addr = (char *)map_domain_page(mfn) + (laddr & ~PAGE_MASK);
-
-    if (dir == COPY_IN)
-	    memcpy(buf, addr, size);
-    else
-	    memcpy(addr, buf, size);
-
-    unmap_domain_page(addr);
     return 1;
 }
 
@@ -712,7 +774,7 @@ vmx_world_save(struct vcpu *d, struct vmx_assist_context *c)
     unsigned long inst_len;
     int error = 0;
 
-    error |= __vmread(INSTRUCTION_LEN, &inst_len);
+    error |= __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
     error |= __vmread(GUEST_RIP, &c->eip);
     c->eip += inst_len; /* skip transition instruction */
     error |= __vmread(GUEST_RSP, &c->esp);
@@ -795,7 +857,7 @@ vmx_world_restore(struct vcpu *d, struct vmx_assist_context *c)
 	 * removed some translation or changed page attributes.
 	 * We simply invalidate the shadow.
 	 */
-	mfn = phys_to_machine_mapping(c->cr3 >> PAGE_SHIFT);
+	mfn = get_mfn_from_pfn(c->cr3 >> PAGE_SHIFT);
 	if (mfn != pagetable_get_pfn(d->arch.guest_table)) {
 	    printk("Invalid CR3 value=%x", c->cr3);
 	    domain_crash_synchronous();
@@ -813,7 +875,7 @@ vmx_world_restore(struct vcpu *d, struct vmx_assist_context *c)
 	    domain_crash_synchronous(); 
 	    return 0;
 	}
-	mfn = phys_to_machine_mapping(c->cr3 >> PAGE_SHIFT);
+	mfn = get_mfn_from_pfn(c->cr3 >> PAGE_SHIFT);
 	d->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
 	update_pagetables(d);
 	/* 
@@ -889,7 +951,7 @@ vmx_assist(struct vcpu *d, int mode)
     u32 cp;
 
     /* make sure vmxassist exists (this is not an error) */
-    if (!vmx_copy(&magic, VMXASSIST_MAGIC_OFFSET, sizeof(magic), COPY_IN))
+    if (!vmx_copy(&magic, VMXASSIST_MAGIC_OFFSET, sizeof(magic), VMX_COPY_IN))
     	return 0;
     if (magic != VMXASSIST_MAGIC)
     	return 0;
@@ -903,20 +965,20 @@ vmx_assist(struct vcpu *d, int mode)
      */
     case VMX_ASSIST_INVOKE:
 	/* save the old context */
-	if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), COPY_IN))
+	if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), VMX_COPY_IN))
     	    goto error;
 	if (cp != 0) {
     	    if (!vmx_world_save(d, &c))
 		goto error;
-	    if (!vmx_copy(&c, cp, sizeof(c), COPY_OUT))
+	    if (!vmx_copy(&c, cp, sizeof(c), VMX_COPY_OUT))
 		goto error;
 	}
 
 	/* restore the new context, this should activate vmxassist */
-	if (!vmx_copy(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp), COPY_IN))
+	if (!vmx_copy(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp), VMX_COPY_IN))
 	    goto error;
 	if (cp != 0) {
-            if (!vmx_copy(&c, cp, sizeof(c), COPY_IN))
+            if (!vmx_copy(&c, cp, sizeof(c), VMX_COPY_IN))
 		goto error;
     	    if (!vmx_world_restore(d, &c))
 		goto error;
@@ -930,10 +992,10 @@ vmx_assist(struct vcpu *d, int mode)
      */
     case VMX_ASSIST_RESTORE:
 	/* save the old context */
-	if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), COPY_IN))
+	if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), VMX_COPY_IN))
     	    goto error;
 	if (cp != 0) {
-            if (!vmx_copy(&c, cp, sizeof(c), COPY_IN))
+            if (!vmx_copy(&c, cp, sizeof(c), VMX_COPY_IN))
 		goto error;
     	    if (!vmx_world_restore(d, &c))
 		goto error;
@@ -968,7 +1030,7 @@ static int vmx_set_cr0(unsigned long value)
         /*
          * The guest CR3 must be pointing to the guest physical.
          */
-        if ( !VALID_MFN(mfn = phys_to_machine_mapping(
+        if ( !VALID_MFN(mfn = get_mfn_from_pfn(
                             d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT)) ||
              !get_page(pfn_to_page(mfn), d->domain) )
         {
@@ -996,6 +1058,15 @@ static int vmx_set_cr0(unsigned long value)
 
 #if CONFIG_PAGING_LEVELS >= 4 
             if(!shadow_set_guest_paging_levels(d->domain, 4)) {
+                printk("Unsupported guest paging levels\n");
+                domain_crash_synchronous(); /* need to take a clean path */
+            }
+#endif
+        }
+        else
+        {
+#if CONFIG_PAGING_LEVELS >= 4
+            if(!shadow_set_guest_paging_levels(d->domain, 2)) {
                 printk("Unsupported guest paging levels\n");
                 domain_crash_synchronous(); /* need to take a clean path */
             }
@@ -1164,7 +1235,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
              * removed some translation or changed page attributes.
              * We simply invalidate the shadow.
              */
-            mfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
+            mfn = get_mfn_from_pfn(value >> PAGE_SHIFT);
             if (mfn != pagetable_get_pfn(d->arch.guest_table))
                 __vmx_bug(regs);
             shadow_sync_all(d->domain);
@@ -1175,7 +1246,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
              */
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             if ( ((value >> PAGE_SHIFT) > d->domain->max_pages ) ||
-                 !VALID_MFN(mfn = phys_to_machine_mapping(value >> PAGE_SHIFT)) ||
+                 !VALID_MFN(mfn = get_mfn_from_pfn(value >> PAGE_SHIFT)) ||
                  !get_page(pfn_to_page(mfn), d->domain) )
             {
                 printk("Invalid CR3 value=%lx", value);
@@ -1282,13 +1353,20 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
     case TYPE_MOV_TO_CR:
         gp = exit_qualification & CONTROL_REG_ACCESS_REG;
         cr = exit_qualification & CONTROL_REG_ACCESS_NUM;
+        TRACE_VMEXIT(1,TYPE_MOV_TO_CR);
+        TRACE_VMEXIT(2,cr);
+        TRACE_VMEXIT(3,gp);
         return mov_to_cr(gp, cr, regs);
     case TYPE_MOV_FROM_CR:
         gp = exit_qualification & CONTROL_REG_ACCESS_REG;
         cr = exit_qualification & CONTROL_REG_ACCESS_NUM;
+        TRACE_VMEXIT(1,TYPE_MOV_FROM_CR);
+        TRACE_VMEXIT(2,cr);
+        TRACE_VMEXIT(3,gp);
         mov_from_cr(cr, gp, regs);
         break;
     case TYPE_CLTS:
+        TRACE_VMEXIT(1,TYPE_CLTS);
         clts();
         setup_fpu(current);
 
@@ -1301,6 +1379,7 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
         __vmwrite(CR0_READ_SHADOW, value);
         break;
     case TYPE_LMSW:
+        TRACE_VMEXIT(1,TYPE_LMSW);
         __vmread(CR0_READ_SHADOW, &value);
 	value = (value & ~0xF) |
 		(((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
@@ -1518,15 +1597,18 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
     __vmread(IDT_VECTORING_INFO_FIELD, &idtv_info_field);
     if (idtv_info_field & INTR_INFO_VALID_MASK) {
-	if ((idtv_info_field & 0x0700) != 0x400) { /* exclude soft ints */
-            __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
+	__vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
 
-	    if (idtv_info_field & 0x800) { /* valid error code */
-		unsigned long error_code;
-		__vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
-		__vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
-	    } 
-	}
+	__vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
+	if (inst_len >= 1 && inst_len <= 15) 
+	    __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
+
+	if (idtv_info_field & 0x800) { /* valid error code */
+	    unsigned long error_code;
+	    __vmread(IDT_VECTORING_ERROR_CODE, &error_code);
+	    __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
+	} 
+
         VMX_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
     }
 
@@ -1544,6 +1626,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
     __vmread(GUEST_RIP, &eip);
     TRACE_3D(TRC_VMX_VMEXIT, v->domain->domain_id, eip, exit_reason);
+    TRACE_VMEXIT(0,exit_reason);
 
     switch (exit_reason) {
     case EXIT_REASON_EXCEPTION_NMI:
@@ -1562,6 +1645,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             __vmx_bug(&regs);
         vector &= 0xff;
 
+	 TRACE_VMEXIT(1,vector);
         perfc_incra(cause_vector, vector);
 
         TRACE_3D(TRC_VMX_VECTOR, v->domain->domain_id, eip, vector);
@@ -1606,6 +1690,10 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         {
             __vmread(EXIT_QUALIFICATION, &va);
             __vmread(VM_EXIT_INTR_ERROR_CODE, &regs.error_code);
+            
+	    TRACE_VMEXIT(3,regs.error_code);
+	    TRACE_VMEXIT(4,va);
+
             VMX_DBG_LOG(DBG_LEVEL_VMMU, 
                         "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
                         (unsigned long)regs.eax, (unsigned long)regs.ebx,
@@ -1680,6 +1768,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                 eip, inst_len, exit_qualification);
         if (vmx_cr_access(exit_qualification, &regs))
 	    __update_guest_eip(inst_len);
+	 TRACE_VMEXIT(3,regs.error_code);
+        TRACE_VMEXIT(4,exit_qualification);
         break;
     }
     case EXIT_REASON_DR_ACCESS:
@@ -1692,6 +1782,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
         __get_instruction_length(inst_len);
         vmx_io_instruction(&regs, exit_qualification, inst_len);
+        TRACE_VMEXIT(4,exit_qualification);
         break;
     case EXIT_REASON_MSR_READ:
         __get_instruction_length(inst_len);
@@ -1726,6 +1817,25 @@ asmlinkage void load_cr2(void)
 #endif
 }
 
+#ifdef TRACE_BUFFER
+asmlinkage void trace_vmentry (void)
+{
+    TRACE_5D(TRC_VMENTRY,trace_values[current->processor][0],
+          trace_values[current->processor][1],trace_values[current->processor][2],
+          trace_values[current->processor][3],trace_values[current->processor][4]);
+    TRACE_VMEXIT(0,9);
+    TRACE_VMEXIT(1,9);
+    TRACE_VMEXIT(2,9);
+    TRACE_VMEXIT(3,9);
+    TRACE_VMEXIT(4,9);
+    return;
+}
+asmlinkage void trace_vmexit (void)
+{
+    TRACE_3D(TRC_VMEXIT,0,0,0);
+    return;
+}
+#endif 
 #endif /* CONFIG_VMX */
 
 /*

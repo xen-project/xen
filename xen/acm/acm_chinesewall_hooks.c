@@ -310,6 +310,28 @@ chwall_dump_stats(u8 *buf, u16 len)
 	return 0;
 }
 
+static int
+chwall_dump_ssid_types(ssidref_t ssidref, u8 *buf, u16 len)
+{
+    int i;
+
+    /* fill in buffer */
+    if (chwall_bin_pol.max_types > len)
+        return -EFAULT;
+
+	if (ssidref >= chwall_bin_pol.max_ssidrefs)
+		return -EFAULT;
+
+    /* read types for chwall ssidref */
+    for(i=0; i< chwall_bin_pol.max_types; i++) {
+        if (chwall_bin_pol.ssidrefs[ssidref * chwall_bin_pol.max_types + i])
+            buf[i] = 1;
+        else
+            buf[i] = 0;
+    }
+    return chwall_bin_pol.max_types;
+}
+
 /***************************
  * Authorization functions
  ***************************/
@@ -492,6 +514,7 @@ struct acm_operations acm_chinesewall_ops = {
 	.dump_binary_policy		= chwall_dump_policy,
 	.set_binary_policy		= chwall_set_policy,
 	.dump_statistics		= chwall_dump_stats,
+    .dump_ssid_types        = chwall_dump_ssid_types,
 	/* domain management control hooks */
 	.pre_domain_create     		= chwall_pre_domain_create,
 	.post_domain_create		= chwall_post_domain_create,

@@ -139,7 +139,7 @@ libxenguest.so: libxenguest.so.$(MAJOR)
 libxenguest.so.$(MAJOR): libxenguest.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
-libxenguest.so.$(MAJOR).$(MINOR): $(PIC_BUILD_OBJS)
+libxenguest.so.$(MAJOR).$(MINOR): $(PIC_BUILD_OBJS) libxenctrl.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,-soname -Wl,libxenguest.so.$(MAJOR) -shared -o $@ $^ -lz -lxenctrl
 
 -include $(DEPS)

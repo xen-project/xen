@@ -243,16 +243,12 @@ int main(int argc, char **argv)
     }
 
     if (read) {
-        while((cpu_mask&1)) {
-            int i;
-            for (i=0x300;i<0x312;i++) {
-                printf("%010llu ",cpus_rdmsr( cpu_mask, i ) );
-            }
-            printf("\n");
-            cpu_mask>>=1;
-        }
+        int i;
+        for (i=0x300;i<0x312;i++)
+            printf("%010llu ",cpus_rdmsr( cpu_mask, i ) );
+        printf("\n");
         exit(1);
-    } 
+    }
     
     if (!escr) {
         fprintf(stderr, "Need an ESCR.\n");
