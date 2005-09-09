@@ -213,6 +213,7 @@ typedef struct {
     u32      cpu_khz;
     unsigned long total_pages;
     unsigned long free_pages;
+    u32      hw_cap[8];
 } dom0_physinfo_t;
 
 /*

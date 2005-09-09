@@ -50,6 +50,8 @@ int vmcs_size;
 unsigned int opt_vmx_debug_level = 0;
 integer_param("vmx_debug", opt_vmx_debug_level);
 
+extern int hvm_enabled;
+
 #ifdef TRACE_BUFFER
 static unsigned long trace_values[NR_CPUS][4];
 #define TRACE_VMEXIT(index,value) trace_values[current->processor][index]=value
@@ -344,6 +346,8 @@ int start_vmx(void)
     }
 
     vmx_save_init_msrs();
+
+    hvm_enabled = 1;
 
     return 1;
 }
