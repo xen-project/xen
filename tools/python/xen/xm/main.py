@@ -450,7 +450,10 @@ def xm_info(args):
     info = server.xend_node()
     
     for x in info[1:]:
-        print "%-23s:" % x[0], x[1]
+        if len(x) < 2: 
+            print "%-23s: (none)" % x[0]
+        else: 
+            print "%-23s:" % x[0], x[1]
 
 # TODO: remove as soon as console server shows up
 def xm_console(args):
