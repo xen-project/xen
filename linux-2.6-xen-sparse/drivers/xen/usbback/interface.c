@@ -161,8 +161,8 @@ void usbif_connect(usbif_be_connect_t *connect)
     }
 
     prot = __pgprot(_KERNPG_TABLE);
-    error = direct_remap_area_pages(&init_mm, VMALLOC_VMADDR(vma->addr),
-                                    shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
+    error = direct_remap_pfn_range(&init_mm, VMALLOC_VMADDR(vma->addr),
+                                    shmem_frame, PAGE_SIZE,
                                     prot, domid);
     if ( error != 0 )
     {

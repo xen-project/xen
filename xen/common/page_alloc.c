@@ -216,7 +216,7 @@ unsigned long alloc_boot_pages(unsigned long nr_pfns, unsigned long pfn_align)
 #define NR_ZONES    3
 
 
-#define MAX_DMADOM_PFN 0x7FFFF /* 31 addressable bits */
+#define MAX_DMADOM_PFN 0x7FFFFUL /* 31 addressable bits */
 #define pfn_dom_zone_type(_pfn)                                 \
     (((_pfn) <= MAX_DMADOM_PFN) ? MEMZONE_DMADOM : MEMZONE_DOM)
 
@@ -485,43 +485,40 @@ void free_xenheap_pages(void *v, unsigned int order)
 
 void init_domheap_pages(physaddr_t ps, physaddr_t pe)
 {
+    unsigned long s_tot, e_tot, s_dma, e_dma, s_nrm, e_nrm;
+
     ASSERT(!in_irq());
 
-    ps = round_pgup(ps) >> PAGE_SHIFT;
-    pe = round_pgdown(pe) >> PAGE_SHIFT;
-    if ( pe <= ps )
-        return;
+    s_tot = round_pgup(ps) >> PAGE_SHIFT;
+    e_tot = round_pgdown(pe) >> PAGE_SHIFT;
 
-    if ( (ps < MAX_DMADOM_PFN) && (pe > MAX_DMADOM_PFN) )
-    {
-        init_heap_pages(
-            MEMZONE_DMADOM, pfn_to_page(ps), MAX_DMADOM_PFN - ps);
-        init_heap_pages(
-            MEMZONE_DOM, pfn_to_page(MAX_DMADOM_PFN), pe - MAX_DMADOM_PFN);
-    }
-    else
-    {
-        init_heap_pages(pfn_dom_zone_type(ps), pfn_to_page(ps), pe - ps);
-    }
+    s_dma = min(s_tot, MAX_DMADOM_PFN + 1);
+    e_dma = min(e_tot, MAX_DMADOM_PFN + 1);
+    if ( s_dma < e_dma )
+        init_heap_pages(MEMZONE_DMADOM, pfn_to_page(s_dma), e_dma - s_dma);
+
+    s_nrm = max(s_tot, MAX_DMADOM_PFN + 1);
+    e_nrm = max(e_tot, MAX_DMADOM_PFN + 1);
+    if ( s_nrm < e_nrm )
+        init_heap_pages(MEMZONE_DOM, pfn_to_page(s_nrm), e_nrm - s_nrm);
 }
 
 
 struct pfn_info *alloc_domheap_pages(
     struct domain *d, unsigned int order, unsigned int flags)
 {
-    struct pfn_info *pg;
+    struct pfn_info *pg = NULL;
     cpumask_t mask;
     int i;
 
     ASSERT(!in_irq());
 
-    pg = NULL;
-    if (! (flags & ALLOC_DOM_DMA))
+    if ( !(flags & ALLOC_DOM_DMA) )
         pg = alloc_heap_pages(MEMZONE_DOM, order);
-    if (pg == NULL) {
-        if ( unlikely((pg = alloc_heap_pages(MEMZONE_DMADOM, order)) == NULL) )
+
+    if ( pg == NULL )
+        if ( (pg = alloc_heap_pages(MEMZONE_DMADOM, order)) == NULL )
             return NULL;
-    }
 
     mask = pg->u.free.cpumask;
     tlbflush_filter(mask, pg->tlbflush_timestamp);

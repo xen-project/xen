@@ -526,28 +526,26 @@ extern int kern_addr_valid(unsigned long addr);
 
 #define DOMID_LOCAL (0xFFFFU)
 
-int direct_remap_area_pages(struct mm_struct *mm,
+int direct_remap_pfn_range(struct mm_struct *mm,
                             unsigned long address,
-                            unsigned long machine_addr,
+                            unsigned long mfn,
                             unsigned long size,
                             pgprot_t prot,
                             domid_t  domid);
-int __direct_remap_area_pages(struct mm_struct *mm,
-                              unsigned long address,
-                              unsigned long size,
-                              mmu_update_t *v);
+
 int create_lookup_pte_addr(struct mm_struct *mm,
                            unsigned long address,
                            unsigned long *ptep);
+
 int touch_pte_range(struct mm_struct *mm,
                     unsigned long address,
                     unsigned long size);
 
 #define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
-		direct_remap_area_pages((vma)->vm_mm,vaddr,paddr,size,prot,DOMID_IO)
+		direct_remap_pfn_range((vma)->vm_mm,vaddr,paddr>>PAGE_SHIFT,size,prot,DOMID_IO)
 
 #define io_remap_pfn_range(vma, vaddr, pfn, size, prot)		\
-		direct_remap_area_pages((vma)->vm_mm,vaddr,(pfn)<<PAGE_SHIFT,size,prot,DOMID_IO)
+		direct_remap_pfn_range((vma)->vm_mm,vaddr,pfn,size,prot,DOMID_IO)
 
 #define MK_IOSPACE_PFN(space, pfn)	(pfn)
 #define GET_IOSPACE(pfn)		0

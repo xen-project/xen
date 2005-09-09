@@ -118,7 +118,8 @@ void __init paging_init(void)
     }
 
     /* Set up mapping cache for domain pages. */
-    mapcache_order = get_order(MAPCACHE_MBYTES << (20 - PAGETABLE_ORDER));
+    mapcache_order = get_order_from_bytes(
+        MAPCACHE_MBYTES << (20 - PAGETABLE_ORDER));
     mapcache = alloc_xenheap_pages(mapcache_order);
     memset(mapcache, 0, PAGE_SIZE << mapcache_order);
     for ( i = 0; i < (MAPCACHE_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )

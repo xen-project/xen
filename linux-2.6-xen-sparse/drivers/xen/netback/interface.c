@@ -154,12 +154,12 @@ static int map_frontend_pages(netif_t *netif, unsigned long localaddr,
     pgprot_t      prot = __pgprot(_KERNPG_TABLE);
     int           err;
 
-    err = direct_remap_area_pages(&init_mm, localaddr,
-				  tx_ring_ref<<PAGE_SHIFT, PAGE_SIZE,
+    err = direct_remap_pfn_range(&init_mm, localaddr,
+				  tx_ring_ref, PAGE_SIZE,
 				  prot, netif->domid); 
     
-    err |= direct_remap_area_pages(&init_mm, localaddr + PAGE_SIZE,
-				  rx_ring_ref<<PAGE_SHIFT, PAGE_SIZE,
+    err |= direct_remap_pfn_range(&init_mm, localaddr + PAGE_SIZE,
+				  rx_ring_ref, PAGE_SIZE,
 				  prot, netif->domid);
 
     if (err)

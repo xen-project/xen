@@ -387,7 +387,19 @@ int xc_domain_setmaxmem(int xc_handle,
 
 int xc_domain_memory_increase_reservation(int xc_handle,
                                           u32 domid, 
-                                          unsigned int mem_kb);
+                                          unsigned long nr_extents,
+                                          unsigned int extent_order,
+                                          unsigned int address_bits,
+					  unsigned long *extent_start);
+
+int xc_domain_memory_decrease_reservation(int xc_handle,
+                                          u32 domid, 
+                                          unsigned long nr_extents,
+                                          unsigned int extent_order,
+					  unsigned long *extent_start);
+
+unsigned long xc_make_page_below_4G(int xc_handle, u32 domid, 
+				    unsigned long mfn);
 
 typedef dom0_perfc_desc_t xc_perfc_desc_t;
 /* IMPORTANT: The caller is responsible for mlock()'ing the @desc array. */
@@ -521,7 +533,7 @@ struct xc_mmu {
 typedef struct xc_mmu xc_mmu_t;
 xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom);
 int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu, 
-                   unsigned long ptr, unsigned long val);
+                   unsigned long long ptr, unsigned long long val);
 int xc_finish_mmu_updates(int xc_handle, xc_mmu_t *mmu);
 
 #endif
