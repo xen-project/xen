@@ -93,7 +93,9 @@ static PyObject *xspy_read(PyObject *self, PyObject *args, PyObject *kwds)
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_read(xh, path, &xsval_n);
+    Py_END_ALLOW_THREADS
     if (!xsval) {
         val = pyvalue_int(0);
         goto exit;
@@ -140,7 +142,9 @@ static PyObject *xspy_write(PyObject *self, PyObject *args, PyObject *kwds)
 	flags |= O_CREAT;
     if (excl)
 	flags |= O_EXCL;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_write(xh, path, data, data_n, flags);
+    Py_END_ALLOW_THREADS
     val = pyvalue_int(xsval);
  exit:
     return val;
@@ -170,7 +174,9 @@ static PyObject *xspy_ls(PyObject *self, PyObject *args, PyObject *kwds)
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_directory(xh, path, &xsval_n);
+    Py_END_ALLOW_THREADS
     if (!xsval) {
         val = pyvalue_int(0);
         goto exit;
@@ -204,7 +210,9 @@ static PyObject *xspy_mkdir(PyObject *self, PyObject *args, PyObject *kwds)
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_mkdir(xh, path);
+    Py_END_ALLOW_THREADS
     val = pyvalue_int(xsval);
  exit:
     return val;
@@ -232,7 +240,9 @@ static PyObject *xspy_rm(PyObject *self, PyObject *args, PyObject *kwds)
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_rm(xh, path);
+    Py_END_ALLOW_THREADS
     val = pyvalue_int(xsval);
  exit:
     return val;
@@ -263,7 +273,9 @@ static PyObject *xspy_get_permissions(PyObject *self, PyObject *args,
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     perms = xs_get_permissions(xh, path, &perms_n);
+    Py_END_ALLOW_THREADS
     if (!perms) {
         PyErr_SetFromErrno(PyExc_RuntimeError);
         goto exit;
@@ -339,7 +351,9 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
         if (p_write)
 	    xsperms[i].perms |= XS_PERM_WRITE;
     }
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_set_permissions(xh, path, xsperms, xsperms_n);
+    Py_END_ALLOW_THREADS
     val = pyvalue_int(xsval);
  exit:
     Py_XDECREF(tuple0);
@@ -381,7 +395,9 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
         goto exit;
     Py_INCREF(token);
     sprintf(token_str, "%li", (unsigned long)token);
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_watch(xh, path, token_str);
+    Py_END_ALLOW_THREADS
     if (!xsval) {
 	val = PyErr_SetFromErrno(PyExc_RuntimeError);
 	Py_DECREF(token);
@@ -429,7 +445,9 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_read_watch(xh);
+    Py_END_ALLOW_THREADS
     if (!xsval) {
 	val = PyErr_SetFromErrno(PyExc_RuntimeError);
 	goto exit;
@@ -479,7 +497,9 @@ static PyObject *xspy_acknowledge_watch(PyObject *self, PyObject *args,
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &token))
         goto exit;
     sprintf(token_str, "%li", (unsigned long)token);
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_acknowledge_watch(xh, token_str);
+    Py_END_ALLOW_THREADS
     if (!xsval) {
 	val = PyErr_SetFromErrno(PyExc_RuntimeError);
 	goto exit;
@@ -519,7 +539,9 @@ static PyObject *xspy_unwatch(PyObject *self, PyObject *args, PyObject *kwds)
 				     &token))
         goto exit;
     sprintf(token_str, "%li", (unsigned long)token);
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_unwatch(xh, path, token_str);
+    Py_END_ALLOW_THREADS
     if (!xsval)
 	val = PyErr_SetFromErrno(PyExc_RuntimeError);
     else {
@@ -561,7 +583,9 @@ static PyObject *xspy_transaction_start(PyObject *self, PyObject *args,
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_transaction_start(xh, path);
+    Py_END_ALLOW_THREADS
     val = pyvalue_int(xsval);
  exit:
     return val;
@@ -591,7 +615,9 @@ static PyObject *xspy_transaction_end(PyObject *self, PyObject *args,
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &abort))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_transaction_end(xh, abort);
+    Py_END_ALLOW_THREADS
     val = pyvalue_int(xsval);
  exit:
     return val;
@@ -627,7 +653,9 @@ static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &dom, &page, &port, &path))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_introduce_domain(xh, dom, page, port, path);
+    Py_END_ALLOW_THREADS
     val = pyvalue_int(xsval);
  exit:
     return val;
@@ -658,7 +686,9 @@ static PyObject *xspy_release_domain(PyObject *self, PyObject *args,
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &dom))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_release_domain(xh, dom);
+    Py_END_ALLOW_THREADS
     val = pyvalue_int(xsval);
  exit:
     return val;
@@ -718,7 +748,9 @@ static PyObject *xspy_shutdown(PyObject *self, PyObject *args, PyObject *kwds)
 	goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
         goto exit;
+    Py_BEGIN_ALLOW_THREADS
     xsval = xs_shutdown(xh);
+    Py_END_ALLOW_THREADS
     val = pyvalue_int(xsval);
  exit:
     return val;

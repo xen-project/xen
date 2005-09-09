@@ -776,8 +776,8 @@ static void blkif_completion(struct blk_shadow *s)
 {
 	int i;
 	for (i = 0; i < s->req.nr_segments; i++)
-		gnttab_free_grant_reference(
-			blkif_gref_from_fas(s->req.frame_and_sects[i]));
+		gnttab_end_foreign_access(
+			blkif_gref_from_fas(s->req.frame_and_sects[i]), 0);
 }
 
 /*

@@ -198,7 +198,6 @@ static void print_chunks(void *start, int nr_pages)
 #endif
 
 
-
 /*
  * Initialise allocator, placing addresses [@min,@max] in free pool.
  * @min and @max are PHYSICAL addresses.
@@ -486,16 +485,17 @@ void init_mm(void)
     phys_to_machine_mapping = (unsigned long *)start_info.mfn_list;
    
     /* First page follows page table pages and 3 more pages (store page etc) */
-    start_pfn = PFN_UP(__pa(start_info.pt_base)) + start_info.nr_pt_frames + 3;
+    start_pfn = PFN_UP(to_phys(start_info.pt_base)) + start_info.nr_pt_frames + 3;
     max_pfn = start_info.nr_pages;
 
     printk("  start_pfn:    %lx\n", start_pfn);
     printk("  max_pfn:      %lx\n", max_pfn);
 
 
-    build_pagetable(&start_pfn, &max_pfn);
-    
 #ifdef __i386__
+    build_pagetable(&start_pfn, &max_pfn);
+#endif
+
     /*
      * now we can initialise the page allocator
      */
@@ -503,7 +503,5 @@ void init_mm(void)
            (u_long)to_virt(PFN_PHYS(start_pfn)), PFN_PHYS(start_pfn), 
            (u_long)to_virt(PFN_PHYS(max_pfn)), PFN_PHYS(max_pfn));
     init_page_allocator(PFN_PHYS(start_pfn), PFN_PHYS(max_pfn));   
-#endif
-    
     printk("MM: done\n");
 }
