@@ -19,3 +19,6 @@ common.o: $(OBJS)
 
 clean:
 	rm -f *.o *~ core
+
+# Object file contains changeset and compiler information.
+kernel.o: $(BASEDIR)/include/xen/compile.h
