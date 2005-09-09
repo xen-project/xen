@@ -457,24 +457,22 @@ class XendDomainInfo:
                                                 self.uuid, devnum)
             frontpath = "%s/device/%s/%d" % (self.path, type, devnum)
 
-            frontt = xstransact(frontpath)
-            frontt.write('backend', backpath)
-            frontt.write('backend-id', "%i" % backdom.id)
-            frontt.write('handle', "%i" % devnum)
-            frontt.write('mac', mac)
-            frontt.commit()
+            front = { 'backend' : backpath,
+                      'backend-id' : "%i" % backdom.id,
+                      'handle' : "%i" % devnum,
+                      'mac' : mac }
+            xstransact.Write(frontpath, front)
 
-            backt = xstransact(backpath)
-            backt.write('script', script)
-            backt.write('domain', self.name)
-            backt.write('mac', mac)
-            backt.write('bridge', bridge)
+            back = { 'script' : script,
+                     'domain' : self.name,
+                     'mac' : mac,
+                     'bridge' : bridge,
+                     'frontend' : frontpath,
+                     'frontend-id' : "%i" % self.id,
+                     'handle' : "%i" % devnum }
             if ipaddr:
-                backt.write('ip', ' '.join(ipaddr))
-            backt.write('frontend', frontpath)
-            backt.write('frontend-id', "%i" % self.id)
-            backt.write('handle', "%i" % devnum)
-            backt.commit()
+                back['ip'] = ' '.join(ipaddr)
+            xstransact.Write(backpath, back)
 
             return
         
@@ -801,6 +799,10 @@ class XendDomainInfo:
         for ctrl in self.getDeviceControllers():
             if ctrl.isDestroyed(): continue
             ctrl.destroyController(reboot=reboot)
+        t = xstransact("%s/device" % self.path)
+        for d in t.list("vif"):
+            t.remove(d)
+        t.commit()
         ddb = self.db.addChild("/device")
         for type in ddb.keys():
             if type == 'vbd':
@@ -809,11 +811,6 @@ class XendDomainInfo:
                     devdb = typedb.addChild(str(dev))
                     Blkctl.block('unbind', devdb['type'].getData(),
                                  devdb['node'].getData())
-                    typedb[dev].delete()
-                typedb.saveDB(save=True)
-            if type == 'vif':
-                typedb = ddb.addChild(type)
-                for dev in typedb.keys():
                     typedb[dev].delete()
                 typedb.saveDB(save=True)
             if type == 'vtpm':
