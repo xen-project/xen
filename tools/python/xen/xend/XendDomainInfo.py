@@ -47,6 +47,7 @@ from xen.xend.XendRoot import get_component
 
 from xen.xend.uuid import getUuid
 from xen.xend.xenstore import DBVar, XenNode, DBMap
+from xen.xend.xenstore.xstransact import xstransact
 
 """Shutdown code for poweroff."""
 DOMAIN_POWEROFF = 0
@@ -452,30 +453,28 @@ class XendDomainInfo:
             mac = sxp.child_value(devconfig, 'mac')
             ipaddr = _get_config_ipaddr(devconfig)
 
-            # create backend db
-            backdb = backdom.db.addChild("/backend/%s/%s/%d" %
-                                         (type, self.uuid, devnum))
+            backpath = "%s/backend/%s/%s/%d" % (backdom.path, type,
+                                                self.uuid, devnum)
+            frontpath = "%s/device/%s/%d" % (self.path, type, devnum)
 
-            # create frontend db
-            db = self.db.addChild("/device/%s/%d" % (type, devnum))
-            
-            backdb['script'] = script
-            backdb['domain'] = self.name
-            backdb['mac'] = mac
-            backdb['bridge'] = bridge
+            frontt = xstransact(frontpath)
+            frontt.write('backend', backpath)
+            frontt.write('backend-id', "%i" % backdom.id)
+            frontt.write('handle', "%i" % devnum)
+            frontt.write('mac', mac)
+            frontt.commit()
+
+            backt = xstransact(backpath)
+            backt.write('script', script)
+            backt.write('domain', self.name)
+            backt.write('mac', mac)
+            backt.write('bridge', bridge)
             if ipaddr:
-                backdb['ip'] = ' '.join(ipaddr)
-            backdb['frontend'] = db.getPath()
-            backdb['frontend-id'] = "%i" % self.id
-            backdb['handle'] = "%i" % devnum
-            backdb.saveDB(save=True)
-
-            db['backend'] = backdb.getPath()
-            db['backend-id'] = "%i" % backdom.id
-            db['handle'] = "%i" % devnum
-            db['mac'] = mac
-
-            db.saveDB(save=True)
+                backt.write('ip', ' '.join(ipaddr))
+            backt.write('frontend', frontpath)
+            backt.write('frontend-id', "%i" % self.id)
+            backt.write('handle', "%i" % devnum)
+            backt.commit()
 
             return
         
