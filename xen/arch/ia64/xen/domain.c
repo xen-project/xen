@@ -1101,3 +1101,19 @@ void vcpu_migrate_cpu(struct vcpu *v, int newcpu)
 	set_bit(_VCPUF_cpu_migrated, &v->vcpu_flags);
 	v->processor = newcpu;
 }
+
+void sync_vcpu_execstate(struct vcpu *v)
+{
+	ia64_save_fpu(v->arch._thread.fph);
+#ifdef CONFIG_VTI
+	if (VMX_DOMAIN(v))
+		vmx_save_state(v);
+#else
+	if (0) do {} while(0);
+#endif
+	else {
+		if (IA64_HAS_EXTRA_STATE(v))
+			ia64_save_extra(v);
+	}
+	// FIXME SMP: Anything else needed here for SMP?
+}

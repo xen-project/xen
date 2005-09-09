@@ -11,6 +11,7 @@
 #include <xen/multiboot.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
+#include <public/version.h>
 //#include <xen/delay.h>
 #include <xen/compile.h>
 //#include <xen/console.h>
@@ -384,3 +385,17 @@ printk("About to call init_trace_bufs()\n");
 printk("About to call startup_cpu_idle_loop()\n");
     startup_cpu_idle_loop();
 }
+
+void arch_get_xen_caps(xen_capabilities_info_t *info)
+{
+    char *p=info->caps;
+
+    *p=0;
+
+    p+=sprintf(p,"xen_%d.%d_ia64 ",XEN_VERSION,XEN_SUBVERSION);
+
+    BUG_ON((p-info->caps)>sizeof(*info));
+
+    if(p>info->caps) *(p-1) = 0;
+}
+

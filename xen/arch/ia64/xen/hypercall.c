@@ -151,7 +151,7 @@ ia64_hypercall (struct pt_regs *regs)
 		regs->r8 = do_dom0_op(regs->r14);
 		break;
 
-	    case __HYPERVISOR_dom_mem_op:
+	    case __HYPERVISOR_memory_op:
 #ifdef CONFIG_VTI
 		regs->r8 = do_dom_mem_op(regs->r14, regs->r15, regs->r16, regs->r17, regs->r18); 
 #else
