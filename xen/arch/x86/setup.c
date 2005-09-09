@@ -93,8 +93,6 @@ unsigned long mmu_cr4_features = X86_CR4_PSE;
 #endif
 EXPORT_SYMBOL(mmu_cr4_features);
 
-int hvm_enabled = 0; /* can we run unmodified guests */
-
 struct vcpu *idle_task[NR_CPUS] = { &idle0_vcpu };
 
 int acpi_disabled;
@@ -533,43 +531,44 @@ void __init __start_xen(multiboot_info_t *mbi)
     startup_cpu_idle_loop();
 }
 
-void arch_get_xen_caps(xen_capabilities_info_t *info)
+void arch_get_xen_caps(xen_capabilities_info_t info)
 {
-    char *p=info->caps;
+    char *p = info;
 
-    *p=0;
+#if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
 
-#ifdef CONFIG_X86_32
+    p += sprintf(p, "xen_%d.%d_x86_32 ", XEN_VERSION, XEN_SUBVERSION);
+    if ( hvm_enabled )
+        p += sprintf(p, "hvm_%d.%d_x86_32 ", XEN_VERSION, XEN_SUBVERSION);
 
-#ifndef CONFIG_X86_PAE       
-    p+=sprintf(p,"xen_%d.%d_x86_32 ",XEN_VERSION,XEN_SUBVERSION);    
-    if(hvm_enabled)
+#elif defined(CONFIG_X86_32) && defined(CONFIG_X86_PAE)
+
+    p += sprintf(p, "xen_%d.%d_x86_32p ", XEN_VERSION, XEN_SUBVERSION);
+    if ( hvm_enabled )
     {
-        p+=sprintf(p,"hvm_%d.%d_x86_32 ",XEN_VERSION,XEN_SUBVERSION);    
+        //p += sprintf(p, "hvm_%d.%d_x86_32 ", XEN_VERSION, XEN_SUBVERSION);
+        //p += sprintf(p, "hvm_%d.%d_x86_32p ", XEN_VERSION, XEN_SUBVERSION);
     }
+
+#elif defined(CONFIG_X86_64)
+
+    p += sprintf(p, "xen_%d.%d_x86_64 ", XEN_VERSION, XEN_SUBVERSION);
+    if ( hvm_enabled )
+    {
+        //p += sprintf(p, "hvm_%d.%d_x86_32 ", XEN_VERSION, XEN_SUBVERSION);
+        //p += sprintf(p, "hvm_%d.%d_x86_32p ", XEN_VERSION, XEN_SUBVERSION);
+        p += sprintf(p, "hvm_%d.%d_x86_64 ", XEN_VERSION, XEN_SUBVERSION);
+    }
+
 #else
-    p+=sprintf(p,"xen_%d.%d_x86_32p ",XEN_VERSION,XEN_SUBVERSION);
-    if(hvm_enabled)
-    {
-        //p+=sprintf(p,"hvm_%d.%d_x86_32 ",XEN_VERSION,XEN_SUBVERSION);    
-        //p+=sprintf(p,"hvm_%d.%d_x86_32p ",XEN_VERSION,XEN_SUBVERSION);    
-    }
 
-#endif        
+    p++;
 
-#else /* !CONFIG_X86_32 */
-    p+=sprintf(p,"xen_%d.%d_x86_64 ",XEN_VERSION,XEN_SUBVERSION);
-    if(hvm_enabled)
-    {
-        //p+=sprintf(p,"hvm_%d.%d_x86_32 ",XEN_VERSION,XEN_SUBVERSION);    
-        //p+=sprintf(p,"hvm_%d.%d_x86_32p ",XEN_VERSION,XEN_SUBVERSION);    
-        p+=sprintf(p,"hvm_%d.%d_x86_64 ",XEN_VERSION,XEN_SUBVERSION);    
-    }
 #endif
     
-    BUG_ON((p-info->caps)>sizeof(*info));
+    *(p-1) = 0;
 
-    if(p>info->caps) *(p-1) = 0;
+    BUG_ON((p - info) > sizeof(info));
 }
 
 /*

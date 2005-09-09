@@ -44,13 +44,13 @@
 
 #include <public/io/ioreq.h>
 
+int hvm_enabled;
+
 #ifdef CONFIG_VMX
 
 int vmcs_size;
 unsigned int opt_vmx_debug_level = 0;
 integer_param("vmx_debug", opt_vmx_debug_level);
-
-extern int hvm_enabled;
 
 #ifdef TRACE_BUFFER
 static unsigned long trace_values[NR_CPUS][4];
