@@ -29,12 +29,14 @@ typedef struct xen_compile_info {
 } xen_compile_info_t;
 
 #define XENVER_capabilities 3
-typedef struct xen_capabilities_info {
-    int pae;
-    int arch;
-} xen_capabilities_info_t;
+typedef char xen_capabilities_info_t[1024];
 
 #define XENVER_changeset 4
 typedef char xen_changeset_info_t[64];
+
+#define XENVER_parameters 5
+typedef struct xen_parameters_info {
+    unsigned long virt_start;
+} xen_parameters_info_t;
 
 #endif /* __XEN_PUBLIC_VERSION_H__ */

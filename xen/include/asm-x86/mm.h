@@ -98,9 +98,10 @@ struct pfn_info
  /* 16-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1U<<16)-1)
 
-#define PGT_mfn_mask        ((1U<<20)-1) /* mfn mask for shadow types */
+ /* 23-bit mfn mask for shadow types: good for up to 32GB RAM. */
+#define PGT_mfn_mask        ((1U<<23)-1)
 
-#define PGT_score_shift     20
+#define PGT_score_shift     23
 #define PGT_score_mask      (((1U<<4)-1)<<PGT_score_shift)
 
  /* Cleared when the owning guest 'frees' this page. */

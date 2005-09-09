@@ -690,6 +690,8 @@ static PyObject *pyxc_physinfo(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
     xc_physinfo_t info;
+    char cpu_cap[128], *p=cpu_cap, *q=cpu_cap;
+    int i;
     
     if ( !PyArg_ParseTuple(args, "") )
         return NULL;
@@ -697,14 +699,25 @@ static PyObject *pyxc_physinfo(PyObject *self,
     if ( xc_physinfo(xc->xc_handle, &info) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
-    return Py_BuildValue("{s:i,s:i,s:i,s:i,s:l,s:l,s:i}",
+    *q=0;
+    for(i=0;i<sizeof(info.hw_cap)/4;i++)
+    {
+        p+=sprintf(p,"%08x:",info.hw_cap[i]);
+        if(info.hw_cap[i])
+	    q=p;
+    }
+    if(q>cpu_cap)
+        *(q-1)=0;
+
+    return Py_BuildValue("{s:i,s:i,s:i,s:i,s:l,s:l,s:i,s:s}",
                          "threads_per_core", info.threads_per_core,
                          "cores_per_socket", info.cores_per_socket,
                          "sockets_per_node", info.sockets_per_node,
                          "nr_nodes",         info.nr_nodes,
                          "total_pages",      info.total_pages,
                          "free_pages",       info.free_pages,
-                         "cpu_khz",          info.cpu_khz);
+                         "cpu_khz",          info.cpu_khz,
+                         "hw_caps",          cpu_cap);
 }
 
 static PyObject *pyxc_xeninfo(PyObject *self,
@@ -715,7 +728,10 @@ static PyObject *pyxc_xeninfo(PyObject *self,
     xen_extraversion_t xen_extra;
     xen_compile_info_t xen_cc;
     xen_changeset_info_t xen_chgset;
+    xen_capabilities_info_t xen_caps;
+    xen_parameters_info_t xen_parms;
     long xen_version;
+    char str[128];
 
     xen_version = xc_version(xc->xc_handle, XENVER_version, NULL);
 
@@ -728,10 +744,20 @@ static PyObject *pyxc_xeninfo(PyObject *self,
     if ( xc_version(xc->xc_handle, XENVER_changeset, &xen_chgset) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
-    return Py_BuildValue("{s:i,s:i,s:s,s:s,s:s,s:s,s:s,s:s}",
+    if ( xc_version(xc->xc_handle, XENVER_capabilities, &xen_caps) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    if ( xc_version(xc->xc_handle, XENVER_parameters, &xen_parms) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    sprintf(str,"virt_start=0x%lx",xen_parms.virt_start);
+
+    return Py_BuildValue("{s:i,s:i,s:s,s:s,s:s,s:s,s:s,s:s,s:s,s:s}",
                          "xen_major", xen_version >> 16,
                          "xen_minor", (xen_version & 0xffff),
                          "xen_extra", xen_extra,
+                         "xen_caps",  xen_caps,
+                         "xen_params", str,
                          "xen_changeset", xen_chgset,
                          "cc_compiler", xen_cc.compiler,
                          "cc_compile_by", xen_cc.compile_by,

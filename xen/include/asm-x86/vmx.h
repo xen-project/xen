@@ -28,6 +28,8 @@
 
 #include <public/io/ioreq.h>
 
+extern int hvm_enabled;
+
 extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_resume(void);
 extern void vmx_asm_do_launch(void);

@@ -44,6 +44,8 @@
 
 #include <public/io/ioreq.h>
 
+int hvm_enabled;
+
 #ifdef CONFIG_VMX
 
 int vmcs_size;
@@ -344,6 +346,8 @@ int start_vmx(void)
     }
 
     vmx_save_init_msrs();
+
+    hvm_enabled = 1;
 
     return 1;
 }

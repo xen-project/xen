@@ -19,6 +19,7 @@
 #include <xen/console.h>
 #include <asm/shadow.h>
 #include <asm/irq.h>
+#include <asm/processor.h>
 #include <public/sched_ctl.h>
 
 #include <asm/mtrr.h>
@@ -34,13 +35,13 @@ static unsigned long msr_hi;
 
 static void write_msr_for(void *unused)
 {
-    if (((1 << current->processor) & msr_cpu_mask))
+    if ( ((1 << current->processor) & msr_cpu_mask) )
         (void)wrmsr_user(msr_addr, msr_lo, msr_hi);
 }
 
 static void read_msr_for(void *unused)
 {
-    if (((1 << current->processor) & msr_cpu_mask))
+    if ( ((1 << current->processor) & msr_cpu_mask) )
         (void)rdmsr_user(msr_addr, msr_lo, msr_hi);
 }
 
@@ -188,9 +189,11 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         pi->total_pages      = max_page;
         pi->free_pages       = avail_domheap_pages();
         pi->cpu_khz          = cpu_khz;
-
-        copy_to_user(u_dom0_op, op, sizeof(*op));
+        memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
+        memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
         ret = 0;
+        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )
+	    ret = -EFAULT;
     }
     break;
     

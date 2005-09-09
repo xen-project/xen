@@ -58,20 +58,26 @@ class XendNode:
 
     def physinfo(self):
         pinfo = self.xc.physinfo()
-        info = [['cores_per_socket', pinfo['cores_per_socket']],
+        info = [['nr_cpus',          pinfo['nr_nodes']*pinfo['sockets_per_node']*pinfo['cores_per_socket']*pinfo['threads_per_core']],
+                ['nr_nodes',         pinfo['nr_nodes']],
+                ['sockets_per_node', pinfo['sockets_per_node']],
+                ['cores_per_socket', pinfo['cores_per_socket']],
                 ['threads_per_core', pinfo['threads_per_core']],
-                ['cpu_mhz', pinfo['cpu_khz']/1000],
-                ['memory', pinfo['total_pages']/256],
-                ['free_memory', pinfo['free_pages']/256]]
+                ['cpu_mhz',          pinfo['cpu_khz']/1000],
+                ['hw_caps',          pinfo['hw_caps']],
+                ['memory',           pinfo['total_pages']/256],
+                ['free_memory',      pinfo['free_pages']/256]]
         return info
         
     def xeninfo(self):
         xinfo = self.xc.xeninfo()
-	return [['xen_major', xinfo['xen_major']],
-	        ['xen_minor', xinfo['xen_minor']],
-	        ['xen_extra', xinfo['xen_extra']],
-		['xen_changeset', xinfo['xen_changeset']],
-		['cc_compiler', xinfo['cc_compiler']],
+        return [['xen_major', xinfo['xen_major']],
+                ['xen_minor', xinfo['xen_minor']],
+                ['xen_extra', xinfo['xen_extra']],
+                ['xen_caps',  xinfo['xen_caps']],
+                ['xen_params',xinfo['xen_params']],
+                ['xen_changeset', xinfo['xen_changeset']],
+                ['cc_compiler', xinfo['cc_compiler']],
                 ['cc_compile_by', xinfo['cc_compile_by']],
                 ['cc_compile_domain', xinfo['cc_compile_domain']],
                 ['cc_compile_date', xinfo['cc_compile_date']]]

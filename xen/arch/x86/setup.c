@@ -12,6 +12,8 @@
 #include <xen/trace.h>
 #include <xen/multiboot.h>
 #include <xen/domain_page.h>
+#include <xen/compile.h>
+#include <public/version.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
 #include <asm/processor.h>
@@ -527,6 +529,46 @@ void __init __start_xen(multiboot_info_t *mbi)
     domain_unpause_by_systemcontroller(dom0);
 
     startup_cpu_idle_loop();
+}
+
+void arch_get_xen_caps(xen_capabilities_info_t info)
+{
+    char *p = info;
+
+#if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
+
+    p += sprintf(p, "xen_%d.%d_x86_32 ", XEN_VERSION, XEN_SUBVERSION);
+    if ( hvm_enabled )
+        p += sprintf(p, "hvm_%d.%d_x86_32 ", XEN_VERSION, XEN_SUBVERSION);
+
+#elif defined(CONFIG_X86_32) && defined(CONFIG_X86_PAE)
+
+    p += sprintf(p, "xen_%d.%d_x86_32p ", XEN_VERSION, XEN_SUBVERSION);
+    if ( hvm_enabled )
+    {
+        //p += sprintf(p, "hvm_%d.%d_x86_32 ", XEN_VERSION, XEN_SUBVERSION);
+        //p += sprintf(p, "hvm_%d.%d_x86_32p ", XEN_VERSION, XEN_SUBVERSION);
+    }
+
+#elif defined(CONFIG_X86_64)
+
+    p += sprintf(p, "xen_%d.%d_x86_64 ", XEN_VERSION, XEN_SUBVERSION);
+    if ( hvm_enabled )
+    {
+        //p += sprintf(p, "hvm_%d.%d_x86_32 ", XEN_VERSION, XEN_SUBVERSION);
+        //p += sprintf(p, "hvm_%d.%d_x86_32p ", XEN_VERSION, XEN_SUBVERSION);
+        p += sprintf(p, "hvm_%d.%d_x86_64 ", XEN_VERSION, XEN_SUBVERSION);
+    }
+
+#else
+
+    p++;
+
+#endif
+    
+    *(p-1) = 0;
+
+    BUG_ON((p - info) > sizeof(info));
 }
 
 /*
