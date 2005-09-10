@@ -1394,21 +1394,20 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
 
 static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
 {
+    u64 msr_content = 0;
+
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_read: ecx=%lx, eax=%lx, edx=%lx",
                 (unsigned long)regs->ecx, (unsigned long)regs->eax, 
                 (unsigned long)regs->edx);
     switch (regs->ecx) {
         case MSR_IA32_SYSENTER_CS:
-            __vmread(GUEST_SYSENTER_CS, &regs->eax);
-            regs->edx = 0;
+            __vmread(GUEST_SYSENTER_CS, (u32 *)&msr_content);
             break;
-        case MSR_IA32_SYSENTER_ESP:	
-             __vmread(GUEST_SYSENTER_ESP, &regs->eax);
-             regs->edx = 0;
+        case MSR_IA32_SYSENTER_ESP:
+             __vmread(GUEST_SYSENTER_ESP, &msr_content);
             break;
-        case MSR_IA32_SYSENTER_EIP:		
-            __vmread(GUEST_SYSENTER_EIP, &regs->eax);
-            regs->edx = 0;
+        case MSR_IA32_SYSENTER_EIP:
+            __vmread(GUEST_SYSENTER_EIP, &msr_content);
             break;
         default:
             if(long_mode_do_msr_read(regs))
@@ -1416,6 +1415,9 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
             rdmsr_user(regs->ecx, regs->eax, regs->edx);
             break;
     }
+
+    regs->eax = msr_content & 0xFFFFFFFF;
+    regs->edx = msr_content >> 32;
 
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_read returns: "
                 "ecx=%lx, eax=%lx, edx=%lx",
@@ -1425,18 +1427,23 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
 
 static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
 {
+    u64 msr_content;
+
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_write: ecx=%lx, eax=%lx, edx=%lx",
                 (unsigned long)regs->ecx, (unsigned long)regs->eax, 
                 (unsigned long)regs->edx);
+
+    msr_content = (regs->eax & 0xFFFFFFFF) | ((u64)regs->edx << 32);
+
     switch (regs->ecx) {
         case MSR_IA32_SYSENTER_CS:
-            __vmwrite(GUEST_SYSENTER_CS, regs->eax);
+            __vmwrite(GUEST_SYSENTER_CS, msr_content);
             break;
-        case MSR_IA32_SYSENTER_ESP:	
-             __vmwrite(GUEST_SYSENTER_ESP, regs->eax);
+        case MSR_IA32_SYSENTER_ESP:
+             __vmwrite(GUEST_SYSENTER_ESP, msr_content);
             break;
-        case MSR_IA32_SYSENTER_EIP:		
-            __vmwrite(GUEST_SYSENTER_EIP, regs->eax);
+        case MSR_IA32_SYSENTER_EIP:
+            __vmwrite(GUEST_SYSENTER_EIP, msr_content);
             break;
         default:
             long_mode_do_msr_write(regs);
