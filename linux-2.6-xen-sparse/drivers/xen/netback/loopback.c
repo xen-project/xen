@@ -160,8 +160,10 @@ static int __init make_loopback(int i)
 	return 0;
 
  fail:
-	kfree(dev1);
-	kfree(dev2);
+	if (dev1 != NULL)
+		kfree(dev1);
+	if (dev2 != NULL)
+		kfree(dev2);
 	return err;
 }
 

@@ -52,7 +52,8 @@ static int tpmback_remove(struct xenbus_device *dev)
 		tpmif_put(be->tpmif);
 	}
 
-	kfree(be->frontpath);
+	if (be->frontpath)
+		kfree(be->frontpath);
 	kfree(be);
 	return 0;
 }
@@ -242,7 +243,8 @@ static int tpmback_probe(struct xenbus_device *dev,
 free_be:
 	if (be->backend_watch.node)
 		unregister_xenbus_watch(&be->backend_watch);
-	kfree(frontend);
+	if (frontend)
+		kfree(frontend);
 	kfree(be);
 	return err;
 }

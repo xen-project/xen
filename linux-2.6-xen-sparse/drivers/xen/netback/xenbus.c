@@ -50,7 +50,8 @@ static int netback_remove(struct xenbus_device *dev)
 	unregister_xenbus_watch(&be->backend_watch);
 	if (be->netif)
 		netif_disconnect(be->netif);
-	kfree(be->frontpath);
+	if (be->frontpath)
+		kfree(be->frontpath);
 	kfree(be);
 	return 0;
 }
@@ -269,7 +270,8 @@ static int netback_probe(struct xenbus_device *dev,
  free_be:
 	if (be->backend_watch.node)
 		unregister_xenbus_watch(&be->backend_watch);
-	kfree(frontend);
+	if (frontend)
+		kfree(frontend);
 	kfree(be);
 	return err;
 }

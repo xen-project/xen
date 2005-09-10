@@ -52,7 +52,8 @@ static int blkback_remove(struct xenbus_device *dev)
 	unregister_xenbus_watch(&be->backend_watch);
 	if (be->blkif)
 		blkif_put(be->blkif);
-	kfree(be->frontpath);
+	if (be->frontpath)
+		kfree(be->frontpath);
 	kfree(be);
 	return 0;
 }
@@ -199,7 +200,8 @@ static int blkback_probe(struct xenbus_device *dev,
  free_be:
 	if (be->backend_watch.node)
 		unregister_xenbus_watch(&be->backend_watch);
-	kfree(frontend);
+	if (frontend)
+		kfree(frontend);
 	kfree(be);
 	return err;
 }

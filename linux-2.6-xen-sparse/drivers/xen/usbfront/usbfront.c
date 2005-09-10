@@ -1720,7 +1720,8 @@ static int __init xhci_hcd_init(void)
 	return 0;
 
 up_failed:
-	kfree(errbuf);
+	if (errbuf)
+		kfree(errbuf);
 
 errbuf_failed:
 	return retval;
