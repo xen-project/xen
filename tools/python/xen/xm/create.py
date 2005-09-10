@@ -772,30 +772,33 @@ def balloon_out(dom0_min_mem, opts):
     """Balloon out memory from dom0 if necessary"""
     SLACK = 4
     timeout = 20 # 2s
-    ret = 0
+    ret = 1
 
     xc = xen.lowlevel.xc.new()
-    pinfo = xc.physinfo()
-    free_mem = pinfo['free_pages'] / 256
+    free_mem = xc.physinfo()['free_pages'] / 256
     domU_need_mem = opts.vals.memory + SLACK 
+
+    # we already have enough free memory, return success
+    if free_mem >= domU_need_mem:
+        del xc
+        return 0
 
     dom0_cur_alloc = get_dom0_alloc()
     dom0_new_alloc = dom0_cur_alloc - (domU_need_mem - free_mem)
+    if dom0_new_alloc < dom0_min_mem:
+        dom0_new_alloc = dom0_min_mem
 
-    if free_mem < domU_need_mem and dom0_new_alloc < dom0_min_mem:
-        ret = 1
-    if free_mem < domU_need_mem and ret == 0:
+    server.xend_domain_mem_target_set(0, dom0_new_alloc)
 
-        server.xend_domain_mem_target_set(0, dom0_new_alloc)
+    while timeout > 0:
+        time.sleep(0.1) # sleep 100ms
 
-        while dom0_cur_alloc > dom0_new_alloc and timeout > 0:
-            time.sleep(0.1) # sleep 100ms
-            dom0_cur_alloc = get_dom0_alloc()
-            timeout -= 1
-        
-        if dom0_cur_alloc > dom0_new_alloc:
-            ret = 1
-    
+        free_mem = xc.physinfo()['free_pages'] / 256
+        if free_mem >= domU_need_mem:
+            ret = 0
+            break
+        timeout -= 1
+
     del xc
     return ret
 
