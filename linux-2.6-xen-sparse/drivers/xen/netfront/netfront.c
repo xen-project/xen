@@ -1232,8 +1232,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 	netif_state = NETIF_STATE_CONNECTED;
 
  out:
-	if (backend)
-		kfree(backend);
+	kfree(backend);
 	return err;
 
  abort_transaction:

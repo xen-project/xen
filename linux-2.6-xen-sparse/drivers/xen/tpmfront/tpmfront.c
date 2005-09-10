@@ -363,8 +363,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 	}
 
 out:
-	if (backend)
-		kfree(backend);
+	kfree(backend);
 	return err;
 
 abort_transaction:

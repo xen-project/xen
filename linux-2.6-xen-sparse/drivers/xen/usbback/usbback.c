@@ -781,8 +781,7 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
     return;
     
  no_mem:
-    if ( setup != NULL )
-        kfree(setup);
+    kfree(setup);
     make_response(up, req->id, req->operation, -ENOMEM, 0, 0);
     return;
 } 
