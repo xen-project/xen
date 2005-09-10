@@ -425,10 +425,15 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
 	GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
 	return reg_mem(instr->op_size, opcode, instr, rex);
 
+    case 0x80:
     case 0x81:
 	if (((opcode[1] >> 3) & 7) == 7) { /* cmp $imm, m32/16 */
 	    instr->instr = INSTR_CMP;
-	    GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+
+        if (opcode[0] == 0x80)
+            GET_OP_SIZE_FOR_BYTE(instr->op_size);
+        else
+            GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
 
 	    instr->operand[0] = mk_operand(instr->op_size, 0, 0, IMMEDIATE);
 	    instr->immediate = get_immediate(vm86, opcode+1, BYTE);
