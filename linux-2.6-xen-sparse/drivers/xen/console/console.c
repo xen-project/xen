@@ -182,9 +182,9 @@ static kdev_t kcons_device(struct console *c)
 #endif
 
 static struct console kcons_info = {
-    device:  kcons_device,
-    flags:   CON_PRINTBUFFER,
-    index:   -1
+    .device	= kcons_device,
+    .flags	= CON_PRINTBUFFER,
+    .index	= -1,
 };
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)

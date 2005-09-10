@@ -168,9 +168,9 @@ static int xenbus_dev_release(struct inode *inode, struct file *filp)
 }
 
 static struct file_operations xenbus_dev_file_ops = {
-	ioctl: xenbus_dev_ioctl,
-	open: xenbus_dev_open,
-	release: xenbus_dev_release
+	.ioctl = xenbus_dev_ioctl,
+	.open = xenbus_dev_open,
+	.release = xenbus_dev_release,
 };
 
 static int __init

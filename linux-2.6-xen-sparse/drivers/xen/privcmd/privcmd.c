@@ -241,8 +241,8 @@ static int privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 }
 
 static struct file_operations privcmd_file_ops = {
-    ioctl : privcmd_ioctl,
-    mmap:   privcmd_mmap
+    .ioctl = privcmd_ioctl,
+    .mmap  = privcmd_mmap,
 };
 
 
