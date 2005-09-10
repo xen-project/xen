@@ -30,6 +30,12 @@
 #include "utils.h"
 #include "io.h"
 
+void usage(char *prg)
+{
+	fprintf(stderr, 
+		"usage: %s [-h] [-V] [-v] [-i]\n", prg);
+}
+
 int main(int argc, char **argv)
 {
 	const char *sopts = "hVvi";
@@ -49,7 +55,7 @@ int main(int argc, char **argv)
 	while ((ch = getopt_long(argc, argv, sopts, lopts, &opt_ind)) != -1) {
 		switch (ch) {
 		case 'h':
-			//usage(argv[0]);
+			usage(argv[0]);
 			exit(0);
 		case 'V':
 			//version(argv[0]);
