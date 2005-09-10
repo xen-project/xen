@@ -261,7 +261,7 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
                 domain_crash_synchronous();
                 break;
         }
-
+        return;
     }
 
     switch (index) {
