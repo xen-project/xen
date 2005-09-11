@@ -55,7 +55,6 @@ void store_cpu_user_regs(struct cpu_user_regs *regs)
 static inline long __get_reg_value(unsigned long reg, int size)
 {
     switch(size) {
-        case BYTE:
         case BYTE_64:
             return (char)(reg & 0xFF);
         case WORD:
@@ -90,10 +89,11 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
                 return (char)((regs->rdx & 0xFF00) >> 8);
 	case 7: /* %bh */
                 return (char)((regs->rbx & 0xFF00) >> 8);
-            default:
+	default:
 	    printf("Error: (get_reg_value) Invalid index value\n"); 
-                domain_crash_synchronous();
+	    domain_crash_synchronous();
         }
+    	/* NOTREACHED */
     }
 
     switch (index) {
@@ -114,8 +114,8 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
         case 14: return __get_reg_value(regs->r14, size);
         case 15: return __get_reg_value(regs->r15, size);
         default:
-	printf("Error: (get_reg_value) Invalid index value\n"); 
-            domain_crash_synchronous();
+	    printf("Error: (get_reg_value) Invalid index value\n"); 
+	    domain_crash_synchronous();
     }
 }
 #elif defined (__i386__)

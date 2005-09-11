@@ -198,7 +198,6 @@ void load_cpu_user_regs(struct cpu_user_regs *regs)
 static inline void __set_reg_value(unsigned long *reg, int size, long value)
 {
     switch (size) {
-        case BYTE:
         case BYTE_64:
             *reg &= ~0xFF;
             *reg |= (value & 0xFF);
