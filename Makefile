@@ -35,8 +35,8 @@ ifeq ($(XEN_TARGET_X86_PAE),y)
 export pae=y
 endif
 
-.PHONY:	all dist install xen kernels tools docs world clean mkpatches mrproper
-.PHONY:	kbuild kdelete kclean
+.PHONY:	all dist install xen kernels tools dev-docs docs world clean
+.PHONY:	mkpatches mrproper kbuild kdelete kclean
 
 # build and install everything into the standard system directories
 install: install-xen install-kernels install-tools install-docs
@@ -65,6 +65,9 @@ kernels:
 
 docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
+
+dev-docs:
+	$(MAKE) -C docs dev-docs
 
 # Build all the various kernels and modules
 kbuild: kernels
