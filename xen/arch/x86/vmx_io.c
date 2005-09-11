@@ -16,6 +16,7 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  *
  */
+
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/mm.h>
@@ -198,24 +199,24 @@ void load_cpu_user_regs(struct cpu_user_regs *regs)
 static inline void __set_reg_value(unsigned long *reg, int size, long value)
 {
     switch (size) {
-        case BYTE_64:
-            *reg &= ~0xFF;
-            *reg |= (value & 0xFF);
-            break;
-        case WORD:
-            *reg &= ~0xFFFF;
-            *reg |= (value & 0xFFFF);
-            break;
-        case LONG:
-            *reg &= ~0xFFFFFFFF;
-            *reg |= (value & 0xFFFFFFFF);
-            break;
-        case QUAD:
-            *reg = value;
-            break;
-        default:
-	    printk("Error: <__set_reg_value>: size:%x is invalid\n", size);
-            domain_crash_synchronous();
+    case BYTE_64:
+        *reg &= ~0xFF;
+        *reg |= (value & 0xFF);
+        break;
+    case WORD:
+        *reg &= ~0xFFFF;
+        *reg |= (value & 0xFFFF);
+        break;
+    case LONG:
+        *reg &= ~0xFFFFFFFF;
+        *reg |= (value & 0xFFFFFFFF);
+        break;
+    case QUAD:
+        *reg = value;
+        break;
+    default:
+        printk("Error: <__set_reg_value>: size:%x is invalid\n", size);
+        domain_crash_synchronous();
     }
 }
 
@@ -223,98 +224,98 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
 {
     if (size == BYTE) {
         switch (index) {
-            case 0:
-                regs->rax &= ~0xFF;
-                regs->rax |= (value & 0xFF);
-                break;
-            case 1:
-                regs->rcx &= ~0xFF;
-                regs->rcx |= (value & 0xFF);
-                break;
-            case 2:
-                regs->rdx &= ~0xFF;
-                regs->rdx |= (value & 0xFF);
-                break;
-            case 3:
-                regs->rbx &= ~0xFF;
-                regs->rbx |= (value & 0xFF);
-                break;
-            case 4:
-                regs->rax &= 0xFFFFFFFFFFFF00FF;
-                regs->rax |= ((value & 0xFF) << 8);
-                break;
-            case 5:
-                regs->rcx &= 0xFFFFFFFFFFFF00FF;
-                regs->rcx |= ((value & 0xFF) << 8);
-                break;
-            case 6:
-                regs->rdx &= 0xFFFFFFFFFFFF00FF;
-                regs->rdx |= ((value & 0xFF) << 8);
-                break;
-            case 7:
-                regs->rbx &= 0xFFFFFFFFFFFF00FF;
-                regs->rbx |= ((value & 0xFF) << 8);
-                break;
-            default:
-                printk("Error: size:%x, index:%x are invalid!\n", size, index);
-                domain_crash_synchronous();
-                break;
+        case 0:
+            regs->rax &= ~0xFF;
+            regs->rax |= (value & 0xFF);
+            break;
+        case 1:
+            regs->rcx &= ~0xFF;
+            regs->rcx |= (value & 0xFF);
+            break;
+        case 2:
+            regs->rdx &= ~0xFF;
+            regs->rdx |= (value & 0xFF);
+            break;
+        case 3:
+            regs->rbx &= ~0xFF;
+            regs->rbx |= (value & 0xFF);
+            break;
+        case 4:
+            regs->rax &= 0xFFFFFFFFFFFF00FF;
+            regs->rax |= ((value & 0xFF) << 8);
+            break;
+        case 5:
+            regs->rcx &= 0xFFFFFFFFFFFF00FF;
+            regs->rcx |= ((value & 0xFF) << 8);
+            break;
+        case 6:
+            regs->rdx &= 0xFFFFFFFFFFFF00FF;
+            regs->rdx |= ((value & 0xFF) << 8);
+            break;
+        case 7:
+            regs->rbx &= 0xFFFFFFFFFFFF00FF;
+            regs->rbx |= ((value & 0xFF) << 8);
+            break;
+        default:
+            printk("Error: size:%x, index:%x are invalid!\n", size, index);
+            domain_crash_synchronous();
+            break;
         }
         return;
     }
 
     switch (index) {
-        case 0: 
-            __set_reg_value(&regs->rax, size, value);
-            break;
-        case 1: 
-            __set_reg_value(&regs->rcx, size, value);
-            break;
-        case 2: 
-            __set_reg_value(&regs->rdx, size, value);
-            break;
-        case 3: 
-            __set_reg_value(&regs->rbx, size, value);
-            break;
-        case 4: 
-            __set_reg_value(&regs->rsp, size, value);
-            break;
-        case 5: 
-            __set_reg_value(&regs->rbp, size, value);
-            break;
-        case 6: 
-            __set_reg_value(&regs->rsi, size, value);
-            break;
-        case 7: 
-            __set_reg_value(&regs->rdi, size, value);
-            break;
-        case 8: 
-            __set_reg_value(&regs->r8, size, value);
-            break;
-        case 9: 
-            __set_reg_value(&regs->r9, size, value);
-            break;
-        case 10: 
-            __set_reg_value(&regs->r10, size, value);
-            break;
-        case 11: 
-            __set_reg_value(&regs->r11, size, value);
-            break;
-        case 12: 
-            __set_reg_value(&regs->r12, size, value);
-            break;
-        case 13: 
-            __set_reg_value(&regs->r13, size, value);
-            break;
-        case 14: 
-            __set_reg_value(&regs->r14, size, value);
-            break;
-        case 15: 
-            __set_reg_value(&regs->r15, size, value);
-            break;
-        default:
-            printk("Error: <set_reg_value> Invalid index\n");
-            domain_crash_synchronous();
+    case 0: 
+        __set_reg_value(&regs->rax, size, value);
+        break;
+    case 1: 
+        __set_reg_value(&regs->rcx, size, value);
+        break;
+    case 2: 
+        __set_reg_value(&regs->rdx, size, value);
+        break;
+    case 3: 
+        __set_reg_value(&regs->rbx, size, value);
+        break;
+    case 4: 
+        __set_reg_value(&regs->rsp, size, value);
+        break;
+    case 5: 
+        __set_reg_value(&regs->rbp, size, value);
+        break;
+    case 6: 
+        __set_reg_value(&regs->rsi, size, value);
+        break;
+    case 7: 
+        __set_reg_value(&regs->rdi, size, value);
+        break;
+    case 8: 
+        __set_reg_value(&regs->r8, size, value);
+        break;
+    case 9: 
+        __set_reg_value(&regs->r9, size, value);
+        break;
+    case 10: 
+        __set_reg_value(&regs->r10, size, value);
+        break;
+    case 11: 
+        __set_reg_value(&regs->r11, size, value);
+        break;
+    case 12: 
+        __set_reg_value(&regs->r12, size, value);
+        break;
+    case 13: 
+        __set_reg_value(&regs->r13, size, value);
+        break;
+    case 14: 
+        __set_reg_value(&regs->r14, size, value);
+        break;
+    case 15: 
+        __set_reg_value(&regs->r15, size, value);
+        break;
+    default:
+        printk("Error: <set_reg_value> Invalid index\n");
+        domain_crash_synchronous();
     }
     return;
 }
@@ -323,44 +324,44 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
 extern long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs);
 
 static inline void set_eflags_CF(int size, unsigned long v1,
-	unsigned long v2, struct cpu_user_regs *regs)
+                                 unsigned long v2, struct cpu_user_regs *regs)
 {
     unsigned long mask = (1 << (8 * size)) - 1;
 
     if ((v1 & mask) > (v2 & mask))
-	regs->eflags |= X86_EFLAGS_CF;
+        regs->eflags |= X86_EFLAGS_CF;
     else
-	regs->eflags &= ~X86_EFLAGS_CF;
+        regs->eflags &= ~X86_EFLAGS_CF;
 }
 
 static inline void set_eflags_OF(int size, unsigned long v1,
-	unsigned long v2, unsigned long v3, struct cpu_user_regs *regs)
+                                 unsigned long v2, unsigned long v3, struct cpu_user_regs *regs)
 {
     if ((v3 ^ v2) & (v3 ^ v1) & (1 << ((8 * size) - 1)))
-	regs->eflags |= X86_EFLAGS_OF;
+        regs->eflags |= X86_EFLAGS_OF;
 }
 
 static inline void set_eflags_AF(int size, unsigned long v1,
-	unsigned long v2, unsigned long v3, struct cpu_user_regs *regs)
+                                 unsigned long v2, unsigned long v3, struct cpu_user_regs *regs)
 {
     if ((v1 ^ v2 ^ v3) & 0x10)
-	regs->eflags |= X86_EFLAGS_AF;
+        regs->eflags |= X86_EFLAGS_AF;
 }
 
 static inline void set_eflags_ZF(int size, unsigned long v1,
-	struct cpu_user_regs *regs)
+                                 struct cpu_user_regs *regs)
 {
     unsigned long mask = (1 << (8 * size)) - 1;
 
     if ((v1 & mask) == 0)
-	regs->eflags |= X86_EFLAGS_ZF;
+        regs->eflags |= X86_EFLAGS_ZF;
 }
 
 static inline void set_eflags_SF(int size, unsigned long v1,
-	struct cpu_user_regs *regs)
+                                 struct cpu_user_regs *regs)
 {
     if (v1 & (1 << ((8 * size) - 1)))
-	regs->eflags |= X86_EFLAGS_SF;
+        regs->eflags |= X86_EFLAGS_SF;
 }
 
 static char parity_table[256] = {
@@ -383,14 +384,14 @@ static char parity_table[256] = {
 };
 
 static inline void set_eflags_PF(int size, unsigned long v1,
-	struct cpu_user_regs *regs)
+                                 struct cpu_user_regs *regs)
 {
     if (parity_table[v1 & 0xFF])
-	regs->eflags |= X86_EFLAGS_PF;
+        regs->eflags |= X86_EFLAGS_PF;
 }
 
 static void vmx_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
-					struct mi_per_cpu_info *mpcip)
+                           struct mi_per_cpu_info *mpcip)
 {
     unsigned long old_eax;
     int sign = p->df ? -1 : 1;
@@ -398,28 +399,28 @@ static void vmx_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     if (p->dir == IOREQ_WRITE) {
         if (p->pdata_valid) {
             regs->esi += sign * p->count * p->size;
-	    if (mpcip->flags & REPZ)
-		regs->ecx -= p->count;
+            if (mpcip->flags & REPZ)
+                regs->ecx -= p->count;
         }
     } else {
-	if (mpcip->flags & OVERLAP) {
-	    unsigned long addr;
+        if (mpcip->flags & OVERLAP) {
+            unsigned long addr;
 
             regs->edi += sign * p->count * p->size;
-	    if (mpcip->flags & REPZ)
-		regs->ecx -= p->count;
+            if (mpcip->flags & REPZ)
+                regs->ecx -= p->count;
 
-	    addr = regs->edi;
-	    if (sign > 0)
-		addr -= p->size;
-	    vmx_copy(&p->u.data, addr, p->size, VMX_COPY_OUT);
-	} else if (p->pdata_valid) {
+            addr = regs->edi;
+            if (sign > 0)
+                addr -= p->size;
+            vmx_copy(&p->u.data, addr, p->size, VMX_COPY_OUT);
+        } else if (p->pdata_valid) {
             regs->edi += sign * p->count * p->size;
-	    if (mpcip->flags & REPZ)
-		regs->ecx -= p->count;
+            if (mpcip->flags & REPZ)
+                regs->ecx -= p->count;
         } else {
-	    old_eax = regs->eax;
-	    switch (p->size) {
+            old_eax = regs->eax;
+            switch (p->size) {
             case 1:
                 regs->eax = (old_eax & 0xffffff00) | (p->u.data & 0xff);
                 break;
@@ -430,15 +431,15 @@ static void vmx_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
                 regs->eax = (p->u.data & 0xffffffff);
                 break;
             default:
-		printk("Error: %s unknown port size\n", __FUNCTION__);
-		domain_crash_synchronous();
-	    }
-    	}
+                printk("Error: %s unknown port size\n", __FUNCTION__);
+                domain_crash_synchronous();
+            }
+        }
     }
 }
 
 static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
-					struct mi_per_cpu_info *mpcip)
+                            struct mi_per_cpu_info *mpcip)
 {
     int sign = p->df ? -1 : 1;
     int size = -1, index = -1;
@@ -451,178 +452,178 @@ static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
 
     switch (mpcip->instr) {
     case INSTR_MOV:
-	if (dst & REGISTER) {
-	    index = operand_index(dst);
-	    set_reg_value(size, index, 0, regs, p->u.data);
-	}
-	break;
+        if (dst & REGISTER) {
+            index = operand_index(dst);
+            set_reg_value(size, index, 0, regs, p->u.data);
+        }
+        break;
 
     case INSTR_MOVZ:
-	if (dst & REGISTER) {
-	    index = operand_index(dst);
-	    switch (size) {
-	    case BYTE: p->u.data = p->u.data & 0xFFULL; break;
-	    case WORD: p->u.data = p->u.data & 0xFFFFULL; break;
-	    case LONG: p->u.data = p->u.data & 0xFFFFFFFFULL; break;
-	    }
-	    set_reg_value(operand_size(dst), index, 0, regs, p->u.data);
-	}
-	break;
+        if (dst & REGISTER) {
+            index = operand_index(dst);
+            switch (size) {
+            case BYTE: p->u.data = p->u.data & 0xFFULL; break;
+            case WORD: p->u.data = p->u.data & 0xFFFFULL; break;
+            case LONG: p->u.data = p->u.data & 0xFFFFFFFFULL; break;
+            }
+            set_reg_value(operand_size(dst), index, 0, regs, p->u.data);
+        }
+        break;
 
     case INSTR_MOVS:
-	sign = p->df ? -1 : 1;
-	regs->esi += sign * p->count * p->size;
-	regs->edi += sign * p->count * p->size;
+        sign = p->df ? -1 : 1;
+        regs->esi += sign * p->count * p->size;
+        regs->edi += sign * p->count * p->size;
 
-	if ((mpcip->flags & OVERLAP) && p->dir == IOREQ_READ) {
-	    unsigned long addr = regs->edi;
+        if ((mpcip->flags & OVERLAP) && p->dir == IOREQ_READ) {
+            unsigned long addr = regs->edi;
 
-	    if (sign > 0)
-		addr -= p->size;
-	    vmx_copy(&p->u.data, addr, p->size, VMX_COPY_OUT);
-	}
+            if (sign > 0)
+                addr -= p->size;
+            vmx_copy(&p->u.data, addr, p->size, VMX_COPY_OUT);
+        }
 
-	if (mpcip->flags & REPZ)
-	    regs->ecx -= p->count;
-	break;
+        if (mpcip->flags & REPZ)
+            regs->ecx -= p->count;
+        break;
 
     case INSTR_STOS:
-	sign = p->df ? -1 : 1;
-	regs->edi += sign * p->count * p->size;
-	if (mpcip->flags & REPZ)
-	    regs->ecx -= p->count;
-	break;
+        sign = p->df ? -1 : 1;
+        regs->edi += sign * p->count * p->size;
+        if (mpcip->flags & REPZ)
+            regs->ecx -= p->count;
+        break;
 
     case INSTR_AND:
-	if (src & REGISTER) {
-	    index = operand_index(src);
-	    value = get_reg_value(size, index, 0, regs);
-	    diff = (unsigned long) p->u.data & value;
-	} else if (src & IMMEDIATE) {
-	    value = mpcip->immediate;
-	    diff = (unsigned long) p->u.data & value;
-	} else if (src & MEMORY) {
-	    index = operand_index(dst);
-	    value = get_reg_value(size, index, 0, regs);
-	    diff = (unsigned long) p->u.data & value;
-	    set_reg_value(size, index, 0, regs, diff);
-	}
+        if (src & REGISTER) {
+            index = operand_index(src);
+            value = get_reg_value(size, index, 0, regs);
+            diff = (unsigned long) p->u.data & value;
+        } else if (src & IMMEDIATE) {
+            value = mpcip->immediate;
+            diff = (unsigned long) p->u.data & value;
+        } else if (src & MEMORY) {
+            index = operand_index(dst);
+            value = get_reg_value(size, index, 0, regs);
+            diff = (unsigned long) p->u.data & value;
+            set_reg_value(size, index, 0, regs, diff);
+        }
 
-	/*
-	 * The OF and CF flags are cleared; the SF, ZF, and PF
-	 * flags are set according to the result. The state of
-	 * the AF flag is undefined.
-	 */
-	regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
-			  X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-	set_eflags_ZF(size, diff, regs);
-	set_eflags_SF(size, diff, regs);
-	set_eflags_PF(size, diff, regs);
-	break;
+        /*
+         * The OF and CF flags are cleared; the SF, ZF, and PF
+         * flags are set according to the result. The state of
+         * the AF flag is undefined.
+         */
+        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        set_eflags_ZF(size, diff, regs);
+        set_eflags_SF(size, diff, regs);
+        set_eflags_PF(size, diff, regs);
+        break;
 
     case INSTR_OR:
-	if (src & REGISTER) {
-	    index = operand_index(src);
-	    value = get_reg_value(size, index, 0, regs);
-	    diff = (unsigned long) p->u.data | value;
-	} else if (src & IMMEDIATE) {
-	    value = mpcip->immediate;
-	    diff = (unsigned long) p->u.data | value;
-	} else if (src & MEMORY) {
-	    index = operand_index(dst);
-	    value = get_reg_value(size, index, 0, regs);
-	    diff = (unsigned long) p->u.data | value;
-	    set_reg_value(size, index, 0, regs, diff);
-	}
+        if (src & REGISTER) {
+            index = operand_index(src);
+            value = get_reg_value(size, index, 0, regs);
+            diff = (unsigned long) p->u.data | value;
+        } else if (src & IMMEDIATE) {
+            value = mpcip->immediate;
+            diff = (unsigned long) p->u.data | value;
+        } else if (src & MEMORY) {
+            index = operand_index(dst);
+            value = get_reg_value(size, index, 0, regs);
+            diff = (unsigned long) p->u.data | value;
+            set_reg_value(size, index, 0, regs, diff);
+        }
 
-	/*
-	 * The OF and CF flags are cleared; the SF, ZF, and PF
-	 * flags are set according to the result. The state of
-	 * the AF flag is undefined.
-	 */
-	regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
-			  X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-	set_eflags_ZF(size, diff, regs);
-	set_eflags_SF(size, diff, regs);
-	set_eflags_PF(size, diff, regs);
-	break;
+        /*
+         * The OF and CF flags are cleared; the SF, ZF, and PF
+         * flags are set according to the result. The state of
+         * the AF flag is undefined.
+         */
+        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        set_eflags_ZF(size, diff, regs);
+        set_eflags_SF(size, diff, regs);
+        set_eflags_PF(size, diff, regs);
+        break;
 
     case INSTR_XOR:
-	if (src & REGISTER) {
-	    index = operand_index(src);
-	    value = get_reg_value(size, index, 0, regs);
-	    diff = (unsigned long) p->u.data ^ value;
-	} else if (src & IMMEDIATE) {
-	    value = mpcip->immediate;
-	    diff = (unsigned long) p->u.data ^ value;
-	} else if (src & MEMORY) {
-	    index = operand_index(dst);
-	    value = get_reg_value(size, index, 0, regs);
-	    diff = (unsigned long) p->u.data ^ value;
-	    set_reg_value(size, index, 0, regs, diff);
-	}
+        if (src & REGISTER) {
+            index = operand_index(src);
+            value = get_reg_value(size, index, 0, regs);
+            diff = (unsigned long) p->u.data ^ value;
+        } else if (src & IMMEDIATE) {
+            value = mpcip->immediate;
+            diff = (unsigned long) p->u.data ^ value;
+        } else if (src & MEMORY) {
+            index = operand_index(dst);
+            value = get_reg_value(size, index, 0, regs);
+            diff = (unsigned long) p->u.data ^ value;
+            set_reg_value(size, index, 0, regs, diff);
+        }
 
-	/*
-	 * The OF and CF flags are cleared; the SF, ZF, and PF
-	 * flags are set according to the result. The state of
-	 * the AF flag is undefined.
-	 */
-	regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
-			  X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-	set_eflags_ZF(size, diff, regs);
-	set_eflags_SF(size, diff, regs);
-	set_eflags_PF(size, diff, regs);
-	break;
+        /*
+         * The OF and CF flags are cleared; the SF, ZF, and PF
+         * flags are set according to the result. The state of
+         * the AF flag is undefined.
+         */
+        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        set_eflags_ZF(size, diff, regs);
+        set_eflags_SF(size, diff, regs);
+        set_eflags_PF(size, diff, regs);
+        break;
 
     case INSTR_CMP:
-	if (src & REGISTER) {
-	    index = operand_index(src);
-	    value = get_reg_value(size, index, 0, regs);
-	    diff = (unsigned long) p->u.data - value;
-	} else if (src & IMMEDIATE) {
-	    value = mpcip->immediate;
-	    diff = (unsigned long) p->u.data - value;
-	} else if (src & MEMORY) {
-	    index = operand_index(dst);
-	    value = get_reg_value(size, index, 0, regs);
-	    diff = value - (unsigned long) p->u.data;
-	}
+        if (src & REGISTER) {
+            index = operand_index(src);
+            value = get_reg_value(size, index, 0, regs);
+            diff = (unsigned long) p->u.data - value;
+        } else if (src & IMMEDIATE) {
+            value = mpcip->immediate;
+            diff = (unsigned long) p->u.data - value;
+        } else if (src & MEMORY) {
+            index = operand_index(dst);
+            value = get_reg_value(size, index, 0, regs);
+            diff = value - (unsigned long) p->u.data;
+        }
 
-	/*
-	 * The CF, OF, SF, ZF, AF, and PF flags are set according
-	 * to the result
-	 */
-	regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|X86_EFLAGS_AF|
-			  X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-	set_eflags_CF(size, value, (unsigned long) p->u.data, regs);
-	set_eflags_OF(size, diff, value, (unsigned long) p->u.data, regs);
-	set_eflags_AF(size, diff, value, (unsigned long) p->u.data, regs);
-	set_eflags_ZF(size, diff, regs);
-	set_eflags_SF(size, diff, regs);
-	set_eflags_PF(size, diff, regs);
-	break;
+        /*
+         * The CF, OF, SF, ZF, AF, and PF flags are set according
+         * to the result
+         */
+        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|X86_EFLAGS_AF|
+                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        set_eflags_CF(size, value, (unsigned long) p->u.data, regs);
+        set_eflags_OF(size, diff, value, (unsigned long) p->u.data, regs);
+        set_eflags_AF(size, diff, value, (unsigned long) p->u.data, regs);
+        set_eflags_ZF(size, diff, regs);
+        set_eflags_SF(size, diff, regs);
+        set_eflags_PF(size, diff, regs);
+        break;
 
     case INSTR_TEST:
-	if (src & REGISTER) {
-	    index = operand_index(src);
-	    value = get_reg_value(size, index, 0, regs);
-	} else if (src & IMMEDIATE) {
-	    value = mpcip->immediate;
-	} else if (src & MEMORY) {
-	    index = operand_index(dst);
-	    value = get_reg_value(size, index, 0, regs);
-	}
-	diff = (unsigned long) p->u.data & value;
+        if (src & REGISTER) {
+            index = operand_index(src);
+            value = get_reg_value(size, index, 0, regs);
+        } else if (src & IMMEDIATE) {
+            value = mpcip->immediate;
+        } else if (src & MEMORY) {
+            index = operand_index(dst);
+            value = get_reg_value(size, index, 0, regs);
+        }
+        diff = (unsigned long) p->u.data & value;
 
-	/*
-	 * Sets the SF, ZF, and PF status flags. CF and OF are set to 0
-	 */
-	regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
-			  X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
-	set_eflags_ZF(size, diff, regs);
-	set_eflags_SF(size, diff, regs);
-	set_eflags_PF(size, diff, regs);
-	break;
+        /*
+         * Sets the SF, ZF, and PF status flags. CF and OF are set to 0
+         */
+        regs->eflags &= ~(X86_EFLAGS_CF|X86_EFLAGS_PF|
+                          X86_EFLAGS_ZF|X86_EFLAGS_SF|X86_EFLAGS_OF);
+        set_eflags_ZF(size, diff, regs);
+        set_eflags_SF(size, diff, regs);
+        set_eflags_PF(size, diff, regs);
+        break;
     }
 
     load_cpu_user_regs(regs);
@@ -644,7 +645,7 @@ void vmx_io_assist(struct vcpu *v)
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, 
                     "bad shared page: %lx", (unsigned long) vio);
-	printf("bad shared page: %lx\n", (unsigned long) vio);
+        printf("bad shared page: %lx\n", (unsigned long) vio);
         domain_crash_synchronous();
     }
 
@@ -655,15 +656,15 @@ void vmx_io_assist(struct vcpu *v)
     /* clear IO wait VMX flag */
     if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags)) {
         if (p->state == STATE_IORESP_READY) {
-	    p->state = STATE_INVALID;
+            p->state = STATE_INVALID;
             clear_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
 
-	    if (p->type == IOREQ_TYPE_PIO)
-		vmx_pio_assist(regs, p, mpci_p);
-	    else
-		vmx_mmio_assist(regs, p, mpci_p);
-	}
-	/* else an interrupt send event raced us */
+            if (p->type == IOREQ_TYPE_PIO)
+                vmx_pio_assist(regs, p, mpci_p);
+            else
+                vmx_mmio_assist(regs, p, mpci_p);
+        }
+        /* else an interrupt send event raced us */
     }
 }
 
@@ -730,7 +731,7 @@ static inline int __fls(u32 word)
     return word ? bit : -1;
 }
 #else
-#define __fls(x) 	generic_fls(x)
+#define __fls(x)  generic_fls(x)
 static __inline__ int generic_fls(u32 x)
 {
     int r = 31;
@@ -839,23 +840,23 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
     struct vmx_virpit_t *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
     switch(type)
     {
-        case VLAPIC_DELIV_MODE_EXT:
-            if (vpit->pending_intr_nr && vector == vpit->vector)
-                vpit->pending_intr_nr--;
-            else
-                clear_highest_bit(v, vector);
+    case VLAPIC_DELIV_MODE_EXT:
+        if (vpit->pending_intr_nr && vector == vpit->vector)
+            vpit->pending_intr_nr--;
+        else
+            clear_highest_bit(v, vector);
 
-            if (vector == vpit->vector && !vpit->first_injected){
-                vpit->first_injected = 1;
-                vpit->pending_intr_nr = 0;
-            }
-            if (vector == vpit->vector)
-                vpit->inject_point = NOW();
-            break;
+        if (vector == vpit->vector && !vpit->first_injected){
+            vpit->first_injected = 1;
+            vpit->pending_intr_nr = 0;
+        }
+        if (vector == vpit->vector)
+            vpit->inject_point = NOW();
+        break;
 
-        default:
-            printk("Not support interrupt type\n");
-            break;
+    default:
+        printk("Not support interrupt type\n");
+        break;
     }
 }
 
@@ -897,51 +898,51 @@ asmlinkage void vmx_intr_assist(void)
         return;
     }
 
-     __vmread(VM_ENTRY_INTR_INFO_FIELD, &intr_fields);
+    __vmread(VM_ENTRY_INTR_INFO_FIELD, &intr_fields);
 
-     if (intr_fields & INTR_INFO_VALID_MASK) {
-         VMX_DBG_LOG(DBG_LEVEL_1, "vmx_intr_assist: intr_fields: %lx",
-           intr_fields);
-         return;
-     }
+    if (intr_fields & INTR_INFO_VALID_MASK) {
+        VMX_DBG_LOG(DBG_LEVEL_1, "vmx_intr_assist: intr_fields: %lx",
+                    intr_fields);
+        return;
+    }
 
-     __vmread(GUEST_INTERRUPTIBILITY_INFO, &interruptibility);
+    __vmread(GUEST_INTERRUPTIBILITY_INFO, &interruptibility);
 
-     if (interruptibility) {
-         enable_irq_window(cpu_exec_control);
-         VMX_DBG_LOG(DBG_LEVEL_1, "guesting pending: %x, interruptibility: %lx",
-                     highest_vector, interruptibility);
-         return;
-     }
+    if (interruptibility) {
+        enable_irq_window(cpu_exec_control);
+        VMX_DBG_LOG(DBG_LEVEL_1, "guesting pending: %x, interruptibility: %lx",
+                    highest_vector, interruptibility);
+        return;
+    }
 
-     __vmread(GUEST_RFLAGS, &eflags);
+    __vmread(GUEST_RFLAGS, &eflags);
 
-     switch (intr_type) {
-         case VLAPIC_DELIV_MODE_EXT:
-             if (irq_masked(eflags)) {
-                 enable_irq_window(cpu_exec_control);
-                 VMX_DBG_LOG(DBG_LEVEL_1, "guesting pending: %x, eflags: %lx",
-                             highest_vector, eflags);
-                 return;
-             }
+    switch (intr_type) {
+    case VLAPIC_DELIV_MODE_EXT:
+        if (irq_masked(eflags)) {
+            enable_irq_window(cpu_exec_control);
+            VMX_DBG_LOG(DBG_LEVEL_1, "guesting pending: %x, eflags: %lx",
+                        highest_vector, eflags);
+            return;
+        }
 
-             vmx_inject_extint(v, highest_vector, VMX_INVALID_ERROR_CODE);
-             TRACE_3D(TRC_VMX_INT, v->domain->domain_id, highest_vector, 0);
-             break;
-         case VLAPIC_DELIV_MODE_FIXED:
-         case VLAPIC_DELIV_MODE_LPRI:
-         case VLAPIC_DELIV_MODE_SMI:
-         case VLAPIC_DELIV_MODE_NMI:
-         case VLAPIC_DELIV_MODE_INIT:
-         case VLAPIC_DELIV_MODE_STARTUP:
-         default:
-             printk("Unsupported interrupt type\n");
-             BUG();
-             break;
-     }
+        vmx_inject_extint(v, highest_vector, VMX_INVALID_ERROR_CODE);
+        TRACE_3D(TRC_VMX_INT, v->domain->domain_id, highest_vector, 0);
+        break;
+    case VLAPIC_DELIV_MODE_FIXED:
+    case VLAPIC_DELIV_MODE_LPRI:
+    case VLAPIC_DELIV_MODE_SMI:
+    case VLAPIC_DELIV_MODE_NMI:
+    case VLAPIC_DELIV_MODE_INIT:
+    case VLAPIC_DELIV_MODE_STARTUP:
+    default:
+        printk("Unsupported interrupt type\n");
+        BUG();
+        break;
+    }
 
-     interrupt_post_injection(v, highest_vector, intr_type);
-     return;
+    interrupt_post_injection(v, highest_vector, intr_type);
+    return;
 }
 
 void vmx_do_resume(struct vcpu *d) 

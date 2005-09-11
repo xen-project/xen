@@ -179,10 +179,10 @@ int vmx_setup_platform(struct vcpu *d, struct cpu_user_regs *regs)
     p = map_domain_page(mpfn);
     d->domain->arch.vmx_platform.shared_page_va = (unsigned long)p;
 
-   VMX_DBG_LOG(DBG_LEVEL_1, "eport: %x\n", iopacket_port(d->domain));
+    VMX_DBG_LOG(DBG_LEVEL_1, "eport: %x\n", iopacket_port(d->domain));
 
-   clear_bit(iopacket_port(d->domain), 
-             &d->domain->shared_info->evtchn_mask[0]);
+    clear_bit(iopacket_port(d->domain), 
+              &d->domain->shared_info->evtchn_mask[0]);
 
     return 0;
 }
@@ -497,7 +497,7 @@ int modify_vmcs(struct arch_vmx_struct *arch_vmx,
     __vmptrst(old_phys_ptr);
     if ((error = load_vmcs(arch_vmx, vmcs_phys_ptr))) {
         printk("modify_vmcs: load_vmcs failed: VMCS = %lx\n",
-                (unsigned long) vmcs_phys_ptr);
+               (unsigned long) vmcs_phys_ptr);
         return -EINVAL; 
     }
     load_cpu_user_regs(regs);

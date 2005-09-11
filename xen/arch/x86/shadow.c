@@ -54,7 +54,7 @@ static unsigned long shadow_l4_table(
 static void shadow_map_into_current(struct vcpu *v,
     unsigned long va, unsigned int from, unsigned int to);
 static inline void validate_bl2e_change( struct domain *d,
-	guest_root_pgentry_t *new_gle_p, pgentry_64_t *shadow_l3, int index);
+    guest_root_pgentry_t *new_gle_p, pgentry_64_t *shadow_l3, int index);
 
 #endif
 

@@ -45,8 +45,8 @@ int vmx_io_intercept(ioreq_t *p, int type)
         addr   = handler->hdl_list[i].addr;
         offset = handler->hdl_list[i].offset;
         if (p->addr >= addr &&
-	    p->addr <  addr + offset)
-	    return handler->hdl_list[i].action(p);
+            p->addr <  addr + offset)
+            return handler->hdl_list[i].action(p);
     }
     return 0;
 }
@@ -172,22 +172,22 @@ int intercept_pit_io(ioreq_t *p)
 
     if (p->size != 1 ||
         p->pdata_valid ||
-	p->type != IOREQ_TYPE_PIO)
+        p->type != IOREQ_TYPE_PIO)
         return 0;
     
     if (p->addr == PIT_MODE &&
-	p->dir == 0 &&				/* write */
-        ((p->u.data >> 4) & 0x3) == 0 &&	/* latch command */
+        p->dir == 0 &&    /* write */
+        ((p->u.data >> 4) & 0x3) == 0 && /* latch command */
         ((p->u.data >> 6) & 0x3) == (vpit->channel)) {/* right channel */
         pit_latch_io(vpit);
-	return 1;
+        return 1;
     }
 
     if (p->addr == (PIT_CH0 + vpit->channel) &&
-	p->dir == 1) {	/* read */
+        p->dir == 1) { /* read */
         p->u.data = pit_read_io(vpit);
         resume_pit_io(p);
-	return 1;
+        return 1;
     }
 
     return 0;
@@ -253,8 +253,8 @@ void vmx_hooks_assist(struct vcpu *d)
         vpit->channel = ((p->u.data >> 24) & 0x3);
         vpit->first_injected = 0;
 
-	vpit->count_LSB_latched = 0;
-	vpit->count_MSB_latched = 0;
+        vpit->count_LSB_latched = 0;
+        vpit->count_MSB_latched = 0;
 
         rw_mode = ((p->u.data >> 26) & 0x3);
         switch(rw_mode) {
@@ -280,9 +280,19 @@ void vmx_hooks_assist(struct vcpu *d)
         /*restore the state*/
         p->state = STATE_IORESP_READY;
 
-	/* register handler to intercept the PIT io when vm_exit */
+        /* register handler to intercept the PIT io when vm_exit */
         if (!reinit)
-	    register_portio_handler(0x40, 4, intercept_pit_io); 
+            register_portio_handler(0x40, 4, intercept_pit_io); 
     }
 }
 #endif /* CONFIG_VMX */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

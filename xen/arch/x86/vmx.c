@@ -122,37 +122,37 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     struct vcpu *vc = current;
     struct msr_state * msr = &vc->arch.arch_vmx.msr_content;
     switch(regs->ecx){
-        case MSR_EFER:
-            msr_content = msr->msr_items[VMX_INDEX_MSR_EFER];
-            VMX_DBG_LOG(DBG_LEVEL_2, "EFER msr_content %llx\n", (unsigned long long)msr_content);
-            if (test_bit(VMX_CPU_STATE_LME_ENABLED,
-                          &vc->arch.arch_vmx.cpu_state))
-                msr_content |= 1 << _EFER_LME;
+    case MSR_EFER:
+        msr_content = msr->msr_items[VMX_INDEX_MSR_EFER];
+        VMX_DBG_LOG(DBG_LEVEL_2, "EFER msr_content %llx\n", (unsigned long long)msr_content);
+        if (test_bit(VMX_CPU_STATE_LME_ENABLED,
+                     &vc->arch.arch_vmx.cpu_state))
+            msr_content |= 1 << _EFER_LME;
 
-            if (VMX_LONG_GUEST(vc))
-                msr_content |= 1 << _EFER_LMA;
-            break;
-        case MSR_FS_BASE:
-            if (!(VMX_LONG_GUEST(vc)))
-                /* XXX should it be GP fault */
-                domain_crash();
-            __vmread(GUEST_FS_BASE, &msr_content);
-            break;
-        case MSR_GS_BASE:
-            if (!(VMX_LONG_GUEST(vc)))
-                domain_crash();
-            __vmread(GUEST_GS_BASE, &msr_content);
-            break;
-        case MSR_SHADOW_GS_BASE:
-            msr_content = msr->shadow_gs;
-            break;
+        if (VMX_LONG_GUEST(vc))
+            msr_content |= 1 << _EFER_LMA;
+        break;
+    case MSR_FS_BASE:
+        if (!(VMX_LONG_GUEST(vc)))
+            /* XXX should it be GP fault */
+            domain_crash();
+        __vmread(GUEST_FS_BASE, &msr_content);
+        break;
+    case MSR_GS_BASE:
+        if (!(VMX_LONG_GUEST(vc)))
+            domain_crash();
+        __vmread(GUEST_GS_BASE, &msr_content);
+        break;
+    case MSR_SHADOW_GS_BASE:
+        msr_content = msr->shadow_gs;
+        break;
 
         CASE_READ_MSR(STAR);
         CASE_READ_MSR(LSTAR);
         CASE_READ_MSR(CSTAR);
         CASE_READ_MSR(SYSCALL_MASK);
-        default:
-            return 0;
+    default:
+        return 0;
     }
     VMX_DBG_LOG(DBG_LEVEL_2, "mode_do_msr_read: msr_content: %lx\n", msr_content);
     regs->eax = msr_content & 0xffffffff;
@@ -166,68 +166,68 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     struct vcpu *vc = current;
     struct msr_state * msr = &vc->arch.arch_vmx.msr_content;
     struct msr_state * host_state = 
-		&percpu_msr[smp_processor_id()];
+        &percpu_msr[smp_processor_id()];
 
     VMX_DBG_LOG(DBG_LEVEL_1, " mode_do_msr_write msr %lx msr_content %lx\n", 
                 regs->ecx, msr_content);
 
     switch (regs->ecx){
-        case MSR_EFER:
-            if ((msr_content & EFER_LME) ^
-                  test_bit(VMX_CPU_STATE_LME_ENABLED,
-                           &vc->arch.arch_vmx.cpu_state)){
-                if (test_bit(VMX_CPU_STATE_PG_ENABLED,
-                             &vc->arch.arch_vmx.cpu_state) ||
-                    !test_bit(VMX_CPU_STATE_PAE_ENABLED,
-                        &vc->arch.arch_vmx.cpu_state)){
-                     vmx_inject_exception(vc, TRAP_gp_fault, 0);
-                }
+    case MSR_EFER:
+        if ((msr_content & EFER_LME) ^
+            test_bit(VMX_CPU_STATE_LME_ENABLED,
+                     &vc->arch.arch_vmx.cpu_state)){
+            if (test_bit(VMX_CPU_STATE_PG_ENABLED,
+                         &vc->arch.arch_vmx.cpu_state) ||
+                !test_bit(VMX_CPU_STATE_PAE_ENABLED,
+                          &vc->arch.arch_vmx.cpu_state)){
+                vmx_inject_exception(vc, TRAP_gp_fault, 0);
             }
-            if (msr_content & EFER_LME)
-                set_bit(VMX_CPU_STATE_LME_ENABLED,
-                        &vc->arch.arch_vmx.cpu_state);
-            /* No update for LME/LMA since it have no effect */
-            msr->msr_items[VMX_INDEX_MSR_EFER] =
-                  msr_content;
-            if (msr_content & ~(EFER_LME | EFER_LMA)){
-                msr->msr_items[VMX_INDEX_MSR_EFER] = msr_content;
-                if (!test_bit(VMX_INDEX_MSR_EFER, &msr->flags)){ 
-                    rdmsrl(MSR_EFER,
-                            host_state->msr_items[VMX_INDEX_MSR_EFER]);
-                      set_bit(VMX_INDEX_MSR_EFER, &host_state->flags);
-                      set_bit(VMX_INDEX_MSR_EFER, &msr->flags);  
-                      wrmsrl(MSR_EFER, msr_content);
-                }
+        }
+        if (msr_content & EFER_LME)
+            set_bit(VMX_CPU_STATE_LME_ENABLED,
+                    &vc->arch.arch_vmx.cpu_state);
+        /* No update for LME/LMA since it have no effect */
+        msr->msr_items[VMX_INDEX_MSR_EFER] =
+            msr_content;
+        if (msr_content & ~(EFER_LME | EFER_LMA)){
+            msr->msr_items[VMX_INDEX_MSR_EFER] = msr_content;
+            if (!test_bit(VMX_INDEX_MSR_EFER, &msr->flags)){ 
+                rdmsrl(MSR_EFER,
+                       host_state->msr_items[VMX_INDEX_MSR_EFER]);
+                set_bit(VMX_INDEX_MSR_EFER, &host_state->flags);
+                set_bit(VMX_INDEX_MSR_EFER, &msr->flags);  
+                wrmsrl(MSR_EFER, msr_content);
             }
-            break;
+        }
+        break;
 
-        case MSR_FS_BASE:
-        case MSR_GS_BASE:
-           if (!(VMX_LONG_GUEST(vc)))
-                domain_crash();
-           if (!IS_CANO_ADDRESS(msr_content)){
-               VMX_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write\n");
-               vmx_inject_exception(vc, TRAP_gp_fault, 0);
-           }
-           if (regs->ecx == MSR_FS_BASE)
-               __vmwrite(GUEST_FS_BASE, msr_content);
-           else 
-               __vmwrite(GUEST_GS_BASE, msr_content);
-           break;
+    case MSR_FS_BASE:
+    case MSR_GS_BASE:
+        if (!(VMX_LONG_GUEST(vc)))
+            domain_crash();
+        if (!IS_CANO_ADDRESS(msr_content)){
+            VMX_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write\n");
+            vmx_inject_exception(vc, TRAP_gp_fault, 0);
+        }
+        if (regs->ecx == MSR_FS_BASE)
+            __vmwrite(GUEST_FS_BASE, msr_content);
+        else 
+            __vmwrite(GUEST_GS_BASE, msr_content);
+        break;
 
-        case MSR_SHADOW_GS_BASE:
-           if (!(VMX_LONG_GUEST(vc)))
-               domain_crash();
-           vc->arch.arch_vmx.msr_content.shadow_gs = msr_content;
-           wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
-           break;
+    case MSR_SHADOW_GS_BASE:
+        if (!(VMX_LONG_GUEST(vc)))
+            domain_crash();
+        vc->arch.arch_vmx.msr_content.shadow_gs = msr_content;
+        wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
+        break;
 
-           CASE_WRITE_MSR(STAR);
-           CASE_WRITE_MSR(LSTAR);
-           CASE_WRITE_MSR(CSTAR);
-           CASE_WRITE_MSR(SYSCALL_MASK);
-        default:
-            return 0;
+        CASE_WRITE_MSR(STAR);
+        CASE_WRITE_MSR(LSTAR);
+        CASE_WRITE_MSR(CSTAR);
+        CASE_WRITE_MSR(SYSCALL_MASK);
+    default:
+        return 0;
     }
     return 1;
 }
@@ -252,8 +252,8 @@ vmx_restore_msrs(struct vcpu *d)
         i = find_first_set_bit(guest_flags);
 
         VMX_DBG_LOG(DBG_LEVEL_2,
-          "restore guest's index %d msr %lx with %lx\n",
-          i, (unsigned long) msr_data_index[i], (unsigned long) guest_state->msr_items[i]);
+                    "restore guest's index %d msr %lx with %lx\n",
+                    i, (unsigned long) msr_data_index[i], (unsigned long) guest_state->msr_items[i]);
         set_bit(i, &host_state->flags);
         wrmsrl(msr_data_index[i], guest_state->msr_items[i]);
         clear_bit(i, &guest_flags);
@@ -309,8 +309,8 @@ int start_vmx(void)
 
     if (eax & IA32_FEATURE_CONTROL_MSR_LOCK) {
         if ((eax & IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON) == 0x0) {
-                printk("VMX disabled by Feature Control MSR.\n");
-                return 0;
+            printk("VMX disabled by Feature Control MSR.\n");
+            return 0;
         }
     }
     else {
@@ -320,16 +320,16 @@ int start_vmx(void)
     }
 
     if (!check_vmx_controls(MONITOR_PIN_BASED_EXEC_CONTROLS, 
-            MSR_IA32_VMX_PINBASED_CTLS_MSR))
+                            MSR_IA32_VMX_PINBASED_CTLS_MSR))
         return 0;
     if (!check_vmx_controls(MONITOR_CPU_BASED_EXEC_CONTROLS, 
-            MSR_IA32_VMX_PROCBASED_CTLS_MSR))
+                            MSR_IA32_VMX_PROCBASED_CTLS_MSR))
         return 0;
     if (!check_vmx_controls(MONITOR_VM_EXIT_CONTROLS, 
-            MSR_IA32_VMX_EXIT_CTLS_MSR))
+                            MSR_IA32_VMX_EXIT_CTLS_MSR))
         return 0;
     if (!check_vmx_controls(MONITOR_VM_ENTRY_CONTROLS, 
-            MSR_IA32_VMX_ENTRY_CTLS_MSR))
+                            MSR_IA32_VMX_ENTRY_CTLS_MSR))
         return 0;
 
     set_in_cr4(X86_CR4_VMXE);   /* Enable VMXE */
@@ -385,8 +385,8 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
     {
         __vmread(GUEST_RIP, &eip);
         VMX_DBG_LOG(DBG_LEVEL_VMMU, 
-                "vmx_do_page_fault = 0x%lx, eip = %lx, error_code = %lx",
-                va, eip, (unsigned long)regs->error_code);
+                    "vmx_do_page_fault = 0x%lx, eip = %lx, error_code = %lx",
+                    va, eip, (unsigned long)regs->error_code);
     }
 #endif
 
@@ -478,8 +478,8 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
     regs->edx = (unsigned long) edx;
 
     VMX_DBG_LOG(DBG_LEVEL_1, 
-            "vmx_vmexit_do_cpuid: eip: %lx, input: %lx, out:eax=%x, ebx=%x, ecx=%x, edx=%x",
-            eip, input, eax, ebx, ecx, edx);
+                "vmx_vmexit_do_cpuid: eip: %lx, input: %lx, out:eax=%x, ebx=%x, ecx=%x, edx=%x",
+                eip, input, eax, ebx, ecx, edx);
 
 }
 
@@ -607,7 +607,7 @@ static int check_for_null_selector(unsigned long eip)
 }
 
 void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
-       unsigned long count, int size, long value, int dir, int pvalid)
+                  unsigned long count, int size, long value, int dir, int pvalid)
 {
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
@@ -620,8 +620,8 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
     }
 
     if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags)) {
-       printf("VMX I/O has not yet completed\n");
-       domain_crash_synchronous();
+        printf("VMX I/O has not yet completed\n");
+        domain_crash_synchronous();
     }
     set_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
 
@@ -656,7 +656,7 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
 }
 
 static void vmx_io_instruction(struct cpu_user_regs *regs, 
-                   unsigned long exit_qualification, unsigned long inst_len) 
+                               unsigned long exit_qualification, unsigned long inst_len) 
 {
     struct mi_per_cpu_info *mpcip;
     unsigned long eip, cs, eflags;
@@ -686,10 +686,10 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
     dir = test_bit(3, &exit_qualification); /* direction */
 
     if (test_bit(4, &exit_qualification)) { /* string instruction */
-	unsigned long addr, count = 1;
-	int sign = regs->eflags & EF_DF ? -1 : 1;
+        unsigned long addr, count = 1;
+        int sign = regs->eflags & EF_DF ? -1 : 1;
 
-	__vmread(GUEST_LINEAR_ADDRESS, &addr);
+        __vmread(GUEST_LINEAR_ADDRESS, &addr);
 
         /*
          * In protected mode, guest linear address is invalid if the
@@ -699,35 +699,35 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
             addr = dir == IOREQ_WRITE ? regs->esi : regs->edi;
 
         if (test_bit(5, &exit_qualification)) { /* "rep" prefix */
-	    mpcip->flags |= REPZ;
-	    count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
-	}
+            mpcip->flags |= REPZ;
+            count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
+        }
 
-	/*
-	 * Handle string pio instructions that cross pages or that
-	 * are unaligned. See the comments in vmx_platform.c/handle_mmio()
-	 */
-	if ((addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK)) {
-	    unsigned long value = 0;
+        /*
+         * Handle string pio instructions that cross pages or that
+         * are unaligned. See the comments in vmx_platform.c/handle_mmio()
+         */
+        if ((addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK)) {
+            unsigned long value = 0;
 
-	    mpcip->flags |= OVERLAP;
-	    if (dir == IOREQ_WRITE)
-		vmx_copy(&value, addr, size, VMX_COPY_IN);
-	    send_pio_req(regs, port, 1, size, value, dir, 0);
-	} else {
-	    if ((addr & PAGE_MASK) != ((addr + count * size - 1) & PAGE_MASK)) {
+            mpcip->flags |= OVERLAP;
+            if (dir == IOREQ_WRITE)
+                vmx_copy(&value, addr, size, VMX_COPY_IN);
+            send_pio_req(regs, port, 1, size, value, dir, 0);
+        } else {
+            if ((addr & PAGE_MASK) != ((addr + count * size - 1) & PAGE_MASK)) {
                 if (sign > 0)
                     count = (PAGE_SIZE - (addr & ~PAGE_MASK)) / size;
                 else
                     count = (addr & ~PAGE_MASK) / size;
-	    } else
-		__update_guest_eip(inst_len);
+            } else
+                __update_guest_eip(inst_len);
 
-	    send_pio_req(regs, port, count, size, addr, dir, 1);
-	}
+            send_pio_req(regs, port, count, size, addr, dir, 1);
+        }
     } else {
         __update_guest_eip(inst_len);
-	send_pio_req(regs, port, 1, size, regs->eax, dir, 0);
+        send_pio_req(regs, port, 1, size, regs->eax, dir, 0);
     }
 }
 
@@ -739,30 +739,30 @@ vmx_copy(void *buf, unsigned long laddr, int size, int dir)
     int count;
 
     while (size > 0) {
-	count = PAGE_SIZE - (laddr & ~PAGE_MASK);
-	if (count > size)
-	    count = size;
+        count = PAGE_SIZE - (laddr & ~PAGE_MASK);
+        if (count > size)
+            count = size;
 
-	if (vmx_paging_enabled(current)) {
-		gpa = gva_to_gpa(laddr);
-		mfn = get_mfn_from_pfn(gpa >> PAGE_SHIFT);
-	} else
-		mfn = get_mfn_from_pfn(laddr >> PAGE_SHIFT);
-	if (mfn == INVALID_MFN)
-		return 0;
+        if (vmx_paging_enabled(current)) {
+            gpa = gva_to_gpa(laddr);
+            mfn = get_mfn_from_pfn(gpa >> PAGE_SHIFT);
+        } else
+            mfn = get_mfn_from_pfn(laddr >> PAGE_SHIFT);
+        if (mfn == INVALID_MFN)
+            return 0;
 
-	addr = (char *)map_domain_page(mfn) + (laddr & ~PAGE_MASK);
+        addr = (char *)map_domain_page(mfn) + (laddr & ~PAGE_MASK);
 
-	if (dir == VMX_COPY_IN)
-	    memcpy(buf, addr, count);
-	else
-	    memcpy(addr, buf, count);
+        if (dir == VMX_COPY_IN)
+            memcpy(buf, addr, count);
+        else
+            memcpy(addr, buf, count);
 
-	unmap_domain_page(addr);
+        unmap_domain_page(addr);
 
-	laddr += count;
-	buf += count;
-	size -= count;
+        laddr += count;
+        buf += count;
+        size -= count;
     }
 
     return 1;
@@ -846,47 +846,47 @@ vmx_world_restore(struct vcpu *d, struct vmx_assist_context *c)
     error |= __vmwrite(CR0_READ_SHADOW, c->cr0);
 
     if (!vmx_paging_enabled(d)) {
-	VMX_DBG_LOG(DBG_LEVEL_VMMU, "switching to vmxassist. use phys table");
-	__vmwrite(GUEST_CR3, pagetable_get_paddr(d->domain->arch.phys_table));
+        VMX_DBG_LOG(DBG_LEVEL_VMMU, "switching to vmxassist. use phys table");
+        __vmwrite(GUEST_CR3, pagetable_get_paddr(d->domain->arch.phys_table));
         goto skip_cr3;
     }
 
     if (c->cr3 == d->arch.arch_vmx.cpu_cr3) {
-	/* 
-	 * This is simple TLB flush, implying the guest has 
-	 * removed some translation or changed page attributes.
-	 * We simply invalidate the shadow.
-	 */
-	mfn = get_mfn_from_pfn(c->cr3 >> PAGE_SHIFT);
-	if (mfn != pagetable_get_pfn(d->arch.guest_table)) {
-	    printk("Invalid CR3 value=%x", c->cr3);
-	    domain_crash_synchronous();
-	    return 0;
-	}
-	shadow_sync_all(d->domain);
+        /* 
+         * This is simple TLB flush, implying the guest has 
+         * removed some translation or changed page attributes.
+         * We simply invalidate the shadow.
+         */
+        mfn = get_mfn_from_pfn(c->cr3 >> PAGE_SHIFT);
+        if (mfn != pagetable_get_pfn(d->arch.guest_table)) {
+            printk("Invalid CR3 value=%x", c->cr3);
+            domain_crash_synchronous();
+            return 0;
+        }
+        shadow_sync_all(d->domain);
     } else {
-	/*
-	 * If different, make a shadow. Check if the PDBR is valid
-	 * first.
-	 */
-	VMX_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %x", c->cr3);
-	if ((c->cr3 >> PAGE_SHIFT) > d->domain->max_pages) {
-	    printk("Invalid CR3 value=%x", c->cr3);
-	    domain_crash_synchronous(); 
-	    return 0;
-	}
-	mfn = get_mfn_from_pfn(c->cr3 >> PAGE_SHIFT);
-	d->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
-	update_pagetables(d);
-	/* 
-	 * arch.shadow_table should now hold the next CR3 for shadow
-	 */
-	d->arch.arch_vmx.cpu_cr3 = c->cr3;
-	VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %x", c->cr3);
-	__vmwrite(GUEST_CR3, pagetable_get_paddr(d->arch.shadow_table));
+        /*
+         * If different, make a shadow. Check if the PDBR is valid
+         * first.
+         */
+        VMX_DBG_LOG(DBG_LEVEL_VMMU, "CR3 c->cr3 = %x", c->cr3);
+        if ((c->cr3 >> PAGE_SHIFT) > d->domain->max_pages) {
+            printk("Invalid CR3 value=%x", c->cr3);
+            domain_crash_synchronous(); 
+            return 0;
+        }
+        mfn = get_mfn_from_pfn(c->cr3 >> PAGE_SHIFT);
+        d->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
+        update_pagetables(d);
+        /* 
+         * arch.shadow_table should now hold the next CR3 for shadow
+         */
+        d->arch.arch_vmx.cpu_cr3 = c->cr3;
+        VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %x", c->cr3);
+        __vmwrite(GUEST_CR3, pagetable_get_paddr(d->arch.shadow_table));
     }
 
-skip_cr3:
+ skip_cr3:
 
     error |= __vmread(CR4_READ_SHADOW, &old_cr4);
     error |= __vmwrite(GUEST_CR4, (c->cr4 | VMX_CR4_HOST_MASK));
@@ -952,59 +952,59 @@ vmx_assist(struct vcpu *d, int mode)
 
     /* make sure vmxassist exists (this is not an error) */
     if (!vmx_copy(&magic, VMXASSIST_MAGIC_OFFSET, sizeof(magic), VMX_COPY_IN))
-    	return 0;
+        return 0;
     if (magic != VMXASSIST_MAGIC)
-    	return 0;
+        return 0;
 
     switch (mode) {
-    /*
-     * Transfer control to vmxassist.
-     * Store the current context in VMXASSIST_OLD_CONTEXT and load
-     * the new VMXASSIST_NEW_CONTEXT context. This context was created
-     * by vmxassist and will transfer control to it.
-     */
+        /*
+         * Transfer control to vmxassist.
+         * Store the current context in VMXASSIST_OLD_CONTEXT and load
+         * the new VMXASSIST_NEW_CONTEXT context. This context was created
+         * by vmxassist and will transfer control to it.
+         */
     case VMX_ASSIST_INVOKE:
-	/* save the old context */
-	if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), VMX_COPY_IN))
-    	    goto error;
-	if (cp != 0) {
-    	    if (!vmx_world_save(d, &c))
-		goto error;
-	    if (!vmx_copy(&c, cp, sizeof(c), VMX_COPY_OUT))
-		goto error;
-	}
+        /* save the old context */
+        if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), VMX_COPY_IN))
+            goto error;
+        if (cp != 0) {
+            if (!vmx_world_save(d, &c))
+                goto error;
+            if (!vmx_copy(&c, cp, sizeof(c), VMX_COPY_OUT))
+                goto error;
+        }
 
-	/* restore the new context, this should activate vmxassist */
-	if (!vmx_copy(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp), VMX_COPY_IN))
-	    goto error;
-	if (cp != 0) {
+        /* restore the new context, this should activate vmxassist */
+        if (!vmx_copy(&cp, VMXASSIST_NEW_CONTEXT, sizeof(cp), VMX_COPY_IN))
+            goto error;
+        if (cp != 0) {
             if (!vmx_copy(&c, cp, sizeof(c), VMX_COPY_IN))
-		goto error;
-    	    if (!vmx_world_restore(d, &c))
-		goto error;
-    	    return 1;
-	}
-	break;
+                goto error;
+            if (!vmx_world_restore(d, &c))
+                goto error;
+            return 1;
+        }
+        break;
 
-    /*
-     * Restore the VMXASSIST_OLD_CONTEXT that was saved by VMX_ASSIST_INVOKE
-     * above.
-     */
+        /*
+         * Restore the VMXASSIST_OLD_CONTEXT that was saved by VMX_ASSIST_INVOKE
+         * above.
+         */
     case VMX_ASSIST_RESTORE:
-	/* save the old context */
-	if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), VMX_COPY_IN))
-    	    goto error;
-	if (cp != 0) {
+        /* save the old context */
+        if (!vmx_copy(&cp, VMXASSIST_OLD_CONTEXT, sizeof(cp), VMX_COPY_IN))
+            goto error;
+        if (cp != 0) {
             if (!vmx_copy(&c, cp, sizeof(c), VMX_COPY_IN))
-		goto error;
-    	    if (!vmx_world_restore(d, &c))
-		goto error;
-	    return 1;
-	}
-	break;
+                goto error;
+            if (!vmx_world_restore(d, &c))
+                goto error;
+            return 1;
+        }
+        break;
     }
 
-error:
+ error:
     printf("Failed to transfer to vmxassist\n");
     domain_crash_synchronous(); 
     return 0;
@@ -1031,7 +1031,7 @@ static int vmx_set_cr0(unsigned long value)
          * The guest CR3 must be pointing to the guest physical.
          */
         if ( !VALID_MFN(mfn = get_mfn_from_pfn(
-                            d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT)) ||
+            d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT)) ||
              !get_page(pfn_to_page(mfn), d->domain) )
         {
             printk("Invalid CR3 value = %lx", d->arch.arch_vmx.cpu_cr3);
@@ -1040,18 +1040,18 @@ static int vmx_set_cr0(unsigned long value)
 
 #if defined(__x86_64__)
         if (test_bit(VMX_CPU_STATE_LME_ENABLED,
-              &d->arch.arch_vmx.cpu_state) &&
-          !test_bit(VMX_CPU_STATE_PAE_ENABLED,
-              &d->arch.arch_vmx.cpu_state)){
+                     &d->arch.arch_vmx.cpu_state) &&
+            !test_bit(VMX_CPU_STATE_PAE_ENABLED,
+                      &d->arch.arch_vmx.cpu_state)){
             VMX_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable\n");
             vmx_inject_exception(d, TRAP_gp_fault, 0);
         }
         if (test_bit(VMX_CPU_STATE_LME_ENABLED,
-              &d->arch.arch_vmx.cpu_state)){
+                     &d->arch.arch_vmx.cpu_state)){
             /* Here the PAE is should to be opened */
             VMX_DBG_LOG(DBG_LEVEL_1, "Enable the Long mode\n");
             set_bit(VMX_CPU_STATE_LMA_ENABLED,
-              &d->arch.arch_vmx.cpu_state);
+                    &d->arch.arch_vmx.cpu_state);
             __vmread(VM_ENTRY_CONTROLS, &vm_entry_value);
             vm_entry_value |= VM_ENTRY_CONTROLS_IA32E_MODE;
             __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
@@ -1073,17 +1073,17 @@ static int vmx_set_cr0(unsigned long value)
 #endif
         }
 
-	unsigned long crn;
+        unsigned long crn;
         /* update CR4's PAE if needed */
         __vmread(GUEST_CR4, &crn);
         if ( (!(crn & X86_CR4_PAE)) &&
-          test_bit(VMX_CPU_STATE_PAE_ENABLED,
-              &d->arch.arch_vmx.cpu_state)){
+             test_bit(VMX_CPU_STATE_PAE_ENABLED,
+                      &d->arch.arch_vmx.cpu_state)){
             VMX_DBG_LOG(DBG_LEVEL_1, "enable PAE on cr4\n");
             __vmwrite(GUEST_CR4, crn | X86_CR4_PAE);
         }
 #elif defined( __i386__)
-       	unsigned long old_base_mfn;
+        unsigned long old_base_mfn;
         old_base_mfn = pagetable_get_pfn(d->arch.guest_table);
         if (old_base_mfn)
             put_page(pfn_to_page(old_base_mfn));
@@ -1095,14 +1095,14 @@ static int vmx_set_cr0(unsigned long value)
         update_pagetables(d);
 
         VMX_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
-                (unsigned long) (mfn << PAGE_SHIFT));
+                    (unsigned long) (mfn << PAGE_SHIFT));
 
         __vmwrite(GUEST_CR3, pagetable_get_paddr(d->arch.shadow_table));
         /* 
          * arch->shadow_table should hold the next CR3 for shadow
          */
         VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx", 
-                d->arch.arch_vmx.cpu_cr3, mfn);
+                    d->arch.arch_vmx.cpu_cr3, mfn);
     }
 
     /*
@@ -1129,29 +1129,29 @@ static int vmx_set_cr0(unsigned long value)
                 __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
             }
         }
-	__vmread(GUEST_RIP, &eip);
-	VMX_DBG_LOG(DBG_LEVEL_1,
-	    "Disabling CR0.PE at %%eip 0x%lx\n", eip);
-	if (vmx_assist(d, VMX_ASSIST_INVOKE)) {
-	    set_bit(VMX_CPU_STATE_ASSIST_ENABLED, &d->arch.arch_vmx.cpu_state);
-	    __vmread(GUEST_RIP, &eip);
-	    VMX_DBG_LOG(DBG_LEVEL_1,
-		"Transfering control to vmxassist %%eip 0x%lx\n", eip);
-	    return 0; /* do not update eip! */
-	}
+        __vmread(GUEST_RIP, &eip);
+        VMX_DBG_LOG(DBG_LEVEL_1,
+                    "Disabling CR0.PE at %%eip 0x%lx\n", eip);
+        if (vmx_assist(d, VMX_ASSIST_INVOKE)) {
+            set_bit(VMX_CPU_STATE_ASSIST_ENABLED, &d->arch.arch_vmx.cpu_state);
+            __vmread(GUEST_RIP, &eip);
+            VMX_DBG_LOG(DBG_LEVEL_1,
+                        "Transfering control to vmxassist %%eip 0x%lx\n", eip);
+            return 0; /* do not update eip! */
+        }
     } else if (test_bit(VMX_CPU_STATE_ASSIST_ENABLED,
-					&d->arch.arch_vmx.cpu_state)) {
-	__vmread(GUEST_RIP, &eip);
-	VMX_DBG_LOG(DBG_LEVEL_1,
-	    "Enabling CR0.PE at %%eip 0x%lx\n", eip);
-	if (vmx_assist(d, VMX_ASSIST_RESTORE)) {
-	    clear_bit(VMX_CPU_STATE_ASSIST_ENABLED,
-					&d->arch.arch_vmx.cpu_state);
-	    __vmread(GUEST_RIP, &eip);
-	    VMX_DBG_LOG(DBG_LEVEL_1,
-		"Restoring to %%eip 0x%lx\n", eip);
-	    return 0; /* do not update eip! */
-	}
+                        &d->arch.arch_vmx.cpu_state)) {
+        __vmread(GUEST_RIP, &eip);
+        VMX_DBG_LOG(DBG_LEVEL_1,
+                    "Enabling CR0.PE at %%eip 0x%lx\n", eip);
+        if (vmx_assist(d, VMX_ASSIST_RESTORE)) {
+            clear_bit(VMX_CPU_STATE_ASSIST_ENABLED,
+                      &d->arch.arch_vmx.cpu_state);
+            __vmread(GUEST_RIP, &eip);
+            VMX_DBG_LOG(DBG_LEVEL_1,
+                        "Restoring to %%eip 0x%lx\n", eip);
+            return 0; /* do not update eip! */
+        }
     }
 
     return 1;
@@ -1198,8 +1198,8 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
         CASE_GET_REG(ESI, esi);
         CASE_GET_REG(EDI, edi);
         CASE_EXTEND_GET_REG
-    case REG_ESP:
-        __vmread(GUEST_RSP, &value);
+            case REG_ESP:
+                __vmread(GUEST_RSP, &value);
         break;
     default:
         printk("invalid gp: %d\n", gp);
@@ -1212,7 +1212,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
     switch(cr) {
     case 0: 
     {
-	return vmx_set_cr0(value);
+        return vmx_set_cr0(value);
     }
     case 3: 
     {
@@ -1262,7 +1262,7 @@ static int mov_to_cr(int gp, int cr, struct cpu_user_regs *regs)
              */
             d->arch.arch_vmx.cpu_cr3 = value;
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx",
-                    value);
+                        value);
             __vmwrite(GUEST_CR3, pagetable_get_paddr(d->arch.shadow_table));
         }
         break;
@@ -1332,8 +1332,8 @@ static void mov_from_cr(int cr, int gp, struct cpu_user_regs *regs)
         CASE_SET_REG(ESI, esi);
         CASE_SET_REG(EDI, edi);
         CASE_EXTEND_SET_REG
-    case REG_ESP:
-        __vmwrite(GUEST_RSP, value);
+            case REG_ESP:
+                __vmwrite(GUEST_RSP, value);
         regs->esp = value;
         break;
     default:
@@ -1381,9 +1381,9 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
     case TYPE_LMSW:
         TRACE_VMEXIT(1,TYPE_LMSW);
         __vmread(CR0_READ_SHADOW, &value);
-	value = (value & ~0xF) |
-		(((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
-	return vmx_set_cr0(value);
+        value = (value & ~0xF) |
+            (((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
+        return vmx_set_cr0(value);
         break;
     default:
         __vmx_bug(regs);
@@ -1400,20 +1400,20 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
                 (unsigned long)regs->ecx, (unsigned long)regs->eax, 
                 (unsigned long)regs->edx);
     switch (regs->ecx) {
-        case MSR_IA32_SYSENTER_CS:
-            __vmread(GUEST_SYSENTER_CS, (u32 *)&msr_content);
-            break;
-        case MSR_IA32_SYSENTER_ESP:
-             __vmread(GUEST_SYSENTER_ESP, &msr_content);
-            break;
-        case MSR_IA32_SYSENTER_EIP:
-            __vmread(GUEST_SYSENTER_EIP, &msr_content);
-            break;
-        default:
-            if(long_mode_do_msr_read(regs))
-                return;
-            rdmsr_user(regs->ecx, regs->eax, regs->edx);
-            break;
+    case MSR_IA32_SYSENTER_CS:
+        __vmread(GUEST_SYSENTER_CS, (u32 *)&msr_content);
+        break;
+    case MSR_IA32_SYSENTER_ESP:
+        __vmread(GUEST_SYSENTER_ESP, &msr_content);
+        break;
+    case MSR_IA32_SYSENTER_EIP:
+        __vmread(GUEST_SYSENTER_EIP, &msr_content);
+        break;
+    default:
+        if(long_mode_do_msr_read(regs))
+            return;
+        rdmsr_user(regs->ecx, regs->eax, regs->edx);
+        break;
     }
 
     regs->eax = msr_content & 0xFFFFFFFF;
@@ -1436,18 +1436,18 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
     msr_content = (regs->eax & 0xFFFFFFFF) | ((u64)regs->edx << 32);
 
     switch (regs->ecx) {
-        case MSR_IA32_SYSENTER_CS:
-            __vmwrite(GUEST_SYSENTER_CS, msr_content);
-            break;
-        case MSR_IA32_SYSENTER_ESP:
-             __vmwrite(GUEST_SYSENTER_ESP, msr_content);
-            break;
-        case MSR_IA32_SYSENTER_EIP:
-            __vmwrite(GUEST_SYSENTER_EIP, msr_content);
-            break;
-        default:
-            long_mode_do_msr_write(regs);
-            break;
+    case MSR_IA32_SYSENTER_CS:
+        __vmwrite(GUEST_SYSENTER_CS, msr_content);
+        break;
+    case MSR_IA32_SYSENTER_ESP:
+        __vmwrite(GUEST_SYSENTER_ESP, msr_content);
+        break;
+    case MSR_IA32_SYSENTER_EIP:
+        __vmwrite(GUEST_SYSENTER_EIP, msr_content);
+        break;
+    default:
+        long_mode_do_msr_write(regs);
+        break;
     }
 
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_write returns: "
@@ -1491,28 +1491,28 @@ static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
     local_irq_disable();
 
     switch(vector) {
-        case LOCAL_TIMER_VECTOR:
-            smp_apic_timer_interrupt(regs);
-            break;
-        case EVENT_CHECK_VECTOR:
-            smp_event_check_interrupt();
-            break;
-        case INVALIDATE_TLB_VECTOR:
-            smp_invalidate_interrupt();
-            break;
-        case CALL_FUNCTION_VECTOR:
-            smp_call_function_interrupt();
-            break;
-        case SPURIOUS_APIC_VECTOR:
-            smp_spurious_interrupt(regs);
-            break;
-        case ERROR_APIC_VECTOR:
-            smp_error_interrupt(regs);
-            break;
-        default:
-            regs->entry_vector = vector;
-            do_IRQ(regs);
-            break;
+    case LOCAL_TIMER_VECTOR:
+        smp_apic_timer_interrupt(regs);
+        break;
+    case EVENT_CHECK_VECTOR:
+        smp_event_check_interrupt();
+        break;
+    case INVALIDATE_TLB_VECTOR:
+        smp_invalidate_interrupt();
+        break;
+    case CALL_FUNCTION_VECTOR:
+        smp_call_function_interrupt();
+        break;
+    case SPURIOUS_APIC_VECTOR:
+        smp_spurious_interrupt(regs);
+        break;
+    case ERROR_APIC_VECTOR:
+        smp_error_interrupt(regs);
+        break;
+    default:
+        regs->entry_vector = vector;
+        do_IRQ(regs);
+        break;
     }
 }
 
@@ -1604,17 +1604,17 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
 
     __vmread(IDT_VECTORING_INFO_FIELD, &idtv_info_field);
     if (idtv_info_field & INTR_INFO_VALID_MASK) {
-	__vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
+        __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
 
-	__vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
-	if (inst_len >= 1 && inst_len <= 15) 
-	    __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
+        __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
+        if (inst_len >= 1 && inst_len <= 15) 
+            __vmwrite(VM_ENTRY_INSTRUCTION_LEN, inst_len);
 
-	if (idtv_info_field & 0x800) { /* valid error code */
-	    unsigned long error_code;
-	    __vmread(IDT_VECTORING_ERROR_CODE, &error_code);
-	    __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
-	} 
+        if (idtv_info_field & 0x800) { /* valid error code */
+            unsigned long error_code;
+            __vmread(IDT_VECTORING_ERROR_CODE, &error_code);
+            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
+        } 
 
         VMX_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x", idtv_info_field);
     }
@@ -1652,7 +1652,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             __vmx_bug(&regs);
         vector &= 0xff;
 
-	 TRACE_VMEXIT(1,vector);
+        TRACE_VMEXIT(1,vector);
         perfc_incra(cause_vector, vector);
 
         TRACE_3D(TRC_VMX_VECTOR, v->domain->domain_id, eip, vector);
@@ -1698,8 +1698,8 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             __vmread(EXIT_QUALIFICATION, &va);
             __vmread(VM_EXIT_INTR_ERROR_CODE, &regs.error_code);
             
-	    TRACE_VMEXIT(3,regs.error_code);
-	    TRACE_VMEXIT(4,va);
+            TRACE_VMEXIT(3,regs.error_code);
+            TRACE_VMEXIT(4,va);
 
             VMX_DBG_LOG(DBG_LEVEL_VMMU, 
                         "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
@@ -1732,7 +1732,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         break;
     case EXIT_REASON_PENDING_INTERRUPT:
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL, 
-              MONITOR_CPU_BASED_EXEC_CONTROLS);
+                  MONITOR_CPU_BASED_EXEC_CONTROLS);
         break;
     case EXIT_REASON_TASK_SWITCH:
         __vmx_bug(&regs);
@@ -1772,10 +1772,10 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
 
         VMX_DBG_LOG(DBG_LEVEL_1, "eip = %lx, inst_len =%lx, exit_qualification = %lx", 
-                eip, inst_len, exit_qualification);
+                    eip, inst_len, exit_qualification);
         if (vmx_cr_access(exit_qualification, &regs))
-	    __update_guest_eip(inst_len);
-	 TRACE_VMEXIT(3,regs.error_code);
+            __update_guest_eip(inst_len);
+        TRACE_VMEXIT(3,regs.error_code);
         TRACE_VMEXIT(4,exit_qualification);
         break;
     }
@@ -1828,8 +1828,8 @@ asmlinkage void load_cr2(void)
 asmlinkage void trace_vmentry (void)
 {
     TRACE_5D(TRC_VMENTRY,trace_values[current->processor][0],
-          trace_values[current->processor][1],trace_values[current->processor][2],
-          trace_values[current->processor][3],trace_values[current->processor][4]);
+             trace_values[current->processor][1],trace_values[current->processor][2],
+             trace_values[current->processor][3],trace_values[current->processor][4]);
     TRACE_VMEXIT(0,9);
     TRACE_VMEXIT(1,9);
     TRACE_VMEXIT(2,9);
