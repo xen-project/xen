@@ -55,6 +55,7 @@ void store_cpu_user_regs(struct cpu_user_regs *regs)
 static inline long __get_reg_value(unsigned long reg, int size)
 {
     switch(size) {
+        case BYTE:
         case BYTE_64:
             return (char)(reg & 0xFF);
         case WORD:
@@ -430,10 +431,10 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
 	if (((opcode[1] >> 3) & 7) == 7) { /* cmp $imm, m32/16 */
 	    instr->instr = INSTR_CMP;
 
-        if (opcode[0] == 0x80)
-            GET_OP_SIZE_FOR_BYTE(instr->op_size);
-        else
-            GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+	    if (opcode[0] == 0x80)
+		GET_OP_SIZE_FOR_BYTE(instr->op_size);
+            else
+		GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
 
 	    instr->operand[0] = mk_operand(instr->op_size, 0, 0, IMMEDIATE);
 	    instr->immediate = get_immediate(vm86, opcode+1, BYTE);

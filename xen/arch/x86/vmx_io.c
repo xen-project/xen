@@ -99,7 +99,6 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
             printk("Error: size:%x, index:%x are invalid!\n", size, index);
             domain_crash_synchronous();
             break;
-
         }
         break;
     case WORD:
@@ -199,6 +198,7 @@ void load_cpu_user_regs(struct cpu_user_regs *regs)
 static inline void __set_reg_value(unsigned long *reg, int size, long value)
 {
     switch (size) {
+        case BYTE:
         case BYTE_64:
             *reg &= ~0xFF;
             *reg |= (value & 0xFF);
@@ -215,7 +215,7 @@ static inline void __set_reg_value(unsigned long *reg, int size, long value)
             *reg = value;
             break;
         default:
-            printk("Error: <__set_reg_value> : Unknown size for register\n");
+	    printk("Error: <__set_reg_value>: size:%x is invalid\n", size);
             domain_crash_synchronous();
     }
 }
