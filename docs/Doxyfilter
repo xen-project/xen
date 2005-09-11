@@ -1,0 +1,12 @@
+#!/bin/sh
+
+dir=$(dirname "$0")
+
+PYFILTER="$dir/pythfilter.py"
+
+if [ "${1/.py/}" != "$1" ]
+then
+    python "$PYFILTER" -f "$1"
+else
+    cat "$1"
+fi

@@ -20,8 +20,8 @@ import threading
 def later(delay, fn, args=(), kwargs={}):
     """Schedule a function to be called later.
 
-    @param _delay: delay in seconds
-    @param _fn:    function
+    @param delay:  delay in seconds
+    @param fn:     function
     @param args:   arguments (list)
     @param kwargs  keyword arguments (map)
     """
@@ -32,7 +32,7 @@ def later(delay, fn, args=(), kwargs={}):
 def now(fn, args=(), kwargs={}):
     """Schedule a function to be called now.
 
-    @param _fn:    function
+    @param fn:     function
     @param args:   arguments (list)
     @param kwargs  keyword arguments (map)
     """
