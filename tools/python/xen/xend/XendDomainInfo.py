@@ -413,17 +413,13 @@ class XendDomainInfo:
             db['backend'] = backdb.getPath()
             db['backend-id'] = "%i" % backdom.id
 
-            backdb['frontend'] = db.getPath()
             (type, params) = string.split(sxp.child_value(devconfig, 'uname'), ':', 1)
-            node = Blkctl.block('bind', type, params)
+            backdb['type'] = type
+            backdb['params'] = params
+            backdb['frontend'] = db.getPath()
             backdb['frontend-id'] = "%i" % self.id
-            backdb['physical-device'] = "%li" % blkdev_name_to_number(node)
             backdb.saveDB(save=True)
 
-            # Ok, super gross, this really doesn't belong in the frontend db...
-            db['type'] = type
-            db['node'] = node
-            db['params'] = params
             db.saveDB(save=True)
             
             return
@@ -808,9 +804,6 @@ class XendDomainInfo:
             if type == 'vbd':
                 typedb = ddb.addChild(type)
                 for dev in typedb.keys():
-                    devdb = typedb.addChild(str(dev))
-                    Blkctl.block('unbind', devdb['type'].getData(),
-                                 devdb['node'].getData())
                     typedb[dev].delete()
                 typedb.saveDB(save=True)
             if type == 'vtpm':
