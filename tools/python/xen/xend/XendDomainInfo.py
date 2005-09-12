@@ -436,8 +436,6 @@ class XendDomainInfo:
 
             backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
 
-            log.error(devconfig)
-            
             devnum = self.netif_idx
             self.netif_idx += 1
 
