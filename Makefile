@@ -10,7 +10,6 @@ INSTALL		:= install
 INSTALL_DIR	:= $(INSTALL) -d -m0755
 INSTALL_DATA	:= $(INSTALL) -m0644
 INSTALL_PROG	:= $(INSTALL) -m0755
-XEN_LOCALVERSION:=
 
 KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
 # linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
@@ -19,7 +18,6 @@ KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
 XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.$(kernel))) )
 
 export DESTDIR
-export XEN_LOCALVERSION
 
 # Export target architecture overrides to Xen and Linux sub-trees.
 ifneq ($(XEN_TARGET_ARCH),)
