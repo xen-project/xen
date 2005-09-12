@@ -461,14 +461,11 @@ int arch_set_info_guest(
         if ( !get_page(&frame_table[phys_basetab>>PAGE_SHIFT], d) )
             return -EINVAL;
     }
-    else
+    else if ( !(c->flags & VGCF_VMX_GUEST) )
     {
-#ifdef __x86_64__
-        if ( !(c->flags & VGCF_VMX_GUEST) )
-#endif
-            if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
-                                    PGT_base_page_table) )
-                return -EINVAL;
+        if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
+                                PGT_base_page_table) )
+            return -EINVAL;
     }
 
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )

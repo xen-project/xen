@@ -1082,11 +1082,6 @@ static int vmx_set_cr0(unsigned long value)
             VMX_DBG_LOG(DBG_LEVEL_1, "enable PAE on cr4\n");
             __vmwrite(GUEST_CR4, crn | X86_CR4_PAE);
         }
-#elif defined( __i386__)
-        unsigned long old_base_mfn;
-        old_base_mfn = pagetable_get_pfn(d->arch.guest_table);
-        if (old_base_mfn)
-            put_page(pfn_to_page(old_base_mfn));
 #endif
         /*
          * Now arch.guest_table points to machine physical.

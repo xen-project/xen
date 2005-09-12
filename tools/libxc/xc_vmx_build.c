@@ -578,15 +578,6 @@ static int setup_guest(int xc_handle,
     sp->sp_global.eport = control_evtchn;
     munmap(sp, PAGE_SIZE);
 
-    /*
-     * Pin down l2tab addr as page dir page - causes hypervisor to provide
-     * correct protection for the page
-     */ 
-#ifdef __i386__
-    if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE, l2tab>>PAGE_SHIFT, dom) )
-        goto error_out;
-#endif
-
     /* Send the page update requests down to the hypervisor. */
     if ( xc_finish_mmu_updates(xc_handle, mmu) )
         goto error_out;
