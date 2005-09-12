@@ -65,7 +65,6 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 
 	/* If other end is gone, delete ourself. */
 	if (node && !xenbus_exists(be->frontpath, "")) {
-		xenbus_rm(be->dev->nodename, "");
 		device_unregister(&be->dev->dev);
 		return;
 	}
