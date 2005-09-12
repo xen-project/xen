@@ -17,7 +17,6 @@ BASECFLAGS+= -O3 $(PROFILE)
 BASECFLAGS+= -I$(XEN_ROOT)/tools/libxc
 BASECFLAGS+= -I$(XEN_ROOT)/xen/include/public
 BASECFLAGS+= -I.
-BASECFLAGS+= -I$(XEN_ROOT)/linux-2.6-xen-sparse/include/asm-xen/linux-public
 
 CFLAGS  += $(BASECFLAGS)
 LDFLAGS += $(PROFILE) -L$(XEN_LIBXC)

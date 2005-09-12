@@ -5,6 +5,7 @@
  * to xenstore.
  * 
  * Copyright (c) 2005, Christian Limpach
+ * Copyright (c) 2005, Rusty Russell, IBM Corporation
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -41,104 +42,96 @@
 
 #include <asm/uaccess.h>
 #include <asm-xen/xenbus.h>
-#include <asm-xen/linux-public/xenbus_dev.h>
 #include <asm-xen/xen_proc.h>
 
 struct xenbus_dev_data {
-	int in_transaction;
+	/* Are there bytes left to be read in this message? */
+	int bytes_left;
+	/* Are we still waiting for the reply to a message we wrote? */
+	int awaiting_reply;
+	/* Buffer for outgoing messages. */
+	unsigned int len;
+	union {
+		struct xsd_sockmsg msg;
+		char buffer[PAGE_SIZE];
+	} u;
 };
 
 static struct proc_dir_entry *xenbus_dev_intf;
 
-void *xs_talkv(enum xsd_sockmsg_type type, const struct kvec *iovec,
-	       unsigned int num_vecs, unsigned int *len);
-
-static int xenbus_dev_talkv(struct xenbus_dev_data *u, unsigned long data)
+/* Reply can be long (dir, getperm): don't buffer, just examine
+ * headers so we can discard rest if they die. */
+static ssize_t xenbus_dev_read(struct file *filp,
+			       char __user *ubuf,
+			       size_t len, loff_t *ppos)
 {
-	struct xenbus_dev_talkv xt;
-	unsigned int len;
-	void *resp, *base;
-	struct kvec *iovec;
-	int ret = -EFAULT, v = 0;
+	struct xenbus_dev_data *data = filp->private_data;
+	struct xsd_sockmsg msg;
+	int err;
 
-	if (copy_from_user(&xt, (void *)data, sizeof(xt)))
+	/* Refill empty buffer? */
+	if (data->bytes_left == 0) {
+		if (len < sizeof(msg))
+			return -EINVAL;
+
+		err = xb_read(&msg, sizeof(msg));
+		if (err)
+			return err;
+		data->bytes_left = msg.len;
+		if (ubuf && copy_to_user(ubuf, &msg, sizeof(msg)) != 0)
+			return -EFAULT;
+		/* We can receive spurious XS_WATCH_EVENT messages. */
+		if (msg.type != XS_WATCH_EVENT)
+			data->awaiting_reply = 0;
+		return sizeof(msg);
+	}
+
+	/* Don't read over next header, or over temporary buffer. */
+	if (len > sizeof(data->u.buffer))
+		len = sizeof(data->u.buffer);
+	if (len > data->bytes_left)
+		len = data->bytes_left;
+
+	err = xb_read(data->u.buffer, len);
+	if (err)
+		return err;
+
+	data->bytes_left -= len;
+	if (ubuf && copy_to_user(ubuf, data->u.buffer, len) != 0)
 		return -EFAULT;
-
-	iovec = kmalloc(xt.num_vecs * sizeof(struct kvec), GFP_KERNEL);
-	if (iovec == NULL)
-		return -ENOMEM;
-
-	if (copy_from_user(iovec, xt.iovec,
-			   xt.num_vecs * sizeof(struct kvec)))
-		goto out;
-
-	for (v = 0; v < xt.num_vecs; v++) {
-		base = iovec[v].iov_base;
-		iovec[v].iov_base = kmalloc(iovec[v].iov_len, GFP_KERNEL);
-		if (iovec[v].iov_base == NULL ||
-		    copy_from_user(iovec[v].iov_base, base, iovec[v].iov_len))
-		{
-			if (iovec[v].iov_base)
-				kfree(iovec[v].iov_base);
-			else
-				ret = -ENOMEM;
-			v--;
-			goto out;
-		}
-	}
-
-	resp = xs_talkv(xt.type, iovec, xt.num_vecs, &len);
-	if (IS_ERR(resp)) {
-		ret = PTR_ERR(resp);
-		goto out;
-	}
-
-	switch (xt.type) {
-	case XS_TRANSACTION_START:
-		u->in_transaction = 1;
-		break;
-	case XS_TRANSACTION_END:
-		u->in_transaction = 0;
-		break;
-	default:
-		break;
-	}
-
-	ret = len;
-	if (len > xt.len)
-		len = xt.len;
-
-	if (copy_to_user(xt.buf, resp, len))
-		ret = -EFAULT;
-
-	kfree(resp);
- out:
-	while (v-- > 0)
-		kfree(iovec[v].iov_base);
-	kfree(iovec);
-	return ret;
+	return len;
 }
 
-static int xenbus_dev_ioctl(struct inode *inode, struct file *filp,
-			    unsigned int cmd, unsigned long data)
+/* We do v. basic sanity checking so they don't screw up kernel later. */
+static ssize_t xenbus_dev_write(struct file *filp,
+				const char __user *ubuf,
+				size_t len, loff_t *ppos)
 {
-	struct xenbus_dev_data *u = filp->private_data;
-	int ret = -ENOSYS;
+	struct xenbus_dev_data *data = filp->private_data;
+	int err;
 
-	switch (cmd) {
-	case IOCTL_XENBUS_DEV_TALKV:
-		ret = xenbus_dev_talkv(u, data);
-		break;
-	default:
-		ret = -EINVAL;
-		break;
+	/* We gather data in buffer until we're ready to send it. */
+	if (len > data->len + sizeof(data->u))
+		return -EINVAL;
+	if (copy_from_user(data->u.buffer + data->len, ubuf, len) != 0)
+		return -EFAULT;
+	data->len += len;
+	if (data->len >= sizeof(data->u.msg) + data->u.msg.len) {
+		err = xb_write(data->u.buffer, data->len);
+		if (err)
+			return err;
+		data->len = 0;
+		data->awaiting_reply = 1;
 	}
-	return ret;
+	return len;
 }
 
 static int xenbus_dev_open(struct inode *inode, struct file *filp)
 {
 	struct xenbus_dev_data *u;
+
+	/* Don't try seeking. */
+	nonseekable_open(inode, filp);
 
 	u = kmalloc(sizeof(*u), GFP_KERNEL);
 	if (u == NULL)
@@ -155,20 +148,25 @@ static int xenbus_dev_open(struct inode *inode, struct file *filp)
 
 static int xenbus_dev_release(struct inode *inode, struct file *filp)
 {
-	struct xenbus_dev_data *u = filp->private_data;
+	struct xenbus_dev_data *data = filp->private_data;
 
-	if (u->in_transaction)
-		xenbus_transaction_end(1);
+	/* Discard any unread replies. */
+	while (data->bytes_left || data->awaiting_reply)
+		xenbus_dev_read(filp, NULL, sizeof(data->u.buffer), NULL);
+
+	/* Harmless if no transaction in progress. */
+	xenbus_transaction_end(1);
 
 	up(&xenbus_lock);
 
-	kfree(u);
+	kfree(data);
 
 	return 0;
 }
 
 static struct file_operations xenbus_dev_file_ops = {
-	.ioctl = xenbus_dev_ioctl,
+	.read = xenbus_dev_read,
+	.write = xenbus_dev_write,
 	.open = xenbus_dev_open,
 	.release = xenbus_dev_release,
 };

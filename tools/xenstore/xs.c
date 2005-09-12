@@ -36,12 +36,10 @@
 #include "xenstored.h"
 #include "xs_lib.h"
 #include "utils.h"
-#include "xenbus_dev.h"
 
 struct xs_handle
 {
 	int fd;
-	enum { SOCK, DEV } type;
 };
 
 /* Get the socket from the store daemon handle.
@@ -68,7 +66,6 @@ static struct xs_handle *get_socket(const char *connect_to)
 		h = malloc(sizeof(*h));
 		if (h) {
 			h->fd = sock;
-			h->type = SOCK;
 			return h;
 		}
 	}
@@ -82,16 +79,15 @@ static struct xs_handle *get_socket(const char *connect_to)
 static struct xs_handle *get_dev(const char *connect_to)
 {
 	int fd, saved_errno;
-	struct xs_handle *h = NULL;
+	struct xs_handle *h;
 
-	fd = open(connect_to, O_RDONLY);
+	fd = open(connect_to, O_RDWR);
 	if (fd < 0)
 		return NULL;
 
 	h = malloc(sizeof(*h));
 	if (h) {
 		h->fd = fd;
-		h->type = DEV;
 		return h;
 	}
 
@@ -190,9 +186,9 @@ static void *read_reply(int fd, enum xsd_sockmsg_type *type, unsigned int *len)
 }
 
 /* Send message to xs, get malloc'ed reply.  NULL and set errno on error. */
-static void *xs_talkv_sock(struct xs_handle *h, enum xsd_sockmsg_type type,
-			   const struct iovec *iovec, unsigned int num_vecs,
-			   unsigned int *len)
+static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
+		      const struct iovec *iovec, unsigned int num_vecs,
+		      unsigned int *len)
 {
 	struct xsd_sockmsg msg;
 	void *ret = NULL;
@@ -250,54 +246,6 @@ close_fd:
 	close(h->fd);
 	h->fd = -1;
 	errno = saved_errno;
-	return NULL;
-}
-
-/* Send message to xs, get malloc'ed reply.  NULL and set errno on error. */
-static void *xs_talkv_dev(struct xs_handle *h, enum xsd_sockmsg_type type,
-			  const struct iovec *iovec, unsigned int num_vecs,
-			  unsigned int *len)
-{
-	struct xenbus_dev_talkv dt;
-	char *buf;
-	int err, buflen = 1024;
-
- again:
-	buf = malloc(buflen);
-	if (buf == NULL) {
-		errno = ENOMEM;
-		return NULL;
-	}
-	dt.type = type;
-	dt.iovec = (struct kvec *)iovec;
-	dt.num_vecs = num_vecs;
-	dt.buf = buf;
-	dt.len = buflen;
-	err = ioctl(h->fd, IOCTL_XENBUS_DEV_TALKV, &dt);
-	if (err < 0) {
-		free(buf);
-		errno = err;
-		return NULL;
-	}
-	if (err > buflen) {
-		free(buf);
-		buflen = err;
-		goto again;
-	}
-	if (len)
-		*len = err;
-	return buf;
-}
-
-/* Send message to xs, get malloc'ed reply.  NULL and set errno on error. */
-static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
-		      const struct iovec *iovec, unsigned int num_vecs,
-		      unsigned int *len)
-{
-	if (h->type == SOCK)
-		return xs_talkv_sock(h, type, iovec, num_vecs, len);
-	if (h->type == DEV)
-		return xs_talkv_dev(h, type, iovec, num_vecs, len);
 	return NULL;
 }
 
