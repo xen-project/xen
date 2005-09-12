@@ -42,18 +42,18 @@ read_exact(int fd, void *buf, size_t count)
     unsigned char *b = buf;
 
     while (r < count) {
-	s = read(fd, &b[r], count - r);
-	if (s <= 0)
-	    break;
-	r += s;
+        s = read(fd, &b[r], count - r);
+        if (s <= 0)
+            break;
+        r += s;
     }
 
     return r;
 }
 
 int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
-		     unsigned int store_evtchn, unsigned long *store_mfn,
-		     unsigned int console_evtchn, unsigned long *console_mfn)
+                     unsigned int store_evtchn, unsigned long *store_mfn,
+                     unsigned int console_evtchn, unsigned long *console_mfn)
 {
     dom0_op_t op;
     int rc = 1, i, n, k;
@@ -91,6 +91,8 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     /* A temporary mapping of the guest's start_info page. */
     start_info_t *start_info;
 
+    int pt_levels = 2; /* XXX auto-detect this */
+
     char *region_base;
 
     xc_mmu_t *mmu = NULL;
@@ -112,8 +114,8 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     }
 
     if (read_exact(io_fd, pfn_to_mfn_frame_list, PAGE_SIZE) != PAGE_SIZE) {
-	ERR("read pfn_to_mfn_frame_list failed");
-	goto out;
+        ERR("read pfn_to_mfn_frame_list failed");
+        goto out;
     }
 
     /* We want zeroed memory so use calloc rather than malloc. */
@@ -289,10 +291,10 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
                         if ( xpfn >= nr_pfns )
                         {
                             ERR("Frame number in type %lu page "
-                                       "table is out of range. i=%d k=%d "
-                                       "pfn=0x%lx nr_pfns=%lu", 
-                                       region_pfn_type[i]>>28, i, 
-                                       k, xpfn, nr_pfns);
+                                "table is out of range. i=%d k=%d "
+                                "pfn=0x%lx nr_pfns=%lu", 
+                                region_pfn_type[i]>>28, i, 
+                                k, xpfn, nr_pfns);
                             goto out;
                         }
 
@@ -317,10 +319,10 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
                         if ( xpfn >= nr_pfns )
                         {
                             ERR("Frame number in type %lu page"
-                                       " table is out of range. i=%d k=%d "
-                                       "pfn=%lu nr_pfns=%lu",
-                                       region_pfn_type[i]>>28, i, k, 
-                                       xpfn, nr_pfns);
+                                " table is out of range. i=%d k=%d "
+                                "pfn=%lu nr_pfns=%lu",
+                                region_pfn_type[i]>>28, i, k, 
+                                xpfn, nr_pfns);
                             goto out;
                         }
 
@@ -334,8 +336,8 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
 
             default:
                 ERR("Bogus page type %lx page table is "
-                           "out of range. i=%d nr_pfns=%lu", 
-                           region_pfn_type[i], i, nr_pfns);
+                    "out of range. i=%d nr_pfns=%lu", 
+                    region_pfn_type[i], i, nr_pfns);
                 goto out;
 
             } /* end of page type switch statement */
@@ -362,8 +364,8 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
             }
 
             if ( xc_add_mmu_update(xc_handle, mmu,
-				   (mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE,
-				   pfn) )
+                                   (mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE,
+                                   pfn) )
             {
                 printf("machpys mfn=%ld pfn=%ld\n",mfn,pfn);
                 goto out;
@@ -376,6 +378,33 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     }
 
     DPRINTF("Received all pages\n");
+
+    if ( pt_levels == 3 )
+    {
+        /* Get all PGDs below 4GB. */
+        for ( i = 0; i < nr_pfns; i++ )
+        {
+            if ( ((pfn_type[i] & LTABTYPE_MASK) == L3TAB) &&
+                 (pfn_to_mfn_table[i] > 0xfffffUL) )
+            {
+                unsigned long new_mfn = xc_make_page_below_4G(
+                    xc_handle, dom, pfn_to_mfn_table[i]);
+                if ( new_mfn == 0 )
+                {
+                    fprintf(stderr, "Couldn't get a page below 4GB :-(\n");
+                    goto out;
+                }
+                pfn_to_mfn_table[i] = new_mfn;
+                if ( xc_add_mmu_update(
+                    xc_handle, mmu, (new_mfn << PAGE_SHIFT) |
+                    MMU_MACHPHYS_UPDATE, i) )
+                {
+                    fprintf(stderr, "Couldn't m2p on PAE root pgdir\n");
+                    goto out;
+                }
+            }
+        }
+    }
 
     if ( xc_finish_mmu_updates(xc_handle, mmu) )
         goto out;
@@ -410,57 +439,57 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
 
     /* Get the list of PFNs that are not in the psuedo-phys map */
     {
-	unsigned int count;
+        unsigned int count;
         unsigned long *pfntab;
-	int rc;
+        int rc;
 
-	if ( read_exact(io_fd, &count, sizeof(count)) != sizeof(count) )
-	{
-	    ERR("Error when reading pfn count");
-	    goto out;
-	}
+        if ( read_exact(io_fd, &count, sizeof(count)) != sizeof(count) )
+        {
+            ERR("Error when reading pfn count");
+            goto out;
+        }
 
-	pfntab = malloc( sizeof(unsigned int) * count );
-	if ( pfntab == NULL )
-	{
-	    ERR("Out of memory");
-	    goto out;
-	}
+        pfntab = malloc( sizeof(unsigned int) * count );
+        if ( pfntab == NULL )
+        {
+            ERR("Out of memory");
+            goto out;
+        }
 
-	if ( read_exact(io_fd, pfntab, sizeof(unsigned int)*count) !=
+        if ( read_exact(io_fd, pfntab, sizeof(unsigned int)*count) !=
              sizeof(unsigned int)*count )
-	{
-	    ERR("Error when reading pfntab");
-	    goto out;
-	}
+        {
+            ERR("Error when reading pfntab");
+            goto out;
+        }
 
-	for ( i = 0; i < count; i++ )
-	{
-	    unsigned long pfn = pfntab[i];
-	    pfntab[i]=pfn_to_mfn_table[pfn];
-	    pfn_to_mfn_table[pfn] = 0x80000001;  // not in pmap
-	}
+        for ( i = 0; i < count; i++ )
+        {
+            unsigned long pfn = pfntab[i];
+            pfntab[i]=pfn_to_mfn_table[pfn];
+            pfn_to_mfn_table[pfn] = 0x80000001;  // not in pmap
+        }
 
-	if ( count > 0 )
-	{
+        if ( count > 0 )
+        {
             struct xen_memory_reservation reservation = {
                 .extent_start = pfntab,
                 .nr_extents   = count,
                 .extent_order = 0,
                 .domid        = dom
             };
-	    if ( (rc = xc_memory_op(xc_handle,
+            if ( (rc = xc_memory_op(xc_handle,
                                     XENMEM_decrease_reservation,
                                     &reservation)) != count )
-	    {
-		ERR("Could not decrease reservation : %d",rc);
-		goto out;
-	    }
-	    else
-	    {
-		printf("Decreased reservation by %d pages\n", count);
-	    }
-	}	
+            {
+                ERR("Could not decrease reservation : %d",rc);
+                goto out;
+            }
+            else
+            {
+                printf("Decreased reservation by %d pages\n", count);
+            }
+        } 
     }
 
     if ( read_exact(io_fd, &ctxt,            sizeof(ctxt)) != sizeof(ctxt) ||
@@ -484,10 +513,10 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     start_info->shared_info = shared_info_frame << PAGE_SHIFT;
     start_info->flags       = 0;
     *store_mfn = start_info->store_mfn   =
-	pfn_to_mfn_table[start_info->store_mfn];
+        pfn_to_mfn_table[start_info->store_mfn];
     start_info->store_evtchn = store_evtchn;
     *console_mfn = start_info->console_mfn   =
-	pfn_to_mfn_table[start_info->console_mfn];
+        pfn_to_mfn_table[start_info->console_mfn];
     start_info->console_evtchn = console_evtchn;
     munmap(start_info, PAGE_SIZE);
 
@@ -522,7 +551,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
 
     /* clear any pending events and the selector */
     memset(&(shared_info->evtchn_pending[0]), 0,
-	   sizeof (shared_info->evtchn_pending));
+           sizeof (shared_info->evtchn_pending));
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_data[i].evtchn_pending_sel = 0;
 
@@ -548,7 +577,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     }
     
     if ( (live_pfn_to_mfn_table = 
-	  xc_map_foreign_batch(xc_handle, dom, 
+          xc_map_foreign_batch(xc_handle, dom, 
                                PROT_WRITE,
                                pfn_to_mfn_frame_list,
                                (nr_pfns+1023)/1024 )) == 0 )
