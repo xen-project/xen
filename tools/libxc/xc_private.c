@@ -425,23 +425,49 @@ int xc_dom0_op(int xc_handle, dom0_op_t *op)
 
 int xc_version(int xc_handle, int cmd, void *arg)
 {
-    return do_xen_version(xc_handle, cmd, arg);
+    int rc, argsize = 0;
+
+    switch ( cmd )
+    {
+    case XENVER_extraversion: argsize = sizeof(xen_extraversion_t); break;
+    case XENVER_compile_info: argsize = sizeof(xen_compile_info_t); break;
+    case XENVER_capabilities: argsize = sizeof(xen_capabilities_info_t); break;
+    case XENVER_changeset:    argsize = sizeof(xen_changeset_info_t); break;
+    case XENVER_parameters:   argsize = sizeof(xen_parameters_info_t); break;
+    }
+
+    if ( (argsize != 0) && (mlock(arg, argsize) != 0) )
+    {
+        PERROR("Could not lock memory for version hypercall");
+        return -ENOMEM;
+    }
+
+    rc = do_xen_version(xc_handle, cmd, arg);
+
+    if ( argsize != 0 )
+        safe_munlock(arg, argsize);
+
+    return rc;
 }
 
-unsigned long xc_make_page_below_4G(int xc_handle, u32 domid, 
-				    unsigned long mfn)
+unsigned long xc_make_page_below_4G(
+    int xc_handle, u32 domid, unsigned long mfn)
 {
     unsigned long new_mfn;
+
     if ( xc_domain_memory_decrease_reservation( 
-	xc_handle, domid, 1, 0, &mfn ) != 1 )
+	xc_handle, domid, 1, 0, &mfn) != 1 )
     {
 	fprintf(stderr,"xc_make_page_below_4G decrease failed. mfn=%lx\n",mfn);
 	return 0;
     }
-    if ( xc_domain_memory_increase_reservation( xc_handle, domid, 1, 0, 32, &new_mfn ) != 1 )
+
+    if ( xc_domain_memory_increase_reservation(
+        xc_handle, domid, 1, 0, 32, &new_mfn) != 1 )
     {
 	fprintf(stderr,"xc_make_page_below_4G increase failed. mfn=%lx\n",mfn);
 	return 0;
     }
+
     return new_mfn;
 }
