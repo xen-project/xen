@@ -473,22 +473,19 @@ class XendDomainInfo:
             devnum = int(sxp.child_value(devconfig, 'instance', '0'))
             log.error("The domain has a TPM with instance %d." % devnum)
 
-            # create backend db
-            backdb = backdom.db.addChild("/backend/%s/%s/%d" %
-                                         (type, self.uuid, devnum))
-            # create frontend db
-            db = self.db.addChild("/device/%s/%d" % (type, devnum))
+            backpath = "%s/backend/%s/%s/%d" % (backdom.path, type,
+                                                self.uuid, devnum)
+            frontpath = "%s/device/%s/%d" % (self.path, type, devnum)
 
-            backdb['frontend'] = db.getPath()
-            backdb['frontend-id'] = "%i" % self.id
-            backdb['instance'] = sxp.child_value(devconfig, 'instance', '0')
-            backdb.saveDB(save=True)
+            front = { 'backend' : backpath,
+                      'backend-id' : "%i" % backdom.id,
+                      'handle' : "%i" % devnum }
+            xstransact.Write(frontpath, front)
 
-            db['handle'] = "%i" % devnum
-            db['backend'] = backdb.getPath()
-            db['backend-id'] = "%i" % int(sxp.child_value(devconfig,
-                                                          'backend', '0'))
-            db.saveDB(save=True)
+            back = { 'instance' : "%i" % devnum,
+                     'frontend' : frontpath,
+                     'frontend-id' : "%i" % self.id }
+            xstransact.Write(backpath, back)
 
             return
 
@@ -795,14 +792,9 @@ class XendDomainInfo:
             t.remove(d)
         for d in t.list("vif"):
             t.remove(d)
+        for d in t.list("vtpm"):
+            t.remove(d)
         t.commit()
-        ddb = self.db.addChild("/device")
-        for type in ddb.keys():
-            if type == 'vtpm':
-                typedb = ddb.addChild(type)
-                for dev in typedb.keys():
-                    typedb[dev].delete()
-                typedb.saveDB(save=True)
 
     def show(self):
         """Print virtual machine info.
