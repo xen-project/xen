@@ -11,8 +11,7 @@ INSTALL_DIR		= $(INSTALL) -d -m0755
 export XEN_VERSION       = 3
 export XEN_SUBVERSION    = 0
 export XEN_EXTRAVERSION  = -devel
-export XEN_LOCALVERSION  =
-export XEN_FULLVERSION   = $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION)$(XEN_LOCALVERSION)
+export XEN_FULLVERSION   = $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION)
 
 export BASEDIR          := $(CURDIR)
 
@@ -33,7 +32,6 @@ build: $(TARGET).gz
 install: $(TARGET).gz
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
 	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_FULLVERSION).gz
-	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_LOCALVERSION).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).gz
 	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET)).gz

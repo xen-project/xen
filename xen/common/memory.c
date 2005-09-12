@@ -29,7 +29,7 @@ increase_reservation(
     int           *preempted)
 {
     struct pfn_info *page;
-    unsigned long    i;
+    unsigned int     i;
 
     if ( (extent_list != NULL) &&
          !array_access_ok(extent_list, nr_extents, sizeof(*extent_list)) )
@@ -37,7 +37,7 @@ increase_reservation(
 
     if ( (extent_order != 0) && !IS_CAPABLE_PHYSDEV(current->domain) )
     {
-        DPRINTK("Only I/O-capable domains may allocate > order-0 memory.\n");
+        DPRINTK("Only I/O-capable domains may allocate multi-page extents.\n");
         return 0;
     }
 
@@ -52,8 +52,9 @@ increase_reservation(
         if ( unlikely((page = alloc_domheap_pages(
             d, extent_order, flags)) == NULL) )
         {
-            DPRINTK("Could not allocate order=%d extent: id=%d flags=%x\n",
-                    extent_order, d->domain_id, flags);
+            DPRINTK("Could not allocate order=%d extent: "
+                    "id=%d flags=%x (%d of %d)\n",
+                    extent_order, d->domain_id, flags, i, nr_extents);
             return i;
         }
 

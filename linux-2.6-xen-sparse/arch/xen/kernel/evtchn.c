@@ -123,7 +123,7 @@ extern asmlinkage unsigned int do_IRQ(struct pt_regs *regs);
  */
 void force_evtchn_callback(void)
 {
-    (void)HYPERVISOR_xen_version(0);
+    (void)HYPERVISOR_xen_version(0, NULL);
 }
 EXPORT_SYMBOL(force_evtchn_callback);
 

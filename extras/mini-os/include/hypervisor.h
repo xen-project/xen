@@ -414,15 +414,15 @@ HYPERVISOR_event_channel_op(
 
 static inline int
 HYPERVISOR_xen_version(
-    int cmd)
+    int cmd, void *arg)
 {
     int ret;
-    unsigned long ignore;
+    unsigned long ignore, ign2;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret), "=b" (ignore)
-	: "0" (__HYPERVISOR_xen_version), "1" (cmd)
+        : "=a" (ret), "=b" (ignore), "=c" (ign2)
+	: "0" (__HYPERVISOR_xen_version), "1" (cmd), "2" (arg)
 	: "memory" );
 
     return ret;
