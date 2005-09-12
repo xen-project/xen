@@ -397,31 +397,28 @@ class XendDomainInfo:
             typedev = sxp.child_value(devconfig, 'dev')
             if re.match('^ioemu:', typedev):
 	        return;
+
             backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
 
             devnum = blkdev_name_to_number(sxp.child_value(devconfig, 'dev'))
 
-            # create backend db
-            backdb = backdom.db.addChild("/backend/%s/%s/%d" %
-                                         (type, self.uuid, devnum))
+            backpath = "%s/backend/%s/%s/%d" % (backdom.path, type,
+                                                self.uuid, devnum)
+            frontpath = "%s/device/%s/%d" % (self.path, type, devnum)
 
-            # create frontend db
-            db = self.db.addChild("/device/%s/%d" % (type, devnum))
-            
-            db['virtual-device'] = "%i" % devnum
-            #db['backend'] = sxp.child_value(devconfig, 'backend', '0')
-            db['backend'] = backdb.getPath()
-            db['backend-id'] = "%i" % backdom.id
+            front = { 'backend' : backpath,
+                      'backend-id' : "%i" % backdom.id,
+                      'virtual-device' : "%i" % devnum }
+            xstransact.Write(frontpath, front)
 
-            (type, params) = string.split(sxp.child_value(devconfig, 'uname'), ':', 1)
-            backdb['type'] = type
-            backdb['params'] = params
-            backdb['frontend'] = db.getPath()
-            backdb['frontend-id'] = "%i" % self.id
-            backdb.saveDB(save=True)
+            (type, params) = string.split(sxp.child_value(devconfig,
+                                                          'uname'), ':', 1)
+            back = { 'type' : type,
+                     'params' : params,
+                     'frontend' : frontpath,
+                     'frontend-id' : "%i" % self.id }
+            xstransact.Write(backpath, back)
 
-            db.saveDB(save=True)
-            
             return
 
         if type == 'vif':
@@ -794,16 +791,13 @@ class XendDomainInfo:
             if ctrl.isDestroyed(): continue
             ctrl.destroyController(reboot=reboot)
         t = xstransact("%s/device" % self.path)
+        for d in t.list("vbd"):
+            t.remove(d)
         for d in t.list("vif"):
             t.remove(d)
         t.commit()
         ddb = self.db.addChild("/device")
         for type in ddb.keys():
-            if type == 'vbd':
-                typedb = ddb.addChild(type)
-                for dev in typedb.keys():
-                    typedb[dev].delete()
-                typedb.saveDB(save=True)
             if type == 'vtpm':
                 typedb = ddb.addChild(type)
                 for dev in typedb.keys():
