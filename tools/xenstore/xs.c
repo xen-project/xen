@@ -97,19 +97,32 @@ static struct xs_handle *get_dev(const char *connect_to)
 	return NULL;
 }
 
+static struct xs_handle *get_handle(const char *connect_to)
+{
+	struct stat buf;
+
+	if (stat(connect_to, &buf) != 0)
+		return NULL;
+
+	if (S_ISSOCK(buf.st_mode))
+		return get_socket(connect_to);
+	else
+		return get_dev(connect_to);
+}
+
 struct xs_handle *xs_daemon_open(void)
 {
-	return get_socket(xs_daemon_socket());
+	return get_handle(xs_daemon_socket());
 }
 
 struct xs_handle *xs_daemon_open_readonly(void)
 {
-	return get_socket(xs_daemon_socket_ro());
+	return get_handle(xs_daemon_socket_ro());
 }
 
 struct xs_handle *xs_domain_open(void)
 {
-	return get_dev(xs_domain_dev());
+	return get_handle(xs_domain_dev());
 }
 
 void xs_daemon_close(struct xs_handle *h)
