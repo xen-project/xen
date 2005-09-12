@@ -260,9 +260,9 @@ HYPERVISOR_event_channel_op(
 
 static inline int
 HYPERVISOR_xen_version(
-	int cmd)
+	int cmd, void *arg)
 {
-	return _hypercall1(int, xen_version, cmd);
+	return _hypercall2(int, xen_version, cmd, arg);
 }
 
 static inline int

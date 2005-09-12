@@ -655,7 +655,7 @@ ENTRY(hypercall_args_table)
         .byte 3 /* do_update_va_mapping */
         .byte 1 /* do_set_timer_op      */  /* 15 */
         .byte 1 /* do_event_channel_op  */
-        .byte 1 /* do_xen_version       */
+        .byte 2 /* do_xen_version       */
         .byte 3 /* do_console_io        */
         .byte 1 /* do_physdev_op        */
         .byte 3 /* do_grant_table_op    */  /* 20 */
