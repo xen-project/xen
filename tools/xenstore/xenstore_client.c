@@ -22,7 +22,7 @@ usage(const char *progname)
     errx(1, "Usage: %s [-h] [-p] key [...]", progname);
 #elif defined(CLIENT_write)
     errx(1, "Usage: %s [-h] key value [...]", progname);
-#elif defined(CLIENT_rm)
+#elif defined(CLIENT_rm) || defined(CLIENT_exists) || defined(CLIENT_list)
     errx(1, "Usage: %s [-h] key [...]", progname);
 #endif
 }
@@ -33,8 +33,7 @@ main(int argc, char **argv)
     struct xs_handle *xsh;
     bool success;
     int ret = 0;
-#if defined(CLIENT_read)
-    char *val;
+#if defined(CLIENT_read) || defined(CLIENT_list)
     int prefix = 0;
 #endif
 
@@ -46,14 +45,14 @@ main(int argc, char **argv)
 	int c, index = 0;
 	static struct option long_options[] = {
 	    {"help", 0, 0, 'h'},
-#if defined(CLIENT_read)
+#if defined(CLIENT_read) || defined(CLIENT_list)
 	    {"prefix", 0, 0, 'p'},
 #endif
 	    {0, 0, 0, 0}
 	};
 
 	c = getopt_long(argc, argv, "h"
-#if defined(CLIENT_read)
+#if defined(CLIENT_read) || defined(CLIENT_list)
 			"p"
 #endif
 			, long_options, &index);
@@ -64,7 +63,7 @@ main(int argc, char **argv)
 	case 'h':
 	    usage(argv[0]);
 	    /* NOTREACHED */
-#if defined(CLIENT_read)
+#if defined(CLIENT_read) || defined(CLIENT_list)
 	case 'p':
 	    prefix = 1;
 	    break;
@@ -90,7 +89,7 @@ main(int argc, char **argv)
 
     while (optind < argc) {
 #if defined(CLIENT_read)
-	val = xs_read(xsh, argv[optind], NULL);
+	char *val = xs_read(xsh, argv[optind], NULL);
 	if (val == NULL) {
 	    warnx("couldn't read path %s", argv[optind]);
 	    ret = 1;
@@ -117,6 +116,29 @@ main(int argc, char **argv)
 	    ret = 1;
 	    goto out;
 	}
+	optind++;
+#elif defined(CLIENT_exists)
+	char *val = xs_read(xsh, argv[optind], NULL);
+	if (val == NULL) {
+	    ret = 1;
+	    goto out;
+	}
+	free(val);
+	optind++;
+#elif defined(CLIENT_list)
+	unsigned int i, num;
+	char **list = xs_directory(xsh, argv[optind], &num);
+	if (list == NULL) {
+	    warnx("could not list path %s", argv[optind]);
+	    ret = 1;
+	    goto out;
+	}
+	for (i = 0; i < num; i++) {
+	    if (prefix)
+		printf("%s/", argv[optind]);
+	    printf("%s\n", list[i]);
+	}
+	free(list);
 	optind++;
 #endif
     }

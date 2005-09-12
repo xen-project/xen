@@ -25,7 +25,8 @@ TESTDIR  = `pwd`/testsuite/tmp
 TESTFLAGS= -DTESTING
 TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
 
-CLIENTS := xenstore-read xenstore-rm xenstore-write
+CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm
+CLIENTS += xenstore-write
 CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
 
 all: libxenstore.so xenstored $(CLIENTS)
