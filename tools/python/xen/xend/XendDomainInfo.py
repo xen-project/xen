@@ -48,6 +48,7 @@ from xen.xend.XendRoot import get_component
 from xen.xend.uuid import getUuid
 from xen.xend.xenstore import DBVar, XenNode, DBMap
 from xen.xend.xenstore.xstransact import xstransact
+from xen.xend.xenstore.xsutil import IntroduceDomain
 
 """Shutdown code for poweroff."""
 DOMAIN_POWEROFF = 0
@@ -156,7 +157,7 @@ class XendDomainInfo:
         @raise: VmError for invalid configuration
         """
         uuid = getUuid()
-        db = parentdb.addChild(uuid)
+        db = parentdb.addChild("%s/xend" % uuid)
         path = parentdb.getPath()
         vm = cls(uuid, path, db)
         vm.construct(config)
@@ -166,17 +167,19 @@ class XendDomainInfo:
 
     create = classmethod(create)
 
-    def recreate(cls, db, info):
+    def recreate(cls, uuid, db, info):
         """Create the VM object for an existing domain.
 
         @param db:        domain db
         @param info:      domain info from xc
         """
         dom = info['dom']
-        path = "/".join(db.getPath().split("/")[0:-1])
-        vm = cls(db.getName(), path, db)
+        path = "/".join(db.getPath().split("/")[0:-2])
+        vm = cls(uuid, path, db)
         vm.setdom(dom)
-        db.readDB()
+        try:
+            db.readDB()
+        except: pass
         vm.importFromDB()
         config = vm.config
         log.debug('info=' + str(info))
@@ -208,7 +211,7 @@ class XendDomainInfo:
         """
         if not uuid:
             uuid = getUuid()
-        db = parentdb.addChild(uuid)
+        db = parentdb.addChild("%s/xend" % uuid)
         path = parentdb.getPath()
         vm = cls(uuid, path, db)
         ssidref = int(sxp.child_value(config, 'ssidref'))
@@ -233,8 +236,6 @@ class XendDomainInfo:
         DBVar('config',        ty='sxpr'),
         DBVar('start_time',    ty='float'),
         DBVar('state',         ty='str'),
-        DBVar('store_mfn',     ty='long'),
-        DBVar('console_mfn',   ty='long', path="console/ring-ref"),
         DBVar('restart_mode',  ty='str'),
         DBVar('restart_state', ty='str'),
         DBVar('restart_time',  ty='float'),
@@ -299,18 +300,13 @@ class XendDomainInfo:
         self.db.saveDB(save=save, sync=sync)
 
     def exportToDB(self, save=False, sync=False):
-        if self.store_channel:
-            self.store_channel.saveToDB(self.db.addChild("store_channel"),
-                                        save=save)
-        if self.console_channel:
-            self.db['console/port'] = "%i" % self.console_channel.port1
         if self.image:
             self.image.exportToDB(save=save, sync=sync)
         self.db.exportToDB(self, fields=self.__exports__, save=save, sync=sync)
 
     def importFromDB(self):
         self.db.importFromDB(self, fields=self.__exports__)
-        self.store_channel = self.eventChannelOld("store_channel")
+        self.store_channel = self.eventChannel("store/port")
 
     def setdom(self, dom):
         """Set the domain id.
@@ -330,11 +326,28 @@ class XendDomainInfo:
     def getName(self):
         return self.name
 
-    def getStoreChannel(self):
-        return self.store_channel
+    def setStoreRef(self, ref):
+        self.store_mfn = ref
+        if ref:
+            xstransact.Write(self.path, "store/ring-ref", "%i" % ref)
+        else:
+            xstransact.Remove(self.path, "store/ring-ref")
 
-    def getConsoleChannel(self):
-        return self.console_channel
+    def setStoreChannel(self, channel):
+        if self.store_channel and self.store_channel != channel:
+            self.store_channel.close()
+        self.store_channel = channel
+        if channel:
+            xstransact.Write(self.path, "store/port", "%i" % channel.port1)
+        else:
+            xstransact.Remove(self.path, "store/port")
+
+    def setConsoleRef(self, ref):
+        self.console_mfn = ref
+        if ref:
+            xstransact.Write(self.path, "console/ring-ref", "%i" % ref)
+        else:
+            xstransact.Remove(self.path, "console/ring-ref")
 
     def update(self, info=None):
         """Update with  info from xc.domain_getinfo().
@@ -702,9 +715,8 @@ class XendDomainInfo:
         self.image.createImage()
         self.exportToDB()
         if self.store_channel and self.store_mfn >= 0:
-            self.db.introduceDomain(self.id,
-                                    self.store_mfn,
-                                    self.store_channel)
+            IntroduceDomain(self.id, self.store_mfn, self.store_channel.port1,
+                            self.path)
         # get the configured value of vcpus and update store
         self.exportVCPUSToDB(self.vcpus)
 
@@ -742,16 +754,7 @@ class XendDomainInfo:
         self.state = STATE_VM_TERMINATED
         self.release_devices()
         if self.store_channel:
-            try:
-                self.store_channel.close()
-                self.store_channel = None
-            except:
-                pass
-            try:
-                self.db.releaseDomain(self.id)
-            except Exception, ex:
-                log.warning("error in domain release on xenstore: %s", ex)
-                pass
+            self.setStoreChannel(None)
         if self.console_channel:
             # notify processes using this cosole?
             try:
@@ -820,36 +823,27 @@ class XendDomainInfo:
                   id, self.name, self.memory)
         self.setdom(id)
 
-    def eventChannelOld(self, key):
-        """Create an event channel to the domain.
-        If saved info is available recreate the channel.
-        
-        @param key db key for the saved data (if any)
-        """
-        db = self.db.addChild(key)
-        return EventChannel.restoreFromDB(db, 0, self.id)
-        
-    def eventChannel(self, path=None, key=None):
+    def eventChannel(self, path=None):
         """Create an event channel to the domain.
         
         @param path under which port is stored in db
         """
         port = 0
-        try:
-            if path and key:
-                if path:
-                    db = self.db.addChild(path)
-                else:
-                    db = self.db
-                port = int(db[key].getData())
-        except: pass
-        return EventChannel.interdomain(0, self.id, port1=port, port2=0)
+        if path:
+            try:
+                port = int(xstransact.Read(self.path, path))
+            except:
+                # if anything goes wrong, assume the port was not yet set
+                pass
+        ret = EventChannel.interdomain(0, self.id, port1=port, port2=0)
+        xstransact.Write(self.path, path, "%i" % ret.port1)
+        return ret
         
     def create_channel(self):
         """Create the channels to the domain.
         """
-        self.store_channel = self.eventChannelOld("store_channel")
-        self.console_channel = self.eventChannel("console", "port")
+        self.store_channel = self.eventChannel("store/port")
+        self.console_channel = self.eventChannel("console/port")
 
     def create_configured_devices(self):
         devices = sxp.children(self.config, 'device')
@@ -1129,12 +1123,11 @@ class XendDomainInfo:
 
     def dom0_init_store(self):
         if not self.store_channel:
-            self.store_channel = self.eventChannelOld("store_channel")
+            self.store_channel = self.eventChannel("store/port")
         self.store_mfn = xc.init_store(self.store_channel.port2)
         if self.store_mfn >= 0:
-            self.db.introduceDomain(self.id, self.store_mfn,
-                                    self.store_channel)
-        self.exportToDB(save=True, sync=True)
+            IntroduceDomain(self.id, self.store_mfn, self.store_channel.port1,
+                            self.path)
         # get run-time value of vcpus and update store
         self.exportVCPUSToDB(dom_get(self.id)['vcpus'])
 

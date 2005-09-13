@@ -13,6 +13,7 @@ from string import join
 from struct import pack, unpack, calcsize
 from xen.util.xpopen import xPopen3
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
+from xen.xend.xenstore.xsutil import IntroduceDomain
 
 from XendError import XendError
 from XendLogging import log
@@ -72,14 +73,6 @@ def save(xd, fd, dominfo, live):
                     xd.domain_shutdown(dominfo.id, reason='suspend')
                     dominfo.state_wait("suspended")
                     log.info("suspend %d done" % dominfo.id)
-                    if dominfo.store_channel:
-                        try:
-                            dominfo.db.releaseDomain(dominfo.id)
-                        except Exception, ex:
-                            log.warning(
-                                "error in domain release on xenstore: %s",
-                                ex)
-                            pass
                     child.tochild.write("done\n")
                     child.tochild.flush()
         if filter(lambda (fd, event): event & select.POLLHUP, r):
@@ -90,11 +83,7 @@ def save(xd, fd, dominfo, live):
     if child.wait() != 0:
         raise XendError("xc_save failed: %s" % lasterr)
 
-    if dominfo.store_channel:
-        dominfo.store_channel.close()
-        dominfo.db['store_channel'].delete()
-        dominfo.db.saveDB(save=True)
-        dominfo.store_channel = None
+    dominfo.setStoreChannel(None)
     xd.domain_destroy(dominfo.id)
     return None
 
@@ -163,16 +152,15 @@ def restore(xd, fd):
                     m = re.match(r"^(store-mfn) (\d+)\n$", l)
                     if m:
                         if dominfo.store_channel:
-                            dominfo.store_mfn = int(m.group(2))
+                            dominfo.setStoreRef(int(m.group(2)))
                             if dominfo.store_mfn >= 0:
-                                dominfo.db.introduceDomain(dominfo.id,
-                                                           dominfo.store_mfn,
-                                                           dominfo.store_channel)
-                            dominfo.exportToDB(save=True, sync=True)
+                                IntroduceDomain(dominfo.id,
+                                                dominfo.store_mfn,
+                                                dominfo.store_channel.port1,
+                                                dominfo.path)
                     m = re.match(r"^(console-mfn) (\d+)\n$", l)
                     if m:
-                        dominfo.console_mfn = int(m.group(2))
-                        dominfo.exportToDB(save=True, sync=True)
+                        dominfo.setConsoleRef(int(m.group(2)))
                     try:
                         l = child.fromchild.readline()
                     except:

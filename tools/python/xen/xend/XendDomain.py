@@ -139,7 +139,7 @@ class XendDomain:
                 domdb.delete()
             elif domid in doms:
                 try:
-                    self._new_domain(domdb, doms[domid]) 
+                    self._new_domain(domdb['uuid'], domdb, doms[domid]) 
                 except Exception, ex:
                     log.exception("Error recreating domain info: id=%d", domid)
                     self._delete_domain(domid)
@@ -155,14 +155,14 @@ class XendDomain:
     def close(self):
         pass
 
-    def _new_domain(self, db, info):
+    def _new_domain(self, uuid, db, info):
         """Create a domain entry from saved info.
 
         @param db:   saved info from the db
         @param info: domain info from xen
         @return: domain
         """
-        dominfo = XendDomainInfo.recreate(db, info)
+        dominfo = XendDomainInfo.recreate(uuid, db, info)
         self.domains[dominfo.id] = dominfo
         return dominfo
 
@@ -355,8 +355,8 @@ class XendDomain:
                 log.info(
                     "Creating entry for unknown domain: id=%d uuid=%s",
                     id, uuid)
-                db = self.dbmap.addChild(uuid)
-                dominfo = XendDomainInfo.recreate(db, info)
+                db = self.dbmap.addChild("%s/xend" % uuid)
+                dominfo = XendDomainInfo.recreate(uuid, db, info)
                 dominfo.setdom(id)
                 self._add_domain(dominfo)
                 return dominfo
