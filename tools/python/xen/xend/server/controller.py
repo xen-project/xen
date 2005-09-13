@@ -63,6 +63,13 @@ def addDevControllerClass(name, cls):
     cls.type = name
     getDevControllerTable().addDevControllerClass(cls)
 
+
+def isDevControllerClass(name):
+    """@return True if a device controller class has been registered with
+    the controller table under the given name."""
+    return name in getDevControllerTable().controllerClasses
+
+
 def createDevController(name, vm, recreate=False):
     return getDevControllerTable().createDevController(name, vm, recreate=recreate)
 
