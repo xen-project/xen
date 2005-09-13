@@ -75,7 +75,7 @@ class DomGeneralTab( CompositeTab ):
        
 class DomGenTab( GeneralTab ):
 
-    def __init__( self, urlWriter ):
+    def __init__( self, _ ):
     
         titles = {}
     
@@ -103,7 +103,7 @@ class DomGenTab( GeneralTab ):
             
 class DomSXPTab( PreTab ):
 
-    def __init__( self, urlWriter ):
+    def __init__( self, _ ):
         self.dom = 0
         PreTab.__init__( self, "" )
 
@@ -126,7 +126,7 @@ class DomSXPTab( PreTab ):
        
 class DomActionTab( ActionTab ):
 
-    def __init__( self, urlWriter ):
+    def __init__( self, _ ):
     	actions = { "shutdown" : "Shutdown",
         	    "reboot" : "Reboot",
                     "pause" : "Pause",
@@ -188,19 +188,19 @@ class DomDeviceListTab( NullTab ):
 
     title = "Device List"
 
-    def __init__( self, urlWriter ):
+    def __init__( self, _ ):
         pass
 
 class DomDeviceOptionsTab( NullTab ):
 
     title = "Device Options"
 
-    def __init__( self, urlWriter ):
+    def __init__( self, _ ):
         pass
 
 class DomDeviceActionTab( ActionTab ):
 
-    def __init__( self, urlWriter ):
+    def __init__( self, _ ):
         ActionTab.__init__( self, { "addvcpu" : "Add VCPU", "addvbd" : "Add VBD", "addvif" : "Add VIF" } )
 
 class DomMigrateTab( CompositeTab ):
@@ -218,7 +218,7 @@ class DomMigrateExtraTab( Sheet ):
                                                                                                             
 class DomMigrateActionTab( ActionTab ):
 
-    def __init__( self, urlWriter ):
+    def __init__( self, _ ):
         actions = { "migrate" : "Migrate" }
         ActionTab.__init__( self, actions )
                 
@@ -249,7 +249,7 @@ class DomSaveExtraTab( Sheet ):
                
 class DomSaveActionTab( ActionTab ):
 
-    def __init__( self, urlWriter ):
+    def __init__( self, _ ):
         actions = { "save" : "Save" }
         ActionTab.__init__( self, actions )
 
