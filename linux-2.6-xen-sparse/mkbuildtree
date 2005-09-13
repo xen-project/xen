@@ -108,5 +108,5 @@ mkdir  ${AD}/include/asm-xen/xen-public
 cd     ${AD}/include/asm-xen/xen-public
 relative_lndir ../../../${RS}/../xen/include/public
 
-cd ${AD}/drivers/xen/xenbus
+cd ${AD}/include/asm-xen/linux-public
 ln -sf ../../../${RS}/../tools/xenstore/xenstored.h
