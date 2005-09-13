@@ -37,7 +37,7 @@
 #include <asm/atomic.h>
 #include <asm/system.h>
 #include <asm/ptrace.h>
-#include <asm-xen/synch_bitops.h>
+#include <asm/synch_bitops.h>
 #include <asm-xen/xen-public/event_channel.h>
 #include <asm-xen/xen-public/physdev.h>
 #include <asm-xen/hypervisor.h>
@@ -123,7 +123,7 @@ extern asmlinkage unsigned int do_IRQ(struct pt_regs *regs);
  */
 void force_evtchn_callback(void)
 {
-    (void)HYPERVISOR_xen_version(0);
+    (void)HYPERVISOR_xen_version(0, NULL);
 }
 EXPORT_SYMBOL(force_evtchn_callback);
 

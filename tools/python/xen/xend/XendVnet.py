@@ -145,7 +145,7 @@ class XendVnet:
     def vnet_get(self, id):
         """Get a vnet.
 
-        @param id: vnet id
+        @param id vnet id
         """
         id = str(id)
         return self.vnet.get(id)

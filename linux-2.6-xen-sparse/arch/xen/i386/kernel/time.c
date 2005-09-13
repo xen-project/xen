@@ -543,7 +543,7 @@ EXPORT_SYMBOL(profile_pc);
 irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	s64 delta, delta_cpu;
-	int cpu = smp_processor_id();
+	int i, cpu = smp_processor_id();
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
 
 	write_seqlock(&xtime_lock);
@@ -566,9 +566,9 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		       (s64)get_nsec_offset(shadow),
 		       processed_system_time,
 		       per_cpu(processed_system_time, cpu));
-		for (cpu = 0; cpu < num_online_cpus(); cpu++)
-			printk(" %d: %lld\n", cpu,
-			       per_cpu(processed_system_time, cpu));
+		for (i = 0; i < num_online_cpus(); i++)
+			printk(" %d: %lld\n", i,
+			       per_cpu(processed_system_time, i));
 	}
 
 	/* System-wide jiffy work. */

@@ -461,14 +461,11 @@ int arch_set_info_guest(
         if ( !get_page(&frame_table[phys_basetab>>PAGE_SHIFT], d) )
             return -EINVAL;
     }
-    else
+    else if ( !(c->flags & VGCF_VMX_GUEST) )
     {
-#ifdef __x86_64__
-        if ( !(c->flags & VGCF_VMX_GUEST) )
-#endif
-            if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
-                                    PGT_base_page_table) )
-                return -EINVAL;
+        if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
+                                PGT_base_page_table) )
+            return -EINVAL;
     }
 
     if ( (rc = (int)set_gdt(v, c->gdt_frames, c->gdt_ents)) != 0 )
@@ -677,10 +674,10 @@ static void save_segments(struct vcpu *v)
     if ( VMX_DOMAIN(v) )
         rdmsrl(MSR_SHADOW_GS_BASE, v->arch.arch_vmx.msr_content.shadow_gs);
 
-    __asm__ __volatile__ ( "movl %%ds,%0" : "=m" (regs->ds) );
-    __asm__ __volatile__ ( "movl %%es,%0" : "=m" (regs->es) );
-    __asm__ __volatile__ ( "movl %%fs,%0" : "=m" (regs->fs) );
-    __asm__ __volatile__ ( "movl %%gs,%0" : "=m" (regs->gs) );
+    __asm__ __volatile__ ( "mov %%ds,%0" : "=m" (regs->ds) );
+    __asm__ __volatile__ ( "mov %%es,%0" : "=m" (regs->es) );
+    __asm__ __volatile__ ( "mov %%fs,%0" : "=m" (regs->fs) );
+    __asm__ __volatile__ ( "mov %%gs,%0" : "=m" (regs->gs) );
 
     if ( regs->ds )
         dirty_segment_mask |= DIRTY_DS;

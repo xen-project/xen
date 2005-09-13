@@ -8,7 +8,7 @@
 
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "/usr/lib/xen/boot/vmxloader"
+kernel = "/usr/@@LIBDIR@@/xen/boot/vmxloader"
 
 # The domain build function. VMX domain uses 'vmx'.
 builder='vmx'
@@ -48,10 +48,10 @@ disk = [ 'file:/var/images/min-el3-i386.img,ioemu:hda,w' ]
 
 
 # New stuff
-device_model = '/usr/lib/xen/bin/qemu-dm'
+device_model = '/usr/@@LIBDIR@@/xen/bin/qemu-dm'
 
 # Advanced users only. Don't touch if you don't know what you're doing
-memmap = '/usr/lib/xen/boot/mem-map.sxp'
+memmap = '/usr/@@LIBDIR@@/xen/boot/mem-map.sxp'
 
 #-----------------------------------------------------------------------------
 # Disk image for 

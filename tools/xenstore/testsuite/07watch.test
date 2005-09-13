@@ -34,12 +34,13 @@ expect 1:/dir/newdir:token
 1 close
 2 close
 
-# We don't get a watch from our own commands.
-watch /dir token
-mkdir /dir/newdir
-expect waitwatch failed: Connection timed out
-waitwatch
-close
+# Changed in b594bb976a743d509f1ffabb5bc698874ab90d8f
+## We don't get a watch from our own commands.
+#watch /dir token
+#mkdir /dir/newdir
+#expect waitwatch failed: Connection timed out
+#waitwatch
+#close
 
 # ignore watches while doing commands, should work.
 watch /dir token

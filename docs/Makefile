@@ -8,6 +8,7 @@ DVIPS		:= dvips
 LATEX		:= latex
 FIG2DEV		:= fig2dev
 LATEX2HTML	:= latex2html
+DOXYGEN		:= doxygen
 
 pkgdocdir	:= /usr/share/doc/xen
 
@@ -18,9 +19,13 @@ DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
 
 GFX = $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
 
+.PHONY:	all build dev-docs python-dev-docs ps pdf html clean install
+
 all: build
 build: ps pdf html
 	rm -f *.aux *.dvi *.bbl *.blg *.glo *.idx *.ilg *.log *.ind *.toc
+
+dev-docs: python-dev-docs
 
 ps: $(DOC_PS)
 
@@ -30,10 +35,18 @@ html:
 	@if which $(LATEX2HTML) 1>/dev/null 2>/dev/null; then \
 	$(MAKE) $(DOC_HTML); fi
 
+python-dev-docs:
+	mkdir -p api/tools/python
+	@if which $(DOXYGEN) 1>/dev/null 2>/dev/null; then         \
+        echo "Running doxygen to generate Python tools APIs ... "; \
+	$(DOXYGEN) Doxyfile;                                       \
+	$(MAKE) -C api/tools/python/latex ; fi
+
 clean:
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
 	rm -rf *.ilg *.log *.ind *.toc *.bak core
 	rm -rf $(GFX) ps pdf html
+	rm -rf api
 
 install: all
 	rm -rf $(DESTDIR)$(pkgdocdir)

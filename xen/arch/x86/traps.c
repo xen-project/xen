@@ -106,7 +106,7 @@ integer_param("debug_stack_lines", debug_stack_lines);
 #define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)&regs->esp)
 #else
 #define stack_words_per_line 4
-#define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->esp)
+#define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
 #endif
 
 int is_kernel_text(unsigned long addr)
@@ -238,7 +238,7 @@ void show_stack(struct cpu_user_regs *regs)
     unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), addr;
     int i;
 
-    if ( GUEST_MODE(regs) )
+    if ( GUEST_CONTEXT(current, regs) )
         return show_guest_stack(regs);
 
     printk("Xen stack trace from "__OP"sp=%p:\n   ", stack);

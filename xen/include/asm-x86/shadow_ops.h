@@ -127,4 +127,4 @@
 #define guest_va_to_l1mfn       va_to_l1mfn
 #endif
 
-#endif	/* _XEN_SHADOW_OPS_H */
+#endif /* _XEN_SHADOW_OPS_H */

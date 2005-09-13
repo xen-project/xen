@@ -16,6 +16,7 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  *
  */
+
 #ifndef __ASM_X86_VMX_PLATFORM_H__
 #define __ASM_X86_VMX_PLATFORM_H__
 
@@ -52,19 +53,19 @@
 #define REPNZ   0x2
 #define OVERLAP 0x4
 
-#define	INSTR_PIO	1
-#define INSTR_OR	2
-#define INSTR_AND	3
-#define INSTR_XOR	4
-#define INSTR_CMP	5
-#define INSTR_MOV	6
-#define INSTR_MOVS	7
-#define INSTR_MOVZ	8
-#define INSTR_STOS	9
-#define INSTR_TEST	10
+#define INSTR_PIO 1
+#define INSTR_OR 2
+#define INSTR_AND 3
+#define INSTR_XOR 4
+#define INSTR_CMP 5
+#define INSTR_MOV 6
+#define INSTR_MOVS 7
+#define INSTR_MOVZ 8
+#define INSTR_STOS 9
+#define INSTR_TEST 10
 
 struct instruction {
-    __s8    instr;	/* instruction type */
+    __s8    instr; /* instruction type */
     __s16   op_size;    /* the operand's bit size, e.g. 16-bit or 32-bit */
     __u64   immediate;
     __u16   seg_sel;    /* segmentation selector */
@@ -76,18 +77,18 @@ struct instruction {
 
 struct mi_per_cpu_info {
     int                    flags;
-    int			   instr;		/* instruction */
-    unsigned long          operand[2];		/* operands */
-    unsigned long          immediate;		/* immediate portion */
-    struct cpu_user_regs   *inst_decoder_regs;	/* current context */
+    int      instr;  /* instruction */
+    unsigned long          operand[2];  /* operands */
+    unsigned long          immediate;  /* immediate portion */
+    struct cpu_user_regs   *inst_decoder_regs; /* current context */
 };
 
 struct virtual_platform_def {
-    unsigned long          *real_mode_data;	/* E820, etc. */
+    unsigned long          *real_mode_data; /* E820, etc. */
     unsigned long          shared_page_va;
     struct vmx_virpit_t    vmx_pit;
     struct vmx_handler_t   vmx_handler;
-    struct mi_per_cpu_info mpci;		/* MMIO */
+    struct mi_per_cpu_info mpci;  /* MMIO */
 };
 
 extern void handle_mmio(unsigned long, unsigned long);

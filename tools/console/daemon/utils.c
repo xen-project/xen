@@ -105,7 +105,8 @@ void daemonize(const char *pidfile)
 	close(fd);
 
 	umask(027);
-	chdir("/");
+	if (chdir("/") < 0)
+		exit (1);
 
 	fd = open(pidfile, O_RDWR | O_CREAT);
 	if (fd == -1) {
@@ -117,7 +118,8 @@ void daemonize(const char *pidfile)
 	}
 
 	len = sprintf(buf, "%d\n", getpid());
-	write(fd, buf, len);
+	if (write(fd, buf, len) < 0)
+		exit(1);
 
 	signal(SIGCHLD, child_exit);
 	signal(SIGTSTP, SIG_IGN);

@@ -9,8 +9,26 @@ PATH=/etc/xen/scripts:$PATH
 
 case "$ACTION" in
   add)
+    case "$XENBUS_TYPE" in
+      vbd)
+        t=$(xenstore-read "$XENBUS_PATH"/type)
+        params=$(xenstore-read "$XENBUS_PATH"/params)
+        [ -x /etc/xen/scripts/block-"$t" ] && \
+            /etc/xen/scripts/block-"$t" bind $params
+        ;;
+    esac
     ;;
   remove)
+    case "$XENBUS_TYPE" in
+      vbd)
+        t=$(xenstore-read "$XENBUS_PATH"/type)
+        node=$(xenstore-read "$XENBUS_PATH"/node)
+        [ -x /etc/xen/scripts/block-"$t" ] && \
+            /etc/xen/scripts/block-"$t" unbind $node
+        ;;
+    esac
+    # remove device backend store entries
+    xenstore-rm "$XENBUS_PATH"
     ;;
   online)
     case "$PHYSDEVDRIVER" in

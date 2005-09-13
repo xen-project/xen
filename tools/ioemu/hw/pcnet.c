@@ -380,10 +380,13 @@ static int pcnet_can_receive(void *opaque)
     return sizeof(s->buffer)-16;
 }
 
+#define MIN_BUF_SIZE 60
+
 static void pcnet_receive(void *opaque, const uint8_t *buf, int size)
 {
     PCNetState *s = opaque;
     int is_padr = 0, is_bcast = 0, is_ladr = 0;
+    uint8_t buf1[60];
 
     if (CSR_DRX(s) || CSR_STOP(s) || CSR_SPND(s) || !size)
         return;
@@ -391,6 +394,14 @@ static void pcnet_receive(void *opaque, const uint8_t *buf, int size)
 #ifdef PCNET_DEBUG
     printf("pcnet_receive size=%d\n", size);
 #endif
+
+    /* if too small buffer, then expand it */
+    if (size < MIN_BUF_SIZE) {
+        memcpy(buf1, buf, size);
+        memset(buf1 + size, 0, MIN_BUF_SIZE - size);
+        buf = buf1;
+        size = MIN_BUF_SIZE;
+    }
 
     if (CSR_PROM(s) 
         || (is_padr=padr_match(s, buf, size)) 

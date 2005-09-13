@@ -353,7 +353,7 @@ static inline void entry_general(
             entry_remove_flags(sle, _PAGE_PSE);
 
             if ( shadow_mode_log_dirty(d) ||
-		 !(entry_get_flags(gle) & _PAGE_DIRTY) )
+                 !(entry_get_flags(gle) & _PAGE_DIRTY) )
             {
                 pgentry_64_t *l1_p;
                 int i;
@@ -365,8 +365,9 @@ static inline void entry_general(
                 unmap_domain_page(l1_p);
             }
         } else {
-            sle = entry_from_pfn(smfn,
-				 (entry_get_flags(gle) | _PAGE_RW | _PAGE_ACCESSED) & ~_PAGE_AVAIL);
+            sle = entry_from_pfn(
+                smfn,
+                (entry_get_flags(gle) | _PAGE_RW | _PAGE_ACCESSED) & ~_PAGE_AVAIL);
             entry_add_flags(gle, _PAGE_ACCESSED);
         }
         // XXX mafetter: Hmm...

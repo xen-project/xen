@@ -166,6 +166,10 @@ static int xenbus_hotplug_backend(struct device *dev, char **envp,
 			    buffer, buffer_size, &length,
 			    "XENBUS_TYPE=%s", xdev->devicetype);
 
+	add_hotplug_env_var(envp, num_envp, &i,
+			    buffer, buffer_size, &length,
+			    "XENBUS_PATH=%s", xdev->nodename);
+
 	/* terminate, set to next free slot, shrink available space */
 	envp[i] = NULL;
 	envp = &envp[i];

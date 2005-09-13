@@ -4,6 +4,7 @@
 # Public License.  See the file "COPYING" in the main directory of
 # this archive for more details.
 
+import errno
 import threading
 from xen.lowlevel import xs
 
@@ -18,9 +19,18 @@ def xshandle():
 class xstransact:
 
     def __init__(self, path):
+        self.in_transaction = False
         self.path = path.rstrip("/")
-        xshandle().transaction_start(path)
-        self.in_transaction = True
+        while True:
+            try:
+                xshandle().transaction_start(path)
+                self.in_transaction = True
+                return
+            except RuntimeError, ex:
+                if ex.args[0] == errno.ENOENT and path != "/":
+                    path = "/".join(path.split("/")[0:-1]) or "/"
+                else:
+                    raise
 
     def __del__(self):
         if self.in_transaction:
@@ -78,36 +88,81 @@ class xstransact:
         else:
             raise TypeError
 
+    def _remove(self, key):
+        path = "%s/%s" % (self.path, key)
+        return xshandle().rm(path)
+
+    def remove(self, *args):
+        if len(args) == 0:
+            raise TypeError
+        for key in args:
+            self._remove(key)
+
+    def _list(self, key):
+        path = "%s/%s" % (self.path, key)
+        return map(lambda x: key + "/" + x, xshandle().ls(path))
+
+    def list(self, *args):
+        if len(args) == 0:
+            raise TypeError
+        ret = []
+        for key in args:
+            ret.extend(self._list(key))
+        return ret
+
+
     def Read(cls, path, *args):
-        t = cls(path)
-        v = t.read(*args)
-        t.commit()
-        return v
+        while True:
+            try:
+                t = cls(path)
+                v = t.read(*args)
+                t.commit()
+                return v
+            except RuntimeError, ex:
+                if ex.args[0] == errno.ETIMEDOUT:
+                    pass
+                raise
 
     Read = classmethod(Read)
 
     def Write(cls, path, *args, **opts):
-        t = cls(path)
-        t.write(*args, **opts)
-        t.commit()
+        while True:
+            try:
+                t = cls(path)
+                t.write(*args, **opts)
+                t.commit()
+                return
+            except RuntimeError, ex:
+                if ex.args[0] == errno.ETIMEDOUT:
+                    pass
+                raise
 
     Write = classmethod(Write)
 
-    def SafeRead(cls, path, *args):
+    def Remove(cls, *args):
         while True:
             try:
-                return cls.Read(path, *args)
-            except RuntimeError, ex:
-                pass
-
-    SafeRead = classmethod(SafeRead)
-
-    def SafeWrite(cls, path, *args, **opts):
-        while True:
-            try:
-                cls.Write(path, *args, **opts)
+                t = cls(path)
+                t.remove(*args)
+                t.commit()
                 return
             except RuntimeError, ex:
-                pass
+                if ex.args[0] == errno.ETIMEDOUT:
+                    pass
+                raise
 
-    SafeWrite = classmethod(SafeWrite)
+    Remove = classmethod(Remove)
+
+    def List(cls, path, *args):
+        while True:
+            try:
+                t = cls(path)
+                v = t.list(*args)
+                t.commit()
+                return v
+            except RuntimeError, ex:
+                if ex.args[0] == errno.ETIMEDOUT:
+                    pass
+                raise
+
+    List = classmethod(List)

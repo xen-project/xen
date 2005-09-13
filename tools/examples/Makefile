@@ -21,10 +21,11 @@ XEN_CONFIGS += xmexample.vmx
 XEN_SCRIPT_DIR = /etc/xen/scripts
 XEN_SCRIPTS = network-bridge vif-bridge
 XEN_SCRIPTS += network-route vif-route
+XEN_SCRIPTS += block-phy
 XEN_SCRIPTS += block-file
 XEN_SCRIPTS += block-enbd
 
-XEN_BOOT_DIR = /usr/lib/xen/boot
+XEN_BOOT_DIR = /usr/$(LIBDIR)/xen/boot
 XEN_BOOT = mem-map.sxp
 
 XEN_HOTPLUG_DIR = /etc/hotplug
@@ -36,12 +37,15 @@ build:
 install: all install-initd install-configs install-scripts install-boot \
 	 install-hotplug
 
+xmexample.vmx: xmexample.vmx.in
+	sed -e 's/@@LIBDIR@@/$(LIBDIR)/' < $< > $@
+
 install-initd:
 	[ -d $(DESTDIR)/etc/init.d ] || $(INSTALL_DIR) $(DESTDIR)/etc/init.d
 	$(INSTALL_PROG) $(XEND_INITD) $(DESTDIR)/etc/init.d
 	$(INSTALL_PROG) $(XENDOMAINS_INITD) $(DESTDIR)/etc/init.d
 
-install-configs:
+install-configs: $(XEN_CONFIGS)
 	[ -d $(DESTDIR)$(XEN_CONFIG_DIR) ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)
 	[ -d $(DESTDIR)$(XEN_CONFIG_DIR)/auto ] || \
@@ -76,3 +80,4 @@ install-hotplug:
 	done
 
 clean:
+	$(RM) xmexample.vmx

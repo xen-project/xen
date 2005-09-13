@@ -218,6 +218,26 @@ static int destroy_domain(void *_domain)
 	return 0;
 }
 
+static void domain_cleanup(void)
+{
+	xc_dominfo_t dominfo;
+	struct domain *domain, *tmp;
+	int released = 0;
+
+	list_for_each_entry_safe(domain, tmp, &domains, list) {
+		if (xc_domain_getinfo(*xc_handle, domain->domid, 1,
+				      &dominfo) == 1 &&
+		    dominfo.domid == domain->domid &&
+		    !dominfo.dying && !dominfo.crashed && !dominfo.shutdown)
+			continue;
+		talloc_free(domain->conn);
+		released++;
+	}
+
+	if (released)
+		fire_watches(NULL, "@releaseDomain", false);
+}
+
 /* We scan all domains rather than use the information given here. */
 void handle_event(int event_fd)
 {
@@ -371,26 +391,6 @@ void do_release(struct connection *conn, const char *domid_str)
 	send_ack(conn, XS_RELEASE);
 }
 
-void domain_cleanup(void)
-{
-	xc_dominfo_t dominfo;
-	struct domain *domain, *tmp;
-	int released = 0;
-
-	list_for_each_entry_safe(domain, tmp, &domains, list) {
-		if (xc_domain_getinfo(*xc_handle, domain->domid, 1,
-				      &dominfo) == 1 &&
-		    dominfo.domid == domain->domid &&
-		    !dominfo.dying && !dominfo.crashed && !dominfo.shutdown)
-			continue;
-		talloc_free(domain->conn);
-		released++;
-	}
-
-	if (released)
-		fire_watches(NULL, "@releaseDomain", false);
-}
-
 void do_get_domain_path(struct connection *conn, const char *domid_str)
 {
 	struct domain *domain;
@@ -457,6 +457,7 @@ int domain_init(void)
 
 #ifdef TESTING
 	eventchn_fd = fake_open_eventchn();
+	(void)&st;
 #else
 	/* Make sure any existing device file links to correct device. */
 	if ((lstat(EVTCHN_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||

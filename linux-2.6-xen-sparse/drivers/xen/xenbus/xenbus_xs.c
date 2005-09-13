@@ -38,7 +38,7 @@
 #include <linux/fcntl.h>
 #include <linux/kthread.h>
 #include <asm-xen/xenbus.h>
-#include "xenstored.h"
+#include <asm-xen/linux-public/xenstored.h>
 #include "xenbus_comms.h"
 
 #define streq(a, b) (strcmp((a), (b)) == 0)
@@ -106,10 +106,10 @@ void xenbus_debug_write(const char *str, unsigned int count)
 }
 
 /* Send message to xs, get kmalloc'ed reply.  ERR_PTR() on error. */
-void *xs_talkv(enum xsd_sockmsg_type type,
-	       const struct kvec *iovec,
-	       unsigned int num_vecs,
-	       unsigned int *len)
+static void *xs_talkv(enum xsd_sockmsg_type type,
+		      const struct kvec *iovec,
+		      unsigned int num_vecs,
+		      unsigned int *len)
 {
 	struct xsd_sockmsg msg;
 	void *ret = NULL;

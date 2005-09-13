@@ -356,14 +356,14 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 }
 
 static struct file_operations evtchn_fops = {
-    owner:    THIS_MODULE,
-    read:     evtchn_read,
-    write:    evtchn_write,
-    ioctl:    evtchn_ioctl,
-    poll:     evtchn_poll,
-    fasync:   evtchn_fasync,
-    open:     evtchn_open,
-    release:  evtchn_release
+    .owner   = THIS_MODULE,
+    .read    = evtchn_read,
+    .write   = evtchn_write,
+    .ioctl   = evtchn_ioctl,
+    .poll    = evtchn_poll,
+    .fasync  = evtchn_fasync,
+    .open    = evtchn_open,
+    .release = evtchn_release,
 };
 
 static struct miscdevice evtchn_miscdev = {

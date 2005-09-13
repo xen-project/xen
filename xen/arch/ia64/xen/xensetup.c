@@ -386,16 +386,17 @@ printk("About to call startup_cpu_idle_loop()\n");
     startup_cpu_idle_loop();
 }
 
-void arch_get_xen_caps(xen_capabilities_info_t *info)
+void arch_get_xen_caps(xen_capabilities_info_t info)
 {
-    char *p=info->caps;
+    char *p=info;
 
     *p=0;
 
     p+=sprintf(p,"xen_%d.%d_ia64 ",XEN_VERSION,XEN_SUBVERSION);
 
-    BUG_ON((p-info->caps)>sizeof(*info));
+    *(p-1) = 0;
 
-    if(p>info->caps) *(p-1) = 0;
+    BUG_ON((p-info)>sizeof(xen_capabilities_info_t));
+
 }
 

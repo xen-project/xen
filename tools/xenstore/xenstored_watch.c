@@ -105,7 +105,6 @@ static void add_event(struct connection *conn,
 	 */
 	if (!check_node_perms(conn, node, XS_PERM_READ|XS_PERM_ENOENT_OK) &&
 	    !check_event_node(node)) {
-		fprintf(stderr, "No permission for %s\n", node);
 		return;
 	}
 
@@ -135,11 +134,8 @@ void fire_watches(struct connection *conn, const char *node, bool recurse)
 	if (conn && conn->transaction)
 		return;
 
-	/* Create an event for each watch.  Don't send to self. */
+	/* Create an event for each watch. */
 	list_for_each_entry(i, &connections, list) {
-		if (i == conn)
-			continue;
-
 		list_for_each_entry(watch, &i->watches, list) {
 			if (is_child(node, watch->node))
 				add_event(i, watch, node);

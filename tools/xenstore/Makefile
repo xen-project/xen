@@ -17,15 +17,15 @@ BASECFLAGS+= -O3 $(PROFILE)
 BASECFLAGS+= -I$(XEN_ROOT)/tools/libxc
 BASECFLAGS+= -I$(XEN_ROOT)/xen/include/public
 BASECFLAGS+= -I.
-BASECFLAGS+= -I$(XEN_ROOT)/linux-2.6-xen-sparse/include/asm-xen/linux-public
 
 CFLAGS  += $(BASECFLAGS)
 LDFLAGS += $(PROFILE) -L$(XEN_LIBXC)
-TESTDIR  = `pwd`/testsuite/tmp
+TESTDIR  = testsuite/tmp
 TESTFLAGS= -DTESTING
 TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
 
-CLIENTS := xenstore-read xenstore-rm xenstore-write
+CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm
+CLIENTS += xenstore-write
 CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
 
 all: libxenstore.so xenstored $(CLIENTS)
@@ -80,10 +80,13 @@ check: print-dir testsuite-fast randomcheck-fast print-end
 
 fullcheck: testsuite-run randomcheck stresstest
 
-testsuite-run: xenstored_test xs_test
+$(TESTDIR):
+	mkdir $@
+
+testsuite-run: xenstored_test xs_test $(TESTDIR)
 	$(TESTENV) testsuite/test.sh && echo
 
-testsuite-fast: xenstored_test xs_test
+testsuite-fast: xenstored_test xs_test $(TESTDIR)
 	@$(TESTENV) testsuite/test.sh --fast
 
 testsuite-clean:
@@ -92,21 +95,21 @@ testsuite-clean:
 # Make this visible so they can see repeat tests without --fast if they
 # fail.
 RANDSEED=$(shell date +%s)
-randomcheck: xs_random xenstored_test
+randomcheck: xs_random xenstored_test $(TESTDIR)
 	$(TESTENV) ./xs_random --simple --fast /tmp/xs_random 200000 $(RANDSEED) && echo
 	$(TESTENV) ./xs_random --fast /tmp/xs_random 100000 $(RANDSEED) && echo
 	$(TESTENV) ./xs_random --fail /tmp/xs_random 10000 $(RANDSEED)
 
-crashme:  xs_crashme xenstored_test
+crashme:  xs_crashme xenstored_test $(TESTDIR)
 	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions /tmp/xs_crashme.vglog* /tmp/trace
 	export $(TESTENV); ./xs_crashme 5000 $(RANDSEED) 2>/dev/null
 	if [ -n "`cat /tmp/xs_crashme.vglog*`" ]; then echo Valgrind complained; cat /tmp/xs_crashme.vglog*; exit 1; fi
 	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions /tmp/xs_crashme.vglog* /tmp/trace
 
-randomcheck-fast: xs_random xenstored_test
+randomcheck-fast: xs_random xenstored_test $(TESTDIR)
 	@$(TESTENV) ./xs_random --fast /tmp/xs_random 2000 $(RANDSEED)
 
-stresstest: xs_stress xenstored_test
+stresstest: xs_stress xenstored_test $(TESTDIR)
 	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions
 	export $(TESTENV); PID=`./xenstored_test --output-pid --trace-file=/tmp/trace`; ./xs_stress 5000; ret=$$?; kill $$PID; exit $$ret
 

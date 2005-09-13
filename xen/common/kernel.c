@@ -114,12 +114,12 @@ long do_xen_version(int cmd, void *arg)
     case XENVER_capabilities:
     {
         xen_capabilities_info_t info;
-        extern void arch_get_xen_caps(xen_capabilities_info_t * info);
-        
-        memset(&info, 0, sizeof(info));
-        arch_get_xen_caps(&info);
+        extern void arch_get_xen_caps(xen_capabilities_info_t info);
 
-        if ( copy_to_user(arg, &info, sizeof(info)) )
+        memset(info, 0, sizeof(info));
+        arch_get_xen_caps(info);
+
+        if ( copy_to_user(arg, info, sizeof(info)) )
             return -EFAULT;
         return 0;
     }
@@ -127,7 +127,6 @@ long do_xen_version(int cmd, void *arg)
     case XENVER_parameters:
     {
         xen_parameters_info_t info = { .virt_start = HYPERVISOR_VIRT_START };
-
         if ( copy_to_user(arg, &info, sizeof(info)) )
             return -EFAULT;
         return 0;

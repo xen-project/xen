@@ -30,10 +30,8 @@ getperm /dir/file
 expect *Permission denied
 setperm /dir/file 0 NONE 
 watch /dir/file token 
-setid 0
-write /dir/file create contents
-rm /dir/file
-setid 1
+1 write /dir/file create contents
+1 rm /dir/file
 expect waitwatch failed: Connection timed out
 waitwatch
 unwatch /dir/file token 
@@ -78,10 +76,8 @@ getperm /dir/file
 expect *Permission denied
 setperm /dir/file 0 NONE 
 watch /dir/file token 
-setid 0
-write /dir/file create contents
-rm /dir/file
-setid 1
+1 write /dir/file create contents
+1 rm /dir/file
 expect waitwatch failed: Connection timed out
 waitwatch
 unwatch /dir/file token 
