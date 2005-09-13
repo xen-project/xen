@@ -27,6 +27,7 @@ import string, re
 import os
 import time
 import threading
+import errno
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 from xen.util.ip import check_subnet, get_current_ipgw
@@ -1097,7 +1098,14 @@ class XendDomainInfo:
         ref = xc.init_store(self.store_channel.port2)
         if ref and ref >= 0:
             self.setStoreRef(ref)
-            IntroduceDomain(self.id, ref, self.store_channel.port1, self.path)
+            try:
+                IntroduceDomain(self.id, ref, self.store_channel.port1,
+                                self.path)
+            except RuntimeError, ex:
+                if ex.args[0] == errno.EISCONN:
+                    pass
+                else:
+                    raise
             # get run-time value of vcpus and update store
             self.exportVCPUSToDB(dom_get(self.id)['vcpus'])
 
