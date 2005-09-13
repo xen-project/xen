@@ -130,8 +130,11 @@ class XendDomain:
         doms = self.xen_domains()
         self.dbmap.readDB()
         for domdb in self.dbmap.values():
+            if not domdb.has_key("xend"):
+                continue
+            db = domdb.addChild("xend")
             try:
-                domid = int(domdb.id)
+                domid = int(db.id)
             except:
                 domid = None
             # XXX if domid in self.domains, then something went wrong
@@ -139,7 +142,7 @@ class XendDomain:
                 domdb.delete()
             elif domid in doms:
                 try:
-                    self._new_domain(domdb['uuid'], domdb, doms[domid]) 
+                    self._new_domain(db.uuid, db, doms[domid]) 
                 except Exception, ex:
                     log.exception("Error recreating domain info: id=%d", domid)
                     self._delete_domain(domid)
@@ -204,8 +207,11 @@ class XendDomain:
                 eserver.inject('xend.domain.died', [info.name, info.id])
         # XXX this should not be needed
         for domdb in self.dbmap.values():
+            if not domdb.has_key("xend"):
+                continue
+            db = domdb.addChild("xend")
             try:
-                domid = int(domdb.id)
+                domid = int(db.id)
             except:
                 domid = None
             if (domid is None) or (domid == id):
