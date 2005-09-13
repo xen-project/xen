@@ -102,34 +102,6 @@ def shutdown_reason(code):
     """
     return shutdown_reasons.get(code, "?")
 
-config_handlers = {}
-
-def add_config_handler(name, h):
-    """Add a handler for a config field.
-
-    @param name:     field name
-    @param h:        handler: fn(vm, config, field, index)
-    """
-    config_handlers[name] = h
-
-def get_config_handler(name):
-    """Get a handler for a config field.
-
-    returns handler or None
-    """
-    return config_handlers.get(name)
-
-"""Table of handlers for devices.
-Indexed by device type.
-"""
-device_handlers = {}
-
-def add_device_handler(name, type):
-    device_handlers[name] = type
-
-def get_device_handler(name):
-    return device_handlers[name]
-
 def dom_get(dom):
     """Get info from xen for an existing domain.
 
@@ -369,12 +341,6 @@ class XendDomainInfo:
 
     __repr__ = __str__
 
-    def getDeviceTypes(self):
-        return self.controllers.keys()
-
-    def getDeviceControllers(self):
-        return self.controllers.values()
-
     def getDeviceController(self, type, error=True):
         ctrl = self.controllers.get(type)
         if not ctrl and error:
@@ -595,7 +561,7 @@ class XendDomainInfo:
 
     def sxpr_devices(self):
         sxpr = []
-        for ty in self.getDeviceTypes():
+        for ty in self.controllers.keys():
             devs = self.getDeviceSxprs(ty)
             sxpr += devs
         if sxpr:
@@ -796,7 +762,7 @@ class XendDomainInfo:
         """Release all vm devices.
         """
         reboot = self.restart_pending()
-        for ctrl in self.getDeviceControllers():
+        for ctrl in self.controllers.values():
             if ctrl.isDestroyed(): continue
             ctrl.destroyController(reboot=reboot)
         t = xstransact("%s/device" % self.path)
@@ -874,6 +840,7 @@ class XendDomainInfo:
         self.store_channel = self.eventChannelOld("store_channel")
         self.console_channel = self.eventChannel("console", "port")
 
+
     def create_configured_devices(self):
         devices = sxp.children(self.config, 'device')
         for d in devices:
@@ -881,18 +848,20 @@ class XendDomainInfo:
             if dev_config is None:
                 raise VmError('invalid device')
             dev_type = sxp.name(dev_config)
-            ctrl_type = get_device_handler(dev_type)
-            if ctrl_type is None:
+
+            if not controller.isDevControllerClass(dev_type):
                 raise VmError('unknown device type: ' + dev_type)
-            self.createDevice(ctrl_type, dev_config)
-        
+            
+            self.createDevice(dev_type, dev_config)
+
+
     def create_devices(self):
         """Create the devices for a vm.
 
         @raise: VmError for invalid devices
         """
         if self.rebooting():
-            for ctrl in self.getDeviceControllers():
+            for ctrl in self.controllers.values():
                 ctrl.initController(reboot=True)
         else:
             self.create_configured_devices()
@@ -1043,7 +1012,7 @@ class XendDomainInfo:
             msg = "Had a bootloader specified, but can't find disk"
             log.error(msg)
             raise VmError(msg)
-        config = sxp.merge(['vm', blconfig ], self.config)
+        config = sxp.merge(['vm', blcfg ], self.config)
         return config
 
     def configure_backends(self):
@@ -1092,7 +1061,7 @@ class XendDomainInfo:
         for field in sxp.children(self.config):
             field_name = sxp.name(field)
             field_index = index.get(field_name, 0)
-            field_handler = get_config_handler(field_name)
+            field_handler = config_handlers.get(field_name)
             # Ignore unknown fields. Warn?
             if field_handler:
                 v = field_handler(self, self.config, field, field_index)
@@ -1161,23 +1130,17 @@ class XendDomainInfo:
         # get run-time value of vcpus and update store
         self.exportVCPUSToDB(dom_get(self.id)['vcpus'])
 
-def vm_field_ignore(vm, config, val, index):
-    """Dummy config field handler used for fields with built-in handling.
 
-    @param vm:        virtual machine
-    @param config:    vm config
-    @param val:       config field
-    @param index:     field index
+def vm_field_ignore(_, _1, _2, _3):
+    """Dummy config field handler used for fields with built-in handling.
+    Matches the signature required by config_handlers.
     """
     pass
 
-def vm_field_maxmem(vm, config, val, index):
-    """Configure vm memory limit.
 
-    @param vm:        virtual machine
-    @param config:    vm config
-    @param val:       config field
-    @param index:     field index
+def vm_field_maxmem(vm, _1, val, _2):
+    """Config field handler to configure vm memory limit.  Matches the
+    signature required by config_handlers.
     """
     maxmem = sxp.child0(val)
     if maxmem is None:
@@ -1188,8 +1151,10 @@ def vm_field_maxmem(vm, config, val, index):
         raise VmError("invalid maxmem: " + str(maxmem))
     xc.domain_setmaxmem(vm.id, maxmem_kb = maxmem * 1024)
 
+
 #============================================================================
 # Register image handlers.
+
 from image import          \
      addImageHandlerClass, \
      ImageHandler,         \
@@ -1199,43 +1164,37 @@ from image import          \
 addImageHandlerClass(LinuxImageHandler)
 addImageHandlerClass(VmxImageHandler)
 
-# Ignore the fields we already handle.
-add_config_handler('name',       vm_field_ignore)
-add_config_handler('memory',     vm_field_ignore)
-add_config_handler('ssidref',    vm_field_ignore)
-add_config_handler('cpu',        vm_field_ignore)
-add_config_handler('cpu_weight', vm_field_ignore)
-add_config_handler('restart',    vm_field_ignore)
-add_config_handler('image',      vm_field_ignore)
-add_config_handler('device',     vm_field_ignore)
-add_config_handler('backend',    vm_field_ignore)
-add_config_handler('vcpus',      vm_field_ignore)
-add_config_handler('bootloader', vm_field_ignore)
 
-# Register other config handlers.
-add_config_handler('maxmem',     vm_field_maxmem)
+"""Table of handlers for field configuration.
+
+field_name[String]: fn(vm, config, field, index) -> value(ignored)
+"""
+config_handlers = {
+    
+    # Ignore the fields we already handle.
+    
+    'name':       vm_field_ignore,
+    'memory':     vm_field_ignore,
+    'ssidref':    vm_field_ignore,
+    'cpu':        vm_field_ignore,
+    'cpu_weight': vm_field_ignore,
+    'restart':    vm_field_ignore,
+    'image':      vm_field_ignore,
+    'device':     vm_field_ignore,
+    'backend':    vm_field_ignore,
+    'vcpus':      vm_field_ignore,
+    'bootloader': vm_field_ignore,
+    
+    # Register other config handlers.
+    'maxmem':     vm_field_maxmem
+    }
+
 
 #============================================================================
 # Register device controllers and their device config types.
 
-from server import blkif
-controller.addDevControllerClass("vbd", blkif.BlkifController)
-add_device_handler("vbd", "vbd")
-
-from server import netif
-controller.addDevControllerClass("vif", netif.NetifController)
-add_device_handler("vif", "vif")
-
-from server import tpmif
-controller.addDevControllerClass("vtpm", tpmif.TPMifController)
-add_device_handler("vtpm", "vtpm")
-
-from server import pciif
-controller.addDevControllerClass("pci", pciif.PciController)
-add_device_handler("pci", "pci")
-
-from xen.xend.server import usbif
-controller.addDevControllerClass("usb", usbif.UsbifController)
-add_device_handler("usb", "usb")
-
-#============================================================================
+controller.addDevControllerClass("vbd",  server.blkif.BlkifController)
+controller.addDevControllerClass("vif",  server.netif.NetifController)
+controller.addDevControllerClass("vtpm", server.tpmif.TPMifController)
+controller.addDevControllerClass("pci",  server.pciif.PciController)
+controller.addDevControllerClass("usb",  server.usbif.UsbifController)
