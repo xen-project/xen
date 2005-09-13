@@ -1193,8 +1193,9 @@ config_handlers = {
 #============================================================================
 # Register device controllers and their device config types.
 
-controller.addDevControllerClass("vbd",  server.blkif.BlkifController)
-controller.addDevControllerClass("vif",  server.netif.NetifController)
-controller.addDevControllerClass("vtpm", server.tpmif.TPMifController)
-controller.addDevControllerClass("pci",  server.pciif.PciController)
-controller.addDevControllerClass("usb",  server.usbif.UsbifController)
+from xen.xend.server import blkif, netif, tpmif, pciif, usbif
+controller.addDevControllerClass("vbd",  blkif.BlkifController)
+controller.addDevControllerClass("vif",  netif.NetifController)
+controller.addDevControllerClass("vtpm", tpmif.TPMifController)
+controller.addDevControllerClass("pci",  pciif.PciController)
+controller.addDevControllerClass("usb",  usbif.UsbifController)
