@@ -469,12 +469,25 @@ def dump(filename):
         sys.stdout.write(s)
 
 def filter(filename):
-    global name, module_has_docstring
+    global name, module_has_docstring, source_root
 
     path,name = os.path.split(filename)
     root,ext  = os.path.splitext(name)
 
-    output("namespace "+root+" {\n",(0,0))
+    if source_root and path.find(source_root) == 0:
+        path = path[len(source_root):]
+
+        if path[0] == os.sep:
+            path = path[1:]
+
+        ns = path.split(os.sep)
+    else:
+        ns = []
+
+    ns.append(root)
+
+    for n in ns:
+        output("namespace " + n + " {\n",(0,0))
 
     # set module name for tok_eater to use if there's a module doc string
     name = root
@@ -486,7 +499,9 @@ def filter(filename):
     print_comment((0,0))
 
     output("\n",(0,0))
-    output("}  // end of namespace\n",(0,0))
+    
+    for n in ns:
+        output("}  // end of namespace\n",(0,0))
 
     if not module_has_docstring:
         # Put in default namespace documentation
@@ -611,9 +626,10 @@ def convert(srcpath, destpath):
 ######################################################################
 
 filter_file = False
+source_root = None
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hf", ["help"])
+    opts, args = getopt.getopt(sys.argv[1:], "hfr:", ["help"])
 except getopt.GetoptError,e:
     print e
     sys.exit(1)
@@ -622,10 +638,13 @@ for o,a in opts:
     if o=="-f":
         filter_file = True
 
+    if o=="-r":
+        source_root = os.path.abspath(a)
+
 if filter_file:
     # Filter the specified file and print the result to stdout
     filename = string.join(args)
-    filterFile(filename)
+    filterFile(os.path.abspath(filename))
 else:
 
     if len(args)!=2:
