@@ -77,7 +77,7 @@ main(int argc, char **argv)
 	/* NOTREACHED */
     }
 #if defined(CLIENT_write)
-    if ((argc - optind) % 1) {
+    if ((argc - optind) % 2 == 1) {
 	usage(argv[0]);
 	/* NOTREACHED */
     }
