@@ -35,7 +35,7 @@
 #include <linux/interrupt.h>
 #include <asm-xen/hypervisor.h>
 #include <asm/ptrace.h>
-#include <asm-xen/synch_bitops.h>
+#include <asm/synch_bitops.h>
 #include <asm-xen/xen-public/event_channel.h>
 #include <linux/smp.h>
 
