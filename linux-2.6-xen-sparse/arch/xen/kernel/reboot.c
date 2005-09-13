@@ -320,19 +320,27 @@ static void __shutdown_handler(void *unused)
 static void shutdown_handler(struct xenbus_watch *watch, const char *node)
 {
     static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
-
     char *str;
+    int err;
 
+ again:
+    err = xenbus_transaction_start("control");
+    if (err)
+	return;
     str = (char *)xenbus_read("control", "shutdown", NULL);
-    /* Ignore read errors. */
-    if (IS_ERR(str))
-        return;
-    if (strlen(str) == 0) {
-        kfree(str);
-        return;
+    /* Ignore read errors and empty reads. */
+    if (XENBUS_IS_ERR_READ(str)) {
+	xenbus_transaction_end(1);
+	return;
     }
 
     xenbus_write("control", "shutdown", "", O_CREAT);
+
+    err = xenbus_transaction_end(0);
+    if (err == -ETIMEDOUT) {
+	kfree(str);
+	goto again;
+    }
 
     if (strcmp(str, "poweroff") == 0)
         shutting_down = SHUTDOWN_POWEROFF;
