@@ -7,14 +7,7 @@
 import errno
 import threading
 from xen.lowlevel import xs
-
-handles = {}
-
-# XXX need to g/c handles from dead threads
-def xshandle():
-    if not handles.has_key(threading.currentThread()):
-        handles[threading.currentThread()] = xs.open()
-    return handles[threading.currentThread()]
+from xen.xend.xenstore.xsutil import xshandle
 
 class xstransact:
 
@@ -100,7 +93,10 @@ class xstransact:
 
     def _list(self, key):
         path = "%s/%s" % (self.path, key)
-        return map(lambda x: key + "/" + x, xshandle().ls(path))
+        l = xshandle().ls(path)
+        if l:
+            return map(lambda x: key + "/" + x, l)
+        return []
 
     def list(self, *args):
         if len(args) == 0:
@@ -139,7 +135,7 @@ class xstransact:
 
     Write = classmethod(Write)
 
-    def Remove(cls, *args):
+    def Remove(cls, path, *args):
         while True:
             try:
                 t = cls(path)
