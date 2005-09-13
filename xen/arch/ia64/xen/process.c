@@ -30,6 +30,7 @@
 #include <asm/ia64_int.h>
 #include <asm/dom_fw.h>
 #include "hpsim_ssc.h"
+#include <xen/multicall.h>
 
 extern unsigned long vcpu_get_itir_on_fault(struct vcpu *, UINT64);
 extern struct ia64_sal_retval pal_emulator_static(UINT64);
@@ -659,7 +660,8 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 		else do_ssc(vcpu_get_gr(current,36), regs);
 	}
 	else if (iim == d->arch.breakimm) {
-		if (ia64_hypercall(regs))
+		if (ia64_hypercall(regs) &&
+		    !PSCBX(v, hypercall_continuation))
 			vcpu_increment_iip(current);
 	}
 	else if (!PSCB(v,interrupt_collection_enabled)) {
@@ -747,3 +749,40 @@ printf("*** Handled privop masquerading as NaT fault\n");
 	if (check_lazy_cover && (isr & IA64_ISR_IR) && handle_lazy_cover(v, isr, regs)) return;
 	reflect_interruption(ifa,isr,itir,regs,vector);
 }
+
+unsigned long __hypercall_create_continuation(
+	unsigned int op, unsigned int nr_args, ...)
+{
+    struct mc_state *mcs = &mc_state[smp_processor_id()];
+    VCPU *vcpu = current;
+    struct cpu_user_regs *regs = vcpu->arch.regs;
+    unsigned int i;
+    va_list args;
+
+    va_start(args, nr_args);
+    if ( test_bit(_MCSF_in_multicall, &mcs->flags) ) {
+	panic("PREEMPT happen in multicall\n");	// Not support yet
+    } else {
+	vcpu_set_gr(vcpu, 2, op);
+	for ( i = 0; i < nr_args; i++) {
+	    switch (i) {
+	    case 0: vcpu_set_gr(vcpu, 14, va_arg(args, unsigned long));
+		    break;
+	    case 1: vcpu_set_gr(vcpu, 15, va_arg(args, unsigned long));
+		    break;
+	    case 2: vcpu_set_gr(vcpu, 16, va_arg(args, unsigned long));
+		    break;
+	    case 3: vcpu_set_gr(vcpu, 17, va_arg(args, unsigned long));
+		    break;
+	    case 4: vcpu_set_gr(vcpu, 18, va_arg(args, unsigned long));
+		    break;
+	    default: panic("Too many args for hypercall continuation\n");
+		    break;
+	    }
+	}
+    }
+    vcpu->arch.hypercall_continuation = 1;
+    va_end(args);
+    return op;
+}
+

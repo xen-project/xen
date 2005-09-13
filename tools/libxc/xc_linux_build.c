@@ -296,12 +296,14 @@ static int setup_guest(int xc_handle,
                          unsigned long shared_info_frame,
                          unsigned long flags,
                          unsigned int vcpus,
-                         unsigned int store_evtchn, unsigned long *store_mfn)
+                         unsigned int store_evtchn, unsigned long *store_mfn,
+		         unsigned int console_evtchn, unsigned long *console_mfn)
 {
     unsigned long *page_array = NULL;
     struct load_funcs load_funcs;
     struct domain_setup_info dsi;
-    unsigned long start_page;
+    unsigned long start_page, pgnr;
+    start_info_t *start_info;
     int rc;
 
     rc = probeimageformat(image, image_size, &load_funcs);
@@ -318,14 +320,14 @@ static int setup_guest(int xc_handle,
     dsi.v_end   = round_pgup(dsi.v_end);
 
     start_page = dsi.v_start >> PAGE_SHIFT;
-    nr_pages = (dsi.v_end - dsi.v_start) >> PAGE_SHIFT;
-    if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
+    pgnr = (dsi.v_end - dsi.v_start) >> PAGE_SHIFT;
+    if ( (page_array = malloc(pgnr * sizeof(unsigned long))) == NULL )
     {
         PERROR("Could not allocate memory");
         goto error_out;
     }
 
-    if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array, start_page, nr_pages) != nr_pages )
+    if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array, start_page, pgnr) != pgnr )
     {
         PERROR("Could not get the page frame list");
         goto error_out;
@@ -335,6 +337,33 @@ static int setup_guest(int xc_handle,
                            &dsi);
 
     *pvke = dsi.v_kernentry;
+
+    /* Now need to retrieve machine pfn for system pages:
+     * 	start_info/store/console
+     */
+    pgnr = 3;
+    if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array, nr_pages - 3, pgnr) != pgnr)
+    {
+	PERROR("Could not get page frame for xenstore");
+	goto error_out;
+    }
+
+    *store_mfn = page_array[1];
+    *console_mfn = page_array[2];
+    printf("store_mfn: 0x%lx, console_mfn: 0x%lx\n",
+	(u64)store_mfn, (u64)console_mfn);
+
+    start_info = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, page_array[0]);
+    memset(start_info, 0, sizeof(*start_info));
+    start_info->flags        = flags;
+    start_info->store_mfn    = nr_pages - 2;
+    start_info->store_evtchn = store_evtchn;
+    start_info->console_mfn   = nr_pages - 1;
+    start_info->console_evtchn = console_evtchn;
+    munmap(start_info, PAGE_SIZE);
+
+    free(page_array);
     return 0;
 
  error_out:
@@ -674,7 +703,12 @@ int xc_linux_build(int xc_handle,
     unsigned long image_size, initrd_size=0;
     unsigned long vstartinfo_start, vkern_entry, vstack_start;
 
+#ifdef __ia64__
+    /* Current xen/ia64 allocates domU pages on demand */
+    if ( (nr_pages = xc_get_max_pages(xc_handle, domid)) < 0 )
+#else
     if ( (nr_pages = xc_get_tot_pages(xc_handle, domid)) < 0 )
+#endif
     {
         PERROR("Could not find total pages for domain");
         goto error_out;
@@ -753,13 +787,16 @@ int xc_linux_build(int xc_handle,
 
 #ifdef __ia64__
     /* based on new_thread in xen/arch/ia64/domain.c */
+    ctxt->flags = 0;
+    ctxt->shared.flags = flags;
+    ctxt->shared.start_info_pfn = nr_pages - 3; // metaphysical
     ctxt->regs.cr_ipsr = 0; /* all necessary bits filled by hypervisor */
     ctxt->regs.cr_iip = vkern_entry;
     ctxt->regs.cr_ifs = 1UL << 63;
     ctxt->regs.ar_fpsr = FPSR_DEFAULT;
     /* ctxt->regs.r28 = dom_fw_setup(); currently done by hypervisor, should move here */
     ctxt->vcpu.privregs = 0;
-    ctxt->shared.flags = flags;
+    ctxt->sys_pgnr = nr_pages - 3;
     i = 0; /* silence unused variable warning */
 #else /* x86 */
     /*

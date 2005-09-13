@@ -106,14 +106,6 @@ while(1);
 }
 #endif
 
-#ifndef CONFIG_VTI
-unsigned long __hypercall_create_continuation(
-	unsigned int op, unsigned int nr_args, ...)
-{
-	printf("__hypercall_create_continuation: not implemented!!!\n");
-}
-#endif
-
 ///////////////////////////////
 // from arch/ia64/page_alloc.c
 ///////////////////////////////

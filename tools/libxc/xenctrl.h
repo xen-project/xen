@@ -440,6 +440,8 @@ int xc_get_pfn_list(int xc_handle, u32 domid, unsigned long *pfn_buf,
 int xc_ia64_get_pfn_list(int xc_handle, u32 domid, unsigned long *pfn_buf, 
                     unsigned int start_page, unsigned int nr_pages);
 
+long xc_get_max_pages(int xc_handle, u32 domid);
+
 int xc_mmuext_op(int xc_handle, struct mmuext_op *op, unsigned int nr_ops,
 		 domid_t dom);
 

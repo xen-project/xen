@@ -152,12 +152,9 @@ ia64_hypercall (struct pt_regs *regs)
 		break;
 
 	    case __HYPERVISOR_memory_op:
-#ifdef CONFIG_VTI
-		regs->r8 = do_dom_mem_op(regs->r14, regs->r15, regs->r16, regs->r17, regs->r18); 
-#else
+		//regs->r8 = do_dom_mem_op(regs->r14, regs->r15, regs->r16, regs->r17, regs->r18); 
 		/* we don't handle reservations; just return success */
 		regs->r8 = regs->r16;
-#endif
 		break;
 
 	    case __HYPERVISOR_event_channel_op:

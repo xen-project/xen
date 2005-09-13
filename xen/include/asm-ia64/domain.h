@@ -26,12 +26,9 @@ struct arch_domain {
 
     int imp_va_msb;
     unsigned long *pmt;	/* physical to machine table */
-    /*
-     * max_pfn is the maximum page frame in guest physical space, including
-     * inter-middle I/O ranges and memory holes. This is different with
-     * max_pages in domain struct, which indicates maximum memory size
-     */
-    unsigned long max_pfn;
+    /* System pages out of guest memory, like for xenstore/console */
+    unsigned long sys_pgnr;
+    unsigned long max_pfn; /* Max pfn including I/O holes */
     struct virutal_platform_def     vmx_platform;
 
     u64 xen_vastart;

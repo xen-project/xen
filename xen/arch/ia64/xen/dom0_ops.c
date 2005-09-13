@@ -148,7 +148,6 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         put_domain(d);
     }
     break;
-#ifndef CONFIG_VTI
     /*
      * NOTE: DOM0_GETMEMLIST has somewhat different semantics on IA64 -
      * it actually allocates and maps pages.
@@ -167,6 +166,14 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         if ( d != NULL )
         {
             ret = 0;
+
+	    /* A temp trick here. When max_pfns == -1, we assume
+	     * the request is for  machine contiguous pages, so request
+	     * all pages at first query
+	     */
+	    if ((op->u.getmemlist.max_pfns == -1UL) &&
+		!test_bit(ARCH_VMX_CONTIG_MEM,&d->vcpu[0]->arch.arch_vmx.flags))
+		return vmx_alloc_contig_pages(d) ? (-ENOMEM) : 0;
 
             for ( i = start_page; i < (start_page + nr_pages); i++ )
             {
@@ -192,42 +199,6 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         }
     }
     break;
-#else
-    case DOM0_GETMEMLIST:
-    {
-	int i;
-	struct domain *d = find_domain_by_id(op->u.getmemlist.domain);
-	unsigned long max_pfns = op->u.getmemlist.max_pfns;
-	unsigned long pfn;
-	unsigned long *buffer = op->u.getmemlist.buffer;
-	struct list_head *list_ent;
-
-	ret = -EINVAL;
-	if (!d) {
-	    ret = 0;
-
-	    spin_lock(&d->page_alloc_lock);
-	    list_ent = d->page_list.next;
-	    for (i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++) {
-		pfn = list_entry(list_ent, struct pfn_info, list) -
-		    frame_table;
-		if (put_user(pfn, buffer)) {
-		    ret = -EFAULT;
-		    break;
-		}
-		buffer++;
-		list_ent = frame_table[pfn].list.next;
-	    }
-	    spin_unlock(&d->page_alloc_lock);
-
-	    op->u.getmemlist.num_pfns = i;
-	    copy_to_user(u_dom0_op, op, sizeof(*op));
-
-	    put_domain(d);
-	}
-    }
-    break;
-#endif // CONFIG_VTI
     default:
         ret = -ENOSYS;
 

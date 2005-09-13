@@ -222,7 +222,11 @@ class ImageHandler:
 
     def getDomainMemory(self, mem_mb):
         """Memory (in KB) the domain will need for mem_mb (in MB)."""
-        return mem_mb * 1024
+        if os.uname()[4] == 'ia64':
+	    """Append extra system pages, like xenstore and console"""
+	    return (mem_mb * 1024 + 3 * 16)
+	else:
+            return mem_mb * 1024
 
     def buildDomain(self):
         """Build the domain. Define in subclass."""
@@ -457,5 +461,8 @@ class VmxImageHandler(ImageHandler):
         # 1 page for the PGD + 1 pte page for 4MB of memory (rounded)
         if os.uname()[4] == 'x86_64':
             return (5 + ((mem_mb + 1) >> 1)) * 4
+	elif os.uname()[4] == 'ia64':
+	    # XEN/IA64 has p2m table allocated on demand, so only return guest firmware size here.
+	    return 16 * 1024
         else:
             return (1 + ((mem_mb + 3) >> 2)) * 4

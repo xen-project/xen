@@ -490,7 +490,7 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	unsigned char checksum = 0;
 	char *cp, *cmd_line, *fw_vendor;
 	int i = 0;
-	unsigned long maxmem = d->max_pages * PAGE_SIZE;
+	unsigned long maxmem = (d->max_pages - d->arch.sys_pgnr) * PAGE_SIZE;
 	unsigned long start_mpaddr = ((d==dom0)?dom0_start:0);
 
 #	define MAKE_MD(typ, attr, start, end, abs) 	\	
@@ -512,10 +512,6 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 		return 0;
 	}
 */
-       /* Last page is for xenstore, and not exported to domain */
-       if (d != dom0)
-               maxmem = (d->max_pages - 1) * PAGE_SIZE;
-
 	memset(fw_mem, 0, fw_mem_size);
 
 #ifdef XEN

@@ -351,6 +351,15 @@ int xc_ia64_get_pfn_list(int xc_handle,
 
     return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
 }
+
+long xc_get_max_pages(int xc_handle, u32 domid)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_GETDOMAININFO;
+    op.u.getdomaininfo.domain = (domid_t)domid;
+    return (do_dom0_op(xc_handle, &op) < 0) ? 
+        -1 : op.u.getdomaininfo.max_pages;
+}
 #endif
 
 long xc_get_tot_pages(int xc_handle, u32 domid)

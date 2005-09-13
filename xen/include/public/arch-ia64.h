@@ -255,11 +255,8 @@ typedef mapped_regs_t vpd_t;
 #define __ARCH_HAS_VCPU_INFO
 
 typedef struct {
-	int domain_controller_evtchn;
 	unsigned int flags;
-	unsigned short store_evtchn;
-	unsigned long store_mfn;
-//} arch_shared_info_t;
+	unsigned long start_info_pfn;
 } arch_shared_info_t;		// DON'T PACK 
 
 typedef struct vcpu_guest_context {
@@ -268,10 +265,9 @@ typedef struct vcpu_guest_context {
 #define VGCF_IN_KERNEL (1<<2)
 	unsigned long flags;       /* VGCF_* flags */
 	unsigned long pt_base;     /* PMT table base */
-	unsigned long pt_max_pfn;  /* Max pfn including holes */
 	unsigned long share_io_pg; /* Shared page for I/O emulation */
+	unsigned long sys_pgnr;    /* System pages out of domain memory */
 	unsigned long vm_assist;   /* VMASST_TYPE_* bitmap, now none on IPF */
-	unsigned long guest_iip;   /* Guest entry point */
 
 	cpu_user_regs_t regs;
 	arch_vcpu_info_t vcpu;

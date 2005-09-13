@@ -233,6 +233,7 @@ void arch_do_createdomain(struct vcpu *v)
 	d->arch.breakimm = 0x1000;
 	v->arch.breakimm = d->arch.breakimm;
 
+	d->arch.sys_pgnr = 0;
 	d->arch.mm = xmalloc(struct mm_struct);
 	if (unlikely(!d->arch.mm)) {
 		printk("Can't allocate mm_struct for domain %d\n",d->domain_id);
@@ -295,6 +296,7 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	}
 
 	v->arch.domain_itm_last = -1L;
+	d->arch.sys_pgnr = c->sys_pgnr;
 	d->shared_info->arch = c->shared;
 
 	/* Don't redo final setup */
@@ -467,6 +469,43 @@ void map_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physa
 	if (pte_none(*pte)) {
 		set_pte(pte, pfn_pte(physaddr >> PAGE_SHIFT,
 			__pgprot(__DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX)));
+	}
+	else printk("map_domain_page: mpaddr %lx already mapped!\n",mpaddr);
+}
+
+/* map a physical address with specified I/O flag */
+void map_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags)
+{
+	struct mm_struct *mm = d->arch.mm;
+	pgd_t *pgd;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+	pte_t io_pte;
+
+	if (!mm->pgd) {
+		printk("map_domain_page: domain pgd must exist!\n");
+		return;
+	}
+	ASSERT(flags & GPFN_IO_MASK);
+
+	pgd = pgd_offset(mm,mpaddr);
+	if (pgd_none(*pgd))
+		pgd_populate(mm, pgd, pud_alloc_one(mm,mpaddr));
+
+	pud = pud_offset(pgd, mpaddr);
+	if (pud_none(*pud))
+		pud_populate(mm, pud, pmd_alloc_one(mm,mpaddr));
+
+	pmd = pmd_offset(pud, mpaddr);
+	if (pmd_none(*pmd))
+		pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm,mpaddr));
+//		pmd_populate(mm, pmd, pte_alloc_one(mm,mpaddr));
+
+	pte = pte_offset_map(pmd, mpaddr);
+	if (pte_none(*pte)) {
+		pte_val(io_pte) = flags;
+		set_pte(pte, io_pte);
 	}
 	else printk("map_domain_page: mpaddr %lx already mapped!\n",mpaddr);
 }
@@ -910,10 +949,12 @@ int construct_dom0(struct domain *d,
 	    panic("PAL CACHE FLUSH failed for dom0.\n");
 	printk("Sync i/d cache for dom0 image SUCC\n");
 
-#if 0
 	/* Set up start info area. */
-	//si = (start_info_t *)vstartinfo_start;
+	si = (start_info_t *)alloc_xenheap_page();
 	memset(si, 0, PAGE_SIZE);
+	d->shared_info->arch.start_info_pfn = __pa(si) >> PAGE_SHIFT;
+
+#if 0
 	si->nr_pages     = d->tot_pages;
 	si->shared_info  = virt_to_phys(d->shared_info);
 	si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;

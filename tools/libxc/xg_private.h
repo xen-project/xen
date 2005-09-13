@@ -1,6 +1,7 @@
 #ifndef XG_PRIVATE_H
 #define XG_PRIVATE_H
 
+#include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>

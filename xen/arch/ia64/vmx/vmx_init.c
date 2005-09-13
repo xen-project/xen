@@ -164,7 +164,6 @@ void vmx_setup_platform(struct vcpu *v, struct vcpu_guest_context *c)
 
 	/* FIXME: only support PMT table continuously by far */
 	d->arch.pmt = __va(c->pt_base);
-	d->arch.max_pfn = c->pt_max_pfn;
 
 	vmx_final_setup_domain(d);
 }
@@ -372,4 +371,120 @@ vmx_final_setup_domain(struct domain *d)
 #endif
 
 	/* Other vmx specific initialization work */
+}
+
+/*
+ * Following stuff should really move to domain builder. However currently
+ * XEN/IA64 doesn't export physical -> machine page table to domain builder,
+ * instead only the copy. Also there's no hypercall to notify hypervisor
+ * IO ranges by far. Let's enhance it later.
+ */
+
+#define MEM_G   (1UL << 30)	
+#define MEM_M   (1UL << 20)	
+
+#define MMIO_START       (3 * MEM_G)
+#define MMIO_SIZE        (512 * MEM_M)
+
+#define VGA_IO_START     0xA0000UL
+#define VGA_IO_SIZE      0x20000
+
+#define LEGACY_IO_START  (MMIO_START + MMIO_SIZE)
+#define LEGACY_IO_SIZE   (64*MEM_M)  
+
+#define IO_PAGE_START (LEGACY_IO_START + LEGACY_IO_SIZE)
+#define IO_PAGE_SIZE  PAGE_SIZE
+
+#define STORE_PAGE_START (IO_PAGE_START + IO_PAGE_SIZE)
+#define STORE_PAGE_SIZE	 PAGE_SIZE
+
+#define IO_SAPIC_START   0xfec00000UL
+#define IO_SAPIC_SIZE    0x100000
+
+#define PIB_START 0xfee00000UL
+#define PIB_SIZE 0x100000 
+
+#define GFW_START        (4*MEM_G -16*MEM_M)
+#define GFW_SIZE         (16*MEM_M)
+
+typedef struct io_range {
+	unsigned long start;
+	unsigned long size;
+	unsigned long type;
+} io_range_t;
+
+io_range_t io_ranges[] = {
+	{VGA_IO_START, VGA_IO_SIZE, GPFN_FRAME_BUFFER},
+	{MMIO_START, MMIO_SIZE, GPFN_LOW_MMIO},
+	{LEGACY_IO_START, LEGACY_IO_SIZE, GPFN_LEGACY_IO},
+	{IO_SAPIC_START, IO_SAPIC_SIZE, GPFN_IOSAPIC},
+	{PIB_START, PIB_SIZE, GPFN_PIB},
+};
+
+#define VMX_SYS_PAGES	(2 + GFW_SIZE >> PAGE_SHIFT)
+#define VMX_CONFIG_PAGES(d) ((d)->max_pages - VMX_SYS_PAGES)
+
+int vmx_alloc_contig_pages(struct domain *d)
+{
+	unsigned int order, i, j;
+	unsigned long start, end, pgnr, conf_nr;
+	struct pfn_info *page;
+	struct vcpu *v = d->vcpu[0];
+
+	ASSERT(!test_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags));
+
+	conf_nr = VMX_CONFIG_PAGES(d);
+	order = get_order_from_pages(conf_nr);
+	if (unlikely((page = alloc_domheap_pages(d, order, 0)) == NULL)) {
+	    printk("Could not allocate order=%d pages for vmx contig alloc\n",
+			order);
+	    return -1;
+	}
+
+	/* Map normal memory below 3G */
+	pgnr = page_to_pfn(page);
+	end = conf_nr << PAGE_SHIFT;
+	for (i = 0;
+	     i < (end < MMIO_START ? end : MMIO_START);
+	     i += PAGE_SIZE, pgnr++)
+	    map_domain_page(d, i, pgnr << PAGE_SHIFT);
+
+	/* Map normal memory beyond 4G */
+	if (unlikely(end > MMIO_START)) {
+	    start = 4 * MEM_G;
+	    end = start + (end - 3 * MEM_G);
+	    for (i = start; i < end; i += PAGE_SIZE, pgnr++)
+		map_domain_page(d, i, pgnr << PAGE_SHIFT);
+	}
+
+	d->arch.max_pfn = end >> PAGE_SHIFT;
+
+	order = get_order_from_pages(VMX_SYS_PAGES);
+	if (unlikely((page = alloc_domheap_pages(d, order, 0)) == NULL)) {
+	    printk("Could not allocate order=%d pages for vmx contig alloc\n",
+			order);
+	    return -1;
+	}
+
+	/* Map for shared I/O page and xenstore */
+	pgnr = page_to_pfn(page);
+	map_domain_page(d, IO_PAGE_START, pgnr << PAGE_SHIFT);
+	pgnr++;
+	map_domain_page(d, STORE_PAGE_START, pgnr << PAGE_SHIFT);
+	pgnr++;
+
+	/* Map guest firmware */
+	for (i = GFW_START; i < GFW_START + GFW_SIZE; i += PAGE_SIZE, pgnr++)
+	    map_domain_page(d, i, pgnr << PAGE_SHIFT);
+
+	/* Mark I/O ranges */
+	for (i = 0; i < (sizeof(io_ranges) / sizeof(io_range_t)); i++) {
+	    for (j = io_ranges[i].start;
+		 j < io_ranges[i].start + io_ranges[i].size;
+		 j += PAGE_SIZE)
+		map_domain_io_page(d, j);
+	}
+
+	set_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags);
+	return 0;
 }
