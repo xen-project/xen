@@ -485,9 +485,11 @@ class DBMap(dict):
         if self.__db__ is None:
             return
         self.__data__ = self.__db__.getData()
-        for k in self.__db__.ls():
-            n = self.addChild(k)
-            n.readDB()
+        l = self.__db__.ls()
+        if l:
+            for k in l:
+                n = self.addChild(k)
+                n.readDB()
         self.__dirty__ = False
 
     def readChildDB(self, k):
