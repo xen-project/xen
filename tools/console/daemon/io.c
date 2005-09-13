@@ -87,6 +87,7 @@ static void buffer_append(struct domain *dom)
 	struct buffer *buffer = &dom->buffer;
 	struct ring_head *ring = (struct ring_head *)dom->page;
 	size_t size;
+	u32 oldcons;
 
 	while ((size = ring->prod - ring->cons) != 0) {
 		if ((buffer->capacity - buffer->size) < size) {
@@ -98,7 +99,8 @@ static void buffer_append(struct domain *dom)
 			}
 		}
 
-		while (ring->cons < ring->prod) {
+		oldcons = ring->cons;
+		while (ring->cons < (oldcons + size)) {
 			buffer->data[buffer->size] =
 				ring->buf[XENCONS_IDX(ring->cons)];
 			buffer->size++;
