@@ -170,6 +170,7 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 
 		be->blkif = alloc_blkif(be->frontend_id);
 		if (IS_ERR(be->blkif)) {
+                        /* XXX SMH: should free blkif here... hmm */
 			err = PTR_ERR(be->blkif);
 			be->blkif = NULL;
 			xenbus_dev_error(dev, err, "creating block interface");
@@ -178,6 +179,8 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 
 		err = vbd_create(be->blkif, handle, be->pdev, be->readonly);
 		if (err) {
+                        /* XXX SMH: should free blkif here too... */
+                        be->blkif = NULL; 
 			xenbus_dev_error(dev, err, "creating vbd structure");
 			return;
 		}
