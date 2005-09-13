@@ -60,8 +60,6 @@
 ^pristine-.*$
 ^ref-.*$
 ^tools/.*/build/lib.*/.*\.py$
-^tools/Makefile\.smh$
-^tools/balloon/balloon$
 ^tools/blktap/Makefile\.smh$
 ^tools/blktap/blkcow$
 ^tools/blktap/blkcowgnbd$
@@ -85,8 +83,7 @@
 ^tools/blktap/ublkback/ublkback$
 ^tools/blktap/xen/.*$
 ^tools/check/\..*$
-^tools/cmdline/.*$
-^tools/cmdline/xen/.*$
+^tools/examples/xmexample\.vmx$
 ^tools/console/xenconsoled$
 ^tools/console/xenconsole$
 ^tools/debugger/pdb/pdb$
@@ -109,8 +106,6 @@
 ^tools/firmware/vmxassist/roms\.h$
 ^tools/firmware/vmxassist/vmxassist$
 ^tools/firmware/vmxassist/vmxloader$
-^tools/gdb/gdb-6\.2\.1-linux-i386-xen/.*$
-^tools/gdb/gdb-6\.2\.1/.*$
 ^tools/ioemu/config-host\..*$
 ^tools/ioemu/keysym_adapter_sdl\.h$
 ^tools/ioemu/keysym_adapter_vnc\.h$
@@ -141,12 +136,9 @@
 ^tools/vnet/vnet-module/\..*\.cmd$
 ^tools/vnet/vnet-module/\.tmp_versions/.*$
 ^tools/vnet/vnet-module/vnet_module\.mod\..*$
-^tools/vnetd/vnetd$
 ^tools/vtpm/vtpm*
 ^tools/vtpm/tpm_emulator-*
 ^tools/vtpm_manager/manager/vtpm_managerd
-^tools/web-shutdown\.tap$
-^tools/x2d2/minixend$
 ^tools/xcutils/xc_restore$
 ^tools/xcutils/xc_save$
 ^tools/xenstat/xentop/xentop$

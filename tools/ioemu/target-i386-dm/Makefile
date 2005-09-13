@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 include config.mak
 override TARGET_ARCH=i386
 
-INSTALL_DIR := $(DESTDIR)/usr/lib/xen/bin
+INSTALL_DIR := $(DESTDIR)/usr/$(LIBDIR)/xen/bin
 TARGET_PATH=$(SRC_PATH)/target-$(TARGET_ARCH)
 VPATH=$(SRC_PATH):$(TARGET_PATH):$(SRC_PATH)/hw:$(SRC_PATH)/audio
 DEFINES=-I. -I$(TARGET_PATH) -I$(SRC_PATH) -I$(XEN_ROOT)/xen/include/public
