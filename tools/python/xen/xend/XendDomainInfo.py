@@ -1124,12 +1124,14 @@ class XendDomainInfo:
     def dom0_init_store(self):
         if not self.store_channel:
             self.store_channel = self.eventChannel("store/port")
-        self.store_mfn = xc.init_store(self.store_channel.port2)
-        if self.store_mfn >= 0:
-            IntroduceDomain(self.id, self.store_mfn, self.store_channel.port1,
-                            self.path)
-        # get run-time value of vcpus and update store
-        self.exportVCPUSToDB(dom_get(self.id)['vcpus'])
+            if not self.store_channel:
+                return
+        ref = xc.init_store(self.store_channel.port2)
+        if ref and ref >= 0:
+            self.setStoreRef(ref)
+            IntroduceDomain(self.id, ref, self.store_channel.port1, self.path)
+            # get run-time value of vcpus and update store
+            self.exportVCPUSToDB(dom_get(self.id)['vcpus'])
 
 def vm_field_ignore(vm, config, val, index):
     """Dummy config field handler used for fields with built-in handling.
