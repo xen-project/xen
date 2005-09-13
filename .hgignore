@@ -154,6 +154,8 @@
 ^tools/xenstore/xen$
 ^tools/xenstore/xenstored$
 ^tools/xenstore/xenstored_test$
+^tools/xenstore/xenstore-exists$
+^tools/xenstore/xenstore-list$
 ^tools/xenstore/xenstore-read$
 ^tools/xenstore/xenstore-rm$
 ^tools/xenstore/xenstore-write$
