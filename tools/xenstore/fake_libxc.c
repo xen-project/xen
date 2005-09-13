@@ -83,6 +83,39 @@ int xc_interface_close(int xc_handle)
 	return 0;
 }
 
+int xc_domain_getinfo(int xc_handle __attribute__((unused)),
+		      u32 first_domid, unsigned int max_doms,
+                      xc_dominfo_t *info)
+{
+	assert(max_doms == 1);
+        info->domid = first_domid;
+
+        info->dying    = 0;
+        info->shutdown = 0;
+        info->paused   = 0;
+        info->blocked  = 0;
+        info->running  = 1;
+
+        info->shutdown_reason = 0;
+
+        if ( info->shutdown && (info->shutdown_reason == SHUTDOWN_crash) )
+        {
+            info->shutdown = 0;
+            info->crashed  = 1;
+        }
+
+	return 1;
+}
+
+int xc_evtchn_bind_virq(int xc_handle __attribute__((unused)),
+			int virq __attribute__((unused)),
+			int *port)
+{
+	if (port)
+		*port = 0;
+	return 0;
+}
+
 static void send_to_fd(int signo __attribute__((unused)))
 {
 	int saved_errno = errno;

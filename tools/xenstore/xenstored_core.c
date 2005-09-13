@@ -1640,8 +1640,10 @@ static void daemonize(void)
 
 	/* Session leader so ^C doesn't whack us. */
 	setsid();
+#ifndef TESTING	/* Relative paths for socket names */
 	/* Move off any mount points we might be in. */
 	chdir("/");
+#endif
 	/* Discard our parent's old-fashioned umask prejudices. */
 	umask(0);
 }

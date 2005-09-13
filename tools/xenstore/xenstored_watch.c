@@ -105,7 +105,6 @@ static void add_event(struct connection *conn,
 	 */
 	if (!check_node_perms(conn, node, XS_PERM_READ|XS_PERM_ENOENT_OK) &&
 	    !check_event_node(node)) {
-		fprintf(stderr, "No permission for %s\n", node);
 		return;
 	}
 

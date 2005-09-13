@@ -43,7 +43,7 @@
 
 static struct xs_handle *handles[10] = { NULL };
 
-static unsigned int timeout_ms = 200;
+static unsigned int timeout_ms = 500;
 static bool timeout_suppressed = true;
 static bool readonly = false;
 static bool print_input = false;
