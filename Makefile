@@ -35,8 +35,8 @@ ifeq ($(XEN_TARGET_X86_PAE),y)
 export pae=y
 endif
 
-.PHONY:	all dist install xen kernels tools docs world clean mkpatches mrproper
-.PHONY:	kbuild kdelete kclean
+.PHONY:	all dist install xen kernels tools dev-docs docs world clean
+.PHONY:	mkpatches mrproper kbuild kdelete kclean
 
 # build and install everything into the standard system directories
 install: install-xen install-kernels install-tools install-docs
@@ -65,6 +65,9 @@ kernels:
 
 docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
+
+dev-docs:
+	$(MAKE) -C docs dev-docs
 
 # Build all the various kernels and modules
 kbuild: kernels
@@ -123,7 +126,7 @@ help:
 	@echo '  install-xen      - build and install the Xen hypervisor'
 	@echo '  install-tools    - build and install the control tools'
 	@echo '  install-kernels  - build and install guest kernels'
-	@echo '  install-docs     - build and install documentation'
+	@echo '  install-docs     - build and install user documentation'
 	@echo ''
 	@echo 'Building targets:'
 	@echo '  dist             - build and install everything into local dist directory'
@@ -133,7 +136,8 @@ help:
 	@echo '  tools            - build and install tools'
 	@echo '  kernels          - build and install guest kernels'
 	@echo '  kbuild           - synonym for make kernels'
-	@echo '  docs             - build and install docs'
+	@echo '  docs             - build and install user documentation'
+	@echo '  dev-docs         - build developer-only documentation'
 	@echo ''
 	@echo 'Cleaning targets:'
 	@echo '  clean            - clean the Xen, tools and docs (but not'

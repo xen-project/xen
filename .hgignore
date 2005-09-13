@@ -19,6 +19,7 @@
 ^docs/.*\.toc$
 ^docs/figs/xenserver\.eps$
 ^docs/html/.*$
+^docs/api/.*$
 ^docs/interface/WARNINGS$
 ^docs/interface/images\.pl$
 ^docs/interface/images\.tex$

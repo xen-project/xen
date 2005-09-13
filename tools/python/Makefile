@@ -1,6 +1,7 @@
-
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
+
+.PHONY: all build install clean
 
 all: build
 build:
