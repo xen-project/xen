@@ -1622,7 +1622,7 @@ static u32 remove_all_access_in_page(
     struct domain *d, unsigned long l1mfn, unsigned long forbidden_gmfn)
 {
     l1_pgentry_t *pl1e = map_domain_page(l1mfn);
-    l1_pgentry_t match;
+    l1_pgentry_t match, ol2e;
     unsigned long flags  = _PAGE_PRESENT;
     int i;
     u32 count = 0;
@@ -1634,17 +1634,17 @@ static u32 remove_all_access_in_page(
 
     for (i = 0; i < L1_PAGETABLE_ENTRIES; i++)
     {
-        if ( unlikely(!l1e_has_changed(pl1e[i], match, flags) == 0) )
-        {
-            l1_pgentry_t ol2e = pl1e[i];
-            pl1e[i] = l1e_empty();
-            count++;
+        if ( l1e_has_changed(pl1e[i], match, flags) )
+            continue;
 
-            if ( is_l1_shadow )
-                shadow_put_page_from_l1e(ol2e, d);
-            else /* must be an hl2 page */
-                put_page(&frame_table[forbidden_gmfn]);
-        }
+        ol2e = pl1e[i];
+        pl1e[i] = l1e_empty();
+        count++;
+
+        if ( is_l1_shadow )
+            shadow_put_page_from_l1e(ol2e, d);
+        else /* must be an hl2 page */
+            put_page(&frame_table[forbidden_gmfn]);
     }
 
     unmap_domain_page(pl1e);
