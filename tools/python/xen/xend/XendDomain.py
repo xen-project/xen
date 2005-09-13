@@ -741,7 +741,7 @@ class XendDomain:
         @return: 0 on success, -1 on error
         """
         dominfo = self.domain_lookup(id)
-        return dominfo.mem_target_set(mem)
+        return dominfo.setMemoryTarget(mem * (1 << 20))
 
     def domain_vcpu_hotplug(self, id, vcpu, state):
         """Enable or disable VCPU vcpu in DOM id

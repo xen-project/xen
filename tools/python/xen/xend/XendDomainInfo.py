@@ -158,7 +158,7 @@ class XendDomainInfo:
         log.debug('info=' + str(info))
         log.debug('config=' + prettyprintstring(config))
 
-        vm.memory = info['mem_kb']/1024
+        vm.memory = info['mem_kb'] / 1024
         vm.target = info['mem_kb'] * 1024
 
         if config:
@@ -213,7 +213,6 @@ class XendDomainInfo:
         DBVar('restart_state', ty='str'),
         DBVar('restart_time',  ty='float'),
         DBVar('restart_count', ty='int'),
-        DBVar('target',        ty='long', path="memory/target"),
         DBVar('device_model_pid', ty='int'),
         ]
     
@@ -321,13 +320,19 @@ class XendDomainInfo:
         else:
             xstransact.Remove(self.path, "console/ring-ref")
 
+    def setMemoryTarget(self, target):
+        self.memory_target = target
+        if target:
+            xstransact.Write(self.path, "memory/target", "%i" % target)
+        else:
+            xstransact.Remove(self.path, "memory/target")
+
     def update(self, info=None):
         """Update with  info from xc.domain_getinfo().
         """
         self.info = info or dom_get(self.id)
         self.memory = self.info['mem_kb'] / 1024
         self.ssidref = self.info['ssidref']
-        self.target = self.info['mem_kb'] * 1024
 
     def state_set(self, state):
         self.state_updated.acquire()
@@ -643,7 +648,7 @@ class XendDomainInfo:
         self.memory = int(sxp.child_value(config, 'memory'))
         if self.memory is None:
             raise VmError('missing memory size')
-        self.target = self.memory * (1 << 20)
+        self.setMemoryTarget(self.memory * (1 << 20))
         self.ssidref = int(sxp.child_value(config, 'ssidref'))
         cpu = sxp.child_value(config, 'cpu')
         if self.recreate and self.id and cpu is not None and int(cpu) >= 0:
@@ -1034,14 +1039,6 @@ class XendDomainInfo:
             else:
                 log.warning("Unknown config field %s", field_name)
             index[field_name] = field_index + 1
-
-    def mem_target_set(self, target):
-        """Set domain memory target in bytes.
-        """
-        if target:
-            self.target = target * (1 << 20)
-            # Commit to XenStore immediately
-            self.exportToDB()
 
     def vcpu_hotplug(self, vcpu, state):
         """Disable or enable VCPU in domain.
