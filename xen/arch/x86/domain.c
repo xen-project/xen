@@ -674,10 +674,10 @@ static void save_segments(struct vcpu *v)
     if ( VMX_DOMAIN(v) )
         rdmsrl(MSR_SHADOW_GS_BASE, v->arch.arch_vmx.msr_content.shadow_gs);
 
-    __asm__ __volatile__ ( "movl %%ds,%0" : "=m" (regs->ds) );
-    __asm__ __volatile__ ( "movl %%es,%0" : "=m" (regs->es) );
-    __asm__ __volatile__ ( "movl %%fs,%0" : "=m" (regs->fs) );
-    __asm__ __volatile__ ( "movl %%gs,%0" : "=m" (regs->gs) );
+    __asm__ __volatile__ ( "mov %%ds,%0" : "=m" (regs->ds) );
+    __asm__ __volatile__ ( "mov %%es,%0" : "=m" (regs->es) );
+    __asm__ __volatile__ ( "mov %%fs,%0" : "=m" (regs->fs) );
+    __asm__ __volatile__ ( "mov %%gs,%0" : "=m" (regs->gs) );
 
     if ( regs->ds )
         dirty_segment_mask |= DIRTY_DS;
