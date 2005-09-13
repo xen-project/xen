@@ -264,7 +264,7 @@ static PyObject *xspy_rm(PyObject *self, PyObject *args, PyObject *kwds)
     Py_BEGIN_ALLOW_THREADS
     xsval = xs_rm(xh, path);
     Py_END_ALLOW_THREADS
-    if (!xsval) {
+    if (!xsval && errno != ENOENT) {
         PyErr_SetFromErrno(PyExc_RuntimeError);
         goto exit;
     }
