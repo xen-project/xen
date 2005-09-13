@@ -1055,21 +1055,15 @@ class XendDomainInfo:
     def shutdown(self, reason):
         if not reason in shutdown_reasons.values():
             raise XendError('invalid reason:' + reason)
-        db = self.db.addChild("/control");
-        db['shutdown'] = reason;
-        db.saveDB(save=True);
+        xstransact.Write(self.path, "control/shutdown", reason)
         if not reason in ['suspend']:
             self.shutdown_pending = {'start':time.time(), 'reason':reason}
 
     def clear_shutdown(self):
-        db = self.db.addChild("/control")
-        db['shutdown'] = ""
-        db.saveDB(save=True)
+        xstransact.Remove(self.path, "control/shutdown")
 
     def send_sysrq(self, key=0):
-        db = self.db.addChild("/control");
-        db['sysrq'] = '%c' % key;
-        db.saveDB(save=True);        
+        xstransact.Write(self.path, "control/sysrq", '%c' % key)
 
     def shutdown_time_left(self, timeout):
         if not self.shutdown_pending:
