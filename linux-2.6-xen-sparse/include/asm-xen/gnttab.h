@@ -18,7 +18,11 @@
 #include <asm-xen/xen-public/grant_table.h>
 
 /* NR_GRANT_FRAMES must be less than or equal to that configured in Xen */
+#ifdef __ia64__
+#define NR_GRANT_FRAMES 1
+#else
 #define NR_GRANT_FRAMES 4
+#endif
 
 struct gnttab_free_callback {
     struct gnttab_free_callback *next;
@@ -62,5 +66,11 @@ void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
 
 void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid,
 				       unsigned long pfn);
+
+#ifdef __ia64__
+#define gnttab_map_vaddr(map) __va(map.dev_bus_addr)
+#else
+#define gnttab_map_vaddr(map) ((void *)(map.host_virt_addr))
+#endif
 
 #endif /* __ASM_GNTTAB_H__ */
