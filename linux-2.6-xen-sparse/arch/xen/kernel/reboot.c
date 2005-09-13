@@ -355,16 +355,26 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
 static void sysrq_handler(struct xenbus_watch *watch, const char *node)
 {
     char sysrq_key = '\0';
-    
+    int err;
+
+ again:
+    err = xenbus_transaction_start("control");
+    if (err)
+	return;
     if (!xenbus_scanf("control", "sysrq", "%c", &sysrq_key)) {
         printk(KERN_ERR "Unable to read sysrq code in control/sysrq\n");
-        return;
+	xenbus_transaction_end(1);
+	return;
     }
 
-    xenbus_printf("control", "sysrq", "%c", '\0');
+    if (sysrq_key != '\0')
+	xenbus_printf("control", "sysrq", "%c", '\0');
+
+    err = xenbus_transaction_end(0);
+    if (err == -ETIMEDOUT)
+	goto again;
 
     if (sysrq_key != '\0') {
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
         handle_sysrq(sysrq_key, NULL, NULL);
 #else
