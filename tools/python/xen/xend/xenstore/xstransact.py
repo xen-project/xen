@@ -117,7 +117,8 @@ class xstransact:
             except RuntimeError, ex:
                 if ex.args[0] == errno.ETIMEDOUT:
                     pass
-                raise
+                else:
+                    raise
 
     Read = classmethod(Read)
 
@@ -131,7 +132,8 @@ class xstransact:
             except RuntimeError, ex:
                 if ex.args[0] == errno.ETIMEDOUT:
                     pass
-                raise
+                else:
+                    raise
 
     Write = classmethod(Write)
 
@@ -145,7 +147,8 @@ class xstransact:
             except RuntimeError, ex:
                 if ex.args[0] == errno.ETIMEDOUT:
                     pass
-                raise
+                else:
+                    raise
 
     Remove = classmethod(Remove)
 
@@ -159,6 +162,7 @@ class xstransact:
             except RuntimeError, ex:
                 if ex.args[0] == errno.ETIMEDOUT:
                     pass
-                raise
+                else:
+                    raise
 
     List = classmethod(List)
