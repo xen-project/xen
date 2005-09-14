@@ -456,14 +456,14 @@ unsigned long xc_make_page_below_4G(
     unsigned long new_mfn;
 
     if ( xc_domain_memory_decrease_reservation( 
-	xc_handle, domid, 1, 0, &mfn) != 1 )
+	xc_handle, domid, 1, 0, &mfn) != 0 )
     {
 	fprintf(stderr,"xc_make_page_below_4G decrease failed. mfn=%lx\n",mfn);
 	return 0;
     }
 
     if ( xc_domain_memory_increase_reservation(
-        xc_handle, domid, 1, 0, 32, &new_mfn) != 1 )
+        xc_handle, domid, 1, 0, 32, &new_mfn) != 0 )
     {
 	fprintf(stderr,"xc_make_page_below_4G increase failed. mfn=%lx\n",mfn);
 	return 0;
