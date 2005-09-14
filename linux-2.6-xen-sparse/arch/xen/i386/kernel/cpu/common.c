@@ -15,7 +15,7 @@
 #include <asm/apic.h>
 #include <mach_apic.h>
 #endif
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 
 #include "cpu.h"
 

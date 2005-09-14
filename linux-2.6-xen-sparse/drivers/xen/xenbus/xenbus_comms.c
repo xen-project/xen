@@ -27,7 +27,7 @@
  * IN THE SOFTWARE.
  */
 
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/evtchn.h>
 #include <linux/wait.h>
 #include <linux/interrupt.h>

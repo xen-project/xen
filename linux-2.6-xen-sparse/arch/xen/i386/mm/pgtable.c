@@ -25,7 +25,7 @@
 #include <asm/mmu_context.h>
 
 #include <asm-xen/foreign_page.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 
 void show_mem(void)
 {

@@ -13,7 +13,7 @@
 #include <asm/setup.h>
 #include <asm/pgalloc.h>
 #include <asm-xen/evtchn.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/xen-public/io/blkif.h>
 #include <asm-xen/xen-public/io/ring.h>
 #include <asm-xen/gnttab.h>

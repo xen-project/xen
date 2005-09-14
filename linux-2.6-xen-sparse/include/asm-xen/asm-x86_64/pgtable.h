@@ -12,7 +12,7 @@
 #include <linux/sched.h>
 #include <asm/pda.h>
 #ifdef CONFIG_XEN
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 
 extern pud_t level3_user_pgt[512];
 extern pud_t init_level4_user_pgt[];

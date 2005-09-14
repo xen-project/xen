@@ -12,7 +12,7 @@
 #include <linux/init.h>
 #include <asm/io.h>
 #include <asm/page.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 
 /* Referenced in netback.c. */
 /*static*/ kmem_cache_t *skbuff_cachep;

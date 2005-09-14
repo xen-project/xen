@@ -13,7 +13,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/evtchn.h>
 #include <linux/wait.h>
 #include <linux/interrupt.h>

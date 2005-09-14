@@ -33,7 +33,7 @@
 #include <linux/vmalloc.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/balloon.h>
 #include <asm-xen/xen-public/memory.h>
 #include <linux/module.h>

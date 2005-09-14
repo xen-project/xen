@@ -39,7 +39,7 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 #include <asm/sections.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 
 extern unsigned long *contiguous_bitmap;
 

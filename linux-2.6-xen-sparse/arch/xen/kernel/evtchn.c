@@ -40,7 +40,7 @@
 #include <asm/synch_bitops.h>
 #include <asm-xen/xen-public/event_channel.h>
 #include <asm-xen/xen-public/physdev.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/evtchn.h>
 
 /*

@@ -27,7 +27,7 @@
  */
 #define DEBUG
 
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/xenbus.h>
 #include <asm-xen/balloon.h>
 #include <linux/kernel.h>

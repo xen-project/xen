@@ -42,7 +42,7 @@
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
 #include <asm-xen/xen_proc.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/balloon.h>
 #include <asm-xen/xen-public/memory.h>
 #include <asm/pgalloc.h>
