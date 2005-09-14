@@ -149,6 +149,7 @@ class XendDomainInfo:
         path = "/".join(db.getPath().split("/")[0:-2])
         vm = cls(uuid, path, db)
         vm.setDomid(domid)
+        vm.name = vm.readStore("name")
         try:
             db.readDB()
         except: pass
@@ -202,7 +203,6 @@ class XendDomainInfo:
     restore = classmethod(restore)
 
     __exports__ = [
-        DBVar('name',          ty='str'),
         DBVar('config',        ty='sxpr'),
         DBVar('start_time',    ty='float'),
         DBVar('state',         ty='str'),
@@ -264,6 +264,9 @@ class XendDomainInfo:
 
         xstransact.Write(self.path, "uuid", self.uuid)
 
+    def readStore(self, key):
+        return xstransact.Read(self.path, key)
+
     def setDB(self, db):
         self.db = db
 
@@ -292,7 +295,7 @@ class XendDomainInfo:
 
     def setName(self, name):
         self.name = name
-        self.db.name = self.name
+        xstransact.Write(self.path, "name", name)
 
     def getName(self):
         return self.name
