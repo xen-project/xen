@@ -115,7 +115,7 @@ void xen_pt_switch(unsigned long ptr)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_NEW_BASEPTR;
-	op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -123,7 +123,7 @@ void xen_new_user_pt(unsigned long ptr)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_NEW_USER_BASEPTR;
-	op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -138,7 +138,7 @@ void xen_invlpg(unsigned long ptr)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_INVLPG_LOCAL;
-	op.linear_addr = ptr & PAGE_MASK;
+	op.arg1.linear_addr = ptr & PAGE_MASK;
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -157,7 +157,7 @@ void xen_tlb_flush_mask(cpumask_t *mask)
 	if ( cpus_empty(*mask) )
 		return;
 	op.cmd = MMUEXT_TLB_FLUSH_MULTI;
-	op.vcpumask = mask->bits;
+	op.arg2.vcpumask = mask->bits;
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -165,7 +165,7 @@ void xen_invlpg_all(unsigned long ptr)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_INVLPG_ALL;
-	op.linear_addr = ptr & PAGE_MASK;
+	op.arg1.linear_addr = ptr & PAGE_MASK;
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -175,8 +175,8 @@ void xen_invlpg_mask(cpumask_t *mask, unsigned long ptr)
 	if ( cpus_empty(*mask) )
 		return;
 	op.cmd = MMUEXT_INVLPG_MULTI;
-	op.vcpumask = mask->bits;
-	op.linear_addr = ptr & PAGE_MASK;
+	op.arg1.linear_addr = ptr & PAGE_MASK;
+	op.arg2.vcpumask    = mask->bits;
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -193,7 +193,7 @@ void xen_pgd_pin(unsigned long ptr)
 #else
 	op.cmd = MMUEXT_PIN_L2_TABLE;
 #endif
-	op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -201,7 +201,7 @@ void xen_pgd_unpin(unsigned long ptr)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_UNPIN_TABLE;
-	op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -209,7 +209,7 @@ void xen_pte_pin(unsigned long ptr)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_PIN_L1_TABLE;
-	op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -217,7 +217,7 @@ void xen_pte_unpin(unsigned long ptr)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_UNPIN_TABLE;
-	op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -226,7 +226,7 @@ void xen_pud_pin(unsigned long ptr)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_PIN_L3_TABLE;
-	op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -234,7 +234,7 @@ void xen_pud_unpin(unsigned long ptr)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_UNPIN_TABLE;
-	op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -242,7 +242,7 @@ void xen_pmd_pin(unsigned long ptr)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_PIN_L2_TABLE;
-	op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -250,7 +250,7 @@ void xen_pmd_unpin(unsigned long ptr)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_UNPIN_TABLE;
-	op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+	op.arg1.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 #endif /* CONFIG_X86_64 */
@@ -260,8 +260,8 @@ void xen_set_ldt(unsigned long ptr, unsigned long len)
 {
 	struct mmuext_op op;
 	op.cmd = MMUEXT_SET_LDT;
-	op.linear_addr = ptr;
-	op.nr_ents = len;
+	op.arg1.linear_addr = ptr;
+	op.arg2.nr_ents     = len;
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 

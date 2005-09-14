@@ -174,13 +174,13 @@ struct mmuext_op {
         unsigned long mfn;
         /* INVLPG_LOCAL, INVLPG_ALL, SET_LDT */
         unsigned long linear_addr;
-    };
+    } arg1;
     union {
         /* SET_LDT */
         unsigned int nr_ents;
         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
         void *vcpumask;
-    };
+    } arg2;
 };
 #endif
 

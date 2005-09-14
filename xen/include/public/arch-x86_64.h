@@ -124,36 +124,46 @@ typedef struct trap_info {
     unsigned long address; /* code offset                                   */
 } trap_info_t;
 
+#ifdef __GNUC__
+/* Anonymous union includes both 32- and 64-bit names (e.g., eax/rax). */
+#define __DECL_REG(name) union { u64 r ## name, e ## name; }
+#else
+/* Non-gcc sources must always use the proper 64-bit name (e.g., rax). */
+#define __DECL_REG(name) u64 r ## name
+#endif
+
 typedef struct cpu_user_regs {
     u64 r15;
     u64 r14;
     u64 r13;
     u64 r12;
-    union { u64 rbp, ebp; };
-    union { u64 rbx, ebx; };
+    __DECL_REG(bp);
+    __DECL_REG(bx);
     u64 r11;
     u64 r10;
     u64 r9;
     u64 r8;
-    union { u64 rax, eax; };
-    union { u64 rcx, ecx; };
-    union { u64 rdx, edx; };
-    union { u64 rsi, esi; };
-    union { u64 rdi, edi; };
+    __DECL_REG(ax);
+    __DECL_REG(cx);
+    __DECL_REG(dx);
+    __DECL_REG(si);
+    __DECL_REG(di);
     u32 error_code;    /* private */
     u32 entry_vector;  /* private */
-    union { u64 rip, eip; };
+    __DECL_REG(ip);
     u16 cs, _pad0[1];
     u8  saved_upcall_mask;
     u8  _pad1[3];
-    union { u64 rflags, eflags; };
-    union { u64 rsp, esp; };
+    __DECL_REG(flags);
+    __DECL_REG(sp);
     u16 ss, _pad2[3];
     u16 es, _pad3[3];
     u16 ds, _pad4[3];
     u16 fs, _pad5[3]; /* Non-zero => takes precedence over fs_base.      */
     u16 gs, _pad6[3]; /* Non-zero => takes precedence over gs_base_user. */
 } cpu_user_regs_t;
+
+#undef __DECL_REG
 
 typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
 

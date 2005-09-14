@@ -432,7 +432,7 @@ void build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
         
         /* Pin the page to provide correct protection */
         pin_request.cmd = MMUEXT_PIN_L1_TABLE;
-        pin_request.mfn = pfn_to_mfn(pt_frame);
+        pin_request.arg1.mfn = pfn_to_mfn(pt_frame);
         if(HYPERVISOR_mmuext_op(&pin_request, 1, NULL, DOMID_SELF) < 0)
         {
             printk("ERROR: pinning failed\n");
