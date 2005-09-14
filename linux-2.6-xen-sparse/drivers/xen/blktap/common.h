@@ -35,7 +35,7 @@ struct vbd {
     blkif_vdev_t   handle;      /* what the domain refers to this vbd as */
     unsigned char  readonly;    /* Non-zero -> read-only */
     unsigned char  type;        /* VDISK_xxx */
-    blkif_pdev_t   pdevice;     /* phys device that this vbd maps to */
+    u32            pdevice;     /* phys device that this vbd maps to */
     struct block_device *bdev;
 }; 
 
@@ -67,11 +67,6 @@ typedef struct blkif_st {
     grant_ref_t shmem_ref;
 } blkif_t;
 
-void blkif_create(blkif_be_create_t *create);
-void blkif_destroy(blkif_be_destroy_t *destroy);
-void blkif_connect(blkif_be_connect_t *connect);
-int  blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id);
-void blkif_disconnect_complete(blkif_t *blkif);
 blkif_t *alloc_blkif(domid_t domid);
 void free_blkif_callback(blkif_t *blkif);
 int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn);
@@ -84,7 +79,7 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn);
     } while (0)
 
 /* Create a vbd. */
-int vbd_create(blkif_t *blkif, blkif_vdev_t vdevice, blkif_pdev_t pdevice,
+int vbd_create(blkif_t *blkif, blkif_vdev_t vdevice, u32 pdevice,
 	       int readonly);
 void vbd_free(struct vbd *vbd);
 

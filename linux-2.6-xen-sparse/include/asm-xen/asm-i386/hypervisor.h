@@ -36,7 +36,6 @@
 #include <linux/version.h>
 #include <asm-xen/xen-public/xen.h>
 #include <asm-xen/xen-public/dom0_ops.h>
-#include <asm-xen/xen-public/io/domain_controller.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
 #if defined(__i386__)
