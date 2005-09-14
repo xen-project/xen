@@ -136,7 +136,6 @@ class XendDomain:
             try:
                 domid = int(domdb["domid"].getData())
             except:
-                log.info("fuck off")
                 domid = None
             # XXX if domid in self.domains, then something went wrong
             if (domid is None) or (domid in self.domains):
