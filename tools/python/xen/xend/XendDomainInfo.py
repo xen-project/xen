@@ -149,7 +149,8 @@ class XendDomainInfo:
         path = "/".join(db.getPath().split("/")[0:-2])
         vm = cls(uuid, path, db)
         vm.setDomid(domid)
-        vm.name = vm.readVm("name")
+        vm.name, vm.start_time = vm.gatherVm(("name", str),
+                                             ("start-time", float))
         try:
             db.readDB()
         except: pass
@@ -204,7 +205,6 @@ class XendDomainInfo:
 
     __exports__ = [
         DBVar('config',        ty='sxpr'),
-        DBVar('start_time',    ty='float'),
         DBVar('state',         ty='str'),
         DBVar('restart_mode',  ty='str'),
         DBVar('restart_state', ty='str'),
@@ -274,6 +274,12 @@ class XendDomainInfo:
     def removeVm(self, *args):
         return xstransact.Remove(self.path, *args)
 
+    def gatherVm(self, *args):
+        return xstransact.Gather(self.path, *args)
+
+    def storeVm(self, *args):
+        return xstransact.Store(self.path, *args)
+
     def readDom(self, *args):
         return xstransact.Read(self.path, *args)
 
@@ -282,6 +288,12 @@ class XendDomainInfo:
 
     def removeDom(self, *args):
         return xstransact.Remove(self.path, *args)
+
+    def gatherDom(self, *args):
+        return xstransact.Gather(self.path, *args)
+
+    def storeDom(self, *args):
+        return xstransact.Store(self.path, *args)
 
     def setDB(self, db):
         self.db = db
@@ -800,6 +812,7 @@ class XendDomainInfo:
             return
         if self.start_time is None:
             self.start_time = time.time()
+            self.storeVm(("start-time", self.start_time))
         try:
             cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
         except:
