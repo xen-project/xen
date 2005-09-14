@@ -144,7 +144,7 @@ void fire_watches(struct connection *conn, const char *node, bool recurse)
 			else
 				continue;
 			/* If connection not doing anything, queue this. */
-			if (!i->out)
+			if (i->state == OK)
 				queue_next_event(i);
 		}
 	}
