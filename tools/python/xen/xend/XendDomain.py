@@ -673,7 +673,7 @@ class XendDomain:
         @param type: device type
         """
         dominfo = self.domain_lookup(id)
-        val = dominfo.device_destroy(type, devid)
+        val = dominfo.device_delete(type, devid)
         dominfo.exportToDB()
         return val
 
