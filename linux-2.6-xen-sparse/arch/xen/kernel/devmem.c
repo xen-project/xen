@@ -27,7 +27,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-static inline int uncached_access(struct file *file, unsigned long addr)
+static inline int uncached_access(struct file *file)
 {
         if (file->f_flags & O_SYNC)
                 return 1;
@@ -90,10 +90,9 @@ out:
 
 static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
-	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 	int uncached;
 
-	uncached = uncached_access(file, offset);
+	uncached = uncached_access(file);
 	if (uncached)
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
@@ -106,8 +105,9 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 	if (uncached)
 		vma->vm_flags |= VM_IO;
 
-	if (io_remap_page_range(vma, vma->vm_start, offset, 
-				vma->vm_end-vma->vm_start, vma->vm_page_prot))
+	if (direct_remap_pfn_range(vma->vm_mm, vma->vm_start, vma->vm_pgoff,
+				   vma->vm_end - vma->vm_start,
+				   vma->vm_page_prot, DOMID_IO))
 		return -EAGAIN;
 
 	return 0;
