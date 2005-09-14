@@ -113,7 +113,7 @@ class xstransact:
             else:
                 (key, fn, defval) = tup
             try:
-                val = fn(self.read(key))
+                val = fn(self._read(key))
             except TypeError:
                 val = defval
             ret.append(val)
@@ -128,12 +128,16 @@ class xstransact:
                 try:
                     fmt = { str : "%s",
                             int : "%i",
-                            float : "%f" }[type(val)]
+                            float : "%f",
+                            type(None) : None }[type(val)]
                 except KeyError:
                     raise TypeError
             else:
                 (key, val, fmt) = tup
-            self.write(key, fmt % val)
+            if val:
+                self._write(key, fmt % val)
+            else:
+                self._remove(key)
 
 
     def Read(cls, path, *args):
