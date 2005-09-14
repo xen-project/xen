@@ -41,4 +41,8 @@
 
 extern start_info_t *xen_start_info;
 
+void force_evtchn_callback(void);
+
+#include <asm/hypercall.h>
+
 #endif /* __HYPERVISOR_H__ */
