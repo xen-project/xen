@@ -138,10 +138,10 @@ class xstransact:
                     raise TypeError
             else:
                 (key, val, fmt) = tup
-            if val:
-                self._write(key, fmt % val)
-            else:
+            if val is None:
                 self._remove(key)
+            else:
+                self._write(key, fmt % val)
 
 
     def Read(cls, path, *args):
