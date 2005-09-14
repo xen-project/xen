@@ -64,7 +64,6 @@ xm full list of subcommands:
   Domain Commands:
     console <DomId>         attach to console of DomId
     cpus-list <DomId> <VCpu>          get the list of cpus for a VCPU
-    cpus-set <DomId> <VCpu> <CPUS>    set which cpus a VCPU can use. 
     create  <ConfigFile>      create a domain
     destroy <DomId>           terminate a domain immediately
     domid   <DomName>         convert a domain name to a domain id
@@ -83,6 +82,7 @@ xm full list of subcommands:
     vcpu-enable <DomId> <VCPU>        disable VCPU in a domain
     vcpu-disable <DomId> <VCPU>       enable VCPU in a domain
     vcpu-list <DomId>                 get the list of VCPUs for a domain
+    vcpu-pin <DomId> <VCpu> <CPUS>    set which cpus a VCPU can use. 
 
   Xen Host Commands:
     dmesg   [--clear]         read or clear Xen's message buffer
@@ -91,14 +91,15 @@ xm full list of subcommands:
     top                       monitor system and domains in real-time
 
   Scheduler Commands:
-    bvt <options>             set BVT scheduler parameters
-    bvt_ctxallow <Allow>      set the BVT scheduler context switch allowance
-    sedf <options>            set simple EDF parameters
+    sched-bvt <options>       set BVT scheduler parameters
+    sched-bvt-ctxallow <Allow>
+        Set the BVT scheduler context switch allowance
+    sched-sedf <options>      set simple EDF parameters
 
   Virtual Device Commands:
-    block-create <DomId> <BackDev> <FrontDev> <Mode> [BackDomId]
+    block-attach  <DomId> <BackDev> <FrontDev> <Mode> [BackDomId]
         Create a new virtual block device 
-    block-destroy <DomId> <DevId>  Destroy a domain's virtual block device
+    block-detach  <DomId> <DevId>  Destroy a domain's virtual block device
     block-list    <DomId>          List virtual block devices for a domain
     block-refresh <DomId> <DevId>  Refresh a virtual block device for a domain
     network-limit   <DomId> <Vif> <Credit> <Period>
@@ -172,8 +173,7 @@ def xm_create(args):
     from xen.xm import create
     # ugly hack because the opt parser apparently wants
     # the subcommand name just to throw it away!
-    args.insert(0,"bogus")
-    create.main(args)
+    create.main(["bogus"] + args)
 
 def xm_save(args):
     arg_check(args,2,"save")
@@ -201,8 +201,7 @@ def xm_migrate(args):
     from xen.xm import migrate
     # ugly hack because the opt parser apparently wants
     # the subcommand name just to throw it away!
-    args.insert(0,"bogus")
-    migrate.main(args)
+    migrate.main(["bogus"] + args)
 
 def xm_list(args):
     use_long = 0
@@ -289,8 +288,7 @@ def xm_show_vcpus(domsinfo):
                    vcpuinfo)
 
 def xm_vcpu_list(args):
-    args.insert(0,"-v")
-    xm_list(args)
+    xm_list(["-v"] + args)
 
 def xm_destroy(args):
     arg_check(args,1,"destroy")
@@ -298,33 +296,28 @@ def xm_destroy(args):
     from xen.xm import destroy
     # ugly hack because the opt parser apparently wants
     # the subcommand name just to throw it away!
-    args.insert(0,"bogus")
-    destroy.main(args)
+    destroy.main(["bogus"] + args)
             
 def xm_reboot(args):
     arg_check(args,1,"reboot")
+    from xen.xm import shutdown
     # ugly hack because the opt parser apparently wants
     # the subcommand name just to throw it away!
-    args.insert(0,"bogus")
-    args.insert(2,"-R")
-    from xen.xm import shutdown
-    shutdown.main(args)
+    shutdown.main(["bogus", "-R"] + args)
 
 def xm_shutdown(args):
     arg_check(args,1,"shutdown")
 
+    from xen.xm import shutdown
     # ugly hack because the opt parser apparently wants
     # the subcommand name just to throw it away!
-    args.insert(0,"bogus")
-    from xen.xm import shutdown
-    shutdown.main(args)
+    shutdown.main(["bogus"] + args)
 
 def xm_sysrq(args):
     from xen.xm import sysrq
     # ugly hack because the opt parser apparently wants
     # the subcommand name just to throw it away!
-    args.insert(0,"bogus")
-    sysrq.main(args)
+    sysrq.main(["bogus"] + args)
 
 def xm_pause(args):
     arg_check(args, 1, "pause")
@@ -358,8 +351,8 @@ def cpu_make_map(cpulist):
 
     return cpumap
 
-def xm_cpus_set(args):
-    arg_check(args, 3, "cpus-set")
+def xm_vcpu_pin(args):
+    arg_check(args, 3, "vcpu-pin")
     
     dom  = args[0]
     vcpu = int(args[1])
@@ -423,22 +416,22 @@ def xm_domname(args):
     dom = server.xend_domain(name)
     print sxp.child_value(dom, 'name')
 
-def xm_bvt(args):
-    arg_check(args, 6, "bvt")
+def xm_sched_bvt(args):
+    arg_check(args, 6, "sched-bvt")
     dom = args[0]
     v = map(long, args[1:6])
     from xen.xend.XendClient import server
     server.xend_domain_cpu_bvt_set(dom, *v)
 
-def xm_bvt_ctxallow(args):
-    arg_check(args, 1, "bvt_ctxallow")
+def xm_sched_bvt_ctxallow(args):
+    arg_check(args, 1, "sched-bvt-ctxallow")
 
     slice = int(args[0])
     from xen.xend.XendClient import server
     server.xend_node_cpu_bvt_slice_set(slice)
 
-def xm_sedf(args):
-    arg_check(args, 6, "sedf")
+def xm_sched_sedf(args):
+    arg_check(args, 6, "sched-sedf")
     
     dom = args[0]
     v = map(int, args[1:6])
@@ -482,10 +475,11 @@ its contents if the [-c|--clear] flag is specified.
               fn=set_true, default=0,
               use="Clear the contents of the Xen message buffer.")
     # Work around for gopts
-    args.insert(0,"bogus")
-    gopts.parse(args)
-    if not (1 <= len(args) <= 2):
-        err('Invalid arguments: ' + str(args))
+    myargs = args
+    myargs.insert(0, "bogus")
+    gopts.parse(myargs)
+    if not (1 <= len(myargs) <= 2):
+        err('Invalid arguments: ' + str(myargs))
 
     from xen.xend.XendClient import server
     if not gopts.vals.clear:
@@ -512,6 +506,14 @@ def xm_network_list(args):
         sxp.show(x)
         print
 
+def xm_network_attach(args):
+
+    print "Not implemented"
+
+def xm_network_detach(args):
+
+    print "Not implemented"
+    
 def xm_block_list(args):
     arg_check(args,1,"block-list")
     dom = args[0]
@@ -520,11 +522,14 @@ def xm_block_list(args):
         sxp.show(x)
         print
 
-def xm_block_create(args):
+def xm_block_attach(args):
     n = len(args)
+    if n == 0:
+        usage("block-attach")
+        
     if n < 4 or n > 5:
         err("%s: Invalid argument(s)" % args[0])
-        usage("block-create")
+        usage("block-attach")
 
     dom = args[0]
     vbd = ['vbd',
@@ -546,8 +551,8 @@ def xm_block_refresh(args):
     from xen.xend.XendClient import server
     server.xend_domain_device_refresh(dom, 'vbd', dev)
 
-def xm_block_destroy(args):
-    arg_check(args,2,"block-destroy")
+def xm_block_detach(args):
+    arg_check(args,2,"block-detach")
 
     dom = args[0]
     dev = args[1]
@@ -615,7 +620,7 @@ commands = {
     "mem-max": xm_mem_max,
     "mem-set": xm_mem_set,
     # cpu commands
-    "cpus-set": xm_cpus_set,
+    "vcpu-pin": xm_vcpu_pin,
 #    "cpus-list": xm_cpus_list,
     "vcpu-enable": xm_vcpu_enable,
     "vcpu-disable": xm_vcpu_disable,
@@ -631,17 +636,19 @@ commands = {
     "info": xm_info,
     "log": xm_log,
     # scheduler
-    "bvt": xm_bvt,
-    "bvt_ctxallow": xm_bvt_ctxallow,
-    "sedf": xm_sedf,
+    "sched-bvt": xm_sched_bvt,
+    "sched-bvt-ctxallow": xm_sched_bvt_ctxallow,
+    "sched-sedf": xm_sched_sedf,
     # block
-    "block-create": xm_block_create,
-    "block-destroy": xm_block_destroy,
+    "block-attach": xm_block_attach,
+    "block-detach": xm_block_detach,
     "block-list": xm_block_list,
     "block-refresh": xm_block_refresh,
     # network
     "network-limit": xm_network_limit,
     "network-list": xm_network_list,
+    "network-attach": xm_network_attach,
+    "network-detach": xm_network_detach,
     # vnet
     "vnet-list": xm_vnet_list,
     "vnet-create": xm_vnet_create,
@@ -719,8 +726,6 @@ def main(argv=sys.argv):
             sys.exit(1)
         except XendError, ex:
             if len(args) > 0:
-                if args[0] == "bogus":
-                    args.remove("bogus")
                 handle_xend_error(argv[1], args[0], ex)
             else:
                 print "Unexpected error:", sys.exc_info()[0]
