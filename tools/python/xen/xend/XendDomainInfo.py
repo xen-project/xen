@@ -205,7 +205,6 @@ class XendDomainInfo:
     __exports__ = [
         DBVar('id',            ty='int'),
         DBVar('name',          ty='str'),
-        DBVar('uuid',          ty='str'),
         DBVar('config',        ty='sxpr'),
         DBVar('start_time',    ty='float'),
         DBVar('state',         ty='str'),
@@ -219,6 +218,7 @@ class XendDomainInfo:
     def __init__(self, uuid, path, db):
         self.uuid = uuid
         self.path = path + "/" + uuid
+
         self.db = db
 
         self.recreate = 0
@@ -263,6 +263,8 @@ class XendDomainInfo:
         self.vcpus = 1
         self.bootloader = None
         self.device_model_pid = 0
+
+        xstransact.Write(self.path, "uuid", self.uuid)
 
     def setDB(self, db):
         self.db = db

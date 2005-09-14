@@ -142,7 +142,7 @@ class XendDomain:
                 domdb.delete()
             elif domid in doms:
                 try:
-                    self._new_domain(db.uuid, db, doms[domid]) 
+                    self._new_domain(domdb["uuid"].getData(), db, doms[domid]) 
                 except Exception, ex:
                     log.exception("Error recreating domain info: id=%d", domid)
                     self._delete_domain(domid)

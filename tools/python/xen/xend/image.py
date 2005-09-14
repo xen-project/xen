@@ -155,7 +155,6 @@ class ImageHandler:
             if dom <= 0:
                 raise VmError('Creating domain failed: name=%s' % self.vm.name)
         log.debug("initDomain: cpu=%d mem_kb=%d ssidref=%d dom=%d", cpu, mem_kb, ssidref, dom)
-        # xc.domain_setuuid(dom, uuid)
         xc.domain_setcpuweight(dom, cpu_weight)
         xc.domain_setmaxmem(dom, mem_kb)
 
