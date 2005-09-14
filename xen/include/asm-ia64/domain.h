@@ -54,7 +54,7 @@ struct arch_vcpu {
 	unsigned long dtlb_pte;
 	unsigned long irr[4];
 	unsigned long insvc[4];
-	unsigned long iva;
+    unsigned long iva;
 	unsigned long dcr;
 	unsigned long itc;
 	unsigned long domain_itm;
@@ -63,6 +63,7 @@ struct arch_vcpu {
 	unsigned long xen_timer_interval;
 #endif
     void *regs;	/* temporary until find a better way to do privops */
+    mapped_regs_t *privregs; /* save the state of vcpu */
     int metaphysical_rr0;		// from arch_domain (so is pinned)
     int metaphysical_rr4;		// from arch_domain (so is pinned)
     int metaphysical_saved_rr0;		// from arch_domain (so is pinned)

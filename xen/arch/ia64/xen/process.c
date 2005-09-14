@@ -173,7 +173,7 @@ void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long it
 	struct vcpu *v = current;
 
 	if (vector == IA64_EXTINT_VECTOR) {
-		
+
 		extern unsigned long vcpu_verbose, privop_trace;
 		static first_extint = 1;
 		if (first_extint) {

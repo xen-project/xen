@@ -234,7 +234,7 @@ int set_one_rr(unsigned long rr, unsigned long val)
 		newrrv.ve = VHPT_ENABLED_REGION_7;
 		newrrv.ps = IA64_GRANULE_SHIFT;
 		ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info,
-				v->vcpu_info->arch.privregs);
+				v->arch.privregs);
 	}
 	else {
 		newrrv.rid = newrid;
@@ -252,7 +252,7 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	newrrv.ps = PAGE_SHIFT;
 	if (rreg == 0) v->arch.metaphysical_saved_rr0 = newrrv.rrval;
 	if (rreg == 7) ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info,
-				v->vcpu_info->arch.privregs);
+				v->arch.privregs);
 	else set_rr(rr,newrrv.rrval);
 #endif
 	return 1;

@@ -194,10 +194,12 @@ void arch_do_createdomain(struct vcpu *v)
    		while (1);
 	}
 	memset(d->shared_info, 0, PAGE_SIZE);
-	d->shared_info->vcpu_data[0].arch.privregs = 
+#if 0
+	d->vcpu[0].arch.privregs = 
 			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
-	printf("arch_vcpu_info=%p\n", d->shared_info->vcpu_data[0].arch.privregs);
-	memset(d->shared_info->vcpu_data[0].arch.privregs, 0, PAGE_SIZE);
+	printf("arch_vcpu_info=%p\n", d->vcpu[0].arch.privregs);
+	memset(d->vcpu.arch.privregs, 0, PAGE_SIZE);
+#endif
 	v->vcpu_info = &(d->shared_info->vcpu_data[0]);
 
 	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
@@ -216,7 +218,7 @@ void arch_do_createdomain(struct vcpu *v)
 	if (((d->arch.metaphysical_rr0 = allocate_metaphysical_rr()) == -1UL)
 	 || ((d->arch.metaphysical_rr4 = allocate_metaphysical_rr()) == -1UL))
 		BUG();
-	VCPU(v, metaphysical_mode) = 1;
+//	VCPU(v, metaphysical_mode) = 1;
 	v->arch.metaphysical_rr0 = d->arch.metaphysical_rr0;
 	v->arch.metaphysical_rr4 = d->arch.metaphysical_rr4;
 	v->arch.metaphysical_saved_rr0 = d->arch.metaphysical_rr0;
@@ -284,12 +286,17 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 
 	    vmx_setup_platform(v, c);
 	}
-
+    else{
+    	v->arch.privregs =
+			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+	    printf("arch_vcpu_info=%p\n", v->arch.privregs);
+    	memset(v->arch.privregs, 0, PAGE_SIZE);
+    }
 	*regs = c->regs;
 	new_thread(v, regs->cr_iip, 0, 0);
 
  	v->vcpu_info->arch.evtchn_vector = c->vcpu.evtchn_vector;
-	if ( c->vcpu.privregs && copy_from_user(v->vcpu_info->arch.privregs,
+	if ( c->vcpu.privregs && copy_from_user(v->arch.privregs,
 			   c->vcpu.privregs, sizeof(mapped_regs_t))) {
 	    printk("Bad ctxt address in arch_set_info_guest: 0x%lx\n", c->vcpu.privregs);
 	    return -EFAULT;
@@ -309,10 +316,10 @@ void arch_do_boot_vcpu(struct vcpu *v)
 	struct domain *d = v->domain;
 	printf("arch_do_boot_vcpu: not implemented\n");
 
-	d->shared_info->vcpu_data[v->vcpu_id].arch.privregs = 
+	d->vcpu[v->vcpu_id]->arch.privregs = 
 			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
-	printf("arch_vcpu_info=%p\n", d->shared_info->vcpu_data[v->vcpu_id].arch.privregs);
-	memset(d->shared_info->vcpu_data[v->vcpu_id].arch.privregs, 0, PAGE_SIZE);
+	printf("arch_vcpu_info=%p\n", d->vcpu[v->vcpu_id]->arch.privregs);
+	memset(d->vcpu[v->vcpu_id]->arch.privregs, 0, PAGE_SIZE);
 	return;
 }
 
@@ -357,10 +364,10 @@ void new_thread(struct vcpu *v,
 #ifdef CONFIG_VTI
 		vmx_init_all_rr(v);
 		if (d == dom0)
-		    VMX_VPD(v,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);
+		    VCPU(v,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);
 		/* Virtual processor context setup */
-		VMX_VPD(v, vpsr) = IA64_PSR_BN;
-		VPD_CR(v, dcr) = 0;
+		VCPU(v, vpsr) = IA64_PSR_BN;
+		VCPU(v, dcr) = 0;
 #endif
 	} else {
 		init_all_rr(v);
@@ -995,6 +1002,12 @@ int construct_dom0(struct domain *d,
 	printk("Dom0: 0x%lx, domain: 0x%lx\n", (u64)dom0, (u64)d);
 	if (vmx_dom0)
 	    vmx_final_setup_domain(dom0);
+    else{
+    	d->vcpu[0]->arch.privregs = 
+			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+	    printf("arch_vcpu_info=%p\n", d->vcpu[0]->arch.privregs);
+    	memset(d->vcpu[0]->arch.privregs, 0, PAGE_SIZE);
+    }
 
 	set_bit(_DOMF_constructed, &d->domain_flags);
 

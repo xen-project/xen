@@ -455,7 +455,7 @@ set_rnat_consumption_isr (VCPU *vcpu,int inst,int read,int write)
     value = set_isr_ei_ni (vcpu);
     visr.val = visr.val | value;
 
-    vmx_vcpu_set_isr (vcpu,visr.val);
+    vcpu_set_isr (vcpu,visr.val);
 }
 
 
@@ -476,7 +476,7 @@ void set_break_isr (VCPU *vcpu)
     value = set_isr_ei_ni (vcpu);
     visr.val = visr.val | value;
 
-    vmx_vcpu_set_isr(vcpu, visr.val);
+    vcpu_set_isr(vcpu, visr.val);
 }
 
 
@@ -508,7 +508,7 @@ void set_privileged_operation_isr (VCPU *vcpu,int inst)
     value = set_isr_ei_ni (vcpu);
     visr.val = visr.val | value;
 
-    vmx_vcpu_set_isr (vcpu, visr.val);
+    vcpu_set_isr (vcpu, visr.val);
 }
 
 
@@ -533,7 +533,7 @@ void set_privileged_reg_isr (VCPU *vcpu, int inst)
     value = set_isr_ei_ni (vcpu);
     visr.val = visr.val | value;
 
-    vmx_vcpu_set_isr (vcpu, visr.val);
+    vcpu_set_isr (vcpu, visr.val);
 }
 
 
@@ -559,7 +559,7 @@ void set_rsv_reg_field_isr (VCPU *vcpu)
     value = set_isr_ei_ni (vcpu);
     visr.val = visr.val | value;
 
-    vmx_vcpu_set_isr (vcpu, visr.val);
+    vcpu_set_isr (vcpu, visr.val);
 }
 
 
@@ -580,7 +580,7 @@ void set_illegal_op_isr (VCPU *vcpu)
     value = set_isr_ei_ni (vcpu);
     visr.val = visr.val | value;
 
-    vmx_vcpu_set_isr (vcpu, visr.val);
+    vcpu_set_isr (vcpu, visr.val);
 }
 
 
@@ -594,7 +594,7 @@ void set_isr_reg_nat_consumption(VCPU *vcpu, u64 flag, u64 non_access)
     isr.na = non_access;
     isr.r = 1;
     isr.w = 0;
-    vmx_vcpu_set_isr(vcpu, isr.val);
+    vcpu_set_isr(vcpu, isr.val);
     return;
 }
 
@@ -606,7 +606,7 @@ void set_isr_for_priv_fault(VCPU *vcpu, u64 non_access)
     isr.val = set_isr_ei_ni(vcpu);
     isr.code = IA64_PRIV_OP_FAULT;
     isr.na = non_access;
-    vmx_vcpu_set_isr(vcpu, isr.val);
+    vcpu_set_isr(vcpu, isr.val);
 
     return;
 }

@@ -98,7 +98,8 @@ void hyper_dom_mem_op(void)
     vmx_vcpu_get_gr(vcpu,18,&r34);
     vmx_vcpu_get_gr(vcpu,19,&r35);
     vmx_vcpu_get_gr(vcpu,20,&r36);
-    ret=do_dom_mem_op(r32,(u64 *)r33,r34,r35,r36);
+//    ret=do_dom_mem_op(r32,(u64 *)r33,r34,r35,r36);
+    ret = 0;
     printf("do_dom_mem return value: %lx\n", ret);
     vmx_vcpu_set_gr(vcpu, 8, ret, 0);
 

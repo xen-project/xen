@@ -355,7 +355,11 @@ extern unsigned long privop_trace;
 
 IA64FAULT vcpu_get_iva(VCPU *vcpu, UINT64 *pval)
 {
-	*pval = PSCBX(vcpu,iva) & ~0x7fffL;
+    if(VMX_DOMAIN(vcpu)){
+    	*pval = PSCB(vcpu,iva) & ~0x7fffL;
+    }else{
+        *pval = PSCBX(vcpu,iva) & ~0x7fffL;
+    }
 	return (IA64_NO_FAULT);
 }
 
@@ -435,7 +439,7 @@ IA64FAULT vcpu_get_iipa(VCPU *vcpu, UINT64 *pval)
 	UINT64 val = PSCB(vcpu,iipa);
 	// SP entry code does not save iipa yet nor does it get
 	//  properly delivered in the pscb
-	printf("*** vcpu_get_iipa: cr.iipa not fully implemented yet!!\n");
+//	printf("*** vcpu_get_iipa: cr.iipa not fully implemented yet!!\n");
 	*pval = val;
 	return (IA64_NO_FAULT);
 }
@@ -480,7 +484,11 @@ extern unsigned long privop_trace;
 
 IA64FAULT vcpu_set_iva(VCPU *vcpu, UINT64 val)
 {
-	PSCBX(vcpu,iva) = val & ~0x7fffL;
+    if(VMX_DOMAIN(vcpu)){
+    	PSCB(vcpu,iva) = val & ~0x7fffL;
+    }else{
+        PSCBX(vcpu,iva) = val & ~0x7fffL;
+    }
 	return (IA64_NO_FAULT);
 }
 
@@ -539,7 +547,7 @@ IA64FAULT vcpu_set_iipa(VCPU *vcpu, UINT64 val)
 {
 	// SP entry code does not save iipa yet nor does it get
 	//  properly delivered in the pscb
-	printf("*** vcpu_set_iipa: cr.iipa not fully implemented yet!!\n");
+//	printf("*** vcpu_set_iipa: cr.iipa not fully implemented yet!!\n");
 	PSCB(vcpu,iipa) = val;
 	return IA64_NO_FAULT;
 }
@@ -578,11 +586,11 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 		printf("vcpu_pend_interrupt: bad vector\n");
 		return;
 	}
-#ifdef CONFIG_VTI
+//#ifdef CONFIG_VTI
     if ( VMX_DOMAIN(vcpu) ) {
- 	    set_bit(vector,VPD_CR(vcpu,irr));
+ 	    set_bit(vector,VCPU(vcpu,irr));
     } else
-#endif // CONFIG_VTI
+//#endif // CONFIG_VTI
     {
 	/* if (!test_bit(vector,PSCB(vcpu,delivery_mask))) return; */
 	if (test_bit(vector,PSCBX(vcpu,irr))) {

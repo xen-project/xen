@@ -42,14 +42,14 @@
 #define VRN5    0x5UL
 #define VRN6    0x6UL
 #define VRN7    0x7UL
-
+// for vlsapic
+#define  VLSAPIC_INSVC(vcpu, i) ((vcpu)->arch.insvc[i])
 // this def for vcpu_regs won't work if kernel stack is present
 #define	vcpu_regs(vcpu) (((struct pt_regs *) ((char *) (vcpu) + IA64_STK_OFFSET)) - 1)
-#define	VMX_VPD(x,y)	((x)->arch.arch_vmx.vpd->y)
+//#define	VMX_VPD(x,y)	((x)->arch.arch_vmx.vpd->y)
 
 #define VMX(x,y)  ((x)->arch.arch_vmx.y)
 
-#define VPD_CR(x,y) (((cr_t*)VMX_VPD(x,vcr))->y)
 
 #define VMM_RR_SHIFT    20
 #define VMM_RR_MASK     ((1UL<<VMM_RR_SHIFT)-1)
@@ -129,89 +129,34 @@ extern void memwrite_p(VCPU *vcpu, u64 *src, u64 *dest, size_t s);
 static inline
 IA64FAULT vmx_vcpu_get_dcr(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,dcr);
+    *pval = VCPU(vcpu,dcr);
     return (IA64_NO_FAULT);
 }
 
 static inline
 IA64FAULT vmx_vcpu_get_itm(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,itm);
+    *pval = VCPU(vcpu,itm);
     return (IA64_NO_FAULT);
 }
 
 static inline
 IA64FAULT vmx_vcpu_get_iva(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,iva);
+    *pval = VCPU(vcpu,iva);
     return (IA64_NO_FAULT);
 }
 static inline
 IA64FAULT vmx_vcpu_get_pta(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,pta);
-    return (IA64_NO_FAULT);
-}
-static inline
-IA64FAULT vmx_vcpu_get_ipsr(VCPU *vcpu, UINT64 *pval)
-{
-    *pval = VPD_CR(vcpu,ipsr);
+    *pval = VCPU(vcpu,pta);
     return (IA64_NO_FAULT);
 }
 
-static inline
-IA64FAULT vmx_vcpu_get_isr(VCPU *vcpu, UINT64 *pval)
-{
-    *pval = VPD_CR(vcpu,isr);
-    return (IA64_NO_FAULT);
-}
-static inline
-IA64FAULT vmx_vcpu_get_iip(VCPU *vcpu, UINT64 *pval)
-{
-    *pval = VPD_CR(vcpu,iip);
-    return (IA64_NO_FAULT);
-}
-static inline
-IA64FAULT vmx_vcpu_get_ifa(VCPU *vcpu, UINT64 *pval)
-{
-    *pval = VPD_CR(vcpu,ifa);
-    return (IA64_NO_FAULT);
-}
-
-static inline
-IA64FAULT vmx_vcpu_get_itir(VCPU *vcpu, UINT64 *pval)
-{
-    *pval = VPD_CR(vcpu,itir);
-    return (IA64_NO_FAULT);
-}
-static inline
-IA64FAULT vmx_vcpu_get_iipa(VCPU *vcpu, UINT64 *pval)
-{
-    *pval = VPD_CR(vcpu,iipa);
-    return (IA64_NO_FAULT);
-}
-static inline
-IA64FAULT vmx_vcpu_get_ifs(VCPU *vcpu, UINT64 *pval)
-{
-    *pval = VPD_CR(vcpu,ifs);
-    return (IA64_NO_FAULT);
-}
-static inline
-IA64FAULT vmx_vcpu_get_iim(VCPU *vcpu, UINT64 *pval)
-{
-    *pval = VPD_CR(vcpu,iim);
-    return (IA64_NO_FAULT);
-}
-static inline
-IA64FAULT vmx_vcpu_get_iha(VCPU *vcpu, UINT64 *pval)
-{
-    *pval = VPD_CR(vcpu,iha);
-    return (IA64_NO_FAULT);
-}
 static inline
 IA64FAULT vmx_vcpu_get_lid(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,lid);
+    *pval = VCPU(vcpu,lid);
     return (IA64_NO_FAULT);
 }
 static inline
@@ -223,7 +168,7 @@ IA64FAULT vmx_vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 static inline
 IA64FAULT vmx_vcpu_get_tpr(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,tpr);
+    *pval = VCPU(vcpu,tpr);
     return (IA64_NO_FAULT);
 }
 static inline
@@ -235,54 +180,54 @@ IA64FAULT vmx_vcpu_get_eoi(VCPU *vcpu, UINT64 *pval)
 static inline
 IA64FAULT vmx_vcpu_get_irr0(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,irr[0]);
+    *pval = VCPU(vcpu,irr[0]);
     return (IA64_NO_FAULT);
 }
 static inline
 IA64FAULT vmx_vcpu_get_irr1(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,irr[1]);
+    *pval = VCPU(vcpu,irr[1]);
     return (IA64_NO_FAULT);
 }
 static inline
 IA64FAULT vmx_vcpu_get_irr2(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,irr[2]);
+    *pval = VCPU(vcpu,irr[2]);
     return (IA64_NO_FAULT);
 }
 static inline
 IA64FAULT vmx_vcpu_get_irr3(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,irr[3]);
+    *pval = VCPU(vcpu,irr[3]);
     return (IA64_NO_FAULT);
 }
 static inline
 IA64FAULT vmx_vcpu_get_itv(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,itv);
+    *pval = VCPU(vcpu,itv);
     return (IA64_NO_FAULT);
 }
 static inline
 IA64FAULT vmx_vcpu_get_pmv(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,pmv);
+    *pval = VCPU(vcpu,pmv);
     return (IA64_NO_FAULT);
 }
 static inline
 IA64FAULT vmx_vcpu_get_cmcv(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,cmcv);
+    *pval = VCPU(vcpu,cmcv);
     return (IA64_NO_FAULT);
 }
 static inline
 IA64FAULT vmx_vcpu_get_lrr0(VCPU *vcpu, UINT64 *pval)
 {
-    *pval = VPD_CR(vcpu,lrr0);
+    *pval = VCPU(vcpu,lrr0);
     return (IA64_NO_FAULT);
 }
 static inline
 IA64FAULT vmx_vcpu_get_lrr1(VCPU *vcpu, UINT64 *pval)
-{    *pval = VPD_CR(vcpu,lrr1);
+{    *pval = VCPU(vcpu,lrr1);
     return (IA64_NO_FAULT);
 }
 static inline
@@ -290,7 +235,7 @@ IA64FAULT
 vmx_vcpu_set_dcr(VCPU *vcpu, u64 val)
 {
     u64 mdcr, mask;
-    VPD_CR(vcpu,dcr)=val;
+    VCPU(vcpu,dcr)=val;
     /* All vDCR bits will go to mDCR, except for be/pp bit */
     mdcr = ia64_get_dcr();
     mask = IA64_DCR_BE | IA64_DCR_PP;
@@ -307,7 +252,7 @@ vmx_vcpu_set_itm(VCPU *vcpu, u64 val)
     vtime_t     *vtm;
     
     vtm=&(vcpu->arch.arch_vmx.vtm);
-    VPD_CR(vcpu,itm)=val;
+    VCPU(vcpu,itm)=val;
 #ifdef CONFIG_VTI
     vtm_interruption_update(vcpu, vtm);
 #endif
@@ -317,7 +262,7 @@ static inline
 IA64FAULT
 vmx_vcpu_set_iva(VCPU *vcpu, u64 val)
 {
-    VPD_CR(vcpu,iva)=val;
+    VCPU(vcpu,iva)=val;
     return IA64_NO_FAULT;
 }
 
@@ -325,78 +270,7 @@ static inline
 IA64FAULT
 vmx_vcpu_set_pta(VCPU *vcpu, u64 val)
 {
-    VPD_CR(vcpu,pta)=val;
-    return IA64_NO_FAULT;
-}
-
-static inline
-IA64FAULT
-vmx_vcpu_set_ipsr(VCPU *vcpu, u64 val)
-{
-    VPD_CR(vcpu,ipsr)=val;
-    return IA64_NO_FAULT;
-}
-
-static inline
-IA64FAULT
-vmx_vcpu_set_isr(VCPU *vcpu, u64 val)
-{
-    VPD_CR(vcpu,isr)=val;
-    return IA64_NO_FAULT;
-}
-
-static inline
-IA64FAULT
-vmx_vcpu_set_iip(VCPU *vcpu, u64 val)
-{
-    VPD_CR(vcpu,iip)=val;
-    return IA64_NO_FAULT;
-}
-
-static inline
-IA64FAULT
-vmx_vcpu_set_ifa(VCPU *vcpu, u64 val)
-{
-    VPD_CR(vcpu,ifa)=val;
-    return IA64_NO_FAULT;
-}
-
-static inline
-IA64FAULT
-vmx_vcpu_set_itir(VCPU *vcpu, u64 val)
-{
-    VPD_CR(vcpu,itir)=val;
-    return IA64_NO_FAULT;
-}
-
-static inline
-IA64FAULT
-vmx_vcpu_set_iipa(VCPU *vcpu, u64 val)
-{
-    VPD_CR(vcpu,iipa)=val;
-    return IA64_NO_FAULT;
-}
-
-static inline
-IA64FAULT
-vmx_vcpu_set_ifs(VCPU *vcpu, u64 val)
-{
-    VPD_CR(vcpu,ifs)=val;
-    return IA64_NO_FAULT;
-}
-static inline
-IA64FAULT
-vmx_vcpu_set_iim(VCPU *vcpu, u64 val)
-{
-    VPD_CR(vcpu,iim)=val;
-    return IA64_NO_FAULT;
-}
-
-static inline
-IA64FAULT
-vmx_vcpu_set_iha(VCPU *vcpu, u64 val)
-{
-    VPD_CR(vcpu,iha)=val;
+    VCPU(vcpu,pta)=val;
     return IA64_NO_FAULT;
 }
 
@@ -404,7 +278,7 @@ static inline
 IA64FAULT
 vmx_vcpu_set_lid(VCPU *vcpu, u64 val)
 {
-    VPD_CR(vcpu,lid)=val;
+    VCPU(vcpu,lid)=val;
 #ifdef V_IOSAPIC_READY
     vlapic_update_shared_info(vcpu);
 #endif
@@ -427,7 +301,7 @@ IA64FAULT
 vmx_vcpu_set_itv(VCPU *vcpu, u64 val)
 {
 
-    VPD_CR(vcpu,itv)=val;
+    VCPU(vcpu,itv)=val;
 #ifdef CONFIG_VTI
     vtm_set_itv(vcpu);
 #endif
@@ -437,28 +311,28 @@ static inline
 IA64FAULT
 vmx_vcpu_set_pmv(VCPU *vcpu, u64 val)
 {
-    VPD_CR(vcpu,pmv)=val;
+    VCPU(vcpu,pmv)=val;
     return IA64_NO_FAULT;
 }
 static inline
 IA64FAULT
 vmx_vcpu_set_cmcv(VCPU *vcpu, u64 val)
 {
-    VPD_CR(vcpu,cmcv)=val;
+    VCPU(vcpu,cmcv)=val;
     return IA64_NO_FAULT;
 }
 static inline
 IA64FAULT
 vmx_vcpu_set_lrr0(VCPU *vcpu, u64 val)
 {
-    VPD_CR(vcpu,lrr0)=val;
+    VCPU(vcpu,lrr0)=val;
     return IA64_NO_FAULT;
 }
 static inline
 IA64FAULT
 vmx_vcpu_set_lrr1(VCPU *vcpu, u64 val)
 {
-    VPD_CR(vcpu,lrr1)=val;
+    VCPU(vcpu,lrr1)=val;
     return IA64_NO_FAULT;
 }
 
@@ -502,7 +376,7 @@ IA64FAULT vmx_vcpu_get_cpuid(VCPU *vcpu, UINT64 reg, UINT64 *pval)
     if(reg > 4){
         panic("there are only five cpuid registers");
     }
-    *pval=VMX_VPD(vcpu,vcpuid[reg]);
+    *pval=VCPU(vcpu,vcpuid[reg]);
     return (IA64_NO_FAULT);
 }
 
@@ -583,14 +457,14 @@ static inline
 IA64FAULT vmx_vcpu_bsw0(VCPU *vcpu)
 {
 
-    VMX_VPD(vcpu,vpsr) &= ~IA64_PSR_BN;
+    VCPU(vcpu,vpsr) &= ~IA64_PSR_BN;
     return (IA64_NO_FAULT);
 }
 static inline
 IA64FAULT vmx_vcpu_bsw1(VCPU *vcpu)
 {
 
-    VMX_VPD(vcpu,vpsr) |= IA64_PSR_BN;
+    VCPU(vcpu,vpsr) |= IA64_PSR_BN;
     return (IA64_NO_FAULT);
 }
 #if 0

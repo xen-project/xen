@@ -95,35 +95,37 @@ typedef struct cpu_user_regs{
 	unsigned long r2;		/* scratch */
 	unsigned long r3;		/* scratch */
 
-#ifdef CONFIG_VTI
-	unsigned long r4;		/* preserved */
-	unsigned long r5;		/* preserved */
-	unsigned long r6;		/* preserved */
-	unsigned long r7;		/* preserved */
-	unsigned long cr_iipa;   /* for emulation */
-	unsigned long cr_isr;    /* for emulation */
-	unsigned long eml_unat;    /* used for emulating instruction */
-	unsigned long rfi_pfs;     /* used for elulating rfi */
-#endif
-
-	/* The following registers are saved by SAVE_REST: */
-	unsigned long r16;		/* scratch */
-	unsigned long r17;		/* scratch */
-	unsigned long r18;		/* scratch */
-	unsigned long r19;		/* scratch */
-	unsigned long r20;		/* scratch */
-	unsigned long r21;		/* scratch */
-	unsigned long r22;		/* scratch */
-	unsigned long r23;		/* scratch */
-	unsigned long r24;		/* scratch */
-	unsigned long r25;		/* scratch */
-	unsigned long r26;		/* scratch */
-	unsigned long r27;		/* scratch */
-	unsigned long r28;		/* scratch */
-	unsigned long r29;		/* scratch */
-	unsigned long r30;		/* scratch */
-	unsigned long r31;		/* scratch */
-
+    union {
+      struct {
+    	/* The following registers are saved by SAVE_REST: */
+	    unsigned long r16;		/* scratch */
+    	unsigned long r17;		/* scratch */
+	    unsigned long r18;		/* scratch */
+    	unsigned long r19;		/* scratch */
+	    unsigned long r20;		/* scratch */
+    	unsigned long r21;		/* scratch */
+    	unsigned long r22;		/* scratch */
+    	unsigned long r23;		/* scratch */
+    	unsigned long r24;		/* scratch */
+    	unsigned long r25;		/* scratch */
+    	unsigned long r26;		/* scratch */
+    	unsigned long r27;		/* scratch */
+    	unsigned long r28;		/* scratch */
+    	unsigned long r29;		/* scratch */
+    	unsigned long r30;		/* scratch */
+    	unsigned long r31;		/* scratch */
+      };
+      struct {
+    	unsigned long r4;		/* preserved */
+	    unsigned long r5;		/* preserved */
+    	unsigned long r6;		/* preserved */
+	    unsigned long r7;		/* preserved */
+    	unsigned long cr_iipa;   /* for emulation */
+	    unsigned long cr_isr;    /* for emulation */
+    	unsigned long eml_unat;    /* used for emulating instruction */
+	    unsigned long rfi_pfs;     /* used for elulating rfi */
+      };
+    };
 	unsigned long ar_ccv;		/* compare/exchange value (scratch) */
 
 	/*
@@ -238,10 +240,12 @@ typedef struct {
 	    unsigned long tmp[8];	// temp registers (e.g. for hyperprivops)
 	  };
         };
+#if 0
 #ifdef CONFIG_VTI
 	unsigned long		reserved6[3456];
 	unsigned long		vmm_avail[128];
 	unsigned long		reserved7[4096];
+#endif
 #endif
 } mapped_regs_t;
 

@@ -180,7 +180,7 @@ IA64FAULT vmx_emul_mov_to_psr(VCPU *vcpu, INST64 inst)
     if(vmx_vcpu_get_gr(vcpu, inst.M35.r2, &val) != IA64_NO_FAULT)
 	panic(" get_psr nat bit fault\n");
 
-	val = (val & MASK(0, 32)) | (VMX_VPD(vcpu, vpsr) & MASK(32, 32));
+	val = (val & MASK(0, 32)) | (VCPU(vcpu, vpsr) & MASK(32, 32));
 #if 0
 	if (last_mov_from_psr && (last_guest_psr != (val & MASK(0,32))))
 		while(1);
@@ -546,10 +546,10 @@ IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
     }
 #endif // VMAL_NO_FAULT_CHECK
 
-    if (vmx_vcpu_get_itir(vcpu,&itir)){
+    if (vcpu_get_itir(vcpu,&itir)){
         return(IA64_FAULT);
     }
-    if (vmx_vcpu_get_ifa(vcpu,&ifa)){
+    if (vcpu_get_ifa(vcpu,&ifa)){
         return(IA64_FAULT);
     }
 #ifdef  VMAL_NO_FAULT_CHECK
@@ -603,10 +603,10 @@ IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
     }
 #endif // VMAL_NO_FAULT_CHECK
 
-    if (vmx_vcpu_get_itir(vcpu,&itir)){
+    if (vcpu_get_itir(vcpu,&itir)){
         return(IA64_FAULT);
     }
-    if (vmx_vcpu_get_ifa(vcpu,&ifa)){
+    if (vcpu_get_ifa(vcpu,&ifa)){
         return(IA64_FAULT);
     }
 #ifdef  VMAL_NO_FAULT_CHECK
@@ -657,10 +657,10 @@ IA64FAULT itc_fault_check(VCPU *vcpu, INST64 inst, u64 *itir, u64 *ifa,u64 *pte)
     }
 #endif // VMAL_NO_FAULT_CHECK
 
-    if (vmx_vcpu_get_itir(vcpu,itir)){
+    if (vcpu_get_itir(vcpu,itir)){
         return(IA64_FAULT);
     }
-    if (vmx_vcpu_get_ifa(vcpu,ifa)){
+    if (vcpu_get_ifa(vcpu,ifa)){
         return(IA64_FAULT);
     }
 #ifdef  VMAL_NO_FAULT_CHECK
@@ -1178,21 +1178,21 @@ IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
 #endif  //CHECK_FAULT
     extern u64 cr_igfld_mask(int index, u64 value);
     r2 = cr_igfld_mask(inst.M32.cr3,r2);
-    VMX_VPD(vcpu, vcr[inst.M32.cr3]) = r2;
+    VCPU(vcpu, vcr[inst.M32.cr3]) = r2;
     switch (inst.M32.cr3) {
         case 0: return vmx_vcpu_set_dcr(vcpu,r2);
         case 1: return vmx_vcpu_set_itm(vcpu,r2);
         case 2: return vmx_vcpu_set_iva(vcpu,r2);
         case 8: return vmx_vcpu_set_pta(vcpu,r2);
-        case 16:return vmx_vcpu_set_ipsr(vcpu,r2);
-        case 17:return vmx_vcpu_set_isr(vcpu,r2);
-        case 19:return vmx_vcpu_set_iip(vcpu,r2);
-        case 20:return vmx_vcpu_set_ifa(vcpu,r2);
-        case 21:return vmx_vcpu_set_itir(vcpu,r2);
-        case 22:return vmx_vcpu_set_iipa(vcpu,r2);
-        case 23:return vmx_vcpu_set_ifs(vcpu,r2);
-        case 24:return vmx_vcpu_set_iim(vcpu,r2);
-        case 25:return vmx_vcpu_set_iha(vcpu,r2);
+        case 16:return vcpu_set_ipsr(vcpu,r2);
+        case 17:return vcpu_set_isr(vcpu,r2);
+        case 19:return vcpu_set_iip(vcpu,r2);
+        case 20:return vcpu_set_ifa(vcpu,r2);
+        case 21:return vcpu_set_itir(vcpu,r2);
+        case 22:return vcpu_set_iipa(vcpu,r2);
+        case 23:return vcpu_set_ifs(vcpu,r2);
+        case 24:return vcpu_set_iim(vcpu,r2);
+        case 25:return vcpu_set_iha(vcpu,r2);
         case 64:printk("SET LID to 0x%lx\n", r2);
 		return vmx_vcpu_set_lid(vcpu,r2);
         case 65:return IA64_NO_FAULT;
@@ -1213,9 +1213,12 @@ IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
 
 
 #define cr_get(cr) \
-    ((fault=vmx_vcpu_get_##cr(vcpu,&val))==IA64_NO_FAULT)?\
+    ((fault=vcpu_get_##cr(vcpu,&val))==IA64_NO_FAULT)?\
         vmx_vcpu_set_gr(vcpu, tgt, val,0):fault;
 
+#define vmx_cr_get(cr) \
+    ((fault=vmx_vcpu_get_##cr(vcpu,&val))==IA64_NO_FAULT)?\
+        vmx_vcpu_set_gr(vcpu, tgt, val,0):fault;
 
 IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
 {
@@ -1241,10 +1244,10 @@ IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
 
 //    from_cr_cnt[inst.M33.cr3]++;
     switch (inst.M33.cr3) {
-        case 0: return cr_get(dcr);
-        case 1: return cr_get(itm);
-        case 2: return cr_get(iva);
-        case 8: return cr_get(pta);
+        case 0: return vmx_cr_get(dcr);
+        case 1: return vmx_cr_get(itm);
+        case 2: return vmx_cr_get(iva);
+        case 8: return vmx_cr_get(pta);
         case 16:return cr_get(ipsr);
         case 17:return cr_get(isr);
         case 19:return cr_get(iip);
@@ -1254,23 +1257,21 @@ IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
         case 23:return cr_get(ifs);
         case 24:return cr_get(iim);
         case 25:return cr_get(iha);
-//	case 64:val = ia64_getreg(_IA64_REG_CR_LID);
-//	     return vmx_vcpu_set_gr(vcpu,tgt,val,0);
-        case 64:return cr_get(lid);
+        case 64:return vmx_cr_get(lid);
         case 65:
-             vmx_vcpu_get_ivr(vcpu,&val);
-             return vmx_vcpu_set_gr(vcpu,tgt,val,0);
-        case 66:return cr_get(tpr);
+                vmx_vcpu_get_ivr(vcpu,&val);
+                return vmx_vcpu_set_gr(vcpu,tgt,val,0);
+        case 66:return vmx_cr_get(tpr);
         case 67:return vmx_vcpu_set_gr(vcpu,tgt,0L,0);
-        case 68:return cr_get(irr0);
-        case 69:return cr_get(irr1);
-        case 70:return cr_get(irr2);
-        case 71:return cr_get(irr3);
-        case 72:return cr_get(itv);
-        case 73:return cr_get(pmv);
-        case 74:return cr_get(cmcv);
-        case 80:return cr_get(lrr0);
-        case 81:return cr_get(lrr1);
+        case 68:return vmx_cr_get(irr0);
+        case 69:return vmx_cr_get(irr1);
+        case 70:return vmx_cr_get(irr2);
+        case 71:return vmx_cr_get(irr3);
+        case 72:return vmx_cr_get(itv);
+        case 73:return vmx_cr_get(pmv);
+        case 74:return vmx_cr_get(cmcv);
+        case 80:return vmx_cr_get(lrr0);
+        case 81:return vmx_cr_get(lrr1);
         default:
             panic("Read reserved cr register");
     }
@@ -1355,7 +1356,7 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
 #else
     inst.inst=opcode;
 #endif /* BYPASS_VMAL_OPCODE */
-
+    vcpu_set_regs(vcpu, regs);
     /*
      * Switch to actual virtual rid in rr0 and rr4,
      * which is required by some tlb related instructions.

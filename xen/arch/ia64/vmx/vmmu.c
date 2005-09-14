@@ -434,7 +434,7 @@ fetch_code(VCPU *vcpu, u64 gip, u64 *code)
     ia64_rr vrr;
     u64     mfn;
     
-    if ( !(VMX_VPD(vcpu, vpsr) & IA64_PSR_IT) ) {   // I-side physical mode
+    if ( !(VCPU(vcpu, vpsr) & IA64_PSR_IT) ) {   // I-side physical mode
         gpip = gip;
     }
     else {
@@ -726,12 +726,12 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
     if(data){
         if(data->p==0){
             visr.na=1;
-            vmx_vcpu_set_isr(vcpu,visr.val);
+            vcpu_set_isr(vcpu,visr.val);
             page_not_present(vcpu, vadr);
             return IA64_FAULT;
         }else if(data->ma == VA_MATTR_NATPAGE){
             visr.na = 1;
-            vmx_vcpu_set_isr(vcpu, visr.val);
+            vcpu_set_isr(vcpu, visr.val);
             dnat_page_consumption(vcpu, vadr);
             return IA64_FAULT;
         }else{
@@ -741,7 +741,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
     }else{
         if(!vhpt_enabled(vcpu, vadr, NA_REF)){
             if(vpsr.ic){
-                vmx_vcpu_set_isr(vcpu, visr.val);
+                vcpu_set_isr(vcpu, visr.val);
                 alt_dtlb(vcpu, vadr);
                 return IA64_FAULT;
             }
@@ -756,7 +756,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
             data = vtlb_lookup_ex(hcb, vrr.rid, vhpt_adr, DSIDE_TLB);
             if(data){
                 if(vpsr.ic){
-                    vmx_vcpu_set_isr(vcpu, visr.val);
+                    vcpu_set_isr(vcpu, visr.val);
                     dtlb_fault(vcpu, vadr);
                     return IA64_FAULT;
                 }
@@ -767,7 +767,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
             }
             else{
                 if(vpsr.ic){
-                    vmx_vcpu_set_isr(vcpu, visr.val);
+                    vcpu_set_isr(vcpu, visr.val);
                     dvhpt_fault(vcpu, vadr);
                     return IA64_FAULT;
                 }

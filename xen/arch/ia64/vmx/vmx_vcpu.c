@@ -100,7 +100,7 @@ vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value)
      * Since these bits will become 0, after success execution of each
      * instruction, we will change set them to mIA64_PSR
      */
-    VMX_VPD(vcpu,vpsr) = value &
+    VCPU(vcpu,vpsr) = value &
             (~ (IA64_PSR_ID |IA64_PSR_DA | IA64_PSR_DD |
                 IA64_PSR_SS | IA64_PSR_ED | IA64_PSR_IA
             ));
@@ -167,7 +167,7 @@ IA64FAULT vmx_vcpu_increment_iip(VCPU *vcpu)
                 IA64_PSR_SS | IA64_PSR_ED | IA64_PSR_IA
             ));
 
-    VMX_VPD(vcpu, vpsr) = vpsr.val;
+    VCPU(vcpu, vpsr) = vpsr.val;
 
     ipsr->val &=
             (~ (IA64_PSR_ID |IA64_PSR_DA | IA64_PSR_DD |
@@ -185,7 +185,7 @@ IA64FAULT vmx_vcpu_cover(VCPU *vcpu)
     vpsr.val = vmx_vcpu_get_psr(vcpu);
 
     if(!vpsr.ic)
-        VPD_CR(vcpu,ifs) = regs->cr_ifs;
+        VCPU(vcpu,ifs) = regs->cr_ifs;
     regs->cr_ifs = IA64_IFS_V;
     return (IA64_NO_FAULT);
 }
@@ -244,7 +244,7 @@ IA64FAULT vmx_vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 #else
     case VRN7:
        vmx_switch_rr7(vmx_vrrtomrr(vcpu,val),vcpu->domain->shared_info,
-        (void *)vcpu->vcpu_info->arch.privregs,
+        (void *)vcpu->arch.privregs,
        ( void *)vcpu->arch.vtlb->ts->vhpt->hash, pal_vaddr );
        break;
 #endif
@@ -307,15 +307,15 @@ IA64FAULT vmx_vcpu_rfi(VCPU *vcpu)
     // TODO: Only allowed for current vcpu
     UINT64 ifs, psr;
     REGS *regs = vcpu_regs(vcpu);
-    psr = VPD_CR(vcpu,ipsr);
+    psr = VCPU(vcpu,ipsr);
     vmx_vcpu_set_psr(vcpu,psr);
-    ifs=VPD_CR(vcpu,ifs);
+    ifs=VCPU(vcpu,ifs);
     if((ifs>>63)&&(ifs<<1)){
         ifs=(regs->cr_ifs)&0x7f;
         regs->rfi_pfs = (ifs<<7)|ifs;
-        regs->cr_ifs = VPD_CR(vcpu,ifs);
+        regs->cr_ifs = VCPU(vcpu,ifs);
     }
-    regs->cr_iip = VPD_CR(vcpu,iip);
+    regs->cr_iip = VCPU(vcpu,iip);
     return (IA64_NO_FAULT);
 }
 
@@ -323,7 +323,7 @@ IA64FAULT vmx_vcpu_rfi(VCPU *vcpu)
 UINT64
 vmx_vcpu_get_psr(VCPU *vcpu)
 {
-    return VMX_VPD(vcpu,vpsr);
+    return VCPU(vcpu,vpsr);
 }
 
 
@@ -334,9 +334,9 @@ vmx_vcpu_get_bgr(VCPU *vcpu, unsigned int reg, UINT64 *val)
 
     vpsr.val = vmx_vcpu_get_psr(vcpu);
     if ( vpsr.bn ) {
-        *val=VMX_VPD(vcpu,vgr[reg-16]);
+        *val=VCPU(vcpu,vgr[reg-16]);
         // Check NAT bit
-        if ( VMX_VPD(vcpu,vnat) & (1UL<<(reg-16)) ) {
+        if ( VCPU(vcpu,vnat) & (1UL<<(reg-16)) ) {
             // TODO
             //panic ("NAT consumption fault\n");
             return IA64_FAULT;
@@ -344,8 +344,8 @@ vmx_vcpu_get_bgr(VCPU *vcpu, unsigned int reg, UINT64 *val)
 
     }
     else {
-        *val=VMX_VPD(vcpu,vbgr[reg-16]);
-        if ( VMX_VPD(vcpu,vbnat) & (1UL<<reg) ) {
+        *val=VCPU(vcpu,vbgr[reg-16]);
+        if ( VCPU(vcpu,vbnat) & (1UL<<reg) ) {
             //panic ("NAT consumption fault\n");
             return IA64_FAULT;
         }
@@ -360,19 +360,19 @@ vmx_vcpu_set_bgr(VCPU *vcpu, unsigned int reg, u64 val,int nat)
     IA64_PSR vpsr;
     vpsr.val = vmx_vcpu_get_psr(vcpu);
     if ( vpsr.bn ) {
-        VMX_VPD(vcpu,vgr[reg-16]) = val;
+        VCPU(vcpu,vgr[reg-16]) = val;
         if(nat){
-            VMX_VPD(vcpu,vnat) |= ( 1UL<<(reg-16) );
+            VCPU(vcpu,vnat) |= ( 1UL<<(reg-16) );
         }else{
-            VMX_VPD(vcpu,vbnat) &= ~( 1UL<<(reg-16) );
+            VCPU(vcpu,vbnat) &= ~( 1UL<<(reg-16) );
         }
     }
     else {
-        VMX_VPD(vcpu,vbgr[reg-16]) = val;
+        VCPU(vcpu,vbgr[reg-16]) = val;
         if(nat){
-            VMX_VPD(vcpu,vnat) |= ( 1UL<<(reg) );
+            VCPU(vcpu,vnat) |= ( 1UL<<(reg) );
         }else{
-            VMX_VPD(vcpu,vbnat) &= ~( 1UL<<(reg) );
+            VCPU(vcpu,vbnat) &= ~( 1UL<<(reg) );
         }
     }
     return IA64_NO_FAULT;
@@ -447,7 +447,7 @@ IA64FAULT vmx_vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
 IA64FAULT
 vmx_vcpu_set_tpr(VCPU *vcpu, u64 val)
 {
-    VPD_CR(vcpu,tpr)=val;
+    VCPU(vcpu,tpr)=val;
     vcpu->arch.irq_new_condition = 1;
     return IA64_NO_FAULT;
 }

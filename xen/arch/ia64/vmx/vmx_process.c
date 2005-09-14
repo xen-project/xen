@@ -82,13 +82,13 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 		    case FW_HYPERCALL_PAL_CALL:
 			//printf("*** PAL hypercall: index=%d\n",regs->r28);
 			//FIXME: This should call a C routine
-			x = pal_emulator_static(VMX_VPD(v, vgr[12]));
+			x = pal_emulator_static(VCPU(v, vgr[12]));
 			regs->r8 = x.status; regs->r9 = x.v0;
 			regs->r10 = x.v1; regs->r11 = x.v2;
 #if 0
 			if (regs->r8)
 				printk("Failed vpal emulation, with index:0x%lx\n",
-					VMX_VPD(v, vgr[12]));
+					VCPU(v, vgr[12]));
 #endif
 			break;
 		    case FW_HYPERCALL_SAL_CALL:
@@ -178,11 +178,11 @@ void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
     if(!(vpsr&IA64_PSR_IC)&&(vector!=5)){
         panic("Guest nested fault!");
     }
-    VPD_CR(vcpu,isr)=isr;
-    VPD_CR(vcpu,iipa) = regs->cr_iip;
+    VCPU(vcpu,isr)=isr;
+    VCPU(vcpu,iipa) = regs->cr_iip;
     vector=vec2off[vector];
     if (vector == IA64_BREAK_VECTOR || vector == IA64_SPECULATION_VECTOR)
-        VPD_CR(vcpu,iim) = iim;
+        VCPU(vcpu,iim) = iim;
     else {
         set_ifa_itir_iha(vcpu,ifa,1,1,1);
     }
@@ -220,8 +220,8 @@ void leave_hypervisor_tail(struct pt_regs *regs)
  		 *
  		 * Now hardcode the vector as 0x10 temporarily
  		 */
- 		if (event_pending(v)&&(!((v->arch.arch_vmx.in_service[0])&(1UL<<0x10)))) {
- 			VPD_CR(v, irr[0]) |= 1UL << 0x10;
+ 		if (event_pending(v)&&(!(VLSAPIC_INSVC(v,0)&(1UL<<0x10)))) {
+ 			VCPU(v, irr[0]) |= 1UL << 0x10;
  			v->arch.irq_new_pending = 1;
  		}
  
@@ -295,7 +295,7 @@ void vmx_hpw_miss(VCPU *vcpu, u64 vec, u64 vadr)
     }else if(type == DSIDE_TLB){
         if(!vhpt_enabled(vcpu, vadr, misr.rs?RSE_REF:DATA_REF)){
             if(vpsr.ic){
-                vmx_vcpu_set_isr(vcpu, misr.val);
+                vcpu_set_isr(vcpu, misr.val);
                 alt_dtlb(vcpu, vadr);
                 return IA64_FAULT;
             } else{
@@ -313,7 +313,7 @@ void vmx_hpw_miss(VCPU *vcpu, u64 vec, u64 vadr)
             data = vtlb_lookup_ex(vtlb, vrr.rid, vhpt_adr, DSIDE_TLB);
             if(data){
                 if(vpsr.ic){
-                    vmx_vcpu_set_isr(vcpu, misr.val);
+                    vcpu_set_isr(vcpu, misr.val);
                     dtlb_fault(vcpu, vadr);
                     return IA64_FAULT;
                 }else{
@@ -327,7 +327,7 @@ void vmx_hpw_miss(VCPU *vcpu, u64 vec, u64 vadr)
                 }
             }else{
                 if(vpsr.ic){
-                    vmx_vcpu_set_isr(vcpu, misr.val);
+                    vcpu_set_isr(vcpu, misr.val);
                     dvhpt_fault(vcpu, vadr);
                     return IA64_FAULT;
                 }else{
@@ -346,7 +346,7 @@ void vmx_hpw_miss(VCPU *vcpu, u64 vec, u64 vadr)
             if(!vpsr.ic){
                 misr.ni=1;
             }
-            vmx_vcpu_set_isr(vcpu, misr.val);
+            vcpu_set_isr(vcpu, misr.val);
             alt_itlb(vcpu, vadr);
             return IA64_FAULT;
         } else{
@@ -357,14 +357,14 @@ void vmx_hpw_miss(VCPU *vcpu, u64 vec, u64 vadr)
                 if(!vpsr.ic){
                     misr.ni=1;
                 }
-                vmx_vcpu_set_isr(vcpu, misr.val);
+                vcpu_set_isr(vcpu, misr.val);
                 itlb_fault(vcpu, vadr);
                 return IA64_FAULT;
             }else{
                 if(!vpsr.ic){
                     misr.ni=1;
                 }
-                vmx_vcpu_set_isr(vcpu, misr.val);
+                vcpu_set_isr(vcpu, misr.val);
                 ivhpt_fault(vcpu, vadr);
                 return IA64_FAULT;
             }

@@ -147,13 +147,6 @@ void foo(void)
 	DEFINE(IA64_PT_REGS_CR_ISR_OFFSET, offsetof (struct pt_regs, cr_isr));
 	DEFINE(IA64_PT_REGS_EML_UNAT_OFFSET, offsetof (struct pt_regs, eml_unat));
 	DEFINE(IA64_PT_REGS_RFI_PFS_OFFSET, offsetof (struct pt_regs, rfi_pfs));
-	DEFINE(RFI_IIP_OFFSET, offsetof(struct vcpu, arch.arch_vmx.rfi_iip));
-	DEFINE(RFI_IPSR_OFFSET, offsetof(struct vcpu, arch.arch_vmx.rfi_ipsr));
-	DEFINE(RFI_IFS_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.rfi_ifs));
-	DEFINE(RFI_PFS_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.rfi_pfs));
-	DEFINE(SWITCH_MRR5_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mrr5));
-	DEFINE(SWITCH_MRR6_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mrr6));
-	DEFINE(SWITCH_MRR7_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mrr7));
 	DEFINE(SWITCH_MPTA_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mpta));
 #endif  //CONFIG_VTI
 	DEFINE(IA64_PT_REGS_R16_OFFSET, offsetof (struct pt_regs, r16));
@@ -228,8 +221,8 @@ void foo(void)
 	BLANK();
 
 #ifdef  CONFIG_VTI
-	DEFINE(IA64_VPD_BASE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.vpd));
- 	DEFINE(IA64_VLSAPIC_INSVC_BASE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.in_service[0]));
+	DEFINE(IA64_VPD_BASE_OFFSET, offsetof (struct vcpu, arch.privregs));
+ 	DEFINE(IA64_VLSAPIC_INSVC_BASE_OFFSET, offsetof (struct vcpu, arch.insvc[0]));
 	DEFINE(IA64_VPD_CR_VPTA_OFFSET, offsetof (cr_t, pta));
 	DEFINE(XXX_THASH_SIZE, sizeof (thash_data_t));
 

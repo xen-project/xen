@@ -147,7 +147,7 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     if(dir==IOREQ_WRITE)     //write;
         p->u.data = *val;
     p->pdata_valid = 0;
-    p->port_mm = 1;
+    p->type = 1;
     p->df = 0;
 
     set_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
@@ -180,7 +180,7 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     if(dir==IOREQ_WRITE)     //write;
         p->u.data = *val;
     p->pdata_valid = 0;
-    p->port_mm = 0;
+    p->type = 0;
     p->df = 0;
 
     set_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
@@ -353,7 +353,7 @@ static inline VCPU *lid_2_vcpu (struct domain *d, u64 id, u64 eid)
 		vcpu = d->vcpu[i];
  		if (!vcpu)
  			continue;
-		lid.val = VPD_CR(vcpu, lid);
+		lid.val = VCPU(vcpu, lid);
 		if ( lid.id == id && lid.eid == eid ) {
 		    return vcpu;
 		}

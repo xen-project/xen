@@ -51,24 +51,24 @@ collect_interruption(VCPU *vcpu)
         ipsr = regs->cr_ipsr;
         vpsr.val = vpsr.val | (ipsr & (IA64_PSR_ID | IA64_PSR_DA
              | IA64_PSR_DD |IA64_PSR_SS |IA64_PSR_ED));
-        vmx_vcpu_set_ipsr(vcpu, vpsr.val);
+        vcpu_set_ipsr(vcpu, vpsr.val);
 
         /* Currently, for trap, we do not advance IIP to next
          * instruction. That's because we assume caller already
          * set up IIP correctly
          */
 
-        vmx_vcpu_set_iip(vcpu , regs->cr_iip);
+        vcpu_set_iip(vcpu , regs->cr_iip);
 
         /* set vifs.v to zero */
-        vifs = VPD_CR(vcpu,ifs);
+        vifs = VCPU(vcpu,ifs);
         vifs &= ~IA64_IFS_V;
-        vmx_vcpu_set_ifs(vcpu, vifs);
+        vcpu_set_ifs(vcpu, vifs);
 
-        vmx_vcpu_set_iipa(vcpu, regs->cr_iipa);
+        vcpu_set_iipa(vcpu, regs->cr_iipa);
     }
 
-    vdcr = VPD_CR(vcpu,dcr);
+    vdcr = VCPU(vcpu,dcr);
 
     /* Set guest psr
      * up/mfl/mfh/pk/dt/rt/mc/it keeps unchanged
@@ -119,16 +119,16 @@ set_ifa_itir_iha (VCPU *vcpu, u64 vadr,
     /* Vol2, Table 8-1 */
     if ( vpsr.ic ) {
         if ( set_ifa){
-            vmx_vcpu_set_ifa(vcpu, vadr);
+            vcpu_set_ifa(vcpu, vadr);
         }
         if ( set_itir) {
             value = vmx_vcpu_get_itir_on_fault(vcpu, vadr);
-            vmx_vcpu_set_itir(vcpu, value);
+            vcpu_set_itir(vcpu, value);
         }
 
         if ( set_iha) {
             vmx_vcpu_thash(vcpu, vadr, &value);
-            vmx_vcpu_set_iha(vcpu, value);
+            vcpu_set_iha(vcpu, value);
         }
     }
 

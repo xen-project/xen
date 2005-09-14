@@ -64,19 +64,19 @@ typedef struct {
 
 struct arch_vmx_struct {
 //    struct virutal_platform_def     vmx_platform;
-	vpd_t       *vpd;
+//	vpd_t       *vpd;
 	vtime_t	    vtm;
     unsigned long   vrr[8];
     unsigned long   vkr[8];
-    unsigned long   mrr5;
-    unsigned long   mrr6;
-    unsigned long   mrr7;
+//    unsigned long   mrr5;
+//    unsigned long   mrr6;
+//    unsigned long   mrr7;
     unsigned long   mpta;
-    unsigned long   rfi_pfs;
-    unsigned long   rfi_iip;
-    unsigned long   rfi_ipsr;
-    unsigned long   rfi_ifs;
-	unsigned long	in_service[4];	// vLsapic inservice IRQ bits
+//    unsigned long   rfi_pfs;
+//    unsigned long   rfi_iip;
+//    unsigned long   rfi_ipsr;
+//    unsigned long   rfi_ifs;
+//	unsigned long	in_service[4];	// vLsapic inservice IRQ bits
 	unsigned long   flags;
 };
 

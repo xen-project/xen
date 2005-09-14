@@ -221,10 +221,11 @@ vmx_init_all_rr(VCPU *vcpu)
 	VMX(vcpu,vrr[VRN5]) = 0x538;
 	VMX(vcpu,vrr[VRN6]) = 0x660;
 	VMX(vcpu,vrr[VRN7]) = 0x760;
-
+#if 0
 	VMX(vcpu,mrr5) = vmx_vrrtomrr(vcpu, 0x38);
 	VMX(vcpu,mrr6) = vmx_vrrtomrr(vcpu, 0x60);
 	VMX(vcpu,mrr7) = vmx_vrrtomrr(vcpu, 0x60);
+#endif
 }
 
 void
@@ -275,7 +276,7 @@ vmx_load_all_rr(VCPU *vcpu)
     ia64_set_rr((VRN6 << VRN_SHIFT),
             vmx_vrrtomrr(vcpu, VMX(vcpu, vrr[VRN6])));
     vmx_switch_rr7(vmx_vrrtomrr(vcpu,VMX(vcpu, vrr[VRN7])),(void *)vcpu->domain->shared_info,
-                (void *)vcpu->vcpu_info->arch.privregs,
+                (void *)vcpu->arch.privregs,
                 ( void *)vcpu->arch.vtlb->ts->vhpt->hash, pal_vaddr );
     ia64_set_pta(vcpu->arch.arch_vmx.mpta);
 #endif

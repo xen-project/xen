@@ -217,7 +217,7 @@ static void
 vmx_create_vp(struct vcpu *v)
 {
 	u64 ret;
-	vpd_t *vpd = v->arch.arch_vmx.vpd;
+	vpd_t *vpd = v->arch.privregs;
 	u64 ivt_base;
     extern char vmx_ia64_ivt;
 	/* ia64_ivt is function pointer, so need this tranlation */
@@ -255,7 +255,7 @@ vmx_save_state(struct vcpu *v)
 	u64 old_rr0, dom_rr7, rr0_xen_start, rr0_vhpt;
 
 	/* FIXME: about setting of pal_proc_vector... time consuming */
-	status = ia64_pal_vp_save(v->arch.arch_vmx.vpd, 0);
+	status = ia64_pal_vp_save(v->arch.privregs, 0);
 	if (status != PAL_STATUS_SUCCESS)
 		panic("Save vp status failed\n");
 
@@ -290,7 +290,7 @@ vmx_load_state(struct vcpu *v)
 	u64 pte_xen, pte_vhpt;
 	int i;
 
-	status = ia64_pal_vp_restore(v->arch.arch_vmx.vpd, 0);
+	status = ia64_pal_vp_restore(v->arch.privregs, 0);
 	if (status != PAL_STATUS_SUCCESS)
 		panic("Restore vp status failed\n");
 
@@ -351,7 +351,8 @@ vmx_final_setup_domain(struct domain *d)
 	vpd = alloc_vpd();
 	ASSERT(vpd);
 
-	v->arch.arch_vmx.vpd = vpd;
+//	v->arch.arch_vmx.vpd = vpd;
+    v->arch.privregs = vpd;
 	vpd->virt_env_vaddr = vm_buffer;
 
 #ifdef CONFIG_VTI

@@ -89,8 +89,8 @@ static void vtm_reset(VCPU *vcpu)
     vtm=&(vcpu->arch.arch_vmx.vtm);
     vtm->vtm_offset = 0;
     vtm->vtm_local_drift = 0;
-    VPD_CR(vcpu, itm) = 0;
-    VPD_CR(vcpu, itv) = 0x10000;
+    VCPU(vcpu, itm) = 0;
+    VCPU(vcpu, itv) = 0x10000;
     cur_itc = ia64_get_itc();
     vtm->last_itc = vtm->vtm_offset + cur_itc;
 }
@@ -104,12 +104,12 @@ static void vtm_timer_fn(void *data)
 
     UINT64  vec;
     
-    vec = VPD_CR(vcpu, itv) & 0xff;
+    vec = VCPU(vcpu, itv) & 0xff;
     vmx_vcpu_pend_interrupt(vcpu, vec);
 
     vtm=&(vcpu->arch.arch_vmx.vtm);
     cur_itc = now_itc(vtm);
-    vitm =VPD_CR(vcpu, itm);
+    vitm =VCPU(vcpu, itm);
  //fire_itc2 = cur_itc;
  //fire_itm2 = vitm;
     update_last_itc(vtm,cur_itc);  // pseudo read to update vITC
@@ -167,7 +167,7 @@ void vtm_set_itv(VCPU *vcpu)
 
     vtm=&(vcpu->arch.arch_vmx.vtm);
     local_irq_save(spsr);
-    itv = VPD_CR(vcpu, itv);
+    itv = VCPU(vcpu, itv);
     if ( ITV_IRQ_MASK(itv) )
         rem_ac_timer(&vtm->vtm_timer);
     vtm_interruption_update(vcpu, vtm);
@@ -190,12 +190,12 @@ void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm)
     long        diff_now, diff_last;
     uint64_t    spsr;
     
-    vitv = VPD_CR(vcpu, itv);
+    vitv = VCPU(vcpu, itv);
     if ( ITV_IRQ_MASK(vitv) ) {
         return;
     }
     
-    vitm =VPD_CR(vcpu, itm);
+    vitm =VCPU(vcpu, itm);
     local_irq_save(spsr);
     cur_itc =now_itc(vtm);
     diff_last = vtm->last_itc - vitm;
@@ -249,7 +249,6 @@ void vtm_domain_in(VCPU *vcpu)
 #define  NMI_VECTOR         2
 #define  ExtINT_VECTOR      0
 #define  NULL_VECTOR        -1
-#define  VLSAPIC_INSVC(vcpu, i) ((vcpu)->arch.arch_vmx.in_service[i])
 static void update_vhpi(VCPU *vcpu, int vec)
 {
     u64     vhpi;
@@ -265,11 +264,11 @@ static void update_vhpi(VCPU *vcpu, int vec)
         vhpi = vec / 16;
     }
 
-    VMX_VPD(vcpu,vhpi) = vhpi;
+    VCPU(vcpu,vhpi) = vhpi;
     // TODO: Add support for XENO
-    if ( VMX_VPD(vcpu,vac).a_int ) {
+    if ( VCPU(vcpu,vac).a_int ) {
         ia64_call_vsa ( PAL_VPS_SET_PENDING_INTERRUPT, 
-                (uint64_t) &(vcpu->arch.arch_vmx.vpd), 0, 0,0,0,0,0);
+                (uint64_t) &(vcpu->arch.privregs), 0, 0,0,0,0,0);
     }
 }
 
@@ -284,7 +283,7 @@ void vlapic_update_shared_info(VCPU *vcpu)
 	return;
 
     ps = get_psapic(vcpu);
-    ps->vl_lapic_id = ((VPD_CR(vcpu, lid) >> 16) & 0xffff) << 16; 
+    ps->vl_lapic_id = ((VCPU(vcpu, lid) >> 16) & 0xffff) << 16; 
     printf("vl_lapic_id = %x\n", ps->vl_lapic_id);
     ps->vl_apr = 0;
     // skip ps->vl_logical_dest && ps->vl_dest_format
@@ -316,18 +315,18 @@ void vlsapic_reset(VCPU *vcpu)
     vl_apic_info  *psapic;	// shared lapic inf.
 #endif
     
-    VPD_CR(vcpu, lid) = ia64_getreg(_IA64_REG_CR_LID);
-    VPD_CR(vcpu, ivr) = 0;
-    VPD_CR(vcpu,tpr) = 0x10000;
-    VPD_CR(vcpu, eoi) = 0;
-    VPD_CR(vcpu, irr[0]) = 0;
-    VPD_CR(vcpu, irr[1]) = 0;
-    VPD_CR(vcpu, irr[2]) = 0;
-    VPD_CR(vcpu, irr[3]) = 0;
-    VPD_CR(vcpu, pmv) = 0x10000;
-    VPD_CR(vcpu, cmcv) = 0x10000;
-    VPD_CR(vcpu, lrr0) = 0x10000;   // default reset value?
-    VPD_CR(vcpu, lrr1) = 0x10000;   // default reset value?
+    VCPU(vcpu, lid) = ia64_getreg(_IA64_REG_CR_LID);
+    VCPU(vcpu, ivr) = 0;
+    VCPU(vcpu,tpr) = 0x10000;
+    VCPU(vcpu, eoi) = 0;
+    VCPU(vcpu, irr[0]) = 0;
+    VCPU(vcpu, irr[1]) = 0;
+    VCPU(vcpu, irr[2]) = 0;
+    VCPU(vcpu, irr[3]) = 0;
+    VCPU(vcpu, pmv) = 0x10000;
+    VCPU(vcpu, cmcv) = 0x10000;
+    VCPU(vcpu, lrr0) = 0x10000;   // default reset value?
+    VCPU(vcpu, lrr1) = 0x10000;   // default reset value?
     update_vhpi(vcpu, NULL_VECTOR);
     for ( i=0; i<4; i++) {
         VLSAPIC_INSVC(vcpu,i) = 0;
@@ -367,9 +366,9 @@ static __inline__ int highest_bits(uint64_t *dat)
  */
 static int highest_pending_irq(VCPU *vcpu)
 {
-    if ( VPD_CR(vcpu, irr[0]) & (1UL<<NMI_VECTOR) ) return NMI_VECTOR;
-    if ( VPD_CR(vcpu, irr[0]) & (1UL<<ExtINT_VECTOR) ) return ExtINT_VECTOR;
-    return highest_bits(&VPD_CR(vcpu, irr[0]));
+    if ( VCPU(vcpu, irr[0]) & (1UL<<NMI_VECTOR) ) return NMI_VECTOR;
+    if ( VCPU(vcpu, irr[0]) & (1UL<<ExtINT_VECTOR) ) return ExtINT_VECTOR;
+    return highest_bits(&VCPU(vcpu, irr[0]));
 }
 
 static int highest_inservice_irq(VCPU *vcpu)
@@ -410,7 +409,7 @@ _xirq_masked(VCPU *vcpu, int h_pending, int h_inservice)
     tpr_t    vtpr;
     uint64_t    mmi;
     
-    vtpr.val = VPD_CR(vcpu, tpr);
+    vtpr.val = VCPU(vcpu, tpr);
 
     if ( h_inservice == NMI_VECTOR ) {
         return IRQ_MASKED_BY_INSVC;
@@ -468,7 +467,7 @@ void vmx_vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
         return;
     }
     local_irq_save(spsr);
-    VPD_CR(vcpu,irr[vector>>6]) |= 1UL<<(vector&63);
+    VCPU(vcpu,irr[vector>>6]) |= 1UL<<(vector&63);
     //vlapic_update_shared_irr(vcpu);
     local_irq_restore(spsr);
     vcpu->arch.irq_new_pending = 1;
@@ -486,7 +485,7 @@ void vmx_vcpu_pend_batch_interrupt(VCPU *vcpu, UINT64 *pend_irr)
 
     local_irq_save(spsr);
     for (i=0 ; i<4; i++ ) {
-        VPD_CR(vcpu,irr[i]) |= pend_irr[i];
+        VCPU(vcpu,irr[i]) |= pend_irr[i];
     }
     //vlapic_update_shared_irr(vcpu);
     local_irq_restore(spsr);
@@ -554,7 +553,7 @@ void guest_write_eoi(VCPU *vcpu)
     local_irq_save(spsr);
     VLSAPIC_INSVC(vcpu,vec>>6) &= ~(1UL <<(vec&63));
     local_irq_restore(spsr);
-    VPD_CR(vcpu, eoi)=0;    // overwrite the data
+    VCPU(vcpu, eoi)=0;    // overwrite the data
     vmx_check_pending_irq(vcpu);
 }
 
@@ -573,7 +572,7 @@ uint64_t guest_read_vivr(VCPU *vcpu)
     }
  
     VLSAPIC_INSVC(vcpu,vec>>6) |= (1UL <<(vec&63));
-    VPD_CR(vcpu, irr[vec>>6]) &= ~(1UL <<(vec&63));
+    VCPU(vcpu, irr[vec>>6]) &= ~(1UL <<(vec&63));
     update_vhpi(vcpu, NULL_VECTOR);     // clear VHPI till EOI or IRR write
     //vlapic_update_shared_irr(vcpu);
     local_irq_restore(spsr);
@@ -600,10 +599,10 @@ vhpi_detection(VCPU *vcpu)
     IA64_PSR    vpsr;
     
     vpsr.val = vmx_vcpu_get_psr(vcpu);
-    vtpr.val = VPD_CR(vcpu, tpr);
+    vtpr.val = VCPU(vcpu, tpr);
 
     threshold = ((!vpsr.i) << 5) | (vtpr.mmi << 4) | vtpr.mic;
-    vhpi = VMX_VPD(vcpu,vhpi);
+    vhpi = VCPU(vcpu,vhpi);
     if ( vhpi > threshold ) {
         // interrupt actived
         generate_exirq (vcpu);
