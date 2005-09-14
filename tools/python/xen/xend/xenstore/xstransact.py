@@ -121,6 +121,20 @@ class xstransact:
             return ret[0]
         return ret
 
+    def store(self, *args):
+        for tup in args:
+            if len(tup) == 2:
+                (key, val) = tup
+                try:
+                    fmt = { str : "%s",
+                            int : "%i",
+                            float : "%f" }[type(val)]
+                except KeyError:
+                    raise TypeError
+            else:
+                (key, val, fmt) = tup
+            self.write(key, fmt % val)
+
 
     def Read(cls, path, *args):
         while True:
@@ -216,3 +230,22 @@ class xstransact:
                 raise
 
     Gather = classmethod(Gather)
+
+    def Store(cls, path, *args):
+        while True:
+            try:
+                t = cls(path)
+                v = t.store(*args)
+                t.commit()
+                return v
+            except RuntimeError, ex:
+                t.abort()
+                if ex.args[0] == errno.ETIMEDOUT:
+                    pass
+                else:
+                    raise
+            except:
+                t.abort()
+                raise
+
+    Store = classmethod(Store)
