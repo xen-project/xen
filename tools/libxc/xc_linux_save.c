@@ -14,8 +14,6 @@
 
 #include "xg_private.h"
 
-#include <xen/io/domain_controller.h>
-
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
 
 #define MAX_MBIT_RATE 500

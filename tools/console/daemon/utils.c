@@ -34,8 +34,6 @@
 #include <string.h>
 
 #include "xenctrl.h"
-#include "xen/io/domain_controller.h"
-
 #include "utils.h"
 
 struct xs_handle *xs;

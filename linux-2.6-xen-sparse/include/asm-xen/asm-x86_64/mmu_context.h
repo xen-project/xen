@@ -83,19 +83,19 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		/* load_cr3(next->pgd) */
 		per_cpu(cur_pgd, smp_processor_id()) = next->pgd;
 		op->cmd = MMUEXT_NEW_BASEPTR;
-		op->mfn = pfn_to_mfn(__pa(next->pgd) >> PAGE_SHIFT);
+		op->arg1.mfn = pfn_to_mfn(__pa(next->pgd) >> PAGE_SHIFT);
 		op++;
 
 		/* xen_new_user_pt(__pa(__user_pgd(next->pgd))) */
 		op->cmd = MMUEXT_NEW_USER_BASEPTR;
-		op->mfn = pfn_to_mfn(__pa(__user_pgd(next->pgd)) >> PAGE_SHIFT);
+		op->arg1.mfn = pfn_to_mfn(__pa(__user_pgd(next->pgd)) >> PAGE_SHIFT);
 		op++;
 		
 		if (unlikely(next->context.ldt != prev->context.ldt)) {
 			/* load_LDT_nolock(&next->context, cpu) */
 			op->cmd = MMUEXT_SET_LDT;
-			op->linear_addr = (unsigned long)next->context.ldt;
-			op->nr_ents     = next->context.size;
+			op->arg1.linear_addr = (unsigned long)next->context.ldt;
+			op->arg2.nr_ents     = next->context.size;
 			op++;
 		}
 

@@ -45,7 +45,7 @@
 #include <linux/blkdev.h>
 #include <linux/major.h>
 #include <linux/devfs_fs_kernel.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/xenbus.h>
 #include <asm-xen/gnttab.h>
 #include <asm-xen/xen-public/xen.h>

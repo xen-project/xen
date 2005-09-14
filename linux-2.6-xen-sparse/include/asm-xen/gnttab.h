@@ -14,7 +14,7 @@
 #define __ASM_GNTTAB_H__
 
 #include <linux/config.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/xen-public/grant_table.h>
 
 /* NR_GRANT_FRAMES must be less than or equal to that configured in Xen */

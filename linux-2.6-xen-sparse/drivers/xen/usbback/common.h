@@ -12,7 +12,7 @@
 #include <asm/io.h>
 #include <asm/setup.h>
 #include <asm/pgalloc.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 
 #include <asm-xen/xen-public/io/usbif.h>
 

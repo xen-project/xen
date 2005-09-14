@@ -180,7 +180,7 @@ class NetDev(Dev):
             else:
                 #todo: Code below will fail on xend restart when backend is not domain 0.
                 xd = get_component('xen.xend.XendDomain')
-                self.backendDomain = xd.domain_lookup_by_name(sxp.child_value(config, 'backend', '0')).id
+                self.backendDomain = xd.domain_lookup_by_name(sxp.child_value(config, 'backend', '0')).domid
         except:
             raise XendError('invalid backend domain')
         return self.config
@@ -206,7 +206,7 @@ class NetDev(Dev):
         mtu = self._get_config_mtu(config)
         
         xd = get_component('xen.xend.XendDomain')
-        backendDomain = xd.domain_lookup_by_name(sxp.child_value(config, 'backend', '0')).id
+        backendDomain = xd.domain_lookup_by_name(sxp.child_value(config, 'backend', '0')).domid
 
         if (mac is not None) and (mac != self.mac):
             raise XendError("cannot change mac")

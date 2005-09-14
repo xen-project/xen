@@ -211,11 +211,12 @@ void vcpu_sleep_sync(struct vcpu *v)
 
     /*
      * We can be sure that the VCPU is finally descheduled after the running
-     * flag is cleared and the scheduler lock is released.
+     * flag is cleared and the scheduler lock is released. We also check that
+     * the domain continues to be unrunnable, in case someone else wakes it.
      */
-    while ( test_bit(_VCPUF_running, &v->vcpu_flags)
-            && !domain_runnable(v)
-            && spin_is_locked(&schedule_data[v->processor].schedule_lock) )
+    while ( !domain_runnable(v) &&
+            (test_bit(_VCPUF_running, &v->vcpu_flags) ||
+             spin_is_locked(&schedule_data[v->processor].schedule_lock)) )
         cpu_relax();
 
     sync_vcpu_execstate(v);

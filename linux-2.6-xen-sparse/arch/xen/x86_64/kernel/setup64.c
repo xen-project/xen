@@ -31,7 +31,7 @@
 #include <asm/mman.h>
 #include <asm/numa.h>
 #ifdef CONFIG_XEN
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #endif
 char x86_boot_params[BOOT_PARAM_SIZE] __initdata = {0,};
 

@@ -25,20 +25,19 @@ XEN_SCRIPTS += block-phy
 XEN_SCRIPTS += block-file
 XEN_SCRIPTS += block-enbd
 
-XEN_BOOT_DIR = /usr/$(LIBDIR)/xen/boot
+# no 64-bit specifics in mem-map.sxp
+# so place in /usr/lib, not /usr/lib64
+XEN_BOOT_DIR = /usr/lib/xen/boot
 XEN_BOOT = mem-map.sxp
 
 XEN_HOTPLUG_DIR = /etc/hotplug
 XEN_HOTPLUG_SCRIPTS = xen-backend.agent
 
-all: 
+all:
 build:
 
 install: all install-initd install-configs install-scripts install-boot \
 	 install-hotplug
-
-xmexample.vmx: xmexample.vmx.in
-	sed -e 's/@@LIBDIR@@/$(LIBDIR)/' < $< > $@
 
 install-initd:
 	[ -d $(DESTDIR)/etc/init.d ] || $(INSTALL_DIR) $(DESTDIR)/etc/init.d
@@ -80,4 +79,3 @@ install-hotplug:
 	done
 
 clean:
-	$(RM) xmexample.vmx

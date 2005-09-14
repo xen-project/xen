@@ -222,27 +222,31 @@ op_stop () {
         return
     fi
 
-    brctl delif ${bridge} ${netdev}
+    if ifconfig peth0 2>/dev/null | grep -q peth0 ; then
 
-    if ifconfig veth0 2>/dev/null | grep -q veth0 ; then
-        brctl delif ${bridge} vif0.0
         ifconfig vif0.0 down
-        mac=`ifconfig veth0 | grep HWadd | sed -e 's/.*\(..:..:..:..:..:..\).*/\1/'`
-        ifconfig ${netdev} down
-        ifconfig ${netdev} hw ether ${mac}
-        ifconfig ${netdev} arp up
-        transfer_addrs veth0 ${netdev}
-        transfer_routes veth0 ${netdev}
-        del_addrs veth0
-        ifconfig veth0 -arp down
-        ifconfig veth0 hw ether 00:00:00:00:00:00
+        mac=`ifconfig eth0 | grep HWadd | \
+            sed -e 's/.*\(..:..:..:..:..:..\).*/\1/'`
+        ifconfig ${netdev} 0.0.0.0 down
+        ifconfig ${netdev} hw ether fe:ff:ff:ff:ff:ff
+
+        ifconfig p${netdev} down
+        ifconfig p${netdev} hw ether ${mac} arp 
+        brctl delif ${bridge} p${netdev}
+
+        ip link set eth0 name veth0
+        ip link set peth0 name eth0
+        ifconfig ${bridge} down
+        brctl delbr ${bridge}
+        ifup eth0
+
     else
         transfer_routes ${bridge} ${netdev}
     fi
 }
 
 case ${OP} in
-  start)
+    start)
         op_start
         ;;
     

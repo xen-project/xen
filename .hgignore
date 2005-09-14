@@ -84,7 +84,6 @@
 ^tools/blktap/ublkback/ublkback$
 ^tools/blktap/xen/.*$
 ^tools/check/\..*$
-^tools/examples/xmexample\.vmx$
 ^tools/console/xenconsoled$
 ^tools/console/xenconsole$
 ^tools/debugger/pdb/pdb$

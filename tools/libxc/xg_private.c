@@ -65,7 +65,7 @@ int pin_table(
     struct mmuext_op op;
 
     op.cmd = type;
-    op.mfn = mfn;
+    op.arg1.mfn = mfn;
 
     if ( xc_mmuext_op(xc_handle, &op, 1, dom) < 0 )
         return 1;

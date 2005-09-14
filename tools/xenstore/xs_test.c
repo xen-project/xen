@@ -398,12 +398,16 @@ static void do_noackwrite(unsigned int handle,
 static void do_readack(unsigned int handle)
 {
 	enum xsd_sockmsg_type type;
-	char *ret;
+	char *ret = NULL;
 
-	ret = read_reply(handles[handle]->fd, &type, NULL);
-	if (!ret)
-		failed(handle);
-	free(ret);
+	/* Watches can have fired before reply comes: daemon detects
+	 * and re-transmits, so we can ignore this. */
+	do {
+		free(ret);
+		ret = read_reply(handles[handle]->fd, &type, NULL);
+		if (!ret)
+			failed(handle);
+	} while (type == XS_WATCH_EVENT);
 }
 
 static void do_setid(unsigned int handle, char *id)

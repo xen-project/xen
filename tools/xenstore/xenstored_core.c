@@ -50,7 +50,6 @@
 #include "xenstored_transaction.h"
 #include "xenstored_domain.h"
 #include "xenctrl.h"
-#include "xen/io/domain_controller.h"
 
 static bool verbose;
 LIST_HEAD(connections);

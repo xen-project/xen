@@ -53,7 +53,7 @@
 #include <asm/io_apic.h>
 #include <asm/ist.h>
 #include <asm/io.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/xen-public/physdev.h>
 #include <asm-xen/xen-public/memory.h>
 #include "setup_arch_pre.h"

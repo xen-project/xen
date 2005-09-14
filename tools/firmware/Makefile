@@ -1,6 +1,8 @@
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
+# vmxloader is a 32-bit protected mode binary.
+# It belongs in /usr/lib, not /usr/lib64.
 TARGET      := vmxassist/vmxloader
 INSTALL_DIR := $(DESTDIR)/usr/lib/xen/boot
 

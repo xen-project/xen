@@ -14,9 +14,6 @@
 
 #include <types.h>
 #include <xen/xen.h>
-#include <xen/io/domain_controller.h>
-
-
 
 /*
  * a placeholder for the start of day information passed up from the hypervisor

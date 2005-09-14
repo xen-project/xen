@@ -7,7 +7,7 @@
 #include <asm/synch_bitops.h>
 #include <asm/segment.h>
 #include <asm/cpufeature.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm/smp_alt.h>
 
 #ifdef __KERNEL__

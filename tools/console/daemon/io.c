@@ -22,10 +22,8 @@
 
 #include "utils.h"
 #include "io.h"
-
 #include "xenctrl.h"
 #include "xs.h"
-#include "xen/io/domain_controller.h"
 
 #include <malloc.h>
 #include <stdlib.h>

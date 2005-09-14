@@ -5,7 +5,7 @@
 #include <linux/kernel.h>
 #include <asm/segment.h>
 #include <asm/synch_bitops.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/xen-public/arch-x86_64.h>
 
 #ifdef __KERNEL__

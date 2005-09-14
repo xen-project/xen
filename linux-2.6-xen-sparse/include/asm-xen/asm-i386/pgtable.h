@@ -2,7 +2,7 @@
 #define _I386_PGTABLE_H
 
 #include <linux/config.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 
 /*
  * The Linux memory management assumes a three-level page table setup. On

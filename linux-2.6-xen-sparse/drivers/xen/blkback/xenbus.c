@@ -178,6 +178,8 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 
 		err = vbd_create(be->blkif, handle, be->pdev, be->readonly);
 		if (err) {
+			blkif_put(be->blkif);
+			be->blkif = NULL;
 			xenbus_dev_error(dev, err, "creating vbd structure");
 			return;
 		}

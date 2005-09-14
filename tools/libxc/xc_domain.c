@@ -134,7 +134,7 @@ int xc_domain_getinfolist(int xc_handle,
     int ret = 0;
     dom0_op_t op;
 
-    if(mlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0)
+    if ( mlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0 )
         return -1;
     
     op.cmd = DOM0_GETDOMAININFOLIST;
@@ -142,12 +142,12 @@ int xc_domain_getinfolist(int xc_handle,
     op.u.getdomaininfolist.max_domains  = max_domains;
     op.u.getdomaininfolist.buffer       = info;
 
-    if(xc_dom0_op(xc_handle, &op) < 0)
+    if ( xc_dom0_op(xc_handle, &op) < 0 )
         ret = -1;
     else
         ret = op.u.getdomaininfolist.num_domains;
     
-    if(munlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0)
+    if ( munlock(info, max_domains*sizeof(xc_domaininfo_t)) != 0 )
         ret = -1;
     
     return ret;
@@ -277,15 +277,18 @@ int xc_domain_memory_increase_reservation(int xc_handle,
     };
 
     err = xc_memory_op(xc_handle, XENMEM_increase_reservation, &reservation);
-    if (err == nr_extents)
+    if ( err == nr_extents )
         return 0;
 
-    if (err > 0) {
-        fprintf(stderr,"Failed alocation for dom %d : %ld pages order %d addr_bits %d\n",
-                                 domid, nr_extents, extent_order, address_bits);
+    if ( err > 0 )
+    {
+        fprintf(stderr, "Failed allocation for dom %d: "
+                "%ld pages order %d addr_bits %d\n",
+                domid, nr_extents, extent_order, address_bits);
         errno = ENOMEM;
         err = -1;
     }
+
     return err;
 }
 
@@ -304,24 +307,24 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
         .domid        = domid
     };
 
-    if (extent_start == NULL)
+    if ( extent_start == NULL )
     {
         fprintf(stderr,"decrease_reservation extent_start is NULL!\n");
         errno = EINVAL;
-        err = -1;
-	goto out;
+        return -1;
     }
 
-    err = xc_memory_op(xc_handle, XENMEM_increase_reservation, &reservation);
-    if (err == nr_extents)
+    err = xc_memory_op(xc_handle, XENMEM_decrease_reservation, &reservation);
+    if ( err == nr_extents )
         return 0;
 
-    if (err > 0) {
-        fprintf(stderr,"Failed de-alocation for dom %d : %ld pages order %d\n",
-                                 domid, nr_extents, extent_order);
+    if ( err > 0 )
+    {
+        fprintf(stderr,"Failed deallocation for dom %d: %ld pages order %d\n",
+                domid, nr_extents, extent_order);
         errno = EBUSY;
         err = -1;
     }
-out:
+
     return err;
 }

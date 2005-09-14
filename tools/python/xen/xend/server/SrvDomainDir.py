@@ -154,7 +154,7 @@ class SrvDomainDir(SrvDir):
             for d in domains:
                req.write('<li><a href="%s%s"> Domain %s</a>'
                          % (url, d.name, d.name))
-               req.write('id=%s' % d.id)
+               req.write('id=%s' % d.domid)
                req.write('memory=%d'% d.memory)
                req.write('ssidref=%d'% d.ssidref)
                req.write('</li>')

@@ -23,6 +23,7 @@ from xen.xend import sxp
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 from xen.xend.xenstore import DBVar
+from xen.xend.xenstore.xstransact import xstransact
 
 from xen.xend.server import channel
 
@@ -154,7 +155,6 @@ class ImageHandler:
             if dom <= 0:
                 raise VmError('Creating domain failed: name=%s' % self.vm.name)
         log.debug("initDomain: cpu=%d mem_kb=%d ssidref=%d dom=%d", cpu, mem_kb, ssidref, dom)
-        # xc.domain_setuuid(dom, uuid)
         xc.domain_setcpuweight(dom, cpu_weight)
         xc.domain_setmaxmem(dom, mem_kb)
 
@@ -240,6 +240,12 @@ class ImageHandler:
         """Extra cleanup on domain destroy (define in subclass if needed)."""
         pass
 
+    def set_vminfo(self, d):
+        if d.has_key('store_mfn'):
+            self.vm.setStoreRef(d.get('store_mfn'))
+        if d.has_key('console_mfn'):
+            self.vm.setConsoleRef(d.get('console_mfn'))
+
 addImageHandlerClass = ImageHandler.addImageHandlerClass
 
 class LinuxImageHandler(ImageHandler):
@@ -274,8 +280,7 @@ class LinuxImageHandler(ImageHandler):
                              flags          = self.flags,
                              vcpus          = self.vm.vcpus)
         if isinstance(ret, dict):
-            self.vm.store_mfn = ret.get('store_mfn')
-            self.vm.console_mfn = ret.get('console_mfn')
+            self.set_vminfo(ret)
             return 0
         return ret
 
@@ -318,7 +323,7 @@ class VmxImageHandler(ImageHandler):
                             flags          = self.flags,
                             vcpus          = self.vm.vcpus)
         if isinstance(ret, dict):
-            self.vm.store_mfn = ret.get('store_mfn')
+            self.set_vminfo(ret)
             return 0
         return ret
 

@@ -61,7 +61,7 @@
 #include <linux/percpu.h>
 #include <asm-xen/xen-public/physdev.h>
 #include "setup_arch_pre.h"
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #define PFN_UP(x)       (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PFN_PHYS(x)     ((x) << PAGE_SHIFT)
 #define end_pfn_map end_pfn

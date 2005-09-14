@@ -10,7 +10,7 @@
 #include <asm/irq.h>
 #include <asm/mmu_context.h>
 #include <asm-xen/evtchn.h>
-#include <asm-xen/hypervisor.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/queues.h>
 #include <asm-xen/xenbus.h>
@@ -320,19 +320,27 @@ static void __shutdown_handler(void *unused)
 static void shutdown_handler(struct xenbus_watch *watch, const char *node)
 {
     static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
-
     char *str;
+    int err;
 
+ again:
+    err = xenbus_transaction_start("control");
+    if (err)
+	return;
     str = (char *)xenbus_read("control", "shutdown", NULL);
-    /* Ignore read errors. */
-    if (IS_ERR(str))
-        return;
-    if (strlen(str) == 0) {
-        kfree(str);
-        return;
+    /* Ignore read errors and empty reads. */
+    if (XENBUS_IS_ERR_READ(str)) {
+	xenbus_transaction_end(1);
+	return;
     }
 
     xenbus_write("control", "shutdown", "", O_CREAT);
+
+    err = xenbus_transaction_end(0);
+    if (err == -ETIMEDOUT) {
+	kfree(str);
+	goto again;
+    }
 
     if (strcmp(str, "poweroff") == 0)
         shutting_down = SHUTDOWN_POWEROFF;
@@ -355,16 +363,26 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
 static void sysrq_handler(struct xenbus_watch *watch, const char *node)
 {
     char sysrq_key = '\0';
-    
+    int err;
+
+ again:
+    err = xenbus_transaction_start("control");
+    if (err)
+	return;
     if (!xenbus_scanf("control", "sysrq", "%c", &sysrq_key)) {
         printk(KERN_ERR "Unable to read sysrq code in control/sysrq\n");
-        return;
+	xenbus_transaction_end(1);
+	return;
     }
 
-    xenbus_printf("control", "sysrq", "%c", '\0');
+    if (sysrq_key != '\0')
+	xenbus_printf("control", "sysrq", "%c", '\0');
+
+    err = xenbus_transaction_end(0);
+    if (err == -ETIMEDOUT)
+	goto again;
 
     if (sysrq_key != '\0') {
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
         handle_sysrq(sysrq_key, NULL, NULL);
 #else

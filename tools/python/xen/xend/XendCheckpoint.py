@@ -13,6 +13,7 @@ from string import join
 from struct import pack, unpack, calcsize
 from xen.util.xpopen import xPopen3
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
+from xen.xend.xenstore.xsutil import IntroduceDomain
 
 from XendError import XendError
 from XendLogging import log
@@ -48,7 +49,7 @@ def save(xd, fd, dominfo, live):
     # simply uses the defaults compiled into libxenguest; see the comments 
     # and/or code in xc_linux_save() for more information. 
     cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
-           str(dominfo.id), "0", "0", str(int(live)) ]
+           str(dominfo.domid), "0", "0", str(int(live)) ]
     log.info("[xc_save] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     
@@ -68,18 +69,10 @@ def save(xd, fd, dominfo, live):
             if fd == child.fromchild.fileno():
                 l = child.fromchild.readline()
                 if l.rstrip() == "suspend":
-                    log.info("suspending %d" % dominfo.id)
-                    xd.domain_shutdown(dominfo.id, reason='suspend')
+                    log.info("suspending %d" % dominfo.domid)
+                    xd.domain_shutdown(dominfo.domid, reason='suspend')
                     dominfo.state_wait("suspended")
-                    log.info("suspend %d done" % dominfo.id)
-                    if dominfo.store_channel:
-                        try:
-                            dominfo.db.releaseDomain(dominfo.id)
-                        except Exception, ex:
-                            log.warning(
-                                "error in domain release on xenstore: %s",
-                                ex)
-                            pass
+                    log.info("suspend %d done" % dominfo.domid)
                     child.tochild.write("done\n")
                     child.tochild.flush()
         if filter(lambda (fd, event): event & select.POLLHUP, r):
@@ -90,12 +83,8 @@ def save(xd, fd, dominfo, live):
     if child.wait() != 0:
         raise XendError("xc_save failed: %s" % lasterr)
 
-    if dominfo.store_channel:
-        dominfo.store_channel.close()
-        dominfo.db['store_channel'].delete()
-        dominfo.db.saveDB(save=True)
-        dominfo.store_channel = None
-    xd.domain_destroy(dominfo.id)
+    dominfo.setStoreChannel(None)
+    xd.domain_destroy(dominfo.domid)
     return None
 
 def restore(xd, fd):
@@ -137,7 +126,7 @@ def restore(xd, fd):
         console_evtchn = 0
 
     cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
-           str(dominfo.id), str(nr_pfns),
+           str(dominfo.domid), str(nr_pfns),
            str(store_evtchn), str(console_evtchn)]
     log.info("[xc_restore] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
@@ -163,16 +152,15 @@ def restore(xd, fd):
                     m = re.match(r"^(store-mfn) (\d+)\n$", l)
                     if m:
                         if dominfo.store_channel:
-                            dominfo.store_mfn = int(m.group(2))
+                            dominfo.setStoreRef(int(m.group(2)))
                             if dominfo.store_mfn >= 0:
-                                dominfo.db.introduceDomain(dominfo.id,
-                                                           dominfo.store_mfn,
-                                                           dominfo.store_channel)
-                            dominfo.exportToDB(save=True, sync=True)
+                                IntroduceDomain(dominfo.domid,
+                                                dominfo.store_mfn,
+                                                dominfo.store_channel.port1,
+                                                dominfo.path)
                     m = re.match(r"^(console-mfn) (\d+)\n$", l)
                     if m:
-                        dominfo.console_mfn = int(m.group(2))
-                        dominfo.exportToDB(save=True, sync=True)
+                        dominfo.setConsoleRef(int(m.group(2)))
                     try:
                         l = child.fromchild.readline()
                     except:

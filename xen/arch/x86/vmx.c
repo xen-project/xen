@@ -1021,7 +1021,7 @@ static int vmx_set_cr0(unsigned long value)
      * CR0: We don't want to lose PE and PG.
      */
     paging_enabled = vmx_paging_enabled(d);
-    __vmwrite(GUEST_CR0, (value | X86_CR0_PE | X86_CR0_PG));
+    __vmwrite(GUEST_CR0, value | X86_CR0_PE | X86_CR0_PG | X86_CR0_NE);
     __vmwrite(CR0_READ_SHADOW, value);
 
     VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx\n", value);

@@ -74,6 +74,7 @@ static inline PyObject *pyvalue_str(char *val) {
 	" path [string]: xenstore path\n"	\
 	"\n"					\
 	"Returns: [string] data read.\n"	\
+	"         None if key doesn't exist.\n"	\
 	"Raises RuntimeError on error.\n"	\
 	"\n"
 
@@ -97,7 +98,11 @@ static PyObject *xspy_read(PyObject *self, PyObject *args, PyObject *kwds)
     xsval = xs_read(xh, path, &xsval_n);
     Py_END_ALLOW_THREADS
     if (!xsval) {
-        PyErr_SetFromErrno(PyExc_RuntimeError);
+        if (errno == ENOENT) {
+            Py_INCREF(Py_None);
+            val = Py_None;
+        } else
+            PyErr_SetFromErrno(PyExc_RuntimeError);
         goto exit;
     }
     val = PyString_FromStringAndSize(xsval, xsval_n);
@@ -160,6 +165,7 @@ static PyObject *xspy_write(PyObject *self, PyObject *args, PyObject *kwds)
 	" path [string]: path to list.\n"			\
 	"\n"							\
 	"Returns: [string array] list of subdirectory names.\n"	\
+	"         None if key doesn't exist.\n"			\
 	"Raises RuntimeError on error.\n"			\
 	"\n"
 
@@ -183,12 +189,17 @@ static PyObject *xspy_ls(PyObject *self, PyObject *args, PyObject *kwds)
     xsval = xs_directory(xh, path, &xsval_n);
     Py_END_ALLOW_THREADS
     if (!xsval) {
-        PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
+        if (errno == ENOENT) {
+            Py_INCREF(Py_None);
+            val = Py_None;
+        } else
+            PyErr_SetFromErrno(PyExc_RuntimeError);
+	goto exit;
     }
     val = PyList_New(xsval_n);
     for (i = 0; i < xsval_n; i++)
         PyList_SetItem(val, i, PyString_FromString(xsval[i]));
+    free(xsval);
  exit:
     return val;
 }
@@ -253,7 +264,7 @@ static PyObject *xspy_rm(PyObject *self, PyObject *args, PyObject *kwds)
     Py_BEGIN_ALLOW_THREADS
     xsval = xs_rm(xh, path);
     Py_END_ALLOW_THREADS
-    if (!xsval) {
+    if (!xsval && errno != ENOENT) {
         PyErr_SetFromErrno(PyExc_RuntimeError);
         goto exit;
     }

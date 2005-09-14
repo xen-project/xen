@@ -9,7 +9,7 @@
 #include "common.h"
 #include <asm-xen/xenbus.h>
 
-static inline dev_t vbd_map_devnum(blkif_pdev_t cookie)
+static inline dev_t vbd_map_devnum(u32 cookie)
 {
     return MKDEV(BLKIF_MAJOR(cookie), BLKIF_MINOR(cookie));
 }
@@ -33,7 +33,7 @@ unsigned long vbd_secsize(struct vbd *vbd)
 }
 
 int vbd_create(blkif_t *blkif, blkif_vdev_t handle,
-	       blkif_pdev_t pdevice, int readonly)
+	       u32 pdevice, int readonly)
 {
     struct vbd *vbd;
 
