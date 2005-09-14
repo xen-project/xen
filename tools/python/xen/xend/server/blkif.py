@@ -123,7 +123,7 @@ class BlkDev(Dev):
     def init(self, recreate=False, reboot=False):
         self.frontendDomain = self.getDomain()
         backend = self.getBackend()
-        self.backendId = backend.id
+        self.backendId = backend.domid
 
     def configure(self, config, change=False, recreate=False):
         if change:
@@ -146,7 +146,7 @@ class BlkDev(Dev):
         
         try:
             xd = get_component('xen.xend.XendDomain')
-            self.backendDomain = xd.domain_lookup_by_name(sxp.child_value(config, 'backend', '0')).id
+            self.backendDomain = xd.domain_lookup_by_name(sxp.child_value(config, 'backend', '0')).domid
         except:
             raise XendError('invalid backend domain')
 

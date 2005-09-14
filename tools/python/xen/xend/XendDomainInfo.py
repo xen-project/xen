@@ -140,16 +140,15 @@ class XendDomainInfo:
 
     create = classmethod(create)
 
-    def recreate(cls, uuid, db, info):
+    def recreate(cls, uuid, domid, db, info):
         """Create the VM object for an existing domain.
 
         @param db:        domain db
         @param info:      domain info from xc
         """
-        dom = info['dom']
         path = "/".join(db.getPath().split("/")[0:-2])
         vm = cls(uuid, path, db)
-        vm.setdom(dom)
+        vm.setDomid(domid)
         try:
             db.readDB()
         except: pass
@@ -168,7 +167,7 @@ class XendDomainInfo:
             finally:
                 vm.recreate = False
         else:
-            vm.setName("Domain-%d" % dom)
+            vm.setName("Domain-%d" % domid)
 
         vm.exportToDB(save=True)
         return vm
@@ -190,7 +189,7 @@ class XendDomainInfo:
         ssidref = int(sxp.child_value(config, 'ssidref'))
         log.debug('restoring with ssidref='+str(ssidref))
         id = xc.domain_create(ssidref = ssidref)
-        vm.setdom(id)
+        vm.setDomid(id)
         vm.clear_shutdown()
         try:
             vm.restore = True
@@ -203,7 +202,6 @@ class XendDomainInfo:
     restore = classmethod(restore)
 
     __exports__ = [
-        DBVar('id',            ty='int'),
         DBVar('name',          ty='str'),
         DBVar('config',        ty='sxpr'),
         DBVar('start_time',    ty='float'),
@@ -225,7 +223,7 @@ class XendDomainInfo:
         self.restore = 0
         
         self.config = None
-        self.id = None
+        self.domid = None
         self.cpu_weight = 1
         self.start_time = None
         self.name = None
@@ -281,16 +279,16 @@ class XendDomainInfo:
         self.db.importFromDB(self, fields=self.__exports__)
         self.store_channel = self.eventChannel("store/port")
 
-    def setdom(self, dom):
+    def setDomid(self, domid):
         """Set the domain id.
 
         @param dom: domain id
         """
-        self.id = int(dom)
-        #self.db.id = self.id
+        self.domid = domid
+        xstransact.Write(self.path, "domid", "%i" % self.domid)
 
     def getDomain(self):
-        return self.id
+        return self.domid
 
     def setName(self, name):
         self.name = name
@@ -332,7 +330,7 @@ class XendDomainInfo:
     def update(self, info=None):
         """Update with  info from xc.domain_getinfo().
         """
-        self.info = info or dom_get(self.id)
+        self.info = info or dom_get(self.domid)
         self.memory = self.info['mem_kb'] / 1024
         self.ssidref = self.info['ssidref']
 
@@ -352,7 +350,7 @@ class XendDomainInfo:
 
     def __str__(self):
         s = "<domain"
-        s += " id=" + str(self.id)
+        s += " id=" + str(self.domid)
         s += " name=" + self.name
         s += " memory=" + str(self.memory)
         s += " ssidref=" + str(self.ssidref)
@@ -393,7 +391,7 @@ class XendDomainInfo:
             frontpath = "%s/device/%s/%d" % (self.path, type, devnum)
 
             front = { 'backend' : backpath,
-                      'backend-id' : "%i" % backdom.id,
+                      'backend-id' : "%i" % backdom.domid,
                       'virtual-device' : "%i" % devnum }
             xstransact.Write(frontpath, front)
 
@@ -402,7 +400,7 @@ class XendDomainInfo:
             back = { 'type' : type,
                      'params' : params,
                      'frontend' : frontpath,
-                     'frontend-id' : "%i" % self.id }
+                     'frontend-id' : "%i" % self.domid }
             xstransact.Write(backpath, back)
 
             return
@@ -435,7 +433,7 @@ class XendDomainInfo:
             frontpath = "%s/device/%s/%d" % (self.path, type, devnum)
 
             front = { 'backend' : backpath,
-                      'backend-id' : "%i" % backdom.id,
+                      'backend-id' : "%i" % backdom.domid,
                       'handle' : "%i" % devnum,
                       'mac' : mac }
             xstransact.Write(frontpath, front)
@@ -445,7 +443,7 @@ class XendDomainInfo:
                      'mac' : mac,
                      'bridge' : bridge,
                      'frontend' : frontpath,
-                     'frontend-id' : "%i" % self.id,
+                     'frontend-id' : "%i" % self.domid,
                      'handle' : "%i" % devnum }
             if ipaddr:
                 back['ip'] = ' '.join(ipaddr)
@@ -464,13 +462,13 @@ class XendDomainInfo:
             frontpath = "%s/device/%s/%d" % (self.path, type, devnum)
 
             front = { 'backend' : backpath,
-                      'backend-id' : "%i" % backdom.id,
+                      'backend-id' : "%i" % backdom.domid,
                       'handle' : "%i" % devnum }
             xstransact.Write(frontpath, front)
 
             back = { 'instance' : "%i" % devnum,
                      'frontend' : frontpath,
-                     'frontend-id' : "%i" % self.id }
+                     'frontend-id' : "%i" % self.domid }
             xstransact.Write(backpath, back)
 
             return
@@ -505,7 +503,7 @@ class XendDomainInfo:
 
     def sxpr(self):
         sxpr = ['domain',
-                ['id', self.id],
+                ['domid', self.domid],
                 ['name', self.name],
                 ['memory', self.memory],
                 ['ssidref', self.ssidref],
@@ -602,7 +600,7 @@ class XendDomainInfo:
             return
         if dominfo.is_terminated():
             return
-        if not self.id or (dominfo.id != self.id):
+        if not self.domid or (dominfo.domid != self.domid):
             raise VmError('vm name clash: ' + name)
         
     def construct(self, config):
@@ -653,8 +651,8 @@ class XendDomainInfo:
         self.setMemoryTarget(self.memory * (1 << 20))
         self.ssidref = int(sxp.child_value(config, 'ssidref'))
         cpu = sxp.child_value(config, 'cpu')
-        if self.recreate and self.id and cpu is not None and int(cpu) >= 0:
-            xc.domain_pincpu(self.id, 0, 1<<int(cpu))
+        if self.recreate and self.domid and cpu is not None and int(cpu) >= 0:
+            xc.domain_pincpu(self.domid, 0, 1<<int(cpu))
         try:
             image = sxp.child_value(self.config, 'image')
             vcpus = sxp.child_value(image, 'vcpus')
@@ -684,17 +682,17 @@ class XendDomainInfo:
         self.image.createImage()
         self.exportToDB()
         if self.store_channel and self.store_mfn >= 0:
-            IntroduceDomain(self.id, self.store_mfn, self.store_channel.port1,
-                            self.path)
+            IntroduceDomain(self.domid, self.store_mfn,
+                            self.store_channel.port1, self.path)
         # get the configured value of vcpus and update store
         self.configure_vcpus(self.vcpus)
 
     def delete(self):
         """Delete the vm's db.
         """
-        if dom_get(self.id):
+        if dom_get(self.domid):
             return
-        self.id = None
+        self.domid = None
         self.saveToDB(sync=True)
         try:
             # Todo: eventually will have to wait for devices to signal
@@ -710,10 +708,10 @@ class XendDomainInfo:
         The domain will not finally go away unless all vm
         devices have been released.
         """
-        if self.id is None:
+        if self.domid is None:
             return
         try:
-            xc.domain_destroy(dom=self.id)
+            xc.domain_destroy(dom=self.domid)
         except Exception, err:
             log.exception("Domain destroy failed: %s", self.name)
 
@@ -771,7 +769,7 @@ class XendDomainInfo:
     def show(self):
         """Print virtual machine info.
         """
-        print "[VM dom=%d name=%s memory=%d ssidref=%d" % (self.id, self.name, self.memory, self.ssidref)
+        print "[VM dom=%d name=%s memory=%d ssidref=%d" % (self.domid, self.name, self.memory, self.ssidref)
         print "image:"
         sxp.show(self.image)
         print "]"
@@ -787,10 +785,10 @@ class XendDomainInfo:
             cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
         except:
             raise VmError('invalid cpu')
-        id = self.image.initDomain(self.id, self.memory, self.ssidref, cpu, self.cpu_weight)
+        id = self.image.initDomain(self.domid, self.memory, self.ssidref, cpu, self.cpu_weight)
         log.debug('init_domain> Created domain=%d name=%s memory=%d',
                   id, self.name, self.memory)
-        self.setdom(id)
+        self.setDomid(id)
 
     def eventChannel(self, path=None):
         """Create an event channel to the domain.
@@ -804,7 +802,7 @@ class XendDomainInfo:
             except:
                 # if anything goes wrong, assume the port was not yet set
                 pass
-        ret = EventChannel.interdomain(0, self.id, port1=port, port2=0)
+        ret = EventChannel.interdomain(0, self.domid, port1=port, port2=0)
         xstransact.Write(self.path, path, "%i" % ret.port1)
         return ret
         
@@ -1081,7 +1079,7 @@ class XendDomainInfo:
         if ref and ref >= 0:
             self.setStoreRef(ref)
             try:
-                IntroduceDomain(self.id, ref, self.store_channel.port1,
+                IntroduceDomain(self.domid, ref, self.store_channel.port1,
                                 self.path)
             except RuntimeError, ex:
                 if ex.args[0] == errno.EISCONN:
@@ -1089,7 +1087,7 @@ class XendDomainInfo:
                 else:
                     raise
             # get run-time value of vcpus and update store
-            self.configure_vcpus(dom_get(self.id)['vcpus'])
+            self.configure_vcpus(dom_get(self.domid)['vcpus'])
 
 
 def vm_field_ignore(_, _1, _2, _3):
@@ -1110,7 +1108,7 @@ def vm_field_maxmem(vm, _1, val, _2):
         maxmem = int(maxmem)
     except:
         raise VmError("invalid maxmem: " + str(maxmem))
-    xc.domain_setmaxmem(vm.id, maxmem_kb = maxmem * 1024)
+    xc.domain_setmaxmem(vm.domid, maxmem_kb = maxmem * 1024)
 
 
 #============================================================================

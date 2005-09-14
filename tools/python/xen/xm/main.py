@@ -192,9 +192,9 @@ def xm_restore(args):
     from xen.xend.XendClient import server
     info = server.xend_domain_restore(savefile)
     PrettyPrint.prettyprint(info)
-    id = sxp.child_value(info, 'id')
+    id = sxp.child_value(info, 'domid')
     if id is not None:
-        server.xend_domain_unpause(id)
+        server.xend_domain_unpause(domid)
 
 def xm_migrate(args):
     # TODO: arg_check
@@ -242,7 +242,7 @@ def xm_list(args):
 
 def parse_doms_info(info):
     dominfo = {}
-    dominfo['dom'] = int(sxp.child_value(info, 'id', '-1'))
+    dominfo['dom'] = int(sxp.child_value(info, 'domid', '-1'))
     dominfo['name'] = sxp.child_value(info, 'name', '??')
     dominfo['mem'] = int(sxp.child_value(info, 'memory', '0'))
     dominfo['cpu'] = str(sxp.child_value(info, 'cpu', '0'))
@@ -265,7 +265,7 @@ def parse_doms_info(info):
     for cpu in vcpu_to_cpu:
         vcpuinfo = {}
         vcpuinfo['name']   = sxp.child_value(info, 'name', '??')
-        vcpuinfo['dom']    = int(sxp.child_value(info, 'id', '-1'))
+        vcpuinfo['dom']    = int(sxp.child_value(info, 'domid', '-1'))
         vcpuinfo['vcpu']   = int(count)
         vcpuinfo['cpu']    = int(cpu)
         vcpuinfo['cpumap'] = int(cpumap[count])&mask
@@ -395,7 +395,7 @@ def xm_vcpu_enable(args):
     
     from xen.xend.XendClient import server
     dom = server.xend_domain(name)
-    id = sxp.child_value(dom, 'id')
+    id = sxp.child_value(dom, 'domid')
     server.xend_domain_vcpu_hotplug(id, vcpu, 1)
 
 def xm_vcpu_disable(args):
@@ -406,7 +406,7 @@ def xm_vcpu_disable(args):
     
     from xen.xend.XendClient import server
     dom = server.xend_domain(name)
-    id = sxp.child_value(dom, 'id')
+    id = sxp.child_value(dom, 'domid')
     server.xend_domain_vcpu_hotplug(id, vcpu, 0)
 
 def xm_domid(args):
@@ -414,7 +414,7 @@ def xm_domid(args):
 
     from xen.xend.XendClient import server
     dom = server.xend_domain(name)
-    print sxp.child_value(dom, 'id')
+    print sxp.child_value(dom, 'domid')
     
 def xm_domname(args):
     name = args[0]
@@ -462,7 +462,7 @@ def xm_console(args):
     dom = args[0]
     from xen.xend.XendClient import server
     info = server.xend_domain(dom)
-    domid = int(sxp.child_value(info, 'id', '-1'))
+    domid = int(sxp.child_value(info, 'domid', '-1'))
     cmd = "/usr/libexec/xen/xenconsole %d" % domid
     os.execvp('/usr/libexec/xen/xenconsole', cmd.split())
     console = sxp.child(info, "console")

@@ -750,7 +750,7 @@ def make_domain(opts, config):
             server.xend_domain_destroy(dom)
             opts.err("Failed to unpause domain %s" % dom)
     opts.info("Started domain %s" % (dom))
-    return int(sxp.child_value(dominfo, 'id'))
+    return int(sxp.child_value(dominfo, 'domid'))
 
 def get_dom0_alloc():
     """Return current allocation memory of dom0 (in MB). Return 0 on error"""

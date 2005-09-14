@@ -49,7 +49,7 @@ def save(xd, fd, dominfo, live):
     # simply uses the defaults compiled into libxenguest; see the comments 
     # and/or code in xc_linux_save() for more information. 
     cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
-           str(dominfo.id), "0", "0", str(int(live)) ]
+           str(dominfo.domid), "0", "0", str(int(live)) ]
     log.info("[xc_save] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     
@@ -69,10 +69,10 @@ def save(xd, fd, dominfo, live):
             if fd == child.fromchild.fileno():
                 l = child.fromchild.readline()
                 if l.rstrip() == "suspend":
-                    log.info("suspending %d" % dominfo.id)
-                    xd.domain_shutdown(dominfo.id, reason='suspend')
+                    log.info("suspending %d" % dominfo.domid)
+                    xd.domain_shutdown(dominfo.domid, reason='suspend')
                     dominfo.state_wait("suspended")
-                    log.info("suspend %d done" % dominfo.id)
+                    log.info("suspend %d done" % dominfo.domid)
                     child.tochild.write("done\n")
                     child.tochild.flush()
         if filter(lambda (fd, event): event & select.POLLHUP, r):
@@ -84,7 +84,7 @@ def save(xd, fd, dominfo, live):
         raise XendError("xc_save failed: %s" % lasterr)
 
     dominfo.setStoreChannel(None)
-    xd.domain_destroy(dominfo.id)
+    xd.domain_destroy(dominfo.domid)
     return None
 
 def restore(xd, fd):
@@ -126,7 +126,7 @@ def restore(xd, fd):
         console_evtchn = 0
 
     cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
-           str(dominfo.id), str(nr_pfns),
+           str(dominfo.domid), str(nr_pfns),
            str(store_evtchn), str(console_evtchn)]
     log.info("[xc_restore] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
@@ -154,7 +154,7 @@ def restore(xd, fd):
                         if dominfo.store_channel:
                             dominfo.setStoreRef(int(m.group(2)))
                             if dominfo.store_mfn >= 0:
-                                IntroduceDomain(dominfo.id,
+                                IntroduceDomain(dominfo.domid,
                                                 dominfo.store_mfn,
                                                 dominfo.store_channel.port1,
                                                 dominfo.path)
