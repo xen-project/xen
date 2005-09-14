@@ -49,6 +49,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
+#include <asm-xen/xen-public/xen.h>
 #include <asm-xen/xen-public/event_channel.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/evtchn.h>
