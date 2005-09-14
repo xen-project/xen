@@ -751,10 +751,10 @@ ecrit:  /**** END OF CRITICAL REGION ****/
 # Hypervisor uses this for application faults while it executes.
 ENTRY(failsafe_callback)
 	addq $0x10,%rsp /* skip rcx and r11 */	
-1:	movl (%rsp),%ds
-2:	movl 8(%rsp),%es
-3:	movl 16(%rsp),%fs
-4:	movl 24(%rsp),%gs
+1:	mov  (%rsp),%ds
+2:	mov  8(%rsp),%es
+3:	mov  16(%rsp),%fs
+4:	mov  24(%rsp),%gs
 	addq $0x20,%rsp /* skip the above selectors */		
 	SAVE_ALL
 	jmp  error_exit
