@@ -149,7 +149,7 @@ class XendDomainInfo:
         path = "/".join(db.getPath().split("/")[0:-2])
         vm = cls(uuid, path, db)
         vm.setDomid(domid)
-        vm.name = vm.readStore("name")
+        vm.name = vm.readVm("name")
         try:
             db.readDB()
         except: pass
@@ -262,10 +262,26 @@ class XendDomainInfo:
         self.bootloader = None
         self.device_model_pid = 0
 
-        xstransact.Write(self.path, "uuid", self.uuid)
+        self.writeVm("uuid", self.uuid)
+        self.writeDom("vm", self.path)
 
-    def readStore(self, key):
-        return xstransact.Read(self.path, key)
+    def readVm(self, *args):
+        return xstransact.Read(self.path, *args)
+
+    def writeVm(self, *args):
+        return xstransact.Write(self.path, *args)
+
+    def removeVm(self, *args):
+        return xstransact.Remove(self.path, *args)
+
+    def readDom(self, *args):
+        return xstransact.Read(self.path, *args)
+
+    def writeDom(self, *args):
+        return xstransact.Write(self.path, *args)
+
+    def removeDom(self, *args):
+        return xstransact.Remove(self.path, *args)
 
     def setDB(self, db):
         self.db = db
@@ -288,14 +304,14 @@ class XendDomainInfo:
         @param dom: domain id
         """
         self.domid = domid
-        xstransact.Write(self.path, "domid", "%i" % self.domid)
+        self.writeDom("domid", "%i" % self.domid)
 
     def getDomain(self):
         return self.domid
 
     def setName(self, name):
         self.name = name
-        xstransact.Write(self.path, "name", name)
+        self.writeVm("name", name)
 
     def getName(self):
         return self.name
@@ -303,32 +319,32 @@ class XendDomainInfo:
     def setStoreRef(self, ref):
         self.store_mfn = ref
         if ref:
-            xstransact.Write(self.path, "store/ring-ref", "%i" % ref)
+            self.writeDom("store/ring-ref", "%i" % ref)
         else:
-            xstransact.Remove(self.path, "store/ring-ref")
+            self.removeDom("store/ring-ref")
 
     def setStoreChannel(self, channel):
         if self.store_channel and self.store_channel != channel:
             self.store_channel.close()
         self.store_channel = channel
         if channel:
-            xstransact.Write(self.path, "store/port", "%i" % channel.port1)
+            self.writeDom("store/port", "%i" % channel.port1)
         else:
-            xstransact.Remove(self.path, "store/port")
+            self.removeDom("store/port")
 
     def setConsoleRef(self, ref):
         self.console_mfn = ref
         if ref:
-            xstransact.Write(self.path, "console/ring-ref", "%i" % ref)
+            self.writeDom("console/ring-ref", "%i" % ref)
         else:
-            xstransact.Remove(self.path, "console/ring-ref")
+            self.removeDom("console/ring-ref")
 
     def setMemoryTarget(self, target):
         self.memory_target = target
         if target:
-            xstransact.Write(self.path, "memory/target", "%i" % target)
+            self.writeDom("memory/target", "%i" % target)
         else:
-            xstransact.Remove(self.path, "memory/target")
+            self.removeDom("memory/target")
 
     def update(self, info=None):
         """Update with  info from xc.domain_getinfo().
@@ -668,7 +684,7 @@ class XendDomainInfo:
         d = {}
         for v in range(0, vcpus):
             d["cpu/%d/availability" % v] = "online"
-        xstransact.Write(self.path, d)
+        self.writeVm(d)
 
     def init_image(self):
         """Create boot image handler for the domain.
@@ -801,12 +817,12 @@ class XendDomainInfo:
         port = 0
         if path:
             try:
-                port = int(xstransact.Read(self.path, path))
+                port = int(self.readDom(path))
             except:
                 # if anything goes wrong, assume the port was not yet set
                 pass
         ret = EventChannel.interdomain(0, self.domid, port1=port, port2=0)
-        xstransact.Write(self.path, path, "%i" % ret.port1)
+        self.writeDom(path, "%i" % ret.port1)
         return ret
         
     def create_channel(self):
@@ -1053,20 +1069,20 @@ class XendDomainInfo:
             availability = "offline"
         else:
             availability = "online"
-        xstransact.Write(self.path, "cpu/%d/availability" % vcpu, availability)
+        self.writeVm("cpu/%d/availability" % vcpu, availability)
 
     def shutdown(self, reason):
         if not reason in shutdown_reasons.values():
             raise XendError('invalid reason:' + reason)
-        xstransact.Write(self.path, "control/shutdown", reason)
+        self.writeVm("control/shutdown", reason)
         if not reason in ['suspend']:
             self.shutdown_pending = {'start':time.time(), 'reason':reason}
 
     def clear_shutdown(self):
-        xstransact.Remove(self.path, "control/shutdown")
+        self.removeVm("control/shutdown")
 
     def send_sysrq(self, key=0):
-        xstransact.Write(self.path, "control/sysrq", '%c' % key)
+        self.writeVm("control/sysrq", '%c' % key)
 
     def shutdown_time_left(self, timeout):
         if not self.shutdown_pending:
