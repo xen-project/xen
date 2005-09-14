@@ -8,7 +8,7 @@ CFLAGS	+= -Iarch/$(XENARCH)/pci
 
 CFLAGS += -Iarch/i386/pci
 
-c-i386-obj-y		:= i386.o
+c-xen-obj-y		:= i386.o
 c-i386-obj-y		+= fixup.o
 c-i386-obj-$(CONFIG_ACPI_PCI)	+= acpi.o
 c-i386-obj-y			+= legacy.o common.o
