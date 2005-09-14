@@ -105,6 +105,8 @@ class xstransact:
         return ret
 
     def gather(self, *args):
+        if len(args) and type(args[0]) != tuple:
+            args = args,
         ret = []
         for tup in args:
             if len(tup) == 2:
@@ -122,6 +124,8 @@ class xstransact:
         return ret
 
     def store(self, *args):
+        if len(args) and type(args[0]) != tuple:
+            args = args,
         for tup in args:
             if len(tup) == 2:
                 (key, val) = tup
