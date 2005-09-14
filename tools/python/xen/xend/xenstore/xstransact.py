@@ -36,8 +36,6 @@ class xstransact:
         return xshandle().transaction_end(False)
 
     def abort(self):
-        if not self.in_transaction:
-            raise RuntimeError
         self.in_transaction = False
         return xshandle().transaction_end(True)
 
