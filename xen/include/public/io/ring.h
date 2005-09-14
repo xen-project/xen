@@ -87,7 +87,7 @@ struct __name##_back_ring {                                             \
 /* Syntactic sugar */                                                   \
 typedef struct __name##_sring __name##_sring_t;                         \
 typedef struct __name##_front_ring __name##_front_ring_t;               \
-typedef struct __name##_back_ring __name##_back_ring_t;
+typedef struct __name##_back_ring __name##_back_ring_t
 
 /*
  *   Macros for manipulating rings.  
