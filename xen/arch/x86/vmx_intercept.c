@@ -227,6 +227,7 @@ void vmx_hooks_assist(struct vcpu *d)
     u64 *intr = &(sp->sp_global.pic_intr[0]);
     struct vmx_virpit_t *vpit = &(d->domain->arch.vmx_platform.vmx_pit);
     int rw_mode, reinit = 0;
+    int oldvec = 0;
 
     /* load init count*/
     if (p->state == STATE_IORESP_HOOK) { 
@@ -235,6 +236,7 @@ void vmx_hooks_assist(struct vcpu *d)
             VMX_DBG_LOG(DBG_LEVEL_1, "VMX_PIT: guest reset PIT with channel %lx!\n", (unsigned long) ((p->u.data >> 24) & 0x3) );
             rem_ac_timer(&(vpit->pit_timer));
             reinit = 1;
+            oldvec = vpit->vector;
         }
         else
             init_ac_timer(&vpit->pit_timer, pit_timer_fn, vpit, d->processor);
@@ -250,6 +252,12 @@ void vmx_hooks_assist(struct vcpu *d)
             vpit->period = 1000000;
         }
         vpit->vector = ((p->u.data >> 16) & 0xFF);
+
+        if( reinit && oldvec != vpit->vector){
+            clear_bit(oldvec, intr);
+            vpit->pending_intr_nr = 0;
+        }
+
         vpit->channel = ((p->u.data >> 24) & 0x3);
         vpit->first_injected = 0;
 

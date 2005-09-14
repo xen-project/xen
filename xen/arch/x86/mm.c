@@ -1659,7 +1659,7 @@ int do_mmuext_op(
 {
     struct mmuext_op op;
     int rc = 0, i = 0, okay, cpu = smp_processor_id();
-    unsigned long type, done = 0;
+    unsigned long mfn, type, done = 0;
     struct pfn_info *page;
     struct vcpu *v = current;
     struct domain *d = v->domain, *e;
@@ -1706,7 +1706,8 @@ int do_mmuext_op(
         }
 
         okay = 1;
-        page = &frame_table[op.mfn];
+        mfn  = op.arg1.mfn;
+        page = &frame_table[mfn];
 
         switch ( op.cmd )
         {
@@ -1717,17 +1718,17 @@ int do_mmuext_op(
             if ( shadow_mode_refcounts(FOREIGNDOM) )
                 type = PGT_writable_page;
 
-            okay = get_page_and_type_from_pagenr(op.mfn, type, FOREIGNDOM);
+            okay = get_page_and_type_from_pagenr(mfn, type, FOREIGNDOM);
             if ( unlikely(!okay) )
             {
-                MEM_LOG("Error while pinning mfn %lx", op.mfn);
+                MEM_LOG("Error while pinning mfn %lx", mfn);
                 break;
             }
             
             if ( unlikely(test_and_set_bit(_PGT_pinned,
                                            &page->u.inuse.type_info)) )
             {
-                MEM_LOG("Mfn %lx already pinned", op.mfn);
+                MEM_LOG("Mfn %lx already pinned", mfn);
                 put_page_and_type(page);
                 okay = 0;
                 break;
@@ -1750,10 +1751,10 @@ int do_mmuext_op(
             goto pin_page;
 
         case MMUEXT_UNPIN_TABLE:
-            if ( unlikely(!(okay = get_page_from_pagenr(op.mfn, FOREIGNDOM))) )
+            if ( unlikely(!(okay = get_page_from_pagenr(mfn, FOREIGNDOM))) )
             {
                 MEM_LOG("Mfn %lx bad domain (dom=%p)",
-                        op.mfn, page_get_owner(page));
+                        mfn, page_get_owner(page));
             }
             else if ( likely(test_and_clear_bit(_PGT_pinned, 
                                                 &page->u.inuse.type_info)) )
@@ -1765,28 +1766,28 @@ int do_mmuext_op(
             {
                 okay = 0;
                 put_page(page);
-                MEM_LOG("Mfn %lx not pinned", op.mfn);
+                MEM_LOG("Mfn %lx not pinned", mfn);
             }
             break;
 
         case MMUEXT_NEW_BASEPTR:
-            okay = new_guest_cr3(op.mfn);
+            okay = new_guest_cr3(mfn);
             percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
             break;
         
 #ifdef __x86_64__
         case MMUEXT_NEW_USER_BASEPTR:
             okay = get_page_and_type_from_pagenr(
-                op.mfn, PGT_root_page_table, d);
+                mfn, PGT_root_page_table, d);
             if ( unlikely(!okay) )
             {
-                MEM_LOG("Error while installing new mfn %lx", op.mfn);
+                MEM_LOG("Error while installing new mfn %lx", mfn);
             }
             else
             {
                 unsigned long old_mfn =
                     pagetable_get_pfn(v->arch.guest_table_user);
-                v->arch.guest_table_user = mk_pagetable(op.mfn << PAGE_SHIFT);
+                v->arch.guest_table_user = mk_pagetable(mfn << PAGE_SHIFT);
                 if ( old_mfn != 0 )
                     put_page_and_type(&frame_table[old_mfn]);
             }
@@ -1799,8 +1800,8 @@ int do_mmuext_op(
     
         case MMUEXT_INVLPG_LOCAL:
             if ( shadow_mode_enabled(d) )
-                shadow_invlpg(v, op.linear_addr);
-            local_flush_tlb_one(op.linear_addr);
+                shadow_invlpg(v, op.arg1.linear_addr);
+            local_flush_tlb_one(op.arg1.linear_addr);
             break;
 
         case MMUEXT_TLB_FLUSH_MULTI:
@@ -1808,7 +1809,7 @@ int do_mmuext_op(
         {
             unsigned long vmask;
             cpumask_t     pmask;
-            if ( unlikely(get_user(vmask, (unsigned long *)op.vcpumask)) )
+            if ( unlikely(get_user(vmask, (unsigned long *)op.arg2.vcpumask)) )
             {
                 okay = 0;
                 break;
@@ -1818,7 +1819,7 @@ int do_mmuext_op(
             if ( op.cmd == MMUEXT_TLB_FLUSH_MULTI )
                 flush_tlb_mask(pmask);
             else
-                flush_tlb_one_mask(pmask, op.linear_addr);
+                flush_tlb_one_mask(pmask, op.arg1.linear_addr);
             break;
         }
 
@@ -1827,7 +1828,7 @@ int do_mmuext_op(
             break;
     
         case MMUEXT_INVLPG_ALL:
-            flush_tlb_one_mask(d->cpumask, op.linear_addr);
+            flush_tlb_one_mask(d->cpumask, op.arg1.linear_addr);
             break;
 
         case MMUEXT_FLUSH_CACHE:
@@ -1852,8 +1853,8 @@ int do_mmuext_op(
                 break;
             }
 
-            unsigned long ptr  = op.linear_addr;
-            unsigned long ents = op.nr_ents;
+            unsigned long ptr  = op.arg1.linear_addr;
+            unsigned long ents = op.arg2.nr_ents;
             if ( ((ptr & (PAGE_SIZE-1)) != 0) || 
                  (ents > 8192) ||
                  !array_access_ok(ptr, ents, LDT_ENTRY_SIZE) )
@@ -1886,7 +1887,7 @@ int do_mmuext_op(
             e = percpu_info[cpu].foreign;
             if ( unlikely(e == NULL) )
             {
-                MEM_LOG("No FOREIGNDOM to reassign mfn %lx to", op.mfn);
+                MEM_LOG("No FOREIGNDOM to reassign mfn %lx to", mfn);
                 okay = 0;
                 break;
             }
@@ -1919,7 +1920,7 @@ int do_mmuext_op(
             {
                 MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
                         "page is in Xen heap (%lx), or dom is dying (%ld).",
-                        e->tot_pages, e->max_pages, op.mfn, e->domain_flags);
+                        e->tot_pages, e->max_pages, mfn, e->domain_flags);
                 okay = 0;
                 goto reassign_fail;
             }

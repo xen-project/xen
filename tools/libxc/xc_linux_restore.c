@@ -421,7 +421,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
             pin[nr_pins].cmd = MMUEXT_PIN_L1_TABLE;
         else /* pfn_type[i] == (L2TAB|LPINTAB) */
             pin[nr_pins].cmd = MMUEXT_PIN_L2_TABLE;
-        pin[nr_pins].mfn = pfn_to_mfn_table[i];
+        pin[nr_pins].arg1.mfn = pfn_to_mfn_table[i];
         if ( ++nr_pins == MAX_PIN_BATCH )
         {
             if ( xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0 )

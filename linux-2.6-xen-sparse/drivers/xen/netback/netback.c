@@ -294,7 +294,7 @@ static void net_rx_action(unsigned long unused)
         mcl++;
 
         mmuext->cmd = MMUEXT_REASSIGN_PAGE;
-        mmuext->mfn = old_mfn;
+        mmuext->arg1.mfn = old_mfn;
         mmuext++;
 #endif
         mmu->ptr = ((unsigned long long)new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
@@ -355,7 +355,7 @@ static void net_rx_action(unsigned long unused)
 #ifdef CONFIG_XEN_NETDEV_GRANT
         old_mfn = 0; /* XXX Fix this so we can free_mfn() on error! */
 #else
-        old_mfn = mmuext[0].mfn;
+        old_mfn = mmuext[0].arg1.mfn;
 #endif
         atomic_set(&(skb_shinfo(skb)->dataref), 1);
         skb_shinfo(skb)->nr_frags = 0;

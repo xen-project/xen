@@ -169,21 +169,35 @@ static int zap_mmio_range(int xc_handle, u32 dom,
    l2_pgentry_t *vl2tab;
  
    mmio_addr = mmio_range_start & PAGE_MASK;
-   for (; mmio_addr < mmio_range_end; mmio_addr += PAGE_SIZE) {
+   for ( ; mmio_addr < mmio_range_end; mmio_addr += PAGE_SIZE )
+   {
        vl3e = vl3tab[l3_table_offset(mmio_addr)];
-       if (vl3e == 0)
+       if ( vl3e == 0 )
            continue;
-       vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-               PROT_READ|PROT_WRITE, vl3e >> PAGE_SHIFT);
-       if (vl2tab == 0) {
+
+       vl2tab = xc_map_foreign_range(
+           xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, vl3e>>PAGE_SHIFT);
+       if ( vl2tab == NULL )
+       {
            PERROR("Failed zap MMIO range");
            return -1;
        }
+
        vl2e = vl2tab[l2_table_offset(mmio_addr)];
-       if (vl2e == 0)
+       if ( vl2e == 0 )
+       {
+           munmap(vl2tab, PAGE_SIZE);
            continue;
-       vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-               PROT_READ|PROT_WRITE, vl2e >> PAGE_SHIFT);
+       }
+
+       vl1tab = xc_map_foreign_range(
+           xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, vl2e>>PAGE_SHIFT);
+       if ( vl1tab == NULL )
+       {
+           PERROR("Failed zap MMIO range");
+           munmap(vl2tab, PAGE_SIZE);
+           return -1;
+       }
 
        vl1tab[l1_table_offset(mmio_addr)] = 0;
        munmap(vl2tab, PAGE_SIZE);

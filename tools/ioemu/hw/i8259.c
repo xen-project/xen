@@ -128,21 +128,23 @@ static int pic_get_irq(PicState *s)
 /* pic[1] is connected to pin2 of pic[0] */
 #define CASCADE_IRQ 2
 
-static void shared_page_update()
+extern shared_iopage_t *shared_page;
+
+static void xen_update_shared_imr(void)
 {
-    extern shared_iopage_t *shared_page;
-    uint8_t * pmask = (uint8_t *)&(shared_page->sp_global.pic_mask[0]);
-    int           index;
+    uint8_t *pmask = (uint8_t *)shared_page->sp_global.pic_mask;
+    int      index;
 
     index = pics[0].irq_base/8;
     pmask[index] = pics[0].imr;
-    index = pics[1].irq_base/8;
 
-    if ( pics[0].imr &  (1 << CASCADE_IRQ) ) {
-        pmask[index] = 0xff;
-    } else {
-        pmask[index] = pics[1].imr;
-    }
+    index = pics[1].irq_base/8;
+    pmask[index] = (pics[0].imr & (1 << CASCADE_IRQ)) ? 0xff : pics[1].imr;
+}
+
+static void xen_clear_shared_irr(void)
+{
+    memset(shared_page->sp_global.pic_intr, 0, INTR_LEN);
 }
 
 /* raise irq to CPU if necessary. must be called every time the active
@@ -174,7 +176,8 @@ static void pic_update_irq(void)
 #endif
         cpu_interrupt(cpu_single_env, CPU_INTERRUPT_HARD);
     }
-    shared_page_update();
+
+    xen_update_shared_imr();
 }
 
 #ifdef DEBUG_IRQ_LATENCY
@@ -283,7 +286,9 @@ static void pic_reset(void *opaque)
     tmp = s->elcr_mask;
     memset(s, 0, sizeof(PicState));
     s->elcr_mask = tmp;
-    shared_page_update();
+
+    xen_update_shared_imr();
+    xen_clear_shared_irr();
 }
 
 static void pic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
