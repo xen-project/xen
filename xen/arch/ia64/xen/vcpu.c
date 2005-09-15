@@ -1721,7 +1721,7 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 	// PAGE_SIZE mapping in the vhpt for now, else purging is complicated
 	else vhpt_insert(vaddr,pte,PAGE_SHIFT<<2);
 #endif
-	if (IorD & 0x4) return;  // don't place in 1-entry TLB
+	if ((mp_pte == -1UL) || (IorD & 0x4)) return;  // don't place in 1-entry TLB
 	if (IorD & 0x1) {
 		vcpu_set_tr_entry(&PSCBX(vcpu,itlb),pte,ps<<2,vaddr);
 		PSCBX(vcpu,itlb_pte) = mp_pte;
