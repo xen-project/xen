@@ -42,7 +42,7 @@ static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE*2+1];
 static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE];
 
 #ifdef CONFIG_XEN_NETDEV_GRANT
-static gnttab_donate_t grant_rx_op[MAX_PENDING_REQS];
+static gnttab_transfer_t grant_rx_op[MAX_PENDING_REQS];
 #else
 static struct mmuext_op rx_mmuext[NETIF_RX_RING_SIZE];
 #endif
@@ -233,7 +233,7 @@ static void net_rx_action(unsigned long unused)
     multicall_entry_t *mcl;
     mmu_update_t *mmu;
 #ifdef CONFIG_XEN_NETDEV_GRANT
-    gnttab_donate_t *gop;
+    gnttab_transfer_t *gop;
 #else
     struct mmuext_op *mmuext;
 #endif
@@ -281,7 +281,7 @@ static void net_rx_action(unsigned long unused)
 #ifdef CONFIG_XEN_NETDEV_GRANT
         gop->mfn = old_mfn;
         gop->domid = netif->domid;
-        gop->handle = netif->rx->ring[
+        gop->ref = netif->rx->ring[
         MASK_NETIF_RX_IDX(netif->rx_resp_prod_copy)].req.gref;
         netif->rx_resp_prod_copy++;
         gop++;
@@ -331,14 +331,14 @@ static void net_rx_action(unsigned long unused)
 
     mcl = rx_mcl;
 #ifdef CONFIG_XEN_NETDEV_GRANT
-    if(HYPERVISOR_grant_table_op(GNTTABOP_donate, grant_rx_op, 
+    if(HYPERVISOR_grant_table_op(GNTTABOP_transfer, grant_rx_op, 
                                  gop - grant_rx_op)) { 
         /* 
         ** The other side has given us a bad grant ref, or has no headroom, 
         ** or has gone away. Unfortunately the current grant table code 
         ** doesn't inform us which is the case, so not much we can do. 
         */
-        DPRINTK("net_rx: donate to DOM%u failed; dropping (up to) %d "
+        DPRINTK("net_rx: transfer to DOM%u failed; dropping (up to) %d "
                 "packets.\n", grant_rx_op[0].domid, gop - grant_rx_op); 
     }
     gop = grant_rx_op;
@@ -371,7 +371,7 @@ static void net_rx_action(unsigned long unused)
         status = NETIF_RSP_OKAY;
 #ifdef CONFIG_XEN_NETDEV_GRANT
         if(gop->status != 0) { 
-            DPRINTK("Bad status %d from grant donate to DOM%u\n", 
+            DPRINTK("Bad status %d from grant transfer to DOM%u\n", 
                     gop->status, netif->domid);
             /* XXX SMH: should free 'old_mfn' here */
             status = NETIF_RSP_ERROR; 
@@ -748,11 +748,6 @@ static void net_tx_action(unsigned long unused)
 
         /* Check the remap error code. */
 #ifdef CONFIG_XEN_NETDEV_GRANT
-        /* 
-           XXX SMH: error returns from grant operations are pretty poorly
-           specified/thought out, but the below at least conforms with 
-           what the rest of the code uses. 
-        */
         if ( unlikely(mop->handle < 0) )
         {
             printk(KERN_ALERT "#### netback grant fails\n");

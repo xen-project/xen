@@ -215,18 +215,19 @@ typedef struct gnttab_dump_table {
 } gnttab_dump_table_t;
 
 /*
- * GNTTABOP_donate_grant_ref: Donate <frame> to a foreign domain.  The
+ * GNTTABOP_transfer_grant_ref: Transfer <frame> to a foreign domain.  The
  * foreign domain has previously registered the details of the transfer.
  * These can be identified from <handle>, a grant reference.
  */
-#define GNTTABOP_donate                4
+#define GNTTABOP_transfer                4
 typedef struct {
-    unsigned long mfn;		      /*  0 */
-    domid_t     domid;		      /*  4 */
-    u16         handle;               /*  8 */
-    s16         status;               /*  10: GNTST_* */
-    u32         __pad;
-} gnttab_donate_t;	      /*  14 bytes */
+    /* IN parameters. */
+    unsigned long mfn;
+    domid_t     domid;
+    grant_ref_t ref;
+    /* OUT parameters. */
+    s16         status;
+} gnttab_transfer_t;
 
 /*
  * Bitfield values for update_pin_status.flags.

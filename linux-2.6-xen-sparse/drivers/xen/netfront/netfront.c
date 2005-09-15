@@ -378,8 +378,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
             BUG();
         }
         grant_rx_ref[id] = ref;
-        gnttab_grant_foreign_transfer_ref(ref, np->backend_id,
-                                          virt_to_mfn(skb->head));
+        gnttab_grant_foreign_transfer_ref(ref, np->backend_id);
         np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.gref = ref;
 #endif
         rx_pfn_array[i] = virt_to_mfn(skb->head);
@@ -825,10 +824,8 @@ static void network_connect(struct net_device *dev)
     for (requeue_idx = 0, i = 1; i <= NETIF_RX_RING_SIZE; i++) { 
         if ((unsigned long)np->rx_skbs[i] >= __PAGE_OFFSET) {
 #ifdef CONFIG_XEN_NETDEV_GRANT 
-            /* Reinstate the grant ref so backend can 'donate' mfn to us. */
-            gnttab_grant_foreign_transfer_ref(grant_rx_ref[i], np->backend_id,
-                                              virt_to_mfn(np->rx_skbs[i]->head)
-                );
+            /* Reinstate the grant ref so backend can transfer mfn to us. */
+            gnttab_grant_foreign_transfer_ref(grant_rx_ref[i], np->backend_id);
             np->rx->ring[requeue_idx].req.gref = grant_rx_ref[i];
 #endif
             np->rx->ring[requeue_idx].req.id   = i;
