@@ -35,7 +35,7 @@ static inline void __prepare_arch_switch(void)
 	 * of cr3/ldt (i.e., not in __switch_to).
 	 */
 	__asm__ __volatile__ (
-		"movl %%es,%0 ; movl %%ds,%1 ; movl %%fs,%2 ; movl %%gs,%3"
+		"mov %%es,%0 ; mov %%ds,%1 ; mov %%fs,%2 ; mov %%gs,%3"
 		: "=m" (current->thread.es),
 		  "=m" (current->thread.ds),
 		  "=m" (current->thread.fsindex),
