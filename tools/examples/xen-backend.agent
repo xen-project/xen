@@ -1,7 +1,3 @@
-
-copyrev: 0000000000000000000000000000000000000000
-copy: tools/examples/backend.hotplug
-
 #! /bin/sh
 
 #ACTION=add
