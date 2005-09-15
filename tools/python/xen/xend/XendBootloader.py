@@ -89,6 +89,4 @@ def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
     if vcpus and sxp.child_value(config_image, "vcpus") is None:
         config_image.append(['vcpus', vcpus])
 
-    config = ['image', config_image]
-    return config
-
+    return config_image

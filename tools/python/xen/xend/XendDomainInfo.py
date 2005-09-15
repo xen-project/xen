@@ -214,7 +214,6 @@ class XendDomainInfo:
         DBVar('restart_state', ty='str'),
         DBVar('restart_time',  ty='float'),
         DBVar('restart_count', ty='int'),
-        DBVar('device_model_pid', ty='int'),
         ]
     
     def __init__(self, uuid, path, db):
@@ -264,7 +263,6 @@ class XendDomainInfo:
         
         self.vcpus = 1
         self.bootloader = None
-        self.device_model_pid = 0
 
         self.writeVm("uuid", self.uuid)
         self.storeDom("vm", self.path)
@@ -306,8 +304,6 @@ class XendDomainInfo:
         self.db.saveDB(save=save, sync=sync)
 
     def exportToDB(self, save=False, sync=False):
-        if self.image:
-            self.image.exportToDB(save=save, sync=sync)
         self.db.exportToDB(self, fields=self.__exports__, save=save, sync=sync)
 
     def importFromDB(self):
@@ -589,8 +585,6 @@ class XendDomainInfo:
             sxpr.append(devs)
         if self.config:
             sxpr.append(['config', self.config])
-        if self.device_model_pid:
-            sxpr.append(['device_model_pid',self.device_model_pid])
         return sxpr
 
     def sxpr_devices(self):
@@ -759,7 +753,6 @@ class XendDomainInfo:
                 pass
         if self.image:
             try:
-                self.device_model_pid = 0
                 self.image.destroy()
                 self.image = None
             except:
@@ -865,8 +858,7 @@ class XendDomainInfo:
                 ctrl.initController(reboot=True)
         else:
             self.create_configured_devices()
-        if not self.device_model_pid:
-            self.device_model_pid = self.image.createDeviceModel()
+        self.image.createDeviceModel()
 
     def device_create(self, dev_config):
         """Create a new device.
