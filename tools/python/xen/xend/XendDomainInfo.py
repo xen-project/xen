@@ -354,7 +354,8 @@ class XendDomainInfo:
         else:
             di = dom_get(self.domid)
             if not di:
-                return 
+                return
+            self.info = di 
         self.memory = self.info['mem_kb'] / 1024
         self.ssidref = self.info['ssidref']
 
