@@ -984,13 +984,13 @@ class XendDomainInfo:
             self.exportToDB()
             self.restart_state = STATE_RESTART_BOOTING
             if self.bootloader:
-                self.config = self.bootloader_config()
+                self.configure_bootloader()
             self.construct(self.config)
             self.saveToDB()
         finally:
             self.restart_state = None
 
-    def bootloader_config(self):
+    def configure_bootloader(self):
         # if we're restarting with a bootloader, we need to run it
         # FIXME: this assumes the disk is the first device and
         # that we're booting from the first disk
@@ -1005,8 +1005,7 @@ class XendDomainInfo:
             msg = "Had a bootloader specified, but can't find disk"
             log.error(msg)
             raise VmError(msg)
-        config = sxp.merge(['vm', blcfg ], self.config)
-        return config
+        self.config = sxp.merge(['vm', ['image', blcfg]], self.config)
 
     def configure_backends(self):
         """Set configuration flags if the vm is a backend for netif or blkif.
