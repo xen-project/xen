@@ -222,11 +222,7 @@ class ImageHandler:
 
     def getDomainMemory(self, mem_mb):
         """Memory (in KB) the domain will need for mem_mb (in MB)."""
-        if os.uname()[4] == 'ia64':
-	    """Append extra system pages, like xenstore and console"""
-	    return (mem_mb * 1024 + 3 * 16)
-	else:
-            return mem_mb * 1024
+        return mem_mb * 1024
 
     def buildDomain(self):
         """Build the domain. Define in subclass."""
