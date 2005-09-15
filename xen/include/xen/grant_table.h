@@ -106,12 +106,6 @@ int
 gnttab_prepare_for_transfer(
     struct domain *rd, struct domain *ld, grant_ref_t ref);
 
-/* Notify 'rd' of a completed transfer via an already-locked grant entry. */
-void 
-gnttab_notify_transfer(
-    struct domain *rd, struct domain *ld,
-    grant_ref_t ref, unsigned long frame);
-
 /* Domain death release of granted device mappings of other domains.*/
 void
 gnttab_release_dev_mappings(grant_table_t *gt);
