@@ -642,7 +642,6 @@ class XendDomainInfo:
             self.configure_cpus(config)
             self.init_domain()
             self.register_domain()
-            self.configure_bootloader()
 
             # Create domain devices.
             self.configure_backends()
@@ -909,11 +908,6 @@ class XendDomainInfo:
             self.config.remove(['device', dev_config])
         self.deleteDevice(type, dev.getId())
 
-    def configure_bootloader(self):
-        """Configure boot loader.
-        """
-        self.bootloader = sxp.child_value(self.config, "bootloader")
-
     def configure_restart(self):
         """Configure the vm restart mode.
         """
@@ -983,14 +977,16 @@ class XendDomainInfo:
             self.restart_check()
             self.exportToDB()
             self.restart_state = STATE_RESTART_BOOTING
-            if self.bootloader:
-                self.configure_bootloader()
+            self.configure_bootloader()
             self.construct(self.config)
             self.saveToDB()
         finally:
             self.restart_state = None
 
     def configure_bootloader(self):
+        self.bootloader = sxp.child_value(self.config, "bootloader")
+        if not self.bootloader:
+            return
         # if we're restarting with a bootloader, we need to run it
         # FIXME: this assumes the disk is the first device and
         # that we're booting from the first disk
