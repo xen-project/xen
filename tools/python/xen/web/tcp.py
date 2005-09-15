@@ -19,6 +19,7 @@ import sys
 import socket
 import types
 import time
+import errno
 
 from connection import *
 from protocol import *
@@ -40,22 +41,16 @@ class TCPListener(SocketListener):
         # SO_REUSEADDR does not always ensure that we do not get an address
         # in use error when restarted quickly
         # we implement a timeout to try and avoid failing unnecessarily
-
         timeout = time.time() + 30
-        again = True
-        while again and time.time() < timeout:
-            again = False
+        while True:
             try:
                 sock.bind((self.interface, self.port))
-            except socket.error, (errno, strerrno):
-                if errno == 98:
-                    again = True
+                return sock
+            except socket.error, (_errno, strerrno):
+                if _errno == errno.EADDRINUSE and time.time() < timeout:
+                    time.sleep(0.5)
                 else:
-                    raise socket.error(errno, strerrno)
-        if again:
-            raise socket.error(98, "address in use")
-                
-        return sock
+                    raise
 
     def acceptConnection(self, sock, protocol, addr):
         return TCPServerConnection(sock, protocol, addr, self)
