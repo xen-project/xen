@@ -110,9 +110,13 @@ def dom_get(dom):
     @param dom: domain id
     @return: info or None
     """
-    domlist = xc.domain_getinfo(dom, 1)
-    if domlist and dom == domlist[0]['dom']:
-        return domlist[0]
+    try:
+        domlist = xc.domain_getinfo(dom, 1)
+        if domlist and dom == domlist[0]['dom']:
+            return domlist[0]
+    except Exception, err:
+        # ignore missing domain
+        log.exception("domain_getinfo(%d) failed, ignoring", dom)
     return None
 
 class XendDomainInfo:
@@ -349,7 +353,12 @@ class XendDomainInfo:
     def update(self, info=None):
         """Update with  info from xc.domain_getinfo().
         """
-        self.info = info or dom_get(self.domid)
+        if info:
+            self.info = info
+        else:
+            di = dom_get(self.domid)
+            if not di:
+                return 
         self.memory = self.info['mem_kb'] / 1024
         self.ssidref = self.info['ssidref']
 

@@ -273,6 +273,9 @@ class HttpServer:
         self.interface = interface
         self.port = port
         self.root = root
+        # ready indicates when we are ready to begin accept connections
+        # it should be set after a successful bind
+        self.ready = False
 
     def getRoot(self):
         return self.root
@@ -283,6 +286,7 @@ class HttpServer:
     def run(self):
         self.bind()
         self.listen()
+        self.ready = True
         self.requestLoop()
 
     def stop(self):
