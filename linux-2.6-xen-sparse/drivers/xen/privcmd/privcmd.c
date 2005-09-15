@@ -80,8 +80,8 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         }
 #elif defined (__ia64__)
        __asm__ __volatile__ (
-           ";; mov r14=%2; mov r15=%3; mov r16=%4; mov r17=%5; mov r18=%6; mov
-r2=%1; break 0x1000;; mov %0=r8 ;;"
+           ";; mov r14=%2; mov r15=%3; mov r16=%4; mov r17=%5; mov r18=%6;"
+           "mov r2=%1; break 0x1000;; mov %0=r8 ;;"
            : "=r" (ret)
            : "r" (hypercall.op),
              "r" (hypercall.arg[0]),
