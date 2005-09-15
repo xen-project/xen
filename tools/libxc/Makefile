@@ -32,8 +32,7 @@ BUILD_SRCS += xc_ia64_stubs.c
 else
 SRCS       += xc_ptrace.c
 SRCS       += xc_ptrace_core.c
-
-BUILD_SRCS := xc_load_aout9.c
+BUILD_SRCS += xc_load_aout9.c
 BUILD_SRCS += xc_linux_restore.c
 BUILD_SRCS += xc_linux_save.c
 BUILD_SRCS += xc_vmx_build.c
