@@ -376,9 +376,21 @@ static int setup_guest(int xc_handle,
     if ( (mmu = xc_init_mmu_updates(xc_handle, dom)) == NULL )
         goto error_out;
 
-#ifdef __i386__
-    /* First allocate page for page dir. */
+    /* First allocate page for page dir or pdpt */
     ppt_alloc = (vpt_start - dsi.v_start) >> PAGE_SHIFT;
+    if ( page_array[ppt_alloc] > 0xfffff )
+    {
+	unsigned long nmfn;
+	nmfn = xc_make_page_below_4G( xc_handle, dom, page_array[ppt_alloc] );
+	if ( nmfn == 0 )
+	{
+	    fprintf(stderr, "Couldn't get a page below 4GB :-(\n");
+	    goto error_out;
+	}
+	page_array[ppt_alloc] = nmfn;
+    }
+
+#ifdef __i386__
     l2tab = page_array[ppt_alloc++] << PAGE_SHIFT;
     ctxt->ctrlreg[3] = l2tab;
 
@@ -414,8 +426,6 @@ static int setup_guest(int xc_handle,
     munmap(vl1tab, PAGE_SIZE);
     munmap(vl2tab, PAGE_SIZE);
 #else
-    /* First allocate pdpt */
-    ppt_alloc = (vpt_start - dsi.v_start) >> PAGE_SHIFT;
     /* here l3tab means pdpt, only 4 entry is used */
     l3tab = page_array[ppt_alloc++] << PAGE_SHIFT;
     ctxt->ctrlreg[3] = l3tab;
