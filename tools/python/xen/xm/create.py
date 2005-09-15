@@ -673,7 +673,7 @@ def choose_vnc_display():
             # Local port is field 3.
             y = x.split()[3]
             # Field is addr:port, split off the port.
-            y = y.split(':')[1]
+            y = y.split(':')[-1]
             r.append(int(y))
         return r
 
