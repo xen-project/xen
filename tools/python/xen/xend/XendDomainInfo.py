@@ -422,10 +422,13 @@ class XendDomainInfo:
 
             (type, params) = string.split(sxp.child_value(devconfig,
                                                           'uname'), ':', 1)
+            readonly = sxp.child_value(devconfig, 'mode', 'r')
             back = { 'type' : type,
                      'params' : params,
                      'frontend' : frontpath,
                      'frontend-id' : "%i" % self.domid }
+            if readonly == 'r':
+                back['read-only'] = ""  # existence indicates read-only
             xstransact.Write(backpath, back)
 
             return
