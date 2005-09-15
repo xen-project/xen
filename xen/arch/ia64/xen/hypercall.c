@@ -14,6 +14,7 @@
 
 #include <asm/vcpu.h>
 #include <asm/dom_fw.h>
+#include <public/memory.h>
 
 extern unsigned long translate_domain_mpaddr(unsigned long);
 extern struct ia64_pal_retval xen_pal_emulator(UINT64,UINT64,UINT64,UINT64);
@@ -152,9 +153,25 @@ ia64_hypercall (struct pt_regs *regs)
 		break;
 
 	    case __HYPERVISOR_memory_op:
-		//regs->r8 = do_dom_mem_op(regs->r14, regs->r15, regs->r16, regs->r17, regs->r18); 
 		/* we don't handle reservations; just return success */
-		regs->r8 = regs->r16;
+		{
+		    struct xen_memory_reservation reservation;
+		    void *arg = regs->r15;
+
+		    switch(regs->r14) {
+		    case XENMEM_increase_reservation:
+		    case XENMEM_decrease_reservation:
+			if (copy_from_user(&reservation, arg,
+				sizeof(reservation)))
+			    regs->r8 = -EFAULT;
+			else
+			    regs->r8 = reservation.nr_extents;
+			break;
+		    default:
+			regs->r8 = do_memory_op(regs->r14, regs->r15);
+			break;
+		    }
+		}
 		break;
 
 	    case __HYPERVISOR_event_channel_op:
