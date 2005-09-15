@@ -48,6 +48,7 @@ from xen.xend import XendRoot; xroot = XendRoot.instance()
 from xen.xend import Vifctl
 from xen.xend.XendLogging import log
 from xen.web.SrvDir import SrvDir
+import time
 
 from SrvRoot import SrvRoot
 
@@ -59,13 +60,32 @@ class XendServers:
     def add(self, server):
         self.servers.append(server)
 
-    def start(self):
+    def start(self, status):
         Vifctl.network('start')
         threads = []
         for server in self.servers:
             thread = Thread(target=server.run)
             thread.start()
             threads.append(thread)
+
+
+        # check for when all threads have initialized themselves and then
+        # close the status pipe
+
+        threads_left = True
+        while threads_left:
+            threads_left = False
+
+            for server in self.servers:
+                if not server.ready:
+                    threads_left = True
+                    break
+
+            if threads_left:
+                time.sleep(.5)
+
+        status.write('0')
+        status.close()
 
         for t in threads:
             t.join()
