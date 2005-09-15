@@ -27,15 +27,6 @@ from xen.xend.xenstore.xstransact import xstransact
 
 from xen.xend.server import channel
 
-"""Flag for a block device backend domain."""
-SIF_BLK_BE_DOMAIN = (1<<4)
-
-"""Flag for a net device backend domain."""
-SIF_NET_BE_DOMAIN = (1<<5)
-
-"""Flag for a TPM device backend domain."""
-SIF_TPM_BE_DOMAIN = (1<<7)
-
 MAX_GUEST_CMDLINE = 1024
 
 class ImageHandler:
@@ -192,10 +183,7 @@ class ImageHandler:
             return
 
         # Set params and call buildDomain().
-        self.flags = 0
-        if self.vm.netif_backend: self.flags |= SIF_NET_BE_DOMAIN
-        if self.vm.blkif_backend: self.flags |= SIF_BLK_BE_DOMAIN
-        if self.vm.tpmif_backend: self.flags |= SIF_TPM_BE_DOMAIN
+        self.flags = self.vm.backend_flags
 
         if not os.path.isfile(self.kernel):
             raise VmError('Kernel image does not exist: %s' % self.kernel)

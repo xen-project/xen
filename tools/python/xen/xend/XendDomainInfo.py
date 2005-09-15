@@ -88,6 +88,15 @@ STATE_VM_OK         = "ok"
 STATE_VM_TERMINATED = "terminated"
 STATE_VM_SUSPENDED  = "suspended"
 
+"""Flag for a block device backend domain."""
+SIF_BLK_BE_DOMAIN = (1<<4)
+
+"""Flag for a net device backend domain."""
+SIF_NET_BE_DOMAIN = (1<<5)
+
+"""Flag for a TPM device backend domain."""
+SIF_TPM_BE_DOMAIN = (1<<7)
+
 
 def domain_exists(name):
     # See comment in XendDomain constructor.
@@ -243,10 +252,8 @@ class XendDomainInfo:
         self.controllers = {}
         
         self.info = None
-        self.blkif_backend = False
-        self.netif_backend = False
+        self.backend_flags = 0
         self.netif_idx = 0
-        self.tpmif_backend = False
         
         #todo: state: running, suspended
         self.state = STATE_VM_OK
@@ -1014,13 +1021,13 @@ class XendDomainInfo:
             v = sxp.child0(c)
             name = sxp.name(v)
             if name == 'blkif':
-                self.blkif_backend = True
+                self.backend_flags |= SIF_BLK_BE_DOMAIN
             elif name == 'netif':
-                self.netif_backend = True
+                self.backend_flags |= SIF_NET_BE_DOMAIN
             elif name == 'usbif':
-                self.usbif_backend = True
+                pass
             elif name == 'tpmif':
-                self.tpmif_backend = True
+                self.backend_flags |= SIF_TPM_BE_DOMAIN
             else:
                 raise VmError('invalid backend type:' + str(name))
 
