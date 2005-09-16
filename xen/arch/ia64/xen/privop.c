@@ -1107,6 +1107,7 @@ int dump_privop_counts_to_user(char __user *ubuf, int len)
 #ifdef PRIVOP_ADDR_COUNT
 	n += dump_privop_addrs(buf + n);
 #endif
+	n += dump_vhpt_stats(buf + n);
 	n += dump_misc_stats(buf + n);
 	if (len < TMPBUFLEN) return -1;
 	if (__copy_to_user(ubuf,buf,n)) return -1;
@@ -1122,6 +1123,7 @@ int zero_privop_counts_to_user(char __user *ubuf, int len)
 #ifdef PRIVOP_ADDR_COUNT
 	zero_privop_addrs();
 #endif
+	zero_vhpt_stats();
 	zero_misc_stats();
 	zero_reflect_counts();
 	if (len < TMPBUFLEN) return -1;
