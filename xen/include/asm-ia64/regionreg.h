@@ -55,8 +55,8 @@ vmMangleRID(unsigned long RIDVal)
 
 	t.uint = RIDVal;
 	tmp = t.bytes[1];
-	t.bytes[1] = t.bytes[2];
-	t.bytes[2] = tmp;
+	t.bytes[1] = t.bytes[3];
+	t.bytes[3] = tmp;
 
 	return t.uint;
 }
