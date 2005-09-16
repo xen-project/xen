@@ -68,6 +68,7 @@ class XendDomain:
         self.dbmap = DBMap(db=XenNode("/domain"))
         self.watchReleaseDomain()
         self.initial_refresh()
+        self.dom0_setup()
 
     def list(self):
         """Get list of domain objects.
@@ -151,6 +152,7 @@ class XendDomain:
                 self._delete_domain(domid)
         self.refresh(cleanup=True)
 
+    def dom0_setup():
         dom0 = self.domain_lookup(0)
         if not dom0:
             dom0 = self.domain_unknown(0)
