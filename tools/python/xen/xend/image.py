@@ -271,9 +271,10 @@ class VmxImageHandler(ImageHandler):
     def configure(self, config):
         ImageHandler.configure(self, config)
         if not config:
-            self.memmap, self.dmargs, self.device_model, self.display = self.vm.gatherVm(
+            self.memmap, dmargs, self.device_model, self.display = self.vm.gatherVm(
                 ("image/memmap"), ("image/dmargs"), ("image/device-model"),
                 ("image/display"))
+            self.dmargs = dmargs.split(' ')
             return
         
         self.memmap = sxp.child_value(config, 'memmap')
@@ -283,10 +284,10 @@ class VmxImageHandler(ImageHandler):
             raise VmError("vmx: missing device model")
         self.display = sxp.child_value(config, 'display')
 
-        self.storeVm(("image/memmap", self.memmap),
-                     ("image/dmargs", self.dmargs),
-                     ("image/device-model", self.device_model),
-                     ("image/display", self.display))
+        self.vm.storeVm(("image/memmap", self.memmap),
+                        ("image/dmargs", " ".join(self.dmargs)),
+                        ("image/device-model", self.device_model),
+                        ("image/display", self.display))
 
     def createImage(self):
         """Create a VM for the VMX environment.
@@ -346,7 +347,7 @@ class VmxImageHandler(ImageHandler):
                 ret.append("%s" % v)
 
         # Handle disk/network related options
-        devices = sxp.children(config, 'device')
+        devices = sxp.children(self.vm.config, 'device')
         for device in devices:
             name = sxp.name(sxp.child0(device))
             if name == 'vbd':
