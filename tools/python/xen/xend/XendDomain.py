@@ -96,7 +96,9 @@ class XendDomain:
         return map(lambda x: x.name, doms)
 
     def onReleaseDomain(self):
-        self.refresh(cleanup=True)
+        self.reap()
+        self.refresh()
+        self.domain_restarts()
 
     def watchReleaseDomain(self):
         from xen.xend.xenstore.xswatch import xswatch
@@ -150,7 +152,9 @@ class XendDomain:
                     self._delete_domain(domid)
             else:
                 self._delete_domain(domid)
-        self.refresh(cleanup=True)
+        self.reap()
+        self.refresh()
+        self.domain_restarts()
 
     def dom0_setup():
         dom0 = self.domain_lookup(0)
@@ -245,25 +249,18 @@ class XendDomain:
                     self.domain_restart_schedule(domid, reason)
             dominfo.destroy()
 
-    def refresh(self, cleanup=False):
+    def refresh(self):
         """Refresh domain list from Xen.
         """
-        if cleanup:
-            self.reap()
         doms = self.xen_domains()
         # Remove entries for domains that no longer exist.
         # Update entries for existing domains.
-        do_domain_restarts = False
         for d in self.domains.values():
             info = doms.get(d.domid)
             if info:
                 d.update(info)
-            elif d.restart_pending():
-                do_domain_restarts = True
-            else:
+            elif not d.restart_pending():
                 self._delete_domain(d.domid)
-        if cleanup and do_domain_restarts:
-            scheduler.now(self.domain_restarts)
 
     def update_domain(self, id):
         """Update information for a single domain.
