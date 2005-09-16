@@ -298,7 +298,6 @@ class Daemon:
         return self.cleanup(kill=True)
 
     def run(self, status):
-        _enforce_dom0_cpus()
         try:
             log.info("Xend Daemon started")
             event.listenEvent(self)
@@ -322,32 +321,6 @@ class Daemon:
         # way to exit a Python with running threads.
         #sys.exit(rc)
         os._exit(rc)
-
-def _enforce_dom0_cpus():
-    dn = xroot.get_dom0_cpus()
-
-    for d in glob.glob("/sys/devices/system/cpu/cpu*"):
-        cpu = int(os.path.basename(d)[3:])
-        if (dn == 0) or (cpu < dn):
-            v = "1"
-        else:
-            v = "0"
-        try:
-            f = open("%s/online" %d, "r+")
-            c = f.read(1)
-            if (c != v):
-                if v == "0":
-                    log.info("dom0 is trying to give back cpu %d", cpu)
-                else:
-                    log.info("dom0 is trying to take cpu %d", cpu)
-                f.seek(0)
-                f.write(v)
-                f.close()
-                log.info("dom0 successfully enforced cpu %d", cpu)
-            else:
-                f.close()
-        except:
-            pass
 
 def instance():
     global inst

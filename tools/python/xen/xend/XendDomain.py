@@ -155,6 +155,7 @@ class XendDomain:
         if not dom0:
             dom0 = self.domain_unknown(0)
         dom0.dom0_init_store()    
+        dom0.dom0_enforce_cpus()
 
     def close(self):
         pass

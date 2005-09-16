@@ -49,6 +49,6 @@
 # If dom0-min-mem=0, dom0 will never balloon out.
 (dom0-min-mem 0)
 
-# In SMP system, dom0 will use only CPUs in range [1,dom0-cpus]
+# In SMP system, dom0 will use dom0-cpus # of CPUS
 # If dom0-cpus = 0, dom0 will take all cpus available
 (dom0-cpus 0)

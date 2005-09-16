@@ -1120,6 +1120,26 @@ class XendDomainInfo:
             # get run-time value of vcpus and update store
             self.configure_vcpus(dom_get(self.domid)['vcpus'])
 
+    def dom0_enforce_cpus(self):
+        dom = 0
+        # get max number of cpus to use for dom0 from config
+        from xen.xend import XendRoot
+        xroot = XendRoot.instance()
+        target = int(xroot.get_dom0_cpus())
+        log.debug("number of cpus to use is %d" % (target))
+   
+        # target = 0 means use all processors
+        if target > 0:
+            # count the number of online vcpus (cpu values in v2c map >= 0)
+            vcpu_to_cpu = dom_get(dom)['vcpu_to_cpu']
+            vcpus_online = len(filter(lambda x: x >= 0, vcpu_to_cpu))
+            log.debug("found %d vcpus online" % (vcpus_online))
+
+            # disable any extra vcpus that are online over the requested target
+            for vcpu in range(target, vcpus_online):
+                log.info("enforcement is disabling DOM%d VCPU%d" % (dom, vcpu))
+                self.vcpu_hotplug(vcpu, 0)
+
 
 def vm_field_ignore(_, _1, _2, _3):
     """Dummy config field handler used for fields with built-in handling.
