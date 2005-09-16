@@ -177,11 +177,6 @@ class XendDomain:
         @param info:   domain info object
         @param notify: send a domain created event if true
         """
-        # Remove entries under the wrong id.
-        for i, d in self.domains.items():
-            if i != d.domid:
-                del self.domains[i]
-                self.dbmap.delete(d.uuid)
         if info.domid in self.domains:
             notify = False
         self.domains[info.domid] = info
