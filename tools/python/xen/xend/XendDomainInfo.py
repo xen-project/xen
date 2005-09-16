@@ -153,13 +153,12 @@ class XendDomainInfo:
 
     create = classmethod(create)
 
-    def recreate(cls, uuid, domid, db, info):
+    def recreate(cls, uuid, path, domid, db, info):
         """Create the VM object for an existing domain.
 
         @param db:        domain db
         @param info:      domain info from xc
         """
-        path = "/".join(db.getPath().split("/")[0:-2])
         vm = cls(uuid, path, db)
         vm.setDomid(domid)
         vm.name, vm.start_time = vm.gatherVm(("name", str),
@@ -726,8 +725,6 @@ class XendDomainInfo:
     def delete(self):
         """Delete the vm's db.
         """
-        if dom_get(self.domid):
-            return
         self.domid = None
         self.saveToDB(sync=True)
         try:
@@ -759,7 +756,7 @@ class XendDomainInfo:
         if self.store_channel:
             self.setStoreChannel(None)
         if self.console_channel:
-            # notify processes using this cosole?
+            # notify processes using this console?
             try:
                 self.console_channel.close()
                 self.console_channel = None

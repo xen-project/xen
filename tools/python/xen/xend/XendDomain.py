@@ -39,10 +39,18 @@ from xen.xend import scheduler
 from xen.xend.server import relocate
 from xen.xend.uuid import getUuid
 from xen.xend.xenstore import XenNode, DBMap
+from xen.xend.xenstore.xstransact import xstransact
+from xen.xend.xenstore.xsutil import GetDomainPath
 
 __all__ = [ "XendDomain" ]
 
 SHUTDOWN_TIMEOUT = 30
+
+def is_dead(dom):
+    return dom['crashed'] or dom['shutdown'] or (
+        dom['dying'] and not(dom['running'] or dom['paused'] or
+                             dom['blocked']))
+
 
 class XendDomainDict(dict):
     def get_by_name(self, name):
@@ -65,7 +73,9 @@ class XendDomain:
         # So we stuff the XendDomain instance (self) into xroot's components.
         xroot.add_component("xen.xend.XendDomain", self)
         self.domains = XendDomainDict()
-        self.dbmap = DBMap(db=XenNode("/domain"))
+        self.domroot = "/domain"
+        self.vmroot = "/domain"
+        self.dbmap = DBMap(db=XenNode(self.vmroot))
         self.watchReleaseDomain()
         self.initial_refresh()
         self.dom0_setup()
@@ -126,56 +136,46 @@ class XendDomain:
         else:
             dominfo = dominfo[0]
         return dominfo
-            
+
     def initial_refresh(self):
         """Refresh initial domain info from db.
         """
         doms = self.xen_domains()
-        self.dbmap.readDB()
-        for domdb in self.dbmap.values():
-            if not domdb.has_key("xend"):
+        self.dbmap.readDB()             # XXX only needed for "xend"
+        for dom in doms.values():
+            domid = dom['dom']
+            dompath = GetDomainPath(domid)
+            if not dompath:
                 continue
-            db = domdb.addChild("xend")
+            vmpath = xstransact.Read(dompath, "vm")
+            if not vmpath:
+                continue
+            uuid = xstransact.Read(vmpath, "uuid")
+            if not uuid:
+                continue
+            log.info("recreating domain %d, uuid %s" % (domid, uuid))
+            dompath = "/".join(dompath.split("/")[0:-1])
+            db = self.dbmap.addChild("%s/xend" % uuid)
             try:
-                domid = int(domdb["domid"].getData())
-            except:
-                domid = None
-            # XXX if domid in self.domains, then something went wrong
-            if (domid is None) or (domid in self.domains):
-                domdb.delete()
-            elif domid in doms:
-                try:
-                    self._new_domain(domdb["uuid"].getData(), domid, db,
-                                     doms[domid]) 
-                except Exception, ex:
-                    log.exception("Error recreating domain info: id=%d", domid)
-                    self._delete_domain(domid)
-            else:
-                self._delete_domain(domid)
+                dominfo = XendDomainInfo.recreate(uuid, dompath, domid, db,
+                                                  dom)
+            except Exception, ex:
+                log.exception("Error recreating domain info: id=%d", domid)
+                continue
+            self._add_domain(dominfo)
         self.reap()
         self.refresh()
         self.domain_restarts()
 
-    def dom0_setup():
+    def dom0_setup(self):
         dom0 = self.domain_lookup(0)
         if not dom0:
-            dom0 = self.domain_unknown(0)
+            dom0 = self.dom0_unknown()
         dom0.dom0_init_store()    
         dom0.dom0_enforce_vcpus()
 
     def close(self):
         pass
-
-    def _new_domain(self, uuid, domid, db, info):
-        """Create a domain entry from saved info.
-
-        @param db:   saved info from the db
-        @param info: domain info from xen
-        @return: domain
-        """
-        dominfo = XendDomainInfo.recreate(uuid, domid, db, info)
-        self.domains[dominfo.domid] = dominfo
-        return dominfo
 
     def _add_domain(self, info, notify=True):
         """Add a domain entry to the tables.
@@ -196,11 +196,6 @@ class XendDomain:
         @param id:     domain id
         @param notify: send a domain died event if true
         """
-        try:
-            if self.xen_domain(id):
-                return
-        except:
-            pass
         info = self.domains.get(id)
         if info:
             del self.domains[id]
@@ -226,10 +221,7 @@ class XendDomain:
         """
         doms = self.xen_domains()
         for d in doms.values():
-            dead = d['crashed'] or d['shutdown'] or (
-                d['dying'] and not(d['running'] or d['paused'] or
-                                   d['blocked']))
-            if not dead:
+            if not is_dead(d):
                 continue
             domid = d['dom']
             dominfo = self.domains.get(domid)
@@ -240,8 +232,8 @@ class XendDomain:
                 self.domain_dumpcore(domid)
             if d['shutdown']:
                 reason = shutdown_reason(d['shutdown_reason'])
-                log.debug('shutdown name=%s id=%d reason=%s', name, domid,
-                          reason)
+                log.debug('shutdown name=%s id=%d reason=%s', dominfo.name,
+                          domid, reason)
                 if reason == 'suspend':
                     dominfo.state_set("suspended")
                     continue
@@ -338,22 +330,32 @@ class XendDomain:
         self.update_domain(id)
         return self.domains.get(id)
 
-    def domain_unknown(self, id):
+    def dom0_unknown(self):
+        dom0 = 0
+        uuid = None
+        info = self.xen_domain(dom0)
+        dompath = GetDomainPath(dom0)
+        if dompath:
+            vmpath = xstransact.Read(dompath, "vm")
+            if vmpath:
+                uuid = xstransact.Read(vmpath, "uuid")
+            if not uuid:
+                uuid = dompath.split("/")[-1]
+            dompath = "/".join(dompath.split("/")[0:-1])
+        if not uuid:
+            uuid = getUuid()
+            dompath = self.domroot
+        log.info("Creating entry for unknown xend domain: id=%d uuid=%s",
+                 dom0, uuid)
+        db = self.dbmap.addChild("%s/xend" % uuid)
         try:
-            info = self.xen_domain(id)
-            if info:
-                uuid = getUuid()
-                log.info(
-                    "Creating entry for unknown domain: id=%d uuid=%s",
-                    id, uuid)
-                db = self.dbmap.addChild("%s/xend" % uuid)
-                dominfo = XendDomainInfo.recreate(uuid, id, db, info)
-                self._add_domain(dominfo)
-                return dominfo
-        except Exception, ex:
-            raise
-            log.exception("Error creating domain info: id=%d", id)
-        return None
+            dominfo = XendDomainInfo.recreate(uuid, dompath, dom0,
+                                              db, info)
+        except:
+            raise XendError("Error recreating xend domain info: id=%d" %
+                            dom0)
+        self._add_domain(dominfo)
+        return dominfo
         
     def domain_lookup(self, id):
         return self.domains.get(id)
