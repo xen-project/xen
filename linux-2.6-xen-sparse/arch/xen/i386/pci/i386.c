@@ -295,7 +295,7 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 	/* Write-combine setting is ignored, it is changed via the mtrr
 	 * interfaces on this platform.
 	 */
-	if (direct_remap_pfn_range(vma->vm_mm, vma->vm_start, vma->vm_pgoff,
+	if (direct_remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
 				   vma->vm_end - vma->vm_start,
 				   vma->vm_page_prot, DOMID_IO))
 		return -EAGAIN;

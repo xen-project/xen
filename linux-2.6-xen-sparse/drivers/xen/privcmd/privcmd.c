@@ -130,12 +130,12 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
                 if ( (msg[j].va + (msg[j].npages<<PAGE_SHIFT)) > vma->vm_end )
                     return -EINVAL;
 
-                if ( (rc = direct_remap_pfn_range(vma->vm_mm, 
-                                                   msg[j].va&PAGE_MASK, 
-                                                   msg[j].mfn, 
-                                                   msg[j].npages<<PAGE_SHIFT, 
-                                                   vma->vm_page_prot,
-                                                   mmapcmd.dom)) < 0 )
+                if ( (rc = direct_remap_pfn_range(vma,
+                                                  msg[j].va&PAGE_MASK, 
+                                                  msg[j].mfn, 
+                                                  msg[j].npages<<PAGE_SHIFT, 
+                                                  vma->vm_page_prot,
+                                                  mmapcmd.dom)) < 0 )
                     return rc;
             }
         }
