@@ -18,16 +18,10 @@
 #include <asm-xen/xen-public/io/netif.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
-
-#ifdef CONFIG_XEN_NETDEV_GRANT
 #include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/gnttab.h>
 
 #define GRANT_INVALID_REF (0xFFFF)
-
-#endif
-
-
 
 #if 0
 #define ASSERT(_p) \
@@ -44,74 +38,73 @@
 #define WPRINTK(fmt, args...) \
     printk(KERN_WARNING "xen_net: " fmt, ##args)
 
-
 typedef struct netif_st {
-    /* Unique identifier for this interface. */
-    domid_t          domid;
-    unsigned int     handle;
+	/* Unique identifier for this interface. */
+	domid_t          domid;
+	unsigned int     handle;
 
-    u8               fe_dev_addr[6];
+	u8               fe_dev_addr[6];
 
-    /* Physical parameters of the comms window. */
-    unsigned long    tx_shmem_frame;
+	/* Physical parameters of the comms window. */
+	unsigned long    tx_shmem_frame;
 #ifdef CONFIG_XEN_NETDEV_GRANT
-    u16              tx_shmem_handle;
-    unsigned long    tx_shmem_vaddr; 
-    grant_ref_t      tx_shmem_ref; 
+	u16              tx_shmem_handle;
+	unsigned long    tx_shmem_vaddr; 
+	grant_ref_t      tx_shmem_ref; 
 #endif
-    unsigned long    rx_shmem_frame;
+	unsigned long    rx_shmem_frame;
 #ifdef CONFIG_XEN_NETDEV_GRANT
-    u16              rx_shmem_handle;
-    unsigned long    rx_shmem_vaddr; 
-    grant_ref_t      rx_shmem_ref; 
+	u16              rx_shmem_handle;
+	unsigned long    rx_shmem_vaddr; 
+	grant_ref_t      rx_shmem_ref; 
 #endif
-    unsigned int     evtchn;
-    unsigned int     remote_evtchn;
+	unsigned int     evtchn;
+	unsigned int     remote_evtchn;
 
-    /* The shared rings and indexes. */
-    netif_tx_interface_t *tx;
-    netif_rx_interface_t *rx;
+	/* The shared rings and indexes. */
+	netif_tx_interface_t *tx;
+	netif_rx_interface_t *rx;
 
-    /* Private indexes into shared ring. */
-    NETIF_RING_IDX rx_req_cons;
-    NETIF_RING_IDX rx_resp_prod; /* private version of shared variable */
+	/* Private indexes into shared ring. */
+	NETIF_RING_IDX rx_req_cons;
+	NETIF_RING_IDX rx_resp_prod; /* private version of shared variable */
 #ifdef CONFIG_XEN_NETDEV_GRANT
-    NETIF_RING_IDX rx_resp_prod_copy; /* private version of shared variable */
+	NETIF_RING_IDX rx_resp_prod_copy;
 #endif
-    NETIF_RING_IDX tx_req_cons;
-    NETIF_RING_IDX tx_resp_prod; /* private version of shared variable */
+	NETIF_RING_IDX tx_req_cons;
+	NETIF_RING_IDX tx_resp_prod; /* private version of shared variable */
 
-    /* Transmit shaping: allow 'credit_bytes' every 'credit_usec'. */
-    unsigned long   credit_bytes;
-    unsigned long   credit_usec;
-    unsigned long   remaining_credit;
-    struct timer_list credit_timeout;
+	/* Transmit shaping: allow 'credit_bytes' every 'credit_usec'. */
+	unsigned long   credit_bytes;
+	unsigned long   credit_usec;
+	unsigned long   remaining_credit;
+	struct timer_list credit_timeout;
 
-    /* Miscellaneous private stuff. */
-    enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
-    int active;
-    struct list_head list;  /* scheduling list */
-    atomic_t         refcnt;
-    struct net_device *dev;
-    struct net_device_stats stats;
+	/* Miscellaneous private stuff. */
+	enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
+	int active;
+	struct list_head list;  /* scheduling list */
+	atomic_t         refcnt;
+	struct net_device *dev;
+	struct net_device_stats stats;
 
-    struct work_struct free_work;
+	struct work_struct free_work;
 } netif_t;
 
 void netif_creditlimit(netif_t *netif);
 int  netif_disconnect(netif_t *netif);
 
 netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN]);
-void free_netif_callback(netif_t *netif);
+void free_netif(netif_t *netif);
 int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	      unsigned long rx_ring_ref, unsigned int evtchn);
 
 #define netif_get(_b) (atomic_inc(&(_b)->refcnt))
-#define netif_put(_b)                             \
-    do {                                          \
-        if ( atomic_dec_and_test(&(_b)->refcnt) ) \
-            free_netif_callback(_b);              \
-    } while (0)
+#define netif_put(_b)						\
+	do {							\
+		if ( atomic_dec_and_test(&(_b)->refcnt) )	\
+			free_netif(_b);				\
+	} while (0)
 
 void netif_xenbus_init(void);
 
@@ -123,3 +116,13 @@ struct net_device_stats *netif_be_get_stats(struct net_device *dev);
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 
 #endif /* __NETIF__BACKEND__COMMON_H__ */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

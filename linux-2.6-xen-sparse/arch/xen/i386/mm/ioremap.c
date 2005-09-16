@@ -45,12 +45,12 @@ static int direct_remap_area_pte_fn(pte_t *pte,
 	return 0;
 }
 
-int direct_remap_pfn_range(struct mm_struct *mm,
-			    unsigned long address, 
-			    unsigned long mfn,
-			    unsigned long size, 
-			    pgprot_t prot,
-			    domid_t  domid)
+static int __direct_remap_pfn_range(struct mm_struct *mm,
+				    unsigned long address, 
+				    unsigned long mfn,
+				    unsigned long size, 
+				    pgprot_t prot,
+				    domid_t  domid)
 {
 	int i;
 	unsigned long start_address;
@@ -96,6 +96,20 @@ int direct_remap_pfn_range(struct mm_struct *mm,
 	flush_tlb_all();
 
 	return 0;
+}
+
+int direct_remap_pfn_range(struct vm_area_struct *vma,
+			   unsigned long address, 
+			   unsigned long mfn,
+			   unsigned long size, 
+			   pgprot_t prot,
+			   domid_t  domid)
+{
+	/* Same as remap_pfn_range(). */
+	vma->vm_flags |= VM_IO | VM_RESERVED;
+
+	return __direct_remap_pfn_range(
+		vma->vm_mm, address, mfn, size, prot, domid);
 }
 
 EXPORT_SYMBOL(direct_remap_pfn_range);
@@ -221,8 +235,9 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 #ifdef __x86_64__
 	flags |= _PAGE_USER;
 #endif
-	if (direct_remap_pfn_range(&init_mm, (unsigned long) addr, phys_addr>>PAGE_SHIFT,
-				    size, __pgprot(flags), domid)) {
+	if (__direct_remap_pfn_range(&init_mm, (unsigned long)addr,
+				     phys_addr>>PAGE_SHIFT,
+				     size, __pgprot(flags), domid)) {
 		vunmap((void __force *) addr);
 		return NULL;
 	}
