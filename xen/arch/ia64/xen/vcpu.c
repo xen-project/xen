@@ -1333,8 +1333,8 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 		dtlb_translate_count++;
 		if (vcpu->domain==dom0 && !in_tpa) *pteval = trp->page_flags;
 		else *pteval = vcpu->arch.dtlb_pte;
-		printf("DTLB MATCH... NEW, DOM%s, %s\n", vcpu->domain==dom0?
-			"0":"U", in_tpa?"vcpu_tpa":"ia64_do_page_fault");
+//		printf("DTLB MATCH... NEW, DOM%s, %s\n", vcpu->domain==dom0?
+//			"0":"U", in_tpa?"vcpu_tpa":"ia64_do_page_fault");
 		*itir = trp->itir;
 		return IA64_NO_FAULT;
 	}
