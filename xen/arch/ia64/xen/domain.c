@@ -951,10 +951,12 @@ int construct_dom0(struct domain *d,
 	//    memcpy((void *)vinitrd_start, initrd_start, initrd_len);
 
 	/* Sync d/i cache conservatively */
-	ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
-	if (ret != PAL_STATUS_SUCCESS)
-	    panic("PAL CACHE FLUSH failed for dom0.\n");
-	printk("Sync i/d cache for dom0 image SUCC\n");
+	if (!running_on_sim) {
+	    ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
+	    if (ret != PAL_STATUS_SUCCESS)
+	        panic("PAL CACHE FLUSH failed for dom0.\n");
+	    printk("Sync i/d cache for dom0 image SUCC\n");
+	}
 
 	/* Set up start info area. */
 	si = (start_info_t *)alloc_xenheap_page();
