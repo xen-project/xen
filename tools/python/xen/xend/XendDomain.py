@@ -222,41 +222,30 @@ class XendDomain:
         """Look for domains that have crashed or stopped.
         Tidy them up.
         """
-        casualties = []
         doms = self.xen_domains()
         for d in doms.values():
-            dead = 0
-            dead = dead or (d['crashed'] or d['shutdown'])
-            dead = dead or (d['dying'] and
-                            not(d['running'] or d['paused'] or d['blocked']))
-            if dead:
-                casualties.append(d)
-        for d in casualties:
-            id = d['dom']
-            dominfo = self.domains.get(id)
-            name = (dominfo and dominfo.name) or '??'
-            if dominfo and dominfo.is_terminated():
+            dead = d['crashed'] or d['shutdown'] or (
+                d['dying'] and not(d['running'] or d['paused'] or
+                                   d['blocked']))
+            if not dead:
                 continue
-            log.debug('XendDomain>reap> domain died name=%s id=%d', name, id)
+            domid = d['dom']
+            dominfo = self.domains.get(domid)
+            if not dominfo or dominfo.is_terminated():
+                continue
+            log.debug('domain died name=%s domid=%d', dominfo.name, domid)
+            if d['crashed'] and xroot.get_enable_dump():
+                self.domain_dumpcore(domid)
             if d['shutdown']:
                 reason = shutdown_reason(d['shutdown_reason'])
-                log.debug('XendDomain>reap> shutdown name=%s id=%d reason=%s', name, id, reason)
-                if reason in ['suspend']:
-                    if dominfo and dominfo.is_terminated():
-                        log.debug('XendDomain>reap> Suspended domain died id=%d', id)
-                    else:
-                        eserver.inject('xend.domain.suspended', [name, id])
-                        if dominfo:
-                            dominfo.state_set("suspended")
-                        continue
+                log.debug('shutdown name=%s id=%d reason=%s', name, domid,
+                          reason)
+                if reason == 'suspend':
+                    dominfo.state_set("suspended")
+                    continue
                 if reason in ['poweroff', 'reboot']:
-                    eserver.inject('xend.domain.exit', [name, id, reason])
-                    self.domain_restart_schedule(id, reason)
-            else:
-               if xroot.get_enable_dump():
-                   self.domain_dumpcore(id)
-               eserver.inject('xend.domain.exit', [name, id, 'crash']) 
-            self.final_domain_destroy(id)
+                    self.domain_restart_schedule(domid, reason)
+            dominfo.destroy()
 
     def refresh(self, cleanup=False):
         """Refresh domain list from Xen.
@@ -494,44 +483,31 @@ class XendDomain:
         for dominfo in self.domains.values():
             if not dominfo.restart_pending():
                 continue
-            print 'domain_restarts>', dominfo.name, dominfo.domid
             info = doms.get(dominfo.domid)
             if info:
                 # Don't execute restart for domains still running.
-                print 'domain_restarts> still runnning: ', dominfo.name
                 continue
             # Remove it from the restarts.
-            print 'domain_restarts> restarting: ', dominfo.name
+            log.info('restarting: %s' % dominfo.name)
             self.domain_restart(dominfo)
 
-    def final_domain_destroy(self, id):
-        """Final destruction of a domain..
-
-        @param id: domain id
-        """
-        try:
-            dominfo = self.domain_lookup(id)
-            log.info('Destroying domain: name=%s', dominfo.name)
-            eserver.inject('xend.domain.destroy', [dominfo.name, dominfo.domid])
-            val = dominfo.destroy()
-        except:
-            #todo
-            try:
-                val = xc.domain_destroy(dom=id)
-            except Exception, ex:
-                raise XendError(str(ex))
-        return val       
-
-    def domain_destroy(self, id, reason='halt'):
+    def domain_destroy(self, domid, reason='halt'):
         """Terminate domain immediately.
         - halt:   cancel any restart for the domain
         - reboot  schedule a restart for the domain
 
-        @param id: domain id
+        @param domid: domain id
         """
-        self.domain_restart_schedule(id, reason, force=True)
-        val = self.final_domain_destroy(id)
-        return val
+        self.domain_restart_schedule(domid, reason, force=True)
+        dominfo = self.domain_lookup(domid)
+        if dominfo:
+            val = dominfo.destroy()
+        else:
+            try:
+                val = xc.domain_destroy(dom=domid)
+            except Exception, ex:
+                raise XendError(str(ex))
+        return val       
 
     def domain_migrate(self, id, dst, live=False, resource=0):
         """Start domain migration.
