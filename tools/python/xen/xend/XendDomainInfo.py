@@ -343,7 +343,11 @@ class XendDomainInfo:
         if self.store_channel and self.store_channel != channel:
             self.store_channel.close()
         self.store_channel = channel
-        self.storeDom("store/port", channel.port1)
+        if channel:
+            port = channel.port1
+        else:
+            port = None
+        self.storeDom("store/port", None)
 
     def setConsoleRef(self, ref):
         self.console_mfn = ref
