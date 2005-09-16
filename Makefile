@@ -98,11 +98,14 @@ clean::
 	$(MAKE) -C tools clean
 	$(MAKE) -C docs clean
 
-# clean, but blow away kernel build tree plus tar balls
-mrproper: clean
+# clean, but blow away kernel build tree plus tarballs
+distclean: clean
 	rm -rf dist patches/tmp
 	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
 	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-mrproper ; done
+
+# Linux name for GNU distclean
+mrproper: distclean
 
 install-logging: LOGGING=logging-0.4.9.2
 install-logging:
@@ -142,7 +145,7 @@ help:
 	@echo 'Cleaning targets:'
 	@echo '  clean            - clean the Xen, tools and docs (but not'
 	@echo '                     guest kernel) trees'
-	@echo '  mrproper         - clean plus delete kernel tarballs and kernel'
+	@echo '  distclean        - clean plus delete kernel tarballs and kernel'
 	@echo '                     build trees'
 	@echo '  kdelete          - delete guest kernel build trees'
 	@echo '  kclean           - clean guest kernel build trees'
