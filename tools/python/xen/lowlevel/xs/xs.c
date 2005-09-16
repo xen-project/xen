@@ -812,6 +812,48 @@ static PyObject *xspy_shutdown(PyObject *self, PyObject *args, PyObject *kwds)
     return val;
 }
 
+#define xspy_get_domain_path_doc "\n"			\
+	"Return store path of domain.\n"		\
+	" domid [int]: domain id\n"			\
+	"\n"						\
+	"Returns: [string] domain store path.\n"	\
+	"         None if domid doesn't exist.\n"	\
+	"Raises RuntimeError on error.\n"		\
+	"\n"
+
+static PyObject *xspy_get_domain_path(PyObject *self, PyObject *args,
+				      PyObject *kwds)
+{
+    static char *kwd_spec[] = { "domid", NULL };
+    static char *arg_spec = "i";
+    int domid = 0;
+
+    struct xs_handle *xh = xshandle(self);
+    char *xsval = NULL;
+    PyObject *val = NULL;
+
+    if (!xh)
+        goto exit;
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
+                                     &domid))
+        goto exit;
+    Py_BEGIN_ALLOW_THREADS
+    xsval = xs_get_domain_path(xh, domid);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        if (errno == ENOENT) {
+            Py_INCREF(Py_None);
+            val = Py_None;
+        } else
+            PyErr_SetFromErrno(PyExc_RuntimeError);
+        goto exit;
+    }
+    val = PyString_FromString(xsval);
+    free(xsval);
+ exit:
+    return val;
+}
+
 #define xspy_fileno_doc "\n"					\
 	"Get the file descriptor of the xenstore socket.\n"	\
 	"Allows an xs object to be passed to select().\n"	\
@@ -858,6 +900,7 @@ static PyMethodDef xshandle_methods[] = {
      XSPY_METH(release_domain),
      XSPY_METH(close),
      XSPY_METH(shutdown),
+     XSPY_METH(get_domain_path),
      XSPY_METH(fileno),
      { /* Terminator. */ },
 };
