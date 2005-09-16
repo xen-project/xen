@@ -1120,13 +1120,13 @@ class XendDomainInfo:
             # get run-time value of vcpus and update store
             self.configure_vcpus(dom_get(self.domid)['vcpus'])
 
-    def dom0_enforce_cpus(self):
+    def dom0_enforce_vcpus(self):
         dom = 0
-        # get max number of cpus to use for dom0 from config
+        # get max number of vcpus to use for dom0 from config
         from xen.xend import XendRoot
         xroot = XendRoot.instance()
-        target = int(xroot.get_dom0_cpus())
-        log.debug("number of cpus to use is %d" % (target))
+        target = int(xroot.get_dom0_vcpus())
+        log.debug("number of vcpus to use is %d" % (target))
    
         # target = 0 means use all processors
         if target > 0:
