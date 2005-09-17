@@ -469,9 +469,6 @@ class DBMap(dict):
             n = n._addChild(x)
         return n
 
-    def getDB(self):
-        return self.__db__
-
     def setDB(self, db):
         if (db is not None) and not isinstance(db, XenNode):
             raise ValueError("invalid db")
