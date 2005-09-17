@@ -368,7 +368,6 @@ class XendDomainInfo:
         self.storeDom("console/ring-ref", ref)
 
     def setMemoryTarget(self, target):
-        self.memory_target = target
         self.storeDom("memory/target", target)
 
     def update(self, info=None):
