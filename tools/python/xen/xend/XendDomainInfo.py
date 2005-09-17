@@ -348,15 +348,20 @@ class XendDomainInfo:
         self.store_mfn = ref
         self.storeDom("store/ring-ref", ref)
 
-    def setStoreChannel(self, channel):
-        if self.store_channel and self.store_channel != channel:
-            self.store_channel.close()
-        self.store_channel = channel
-        if channel:
-            port = channel.port1
-        else:
-            port = None
-        self.storeDom("store/port", None)
+
+    def closeStoreChannel(self):
+        """Close the store channel, if any.  Nothrow guarantee."""
+        
+        try:
+            if self.store_channel:
+                try:
+                    self.store_channel.close()
+                    self.removeDom("store/port")
+                finally:
+                    self.store_channel = None
+        except Exception, exn:
+            log.exception(exn)
+
 
     def setConsoleRef(self, ref):
         self.console_mfn = ref
@@ -763,8 +768,7 @@ class XendDomainInfo:
         """
         self.state = STATE_VM_TERMINATED
         self.release_devices()
-        if self.store_channel:
-            self.setStoreChannel(None)
+        self.closeStoreChannel()
         if self.console_channel:
             # notify processes using this console?
             try:

@@ -83,7 +83,7 @@ def save(xd, fd, dominfo, live):
     if child.wait() != 0:
         raise XendError("xc_save failed: %s" % lasterr)
 
-    dominfo.setStoreChannel(None)
+    dominfo.closeStoreChannel()
     xd.domain_destroy(dominfo.domid)
     return None
 
