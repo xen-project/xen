@@ -67,7 +67,12 @@ class xstransact:
                 if not isinstance(d, dict):
                     raise TypeError
                 for key in d.keys():
-                    self._write(key, d[key], create, excl)
+                    try:
+                        self._write(key, d[key], create, excl)
+                    except TypeError, msg:
+                        raise TypeError('Writing %s: %s: %s' %
+                                        (key, str(d[key]), msg))
+                        
         elif isinstance(args[0], list):
             for l in args:
                 if not len(l) == 2:
