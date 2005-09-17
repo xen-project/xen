@@ -1,0 +1,74 @@
+--- ref-linux-2.6.12/drivers/char/tpm/tpm.c	2005-06-17 15:48:29.000000000 -0400
++++ linux-2.6-xen-sparse/drivers/char/tpm/tpm.c	2005-09-15 14:56:05.000000000 -0400
+@@ -473,6 +401,7 @@ ssize_t tpm_write(struct file * file, co
+ 	out_size = tpm_transmit(chip, chip->data_buffer, TPM_BUFSIZE);
+ 
+ 	atomic_set(&chip->data_pending, out_size);
++	atomic_set(&chip->data_position, 0);
+ 	up(&chip->buffer_mutex);
+ 
+ 	/* Set a timeout by which the reader must come claim the result */
+@@ -494,29 +423,34 @@ ssize_t tpm_read(struct file * file, cha
+ {
+ 	struct tpm_chip *chip = file->private_data;
+ 	int ret_size = -ENODATA;
++	int pos, pending = 0;
+ 
+-	if (atomic_read(&chip->data_pending) != 0) {	/* Result available */
++	down(&chip->buffer_mutex);
++	ret_size = atomic_read(&chip->data_pending);
++	if ( ret_size > 0 ) {	/* Result available */
++		if (size < ret_size)
++			ret_size = size;
++
++		pos = atomic_read(&chip->data_position);
++
++		if (copy_to_user((void __user *) buf,
++				 &chip->data_buffer[pos], ret_size)) {
++			ret_size = -EFAULT;
++		} else {
++			pending = atomic_read(&chip->data_pending) - ret_size;
++			if ( pending ) {
++				atomic_set( &chip->data_pending, pending );
++				atomic_set( &chip->data_position, pos+ret_size );
++			}
++		}
++	}
++	up(&chip->buffer_mutex);
++
++	if ( ret_size <= 0 || pending == 0 ) {
++		atomic_set( &chip->data_pending, 0 );
+ 		down(&chip->timer_manipulation_mutex);
+ 		del_singleshot_timer_sync(&chip->user_read_timer);
+ 		up(&chip->timer_manipulation_mutex);
+-
+-		down(&chip->buffer_mutex);
+-
+-		ret_size = atomic_read(&chip->data_pending);
+-		atomic_set(&chip->data_pending, 0);
+-
+-		if (ret_size == 0)	/* timeout just occurred */
+-			ret_size = -ETIME;
+-		else if (ret_size > 0) {	/* relay data */
+-			if (size < ret_size)
+-				ret_size = size;
+-
+-			if (copy_to_user((void __user *) buf,
+-					 chip->data_buffer, ret_size)) {
+-				ret_size = -EFAULT;
+-			}
+-		}
+-		up(&chip->buffer_mutex);
+ 	}
+ 
+ 	return ret_size;
+--- ref-linux-2.6.12/drivers/char/tpm/tpm.h	2005-06-17 15:48:29.000000000 -0400
++++ linux-2.6-xen-sparse/drivers/char/tpm/tpm.h	2005-09-15 14:56:05.000000000 -0400
+@@ -54,6 +54,7 @@ struct tpm_chip {
+ 	/* Data passed to and from the tpm via the read/write calls */
+ 	u8 *data_buffer;
+ 	atomic_t data_pending;
++	atomic_t data_position;
+ 	struct semaphore buffer_mutex;
+ 
+ 	struct timer_list user_read_timer;	/* user needs to claim result */
