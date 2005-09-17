@@ -141,7 +141,7 @@ gopts.var('memory', val='MEMORY',
           use="Domain memory in MB.")
 
 gopts.var('ssidref', val='SSIDREF',
-          fn=set_u32, default=-1, 
+          fn=set_u32, default=0, 
           use="Security Identifier.")
 
 gopts.var('maxmem', val='MEMORY',
