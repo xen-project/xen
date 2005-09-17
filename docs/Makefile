@@ -36,11 +36,12 @@ html:
 	$(MAKE) $(DOC_HTML); fi
 
 python-dev-docs:
-	mkdir -p api/tools/python
+	@mkdir -v -p api/tools/python
 	@if which $(DOXYGEN) 1>/dev/null 2>/dev/null; then         \
         echo "Running doxygen to generate Python tools APIs ... "; \
 	$(DOXYGEN) Doxyfile;                                       \
-	$(MAKE) -C api/tools/python/latex ; fi
+	$(MAKE) -C api/tools/python/latex ; else                   \
+        echo "Doxygen not installed; skipping python-dev-docs."; fi
 
 clean:
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
