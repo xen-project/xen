@@ -334,6 +334,9 @@ class XendDomainInfo:
     def getName(self):
         return self.name
 
+    def getVCpuCount(self):
+        return self.vcpus
+
     def getSsidref(self):
         return self.ssidref
 
