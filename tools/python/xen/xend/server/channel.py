@@ -43,33 +43,6 @@ class EventChannel(dict):
 
     interdomain = classmethod(interdomain)
 
-    def restoreFromDB(cls, db, dom1, dom2, port1=0, port2=0):
-        """Create an event channel using db info if available.
-        Inverse to saveToDB().
-
-        @param db db
-        @param dom1
-        @param dom2
-        @param port1
-        @param port2
-        """
-        try:
-            dom1  = int(db['dom1'].getData())
-        except: pass
-        try:
-            dom2  = int(db['dom2'].getData())
-        except: pass
-        try:
-            port1 = int(db['port1'].getData())
-        except: pass
-        try:
-            port2 = int(db['port2'].getData())
-        except: pass
-        evtchn = cls.interdomain(dom1, dom2, port1=port1, port2=port2)
-        return evtchn
-
-    restoreFromDB = classmethod(restoreFromDB)
-
     def __init__(self, dom1, dom2, d):
         d['dom1'] = dom1
         d['dom2'] = dom2
@@ -92,18 +65,6 @@ class EventChannel(dict):
             print 'EventChannel>close>', self
         evtchn_close(self.dom1, self.port1)
         evtchn_close(self.dom2, self.port2)
-
-    def saveToDB(self, db, save=False):
-        """Save the event channel to the db so it can be restored later,
-        using restoreFromDB() on the class.
-
-        @param db db
-        """
-        db['dom1']  = str(self.dom1)
-        db['dom2']  = str(self.dom2)
-        db['port1'] = str(self.port1)
-        db['port2'] = str(self.port2)
-        db.saveDB(save=save)
 
     def sxpr(self):
         return ['event-channel',
