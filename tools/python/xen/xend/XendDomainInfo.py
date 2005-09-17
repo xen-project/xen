@@ -334,6 +334,13 @@ class XendDomainInfo:
     def getName(self):
         return self.name
 
+    def getSsidref(self):
+        return self.ssidref
+
+    def getTargetMemory(self):
+        """Get this domain's target memory size, in MiB."""
+        return self.memory
+
     def setStoreRef(self, ref):
         self.store_mfn = ref
         self.storeDom("store/ring-ref", ref)
