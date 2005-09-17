@@ -46,7 +46,6 @@
 #include <asm-xen/xen-public/io/tpmif.h>
 #include <asm/uaccess.h>
 #include <asm-xen/xenbus.h>
-#include <asm-xen/xen-public/io/domain_controller.h>
 #include <asm-xen/xen-public/grant_table.h>
 
 #include "tpmfront.h"

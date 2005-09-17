@@ -14,7 +14,6 @@
 #include <asm-xen/xen-public/io/tpmif.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
-#include <asm-xen/xen-public/io/domain_controller.h>
 
 #if 0
 #define ASSERT(_p) \
