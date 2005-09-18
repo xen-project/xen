@@ -291,16 +291,18 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 	long r11 = 0;
 	long status = -1;
 
-#define USE_PAL_EMULATOR
-#ifdef USE_PAL_EMULATOR
-	return pal_emulator_static(index);
-#endif
 	if (running_on_sim) return pal_emulator_static(index);
 	if (index >= PAL_COPY_PAL) {
-		printk("xen_pal_emulator: UNIMPLEMENTED PAL CALL %d!!!!\n",
-				index);
+		// build_hypercall_bundle needs to be modified to generate
+		// a second bundle that conditionally does a br.ret
+		panic("xen_pal_emulator: stacked calls not supported!!\n");
 	}
-	else switch (index) {
+	printk("xen_pal_emulator: index=%d\n",index);
+	// pal code must be mapped by a TR when pal is called, however
+	// calls are rare enough that we will map it lazily rather than
+	// at every context switch
+	efi_map_pal_code();
+	switch (index) {
 	    case PAL_MEM_ATTRIB:
 		status = ia64_pal_mem_attrib(&r9);
 		break;
@@ -514,11 +516,12 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 */
 	memset(fw_mem, 0, fw_mem_size);
 
-#ifdef XEN
-#else
+#ifdef USE_PAL_EMULATOR
 	pal_desc = (unsigned long *) &pal_emulator_static;
-	sal_desc = (unsigned long *) &sal_emulator;
+#else
+	pal_desc = (unsigned long *) &xen_pal_emulator;
 #endif
+	sal_desc = (unsigned long *) &sal_emulator;
 
 	cp = fw_mem;
 	efi_systab  = (void *) cp; cp += sizeof(*efi_systab);

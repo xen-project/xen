@@ -1,6 +1,7 @@
 #ifndef	_IA64_CONFIG_H_
 #define _IA64_CONFIG_H_
 
+#undef USE_PAL_EMULATOR
 // control flags for turning on/off features under test
 #undef CLONE_DOMAIN0
 //#define CLONE_DOMAIN0 1
