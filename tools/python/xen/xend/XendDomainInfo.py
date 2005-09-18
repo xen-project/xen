@@ -1,4 +1,4 @@
-#============================================================================
+#===========================================================================
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of version 2.1 of the GNU Lesser General Public
 # License as published by the Free Software Foundation.
@@ -23,23 +23,18 @@ Author: Mike Wray <mike.wray@hp.com>
 
 """
 
-import string, re
-import os
+import string
 import time
 import threading
 import errno
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
-from xen.util.ip import check_subnet, get_current_ipgw
 from xen.util.blkif import blkdev_uname_to_file
 
-from xen.xend.server import controller
 from xen.xend.server import SrvDaemon; xend = SrvDaemon.instance()
 from xen.xend.server.channel import EventChannel
-from xen.util.blkif import blkdev_name_to_number, expand_dev_name
 
 from xen.xend import sxp
-from xen.xend import Blkctl
 from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendBootloader import bootloader
 from xen.xend.XendLogging import log
@@ -47,7 +42,7 @@ from xen.xend.XendError import XendError, VmError
 from xen.xend.XendRoot import get_component
 
 from xen.xend.uuid import getUuid
-from xen.xend.xenstore import DBVar, XenNode, DBMap
+from xen.xend.xenstore import DBVar
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xsutil import IntroduceDomain
 
@@ -248,11 +243,9 @@ class XendDomainInfo:
         self.store_mfn = None
         self.console_channel = None
         self.console_mfn = None
-        self.controllers = {}
         
         self.info = None
         self.backend_flags = 0
-        self.netif_idx = 0
         
         #todo: state: running, suspended
         self.state = STATE_VM_OK
@@ -334,6 +327,12 @@ class XendDomainInfo:
     def getName(self):
         return self.name
 
+    def getPath(self):
+        return self.path
+
+    def getUuid(self):
+        return self.uuid
+
     def getVCpuCount(self):
         return self.vcpus
 
@@ -408,150 +407,26 @@ class XendDomainInfo:
 
     __repr__ = __str__
 
-    def getDeviceController(self, type, error=True):
-        ctrl = self.controllers.get(type)
-        if not ctrl and error:
-            raise XendError("invalid device type:" + type)
-        return ctrl
-    
-    def findDeviceController(self, type):
-        return (self.getDeviceController(type, error=False)
-                or self.createDeviceController(type))
 
-    def createDeviceController(self, type):
-        ctrl = controller.createDevController(type, self, recreate=self.recreate)
-        self.controllers[type] = ctrl
-        return ctrl
+    def getDeviceController(self, name):
+        if name not in controllerClasses:
+            raise XendError("unknown device type: " + str(name))
 
-    def createDevice(self, type, devconfig, change=False):
-        if self.recreate:
-            return
-        if type == 'vbd':
-            typedev = sxp.child_value(devconfig, 'dev')
-            if re.match('^ioemu:', typedev):
-	        return;
+        return controllerClasses[name](self)
 
-            backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
 
-            devnum = blkdev_name_to_number(sxp.child_value(devconfig, 'dev'))
+    def createDevice(self, deviceClass, devconfig):
+        return self.getDeviceController(deviceClass).createDevice(devconfig)
 
-            backpath = "%s/backend/%s/%s/%d" % (backdom.path, type,
-                                                self.uuid, devnum)
-            frontpath = "%s/device/%s/%d" % (self.path, type, devnum)
 
-            front = { 'backend' : backpath,
-                      'backend-id' : "%i" % backdom.domid,
-                      'virtual-device' : "%i" % devnum }
-            xstransact.Write(frontpath, front)
+    def configureDevice(self, deviceClass, devid, devconfig):
+        return self.getDeviceController(deviceClass).configureDevice(
+            devid, devconfig)
 
-            (type, params) = string.split(sxp.child_value(devconfig,
-                                                          'uname'), ':', 1)
-            readonly = sxp.child_value(devconfig, 'mode', 'r')
-            back = { 'type' : type,
-                     'params' : params,
-                     'frontend' : frontpath,
-                     'frontend-id' : "%i" % self.domid }
-            if readonly == 'r':
-                back['read-only'] = ""  # existence indicates read-only
-            xstransact.Write(backpath, back)
 
-            return
+    def destroyDevice(self, deviceClass, devid):
+        return self.getDeviceController(deviceClass).destroyDevice(devid)
 
-        if type == 'vif':
-            from xen.xend import XendRoot
-            xroot = XendRoot.instance()
-
-            def _get_config_ipaddr(config):
-                val = []
-                for ipaddr in sxp.children(config, elt='ip'):
-                    val.append(sxp.child0(ipaddr))
-                return val
-
-            backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
-
-            devnum = self.netif_idx
-            self.netif_idx += 1
-
-            script = sxp.child_value(devconfig, 'script',
-                                     xroot.get_vif_script())
-            script = os.path.join(xroot.network_script_dir, script)
-            bridge = sxp.child_value(devconfig, 'bridge',
-                                     xroot.get_vif_bridge())
-            mac = sxp.child_value(devconfig, 'mac')
-            ipaddr = _get_config_ipaddr(devconfig)
-
-            backpath = "%s/backend/%s/%s/%d" % (backdom.path, type,
-                                                self.uuid, devnum)
-            frontpath = "%s/device/%s/%d" % (self.path, type, devnum)
-
-            front = { 'backend' : backpath,
-                      'backend-id' : "%i" % backdom.domid,
-                      'handle' : "%i" % devnum,
-                      'mac' : mac }
-            xstransact.Write(frontpath, front)
-
-            back = { 'script' : script,
-                     'domain' : self.name,
-                     'mac' : mac,
-                     'bridge' : bridge,
-                     'frontend' : frontpath,
-                     'frontend-id' : "%i" % self.domid,
-                     'handle' : "%i" % devnum }
-            if ipaddr:
-                back['ip'] = ' '.join(ipaddr)
-            xstransact.Write(backpath, back)
-
-            return
-        
-        if type == 'vtpm':
-            backdom = domain_exists(sxp.child_value(devconfig, 'backend', '0'))
-
-            devnum = int(sxp.child_value(devconfig, 'instance', '0'))
-            log.error("The domain has a TPM with instance %d." % devnum)
-
-            backpath = "%s/backend/%s/%s/%d" % (backdom.path, type,
-                                                self.uuid, devnum)
-            frontpath = "%s/device/%s/%d" % (self.path, type, devnum)
-
-            front = { 'backend' : backpath,
-                      'backend-id' : "%i" % backdom.domid,
-                      'handle' : "%i" % devnum }
-            xstransact.Write(frontpath, front)
-
-            back = { 'instance' : "%i" % devnum,
-                     'frontend' : frontpath,
-                     'frontend-id' : "%i" % self.domid }
-            xstransact.Write(backpath, back)
-
-            return
-
-        ctrl = self.findDeviceController(type)
-        return ctrl.createDevice(devconfig, recreate=self.recreate,
-                                 change=change)
-
-    def configureDevice(self, type, id, devconfig):
-        ctrl = self.getDeviceController(type)
-        return ctrl.configureDevice(id, devconfig)
-
-    def destroyDevice(self, type, id, change=False, reboot=False):
-        ctrl = self.getDeviceController(type)
-        return ctrl.destroyDevice(id, change=change, reboot=reboot)
-
-    def deleteDevice(self, type, id):
-        ctrl = self.getDeviceController(type)
-        return ctrl.deleteDevice(id)
-
-    def getDevice(self, type, id, error=True):
-        ctrl = self.getDeviceController(type)
-        return ctrl.getDevice(id, error=error)
-        
-    def getDeviceIds(self, type):
-        ctrl = self.getDeviceController(type)
-        return ctrl.getDeviceIds()
-    
-    def getDeviceSxprs(self, type):
-        ctrl = self.getDeviceController(type)
-        return ctrl.getDeviceSxprs()
 
     def sxpr(self):
         sxpr = ['domain',
@@ -607,23 +482,8 @@ class XendDomainInfo:
             sxpr.append(['restart_state', self.restart_state])
         if self.restart_time:
             sxpr.append(['restart_time', str(self.restart_time)])
-
-        devs = self.sxpr_devices()
-        if devs:
-            sxpr.append(devs)
         if self.config:
             sxpr.append(['config', self.config])
-        return sxpr
-
-    def sxpr_devices(self):
-        sxpr = []
-        for ty in self.controllers.keys():
-            devs = self.getDeviceSxprs(ty)
-            sxpr += devs
-        if sxpr:
-            sxpr.insert(0, 'devices')
-        else:
-            sxpr = None
         return sxpr
 
     def check_name(self, name):
@@ -798,18 +658,20 @@ class XendDomainInfo:
     def release_devices(self):
         """Release all vm devices.
         """
-        reboot = self.restart_pending()
-        for ctrl in self.controllers.values():
-            if ctrl.isDestroyed(): continue
-            ctrl.destroyController(reboot=reboot)
+
         t = xstransact("%s/device" % self.path)
-        for d in t.list("vbd"):
-            t.remove(d)
-        for d in t.list("vif"):
-            t.remove(d)
-        for d in t.list("vtpm"):
-            t.remove(d)
+        for n in controllerClasses.keys():
+            for d in t.list(n):
+                try:
+                    t.remove(d)
+                except ex:
+                    # Log and swallow any exceptions in removal -- there's
+                    # nothing more we can do.
+                    log.exception(
+                        "Device release failed: %s; %s; %s; %s" %
+                        (self.info['name'], n, d, str(ex)))
         t.commit()
+
 
     def show(self):
         """Print virtual machine info.
@@ -866,9 +728,6 @@ class XendDomainInfo:
                 raise VmError('invalid device')
             dev_type = sxp.name(dev_config)
 
-            if not controller.isDevControllerClass(dev_type):
-                raise VmError('unknown device type: ' + dev_type)
-            
             self.createDevice(dev_type, dev_config)
 
 
@@ -877,10 +736,7 @@ class XendDomainInfo:
 
         @raise: VmError for invalid devices
         """
-        if self.rebooting():
-            for ctrl in self.controllers.values():
-                ctrl.initController(reboot=True)
-        else:
+        if not self.rebooting():
             self.create_configured_devices()
         self.image.createDeviceModel()
 
@@ -890,47 +746,19 @@ class XendDomainInfo:
         @param dev_config: device configuration
         """
         dev_type = sxp.name(dev_config)
-        dev = self.createDevice(dev_type, dev_config, change=True)
-        self.config.append(['device', dev.getConfig()])
-        return dev.sxpr()
+        devid = self.createDevice(dev_type, dev_config)
+#        self.config.append(['device', dev.getConfig()])
+        return self.getDeviceController(dev_type).sxpr(devid)
 
-    def device_configure(self, dev_config, id):
+
+    def device_configure(self, dev_config, devid):
         """Configure an existing device.
-
         @param dev_config: device configuration
-        @param id:         device id
+        @param devid:      device id
         """
-        type = sxp.name(dev_config)
-        dev = self.getDevice(type, id)
-        old_config = dev.getConfig()
-        new_config = dev.configure(dev_config, change=True)
-        # Patch new config into vm config.
-        new_full_config = ['device', new_config]
-        old_full_config = ['device', old_config]
-        old_index = self.config.index(old_full_config)
-        self.config[old_index] = new_full_config
-        return new_config
+        deviceClass = sxp.name(dev_config)
+        self.configureDevice(deviceClass, devid, dev_config)
 
-    def device_refresh(self, type, id):
-        """Refresh a device.
-
-        @param type: device type
-        @param id:   device id
-        """
-        dev = self.getDevice(type, id)
-        dev.refresh()
-        
-    def device_delete(self, type, id):
-        """Destroy and remove a device.
-
-        @param type: device type
-        @param id:   device id
-        """
-        dev = self.getDevice(type, id)
-        dev_config = dev.getConfig()
-        if dev_config:
-            self.config.remove(['device', dev_config])
-        self.deleteDevice(type, dev.getId())
 
     def configure_restart(self):
         """Configure the vm restart mode.
@@ -1060,11 +888,6 @@ class XendDomainInfo:
 
         """
         return
-        blkif = self.getDeviceController("vbd", error=False)
-        if not blkif:
-            blkif = self.createDeviceController("vbd")
-            backend = blkif.getBackend(0)
-            backend.connect(recreate=self.recreate)
 
     def configure_fields(self):
         """Process the vm configuration fields using the registered handlers.
@@ -1213,9 +1036,21 @@ config_handlers = {
 #============================================================================
 # Register device controllers and their device config types.
 
+"""A map from device-class names to the subclass of DevController that
+implements the device control specific to that device-class."""
+controllerClasses = {}
+
+
+def addControllerClass(device_class, cls):
+    """Register a subclass of DevController to handle the named device-class.
+    """
+    cls.deviceClass = device_class
+    controllerClasses[device_class] = cls
+
+
 from xen.xend.server import blkif, netif, tpmif, pciif, usbif
-controller.addDevControllerClass("vbd",  blkif.BlkifController)
-controller.addDevControllerClass("vif",  netif.NetifController)
-controller.addDevControllerClass("vtpm", tpmif.TPMifController)
-controller.addDevControllerClass("pci",  pciif.PciController)
-controller.addDevControllerClass("usb",  usbif.UsbifController)
+addControllerClass('vbd',  blkif.BlkifController)
+addControllerClass('vif',  netif.NetifController)
+addControllerClass('vtpm', tpmif.TPMifController)
+addControllerClass('pci',  pciif.PciController)
+addControllerClass('usb',  usbif.UsbifController)

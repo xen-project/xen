@@ -660,9 +660,8 @@ class XendDomain:
         @param type: device type
         """
         dominfo = self.domain_lookup(id)
-        val = dominfo.device_delete(type, devid)
-        dominfo.exportToDB()
-        return val
+        return dominfo.destroyDevice(type, devid)
+
 
     def domain_devtype_ls(self, id, type):
         """Get list of device sxprs for a domain.

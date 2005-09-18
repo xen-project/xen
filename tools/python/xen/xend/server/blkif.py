@@ -13,322 +13,47 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
-"""Support for virtual block devices.
-"""
+
+import re
 import string
 
 from xen.util import blkif
-from xen.xend.XendError import XendError, VmError
-from xen.xend.XendRoot import get_component
-from xen.xend.XendLogging import log
 from xen.xend import sxp
-from xen.xend import Blkctl
-from xen.xend.xenstore import DBVar
 
-from xen.xend.server.controller import Dev, DevController
+from xen.xend.server.DevController import DevController
 
-class BlkifBackend:
-    """ Handler for the 'back-end' channel to a block device driver domain
-    on behalf of a front-end domain.
-    Must be connected using connect() before it can be used.
-    """
 
-    def __init__(self, controller, id, dom, recreate=False):
-        self.controller = controller
-        self.id = id
-        self.frontendDomain = self.controller.getDomain()
-        self.backendDomain = dom
-        self.destroyed = False
-        self.connected = False
-        self.status = None
-
-    def init(self, recreate=False, reboot=False):
-        self.destroyed = False
-        self.status = BLKIF_INTERFACE_STATUS_DISCONNECTED
-        self.frontendDomain = self.controller.getDomain()
-
-    def __str__(self):
-        return ('<BlkifBackend frontend=%d backend=%d id=%d>'
-                % (self.frontendDomain,
-                   self.backendDomain,
-                   self.id))
-
-    def getId(self):
-        return self.id
-
-    def connect(self, recreate=False):
-        """Connect to the blkif control interface.
-
-        @param recreate: true if after xend restart
-        """
-        log.debug("Connecting blkif %s", str(self))
-        if recreate or self.connected:
-            self.connected = True
-            pass
-        
-    def destroy(self, change=False, reboot=False):
-        """Disconnect from the blkif control interface and destroy it.
-        """
-        self.destroyed = True
-        # For change true need to notify front-end, or back-end will do it?
-
-    def connectInterface(self, val):
-        self.status = BLKIF_INTERFACE_STATUS_CONNECTED
-            
-    def interfaceDisconnected(self):
-        self.status = BLKIF_INTERFACE_STATUS_DISCONNECTED
-        
-class BlkDev(Dev):
-    """Info record for a block device.
-    """
-
-    __exports__ = Dev.__exports__ + [
-        DBVar('dev',          ty='str'),
-        DBVar('vdev',         ty='int'),
-        DBVar('mode',         ty='str'),
-        DBVar('viftype',      ty='str'),
-        DBVar('params',       ty='str'),
-        DBVar('node',         ty='str'),
-        DBVar('device',       ty='long'),
-        DBVar('dev_handle',   ty='long'),
-        DBVar('start_sector', ty='long'),
-        DBVar('nr_sectors',   ty='long'),
-        ]
-
-    def __init__(self, controller, id, config, recreate=False):
-        Dev.__init__(self, controller, id, config, recreate=recreate)
-        self.dev = None
-        self.uname = None
-        self.vdev = None
-        self.mode = None
-        self.type = None
-        self.params = None
-        self.node = None
-        self.device = None
-        self.dev_handle = 0
-        self.start_sector = None
-        self.nr_sectors = None
-        
-        self.frontendDomain = self.getDomain()
-        self.backendDomain = None
-        self.backendId = 0
-        self.configure(self.config, recreate=recreate)
-
-    def exportToDB(self, save=False):
-        Dev.exportToDB(self, save=save)
-        backend = self.getBackend()
-
-    def init(self, recreate=False, reboot=False):
-        self.frontendDomain = self.getDomain()
-        backend = self.getBackend()
-        self.backendId = backend.domid
-
-    def configure(self, config, change=False, recreate=False):
-        if change:
-            raise XendError("cannot reconfigure vbd")
-        self.config = config
-        self.uname = sxp.child_value(config, 'uname')
-        if not self.uname:
-            raise VmError('vbd: Missing uname')
-        # Split into type and type-specific params (which are passed to the
-        # type-specific control script).
-        (self.type, self.params) = string.split(self.uname, ':', 1)
-        self.dev = sxp.child_value(config, 'dev')
-        if not self.dev:
-            raise VmError('vbd: Missing dev')
-        self.mode = sxp.child_value(config, 'mode', 'r')
-        
-        self.vdev = blkif.blkdev_name_to_number(self.dev)
-        if not self.vdev:
-            raise VmError('vbd: Device not found: %s' % self.dev)
-        
-        try:
-            xd = get_component('xen.xend.XendDomain')
-            self.backendDomain = xd.domain_lookup_by_name(sxp.child_value(config, 'backend', '0')).domid
-        except:
-            raise XendError('invalid backend domain')
-
-        return self.config
-
-    def attach(self, recreate=False, change=False):
-        if recreate:
-            pass
-        else:
-            node = Blkctl.block('bind', self.type, self.params)
-            self.setNode(node)
-            self.attachBackend()
-        if change:
-            self.interfaceChanged()
-
-    def unbind(self):
-        if self.node is None: return
-        log.debug("Unbinding vbd (type %s) from %s"
-                  % (self.type, self.node))
-        Blkctl.block('unbind', self.type, self.node)
-
-    def setNode(self, node):
-    
-        # NOTE: 
-        # This clause is testing code for storage system experiments.
-        # Add a new disk type that will just pass an opaque id in the
-        # dev_handle and use an experimental device type.
-        # Please contact andrew.warfield@cl.cam.ac.uk with any concerns.
-        if self.type == 'parallax':
-            self.node   = node
-            self.device =  61440 # (240,0)
-            self.dev_handle = long(self.params)
-            self.nr_sectors = long(0)
-            return
-        # done.
-            
-        mounted_mode = self.check_mounted(node)
-        if not '!' in self.mode and mounted_mode:
-            if mounted_mode == "w":
-                raise VmError("vbd: Segment %s is in writable use" %
-                              self.uname)
-            elif 'w' in self.mode:
-                raise VmError("vbd: Segment %s is in read-only use" %
-                              self.uname)
-            
-        segment = blkif.blkdev_segment(node)
-        if not segment:
-            raise VmError("vbd: Segment not found: uname=%s" % self.uname)
-        self.node = node
-        self.device = segment['device']
-        self.start_sector = segment['start_sector']
-        self.nr_sectors = segment['nr_sectors']
-
-    def check_mounted(self, name):
-        mode = blkif.mount_mode(name)
-        xd = get_component('xen.xend.XendDomain')
-        for vm in xd.list():
-            ctrl = vm.getDeviceController(self.getType(), error=False)
-            if (not ctrl): continue
-            for dev in ctrl.getDevices():
-                if dev is self: continue
-                if dev.type == 'phy' and name == blkif.expand_dev_name(dev.params):
-                    mode = dev.mode
-                    if 'w' in mode:
-                        return 'w'
-        if mode and 'r' in mode:
-            return 'r'
-        return None
-
-    def readonly(self):
-        return 'w' not in self.mode
-
-    def sxpr(self):
-        val = ['vbd',
-               ['id', self.id],
-               ['vdev', self.vdev],
-               ['device', self.device],
-               ['mode', self.mode]]
-        if self.dev:
-            val.append(['dev', self.dev])
-        if self.uname:
-            val.append(['uname', self.uname])
-        if self.node:
-            val.append(['node', self.node])
-        return val
-
-    def getBackend(self):
-        return self.controller.getBackend(self.backendDomain)
-
-    def refresh(self):
-        log.debug("Refreshing vbd domain=%d id=%s", self.frontendDomain,
-                  self.id)
-        self.interfaceChanged()
-
-    def destroy(self, change=False, reboot=False):
-        """Destroy the device. If 'change' is true notify the front-end interface.
-
-        @param change: change flag
-        """
-        self.destroyed = True
-        log.debug("Destroying vbd domain=%d id=%s", self.frontendDomain,
-                  self.id)
-        if change:
-            self.interfaceChanged()
-        self.unbind()
-
-    def interfaceChanged(self):
-        """Tell the back-end to notify the front-end that a device has been
-        added or removed.
-        """
-        self.getBackend().interfaceChanged()
-
-    def attachBackend(self):
-        """Attach the device to its controller.
-
-        """
-        self.getBackend().connect()
-        
 class BlkifController(DevController):
     """Block device interface controller. Handles all block devices
     for a domain.
     """
     
-    def __init__(self, vm, recreate=False):
+    def __init__(self, vm):
         """Create a block device controller.
         """
-        DevController.__init__(self, vm, recreate=recreate)
-        self.backends = {}
-        self.backendId = 0
+        DevController.__init__(self, vm)
 
-    def initController(self, recreate=False, reboot=False):
-        self.destroyed = False
-        if reboot:
-            self.rebootBackends()
-            self.rebootDevices()
 
-    def sxpr(self):
-        val = ['blkif', ['dom', self.getDomain()]]
-        return val
-
-    def rebootBackends(self):
-        for backend in self.backends.values():
-            backend.init(reboot=True)
-
-    def getBackendById(self, id):
-        return self.backends.get(id)
-
-    def getBackendByDomain(self, dom):
-        for backend in self.backends.values():
-            if backend.backendDomain == dom:
-                return backend
-        return None
-
-    def getBackend(self, dom):
-        backend = self.getBackendByDomain(dom)
-        if backend: return backend
-        backend = BlkifBackend(self, self.backendId, dom)
-        self.backendId += 1
-        self.backends[backend.getId()] = backend
-        backend.init()
-        return backend
-
-    def newDevice(self, id, config, recreate=False):
-        """Create a device..
-
-        @param id:      device id
-        @param config:   device configuration
-        @param recreate: if true it's being recreated (after xend restart)
-        @type  recreate: bool
-        @return: device
-        @rtype:  BlkDev
-        """
-        return BlkDev(self, id, config, recreate=recreate)
+    def getDeviceDetails(self, config):
+        """@see DevController.getDeviceDetails"""
         
-    def destroyController(self, reboot=False):
-        """Destroy the controller and all devices.
-        """
-        self.destroyed = True
-        log.debug("Destroying blkif domain=%d", self.getDomain())
-        self.destroyDevices(reboot=reboot)
-        self.destroyBackends(reboot=reboot)
+        typedev = sxp.child_value(config, 'dev')
+        if re.match('^ioemu:', typedev):
+            return
 
-    def destroyBackends(self, reboot=False):
-        for backend in self.backends.values():
-            backend.destroy(reboot=reboot)
+        devid = blkif.blkdev_name_to_number(sxp.child_value(config, 'dev'))
+
+        (typ, params) = string.split(sxp.child_value(config, 'uname'), ':', 1)
+        back = { 'type' : typ,
+                 'params' : params
+                 }
+
+        if 'r' == sxp.child_value(config, 'mode', 'r'):
+            back['read-only'] = ""  # existence indicates read-only
+
+        front = { 'virtual-device' : "%i" % devid }
+
+        return (devid, back, front)
