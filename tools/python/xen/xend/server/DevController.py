@@ -117,6 +117,31 @@ class DevController:
         return self.vm.getDomain()
 
 
+    def allocateDeviceID(self):
+        """Allocate a device ID, allocating them consecutively on a
+        per-domain, per-device-class basis, and using the store to record the
+        next available ID.
+
+        This method is available to our subclasses, though it is not
+        compulsory to use it; subclasses may prefer to allocate IDs based upon
+        the device configuration instead.
+        """
+        path = self.frontendMiscPath()
+        t = xstransact(path)
+        try:
+            result = t.read("nextDeviceID")
+            if result:
+                result = int(result)
+            else:
+                result = 1
+            t.write("nextDeviceID", str(result + 1))
+            t.commit()
+            return result
+        except:
+            t.abort()
+            raise
+
+
     ## private:
 
     def writeDetails(self, config, devid, backDetails, frontDetails):
@@ -170,6 +195,9 @@ class DevController:
 
 
     def frontendPath(self, devid):
-        return "%s/device/%s/%d" % (self.vm.getPath(),
-                                    self.deviceClass,
+        return "%s/device/%s/%d" % (self.vm.getPath(), self.deviceClass,
                                     devid)
+
+
+    def frontendMiscPath(self):
+        return "%s/device-misc/%s" % (self.vm.getPath(), self.deviceClass)
