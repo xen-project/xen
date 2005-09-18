@@ -313,7 +313,7 @@ class VmxImageHandler(ImageHandler):
                            image          = self.kernel,
                            control_evtchn = self.device_channel.port2,
                            store_evtchn   = store_evtchn,
-                           memsize        = self.vm.getTargetMemory(),
+                           memsize        = self.vm.getMemoryTarget(),
                            memmap         = self.memmap_value,
                            cmdline        = self.cmdline,
                            ramdisk        = self.ramdisk,
@@ -413,7 +413,7 @@ class VmxImageHandler(ImageHandler):
             args = args + vnc
         args = args + ([ "-d",  "%d" % self.vm.getDomain(),
                   "-p", "%d" % self.device_channel.port1,
-                  "-m", "%s" % self.vm.getTargetMemory() ])
+                  "-m", "%s" % self.vm.getMemoryTarget() ])
         args = args + self.dmargs
         env = dict(os.environ)
         env['DISPLAY'] = self.display

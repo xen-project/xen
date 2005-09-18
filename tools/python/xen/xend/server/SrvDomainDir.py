@@ -155,7 +155,7 @@ class SrvDomainDir(SrvDir):
                 req.write('<li><a href="%s%s"> Domain %s</a>'
                           % (url, d.getName(), d.getName()))
                 req.write('id=%s' % d.getDomain())
-                req.write('memory=%d'% d.getTargetMemory())
+                req.write('memory=%d'% d.getMemoryTarget())
                 req.write('ssidref=%d'% d.getSsidref())
                 req.write('</li>')
             req.write('</ul>')

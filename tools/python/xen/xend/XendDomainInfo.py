@@ -339,7 +339,7 @@ class XendDomainInfo:
     def getSsidref(self):
         return self.ssidref
 
-    def getTargetMemory(self):
+    def getMemoryTarget(self):
         """Get this domain's target memory size, in MiB."""
         return self.memory
 
