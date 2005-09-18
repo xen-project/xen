@@ -151,8 +151,8 @@ class xstransact:
 
     def Read(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 v = t.read(*args)
                 t.commit()
                 return v
@@ -170,8 +170,8 @@ class xstransact:
 
     def Write(cls, path, *args, **opts):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 t.write(*args, **opts)
                 t.commit()
                 return
@@ -189,8 +189,8 @@ class xstransact:
 
     def Remove(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 t.remove(*args)
                 t.commit()
                 return
@@ -208,8 +208,8 @@ class xstransact:
 
     def List(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 v = t.list(*args)
                 t.commit()
                 return v
@@ -227,8 +227,8 @@ class xstransact:
 
     def Gather(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 v = t.gather(*args)
                 t.commit()
                 return v
@@ -246,8 +246,8 @@ class xstransact:
 
     def Store(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 v = t.store(*args)
                 t.commit()
                 return v
