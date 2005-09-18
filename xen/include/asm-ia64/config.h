@@ -9,6 +9,8 @@
 #define VHPT_GLOBAL
 #define DOMU_AUTO_RESTART
 
+#undef DEBUG_PFMON
+
 // manufactured from component pieces
 
 // defined in linux/arch/ia64/defconfig

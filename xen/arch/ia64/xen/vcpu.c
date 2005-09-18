@@ -1453,6 +1453,9 @@ IA64FAULT vcpu_set_pmc(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
 	// TODO: Should set Logical CPU state, not just physical
 	// NOTE: Writes to unimplemented PMC registers are discarded
+#ifdef DEBUG_PFMON
+printf("vcpu_set_pmc(%x,%lx)\n",reg,val);
+#endif
 	ia64_set_pmc(reg,val);
 	return (IA64_NO_FAULT);
 }
@@ -1461,6 +1464,9 @@ IA64FAULT vcpu_set_pmd(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
 	// TODO: Should set Logical CPU state, not just physical
 	// NOTE: Writes to unimplemented PMD registers are discarded
+#ifdef DEBUG_PFMON
+printf("vcpu_set_pmd(%x,%lx)\n",reg,val);
+#endif
 	ia64_set_pmd(reg,val);
 	return (IA64_NO_FAULT);
 }
@@ -1469,6 +1475,9 @@ IA64FAULT vcpu_get_pmc(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 {
 	// NOTE: Reads from unimplemented PMC registers return zero
 	UINT64 val = (UINT64)ia64_get_pmc(reg);
+#ifdef DEBUG_PFMON
+printf("%lx=vcpu_get_pmc(%x)\n",val,reg);
+#endif
 	*pval = val;
 	return (IA64_NO_FAULT);
 }
@@ -1477,6 +1486,9 @@ IA64FAULT vcpu_get_pmd(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 {
 	// NOTE: Reads from unimplemented PMD registers return zero
 	UINT64 val = (UINT64)ia64_get_pmd(reg);
+#ifdef DEBUG_PFMON
+printf("%lx=vcpu_get_pmd(%x)\n",val,reg);
+#endif
 	*pval = val;
 	return (IA64_NO_FAULT);
 }
