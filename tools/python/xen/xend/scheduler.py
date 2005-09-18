@@ -13,11 +13,12 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
 import threading
 
-def later(delay, fn, args=(), kwargs={}):
+def later(delay, fn, *args, **kwargs):
     """Schedule a function to be called later.
 
     @param delay:  delay in seconds
@@ -29,7 +30,7 @@ def later(delay, fn, args=(), kwargs={}):
     timer.start()
     return timer
 
-def now(fn, args=(), kwargs={}):
+def now(fn, *args, **kwargs):
     """Schedule a function to be called now.
 
     @param fn:     function

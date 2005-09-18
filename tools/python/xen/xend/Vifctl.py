@@ -13,13 +13,13 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
 """Xend interface to networking control scripts.
 """
 import os
 import os.path
-import sys
 import xen.util.process
 
 from xen.xend import XendRoot
@@ -71,7 +71,7 @@ def set_vif_name(vif_old, vif_new):
         vif = vif_old
     return vif
 
-def vifctl(op, vif=None, script=None, domain=None, mac=None, bridge=None, ipaddr=[]):
+def vifctl(op, vif=None, script=None, domain=None, mac=None, bridge=None, ipaddr=None):
     """Call a vif control script.
     Xend calls this when bringing vifs up or down.
 

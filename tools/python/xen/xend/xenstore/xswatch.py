@@ -1,4 +1,5 @@
 # Copyright (C) 2005 Christian Limpach <Christian.Limpach@cl.cam.ac.uk>
+# Copyright (C) 2005 XenSource Ltd
 
 # This file is subject to the terms and conditions of the GNU General
 # Public License.  See the file "COPYING" in the main directory of
@@ -15,7 +16,7 @@ class xswatch:
     xs = None
     xslock = threading.Lock()
     
-    def __init__(self, path, fn, args=(), kwargs={}):
+    def __init__(self, path, fn, *args, **kwargs):
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
@@ -46,11 +47,11 @@ class xswatch:
         cls.threadcond.release()
         while True:
             try:
-                (ord, owr, oer) = select.select([ cls.xs ], [], [])
+                (fd, _1, _2) = select.select([ cls.xs ], [], [])
                 cls.xslock.acquire()
                 # reconfirm ready to read with lock
-                (ord, owr, oer) = select.select([ cls.xs ], [], [], 0.001)
-                if not cls.xs in ord:
+                (fd, _1, _2) = select.select([ cls.xs ], [], [], 0.001)
+                if not cls.xs in fd:
                     cls.xslock.release()
                     continue
                 we = cls.xs.read_watch()

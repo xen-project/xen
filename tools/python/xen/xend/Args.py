@@ -32,12 +32,12 @@ class Args:
         self.arg_dict = {}
         self.key_ord = []
         self.key_dict = {}
-        for (name, type) in paramspec:
+        for (name, typ) in paramspec:
                 self.arg_ord.append(name)
-                self.arg_dict[name] = type
-        for (name, type) in keyspec:
+                self.arg_dict[name] = typ
+        for (name, typ) in keyspec:
                 self.key_ord.append(name)
-                self.key_dict[name] = type
+                self.key_dict[name] = typ
 
     def get_args(self, d, xargs=None):
         args = {}
@@ -56,12 +56,12 @@ class Args:
     def split_args(self, d, args, keys):
         for (k, v) in d.items():
             if k in self.arg_dict:
-                type = self.arg_dict[k]
-                val = self.coerce(type, v)
+                typ = self.arg_dict[k]
+                val = self.coerce(typ, v)
                 args[k] = val
             elif k in self.key_dict:
-                type = self.key_dict[k]
-                val = self.coerce(type, v)
+                typ = self.key_dict[k]
+                val = self.coerce(typ, v)
                 keys[k] = val
             else:
                 raise ArgError('Invalid parameter: %s' % k)
@@ -85,20 +85,20 @@ class Args:
             d[k] = val
         return self.get_args(d, xargs=xargs)
 
-    def coerce(self, type, v):
+    def coerce(self, typ, v):
         try:
-            if type == 'int':
+            if typ == 'int':
                 val = int(v)
-            elif type == 'long':
+            elif typ == 'long':
                 val = long(v)
-            elif type == 'str':
+            elif typ == 'str':
                 val = str(v)
-            elif type == 'sxpr':
+            elif typ == 'sxpr':
                 val = self.sxpr(v)
-            elif type == 'bool':
+            elif typ == 'bool':
                 val = self.bool(v)
             else:
-                raise ArgError('invalid type:' + str(type))
+                raise ArgError('invalid type:' + str(typ))
             return val
         except ArgError:
             raise
@@ -142,7 +142,9 @@ class ArgFn(Args):
     Used on the client.
     """
 
-    def __init__(self, fn, paramspec, keyspec={}):
+    def __init__(self, fn, paramspec, keyspec = None):
+        if keyspec == None:
+            keyspec = {}
         Args.__init__(self, paramspec, keyspec)
         self.fn = fn
 
@@ -154,7 +156,9 @@ class FormFn(Args):
     Used in the HTTP server.
     """
 
-    def __init__(self, fn, paramspec, keyspec={}):
+    def __init__(self, fn, paramspec, keyspec = None):
+        if keyspec == None:
+            keyspec = {}
         Args.__init__(self, paramspec, keyspec)
         self.fn = fn
 
