@@ -883,7 +883,7 @@ class XendDomainInfo:
         """Configure a vm.
 
         """
-        self.configure_fields()
+        self.configure_maxmem()
         self.create_devices()
         self.create_blkif()
 
@@ -895,20 +895,14 @@ class XendDomainInfo:
         """
         return
 
-    def configure_fields(self):
-        """Process the vm configuration fields using the registered handlers.
-        """
-        index = {}
-        for field in sxp.children(self.config):
-            field_name = sxp.name(field)
-            field_index = index.get(field_name, 0)
-            field_handler = config_handlers.get(field_name)
-            # Ignore unknown fields. Warn?
-            if field_handler:
-                v = field_handler(self, self.config, field, field_index)
-            else:
-                log.warning("Unknown config field %s", field_name)
-            index[field_name] = field_index + 1
+    def configure_maxmem(self):
+        try:
+            maxmem = int(sxp.child_value(self.config, 'maxmem', self.memory))
+            xc.domain_setmaxmem(self.domid, maxmem_kb = maxmem * 1024)
+        except:
+            raise VmError("invalid maxmem: " +
+                          sxp.child_value(self.config, 'maxmem'))
+
 
     def vcpu_hotplug(self, vcpu, state):
         """Disable or enable VCPU in domain.
@@ -980,26 +974,6 @@ class XendDomainInfo:
                 self.vcpu_hotplug(vcpu, 0)
 
 
-def vm_field_ignore(_, _1, _2, _3):
-    """Dummy config field handler used for fields with built-in handling.
-    Matches the signature required by config_handlers.
-    """
-    pass
-
-
-def vm_field_maxmem(vm, _1, val, _2):
-    """Config field handler to configure vm memory limit.  Matches the
-    signature required by config_handlers.
-    """
-    maxmem = sxp.child0(val)
-    if maxmem is None:
-        maxmem = vm.memory
-    try:
-        maxmem = int(maxmem)
-    except:
-        raise VmError("invalid maxmem: " + str(maxmem))
-    xc.domain_setmaxmem(vm.domid, maxmem_kb = maxmem * 1024)
-
 
 #============================================================================
 # Register image handlers.
@@ -1012,31 +986,6 @@ from image import          \
 
 addImageHandlerClass(LinuxImageHandler)
 addImageHandlerClass(VmxImageHandler)
-
-
-"""Table of handlers for field configuration.
-
-field_name[String]: fn(vm, config, field, index) -> value(ignored)
-"""
-config_handlers = {
-    
-    # Ignore the fields we already handle.
-    
-    'name':       vm_field_ignore,
-    'memory':     vm_field_ignore,
-    'ssidref':    vm_field_ignore,
-    'cpu':        vm_field_ignore,
-    'cpu_weight': vm_field_ignore,
-    'restart':    vm_field_ignore,
-    'image':      vm_field_ignore,
-    'device':     vm_field_ignore,
-    'backend':    vm_field_ignore,
-    'vcpus':      vm_field_ignore,
-    'bootloader': vm_field_ignore,
-    
-    # Register other config handlers.
-    'maxmem':     vm_field_maxmem
-    }
 
 
 #============================================================================
