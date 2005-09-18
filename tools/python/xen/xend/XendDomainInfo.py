@@ -28,10 +28,10 @@ import time
 import threading
 import errno
 
-import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
+import xen.lowlevel.xc
 from xen.util.blkif import blkdev_uname_to_file
 
-from xen.xend.server import SrvDaemon; xend = SrvDaemon.instance()
+from xen.xend.server import SrvDaemon
 from xen.xend.server.channel import EventChannel
 
 from xen.xend import sxp
@@ -91,6 +91,12 @@ SIF_NET_BE_DOMAIN = (1<<5)
 
 """Flag for a TPM device backend domain."""
 SIF_TPM_BE_DOMAIN = (1<<7)
+
+
+xc = xen.lowlevel.xc.new()
+
+
+xend = SrvDaemon.instance()
 
 
 def domain_exists(name):
