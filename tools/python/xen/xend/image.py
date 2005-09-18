@@ -188,7 +188,7 @@ class ImageHandler:
             return
 
         # Set params and call buildDomain().
-        self.flags = self.vm.backend_flags
+        self.flags = self.vm.getBackendFlags()
 
         if not os.path.isfile(self.kernel):
             raise VmError('Kernel image does not exist: %s' % self.kernel)

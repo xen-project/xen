@@ -354,6 +354,10 @@ class XendDomainInfo:
         self.storeDom("store/ring-ref", ref)
 
 
+    def getBackendFlags(self):
+        return self.backend_flags
+
+
     def closeStoreChannel(self):
         """Close the store channel, if any.  Nothrow guarantee."""
         
