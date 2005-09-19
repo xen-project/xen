@@ -170,7 +170,7 @@ uninstall:
 	rm -rf $(D)/var/run/xen* $(D)/var/lib/xen*
 	rm -rf $(D)/boot/*xen*
 	rm -rf $(D)/lib/modules/*xen*
-	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/miniterm
+	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/lomount
 	rm -rf $(D)/usr/bin/cpuperf-perfcntr $(D)/usr/bin/cpuperf-xen
 	rm -rf $(D)/usr/bin/xc_shadow
 	rm -rf $(D)/usr/include/xenctrl.h
