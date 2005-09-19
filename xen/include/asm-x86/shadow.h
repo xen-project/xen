@@ -1595,6 +1595,8 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
         }
     }
 
+    __shadow_get_l2e(v, va, &sl2e);
+
     if ( shadow_mode_refcounts(d) )
     {
         l1_pgentry_t old_spte = shadow_linear_pg_table[l1_linear_offset(va)];
