@@ -15,7 +15,7 @@ void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
     void *addr;
     addr = mmap(NULL, num*PAGE_SIZE, prot, MAP_SHARED, xc_handle, 0);
     if ( addr == MAP_FAILED )
-	return NULL;
+        return NULL;
 
     ioctlx.num=num;
     ioctlx.dom=dom;
@@ -24,10 +24,10 @@ void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
     if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx ) < 0 )
     {
         int saved_errno = errno;
-	perror("XXXXXXXX");
-	(void)munmap(addr, num*PAGE_SIZE);
+        perror("XXXXXXXX");
+        (void)munmap(addr, num*PAGE_SIZE);
         errno = saved_errno;
-	return NULL;
+        return NULL;
     }
     return addr;
 
@@ -36,15 +36,15 @@ void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
 /*******************/
 
 void *xc_map_foreign_range(int xc_handle, u32 dom,
-                            int size, int prot,
-                            unsigned long mfn )
+                           int size, int prot,
+                           unsigned long mfn )
 {
     privcmd_mmap_t ioctlx; 
     privcmd_mmap_entry_t entry; 
     void *addr;
     addr = mmap(NULL, size, prot, MAP_SHARED, xc_handle, 0);
     if ( addr == MAP_FAILED )
-	return NULL;
+        return NULL;
 
     ioctlx.num=1;
     ioctlx.dom=dom;
@@ -55,9 +55,9 @@ void *xc_map_foreign_range(int xc_handle, u32 dom,
     if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) < 0 )
     {
         int saved_errno = errno;
-	(void)munmap(addr, size);
+        (void)munmap(addr, size);
         errno = saved_errno;
-	return NULL;
+        return NULL;
     }
     return addr;
 }
@@ -66,7 +66,7 @@ void *xc_map_foreign_range(int xc_handle, u32 dom,
 
 /* NB: arr must be mlock'ed */
 int xc_get_pfn_type_batch(int xc_handle, 
-			  u32 dom, int num, unsigned long *arr)
+                          u32 dom, int num, unsigned long *arr)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO2;
@@ -116,8 +116,8 @@ int xc_mmuext_op(
 
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
-	fprintf(stderr, "Dom_mmuext operation failed (rc=%ld errno=%d)-- need to"
-                    " rebuild the user-space tool set?\n",ret,errno);
+        fprintf(stderr, "Dom_mmuext operation failed (rc=%ld errno=%d)-- need to"
+                " rebuild the user-space tool set?\n",ret,errno);
     }
 
     safe_munlock(op, nr_ops*sizeof(*op));
@@ -172,7 +172,7 @@ xc_mmu_t *xc_init_mmu_updates(int xc_handle, domid_t dom)
 }
 
 int xc_add_mmu_update(int xc_handle, xc_mmu_t *mmu, 
-		      unsigned long long ptr, unsigned long long val)
+                      unsigned long long ptr, unsigned long long val)
 {
     mmu->updates[mmu->idx].ptr = ptr;
     mmu->updates[mmu->idx].val = val;
@@ -229,7 +229,7 @@ int xc_memory_op(int xc_handle,
 
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
-	fprintf(stderr, "hypercall failed (rc=%ld errno=%d)-- need to"
+        fprintf(stderr, "hypercall failed (rc=%ld errno=%d)-- need to"
                 " rebuild the user-space tool set?\n",ret,errno);
     }
 
@@ -275,16 +275,16 @@ unsigned long xc_get_m2p_start_mfn ( int xc_handle )
 
     if ( ioctl( xc_handle, IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN, &mfn ) < 0 )
     {
-	perror("xc_get_m2p_start_mfn:");
-	return 0;
+        perror("xc_get_m2p_start_mfn:");
+        return 0;
     }
     return mfn;
 }
 
 int xc_get_pfn_list(int xc_handle,
-		 u32 domid, 
-		 unsigned long *pfn_buf, 
-		 unsigned long max_pfns)
+                    u32 domid, 
+                    unsigned long *pfn_buf, 
+                    unsigned long max_pfns)
 {
     dom0_op_t op;
     int ret;
@@ -306,16 +306,16 @@ int xc_get_pfn_list(int xc_handle,
 
 #if 0
 #ifdef DEBUG
-	DPRINTF(("Ret for xc_get_pfn_list is %d\n", ret));
-	if (ret >= 0) {
-		int i, j;
-		for (i = 0; i < op.u.getmemlist.num_pfns; i += 16) {
-			fprintf(stderr, "0x%x: ", i);
-			for (j = 0; j < 16; j++)
-				fprintf(stderr, "0x%lx ", pfn_buf[i + j]);
-			fprintf(stderr, "\n");
-		}
-	}
+    DPRINTF(("Ret for xc_get_pfn_list is %d\n", ret));
+    if (ret >= 0) {
+        int i, j;
+        for (i = 0; i < op.u.getmemlist.num_pfns; i += 16) {
+            fprintf(stderr, "0x%x: ", i);
+            for (j = 0; j < 16; j++)
+                fprintf(stderr, "0x%lx ", pfn_buf[i + j]);
+            fprintf(stderr, "\n");
+        }
+    }
 #endif
 #endif
 
@@ -324,10 +324,10 @@ int xc_get_pfn_list(int xc_handle,
 
 #ifdef __ia64__
 int xc_ia64_get_pfn_list(int xc_handle,
-		 u32 domid, 
-		 unsigned long *pfn_buf, 
-		 unsigned int start_page,
-		 unsigned int nr_pages)
+                         u32 domid, 
+                         unsigned long *pfn_buf, 
+                         unsigned int start_page,
+                         unsigned int nr_pages)
 {
     dom0_op_t op;
     int ret;
@@ -372,9 +372,9 @@ long xc_get_tot_pages(int xc_handle, u32 domid)
 }
 
 int xc_copy_to_domain_page(int xc_handle,
-                                   u32 domid,
-                                   unsigned long dst_pfn, 
-                                   void *src_page)
+                           u32 domid,
+                           unsigned long dst_pfn, 
+                           void *src_page)
 {
     void *vaddr = xc_map_foreign_range(
         xc_handle, domid, PAGE_SIZE, PROT_WRITE, dst_pfn);
@@ -465,18 +465,28 @@ unsigned long xc_make_page_below_4G(
     unsigned long new_mfn;
 
     if ( xc_domain_memory_decrease_reservation( 
-	xc_handle, domid, 1, 0, &mfn) != 0 )
+        xc_handle, domid, 1, 0, &mfn) != 0 )
     {
-	fprintf(stderr,"xc_make_page_below_4G decrease failed. mfn=%lx\n",mfn);
-	return 0;
+        fprintf(stderr,"xc_make_page_below_4G decrease failed. mfn=%lx\n",mfn);
+        return 0;
     }
 
     if ( xc_domain_memory_increase_reservation(
         xc_handle, domid, 1, 0, 32, &new_mfn) != 0 )
     {
-	fprintf(stderr,"xc_make_page_below_4G increase failed. mfn=%lx\n",mfn);
-	return 0;
+        fprintf(stderr,"xc_make_page_below_4G increase failed. mfn=%lx\n",mfn);
+        return 0;
     }
 
     return new_mfn;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
