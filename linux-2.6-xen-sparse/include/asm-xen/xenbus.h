@@ -83,8 +83,7 @@ extern struct semaphore xenbus_lock;
 
 char **xenbus_directory(const char *dir, const char *node, unsigned int *num);
 void *xenbus_read(const char *dir, const char *node, unsigned int *len);
-int xenbus_write(const char *dir, const char *node,
-		 const char *string, int createflags);
+int xenbus_write(const char *dir, const char *node, const char *string);
 int xenbus_mkdir(const char *dir, const char *node);
 int xenbus_exists(const char *dir, const char *node);
 int xenbus_rm(const char *dir, const char *node);

@@ -253,31 +253,19 @@ void *xenbus_read(const char *dir, const char *node, unsigned int *len)
 EXPORT_SYMBOL(xenbus_read);
 
 /* Write the value of a single file.
- * Returns -err on failure.  createflags can be 0, O_CREAT, or O_CREAT|O_EXCL.
+ * Returns -err on failure.
  */
-int xenbus_write(const char *dir, const char *node,
-		 const char *string, int createflags)
+int xenbus_write(const char *dir, const char *node, const char *string)
 {
-	const char *flags, *path;
-	struct kvec iovec[3];
+	const char *path;
+	struct kvec iovec[2];
 
 	path = join(dir, node);
-	/* Format: Flags (as string), path, data. */
-	if (createflags == 0)
-		flags = XS_WRITE_NONE;
-	else if (createflags == O_CREAT)
-		flags = XS_WRITE_CREATE;
-	else if (createflags == (O_CREAT|O_EXCL))
-		flags = XS_WRITE_CREATE_EXCL;
-	else
-		return -EINVAL;
 
 	iovec[0].iov_base = (void *)path;
 	iovec[0].iov_len = strlen(path) + 1;
-	iovec[1].iov_base = (void *)flags;
-	iovec[1].iov_len = strlen(flags) + 1;
-	iovec[2].iov_base = (void *)string;
-	iovec[2].iov_len = strlen(string);
+	iovec[1].iov_base = (void *)string;
+	iovec[1].iov_len = strlen(string);
 
 	return xs_error(xs_talkv(XS_WRITE, iovec, ARRAY_SIZE(iovec), NULL));
 }
@@ -357,7 +345,7 @@ int xenbus_printf(const char *dir, const char *node, const char *fmt, ...)
 	va_end(ap);
 
 	BUG_ON(ret > sizeof(printf_buffer)-1);
-	return xenbus_write(dir, node, printf_buffer, O_CREAT);
+	return xenbus_write(dir, node, printf_buffer);
 }
 EXPORT_SYMBOL(xenbus_printf);
 
@@ -377,7 +365,7 @@ void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt, ...)
 
 	BUG_ON(len + ret > sizeof(printf_buffer)-1);
 	dev->has_error = 1;
-	if (xenbus_write(dev->nodename, "error", printf_buffer, O_CREAT) != 0)
+	if (xenbus_write(dev->nodename, "error", printf_buffer) != 0)
 		printk("xenbus: failed to write error node for %s (%s)\n",
 		       dev->nodename, printf_buffer);
 }

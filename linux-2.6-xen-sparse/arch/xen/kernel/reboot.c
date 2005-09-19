@@ -334,7 +334,7 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
 	return;
     }
 
-    xenbus_write("control", "shutdown", "", O_CREAT);
+    xenbus_write("control", "shutdown", "");
 
     err = xenbus_transaction_end(0);
     if (err == -ETIMEDOUT) {
