@@ -25,7 +25,6 @@ from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
 from xen.xend import XendRoot; xroot = XendRoot.instance()
 
-import controller
 import event
 import relocate
 from params import *
