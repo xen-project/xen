@@ -102,7 +102,7 @@ main(int argc, char **argv)
 	optind++;
 #elif defined(CLIENT_write)
 	success = xs_write(xsh, argv[optind], argv[optind + 1],
-			   strlen(argv[optind + 1]), O_CREAT);
+			   strlen(argv[optind + 1]));
 	if (!success) {
 	    warnx("could not write path %s", argv[optind]);
 	    ret = 1;
