@@ -3,7 +3,7 @@
 # Currently supported architectures: x86_32, x86_64
 XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
 XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
-XEN_TARGET_X86_PAE  ?= y
+XEN_TARGET_X86_PAE  ?= n
 
 # Tools to run on system hosting the build
 HOSTCC     = gcc
