@@ -276,6 +276,7 @@ class XendDomain:
         @return: domain
         """
         dominfo = XendDomainInfo.create(self.dbmap, config)
+        self._add_domain(dominfo)
         return dominfo
 
     def domain_restart(self, dominfo):

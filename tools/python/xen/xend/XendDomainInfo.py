@@ -538,7 +538,6 @@ class XendDomainInfo:
             self.init_image()
             self.configure_cpus(config)
             self.init_domain()
-            self.register_domain()
 
             # Create domain devices.
             self.configure_backends()
@@ -553,11 +552,6 @@ class XendDomainInfo:
             traceback.print_exc()
             self.destroy()
             raise
-
-    def register_domain(self):
-        xd = get_component('xen.xend.XendDomain')
-        xd._add_domain(self)
-        self.exportToDB(save=True)
 
     def configure_cpus(self, config):
         try:
@@ -746,6 +740,8 @@ class XendDomainInfo:
 
         @raise: VmError for invalid devices
         """
+        if self.recreate:
+            return
         if not self.rebooting():
             self.create_configured_devices()
         self.image.createDeviceModel()
