@@ -59,12 +59,12 @@ bool xs_write(struct xs_handle *h, const char *path, const void *data,
 	      unsigned int len, int createflags);
 
 /* Create a new directory.
- * Returns false on failure.
+ * Returns false on failure, or success if it already exists.
  */
 bool xs_mkdir(struct xs_handle *h, const char *path);
 
 /* Destroy a file or directory (and children).
- * Returns false on failure.
+ * Returns false on failure, or success if it doesn't exist.
  */
 bool xs_rm(struct xs_handle *h, const char *path);
 

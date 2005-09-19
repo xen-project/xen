@@ -385,7 +385,7 @@ static bool file_mkdir(struct file_ops_info *info, const char *path)
 
 	make_dirs(parent_filename(dirname));
 	if (mkdir(dirname, 0700) != 0)
-		return false;
+		return (errno == EEXIST);
 
 	init_perms(dirname);
 	return true;
@@ -401,8 +401,11 @@ static bool file_rm(struct file_ops_info *info, const char *path)
 		return false;
 	}
 
-	if (lstat(filename, &st) != 0)
-		return false;
+	if (lstat(filename, &st) != 0) {
+		if (lstat(parent_filename(filename), &st) != 0)
+			return false;
+		return true;
+	}
 
 	if (!write_ok(info, path))
 		return false;

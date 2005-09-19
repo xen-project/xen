@@ -27,10 +27,8 @@ dir /dir
 expect contents2
 read /dir/test2
 
-# Creating dir over the top should fail.
-expect mkdir failed: File exists
+# Creating dir over the top should succeed.
 mkdir /dir
-expect mkdir failed: File exists
 mkdir /dir/test2
 
 # Mkdir implicitly creates directories.

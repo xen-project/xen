@@ -961,6 +961,13 @@ static char *tempdir(struct connection *conn,
 	return dir;
 }
 
+static bool node_exists(struct connection *conn, const char *node)
+{
+	struct stat st;
+
+	return lstat(node_dir(conn->transaction, node), &st) == 0;
+}
+
 /* path, flags, data... */
 static void do_write(struct connection *conn, struct buffered_data *in)
 {
@@ -1050,7 +1057,6 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 static void do_mkdir(struct connection *conn, const char *node)
 {
 	char *dir;
-	struct stat st;
 
 	node = canonicalize(conn, node);
 	if (!check_node_perms(conn, node, XS_PERM_WRITE|XS_PERM_ENOENT_OK)) {
@@ -1066,9 +1072,9 @@ static void do_mkdir(struct connection *conn, const char *node)
 	if (transaction_block(conn, node))
 		return;
 
-	/* Must not already exist. */
-	if (lstat(node_dir(conn->transaction, node), &st) == 0) {
-		send_error(conn, EEXIST);
+	/* If it already exists, fine. */
+	if (node_exists(conn, node)) {
+		send_ack(conn, XS_MKDIR);
 		return;
 	}
 
@@ -1089,6 +1095,15 @@ static void do_rm(struct connection *conn, const char *node)
 
 	node = canonicalize(conn, node);
 	if (!check_node_perms(conn, node, XS_PERM_WRITE)) {
+		/* Didn't exist already?  Fine, if parent exists. */
+		if (errno == ENOENT) {
+			if (node_exists(conn, get_parent(node))) {
+				send_ack(conn, XS_RM);
+				return;
+			}
+			/* Restore errno, just in case. */
+			errno = ENOENT;
+		}
 		send_error(conn, errno);
 		return;
 	}

@@ -1,5 +1,4 @@
-# Remove non-existant fails.
-expect rm failed: No such file or directory
+# Remove non-existant is OK, as long as parent exists
 rm /test
 expect rm failed: No such file or directory
 rm /dir/test
