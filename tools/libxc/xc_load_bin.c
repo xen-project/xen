@@ -109,8 +109,8 @@ loadbinimage(
     unsigned long *parray, struct domain_setup_info *dsi);
 
 int probe_bin(char *image,
-	      unsigned long image_size,
-	      struct load_funcs *load_funcs)
+              unsigned long image_size,
+              struct load_funcs *load_funcs)
 {
     if ( NULL == findtable(image, image_size) )
     {
@@ -297,3 +297,13 @@ loadbinimage(
 
     return 0;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

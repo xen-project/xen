@@ -64,11 +64,11 @@ parseaout9image(
     dstart = round_pgup(start + ehdr.text);
     end = dstart + ehdr.data + ehdr.bss;
 
-    dsi->v_start	= KZERO;
-    dsi->v_kernstart	= start;
-    dsi->v_kernend	= end;
-    dsi->v_kernentry	= ehdr.entry;
-    dsi->v_end		= end;
+    dsi->v_start     = KZERO;
+    dsi->v_kernstart = start;
+    dsi->v_kernend   = end;
+    dsi->v_kernentry = ehdr.entry;
+    dsi->v_end       = end;
 
     /* XXX load symbols */
 
@@ -168,3 +168,12 @@ get_header(
     return ehdr;
 }
 
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

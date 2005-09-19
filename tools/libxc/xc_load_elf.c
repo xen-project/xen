@@ -30,8 +30,8 @@ loadelfsymtab(
     struct domain_setup_info *dsi);
 
 int probe_elf(char *image,
-	      unsigned long image_size,
-	      struct load_funcs *load_funcs)
+              unsigned long image_size,
+              struct load_funcs *load_funcs)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)image;
 
@@ -116,7 +116,7 @@ static int parseelfimage(char *image,
             return -EINVAL;
         }
         if ( (strstr(guestinfo, "PAE=yes") != NULL) )
-	    dsi->pae_kernel = 1;
+            dsi->pae_kernel = 1;
 
         break;
     }
@@ -313,3 +313,13 @@ loadelfsymtab(
 
     return 0;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

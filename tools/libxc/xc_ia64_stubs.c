@@ -9,8 +9,8 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters,
 }
 
 int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
-		     unsigned int store_evtchn, unsigned long *store_mfn,
-		     unsigned int console_evtchn, unsigned long *console_mfn)
+                     unsigned int store_evtchn, unsigned long *store_mfn,
+                     unsigned int console_evtchn, unsigned long *console_mfn)
 {
     PERROR("xc_linux_restore not implemented\n");
     return -1;
@@ -44,3 +44,12 @@ xc_plan9_build(int xc_handle,
     return -1;
 }
 
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
