@@ -2,17 +2,28 @@
 DomU GDB server for 32-bit (PAE and non-PAE) systems
 ----------------------------------------------------
 
-To build:
+Lines marked below with [*] are optional, if you want full
+source-level debugging of your kernel image.
+
+To build the GDB server:
  1. Run ./gdbbuild from within this directory.
  2. Copy ./gdb-6.2.1-linux-i386-xen/gdb/gdbserver/gdbserver-xen
     to your test machine.
 
-To debug a running domain:
+To build a debuggable guest kernel image:
+ 1. cd linux-2.6.12-xenU
+ 2. ARCH=xen make menuconfig
+ 3. From within the configurator, enable the following options:
+    # Kernel hacking -> Compile the kernel with debug info [*]
+                     -> Compile the kernel with frame pointers
+ 4. (Re)build and (re)install your xenU kernel image.
+
+To debug a running guest:
  1. Use 'xm list' to discover its domain id ($domid). 
  2. Run 'gdbserver-xen 127.0.0.1:9999 --attach $domid'
  3. Run 'gdb /path/to/vmlinux-syms-2.6.xx-xenU'
  4. From within the gdb client session:
+    # directory /path/to/linux-2.6.xx-xenU [*]
     # target remote 127.0.0.1:9999
     # bt
     # disass
- 5. And so on...
