@@ -27,9 +27,6 @@ from xen.xend import sxp
 from xen.xend.server.DevController import DevController
 
 
-next_devid = 1
-
-
 class NetifController(DevController):
     """Network interface controller. Handles all network devices for a domain.
     """
@@ -41,8 +38,6 @@ class NetifController(DevController):
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
 
-        global next_devid
-
         from xen.xend import XendRoot
         xroot = XendRoot.instance()
 
@@ -52,9 +47,6 @@ class NetifController(DevController):
                 val.append(sxp.child0(ipaddr))
             return val
 
-        devid = next_devid
-        next_devid += 1
-
         script = os.path.join(xroot.network_script_dir,
                               sxp.child_value(config, 'script',
                                               xroot.get_vif_script()))
@@ -62,6 +54,8 @@ class NetifController(DevController):
                                  xroot.get_vif_bridge())
         mac = sxp.child_value(config, 'mac')
         ipaddr = _get_config_ipaddr(config)
+
+        devid = self.allocateDeviceID()
 
         back = { 'script' : script,
                  'mac' : mac,
