@@ -228,6 +228,7 @@ static int blkback_probe(struct xenbus_device *dev,
 	be->dev = dev;
 	be->backend_watch.node = dev->nodename;
 	be->backend_watch.callback = backend_changed;
+	/* Will implicitly call backend_changed once. */
 	err = register_xenbus_watch(&be->backend_watch);
 	if (err) {
 		be->backend_watch.node = NULL;
@@ -249,8 +250,6 @@ static int blkback_probe(struct xenbus_device *dev,
 	}
 
 	dev->data = be;
-
-	backend_changed(&be->backend_watch, dev->nodename);
 	return 0;
 
  free_be:

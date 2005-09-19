@@ -213,6 +213,7 @@ static int tpmback_probe(struct xenbus_device *dev,
 
 	be->dev = dev;
 	be->backend_watch.node     = dev->nodename;
+	/* Implicitly calls backend_changed() once. */
 	be->backend_watch.callback = backend_changed;
 	be->instance = -1;
 	err = register_xenbus_watch(&be->backend_watch);
@@ -236,8 +237,6 @@ static int tpmback_probe(struct xenbus_device *dev,
 	}
 
 	dev->data = be;
-
-	backend_changed(&be->backend_watch, dev->nodename);
 	return err;
 
 free_be:

@@ -168,10 +168,12 @@ expect 1: waitwatch failed: Connection timed out
 # Watch event must have happened before we registered interest.
 1 watch / token
 2 write /test/subnode contents2
-1 watch / token2 0
+1 watchnoack / token2 0
 expect 1:/test/subnode:token
 1 waitwatch
 1 ackwatch token
+expect 1:/:token2
+1 waitwatch
 expect 1: waitwatch failed: Connection timed out
 1 waitwatch
 1 close

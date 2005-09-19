@@ -23,7 +23,8 @@ expect *Permission denied
 getperm /dir/file 
 expect *Permission denied
 setperm /dir/file 0 NONE 
-watch /dir/file token 
+# We get no watch event when there's no permission.  It's a corner case.
+watchnoack /dir/file token 
 1 write /dir/file contents
 1 rm /dir/file
 expect waitwatch failed: Connection timed out
@@ -63,7 +64,7 @@ expect *Permission denied
 getperm /dir/file 
 expect *Permission denied
 setperm /dir/file 0 NONE 
-watch /dir/file token 
+watchnoack /dir/file token 
 1 write /dir/file contents
 1 rm /dir/file
 expect waitwatch failed: Connection timed out

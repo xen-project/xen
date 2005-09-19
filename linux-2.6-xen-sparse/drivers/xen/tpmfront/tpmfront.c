@@ -411,7 +411,6 @@ static int tpmfront_probe(struct xenbus_device *dev,
 		return err;
 	}
 
-	watch_for_status(&info->watch, info->watch.node);
 	return 0;
 }
 

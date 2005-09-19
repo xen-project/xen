@@ -200,6 +200,7 @@ static void __attribute__((noreturn)) usage(void)
 	     "  setperm <path> <id> <flags> ...\n"
 	     "  shutdown\n"
 	     "  watch <path> <token>\n"
+	     "  watchnoack <path> <token>\n"
 	     "  waitwatch\n"
 	     "  ackwatch <token>\n"
 	     "  unwatch <path> <token>\n"
@@ -480,10 +481,20 @@ static void do_shutdown(unsigned int handle)
 		failed(handle);
 }
 
-static void do_watch(unsigned int handle, const char *node, const char *token)
+static void do_watch(unsigned int handle, const char *node, const char *token,
+		     bool swallow_event)
 {
 	if (!xs_watch(handles[handle], node, token))
 		failed(handle);
+
+	/* Convenient for testing... */
+	if (swallow_event) {
+		char **vec = xs_read_watch(handles[handle]);
+		if (!vec || !streq(vec[0], node) || !streq(vec[1], token))
+			failed(handle);
+		if (!xs_acknowledge_watch(handles[handle], token))
+			failed(handle);
+	}
 }
 
 static void set_timeout(void)
@@ -767,7 +778,9 @@ static void do_command(unsigned int default_handle, char *line)
 	else if (streq(command, "shutdown"))
 		do_shutdown(handle);
 	else if (streq(command, "watch"))
-		do_watch(handle, arg(line, 1), arg(line, 2));
+		do_watch(handle, arg(line, 1), arg(line, 2), true);
+	else if (streq(command, "watchnoack"))
+		do_watch(handle, arg(line, 1), arg(line, 2), false);
 	else if (streq(command, "waitwatch"))
 		do_waitwatch(handle);
 	else if (streq(command, "ackwatch"))

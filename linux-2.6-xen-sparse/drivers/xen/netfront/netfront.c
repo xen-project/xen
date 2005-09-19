@@ -1284,10 +1284,6 @@ static int netfront_probe(struct xenbus_device *dev,
 		return err;
 	}
 
-
-	/* Call once in case entries already there. */
-	watch_for_status(&info->watch, info->watch.node);
-
 	return 0;
 }
 

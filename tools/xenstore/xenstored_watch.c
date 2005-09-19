@@ -236,6 +236,9 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 	trace_create(watch, "watch");
 	talloc_set_destructor(watch, destroy_watch);
 	send_ack(conn, XS_WATCH);
+
+	/* We fire once up front: simplifies clients and restart. */
+	add_event(conn, watch, watch->node);
 }
 
 void do_watch_ack(struct connection *conn, const char *token)
