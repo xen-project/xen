@@ -275,7 +275,8 @@ class XendDomain:
         @param config: configuration
         @return: domain
         """
-        return XendDomainInfo.create(self.dbmap.getPath(), config)
+        dominfo = XendDomainInfo.create(self.dbmap, config)
+        return dominfo
 
     def domain_restart(self, dominfo):
         """Restart a domain.
@@ -308,7 +309,8 @@ class XendDomain:
         @param vmconfig: vm configuration
         """
         config = sxp.child_value(vmconfig, 'config')
-        return XendDomainInfo.restore(self.dbmap.getPath(), config)
+        dominfo = XendDomainInfo.restore(self.dbmap, config)
+        return dominfo
 
     def domain_restore(self, src, progress=False):
         """Restore a domain from file.
@@ -350,12 +352,13 @@ class XendDomain:
             dompath = self.domroot
         log.info("Creating entry for unknown xend domain: id=%d uuid=%s",
                  dom0, uuid)
+        db = self.dbmap.addChild("%s/xend" % uuid)
         try:
-            dominfo = XendDomainInfo.recreate(uuid, dompath, info)
-        except Exception, exn:
-            log.exception(exn)
-            raise XendError("Error recreating xend domain info: id=%d: %s" %
-                            (dom0, str(exn)))
+            dominfo = XendDomainInfo.recreate(uuid, dompath, dom0,
+                                              db, info)
+        except:
+            raise XendError("Error recreating xend domain info: id=%d" %
+                            dom0)
         self._add_domain(dominfo)
         return dominfo
         
