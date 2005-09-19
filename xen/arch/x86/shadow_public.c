@@ -595,18 +595,21 @@ void free_shadow_page(unsigned long smfn)
         perfc_decr(shadow_l1_pages);
         shadow_demote(d, gpfn, gmfn);
         free_shadow_l1_table(d, smfn);
+        d->arch.shadow_page_count--;
         break;
 #if defined (__i386__)
     case PGT_l2_shadow:
         perfc_decr(shadow_l2_pages);
         shadow_demote(d, gpfn, gmfn);
         free_shadow_l2_table(d, smfn, page->u.inuse.type_info);
+        d->arch.shadow_page_count--;
         break;
 
     case PGT_hl2_shadow:
         perfc_decr(hl2_table_pages);
         shadow_demote(d, gpfn, gmfn);
         free_shadow_hl2_table(d, smfn);
+        d->arch.hl2_page_count--;
         break;
 #else
     case PGT_l2_shadow:
@@ -614,12 +617,13 @@ void free_shadow_page(unsigned long smfn)
     case PGT_l4_shadow:
         shadow_demote(d, gpfn, gmfn);
         free_shadow_tables(d, smfn, shadow_type_to_level(type));
+        d->arch.shadow_page_count--;
         break;
 
     case PGT_fl1_shadow:
         free_shadow_fl1_table(d, smfn);
+        d->arch.shadow_page_count--;
         break;
-
 #endif
 
     case PGT_snapshot:
@@ -631,8 +635,6 @@ void free_shadow_page(unsigned long smfn)
                page_to_pfn(page), page->u.inuse.type_info);
         break;
     }
-
-    d->arch.shadow_page_count--;
 
     // No TLB flushes are needed the next time this page gets allocated.
     //
