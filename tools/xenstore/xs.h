@@ -53,10 +53,10 @@ char **xs_directory(struct xs_handle *h, const char *path, unsigned int *num);
 void *xs_read(struct xs_handle *h, const char *path, unsigned int *len);
 
 /* Write the value of a single file.
- * Returns false on failure.  createflags can be 0, O_CREAT, or O_CREAT|O_EXCL.
+ * Returns false on failure.
  */
 bool xs_write(struct xs_handle *h, const char *path, const void *data,
-	      unsigned int len, int createflags);
+	      unsigned int len);
 
 /* Create a new directory.
  * Returns false on failure, or success if it already exists.

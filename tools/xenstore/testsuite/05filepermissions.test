@@ -5,7 +5,7 @@ expect getperm failed: No such file or directory
 getperm /dir/test
 
 # Create file: inherits from root (0 READ)
-write /test excl contents
+write /test contents
 expect 0 READ
 getperm /test
 setid 1
@@ -14,7 +14,7 @@ getperm /test
 expect contents
 read /test
 expect write failed: Permission denied
-write /test none contents
+write /test contents
 
 # Take away read access to file.
 setid 0
@@ -25,7 +25,7 @@ getperm /test
 expect read failed: Permission denied
 read /test
 expect write failed: Permission denied
-write /test none contents
+write /test contents
 
 # Grant everyone write access to file.
 setid 0
@@ -35,7 +35,7 @@ expect getperm failed: Permission denied
 getperm /test
 expect read failed: Permission denied
 read /test
-write /test none contents2
+write /test contents2
 setid 0
 expect contents2
 read /test
@@ -47,7 +47,7 @@ expect 0 READ/WRITE
 getperm /test
 expect contents2
 read /test
-write /test none contents3
+write /test contents3
 expect contents3
 read /test
 
@@ -59,7 +59,7 @@ expect 1 NONE
 getperm /test
 expect contents3
 read /test
-write /test none contents4
+write /test contents4
 
 # User 2 can do nothing.
 setid 2
@@ -70,7 +70,7 @@ getperm /test
 expect read failed: Permission denied
 read /test
 expect write failed: Permission denied
-write /test none contents4
+write /test contents4
 
 # Tools can always access things.
 setid 0
@@ -78,4 +78,4 @@ expect 1 NONE
 getperm /test
 expect contents4
 read /test
-write /test none contents5
+write /test contents5

@@ -4,7 +4,7 @@
 mkdir /home
 expect handle is 1
 introduce 1 100 7 /home
-1 write entry1 create contents
+1 write entry1 contents
 expect contents
 read /home/entry1
 expect entry1
@@ -13,7 +13,7 @@ dir /home
 # Place a watch using a relative path: expect relative answer.
 1 mkdir foo
 1 watch foo token
-write /home/foo/bar create contents
+write /home/foo/bar contents
 expect 1:foo/bar:token
 1 waitwatch
 1 ackwatch token

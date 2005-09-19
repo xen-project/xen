@@ -11,7 +11,7 @@ expect 0 READ
 getperm /dir
 dir /dir
 expect write failed: Permission denied
-write /dir/test create contents2
+write /dir/test contents2
 
 # Remove everyone's read access to directoy.
 setid 0
@@ -22,7 +22,7 @@ dir /dir
 expect read failed: Permission denied
 read /dir/test create contents2
 expect write failed: Permission denied
-write /dir/test create contents2
+write /dir/test contents2
 
 # Grant everyone write access to directory.
 setid 0
@@ -32,7 +32,7 @@ expect getperm failed: Permission denied
 getperm /dir
 expect dir failed: Permission denied
 dir /dir
-write /dir/test create contents
+write /dir/test contents
 setid 0
 expect 1 WRITE
 getperm /dir/test
@@ -47,7 +47,7 @@ expect 0 READ/WRITE
 getperm /dir
 expect test
 dir /dir
-write /dir/test2 create contents
+write /dir/test2 contents
 expect contents
 read /dir/test2
 setperm /dir/test2 1 NONE
@@ -60,7 +60,7 @@ getperm /dir
 expect test
 expect test2
 dir /dir
-write /dir/test3 create contents
+write /dir/test3 contents
 
 # User 2 can do nothing.  Can't even tell if file exists.
 setid 2
@@ -79,17 +79,9 @@ read /dir/test3
 expect read failed: Permission denied
 read /dir/test4
 expect write failed: Permission denied
-write /dir/test none contents
+write /dir/test contents
 expect write failed: Permission denied
-write /dir/test create contents
-expect write failed: Permission denied
-write /dir/test excl contents
-expect write failed: Permission denied
-write /dir/test4 none contents
-expect write failed: Permission denied
-write /dir/test4 create contents
-expect write failed: Permission denied
-write /dir/test4 excl contents
+write /dir/test4 contents
 
 # Tools can always access things.
 setid 0
@@ -99,13 +91,13 @@ expect test
 expect test2
 expect test3
 dir /dir
-write /dir/test4 create contents
+write /dir/test4 contents
 
 # Inherited by child.
 mkdir /dir/subdir
 expect 1 NONE
 getperm /dir/subdir
-write /dir/subfile excl contents
+write /dir/subfile contents
 expect 1 NONE
 getperm /dir/subfile
 
@@ -114,12 +106,12 @@ setperm /dir/subdir 2 READ/WRITE
 expect 2 READ/WRITE
 getperm /dir/subdir
 setid 3
-write /dir/subdir/subfile excl contents
+write /dir/subdir/subfile contents
 expect 3 READ/WRITE
 getperm /dir/subdir/subfile
 
 # Inheritence works through multiple directories, too.
-write /dir/subdir/1/2/3/4 excl contents
+write /dir/subdir/1/2/3/4 contents
 expect 3 READ/WRITE
 getperm /dir/subdir/1/2/3/4
 mkdir /dir/subdir/a/b/c/d

@@ -326,32 +326,17 @@ void *xs_read(struct xs_handle *h, const char *path, unsigned int *len)
 }
 
 /* Write the value of a single file.
- * Returns false on failure.  createflags can be 0, O_CREAT, or O_CREAT|O_EXCL.
+ * Returns false on failure.
  */
 bool xs_write(struct xs_handle *h, const char *path,
-	      const void *data, unsigned int len, int createflags)
+	      const void *data, unsigned int len)
 {
-	const char *flags;
-	struct iovec iovec[3];
-
-	/* Format: Flags (as string), path, data. */
-	if (createflags == 0)
-		flags = XS_WRITE_NONE;
-	else if (createflags == O_CREAT)
-		flags = XS_WRITE_CREATE;
-	else if (createflags == (O_CREAT|O_EXCL))
-		flags = XS_WRITE_CREATE_EXCL;
-	else {
-		errno = EINVAL;
-		return false;
-	}
+	struct iovec iovec[2];
 
 	iovec[0].iov_base = (void *)path;
 	iovec[0].iov_len = strlen(path) + 1;
-	iovec[1].iov_base = (void *)flags;
-	iovec[1].iov_len = strlen(flags) + 1;
-	iovec[2].iov_base = (void *)data;
-	iovec[2].iov_len = len;
+	iovec[1].iov_base = (void *)data;
+	iovec[1].iov_len = len;
 
 	return xs_bool(xs_talkv(h, XS_WRITE, iovec, ARRAY_SIZE(iovec), NULL));
 }

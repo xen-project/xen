@@ -92,7 +92,7 @@ int xs_printf(struct xs_handle *h, const char *dir, const char *node,
         if ((path == NULL) || (buf == NULL))
             return 0;
 
-        ret = xs_write(h, path, buf, strlen(buf)+1, O_CREAT);
+        ret = xs_write(h, path, buf, strlen(buf)+1);
 
         free(buf);
         free(path);

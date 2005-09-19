@@ -165,7 +165,7 @@ static int domain_create_tty(struct domain *dom)
 		success = asprintf(&path, "%s/tty", dom->conspath) != -1;
 		if (!success)
 			goto out;
-		success = xs_write(xs, path, slave, strlen(slave), O_CREAT);
+		success = xs_write(xs, path, slave, strlen(slave));
 		free(path);
 		if (!success)
 			goto out;

@@ -61,7 +61,7 @@ static void work(unsigned int cycles, unsigned int childnum)
 			barf_perror("%i: can't read %s iter %i",
 				    childnum, file, i);
 		sprintf(tmp, "%i", atoi(contents) + 1);
-		if (!xs_write(h, file, tmp, strlen(tmp)+1, 0))
+		if (!xs_write(h, file, tmp, strlen(tmp)+1))
 			barf_perror("%i: can't write %s iter %i",
 				    childnum, file, i);
 
@@ -91,7 +91,7 @@ static void create_dirs(struct xs_handle *h, const char *base, int togo)
 
 	if (togo == 0) {
 		sprintf(filename, "%s/count", base);
-		if (!xs_write(h, filename, "0", 2, O_EXCL|O_CREAT))
+		if (!xs_write(h, filename, "0", 1))
 			barf_perror("Writing to %s", filename);
 		return;
 	}

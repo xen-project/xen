@@ -1,10 +1,10 @@
 # If we don't wait for an ack, we can crash daemon as it never expects to be
 # sending out two replies on top of each other.
-noackwrite /1 create 1
-noackwrite /2 create 2
-noackwrite /3 create 3
-noackwrite /4 create 4
-noackwrite /5 create 5
+noackwrite /1 1
+noackwrite /2 2
+noackwrite /3 3
+noackwrite /4 4
+noackwrite /5 5
 readack
 readack
 readack
@@ -13,11 +13,11 @@ readack
 
 expect handle is 1
 introduce 1 100 7 /my/home
-1 noackwrite /1 create 1
-1 noackwrite /2 create 2
-1 noackwrite /3 create 3
-1 noackwrite /4 create 4
-1 noackwrite /5 create 5
+1 noackwrite /1 1
+1 noackwrite /2 2
+1 noackwrite /3 3
+1 noackwrite /4 4
+1 noackwrite /5 5
 1 readack
 1 readack
 1 readack

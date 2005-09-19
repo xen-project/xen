@@ -53,13 +53,11 @@ class xstransact:
             ret.append(self._read(key))
         return ret
 
-    def _write(self, key, data, create=True, excl=False):
+    def _write(self, key, data):
         path = "%s/%s" % (self.path, key)
-        xshandle().write(path, data, create=create, excl=excl)
+        xshandle().write(path, data)
 
     def write(self, *args, **opts):
-        create = opts.get('create') or True
-        excl = opts.get('excl') or False
         if len(args) == 0:
             raise TypeError
         if isinstance(args[0], dict):
@@ -68,19 +66,18 @@ class xstransact:
                     raise TypeError
                 for key in d.keys():
                     try:
-                        self._write(key, d[key], create, excl)
+                        self._write(key, d[key])
                     except TypeError, msg:
                         raise TypeError('Writing %s: %s: %s' %
                                         (key, str(d[key]), msg))
-                        
         elif isinstance(args[0], list):
             for l in args:
                 if not len(l) == 2:
                     raise TypeError
-                self._write(l[0], l[1], create, excl)
+                self._write(l[0], l[1])
         elif len(args) % 2 == 0:
             for i in range(len(args) / 2):
-                self._write(args[i * 2], args[i * 2 + 1], create, excl)
+                self._write(args[i * 2], args[i * 2 + 1])
         else:
             raise TypeError
 

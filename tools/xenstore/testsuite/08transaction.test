@@ -4,7 +4,7 @@ mkdir /test
 
 # Simple transaction: create a file inside transaction.
 1 start /test
-1 write /test/entry1 create contents
+1 write /test/entry1 contents
 2 dir /test
 expect 1:entry1
 1 dir /test
@@ -16,14 +16,14 @@ rm /test/entry1
 
 # Create a file and abort transaction.
 1 start /test
-1 write /test/entry1 create contents
+1 write /test/entry1 contents
 2 dir /test
 expect 1:entry1
 1 dir /test
 1 abort
 2 dir /test
 
-write /test/entry1 create contents
+write /test/entry1 contents
 # Delete in transaction, commit
 1 start /test
 1 rm /test/entry1
@@ -34,7 +34,7 @@ expect 2:entry1
 2 dir /test
 
 # Delete in transaction, abort.
-write /test/entry1 create contents
+write /test/entry1 contents
 1 start /test
 1 rm /test/entry1
 expect 2:entry1
@@ -84,8 +84,8 @@ expect 1:/test/dir/sub:token
 # Multiple events from single transaction don't trigger assert
 1 watch /test token
 2 start /test
-2 write /test/1 create contents
-2 write /test/2 create contents
+2 write /test/1 contents
+2 write /test/2 contents
 2 commit
 expect 1:/test/1:token
 1 waitwatch

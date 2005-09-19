@@ -192,7 +192,7 @@ static void __attribute__((noreturn)) usage(void)
 	     "Reads commands from stdin, one per line:"
 	     "  dir <path>\n"
 	     "  read <path>\n"
-	     "  write <path> <flags> <value>...\n"
+	     "  write <path> <value>...\n"
 	     "  setid <id>\n"
 	     "  mkdir <path>\n"
 	     "  rm <path>\n"
@@ -213,7 +213,7 @@ static void __attribute__((noreturn)) usage(void)
 	     "  notimeout\n"
 	     "  readonly\n"
 	     "  readwrite\n"
-	     "  noackwrite <path> <flags> <value>...\n"
+	     "  noackwrite <path> <value>...\n"
 	     "  readack\n"
 	     "  dump\n");
 }
@@ -348,47 +348,22 @@ static void do_read(unsigned int handle, char *path)
 		output("%.*s\n", len, value);
 }
 
-static void do_write(unsigned int handle, char *path, char *flags, char *data)
+static void do_write(unsigned int handle, char *path, char *data)
 {
-	int f;
-
-	if (streq(flags, "none"))
-		f = 0;
-	else if (streq(flags, "create"))
-		f = O_CREAT;
-	else if (streq(flags, "excl"))
-		f = O_CREAT | O_EXCL;
-	else if (streq(flags, "crap"))
-		f = 100;
-	else
-		barf("write flags 'none', 'create' or 'excl' only");
-
-	if (!xs_write(handles[handle], path, data, strlen(data), f))
+	if (!xs_write(handles[handle], path, data, strlen(data)))
 		failed(handle);
 }
 
 static void do_noackwrite(unsigned int handle,
-			  char *path, const char *flags, char *data)
+			  char *path, char *data)
 {
 	struct xsd_sockmsg msg;
 
-	/* Format: Flags (as string), path, data. */
-	if (streq(flags, "none"))
-		flags = XS_WRITE_NONE;
-	else if (streq(flags, "create"))
-		flags = XS_WRITE_CREATE;
-	else if (streq(flags, "excl"))
-		flags = XS_WRITE_CREATE_EXCL;
-	else
-		barf("noackwrite flags 'none', 'create' or 'excl' only");
-
-	msg.len = strlen(path) + 1 + strlen(flags) + 1 + strlen(data);
+	msg.len = strlen(path) + 1 + strlen(data);
 	msg.type = XS_WRITE;
 	if (!write_all_choice(handles[handle]->fd, &msg, sizeof(msg)))
 		failed(handle);
 	if (!write_all_choice(handles[handle]->fd, path, strlen(path) + 1))
-		failed(handle);
-	if (!write_all_choice(handles[handle]->fd, flags, strlen(flags) + 1))
 		failed(handle);
 	if (!write_all_choice(handles[handle]->fd, data, strlen(data)))
 		failed(handle);
@@ -778,8 +753,7 @@ static void do_command(unsigned int default_handle, char *line)
 	else if (streq(command, "read"))
 		do_read(handle, arg(line, 1));
 	else if (streq(command, "write"))
-		do_write(handle,
-			 arg(line, 1), arg(line, 2), arg(line, 3));
+		do_write(handle, arg(line, 1), arg(line, 2));
 	else if (streq(command, "setid"))
 		do_setid(handle, arg(line, 1));
 	else if (streq(command, "mkdir"))
@@ -832,7 +806,7 @@ static void do_command(unsigned int default_handle, char *line)
 		xs_daemon_close(handles[handle]);
 		handles[handle] = NULL;
 	} else if (streq(command, "noackwrite"))
-		do_noackwrite(handle, arg(line,1), arg(line,2), arg(line,3));
+		do_noackwrite(handle, arg(line,1), arg(line,2));
 	else if (streq(command, "readack"))
 		do_readack(handle);
 	else

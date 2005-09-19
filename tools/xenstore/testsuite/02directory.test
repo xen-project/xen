@@ -3,7 +3,7 @@ expect tool
 dir /
 
 # Create a file.
-write /test create contents
+write /test contents
 
 # Directory shows it.
 expect test
@@ -21,7 +21,7 @@ dir /
 dir /dir
 
 # Create a file, check it exists.
-write /dir/test2 create contents2
+write /dir/test2 contents2
 expect test2
 dir /dir
 expect contents2

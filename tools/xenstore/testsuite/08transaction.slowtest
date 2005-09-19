@@ -1,7 +1,7 @@
 # Test transaction timeouts.  Take a second each.
 
 mkdir /test
-write /test/entry1 create contents
+write /test/entry1 contents
 
 # Transactions can take as long as the want...
 start /test

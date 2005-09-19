@@ -968,14 +968,12 @@ static bool node_exists(struct connection *conn, const char *node)
 	return lstat(node_dir(conn->transaction, node), &st) == 0;
 }
 
-/* path, flags, data... */
+/* path, data... */
 static void do_write(struct connection *conn, struct buffered_data *in)
 {
 	unsigned int offset, datalen;
-	char *vec[2];
+	char *vec[1] = { NULL }; /* gcc4 + -W + -Werror fucks code. */
 	char *node, *tmppath;
-	enum xs_perm_type mode;
-	struct stat st;
 
 	/* Extra "strings" can be created by binary data. */
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
@@ -992,37 +990,20 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	if (transaction_block(conn, node))
 		return;
 
-	offset = strlen(vec[0]) + strlen(vec[1]) + 2;
+	offset = strlen(vec[0]) + 1;
 	datalen = in->used - offset;
 
-	if (streq(vec[1], XS_WRITE_NONE))
-		mode = XS_PERM_WRITE;
-	else if (streq(vec[1], XS_WRITE_CREATE))
-		mode = XS_PERM_WRITE|XS_PERM_ENOENT_OK;
-	else if (streq(vec[1], XS_WRITE_CREATE_EXCL))
-		mode = XS_PERM_WRITE|XS_PERM_ENOENT_OK;
-	else {
-		send_error(conn, EINVAL);
-		return;
-	}
-
-	if (!check_node_perms(conn, node, mode)) {
+	if (!check_node_perms(conn, node, XS_PERM_WRITE|XS_PERM_ENOENT_OK)) {
 		send_error(conn, errno);
 		return;
 	}
 
-	if (lstat(node_dir(conn->transaction, node), &st) != 0) {
+	if (!node_exists(conn, node)) {
 		char *dir;
 
 		/* Does not exist... */
 		if (errno != ENOENT) {
 			send_error(conn, errno);
-			return;
-		}
-
-		/* Not going to create it? */
-		if (streq(vec[1], XS_WRITE_NONE)) {
-			send_error(conn, ENOENT);
 			return;
 		}
 
@@ -1034,11 +1015,6 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 		
 	} else {
 		/* Exists... */
-		if (streq(vec[1], XS_WRITE_CREATE_EXCL)) {
-			send_error(conn, EEXIST);
-			return;
-		}
-
 		tmppath = tempfile(node_datafile(conn->transaction, node),
 				   in->buffer + offset, datalen);
 		if (!tmppath) {
