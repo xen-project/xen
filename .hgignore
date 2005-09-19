@@ -86,6 +86,9 @@
 ^tools/check/\..*$
 ^tools/console/xenconsoled$
 ^tools/console/xenconsole$
+^tools/debugger/gdb/gdb-6\.2\.1\.tar\.bz2$
+^tools/debugger/gdb/gdb-6\.2\.1/.*$
+^tools/debugger/gdb/gdb-6\.2\.1-linux-i386-xen/.*$
 ^tools/debugger/pdb/pdb$
 ^tools/debugger/pdb/linux-[0-9.]*-module/.*\.ko$
 ^tools/debugger/pdb/linux-[0-9.]*-module/.*\.mod.c$
@@ -156,6 +159,7 @@
 ^tools/xenstore/xs_stress$
 ^tools/xenstore/xs_test$
 ^tools/xenstore/xs_watch_stress$
+^tools/xentrace/xenctx$
 ^tools/xentrace/xentrace$
 ^xen/BLOG$
 ^xen/TAGS$

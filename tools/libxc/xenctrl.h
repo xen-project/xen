@@ -101,23 +101,31 @@ typedef struct xc_core_header {
 } xc_core_header_t;
 
 
-long xc_ptrace(enum __ptrace_request request, 
-               u32  domid,
-               long addr, 
-               long data);
+long xc_ptrace(
+    int xc_handle,
+    enum __ptrace_request request, 
+    u32  domid,
+    long addr, 
+    long data);
 
-long xc_ptrace_core(enum __ptrace_request request, 
-                    u32 domid, 
-                    long addr, 
-                    long data);
+long xc_ptrace_core(
+    int xc_handle,
+    enum __ptrace_request request, 
+    u32 domid, 
+    long addr, 
+    long data);
 
-int xc_waitdomain(int domain, 
-                  int *status, 
-                  int options);
+int xc_waitdomain(
+    int xc_handle,
+    int domain, 
+    int *status, 
+    int options);
 
-int xc_waitdomain_core(int domain, 
-                       int *status, 
-                       int options);
+int xc_waitdomain_core(
+    int xc_handle,
+    int domain, 
+    int *status, 
+    int options);
 
 /*
  * DOMAIN MANAGEMENT FUNCTIONS
