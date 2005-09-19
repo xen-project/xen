@@ -65,7 +65,6 @@
     ld8 r25=[r25];      /* read vpd base */     \
     ld8 r20=[r20];      /* read entry point */  \
     ;;      \
-    mov r6=r25;     \
     add r20=PAL_VPS_SYNC_READ,r20;  \
     ;;  \
 { .mii;  \
@@ -80,21 +79,19 @@
     br.cond.sptk b0;        /*  call the service */ \
     ;;              \
 };           \
-    ld8 r7=[r22];   \
+    ld8 r17=[r22];   \
     /* deposite ipsr bit cpl into vpd.vpsr, since epc will change */    \
     extr.u r30=r16, IA64_PSR_CPL0_BIT, 2;   \
     ;;      \
-    dep r7=r30, r7, IA64_PSR_CPL0_BIT, 2;   \
-    ;;      \
+    dep r17=r30, r17, IA64_PSR_CPL0_BIT, 2;   \
     extr.u r30=r16, IA64_PSR_BE_BIT, 5;   \
     ;;      \
-    dep r7=r30, r7, IA64_PSR_BE_BIT, 5;   \
-    ;;      \
+    dep r17=r30, r17, IA64_PSR_BE_BIT, 5;   \
     extr.u r30=r16, IA64_PSR_RI_BIT, 2;   \
     ;;      \
-    dep r7=r30, r7, IA64_PSR_RI_BIT, 2;   \
+    dep r17=r30, r17, IA64_PSR_RI_BIT, 2;   \
     ;;      \
-    st8 [r22]=r7;      \
+    st8 [r22]=r17;      \
     ;;
 
 
@@ -156,12 +153,14 @@
     VMX_MINSTATE_GET_CURRENT(r16);  /* M (or M;;I) */                   \
     mov r27=ar.rsc;         /* M */                         \
     mov r20=r1;         /* A */                         \
-    mov r26=ar.unat;        /* M */                         \
+    mov r25=ar.unat;        /* M */                         \
     mov r29=cr.ipsr;        /* M */                         \
+    mov r26=ar.pfs;         /* I */                     \
     mov r18=cr.isr;         \
     COVER;              /* B;; (or nothing) */                  \
     ;;                                          \
     tbit.z p6,p0=r29,IA64_PSR_VM_BIT;       \
+    ;;      \
     tbit.nz.or p6,p0 = r18,39; \
     ;;        \
 (p6) br.sptk.few vmx_panic;        \
@@ -193,7 +192,6 @@
 .mem.offset 0,0; st8.spill [r16]=r10,24;                            \
 .mem.offset 8,0; st8.spill [r17]=r11,24;                            \
         ;;                                          \
-    mov r8=ar.pfs;         /* I */                         \
     mov r9=cr.iip;         /* M */                         \
     mov r10=ar.fpsr;        /* M */                         \
         ;;                      \
@@ -201,8 +199,8 @@
     st8 [r17]=r30,16;   /* save cr.ifs */                       \
     sub r18=r18,r22;    /* r18=RSE.ndirty*8 */                      \
     ;;          \
-    st8 [r16]=r26,16;   /* save ar.unat */                      \
-    st8 [r17]=r8,16;    /* save ar.pfs */                       \
+    st8 [r16]=r25,16;   /* save ar.unat */                      \
+    st8 [r17]=r26,16;    /* save ar.pfs */                       \
     shl r18=r18,16;     /* compute ar.rsc to be used for "loadrs" */            \
     ;;                                          \
     st8 [r16]=r27,16;   /* save ar.rsc */                       \
@@ -227,32 +225,18 @@
     ;;                                          \
 .mem.offset 0,0; st8.spill [r16]=r2,16;                             \
 .mem.offset 8,0; st8.spill [r17]=r3,16;                             \
-    adds r2=PT(F6),r1;                         \
-    ;;                                          \
- .mem.offset 0,0; st8.spill [r16]=r4,16;                             \
- .mem.offset 8,0; st8.spill [r17]=r5,16;                             \
-    ;;          \
- .mem.offset 0,0; st8.spill [r16]=r6,16;     \
- .mem.offset 8,0; st8.spill [r17]=r7,16;     \
-    mov r20=ar.ccv;      \
-    ;;  \
-  mov r18=cr.iipa;  \
-  mov r4=cr.isr;   \
-  mov r22=ar.unat;    \
-    ;;  \
-  st8 [r16]=r18,16;      \
-  st8 [r17]=r4;      \
-    ;;      \
-    adds r16=PT(EML_UNAT),r1;   \
-    adds r17=PT(AR_CCV),r1;                 \
-    ;;                      \
-    st8 [r16]=r22,8;     \
-    st8 [r17]=r20;       \
-    mov r4=r24;         \
-    mov r5=r25;         \
+    adds r2=IA64_PT_REGS_R16_OFFSET,r1;                         \
      ;;  \
-    st8 [r16]=r0;  \
+    adds r16=IA64_VCPU_IIPA_OFFSET,r13;                       \
+    adds r17=IA64_VCPU_ISR_OFFSET,r13;                       \
+    mov r26=cr.iipa;  \
+    mov r27=cr.isr;   \
+    ;;      \
+    st8 [r16]=r26;      \
+    st8 [r17]=r27;      \
+    ;;  \
     EXTRA;                                          \
+    mov r8=ar.ccv;          \
     mov r9=ar.csd;                                      \
     mov r10=ar.ssd;                                     \
     movl r11=FPSR_DEFAULT;   /* L-unit */                           \
@@ -268,9 +252,7 @@
  *  psr.ic: on
  *  r2: points to &pt_regs.f6
  *  r3: points to &pt_regs.f7
- *  r4,r5,scrach
- *  r6: points to vpd
- *  r7: vpsr
+ *  r8: contents of ar.ccv
  *  r9: contents of ar.csd
  *  r10:    contents of ar.ssd
  *  r11:    FPSR_DEFAULT
@@ -278,46 +260,35 @@
  * Registers r14 and r15 are guaranteed not to be touched by SAVE_REST.
  */
 #define VMX_SAVE_REST               \
-    tbit.z pBN0,pBN1=r7,IA64_PSR_BN_BIT;  /* guest bank0 or bank1 ? */      \
-    ;;      \
-(pBN0) add r4=VPD(VBGR),r6;     \
-(pBN0) add r5=VPD(VBGR)+0x8,r6;     \
-(pBN0) add r7=VPD(VBNAT),r6;     \
-    ;;      \
-(pBN1) add r5=VPD(VGR)+0x8,r6;      \
-(pBN1) add r4=VPD(VGR),r6;      \
-(pBN1) add r7=VPD(VNAT),r6;      \
-    ;;      \
-.mem.offset 0,0; st8.spill [r4]=r16,16;     \
-.mem.offset 8,0; st8.spill [r5]=r17,16;     \
+.mem.offset 0,0; st8.spill [r2]=r16,16;     \
+.mem.offset 8,0; st8.spill [r3]=r17,16;     \
     ;;                  \
-.mem.offset 0,0; st8.spill [r4]=r18,16;     \
-.mem.offset 8,0; st8.spill [r5]=r19,16;     \
+.mem.offset 0,0; st8.spill [r2]=r18,16;     \
+.mem.offset 8,0; st8.spill [r3]=r19,16;     \
     ;;                  \
-.mem.offset 0,0; st8.spill [r4]=r20,16;     \
-.mem.offset 8,0; st8.spill [r5]=r21,16;     \
+.mem.offset 0,0; st8.spill [r2]=r20,16;     \
+.mem.offset 8,0; st8.spill [r3]=r21,16;     \
+    mov r18=b6;         \
     ;;                  \
-.mem.offset 0,0; st8.spill [r4]=r22,16;     \
-.mem.offset 8,0; st8.spill [r5]=r23,16;     \
+.mem.offset 0,0; st8.spill [r2]=r22,16;     \
+.mem.offset 8,0; st8.spill [r3]=r23,16;     \
+    mov r19=b7;     \
     ;;                  \
-.mem.offset 0,0; st8.spill [r4]=r24,16;     \
-.mem.offset 8,0; st8.spill [r5]=r25,16;     \
+.mem.offset 0,0; st8.spill [r2]=r24,16;     \
+.mem.offset 8,0; st8.spill [r3]=r25,16;     \
     ;;                  \
-.mem.offset 0,0; st8.spill [r4]=r26,16;     \
-.mem.offset 8,0; st8.spill [r5]=r27,16;     \
+.mem.offset 0,0; st8.spill [r2]=r26,16;     \
+.mem.offset 8,0; st8.spill [r3]=r27,16;     \
     ;;                  \
-.mem.offset 0,0; st8.spill [r4]=r28,16;     \
-.mem.offset 8,0; st8.spill [r5]=r29,16;     \
-    mov r26=b6;         \
+.mem.offset 0,0; st8.spill [r2]=r28,16;     \
+.mem.offset 8,0; st8.spill [r3]=r29,16;     \
     ;;                  \
-.mem.offset 0,0; st8.spill [r4]=r30,16;     \
-.mem.offset 8,0; st8.spill [r5]=r31,16;     \
-    mov r27=b7;     \
+.mem.offset 0,0; st8.spill [r2]=r30,16;     \
+.mem.offset 8,0; st8.spill [r3]=r31,32;     \
     ;;                  \
-    mov r30=ar.unat;    \
-    ;;      \
-    st8 [r7]=r30;       \
-    mov ar.fpsr=r11;    /* M-unit */    \
+    mov ar.fpsr=r11;     \
+    st8 [r2]=r8,8;       \
+    adds r24=PT(B6)-PT(F7),r3;      \
     ;;                  \
     stf.spill [r2]=f6,32;           \
     stf.spill [r3]=f7,32;           \
@@ -325,17 +296,24 @@
     stf.spill [r2]=f8,32;           \
     stf.spill [r3]=f9,32;           \
     ;;                  \
-    stf.spill [r2]=f10;         \
-    stf.spill [r3]=f11;         \
+    stf.spill [r2]=f10,32;         \
+    stf.spill [r3]=f11,24;         \
     ;;                  \
-    adds r2=PT(B6)-PT(F10),r2;      \
-    adds r3=PT(B7)-PT(F11),r3;      \
-    ;;          \
-    st8 [r2]=r26,16;       /* b6 */    \
-    st8 [r3]=r27,16;       /* b7 */    \
+.mem.offset 0,0; st8.spill [r2]=r4,16;     \
+.mem.offset 8,0; st8.spill [r3]=r5,16;     \
     ;;                  \
-    st8 [r2]=r9;           /* ar.csd */    \
-    st8 [r3]=r10;          /* ar.ssd */    \
+.mem.offset 0,0; st8.spill [r2]=r6,16;      \
+.mem.offset 8,0; st8.spill [r3]=r7;      \
+    adds r25=PT(B7)-PT(R7),r3;     \
+    ;;                  \
+    st8 [r24]=r18,16;       /* b6 */    \
+    st8 [r25]=r19,16;       /* b7 */    \
+    ;;                  \
+    st8 [r24]=r9;           /* ar.csd */    \
+    mov r26=ar.unat;            \
+    ;;      \
+    st8 [r25]=r10;          /* ar.ssd */    \
+    st8 [r2]=r26;       /* eml_unat */ \
     ;;
 
 #define VMX_SAVE_MIN_WITH_COVER   VMX_DO_SAVE_MIN(cover, mov r30=cr.ifs,)

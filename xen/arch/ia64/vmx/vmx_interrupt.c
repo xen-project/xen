@@ -37,11 +37,8 @@ collect_interruption(VCPU *vcpu)
     IA64_PSR vpsr;
     REGS * regs = vcpu_regs(vcpu);
     vpsr.val = vmx_vcpu_get_psr(vcpu);
-
+    vcpu_bsw0(vcpu);
     if(vpsr.ic){
-	extern void vmx_dorfirfi(void);
-	if (regs->cr_iip == *(unsigned long *)vmx_dorfirfi)
-		panic("COLLECT interruption for vmx_dorfirfi\n");
 
         /* Sync mpsr id/da/dd/ss/ed bits to vipsr
          * since after guest do rfi, we still want these bits on in
@@ -65,7 +62,7 @@ collect_interruption(VCPU *vcpu)
         vifs &= ~IA64_IFS_V;
         vcpu_set_ifs(vcpu, vifs);
 
-        vcpu_set_iipa(vcpu, regs->cr_iipa);
+        vcpu_set_iipa(vcpu, VMX(vcpu,cr_iipa));
     }
 
     vdcr = VCPU(vcpu,dcr);
@@ -88,6 +85,7 @@ collect_interruption(VCPU *vcpu)
     vmx_vcpu_set_psr(vcpu, vpsr.val);
 
 }
+
 int
 inject_guest_interruption(VCPU *vcpu, u64 vec)
 {

@@ -548,7 +548,7 @@ do_ssc(unsigned long ssc, struct pt_regs *regs)
 		break;
 	    case SSC_GETCHAR:
 		retval = ia64_ssc(0,0,0,0,ssc);
-		vcpu_set_gr(current,8,retval);
+		vcpu_set_gr(current,8,retval,0);
 		break;
 	    case SSC_WAIT_COMPLETION:
 		if (arg0) {	// metaphysical address
@@ -562,7 +562,7 @@ do_ssc(unsigned long ssc, struct pt_regs *regs)
 /**/			retval = 0;
 		}
 		else retval = -1L;
-		vcpu_set_gr(current,8,retval);
+		vcpu_set_gr(current,8,retval,0);
 		break;
 	    case SSC_OPEN:
 		arg1 = vcpu_get_gr(current,33);	// access rights
@@ -572,7 +572,7 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 			retval = ia64_ssc(arg0,arg1,0,0,ssc);
 		}
 		else retval = -1L;
-		vcpu_set_gr(current,8,retval);
+		vcpu_set_gr(current,8,retval,0);
 		break;
 	    case SSC_WRITE:
 	    case SSC_READ:
@@ -620,7 +620,7 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 			req->len = last_count;
 		}
 		else retval = -1L;
-		vcpu_set_gr(current,8,retval);
+		vcpu_set_gr(current,8,retval,0);
 //if (last_count >= PAGE_SIZE) printf("retval=%x\n",retval);
 		break;
 	    case SSC_CONNECT_INTERRUPT:
@@ -631,7 +631,7 @@ if (!running_on_sim) { printf("SSC_OPEN, not implemented on hardware.  (ignoring
 		(void)ia64_ssc(arg0,arg1,arg2,arg3,ssc);
 		break;
 	    case SSC_NETDEV_PROBE:
-		vcpu_set_gr(current,8,-1L);
+		vcpu_set_gr(current,8,-1L,0);
 		break;
 	    default:
 		printf("ia64_handle_break: bad ssc code %lx, iip=%p, b0=%p... spinning\n",ssc,regs->cr_iip,regs->b0);
@@ -763,18 +763,18 @@ unsigned long __hypercall_create_continuation(
     if ( test_bit(_MCSF_in_multicall, &mcs->flags) ) {
 	panic("PREEMPT happen in multicall\n");	// Not support yet
     } else {
-	vcpu_set_gr(vcpu, 2, op);
+	vcpu_set_gr(vcpu, 2, op, 0);
 	for ( i = 0; i < nr_args; i++) {
 	    switch (i) {
-	    case 0: vcpu_set_gr(vcpu, 14, va_arg(args, unsigned long));
+	    case 0: vcpu_set_gr(vcpu, 14, va_arg(args, unsigned long), 0);
 		    break;
-	    case 1: vcpu_set_gr(vcpu, 15, va_arg(args, unsigned long));
+	    case 1: vcpu_set_gr(vcpu, 15, va_arg(args, unsigned long), 0);
 		    break;
-	    case 2: vcpu_set_gr(vcpu, 16, va_arg(args, unsigned long));
+	    case 2: vcpu_set_gr(vcpu, 16, va_arg(args, unsigned long), 0);
 		    break;
-	    case 3: vcpu_set_gr(vcpu, 17, va_arg(args, unsigned long));
+	    case 3: vcpu_set_gr(vcpu, 17, va_arg(args, unsigned long), 0);
 		    break;
-	    case 4: vcpu_set_gr(vcpu, 18, va_arg(args, unsigned long));
+	    case 4: vcpu_set_gr(vcpu, 18, va_arg(args, unsigned long), 0);
 		    break;
 	    default: panic("Too many args for hypercall continuation\n");
 		    break;

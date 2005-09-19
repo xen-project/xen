@@ -633,10 +633,19 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
 	// new domains are cloned but not exec'ed so switch to user mode here
 	cmp.ne pKStk,pUStk=r0,r0
 #ifdef CONFIG_VTI
-	br.cond.spnt ia64_leave_hypervisor
+    br.cond.spnt ia64_leave_hypervisor
 #else // CONFIG_VTI
-	br.cond.spnt ia64_leave_kernel
+    br.cond.spnt ia64_leave_kernel
 #endif // CONFIG_VTI
+
+//    adds r16 = IA64_VCPU_FLAGS_OFFSET, r13
+//    ;;
+//    ld8 r16 = [r16]
+//    ;;
+//    cmp.ne p6,p7 = r16, r0
+//	(p6) br.cond.spnt ia64_leave_hypervisor
+//	(p7) br.cond.spnt ia64_leave_kernel
+//    ;;
 #else
 .ret8:
 	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
@@ -875,10 +884,16 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 #ifdef XEN
 	alloc loc0=ar.pfs,0,1,1,0
 	adds out0=16,r12
+    adds r7 = PT(EML_UNAT)+16,r12
 	;;
+    ld8 r7 = [r7]
 (p6)	br.call.sptk.many b0=deliver_pending_interrupt
+    ;;
 	mov ar.pfs=loc0
+    mov ar.unat=r7  /* load eml_unat  */
 	mov r31=r0
+
+
 #else
 	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
@@ -957,6 +972,23 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	ldf.fill f6=[r2],PT(F7)-PT(F6)
 	;;
 	ldf.fill f7=[r2],PT(F11)-PT(F7)
+#ifdef XEN
+	ldf.fill f8=[r3],PT(R5)-PT(F8)
+	;;
+	ldf.fill f11=[r2],PT(R4)-PT(F11)
+	mov ar.ccv=r15
+	;;
+	ld8.fill r4=[r2],16
+	ld8.fill r5=[r3],16
+	;;
+	ld8.fill r6=[r2]
+	ld8.fill r7=[r3]
+	;;
+	srlz.d	// ensure that inter. collection is off (VHPT is don't care, since text is pinned)
+    ;;
+	bsw.0			// switch back to bank 0 (no stop bit required beforehand...)
+	;;
+#else
 	ldf.fill f8=[r3],32
 	;;
 	srlz.d	// ensure that inter. collection is off (VHPT is don't care, since text is pinned)
@@ -965,6 +997,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	ldf.fill f11=[r2]
 	bsw.0			// switch back to bank 0 (no stop bit required beforehand...)
 	;;
+#endif
 #ifdef XEN
 (pUStk) movl r18=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 (pUStk) ld8 r18=[r18]

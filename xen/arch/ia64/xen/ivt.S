@@ -1012,7 +1012,8 @@ dispatch_break_fault_post_save:
 	movl r14=ia64_leave_kernel
 	;;
 	mov rp=r14
-	br.sptk.many ia64_prepare_handle_break
+//	br.sptk.many ia64_prepare_handle_break
+    br.call.sptk.many b6=ia64_handle_break
 END(dispatch_break_fault)
 #endif
 
@@ -1239,7 +1240,8 @@ ENTRY(dispatch_privop_fault)
 	movl r14=ia64_leave_kernel
 	;;
 	mov rp=r14
-	br.sptk.many ia64_prepare_handle_privop
+//	br.sptk.many ia64_prepare_handle_privop
+     br.call.sptk.many b6=ia64_handle_privop
 END(dispatch_privop_fault)
 #endif
 
@@ -1307,7 +1309,8 @@ ENTRY(dispatch_unaligned_handler)
 	movl r14=ia64_leave_kernel
 	;;
 	mov rp=r14
-	br.sptk.many ia64_prepare_handle_unaligned
+//	br.sptk.many ia64_prepare_handle_unaligned
+    br.call.sptk.many b6=ia64_handle_unaligned
 END(dispatch_unaligned_handler)
 
 	.org ia64_ivt+0x4c00
@@ -1874,7 +1877,8 @@ GLOBAL_ENTRY(dispatch_reflection)
 	movl r14=ia64_leave_kernel
 	;;
 	mov rp=r14
-	br.sptk.many ia64_prepare_handle_reflection
+//	br.sptk.many ia64_prepare_handle_reflection
+    br.call.sptk.many b6=ia64_handle_reflection
 END(dispatch_reflection)
 
 #define SAVE_MIN_COVER_DONE	DO_SAVE_MIN(,mov r30=cr.ifs,)

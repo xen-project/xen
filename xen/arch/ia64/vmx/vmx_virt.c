@@ -161,13 +161,13 @@ IA64FAULT vmx_emul_mov_from_psr(VCPU *vcpu, INST64 inst)
 
 /*
     if ((fault = vmx_vcpu_get_psr(vcpu,&val)) == IA64_NO_FAULT)
-        return vmx_vcpu_set_gr(vcpu, tgt, val);
+        return vcpu_set_gr(vcpu, tgt, val);
     else return fault;
     */
     val = vmx_vcpu_get_psr(vcpu);
     val = (val & MASK(0, 32)) | (val & MASK(35, 2));
     last_guest_psr = val;
-    return vmx_vcpu_set_gr(vcpu, tgt, val, 0);
+    return vcpu_set_gr(vcpu, tgt, val, 0);
 }
 
 /**
@@ -177,7 +177,7 @@ IA64FAULT vmx_emul_mov_to_psr(VCPU *vcpu, INST64 inst)
 {
     UINT64 val;
     IA64FAULT fault;
-    if(vmx_vcpu_get_gr(vcpu, inst.M35.r2, &val) != IA64_NO_FAULT)
+    if(vcpu_get_gr_nat(vcpu, inst.M35.r2, &val) != IA64_NO_FAULT)
 	panic(" get_psr nat bit fault\n");
 
 	val = (val & MASK(0, 32)) | (VCPU(vcpu, vpsr) & MASK(32, 32));
@@ -229,7 +229,7 @@ IA64FAULT vmx_emul_bsw0(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // CHECK_FAULT
-   return vmx_vcpu_bsw0(vcpu);
+   return vcpu_bsw0(vcpu);
 }
 
 IA64FAULT vmx_emul_bsw1(VCPU *vcpu, INST64 inst)
@@ -244,7 +244,7 @@ IA64FAULT vmx_emul_bsw1(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // CHECK_FAULT
-    return vmx_vcpu_bsw1(vcpu);
+    return vcpu_bsw1(vcpu);
 }
 
 IA64FAULT vmx_emul_cover(VCPU *vcpu, INST64 inst)
@@ -265,7 +265,7 @@ IA64FAULT vmx_emul_ptc_l(VCPU *vcpu, INST64 inst)
         privilege_op (vcpu);
         return IA64_FAULT;
     }
-    if(vmx_vcpu_get_gr(vcpu,inst.M45.r3,&r3)||vmx_vcpu_get_gr(vcpu,inst.M45.r2,&r2)){
+    if(vcpu_get_gr_nat(vcpu,inst.M45.r3,&r3)||vcpu_get_gr_nat(vcpu,inst.M45.r2,&r2)){
 #ifdef  VMAL_NO_FAULT_CHECK
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -299,7 +299,7 @@ IA64FAULT vmx_emul_ptc_e(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // VMAL_NO_FAULT_CHECK
-    if(vmx_vcpu_get_gr(vcpu,inst.M47.r3,&r3)){
+    if(vcpu_get_gr_nat(vcpu,inst.M47.r3,&r3)){
 #ifdef  VMAL_NO_FAULT_CHECK
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -334,8 +334,8 @@ IA64FAULT ptr_fault_check(VCPU *vcpu, INST64 inst, u64 *pr2, u64 *pr3)
         return IA64_FAULT;
     }
 #endif // VMAL_NO_FAULT_CHECK
-    ret1 = vmx_vcpu_get_gr(vcpu,inst.M45.r3,pr3);
-    ret2 = vmx_vcpu_get_gr(vcpu,inst.M45.r2,pr2);
+    ret1 = vcpu_get_gr_nat(vcpu,inst.M45.r3,pr3);
+    ret2 = vcpu_get_gr_nat(vcpu,inst.M45.r2,pr2);
 #ifdef  VMAL_NO_FAULT_CHECK
     if ( ret1 != IA64_NO_FAULT || ret2 != IA64_NO_FAULT ) {
         set_isr_reg_nat_consumption(vcpu,0,0);
@@ -382,20 +382,20 @@ IA64FAULT vmx_emul_thash(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif //CHECK_FAULT
-    if(vmx_vcpu_get_gr(vcpu, inst.M46.r3, &r3)){
+    if(vcpu_get_gr_nat(vcpu, inst.M46.r3, &r3)){
 #ifdef  CHECK_FAULT
-        vmx_vcpu_set_gr(vcpu, inst.M46.r1, 0, 1);
+        vcpu_set_gr(vcpu, inst.M46.r1, 0, 1);
         return IA64_NO_FAULT;
 #endif  //CHECK_FAULT
     }
 #ifdef  CHECK_FAULT
     if(unimplemented_gva(vcpu, r3)){
-        vmx_vcpu_set_gr(vcpu, inst.M46.r1, 0, 1);
+        vcpu_set_gr(vcpu, inst.M46.r1, 0, 1);
         return IA64_NO_FAULT;
     }
 #endif  //CHECK_FAULT
     vmx_vcpu_thash(vcpu, r3, &r1);
-    vmx_vcpu_set_gr(vcpu, inst.M46.r1, r1, 0);
+    vcpu_set_gr(vcpu, inst.M46.r1, r1, 0);
     return(IA64_NO_FAULT);
 }
 
@@ -412,20 +412,20 @@ IA64FAULT vmx_emul_ttag(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif //CHECK_FAULT
-    if(vmx_vcpu_get_gr(vcpu, inst.M46.r3, &r3)){
+    if(vcpu_get_gr_nat(vcpu, inst.M46.r3, &r3)){
 #ifdef  CHECK_FAULT
-        vmx_vcpu_set_gr(vcpu, inst.M46.r1, 0, 1);
+        vcpu_set_gr(vcpu, inst.M46.r1, 0, 1);
         return IA64_NO_FAULT;
 #endif  //CHECK_FAULT
     }
 #ifdef  CHECK_FAULT
     if(unimplemented_gva(vcpu, r3)){
-        vmx_vcpu_set_gr(vcpu, inst.M46.r1, 0, 1);
+        vcpu_set_gr(vcpu, inst.M46.r1, 0, 1);
         return IA64_NO_FAULT;
     }
 #endif  //CHECK_FAULT
     vmx_vcpu_ttag(vcpu, r3, &r1);
-    vmx_vcpu_set_gr(vcpu, inst.M46.r1, r1, 0);
+    vcpu_set_gr(vcpu, inst.M46.r1, r1, 0);
     return(IA64_NO_FAULT);
 }
 
@@ -448,7 +448,7 @@ IA64FAULT vmx_emul_tpa(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif  //CHECK_FAULT
-    if(vmx_vcpu_get_gr(vcpu, inst.M46.r3, &r3)){
+    if(vcpu_get_gr_nat(vcpu, inst.M46.r3, &r3)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,1);
         rnat_comsumption(vcpu);
@@ -470,7 +470,7 @@ IA64FAULT vmx_emul_tpa(VCPU *vcpu, INST64 inst)
     if(vmx_vcpu_tpa(vcpu, r3, &r1)){
         return IA64_FAULT;
     }
-    vmx_vcpu_set_gr(vcpu, inst.M46.r1, r1, 0);
+    vcpu_set_gr(vcpu, inst.M46.r1, r1, 0);
     return(IA64_NO_FAULT);
 }
 
@@ -493,7 +493,7 @@ IA64FAULT vmx_emul_tak(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif
-    if(vmx_vcpu_get_gr(vcpu, inst.M46.r3, &r3)){
+    if(vcpu_get_gr_nat(vcpu, inst.M46.r3, &r3)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,1);
         rnat_comsumption(vcpu);
@@ -503,7 +503,7 @@ IA64FAULT vmx_emul_tak(VCPU *vcpu, INST64 inst)
     if(vmx_vcpu_tak(vcpu, r3, &r1)){
         return IA64_FAULT;
     }
-    vmx_vcpu_set_gr(vcpu, inst.M46.r1, r1, 0);
+    vcpu_set_gr(vcpu, inst.M46.r1, r1, 0);
     return(IA64_NO_FAULT);
 }
 
@@ -531,7 +531,7 @@ IA64FAULT vmx_emul_itr_d(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // VMAL_NO_FAULT_CHECK
-    if(vmx_vcpu_get_gr(vcpu,inst.M45.r3,&slot)||vmx_vcpu_get_gr(vcpu,inst.M45.r2,&pte)){
+    if(vcpu_get_gr_nat(vcpu,inst.M45.r3,&slot)||vcpu_get_gr_nat(vcpu,inst.M45.r2,&pte)){
 #ifdef  VMAL_NO_FAULT_CHECK
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -588,7 +588,7 @@ IA64FAULT vmx_emul_itr_i(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // VMAL_NO_FAULT_CHECK
-    if(vmx_vcpu_get_gr(vcpu,inst.M45.r3,&slot)||vmx_vcpu_get_gr(vcpu,inst.M45.r2,&pte)){
+    if(vcpu_get_gr_nat(vcpu,inst.M45.r3,&slot)||vcpu_get_gr_nat(vcpu,inst.M45.r2,&pte)){
 #ifdef  VMAL_NO_FAULT_CHECK
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -648,7 +648,7 @@ IA64FAULT itc_fault_check(VCPU *vcpu, INST64 inst, u64 *itir, u64 *ifa,u64 *pte)
         return IA64_FAULT;
     }
 #endif // VMAL_NO_FAULT_CHECK
-    ret1 = vmx_vcpu_get_gr(vcpu,inst.M45.r2,pte);
+    ret1 = vcpu_get_gr_nat(vcpu,inst.M45.r2,pte);
 #ifdef  VMAL_NO_FAULT_CHECK
     if( ret1 != IA64_NO_FAULT ){
         set_isr_reg_nat_consumption(vcpu,0,0);
@@ -734,7 +734,7 @@ IA64FAULT vmx_emul_mov_to_ar_reg(VCPU *vcpu, INST64 inst)
     if(inst.M29.ar3!=44){
         panic("Can't support ar register other than itc");
     }
-    if(vmx_vcpu_get_gr(vcpu,inst.M29.r2,&r2)){
+    if(vcpu_get_gr_nat(vcpu,inst.M29.r2,&r2)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -778,7 +778,7 @@ IA64FAULT vmx_emul_mov_from_ar_reg(VCPU *vcpu, INST64 inst)
 #endif // CHECK_FAULT
     u64 r1;
     vmx_vcpu_get_itc(vcpu,&r1);
-    vmx_vcpu_set_gr(vcpu,inst.M31.r1,r1,0);
+    vcpu_set_gr(vcpu,inst.M31.r1,r1,0);
     return IA64_NO_FAULT;
 }
 
@@ -800,7 +800,7 @@ IA64FAULT vmx_emul_mov_to_pkr(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // CHECK_FAULT
-    if(vmx_vcpu_get_gr(vcpu,inst.M42.r3,&r3)||vmx_vcpu_get_gr(vcpu,inst.M42.r2,&r2)){
+    if(vcpu_get_gr_nat(vcpu,inst.M42.r3,&r3)||vcpu_get_gr_nat(vcpu,inst.M42.r2,&r2)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -823,7 +823,7 @@ IA64FAULT vmx_emul_mov_to_rr(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // CHECK_FAULT
-    if(vmx_vcpu_get_gr(vcpu,inst.M42.r3,&r3)||vmx_vcpu_get_gr(vcpu,inst.M42.r2,&r2)){
+    if(vcpu_get_gr_nat(vcpu,inst.M42.r3,&r3)||vcpu_get_gr_nat(vcpu,inst.M42.r2,&r2)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -846,7 +846,7 @@ IA64FAULT vmx_emul_mov_to_dbr(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // CHECK_FAULT
-    if(vmx_vcpu_get_gr(vcpu,inst.M42.r3,&r3)||vmx_vcpu_get_gr(vcpu,inst.M42.r2,&r2)){
+    if(vcpu_get_gr_nat(vcpu,inst.M42.r3,&r3)||vcpu_get_gr_nat(vcpu,inst.M42.r2,&r2)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -869,7 +869,7 @@ IA64FAULT vmx_emul_mov_to_ibr(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // CHECK_FAULT
-    if(vmx_vcpu_get_gr(vcpu,inst.M42.r3,&r3)||vmx_vcpu_get_gr(vcpu,inst.M42.r2,&r2)){
+    if(vcpu_get_gr_nat(vcpu,inst.M42.r3,&r3)||vcpu_get_gr_nat(vcpu,inst.M42.r2,&r2)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -892,7 +892,7 @@ IA64FAULT vmx_emul_mov_to_pmc(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // CHECK_FAULT
-    if(vmx_vcpu_get_gr(vcpu,inst.M42.r3,&r3)||vmx_vcpu_get_gr(vcpu,inst.M42.r2,&r2)){
+    if(vcpu_get_gr_nat(vcpu,inst.M42.r3,&r3)||vcpu_get_gr_nat(vcpu,inst.M42.r2,&r2)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -915,7 +915,7 @@ IA64FAULT vmx_emul_mov_to_pmd(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // CHECK_FAULT
-    if(vmx_vcpu_get_gr(vcpu,inst.M42.r3,&r3)||vmx_vcpu_get_gr(vcpu,inst.M42.r2,&r2)){
+    if(vcpu_get_gr_nat(vcpu,inst.M42.r3,&r3)||vcpu_get_gr_nat(vcpu,inst.M42.r2,&r2)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -949,7 +949,7 @@ IA64FAULT vmx_emul_mov_from_rr(VCPU *vcpu, INST64 inst)
     }
 
 #endif //CHECK_FAULT
-     if(vmx_vcpu_get_gr(vcpu,inst.M43.r3,&r3)){
+     if(vcpu_get_gr_nat(vcpu,inst.M43.r3,&r3)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -963,7 +963,7 @@ IA64FAULT vmx_emul_mov_from_rr(VCPU *vcpu, INST64 inst)
     }
 #endif  //CHECK_FAULT
     vmx_vcpu_get_rr(vcpu,r3,&r1);
-    return vmx_vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
+    return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
 IA64FAULT vmx_emul_mov_from_pkr(VCPU *vcpu, INST64 inst)
@@ -985,7 +985,7 @@ IA64FAULT vmx_emul_mov_from_pkr(VCPU *vcpu, INST64 inst)
     }
 
 #endif //CHECK_FAULT
-     if(vmx_vcpu_get_gr(vcpu,inst.M43.r3,&r3)){
+     if(vcpu_get_gr_nat(vcpu,inst.M43.r3,&r3)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -1000,7 +1000,7 @@ IA64FAULT vmx_emul_mov_from_pkr(VCPU *vcpu, INST64 inst)
     }
 #endif  //CHECK_FAULT
     vmx_vcpu_get_pkr(vcpu,r3,&r1);
-    return vmx_vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
+    return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
 IA64FAULT vmx_emul_mov_from_dbr(VCPU *vcpu, INST64 inst)
@@ -1022,7 +1022,7 @@ IA64FAULT vmx_emul_mov_from_dbr(VCPU *vcpu, INST64 inst)
     }
 
 #endif //CHECK_FAULT
-     if(vmx_vcpu_get_gr(vcpu,inst.M43.r3,&r3)){
+     if(vcpu_get_gr_nat(vcpu,inst.M43.r3,&r3)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -1037,7 +1037,7 @@ IA64FAULT vmx_emul_mov_from_dbr(VCPU *vcpu, INST64 inst)
     }
 #endif  //CHECK_FAULT
     vmx_vcpu_get_dbr(vcpu,r3,&r1);
-    return vmx_vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
+    return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
 IA64FAULT vmx_emul_mov_from_ibr(VCPU *vcpu, INST64 inst)
@@ -1059,7 +1059,7 @@ IA64FAULT vmx_emul_mov_from_ibr(VCPU *vcpu, INST64 inst)
     }
 
 #endif //CHECK_FAULT
-     if(vmx_vcpu_get_gr(vcpu,inst.M43.r3,&r3)){
+     if(vcpu_get_gr_nat(vcpu,inst.M43.r3,&r3)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -1074,7 +1074,7 @@ IA64FAULT vmx_emul_mov_from_ibr(VCPU *vcpu, INST64 inst)
     }
 #endif  //CHECK_FAULT
     vmx_vcpu_get_ibr(vcpu,r3,&r1);
-    return vmx_vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
+    return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
 IA64FAULT vmx_emul_mov_from_pmc(VCPU *vcpu, INST64 inst)
@@ -1096,7 +1096,7 @@ IA64FAULT vmx_emul_mov_from_pmc(VCPU *vcpu, INST64 inst)
     }
 
 #endif //CHECK_FAULT
-     if(vmx_vcpu_get_gr(vcpu,inst.M43.r3,&r3)){
+     if(vcpu_get_gr_nat(vcpu,inst.M43.r3,&r3)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -1111,7 +1111,7 @@ IA64FAULT vmx_emul_mov_from_pmc(VCPU *vcpu, INST64 inst)
     }
 #endif  //CHECK_FAULT
     vmx_vcpu_get_pmc(vcpu,r3,&r1);
-    return vmx_vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
+    return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
 IA64FAULT vmx_emul_mov_from_cpuid(VCPU *vcpu, INST64 inst)
@@ -1124,7 +1124,7 @@ IA64FAULT vmx_emul_mov_from_cpuid(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif //CHECK_FAULT
-     if(vmx_vcpu_get_gr(vcpu,inst.M43.r3,&r3)){
+     if(vcpu_get_gr_nat(vcpu,inst.M43.r3,&r3)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -1139,7 +1139,7 @@ IA64FAULT vmx_emul_mov_from_cpuid(VCPU *vcpu, INST64 inst)
     }
 #endif  //CHECK_FAULT
     vmx_vcpu_get_cpuid(vcpu,r3,&r1);
-    return vmx_vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
+    return vcpu_set_gr(vcpu, inst.M43.r1, r1,0);
 }
 
 IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
@@ -1160,7 +1160,7 @@ IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
         return IA64_FAULT;
     }
 #endif // CHECK_FAULT
-    if(vmx_vcpu_get_gr(vcpu, inst.M32.r2, &r2)){
+    if(vcpu_get_gr_nat(vcpu, inst.M32.r2, &r2)){
 #ifdef  CHECK_FAULT
         set_isr_reg_nat_consumption(vcpu,0,0);
         rnat_comsumption(vcpu);
@@ -1214,11 +1214,11 @@ IA64FAULT vmx_emul_mov_to_cr(VCPU *vcpu, INST64 inst)
 
 #define cr_get(cr) \
     ((fault=vcpu_get_##cr(vcpu,&val))==IA64_NO_FAULT)?\
-        vmx_vcpu_set_gr(vcpu, tgt, val,0):fault;
+        vcpu_set_gr(vcpu, tgt, val,0):fault;
 
 #define vmx_cr_get(cr) \
     ((fault=vmx_vcpu_get_##cr(vcpu,&val))==IA64_NO_FAULT)?\
-        vmx_vcpu_set_gr(vcpu, tgt, val,0):fault;
+        vcpu_set_gr(vcpu, tgt, val,0):fault;
 
 IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
 {
@@ -1260,9 +1260,9 @@ IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
         case 64:return vmx_cr_get(lid);
         case 65:
                 vmx_vcpu_get_ivr(vcpu,&val);
-                return vmx_vcpu_set_gr(vcpu,tgt,val,0);
+                return vcpu_set_gr(vcpu,tgt,val,0);
         case 66:return vmx_cr_get(tpr);
-        case 67:return vmx_vcpu_set_gr(vcpu,tgt,0L,0);
+        case 67:return vcpu_set_gr(vcpu,tgt,0L,0);
         case 68:return vmx_cr_get(irr0);
         case 69:return vmx_cr_get(irr1);
         case 70:return vmx_cr_get(irr2);
@@ -1306,18 +1306,19 @@ IA64_BUNDLE __vmx_get_domain_bundle(u64 iip)
  */
 
 void
-vmx_emulate(VCPU *vcpu, UINT64 cause, UINT64 opcode)
+vmx_emulate(VCPU *vcpu, REGS *regs)
 {
     IA64_BUNDLE bundle;
     int slot;
     IA64_SLOT_TYPE slot_type;
     IA64FAULT status;
     INST64 inst;
-    REGS * regs;
-    UINT64 iip;
-    regs = vcpu_regs(vcpu);
+    UINT64 iip, cause, opcode;
     iip = regs->cr_iip;
     IA64_PSR vpsr;
+    cause = VMX(vcpu,cause);
+    opcode = VMX(vcpu,opcode);
+
 /*
     if (privop_trace) {
         static long i = 400;
@@ -1356,7 +1357,6 @@ if ( (cause == 0xff && opcode == 0x1e000000000) || cause == 0 ) {
 #else
     inst.inst=opcode;
 #endif /* BYPASS_VMAL_OPCODE */
-    vcpu_set_regs(vcpu, regs);
     /*
      * Switch to actual virtual rid in rr0 and rr4,
      * which is required by some tlb related instructions.

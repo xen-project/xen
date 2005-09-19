@@ -83,7 +83,6 @@ GLOBAL_ENTRY(ia64_leave_nested)
 	;;
 	adds r21=PT(PR)+16,r12
 	;;
-
 	lfetch [r21],PT(CR_IPSR)-PT(PR)
 	adds r2=PT(B6)+16,r12
 	adds r3=PT(R16)+16,r12
@@ -216,138 +215,90 @@ GLOBAL_ENTRY(ia64_leave_hypervisor)
     ;;
     alloc loc0=ar.pfs,0,1,1,0
     adds out0=16,r12
+    adds r7 = PT(EML_UNAT)+16,r12
     ;;
+    ld8 r7 = [r7]
     br.call.sptk.many b0=leave_hypervisor_tail
     ;;
     mov ar.pfs=loc0
-    adds r8=IA64_VPD_BASE_OFFSET,r13
-    ;;
-    ld8 r8=[r8]
-    ;;
-    adds r9=VPD(VPSR),r8
-    ;;
-    ld8 r9=[r9]
-    ;;
-    tbit.z pBN0,pBN1=r9,IA64_PSR_BN_BIT
-    ;;
-(pBN0) add r7=VPD(VBNAT),r8;
-(pBN1) add r7=VPD(VNAT),r8;
-    ;;
-    ld8 r7=[r7]
-    ;;
     mov ar.unat=r7
-(pBN0) add r4=VPD(VBGR),r8;
-(pBN1) add r4=VPD(VGR),r8;
-(pBN0) add r5=VPD(VBGR)+0x8,r8;
-(pBN1) add r5=VPD(VGR)+0x8,r8;
-    ;;
-    ld8.fill r16=[r4],16
-    ld8.fill r17=[r5],16
-    ;;
-    ld8.fill r18=[r4],16
-    ld8.fill r19=[r5],16
-    ;;
-    ld8.fill r20=[r4],16
-    ld8.fill r21=[r5],16
-    ;;
-    ld8.fill r22=[r4],16
-    ld8.fill r23=[r5],16
-    ;;
-    ld8.fill r24=[r4],16
-    ld8.fill r25=[r5],16
-    ;;
-    ld8.fill r26=[r4],16
-    ld8.fill r27=[r5],16
-    ;;
-    ld8.fill r28=[r4],16
-    ld8.fill r29=[r5],16
-    ;;
-    ld8.fill r30=[r4],16
-    ld8.fill r31=[r5],16
-    ;;
-    bsw.0
-    ;;
-    mov r18=r8      //vpd
-    mov r19=r9      //vpsr
     adds r20=PT(PR)+16,r12
     ;;
     lfetch [r20],PT(CR_IPSR)-PT(PR)
-    adds r16=PT(B6)+16,r12
-    adds r17=PT(B7)+16,r12
+    adds r2 = PT(B6)+16,r12
+    adds r3 = PT(B7)+16,r12
     ;;
     lfetch [r20]
-    mov r21=r13		// get current
     ;;
-    ld8 r30=[r16],16      // load b6
-    ld8 r31=[r17],16      // load b7
-    add r20=PT(EML_UNAT)+16,r12
+    ld8 r24=[r2],16        /* B6 */
+    ld8 r25=[r3],16        /* B7 */
     ;;
-    ld8 r29=[r20]       //load ar_unat
-    mov b6=r30
-    mov b7=r31
-    ld8 r30=[r16],16    //load ar_csd
-    ld8 r31=[r17],16    //load ar_ssd
+    ld8 r26=[r2],16        /* ar_csd */
+    ld8 r27=[r3],16        /* ar_ssd */
+    mov b6 = r24
     ;;
-    mov ar.unat=r29
-    mov ar.csd=r30
-    mov ar.ssd=r31
+    ld8.fill r8=[r2],16
+    ld8.fill r9=[r3],16
+    mov b7 = r25
     ;;
-    ld8.fill r8=[r16],16    //load r8
-    ld8.fill r9=[r17],16    //load r9
+    mov ar.csd = r26
+    mov ar.ssd = r27
     ;;
-    ld8.fill r10=[r16],PT(R1)-PT(R10)    //load r10
-    ld8.fill r11=[r17],PT(R12)-PT(R11)    //load r11
+    ld8.fill r10=[r2],PT(R15)-PT(R10)
+    ld8.fill r11=[r3],PT(R14)-PT(R11)
     ;;
-    ld8.fill r1=[r16],16    //load r1
-    ld8.fill r12=[r17],16    //load r12
+    ld8.fill r15=[r2],PT(R16)-PT(R15)
+    ld8.fill r14=[r3],PT(R17)-PT(R14)
     ;;
-    ld8.fill r13=[r16],16    //load r13
-    ld8 r30=[r17],16    //load ar_fpsr
+    ld8.fill r16=[r2],16
+    ld8.fill r17=[r3],16
     ;;
-    ld8.fill r15=[r16],16    //load r15
-    ld8.fill r14=[r17],16    //load r14
-    mov ar.fpsr=r30
+    ld8.fill r18=[r2],16
+    ld8.fill r19=[r3],16
     ;;
-    ld8.fill r2=[r16],16    //load r2
-    ld8.fill r3=[r17],16    //load r3
+    ld8.fill r20=[r2],16
+    ld8.fill r21=[r3],16
     ;;
-/*
-(pEml) ld8.fill r4=[r16],16    //load r4
-(pEml) ld8.fill r5=[r17],16    //load r5
+    ld8.fill r22=[r2],16
+    ld8.fill r23=[r3],16
     ;;
-(pEml) ld8.fill r6=[r16],PT(AR_CCV)-PT(R6)   //load r6
-(pEml) ld8.fill r7=[r17],PT(F7)-PT(R7)   //load r7
+    ld8.fill r24=[r2],16
+    ld8.fill r25=[r3],16
     ;;
-(pNonEml) adds r16=PT(AR_CCV)-PT(R4),r16
-(pNonEml) adds r17=PT(F7)-PT(R5),r17
+    ld8.fill r26=[r2],16
+    ld8.fill r27=[r3],16
     ;;
-*/
-    ld8.fill r4=[r16],16    //load r4
-    ld8.fill r5=[r17],16    //load r5
-     ;;
-    ld8.fill r6=[r16],PT(AR_CCV)-PT(R6)   //load r6
-    ld8.fill r7=[r17],PT(F7)-PT(R7)   //load r7
+    ld8.fill r28=[r2],16
+    ld8.fill r29=[r3],16
     ;;
-
-    ld8 r30=[r16],PT(F6)-PT(AR_CCV)
+    ld8.fill r30=[r2],PT(F6)-PT(R30)
+    ld8.fill r31=[r3],PT(F7)-PT(R31)
+    ;;
     rsm psr.i | psr.ic  // initiate turning off of interrupt and interruption collection
+    invala          // invalidate ALAT
+    ;;
+    ldf.fill f6=[r2],32
+    ldf.fill f7=[r3],32
+    ;;
+    ldf.fill f8=[r2],32
+    ldf.fill f9=[r3],32
+    ;;
+    ldf.fill f10=[r2],32
+    ldf.fill f11=[r3],24
+    ;;
+    ld8.fill r4=[r2],16    //load r4
+    ld8.fill r5=[r3],16    //load r5
+    ;;
+    ld8.fill r6=[r2]    //load r6
+    ld8.fill r7=[r3]    //load r7
     ;;
     srlz.i          // ensure interruption collection is off
     ;;
-    invala          // invalidate ALAT
+    bsw.0
     ;;
-    ldf.fill f6=[r16],32
-    ldf.fill f7=[r17],32
-    ;;
-    ldf.fill f8=[r16],32
-    ldf.fill f9=[r17],32
-    ;;
-    ldf.fill f10=[r16]
-    ldf.fill f11=[r17]
-    ;;
-    mov ar.ccv=r30
-    adds r16=PT(CR_IPSR)-PT(F10),r16
-    adds r17=PT(CR_IIP)-PT(F11),r17
+    adds r16 = PT(CR_IPSR)+16,r12
+    adds r17 = PT(CR_IIP)+16,r12
+    mov r21=r13		// get current
     ;;
     ld8 r31=[r16],16    // load cr.ipsr
     ld8 r30=[r17],16    // load cr.iip
@@ -358,13 +309,26 @@ GLOBAL_ENTRY(ia64_leave_hypervisor)
     ld8 r27=[r16],16    // load ar.pfs
     ld8 r26=[r17],16    // load ar.rsc
     ;;
-    ld8 r25=[r16],16    // load ar.rnat (may be garbage)
-    ld8 r24=[r17],16// load ar.bspstore (may be garbage)
+    ld8 r25=[r16],16    // load ar.rnat
+    ld8 r24=[r17],16    // load ar.bspstore
     ;;
     ld8 r23=[r16],16    // load predicates
-    ld8 r22=[r17],PT(RFI_PFS)-PT(B0)    // load b0
+    ld8 r22=[r17],16    // load b0
     ;;
     ld8 r20=[r16],16    // load ar.rsc value for "loadrs"
+    ld8.fill r1=[r17],16    //load r1
+    ;;
+    ld8.fill r12=[r16],16    //load r12
+    ld8.fill r13=[r17],PT(R2)-PT(R13)    //load r13
+    ;;
+    ld8 r19=[r16],PT(R3)-PT(AR_FPSR)    //load ar_fpsr
+    ld8.fill r2=[r17],PT(AR_CCV)-PT(R2)    //load r2
+    ;;
+    ld8.fill r3=[r16]    //load r3
+    ld8 r18=[r17],PT(RFI_PFS)-PT(AR_CCV)           //load ar_ccv
+    ;;
+    mov ar.fpsr=r19
+    mov ar.ccv=r18
     ;;
 //rbs_switch
     // loadrs has already been shifted
@@ -389,7 +353,13 @@ GLOBAL_ENTRY(ia64_leave_hypervisor)
     ;;
 vmx_dorfirfi_back:
     mov ar.pfs=r27
-
+    adds r18=IA64_VPD_BASE_OFFSET,r21
+    ;;
+    ld8 r18=[r18]   //vpd
+    ;;
+    adds r19=VPD(VPSR),r18
+    ;;
+    ld8 r19=[r19]        //vpsr
 //vsa_sync_write_start
     movl r20=__vsa_base
     ;;

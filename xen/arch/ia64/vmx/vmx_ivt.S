@@ -690,9 +690,14 @@ END(vmx_single_step_trap)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6100 Entry 37 (size 16 bundles) Virtualization Fault
 ENTRY(vmx_virtualization_fault)
-	VMX_DBG_FAULT(37)
 	mov r31=pr
     mov r19=37
+    adds r16 = IA64_VCPU_CAUSE_OFFSET,r21
+    adds r17 = IA64_VCPU_OPCODE_OFFSET,r21
+    ;;
+    st8 [r16] = r24
+    st8 [r17] = r25
+    ;;
     br.sptk vmx_dispatch_virtualization_fault
 END(vmx_virtualization_fault)
 
@@ -897,44 +902,45 @@ ENTRY(vmx_dispatch_reflection)
      *  r31:    contains saved predicates (pr)
      */
     VMX_SAVE_MIN_WITH_COVER_R19
-    alloc r14=ar.pfs,0,0,4,0
+    alloc r14=ar.pfs,0,0,5,0
     mov out0=cr.ifa
     mov out1=cr.isr
     mov out2=cr.iim
     mov out3=r15
-
+    adds r3=8,r2                // set up second base pointer
+    ;;
     ssm psr.ic
     ;;
     srlz.i                  // guarantee that interruption collection is on
     ;;
     (p15) ssm psr.i               // restore psr.i
-    adds r3=16,r2                // set up second base pointer
-    ;;
-    VMX_SAVE_REST
     movl r14=ia64_leave_hypervisor
     ;;
+    VMX_SAVE_REST
     mov rp=r14
+    ;;
+    adds out4=16,r12
     br.call.sptk.many b6=vmx_reflect_interruption
 END(vmx_dispatch_reflection)
 
 ENTRY(vmx_dispatch_virtualization_fault)
     VMX_SAVE_MIN_WITH_COVER_R19
     ;;
-    alloc r14=ar.pfs,0,0,3,0        // now it's safe (must be first in insn group!)
+    alloc r14=ar.pfs,0,0,2,0        // now it's safe (must be first in insn group!)
     mov out0=r13        //vcpu
-    mov out1=r4         //cause
-    mov out2=r5         //opcode
+    adds r3=8,r2                // set up second base pointer
+    ;;
     ssm psr.ic
     ;;
     srlz.i                  // guarantee that interruption collection is on
     ;;
     (p15) ssm psr.i               // restore psr.i
-    adds r3=16,r2                // set up second base pointer
-    ;;
-    VMX_SAVE_REST
     movl r14=ia64_leave_hypervisor
     ;;
+    VMX_SAVE_REST
     mov rp=r14
+    ;;
+    adds out1=16,sp         //regs
     br.call.sptk.many b6=vmx_emulate
 END(vmx_dispatch_virtualization_fault)
 
@@ -949,7 +955,7 @@ ENTRY(vmx_dispatch_vexirq)
     srlz.i                  // guarantee that interruption collection is on
     ;;
     (p15) ssm psr.i               // restore psr.i
-    adds r3=16,r2                // set up second base pointer
+    adds r3=8,r2                // set up second base pointer
     ;;
     VMX_SAVE_REST
     movl r14=ia64_leave_hypervisor
@@ -961,21 +967,21 @@ END(vmx_dispatch_vexirq)
 ENTRY(vmx_dispatch_tlb_miss)
     VMX_SAVE_MIN_WITH_COVER_R19
     alloc r14=ar.pfs,0,0,3,0
-    mov out0=r13
+    mov out0=cr.ifa
     mov out1=r15
-    mov out2=cr.ifa
-
+    adds r3=8,r2                // set up second base pointer
+    ;;
     ssm psr.ic
     ;;
     srlz.i                  // guarantee that interruption collection is on
     ;;
     (p15) ssm psr.i               // restore psr.i
-    adds r3=16,r2                // set up second base pointer
-    ;;
-    VMX_SAVE_REST
     movl r14=ia64_leave_hypervisor
     ;;
+    VMX_SAVE_REST
     mov rp=r14
+    ;;
+    adds out2=16,r12
     br.call.sptk.many b6=vmx_hpw_miss
 END(vmx_dispatch_tlb_miss)
 
@@ -986,21 +992,21 @@ ENTRY(vmx_dispatch_break_fault)
     ;;
     alloc r14=ar.pfs,0,0,4,0 // now it's safe (must be first in insn group!)
     mov out0=cr.ifa
-    adds out1=16,sp
     mov out2=cr.isr     // FIXME: pity to make this slow access twice
     mov out3=cr.iim     // FIXME: pity to make this slow access twice
-
+    adds r3=8,r2                // set up second base pointer
+    ;;
     ssm psr.ic
     ;;
     srlz.i                  // guarantee that interruption collection is on
     ;;
     (p15)ssm psr.i               // restore psr.i
-    adds r3=16,r2                // set up second base pointer
-    ;;
-    VMX_SAVE_REST
     movl r14=ia64_leave_hypervisor
     ;;
+    VMX_SAVE_REST
     mov rp=r14
+    ;;
+    adds out1=16,sp
     br.call.sptk.many b6=vmx_ia64_handle_break
     ;;
 END(vmx_dispatch_break_fault)
@@ -1013,7 +1019,7 @@ ENTRY(vmx_hypercall_dispatch)
     srlz.i                  // guarantee that interruption collection is on
     ;;
     (p15) ssm psr.i               // restore psr.i
-    adds r3=16,r2                // set up second base pointer
+    adds r3=8,r2                // set up second base pointer
     ;;
     VMX_SAVE_REST
     ;;
@@ -1038,19 +1044,19 @@ ENTRY(vmx_dispatch_interrupt)
 	;;
 	alloc r14=ar.pfs,0,0,2,0 // must be first in an insn group
 	mov out0=cr.ivr		// pass cr.ivr as first arg
-	add out1=16,sp		// pass pointer to pt_regs as second arg
-
+	adds r3=8,r2		// set up second base pointer for SAVE_REST
+    ;;
 	ssm psr.ic
 	;;
     srlz.i
     ;;
     (p15) ssm psr.i
-	adds r3=16,r2		// set up second base pointer for SAVE_REST
-	;;
-	VMX_SAVE_REST
 	movl r14=ia64_leave_hypervisor
 	;;
+	VMX_SAVE_REST
 	mov rp=r14
+	;;
+	add out1=16,sp		// pass pointer to pt_regs as second arg
 	br.call.sptk.many b6=vmx_ia64_handle_irq
 END(vmx_dispatch_interrupt)
 

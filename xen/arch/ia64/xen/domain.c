@@ -364,7 +364,8 @@ void new_thread(struct vcpu *v,
 #ifdef CONFIG_VTI
 		vmx_init_all_rr(v);
 		if (d == dom0)
-		    VCPU(v,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);
+//		    VCPU(v,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);
+		    regs->r28 = dom_fw_setup(d,saved_command_line,256L);
 		/* Virtual processor context setup */
 		VCPU(v, vpsr) = IA64_PSR_BN;
 		VCPU(v, dcr) = 0;

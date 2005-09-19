@@ -138,17 +138,6 @@ void foo(void)
 	DEFINE(IA64_PT_REGS_R14_OFFSET, offsetof (struct pt_regs, r14));
 	DEFINE(IA64_PT_REGS_R2_OFFSET, offsetof (struct pt_regs, r2));
 	DEFINE(IA64_PT_REGS_R3_OFFSET, offsetof (struct pt_regs, r3));
-#ifdef CONFIG_VTI
-	DEFINE(IA64_PT_REGS_R4_OFFSET, offsetof (struct pt_regs, r4));
-	DEFINE(IA64_PT_REGS_R5_OFFSET, offsetof (struct pt_regs, r5));
-	DEFINE(IA64_PT_REGS_R6_OFFSET, offsetof (struct pt_regs, r6));
-	DEFINE(IA64_PT_REGS_R7_OFFSET, offsetof (struct pt_regs, r7));
-	DEFINE(IA64_PT_REGS_CR_IIPA_OFFSET, offsetof (struct pt_regs, cr_iipa));
-	DEFINE(IA64_PT_REGS_CR_ISR_OFFSET, offsetof (struct pt_regs, cr_isr));
-	DEFINE(IA64_PT_REGS_EML_UNAT_OFFSET, offsetof (struct pt_regs, eml_unat));
-	DEFINE(IA64_PT_REGS_RFI_PFS_OFFSET, offsetof (struct pt_regs, rfi_pfs));
-	DEFINE(SWITCH_MPTA_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mpta));
-#endif  //CONFIG_VTI
 	DEFINE(IA64_PT_REGS_R16_OFFSET, offsetof (struct pt_regs, r16));
 	DEFINE(IA64_PT_REGS_R17_OFFSET, offsetof (struct pt_regs, r17));
 	DEFINE(IA64_PT_REGS_R18_OFFSET, offsetof (struct pt_regs, r18));
@@ -172,6 +161,19 @@ void foo(void)
 	DEFINE(IA64_PT_REGS_F9_OFFSET, offsetof (struct pt_regs, f9));
 	DEFINE(IA64_PT_REGS_F10_OFFSET, offsetof (struct pt_regs, f10));
 	DEFINE(IA64_PT_REGS_F11_OFFSET, offsetof (struct pt_regs, f11));
+	DEFINE(IA64_PT_REGS_R4_OFFSET, offsetof (struct pt_regs, r4));
+	DEFINE(IA64_PT_REGS_R5_OFFSET, offsetof (struct pt_regs, r5));
+	DEFINE(IA64_PT_REGS_R6_OFFSET, offsetof (struct pt_regs, r6));
+	DEFINE(IA64_PT_REGS_R7_OFFSET, offsetof (struct pt_regs, r7));
+	DEFINE(IA64_PT_REGS_EML_UNAT_OFFSET, offsetof (struct pt_regs, eml_unat));
+	DEFINE(IA64_PT_REGS_RFI_PFS_OFFSET, offsetof (struct pt_regs, rfi_pfs));
+    DEFINE(IA64_VCPU_IIPA_OFFSET, offsetof (struct vcpu, arch.arch_vmx.cr_iipa));
+    DEFINE(IA64_VCPU_ISR_OFFSET, offsetof (struct vcpu, arch.arch_vmx.cr_isr));
+    DEFINE(IA64_VCPU_CAUSE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.cause));
+    DEFINE(IA64_VCPU_OPCODE_OFFSET, offsetof (struct vcpu, arch.arch_vmx.opcode));
+	DEFINE(SWITCH_MPTA_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.mpta));
+    DEFINE(IA64_PT_REGS_R16_SLOT, (((offsetof(struct pt_regs, r16)-sizeof(struct pt_regs))>>3)&0x3f));
+	DEFINE(IA64_VCPU_FLAGS_OFFSET,offsetof(struct vcpu ,arch.arch_vmx.flags));
 
 	BLANK();
 

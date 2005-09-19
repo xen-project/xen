@@ -24,18 +24,18 @@ static void
 get_pal_parameters (VCPU *vcpu, UINT64 *gr29,
 			UINT64 *gr30, UINT64 *gr31) {
 
-  	vmx_vcpu_get_gr(vcpu,29,gr29);
-  	vmx_vcpu_get_gr(vcpu,30,gr30); 
-  	vmx_vcpu_get_gr(vcpu,31,gr31);
+  	vcpu_get_gr_nat(vcpu,29,gr29);
+  	vcpu_get_gr_nat(vcpu,30,gr30); 
+  	vcpu_get_gr_nat(vcpu,31,gr31);
 }
 
 static void
 set_pal_result (VCPU *vcpu,struct ia64_pal_retval result) {
 
-	vmx_vcpu_set_gr(vcpu,8, result.status,0);
-	vmx_vcpu_set_gr(vcpu,9, result.v0,0);
-	vmx_vcpu_set_gr(vcpu,10, result.v1,0);
-	vmx_vcpu_set_gr(vcpu,11, result.v2,0);
+	vcpu_set_gr(vcpu,8, result.status,0);
+	vcpu_set_gr(vcpu,9, result.v0,0);
+	vcpu_set_gr(vcpu,10, result.v1,0);
+	vcpu_set_gr(vcpu,11, result.v2,0);
 }
 
 
@@ -45,7 +45,7 @@ pal_cache_flush (VCPU *vcpu) {
 	struct ia64_pal_retval result;
 
 	get_pal_parameters (vcpu, &gr29, &gr30, &gr31);
-	vmx_vcpu_get_gr(vcpu,28,&gr28);
+	vcpu_get_gr_nat(vcpu,28,&gr28);
 
 	/* Always call Host Pal in int=1 */
 	gr30 = gr30 &(~(0x2UL));
@@ -236,7 +236,7 @@ pal_emul( VCPU *vcpu) {
 	struct ia64_pal_retval result;
 
 
-	vmx_vcpu_get_gr(vcpu,28,&gr28);  //bank1
+	vcpu_get_gr_nat(vcpu,28,&gr28);  //bank1
 
 	switch (gr28) {
 		case PAL_CACHE_FLUSH:

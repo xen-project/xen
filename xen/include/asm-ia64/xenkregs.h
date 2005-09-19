@@ -8,13 +8,6 @@
 #define	IA64_TR_VHPT		4	/* dtr4: vhpt */
 #define IA64_TR_ARCH_INFO      5
 
-#ifdef CONFIG_VTI
-#define IA64_TR_VHPT_IN_DOM	5	/* dtr5: Double mapping for vhpt table in domain space */
-#define IA64_TR_XEN_IN_DOM	6	/* itr6, dtr6: Double mapping for xen image in domain space */
-#define IA64_TR_RR7_SWITCH_STUB	7	/* dtr7: mapping for rr7 switch stub */
-#define IA64_TEMP_PHYSICAL	8	/* itr8, dtr8: temp mapping for guest physical memory 256M */
-#endif // CONFIG_VTI
-
 /* Processor status register bits: */
 #define IA64_PSR_VM_BIT		46
 #define IA64_PSR_VM	(__IA64_UL(1) << IA64_PSR_VM_BIT)

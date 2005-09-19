@@ -308,6 +308,7 @@ IA64FAULT vmx_vcpu_rfi(VCPU *vcpu)
     UINT64 ifs, psr;
     REGS *regs = vcpu_regs(vcpu);
     psr = VCPU(vcpu,ipsr);
+    vcpu_bsw1(vcpu);
     vmx_vcpu_set_psr(vcpu,psr);
     ifs=VCPU(vcpu,ifs);
     if((ifs>>63)&&(ifs<<1)){
@@ -326,7 +327,7 @@ vmx_vcpu_get_psr(VCPU *vcpu)
     return VCPU(vcpu,vpsr);
 }
 
-
+#if 0
 IA64FAULT
 vmx_vcpu_get_bgr(VCPU *vcpu, unsigned int reg, UINT64 *val)
 {
@@ -378,8 +379,8 @@ vmx_vcpu_set_bgr(VCPU *vcpu, unsigned int reg, u64 val,int nat)
     return IA64_NO_FAULT;
 }
 
-
-
+#endif
+#if 0
 IA64FAULT
 vmx_vcpu_get_gr(VCPU *vcpu, unsigned reg, UINT64 * val)
 {
@@ -387,9 +388,11 @@ vmx_vcpu_get_gr(VCPU *vcpu, unsigned reg, UINT64 * val)
     int nat;
     //TODO, Eddie
     if (!regs) return 0;
+#if 0
     if (reg >= 16 && reg < 32) {
         return vmx_vcpu_get_bgr(vcpu,reg,val);
     }
+#endif
     getreg(reg,val,&nat,regs);    // FIXME: handle NATs later
     if(nat){
         return IA64_FAULT;
@@ -410,13 +413,16 @@ vmx_vcpu_set_gr(VCPU *vcpu, unsigned reg, u64 value, int nat)
 
     if (!regs) return IA64_ILLOP_FAULT;
     if (reg >= sof + 32) return IA64_ILLOP_FAULT;
+#if 0
     if ( reg >= 16 && reg < 32 ) {
         return vmx_vcpu_set_bgr(vcpu,reg, value, nat);
     }
+#endif
     setreg(reg,value,nat,regs);
     return IA64_NO_FAULT;
 }
 
+#endif
 
 IA64FAULT vmx_vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 {

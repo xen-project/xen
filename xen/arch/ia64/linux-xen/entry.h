@@ -23,19 +23,8 @@
 
 #define PT(f)		(IA64_PT_REGS_##f##_OFFSET)
 #define SW(f)		(IA64_SWITCH_STACK_##f##_OFFSET)
-
-#ifdef XEN
-#ifdef CONFIG_VTI
-#define PRED_EMUL		2 /* Need to save r4-r7 for inst emulation */
-#define PRED_NON_EMUL		3 /* No need to save r4-r7 for normal path */
-#define PRED_BN0		6 /* Guest is in bank 0 */
-#define PRED_BN1		7 /* Guest is in bank 1 */
-# define pEml		PASTE(p,PRED_EMUL)
-# define pNonEml	PASTE(p,PRED_NON_EMUL)
-# define pBN0		PASTE(p,PRED_BN0)
-# define pBN1		PASTE(p,PRED_BN1)
+#ifdef  XEN
 #define VPD(f)      (VPD_##f##_START_OFFSET)
-#endif // CONFIG_VTI
 #endif
 
 #define PT_REGS_SAVES(off)			\

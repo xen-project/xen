@@ -2,11 +2,11 @@
 #define _XEN_IA64_PRIVOP_H
 
 #include <asm/ia64_int.h>
-#ifdef CONFIG_VTI
+//#ifdef CONFIG_VTI
 #include <asm/vmx_vcpu.h>
-#else //CONFIG_VTI
+//#else //CONFIG_VTI
 #include <asm/vcpu.h>
-#endif //CONFIG_VTI
+//#endif //CONFIG_VTI
 
 typedef unsigned long IA64_INST;
 
@@ -95,7 +95,7 @@ typedef union U_INST64_M33 {
 typedef union U_INST64_M35 {
     IA64_INST inst;
     struct { unsigned long qp:6, :7, r2:7, :7, x6:6, x3:3, :1, major:4; };
-    	
+   
 } INST64_M35;
 
 typedef union U_INST64_M36 {

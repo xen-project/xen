@@ -68,6 +68,11 @@ struct arch_vmx_struct {
 	vtime_t	    vtm;
     unsigned long   vrr[8];
     unsigned long   vkr[8];
+    unsigned long   cr_iipa;   /* for emulation */
+    unsigned long   cr_isr;    /* for emulation */
+    unsigned long   cause;
+    unsigned long   opcode;
+
 //    unsigned long   mrr5;
 //    unsigned long   mrr6;
 //    unsigned long   mrr7;

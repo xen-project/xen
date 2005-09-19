@@ -201,7 +201,8 @@ static u16 gr_info[32]={
 
 	RPT(r1), RPT(r2), RPT(r3),
 
-#if defined(XEN) && defined(CONFIG_VTI)
+//#if defined(XEN) && defined(CONFIG_VTI)
+#if defined(XEN)
 	RPT(r4), RPT(r5), RPT(r6), RPT(r7),
 #else   //CONFIG_VTI
 	RSW(r4), RSW(r5), RSW(r6), RSW(r7),
@@ -295,7 +296,8 @@ rotate_reg (unsigned long sor, unsigned long rrb, unsigned long reg)
 	return reg;
 }
 
-#if defined(XEN) && defined(CONFIG_VTI)
+//#if defined(XEN) && defined(CONFIG_VTI)
+#if defined(XEN)
 void
 set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, unsigned long nat)
 {
@@ -402,12 +404,14 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, unsigne
         bspstore = ia64_get_bspstore();
     }
     *val=*addr;
-    if(bspstore < rnat_addr){
-        *nat=!!(ia64_get_rnat()&nat_mask);
-    }else{
-        *nat = !!((*rnat_addr)&nat_mask);
+    if(nat){
+        if(bspstore < rnat_addr){
+            *nat=!!(ia64_get_rnat()&nat_mask);
+        }else{
+            *nat = !!((*rnat_addr)&nat_mask);
+        }
+        ia64_set_rsc(old_rsc);
     }
-    ia64_set_rsc(old_rsc);
 }
 
 #else // CONFIG_VTI

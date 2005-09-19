@@ -143,7 +143,7 @@ IA64FAULT priv_tpa(VCPU *vcpu, INST64 inst)
 		fault = vcpu_ttag(vcpu,vcpu_get_gr(vcpu,src-64),&padr);
 	else fault = vcpu_tpa(vcpu,vcpu_get_gr(vcpu,src),&padr);
 	if (fault == IA64_NO_FAULT)
-		return vcpu_set_gr(vcpu, inst.M46.r1, padr);
+		return vcpu_set_gr(vcpu, inst.M46.r1, padr, 0);
 	else return fault;
 }
 
@@ -158,7 +158,7 @@ IA64FAULT priv_tak(VCPU *vcpu, INST64 inst)
 		fault = vcpu_thash(vcpu,vcpu_get_gr(vcpu,src-64),&key);
 	else fault = vcpu_tak(vcpu,vcpu_get_gr(vcpu,src),&key);
 	if (fault == IA64_NO_FAULT)
-		return vcpu_set_gr(vcpu, inst.M46.r1, key);
+		return vcpu_set_gr(vcpu, inst.M46.r1, key,0);
 	else return fault;
 }
 
@@ -244,7 +244,7 @@ IA64FAULT priv_mov_to_ar_reg(VCPU *vcpu, INST64 inst)
 	if (inst.M29.r2 > 63 && inst.M29.ar3 < 8) { // privified mov from kr
 		UINT64 val;
 		if (vcpu_get_ar(vcpu,ar3,&val) != IA64_ILLOP_FAULT)
-			return vcpu_set_gr(vcpu, inst.M29.r2-64, val);
+			return vcpu_set_gr(vcpu, inst.M29.r2-64, val,0);
 		else return IA64_ILLOP_FAULT;
 	}
 	else {
@@ -369,12 +369,12 @@ IA64FAULT priv_mov_from_rr(VCPU *vcpu, INST64 inst)
 	if (inst.M43.r1 > 63) { // privified mov from cpuid
 		fault = vcpu_get_cpuid(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
 		if (fault == IA64_NO_FAULT)
-			return vcpu_set_gr(vcpu, inst.M43.r1-64, val);
+			return vcpu_set_gr(vcpu, inst.M43.r1-64, val, 0);
 	}
 	else {
 		fault = vcpu_get_rr(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
 		if (fault == IA64_NO_FAULT)
-			return vcpu_set_gr(vcpu, inst.M43.r1, val);
+			return vcpu_set_gr(vcpu, inst.M43.r1, val, 0);
 	}
 	return fault;
 }
@@ -386,7 +386,7 @@ IA64FAULT priv_mov_from_pkr(VCPU *vcpu, INST64 inst)
 	
 	fault = vcpu_get_pkr(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
 	if (fault == IA64_NO_FAULT)
-		return vcpu_set_gr(vcpu, inst.M43.r1, val);
+		return vcpu_set_gr(vcpu, inst.M43.r1, val, 0);
 	else return fault;
 }
 
@@ -397,7 +397,7 @@ IA64FAULT priv_mov_from_dbr(VCPU *vcpu, INST64 inst)
 	
 	fault = vcpu_get_dbr(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
 	if (fault == IA64_NO_FAULT)
-		return vcpu_set_gr(vcpu, inst.M43.r1, val);
+		return vcpu_set_gr(vcpu, inst.M43.r1, val, 0);
 	else return fault;
 }
 
@@ -408,7 +408,7 @@ IA64FAULT priv_mov_from_ibr(VCPU *vcpu, INST64 inst)
 	
 	fault = vcpu_get_ibr(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
 	if (fault == IA64_NO_FAULT)
-		return vcpu_set_gr(vcpu, inst.M43.r1, val);
+		return vcpu_set_gr(vcpu, inst.M43.r1, val, 0);
 	else return fault;
 }
 
@@ -420,12 +420,12 @@ IA64FAULT priv_mov_from_pmc(VCPU *vcpu, INST64 inst)
 	if (inst.M43.r1 > 63) { // privified mov from pmd
 		fault = vcpu_get_pmd(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
 		if (fault == IA64_NO_FAULT)
-			return vcpu_set_gr(vcpu, inst.M43.r1-64, val);
+			return vcpu_set_gr(vcpu, inst.M43.r1-64, val, 0);
 	}
 	else {
 		fault = vcpu_get_pmc(vcpu,vcpu_get_gr(vcpu,inst.M43.r3),&val);
 		if (fault == IA64_NO_FAULT)
-			return vcpu_set_gr(vcpu, inst.M43.r1, val);
+			return vcpu_set_gr(vcpu, inst.M43.r1, val, 0);
 	}
 	return fault;
 }
@@ -434,7 +434,7 @@ unsigned long from_cr_cnt[128] = { 0 };
 
 #define cr_get(cr) \
 	((fault = vcpu_get_##cr(vcpu,&val)) == IA64_NO_FAULT) ? \
-		vcpu_set_gr(vcpu, tgt, val) : fault;
+		vcpu_set_gr(vcpu, tgt, val, 0) : fault;
 	
 IA64FAULT priv_mov_from_cr(VCPU *vcpu, INST64 inst)
 {
@@ -460,7 +460,7 @@ IA64FAULT priv_mov_from_cr(VCPU *vcpu, INST64 inst)
 	    case 64:return cr_get(lid);
 	    case 65:return cr_get(ivr);
 	    case 66:return cr_get(tpr);
-	    case 67:return vcpu_set_gr(vcpu,tgt,0L);
+	    case 67:return vcpu_set_gr(vcpu,tgt,0L,0);
 	    case 68:return cr_get(irr0);
 	    case 69:return cr_get(irr1);
 	    case 70:return cr_get(irr2);
@@ -482,7 +482,7 @@ IA64FAULT priv_mov_from_psr(VCPU *vcpu, INST64 inst)
 	IA64FAULT fault;
 
 	if ((fault = vcpu_get_psr(vcpu,&val)) == IA64_NO_FAULT)
-		return vcpu_set_gr(vcpu, tgt, val);
+		return vcpu_set_gr(vcpu, tgt, val, 0);
 	else return fault;
 }
 

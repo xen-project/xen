@@ -419,10 +419,10 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         size=(inst.M1.x6&0x3);
         if((inst.M1.x6>>2)>0xb){      // write
             dir=IOREQ_WRITE;     //write
-            vmx_vcpu_get_gr(vcpu,inst.M4.r2,&data);
+            vcpu_get_gr_nat(vcpu,inst.M4.r2,&data);
         }else if((inst.M1.x6>>2)<0xb){   //  read
             dir=IOREQ_READ;
-            vmx_vcpu_get_gr(vcpu,inst.M1.r1,&value);
+            vcpu_get_gr_nat(vcpu,inst.M1.r1,&value);
         }
     }
     // Integer Load + Reg update
@@ -430,11 +430,11 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         inst_type = SL_INTEGER;
         dir = IOREQ_READ;     //write
         size = (inst.M2.x6&0x3);
-        vmx_vcpu_get_gr(vcpu,inst.M2.r1,&value);
-        vmx_vcpu_get_gr(vcpu,inst.M2.r3,&temp);
-        vmx_vcpu_get_gr(vcpu,inst.M2.r2,&post_update);
+        vcpu_get_gr_nat(vcpu,inst.M2.r1,&value);
+        vcpu_get_gr_nat(vcpu,inst.M2.r3,&temp);
+        vcpu_get_gr_nat(vcpu,inst.M2.r2,&post_update);
         temp += post_update;
-        vmx_vcpu_set_gr(vcpu,inst.M2.r3,temp,0);
+        vcpu_set_gr(vcpu,inst.M2.r3,temp,0);
     }
     // Integer Load/Store + Imm update
     else if(inst.M3.major==5){
@@ -442,25 +442,25 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
         size=(inst.M3.x6&0x3);
         if((inst.M5.x6>>2)>0xb){      // write
             dir=IOREQ_WRITE;     //write
-            vmx_vcpu_get_gr(vcpu,inst.M5.r2,&data);
-            vmx_vcpu_get_gr(vcpu,inst.M5.r3,&temp);
+            vcpu_get_gr_nat(vcpu,inst.M5.r2,&data);
+            vcpu_get_gr_nat(vcpu,inst.M5.r3,&temp);
             post_update = (inst.M5.i<<7)+inst.M5.imm7;
             if(inst.M5.s)
                 temp -= post_update;
             else
                 temp += post_update;
-            vmx_vcpu_set_gr(vcpu,inst.M5.r3,temp,0);
+            vcpu_set_gr(vcpu,inst.M5.r3,temp,0);
 
         }else if((inst.M3.x6>>2)<0xb){   //  read
             dir=IOREQ_READ;
-            vmx_vcpu_get_gr(vcpu,inst.M3.r1,&value);
-            vmx_vcpu_get_gr(vcpu,inst.M3.r3,&temp);
+            vcpu_get_gr_nat(vcpu,inst.M3.r1,&value);
+            vcpu_get_gr_nat(vcpu,inst.M3.r3,&temp);
             post_update = (inst.M3.i<<7)+inst.M3.imm7;
             if(inst.M3.s)
                 temp -= post_update;
             else
                 temp += post_update;
-            vmx_vcpu_set_gr(vcpu,inst.M3.r3,temp,0);
+            vcpu_set_gr(vcpu,inst.M3.r3,temp,0);
 
         }
     }
@@ -488,7 +488,7 @@ void emulate_io_inst(VCPU *vcpu, u64 padr, u64 ma)
             data = (value & 0xffffffff00000000U) | (data & 0xffffffffU);
 
         if(inst_type==SL_INTEGER){       //gp
-            vmx_vcpu_set_gr(vcpu,inst.M1.r1,data,0);
+            vcpu_set_gr(vcpu,inst.M1.r1,data,0);
         }else{
             panic("Don't support ldfd now !");
 /*            switch(inst.M6.f1){

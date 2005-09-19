@@ -31,7 +31,8 @@ typedef	union {
 //typedef struct domain VCPU;
 
 // this def for vcpu_regs won't work if kernel stack is present
-#define	vcpu_regs(vcpu) ((struct pt_regs *) vcpu->arch.regs)
+//#define	vcpu_regs(vcpu) ((struct pt_regs *) vcpu->arch.regs
+#define vcpu_regs(vcpu) (((struct pt_regs *) ((char *) (vcpu) + IA64_STK_OFFSET)) - 1)
 #define	PSCB(x,y)	VCPU(x,y)
 #define	PSCBX(x,y)	x->arch.y
 
@@ -70,18 +71,41 @@ extern TR_ENTRY *match_dtlb(VCPU *vcpu, unsigned long ifa);
 /**************************************************************************
  VCPU general register access routines
 **************************************************************************/
-
+#ifdef XEN
 UINT64
 vcpu_get_gr(VCPU *vcpu, unsigned reg)
 {
 	REGS *regs = vcpu_regs(vcpu);
 	UINT64 val;
-
 	if (!reg) return 0;
 	getreg(reg,&val,0,regs);	// FIXME: handle NATs later
 	return val;
 }
+IA64FAULT
+vcpu_get_gr_nat(VCPU *vcpu, unsigned reg, UINT64 *val)
+{
+	REGS *regs = vcpu_regs(vcpu);
+    int nat;
+	getreg(reg,val,&nat,regs);	// FIXME: handle NATs later
+    if(nat)
+        return IA64_NAT_CONSUMPTION_VECTOR;
+	return 0;
+}
 
+// returns:
+//   IA64_ILLOP_FAULT if the register would cause an Illegal Operation fault
+//   IA64_NO_FAULT otherwise
+IA64FAULT
+vcpu_set_gr(VCPU *vcpu, unsigned reg, UINT64 value, int nat)
+{
+	REGS *regs = vcpu_regs(vcpu);
+	if (!reg) return IA64_ILLOP_FAULT;
+	long sof = (regs->cr_ifs) & 0x7f;
+	if (reg >= sof + 32) return IA64_ILLOP_FAULT;
+	setreg(reg,value,nat,regs);	// FIXME: handle NATs later
+	return IA64_NO_FAULT;
+}
+#else
 // returns:
 //   IA64_ILLOP_FAULT if the register would cause an Illegal Operation fault
 //   IA64_NO_FAULT otherwise
@@ -97,6 +121,7 @@ vcpu_set_gr(VCPU *vcpu, unsigned reg, UINT64 value)
 	return IA64_NO_FAULT;
 }
 
+#endif
 /**************************************************************************
  VCPU privileged application register access routines
 **************************************************************************/
@@ -586,11 +611,9 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 		printf("vcpu_pend_interrupt: bad vector\n");
 		return;
 	}
-//#ifdef CONFIG_VTI
     if ( VMX_DOMAIN(vcpu) ) {
  	    set_bit(vector,VCPU(vcpu,irr));
     } else
-//#endif // CONFIG_VTI
     {
 	/* if (!test_bit(vector,PSCB(vcpu,delivery_mask))) return; */
 	if (test_bit(vector,PSCBX(vcpu,irr))) {
@@ -1360,7 +1383,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 
 			vcpu_thash(vcpu, address, &iha);
 			if (__copy_from_user(&pte, (void *)iha, sizeof(pte)) != 0)
-				return IA64_VHPT_TRANS_VECTOR;
+				return IA64_VHPT_FAULT;
 
 			/* 
 			 * Optimisation: this VHPT walker aborts on not-present pages
@@ -1496,6 +1519,18 @@ printf("%lx=vcpu_get_pmd(%x)\n",val,reg);
 /**************************************************************************
  VCPU banked general register access routines
 **************************************************************************/
+#define vcpu_bsw0_unat(i,b0unat,b1unat,runat,IA64_PT_REGS_R16_SLOT)     \
+do{     \
+    __asm__ __volatile__ (                      \
+        ";;extr.u %0 = %3,%6,16;;\n"            \
+        "dep %1 = %0, %1, 0, 16;;\n"            \
+        "st8 [%4] = %1\n"                       \
+        "extr.u %0 = %2, 16, 16;;\n"            \
+        "dep %3 = %0, %3, %6, 16;;\n"           \
+        "st8 [%5] = %3\n"                       \
+        ::"r"(i),"r"(*b1unat),"r"(*b0unat),"r"(*runat),"r"(b1unat), \
+        "r"(runat),"i"(IA64_PT_REGS_R16_SLOT):"memory");    \
+}while(0)
 
 IA64FAULT vcpu_bsw0(VCPU *vcpu)
 {
@@ -1504,14 +1539,40 @@ IA64FAULT vcpu_bsw0(VCPU *vcpu)
 	unsigned long *r = &regs->r16;
 	unsigned long *b0 = &PSCB(vcpu,bank0_regs[0]);
 	unsigned long *b1 = &PSCB(vcpu,bank1_regs[0]);
-	int i;
+	unsigned long *runat = &regs->eml_unat;
+	unsigned long *b0unat = &PSCB(vcpu,vbnat);
+	unsigned long *b1unat = &PSCB(vcpu,vnat);
 
-	if (PSCB(vcpu,banknum)) {
-		for (i = 0; i < 16; i++) { *b1++ = *r; *r++ = *b0++; }
-		PSCB(vcpu,banknum) = 0;
-	}
+	unsigned long i;
+
+    if(VMX_DOMAIN(vcpu)){
+        if(VCPU(vcpu,vpsr)&IA64_PSR_BN){
+            for (i = 0; i < 16; i++) { *b1++ = *r; *r++ = *b0++; }
+            vcpu_bsw0_unat(i,b0unat,b1unat,runat,IA64_PT_REGS_R16_SLOT);
+            VCPU(vcpu,vpsr) &= ~IA64_PSR_BN;
+        }
+    }else{
+        if (PSCB(vcpu,banknum)) {
+            for (i = 0; i < 16; i++) { *b1++ = *r; *r++ = *b0++; }
+            vcpu_bsw0_unat(i,b0unat,b1unat,runat,IA64_PT_REGS_R16_SLOT);
+            PSCB(vcpu,banknum) = 0;
+        }
+    }
 	return (IA64_NO_FAULT);
 }
+
+#define vcpu_bsw1_unat(i,b0unat,b1unat,runat,IA64_PT_REGS_R16_SLOT)     \
+do{             \
+    __asm__ __volatile__ (      \
+        ";;extr.u %0 = %3,%6,16;;\n"                \
+        "dep %1 = %0, %1, 16, 16;;\n"               \
+        "st8 [%4] = %1\n"                           \
+        "extr.u %0 = %2, 0, 16;;\n"                 \
+        "dep %3 = %0, %3, %6, 16;;\n"               \
+        "st8 [%5] = %3\n"                           \
+        ::"r"(i),"r"(*b0unat),"r"(*b1unat),"r"(*runat),"r"(b0unat), \
+        "r"(runat),"i"(IA64_PT_REGS_R16_SLOT):"memory");            \
+}while(0)
 
 IA64FAULT vcpu_bsw1(VCPU *vcpu)
 {
@@ -1520,12 +1581,25 @@ IA64FAULT vcpu_bsw1(VCPU *vcpu)
 	unsigned long *r = &regs->r16;
 	unsigned long *b0 = &PSCB(vcpu,bank0_regs[0]);
 	unsigned long *b1 = &PSCB(vcpu,bank1_regs[0]);
-	int i;
+	unsigned long *runat = &regs->eml_unat;
+	unsigned long *b0unat = &PSCB(vcpu,vbnat);
+	unsigned long *b1unat = &PSCB(vcpu,vnat);
 
-	if (!PSCB(vcpu,banknum)) {
-		for (i = 0; i < 16; i++) { *b0++ = *r; *r++ = *b1++; }
-		PSCB(vcpu,banknum) = 1;
-	}
+	unsigned long i;
+
+    if(VMX_DOMAIN(vcpu)){
+        if(!(VCPU(vcpu,vpsr)&IA64_PSR_BN)){
+            for (i = 0; i < 16; i++) { *b0++ = *r; *r++ = *b1++; }
+            vcpu_bsw1_unat(i,b0unat,b1unat,runat,IA64_PT_REGS_R16_SLOT);
+            VCPU(vcpu,vpsr) |= IA64_PSR_BN;
+        }
+    }else{
+        if (!PSCB(vcpu,banknum)) {
+            for (i = 0; i < 16; i++) { *b0++ = *r; *r++ = *b1++; }
+            vcpu_bsw1_unat(i,b0unat,b1unat,runat,IA64_PT_REGS_R16_SLOT);
+            PSCB(vcpu,banknum) = 1;
+        }
+    }
 	return (IA64_NO_FAULT);
 }
 

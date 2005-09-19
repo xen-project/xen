@@ -35,7 +35,7 @@
 void hyper_not_support(void)
 {
     VCPU *vcpu=current;
-    vmx_vcpu_set_gr(vcpu, 8, -1, 0);
+    vcpu_set_gr(vcpu, 8, -1, 0);
     vmx_vcpu_increment_iip(vcpu);
 }
 
@@ -43,12 +43,12 @@ void hyper_mmu_update(void)
 {
     VCPU *vcpu=current;
     u64 r32,r33,r34,r35,ret;
-    vmx_vcpu_get_gr(vcpu,16,&r32);
-    vmx_vcpu_get_gr(vcpu,17,&r33);
-    vmx_vcpu_get_gr(vcpu,18,&r34);
-    vmx_vcpu_get_gr(vcpu,19,&r35);
+    vcpu_get_gr_nat(vcpu,16,&r32);
+    vcpu_get_gr_nat(vcpu,17,&r33);
+    vcpu_get_gr_nat(vcpu,18,&r34);
+    vcpu_get_gr_nat(vcpu,19,&r35);
     ret=do_mmu_update((mmu_update_t*)r32,r33,r34,r35);
-    vmx_vcpu_set_gr(vcpu, 8, ret, 0);
+    vcpu_set_gr(vcpu, 8, ret, 0);
     vmx_vcpu_increment_iip(vcpu);
 }
 
@@ -65,18 +65,18 @@ unsigned long __hypercall_create_continuation(
     if ( test_bit(_MCSF_in_multicall, &mcs->flags) ) {
 	panic("PREEMPT happen in multicall\n");	// Not support yet
     } else {
-	vmx_vcpu_set_gr(vcpu, 15, op, 0);
+	vcpu_set_gr(vcpu, 15, op, 0);
 	for ( i = 0; i < nr_args; i++) {
 	    switch (i) {
-	    case 0: vmx_vcpu_set_gr(vcpu, 16, va_arg(args, unsigned long), 0);
+	    case 0: vcpu_set_gr(vcpu, 16, va_arg(args, unsigned long), 0);
 		    break;
-	    case 1: vmx_vcpu_set_gr(vcpu, 17, va_arg(args, unsigned long), 0);
+	    case 1: vcpu_set_gr(vcpu, 17, va_arg(args, unsigned long), 0);
 		    break;
-	    case 2: vmx_vcpu_set_gr(vcpu, 18, va_arg(args, unsigned long), 0);
+	    case 2: vcpu_set_gr(vcpu, 18, va_arg(args, unsigned long), 0);
 		    break;
-	    case 3: vmx_vcpu_set_gr(vcpu, 19, va_arg(args, unsigned long), 0);
+	    case 3: vcpu_set_gr(vcpu, 19, va_arg(args, unsigned long), 0);
 		    break;
-	    case 4: vmx_vcpu_set_gr(vcpu, 20, va_arg(args, unsigned long), 0);
+	    case 4: vcpu_set_gr(vcpu, 20, va_arg(args, unsigned long), 0);
 		    break;
 	    default: panic("Too many args for hypercall continuation\n");
 		    break;
@@ -93,15 +93,15 @@ void hyper_dom_mem_op(void)
     VCPU *vcpu=current;
     u64 r32,r33,r34,r35,r36;
     u64 ret;
-    vmx_vcpu_get_gr(vcpu,16,&r32);
-    vmx_vcpu_get_gr(vcpu,17,&r33);
-    vmx_vcpu_get_gr(vcpu,18,&r34);
-    vmx_vcpu_get_gr(vcpu,19,&r35);
-    vmx_vcpu_get_gr(vcpu,20,&r36);
+    vcpu_get_gr_nat(vcpu,16,&r32);
+    vcpu_get_gr_nat(vcpu,17,&r33);
+    vcpu_get_gr_nat(vcpu,18,&r34);
+    vcpu_get_gr_nat(vcpu,19,&r35);
+    vcpu_get_gr_nat(vcpu,20,&r36);
 //    ret=do_dom_mem_op(r32,(u64 *)r33,r34,r35,r36);
     ret = 0;
     printf("do_dom_mem return value: %lx\n", ret);
-    vmx_vcpu_set_gr(vcpu, 8, ret, 0);
+    vcpu_set_gr(vcpu, 8, ret, 0);
 
     /* Hard to define a special return value to indicate hypercall restart.
      * So just add a new mark, which is SMP safe
@@ -117,9 +117,9 @@ void hyper_sched_op(void)
 {
     VCPU *vcpu=current;
     u64 r32,ret;
-    vmx_vcpu_get_gr(vcpu,16,&r32);
+    vcpu_get_gr_nat(vcpu,16,&r32);
     ret=do_sched_op(r32);
-    vmx_vcpu_set_gr(vcpu, 8, ret, 0);
+    vcpu_set_gr(vcpu, 8, ret, 0);
 
     vmx_vcpu_increment_iip(vcpu);
 }
@@ -128,9 +128,9 @@ void hyper_dom0_op(void)
 {
     VCPU *vcpu=current;
     u64 r32,ret;
-    vmx_vcpu_get_gr(vcpu,16,&r32);
+    vcpu_get_gr_nat(vcpu,16,&r32);
     ret=do_dom0_op((dom0_op_t *)r32);
-    vmx_vcpu_set_gr(vcpu, 8, ret, 0);
+    vcpu_set_gr(vcpu, 8, ret, 0);
 
     vmx_vcpu_increment_iip(vcpu);
 }
@@ -139,9 +139,9 @@ void hyper_event_channel_op(void)
 {
     VCPU *vcpu=current;
     u64 r32,ret;
-    vmx_vcpu_get_gr(vcpu,16,&r32);
+    vcpu_get_gr_nat(vcpu,16,&r32);
     ret=do_event_channel_op((evtchn_op_t *)r32);
-    vmx_vcpu_set_gr(vcpu, 8, ret, 0);
+    vcpu_set_gr(vcpu, 8, ret, 0);
     vmx_vcpu_increment_iip(vcpu);
 }
 
@@ -149,9 +149,9 @@ void hyper_xen_version(void)
 {
     VCPU *vcpu=current;
     u64 r32,ret;
-    vmx_vcpu_get_gr(vcpu,16,&r32);
+    vcpu_get_gr_nat(vcpu,16,&r32);
     ret=do_xen_version((int )r32);
-    vmx_vcpu_set_gr(vcpu, 8, ret, 0);
+    vcpu_set_gr(vcpu, 8, ret, 0);
     vmx_vcpu_increment_iip(vcpu);
 }
 
@@ -174,10 +174,10 @@ void hyper_lock_page(void)
 //TODO:
     VCPU *vcpu=current;
     u64 va,lock, ret;
-    vmx_vcpu_get_gr(vcpu,16,&va);
-    vmx_vcpu_get_gr(vcpu,17,&lock);
+    vcpu_get_gr_nat(vcpu,16,&va);
+    vcpu_get_gr_nat(vcpu,17,&lock);
     ret=do_lock_page(vcpu, va, lock);
-    vmx_vcpu_set_gr(vcpu, 8, ret, 0);
+    vcpu_set_gr(vcpu, 8, ret, 0);
 
     vmx_vcpu_increment_iip(vcpu);
 }
@@ -213,10 +213,10 @@ void hyper_set_shared_page(void)
 {
     VCPU *vcpu=current;
     u64 gpa,ret;
-    vmx_vcpu_get_gr(vcpu,16,&gpa);
+    vcpu_get_gr_nat(vcpu,16,&gpa);
 
     ret=do_set_shared_page(vcpu, gpa);
-    vmx_vcpu_set_gr(vcpu, 8, ret, 0);
+    vcpu_set_gr(vcpu, 8, ret, 0);
 
     vmx_vcpu_increment_iip(vcpu);
 }
@@ -226,11 +226,11 @@ void hyper_grant_table_op(void)
 {
     VCPU *vcpu=current;
     u64 r32,r33,r34,ret;
-    vmx_vcpu_get_gr(vcpu,16,&r32);
-    vmx_vcpu_get_gr(vcpu,17,&r33);
-    vmx_vcpu_get_gr(vcpu,18,&r34);
+    vcpu_get_gr_nat(vcpu,16,&r32);
+    vcpu_get_gr_nat(vcpu,17,&r33);
+    vcpu_get_gr_nat(vcpu,18,&r34);
 
     ret=do_grant_table_op((unsigned int)r32, (void *)r33, (unsigned int)r34);
-    vmx_vcpu_set_gr(vcpu, 8, ret, 0);
+    vcpu_set_gr(vcpu, 8, ret, 0);
 }
 */

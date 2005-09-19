@@ -713,7 +713,7 @@ IA64FAULT vmx_vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
     hcb = vmx_vcpu_get_vtlb(vcpu);
     vrr=vmx_vcpu_rr(vcpu,vadr);
     regs=vcpu_regs(vcpu);
-    pt_isr.val=regs->cr_isr;
+    pt_isr.val=VMX(vcpu,cr_isr);
     visr.val=0;
     visr.ei=pt_isr.ei;
     visr.ir=pt_isr.ir;

@@ -93,8 +93,10 @@ extern IA64FAULT vmx_vcpu_rfi(VCPU *vcpu);
 extern UINT64 vmx_vcpu_get_psr(VCPU *vcpu);
 extern IA64FAULT vmx_vcpu_get_bgr(VCPU *vcpu, unsigned int reg, UINT64 *val);
 extern IA64FAULT vmx_vcpu_set_bgr(VCPU *vcpu, unsigned int reg, u64 val,int nat);
+#if 0
 extern IA64FAULT vmx_vcpu_get_gr(VCPU *vcpu, unsigned reg, UINT64 * val);
 extern IA64FAULT vmx_vcpu_set_gr(VCPU *vcpu, unsigned reg, u64 value, int nat);
+#endif
 extern IA64FAULT vmx_vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24);
 extern IA64FAULT vmx_vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24);
 extern IA64FAULT vmx_vcpu_set_psr_l(VCPU *vcpu, UINT64 val);
@@ -453,6 +455,7 @@ IA64FAULT vmx_vcpu_get_pmd(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 /**************************************************************************
  VCPU banked general register access routines
 **************************************************************************/
+#if 0
 static inline
 IA64FAULT vmx_vcpu_bsw0(VCPU *vcpu)
 {
@@ -467,6 +470,7 @@ IA64FAULT vmx_vcpu_bsw1(VCPU *vcpu)
     VCPU(vcpu,vpsr) |= IA64_PSR_BN;
     return (IA64_NO_FAULT);
 }
+#endif
 #if 0
 /* Another hash performance algorithm */
 #define redistribute_rid(rid)	(((rid) & ~0xffff) | (((rid) << 8) & 0xff00) | (((rid) >> 8) & 0xff))
