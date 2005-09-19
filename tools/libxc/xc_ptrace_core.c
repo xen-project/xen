@@ -166,7 +166,11 @@ map_domain_va(unsigned long domfd, int cpu, void * guest_va)
 }
 
 int 
-xc_waitdomain_core(int domfd, int *status, int options)
+xc_waitdomain_core(
+    int xc_handle,
+    int domfd,
+    int *status,
+    int options)
 {
     int retval = -1;
     int nr_vcpus;
@@ -215,7 +219,12 @@ xc_waitdomain_core(int domfd, int *status, int options)
 }
 
 long
-xc_ptrace_core(enum __ptrace_request request, u32 domfd, long eaddr, long edata)
+xc_ptrace_core(
+    int xc_handle,
+    enum __ptrace_request request,
+    u32 domfd,
+    long eaddr,
+    long edata)
 {
     int             status = 0;
     struct gdb_regs pt;
