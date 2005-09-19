@@ -145,22 +145,21 @@ class ImageHandler:
         except OSError, ex:
             log.warning("error removing bootloader file '%s': %s", f, ex)
 
-    def initDomain(self, dom, memory, ssidref, cpu, cpu_weight):
+    def initDomain(self, dom, memory, ssidref, cpu, cpu_weight, bootloading):
         """Initial domain create.
 
         @return domain id
         """
 
         mem_kb = self.getDomainMemory(memory)
-        if not self.vm.restore:
-            dom = xc.domain_create(dom = dom or 0, ssidref = ssidref)
-            # if bootloader, unlink here. But should go after buildDomain() ?
-            if self.vm.bootloader:
-                self.unlink(self.kernel)
-                self.unlink(self.ramdisk)
-            if dom <= 0:
-                raise VmError('Creating domain failed: name=%s' %
-                              self.vm.getName())
+        dom = xc.domain_create(dom = dom or 0, ssidref = ssidref)
+        # if bootloader, unlink here. But should go after buildDomain() ?
+        if bootloading:
+            self.unlink(self.kernel)
+            self.unlink(self.ramdisk)
+        if dom <= 0:
+            raise VmError('Creating domain failed: name=%s' %
+                          self.vm.getName())
         log.debug("initDomain: cpu=%d mem_kb=%d ssidref=%d dom=%d", cpu, mem_kb, ssidref, dom)
         xc.domain_setcpuweight(dom, cpu_weight)
         xc.domain_setmaxmem(dom, mem_kb)
@@ -184,9 +183,6 @@ class ImageHandler:
     def createDomain(self):
         """Build the domain boot image.
         """
-        if self.vm.recreate or self.vm.restore:
-            return
-
         # Set params and call buildDomain().
         self.flags = self.vm.getBackendFlags()
 
