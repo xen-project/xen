@@ -15,7 +15,6 @@
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
 #============================================================================
 
-import os
 
 from xen.web.SrvDir import SrvDir
 from xen.xend import sxp
@@ -32,15 +31,15 @@ class SrvNode(SrvDir):
         self.add('dmesg', 'SrvDmesg')
         self.add('log', 'SrvXendLog')
 
-    def op_shutdown(self, op, req):
+    def op_shutdown(self, _1, _2):
         val = self.xn.shutdown()
         return val
 
-    def op_reboot(self, op, req):
+    def op_reboot(self, _1, _2):
         val = self.xn.reboot()
         return val
 
-    def op_cpu_bvt_slice_set(self, op, req):
+    def op_cpu_bvt_slice_set(self, _, req):
         fn = FormFn(self.xn.cpu_bvt_slice_set,
                     [['ctx_allow', 'int']])
         val = fn(req.args, {})

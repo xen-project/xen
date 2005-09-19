@@ -67,7 +67,12 @@ class xstransact:
                 if not isinstance(d, dict):
                     raise TypeError
                 for key in d.keys():
-                    self._write(key, d[key], create, excl)
+                    try:
+                        self._write(key, d[key], create, excl)
+                    except TypeError, msg:
+                        raise TypeError('Writing %s: %s: %s' %
+                                        (key, str(d[key]), msg))
+                        
         elif isinstance(args[0], list):
             for l in args:
                 if not len(l) == 2:
@@ -84,10 +89,15 @@ class xstransact:
         return xshandle().rm(path)
 
     def remove(self, *args):
+        """If no arguments are given, remove this transaction's path.
+        Otherwise, treat each argument as a subpath to this transaction's
+        path, and remove each of those instead.
+        """
         if len(args) == 0:
-            raise TypeError
-        for key in args:
-            self._remove(key)
+            xshandle().rm(self.path)
+        else:
+            for key in args:
+                self._remove(key)
 
     def _list(self, key):
         path = "%s/%s" % (self.path, key)
@@ -146,8 +156,8 @@ class xstransact:
 
     def Read(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 v = t.read(*args)
                 t.commit()
                 return v
@@ -165,8 +175,8 @@ class xstransact:
 
     def Write(cls, path, *args, **opts):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 t.write(*args, **opts)
                 t.commit()
                 return
@@ -183,9 +193,13 @@ class xstransact:
     Write = classmethod(Write)
 
     def Remove(cls, path, *args):
+        """If only one argument is given (path), remove it.  Otherwise, treat
+        each further argument as a subpath to the given path, and remove each
+        of those instead.  This operation is performed inside a transaction.
+        """
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 t.remove(*args)
                 t.commit()
                 return
@@ -203,8 +217,8 @@ class xstransact:
 
     def List(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 v = t.list(*args)
                 t.commit()
                 return v
@@ -222,8 +236,8 @@ class xstransact:
 
     def Gather(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 v = t.gather(*args)
                 t.commit()
                 return v
@@ -241,8 +255,8 @@ class xstransact:
 
     def Store(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 v = t.store(*args)
                 t.commit()
                 return v

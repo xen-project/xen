@@ -145,7 +145,7 @@ class EventServer:
             self.lock.release()
             
         if async:
-            scheduler.now(self.call_handlers, [event, val])
+            scheduler.now(self.call_handlers, event, val)
         else:
             self.call_handlers(event, val)
 
