@@ -25,9 +25,6 @@
 from xen.xend.server.DevController import DevController
 
 
-next_devid = 1
-
-
 class UsbifController(DevController):
     """USB device interface controller. Handles all USB devices
     for a domain.
@@ -42,9 +39,4 @@ class UsbifController(DevController):
     def getDeviceDetails(self, _):
         """@see DevController.getDeviceDetails"""
 
-        global next_devid
-
-        devid = next_devid
-        next_devid += 1
-
-        return (devid, {}, {})
+        return (self.allocateDeviceID(), {}, {})
