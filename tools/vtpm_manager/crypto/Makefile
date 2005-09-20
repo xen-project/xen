@@ -13,6 +13,7 @@ clean:
 	rm -f *.a *.so *.o *.rpm $(DEP_FILES)
 
 mrproper: clean
+	rm -f *~
 
 $(BIN): $(OBJS)
 	$(AR) rcs $(BIN) $(OBJS)

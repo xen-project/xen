@@ -17,7 +17,7 @@ clean:
 	rm -f *.a *.so *.o *.rpm $(DEP_FILES)
 
 mrproper: clean
-	rm -f $(BIN)
+	rm -f $(BIN) *~
 
 $(BIN): $(OBJS)
 	$(CC) $(LDFLAGS) $^ $(LIBS) -o $@

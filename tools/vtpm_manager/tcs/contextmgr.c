@@ -43,6 +43,7 @@
 #include "tcs.h"
 #include "contextmgr.h"
 #include "log.h"
+#include "hashtable.h"
 
 BYTE* AddMemBlock(CONTEXT_HANDLE* pContextHandle, // in
 		  int    BlockSize)  { // in
@@ -131,12 +132,14 @@ BOOL DeleteMemBlock(CONTEXT_HANDLE* pContextHandle, // in
   return bFound;
 }
 
-BOOL AddHandleToList(CONTEXT_HANDLE* pContextHandle, // in
+BOOL AddHandleToList(TCS_CONTEXT_HANDLE hContext, // in
 		     TPM_RESOURCE_TYPE type, // in
 		     TPM_HANDLE    handle)  { // in
   HANDLE_LIST* pNewHandle = NULL;
-  
+
   vtpmloginfo(VTPM_LOG_TCS_DEEP, "Adding Handle to list\n");
+  CONTEXT_HANDLE* pContextHandle = LookupContext(hContext);
+
   if (pContextHandle == NULL)
     return 0;
   
@@ -154,11 +157,13 @@ BOOL AddHandleToList(CONTEXT_HANDLE* pContextHandle, // in
   return 1;
 }
 
-BOOL DeleteHandleFromList(   CONTEXT_HANDLE*     pContextHandle, // in
+BOOL DeleteHandleFromList(   TCS_CONTEXT_HANDLE hContext, // in		     
                              TPM_HANDLE          handle) { // in
     
+  CONTEXT_HANDLE* pContextHandle = LookupContext(hContext);
+
   HANDLE_LIST *pCurrentHandle = pContextHandle->pHandleList, 
-    *pLastHandle = pCurrentHandle;
+              *pLastHandle = pCurrentHandle;
   
   vtpmloginfo(VTPM_LOG_TCS_DEEP, "Deleting Handle from list\n");
   
@@ -202,10 +207,10 @@ BOOL FreeHandleList(    CONTEXT_HANDLE*     pContextHandle) { // in
     
     switch (pCurrentHandle->type) {
     case TPM_RT_KEY:
-      returncode = returncode && !TCSP_EvictKey((TCS_CONTEXT_HANDLE) pContextHandle, pCurrentHandle->handle);
+      returncode = returncode && !TCSP_EvictKey(pContextHandle->handle, pCurrentHandle->handle);
       break;
     case TPM_RT_AUTH:
-      returncode = returncode && !TCSP_TerminateHandle((TCS_CONTEXT_HANDLE) pContextHandle, pCurrentHandle->handle);
+      returncode = returncode && !TCSP_TerminateHandle(pContextHandle->handle, pCurrentHandle->handle);
       break;
     default:
       returncode = FALSE;

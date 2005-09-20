@@ -107,6 +107,33 @@ static void build_e820map(struct mem_map *mem_mapp, unsigned long mem_size)
     mem_mapp->nr_map = nr_map;
 }
 
+/*
+ * Use E820 reserved memory 0x9F800 to pass number of vcpus to vmxloader
+ * vmxloader will use it to config ACPI MADT table
+ */
+#define VCPU_MAGIC 0x76637075 /* "vcpu" */
+static int 
+set_nr_vcpus(int xc_handle, u32 dom, unsigned long *pfn_list, 
+             struct domain_setup_info *dsi, unsigned long vcpus)
+{
+    char          *va_map;
+    unsigned long *va_vcpus;
+    
+    va_map = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
+        pfn_list[(0x9F000 - dsi->v_start) >> PAGE_SHIFT]);    
+    if ( va_map == NULL )
+        return -1;
+    
+    va_vcpus = (unsigned long *)(va_map + 0x800);
+    *va_vcpus++ = VCPU_MAGIC;
+    *va_vcpus++ = vcpus;
+
+    munmap(va_map, PAGE_SIZE);
+
+    return 0;
+}
+
 #ifdef __i386__
 static int zap_mmio_range(int xc_handle, u32 dom,
                           l2_pgentry_32_t *vl2tab,
@@ -496,7 +523,8 @@ static int setup_guest(int xc_handle,
                                MMU_MACHPHYS_UPDATE, count) )
             goto error_out;
     }
-    
+
+    set_nr_vcpus(xc_handle, dom, page_array, &dsi, vcpus);
 
     if ((boot_paramsp = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,

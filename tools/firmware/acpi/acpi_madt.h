@@ -35,9 +35,9 @@
 //
 #pragma pack (1)
 typedef struct {
-  ACPI_2_0_MADT   				Header;
-  ACPI_LOCAL_APIC_STRUCTURE     LocalApic[4];
-  ACPI_IO_APIC_STRUCTURE        IoApic[1];
+	ACPI_2_0_MADT			Header;
+	ACPI_IO_APIC_STRUCTURE		IoApic[1];
+	ACPI_LOCAL_APIC_STRUCTURE	LocalApic[32];
 } ACPI_MULTIPLE_APIC_DESCRIPTION_TABLE;
 #pragma pack ()
 

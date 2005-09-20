@@ -47,9 +47,10 @@
 #include "contextmgr.h"
 #include "tpmddl.h"
 #include "log.h"
+#include "hashtable.h"
+#include "hashtable_itr.h"
 
 // Static Global Vars for the TCS
-static BOOL TCS_m_bConnected;
 static int TCS_m_nCount = 0;
 
 #define TCPA_MAX_BUFFER_LENGTH 0x2000
@@ -57,6 +58,21 @@ static int TCS_m_nCount = 0;
 static BYTE InBuf [TCPA_MAX_BUFFER_LENGTH];
 static BYTE OutBuf[TCPA_MAX_BUFFER_LENGTH];
 
+struct hashtable *context_ht;
+
+// -------------------------- Hash table functions --------------------
+
+static unsigned int hashfunc32(void *ky) {
+  return (* (UINT32 *) ky);
+}
+
+static int equals32(void *k1, void *k2) {
+  return (*(UINT32 *) k1 == *(UINT32 *) k2);
+}
+
+CONTEXT_HANDLE *LookupContext( TCS_CONTEXT_HANDLE  hContext) {
+  return( (CONTEXT_HANDLE *) hashtable_search(context_ht, &hContext) );
+}
 
 // ---------------------------------------------------------------------------------
 // Initialization/Uninitialization SubComponent API
@@ -64,34 +80,50 @@ static BYTE OutBuf[TCPA_MAX_BUFFER_LENGTH];
 TPM_RESULT TCS_create() {
   TDDL_RESULT hRes = TDDL_E_FAIL;
   TPM_RESULT result = TPM_FAIL;
-  TCS_m_bConnected = FALSE;
   
   if (TCS_m_nCount == 0) {
     vtpmloginfo(VTPM_LOG_TCS, "Constructing new TCS:\n");
     hRes = TDDL_Open();
-    
-    if (hRes == TDDL_SUCCESS) {
-      TCS_m_bConnected = TRUE;
+
+    context_ht = create_hashtable(10, hashfunc32, equals32);
+	  
+    if ((hRes == TDDL_SUCCESS) && (context_ht != NULL)) {
       result = TPM_SUCCESS;
+      TCS_m_nCount++;
+    } else {
+      result = TPM_IOERROR;
+      hashtable_destroy(context_ht, 1);
     }
   } else
-    TCS_m_bConnected = TRUE;
-  
-  TCS_m_nCount++;
-  
+    TCS_m_nCount++;
+    
   return(result);
 }
 
 
 void TCS_destroy()
 {
-  // FIXME: Should iterate through all open contexts and close them.
   TCS_m_nCount--;
   
-  if (TCS_m_bConnected == TRUE && TCS_m_nCount == 0) {
+  if (TCS_m_nCount == 0) {
     vtpmloginfo(VTPM_LOG_TCS, "Destructing TCS:\n");
     TDDL_Close();
-    TCS_m_bConnected = FALSE;
+
+    struct hashtable_itr *context_itr;
+    TCS_CONTEXT_HANDLE  *hContext;
+    
+    // Close all the TCS contexts. TCS should evict keys based on this
+    if (hashtable_count(context_ht) > 0) {
+      context_itr = hashtable_iterator(context_ht);
+      do {
+        hContext = (TCS_CONTEXT_HANDLE *) hashtable_iterator_key(context_itr);
+	if (TCS_CloseContext(*hContext) != TPM_SUCCESS) 
+	    vtpmlogerror(VTPM_LOG_TCS, "Failed to close context %d properly.\n", *hContext);
+      
+      } while (hashtable_iterator_advance(context_itr));
+      free(context_itr);
+    }
+    hashtable_destroy(context_ht, 1);
   }
   
 }
@@ -101,7 +133,7 @@ TPM_RESULT TCS_Malloc(  TCS_CONTEXT_HANDLE  hContext, // in
                         BYTE**              ppMemPtr) {// out
 
   TPM_RESULT returnCode = TPM_FAIL;
-  CONTEXT_HANDLE* pContextHandle = (CONTEXT_HANDLE*)hContext;
+  CONTEXT_HANDLE* pContextHandle = LookupContext(hContext);
   
   if (pContextHandle != NULL && ppMemPtr != NULL) {
     *ppMemPtr = (BYTE *)AddMemBlock(pContextHandle, MemSize);
@@ -114,7 +146,7 @@ TPM_RESULT TCS_Malloc(  TCS_CONTEXT_HANDLE  hContext, // in
 TPM_RESULT TCS_FreeMemory(  TCS_CONTEXT_HANDLE  hContext, // in
                             BYTE*               pMemory) { // in
   TPM_RESULT returnCode = TPM_FAIL;
-  CONTEXT_HANDLE* pContextHandle = (CONTEXT_HANDLE*)hContext;
+  CONTEXT_HANDLE* pContextHandle = LookupContext(hContext);
   
   if ( (pContextHandle != NULL && pMemory != NULL) &&
        (DeleteMemBlock(pContextHandle, pMemory) == TRUE) )
@@ -126,15 +158,15 @@ TPM_RESULT TCS_FreeMemory(  TCS_CONTEXT_HANDLE  hContext, // in
 
 TPM_RESULT TCS_OpenContext(TCS_CONTEXT_HANDLE* hContext) { // out
   TPM_RESULT returnCode = TPM_FAIL;
+  TCS_CONTEXT_HANDLE *newContext;
   
   vtpmloginfo(VTPM_LOG_TCS, "Calling TCS_OpenContext:\n");
   
   // hContext must point to a null memory context handle
   if(*hContext == HANDLE_NULL) {
-    CONTEXT_HANDLE* pContextHandle = (CONTEXT_HANDLE *)malloc(sizeof(CONTEXT_HANDLE));
+    CONTEXT_HANDLE* pContextHandle = (CONTEXT_HANDLE *) malloc(sizeof(CONTEXT_HANDLE));
     if (pContextHandle == NULL) 
       return TPM_SIZE;
-    
     
     // initialize to 0
     pContextHandle->nBlockCount = 0;
@@ -144,19 +176,32 @@ TPM_RESULT TCS_OpenContext(TCS_CONTEXT_HANDLE* hContext) { // out
     // Create New Block
     AddMemBlock(pContextHandle, BLOCK_SIZE);
     
-    *hContext = (TCS_CONTEXT_HANDLE)pContextHandle;
-    returnCode = TPM_SUCCESS;
+    newContext = (TCS_CONTEXT_HANDLE *) malloc(sizeof(TCS_CONTEXT_HANDLE));
+    *newContext = (TCS_CONTEXT_HANDLE) (((uintptr_t) pContextHandle >> 2) & 0xffffffff);
+    
+    if (hashtable_search(context_ht, &newContext) !=NULL)
+    	*newContext += 1;
+    
+    pContextHandle->handle = *newContext;
+    if (!hashtable_insert(context_ht, newContext, pContextHandle)) {
+        free(newContext);
+        free(pContextHandle);
+    	returnCode = TPM_FAIL;
+    } else {
+    	*hContext = *newContext;
+    	returnCode = TPM_SUCCESS;
+    }
   }
   
   return(returnCode);
 }
 
 TPM_RESULT TCS_CloseContext(TCS_CONTEXT_HANDLE hContext) {// in
-  //FIXME: TCS SHOULD Track track failed auths and make sure
+  //FIXME: TCS SHOULD Track failed auths and make sure
   //we don't try and re-free them here.
   TPM_RESULT returnCode = TPM_FAIL;
   
-  CONTEXT_HANDLE* pContextHandle = (CONTEXT_HANDLE*)hContext;
+  CONTEXT_HANDLE* pContextHandle = LookupContext(hContext);
   
   if(pContextHandle != NULL) {
     // Print test info
@@ -171,6 +216,9 @@ TPM_RESULT TCS_CloseContext(TCS_CONTEXT_HANDLE hContext) {// in
       vtpmlogerror(VTPM_LOG_TCS, "Not all handles evicted from TPM.\n");
     
     // Release the TPM's resources
+    if (hashtable_remove(context_ht, &hContext) == NULL) 
+      vtpmlogerror(VTPM_LOG_TCS, "Not all handles evicted from TPM.\n");
+    
     free(pContextHandle);
     returnCode = TPM_SUCCESS;
   }
@@ -255,7 +303,7 @@ TPM_RESULT TCSP_OIAP(TCS_CONTEXT_HANDLE hContext, // in
 		     BSG_TYPE_UINT32, authHandle, 
 		     BSG_TPM_NONCE, nonce0);
       
-      if (!AddHandleToList((CONTEXT_HANDLE *)hContext, TPM_RT_AUTH, *authHandle)) 
+      if (!AddHandleToList(hContext, TPM_RT_AUTH, *authHandle)) 
         vtpmlogerror(VTPM_LOG_TCS, "New AuthHandle not recorded\n");
       
       vtpmloginfo(VTPM_LOG_TCS_DEEP, "Received paramSize : %d\n", paramSize);
@@ -321,7 +369,7 @@ TPM_RESULT TCSP_OSAP(TCS_CONTEXT_HANDLE hContext,  // in
 		     BSG_TPM_NONCE, nonceEven, 
 		     BSG_TPM_NONCE, nonceEvenOSAP);
       
-      if (!AddHandleToList((CONTEXT_HANDLE *)hContext, TPM_RT_AUTH, *authHandle)) {
+      if (!AddHandleToList(hContext, TPM_RT_AUTH, *authHandle)) {
 	    vtpmlogerror(VTPM_LOG_TCS, "New AuthHandle not recorded\n");
       }
       
@@ -498,7 +546,7 @@ TPM_RESULT TCSP_TerminateHandle(TCS_CONTEXT_HANDLE hContext, // in
 			   BSG_TYPE_UINT32, &paramSize, 
 			   BSG_TPM_COMMAND_CODE, &returnCode);
     
-    if (!DeleteHandleFromList((CONTEXT_HANDLE *)hContext, handle)) 
+    if (!DeleteHandleFromList(hContext, handle)) 
       vtpmlogerror(VTPM_LOG_TCS, "KeyHandle not removed from list\n");
        
     
@@ -897,7 +945,7 @@ TPM_RESULT TCSP_LoadKeyByBlob(TCS_CONTEXT_HANDLE hContext,    // in
 		      phKeyTCSI);
       unpackAuth(pAuth, OutBuf+i);
       
-      if (!AddHandleToList((CONTEXT_HANDLE *)hContext, TPM_RT_KEY, *phKeyTCSI)) {
+      if (!AddHandleToList(hContext, TPM_RT_KEY, *phKeyTCSI)) {
         vtpmlogerror(VTPM_LOG_TCS, "New KeyHandle not recorded\n");
       }
       
@@ -942,7 +990,7 @@ TPM_RESULT TCSP_EvictKey(TCS_CONTEXT_HANDLE hContext, // in
 			   BSG_TYPE_UINT32, &paramSize, 
 			   BSG_TPM_COMMAND_CODE, &returnCode);
     
-    if (!DeleteHandleFromList((CONTEXT_HANDLE *)hContext, hKey)) {
+    if (!DeleteHandleFromList(hContext, hKey)) {
       vtpmlogerror(VTPM_LOG_TCS, "KeyHandle not removed from list\n");
     }	 
     

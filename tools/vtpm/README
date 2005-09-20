@@ -23,6 +23,7 @@ Requirements
 - xen-unstable 
 - IBM frontend/backend vtpm driver patch
 - vtpm_managerd
+- GNU MP Big number library (GMP)
 
 vtpmd Flow (for vtpm_manager. vtpmd never run by default)
 ============================

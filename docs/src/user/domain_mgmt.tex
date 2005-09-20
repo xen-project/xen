@@ -1,0 +1,203 @@
+\chapter{Domain Management Tools}
+
+The previous chapter described a simple example of how to configure
+and start a domain.  This chapter summarises the tools available to
+manage running domains.
+
+
+\section{Command-line Management}
+
+Command line management tasks are also performed using the \path{xm}
+tool.  For online help for the commands available, type:
+\begin{quote}
+  \verb_# xm help_
+\end{quote}
+
+You can also type \path{xm help $<$command$>$} for more information on
+a given command.
+
+\subsection{Basic Management Commands}
+
+The most important \path{xm} commands are:
+\begin{quote}
+  \verb_# xm list_: Lists all domains running.\\
+  \verb_# xm consoles_: Gives information about the domain consoles.\\
+  \verb_# xm console_: Opens a console to a domain (e.g.\
+  \verb_# xm console myVM_)
+\end{quote}
+
+\subsection{\tt xm list}
+
+The output of \path{xm list} is in rows of the following format:
+\begin{center} {\tt name domid memory cpu state cputime console}
+\end{center}
+
+\begin{quote}
+  \begin{description}
+  \item[name] The descriptive name of the virtual machine.
+  \item[domid] The number of the domain ID this virtual machine is
+    running in.
+  \item[memory] Memory size in megabytes.
+  \item[cpu] The CPU this domain is running on.
+  \item[state] Domain state consists of 5 fields:
+    \begin{description}
+    \item[r] running
+    \item[b] blocked
+    \item[p] paused
+    \item[s] shutdown
+    \item[c] crashed
+    \end{description}
+  \item[cputime] How much CPU time (in seconds) the domain has used so
+    far.
+  \item[console] TCP port accepting connections to the domain's
+    console.
+  \end{description}
+\end{quote}
+
+The \path{xm list} command also supports a long output format when the
+\path{-l} switch is used.  This outputs the fulls details of the
+running domains in \xend's SXP configuration format.
+
+For example, suppose the system is running the ttylinux domain as
+described earlier.  The list command should produce output somewhat
+like the following:
+\begin{verbatim}
+# xm list
+Name              Id  Mem(MB)  CPU  State  Time(s)  Console
+Domain-0           0      251    0  r----    172.2        
+ttylinux           5       63    0  -b---      3.0    9605
+\end{verbatim}
+
+Here we can see the details for the ttylinux domain, as well as for
+domain~0 (which, of course, is always running).  Note that the console
+port for the ttylinux domain is 9605.  This can be connected to by TCP
+using a terminal program (e.g. \path{telnet} or, better,
+\path{xencons}).  The simplest way to connect is to use the
+\path{xm~console} command, specifying the domain name or ID.  To
+connect to the console of the ttylinux domain, we could use any of the
+following:
+\begin{verbatim}
+# xm console ttylinux
+# xm console 5
+# xencons localhost 9605
+\end{verbatim}
+
+\section{Domain Save and Restore}
+
+The administrator of a Xen system may suspend a virtual machine's
+current state into a disk file in domain~0, allowing it to be resumed
+at a later time.
+
+The ttylinux domain described earlier can be suspended to disk using
+the command:
+\begin{verbatim}
+# xm save ttylinux ttylinux.xen
+\end{verbatim}
+
+This will stop the domain named `ttylinux' and save its current state
+into a file called \path{ttylinux.xen}.
+
+To resume execution of this domain, use the \path{xm restore} command:
+\begin{verbatim}
+# xm restore ttylinux.xen
+\end{verbatim}
+
+This will restore the state of the domain and restart it.  The domain
+will carry on as before and the console may be reconnected using the
+\path{xm console} command, as above.
+
+\section{Live Migration}
+
+Live migration is used to transfer a domain between physical hosts
+whilst that domain continues to perform its usual activities --- from
+the user's perspective, the migration should be imperceptible.
+
+To perform a live migration, both hosts must be running Xen / \xend\
+and the destination host must have sufficient resources (e.g.\ memory
+capacity) to accommodate the domain after the move. Furthermore we
+currently require both source and destination machines to be on the
+same L2 subnet.
+
+Currently, there is no support for providing automatic remote access
+to filesystems stored on local disk when a domain is migrated.
+Administrators should choose an appropriate storage solution (i.e.\
+SAN, NAS, etc.) to ensure that domain filesystems are also available
+on their destination node. GNBD is a good method for exporting a
+volume from one machine to another. iSCSI can do a similar job, but is
+more complex to set up.
+
+When a domain migrates, it's MAC and IP address move with it, thus it
+is only possible to migrate VMs within the same layer-2 network and IP
+subnet. If the destination node is on a different subnet, the
+administrator would need to manually configure a suitable etherip or
+IP tunnel in the domain~0 of the remote node.
+
+A domain may be migrated using the \path{xm migrate} command.  To live
+migrate a domain to another machine, we would use the command:
+
+\begin{verbatim}
+# xm migrate --live mydomain destination.ournetwork.com
+\end{verbatim}
+
+Without the \path{--live} flag, \xend\ simply stops the domain and
+copies the memory image over to the new node and restarts it. Since
+domains can have large allocations this can be quite time consuming,
+even on a Gigabit network. With the \path{--live} flag \xend\ attempts
+to keep the domain running while the migration is in progress,
+resulting in typical `downtimes' of just 60--300ms.
+
+For now it will be necessary to reconnect to the domain's console on
+the new machine using the \path{xm console} command.  If a migrated
+domain has any open network connections then they will be preserved,
+so SSH connections do not have this limitation.
+
+
+\section{Managing Domain Memory}
+
+XenLinux domains have the ability to relinquish / reclaim machine
+memory at the request of the administrator or the user of the domain.
+
+\subsection{Setting memory footprints from dom0}
+
+The machine administrator can request that a domain alter its memory
+footprint using the \path{xm set-mem} command.  For instance, we can
+request that our example ttylinux domain reduce its memory footprint
+to 32 megabytes.
+
+\begin{verbatim}
+# xm set-mem ttylinux 32
+\end{verbatim}
+
+We can now see the result of this in the output of \path{xm list}:
+
+\begin{verbatim}
+# xm list
+Name              Id  Mem(MB)  CPU  State  Time(s)  Console
+Domain-0           0      251    0  r----    172.2        
+ttylinux           5       31    0  -b---      4.3    9605
+\end{verbatim}
+
+The domain has responded to the request by returning memory to Xen. We
+can restore the domain to its original size using the command line:
+
+\begin{verbatim}
+# xm set-mem ttylinux 64
+\end{verbatim}
+
+\subsection{Setting memory footprints from within a domain}
+
+The virtual file \path{/proc/xen/balloon} allows the owner of a domain
+to adjust their own memory footprint.  Reading the file (e.g.\
+\path{cat /proc/xen/balloon}) prints out the current memory footprint
+of the domain.  Writing the file (e.g.\ \path{echo new\_target >
+  /proc/xen/balloon}) requests that the kernel adjust the domain's
+memory footprint to a new value.
+
+\subsection{Setting memory limits}
+
+Xen associates a memory size limit with each domain.  By default, this
+is the amount of memory the domain is originally started with,
+preventing the domain from ever growing beyond this size.  To permit a
+domain to grow beyond its original allocation or to prevent a domain
+you've shrunk from reclaiming the memory it relinquished, use the
+\path{xm maxmem} command.
