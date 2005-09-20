@@ -4,7 +4,6 @@
 # Public License.  See the file "COPYING" in the main directory of
 # this archive for more details.
 
-import errno
 import os
 import re
 import select
@@ -12,7 +11,7 @@ import sxp
 from string import join
 from struct import pack, unpack, calcsize
 from xen.util.xpopen import xPopen3
-import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
+import xen.lowlevel.xc
 from xen.xend.xenstore.xsutil import IntroduceDomain
 
 from XendError import XendError
@@ -24,6 +23,10 @@ PATH_XC_RESTORE = "/usr/libexec/xen/xc_restore"
 
 sizeof_int = calcsize("i")
 sizeof_unsigned_long = calcsize("L")
+
+
+xc = xen.lowlevel.xc.new()
+
 
 def write_exact(fd, buf, errmsg):
     if os.write(fd, buf) != len(buf):
