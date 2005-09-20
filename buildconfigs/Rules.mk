@@ -15,6 +15,13 @@ ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
 PRISTINE_SRC_PATH	?= .:..
 vpath pristine-% $(PRISTINE_SRC_PATH)
 
+# By default, build Linux with ARCH=xen (overridden by some non arch's)
+ifneq ($(ARCH),ia64)
+LINUX_ARCH	?= xen
+else
+LINUX_ARCH	?= ia64
+endif
+
 # Expand Linux series to Linux version
 LINUX_SERIES	?= 2.6
 

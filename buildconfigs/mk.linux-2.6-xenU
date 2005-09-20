@@ -15,17 +15,17 @@ include buildconfigs/Rules.mk
 # The real action starts here!
 build: $(LINUX_DIR)/include/linux/autoconf.h
 	if grep "^CONFIG_MODULES=" $(LINUX_DIR)/.config ; then \
-	    $(MAKE) -C $(LINUX_DIR) ARCH=xen modules ; \
-	    $(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_MOD_PATH=$(DESTDIR) modules_install ; \
+	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) modules ; \
+	    $(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_MOD_PATH=$(DESTDIR) modules_install ; \
 	fi
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(DESTDIR) install
+	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) INSTALL_PATH=$(DESTDIR) install
 
 $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
 	rm -rf $(LINUX_DIR)
 	cp -al $(<D) $(LINUX_DIR)
 	# Apply arch-xen patches
 	( cd linux-$(LINUX_SERIES)-xen-sparse ; \
-          ./mkbuildtree ../$(LINUX_DIR) )
+          LINUX_ARCH=$(LINUX_ARCH) ./mkbuildtree ../$(LINUX_DIR) )
 	# Re-use config from install dir if one exits else use default config
 	CONFIG_VERSION=$$(sed -ne 's/^EXTRAVERSION = //p' $(LINUX_DIR)/Makefile); \
 	[ -r $(DESTDIR)/boot/config-$(LINUX_VER)$$CONFIG_VERSION-$(EXTRAVERSION) ] && \
@@ -38,14 +38,14 @@ $(LINUX_DIR)/include/linux/autoconf.h: ref-$(OS)-$(LINUX_VER)/.valid-ref
 	( cd $(LINUX_DIR) ; \
 	  sed -e 's/^EXTRAVERSION.*/&$$(XENGUEST)\nXENGUEST = -$(EXTRAVERSION)/' Makefile >Mk.tmp ; \
 	  rm -f Makefile ; mv Mk.tmp Makefile )
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen oldconfig
+	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) oldconfig
 
 config: CONFIGMODE = menuconfig
 config: $(LINUX_DIR)/include/linux/autoconf.h
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen $(CONFIGMODE)
+	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) $(CONFIGMODE)
 
 clean::
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean
+	$(MAKE) -C $(LINUX_DIR) ARCH=$(LINUX_ARCH) clean
 
 delete: 
 	rm -rf tmp-$(OS)-$(LINUX_VER) $(LINUX_DIR) 
