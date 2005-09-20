@@ -37,44 +37,7 @@ ACPI_MULTIPLE_APIC_DESCRIPTION_TABLE Madt = {
 				ACPI_LOCAL_APIC_ADDRESS,
 				ACPI_MULTIPLE_APIC_FLAGS,
 		},
-		//
-		// LOCAL APIC Entries for 4 processors.
-		//
-		{
-				{
-						ACPI_PROCESSOR_LOCAL_APIC,                          
-						sizeof (ACPI_LOCAL_APIC_STRUCTURE),     
-						0x00,                                                     
-						0x00,                                                     
-						0x00000001,                                               
-				},
-
-				{
-						ACPI_PROCESSOR_LOCAL_APIC,                          
-						sizeof (ACPI_LOCAL_APIC_STRUCTURE),     
-						0x01,                                                     
-						0x00,                                                     
-						0x00000000
-				},                                               
-
-				{
-						ACPI_PROCESSOR_LOCAL_APIC,                          
-						sizeof (ACPI_LOCAL_APIC_STRUCTURE),     
-						0x02,                                                     
-						0x00,                                                     
-						0x00000000
-				},                                               
-
-				{
-						ACPI_PROCESSOR_LOCAL_APIC,                          
-						sizeof (ACPI_LOCAL_APIC_STRUCTURE),     
-						0x03,                                                     
-						0x00,                                                     
-						0x00000000
-				}
-		}
-		,
-
+	
 		//
 		// IO APIC
 		// 
@@ -87,5 +50,19 @@ ACPI_MULTIPLE_APIC_DESCRIPTION_TABLE Madt = {
 						ACPI_IO_APIC_ADDRESS_1,
 						0x0000
 				}
+		},
+
+		//
+		// LOCAL APIC Entries for up to 32 processors.
+		//
+		{
+				{
+						ACPI_PROCESSOR_LOCAL_APIC,
+						sizeof (ACPI_LOCAL_APIC_STRUCTURE),
+						0x00,
+						0x00,
+						0x00000001,
+				}
+
 		}
 };
