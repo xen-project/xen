@@ -42,7 +42,7 @@ class BlkifController(DevController):
         
         typedev = sxp.child_value(config, 'dev')
         if re.match('^ioemu:', typedev):
-            return
+            return (0,{},{})
 
         devid = blkif.blkdev_name_to_number(sxp.child_value(config, 'dev'))
 
