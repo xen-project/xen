@@ -22,7 +22,7 @@ import types
 from encode import *
 import sxp
 
-from xen.xend import XendRoot; xroot = XendRoot.instance()
+from xen.xend import XendRoot
 
 DEBUG = 0
 
@@ -30,6 +30,10 @@ HTTP_OK                              = 200
 HTTP_CREATED                         = 201
 HTTP_ACCEPTED                        = 202
 HTTP_NO_CONTENT                      = 204
+
+
+xroot = XendRoot.instance()
+
 
 class XendError(RuntimeError):
     """Error class for 'expected errors' when talking to xend.
