@@ -261,7 +261,8 @@ ENTRY(hyper_ssm_i)
 	;;
 	// FOR SSM_I ONLY, also turn on psr.i and psr.ic
 	movl r28=(IA64_PSR_DT|IA64_PSR_IT|IA64_PSR_RT|IA64_PSR_I|IA64_PSR_IC);;
-	movl r27=~(IA64_PSR_BE|IA64_PSR_PP|IA64_PSR_BN);;
+//	movl r27=~(IA64_PSR_BE|IA64_PSR_PP|IA64_PSR_BN);;
+	movl r27=~(IA64_PSR_BE|IA64_PSR_BN);;
 	or r30=r30,r28;;
 	and r30=r30,r27;;
 	adds r21=XSI_IPSR_OFS-XSI_PSR_IC_OFS,r18 ;;

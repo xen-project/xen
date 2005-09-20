@@ -191,7 +191,12 @@ IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 			return (IA64_ILLOP_FAULT);
 	if (imm.dfh) ipsr->dfh = 0;
 	if (imm.dfl) ipsr->dfl = 0;
-	if (imm.pp) { ipsr->pp = 0; psr.pp = 0; }
+	if (imm.pp) {
+		ipsr->pp = 1;
+		psr.pp = 1;	// priv perf ctrs always enabled
+// FIXME: need new field in mapped_regs_t for virtual psr.pp (psr.be too?)
+		PSCB(vcpu,tmp[8]) = 0;	// but fool the domain if it gets psr
+	}
 	if (imm.up) { ipsr->up = 0; psr.up = 0; }
 	if (imm.sp) { ipsr->sp = 0; psr.sp = 0; }
 	if (imm.be) ipsr->be = 0;
@@ -233,7 +238,11 @@ IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 	if (imm24 & ~mask) return (IA64_ILLOP_FAULT);
 	if (imm.dfh) ipsr->dfh = 1;
 	if (imm.dfl) ipsr->dfl = 1;
-	if (imm.pp) { ipsr->pp = 1; psr.pp = 1; }
+	if (imm.pp) {
+		ipsr->pp = 1; psr.pp = 1;
+// FIXME: need new field in mapped_regs_t for virtual psr.pp (psr.be too?)
+		PSCB(vcpu,tmp[8]) = 1;
+	}
 	if (imm.sp) { ipsr->sp = 1; psr.sp = 1; }
 	if (imm.i) {
 		if (!PSCB(vcpu,interrupt_delivery_enabled)) {
@@ -284,7 +293,15 @@ IA64FAULT vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
 	// however trying to set other bits can't be an error as it is in ssm
 	if (newpsr.dfh) ipsr->dfh = 1;
 	if (newpsr.dfl) ipsr->dfl = 1;
-	if (newpsr.pp) { ipsr->pp = 1; psr.pp = 1; }
+	if (newpsr.pp) {
+		ipsr->pp = 1; psr.pp = 1;
+// FIXME: need new field in mapped_regs_t for virtual psr.pp (psr.be too?)
+		PSCB(vcpu,tmp[8]) = 1;
+	}
+	else {
+		ipsr->pp = 1; psr.pp = 1;
+		PSCB(vcpu,tmp[8]) = 0;
+	}
 	if (newpsr.up) { ipsr->up = 1; psr.up = 1; }
 	if (newpsr.sp) { ipsr->sp = 1; psr.sp = 1; }
 	if (newpsr.i) {
@@ -331,6 +348,9 @@ IA64FAULT vcpu_get_psr(VCPU *vcpu, UINT64 *pval)
 	else newpsr.i = 0;
 	if (PSCB(vcpu,interrupt_collection_enabled)) newpsr.ic = 1;
 	else newpsr.ic = 0;
+// FIXME: need new field in mapped_regs_t for virtual psr.pp (psr.be too?)
+	if (PSCB(vcpu,tmp[8])) newpsr.pp = 1;
+	else newpsr.pp = 0;
 	*pval = *(unsigned long *)&newpsr;
 	return IA64_NO_FAULT;
 }

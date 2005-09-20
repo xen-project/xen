@@ -229,6 +229,7 @@ typedef struct {
 	    unsigned long krs[8];	// kernel registers
 	    unsigned long pkrs[8];	// protection key registers
 	    unsigned long tmp[8];	// temp registers (e.g. for hyperprivops)
+		// FIXME: tmp[8] temp'ly being used for virtual psr.pp
 	  };
         };
 #if 0
