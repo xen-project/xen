@@ -300,6 +300,7 @@ class VmxImageHandler(ImageHandler):
         """
         self.parseMemmap()
         self.createDomain()
+        self.dmargs += self.configVNC(sxp.child_value(self.vm.config, 'image'))
 
     def buildDomain(self):
         # Create an event channel
@@ -383,10 +384,13 @@ class VmxImageHandler(ImageHandler):
                instance = sxp.child_value(vtpminfo, 'instance')
                ret.append("-instance")
                ret.append("%s" % instance)
+        return ret
 
+    def configVNC(self, config):
         # Handle graphics library related options
         vnc = sxp.child_value(config, 'vnc')
         sdl = sxp.child_value(config, 'sdl')
+        ret = []
         nographic = sxp.child_value(config, 'nographic')
         if nographic:
             ret.append('-nographic')
