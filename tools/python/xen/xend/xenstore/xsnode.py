@@ -272,8 +272,11 @@ class XenStore:
     def write(self, path, data):
         try:
             self.getxs().write(path, data)
-        except Exception, ex:
-            raise
+        except RuntimeError, ex:
+            raise RuntimeError(ex.args[0],
+                               ex.args[1] +
+                               (', while writing %s : %s' % (str(path),
+                                                             str(data))))
 
     def begin(self, path):
         self.getxs().transaction_start(path)
