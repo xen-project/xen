@@ -89,6 +89,11 @@ AS=`pwd`
 abs_to_rel ${AD} ${AS}
 RS=$DESTPATH
 
+# Arch-specific pre-processing
+if [ -x arch/${LINUX_ARCH}/xen-mkbuildtree-pre ]; then
+	arch/${LINUX_ARCH}/xen-mkbuildtree-pre
+fi
+
 # Remove old copies of files and directories at the destination
 for i in `find . -type f -o -type l` ; do rm -f ${AD}/${i#./} ; done
 
@@ -110,3 +115,9 @@ relative_lndir ../../../${RS}/../xen/include/public
 
 cd ${AD}/include/asm-xen/linux-public
 ln -sf ../../../${RS}/../tools/xenstore/xenstored.h
+
+# Arch-specific post-processing
+cd ${AD}
+if [ -x arch/${LINUX_ARCH}/xen-mkbuildtree-post ]; then
+	arch/${LINUX_ARCH}/xen-mkbuildtree-post
+fi
