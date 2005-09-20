@@ -671,13 +671,13 @@ static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
     if (inst->operand[0] & REGISTER) { /* dest is memory */
         index = operand_index(inst->operand[0]);
         value = get_reg_value(size, index, 0, regs);
-        send_mmio_req(type, gpa, 1, size, value, IOREQ_WRITE, 0);
+        send_mmio_req(type, gpa, 1, inst->op_size, value, IOREQ_WRITE, 0);
     } else if (inst->operand[0] & IMMEDIATE) { /* dest is memory */
         value = inst->immediate;
-        send_mmio_req(type, gpa, 1, size, value, IOREQ_WRITE, 0);
+        send_mmio_req(type, gpa, 1, inst->op_size, value, IOREQ_WRITE, 0);
     } else if (inst->operand[0] & MEMORY) { /* dest is register */
         /* send the request and wait for the value */
-        send_mmio_req(type, gpa, 1, size, 0, IOREQ_READ, 0);
+        send_mmio_req(type, gpa, 1, inst->op_size, 0, IOREQ_READ, 0);
     } else {
         printf("mmio_operands: invalid operand\n");
         domain_crash_synchronous();
