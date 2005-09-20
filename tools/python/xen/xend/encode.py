@@ -26,7 +26,6 @@ import types
 from StringIO import StringIO
 
 import urllib
-import httplib
 import random
 import md5
 
@@ -104,7 +103,7 @@ def encode_data(d):
     val = ({}, None)
     if d is None: return val
     multipart = 0
-    for (k, v) in data_values(d):
+    for (_, v) in data_values(d):
         if encode_isfile(v):
             multipart = 1
             break
@@ -156,7 +155,7 @@ def encode_multipart(d):
 def mime_boundary():
     random.seed()
     m = md5.new()
-    for i in range(0, 10):
+    for _ in range(0, 10):
         c = chr(random.randint(1, 255))
         m.update(c)
     b = m.hexdigest()
