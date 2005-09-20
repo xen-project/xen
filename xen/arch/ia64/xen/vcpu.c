@@ -21,6 +21,7 @@ int in_tpa = 0;
 #include <asm/processor.h>
 #include <asm/delay.h>
 #include <asm/vmx_vcpu.h>
+#include <xen/event.h>
 
 typedef	union {
 	struct ia64_psr ia64_psr;
@@ -653,6 +654,15 @@ void early_tick(VCPU *vcpu)
 UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 {
 	UINT64 *p, *q, *r, bits, bitnum, mask, i, vector;
+
+	/* Always check pending event, since guest may just ack the
+	 * event injection without handle. Later guest may throw out
+	 * the event itself.
+	 */
+	if (event_pending(vcpu) && 
+		!test_bit(vcpu->vcpu_info->arch.evtchn_vector,
+			&PSCBX(vcpu, insvc[0])))
+		vcpu_pend_interrupt(vcpu, vcpu->vcpu_info->arch.evtchn_vector);
 
 	p = &PSCBX(vcpu,irr[3]);
 	/* q = &PSCB(vcpu,delivery_mask[3]); */

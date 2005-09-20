@@ -917,7 +917,7 @@ int construct_dom0(struct domain *d,
 #endif
 
 	/* Mask all upcalls... */
-	for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+	for ( i = 1; i < MAX_VIRT_CPUS; i++ )
 	    d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
 
 #ifdef CONFIG_VTI
