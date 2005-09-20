@@ -12,7 +12,7 @@ DOXYGEN		:= doxygen
 
 pkgdocdir	:= /usr/share/doc/xen
 
-DOC_TEX		:= $(wildcard src/*.tex)
+DOC_TEX		:= src/user.tex src/interface.tex
 DOC_PS		:= $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
 DOC_PDF		:= $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
 DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
