@@ -261,7 +261,6 @@ extern int sysctl_legacy_va_layout;
 
 /* VIRT <-> MACHINE conversion */
 #define virt_to_machine(v)	(phys_to_machine(__pa(v)))
-#define machine_to_virt(m)	(__va(machine_to_phys(m)))
 #define virt_to_mfn(v)		(pfn_to_mfn(__pa(v) >> PAGE_SHIFT))
 #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
 

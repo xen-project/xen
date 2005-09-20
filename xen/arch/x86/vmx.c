@@ -1100,6 +1100,11 @@ static int vmx_set_cr0(unsigned long value)
                     d->arch.arch_vmx.cpu_cr3, mfn);
     }
 
+    if(!((value & X86_CR0_PE) && (value & X86_CR0_PG)) && paging_enabled)
+        if(d->arch.arch_vmx.cpu_cr3)
+            put_page(pfn_to_page(get_mfn_from_pfn(
+                      d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT)));
+
     /*
      * VMX does not implement real-mode virtualization. We emulate
      * real-mode by performing a world switch to VMXAssist whenever
