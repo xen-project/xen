@@ -1,12 +1,12 @@
-diff -uprN orig/tpm_emulator-0.2/AUTHORS tpm_emulator-0.2/AUTHORS
---- orig/tpm_emulator-0.2/AUTHORS	2005-08-17 10:58:36.000000000 -0700
-+++ tpm_emulator-0.2/AUTHORS	2005-08-17 10:55:52.000000000 -0700
+diff -uprN orig/tpm_emulator-0.2-x86_64/AUTHORS tpm_emulator/AUTHORS
+--- orig/tpm_emulator-0.2-x86_64/AUTHORS	2005-08-15 00:58:57.000000000 -0700
++++ tpm_emulator/AUTHORS	2005-09-14 20:27:22.000000000 -0700
 @@ -1 +1,2 @@
  Mario Strasser <mast@gmx.net>
 +INTEL Corp <>
-diff -uprN orig/tpm_emulator-0.2/ChangeLog tpm_emulator-0.2/ChangeLog
---- orig/tpm_emulator-0.2/ChangeLog	2005-08-17 10:58:36.000000000 -0700
-+++ tpm_emulator-0.2/ChangeLog	2005-08-17 10:55:52.000000000 -0700
+diff -uprN orig/tpm_emulator-0.2-x86_64/ChangeLog tpm_emulator/ChangeLog
+--- orig/tpm_emulator-0.2-x86_64/ChangeLog	2005-08-15 00:58:57.000000000 -0700
++++ tpm_emulator/ChangeLog	2005-09-14 20:27:22.000000000 -0700
 @@ -1,3 +1,7 @@
 +2005-08-16: INTEL Corp
 +	* Set default permissions to PCRs
@@ -15,10 +15,29 @@ diff -uprN orig/tpm_emulator-0.2/ChangeLog tpm_emulator-0.2/ChangeLog
  2005-08-15  Mario Strasser <mast@gmx.net>
  	* all: some typos corrected
  	* tpm_integrity.c: bug in TPM_Extend fixed
-diff -uprN orig/tpm_emulator-0.2/Makefile tpm_emulator-0.2/Makefile
---- orig/tpm_emulator-0.2/Makefile	2005-08-17 10:58:36.000000000 -0700
-+++ tpm_emulator-0.2/Makefile	2005-08-17 10:55:52.000000000 -0700
-@@ -1,15 +1,19 @@
+diff -uprN orig/tpm_emulator-0.2-x86_64/linux_module.h tpm_emulator/linux_module.h
+--- orig/tpm_emulator-0.2-x86_64/linux_module.h	2005-09-15 19:21:14.844078720 -0700
++++ tpm_emulator/linux_module.h	2005-09-14 20:27:22.000000000 -0700
+@@ -1,5 +1,6 @@
+ /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
+  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
++ * Copyright (C) 2005 INTEL Corp.
+  *
+  * This module is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published
+@@ -35,7 +36,7 @@
+ #include "tpm_version.h"
+ 
+ #define TPM_DEVICE_MINOR	224
+-#define TPM_DEVICE_NAME         "tpm"
++#define TPM_DEVICE_NAME         "tpm0"
+ #define TPM_MODULE_NAME 	"tpm_emulator"
+ 
+ /* debug and log output functions */
+diff -uprN orig/tpm_emulator-0.2-x86_64/Makefile tpm_emulator/Makefile
+--- orig/tpm_emulator-0.2-x86_64/Makefile	2005-09-15 19:21:14.845078568 -0700
++++ tpm_emulator/Makefile	2005-09-14 20:27:22.000000000 -0700
+@@ -1,16 +1,20 @@
  # Software-Based Trusted Platform Module (TPM) Emulator for Linux
  # Copyright (C) 2004 Mario Strasser <mast@gmx.net>
 +# Copyright (C) 2005 INTEL Corp.
@@ -33,6 +52,7 @@ diff -uprN orig/tpm_emulator-0.2/Makefile tpm_emulator-0.2/Makefile
 -KERNEL_BUILD   := /lib/modules/$(KERNEL_RELEASE)/build
 +KERNEL_BUILD   := $(XEN_ROOT)/linux-2.6.12-xen0
  MOD_SUBDIR     := misc
+ COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
  
  # module settings
 -MODULE_NAME    := tpm_emulator
@@ -40,7 +60,7 @@ diff -uprN orig/tpm_emulator-0.2/Makefile tpm_emulator-0.2/Makefile
  VERSION_MAJOR  := 0
  VERSION_MINOR  := 2
  VERSION_BUILD  := $(shell date +"%s")
-@@ -27,11 +30,9 @@ DIRS           := . crypto tpm 
+@@ -34,11 +38,9 @@ DIRS           := . crypto tpm 
  SRCS           := $(foreach dir, $(DIRS), $(wildcard $(src)/$(dir)/*.c))
  OBJS           := $(patsubst %.c, %.o, $(SRCS))
  SRCS           += $(foreach dir, $(DIRS), $(wildcard $(src)/$(dir)/*.h))
@@ -54,7 +74,7 @@ diff -uprN orig/tpm_emulator-0.2/Makefile tpm_emulator-0.2/Makefile
  
  EXTRA_CFLAGS   += -I$(src) -I$(src)/crypto -I$(src)/tpm 
  
-@@ -42,23 +43,17 @@ all:	$(src)/crypto/gmp.h $(src)/crypto/l
+@@ -49,23 +51,17 @@ all:	$(src)/crypto/gmp.h $(src)/crypto/l
  	@$(MAKE) -C $(KERNEL_BUILD) M=$(CURDIR) modules
  
  install:
@@ -84,9 +104,9 @@ diff -uprN orig/tpm_emulator-0.2/Makefile tpm_emulator-0.2/Makefile
  
  $(src)/crypto/libgmp.a:
  	test -f $(src)/crypto/libgmp.a || ln -s $(GMP_LIB) $(src)/crypto/libgmp.a
-diff -uprN orig/tpm_emulator-0.2/README tpm_emulator-0.2/README
---- orig/tpm_emulator-0.2/README	2005-08-17 10:58:36.000000000 -0700
-+++ tpm_emulator-0.2/README	2005-08-17 10:55:52.000000000 -0700
+diff -uprN orig/tpm_emulator-0.2-x86_64/README tpm_emulator/README
+--- orig/tpm_emulator-0.2-x86_64/README	2005-08-15 00:58:57.000000000 -0700
++++ tpm_emulator/README	2005-09-14 20:27:22.000000000 -0700
 @@ -13,7 +13,8 @@ $Id: README 8 2005-01-25 21:11:45Z jmoli
  Copyright
  --------------------------------------------------------------------------
@@ -97,28 +117,9 @@ diff -uprN orig/tpm_emulator-0.2/README tpm_emulator-0.2/README
                
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
-diff -uprN orig/tpm_emulator-0.2/linux_module.h tpm_emulator-0.2/linux_module.h
---- orig/tpm_emulator-0.2/linux_module.h	2005-08-17 10:58:36.000000000 -0700
-+++ tpm_emulator-0.2/linux_module.h	2005-08-17 10:55:52.000000000 -0700
-@@ -1,5 +1,6 @@
- /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
-  * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
-+ * Copyright (C) 2005 INTEL Corp.
-  *
-  * This module is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published
-@@ -33,7 +34,7 @@
- #include "tpm_version.h"
- 
- #define TPM_DEVICE_MINOR	224
--#define TPM_DEVICE_NAME         "tpm"
-+#define TPM_DEVICE_NAME         "tpm0"
- #define TPM_MODULE_NAME 	"tpm_emulator"
- 
- /* debug and log output functions */
-diff -uprN orig/tpm_emulator-0.2/tpm/tpm_data.c tpm_emulator-0.2/tpm/tpm_data.c
---- orig/tpm_emulator-0.2/tpm/tpm_data.c	2005-08-17 10:58:36.000000000 -0700
-+++ tpm_emulator-0.2/tpm/tpm_data.c	2005-08-17 10:55:52.000000000 -0700
+diff -uprN orig/tpm_emulator-0.2-x86_64/tpm/tpm_data.c tpm_emulator/tpm/tpm_data.c
+--- orig/tpm_emulator-0.2-x86_64/tpm/tpm_data.c	2005-09-15 19:21:14.847078264 -0700
++++ tpm_emulator/tpm/tpm_data.c	2005-09-14 20:27:22.000000000 -0700
 @@ -1,6 +1,7 @@
  /* Software-Based Trusted Platform Module (TPM) Emulator for Linux
   * Copyright (C) 2004 Mario Strasser <mast@gmx.net>,
@@ -139,13 +140,3 @@ diff -uprN orig/tpm_emulator-0.2/tpm/tpm_data.c tpm_emulator-0.2/tpm/tpm_data.c
      tpmData.permanent.data.pcrAttrib[i].pcrReset = TRUE;
    }
    /* set tick type */
-diff -uprN orig/tpm_emulator-0.2/tpm_version.h tpm_emulator-0.2/tpm_version.h
---- orig/tpm_emulator-0.2/tpm_version.h	2005-08-17 10:58:36.000000000 -0700
-+++ tpm_emulator-0.2/tpm_version.h	2005-08-17 10:55:53.000000000 -0700
-@@ -2,5 +2,5 @@
- #define _TPM_VERSION_H_
- #define VERSION_MAJOR 0
- #define VERSION_MINOR 2
--#define VERSION_BUILD 1123950310
-+#define VERSION_BUILD 1124301353
- #endif /* _TPM_VERSION_H_ */

@@ -41,6 +41,7 @@
 #define __TCS_H__
 
 #include "tcg.h"
+#include "contextmgr.h"
 #include "buffer.h"
 
 #define HANDLE_NULL 0
@@ -234,5 +235,8 @@ TPM_RESULT TCSP_RawTransmitData(UINT32 inDataSize,  // in
 				BYTE *inData,       // in
 				UINT32 *outDataSize,// in/out
 				BYTE *outData);     // out
+
+///////////// Private Functions ////////////////////
+CONTEXT_HANDLE* LookupContext( TCS_CONTEXT_HANDLE hContext);
 
 #endif //TCS_H

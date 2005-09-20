@@ -57,6 +57,7 @@ typedef struct handle_List {
 } HANDLE_LIST;
 
 typedef struct context_handle {
+  TCS_CONTEXT_HANDLE handle;
   int nBlockCount;
   BLOCK* pTopBlock;
   HANDLE_LIST* pHandleList;
@@ -69,11 +70,11 @@ BOOL DeleteMemBlock(CONTEXT_HANDLE* pContextHandle, // in
                     BYTE*           pTCPA_BYTEs); // in
 
 
-BOOL AddHandleToList(   CONTEXT_HANDLE*     pContextHandle, // in
+BOOL AddHandleToList(   TCS_CONTEXT_HANDLE hContext, // in	
                         TPM_RESOURCE_TYPE   type, // in
                         TPM_HANDLE          handle); // in
 
-BOOL DeleteHandleFromList(   CONTEXT_HANDLE*     pContextHandle, // in
+BOOL DeleteHandleFromList(   TCS_CONTEXT_HANDLE hContext, // in	
                              TPM_HANDLE          handle); // in
 
 BOOL FreeHandleList(    CONTEXT_HANDLE*     pContextHandle); // in

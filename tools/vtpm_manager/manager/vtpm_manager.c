@@ -73,15 +73,15 @@ VTPM_GLOBALS *vtpm_globals=NULL;
  #define vtpmhandlerlogerror(module,fmt,args...) vtpmlogerror (module, "[%d]: " fmt, threadType, ##args );
 #endif
 
-// --------------------------- Static Auths --------------------------
-#ifdef USE_FIXED_SRK_AUTH
-
+// --------------------------- Well Known Auths --------------------------
+#ifdef WELL_KNOWN_SRK_AUTH
 static BYTE FIXED_SRK_AUTH[20] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                                   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+#endif
 
-static BYTE FIXED_EK_AUTH[20] =  {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+#ifdef WELL_KNOWN_OWNER_AUTH
+static BYTE FIXED_OWNER_AUTH[20] =  {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                                   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-
 #endif
                                   
 // -------------------------- Hash table functions --------------------
@@ -101,14 +101,18 @@ TPM_RESULT VTPM_Create_Service(){
   TPM_RESULT status = TPM_SUCCESS;
   
   // Generate Auth's for SRK & Owner
-#ifdef USE_FIXED_SRK_AUTH
-  memcpy(vtpm_globals->owner_usage_auth, FIXED_SRK_AUTH, sizeof(TPM_AUTHDATA));
-  memcpy(vtpm_globals->srk_usage_auth, FIXED_EK_AUTH, sizeof(TPM_AUTHDATA));
+#ifdef WELL_KNOWN_SRK_AUTH 
+  memcpy(vtpm_globals->srk_usage_auth, FIXED_SRK_AUTH, sizeof(TPM_AUTHDATA));
 #else    
-  Crypto_GetRandom(vtpm_globals->owner_usage_auth, sizeof(TPM_AUTHDATA) );
   Crypto_GetRandom(vtpm_globals->srk_usage_auth, sizeof(TPM_AUTHDATA) );  
 #endif
   
+#ifdef WELL_KNOWN_OWNER_AUTH 
+  memcpy(vtpm_globals->owner_usage_auth, FIXED_OWNER_AUTH, sizeof(TPM_AUTHDATA));
+#else    
+  Crypto_GetRandom(vtpm_globals->owner_usage_auth, sizeof(TPM_AUTHDATA) );
+#endif
+
   // Take Owership of TPM
   CRYPTO_INFO ek_cryptoInfo;
   
@@ -158,7 +162,7 @@ TPM_RESULT VTPM_Create_Service(){
   exit(1);
   
  egress:
-  vtpmloginfo(VTPM_LOG_VTPM, "New VTPM Service initialized (Status = %d).\n", status);
+  vtpmloginfo(VTPM_LOG_VTPM, "Finished initialized new VTPM service (Status = %d).\n", status);
   return status;
   
 }
@@ -171,8 +175,8 @@ int VTPM_Service_Handler(){
 void *VTPM_Service_Handler(void *threadTypePtr){
 #endif
   TPM_RESULT      status =  TPM_FAIL; // Should never return
-  UINT32          dmi, in_param_size, cmd_size, out_param_size, out_message_size, out_message_size_full, dmi_cmd_size;
-  BYTE            *cmd_header, *in_param, *out_message, *dmi_cmd;
+  UINT32          dmi, in_param_size, cmd_size, out_param_size, out_message_size, out_message_size_full;
+  BYTE            *cmd_header, *in_param, *out_message;
   buffer_t        *command_buf=NULL, *result_buf=NULL;
   TPM_TAG         tag;
   TPM_COMMAND_CODE ord;
@@ -180,6 +184,8 @@ void *VTPM_Service_Handler(void *threadTypePtr){
   int  size_read, size_write, i;
   
 #ifndef VTPM_MULTI_VM
+  UINT32 dmi_cmd_size;
+  BYTE *dmi_cmd;
   int threadType = *(int *) threadTypePtr;
   
   // async io structures
@@ -192,8 +198,6 @@ void *VTPM_Service_Handler(void *threadTypePtr){
   int dummy_rx;  
 #endif
   
-  // TODO: Reinsert ifdefs to enable support for MULTI-VM 
-  
   cmd_header = (BYTE *) malloc(VTPM_COMMAND_HEADER_SIZE_SRV);
   command_buf = (buffer_t *) malloc(sizeof(buffer_t));
   result_buf = (buffer_t *) malloc(sizeof(buffer_t));
@@ -202,31 +206,41 @@ void *VTPM_Service_Handler(void *threadTypePtr){
   TPM_RESULT *ret_value = (TPM_RESULT *) malloc(sizeof(TPM_RESULT));
 #endif
   
-  int *tx_fh, *rx_fh;
-  
+  int *tx_fh, // Pointer to the filehandle this function will write to
+      *rx_fh; // Pointer to the filehandle this function will read from
+              // For a multi VM VTPM system, this function tx/rx with the BE
+              //   via vtpm_globals->be_fh.
+              // For a single VM system, the BE_LISTENER_THREAD tx/rx with theBE
+              //   via vtpm_globals->be_fh, and the DMI_LISTENER_THREAD rx from
+	      //   vtpm_globals->vtpm_rx_fh and tx to dmi_res->vtpm_tx_fh
+
+  // Set rx_fh to point to the correct fh based on this mode.
 #ifdef VTPM_MULTI_VM
   rx_fh = &vtpm_globals->be_fh;
 #else
   if (threadType == BE_LISTENER_THREAD) {
-#ifdef DUMMY_BACKEND    
+ #ifdef DUMMY_BACKEND    
     dummy_rx = -1;
     rx_fh = &dummy_rx;
-#else
+ #else
     rx_fh = &vtpm_globals->be_fh;
-#endif
+ #endif
   } else { // DMI_LISTENER_THREAD
     rx_fh = &vtpm_globals->vtpm_rx_fh;
   }
 #endif
   
+  // Set tx_fh to point to the correct fh based on this mode (If static)
+  // Create any fifos that these fh will use.  
 #ifndef VTPM_MULTI_VM
   int fh;
   if (threadType == BE_LISTENER_THREAD) {
     tx_fh = &vtpm_globals->be_fh;
     if ( (fh = open(GUEST_RX_FIFO, O_RDWR)) == -1) {
       if ( mkfifo(GUEST_RX_FIFO, S_IWUSR | S_IRUSR ) ){
-				*ret_value = TPM_FAIL;
-				pthread_exit(ret_value);
+        vtpmlogerror(VTPM_LOG_VTPM, "Unable to create FIFO: %s.\n", GUEST_RX_FIFO);        
+	*ret_value = TPM_FAIL;
+	pthread_exit(ret_value);
       }
     } else 
       close(fh);
@@ -236,6 +250,7 @@ void *VTPM_Service_Handler(void *threadTypePtr){
     // But we need to make sure the read pip is created.
     if ( (fh = open(VTPM_RX_FIFO, O_RDWR)) == -1) {
       if ( mkfifo(VTPM_RX_FIFO, S_IWUSR | S_IRUSR ) ){
+        vtpmlogerror(VTPM_LOG_VTPM, "Unable to create FIFO: %s.\n", VTPM_RX_FIFO);
 	*ret_value = TPM_FAIL;
 	pthread_exit(ret_value);
       }
@@ -243,28 +258,39 @@ void *VTPM_Service_Handler(void *threadTypePtr){
       close(fh);
     
   }
+#else
+  tx_fh = &vtpm_globals->be_fh;
 #endif
   
+  ////////////////////////// Main Loop //////////////////////////////////
   while(1) {
     
+#ifdef VTPM_MULTI_VM
+    vtpmhandlerloginfo(VTPM_LOG_VTPM, "Waiting for DMI messages.\n");
+#else
     if (threadType == BE_LISTENER_THREAD) {
       vtpmhandlerloginfo(VTPM_LOG_VTPM, "Waiting for Guest requests & ctrl messages.\n");
-    } else 
+    } else    
       vtpmhandlerloginfo(VTPM_LOG_VTPM, "Waiting for DMI messages.\n");
-    
-    
-    if (*rx_fh < 0) {
-      if (threadType == BE_LISTENER_THREAD) 
-#ifdef DUMMY_BACKEND
-	*rx_fh = open("/tmp/in.fifo", O_RDWR);
-#else
-        *rx_fh = open(VTPM_BE_DEV, O_RDWR);
 #endif
+
+    // Check status of rx_fh. If necessary attempt to re-open it.    
+    if (*rx_fh < 0) {
+#ifdef VTPM_MULTI_VM
+      *rx_fh = open(VTPM_BE_DEV, O_RDWR);
+#else
+      if (threadType == BE_LISTENER_THREAD) 
+  #ifdef DUMMY_BACKEND
+	*rx_fh = open("/tmp/in.fifo", O_RDWR);
+  #else
+        *rx_fh = open(VTPM_BE_DEV, O_RDWR);
+  #endif
       else  // DMI Listener   
 	*rx_fh = open(VTPM_RX_FIFO, O_RDWR);
-      
+#endif    
     }
     
+    // Respond to failures to open rx_fh
     if (*rx_fh < 0) {
       vtpmhandlerlogerror(VTPM_LOG_VTPM, "Can't open inbound fh.\n");
 #ifdef VTPM_MULTI_VM
@@ -275,6 +301,7 @@ void *VTPM_Service_Handler(void *threadTypePtr){
 #endif
     }
     
+    // Read command header from rx_fh
     size_read = read(*rx_fh, cmd_header, VTPM_COMMAND_HEADER_SIZE_SRV);
     if (size_read > 0) {
       vtpmhandlerloginfo(VTPM_LOG_VTPM_DEEP, "RECV[%d}: 0x", size_read);
@@ -293,12 +320,14 @@ void *VTPM_Service_Handler(void *threadTypePtr){
       goto abort_command;
     }
     
+    // Unpack header
     BSG_UnpackList(cmd_header, 4,
 		   BSG_TYPE_UINT32, &dmi,
 		   BSG_TPM_TAG, &tag,
 		   BSG_TYPE_UINT32, &in_param_size,
 		   BSG_TPM_COMMAND_CODE, &ord );
     
+    // Using the header info, read from rx_fh the parameters of the command
     // Note that in_param_size is in the client's context
     cmd_size = in_param_size - VTPM_COMMAND_HEADER_SIZE_CLT;
     if (cmd_size > 0) {
@@ -309,7 +338,7 @@ void *VTPM_Service_Handler(void *threadTypePtr){
 	  vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", in_param[i]);
 	
       } else {
-        vtpmhandlerlogerror(VTPM_LOG_VTPM, "Error reading from BE. Aborting... \n");
+        vtpmhandlerlogerror(VTPM_LOG_VTPM, "Error reading from cmd. Aborting... \n");
 	close(*rx_fh);
 	*rx_fh = -1;
 	goto abort_command;
@@ -325,12 +354,16 @@ void *VTPM_Service_Handler(void *threadTypePtr){
       in_param = NULL;
       vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "\n");
     }            
-    
+
+#ifndef VTPM_MULTI_VM
+    // It's illegal to receive a Dom0 command from a DMI.
     if ((threadType != BE_LISTENER_THREAD) && (dmi == 0)) {
       vtpmhandlerlogerror(VTPM_LOG_VTPM, "Attempt to access dom0 commands from DMI interface. Aborting...\n");
       goto abort_command;
     }
+#endif
     
+    // Fetch infomation about the DMI issuing the request.
     dmi_res = (VTPM_DMI_RESOURCE *) hashtable_search(vtpm_globals->dmi_map, &dmi);
     if (dmi_res == NULL) {
       vtpmhandlerlogerror(VTPM_LOG_VTPM, "Attempted access to non-existent DMI in domain: %d. Aborting...\n", dmi);
@@ -340,11 +373,15 @@ void *VTPM_Service_Handler(void *threadTypePtr){
       vtpmhandlerlogerror(VTPM_LOG_VTPM, "Attempted access to disconnected DMI in domain: %d. Aborting...\n", dmi);
       goto abort_command;
     }
-    
+
+#ifndef VTPM_MULTI_VM
+    // Now that we know which DMI this is, we can set the tx_fh handle.
     if (threadType != BE_LISTENER_THREAD) 
       tx_fh = &dmi_res->vtpm_tx_fh;
     // else we set this before the while loop since it doesn't change.
-    
+#endif 
+   
+    // Init the buffers used to handle the command and the response
     if ( (buffer_init_convert(command_buf, cmd_size, in_param) != TPM_SUCCESS) || 
 	 (buffer_init(result_buf, 0, 0) != TPM_SUCCESS) ) {
       vtpmhandlerlogerror(VTPM_LOG_VTPM, "Failed to setup buffers. Aborting...\n");
@@ -393,26 +430,46 @@ void *VTPM_Service_Handler(void *threadTypePtr){
 	  status = TPM_BAD_ORDINAL; 
 	} // switch
       }
-    } else { // This is not a VTPM Command at all
+    } else { // This is not a VTPM Command at all.
+	     // This happens in two cases. 
+	     // MULTI_VM = A DMI illegally sent a raw TPM command to the manager
+	     // Single VM:
+	     //   BE_LISTENER_THREAD: Guest issued a TPM command.
+	     //                       Send this to DMI and wait for response
+	     //   DMI_LISTENER_THREAD: A DMI illegally sent a raw TPM command.
+    
+#ifdef VTPM_MULTI_VM
+      // Raw TPM commands are not supported from the DMI
+      vtpmhandlerlogerror(VTPM_LOG_VTPM, "Attempt to use unsupported direct access to TPM.\n");
+      vtpmhandlerloginfo(VTPM_LOG_VTPM_DEEP, "Bad Command. dmi:%d, tag:%d, size:%d, ord:%d, Params: ", dmi, tag, in_param_size, ord);
+      for (i=0; i<cmd_size; i++) 
+	vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", in_param[i]);
       
+      vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "\n");
+      status = TPM_FAIL;
+    
+#else
+      // If BE_LISTENER_THREAD then this is a TPM command from a guest
       if (threadType == BE_LISTENER_THREAD) {
+	// Dom0 can't talk to the BE, so this must be a broken FE/BE or badness
 	if (dmi == 0) {
-	  // This usually indicates a FE/BE driver.
 	  vtpmhandlerlogerror(VTPM_LOG_VTPM, "Illegal use of TPM command from dom0\n");
 	  status = TPM_FAIL;
 	} else {
 	  vtpmhandlerloginfo(VTPM_LOG_VTPM, "Forwarding command to DMI.\n");
 	  
+	  // open the dmi_res->guest_tx_fh to send command to DMI
 	  if (dmi_res->guest_tx_fh < 0)
 	    dmi_res->guest_tx_fh = open(dmi_res->guest_tx_fname, O_WRONLY | O_NONBLOCK);
-          
+
+	  // handle failed opens dmi_res->guest_tx_fh        
 	  if (dmi_res->guest_tx_fh < 0){
 	    vtpmhandlerlogerror(VTPM_LOG_VTPM, "VTPM ERROR: Can't open outbound fh to dmi.\n");
 	    status = TPM_IOERROR;
 	    goto abort_with_error;
 	  }        
           
-	  //Note: Send message + dmi_id
+	  //Forward TPM CMD stamped with dmi_id to DMI for handling
 	  if (cmd_size) {
 	    dmi_cmd = (BYTE *) malloc(VTPM_COMMAND_HEADER_SIZE_SRV + cmd_size);
 	    dmi_cmd_size = VTPM_COMMAND_HEADER_SIZE_SRV + cmd_size;
@@ -450,20 +507,23 @@ void *VTPM_Service_Handler(void *threadTypePtr){
 	      goto abort_with_error;
 	    }
 	  }
-          
+         
 	  if (size_write != (int) dmi_cmd_size) 
 	    vtpmhandlerlogerror(VTPM_LOG_VTPM, "Could not write entire command to DMI (%d/%d)\n", size_write, dmi_cmd_size);
 	  buffer_free(command_buf);
-	  
+	 
+	  // Open vtpm_globals->guest_rx_fh to receive DMI response	  
 	  if (vtpm_globals->guest_rx_fh < 0) 
 	    vtpm_globals->guest_rx_fh = open(GUEST_RX_FIFO, O_RDONLY);
           
+	  // Handle open failures
 	  if (vtpm_globals->guest_rx_fh < 0){
 	    vtpmhandlerlogerror(VTPM_LOG_VTPM, "Can't open inbound fh to dmi.\n");
             status = TPM_IOERROR;
 	    goto abort_with_error;
 	  }                  
 	  
+	  // Read header for response to TPM command from DMI
           size_read = read( vtpm_globals->guest_rx_fh, cmd_header, VTPM_COMMAND_HEADER_SIZE_SRV);
 	  if (size_read > 0) {
 	    vtpmhandlerloginfo(VTPM_LOG_VTPM_DEEP, "RECV (DMI): 0x");
@@ -485,12 +545,14 @@ void *VTPM_Service_Handler(void *threadTypePtr){
 	    goto abort_with_error;
 	  }
           
+	  // Unpack response from DMI for TPM command
 	  BSG_UnpackList(cmd_header, 4,
 			 BSG_TYPE_UINT32, &dmi,
 			 BSG_TPM_TAG, &tag,
 			 BSG_TYPE_UINT32, &in_param_size,
 			 BSG_TPM_COMMAND_CODE, &status );
         
+	  // If response has parameters, read them.
 	  // Note that in_param_size is in the client's context
 	  cmd_size = in_param_size - VTPM_COMMAND_HEADER_SIZE_CLT;
 	  if (cmd_size > 0) {
@@ -519,7 +581,7 @@ void *VTPM_Service_Handler(void *threadTypePtr){
 	    in_param = NULL;
 	    vtpmhandlerloginfomore(VTPM_LOG_VTPM, "\n");
 	  }
-                           
+          
 	  if (buffer_init_convert(result_buf, cmd_size, in_param) != TPM_SUCCESS) {
 	    vtpmhandlerlogerror(VTPM_LOG_VTPM, "Failed to setup buffers. Aborting...\n");
             status = TPM_FAIL;
@@ -530,33 +592,48 @@ void *VTPM_Service_Handler(void *threadTypePtr){
 	} // end else for if (dmi==0)
         
       } else { // This is a DMI lister thread. Thus this is from a DMI
-#ifdef VTPM_MULTI_VM
+	// Raw TPM commands are not supported from the DMI
 	vtpmhandlerlogerror(VTPM_LOG_VTPM, "Attempt to use unsupported direct access to TPM.\n");
 	vtpmhandlerloginfo(VTPM_LOG_VTPM_DEEP, "Bad Command. dmi:%d, tag:%d, size:%d, ord:%d, Params: ", dmi, tag, in_param_size, ord);
-	for (UINT32 q=0; q<cmd_size; q++) 
-	  vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", in_param[q]);
+	for (i=0; i<cmd_size; i++) 
+	  vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "%x ", in_param[i]);
 	
 	vtpmhandlerloginfomore(VTPM_LOG_VTPM_DEEP, "\n");
         
 	status = TPM_FAIL;
-#else
-	
-#endif
       } // end else for if BE Listener
-    } // end else for is VTPM Command
-    
-    // Send response to Backend
-    if (*tx_fh < 0) {
-      if (threadType == BE_LISTENER_THREAD) 
-#ifdef DUMMY_BACKEND
-	*tx_fh = open("/tmp/out.fifo", O_RDWR);
-#else
-        *tx_fh = open(VTPM_BE_DEV, O_RDWR);
 #endif
+      
+    } // end else for is VTPM Command
+
+    // This marks the beginning of preparing response to be sent out.
+    // Errors while handling responses jump here to reply with error messages
+    // NOTE: Currently there are no recoverable errors in multi-VM mode. If one
+    //       is added to the code, this ifdef should be removed.
+    //       Also note this is NOT referring to errors in commands, but rather
+    //       this is about I/O errors and such.
+#ifndef VTPM_MULTI_VM
+ abort_with_error:
+#endif
+    
+    // Open tx_fh in preperation to send reponse back
+    if (*tx_fh < 0) {
+#ifdef VTPM_MULTI_VM
+      *tx_fh = open(VTPM_BE_DEV, O_RDWR);
+#else
+      if (threadType == BE_LISTENER_THREAD) 
+ #ifdef DUMMY_BACKEND
+	*tx_fh = open("/tmp/out.fifo", O_RDWR);
+ #else
+        *tx_fh = open(VTPM_BE_DEV, O_RDWR);
+ #endif
       else  // DMI Listener
 	*tx_fh = open(dmi_res->vtpm_tx_fname, O_WRONLY);
-    }
+#endif
+      }
+
     
+    // Handle failed open
     if (*tx_fh < 0) {
       vtpmhandlerlogerror(VTPM_LOG_VTPM, "VTPM ERROR: Can't open outbound fh.\n");
 #ifdef VTPM_MULTI_VM
@@ -567,7 +644,6 @@ void *VTPM_Service_Handler(void *threadTypePtr){
 #endif
     }        
     
- abort_with_error:
     // Prepend VTPM header with destination DM stamped
     out_param_size = buffer_len(result_buf);
     out_message_size = VTPM_COMMAND_HEADER_SIZE_CLT + out_param_size;
@@ -605,6 +681,8 @@ void *VTPM_Service_Handler(void *threadTypePtr){
       goto abort_command;
     }
     
+    // On certain failures an error message cannot be sent. 
+    // This marks the beginning of cleanup in preperation for the next command.
   abort_command:
     //free buffers
     bzero(cmd_header, VTPM_COMMAND_HEADER_SIZE_SRV);
@@ -634,13 +712,13 @@ void *VTPM_Service_Handler(void *threadTypePtr){
 TPM_RESULT VTPM_Init_Service() {
   TPM_RESULT status = TPM_FAIL;   
   BYTE *randomsead;
-	UINT32 randomsize;
-	
+  UINT32 randomsize;
+
   if ((vtpm_globals = (VTPM_GLOBALS *) malloc(sizeof(VTPM_GLOBALS))) == NULL){
-		status = TPM_FAIL;
-		goto abort_egress;
-	}
-	memset(vtpm_globals, 0, sizeof(VTPM_GLOBALS));
+    status = TPM_FAIL;
+    goto abort_egress;
+  }
+  memset(vtpm_globals, 0, sizeof(VTPM_GLOBALS));
   vtpm_globals->be_fh = -1;
 
 #ifndef VTPM_MULTI_VM
@@ -648,9 +726,9 @@ TPM_RESULT VTPM_Init_Service() {
   vtpm_globals->guest_rx_fh = -1;
 #endif
   if ((vtpm_globals->dmi_map = create_hashtable(10, hashfunc32, equals32)) == NULL){
-		status = TPM_FAIL;
-		goto abort_egress;
-	}
+    status = TPM_FAIL;
+    goto abort_egress;
+  }
   
   vtpm_globals->DMI_table_dirty = FALSE;
   
@@ -662,12 +740,12 @@ TPM_RESULT VTPM_Init_Service() {
   // Create TCS Context for service
   TPMTRYRETURN( TCS_OpenContext(&vtpm_globals->manager_tcs_handle ) );
 
-	TPMTRYRETURN( TCSP_GetRandom(vtpm_globals->manager_tcs_handle, 
-															 &randomsize, 
-															 &randomsead));
-
-	Crypto_Init(randomsead, randomsize);
-	TPMTRYRETURN( TCS_FreeMemory (vtpm_globals->manager_tcs_handle, randomsead)); 
+  TPMTRYRETURN( TCSP_GetRandom(vtpm_globals->manager_tcs_handle, 
+			       &randomsize, 
+			       &randomsead));
+  
+  Crypto_Init(randomsead, randomsize);
+  TPMTRYRETURN( TCS_FreeMemory (vtpm_globals->manager_tcs_handle, randomsead)); 
 	
   // Create OIAP session for service's authorized commands
   TPMTRYRETURN( VTSP_OIAP( vtpm_globals->manager_tcs_handle, 
@@ -678,7 +756,6 @@ TPM_RESULT VTPM_Init_Service() {
   if (VTPM_LoadService() != TPM_SUCCESS)
     TPMTRYRETURN( VTPM_Create_Service() );    
 
-  
   //Load Storage Key 
   TPMTRYRETURN( VTSP_LoadKey( vtpm_globals->manager_tcs_handle,
 			      TPM_SRK_KEYHANDLE,
@@ -687,10 +764,10 @@ TPM_RESULT VTPM_Init_Service() {
 			      &vtpm_globals->storageKeyHandle,
 			      &vtpm_globals->keyAuth,
 			      &vtpm_globals->storageKey) );
-  
+
   // Create entry for Dom0 for control messages
   TPMTRYRETURN( VTPM_Handle_New_DMI(NULL) );
-  
+    
   // --------------------- Command handlers ---------------------------
   
   goto egress;
@@ -711,8 +788,7 @@ void VTPM_Stop_Service() {
     do {
       dmi_res = (VTPM_DMI_RESOURCE *) hashtable_iterator_value(dmi_itr);
       if (dmi_res->connected) 
-				if (close_dmi( dmi_res ) != TPM_SUCCESS) 
-					vtpmlogerror(VTPM_LOG_VTPM, "Failed to close dmi %d properly.\n", dmi_res->dmi_id);
+	close_dmi( dmi_res ); // Not really interested in return code
       
     } while (hashtable_iterator_advance(dmi_itr));
 		free (dmi_itr);

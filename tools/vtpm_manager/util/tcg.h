@@ -453,14 +453,14 @@ typedef struct TCS_AUTH {
 // DEPENDS: local var 'status' of type TPM_RESULT
 // DEPENDS: label 'abort_egress' which cleans up and returns the status
 #define ERRORDIE(s) do { status = s; \
-                         fprintf (stderr, "*** ERRORDIE in %s, line %i\n", __func__, __LINE__); \
+                         fprintf (stderr, "*** ERRORDIE in %s at %s: %i\n", __func__, __FILE__, __LINE__); \
                          goto abort_egress; } \
                     while (0)
 
 // ASSUME: the return value used after the abort_egress label has been set
 // already (eg. the 'status' local var)
 #define STATUSCHECK(s) if (s != TPM_SUCCESS) { \
-                            fprintf (stderr, "*** ERR in %s, line %i\n", __func__, __LINE__); \
+                            fprintf (stderr, "*** ERR in %s at %s:%i\n", __func__, __FILE__, __LINE__); \
                             goto abort_egress; \
                         }
 
@@ -475,7 +475,7 @@ typedef struct TCS_AUTH {
 // Try command c. If it fails, print error message, set status to actual return code. Goto shame
 #define TPMTRYRETURN(c) do { status = c; \
                              if (status != TPM_SUCCESS) { \
-                               printf("ERROR in %s:%i code: %s.\n", __func__, __LINE__, tpm_get_error_name(status)); \
+                               printf("ERROR in %s at %s:%i code: %s.\n", __func__, __FILE__, __LINE__, tpm_get_error_name(status)); \
                                goto abort_egress; \
                              } \
                         } while(0)    

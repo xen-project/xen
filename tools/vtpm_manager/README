@@ -51,14 +51,24 @@ VTPM_MULTI_VM                -> Defined: VTPMs run in their own VMs
 DUMMY_BACKEND                -> vtpm_manager listens on /tmp/in.fifo and 
                                 /tmp/out.fifo rather than backend
 
-MANUAL_DM_LAUNCH             -> User must manually launch & kill VTPMs
+MANUAL_DM_LAUNCH             -> Must manually launch & kill VTPMs
 
-USE_FIXED_SRK_AUTH           -> Do not randomly generate a random SRK & Owner auth
+WELL_KNOWN_SRK_AUTH          -> Rather than randomly generating the password for the SRK,
+                                use a well known value. This is necessary for sharing use
+                                of the SRK across applications. Such as VTPM and Dom0
+                                measurement software.
+
+WELL_KNOWN_OWNER_AUTH        -> Rather than randomly generating the password for the owner,
+                                use a well known value. This is useful for debugging and for
+                                poor bios which do not support clearing TPM if OwnerAuth is
+                                lost. However this has no protection from malicious app
+                                issuing a TPM_OwnerClear to wipe the TPM 
 
 Requirements
 ============
 - xen-unstable 
-- IBM frontend/backend vtpm driver patch
+- vtpm frontend/backend driver patch
+- OpenSSL Library
 
 Single-VM Flow
 ============================
