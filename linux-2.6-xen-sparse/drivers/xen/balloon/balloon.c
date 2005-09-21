@@ -362,7 +362,10 @@ static void watch_target(struct xenbus_watch *watch, const char *node)
 		return;
 	} 
         
-	set_new_target(new_target >> PAGE_SHIFT);
+	/* The given memory/target value is in KiB, so it needs converting to
+	   pages.  PAGE_SHIFT converts bytes to pages, hence PAGE_SHIFT - 10.
+	*/
+	set_new_target(new_target >> (PAGE_SHIFT - 10));
     
 }
 
