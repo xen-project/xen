@@ -33,8 +33,6 @@ from XendProtocol import HttpXendClientProtocol, \
                          UnixXendClientProtocol, \
                          XendError
 
-DEBUG = 0
-
 def fileof(val):
     """Converter for passing configs or other 'large' data.
     Handles lists, files directly.
@@ -385,7 +383,6 @@ python XendClient.py domains
 python XendClient.py domain 0
     (domain (id 0) (name Domain-0) (memory 128))
     """
-    global DEBUG
     from getopt import getopt
     short_options = 'x:au:d'
     long_options = ['xend=', 'unix=', 'debug']
@@ -397,8 +394,6 @@ python XendClient.py domain 0
             srv = v
         elif k in ['-u', '--unix']:
             unix = int(v)
-        elif k in ['-d', '--debug']:
-            DEBUG = 1
     if len(args):
         fn = args[0]
         args = args[1:]
