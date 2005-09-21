@@ -28,6 +28,7 @@
 #include <xen/sched.h>
 #include <asm/current.h>
 #include <io_ports.h>
+#include <xen/event.h>
 
 #ifdef CONFIG_VMX
 
@@ -205,6 +206,7 @@ static void pit_timer_fn(void *data)
     /* Set the pending intr bit, and send evtchn notification to myself. */
     if (test_and_set_bit(vpit->vector, vpit->intr_bitmap))
         vpit->pending_intr_nr++; /* already set, then count the pending intr */
+    evtchn_set_pending(vpit->v, iopacket_port(vpit->v->domain));
 
     /* pick up missed timer tick */
     if ( missed_ticks > 0 ) {
@@ -281,6 +283,7 @@ void vmx_hooks_assist(struct vcpu *d)
         }
 
         vpit->intr_bitmap = intr;
+        vpit->v = d;
 
         vpit->scheduled = NOW() + vpit->period;
         set_ac_timer(&vpit->pit_timer, vpit->scheduled);

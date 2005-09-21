@@ -471,6 +471,8 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
         }
 #endif
 
+        /* Unsupportable for virtualised CPUs. */
+        clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
     }
 
     regs->eax = (unsigned long) eax;
@@ -1461,7 +1463,7 @@ volatile unsigned long do_hlt_count;
  */
 void vmx_vmexit_do_hlt(void)
 {
-    raise_softirq(SCHEDULE_SOFTIRQ);
+    do_block();
 }
 
 static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
@@ -1509,12 +1511,6 @@ static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
         do_IRQ(regs);
         break;
     }
-}
-
-volatile unsigned long do_mwait_count;
-static inline void vmx_vmexit_do_mwait(void)
-{
-    raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
 #define BUF_SIZ     256
@@ -1798,9 +1794,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __update_guest_eip(inst_len);
         break;
     case EXIT_REASON_MWAIT_INSTRUCTION:
-        __get_instruction_length(inst_len);
-        __update_guest_eip(inst_len);
-        vmx_vmexit_do_mwait();
+        __vmx_bug(&regs);
         break;
     default:
         __vmx_bug(&regs);       /* should not happen */
