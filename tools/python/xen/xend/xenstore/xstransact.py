@@ -41,7 +41,11 @@ class xstransact:
 
     def _read(self, key):
         path = "%s/%s" % (self.path, key)
-        return xshandle().read(path)
+        try:
+            return xshandle().read(path)
+        except RuntimeError, ex:
+            raise RuntimeError(ex.args[0],
+                               '%s, while reading %s' % (ex.args[1], path))
 
     def read(self, *args):
         if len(args) == 0:
@@ -55,7 +59,12 @@ class xstransact:
 
     def _write(self, key, data):
         path = "%s/%s" % (self.path, key)
-        xshandle().write(path, data)
+        try:
+            xshandle().write(path, data)
+        except RuntimeError, ex:
+            raise RuntimeError(ex.args[0],
+                               ('%s, while writing %s : %s' %
+                                (ex.args[1], path, str(data))))
 
     def write(self, *args, **opts):
         if len(args) == 0:
@@ -121,10 +130,20 @@ class xstransact:
                 defval = None
             else:
                 (key, fn, defval) = tup
-            try:
-                val = fn(self._read(key))
-            except TypeError:
+
+            val = self._read(key)
+            # If fn is str, then this will successfully convert None to
+            # 'None'.  If it is int, then it will throw TypeError on None, or
+            # on any other non-integer value.  We have to, therefore, both
+            # check explicitly for None, and catch TypeError.  Either failure
+            # will result in defval being used instead.
+            if val is None:
                 val = defval
+            else:
+                try:
+                    val = fn(val)
+                except TypeError:
+                    val = defval
             ret.append(val)
         if len(ret) == 1:
             return ret[0]
