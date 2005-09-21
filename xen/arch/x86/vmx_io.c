@@ -891,7 +891,7 @@ asmlinkage void vmx_intr_assist(void)
     struct vcpu *v = current;
 
     highest_vector = find_highest_pending_irq(v, &intr_type);
-    __vmread(CPU_BASED_VM_EXEC_CONTROL, &cpu_exec_control);
+    __vmread_vcpu(CPU_BASED_VM_EXEC_CONTROL, &cpu_exec_control);
 
     if (highest_vector == -1) {
         disable_irq_window(cpu_exec_control);
@@ -948,14 +948,6 @@ asmlinkage void vmx_intr_assist(void)
 void vmx_do_resume(struct vcpu *d) 
 {
     vmx_stts();
-    if ( vmx_paging_enabled(d) )
-        __vmwrite(GUEST_CR3, pagetable_get_paddr(d->arch.shadow_table));
-    else
-        // paging is not enabled in the guest
-        __vmwrite(GUEST_CR3, pagetable_get_paddr(d->domain->arch.phys_table));
-
-    __vmwrite(HOST_CR3, pagetable_get_paddr(d->arch.monitor_table));
-    __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 
     if (event_pending(d)) {
         vmx_check_events(d);
