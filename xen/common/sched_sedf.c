@@ -846,7 +846,7 @@ static void sedf_sleep(struct vcpu *d) {
  *      the domain can't finish it's workload in the period
  *     -in addition to that the domain can be treated prioritised when
  *      extratime is available
- *     -addition: experiments hve shown that this may have a HUGE impact on
+ *     -addition: experiments have shown that this may have a HUGE impact on
  *      performance of other domains, becaus it can lead to excessive context
  *      switches
  
