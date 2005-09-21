@@ -222,8 +222,11 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     nr_doms = xc_domain_getinfo(xc->xc_handle, first_dom, max_doms, info);
 
     if (nr_doms < 0)
+    {
+        free(info);
         return PyErr_SetFromErrno(xc_error);
-    
+    }
+
     list = PyList_New(nr_doms);
     for ( i = 0 ; i < nr_doms; i++ )
     {
