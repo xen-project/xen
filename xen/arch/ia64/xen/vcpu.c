@@ -134,7 +134,10 @@ IA64FAULT vcpu_set_ar(VCPU *vcpu, UINT64 reg, UINT64 val)
 	else if (reg == 24)
 	    printf("warning: setting ar.eflg is a no-op; no IA-32 support\n");
 	else if (reg > 7) return (IA64_ILLOP_FAULT);
-	else PSCB(vcpu,krs[reg]) = val;
+	else {
+		PSCB(vcpu,krs[reg]) = val;
+		ia64_set_kr(reg,val);
+	}
 	return IA64_NO_FAULT;
 }
 
