@@ -13,6 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
 """Representation of a single domain.
@@ -31,18 +32,15 @@ import errno
 import xen.lowlevel.xc
 from xen.util.blkif import blkdev_uname_to_file
 
-from xen.xend.server import SrvDaemon
 from xen.xend.server.channel import EventChannel
 
 from xen.xend import sxp
-from xen.xend.PrettyPrint import prettyprintstring
 from xen.xend.XendBootloader import bootloader
 from xen.xend.XendLogging import log
 from xen.xend.XendError import XendError, VmError
 from xen.xend.XendRoot import get_component
 
 from xen.xend.uuid import getUuid
-from xen.xend.xenstore import DBVar
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xsutil import IntroduceDomain
 
@@ -96,9 +94,6 @@ SIF_TPM_BE_DOMAIN = (1<<7)
 xc = xen.lowlevel.xc.new()
 
 
-xend = SrvDaemon.instance()
-
-
 def domain_exists(name):
     # See comment in XendDomain constructor.
     xd = get_component('xen.xend.XendDomain')
@@ -136,141 +131,281 @@ class XendDomainInfo:
     """
     MINIMUM_RESTART_TIME = 20
 
-    def create(cls, parentdb, config):
+
+    def create(cls, dompath, config):
         """Create a VM from a configuration.
 
-        @param parentdb:  parent db
+        @param dompath:   The path to all domain information
         @param config    configuration
         @raise: VmError for invalid configuration
         """
-        uuid = getUuid()
-        db = parentdb.addChild("%s/xend" % uuid)
-        path = parentdb.getPath()
-        vm = cls(uuid, path, db)
-        vm.construct(config)
-        vm.saveToDB(sync=True)
 
+        log.debug("XendDomainInfo.create(%s, ...)", dompath)
+        
+        vm = cls(getUuid(), dompath, cls.parseConfig(config))
+        vm.construct()
         return vm
 
     create = classmethod(create)
 
-    def recreate(cls, uuid, path, domid, db, info):
+
+    def recreate(cls, uuid, dompath, domid, info):
         """Create the VM object for an existing domain.
 
-        @param db:        domain db
+        @param dompath:   The path to all domain information
         @param info:      domain info from xc
         """
-        vm = cls(uuid, path, db)
-        vm.setDomid(domid)
-        vm.name, vm.start_time = vm.gatherVm(("name", str),
-                                             ("start-time", float))
-        try:
-            db.readDB()
-        except: pass
-        vm.importFromDB()
-        config = vm.config
-        log.debug('info=' + str(info))
-        log.debug('config=' + prettyprintstring(config))
 
-        vm.memory = info['mem_kb'] / 1024
-        vm.target = info['mem_kb'] * 1024
+        log.debug("XendDomainInfo.recreate(%s, %s, %s, %s)", uuid, dompath,
+                  domid, info)
 
-        if config:
-            try:
-                vm.recreate = True
-                vm.construct(config)
-            finally:
-                vm.recreate = False
-        else:
-            vm.setName("Domain-%d" % domid)
-
-        vm.exportToDB(save=True)
-        return vm
+        return cls(uuid, dompath, info, domid, True)
 
     recreate = classmethod(recreate)
 
-    def restore(cls, parentdb, config, uuid=None):
+
+    def restore(cls, dompath, config, uuid = None):
         """Create a domain and a VM object to do a restore.
 
-        @param parentdb:  parent db
+        @param dompath:   The path to all domain information
         @param config:    domain configuration
         @param uuid:      uuid to use
         """
+        
+        log.debug("XendDomainInfo.restore(%s, ..., %s)", dompath, uuid)
+
         if not uuid:
             uuid = getUuid()
-        db = parentdb.addChild("%s/xend" % uuid)
-        path = parentdb.getPath()
-        vm = cls(uuid, path, db)
-        ssidref = int(sxp.child_value(config, 'ssidref'))
-        log.debug('restoring with ssidref='+str(ssidref))
-        id = xc.domain_create(ssidref = ssidref)
-        vm.setDomid(id)
-        vm.clear_shutdown()
+
         try:
-            vm.restore = True
-            vm.construct(config)
-        finally:
-            vm.restore = False
-        vm.exportToDB(save=True, sync=True)
+            ssidref = int(sxp.child_value(config, 'ssidref'))
+        except TypeError, exn:
+            raise VmError('Invalid ssidref in config: %s' % exn)
+
+        log.debug('restoring with ssidref = %d' % ssidref)
+
+        vm = cls(uuid, dompath, cls.parseConfig(config),
+                 xc.domain_create(ssidref = ssidref))
+        vm.clear_shutdown()
         return vm
 
     restore = classmethod(restore)
 
-    __exports__ = [
-        DBVar('config',        ty='sxpr'),
-        DBVar('state',         ty='str'),
-        DBVar('restart_mode',  ty='str'),
-        DBVar('restart_state', ty='str'),
-        DBVar('restart_time',  ty='float'),
-        DBVar('restart_count', ty='int'),
-        ]
+
+    def parseConfig(cls, config):
+        def get_cfg(name, conv = None):
+            val = sxp.child_value(config, name)
+
+            if conv and not val is None:
+                try:
+                    return conv(val)
+                except TypeError, exn:
+                    raise VmError(
+                        'Invalid setting %s = %s in configuration: %s' %
+                        (name, val, str(exn)))
+            else:
+                return val
+
+
+        log.debug("parseConfig: config is %s" % str(config))
+
+        result = {}
+        imagecfg = "()"
+
+        result['name']         = get_cfg('name')
+        result['ssidref']      = get_cfg('ssidref',    int)
+        result['memory']       = get_cfg('memory',     int)
+        result['mem_kb']       = get_cfg('mem_kb',     int)
+        result['maxmem']       = get_cfg('maxmem',     int)
+        result['maxmem_kb']    = get_cfg('maxmem_kb',  int)
+        result['cpu']          = get_cfg('cpu',        int)
+        result['cpu_weight']   = get_cfg('cpu_weight', float)
+        result['bootloader']   = get_cfg('bootloader')
+        result['restart_mode'] = get_cfg('restart')
+
+        try:
+            imagecfg = get_cfg('image')
+
+            if imagecfg:
+                result['image'] = imagecfg
+                result['vcpus'] = int(sxp.child_value(imagecfg, 'vcpus',
+                                                      1))
+            else:
+                result['vcpus'] = 1
+        except TypeError, exn:
+            raise VmError(
+                'Invalid configuration setting: vcpus = %s: %s' %
+                (sxp.child_value(imagecfg, 'vcpus', 1),
+                 str(exn)))
+
+        result['backend'] = []
+        for c in sxp.children(config, 'backend'):
+            result['backend'].append(sxp.name(sxp.child0(c)))
+
+        result['device'] = []
+        for d in sxp.children(config, 'device'):
+            c = sxp.child0(d)
+            result['device'].append((sxp.name(c), c))
+
+        log.debug("parseConfig: result is %s" % str(result))
+        return result
+
+
+    parseConfig = classmethod(parseConfig)
+
     
-    def __init__(self, uuid, path, db):
+    def __init__(self, uuid, parentpath, info, domid = None, augment = False):
+
         self.uuid = uuid
-        self.path = path + "/" + uuid
+        self.info = info
 
-        self.db = db
+        self.path = parentpath + "/" + uuid
 
-        self.recreate = 0
-        self.restore = 0
-        
-        self.config = None
-        self.domid = None
-        self.cpu_weight = 1
-        self.start_time = None
-        self.name = None
-        self.memory = None
-        self.ssidref = None
+        if domid:
+            self.domid = domid
+        elif 'dom' in info:
+            self.domid = int(info['dom'])
+        else:
+            self.domid = None
+
+        if augment:
+            self.augmentInfo()
+
+        self.validateInfo()
+
         self.image = None
-
-        self.target = None
 
         self.store_channel = None
         self.store_mfn = None
         self.console_channel = None
         self.console_mfn = None
         
-        self.info = None
-        self.backend_flags = 0
-        
         #todo: state: running, suspended
         self.state = STATE_VM_OK
         self.state_updated = threading.Condition()
         self.shutdown_pending = None
 
-        #todo: set to migrate info if migrating
-        self.migrate = None
-        
-        self.restart_mode = RESTART_ONREBOOT
         self.restart_state = None
         self.restart_time = None
         self.restart_count = 0
         
-        self.vcpus = 1
-        self.bootloader = None
-
         self.writeVm("uuid", self.uuid)
         self.storeDom("vm", self.path)
+
+
+    def augmentInfo(self):
+        def useIfNeeded(name, val):
+            if not self.infoIsSet(name) and val is not None:
+                self.info[name] = val
+
+        params = (("name", str),
+                  ("start-time", float))
+
+        from_store = self.gatherVm(*params)
+
+        map(lambda x, y: useIfNeeded(x[0], y), params, from_store)
+
+
+    def validateInfo(self):
+        """Validate and normalise the info block.  This has either been parsed
+        by parseConfig, or received from xc through recreate.
+        """
+        def defaultInfo(name, val):
+            if not self.infoIsSet(name):
+                self.info[name] = val()
+
+        try:
+            defaultInfo('name',         lambda: "Domain-%d" % self.domid)
+            defaultInfo('restart_mode', lambda: RESTART_ONREBOOT)
+            defaultInfo('cpu_weight',   lambda: 1.0)
+            defaultInfo('bootloader',   lambda: None)
+            defaultInfo('backend',      lambda: [])
+            defaultInfo('device',       lambda: [])
+
+            self.check_name(self.info['name'])
+
+            # Internally, we keep only maxmem_KiB, and not maxmem or maxmem_kb
+            # (which come from outside, and are in MiB and KiB respectively).
+            # This means that any maxmem or maxmem_kb settings here have come
+            # from outside, and maxmem_KiB must be updated to reflect them.
+            # If we have both maxmem and maxmem_kb and these are not
+            # consistent, then this is an error, as we've no way to tell which
+            # one takes precedence.
+
+            # Exactly the same thing applies to memory_KiB, memory, and
+            # mem_kb.
+
+            def discard_negatives(name):
+                if self.infoIsSet(name) and self.info[name] <= 0:
+                    del self.info[name]
+
+            def valid_KiB_(mb_name, kb_name):
+                discard_negatives(kb_name)
+                discard_negatives(mb_name)
+                
+                if self.infoIsSet(kb_name):
+                    if self.infoIsSet(mb_name):
+                        mb = self.info[mb_name]
+                        kb = self.info[kb_name]
+                        if mb * 1024 == kb:
+                            return kb
+                        else:
+                            raise VmError(
+                                'Inconsistent %s / %s settings: %s / %s' %
+                                (mb_name, kb_name, mb, kb))
+                    else:
+                        return self.info[kb_name]
+                elif self.infoIsSet(mb_name):
+                    return self.info[mb_name] * 1024
+                else:
+                    return None
+
+            def valid_KiB(mb_name, kb_name):
+                result = valid_KiB_(mb_name, kb_name)
+                if result <= 0:
+                    raise VmError('Invalid %s / %s: %s' %
+                                  (mb_name, kb_name, result))
+                else:
+                    return result
+
+            def delIf(name):
+                if name in self.info:
+                    del self.info[name]
+
+            self.info['memory_KiB'] = valid_KiB('memory', 'mem_kb')
+            delIf('memory')
+            delIf('mem_kb')
+            self.info['maxmem_KiB'] = valid_KiB_('maxmem', 'maxmem_kb')
+            delIf('maxmem')
+            delIf('maxmem_kb')
+
+            if not self.info['maxmem_KiB']:
+                self.info['maxmem_KiB'] = 1 << 30
+
+            # Validate the given backend names.
+            for s in self.info['backend']:
+                if s not in backendFlags:
+                    raise VmError('Invalid backend type: %s' % s)
+
+            for (n, c) in self.info['device']:
+                if not n or not c or n not in controllerClasses:
+                    raise VmError('invalid device (%s, %s)' %
+                                  (str(n), str(c)))
+
+            if self.info['restart_mode'] not in restart_modes:
+                raise VmError('invalid restart mode: ' +
+                              str(self.info['restart_mode']))
+
+            if 'cpumap' not in self.info:
+                if [self.info['vcpus'] == 1]:
+                    self.info['cpumap'] = [1];
+                else:
+                    raise VmError('Cannot create CPU map')
+
+        except KeyError, exn:
+            log.exception(exn)
+            raise VmError('Unspecified domain detail: %s' % str(exn))
+
 
     def readVm(self, *args):
         return xstransact.Read(self.path, *args)
@@ -302,18 +437,28 @@ class XendDomainInfo:
     def storeDom(self, *args):
         return xstransact.Store(self.path, *args)
 
-    def setDB(self, db):
-        self.db = db
 
-    def saveToDB(self, save=False, sync=False):
-        self.db.saveDB(save=save, sync=sync)
+    def exportToDB(self, save=False):
+        to_store = {
+            'domid':              str(self.domid),
+            'uuid':               self.uuid,
 
-    def exportToDB(self, save=False, sync=False):
-        self.db.exportToDB(self, fields=self.__exports__, save=save, sync=sync)
+            'restart_time':       str(self.restart_time),
 
-    def importFromDB(self):
-        self.db.importFromDB(self, fields=self.__exports__)
-        self.store_channel = self.eventChannel("store/port")
+            'xend/state':         self.state,
+            'xend/restart_count': str(self.restart_count),
+            'xend/restart_mode':  str(self.info['restart_mode']),
+
+            'memory/target':      str(self.info['memory_KiB'])
+            }
+
+        for (k, v) in self.info.items():
+            to_store[k] = str(v)
+
+        log.debug("Storing %s" % str(to_store))
+
+        self.writeVm(to_store)
+
 
     def setDomid(self, domid):
         """Set the domain id.
@@ -327,11 +472,12 @@ class XendDomainInfo:
         return self.domid
 
     def setName(self, name):
-        self.name = name
+        self.check_name(name)
+        self.info['name'] = name
         self.storeVm("name", name)
 
     def getName(self):
-        return self.name
+        return self.info['name']
 
     def getPath(self):
         return self.path
@@ -340,14 +486,14 @@ class XendDomainInfo:
         return self.uuid
 
     def getVCpuCount(self):
-        return self.vcpus
+        return self.info['vcpus']
 
     def getSsidref(self):
-        return self.ssidref
+        return self.info['ssidref']
 
     def getMemoryTarget(self):
-        """Get this domain's target memory size, in MiB."""
-        return self.memory
+        """Get this domain's target memory size, in KiB."""
+        return self.info['memory_KiB']
 
     def setStoreRef(self, ref):
         self.store_mfn = ref
@@ -355,7 +501,8 @@ class XendDomainInfo:
 
 
     def getBackendFlags(self):
-        return self.backend_flags
+        return reduce(lambda x, y: x | backendFlags[y],
+                      self.info['backend'], 0)
 
 
     def closeStoreChannel(self):
@@ -376,21 +523,32 @@ class XendDomainInfo:
         self.console_mfn = ref
         self.storeDom("console/ring-ref", ref)
 
+
     def setMemoryTarget(self, target):
+        """Set the memory target of this domain.
+        @param target In KiB.
+        """
+        self.info['memory_KiB'] = target
         self.storeDom("memory/target", target)
 
-    def update(self, info=None):
-        """Update with  info from xc.domain_getinfo().
+
+    def update(self, info = None):
+        """Update with info from xc.domain_getinfo().
         """
-        if info:
-            self.info = info
-        else:
-            di = dom_get(self.domid)
-            if not di:
+
+        log.debug("XendDomainInfo.update(%s) on domain %d", info, self.domid)
+
+        if not info:
+            info = dom_get(self.domid)
+            if not info:
                 return
-            self.info = di 
-        self.memory = self.info['mem_kb'] / 1024
-        self.ssidref = self.info['ssidref']
+            
+        self.info.update(info)
+        self.validateInfo()
+
+        log.debug("XendDomainInfo.update done on domain %d: %s", self.domid,
+                  self.info)
+
 
     def state_set(self, state):
         self.state_updated.acquire()
@@ -398,7 +556,7 @@ class XendDomainInfo:
             self.state = state
             self.state_updated.notifyAll()
         self.state_updated.release()
-        self.saveToDB()
+        self.exportToDB()
 
     def state_wait(self, state):
         self.state_updated.acquire()
@@ -409,9 +567,9 @@ class XendDomainInfo:
     def __str__(self):
         s = "<domain"
         s += " id=" + str(self.domid)
-        s += " name=" + self.name
-        s += " memory=" + str(self.memory)
-        s += " ssidref=" + str(self.ssidref)
+        s += " name=" + self.info['name']
+        s += " memory=" + str(self.info['memory_KiB'] / 1024)
+        s += " ssidref=" + str(self.info['ssidref'])
         s += ">"
         return s
 
@@ -441,37 +599,47 @@ class XendDomainInfo:
     def sxpr(self):
         sxpr = ['domain',
                 ['domid', self.domid],
-                ['name', self.name],
-                ['memory', self.memory],
-                ['ssidref', self.ssidref],
-                ['target', self.target] ]
+                ['name', self.info['name']],
+                ['memory', self.info['memory_KiB'] / 1024],
+                ['ssidref', self.info['ssidref']]]
         if self.uuid:
             sxpr.append(['uuid', self.uuid])
         if self.info:
-            sxpr.append(['maxmem', self.info['maxmem_kb']/1024 ])
-            run   = (self.info['running']  and 'r') or '-'
-            block = (self.info['blocked']  and 'b') or '-'
-            pause = (self.info['paused']   and 'p') or '-'
-            shut  = (self.info['shutdown'] and 's') or '-'
-            crash = (self.info['crashed']  and 'c') or '-'
-            state = run + block + pause + shut + crash
+            sxpr.append(['maxmem', self.info['maxmem_KiB'] / 1024])
+
+            def stateChar(name):
+                if name in self.info:
+                    if self.info[name]:
+                        return name[0]
+                    else:
+                        return '-'
+                else:
+                    return '?'
+
+            state = reduce(
+                lambda x, y: x + y,
+                map(stateChar,
+                    ['running', 'blocked', 'paused', 'shutdown', 'crashed']))
+
             sxpr.append(['state', state])
-            if self.info['shutdown']:
+            if self.infoIsSet('shutdown'):
                 reason = shutdown_reason(self.info['shutdown_reason'])
                 sxpr.append(['shutdown_reason', reason])
-            sxpr.append(['cpu', self.info['vcpu_to_cpu'][0]])
-            sxpr.append(['cpu_time', self.info['cpu_time']/1e9])    
+            if self.infoIsSet('cpu_time'):
+                sxpr.append(['cpu_time', self.info['cpu_time']/1e9])    
             sxpr.append(['vcpus', self.info['vcpus']])
             sxpr.append(['cpumap', self.info['cpumap']])
-            # build a string, using '|' to seperate items, show only up
-            # to number of vcpus in domain, and trim the trailing '|'
-            sxpr.append(['vcpu_to_cpu', ''.join(map(lambda x: str(x)+'|',
-                        self.info['vcpu_to_cpu'][0:self.info['vcpus']]))[:-1]])
+            if self.infoIsSet('vcpu_to_cpu'):
+                sxpr.append(['cpu', self.info['vcpu_to_cpu'][0]])
+                # build a string, using '|' to separate items, show only up
+                # to number of vcpus in domain, and trim the trailing '|'
+                sxpr.append(['vcpu_to_cpu', ''.join(map(lambda x: str(x)+'|',
+                            self.info['vcpu_to_cpu'][0:self.info['vcpus']]))[:-1]])
             
-        if self.start_time:
-            up_time =  time.time() - self.start_time  
+        if self.infoIsSet('start_time'):
+            up_time =  time.time() - self.info['start_time']
             sxpr.append(['up_time', str(up_time) ])
-            sxpr.append(['start_time', str(self.start_time) ])
+            sxpr.append(['start_time', str(self.info['start_time']) ])
 
         if self.store_channel:
             sxpr.append(self.store_channel.sxpr())
@@ -481,19 +649,12 @@ class XendDomainInfo:
             sxpr.append(['console_channel', self.console_channel.sxpr()])
         if self.console_mfn:
             sxpr.append(['console_mfn', self.console_mfn])
-# already in (devices)
-#        console = self.getConsole()
-#        if console:
-#            sxpr.append(console.sxpr())
-
         if self.restart_count:
             sxpr.append(['restart_count', self.restart_count])
         if self.restart_state:
             sxpr.append(['restart_state', self.restart_state])
         if self.restart_time:
             sxpr.append(['restart_time', str(self.restart_time)])
-        if self.config:
-            sxpr.append(['config', self.config])
         return sxpr
 
     def check_name(self, name):
@@ -502,9 +663,8 @@ class XendDomainInfo:
         The same name cannot be used for more than one vm at the same time.
 
         @param name: name
-        @raise: VMerror if invalid
+        @raise: VmError if invalid
         """
-        if self.recreate: return
         if name is None or name == '':
             raise VmError('missing vm name')
         for c in name:
@@ -520,28 +680,50 @@ class XendDomainInfo:
             return
         if dominfo.is_terminated():
             return
-        if not self.domid or (dominfo.domid != self.domid):
-            raise VmError('vm name clash: ' + name)
-        
-    def construct(self, config):
+        if self.domid is None:
+            raise VmError("VM name '%s' already in use by domain %d" %
+                          (name, dominfo.domid))
+        if dominfo.domid != self.domid:
+            raise VmError("VM name '%s' is used in both domains %d and %d" %
+                          (name, self.domid, dominfo.domid))
+
+
+    def construct(self):
         """Construct the vm instance from its configuration.
 
         @param config: configuration
         @raise: VmError on error
         """
         # todo - add support for scheduling params?
-        self.config = config
         try:
             # Initial domain create.
-            self.setName(sxp.child_value(config, 'name'))
-            self.check_name(self.name)
-            self.init_image()
-            self.configure_cpus(config)
-            self.init_domain()
+            if 'image' not in self.info:
+                raise VmError('Missing image in configuration')
+
+            self.image = ImageHandler.create(self, self.info['image'],
+                                             self.info['device'])
+
+            log.debug('XendDomainInfo.construct: '
+                      'calling initDomain(%s %s %s %s %s)',
+                      str(self.domid),
+                      str(self.info['memory_KiB']),
+                      str(self.info['ssidref']),
+                      str(self.info['cpu']),
+                      str(self.info['cpu_weight']))
+
+            self.setDomid(self.image.initDomain(self.domid,
+                                                self.info['memory_KiB'],
+                                                self.info['ssidref'],
+                                                self.info['cpu'],
+                                                self.info['cpu_weight'],
+                                                self.info['bootloader']))
+            
+            self.info['start_time'] = time.time()
+
+            log.debug('init_domain> Created domain=%d name=%s memory=%d',
+                      self.domid, self.info['name'], self.info['memory_KiB'])
 
             # Create domain devices.
-            self.configure_backends()
-            self.configure_restart()
             self.construct_image()
             self.configure()
             self.exportToDB(save=True)
@@ -553,40 +735,11 @@ class XendDomainInfo:
             self.destroy()
             raise
 
-    def configure_cpus(self, config):
-        try:
-            self.cpu_weight = float(sxp.child_value(config, 'cpu_weight', '1'))
-        except:
-            raise VmError('invalid cpu weight')
-        self.memory = int(sxp.child_value(config, 'memory'))
-        if self.memory is None:
-            raise VmError('missing memory size')
-        self.setMemoryTarget(self.memory * (1 << 20))
-        self.ssidref = int(sxp.child_value(config, 'ssidref'))
-        cpu = sxp.child_value(config, 'cpu')
-        if self.recreate and self.domid and cpu is not None and int(cpu) >= 0:
-            xc.domain_pincpu(self.domid, 0, 1<<int(cpu))
-        try:
-            image = sxp.child_value(self.config, 'image')
-            vcpus = sxp.child_value(image, 'vcpus')
-            if vcpus:
-                self.vcpus = int(vcpus)
-        except:
-            raise VmError('invalid vcpus value')
-
     def configure_vcpus(self, vcpus):
         d = {}
         for v in range(0, vcpus):
             d["cpu/%d/availability" % v] = "online"
         self.writeVm(d)
-
-    def init_image(self):
-        """Create boot image handler for the domain.
-        """
-        image = sxp.child_value(self.config, 'image')
-        if image is None:
-            raise VmError('missing image')
-        self.image = ImageHandler.create(self, image)
 
     def construct_image(self):
         """Construct the boot image for the domain.
@@ -598,21 +751,17 @@ class XendDomainInfo:
             IntroduceDomain(self.domid, self.store_mfn,
                             self.store_channel.port1, self.path)
         # get the configured value of vcpus and update store
-        self.configure_vcpus(self.vcpus)
+        self.configure_vcpus(self.info['vcpus'])
+
 
     def delete(self):
         """Delete the vm's db.
         """
-        self.domid = None
-        self.saveToDB(sync=True)
         try:
-            # Todo: eventually will have to wait for devices to signal
-            # destruction before can delete the db.
-            if self.db:
-                self.db.delete()
+            xstransact.Remove(self.path, 'domid')
         except Exception, ex:
             log.warning("error in domain db delete: %s", ex)
-            pass
+
 
     def destroy_domain(self):
         """Destroy the vm's domain.
@@ -624,7 +773,7 @@ class XendDomainInfo:
         try:
             xc.domain_destroy(dom=self.domid)
         except Exception, err:
-            log.exception("Domain destroy failed: %s", self.name)
+            log.exception("Domain destroy failed: %s", self.info['name'])
 
     def cleanup(self):
         """Cleanup vm resources: release devices.
@@ -647,11 +796,14 @@ class XendDomainInfo:
                 pass
 
     def destroy(self):
-        """Clenup vm and destroy domain.
+        """Cleanup vm and destroy domain.
         """
+
+        log.debug("XendDomainInfo.destroy")
+
         self.destroy_domain()
         self.cleanup()
-        self.saveToDB()
+        self.exportToDB()
         return 0
 
     def is_terminated(self):
@@ -664,6 +816,7 @@ class XendDomainInfo:
         """
 
         t = xstransact("%s/device" % self.path)
+
         for n in controllerClasses.keys():
             for d in t.list(n):
                 try:
@@ -676,31 +829,6 @@ class XendDomainInfo:
                         (self.info['name'], n, d, str(ex)))
         t.commit()
 
-
-    def show(self):
-        """Print virtual machine info.
-        """
-        print "[VM dom=%d name=%s memory=%d ssidref=%d" % (self.domid, self.name, self.memory, self.ssidref)
-        print "image:"
-        sxp.show(self.image)
-        print "]"
-
-    def init_domain(self):
-        """Initialize the domain memory.
-        """
-        if self.recreate:
-            return
-        if self.start_time is None:
-            self.start_time = time.time()
-            self.storeVm(("start-time", self.start_time))
-        try:
-            cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
-        except:
-            raise VmError('invalid cpu')
-        id = self.image.initDomain(self.domid, self.memory, self.ssidref, cpu, self.cpu_weight)
-        log.debug('init_domain> Created domain=%d name=%s memory=%d',
-                  id, self.name, self.memory)
-        self.setDomid(id)
 
     def eventChannel(self, path=None):
         """Create an event channel to the domain.
@@ -725,14 +853,8 @@ class XendDomainInfo:
         self.console_channel = self.eventChannel("console/port")
 
     def create_configured_devices(self):
-        devices = sxp.children(self.config, 'device')
-        for d in devices:
-            dev_config = sxp.child0(d)
-            if dev_config is None:
-                raise VmError('invalid device')
-            dev_type = sxp.name(dev_config)
-
-            self.createDevice(dev_type, dev_config)
+        for (n, c) in self.info['device']:
+            self.createDevice(n, c)
 
 
     def create_devices(self):
@@ -740,8 +862,6 @@ class XendDomainInfo:
 
         @raise: VmError for invalid devices
         """
-        if self.recreate:
-            return
         if not self.rebooting():
             self.create_configured_devices()
         self.image.createDeviceModel()
@@ -766,14 +886,6 @@ class XendDomainInfo:
         self.configureDevice(deviceClass, devid, dev_config)
 
 
-    def configure_restart(self):
-        """Configure the vm restart mode.
-        """
-        r = sxp.child_value(self.config, 'restart', RESTART_ONREBOOT)
-        if r not in restart_modes:
-            raise VmError('invalid restart mode: ' + str(r))
-        self.restart_mode = r;
-
     def restart_needed(self, reason):
         """Determine if the vm needs to be restarted when shutdown
         for the given reason.
@@ -781,11 +893,11 @@ class XendDomainInfo:
         @param reason: shutdown reason
         @return True if needs restart, False otherwise
         """
-        if self.restart_mode == RESTART_NEVER:
+        if self.info['restart_mode'] == RESTART_NEVER:
             return False
-        if self.restart_mode == RESTART_ALWAYS:
+        if self.info['restart_mode'] == RESTART_ALWAYS:
             return True
-        if self.restart_mode == RESTART_ONREBOOT:
+        if self.info['restart_mode'] == RESTART_ONREBOOT:
             return reason == 'reboot'
         return False
 
@@ -817,7 +929,7 @@ class XendDomainInfo:
             tdelta = tnow - self.restart_time
             if tdelta < self.MINIMUM_RESTART_TIME:
                 self.restart_cancel()
-                msg = 'VM %s restarting too fast' % self.name
+                msg = 'VM %s restarting too fast' % self.info['name']
                 log.error(msg)
                 raise VmError(msg)
         self.restart_time = tnow
@@ -836,14 +948,13 @@ class XendDomainInfo:
             self.exportToDB()
             self.restart_state = STATE_RESTART_BOOTING
             self.configure_bootloader()
-            self.construct(self.config)
-            self.saveToDB()
+            self.construct()
+            self.exportToDB()
         finally:
             self.restart_state = None
 
     def configure_bootloader(self):
-        self.bootloader = sxp.child_value(self.config, "bootloader")
-        if not self.bootloader:
+        if not self.info['bootloader']:
             return
         # if we're restarting with a bootloader, we need to run it
         # FIXME: this assumes the disk is the first device and
@@ -854,30 +965,13 @@ class XendDomainInfo:
         if dev:
             disk = sxp.child_value(dev, "uname")
             fn = blkdev_uname_to_file(disk)
-            blcfg = bootloader(self.bootloader, fn, 1, self.vcpus)
+            blcfg = bootloader(self.info['bootloader'], fn, 1, self.info['vcpus'])
         if blcfg is None:
             msg = "Had a bootloader specified, but can't find disk"
             log.error(msg)
             raise VmError(msg)
         self.config = sxp.merge(['vm', ['image', blcfg]], self.config)
 
-    def configure_backends(self):
-        """Set configuration flags if the vm is a backend for netif or blkif.
-        Configure the backends to use for vbd and vif if specified.
-        """
-        for c in sxp.children(self.config, 'backend'):
-            v = sxp.child0(c)
-            name = sxp.name(v)
-            if name == 'blkif':
-                self.backend_flags |= SIF_BLK_BE_DOMAIN
-            elif name == 'netif':
-                self.backend_flags |= SIF_NET_BE_DOMAIN
-            elif name == 'usbif':
-                pass
-            elif name == 'tpmif':
-                self.backend_flags |= SIF_TPM_BE_DOMAIN
-            else:
-                raise VmError('invalid backend type:' + str(name))
 
     def configure(self):
         """Configure a vm.
@@ -895,19 +989,15 @@ class XendDomainInfo:
         """
         return
 
+
     def configure_maxmem(self):
-        try:
-            maxmem = int(sxp.child_value(self.config, 'maxmem', self.memory))
-            xc.domain_setmaxmem(self.domid, maxmem_kb = maxmem * 1024)
-        except:
-            raise VmError("invalid maxmem: " +
-                          sxp.child_value(self.config, 'maxmem'))
+        xc.domain_setmaxmem(self.domid, maxmem_kb = self.info['maxmem_KiB'])
 
 
     def vcpu_hotplug(self, vcpu, state):
         """Disable or enable VCPU in domain.
         """
-        if vcpu > self.vcpus:
+        if vcpu > self.info['vcpus']:
             log.error("Invalid VCPU %d" % vcpu)
             return
         if int(state) == 0:
@@ -974,6 +1064,9 @@ class XendDomainInfo:
                 self.vcpu_hotplug(vcpu, 0)
 
 
+    def infoIsSet(self, name):
+        return name in self.info and self.info[name] is not None
+
 
 #============================================================================
 # Register image handlers.
@@ -996,16 +1089,24 @@ implements the device control specific to that device-class."""
 controllerClasses = {}
 
 
-def addControllerClass(device_class, cls):
+"""A map of backend names and the corresponding flag."""
+backendFlags = {}
+
+
+def addControllerClass(device_class, backend_name, backend_flag, cls):
     """Register a subclass of DevController to handle the named device-class.
+
+    @param backend_flag One of the SIF_XYZ_BE_DOMAIN constants, or None if
+    no flag is to be set.
     """
     cls.deviceClass = device_class
+    backendFlags[backend_name] = backend_flag
     controllerClasses[device_class] = cls
 
 
 from xen.xend.server import blkif, netif, tpmif, pciif, usbif
-addControllerClass('vbd',  blkif.BlkifController)
-addControllerClass('vif',  netif.NetifController)
-addControllerClass('vtpm', tpmif.TPMifController)
-addControllerClass('pci',  pciif.PciController)
-addControllerClass('usb',  usbif.UsbifController)
+addControllerClass('vbd',  'blkif', SIF_BLK_BE_DOMAIN, blkif.BlkifController)
+addControllerClass('vif',  'netif', SIF_NET_BE_DOMAIN, netif.NetifController)
+addControllerClass('vtpm', 'tpmif', SIF_TPM_BE_DOMAIN, tpmif.TPMifController)
+addControllerClass('pci',  'pciif', None,              pciif.PciController)
+addControllerClass('usb',  'usbif', None,              usbif.UsbifController)

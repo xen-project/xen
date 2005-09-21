@@ -14,17 +14,14 @@
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
 # Copyright (C) 2005 Christian Limpach <Christian.Limpach@cl.cam.ac.uk>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
 """Handler for domain operations.
  Nothing here is persistent (across reboots).
  Needs to be persistent for one uptime.
 """
-import errno
 import os
-import sys
-import time
-import traceback
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 
@@ -155,10 +152,8 @@ class XendDomain:
                 continue
             log.info("recreating domain %d, uuid %s" % (domid, uuid))
             dompath = "/".join(dompath.split("/")[0:-1])
-            db = self.dbmap.addChild("%s/xend" % uuid)
             try:
-                dominfo = XendDomainInfo.recreate(uuid, dompath, domid, db,
-                                                  dom)
+                dominfo = XendDomainInfo.recreate(uuid, dompath, domid, dom)
             except Exception, ex:
                 log.exception("Error recreating domain info: id=%d", domid)
                 continue
@@ -275,7 +270,7 @@ class XendDomain:
         @param config: configuration
         @return: domain
         """
-        dominfo = XendDomainInfo.create(self.dbmap, config)
+        dominfo = XendDomainInfo.create(self.dbmap.getPath(), config)
         self._add_domain(dominfo)
         return dominfo
 
@@ -310,8 +305,7 @@ class XendDomain:
         @param vmconfig: vm configuration
         """
         config = sxp.child_value(vmconfig, 'config')
-        dominfo = XendDomainInfo.restore(self.dbmap, config)
-        return dominfo
+        return XendDomainInfo.restore(self.dbmap.getPath(), config)
 
     def domain_restore(self, src, progress=False):
         """Restore a domain from file.
@@ -353,15 +347,15 @@ class XendDomain:
             dompath = self.domroot
         log.info("Creating entry for unknown xend domain: id=%d uuid=%s",
                  dom0, uuid)
-        db = self.dbmap.addChild("%s/xend" % uuid)
         try:
-            dominfo = XendDomainInfo.recreate(uuid, dompath, dom0,
-                                              db, info)
-        except:
-            raise XendError("Error recreating xend domain info: id=%d" %
-                            dom0)
-        self._add_domain(dominfo)
-        return dominfo
+            dominfo = XendDomainInfo.recreate(uuid, dompath, dom0, info)
+            self._add_domain(dominfo)
+            return dominfo
+        except Exception, exn:
+            log.exception(exn)
+            raise XendError("Error recreating xend domain info: id=%d: %s" %
+                            (dom0, str(exn)))
+
         
     def domain_lookup(self, id):
         return self.domains.get(id)
@@ -729,7 +723,7 @@ class XendDomain:
         @return: 0 on success, -1 on error
         """
         dominfo = self.domain_lookup(id)
-        return dominfo.setMemoryTarget(mem * (1 << 20))
+        return dominfo.setMemoryTarget(mem << 10)
 
     def domain_vcpu_hotplug(self, id, vcpu, state):
         """Enable or disable VCPU vcpu in DOM id
