@@ -50,9 +50,6 @@ class XendLogging:
         self.getLogger().setLevel(level)
         self.level = level
 
-    def getLevel(self, level):
-        return logging.getLevelName(self.level)
-
     def getLogger(self):
         return logging.getLogger("xend")
 
@@ -65,8 +62,7 @@ class XendLogging:
                                            backupCount=self.backupCount)
         self.logfilename = filename
         self.logfile.setFormatter(Formatter(self.logFileFormat, self.dateFormat))
-        log = self.getLogger()
-        log.addHandler(self.logfile)
+        self.getLogger().addHandler(self.logfile)
 
     def getLogFile(self):
         return self.logfile
