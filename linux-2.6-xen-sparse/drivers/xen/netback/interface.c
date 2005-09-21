@@ -8,6 +8,7 @@
 
 #include "common.h"
 #include <linux/rtnetlink.h>
+#include <asm-xen/driver_util.h>
 
 static void __netif_up(netif_t *netif)
 {
@@ -198,14 +199,14 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	evtchn_op_t op = { .cmd = EVTCHNOP_bind_interdomain };
 	int err;
 
-	vma = get_vm_area(2*PAGE_SIZE, VM_IOREMAP);
+	vma = prepare_vm_area(2*PAGE_SIZE);
 	if (vma == NULL)
 		return -ENOMEM;
 
 	err = map_frontend_pages(
 		netif, (unsigned long)vma->addr, tx_ring_ref, rx_ring_ref);
 	if (err) {
-		vfree(vma->addr);
+		vunmap(vma->addr);
 		return err;
 	}
 
@@ -216,7 +217,7 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		unmap_frontend_pages(netif);
-		vfree(vma->addr);
+		vunmap(vma->addr);
 		return err;
 	}
 
@@ -261,7 +262,7 @@ static void free_netif_callback(void *arg)
 
 	if (netif->tx) {
 		unmap_frontend_pages(netif);
-		vfree(netif->tx); /* Frees netif->rx as well. */
+		vunmap(netif->tx); /* Frees netif->rx as well. */
 	}
 
 	free_netdev(netif->dev);

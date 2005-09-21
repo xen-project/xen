@@ -1,4 +1,4 @@
- /******************************************************************************
+ /*****************************************************************************
  * drivers/xen/tpmback/interface.c
  *
  * Vritual TPM interface management.
@@ -13,6 +13,7 @@
 
 #include "common.h"
 #include <asm-xen/balloon.h>
+#include <asm-xen/driver_util.h>
 
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
 
@@ -122,12 +123,12 @@ tpmif_map(tpmif_t * tpmif, unsigned long shared_page, unsigned int evtchn)
 
 	BUG_ON(tpmif->remote_evtchn);
 
-	if ((vma = get_vm_area(PAGE_SIZE, VM_IOREMAP)) == NULL)
+	if ((vma = prepare_vm_area(PAGE_SIZE)) == NULL)
 		return -ENOMEM;
 
 	err = map_frontend_page(tpmif, VMALLOC_VMADDR(vma->addr), shared_page);
 	if (err) {
-		vfree(vma->addr);
+		vunmap(vma->addr);
 		return err;
 	}
 
@@ -138,7 +139,7 @@ tpmif_map(tpmif_t * tpmif, unsigned long shared_page, unsigned int evtchn)
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		unmap_frontend_page(tpmif);
-		vfree(vma->addr);
+		vunmap(vma->addr);
 		return err;
 	}
 
@@ -174,7 +175,7 @@ __tpmif_disconnect_complete(void *arg)
 
 	if (tpmif->tx) {
 		unmap_frontend_page(tpmif);
-		vfree(tpmif->tx);
+		vunmap(tpmif->tx);
 	}
 
 	free_tpmif(tpmif);

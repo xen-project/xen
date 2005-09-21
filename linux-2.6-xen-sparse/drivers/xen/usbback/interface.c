@@ -7,6 +7,7 @@
  */
 
 #include "common.h"
+#include <asm-xen/driver_util.h>
 
 #define USBIF_HASHSZ 1024
 #define USBIF_HASH(_d) (((int)(_d))&(USBIF_HASHSZ-1))
@@ -33,7 +34,7 @@ static void __usbif_disconnect_complete(void *arg)
      * may be outstanding requests at the device whose asynchronous responses
      * must still be notified to the remote driver.
      */
-    vfree(usbif->usb_ring.sring);
+    vunmap(usbif->usb_ring.sring);
 
     /* Construct the deferred response message. */
     cmsg.type         = CMSG_USBIF_BE;
@@ -154,7 +155,7 @@ void usbif_connect(usbif_be_connect_t *connect)
         return;
     }
 
-    if ( (vma = get_vm_area(PAGE_SIZE, VM_IOREMAP)) == NULL )
+    if ( (vma = prepare_vm_area(PAGE_SIZE)) == NULL )
     {
         connect->status = USBIF_BE_STATUS_OUT_OF_MEMORY;
         return;
@@ -172,14 +173,14 @@ void usbif_connect(usbif_be_connect_t *connect)
             connect->status = USBIF_BE_STATUS_MAPPING_ERROR;
         else
             connect->status = USBIF_BE_STATUS_ERROR;
-        vfree(vma->addr);
+        vunmap(vma->addr);
         return;
     }
 
     if ( up->status != DISCONNECTED )
     {
         connect->status = USBIF_BE_STATUS_INTERFACE_CONNECTED;
-        vfree(vma->addr);
+        vunmap(vma->addr);
         return;
     }
 

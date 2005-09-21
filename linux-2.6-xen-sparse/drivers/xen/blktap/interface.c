@@ -8,6 +8,7 @@
 
 #include "common.h"
 #include <asm-xen/evtchn.h>
+#include <asm-xen/driver_util.h>
 
 static kmem_cache_t *blkif_cachep;
 
@@ -69,12 +70,12 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 
     BUG_ON(blkif->remote_evtchn);
 
-    if ( (vma = get_vm_area(PAGE_SIZE, VM_IOREMAP)) == NULL )
+    if ( (vma = prepare_vm_area(PAGE_SIZE)) == NULL )
 	return -ENOMEM;
 
     err = map_frontend_page(blkif, (unsigned long)vma->addr, shared_page);
     if (err) {
-        vfree(vma->addr);
+        vunmap(vma->addr);
 	return err;
     }
 
@@ -85,7 +86,7 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
     err = HYPERVISOR_event_channel_op(&op);
     if (err) {
 	unmap_frontend_page(blkif);
-	vfree(vma->addr);
+	vunmap(vma->addr);
 	return err;
     }
 
@@ -121,7 +122,7 @@ static void free_blkif(void *arg)
 
     if (blkif->blk_ring.sring) {
 	unmap_frontend_page(blkif);
-	vfree(blkif->blk_ring.sring);
+	vunmap(blkif->blk_ring.sring);
 	blkif->blk_ring.sring = NULL;
     }
 
