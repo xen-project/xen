@@ -26,6 +26,10 @@ memory = 128
 # A name for your domain. All domains must have different names.
 name = "ExampleVMXDomain"
 
+#-----------------------------------------------------------------------------
+# the number of cpus guest platform has, default=1
+vcpus=1
+
 # Which CPU to start domain on? 
 #cpu = -1   # leave to Xen to pick
 

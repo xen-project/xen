@@ -336,7 +336,7 @@ class VmxImageHandler(ImageHandler):
     # xm config file
     def parseDeviceModelArgs(self, config):
         dmargs = [ 'cdrom', 'boot', 'fda', 'fdb',
-                   'localtime', 'serial', 'stdvga', 'isa' ] 
+                   'localtime', 'serial', 'stdvga', 'isa', 'vcpus' ] 
         ret = []
         for a in dmargs:
             v = sxp.child_value(config, a)
