@@ -93,9 +93,8 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
 	XEN_HYPER_SSM_I;						\
 })
 
-/* kernel register paravirtualization may soon go away */
-#define xen_get_kr(regnum) (((unsigned long *)(XSI_KR0))[regnum])
-#define xen_set_kr(regnum,val) ((((unsigned long *)(XSI_KR0))[regnum]) = val)
+// for now, just use privop.  may use hyperprivop later
+#define xen_set_kr(regnum,val) (__ia64_setreg(regnum,val))
 
 /* turning off interrupts can be paravirtualized simply by writing
  * to a memory-mapped virtual psr.i bit (implemented as a 16-bit bool) */
@@ -168,11 +167,6 @@ extern unsigned long xen_get_rr(unsigned long index);
 	__u64 ia64_intri_res;						\
 									\
 	switch(regnum) {						\
-	case _IA64_REG_AR_KR0 ... _IA64_REG_AR_KR7:			\
-		ia64_intri_res = (running_on_xen) ?			\
-			xen_get_kr((regnum-_IA64_REG_AR_KR0)) :		\
-			__ia64_getreg(regnum);				\
-		break;							\
 	case _IA64_REG_CR_IVR:						\
 		ia64_intri_res = (running_on_xen) ?			\
 			xen_get_ivr() :					\

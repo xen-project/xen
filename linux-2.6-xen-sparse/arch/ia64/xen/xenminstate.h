@@ -104,9 +104,7 @@
  */
 #ifdef CONFIG_XEN
 #define DO_SAVE_MIN(COVER,SAVE_IFS,EXTRA)							\
-	/*MINSTATE_GET_CURRENT(r16);	/* M (or M;;I) */					\
-	movl r16=XSI_KR0+(IA64_KR_CURRENT*8);;							\
-	ld8 r16=[r16];;										\
+	MINSTATE_GET_CURRENT(r16);	/* M (or M;;I) */					\
 	mov r27=ar.rsc;			/* M */							\
 	mov r20=r1;			/* A */							\
 	mov r25=ar.unat;		/* M */							\
@@ -194,9 +192,7 @@
 	;;											\
 .mem.offset 0,0; st8.spill [r16]=r13,16;							\
 .mem.offset 8,0; st8.spill [r17]=r21,16;	/* save ar.fpsr */				\
-	/* mov r13=IA64_KR(CURRENT);	/* establish `current' */				\
-	movl r21=XSI_KR0+(IA64_KR_CURRENT*8);;							\
-	ld8 r13=[r21];;										\
+	mov r13=IA64_KR(CURRENT);	/* establish `current' */				\
 	;;											\
 .mem.offset 0,0; st8.spill [r16]=r15,16;							\
 .mem.offset 8,0; st8.spill [r17]=r14,16;							\

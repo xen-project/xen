@@ -123,13 +123,7 @@ ENTRY(vhpt_miss)
 	rsm psr.dt				// use physical addressing for data
 #endif
 	mov r31=pr				// save the predicate registers
-#ifdef CONFIG_XEN
-	movl r19=XSI_KR0+(IA64_KR_PT_BASE*8)	// get the page table base address
-	;;
-	ld8 r19=[r19]
-#else
 	mov r19=IA64_KR(PT_BASE)		// get page table base address
-#endif
 	shl r21=r16,3				// shift bit 60 into sign bit
 	shr.u r17=r16,61			// get the region number into r17
 	;;
@@ -573,13 +567,7 @@ ENTRY(nested_dtlb_miss)
 #else
 	rsm psr.dt				// switch to using physical data addressing
 #endif
-#ifdef CONFIG_XEN
-	movl r19=XSI_KR0+(IA64_KR_PT_BASE*8)	// get the page table base address
-	;;
-	ld8 r19=[r19]
-#else
 	mov r19=IA64_KR(PT_BASE)		// get the page table base address
-#endif
 	shl r21=r16,3				// shift bit 60 into sign bit
 	;;
 	shr.u r17=r16,61			// get the region number into r17
@@ -968,6 +956,7 @@ ENTRY(break_fault)
 	 * to prevent leaking bits from kernel to user level.
 	 */
 	DBG_FAULT(11)
+	mov r16=IA64_KR(CURRENT)		// r16 = current task; 12 cycle read lat.
 #ifdef CONFIG_XEN
 	movl r31=XSI_IPSR
 	;;
@@ -983,11 +972,7 @@ ENTRY(break_fault)
 	mov r27=ar.rsc
 	mov r26=ar.pfs
 	;;
-	adds r31=(XSI_KR0+(IA64_KR_CURRENT*8))-XSI_IIM,r31
-	;;
-	ld8 r16=[r31]				// r16 = current task
 #else
-	mov r16=IA64_KR(CURRENT)		// r16 = current task; 12 cycle read lat.
 	mov r17=cr.iim
 	mov r18=__IA64_BREAK_SYSCALL
 	mov r21=ar.fpsr

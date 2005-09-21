@@ -53,13 +53,7 @@ GLOBAL_ENTRY(ia64_switch_to)
 
 	adds r22=IA64_TASK_THREAD_KSP_OFFSET,r13
 	movl r25=init_task
-#ifdef CONFIG_XEN
-	movl r27=XSI_KR0+(IA64_KR_CURRENT_STACK*8)
-	;;
-	ld8 r27=[r27]
-#else
 	mov r27=IA64_KR(CURRENT_STACK)
-#endif
 	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
 	dep r20=0,in0,61,3		// physical address of "next"
 	;;
@@ -86,13 +80,7 @@ GLOBAL_ENTRY(ia64_switch_to)
 (p6)	srlz.d
 #endif
 	ld8 sp=[r21]			// load kernel stack pointer of new task
-#ifdef CONFIG_XEN
-	movl r8=XSI_KR0+(IA64_KR_CURRENT*8)
-	;;
-	st8 [r8]=in0
-#else
 	mov IA64_KR(CURRENT)=in0	// update "current" application register
-#endif
 	mov r8=r13			// return pointer to previously running task
 	mov r13=in0			// set "current" pointer
 	;;
@@ -127,16 +115,13 @@ GLOBAL_ENTRY(ia64_switch_to)
 	st8 [r8]=in0			 // VA of next task...
 	;;
 	mov r25=IA64_TR_CURRENT_STACK
-	movl r8=XSI_KR0+(IA64_KR_CURRENT_STACK*8)
-	;;
-	st8 [r8]=r26
 #else
 	mov cr.itir=r25
 	mov cr.ifa=in0			// VA of next task...
 	;;
 	mov r25=IA64_TR_CURRENT_STACK
-	mov IA64_KR(CURRENT_STACK)=r26	// remember last page we mapped...
 #endif
+	mov IA64_KR(CURRENT_STACK)=r26	// remember last page we mapped...
 	;;
 	itr.d dtr[r25]=r23		// wire in new mapping...
 	br.cond.sptk .done
@@ -573,14 +558,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	bsw.0			// switch back to bank 0 (no stop bit required beforehand...)
 #endif
 	;;
-#ifdef CONFIG_XEN
-(pUStk)	movl r18=XSI_KR0+(IA64_KR_CURRENT*8)
-	;;
-(pUStk)	ld8 r18=[r18]
-	;;
-#else
 (pUStk)	mov r18=IA64_KR(CURRENT)// M2 (12 cycle read latency)
-#endif
 	adds r16=PT(CR_IPSR)+16,r12
 	adds r17=PT(CR_IIP)+16,r12
 
