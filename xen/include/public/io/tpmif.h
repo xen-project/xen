@@ -20,8 +20,7 @@ typedef struct {
     unsigned long addr;   /* Machine address of packet.   */
     int      ref;         /* grant table access reference */
     u16      id;          /* Echoed in response message.  */
-    u16      size:15;     /* Packet size in bytes.        */
-    u16      mapped:1;
+    u16      size;        /* Packet size in bytes.        */
 } tpmif_tx_request_t;
 
 /*
@@ -30,13 +29,16 @@ typedef struct {
  */
 typedef u32 TPMIF_RING_IDX;
 
-#define TPMIF_TX_RING_SIZE 16
+#define TPMIF_TX_RING_SIZE 10
 
 /* This structure must fit in a memory page. */
+
 typedef struct {
-    union {
-        tpmif_tx_request_t  req;
-    } ring[TPMIF_TX_RING_SIZE];
+    tpmif_tx_request_t req;
+} tpmif_ring_t;
+
+typedef struct {
+    tpmif_ring_t ring[TPMIF_TX_RING_SIZE];
 } tpmif_tx_interface_t;
 
 #endif

@@ -126,6 +126,7 @@ QEMUTimer *polling_timer;
 int vm_running;
 int audio_enabled = 0;
 int nic_pcnet = 1;
+int vcpus = 1;
 int sb16_enabled = 1;
 int adlib_enabled = 1;
 int gus_enabled = 1;
@@ -2105,6 +2106,7 @@ void help(void)
 	   "-snapshot       write to temporary files instead of disk image files\n"
            "-m megs         set virtual RAM size to megs MB [default=%d]\n"
            "-nographic      disable graphical output and redirect serial I/Os to console\n"
+           "-vcpus          set CPU number of guest platform\n"
 #ifdef CONFIG_VNC
 	   "-vnc port             use vnc instead of sdl\n"
 	   "-vncport port         use a different port\n"
@@ -2235,6 +2237,7 @@ enum {
     QEMU_OPTION_hdachs,
     QEMU_OPTION_L,
     QEMU_OPTION_no_code_copy,
+    QEMU_OPTION_vcpus,
     QEMU_OPTION_pci,
     QEMU_OPTION_nic_pcnet,
     QEMU_OPTION_isa,
@@ -2307,6 +2310,7 @@ const QEMUOption qemu_options[] = {
     { "hdachs", HAS_ARG, QEMU_OPTION_hdachs },
     { "L", HAS_ARG, QEMU_OPTION_L },
     { "no-code-copy", 0, QEMU_OPTION_no_code_copy },
+    { "vcpus", 1, QEMU_OPTION_vcpus },
 #ifdef TARGET_PPC
     { "prep", 0, QEMU_OPTION_prep },
     { "g", 1, QEMU_OPTION_g },
@@ -2646,6 +2650,9 @@ int main(int argc, char **argv)
             case QEMU_OPTION_S:
                 start_emulation = 0;
                 break;
+            case QEMU_OPTION_vcpus:
+                vcpus = atoi(optarg);
+                fprintf(logfile, "qemu: the number of cpus is %d\n", vcpus);
             case QEMU_OPTION_pci:
                 pci_enabled = 1;
                 break;

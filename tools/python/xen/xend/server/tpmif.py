@@ -39,7 +39,7 @@ class TPMifController(DevController):
         """@see DevController.getDeviceDetails"""
         
         devid = int(sxp.child_value(config, 'instance', '0'))
-        log.error("The domain has a TPM with instance %d." % devid)
+        log.debug("The domain has a TPM with instance %d." % devid)
 
         back  = { 'instance' : "%i" % devid }
         front = { 'handle' : "%i" % devid }

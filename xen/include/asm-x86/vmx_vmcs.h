@@ -74,9 +74,12 @@ struct msr_state{
 struct arch_vmx_struct {
     struct vmcs_struct      *vmcs;  /* VMCS pointer in virtual */
     unsigned long           flags;  /* VMCS flags */
+    unsigned long           cpu_cr0; /* copy of guest CR0 */
+    unsigned long           cpu_shadow_cr0; /* copy of guest read shadow CR0 */
     unsigned long           cpu_cr2; /* save CR2 */
     unsigned long           cpu_cr3;
     unsigned long           cpu_state;
+    unsigned long           cpu_based_exec_control;
     struct msr_state        msr_content;
     void                   *io_bitmap_a, *io_bitmap_b;
 };

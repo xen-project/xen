@@ -68,9 +68,6 @@ static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
     error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL, 
                        MONITOR_PIN_BASED_EXEC_CONTROLS);
 
-    error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL, 
-                       MONITOR_CPU_BASED_EXEC_CONTROLS);
-
     error |= __vmwrite(VM_EXIT_CONTROLS, MONITOR_VM_EXIT_CONTROLS);
 
     error |= __vmwrite(VM_ENTRY_CONTROLS, MONITOR_VM_ENTRY_CONTROLS);
@@ -117,12 +114,6 @@ struct host_execution_env {
     unsigned long fs_base; 
     unsigned long gs_base; 
 #endif 
-
-    /* control registers */
-    unsigned long cr3;
-    unsigned long cr0;
-    unsigned long cr4;
-    unsigned long dr7;
 };
 
 #define round_pgdown(_p) ((_p)&PAGE_MASK) /* coped from domain.c */
@@ -217,8 +208,32 @@ void vmx_do_launch(struct vcpu *v)
 /* Update CR3, GDT, LDT, TR */
     unsigned int  error = 0;
     unsigned long pfn = 0;
+    unsigned long cr0, cr4;
     struct pfn_info *page;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
+
+    __asm__ __volatile__ ("mov %%cr0,%0" : "=r" (cr0) : );
+
+    error |= __vmwrite(GUEST_CR0, cr0);
+    cr0 &= ~X86_CR0_PG;
+    error |= __vmwrite(CR0_READ_SHADOW, cr0);
+    error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL, 
+                       MONITOR_CPU_BASED_EXEC_CONTROLS);
+
+    __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (cr4) : );
+
+#ifdef __x86_64__
+    error |= __vmwrite(GUEST_CR4, cr4 & ~X86_CR4_PSE);
+#else
+    error |= __vmwrite(GUEST_CR4, cr4);
+#endif
+
+#ifdef __x86_64__
+    cr4 &= ~(X86_CR4_PGE | X86_CR4_VMXE | X86_CR4_PAE);
+#else
+    cr4 &= ~(X86_CR4_PGE | X86_CR4_VMXE);
+#endif
+    error |= __vmwrite(CR4_READ_SHADOW, cr4);
 
     vmx_stts();
 
@@ -254,7 +269,7 @@ construct_init_vmcs_guest(struct cpu_user_regs *regs,
     int error = 0;
     union vmcs_arbytes arbytes;
     unsigned long dr7;
-    unsigned long eflags, shadow_cr;
+    unsigned long eflags;
 
     /* MSR */
     error |= __vmwrite(VM_EXIT_MSR_LOAD_ADDR, 0);
@@ -326,27 +341,7 @@ construct_init_vmcs_guest(struct cpu_user_regs *regs,
 
     arbytes.fields.seg_type = 0xb;          /* 32-bit TSS (busy) */
     error |= __vmwrite(GUEST_TR_AR_BYTES, arbytes.bytes);
-
-    error |= __vmwrite(GUEST_CR0, host_env->cr0); /* same CR0 */
-
-    /* Initally PG, PE are not set*/
-    shadow_cr = host_env->cr0;
-    shadow_cr &= ~X86_CR0_PG;
-    error |= __vmwrite(CR0_READ_SHADOW, shadow_cr);
     /* CR3 is set in vmx_final_setup_guest */
-#ifdef __x86_64__
-    error |= __vmwrite(GUEST_CR4, host_env->cr4 & ~X86_CR4_PSE);
-#else
-    error |= __vmwrite(GUEST_CR4, host_env->cr4);
-#endif
-    shadow_cr = host_env->cr4;
-
-#ifdef __x86_64__
-    shadow_cr &= ~(X86_CR4_PGE | X86_CR4_VMXE | X86_CR4_PAE);
-#else
-    shadow_cr &= ~(X86_CR4_PGE | X86_CR4_VMXE);
-#endif
-    error |= __vmwrite(CR4_READ_SHADOW, shadow_cr);
 
     error |= __vmwrite(GUEST_ES_BASE, host_env->ds_base);
     error |= __vmwrite(GUEST_CS_BASE, host_env->cs_base);
@@ -403,12 +398,10 @@ static inline int construct_vmcs_host(struct host_execution_env *host_env)
     host_env->cs_base = 0;
 
     __asm__ __volatile__ ("mov %%cr0,%0" : "=r" (crn) : );
-    host_env->cr0 = crn;
     error |= __vmwrite(HOST_CR0, crn); /* same CR0 */
 
     /* CR3 is set in vmx_final_setup_hostos */
     __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (crn) : ); 
-    host_env->cr4 = crn;
     error |= __vmwrite(HOST_CR4, crn);
 
     error |= __vmwrite(HOST_RIP, (unsigned long) vmx_asm_vmexit_handler);

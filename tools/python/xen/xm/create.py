@@ -496,7 +496,7 @@ def configure_vfr(opts, config, vals):
 def configure_vmx(opts, config_image, vals):
     """Create the config for VMX devices.
     """
-    args = [ 'memmap', 'device_model', 'cdrom',
+    args = [ 'memmap', 'device_model', 'vcpus', 'cdrom',
              'boot', 'fda', 'fdb', 'localtime', 'serial', 'macaddr', 'stdvga', 
              'isa', 'nographic', 'vnc', 'vncviewer', 'sdl', 'display']
     for a in args:

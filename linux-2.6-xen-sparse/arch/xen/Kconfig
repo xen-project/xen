@@ -73,6 +73,8 @@ config XEN_NETDEV_BACKEND
 config XEN_TPMDEV_FRONTEND
         bool "TPM-device frontend driver"
         default n
+	select TCG_TPM
+	select TCG_XEN
         help
           The TPM-device frontend driver.
 
