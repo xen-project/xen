@@ -1,9 +1,14 @@
-mv arch/xen/kernel drivers/xen/core
-mv mm mm.x86
-mv net net.x86
-mv kernel kernel.x86
-mv arch/xen arch/xen.x86
-mkdir arch/xen
-mv arch/xen.x86/configs arch/xen
-mv include/asm-generic include/asm-generic.x86
-mv include/linux include/linux.x86
+#!/bin/bash
+if [ -e mm ]
+then
+	mv mm mm.x86
+	mv net net.x86
+	mv kernel kernel.x86
+	mv arch/xen/kernel drivers/xen/core
+	mv arch/xen arch/xen.x86
+	mkdir arch/xen
+	mv arch/xen.x86/configs arch/xen
+	mv include/asm-generic include/asm-generic.x86
+	mv include/linux include/linux.x86
+fi
+cp ../xen/include/asm-ia64/asm-xsi-offsets.h include/asm-ia64/xen/

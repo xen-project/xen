@@ -87,9 +87,9 @@ archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
 CLEAN_FILES += include/asm-ia64/.offsets.h.stamp vmlinux.gz bootloader
-CLEAN_FILES += include/asm-xen/xen-public include/asm-ia64/xen/asm-xsi-offsets.h
-CLEAN_FILES += include/asm-xen/linux-public/xenstored.h
-CLEAN_FILES += include/asm-xen/linux-public include/asm-xen/asm-ia64/hypervisor.h
+#CLEAN_FILES += include/asm-xen/xen-public include/asm-ia64/xen/asm-xsi-offsets.h
+#CLEAN_FILES += include/asm-xen/linux-public/xenstored.h
+#CLEAN_FILES += include/asm-xen/linux-public include/asm-xen/asm-ia64/hypervisor.h
 
 MRPROPER_FILES += include/asm-ia64/offsets.h
 
@@ -102,7 +102,7 @@ include/asm-ia64/offsets.h: arch/ia64/kernel/asm-offsets.s
 
 arch/ia64/kernel/asm-offsets.s: include/asm-ia64/.offsets.h.stamp
 
-XEN_PATH ?= $(srctree)/../xen-ia64-unstable.hg/
+#XEN_PATH ?= $(srctree)/../xen-ia64-unstable.hg/
 include/asm-ia64/.offsets.h.stamp:
 	mkdir -p include/asm-ia64
 	[ -s include/asm-ia64/offsets.h ] \
@@ -110,14 +110,14 @@ include/asm-ia64/.offsets.h.stamp:
 	touch $@
 	[ -e include/asm-xen/asm ] \
 	 || ln -s asm-ia64 include/asm-xen/asm
-	[ -e include/asm-xen/xen-public ] \
-	 || ln -s $(XEN_PATH)/xen/include/public \
-		include/asm-xen/xen-public
-	[ -e include/asm-ia64/xen/asm-xsi-offsets.h ] \
-	 || ln -s $(XEN_PATH)/xen/include/asm-ia64/asm-xsi-offsets.h \
-		include/asm-ia64/xen/asm-xsi-offsets.h
-	[ -e include/asm-xen/linux-public ] \
-	 || ln -s $(XEN_PATH)/linux-2.6-xen-sparse/include/asm-xen/linux-public \
+#	[ -e include/asm-xen/xen-public ] \
+#	 || ln -s $(XEN_PATH)/xen/include/public \
+#		include/asm-xen/xen-public
+#	[ -e include/asm-ia64/xen/asm-xsi-offsets.h ] \
+#	 || ln -s $(XEN_PATH)/xen/include/asm-ia64/asm-xsi-offsets.h \
+#		include/asm-ia64/xen/asm-xsi-offsets.h
+#	[ -e include/asm-xen/linux-public ] \
+#	 || ln -s $(XEN_PATH)/linux-2.6-xen-sparse/include/asm-xen/linux-public \
 		include/asm-xen/linux-public
 	[ -e include/asm-xen/linux-public/xenstored.h ] \
 	 || ln -s $(XEN_PATH)/tools/xenstore/xenstored.h \
