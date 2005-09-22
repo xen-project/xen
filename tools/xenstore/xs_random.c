@@ -74,9 +74,9 @@ static void convert_to_dir(const char *dirname)
 static void maybe_convert_to_directory(const char *filename)
 {
 	struct stat st;
-	char *dirname = talloc_asprintf(filename, "%.*s", 
-					strrchr(filename, '/') - filename,
-					filename);
+	char *dirname = talloc_asprintf(
+		filename, "%.*s",
+		(int)(strrchr(filename, '/') - filename), filename);
 	if (lstat(dirname, &st) == 0 && S_ISREG(st.st_mode))
 		convert_to_dir(dirname);
 }
@@ -249,7 +249,7 @@ static void init_perms(const char *filename)
 
 	/* Copy permissions from parent */
 	command = talloc_asprintf(filename, "cp %.*s/.perms %s",
-				  strrchr(filename, '/') - filename,
+				  (int)(strrchr(filename, '/') - filename),
 				  filename, permfile);
 	do_command(command);
 }	
@@ -308,7 +308,7 @@ static char *parent_filename(const char *name)
 	char *slash = strrchr(name + 1, '/');
 	if (!slash)
 		return talloc_strdup(name, "/");
-	return talloc_asprintf(name, "%.*s", slash-name, name);
+	return talloc_asprintf(name, "%.*s", (int)(slash-name), name);
 }
 
 static void make_dirs(const char *filename)
@@ -1063,7 +1063,8 @@ static unsigned int try_simple(const bool *trymap,
 
 		ret = do_next_op(data->ops, h, i + data->seed, verbose);
 		if (verbose)
-			printf("-> %.*s\n", strchr(ret, '\n') - ret, ret);
+			printf("-> %.*s\n",
+			       (int)(strchr(ret, '\n') - ret), ret);
 		if (streq(ret, "FAILED:Bad file descriptor"))
 			goto out;
 		if (kill(daemon_pid, 0) != 0)
@@ -1334,13 +1335,14 @@ static unsigned int try_diff(const bool *trymap,
 
 		file = do_next_op(&file_ops, fileh, i+data->seed, verbose);
 		if (verbose)
-			printf("-> %.*s\n", strchr(file, '/') - file, file);
+			printf("-> %.*s\n",
+			       (int)(strchr(file, '/') - file), file);
 		
 		if (verbose)
 			printf("XS: ");
 		xs = do_next_op(&xs_ops, xsh, i+data->seed, verbose);
 		if (verbose)
-			printf("-> %.*s\n", strchr(xs, '/') - xs, xs);
+			printf("-> %.*s\n", (int)(strchr(xs, '/') - xs), xs);
 
 		if (!streq(file, xs))
 			goto out;
@@ -1508,7 +1510,8 @@ static unsigned int try_fail(const bool *trymap,
 			aborted++;
 
 		if (verbose)
-			printf("-> %.*s\n", strchr(ret, '\n') - ret, ret);
+			printf("-> %.*s\n",
+			       (int)(strchr(ret, '\n') - ret), ret);
 
 		talloc_free(ret);
 
