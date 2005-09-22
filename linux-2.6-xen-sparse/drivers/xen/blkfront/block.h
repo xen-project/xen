@@ -146,4 +146,15 @@ extern void do_blkif_request (request_queue_t *rq);
 int xlvbd_add(blkif_sector_t capacity, int device,
 	      u16 vdisk_info, u16 sector_size, struct blkfront_info *info);
 void xlvbd_del(struct blkfront_info *info);
+
 #endif /* __XEN_DRIVERS_BLOCK_H__ */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

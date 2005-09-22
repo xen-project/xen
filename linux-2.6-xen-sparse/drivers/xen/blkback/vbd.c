@@ -11,10 +11,10 @@
 
 static inline dev_t vbd_map_devnum(u32 cookie)
 {
-    return MKDEV(BLKIF_MAJOR(cookie), BLKIF_MINOR(cookie));
+	return MKDEV(BLKIF_MAJOR(cookie), BLKIF_MINOR(cookie));
 }
-#define vbd_sz(_v)   ((_v)->bdev->bd_part ? \
-    (_v)->bdev->bd_part->nr_sects : (_v)->bdev->bd_disk->capacity)
+#define vbd_sz(_v)   ((_v)->bdev->bd_part ?				\
+	(_v)->bdev->bd_part->nr_sects : (_v)->bdev->bd_disk->capacity)
 #define bdev_put(_b) blkdev_put(_b)
 
 unsigned long vbd_size(struct vbd *vbd)
@@ -35,63 +35,73 @@ unsigned long vbd_secsize(struct vbd *vbd)
 int vbd_create(blkif_t *blkif, blkif_vdev_t handle,
 	       u32 pdevice, int readonly)
 {
-    struct vbd *vbd;
+	struct vbd *vbd;
 
-    vbd = &blkif->vbd;
-    vbd->handle   = handle; 
-    vbd->readonly = readonly;
-    vbd->type     = 0;
+	vbd = &blkif->vbd;
+	vbd->handle   = handle; 
+	vbd->readonly = readonly;
+	vbd->type     = 0;
 
-    vbd->pdevice  = pdevice;
+	vbd->pdevice  = pdevice;
 
-    vbd->bdev = open_by_devnum(
-        vbd_map_devnum(vbd->pdevice),
-        vbd->readonly ? FMODE_READ : FMODE_WRITE);
-    if ( IS_ERR(vbd->bdev) )
-    {
-        DPRINTK("vbd_creat: device %08x doesn't exist.\n", vbd->pdevice);
-        return -ENOENT;
-    }
+	vbd->bdev = open_by_devnum(
+		vbd_map_devnum(vbd->pdevice),
+		vbd->readonly ? FMODE_READ : FMODE_WRITE);
+	if (IS_ERR(vbd->bdev)) {
+		DPRINTK("vbd_creat: device %08x doesn't exist.\n",
+			vbd->pdevice);
+		return -ENOENT;
+	}
 
-    if ( (vbd->bdev->bd_disk == NULL) )
-    {
-        DPRINTK("vbd_creat: device %08x doesn't exist.\n", vbd->pdevice);
-	vbd_free(vbd);
-        return -ENOENT;
-    }
+	if (vbd->bdev->bd_disk == NULL) {
+		DPRINTK("vbd_creat: device %08x doesn't exist.\n",
+			vbd->pdevice);
+		vbd_free(vbd);
+		return -ENOENT;
+	}
 
-    if ( vbd->bdev->bd_disk->flags & GENHD_FL_CD )
-        vbd->type |= VDISK_CDROM;
-    if ( vbd->bdev->bd_disk->flags & GENHD_FL_REMOVABLE )
-        vbd->type |= VDISK_REMOVABLE;
+	if (vbd->bdev->bd_disk->flags & GENHD_FL_CD)
+		vbd->type |= VDISK_CDROM;
+	if (vbd->bdev->bd_disk->flags & GENHD_FL_REMOVABLE)
+		vbd->type |= VDISK_REMOVABLE;
 
-    DPRINTK("Successful creation of handle=%04x (dom=%u)\n",
-            handle, blkif->domid);
-    return 0;
+	DPRINTK("Successful creation of handle=%04x (dom=%u)\n",
+		handle, blkif->domid);
+	return 0;
 }
 
 void vbd_free(struct vbd *vbd)
 {
-    if (vbd->bdev)
-	bdev_put(vbd->bdev);
-    vbd->bdev = NULL;
+	if (vbd->bdev)
+		bdev_put(vbd->bdev);
+	vbd->bdev = NULL;
 }
 
 int vbd_translate(struct phys_req *req, blkif_t *blkif, int operation)
 {
-    struct vbd *vbd = &blkif->vbd;
-    int rc = -EACCES;
+	struct vbd *vbd = &blkif->vbd;
+	int rc = -EACCES;
 
-    if ((operation == WRITE) && vbd->readonly)
-        goto out;
+	if ((operation == WRITE) && vbd->readonly)
+		goto out;
 
-    if (unlikely((req->sector_number + req->nr_sects) > vbd_sz(vbd)))
-        goto out;
+	if (unlikely((req->sector_number + req->nr_sects) > vbd_sz(vbd)))
+		goto out;
 
-    req->dev  = vbd->pdevice;
-    req->bdev = vbd->bdev;
-    rc = 0;
+	req->dev  = vbd->pdevice;
+	req->bdev = vbd->bdev;
+	rc = 0;
 
  out:
-    return rc;
+	return rc;
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

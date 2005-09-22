@@ -305,6 +305,13 @@ class XendDomain:
 
         @param vmconfig: vm configuration
         """
+        # We accept our configuration specified as ['config' [...]], which
+        # some tools or configuration files may be using.  For save-restore,
+        # we use the value of XendDomainInfo.sxpr() directly, which has no
+        # such item.
+        nested = sxp.child_value(config, 'config')
+        if nested:
+            config = nested
         return XendDomainInfo.restore(self.dbmap.getPath(), config)
 
     def domain_restore(self, src, progress=False):

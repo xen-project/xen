@@ -65,7 +65,7 @@ static struct xlbd_type_info xlbd_vbd_type = {
 };
 
 static struct xlbd_major_info *major_info[NUM_IDE_MAJORS + NUM_SCSI_MAJORS +
-					  NUM_VBD_MAJORS];
+					 NUM_VBD_MAJORS];
 
 #define XLBD_MAJOR_IDE_START	0
 #define XLBD_MAJOR_SCSI_START	(NUM_IDE_MAJORS)
@@ -309,3 +309,13 @@ xlvbd_del(struct blkfront_info *info)
 
 	bdput(bd);
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */
