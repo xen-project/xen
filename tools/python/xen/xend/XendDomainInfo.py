@@ -172,7 +172,7 @@ class XendDomainInfo:
         @param uuid:      uuid to use
         """
         
-        log.debug("XendDomainInfo.restore(%s, ..., %s)", dompath, uuid)
+        log.debug("XendDomainInfo.restore(%s, %s, %s)", dompath, config, uuid)
 
         if not uuid:
             uuid = getUuid()
@@ -187,6 +187,9 @@ class XendDomainInfo:
         vm = cls(uuid, dompath, cls.parseConfig(config),
                  xc.domain_create(ssidref = ssidref))
         vm.clear_shutdown()
+        vm.create_channel()
+        vm.configure()
+        vm.exportToDB()
         return vm
 
     restore = classmethod(restore)
@@ -381,6 +384,9 @@ class XendDomainInfo:
 
             if not self.info['maxmem_KiB']:
                 self.info['maxmem_KiB'] = 1 << 30
+
+            if self.info['maxmem_KiB'] > self.info['memory_KiB']:
+                self.info['maxmem_KiB'] = self.info['memory_KiB']
 
             # Validate the given backend names.
             for s in self.info['backend']:
@@ -606,6 +612,10 @@ class XendDomainInfo:
             sxpr.append(['uuid', self.uuid])
         if self.info:
             sxpr.append(['maxmem', self.info['maxmem_KiB'] / 1024])
+
+            if self.infoIsSet('device'):
+                for (n, c) in self.info['device']:
+                    sxpr.append(['device', c])
 
             def stateChar(name):
                 if name in self.info:
@@ -864,7 +874,8 @@ class XendDomainInfo:
         """
         if not self.rebooting():
             self.create_configured_devices()
-        self.image.createDeviceModel()
+        if self.image:
+            self.image.createDeviceModel()
 
     def device_create(self, dev_config):
         """Create a new device.
@@ -979,15 +990,6 @@ class XendDomainInfo:
         """
         self.configure_maxmem()
         self.create_devices()
-        self.create_blkif()
-
-    def create_blkif(self):
-        """Create the block device interface (blkif) for the vm.
-        The vm needs a blkif even if it doesn't have any disks
-        at creation time, for example when it uses NFS root.
-
-        """
-        return
 
 
     def configure_maxmem(self):

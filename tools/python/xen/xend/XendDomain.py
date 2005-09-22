@@ -299,13 +299,12 @@ class XendDomain:
                            [dominfo.getName(), dominfo.getDomain(), "fail"])
         return dominfo
 
-    def domain_configure(self, vmconfig):
+    def domain_configure(self, config):
         """Configure an existing domain. This is intended for internal
         use by domain restore and migrate.
 
         @param vmconfig: vm configuration
         """
-        config = sxp.child_value(vmconfig, 'config')
         return XendDomainInfo.restore(self.dbmap.getPath(), config)
 
     def domain_restore(self, src, progress=False):
@@ -317,7 +316,9 @@ class XendDomain:
 
         try:
             fd = os.open(src, os.O_RDONLY)
-            return XendCheckpoint.restore(self, fd)
+            dominfo = XendCheckpoint.restore(self, fd)
+            self._add_domain(dominfo)
+            return dominfo
         except OSError, ex:
             raise XendError("can't read guest state file %s: %s" %
                             (src, ex[1]))
@@ -502,7 +503,7 @@ class XendDomain:
         """
 
         if domid == PRIV_DOMAIN:
-            raise XendError("Cannot destroy priviliged domain %i" % domid)
+            raise XendError("Cannot destroy privileged domain %i" % domid)
         
         self.domain_restart_schedule(domid, reason, force=True)
         dominfo = self.domain_lookup(domid)
