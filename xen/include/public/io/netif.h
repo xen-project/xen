@@ -10,10 +10,11 @@
 #define __XEN_PUBLIC_IO_NETIF_H__
 
 typedef struct netif_tx_request {
-    unsigned long addr;   /* Machine address of packet.  */
+    grant_ref_t gref;      /* Reference to buffer page */
+    u16      offset:15;    /* Offset within buffer page */
     u16      csum_blank:1; /* Proto csum field blank?   */
-    u16      id:15;  /* Echoed in response message. */
-    u16      size;   /* Packet size in bytes.       */
+    u16      id;           /* Echoed in response message. */
+    u16      size;         /* Packet size in bytes.       */
 } netif_tx_request_t;
 
 typedef struct netif_tx_response {
@@ -22,21 +23,15 @@ typedef struct netif_tx_response {
 } netif_tx_response_t;
 
 typedef struct {
-    u16       id;    /* Echoed in response message.        */
-#ifdef CONFIG_XEN_NETDEV_GRANT
-    grant_ref_t gref;	/* 2: Reference to incoming granted frame */
-#endif
+    u16       id;       /* Echoed in response message.        */
+    grant_ref_t gref;	/* Reference to incoming granted frame */
 } netif_rx_request_t;
 
 typedef struct {
-#ifdef CONFIG_XEN_NETDEV_GRANT
-    u32      addr;   /*  0: Offset in page of start of received packet  */
-#else
-    unsigned long addr; /* Machine address of packet.              */
-#endif
-    u16      csum_valid:1; /* Protocol checksum is validated?       */
-    u16      id:15;
-    s16      status; /* -ve: BLKIF_RSP_* ; +ve: Rx'ed pkt size. */
+    u16      offset;     /* Offset in page of start of received packet  */
+    u16      csum_valid; /* Protocol checksum is validated?       */
+    u16      id;
+    s16      status;     /* -ve: BLKIF_RSP_* ; +ve: Rx'ed pkt size. */
 } netif_rx_response_t;
 
 /*
@@ -53,18 +48,8 @@ typedef u32 NETIF_RING_IDX;
 #define MASK_NETIF_RX_IDX(_i) ((_i)&(NETIF_RX_RING_SIZE-1))
 #define MASK_NETIF_TX_IDX(_i) ((_i)&(NETIF_TX_RING_SIZE-1))
 
-#ifdef __x86_64__
-/*
- * This restriction can be lifted when we move netfront/netback to use
- * grant tables. This will remove memory_t fields from the above structures
- * and thus relax natural alignment restrictions.
- */
-#define NETIF_TX_RING_SIZE 128
-#define NETIF_RX_RING_SIZE 128
-#else
 #define NETIF_TX_RING_SIZE 256
 #define NETIF_RX_RING_SIZE 256
-#endif
 
 /* This structure must fit in a memory page. */
 typedef struct netif_tx_interface {
