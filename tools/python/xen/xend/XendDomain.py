@@ -23,13 +23,13 @@
 """
 import os
 
-import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
+import xen.lowlevel.xc
 
 from xen.xend import sxp
-from xen.xend import XendRoot; xroot = XendRoot.instance()
+from xen.xend import XendRoot
 from xen.xend import XendCheckpoint
 from xen.xend.XendDomainInfo import XendDomainInfo, shutdown_reason
-from xen.xend import EventServer; eserver = EventServer.instance()
+from xen.xend import EventServer
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 from xen.xend import scheduler
@@ -38,6 +38,12 @@ from xen.xend.uuid import getUuid
 from xen.xend.xenstore import XenNode, DBMap
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xsutil import GetDomainPath
+
+
+xc = xen.lowlevel.xc.new()
+xroot = XendRoot.instance()
+eserver = EventServer.instance()
+
 
 __all__ = [ "XendDomain" ]
 
@@ -182,7 +188,7 @@ class XendDomain:
         if info.getDomid() in self.domains:
             notify = False
         self.domains[info.getDomid()] = info
-        info.exportToDB(save=True)
+        info.exportToDB()
         if notify:
             eserver.inject('xend.domain.create', [info.getName(),
                                                   info.getDomid()])

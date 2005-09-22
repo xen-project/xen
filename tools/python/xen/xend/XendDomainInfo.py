@@ -444,7 +444,7 @@ class XendDomainInfo:
         return xstransact.Store(self.path, *args)
 
 
-    def exportToDB(self, save=False):
+    def exportToDB(self):
         to_store = {
             'domid':              str(self.domid),
             'uuid':               self.uuid,
@@ -718,7 +718,7 @@ class XendDomainInfo:
             # Create domain devices.
             self.construct_image()
             self.configure()
-            self.exportToDB(save=True)
+            self.exportToDB()
         except Exception, ex:
             # Catch errors, cleanup and re-raise.
             print 'Domain construction error:', ex
@@ -739,7 +739,7 @@ class XendDomainInfo:
                                       ssidref = self.info['ssidref'])
         if self.domid <= 0:
             raise VmError('Creating domain failed: name=%s' %
-                          self.vm.getName())
+                          self.info['name'])
 
         if self.info['bootloader']:
             self.image.handleBootloading()
