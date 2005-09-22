@@ -43,6 +43,7 @@
 #include <asm/hypervisor.h>
 #include <asm-xen/xenbus.h>
 #include <asm-xen/xen_proc.h>
+#include <asm/hypervisor.h>
 #include <asm-xen/linux-public/xenstored.h>
 
 struct xenbus_dev_data {

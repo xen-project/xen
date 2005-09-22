@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <asm/pgtable.h>
+#include <asm-xen/xen-public/xen.h>
 #include <asm/fixmap.h>
 #include <asm/uaccess.h>
 #include <asm-xen/xen_proc.h>
@@ -434,6 +435,9 @@ static int __init
 gnttab_init(void)
 {
     int i;
+
+    if (xen_init() < 0)
+        return -ENODEV;
 
     BUG_ON(gnttab_resume());
 

@@ -674,6 +674,9 @@ int do_xenbus_probe(void *unused)
 
 static int __init xenbus_probe_init(void)
 {
+	if (xen_init() < 0)
+		return -ENODEV;
+
 	bus_register(&xenbus_frontend.bus);
 	bus_register(&xenbus_backend.bus);
 	device_register(&xenbus_frontend.dev);

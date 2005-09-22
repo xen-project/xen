@@ -140,6 +140,8 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order);
 #define MULTI_UVMDOMID_INDEX 4
 #endif
 
+#define xen_init()	(0)
+
 static inline void
 MULTI_update_va_mapping(
     multicall_entry_t *mcl, unsigned long va,

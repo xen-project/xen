@@ -691,6 +691,9 @@ static int __init xencons_init(void)
 {
 	int rc;
 
+	if (xen_init() < 0)
+		return -ENODEV;
+
 	if (xc_mode == XC_OFF)
 		return 0;
 
