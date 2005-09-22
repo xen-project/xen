@@ -161,14 +161,14 @@ class ImageHandler:
             raise VmError('Kernel ramdisk does not exist: %s' % self.ramdisk)
         if len(self.cmdline) >= MAX_GUEST_CMDLINE:
             log.warning('kernel cmdline too long, domain %d',
-                        self.vm.getDomain())
+                        self.vm.getDomid())
         
         log.info("buildDomain os=%s dom=%d vcpus=%d", self.ostype,
-                 self.vm.getDomain(), self.vm.getVCpuCount())
+                 self.vm.getDomid(), self.vm.getVCpuCount())
         err = self.buildDomain()
         if err != 0:
             raise VmError('Building domain failed: ostype=%s dom=%d err=%d'
-                          % (self.ostype, self.vm.getDomain(), err))
+                          % (self.ostype, self.vm.getDomid(), err))
 
     def getDomainMemory(self, mem):
         """@return The memory required, in KiB, by the domain to store the
@@ -210,7 +210,7 @@ class LinuxImageHandler(ImageHandler):
         else:
             console_evtchn = 0
 
-        log.debug("dom            = %d", self.vm.getDomain())
+        log.debug("dom            = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("console_evtchn = %d", console_evtchn)
@@ -219,7 +219,7 @@ class LinuxImageHandler(ImageHandler):
         log.debug("flags          = %d", self.flags)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
 
-        ret = xc.linux_build(dom            = self.vm.getDomain(),
+        ret = xc.linux_build(dom            = self.vm.getDomid(),
                              image          = self.kernel,
                              store_evtchn   = store_evtchn,
                              console_evtchn = console_evtchn,
@@ -266,14 +266,14 @@ class VmxImageHandler(ImageHandler):
 
     def buildDomain(self):
         # Create an event channel
-        self.device_channel = channel.eventChannel(0, self.vm.getDomain())
+        self.device_channel = channel.eventChannel(0, self.vm.getDomid())
         log.info("VMX device model port: %d", self.device_channel.port2)
         if self.vm.store_channel:
             store_evtchn = self.vm.store_channel.port2
         else:
             store_evtchn = 0
 
-        log.debug("dom            = %d", self.vm.getDomain())
+        log.debug("dom            = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
         log.debug("control_evtchn = %d", self.device_channel.port2)
         log.debug("store_evtchn   = %d", store_evtchn)
@@ -284,7 +284,7 @@ class VmxImageHandler(ImageHandler):
         log.debug("flags          = %d", self.flags)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
 
-        ret = xc.vmx_build(dom            = self.vm.getDomain(),
+        ret = xc.vmx_build(dom            = self.vm.getDomid(),
                            image          = self.kernel,
                            control_evtchn = self.device_channel.port2,
                            store_evtchn   = store_evtchn,
@@ -370,7 +370,7 @@ class VmxImageHandler(ImageHandler):
         elif vnc:
             ret = ret + ['-vnc', '-k', 'en-us']
         if vnc:
-            vncport = int(self.vm.getDomain()) + 5900
+            vncport = int(self.vm.getDomid()) + 5900
             ret = ret + ['-vncport', '%d' % vncport]
         return ret
 
@@ -384,7 +384,7 @@ class VmxImageHandler(ImageHandler):
         vnc = self.vncParams()
         if len(vnc):
             args = args + vnc
-        args = args + ([ "-d",  "%d" % self.vm.getDomain(),
+        args = args + ([ "-d",  "%d" % self.vm.getDomid(),
                   "-p", "%d" % self.device_channel.port1,
                   "-m", "%s" % (self.vm.getMemoryTarget() / 1024)])
         args = args + self.dmargs

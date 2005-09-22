@@ -179,13 +179,13 @@ class XendDomain:
         @param info:   domain info object
         @param notify: send a domain created event if true
         """
-        if info.getDomain() in self.domains:
+        if info.getDomid() in self.domains:
             notify = False
-        self.domains[info.getDomain()] = info
+        self.domains[info.getDomid()] = info
         info.exportToDB(save=True)
         if notify:
             eserver.inject('xend.domain.create', [info.getName(),
-                                                  info.getDomain()])
+                                                  info.getDomid()])
 
     def _delete_domain(self, id, notify=True):
         """Remove a domain from the tables.
@@ -200,7 +200,7 @@ class XendDomain:
             info.delete()
             if notify:
                 eserver.inject('xend.domain.died', [info.getName(),
-                                                    info.getDomain()])
+                                                    info.getDomid()])
         # XXX this should not be needed
         for domdb in self.dbmap.values():
             if not domdb.has_key("xend"):
@@ -246,11 +246,11 @@ class XendDomain:
         # Remove entries for domains that no longer exist.
         # Update entries for existing domains.
         for d in self.domains.values():
-            info = doms.get(d.getDomain())
+            info = doms.get(d.getDomid())
             if info:
                 d.update(info)
             elif not d.restart_pending():
-                self._delete_domain(d.getDomain())
+                self._delete_domain(d.getDomid())
 
     def update_domain(self, id):
         """Update information for a single domain.
@@ -281,22 +281,22 @@ class XendDomain:
         @param dominfo: domain object
         """
         log.info("Restarting domain: name=%s id=%s", dominfo.getName(),
-                 dominfo.getDomain())
+                 dominfo.getDomid())
         eserver.inject("xend.domain.restart",
-                       [dominfo.getName(), dominfo.getDomain(), "begin"])
+                       [dominfo.getName(), dominfo.getDomid(), "begin"])
         try:
             dominfo.restart()
             log.info('Restarted domain name=%s id=%s', dominfo.getName(),
-                     dominfo.getDomain())
+                     dominfo.getDomid())
             eserver.inject("xend.domain.restart",
-                           [dominfo.getName(), dominfo.getDomain(),
+                           [dominfo.getName(), dominfo.getDomid(),
                             "success"])
-            self.domain_unpause(dominfo.getDomain())
+            self.domain_unpause(dominfo.getDomid())
         except Exception, ex:
             log.exception("Exception restarting domain: name=%s id=%s",
-                          dominfo.getName(), dominfo.getDomain())
+                          dominfo.getName(), dominfo.getDomid())
             eserver.inject("xend.domain.restart",
-                           [dominfo.getName(), dominfo.getDomain(), "fail"])
+                           [dominfo.getName(), dominfo.getDomid(), "fail"])
         return dominfo
 
     def domain_configure(self, config):
@@ -386,9 +386,9 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         eserver.inject('xend.domain.unpause', [dominfo.getName(),
-                                               dominfo.getDomain()])
+                                               dominfo.getDomid()])
         try:
-            return xc.domain_unpause(dom=dominfo.getDomain())
+            return xc.domain_unpause(dom=dominfo.getDomid())
         except Exception, ex:
             raise XendError(str(ex))
     
@@ -399,9 +399,9 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         eserver.inject('xend.domain.pause', [dominfo.getName(),
-                                             dominfo.getDomain()])
+                                             dominfo.getDomid()])
         try:
-            return xc.domain_pause(dom=dominfo.getDomain())
+            return xc.domain_pause(dom=dominfo.getDomid())
         except Exception, ex:
             raise XendError(str(ex))
     
@@ -417,9 +417,9 @@ class XendDomain:
         @param reason: shutdown type: poweroff, reboot, suspend, halt
         """
         dominfo = self.domain_lookup(id)
-        self.domain_restart_schedule(dominfo.getDomain(), reason, force=True)
+        self.domain_restart_schedule(dominfo.getDomid(), reason, force=True)
         eserver.inject('xend.domain.shutdown', [dominfo.getName(),
-                                                dominfo.getDomain(), reason])
+                                                dominfo.getDomid(), reason])
         if reason == 'halt':
             reason = 'poweroff'
         val = dominfo.shutdown(reason)
@@ -443,7 +443,7 @@ class XendDomain:
             if not dominfo.shutdown_pending:
                 # domain doesn't need shutdown
                 continue
-            id = dominfo.getDomain()
+            id = dominfo.getDomid()
             left = dominfo.shutdown_time_left(SHUTDOWN_TIMEOUT)
             if left <= 0:
                 # Shutdown expired - destroy domain.
@@ -474,16 +474,16 @@ class XendDomain:
         restart = (force and reason == 'reboot') or dominfo.restart_needed(reason)
         if restart:
             log.info('Scheduling restart for domain: name=%s id=%s',
-                     dominfo.getName(), dominfo.getDomain())
+                     dominfo.getName(), dominfo.getDomid())
             eserver.inject("xend.domain.restart",
-                           [dominfo.getName(), dominfo.getDomain(),
+                           [dominfo.getName(), dominfo.getDomid(),
                             "schedule"])
             dominfo.restarting()
         else:
             log.info('Cancelling restart for domain: name=%s id=%s',
-                     dominfo.getName(), dominfo.getDomain())
+                     dominfo.getName(), dominfo.getDomid())
             eserver.inject("xend.domain.restart",
-                           [dominfo.getName(), dominfo.getDomain(), "cancel"])
+                           [dominfo.getName(), dominfo.getDomid(), "cancel"])
             dominfo.restart_cancel()
 
     def domain_restarts(self):
@@ -493,7 +493,7 @@ class XendDomain:
         for dominfo in self.domains.values():
             if not dominfo.restart_pending():
                 continue
-            info = doms.get(dominfo.getDomain())
+            info = doms.get(dominfo.getDomid())
             if info:
                 # Don't execute restart for domains still running.
                 continue
@@ -578,7 +578,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.domain_pincpu(dominfo.getDomain(), vcpu, cpumap)
+            return xc.domain_pincpu(dominfo.getDomid(), vcpu, cpumap)
         except Exception, ex:
             raise XendError(str(ex))
 
@@ -587,7 +587,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.bvtsched_domain_set(dom=dominfo.getDomain(),
+            return xc.bvtsched_domain_set(dom=dominfo.getDomid(),
                                           mcuadv=mcuadv,
                                           warpback=warpback,
                                           warpvalue=warpvalue, 
@@ -600,7 +600,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.bvtsched_domain_get(dominfo.getDomain())
+            return xc.bvtsched_domain_get(dominfo.getDomid())
         except Exception, ex:
             raise XendError(str(ex))
     
@@ -610,7 +610,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.sedf_domain_set(dominfo.getDomain(), period, slice,
+            return xc.sedf_domain_set(dominfo.getDomid(), period, slice,
                                       latency, extratime, weight)
         except Exception, ex:
             raise XendError(str(ex))
@@ -620,7 +620,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.sedf_domain_get(dominfo.getDomain())
+            return xc.sedf_domain_get(dominfo.getDomid())
         except Exception, ex:
             raise XendError(str(ex))
 
@@ -709,7 +709,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         try:
-            return xc.shadow_control(dominfo.getDomain(), op)
+            return xc.shadow_control(dominfo.getDomid(), op)
         except Exception, ex:
             raise XendError(str(ex))
 
@@ -723,7 +723,7 @@ class XendDomain:
         dominfo = self.domain_lookup(id)
         maxmem = int(mem) * 1024
         try:
-            return xc.domain_setmaxmem(dominfo.getDomain(),
+            return xc.domain_setmaxmem(dominfo.getDomid(),
                                        maxmem_kb = maxmem)
         except Exception, ex:
             raise XendError(str(ex))
@@ -757,12 +757,12 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         corefile = "/var/xen/dump/%s.%s.core" % (dominfo.getName(),
-                                                 dominfo.getDomain())
+                                                 dominfo.getDomid())
         try:
-            xc.domain_dumpcore(dom=dominfo.getDomain(), corefile=corefile)
+            xc.domain_dumpcore(dom=dominfo.getDomid(), corefile=corefile)
         except Exception, ex:
             log.warning("Dumpcore failed, id=%s name=%s: %s",
-                        dominfo.getDomain(), dominfo.getName(), ex)
+                        dominfo.getDomid(), dominfo.getName(), ex)
         
 def instance():
     """Singleton constructor. Use this instead of the class constructor.

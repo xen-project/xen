@@ -474,7 +474,7 @@ class XendDomainInfo:
         self.domid = domid
         self.storeDom("domid", self.domid)
 
-    def getDomain(self):
+    def getDomid(self):
         return self.domid
 
     def setName(self, name):

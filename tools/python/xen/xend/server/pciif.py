@@ -68,7 +68,7 @@ class PciController(DevController):
         dev  = get_param('dev')
         func = get_param('func')
 
-        rc = xc.physdev_pci_access_modify(dom    = self.getDomain(),
+        rc = xc.physdev_pci_access_modify(dom    = self.getDomid(),
                                           bus    = bus,
                                           dev    = dev,
                                           func   = func,

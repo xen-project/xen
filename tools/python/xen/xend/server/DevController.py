@@ -84,7 +84,7 @@ class DevController:
     def sxpr(self, devid):
         """@return an s-expression describing the specified device.
         """
-        return [self.deviceClass, ['dom', self.vm.getDomain(),
+        return [self.deviceClass, ['dom', self.vm.getDomid(),
                                    'id', devid]]
 
 
@@ -110,11 +110,11 @@ class DevController:
         raise NotImplementedError()
 
 
-    def getDomain(self):
-        """Stub to {@link XendDomainInfo.getDomain}, for use by our
+    def getDomid(self):
+        """Stub to {@link XendDomainInfo.getDomid}, for use by our
         subclasses.
         """
-        return self.vm.getDomain()
+        return self.vm.getDomid()
 
 
     def allocateDeviceID(self):
@@ -167,14 +167,14 @@ class DevController:
         
         frontDetails.update({
             'backend' : backpath,
-            'backend-id' : "%i" % backdom.getDomain()
+            'backend-id' : "%i" % backdom.getDomid()
             })
 
 
         backDetails.update({
             'domain' : self.vm.getName(),
             'frontend' : frontpath,
-            'frontend-id' : "%i" % self.vm.getDomain()
+            'frontend-id' : "%i" % self.vm.getDomid()
             })
 
         log.debug('DevController: writing %s to %s.', str(frontDetails),
