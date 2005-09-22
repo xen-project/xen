@@ -4,7 +4,6 @@
  * This is a modified version of the block backend driver that remaps requests
  * to a user-space memory region.  It is intended to be used to write 
  * application-level servers that provide block interfaces to client VMs.
- * 
  */
 
 #include <linux/kernel.h>
@@ -67,20 +66,19 @@ static int blktap_read_ufe_ring(void);
 
 static inline int BLKTAP_MODE_VALID(unsigned long arg)
 {
-    return (
-        ( arg == BLKTAP_MODE_PASSTHROUGH  ) ||
-        ( arg == BLKTAP_MODE_INTERCEPT_FE ) ||
-        ( arg == BLKTAP_MODE_INTERPOSE    ) );
+	return ((arg == BLKTAP_MODE_PASSTHROUGH ) ||
+		(arg == BLKTAP_MODE_INTERCEPT_FE) ||
+		(arg == BLKTAP_MODE_INTERPOSE   ));
 /*
-    return (
-        ( arg == BLKTAP_MODE_PASSTHROUGH  ) ||
-        ( arg == BLKTAP_MODE_INTERCEPT_FE ) ||
-        ( arg == BLKTAP_MODE_INTERCEPT_BE ) ||
-        ( arg == BLKTAP_MODE_INTERPOSE    ) ||
-        ( (arg & ~BLKTAP_MODE_COPY_FE_PAGES) == BLKTAP_MODE_COPY_FE ) ||
-        ( (arg & ~BLKTAP_MODE_COPY_BE_PAGES) == BLKTAP_MODE_COPY_BE ) ||
-        ( (arg & ~BLKTAP_MODE_COPY_BOTH_PAGES) == BLKTAP_MODE_COPY_BOTH )
-        );
+  return (
+  ( arg == BLKTAP_MODE_PASSTHROUGH  ) ||
+  ( arg == BLKTAP_MODE_INTERCEPT_FE ) ||
+  ( arg == BLKTAP_MODE_INTERCEPT_BE ) ||
+  ( arg == BLKTAP_MODE_INTERPOSE    ) ||
+  ( (arg & ~BLKTAP_MODE_COPY_FE_PAGES) == BLKTAP_MODE_COPY_FE ) ||
+  ( (arg & ~BLKTAP_MODE_COPY_BE_PAGES) == BLKTAP_MODE_COPY_BE ) ||
+  ( (arg & ~BLKTAP_MODE_COPY_BOTH_PAGES) == BLKTAP_MODE_COPY_BOTH )
+  );
 */
 }
 
@@ -110,14 +108,12 @@ unsigned long mmap_vstart;  /* Kernel pages for mapping in data. */
 unsigned long rings_vstart; /* start of mmaped vma               */
 unsigned long user_vstart;  /* start of user mappings            */
 
-#define MMAP_PAGES                                              \
-    (MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST)
-#define MMAP_VADDR(_start, _req,_seg)                           \
-    (_start +                                                   \
-     ((_req) * BLKIF_MAX_SEGMENTS_PER_REQUEST * PAGE_SIZE) +    \
-     ((_seg) * PAGE_SIZE))
-
-
+#define MMAP_PAGES						\
+	(MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST)
+#define MMAP_VADDR(_start, _req,_seg)					\
+	(_start +							\
+	 ((_req) * BLKIF_MAX_SEGMENTS_PER_REQUEST * PAGE_SIZE) +	\
+	 ((_seg) * PAGE_SIZE))
 
 /*
  * Each outstanding request that we've passed to the lower device layers has a 
@@ -126,12 +122,12 @@ unsigned long user_vstart;  /* start of user mappings            */
  * response queued for it, with the saved 'id' passed back.
  */
 typedef struct {
-    blkif_t       *blkif;
-    unsigned long  id;
-    int            nr_pages;
-    atomic_t       pendcnt;
-    unsigned short operation;
-    int            status;
+	blkif_t       *blkif;
+	unsigned long  id;
+	int            nr_pages;
+	atomic_t       pendcnt;
+	unsigned short operation;
+	int            status;
 } pending_req_t;
 
 /*
@@ -156,17 +152,17 @@ static PEND_RING_IDX pending_prod, pending_cons;
 
 static inline unsigned long MAKE_ID(domid_t fe_dom, PEND_RING_IDX idx)
 {
-    return ( (fe_dom << 16) | MASK_PEND_IDX(idx) );
+	return ((fe_dom << 16) | MASK_PEND_IDX(idx));
 }
 
 extern inline PEND_RING_IDX ID_TO_IDX(unsigned long id) 
 { 
-    return (PEND_RING_IDX)( id & 0x0000ffff );
+	return (PEND_RING_IDX)(id & 0x0000ffff);
 }
 
 extern inline domid_t ID_TO_DOM(unsigned long id) 
 { 
-    return (domid_t)(id >> 16); 
+	return (domid_t)(id >> 16); 
 }
 
 
@@ -181,8 +177,8 @@ extern inline domid_t ID_TO_DOM(unsigned long id)
  */
 struct grant_handle_pair
 {
-    u16  kernel;
-    u16  user;
+	u16  kernel;
+	u16  user;
 };
 static struct grant_handle_pair pending_grant_handles[MMAP_PAGES];
 #define pending_handle(_idx, _i) \
@@ -199,21 +195,20 @@ static struct grant_handle_pair pending_grant_handles[MMAP_PAGES];
  */
 
 static struct page *blktap_nopage(struct vm_area_struct *vma,
-                                             unsigned long address,
-                                             int *type)
+				  unsigned long address,
+				  int *type)
 {
-    /*
-     * if the page has not been mapped in by the driver then generate
-     * a SIGBUS to the domain.
-     */
+	/*
+	 * if the page has not been mapped in by the driver then generate
+	 * a SIGBUS to the domain.
+	 */
+	force_sig(SIGBUS, current);
 
-    force_sig(SIGBUS, current);
-
-    return 0;
+	return 0;
 }
 
 struct vm_operations_struct blktap_vm_ops = {
-    nopage:   blktap_nopage,
+	nopage:   blktap_nopage,
 };
 
 /******************************************************************
@@ -222,44 +217,45 @@ struct vm_operations_struct blktap_vm_ops = {
 
 static int blktap_open(struct inode *inode, struct file *filp)
 {
-    blkif_sring_t *sring;
-    
-    if ( test_and_set_bit(0, &blktap_dev_inuse) )
-        return -EBUSY;
-    
-    /* Allocate the fe ring. */
-    sring = (blkif_sring_t *)get_zeroed_page(GFP_KERNEL);
-    if (sring == NULL)
-        goto fail_nomem;
+	blkif_sring_t *sring;
 
-    SetPageReserved(virt_to_page(sring));
+	if (test_and_set_bit(0, &blktap_dev_inuse))
+		return -EBUSY;
     
-    SHARED_RING_INIT(sring);
-    FRONT_RING_INIT(&blktap_ufe_ring, sring, PAGE_SIZE);
+	/* Allocate the fe ring. */
+	sring = (blkif_sring_t *)get_zeroed_page(GFP_KERNEL);
+	if (sring == NULL)
+		goto fail_nomem;
 
-    return 0;
+	SetPageReserved(virt_to_page(sring));
+    
+	SHARED_RING_INIT(sring);
+	FRONT_RING_INIT(&blktap_ufe_ring, sring, PAGE_SIZE);
+
+	return 0;
 
  fail_nomem:
-    return -ENOMEM;
+	return -ENOMEM;
 }
 
 static int blktap_release(struct inode *inode, struct file *filp)
 {
-    blktap_dev_inuse = 0;
-    blktap_ring_ok = 0;
+	blktap_dev_inuse = 0;
+	blktap_ring_ok = 0;
 
-    /* Free the ring page. */
-    ClearPageReserved(virt_to_page(blktap_ufe_ring.sring));
-    free_page((unsigned long) blktap_ufe_ring.sring);
+	/* Free the ring page. */
+	ClearPageReserved(virt_to_page(blktap_ufe_ring.sring));
+	free_page((unsigned long) blktap_ufe_ring.sring);
 
-    /* Clear any active mappings and free foreign map table */
-    if (blktap_vma != NULL) {
-        zap_page_range(blktap_vma, blktap_vma->vm_start, 
-                       blktap_vma->vm_end - blktap_vma->vm_start, NULL);
-        blktap_vma = NULL;
-    }
+	/* Clear any active mappings and free foreign map table */
+	if (blktap_vma != NULL) {
+		zap_page_range(
+			blktap_vma, blktap_vma->vm_start, 
+			blktap_vma->vm_end - blktap_vma->vm_start, NULL);
+		blktap_vma = NULL;
+	}
 
-    return 0;
+	return 0;
 }
 
 
@@ -283,128 +279,124 @@ static int blktap_release(struct inode *inode, struct file *filp)
  */
 static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-    int size;
-    struct page **map;
-    int i;
+	int size;
+	struct page **map;
+	int i;
 
-    DPRINTK(KERN_ALERT "blktap mmap (%lx, %lx)\n",
-           vma->vm_start, vma->vm_end);
+	DPRINTK(KERN_ALERT "blktap mmap (%lx, %lx)\n",
+		vma->vm_start, vma->vm_end);
 
-    vma->vm_flags |= VM_RESERVED;
-    vma->vm_ops = &blktap_vm_ops;
+	vma->vm_flags |= VM_RESERVED;
+	vma->vm_ops = &blktap_vm_ops;
 
-    size = vma->vm_end - vma->vm_start;
-    if ( size != ( (MMAP_PAGES + RING_PAGES) << PAGE_SHIFT ) ) {
-        printk(KERN_INFO 
-               "blktap: you _must_ map exactly %d pages!\n",
-               MMAP_PAGES + RING_PAGES);
-        return -EAGAIN;
-    }
+	size = vma->vm_end - vma->vm_start;
+	if (size != ((MMAP_PAGES + RING_PAGES) << PAGE_SHIFT)) {
+		printk(KERN_INFO 
+		       "blktap: you _must_ map exactly %d pages!\n",
+		       MMAP_PAGES + RING_PAGES);
+		return -EAGAIN;
+	}
 
-    size >>= PAGE_SHIFT;
-    DPRINTK(KERN_INFO "blktap: 2 rings + %d pages.\n", size-1);
+	size >>= PAGE_SHIFT;
+	DPRINTK(KERN_INFO "blktap: 2 rings + %d pages.\n", size-1);
     
-    rings_vstart = vma->vm_start;
-    user_vstart  = rings_vstart + (RING_PAGES << PAGE_SHIFT);
+	rings_vstart = vma->vm_start;
+	user_vstart  = rings_vstart + (RING_PAGES << PAGE_SHIFT);
     
-    /* Map the ring pages to the start of the region and reserve it. */
+	/* Map the ring pages to the start of the region and reserve it. */
 
-    /* not sure if I really need to do this... */
-    vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+	/* not sure if I really need to do this... */
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-    if (remap_pfn_range(vma, vma->vm_start, 
-                         __pa(blktap_ufe_ring.sring) >> PAGE_SHIFT, 
-                         PAGE_SIZE, vma->vm_page_prot)) 
-    {
-        WPRINTK("Mapping user ring failed!\n");
-        goto fail;
-    }
+	if (remap_pfn_range(vma, vma->vm_start, 
+			    __pa(blktap_ufe_ring.sring) >> PAGE_SHIFT, 
+			    PAGE_SIZE, vma->vm_page_prot)) {
+		WPRINTK("Mapping user ring failed!\n");
+		goto fail;
+	}
 
-    /* Mark this VM as containing foreign pages, and set up mappings. */
-    map = kmalloc(((vma->vm_end - vma->vm_start) >> PAGE_SHIFT)
-                  * sizeof(struct page_struct*),
-                  GFP_KERNEL);
-    if (map == NULL) 
-    {
-        WPRINTK("Couldn't alloc VM_FOREIGH map.\n");
-        goto fail;
-    }
+	/* Mark this VM as containing foreign pages, and set up mappings. */
+	map = kmalloc(((vma->vm_end - vma->vm_start) >> PAGE_SHIFT)
+		      * sizeof(struct page_struct*),
+		      GFP_KERNEL);
+	if (map == NULL) {
+		WPRINTK("Couldn't alloc VM_FOREIGH map.\n");
+		goto fail;
+	}
 
-    for (i=0; i<((vma->vm_end - vma->vm_start) >> PAGE_SHIFT); i++)
-        map[i] = NULL;
+	for (i = 0; i < ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT); i++)
+		map[i] = NULL;
     
-    vma->vm_private_data = map;
-    vma->vm_flags |= VM_FOREIGN;
+	vma->vm_private_data = map;
+	vma->vm_flags |= VM_FOREIGN;
 
-    blktap_vma = vma;
-    blktap_ring_ok = 1;
+	blktap_vma = vma;
+	blktap_ring_ok = 1;
 
-    return 0;
+	return 0;
  fail:
-    /* Clear any active mappings. */
-    zap_page_range(vma, vma->vm_start, 
-                   vma->vm_end - vma->vm_start, NULL);
+	/* Clear any active mappings. */
+	zap_page_range(vma, vma->vm_start, 
+		       vma->vm_end - vma->vm_start, NULL);
 
-    return -ENOMEM;
+	return -ENOMEM;
 }
 
 static int blktap_ioctl(struct inode *inode, struct file *filp,
                         unsigned int cmd, unsigned long arg)
 {
-    switch(cmd) {
-    case BLKTAP_IOCTL_KICK_FE: /* There are fe messages to process. */
-        return blktap_read_ufe_ring();
+	switch(cmd) {
+	case BLKTAP_IOCTL_KICK_FE: /* There are fe messages to process. */
+		return blktap_read_ufe_ring();
 
-    case BLKTAP_IOCTL_SETMODE:
-        if (BLKTAP_MODE_VALID(arg)) {
-            blktap_mode = arg;
-            /* XXX: may need to flush rings here. */
-            printk(KERN_INFO "blktap: set mode to %lx\n", arg);
-            return 0;
-        }
-    case BLKTAP_IOCTL_PRINT_IDXS:
+	case BLKTAP_IOCTL_SETMODE:
+		if (BLKTAP_MODE_VALID(arg)) {
+			blktap_mode = arg;
+			/* XXX: may need to flush rings here. */
+			printk(KERN_INFO "blktap: set mode to %lx\n", arg);
+			return 0;
+		}
+	case BLKTAP_IOCTL_PRINT_IDXS:
         {
-            //print_fe_ring_idxs();
-            WPRINTK("User Rings: \n-----------\n");
-            WPRINTK("UF: rsp_cons: %2d, req_prod_prv: %2d "
-                            "| req_prod: %2d, rsp_prod: %2d\n",
-                            blktap_ufe_ring.rsp_cons,
-                            blktap_ufe_ring.req_prod_pvt,
-                            blktap_ufe_ring.sring->req_prod,
-                            blktap_ufe_ring.sring->rsp_prod);
+		//print_fe_ring_idxs();
+		WPRINTK("User Rings: \n-----------\n");
+		WPRINTK("UF: rsp_cons: %2d, req_prod_prv: %2d "
+			"| req_prod: %2d, rsp_prod: %2d\n",
+			blktap_ufe_ring.rsp_cons,
+			blktap_ufe_ring.req_prod_pvt,
+			blktap_ufe_ring.sring->req_prod,
+			blktap_ufe_ring.sring->rsp_prod);
             
         }
-    }
-    return -ENOIOCTLCMD;
+	}
+	return -ENOIOCTLCMD;
 }
 
 static unsigned int blktap_poll(struct file *file, poll_table *wait)
 {
-        poll_wait(file, &blktap_wait, wait);
-        if ( RING_HAS_UNPUSHED_REQUESTS(&blktap_ufe_ring) ) 
-        {
-            flush_tlb_all();
+	poll_wait(file, &blktap_wait, wait);
+	if (RING_HAS_UNPUSHED_REQUESTS(&blktap_ufe_ring)) {
+		flush_tlb_all();
+		RING_PUSH_REQUESTS(&blktap_ufe_ring);
+		return POLLIN | POLLRDNORM;
+	}
 
-            RING_PUSH_REQUESTS(&blktap_ufe_ring);
-            return POLLIN | POLLRDNORM;
-        }
-
-        return 0;
+	return 0;
 }
 
 void blktap_kick_user(void)
 {
-    /* blktap_ring->req_prod = blktap_req_prod; */
-    wake_up_interruptible(&blktap_wait);
+	/* blktap_ring->req_prod = blktap_req_prod; */
+	wake_up_interruptible(&blktap_wait);
 }
 
 static struct file_operations blktap_fops = {
-    owner:    THIS_MODULE,
-    poll:     blktap_poll,
-    ioctl:    blktap_ioctl,
-    open:     blktap_open,
-    release:  blktap_release,
-    mmap:     blktap_mmap,
+	owner:    THIS_MODULE,
+	poll:     blktap_poll,
+	ioctl:    blktap_ioctl,
+	open:     blktap_open,
+	release:  blktap_release,
+	mmap:     blktap_mmap,
 };
 
 
@@ -417,44 +409,44 @@ static void make_response(blkif_t *blkif, unsigned long id,
 
 static void fast_flush_area(int idx, int nr_pages)
 {
-    struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
-    unsigned int i, op = 0;
-    struct grant_handle_pair *handle;
-    unsigned long ptep;
+	struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
+	unsigned int i, op = 0;
+	struct grant_handle_pair *handle;
+	unsigned long ptep;
 
-    for (i=0; i<nr_pages; i++)
-    {
-        handle = &pending_handle(idx, i);
-        if (!BLKTAP_INVALID_HANDLE(handle))
-        {
+	for ( i = 0; i < nr_pages; i++)
+	{
+		handle = &pending_handle(idx, i);
+		if (BLKTAP_INVALID_HANDLE(handle))
+			continue;
 
-            unmap[op].host_addr = MMAP_VADDR(mmap_vstart, idx, i);
-            unmap[op].dev_bus_addr = 0;
-            unmap[op].handle = handle->kernel;
-            op++;
+		unmap[op].host_addr = MMAP_VADDR(mmap_vstart, idx, i);
+		unmap[op].dev_bus_addr = 0;
+		unmap[op].handle = handle->kernel;
+		op++;
 
-            if (create_lookup_pte_addr(blktap_vma->vm_mm,
-                                       MMAP_VADDR(user_vstart, idx, i), 
-                                       &ptep) !=0) {
-                DPRINTK("Couldn't get a pte addr!\n");
-                return;
-            }
-            unmap[op].host_addr    = ptep;
-            unmap[op].dev_bus_addr = 0;
-            unmap[op].handle       = handle->user;
-            op++;
+		if (create_lookup_pte_addr(
+			blktap_vma->vm_mm,
+			MMAP_VADDR(user_vstart, idx, i), 
+			&ptep) !=0) {
+			DPRINTK("Couldn't get a pte addr!\n");
+			return;
+		}
+		unmap[op].host_addr    = ptep;
+		unmap[op].dev_bus_addr = 0;
+		unmap[op].handle       = handle->user;
+		op++;
             
-           BLKTAP_INVALIDATE_HANDLE(handle);
-        }
-    }
-    if ( unlikely(HYPERVISOR_grant_table_op(
-        GNTTABOP_unmap_grant_ref, unmap, op)))
-        BUG();
+		BLKTAP_INVALIDATE_HANDLE(handle);
+	}
 
-    if (blktap_vma != NULL)
-        zap_page_range(blktap_vma, 
-                       MMAP_VADDR(user_vstart, idx, 0), 
-                       nr_pages << PAGE_SHIFT, NULL);
+	BUG_ON(HYPERVISOR_grant_table_op(
+		GNTTABOP_unmap_grant_ref, unmap, op));
+
+	if (blktap_vma != NULL)
+		zap_page_range(blktap_vma, 
+			       MMAP_VADDR(user_vstart, idx, 0), 
+			       nr_pages << PAGE_SHIFT, NULL);
 }
 
 /******************************************************************
@@ -466,34 +458,38 @@ static spinlock_t blkio_schedule_list_lock;
 
 static int __on_blkdev_list(blkif_t *blkif)
 {
-    return blkif->blkdev_list.next != NULL;
+	return blkif->blkdev_list.next != NULL;
 }
 
 static void remove_from_blkdev_list(blkif_t *blkif)
 {
-    unsigned long flags;
-    if ( !__on_blkdev_list(blkif) ) return;
-    spin_lock_irqsave(&blkio_schedule_list_lock, flags);
-    if ( __on_blkdev_list(blkif) )
-    {
-        list_del(&blkif->blkdev_list);
-        blkif->blkdev_list.next = NULL;
-        blkif_put(blkif);
-    }
-    spin_unlock_irqrestore(&blkio_schedule_list_lock, flags);
+	unsigned long flags;
+
+	if (!__on_blkdev_list(blkif))
+		return;
+
+	spin_lock_irqsave(&blkio_schedule_list_lock, flags);
+	if (__on_blkdev_list(blkif)) {
+		list_del(&blkif->blkdev_list);
+		blkif->blkdev_list.next = NULL;
+		blkif_put(blkif);
+	}
+	spin_unlock_irqrestore(&blkio_schedule_list_lock, flags);
 }
 
 static void add_to_blkdev_list_tail(blkif_t *blkif)
 {
-    unsigned long flags;
-    if ( __on_blkdev_list(blkif) ) return;
-    spin_lock_irqsave(&blkio_schedule_list_lock, flags);
-    if ( !__on_blkdev_list(blkif) && (blkif->status == CONNECTED) )
-    {
-        list_add_tail(&blkif->blkdev_list, &blkio_schedule_list);
-        blkif_get(blkif);
-    }
-    spin_unlock_irqrestore(&blkio_schedule_list_lock, flags);
+	unsigned long flags;
+
+	if (__on_blkdev_list(blkif))
+		return;
+
+	spin_lock_irqsave(&blkio_schedule_list_lock, flags);
+	if (!__on_blkdev_list(blkif) && (blkif->status == CONNECTED)) {
+		list_add_tail(&blkif->blkdev_list, &blkio_schedule_list);
+		blkif_get(blkif);
+	}
+	spin_unlock_irqrestore(&blkio_schedule_list_lock, flags);
 }
 
 
@@ -505,51 +501,50 @@ static DECLARE_WAIT_QUEUE_HEAD(blkio_schedule_wait);
 
 static int blkio_schedule(void *arg)
 {
-    DECLARE_WAITQUEUE(wq, current);
+	DECLARE_WAITQUEUE(wq, current);
 
-    blkif_t          *blkif;
-    struct list_head *ent;
+	blkif_t          *blkif;
+	struct list_head *ent;
 
-    daemonize("xenblkd");
+	daemonize("xenblkd");
 
-    for ( ; ; )
-    {
-        /* Wait for work to do. */
-        add_wait_queue(&blkio_schedule_wait, &wq);
-        set_current_state(TASK_INTERRUPTIBLE);
-        if ( (NR_PENDING_REQS == MAX_PENDING_REQS) || 
-             list_empty(&blkio_schedule_list) )
-            schedule();
-        __set_current_state(TASK_RUNNING);
-        remove_wait_queue(&blkio_schedule_wait, &wq);
+	for (;;) {
+		/* Wait for work to do. */
+		add_wait_queue(&blkio_schedule_wait, &wq);
+		set_current_state(TASK_INTERRUPTIBLE);
+		if ((NR_PENDING_REQS == MAX_PENDING_REQS) || 
+		    list_empty(&blkio_schedule_list))
+			schedule();
+		__set_current_state(TASK_RUNNING);
+		remove_wait_queue(&blkio_schedule_wait, &wq);
 
-        /* Queue up a batch of requests. */
-        while ( (NR_PENDING_REQS < MAX_PENDING_REQS) &&
-                !list_empty(&blkio_schedule_list) )
-        {
-            ent = blkio_schedule_list.next;
-            blkif = list_entry(ent, blkif_t, blkdev_list);
-            blkif_get(blkif);
-            remove_from_blkdev_list(blkif);
-            if ( do_block_io_op(blkif, BATCH_PER_DOMAIN) )
-                add_to_blkdev_list_tail(blkif);
-            blkif_put(blkif);
-        }
-    }
+		/* Queue up a batch of requests. */
+		while ((NR_PENDING_REQS < MAX_PENDING_REQS) &&
+		       !list_empty(&blkio_schedule_list)) {
+			ent = blkio_schedule_list.next;
+			blkif = list_entry(ent, blkif_t, blkdev_list);
+			blkif_get(blkif);
+			remove_from_blkdev_list(blkif);
+			if (do_block_io_op(blkif, BATCH_PER_DOMAIN))
+				add_to_blkdev_list_tail(blkif);
+			blkif_put(blkif);
+		}
+	}
 }
 
 static void maybe_trigger_blkio_schedule(void)
 {
-    /*
-     * Needed so that two processes, who together make the following predicate
-     * true, don't both read stale values and evaluate the predicate
-     * incorrectly. Incredibly unlikely to stall the scheduler on x86, but...
-     */
-    smp_mb();
+	/*
+	 * Needed so that two processes, who together make the following
+	 * predicate true, don't both read stale values and evaluate the
+	 * predicate incorrectly. Incredibly unlikely to stall the scheduler
+	 * on the x86, but...
+	 */
+	smp_mb();
 
-    if ( (NR_PENDING_REQS < (MAX_PENDING_REQS/2)) &&
-         !list_empty(&blkio_schedule_list) )
-        wake_up(&blkio_schedule_wait);
+	if ((NR_PENDING_REQS < (MAX_PENDING_REQS/2)) &&
+	    !list_empty(&blkio_schedule_list))
+		wake_up(&blkio_schedule_wait);
 }
 
 
@@ -561,54 +556,53 @@ static void maybe_trigger_blkio_schedule(void)
 
 static int blktap_read_ufe_ring(void)
 {
-    /* This is called to read responses from the UFE ring. */
+	/* This is called to read responses from the UFE ring. */
 
-    RING_IDX i, j, rp;
-    blkif_response_t *resp;
-    blkif_t *blkif;
-    int pending_idx;
-    pending_req_t *pending_req;
-    unsigned long     flags;
+	RING_IDX i, j, rp;
+	blkif_response_t *resp;
+	blkif_t *blkif;
+	int pending_idx;
+	pending_req_t *pending_req;
+	unsigned long     flags;
 
-    /* if we are forwarding from UFERring to FERing */
-    if (blktap_mode & BLKTAP_MODE_INTERCEPT_FE) {
+	/* if we are forwarding from UFERring to FERing */
+	if (blktap_mode & BLKTAP_MODE_INTERCEPT_FE) {
 
-        /* for each outstanding message on the UFEring  */
-        rp = blktap_ufe_ring.sring->rsp_prod;
-        rmb();
+		/* for each outstanding message on the UFEring  */
+		rp = blktap_ufe_ring.sring->rsp_prod;
+		rmb();
         
-        for ( i = blktap_ufe_ring.rsp_cons; i != rp; i++ )
-        {
-            resp = RING_GET_RESPONSE(&blktap_ufe_ring, i);
-            pending_idx = MASK_PEND_IDX(ID_TO_IDX(resp->id));
-            pending_req = &pending_reqs[pending_idx];
+		for (i = blktap_ufe_ring.rsp_cons; i != rp; i++) {
+			resp = RING_GET_RESPONSE(&blktap_ufe_ring, i);
+			pending_idx = MASK_PEND_IDX(ID_TO_IDX(resp->id));
+			pending_req = &pending_reqs[pending_idx];
             
-            blkif = pending_req->blkif;
-            for (j = 0; j < pending_req->nr_pages; j++) {
-                unsigned long vaddr;
-                struct page **map = blktap_vma->vm_private_data;
-                int offset; 
+			blkif = pending_req->blkif;
+			for (j = 0; j < pending_req->nr_pages; j++) {
+				unsigned long vaddr;
+				struct page **map = blktap_vma->vm_private_data;
+				int offset; 
 
-                vaddr  = MMAP_VADDR(user_vstart, pending_idx, j);
-                offset = (vaddr - blktap_vma->vm_start) >> PAGE_SHIFT;
+				vaddr  = MMAP_VADDR(user_vstart, pending_idx, j);
+				offset = (vaddr - blktap_vma->vm_start) >> PAGE_SHIFT;
 
-                //ClearPageReserved(virt_to_page(vaddr));
-                ClearPageReserved((struct page *)map[offset]);
-                map[offset] = NULL;
-            }
+				//ClearPageReserved(virt_to_page(vaddr));
+				ClearPageReserved((struct page *)map[offset]);
+				map[offset] = NULL;
+			}
 
-            fast_flush_area(pending_idx, pending_req->nr_pages);
-            make_response(blkif, pending_req->id, resp->operation, 
-                          resp->status);
-            blkif_put(pending_req->blkif);
-            spin_lock_irqsave(&pend_prod_lock, flags);
-            pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
-            spin_unlock_irqrestore(&pend_prod_lock, flags);
-        }
-        blktap_ufe_ring.rsp_cons = i;
-        maybe_trigger_blkio_schedule();
-    }
-    return 0;
+			fast_flush_area(pending_idx, pending_req->nr_pages);
+			make_response(blkif, pending_req->id, resp->operation, 
+				      resp->status);
+			blkif_put(pending_req->blkif);
+			spin_lock_irqsave(&pend_prod_lock, flags);
+			pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
+			spin_unlock_irqrestore(&pend_prod_lock, flags);
+		}
+		blktap_ufe_ring.rsp_cons = i;
+		maybe_trigger_blkio_schedule();
+	}
+	return 0;
 }
 
 
@@ -618,10 +612,10 @@ static int blktap_read_ufe_ring(void)
 
 irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 {
-    blkif_t *blkif = dev_id;
-    add_to_blkdev_list_tail(blkif);
-    maybe_trigger_blkio_schedule();
-    return IRQ_HANDLED;
+	blkif_t *blkif = dev_id;
+	add_to_blkdev_list_tail(blkif);
+	maybe_trigger_blkio_schedule();
+	return IRQ_HANDLED;
 }
 
 
@@ -632,199 +626,194 @@ irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 
 static int do_block_io_op(blkif_t *blkif, int max_to_do)
 {
-    blkif_back_ring_t *blk_ring = &blkif->blk_ring;
-    blkif_request_t *req;
-    RING_IDX i, rp;
-    int more_to_do = 0;
+	blkif_back_ring_t *blk_ring = &blkif->blk_ring;
+	blkif_request_t *req;
+	RING_IDX i, rp;
+	int more_to_do = 0;
     
-    rp = blk_ring->sring->req_prod;
-    rmb(); /* Ensure we see queued requests up to 'rp'. */
+	rp = blk_ring->sring->req_prod;
+	rmb(); /* Ensure we see queued requests up to 'rp'. */
 
-    for ( i = blk_ring->req_cons; 
-         (i != rp) && !RING_REQUEST_CONS_OVERFLOW(blk_ring, i);
-          i++ )
-    {
-        if ( (max_to_do-- == 0) || (NR_PENDING_REQS == MAX_PENDING_REQS) )
-        {
-            more_to_do = 1;
-            break;
-        }
+	for (i = blk_ring->req_cons; 
+	     (i != rp) && !RING_REQUEST_CONS_OVERFLOW(blk_ring, i);
+	     i++ ) {
+		if ((max_to_do-- == 0) ||
+		    (NR_PENDING_REQS == MAX_PENDING_REQS)) {
+			more_to_do = 1;
+			break;
+		}
         
-        req = RING_GET_REQUEST(blk_ring, i);
-        switch ( req->operation )
-        {
-        case BLKIF_OP_READ:
-        case BLKIF_OP_WRITE:
-            dispatch_rw_block_io(blkif, req);
-            break;
+		req = RING_GET_REQUEST(blk_ring, i);
+		switch (req->operation) {
+		case BLKIF_OP_READ:
+		case BLKIF_OP_WRITE:
+			dispatch_rw_block_io(blkif, req);
+			break;
 
-        default:
-            DPRINTK("error: unknown block io operation [%d]\n",
-                    req->operation);
-            make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
-            break;
-        }
-    }
+		default:
+			DPRINTK("error: unknown block io operation [%d]\n",
+				req->operation);
+			make_response(blkif, req->id, req->operation,
+				      BLKIF_RSP_ERROR);
+			break;
+		}
+	}
 
-    blk_ring->req_cons = i;
-    blktap_kick_user();
+	blk_ring->req_cons = i;
+	blktap_kick_user();
 
-    return more_to_do;
+	return more_to_do;
 }
 
 static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 {
-    blkif_request_t *target;
-    int i, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
-    pending_req_t *pending_req;
-    struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
-    int op, ret;
-    unsigned int nseg;
+	blkif_request_t *target;
+	int i, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
+	pending_req_t *pending_req;
+	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
+	int op, ret;
+	unsigned int nseg;
 
-    /* Check that number of segments is sane. */
-    nseg = req->nr_segments;
-    if ( unlikely(nseg == 0) || 
-         unlikely(nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST) )
-    {
-        DPRINTK("Bad number of segments in request (%d)\n", nseg);
-        goto bad_descriptor;
-    }
+	/* Check that number of segments is sane. */
+	nseg = req->nr_segments;
+	if (unlikely(nseg == 0) || 
+	    unlikely(nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST)) {
+		DPRINTK("Bad number of segments in request (%d)\n", nseg);
+		goto bad_descriptor;
+	}
 
-    /* Make sure userspace is ready. */
-    if (!blktap_ring_ok) {
-        DPRINTK("blktap: ring not ready for requests!\n");
-        goto bad_descriptor;
-    }
+	/* Make sure userspace is ready. */
+	if (!blktap_ring_ok) {
+		DPRINTK("blktap: ring not ready for requests!\n");
+		goto bad_descriptor;
+	}
     
 
-    if ( RING_FULL(&blktap_ufe_ring) ) {
-        WPRINTK("blktap: fe_ring is full, can't add (very broken!).\n");
-        goto bad_descriptor;
-    }
+	if (RING_FULL(&blktap_ufe_ring)) {
+		WPRINTK("blktap: fe_ring is full, can't add "
+			"(very broken!).\n");
+		goto bad_descriptor;
+	}
 
-    flush_cache_all(); /* a noop on intel... */
+	flush_cache_all(); /* a noop on intel... */
 
-    /* Map the foreign pages directly in to the application */    
-    op = 0;
-    for (i=0; i<req->nr_segments; i++) {
+	/* Map the foreign pages directly in to the application */    
+	op = 0;
+	for (i = 0; i < req->nr_segments; i++) {
 
-        unsigned long uvaddr;
-        unsigned long kvaddr;
-        unsigned long ptep;
+		unsigned long uvaddr;
+		unsigned long kvaddr;
+		unsigned long ptep;
 
-        uvaddr = MMAP_VADDR(user_vstart, pending_idx, i);
-        kvaddr = MMAP_VADDR(mmap_vstart, pending_idx, i);
+		uvaddr = MMAP_VADDR(user_vstart, pending_idx, i);
+		kvaddr = MMAP_VADDR(mmap_vstart, pending_idx, i);
 
-        /* Map the remote page to kernel. */
-        map[op].host_addr = kvaddr;
-        map[op].dom   = blkif->domid;
-        map[op].ref   = blkif_gref_from_fas(req->frame_and_sects[i]);
-        map[op].flags = GNTMAP_host_map;
-        /* This needs a bit more thought in terms of interposition: 
-         * If we want to be able to modify pages during write using 
-         * grant table mappings, the guest will either need to allow 
-         * it, or we'll need to incur a copy. Bit of an fbufs moment. ;) */
-        if (req->operation == BLKIF_OP_WRITE)
-            map[op].flags |= GNTMAP_readonly;
-        op++;
+		/* Map the remote page to kernel. */
+		map[op].host_addr = kvaddr;
+		map[op].dom   = blkif->domid;
+		map[op].ref   = blkif_gref_from_fas(req->frame_and_sects[i]);
+		map[op].flags = GNTMAP_host_map;
+		/* This needs a bit more thought in terms of interposition: 
+		 * If we want to be able to modify pages during write using 
+		 * grant table mappings, the guest will either need to allow 
+		 * it, or we'll need to incur a copy. Bit of an fbufs moment. ;) */
+		if (req->operation == BLKIF_OP_WRITE)
+			map[op].flags |= GNTMAP_readonly;
+		op++;
 
-        /* Now map it to user. */
-        ret = create_lookup_pte_addr(blktap_vma->vm_mm, uvaddr, &ptep);
-        if (ret)
-        {
-            DPRINTK("Couldn't get a pte addr!\n");
-            fast_flush_area(pending_idx, req->nr_segments);
-            goto bad_descriptor;
-        }
+		/* Now map it to user. */
+		ret = create_lookup_pte_addr(blktap_vma->vm_mm, uvaddr, &ptep);
+		if (ret) {
+			DPRINTK("Couldn't get a pte addr!\n");
+			fast_flush_area(pending_idx, req->nr_segments);
+			goto bad_descriptor;
+		}
 
-        map[op].host_addr = ptep;
-        map[op].dom       = blkif->domid;
-        map[op].ref       = blkif_gref_from_fas(req->frame_and_sects[i]);
-        map[op].flags     = GNTMAP_host_map | GNTMAP_application_map
-                            | GNTMAP_contains_pte;
-        /* Above interposition comment applies here as well. */
-        if (req->operation == BLKIF_OP_WRITE)
-            map[op].flags |= GNTMAP_readonly;
-        op++;
-    }
+		map[op].host_addr = ptep;
+		map[op].dom       = blkif->domid;
+		map[op].ref       = blkif_gref_from_fas(req->frame_and_sects[i]);
+		map[op].flags     = GNTMAP_host_map | GNTMAP_application_map
+			| GNTMAP_contains_pte;
+		/* Above interposition comment applies here as well. */
+		if (req->operation == BLKIF_OP_WRITE)
+			map[op].flags |= GNTMAP_readonly;
+		op++;
+	}
 
-    if ( unlikely(HYPERVISOR_grant_table_op(
-            GNTTABOP_map_grant_ref, map, op)))
-        BUG();
+	BUG_ON(HYPERVISOR_grant_table_op(
+		GNTTABOP_map_grant_ref, map, op));
 
-    op = 0;
-    for (i=0; i<(req->nr_segments*2); i+=2) {
-        unsigned long uvaddr;
-        unsigned long kvaddr;
-        unsigned long offset;
-        int cancel = 0;
+	op = 0;
+	for (i = 0; i < (req->nr_segments*2); i += 2) {
+		unsigned long uvaddr;
+		unsigned long kvaddr;
+		unsigned long offset;
+		int cancel = 0;
 
-        uvaddr = MMAP_VADDR(user_vstart, pending_idx, i/2);
-        kvaddr = MMAP_VADDR(mmap_vstart, pending_idx, i/2);
+		uvaddr = MMAP_VADDR(user_vstart, pending_idx, i/2);
+		kvaddr = MMAP_VADDR(mmap_vstart, pending_idx, i/2);
 
-        if ( unlikely(map[i].handle < 0) ) 
-        {
-            DPRINTK("Error on kernel grant mapping (%d)\n", map[i].handle);
-            ret = map[i].handle;
-            cancel = 1;
-        }
+		if (unlikely(map[i].handle < 0)) {
+			DPRINTK("Error on kernel grant mapping (%d)\n",
+				map[i].handle);
+			ret = map[i].handle;
+			cancel = 1;
+		}
 
-        if ( unlikely(map[i+1].handle < 0) ) 
-        {
-            DPRINTK("Error on user grant mapping (%d)\n", map[i+1].handle);
-            ret = map[i+1].handle;
-            cancel = 1;
-        }
+		if (unlikely(map[i+1].handle < 0)) {
+			DPRINTK("Error on user grant mapping (%d)\n",
+				map[i+1].handle);
+			ret = map[i+1].handle;
+			cancel = 1;
+		}
 
-        if (cancel) 
-        {
-            fast_flush_area(pending_idx, req->nr_segments);
-            goto bad_descriptor;
-        }
+		if (cancel) {
+			fast_flush_area(pending_idx, req->nr_segments);
+			goto bad_descriptor;
+		}
 
-        /* Set the necessary mappings in p2m and in the VM_FOREIGN 
-         * vm_area_struct to allow user vaddr -> struct page lookups
-         * to work.  This is needed for direct IO to foreign pages. */
-        phys_to_machine_mapping[__pa(kvaddr) >> PAGE_SHIFT] =
-            FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT);
+		/* Set the necessary mappings in p2m and in the VM_FOREIGN 
+		 * vm_area_struct to allow user vaddr -> struct page lookups
+		 * to work.  This is needed for direct IO to foreign pages. */
+		phys_to_machine_mapping[__pa(kvaddr) >> PAGE_SHIFT] =
+			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT);
 
-        offset = (uvaddr - blktap_vma->vm_start) >> PAGE_SHIFT;
-        ((struct page **)blktap_vma->vm_private_data)[offset] =
-            pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+		offset = (uvaddr - blktap_vma->vm_start) >> PAGE_SHIFT;
+		((struct page **)blktap_vma->vm_private_data)[offset] =
+			pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
 
-        /* Save handles for unmapping later. */
-        pending_handle(pending_idx, i/2).kernel = map[i].handle;
-        pending_handle(pending_idx, i/2).user   = map[i+1].handle;
-    }
+		/* Save handles for unmapping later. */
+		pending_handle(pending_idx, i/2).kernel = map[i].handle;
+		pending_handle(pending_idx, i/2).user   = map[i+1].handle;
+	}
 
-    /* Mark mapped pages as reserved: */
-    for ( i = 0; i < req->nr_segments; i++ )
-    {
-        unsigned long kvaddr;
+	/* Mark mapped pages as reserved: */
+	for (i = 0; i < req->nr_segments; i++) {
+		unsigned long kvaddr;
+		kvaddr = MMAP_VADDR(mmap_vstart, pending_idx, i);
+		SetPageReserved(pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT));
+	}
 
-        kvaddr = MMAP_VADDR(mmap_vstart, pending_idx, i);
-        SetPageReserved(pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT));
-    }
+	pending_req = &pending_reqs[pending_idx];
+	pending_req->blkif     = blkif;
+	pending_req->id        = req->id;
+	pending_req->operation = req->operation;
+	pending_req->status    = BLKIF_RSP_OKAY;
+	pending_req->nr_pages  = nseg;
+	req->id = MAKE_ID(blkif->domid, pending_idx);
+	//atomic_set(&pending_req->pendcnt, nbio);
+	pending_cons++;
+	blkif_get(blkif);
 
-    pending_req = &pending_reqs[pending_idx];
-    pending_req->blkif     = blkif;
-    pending_req->id        = req->id;
-    pending_req->operation = req->operation;
-    pending_req->status    = BLKIF_RSP_OKAY;
-    pending_req->nr_pages  = nseg;
-    req->id = MAKE_ID(blkif->domid, pending_idx);
-    //atomic_set(&pending_req->pendcnt, nbio);
-    pending_cons++;
-    blkif_get(blkif);
-
-    /* Finally, write the request message to the user ring. */
-    target = RING_GET_REQUEST(&blktap_ufe_ring, blktap_ufe_ring.req_prod_pvt);
-    memcpy(target, req, sizeof(*req));
-    blktap_ufe_ring.req_prod_pvt++;
-    return;
+	/* Finally, write the request message to the user ring. */
+	target = RING_GET_REQUEST(&blktap_ufe_ring,
+				  blktap_ufe_ring.req_prod_pvt);
+	memcpy(target, req, sizeof(*req));
+	blktap_ufe_ring.req_prod_pvt++;
+	return;
 
  bad_descriptor:
-    make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
+	make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
 } 
 
 
@@ -837,80 +826,89 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 static void make_response(blkif_t *blkif, unsigned long id, 
                           unsigned short op, int st)
 {
-    blkif_response_t *resp;
-    unsigned long     flags;
-    blkif_back_ring_t *blk_ring = &blkif->blk_ring;
+	blkif_response_t *resp;
+	unsigned long     flags;
+	blkif_back_ring_t *blk_ring = &blkif->blk_ring;
 
-    /* Place on the response ring for the relevant domain. */ 
-    spin_lock_irqsave(&blkif->blk_ring_lock, flags);
-    resp = RING_GET_RESPONSE(blk_ring, blk_ring->rsp_prod_pvt);
-    resp->id        = id;
-    resp->operation = op;
-    resp->status    = st;
-    wmb(); /* Ensure other side can see the response fields. */
-    blk_ring->rsp_prod_pvt++;
-    RING_PUSH_RESPONSES(blk_ring);
-    spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
+	/* Place on the response ring for the relevant domain. */ 
+	spin_lock_irqsave(&blkif->blk_ring_lock, flags);
+	resp = RING_GET_RESPONSE(blk_ring, blk_ring->rsp_prod_pvt);
+	resp->id        = id;
+	resp->operation = op;
+	resp->status    = st;
+	wmb(); /* Ensure other side can see the response fields. */
+	blk_ring->rsp_prod_pvt++;
+	RING_PUSH_RESPONSES(blk_ring);
+	spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 
-    /* Kick the relevant domain. */
-    notify_via_evtchn(blkif->evtchn);
+	/* Kick the relevant domain. */
+	notify_via_evtchn(blkif->evtchn);
 }
 
 static struct miscdevice blktap_miscdev = {
-    .minor        = BLKTAP_MINOR,
-    .name         = "blktap",
-    .fops         = &blktap_fops,
-    .devfs_name   = "misc/blktap",
+	.minor        = BLKTAP_MINOR,
+	.name         = "blktap",
+	.fops         = &blktap_fops,
+	.devfs_name   = "misc/blktap",
 };
 
 void blkif_deschedule(blkif_t *blkif)
 {
-    remove_from_blkdev_list(blkif);
+	remove_from_blkdev_list(blkif);
 }
 
 static int __init blkif_init(void)
 {
-    int i, j, err;
-    struct page *page;
+	int i, j, err;
+	struct page *page;
 /*
-    if ( !(xen_start_info->flags & SIF_INITDOMAIN) &&
-         !(xen_start_info->flags & SIF_BLK_BE_DOMAIN) )
-        return 0;
+  if ( !(xen_start_info->flags & SIF_INITDOMAIN) &&
+  !(xen_start_info->flags & SIF_BLK_BE_DOMAIN) )
+  return 0;
 */
-    blkif_interface_init();
+	blkif_interface_init();
 
-    page = balloon_alloc_empty_page_range(MMAP_PAGES);
-    BUG_ON(page == NULL);
-    mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
+	page = balloon_alloc_empty_page_range(MMAP_PAGES);
+	BUG_ON(page == NULL);
+	mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
 
-    pending_cons = 0;
-    pending_prod = MAX_PENDING_REQS;
-    memset(pending_reqs, 0, sizeof(pending_reqs));
-    for ( i = 0; i < MAX_PENDING_REQS; i++ )
-        pending_ring[i] = i;
+	pending_cons = 0;
+	pending_prod = MAX_PENDING_REQS;
+	memset(pending_reqs, 0, sizeof(pending_reqs));
+	for ( i = 0; i < MAX_PENDING_REQS; i++ )
+		pending_ring[i] = i;
     
-    spin_lock_init(&blkio_schedule_list_lock);
-    INIT_LIST_HEAD(&blkio_schedule_list);
+	spin_lock_init(&blkio_schedule_list_lock);
+	INIT_LIST_HEAD(&blkio_schedule_list);
 
-    if ( kernel_thread(blkio_schedule, 0, CLONE_FS | CLONE_FILES) < 0 )
-        BUG();
+	BUG_ON(kernel_thread(blkio_schedule, 0, CLONE_FS | CLONE_FILES) < 0);
 
-    blkif_xenbus_init();
+	blkif_xenbus_init();
 
-    for (i=0; i<MAX_PENDING_REQS ; i++)
-        for (j=0; j<BLKIF_MAX_SEGMENTS_PER_REQUEST; j++)
-            BLKTAP_INVALIDATE_HANDLE(&pending_handle(i, j));
+	for (i = 0; i < MAX_PENDING_REQS ; i++)
+		for (j = 0; j < BLKIF_MAX_SEGMENTS_PER_REQUEST; j++)
+			BLKTAP_INVALIDATE_HANDLE(&pending_handle(i, j));
 
-    err = misc_register(&blktap_miscdev);
-    if ( err != 0 )
-    {
-        printk(KERN_ALERT "Couldn't register /dev/misc/blktap (%d)\n", err);
-        return err;
-    }
+	err = misc_register(&blktap_miscdev);
+	if (err != 0) {
+		printk(KERN_ALERT "Couldn't register /dev/misc/blktap (%d)\n",
+		       err);
+		return err;
+	}
 
-    init_waitqueue_head(&blktap_wait);
+	init_waitqueue_head(&blktap_wait);
 
-    return 0;
+	return 0;
 }
 
 __initcall(blkif_init);
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */
