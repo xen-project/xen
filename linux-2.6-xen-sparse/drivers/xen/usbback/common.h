@@ -13,7 +13,7 @@
 #include <asm/setup.h>
 #include <asm/pgalloc.h>
 #include <asm/hypervisor.h>
-
+#include <asm-xen/driver_util.h>
 #include <asm-xen/xen-public/io/usbif.h>
 
 #if 0
@@ -38,6 +38,7 @@ struct usbif_priv_st {
     unsigned int     evtchn;
     /* Comms Information */
     usbif_back_ring_t usb_ring;
+    struct vm_struct *usb_ring_area;
     /* Private fields. */
     enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
     /*

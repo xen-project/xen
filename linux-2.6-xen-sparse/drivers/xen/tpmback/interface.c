@@ -13,9 +13,6 @@
 
 #include "common.h"
 #include <asm-xen/balloon.h>
-#include <asm-xen/driver_util.h>
-
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
 
 #define TPMIF_HASHSZ (2 << 5)
 #define TPMIF_HASH(_d,_h) (((int)(_d)^(int)(_h))&(TPMIF_HASHSZ-1))
@@ -79,17 +76,18 @@ tpmif_find(domid_t domid, long int instance)
 }
 
 static int
-map_frontend_page(tpmif_t * tpmif, unsigned long localaddr,
-		  unsigned long shared_page)
+map_frontend_page(tpmif_t *tpmif, unsigned long shared_page)
 {
 	struct gnttab_map_grant_ref op = {
-		.host_addr = localaddr,
+		.host_addr = (unsigned long)tpmif->tx_area->addr,
 		.flags = GNTMAP_host_map,
 		.ref = shared_page,
 		.dom = tpmif->domid,
 	};
 
+	lock_vm_area(tpmif->tx_area);
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
+	unlock_vm_area(tpmif->tx_area);
 
 	if (op.handle < 0) {
 		DPRINTK(" Grant table operation failure !\n");
@@ -98,37 +96,38 @@ map_frontend_page(tpmif_t * tpmif, unsigned long localaddr,
 
 	tpmif->shmem_ref = shared_page;
 	tpmif->shmem_handle = op.handle;
-	tpmif->shmem_vaddr = localaddr;
+
 	return 0;
 }
 
 static void
-unmap_frontend_page(tpmif_t * tpmif)
+unmap_frontend_page(tpmif_t *tpmif)
 {
 	struct gnttab_unmap_grant_ref op;
 
-	op.host_addr = tpmif->shmem_vaddr;
-	op.handle = tpmif->shmem_handle;
+	op.host_addr    = (unsigned long)tpmif->tx_area->addr;
+	op.handle       = tpmif->shmem_handle;
 	op.dev_bus_addr = 0;
 
+	lock_vm_area(tpmif->tx_area);
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
+	unlock_vm_area(tpmif->tx_area);
 }
 
 int
-tpmif_map(tpmif_t * tpmif, unsigned long shared_page, unsigned int evtchn)
+tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 {
-	struct vm_struct *vma;
 	evtchn_op_t op = {.cmd = EVTCHNOP_bind_interdomain };
 	int err;
 
 	BUG_ON(tpmif->remote_evtchn);
 
-	if ((vma = prepare_vm_area(PAGE_SIZE)) == NULL)
+	if ((tpmif->tx_area = alloc_vm_area(PAGE_SIZE)) == NULL)
 		return -ENOMEM;
 
-	err = map_frontend_page(tpmif, VMALLOC_VMADDR(vma->addr), shared_page);
+	err = map_frontend_page(tpmif, shared_page);
 	if (err) {
-		vunmap(vma->addr);
+		free_vm_area(tpmif->tx_area);
 		return err;
 	}
 
@@ -139,14 +138,14 @@ tpmif_map(tpmif_t * tpmif, unsigned long shared_page, unsigned int evtchn)
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		unmap_frontend_page(tpmif);
-		vunmap(vma->addr);
+		free_vm_area(tpmif->tx_area);
 		return err;
 	}
 
 	tpmif->evtchn = op.u.bind_interdomain.port1;
 	tpmif->remote_evtchn = evtchn;
 
-	tpmif->tx = (tpmif_tx_interface_t *) vma->addr;
+	tpmif->tx = (tpmif_tx_interface_t *)tpmif->tx_area->addr;
 
 	bind_evtchn_to_irqhandler(tpmif->evtchn,
 				  tpmif_be_int, 0, "tpmif-backend", tpmif);
@@ -175,7 +174,7 @@ __tpmif_disconnect_complete(void *arg)
 
 	if (tpmif->tx) {
 		unmap_frontend_page(tpmif);
-		vunmap(tpmif->tx);
+		free_vm_area(tpmif->tx_area);
 	}
 
 	free_tpmif(tpmif);
@@ -194,3 +193,13 @@ tpmif_interface_init(void)
 	tpmif_cachep = kmem_cache_create("tpmif_cache", sizeof (tpmif_t),
 					 0, 0, NULL, NULL);
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

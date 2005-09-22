@@ -17,6 +17,7 @@
 #include <asm-xen/xen-public/io/blkif.h>
 #include <asm-xen/xen-public/io/ring.h>
 #include <asm-xen/gnttab.h>
+#include <asm-xen/driver_util.h>
 
 #if 0
 #define ASSERT(_p) \
@@ -42,11 +43,11 @@ typedef struct blkif_st {
     domid_t           domid;
     unsigned int      handle;
     /* Physical parameters of the comms window. */
-    unsigned long     shmem_frame;
     unsigned int      evtchn;
     unsigned int      remote_evtchn;
     /* Comms information. */
     blkif_back_ring_t blk_ring;
+    struct vm_struct *blk_ring_area;
     /* VBDs attached to this interface. */
     struct vbd        vbd;
     /* Private fields. */
@@ -60,8 +61,8 @@ typedef struct blkif_st {
     atomic_t         refcnt;
 
     struct work_struct free_work;
-    u16 shmem_handle;
-    unsigned long shmem_vaddr;
+
+    u16         shmem_handle;
     grant_ref_t shmem_ref;
 } blkif_t;
 

@@ -20,6 +20,7 @@
 #include <asm/pgalloc.h>
 #include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/gnttab.h>
+#include <asm-xen/driver_util.h>
 
 #define GRANT_INVALID_REF (0xFFFF)
 
@@ -46,24 +47,17 @@ typedef struct netif_st {
 	u8               fe_dev_addr[6];
 
 	/* Physical parameters of the comms window. */
-	unsigned long    tx_shmem_frame;
-#ifdef CONFIG_XEN_NETDEV_GRANT
 	u16              tx_shmem_handle;
-	unsigned long    tx_shmem_vaddr; 
 	grant_ref_t      tx_shmem_ref; 
-#endif
-	unsigned long    rx_shmem_frame;
-#ifdef CONFIG_XEN_NETDEV_GRANT
 	u16              rx_shmem_handle;
-	unsigned long    rx_shmem_vaddr; 
 	grant_ref_t      rx_shmem_ref; 
-#endif
 	unsigned int     evtchn;
 	unsigned int     remote_evtchn;
 
 	/* The shared rings and indexes. */
 	netif_tx_interface_t *tx;
 	netif_rx_interface_t *rx;
+	struct vm_struct *comms_area;
 
 	/* Private indexes into shared ring. */
 	NETIF_RING_IDX rx_req_cons;
