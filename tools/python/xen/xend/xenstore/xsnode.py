@@ -244,7 +244,9 @@ class XenStore:
             if ex.args[0] == errno.ENOENT:
                 return False
             else:
-                raise
+                raise RuntimeError(ex.args[0],
+                                   ex.args[1] +
+                                   (', in exists(%s)' % (str(path))))
 
     def mkdirs(self, path):
         if self.exists(path):
