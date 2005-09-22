@@ -566,7 +566,7 @@ vtpm_op_read(struct file *file,
 				 * the more time we give the TPM to process the request.
 				 */
 				mod_timer(&pak->processing_timer,
-				          jiffies + (num_frontends * 10 * HZ));
+				          jiffies + (num_frontends * 60 * HZ));
 				dataex.copied_so_far = 0;
 			}
 		}
@@ -850,7 +850,7 @@ static int vtpm_queue_packet(struct packet *pak)
 		write_lock_irqsave(&dataex.pak_lock, flags);
 		list_add_tail(&pak->next, &dataex.pending_pak);
 		/* give the TPM some time to pick up the request */
-		mod_timer(&pak->processing_timer, jiffies + (10 * HZ));
+		mod_timer(&pak->processing_timer, jiffies + (30 * HZ));
 		write_unlock_irqrestore(&dataex.pak_lock,
 		                        flags);
 
