@@ -300,6 +300,18 @@ class VmxImageHandler(ImageHandler):
             store_evtchn = self.vm.store_channel.port2
         else:
             store_evtchn = 0
+
+        log.debug("dom            = %d", self.vm.getDomain())
+        log.debug("image          = %s", self.kernel)
+        log.debug("control_evtchn = %d", self.device_channel.port2)
+        log.debug("store_evtchn   = %d", store_evtchn)
+        log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
+        log.debug("memmap         = %s", self.memmap_value)
+        log.debug("cmdline        = %s", self.cmdline)
+        log.debug("ramdisk        = %s", self.ramdisk)
+        log.debug("flags          = %d", self.flags)
+        log.debug("vcpus          = %d", self.vm.getVCpuCount())
+
         ret = xc.vmx_build(dom            = self.vm.getDomain(),
                            image          = self.kernel,
                            control_evtchn = self.device_channel.port2,
@@ -402,7 +414,7 @@ class VmxImageHandler(ImageHandler):
             args = args + vnc
         args = args + ([ "-d",  "%d" % self.vm.getDomain(),
                   "-p", "%d" % self.device_channel.port1,
-                  "-m", "%s" % self.vm.getMemoryTarget() / 1024 ])
+                  "-m", "%s" % (self.vm.getMemoryTarget() / 1024)])
         args = args + self.dmargs
         env = dict(os.environ)
         env['DISPLAY'] = self.display
@@ -437,7 +449,7 @@ class VmxImageHandler(ImageHandler):
         """@see ImageHandler.getDomainMemory"""
         # for ioreq_t and xenstore
         static_pages = 2
-        return mem + self.getPageTableSize(mem * 1024) + 4 * static_pages
+        return mem + self.getPageTableSize(mem / 1024) + 4 * static_pages
             
     def getPageTableSize(self, mem_mb):
         """Return the size of memory needed for 1:1 page tables for physical
