@@ -35,8 +35,8 @@ struct vmx_virpit_t {
 
     unsigned int count;  /* the 16 bit channel count */
     unsigned int init_val; /* the init value for the counter */
-
-} ;
+    struct vcpu *v;
+};
 
 /* to hook the ioreq packet to get the PIT initializaiton info */
 extern void vmx_hooks_assist(struct vcpu *d);

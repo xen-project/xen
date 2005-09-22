@@ -13,7 +13,6 @@
 #define ELFSIZE 64
 #endif
 
-
 #include "xc_elf.h"
 #include "xc_aout9.h"
 #include <stdlib.h>
@@ -33,6 +32,13 @@
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #endif
 
+#ifdef __ia64__
+#define already_built(ctxt) (0)
+#define get_tot_pages xc_get_max_pages
+#else
+#define already_built(ctxt) ((ctxt)->ctrlreg[3] != 0)
+#define get_tot_pages xc_get_tot_pages
+#endif
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
@@ -47,7 +53,7 @@ static int probeimageformat(char *image,
 {
     if ( probe_elf(image, image_size, load_funcs) &&
          probe_bin(image, image_size, load_funcs) &&
-	 probe_aout9(image, image_size, load_funcs) )
+         probe_aout9(image, image_size, load_funcs) )
     {
         ERROR( "Unrecognized image format" );
         return -EINVAL;
@@ -56,27 +62,27 @@ static int probeimageformat(char *image,
     return 0;
 }
 
-#define alloc_pt(ltab, vltab) \
-        ltab = (unsigned long long)(page_array[ppt_alloc++]) << PAGE_SHIFT; \
-        if (vltab != NULL) { \
-            munmap(vltab, PAGE_SIZE); \
-        } \
-        if ((vltab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, \
-                          PROT_READ|PROT_WRITE, \
-                          ltab >> PAGE_SHIFT)) == NULL) { \
-            goto error_out; \
-        } \
-        memset(vltab, 0, PAGE_SIZE);
+#define alloc_pt(ltab, vltab)                                           \
+do {                                                                    \
+    ltab = (u64)page_array[ppt_alloc++] << PAGE_SHIFT;                  \
+    if ( vltab != NULL )                                                \
+        munmap(vltab, PAGE_SIZE);                                       \
+    if ( (vltab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,       \
+                                       PROT_READ|PROT_WRITE,            \
+                                       ltab >> PAGE_SHIFT)) == NULL )   \
+        goto error_out;                                                 \
+    memset(vltab, 0, PAGE_SIZE);                                        \
+} while ( 0 )
 
 #if defined(__i386__)
 
 static int setup_pg_tables(int xc_handle, u32 dom,
-			   vcpu_guest_context_t *ctxt,
-			   unsigned long dsi_v_start,
-			   unsigned long v_end,
-			   unsigned long *page_array,
-			   unsigned long vpt_start,
-			   unsigned long vpt_end)
+                           vcpu_guest_context_t *ctxt,
+                           unsigned long dsi_v_start,
+                           unsigned long v_end,
+                           unsigned long *page_array,
+                           unsigned long vpt_start,
+                           unsigned long vpt_end)
 {
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
@@ -90,11 +96,11 @@ static int setup_pg_tables(int xc_handle, u32 dom,
     vl2e = &vl2tab[l2_table_offset(dsi_v_start)];
     ctxt->ctrlreg[3] = l2tab;
 
-    for ( count = 0; count < ((v_end-dsi_v_start)>>PAGE_SHIFT); count++ )
+    for ( count = 0; count < ((v_end - dsi_v_start) >> PAGE_SHIFT); count++ )
     {    
         if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
         {
-	    alloc_pt(l1tab, vl1tab);
+            alloc_pt(l1tab, vl1tab);
             vl1e = &vl1tab[l1_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
             *vl2e++ = l1tab | L2_PROT;
         }
@@ -111,79 +117,67 @@ static int setup_pg_tables(int xc_handle, u32 dom,
 
  error_out:
     if (vl1tab)
-	munmap(vl1tab, PAGE_SIZE);
+        munmap(vl1tab, PAGE_SIZE);
     if (vl2tab)
-	munmap(vl2tab, PAGE_SIZE);
+        munmap(vl2tab, PAGE_SIZE);
     return -1;
 }
 
 static int setup_pg_tables_pae(int xc_handle, u32 dom,
-			       vcpu_guest_context_t *ctxt,
-			       unsigned long dsi_v_start,
-			       unsigned long v_end,
-			       unsigned long *page_array,
-			       unsigned long vpt_start,
-			       unsigned long vpt_end)
+                               vcpu_guest_context_t *ctxt,
+                               unsigned long dsi_v_start,
+                               unsigned long v_end,
+                               unsigned long *page_array,
+                               unsigned long vpt_start,
+                               unsigned long vpt_end)
 {
-    l1_pgentry_64_t *vl1tab=NULL, *vl1e=NULL;
-    l2_pgentry_64_t *vl2tab=NULL, *vl2e=NULL;
-    l3_pgentry_64_t *vl3tab=NULL, *vl3e=NULL;
-    unsigned long long l1tab = 0;
-    unsigned long long l2tab = 0;
-    unsigned long long l3tab = 0;
-    unsigned long ppt_alloc;
-    unsigned long count;
+    l1_pgentry_64_t *vl1tab = NULL, *vl1e = NULL;
+    l2_pgentry_64_t *vl2tab = NULL, *vl2e = NULL;
+    l3_pgentry_64_t *vl3tab = NULL, *vl3e = NULL;
+    u64 l1tab, l2tab, l3tab;
+    unsigned long ppt_alloc, count, nmfn;
 
     /* First allocate page for page dir. */
     ppt_alloc = (vpt_start - dsi_v_start) >> PAGE_SHIFT;
 
     if ( page_array[ppt_alloc] > 0xfffff )
     {
-	unsigned long nmfn;
-	nmfn = xc_make_page_below_4G( xc_handle, dom, page_array[ppt_alloc] );
-	if ( nmfn == 0 )
-	{
-	    fprintf(stderr, "Couldn't get a page below 4GB :-(\n");
-	    goto error_out;
-	}
-	page_array[ppt_alloc] = nmfn;
+        nmfn = xc_make_page_below_4G(xc_handle, dom, page_array[ppt_alloc]);
+        if ( nmfn == 0 )
+        {
+            fprintf(stderr, "Couldn't get a page below 4GB :-(\n");
+            goto error_out;
+        }
+        page_array[ppt_alloc] = nmfn;
     }
 
     alloc_pt(l3tab, vl3tab);
     vl3e = &vl3tab[l3_table_offset_pae(dsi_v_start)];
     ctxt->ctrlreg[3] = l3tab;
 
-    if(l3tab>0xfffff000ULL)
-    {
-        fprintf(stderr,"L3TAB = %llx above 4GB!\n",l3tab);
-        goto error_out;
-    }
- 
-    for ( count = 0; count < ((v_end-dsi_v_start)>>PAGE_SHIFT); count++)
+    for ( count = 0; count < ((v_end - dsi_v_start) >> PAGE_SHIFT); count++)
     {
         if ( !((unsigned long)vl1e & (PAGE_SIZE-1)) )
         {
+            if ( !((unsigned long)vl2e & (PAGE_SIZE-1)) )
+            {
+                alloc_pt(l2tab, vl2tab);
+                vl2e = &vl2tab[l2_table_offset_pae(
+                    dsi_v_start + (count << PAGE_SHIFT))];
+                *vl3e++ = l2tab | L3_PROT;
+            }
+
             alloc_pt(l1tab, vl1tab);
-            
-                if ( !((unsigned long)vl2e & (PAGE_SIZE-1)) )
-                {
-                    alloc_pt(l2tab, vl2tab);
-                    vl2e = &vl2tab[l2_table_offset_pae(dsi_v_start + (count<<PAGE_SHIFT))];
-                    *vl3e = l2tab | L3_PROT;
-                    vl3e++;
-                }
-            vl1e = &vl1tab[l1_table_offset_pae(dsi_v_start + (count<<PAGE_SHIFT))];
-            *vl2e = l1tab | L2_PROT;
-            vl2e++;
+            vl1e = &vl1tab[l1_table_offset_pae(
+                dsi_v_start + (count << PAGE_SHIFT))];
+            *vl2e++ = l1tab | L2_PROT;
         }
         
-        *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
+        *vl1e = ((u64)page_array[count] << PAGE_SHIFT) | L1_PROT;
         if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
-	     (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
-        {
-	    *vl1e &= ~_PAGE_RW;
-        }
-	vl1e++;
+             (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
+            *vl1e &= ~_PAGE_RW;
+        vl1e++;
     }
      
     munmap(vl1tab, PAGE_SIZE);
@@ -193,11 +187,11 @@ static int setup_pg_tables_pae(int xc_handle, u32 dom,
 
  error_out:
     if (vl1tab)
-	munmap(vl1tab, PAGE_SIZE);
+        munmap(vl1tab, PAGE_SIZE);
     if (vl2tab)
-	munmap(vl2tab, PAGE_SIZE);
+        munmap(vl2tab, PAGE_SIZE);
     if (vl3tab)
-	munmap(vl3tab, PAGE_SIZE);
+        munmap(vl3tab, PAGE_SIZE);
     return -1;
 }
 
@@ -206,12 +200,12 @@ static int setup_pg_tables_pae(int xc_handle, u32 dom,
 #if defined(__x86_64__)
 
 static int setup_pg_tables_64(int xc_handle, u32 dom,
-			      vcpu_guest_context_t *ctxt,
-			      unsigned long dsi_v_start,
-			      unsigned long v_end,
-			      unsigned long *page_array,
-			      unsigned long vpt_start,
-			      unsigned long vpt_end)
+                              vcpu_guest_context_t *ctxt,
+                              unsigned long dsi_v_start,
+                              unsigned long v_end,
+                              unsigned long *page_array,
+                              unsigned long vpt_start,
+                              unsigned long vpt_end)
 {
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
@@ -236,20 +230,20 @@ static int setup_pg_tables_64(int xc_handle, u32 dom,
         {
             alloc_pt(l1tab, vl1tab);
             
-                if ( !((unsigned long)vl2e & (PAGE_SIZE-1)) )
+            if ( !((unsigned long)vl2e & (PAGE_SIZE-1)) )
+            {
+                alloc_pt(l2tab, vl2tab);
+                if ( !((unsigned long)vl3e & (PAGE_SIZE-1)) )
                 {
-                    alloc_pt(l2tab, vl2tab);
-                    if ( !((unsigned long)vl3e & (PAGE_SIZE-1)) )
-                    {
-                        alloc_pt(l3tab, vl3tab);
-                        vl3e = &vl3tab[l3_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
-                        *vl4e = l3tab | L4_PROT;
-                        vl4e++;
-                    }
-                    vl2e = &vl2tab[l2_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
-                    *vl3e = l2tab | L3_PROT;
-                    vl3e++;
+                    alloc_pt(l3tab, vl3tab);
+                    vl3e = &vl3tab[l3_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
+                    *vl4e = l3tab | L4_PROT;
+                    vl4e++;
                 }
+                vl2e = &vl2tab[l2_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
+                *vl3e = l2tab | L3_PROT;
+                vl3e++;
+            }
             vl1e = &vl1tab[l1_table_offset(dsi_v_start + (count<<PAGE_SHIFT))];
             *vl2e = l1tab | L2_PROT;
             vl2e++;
@@ -257,11 +251,11 @@ static int setup_pg_tables_64(int xc_handle, u32 dom,
         
         *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
         if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
-            (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
+             (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
         {
-                *vl1e &= ~_PAGE_RW;
+            *vl1e &= ~_PAGE_RW;
         }
-            vl1e++;
+        vl1e++;
     }
      
     munmap(vl1tab, PAGE_SIZE);
@@ -272,13 +266,13 @@ static int setup_pg_tables_64(int xc_handle, u32 dom,
 
  error_out:
     if (vl1tab)
-	munmap(vl1tab, PAGE_SIZE);
+        munmap(vl1tab, PAGE_SIZE);
     if (vl2tab)
-	munmap(vl2tab, PAGE_SIZE);
+        munmap(vl2tab, PAGE_SIZE);
     if (vl3tab)
-	munmap(vl3tab, PAGE_SIZE);
+        munmap(vl3tab, PAGE_SIZE);
     if (vl4tab)
-	munmap(vl4tab, PAGE_SIZE);
+        munmap(vl4tab, PAGE_SIZE);
     return -1;
 }
 #endif
@@ -286,18 +280,18 @@ static int setup_pg_tables_64(int xc_handle, u32 dom,
 #ifdef __ia64__
 #include <asm/fpu.h> /* for FPSR_DEFAULT */
 static int setup_guest(int xc_handle,
-                         u32 dom,
-                         char *image, unsigned long image_size,
-                         gzFile initrd_gfd, unsigned long initrd_len,
-                         unsigned long nr_pages,
-                         unsigned long *pvsi, unsigned long *pvke,
-                         unsigned long *pvss, vcpu_guest_context_t *ctxt,
-                         const char *cmdline,
-                         unsigned long shared_info_frame,
-                         unsigned long flags,
-                         unsigned int vcpus,
-                         unsigned int store_evtchn, unsigned long *store_mfn,
-		         unsigned int console_evtchn, unsigned long *console_mfn)
+                       u32 dom,
+                       char *image, unsigned long image_size,
+                       gzFile initrd_gfd, unsigned long initrd_len,
+                       unsigned long nr_pages,
+                       unsigned long *pvsi, unsigned long *pvke,
+                       unsigned long *pvss, vcpu_guest_context_t *ctxt,
+                       const char *cmdline,
+                       unsigned long shared_info_frame,
+                       unsigned long flags,
+                       unsigned int vcpus,
+                       unsigned int store_evtchn, unsigned long *store_mfn,
+                       unsigned int console_evtchn, unsigned long *console_mfn)
 {
     unsigned long *page_array = NULL;
     struct load_funcs load_funcs;
@@ -339,19 +333,20 @@ static int setup_guest(int xc_handle,
     *pvke = dsi.v_kernentry;
 
     /* Now need to retrieve machine pfn for system pages:
-     * 	start_info/store/console
+     *  start_info/store/console
      */
     pgnr = 3;
-    if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array, nr_pages - 3, pgnr) != pgnr)
+    if ( xc_ia64_get_pfn_list(xc_handle, dom, page_array,
+                              nr_pages - 3, pgnr) != pgnr )
     {
-	PERROR("Could not get page frame for xenstore");
-	goto error_out;
+        PERROR("Could not get page frame for xenstore");
+        goto error_out;
     }
 
     *store_mfn = page_array[1];
     *console_mfn = page_array[2];
     printf("store_mfn: 0x%lx, console_mfn: 0x%lx\n",
-	(u64)store_mfn, (u64)console_mfn);
+           (u64)store_mfn, (u64)console_mfn);
 
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, page_array[0]);
@@ -382,8 +377,8 @@ static int setup_guest(int xc_handle,
                        unsigned long shared_info_frame,
                        unsigned long flags,
                        unsigned int vcpus,
-		       unsigned int store_evtchn, unsigned long *store_mfn,
-		       unsigned int console_evtchn, unsigned long *console_mfn)
+                       unsigned int store_evtchn, unsigned long *store_mfn,
+                       unsigned int console_evtchn, unsigned long *console_mfn)
 {
     unsigned long *page_array = NULL;
     unsigned long count, i;
@@ -458,26 +453,26 @@ static int setup_guest(int xc_handle,
         if ( (v_end - vstack_end) < (512UL << 10) )
             v_end += 1UL << 22; /* Add extra 4MB to get >= 512kB padding. */
 #if defined(__i386__)
-	if (dsi.pae_kernel) {
-	    /* FIXME: assumes one L2 pgtable @ 0xc0000000 */
-	    if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT_PAE)-1)) >> 
-		   L2_PAGETABLE_SHIFT_PAE) + 2) <= nr_pt_pages )
-		break;
-	} else {
-	    if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
-		   L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
-		break;
-	}
+        if (dsi.pae_kernel) {
+            /* FIXME: assumes one L2 pgtable @ 0xc0000000 */
+            if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT_PAE)-1)) >> 
+                   L2_PAGETABLE_SHIFT_PAE) + 2) <= nr_pt_pages )
+                break;
+        } else {
+            if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
+                   L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
+                break;
+        }
 #endif
 #if defined(__x86_64__)
 #define NR(_l,_h,_s) \
     (((((_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) - \
     ((_l) & ~((1UL<<(_s))-1))) >> (_s))
-    if ( (1 + /* # L4 */
-        NR(dsi.v_start, v_end, L4_PAGETABLE_SHIFT) + /* # L3 */
-        NR(dsi.v_start, v_end, L3_PAGETABLE_SHIFT) + /* # L2 */
-        NR(dsi.v_start, v_end, L2_PAGETABLE_SHIFT))  /* # L1 */
-        <= nr_pt_pages )
+        if ( (1 + /* # L4 */
+              NR(dsi.v_start, v_end, L4_PAGETABLE_SHIFT) + /* # L3 */
+              NR(dsi.v_start, v_end, L3_PAGETABLE_SHIFT) + /* # L2 */
+              NR(dsi.v_start, v_end, L2_PAGETABLE_SHIFT))  /* # L1 */
+             <= nr_pt_pages )
             break;
 #endif
     }
@@ -541,7 +536,7 @@ static int setup_guest(int xc_handle,
                 goto error_out;
             }
             xc_copy_to_domain_page(xc_handle, dom,
-                                page_array[i>>PAGE_SHIFT], page);
+                                   page_array[i>>PAGE_SHIFT], page);
         }
     }
 
@@ -551,22 +546,22 @@ static int setup_guest(int xc_handle,
     /* setup page tables */
 #if defined(__i386__)
     if (dsi.pae_kernel)
-	rc = setup_pg_tables_pae(xc_handle, dom, ctxt,
-				 dsi.v_start, v_end,
-				 page_array, vpt_start, vpt_end);
+        rc = setup_pg_tables_pae(xc_handle, dom, ctxt,
+                                 dsi.v_start, v_end,
+                                 page_array, vpt_start, vpt_end);
     else {
-	rc = setup_pg_tables(xc_handle, dom, ctxt,
-			     dsi.v_start, v_end,
-			     page_array, vpt_start, vpt_end);
+        rc = setup_pg_tables(xc_handle, dom, ctxt,
+                             dsi.v_start, v_end,
+                             page_array, vpt_start, vpt_end);
     }
 #endif
 #if defined(__x86_64__)
     rc = setup_pg_tables_64(xc_handle, dom, ctxt,
-			    dsi.v_start, v_end,
-			    page_array, vpt_start, vpt_end);
+                            dsi.v_start, v_end,
+                            page_array, vpt_start, vpt_end);
 #endif
     if (0 != rc)
-	goto error_out;
+        goto error_out;
 
     /* Write the phys->machine and machine->phys table entries. */
     physmap_pfn = (vphysmap_start - dsi.v_start) >> PAGE_SHIFT;
@@ -576,11 +571,13 @@ static int setup_guest(int xc_handle,
 
     for ( count = 0; count < nr_pages; count++ )
     {
-        if ( xc_add_mmu_update(xc_handle, mmu,
-			       ((unsigned long long)page_array[count] << PAGE_SHIFT) | 
-			       MMU_MACHPHYS_UPDATE, count) )
+        if ( xc_add_mmu_update(
+            xc_handle, mmu,
+            ((u64)page_array[count] << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE,
+            count) )
         {
-            fprintf(stderr,"m2p update failure p=%lx m=%lx\n",count,page_array[count] ); 
+            fprintf(stderr,"m2p update failure p=%lx m=%lx\n",
+                    count, page_array[count]); 
             munmap(physmap, PAGE_SIZE);
             goto error_out;
         }
@@ -601,13 +598,13 @@ static int setup_guest(int xc_handle,
      * correct protection for the page
      */
     if (dsi.pae_kernel) {
-	if ( pin_table(xc_handle, MMUEXT_PIN_L3_TABLE,
-		       ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
-	    goto error_out;
+        if ( pin_table(xc_handle, MMUEXT_PIN_L3_TABLE,
+                       ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+            goto error_out;
     } else {
-	if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE,
-		       ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
-	    goto error_out;
+        if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE,
+                       ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+            goto error_out;
     }
 #endif
 
@@ -616,8 +613,8 @@ static int setup_guest(int xc_handle,
      * Pin down l4tab addr as page dir page - causes hypervisor to  provide
      * correct protection for the page
      */
-     if ( pin_table(xc_handle, MMUEXT_PIN_L4_TABLE,
-		    ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
+    if ( pin_table(xc_handle, MMUEXT_PIN_L4_TABLE,
+                   ctxt->ctrlreg[3] >> PAGE_SHIFT, dom) )
         goto error_out;
 #endif
 
@@ -703,12 +700,7 @@ int xc_linux_build(int xc_handle,
     unsigned long image_size, initrd_size=0;
     unsigned long vstartinfo_start, vkern_entry, vstack_start;
 
-#ifdef __ia64__
-    /* Current xen/ia64 allocates domU pages on demand */
-    if ( (nr_pages = xc_get_max_pages(xc_handle, domid)) < 0 )
-#else
-    if ( (nr_pages = xc_get_tot_pages(xc_handle, domid)) < 0 )
-#endif
+    if ( (nr_pages = get_tot_pages(xc_handle, domid)) < 0 )
     {
         PERROR("Could not find total pages for domain");
         goto error_out;
@@ -755,12 +747,7 @@ int xc_linux_build(int xc_handle,
         goto error_out;
     }
 
-    if ( !(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED) ||
-#ifdef __ia64__
-	0 )
-#else
-         (ctxt->ctrlreg[3] != 0) )
-#endif
+    if ( !(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED) || already_built(ctxt) )
     {
         ERROR("Domain is already constructed");
         goto error_out;
@@ -773,7 +760,7 @@ int xc_linux_build(int xc_handle,
                      op.u.getdomaininfo.shared_info_frame,
                      flags, vcpus,
                      store_evtchn, store_mfn,
-		     console_evtchn, console_mfn) < 0 )
+                     console_evtchn, console_mfn) < 0 )
     {
         ERROR("Error constructing guest OS");
         goto error_out;
@@ -789,12 +776,13 @@ int xc_linux_build(int xc_handle,
     /* based on new_thread in xen/arch/ia64/domain.c */
     ctxt->flags = 0;
     ctxt->shared.flags = flags;
-    ctxt->shared.start_info_pfn = nr_pages - 3; // metaphysical
+    ctxt->shared.start_info_pfn = nr_pages - 3; /* metaphysical */
     ctxt->regs.cr_ipsr = 0; /* all necessary bits filled by hypervisor */
     ctxt->regs.cr_iip = vkern_entry;
     ctxt->regs.cr_ifs = 1UL << 63;
     ctxt->regs.ar_fpsr = FPSR_DEFAULT;
-    /* ctxt->regs.r28 = dom_fw_setup(); currently done by hypervisor, should move here */
+    /* currently done by hypervisor, should move here */
+    /* ctxt->regs.r28 = dom_fw_setup(); */
     ctxt->vcpu.privregs = 0;
     ctxt->sys_pgnr = nr_pages - 3;
     i = 0; /* silence unused variable warning */
@@ -875,3 +863,13 @@ int xc_linux_build(int xc_handle,
 
     return -1;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

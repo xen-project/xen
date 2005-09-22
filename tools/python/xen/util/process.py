@@ -24,6 +24,8 @@ def runscript(cmd):
         r = p.poll()
         for (fd, event) in r:
             if event == select.POLLHUP:
+                cout.close()
+                cerr.close()
                 return stdout
             if fd == cout.fileno():
                 stdout = stdout + cout.readline()

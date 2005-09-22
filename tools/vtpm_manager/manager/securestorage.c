@@ -386,16 +386,16 @@ TPM_RESULT VTPM_LoadService(void) {
     
   }
   
+  vtpmloginfo(VTPM_LOG_VTPM, "Loaded saved state (dmis = %d).\n", dmis);
   goto egress;
   
  abort_egress:
-  vtpmlogerror(VTPM_LOG_VTPM, "Failed to save service data\n");
+  vtpmlogerror(VTPM_LOG_VTPM, "Failed to load service data with error = %s\n", tpm_get_error_name(status));
  egress:
   
   if (flat_global)
     free(flat_global);
   close(fh);
   
-  vtpmloginfo(VTPM_LOG_VTPM, "Previously saved state reloaded (status = %d, dmis = %d).\n", (int) status, dmis);
   return status;
 }

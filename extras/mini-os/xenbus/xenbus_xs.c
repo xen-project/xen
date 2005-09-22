@@ -127,7 +127,7 @@ static void *xs_talkv(enum xsd_sockmsg_type type,
 		return ERR_PTR(err);
 
 	for (i = 0; i < num_vecs; i++) {
-		err = xb_write(iovec[i].iov_base, iovec[i].iov_len);;
+		err = xb_write(iovec[i].iov_base, iovec[i].iov_len);
 		if (err)
 			return ERR_PTR(err);
 	}

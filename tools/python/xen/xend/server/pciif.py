@@ -13,16 +13,22 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
+
 
 import types
 
-import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
+import xen.lowlevel.xc;
 
 from xen.xend import sxp
 from xen.xend.XendError import VmError
 
-from controller import Dev, DevController
+from xen.xend.server.DevController import DevController
+
+
+xc = xen.lowlevel.xc.new()
+
 
 def parse_pci(val):
     """Parse a pci field.
@@ -36,41 +42,41 @@ def parse_pci(val):
         v = val
     return v
 
-class PciDev(Dev):
 
-    def __init__(self, controller, id, config, recreate=False):
-        Dev.__init__(self, controller, id, config, recreate=recreate)
-        bus = sxp.child_value(self.config, 'bus')
-        if not bus:
-            raise VmError('pci: Missing bus')
-        dev = sxp.child_value(self.config, 'dev')
-        if not dev:
-            raise VmError('pci: Missing dev')
-        func = sxp.child_value(self.config, 'func')
-        if not func:
-            raise VmError('pci: Missing func')
-        try:
-            bus = parse_pci(bus)
-            dev = parse_pci(dev)
-            func = parse_pci(func)
-        except:
-            raise VmError('pci: invalid parameter')
+class PciController(DevController):
 
-    def attach(self, recreate=False, change=False):
-        rc = xc.physdev_pci_access_modify(dom    = self.getDomain(),
+    def __init__(self, vm):
+        DevController.__init__(self, vm)
+
+
+    def getDeviceDetails(self, config):
+        """@see DevController.getDeviceDetails"""
+
+        def get_param(field):
+            try:
+                val = sxp.child_value(config, field)
+
+                if not val:
+                    raise VmError('pci: Missing %s config setting' % field)
+
+                return parse_pci(val)
+            except:
+                raise VmError('pci: Invalid config setting %s: %s' %
+                              (field, val))
+        
+        bus  = get_param('bus')
+        dev  = get_param('dev')
+        func = get_param('func')
+
+        rc = xc.physdev_pci_access_modify(dom    = self.getDomid(),
                                           bus    = bus,
                                           dev    = dev,
                                           func   = func,
                                           enable = True)
         if rc < 0:
             #todo non-fatal
-            raise VmError('pci: Failed to configure device: bus=%s dev=%s func=%s' %
-                          (bus, dev, func))
+            raise VmError(
+                'pci: Failed to configure device: bus=%s dev=%s func=%s' %
+                (bus, dev, func))
 
-    def destroy(self, change=False, reboot=False):
-        pass
-
-class PciController(DevController):
-
-    def newDevice(self, id, config, recreate=False):
-        return PciDev(self, id, config, recreate=recreate)
+        return (dev, {}, {})

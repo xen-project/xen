@@ -98,11 +98,14 @@ clean::
 	$(MAKE) -C tools clean
 	$(MAKE) -C docs clean
 
-# clean, but blow away kernel build tree plus tar balls
-mrproper: clean
+# clean, but blow away kernel build tree plus tarballs
+distclean: clean
 	rm -rf dist patches/tmp
 	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
 	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-mrproper ; done
+
+# Linux name for GNU distclean
+mrproper: distclean
 
 install-logging: LOGGING=logging-0.4.9.2
 install-logging:
@@ -142,7 +145,7 @@ help:
 	@echo 'Cleaning targets:'
 	@echo '  clean            - clean the Xen, tools and docs (but not'
 	@echo '                     guest kernel) trees'
-	@echo '  mrproper         - clean plus delete kernel tarballs and kernel'
+	@echo '  distclean        - clean plus delete kernel tarballs and kernel'
 	@echo '                     build trees'
 	@echo '  kdelete          - delete guest kernel build trees'
 	@echo '  kclean           - clean guest kernel build trees'
@@ -163,27 +166,25 @@ uninstall: D=$(DESTDIR)
 uninstall:
 	[ -d $(D)/etc/xen ] && mv -f $(D)/etc/xen $(D)/etc/xen.old-`date +%s`
 	rm -rf $(D)/etc/init.d/xend*
-	rm -rf $(D)/usr/$(LIBDIR)/libxc* $(D)/usr/$(LIBDIR)/libxutil*
-	rm -rf $(D)/usr/$(LIBDIR)/python/xen $(D)/usr/include/xen
-	rm -rf $(D)/usr/$(LIBDIR)/share/xen $(D)/usr/$(LIBDIR)/libxenstore*
+	rm -rf $(D)/etc/hotplug/xen-backend.agent
 	rm -rf $(D)/var/run/xen* $(D)/var/lib/xen*
-	rm -rf $(D)/usr/include/xcs_proto.h $(D)/usr/include/xc.h
-	rm -rf $(D)/usr/include/xs_lib.h $(D)/usr/include/xs.h
-	rm -rf $(D)/usr/sbin/xcs $(D)/usr/sbin/xcsdump $(D)/usr/sbin/xen*
-	rm -rf $(D)/usr/sbin/netfix
-	rm -rf $(D)/usr/sbin/xfrd $(D)/usr/sbin/xm
-	rm -rf $(D)/usr/share/doc/xen  $(D)/usr/man/man*/xentrace*
-	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/miniterm
 	rm -rf $(D)/boot/*xen*
 	rm -rf $(D)/lib/modules/*xen*
+	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/lomount
 	rm -rf $(D)/usr/bin/cpuperf-perfcntr $(D)/usr/bin/cpuperf-xen
 	rm -rf $(D)/usr/bin/xc_shadow
-	rm -rf $(D)/usr/share/xen $(D)/usr/libexec/xen
+	rm -rf $(D)/usr/include/xenctrl.h
+	rm -rf $(D)/usr/include/xs_lib.h $(D)/usr/include/xs.h
+	rm -rf $(D)/usr/include/xen
+	rm -rf $(D)/usr/$(LIBDIR)/libxenctrl* $(D)/usr/$(LIBDIR)/libxenguest*
+	rm -rf $(D)/usr/$(LIBDIR)/libxenstore*
+	rm -rf $(D)/usr/$(LIBDIR)/python/xen $(D)/usr/$(LIBDIR)/xen 
+	rm -rf $(D)/usr/libexec/xen
+	rm -rf $(D)/usr/sbin/xen* $(D)/usr/sbin/netfix $(D)/usr/sbin/xm
+	rm -rf $(D)/usr/share/doc/xen
+	rm -rf $(D)/usr/share/xen
 	rm -rf $(D)/usr/share/man/man1/xen*
 	rm -rf $(D)/usr/share/man/man8/xen*
-	rm -rf $(D)/usr/lib/xen
-	rm -rf $(D)/etc/hotplug.d/xen-backend
-	rm -rf $(D)/etc/hotplug/xen-backend.agent
 
 # Legacy targets for compatibility
 linux24:

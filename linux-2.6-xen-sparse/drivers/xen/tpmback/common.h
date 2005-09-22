@@ -11,10 +11,10 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <asm-xen/evtchn.h>
+#include <asm-xen/driver_util.h>
 #include <asm-xen/xen-public/io/tpmif.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
-#include <asm-xen/xen-public/io/domain_controller.h>
 
 #if 0
 #define ASSERT(_p) \
@@ -34,12 +34,12 @@ typedef struct tpmif_st {
 	unsigned int handle;
 
 	/* Physical parameters of the comms window. */
-	unsigned long tx_shmem_frame;
 	unsigned int evtchn;
 	unsigned int remote_evtchn;
 
 	/* The shared rings and indexes. */
 	tpmif_tx_interface_t *tx;
+	struct vm_struct *tx_area;
 
 	/* Miscellaneous private stuff. */
 	enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
@@ -55,9 +55,7 @@ typedef struct tpmif_st {
 	struct work_struct work;
 
 	u16 shmem_handle;
-	unsigned long shmem_vaddr;
 	grant_ref_t shmem_ref;
-
 } tpmif_t;
 
 void tpmif_disconnect_complete(tpmif_t * tpmif);
@@ -86,3 +84,13 @@ extern int num_frontends;
 #define MMAP_VADDR(t,_req) ((t)->mmap_vstart + ((_req) * PAGE_SIZE))
 
 #endif /* __TPMIF__BACKEND__COMMON_H__ */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

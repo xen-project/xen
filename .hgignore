@@ -86,6 +86,9 @@
 ^tools/check/\..*$
 ^tools/console/xenconsoled$
 ^tools/console/xenconsole$
+^tools/debugger/gdb/gdb-6\.2\.1\.tar\.bz2$
+^tools/debugger/gdb/gdb-6\.2\.1/.*$
+^tools/debugger/gdb/gdb-6\.2\.1-linux-i386-xen/.*$
 ^tools/debugger/pdb/pdb$
 ^tools/debugger/pdb/linux-[0-9.]*-module/.*\.ko$
 ^tools/debugger/pdb/linux-[0-9.]*-module/.*\.mod.c$
@@ -136,9 +139,10 @@
 ^tools/vnet/vnet-module/\..*\.cmd$
 ^tools/vnet/vnet-module/\.tmp_versions/.*$
 ^tools/vnet/vnet-module/vnet_module\.mod\..*$
-^tools/vtpm/vtpm*
-^tools/vtpm/tpm_emulator-*
-^tools/vtpm_manager/manager/vtpm_managerd
+^tools/vtpm/tpm_emulator/.*$
+^tools/vtpm/tpm_emulator-.*\.tar\.gz$
+^tools/vtpm/vtpm/.*$
+^tools/vtpm_manager/manager/vtpm_managerd$
 ^tools/xcutils/xc_restore$
 ^tools/xcutils/xc_save$
 ^tools/xenstat/xentop/xentop$
@@ -156,6 +160,7 @@
 ^tools/xenstore/xs_stress$
 ^tools/xenstore/xs_test$
 ^tools/xenstore/xs_watch_stress$
+^tools/xentrace/xenctx$
 ^tools/xentrace/xentrace$
 ^xen/BLOG$
 ^xen/TAGS$

@@ -36,7 +36,7 @@ class XendNode:
     def reboot(self):
         return 0
 
-    def notify(self, uri):
+    def notify(self, _):
         return 0
     
     def cpu_bvt_slice_set(self, ctx_allow):

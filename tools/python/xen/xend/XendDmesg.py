@@ -18,7 +18,6 @@
 """Get dmesg output for this node.
 """
 
-import os
 import xen.lowlevel.xc
 
 class XendDmesg:

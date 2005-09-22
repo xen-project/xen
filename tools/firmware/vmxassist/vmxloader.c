@@ -27,6 +27,7 @@
 #ifdef _ACPI_
 #include "acpi.h"
 #include "../acpi/acpi2_0.h"  // for ACPI_PHYSICAL_ADDRESS
+int acpi_madt_update(unsigned char* acpi_start);
 #endif
 
 
@@ -110,7 +111,10 @@ main()
 	}
 #ifdef _ACPI_
 	puts("Loading ACPI ...\n");
-	if (ACPI_PHYSICAL_ADDRESS+sizeof(acpi) <= 0xF0000 ){
+
+	acpi_madt_update(acpi);
+
+	if (ACPI_PHYSICAL_ADDRESS+sizeof(acpi) <= 0xF0000) {
 		/* make sure acpi table does not overlap rombios
  		 * currently acpi less than 8K will be OK.
 		 */

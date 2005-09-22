@@ -86,9 +86,6 @@ def main():
     daemon = SrvDaemon.instance()
     if not sys.argv[1:]:
         print 'usage: %s {start|stop|restart}' % sys.argv[0]
-    elif os.fork():
-        pid, status = os.wait()
-        return status >> 8
     elif sys.argv[1] == 'start':
         start_xenstored()
         start_consoled()

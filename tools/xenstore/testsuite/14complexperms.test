@@ -12,13 +12,7 @@ dir /dir/file
 expect *Permission denied
 read /dir/file 
 expect *Permission denied
-write /dir/file none value 
-expect *Permission denied
-write /dir/file create value 
-expect *Permission denied
-write /dir/file excl value 
-expect write failed: Invalid argument
-write /dir/file crap value 
+write /dir/file value 
 expect *Permission denied
 mkdir /dir/file 
 expect *Permission denied
@@ -29,8 +23,9 @@ expect *Permission denied
 getperm /dir/file 
 expect *Permission denied
 setperm /dir/file 0 NONE 
-watch /dir/file token 
-1 write /dir/file create contents
+# We get no watch event when there's no permission.  It's a corner case.
+watchnoack /dir/file token 
+1 write /dir/file contents
 1 rm /dir/file
 expect waitwatch failed: Connection timed out
 waitwatch
@@ -50,7 +45,7 @@ introduce 2 100 7 /dir/file
 
 # Now it exists
 setid 0
-write /dir/file create contents
+write /dir/file contents
 
 setid 1
 expect *Permission denied
@@ -58,13 +53,7 @@ dir /dir/file
 expect *Permission denied
 read /dir/file 
 expect *Permission denied
-write /dir/file none value 
-expect *Permission denied
-write /dir/file create value 
-expect *Permission denied
-write /dir/file excl value 
-expect write failed: Invalid argument
-write /dir/file crap value 
+write /dir/file value 
 expect *Permission denied
 mkdir /dir/file 
 expect *Permission denied
@@ -75,8 +64,8 @@ expect *Permission denied
 getperm /dir/file 
 expect *Permission denied
 setperm /dir/file 0 NONE 
-watch /dir/file token 
-1 write /dir/file create contents
+watchnoack /dir/file token 
+1 write /dir/file contents
 1 rm /dir/file
 expect waitwatch failed: Connection timed out
 waitwatch

@@ -36,13 +36,12 @@ struct ring_head
 
 static inline struct ring_head *outring(void)
 {
-	return machine_to_virt(xen_start_info->console_mfn << PAGE_SHIFT);
+	return mfn_to_virt(xen_start_info->console_mfn);
 }
 
 static inline struct ring_head *inring(void)
 {
-	return machine_to_virt(xen_start_info->console_mfn << PAGE_SHIFT)
-		+ PAGE_SIZE/2;
+	return mfn_to_virt(xen_start_info->console_mfn) + PAGE_SIZE/2;
 }
 
 
@@ -126,3 +125,13 @@ void xencons_resume(void)
 
 	(void)xencons_ring_init();
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

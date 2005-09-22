@@ -12,7 +12,7 @@ DOXYGEN		:= doxygen
 
 pkgdocdir	:= /usr/share/doc/xen
 
-DOC_TEX		:= $(wildcard src/*.tex)
+DOC_TEX		:= src/user.tex src/interface.tex
 DOC_PS		:= $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
 DOC_PDF		:= $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
 DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
@@ -36,11 +36,12 @@ html:
 	$(MAKE) $(DOC_HTML); fi
 
 python-dev-docs:
-	mkdir -p api/tools/python
+	@mkdir -v -p api/tools/python
 	@if which $(DOXYGEN) 1>/dev/null 2>/dev/null; then         \
         echo "Running doxygen to generate Python tools APIs ... "; \
 	$(DOXYGEN) Doxyfile;                                       \
-	$(MAKE) -C api/tools/python/latex ; fi
+	$(MAKE) -C api/tools/python/latex ; else                   \
+        echo "Doxygen not installed; skipping python-dev-docs."; fi
 
 clean:
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 

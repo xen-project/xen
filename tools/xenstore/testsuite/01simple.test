@@ -1,4 +1,4 @@
 # Create an entry, read it.
-write /test create contents
+write /test contents
 expect contents
 read /test

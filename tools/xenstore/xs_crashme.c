@@ -267,17 +267,12 @@ static void do_next_op(struct xs_handle *h, bool verbose)
 		free(xs_read(h, name, &num));
 		break;
 	case 2: {
-		int flags = random_flags(&state);
 		char *contents = talloc_asprintf(NULL, "%i",
 						 get_randomness(&state));
 		unsigned int len = get_randomness(&state)%(strlen(contents)+1);
 		if (verbose)
-			printf("WRITE %s %s %.*s\n", name,
-			       flags == O_CREAT ? "O_CREAT" 
-			       : flags == (O_CREAT|O_EXCL) ? "O_CREAT|O_EXCL"
-			       : flags == 0 ? "0" : "CRAPFLAGS",
-			       len, contents);
-		xs_write(h, name, contents, len, flags);
+			printf("WRITE %s %.*s\n", name, len, contents);
+		xs_write(h, name, contents, len);
 		break;
 	}
 	case 3:

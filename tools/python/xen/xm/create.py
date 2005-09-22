@@ -109,7 +109,7 @@ gopts.var('vncviewer', val='no|yes',
           The address of the vncviewer is passed to the domain on the kernel command
           line using 'VNC_SERVER=<host>:<port>'. The port used by vnc is 5500 + DISPLAY.
           A display value with a free port is chosen if possible.
-	  Only valid when vnc=1.
+          Only valid when vnc=1.
           """)
 
 gopts.var('name', val='NAME',
@@ -141,7 +141,7 @@ gopts.var('memory', val='MEMORY',
           use="Domain memory in MB.")
 
 gopts.var('ssidref', val='SSIDREF',
-          fn=set_u32, default=-1, 
+          fn=set_u32, default=0, 
           use="Security Identifier.")
 
 gopts.var('maxmem', val='MEMORY',
@@ -342,7 +342,7 @@ def strip(pre, s):
     else:
         return s
 
-def configure_image(opts, config, vals):
+def configure_image(opts, vals):
     """Create the image config.
     """
     config_image = [ vals.builder ]
@@ -359,8 +359,7 @@ def configure_image(opts, config, vals):
         config_image.append(['args', vals.extra])
     if vals.vcpus:
         config_image.append(['vcpus', vals.vcpus])
-    config.append(['image', config_image ])
-
+    return config_image
     
 def configure_disks(opts, config_devs, vals):
     """Create the config for disks (virtual block devices).
@@ -494,17 +493,17 @@ def configure_vfr(opts, config, vals):
          config_vfr.append(['vif', ['id', idx], ['ip', ip]])
      config.append(config_vfr)
 
-def configure_vmx(opts, config_devs, vals):
+def configure_vmx(opts, config_image, vals):
     """Create the config for VMX devices.
     """
-    args = [ 'memmap', 'device_model', 'cdrom',
- 	     'boot', 'fda', 'fdb', 'localtime', 'serial', 'macaddr', 'stdvga', 
-             'isa', 'nographic', 'vnc', 'vncviewer', 'sdl', 'display']	  
+    args = [ 'memmap', 'device_model', 'vcpus', 'cdrom',
+             'boot', 'fda', 'fdb', 'localtime', 'serial', 'macaddr', 'stdvga', 
+             'isa', 'nographic', 'vnc', 'vncviewer', 'sdl', 'display']
     for a in args:
-	if (vals.__dict__[a]):
-    	    config_devs.append([a, vals.__dict__[a]])
+        if (vals.__dict__[a]):
+            config_image.append([a, vals.__dict__[a]])
 
-def run_bootloader(opts, config, vals):
+def run_bootloader(opts, vals):
     if not os.access(vals.bootloader, os.X_OK):
         opts.err("Bootloader isn't executable")
     if len(vals.disk) < 1:
@@ -512,11 +511,8 @@ def run_bootloader(opts, config, vals):
     (uname, dev, mode, backend) = vals.disk[0]
     file = blkif.blkdev_uname_to_file(uname)
 
-    blcfg = bootloader(vals.bootloader, file, not vals.console_autoconnect,
-                       vals.vcpus, vals.blentry)
-
-    config.append(['bootloader', vals.bootloader])
-    config.append(blcfg)
+    return bootloader(vals.bootloader, file, not vals.console_autoconnect,
+                      vals.vcpus, vals.blentry)
 
 def make_config(opts, vals):
     """Create the domain configuration.
@@ -542,16 +538,19 @@ def make_config(opts, vals):
         config.append(['restart', vals.restart])
 
     if vals.bootloader:
-        run_bootloader(opts, config, vals)
+        config.append(['bootloader', vals.bootloader])
+        config_image = run_bootloader(opts, vals)
     else:
-        configure_image(opts, config, vals)
+        config_image = configure_image(opts, vals)
+    configure_vmx(opts, config_image, vals)
+    config.append(['image', config_image ])
+
     config_devs = []
     configure_disks(opts, config_devs, vals)
     configure_pci(opts, config_devs, vals)
     configure_vifs(opts, config_devs, vals)
     configure_usb(opts, config_devs, vals)
     configure_vtpm(opts, config_devs, vals)
-    configure_vmx(opts, config_devs, vals)
     config += config_devs
 
     return config
@@ -673,7 +672,7 @@ def choose_vnc_display():
             # Local port is field 3.
             y = x.split()[3]
             # Field is addr:port, split off the port.
-            y = y.split(':')[1]
+            y = y.split(':')[-1]
             r.append(int(y))
         return r
 

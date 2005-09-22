@@ -87,7 +87,7 @@ class XendRoot:
 
     dom0_min_mem_default = '0'
 
-    dom0_cpus_default = '0'
+    dom0_vcpus_default = '0'
 
     components = {}
 
@@ -332,8 +332,8 @@ class XendRoot:
     def get_dom0_min_mem(self):
         return self.get_config_int('dom0-min-mem', self.dom0_min_mem_default)
 
-    def get_dom0_cpus(self):
-        return self.get_config_int('dom0-cpus', self.dom0_cpus_default)
+    def get_dom0_vcpus(self):
+        return self.get_config_int('dom0-cpus', self.dom0_vcpus_default)
 
 def instance():
     """Get an instance of XendRoot.

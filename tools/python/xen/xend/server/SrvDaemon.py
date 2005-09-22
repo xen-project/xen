@@ -25,7 +25,6 @@ from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
 from xen.xend import XendRoot; xroot = XendRoot.instance()
 
-import controller
 import event
 import relocate
 from params import *
@@ -137,13 +136,6 @@ class Daemon:
         else:
             return 0
 
-    def onSIGCHLD(self, signum, frame):
-        if self.child > 0: 
-            try: 
-                pid, sts = os.waitpid(self.child, os.WNOHANG)
-            except os.error, ex:
-                pass
-
     def fork_pid(self, pidfile):
         """Fork and write the pid of the child to 'pidfile'.
 
@@ -200,15 +192,29 @@ class Daemon:
             # Trying to run an already-running service is a success.
             return 0
 
-        signal.signal(signal.SIGCHLD, self.onSIGCHLD)
+        ret = 0
+
+        # we use a pipe to communicate between the parent and the child process
+        # this way we know when the child has actually initialized itself so
+        # we can avoid a race condition during startup
+        
+        r,w = os.pipe()
         if self.fork_pid(XEND_PID_FILE):
-            #Parent. Sleep to give child time to start.
-            time.sleep(1)
+            os.close(w)
+            r = os.fdopen(r, 'r')
+            s = r.read()
+            r.close()
+            if not len(s):
+                ret = 1
+            else:
+                ret = int(s)
         else:
+            os.close(r)
             # Child
             self.tracing(trace)
-            self.run()
-        return 0
+            self.run(os.fdopen(w, 'w'))
+
+        return ret
 
     def tracing(self, traceon):
         """Turn tracing on or off.
@@ -290,20 +296,21 @@ class Daemon:
     def stop(self):
         return self.cleanup(kill=True)
 
-    def run(self):
-        _enforce_dom0_cpus()
+    def run(self, status):
         try:
             log.info("Xend Daemon started")
             event.listenEvent(self)
             relocate.listenRelocation()
             servers = SrvServer.create()
             self.daemonize()
-            servers.start()
+            servers.start(status)
         except Exception, ex:
             print >>sys.stderr, 'Exception starting xend:', ex
             if XEND_DEBUG:
                 traceback.print_exc()
             log.exception("Exception starting xend (%s)" % ex)
+            status.write('1')
+            status.close()
             self.exit(1)
             
     def exit(self, rc=0):
@@ -313,32 +320,6 @@ class Daemon:
         # way to exit a Python with running threads.
         #sys.exit(rc)
         os._exit(rc)
-
-def _enforce_dom0_cpus():
-    dn = xroot.get_dom0_cpus()
-
-    for d in glob.glob("/sys/devices/system/cpu/cpu*"):
-        cpu = int(os.path.basename(d)[3:])
-        if (dn == 0) or (cpu < dn):
-            v = "1"
-        else:
-            v = "0"
-        try:
-            f = open("%s/online" %d, "r+")
-            c = f.read(1)
-            if (c != v):
-                if v == "0":
-                    log.info("dom0 is trying to give back cpu %d", cpu)
-                else:
-                    log.info("dom0 is trying to take cpu %d", cpu)
-                f.seek(0)
-                f.write(v)
-                f.close()
-                log.info("dom0 successfully enforced cpu %d", cpu)
-            else:
-                f.close()
-        except:
-            pass
 
 def instance():
     global inst

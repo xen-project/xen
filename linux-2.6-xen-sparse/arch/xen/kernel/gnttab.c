@@ -182,14 +182,14 @@ gnttab_end_foreign_access(grant_ref_t ref, int readonly)
 }
 
 int
-gnttab_grant_foreign_transfer(domid_t domid, unsigned long pfn)
+gnttab_grant_foreign_transfer(domid_t domid)
 {
     int ref;
 
     if ( unlikely((ref = get_free_entry()) == -1) )
         return -ENOSPC;
 
-    shared[ref].frame = pfn;
+    shared[ref].frame = 0;
     shared[ref].domid = domid;
     wmb();
     shared[ref].flags = GTF_accept_transfer;
@@ -198,10 +198,9 @@ gnttab_grant_foreign_transfer(domid_t domid, unsigned long pfn)
 }
 
 void
-gnttab_grant_foreign_transfer_ref(grant_ref_t ref, domid_t domid,
-				  unsigned long pfn)
+gnttab_grant_foreign_transfer_ref(grant_ref_t ref, domid_t domid)
 {
-    shared[ref].frame = pfn;
+    shared[ref].frame = 0;
     shared[ref].domid = domid;
     wmb();
     shared[ref].flags = GTF_accept_transfer;

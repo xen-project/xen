@@ -961,14 +961,19 @@ static char *tempdir(struct connection *conn,
 	return dir;
 }
 
-/* path, flags, data... */
+static bool node_exists(struct connection *conn, const char *node)
+{
+	struct stat st;
+
+	return lstat(node_dir(conn->transaction, node), &st) == 0;
+}
+
+/* path, data... */
 static void do_write(struct connection *conn, struct buffered_data *in)
 {
 	unsigned int offset, datalen;
-	char *vec[2];
+	char *vec[1] = { NULL }; /* gcc4 + -W + -Werror fucks code. */
 	char *node, *tmppath;
-	enum xs_perm_type mode;
-	struct stat st;
 
 	/* Extra "strings" can be created by binary data. */
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
@@ -985,37 +990,20 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 	if (transaction_block(conn, node))
 		return;
 
-	offset = strlen(vec[0]) + strlen(vec[1]) + 2;
+	offset = strlen(vec[0]) + 1;
 	datalen = in->used - offset;
 
-	if (streq(vec[1], XS_WRITE_NONE))
-		mode = XS_PERM_WRITE;
-	else if (streq(vec[1], XS_WRITE_CREATE))
-		mode = XS_PERM_WRITE|XS_PERM_ENOENT_OK;
-	else if (streq(vec[1], XS_WRITE_CREATE_EXCL))
-		mode = XS_PERM_WRITE|XS_PERM_ENOENT_OK;
-	else {
-		send_error(conn, EINVAL);
-		return;
-	}
-
-	if (!check_node_perms(conn, node, mode)) {
+	if (!check_node_perms(conn, node, XS_PERM_WRITE|XS_PERM_ENOENT_OK)) {
 		send_error(conn, errno);
 		return;
 	}
 
-	if (lstat(node_dir(conn->transaction, node), &st) != 0) {
+	if (!node_exists(conn, node)) {
 		char *dir;
 
 		/* Does not exist... */
 		if (errno != ENOENT) {
 			send_error(conn, errno);
-			return;
-		}
-
-		/* Not going to create it? */
-		if (streq(vec[1], XS_WRITE_NONE)) {
-			send_error(conn, ENOENT);
 			return;
 		}
 
@@ -1027,11 +1015,6 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 		
 	} else {
 		/* Exists... */
-		if (streq(vec[1], XS_WRITE_CREATE_EXCL)) {
-			send_error(conn, EEXIST);
-			return;
-		}
-
 		tmppath = tempfile(node_datafile(conn->transaction, node),
 				   in->buffer + offset, datalen);
 		if (!tmppath) {
@@ -1050,7 +1033,6 @@ static void do_write(struct connection *conn, struct buffered_data *in)
 static void do_mkdir(struct connection *conn, const char *node)
 {
 	char *dir;
-	struct stat st;
 
 	node = canonicalize(conn, node);
 	if (!check_node_perms(conn, node, XS_PERM_WRITE|XS_PERM_ENOENT_OK)) {
@@ -1066,9 +1048,9 @@ static void do_mkdir(struct connection *conn, const char *node)
 	if (transaction_block(conn, node))
 		return;
 
-	/* Must not already exist. */
-	if (lstat(node_dir(conn->transaction, node), &st) == 0) {
-		send_error(conn, EEXIST);
+	/* If it already exists, fine. */
+	if (node_exists(conn, node)) {
+		send_ack(conn, XS_MKDIR);
 		return;
 	}
 
@@ -1089,6 +1071,15 @@ static void do_rm(struct connection *conn, const char *node)
 
 	node = canonicalize(conn, node);
 	if (!check_node_perms(conn, node, XS_PERM_WRITE)) {
+		/* Didn't exist already?  Fine, if parent exists. */
+		if (errno == ENOENT) {
+			if (node_exists(conn, get_parent(node))) {
+				send_ack(conn, XS_RM);
+				return;
+			}
+			/* Restore errno, just in case. */
+			errno = ENOENT;
+		}
 		send_error(conn, errno);
 		return;
 	}

@@ -13,6 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
 """General pretty-printer, including support for SXP.
@@ -34,11 +35,11 @@ class PrettyItem:
     def get_width(self):
         return self.width
 
-    def output(self, out):
+    def output(self, _):
         print '***PrettyItem>output>', self
         pass
 
-    def prettyprint(self, out, width):
+    def prettyprint(self, _, width):
         print '***PrettyItem>prettyprint>', self
         return width
 
@@ -51,7 +52,7 @@ class PrettyString(PrettyItem):
     def output(self, out):
         out.write(self.value)
 
-    def prettyprint(self, line):
+    def prettyprint(self, line, _):
         line.output(self)
 
     def show(self, out):
@@ -62,7 +63,7 @@ class PrettySpace(PrettyItem):
     def output(self, out):
         out.write(' ' * self.width)
 
-    def prettyprint(self, line):
+    def prettyprint(self, line, _):
         line.output(self)
 
     def show(self, out):
@@ -79,7 +80,7 @@ class PrettyBreak(PrettyItem):
     def output(self, out):
         out.write(' ' * self.width)
 
-    def prettyprint(self, line):
+    def prettyprint(self, line, _):
         if line.breaks(self.space):
             self.active = 1
             line.newline(self.indent)
@@ -88,26 +89,20 @@ class PrettyBreak(PrettyItem):
 
     def show(self, out):
         print >> out, ("(break (width %d) (indent %d) (space %d) (active %d))"
-                       % (self.width, self.indent, self.space, self.lspace, self.active))
+                       % (self.width, self.indent, self.space, self.active))
 
 class PrettyNewline(PrettySpace):
-
-    def __init__(self, indent):
-        PrettySpace.__init__(self, indent)
 
     def insert(self, block):
         block.newline()
         block.addtoline(self)
 
-    def output(self, out):
-        out.write(' ' * self.width)
-
-    def prettyprint(self, line):
+    def prettyprint(self, line, _):
         line.newline(0)
         line.output(self)
 
     def show(self, out):
-        print >> out, ("(nl (indent %d))" % self.indent)
+        print >> out, ("(nl (width %d))" % self.width)
 
 class PrettyLine(PrettyItem):
     def __init__(self):
@@ -132,7 +127,7 @@ class PrettyLine(PrettyItem):
             lastbreak.space = (width - lastwidth)
         self.width = width
  
-    def prettyprint(self, line):
+    def prettyprint(self, line, _):
         for x in self.content:
             x.prettyprint(line)
 
@@ -145,7 +140,8 @@ class PrettyLine(PrettyItem):
 class PrettyBlock(PrettyItem):
 
     def __init__(self, all=0, parent=None):
-        self.width = 0
+        PrettyItem.__init__(self, 0)
+
         self.lines = []
         self.parent = parent
         self.indent = 0
@@ -163,7 +159,7 @@ class PrettyBlock(PrettyItem):
             if self.width < l.width:
                 self.width = l.width
 
-    def breaks(self, n):
+    def breaks(self, _):
         return self.all and self.broken
 
     def newline(self):
@@ -172,7 +168,7 @@ class PrettyBlock(PrettyItem):
     def addtoline(self, x):
         self.lines[-1].write(x)
 
-    def prettyprint(self, line):
+    def prettyprint(self, line, _):
         self.indent = line.used
         line.block = self
         if not line.fits(self.width):
@@ -191,6 +187,7 @@ class PrettyBlock(PrettyItem):
 class Line:
 
     def __init__(self, out, width):
+        self.block = None
         self.out = out
         self.width = width
         self.used = 0
@@ -255,8 +252,7 @@ class PrettyPrinter:
         self.block = self.block.parent
 
     def prettyprint(self, out=sys.stdout):
-        line = Line(out, self.width)
-        self.top.prettyprint(line)
+        self.top.prettyprint(Line(out, self.width))
 
 class SXPPrettyPrinter(PrettyPrinter):
     """An SXP prettyprinter.

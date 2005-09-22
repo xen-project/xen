@@ -3,7 +3,7 @@
 # Create a domain, write an entry.
 expect handle is 1
 introduce 1 100 7 /my/home
-1 write /entry1 create contents
+1 write /entry1 contents
 expect entry1
 expect tool
 dir /

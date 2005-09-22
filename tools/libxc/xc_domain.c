@@ -265,7 +265,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned int address_bits,
-					  unsigned long *extent_start)
+                                          unsigned long *extent_start)
 {
     int err;
     struct xen_memory_reservation reservation = {
@@ -296,7 +296,7 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
                                           u32 domid, 
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
-					  unsigned long *extent_start)
+                                          unsigned long *extent_start)
 {
     int err;
     struct xen_memory_reservation reservation = {
@@ -328,3 +328,13 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
 
     return err;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

@@ -26,7 +26,7 @@ struct ops
 	void *(*read)(void *h, const char *path, unsigned int *len);
 
 	bool (*write)(void *h, const char *path, const void *data,
-		      unsigned int len, int createflags);
+		      unsigned int len);
 
 	bool (*mkdir)(void *h, const char *path);
 
@@ -74,9 +74,9 @@ static void convert_to_dir(const char *dirname)
 static void maybe_convert_to_directory(const char *filename)
 {
 	struct stat st;
-	char *dirname = talloc_asprintf(filename, "%.*s", 
-					strrchr(filename, '/') - filename,
-					filename);
+	char *dirname = talloc_asprintf(
+		filename, "%.*s",
+		(int)(strrchr(filename, '/') - filename), filename);
 	if (lstat(dirname, &st) == 0 && S_ISREG(st.st_mode))
 		convert_to_dir(dirname);
 }
@@ -249,7 +249,7 @@ static void init_perms(const char *filename)
 
 	/* Copy permissions from parent */
 	command = talloc_asprintf(filename, "cp %.*s/.perms %s",
-				  strrchr(filename, '/') - filename,
+				  (int)(strrchr(filename, '/') - filename),
 				  filename, permfile);
 	do_command(command);
 }	
@@ -308,7 +308,7 @@ static char *parent_filename(const char *name)
 	char *slash = strrchr(name + 1, '/');
 	if (!slash)
 		return talloc_strdup(name, "/");
-	return talloc_asprintf(name, "%.*s", slash-name, name);
+	return talloc_asprintf(name, "%.*s", (int)(slash-name), name);
 }
 
 static void make_dirs(const char *filename)
@@ -333,40 +333,18 @@ static void make_dirs(const char *filename)
 
 static bool file_write(struct file_ops_info *info,
 		       const char *path, const void *data,
-		       unsigned int len, int createflags)
+		       unsigned int len)
 {
 	char *filename = filename_to_data(path_to_name(info, path));
 	int fd;
 
-	/* Kernel isn't strict, but library is. */
-	if (createflags & ~(O_CREAT|O_EXCL)) {
-		errno = EINVAL;
-		return false;
-	}
-
 	if (!write_ok(info, path))
 		return false;
 
-	/* We regard it as existing if dir exists. */
-	if (strends(filename, ".DATA")) {
-		if (!createflags)
-			createflags = O_CREAT;
-		if (createflags & O_EXCL) {
-			errno = EEXIST;
-			return false;
-		}
-	}
-
-	if (createflags & O_CREAT)
-		make_dirs(parent_filename(filename));
-
-	fd = open(filename, createflags|O_TRUNC|O_WRONLY, 0600);
-	if (fd < 0) {
-		/* FIXME: Another hack. */
-		if (!(createflags & O_CREAT) && errno == EISDIR)
-			errno = EEXIST;
+	make_dirs(parent_filename(filename));
+	fd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0600);
+	if (fd < 0)
 		return false;
-	}
 
 	if (write(fd, data, len) != (int)len)
 		barf_perror("Bad write to %s", filename);
@@ -385,7 +363,7 @@ static bool file_mkdir(struct file_ops_info *info, const char *path)
 
 	make_dirs(parent_filename(dirname));
 	if (mkdir(dirname, 0700) != 0)
-		return false;
+		return (errno == EEXIST);
 
 	init_perms(dirname);
 	return true;
@@ -401,8 +379,11 @@ static bool file_rm(struct file_ops_info *info, const char *path)
 		return false;
 	}
 
-	if (lstat(filename, &st) != 0)
-		return false;
+	if (lstat(filename, &st) != 0) {
+		if (lstat(parent_filename(filename), &st) != 0)
+			return false;
+		return true;
+	}
 
 	if (!write_ok(info, path))
 		return false;
@@ -843,20 +824,6 @@ static char *linearize_perms(struct xs_permissions *perms, unsigned int *size)
 	return ret;
 }
 
-static int random_flags(int *state)
-{
-	switch (get_randomness(state) % 4) {
-	case 0:
-		return 0;
-	case 1:
-		return O_CREAT;
-	case 2:
-		return O_CREAT|O_EXCL;
-	default:
-		return get_randomness(state);
-	}
-}
-
 /* Do the next operation, return the results. */
 static char *do_next_op(struct ops *ops, void *h, int state, bool verbose)
 {
@@ -880,18 +847,12 @@ static char *do_next_op(struct ops *ops, void *h, int state, bool verbose)
 		ret = linearize_read(ops->read(h, name, &num), &num);
 		break;
 	case 2: {
-		int flags = random_flags(&state);
 		char *contents = talloc_asprintf(NULL, "%i",
 						 get_randomness(&state));
 		unsigned int len = get_randomness(&state)%(strlen(contents)+1);
 		if (verbose)
-			printf("WRITE %s %s %.*s\n", name,
-			       flags == O_CREAT ? "O_CREAT" 
-			       : flags == (O_CREAT|O_EXCL) ? "O_CREAT|O_EXCL"
-			       : flags == 0 ? "0" : "CRAPFLAGS",
-			       len, contents);
-		ret = bool_to_errstring(ops->write(h, name, contents, len,
-						   flags));
+			printf("WRITE %s %.*s\n", name, len, contents);
+		ret = bool_to_errstring(ops->write(h, name, contents, len));
 		talloc_steal(ret, contents);
 		break;
 	}
@@ -1102,7 +1063,8 @@ static unsigned int try_simple(const bool *trymap,
 
 		ret = do_next_op(data->ops, h, i + data->seed, verbose);
 		if (verbose)
-			printf("-> %.*s\n", strchr(ret, '\n') - ret, ret);
+			printf("-> %.*s\n",
+			       (int)(strchr(ret, '\n') - ret), ret);
 		if (streq(ret, "FAILED:Bad file descriptor"))
 			goto out;
 		if (kill(daemon_pid, 0) != 0)
@@ -1373,13 +1335,14 @@ static unsigned int try_diff(const bool *trymap,
 
 		file = do_next_op(&file_ops, fileh, i+data->seed, verbose);
 		if (verbose)
-			printf("-> %.*s\n", strchr(file, '/') - file, file);
+			printf("-> %.*s\n",
+			       (int)(strchr(file, '/') - file), file);
 		
 		if (verbose)
 			printf("XS: ");
 		xs = do_next_op(&xs_ops, xsh, i+data->seed, verbose);
 		if (verbose)
-			printf("-> %.*s\n", strchr(xs, '/') - xs, xs);
+			printf("-> %.*s\n", (int)(strchr(xs, '/') - xs), xs);
 
 		if (!streq(file, xs))
 			goto out;
@@ -1547,7 +1510,8 @@ static unsigned int try_fail(const bool *trymap,
 			aborted++;
 
 		if (verbose)
-			printf("-> %.*s\n", strchr(ret, '\n') - ret, ret);
+			printf("-> %.*s\n",
+			       (int)(strchr(ret, '\n') - ret), ret);
 
 		talloc_free(ret);
 

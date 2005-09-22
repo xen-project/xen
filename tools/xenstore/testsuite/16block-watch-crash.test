@@ -4,8 +4,8 @@ mkdir /test
 watch /test token
 1 start /test
 # This will block on above
-noackwrite /test/entry create contents
-1 write /test/entry2 create contents
+noackwrite /test/entry contents
+1 write /test/entry2 contents
 1 commit
 readack
 expect /test/entry2:token

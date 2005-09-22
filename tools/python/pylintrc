@@ -74,7 +74,7 @@ enable-variables=yes
 init-import=no
 
 # List of variable names used for dummy variables (i.e. not used).
-dummy-variables=_,dummy
+dummy-variables=_,_1,_2,_3,_4,_5,dummy
 
 
 
@@ -131,7 +131,7 @@ good-names=i,j,k,ex,Run,_
 bad-names=foo,bar,baz,toto,tutu,tata
 
 # List of builtins function names that should not be used, separated by a comma
-bad-functions=map,filter,apply,input
+bad-functions=apply,input
 
 
 

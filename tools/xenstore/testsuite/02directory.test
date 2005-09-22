@@ -3,7 +3,7 @@ expect tool
 dir /
 
 # Create a file.
-write /test create contents
+write /test contents
 
 # Directory shows it.
 expect test
@@ -21,16 +21,14 @@ dir /
 dir /dir
 
 # Create a file, check it exists.
-write /dir/test2 create contents2
+write /dir/test2 contents2
 expect test2
 dir /dir
 expect contents2
 read /dir/test2
 
-# Creating dir over the top should fail.
-expect mkdir failed: File exists
+# Creating dir over the top should succeed.
 mkdir /dir
-expect mkdir failed: File exists
 mkdir /dir/test2
 
 # Mkdir implicitly creates directories.

@@ -1,8 +1,8 @@
 # Watch something, write to it, check watch has fired.
-write /test create contents
+write /test contents
 
 1 watch /test token
-2 write /test create contents2
+2 write /test contents2
 expect 1:/test:token
 1 waitwatch
 1 ackwatch token
@@ -44,7 +44,7 @@ expect 1:/dir/newdir:token
 
 # ignore watches while doing commands, should work.
 watch /dir token
-1 write /dir/test create contents
+1 write /dir/test contents
 expect contents
 read /dir/test
 expect /dir/test:token
@@ -56,7 +56,7 @@ close
 1 watch /dir token1
 3 watch /dir token3
 2 watch /dir token2
-write /dir/test create contents
+write /dir/test contents
 expect 3:/dir/test:token3
 3 waitwatch
 3 ackwatch token3
@@ -73,7 +73,7 @@ expect 1:/dir/test:token1
 # If one dies (without acking), the other should still get ack.
 1 watch /dir token1
 2 watch /dir token2
-write /dir/test create contents
+write /dir/test contents
 expect 2:/dir/test:token2
 2 waitwatch
 2 close
@@ -85,7 +85,7 @@ expect 1:/dir/test:token1
 # If one dies (without reading at all), the other should still get ack.
 1 watch /dir token1
 2 watch /dir token2
-write /dir/test create contents
+write /dir/test contents
 2 close
 expect 1:/dir/test:token1
 1 waitwatch
@@ -97,7 +97,7 @@ expect 1:/dir/test:token1
 1 watch /dir token1
 1 unwatch /dir token1
 1 watch /dir token2
-2 write /dir/test2 create contents
+2 write /dir/test2 contents
 expect 1:/dir/test2:token2
 1 waitwatch
 1 unwatch /dir token2
@@ -107,7 +107,7 @@ expect 1:/dir/test2:token2
 # unwatch while watch pending.  Other watcher still gets the event.
 1 watch /dir token1
 2 watch /dir token2
-write /dir/test create contents
+write /dir/test contents
 2 unwatch /dir token2
 expect 1:/dir/test:token1
 1 waitwatch
@@ -117,17 +117,17 @@ expect 1:/dir/test:token1
 
 # unwatch while watch pending.  Should clear this so we get next event.
 1 watch /dir token1
-write /dir/test create contents
+write /dir/test contents
 1 unwatch /dir token1
 1 watch /dir/test token2
-write /dir/test none contents2
+write /dir/test contents2
 expect 1:/dir/test:token2
 1 waitwatch
 1 ackwatch token2
 
 # check we only get notified once.
 1 watch /test token
-2 write /test create contents2
+2 write /test contents2
 expect 1:/test:token
 1 waitwatch
 1 ackwatch token
@@ -137,9 +137,9 @@ expect 1: waitwatch failed: Connection timed out
 
 # watches are queued in order.
 1 watch / token
-2 write /test1 create contents
-2 write /test2 create contents
-2 write /test3 create contents
+2 write /test1 contents
+2 write /test2 contents
+2 write /test3 contents
 expect 1:/test1:token
 1 waitwatch
 1 ackwatch token
@@ -153,8 +153,8 @@ expect 1:/test3:token
 
 # Creation of subpaths should be covered correctly.
 1 watch / token
-2 write /test/subnode create contents2
-2 write /test/subnode/subnode create contents2
+2 write /test/subnode contents2
+2 write /test/subnode/subnode contents2
 expect 1:/test/subnode:token
 1 waitwatch
 1 ackwatch token
@@ -167,11 +167,13 @@ expect 1: waitwatch failed: Connection timed out
 
 # Watch event must have happened before we registered interest.
 1 watch / token
-2 write /test/subnode create contents2
-1 watch / token2 0
+2 write /test/subnode contents2
+1 watchnoack / token2 0
 expect 1:/test/subnode:token
 1 waitwatch
 1 ackwatch token
+expect 1:/:token2
+1 waitwatch
 expect 1: waitwatch failed: Connection timed out
 1 waitwatch
 1 close
@@ -185,7 +187,7 @@ expect 1:/test/subnode:token
 
 # Watch should not double-send after we ack, even if we did something in between.
 1 watch /test2 token
-2 write /test2/foo create contents2
+2 write /test2/foo contents2
 expect 1:/test2/foo:token
 1 waitwatch
 expect 1:contents2

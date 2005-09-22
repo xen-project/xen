@@ -59,39 +59,41 @@
 #define TPM_EMULATOR_PATH "/usr/bin/vtpmd"
 
 TPM_RESULT close_dmi( VTPM_DMI_RESOURCE *dmi_res) {
-	TPM_RESULT status = TPM_FAIL;
-	
-	if (dmi_res == NULL) 
-		return TPM_SUCCESS;
-	
-	status = TCS_CloseContext(dmi_res->TCSContext);
-	free ( dmi_res->NVMLocation );
-	dmi_res->connected = FALSE;
+  TPM_RESULT status = TPM_FAIL;
+  
+  if (dmi_res == NULL) 
+    return TPM_SUCCESS;
+
+  status = TCS_CloseContext(dmi_res->TCSContext);
+  free ( dmi_res->NVMLocation );
+  dmi_res->connected = FALSE;
 
 #ifndef VTPM_MULTI_VM	
-	free(dmi_res->guest_tx_fname);
-	free(dmi_res->vtpm_tx_fname);
-		
-	close(dmi_res->guest_tx_fh); dmi_res->guest_tx_fh = -1;
-	close(dmi_res->vtpm_tx_fh);  dmi_res->vtpm_tx_fh = -1; 
-	
+  free(dmi_res->guest_tx_fname);
+  free(dmi_res->vtpm_tx_fname);
+	  
+  close(dmi_res->guest_tx_fh); dmi_res->guest_tx_fh = -1;
+  close(dmi_res->vtpm_tx_fh);  dmi_res->vtpm_tx_fh = -1; 
 		
  #ifndef MANUAL_DM_LAUNCH
   if (dmi_res->dmi_id != VTPM_CTL_DM) {
     if (dmi_res->dmi_pid != 0) {
       vtpmloginfo(VTPM_LOG_VTPM, "Killing dmi on pid %d.\n", dmi_res->dmi_pid);
-      if ((kill(dmi_res->dmi_pid, SIGKILL) !=0) ||
-         (waitpid(dmi_res->dmi_pid, NULL, 0) != dmi_res->dmi_pid)){
-        vtpmlogerror(VTPM_LOG_VTPM, "Could not kill dmi on pid %d.\n", dmi_res->dmi_pid);
+      if (kill(dmi_res->dmi_pid, SIGKILL) !=0) {
+        vtpmloginfo(VTPM_LOG_VTPM, "DMI on pid %d is already dead.\n", dmi_res->dmi_pid);
+      } else if (waitpid(dmi_res->dmi_pid, NULL, 0) != dmi_res->dmi_pid) {
+        vtpmlogerror(VTPM_LOG_VTPM, "DMI on pid %d failed to stop.\n", dmi_res->dmi_pid);
         status = TPM_FAIL;
       }
-    } else 
+    } else { 
       vtpmlogerror(VTPM_LOG_VTPM, "Could not kill dmi because it's pid was 0.\n");
+      status = TPM_FAIL;
+    }
   }
  #endif
 #endif
 
-	return status;
+  return status;
 }
 	
 TPM_RESULT VTPM_Handle_New_DMI( const buffer_t *param_buf) {
@@ -100,9 +102,9 @@ TPM_RESULT VTPM_Handle_New_DMI( const buffer_t *param_buf) {
   TPM_RESULT status=TPM_FAIL;
   BYTE type;
   UINT32 dmi_id, domain_id, *dmi_id_key; 
-  int fh;
 
-#ifndef VTPM_MUTLI_VM
+#ifndef VTPM_MULTI_VM
+  int fh;
   char dmi_id_str[11]; // UINT32s are up to 10 digits + NULL
   struct stat file_info;
 #endif
@@ -175,7 +177,7 @@ TPM_RESULT VTPM_Handle_New_DMI( const buffer_t *param_buf) {
   if (stat_ret == 0) 
     dmi_size = file_stat.st_size;
   else {
-	vtpmlogerror(VTPM_LOG_VTPM, "Could not open tpm_emulator!!\n");
+      vtpmlogerror(VTPM_LOG_VTPM, "Could not open tpm_emulator!!\n");
     status = TPM_IOERROR;
     goto abort_egress;
   }
@@ -186,31 +188,33 @@ TPM_RESULT VTPM_Handle_New_DMI( const buffer_t *param_buf) {
 #ifndef VTPM_MULTI_VM
   if (dmi_id != VTPM_CTL_DM) {
     // Create a pair of fifo pipes
-		if( (new_dmi->guest_tx_fname = (char *) malloc(11 + strlen(GUEST_TX_FIFO))) == NULL){ 
-			status = TPM_RESOURCES;
-			goto abort_egress;
-		}
-		sprintf(new_dmi->guest_tx_fname, GUEST_TX_FIFO, (uint32_t) dmi_id);
+    if( (new_dmi->guest_tx_fname = (char *) malloc(11 + strlen(GUEST_TX_FIFO))) == NULL){ 
+      status = TPM_RESOURCES;
+      goto abort_egress;
+    }
+    sprintf(new_dmi->guest_tx_fname, GUEST_TX_FIFO, (uint32_t) dmi_id);
     
-		if ((new_dmi->vtpm_tx_fname = (char *) malloc(11 + strlen(VTPM_TX_FIFO))) == NULL) {
-			status = TPM_RESOURCES;
-			goto abort_egress;
-		}
-		sprintf(new_dmi->vtpm_tx_fname, VTPM_TX_FIFO, (uint32_t) dmi_id);
+    if ((new_dmi->vtpm_tx_fname = (char *) malloc(11 + strlen(VTPM_TX_FIFO))) == NULL) {
+      status = TPM_RESOURCES;
+      goto abort_egress;
+    }
+    sprintf(new_dmi->vtpm_tx_fname, VTPM_TX_FIFO, (uint32_t) dmi_id);
     
     new_dmi->guest_tx_fh = -1;
     new_dmi->vtpm_tx_fh= -1;
     
     if ( stat(new_dmi->guest_tx_fname, &file_info) == -1) {
       if ( mkfifo(new_dmi->guest_tx_fname, S_IWUSR | S_IRUSR ) ){
-				status = TPM_FAIL;
-				goto abort_egress;
+	vtpmlogerror(VTPM_LOG_VTPM, "Failed to create dmi fifo.\n");
+	status = TPM_IOERROR;
+	goto abort_egress;
       }
     }
             
     if ( (fh = open(new_dmi->vtpm_tx_fname, O_RDWR)) == -1) {
       if ( mkfifo(new_dmi->vtpm_tx_fname, S_IWUSR | S_IRUSR ) ) {
-	status = TPM_FAIL;
+	vtpmlogerror(VTPM_LOG_VTPM, "Failed to create dmi fifo.\n");
+	status = TPM_IOERROR;
 	goto abort_egress;
       }
     }
@@ -224,17 +228,17 @@ TPM_RESULT VTPM_Handle_New_DMI( const buffer_t *param_buf) {
     pid_t pid = fork();
     
     if (pid == -1) {
-			vtpmlogerror(VTPM_LOG_VTPM, "Could not fork to launch vtpm\n");
-		  status = TPM_RESOURCES;
+      vtpmlogerror(VTPM_LOG_VTPM, "Could not fork to launch vtpm\n");
+      status = TPM_RESOURCES;
       goto abort_egress;
-		} else if (pid == 0) {
-		  if ( stat(new_dmi->NVMLocation, &file_info) == -1)
-				execl (TPM_EMULATOR_PATH, "vtmpd", "clear", dmi_id_str, NULL);
-			else 
-				execl (TPM_EMULATOR_PATH, "vtpmd", "save", dmi_id_str, NULL);
+    } else if (pid == 0) {
+      if ( stat(new_dmi->NVMLocation, &file_info) == -1)
+	execl (TPM_EMULATOR_PATH, "vtmpd", "clear", dmi_id_str, NULL);
+      else 
+	execl (TPM_EMULATOR_PATH, "vtpmd", "save", dmi_id_str, NULL);
 			
-			// Returning from these at all is an error.
-			vtpmlogerror(VTPM_LOG_VTPM, "Could not exec to launch vtpm\n");
+      // Returning from these at all is an error.
+      vtpmlogerror(VTPM_LOG_VTPM, "Could not exec to launch vtpm\n");
     } else {
       new_dmi->dmi_pid = pid;
       vtpmloginfo(VTPM_LOG_VTPM, "Launching DMI on PID = %d\n", pid);
@@ -251,7 +255,8 @@ TPM_RESULT VTPM_Handle_New_DMI( const buffer_t *param_buf) {
   goto egress;
   
  abort_egress:
-	close_dmi( new_dmi );
+  vtpmlogerror(VTPM_LOG_VTPM, "Failed to create DMI id=%d due to status=%s. Cleaning.\n", dmi_id, tpm_get_error_name(status));
+  close_dmi( new_dmi );
 	
  egress:
   return status;

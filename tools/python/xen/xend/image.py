@@ -13,34 +13,29 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
+
 
 import os, string
 import re
 
-import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
+import xen.lowlevel.xc
 from xen.xend import sxp
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
-from xen.xend.xenstore import DBVar
-from xen.xend.xenstore.xstransact import xstransact
 
 from xen.xend.server import channel
 
-"""Flag for a block device backend domain."""
-SIF_BLK_BE_DOMAIN = (1<<4)
 
-"""Flag for a net device backend domain."""
-SIF_NET_BE_DOMAIN = (1<<5)
+xc = xen.lowlevel.xc.new()
 
-"""Flag for a TPM device backend domain."""
-SIF_TPM_BE_DOMAIN = (1<<7)
+
+MAX_GUEST_CMDLINE = 1024
 
 class ImageHandler:
     """Abstract base class for image handlers.
 
-    initDomain() is called to initialise the domain memory.
-    
     createImage() is called to configure and build the domain from its
     kernel image and ramdisk etc.
 
@@ -88,49 +83,57 @@ class ImageHandler:
 
     findImageHandlerClass = classmethod(findImageHandlerClass)
 
-    def create(cls, vm, image):
+    def create(cls, vm, imageConfig, deviceConfig):
         """Create an image handler for a vm.
 
-        @param vm vm
-        @param image image config
         @return ImageHandler instance
         """
-        imageClass = cls.findImageHandlerClass(image)
-        return imageClass(vm, image)
+        imageClass = cls.findImageHandlerClass(imageConfig)
+        return imageClass(vm, imageConfig, deviceConfig)
 
     create = classmethod(create)
 
     #======================================================================
     # Instance vars and methods.
 
-    db = None
     ostype = None
 
-    config = None
     kernel = None
     ramdisk = None
     cmdline = None
+
     flags = 0
 
-    __exports__ = [
-        DBVar('ostype',  ty='str'),
-        DBVar('config',  ty='sxpr'),
-        DBVar('kernel',  ty='str'),
-        DBVar('ramdisk', ty='str'),
-        DBVar('cmdline', ty='str'),
-        DBVar('flags',   ty='int'),
-        ]
-
-    def __init__(self, vm, config):
+    def __init__(self, vm, imageConfig, deviceConfig):
         self.vm = vm
-        self.db = vm.db.addChild('/image')
-        self.config = config
+        self.configure(imageConfig, deviceConfig)
 
-    def exportToDB(self, save=False, sync=False):
-        self.db.exportToDB(self, fields=self.__exports__, save=save, sync=sync)
+    def configure(self, imageConfig, _):
+        """Config actions common to all unix-like domains."""
 
-    def importFromDB(self):
-        self.db.importFromDB(self, fields=self.__exports__)
+        self.kernel = sxp.child_value(imageConfig, "kernel")
+        self.cmdline = ""
+        ip = sxp.child_value(imageConfig, "ip", None)
+        if ip:
+            self.cmdline += " ip=" + ip
+        root = sxp.child_value(imageConfig, "root")
+        if root:
+            self.cmdline += " root=" + root
+        args = sxp.child_value(imageConfig, "args")
+        if args:
+            self.cmdline += " " + args
+        self.ramdisk = sxp.child_value(imageConfig, "ramdisk", '')
+        
+        self.vm.storeVm(("image/ostype", self.ostype),
+                        ("image/kernel", self.kernel),
+                        ("image/cmdline", self.cmdline),
+                        ("image/ramdisk", self.ramdisk))
+
+
+    def handleBootloading():
+        self.unlink(self.kernel)
+        self.unlink(self.ramdisk)
+
 
     def unlink(self, f):
         if not f: return
@@ -139,94 +142,39 @@ class ImageHandler:
         except OSError, ex:
             log.warning("error removing bootloader file '%s': %s", f, ex)
 
-    def initDomain(self, dom, memory, ssidref, cpu, cpu_weight):
-        """Initial domain create.
-
-        @return domain id
-        """
-
-        mem_kb = self.getDomainMemory(memory)
-        if not self.vm.restore:
-            dom = xc.domain_create(dom = dom or 0, ssidref = ssidref)
-            # if bootloader, unlink here. But should go after buildDomain() ?
-            if self.vm.bootloader:
-                self.unlink(self.kernel)
-                self.unlink(self.ramdisk)
-            if dom <= 0:
-                raise VmError('Creating domain failed: name=%s' % self.vm.name)
-        log.debug("initDomain: cpu=%d mem_kb=%d ssidref=%d dom=%d", cpu, mem_kb, ssidref, dom)
-        xc.domain_setcpuweight(dom, cpu_weight)
-        xc.domain_setmaxmem(dom, mem_kb)
-
-        try:
-            # Give the domain some memory below 4GB
-            lmem_kb = 0
-            if lmem_kb > 0:
-                xc.domain_memory_increase_reservation(dom, min(lmem_kb,mem_kb), 0, 32)
-            if mem_kb > lmem_kb:
-                xc.domain_memory_increase_reservation(dom, mem_kb-lmem_kb, 0, 0)
-        except:
-            xc.domain_destroy(dom)
-            raise
-
-        if cpu != -1:
-            xc.domain_pincpu(dom, 0, 1<<int(cpu))
-        return dom
 
     def createImage(self):
         """Entry point to create domain memory image.
         Override in subclass  if needed.
         """
-        self.configure()
         self.createDomain()
 
-    def configure(self):
-        """Config actions common to all unix-like domains."""
-        self.kernel = sxp.child_value(self.config, "kernel")
-        self.cmdline = ""
-        ip = sxp.child_value(self.config, "ip", None)
-        if ip:
-            self.cmdline += " ip=" + ip
-        root = sxp.child_value(self.config, "root")
-        if root:
-            self.cmdline += " root=" + root
-        args = sxp.child_value(self.config, "args")
-        if args:
-            self.cmdline += " " + args
-        self.ramdisk = sxp.child_value(self.config, "ramdisk", '')
-        
     def createDomain(self):
         """Build the domain boot image.
         """
         # Set params and call buildDomain().
-        self.flags = 0
-        if self.vm.netif_backend: self.flags |= SIF_NET_BE_DOMAIN
-        if self.vm.blkif_backend: self.flags |= SIF_BLK_BE_DOMAIN
-        if self.vm.tpmif_backend: self.flags |= SIF_TPM_BE_DOMAIN
+        self.flags = self.vm.getBackendFlags()
 
-        if self.vm.recreate or self.vm.restore:
-            return
         if not os.path.isfile(self.kernel):
             raise VmError('Kernel image does not exist: %s' % self.kernel)
         if self.ramdisk and not os.path.isfile(self.ramdisk):
             raise VmError('Kernel ramdisk does not exist: %s' % self.ramdisk)
-        if len(self.cmdline) >= 256:
-            log.warning('kernel cmdline too long, domain %d', self.vm.getDomain())
+        if len(self.cmdline) >= MAX_GUEST_CMDLINE:
+            log.warning('kernel cmdline too long, domain %d',
+                        self.vm.getDomid())
         
         log.info("buildDomain os=%s dom=%d vcpus=%d", self.ostype,
-                 self.vm.getDomain(), self.vm.vcpus)
+                 self.vm.getDomid(), self.vm.getVCpuCount())
         err = self.buildDomain()
         if err != 0:
             raise VmError('Building domain failed: ostype=%s dom=%d err=%d'
-                          % (self.ostype, self.vm.getDomain(), err))
+                          % (self.ostype, self.vm.getDomid(), err))
 
-    def getDomainMemory(self, mem_mb):
-        """Memory (in KB) the domain will need for mem_mb (in MB)."""
-        if os.uname()[4] == 'ia64':
-	    """Append extra system pages, like xenstore and console"""
-	    return (mem_mb * 1024 + 3 * 16)
-	else:
-            return mem_mb * 1024
+    def getDomainMemory(self, mem):
+        """@return The memory required, in KiB, by the domain to store the
+        given amount, also in KiB.  This is normally just mem, but VMX domains
+        have overheads to account for."""
+        return mem
 
     def buildDomain(self):
         """Build the domain. Define in subclass."""
@@ -262,23 +210,23 @@ class LinuxImageHandler(ImageHandler):
         else:
             console_evtchn = 0
 
-        log.debug("dom            = %d", self.vm.getDomain())
+        log.debug("dom            = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("console_evtchn = %d", console_evtchn)
         log.debug("cmdline        = %s", self.cmdline)
         log.debug("ramdisk        = %s", self.ramdisk)
         log.debug("flags          = %d", self.flags)
-        log.debug("vcpus          = %d", self.vm.vcpus)
+        log.debug("vcpus          = %d", self.vm.getVCpuCount())
 
-        ret = xc.linux_build(dom            = self.vm.getDomain(),
+        ret = xc.linux_build(dom            = self.vm.getDomid(),
                              image          = self.kernel,
                              store_evtchn   = store_evtchn,
                              console_evtchn = console_evtchn,
                              cmdline        = self.cmdline,
                              ramdisk        = self.ramdisk,
                              flags          = self.flags,
-                             vcpus          = self.vm.vcpus)
+                             vcpus          = self.vm.getVCpuCount())
         if isinstance(ret, dict):
             self.set_vminfo(ret)
             return 0
@@ -286,49 +234,72 @@ class LinuxImageHandler(ImageHandler):
 
 class VmxImageHandler(ImageHandler):
 
-    __exports__ = ImageHandler.__exports__ + [
-        DBVar('memmap',        ty='str'),
-        DBVar('memmap_value',  ty='sxpr'),
-        # device channel?
-        ]
-    
     ostype = "vmx"
-    memmap = None
-    memmap_value = []
-    device_channel = None
-    pid = 0
+
+    def configure(self, imageConfig, deviceConfig):
+        ImageHandler.configure(self, imageConfig, deviceConfig)
+        
+        self.memmap = sxp.child_value(imageConfig, 'memmap')
+        self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
+        self.device_model = sxp.child_value(imageConfig, 'device_model')
+        if not self.device_model:
+            raise VmError("vmx: missing device model")
+        self.display = sxp.child_value(imageConfig, 'display')
+
+        self.vm.storeVm(("image/memmap", self.memmap),
+                        ("image/dmargs", " ".join(self.dmargs)),
+                        ("image/device-model", self.device_model),
+                        ("image/display", self.display))
+
+        self.device_channel = None
+        self.pid = 0
+        self.memmap_value = []
+
+        self.dmargs += self.configVNC(imageConfig)
+
+
     def createImage(self):
         """Create a VM for the VMX environment.
         """
-        self.configure()
         self.parseMemmap()
         self.createDomain()
 
     def buildDomain(self):
         # Create an event channel
-        self.device_channel = channel.eventChannel(0, self.vm.getDomain())
+        self.device_channel = channel.eventChannel(0, self.vm.getDomid())
         log.info("VMX device model port: %d", self.device_channel.port2)
         if self.vm.store_channel:
             store_evtchn = self.vm.store_channel.port2
         else:
             store_evtchn = 0
-        ret = xc.vmx_build(dom            = self.vm.getDomain(),
-                            image          = self.kernel,
-                            control_evtchn = self.device_channel.port2,
-                            store_evtchn   = store_evtchn,
-                            memsize        = self.vm.memory,
-                            memmap         = self.memmap_value,
-                            cmdline        = self.cmdline,
-                            ramdisk        = self.ramdisk,
-                            flags          = self.flags,
-                            vcpus          = self.vm.vcpus)
+
+        log.debug("dom            = %d", self.vm.getDomid())
+        log.debug("image          = %s", self.kernel)
+        log.debug("control_evtchn = %d", self.device_channel.port2)
+        log.debug("store_evtchn   = %d", store_evtchn)
+        log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
+        log.debug("memmap         = %s", self.memmap_value)
+        log.debug("cmdline        = %s", self.cmdline)
+        log.debug("ramdisk        = %s", self.ramdisk)
+        log.debug("flags          = %d", self.flags)
+        log.debug("vcpus          = %d", self.vm.getVCpuCount())
+
+        ret = xc.vmx_build(dom            = self.vm.getDomid(),
+                           image          = self.kernel,
+                           control_evtchn = self.device_channel.port2,
+                           store_evtchn   = store_evtchn,
+                           memsize        = self.vm.getMemoryTarget() / 1024,
+                           memmap         = self.memmap_value,
+                           cmdline        = self.cmdline,
+                           ramdisk        = self.ramdisk,
+                           flags          = self.flags,
+                           vcpus          = self.vm.getVCpuCount())
         if isinstance(ret, dict):
             self.set_vminfo(ret)
             return 0
         return ret
 
     def parseMemmap(self):
-        self.memmap = sxp.child_value(self.vm.config, "memmap")
         if self.memmap is None:
             return
         memmap = sxp.parse(open(self.memmap))[0]
@@ -337,12 +308,12 @@ class VmxImageHandler(ImageHandler):
         
     # Return a list of cmd line args to the device models based on the
     # xm config file
-    def parseDeviceModelArgs(self):
-	dmargs = [ 'cdrom', 'boot', 'fda', 'fdb',
-                   'localtime', 'serial', 'stdvga', 'isa' ] 
-	ret = []
-	for a in dmargs:
-       	    v = sxp.child_value(self.vm.config, a)
+    def parseDeviceModelArgs(self, imageConfig, deviceConfig):
+        dmargs = [ 'cdrom', 'boot', 'fda', 'fdb',
+                   'localtime', 'serial', 'stdvga', 'isa', 'vcpus' ] 
+        ret = []
+        for a in dmargs:
+            v = sxp.child_value(imageConfig, a)
 
             # python doesn't allow '-' in variable names
             if a == 'stdvga': a = 'std-vga'
@@ -351,20 +322,17 @@ class VmxImageHandler(ImageHandler):
             if a in ['localtime', 'std-vga', 'isa']:
                 if v != None: v = int(v)
 
-	    log.debug("args: %s, val: %s" % (a,v))
-	    if v: 
-		ret.append("-%s" % a)
-		ret.append("%s" % v)
+            log.debug("args: %s, val: %s" % (a,v))
+            if v: 
+                ret.append("-%s" % a)
+                ret.append("%s" % v)
 
         # Handle disk/network related options
-        devices = sxp.children(self.vm.config, 'device')
-        for device in devices:
-            name = sxp.name(sxp.child0(device))
+        for (name, info) in deviceConfig:
             if name == 'vbd':
-               vbdinfo = sxp.child(device, 'vbd')
-               uname = sxp.child_value(vbdinfo, 'uname')
-               typedev = sxp.child_value(vbdinfo, 'dev')
-               (vbdtype, vbdparam) = string.split(uname, ':', 1)
+               uname = sxp.child_value(info, 'uname')
+               typedev = sxp.child_value(info, 'dev')
+               (_, vbdparam) = string.split(uname, ':', 1)
                if re.match('^ioemu:', typedev):
                   (emtype, vbddev) = string.split(typedev, ':', 1)
                else:
@@ -378,61 +346,59 @@ class VmxImageHandler(ImageHandler):
                ret.append("-%s" % vbddev)
                ret.append("%s" % vbdparam)
             if name == 'vif':
-               vifinfo = sxp.child(device, 'vif')
-               mac = sxp.child_value(vifinfo, 'mac')
+               mac = sxp.child_value(info, 'mac')
                ret.append("-macaddr")
                ret.append("%s" % mac)
             if name == 'vtpm':
-               vtpminfo = sxp.child(device, 'vtpm')
-               instance = sxp.child_value(vtpminfo, 'instance')
+               instance = sxp.child_value(info, 'instance')
                ret.append("-instance")
                ret.append("%s" % instance)
+        return ret
 
-	# Handle graphics library related options
-	vnc = sxp.child_value(self.vm.config, 'vnc')
-	sdl = sxp.child_value(self.vm.config, 'sdl')
-	nographic = sxp.child_value(self.vm.config, 'nographic')
-	if nographic:
-	    ret.append('-nographic')
-	    return ret
-	
-	if vnc and sdl:
-	    ret = ret + ['-vnc-and-sdl', '-k', 'en-us']
-	elif vnc:
-	    ret = ret + ['-vnc', '-k', 'en-us']
-	if vnc:
-	    vncport = int(self.vm.getDomain()) + 5900
-	    ret = ret + ['-vncport', '%d' % vncport]
-	return ret
-	      	  
+    def configVNC(self, config):
+        # Handle graphics library related options
+        vnc = sxp.child_value(config, 'vnc')
+        sdl = sxp.child_value(config, 'sdl')
+        ret = []
+        nographic = sxp.child_value(config, 'nographic')
+        if nographic:
+            ret.append('-nographic')
+            return ret
+
+        if vnc and sdl:
+            ret = ret + ['-vnc-and-sdl', '-k', 'en-us']
+        elif vnc:
+            ret = ret + ['-vnc', '-k', 'en-us']
+        if vnc:
+            vncport = int(self.vm.getDomid()) + 5900
+            ret = ret + ['-vncport', '%d' % vncport]
+        return ret
+
     def createDeviceModel(self):
-        device_model = sxp.child_value(self.vm.config, 'device_model')
-        if not device_model:
-            raise VmError("vmx: missing device model")
+        if self.pid:
+            return
         # Execute device model.
         #todo: Error handling
         # XXX RN: note that the order of args matter!
-        args = [device_model]
+        args = [self.device_model]
         vnc = self.vncParams()
         if len(vnc):
             args = args + vnc
-        args = args + ([ "-d",  "%d" % self.vm.getDomain(),
+        args = args + ([ "-d",  "%d" % self.vm.getDomid(),
                   "-p", "%d" % self.device_channel.port1,
-                  "-m", "%s" % self.vm.memory ])
-	args = args + self.parseDeviceModelArgs()
+                  "-m", "%s" % (self.vm.getMemoryTarget() / 1024)])
+        args = args + self.dmargs
         env = dict(os.environ)
-        env['DISPLAY'] = sxp.child_value(self.vm.config, 'display')
-        log.info("spawning device models: %s %s", device_model, args)
-        self.pid = os.spawnve(os.P_NOWAIT, device_model, args, env)
+        env['DISPLAY'] = self.display
+        log.info("spawning device models: %s %s", self.device_model, args)
+        self.pid = os.spawnve(os.P_NOWAIT, self.device_model, args, env)
         log.info("device model pid: %d", self.pid)
-        return self.pid
 
     def vncParams(self):
         # see if a vncviewer was specified
         # XXX RN: bit of a hack. should unify this, maybe stick in config space
         vncconnect=[]
-        image = self.config
-        args = sxp.child_value(image, "args")
+        args = self.cmdline
         if args:
             arg_list = string.split(args)
             for arg in arg_list:
@@ -446,15 +412,16 @@ class VmxImageHandler(ImageHandler):
         channel.eventChannelClose(self.device_channel)
         import signal
         if not self.pid:
-            self.pid = self.vm.device_model_pid
+            return
         os.kill(self.pid, signal.SIGKILL)
-        (pid, status) = os.waitpid(self.pid, 0)
+        os.waitpid(self.pid, 0)
         self.pid = 0
 
-    def getDomainMemory(self, mem_mb):
+    def getDomainMemory(self, mem):
+        """@see ImageHandler.getDomainMemory"""
         # for ioreq_t and xenstore
         static_pages = 2
-        return (mem_mb * 1024) + self.getPageTableSize(mem_mb) + 4 * static_pages
+        return mem + self.getPageTableSize(mem / 1024) + 4 * static_pages
             
     def getPageTableSize(self, mem_mb):
         """Return the size of memory needed for 1:1 page tables for physical
@@ -466,8 +433,9 @@ class VmxImageHandler(ImageHandler):
         # 1 page for the PGD + 1 pte page for 4MB of memory (rounded)
         if os.uname()[4] == 'x86_64':
             return (5 + ((mem_mb + 1) >> 1)) * 4
-	elif os.uname()[4] == 'ia64':
-	    # XEN/IA64 has p2m table allocated on demand, so only return guest firmware size here.
-	    return 16 * 1024
+        elif os.uname()[4] == 'ia64':
+            # XEN/IA64 has p2m table allocated on demand, so only return
+            # guest firmware size here.
+            return 16 * 1024
         else:
             return (1 + ((mem_mb + 3) >> 2)) * 4

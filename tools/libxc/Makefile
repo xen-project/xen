@@ -26,19 +26,21 @@ SRCS       += xc_sedf.c
 BUILD_SRCS += xc_linux_build.c
 BUILD_SRCS += xc_load_bin.c
 BUILD_SRCS += xc_load_elf.c
-BUILD_SRCS += xg_private.c
 
 ifeq ($(XEN_TARGET_ARCH),ia64)
 BUILD_SRCS += xc_ia64_stubs.c
 else
+ifeq ($(XEN_TARGET_ARCH),x86_32)
 SRCS       += xc_ptrace.c
 SRCS       += xc_ptrace_core.c
-
-BUILD_SRCS := xc_load_aout9.c
+endif
+BUILD_SRCS += xc_load_aout9.c
 BUILD_SRCS += xc_linux_restore.c
 BUILD_SRCS += xc_linux_save.c
 BUILD_SRCS += xc_vmx_build.c
 endif
+
+BUILD_SRCS += xg_private.c
 
 CFLAGS   += -Wall
 CFLAGS   += -Werror

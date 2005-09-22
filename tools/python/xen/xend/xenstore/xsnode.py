@@ -244,7 +244,9 @@ class XenStore:
             if ex.args[0] == errno.ENOENT:
                 return False
             else:
-                raise
+                raise RuntimeError(ex.args[0],
+                                   ex.args[1] +
+                                   (', in exists(%s)' % (str(path))))
 
     def mkdirs(self, path):
         if self.exists(path):
@@ -255,7 +257,7 @@ class XenStore:
             if x == "": continue
             p = os.path.join(p, x)
             if not self.exists(p):
-                self.getxs().write(p, "", create=True)
+                self.getxs().write(p, "")
 
     def read(self, path):
         try:
@@ -266,15 +268,17 @@ class XenStore:
             else:
                 raise
 
-    def create(self, path, excl=False):
-        self.write(path, "", create=True, excl=excl)
+    def create(self, path):
+        self.write(path, "")
 
-    def write(self, path, data, create=True, excl=False):
-        self.mkdirs(path)
+    def write(self, path, data):
         try:
-            self.getxs().write(path, data, create=create, excl=excl)
-        except Exception, ex:
-            raise
+            self.getxs().write(path, data)
+        except RuntimeError, ex:
+            raise RuntimeError(ex.args[0],
+                               ex.args[1] +
+                               (', while writing %s : %s' % (str(path),
+                                                             str(data))))
 
     def begin(self, path):
         self.getxs().transaction_start(path)

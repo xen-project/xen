@@ -47,7 +47,7 @@ class Sheet( HTMLBase ):
     def __init__( self, urlWriter, title, location ):
         HTMLBase.__init__( self )
         self.urlWriter = urlWriter
-        self.feilds = []
+        self.fields = []
         self.title = title
         self.location = location
         self.passback = None
@@ -86,9 +86,9 @@ class Sheet( HTMLBase ):
         
         request.write( "<table width='100%' cellpadding='0' cellspacing='1' border='0'>" )
         
-    	for (feild, control) in self.feilds:
-            control.write_Control( request, previous_values.get( feild ) )
-            if previous_values.get( feild ) is not None and not control.validate( previous_values.get( feild ) ):
+    	for (field, control) in self.fields:
+            control.write_Control( request, previous_values.get( field ) )
+            if previous_values.get( field ) is not None and not control.validate( previous_values.get( field ) ):
             	control.write_Help( request )
             
         request.write( "</table>" )
@@ -97,7 +97,7 @@ class Sheet( HTMLBase ):
         #request.write( "<input type='hidden' name='visited-sheet%s' value='True'></p>" % self.location )
                 
     def addControl( self, control ):
-    	self.feilds.append( [ control.getName(), control ] )
+    	self.fields.append( [ control.getName(), control ] )
         
     def validate( self, request ):
     
@@ -108,10 +108,10 @@ class Sheet( HTMLBase ):
         previous_values = ssxp2hash( string2sxp( self.passback ) ) #get the map for quick reference
     	if DEBUG: print previous_values
       
-      	for (feild, control) in self.feilds:
-            if not control.validate( previous_values.get( feild ) ):
+      	for (field, control) in self.fields:
+            if not control.validate( previous_values.get( field ) ):
                 check = False
-                if DEBUG: print "> %s = %s" % (feild, previous_values.get( feild ))
+                if DEBUG: print "> %s = %s" % (field, previous_values.get( field ))
 
         return check
         
@@ -143,7 +143,7 @@ class SheetControl( HTMLBase ):
         
 class InputControl( SheetControl ):
 
-    def __init__( self, name, defaultValue, humanText,  reg_exp = ".*", help_text = "You must enter the appropriate details in this feild." ):
+    def __init__( self, name, defaultValue, humanText,  reg_exp = ".*", help_text = "You must enter the appropriate details in this field." ):
         SheetControl.__init__( self, reg_exp )
         self.setName( name )
         
@@ -206,7 +206,7 @@ class ListControl( SheetControl ):
         
 class FileControl( InputControl ):
 
-    def __init__( self, name, defaultValue, humanText,  reg_exp = ".*", help_text = "You must enter the appropriate details in this feild." ):
+    def __init__( self, name, defaultValue, humanText,  reg_exp = ".*", help_text = "You must enter the appropriate details in this field." ):
 	InputControl.__init__( self, name, defaultValue, humanText )
         
     def validate( self, persistedValue ):

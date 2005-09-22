@@ -1,45 +1,47 @@
-# Copyright (C) 2005 IBM Corporation
-#   Authort: Stefan Berger, stefanb@us.ibm.com
-# Derived from netif.py:
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 IBM Corporation
+#   Author: Stefan Berger, stefanb@us.ibm.com
+# Copyright (C) 2005 XenSource Ltd
+#============================================================================
+
 """Support for virtual TPM interfaces.
 """
 
-import random
-
 from xen.xend import sxp
-from xen.xend.XendError import XendError, VmError
 from xen.xend.XendLogging import log
-from xen.xend.XendRoot import get_component
-from xen.xend.xenstore import DBVar
 
-from xen.xend.server.controller import Dev, DevController
+from xen.xend.server.DevController import DevController
+
 
 class TPMifController(DevController):
     """TPM interface controller. Handles all TPM devices for a domain.
     """
 
-    def __init__(self, vm, recreate=False):
-        DevController.__init__(self, vm, recreate=recreate)
+    def __init__(self, vm):
+        DevController.__init__(self, vm)
 
-    def initController(self, recreate=False, reboot=False):
-        self.destroyed = False
 
-    def destroyController(self, reboot=False):
-        """Destroy the controller and all devices.
-        """
-        self.destroyed = True
-        self.destroyDevices(reboot=reboot)
+    def getDeviceDetails(self, config):
+        """@see DevController.getDeviceDetails"""
+        
+        devid = int(sxp.child_value(config, 'instance', '0'))
+        log.debug("The domain has a TPM with instance %d." % devid)
 
-    def sxpr(self):
-        val = ['tpmif', ['dom', self.getDomain()]]
-        return val
+        back  = { 'instance' : "%i" % devid }
+        front = { 'handle' : "%i" % devid }
 
-    def newDevice(self, id, config, recreate=False):
-        """Create a TPM device.
-
-        @param id: interface id
-        @param config: device configuration
-        @param recreate: recreate flag (true after xend restart)
-        """
-        return None
+        return (devid, back, front)

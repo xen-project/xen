@@ -220,7 +220,13 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
         return PyErr_NoMemory();
 
     nr_doms = xc_domain_getinfo(xc->xc_handle, first_dom, max_doms, info);
-    
+
+    if (nr_doms < 0)
+    {
+        free(info);
+        return PyErr_SetFromErrno(xc_error);
+    }
+
     list = PyList_New(nr_doms);
     for ( i = 0 ; i < nr_doms; i++ )
     {
@@ -844,7 +850,7 @@ static PyObject *pyxc_domain_setmaxmem(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     u32 dom;
-    unsigned long maxmem_kb;
+    unsigned int maxmem_kb;
 
     static char *kwd_list[] = { "dom", "maxmem_kb", NULL };
 
@@ -1175,7 +1181,7 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set a domain's memory limit\n"
       " dom [int]: Identifier of domain.\n"
-      " maxmem_kb [long]: .\n"
+      " maxmem_kb [int]: .\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_memory_increase_reservation", 

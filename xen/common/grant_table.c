@@ -797,7 +797,7 @@ gnttab_dump_table(gnttab_dump_table_t *uop)
 #endif
 
 static long
-gnttab_donate(gnttab_donate_t *uop, unsigned int count)
+gnttab_transfer(gnttab_transfer_t *uop, unsigned int count)
 {
     struct domain *d = current->domain;
     struct domain *e;
@@ -805,19 +805,20 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
     u32 _d, _nd, x, y;
     int i;
     int result = GNTST_okay;
+    grant_entry_t *sha;
 
     for ( i = 0; i < count; i++ )
     {
-        gnttab_donate_t *gop = &uop[i];
+        gnttab_transfer_t *gop = &uop[i];
 #if GRANT_DEBUG
-        printk("gnttab_donate: i=%d mfn=%lx domid=%d gref=%08x\n",
+        printk("gnttab_transfer: i=%d mfn=%lx domid=%d gref=%08x\n",
                i, gop->mfn, gop->domid, gop->handle);
 #endif
         page = &frame_table[gop->mfn];
         
         if ( unlikely(IS_XEN_HEAP_FRAME(page)))
         { 
-            printk("gnttab_donate: xen heap frame mfn=%lx\n", 
+            printk("gnttab_transfer: xen heap frame mfn=%lx\n", 
                    (unsigned long) gop->mfn);
             gop->status = GNTST_bad_virt_addr;
             continue;
@@ -825,7 +826,7 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
         
         if ( unlikely(!pfn_valid(page_to_pfn(page))) )
         {
-            printk("gnttab_donate: invalid pfn for mfn=%lx\n", 
+            printk("gnttab_transfer: invalid pfn for mfn=%lx\n", 
                    (unsigned long) gop->mfn);
             gop->status = GNTST_bad_virt_addr;
             continue;
@@ -833,7 +834,7 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
 
         if ( unlikely((e = find_domain_by_id(gop->domid)) == NULL) )
         {
-            printk("gnttab_donate: can't find domain %d\n", gop->domid);
+            printk("gnttab_transfer: can't find domain %d\n", gop->domid);
             gop->status = GNTST_bad_domain;
             continue;
         }
@@ -853,7 +854,7 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
             x = y;
             if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
                          (1 | PGC_allocated)) || unlikely(_nd != _d)) {
-                printk("gnttab_donate: Bad page values %p: ed=%p(%u), sd=%p,"
+                printk("gnttab_transfer: Bad page values %p: ed=%p(%u), sd=%p,"
                        " caf=%08x, taf=%" PRtype_info "\n", 
                        (void *) page_to_pfn(page),
                         d, d->domain_id, unpickle_domptr(_nd), x, 
@@ -888,12 +889,12 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
          */
         if ( unlikely(test_bit(DOMFLAGS_DYING, &e->domain_flags)) ||
              unlikely(e->tot_pages >= e->max_pages) ||
-             unlikely(!gnttab_prepare_for_transfer(e, d, gop->handle)) )
+             unlikely(!gnttab_prepare_for_transfer(e, d, gop->ref)) )
         {
-            DPRINTK("gnttab_donate: Transferee has no reservation headroom "
+            DPRINTK("gnttab_transfer: Transferee has no reservation headroom "
                     "(%d,%d) or provided a bad grant ref (%08x) or "
                     "is dying (%lx)\n",
-                    e->tot_pages, e->max_pages, gop->handle, e->domain_flags);
+                    e->tot_pages, e->max_pages, gop->ref, e->domain_flags);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
             gop->status = result = GNTST_general_error;
@@ -908,11 +909,11 @@ gnttab_donate(gnttab_donate_t *uop, unsigned int count)
         
         spin_unlock(&e->page_alloc_lock);
         
-        /*
-         * Transfer is all done: tell the guest about its new page
-         * frame.
-         */
-        gnttab_notify_transfer(e, d, gop->handle, gop->mfn);
+        /* Tell the guest about its new page frame. */
+        sha = &e->grant_table->shared[gop->ref];
+        sha->frame = gop->mfn;
+        wmb();
+        sha->flags |= GTF_transfer_completed;
         
         put_domain(e);
         
@@ -960,11 +961,11 @@ do_grant_table_op(
         rc = gnttab_dump_table((gnttab_dump_table_t *)uop);
         break;
 #endif
-    case GNTTABOP_donate:
+    case GNTTABOP_transfer:
         if (unlikely(!array_access_ok(
-            uop, count, sizeof(gnttab_donate_t))))
+            uop, count, sizeof(gnttab_transfer_t))))
             goto out;
-        rc = gnttab_donate(uop, count);
+        rc = gnttab_transfer(uop, count);
         break;
     default:
         rc = -ENOSYS;
@@ -1169,46 +1170,6 @@ gnttab_prepare_for_transfer(
  fail:
     spin_unlock(&rgt->lock);
     return 0;
-}
-
-void 
-gnttab_notify_transfer(
-    struct domain *rd, struct domain *ld, grant_ref_t ref, unsigned long frame)
-{
-    grant_entry_t  *sha;
-    unsigned long   pfn;
-
-#if GRANT_DEBUG_VERBOSE
-    DPRINTK("gnttab_notify_transfer rd(%hu) ld(%hu) ref(%hu).\n",
-            rd->domain_id, ld->domain_id, ref);
-#endif
-
-    sha = &rd->grant_table->shared[ref];
-
-    spin_lock(&rd->grant_table->lock);
-
-    pfn = sha->frame;
-
-    if ( unlikely(pfn >= max_page ) )
-        DPRINTK("Bad pfn (%lx)\n", pfn);
-    else
-    {
-        set_pfn_from_mfn(frame, pfn);
-
-        if ( unlikely(shadow_mode_log_dirty(ld)))
-             mark_dirty(ld, frame);
-
-        if (shadow_mode_translate(ld))
-            set_mfn_from_pfn(pfn, frame);
-    }
-    sha->frame = __mfn_to_gpfn(rd, frame);
-    sha->domid = rd->domain_id;
-    wmb();
-    sha->flags = ( GTF_accept_transfer | GTF_transfer_completed );
-
-    spin_unlock(&rd->grant_table->lock);
-
-    return;
 }
 
 int 

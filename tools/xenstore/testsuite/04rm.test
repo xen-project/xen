@@ -1,11 +1,10 @@
-# Remove non-existant fails.
-expect rm failed: No such file or directory
+# Remove non-existant is OK, as long as parent exists
 rm /test
 expect rm failed: No such file or directory
 rm /dir/test
 
 # Create file and remove it
-write /test excl contents
+write /test contents
 rm /test
 
 # Create directory and remove it.
@@ -14,5 +13,5 @@ rm /dir
 
 # Create directory, create file, remove all.
 mkdir /dir
-write /dir/test excl contents
+write /dir/test contents
 rm /dir

@@ -377,12 +377,13 @@ static void inline __update_guest_eip(unsigned long inst_len)
 
 static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs) 
 {
-    unsigned long eip;
     unsigned long gpa; /* FIXME: PAE */
     int result;
 
-#if VMX_DEBUG
+#if 0 /* keep for debugging */
     {
+        unsigned long eip;
+
         __vmread(GUEST_RIP, &eip);
         VMX_DBG_LOG(DBG_LEVEL_VMMU, 
                     "vmx_do_page_fault = 0x%lx, eip = %lx, error_code = %lx",
@@ -429,9 +430,9 @@ static void vmx_do_no_device_fault(void)
         
     clts();
     setup_fpu(current);
-    __vmread(CR0_READ_SHADOW, &cr0);
+    __vmread_vcpu(CR0_READ_SHADOW, &cr0);
     if (!(cr0 & X86_CR0_TS)) {
-        __vmread(GUEST_CR0, &cr0);
+        __vmread_vcpu(GUEST_CR0, &cr0);
         cr0 &= ~X86_CR0_TS;
         __vmwrite(GUEST_CR0, cr0);
     }
@@ -470,6 +471,8 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
         }
 #endif
 
+        /* Unsupportable for virtualised CPUs. */
+        clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
     }
 
     regs->eax = (unsigned long) eax;
@@ -1100,6 +1103,11 @@ static int vmx_set_cr0(unsigned long value)
                     d->arch.arch_vmx.cpu_cr3, mfn);
     }
 
+    if(!((value & X86_CR0_PE) && (value & X86_CR0_PG)) && paging_enabled)
+        if(d->arch.arch_vmx.cpu_cr3)
+            put_page(pfn_to_page(get_mfn_from_pfn(
+                      d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT)));
+
     /*
      * VMX does not implement real-mode virtualization. We emulate
      * real-mode by performing a world switch to VMXAssist whenever
@@ -1124,9 +1132,7 @@ static int vmx_set_cr0(unsigned long value)
                 __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
             }
         }
-        __vmread(GUEST_RIP, &eip);
-        VMX_DBG_LOG(DBG_LEVEL_1,
-                    "Disabling CR0.PE at %%eip 0x%lx\n", eip);
+
         if (vmx_assist(d, VMX_ASSIST_INVOKE)) {
             set_bit(VMX_CPU_STATE_ASSIST_ENABLED, &d->arch.arch_vmx.cpu_state);
             __vmread(GUEST_RIP, &eip);
@@ -1365,17 +1371,17 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
         clts();
         setup_fpu(current);
 
-        __vmread(GUEST_CR0, &value);
+        __vmread_vcpu(GUEST_CR0, &value);
         value &= ~X86_CR0_TS; /* clear TS */
         __vmwrite(GUEST_CR0, value);
 
-        __vmread(CR0_READ_SHADOW, &value);
+        __vmread_vcpu(CR0_READ_SHADOW, &value);
         value &= ~X86_CR0_TS; /* clear TS */
         __vmwrite(CR0_READ_SHADOW, value);
         break;
     case TYPE_LMSW:
         TRACE_VMEXIT(1,TYPE_LMSW);
-        __vmread(CR0_READ_SHADOW, &value);
+        __vmread_vcpu(CR0_READ_SHADOW, &value);
         value = (value & ~0xF) |
             (((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
         return vmx_set_cr0(value);
@@ -1451,17 +1457,13 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
                 (unsigned long)regs->edx);
 }
 
+volatile unsigned long do_hlt_count;
 /*
  * Need to use this exit to reschedule
  */
-static inline void vmx_vmexit_do_hlt(void)
+void vmx_vmexit_do_hlt(void)
 {
-#if VMX_DEBUG
-    unsigned long eip;
-    __vmread(GUEST_RIP, &eip);
-#endif
-    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_hlt:eip=%lx", eip);
-    raise_softirq(SCHEDULE_SOFTIRQ);
+    do_block();
 }
 
 static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
@@ -1509,16 +1511,6 @@ static inline void vmx_vmexit_do_extint(struct cpu_user_regs *regs)
         do_IRQ(regs);
         break;
     }
-}
-
-static inline void vmx_vmexit_do_mwait(void)
-{
-#if VMX_DEBUG
-    unsigned long eip;
-    __vmread(GUEST_RIP, &eip);
-#endif
-    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_mwait:eip=%lx", eip);
-    raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
 #define BUF_SIZ     256
@@ -1626,9 +1618,13 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         return;
     }
 
-    __vmread(GUEST_RIP, &eip);
-    TRACE_3D(TRC_VMX_VMEXIT, v->domain->domain_id, eip, exit_reason);
-    TRACE_VMEXIT(0,exit_reason);
+#ifdef TRACE_BUFFER
+    {
+        __vmread(GUEST_RIP, &eip);
+        TRACE_3D(TRC_VMX_VMEXIT, v->domain->domain_id, eip, exit_reason);
+        TRACE_VMEXIT(0,exit_reason);
+    }
+#endif
 
     switch (exit_reason) {
     case EXIT_REASON_EXCEPTION_NMI:
@@ -1798,9 +1794,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         __update_guest_eip(inst_len);
         break;
     case EXIT_REASON_MWAIT_INSTRUCTION:
-        __get_instruction_length(inst_len);
-        __update_guest_eip(inst_len);
-        vmx_vmexit_do_mwait();
+        __vmx_bug(&regs);
         break;
     default:
         __vmx_bug(&regs);       /* should not happen */

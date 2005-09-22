@@ -85,7 +85,7 @@ class SrvDomainDir(SrvDir):
     def _op_create_cb(self, dominfo, configstring, req):
         """Callback to handle domain creation.
         """
-        dom = dominfo.name
+        dom = dominfo.getName()
         domurl = "%s/%s" % (req.prePathURL(), dom)
         req.setResponseCode(http.CREATED, "created")
         req.setHeader("Location", domurl)
@@ -112,7 +112,7 @@ class SrvDomainDir(SrvDir):
         fn = FormFn(self.xd.domain_restore,
                     [['file', 'str']])
         dominfo = fn(req.args)
-        dom = dominfo.name
+        dom = dominfo.getName()
         domurl = "%s/%s" % (req.prePathURL(), dom)
         req.setResponseCode(http.CREATED)
         req.setHeader("Location", domurl)
@@ -152,12 +152,12 @@ class SrvDomainDir(SrvDir):
             domains = self.xd.list_sorted()
             req.write('<ul>')
             for d in domains:
-               req.write('<li><a href="%s%s"> Domain %s</a>'
-                         % (url, d.name, d.name))
-               req.write('id=%s' % d.domid)
-               req.write('memory=%d'% d.memory)
-               req.write('ssidref=%d'% d.ssidref)
-               req.write('</li>')
+                req.write('<li><a href="%s%s"> Domain %s</a>'
+                          % (url, d.getName(), d.getName()))
+                req.write('id=%s' % d.getDomain())
+                req.write('memory=%d'% d.getMemoryTarget())
+                req.write('ssidref=%d'% d.getSsidref())
+                req.write('</li>')
             req.write('</ul>')
 
     def form(self, req):

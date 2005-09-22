@@ -18,6 +18,8 @@
 import sys
 import socket
 import types
+import time
+import errno
 
 from connection import *
 from protocol import *
@@ -35,9 +37,20 @@ class TCPListener(SocketListener):
     def createSocket(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        addr = (self.interface, self.port)
-        sock.bind(addr)
-        return sock
+
+        # SO_REUSEADDR does not always ensure that we do not get an address
+        # in use error when restarted quickly
+        # we implement a timeout to try and avoid failing unnecessarily
+        timeout = time.time() + 30
+        while True:
+            try:
+                sock.bind((self.interface, self.port))
+                return sock
+            except socket.error, (_errno, strerrno):
+                if _errno == errno.EADDRINUSE and time.time() < timeout:
+                    time.sleep(0.5)
+                else:
+                    raise
 
     def acceptConnection(self, sock, protocol, addr):
         return TCPServerConnection(sock, protocol, addr, self)

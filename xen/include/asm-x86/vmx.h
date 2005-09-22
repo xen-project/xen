@@ -314,6 +314,57 @@ static always_inline int ___vmread (const unsigned long field,  void *ptr, const
     return 0;
 }
 
+
+static always_inline void __vmwrite_vcpu(unsigned long field, unsigned long value)
+{
+    struct vcpu *v = current;
+
+    switch(field) {
+    case CR0_READ_SHADOW:
+	v->arch.arch_vmx.cpu_shadow_cr0 = value;
+	break;
+    case GUEST_CR0:
+	v->arch.arch_vmx.cpu_cr0 = value;
+	break;
+    case CPU_BASED_VM_EXEC_CONTROL:
+	v->arch.arch_vmx.cpu_based_exec_control = value;
+	break;
+    default:
+	printk("__vmwrite_cpu: invalid field %lx\n", field);
+	break;
+    }
+}
+
+static always_inline void __vmread_vcpu(unsigned long field, unsigned long *value)
+{
+    struct vcpu *v = current;
+
+    switch(field) {
+    case CR0_READ_SHADOW:
+	*value = v->arch.arch_vmx.cpu_shadow_cr0;
+	break;
+    case GUEST_CR0:
+	*value = v->arch.arch_vmx.cpu_cr0;
+	break;
+    case CPU_BASED_VM_EXEC_CONTROL:
+	*value = v->arch.arch_vmx.cpu_based_exec_control;
+	break;
+    default:
+	printk("__vmread_cpu: invalid field %lx\n", field);
+	break;
+    }
+
+   /* 
+    * __vmwrite() can be used for non-current vcpu, and it's possible that
+    * the vcpu field is not initialized at that case.
+    * 
+    */
+    if (!*value) {
+	__vmread(field, value);
+	__vmwrite_vcpu(field, *value);
+    }
+}
+
 static inline int __vmwrite (unsigned long field, unsigned long value)
 {
     unsigned long eflags;
@@ -326,6 +377,15 @@ static inline int __vmwrite (unsigned long field, unsigned long value)
     __save_flags(eflags);
     if (eflags & X86_EFLAGS_ZF || eflags & X86_EFLAGS_CF)
         return -1;
+
+    switch(field) {
+    case CR0_READ_SHADOW:
+    case GUEST_CR0:
+    case CPU_BASED_VM_EXEC_CONTROL:
+	__vmwrite_vcpu(field, value);
+	break;
+    }
+
     return 0;
 }
 
@@ -379,11 +439,12 @@ static inline void vmx_stts(void)
 {
     unsigned long cr0;
 
-    __vmread(GUEST_CR0, &cr0);
-    if (!(cr0 & X86_CR0_TS))
+    __vmread_vcpu(GUEST_CR0, &cr0);
+    if (!(cr0 & X86_CR0_TS)) {
         __vmwrite(GUEST_CR0, cr0 | X86_CR0_TS);
+    }
 
-    __vmread(CR0_READ_SHADOW, &cr0);
+    __vmread_vcpu(CR0_READ_SHADOW, &cr0);
     if (!(cr0 & X86_CR0_TS))
        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
 }
@@ -393,7 +454,7 @@ static inline int vmx_paging_enabled(struct vcpu *v)
 {
     unsigned long cr0;
 
-    __vmread(CR0_READ_SHADOW, &cr0);
+    __vmread_vcpu(CR0_READ_SHADOW, &cr0);
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
 }
 

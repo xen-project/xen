@@ -69,7 +69,7 @@ TDDL_TransmitData( TDDL_BYTE* in,
     ERRORDIE (TPM_IOERROR);
   }
   else if ((TDDL_UINT32) size < insize) {
-    vtpmlogerror(VTPM_LOG_TXDATA, "Wrote %d instead of %d bytes!\n", size, insize);
+    vtpmlogerror(VTPM_LOG_TXDATA, "Wrote %d instead of %d bytes!\n", (int) size, insize);
     // ... ?
   }
 

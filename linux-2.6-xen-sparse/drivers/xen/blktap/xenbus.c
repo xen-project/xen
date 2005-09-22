@@ -172,6 +172,7 @@ static int blkback_probe(struct xenbus_device *dev,
 	be->dev = dev;
 	be->backend_watch.node = dev->nodename;
 	be->backend_watch.callback = backend_changed;
+	/* Registration implicitly fires backend_changed once */
 	err = register_xenbus_watch(&be->backend_watch);
 	if (err) {
 		be->backend_watch.node = NULL;
@@ -193,8 +194,6 @@ static int blkback_probe(struct xenbus_device *dev,
 	}
 
 	dev->data = be;
-
-	backend_changed(&be->backend_watch, dev->nodename);
 	return 0;
 
  free_be:
@@ -223,3 +222,13 @@ void blkif_xenbus_init(void)
 {
 	xenbus_register_backend(&blkback);
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

@@ -1,5 +1,4 @@
 
-from xen.sv.HTMLBase import HTMLBase
 from xen.sv.NodeInfo import NodeInfo
 from xen.sv.DomInfo  import DomInfo
 from xen.sv.CreateDomain import CreateDomain
@@ -33,15 +32,8 @@ class Args:
             result.append( (key, self.fieldStorage.getlist( key ) ) )
         return result
                                                                                                                                                             
-class TwistedAdapter:
-    def __init__( self, req ):
-        self.args = Args( req )
-        self.uri = req.unparsed_uri
-        self.url = req.uri
-        self.write = req.write
-
 # This is the Main class
-# It peices together all the modules
+# It pieces together all the modules
 
 class Main:
     def __init__( self ):
@@ -61,7 +53,7 @@ class Main:
             self.init_modules( request )
             self.init_done = True
             
-        for moduleName, module in self.modules.iteritems():
+        for _, module in self.modules.iteritems():
             module.write_MENU( request )
             request.write( "\n" )
 

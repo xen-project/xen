@@ -46,7 +46,6 @@
 #include <asm-xen/xen-public/io/tpmif.h>
 #include <asm/uaccess.h>
 #include <asm-xen/xenbus.h>
-#include <asm-xen/xen-public/io/domain_controller.h>
 #include <asm-xen/xen-public/grant_table.h>
 
 #include "tpmfront.h"
@@ -258,18 +257,24 @@ static int setup_tpmring(struct xenbus_device *dev,
 
 	tpm_allocate_buffers(tp);
 
-	info->ring_ref = gnttab_claim_grant_reference(&gref_head);
-	ASSERT(info->ring_ref != -ENOSPC);
-	gnttab_grant_foreign_access_ref(info->ring_ref,
-					backend_id,
-					(virt_to_machine(tp->tx) >> PAGE_SHIFT),
-					0);
+	err = gnttab_grant_foreign_access(backend_id,
+					  (virt_to_machine(tp->tx) >> PAGE_SHIFT),
+					  0);
+
+	if (err == -ENOSPC) {
+		free_page((unsigned long)sring);
+		tp->tx = NULL;
+		xenbus_dev_error(dev, err, "allocating grant reference");
+		return err;
+	}
+	info->ring_ref = err;
 
 	op.u.alloc_unbound.dom = backend_id;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
+		gnttab_end_foreign_access(info->ring_ref, 0);
 		free_page((unsigned long)sring);
-		tp->tx = 0;
+		tp->tx = NULL;
 		xenbus_dev_error(dev, err, "allocating event channel");
 		return err;
 	}
@@ -283,6 +288,7 @@ static void destroy_tpmring(struct tpmfront_info *info, struct tpm_private *tp)
 	tpmif_set_connected_state(tp,0);
 
 	if ( tp->tx != NULL ) {
+		gnttab_end_foreign_access(info->ring_ref, 0);
 		free_page((unsigned long)tp->tx);
 		tp->tx = NULL;
 	}
@@ -412,7 +418,6 @@ static int tpmfront_probe(struct xenbus_device *dev,
 		return err;
 	}
 
-	watch_for_status(&info->watch, info->watch.node);
 	return 0;
 }
 
@@ -736,3 +741,13 @@ tpmif_init(void)
 }
 
 __initcall(tpmif_init);
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

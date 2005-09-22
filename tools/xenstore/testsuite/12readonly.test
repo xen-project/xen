@@ -1,6 +1,6 @@
 # Test that read only connection can't alter store.
 
-write /test create contents
+write /test contents
 
 readonly
 expect test
@@ -20,9 +20,9 @@ abort
 
 # These don't work
 expect write failed: Read-only file system
-write /test2 create contents
+write /test2 contents
 expect write failed: Read-only file system
-write /test create contents
+write /test contents
 expect setperm failed: Read-only file system
 setperm /test 100 NONE
 expect setperm failed: Read-only file system
@@ -35,7 +35,7 @@ introduce 1 100 7 /home
 # Check that watches work like normal.
 watch / token
 1 readwrite
-1 write /test create contents
+1 write /test contents
 expect /test:token
 waitwatch
 ackwatch token

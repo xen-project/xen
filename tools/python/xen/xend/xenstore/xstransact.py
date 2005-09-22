@@ -41,7 +41,11 @@ class xstransact:
 
     def _read(self, key):
         path = "%s/%s" % (self.path, key)
-        return xshandle().read(path)
+        try:
+            return xshandle().read(path)
+        except RuntimeError, ex:
+            raise RuntimeError(ex.args[0],
+                               '%s, while reading %s' % (ex.args[1], path))
 
     def read(self, *args):
         if len(args) == 0:
@@ -53,13 +57,16 @@ class xstransact:
             ret.append(self._read(key))
         return ret
 
-    def _write(self, key, data, create=True, excl=False):
+    def _write(self, key, data):
         path = "%s/%s" % (self.path, key)
-        xshandle().write(path, data, create=create, excl=excl)
+        try:
+            xshandle().write(path, data)
+        except RuntimeError, ex:
+            raise RuntimeError(ex.args[0],
+                               ('%s, while writing %s : %s' %
+                                (ex.args[1], path, str(data))))
 
     def write(self, *args, **opts):
-        create = opts.get('create') or True
-        excl = opts.get('excl') or False
         if len(args) == 0:
             raise TypeError
         if isinstance(args[0], dict):
@@ -67,15 +74,19 @@ class xstransact:
                 if not isinstance(d, dict):
                     raise TypeError
                 for key in d.keys():
-                    self._write(key, d[key], create, excl)
+                    try:
+                        self._write(key, d[key])
+                    except TypeError, msg:
+                        raise TypeError('Writing %s: %s: %s' %
+                                        (key, str(d[key]), msg))
         elif isinstance(args[0], list):
             for l in args:
                 if not len(l) == 2:
                     raise TypeError
-                self._write(l[0], l[1], create, excl)
+                self._write(l[0], l[1])
         elif len(args) % 2 == 0:
             for i in range(len(args) / 2):
-                self._write(args[i * 2], args[i * 2 + 1], create, excl)
+                self._write(args[i * 2], args[i * 2 + 1])
         else:
             raise TypeError
 
@@ -84,10 +95,15 @@ class xstransact:
         return xshandle().rm(path)
 
     def remove(self, *args):
+        """If no arguments are given, remove this transaction's path.
+        Otherwise, treat each argument as a subpath to this transaction's
+        path, and remove each of those instead.
+        """
         if len(args) == 0:
-            raise TypeError
-        for key in args:
-            self._remove(key)
+            xshandle().rm(self.path)
+        else:
+            for key in args:
+                self._remove(key)
 
     def _list(self, key):
         path = "%s/%s" % (self.path, key)
@@ -114,10 +130,20 @@ class xstransact:
                 defval = None
             else:
                 (key, fn, defval) = tup
-            try:
-                val = fn(self._read(key))
-            except TypeError:
+
+            val = self._read(key)
+            # If fn is str, then this will successfully convert None to
+            # 'None'.  If it is int, then it will throw TypeError on None, or
+            # on any other non-integer value.  We have to, therefore, both
+            # check explicitly for None, and catch TypeError.  Either failure
+            # will result in defval being used instead.
+            if val is None:
                 val = defval
+            else:
+                try:
+                    val = fn(val)
+                except TypeError:
+                    val = defval
             ret.append(val)
         if len(ret) == 1:
             return ret[0]
@@ -146,8 +172,8 @@ class xstransact:
 
     def Read(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 v = t.read(*args)
                 t.commit()
                 return v
@@ -165,8 +191,8 @@ class xstransact:
 
     def Write(cls, path, *args, **opts):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 t.write(*args, **opts)
                 t.commit()
                 return
@@ -183,9 +209,13 @@ class xstransact:
     Write = classmethod(Write)
 
     def Remove(cls, path, *args):
+        """If only one argument is given (path), remove it.  Otherwise, treat
+        each further argument as a subpath to the given path, and remove each
+        of those instead.  This operation is performed inside a transaction.
+        """
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 t.remove(*args)
                 t.commit()
                 return
@@ -203,8 +233,8 @@ class xstransact:
 
     def List(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 v = t.list(*args)
                 t.commit()
                 return v
@@ -222,8 +252,8 @@ class xstransact:
 
     def Gather(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 v = t.gather(*args)
                 t.commit()
                 return v
@@ -241,8 +271,8 @@ class xstransact:
 
     def Store(cls, path, *args):
         while True:
+            t = cls(path)
             try:
-                t = cls(path)
                 v = t.store(*args)
                 t.commit()
                 return v

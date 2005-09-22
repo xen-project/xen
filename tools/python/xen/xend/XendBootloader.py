@@ -12,7 +12,7 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-import os, sys, select, errno
+import os, select, errno
 import sxp
 
 from XendLogging import log
@@ -72,7 +72,7 @@ def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
         if len(s) == 0:
             break
         
-    (pid, status) = os.waitpid(child, 0)
+    os.waitpid(child, 0)
     os.close(r)
     os.unlink(BL_FIFO)
 
@@ -89,6 +89,4 @@ def bootloader(blexec, disk, quiet = 0, vcpus = None, entry = None):
     if vcpus and sxp.child_value(config_image, "vcpus") is None:
         config_image.append(['vcpus', vcpus])
 
-    config = ['image', config_image]
-    return config
-
+    return config_image

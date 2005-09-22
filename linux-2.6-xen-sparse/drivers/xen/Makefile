@@ -1,4 +1,5 @@
 
+obj-y	+= util.o
 
 obj-y	+= console/
 obj-y	+= evtchn/

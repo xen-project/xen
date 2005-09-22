@@ -2,7 +2,8 @@
 #define TPM_FRONT_H
 
 
-struct tpm_private {
+struct tpm_private
+{
 	tpmif_tx_interface_t *tx;
 	unsigned int evtchn;
 	int connected;
@@ -29,10 +30,21 @@ struct tpmfront_info
 };
 
 
-struct tx_buffer {
+struct tx_buffer
+{
 	unsigned int size;	// available space in data
 	unsigned int len;	// used space in data
 	unsigned char *data;    // pointer to a page
 };
 
 #endif
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

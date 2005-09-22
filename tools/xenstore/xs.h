@@ -53,18 +53,18 @@ char **xs_directory(struct xs_handle *h, const char *path, unsigned int *num);
 void *xs_read(struct xs_handle *h, const char *path, unsigned int *len);
 
 /* Write the value of a single file.
- * Returns false on failure.  createflags can be 0, O_CREAT, or O_CREAT|O_EXCL.
+ * Returns false on failure.
  */
 bool xs_write(struct xs_handle *h, const char *path, const void *data,
-	      unsigned int len, int createflags);
+	      unsigned int len);
 
 /* Create a new directory.
- * Returns false on failure.
+ * Returns false on failure, or success if it already exists.
  */
 bool xs_mkdir(struct xs_handle *h, const char *path);
 
 /* Destroy a file or directory (and children).
- * Returns false on failure.
+ * Returns false on failure, or success if it doesn't exist.
  */
 bool xs_rm(struct xs_handle *h, const char *path);
 
