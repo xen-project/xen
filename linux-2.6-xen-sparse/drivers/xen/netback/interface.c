@@ -8,7 +8,6 @@
 
 #include "common.h"
 #include <linux/rtnetlink.h>
-#include <asm-xen/driver_util.h>
 
 static void __netif_up(netif_t *netif)
 {
@@ -113,20 +112,20 @@ netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 	return netif;
 }
 
-static int map_frontend_pages(netif_t *netif, unsigned long localaddr,
-                              unsigned long tx_ring_ref, 
-                              unsigned long rx_ring_ref)
+static int map_frontend_pages(
+	netif_t *netif, grant_ref_t tx_ring_ref, grant_ref_t rx_ring_ref)
 {
-#ifdef CONFIG_XEN_NETDEV_GRANT
 	struct gnttab_map_grant_ref op;
 
-	/* Map: Use the Grant table reference */
-	op.host_addr = localaddr;
+	op.host_addr = (unsigned long)netif->comms_area->addr;
 	op.flags     = GNTMAP_host_map;
 	op.ref       = tx_ring_ref;
 	op.dom       = netif->domid;
     
-	BUG_ON( HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) );
+	lock_vm_area(netif->comms_area);
+	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
+	unlock_vm_area(netif->comms_area);
+
 	if (op.handle < 0) { 
 		DPRINTK(" Gnttab failure mapping tx_ring_ref!\n");
 		return op.handle;
@@ -134,15 +133,16 @@ static int map_frontend_pages(netif_t *netif, unsigned long localaddr,
 
 	netif->tx_shmem_ref    = tx_ring_ref;
 	netif->tx_shmem_handle = op.handle;
-	netif->tx_shmem_vaddr  = localaddr;
 
-	/* Map: Use the Grant table reference */
-	op.host_addr = localaddr + PAGE_SIZE;
+	op.host_addr = (unsigned long)netif->comms_area->addr + PAGE_SIZE;
 	op.flags     = GNTMAP_host_map;
 	op.ref       = rx_ring_ref;
 	op.dom       = netif->domid;
 
-	BUG_ON( HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1) );
+	lock_vm_area(netif->comms_area);
+	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
+	unlock_vm_area(netif->comms_area);
+
 	if (op.handle < 0) { 
 		DPRINTK(" Gnttab failure mapping rx_ring_ref!\n");
 		return op.handle;
@@ -150,63 +150,44 @@ static int map_frontend_pages(netif_t *netif, unsigned long localaddr,
 
 	netif->rx_shmem_ref    = rx_ring_ref;
 	netif->rx_shmem_handle = op.handle;
-	netif->rx_shmem_vaddr  = localaddr + PAGE_SIZE;
-
-#else
-	pgprot_t prot = __pgprot(_KERNPG_TABLE);
-	int      err;
-
-	err = direct_remap_pfn_range(
-		&init_mm, localaddr,
-		tx_ring_ref, PAGE_SIZE,
-		prot, netif->domid); 
-    
-	err |= direct_remap_pfn_range(
-		&init_mm, localaddr + PAGE_SIZE,
-		rx_ring_ref, PAGE_SIZE,
-		prot, netif->domid);
-
-	if (err)
-		return err;
-#endif
 
 	return 0;
 }
 
 static void unmap_frontend_pages(netif_t *netif)
 {
-#ifdef CONFIG_XEN_NETDEV_GRANT
 	struct gnttab_unmap_grant_ref op;
 
-	op.host_addr    = netif->tx_shmem_vaddr;
+	op.host_addr    = (unsigned long)netif->comms_area->addr;
 	op.handle       = netif->tx_shmem_handle;
 	op.dev_bus_addr = 0;
-	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
 
-	op.host_addr    = netif->rx_shmem_vaddr;
+	lock_vm_area(netif->comms_area);
+	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
+	unlock_vm_area(netif->comms_area);
+
+	op.host_addr    = (unsigned long)netif->comms_area->addr + PAGE_SIZE;
 	op.handle       = netif->rx_shmem_handle;
 	op.dev_bus_addr = 0;
-	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
-#endif
 
-	return; 
+	lock_vm_area(netif->comms_area);
+	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1));
+	unlock_vm_area(netif->comms_area);
 }
 
 int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	      unsigned long rx_ring_ref, unsigned int evtchn)
 {
-	struct vm_struct *vma;
 	evtchn_op_t op = { .cmd = EVTCHNOP_bind_interdomain };
 	int err;
 
-	vma = prepare_vm_area(2*PAGE_SIZE);
-	if (vma == NULL)
+	netif->comms_area = alloc_vm_area(2*PAGE_SIZE);
+	if (netif->comms_area == NULL)
 		return -ENOMEM;
 
-	err = map_frontend_pages(
-		netif, (unsigned long)vma->addr, tx_ring_ref, rx_ring_ref);
+	err = map_frontend_pages(netif, tx_ring_ref, rx_ring_ref);
 	if (err) {
-		vunmap(vma->addr);
+		free_vm_area(netif->comms_area);
 		return err;
 	}
 
@@ -217,15 +198,16 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		unmap_frontend_pages(netif);
-		vunmap(vma->addr);
+		free_vm_area(netif->comms_area);
 		return err;
 	}
 
 	netif->evtchn = op.u.bind_interdomain.port1;
 	netif->remote_evtchn = evtchn;
 
-	netif->tx = (netif_tx_interface_t *)vma->addr;
-	netif->rx = (netif_rx_interface_t *)((char *)vma->addr + PAGE_SIZE);
+	netif->tx = (netif_tx_interface_t *)netif->comms_area->addr;
+	netif->rx = (netif_rx_interface_t *)
+		((char *)netif->comms_area->addr + PAGE_SIZE);
 	netif->tx->resp_prod = netif->rx->resp_prod = 0;
 	netif_get(netif);
 	wmb(); /* Other CPUs see new state before interface is started. */
@@ -262,7 +244,7 @@ static void free_netif_callback(void *arg)
 
 	if (netif->tx) {
 		unmap_frontend_pages(netif);
-		vunmap(netif->tx); /* Frees netif->rx as well. */
+		free_vm_area(netif->comms_area);
 	}
 
 	free_netdev(netif->dev);

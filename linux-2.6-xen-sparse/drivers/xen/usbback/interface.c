@@ -7,7 +7,6 @@
  */
 
 #include "common.h"
-#include <asm-xen/driver_util.h>
 
 #define USBIF_HASHSZ 1024
 #define USBIF_HASH(_d) (((int)(_d))&(USBIF_HASHSZ-1))
@@ -34,7 +33,7 @@ static void __usbif_disconnect_complete(void *arg)
      * may be outstanding requests at the device whose asynchronous responses
      * must still be notified to the remote driver.
      */
-    vunmap(usbif->usb_ring.sring);
+    free_vm_area(usbif->usb_ring_area);
 
     /* Construct the deferred response message. */
     cmsg.type         = CMSG_USBIF_BE;
@@ -140,7 +139,6 @@ void usbif_connect(usbif_be_connect_t *connect)
     domid_t       domid  = connect->domid;
     unsigned int  evtchn = connect->evtchn;
     unsigned long shmem_frame = connect->shmem_frame;
-    struct vm_struct *vma;
     pgprot_t      prot;
     int           error;
     usbif_priv_t *up;
@@ -155,14 +153,14 @@ void usbif_connect(usbif_be_connect_t *connect)
         return;
     }
 
-    if ( (vma = prepare_vm_area(PAGE_SIZE)) == NULL )
+    if ( (up->usb_ring_area = alloc_vm_area(PAGE_SIZE)) == NULL )
     {
         connect->status = USBIF_BE_STATUS_OUT_OF_MEMORY;
         return;
     }
 
     prot = __pgprot(_KERNPG_TABLE);
-    error = direct_remap_pfn_range(&init_mm, VMALLOC_VMADDR(vma->addr),
+    error = direct_remap_pfn_range(&init_mm, AREALLOC_AREADDR(area->addr),
                                     shmem_frame, PAGE_SIZE,
                                     prot, domid);
     if ( error != 0 )
@@ -173,18 +171,18 @@ void usbif_connect(usbif_be_connect_t *connect)
             connect->status = USBIF_BE_STATUS_MAPPING_ERROR;
         else
             connect->status = USBIF_BE_STATUS_ERROR;
-        vunmap(vma->addr);
+        free_vm_area(up->usb_ring_area);
         return;
     }
 
     if ( up->status != DISCONNECTED )
     {
         connect->status = USBIF_BE_STATUS_INTERFACE_CONNECTED;
-        vunmap(vma->addr);
+        free_vm_area(up->usb_ring_area);
         return;
     }
 
-    sring = (usbif_sring_t *)vma->addr;
+    sring = (usbif_sring_t *)area->addr;
     SHARED_RING_INIT(sring);
     BACK_RING_INIT(&up->usb_ring, sring, PAGE_SIZE);
 
