@@ -201,12 +201,11 @@ static u16 gr_info[32]={
 
 	RPT(r1), RPT(r2), RPT(r3),
 
-//#if defined(XEN) && defined(CONFIG_VTI)
 #if defined(XEN)
 	RPT(r4), RPT(r5), RPT(r6), RPT(r7),
-#else   //CONFIG_VTI
+#else
 	RSW(r4), RSW(r5), RSW(r6), RSW(r7),
-#endif  //CONFIG_VTI
+#endif
 
 	RPT(r8), RPT(r9), RPT(r10), RPT(r11),
 	RPT(r12), RPT(r13), RPT(r14), RPT(r15),
@@ -296,7 +295,6 @@ rotate_reg (unsigned long sor, unsigned long rrb, unsigned long reg)
 	return reg;
 }
 
-//#if defined(XEN) && defined(CONFIG_VTI)
 #if defined(XEN)
 void
 set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, unsigned long nat)
@@ -414,7 +412,7 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, unsigne
     }
 }
 
-#else // CONFIG_VTI
+#else
 static void
 set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, int nat)
 {
@@ -559,7 +557,7 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, int *na
 		*nat = 0;
 	return;
 }
-#endif // CONFIG_VTI
+#endif
 
 
 #ifdef XEN
@@ -595,11 +593,11 @@ setreg (unsigned long regnum, unsigned long val, int nat, struct pt_regs *regs)
 		unat = &sw->ar_unat;
 	} else {
 		addr = (unsigned long)regs;
-#if defined(XEN) && defined(CONFIG_VTI)
+#if defined(XEN)
 		unat = &regs->eml_unat;
-#else //CONFIG_VTI
+#else
 		unat = &sw->caller_unat;
-#endif  //CONFIG_VTI
+#endif
 	}
 	DPRINT("tmp_base=%lx switch_stack=%s offset=%d\n",
 	       addr, unat==&sw->ar_unat ? "yes":"no", GR_OFFS(regnum));
@@ -785,11 +783,11 @@ getreg (unsigned long regnum, unsigned long *val, int *nat, struct pt_regs *regs
 		unat = &sw->ar_unat;
 	} else {
 		addr = (unsigned long)regs;
-#if defined(XEN) && defined(CONFIG_VTI)
+#if defined(XEN)
 		unat = &regs->eml_unat;;
-#else   //CONFIG_VTI
+#else
 		unat = &sw->caller_unat;
-#endif  //CONFIG_VTI
+#endif
 	}
 
 	DPRINT("addr_base=%lx offset=0x%x\n", addr,  GR_OFFS(regnum));

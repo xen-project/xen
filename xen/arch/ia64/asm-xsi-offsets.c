@@ -32,10 +32,8 @@
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <public/xen.h>
-#ifdef CONFIG_VTI
 #include <asm/tlb.h>
 #include <asm/regs.h>
-#endif // CONFIG_VTI
 
 #define task_struct vcpu
 

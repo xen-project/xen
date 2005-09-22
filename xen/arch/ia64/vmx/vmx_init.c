@@ -163,7 +163,8 @@ void vmx_setup_platform(struct vcpu *v, struct vcpu_guest_context *c)
 	}
 
 	/* FIXME: only support PMT table continuously by far */
-	d->arch.pmt = __va(c->pt_base);
+//	d->arch.pmt = __va(c->pt_base);
+
 
 	vmx_final_setup_domain(d);
 }
@@ -209,7 +210,6 @@ static vpd_t *alloc_vpd(void)
 }
 
 
-#ifdef CONFIG_VTI
 /*
  * Create a VP on intialized VMX environment.
  */
@@ -333,7 +333,6 @@ vmx_change_double_mapping(struct vcpu *v, u64 oldrr7, u64 newrr7)
 				  pte_xen, pte_vhpt);
 }
 #endif // XEN_DBL_MAPPING
-#endif // CONFIG_VTI
 
 /*
  * Initialize VMX envirenment for guest. Only the 1st vp/vcpu
@@ -355,7 +354,11 @@ vmx_final_setup_domain(struct domain *d)
     v->arch.privregs = vpd;
 	vpd->virt_env_vaddr = vm_buffer;
 
-#ifdef CONFIG_VTI
+	/* Per-domain vTLB and vhpt implementation. Now vmx domain will stick
+	 * to this solution. Maybe it can be deferred until we know created
+	 * one as vmx domain */
+	v->arch.vtlb = init_domain_tlb(v);
+
 	/* v->arch.schedule_tail = arch_vmx_do_launch; */
 	vmx_create_vp(v);
 
@@ -369,7 +372,6 @@ vmx_final_setup_domain(struct domain *d)
 
 	vlsapic_reset(v);
 	vtm_init(v);
-#endif
 
 	/* Other vmx specific initialization work */
 }
@@ -483,7 +485,7 @@ int vmx_alloc_contig_pages(struct domain *d)
 	    for (j = io_ranges[i].start;
 		 j < io_ranges[i].start + io_ranges[i].size;
 		 j += PAGE_SIZE)
-		map_domain_io_page(d, j);
+		map_domain_page(d, j, io_ranges[i].type);
 	}
 
 	set_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags);

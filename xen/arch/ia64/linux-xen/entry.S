@@ -223,9 +223,20 @@ GLOBAL_ENTRY(ia64_switch_to)
 #else
 	mov IA64_KR(CURRENT)=in0	// update "current" application register
 #endif
+#ifdef XEN          //for VTI domain current is save to 21 of bank0
+    ;;
+    bsw.0
+    ;;
 	mov r8=r13			// return pointer to previously running task
 	mov r13=in0			// set "current" pointer
+    mov r21=in0
+    ;;
+    bsw.1
 	;;
+#else
+    mov r8=r13          // return pointer to previously running task
+    mov r13=in0         // set "current" pointer
+#endif
 	DO_LOAD_SWITCH_STACK
 
 #ifdef CONFIG_SMP
@@ -632,12 +643,14 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
 #ifdef XEN
 	// new domains are cloned but not exec'ed so switch to user mode here
 	cmp.ne pKStk,pUStk=r0,r0
-#ifdef CONFIG_VTI
-    br.cond.spnt ia64_leave_hypervisor
-#else // CONFIG_VTI
-    br.cond.spnt ia64_leave_kernel
-#endif // CONFIG_VTI
-
+    adds r16 = IA64_VCPU_FLAGS_OFFSET, r13
+    ;;
+    ld8 r16 = [r16]
+    ;;
+    cmp.ne p6,p7 = r16, r0
+ (p6) br.cond.spnt ia64_leave_hypervisor
+ (p7) br.cond.spnt ia64_leave_kernel
+    ;;
 //    adds r16 = IA64_VCPU_FLAGS_OFFSET, r13
 //    ;;
 //    ld8 r16 = [r16]

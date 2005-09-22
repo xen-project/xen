@@ -67,14 +67,14 @@ void schedule_tail(struct vcpu *next)
 	unsigned long rr7;
 	//printk("current=%lx,shared_info=%lx\n",current,current->vcpu_info);
 	//printk("next=%lx,shared_info=%lx\n",next,next->vcpu_info);
-#ifdef CONFIG_VTI
 	/* rr7 will be postponed to last point when resuming back to guest */
-	vmx_load_all_rr(current);
-#else // CONFIG_VTI
-	if (rr7 = load_region_regs(current)) {
-		printk("schedule_tail: change to rr7 not yet implemented\n");
-	}
-#endif // CONFIG_VTI
+    if(VMX_DOMAIN(current)){
+    	vmx_load_all_rr(current);
+    }else{
+	    if (rr7 = load_region_regs(current)) {
+		    printk("schedule_tail: change to rr7 not yet implemented\n");
+    	}
+    }
 }
 
 void tdpfoo(void) { }
@@ -755,7 +755,7 @@ unsigned long __hypercall_create_continuation(
 {
     struct mc_state *mcs = &mc_state[smp_processor_id()];
     VCPU *vcpu = current;
-    struct cpu_user_regs *regs = vcpu->arch.regs;
+    struct cpu_user_regs *regs = vcpu_regs(vcpu);
     unsigned int i;
     va_list args;
 

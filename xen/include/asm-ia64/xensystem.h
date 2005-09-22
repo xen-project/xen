@@ -34,7 +34,7 @@
 #define IA64_HAS_EXTRA_STATE(t) 0
 
 #undef __switch_to
-#ifdef CONFIG_VTI
+#if     1
 extern struct task_struct *vmx_ia64_switch_to (void *next_task);
 #define __switch_to(prev,next,last) do {	\
        ia64_save_fpu(prev->arch._thread.fph);	\
@@ -51,10 +51,13 @@ extern struct task_struct *vmx_ia64_switch_to (void *next_task);
                if (IA64_HAS_EXTRA_STATE(next)) \
                        ia64_save_extra(next);  \
        }                                       \
-       ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next); \
-       (last) = vmx_ia64_switch_to((next));        \
+	/*ia64_psr(ia64_task_regs(next))->dfh = !ia64_is_local_fpu_owner(next);*/			 \
+       (last) = ia64_switch_to((next));        \
+       if (!VMX_DOMAIN(current)){                   \
+    	   vcpu_set_next_timer(current);    		\
+       }                                       \
 } while (0)
-#else // CONFIG_VTI
+#else
 #define __switch_to(prev,next,last) do {							 \
 	ia64_save_fpu(prev->arch._thread.fph);							\
 	ia64_load_fpu(next->arch._thread.fph);							\
@@ -66,7 +69,7 @@ extern struct task_struct *vmx_ia64_switch_to (void *next_task);
 	(last) = ia64_switch_to((next));							 \
 	vcpu_set_next_timer(current);								\
 } while (0)
-#endif // CONFIG_VTI
+#endif
 
 #undef switch_to
 // FIXME SMP... see system.h, does this need to be different?

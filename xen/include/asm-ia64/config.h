@@ -199,11 +199,11 @@ void sort_main_extable(void);
      access_ok(type,addr,count*size))
 
 // see drivers/char/console.c
-#ifndef CONFIG_VTI
+#ifndef VALIDATE_VT
 #define	OPT_CONSOLE_STR "com1"
-#else // CONFIG_VTI
+#else
 #define	OPT_CONSOLE_STR "com2"
-#endif // CONFIG_VTI
+#endif
 
 #define __attribute_used__	__attribute__ ((unused))
 #define __nocast

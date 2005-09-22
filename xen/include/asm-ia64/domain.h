@@ -25,7 +25,6 @@ struct arch_domain {
     int breakimm;
 
     int imp_va_msb;
-    unsigned long *pmt;	/* physical to machine table */
     /* System pages out of guest memory, like for xenstore/console */
     unsigned long sys_pgnr;
     unsigned long max_pfn; /* Max pfn including I/O holes */
@@ -62,7 +61,6 @@ struct arch_vcpu {
 	unsigned long xen_itm;
 	unsigned long xen_timer_interval;
 #endif
-    void *regs;	/* temporary until find a better way to do privops */
     mapped_regs_t *privregs; /* save the state of vcpu */
     int metaphysical_rr0;		// from arch_domain (so is pinned)
     int metaphysical_rr4;		// from arch_domain (so is pinned)

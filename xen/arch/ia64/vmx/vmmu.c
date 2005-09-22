@@ -220,6 +220,7 @@ thash_cb_t *init_domain_tlb(struct vcpu *d)
  * by control panel. Dom0 has gpfn identical to mfn, which doesn't need
  * this interface at all.
  */
+#if 0
 void
 alloc_pmt(struct domain *d)
 {
@@ -234,7 +235,7 @@ alloc_pmt(struct domain *d)
     d->arch.pmt = page_to_virt(page);
     memset(d->arch.pmt, 0x55, d->max_pages * 8);
 }
-
+#endif
 /*
  * Insert guest TLB to machine TLB.
  *  data:   In TLB format

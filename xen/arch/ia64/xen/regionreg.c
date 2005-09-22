@@ -227,7 +227,7 @@ int set_one_rr(unsigned long rr, unsigned long val)
 		return 0;
 	}
 
-#ifdef CONFIG_VTI
+#if 0
 	memrrv.rrval = rrv.rrval;
 	if (rreg == 7) {
 		newrrv.rid = newrid;

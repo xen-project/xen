@@ -9,10 +9,8 @@
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <public/xen.h>
-#ifdef CONFIG_VTI
 #include <asm/tlb.h>
 #include <asm/regs.h>
-#endif // CONFIG_VTI
 
 #define task_struct vcpu
 
@@ -222,14 +220,12 @@ void foo(void)
 
 	BLANK();
 
-#ifdef  CONFIG_VTI
 	DEFINE(IA64_VPD_BASE_OFFSET, offsetof (struct vcpu, arch.privregs));
  	DEFINE(IA64_VLSAPIC_INSVC_BASE_OFFSET, offsetof (struct vcpu, arch.insvc[0]));
 	DEFINE(IA64_VPD_CR_VPTA_OFFSET, offsetof (cr_t, pta));
 	DEFINE(XXX_THASH_SIZE, sizeof (thash_data_t));
 
 	BLANK();
-#endif  //CONFIG_VTI
 	//DEFINE(IA64_SIGCONTEXT_IP_OFFSET, offsetof (struct sigcontext, sc_ip));
 	//DEFINE(IA64_SIGCONTEXT_AR_BSP_OFFSET, offsetof (struct sigcontext, sc_ar_bsp));
 	//DEFINE(IA64_SIGCONTEXT_AR_FPSR_OFFSET, offsetof (struct sigcontext, sc_ar_fpsr));

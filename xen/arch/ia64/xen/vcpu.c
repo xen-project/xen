@@ -1977,7 +1977,3 @@ IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 	return (IA64_ILLOP_FAULT);
 }
 
-void vcpu_set_regs(VCPU *vcpu, REGS *regs)
-{
-	vcpu->arch.regs = regs;
-}

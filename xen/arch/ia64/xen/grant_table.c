@@ -1,4 +1,3 @@
-#ifndef CONFIG_VTI
 // temporarily in arch/ia64 until can merge into common/grant_table.c
 /******************************************************************************
  * common/grant_table.c
@@ -1452,7 +1451,6 @@ grant_table_init(
 {
     /* Nothing. */
 }
-#endif
 
 /*
  * Local variables:

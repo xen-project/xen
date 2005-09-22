@@ -28,17 +28,13 @@ static unsigned long num_dma_physpages;
 /*
  * Set up the page tables.
  */
-#ifdef CONFIG_VTI
 unsigned long *mpt_table;
 unsigned long mpt_table_size;
-#endif // CONFIG_VTI
 
 void
 paging_init (void)
 {
 	struct pfn_info *pg;
-
-#ifdef CONFIG_VTI
 	unsigned int mpt_order;
 	/* Create machine to physical mapping table
 	 * NOTE: similar to frame table, later we may need virtually
@@ -53,8 +49,6 @@ paging_init (void)
 
 	printk("machine to physical table: 0x%lx\n", (u64)mpt_table);
 	memset(mpt_table, INVALID_M2P_ENTRY, mpt_table_size);
-#endif // CONFIG_VTI
-
 	/* Other mapping setup */
 
 	zero_page_memmap_ptr = virt_to_page(ia64_imva(empty_zero_page));

@@ -47,11 +47,13 @@ void hyper_mmu_update(void)
     vcpu_get_gr_nat(vcpu,17,&r33);
     vcpu_get_gr_nat(vcpu,18,&r34);
     vcpu_get_gr_nat(vcpu,19,&r35);
-    ret=do_mmu_update((mmu_update_t*)r32,r33,r34,r35);
+    ret=vmx_do_mmu_update((mmu_update_t*)r32,r33,r34,r35);
     vcpu_set_gr(vcpu, 8, ret, 0);
     vmx_vcpu_increment_iip(vcpu);
 }
-
+/* turn off temporarily, we will merge hypercall parameter convention with xeno, when
+    VTI domain need to call hypercall */
+#if 0
 unsigned long __hypercall_create_continuation(
     unsigned int op, unsigned int nr_args, ...)
 {
@@ -87,7 +89,7 @@ unsigned long __hypercall_create_continuation(
     va_end(args);
     return op;
 }
-
+#endif
 void hyper_dom_mem_op(void)
 {
     VCPU *vcpu=current;
@@ -184,14 +186,13 @@ void hyper_lock_page(void)
 
 static int do_set_shared_page(VCPU *vcpu, u64 gpa)
 {
-    u64 shared_info, o_info;
+    u64 o_info;
     struct domain *d = vcpu->domain;
     struct vcpu *v;
     if(vcpu->domain!=dom0)
         return -EPERM;
-    shared_info = __gpa_to_mpa(vcpu->domain, gpa);
     o_info = (u64)vcpu->domain->shared_info;
-    d->shared_info= (shared_info_t *)__va(shared_info);
+    d->shared_info= (shared_info_t *)domain_mpa_to_imva(vcpu->domain, gpa);
 
     /* Copy existing shared info into new page */
     if (o_info) {

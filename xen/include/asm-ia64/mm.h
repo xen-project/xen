@@ -134,7 +134,7 @@ void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
 static inline void put_page(struct pfn_info *page)
 {
-#ifdef CONFIG_VTI	// doesn't work with non-VTI in grant tables yet
+#ifdef VALIDATE_VT	// doesn't work with non-VTI in grant tables yet
     u32 nx, x, y = page->count_info;
 
     do {
@@ -152,7 +152,7 @@ static inline void put_page(struct pfn_info *page)
 static inline int get_page(struct pfn_info *page,
                            struct domain *domain)
 {
-#ifdef CONFIG_VTI
+#ifdef VALIDATE_VT
     u64 x, nx, y = *((u64*)&page->count_info);
     u32 _domain = pickle_domptr(domain);
 
@@ -404,7 +404,6 @@ extern unsigned long num_physpages;
 extern unsigned long totalram_pages;
 extern int nr_swap_pages;
 
-#ifdef CONFIG_VTI
 extern unsigned long *mpt_table;
 #undef machine_to_phys_mapping
 #define machine_to_phys_mapping	mpt_table
@@ -415,34 +414,29 @@ extern unsigned long *mpt_table;
 /* If pmt table is provided by control pannel later, we need __get_user
 * here. However if it's allocated by HV, we should access it directly
 */
-#define get_mfn_from_pfn(d, gpfn)			\
-    ((d) == dom0 ? gpfn : 					\
-	(gpfn <= d->arch.max_pfn ? (d)->arch.pmt[(gpfn)] :	\
-		INVALID_MFN))
 
 #define __mfn_to_gpfn(_d, mfn)			\
     machine_to_phys_mapping[(mfn)]
 
 #define __gpfn_to_mfn(_d, gpfn)			\
-    get_mfn_from_pfn((_d), (gpfn))
+    __gpfn_to_mfn_foreign((_d), (gpfn))
 
 #define __gpfn_invalid(_d, gpfn)			\
-	(__gpfn_to_mfn((_d), (gpfn)) & GPFN_INV_MASK)
+	(lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT)) & GPFN_INV_MASK)
 
 #define __gpfn_valid(_d, gpfn)	!__gpfn_invalid(_d, gpfn)
 
 /* Return I/O type if trye */
 #define __gpfn_is_io(_d, gpfn)				\
 	(__gpfn_valid(_d, gpfn) ? 			\
-	(__gpfn_to_mfn((_d), (gpfn)) & GPFN_IO_MASK) : 0)
+	(lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT)) & GPFN_IO_MASK) : 0)
 
 #define __gpfn_is_mem(_d, gpfn)				\
 	(__gpfn_valid(_d, gpfn) ?			\
-	((__gpfn_to_mfn((_d), (gpfn)) & GPFN_IO_MASK) == GPFN_MEM) : 0)
+	(lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT) & GPFN_IO_MASK) == GPFN_MEM) : 0)
 
 
-#define __gpa_to_mpa(_d, gpa)   \
-    ((__gpfn_to_mfn((_d),(gpa)>>PAGE_SHIFT)<<PAGE_SHIFT)|((gpa)&~PAGE_MASK))
-#endif // CONFIG_VTI
+//#define __gpa_to_mpa(_d, gpa)   \
+//    ((__gpfn_to_mfn((_d),(gpa)>>PAGE_SHIFT)<<PAGE_SHIFT)|((gpa)&~PAGE_MASK))
 
 #endif /* __ASM_IA64_MM_H__ */

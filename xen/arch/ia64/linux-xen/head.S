@@ -259,7 +259,7 @@ start_ap:
 	/*
 	 * Switch into virtual mode:
 	 */
-#if defined(XEN) && defined(CONFIG_VTI)
+#if defined(XEN) && defined(VALIDATE_VT)
 	movl r16=(IA64_PSR_IT|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_DFH\
 		  |IA64_PSR_DI)
 #else
@@ -284,7 +284,7 @@ start_ap:
 	;;
 
 	// set IVT entry point---can't access I/O ports without it
-#if defined(XEN) && defined(CONFIG_VTI)
+#if defined(XEN) && defined(VALIDATE_VT)
 	movl r3=vmx_ia64_ivt
 #else
 	movl r3=ia64_ivt
@@ -356,7 +356,7 @@ start_ap:
 
 .load_current:
 	// load the "current" pointer (r13) and ar.k6 with the current task
-#if defined(XEN) && defined(CONFIG_VTI)
+#if defined(XEN) && defined(VALIDATE_VT)
 	mov r21=r2
 	;;
 	bsw.1

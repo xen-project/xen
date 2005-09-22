@@ -2,11 +2,8 @@
 #define _XEN_IA64_PRIVOP_H
 
 #include <asm/ia64_int.h>
-//#ifdef CONFIG_VTI
 #include <asm/vmx_vcpu.h>
-//#else //CONFIG_VTI
 #include <asm/vcpu.h>
-//#endif //CONFIG_VTI
 
 typedef unsigned long IA64_INST;
 

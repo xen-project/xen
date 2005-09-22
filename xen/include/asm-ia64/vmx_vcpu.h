@@ -62,7 +62,7 @@ extern u64 set_isr_ei_ni (VCPU *vcpu);
 extern u64 set_isr_for_na_inst(VCPU *vcpu, int op);
 
 
-/* next all for CONFIG_VTI APIs definition */
+/* next all for VTI domain APIs definition */
 extern void vmx_vcpu_set_psr(VCPU *vcpu, unsigned long value);
 extern UINT64 vmx_vcpu_sync_mpsr(UINT64 mipsr, UINT64 value);
 extern void vmx_vcpu_set_psr_sync_mpsr(VCPU * vcpu, UINT64 value);
@@ -252,12 +252,9 @@ IA64FAULT
 vmx_vcpu_set_itm(VCPU *vcpu, u64 val)
 {
     vtime_t     *vtm;
-    
     vtm=&(vcpu->arch.arch_vmx.vtm);
     VCPU(vcpu,itm)=val;
-#ifdef CONFIG_VTI
     vtm_interruption_update(vcpu, vtm);
-#endif
     return IA64_NO_FAULT;
 }
 static inline
@@ -292,9 +289,7 @@ static inline
 IA64FAULT
 vmx_vcpu_set_eoi(VCPU *vcpu, u64 val)
 {
-#ifdef CONFIG_VTI
     guest_write_eoi(vcpu);
-#endif
     return IA64_NO_FAULT;
 }
 
@@ -304,9 +299,7 @@ vmx_vcpu_set_itv(VCPU *vcpu, u64 val)
 {
 
     VCPU(vcpu,itv)=val;
-#ifdef CONFIG_VTI
     vtm_set_itv(vcpu);
-#endif
     return IA64_NO_FAULT;
 }
 static inline
@@ -347,17 +340,13 @@ vmx_vcpu_set_lrr1(VCPU *vcpu, u64 val)
 static inline
 IA64FAULT vmx_vcpu_set_itc(VCPU *vcpu, UINT64 val)
 {
-#ifdef CONFIG_VTI
     vtm_set_itc(vcpu, val);
-#endif
     return  IA64_NO_FAULT;
 }
 static inline
 IA64FAULT vmx_vcpu_get_itc(VCPU *vcpu,UINT64 *val)
 {
-#ifdef CONFIG_VTI
     *val = vtm_get_itc(vcpu);
-#endif
     return  IA64_NO_FAULT;
 }
 static inline

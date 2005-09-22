@@ -65,7 +65,7 @@ platform_is_hp_ski(void)
 
 void sync_lazy_execstate_cpu(unsigned int cpu) {}
 
-#ifdef CONFIG_VTI
+#if 0
 int grant_table_create(struct domain *d) { return 0; }
 void grant_table_destroy(struct domain *d) { return; }
 #endif
@@ -77,7 +77,6 @@ void raise_actimer_softirq(void)
 	raise_softirq(AC_TIMER_SOFTIRQ);
 }
 
-#ifndef CONFIG_VTI
 unsigned long
 __gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 {
@@ -93,7 +92,7 @@ while(1);
 		return ((pte & _PFN_MASK) >> PAGE_SHIFT);
 	}
 }
-
+#if 0
 u32
 __mfn_to_gpfn(struct domain *d, unsigned long frame)
 {
@@ -288,14 +287,14 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 //if (prev->domain->domain_id == 1 && next->domain->domain_id == 0) cs10foo();
 //if (prev->domain->domain_id == 0 && next->domain->domain_id == 1) cs01foo();
 //printk("@@sw %d->%d\n",prev->domain->domain_id,next->domain->domain_id);
-#ifdef CONFIG_VTI
-	vtm_domain_out(prev);
-#endif
+    if(VMX_DOMAIN(prev)){
+    	vtm_domain_out(prev);
+    }
 	context_switch_count++;
 	switch_to(prev,next,prev);
-#ifdef CONFIG_VTI
-	 vtm_domain_in(current);
-#endif
+    if(VMX_DOMAIN(current)){
+        vtm_domain_in(current);
+    }
 
 // leave this debug for now: it acts as a heartbeat when more than
 // one domain is active
@@ -307,16 +306,15 @@ if (!cnt[id]--) { printk("%x",id); cnt[id] = 500000; }
 if (!i--) { printk("+",id); i = 1000000; }
 }
 
-#ifdef CONFIG_VTI
-	if (VMX_DOMAIN(current))
+	if (VMX_DOMAIN(current)){
 		vmx_load_all_rr(current);
-#else
-	if (!is_idle_task(current->domain)) {
-		load_region_regs(current);
-		if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
-	}
-	if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
-#endif
+    }else{
+    	if (!is_idle_task(current->domain)) {
+	    	load_region_regs(current);
+		    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
+    	}
+	    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
+    }
 }
 
 void context_switch_finalise(struct vcpu *next)

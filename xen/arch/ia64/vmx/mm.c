@@ -100,8 +100,7 @@
         uregs->ptr is virtual address
         uregs->val is pte value
  */
-#ifdef CONFIG_VTI
-int do_mmu_update(mmu_update_t *ureqs,u64 count,u64 *pdone,u64 foreigndom)
+int vmx_do_mmu_update(mmu_update_t *ureqs,u64 count,u64 *pdone,u64 foreigndom)
 {
     int i,cmd;
     u64 mfn, gpfn;
@@ -149,4 +148,3 @@ int do_mmu_update(mmu_update_t *ureqs,u64 count,u64 *pdone,u64 foreigndom)
     }
     return 0;
 }
-#endif

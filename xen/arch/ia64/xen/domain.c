@@ -7,7 +7,7 @@
  *  Copyright (C) 2005 Intel Co
  *	Kun Tian (Kevin Tian) <kevin.tian@intel.com>
  *
- * 05/04/29 Kun Tian (Kevin Tian) <kevin.tian@intel.com> Add CONFIG_VTI domain support
+ * 05/04/29 Kun Tian (Kevin Tian) <kevin.tian@intel.com> Add VTI domain support
  */
 
 #include <xen/config.h>
@@ -204,13 +204,6 @@ void arch_do_createdomain(struct vcpu *v)
 
 	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
 
-#ifdef CONFIG_VTI
-	/* Per-domain vTLB and vhpt implementation. Now vmx domain will stick
-	 * to this solution. Maybe it can be deferred until we know created
-	 * one as vmx domain */
-	v->arch.vtlb = init_domain_tlb(v);
-#endif
-
 	/* We may also need emulation rid for region4, though it's unlikely
 	 * to see guest issue uncacheable access in metaphysical mode. But
 	 * keep such info here may be more sane.
@@ -361,7 +354,6 @@ void new_thread(struct vcpu *v,
 	regs->ar_fpsr = FPSR_DEFAULT;
 
 	if (VMX_DOMAIN(v)) {
-#ifdef CONFIG_VTI
 		vmx_init_all_rr(v);
 		if (d == dom0)
 //		    VCPU(v,vgr[12]) = dom_fw_setup(d,saved_command_line,256L);
@@ -369,7 +361,6 @@ void new_thread(struct vcpu *v,
 		/* Virtual processor context setup */
 		VCPU(v, vpsr) = IA64_PSR_BN;
 		VCPU(v, dcr) = 0;
-#endif
 	} else {
 		init_all_rr(v);
 		if (d == dom0) 
@@ -480,7 +471,7 @@ void map_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physa
 	}
 	else printk("map_domain_page: mpaddr %lx already mapped!\n",mpaddr);
 }
-
+#if 0
 /* map a physical address with specified I/O flag */
 void map_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags)
 {
@@ -517,7 +508,7 @@ void map_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long fl
 	}
 	else printk("map_domain_page: mpaddr %lx already mapped!\n",mpaddr);
 }
-
+#endif
 void mpafoo(unsigned long mpaddr)
 {
 	extern unsigned long privop_trace;
@@ -571,7 +562,7 @@ tryagain:
 }
 
 // FIXME: ONLY USE FOR DOMAIN PAGE_SIZE == PAGE_SIZE
-#ifndef CONFIG_VTI
+#if 1
 unsigned long domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 {
 	unsigned long pte = lookup_domain_mpa(d,mpaddr);
@@ -582,14 +573,14 @@ unsigned long domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 	imva |= mpaddr & ~PAGE_MASK;
 	return(imva);
 }
-#else // CONFIG_VTI
+#else
 unsigned long domain_mpa_to_imva(struct domain *d, unsigned long mpaddr)
 {
     unsigned long imva = __gpa_to_mpa(d, mpaddr);
 
     return __va(imva);
 }
-#endif // CONFIG_VTI
+#endif
 
 // remove following line if not privifying in memory
 //#define HAVE_PRIVIFY_MEMORY
@@ -860,7 +851,7 @@ int construct_dom0(struct domain *d,
 	if ( rc != 0 )
 	    return rc;
 
-#ifdef CONFIG_VTI
+#ifdef VALIDATE_VT
 	/* Temp workaround */
 	if (running_on_sim)
 	    dsi.xen_section_string = (char *)1;
@@ -920,7 +911,7 @@ int construct_dom0(struct domain *d,
 	for ( i = 1; i < MAX_VIRT_CPUS; i++ )
 	    d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
 
-#ifdef CONFIG_VTI
+#ifdef VALIDATE_VT 
 	/* Construct a frame-allocation list for the initial domain, since these
 	 * pages are allocated by boot allocator and pfns are not set properly
 	 */
@@ -938,10 +929,6 @@ int construct_dom0(struct domain *d,
 	    machine_to_phys_mapping[mfn] = mfn;
 	}
 
-	/* Dom0's pfn is equal to mfn, so there's no need to allocate pmt
-	 * for dom0
-	 */
-	d->arch.pmt = NULL;
 #endif
 
 	/* Copy the OS image. */
@@ -1162,12 +1149,8 @@ void vcpu_migrate_cpu(struct vcpu *v, int newcpu)
 void sync_vcpu_execstate(struct vcpu *v)
 {
 	ia64_save_fpu(v->arch._thread.fph);
-#ifdef CONFIG_VTI
 	if (VMX_DOMAIN(v))
 		vmx_save_state(v);
-#else
-	if (0) do {} while(0);
-#endif
 	else {
 		if (IA64_HAS_EXTRA_STATE(v))
 			ia64_save_extra(v);

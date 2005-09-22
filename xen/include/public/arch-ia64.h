@@ -232,13 +232,9 @@ typedef struct {
 		// FIXME: tmp[8] temp'ly being used for virtual psr.pp
 	  };
         };
-#if 0
-#ifdef CONFIG_VTI
 	unsigned long		reserved6[3456];
 	unsigned long		vmm_avail[128];
 	unsigned long		reserved7[4096];
-#endif
-#endif
 } mapped_regs_t;
 
 typedef struct {

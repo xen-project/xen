@@ -36,7 +36,6 @@
 
 #define IRQ_DEBUG	0
 
-#ifdef  CONFIG_VTI
 #define vmx_irq_enter()		\
 	add_preempt_count(HARDIRQ_OFFSET);
 
@@ -130,4 +129,3 @@ vmx_ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 	if ( wake_dom0 && current != dom0 ) 
 		vcpu_wake(dom0->vcpu[0]);
 }
-#endif
