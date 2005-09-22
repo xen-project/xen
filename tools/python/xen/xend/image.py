@@ -36,9 +36,6 @@ MAX_GUEST_CMDLINE = 1024
 class ImageHandler:
     """Abstract base class for image handlers.
 
-    initDomain() is called to initialise the domain memory and parse
-    the configuration.
-    
     createImage() is called to configure and build the domain from its
     kernel image and ramdisk etc.
 
@@ -132,6 +129,12 @@ class ImageHandler:
                         ("image/cmdline", self.cmdline),
                         ("image/ramdisk", self.ramdisk))
 
+
+    def handleBootloading():
+        self.unlink(self.kernel)
+        self.unlink(self.ramdisk)
+
+
     def unlink(self, f):
         if not f: return
         try:
@@ -139,37 +142,6 @@ class ImageHandler:
         except OSError, ex:
             log.warning("error removing bootloader file '%s': %s", f, ex)
 
-    def initDomain(self, dom, memory, ssidref, cpu, cpu_weight, bootloading):
-        """Initial domain create.
-
-        @param memory In KiB
-        @return domain id
-        """
-
-        mem_kb = self.getDomainMemory(memory)
-        dom = xc.domain_create(dom = dom or 0, ssidref = ssidref)
-        # if bootloader, unlink here. But should go after buildDomain() ?
-        if bootloading:
-            self.unlink(self.kernel)
-            self.unlink(self.ramdisk)
-        if dom <= 0:
-            raise VmError('Creating domain failed: name=%s' %
-                          self.vm.getName())
-        if cpu is None:
-            cpu = -1;
-        log.debug("initDomain: cpu=%d mem_kb=%d ssidref=%d dom=%d", cpu, mem_kb, ssidref, dom)
-        xc.domain_setcpuweight(dom, cpu_weight)
-        xc.domain_setmaxmem(dom, mem_kb)
-
-        try:
-            xc.domain_memory_increase_reservation(dom, mem_kb, 0, 0)
-        except:
-            xc.domain_destroy(dom)
-            raise
-
-        if cpu != -1:
-            xc.domain_pincpu(dom, 0, 1<<int(cpu))
-        return dom
 
     def createImage(self):
         """Entry point to create domain memory image.

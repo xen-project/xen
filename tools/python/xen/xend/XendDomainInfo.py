@@ -706,32 +706,14 @@ class XendDomainInfo:
         """
         # todo - add support for scheduling params?
         try:
-            # Initial domain create.
             if 'image' not in self.info:
                 raise VmError('Missing image in configuration')
 
-            self.image = ImageHandler.create(self, self.info['image'],
+            self.image = ImageHandler.create(self,
+                                             self.info['image'],
                                              self.info['device'])
 
-            log.debug('XendDomainInfo.construct: '
-                      'calling initDomain(%s %s %s %s %s)',
-                      str(self.domid),
-                      str(self.info['memory_KiB']),
-                      str(self.info['ssidref']),
-                      str(self.info['cpu']),
-                      str(self.info['cpu_weight']))
-
-            self.setDomid(self.image.initDomain(self.domid,
-                                                self.info['memory_KiB'],
-                                                self.info['ssidref'],
-                                                self.info['cpu'],
-                                                self.info['cpu_weight'],
-                                                self.info['bootloader']))
-            
-            self.info['start_time'] = time.time()
-
-            log.debug('init_domain> Created domain=%d name=%s memory=%d',
-                      self.domid, self.info['name'], self.info['memory_KiB'])
+            self.initDomain()
 
             # Create domain devices.
             self.construct_image()
@@ -744,6 +726,38 @@ class XendDomainInfo:
             traceback.print_exc()
             self.destroy()
             raise
+
+
+    def initDomain(self):
+        log.debug('XendDomainInfo.initDomain: %s %s %s %s)',
+                  str(self.domid),
+                  str(self.info['memory_KiB']),
+                  str(self.info['ssidref']),
+                  str(self.info['cpu_weight']))
+
+        self.domid = xc.domain_create(dom = self.domid or 0,
+                                      ssidref = self.info['ssidref'])
+        if self.domid <= 0:
+            raise VmError('Creating domain failed: name=%s' %
+                          self.vm.getName())
+
+        if self.info['bootloader']:
+            self.image.handleBootloading()
+
+        xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
+        m = self.image.getDomainMemory(self.info['memory_KiB'])
+        xc.domain_setmaxmem(self.domid, m)
+        xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
+
+        cpu = self.info['cpu']
+        if cpu is not None and cpu != -1:
+            xc.domain_pincpu(self.domid, 0, 1 << cpu)
+
+        self.info['start_time'] = time.time()
+
+        log.debug('init_domain> Created domain=%d name=%s memory=%d',
+                  self.domid, self.info['name'], self.info['memory_KiB'])
+
 
     def configure_vcpus(self, vcpus):
         d = {}
