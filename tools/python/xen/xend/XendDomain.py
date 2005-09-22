@@ -42,6 +42,7 @@ from xen.xend.xenstore.xsutil import GetDomainPath
 __all__ = [ "XendDomain" ]
 
 SHUTDOWN_TIMEOUT = 30
+PRIV_DOMAIN      =  0
 
 def is_dead(dom):
     return dom['crashed'] or dom['shutdown'] or (
@@ -163,7 +164,7 @@ class XendDomain:
         self.domain_restarts()
 
     def dom0_setup(self):
-        dom0 = self.domain_lookup(0)
+        dom0 = self.domain_lookup(PRIV_DOMAIN)
         if not dom0:
             dom0 = self.dom0_unknown()
         dom0.dom0_init_store()    
@@ -331,7 +332,7 @@ class XendDomain:
         return self.domains.get(id)
 
     def dom0_unknown(self):
-        dom0 = 0
+        dom0 = PRIV_DOMAIN
         uuid = None
         info = self.xen_domain(dom0)
         dompath = GetDomainPath(dom0)
@@ -499,6 +500,10 @@ class XendDomain:
 
         @param domid: domain id
         """
+
+        if domid == PRIV_DOMAIN:
+            raise XendError("Cannot destroy priviliged domain %i" % domid)
+        
         self.domain_restart_schedule(domid, reason, force=True)
         dominfo = self.domain_lookup(domid)
         if dominfo:
