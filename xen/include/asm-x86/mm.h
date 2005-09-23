@@ -380,11 +380,9 @@ extern int __sync_lazy_execstate(void);
  * hold a reference to the page.
  */
 int update_grant_va_mapping(
-    unsigned long va, l1_pgentry_t _nl1e, 
-    struct domain *d, struct vcpu *v);
+    unsigned long va, l1_pgentry_t _nl1e, struct vcpu *v);
 int update_grant_pte_mapping(
-    unsigned long pte_addr, l1_pgentry_t _nl1e, 
-    struct domain *d, struct vcpu *v);
+    unsigned long pte_addr, l1_pgentry_t _nl1e, struct vcpu *v);
 int clear_grant_va_mapping(unsigned long addr, unsigned long frame);
 int clear_grant_pte_mapping(
     unsigned long addr, unsigned long frame, struct domain *d);
