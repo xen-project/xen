@@ -1,0 +1,10 @@
+#!/bin/bash
+# CHECK-INSTALL
+
+function error {
+   echo
+   echo '  *** Check for the hotplug scripts (hotplug) FAILED'
+   exit 1
+}
+
+which hotplug 1>/dev/null 2>&1 || error
