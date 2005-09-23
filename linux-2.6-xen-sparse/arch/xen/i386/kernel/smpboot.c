@@ -1394,9 +1394,7 @@ static void handle_vcpu_hotplug_event(struct xenbus_watch *watch, const char *no
 			return;
 
 		/* get the state value */
-		xenbus_transaction_start("cpu");
 		err = xenbus_scanf(dir, "availability", "%s", state);
-		xenbus_transaction_end(0);
 
 		if (err != 1) {
 			printk(KERN_ERR

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 #include "xs_lib.h"
 #include "tdb.h"

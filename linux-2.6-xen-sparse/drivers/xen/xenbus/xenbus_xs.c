@@ -287,12 +287,11 @@ EXPORT_SYMBOL(xenbus_rm);
 
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
- * Transaction only applies to the given subtree.
  * You can only have one transaction at any time.
  */
-int xenbus_transaction_start(const char *subtree)
+int xenbus_transaction_start(void)
 {
-	return xs_error(xs_single(XS_TRANSACTION_START, subtree, NULL));
+	return xs_error(xs_single(XS_TRANSACTION_START, "", NULL));
 }
 EXPORT_SYMBOL(xenbus_transaction_start);
 

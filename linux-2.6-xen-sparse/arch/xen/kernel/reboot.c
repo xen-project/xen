@@ -324,7 +324,7 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
     int err;
 
  again:
-    err = xenbus_transaction_start("control");
+    err = xenbus_transaction_start();
     if (err)
 	return;
     str = (char *)xenbus_read("control", "shutdown", NULL);
@@ -337,7 +337,7 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
     xenbus_write("control", "shutdown", "");
 
     err = xenbus_transaction_end(0);
-    if (err == -ETIMEDOUT) {
+    if (err == -EAGAIN) {
 	kfree(str);
 	goto again;
     }
@@ -366,7 +366,7 @@ static void sysrq_handler(struct xenbus_watch *watch, const char *node)
     int err;
 
  again:
-    err = xenbus_transaction_start("control");
+    err = xenbus_transaction_start();
     if (err)
 	return;
     if (!xenbus_scanf("control", "sysrq", "%c", &sysrq_key)) {
@@ -379,7 +379,7 @@ static void sysrq_handler(struct xenbus_watch *watch, const char *node)
 	xenbus_printf("control", "sysrq", "%c", '\0');
 
     err = xenbus_transaction_end(0);
-    if (err == -ETIMEDOUT)
+    if (err == -EAGAIN)
 	goto again;
 
     if (sysrq_key != '\0') {

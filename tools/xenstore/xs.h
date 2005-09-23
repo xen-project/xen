@@ -116,8 +116,8 @@ bool xs_transaction_start(struct xs_handle *h);
 
 /* End a transaction.
  * If abandon is true, transaction is discarded instead of committed.
- * Returns false on failure, which indicates an error: transactions will
- * not fail spuriously.
+ * Returns false on failure: if errno == EAGAIN, you have to restart
+ * transaction.
  */
 bool xs_transaction_end(struct xs_handle *h, bool abort);
 

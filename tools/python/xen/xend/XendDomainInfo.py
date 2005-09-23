@@ -839,20 +839,20 @@ class XendDomainInfo:
         """Release all vm devices.
         """
 
-        t = xstransact("%s/device" % self.path)
-
-        for n in controllerClasses.keys():
-            for d in t.list(n):
-                try:
-                    t.remove(d)
-                except ex:
-                    # Log and swallow any exceptions in removal -- there's
-                    # nothing more we can do.
-                    log.exception(
-                        "Device release failed: %s; %s; %s; %s" %
-                        (self.info['name'], n, d, str(ex)))
-        t.commit()
-
+        while True:
+            t = xstransact("%s/device" % self.path)
+            for n in controllerClasses.keys():
+                for d in t.list(n):
+                    try:
+                        t.remove(d)
+                    except ex:
+                        # Log and swallow any exceptions in removal --
+                        # there's nothing more we can do.
+                        log.exception(
+                           "Device release failed: %s; %s; %s; %s" %
+                            (self.info['name'], n, d, str(ex)))
+            if t.commit():
+                break
 
     def eventChannel(self, path=None):
         """Create an event channel to the domain.
