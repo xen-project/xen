@@ -61,7 +61,7 @@ config ARCH_XEN
 
 config XEN_PRIVILEGED_GUEST
 	bool
-	default n
+	default y
 	help
 	  Used in drivers/xen/privcmd.c.  Should go away?
 
