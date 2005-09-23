@@ -144,10 +144,6 @@ static void vmx_setup_platform(struct vcpu *v, struct cpu_user_regs *regs)
     e820_map_nr = *(p + E820_MAP_NR_OFFSET);
     e820entry = (struct e820entry *)(p + E820_MAP_OFFSET);
 
-#ifndef NDEBUG
-    print_e820_memory_map(e820entry, n);
-#endif
-
     for ( i = 0; i < e820_map_nr; i++ )
     {
         if (e820entry[i].type == E820_SHARED_PAGE)
