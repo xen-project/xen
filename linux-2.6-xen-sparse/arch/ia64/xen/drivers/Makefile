@@ -1,4 +1,5 @@
 
+obj-y   += util.o
 
 obj-y	+= core/
 obj-y	+= console/
