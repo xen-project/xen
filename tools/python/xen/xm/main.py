@@ -1,5 +1,6 @@
 # (C) Copyright IBM Corp. 2005
 # Copyright (C) 2004 Mike Wray
+# Copyright (c) 2005 XenSource Ltd
 #
 # Authors:
 #     Sean Dague <sean at dague dot net>
@@ -169,12 +170,6 @@ def handle_xend_error(cmd, dom, ex):
 #
 #########################################################################
 
-def xm_create(args):
-    from xen.xm import create
-    # ugly hack because the opt parser apparently wants
-    # the subcommand name just to throw it away!
-    create.main(["bogus"] + args)
-
 def xm_save(args):
     arg_check(args,2,"save")
 
@@ -195,13 +190,6 @@ def xm_restore(args):
     id = sxp.child_value(info, 'domid')
     if id is not None:
         server.xend_domain_unpause(domid)
-
-def xm_migrate(args):
-    # TODO: arg_check
-    from xen.xm import migrate
-    # ugly hack because the opt parser apparently wants
-    # the subcommand name just to throw it away!
-    migrate.main(["bogus"] + args)
 
 def xm_list(args):
     use_long = 0
@@ -290,34 +278,12 @@ def xm_show_vcpus(domsinfo):
 def xm_vcpu_list(args):
     xm_list(["-v"] + args)
 
-def xm_destroy(args):
-    arg_check(args,1,"destroy")
-
-    from xen.xm import destroy
-    # ugly hack because the opt parser apparently wants
-    # the subcommand name just to throw it away!
-    destroy.main(["bogus"] + args)
-            
 def xm_reboot(args):
     arg_check(args,1,"reboot")
     from xen.xm import shutdown
     # ugly hack because the opt parser apparently wants
     # the subcommand name just to throw it away!
     shutdown.main(["bogus", "-R"] + args)
-
-def xm_shutdown(args):
-    arg_check(args,1,"shutdown")
-
-    from xen.xm import shutdown
-    # ugly hack because the opt parser apparently wants
-    # the subcommand name just to throw it away!
-    shutdown.main(["bogus"] + args)
-
-def xm_sysrq(args):
-    from xen.xm import sysrq
-    # ugly hack because the opt parser apparently wants
-    # the subcommand name just to throw it away!
-    sysrq.main(["bogus"] + args)
 
 def xm_pause(args):
     arg_check(args, 1, "pause")
@@ -332,6 +298,11 @@ def xm_unpause(args):
 
     from xen.xend.XendClient import server
     server.xend_domain_unpause(dom)
+
+def xm_subcommand(command, args):
+    cmd = __import__(command, globals(), locals(), 'xen.xm')
+    cmd.main(["bogus"] + args)
+
 
 #############################################################
 
@@ -506,14 +477,6 @@ def xm_network_list(args):
         sxp.show(x)
         print
 
-def xm_network_attach(args):
-
-    print "Not implemented"
-
-def xm_network_detach(args):
-
-    print "Not implemented"
-    
 def xm_block_list(args):
     arg_check(args,1,"block-list")
     dom = args[0]
@@ -609,11 +572,8 @@ commands = {
     # domain commands
     "domid": xm_domid,
     "domname": xm_domname,
-    "create": xm_create,
-    "destroy": xm_destroy,
     "restore": xm_restore,
     "save": xm_save,
-    "shutdown": xm_shutdown,
     "reboot": xm_reboot,
     "list": xm_list,
     # memory commands
@@ -625,10 +585,7 @@ commands = {
     "vcpu-enable": xm_vcpu_enable,
     "vcpu-disable": xm_vcpu_disable,
     "vcpu-list": xm_vcpu_list,
-    # migration
-    "migrate": xm_migrate,
     # special
-    "sysrq": xm_sysrq,
     "pause": xm_pause,
     "unpause": xm_unpause,
     # host commands
@@ -647,13 +604,23 @@ commands = {
     # network
     "network-limit": xm_network_limit,
     "network-list": xm_network_list,
-    "network-attach": xm_network_attach,
-    "network-detach": xm_network_detach,
     # vnet
     "vnet-list": xm_vnet_list,
     "vnet-create": xm_vnet_create,
     "vnet-delete": xm_vnet_delete,
     }
+
+## The commands supported by a separate argument parser in xend.xm.
+subcommands = [
+    'create',
+    'destroy',
+    'migrate',
+    'sysrq',
+    'shutdown'
+    ]
+
+for c in subcommands:
+    commands[c] = eval('lambda args: xm_subcommand("%s", args)' % c)
 
 aliases = {
     "balloon": "mem-set",
@@ -668,6 +635,7 @@ aliases = {
 help = {
     "--long": longhelp
    }
+
 
 def xm_lookup_cmd(cmd):
     if commands.has_key(cmd):
@@ -688,9 +656,7 @@ def deprecated(old,new):
     err('Option %s is the new replacement, see "xm help %s" for more info' % (new, new))
 
 def usage(cmd=None):
-    if cmd == "full":
-        print fullhelp
-    elif help.has_key(cmd):
+    if help.has_key(cmd):
         print help[cmd]
     else:
         print shorthelp
@@ -701,7 +667,7 @@ def main(argv=sys.argv):
         usage()
     
     if re.compile('-*help').match(argv[1]):
-	if len(argv) > 2 and help.has_key(argv[2]):
+	if len(argv) > 2:
 	    usage(argv[2])
 	else:
 	    usage()
