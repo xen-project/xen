@@ -238,22 +238,19 @@ class VmxImageHandler(ImageHandler):
 
     def configure(self, imageConfig, deviceConfig):
         ImageHandler.configure(self, imageConfig, deviceConfig)
-        
-        self.memmap = sxp.child_value(imageConfig, 'memmap')
+
         self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
         self.device_model = sxp.child_value(imageConfig, 'device_model')
         if not self.device_model:
             raise VmError("vmx: missing device model")
         self.display = sxp.child_value(imageConfig, 'display')
 
-        self.vm.storeVm(("image/memmap", self.memmap),
-                        ("image/dmargs", " ".join(self.dmargs)),
+        self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))
 
         self.device_channel = None
         self.pid = 0
-        self.memmap_value = []
 
         self.dmargs += self.configVNC(imageConfig)
 
@@ -261,7 +258,6 @@ class VmxImageHandler(ImageHandler):
     def createImage(self):
         """Create a VM for the VMX environment.
         """
-        self.parseMemmap()
         self.createDomain()
 
     def buildDomain(self):
@@ -278,9 +274,6 @@ class VmxImageHandler(ImageHandler):
         log.debug("control_evtchn = %d", self.device_channel.port2)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
-        log.debug("memmap         = %s", self.memmap_value)
-        log.debug("cmdline        = %s", self.cmdline)
-        log.debug("ramdisk        = %s", self.ramdisk)
         log.debug("flags          = %d", self.flags)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
 
@@ -289,9 +282,6 @@ class VmxImageHandler(ImageHandler):
                            control_evtchn = self.device_channel.port2,
                            store_evtchn   = store_evtchn,
                            memsize        = self.vm.getMemoryTarget() / 1024,
-                           memmap         = self.memmap_value,
-                           cmdline        = self.cmdline,
-                           ramdisk        = self.ramdisk,
                            flags          = self.flags,
                            vcpus          = self.vm.getVCpuCount())
         if isinstance(ret, dict):
@@ -299,18 +289,11 @@ class VmxImageHandler(ImageHandler):
             return 0
         return ret
 
-    def parseMemmap(self):
-        if self.memmap is None:
-            return
-        memmap = sxp.parse(open(self.memmap))[0]
-        from xen.util.memmap import memmap_parse
-        self.memmap_value = memmap_parse(memmap)
-        
     # Return a list of cmd line args to the device models based on the
     # xm config file
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
         dmargs = [ 'cdrom', 'boot', 'fda', 'fdb',
-                   'localtime', 'serial', 'stdvga', 'isa', 'vcpus' ] 
+                   'localtime', 'serial', 'stdvga', 'isa', 'vcpus' ]
         ret = []
         for a in dmargs:
             v = sxp.child_value(imageConfig, a)

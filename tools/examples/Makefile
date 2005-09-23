@@ -25,19 +25,13 @@ XEN_SCRIPTS += block-phy
 XEN_SCRIPTS += block-file
 XEN_SCRIPTS += block-enbd
 
-# no 64-bit specifics in mem-map.sxp
-# so place in /usr/lib, not /usr/lib64
-XEN_BOOT_DIR = /usr/lib/xen/boot
-XEN_BOOT = mem-map.sxp
-
 XEN_HOTPLUG_DIR = /etc/hotplug
 XEN_HOTPLUG_SCRIPTS = xen-backend.agent
 
 all:
 build:
 
-install: all install-initd install-configs install-scripts install-boot \
-	 install-hotplug
+install: all install-initd install-configs install-scripts install-hotplug
 
 install-initd:
 	[ -d $(DESTDIR)/etc/init.d ] || $(INSTALL_DIR) $(DESTDIR)/etc/init.d
@@ -60,14 +54,6 @@ install-scripts:
 	for i in $(XEN_SCRIPTS); \
 	    do [ -a $(DESTDIR)$(XEN_SCRIPT_DIR)/$$i ] || \
 	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
-	done
-
-install-boot:
-	[ -d $(DESTDIR)$(XEN_BOOT_DIR) ] || \
-		$(INSTALL_DIR) $(DESTDIR)$(XEN_BOOT_DIR)
-	for i in $(XEN_BOOT); \
-	    do [ -a $(DESTDIR)$(XEN_BOOT_DIR)/$$i ] || \
-	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_BOOT_DIR); \
 	done
 
 install-hotplug:

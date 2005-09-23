@@ -11,6 +11,11 @@
 #define E820_NVS          4
 #define E820_IO          16
 #define E820_SHARED_PAGE 17
+#define E820_XENSTORE    18
+
+#define E820_MAP_PAGE        0x00090000
+#define E820_MAP_NR_OFFSET   0x000001E8
+#define E820_MAP_OFFSET      0x000002D0
 
 #ifndef __ASSEMBLY__
 struct e820entry {

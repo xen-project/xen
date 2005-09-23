@@ -44,7 +44,7 @@ all: vmxloader
 vmxloader: roms.h vmxloader.c acpi.h acpi_madt.c
 	${CC} ${CFLAGS} ${DEFINES} -c vmxloader.c -c acpi_madt.c
 	$(CC) -o vmxloader.tmp -m32 -nostdlib -Wl,-N -Wl,-Ttext -Wl,0x100000 vmxloader.o acpi_madt.o
-	objcopy --change-addresses=0xC0000000 vmxloader.tmp vmxloader
+	objcopy vmxloader.tmp vmxloader
 	rm -f vmxloader.tmp
 
 vmxassist.bin: vmxassist.ld ${OBJECTS}
