@@ -13,3 +13,7 @@ then
 	mv include/linux include/linux.xen-x86
 fi
 cp ../xen/include/asm-ia64/asm-xsi-offsets.h include/asm-ia64/xen/
+cp arch/ia64/xen/drivers/Makefile drivers/xen/Makefile
+cp arch/ia64/xen/drivers/coreMakefile drivers/xen/core/Makefile
+cp arch/ia64/xen/drivers/xenia64_init.c drivers/xen/core
+cp arch/ia64/xen/drivers/evtchn_ia64.c drivers/xen/core
