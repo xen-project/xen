@@ -50,6 +50,11 @@ xs_random: xs_random.o xs_test_lib.o xs_lib.o talloc.o utils.o
 xs_stress: xs_stress.o xs_test_lib.o xs_lib.o talloc.o utils.o
 xs_crashme: xs_crashme.o xs_lib.o talloc.o utils.o
 
+speedtest: speedtest.o xs.o xs_lib.o utils.o talloc.o
+
+check-speed: speedtest xenstored_test $(TESTDIR)
+	$(TESTENV) time ./speedtest 100
+
 xs_test.o xs_stress.o xenstored_core_test.o xenstored_watch_test.o xenstored_transaction_test.o xenstored_domain_test.o xs_random.o xs_test_lib.o talloc_test.o fake_libxc.o xs_crashme.o: CFLAGS=$(BASECFLAGS) $(TESTFLAGS)
 
 xenstored_%_test.o: xenstored_%.c
