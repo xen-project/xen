@@ -614,7 +614,7 @@ class XendDomainInfo:
             sxpr.append(['maxmem', self.info['maxmem_KiB'] / 1024])
 
             if self.infoIsSet('device'):
-                for (n, c) in self.info['device']:
+                for (_, c) in self.info['device']:
                     sxpr.append(['device', c])
 
             def stateChar(name):
@@ -706,13 +706,6 @@ class XendDomainInfo:
         """
         # todo - add support for scheduling params?
         try:
-            if 'image' not in self.info:
-                raise VmError('Missing image in configuration')
-
-            self.image = ImageHandler.create(self,
-                                             self.info['image'],
-                                             self.info['device'])
-
             self.initDomain()
 
             # Create domain devices.
@@ -737,6 +730,14 @@ class XendDomainInfo:
 
         self.domid = xc.domain_create(dom = self.domid or 0,
                                       ssidref = self.info['ssidref'])
+
+        if 'image' not in self.info:
+            raise VmError('Missing image in configuration')
+
+        self.image = ImageHandler.create(self,
+                                         self.info['image'],
+                                         self.info['device'])
+
         if self.domid <= 0:
             raise VmError('Creating domain failed: name=%s' %
                           self.info['name'])
