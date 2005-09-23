@@ -53,6 +53,18 @@ config XEN
 	  Enable Xen hypervisor support.  Resulting kernel runs
 	  both as a guest OS on Xen and natively on hardware.
 
+config ARCH_XEN
+	bool
+	default y
+	help
+	  TEMP ONLY. Needs to be on for drivers/xen to build.
+
+config XEN_PRIVILEGED_GUEST
+	bool
+	default n
+	help
+	  Used in drivers/xen/privcmd.c.  Should go away?
+
 config XEN_PHYSDEV_ACCESS
 	depends on XEN
 	bool
