@@ -36,7 +36,7 @@ enum xs_perm_type {
 
 struct xs_permissions
 {
-	domid_t id;
+	unsigned int id;
 	enum xs_perm_type perms;
 };
 
@@ -46,9 +46,8 @@ struct xs_permissions
 /* Path for various daemon things: env vars can override. */
 const char *xs_daemon_socket(void);
 const char *xs_daemon_socket_ro(void);
-const char *xs_daemon_store(void);
-const char *xs_daemon_transactions(void);
 const char *xs_domain_dev(void);
+const char *xs_daemon_tdb(void);
 
 /* Simple write function: loops for you. */
 bool xs_write_all(int fd, const void *data, unsigned int len);

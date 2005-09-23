@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 
 #define NUM_HANDLES 2
 #define DIR_FANOUT 3
@@ -36,24 +37,18 @@ static void work(unsigned int cycles, unsigned int childnum)
 
 	srandom(childnum);
 	for (i = 0; i < cycles; i++) {
-		unsigned int lockdepth, j, len;
-		char file[100] = "", lockdir[100];
+		unsigned int j, len;
+		char file[100] = "";
 		char *contents, tmp[100];
 		struct xs_handle *h = handles[random() % NUM_HANDLES];
 
-		lockdepth = random() % DIR_DEPTH;
-		for (j = 0; j < DIR_DEPTH; j++) {
-			if (j == lockdepth)
-				strcpy(lockdir, file);
+		for (j = 0; j < DIR_DEPTH; j++)
 			sprintf(file + strlen(file), "/%li",
 				random()%DIR_FANOUT);
-		}
-		if (streq(lockdir, ""))
-			strcpy(lockdir, "/");
 
-		if (!xs_transaction_start(h, lockdir))
-			barf_perror("%i: starting transaction %i on %s",
-				    childnum, i, lockdir);
+		if (!xs_transaction_start(h))
+			barf_perror("%i: starting transaction %i",
+				    childnum, i);
 
 		sprintf(file + strlen(file), "/count");
 		contents = xs_read(h, file, &len);
@@ -68,18 +63,23 @@ static void work(unsigned int cycles, unsigned int childnum)
 		/* Abandon 1 in 10 */
 		if (random() % 10 == 0) {
 			if (!xs_transaction_end(h, true))
-				barf_perror("%i: can't abort transact %s",
-					    childnum, lockdir);
+				barf_perror("%i: can't abort transact",
+					    childnum);
 			i--;
 		} else {
-			if (!xs_transaction_end(h, false))
-				barf_perror("%i: can't commit transact %s",
-					    childnum, lockdir);
-
-			/* Offset when we print . so kids don't all
-			 * print at once. */
-			if ((i + print/(childnum+1)) % print == 0)
-				write(STDOUT_FILENO, &id, 1);
+			if (!xs_transaction_end(h, false)) {
+				if (errno == EAGAIN) {
+					write(STDOUT_FILENO, "!", 1);
+					i--;
+				} else
+					barf_perror("%i: can't commit trans",
+						    childnum);
+			} else {
+				/* Offset when we print . so kids don't all
+				 * print at once. */
+				if ((i + print/(childnum+1)) % print == 0)
+					write(STDOUT_FILENO, &id, 1);
+			}
 		}
 	}
 }
@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
 	printf("\nCounting results...\n");
 	i = tally_counts();
 	if (i != (unsigned)atoi(argv[1]))
-		barf("Total counts %i not %s", i, atoi(argv[1]));
+		barf("Total counts %i not %s", i, argv[1]);
 	printf("Success!\n");
 	exit(0);
 }

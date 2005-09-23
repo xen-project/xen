@@ -309,13 +309,8 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
-	if (conn->id != 0) {
+	if (conn->id != 0 || !conn->can_write) {
 		send_error(conn, EACCES);
-		return;
-	}
-
-	if (!conn->can_write) {
-		send_error(conn, EROFS);
 		return;
 	}
 
@@ -386,7 +381,7 @@ void do_release(struct connection *conn, const char *domid_str)
 
 	talloc_free(domain->conn);
 
-	fire_watches(NULL, "@releaseDomain", false);
+	fire_watches(conn, "@releaseDomain", false);
 
 	send_ack(conn, XS_RELEASE);
 }

@@ -28,6 +28,7 @@
 #include "xs_lib.h"
 #include "xenstored.h"
 #include "list.h"
+#include "tdb.h"
 
 struct buffered_data
 {
@@ -49,8 +50,6 @@ typedef int connreadfn_t(struct connection *, void *, unsigned int);
 
 enum state
 {
-	/* Blocked by transaction. */
-	BLOCKED,
 	/* Doing action, not listening */
 	BUSY,
 	/* Completed */
@@ -69,9 +68,6 @@ struct connection
 
 	/* Blocked on transaction?  Busy? */
 	enum state state;
-
-	/* Node we are waiting for (if state == BLOCKED) */
-	char *blocked_by;
 
 	/* Is this a read-only connection? */
 	bool can_write;
@@ -103,9 +99,27 @@ struct connection
 };
 extern struct list_head connections;
 
-/* Return length of string (including nul) at this offset. */
-unsigned int get_string(const struct buffered_data *data,
-			unsigned int offset);
+struct node {
+	const char *name;
+
+	/* Database I came from */
+	TDB_CONTEXT *tdb;
+
+	/* Parent (optional) */
+	struct node *parent;
+
+	/* Permissions. */
+	unsigned int num_perms;
+	struct xs_permissions *perms;
+
+	/* Contents. */
+	unsigned int datalen;
+	void *data;
+
+	/* Children, each nul-terminated. */
+	unsigned int childlen;
+	char *children;
+};
 
 /* Break input into vectors, return the number, fill in up to num of them. */
 unsigned int get_strings(struct buffered_data *data,
@@ -113,9 +127,6 @@ unsigned int get_strings(struct buffered_data *data,
 
 /* Is child node a child or equal to parent node? */
 bool is_child(const char *child, const char *parent);
-
-/* Create a new buffer with lifetime of context. */
-struct buffered_data *new_buffer(void *ctx);
 
 void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 		const void *data, unsigned int len);
@@ -129,15 +140,22 @@ void send_error(struct connection *conn, int error);
 /* Canonicalize this path if possible. */
 char *canonicalize(struct connection *conn, const char *node);
 
-/* Check permissions on this node. */
-bool check_node_perms(struct connection *conn, const char *node,
-		      enum xs_perm_type perm);
-
 /* Check if node is an event node. */
 bool check_event_node(const char *node);
 
-/* Path to this node outside transaction. */
-char *node_dir_outside_transaction(const char *node);
+/* Get this node, checking we have permissions. */
+struct node *get_node(struct connection *conn,
+		      const char *name,
+		      enum xs_perm_type perm);
+
+/* Get TDB context for this connection */
+TDB_CONTEXT *tdb_context(struct connection *conn);
+
+/* Destructor for tdbs: required for transaction code */
+int destroy_tdb(void *_tdb);
+
+/* Replace the tdb: required for transaction code */
+bool replace_tdb(const char *newname, TDB_CONTEXT *newtdb);
 
 /* Fail due to excessive corruption, capitalist pigdogs! */
 void __attribute__((noreturn)) corrupt(struct connection *conn,
@@ -145,23 +163,9 @@ void __attribute__((noreturn)) corrupt(struct connection *conn,
 
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read);
 
-void handle_input(struct connection *conn);
-void handle_output(struct connection *conn);
-
 /* Is this a valid node name? */
 bool is_valid_nodename(const char *node);
 
-/* Return a pointer to an open dir, self-closig and attached to pathname. */
-DIR **talloc_opendir(const char *pathname);
-
-/* Return a pointer to an fd, self-closing and attached to this pathname. */
-int *talloc_open(const char *pathname, int flags, int mode);
-
-/* Convenient talloc-style destructor for paths. */
-int destroy_path(void *path);
-
-/* Read entire contents of a talloced fd. */
-void *read_all(int *fd, unsigned int *size);
 
 /* Tracing infrastructure. */
 void trace_create(const void *data, const char *type);

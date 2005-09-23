@@ -41,7 +41,7 @@ struct ops
 			  struct xs_permissions *perms,
 			  unsigned int num);
 
-	bool (*transaction_start)(void *h, const char *subtree);
+	bool (*transaction_start)(void *h);
 	bool (*transaction_end)(void *h, bool abort);
 
 	/* Create and destroy a new handle. */
@@ -53,7 +53,6 @@ struct file_ops_info
 {
 	const char *base;
 	char *transact_base;
-	char *transact;
 };
 
 static void convert_to_dir(const char *dirname)
@@ -95,31 +94,6 @@ static char *path_to_name(struct file_ops_info *info, const char *path)
 	maybe_convert_to_directory(filename);
 	return filename;
 }
-
-/* Is child a subnode of parent, or equal? */
-static bool is_child(const char *child, const char *parent)
-{
-	unsigned int len = strlen(parent);
-
-	/* / should really be "" for this algorithm to work, but that's a
-	 * usability nightmare. */
-	if (streq(parent, "/"))
-		return true;
-
-	if (strncmp(child, parent, len) != 0)
-		return false;
-
-	return child[len] == '/' || child[len] == '\0';
-}
-
-static bool write_ok(struct file_ops_info *info, const char *path)
-{
-	if (info->transact && !is_child(path, info->transact)) {
-		errno = EROFS;
-		return false;
-	}
-	return true;
-}	
 
 static char **file_directory(struct file_ops_info *info,
 			     const char *path, unsigned int *num)
@@ -184,8 +158,10 @@ static void *file_read(struct file_ops_info *info,
 
 	ret = grab_file(filename, &size);
 	/* Directory exists, .DATA doesn't. */
-	if (!ret && errno == ENOENT && strends(filename, ".DATA"))
-		errno = EISDIR;
+	if (!ret && errno == ENOENT && strends(filename, ".DATA")) {
+		ret = strdup("");
+		size = 0;
+	}
 	*len = size;
 	return ret;
 }
@@ -270,9 +246,6 @@ static bool file_set_perms(struct file_ops_info *info,
 		return false;
 	}
 
-	if (!write_ok(info, path))
-		return false;
-
 	/* Check non-perm file exists/ */
 	if (lstat(filename, &st) != 0)
 		return false;
@@ -338,9 +311,6 @@ static bool file_write(struct file_ops_info *info,
 	char *filename = filename_to_data(path_to_name(info, path));
 	int fd;
 
-	if (!write_ok(info, path))
-		return false;
-
 	make_dirs(parent_filename(filename));
 	fd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0600);
 	if (fd < 0)
@@ -358,9 +328,6 @@ static bool file_mkdir(struct file_ops_info *info, const char *path)
 {
 	char *dirname = path_to_name(info, path);
 
-	if (!write_ok(info, path))
-		return false;
-
 	make_dirs(parent_filename(dirname));
 	if (mkdir(dirname, 0700) != 0)
 		return (errno == EEXIST);
@@ -374,19 +341,11 @@ static bool file_rm(struct file_ops_info *info, const char *path)
 	char *filename = path_to_name(info, path);
 	struct stat st;
 
-	if (info->transact && streq(info->transact, path)) {
-		errno = EINVAL;
-		return false;
-	}
-
 	if (lstat(filename, &st) != 0) {
 		if (lstat(parent_filename(filename), &st) != 0)
 			return false;
 		return true;
 	}
-
-	if (!write_ok(info, path))
-		return false;
 
 	if (streq(path, "/")) {
 		errno = EINVAL;
@@ -398,28 +357,20 @@ static bool file_rm(struct file_ops_info *info, const char *path)
 	return true;
 }
 
-static bool file_transaction_start(struct file_ops_info *info,
-				   const char *subtree)
+static bool file_transaction_start(struct file_ops_info *info)
 {
 	char *cmd;
-	char *filename = path_to_name(info, subtree);
-	struct stat st;
 
-	if (info->transact) {
+	if (info->transact_base) {
 		errno = EBUSY;
 		return false;
 	}
 
-	if (lstat(filename, &st) != 0)
-		return false;
-
-	cmd = talloc_asprintf(NULL, "cp -r %s %s.transact",
-			      info->base, info->base);
+	info->transact_base = talloc_asprintf(NULL, "%s.transact", info->base);
+	cmd = talloc_asprintf(NULL, "cp -r %s %s",
+			      info->base, info->transact_base);
 	do_command(cmd);
 	talloc_free(cmd);
-
-	info->transact_base = talloc_asprintf(NULL, "%s.transact", info->base);
-	info->transact = talloc_strdup(NULL, subtree);
 	return true;
 }
 
@@ -427,7 +378,7 @@ static bool file_transaction_end(struct file_ops_info *info, bool abort)
 {
 	char *old, *cmd;
 
-	if (!info->transact) {
+	if (!info->transact_base) {
 		errno = ENOENT;
 		return false;
 	}
@@ -448,9 +399,7 @@ static bool file_transaction_end(struct file_ops_info *info, bool abort)
 
 success:
 	talloc_free(cmd);
-	talloc_free(info->transact);
 	talloc_free(info->transact_base);
-	info->transact = NULL;
 	info->transact_base = NULL;
 	return true;
 }
@@ -461,7 +410,6 @@ static struct file_ops_info *file_handle(const char *dir)
 
 	info->base = dir;
 	info->transact_base = NULL;
-	info->transact = NULL;
 	return info;
 }
 
@@ -898,11 +846,10 @@ static char *do_next_op(struct ops *ops, void *h, int state, bool verbose)
 	case 7: {
 		if (verbose)
 			printf("START %s\n", name);
-		ret = bool_to_errstring(ops->transaction_start(h, name));
+		ret = bool_to_errstring(ops->transaction_start(h));
 		if (streq(ret, "OK")) {
 			talloc_free(ret);
-			ret = talloc_asprintf(NULL, "OK:START-TRANSACT:%s",
-					      name);
+			ret = talloc_asprintf(NULL, "OK:START-TRANSACT");
 		}
 
 		break;
@@ -978,6 +925,8 @@ static void setup_file_ops(const char *dir)
 		barf_perror("Creating directory %s/tool", dir);
 	if (!file_set_perms(h, talloc_strdup(h, "/"), &perm, 1))
 		barf_perror("Setting root perms in %s", dir);
+	if (!file_set_perms(h, talloc_strdup(h, "/tool"), &perm, 1))
+		barf_perror("Setting root perms in %s/tool", dir);
 	file_close(h);
 }
 
@@ -1071,7 +1020,7 @@ static unsigned int try_simple(const bool *trymap,
 			goto out;
 
 		if (!data->fast) {
-			if (strstarts(ret, "OK:START-TRANSACT:")) {
+			if (streq(ret, "OK:START-TRANSACT")) {
 				void *pre = data->ops->handle(data->dir);
 
 				snapshot = dump(data->ops, pre);
@@ -1303,7 +1252,7 @@ static unsigned int try_diff(const bool *trymap,
 			     void *_data)
 {
 	void *fileh, *xsh;
-	char *transact = NULL;
+	bool transact = false;
 	struct ops *fail;
 	struct diff_data *data = _data;
 	unsigned int i, print;
@@ -1348,13 +1297,9 @@ static unsigned int try_diff(const bool *trymap,
 			goto out;
 
 		if (strstarts(file, "OK:START-TRANSACT:"))
-			transact = talloc_strdup(NULL,
-						 file +
-						 strlen("OK:START-TRANSACT:"));
-		else if (streq(file, "OK:STOP-TRANSACT")) {
-			talloc_free(transact);
-			transact = NULL;
-		}
+			transact = true;
+		else if (streq(file, "OK:STOP-TRANSACT"))
+			transact = false;
 
 		talloc_free(file);
 		talloc_free(xs);
@@ -1379,7 +1324,7 @@ static unsigned int try_diff(const bool *trymap,
 
 			fail = NULL;
 			if (!ops_equal(&xs_ops, xsh_pre, &file_ops, fileh_pre,
-				       transact, &fail)) {
+				       "/", &fail)) {
 				if (fail)
 					barf("%s failed during transact\n",
 					     fail->name);
@@ -1456,9 +1401,6 @@ static unsigned int try_fail(const bool *trymap,
 	fileh = file_handle(data->dir);
 	xsh = xs_handle(data->dir);
 
-	sprintf(seed, "%i", data->seed);
-	free(xs_debug_command(xsh, "failtest", seed, strlen(seed)+1));
-
 	print = number / 76;
 	if (!print)
 		print = 1;
@@ -1491,8 +1433,12 @@ static unsigned int try_fail(const bool *trymap,
 		if (trymap && !trymap[i])
 			continue;
 
+		/* Turn on failure. */
+		sprintf(seed, "%i", data->seed + i);
+		free(xs_debug_command(xsh, "failtest",seed,strlen(seed)+1));
+
 		if (verbose)
-			printf("(%i) ", i);
+			printf("(%i) seed %s ", i, seed);
 		ret = do_next_op(&xs_ops, xsh, i + data->seed, verbose);
 		if (streq(ret, "FAILED:Connection reset by peer")
 		    || streq(ret, "FAILED:Bad file descriptor")
@@ -1549,8 +1495,6 @@ static unsigned int try_fail(const bool *trymap,
 		fail = NULL;
 		if (!ops_equal(&xs_ops, tmpxsh, &file_ops, tmpfileh, "/",
 			       &fail)) {
-			xs_close(tmpxsh);
-			file_close(tmpfileh);
 			if (fail) {
 				if (verbose)
 					printf("%s failed\n", fail->name);
@@ -1561,10 +1505,16 @@ static unsigned int try_fail(const bool *trymap,
 				failed = 0;
 				if (verbose)
 					printf("(Looks like it succeeded)\n");
+				xs_close(tmpxsh);
+				file_close(tmpfileh);
 				goto try_applying;
 			}
 			if (verbose)
-				printf("Two backends not equal\n");
+				printf("Trees differ:\nXS:%s\nFILE:%s\n",
+				       dump(&xs_ops, tmpxsh),
+				       dump(&file_ops, tmpfileh));
+			xs_close(tmpxsh);
+			file_close(tmpfileh);
 			goto out;
 		}
 
@@ -1572,8 +1522,6 @@ static unsigned int try_fail(const bool *trymap,
 		if (!xsh)
 			file_transaction_end(fileh, true);
 
-		/* Turn failures back on. */
-		free(xs_debug_command(tmpxsh, "failtest",  NULL, 0));
 		xs_close(tmpxsh);
 		file_close(tmpfileh);
 	}

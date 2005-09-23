@@ -13,23 +13,23 @@ expect 0 READ
 getperm /test
 watch /test token
 unwatch /test token 
-start /
+start
 commit
-start /
+start
 abort
 
 # These don't work
-expect write failed: Read-only file system
+expect write failed: Permission denied
 write /test2 contents
-expect write failed: Read-only file system
+expect write failed: Permission denied
 write /test contents
-expect setperm failed: Read-only file system
+expect setperm failed: Permission denied
 setperm /test 100 NONE
-expect setperm failed: Read-only file system
+expect setperm failed: Permission denied
 setperm /test 100 NONE
-expect shutdown failed: Read-only file system
+expect shutdown failed: Permission denied
 shutdown
-expect introduce failed: Read-only file system
+expect introduce failed: Permission denied
 introduce 1 100 7 /home
 
 # Check that watches work like normal.
