@@ -111,18 +111,21 @@ class ImageHandler:
     def configure(self, imageConfig, _):
         """Config actions common to all unix-like domains."""
 
-        self.kernel = sxp.child_value(imageConfig, "kernel")
+        def get_cfg(name, default = None):
+            return sxp.child_value(imageConfig, name, default)
+
+        self.kernel = get_cfg("kernel")
         self.cmdline = ""
-        ip = sxp.child_value(imageConfig, "ip", None)
+        ip = get_cfg("ip")
         if ip:
             self.cmdline += " ip=" + ip
-        root = sxp.child_value(imageConfig, "root")
+        root = get_cfg("root")
         if root:
             self.cmdline += " root=" + root
-        args = sxp.child_value(imageConfig, "args")
+        args = get_cfg("args")
         if args:
             self.cmdline += " " + args
-        self.ramdisk = sxp.child_value(imageConfig, "ramdisk", '')
+        self.ramdisk = get_cfg("ramdisk", '')
         
         self.vm.storeVm(("image/ostype", self.ostype),
                         ("image/kernel", self.kernel),
@@ -130,7 +133,7 @@ class ImageHandler:
                         ("image/ramdisk", self.ramdisk))
 
 
-    def handleBootloading():
+    def handleBootloading(self):
         self.unlink(self.kernel)
         self.unlink(self.ramdisk)
 
