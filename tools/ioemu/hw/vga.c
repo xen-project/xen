@@ -1568,6 +1568,8 @@ void vga_update_display(void)
             s->graphic_mode = graphic_mode;
             full_update = 1;
         }
+
+        full_update = 1;
         switch(graphic_mode) {
         case GMODE_TEXT:
             vga_draw_text(s, full_update);
@@ -1848,6 +1850,7 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
                      unsigned long vga_ram_offset, int vga_ram_size)
 {
     int i, j, v, b;
+    extern void* shared_vram;
 
     for(i = 0;i < 256; i++) {
         v = 0;
@@ -1876,7 +1879,7 @@ void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base,
 
     /* qemu's vga mem is not detached from phys_ram_base and can cause DM abort
      * when guest write vga mem, so allocate a new one */
-    s->vram_ptr = qemu_mallocz(vga_ram_size);
+    s->vram_ptr = shared_vram;
 
     s->vram_offset = vga_ram_offset;
     s->vram_size = vga_ram_size;

@@ -383,7 +383,6 @@ static int setup_guest(int xc_handle,
     l2tab = page_array[ppt_alloc++] << PAGE_SHIFT;
     ctxt->ctrlreg[3] = l2tab;
 
-    /* Initialise the page tables. */
     if ( (vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                         PROT_READ|PROT_WRITE,
                                         l2tab >> PAGE_SHIFT)) == NULL )
@@ -415,23 +414,35 @@ static int setup_guest(int xc_handle,
     munmap(vl1tab, PAGE_SIZE);
     munmap(vl2tab, PAGE_SIZE);
 #else
-    /* here l3tab means pdpt, only 4 entry is used */
     l3tab = page_array[ppt_alloc++] << PAGE_SHIFT;
     ctxt->ctrlreg[3] = l3tab;
 
-    /* Initialise the page tables. */
     if ( (vl3tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                         PROT_READ|PROT_WRITE,
                                         l3tab >> PAGE_SHIFT)) == NULL )
         goto error_out;
     memset(vl3tab, 0, PAGE_SIZE);
 
+    /* Fill in every PDPT entry. */
+    for ( i = 0; i < L3_PAGETABLE_ENTRIES_PAE; i++ )
+    {
+        l2tab = page_array[ppt_alloc++] << PAGE_SHIFT;
+        if ( (vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                            PROT_READ|PROT_WRITE,
+                                            l2tab >> PAGE_SHIFT)) == NULL )
+            goto error_out;
+        memset(vl2tab, 0, PAGE_SIZE);
+        munmap(vl2tab, PAGE_SIZE);
+        vl3tab[i] = l2tab | L3_PROT;
+    }
+
     vl3e = &vl3tab[l3_table_offset(dsi.v_start)];
 
     for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
     {
-        if (!(count % (1 << (L3_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)))){
-            l2tab = page_array[ppt_alloc++] << PAGE_SHIFT;
+        if (!(count & (1 << (L3_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)))){
+            l2tab = vl3tab[count >> (L3_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)]
+                & PAGE_MASK;
 
             if (vl2tab != NULL)
                 munmap(vl2tab, PAGE_SIZE);
@@ -441,8 +452,6 @@ static int setup_guest(int xc_handle,
                                                 l2tab >> PAGE_SHIFT)) == NULL )
                 goto error_out;
 
-            memset(vl2tab, 0, PAGE_SIZE);
-            *vl3e++ = l2tab | L3_PROT;
             vl2e = &vl2tab[l2_table_offset(dsi.v_start + (count << PAGE_SHIFT))];
         }
         if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
