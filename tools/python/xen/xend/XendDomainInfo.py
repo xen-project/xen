@@ -320,6 +320,7 @@ class XendDomainInfo:
 
         try:
             defaultInfo('name',         lambda: "Domain-%d" % self.domid)
+            defaultInfo('ssidref',      lambda: 0)
             defaultInfo('restart_mode', lambda: RESTART_ONREBOOT)
             defaultInfo('cpu_weight',   lambda: 1.0)
             defaultInfo('bootloader',   lambda: None)
