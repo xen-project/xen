@@ -34,6 +34,7 @@ from xen.util.blkif import blkdev_uname_to_file
 
 from xen.xend.server.channel import EventChannel
 
+from xen.xend import image
 from xen.xend import sxp
 from xen.xend.XendBootloader import bootloader
 from xen.xend.XendLogging import log
@@ -734,9 +735,9 @@ class XendDomainInfo:
         if 'image' not in self.info:
             raise VmError('Missing image in configuration')
 
-        self.image = ImageHandler.create(self,
-                                         self.info['image'],
-                                         self.info['device'])
+        self.image = image.create(self,
+                                  self.info['image'],
+                                  self.info['device'])
 
         if self.domid <= 0:
             raise VmError('Creating domain failed: name=%s' %
@@ -1083,19 +1084,6 @@ class XendDomainInfo:
 
     def infoIsSet(self, name):
         return name in self.info and self.info[name] is not None
-
-
-#============================================================================
-# Register image handlers.
-
-from image import          \
-     addImageHandlerClass, \
-     ImageHandler,         \
-     LinuxImageHandler,    \
-     VmxImageHandler
-
-addImageHandlerClass(LinuxImageHandler)
-addImageHandlerClass(VmxImageHandler)
 
 
 #============================================================================

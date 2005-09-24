@@ -33,6 +33,15 @@ xc = xen.lowlevel.xc.new()
 
 MAX_GUEST_CMDLINE = 1024
 
+
+def create(vm, imageConfig, deviceConfig):
+    """Create an image handler for a vm.
+
+    @return ImageHandler instance
+    """
+    return findImageHandlerClass(imageConfig)(vm, imageConfig, deviceConfig)
+
+
 class ImageHandler:
     """Abstract base class for image handlers.
 
@@ -48,64 +57,19 @@ class ImageHandler:
 
     The method destroy() is called when the domain is destroyed.
     The default is to do nothing.
-    
     """
-
-    #======================================================================
-    # Class vars and methods.
-
-    """Table of image handler classes for virtual machine images.
-    Indexed by image type.
-    """
-    imageHandlerClasses = {}
-
-    def addImageHandlerClass(cls, h):
-        """Add a handler class for an image type
-        @param h:        handler: ImageHandler subclass
-        """
-        cls.imageHandlerClasses[h.ostype] = h
-
-    addImageHandlerClass = classmethod(addImageHandlerClass)
-
-    def findImageHandlerClass(cls, image):
-        """Find the image handler class for an image config.
-
-        @param image config
-        @return ImageHandler subclass or None
-        """
-        ty = sxp.name(image)
-        if ty is None:
-            raise VmError('missing image type')
-        imageClass = cls.imageHandlerClasses.get(ty)
-        if imageClass is None:
-            raise VmError('unknown image type: ' + ty)
-        return imageClass
-
-    findImageHandlerClass = classmethod(findImageHandlerClass)
-
-    def create(cls, vm, imageConfig, deviceConfig):
-        """Create an image handler for a vm.
-
-        @return ImageHandler instance
-        """
-        imageClass = cls.findImageHandlerClass(imageConfig)
-        return imageClass(vm, imageConfig, deviceConfig)
-
-    create = classmethod(create)
-
-    #======================================================================
-    # Instance vars and methods.
 
     ostype = None
 
-    kernel = None
-    ramdisk = None
-    cmdline = None
-
-    flags = 0
 
     def __init__(self, vm, imageConfig, deviceConfig):
         self.vm = vm
+
+        self.kernel = None
+        self.ramdisk = None
+        self.cmdline = None
+        self.flags = 0
+
         self.configure(imageConfig, deviceConfig)
 
     def configure(self, imageConfig, _):
@@ -197,7 +161,6 @@ class ImageHandler:
         if d.has_key('console_mfn'):
             self.vm.setConsoleRef(d.get('console_mfn'))
 
-addImageHandlerClass = ImageHandler.addImageHandlerClass
 
 class LinuxImageHandler(ImageHandler):
 
@@ -425,3 +388,28 @@ class VmxImageHandler(ImageHandler):
             return 16 * 1024
         else:
             return (1 + ((mem_mb + 3) >> 2)) * 4
+
+
+"""Table of image handler classes for virtual machine images.  Indexed by
+image type.
+"""
+imageHandlerClasses = {}
+
+
+for h in LinuxImageHandler, VmxImageHandler:
+    imageHandlerClasses[h.ostype] = h
+
+
+def findImageHandlerClass(image):
+    """Find the image handler class for an image config.
+
+    @param image config
+    @return ImageHandler subclass or None
+    """
+    ty = sxp.name(image)
+    if ty is None:
+        raise VmError('missing image type')
+    imageClass = imageHandlerClasses.get(ty)
+    if imageClass is None:
+        raise VmError('unknown image type: ' + ty)
+    return imageClass
