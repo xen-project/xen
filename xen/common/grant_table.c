@@ -83,7 +83,7 @@ __gnttab_map_grant_ref(
     int            handle;
     u64            addr;
     unsigned long  frame = 0;
-    int            rc;
+    int            rc = GNTST_okay;
     active_grant_entry_t *act;
 
     /* Entry details from @rd's shared grant table. */
@@ -377,7 +377,6 @@ __gnttab_map_grant_ref(
 
             spin_unlock(&rd->grant_table->lock);
         }
-
     }
 
     ld->grant_table->maptrack[handle].domid         = dom;
