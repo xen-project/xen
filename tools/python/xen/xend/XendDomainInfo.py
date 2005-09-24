@@ -513,6 +513,19 @@ class XendDomainInfo:
                       self.info['backend'], 0)
 
 
+    def dumpCore(self):
+        """Create a core dump for this domain.  Nothrow guarantee."""
+        
+        try:
+            corefile = "/var/xen/dump/%s.%s.core" % (self.info['name'],
+                                                     self.domid)
+            xc.domain_dumpcore(dom = self.domid, corefile = corefile)
+
+        except Exception, exn:
+            log.error("XendDomainInfo.dumpCore failed: id = %s name = %s: %s",
+                      self.domid, self.info['name'], str(exn))
+
+
     def closeStoreChannel(self):
         """Close the store channel, if any.  Nothrow guarantee."""
         
