@@ -129,7 +129,7 @@ again:
 	}
 
 	err = xenbus_transaction_end(0);
-	if (err == EAGAIN)
+	if (err == -EAGAIN)
 		goto again;
 	if (err) {
 		xenbus_dev_error(be->dev, err, "end of transaction");

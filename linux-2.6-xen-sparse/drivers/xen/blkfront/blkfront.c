@@ -604,7 +604,7 @@ again:
 
 	err = xenbus_transaction_end(0);
 	if (err) {
-		if (err == EAGAIN)
+		if (err == -EAGAIN)
 			goto again;
 		xenbus_dev_error(dev, err, "completing transaction");
 		goto destroy_blkring;
