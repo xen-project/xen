@@ -93,7 +93,8 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 	 * Tell the front-end that we are ready to go -
 	 * unless something bad happens
 	 */
-	err = xenbus_transaction_start(be->dev->nodename);
+again:
+	err = xenbus_transaction_start();
 	if (err) {
 		xenbus_dev_error(be->dev, err, "starting transaction");
 		return;
@@ -127,7 +128,14 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		goto abort;
 	}
 
-	xenbus_transaction_end(0);
+	err = xenbus_transaction_end(0);
+	if (err == -EAGAIN)
+		goto again;
+	if (err) {
+		xenbus_dev_error(be->dev, err, "end of transaction");
+		goto abort;
+	}
+
 	xenbus_dev_ok(be->dev);
 	return;
 abort:

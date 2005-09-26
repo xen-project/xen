@@ -2273,8 +2273,7 @@ int do_mmu_update(
 
 
 int update_grant_pte_mapping(
-    unsigned long pte_addr, l1_pgentry_t _nl1e, 
-    struct domain *d, struct vcpu *v)
+    unsigned long pte_addr, l1_pgentry_t _nl1e, struct vcpu *v)
 {
     int rc = GNTST_okay;
     void *va;
@@ -2282,6 +2281,7 @@ int update_grant_pte_mapping(
     struct pfn_info *page;
     u32 type_info;
     l1_pgentry_t ol1e;
+    struct domain *d = v->domain;
 
     ASSERT(spin_is_locked(&d->big_lock));
     ASSERT(!shadow_mode_refcounts(d));
@@ -2318,8 +2318,6 @@ int update_grant_pte_mapping(
     } 
 
     put_page_from_l1e(ol1e, d);
-
-    rc = (l1e_get_flags(ol1e) & _PAGE_PRESENT) ? GNTST_flush_all : GNTST_okay;
 
     if ( unlikely(shadow_mode_enabled(d)) )
     {
@@ -2415,10 +2413,10 @@ int clear_grant_pte_mapping(
 
 
 int update_grant_va_mapping(
-    unsigned long va, l1_pgentry_t _nl1e, struct domain *d, struct vcpu *v)
+    unsigned long va, l1_pgentry_t _nl1e, struct vcpu *v)
 {
-    int rc = GNTST_okay;
     l1_pgentry_t *pl1e, ol1e;
+    struct domain *d = v->domain;
     
     ASSERT(spin_is_locked(&d->big_lock));
     ASSERT(!shadow_mode_refcounts(d));
@@ -2439,12 +2437,10 @@ int update_grant_va_mapping(
 
     put_page_from_l1e(ol1e, d);
 
-    rc = (l1e_get_flags(ol1e) & _PAGE_PRESENT) ? GNTST_flush_one : GNTST_okay;
-
     if ( unlikely(shadow_mode_enabled(d)) )
         shadow_do_update_va_mapping(va, _nl1e, v);
 
-    return rc;
+    return GNTST_okay;
 }
 
 int clear_grant_va_mapping(unsigned long addr, unsigned long frame)

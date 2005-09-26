@@ -126,20 +126,21 @@ class DevController:
         compulsory to use it; subclasses may prefer to allocate IDs based upon
         the device configuration instead.
         """
-        path = self.frontendMiscPath()
-        t = xstransact(path)
-        try:
-            result = t.read("nextDeviceID")
-            if result:
-                result = int(result)
-            else:
-                result = 1
-            t.write("nextDeviceID", str(result + 1))
-            t.commit()
-            return result
-        except:
-            t.abort()
-            raise
+        while True:
+            path = self.frontendMiscPath()
+            t = xstransact(path)
+            try:
+                result = t.read("nextDeviceID")
+                if result:
+                    result = int(result)
+                else:
+                    result = 1
+                t.write("nextDeviceID", str(result + 1))
+                if t.commit():
+                    return result
+            except:
+                t.abort()
+                raise
 
 
     ## private:

@@ -28,25 +28,27 @@ unsigned long csum_page (void * page);
 #define _PAGE_PSE       0x080
 #define _PAGE_GLOBAL    0x100
 
-#if defined(__i386__)
-#define L1_PAGETABLE_SHIFT       12
-#define L2_PAGETABLE_SHIFT       22
 #define L1_PAGETABLE_SHIFT_PAE   12
 #define L2_PAGETABLE_SHIFT_PAE   21
 #define L3_PAGETABLE_SHIFT_PAE   30
+
+#if defined(__i386__)
+#define L1_PAGETABLE_SHIFT       12
+#define L2_PAGETABLE_SHIFT       22
 #elif defined(__x86_64__)
-#define L1_PAGETABLE_SHIFT      12
-#define L2_PAGETABLE_SHIFT      21
-#define L3_PAGETABLE_SHIFT      30
-#define L4_PAGETABLE_SHIFT      39
+#define L1_PAGETABLE_SHIFT       12
+#define L2_PAGETABLE_SHIFT       21
+#define L3_PAGETABLE_SHIFT       30
+#define L4_PAGETABLE_SHIFT       39
 #endif
 
-#if defined(__i386__) 
-#define ENTRIES_PER_L1_PAGETABLE 1024
-#define ENTRIES_PER_L2_PAGETABLE 1024
 #define L1_PAGETABLE_ENTRIES_PAE  512
 #define L2_PAGETABLE_ENTRIES_PAE  512
 #define L3_PAGETABLE_ENTRIES_PAE    4
+
+#if defined(__i386__) 
+#define L1_PAGETABLE_ENTRIES   1024
+#define L2_PAGETABLE_ENTRIES   1024
 #elif defined(__x86_64__)
 #define L1_PAGETABLE_ENTRIES    512
 #define L2_PAGETABLE_ENTRIES    512
@@ -70,17 +72,18 @@ typedef unsigned long l3_pgentry_t;
 typedef unsigned long l4_pgentry_t;
 #endif
 
-#if defined(__i386__)
-#define l1_table_offset(_a) \
-          (((_a) >> L1_PAGETABLE_SHIFT) & (ENTRIES_PER_L1_PAGETABLE - 1))
-#define l2_table_offset(_a) \
-          ((_a) >> L2_PAGETABLE_SHIFT)
 #define l1_table_offset_pae(_a) \
   (((_a) >> L1_PAGETABLE_SHIFT_PAE) & (L1_PAGETABLE_ENTRIES_PAE - 1))
 #define l2_table_offset_pae(_a) \
   (((_a) >> L2_PAGETABLE_SHIFT_PAE) & (L2_PAGETABLE_ENTRIES_PAE - 1))
 #define l3_table_offset_pae(_a) \
 	(((_a) >> L3_PAGETABLE_SHIFT_PAE) & (L3_PAGETABLE_ENTRIES_PAE - 1))
+
+#if defined(__i386__)
+#define l1_table_offset(_a) \
+          (((_a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1))
+#define l2_table_offset(_a) \
+          ((_a) >> L2_PAGETABLE_SHIFT)
 #elif defined(__x86_64__)
 #define l1_table_offset(_a) \
   (((_a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1))

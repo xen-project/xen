@@ -280,8 +280,8 @@ class XenStore:
                                (', while writing %s : %s' % (str(path),
                                                              str(data))))
 
-    def begin(self, path):
-        self.getxs().transaction_start(path)
+    def begin(self):
+        self.getxs().transaction_start()
 
     def commit(self, abandon=False):
         self.getxs().transaction_end(abort=abandon)

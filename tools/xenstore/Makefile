@@ -28,11 +28,11 @@ CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm
 CLIENTS += xenstore-write
 CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
 
-all: libxenstore.so xenstored $(CLIENTS)
+all: libxenstore.so xenstored $(CLIENTS) xs_tdb_dump
 
 testcode: xs_test xenstored_test xs_random xs_dom0_test
 
-xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o
+xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
 
 $(CLIENTS): libxenstore.so
@@ -42,13 +42,21 @@ $(CLIENTS): xenstore-%: xenstore_%.o
 $(CLIENTS_OBJS): xenstore_%.o: xenstore_client.c
 	$(COMPILE.c) -DCLIENT_$(*F) -o $@ $<
 
-xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_test.o xenstored_transaction_test.o xs_lib.o talloc_test.o fake_libxc.o utils.o
+xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_test.o xenstored_transaction_test.o xs_lib.o talloc_test.o fake_libxc.o utils.o tdb.o
+	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+xs_tdb_dump: xs_tdb_dump.o utils.o tdb.o talloc.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 xs_test: xs_test.o xs_lib.o utils.o
 xs_random: xs_random.o xs_test_lib.o xs_lib.o talloc.o utils.o
 xs_stress: xs_stress.o xs_test_lib.o xs_lib.o talloc.o utils.o
 xs_crashme: xs_crashme.o xs_lib.o talloc.o utils.o
+
+speedtest: speedtest.o xs.o xs_lib.o utils.o talloc.o
+
+check-speed: speedtest xenstored_test $(TESTDIR)
+	$(TESTENV) time ./speedtest 100
 
 xs_test.o xs_stress.o xenstored_core_test.o xenstored_watch_test.o xenstored_transaction_test.o xenstored_domain_test.o xs_random.o xs_test_lib.o talloc_test.o fake_libxc.o xs_crashme.o: CFLAGS=$(BASECFLAGS) $(TESTFLAGS)
 
@@ -98,7 +106,7 @@ RANDSEED=$(shell date +%s)
 randomcheck: xs_random xenstored_test $(TESTDIR)
 	$(TESTENV) ./xs_random --simple --fast /tmp/xs_random 200000 $(RANDSEED) && echo
 	$(TESTENV) ./xs_random --fast /tmp/xs_random 100000 $(RANDSEED) && echo
-	$(TESTENV) ./xs_random --fail /tmp/xs_random 10000 $(RANDSEED)
+#	$(TESTENV) ./xs_random --fail /tmp/xs_random 10000 $(RANDSEED)
 
 crashme:  xs_crashme xenstored_test $(TESTDIR)
 	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions /tmp/xs_crashme.vglog* /tmp/trace

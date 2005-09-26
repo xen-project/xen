@@ -54,6 +54,8 @@
 #include "exec-all.h"
 #include "vl.h"
 
+void *shared_vram;
+
 shared_iopage_t *shared_page = NULL;
 extern int reset_requested;
 

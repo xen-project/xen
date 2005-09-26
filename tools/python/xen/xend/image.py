@@ -33,6 +33,15 @@ xc = xen.lowlevel.xc.new()
 
 MAX_GUEST_CMDLINE = 1024
 
+
+def create(vm, imageConfig, deviceConfig):
+    """Create an image handler for a vm.
+
+    @return ImageHandler instance
+    """
+    return findImageHandlerClass(imageConfig)(vm, imageConfig, deviceConfig)
+
+
 class ImageHandler:
     """Abstract base class for image handlers.
 
@@ -48,81 +57,39 @@ class ImageHandler:
 
     The method destroy() is called when the domain is destroyed.
     The default is to do nothing.
-    
     """
-
-    #======================================================================
-    # Class vars and methods.
-
-    """Table of image handler classes for virtual machine images.
-    Indexed by image type.
-    """
-    imageHandlerClasses = {}
-
-    def addImageHandlerClass(cls, h):
-        """Add a handler class for an image type
-        @param h:        handler: ImageHandler subclass
-        """
-        cls.imageHandlerClasses[h.ostype] = h
-
-    addImageHandlerClass = classmethod(addImageHandlerClass)
-
-    def findImageHandlerClass(cls, image):
-        """Find the image handler class for an image config.
-
-        @param image config
-        @return ImageHandler subclass or None
-        """
-        ty = sxp.name(image)
-        if ty is None:
-            raise VmError('missing image type')
-        imageClass = cls.imageHandlerClasses.get(ty)
-        if imageClass is None:
-            raise VmError('unknown image type: ' + ty)
-        return imageClass
-
-    findImageHandlerClass = classmethod(findImageHandlerClass)
-
-    def create(cls, vm, imageConfig, deviceConfig):
-        """Create an image handler for a vm.
-
-        @return ImageHandler instance
-        """
-        imageClass = cls.findImageHandlerClass(imageConfig)
-        return imageClass(vm, imageConfig, deviceConfig)
-
-    create = classmethod(create)
-
-    #======================================================================
-    # Instance vars and methods.
 
     ostype = None
 
-    kernel = None
-    ramdisk = None
-    cmdline = None
-
-    flags = 0
 
     def __init__(self, vm, imageConfig, deviceConfig):
         self.vm = vm
+
+        self.kernel = None
+        self.ramdisk = None
+        self.cmdline = None
+        self.flags = 0
+
         self.configure(imageConfig, deviceConfig)
 
     def configure(self, imageConfig, _):
         """Config actions common to all unix-like domains."""
 
-        self.kernel = sxp.child_value(imageConfig, "kernel")
+        def get_cfg(name, default = None):
+            return sxp.child_value(imageConfig, name, default)
+
+        self.kernel = get_cfg("kernel")
         self.cmdline = ""
-        ip = sxp.child_value(imageConfig, "ip", None)
+        ip = get_cfg("ip")
         if ip:
             self.cmdline += " ip=" + ip
-        root = sxp.child_value(imageConfig, "root")
+        root = get_cfg("root")
         if root:
             self.cmdline += " root=" + root
-        args = sxp.child_value(imageConfig, "args")
+        args = get_cfg("args")
         if args:
             self.cmdline += " " + args
-        self.ramdisk = sxp.child_value(imageConfig, "ramdisk", '')
+        self.ramdisk = get_cfg("ramdisk", '')
         
         self.vm.storeVm(("image/ostype", self.ostype),
                         ("image/kernel", self.kernel),
@@ -130,7 +97,7 @@ class ImageHandler:
                         ("image/ramdisk", self.ramdisk))
 
 
-    def handleBootloading():
+    def handleBootloading(self):
         self.unlink(self.kernel)
         self.unlink(self.ramdisk)
 
@@ -194,7 +161,6 @@ class ImageHandler:
         if d.has_key('console_mfn'):
             self.vm.setConsoleRef(d.get('console_mfn'))
 
-addImageHandlerClass = ImageHandler.addImageHandlerClass
 
 class LinuxImageHandler(ImageHandler):
 
@@ -238,22 +204,19 @@ class VmxImageHandler(ImageHandler):
 
     def configure(self, imageConfig, deviceConfig):
         ImageHandler.configure(self, imageConfig, deviceConfig)
-        
-        self.memmap = sxp.child_value(imageConfig, 'memmap')
+
         self.dmargs = self.parseDeviceModelArgs(imageConfig, deviceConfig)
         self.device_model = sxp.child_value(imageConfig, 'device_model')
         if not self.device_model:
             raise VmError("vmx: missing device model")
         self.display = sxp.child_value(imageConfig, 'display')
 
-        self.vm.storeVm(("image/memmap", self.memmap),
-                        ("image/dmargs", " ".join(self.dmargs)),
+        self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))
 
         self.device_channel = None
         self.pid = 0
-        self.memmap_value = []
 
         self.dmargs += self.configVNC(imageConfig)
 
@@ -261,7 +224,6 @@ class VmxImageHandler(ImageHandler):
     def createImage(self):
         """Create a VM for the VMX environment.
         """
-        self.parseMemmap()
         self.createDomain()
 
     def buildDomain(self):
@@ -278,9 +240,6 @@ class VmxImageHandler(ImageHandler):
         log.debug("control_evtchn = %d", self.device_channel.port2)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
-        log.debug("memmap         = %s", self.memmap_value)
-        log.debug("cmdline        = %s", self.cmdline)
-        log.debug("ramdisk        = %s", self.ramdisk)
         log.debug("flags          = %d", self.flags)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
 
@@ -289,9 +248,6 @@ class VmxImageHandler(ImageHandler):
                            control_evtchn = self.device_channel.port2,
                            store_evtchn   = store_evtchn,
                            memsize        = self.vm.getMemoryTarget() / 1024,
-                           memmap         = self.memmap_value,
-                           cmdline        = self.cmdline,
-                           ramdisk        = self.ramdisk,
                            flags          = self.flags,
                            vcpus          = self.vm.getVCpuCount())
         if isinstance(ret, dict):
@@ -299,18 +255,11 @@ class VmxImageHandler(ImageHandler):
             return 0
         return ret
 
-    def parseMemmap(self):
-        if self.memmap is None:
-            return
-        memmap = sxp.parse(open(self.memmap))[0]
-        from xen.util.memmap import memmap_parse
-        self.memmap_value = memmap_parse(memmap)
-        
     # Return a list of cmd line args to the device models based on the
     # xm config file
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
         dmargs = [ 'cdrom', 'boot', 'fda', 'fdb',
-                   'localtime', 'serial', 'stdvga', 'isa', 'vcpus' ] 
+                   'localtime', 'serial', 'stdvga', 'isa', 'vcpus' ]
         ret = []
         for a in dmargs:
             v = sxp.child_value(imageConfig, a)
@@ -439,3 +388,28 @@ class VmxImageHandler(ImageHandler):
             return 16 * 1024
         else:
             return (1 + ((mem_mb + 3) >> 2)) * 4
+
+
+"""Table of image handler classes for virtual machine images.  Indexed by
+image type.
+"""
+imageHandlerClasses = {}
+
+
+for h in LinuxImageHandler, VmxImageHandler:
+    imageHandlerClasses[h.ostype] = h
+
+
+def findImageHandlerClass(image):
+    """Find the image handler class for an image config.
+
+    @param image config
+    @return ImageHandler subclass or None
+    """
+    ty = sxp.name(image)
+    if ty is None:
+        raise VmError('missing image type')
+    imageClass = imageHandlerClasses.get(ty)
+    if imageClass is None:
+        raise VmError('unknown image type: ' + ty)
+    return imageClass

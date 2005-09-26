@@ -34,6 +34,7 @@ from xen.util.blkif import blkdev_uname_to_file
 
 from xen.xend.server.channel import EventChannel
 
+from xen.xend import image
 from xen.xend import sxp
 from xen.xend.XendBootloader import bootloader
 from xen.xend.XendLogging import log
@@ -319,6 +320,7 @@ class XendDomainInfo:
 
         try:
             defaultInfo('name',         lambda: "Domain-%d" % self.domid)
+            defaultInfo('ssidref',      lambda: 0)
             defaultInfo('restart_mode', lambda: RESTART_ONREBOOT)
             defaultInfo('cpu_weight',   lambda: 1.0)
             defaultInfo('bootloader',   lambda: None)
@@ -511,6 +513,19 @@ class XendDomainInfo:
                       self.info['backend'], 0)
 
 
+    def dumpCore(self):
+        """Create a core dump for this domain.  Nothrow guarantee."""
+        
+        try:
+            corefile = "/var/xen/dump/%s.%s.core" % (self.info['name'],
+                                                     self.domid)
+            xc.domain_dumpcore(dom = self.domid, corefile = corefile)
+
+        except Exception, exn:
+            log.error("XendDomainInfo.dumpCore failed: id = %s name = %s: %s",
+                      self.domid, self.info['name'], str(exn))
+
+
     def closeStoreChannel(self):
         """Close the store channel, if any.  Nothrow guarantee."""
         
@@ -614,7 +629,7 @@ class XendDomainInfo:
             sxpr.append(['maxmem', self.info['maxmem_KiB'] / 1024])
 
             if self.infoIsSet('device'):
-                for (n, c) in self.info['device']:
+                for (_, c) in self.info['device']:
                     sxpr.append(['device', c])
 
             def stateChar(name):
@@ -706,13 +721,6 @@ class XendDomainInfo:
         """
         # todo - add support for scheduling params?
         try:
-            if 'image' not in self.info:
-                raise VmError('Missing image in configuration')
-
-            self.image = ImageHandler.create(self,
-                                             self.info['image'],
-                                             self.info['device'])
-
             self.initDomain()
 
             # Create domain devices.
@@ -737,6 +745,14 @@ class XendDomainInfo:
 
         self.domid = xc.domain_create(dom = self.domid or 0,
                                       ssidref = self.info['ssidref'])
+
+        if 'image' not in self.info:
+            raise VmError('Missing image in configuration')
+
+        self.image = image.create(self,
+                                  self.info['image'],
+                                  self.info['device'])
+
         if self.domid <= 0:
             raise VmError('Creating domain failed: name=%s' %
                           self.info['name'])
@@ -839,20 +855,20 @@ class XendDomainInfo:
         """Release all vm devices.
         """
 
-        t = xstransact("%s/device" % self.path)
-
-        for n in controllerClasses.keys():
-            for d in t.list(n):
-                try:
-                    t.remove(d)
-                except ex:
-                    # Log and swallow any exceptions in removal -- there's
-                    # nothing more we can do.
-                    log.exception(
-                        "Device release failed: %s; %s; %s; %s" %
-                        (self.info['name'], n, d, str(ex)))
-        t.commit()
-
+        while True:
+            t = xstransact("%s/device" % self.path)
+            for n in controllerClasses.keys():
+                for d in t.list(n):
+                    try:
+                        t.remove(d)
+                    except ex:
+                        # Log and swallow any exceptions in removal --
+                        # there's nothing more we can do.
+                        log.exception(
+                           "Device release failed: %s; %s; %s; %s" %
+                            (self.info['name'], n, d, str(ex)))
+            if t.commit():
+                break
 
     def eventChannel(self, path=None):
         """Create an event channel to the domain.
@@ -1082,19 +1098,6 @@ class XendDomainInfo:
 
     def infoIsSet(self, name):
         return name in self.info and self.info[name] is not None
-
-
-#============================================================================
-# Register image handlers.
-
-from image import          \
-     addImageHandlerClass, \
-     ImageHandler,         \
-     LinuxImageHandler,    \
-     VmxImageHandler
-
-addImageHandlerClass(LinuxImageHandler)
-addImageHandlerClass(VmxImageHandler)
 
 
 #============================================================================

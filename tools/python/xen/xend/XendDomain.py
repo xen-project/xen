@@ -433,12 +433,11 @@ class XendDomain:
             self.domain_shutdowns()
         return val
 
+
     def domain_sysrq(self, id, key):
-        """Send a SysRq to a domain
-        """
-        dominfo = self.domain_lookup(id)
-        val = dominfo.send_sysrq(key)
-        return val
+        """Send a SysRq to the specified domain."""
+        return self.callInfo(id, XendDomainInfo.send_sysrq, key)
+
 
     def domain_shutdowns(self):
         """Process pending domain shutdowns.
@@ -630,73 +629,45 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
-    def domain_device_create(self, id, devconfig):
-        """Create a new device for a domain.
 
-        @param id:       domain id
-        @param devconfig: device configuration
+    def domain_device_create(self, domid, devconfig):
+        """Create a new device for the specified domain.
         """
-        dominfo = self.domain_lookup(id)
-        val = dominfo.device_create(devconfig)
-        dominfo.exportToDB()
-        return val
+        return self.callInfo(domid, XendDomainInfo.device_create, devconfig)
 
-    def domain_device_configure(self, id, devconfig, devid):
-        """Configure an existing device for a domain.
 
-        @param id:   domain id
-        @param devconfig: device configuration
-        @param devid:  device id
+    def domain_device_configure(self, domid, devconfig, devid):
+        """Configure an existing device in the specified domain.
         @return: updated device configuration
         """
-        dominfo = self.domain_lookup(id)
-        val = dominfo.device_configure(devconfig, devid)
-        dominfo.exportToDB()
-        return val
+        return self.callInfo(domid, XendDomainInfo.device_configure,
+                             devconfig, devid)
+
     
-    def domain_device_refresh(self, id, type, devid):
-        """Refresh a device.
-
-        @param id:  domain id
-        @param devid:  device id
-        @param type: device type
-        """
-        dominfo = self.domain_lookup(id)
-        val = dominfo.device_refresh(type, devid)
-        dominfo.exportToDB()
-        return val
-
-    def domain_device_destroy(self, id, type, devid):
-        """Destroy a device.
-
-        @param id:  domain id
-        @param devid:  device id
-        @param type: device type
-        """
-        dominfo = self.domain_lookup(id)
-        return dominfo.destroyDevice(type, devid)
+    def domain_device_refresh(self, domid, devtype, devid):
+        """Refresh a device."""
+        return self.callInfo(domid, XendDomainInfo.device_refresh, devtype,
+                             devid)
 
 
-    def domain_devtype_ls(self, id, type):
-        """Get list of device sxprs for a domain.
+    def domain_device_destroy(self, domid, devtype, devid):
+        """Destroy a device."""
+        return self.callInfo(domid, XendDomainInfo.destroyDevice, devtype,
+                             devid)
 
-        @param id:  domain
-        @param type: device type
-        @return: device sxprs
-        """
-        dominfo = self.domain_lookup(id)
-        return dominfo.getDeviceSxprs(type)
 
-    def domain_devtype_get(self, id, type, devid):
+    def domain_devtype_ls(self, domid, devtype):
+        """Get list of device sxprs for the specified domain."""
+        return self.callInfo(domid, XendDomainInfo.getDeviceSxprs, devtype)
+
+
+    def domain_devtype_get(self, domid, devtype, devid):
         """Get a device from a domain.
         
-        @param id:  domain
-        @param type: device type
-        @param devid:  device id
         @return: device object (or None)
         """
-        dominfo = self.domain_lookup(id)
-        return dominfo.getDevice(type, devid)
+        return self.callInfo(domid, XendDomainInfo.getDevice, devtype, devid)
+
 
     def domain_vif_limit_set(self, id, vif, credit, period):
         """Limit the vif's transmission rate
@@ -723,7 +694,7 @@ class XendDomain:
         """Set the memory limit for a domain.
 
         @param id: domain
-        @param mem: memory limit (in MB)
+        @param mem: memory limit (in MiB)
         @return: 0 on success, -1 on error
         """
         dominfo = self.domain_lookup(id)
@@ -734,42 +705,37 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
-    def domain_mem_target_set(self, id, mem):
+    def domain_mem_target_set(self, domid, mem):
         """Set the memory target for a domain.
 
-        @param id: domain
-        @param mem: memory target (in MB)
-        @return: 0 on success, -1 on error
+        @param mem: memory target (in MiB)
         """
-        dominfo = self.domain_lookup(id)
-        return dominfo.setMemoryTarget(mem << 10)
+        self.callInfo(domid, XendDomainInfo.setMemoryTarget, mem << 10)
 
-    def domain_vcpu_hotplug(self, id, vcpu, state):
-        """Enable or disable VCPU vcpu in DOM id
 
-        @param id: domain
+    def domain_vcpu_hotplug(self, domid, vcpu, state):
+        """Enable or disable specified VCPU in specified domain
+
         @param vcpu: target VCPU in domain
         @param state: which state VCPU will become
-        @return: 0 on success, -1 on error
         """
+        self.callInfo(domid, XendDomainInfo.vcpu_hotplug, vcpu, state)
 
-        dominfo = self.domain_lookup(id)
-        return dominfo.vcpu_hotplug(vcpu, state)
 
-    def domain_dumpcore(self, id):
-        """Save a core dump for a crashed domain.
+    def domain_dumpcore(self, domid):
+        """Save a core dump for a crashed domain."""
+        self.callInfo(domid, XendDomainInfo.dumpCore)
 
-        @param id: domain
-        """
-        dominfo = self.domain_lookup(id)
-        corefile = "/var/xen/dump/%s.%s.core" % (dominfo.getName(),
-                                                 dominfo.getDomid())
-        try:
-            xc.domain_dumpcore(dom=dominfo.getDomid(), corefile=corefile)
-        except Exception, ex:
-            log.warning("Dumpcore failed, id=%s name=%s: %s",
-                        dominfo.getDomid(), dominfo.getName(), ex)
-        
+
+    ## private:
+
+    def callInfo(self, domid, fn, *args, **kwargs):
+        self.refresh()
+        dominfo = self.domains.get(domid)
+        if dominfo:
+            return fn(dominfo, *args, **kwargs)
+
+
 def instance():
     """Singleton constructor. Use this instead of the class constructor.
     """

@@ -134,6 +134,7 @@ int pci_enabled = 1;
 int prep_enabled = 0;
 int rtc_utc = 1;
 int cirrus_vga_enabled = 1;
+int vga_accelerate = 1;
 int graphic_width = 800;
 int graphic_height = 600;
 int graphic_depth = 15;
@@ -141,6 +142,12 @@ int full_screen = 0;
 TextConsole *vga_console;
 CharDriverState *serial_hds[MAX_SERIAL_PORTS];
 int xc_handle;
+unsigned long *vgapage_array;
+unsigned long *freepage_array;
+unsigned long free_pages;
+void *vtop_table;
+unsigned long toptab;
+unsigned long vgaram_pages;
 
 /***********************************************************/
 /* x86 ISA bus support */
@@ -2162,6 +2169,7 @@ void help(void)
            "-isa            simulate an ISA-only system (default is PCI system)\n"
            "-std-vga        simulate a standard VGA card with VESA Bochs Extensions\n"
            "                (default is CL-GD5446 PCI VGA)\n"
+           "-vgaacc [0|1]   1 to accelerate CL-GD5446 speed, default is 1\n"
 #endif
            "-loadvm file    start right away with a saved state (loadvm in monitor)\n"
            "\n"
@@ -2251,6 +2259,7 @@ enum {
     QEMU_OPTION_serial,
     QEMU_OPTION_loadvm,
     QEMU_OPTION_full_screen,
+    QEMU_OPTION_vgaacc,
 };
 
 typedef struct QEMUOption {
@@ -2327,6 +2336,7 @@ const QEMUOption qemu_options[] = {
     { "pci", 0, QEMU_OPTION_pci },
     { "nic-pcnet", 0, QEMU_OPTION_nic_pcnet },
     { "cirrusvga", 0, QEMU_OPTION_cirrusvga },
+    { "vgaacc", HAS_ARG, QEMU_OPTION_vgaacc },
     { NULL },
 };
 
@@ -2342,6 +2352,177 @@ static uint8_t *signal_stack;
 #define NET_IF_TUN   0
 #define NET_IF_USER  1
 #define NET_IF_DUMMY 2
+
+#include <xg_private.h>
+
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
+#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+
+#ifdef __i386__
+#define _LEVEL_3_ 0
+#else
+#define _LEVEL_3_ 1
+#endif
+
+#if _LEVEL_3_
+#define L3_PROT (_PAGE_PRESENT)
+#define L1_PAGETABLE_ENTRIES    512
+#else
+#define L1_PAGETABLE_ENTRIES    1024
+#endif
+
+inline int
+get_vl2_table(unsigned long count, unsigned long start)
+{
+#if _LEVEL_3_
+    return ((start + (count << PAGE_SHIFT)) >> L3_PAGETABLE_SHIFT) & 0x3;
+#else
+    return 0;
+#endif
+}
+
+int
+setup_mapping(int xc_handle, u32 dom, unsigned long toptab, unsigned long  *mem_page_array, unsigned long *page_table_array, unsigned long v_start, unsigned long v_end)
+{
+    l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
+    l2_pgentry_t *vl2tab[4], *vl2e=NULL, *vl2_table = NULL;
+    unsigned long l1tab;
+    unsigned long ppt_alloc = 0;
+    unsigned long count;
+    int i = 0;
+#if _LEVEL_3_
+    l3_pgentry_t *vl3tab = NULL;
+    unsigned long l2tab;
+    if ( (vl3tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, 
+                                        PROT_READ|PROT_WRITE, 
+                                        toptab >> PAGE_SHIFT)) == NULL )
+        goto error_out;
+    for (i = 0; i < 4 ; i++) {
+        l2tab = vl3tab[i] & PAGE_MASK;
+        vl2tab[i] = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+          PROT_READ|PROT_WRITE,
+          l2tab >> PAGE_SHIFT);
+        if(vl2tab[i] == NULL)
+            goto error_out;
+    }
+    munmap(vl3tab, PAGE_SIZE);
+    vl3tab = NULL;
+#else
+    if ( (vl2tab[0] = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, 
+                                           PROT_READ|PROT_WRITE, 
+                                           toptab >> PAGE_SHIFT)) == NULL )
+        goto error_out;
+#endif
+
+    for ( count = 0; count < ((v_end-v_start)>>PAGE_SHIFT); count++ )
+    {
+        if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
+        {
+            vl2_table = vl2tab[get_vl2_table(count, v_start)];
+            vl2e = &vl2_table[l2_table_offset(
+                v_start + (count << PAGE_SHIFT))];
+
+            l1tab = page_table_array[ppt_alloc++] << PAGE_SHIFT;
+            if ( vl1tab != NULL )
+                munmap(vl1tab, PAGE_SIZE);
+
+            if ( (vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                                PROT_READ|PROT_WRITE,
+                                                l1tab >> PAGE_SHIFT)) == NULL )
+            {
+                goto error_out;
+            }
+            memset(vl1tab, 0, PAGE_SIZE);
+            vl1e = &vl1tab[l1_table_offset(v_start + (count<<PAGE_SHIFT))];
+            *vl2e = l1tab | L2_PROT;
+        }
+
+        *vl1e = (mem_page_array[count] << PAGE_SHIFT) | L1_PROT;
+        vl1e++;
+    }
+error_out:
+    if(vl1tab)  munmap(vl1tab, PAGE_SIZE);
+    for(i = 0; i < 4; i++)
+        if(vl2tab[i]) munmap(vl2tab[i], PAGE_SIZE);
+    return ppt_alloc;
+}
+
+void
+unsetup_mapping(int xc_handle, u32 dom, unsigned long toptab, unsigned long v_start, unsigned long v_end)
+{
+    l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
+    l2_pgentry_t *vl2tab[4], *vl2e=NULL, *vl2_table = NULL;
+    unsigned long l1tab;
+    unsigned long count;
+    int i = 0;
+#if _LEVEL_3_
+    l3_pgentry_t *vl3tab = NULL;
+    unsigned long l2tab;
+    if ( (vl3tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, 
+                                        PROT_READ|PROT_WRITE, 
+                                        toptab >> PAGE_SHIFT)) == NULL )
+        goto error_out;
+    for (i = 0; i < 4 ; i ++){
+        l2tab = vl3tab[i] & PAGE_MASK;
+        vl2tab[i] = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+          PROT_READ|PROT_WRITE,
+          l2tab >> PAGE_SHIFT);
+        if(vl2tab[i] == NULL)
+            goto error_out;
+    }
+    munmap(vl3tab, PAGE_SIZE);
+    vl3tab = NULL;
+#else
+    if ( (vl2tab[0] = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, 
+                                        PROT_READ|PROT_WRITE, 
+                                        toptab >> PAGE_SHIFT)) == NULL )
+        goto error_out;
+#endif
+
+    for ( count = 0; count < ((v_end-v_start)>>PAGE_SHIFT); count++ ){
+        if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
+        {
+            vl2_table = vl2tab[get_vl2_table(count, v_start)];
+            vl2e = &vl2_table[l2_table_offset(v_start + (count << PAGE_SHIFT))];
+            l1tab = *vl2e & PAGE_MASK;
+
+            if(l1tab == 0)
+                continue;
+            if ( vl1tab != NULL )
+                munmap(vl1tab, PAGE_SIZE);
+
+            if ( (vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                      PROT_READ|PROT_WRITE,
+                      l1tab >> PAGE_SHIFT)) == NULL )
+            {
+                goto error_out;
+            }
+            vl1e = &vl1tab[l1_table_offset(v_start + (count<<PAGE_SHIFT))];
+            *vl2e = 0;
+        }
+
+        *vl1e = 0;
+        vl1e++;
+    }
+error_out:
+    if(vl1tab)  munmap(vl1tab, PAGE_SIZE);
+    for(i = 0; i < 4; i++)
+        if(vl2tab[i]) munmap(vl2tab[i], PAGE_SIZE);
+}
+
+void set_vram_mapping(unsigned long addr, unsigned long end)
+{
+    end = addr + VGA_RAM_SIZE;
+    setup_mapping(xc_handle, domid, toptab,
+      vgapage_array, freepage_array, addr, end);
+}
+
+void unset_vram_mapping(unsigned long addr, unsigned long end)
+{
+    end = addr + VGA_RAM_SIZE;
+    /* FIXME Flush the shadow page */
+    unsetup_mapping(xc_handle, domid, toptab, addr, end);
+}
 
 int main(int argc, char **argv)
 {
@@ -2366,8 +2547,9 @@ int main(int argc, char **argv)
     char serial_devices[MAX_SERIAL_PORTS][128];
     int serial_device_index;
     const char *loadvm = NULL;
-    unsigned long nr_pages, *page_array;
+    unsigned long nr_pages, extra_pages, ram_pages, *page_array;
     extern void *shared_page;
+    extern void *shared_vram;
     /* change the qemu-dm to daemon, just like bochs dm */
 //    daemon(0, 0);
     
@@ -2674,6 +2856,17 @@ int main(int argc, char **argv)
             case QEMU_OPTION_cirrusvga:
                 cirrus_vga_enabled = 1;
                 break;
+            case QEMU_OPTION_vgaacc:
+                {
+                    const char *p;
+                    p = optarg;
+                    vga_accelerate = strtol(p, (char **)&p, 0);
+                    if (*p != '\0') {
+                        fprintf(stderr, "qemu: invalid vgaacc option\n");
+                        exit(1);
+                    }
+                    break;
+                }
             case QEMU_OPTION_std_vga:
                 cirrus_vga_enabled = 0;
                 break;
@@ -2803,17 +2996,36 @@ int main(int argc, char **argv)
     /* init the memory */
     phys_ram_size = ram_size + vga_ram_size + bios_size;
 
-    #define PAGE_SHIFT 12
-    #define PAGE_SIZE  (1 << PAGE_SHIFT)
+    ram_pages = ram_size/PAGE_SIZE;
+    vgaram_pages =  (vga_ram_size -1)/PAGE_SIZE + 1;
+    free_pages = vgaram_pages / L1_PAGETABLE_ENTRIES;
+    extra_pages = vgaram_pages + free_pages;
 
-    nr_pages = ram_size/PAGE_SIZE;
     xc_handle = xc_interface_open();
-    
+
+    xc_dominfo_t info;
+    xc_domain_getinfo(xc_handle, domid, 1, &info);
+
+    nr_pages = info.nr_pages + extra_pages;
+
+    if ( xc_domain_setmaxmem(xc_handle, domid,
+            (nr_pages) * PAGE_SIZE/1024 ) != 0)
+    {
+        perror("set maxmem");
+        exit(-1);
+    }
+   
     if ( (page_array = (unsigned long *)
 	  malloc(nr_pages * sizeof(unsigned long))) == NULL)
     {
 	    perror("malloc");
 	    exit(-1);
+    }
+
+    if (xc_domain_memory_increase_reservation(xc_handle, domid, 
+          extra_pages , 0, 0, NULL) != 0) {
+        perror("increase reservation");
+        exit(-1);
     }
 
     if ( xc_get_pfn_list(xc_handle, domid, page_array, nr_pages) != nr_pages )
@@ -2825,15 +3037,36 @@ int main(int argc, char **argv)
     if ((phys_ram_base =  xc_map_foreign_batch(xc_handle, domid,
 						 PROT_READ|PROT_WRITE,
 						 page_array,
-						 nr_pages - 1)) == 0) {
+						 ram_pages - 1)) == 0) {
 	    perror("xc_map_foreign_batch");
 	    exit(-1);
     }
 
     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
 				       PROT_READ|PROT_WRITE,
-				       page_array[nr_pages - 1]);
+ 				       page_array[ram_pages - 1]);
 
+    vgapage_array = &page_array[nr_pages - vgaram_pages];
+
+    if ((shared_vram =  xc_map_foreign_batch(xc_handle, domid,
+ 						 PROT_READ|PROT_WRITE,
+ 						 vgapage_array,
+ 						 vgaram_pages)) == 0) {
+ 	    perror("xc_map_foreign_batch vgaram ");
+ 	    exit(-1);
+     }
+
+
+
+    memset(shared_vram, 0, vgaram_pages * PAGE_SIZE);
+    toptab = page_array[ram_pages] << PAGE_SHIFT;
+
+    vtop_table = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+				       PROT_READ|PROT_WRITE,
+ 				       page_array[ram_pages]);
+
+    freepage_array = &page_array[nr_pages - extra_pages];
+ 
 
     fprintf(logfile, "shared page at pfn:%lx, mfn: %lx\n", (nr_pages-1), 
            (page_array[nr_pages - 1]));

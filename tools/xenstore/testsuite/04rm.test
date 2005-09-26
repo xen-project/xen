@@ -6,6 +6,8 @@ rm /dir/test
 # Create file and remove it
 write /test contents
 rm /test
+expect tool
+dir /
 
 # Create directory and remove it.
 mkdir /dir
@@ -15,3 +17,4 @@ rm /dir
 mkdir /dir
 write /dir/test contents
 rm /dir
+

@@ -3,7 +3,7 @@
 mkdir /test
 
 # Simple transaction: create a file inside transaction.
-1 start /test
+1 start
 1 write /test/entry1 contents
 2 dir /test
 expect 1:entry1
@@ -15,7 +15,7 @@ expect 2:contents
 rm /test/entry1
 
 # Create a file and abort transaction.
-1 start /test
+1 start
 1 write /test/entry1 contents
 2 dir /test
 expect 1:entry1
@@ -25,7 +25,7 @@ expect 1:entry1
 
 write /test/entry1 contents
 # Delete in transaction, commit
-1 start /test
+1 start
 1 rm /test/entry1
 expect 2:entry1
 2 dir /test
@@ -35,7 +35,7 @@ expect 2:entry1
 
 # Delete in transaction, abort.
 write /test/entry1 contents
-1 start /test
+1 start
 1 rm /test/entry1
 expect 2:entry1
 2 dir /test
@@ -47,7 +47,7 @@ expect 2:entry1
 # Events inside transactions don't trigger watches until (successful) commit.
 mkdir /test/dir
 1 watch /test token
-2 start /test
+2 start
 2 mkdir /test/dir/sub
 expect 1: waitwatch failed: Connection timed out
 1 waitwatch
@@ -55,7 +55,7 @@ expect 1: waitwatch failed: Connection timed out
 1 close
 
 1 watch /test token
-2 start /test
+2 start
 2 mkdir /test/dir/sub
 2 abort
 expect 1: waitwatch failed: Connection timed out
@@ -63,7 +63,7 @@ expect 1: waitwatch failed: Connection timed out
 1 close
 
 1 watch /test token
-2 start /test
+2 start
 2 mkdir /test/dir/sub
 2 commit
 expect 1:/test/dir/sub:token
@@ -73,7 +73,7 @@ expect 1:/test/dir/sub:token
 
 # Rm inside transaction works like rm outside: children get notified.
 1 watch /test/dir/sub token
-2 start /test
+2 start
 2 rm /test/dir
 2 commit
 expect 1:/test/dir/sub:token
@@ -83,7 +83,7 @@ expect 1:/test/dir/sub:token
 
 # Multiple events from single transaction don't trigger assert
 1 watch /test token
-2 start /test
+2 start
 2 write /test/1 contents
 2 write /test/2 contents
 2 commit

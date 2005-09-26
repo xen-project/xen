@@ -582,9 +582,8 @@ static PyObject *xspy_unwatch(PyObject *self, PyObject *args, PyObject *kwds)
 }
 
 #define xspy_transaction_start_doc "\n"				\
-	"Start a transaction on a path.\n"			\
+	"Start a transaction.\n"				\
 	"Only one transaction can be active at a time.\n"	\
-	" path [string]: xenstore path.\n"			\
 	"\n"							\
 	"Returns None on success.\n"				\
 	"Raises RuntimeError on error.\n"			\
@@ -593,8 +592,8 @@ static PyObject *xspy_unwatch(PyObject *self, PyObject *args, PyObject *kwds)
 static PyObject *xspy_transaction_start(PyObject *self, PyObject *args,
                                         PyObject *kwds)
 {
-    static char *kwd_spec[] = { "path", NULL };
-    static char *arg_spec = "s|";
+    static char *kwd_spec[] = { NULL };
+    static char *arg_spec = "";
     char *path = NULL;
 
     struct xs_handle *xh = xshandle(self);
@@ -606,7 +605,7 @@ static PyObject *xspy_transaction_start(PyObject *self, PyObject *args,
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
         goto exit;
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_transaction_start(xh, path);
+    xsval = xs_transaction_start(xh);
     Py_END_ALLOW_THREADS
     if (!xsval) {
         PyErr_SetFromErrno(PyExc_RuntimeError);
@@ -623,7 +622,7 @@ static PyObject *xspy_transaction_start(PyObject *self, PyObject *args,
 	"Attempts to commit the transaction unless abort is true.\n"	\
 	" abort [int]: abort flag (default 0).\n"			\
 	"\n"								\
-	"Returns None on success.\n"					\
+	"Returns True on success, False if you need to try again.\n"	\
 	"Raises RuntimeError on error.\n"				\
 	"\n"
 
@@ -646,11 +645,16 @@ static PyObject *xspy_transaction_end(PyObject *self, PyObject *args,
     xsval = xs_transaction_end(xh, abort);
     Py_END_ALLOW_THREADS
     if (!xsval) {
+	if (errno == EAGAIN) {
+	    Py_INCREF(Py_False);
+	    val = Py_False;
+	    goto exit;
+	}
         PyErr_SetFromErrno(PyExc_RuntimeError);
         goto exit;
     }
-    Py_INCREF(Py_None);
-    val = Py_None;
+    Py_INCREF(Py_True);
+    val = Py_True;
  exit:
     return val;
 }

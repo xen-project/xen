@@ -110,8 +110,4 @@ gnttab_prepare_for_transfer(
 void
 gnttab_release_dev_mappings(grant_table_t *gt);
 
-/* Extra GNTST_ values, for internal use only. */
-#define GNTST_flush_all        (2)  /* Success, need to flush entire TLB.    */
-#define GNTST_flush_one        (1)  /* Success, need to flush a vaddr.       */
-
 #endif /* __XEN_GRANT_H__ */

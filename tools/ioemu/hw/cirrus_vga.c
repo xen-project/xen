@@ -231,6 +231,8 @@ typedef struct CirrusVGAState {
     int cirrus_linear_io_addr;
     int cirrus_linear_bitblt_io_addr;
     int cirrus_mmio_io_addr;
+    unsigned long cirrus_lfb_addr;
+    unsigned long cirrus_lfb_end;
     uint32_t cirrus_addr_mask;
     uint32_t linear_mmio_mask;
     uint8_t cirrus_shadow_gr0;
@@ -2447,6 +2449,10 @@ static void cirrus_update_memory_access(CirrusVGAState *s)
 {
     unsigned mode;
 
+    extern void unset_vram_mapping(unsigned long addr, unsigned long end);
+    extern void set_vram_mapping(unsigned long addr, unsigned long end);
+    extern int vga_accelerate;
+
     if ((s->sr[0x17] & 0x44) == 0x44) {
         goto generic_io;
     } else if (s->cirrus_srcptr != s->cirrus_srcptr_end) {
@@ -2454,17 +2460,21 @@ static void cirrus_update_memory_access(CirrusVGAState *s)
     } else {
 	if ((s->gr[0x0B] & 0x14) == 0x14) {
             goto generic_io;
-	} else if (s->gr[0x0B] & 0x02) {
-            goto generic_io;
-        }
-        
-	mode = s->gr[0x05] & 0x7;
-	if (mode < 4 || mode > 5 || ((s->gr[0x0B] & 0x4) == 0)) {
+    } else if (s->gr[0x0B] & 0x02) {
+        goto generic_io;
+    }
+
+    mode = s->gr[0x05] & 0x7;
+    if (mode < 4 || mode > 5 || ((s->gr[0x0B] & 0x4) == 0)) {
+            if (vga_accelerate && s->cirrus_lfb_addr && s->cirrus_lfb_end)
+                set_vram_mapping(s->cirrus_lfb_addr, s->cirrus_lfb_end);
             s->cirrus_linear_write[0] = cirrus_linear_mem_writeb;
             s->cirrus_linear_write[1] = cirrus_linear_mem_writew;
             s->cirrus_linear_write[2] = cirrus_linear_mem_writel;
         } else {
         generic_io:
+            if (vga_accelerate && s->cirrus_lfb_addr && s->cirrus_lfb_end)
+                 unset_vram_mapping(s->cirrus_lfb_addr, s->cirrus_lfb_end);
             s->cirrus_linear_write[0] = cirrus_linear_writeb;
             s->cirrus_linear_write[1] = cirrus_linear_writew;
             s->cirrus_linear_write[2] = cirrus_linear_writel;
@@ -3058,6 +3068,8 @@ static void cirrus_pci_lfb_map(PCIDevice *d, int region_num,
     /* XXX: add byte swapping apertures */
     cpu_register_physical_memory(addr, s->vram_size,
 				 s->cirrus_linear_io_addr);
+    s->cirrus_lfb_addr = addr;
+    s->cirrus_lfb_end = addr + VGA_RAM_SIZE;
     cpu_register_physical_memory(addr + 0x1000000, 0x400000,
 				 s->cirrus_linear_bitblt_io_addr);
 }
