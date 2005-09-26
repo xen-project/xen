@@ -80,6 +80,15 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		return;
 	}
 
+	/* Map the shared frame, irq etc. */
+	err = blkif_map(be->blkif, ring_ref, evtchn);
+	if (err) {
+		xenbus_dev_error(be->dev, err, "mapping ring-ref %lu port %u",
+				 ring_ref, evtchn);
+		return;
+	}
+	/* XXX From here on should 'blkif_unmap' on error. */
+
 again:
 	/* Supply the information about the device the frontend needs */
 	err = xenbus_transaction_start();
@@ -109,14 +118,6 @@ again:
 	if (err) {
 		xenbus_dev_error(be->dev, err, "writing %s/sector-size",
 				 be->dev->nodename);
-		goto abort;
-	}
-
-	/* Map the shared frame, irq etc. */
-	err = blkif_map(be->blkif, ring_ref, evtchn);
-	if (err) {
-		xenbus_dev_error(be->dev, err, "mapping ring-ref %lu port %u",
-				 ring_ref, evtchn);
 		goto abort;
 	}
 

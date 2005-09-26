@@ -591,17 +591,6 @@ again:
 		goto abort_transaction;
 	}
 
-	info->backend = backend;
-	backend = NULL;
-
-	info->watch.node = info->backend;
-	info->watch.callback = watch_for_status;
-	err = register_xenbus_watch(&info->watch);
-	if (err) {
-		message = "registering watch on backend";
-		goto abort_transaction;
-	}
-
 	err = xenbus_transaction_end(0);
 	if (err) {
 		if (err == -EAGAIN)
@@ -610,10 +599,17 @@ again:
 		goto destroy_blkring;
 	}
 
- out:
-	if (backend)
-		kfree(backend);
-	return err;
+	info->watch.node = backend;
+	info->watch.callback = watch_for_status;
+	err = register_xenbus_watch(&info->watch);
+	if (err) {
+		message = "registering watch on backend";
+		goto destroy_blkring;
+	}
+
+	info->backend = backend;
+
+	return 0;
 
  abort_transaction:
 	xenbus_transaction_end(1);
@@ -621,7 +617,10 @@ again:
 	xenbus_dev_error(dev, err, "%s", message);
  destroy_blkring:
 	blkif_free(info);
-	goto out;
+ out:
+	if (backend)
+		kfree(backend);
+	return err;
 }
 
 /* Setup supplies the backend dir, virtual device.
