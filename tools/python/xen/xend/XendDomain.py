@@ -34,7 +34,6 @@ from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 from xen.xend import scheduler
 from xen.xend.server import relocate
-from xen.xend.xenstore import XenNode, DBMap
 from xen.xend.xenstore.xstransact import xstransact
 
 
@@ -68,8 +67,6 @@ class XendDomain:
         # So we stuff the XendDomain instance (self) into xroot's components.
         xroot.add_component("xen.xend.XendDomain", self)
         self.domains = XendDomainDict()
-        self.vmroot = "/domain"
-        self.dbmap = DBMap(db=XenNode(self.vmroot))
         self.watchReleaseDomain()
         self.refresh()
         self.dom0_setup()
@@ -174,17 +171,6 @@ class XendDomain:
             if notify:
                 eserver.inject('xend.domain.died', [info.getName(),
                                                     info.getDomid()])
-        # XXX this should not be needed
-        for domdb in self.dbmap.values():
-            if not domdb.has_key("xend"):
-                continue
-            db = domdb.addChild("xend")
-            try:
-                domid = int(domdb["domid"].getData())
-            except:
-                domid = None
-            if (domid is None) or (domid == id):
-                domdb.delete()
 
 
     def refresh(self):
@@ -230,7 +216,7 @@ class XendDomain:
         @param config: configuration
         @return: domain
         """
-        dominfo = XendDomainInfo.create(self.dbmap.getPath(), config)
+        dominfo = XendDomainInfo.create(config)
         self._add_domain(dominfo)
         return dominfo
 
@@ -247,7 +233,7 @@ class XendDomain:
         nested = sxp.child_value(config, 'config')
         if nested:
             config = nested
-        return XendDomainInfo.restore(self.dbmap.getPath(), config)
+        return XendDomainInfo.restore(config)
 
     def domain_restore(self, src, progress=False):
         """Restore a domain from file.

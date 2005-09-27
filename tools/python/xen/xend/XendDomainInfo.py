@@ -154,17 +154,16 @@ class XendDomainInfo:
     MINIMUM_RESTART_TIME = 20
 
 
-    def create(cls, dompath, config):
+    def create(cls, config):
         """Create a VM from a configuration.
 
-        @param dompath:   The path to all domain information
         @param config    configuration
         @raise: VmError for invalid configuration
         """
 
-        log.debug("XendDomainInfo.create(%s, ...)", dompath)
+        log.debug("XendDomainInfo.create(...)")
         
-        vm = cls(getUuid(), dompath, cls.parseConfig(config))
+        vm = cls(getUuid(), cls.parseConfig(config))
         vm.construct()
         vm.refreshShutdown()
         return vm
@@ -192,30 +191,27 @@ class XendDomainInfo:
                 raise XendError(
                     'No vm/uuid path in store for existing domain %d' % domid)
 
-            dompath = "/".join(dompath.split("/")[0:-1])
         except Exception, exn:
             log.warn(str(exn))
-            dompath = DOMROOT
             uuid = getUuid()
 
         log.info("Recreating domain %d, uuid %s", domid, uuid)
 
-        vm = cls(uuid, dompath, xeninfo, domid, True)
+        vm = cls(uuid, xeninfo, domid, True)
         vm.refreshShutdown(xeninfo)
         return vm
 
     recreate = classmethod(recreate)
 
 
-    def restore(cls, dompath, config, uuid = None):
+    def restore(cls, config, uuid = None):
         """Create a domain and a VM object to do a restore.
 
-        @param dompath:   The path to all domain information
         @param config:    domain configuration
         @param uuid:      uuid to use
         """
         
-        log.debug("XendDomainInfo.restore(%s, %s, %s)", dompath, config, uuid)
+        log.debug("XendDomainInfo.restore(%s, %s)", config, uuid)
 
         if not uuid:
             uuid = getUuid()
@@ -225,7 +221,7 @@ class XendDomainInfo:
         except TypeError, exn:
             raise VmError('Invalid ssidref in config: %s' % exn)
 
-        vm = cls(uuid, dompath, cls.parseConfig(config),
+        vm = cls(uuid, cls.parseConfig(config),
                  xc.domain_create(ssidref = ssidref))
         vm.create_channel()
         vm.configure()
@@ -293,12 +289,12 @@ class XendDomainInfo:
     parseConfig = classmethod(parseConfig)
 
     
-    def __init__(self, uuid, parentpath, info, domid = None, augment = False):
+    def __init__(self, uuid, info, domid = None, augment = False):
 
         self.uuid = uuid
         self.info = info
 
-        self.path = parentpath + "/" + uuid
+        self.path = DOMROOT + "/" + uuid
 
         if domid:
             self.domid = domid
