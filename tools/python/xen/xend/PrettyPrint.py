@@ -39,9 +39,9 @@ class PrettyItem:
         print '***PrettyItem>output>', self
         pass
 
-    def prettyprint(self, _, width):
+    def prettyprint(self, _):
         print '***PrettyItem>prettyprint>', self
-        return width
+        return self.width
 
 class PrettyString(PrettyItem):
 
