@@ -22,6 +22,7 @@
 from  mimetools import Message
 from cStringIO import StringIO
 import math
+import socket
 import time
 import cgi
 
