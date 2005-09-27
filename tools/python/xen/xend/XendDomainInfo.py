@@ -977,9 +977,19 @@ class XendDomainInfo:
         self.cleanup()
 
         try:
+            self.removeVm()
+        except Exception:
+            log.exception("Removing VM path failed.")
+
+        try:
+            self.removeDom()
+        except Exception:
+            log.exception("Removing domain path failed.")
+
+        try:
             if self.domid is not None:
                 xc.domain_destroy(dom=self.domid)
-        except Exception, exn:
+        except Exception:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
 
 
