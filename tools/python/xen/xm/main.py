@@ -188,6 +188,10 @@ def xm_restore(args):
 
     savefile = os.path.abspath(args[0])
 
+    if not os.access(savefile, os.R_OK):
+        err("xm restore: Unable to read file %s" % savefile)
+        sys.exit(1)
+
     from xen.xend.XendClient import server
     info = server.xend_domain_restore(savefile)
     PrettyPrint.prettyprint(info)
