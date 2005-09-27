@@ -81,6 +81,22 @@ class DevController:
         xstransact.Remove(backpath)
 
 
+    def sxprs(self):
+        """@return an s-expression describing all the devices of this
+        controller's device-class.
+        """
+        path = self.frontendRoot()
+        while True:
+            t = xstransact(path)
+            try:
+                listing = t.list_recursive()
+                if t.commit():
+                    return listing
+            except:
+                t.abort()
+                raise
+
+
     def sxpr(self, devid):
         """@return an s-expression describing the specified device.
         """
@@ -126,8 +142,8 @@ class DevController:
         compulsory to use it; subclasses may prefer to allocate IDs based upon
         the device configuration instead.
         """
+        path = self.frontendMiscPath()
         while True:
-            path = self.frontendMiscPath()
             t = xstransact(path)
             try:
                 result = t.read("nextDeviceID")
@@ -196,8 +212,11 @@ class DevController:
 
 
     def frontendPath(self, devid):
-        return "%s/device/%s/%d" % (self.vm.getPath(), self.deviceClass,
-                                    devid)
+        return "%s/%d" % (self.frontendRoot(), devid)
+
+
+    def frontendRoot(self):
+        return "%s/device/%s" % (self.vm.getPath(), self.deviceClass)
 
 
     def frontendMiscPath(self):
