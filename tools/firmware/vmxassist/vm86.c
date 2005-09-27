@@ -752,6 +752,9 @@ opcode(struct regs *regs)
 					goto invalid;
 				}
 				break;
+			case 0x09: /* wbinvd */
+				asm volatile ( "wbinvd" );
+				return OPC_EMULATED;
 			case 0x20: /* mov Rd, Cd (1h) */
 			case 0x22:
 				if (!movcr(regs, prefix, opc))
