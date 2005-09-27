@@ -28,13 +28,11 @@ import xen.lowlevel.xc
 from xen.xend import sxp
 from xen.xend import XendRoot
 from xen.xend import XendCheckpoint
-from xen.xend.XendDomainInfo import XendDomainInfo, shutdown_reason
+from xen.xend.XendDomainInfo import XendDomainInfo
 from xen.xend import EventServer
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
-from xen.xend import scheduler
 from xen.xend.server import relocate
-from xen.xend.xenstore.xstransact import xstransact
 
 
 xc = xen.lowlevel.xc.new()
@@ -157,15 +155,15 @@ class XendDomain:
             eserver.inject('xend.domain.create', [info.getName(),
                                                   info.getDomid()])
 
-    def _delete_domain(self, id, notify=True):
+    def _delete_domain(self, domid, notify=True):
         """Remove a domain from the tables.
 
         @param id:     domain id
         @param notify: send a domain died event if true
         """
-        info = self.domains.get(id)
+        info = self.domains.get(domid)
         if info:
-            del self.domains[id]
+            del self.domains[domid]
             info.cleanup()
             info.delete()
             if notify:
@@ -235,11 +233,10 @@ class XendDomain:
             config = nested
         return XendDomainInfo.restore(config)
 
-    def domain_restore(self, src, progress=False):
+    def domain_restore(self, src):
         """Restore a domain from file.
 
         @param src:      source file
-        @param progress: output progress if true
         """
 
         try:
@@ -367,12 +364,11 @@ class XendDomain:
         
         return None
 
-    def domain_save(self, id, dst, progress=False):
+    def domain_save(self, id, dst):
         """Start saving a domain to file.
 
         @param id:       domain id
         @param dst:      destination file
-        @param progress: output progress if true
         """
 
         try:
