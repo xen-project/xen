@@ -10,8 +10,12 @@ import select
 import sxp
 from string import join
 from struct import pack, unpack, calcsize
+
 from xen.util.xpopen import xPopen3
+
 import xen.lowlevel.xc
+
+import XendDomainInfo
 from xen.xend.xenstore.xsutil import IntroduceDomain
 
 from XendError import XendError
@@ -74,7 +78,7 @@ def save(xd, fd, dominfo, live):
                 if l.rstrip() == "suspend":
                     log.info("suspending %d" % dominfo.domid)
                     xd.domain_shutdown(dominfo.domid, reason='suspend')
-                    dominfo.state_wait("suspended")
+                    dominfo.state_wait(XendDomainInfo.STATE_VM_SUSPENDED)
                     log.info("suspend %d done" % dominfo.domid)
                     child.tochild.write("done\n")
                     child.tochild.flush()
