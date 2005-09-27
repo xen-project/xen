@@ -734,13 +734,6 @@ class XendDomainInfo:
     __repr__ = __str__
 
 
-    def getDeviceController(self, name):
-        if name not in controllerClasses:
-            raise XendError("unknown device type: " + str(name))
-
-        return controllerClasses[name](self)
-
-
     def createDevice(self, deviceClass, devconfig):
         return self.getDeviceController(deviceClass).createDevice(devconfig)
 
@@ -753,6 +746,21 @@ class XendDomainInfo:
     def destroyDevice(self, deviceClass, devid):
         return self.getDeviceController(deviceClass).destroyDevice(devid)
 
+
+    def getDeviceSxprs(self, deviceClass):
+        return self.getDeviceController(deviceClass).sxprs()
+
+
+    ## private:
+
+    def getDeviceController(self, name):
+        if name not in controllerClasses:
+            raise XendError("unknown device type: " + str(name))
+
+        return controllerClasses[name](self)
+
+
+    ## public:
 
     def sxpr(self):
         sxpr = ['domain',
