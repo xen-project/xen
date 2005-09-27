@@ -63,6 +63,8 @@ struct domain
 	/* The connection associated with this. */
 	struct connection *conn;
 
+	/* Have we noticed that this domain is shutdown? */
+	int shutdown;
 };
 
 static LIST_HEAD(domains);
@@ -222,19 +224,25 @@ static void domain_cleanup(void)
 {
 	xc_dominfo_t dominfo;
 	struct domain *domain, *tmp;
-	int released = 0;
+	int notify = 0;
 
 	list_for_each_entry_safe(domain, tmp, &domains, list) {
 		if (xc_domain_getinfo(*xc_handle, domain->domid, 1,
 				      &dominfo) == 1 &&
-		    dominfo.domid == domain->domid &&
-		    !dominfo.dying && !dominfo.crashed && !dominfo.shutdown)
-			continue;
+		    dominfo.domid == domain->domid) {
+			if ((dominfo.crashed || dominfo.shutdown)
+			    && !domain->shutdown) {
+				domain->shutdown = 1;
+				notify = 1;
+			}
+			if (!dominfo.dying)
+				continue;
+		}
 		talloc_free(domain->conn);
-		released++;
+		notify = 1;
 	}
 
-	if (released)
+	if (notify)
 		fire_watches(NULL, "@releaseDomain", false);
 }
 
@@ -272,6 +280,7 @@ static struct domain *new_domain(void *context, domid_t domid,
 	struct domain *domain;
 	domain = talloc(context, struct domain);
 	domain->port = 0;
+	domain->shutdown = 0;
 	domain->domid = domid;
 	domain->path = talloc_strdup(domain, path);
 	domain->page = xc_map_foreign_range(*xc_handle, domain->domid,

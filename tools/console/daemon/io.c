@@ -399,7 +399,7 @@ void enum_domains(void)
 
 	while (xc_domain_getinfo(xc, domid, 1, &dominfo) == 1) {
 		dom = lookup_domain(dominfo.domid);
-		if (dominfo.dying || dominfo.crashed || dominfo.shutdown) {
+		if (dominfo.dying) {
 			if (dom)
 				shutdown_domain(dom);
 		} else {

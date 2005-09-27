@@ -352,29 +352,25 @@ again:
 		goto abort_transaction;
 	}
 
-	info->backend = backend;
-	backend = NULL;
-
-	info->watch.node = info->backend;
-	info->watch.callback = watch_for_status;
-	err = register_xenbus_watch(&info->watch);
-	if (err) {
-		message = "registering watch on backend";
-		goto abort_transaction;
-	}
-
 	err = xenbus_transaction_end(0);
-	if (err == EAGAIN)
+	if (err == -EAGAIN)
 		goto again;
 	if (err) {
 		xenbus_dev_error(dev, err, "completing transaction");
 		goto destroy_tpmring;
 	}
 
-out:
-	if (backend)
-		kfree(backend);
-	return err;
+	info->watch.node = backend;
+	info->watch.callback = watch_for_status;
+	err = register_xenbus_watch(&info->watch);
+	if (err) {
+		message = "registering watch on backend";
+		goto destroy_tpmring;
+	}
+
+	info->backend = backend;
+
+	return 0;
 
 abort_transaction:
 	xenbus_transaction_end(1);
@@ -382,7 +378,10 @@ abort_transaction:
 	xenbus_dev_error(dev, err, "%s", message);
 destroy_tpmring:
 	destroy_tpmring(info, &my_private);
-	goto out;
+out:
+	if (backend)
+		kfree(backend);
+	return err;
 }
 
 
