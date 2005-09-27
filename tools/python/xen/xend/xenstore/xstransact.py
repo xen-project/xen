@@ -1,4 +1,5 @@
 # Copyright (C) 2005 Christian Limpach <Christian.Limpach@cl.cam.ac.uk>
+# Copyright (C) 2005 XenSource Ltd
 
 # This file is subject to the terms and conditions of the GNU General
 # Public License.  See the file "COPYING" in the main directory of
@@ -8,6 +9,7 @@ import errno
 import threading
 from xen.lowlevel import xs
 from xen.xend.xenstore.xsutil import xshandle
+
 
 class xstransact:
 
@@ -105,12 +107,38 @@ class xstransact:
         return []
 
     def list(self, *args):
+        """If no arguments are given, list this transaction's path, returning
+        the entries therein, or None if no entries are found.  Otherwise,
+        treat each argument as a subpath to this transaction's path, and
+        return the cumulative listing of each of those instead.
+        """
         if len(args) == 0:
-            raise TypeError
+            return xshandle().ls(self.path)
+        else:
+            ret = []
+            for key in args:
+                ret.extend(self._list(key))
+            return ret
+
+
+    def list_recursive_(self, subdir, keys):
         ret = []
-        for key in args:
-            ret.extend(self._list(key))
+        for key in keys:
+            new_subdir = subdir + "/" + key
+            l = xshandle().ls(new_subdir)
+            if l:
+                ret.append([key, self.list_recursive_(new_subdir, l)])
+            else:
+                ret.append([key, xshandle().read(new_subdir)])
         return ret
+
+
+    def list_recursive(self, *args):
+        if len(args) == 0:
+            args = self.list()
+
+        return self.list_recursive_(self.path, args)
+
 
     def gather(self, *args):
         if len(args) and type(args[0]) != tuple:
