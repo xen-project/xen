@@ -42,8 +42,15 @@ class xstransact:
                                '%s, while reading %s' % (ex.args[1], path))
 
     def read(self, *args):
+        """If no arguments are given, return the value at this transaction's
+        path.  If one argument is given, treat that argument as a subpath to
+        this transaction's path, and return the value at that path.
+        Otherwise, treat each argument as a subpath to this transaction's
+        path, and return a list composed of the values at each of those
+        instead.
+        """
         if len(args) == 0:
-            raise TypeError
+            return xshandle().read(self.path)
         if len(args) == 1:
             return self._read(args[0])
         ret = []
@@ -191,6 +198,13 @@ class xstransact:
 
 
     def Read(cls, path, *args):
+        """If only one argument is given (path), return the value stored at
+        that path.  If two arguments are given, treat the second argument as a
+        subpath within the first, and return the value at the composed path.
+        Otherwise, treat each argument after the first as a subpath to the
+        given path, and return a list composed of the values at each of those
+        instead.  This operation is performed inside a transaction.
+        """
         while True:
             t = cls(path)
             try:
@@ -234,6 +248,12 @@ class xstransact:
     Remove = classmethod(Remove)
 
     def List(cls, path, *args):
+        """If no arguments are given (path), list its contents, returning the
+        entries therein, or None if no entries are found.  Otherwise, treat
+        each further argument as a subpath to the given path, and return the
+        cumulative listing of each of those instead.  This operation is
+        performed inside a transaction.
+        """
         while True:
             t = cls(path)
             try:
