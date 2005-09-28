@@ -454,7 +454,8 @@ gnttab_init(void)
 
 	for (i = NR_RESERVED_ENTRIES; i < NR_GRANT_ENTRIES; i++)
 		gnttab_list[i] = i + 1;
-	gnttab_free_count = NR_GRANT_ENTRIES;
+	gnttab_free_count = NR_GRANT_ENTRIES - NR_RESERVED_ENTRIES;
+	gnttab_free_head  = NR_RESERVED_ENTRIES;
 
 #ifdef CONFIG_PROC_FS
 	/*
