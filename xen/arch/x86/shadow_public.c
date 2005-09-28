@@ -256,7 +256,6 @@ void free_monitor_pagetable(struct vcpu *v)
 {
     unsigned long mfn;
 
-    ASSERT( pagetable_val(v->arch.monitor_table) );
     /*
      * free monitor_table.
      * Note: for VMX guest, only BSP need do this free.
