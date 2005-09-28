@@ -115,12 +115,16 @@ class xstransact:
 
     def list(self, *args):
         """If no arguments are given, list this transaction's path, returning
-        the entries therein, or None if no entries are found.  Otherwise,
-        treat each argument as a subpath to this transaction's path, and
-        return the cumulative listing of each of those instead.
+        the entries therein, or the empty list if no entries are found.
+        Otherwise, treat each argument as a subpath to this transaction's
+        path, and return the cumulative listing of each of those instead.
         """
         if len(args) == 0:
-            return xshandle().ls(self.path)
+            ret = xshandle().ls(self.path)
+            if ret is None:
+                return []
+            else:
+                return ret
         else:
             ret = []
             for key in args:
@@ -141,8 +145,15 @@ class xstransact:
 
 
     def list_recursive(self, *args):
+        """If no arguments are given, list this transaction's path, returning
+        the entries therein, or the empty list if no entries are found.
+        Otherwise, treat each argument as a subpath to this transaction's
+        path, and return the cumulative listing of each of those instead.
+        """
         if len(args) == 0:
             args = self.list()
+            if args is None or len(args) == 0:
+                return []
 
         return self.list_recursive_(self.path, args)
 
@@ -248,11 +259,11 @@ class xstransact:
     Remove = classmethod(Remove)
 
     def List(cls, path, *args):
-        """If no arguments are given (path), list its contents, returning the
-        entries therein, or None if no entries are found.  Otherwise, treat
-        each further argument as a subpath to the given path, and return the
-        cumulative listing of each of those instead.  This operation is
-        performed inside a transaction.
+        """If only one argument is given (path), list its contents, returning
+        the entries therein, or the empty list if no entries are found.
+        Otherwise, treat each further argument as a subpath to the given path,
+        and return the cumulative listing of each of those instead.  This
+        operation is performed inside a transaction.
         """
         while True:
             t = cls(path)
@@ -265,6 +276,25 @@ class xstransact:
                 raise
 
     List = classmethod(List)
+
+    def ListRecursive(cls, path, *args):
+        """If only one argument is given (path), list its contents
+        recursively, returning the entries therein, or the empty list if no
+        entries are found.  Otherwise, treat each further argument as a
+        subpath to the given path, and return the cumulative listing of each
+        of those instead.  This operation is performed inside a transaction.
+        """
+        while True:
+            t = cls(path)
+            try:
+                v = t.list_recursive(*args)
+                if t.commit():
+                    return v
+            except:
+                t.abort()
+                raise
+
+    ListRecursive = classmethod(ListRecursive)
 
     def Gather(cls, path, *args):
         while True:

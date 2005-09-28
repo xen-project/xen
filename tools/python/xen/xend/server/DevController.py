@@ -85,16 +85,7 @@ class DevController:
         """@return an s-expression describing all the devices of this
         controller's device-class.
         """
-        path = self.frontendRoot()
-        while True:
-            t = xstransact(path)
-            try:
-                listing = t.list_recursive()
-                if t.commit():
-                    return listing
-            except:
-                t.abort()
-                raise
+        return xstransact.ListRecursive(self.frontendRoot())
 
 
     def sxpr(self, devid):
