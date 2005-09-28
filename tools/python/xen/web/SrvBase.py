@@ -82,7 +82,7 @@ class SrvBase(resource.Resource):
             return ''
         else:
             try:
-                res = op_method(op, req)
+                return op_method(op, req)
             except Exception, exn:
                 log.exception("Request %s failed.", op)
                 if req.useSxp():
