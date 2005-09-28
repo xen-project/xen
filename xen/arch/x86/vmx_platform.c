@@ -667,6 +667,7 @@ static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
     mpcip->instr = inst->instr;
     mpcip->operand[0] = inst->operand[0]; /* source */
     mpcip->operand[1] = inst->operand[1]; /* destination */
+    mpcip->immediate = inst->immediate;
 
     if (inst->operand[0] & REGISTER) { /* dest is memory */
         index = operand_index(inst->operand[0]);
