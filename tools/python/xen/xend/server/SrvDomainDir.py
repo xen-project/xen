@@ -38,19 +38,17 @@ class SrvDomainDir(SrvDir):
         self.xd = XendDomain.instance()
 
     def domain(self, x):
-        val = None
         dom = self.xd.domain_lookup_by_name(x)
         if not dom:
             raise XendError('No such domain ' + str(x))
-        val = SrvDomain(dom)
-        return val
+        return SrvDomain(dom)
 
     def get(self, x):
         v = SrvDir.get(self, x)
         if v is not None:
             return v
-        v = self.domain(x)
-        return v
+        else:
+            return self.domain(x)
 
     def op_create(self, op, req):
         """Create a domain.
