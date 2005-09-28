@@ -23,7 +23,7 @@
 #include <vm86.h>
 
 int
-main()
+main(void)
 {
 	printf("/* MACHINE GENERATED; DO NOT EDIT */\n");
 	printf("#define VMX_ASSIST_CTX_GS_SEL	0x%x\n",

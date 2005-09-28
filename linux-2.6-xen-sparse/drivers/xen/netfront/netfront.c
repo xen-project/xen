@@ -1,7 +1,7 @@
 /******************************************************************************
  * Virtual network driver for conversing with remote driver backends.
  * 
- * Copyright (c) 2002-2004, K A Fraser
+ * Copyright (c) 2002-2005, K A Fraser
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -57,7 +57,7 @@
 #include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/gnttab.h>
 
-#define GRANT_INVALID_REF	(0xFFFF)
+#define GRANT_INVALID_REF	0
 
 #ifndef __GFP_NOWARN
 #define __GFP_NOWARN 0
@@ -700,6 +700,7 @@ static void network_connect(struct net_device *dev)
 	struct net_private *np;
 	int i, requeue_idx;
 	netif_tx_request_t *tx;
+	struct sk_buff *skb;
 
 	np = netdev_priv(dev);
 	spin_lock_irq(&np->tx_lock);
@@ -711,7 +712,8 @@ static void network_connect(struct net_device *dev)
 	np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
 	np->rx->event = np->tx->event = 1;
 
-	/* Step 2: Rebuild the RX and TX ring contents.
+	/*
+	 * Step 2: Rebuild the RX and TX ring contents.
 	 * NB. We could just free the queued TX packets now but we hope
 	 * that sending them out might do some good.  We have to rebuild
 	 * the RX ring because some of our pages are currently flipped out
@@ -722,49 +724,52 @@ static void network_connect(struct net_device *dev)
 	 * them.
 	 */
 
-	/* Rebuild the TX buffer freelist and the TX ring itself.
+	/*
+	 * Rebuild the TX buffer freelist and the TX ring itself.
 	 * NB. This reorders packets.  We could keep more private state
 	 * to avoid this but maybe it doesn't matter so much given the
 	 * interface has been down.
 	 */
 	for (requeue_idx = 0, i = 1; i <= NETIF_TX_RING_SIZE; i++) {
-		if ((unsigned long)np->tx_skbs[i] >= __PAGE_OFFSET) {
-			struct sk_buff *skb = np->tx_skbs[i];
+		if ((unsigned long)np->tx_skbs[i] < __PAGE_OFFSET)
+			continue;
 
-			tx = &np->tx->ring[requeue_idx++].req;
+		skb = np->tx_skbs[i];
 
-			tx->id   = i;
-			gnttab_grant_foreign_access_ref(
-				np->grant_tx_ref[i], np->backend_id, 
-				virt_to_mfn(np->tx_skbs[i]->data),
-				GNTMAP_readonly); 
-			tx->gref = np->grant_tx_ref[i];
-			tx->offset = (unsigned long)skb->data & ~PAGE_MASK;
-			tx->size = skb->len;
+		tx = &np->tx->ring[requeue_idx++].req;
 
-			np->stats.tx_bytes += skb->len;
-			np->stats.tx_packets++;
-		}
+		tx->id = i;
+		gnttab_grant_foreign_access_ref(
+			np->grant_tx_ref[i], np->backend_id, 
+			virt_to_mfn(np->tx_skbs[i]->data),
+			GNTMAP_readonly); 
+		tx->gref = np->grant_tx_ref[i];
+		tx->offset = (unsigned long)skb->data & ~PAGE_MASK;
+		tx->size = skb->len;
+		tx->csum_blank = (skb->ip_summed == CHECKSUM_HW);
+
+		np->stats.tx_bytes += skb->len;
+		np->stats.tx_packets++;
 	}
 	wmb();
 	np->tx->req_prod = requeue_idx;
 
 	/* Rebuild the RX buffer freelist and the RX ring itself. */
 	for (requeue_idx = 0, i = 1; i <= NETIF_RX_RING_SIZE; i++) { 
-		if ((unsigned long)np->rx_skbs[i] >= __PAGE_OFFSET) {
-			gnttab_grant_foreign_transfer_ref(
-				np->grant_rx_ref[i], np->backend_id);
-			np->rx->ring[requeue_idx].req.gref =
-				np->grant_rx_ref[i];
-			np->rx->ring[requeue_idx].req.id = i;
-			requeue_idx++; 
-		}
+		if ((unsigned long)np->rx_skbs[i] < __PAGE_OFFSET)
+			continue;
+		gnttab_grant_foreign_transfer_ref(
+			np->grant_rx_ref[i], np->backend_id);
+		np->rx->ring[requeue_idx].req.gref =
+			np->grant_rx_ref[i];
+		np->rx->ring[requeue_idx].req.id = i;
+		requeue_idx++; 
 	}
-
 	wmb();                
 	np->rx->req_prod = requeue_idx;
 
-	/* Step 3: All public and private state should now be sane.  Get
+	/*
+	 * Step 3: All public and private state should now be sane.  Get
 	 * ready to start sending and receiving packets and give the driver
 	 * domain a kick because we've probably just requeued some
 	 * packets.
@@ -798,7 +803,8 @@ static void show_device(struct net_private *np)
 #endif
 }
 
-/* Move the vif into connected state.
+/*
+ * Move the vif into connected state.
  * Sets the mac and event channel from the message.
  * Binds the irq to the event channel.
  */
@@ -1053,8 +1059,7 @@ static void netif_free(struct netfront_info *info)
 	info->evtchn = 0;
 }
 
-/* Stop network device and free tx/rx queues and irq.
- */
+/* Stop network device and free tx/rx queues and irq. */
 static void shutdown_device(struct net_private *np)
 {
 	/* Stop old i/f to prevent errors whilst we rebuild the state. */
@@ -1148,17 +1153,6 @@ again:
 		goto abort_transaction;
 	}
 
-	info->backend = backend;
-	backend = NULL;
-
-	info->watch.node = info->backend;
-	info->watch.callback = watch_for_status;
-	err = register_xenbus_watch(&info->watch);
-	if (err) {
-		message = "registering watch on backend";
-		goto abort_transaction;
-	}
-
 	err = xenbus_transaction_end(0);
 	if (err) {
 		if (err == -EAGAIN)
@@ -1167,12 +1161,19 @@ again:
 		goto destroy_ring;
 	}
 
+	info->watch.node = backend;
+	info->watch.callback = watch_for_status;
+	err = register_xenbus_watch(&info->watch);
+	if (err) {
+		message = "registering watch on backend";
+		goto destroy_ring;
+	}
+
+	info->backend = backend;
+
 	netif_state = NETIF_STATE_CONNECTED;
 
- out:
-	if (backend)
-		kfree(backend);
-	return err;
+	return 0;
 
  abort_transaction:
 	xenbus_transaction_end(1);
@@ -1180,13 +1181,17 @@ again:
 	xenbus_dev_error(dev, err, "%s", message);
  destroy_ring:
 	shutdown_device(info);
-	goto out;
+ out:
+	if (backend)
+		kfree(backend);
+	return err;
 }
 
-/* Setup supplies the backend dir, virtual device.
-
-   We place an event channel and shared frame entries.
-   We watch backend to wait if it's ok. */
+/*
+ * Setup supplies the backend dir, virtual device.
+ * We place an event channel and shared frame entries.
+ * We watch backend to wait if it's ok.
+ */
 static int netfront_probe(struct xenbus_device *dev,
 			  const struct xenbus_device_id *id)
 {

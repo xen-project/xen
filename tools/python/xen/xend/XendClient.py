@@ -302,12 +302,6 @@ class Xend:
                              {'op'      : 'devices',
                               'type'    : type })
 
-    def xend_domain_device(self, id, type, idx):
-        return self.xendPost(self.domainurl(id),
-                             {'op'      : 'device',
-                              'type'    : type,
-                              'idx'     : idx })
-    
     def xend_domain_device_create(self, id, config):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'device_create',

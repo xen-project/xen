@@ -112,6 +112,10 @@ void xen_idle(void)
 
 #ifdef CONFIG_HOTPLUG_CPU
 #include <asm/nmi.h>
+#ifdef CONFIG_SMP
+extern void smp_suspend(void);
+extern void smp_resume(void);
+#endif
 /* We don't actually take CPU down, just spin without interrupts. */
 static inline void play_dead(void)
 {
@@ -120,6 +124,13 @@ static inline void play_dead(void)
 		HYPERVISOR_yield();
 
 	__flush_tlb_all();
+   /* 
+    * Restore IPI/IRQ mappings before marking online to prevent 
+    * race between pending interrupts and restoration of handler. 
+    */
+#ifdef CONFIG_SMP
+	smp_resume();
+#endif
 	cpu_set(smp_processor_id(), cpu_online_map);
 }
 #else
@@ -135,10 +146,6 @@ static inline void play_dead(void)
  * low exit latency (ie sit in a loop waiting for
  * somebody to say that they'd like to reschedule)
  */
-#ifdef CONFIG_SMP
-extern void smp_suspend(void);
-extern void smp_resume(void);
-#endif
 void cpu_idle (void)
 {
 	int cpu = _smp_processor_id();
@@ -166,9 +173,6 @@ void cpu_idle (void)
 				HYPERVISOR_vcpu_down(cpu);
 #endif
 				play_dead();
-#ifdef CONFIG_SMP
-				smp_resume();
-#endif
 				local_irq_enable();
 			}
 

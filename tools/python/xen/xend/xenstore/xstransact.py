@@ -1,4 +1,5 @@
 # Copyright (C) 2005 Christian Limpach <Christian.Limpach@cl.cam.ac.uk>
+# Copyright (C) 2005 XenSource Ltd
 
 # This file is subject to the terms and conditions of the GNU General
 # Public License.  See the file "COPYING" in the main directory of
@@ -8,6 +9,7 @@ import errno
 import threading
 from xen.lowlevel import xs
 from xen.xend.xenstore.xsutil import xshandle
+
 
 class xstransact:
 
@@ -40,8 +42,15 @@ class xstransact:
                                '%s, while reading %s' % (ex.args[1], path))
 
     def read(self, *args):
+        """If no arguments are given, return the value at this transaction's
+        path.  If one argument is given, treat that argument as a subpath to
+        this transaction's path, and return the value at that path.
+        Otherwise, treat each argument as a subpath to this transaction's
+        path, and return a list composed of the values at each of those
+        instead.
+        """
         if len(args) == 0:
-            raise TypeError
+            return xshandle().read(self.path)
         if len(args) == 1:
             return self._read(args[0])
         ret = []
@@ -105,12 +114,49 @@ class xstransact:
         return []
 
     def list(self, *args):
+        """If no arguments are given, list this transaction's path, returning
+        the entries therein, or the empty list if no entries are found.
+        Otherwise, treat each argument as a subpath to this transaction's
+        path, and return the cumulative listing of each of those instead.
+        """
         if len(args) == 0:
-            raise TypeError
+            ret = xshandle().ls(self.path)
+            if ret is None:
+                return []
+            else:
+                return ret
+        else:
+            ret = []
+            for key in args:
+                ret.extend(self._list(key))
+            return ret
+
+
+    def list_recursive_(self, subdir, keys):
         ret = []
-        for key in args:
-            ret.extend(self._list(key))
+        for key in keys:
+            new_subdir = subdir + "/" + key
+            l = xshandle().ls(new_subdir)
+            if l:
+                ret.append([key, self.list_recursive_(new_subdir, l)])
+            else:
+                ret.append([key, xshandle().read(new_subdir)])
         return ret
+
+
+    def list_recursive(self, *args):
+        """If no arguments are given, list this transaction's path, returning
+        the entries therein, or the empty list if no entries are found.
+        Otherwise, treat each argument as a subpath to this transaction's
+        path, and return the cumulative listing of each of those instead.
+        """
+        if len(args) == 0:
+            args = self.list()
+            if args is None or len(args) == 0:
+                return []
+
+        return self.list_recursive_(self.path, args)
+
 
     def gather(self, *args):
         if len(args) and type(args[0]) != tuple:
@@ -163,6 +209,13 @@ class xstransact:
 
 
     def Read(cls, path, *args):
+        """If only one argument is given (path), return the value stored at
+        that path.  If two arguments are given, treat the second argument as a
+        subpath within the first, and return the value at the composed path.
+        Otherwise, treat each argument after the first as a subpath to the
+        given path, and return a list composed of the values at each of those
+        instead.  This operation is performed inside a transaction.
+        """
         while True:
             t = cls(path)
             try:
@@ -206,6 +259,12 @@ class xstransact:
     Remove = classmethod(Remove)
 
     def List(cls, path, *args):
+        """If only one argument is given (path), list its contents, returning
+        the entries therein, or the empty list if no entries are found.
+        Otherwise, treat each further argument as a subpath to the given path,
+        and return the cumulative listing of each of those instead.  This
+        operation is performed inside a transaction.
+        """
         while True:
             t = cls(path)
             try:
@@ -217,6 +276,25 @@ class xstransact:
                 raise
 
     List = classmethod(List)
+
+    def ListRecursive(cls, path, *args):
+        """If only one argument is given (path), list its contents
+        recursively, returning the entries therein, or the empty list if no
+        entries are found.  Otherwise, treat each further argument as a
+        subpath to the given path, and return the cumulative listing of each
+        of those instead.  This operation is performed inside a transaction.
+        """
+        while True:
+            t = cls(path)
+            try:
+                v = t.list_recursive(*args)
+                if t.commit():
+                    return v
+            except:
+                t.abort()
+                raise
+
+    ListRecursive = classmethod(ListRecursive)
 
     def Gather(cls, path, *args):
         while True:

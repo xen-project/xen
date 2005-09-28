@@ -13,14 +13,14 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
-import os
 
-from xen.xend import sxp
 from xen.xend import XendDmesg
 
 from xen.web.SrvDir import SrvDir
+
 
 class SrvDmesg(SrvDir):
     """Xen Dmesg output.
@@ -47,6 +47,6 @@ class SrvDmesg(SrvDir):
     def info(self):
         return self.xd.info()
 
-    def op_clear(self, op, req):
+    def op_clear(self, _1, _2):
         self.xd.clear()
         return 0

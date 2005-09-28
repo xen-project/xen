@@ -29,6 +29,9 @@
 
 #define	min(a, b)	((a) > (b) ? (b) : (a))
 
+/* Which CPU are we booting, and what is the initial CS segment? */
+int booting_cpu, booting_vector;
+
 unsigned long long gdt[] __attribute__ ((aligned(32))) = {
 	0x0000000000000000ULL,		/* 0x00: reserved */
 	0x0000890000000000ULL,		/* 0x08: 32-bit TSS */
@@ -201,12 +204,17 @@ enter_real_mode(struct regs *regs)
 		initialize_real_mode = 0;
 		regs->eflags |= EFLAGS_VM | 0x02;
 		regs->ves = regs->vds = regs->vfs = regs->vgs = 0xF000;
-		regs->cs = 0xF000; /* ROM BIOS POST entry point */
+		if (booting_cpu == 0) {
+			regs->cs = 0xF000; /* ROM BIOS POST entry point */
 #ifdef TEST
-		regs->eip = 0xFFE0;
+			regs->eip = 0xFFE0;
 #else
-		regs->eip = 0xFFF0;
+			regs->eip = 0xFFF0;
 #endif
+		} else {
+			regs->cs = booting_vector << 8; /* AP entry point */
+			regs->eip = 0;
+		}
 		regs->uesp = 0;
 		regs->uss = 0;
 		printf("Starting emulated 16-bit real-mode: ip=%04x:%04x\n",
@@ -215,8 +223,8 @@ enter_real_mode(struct regs *regs)
 		mode = VM86_REAL; /* becomes previous mode */
 		set_mode(regs, VM86_REAL);
 
-                /* this should get us into 16-bit mode */
-                return;
+		/* this should get us into 16-bit mode */
+		return;
 	} else {
 		/* go from protected to real mode */
 		regs->eflags |= EFLAGS_VM;
@@ -334,7 +342,12 @@ start_bios(void)
 {
 	unsigned long cr0;
 
-	printf("Start BIOS ...\n");
+	if (booting_cpu == 0)
+		printf("Start BIOS ...\n");
+	else
+		printf("Start AP %d from %08x ...\n",
+		       booting_cpu, booting_vector << 12);
+
 	initialize_real_mode = 1;
 	cr0 = get_cr0();
 #ifndef TEST
@@ -345,20 +358,28 @@ start_bios(void)
 }
 
 int
-main()
+main(void)
 {
-	banner();
+	if (booting_cpu == 0)
+		banner();
+
 #ifdef TEST
 	setup_paging();
 #endif
+
 	setup_gdt();
 	setup_idt();
+
 #ifndef	TEST
-	set_cr4(get_cr4() | CR4_VME); 
+	set_cr4(get_cr4() | CR4_VME);
 #endif
+
 	setup_ctx();
-	setup_pic();
+
+	if (booting_cpu == 0)
+		setup_pic();
+
 	start_bios();
+
 	return 0;
 }
-

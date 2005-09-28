@@ -38,19 +38,17 @@ class SrvDomainDir(SrvDir):
         self.xd = XendDomain.instance()
 
     def domain(self, x):
-        val = None
         dom = self.xd.domain_lookup_by_name(x)
         if not dom:
             raise XendError('No such domain ' + str(x))
-        val = SrvDomain(dom)
-        return val
+        return SrvDomain(dom)
 
     def get(self, x):
         v = SrvDir.get(self, x)
         if v is not None:
             return v
-        v = self.domain(x)
-        return v
+        else:
+            return self.domain(x)
 
     def op_create(self, op, req):
         """Create a domain.
@@ -152,11 +150,11 @@ class SrvDomainDir(SrvDir):
             domains = self.xd.list_sorted()
             req.write('<ul>')
             for d in domains:
-                req.write('<li><a href="%s%s"> Domain %s</a>'
-                          % (url, d.getName(), d.getName()))
-                req.write('id=%s' % d.getDomain())
-                req.write('memory=%d'% d.getMemoryTarget())
-                req.write('ssidref=%d'% d.getSsidref())
+                req.write(
+                    '<li><a href="%s%s">Domain %s</a>: id = %s, memory = %d, '
+                    'ssidref = %d.'
+                    % (url, d.getName(), d.getName(), d.getDomid(),
+                       d.getMemoryTarget(), d.getSsidref()))
                 req.write('</li>')
             req.write('</ul>')
 
