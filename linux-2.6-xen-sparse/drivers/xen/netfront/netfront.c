@@ -1,7 +1,7 @@
 /******************************************************************************
  * Virtual network driver for conversing with remote driver backends.
  * 
- * Copyright (c) 2002-2004, K A Fraser
+ * Copyright (c) 2002-2005, K A Fraser
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -57,7 +57,7 @@
 #include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/gnttab.h>
 
-#define GRANT_INVALID_REF	(0xFFFF)
+#define GRANT_INVALID_REF	0
 
 #ifndef __GFP_NOWARN
 #define __GFP_NOWARN 0

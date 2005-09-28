@@ -57,7 +57,7 @@ static unsigned int blkif_state = BLKIF_STATE_DISCONNECTED;
 
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
-#define GRANT_INVALID_REF	(0xFFFF)
+#define GRANT_INVALID_REF	0
 
 static void kick_pending_request_queues(struct blkfront_info *info);
 
