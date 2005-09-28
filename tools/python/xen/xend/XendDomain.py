@@ -547,6 +547,7 @@ class XendDomain:
         except XendError:
             raise
         except Exception, exn:
+            log.exception("")
             raise XendError(str(exn))
 
 
