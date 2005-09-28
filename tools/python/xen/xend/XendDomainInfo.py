@@ -615,7 +615,7 @@ class XendDomainInfo:
         if not reason in shutdown_reasons.values():
             raise XendError('invalid reason:' + reason)
         self.storeVm("control/shutdown", reason)
-        if not reason in ['suspend']:
+        if not reason == 'suspend':
             self.storeVm('xend/shutdown_start_time', time.time())
 
 
