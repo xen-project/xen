@@ -2385,7 +2385,8 @@ int
 setup_mapping(int xc_handle, u32 dom, unsigned long toptab, unsigned long  *mem_page_array, unsigned long *page_table_array, unsigned long v_start, unsigned long v_end)
 {
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
-    l2_pgentry_t *vl2tab[4], *vl2e=NULL, *vl2_table = NULL;
+    l2_pgentry_t *vl2tab[4] = {NULL, NULL, NULL, NULL};
+    l2_pgentry_t *vl2e=NULL, *vl2_table = NULL;
     unsigned long l1tab;
     unsigned long ppt_alloc = 0;
     unsigned long count;
