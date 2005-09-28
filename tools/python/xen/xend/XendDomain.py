@@ -470,14 +470,6 @@ class XendDomain:
         return self.callInfo(domid, XendDomainInfo.getDeviceSxprs, devtype)
 
 
-    def domain_devtype_get(self, domid, devtype, devid):
-        """Get a device from a domain.
-        
-        @return: device object (or None)
-        """
-        return self.callInfo(domid, XendDomainInfo.getDevice, devtype, devid)
-
-
     def domain_vif_limit_set(self, id, vif, credit, period):
         """Limit the vif's transmission rate
         """
