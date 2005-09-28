@@ -110,6 +110,10 @@ rom_gdtr:
 _start:
 	cli
 
+	/* save register parameters to C land */
+	movl	%edx, booting_cpu
+	movl	%ebx, booting_vector
+
 	/* clear bss */
 	cld
 	xorb	%al, %al
@@ -128,7 +132,6 @@ _start:
 	/* go ... */
 	call    main
 	jmp	halt
-
 
 /*
  * Something bad happened, print invoking %eip and loop forever

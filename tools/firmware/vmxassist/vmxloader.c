@@ -132,11 +132,12 @@ main(void)
 		 memcpy((void *)ACPI_PHYSICAL_ADDRESS, acpi, sizeof(acpi));
 	}
 #endif
-			
+
 	puts("Loading VMXAssist ...\n");
 	memcpy((void *)TEXTADDR, vmxassist, sizeof(vmxassist));
+
 	puts("Go ...\n");
-	((void (*)())TEXTADDR)();
+	asm volatile ( "jmp *%%eax" : : "a" (TEXTADDR), "d" (0) );
+
 	return 0;
 }
-
