@@ -186,8 +186,8 @@ static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 		"mov  %4,%%eax ; "
 		"mov  %%edx,%4 ; "
 		"mul  %5       ; "
-		"add  %4,%%eax ; "
 		"xor  %5,%5    ; "
+		"add  %4,%%eax ; "
 		"adc  %5,%%edx ; "
 		: "=A" (product), "=r" (tmp1), "=r" (tmp2)
 		: "a" ((u32)delta), "1" ((u32)(delta >> 32)), "2" (mul_frac) );
