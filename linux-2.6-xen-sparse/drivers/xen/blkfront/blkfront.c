@@ -57,10 +57,7 @@ static unsigned int blkif_state = BLKIF_STATE_DISCONNECTED;
 
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
-#define GRANTREF_INVALID (1<<15)
 #define GRANT_INVALID_REF	(0xFFFF)
-
-static int recovery = 0; /* Recovery in progress: protected by blkif_io_lock */
 
 static void kick_pending_request_queues(struct blkfront_info *info);
 
@@ -82,18 +79,6 @@ static inline void ADD_ID_TO_FREELIST(
 	info->shadow[id].req.id  = info->shadow_free;
 	info->shadow[id].request = 0;
 	info->shadow_free = id;
-}
-
-static inline void pickle_request(struct blk_shadow *s, blkif_request_t *r)
-{
-
-	s->req = *r;
-}
-
-static inline void unpickle_request(blkif_request_t *r, struct blk_shadow *s)
-{
-
-	*r = s->req;
 }
 
 static inline void flush_requests(struct blkfront_info *info)
@@ -235,7 +220,7 @@ static int blkif_queue_request(struct request *req)
 				rq_data_dir(req) );
 
 			info->shadow[id].frame[ring_req->nr_segments] =
-				buffer_mfn;
+				mfn_to_pfn(buffer_mfn);
 
 			ring_req->frame_and_sects[ring_req->nr_segments] =
 				blkif_fas_from_gref(ref, fsect, lsect);
@@ -247,7 +232,7 @@ static int blkif_queue_request(struct request *req)
 	info->ring.req_prod_pvt++;
 
 	/* Keep a private copy so we can reissue requests when recovering. */
-	pickle_request(&info->shadow[id], ring_req);
+	info->shadow[id].req = *ring_req;
 
 	gnttab_free_grant_references(gref_head);
 
@@ -312,7 +297,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 	spin_lock_irqsave(&blkif_io_lock, flags);
 
-	if (unlikely(info->connected != BLKIF_STATE_CONNECTED || recovery)) {
+	if (unlikely(info->connected != BLKIF_STATE_CONNECTED)) {
 		spin_unlock_irqrestore(&blkif_io_lock, flags);
 		return IRQ_HANDLED;
 	}
@@ -401,28 +386,24 @@ static void blkif_recover(struct blkfront_info *info)
 		if (copy[i].request == 0)
 			continue;
 
-		/* Grab a request slot and unpickle shadow state into it. */
+		/* Grab a request slot and copy shadow state into it. */
 		req = RING_GET_REQUEST(
 			&info->ring, info->ring.req_prod_pvt);
-		unpickle_request(req, &copy[i]);
+		*req = copy[i].req;
 
 		/* We get a new request id, and must reset the shadow state. */
 		req->id = GET_ID_FROM_FREELIST(info);
 		memcpy(&info->shadow[req->id], &copy[i], sizeof(copy[i]));
 
 		/* Rewrite any grant references invalidated by susp/resume. */
-		for (j = 0; j < req->nr_segments; j++) {
-			if ( req->frame_and_sects[j] & GRANTREF_INVALID )
-				gnttab_grant_foreign_access_ref(
-					blkif_gref_from_fas(
-						req->frame_and_sects[j]),
-					info->backend_id,
-					info->shadow[req->id].frame[j],
-					rq_data_dir(
-						(struct request *)
-						info->shadow[req->id].request));
-			req->frame_and_sects[j] &= ~GRANTREF_INVALID;
-		}
+		for (j = 0; j < req->nr_segments; j++)
+			gnttab_grant_foreign_access_ref(
+				blkif_gref_from_fas(req->frame_and_sects[j]),
+				info->backend_id,
+				pfn_to_mfn(info->shadow[req->id].frame[j]),
+				rq_data_dir(
+					(struct request *)
+					info->shadow[req->id].request));
 		info->shadow[req->id].req = *req;
 
 		info->ring.req_prod_pvt++;
@@ -430,15 +411,13 @@ static void blkif_recover(struct blkfront_info *info)
 
 	kfree(copy);
 
-	recovery = 0;
-
 	/* info->ring->req_prod will be set when we flush_requests().*/
 	wmb();
 
 	/* Kicks things back into life. */
 	flush_requests(info);
 
-	/* Now safe to left other people use the interface. */
+	/* Now safe to let other people use the interface. */
 	info->connected = BLKIF_STATE_CONNECTED;
 }
 
@@ -701,7 +680,6 @@ static int blkfront_suspend(struct xenbus_device *dev)
 	kfree(info->backend);
 	info->backend = NULL;
 
-	recovery = 1;
 	blkif_free(info);
 
 	return 0;

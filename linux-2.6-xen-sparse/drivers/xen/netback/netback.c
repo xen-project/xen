@@ -434,7 +434,6 @@ inline static void net_tx_action_dealloc(void)
 		gop->host_addr    = MMAP_VADDR(pending_idx);
 		gop->dev_bus_addr = 0;
 		gop->handle       = grant_tx_ref[pending_idx];
-		grant_tx_ref[pending_idx] = GRANT_INVALID_REF;
 		gop++;
 	}
 	BUG_ON(HYPERVISOR_grant_table_op(

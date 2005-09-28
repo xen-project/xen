@@ -22,8 +22,6 @@
 #include <asm-xen/gnttab.h>
 #include <asm-xen/driver_util.h>
 
-#define GRANT_INVALID_REF (0xFFFF)
-
 #if 0
 #define ASSERT(_p) \
     if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
