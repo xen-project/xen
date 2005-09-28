@@ -149,7 +149,9 @@ void dump_pagetable(unsigned long address)
 	pmd_t *pmd;
 	pte_t *pte;
 
+	preempt_disable();
 	pgd = (pgd_t *)per_cpu(cur_pgd, smp_processor_id());
+	preempt_enable();
 	pgd += pgd_index(address);
 
 	printk("PGD %lx ", pgd_val(*pgd));
@@ -252,7 +254,9 @@ static int vmalloc_fault(unsigned long address)
 
 	/* On Xen the line below does not always work. Needs investigating! */
 	/*pgd = pgd_offset(current->mm ?: &init_mm, address);*/
+	preempt_disable();
 	pgd = (pgd_t *)per_cpu(cur_pgd, smp_processor_id());
+	preempt_enable();
 	pgd += pgd_index(address);
 
 	pgd_ref = pgd_offset_k(address);
