@@ -152,11 +152,11 @@ class SrvDomainDir(SrvDir):
             domains = self.xd.list_sorted()
             req.write('<ul>')
             for d in domains:
-                req.write('<li><a href="%s%s"> Domain %s</a>'
-                          % (url, d.getName(), d.getName()))
-                req.write('id=%s' % d.getDomain())
-                req.write('memory=%d'% d.getMemoryTarget())
-                req.write('ssidref=%d'% d.getSsidref())
+                req.write(
+                    '<li><a href="%s%s">Domain %s</a>: id = %s, memory = %d, '
+                    'ssidref = %d.'
+                    % (url, d.getName(), d.getName(), d.getDomid(),
+                       d.getMemoryTarget(), d.getSsidref()))
                 req.write('</li>')
             req.write('</ul>')
 
