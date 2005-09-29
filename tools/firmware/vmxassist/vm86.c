@@ -470,10 +470,21 @@ load_seg(unsigned long sel, u32 *base, u32 *limit, union vmcs_arbytes *arbytes)
 	unsigned long long entry;
 
 	/* protected mode: use seg as index into gdt */
-	if (sel == 0 || sel > oldctx.gdtr_limit)
+	if (sel > oldctx.gdtr_limit)
 		return 0;
 
+    if (sel == 0) {
+        arbytes->fields.null_bit = 1;
+        return 1;
+    }
+
 	entry =  ((unsigned long long *) oldctx.gdtr_base)[sel >> 3];
+
+    /* Check the P bit fisrt*/
+    if (!((entry >> (15+32)) & 0x1) && sel != 0) {
+        return 0;
+    }
+
 	*base =  (((entry >> (56-24)) & 0xFF000000) |
 		  ((entry >> (32-16)) & 0x00FF0000) |
 		  ((entry >> (   16)) & 0x0000FFFF));
@@ -519,22 +530,42 @@ protected_mode(struct regs *regs)
 	if (load_seg(regs->ves, &oldctx.es_base,
 				&oldctx.es_limit, &oldctx.es_arbytes))
 		oldctx.es_sel = regs->ves;
+    else {
+        load_seg(0, &oldctx.es_base,&oldctx.es_limit, &oldctx.es_arbytes);
+        oldctx.es_sel = 0;
+    }
 
 	if (load_seg(regs->uss, &oldctx.ss_base,
 				&oldctx.ss_limit, &oldctx.ss_arbytes))
 		oldctx.ss_sel = regs->uss;
+    else {
+        load_seg(0, &oldctx.ss_base, &oldctx.ss_limit, &oldctx.ss_arbytes);
+        oldctx.ss_sel = 0;
+    }
 
 	if (load_seg(regs->vds, &oldctx.ds_base,
 				&oldctx.ds_limit, &oldctx.ds_arbytes))
 		oldctx.ds_sel = regs->vds;
+    else {
+        load_seg(0, &oldctx.ds_base, &oldctx.ds_limit, &oldctx.ds_arbytes);
+        oldctx.ds_sel = 0;
+    }
 
 	if (load_seg(regs->vfs, &oldctx.fs_base,
 				&oldctx.fs_limit, &oldctx.fs_arbytes))
 		oldctx.fs_sel = regs->vfs;
+    else {
+        load_seg(0, &oldctx.fs_base, &oldctx.fs_limit, &oldctx.fs_arbytes);
+        oldctx.fs_sel = 0;
+    }
 
 	if (load_seg(regs->vgs, &oldctx.gs_base,
 				&oldctx.gs_limit, &oldctx.gs_arbytes))
 		oldctx.gs_sel = regs->vgs;
+    else {
+        load_seg(0, &oldctx.gs_base, &oldctx.gs_limit, &oldctx.gs_arbytes);
+        oldctx.gs_sel = 0;
+    }
 
 	/* initialize jump environment to warp back to protected mode */
 	regs->cs = CODE_SELECTOR;
