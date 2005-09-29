@@ -650,7 +650,6 @@ int do_xenbus_probe(void *unused)
 	int err = 0;
 
 	/* Initialize xenstore comms unless already done. */
-	printk("store_evtchn = %i\n", xen_start_info->store_evtchn);
 	err = xs_init();
 	if (err) {
 		printk("XENBUS: Error initializing xenstore comms:"
