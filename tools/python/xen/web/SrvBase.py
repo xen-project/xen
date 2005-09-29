@@ -81,7 +81,14 @@ class SrvBase(resource.Resource):
             req.write("Operation not implemented: " + op)
             return ''
         else:
-            return op_method(op, req)
+            try:
+                return op_method(op, req)
+            except Exception, exn:
+                log.exception("Request %s failed.", op)
+                if req.useSxp():
+                    return ['xend.err', "Exception: " + str(exn)]
+                else:
+                    return "<p>%s</p>" % str(exn)
 
     def print_path(self, req):
         """Print the path with hyperlinks.

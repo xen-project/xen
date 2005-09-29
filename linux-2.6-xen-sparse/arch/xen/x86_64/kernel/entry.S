@@ -536,7 +536,7 @@ retint_kernel:
 	CFI_ENDPROC
 	.endm
 
-#ifdef CONFIG_SMP	
+#if 0
 ENTRY(reschedule_interrupt)
 	apicinterrupt RESCHEDULE_VECTOR,smp_reschedule_interrupt
 

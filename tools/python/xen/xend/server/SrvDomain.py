@@ -150,17 +150,6 @@ class SrvDomain(SrvDir):
         val = fn(req.args, {'dom': self.dom.domid})
         return val
 
-    def op_device(self, op, req):
-        fn = FormFn(self.xd.domain_devtype_get,
-                    [['dom',    'int'],
-                     ['type',   'str'],
-                     ['idx',    'int']])
-        val = fn(req.args, {'dom': self.dom.domid})
-        if val:
-            return val.sxpr()
-        else:
-            raise XendError("invalid device")
-
     def op_device_create(self, op, req):
         fn = FormFn(self.xd.domain_device_create,
                     [['dom',    'int'],
@@ -172,7 +161,7 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_device_refresh,
                     [['dom',  'int'],
                      ['type', 'str'],
-                     ['idx',  'str']])
+                     ['idx',  'int']])
         val = fn(req.args, {'dom': self.dom.domid})
         return val
 
@@ -180,7 +169,7 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_device_destroy,
                     [['dom',  'int'],
                      ['type', 'str'],
-                     ['idx',  'str']])
+                     ['idx',  'int']])
         val = fn(req.args, {'dom': self.dom.domid})
         return val
                 
@@ -188,7 +177,7 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_device_configure,
                     [['dom',    'int'],
                      ['config', 'sxpr'],
-                     ['idx',    'str']])
+                     ['idx',    'int']])
         val = fn(req.args, {'dom': self.dom.domid})
         return val
 
@@ -230,10 +219,6 @@ class SrvDomain(SrvDir):
             self.print_path(req)
             #self.ls()
             req.write('<p>%s</p>' % self.dom)
-            if self.dom.config:
-                req.write("<code><pre>")
-                PrettyPrint.prettyprint(self.dom.config, out=req)
-                req.write("</pre></code>")
             self.form(req)
             req.write('</body></html>')
         return ''

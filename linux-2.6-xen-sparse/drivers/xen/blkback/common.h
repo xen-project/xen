@@ -44,7 +44,7 @@ typedef struct blkif_st {
 	unsigned int      handle;
 	/* Physical parameters of the comms window. */
 	unsigned int      evtchn;
-	unsigned int      remote_evtchn;
+	unsigned int      irq;
 	/* Comms information. */
 	blkif_back_ring_t blk_ring;
 	struct vm_struct *blk_ring_area;

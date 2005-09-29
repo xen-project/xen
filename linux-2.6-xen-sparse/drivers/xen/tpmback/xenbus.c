@@ -88,6 +88,26 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		return;
 	}
 
+	err = tpmif_map(be->tpmif, ringref, evtchn);
+	if (err) {
+		xenbus_dev_error(be->dev, err,
+				 "mapping shared-frame %lu port %u",
+				 ringref, evtchn);
+		return;
+	}
+
+	err = tpmif_vtpm_open(be->tpmif,
+	                      be->frontend_id,
+	                      be->instance);
+	if (err) {
+		xenbus_dev_error(be->dev, err,
+		                 "queueing vtpm open packet");
+		/*
+		 * Should close down this device and notify FE
+		 * about closure.
+		 */
+		return;
+	}
 
 	/*
 	 * Tell the front-end that we are ready to go -
@@ -104,27 +124,6 @@ again:
 	                    "ready", "%lu", ready);
 	if (err) {
 		xenbus_dev_error(be->dev, err, "writing 'ready'");
-		goto abort;
-	}
-
-	err = tpmif_map(be->tpmif, ringref, evtchn);
-	if (err) {
-		xenbus_dev_error(be->dev, err,
-				 "mapping shared-frame %lu port %u",
-				 ringref, evtchn);
-		goto abort;
-	}
-
-	err = tpmif_vtpm_open(be->tpmif,
-	                      be->frontend_id,
-	                      be->instance);
-	if (err) {
-		xenbus_dev_error(be->dev, err,
-		                 "queueing vtpm open packet");
-		/*
-		 * Should close down this device and notify FE
-		 * about closure.
-		 */
 		goto abort;
 	}
 

@@ -15,18 +15,17 @@ static void __netif_up(netif_t *netif)
 	spin_lock_bh(&dev->xmit_lock);
 	netif->active = 1;
 	spin_unlock_bh(&dev->xmit_lock);
-	(void)bind_evtchn_to_irqhandler(
-		netif->evtchn, netif_be_int, 0, dev->name, netif);
+	enable_irq(netif->irq);
 	netif_schedule_work(netif);
 }
 
 static void __netif_down(netif_t *netif)
 {
 	struct net_device *dev = netif->dev;
+	disable_irq(netif->irq);
 	spin_lock_bh(&dev->xmit_lock);
 	netif->active = 0;
 	spin_unlock_bh(&dev->xmit_lock);
-	unbind_evtchn_from_irqhandler(netif->evtchn, netif);
 	netif_deschedule_work(netif);
 }
 
@@ -203,7 +202,10 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	}
 
 	netif->evtchn = op.u.bind_interdomain.port1;
-	netif->remote_evtchn = evtchn;
+
+	netif->irq = bind_evtchn_to_irqhandler(
+		netif->evtchn, netif_be_int, 0, netif->dev->name, netif);
+	disable_irq(netif->irq);
 
 	netif->tx = (netif_tx_interface_t *)netif->comms_area->addr;
 	netif->rx = (netif_rx_interface_t *)
@@ -224,21 +226,15 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 
 static void free_netif_callback(void *arg)
 {
-	evtchn_op_t op = { .cmd = EVTCHNOP_close };
 	netif_t *netif = (netif_t *)arg;
 
 	/*
-	 * These can't be done in netif_disconnect() because at that point
+	 * This can't be done in netif_disconnect() because at that point
 	 * there may be outstanding requests in the network stack whose
 	 * asynchronous responses must still be notified to the remote driver.
 	 */
-
-	op.u.close.port = netif->evtchn;
-	op.u.close.dom = DOMID_SELF;
-	HYPERVISOR_event_channel_op(&op);
-	op.u.close.port = netif->remote_evtchn;
-	op.u.close.dom = netif->domid;
-	HYPERVISOR_event_channel_op(&op);
+	if (netif->irq)
+		unbind_evtchn_from_irqhandler(netif->irq, netif);
 
 	unregister_netdev(netif->dev);
 

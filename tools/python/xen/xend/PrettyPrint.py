@@ -39,9 +39,9 @@ class PrettyItem:
         print '***PrettyItem>output>', self
         pass
 
-    def prettyprint(self, _, width):
+    def prettyprint(self, _):
         print '***PrettyItem>prettyprint>', self
-        return width
+        return self.width
 
 class PrettyString(PrettyItem):
 
@@ -52,7 +52,7 @@ class PrettyString(PrettyItem):
     def output(self, out):
         out.write(self.value)
 
-    def prettyprint(self, line, _):
+    def prettyprint(self, line):
         line.output(self)
 
     def show(self, out):
@@ -63,7 +63,7 @@ class PrettySpace(PrettyItem):
     def output(self, out):
         out.write(' ' * self.width)
 
-    def prettyprint(self, line, _):
+    def prettyprint(self, line):
         line.output(self)
 
     def show(self, out):
@@ -80,7 +80,7 @@ class PrettyBreak(PrettyItem):
     def output(self, out):
         out.write(' ' * self.width)
 
-    def prettyprint(self, line, _):
+    def prettyprint(self, line):
         if line.breaks(self.space):
             self.active = 1
             line.newline(self.indent)
@@ -97,7 +97,7 @@ class PrettyNewline(PrettySpace):
         block.newline()
         block.addtoline(self)
 
-    def prettyprint(self, line, _):
+    def prettyprint(self, line):
         line.newline(0)
         line.output(self)
 
@@ -127,7 +127,7 @@ class PrettyLine(PrettyItem):
             lastbreak.space = (width - lastwidth)
         self.width = width
  
-    def prettyprint(self, line, _):
+    def prettyprint(self, line):
         for x in self.content:
             x.prettyprint(line)
 
@@ -168,7 +168,7 @@ class PrettyBlock(PrettyItem):
     def addtoline(self, x):
         self.lines[-1].write(x)
 
-    def prettyprint(self, line, _):
+    def prettyprint(self, line):
         self.indent = line.used
         line.block = self
         if not line.fits(self.width):
@@ -252,7 +252,7 @@ class PrettyPrinter:
         self.block = self.block.parent
 
     def prettyprint(self, out=sys.stdout):
-        self.top.prettyprint(Line(out, self.width), self.width)
+        self.top.prettyprint(Line(out, self.width))
 
 class SXPPrettyPrinter(PrettyPrinter):
     """An SXP prettyprinter.

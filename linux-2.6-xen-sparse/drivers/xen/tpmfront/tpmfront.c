@@ -292,8 +292,10 @@ static void destroy_tpmring(struct tpmfront_info *info, struct tpm_private *tp)
 		free_page((unsigned long)tp->tx);
 		tp->tx = NULL;
 	}
-	unbind_evtchn_from_irqhandler(tp->evtchn, NULL);
-	tp->evtchn = 0;
+
+	if (tpm->irq)
+		unbind_evtchn_from_irqhandler(tp->irq, NULL);
+	tp->evtchn = tpm->irq = 0;
 }
 
 
@@ -352,17 +354,6 @@ again:
 		goto abort_transaction;
 	}
 
-	info->backend = backend;
-	backend = NULL;
-
-	info->watch.node = info->backend;
-	info->watch.callback = watch_for_status;
-	err = register_xenbus_watch(&info->watch);
-	if (err) {
-		message = "registering watch on backend";
-		goto abort_transaction;
-	}
-
 	err = xenbus_transaction_end(0);
 	if (err == -EAGAIN)
 		goto again;
@@ -371,10 +362,17 @@ again:
 		goto destroy_tpmring;
 	}
 
-out:
-	if (backend)
-		kfree(backend);
-	return err;
+	info->watch.node = backend;
+	info->watch.callback = watch_for_status;
+	err = register_xenbus_watch(&info->watch);
+	if (err) {
+		message = "registering watch on backend";
+		goto destroy_tpmring;
+	}
+
+	info->backend = backend;
+
+	return 0;
 
 abort_transaction:
 	xenbus_transaction_end(1);
@@ -382,7 +380,10 @@ abort_transaction:
 	xenbus_dev_error(dev, err, "%s", message);
 destroy_tpmring:
 	destroy_tpmring(info, &my_private);
-	goto out;
+out:
+	if (backend)
+		kfree(backend);
+	return err;
 }
 
 
@@ -502,10 +503,12 @@ static void tpmif_connect(u16 evtchn, domid_t domid)
 	err = bind_evtchn_to_irqhandler(
 		tp->evtchn,
 		tpmif_int, SA_SAMPLE_RANDOM, "tpmif", tp);
-	if ( err != 0 ) {
+	if ( err <= 0 ) {
 		WPRINTK("bind_evtchn_to_irqhandler failed (err=%d)\n", err);
 		return;
 	}
+
+	tp->irq = err;
 }
 
 static struct xenbus_device_id tpmfront_ids[] = {
@@ -679,7 +682,7 @@ tpm_xmit(struct tpm_private *tp,
 	DPRINTK("Notifying backend via event channel %d\n",
 	        tp->evtchn);
 
-	notify_via_evtchn(tp->evtchn);
+	notify_remote_via_irq(tp->irq);
 
 	spin_unlock_irq(&tp->tx_lock);
 	return offset;

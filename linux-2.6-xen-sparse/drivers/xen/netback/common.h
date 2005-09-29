@@ -22,8 +22,6 @@
 #include <asm-xen/gnttab.h>
 #include <asm-xen/driver_util.h>
 
-#define GRANT_INVALID_REF (0xFFFF)
-
 #if 0
 #define ASSERT(_p) \
     if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
@@ -52,7 +50,7 @@ typedef struct netif_st {
 	u16              rx_shmem_handle;
 	grant_ref_t      rx_shmem_ref; 
 	unsigned int     evtchn;
-	unsigned int     remote_evtchn;
+	unsigned int     irq;
 
 	/* The shared rings and indexes. */
 	netif_tx_interface_t *tx;

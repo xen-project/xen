@@ -308,7 +308,7 @@ _packet_write(struct packet *pak,
 	rc = offset;
 	DPRINTK("Notifying frontend via event channel %d\n",
 	        tpmif->evtchn);
-	notify_via_evtchn(tpmif->evtchn);
+	notify_remote_via_irq(tpmif->irq);
 
 	return rc;
 }

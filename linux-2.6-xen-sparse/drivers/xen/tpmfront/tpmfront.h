@@ -5,7 +5,7 @@
 struct tpm_private
 {
 	tpmif_tx_interface_t *tx;
-	unsigned int evtchn;
+	unsigned int evtchn, irq;
 	int connected;
 
 	spinlock_t tx_lock;

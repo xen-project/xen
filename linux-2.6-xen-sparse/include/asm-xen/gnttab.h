@@ -6,7 +6,7 @@
  * 2. Accessing others' memory reservations via grant references.
  * (i.e., mechanisms for both sender and recipient of grant references)
  * 
- * Copyright (c) 2004, K A Fraser
+ * Copyright (c) 2004-2005, K A Fraser
  * Copyright (c) 2005, Christopher Clark
  */
 
@@ -25,10 +25,10 @@
 #endif
 
 struct gnttab_free_callback {
-    struct gnttab_free_callback *next;
-    void (*fn)(void *);
-    void *arg;
-    u16 count;
+	struct gnttab_free_callback *next;
+	void (*fn)(void *);
+	void *arg;
+	u16 count;
 };
 
 int gnttab_grant_foreign_access(domid_t domid, unsigned long frame,
@@ -73,3 +73,13 @@ void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid);
 #endif
 
 #endif /* __ASM_GNTTAB_H__ */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

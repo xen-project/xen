@@ -667,6 +667,7 @@ static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
     mpcip->instr = inst->instr;
     mpcip->operand[0] = inst->operand[0]; /* source */
     mpcip->operand[1] = inst->operand[1]; /* destination */
+    mpcip->immediate = inst->immediate;
 
     if (inst->operand[0] & REGISTER) { /* dest is memory */
         index = operand_index(inst->operand[0]);
@@ -833,12 +834,16 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         mmio_operands(IOREQ_TYPE_XOR, gpa, &mmio_inst, mpcip, regs);
         break;
 
-    case INSTR_CMP:
-        mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mpcip, regs);
-        break;
-
+    case INSTR_CMP:        /* Pass through */
     case INSTR_TEST:
-        mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mpcip, regs);
+        mpcip->flags = mmio_inst.flags;
+        mpcip->instr = mmio_inst.instr;
+        mpcip->operand[0] = mmio_inst.operand[0]; /* source */
+        mpcip->operand[1] = mmio_inst.operand[1]; /* destination */
+        mpcip->immediate = mmio_inst.immediate;
+
+        /* send the request and wait for the value */
+        send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, mmio_inst.op_size, 0, IOREQ_READ, 0);
         break;
 
     default:

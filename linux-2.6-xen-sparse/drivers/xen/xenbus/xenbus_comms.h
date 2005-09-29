@@ -30,7 +30,6 @@
 
 int xs_init(void);
 int xb_init_comms(void);
-void xb_suspend_comms(void);
 
 /* Low level routines. */
 int xb_write(const void *data, unsigned len);

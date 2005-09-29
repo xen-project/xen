@@ -9,25 +9,23 @@ import signal
 import sys
 import threading
 import linecache
-import socket
 import pwd
 import re
-import StringIO
 import traceback
-import time
-import glob
 
-from xen.xend import sxp
-from xen.xend import PrettyPrint
-from xen.xend import EventServer; eserver = EventServer.instance()
-from xen.xend.XendError import XendError
+from xen.xend import EventServer
 from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
-from xen.xend import XendRoot; xroot = XendRoot.instance()
+from xen.xend import XendRoot
 
 import event
 import relocate
 from params import *
+
+
+eserver = EventServer.instance()
+xroot = XendRoot.instance()
+
 
 class Daemon:
     """The xend daemon.
@@ -233,7 +231,7 @@ class Daemon:
             except:
                 pass
 
-    def print_trace(self, str):
+    def print_trace(self, string):
         for i in range(self.traceindent):
             ch = " "
             if (i % 5):
@@ -241,7 +239,7 @@ class Daemon:
             else:
                 ch = '|'
             self.tracefile.write(ch)
-        self.tracefile.write(str)
+        self.tracefile.write(string)
             
     def trace(self, frame, event, arg):
         if not self.traceon:
@@ -289,7 +287,7 @@ class Daemon:
         try:
             os.setuid(pwd.getpwnam(XEND_USER)[2])
             return 0
-        except KeyError, error:
+        except KeyError:
             print >>sys.stderr, "Error: no such user '%s'" % XEND_USER
             return 1
 

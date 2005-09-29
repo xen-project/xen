@@ -20,10 +20,18 @@ To build a debuggable guest kernel image:
 
 To debug a running guest:
  1. Use 'xm list' to discover its domain id ($domid). 
- 2. Run 'gdbserver-xen 127.0.0.1:9999 --attach $domid'
- 3. Run 'gdb /path/to/vmlinux-syms-2.6.xx-xenU'
+ 2. Run 'gdbserver-xen 127.0.0.1:9999 --attach $domid'.
+ 3. Run 'gdb /path/to/vmlinux-syms-2.6.xx-xenU'.
  4. From within the gdb client session:
     # directory /path/to/linux-2.6.xx-xenU [*]
     # target remote 127.0.0.1:9999
     # bt
     # disass
+
+To debug a crashed guest:
+ 1. Add '(enable-dump yes)' to /etc/xen/xend-config.sxp before
+    starting xend.
+ 2. When the domain crashes, a core file is written to
+    '/var/xen/dump/<domain-name>.<domain-id>.core'.
+ 3. Run 'gdbserver-xen 127.0.0.1:9999 --file <core-file>'.
+ 4. Connect to the server as for a running guest.

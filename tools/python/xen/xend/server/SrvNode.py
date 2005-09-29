@@ -62,7 +62,7 @@ class SrvNode(SrvDir):
             for d in self.info():
                 req.write('<li> %10s: %s' % (d[0], str(d[1])))
             req.write('<li><a href="%sdmesg">Xen dmesg output</a>' % url)
-            req.write('<li><a href="%slog>Xend log</a>' % url)
+            req.write('<li><a href="%slog">Xend log</a>' % url)
             req.write('</ul>')
             req.write('</body></html>')
             

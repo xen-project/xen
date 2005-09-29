@@ -209,7 +209,10 @@ static void dump_fault_path(unsigned long address)
 {
 	unsigned long *p, page;
 
-        page = __pa(per_cpu(cur_pgd, smp_processor_id()));
+	preempt_disable();
+	page = __pa(per_cpu(cur_pgd, smp_processor_id()));
+	preempt_enable();
+
 	p  = (unsigned long *)__va(page);
 	p += (address >> 30) * 2;
 	printk(KERN_ALERT "%08lx -> *pde = %08lx:%08lx\n", page, p[1], p[0]);
@@ -237,7 +240,12 @@ static void dump_fault_path(unsigned long address)
 {
 	unsigned long page;
 
+	preempt_disable();
 	page = ((unsigned long *) per_cpu(cur_pgd, smp_processor_id()))
+	    [address >> 22];
+	preempt_enable();
+
+	page = ((unsigned long *) per_cpu(cur_pgd, get_cpu()))
 	    [address >> 22];
 	printk(KERN_ALERT "*pde = ma %08lx pa %08lx\n", page,
 	       machine_to_phys(page));
@@ -567,7 +575,9 @@ vmalloc_fault:
 		pmd_t *pmd, *pmd_k;
 		pte_t *pte_k;
 
+		preempt_disable();
 		pgd = index + per_cpu(cur_pgd, smp_processor_id());
+		preempt_enable();
 		pgd_k = init_mm.pgd + index;
 
 		if (!pgd_present(*pgd_k))

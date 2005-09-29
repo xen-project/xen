@@ -175,6 +175,10 @@ def xm_save(args):
 
     dom = args[0] # TODO: should check if this exists
     savefile = os.path.abspath(args[1])
+
+    if not os.access(os.path.dirname(savefile), os.W_OK):
+        err("xm save: Unable to create file %s" % savefile)
+        sys.exit(1)
     
     from xen.xend.XendClient import server
     server.xend_domain_save(dom, savefile)
@@ -183,6 +187,10 @@ def xm_restore(args):
     arg_check(args,1,"restore")
 
     savefile = os.path.abspath(args[0])
+
+    if not os.access(savefile, os.R_OK):
+        err("xm restore: Unable to read file %s" % savefile)
+        sys.exit(1)
 
     from xen.xend.XendClient import server
     info = server.xend_domain_restore(savefile)

@@ -158,6 +158,7 @@
 ^tools/xenstore/xs_dom0_test$
 ^tools/xenstore/xs_random$
 ^tools/xenstore/xs_stress$
+^tools/xenstore/xs_tdb_dump$
 ^tools/xenstore/xs_test$
 ^tools/xenstore/xs_watch_stress$
 ^tools/xentrace/xenctx$
