@@ -96,6 +96,8 @@ static int __do_suspend(void *ignore)
 	}
 #endif
 
+	xenbus_suspend();
+
 	preempt_disable();
 #ifdef CONFIG_SMP
 	/* Take all of the other cpus offline.  We need to be careful not
@@ -139,8 +141,6 @@ static int __do_suspend(void *ignore)
 		cpu_set(i, prev_present_cpus);
 	}
 #endif
-
-	xenbus_suspend();
 
 	gnttab_suspend();
 
