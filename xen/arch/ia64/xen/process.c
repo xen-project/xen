@@ -275,7 +275,7 @@ int handle_lazy_cover(struct vcpu *v, unsigned long isr, struct pt_regs *regs)
 
 void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *regs, unsigned long itir)
 {
-	unsigned long iip = regs->cr_iip;
+	unsigned long iip = regs->cr_iip, iha;
 	// FIXME should validate address here
 	unsigned long pteval;
 	unsigned long is_data = !((isr >> IA64_ISR_X_BIT) & 1UL);
@@ -294,7 +294,7 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		return;
 	}
 
-	fault = vcpu_translate(current,address,is_data,&pteval,&itir);
+	fault = vcpu_translate(current,address,is_data,&pteval,&itir,&iha);
 	if (fault == IA64_NO_FAULT)
 	{
 		pteval = translate_domain_pte(pteval,address,itir);

@@ -65,6 +65,7 @@ void foo(void)
 	DEFINE(XSI_INCOMPL_REG_OFS, offsetof(mapped_regs_t, incomplete_regframe));
 	DEFINE(XSI_PEND_OFS, offsetof(mapped_regs_t, pending_interruption));
 	DEFINE(XSI_RR0_OFS, offsetof(mapped_regs_t, rrs[0]));
+	DEFINE(XSI_IHA_OFS, offsetof(mapped_regs_t, iha));
 	DEFINE(XSI_TPR_OFS, offsetof(mapped_regs_t, tpr));
 	DEFINE(XSI_PTA_OFS, offsetof(mapped_regs_t, pta));
 	DEFINE(XSI_ITV_OFS, offsetof(mapped_regs_t, itv));

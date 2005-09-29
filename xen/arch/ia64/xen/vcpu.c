@@ -1354,9 +1354,9 @@ IA64FAULT vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 
 unsigned long vhpt_translate_count = 0;
 
-IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir)
+IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
-	unsigned long pta, pta_mask, iha, pte, ps;
+	unsigned long pta, pta_mask, pte, ps;
 	TR_ENTRY *trp;
 	ia64_rr rr;
 
@@ -1398,51 +1398,45 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 	/* check guest VHPT */
 	pta = PSCB(vcpu,pta);
 	rr.rrval = PSCB(vcpu,rrs)[address>>61];
-	if (rr.ve && (pta & IA64_PTA_VE))
-	{
-		if (pta & IA64_PTA_VF)
-		{
-			/* long format VHPT - not implemented */
-			return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
-		}
-		else
-		{
-			/* short format VHPT */
-
-			/* avoid recursively walking VHPT */
-			pta_mask = (itir_mask(pta) << 3) >> 3;
-			if (((address ^ pta) & pta_mask) == 0)
-				return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
-
-			vcpu_thash(vcpu, address, &iha);
-			if (__copy_from_user(&pte, (void *)iha, sizeof(pte)) != 0)
-				return IA64_VHPT_FAULT;
-
-			/* 
-			 * Optimisation: this VHPT walker aborts on not-present pages
-			 * instead of inserting a not-present translation, this allows
-			 * vectoring directly to the miss handler.
-	\		 */
-			if (pte & _PAGE_P)
-			{
-				*pteval = pte;
-				*itir = vcpu_get_itir_on_fault(vcpu,address);
-				vhpt_translate_count++;
-				return IA64_NO_FAULT;
-			}
-			return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
-		}
+	if (!rr.ve || !(pta & IA64_PTA_VE))
+		return (is_data ? IA64_ALT_DATA_TLB_VECTOR :
+				IA64_ALT_INST_TLB_VECTOR);
+	if (pta & IA64_PTA_VF) { /* long format VHPT - not implemented */
+		// thash won't work right?
+		panic_domain(vcpu_regs(vcpu),"can't do long format VHPT\n");
+		//return (is_data ? IA64_DATA_TLB_VECTOR:IA64_INST_TLB_VECTOR);
 	}
-	return (is_data ? IA64_ALT_DATA_TLB_VECTOR : IA64_ALT_INST_TLB_VECTOR);
+
+	/* avoid recursively walking (short format) VHPT */
+	pta_mask = (itir_mask(pta) << 3) >> 3;
+	if (((address ^ pta) & pta_mask) == 0)
+		return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
+
+	vcpu_thash(vcpu, address, iha);
+	if (__copy_from_user(&pte, (void *)(*iha), sizeof(pte)) != 0)
+		return IA64_VHPT_FAULT;
+
+	/*
+	 * Optimisation: this VHPT walker aborts on not-present pages
+	 * instead of inserting a not-present translation, this allows
+	 * vectoring directly to the miss handler.
+	 */
+	if (pte & _PAGE_P) {
+		*pteval = pte;
+		*itir = vcpu_get_itir_on_fault(vcpu,address);
+		vhpt_translate_count++;
+		return IA64_NO_FAULT;
+	}
+	return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
 }
 
 IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 {
-	UINT64 pteval, itir, mask;
+	UINT64 pteval, itir, mask, iha;
 	IA64FAULT fault;
 
 	in_tpa = 1;
-	fault = vcpu_translate(vcpu, vadr, 1, &pteval, &itir);
+	fault = vcpu_translate(vcpu, vadr, 1, &pteval, &itir, &iha);
 	in_tpa = 0;
 	if (fault == IA64_NO_FAULT)
 	{
