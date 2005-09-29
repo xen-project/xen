@@ -80,11 +80,9 @@
  * the usable vector space is 0x20-0xff (224 vectors)
  */
 
-#define NR_IPIS 8
-
-#define RESCHEDULE_VECTOR	1
-#define INVALIDATE_TLB_VECTOR	2
-#define CALL_FUNCTION_VECTOR	3
+#define RESCHEDULE_VECTOR	0
+#define CALL_FUNCTION_VECTOR	1
+#define NR_IPIS			2
 
 /*
  * The maximum number of vectors supported by i386 processors

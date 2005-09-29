@@ -74,16 +74,12 @@ static int __do_suspend(void *ignore)
 	extern int gnttab_suspend(void);
 	extern int gnttab_resume(void);
 
-	extern void time_suspend(void);
 	extern void time_resume(void);
 	extern unsigned long max_pfn;
 	extern unsigned long *pfn_to_mfn_frame_list_list;
 	extern unsigned long *pfn_to_mfn_frame_list[];
 
 #ifdef CONFIG_SMP
-	extern void smp_suspend(void);
-	extern void smp_resume(void);
-
 	static vcpu_guest_context_t suspended_cpu_records[NR_CPUS];
 	cpumask_t prev_online_cpus, prev_present_cpus;
 
@@ -156,17 +152,9 @@ static int __do_suspend(void *ignore)
 	kmem_cache_shrink(pgd_cache);
 #endif
 
-	time_suspend();
-
-#ifdef CONFIG_SMP
-	smp_suspend();
-#endif
-
 	xenbus_suspend();
 
 	xencons_suspend();
-
-	irq_suspend();
 
 	gnttab_suspend();
 
@@ -211,10 +199,6 @@ static int __do_suspend(void *ignore)
 	xencons_resume();
 
 	xenbus_resume();
-
-#ifdef CONFIG_SMP
-	smp_resume();
-#endif
 
 	time_resume();
 

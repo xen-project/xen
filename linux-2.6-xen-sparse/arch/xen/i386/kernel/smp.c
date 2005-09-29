@@ -131,21 +131,9 @@ DECLARE_PER_CPU(int, ipi_to_evtchn[NR_IPIS]);
 
 static inline void __send_IPI_one(unsigned int cpu, int vector)
 {
-	unsigned int evtchn;
-
-	evtchn = per_cpu(ipi_to_evtchn, cpu)[vector];
-	// printk("send_IPI_mask_bitmask cpu %d vector %d evtchn %d\n", cpu, vector, evtchn);
-	if (evtchn) {
-#if 0
-		shared_info_t *s = HYPERVISOR_shared_info;
-		while (synch_test_bit(evtchn, &s->evtchn_pending[0]) ||
-		       synch_test_bit(evtchn, &s->evtchn_mask[0]))
-			;
-#endif
-		notify_via_evtchn(evtchn);
-	} else
-		printk("send_IPI to unbound port %d/%d",
-		       cpu, vector);
+	int evtchn = per_cpu(ipi_to_evtchn, cpu)[vector];
+	BUG_ON(evtchn < 0);
+	notify_via_evtchn(evtchn);
 }
 
 void __send_IPI_shortcut(unsigned int shortcut, int vector)

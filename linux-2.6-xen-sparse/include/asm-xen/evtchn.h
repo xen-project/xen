@@ -68,7 +68,6 @@ extern int  bind_evtchn_to_irqhandler(
 	void *dev_id);
 extern void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id);
 
-extern void irq_suspend(void);
 extern void irq_resume(void);
 
 /* Entry point for notifications into Linux subsystems. */

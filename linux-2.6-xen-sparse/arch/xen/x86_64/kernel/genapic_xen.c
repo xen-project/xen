@@ -31,14 +31,9 @@ DECLARE_PER_CPU(int, ipi_to_evtchn[NR_IPIS]);
 
 static inline void __send_IPI_one(unsigned int cpu, int vector)
 {
-	unsigned int evtchn;
-	Dprintk("%s\n", __FUNCTION__);
-
-	evtchn = per_cpu(ipi_to_evtchn, cpu)[vector];
-	if (evtchn)
-		notify_via_evtchn(evtchn);
-	else
-		printk("send_IPI to unbound port %d/%d", cpu, vector);
+	int evtchn = per_cpu(ipi_to_evtchn, cpu)[vector];
+	BUG_ON(evtchn < 0);
+	notify_via_evtchn(evtchn);
 }
 
 void xen_send_IPI_shortcut(unsigned int shortcut, int vector, unsigned int dest)

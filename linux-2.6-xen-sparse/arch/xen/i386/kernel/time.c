@@ -836,13 +836,6 @@ void start_hz_timer(void)
 	cpu_clear(smp_processor_id(), nohz_cpu_mask);
 }
 
-void time_suspend(void)
-{
-	/* nothing */
-	teardown_irq(per_cpu(timer_irq, 0), &irq_timer);
-	unbind_virq_from_irq(VIRQ_TIMER);
-}
-
 /* No locking required. We are only CPU running, and interrupts are off. */
 void time_resume(void)
 {
@@ -854,9 +847,6 @@ void time_resume(void)
 	per_cpu(processed_system_time, 0) = processed_system_time;
 
 	update_wallclock();
-
-	per_cpu(timer_irq, 0) = bind_virq_to_irq(VIRQ_TIMER);
-	(void)setup_irq(per_cpu(timer_irq, 0), &irq_timer);
 }
 
 #ifdef CONFIG_SMP

@@ -78,11 +78,18 @@ static u32 cpu_evtchn_mask[NR_CPUS][NR_EVENT_CHANNELS/32];
 	 cpu_evtchn_mask[cpu][idx] &		\
 	 ~(sh)->evtchn_mask[idx])
 
-void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
+static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
 {
 	clear_bit(chn, (unsigned long *)cpu_evtchn_mask[cpu_evtchn[chn]]);
 	set_bit(chn, (unsigned long *)cpu_evtchn_mask[cpu]);
 	cpu_evtchn[chn] = cpu;
+}
+
+static void init_evtchn_cpu_bindings(void)
+{
+	/* By default all event channels notify CPU#0. */
+	memset(cpu_evtchn, 0, sizeof(cpu_evtchn));
+	memset(cpu_evtchn_mask[0], ~0, sizeof(cpu_evtchn_mask[0]));
 }
 
 #else
@@ -90,10 +97,9 @@ void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
 #define active_evtchns(cpu,sh,idx)		\
 	((sh)->evtchn_pending[idx] &		\
 	 ~(sh)->evtchn_mask[idx])
+#define bind_evtchn_to_cpu(chn,cpu)	((void)0)
+#define init_evtchn_cpu_bindings()	((void)0)
 
-void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
-{
-}
 #endif
 
 /* Upcall to generic IRQ layer. */
@@ -244,7 +250,7 @@ int bind_ipi_to_irq(int ipi)
 
 	spin_lock(&irq_mapping_update_lock);
 
-	if ((evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi]) == 0) {
+	if ((evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi]) == -1) {
 		op.cmd = EVTCHNOP_bind_ipi;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 		evtchn = op.u.bind_ipi.port;
@@ -287,7 +293,7 @@ void unbind_ipi_from_irq(int ipi)
 		bind_evtchn_to_cpu(evtchn, 0);
 		evtchn_to_irq[evtchn] = -1;
 		irq_to_evtchn[irq]    = -1;
-		per_cpu(ipi_to_evtchn, cpu)[ipi] = 0;
+		per_cpu(ipi_to_evtchn, cpu)[ipi] = -1;
 	}
 
 	spin_unlock(&irq_mapping_update_lock);
@@ -608,41 +614,32 @@ void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
 	synch_set_bit(evtchn, &s->evtchn_pending[0]);
 }
 
-void irq_suspend(void)
-{
-	int pirq, virq, irq, evtchn;
-	int cpu = smp_processor_id(); /* XXX */
-
-	/* Unbind VIRQs from event channels. */
-	for (virq = 0; virq < NR_VIRQS; virq++) {
-		if ((irq = per_cpu(virq_to_irq, cpu)[virq]) == -1)
-			continue;
-		evtchn = irq_to_evtchn[irq];
-
-		/* Mark the event channel as unused in our table. */
-		evtchn_to_irq[evtchn] = -1;
-		irq_to_evtchn[irq]    = -1;
-	}
-
-	/* Check that no PIRQs are still bound. */
-	for (pirq = 0; pirq < NR_PIRQS; pirq++)
-		if ((evtchn = irq_to_evtchn[pirq_to_irq(pirq)]) != -1)
-			panic("Suspend attempted while PIRQ %d bound "
-			      "to evtchn %d.\n", pirq, evtchn);
-}
-
 void irq_resume(void)
 {
 	evtchn_op_t op;
-	int         virq, irq, evtchn;
-	int cpu = smp_processor_id(); /* XXX */
+	int         cpu, pirq, virq, ipi, irq, evtchn;
+
+	init_evtchn_cpu_bindings();
 
 	/* New event-channel space is not 'live' yet. */
 	for (evtchn = 0; evtchn < NR_EVENT_CHANNELS; evtchn++)
 		mask_evtchn(evtchn);
 
+	/* Check that no PIRQs are still bound. */
+	for (pirq = 0; pirq < NR_PIRQS; pirq++)
+		BUG_ON(irq_to_evtchn[pirq_to_irq(pirq)] != -1);
+
+	/* Secondary CPUs must have no VIRQ or IPI bindings. */
+	for (cpu = 1; cpu < NR_CPUS; cpu++) {
+		for (virq = 0; virq < NR_VIRQS; virq++)
+			BUG_ON(per_cpu(virq_to_irq, cpu)[virq] != -1);
+		for (ipi = 0; ipi < NR_IPIS; ipi++)
+			BUG_ON(per_cpu(ipi_to_evtchn, cpu)[ipi] != -1);
+	}
+
+	/* Primary CPU: rebind VIRQs automatically. */
 	for (virq = 0; virq < NR_VIRQS; virq++) {
-		if ((irq = per_cpu(virq_to_irq, cpu)[virq]) == -1)
+		if ((irq = per_cpu(virq_to_irq, 0)[virq]) == -1)
 			continue;
 
 		/* Get a new binding from Xen. */
@@ -652,7 +649,27 @@ void irq_resume(void)
 		evtchn = op.u.bind_virq.port;
         
 		/* Record the new mapping. */
-		bind_evtchn_to_cpu(evtchn, 0);
+		evtchn_to_irq[evtchn] = irq;
+		irq_to_evtchn[irq]    = evtchn;
+
+		/* Ready for use. */
+		unmask_evtchn(evtchn);
+	}
+
+	/* Primary CPU: rebind IPIs automatically. */
+	for (ipi = 0; ipi < NR_IPIS; ipi++) {
+		if ((evtchn = per_cpu(ipi_to_evtchn, 0)[ipi]) == -1)
+			continue;
+
+		irq = evtchn_to_irq[evtchn];
+		evtchn_to_irq[evtchn] = -1;
+
+		/* Get a new binding from Xen. */
+		op.cmd = EVTCHNOP_bind_ipi;
+		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
+		evtchn = op.u.bind_ipi.port;
+        
+		/* Record the new mapping. */
 		evtchn_to_irq[evtchn] = irq;
 		irq_to_evtchn[irq]    = evtchn;
 
@@ -670,15 +687,15 @@ void __init init_IRQ(void)
 
 	spin_lock_init(&irq_mapping_update_lock);
 
-#ifdef CONFIG_SMP
-	/* By default all event channels notify CPU#0. */
-	memset(cpu_evtchn_mask[0], ~0, sizeof(cpu_evtchn_mask[0]));
-#endif
+	init_evtchn_cpu_bindings();
 
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		/* No VIRQ -> IRQ mappings. */
 		for (i = 0; i < NR_VIRQS; i++)
 			per_cpu(virq_to_irq, cpu)[i] = -1;
+		/* No VIRQ -> IRQ mappings. */
+		for (i = 0; i < NR_IPIS; i++)
+			per_cpu(ipi_to_evtchn, cpu)[i] = -1;
 	}
 
 	/* No event-channel -> IRQ mappings. */
