@@ -71,8 +71,6 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 	evtchn_op_t op = { .cmd = EVTCHNOP_bind_interdomain };
 	int err;
 
-	BUG_ON(blkif->remote_evtchn);
-
 	if ( (blkif->blk_ring_area = alloc_vm_area(PAGE_SIZE)) == NULL )
 		return -ENOMEM;
 
@@ -94,13 +92,12 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 	}
 
 	blkif->evtchn = op.u.bind_interdomain.port1;
-	blkif->remote_evtchn = evtchn;
 
 	sring = (blkif_sring_t *)blkif->blk_ring_area->addr;
 	SHARED_RING_INIT(sring);
 	BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
 
-	bind_evtchn_to_irqhandler(
+	blkif->irq = bind_evtchn_to_irqhandler(
 		blkif->evtchn, blkif_be_int, 0, "blkif-backend", blkif);
 	blkif->status = CONNECTED;
 
@@ -109,20 +106,12 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 
 static void free_blkif(void *arg)
 {
-	evtchn_op_t op = { .cmd = EVTCHNOP_close };
 	blkif_t *blkif = (blkif_t *)arg;
 
-	op.u.close.port = blkif->evtchn;
-	op.u.close.dom = DOMID_SELF;
-	HYPERVISOR_event_channel_op(&op);
-	op.u.close.port = blkif->remote_evtchn;
-	op.u.close.dom = blkif->domid;
-	HYPERVISOR_event_channel_op(&op);
+	if (blkif->irq)
+		unbind_evtchn_from_irqhandler(blkif->irq, blkif);
 
 	vbd_free(&blkif->vbd);
-
-	if (blkif->evtchn)
-		unbind_evtchn_from_irqhandler(blkif->evtchn, blkif);
 
 	if (blkif->blk_ring.sring) {
 		unmap_frontend_page(blkif);

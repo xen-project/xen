@@ -35,7 +35,7 @@ typedef struct tpmif_st {
 
 	/* Physical parameters of the comms window. */
 	unsigned int evtchn;
-	unsigned int remote_evtchn;
+	unsigned int irq;
 
 	/* The shared rings and indexes. */
 	tpmif_tx_interface_t *tx;

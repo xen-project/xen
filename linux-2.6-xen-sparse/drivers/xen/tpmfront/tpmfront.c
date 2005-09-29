@@ -292,8 +292,10 @@ static void destroy_tpmring(struct tpmfront_info *info, struct tpm_private *tp)
 		free_page((unsigned long)tp->tx);
 		tp->tx = NULL;
 	}
-	unbind_evtchn_from_irqhandler(tp->evtchn, NULL);
-	tp->evtchn = 0;
+
+	if (tpm->irq)
+		unbind_evtchn_from_irqhandler(tp->irq, NULL);
+	tp->evtchn = tpm->irq = 0;
 }
 
 
@@ -501,10 +503,12 @@ static void tpmif_connect(u16 evtchn, domid_t domid)
 	err = bind_evtchn_to_irqhandler(
 		tp->evtchn,
 		tpmif_int, SA_SAMPLE_RANDOM, "tpmif", tp);
-	if ( err != 0 ) {
+	if ( err <= 0 ) {
 		WPRINTK("bind_evtchn_to_irqhandler failed (err=%d)\n", err);
 		return;
 	}
+
+	tp->irq = err;
 }
 
 static struct xenbus_device_id tpmfront_ids[] = {

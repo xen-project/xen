@@ -123,7 +123,7 @@ struct blkfront_info
 	int backend_id;
 	int ring_ref;
 	blkif_front_ring_t ring;
-	unsigned int evtchn;
+	unsigned int evtchn, irq;
 	struct xlbd_major_info *mi;
 	request_queue_t *rq;
 	struct work_struct work;

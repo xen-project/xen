@@ -607,7 +607,6 @@ void xenbus_suspend(void)
 	down(&xenbus_lock);
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_dev);
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, suspend_dev);
-	xb_suspend_comms();
 }
 
 void xenbus_resume(void)

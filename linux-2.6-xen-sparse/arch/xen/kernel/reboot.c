@@ -65,12 +65,6 @@ static int __do_suspend(void *ignore)
 {
 	int i, j, k, fpp;
 
-#ifdef CONFIG_XEN_USB_FRONTEND
-	extern void usbif_resume();
-#else
-#define usbif_resume() do{}while(0)
-#endif
-
 	extern int gnttab_suspend(void);
 	extern int gnttab_resume(void);
 
@@ -87,7 +81,6 @@ static int __do_suspend(void *ignore)
 	int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt);
 #endif
 
-	extern void xencons_suspend(void);
 	extern void xencons_resume(void);
 
 	int err = 0;
@@ -147,16 +140,14 @@ static int __do_suspend(void *ignore)
 	}
 #endif
 
+	xenbus_suspend();
+
+	gnttab_suspend();
+
 #ifdef __i386__
 	mm_pin_all();
 	kmem_cache_shrink(pgd_cache);
 #endif
-
-	xenbus_suspend();
-
-	xencons_suspend();
-
-	gnttab_suspend();
 
 	HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 	clear_fixmap(FIX_SHARED_INFO);
@@ -201,8 +192,6 @@ static int __do_suspend(void *ignore)
 	xenbus_resume();
 
 	time_resume();
-
-	usbif_resume();
 
 #ifdef CONFIG_SMP
 	for_each_cpu_mask(i, prev_present_cpus)

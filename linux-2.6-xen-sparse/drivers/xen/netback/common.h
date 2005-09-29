@@ -50,7 +50,7 @@ typedef struct netif_st {
 	u16              rx_shmem_handle;
 	grant_ref_t      rx_shmem_ref; 
 	unsigned int     evtchn;
-	unsigned int     remote_evtchn;
+	unsigned int     irq;
 
 	/* The shared rings and indexes. */
 	netif_tx_interface_t *tx;

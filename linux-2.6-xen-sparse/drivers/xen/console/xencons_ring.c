@@ -21,7 +21,6 @@
 #include <linux/err.h>
 #include "xencons_ring.h"
 
-
 struct ring_head
 {
 	u32 cons;
@@ -29,6 +28,7 @@ struct ring_head
 	char buf[0];
 } __attribute__((packed));
 
+static int xencons_irq;
 
 #define XENCONS_RING_SIZE (PAGE_SIZE/2 - sizeof (struct ring_head))
 #define XENCONS_IDX(cnt) ((cnt) % XENCONS_RING_SIZE)
@@ -97,32 +97,28 @@ int xencons_ring_init(void)
 {
 	int err;
 
+	if (xencons_irq)
+		unbind_evtchn_from_irqhandler(xencons_irq, inring());
+	xencons_irq = 0;
+
 	if (!xen_start_info->console_evtchn)
 		return 0;
 
-	err = bind_evtchn_to_irqhandler(xen_start_info->console_evtchn,
-					handle_input, 0, "xencons", inring());
-	if (err) {
+	err = bind_evtchn_to_irqhandler(
+		xen_start_info->console_evtchn,
+		handle_input, 0, "xencons", inring());
+	if (err <= 0) {
 		xprintk("XEN console request irq failed %i\n", err);
 		return err;
 	}
 
+	xencons_irq = err;
+
 	return 0;
-}
-
-void xencons_suspend(void)
-{
-
-	if (!xen_start_info->console_evtchn)
-		return;
-
-	unbind_evtchn_from_irqhandler(xen_start_info->console_evtchn,
-				      inring());
 }
 
 void xencons_resume(void)
 {
-
 	(void)xencons_ring_init();
 }
 

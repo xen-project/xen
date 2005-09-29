@@ -120,8 +120,6 @@ tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 	evtchn_op_t op = {.cmd = EVTCHNOP_bind_interdomain };
 	int err;
 
-	BUG_ON(tpmif->remote_evtchn);
-
 	if ((tpmif->tx_area = alloc_vm_area(PAGE_SIZE)) == NULL)
 		return -ENOMEM;
 
@@ -143,12 +141,11 @@ tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 	}
 
 	tpmif->evtchn = op.u.bind_interdomain.port1;
-	tpmif->remote_evtchn = evtchn;
 
 	tpmif->tx = (tpmif_tx_interface_t *)tpmif->tx_area->addr;
 
-	bind_evtchn_to_irqhandler(tpmif->evtchn,
-				  tpmif_be_int, 0, "tpmif-backend", tpmif);
+	tpmif->irq = bind_evtchn_to_irqhandler(
+		tpmif->evtchn, tpmif_be_int, 0, "tpmif-backend", tpmif);
 	tpmif->status = CONNECTED;
 	tpmif->shmem_ref = shared_page;
 	tpmif->active = 1;
@@ -159,18 +156,10 @@ tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 static void
 __tpmif_disconnect_complete(void *arg)
 {
-	evtchn_op_t op = {.cmd = EVTCHNOP_close };
 	tpmif_t *tpmif = (tpmif_t *) arg;
 
-	op.u.close.port = tpmif->evtchn;
-	op.u.close.dom = DOMID_SELF;
-	HYPERVISOR_event_channel_op(&op);
-	op.u.close.port = tpmif->remote_evtchn;
-	op.u.close.dom = tpmif->domid;
-	HYPERVISOR_event_channel_op(&op);
-
-	if (tpmif->evtchn)
-		unbind_evtchn_from_irqhandler(tpmif->evtchn, tpmif);
+	if (tpmif->irq)
+		unbind_evtchn_from_irqhandler(tpmif->irq, tpmif);
 
 	if (tpmif->tx) {
 		unmap_frontend_page(tpmif);

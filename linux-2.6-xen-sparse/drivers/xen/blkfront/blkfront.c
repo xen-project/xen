@@ -357,8 +357,9 @@ static void blkif_free(struct blkfront_info *info)
 	if (info->ring_ref != GRANT_INVALID_REF)
 		gnttab_end_foreign_access(info->ring_ref, 0);
 	info->ring_ref = GRANT_INVALID_REF;
-	unbind_evtchn_from_irqhandler(info->evtchn, info); 
-	info->evtchn = 0;
+	if (info->irq)
+		unbind_evtchn_from_irqhandler(info->irq, info); 
+	info->evtchn = info->irq = 0;
 }
 
 static void blkif_recover(struct blkfront_info *info)
@@ -429,10 +430,12 @@ static void blkif_connect(struct blkfront_info *info, u16 evtchn)
 
 	err = bind_evtchn_to_irqhandler(
 		info->evtchn, blkif_int, SA_SAMPLE_RANDOM, "blkif", info);
-	if (err != 0) {
+	if (err <= 0) {
 		WPRINTK("bind_evtchn_to_irqhandler failed (err=%d)\n", err);
 		return;
 	}
+
+	info->irq = err;
 }
 
 

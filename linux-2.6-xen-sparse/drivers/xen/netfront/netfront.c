@@ -127,7 +127,7 @@ struct net_private
 	spinlock_t   rx_lock;
 
 	unsigned int handle;
-	unsigned int evtchn;
+	unsigned int evtchn, irq;
 
 	/* What is the status of our connection to the remote backend? */
 #define BEST_CLOSED       0
@@ -815,7 +815,7 @@ connect_device(struct net_private *np, unsigned int evtchn)
 	memcpy(dev->dev_addr, np->mac, ETH_ALEN);
 	np->evtchn = evtchn;
 	network_connect(dev);
-	(void)bind_evtchn_to_irqhandler(
+	np->irq = bind_evtchn_to_irqhandler(
 		np->evtchn, netif_int, SA_SAMPLE_RANDOM, dev->name, dev);
 	(void)send_fake_arp(dev);
 	show_device(np);
@@ -1055,8 +1055,9 @@ static void netif_free(struct netfront_info *info)
 		gnttab_end_foreign_access(info->rx_ring_ref, 0);
 	info->rx_ring_ref = GRANT_INVALID_REF;
 
-	unbind_evtchn_from_irqhandler(info->evtchn, info->netdev);
-	info->evtchn = 0;
+	if (info->irq)
+		unbind_evtchn_from_irqhandler(info->irq, info->netdev);
+	info->evtchn = info->irq = 0;
 }
 
 /* Stop network device and free tx/rx queues and irq. */

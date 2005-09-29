@@ -320,13 +320,19 @@ int bind_evtchn_to_irq(unsigned int evtchn)
 }
 EXPORT_SYMBOL(bind_evtchn_to_irq);
 
-void unbind_evtchn_from_irq(unsigned int evtchn)
+void unbind_evtchn_from_irq(unsigned int irq)
 {
-	int irq = evtchn_to_irq[evtchn];
+	evtchn_op_t op;
+	int evtchn = irq_to_evtchn[irq];
 
 	spin_lock(&irq_mapping_update_lock);
 
-	if (--irq_bindcount[irq] == 0) {
+	if ((--irq_bindcount[irq] == 0) && (evtchn != -1)) {
+		op.cmd          = EVTCHNOP_close;
+		op.u.close.dom  = DOMID_SELF;
+		op.u.close.port = evtchn;
+		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
+
 		evtchn_to_irq[evtchn] = -1;
 		irq_to_evtchn[irq]    = -1;
 	}
@@ -348,17 +354,16 @@ int bind_evtchn_to_irqhandler(
 	irq = bind_evtchn_to_irq(evtchn);
 	retval = request_irq(irq, handler, irqflags, devname, dev_id);
 	if (retval != 0)
-		unbind_evtchn_from_irq(evtchn);
+		unbind_evtchn_from_irq(irq);
 
-	return retval;
+	return irq;
 }
 EXPORT_SYMBOL(bind_evtchn_to_irqhandler);
 
-void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id)
+void unbind_evtchn_from_irqhandler(unsigned int irq, void *dev_id)
 {
-	unsigned int irq = evtchn_to_irq[evtchn];
 	free_irq(irq, dev_id);
-	unbind_evtchn_from_irq(evtchn);
+	unbind_evtchn_from_irq(irq);
 }
 EXPORT_SYMBOL(unbind_evtchn_from_irqhandler);
 
@@ -425,9 +430,8 @@ static unsigned int startup_dynirq(unsigned int irq)
 {
 	int evtchn = irq_to_evtchn[irq];
 
-	if (!VALID_EVTCHN(evtchn))
-		return 0;
-	unmask_evtchn(evtchn);
+	if (VALID_EVTCHN(evtchn))
+		unmask_evtchn(evtchn);
 	return 0;
 }
 
@@ -435,38 +439,41 @@ static void shutdown_dynirq(unsigned int irq)
 {
 	int evtchn = irq_to_evtchn[irq];
 
-	if (!VALID_EVTCHN(evtchn))
-		return;
-	mask_evtchn(evtchn);
+	if (VALID_EVTCHN(evtchn))
+		mask_evtchn(evtchn);
 }
 
 static void enable_dynirq(unsigned int irq)
 {
 	int evtchn = irq_to_evtchn[irq];
 
-	unmask_evtchn(evtchn);
+	if (VALID_EVTCHN(evtchn))
+		unmask_evtchn(evtchn);
 }
 
 static void disable_dynirq(unsigned int irq)
 {
 	int evtchn = irq_to_evtchn[irq];
 
-	mask_evtchn(evtchn);
+	if (VALID_EVTCHN(evtchn))
+		mask_evtchn(evtchn);
 }
 
 static void ack_dynirq(unsigned int irq)
 {
 	int evtchn = irq_to_evtchn[irq];
 
-	mask_evtchn(evtchn);
-	clear_evtchn(evtchn);
+	if (VALID_EVTCHN(evtchn)) {
+		mask_evtchn(evtchn);
+		clear_evtchn(evtchn);
+	}
 }
 
 static void end_dynirq(unsigned int irq)
 {
 	int evtchn = irq_to_evtchn[irq];
 
-	if (!(irq_desc[irq].status & IRQ_DISABLED))
+	if (VALID_EVTCHN(evtchn) && !(irq_desc[irq].status & IRQ_DISABLED))
 		unmask_evtchn(evtchn);
 }
 
@@ -559,35 +566,36 @@ static void shutdown_pirq(unsigned int irq)
 static void enable_pirq(unsigned int irq)
 {
 	int evtchn = irq_to_evtchn[irq];
-	if (!VALID_EVTCHN(evtchn))
-		return;
-	unmask_evtchn(evtchn);
-	pirq_unmask_notify(irq_to_pirq(irq));
+
+	if (VALID_EVTCHN(evtchn)) {
+		unmask_evtchn(evtchn);
+		pirq_unmask_notify(irq_to_pirq(irq));
+	}
 }
 
 static void disable_pirq(unsigned int irq)
 {
 	int evtchn = irq_to_evtchn[irq];
-	if (!VALID_EVTCHN(evtchn))
-		return;
-	mask_evtchn(evtchn);
+
+	if (VALID_EVTCHN(evtchn))
+		mask_evtchn(evtchn);
 }
 
 static void ack_pirq(unsigned int irq)
 {
 	int evtchn = irq_to_evtchn[irq];
-	if (!VALID_EVTCHN(evtchn))
-		return;
-	mask_evtchn(evtchn);
-	clear_evtchn(evtchn);
+
+	if (VALID_EVTCHN(evtchn)) {
+		mask_evtchn(evtchn);
+		clear_evtchn(evtchn);
+	}
 }
 
 static void end_pirq(unsigned int irq)
 {
 	int evtchn = irq_to_evtchn[irq];
-	if (!VALID_EVTCHN(evtchn))
-		return;
-	if (!(irq_desc[irq].status & IRQ_DISABLED)) {
+
+	if (VALID_EVTCHN(evtchn) && !(irq_desc[irq].status & IRQ_DISABLED)) {
 		unmask_evtchn(evtchn);
 		pirq_unmask_notify(irq_to_pirq(irq));
 	}
@@ -637,6 +645,10 @@ void irq_resume(void)
 			BUG_ON(per_cpu(ipi_to_evtchn, cpu)[ipi] != -1);
 	}
 
+	/* No IRQ -> event-channel mappings. */
+	for (irq = 0; irq < NR_IRQS; irq++)
+		irq_to_evtchn[irq] = -1;
+
 	/* Primary CPU: rebind VIRQs automatically. */
 	for (virq = 0; virq < NR_VIRQS; virq++) {
 		if ((irq = per_cpu(virq_to_irq, 0)[virq]) == -1)
@@ -676,6 +688,13 @@ void irq_resume(void)
 		/* Ready for use. */
 		unmask_evtchn(evtchn);
 	}
+
+	/* Remove defunct event-channel -> IRQ mappings. */
+	for (evtchn = 0; evtchn < NR_EVENT_CHANNELS; evtchn++) {
+		if ((evtchn_to_irq[evtchn] != -1) &&
+		    (irq_to_evtchn[evtchn_to_irq[evtchn]] == -1))
+			evtchn_to_irq[evtchn] = -1;
+	}
 }
 
 void __init init_IRQ(void)
@@ -689,11 +708,10 @@ void __init init_IRQ(void)
 
 	init_evtchn_cpu_bindings();
 
+	/* No VIRQ or IPI bindings. */
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		/* No VIRQ -> IRQ mappings. */
 		for (i = 0; i < NR_VIRQS; i++)
 			per_cpu(virq_to_irq, cpu)[i] = -1;
-		/* No VIRQ -> IRQ mappings. */
 		for (i = 0; i < NR_IPIS; i++)
 			per_cpu(ipi_to_evtchn, cpu)[i] = -1;
 	}

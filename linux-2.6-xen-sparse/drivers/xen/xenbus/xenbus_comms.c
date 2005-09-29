@@ -44,6 +44,8 @@ struct ringbuf_head
 	char buf[0];
 } __attribute__((packed));
 
+static int xenbus_irq;
+
 DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
 
 static inline struct ringbuf_head *outbuf(void)
@@ -205,31 +207,27 @@ int xb_init_comms(void)
 {
 	int err;
 
+	if (xenbus_irq)
+		unbind_evtchn_from_irqhandler(xenbus_irq, &xb_waitq);
+	xenbus_irq = 0;
+
 	if (!xen_start_info->store_evtchn)
 		return 0;
 
 	err = bind_evtchn_to_irqhandler(
 		xen_start_info->store_evtchn, wake_waiting,
 		0, "xenbus", &xb_waitq);
-	if (err) {
+	if (err <= 0) {
 		printk(KERN_ERR "XENBUS request irq failed %i\n", err);
-		unbind_evtchn_from_irq(xen_start_info->store_evtchn);
 		return err;
 	}
+
+	xenbus_irq = err;
 
 	/* FIXME zero out page -- domain builder should probably do this*/
 	memset(mfn_to_virt(xen_start_info->store_mfn), 0, PAGE_SIZE);
 
 	return 0;
-}
-
-void xb_suspend_comms(void)
-{
-
-	if (!xen_start_info->store_evtchn)
-		return;
-
-	unbind_evtchn_from_irqhandler(xen_start_info->store_evtchn, &xb_waitq);
 }
 
 /*
