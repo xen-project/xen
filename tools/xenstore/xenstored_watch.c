@@ -96,36 +96,38 @@ static int destroy_watch_event(void *_event)
 }
 
 static void add_event(struct connection *conn,
-		      struct watch *watch, const char *node)
+		      struct watch *watch,
+		      const char *name)
 {
 	struct watch_event *event;
 
-	/* Check read permission: no permission, no watch event.
-	 * If it doesn't exist, we need permission to read parent.
-	 */
-	if (!check_node_perms(conn, node, XS_PERM_READ|XS_PERM_ENOENT_OK) &&
-	    !check_event_node(node)) {
-		return;
+	if (!check_event_node(name)) {
+		/* Can this conn load node, or see that it doesn't exist? */
+		struct node *node;
+
+		node = get_node(conn, name, XS_PERM_READ);
+		if (!node && errno != ENOENT)
+			return;
 	}
 
 	if (watch->relative_path) {
-		node += strlen(watch->relative_path);
-		if (*node == '/') /* Could be "" */
-			node++;
+		name += strlen(watch->relative_path);
+		if (*name == '/') /* Could be "" */
+			name++;
 	}
 
 	event = talloc(watch, struct watch_event);
-	event->len = strlen(node) + 1 + strlen(watch->token) + 1;
+	event->len = strlen(name) + 1 + strlen(watch->token) + 1;
 	event->data = talloc_array(event, char, event->len);
-	strcpy(event->data, node);
-	strcpy(event->data + strlen(node) + 1, watch->token);
+	strcpy(event->data, name);
+	strcpy(event->data + strlen(name) + 1, watch->token);
 	talloc_set_destructor(event, destroy_watch_event);
 	list_add_tail(&event->list, &watch->events);
 	trace_create(event, "watch_event");
 }
 
 /* FIXME: we fail to fire on out of memory.  Should drop connections. */
-void fire_watches(struct connection *conn, const char *node, bool recurse)
+void fire_watches(struct connection *conn, const char *name, bool recurse)
 {
 	struct connection *i;
 	struct watch *watch;
@@ -137,9 +139,9 @@ void fire_watches(struct connection *conn, const char *node, bool recurse)
 	/* Create an event for each watch. */
 	list_for_each_entry(i, &connections, list) {
 		list_for_each_entry(watch, &i->watches, list) {
-			if (is_child(node, watch->node))
-				add_event(i, watch, node);
-			else if (recurse && is_child(watch->node, node))
+			if (is_child(name, watch->node))
+				add_event(i, watch, name);
+			else if (recurse && is_child(watch->node, name))
 				add_event(i, watch, watch->node);
 			else
 				continue;
@@ -154,49 +156,6 @@ static int destroy_watch(void *_watch)
 {
 	trace_destroy(_watch, "watch");
 	return 0;
-}
-
-void shortest_watch_ack_timeout(struct timeval *tv)
-{
-	(void)tv;
-#if 0 /* FIXME */
-	struct watch *watch;
-
-	list_for_each_entry(watch, &watches, list) {
-		struct watch_event *i;
-		list_for_each_entry(i, &watch->events, list) {
-			if (!timerisset(&i->timeout))
-				continue;
-			if (!timerisset(tv) || timercmp(&i->timeout, tv, <))
-				*tv = i->timeout;
-		}
-	}
-#endif
-}	
-
-void check_watch_ack_timeout(void)
-{
-#if 0
-	struct watch *watch;
-	struct timeval now;
-
-	gettimeofday(&now, NULL);
-	list_for_each_entry(watch, &watches, list) {
-		struct watch_event *i, *tmp;
-		list_for_each_entry_safe(i, tmp, &watch->events, list) {
-			if (!timerisset(&i->timeout))
-				continue;
-			if (timercmp(&i->timeout, &now, <)) {
-				xprintf("Warning: timeout on watch event %s"
-					" token %s\n",
-					i->node, watch->token);
-				trace_watch_timeout(watch->conn, i->node,
-						    watch->token);
-				timerclear(&i->timeout);
-			}
-		}
-	}
-#endif
 }
 
 void do_watch(struct connection *conn, struct buffered_data *in)

@@ -109,16 +109,15 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token);
 
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
- * Transaction only applies to the given subtree.
  * You can only have one transaction at any time.
  * Returns false on failure.
  */
-bool xs_transaction_start(struct xs_handle *h, const char *subtree);
+bool xs_transaction_start(struct xs_handle *h);
 
 /* End a transaction.
  * If abandon is true, transaction is discarded instead of committed.
- * Returns false on failure, which indicates an error: transactions will
- * not fail spuriously.
+ * Returns false on failure: if errno == EAGAIN, you have to restart
+ * transaction.
  */
 bool xs_transaction_end(struct xs_handle *h, bool abort);
 

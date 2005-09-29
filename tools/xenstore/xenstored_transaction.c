@@ -26,6 +26,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include "talloc.h"
 #include "list.h"
 #include "xenstored_transaction.h"
@@ -51,74 +52,26 @@ struct transaction
 	/* Global list of transactions. */
 	struct list_head list;
 
+	/* Generation when transaction started. */
+	unsigned int generation;
+
 	/* My owner (conn->transaction == me). */
 	struct connection *conn;
 
-	/* Subtree this transaction covers */
-	char *node;
-
-	/* Base for this transaction. */
-	char *divert;
+	/* TDB to work on, and filename */
+	TDB_CONTEXT *tdb;
+	char *tdb_name;
 
 	/* List of changed nodes. */
 	struct list_head changes;
-
-	/* Someone's waiting: time limit. */
-	struct timeval timeout;
-
-	/* We've timed out. */
-	bool destined_to_fail;
 };
 static LIST_HEAD(transactions);
+static unsigned int generation;
 
-bool within_transaction(struct transaction *trans, const char *node)
+/* Return tdb context to use for this connection. */
+TDB_CONTEXT *tdb_transaction_context(struct transaction *trans)
 {
-	if (!trans)
-		return true;
-	return is_child(node, trans->node);
-}
-
-/* You are on notice: this transaction is blocking someone. */
-static void start_transaction_timeout(struct transaction *trans)
-{
-	if (timerisset(&trans->timeout))
-		return;
-
-	/* One second timeout. */
-	gettimeofday(&trans->timeout, NULL);
-	trans->timeout.tv_sec += 1;
-}
-
-struct transaction *transaction_covering_node(const char *node)
-{
-	struct transaction *i;
-
-	list_for_each_entry(i, &transactions, list) {
-		if (i->destined_to_fail)
-			continue;
-		if (is_child(i->node, node) || is_child(node, i->node))
-			return i;
-	}
-	return NULL;
-}
-
-bool transaction_block(struct connection *conn, const char *node)
-{
-	struct transaction *trans;
-
-	/* Transactions don't overlap, so we can't be blocked by
-	 * others if we're in one. */
-	if (conn->transaction)
-		return false;
-
-	trans = transaction_covering_node(node);
-	if (trans) {
-		start_transaction_timeout(trans);
-		conn->state = BLOCKED;
-		conn->blocked_by = talloc_strdup(conn, node);
-		return true;
-	}
-	return false;
+	return trans->tdb;
 }
 
 /* Callers get a change node (which can fail) and only commit after they've
@@ -127,8 +80,11 @@ void add_change_node(struct transaction *trans, const char *node, bool recurse)
 {
 	struct changed_node *i;
 
-	if (!trans)
+	if (!trans) {
+		/* They're changing the global database. */
+		generation++;
 		return;
+	}
 
 	list_for_each_entry(i, &trans->changes, list)
 		if (streq(i->node, node))
@@ -140,167 +96,47 @@ void add_change_node(struct transaction *trans, const char *node, bool recurse)
 	list_add_tail(&i->list, &trans->changes);
 }
 
-char *node_dir_inside_transaction(struct transaction *trans, const char *node)
-{
-	return talloc_asprintf(node, "%s/%s", trans->divert,
-			       node + strlen(trans->node));
-}
-
-void shortest_transaction_timeout(struct timeval *tv)
-{
-	struct transaction *i;
-
-	list_for_each_entry(i, &transactions, list) {
-		if (!timerisset(&i->timeout))
-			continue;
-
-		if (!timerisset(tv) || timercmp(&i->timeout, tv, <))
-			*tv = i->timeout;
-	}
-}	
-
-void check_transaction_timeout(void)
-{
-	struct transaction *i;
-	struct timeval now;
-
-	gettimeofday(&now, NULL);
-
-	list_for_each_entry(i, &transactions, list) {
-		if (!timerisset(&i->timeout))
-			continue;
-
-		if (timercmp(&i->timeout, &now, <))
-			i->destined_to_fail = true;
-	}
-}
-
 static int destroy_transaction(void *_transaction)
 {
 	struct transaction *trans = _transaction;
 
 	list_del(&trans->list);
 	trace_destroy(trans, "transaction");
-	return destroy_path(trans->divert);
+	if (trans->tdb)
+		tdb_close(trans->tdb);
+	unlink(trans->tdb_name);
+	return 0;
 }
 
-static bool copy_file(const char *src, const char *dst)
+void do_transaction_start(struct connection *conn, struct buffered_data *in)
 {
-	int *infd, *outfd;
-	void *data;
-	unsigned int size;
-
-	infd = talloc_open(src, O_RDONLY, 0);
-	if (!infd)
-		return false;
-	outfd = talloc_open(dst, O_WRONLY|O_CREAT|O_EXCL, 0640);
-	if (!outfd)
-		return false;
-	data = read_all(infd, &size);
-	if (!data)
-		return false;
-	return xs_write_all(*outfd, data, size);
-}
-
-static bool copy_dir(const char *src, const char *dst)
-{
-	DIR **dir;
-	struct dirent *dirent;
-
-	if (mkdir(dst, 0750) != 0)
-		return false;
-
-	dir = talloc_opendir(src);
-	if (!dir)
-		return false;
-
-	while ((dirent = readdir(*dir)) != NULL) {
-		struct stat st;
-		char *newsrc, *newdst;
-
-		if (streq(dirent->d_name, ".") || streq(dirent->d_name, ".."))
-			continue;
-
-		newsrc = talloc_asprintf(src, "%s/%s", src, dirent->d_name);
-		newdst = talloc_asprintf(src, "%s/%s", dst, dirent->d_name);
-		if (stat(newsrc, &st) != 0)
-			return false;
-		
-		if (S_ISDIR(st.st_mode)) {
-			if (!copy_dir(newsrc, newdst))
-				return false;
-		} else {
-			if (!copy_file(newsrc, newdst))
-				return false;
-		}
-		/* Free now so we don't run out of file descriptors */
-		talloc_free(newsrc);
-		talloc_free(newdst);
-	}
-	return true;
-}
-
-void do_transaction_start(struct connection *conn, const char *node)
-{
-	struct transaction *transaction;
-	char *dir;
+	struct transaction *trans;
 
 	if (conn->transaction) {
 		send_error(conn, EBUSY);
 		return;
 	}
 
-	node = canonicalize(conn, node);
-	if (!check_node_perms(conn, node, XS_PERM_READ)) {
+	/* Attach transaction to input for autofree until it's complete */
+	trans = talloc(in, struct transaction);
+	INIT_LIST_HEAD(&trans->changes);
+	trans->conn = conn;
+	trans->generation = generation;
+	trans->tdb_name = talloc_asprintf(trans, "%s.%p",
+					  xs_daemon_tdb(), trans);
+	trans->tdb = tdb_copy(tdb_context(conn), trans->tdb_name);
+	if (!trans->tdb) {
 		send_error(conn, errno);
 		return;
 	}
+	/* Make it close if we go away. */
+	talloc_steal(trans, trans->tdb);
 
-	if (transaction_block(conn, node))
-		return;
-
-	dir = node_dir_outside_transaction(node);
-
-	/* Attach transaction to node for autofree until it's complete */
-	transaction = talloc(node, struct transaction);
-	transaction->node = talloc_strdup(transaction, node);
-	transaction->divert = talloc_asprintf(transaction, "%s/%p", 
-					      xs_daemon_transactions(),
-					      transaction);
-	INIT_LIST_HEAD(&transaction->changes);
-	transaction->conn = conn;
-	timerclear(&transaction->timeout);
-	transaction->destined_to_fail = false;
-	list_add_tail(&transaction->list, &transactions);
-	talloc_set_destructor(transaction, destroy_transaction);
-	trace_create(transaction, "transaction");
-
-	if (!copy_dir(dir, transaction->divert)) {
-		send_error(conn, errno);
-		return;
-	}
-
-	talloc_steal(conn, transaction);
-	conn->transaction = transaction;
-	send_ack(transaction->conn, XS_TRANSACTION_START);
-}
-
-static bool commit_transaction(struct transaction *trans)
-{
-	char *tmp, *dir;
-
-	/* Move: orig -> .old, repl -> orig.  Cleanup deletes .old. */
-	dir = node_dir_outside_transaction(trans->node);
-	tmp = talloc_asprintf(trans, "%s.old", dir);
-
-	if (rename(dir, tmp) != 0)
-		return false;
-	if (rename(trans->divert, dir) != 0)
-		corrupt(trans->conn, "Failed rename %s to %s",
-			trans->divert, dir);
-
-	trans->divert = tmp;
-	return true;
+	/* Now we own it. */
+	conn->transaction = talloc_steal(conn, trans);
+	list_add_tail(&trans->list, &transactions);
+	talloc_set_destructor(trans, destroy_transaction);
+	send_ack(conn, XS_TRANSACTION_START);
 }
 
 void do_transaction_end(struct connection *conn, const char *arg)
@@ -318,25 +154,29 @@ void do_transaction_end(struct connection *conn, const char *arg)
 		return;
 	}
 
-	/* Set to NULL so fire_watches sends events. */
+	/* Set to NULL so fire_watches sends events, tdb_context works. */
 	trans = conn->transaction;
 	conn->transaction = NULL;
 	/* Attach transaction to arg for auto-cleanup */
 	talloc_steal(arg, trans);
 
 	if (streq(arg, "T")) {
-		if (trans->destined_to_fail) {
-			send_error(conn, ETIMEDOUT);
+		/* FIXME: Merge, rather failing on any change. */
+		if (trans->generation != generation) {
+			send_error(conn, EAGAIN);
 			return;
 		}
-		if (!commit_transaction(trans)) {
+		if (!replace_tdb(trans->tdb_name, trans->tdb)) {
 			send_error(conn, errno);
 			return;
 		}
+		/* Don't close this: we won! */
+		trans->tdb = NULL;
 
 		/* Fire off the watches for everything that changed. */
 		list_for_each_entry(i, &trans->changes, list)
 			fire_watches(conn, i->node, i->recurse);
+		generation++;
 	}
 	send_ack(conn, XS_TRANSACTION_END);
 }

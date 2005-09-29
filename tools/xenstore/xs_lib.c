@@ -50,6 +50,13 @@ static const char *xs_daemon_path(void)
 	return buf;
 }
 
+const char *xs_daemon_tdb(void)
+{
+	static char buf[PATH_MAX];
+	sprintf(buf, "%s/tdb", xs_daemon_rootdir());
+	return buf;
+}
+
 const char *xs_daemon_socket(void)
 {
 	return xs_daemon_path();
@@ -62,24 +69,6 @@ const char *xs_daemon_socket_ro(void)
 	if (s == NULL)
 		return NULL;
 	if (snprintf(buf, PATH_MAX, "%s_ro", s) >= PATH_MAX)
-		return NULL;
-	return buf;
-}
-
-const char *xs_daemon_store(void)
-{
-	static char buf[PATH_MAX];
-	if (snprintf(buf, PATH_MAX, "%s/store",
-		     xs_daemon_rootdir()) >= PATH_MAX)
-		return NULL;
-	return buf;
-}
-
-const char *xs_daemon_transactions(void)
-{
-	static char buf[PATH_MAX];
-	if (snprintf(buf, PATH_MAX, "%s/transactions",
-		     xs_daemon_rootdir()) >= PATH_MAX)
 		return NULL;
 	return buf;
 }

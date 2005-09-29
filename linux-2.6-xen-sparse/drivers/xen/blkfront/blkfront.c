@@ -572,7 +572,8 @@ static int talk_to_backend(struct xenbus_device *dev,
 		goto out;
 	}
 
-	err = xenbus_transaction_start(dev->nodename);
+again:
+	err = xenbus_transaction_start();
 	if (err) {
 		xenbus_dev_error(dev, err, "starting transaction");
 		goto destroy_blkring;
@@ -603,6 +604,8 @@ static int talk_to_backend(struct xenbus_device *dev,
 
 	err = xenbus_transaction_end(0);
 	if (err) {
+		if (err == -EAGAIN)
+			goto again;
 		xenbus_dev_error(dev, err, "completing transaction");
 		goto destroy_blkring;
 	}

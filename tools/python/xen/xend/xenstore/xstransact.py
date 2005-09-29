@@ -14,16 +14,8 @@ class xstransact:
     def __init__(self, path):
         self.in_transaction = False
         self.path = path.rstrip("/")
-        while True:
-            try:
-                xshandle().transaction_start(path)
-                self.in_transaction = True
-                return
-            except RuntimeError, ex:
-                if ex.args[0] == errno.ENOENT and path != "/":
-                    path = "/".join(path.split("/")[0:-1]) or "/"
-                else:
-                    raise
+        xshandle().transaction_start()
+        self.in_transaction = True
 
     def __del__(self):
         if self.in_transaction:
@@ -175,14 +167,8 @@ class xstransact:
             t = cls(path)
             try:
                 v = t.read(*args)
-                t.commit()
-                return v
-            except RuntimeError, ex:
                 t.abort()
-                if ex.args[0] == errno.ETIMEDOUT:
-                    pass
-                else:
-                    raise
+                return v
             except:
                 t.abort()
                 raise
@@ -194,14 +180,8 @@ class xstransact:
             t = cls(path)
             try:
                 t.write(*args, **opts)
-                t.commit()
-                return
-            except RuntimeError, ex:
-                t.abort()
-                if ex.args[0] == errno.ETIMEDOUT:
-                    pass
-                else:
-                    raise
+                if t.commit():
+                    return
             except:
                 t.abort()
                 raise
@@ -217,14 +197,8 @@ class xstransact:
             t = cls(path)
             try:
                 t.remove(*args)
-                t.commit()
-                return
-            except RuntimeError, ex:
-                t.abort()
-                if ex.args[0] == errno.ETIMEDOUT:
-                    pass
-                else:
-                    raise
+                if t.commit():
+                    return
             except:
                 t.abort()
                 raise
@@ -236,14 +210,8 @@ class xstransact:
             t = cls(path)
             try:
                 v = t.list(*args)
-                t.commit()
-                return v
-            except RuntimeError, ex:
-                t.abort()
-                if ex.args[0] == errno.ETIMEDOUT:
-                    pass
-                else:
-                    raise
+                if t.commit():
+                    return v
             except:
                 t.abort()
                 raise
@@ -255,14 +223,8 @@ class xstransact:
             t = cls(path)
             try:
                 v = t.gather(*args)
-                t.commit()
-                return v
-            except RuntimeError, ex:
-                t.abort()
-                if ex.args[0] == errno.ETIMEDOUT:
-                    pass
-                else:
-                    raise
+                if t.commit():
+                    return v
             except:
                 t.abort()
                 raise
@@ -274,14 +236,8 @@ class xstransact:
             t = cls(path)
             try:
                 v = t.store(*args)
-                t.commit()
-                return v
-            except RuntimeError, ex:
-                t.abort()
-                if ex.args[0] == errno.ETIMEDOUT:
-                    pass
-                else:
-                    raise
+                if t.commit():
+                    return v
             except:
                 t.abort()
                 raise

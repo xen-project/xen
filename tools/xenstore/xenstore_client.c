@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <xs.h>
+#include <errno.h>
 
 static void
 usage(const char *progname)
@@ -82,8 +83,8 @@ main(int argc, char **argv)
     }
 #endif
 
-    /* XXX maybe find longest common prefix */
-    success = xs_transaction_start(xsh, "/");
+  again:
+    success = xs_transaction_start(xsh);
     if (!success)
 	errx(1, "couldn't start transaction");
 
@@ -145,8 +146,10 @@ main(int argc, char **argv)
 
  out:
     success = xs_transaction_end(xsh, ret ? true : false);
-    if (!success)
+    if (!success) {
+	if (ret == 0 && errno == EAGAIN)
+	    goto again;
 	errx(1, "couldn't end transaction");
-
+    }
     return ret;
 }

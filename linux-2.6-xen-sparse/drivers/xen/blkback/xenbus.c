@@ -80,8 +80,9 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		return;
 	}
 
+again:
 	/* Supply the information about the device the frontend needs */
-	err = xenbus_transaction_start(be->dev->nodename);
+	err = xenbus_transaction_start();
 	if (err) {
 		xenbus_dev_error(be->dev, err, "starting transaction");
 		return;
@@ -119,7 +120,15 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		goto abort;
 	}
 
-	xenbus_transaction_end(0);
+	err = xenbus_transaction_end(0);
+	if (err == -EAGAIN)
+		goto again;
+	if (err) {
+		xenbus_dev_error(be->dev, err, "ending transaction",
+				 ring_ref, evtchn);
+		goto abort;
+	}
+
 	xenbus_dev_ok(be->dev);
 
 	return;

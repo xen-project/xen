@@ -252,7 +252,7 @@ class PrettyPrinter:
         self.block = self.block.parent
 
     def prettyprint(self, out=sys.stdout):
-        self.top.prettyprint(Line(out, self.width))
+        self.top.prettyprint(Line(out, self.width), self.width)
 
 class SXPPrettyPrinter(PrettyPrinter):
     """An SXP prettyprinter.

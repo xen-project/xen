@@ -33,14 +33,6 @@ unwatch /dir/file token
 expect *No such file or directory
 unwatch /dir/file token 
 expect *Permission denied
-start /dir/file
-expect *No such file or directory
-abort
-expect *Permission denied
-start /dir/file
-expect *No such file or directory
-commit
-expect *Permission denied
 introduce 2 100 7 /dir/file
 
 # Now it exists
@@ -72,13 +64,5 @@ waitwatch
 unwatch /dir/file token 
 expect *No such file or directory
 unwatch /dir/file token 
-expect *Permission denied
-start /dir/file
-expect *No such file or directory
-abort
-expect *Permission denied
-start /dir/file
-expect *No such file or directory
-commit
 expect *Permission denied
 introduce 2 100 7 /dir/file

@@ -22,29 +22,14 @@
 
 struct transaction;
 
-void do_transaction_start(struct connection *conn, const char *node);
+void do_transaction_start(struct connection *conn, struct buffered_data *node);
 void do_transaction_end(struct connection *conn, const char *arg);
 
-/* Is node covered by this transaction? */
-bool within_transaction(struct transaction *trans, const char *node);
-
-/* If a write op on this node blocked by another connections' transaction,
- * mark conn, setup transaction timeout and return true.
- */
-bool transaction_block(struct connection *conn, const char *node);
-
-/* Return transaction which covers this node. */
-struct transaction *transaction_covering_node(const char *node);
-
-/* Return directory of node within transaction t. */
-char *node_dir_inside_transaction(struct transaction *t, const char *node);
+bool transaction_block(struct connection *conn);
 
 /* This node was changed: can fail and longjmp. */
 void add_change_node(struct transaction *trans, const char *node, bool recurse);
 
-/* Get shortest timeout: leave tv unset if none. */
-void shortest_transaction_timeout(struct timeval *tv);
-
-/* Have any transactions timed out yet? */
-void check_transaction_timeout(void);
+/* Return tdb context to use for this connection. */
+TDB_CONTEXT *tdb_transaction_context(struct transaction *trans);
 #endif /* _XENSTORED_TRANSACTION_H */

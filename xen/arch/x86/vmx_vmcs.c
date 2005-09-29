@@ -37,19 +37,19 @@
 #endif
 #ifdef CONFIG_VMX
 
-struct vmcs_struct *alloc_vmcs(void) 
+struct vmcs_struct *alloc_vmcs(void)
 {
     struct vmcs_struct *vmcs;
     u32 vmx_msr_low, vmx_msr_high;
 
     rdmsr(MSR_IA32_VMX_BASIC_MSR, vmx_msr_low, vmx_msr_high);
     vmcs_size = vmx_msr_high & 0x1fff;
-    vmcs = alloc_xenheap_pages(get_order_from_bytes(vmcs_size)); 
+    vmcs = alloc_xenheap_pages(get_order_from_bytes(vmcs_size));
     memset((char *)vmcs, 0, vmcs_size); /* don't remove this */
 
     vmcs->vmcs_revision_id = vmx_msr_low;
     return vmcs;
-} 
+}
 
 void free_vmcs(struct vmcs_struct *vmcs)
 {
@@ -65,7 +65,7 @@ static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
     void *io_bitmap_a;
     void *io_bitmap_b;
 
-    error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL, 
+    error |= __vmwrite(PIN_BASED_VM_EXEC_CONTROL,
                        MONITOR_PIN_BASED_EXEC_CONTROLS);
 
     error |= __vmwrite(VM_EXIT_CONTROLS, MONITOR_VM_EXIT_CONTROLS);
@@ -73,8 +73,8 @@ static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
     error |= __vmwrite(VM_ENTRY_CONTROLS, MONITOR_VM_ENTRY_CONTROLS);
 
     /* need to use 0x1000 instead of PAGE_SIZE */
-    io_bitmap_a = (void*) alloc_xenheap_pages(get_order_from_bytes(0x1000)); 
-    io_bitmap_b = (void*) alloc_xenheap_pages(get_order_from_bytes(0x1000)); 
+    io_bitmap_a = (void*) alloc_xenheap_pages(get_order_from_bytes(0x1000));
+    io_bitmap_b = (void*) alloc_xenheap_pages(get_order_from_bytes(0x1000));
     memset(io_bitmap_a, 0xff, 0x1000);
     /* don't bother debug port access */
     clear_bit(PC_DEBUG_PORT, io_bitmap_a);
@@ -89,8 +89,10 @@ static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
     return error;
 }
 
-#define GUEST_SEGMENT_LIMIT     0xffffffff      
-#define HOST_SEGMENT_LIMIT      0xffffffff      
+#define GUEST_LAUNCH_DS         0x08
+#define GUEST_LAUNCH_CS         0x10
+#define GUEST_SEGMENT_LIMIT     0xffffffff
+#define HOST_SEGMENT_LIMIT      0xffffffff
 
 struct host_execution_env {
     /* selectors */
@@ -110,72 +112,76 @@ struct host_execution_env {
     unsigned long tr_base;
     unsigned long ds_base;
     unsigned long cs_base;
-#ifdef __x86_64__ 
-    unsigned long fs_base; 
-    unsigned long gs_base; 
-#endif 
+#ifdef __x86_64__
+    unsigned long fs_base;
+    unsigned long gs_base;
+#endif
 };
 
-#define round_pgdown(_p) ((_p)&PAGE_MASK) /* coped from domain.c */
-
-int vmx_setup_platform(struct vcpu *d, struct cpu_user_regs *regs)
+static void vmx_setup_platform(struct vcpu *v, struct cpu_user_regs *regs)
 {
     int i;
-    unsigned int n;
-    unsigned long *p, mpfn, offset, addr;
-    struct e820entry *e820p;
+    unsigned char e820_map_nr;
+    struct e820entry *e820entry;
+    unsigned char *p;
+    unsigned long mpfn;
     unsigned long gpfn = 0;
 
     local_flush_tlb_pge();
-    regs->ebx = 0;   /* Linux expects ebx to be 0 for boot proc */
 
-    n = regs->ecx;
-    if (n > 32) {
-        VMX_DBG_LOG(DBG_LEVEL_1, "Too many e820 entries: %d", n);
-        return -1;
+    mpfn = get_mfn_from_pfn(E820_MAP_PAGE >> PAGE_SHIFT);
+    if (mpfn == INVALID_MFN) {
+        printk("Can not find E820 memory map page for VMX domain.\n");
+        domain_crash();
     }
 
-    addr = regs->edi;
-    offset = (addr & ~PAGE_MASK);
-    addr = round_pgdown(addr);
-
-    mpfn = get_mfn_from_pfn(addr >> PAGE_SHIFT);
     p = map_domain_page(mpfn);
+    if (p == NULL) {
+        printk("Can not map E820 memory map page for VMX domain.\n");
+        domain_crash();
+    }
 
-    e820p = (struct e820entry *) ((unsigned long) p + offset); 
+    e820_map_nr = *(p + E820_MAP_NR_OFFSET);
+    e820entry = (struct e820entry *)(p + E820_MAP_OFFSET);
 
-#ifndef NDEBUG
-    print_e820_memory_map(e820p, n);
-#endif
-
-    for ( i = 0; i < n; i++ )
+    for ( i = 0; i < e820_map_nr; i++ )
     {
-        if ( e820p[i].type == E820_SHARED_PAGE )
+        if (e820entry[i].type == E820_SHARED_PAGE)
         {
-            gpfn = (e820p[i].addr >> PAGE_SHIFT);
+            gpfn = (e820entry[i].addr >> PAGE_SHIFT);
             break;
         }
     }
 
-    if ( gpfn == 0 )
-    {
-        unmap_domain_page(p);        
-        return -1;
-    }   
+    if ( gpfn == 0 ) {
+        printk("Can not get io request shared page"
+               " from E820 memory map for VMX domain.\n");
+        unmap_domain_page(p);
+        domain_crash();
+    }
+    unmap_domain_page(p);
 
-    unmap_domain_page(p);        
+    if (v->vcpu_id)
+        return;
 
     /* Initialise shared page */
     mpfn = get_mfn_from_pfn(gpfn);
+    if (mpfn == INVALID_MFN) {
+        printk("Can not find io request shared page for VMX domain.\n");
+        domain_crash();
+    }
+
     p = map_domain_page(mpfn);
-    d->domain->arch.vmx_platform.shared_page_va = (unsigned long)p;
+    if (p == NULL) {
+        printk("Can not map io request shared page for VMX domain.\n");
+        domain_crash();
+    }
+    v->domain->arch.vmx_platform.shared_page_va = (unsigned long)p;
 
-    VMX_DBG_LOG(DBG_LEVEL_1, "eport: %x\n", iopacket_port(d->domain));
+    VMX_DBG_LOG(DBG_LEVEL_1, "eport: %x\n", iopacket_port(v->domain));
 
-    clear_bit(iopacket_port(d->domain), 
-              &d->domain->shared_info->evtchn_mask[0]);
-
-    return 0;
+    clear_bit(iopacket_port(v->domain),
+              &v->domain->shared_info->evtchn_mask[0]);
 }
 
 void vmx_set_host_env(struct vcpu *v)
@@ -203,7 +209,7 @@ void vmx_set_host_env(struct vcpu *v)
     error |= __vmwrite(HOST_TR_BASE, host_env.tr_base);
 }
 
-void vmx_do_launch(struct vcpu *v) 
+void vmx_do_launch(struct vcpu *v)
 {
 /* Update CR3, GDT, LDT, TR */
     unsigned int  error = 0;
@@ -217,7 +223,7 @@ void vmx_do_launch(struct vcpu *v)
     error |= __vmwrite(GUEST_CR0, cr0);
     cr0 &= ~X86_CR0_PG;
     error |= __vmwrite(CR0_READ_SHADOW, cr0);
-    error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL, 
+    error |= __vmwrite(CPU_BASED_VM_EXEC_CONTROL,
                        MONITOR_CPU_BASED_EXEC_CONTROLS);
 
     __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (cr4) : );
@@ -247,7 +253,7 @@ void vmx_do_launch(struct vcpu *v)
     error |= __vmwrite(GUEST_LDTR_SELECTOR, 0);
     error |= __vmwrite(GUEST_LDTR_BASE, 0);
     error |= __vmwrite(GUEST_LDTR_LIMIT, 0);
-        
+
     error |= __vmwrite(GUEST_TR_BASE, 0);
     error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
 
@@ -261,10 +267,8 @@ void vmx_do_launch(struct vcpu *v)
 /*
  * Initially set the same environement as host.
  */
-static inline int 
-construct_init_vmcs_guest(struct cpu_user_regs *regs, 
-                          struct vcpu_guest_context *ctxt,
-                          struct host_execution_env *host_env)
+static inline int
+construct_init_vmcs_guest(struct cpu_user_regs *regs)
 {
     int error = 0;
     union vmcs_arbytes arbytes;
@@ -292,31 +296,37 @@ construct_init_vmcs_guest(struct cpu_user_regs *regs,
     error |= __vmwrite(CR3_TARGET_COUNT, 0);
 
     /* Guest Selectors */
-    error |= __vmwrite(GUEST_CS_SELECTOR, regs->cs);
-    error |= __vmwrite(GUEST_ES_SELECTOR, regs->es);
-    error |= __vmwrite(GUEST_SS_SELECTOR, regs->ss);
-    error |= __vmwrite(GUEST_DS_SELECTOR, regs->ds);
-    error |= __vmwrite(GUEST_FS_SELECTOR, regs->fs);
-    error |= __vmwrite(GUEST_GS_SELECTOR, regs->gs);
+    error |= __vmwrite(GUEST_ES_SELECTOR, GUEST_LAUNCH_DS);
+    error |= __vmwrite(GUEST_SS_SELECTOR, GUEST_LAUNCH_DS);
+    error |= __vmwrite(GUEST_DS_SELECTOR, GUEST_LAUNCH_DS);
+    error |= __vmwrite(GUEST_FS_SELECTOR, GUEST_LAUNCH_DS);
+    error |= __vmwrite(GUEST_GS_SELECTOR, GUEST_LAUNCH_DS);
+    error |= __vmwrite(GUEST_CS_SELECTOR, GUEST_LAUNCH_CS);
+
+    /* Guest segment bases */
+    error |= __vmwrite(GUEST_ES_BASE, 0);
+    error |= __vmwrite(GUEST_SS_BASE, 0);
+    error |= __vmwrite(GUEST_DS_BASE, 0);
+    error |= __vmwrite(GUEST_FS_BASE, 0);
+    error |= __vmwrite(GUEST_GS_BASE, 0);
+    error |= __vmwrite(GUEST_CS_BASE, 0);
 
     /* Guest segment Limits */
-    error |= __vmwrite(GUEST_CS_LIMIT, GUEST_SEGMENT_LIMIT);
     error |= __vmwrite(GUEST_ES_LIMIT, GUEST_SEGMENT_LIMIT);
     error |= __vmwrite(GUEST_SS_LIMIT, GUEST_SEGMENT_LIMIT);
     error |= __vmwrite(GUEST_DS_LIMIT, GUEST_SEGMENT_LIMIT);
     error |= __vmwrite(GUEST_FS_LIMIT, GUEST_SEGMENT_LIMIT);
     error |= __vmwrite(GUEST_GS_LIMIT, GUEST_SEGMENT_LIMIT);
+    error |= __vmwrite(GUEST_CS_LIMIT, GUEST_SEGMENT_LIMIT);
 
-    error |= __vmwrite(GUEST_IDTR_LIMIT, host_env->idtr_limit);
-
-    /* AR bytes */
+    /* Guest segment AR bytes */
     arbytes.bytes = 0;
     arbytes.fields.seg_type = 0x3;          /* type = 3 */
     arbytes.fields.s = 1;                   /* code or data, i.e. not system */
     arbytes.fields.dpl = 0;                 /* DPL = 3 */
     arbytes.fields.p = 1;                   /* segment present */
     arbytes.fields.default_ops_size = 1;    /* 32-bit */
-    arbytes.fields.g = 1;   
+    arbytes.fields.g = 1;
     arbytes.fields.null_bit = 0;            /* not null */
 
     error |= __vmwrite(GUEST_ES_AR_BYTES, arbytes.bytes);
@@ -328,35 +338,31 @@ construct_init_vmcs_guest(struct cpu_user_regs *regs,
     arbytes.fields.seg_type = 0xb;          /* type = 0xb */
     error |= __vmwrite(GUEST_CS_AR_BYTES, arbytes.bytes);
 
-    error |= __vmwrite(GUEST_GDTR_BASE, regs->edx);
-    regs->edx = 0;
-    error |= __vmwrite(GUEST_GDTR_LIMIT, regs->eax);
-    regs->eax = 0;
+    /* Guest GDT */
+    error |= __vmwrite(GUEST_GDTR_BASE, 0);
+    error |= __vmwrite(GUEST_GDTR_LIMIT, 0);
 
+    /* Guest IDT */
+    error |= __vmwrite(GUEST_IDTR_BASE, 0);
+    error |= __vmwrite(GUEST_IDTR_LIMIT, 0);
+
+    /* Guest LDT & TSS */
     arbytes.fields.s = 0;                   /* not code or data segement */
     arbytes.fields.seg_type = 0x2;          /* LTD */
     arbytes.fields.default_ops_size = 0;    /* 16-bit */
-    arbytes.fields.g = 0;   
+    arbytes.fields.g = 0;
     error |= __vmwrite(GUEST_LDTR_AR_BYTES, arbytes.bytes);
 
     arbytes.fields.seg_type = 0xb;          /* 32-bit TSS (busy) */
     error |= __vmwrite(GUEST_TR_AR_BYTES, arbytes.bytes);
     /* CR3 is set in vmx_final_setup_guest */
 
-    error |= __vmwrite(GUEST_ES_BASE, host_env->ds_base);
-    error |= __vmwrite(GUEST_CS_BASE, host_env->cs_base);
-    error |= __vmwrite(GUEST_SS_BASE, host_env->ds_base);
-    error |= __vmwrite(GUEST_DS_BASE, host_env->ds_base);
-    error |= __vmwrite(GUEST_FS_BASE, host_env->ds_base);
-    error |= __vmwrite(GUEST_GS_BASE, host_env->ds_base);
-    error |= __vmwrite(GUEST_IDTR_BASE, host_env->idtr_base);
-
-    error |= __vmwrite(GUEST_RSP, regs->esp);
+    error |= __vmwrite(GUEST_RSP, 0);
     error |= __vmwrite(GUEST_RIP, regs->eip);
 
+    /* Guest EFLAGS */
     eflags = regs->eflags & ~VMCS_EFLAGS_RESERVED_0; /* clear 0s */
     eflags |= VMCS_EFLAGS_RESERVED_1; /* set 1s */
-
     error |= __vmwrite(GUEST_RFLAGS, eflags);
 
     error |= __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
@@ -381,14 +387,14 @@ static inline int construct_vmcs_host(struct host_execution_env *host_env)
 #if defined (__i386__)
     error |= __vmwrite(HOST_FS_SELECTOR, host_env->ds_selector);
     error |= __vmwrite(HOST_GS_SELECTOR, host_env->ds_selector);
-    error |= __vmwrite(HOST_FS_BASE, host_env->ds_base); 
-    error |= __vmwrite(HOST_GS_BASE, host_env->ds_base); 
+    error |= __vmwrite(HOST_FS_BASE, host_env->ds_base);
+    error |= __vmwrite(HOST_GS_BASE, host_env->ds_base);
 
 #else
-    rdmsrl(MSR_FS_BASE, host_env->fs_base); 
-    rdmsrl(MSR_GS_BASE, host_env->gs_base); 
-    error |= __vmwrite(HOST_FS_BASE, host_env->fs_base); 
-    error |= __vmwrite(HOST_GS_BASE, host_env->gs_base); 
+    rdmsrl(MSR_FS_BASE, host_env->fs_base);
+    rdmsrl(MSR_GS_BASE, host_env->gs_base);
+    error |= __vmwrite(HOST_FS_BASE, host_env->fs_base);
+    error |= __vmwrite(HOST_GS_BASE, host_env->gs_base);
 
 #endif
     host_env->cs_selector = __HYPERVISOR_CS;
@@ -401,16 +407,16 @@ static inline int construct_vmcs_host(struct host_execution_env *host_env)
     error |= __vmwrite(HOST_CR0, crn); /* same CR0 */
 
     /* CR3 is set in vmx_final_setup_hostos */
-    __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (crn) : ); 
+    __asm__ __volatile__ ("mov %%cr4,%0" : "=r" (crn) : );
     error |= __vmwrite(HOST_CR4, crn);
 
     error |= __vmwrite(HOST_RIP, (unsigned long) vmx_asm_vmexit_handler);
-#ifdef __x86_64__ 
-    /* TBD: support cr8 for 64-bit guest */ 
-    __vmwrite(VIRTUAL_APIC_PAGE_ADDR, 0); 
-    __vmwrite(TPR_THRESHOLD, 0); 
-    __vmwrite(SECONDARY_VM_EXEC_CONTROL, 0); 
-#endif 
+#ifdef __x86_64__
+    /* TBD: support cr8 for 64-bit guest */
+    __vmwrite(VIRTUAL_APIC_PAGE_ADDR, 0);
+    __vmwrite(TPR_THRESHOLD, 0);
+    __vmwrite(SECONDARY_VM_EXEC_CONTROL, 0);
+#endif
 
     return error;
 }
@@ -440,37 +446,37 @@ int construct_vmcs(struct arch_vmx_struct *arch_vmx,
 
     if ((error = __vmpclear (vmcs_phys_ptr))) {
         printk("construct_vmcs: VMCLEAR failed\n");
-        return -EINVAL;         
+        return -EINVAL;
     }
     if ((error = load_vmcs(arch_vmx, vmcs_phys_ptr))) {
         printk("construct_vmcs: load_vmcs failed: VMCS = %lx\n",
                (unsigned long) vmcs_phys_ptr);
-        return -EINVAL; 
+        return -EINVAL;
     }
     if ((error = construct_vmcs_controls(arch_vmx))) {
         printk("construct_vmcs: construct_vmcs_controls failed\n");
-        return -EINVAL;         
+        return -EINVAL;
     }
     /* host selectors */
     if ((error = construct_vmcs_host(&host_env))) {
         printk("construct_vmcs: construct_vmcs_host failed\n");
-        return -EINVAL;         
+        return -EINVAL;
     }
     /* guest selectors */
-    if ((error = construct_init_vmcs_guest(regs, ctxt, &host_env))) {
+    if ((error = construct_init_vmcs_guest(regs))) {
         printk("construct_vmcs: construct_vmcs_guest failed\n");
-        return -EINVAL;         
-    }       
+        return -EINVAL;
+    }
 
-    if ((error |= __vmwrite(EXCEPTION_BITMAP, 
+    if ((error |= __vmwrite(EXCEPTION_BITMAP,
                             MONITOR_DEFAULT_EXCEPTION_BITMAP))) {
         printk("construct_vmcs: setting Exception bitmap failed\n");
-        return -EINVAL;         
+        return -EINVAL;
     }
 
     if (regs->eflags & EF_TF)
         __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-    else 
+    else
         __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
 
     return 0;
@@ -491,7 +497,7 @@ int modify_vmcs(struct arch_vmx_struct *arch_vmx,
     if ((error = load_vmcs(arch_vmx, vmcs_phys_ptr))) {
         printk("modify_vmcs: load_vmcs failed: VMCS = %lx\n",
                (unsigned long) vmcs_phys_ptr);
-        return -EINVAL; 
+        return -EINVAL;
     }
     load_cpu_user_regs(regs);
 
@@ -500,23 +506,23 @@ int modify_vmcs(struct arch_vmx_struct *arch_vmx,
     return 0;
 }
 
-int load_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr) 
+int load_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr)
 {
     int error;
 
     if ((error = __vmptrld(phys_ptr))) {
-        clear_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags); 
+        clear_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags);
         return error;
     }
-    set_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags); 
+    set_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags);
     return 0;
 }
 
-int store_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr) 
+int store_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr)
 {
     /* take the current VMCS */
     __vmptrst(phys_ptr);
-    clear_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags); 
+    clear_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags);
     return 0;
 }
 
@@ -536,7 +542,7 @@ void vm_resume_fail(unsigned long eflags)
     __vmx_bug(guest_cpu_user_regs());
 }
 
-void arch_vmx_do_resume(struct vcpu *v) 
+void arch_vmx_do_resume(struct vcpu *v)
 {
     u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
 
@@ -545,7 +551,7 @@ void arch_vmx_do_resume(struct vcpu *v)
     reset_stack_and_jump(vmx_asm_do_resume);
 }
 
-void arch_vmx_do_launch(struct vcpu *v) 
+void arch_vmx_do_launch(struct vcpu *v)
 {
     u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
 

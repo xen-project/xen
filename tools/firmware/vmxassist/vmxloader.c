@@ -34,28 +34,39 @@ int acpi_madt_update(unsigned char* acpi_start);
 /*
  * C runtime start off
  */
-asm("					\n\
-	.text				\n\
-	.globl	_start			\n\
-_start:					\n\
-	cli				\n\
-	movl	$stack_top, %esp	\n\
-	movl	%esp, %ebp		\n\
-	call    main			\n\
-	jmp	halt			\n\
-					\n\
-	.globl	halt			\n\
-halt:					\n\
-	sti				\n\
-	jmp	.			\n\
-					\n\
-	.bss				\n\
-	.align	8			\n\
-	.globl	stack, stack_top	\n\
-stack:					\n\
-	.skip	0x4000			\n\
-stack_top:				\n\
-");
+asm(
+"	.text				\n"
+"	.globl	_start			\n"
+"_start:				\n"
+"	cld				\n"
+"	cli				\n"
+"	lgdt	gdt_desr		\n"
+"	movl	$stack_top, %esp	\n"
+"	movl	%esp, %ebp		\n"
+"	call	main			\n"
+"	jmp	halt			\n"
+"					\n"
+"gdt_desr:				\n"
+"	.word	gdt_end - gdt - 1	\n"
+"	.long	gdt			\n"
+"					\n"
+"	.align	8			\n"
+"gdt:					\n"
+"	.quad	0x0000000000000000	\n"
+"	.quad	0x00CF92000000FFFF	\n"
+"	.quad	0x00CF9A000000FFFF	\n"
+"gdt_end:				\n"
+"					\n"
+"halt:					\n"
+"	sti				\n"
+"	jmp	.			\n"
+"					\n"
+"	.bss				\n"
+"	.align	8			\n"
+"stack:					\n"
+"	.skip	0x4000			\n"
+"stack_top:				\n"
+);
 
 void *
 memcpy(void *dest, const void *src, unsigned n)
@@ -95,7 +106,7 @@ cirrus_check(void)
 }
 
 int
-main()
+main(void)
 {
 	puts("VMXAssist Loader\n");
 	puts("Loading ROMBIOS ...\n");

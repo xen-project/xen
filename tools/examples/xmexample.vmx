@@ -60,9 +60,6 @@ disk = [ 'file:/var/images/min-el3-i386.img,ioemu:hda,w' ]
 # New stuff
 device_model = '/usr/' + arch_libdir + '/xen/bin/qemu-dm'
 
-# Advanced users only. Don't touch if you don't know what you're doing
-memmap = '/usr/lib/xen/boot/mem-map.sxp'
-
 #-----------------------------------------------------------------------------
 # Disk image for 
 #cdrom=

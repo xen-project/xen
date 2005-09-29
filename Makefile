@@ -164,7 +164,7 @@ help:
 uninstall: DESTDIR=
 uninstall: D=$(DESTDIR)
 uninstall:
-	[ -d $(D)/etc/xen ] && mv -f $(D)/etc/xen $(D)/etc/xen.old-`date +%s`
+	[ -d $(D)/etc/xen ] && mv -f $(D)/etc/xen $(D)/etc/xen.old-`date +%s` || true
 	rm -rf $(D)/etc/init.d/xend*
 	rm -rf $(D)/etc/hotplug/xen-backend.agent
 	rm -rf $(D)/var/run/xen* $(D)/var/lib/xen*

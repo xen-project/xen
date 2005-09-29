@@ -87,7 +87,7 @@ int xenbus_write(const char *dir, const char *node, const char *string);
 int xenbus_mkdir(const char *dir, const char *node);
 int xenbus_exists(const char *dir, const char *node);
 int xenbus_rm(const char *dir, const char *node);
-int xenbus_transaction_start(const char *subtree);
+int xenbus_transaction_start(void);
 int xenbus_transaction_end(int abort);
 
 /* Single read and scanf: returns -errno or num scanned if > 0. */

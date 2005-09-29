@@ -562,9 +562,9 @@ static void do_unwatch(unsigned int handle, const char *node, const char *token)
 		failed(handle);
 }
 
-static void do_start(unsigned int handle, const char *node)
+static void do_start(unsigned int handle)
 {
-	if (!xs_transaction_start(handles[handle], node))
+	if (!xs_transaction_start(handles[handle]))
 		failed(handle);
 }
 
@@ -791,7 +791,7 @@ static void do_command(unsigned int default_handle, char *line)
 		xs_daemon_close(handles[handle]);
 		handles[handle] = NULL;
 	} else if (streq(command, "start"))
-		do_start(handle, arg(line, 1));
+		do_start(handle);
 	else if (streq(command, "commit"))
 		do_end(handle, false);
 	else if (streq(command, "abort"))

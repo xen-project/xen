@@ -17,7 +17,6 @@
 #include <arpa/inet.h>
 
 #include "xc_private.h"
-#include "linux_boot_params.h"
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC
@@ -310,80 +309,24 @@ static PyObject *pyxc_vmx_build(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     u32   dom;
-    char *image, *ramdisk = NULL, *cmdline = "";
-    PyObject *memmap;
+    char *image;
     int   control_evtchn, store_evtchn;
     int flags = 0, vcpus = 1;
-    int numItems, i;
     int memsize;
-    struct mem_map mem_map;
     unsigned long store_mfn = 0;
 
     static char *kwd_list[] = { "dom", "control_evtchn", "store_evtchn",
-                                "memsize", "image", "memmap",
-				"ramdisk", "cmdline", "flags",
-				"vcpus", NULL };
+                                "memsize", "image", "flags", "vcpus", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiisO!|ssii", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiisii", kwd_list,
                                       &dom, &control_evtchn, &store_evtchn,
-                                      &memsize,
-                                      &image, &PyList_Type, &memmap,
-				      &ramdisk, &cmdline, &flags, &vcpus) )
+                                      &memsize, &image, &flags, &vcpus) )
         return NULL;
 
-    memset(&mem_map, 0, sizeof(mem_map));
-    /* Parse memmap */
-
-    /* get the number of lines passed to us */
-    numItems = PyList_Size(memmap) - 1;	/* removing the line 
-					   containing "memmap" */
-    mem_map.nr_map = numItems;
-   
-    /* should raise an error here. */
-    if (numItems < 0) return NULL; /* Not a list */
-
-    /* iterate over items of the list, grabbing ranges and parsing them */
-    for (i = 1; i <= numItems; i++) {	// skip over "memmap"
-	    PyObject *item, *f1, *f2, *f3, *f4;
-	    int numFields;
-	    unsigned long lf1, lf2, lf3, lf4;
-	    char *sf1, *sf2;
-	    
-	    /* grab the string object from the next element of the list */
-	    item = PyList_GetItem(memmap, i); /* Can't fail */
-
-	    /* get the number of lines passed to us */
-	    numFields = PyList_Size(item);
-
-	    if (numFields != 4)
-		    return NULL;
-
-	    f1 = PyList_GetItem(item, 0);
-	    f2 = PyList_GetItem(item, 1);
-	    f3 = PyList_GetItem(item, 2);
-	    f4 = PyList_GetItem(item, 3);
-
-	    /* Convert objects to strings/longs */
-	    sf1 = PyString_AsString(f1);
-	    sf2 = PyString_AsString(f2);
-	    lf3 = PyLong_AsLong(f3);
-	    lf4 = PyLong_AsLong(f4);
-	    if ( sscanf(sf1, "%lx", &lf1) != 1 )
-                return NULL;
-	    if ( sscanf(sf2, "%lx", &lf2) != 1 )
-                return NULL;
-
-            mem_map.map[i-1].addr = lf1;
-            mem_map.map[i-1].size = lf2 - lf1;
-            mem_map.map[i-1].type = lf3;
-            mem_map.map[i-1].caching_attr = lf4;
-    }
-
-    if ( xc_vmx_build(xc->xc_handle, dom, memsize, image, &mem_map,
-                        ramdisk, cmdline, control_evtchn, flags,
-                        vcpus, store_evtchn, &store_mfn) != 0 )
+    if ( xc_vmx_build(xc->xc_handle, dom, memsize, image, control_evtchn,
+                      flags, vcpus, store_evtchn, &store_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);
-    
+
     return Py_BuildValue("{s:i}", "store_mfn", store_mfn);
 }
 

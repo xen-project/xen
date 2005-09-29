@@ -16,7 +16,7 @@ PRISTINE_SRC_PATH	?= .:..
 vpath pristine-% $(PRISTINE_SRC_PATH)
 
 # By default, build Linux with ARCH=xen (overridden by some non arch's)
-ifneq ($(ARCH),ia64)
+ifneq ($(XEN_TARGET_ARCH),ia64)
 LINUX_ARCH	?= xen
 else
 LINUX_ARCH	?= ia64
