@@ -7,6 +7,9 @@
 #include <asm-xen/evtchn.h>
 
 #define MAX_EVTCHN 256
+
+#define VALID_EVTCHN(_chn) ((_chn) >= 0)
+
 static struct {
 	irqreturn_t (*handler)(int, void *, struct pt_regs *);
 	void *dev_id;
@@ -71,6 +74,14 @@ void unbind_evtchn_from_irq(unsigned int evtchn)
 {
 	printk("unbind_evtchn_from_irq called... FIXME??\n");
 	while(1);
+}
+
+void notify_remote_via_irq(int irq)
+{
+	int evtchn = virq_to_evtchn[irq];	// FIXME... is this right??
+
+	if (VALID_EVTCHN(evtchn))
+		notify_remote_via_evtchn(evtchn);
 }
 
 irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)

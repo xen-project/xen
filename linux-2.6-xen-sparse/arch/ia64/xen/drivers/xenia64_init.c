@@ -45,4 +45,8 @@ unsigned long alloc_empty_foreign_map_page_range(unsigned long pages)
 
 	return (unsigned long)vma->addr;
 }
+
+/* These should be define'd but some drivers use them without
+ * a convenient arch include */
+unsigned long mfn_to_pfn(unsigned long mfn) { return mfn; }
 #endif
