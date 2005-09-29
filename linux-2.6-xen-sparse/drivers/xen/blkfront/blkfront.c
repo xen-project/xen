@@ -683,8 +683,6 @@ static int blkfront_suspend(struct xenbus_device *dev)
 	kfree(info->backend);
 	info->backend = NULL;
 
-	blkif_free(info);
-
 	return 0;
 }
 
@@ -693,11 +691,12 @@ static int blkfront_resume(struct xenbus_device *dev)
 	struct blkfront_info *info = dev->data;
 	int err;
 
-	/* FIXME: Check geometry hasn't changed here... */
+	blkif_free(info);
+
 	err = talk_to_backend(dev, info);
-	if (!err) {
+	if (!err)
 		blkif_recover(info);
-	}
+
 	return err;
 }
 

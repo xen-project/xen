@@ -1247,24 +1247,17 @@ static int netfront_remove(struct xenbus_device *dev)
 static int netfront_suspend(struct xenbus_device *dev)
 {
 	struct netfront_info *info = dev->data;
-
 	unregister_xenbus_watch(&info->watch);
 	kfree(info->backend);
 	info->backend = NULL;
-
-	netif_free(info);
-
 	return 0;
 }
 
 static int netfront_resume(struct xenbus_device *dev)
 {
-	struct net_private *np = dev->data;
-	int err;
-
-	err = talk_to_backend(dev, np);
-
-	return err;
+	struct netfront_info *info = dev->data;
+	netif_free(info);
+	return talk_to_backend(dev, info);
 }
 
 static struct xenbus_driver netfront = {
