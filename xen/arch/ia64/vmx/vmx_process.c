@@ -199,8 +199,8 @@ void save_banked_regs_to_vpd(VCPU *v, REGS *regs)
     if(vpsr.bn){
         dst = &VCPU(v, vgr[0]);
         dunat =&VCPU(v, vnat);
-        __asm__ __volatile__ (";;extr.u %0 = %1,%4,16;;
-                            dep %2 = %0, %2, 0, 16;;
+        __asm__ __volatile__ (";;extr.u %0 = %1,%4,16;; \
+                            dep %2 = %0, %2, 0, 16;; \
                             st8 [%3] = %2;;"
        ::"r"(i),"r"(*sunat),"r"(*dunat),"r"(dunat),"i"(IA64_PT_REGS_R16_SLOT):"memory");
 
