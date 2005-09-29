@@ -187,10 +187,6 @@ static int __do_suspend(void *ignore)
 
 	irq_resume();
 
-	xencons_resume();
-
-	xenbus_resume();
-
 	time_resume();
 
 #ifdef CONFIG_SMP
@@ -199,6 +195,10 @@ static int __do_suspend(void *ignore)
 #endif
 
 	__sti();
+
+	xencons_resume();
+
+	xenbus_resume();
 
 #ifdef CONFIG_SMP
  out_reenable_cpus:
