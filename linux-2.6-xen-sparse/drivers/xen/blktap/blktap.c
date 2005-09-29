@@ -842,7 +842,7 @@ static void make_response(blkif_t *blkif, unsigned long id,
 	spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 
 	/* Kick the relevant domain. */
-	notify_via_evtchn(blkif->evtchn);
+	notify_remote_via_irq(blkif->irq);
 }
 
 static struct miscdevice blktap_miscdev = {

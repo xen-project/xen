@@ -682,7 +682,7 @@ tpm_xmit(struct tpm_private *tp,
 	DPRINTK("Notifying backend via event channel %d\n",
 	        tp->evtchn);
 
-	notify_via_evtchn(tp->evtchn);
+	notify_remote_via_irq(tp->irq);
 
 	spin_unlock_irq(&tp->tx_lock);
 	return offset;

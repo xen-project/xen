@@ -147,7 +147,7 @@ int xb_write(const void *data, unsigned len)
 		data += avail;
 		len -= avail;
 		update_output_chunk(out, avail);
-		notify_via_evtchn(xen_start_info->store_evtchn);
+		notify_remote_via_irq(xenbus_irq);
 	} while (len != 0);
 
 	return 0;
@@ -192,7 +192,7 @@ int xb_read(void *data, unsigned len)
 		pr_debug("Finished read of %i bytes (%i to go)\n", avail, len);
 		/* If it was full, tell them we've taken some. */
 		if (was_full)
-			notify_via_evtchn(xen_start_info->store_evtchn);
+			notify_remote_via_irq(xenbus_irq);
 	}
 
 	/* If we left something, wake watch thread to deal with it. */

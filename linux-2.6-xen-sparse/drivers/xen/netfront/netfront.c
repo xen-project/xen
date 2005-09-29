@@ -457,7 +457,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Only notify Xen if we really have to. */
 	mb();
 	if (np->tx->TX_TEST_IDX == i)
-		notify_via_evtchn(np->evtchn);
+		notify_remote_via_irq(np->irq);
 
 	return 0;
 
@@ -776,7 +776,7 @@ static void network_connect(struct net_device *dev)
 	 */
 	np->backend_state = BEST_CONNECTED;
 	wmb();
-	notify_via_evtchn(np->evtchn);  
+	notify_remote_via_irq(np->irq);
 	network_tx_buf_gc(dev);
 
 	if (np->user_state == UST_OPEN)

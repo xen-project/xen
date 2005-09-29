@@ -622,6 +622,14 @@ void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
 	synch_set_bit(evtchn, &s->evtchn_pending[0]);
 }
 
+void notify_remote_via_irq(int irq)
+{
+	int evtchn = irq_to_evtchn[irq];
+
+	if (VALID_EVTCHN(evtchn))
+		notify_remote_via_evtchn(evtchn);
+}
+
 void irq_resume(void)
 {
 	evtchn_op_t op;

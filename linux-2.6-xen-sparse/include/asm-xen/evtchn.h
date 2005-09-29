@@ -75,6 +75,12 @@ extern int  bind_evtchn_to_irqhandler(
 	void *dev_id);
 extern void unbind_evtchn_from_irqhandler(unsigned int irq, void *dev_id);
 
+/*
+ * Unlike notify_remote_via_evtchn(), this is safe to use across
+ * save/restore. Notifications on a broken connection are silently dropped.
+ */
+void notify_remote_via_irq(int irq);
+
 extern void irq_resume(void);
 
 /* Entry point for notifications into Linux subsystems. */
@@ -115,12 +121,12 @@ static inline void clear_evtchn(int port)
 	synch_clear_bit(port, &s->evtchn_pending[0]);
 }
 
-static inline int notify_via_evtchn(int port)
+static inline void notify_remote_via_evtchn(int port)
 {
 	evtchn_op_t op;
 	op.cmd = EVTCHNOP_send;
 	op.u.send.local_port = port;
-	return HYPERVISOR_event_channel_op(&op);
+	(void)HYPERVISOR_event_channel_op(&op);
 }
 
 /*

@@ -42,7 +42,7 @@ static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE*2+1];
 static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE];
 
 static gnttab_transfer_t grant_rx_op[MAX_PENDING_REQS];
-static unsigned char rx_notify[NR_EVENT_CHANNELS];
+static unsigned char rx_notify[NR_IRQS];
 
 /* Don't currently gate addition of an interface to the tx scheduling list. */
 #define tx_work_exists(_if) (1)
@@ -209,7 +209,7 @@ static void net_rx_action(unsigned long unused)
 {
 	netif_t *netif = NULL; 
 	s8 status;
-	u16 size, id, evtchn;
+	u16 size, id, irq;
 	multicall_entry_t *mcl;
 	mmu_update_t *mmu;
 	gnttab_transfer_t *gop;
@@ -320,16 +320,16 @@ static void net_rx_action(unsigned long unused)
 				gop->status, netif->domid);
 			/* XXX SMH: should free 'old_mfn' here */
 			status = NETIF_RSP_ERROR; 
-		} 
-		evtchn = netif->evtchn;
+		}
+		irq = netif->irq;
 		id = netif->rx->ring[
 			MASK_NETIF_RX_IDX(netif->rx_resp_prod)].req.id;
 		if (make_rx_response(netif, id, status,
 				     (unsigned long)skb->data & ~PAGE_MASK,
 				     size, skb->proto_csum_valid) &&
-		    (rx_notify[evtchn] == 0)) {
-			rx_notify[evtchn] = 1;
-			notify_list[notify_nr++] = evtchn;
+		    (rx_notify[irq] == 0)) {
+			rx_notify[irq] = 1;
+			notify_list[notify_nr++] = irq;
 		}
 
 		netif_put(netif);
@@ -339,9 +339,9 @@ static void net_rx_action(unsigned long unused)
 	}
 
 	while (notify_nr != 0) {
-		evtchn = notify_list[--notify_nr];
-		rx_notify[evtchn] = 0;
-		notify_via_evtchn(evtchn);
+		irq = notify_list[--notify_nr];
+		rx_notify[irq] = 0;
+		notify_remote_via_irq(irq);
 	}
 
 	/* More work to do? */
@@ -717,7 +717,7 @@ static void make_tx_response(netif_t *netif,
 
 	mb(); /* Update producer before checking event threshold. */
 	if (i == netif->tx->event)
-		notify_via_evtchn(netif->evtchn);
+		notify_remote_via_irq(netif->irq);
 }
 
 static int make_rx_response(netif_t *netif, 

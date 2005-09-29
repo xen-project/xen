@@ -133,7 +133,7 @@ static inline void __send_IPI_one(unsigned int cpu, int vector)
 {
 	int evtchn = per_cpu(ipi_to_evtchn, cpu)[vector];
 	BUG_ON(evtchn < 0);
-	notify_via_evtchn(evtchn);
+	notify_remote_via_evtchn(evtchn);
 }
 
 void __send_IPI_shortcut(unsigned int shortcut, int vector)

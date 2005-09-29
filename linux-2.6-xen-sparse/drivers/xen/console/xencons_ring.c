@@ -46,7 +46,8 @@ static inline struct ring_head *inring(void)
 
 
 /* don't block -  write as much as possible and return */
-static int __xencons_ring_send(struct ring_head *ring, const char *data, unsigned len)
+static int __xencons_ring_send(
+	struct ring_head *ring, const char *data, unsigned len)
 {
 	int copied = 0;
 
@@ -63,13 +64,9 @@ static int __xencons_ring_send(struct ring_head *ring, const char *data, unsigne
 
 int xencons_ring_send(const char *data, unsigned len)
 {
-	struct ring_head *out = outring();
-	int sent = 0;
-	
-	sent = __xencons_ring_send(out, data, len);
-	notify_via_evtchn(xen_start_info->console_evtchn);
+	int sent = __xencons_ring_send(outring(), data, len);
+	notify_remote_via_irq(xencons_irq);
 	return sent;
-
 }	
 
 

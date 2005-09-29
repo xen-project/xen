@@ -84,7 +84,7 @@ static inline void ADD_ID_TO_FREELIST(
 static inline void flush_requests(struct blkfront_info *info)
 {
 	RING_PUSH_REQUESTS(&info->ring);
-	notify_via_evtchn(info->evtchn);
+	notify_remote_via_irq(info->irq);
 }
 
 static void kick_pending_request_queues(struct blkfront_info *info)
