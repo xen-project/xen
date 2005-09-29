@@ -37,51 +37,57 @@
 
 #define DP(_f, _args...) printk(KERN_ALERT "  " _f "\n" , ## _args )
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#define __LINKAGE fastcall
-#else
-#define __LINKAGE asmlinkage
-#endif
-
-__LINKAGE void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
+fastcall void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 {
-    static unsigned long printed = 0;
-    char info[100];
-    int i;
+	static unsigned long printed = 0;
+	char info[100];
+	int i;
 
-    if ( !test_and_set_bit(0, &printed) )
-    {
-        HYPERVISOR_vm_assist(VMASST_CMD_disable,
-			     VMASST_TYPE_4gb_segments_notify);
+	if (test_and_set_bit(0, &printed))
+		return;
 
-        sprintf(info, "%s (pid=%d)", current->comm, current->tgid);
+	HYPERVISOR_vm_assist(
+		VMASST_CMD_disable, VMASST_TYPE_4gb_segments_notify);
 
-        DP("");
-        DP("***************************************************************");
-        DP("***************************************************************");
-        DP("** WARNING: Currently emulating unsupported memory accesses  **");
-        DP("**          in /lib/tls libraries. The emulation is very     **");
-        DP("**          slow. To ensure full performance you should      **");
-        DP("**          execute the following as root:                   **");
-        DP("**          mv /lib/tls /lib/tls.disabled                    **");
-        DP("** Offending process: %-38.38s **", info);
-        DP("***************************************************************");
-        DP("***************************************************************");
-        DP("");
+	sprintf(info, "%s (pid=%d)", current->comm, current->tgid);
 
-        for ( i = 5; i > 0; i-- )
-        {
-            printk("Pausing... %d", i);
-            mdelay(1000);
-            printk("\b\b\b\b\b\b\b\b\b\b\b\b");
-        }
-        printk("Continuing...\n\n");
-    }
+
+	DP("");
+	DP("***************************************************************");
+	DP("***************************************************************");
+	DP("** WARNING: Currently emulating unsupported memory accesses  **");
+	DP("**          in /lib/tls libraries. The emulation is very     **");
+	DP("**          slow. To ensure full performance you should      **");
+	DP("**          execute the following as root:                   **");
+	DP("**          mv /lib/tls /lib/tls.disabled                    **");
+	DP("** Offending process: %-38.38s **", info);
+	DP("***************************************************************");
+	DP("***************************************************************");
+	DP("");
+
+	for (i = 5; i > 0; i--) {
+		printk("Pausing... %d", i);
+		mdelay(1000);
+		printk("\b\b\b\b\b\b\b\b\b\b\b\b");
+	}
+
+	printk("Continuing...\n\n");
 }
 
 static int __init fixup_init(void)
 {
-    HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_4gb_segments_notify);
-    return 0;
+	HYPERVISOR_vm_assist(
+		VMASST_CMD_enable, VMASST_TYPE_4gb_segments_notify);
+	return 0;
 }
 __initcall(fixup_init);
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

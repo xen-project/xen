@@ -139,3 +139,13 @@ void xenbus_resume(void);
 #define XENBUS_EXIST_ERR(err) ((err) == -ENOENT || (err) == -ERANGE)
 
 #endif /* _ASM_XEN_XENBUS_H */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

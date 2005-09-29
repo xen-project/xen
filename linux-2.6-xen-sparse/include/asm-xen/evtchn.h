@@ -4,7 +4,7 @@
  * Communication via Xen event channels.
  * Also definitions for the device that demuxes notifications to userspace.
  * 
- * Copyright (c) 2004, K A Fraser
+ * Copyright (c) 2004-2005, K A Fraser
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -61,11 +61,11 @@ extern void unbind_evtchn_from_irq(unsigned int evtchn);
  * You *cannot* trust the irq argument passed to the callback handler.
  */
 extern int  bind_evtchn_to_irqhandler(
-    unsigned int evtchn,
-    irqreturn_t (*handler)(int, void *, struct pt_regs *),
-    unsigned long irqflags,
-    const char *devname,
-    void *dev_id);
+	unsigned int evtchn,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id);
 extern void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id);
 
 extern void irq_suspend(void);
@@ -79,42 +79,42 @@ void evtchn_device_upcall(int port);
 
 static inline void mask_evtchn(int port)
 {
-    shared_info_t *s = HYPERVISOR_shared_info;
-    synch_set_bit(port, &s->evtchn_mask[0]);
+	shared_info_t *s = HYPERVISOR_shared_info;
+	synch_set_bit(port, &s->evtchn_mask[0]);
 }
 
 static inline void unmask_evtchn(int port)
 {
-    shared_info_t *s = HYPERVISOR_shared_info;
-    vcpu_info_t *vcpu_info = &s->vcpu_data[smp_processor_id()];
+	shared_info_t *s = HYPERVISOR_shared_info;
+	vcpu_info_t *vcpu_info = &s->vcpu_data[smp_processor_id()];
 
-    synch_clear_bit(port, &s->evtchn_mask[0]);
+	synch_clear_bit(port, &s->evtchn_mask[0]);
 
-    /*
-     * The following is basically the equivalent of 'hw_resend_irq'. Just like
-     * a real IO-APIC we 'lose the interrupt edge' if the channel is masked.
-     */
-    if (  synch_test_bit        (port,    &s->evtchn_pending[0]) && 
-         !synch_test_and_set_bit(port>>5, &vcpu_info->evtchn_pending_sel) )
-    {
-        vcpu_info->evtchn_upcall_pending = 1;
-        if ( !vcpu_info->evtchn_upcall_mask )
-            force_evtchn_callback();
-    }
+	/*
+	 * The following is basically the equivalent of 'hw_resend_irq'. Just
+	 * like a real IO-APIC we 'lose the interrupt edge' if the channel is
+	 * masked.
+	 */
+	if (synch_test_bit         (port,    &s->evtchn_pending[0]) && 
+	    !synch_test_and_set_bit(port>>5, &vcpu_info->evtchn_pending_sel)) {
+		vcpu_info->evtchn_upcall_pending = 1;
+		if (!vcpu_info->evtchn_upcall_mask)
+			force_evtchn_callback();
+	}
 }
 
 static inline void clear_evtchn(int port)
 {
-    shared_info_t *s = HYPERVISOR_shared_info;
-    synch_clear_bit(port, &s->evtchn_pending[0]);
+	shared_info_t *s = HYPERVISOR_shared_info;
+	synch_clear_bit(port, &s->evtchn_pending[0]);
 }
 
 static inline int notify_via_evtchn(int port)
 {
-    evtchn_op_t op;
-    op.cmd = EVTCHNOP_send;
-    op.u.send.local_port = port;
-    return HYPERVISOR_event_channel_op(&op);
+	evtchn_op_t op;
+	op.cmd = EVTCHNOP_send;
+	op.u.send.local_port = port;
+	return HYPERVISOR_event_channel_op(&op);
 }
 
 /*
@@ -133,3 +133,13 @@ static inline int notify_via_evtchn(int port)
 #define EVTCHN_UNBIND _IO('E', 3)
 
 #endif /* __ASM_EVTCHN_H__ */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */
