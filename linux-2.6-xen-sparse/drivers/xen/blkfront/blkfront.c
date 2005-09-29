@@ -469,8 +469,8 @@ static void watch_for_status(struct xenbus_watch *watch, const char *node)
 		return;
 	}
 
-	xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
 	info->connected = BLKIF_STATE_CONNECTED;
+	xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
 
 	blkif_state = BLKIF_STATE_CONNECTED;
 
