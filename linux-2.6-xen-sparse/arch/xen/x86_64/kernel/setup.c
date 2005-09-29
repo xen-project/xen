@@ -771,11 +771,14 @@ void __init setup_arch(char **cmdline_p)
 				virt_to_mfn(&phys_to_machine_mapping[i]);
 		}
 		HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
-		
-		
+	}
 
-
-
+	if ( ! (xen_start_info->flags & SIF_INITDOMAIN))
+	{
+		acpi_disabled = 1;
+#ifdef  CONFIG_ACPI_BOOT
+		acpi_ht = 0;
+#endif
 	}
 #endif
 
