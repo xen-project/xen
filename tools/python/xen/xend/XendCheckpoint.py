@@ -56,7 +56,7 @@ def save(xd, fd, dominfo, live):
     # simply uses the defaults compiled into libxenguest; see the comments 
     # and/or code in xc_linux_save() for more information. 
     cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
-           str(dominfo.domid), "0", "0", str(int(live)) ]
+           str(dominfo.getDomid()), "0", "0", str(int(live)) ]
     log.info("[xc_save] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
     
@@ -76,10 +76,10 @@ def save(xd, fd, dominfo, live):
             if fd == child.fromchild.fileno():
                 l = child.fromchild.readline()
                 if l.rstrip() == "suspend":
-                    log.info("suspending %d" % dominfo.domid)
-                    xd.domain_shutdown(dominfo.domid, reason='suspend')
+                    log.info("suspending %d" % dominfo.getDomid())
+                    xd.domain_shutdown(dominfo.getDomid(), reason='suspend')
                     dominfo.state_wait(XendDomainInfo.STATE_VM_SUSPENDED)
-                    log.info("suspend %d done" % dominfo.domid)
+                    log.info("suspend %d done" % dominfo.getDomid())
                     child.tochild.write("done\n")
                     child.tochild.flush()
         if filter(lambda (fd, event): event & select.POLLHUP, r):
@@ -90,11 +90,10 @@ def save(xd, fd, dominfo, live):
     if child.wait() != 0:
         raise XendError("xc_save failed: %s" % lasterr)
 
-    dominfo.closeStoreChannel()
-    xd.domain_destroy(dominfo.domid)
+    dominfo.destroy()
     return None
 
-def restore(xd, fd):
+def restore(fd):
     signature = read_exact(fd, len(SIGNATURE),
         "not a valid guest state file: signature read")
     if signature != SIGNATURE:
@@ -113,7 +112,7 @@ def restore(xd, fd):
         raise XendError("not a valid guest state file: config parse")
 
     vmconfig = p.get_val()
-    dominfo = xd.domain_configure(vmconfig)
+    dominfo = XendDomainInfo.restore(vmconfig)
 
     l = read_exact(fd, sizeof_unsigned_long,
                    "not a valid guest state file: pfn count read")
@@ -133,7 +132,7 @@ def restore(xd, fd):
         console_evtchn = 0
 
     cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
-           str(dominfo.domid), str(nr_pfns),
+           str(dominfo.getDomid()), str(nr_pfns),
            str(store_evtchn), str(console_evtchn)]
     log.info("[xc_restore] " + join(cmd))
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
@@ -161,10 +160,10 @@ def restore(xd, fd):
                         if dominfo.store_channel:
                             dominfo.setStoreRef(int(m.group(2)))
                             if dominfo.store_mfn >= 0:
-                                IntroduceDomain(dominfo.domid,
+                                IntroduceDomain(dominfo.getDomid(),
                                                 dominfo.store_mfn,
                                                 dominfo.store_channel.port1,
-                                                dominfo.path)
+                                                dominfo.getDomainPath())
                     m = re.match(r"^(console-mfn) (\d+)\n$", l)
                     if m:
                         dominfo.setConsoleRef(int(m.group(2)))

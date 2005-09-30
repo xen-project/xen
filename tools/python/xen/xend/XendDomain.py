@@ -22,6 +22,7 @@
  Needs to be persistent for one uptime.
 """
 import os
+import threading
 
 import xen.lowlevel.xc
 
@@ -57,6 +58,9 @@ class XendDomain:
 
     """Dict of domain info indexed by domain id."""
     domains = None
+
+
+    ## public:
     
     def __init__(self):
         # Hack alert. Python does not support mutual imports, but XendDomainInfo
@@ -65,6 +69,7 @@ class XendDomain:
         # So we stuff the XendDomain instance (self) into xroot's components.
         xroot.add_component("xen.xend.XendDomain", self)
         self.domains = XendDomainDict()
+        self.refresh_lock = threading.Condition()
         self.watchReleaseDomain()
         self.refresh()
         self.dom0_setup()
@@ -93,6 +98,9 @@ class XendDomain:
         """
         doms = self.list_sorted()
         return map(lambda x: x.getName(), doms)
+
+
+    ## private:
 
     def onReleaseDomain(self):
         self.refresh()
@@ -135,9 +143,6 @@ class XendDomain:
 
     def dom0_setup(self):
         dom0 = self.domain_lookup(PRIV_DOMAIN)
-        if not dom0:
-            dom0 = self.recreate_domain(self.xen_domain(PRIV_DOMAIN))
-        dom0.dom0_init_store()
         dom0.dom0_enforce_vcpus()
 
 
@@ -150,10 +155,10 @@ class XendDomain:
         if info.getDomid() in self.domains:
             notify = False
         self.domains[info.getDomid()] = info
-        info.exportToDB()
-        if notify:
-            eserver.inject('xend.domain.create', [info.getName(),
-                                                  info.getDomid()])
+        #info.exportToDB()
+        #if notify:
+        #    eserver.inject('xend.domain.create', [info.getName(),
+        #                                          info.getDomid()])
 
     def _delete_domain(self, domid, notify=True):
         """Remove a domain from the tables.
@@ -164,8 +169,8 @@ class XendDomain:
         info = self.domains.get(domid)
         if info:
             del self.domains[domid]
-            info.cleanup()
-            info.delete()
+            info.cleanupDomain()
+            info.cleanupVm()
             if notify:
                 eserver.inject('xend.domain.died', [info.getName(),
                                                     info.getDomid()])
@@ -174,25 +179,36 @@ class XendDomain:
     def refresh(self):
         """Refresh domain list from Xen.
         """
-        doms = self.xen_domains()
-        for d in self.domains.values():
-            info = doms.get(d.getDomid())
-            if info:
-                d.update(info)
-            else:
-                self._delete_domain(d.getDomid())
-        for d in doms:
-            if d not in self.domains:
-                try:
-                    self.recreate_domain(doms[d])
-                except:
-                    log.exception(
-                        "Failed to recreate information for domain %d.  "
-                        "Destroying it in the hope of recovery.", d)
+        self.refresh_lock.acquire()
+        try:
+            doms = self.xen_domains()
+            for d in self.domains.values():
+                info = doms.get(d.getDomid())
+                if info:
+                    d.update(info)
+                else:
+                    self._delete_domain(d.getDomid())
+            for d in doms:
+                if d not in self.domains and not doms[d]['dying']:
                     try:
-                        xc.domain_destroy(dom = d)
+                        self.recreate_domain(doms[d])
                     except:
-                        log.exception('Destruction of %d failed.', d)
+                        if d == PRIV_DOMAIN:
+                            log.exception(
+                                "Failed to recreate information for domain "
+                                "%d.  Doing nothing except crossing my "
+                                "fingers.", d)
+                        else:
+                            log.exception(
+                                "Failed to recreate information for domain "
+                                "%d.  Destroying it in the hope of "
+                                "recovery.", d)
+                            try:
+                                xc.domain_destroy(dom = d)
+                            except:
+                                log.exception('Destruction of %d failed.', d)
+        finally:
+            self.refresh_lock.release()
 
 
     def update_domain(self, id):
@@ -208,6 +224,9 @@ class XendDomain:
         else:
             self._delete_domain(id)
 
+
+    ## public:
+
     def domain_create(self, config):
         """Create a domain from a configuration.
 
@@ -219,19 +238,12 @@ class XendDomain:
         return dominfo
 
     def domain_configure(self, config):
-        """Configure an existing domain. This is intended for internal
-        use by domain restore and migrate.
+        """Configure an existing domain.
 
         @param vmconfig: vm configuration
         """
-        # We accept our configuration specified as ['config' [...]], which
-        # some tools or configuration files may be using.  For save-restore,
-        # we use the value of XendDomainInfo.sxpr() directly, which has no
-        # such item.
-        nested = sxp.child_value(config, 'config')
-        if nested:
-            config = nested
-        return XendDomainInfo.restore(config)
+        # !!!
+        raise XendError("Unsupported")
 
     def domain_restore(self, src):
         """Restore a domain from file.
@@ -241,7 +253,7 @@ class XendDomain:
 
         try:
             fd = os.open(src, os.O_RDONLY)
-            dominfo = XendCheckpoint.restore(self, fd)
+            dominfo = XendCheckpoint.restore(fd)
             self._add_domain(dominfo)
             return dominfo
         except OSError, ex:

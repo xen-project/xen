@@ -219,7 +219,7 @@ class DevController:
     def backendPath(self, backdom, devid):
         """@param backdom [XendDomainInfo] The backend domain info."""
 
-        return "%s/backend/%s/%s/%d" % (backdom.getPath(),
+        return "%s/backend/%s/%s/%d" % (backdom.getDomainPath(),
                                         self.deviceClass,
                                         self.vm.getUuid(), devid)
 
@@ -229,9 +229,9 @@ class DevController:
 
 
     def frontendRoot(self):
-        return "%s/device/%s" % (self.vm.getPath(), self.deviceClass)
+        return "%s/device/%s" % (self.vm.getDomainPath(), self.deviceClass)
 
 
     def frontendMiscPath(self):
-        return "%s/device-misc/%s" % (self.vm.getPath(),
+        return "%s/device-misc/%s" % (self.vm.getDomainPath(),
                                       self.deviceClass)
