@@ -129,10 +129,15 @@ extra = "4 VMID=%d usr=/dev/sda6" % vmid
 #----------------------------------------------------------------------------
 # Configure the behaviour when a domain exits.  There are three 'reasons'
 # for a domain to stop: poweroff, reboot, and crash.  For each of these you
-# may specify "destroy", meaning that the domain is cleaned up as normal,
-# "restart", meaning that a new domain is started in place of the old one, or
-# "preserve", meaning that no clean-up is done until the domain is manually
-# destroyed (using xm destroy, for example).
+# may specify:
+#
+#   "destroy",        meaning that the domain is cleaned up as normal;
+#   "restart",        meaning that a new domain is started in place of the old
+#                     one;
+#   "preserve",       meaning that no clean-up is done until the domain is
+#                     manually destroyed (using xm destroy, for example); or
+#   "rename-restart", meaning that the old domain is not cleaned up, but is
+#                     renamed and a new domain started in its place.
 #
 # The default is
 #

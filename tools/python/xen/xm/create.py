@@ -163,10 +163,46 @@ gopts.var('cpu_weight', val='WEIGHT',
 
 gopts.var('restart', val='onreboot|always|never',
           fn=set_value, default=None,
-          use="""Whether the domain should be restarted on exit.
+          use="""Deprecated.  Use on_poweroff, on_reboot, and on_crash
+          instead.
+
+          Whether the domain should be restarted on exit.
           - onreboot: restart on exit with shutdown code reboot
           - always:   always restart on exit, ignore exit code
           - never:    never restart on exit, ignore exit code""")
+
+gopts.var('on_poweroff', val='destroy|restart|preserve|rename-restart',
+          fn=set_value, default=None,
+          use="""Behaviour when a domain exits with reason 'poweroff'.
+          - destroy:        the domain is cleaned up as normal;
+          - restart:        a new domain is started in place of the old one;
+          - preserve:       no clean-up is done until the domain is manually
+                            destroyed (using xm destroy, for example);
+          - rename-restart: the old domain is not cleaned up, but is
+                            renamed and a new domain started in its place.
+          """)
+
+gopts.var('on_reboot', val='destroy|restart|preserve|rename-restart',
+          fn=set_value, default=None,
+          use="""Behaviour when a domain exits with reason 'reboot'.
+          - destroy:        the domain is cleaned up as normal;
+          - restart:        a new domain is started in place of the old one;
+          - preserve:       no clean-up is done until the domain is manually
+                            destroyed (using xm destroy, for example);
+          - rename-restart: the old domain is not cleaned up, but is
+                            renamed and a new domain started in its place.
+          """)
+
+gopts.var('on_crash', val='destroy|restart|preserve|rename-restart',
+          fn=set_value, default=None,
+          use="""Behaviour  when a domain exits with reason 'crash'.
+          - destroy:        the domain is cleaned up as normal;
+          - restart:        a new domain is started in place of the old one;
+          - preserve:       no clean-up is done until the domain is manually
+                            destroyed (using xm destroy, for example);
+          - rename-restart: the old domain is not cleaned up, but is
+                            renamed and a new domain started in its place.
+          """)
 
 gopts.var('blkif', val='no|yes',
           fn=set_bool, default=0,
@@ -536,6 +572,12 @@ def make_config(opts, vals):
         config.append(['backend', ['tpmif']])
     if vals.restart:
         config.append(['restart', vals.restart])
+    if vals.on_poweroff:
+        config.append(['on_poweroff', vals.on_poweroff])
+    if vals.on_reboot:
+        config.append(['on_reboot', vals.on_reboot])
+    if vals.on_crash:
+        config.append(['on_crash', vals.on_crash])
 
     if vals.bootloader:
         config.append(['bootloader', vals.bootloader])
