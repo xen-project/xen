@@ -13,58 +13,41 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
-import threading
-import select
-
-import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
+import xen.lowlevel.xc
 
 from xen.xend.XendLogging import log
 
-DEBUG = 0
 
-RESPONSE_TIMEOUT = 20.0
+xc = xen.lowlevel.xc.new()
 
-class EventChannel(dict):
+
+class EventChannel:
     """An event channel between domains.
     """
 
-    def interdomain(cls, dom1, dom2, port1=0, port2=0):
-        """Create an event channel between domains.
-        
-        @return EventChannel (None on error)
-        """
-        v = xc.evtchn_bind_interdomain(dom1=dom1, dom2=dom2,
-                                       port1=port1, port2=port2)
-        if v:
-            v = cls(dom1, dom2, v)
-        return v
-
-    interdomain = classmethod(interdomain)
-
-    def __init__(self, dom1, dom2, d):
-        d['dom1'] = dom1
-        d['dom2'] = dom2
-        self.update(d)
+    def __init__(self, dom1, dom2, port1, port2):
         self.dom1 = dom1
         self.dom2 = dom2
-        self.port1 = d.get('port1')
-        self.port2 = d.get('port2')
+        self.port1 = port1
+        self.port2 = port2
+
 
     def close(self):
-        """Close the event channel.
+        """Close the event channel.  Nothrow guarantee.
         """
         def evtchn_close(dom, port):
             try:
                 xc.evtchn_close(dom=dom, port=port)
-            except Exception, ex:
-                pass
+            except Exception:
+                log.exception("Exception closing event channel %d, %d.", dom,
+                              port)
             
-        if DEBUG:
-            print 'EventChannel>close>', self
         evtchn_close(self.dom1, self.port1)
         evtchn_close(self.dom2, self.port2)
+
 
     def sxpr(self):
         return ['event-channel',
@@ -74,19 +57,20 @@ class EventChannel(dict):
                 ['port2', self.port2 ]
                 ]
 
+
     def __repr__(self):
         return ("<EventChannel dom1:%d:%d dom2:%d:%d>"
                 % (self.dom1, self.port1, self.dom2, self.port2))
 
-def eventChannel(dom1, dom2, port1=0, port2=0):
+
+def eventChannel(dom1, dom2, port1 = 0, port2 = 0):
     """Create an event channel between domains.
         
     @return EventChannel (None on error)
     """
-    return EventChannel.interdomain(dom1, dom2, port1=port1, port2=port2)
-
-def eventChannelClose(evtchn):
-    """Close an event channel.
-    """
-    if not evtchn: return
-    evtchn.close()
+    v = xc.evtchn_bind_interdomain(dom1=dom1, dom2=dom2,
+                                   port1=port1, port2=port2)
+    if v and v.get('port1'):
+        return EventChannel(dom1, dom2, v['port1'], v['port2'])
+    else:
+        return None

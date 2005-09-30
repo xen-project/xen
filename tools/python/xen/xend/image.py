@@ -358,7 +358,8 @@ class VmxImageHandler(ImageHandler):
         return vncconnect
 
     def destroy(self):
-        channel.eventChannelClose(self.device_channel)
+        if self.device_channel:
+            self.device_channel.close()
         import signal
         if not self.pid:
             return

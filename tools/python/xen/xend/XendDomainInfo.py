@@ -32,7 +32,7 @@ import errno
 import xen.lowlevel.xc
 from xen.util.blkif import blkdev_uname_to_file
 
-from xen.xend.server.channel import EventChannel
+from xen.xend.server import channel
 
 from xen.xend import image
 from xen.xend import scheduler
@@ -1032,7 +1032,7 @@ class XendDomainInfo:
             except:
                 # if anything goes wrong, assume the port was not yet set
                 pass
-        ret = EventChannel.interdomain(0, self.domid, port1=port, port2=0)
+        ret = channel.eventChannel(0, self.domid, port1=port, port2=0)
         self.storeDom(path, ret.port1)
         return ret
         
