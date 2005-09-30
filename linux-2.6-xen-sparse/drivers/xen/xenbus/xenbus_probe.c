@@ -184,7 +184,7 @@ static int xenbus_hotplug_backend(struct device *dev, char **envp,
 	return 0;
 }
 
-static int xenbus_probe_backend(const char *type, const char *uuid);
+static int xenbus_probe_backend(const char *type, const char *domid);
 static struct xen_bus_type xenbus_backend = {
 	.root = "backend",
 	.levels = 3, 		/* backend/type/<frontend>/<id> */
@@ -419,15 +419,15 @@ static int xenbus_probe_backend_unit(const char *dir,
 	return err;
 }
 
-/* backend/<typename>/<frontend-uuid> */
-static int xenbus_probe_backend(const char *type, const char *uuid)
+/* backend/<typename>/<frontend-domid> */
+static int xenbus_probe_backend(const char *type, const char *domid)
 {
 	char *nodename;
 	int err = 0;
 	char **dir;
 	unsigned int i, dir_n = 0;
 
-	nodename = kasprintf("%s/%s/%s", xenbus_backend.root, type, uuid);
+	nodename = kasprintf("%s/%s/%s", xenbus_backend.root, type, domid);
 	if (!nodename)
 		return -ENOMEM;
 
@@ -607,6 +607,7 @@ void xenbus_suspend(void)
 	down(&xenbus_lock);
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_dev);
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, suspend_dev);
+	xb_suspend_comms();
 }
 
 void xenbus_resume(void)
@@ -650,6 +651,7 @@ int do_xenbus_probe(void *unused)
 	int err = 0;
 
 	/* Initialize xenstore comms unless already done. */
+	printk("store_evtchn = %i\n", xen_start_info->store_evtchn);
 	err = xs_init();
 	if (err) {
 		printk("XENBUS: Error initializing xenstore comms:"
