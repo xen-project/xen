@@ -40,14 +40,15 @@ class BlkifController(DevController):
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
         
-        typedev = sxp.child_value(config, 'dev')
-        if re.match('^ioemu:', typedev):
+        dev = sxp.child_value(config, 'dev')
+        if re.match('^ioemu:', dev):
             return (0,{},{})
 
-        devid = blkif.blkdev_name_to_number(sxp.child_value(config, 'dev'))
+        devid = blkif.blkdev_name_to_number(dev)
 
         (typ, params) = string.split(sxp.child_value(config, 'uname'), ':', 1)
-        back = { 'type' : typ,
+        back = { 'dev' : dev,
+                 'type' : typ,
                  'params' : params
                  }
 
@@ -57,3 +58,22 @@ class BlkifController(DevController):
         front = { 'virtual-device' : "%i" % devid }
 
         return (devid, back, front)
+
+
+    def configuration(self, devid):
+        """@see DevController.configuration"""
+
+        result = DevController.configuration(self, devid)
+
+        (dev, typ, params, ro) = self.readBackend(devid,
+                                                  'dev', 'type', 'params',
+                                                  'read-only')
+
+        result.append(['dev', dev])
+        result.append(['uname', typ + ":" + params])
+        if ro:
+            result.append(['mode', 'r'])
+        else:
+            result.append(['mode', 'w'])
+
+        return result

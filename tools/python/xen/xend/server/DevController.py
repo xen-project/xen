@@ -75,10 +75,26 @@ class DevController:
         """
 
         frontpath = self.frontendPath(devid)
-        backpath = xstransact.Read("%s/backend" % frontpath)
+        backpath = xstransact.Read(frontpath, "backend")
 
         xstransact.Remove(frontpath)
         xstransact.Remove(backpath)
+
+
+    def configurations(self):
+        return map(lambda x: self.configuration(int(x)),
+                   xstransact.List(self.frontendRoot()))
+
+
+    def configuration(self, devid):
+        """@return an s-expression giving the current configuration of the
+        specified device.  This would be suitable for giving to {@link
+        #createDevice} in order to recreate that device."""
+
+        backdomid = int(xstransact.Read(self.frontendPath(devid),
+                                        "backend-id"))
+
+        return [self.deviceClass, ['backend', backdomid]]
 
 
     def sxprs(self):
@@ -150,6 +166,12 @@ class DevController:
                 raise
 
 
+    def readBackend(self, devid, *args):
+        frontpath = self.frontendPath(devid)
+        backpath = xstransact.Read(frontpath, "backend")
+        return xstransact.Read(backpath, *args)
+
+
     ## private:
 
     def writeDetails(self, config, devid, backDetails, frontDetails):
@@ -211,4 +233,5 @@ class DevController:
 
 
     def frontendMiscPath(self):
-        return "%s/device-misc/%s" % (self.vm.getPath(), self.deviceClass)
+        return "%s/device-misc/%s" % (self.vm.getPath(),
+                                      self.deviceClass)

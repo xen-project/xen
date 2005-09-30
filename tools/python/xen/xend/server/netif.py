@@ -23,8 +23,12 @@
 import os
 
 from xen.xend import sxp
+from xen.xend import XendRoot
 
 from xen.xend.server.DevController import DevController
+
+
+xroot = XendRoot.instance()
 
 
 class NetifController(DevController):
@@ -37,9 +41,6 @@ class NetifController(DevController):
 
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
-
-        from xen.xend import XendRoot
-        xroot = XendRoot.instance()
 
         def _get_config_ipaddr(config):
             val = []
@@ -68,3 +69,22 @@ class NetifController(DevController):
                   'mac' : mac }
 
         return (devid, back, front)
+
+
+    def configuration(self, devid):
+        """@see DevController.configuration"""
+
+        result = DevController.configuration(self, devid)
+
+        (script, ip, bridge, mac) = self.readBackend(devid,
+                                                     'script', 'ip', 'bridge',
+                                                     'mac')
+
+        result.append(['script',
+                       script.replace(xroot.network_script_dir + os.sep, "")])
+        if ip:
+            result.append(['ip', ip.split(" ")])
+        result.append(['bridge', bridge])
+        result.append(['mac', mac])
+
+        return result
