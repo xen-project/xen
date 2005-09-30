@@ -607,7 +607,6 @@ void xenbus_suspend(void)
 	down(&xenbus_lock);
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_dev);
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, suspend_dev);
-	xb_suspend_comms();
 }
 
 void xenbus_resume(void)
@@ -651,7 +650,6 @@ int do_xenbus_probe(void *unused)
 	int err = 0;
 
 	/* Initialize xenstore comms unless already done. */
-	printk("store_evtchn = %i\n", xen_start_info->store_evtchn);
 	err = xs_init();
 	if (err) {
 		printk("XENBUS: Error initializing xenstore comms:"
