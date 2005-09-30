@@ -158,12 +158,12 @@ def restore(fd):
                     m = re.match(r"^(store-mfn) (\d+)\n$", l)
                     if m:
                         if dominfo.store_channel:
-                            dominfo.setStoreRef(int(m.group(2)))
-                            if dominfo.store_mfn >= 0:
-                                IntroduceDomain(dominfo.getDomid(),
-                                                dominfo.store_mfn,
-                                                dominfo.store_channel.port1,
-                                                dominfo.getDomainPath())
+                            store_mfn = int(m.group(2))
+                            dominfo.setStoreRef(store_mfn)
+                            IntroduceDomain(dominfo.getDomid(),
+                                            store_mfn,
+                                            dominfo.store_channel.port1,
+                                            dominfo.getDomainPath())
                     m = re.match(r"^(console-mfn) (\d+)\n$", l)
                     if m:
                         dominfo.setConsoleRef(int(m.group(2)))
