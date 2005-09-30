@@ -129,6 +129,7 @@ static inline void play_dead(void)
     * race between pending interrupts and restoration of handler. 
     */
 #ifdef CONFIG_SMP
+	local_irq_enable(); /* XXX Needed for smp_resume(). Clean me up. */
 	smp_resume();
 #endif
 	cpu_set(smp_processor_id(), cpu_online_map);

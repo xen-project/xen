@@ -1836,7 +1836,7 @@ shadow_mark_mfn_out_of_sync(struct vcpu *v, unsigned long gpfn,
     }
 #endif
 
-    FSH_LOG("%s(gpfn=%lx, mfn=%lx) c=%08x t=%08x", __func__,
+    FSH_LOG("%s(gpfn=%lx, mfn=%lx) c=%08x t=%08lx", __func__,
             gpfn, mfn, page->count_info, page->u.inuse.type_info);
 
     // XXX this will require some more thought...  Cross-domain sharing and
@@ -3017,7 +3017,7 @@ static int check_pte(
     l1_pgentry_t guest_pte = *p_guest_pte;
     l1_pgentry_t shadow_pte = *p_shadow_pte;
     l1_pgentry_t snapshot_pte = p_snapshot_pte ? *p_snapshot_pte : l1e_empty();
-    l1_pgentry_t eff_guest_pte;
+    l1_pgentry_t eff_guest_pte = l1e_empty();
     unsigned long mask, eff_guest_pfn, eff_guest_mfn, shadow_mfn;
     int errors = 0, guest_writable;
     int page_table_page;
@@ -3074,7 +3074,7 @@ static int check_pte(
 
     if ( (l1e_get_flags(shadow_pte) & _PAGE_RW ) && !guest_writable )
     {
-        printk("eff_guest_pfn=%lx eff_guest_mfn=%lx shadow_mfn=%lx t=0x%08x page_table_page=%d\n",
+        printk("eff_guest_pfn=%lx eff_guest_mfn=%lx shadow_mfn=%lx t=%lx page_table_page=%d\n",
                eff_guest_pfn, eff_guest_mfn, shadow_mfn,
                frame_table[eff_guest_mfn].u.inuse.type_info,
                page_table_page);
@@ -3085,7 +3085,7 @@ static int check_pte(
          (l1e_get_flags(shadow_pte) & _PAGE_RW ) &&
          !(guest_writable && (l1e_get_flags(eff_guest_pte) & _PAGE_DIRTY)) )
     {
-        printk("eff_guest_pfn=%lx eff_guest_mfn=%lx shadow_mfn=%lx t=0x%08x page_table_page=%d\n",
+        printk("eff_guest_pfn=%lx eff_guest_mfn=%lx shadow_mfn=%lx t=%lx page_table_page=%d\n",
                eff_guest_pfn, eff_guest_mfn, shadow_mfn,
                frame_table[eff_guest_mfn].u.inuse.type_info,
                page_table_page);

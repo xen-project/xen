@@ -446,27 +446,6 @@ static void __init smp_callin(void)
 
 static int cpucount;
 
-
-static irqreturn_t ldebug_interrupt(
-	int irq, void *dev_id, struct pt_regs *regs)
-{
-	return IRQ_HANDLED;
-}
-
-static DEFINE_PER_CPU(int, ldebug_irq);
-static char ldebug_name[NR_CPUS][15];
-
-void ldebug_setup(void)
-{
-	int cpu = smp_processor_id();
-
-	per_cpu(ldebug_irq, cpu) = bind_virq_to_irq(VIRQ_DEBUG);
-	sprintf(ldebug_name[cpu], "ldebug%d", cpu);
-	BUG_ON(request_irq(per_cpu(ldebug_irq, cpu), ldebug_interrupt,
-	                   SA_INTERRUPT, ldebug_name[cpu], NULL));
-}
-
-
 extern void local_setup_timer(void);
 
 /*
@@ -484,7 +463,6 @@ static void __init start_secondary(void *unused)
 	while (!cpu_isset(smp_processor_id(), smp_commenced_mask))
 		rep_nop();
 	local_setup_timer();
-	ldebug_setup();
 	smp_intr_init();
 	local_irq_enable();
 	/*
