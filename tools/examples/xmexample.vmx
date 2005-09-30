@@ -48,12 +48,36 @@ vcpus=1
 disk = [ 'file:/var/images/min-el3-i386.img,ioemu:hda,w' ]
 
 #----------------------------------------------------------------------------
-# Set according to whether you want the domain restarted when it exits.
-# The default is 'onreboot', which restarts the domain when it shuts down
-# with exit code reboot.
-# Other values are 'always', and 'never'.
+# Configure the behaviour when a domain exits.  There are three 'reasons'
+# for a domain to stop: poweroff, reboot, and crash.  For each of these you
+# may specify "destroy", meaning that the domain is cleaned up as normal,
+# "restart", meaning that a new domain is started in place of the old one, or
+# "preserve", meaning that no clean-up is done until the domain is manually
+# destroyed (using xm destroy, for example).
+#
+# The default is
+#
+#   on_poweroff = 'destroy'
+#   on_reboot   = 'restart'
+#   on_crash    = 'restart'
+#
+# For backwards compatibility we also support the deprecated option restart
+#
+# restart = 'onreboot' means on_poweroff = 'destroy'
+#                            on_reboot   = 'restart'
+#                            on_crash    = 'destroy'
+#
+# restart = 'always'   means on_poweroff = 'restart'
+#                            on_reboot   = 'restart'
+#                            on_crash    = 'restart'
+#
+# restart = 'never'    means on_poweroff = 'destroy'
+#                            on_reboot   = 'destroy'
+#                            on_crash    = 'destroy'
 
-#restart = 'onreboot'
+#on_poweroff = 'destroy'
+#on_reboot   = 'restart'
+#on_crash    = 'restart'
 
 #============================================================================
 

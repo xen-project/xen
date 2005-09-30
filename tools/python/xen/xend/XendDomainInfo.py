@@ -67,14 +67,10 @@ shutdown_reasons = {
     DOMAIN_CRASH   : "crash",
     }
 
-RESTART_ALWAYS   = 'always'
-RESTART_ONREBOOT = 'onreboot'
-RESTART_NEVER    = 'never'
-
 restart_modes = [
-    RESTART_ALWAYS,
-    RESTART_ONREBOOT,
-    RESTART_NEVER,
+    "restart",
+    "destroy",
+    "preserve"
     ]
 
 STATE_VM_OK         = "ok"
@@ -112,7 +108,10 @@ ROUNDTRIPPING_CONFIG_ENTRIES = [
         ('name',         str),
         ('ssidref',      int),
         ('cpu_weight',   float),
-        ('bootloader',   str)
+        ('bootloader',   str),
+        ('on_poweroff',  str),
+        ('on_reboot',    str),
+        ('on_crash',     str)
     ]
 
 
@@ -135,8 +134,6 @@ def restore(config):
     vm.storeVmDetails()
     vm.configure()
     vm.create_channel()
-#         vm.exportToDB()
-#    vm.refreshShutdown()
     vm.storeDomDetails()
     return vm
 
@@ -272,7 +269,6 @@ class XendDomainInfo:
         result['maxmem']       = get_cfg('maxmem',     int)
         result['maxmem_kb']    = get_cfg('maxmem_kb',  int)
         result['cpu']          = get_cfg('cpu',        int)
-        result['restart_mode'] = get_cfg('restart')
         result['image']        = get_cfg('image')
 
         try:
@@ -294,6 +290,30 @@ class XendDomainInfo:
         for d in sxp.children(config, 'device'):
             c = sxp.child0(d)
             result['device'].append((sxp.name(c), c))
+
+        # Configuration option "restart" is deprecated.  Parse it, but
+        # let on_xyz override it if they are present.
+        restart = get_cfg('restart')
+        if restart:
+            def handle_restart(event, val):
+                if not event in result:
+                    result[event] = val
+
+            if restart == "onreboot":
+                handle_restart('on_poweroff', 'destroy')
+                handle_restart('on_reboot',   'restart')
+                handle_restart('on_crash',    'destroy')
+            elif restart == "always":
+                handle_restart('on_poweroff', 'restart')
+                handle_restart('on_reboot',   'restart')
+                handle_restart('on_crash',    'restart')
+            elif restart == "never":
+                handle_restart('on_poweroff', 'destroy')
+                handle_restart('on_reboot',   'destroy')
+                handle_restart('on_crash',    'destroy')
+            else:
+                log.warn("Ignoring malformed and deprecated config option "
+                         "restart = %s", restart)
 
         log.debug("parseConfig: result is %s" % str(result))
         return result
@@ -347,7 +367,9 @@ class XendDomainInfo:
                 self.info[name] = val
 
         params = (("name", str),
-                  ("restart_mode", str),
+                  ("on_poweroff",  str),
+                  ("on_reboot",    str),
+                  ("on_crash",     str),
                   ("image",        str),
                   ("start_time", float))
 
@@ -375,7 +397,9 @@ class XendDomainInfo:
         try:
             defaultInfo('name',         lambda: "Domain-%d" % self.domid)
             defaultInfo('ssidref',      lambda: 0)
-            defaultInfo('restart_mode', lambda: RESTART_ONREBOOT)
+            defaultInfo('on_poweroff',  lambda: "destroy")
+            defaultInfo('on_reboot',    lambda: "restart")
+            defaultInfo('on_crash',     lambda: "restart")
             defaultInfo('cpu',          lambda: None)
             defaultInfo('cpu_weight',   lambda: 1.0)
             defaultInfo('bootloader',   lambda: None)
@@ -459,9 +483,10 @@ class XendDomainInfo:
                     raise VmError('invalid device (%s, %s)' %
                                   (str(n), str(c)))
 
-            if self.info['restart_mode'] not in restart_modes:
-                raise VmError('invalid restart mode: ' +
-                              str(self.info['restart_mode']))
+            for event in ['on_poweroff', 'on_reboot', 'on_crash']:
+                if self.info[event] not in restart_modes:
+                    raise VmError('invalid restart event: %s = %s' %
+                                  (event, str(self.info[event])))
 
             if 'cpumap' not in self.info:
                 if [self.info['vcpus'] == 1]:
@@ -509,14 +534,14 @@ class XendDomainInfo:
         to_store = {
             'uuid':               self.uuid,
 
-            # !!!
+            # XXX
             'memory/target':      str(self.info['memory_KiB'])
             }
 
         if self.infoIsSet('image'):
             to_store['image'] = sxp.to_string(self.info['image'])
 
-        for k in ['name', 'ssidref', 'restart_mode']:
+        for k in ['name', 'ssidref', 'on_poweroff', 'on_reboot', 'on_crash']:
             if self.infoIsSet(k):
                 to_store[k] = str(self.info[k])
 
@@ -625,7 +650,7 @@ class XendDomainInfo:
                 if xroot.get_enable_dump():
                     self.dumpCore()
 
-                restart_reason = 'crashed'
+                restart_reason = 'crash'
 
             elif xeninfo['shutdown']:
                 reason = shutdown_reason(xeninfo['shutdown_reason'])
@@ -682,10 +707,16 @@ class XendDomainInfo:
 
 
     def maybeRestart(self, reason):
-        if self.restart_needed(reason):
-            self.restart()
-        else:
-            self.destroy()
+        # Dispatch to the correct method based upon the configured on_{reason}
+        # behaviour.
+        {"destroy"  : self.destroy,
+         "restart"  : self.restart,
+         "preserve" : self.preserve}[self.info['on_' + reason]]()
+
+
+    def preserve(self):
+        log.info("Preserving dead domain %s (%d).", self.info['name'],
+                 self.domid)
 
 
     def dumpCore(self):
@@ -998,7 +1029,6 @@ class XendDomainInfo:
         """
         self.create_channel()
         self.image.createImage()
-#        !!! self.exportToDB()
         IntroduceDomain(self.domid, self.store_mfn,
                         self.store_channel.port1, self.dompath)
         self.configure_vcpus()
@@ -1091,7 +1121,6 @@ class XendDomainInfo:
                 # The port is not yet set, i.e. the channel has not yet been
                 # created.
                 pass
-        ret = channel.eventChannel(0, self.domid, port1=port, port2=0)
 
         # Stale port information from above causes an Invalid Argument to be
         # thrown by the eventChannel call below.  To recover, we throw away
