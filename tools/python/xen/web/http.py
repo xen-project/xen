@@ -437,6 +437,9 @@ class HttpRequest:
         send_body = self.hasBody()
         if not self.close_connection:
             self.setResponseHeader("Connection", "keep-alive")
+        self.setResponseHeader("Pragma", "no-cache")
+        self.setResponseHeader("Cache-Control", "no-cache")
+        self.setResponseHeader("Expires", "-1")
         if send_body:
             self.output.seek(0, 0)
             body = self.output.getvalue()
