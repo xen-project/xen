@@ -271,9 +271,11 @@ class XendDomain:
 
 
     def domain_lookup(self, id):
+        self.refresh()
         return self.domains.get(id)
 
     def domain_lookup_by_name(self, name):
+        self.refresh()
         dominfo = self.domains.get_by_name(name)
         if not dominfo:
             try:
