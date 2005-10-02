@@ -13,19 +13,25 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
 import sys
 import StringIO
 
-from xen.web import reactor, protocol
+from xen.web import protocol, tcp, unix
 
 from xen.xend import scheduler
 from xen.xend import sxp
 from xen.xend import PrettyPrint
-from xen.xend import EventServer; eserver = EventServer.instance()
+from xen.xend import EventServer
 from xen.xend.XendError import XendError
-from xen.xend import XendRoot; xroot = XendRoot.instance()
+from xen.xend import XendRoot
+
+
+eserver = EventServer.instance()
+xroot = XendRoot.instance()
+
 
 DEBUG = 0
 
@@ -210,8 +216,8 @@ def listenEvent(daemon):
     factory = EventFactory(daemon)
     if xroot.get_xend_unix_server():
         path = '/var/lib/xend/event-socket'
-        reactor.listenUNIX(path, factory)
+        unix.listenUNIX(path, factory)
     if xroot.get_xend_http_server():
         port = xroot.get_xend_event_port()
         interface = xroot.get_xend_address()
-        reactor.listenTCP(port, factory, interface=interface)
+        tcp.listenTCP(port, factory, interface=interface)

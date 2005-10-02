@@ -13,21 +13,27 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
 import socket
 import sys
 import StringIO
 
-from xen.web import reactor, protocol
+from xen.web import protocol, tcp, unix
 
 from xen.xend import scheduler
 from xen.xend import sxp
-from xen.xend import EventServer; eserver = EventServer.instance()
+from xen.xend import EventServer
 from xen.xend.XendError import XendError
-from xen.xend import XendRoot; xroot = XendRoot.instance()
+from xen.xend import XendRoot
 from xen.xend.XendLogging import log
 from xen.xend import XendCheckpoint
+
+
+eserver = EventServer.instance()
+xroot = XendRoot.instance()
+
 
 DEBUG = 0
 
@@ -114,8 +120,7 @@ class RelocationProtocol(protocol.Protocol):
         if self.transport:
             self.send_reply(["ready", name])
             self.transport.sock.setblocking(1)
-            xd = xroot.get_component("xen.xend.XendDomain")
-            XendCheckpoint.restore(xd, self.transport.sock.fileno())
+            XendCheckpoint.restore(self.transport.sock.fileno())
             self.transport.sock.setblocking(0)
         else:
             log.error(name + ": no transport")
@@ -136,11 +141,11 @@ def listenRelocation():
     factory = RelocationFactory()
     if xroot.get_xend_unix_server():
         path = '/var/lib/xend/relocation-socket'
-        reactor.listenUNIX(path, factory)
+        unix.listenUNIX(path, factory)
     if xroot.get_xend_relocation_server():
         port = xroot.get_xend_relocation_port()
         interface = xroot.get_xend_relocation_address()
-        l = reactor.listenTCP(port, factory, interface=interface)
+        l = tcp.listenTCP(port, factory, interface=interface)
         l.setCloExec()
 
 def setupRelocation(dst, port):
