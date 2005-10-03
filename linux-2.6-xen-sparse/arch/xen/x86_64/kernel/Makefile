@@ -51,7 +51,7 @@ bootflag-y			+= ../../../i386/kernel/bootflag.o
 cpuid-$(subst m,y,$(CONFIG_X86_CPUID))  += ../../../i386/kernel/cpuid.o
 topology-y                     += ../../../i386/mach-default/topology.o
 #swiotlb-$(CONFIG_SWIOTLB)      += ../../../ia64/lib/swiotlb.o
-microcode-$(subst m,y,$(CONFIG_MICROCODE))  += ../../../i386/kernel/microcode.o
+microcode-$(subst m,y,$(CONFIG_MICROCODE))  += ../../i386/kernel/microcode.o
 intel_cacheinfo-y		+= ../../../i386/kernel/cpu/intel_cacheinfo.o
 quirks-y			+= ../../i386/kernel/quirks.o
 
