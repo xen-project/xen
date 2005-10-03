@@ -59,12 +59,16 @@ DOMAIN_SUSPEND  = 2
 """Shutdown code for crash."""
 DOMAIN_CRASH    = 3
 
+"""Shutdown code for halt."""
+DOMAIN_HALT     = 4
+
 """Map shutdown codes to strings."""
 shutdown_reasons = {
     DOMAIN_POWEROFF: "poweroff",
     DOMAIN_REBOOT  : "reboot",
     DOMAIN_SUSPEND : "suspend",
     DOMAIN_CRASH   : "crash",
+    DOMAIN_HALT    : "halt"
     }
 
 restart_modes = [

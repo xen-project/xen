@@ -316,16 +316,10 @@ class XendDomain:
             raise XendError(str(ex))
 
 
-    def domain_shutdown(self, domid, reason='poweroff'):
+    def domain_shutdown(self, domid, reason = 'poweroff'):
         """Shutdown domain (nicely).
-         - poweroff: restart according to exit code and restart mode
-         - reboot:   restart on exit
-         - halt:     do not restart
 
-         Returns immediately.
-
-        @param id:     domain id
-        @param reason: shutdown type: poweroff, reboot, suspend, halt
+        @param reason: shutdown reason: poweroff, reboot, suspend, halt
         """
         self.callInfo(domid, XendDomainInfo.shutdown, reason)
 
@@ -335,13 +329,8 @@ class XendDomain:
         return self.callInfo(domid, XendDomainInfo.send_sysrq, key)
 
 
-    def domain_destroy(self, domid, reason='halt'):
-        """Terminate domain immediately.
-        - halt:   cancel any restart for the domain
-        - reboot  schedule a restart for the domain
-
-        @param domid: domain id
-        """
+    def domain_destroy(self, domid):
+        """Terminate domain immediately."""
 
         if domid == PRIV_DOMAIN:
             raise XendError("Cannot destroy privileged domain %i" % domid)
