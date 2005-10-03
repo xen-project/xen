@@ -62,6 +62,7 @@ struct tpm_vendor_specific {
 	u8 req_complete_val;
 	u8 req_canceled;
 	u16 base;		/* TPM base address */
+	u32 buffersize;         /* The device's requested buffersize */
 
 	int (*recv) (struct tpm_chip *, u8 *, size_t);
 	int (*send) (struct tpm_chip *, u8 *, size_t);

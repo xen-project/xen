@@ -30,7 +30,8 @@
 
 enum {
 	TPM_MINOR = 224,	/* officially assigned */
-	TPM_BUFSIZE = 2048,
+	TPM_MIN_BUFSIZE = 2048,
+	TPM_MAX_BUFSIZE = 65536,
 	TPM_NUM_DEVICES = 256,
 	TPM_NUM_MASK_ENTRIES = TPM_NUM_DEVICES / (8 * sizeof(int))
 };
@@ -63,7 +64,7 @@ static void user_reader_timeout(unsigned long ptr)
 
 	down(&chip->buffer_mutex);
 	atomic_set(&chip->data_pending, 0);
-	memset(chip->data_buffer, 0, TPM_BUFSIZE);
+	memset(chip->data_buffer, 0, chip->vendor->buffersize);
 	up(&chip->buffer_mutex);
 }
 
@@ -458,7 +459,8 @@ int tpm_open(struct inode *inode, struct file *file)
 
 	spin_unlock(&driver_lock);
 
-	chip->data_buffer = kmalloc(TPM_BUFSIZE * sizeof(u8), GFP_KERNEL);
+	chip->data_buffer = kmalloc(chip->vendor->buffersize * sizeof(u8),
+	                            GFP_KERNEL);
 	if (chip->data_buffer == NULL) {
 		chip->num_opens--;
 		put_device(chip->dev);
@@ -507,8 +509,8 @@ ssize_t tpm_write(struct file * file, const char __user * buf,
 
 	down(&chip->buffer_mutex);
 
-	if (in_size > TPM_BUFSIZE)
-		in_size = TPM_BUFSIZE;
+	if (in_size > chip->vendor->buffersize)
+		in_size = chip->vendor->buffersize;
 
 	if (copy_from_user
 	    (chip->data_buffer, (void __user *) buf, in_size)) {
@@ -517,7 +519,9 @@ ssize_t tpm_write(struct file * file, const char __user * buf,
 	}
 
 	/* atomic tpm command send and result receive */
-	out_size = tpm_transmit(chip, chip->data_buffer, TPM_BUFSIZE);
+	out_size = tpm_transmit(chip,
+	                        chip->data_buffer,
+	                        chip->vendor->buffersize);
 
 	atomic_set(&chip->data_pending, out_size);
 	up(&chip->buffer_mutex);
@@ -666,6 +670,12 @@ int tpm_register_hardware_nopci(struct device *dev,
 	chip->user_read_timer.data = (unsigned long) chip;
 
 	chip->vendor = entry;
+
+	if (entry->buffersize < TPM_MIN_BUFSIZE) {
+		entry->buffersize = TPM_MIN_BUFSIZE;
+	} else if (entry->buffersize > TPM_MAX_BUFSIZE) {
+		entry->buffersize = TPM_MAX_BUFSIZE;
+	}
 
 	chip->dev_num = -1;
 
