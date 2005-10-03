@@ -266,15 +266,6 @@ IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 	}
 	if (imm.dt) vcpu_set_metaphysical_mode(vcpu,FALSE);
 	__asm__ __volatile (";; mov psr.l=%0;; srlz.d"::"r"(psr):"memory");
-#if 0 // now done with deliver_pending_interrupts
-	if (enabling_interrupts) {
-		if (vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR) {
-//printf("with interrupts pending\n");
-			return IA64_EXTINT_VECTOR;
-		}
-//else printf("but nothing pending\n");
-	}
-#endif
 	if (enabling_interrupts &&
 		vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
 			PSCB(vcpu,pending_interruption) = 1;
@@ -323,13 +314,6 @@ IA64FAULT vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
 		printf("*** DOMAIN TRYING TO TURN ON BIG-ENDIAN!!!\n");
 		return (IA64_ILLOP_FAULT);
 	}
-	//__asm__ __volatile (";; mov psr.l=%0;; srlz.d"::"r"(psr):"memory");
-#if 0 // now done with deliver_pending_interrupts
-	if (enabling_interrupts) {
-		if (vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
-			return IA64_EXTINT_VECTOR;
-	}
-#endif
 	if (enabling_interrupts &&
 		vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR)
 			PSCB(vcpu,pending_interruption) = 1;
@@ -1245,8 +1229,8 @@ Privileged operation emulation routines
 
 IA64FAULT vcpu_force_data_miss(VCPU *vcpu, UINT64 ifa)
 {
-	PSCB(vcpu,tmp[0]) = ifa;	// save ifa in vcpu structure, then specify IA64_FORCED_IFA
-	return (vcpu_get_rr_ve(vcpu,ifa) ? IA64_DATA_TLB_VECTOR : IA64_ALT_DATA_TLB_VECTOR) | IA64_FORCED_IFA;
+	PSCB(vcpu,ifa) = ifa;
+	return (vcpu_get_rr_ve(vcpu,ifa) ? IA64_DATA_TLB_VECTOR : IA64_ALT_DATA_TLB_VECTOR);
 }
 
 
@@ -1398,9 +1382,14 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 	/* check guest VHPT */
 	pta = PSCB(vcpu,pta);
 	rr.rrval = PSCB(vcpu,rrs)[address>>61];
-	if (!rr.ve || !(pta & IA64_PTA_VE))
+	if (!rr.ve || !(pta & IA64_PTA_VE)) {
+// FIXME? does iha get set for alt faults? does xenlinux depend on it?
+		vcpu_thash(vcpu, address, iha);
+// FIXME?: does itir get set for alt faults?
+		*itir = vcpu_get_itir_on_fault(vcpu,address);
 		return (is_data ? IA64_ALT_DATA_TLB_VECTOR :
 				IA64_ALT_INST_TLB_VECTOR);
+	}
 	if (pta & IA64_PTA_VF) { /* long format VHPT - not implemented */
 		// thash won't work right?
 		panic_domain(vcpu_regs(vcpu),"can't do long format VHPT\n");
@@ -1414,6 +1403,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 
 	vcpu_thash(vcpu, address, iha);
 	if (__copy_from_user(&pte, (void *)(*iha), sizeof(pte)) != 0)
+// FIXME?: does itir get set for vhpt faults?
 		return IA64_VHPT_FAULT;
 
 	/*
@@ -1444,11 +1434,7 @@ IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 		*padr = (pteval & _PAGE_PPN_MASK & mask) | (vadr & ~mask);
 		return (IA64_NO_FAULT);
 	}
-	else
-	{
-		PSCB(vcpu,tmp[0]) = vadr;       // save ifa in vcpu structure, then specify IA64_FORCED_IFA
-		return (fault | IA64_FORCED_IFA);
-	}
+	return vcpu_force_data_miss(vcpu,vadr);
 }
 
 IA64FAULT vcpu_tak(VCPU *vcpu, UINT64 vadr, UINT64 *key)

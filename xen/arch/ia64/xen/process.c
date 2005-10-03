@@ -165,59 +165,34 @@ int dump_reflect_counts(char *buf)
 	return s - buf;
 }
 
-void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long itiriim, struct pt_regs *regs, unsigned long vector)
+// should never panic domain... if it does, stack may have been overrun
+void check_bad_nested_interruption(unsigned long isr, struct pt_regs *regs, unsigned long vector)
 {
-	unsigned long vcpu_get_ipsr_int_state(struct vcpu *,unsigned long);
-	unsigned long vcpu_get_rr_ve(struct vcpu *,unsigned long);
-	struct domain *d = current->domain;
 	struct vcpu *v = current;
 
-	if (vector == IA64_EXTINT_VECTOR) {
-
-		extern unsigned long vcpu_verbose, privop_trace;
-		static first_extint = 1;
-		if (first_extint) {
-			printf("Delivering first extint to domain: ifa=%p, isr=%p, itir=%p, iip=%p\n",ifa,isr,itiriim,regs->cr_iip);
-			//privop_trace = 1; vcpu_verbose = 1;
-			first_extint = 0;
-		}
+	if (!(PSCB(v,ipsr) & IA64_PSR_DT)) {
+		panic_domain(regs,"psr.dt off, trying to deliver nested dtlb!\n");
 	}
-	if (!PSCB(v,interrupt_collection_enabled)) {
-		if (!(PSCB(v,ipsr) & IA64_PSR_DT)) {
-			panic_domain(regs,"psr.dt off, trying to deliver nested dtlb!\n");
-		}
-		vector &= ~0xf;
-		if (vector != IA64_DATA_TLB_VECTOR &&
-		    vector != IA64_ALT_DATA_TLB_VECTOR &&
-		    vector != IA64_VHPT_TRANS_VECTOR) {
+	if (vector != IA64_DATA_TLB_VECTOR &&
+		vector != IA64_ALT_DATA_TLB_VECTOR &&
+		vector != IA64_VHPT_TRANS_VECTOR) {
 panic_domain(regs,"psr.ic off, delivering fault=%lx,ipsr=%p,iip=%p,ifa=%p,isr=%p,PSCB.iip=%p\n",
-	vector,regs->cr_ipsr,regs->cr_iip,ifa,isr,PSCB(v,iip));
-			
-		}
-//printf("Delivering NESTED DATA TLB fault\n");
-		vector = IA64_DATA_NESTED_TLB_VECTOR;
-		regs->cr_iip = ((unsigned long) PSCBX(v,iva) + vector) & ~0xffUL;
-		regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
-// NOTE: nested trap must NOT pass PSCB address
-		//regs->r31 = (unsigned long) &PSCB(v);
-		inc_slow_reflect_count(vector);
-		return;
-
+	vector,regs->cr_ipsr,regs->cr_iip,PSCB(v,ifa),isr,PSCB(v,iip));
 	}
-	if ((vector & 0xf) == IA64_FORCED_IFA)
-		ifa = PSCB(v,tmp[0]);
-	vector &= ~0xf;
-	PSCB(v,ifa) = ifa;
-	if (vector < IA64_DATA_NESTED_TLB_VECTOR) /* VHPT miss, TLB miss, Alt TLB miss */
-		vcpu_thash(v,ifa,&PSCB(current,iha));
+}
+
+void reflect_interruption(unsigned long isr, struct pt_regs *regs, unsigned long vector)
+{
+	unsigned long vcpu_get_ipsr_int_state(struct vcpu *,unsigned long);
+	struct vcpu *v = current;
+
+	if (!PSCB(v,interrupt_collection_enabled))
+		check_bad_nested_interruption(isr,regs,vector);
 	PSCB(v,unat) = regs->ar_unat;  // not sure if this is really needed?
 	PSCB(v,precover_ifs) = regs->cr_ifs;
 	vcpu_bsw0(v);
 	PSCB(v,ipsr) = vcpu_get_ipsr_int_state(v,regs->cr_ipsr);
-	if (vector == IA64_BREAK_VECTOR || vector == IA64_SPECULATION_VECTOR)
-		PSCB(v,iim) = itiriim;
-	else PSCB(v,itir) = vcpu_get_itir_on_fault(v,ifa);
-	PSCB(v,isr) = isr; // this is unnecessary except for interrupts!
+	PSCB(v,isr) = isr;
 	PSCB(v,iip) = regs->cr_iip;
 	PSCB(v,ifs) = 0;
 	PSCB(v,incomplete_regframe) = 0;
@@ -239,6 +214,24 @@ void foodpi(void) {}
 
 unsigned long pending_false_positive = 0;
 
+void reflect_extint(struct pt_regs *regs)
+{
+	extern unsigned long vcpu_verbose, privop_trace;
+	unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
+	struct vcpu *v = current;
+	static first_extint = 1;
+
+	if (first_extint) {
+		printf("Delivering first extint to domain: isr=%p, iip=%p\n",isr,regs->cr_iip);
+		//privop_trace = 1; vcpu_verbose = 1;
+		first_extint = 0;
+	}
+	if (vcpu_timer_pending_early(v))
+printf("*#*#*#* about to deliver early timer to domain %d!!!\n",v->domain->domain_id);
+	PSCB(current,itir) = 0;
+	reflect_interruption(isr,regs,IA64_EXTINT_VECTOR);
+}
+
 // ONLY gets called from ia64_leave_kernel
 // ONLY call with interrupts disabled?? (else might miss one?)
 // NEVER successful if already reflecting a trap/fault because psr.i==0
@@ -249,12 +242,8 @@ void deliver_pending_interrupt(struct pt_regs *regs)
 	// FIXME: Will this work properly if doing an RFI???
 	if (!is_idle_task(d) && user_mode(regs)) {
 		//vcpu_poke_timer(v);
-		if (vcpu_deliverable_interrupts(v)) {
-			unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
-			if (vcpu_timer_pending_early(v))
-printf("*#*#*#* about to deliver early timer to domain %d!!!\n",v->domain->domain_id);
-			reflect_interruption(0,isr,0,regs,IA64_EXTINT_VECTOR);
-		}
+		if (vcpu_deliverable_interrupts(v))
+			reflect_extint(regs);
 		else if (PSCB(v,pending_interruption))
 			++pending_false_positive;
 	}
@@ -295,14 +284,12 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	}
 
 	fault = vcpu_translate(current,address,is_data,&pteval,&itir,&iha);
-	if (fault == IA64_NO_FAULT)
-	{
+	if (fault == IA64_NO_FAULT) {
 		pteval = translate_domain_pte(pteval,address,itir);
 		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,(itir>>2)&0x3f);
 		return;
 	}
-	else if (IS_VMM_ADDRESS(iip))
-	{
+	if (IS_VMM_ADDRESS(iip)) {
 		if (!ia64_done_with_exception(regs)) {
 			// should never happen.  If it does, region 0 addr may
 			// indicate a bad xen pointer
@@ -315,8 +302,22 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		}
 		return;
 	}
+	if (!PSCB(current,interrupt_collection_enabled)) {
+		check_bad_nested_interruption(isr,regs,fault);
+		//printf("Delivering NESTED DATA TLB fault\n");
+		fault = IA64_DATA_NESTED_TLB_VECTOR;
+		regs->cr_iip = ((unsigned long) PSCBX(current,iva) + fault) & ~0xffUL;
+		regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
+		// NOTE: nested trap must NOT pass PSCB address
+		//regs->r31 = (unsigned long) &PSCB(current);
+		inc_slow_reflect_count(fault);
+		return;
+	}
 
-	reflect_interruption(address, isr, 0, regs, fault);
+	PSCB(current,itir) = itir;
+	PSCB(current,iha) = iha;
+	PSCB(current,ifa) = address;
+	reflect_interruption(isr, regs, fault);
 }
 
 void
@@ -521,7 +522,9 @@ printf("ia64_fault, vector=0x%p, ifa=%p, iip=%p, ipsr=%p, isr=%p\n",
 	}
 	//die_if_kernel(buf, regs, error);
 printk("ia64_fault: %s: reflecting\n",buf);
-reflect_interruption(ifa,isr,iim,regs,IA64_GENEX_VECTOR);
+PSCB(current,itir) = vcpu_get_itir_on_fault(current,ifa);
+PSCB(current,ifa) = ifa;
+reflect_interruption(isr,regs,IA64_GENEX_VECTOR);
 //while(1);
 	//force_sig(SIGILL, current);
 }
@@ -668,7 +671,10 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 		if (ia64_hyperprivop(iim,regs))
 			vcpu_increment_iip(current);
 	}
-	else reflect_interruption(ifa,isr,iim,regs,IA64_BREAK_VECTOR);
+	else {
+		PSCB(v,iim) = iim;
+		reflect_interruption(isr,regs,IA64_BREAK_VECTOR);
+	}
 }
 
 void
@@ -680,10 +686,11 @@ ia64_handle_privop (unsigned long ifa, struct pt_regs *regs, unsigned long isr, 
 	// FIXME: no need to pass itir in to this routine as we need to
 	// compute the virtual itir anyway (based on domain's RR.ps)
 	// AND ACTUALLY reflect_interruption doesn't use it anyway!
-	itir = vcpu_get_itir_on_fault(v,ifa);
 	vector = priv_emulate(current,regs,isr);
 	if (vector != IA64_NO_FAULT && vector != IA64_RFI_IN_PROGRESS) {
-		reflect_interruption(ifa,isr,itir,regs,vector);
+		PSCB(current,itir) =
+			vcpu_get_itir_on_fault(v,PSCB(current,ifa));
+		reflect_interruption(isr,regs,vector);
 	}
 }
 
@@ -697,15 +704,10 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	struct vcpu *v = (struct domain *) current;
 	unsigned long check_lazy_cover = 0;
 	unsigned long psr = regs->cr_ipsr;
-	unsigned long itir = vcpu_get_itir_on_fault(v,ifa);
 
 	if (!(psr & IA64_PSR_CPL)) {
 		printk("ia64_handle_reflection: reflecting with priv=0!!\n");
 	}
-	// FIXME: no need to pass itir in to this routine as we need to
-	// compute the virtual itir anyway (based on domain's RR.ps)
-	// AND ACTUALLY reflect_interruption doesn't use it anyway!
-	itir = vcpu_get_itir_on_fault(v,ifa);
 	switch(vector) {
 	    case 8:
 		vector = IA64_DIRTY_BIT_VECTOR; break;
@@ -736,7 +738,7 @@ printf("*** Handled privop masquerading as NaT fault\n");
 		vector = IA64_NAT_CONSUMPTION_VECTOR; break;
 	    case 27:
 //printf("*** Handled speculation vector, itc=%lx!\n",ia64_get_itc());
-		itir = iim;
+		PSCB(current,iim) = iim;
 		vector = IA64_SPECULATION_VECTOR; break;
 	    case 30:
 		// FIXME: Should we handle unaligned refs in Xen??
@@ -747,7 +749,9 @@ printf("*** Handled privop masquerading as NaT fault\n");
 		return;
 	}
 	if (check_lazy_cover && (isr & IA64_ISR_IR) && handle_lazy_cover(v, isr, regs)) return;
-	reflect_interruption(ifa,isr,itir,regs,vector);
+	PSCB(current,ifa) = ifa;
+	PSCB(current,itir) = vcpu_get_itir_on_fault(v,ifa);
+	reflect_interruption(isr,regs,vector);
 }
 
 unsigned long __hypercall_create_continuation(
