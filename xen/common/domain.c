@@ -18,6 +18,7 @@
 #include <xen/domain_page.h>
 #include <asm/debugger.h>
 #include <public/dom0_ops.h>
+#include <public/vcpu.h>
 
 /* Both these structures are protected by the domlist_lock. */
 rwlock_t domlist_lock = RW_LOCK_UNLOCKED;
@@ -366,37 +367,17 @@ int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
     return rc;
 }
 
-/*
- * final_setup_guest is used for final setup and launching of domains other
- * than domain 0. ie. the domains that are being built by the userspace dom0
- * domain builder.
- */
-long do_boot_vcpu(unsigned long vcpu, struct vcpu_guest_context *ctxt) 
+int boot_vcpu(struct domain *d, int vcpuid, struct vcpu_guest_context *ctxt) 
 {
-    struct domain *d = current->domain;
     struct vcpu *v;
-    int rc = 0;
-    struct vcpu_guest_context *c;
+    int rc;
 
-    if ( (vcpu >= MAX_VIRT_CPUS) || (d->vcpu[vcpu] != NULL) )
-        return -EINVAL;
+    ASSERT(d->vcpu[vcpuid] == NULL);
 
-    if ( alloc_vcpu_struct(d, vcpu) == NULL )
+    if ( alloc_vcpu_struct(d, vcpuid) == NULL )
         return -ENOMEM;
 
-    if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
-    {
-        rc = -ENOMEM;
-        goto out;
-    }
-
-    if ( copy_from_user(c, ctxt, sizeof(*c)) )
-    {
-        rc = -EFAULT;
-        goto out;
-    }
-
-    v = d->vcpu[vcpu];
+    v = d->vcpu[vcpuid];
 
     atomic_set(&v->pausecnt, 0);
     v->cpumap = CPUMAP_RUNANYWHERE;
@@ -405,22 +386,73 @@ long do_boot_vcpu(unsigned long vcpu, struct vcpu_guest_context *ctxt)
 
     arch_do_boot_vcpu(v);
 
-    if ( (rc = arch_set_info_guest(v, c)) != 0 )
+    if ( (rc = arch_set_info_guest(v, ctxt)) != 0 )
         goto out;
 
     sched_add_domain(v);
 
-    /* domain_unpause_by_systemcontroller */
-    if ( test_and_clear_bit(_VCPUF_ctrl_pause, &v->vcpu_flags) )
-        vcpu_wake(v);
+    set_bit(_VCPUF_down, &v->vcpu_flags);
+    clear_bit(_VCPUF_ctrl_pause, &v->vcpu_flags);
 
-    xfree(c);
     return 0;
 
  out:
-    xfree(c);
-    arch_free_vcpu_struct(d->vcpu[vcpu]);
-    d->vcpu[vcpu] = NULL;
+    arch_free_vcpu_struct(d->vcpu[vcpuid]);
+    d->vcpu[vcpuid] = NULL;
+    return rc;
+}
+
+long do_vcpu_op(int cmd, int vcpuid, void *arg)
+{
+    struct domain *d = current->domain;
+    struct vcpu *v;
+    struct vcpu_guest_context *ctxt;
+    long rc = 0;
+
+    if ( (vcpuid < 0) || (vcpuid >= MAX_VIRT_CPUS) )
+        return -EINVAL;
+
+    if ( ((v = d->vcpu[vcpuid]) == NULL) && (cmd != VCPUOP_create) )
+        return -ENOENT;
+
+    switch ( cmd )
+    {
+    case VCPUOP_create:
+        if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
+        {
+            rc = -ENOMEM;
+            break;
+        }
+
+        if ( copy_from_user(ctxt, arg, sizeof(*ctxt)) )
+        {
+            xfree(ctxt);
+            rc = -EFAULT;
+            break;
+        }
+
+        LOCK_BIGLOCK(d);
+        rc = (d->vcpu[vcpuid] == NULL) ? boot_vcpu(d, vcpuid, ctxt) : -EEXIST;
+        UNLOCK_BIGLOCK(d);
+
+        xfree(ctxt);
+        break;
+
+    case VCPUOP_up:
+        if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+            vcpu_wake(v);
+        break;
+
+    case VCPUOP_down:
+        if ( !test_and_set_bit(_VCPUF_down, &v->vcpu_flags) )
+            vcpu_sleep_nosync(v);
+        break;
+
+    case VCPUOP_is_up:
+        rc = !test_bit(_VCPUF_down, &v->vcpu_flags);
+        break;
+    }
+
     return rc;
 }
 

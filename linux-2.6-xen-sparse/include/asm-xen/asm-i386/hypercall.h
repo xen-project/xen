@@ -316,26 +316,10 @@ HYPERVISOR_vm_assist(
 }
 
 static inline int
-HYPERVISOR_boot_vcpu(
-	unsigned long vcpu, vcpu_guest_context_t *ctxt)
+HYPERVISOR_vcpu_op(
+	int cmd, int vcpuid, void *extra_args)
 {
-	return _hypercall2(int, boot_vcpu, vcpu, ctxt);
-}
-
-static inline int
-HYPERVISOR_vcpu_up(
-	int vcpu)
-{
-	return _hypercall2(int, sched_op, SCHEDOP_vcpu_up |
-			   (vcpu << SCHEDOP_vcpushift), 0);
-}
-
-static inline int
-HYPERVISOR_vcpu_pickle(
-	int vcpu, vcpu_guest_context_t *ctxt)
-{
-	return _hypercall2(int, sched_op, SCHEDOP_vcpu_pickle |
-			   (vcpu << SCHEDOP_vcpushift), ctxt);
+	return _hypercall3(int, vcpu_op, cmd, vcpuid, extra_args);
 }
 
 static inline int
@@ -354,24 +338,6 @@ HYPERVISOR_suspend(
 					 SCHEDOP_reasonshift)), 
 		"2" (srec) : "memory", "ecx");
 
-	return ret;
-}
-
-static inline int
-HYPERVISOR_vcpu_down(
-	int vcpu)
-{
-	int ret;
-	unsigned long ign1;
-	/* Yes, I really do want to clobber edx here: when we resume a
-	   vcpu after unpickling a multi-processor domain, it returns
-	   here, but clobbers all of the call clobbered registers. */
-	__asm__ __volatile__ (
-		TRAP_INSTR
-		: "=a" (ret), "=b" (ign1)
-		: "0" (__HYPERVISOR_sched_op),
-		"1" (SCHEDOP_vcpu_down | (vcpu << SCHEDOP_vcpushift))
-		: "memory", "ecx", "edx" );
 	return ret;
 }
 

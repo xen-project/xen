@@ -629,7 +629,7 @@ ENTRY(hypercall_table)
         .quad do_vm_assist
         .quad do_update_va_mapping_otherdomain
         .quad do_switch_to_user
-        .quad do_boot_vcpu
+        .quad do_vcpu_op
         .quad do_set_segment_base   /* 25 */
         .quad do_mmuext_op
         .quad do_acm_op
@@ -662,7 +662,7 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_vm_assist         */
         .byte 4 /* do_update_va_mapping_otherdomain */
         .byte 0 /* do_switch_to_user    */
-        .byte 2 /* do_boot_vcpu         */
+        .byte 3 /* do_vcpu_op           */
         .byte 2 /* do_set_segment_base  */  /* 25 */
         .byte 4 /* do_mmuext_op         */
         .byte 1 /* do_acm_op            */

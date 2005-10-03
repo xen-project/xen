@@ -62,8 +62,8 @@
 #include <asm/nmi.h>
 #ifdef CONFIG_XEN
 #include <asm/arch_hooks.h>
-
 #include <asm-xen/evtchn.h>
+#include <asm-xen/xen-public/vcpu.h>
 #endif
 
 /* Change for real CPU hotplug. Note other files need to be fixed
@@ -771,11 +771,13 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 
 	ctxt.ctrlreg[3] = virt_to_mfn(init_level4_pgt) << PAGE_SHIFT;
 
-	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
+	boot_error  = HYPERVISOR_vcpu_op(VCPUOP_create, cpu, &ctxt);
 	if (boot_error)
 		printk("boot error: %ld\n", boot_error);
 
 	if (!boot_error) {
+		HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
+
 		/*
 		 * allow APs to start initializing.
 		 */

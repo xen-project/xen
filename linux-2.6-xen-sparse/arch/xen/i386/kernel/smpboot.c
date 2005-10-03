@@ -63,6 +63,7 @@
 #include <smpboot_hooks.h>
 
 #include <asm-xen/evtchn.h>
+#include <asm-xen/xen-public/vcpu.h>
 
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
@@ -882,11 +883,13 @@ static int __init do_boot_cpu(int apicid)
 
 	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 
-	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
+	boot_error = HYPERVISOR_vcpu_op(VCPUOP_create, cpu, &ctxt);
 	if (boot_error)
 		printk("boot error: %ld\n", boot_error);
 
 	if (!boot_error) {
+		HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
+
 		/*
 		 * allow APs to start initializing.
 		 */
@@ -1499,7 +1502,7 @@ int __devinit __cpu_up(unsigned int cpu)
 #ifdef CONFIG_HOTPLUG_CPU
 #ifdef CONFIG_XEN
 	/* Tell hypervisor to bring vcpu up. */
-	HYPERVISOR_vcpu_up(cpu);
+	HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
 #endif
 	/* Already up, and in cpu_quiescent now? */
 	if (cpu_isset(cpu, smp_commenced_mask)) {
@@ -1621,5 +1624,6 @@ void vcpu_prepare(int vcpu)
 
 	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 
-	(void)HYPERVISOR_boot_vcpu(vcpu, &ctxt);
+	(void)HYPERVISOR_vcpu_op(VCPUOP_create, vcpu, &ctxt);
+	(void)HYPERVISOR_vcpu_op(VCPUOP_up, vcpu, NULL);
 }
