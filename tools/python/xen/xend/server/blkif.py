@@ -69,8 +69,10 @@ class BlkifController(DevController):
                                                   'dev', 'type', 'params',
                                                   'read-only')
 
-        result.append(['dev', dev])
-        result.append(['uname', typ + ":" + params])
+        if dev:
+            result.append(['dev', dev])
+        if typ and params:
+            result.append(['uname', typ + ":" + params])
         if ro:
             result.append(['mode', 'r'])
         else:
