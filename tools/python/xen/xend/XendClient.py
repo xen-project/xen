@@ -232,10 +232,9 @@ class Xend:
                              {'op'      : 'sysrq',
                               'key'     : key})
 
-    def xend_domain_destroy(self, id, reason):
+    def xend_domain_destroy(self, id):
         return self.xendPost(self.domainurl(id),
-                             {'op'      : 'destroy',
-                              'reason'  : reason })
+                             {'op'      : 'destroy' })
 
     def xend_domain_save(self, id, filename):
         return self.xendPost(self.domainurl(id),

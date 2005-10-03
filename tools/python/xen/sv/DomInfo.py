@@ -139,7 +139,7 @@ class DomActionTab( ActionTab ):
         if not dom is None and dom != '0':
     	   if DEBUG: print ">DomShutDown %s" % dom
            try:
-    	   	server.xend_domain_shutdown( int( dom ), "halt" )
+    	   	server.xend_domain_shutdown( int( dom ), "poweroff" )
            except:
            	pass
     
@@ -175,7 +175,7 @@ class DomActionTab( ActionTab ):
         if not dom is None and dom != '0':
     	   if DEBUG: print ">DomDestroy %s" % dom
            try:
-           	server.xend_domain_destroy( int( dom ), "halt" )
+           	server.xend_domain_destroy(int( dom ))
            except:
            	pass
 
