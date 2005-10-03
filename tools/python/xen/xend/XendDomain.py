@@ -284,6 +284,11 @@ class XendDomain:
                 pass
         return dominfo
 
+
+    def privilegedDomain(self):
+        return self.domains[PRIV_DOMAIN]
+
+ 
     def domain_unpause(self, id):
         """Unpause domain execution.
 

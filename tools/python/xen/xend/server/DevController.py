@@ -189,8 +189,17 @@ class DevController:
         """
 
         import xen.xend.XendDomain
-        backdom = xen.xend.XendDomain.instance().domain_lookup_by_name(
-            sxp.child_value(config, 'backend', '0'))
+        xd = xen.xend.XendDomain.instance()
+
+        backdom_name = sxp.child_value(config, 'backend')
+        if backdom_name:
+            backdom = xd.domain_lookup_by_name(backdom_name)
+        else:
+            backdom = xd.privilegedDomain()
+
+        if not backdom:
+            raise VmError("Cannot configure device for unknown backend %s" %
+                          backdom_name)
 
         frontpath = self.frontendPath(devid)
         backpath  = self.backendPath(backdom, devid)
