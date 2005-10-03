@@ -73,19 +73,15 @@ def shutdown(opts, doms, mode, wait):
         opts.info("All domains terminated")
 
 def shutdown_mode(opts):
-    mode = 'poweroff'
-    if opts.vals.wait:
-        mode = 'halt'
-        if opts.vals.reboot:
-           opts.err("Can't specify wait and reboot") 
+    if opts.vals.halt and opts.vals.reboot:
+        opts.err("Can't specify halt and reboot")
+
+    if opts.vals.halt:
+        return 'halt'
+    elif opts.vals.reboot:
+        return 'reboot'
     else:
-        if opts.vals.halt and opts.vals.reboot:
-            opts.err("Can't specify halt and reboot")
-        if opts.vals.halt:
-            mode = 'halt'
-        elif opts.vals.reboot:
-            mode = 'reboot'
-    return mode
+        return 'poweroff'
 
 def main_all(opts, args):
     mode = shutdown_mode(opts)  
