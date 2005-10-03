@@ -742,12 +742,6 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 	/* FPU is set up to default initial state. */
 	memset(&ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
 
-	/* Virtual IDT is empty at start-of-day. */
-	for ( i = 0; i < 256; i++ )
-	{
-		ctxt.trap_ctxt[i].vector = i;
-		ctxt.trap_ctxt[i].cs     = FLAT_KERNEL_CS;
-	}
 	smp_trap_init(ctxt.trap_ctxt);
 
 	/* No LDT. */
@@ -1267,13 +1261,8 @@ void smp_resume(void)
 	local_setup_timer_irq();
 }
 
-void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
+void vcpu_prepare(int vcpu)
 {
-}
-
-int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
-{
-	return 0;
 }
 
 #endif

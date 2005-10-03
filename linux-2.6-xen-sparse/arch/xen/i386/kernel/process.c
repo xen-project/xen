@@ -141,6 +141,13 @@ static inline void play_dead(void)
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
+void cpu_restore(void)
+{
+	play_dead();
+	local_irq_enable();
+	cpu_idle();
+}
+
 /*
  * The idle thread. There's no useful work to be
  * done, so just try to conserve power and have a

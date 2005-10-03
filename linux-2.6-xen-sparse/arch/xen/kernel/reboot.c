@@ -74,11 +74,8 @@ static int __do_suspend(void *ignore)
 	extern unsigned long *pfn_to_mfn_frame_list[];
 
 #ifdef CONFIG_SMP
-	static vcpu_guest_context_t suspended_cpu_records[NR_CPUS];
-	cpumask_t prev_online_cpus, prev_present_cpus;
-
-	void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt);
-	int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt);
+	cpumask_t prev_online_cpus;
+	int vcpu_prepare(int vcpu);
 #endif
 
 	extern void xencons_resume(void);
@@ -132,16 +129,6 @@ static int __do_suspend(void *ignore)
 
 	preempt_enable();
 
-#ifdef CONFIG_SMP
-	cpus_clear(prev_present_cpus);
-	for_each_present_cpu(i) {
-		if (i == 0)
-			continue;
-		save_vcpu_context(i, &suspended_cpu_records[i]);
-		cpu_set(i, prev_present_cpus);
-	}
-#endif
-
 	gnttab_suspend();
 
 #ifdef __i386__
@@ -189,11 +176,6 @@ static int __do_suspend(void *ignore)
 
 	time_resume();
 
-#ifdef CONFIG_SMP
-	for_each_cpu_mask(i, prev_present_cpus)
-		restore_vcpu_context(i, &suspended_cpu_records[i]);
-#endif
-
 	__sti();
 
 	xencons_resume();
@@ -201,6 +183,9 @@ static int __do_suspend(void *ignore)
 	xenbus_resume();
 
 #ifdef CONFIG_SMP
+	for_each_present_cpu(i)
+		vcpu_prepare(i);
+
  out_reenable_cpus:
 	for_each_cpu_mask(i, prev_online_cpus) {
 		j = cpu_up(i);
