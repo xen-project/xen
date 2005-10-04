@@ -1,7 +1,7 @@
 /******************************************************************************
  * vcpu.h
  * 
- * VCPU creation and hotplug.
+ * VCPU initialisation, query, and hotplug.
  * 
  * Copyright (c) 2005, Keir Fraser <keir@xensource.com>
  */
@@ -18,18 +18,17 @@
  */
 
 /*
- * Create a new VCPU. This must be called before a VCPU can be referred to
- * in any other hypercall (e.g., to bind event channels). The new VCPU
- * will not run until it is brought up by VCPUOP_up.
+ * Initialise a VCPU. Each VCPU can be initialised only once. A 
+ * newly-initialised VCPU will not run until it is brought up by VCPUOP_up.
  * 
  * @extra_arg == pointer to vcpu_guest_context structure containing initial
- *               state for the new VCPU.
+ *               state for the VCPU.
  */
-#define VCPUOP_create               0
+#define VCPUOP_initialise           0
 
 /*
- * Bring up a newly-created or previously brought-down VCPU. This makes the
- * VCPU runnable.
+ * Bring up a VCPU. This makes the VCPU runnable. This operation will fail
+ * if the VCPU has not been initialised (VCPUOP_initialise).
  */
 #define VCPUOP_up                   1
 
@@ -41,7 +40,7 @@
  *     idea to ensure that the VCPU has entered a non-critical loop before
  *     bringing it down. Alternatively, this operation is guaranteed
  *     synchronous if invoked by the VCPU itself.
- *  2. After a VCPU is created, there is currently no way to drop all its
+ *  2. After a VCPU is initialised, there is currently no way to drop all its
  *     references to domain memory. Even a VCPU that is down still holds
  *     memory references via its pagetable base pointer and GDT. It is good
  *     practise to move a VCPU onto an 'idle' or default page table, LDT and

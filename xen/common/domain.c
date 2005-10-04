@@ -412,12 +412,12 @@ long do_vcpu_op(int cmd, int vcpuid, void *arg)
     if ( (vcpuid < 0) || (vcpuid >= MAX_VIRT_CPUS) )
         return -EINVAL;
 
-    if ( ((v = d->vcpu[vcpuid]) == NULL) && (cmd != VCPUOP_create) )
+    if ( ((v = d->vcpu[vcpuid]) == NULL) && (cmd != VCPUOP_initialise) )
         return -ENOENT;
 
     switch ( cmd )
     {
-    case VCPUOP_create:
+    case VCPUOP_initialise:
         if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
         {
             rc = -ENOMEM;

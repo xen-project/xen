@@ -771,7 +771,7 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 
 	ctxt.ctrlreg[3] = virt_to_mfn(init_level4_pgt) << PAGE_SHIFT;
 
-	boot_error  = HYPERVISOR_vcpu_op(VCPUOP_create, cpu, &ctxt);
+	boot_error  = HYPERVISOR_vcpu_op(VCPUOP_initialise, cpu, &ctxt);
 	if (boot_error)
 		printk("boot error: %ld\n", boot_error);
 

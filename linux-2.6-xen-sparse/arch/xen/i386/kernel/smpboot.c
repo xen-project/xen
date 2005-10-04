@@ -883,7 +883,7 @@ static int __init do_boot_cpu(int apicid)
 
 	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 
-	boot_error = HYPERVISOR_vcpu_op(VCPUOP_create, cpu, &ctxt);
+	boot_error = HYPERVISOR_vcpu_op(VCPUOP_initialise, cpu, &ctxt);
 	if (boot_error)
 		printk("boot error: %ld\n", boot_error);
 
@@ -1624,6 +1624,6 @@ void vcpu_prepare(int vcpu)
 
 	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 
-	(void)HYPERVISOR_vcpu_op(VCPUOP_create, vcpu, &ctxt);
+	(void)HYPERVISOR_vcpu_op(VCPUOP_initialise, vcpu, &ctxt);
 	(void)HYPERVISOR_vcpu_op(VCPUOP_up, vcpu, NULL);
 }
