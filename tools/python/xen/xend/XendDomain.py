@@ -22,14 +22,12 @@
  Needs to be persistent for one uptime.
 """
 import os
-import string
 import threading
 
 import xen.lowlevel.xc
 
 import XendDomainInfo
 
-from xen.xend import sxp
 from xen.xend import XendRoot
 from xen.xend import XendCheckpoint
 from xen.xend import EventServer
@@ -116,8 +114,10 @@ class XendDomain:
         from xen.xend.xenstore.xswatch import xswatch
         self.releaseDomain = xswatch("@releaseDomain", self.onReleaseDomain)
 
+
     def xen_domains(self):
-        """Get table of domains indexed by id from xc.
+        """Get table of domains indexed by id from xc.  Expects to be
+        protected by the domains_lock.
         """
         domlist = xc.domain_getinfo()
         doms = {}
@@ -126,57 +126,34 @@ class XendDomain:
             doms[domid] = d
         return doms
 
-    def xen_domain(self, dom):
-        """Get info about a single domain from xc.
-        Returns None if not found.
-
-        @param dom domain id (int)
-        """
-        dominfo = xc.domain_getinfo(dom, 1)
-        if dominfo == [] or dominfo[0]['dom'] != dom:
-            dominfo = None
-        else:
-            dominfo = dominfo[0]
-        return dominfo
-
 
     def dom0_setup(self):
+        """Expects to be protected by the domains_lock."""
         dom0 = self.domains[PRIV_DOMAIN]
         dom0.dom0_enforce_vcpus()
 
 
-    def _add_domain(self, info, notify=True):
-        """Add a domain entry to the tables.
-
-        @param info:   domain info object
-        @param notify: send a domain created event if true
+    def _add_domain(self, info):
+        """Add the given domain entry to this instance's internal cache.
+        Expects to be protected by the domains_lock.
         """
-        if info.getDomid() in self.domains:
-            notify = False
         self.domains[info.getDomid()] = info
-        #info.exportToDB()
-        #if notify:
-        #    eserver.inject('xend.domain.create', [info.getName(),
-        #                                          info.getDomid()])
 
-    def _delete_domain(self, domid, notify=True):
-        """Remove a domain from the tables.
 
-        @param id:     domain id
-        @param notify: send a domain died event if true
+    def _delete_domain(self, domid):
+        """Remove the given domain from this instance's internal cache.
+        Expects to be protected by the domains_lock.
         """
         info = self.domains.get(domid)
         if info:
             del self.domains[domid]
             info.cleanupDomain()
             info.cleanupVm()
-            if notify:
-                eserver.inject('xend.domain.died', [info.getName(),
-                                                    info.getDomid()])
 
 
     def refresh(self):
-        """Refresh domain list from Xen.
+        """Refresh domain list from Xen.  Expects to be protected by the
+        domains_lock.
         """
         doms = self.xen_domains()
         for d in self.domains.values():
@@ -249,7 +226,10 @@ class XendDomain:
 
         try:
             return XendCheckpoint.restore(self, fd)
-        except Exception, ex:
+        except:
+            # I don't really want to log this exception here, but the error
+            # handling in the relocation-socket handling code (relocate.py) is
+            # poor, so we need to log this for debugging.
             log.exception("Restore failed")
             raise
 
