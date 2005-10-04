@@ -23,9 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "version.h"
-#include "privcmd.h"
-#include "xen.h"
+#include <xen/linux/privcmd.h>
 
 struct xi_handle {
 	int fd;

@@ -47,8 +47,8 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
-#include "xenctrl.h"
-#include <io/ioreq.h>
+#include <xenctrl.h>
+#include <xen/io/ioreq.h>
 
 #include "cpu.h"
 #include "exec-all.h"

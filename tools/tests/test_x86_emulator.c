@@ -78,7 +78,7 @@ static struct x86_mem_emulator emulops = {
 
 int main(int argc, char **argv)
 {
-    struct xen_regs regs;
+    struct cpu_user_regs regs;
     char instr[20] = { 0x01, 0x08 }; /* add %ecx,(%eax) */
     unsigned int res = 0x7FFFFFFF;
     u32 cmpxchg8b_res[2] = { 0x12345678, 0x87654321 };

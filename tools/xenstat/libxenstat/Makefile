@@ -38,9 +38,7 @@ SONAME_FLAGS=-Wl,-soname -Wl,libxenstat.so.$(MAJOR)
 
 WARN_FLAGS=-Wall -Werror
 
-CFLAGS+=-Isrc
-CFLAGS+=-I$(XEN_ROOT)/xen/include/public
-CFLAGS+=-I$(LINUX_ROOT)/include/asm-xen/linux-public/
+CFLAGS+=-Isrc -I$(XEN_LIBXC)
 LDFLAGS+=-Lsrc
 
 all: $(LIB)

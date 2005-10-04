@@ -26,8 +26,9 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
-#include "dom0_ops.h"
-#include "version.h"
+#include <xen/xen.h>
+#include <xen/dom0_ops.h>
+#include <xen/version.h>
 
 /* Opaque handles */
 typedef struct xi_handle xi_handle;

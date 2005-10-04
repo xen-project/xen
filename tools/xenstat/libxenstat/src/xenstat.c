@@ -22,7 +22,6 @@
 #include <unistd.h>
 #include <xen-interface.h>
 #include "xenstat.h"
-#include "version.h"
 
 /*
  * Types

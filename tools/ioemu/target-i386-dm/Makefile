@@ -6,7 +6,7 @@ override TARGET_ARCH=i386
 INSTALL_DIR := $(DESTDIR)/usr/$(LIBDIR)/xen/bin
 TARGET_PATH=$(SRC_PATH)/target-$(TARGET_ARCH)
 VPATH=$(SRC_PATH):$(TARGET_PATH):$(SRC_PATH)/hw:$(SRC_PATH)/audio
-DEFINES=-I. -I$(TARGET_PATH) -I$(SRC_PATH) -I$(XEN_ROOT)/xen/include/public
+DEFINES=-I. -I$(TARGET_PATH) -I$(SRC_PATH)
 DEFINES+= -I$(XEN_ROOT)/tools/libxc
 ifdef CONFIG_USER_ONLY
 VPATH+=:$(SRC_PATH)/linux-user

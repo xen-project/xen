@@ -15,7 +15,6 @@ PROG_DEP = .*.d
 BASECFLAGS+= -O3 $(PROFILE)
 #BASECFLAGS+= -I$(XEN_ROOT)/tools
 BASECFLAGS+= -I$(XEN_ROOT)/tools/libxc
-BASECFLAGS+= -I$(XEN_ROOT)/xen/include/public
 BASECFLAGS+= -I.
 
 CFLAGS  += $(BASECFLAGS)
