@@ -80,11 +80,15 @@ class NetifController(DevController):
                                                      'script', 'ip', 'bridge',
                                                      'mac')
 
-        result.append(['script',
-                       script.replace(xroot.network_script_dir + os.sep, "")])
+        if script:
+            result.append(['script',
+                           script.replace(xroot.network_script_dir + os.sep,
+                                          "")])
         if ip:
             result.append(['ip', ip.split(" ")])
-        result.append(['bridge', bridge])
-        result.append(['mac', mac])
+        if bridge:
+            result.append(['bridge', bridge])
+        if mac:
+            result.append(['mac', mac])
 
         return result
