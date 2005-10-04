@@ -248,7 +248,7 @@ class XendDomain:
         """Restore a domain from the given file descriptor."""
 
         try:
-            XendCheckpoint.restore(self, fd)
+            return XendCheckpoint.restore(self, fd)
         except Exception, ex:
             log.exception("Restore failed")
             raise
