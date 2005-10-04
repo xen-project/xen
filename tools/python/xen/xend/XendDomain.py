@@ -216,7 +216,11 @@ class XendDomain:
         """
 
         try:
-            return self.domain_restore_fd(os.open(src, os.O_RDONLY))
+            fd = os.open(src, os.O_RDONLY)
+            try:
+                return self.domain_restore_fd(fd)
+            finally:
+                os.close(fd)
         except OSError, ex:
             raise XendError("can't read guest state file %s: %s" %
                             (src, ex[1]))
@@ -256,19 +260,19 @@ class XendDomain:
             self.domains_lock.release()
 
 
-    def domain_lookup(self, id):
+    def domain_lookup(self, domid):
         self.domains_lock.acquire()
         try:
             self.refresh()
-            return self.domains.get(id)
+            return self.domains.get(domid)
         finally:
             self.domains_lock.release()
 
 
-    def domain_lookup_nr(self, id):
+    def domain_lookup_nr(self, domid):
         self.domains_lock.acquire()
         try:
-            return self.domains.get(id)
+            return self.domains.get(domid)
         finally:
             self.domains_lock.release()
 
@@ -323,12 +327,9 @@ class XendDomain:
             self.domains_lock.release()
 
  
-    def domain_unpause(self, id):
-        """Unpause domain execution.
-
-        @param id: domain id
-        """
-        dominfo = self.domain_lookup(id)
+    def domain_unpause(self, domid):
+        """Unpause domain execution."""
+        dominfo = self.domain_lookup(domid)
         eserver.inject('xend.domain.unpause', [dominfo.getName(),
                                                dominfo.getDomid()])
         try:
@@ -336,12 +337,9 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
     
-    def domain_pause(self, id):
-        """Pause domain execution.
-
-        @param id: domain id
-        """
-        dominfo = self.domain_lookup(id)
+    def domain_pause(self, domid):
+        """Pause domain execution."""
+        dominfo = self.domain_lookup(domid)
         eserver.inject('xend.domain.pause', [dominfo.getName(),
                                              dominfo.getDomid()])
         try:
@@ -380,14 +378,10 @@ class XendDomain:
                 raise XendError(str(ex))
         return val       
 
-    def domain_migrate(self, id, dst, live=False, resource=0):
-        """Start domain migration.
+    def domain_migrate(self, domid, dst, live=False, resource=0):
+        """Start domain migration."""
 
-        @param id: domain id
-        """
-        # Need a cancel too?
-        # Don't forget to cancel restart for it.
-        dominfo = self.domain_lookup(id)
+        dominfo = self.domain_lookup(domid)
 
         port = xroot.get_xend_relocation_port()
         sock = relocate.setupRelocation(dst, port)
@@ -395,42 +389,41 @@ class XendDomain:
         XendCheckpoint.save(sock.fileno(), dominfo, live)
         
 
-    def domain_save(self, id, dst):
+    def domain_save(self, domid, dst):
         """Start saving a domain to file.
 
-        @param id:       domain id
         @param dst:      destination file
         """
 
         try:
-            dominfo = self.domain_lookup(id)
+            dominfo = self.domain_lookup(domid)
 
             fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
-
-            # For now we don't support 'live checkpoint' 
-            return XendCheckpoint.save(fd, dominfo, False)
-
+            try:
+                # For now we don't support 'live checkpoint' 
+                return XendCheckpoint.save(fd, dominfo, False)
+            finally:
+                os.close(fd)
         except OSError, ex:
             raise XendError("can't write guest state file %s: %s" %
                             (dst, ex[1]))
 
-    def domain_pincpu(self, id, vcpu, cpumap):
+    def domain_pincpu(self, domid, vcpu, cpumap):
         """Set which cpus vcpu can use
 
-        @param id:   domain
-        @param vcpu: vcpu number
-        @param cpumap:  bitmap of usbale cpus
+        @param cpumap:  bitmap of usable cpus
         """
-        dominfo = self.domain_lookup(id)
+        dominfo = self.domain_lookup(domid)
         try:
             return xc.domain_pincpu(dominfo.getDomid(), vcpu, cpumap)
         except Exception, ex:
             raise XendError(str(ex))
 
-    def domain_cpu_bvt_set(self, id, mcuadv, warpback, warpvalue, warpl, warpu):
+    def domain_cpu_bvt_set(self, domid, mcuadv, warpback, warpvalue, warpl,
+                           warpu):
         """Set BVT (Borrowed Virtual Time) scheduler parameters for a domain.
         """
-        dominfo = self.domain_lookup(id)
+        dominfo = self.domain_lookup(domid)
         try:
             return xc.bvtsched_domain_set(dom=dominfo.getDomid(),
                                           mcuadv=mcuadv,
@@ -440,30 +433,31 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
-    def domain_cpu_bvt_get(self, id):
+    def domain_cpu_bvt_get(self, domid):
         """Get BVT (Borrowed Virtual Time) scheduler parameters for a domain.
         """
-        dominfo = self.domain_lookup(id)
+        dominfo = self.domain_lookup(domid)
         try:
             return xc.bvtsched_domain_get(dominfo.getDomid())
         except Exception, ex:
             raise XendError(str(ex))
     
     
-    def domain_cpu_sedf_set(self, id, period, slice, latency, extratime, weight):
+    def domain_cpu_sedf_set(self, domid, period, slice_, latency, extratime,
+                            weight):
         """Set Simple EDF scheduler parameters for a domain.
         """
-        dominfo = self.domain_lookup(id)
+        dominfo = self.domain_lookup(domid)
         try:
-            return xc.sedf_domain_set(dominfo.getDomid(), period, slice,
+            return xc.sedf_domain_set(dominfo.getDomid(), period, slice_,
                                       latency, extratime, weight)
         except Exception, ex:
             raise XendError(str(ex))
 
-    def domain_cpu_sedf_get(self, id):
+    def domain_cpu_sedf_get(self, domid):
         """Get Simple EDF scheduler parameters for a domain.
         """
-        dominfo = self.domain_lookup(id)
+        dominfo = self.domain_lookup(domid)
         try:
             return xc.sedf_domain_get(dominfo.getDomid())
         except Exception, ex:
@@ -508,35 +502,30 @@ class XendDomain:
                              devtype)
 
 
-    def domain_vif_limit_set(self, id, vif, credit, period):
+    def domain_vif_limit_set(self, domid, vif, credit, period):
         """Limit the vif's transmission rate
         """
-        dominfo = self.domain_lookup(id)
+        dominfo = self.domain_lookup(domid)
         dev = dominfo.getDevice('vif', vif)
         if not dev:
             raise XendError("invalid vif")
         return dev.setCreditLimit(credit, period)
         
-    def domain_shadow_control(self, id, op):
-        """Shadow page control.
-
-        @param id: domain
-        @param op:  operation
-        """
-        dominfo = self.domain_lookup(id)
+    def domain_shadow_control(self, domid, op):
+        """Shadow page control."""
+        dominfo = self.domain_lookup(domid)
         try:
             return xc.shadow_control(dominfo.getDomid(), op)
         except Exception, ex:
             raise XendError(str(ex))
 
-    def domain_maxmem_set(self, id, mem):
+    def domain_maxmem_set(self, domid, mem):
         """Set the memory limit for a domain.
 
-        @param id: domain
         @param mem: memory limit (in MiB)
         @return: 0 on success, -1 on error
         """
-        dominfo = self.domain_lookup(id)
+        dominfo = self.domain_lookup(domid)
         maxmem = int(mem) * 1024
         try:
             return xc.domain_setmaxmem(dominfo.getDomid(),
