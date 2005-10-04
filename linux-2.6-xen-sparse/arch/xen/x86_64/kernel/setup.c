@@ -86,6 +86,7 @@ DEFINE_PER_CPU(int, nr_multicall_ents);
 
 /* Raw start-of-day parameters from the hypervisor. */
 start_info_t *xen_start_info;
+EXPORT_SYMBOL(xen_start_info);
 #endif
 
 /*

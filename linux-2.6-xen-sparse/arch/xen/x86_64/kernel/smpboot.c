@@ -62,8 +62,8 @@
 #include <asm/nmi.h>
 #ifdef CONFIG_XEN
 #include <asm/arch_hooks.h>
-
 #include <asm-xen/evtchn.h>
+#include <asm-xen/xen-public/vcpu.h>
 #endif
 
 /* Change for real CPU hotplug. Note other files need to be fixed
@@ -742,12 +742,6 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 	/* FPU is set up to default initial state. */
 	memset(&ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
 
-	/* Virtual IDT is empty at start-of-day. */
-	for ( i = 0; i < 256; i++ )
-	{
-		ctxt.trap_ctxt[i].vector = i;
-		ctxt.trap_ctxt[i].cs     = FLAT_KERNEL_CS;
-	}
 	smp_trap_init(ctxt.trap_ctxt);
 
 	/* No LDT. */
@@ -777,11 +771,13 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 
 	ctxt.ctrlreg[3] = virt_to_mfn(init_level4_pgt) << PAGE_SHIFT;
 
-	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
+	boot_error  = HYPERVISOR_vcpu_op(VCPUOP_create, cpu, &ctxt);
 	if (boot_error)
 		printk("boot error: %ld\n", boot_error);
 
 	if (!boot_error) {
+		HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
+
 		/*
 		 * allow APs to start initializing.
 		 */
@@ -1267,13 +1263,8 @@ void smp_resume(void)
 	local_setup_timer_irq();
 }
 
-void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
+void vcpu_prepare(int vcpu)
 {
-}
-
-int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
-{
-	return 0;
 }
 
 #endif

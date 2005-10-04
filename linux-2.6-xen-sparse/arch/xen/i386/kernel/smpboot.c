@@ -63,6 +63,7 @@
 #include <smpboot_hooks.h>
 
 #include <asm-xen/evtchn.h>
+#include <asm-xen/xen-public/vcpu.h>
 
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
@@ -802,7 +803,6 @@ static int __init do_boot_cpu(int apicid)
 	extern void hypervisor_callback(void);
 	extern void failsafe_callback(void);
 	extern void smp_trap_init(trap_info_t *);
-	int i;
 
 	cpu = ++cpucount;
 	/*
@@ -853,12 +853,6 @@ static int __init do_boot_cpu(int apicid)
 	/* FPU is set up to default initial state. */
 	memset(&ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
 
-	/* Virtual IDT is empty at start-of-day. */
-	for ( i = 0; i < 256; i++ )
-	{
-		ctxt.trap_ctxt[i].vector = i;
-		ctxt.trap_ctxt[i].cs     = FLAT_KERNEL_CS;
-	}
 	smp_trap_init(ctxt.trap_ctxt);
 
 	/* No LDT. */
@@ -889,11 +883,13 @@ static int __init do_boot_cpu(int apicid)
 
 	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 
-	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
+	boot_error = HYPERVISOR_vcpu_op(VCPUOP_create, cpu, &ctxt);
 	if (boot_error)
 		printk("boot error: %ld\n", boot_error);
 
 	if (!boot_error) {
+		HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
+
 		/*
 		 * allow APs to start initializing.
 		 */
@@ -1506,7 +1502,7 @@ int __devinit __cpu_up(unsigned int cpu)
 #ifdef CONFIG_HOTPLUG_CPU
 #ifdef CONFIG_XEN
 	/* Tell hypervisor to bring vcpu up. */
-	HYPERVISOR_vcpu_up(cpu);
+	HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
 #endif
 	/* Already up, and in cpu_quiescent now? */
 	if (cpu_isset(cpu, smp_commenced_mask)) {
@@ -1585,61 +1581,49 @@ void smp_resume(void)
 	local_setup_timer_irq();
 }
 
-static atomic_t vcpus_rebooting;
-
-static void restore_vcpu_ready(void)
+void vcpu_prepare(int vcpu)
 {
+	extern void hypervisor_callback(void);
+	extern void failsafe_callback(void);
+	extern void smp_trap_init(trap_info_t *);
+	extern void cpu_restore(void);
+	vcpu_guest_context_t ctxt;
+	struct task_struct *idle = idle_task(vcpu);
 
-	atomic_dec(&vcpus_rebooting);
-}
+	if (vcpu == 0)
+		return;
 
-void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
-{
-	int r;
-	int gdt_pages;
-	r = HYPERVISOR_vcpu_pickle(vcpu, ctxt);
-	if (r != 0)
-		panic("pickling vcpu %d -> %d!\n", vcpu, r);
+	memset(&ctxt, 0, sizeof(ctxt));
 
-	/* Translate from machine to physical addresses where necessary,
-	   so that they can be translated to our new machine address space
-	   after resume.  libxc is responsible for doing this to vcpu0,
-	   but we do it to the others. */
-	gdt_pages = (ctxt->gdt_ents + 511) / 512;
-	ctxt->ctrlreg[3] = machine_to_phys(ctxt->ctrlreg[3]);
-	for (r = 0; r < gdt_pages; r++)
-		ctxt->gdt_frames[r] = mfn_to_pfn(ctxt->gdt_frames[r]);
-}
+	ctxt.user_regs.ds = __USER_DS;
+	ctxt.user_regs.es = __USER_DS;
+	ctxt.user_regs.fs = 0;
+	ctxt.user_regs.gs = 0;
+	ctxt.user_regs.ss = __KERNEL_DS;
+	ctxt.user_regs.cs = __KERNEL_CS;
+	ctxt.user_regs.eip = (unsigned long)cpu_restore;
+	ctxt.user_regs.esp = idle->thread.esp;
+	ctxt.user_regs.eflags = X86_EFLAGS_IF | X86_EFLAGS_IOPL_RING1;
 
-int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt)
-{
-	int r;
-	int gdt_pages = (ctxt->gdt_ents + 511) / 512;
+	memset(&ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
 
-	/* This is kind of a hack, and implicitly relies on the fact that
-	   the vcpu stops in a place where all of the call clobbered
-	   registers are already dead. */
-	ctxt->user_regs.esp -= 4;
-	((unsigned long *)ctxt->user_regs.esp)[0] = ctxt->user_regs.eip;
-	ctxt->user_regs.eip = (unsigned long)restore_vcpu_ready;
+	smp_trap_init(ctxt.trap_ctxt);
 
-	/* De-canonicalise.  libxc handles this for vcpu 0, but we need
-	   to do it for the other vcpus. */
-	ctxt->ctrlreg[3] = phys_to_machine(ctxt->ctrlreg[3]);
-	for (r = 0; r < gdt_pages; r++)
-		ctxt->gdt_frames[r] = pfn_to_mfn(ctxt->gdt_frames[r]);
+	ctxt.ldt_ents = 0;
 
-	atomic_set(&vcpus_rebooting, 1);
-	r = HYPERVISOR_boot_vcpu(vcpu, ctxt);
-	if (r != 0) {
-		printk(KERN_EMERG "Failed to reboot vcpu %d (%d)\n", vcpu, r);
-		return -1;
-	}
+	ctxt.gdt_frames[0] = virt_to_mfn(cpu_gdt_descr[vcpu].address);
+	ctxt.gdt_ents      = cpu_gdt_descr[vcpu].size / 8;
 
-	/* Make sure we wait for the new vcpu to come up before trying to do
-	   anything with it or starting the next one. */
-	while (atomic_read(&vcpus_rebooting))
-		barrier();
+	ctxt.kernel_ss = __KERNEL_DS;
+	ctxt.kernel_sp = idle->thread.esp0;
 
-	return 0;
+	ctxt.event_callback_cs     = __KERNEL_CS;
+	ctxt.event_callback_eip    = (unsigned long)hypervisor_callback;
+	ctxt.failsafe_callback_cs  = __KERNEL_CS;
+	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
+
+	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
+
+	(void)HYPERVISOR_vcpu_op(VCPUOP_create, vcpu, &ctxt);
+	(void)HYPERVISOR_vcpu_op(VCPUOP_up, vcpu, NULL);
 }

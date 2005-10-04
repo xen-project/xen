@@ -412,17 +412,6 @@ do {				  					\
 	ptep_set_access_flags(__vma, __address, __ptep, __entry, 1);	\
 } while (0)
 
-#define __HAVE_ARCH_PTEP_ESTABLISH_NEW
-#define ptep_establish_new(__vma, __address, __ptep, __entry)		\
-do {				  					\
-	if (likely((__vma)->vm_mm == current->mm)) {			\
-		BUG_ON(HYPERVISOR_update_va_mapping((__address),	\
-					     __entry, 0));		\
-	} else {							\
-		xen_l1_entry_update((__ptep), (__entry));	\
-	}								\
-} while (0)
-
 #ifndef CONFIG_XEN_SHADOW_MODE
 void make_lowmem_page_readonly(void *va);
 void make_lowmem_page_writable(void *va);

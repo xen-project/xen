@@ -445,6 +445,7 @@ static struct tpm_vendor_specific tpm_xen = {
 	.base = 0,
 	.attr = TPM_DEVICE_ATTRS,
 	.miscdev.fops = &tpm_xen_ops,
+	.buffersize = 64 * 1024,
 };
 
 static struct device tpm_device = {
@@ -476,6 +477,8 @@ static int __init init_xen(void)
 		tpm_fe_unregister_receiver();
 		return rc;
 	}
+
+	tpm_xen.buffersize = tpmfe.max_tx_size;
 
 	if ((rc = tpm_register_hardware_nopci(&tpm_device, &tpm_xen)) < 0) {
 		device_unregister(&tpm_device);

@@ -49,6 +49,7 @@
 #include <asm/irq.h>
 #include <asm/desc.h>
 #include <asm-xen/xen-public/physdev.h>
+#include <asm-xen/xen-public/vcpu.h>
 #ifdef CONFIG_MATH_EMULATION
 #include <asm/math_emu.h>
 #endif
@@ -141,6 +142,13 @@ static inline void play_dead(void)
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
+void cpu_restore(void)
+{
+	play_dead();
+	local_irq_enable();
+	cpu_idle();
+}
+
 /*
  * The idle thread. There's no useful work to be
  * done, so just try to conserve power and have a
@@ -171,7 +179,7 @@ void cpu_idle (void)
 				   don't printk. */
 				__get_cpu_var(cpu_state) = CPU_DEAD;
 				/* Tell hypervisor to take vcpu down. */
-				HYPERVISOR_vcpu_down(cpu);
+				HYPERVISOR_vcpu_op(VCPUOP_down, cpu, NULL);
 #endif
 				play_dead();
 				local_irq_enable();

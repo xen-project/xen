@@ -59,12 +59,16 @@ DOMAIN_SUSPEND  = 2
 """Shutdown code for crash."""
 DOMAIN_CRASH    = 3
 
+"""Shutdown code for halt."""
+DOMAIN_HALT     = 4
+
 """Map shutdown codes to strings."""
 shutdown_reasons = {
     DOMAIN_POWEROFF: "poweroff",
     DOMAIN_REBOOT  : "reboot",
     DOMAIN_SUSPEND : "suspend",
     DOMAIN_CRASH   : "crash",
+    DOMAIN_HALT    : "halt"
     }
 
 restart_modes = [
@@ -76,7 +80,6 @@ restart_modes = [
 
 STATE_VM_OK         = "ok"
 STATE_VM_TERMINATED = "terminated"
-STATE_VM_SUSPENDED  = "suspended"
 
 """Flag for a block device backend domain."""
 SIF_BLK_BE_DOMAIN = (1<<4)
@@ -116,6 +119,68 @@ ROUNDTRIPPING_CONFIG_ENTRIES = [
     ]
 
 
+def create(config):
+    """Create a VM from a configuration.
+
+    @param config    configuration
+    @raise: VmError for invalid configuration
+    """
+
+    log.debug("XendDomainInfo.create(%s)", config)
+
+    vm = XendDomainInfo(getUuid(), parseConfig(config))
+    vm.construct()
+    vm.refreshShutdown()
+    return vm
+
+
+def recreate(xeninfo):
+    """Create the VM object for an existing domain.  The domain must not
+    be dying, as the paths in the store should already have been removed,
+    and asking us to recreate them causes problems."""
+
+    log.debug("XendDomainInfo.recreate(%s)", xeninfo)
+
+    assert not xeninfo['dying']
+
+    domid = xeninfo['dom']
+    try:
+        dompath = GetDomainPath(domid)
+        if not dompath:
+            raise XendError(
+                'No domain path in store for existing domain %d' % domid)
+        vmpath = xstransact.Read(dompath, "vm")
+        if not vmpath:
+            raise XendError(
+                'No vm path in store for existing domain %d' % domid)
+        uuid = xstransact.Read(vmpath, "uuid")
+        if not uuid:
+            raise XendError(
+                'No vm/uuid path in store for existing domain %d' % domid)
+
+        log.info("Recreating domain %d, UUID %s.", domid, uuid)
+
+        vm = XendDomainInfo(uuid, xeninfo, domid, True)
+
+    except Exception, exn:
+        log.warn(str(exn))
+
+        uuid = getUuid()
+
+        log.info("Recreating domain %d with new UUID %s.", domid, uuid)
+
+        vm = XendDomainInfo(uuid, xeninfo, domid, True)
+        vm.storeVmDetails()
+        vm.storeDomDetails()
+
+    vm.create_channel()
+    if domid == 0:
+        vm.initStoreConnection()
+
+    vm.refreshShutdown(xeninfo)
+    return vm
+
+
 def restore(config):
     """Create a domain and a VM object to do a restore.
 
@@ -130,7 +195,7 @@ def restore(config):
     except TypeError, exn:
         raise VmError('Invalid ssidref in config: %s' % exn)
 
-    vm = XendDomainInfo(uuid, XendDomainInfo.parseConfig(config),
+    vm = XendDomainInfo(uuid, parseConfig(config),
                         xc.domain_create(ssidref = ssidref))
     vm.storeVmDetails()
     vm.configure()
@@ -139,10 +204,87 @@ def restore(config):
     return vm
 
 
-def domain_exists(name):
+def parseConfig(config):
+    def get_cfg(name, conv = None):
+        val = sxp.child_value(config, name)
+
+        if conv and not val is None:
+            try:
+                return conv(val)
+            except TypeError, exn:
+                raise VmError(
+                    'Invalid setting %s = %s in configuration: %s' %
+                    (name, val, str(exn)))
+        else:
+            return val
+
+
+    log.debug("parseConfig: config is %s" % str(config))
+
+    result = {}
+
+    for e in ROUNDTRIPPING_CONFIG_ENTRIES:
+        result[e[0]] = get_cfg(e[0], e[1])
+
+    result['memory']       = get_cfg('memory',     int)
+    result['mem_kb']       = get_cfg('mem_kb',     int)
+    result['maxmem']       = get_cfg('maxmem',     int)
+    result['maxmem_kb']    = get_cfg('maxmem_kb',  int)
+    result['cpu']          = get_cfg('cpu',        int)
+    result['image']        = get_cfg('image')
+
+    try:
+        if result['image']:
+            result['vcpus'] = int(sxp.child_value(result['image'],
+                                                  'vcpus', 1))
+        else:
+            result['vcpus'] = 1
+    except TypeError, exn:
+        raise VmError(
+            'Invalid configuration setting: vcpus = %s: %s' %
+            (sxp.child_value(result['image'], 'vcpus', 1), str(exn)))
+
+    result['backend'] = []
+    for c in sxp.children(config, 'backend'):
+        result['backend'].append(sxp.name(sxp.child0(c)))
+
+    result['device'] = []
+    for d in sxp.children(config, 'device'):
+        c = sxp.child0(d)
+        result['device'].append((sxp.name(c), c))
+
+    # Configuration option "restart" is deprecated.  Parse it, but
+    # let on_xyz override it if they are present.
+    restart = get_cfg('restart')
+    if restart:
+        def handle_restart(event, val):
+            if not event in result:
+                result[event] = val
+
+        if restart == "onreboot":
+            handle_restart('on_poweroff', 'destroy')
+            handle_restart('on_reboot',   'restart')
+            handle_restart('on_crash',    'destroy')
+        elif restart == "always":
+            handle_restart('on_poweroff', 'restart')
+            handle_restart('on_reboot',   'restart')
+            handle_restart('on_crash',    'restart')
+        elif restart == "never":
+            handle_restart('on_poweroff', 'destroy')
+            handle_restart('on_reboot',   'destroy')
+            handle_restart('on_crash',    'destroy')
+        else:
+            log.warn("Ignoring malformed and deprecated config option "
+                     "restart = %s", restart)
+
+    log.debug("parseConfig: result is %s" % str(result))
+    return result
+
+
+def domain_by_name(name):
     # See comment in XendDomain constructor.
     xd = get_component('xen.xend.XendDomain')
-    return xd.domain_lookup_by_name(name)
+    return xd.domain_lookup_by_name_nr(name)
 
 def shutdown_reason(code):
     """Get a shutdown reason from a code.
@@ -177,152 +319,6 @@ class XendDomainInfo:
     MINIMUM_RESTART_TIME = 20
 
 
-    def create(cls, config):
-        """Create a VM from a configuration.
-
-        @param config    configuration
-        @raise: VmError for invalid configuration
-        """
-
-        log.debug("XendDomainInfo.create(%s)", config)
-        
-        vm = cls(getUuid(), cls.parseConfig(config))
-        vm.construct()
-        vm.refreshShutdown()
-        return vm
-
-    create = classmethod(create)
-
-
-    def recreate(cls, xeninfo):
-        """Create the VM object for an existing domain.  The domain must not
-        be dying, as the paths in the store should already have been removed,
-        and asking us to recreate them causes problems."""
-
-        log.debug("XendDomainInfo.recreate(%s)", xeninfo)
-
-        assert not xeninfo['dying']
-
-        domid = xeninfo['dom']
-        try:
-            dompath = GetDomainPath(domid)
-            if not dompath:
-                raise XendError(
-                    'No domain path in store for existing domain %d' % domid)
-            vmpath = xstransact.Read(dompath, "vm")
-            if not vmpath:
-                raise XendError(
-                    'No vm path in store for existing domain %d' % domid)
-            uuid = xstransact.Read(vmpath, "uuid")
-            if not uuid:
-                raise XendError(
-                    'No vm/uuid path in store for existing domain %d' % domid)
-
-            log.info("Recreating domain %d, UUID %s.", domid, uuid)
-
-            vm = cls(uuid, xeninfo, domid, True)
-
-        except Exception, exn:
-            log.warn(str(exn))
-
-            uuid = getUuid()
-
-            log.info("Recreating domain %d with new UUID %s.", domid, uuid)
-
-            vm = cls(uuid, xeninfo, domid, True)
-            vm.storeVmDetails()
-            vm.storeDomDetails()
-
-        vm.create_channel()
-        if domid == 0:
-            vm.initStoreConnection()
-
-        vm.refreshShutdown(xeninfo)
-        return vm
-
-    recreate = classmethod(recreate)
-
-
-    def parseConfig(cls, config):
-        def get_cfg(name, conv = None):
-            val = sxp.child_value(config, name)
-
-            if conv and not val is None:
-                try:
-                    return conv(val)
-                except TypeError, exn:
-                    raise VmError(
-                        'Invalid setting %s = %s in configuration: %s' %
-                        (name, val, str(exn)))
-            else:
-                return val
-
-
-        log.debug("parseConfig: config is %s" % str(config))
-
-        result = {}
-
-        for e in ROUNDTRIPPING_CONFIG_ENTRIES:
-            result[e[0]] = get_cfg(e[0], e[1])
-
-        result['memory']       = get_cfg('memory',     int)
-        result['mem_kb']       = get_cfg('mem_kb',     int)
-        result['maxmem']       = get_cfg('maxmem',     int)
-        result['maxmem_kb']    = get_cfg('maxmem_kb',  int)
-        result['cpu']          = get_cfg('cpu',        int)
-        result['image']        = get_cfg('image')
-
-        try:
-            if result['image']:
-                result['vcpus'] = int(sxp.child_value(result['image'],
-                                                      'vcpus', 1))
-            else:
-                result['vcpus'] = 1
-        except TypeError, exn:
-            raise VmError(
-                'Invalid configuration setting: vcpus = %s: %s' %
-                (sxp.child_value(result['image'], 'vcpus', 1), str(exn)))
-
-        result['backend'] = []
-        for c in sxp.children(config, 'backend'):
-            result['backend'].append(sxp.name(sxp.child0(c)))
-
-        result['device'] = []
-        for d in sxp.children(config, 'device'):
-            c = sxp.child0(d)
-            result['device'].append((sxp.name(c), c))
-
-        # Configuration option "restart" is deprecated.  Parse it, but
-        # let on_xyz override it if they are present.
-        restart = get_cfg('restart')
-        if restart:
-            def handle_restart(event, val):
-                if not event in result:
-                    result[event] = val
-
-            if restart == "onreboot":
-                handle_restart('on_poweroff', 'destroy')
-                handle_restart('on_reboot',   'restart')
-                handle_restart('on_crash',    'destroy')
-            elif restart == "always":
-                handle_restart('on_poweroff', 'restart')
-                handle_restart('on_reboot',   'restart')
-                handle_restart('on_crash',    'restart')
-            elif restart == "never":
-                handle_restart('on_poweroff', 'destroy')
-                handle_restart('on_reboot',   'destroy')
-                handle_restart('on_crash',    'destroy')
-            else:
-                log.warn("Ignoring malformed and deprecated config option "
-                         "restart = %s", restart)
-
-        log.debug("parseConfig: result is %s" % str(result))
-        return result
-
-
-    parseConfig = classmethod(parseConfig)
-
-    
     def __init__(self, uuid, info, domid = None, augment = False):
 
         self.uuid = uuid
@@ -627,21 +623,22 @@ class XendDomainInfo:
                     # The domain no longer exists.  This will occur if we have
                     # scheduled a timer to check for shutdown timeouts and the
                     # shutdown succeeded.  It will also occur if someone
-                    # destroys a domain beneath us.  We clean up, just in
-                    # case.
+                    # destroys a domain beneath us.  We clean up the domain,
+                    # just in case, but we can't clean up the VM, because that
+                    # VM may have migrated to a different domain on this
+                    # machine.
                     self.cleanupDomain()
-                    self.cleanupVm()
                     return
 
             if xeninfo['dying']:
                 # Dying means that a domain has been destroyed, but has not
-                # yet been cleaned up by Xen.  This could persist indefinitely
-                # if, for example, another domain has some of its pages
-                # mapped.  We might like to diagnose this problem in the
-                # future, but for now all we do is make sure that it's not
-                # us holding the pages, by calling the cleanup methods.
+                # yet been cleaned up by Xen.  This state could persist
+                # indefinitely if, for example, another domain has some of its
+                # pages mapped.  We might like to diagnose this problem in the
+                # future, but for now all we do is make sure that it's not us
+                # holding the pages, by calling cleanupDomain.  We can't
+                # clean up the VM, as above.
                 self.cleanupDomain()
-                self.cleanupVm()
                 return
 
             elif xeninfo['crashed']:
@@ -654,10 +651,11 @@ class XendDomainInfo:
                 restart_reason = 'crash'
 
             elif xeninfo['shutdown']:
-                if self.readDom('xend/shutdown'):
+                if self.readDom('xend/shutdown_completed'):
                     # We've seen this shutdown already, but we are preserving
                     # the domain for debugging.  Leave it alone.
-                    pass
+                    return
+
                 else:
                     reason = shutdown_reason(xeninfo['shutdown_reason'])
 
@@ -667,7 +665,7 @@ class XendDomainInfo:
                     self.clearRestart()
 
                     if reason == 'suspend':
-                        self.state_set(STATE_VM_SUSPENDED)
+                        self.state_set(STATE_VM_TERMINATED)
                         # Don't destroy the domain.  XendCheckpoint will do
                         # this once it has finished.
                     elif reason in ['poweroff', 'reboot']:
@@ -704,7 +702,7 @@ class XendDomainInfo:
         if not reason in shutdown_reasons.values():
             raise XendError('invalid reason:' + reason)
         self.storeDom("control/shutdown", reason)
-        if not reason == 'suspend':
+        if reason != 'suspend':
             self.storeDom('xend/shutdown_start_time', time.time())
 
 
@@ -721,11 +719,6 @@ class XendDomainInfo:
          "restart"        : self.restart,
          "preserve"       : self.preserve,
          "rename-restart" : self.renameRestart}[self.info['on_' + reason]]()
-
-
-    def preserve(self):
-        log.info("Preserving dead domain %s (%d).", self.info['name'],
-                 self.domid)
 
 
     def renameRestart(self):
@@ -817,9 +810,9 @@ class XendDomainInfo:
 
     ## public:
 
-    def state_wait(self, state):
+    def waitForShutdown(self):
         self.state_updated.acquire()
-        while self.state != state:
+        while self.state == STATE_VM_OK:
             self.state_updated.wait()
         self.state_updated.release()
 
@@ -953,10 +946,8 @@ class XendDomainInfo:
             if c in '_-.:/+': continue
             if c in string.ascii_letters: continue
             raise VmError('invalid vm name')
-        dominfo = domain_exists(name)
-        # When creating or rebooting, a domain with my name should not exist.
-        # When restoring, a domain with my name will exist, but it should have
-        # my domain id.
+
+        dominfo = domain_by_name(name)
         if not dominfo:
             return
         if dominfo.is_terminated():
@@ -1059,7 +1050,6 @@ class XendDomainInfo:
         """Cleanup domain resources; release devices.  Idempotent.  Nothrow
         guarantee."""
 
-        self.state_set(STATE_VM_TERMINATED)
         self.release_devices()
         self.closeStoreChannel()
         self.closeConsoleChannel()
@@ -1092,14 +1082,22 @@ class XendDomainInfo:
 
         log.debug("XendDomainInfo.destroy: domid=%s", str(self.domid))
 
-        self.cleanupDomain()
         self.cleanupVm()
+        self.destroyDomain()
+
+
+    def destroyDomain(self):
+        log.debug("XendDomainInfo.destroyDomain(%s)", str(self.domid))
+
+        self.cleanupDomain()
         
         try:
             if self.domid is not None:
                 xc.domain_destroy(dom=self.domid)
         except Exception:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
+
+        self.state_set(STATE_VM_TERMINATED)
 
 
     ## private:
@@ -1248,14 +1246,18 @@ class XendDomainInfo:
 
         try:
             if rename:
-                self.preserveShutdownDomain()
+                self.preserveForRestart()
             else:
-                self.cleanupDomain()
                 self.destroy()
                 
             try:
                 xd = get_component('xen.xend.XendDomain')
-                xd.domain_unpause(xd.domain_create(config).getDomid())
+                new_dom = xd.domain_create(config)
+                try:
+                    xc.domain_unpause(new_dom.getDomid())
+                except:
+                    new_dom.destroy()
+                    raise
             except Exception, exn:
                 log.exception('Failed to restart domain %d.', self.domid)
         finally:
@@ -1265,7 +1267,7 @@ class XendDomainInfo:
         #        self.exportToDB()
 
 
-    def preserveShutdownDomain(self):
+    def preserveForRestart(self):
         """Preserve a domain that has been shut down, by giving it a new UUID,
         cloning the VM details, and giving it a new name.  This allows us to
         keep this domain for debugging, but restart a new one in its place
@@ -1281,8 +1283,14 @@ class XendDomainInfo:
         self.uuid = new_uuid
         self.vmpath = VMROOT + new_uuid
         self.storeVmDetails()
-        self.storeDom('vm', self.vmpath)
-        self.storeDom('xend/shutdown', 'True')
+        self.preserve()
+
+
+    def preserve(self):
+        log.info("Preserving dead domain %s (%d).", self.info['name'],
+                 self.domid)
+        self.storeDom('xend/shutdown_completed', 'True')
+        self.set_state(STATE_VM_TERMINATED)
 
 
     def generateShutdownName(self):
