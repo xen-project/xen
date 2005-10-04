@@ -71,14 +71,17 @@ class Daemon:
         @param pidfile: file to read
         @return pid or 0
         """
-        pid = 0
         if os.path.isfile(pidfile) and os.path.getsize(pidfile):
             try:
-                pid = open(pidfile, 'r').read()
-                pid = int(pid)
+                f = open(pidfile, 'r')
+                try:
+                    return int(f.read())
+                finally:
+                    f.close()
             except:
-                pid = 0
-        return pid
+                return 0
+        else:
+            return 0
 
     def find_process(self, pid, name):
         """Search for a process.
@@ -146,8 +149,10 @@ class Daemon:
         if self.child:
             # Parent
             pidfile = open(pidfile, 'w')
-            pidfile.write(str(self.child))
-            pidfile.close()
+            try:
+                pidfile.write(str(self.child))
+            finally:
+                pidfile.close()
 
         return self.child
 
@@ -200,8 +205,10 @@ class Daemon:
         if self.fork_pid(XEND_PID_FILE):
             os.close(w)
             r = os.fdopen(r, 'r')
-            s = r.read()
-            r.close()
+            try:
+                s = r.read()
+            finally:
+                r.close()
             if not len(s):
                 ret = 1
             else:
