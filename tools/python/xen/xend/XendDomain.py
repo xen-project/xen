@@ -22,14 +22,16 @@
  Needs to be persistent for one uptime.
 """
 import os
+import string
 import threading
 
 import xen.lowlevel.xc
 
+import XendDomainInfo
+
 from xen.xend import sxp
 from xen.xend import XendRoot
 from xen.xend import XendCheckpoint
-from xen.xend.XendDomainInfo import XendDomainInfo
 from xen.xend import EventServer
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
@@ -45,20 +47,9 @@ __all__ = [ "XendDomain" ]
 
 PRIV_DOMAIN = 0
 
-class XendDomainDict(dict):
-    def get_by_name(self, name):
-        try:
-            return filter(lambda d: d.getName() == name, self.values())[0]
-        except IndexError, err:
-            return None
-
 class XendDomain:
     """Index of all domains. Singleton.
     """
-
-    """Dict of domain info indexed by domain id."""
-    domains = None
-
 
     ## public:
     
@@ -68,19 +59,30 @@ class XendDomain:
         # to import XendDomain from XendDomainInfo causes unbounded recursion.
         # So we stuff the XendDomain instance (self) into xroot's components.
         xroot.add_component("xen.xend.XendDomain", self)
-        self.domains = XendDomainDict()
-        self.refresh_lock = threading.Condition()
+        self.domains = {}
+        self.domains_lock = threading.Condition()
         self.watchReleaseDomain()
-        self.refresh()
-        self.dom0_setup()
+
+        self.domains_lock.acquire()
+        try:
+            self.refresh()
+            self.dom0_setup()
+        finally:
+            self.domains_lock.release()
+
 
     def list(self):
         """Get list of domain objects.
 
         @return: domain objects
         """
-        self.refresh()
-        return self.domains.values()
+        self.domains_lock.acquire()
+        try:
+            self.refresh()
+            return self.domains.values()
+        finally:
+            self.domains_lock.release()
+
 
     def list_sorted(self):
         """Get list of domain objects, sorted by name.
@@ -103,7 +105,12 @@ class XendDomain:
     ## private:
 
     def onReleaseDomain(self):
-        self.refresh()
+        self.domains_lock.acquire()
+        try:
+            self.refresh()
+        finally:
+            self.domains_lock.release()
+            
 
     def watchReleaseDomain(self):
         from xen.xend.xenstore.xswatch import xswatch
@@ -133,16 +140,8 @@ class XendDomain:
         return dominfo
 
 
-    def recreate_domain(self, xeninfo):
-        """Refresh initial domain info from db."""
-
-        dominfo = XendDomainInfo.recreate(xeninfo)
-        self._add_domain(dominfo)
-        return dominfo
-
-
     def dom0_setup(self):
-        dom0 = self.domain_lookup(PRIV_DOMAIN)
+        dom0 = self.domains[PRIV_DOMAIN]
         dom0.dom0_enforce_vcpus()
 
 
@@ -179,50 +178,33 @@ class XendDomain:
     def refresh(self):
         """Refresh domain list from Xen.
         """
-        self.refresh_lock.acquire()
-        try:
-            doms = self.xen_domains()
-            for d in self.domains.values():
-                info = doms.get(d.getDomid())
-                if info:
-                    d.update(info)
-                else:
-                    self._delete_domain(d.getDomid())
-            for d in doms:
-                if d not in self.domains and not doms[d]['dying']:
-                    try:
-                        self.recreate_domain(doms[d])
-                    except:
-                        if d == PRIV_DOMAIN:
-                            log.exception(
-                                "Failed to recreate information for domain "
-                                "%d.  Doing nothing except crossing my "
-                                "fingers.", d)
-                        else:
-                            log.exception(
-                                "Failed to recreate information for domain "
-                                "%d.  Destroying it in the hope of "
-                                "recovery.", d)
-                            try:
-                                xc.domain_destroy(dom = d)
-                            except:
-                                log.exception('Destruction of %d failed.', d)
-        finally:
-            self.refresh_lock.release()
-
-
-    def update_domain(self, id):
-        """Update information for a single domain.
-
-        @param id: domain id
-        """
-        dominfo = self.xen_domain(id)
-        if dominfo:
-            d = self.domains.get(id)
-            if d:
-                d.update(dominfo)
-        else:
-            self._delete_domain(id)
+        doms = self.xen_domains()
+        for d in self.domains.values():
+            info = doms.get(d.getDomid())
+            if info:
+                d.update(info)
+            else:
+                self._delete_domain(d.getDomid())
+        for d in doms:
+            if d not in self.domains and not doms[d]['dying']:
+                try:
+                    dominfo = XendDomainInfo.recreate(doms[d])
+                    self._add_domain(dominfo)
+                except:
+                    if d == PRIV_DOMAIN:
+                        log.exception(
+                            "Failed to recreate information for domain "
+                            "%d.  Doing nothing except crossing my "
+                            "fingers.", d)
+                    else:
+                        log.exception(
+                            "Failed to recreate information for domain "
+                            "%d.  Destroying it in the hope of "
+                            "recovery.", d)
+                        try:
+                            xc.domain_destroy(dom = d)
+                        except:
+                            log.exception('Destruction of %d failed.', d)
 
 
     ## public:
@@ -233,9 +215,14 @@ class XendDomain:
         @param config: configuration
         @return: domain
         """
-        dominfo = XendDomainInfo.create(config)
-        self._add_domain(dominfo)
-        return dominfo
+        self.domains_lock.acquire()
+        try:
+            dominfo = XendDomainInfo.create(config)
+            self._add_domain(dominfo)
+            return dominfo
+        finally:
+            self.domains_lock.release()
+
 
     def domain_configure(self, config):
         """Configure an existing domain.
@@ -260,33 +247,72 @@ class XendDomain:
             raise XendError("can't read guest state file %s: %s" %
                             (src, ex[1]))
 
-    def domain_get(self, id):
-        """Get up-to-date info about a domain.
-
-        @param id: domain id
-        @return: domain object (or None)
-        """
-        self.update_domain(id)
-        return self.domains.get(id)
-
 
     def domain_lookup(self, id):
-        self.refresh()
-        return self.domains.get(id)
+        self.domains_lock.acquire()
+        try:
+            self.refresh()
+            return self.domains.get(id)
+        finally:
+            self.domains_lock.release()
 
-    def domain_lookup_by_name(self, name):
-        dominfo = self.domains.get_by_name(name)
-        if not dominfo:
-            try:
-                id = int(name)
-                dominfo = self.domain_lookup(id)
-            except ValueError:
-                pass
-        return dominfo
+
+    def domain_lookup_nr(self, id):
+        self.domains_lock.acquire()
+        try:
+            return self.domains.get(id)
+        finally:
+            self.domains_lock.release()
+
+
+    def domain_lookup_by_name_or_id(self, name):
+        self.domains_lock.acquire()
+        try:
+            self.refresh()
+            return self.domain_lookup_by_name_or_id_nr(name)
+        finally:
+            self.domains_lock.release()
+
+
+    def domain_lookup_by_name_or_id_nr(self, name):
+        self.domains_lock.acquire()
+        try:
+            dominfo = self.domain_lookup_by_name_nr(name)
+
+            if dominfo:
+                return dominfo
+            else:
+                try:
+                    return self.domains.get(int(name))
+                except ValueError:
+                    return None
+        finally:
+            self.domains_lock.release()
+
+
+    def domain_lookup_by_name_nr(self, name):
+        self.domains_lock.acquire()
+        try:
+            matching = filter(lambda d: d.getName() == name,
+                              self.domains.values())
+            n = len(matching)
+            if n == 1:
+                return matching[0]
+            elif n > 1:
+                raise XendError(
+                    'Name uniqueness has been violated for name %s' % name)
+            else:
+                return None
+        finally:
+            self.domains_lock.release()
 
 
     def privilegedDomain(self):
-        return self.domains[PRIV_DOMAIN]
+        self.domains_lock.acquire()
+        try:
+            return self.domains[PRIV_DOMAIN]
+        finally:
+            self.domains_lock.release()
 
  
     def domain_unpause(self, id):
@@ -321,12 +347,13 @@ class XendDomain:
 
         @param reason: shutdown reason: poweroff, reboot, suspend, halt
         """
-        self.callInfo(domid, XendDomainInfo.shutdown, reason)
+        self.callInfo(domid, XendDomainInfo.XendDomainInfo.shutdown, reason)
 
 
     def domain_sysrq(self, domid, key):
         """Send a SysRq to the specified domain."""
-        return self.callInfo(domid, XendDomainInfo.send_sysrq, key)
+        return self.callInfo(domid, XendDomainInfo.XendDomainInfo.send_sysrq,
+                             key)
 
 
     def domain_destroy(self, domid):
@@ -449,32 +476,39 @@ class XendDomain:
     def domain_device_create(self, domid, devconfig):
         """Create a new device for the specified domain.
         """
-        return self.callInfo(domid, XendDomainInfo.device_create, devconfig)
+        return self.callInfo(domid,
+                             XendDomainInfo.XendDomainInfo.device_create,
+                             devconfig)
 
 
     def domain_device_configure(self, domid, devconfig, devid):
         """Configure an existing device in the specified domain.
         @return: updated device configuration
         """
-        return self.callInfo(domid, XendDomainInfo.device_configure,
+        return self.callInfo(domid,
+                             XendDomainInfo.XendDomainInfo.device_configure,
                              devconfig, devid)
 
     
     def domain_device_refresh(self, domid, devtype, devid):
         """Refresh a device."""
-        return self.callInfo(domid, XendDomainInfo.device_refresh, devtype,
-                             devid)
+        return self.callInfo(domid,
+                             XendDomainInfo.XendDomainInfo.device_refresh,
+                             devtype, devid)
 
 
     def domain_device_destroy(self, domid, devtype, devid):
         """Destroy a device."""
-        return self.callInfo(domid, XendDomainInfo.destroyDevice, devtype,
-                             devid)
+        return self.callInfo(domid,
+                             XendDomainInfo.XendDomainInfo.destroyDevice,
+                             devtype, devid)
 
 
     def domain_devtype_ls(self, domid, devtype):
         """Get list of device sxprs for the specified domain."""
-        return self.callInfo(domid, XendDomainInfo.getDeviceSxprs, devtype)
+        return self.callInfo(domid,
+                             XendDomainInfo.XendDomainInfo.getDeviceSxprs,
+                             devtype)
 
 
     def domain_vif_limit_set(self, id, vif, credit, period):
@@ -518,7 +552,8 @@ class XendDomain:
 
         @param mem: memory target (in MiB)
         """
-        self.callInfo(domid, XendDomainInfo.setMemoryTarget, mem << 10)
+        self.callInfo(domid, XendDomainInfo.XendDomainInfo.setMemoryTarget,
+                      mem << 10)
 
 
     def domain_vcpu_hotplug(self, domid, vcpu, state):
@@ -527,12 +562,13 @@ class XendDomain:
         @param vcpu: target VCPU in domain
         @param state: which state VCPU will become
         """
-        self.callInfo(domid, XendDomainInfo.vcpu_hotplug, vcpu, state)
+        self.callInfo(domid, XendDomainInfo.XendDomainInfo.vcpu_hotplug, vcpu,
+                      state)
 
 
     def domain_dumpcore(self, domid):
         """Save a core dump for a crashed domain."""
-        self.callInfo(domid, XendDomainInfo.dumpCore)
+        self.callInfo(domid, XendDomainInfo.XendDomainInfo.dumpCore)
 
 
     ## private:

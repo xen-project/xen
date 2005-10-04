@@ -193,7 +193,7 @@ class DevController:
 
         backdom_name = sxp.child_value(config, 'backend')
         if backdom_name:
-            backdom = xd.domain_lookup_by_name(backdom_name)
+            backdom = xd.domain_lookup_by_name_or_id_nr(backdom_name)
         else:
             backdom = xd.privilegedDomain()
 
