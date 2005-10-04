@@ -28,7 +28,6 @@ from xen.xend import EventServer
 from xen.xend.XendError import XendError
 from xen.xend import XendRoot
 from xen.xend.XendLogging import log
-from xen.xend import XendCheckpoint
 
 
 eserver = EventServer.instance()
@@ -120,7 +119,8 @@ class RelocationProtocol(protocol.Protocol):
         if self.transport:
             self.send_reply(["ready", name])
             self.transport.sock.setblocking(1)
-            XendCheckpoint.restore(self.transport.sock.fileno())
+            xd = xroot.get_component("xen.xend.XendDomain")
+            xd.domain_restore_fd(self.transport.sock.fileno())
             self.transport.sock.setblocking(0)
         else:
             log.error(name + ": no transport")

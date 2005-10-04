@@ -239,13 +239,41 @@ class XendDomain:
         """
 
         try:
-            fd = os.open(src, os.O_RDONLY)
-            dominfo = XendCheckpoint.restore(fd)
-            self._add_domain(dominfo)
-            return dominfo
+            return self.domain_restore_fd(os.open(src, os.O_RDONLY))
         except OSError, ex:
             raise XendError("can't read guest state file %s: %s" %
                             (src, ex[1]))
+
+    def domain_restore_fd(self, fd):
+        """Restore a domain from the given file descriptor."""
+
+        try:
+            XendCheckpoint.restore(self, fd)
+        except Exception, ex:
+            log.exception("Restore failed")
+            raise
+
+
+    def restore_(self, config):
+        """Create a domain as part of the restore process.  This is called
+        only from {@link XendCheckpoint}.
+
+        A restore request comes into XendDomain through {@link
+        #domain_restore} or {@link #domain_restore_fd}.  That request is
+        forwarded immediately to XendCheckpoint which, when it is ready, will
+        call this method.  It is necessary to come through here rather than go
+        directly to {@link XendDomainInfo.restore} because we need to
+        serialise the domain creation process, but cannot lock
+        domain_restore_fd as a whole, otherwise we will deadlock waiting for
+        the old domain to die.
+        """
+        self.domains_lock.acquire()
+        try:
+            dominfo = XendDomainInfo.restore(config)
+            self._add_domain(dominfo)
+            return dominfo
+        finally:
+            self.domains_lock.release()
 
 
     def domain_lookup(self, id):
@@ -384,19 +412,8 @@ class XendDomain:
         port = xroot.get_xend_relocation_port()
         sock = relocate.setupRelocation(dst, port)
 
-        # temporarily rename domain for localhost migration
-        if dst == "localhost":
-            dominfo.setName("tmp-" + dominfo.getName())
-
-        try:
-            XendCheckpoint.save(self, sock.fileno(), dominfo, live)
-        except:
-            if dst == "localhost":
-                dominfo.setName(
-                    string.replace(dominfo.getName(), "tmp-", "", 1))
-            raise
+        XendCheckpoint.save(sock.fileno(), dominfo, live)
         
-        return None
 
     def domain_save(self, id, dst):
         """Start saving a domain to file.
@@ -411,7 +428,7 @@ class XendDomain:
             fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
 
             # For now we don't support 'live checkpoint' 
-            return XendCheckpoint.save(self, fd, dominfo, False)
+            return XendCheckpoint.save(fd, dominfo, False)
 
         except OSError, ex:
             raise XendError("can't write guest state file %s: %s" %

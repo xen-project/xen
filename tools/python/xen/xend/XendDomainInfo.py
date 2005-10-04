@@ -80,7 +80,6 @@ restart_modes = [
 
 STATE_VM_OK         = "ok"
 STATE_VM_TERMINATED = "terminated"
-STATE_VM_SUSPENDED  = "suspended"
 
 """Flag for a block device backend domain."""
 SIF_BLK_BE_DOMAIN = (1<<4)
@@ -624,21 +623,22 @@ class XendDomainInfo:
                     # The domain no longer exists.  This will occur if we have
                     # scheduled a timer to check for shutdown timeouts and the
                     # shutdown succeeded.  It will also occur if someone
-                    # destroys a domain beneath us.  We clean up, just in
-                    # case.
+                    # destroys a domain beneath us.  We clean up the domain,
+                    # just in case, but we can't clean up the VM, because that
+                    # VM may have migrated to a different domain on this
+                    # machine.
                     self.cleanupDomain()
-                    self.cleanupVm()
                     return
 
             if xeninfo['dying']:
                 # Dying means that a domain has been destroyed, but has not
-                # yet been cleaned up by Xen.  This could persist indefinitely
-                # if, for example, another domain has some of its pages
-                # mapped.  We might like to diagnose this problem in the
-                # future, but for now all we do is make sure that it's not
-                # us holding the pages, by calling the cleanup methods.
+                # yet been cleaned up by Xen.  This state could persist
+                # indefinitely if, for example, another domain has some of its
+                # pages mapped.  We might like to diagnose this problem in the
+                # future, but for now all we do is make sure that it's not us
+                # holding the pages, by calling cleanupDomain.  We can't
+                # clean up the VM, as above.
                 self.cleanupDomain()
-                self.cleanupVm()
                 return
 
             elif xeninfo['crashed']:
@@ -651,10 +651,11 @@ class XendDomainInfo:
                 restart_reason = 'crash'
 
             elif xeninfo['shutdown']:
-                if self.readDom('xend/shutdown'):
+                if self.readDom('xend/shutdown_completed'):
                     # We've seen this shutdown already, but we are preserving
                     # the domain for debugging.  Leave it alone.
-                    pass
+                    return
+
                 else:
                     reason = shutdown_reason(xeninfo['shutdown_reason'])
 
@@ -664,7 +665,7 @@ class XendDomainInfo:
                     self.clearRestart()
 
                     if reason == 'suspend':
-                        self.state_set(STATE_VM_SUSPENDED)
+                        self.state_set(STATE_VM_TERMINATED)
                         # Don't destroy the domain.  XendCheckpoint will do
                         # this once it has finished.
                     elif reason in ['poweroff', 'reboot']:
@@ -701,7 +702,7 @@ class XendDomainInfo:
         if not reason in shutdown_reasons.values():
             raise XendError('invalid reason:' + reason)
         self.storeDom("control/shutdown", reason)
-        if not reason == 'suspend':
+        if reason != 'suspend':
             self.storeDom('xend/shutdown_start_time', time.time())
 
 
@@ -718,11 +719,6 @@ class XendDomainInfo:
          "restart"        : self.restart,
          "preserve"       : self.preserve,
          "rename-restart" : self.renameRestart}[self.info['on_' + reason]]()
-
-
-    def preserve(self):
-        log.info("Preserving dead domain %s (%d).", self.info['name'],
-                 self.domid)
 
 
     def renameRestart(self):
@@ -814,9 +810,9 @@ class XendDomainInfo:
 
     ## public:
 
-    def state_wait(self, state):
+    def waitForShutdown(self):
         self.state_updated.acquire()
-        while self.state != state:
+        while self.state == STATE_VM_OK:
             self.state_updated.wait()
         self.state_updated.release()
 
@@ -1054,7 +1050,6 @@ class XendDomainInfo:
         """Cleanup domain resources; release devices.  Idempotent.  Nothrow
         guarantee."""
 
-        self.state_set(STATE_VM_TERMINATED)
         self.release_devices()
         self.closeStoreChannel()
         self.closeConsoleChannel()
@@ -1087,14 +1082,22 @@ class XendDomainInfo:
 
         log.debug("XendDomainInfo.destroy: domid=%s", str(self.domid))
 
-        self.cleanupDomain()
         self.cleanupVm()
+        self.destroyDomain()
+
+
+    def destroyDomain(self):
+        log.debug("XendDomainInfo.destroyDomain(%s)", str(self.domid))
+
+        self.cleanupDomain()
         
         try:
             if self.domid is not None:
                 xc.domain_destroy(dom=self.domid)
         except Exception:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
+
+        self.state_set(STATE_VM_TERMINATED)
 
 
     ## private:
@@ -1243,14 +1246,18 @@ class XendDomainInfo:
 
         try:
             if rename:
-                self.preserveShutdownDomain()
+                self.preserveForRestart()
             else:
-                self.cleanupDomain()
                 self.destroy()
                 
             try:
                 xd = get_component('xen.xend.XendDomain')
-                xd.domain_unpause(xd.domain_create(config).getDomid())
+                new_dom = xd.domain_create(config)
+                try:
+                    xc.domain_unpause(new_dom.getDomid())
+                except:
+                    new_dom.destroy()
+                    raise
             except Exception, exn:
                 log.exception('Failed to restart domain %d.', self.domid)
         finally:
@@ -1260,7 +1267,7 @@ class XendDomainInfo:
         #        self.exportToDB()
 
 
-    def preserveShutdownDomain(self):
+    def preserveForRestart(self):
         """Preserve a domain that has been shut down, by giving it a new UUID,
         cloning the VM details, and giving it a new name.  This allows us to
         keep this domain for debugging, but restart a new one in its place
@@ -1276,8 +1283,14 @@ class XendDomainInfo:
         self.uuid = new_uuid
         self.vmpath = VMROOT + new_uuid
         self.storeVmDetails()
-        self.storeDom('vm', self.vmpath)
-        self.storeDom('xend/shutdown', 'True')
+        self.preserve()
+
+
+    def preserve(self):
+        log.info("Preserving dead domain %s (%d).", self.info['name'],
+                 self.domid)
+        self.storeDom('xend/shutdown_completed', 'True')
+        self.set_state(STATE_VM_TERMINATED)
 
 
     def generateShutdownName(self):
