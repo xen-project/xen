@@ -177,7 +177,7 @@ def forkHelper(cmd, fd, inputHandler, closeToChild):
             if fd == child.childerr.fileno():
                 lasterr = child.childerr.readline().rstrip()
                 log.error('%s', lasterr)
-            else
+            else:
                 l = child.fromchild.readline().rstrip()
                 while l:
                     log.debug('%s', l)
