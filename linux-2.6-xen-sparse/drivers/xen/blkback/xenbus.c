@@ -63,13 +63,23 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 	struct backend_info *be
 		= container_of(watch, struct backend_info, watch);
 
+	DPRINTK("frontend_changed: %s.\n", be->frontpath);
+
 	/* If other end is gone, delete ourself. */
 	if (node && !xenbus_exists(be->frontpath, "")) {
+		DPRINTK("Frontend has disappeared; unregistering device.\n");
 		device_unregister(&be->dev->dev);
 		return;
 	}
-	if (be->blkif == NULL || be->blkif->status == CONNECTED)
+	if (be->blkif == NULL) {
+		DPRINTK("blkif is null; doing nothing.\n");
 		return;
+	}
+
+	if (be->blkif->status == CONNECTED) {
+		DPRINTK("blkif is CONNECTED; doing nothing.\n");
+		return;
+	}
 
 	err = xenbus_gather(be->frontpath, "ring-ref", "%lu", &ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
@@ -132,10 +142,11 @@ again:
 
 	xenbus_dev_ok(be->dev);
 
+	DPRINTK("frontend_changed(%s) finished OK.\n", be->frontpath);
 	return;
-
  abort:
 	xenbus_transaction_end(1);
+	DPRINTK("frontend_changed(%s) aborted.\n", be->frontpath);
 }
 
 /* 
@@ -152,9 +163,13 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
 
+	DPRINTK("backend_changed: %s\n", watch->node);
+
 	err = xenbus_scanf(dev->nodename, "physical-device", "%li", &pdev);
-	if (XENBUS_EXIST_ERR(err))
+	if (XENBUS_EXIST_ERR(err)) {
+		DPRINTK("physical-device node exists; doing nothing.\n");
 		return;
+	}
 	if (err < 0) {
 		xenbus_dev_error(dev, err, "reading physical-device");
 		return;
@@ -174,6 +189,8 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 	}
 
 	if (be->blkif == NULL) {
+		DPRINTK("be->blkif is null; creating VBD.\n");
+
 		/* Front end dir is a number, which is used as the handle. */
 		p = strrchr(be->frontpath, '/') + 1;
 		handle = simple_strtoul(p, NULL, 0);
@@ -197,6 +214,11 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		/* Pass in NULL node to skip exist test. */
 		frontend_changed(&be->watch, NULL);
 	}
+	else {
+		DPRINTK("be->blkif is non-null; doing nothing.\n");
+	}
+
+	DPRINTK("backend_changed(%s) finished OK.\n", watch->node);
 }
 
 static int blkback_probe(struct xenbus_device *dev,
@@ -218,8 +240,10 @@ static int blkback_probe(struct xenbus_device *dev,
 			    "frontend-id", "%li", &be->frontend_id,
 			    "frontend", NULL, &frontend,
 			    NULL);
-	if (XENBUS_EXIST_ERR(err))
+	if (XENBUS_EXIST_ERR(err)) {
+		DPRINTK("blkback_probe: %s does not exist", dev->nodename);
 		goto free_be;
+	}
 	if (err < 0) {
 		xenbus_dev_error(dev, err,
 				 "reading %s/frontend or frontend-id",
@@ -231,6 +255,8 @@ static int blkback_probe(struct xenbus_device *dev,
 		 * then our bus-id is no longer valid and we need to
 		 * destroy the backend device.
 		 */
+		DPRINTK("blkback_probe: failed to get frontend path and ID; "
+			"destroying backend device");
 		err = -ENOENT;
 		goto free_be;
 	}
