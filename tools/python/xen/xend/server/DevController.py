@@ -78,8 +78,12 @@ class DevController:
         backpath = xstransact.Read(frontpath, "backend")
 
         xstransact.Remove(frontpath)
-        xstransact.Remove(backpath)
 
+        if backpath:
+            xstransact.Remove(backpath)
+        else:
+            raise VmError("Device not connected")
+           
 
     def configurations(self):
         return map(lambda x: self.configuration(int(x)),

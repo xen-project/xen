@@ -166,6 +166,9 @@ def handle_xend_error(cmd, dom, ex):
     if error == "Not found" and dom != None:
         err("Domain '%s' not found when running 'xm %s'" % (dom, cmd))
         sys.exit(1)
+    elif error == "Exception: Device not connected":
+        err("Device not connected")
+        sys.exit(1)
     else:
         raise ex
     
@@ -532,7 +535,12 @@ def xm_block_detach(args):
     arg_check(args,2,"block-detach")
 
     dom = args[0]
-    dev = args[1]
+
+    try:
+        dev = int(args[1])
+    except ValueError, e:
+        err("Invalid device id: %s" % args[1])
+        sys.exit(1)
 
     from xen.xend.XendClient import server
     server.xend_domain_device_destroy(dom, 'vbd', dev)
