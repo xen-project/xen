@@ -629,6 +629,7 @@ void notify_remote_via_irq(int irq)
 	if (VALID_EVTCHN(evtchn))
 		notify_remote_via_evtchn(evtchn);
 }
+EXPORT_SYMBOL(notify_remote_via_irq);
 
 void irq_resume(void)
 {
