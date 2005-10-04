@@ -30,9 +30,14 @@ from getopt import getopt
 import socket
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
+
+import xen.xend.XendError
+
 from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xm.opts import *
+
+
 shorthelp = """Usage: xm <subcommand> [args]
     Control, list, and manipulate Xen guest instances
 
@@ -687,7 +692,6 @@ def main(argv=sys.argv):
     args = argv[2:]
     if cmd:
         try:
-            from xen.xend.XendClient import XendError
             rc = cmd(args)
             if rc:
                 usage()
@@ -698,7 +702,7 @@ def main(argv=sys.argv):
         except IOError:
             err("Most commands need root access.  Please try again as root")
             sys.exit(1)
-        except XendError, ex:
+        except xen.xend.XendError.XendError, ex:
             if len(args) > 0:
                 handle_xend_error(argv[1], args[0], ex)
             else:
@@ -719,6 +723,3 @@ def main(argv=sys.argv):
 
 if __name__ == "__main__":
     main()
-
-
-
