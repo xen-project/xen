@@ -32,6 +32,7 @@ import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
 
 import xen.xend.XendError
+import xen.xend.XendProtocol
 
 from xen.xend import PrettyPrint
 from xen.xend import sxp
@@ -703,6 +704,14 @@ def main(argv=sys.argv):
             err("Most commands need root access.  Please try again as root")
             sys.exit(1)
         except xen.xend.XendError.XendError, ex:
+            if len(args) > 0:
+                handle_xend_error(argv[1], args[0], ex)
+            else:
+                print "Unexpected error:", sys.exc_info()[0]
+                print
+                print "Please report to xen-devel@lists.xensource.com"
+                raise
+        except xen.xend.XendProtocol.XendError, ex:
             if len(args) > 0:
                 handle_xend_error(argv[1], args[0], ex)
             else:
