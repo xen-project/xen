@@ -129,9 +129,13 @@ def create(config):
     log.debug("XendDomainInfo.create(%s)", config)
 
     vm = XendDomainInfo(getUuid(), parseConfig(config))
-    vm.construct()
-    vm.refreshShutdown()
-    return vm
+    try:
+        vm.construct()
+        vm.refreshShutdown()
+        return vm
+    except:
+        vm.destroy()
+        raise
 
 
 def recreate(xeninfo):
@@ -195,13 +199,23 @@ def restore(config):
     except TypeError, exn:
         raise VmError('Invalid ssidref in config: %s' % exn)
 
-    vm = XendDomainInfo(uuid, parseConfig(config),
-                        xc.domain_create(ssidref = ssidref))
-    vm.storeVmDetails()
-    vm.configure()
-    vm.create_channel()
-    vm.storeDomDetails()
-    return vm
+    domid = xc.domain_create(ssidref = ssidref)
+    if domid <= 0:
+        raise VmError('Creating domain failed for restore')
+    try:
+        vm = XendDomainInfo(uuid, parseConfig(config), domid)
+    except:
+        xc.domain_destroy(domid)
+        raise
+    try:
+        vm.storeVmDetails()
+        vm.configure()
+        vm.create_channel()
+        vm.storeDomDetails()
+        return vm
+    except:
+        vm.destroy()
+        raise
 
 
 def parseConfig(config):
