@@ -365,6 +365,7 @@ EXPORT_SYMBOL(phys_to_machine_mapping);
 
 /* Raw start-of-day parameters from the hypervisor. */
 start_info_t *xen_start_info;
+EXPORT_SYMBOL(xen_start_info);
 
 static void __init limit_regions(unsigned long long size)
 {
