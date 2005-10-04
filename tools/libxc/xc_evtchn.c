@@ -90,7 +90,8 @@ int xc_evtchn_bind_virq(int xc_handle,
 
     op.cmd = EVTCHNOP_bind_virq;
     op.u.bind_virq.virq = (u32)virq;
-   
+    op.u.bind_virq.vcpu = 0;
+
     if ( (rc = do_evtchn_op(xc_handle, &op)) == 0 )
     {
         if ( port != NULL )

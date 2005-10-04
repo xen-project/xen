@@ -189,6 +189,7 @@ int bind_virq_to_irq(int virq)
 	if ((irq = per_cpu(virq_to_irq, cpu)[virq]) == -1) {
 		op.cmd              = EVTCHNOP_bind_virq;
 		op.u.bind_virq.virq = virq;
+		op.u.bind_virq.vcpu = cpu;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 		evtchn = op.u.bind_virq.port;
 
@@ -252,6 +253,7 @@ int bind_ipi_to_irq(int ipi)
 
 	if ((evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi]) == -1) {
 		op.cmd = EVTCHNOP_bind_ipi;
+		op.u.bind_ipi.vcpu = cpu;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 		evtchn = op.u.bind_ipi.port;
 
@@ -666,6 +668,7 @@ void irq_resume(void)
 		/* Get a new binding from Xen. */
 		op.cmd              = EVTCHNOP_bind_virq;
 		op.u.bind_virq.virq = virq;
+		op.u.bind_virq.vcpu = 0;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 		evtchn = op.u.bind_virq.port;
         
@@ -687,6 +690,7 @@ void irq_resume(void)
 
 		/* Get a new binding from Xen. */
 		op.cmd = EVTCHNOP_bind_ipi;
+		op.u.bind_ipi.vcpu = 0;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 		evtchn = op.u.bind_ipi.port;
         

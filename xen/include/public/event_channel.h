@@ -51,22 +51,24 @@ typedef struct evtchn_bind_interdomain {
 } evtchn_bind_interdomain_t;
 
 /*
- * EVTCHNOP_bind_virq: Bind a local event channel to IRQ <irq> on calling vcpu.
+ * EVTCHNOP_bind_virq: Bind a local event channel to VIRQ <irq> on specified
+ * vcpu.
  * NOTES:
  *  1. A virtual IRQ may be bound to at most one event channel per vcpu.
- *  2. The allocated event channel is bound to the calling vcpu. The binding
+ *  2. The allocated event channel is bound to the specified vcpu. The binding
  *     may not be changed.
  */
 #define EVTCHNOP_bind_virq        1
 typedef struct evtchn_bind_virq {
     /* IN parameters. */
     u32 virq;
+    u32 vcpu;
     /* OUT parameters. */
     u32 port;
 } evtchn_bind_virq_t;
 
 /*
- * EVTCHNOP_bind_pirq: Bind a local event channel to IRQ <irq>.
+ * EVTCHNOP_bind_pirq: Bind a local event channel to PIRQ <irq>.
  * NOTES:
  *  1. A physical IRQ may be bound to at most one event channel per domain.
  *  2. Only a sufficiently-privileged domain may bind to a physical IRQ.
@@ -84,11 +86,12 @@ typedef struct evtchn_bind_pirq {
 /*
  * EVTCHNOP_bind_ipi: Bind a local event channel to receive events.
  * NOTES:
- *  1. The allocated event channel is bound to the calling vcpu. The binding
+ *  1. The allocated event channel is bound to the specified vcpu. The binding
  *     may not be changed.
  */
 #define EVTCHNOP_bind_ipi         7
 typedef struct evtchn_bind_ipi {
+    u32 vcpu;
     /* OUT parameters. */
     u32 port;
 } evtchn_bind_ipi_t;

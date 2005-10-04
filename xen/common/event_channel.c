@@ -244,15 +244,15 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
 {
     struct evtchn *chn;
-    struct vcpu   *v = current;
-    struct domain *d = v->domain;
+    struct vcpu   *v;
+    struct domain *d = current->domain;
     int            port, virq = bind->virq;
 
     if ( virq >= ARRAY_SIZE(v->virq_to_evtchn) )
         return -EINVAL;
 
-    if ( d->domain_id == 0 && virq >= VIRQ_CONSOLE )
-        v = d->vcpu[0];
+    if ( (v = d->vcpu[bind->vcpu]) == NULL )
+        return -ENOENT;
 
     spin_lock(&d->evtchn_lock);
 
@@ -288,13 +288,16 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     struct domain *d = current->domain;
     int            port;
 
+    if ( d->vcpu[bind->vcpu] == NULL )
+        return -ENOENT;
+
     spin_lock(&d->evtchn_lock);
 
     if ( (port = get_free_port(d)) >= 0 )
     {
         chn = evtchn_from_port(d, port);
         chn->state          = ECS_IPI;
-        chn->notify_vcpu_id = current->vcpu_id;
+        chn->notify_vcpu_id = bind->vcpu;
     }
 
     spin_unlock(&d->evtchn_lock);
