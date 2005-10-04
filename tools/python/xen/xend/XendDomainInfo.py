@@ -308,7 +308,7 @@ def dom_get(dom):
             return domlist[0]
     except Exception, err:
         # ignore missing domain
-        log.exception("domain_getinfo(%d) failed, ignoring", dom)
+        log.debug("domain_getinfo(%d) failed, ignoring: %s", dom, str(err))
     return None
 
 class XendDomainInfo:
@@ -733,21 +733,21 @@ class XendDomainInfo:
                                                      self.domid)
             xc.domain_dumpcore(dom = self.domid, corefile = corefile)
 
-        except Exception, exn:
-            log.error("XendDomainInfo.dumpCore failed: id = %s name = %s: %s",
-                      self.domid, self.info['name'], str(exn))
+        except:
+            log.exception("XendDomainInfo.dumpCore failed: id = %s name = %s",
+                          self.domid, self.info['name'])
 
 
-    def closeChannel(self, channel, entry):
+    def closeChannel(self, chan, entry):
         """Close the given channel, if set, and remove the given entry in the
         store.  Nothrow guarantee."""
         
-        if channel:
-            channel.close()
+        if chan:
+            chan.close()
         try:
             self.removeDom(entry)
-        except Exception, exn:
-            log.exception(exn)
+        except:
+            log.exception('Removing entry %s failed', entry)
         
 
     def closeStoreChannel(self):
@@ -988,7 +988,7 @@ class XendDomainInfo:
             self.configure()
             self.storeVmDetails()
             self.storeDomDetails()
-        except Exception:
+        except:
             log.exception('Domain construction failed')
             self.destroy()
             raise VmError('Creating domain failed: name=%s' %
@@ -1064,7 +1064,7 @@ class XendDomainInfo:
 
         try:
             self.removeDom()
-        except Exception:
+        except:
             log.exception("Removing domain path failed.")
 
 
@@ -1073,7 +1073,7 @@ class XendDomainInfo:
 
         try:
             self.removeVm()
-        except Exception:
+        except:
             log.exception("Removing VM path failed.")
 
 
@@ -1094,7 +1094,7 @@ class XendDomainInfo:
         try:
             if self.domid is not None:
                 xc.domain_destroy(dom=self.domid)
-        except Exception:
+        except:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
 
         self.state_set(STATE_VM_TERMINATED)
@@ -1117,7 +1117,7 @@ class XendDomainInfo:
                 for d in t.list(n):
                     try:
                         t.remove(d)
-                    except ex:
+                    except:
                         # Log and swallow any exceptions in removal --
                         # there's nothing more we can do.
                         log.exception(
@@ -1258,7 +1258,7 @@ class XendDomainInfo:
                 except:
                     new_dom.destroy()
                     raise
-            except Exception, exn:
+            except:
                 log.exception('Failed to restart domain %d.', self.domid)
         finally:
             self.removeVm('xend/restart_in_progress')
@@ -1290,7 +1290,7 @@ class XendDomainInfo:
         log.info("Preserving dead domain %s (%d).", self.info['name'],
                  self.domid)
         self.storeDom('xend/shutdown_completed', 'True')
-        self.set_state(STATE_VM_TERMINATED)
+        self.state_set(STATE_VM_TERMINATED)
 
 
     def generateShutdownName(self):
