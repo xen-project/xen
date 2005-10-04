@@ -8,8 +8,8 @@
 import os
 import re
 import select
+import string
 import sxp
-from string import join
 from struct import pack, unpack, calcsize
 
 from xen.util.xpopen import xPopen3
@@ -65,40 +65,22 @@ def save(fd, dominfo, live):
         # more information.
         cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
                str(dominfo.getDomid()), "0", "0", str(int(live)) ]
-        log.info("[xc_save] " + join(cmd))
-        child = xPopen3(cmd, True, -1, [fd, xc.handle()])
-    
-        lasterr = ""
-        p = select.poll()
-        p.register(child.fromchild.fileno())
-        p.register(child.childerr.fileno())
-        while True: 
-            r = p.poll()
-            for (fd, event) in r:
-                if not event & select.POLLIN:
-                    continue
-                if fd == child.childerr.fileno():
-                    l = child.childerr.readline()
-                    log.error(l.rstrip())
-                    lasterr = l.rstrip()
-                if fd == child.fromchild.fileno():
-                    l = child.fromchild.readline()
-                    if l.rstrip() == "suspend":
-                        log.info("suspending %d", dominfo.getDomid())
-                        dominfo.shutdown('suspend')
-                        dominfo.waitForShutdown()
-                        log.info("suspend %d done", dominfo.getDomid())
-                        child.tochild.write("done\n")
-                        child.tochild.flush()
-            if filter(lambda (fd, event): event & select.POLLHUP, r):
-                break
+        log.debug("[xc_save]: %s", string.join(cmd))
 
-        if child.wait() >> 8 == 127:
-            lasterr = "popen %s failed" % PATH_XC_SAVE
-        if child.wait() != 0:
-            raise XendError("xc_save failed: %s" % lasterr)
+        def saveInputHandler(line, tochild):
+            log.debug("In saveInputHandler %s", line)
+            if line == "suspend":
+                log.debug("Suspending %d ...", dominfo.getDomid())
+                dominfo.shutdown('suspend')
+                dominfo.waitForShutdown()
+                log.info("Domain %d suspended.", dominfo.getDomid())
+                tochild.write("done\n")
+                tochild.flush()
+
+        forkHelper(cmd, fd, saveInputHandler, False)
 
         dominfo.destroyDomain()
+
     except Exception, exn:
         log.exception("Save failed on domain %s (%d).", domain_name,
                       dominfo.getDomid())
@@ -149,52 +131,66 @@ def restore(xd, fd):
         cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
                str(dominfo.getDomid()), str(nr_pfns),
                str(store_evtchn), str(console_evtchn)]
-        log.info("[xc_restore] " + join(cmd))
-        child = xPopen3(cmd, True, -1, [fd, xc.handle()])
-        child.tochild.close()
+        log.debug("[xc_restore]: %s", string.join(cmd))
 
-        lasterr = ""
-        p = select.poll()
-        p.register(child.fromchild.fileno())
-        p.register(child.childerr.fileno())
-        while True:
-            r = p.poll()
-            for (fd, event) in r:
-                if not event & select.POLLIN:
-                    continue
-                if fd == child.childerr.fileno():
-                    l = child.childerr.readline()
-                    log.error(l.rstrip())
-                    lasterr = l.rstrip()
-                if fd == child.fromchild.fileno():
-                    l = child.fromchild.readline()
-                    while l:
-                        log.info(l.rstrip())
-                        m = re.match(r"^(store-mfn) (\d+)\n$", l)
-                        if m:
-                            store_mfn = int(m.group(2))
-                            dominfo.setStoreRef(store_mfn)
-                            IntroduceDomain(dominfo.getDomid(),
-                                            store_mfn,
-                                            dominfo.store_channel.port1,
-                                            dominfo.getDomainPath())
-                        m = re.match(r"^(console-mfn) (\d+)\n$", l)
-                        if m:
-                            dominfo.setConsoleRef(int(m.group(2)))
-                        try:
-                            l = child.fromchild.readline()
-                        except:
-                            l = None
-            if filter(lambda (fd, event): event & select.POLLHUP, r):
-                break
+        def restoreInputHandler(line, _):
+            m = re.match(r"^(store-mfn) (\d+)$", line)
+            if m:
+                store_mfn = int(m.group(2))
+                dominfo.setStoreRef(store_mfn)
+                IntroduceDomain(dominfo.getDomid(),
+                                store_mfn,
+                                dominfo.store_channel.port1,
+                                dominfo.getDomainPath())
+            else:
+                m = re.match(r"^(console-mfn) (\d+)$", line)
+                if m:
+                    dominfo.setConsoleRef(int(m.group(2)))
 
-        if child.wait() >> 8 == 127:
-            lasterr = "popen %s failed" % PATH_XC_RESTORE
-        if child.wait() != 0:
-            raise XendError("xc_restore failed: %s" % lasterr)
+        forkHelper(cmd, fd, restoreInputHandler, True)
 
         return dominfo
     except:
-        log.exception("Restore failed")
         dominfo.destroy()
         raise
+
+
+def forkHelper(cmd, fd, inputHandler, closeToChild):
+    child = xPopen3(cmd, True, -1, [fd, xc.handle()])
+
+    if closeToChild:
+        child.tochild.close()
+
+    fds = [child.fromchild.fileno(),
+           child.childerr.fileno()]
+    p = select.poll()
+    map(p.register, fds)
+    while len(fds) > 0:
+        r = p.poll()
+        for (fd, event) in r:
+            if event & select.POLLHUP or event & select.POLLERR:
+                fds.remove(fd)
+                p.unregister(fd)
+                continue
+            if not event & select.POLLIN:
+                continue
+            if fd == child.childerr.fileno():
+                lasterr = child.childerr.readline().rstrip()
+                log.error('%s', lasterr)
+            else
+                l = child.fromchild.readline().rstrip()
+                while l:
+                    log.debug('%s', l)
+                    inputHandler(l, child.tochild)
+                    try:
+                        l = child.fromchild.readline().rstrip()
+                    except:
+                        l = None
+
+    child.fromchild.close()
+    child.childerr.close()
+
+    if child.wait() >> 8 == 127:
+        lasterr = "popen failed"
+    if child.wait() != 0:
+        raise XendError("%s failed: %s" % (string.join(cmd), lasterr))
