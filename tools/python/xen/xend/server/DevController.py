@@ -230,7 +230,7 @@ class DevController:
 
         return "%s/backend/%s/%s/%d" % (backdom.getDomainPath(),
                                         self.deviceClass,
-                                        self.vm.getUuid(), devid)
+                                        self.vm.getDomid(), devid)
 
 
     def frontendPath(self, devid):
