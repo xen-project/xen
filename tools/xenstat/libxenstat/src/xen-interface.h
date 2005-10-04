@@ -28,6 +28,7 @@ typedef uint64_t u64;
 
 #include <xen/xen.h>
 #include <xen/dom0_ops.h>
+#include <xen/sched.h>
 #include <xen/version.h>
 
 /* Opaque handles */

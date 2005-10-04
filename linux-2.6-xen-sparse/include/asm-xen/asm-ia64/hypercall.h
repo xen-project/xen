@@ -29,7 +29,9 @@
 
 #ifndef __HYPERCALL_H__
 #define __HYPERCALL_H__
+
 #include <asm-xen/xen-public/xen.h>
+#include <asm-xen/xen-public/sched.h>
 
 /* FIXME: temp place to hold these page related macros */
 #include <asm/page.h>
@@ -184,77 +186,9 @@ HYPERVISOR_fpu_taskswitch(
 }
 
 static inline int
-HYPERVISOR_yield(
-    void)
+HYPERVISOR_sched_op(
+    int cmd, unsigned long arg)
 {
-#if 0
-    int ret;
-    unsigned long ign;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret), "=b" (ign)
-	: "0" (__HYPERVISOR_sched_op), "1" (SCHEDOP_yield)
-	: "memory" );
-
-    return ret;
-#endif
-    return 1;
-}
-
-static inline int
-HYPERVISOR_block(
-    void)
-{
-#if 0
-    int ret;
-    unsigned long ign1;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret), "=b" (ign1)
-	: "0" (__HYPERVISOR_sched_op), "1" (SCHEDOP_block)
-	: "memory" );
-
-    return ret;
-#endif
-    return 1;
-}
-
-static inline int
-HYPERVISOR_shutdown(
-    void)
-{
-#if 0
-    int ret;
-    unsigned long ign1;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret), "=b" (ign1)
-	: "0" (__HYPERVISOR_sched_op),
-	  "1" (SCHEDOP_shutdown | (SHUTDOWN_poweroff << SCHEDOP_reasonshift))
-        : "memory" );
-
-    return ret;
-#endif
-    return 1;
-}
-
-static inline int
-HYPERVISOR_reboot(
-    void)
-{
-#if 0
-    int ret;
-    unsigned long ign1;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret), "=b" (ign1)
-	: "0" (__HYPERVISOR_sched_op),
-	  "1" (SCHEDOP_shutdown | (SHUTDOWN_reboot << SCHEDOP_reasonshift))
-        : "memory" );
-
-    return ret;
-#endif
     return 1;
 }
 
@@ -262,39 +196,6 @@ static inline int
 HYPERVISOR_suspend(
     unsigned long srec)
 {
-#if 0
-    int ret;
-    unsigned long ign1, ign2;
-
-    /* NB. On suspend, control software expects a suspend record in %esi. */
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret), "=b" (ign1), "=S" (ign2)
-	: "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_shutdown | (SHUTDOWN_suspend << SCHEDOP_reasonshift)), 
-        "S" (srec) : "memory");
-
-    return ret;
-#endif
-    return 1;
-}
-
-static inline int
-HYPERVISOR_crash(
-    void)
-{
-#if 0
-    int ret;
-    unsigned long ign1;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret), "=b" (ign1)
-	: "0" (__HYPERVISOR_sched_op),
-	  "1" (SCHEDOP_shutdown | (SHUTDOWN_crash << SCHEDOP_reasonshift))
-        : "memory" );
-
-    return ret;
-#endif
     return 1;
 }
 

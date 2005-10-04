@@ -35,6 +35,7 @@
 #define __HYPERCALL_H__
 
 #include <asm-xen/xen-public/xen.h>
+#include <asm-xen/xen-public/sched.h>
 
 #define __syscall_clobber "r11","rcx","memory"
 
@@ -165,33 +166,10 @@ HYPERVISOR_fpu_taskswitch(
 }
 
 static inline int
-HYPERVISOR_yield(
-	void)
+HYPERVISOR_sched_op(
+	int cmd, unsigned long arg)
 {
-	return _hypercall2(int, sched_op, SCHEDOP_yield, 0);
-}
-
-static inline int
-HYPERVISOR_block(
-	void)
-{
-	return _hypercall2(int, sched_op, SCHEDOP_block, 0);
-}
-
-static inline int
-HYPERVISOR_shutdown(
-	void)
-{
-	return _hypercall2(int, sched_op, SCHEDOP_shutdown |
-			   (SHUTDOWN_poweroff << SCHEDOP_reasonshift), 0);
-}
-
-static inline int
-HYPERVISOR_reboot(
-	void)
-{
-	return _hypercall2(int, sched_op, SCHEDOP_shutdown |
-			   (SHUTDOWN_reboot << SCHEDOP_reasonshift), 0);
+	return _hypercall2(int, sched_op, cmd, arg);
 }
 
 static inline long
@@ -325,8 +303,8 @@ static inline int
 HYPERVISOR_suspend(
 	unsigned long srec)
 {
-	return _hypercall2(int, sched_op, SCHEDOP_shutdown |
-			   (SHUTDOWN_suspend << SCHEDOP_reasonshift), srec);
+	return _hypercall3(int, sched_op, SCHEDOP_shutdown,
+			   SHUTDOWN_suspend, srec);
 }
 
 #endif /* __HYPERCALL_H__ */

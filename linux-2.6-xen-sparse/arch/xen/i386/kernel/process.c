@@ -106,7 +106,8 @@ void xen_idle(void)
 		local_irq_enable();
 	} else {
 		stop_hz_timer();
-		HYPERVISOR_block(); /* implicit local_irq_enable() */
+		/* Blocking includes an implicit local_irq_enable(). */
+		HYPERVISOR_sched_op(SCHEDOP_block, 0);
 		start_hz_timer();
 	}
 }
@@ -122,7 +123,7 @@ static inline void play_dead(void)
 {
 	/* Death loop */
 	while (__get_cpu_var(cpu_state) != CPU_UP_PREPARE)
-		HYPERVISOR_yield();
+		HYPERVISOR_sched_op(SCHEDOP_yield, 0);
 
 	__flush_tlb_all();
    /* 

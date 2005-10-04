@@ -25,6 +25,7 @@ typedef int64_t            s64;
 #include <xen/dom0_ops.h>
 #include <xen/version.h>
 #include <xen/event_channel.h>
+#include <xen/sched.h>
 #include <xen/sched_ctl.h>
 #include <xen/acm.h>
 

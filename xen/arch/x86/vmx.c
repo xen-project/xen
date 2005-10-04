@@ -41,7 +41,7 @@
 #if CONFIG_PAGING_LEVELS >= 3
 #include <asm/shadow_64.h>
 #endif
-
+#include <public/sched.h>
 #include <public/io/ioreq.h>
 
 int hvm_enabled;

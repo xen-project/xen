@@ -978,9 +978,9 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters,
                     goto out;
                 }
 
-                DPRINTF("SUSPEND shinfo %08lx eip %08u esi %08u\n",
+                DPRINTF("SUSPEND shinfo %08lx eip %08u edx %08u\n",
                         info.shared_info_frame,
-                        ctxt.user_regs.eip, ctxt.user_regs.esi);
+                        ctxt.user_regs.eip, ctxt.user_regs.edx);
             } 
 
             if ( xc_shadow_control( xc_handle, dom, 
@@ -1048,7 +1048,7 @@ int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters,
     }
 
     /* Canonicalise the suspend-record frame number. */
-    if ( !translate_mfn_to_pfn(&ctxt.user_regs.esi) )
+    if ( !translate_mfn_to_pfn(&ctxt.user_regs.edx) )
     {
         ERR("Suspend record is not in range of pseudophys map");
         goto out;

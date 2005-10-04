@@ -18,6 +18,7 @@
 #include <xen/domain_page.h>
 #include <asm/debugger.h>
 #include <public/dom0_ops.h>
+#include <public/sched.h>
 #include <public/vcpu.h>
 
 /* Both these structures are protected by the domlist_lock. */

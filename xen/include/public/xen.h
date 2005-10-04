@@ -196,25 +196,6 @@ struct mmuext_op {
 #define UVMF_ALL                (1UL<<2) /* Flush all TLBs.       */
 
 /*
- * Commands to HYPERVISOR_sched_op().
- */
-#define SCHEDOP_yield           0   /* Give up the CPU voluntarily.       */
-#define SCHEDOP_block           1   /* Block until an event is received.  */
-#define SCHEDOP_shutdown        2   /* Stop executing this domain.        */
-#define SCHEDOP_cmdmask       255   /* 8-bit command. */
-#define SCHEDOP_reasonshift     8   /* 8-bit reason code. (SCHEDOP_shutdown) */
-
-/*
- * Reason codes for SCHEDOP_shutdown. These may be interpreted by control 
- * software to determine the appropriate action. For the most part, Xen does
- * not care about the shutdown code (SHUTDOWN_crash excepted).
- */
-#define SHUTDOWN_poweroff   0  /* Domain exited normally. Clean up and kill. */
-#define SHUTDOWN_reboot     1  /* Clean up, kill, and then restart.          */
-#define SHUTDOWN_suspend    2  /* Clean up, save suspend info, kill.         */
-#define SHUTDOWN_crash      3  /* Tell controller we've crashed.             */
-
-/*
  * Commands to HYPERVISOR_console_io().
  */
 #define CONSOLEIO_write         0

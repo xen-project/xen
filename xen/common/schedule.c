@@ -36,6 +36,7 @@
 #include <xen/softirq.h>
 #include <xen/trace.h>
 #include <xen/mm.h>
+#include <public/sched.h>
 #include <public/sched_ctl.h>
 
 extern void arch_getdomaininfo_ctxt(struct vcpu *,
@@ -270,11 +271,11 @@ static long do_yield(void)
     return 0;
 }
 
-long do_sched_op(unsigned long op, unsigned long arg)
+long do_sched_op(int cmd, unsigned long arg)
 {
     long ret = 0;
 
-    switch ( op & SCHEDOP_cmdmask ) 
+    switch ( cmd )
     {
     case SCHEDOP_yield:
     {
@@ -291,9 +292,8 @@ long do_sched_op(unsigned long op, unsigned long arg)
     case SCHEDOP_shutdown:
     {
         TRACE_3D(TRC_SCHED_SHUTDOWN,
-                 current->domain->domain_id, current->vcpu_id,
-                 (op >> SCHEDOP_reasonshift));
-        domain_shutdown((u8)(op >> SCHEDOP_reasonshift));
+                 current->domain->domain_id, current->vcpu_id, arg);
+        domain_shutdown((u8)arg);
         break;
     }
 
