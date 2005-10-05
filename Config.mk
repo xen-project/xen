@@ -20,6 +20,15 @@ STRIP      = $(CROSS_COMPILE)strip
 OBJCOPY    = $(CROSS_COMPILE)objcopy
 OBJDUMP    = $(CROSS_COMPILE)objdump
 
+# Default is to install to local 'dist' directory.
+DISTDIR ?= $(XEN_ROOT)/dist
+DESTDIR ?= $(DISTDIR)/install
+
+INSTALL      = install
+INSTALL_DIR  = $(INSTALL) -d -m0755
+INSTALL_DATA = $(INSTALL) -m0644
+INSTALL_PROG = $(INSTALL) -m0755
+
 ifeq ($(XEN_TARGET_ARCH),x86_64)
 LIBDIR = lib64
 else
@@ -49,3 +58,5 @@ ACM_USE_SECURITY_POLICY ?= ACM_NULL_POLICY
 XENSTAT_XENTOP ?= y
 
 VTPM_TOOLS ?= n
+
+-include $(XEN_ROOT)/.config

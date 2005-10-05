@@ -2,22 +2,11 @@
 # Grand Unified Makefile for Xen.
 #
 
-# Default is to install to local 'dist' directory.
-DISTDIR ?= $(CURDIR)/dist
-DESTDIR ?= $(DISTDIR)/install
-
-INSTALL		:= install
-INSTALL_DIR	:= $(INSTALL) -d -m0755
-INSTALL_DATA	:= $(INSTALL) -m0644
-INSTALL_PROG	:= $(INSTALL) -m0755
-
 KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
 # linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
 # You may use wildcards in the above e.g. KERNELS=*2.4*
 
 XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.$(kernel))) )
-
-export DESTDIR
 
 # Export target architecture overrides to Xen and Linux sub-trees.
 ifneq ($(XEN_TARGET_ARCH),)
@@ -28,6 +17,7 @@ endif
 # Default target must appear before any include lines
 all: dist
 
+XEN_ROOT=$(CURDIR)
 include Config.mk
 include buildconfigs/Rules.mk
 
