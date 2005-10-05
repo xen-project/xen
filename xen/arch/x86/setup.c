@@ -418,6 +418,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     printk("System RAM: %luMB (%lukB)\n", 
            nr_pages >> (20 - PAGE_SHIFT),
            nr_pages << (PAGE_SHIFT - 10));
+    total_pages = nr_pages;
 
     init_frametable();
 

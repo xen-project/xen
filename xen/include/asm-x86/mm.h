@@ -156,6 +156,7 @@ static inline u32 pickle_domptr(struct domain *domain)
 
 extern struct pfn_info *frame_table;
 extern unsigned long max_page;
+extern unsigned long total_pages;
 void init_frametable(void);
 
 int alloc_page_type(struct pfn_info *page, unsigned long type);

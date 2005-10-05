@@ -147,6 +147,7 @@ static struct domain *dom_xen, *dom_io;
 /* Frame table and its size in pages. */
 struct pfn_info *frame_table;
 unsigned long max_page;
+unsigned long total_pages;
 
 void __init init_frametable(void)
 {

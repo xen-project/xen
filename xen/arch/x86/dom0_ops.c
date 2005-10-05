@@ -186,7 +186,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         pi->sockets_per_node = 
             num_online_cpus() / (pi->threads_per_core * pi->cores_per_socket);
         pi->nr_nodes         = 1;
-        pi->total_pages      = max_page;
+        pi->total_pages      = total_pages;
         pi->free_pages       = avail_domheap_pages();
         pi->cpu_khz          = cpu_khz;
         memset(pi->hw_cap, 0, sizeof(pi->hw_cap));
