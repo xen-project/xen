@@ -20,9 +20,7 @@ STRIP      = $(CROSS_COMPILE)strip
 OBJCOPY    = $(CROSS_COMPILE)objcopy
 OBJDUMP    = $(CROSS_COMPILE)objdump
 
-# Default is to install to local 'dist' directory.
-DISTDIR ?= $(XEN_ROOT)/dist
-DESTDIR ?= $(DISTDIR)/install
+DISTDIR     ?= $(XEN_ROOT)/dist
 
 INSTALL      = install
 INSTALL_DIR  = $(INSTALL) -d -m0755

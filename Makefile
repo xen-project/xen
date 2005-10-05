@@ -37,23 +37,33 @@ build: kernels
 	$(MAKE) -C docs build
 
 # build and install everything into local dist directory
-dist: xen kernels tools docs
+dist: DESTDIR=$(DISTDIR)/install
+dist: dist-xen dist-kernels dist-tools dist-docs
 	$(INSTALL_DIR) $(DISTDIR)/check
 	$(INSTALL_DATA) ./COPYING $(DISTDIR)
 	$(INSTALL_DATA) ./README $(DISTDIR)
 	$(INSTALL_PROG) ./install.sh $(DISTDIR)
 	$(INSTALL_PROG) tools/check/chk tools/check/check_* $(DISTDIR)/check
+dist-%: DESTDIR=$(DISTDIR)/install
+dist-%: install-%
+	@: # do nothing
 
-xen:
+# Legacy dist targets
+xen: dist-xen
+tools: dist-tools
+kernels: dist-kernels
+docs: dist-docs
+
+install-xen:
 	$(MAKE) -C xen install
 
-tools:
+install-tools:
 	$(MAKE) -C tools install
 
-kernels:
+install-kernels:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-build || exit 1; done
 
-docs:
+install-docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
 
 dev-docs:
@@ -109,10 +119,6 @@ install-iptables:
 	tar -jxf iptables-1.2.11.tar.bz2
 	$(MAKE) -C iptables-1.2.11 PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install
 
-install-%: DESTDIR=
-install-%: %
-	@: # do nothing
-
 help:
 	@echo 'Installation targets:'
 	@echo '  install          - build and install everything'
@@ -151,7 +157,6 @@ help:
 	@echo '                     with extreme care!)'
 
 # Use this target with extreme care!
-uninstall: DESTDIR=
 uninstall: D=$(DESTDIR)
 uninstall:
 	[ -d $(D)/etc/xen ] && mv -f $(D)/etc/xen $(D)/etc/xen.old-`date +%s` || true

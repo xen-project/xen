@@ -1,11 +1,6 @@
 
 include Config.mk
 
-# We expect these two to already be set if people 
-# are using the top-level Makefile
-DISTDIR	?= $(CURDIR)/dist
-DESTDIR	?= $(DISTDIR)/install
-
 export DESTDIR
 
 ALLKERNELS = $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.*))
