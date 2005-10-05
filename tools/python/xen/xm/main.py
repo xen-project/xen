@@ -86,8 +86,8 @@ xm full list of subcommands:
     shutdown [-w|-a] <DomId>  shutdown a domain
     sysrq   <DomId> <letter>  send a sysrq to a domain
     unpause <DomId>           unpause a paused domain
-    vcpu-enable <DomId> <VCPU>        disable VCPU in a domain
-    vcpu-disable <DomId> <VCPU>       enable VCPU in a domain
+    vcpu-enable <DomId> <VCPU>        enable VCPU in a domain
+    vcpu-disable <DomId> <VCPU>       disable VCPU in a domain
     vcpu-list <DomId>                 get the list of VCPUs for a domain
     vcpu-pin <DomId> <VCpu> <CPUS>    set which cpus a VCPU can use. 
 
