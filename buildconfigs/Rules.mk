@@ -6,6 +6,8 @@ include Config.mk
 DISTDIR	?= $(CURDIR)/dist
 DESTDIR	?= $(DISTDIR)/install
 
+export DESTDIR
+
 ALLKERNELS = $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.*))
 ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
 
