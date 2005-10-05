@@ -137,8 +137,10 @@ void subarch_init_memory(struct domain *dom_xen)
      * count_info and domain fields must be adjacent, as we perform atomic
      * 64-bit operations on them.
      */
-    if ( (offsetof(struct pfn_info, u.inuse._domain) != 
-          (offsetof(struct pfn_info, count_info) + sizeof(u32))) )
+    if ( ((offsetof(struct pfn_info, u.inuse._domain) != 
+           (offsetof(struct pfn_info, count_info) + sizeof(u32)))) ||
+         ((offsetof(struct pfn_info, count_info) & 7) != 0) ||
+         (sizeof(struct pfn_info) != 40) )
     {
         printk("Weird pfn_info layout (%ld,%ld,%ld)\n",
                offsetof(struct pfn_info, count_info),

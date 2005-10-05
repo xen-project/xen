@@ -22,9 +22,6 @@ struct pfn_info
     /* Each frame can be threaded onto a doubly-linked list. */
     struct list_head list;
 
-    /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
-    u32 tlbflush_timestamp;
-
     /* Reference count and various PGC_xxx flags and fields. */
     u32 count_info;
 
@@ -37,17 +34,20 @@ struct pfn_info
             u32 _domain; /* pickled format */
             /* Type reference count and various PGT_xxx flags and fields. */
             unsigned long type_info;
-        } inuse;
+        } __attribute__ ((packed)) inuse;
 
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
+            /* Order-size of the free chunk this page is the head of. */
+            u32 order;
             /* Mask of possibly-tainted TLBs. */
             cpumask_t cpumask;
-            /* Order-size of the free chunk this page is the head of. */
-            u8 order;
-        } free;
+        } __attribute__ ((packed)) free;
 
     } u;
+
+    /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
+    u32 tlbflush_timestamp;
 };
 
  /* The following page types are MUTUALLY EXCLUSIVE. */
