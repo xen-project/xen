@@ -432,16 +432,16 @@ static PyObject *pyxc_evtchn_alloc_unbound(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
+    u32 dom = DOMID_SELF, remote_dom;
     int port = 0;
 
-    static char *kwd_list[] = { "dom", "port", NULL };
+    static char *kwd_list[] = { "remote_dom", "dom", "port", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list,
-                                      &dom, &port) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|ii", kwd_list,
+                                      &remote_dom, &dom, &port) )
         return NULL;
 
-    if ( xc_evtchn_alloc_unbound(xc->xc_handle, dom, &port) != 0 )
+    if ( xc_evtchn_alloc_unbound(xc->xc_handle, remote_dom, dom, &port) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return PyInt_FromLong(port);

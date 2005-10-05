@@ -485,7 +485,7 @@ static void watch_for_status(struct xenbus_watch *watch, const char *node)
 static int setup_blkring(struct xenbus_device *dev, struct blkfront_info *info)
 {
 	blkif_sring_t *sring;
-	evtchn_op_t op = { .cmd = EVTCHNOP_alloc_unbound };
+	evtchn_op_t op;
 	int err;
 
 	info->ring_ref = GRANT_INVALID_REF;
@@ -508,7 +508,9 @@ static int setup_blkring(struct xenbus_device *dev, struct blkfront_info *info)
 	}
 	info->ring_ref = err;
 
-	op.u.alloc_unbound.dom = info->backend_id;
+	op.cmd = EVTCHNOP_alloc_unbound;
+	op.u.alloc_unbound.dom = DOMID_SELF;
+	op.u.alloc_unbound.remote_dom = info->backend_id;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		gnttab_end_foreign_access(info->ring_ref, 0);
@@ -518,7 +520,9 @@ static int setup_blkring(struct xenbus_device *dev, struct blkfront_info *info)
 		xenbus_dev_error(dev, err, "allocating event channel");
 		return err;
 	}
+
 	blkif_connect(info, op.u.alloc_unbound.port);
+
 	return 0;
 }
 

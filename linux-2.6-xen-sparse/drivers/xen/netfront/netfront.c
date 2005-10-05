@@ -972,7 +972,7 @@ static void watch_for_status(struct xenbus_watch *watch, const char *node)
 
 static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 {
-	evtchn_op_t op = { .cmd = EVTCHNOP_alloc_unbound };
+	evtchn_op_t op;
 	int err;
 
 	info->tx_ring_ref = GRANT_INVALID_REF;
@@ -1010,13 +1010,17 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	}
 	info->rx_ring_ref = err;
 
-	op.u.alloc_unbound.dom = info->backend_id;
+	op.cmd = EVTCHNOP_alloc_unbound;
+	op.u.alloc_unbound.dom = DOMID_SELF;
+	op.u.alloc_unbound.remote_dom = info->backend_id;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		xenbus_dev_error(dev, err, "allocating event channel");
 		goto out;
 	}
+
 	connect_device(info, op.u.alloc_unbound.port);
+
 	return 0;
 
  out:

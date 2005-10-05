@@ -63,9 +63,18 @@ static int get_free_port(struct domain *d)
 static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 {
     struct evtchn *chn;
-    struct domain *d = current->domain;
+    struct domain *d;
     int            port = alloc->port;
+    domid_t        dom = alloc->dom;
     long           rc = 0;
+
+    if ( dom == DOMID_SELF )
+        dom = current->domain->domain_id;
+    else if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+
+    if ( (d = find_domain_by_id(dom)) == NULL )
+        return -ESRCH;
 
     spin_lock(&d->evtchn_lock);
 
@@ -84,11 +93,11 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     {
     case ECS_FREE:
         chn->state = ECS_UNBOUND;
-        chn->u.unbound.remote_domid = alloc->dom;
+        chn->u.unbound.remote_domid = alloc->remote_dom;
         break;
 
     case ECS_UNBOUND:
-        if ( chn->u.unbound.remote_domid != alloc->dom )
+        if ( chn->u.unbound.remote_domid != alloc->remote_dom )
             ERROR_EXIT(-EINVAL);
         break;
 
@@ -99,7 +108,10 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
  out:
     spin_unlock(&d->evtchn_lock);
 
+    put_domain(d);
+
     alloc->port = port;
+
     return rc;
 }
 

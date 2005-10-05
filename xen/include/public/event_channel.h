@@ -10,14 +10,16 @@
 #define __XEN_PUBLIC_EVENT_CHANNEL_H__
 
 /*
- * EVTCHNOP_alloc_unbound: Prepare a local port for binding to <dom>.
- * <port> may be wildcarded by setting to zero, in which case a fresh port
- * will be allocated, and the field filled in on return.
+ * EVTCHNOP_alloc_unbound: Allocate a port in <dom> for later binding to
+ * <remote_dom>. <port> may be wildcarded by setting to zero, in which case a
+ * fresh port will be allocated, and the field filled in on return.
+ * NOTES:
+ *  1. If the caller is unprivileged then <dom> must be DOMID_SELF.
  */
 #define EVTCHNOP_alloc_unbound    6
 typedef struct evtchn_alloc_unbound {
     /* IN parameters */
-    domid_t dom;
+    domid_t dom, remote_dom;
     /* IN/OUT parameters */
     u32     port;
 } evtchn_alloc_unbound_t;
