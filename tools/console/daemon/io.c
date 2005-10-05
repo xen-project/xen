@@ -86,8 +86,11 @@ static void buffer_append(struct domain *dom)
 	struct ring_head *ring = (struct ring_head *)dom->page;
 	size_t size;
 	u32 oldcons;
+	int notify = 0;
 
 	while ((size = ring->prod - ring->cons) != 0) {
+		notify = 1;
+
 		if ((buffer->capacity - buffer->size) < size) {
 			buffer->capacity += (size + 1024);
 			buffer->data = realloc(buffer->data, buffer->capacity);
@@ -115,6 +118,9 @@ static void buffer_append(struct domain *dom)
 			buffer->capacity = buffer->max_capacity;
 		}
 	}
+
+	if (notify)
+		xc_evtchn_send(xc, dom->local_port);
 }
 
 static bool buffer_empty(struct buffer *buffer)
