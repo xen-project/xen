@@ -24,13 +24,11 @@ from xen.web import protocol, tcp, unix
 
 from xen.xend import scheduler
 from xen.xend import sxp
-from xen.xend import EventServer
 from xen.xend.XendError import XendError
 from xen.xend import XendRoot
 from xen.xend.XendLogging import log
 
 
-eserver = EventServer.instance()
 xroot = XendRoot.instance()
 
 

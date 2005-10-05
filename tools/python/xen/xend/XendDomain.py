@@ -30,7 +30,6 @@ import XendDomainInfo
 
 from xen.xend import XendRoot
 from xen.xend import XendCheckpoint
-from xen.xend import EventServer
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 from xen.xend.server import relocate
@@ -38,7 +37,6 @@ from xen.xend.server import relocate
 
 xc = xen.lowlevel.xc.new()
 xroot = XendRoot.instance()
-eserver = EventServer.instance()
 
 
 __all__ = [ "XendDomain" ]
@@ -329,20 +327,21 @@ class XendDomain:
  
     def domain_unpause(self, domid):
         """Unpause domain execution."""
-        dominfo = self.domain_lookup(domid)
-        eserver.inject('xend.domain.unpause', [dominfo.getName(),
-                                               dominfo.getDomid()])
         try:
+            dominfo = self.domain_lookup(domid)
+            log.info("Domain %s (%d) unpaused.", dominfo.getName(),
+                     dominfo.getDomid())
             return xc.domain_unpause(dom=dominfo.getDomid())
         except Exception, ex:
             raise XendError(str(ex))
-    
+
+
     def domain_pause(self, domid):
         """Pause domain execution."""
-        dominfo = self.domain_lookup(domid)
-        eserver.inject('xend.domain.pause', [dominfo.getName(),
-                                             dominfo.getDomid()])
         try:
+            dominfo = self.domain_lookup(domid)
+            log.info("Domain %s (%d) paused.", dominfo.getName(),
+                     dominfo.getDomid())
             return xc.domain_pause(dom=dominfo.getDomid())
         except Exception, ex:
             raise XendError(str(ex))

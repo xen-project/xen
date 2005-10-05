@@ -24,12 +24,10 @@ from xen.web import protocol, tcp, unix
 from xen.xend import scheduler
 from xen.xend import sxp
 from xen.xend import PrettyPrint
-from xen.xend import EventServer
 from xen.xend.XendError import XendError
 from xen.xend import XendRoot
 
 
-eserver = EventServer.instance()
 xroot = XendRoot.instance()
 
 
@@ -44,13 +42,7 @@ class EventProtocol(protocol.Protocol):
         self.daemon = daemon
         # Event queue.
         self.queue = []
-        # Subscribed events.
-        self.events = []
         self.parser = sxp.Parser()
-        self.pretty = 0
-
-        # For debugging subscribe to everything and make output pretty.
-        #self.subscribe(['*'])
         self.pretty = 1
 
     def dataReceived(self, data):
@@ -74,7 +66,7 @@ class EventProtocol(protocol.Protocol):
             scheduler.now(self.connectionLost)
 
     def connectionLost(self, reason=None):
-        self.unsubscribe()
+        pass
 
     def send_reply(self, sxpr):
         io = StringIO.StringIO()
@@ -105,16 +97,6 @@ class EventProtocol(protocol.Protocol):
     def send_event(self, val):
         return self.send_reply(['event', val[0], val[1]])
 
-    def unsubscribe(self):
-        for event in self.events:
-            eserver.unsubscribe(event, self.queue_event)
-
-    def subscribe(self, events):
-        self.unsubscribe()
-        for event in events:
-            eserver.subscribe(event, self.queue_event)
-        self.events = events
-
     def queue_event(self, name, v):
         # Despite the name we don't queue the event here.
         # We send it because the transport will queue it.
@@ -132,7 +114,7 @@ class EventProtocol(protocol.Protocol):
         op_method = getattr(self, op_method_name, self.operror)
         return op_method(op_name, req)
 
-    def op_help(self, name, req):
+    def op_help(self, _1, _2):
         def nameop(x):
             if x.startswith('op_'):
                 return x[3:].replace('_', '.')
@@ -142,37 +124,27 @@ class EventProtocol(protocol.Protocol):
         l = [ nameop(k) for k in dir(self) if k.startswith('op_') ]
         return l
 
-    def op_quit(self, name, req):
+    def op_quit(self, _1, _2):
         self.loseConnection()
 
-    def op_exit(self, name, req):
+    def op_exit(self, _1, _2):
         sys.exit(0)
 
-    def op_pretty(self, name, req):
+    def op_pretty(self, _1, _2):
         self.pretty = 1
 
-    def op_info(self, name, req):
+    def op_info(self, _1, _2):
         val = ['info']
         #val += self.daemon.blkifs()
         #val += self.daemon.netifs()
         #val += self.daemon.usbifs()
         return val
 
-    def op_sys_subscribe(self, name, v):
-        # (sys.subscribe event*)
-        # Subscribe to the events:
-        self.subscribe(v[1:])
-
-    def op_sys_inject(self, name, v):
-        # (sys.inject event)
-        event = v[1]
-        eserver.inject(sxp.name(event), event)
-
-    def op_trace(self, name, v):
+    def op_trace(self, _, v):
         mode = (v[1] == 'on')
         self.daemon.tracing(mode)
 
-    def op_log_stderr(self, name, v):
+    def op_log_stderr(self, _, v):
         mode = v[1]
         logging = xroot.get_logging()
         if mode == 'on':
@@ -180,11 +152,11 @@ class EventProtocol(protocol.Protocol):
         else:
             logging.removeLogStderr()
 
-    def op_domain_ls(self, name, v):
+    def op_domain_ls(self, _1, _2):
         xd = xroot.get_component("xen.xend.XendDomain")
         return xd.list_names()
 
-    def op_domain_configure(self, name, v):
+    def op_domain_configure(self, _, v):
         domid = sxp.child_value(v, "dom")
         config = sxp.child_value(v, "config")
         if domid is None:
@@ -194,7 +166,7 @@ class EventProtocol(protocol.Protocol):
         xd = xroot.get_component("xen.xend.XendDomain")
         xd.domain_configure(domid, config)
 
-    def op_domain_unpause(self, name, v):
+    def op_domain_unpause(self, _, v):
         domid = sxp.child_value(v, "dom")
         if domid is None:
             raise XendError("missing domain id")
@@ -206,10 +178,10 @@ class EventFactory(protocol.ServerFactory):
     """
 
     def __init__(self, daemon):
-        #protocol.ServerFactory.__init__(self)
+        protocol.ServerFactory.__init__(self)
         self.daemon = daemon
 
-    def buildProtocol(self, addr):
+    def buildProtocol(self, _):
         return EventProtocol(self.daemon)
 
 def listenEvent(daemon):

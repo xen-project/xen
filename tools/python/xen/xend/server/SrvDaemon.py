@@ -2,6 +2,7 @@
 ## Xen controller daemon
 ## Copyright (c) 2004, K A Fraser (University of Cambridge)
 ## Copyright (C) 2004, Mike Wray <mike.wray@hp.com>
+## Copyright (C) 2005, XenSource Ltd
 ###########################################################
 
 import os
@@ -13,18 +14,12 @@ import pwd
 import re
 import traceback
 
-from xen.xend import EventServer
 from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
-from xen.xend import XendRoot
 
 import event
 import relocate
 from params import *
-
-
-eserver = EventServer.instance()
-xroot = XendRoot.instance()
 
 
 class Daemon:

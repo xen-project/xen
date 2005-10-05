@@ -28,14 +28,11 @@ import os
 import os.path
 import sys
 
-import EventServer
 from XendLogging import XendLogging
 from XendError import XendError
 
-# Initial create of the event server.
-eserver = EventServer.instance()
-
 import sxp
+
 
 class XendRoot:
     """Root of the management classes."""
@@ -96,9 +93,7 @@ class XendRoot:
         self.config = None
         self.logging = None
         self.configure()
-        eserver.subscribe('xend.*', self.event_handler)
-        #eserver.subscribe('xend.domain.created', self.event_handler)
-        #eserver.subscribe('xend.domain.died', self.event_handler)
+
 
     def add_component(self, name, val):
         """Add a xend component.
@@ -117,9 +112,6 @@ class XendRoot:
         @return: component object (or None)
         """
         return self.components.get(name)
-
-    def start(self):
-        eserver.inject('xend.start', 0)
 
     def _format(self, msg, args):
         if args:
