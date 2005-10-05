@@ -26,6 +26,7 @@ configured values.
 
 import os
 import os.path
+import string
 import sys
 
 from XendLogging import XendLogging
@@ -238,10 +239,10 @@ class XendRoot:
         return sxp.child_value(self.config, name, val=val)
 
     def get_config_bool(self, name, val=None):
-        v = self.get_config_value(name, val)
-        if v in ['yes', '1', 'on', 'true', 1, True]:
+        v = string.lower(str(self.get_config_value(name, val)))
+        if v in ['yes', 'y', '1', 'on',  'true',  't']:
             return True
-        if v in ['no', '0', 'off', 'false', 0, False]:
+        if v in ['no',  'n', '0', 'off', 'false', 'f']:
             return False
         raise XendError("invalid xend config %s: expected bool: %s" % (name, v))
 
