@@ -1288,7 +1288,7 @@ class XendDomainInfo:
         preserving the restart semantics (name and UUID preserved).
         """
         
-        new_name = self.generateShutdownName()
+        new_name = self.generateUniqueName()
         new_uuid = getUuid()
         log.info("Renaming dead domain %s (%d, %s) to %s (%s).",
                  self.info['name'], self.domid, self.uuid, new_name, new_uuid)
@@ -1307,7 +1307,23 @@ class XendDomainInfo:
         self.state_set(STATE_VM_TERMINATED)
 
 
-    def generateShutdownName(self):
+    ## public:
+
+    def renameUniquely(self):
+        """Rename this domain so that it has a unique name.  This is used by
+        XendDomain to recover from non-uniqueness errors; we should never have
+        allowed the system to reach this state in the first place."""
+        new_name = self.generateUniqueName()
+        
+        log.error('Renaming %s (%d, %s) to %s', self.info['name'], self.domid,
+                  self.uuid, new_name)
+
+        self.setName(new_name)
+
+
+    # private:
+
+    def generateUniqueName(self):
         n = 1
         while True:
             name = "%s-%d" % (self.info['name'], n)

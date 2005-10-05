@@ -309,10 +309,12 @@ class XendDomain:
             if n == 1:
                 return matching[0]
             elif n > 1:
-                raise XendError(
-                    'Name uniqueness has been violated for name %s' % name)
-            else:
-                return None
+                log.error('Name uniqueness has been violated for name %s!  '
+                          'Recovering by renaming:', name)
+                for d in matching:
+                    d.renameUniquely()
+
+            return None
         finally:
             self.domains_lock.release()
 
