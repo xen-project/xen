@@ -95,25 +95,20 @@ static int __do_suspend(void *ignore)
 
 	xenbus_suspend();
 
-	preempt_disable();
+	lock_cpu_hotplug();
 #ifdef CONFIG_SMP
-	/* Take all of the other cpus offline.  We need to be careful not
-	   to get preempted between the final test for num_online_cpus()
-	   == 1 and disabling interrupts, since otherwise userspace could
-	   bring another cpu online, and then we'd be stuffed.  At the
-	   same time, cpu_down can reschedule, so we need to enable
-	   preemption while doing that.  This kind of sucks, but should be
-	   correct. */
-	/* (We don't need to worry about other cpus bringing stuff up,
-	   since by the time num_online_cpus() == 1, there aren't any
-	   other cpus) */
+	/*
+	 * Take all other CPUs offline. We hold the hotplug semaphore to
+	 * avoid other processes bringing up CPUs under our feet.
+	 */
 	cpus_clear(prev_online_cpus);
 	while (num_online_cpus() > 1) {
-		preempt_enable();
 		for_each_online_cpu(i) {
 			if (i == 0)
 				continue;
+			unlock_cpu_hotplug();
 			err = cpu_down(i);
+			lock_cpu_hotplug();
 			if (err != 0) {
 				printk(KERN_CRIT "Failed to take all CPUs "
 				       "down: %d.\n", err);
@@ -121,20 +116,21 @@ static int __do_suspend(void *ignore)
 			}
 			cpu_set(i, prev_online_cpus);
 		}
-		preempt_disable();
 	}
 #endif
 
-	__cli();
-
-	preempt_enable();
-
-	gnttab_suspend();
+	preempt_disable();
 
 #ifdef __i386__
 	mm_pin_all();
 	kmem_cache_shrink(pgd_cache);
 #endif
+
+	__cli();
+	preempt_enable();
+	unlock_cpu_hotplug();
+
+	gnttab_suspend();
 
 	HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 	clear_fixmap(FIX_SHARED_INFO);
@@ -142,8 +138,10 @@ static int __do_suspend(void *ignore)
 	xen_start_info->store_mfn = mfn_to_pfn(xen_start_info->store_mfn);
 	xen_start_info->console_mfn = mfn_to_pfn(xen_start_info->console_mfn);
 
-	/* We'll stop somewhere inside this hypercall.  When it returns,
-	   we'll start resuming after the restore. */
+	/*
+	 * We'll stop somewhere inside this hypercall. When it returns,
+	 * we'll start resuming after the restore.
+	 */
 	HYPERVISOR_suspend(virt_to_mfn(xen_start_info));
 
 	shutting_down = SHUTDOWN_INVALID; 
