@@ -94,7 +94,7 @@ void enable_hlt(void)
 }
 
 EXPORT_SYMBOL(enable_hlt);
-#define xxprint(msg) HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg)
+
 /* XXX XEN doesn't use default_idle(), poll_idle(). Use xen_idle() instead. */
 extern void stop_hz_timer(void);
 extern void start_hz_timer(void);
@@ -121,16 +121,9 @@ extern void smp_resume(void);
 /* We don't actually take CPU down, just spin without interrupts. */
 static inline void play_dead(void)
 {
-    char foo[100];
-
-    sprintf(foo, "cpu=%d stack=%p\n", smp_processor_id(), foo);
-    xxprint(foo);
-
 	/* Death loop */
 	while (__get_cpu_var(cpu_state) != CPU_UP_PREPARE)
 		HYPERVISOR_sched_op(SCHEDOP_yield, 0);
-
-        xxprint("Out of loop\n");
 
 	__flush_tlb_all();
    /* 
@@ -176,15 +169,10 @@ void cpu_idle (void)
 			rmb();
 
 			if (cpu_is_offline(cpu)) {
-                            char foo[100];
 				local_irq_disable();
 #ifdef CONFIG_SMP
 				smp_suspend();
 #endif
-
-                                sprintf(foo, "X cpu=%d stack=%p\n",
-                                        cpu, &cpu);
-                                xxprint(foo);
 #if defined(CONFIG_XEN) && defined(CONFIG_HOTPLUG_CPU)
 				/* Ack it.  From this point on until
 				   we get woken up, we're not allowed
