@@ -25,7 +25,7 @@
 #include <linux/tpmfe.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
-#include "tpm_nopci.h"
+#include "tpm.h"
 
 /* read status bits */
 enum {
@@ -434,6 +434,21 @@ static struct file_operations tpm_xen_ops = {
 	.release = tpm_release,
 };
 
+static DEVICE_ATTR(pubek, S_IRUGO, tpm_show_pubek, NULL);
+static DEVICE_ATTR(pcrs, S_IRUGO, tpm_show_pcrs, NULL);
+static DEVICE_ATTR(caps, S_IRUGO, tpm_show_caps, NULL);
+static DEVICE_ATTR(cancel, S_IWUSR |S_IWGRP, NULL, tpm_store_cancel);
+
+static struct attribute* xen_attrs[] = {
+	&dev_attr_pubek.attr,
+	&dev_attr_pcrs.attr,
+	&dev_attr_caps.attr,
+	&dev_attr_cancel.attr,
+	0,
+};
+
+static struct attribute_group xen_attr_grp = { .attrs = xen_attrs };
+
 static struct tpm_vendor_specific tpm_xen = {
 	.recv = tpm_xen_recv,
 	.send = tpm_xen_send,
@@ -443,7 +458,7 @@ static struct tpm_vendor_specific tpm_xen = {
 	.req_complete_val  = STATUS_DATA_AVAIL,
 	.req_canceled = STATUS_READY,
 	.base = 0,
-	.attr = TPM_DEVICE_ATTRS,
+	.attr_group = &xen_attr_grp,
 	.miscdev.fops = &tpm_xen_ops,
 	.buffersize = 64 * 1024,
 };
@@ -480,7 +495,7 @@ static int __init init_xen(void)
 
 	tpm_xen.buffersize = tpmfe.max_tx_size;
 
-	if ((rc = tpm_register_hardware_nopci(&tpm_device, &tpm_xen)) < 0) {
+	if ((rc = tpm_register_hardware(&tpm_device, &tpm_xen)) < 0) {
 		device_unregister(&tpm_device);
 		tpm_fe_unregister_receiver();
 		return rc;
