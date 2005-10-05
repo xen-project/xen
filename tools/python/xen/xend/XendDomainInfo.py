@@ -111,12 +111,35 @@ xroot = XendRoot.instance()
 ROUNDTRIPPING_CONFIG_ENTRIES = [
         ('name',         str),
         ('ssidref',      int),
+        ('vcpus',        int),
+        ('vcpu_avail',   int),
         ('cpu_weight',   float),
         ('bootloader',   str),
         ('on_poweroff',  str),
         ('on_reboot',    str),
         ('on_crash',     str)
     ]
+
+
+#
+# There are a number of CPU-related fields:
+#
+#   vcpus:       the number of virtual CPUs this domain is configured to use.
+#   vcpu_avail:  a bitmap telling the guest domain whether it may use each of
+#                its VCPUs.  This is translated to
+#                <dompath>/cpu/<id>/availability = {online,offline} for use
+#                by the guest domain.
+#   vcpu_to_cpu: the current mapping between virtual CPUs and the physical
+#                CPU it is using.
+#   cpumap:      a list of bitmaps, one for each VCPU, giving the physical
+#                CPUs that that VCPU may use.
+#   cpu:         a configuration setting requesting that VCPU 0 is pinned to
+#                the specified physical CPU.
+#
+# vcpus and vcpu_avail settings persist with the VM (i.e. they are persistent
+# across save, restore, migrate, and restart).  The other settings are only
+# specific to the domain, so are lost when the VM moves.
+#
 
 
 def create(config):
@@ -134,6 +157,7 @@ def create(config):
         vm.refreshShutdown()
         return vm
     except:
+        log.exception('Domain construction failed')
         vm.destroy()
         raise
 
@@ -200,7 +224,7 @@ def restore(config):
         raise VmError('Invalid ssidref in config: %s' % exn)
 
     domid = xc.domain_create(ssidref = ssidref)
-    if domid <= 0:
+    if domid < 0:
         raise VmError('Creating domain failed for restore')
     try:
         vm = XendDomainInfo(uuid, parseConfig(config), domid)
@@ -240,12 +264,12 @@ def parseConfig(config):
     for e in ROUNDTRIPPING_CONFIG_ENTRIES:
         result[e[0]] = get_cfg(e[0], e[1])
 
-    result['memory']       = get_cfg('memory',     int)
-    result['mem_kb']       = get_cfg('mem_kb',     int)
-    result['maxmem']       = get_cfg('maxmem',     int)
-    result['maxmem_kb']    = get_cfg('maxmem_kb',  int)
-    result['cpu']          = get_cfg('cpu',        int)
-    result['image']        = get_cfg('image')
+    result['memory']    = get_cfg('memory',    int)
+    result['mem_kb']    = get_cfg('mem_kb',    int)
+    result['maxmem']    = get_cfg('maxmem',    int)
+    result['maxmem_kb'] = get_cfg('maxmem_kb', int)
+    result['cpu']       = get_cfg('cpu',       int)
+    result['image']     = get_cfg('image')
 
     try:
         if result['image']:
@@ -338,7 +362,7 @@ class XendDomainInfo:
         self.uuid = uuid
         self.info = info
 
-        if domid:
+        if domid is not None:
             self.domid = domid
         elif 'dom' in info:
             self.domid = int(info['dom'])
@@ -382,6 +406,8 @@ class XendDomainInfo:
                   ("on_reboot",    str),
                   ("on_crash",     str),
                   ("image",        str),
+                  ("vcpus",        int),
+                  ("vcpu_avail",   int),
                   ("start_time", float))
 
         from_store = self.gatherVm(*params)
@@ -393,13 +419,13 @@ class XendDomainInfo:
             devconfig = self.getDeviceConfigurations(c)
             if devconfig:
                 device.extend(map(lambda x: (c, x), devconfig))
-
         useIfNeeded('device', device)
 
 
     def validateInfo(self):
         """Validate and normalise the info block.  This has either been parsed
-        by parseConfig, or received from xc through recreate.
+        by parseConfig, or received from xc through recreate and augmented by
+        the current store contents.
         """
         def defaultInfo(name, val):
             if not self.infoIsSet(name):
@@ -413,6 +439,8 @@ class XendDomainInfo:
             defaultInfo('on_crash',     lambda: "restart")
             defaultInfo('cpu',          lambda: None)
             defaultInfo('cpu_weight',   lambda: 1.0)
+            defaultInfo('vcpus',        lambda: 1)
+            defaultInfo('vcpu_avail',   lambda: (1 << self.info['vcpus']) - 1)
             defaultInfo('bootloader',   lambda: None)
             defaultInfo('backend',      lambda: [])
             defaultInfo('device',       lambda: [])
@@ -499,12 +527,6 @@ class XendDomainInfo:
                     raise VmError('invalid restart event: %s = %s' %
                                   (event, str(self.info[event])))
 
-            if 'cpumap' not in self.info:
-                if [self.info['vcpus'] == 1]:
-                    self.info['cpumap'] = [1];
-                else:
-                    raise VmError('Cannot create CPU map')
-
         except KeyError, exn:
             log.exception(exn)
             raise VmError('Unspecified domain detail: %s' % str(exn))
@@ -552,7 +574,8 @@ class XendDomainInfo:
         if self.infoIsSet('image'):
             to_store['image'] = sxp.to_string(self.info['image'])
 
-        for k in ['name', 'ssidref', 'on_poweroff', 'on_reboot', 'on_crash']:
+        for k in ['name', 'ssidref', 'on_poweroff', 'on_reboot', 'on_crash',
+                  'vcpus', 'vcpu_avail']:
             if self.infoIsSet(k):
                 to_store[k] = str(self.info[k])
 
@@ -572,6 +595,15 @@ class XendDomainInfo:
         for (k, v) in self.info.items():
             if v:
                 to_store[k] = str(v)
+
+        def availability(n):
+            if self.info['vcpu_avail'] & (1 << n):
+                return 'online'
+            else:
+                return 'offline'
+
+        for v in range(0, self.info['vcpus']):
+            to_store["cpu/%d/availability" % v] = availability(v)
 
         log.debug("Storing domain details: %s" % str(to_store))
 
@@ -916,7 +948,8 @@ class XendDomainInfo:
         if self.infoIsSet('cpu_time'):
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])
         sxpr.append(['vcpus', self.info['vcpus']])
-        sxpr.append(['cpumap', self.info['cpumap']])
+        if self.infoIsSet('cpumap'):
+            sxpr.append(['cpumap', self.info['cpumap']])
         if self.infoIsSet('vcpu_to_cpu'):
             sxpr.append(['cpu', self.info['vcpu_to_cpu'][0]])
             sxpr.append(['vcpu_to_cpu', self.prettyVCpuMap()])
@@ -986,27 +1019,21 @@ class XendDomainInfo:
 
         self.domid = xc.domain_create(dom = 0, ssidref = self.info['ssidref'])
 
-        if self.domid <= 0:
+        if self.domid < 0:
             raise VmError('Creating domain failed: name=%s' %
                           self.info['name'])
 
-        try:
-            self.dompath = DOMROOT + str(self.domid)
+        self.dompath = DOMROOT + str(self.domid)
 
-            # Ensure that the domain entry is clean.  This prevents a stale
-            # shutdown_start_time from killing the domain, for example.
-            self.removeDom()
+        # Ensure that the domain entry is clean.  This prevents a stale
+        # shutdown_start_time from killing the domain, for example.
+        self.removeDom()
 
-            self.initDomain()
-            self.construct_image()
-            self.configure()
-            self.storeVmDetails()
-            self.storeDomDetails()
-        except:
-            log.exception('Domain construction failed')
-            self.destroy()
-            raise VmError('Creating domain failed: name=%s' %
-                          self.info['name'])
+        self.initDomain()
+        self.construct_image()
+        self.configure()
+        self.storeVmDetails()
+        self.storeDomDetails()
 
 
     def initDomain(self):
@@ -1041,13 +1068,6 @@ class XendDomainInfo:
                   self.domid, self.info['name'], self.info['memory_KiB'])
 
 
-    def configure_vcpus(self):
-        d = {}
-        for v in range(0, self.info['vcpus']):
-            d["cpu/%d/availability" % v] = "online"
-        self.writeVm(d)
-
-
     def construct_image(self):
         """Construct the boot image for the domain.
         """
@@ -1055,7 +1075,6 @@ class XendDomainInfo:
         self.image.createImage()
         IntroduceDomain(self.domid, self.store_mfn,
                         self.store_channel.port1, self.dompath)
-        self.configure_vcpus()
 
 
     ## public:
@@ -1376,10 +1395,13 @@ class XendDomainInfo:
             log.error("Invalid VCPU %d" % vcpu)
             return
         if int(state) == 0:
+            self.info['vcpu_avail'] &= ~(1 << vcpu)
             availability = "offline"
         else:
+            self.info['vcpu_avail'] &= (1 << vcpu)
             availability = "online"
-        self.storeVm("cpu/%d/availability" % vcpu, availability)
+        self.storeVm('vcpu_avail', self.info['vcpu_avail'])
+        self.storeDom("cpu/%d/availability" % vcpu, availability)
 
     def send_sysrq(self, key=0):
         self.storeDom("control/sysrq", '%c' % key)
@@ -1397,7 +1419,6 @@ class XendDomainInfo:
                     pass
                 else:
                     raise
-        self.configure_vcpus()
 
 
     def dom0_enforce_vcpus(self):
