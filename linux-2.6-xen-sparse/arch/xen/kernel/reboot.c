@@ -20,6 +20,12 @@
 #define SHUTDOWN_POWEROFF  0
 #define SHUTDOWN_REBOOT    1
 #define SHUTDOWN_SUSPEND   2
+// Code 3 is SHUTDOWN_CRASH, which we don't use because the domain can only
+// report a crash, not be instructed to crash!
+// HALT is the same as POWEROFF, as far as we're concerned.  The tools use
+// the distinction when we return the reason code to them.
+#define SHUTDOWN_HALT      4
+
 
 void machine_restart(char * __unused)
 {
@@ -213,6 +219,7 @@ static int shutdown_process(void *__unused)
 
 	switch (shutting_down) {
 	case SHUTDOWN_POWEROFF:
+	case SHUTDOWN_HALT:
 		if (execve("/sbin/poweroff", poweroff_argv, envp) < 0) {
 			sys_reboot(LINUX_REBOOT_MAGIC1,
 				   LINUX_REBOOT_MAGIC2,
@@ -294,6 +301,8 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
 		shutting_down = SHUTDOWN_REBOOT;
 	else if (strcmp(str, "suspend") == 0)
 		shutting_down = SHUTDOWN_SUSPEND;
+	else if (strcmp(str, "halt") == 0)
+		shutting_down = SHUTDOWN_HALT;
 	else {
 		printk("Ignoring shutdown request: %s\n", str);
 		shutting_down = SHUTDOWN_INVALID;
