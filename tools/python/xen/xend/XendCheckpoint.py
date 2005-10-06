@@ -116,6 +116,7 @@ def restore(xd, fd):
 
     assert dominfo.store_channel
     assert dominfo.console_channel
+    assert dominfo.getDomainPath()
 
     try:
         l = read_exact(fd, sizeof_unsigned_long,
@@ -138,6 +139,11 @@ def restore(xd, fd):
             if m:
                 store_mfn = int(m.group(2))
                 dominfo.setStoreRef(store_mfn)
+                log.debug("IntroduceDomain %d %d %d %s",
+                          dominfo.getDomid(),
+                          store_mfn,
+                          dominfo.store_channel.port1,
+                          dominfo.getDomainPath())
                 IntroduceDomain(dominfo.getDomid(),
                                 store_mfn,
                                 dominfo.store_channel.port1,
@@ -161,34 +167,40 @@ def forkHelper(cmd, fd, inputHandler, closeToChild):
     if closeToChild:
         child.tochild.close()
 
-    fds = [child.fromchild.fileno(),
-           child.childerr.fileno()]
-    p = select.poll()
-    map(p.register, fds)
-    while len(fds) > 0:
-        r = p.poll()
-        for (fd, event) in r:
-            if event & select.POLLHUP or event & select.POLLERR:
-                fds.remove(fd)
-                p.unregister(fd)
-                continue
-            if not event & select.POLLIN:
-                continue
-            if fd == child.childerr.fileno():
-                lasterr = child.childerr.readline().rstrip()
-                log.error('%s', lasterr)
-            else:
-                l = child.fromchild.readline().rstrip()
-                while l:
-                    log.debug('%s', l)
-                    inputHandler(l, child.tochild)
-                    try:
+    try:
+        fds = [child.fromchild.fileno(),
+               child.childerr.fileno()]
+        p = select.poll()
+        map(p.register, fds)
+        while len(fds) > 0:
+            r = p.poll()
+            for (fd, event) in r:
+                if event & select.POLLIN:
+                    if fd == child.childerr.fileno():
+                        lasterr = child.childerr.readline().rstrip()
+                        log.error('%s', lasterr)
+                    else:
                         l = child.fromchild.readline().rstrip()
-                    except:
-                        l = None
+                        while l:
+                            log.debug('%s', l)
+                            inputHandler(l, child.tochild)
+                            try:
+                                l = child.fromchild.readline().rstrip()
+                            except:
+                                l = None
 
-    child.fromchild.close()
-    child.childerr.close()
+                if event & select.POLLERR:
+                    raise XendError('Error reading from child process for %s',
+                                    cmd)
+
+                if event & select.POLLHUP:
+                    fds.remove(fd)
+                    p.unregister(fd)
+    finally:
+        child.fromchild.close()
+        child.childerr.close()
+        if not closeToChild:
+            child.tochild.close()
 
     if child.wait() >> 8 == 127:
         lasterr = "popen failed"
