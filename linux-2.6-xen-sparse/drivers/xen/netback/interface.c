@@ -177,8 +177,13 @@ static void unmap_frontend_pages(netif_t *netif)
 int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	      unsigned long rx_ring_ref, unsigned int evtchn)
 {
-	evtchn_op_t op = { .cmd = EVTCHNOP_bind_interdomain };
 	int err;
+	evtchn_op_t op = {
+		.cmd = EVTCHNOP_bind_interdomain,
+		.u.bind_interdomain.dom1 = DOMID_SELF,
+		.u.bind_interdomain.dom2 = netif->domid,
+		.u.bind_interdomain.port1 = 0,
+		.u.bind_interdomain.port2 = evtchn };
 
 	netif->comms_area = alloc_vm_area(2*PAGE_SIZE);
 	if (netif->comms_area == NULL)
@@ -190,10 +195,6 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 		return err;
 	}
 
-	op.u.bind_interdomain.dom1 = DOMID_SELF;
-	op.u.bind_interdomain.dom2 = netif->domid;
-	op.u.bind_interdomain.port1 = 0;
-	op.u.bind_interdomain.port2 = evtchn;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		unmap_frontend_pages(netif);

@@ -180,14 +180,13 @@ static int find_unbound_irq(void)
 
 int bind_virq_to_irq(int virq)
 {
-	evtchn_op_t op;
+	evtchn_op_t op = { .cmd = EVTCHNOP_bind_virq };
 	int evtchn, irq;
 	int cpu = smp_processor_id();
 
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((irq = per_cpu(virq_to_irq, cpu)[virq]) == -1) {
-		op.cmd              = EVTCHNOP_bind_virq;
 		op.u.bind_virq.virq = virq;
 		op.u.bind_virq.vcpu = cpu;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
@@ -212,7 +211,7 @@ EXPORT_SYMBOL(bind_virq_to_irq);
 
 void unbind_virq_from_irq(int virq)
 {
-	evtchn_op_t op;
+	evtchn_op_t op = { .cmd = EVTCHNOP_close };
 	int cpu    = smp_processor_id();
 	int irq    = per_cpu(virq_to_irq, cpu)[virq];
 	int evtchn = irq_to_evtchn[irq];
@@ -220,7 +219,6 @@ void unbind_virq_from_irq(int virq)
 	spin_lock(&irq_mapping_update_lock);
 
 	if (--irq_bindcount[irq] == 0) {
-		op.cmd          = EVTCHNOP_close;
 		op.u.close.dom  = DOMID_SELF;
 		op.u.close.port = evtchn;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
@@ -245,14 +243,13 @@ EXPORT_SYMBOL(unbind_virq_from_irq);
 
 int bind_ipi_to_irq(int ipi)
 {
-	evtchn_op_t op;
+	evtchn_op_t op = { .cmd = EVTCHNOP_bind_ipi };
 	int evtchn, irq;
 	int cpu = smp_processor_id();
 
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi]) == -1) {
-		op.cmd = EVTCHNOP_bind_ipi;
 		op.u.bind_ipi.vcpu = cpu;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 		evtchn = op.u.bind_ipi.port;
@@ -278,7 +275,7 @@ EXPORT_SYMBOL(bind_ipi_to_irq);
 
 void unbind_ipi_from_irq(int ipi)
 {
-	evtchn_op_t op;
+	evtchn_op_t op = { .cmd = EVTCHNOP_close };
 	int cpu    = smp_processor_id();
 	int evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi];
 	int irq    = evtchn_to_irq[evtchn];
@@ -286,7 +283,6 @@ void unbind_ipi_from_irq(int ipi)
 	spin_lock(&irq_mapping_update_lock);
 
 	if (--irq_bindcount[irq] == 0) {
-		op.cmd          = EVTCHNOP_close;
 		op.u.close.dom  = DOMID_SELF;
 		op.u.close.port = evtchn;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
@@ -324,13 +320,12 @@ EXPORT_SYMBOL(bind_evtchn_to_irq);
 
 void unbind_evtchn_from_irq(unsigned int irq)
 {
-	evtchn_op_t op;
+	evtchn_op_t op = { .cmd = EVTCHNOP_close };
 	int evtchn = irq_to_evtchn[irq];
 
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((--irq_bindcount[irq] == 0) && (evtchn != -1)) {
-		op.cmd          = EVTCHNOP_close;
 		op.u.close.dom  = DOMID_SELF;
 		op.u.close.port = evtchn;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
@@ -378,7 +373,7 @@ static void do_nothing_function(void *ign)
 /* Rebind an evtchn so that it gets delivered to a specific cpu */
 static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 {
-	evtchn_op_t op;
+	evtchn_op_t op = { .cmd = EVTCHNOP_bind_vcpu };
 	int evtchn;
 
 	spin_lock(&irq_mapping_update_lock);
@@ -389,7 +384,6 @@ static void rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
 	}
 
 	/* Send future instances of this interrupt to other vcpu. */
-	op.cmd = EVTCHNOP_bind_vcpu;
 	op.u.bind_vcpu.port = evtchn;
 	op.u.bind_vcpu.vcpu = tcpu;
 
@@ -518,10 +512,9 @@ static inline void pirq_query_unmask(int pirq)
 
 static unsigned int startup_pirq(unsigned int irq)
 {
-	evtchn_op_t op;
+	evtchn_op_t op = { .cmd = EVTCHNOP_bind_pirq };
 	int evtchn;
 
-	op.cmd               = EVTCHNOP_bind_pirq;
 	op.u.bind_pirq.pirq  = irq;
 	/* NB. We are happy to share unless we are probing. */
 	op.u.bind_pirq.flags = probing_irq(irq) ? 0 : BIND_PIRQ__WILL_SHARE;
@@ -547,7 +540,7 @@ static unsigned int startup_pirq(unsigned int irq)
 
 static void shutdown_pirq(unsigned int irq)
 {
-	evtchn_op_t op;
+	evtchn_op_t op = { .cmd = EVTCHNOP_close };
 	int evtchn = irq_to_evtchn[irq];
 
 	if (!VALID_EVTCHN(evtchn))
@@ -555,7 +548,6 @@ static void shutdown_pirq(unsigned int irq)
 
 	mask_evtchn(evtchn);
 
-	op.cmd          = EVTCHNOP_close;
 	op.u.close.dom  = DOMID_SELF;
 	op.u.close.port = evtchn;
 	BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
@@ -666,6 +658,7 @@ void irq_resume(void)
 			continue;
 
 		/* Get a new binding from Xen. */
+		memset(&op, 0, sizeof(op));
 		op.cmd              = EVTCHNOP_bind_virq;
 		op.u.bind_virq.virq = virq;
 		op.u.bind_virq.vcpu = 0;
@@ -689,6 +682,7 @@ void irq_resume(void)
 		evtchn_to_irq[evtchn] = -1;
 
 		/* Get a new binding from Xen. */
+		memset(&op, 0, sizeof(op));
 		op.cmd = EVTCHNOP_bind_ipi;
 		op.u.bind_ipi.vcpu = 0;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);

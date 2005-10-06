@@ -244,8 +244,11 @@ static int setup_tpmring(struct xenbus_device *dev,
 {
 	tpmif_tx_interface_t *sring;
 	struct tpm_private *tp = &my_private;
-	evtchn_op_t op;
 	int err;
+	evtchn_op_t op = {
+		.cmd = EVTCHNOP_alloc_unbound,
+		.u.alloc_unbound.dom = DOMID_SELF,
+		.u.alloc_unbound.remote_dom = backend_id } ;
 
 	sring = (void *)__get_free_page(GFP_KERNEL);
 	if (!sring) {
@@ -268,9 +271,6 @@ static int setup_tpmring(struct xenbus_device *dev,
 	}
 	info->ring_ref = err;
 
-	op.cmd = EVTCHNOP_alloc_unbound;
-	op.u.alloc_unbound.dom = DOMID_SELF;
-	op.u.alloc_unbound.remote_dom = backend_id;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		gnttab_end_foreign_access(info->ring_ref, 0);

@@ -37,13 +37,12 @@ int xc_evtchn_alloc_unbound(int xc_handle,
                             u32 dom,
                             int *port)
 {
-    evtchn_op_t op;
     int         rc;
-
-    op.cmd = EVTCHNOP_alloc_unbound;
-    op.u.alloc_unbound.remote_dom = (domid_t)remote_dom;
-    op.u.alloc_unbound.dom  = (domid_t)dom;
-    op.u.alloc_unbound.port = (port != NULL) ? *port : 0;
+    evtchn_op_t op = {
+        .cmd = EVTCHNOP_alloc_unbound,
+        .u.alloc_unbound.remote_dom = (domid_t)remote_dom,
+        .u.alloc_unbound.dom  = (domid_t)dom,
+        .u.alloc_unbound.port = (port != NULL) ? *port : 0 };
 
     if ( (rc = do_evtchn_op(xc_handle, &op)) == 0 )
     {
@@ -61,15 +60,13 @@ int xc_evtchn_bind_interdomain(int xc_handle,
                                int *port1,
                                int *port2)
 {
-    evtchn_op_t op;
     int         rc;
-
-    op.cmd = EVTCHNOP_bind_interdomain;
-    op.u.bind_interdomain.dom1  = (domid_t)dom1;
-    op.u.bind_interdomain.dom2  = (domid_t)dom2;
-    op.u.bind_interdomain.port1 = (port1 != NULL) ? *port1 : 0;
-    op.u.bind_interdomain.port2 = (port2 != NULL) ? *port2 : 0;
-
+    evtchn_op_t op = {
+        .cmd = EVTCHNOP_bind_interdomain,
+        .u.bind_interdomain.dom1  = (domid_t)dom1,
+        .u.bind_interdomain.dom2  = (domid_t)dom2,
+        .u.bind_interdomain.port1 = (port1 != NULL) ? *port1 : 0,
+        .u.bind_interdomain.port2 = (port2 != NULL) ? *port2 : 0 };
 
     if ( (rc = do_evtchn_op(xc_handle, &op)) == 0 )
     {
@@ -87,12 +84,11 @@ int xc_evtchn_bind_virq(int xc_handle,
                         int virq,
                         int *port)
 {
-    evtchn_op_t op;
     int         rc;
-
-    op.cmd = EVTCHNOP_bind_virq;
-    op.u.bind_virq.virq = (u32)virq;
-    op.u.bind_virq.vcpu = 0;
+    evtchn_op_t op = {
+        .cmd = EVTCHNOP_bind_virq,
+        .u.bind_virq.virq = (u32)virq,
+        .u.bind_virq.vcpu = 0 };
 
     if ( (rc = do_evtchn_op(xc_handle, &op)) == 0 )
     {
@@ -108,10 +104,10 @@ int xc_evtchn_close(int xc_handle,
                     u32 dom,
                     int port)
 {
-    evtchn_op_t op;
-    op.cmd = EVTCHNOP_close;
-    op.u.close.dom  = (domid_t)dom;
-    op.u.close.port = port;
+    evtchn_op_t op = {
+        .cmd          = EVTCHNOP_close,
+        .u.close.dom  = (domid_t)dom,
+        .u.close.port = port };
     return do_evtchn_op(xc_handle, &op);
 }
 
@@ -119,9 +115,9 @@ int xc_evtchn_close(int xc_handle,
 int xc_evtchn_send(int xc_handle,
                    int local_port)
 {
-    evtchn_op_t op;
-    op.cmd = EVTCHNOP_send;
-    op.u.send.local_port = local_port;
+    evtchn_op_t op = {
+        .cmd = EVTCHNOP_send,
+        .u.send.local_port = local_port };
     return do_evtchn_op(xc_handle, &op);
 }
 
@@ -131,13 +127,12 @@ int xc_evtchn_status(int xc_handle,
                      int port,
                      xc_evtchn_status_t *status)
 {
-    evtchn_op_t op;
     int         rc;
+    evtchn_op_t op = {
+        .cmd           = EVTCHNOP_status,
+        .u.status.dom  = (domid_t)dom,
+        .u.status.port = port };
 
-    op.cmd = EVTCHNOP_status;
-    op.u.status.dom  = (domid_t)dom;
-    op.u.status.port = port;
-   
     if ( (rc = do_evtchn_op(xc_handle, &op)) == 0 )
         memcpy(status, &op.u.status, sizeof(*status));
     
