@@ -39,6 +39,17 @@
 #
 #============================================================================
 
+# Gentoo doesn't have ifup/ifdown: define appropriate alternatives
+which ifup >& /dev/null
+if [ "$?" != 0 -a -e /etc/conf.d/net ]; then
+    ifup() {
+        /etc/init.d/net.$1 start
+    }
+    ifdown() {
+        /etc/init.d/net.$1 stop
+    }
+fi
+
 # Exit if anything goes wrong.
 set -e 
 
@@ -54,17 +65,6 @@ netdev=${netdev:-eth0}
 antispoof=${antispoof:-no}
 
 echo "*network $OP bridge=$bridge netdev=$netdev antispoof=$antispoof" >&2
-
-# Gentoo doesn't have ifup/ifdown: define appropriate alternatives
-which ifup >& /dev/null
-if [ "$?" != 0 -a -e /etc/conf.d/net ]; then
-    ifup() {
-        /etc/init.d/net.$1 start
-    }
-    ifdown() {
-        /etc/init.d/net.$1 stop
-    }
-fi
 
 # Usage: transfer_addrs src dst
 # Copy all IP addresses (including aliases) from device $src to device $dst.

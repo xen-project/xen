@@ -117,8 +117,13 @@ unmap_frontend_page(tpmif_t *tpmif)
 int
 tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 {
-	evtchn_op_t op = {.cmd = EVTCHNOP_bind_interdomain };
 	int err;
+	evtchn_op_t op = {
+		.cmd = EVTCHNOP_bind_interdomain,
+		.u.bind_interdomain.dom1 = DOMID_SELF,
+		.u.bind_interdomain.dom2 = tpmif->domid,
+		.u.bind_interdomain.port1 = 0,
+		.u.bind_interdomain.port2 = evtchn };
 
 	if ((tpmif->tx_area = alloc_vm_area(PAGE_SIZE)) == NULL)
 		return -ENOMEM;
@@ -129,10 +134,6 @@ tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 		return err;
 	}
 
-	op.u.bind_interdomain.dom1 = DOMID_SELF;
-	op.u.bind_interdomain.dom2 = tpmif->domid;
-	op.u.bind_interdomain.port1 = 0;
-	op.u.bind_interdomain.port2 = evtchn;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		unmap_frontend_page(tpmif);

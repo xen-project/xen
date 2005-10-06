@@ -306,13 +306,15 @@ typedef evtchn_status_t xc_evtchn_status_t;
  * well-known port within a domain to receive events on.
  *
  * @parm xc_handle a handle to an open hypervisor interface
- * @parm dom the ID of the domain.  This maybe DOMID_SELF
+ * @parm remote_dom the ID of the domain who will later bind
+ * @parm dom the ID of the local domain (the 'allocatee')
  * @parm port a pointer to a port.  This is an in/out parameter.  If *port is
  *            0, then a new port will be assigned, if port is > 0 then that
  *            port is allocated if the port is unallocated.
  * @return 0 on success, -1 on failure
  */
 int xc_evtchn_alloc_unbound(int xc_handle,
+                            u32 remote_dom,
                             u32 dom,
                             int *port);
 
