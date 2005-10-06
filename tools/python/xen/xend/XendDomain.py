@@ -22,6 +22,7 @@
  Needs to be persistent for one uptime.
 """
 import os
+import logging
 import threading
 
 import xen.lowlevel.xc
@@ -61,7 +62,7 @@ class XendDomain:
 
         self.domains_lock.acquire()
         try:
-            self.refresh()
+            self.refresh(True)
             self.dom0_setup()
         finally:
             self.domains_lock.release()
@@ -148,9 +149,13 @@ class XendDomain:
             info.cleanupDomain()
 
 
-    def refresh(self):
+    def refresh(self, initialising = False):
         """Refresh domain list from Xen.  Expects to be protected by the
         domains_lock.
+
+        @param initialising True if this is the first refresh after starting
+        Xend.  This does not change this method's behaviour, except for
+        logging.
         """
         doms = self.xen_domains()
         for d in self.domains.values():
@@ -162,10 +167,10 @@ class XendDomain:
         for d in doms:
             if d not in self.domains:
                 if doms[d]['dying']:
-                    log.error(
-                        'Cannot recreate information for dying domain %d.  '
-                        'Xend will ignore this domain from now on.',
-                        doms[d]['dom'])
+                    log.log(initialising and logging.ERROR or logging.DEBUG,
+                            'Cannot recreate information for dying domain %d.'
+                            '  Xend will ignore this domain from now on.',
+                            doms[d]['dom'])
                 else:
                     try:
                         dominfo = XendDomainInfo.recreate(doms[d])
