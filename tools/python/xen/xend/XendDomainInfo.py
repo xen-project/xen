@@ -97,6 +97,7 @@ SHUTDOWN_TIMEOUT = 30
 DOMROOT = '/local/domain/'
 VMROOT  = '/vm/'
 
+ZOMBIE_PREFIX = 'Zombie-'
 
 xc = xen.lowlevel.xc.new()
 xroot = XendRoot.instance()
@@ -997,8 +998,6 @@ class XendDomainInfo:
         dominfo = domain_by_name(name)
         if not dominfo:
             return
-        if dominfo.is_terminated():
-            return
         if self.domid is None:
             raise VmError("VM name '%s' already in use by domain %d" %
                           (name, dominfo.domid))
@@ -1100,6 +1099,14 @@ class XendDomainInfo:
         except:
             log.exception("Removing domain path failed.")
 
+        try:
+            if not self.info['name'].startswith(ZOMBIE_PREFIX):
+                self.info['name'] = self.generateZombieName()
+        except:
+            log.exception("Renaming Zombie failed.")
+
+        self.state_set(STATE_VM_TERMINATED)
+
 
     def cleanupVm(self):
         """Cleanup VM resources.  Idempotent.  Nothrow guarantee."""
@@ -1123,23 +1130,15 @@ class XendDomainInfo:
         log.debug("XendDomainInfo.destroyDomain(%s)", str(self.domid))
 
         self.cleanupDomain()
-        
+
         try:
             if self.domid is not None:
                 xc.domain_destroy(dom=self.domid)
         except:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
 
-        self.state_set(STATE_VM_TERMINATED)
-
 
     ## private:
-
-    def is_terminated(self):
-        """Check if a domain has been terminated.
-        """
-        return self.state == STATE_VM_TERMINATED
-
 
     def release_devices(self):
         """Release all domain's devices.  Nothrow guarantee."""
@@ -1351,6 +1350,18 @@ class XendDomainInfo:
                 return name
             except VmError:
                 n += 1
+
+
+    def generateZombieName(self):
+        n = 0
+        name = ZOMBIE_PREFIX + self.info['name']
+        while True:
+            try:
+                self.check_name(name)
+                return name
+            except VmError:
+                n += 1
+                name = "%s%d-%s" % (ZOMBIE_PREFIX, n, self.info['name'])
 
 
     def configure_bootloader(self):
