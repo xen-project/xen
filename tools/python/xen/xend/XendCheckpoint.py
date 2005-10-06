@@ -142,7 +142,7 @@ def restore(xd, fd):
                 log.debug("IntroduceDomain %d %d %d %s",
                           dominfo.getDomid(),
                           store_mfn,
-                          dominfo.store_channel.port1,
+                          dominfo.store_channel,
                           dominfo.getDomainPath())
                 IntroduceDomain(dominfo.getDomid(),
                                 store_mfn,
