@@ -29,7 +29,7 @@ CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
 
 all: libxenstore.so xenstored $(CLIENTS) xs_tdb_dump
 
-testcode: xs_test xenstored_test xs_random xs_dom0_test
+testcode: xs_test xenstored_test xs_random
 
 xenstored: xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
@@ -74,7 +74,7 @@ libxenstore.so: xs.opic xs_lib.opic
 clean: testsuite-clean
 	rm -f *.o *.opic *.so
 	rm -f xenstored xs_random xs_stress xs_crashme
-	rm -f xs_test xenstored_test xs_dom0_test
+	rm -f xs_test xenstored_test
 	$(RM) $(PROG_DEP)
 
 print-dir:
@@ -119,9 +119,6 @@ randomcheck-fast: xs_random xenstored_test $(TESTDIR)
 stresstest: xs_stress xenstored_test $(TESTDIR)
 	rm -rf $(TESTDIR)/store $(TESTDIR)/transactions
 	export $(TESTENV); PID=`./xenstored_test --output-pid --trace-file=/tmp/trace`; ./xs_stress 5000; ret=$$?; kill $$PID; exit $$ret
-
-xs_dom0_test: xs_dom0_test.o utils.o
-	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -o $@
 
 TAGS:
 	etags `find . -name '*.[ch]'`

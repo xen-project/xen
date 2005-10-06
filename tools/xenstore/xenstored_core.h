@@ -173,4 +173,6 @@ void trace_destroy(const void *data, const char *type);
 void trace_watch_timeout(const struct connection *conn, const char *node, const char *token);
 void trace(const char *fmt, ...);
 
+extern int event_fd;
+
 #endif /* _XENSTORED_CORE_H */

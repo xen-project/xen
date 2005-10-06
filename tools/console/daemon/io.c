@@ -81,6 +81,13 @@ struct ring_head
 #define XENCONS_FULL(ring) (((ring)->prod - (ring)->cons) == XENCONS_RING_SIZE)
 #define XENCONS_SPACE(ring) (XENCONS_RING_SIZE - ((ring)->prod - (ring)->cons))
 
+static void evtchn_notify(struct domain *dom)
+{
+	struct ioctl_evtchn_notify notify;
+	notify.port = dom->local_port;
+	(void)ioctl(dom->evtchn_fd, IOCTL_EVTCHN_NOTIFY, &notify);
+}
+
 static void buffer_append(struct domain *dom)
 {
 	struct buffer *buffer = &dom->buffer;
@@ -121,7 +128,7 @@ static void buffer_append(struct domain *dom)
 	}
 
 	if (notify)
-		xc_evtchn_send(xc, dom->local_port);
+		evtchn_notify(dom);
 }
 
 static bool buffer_empty(struct buffer *buffer)
@@ -440,7 +447,7 @@ static void handle_tty_read(struct domain *dom)
 			inring->buf[XENCONS_IDX(inring->prod)] = msg[i];
 			inring->prod++;
 		}
-		xc_evtchn_send(xc, dom->local_port);
+		evtchn_notify(dom);
 	} else {
 		close(dom->tty_fd);
 		dom->tty_fd = -1;

@@ -306,68 +306,14 @@ typedef evtchn_status_t xc_evtchn_status_t;
  * well-known port within a domain to receive events on.
  *
  * @parm xc_handle a handle to an open hypervisor interface
- * @parm remote_dom the ID of the domain who will later bind
  * @parm dom the ID of the local domain (the 'allocatee')
- * @parm port a pointer to a port.  This is an in/out parameter.  If *port is
- *            0, then a new port will be assigned, if port is > 0 then that
- *            port is allocated if the port is unallocated.
- * @return 0 on success, -1 on failure
+ * @parm remote_dom the ID of the domain who will later bind
+ * @return allocated port (in @dom) on success, -1 on failure
  */
 int xc_evtchn_alloc_unbound(int xc_handle,
-                            u32 remote_dom,
                             u32 dom,
-                            int *port);
+                            u32 remote_dom);
 
-/**
- * This function creates a pair of ports between two domains.  A port can only
- * be bound once within a domain.
- *
- * @parm xc_handle a handle to an open hypervisor interface
- * @parm dom1 one of the two domains to connect.  Can be DOMID_SELF.
- * @parm dom2 the other domain to connect.  Can be DOMID_SELF.
- * @parm port1 an in/out parameter.  If > 0, then try to connect *port.  If
- *             0, then allocate a new port and store the port in *port.
- * @parm port2 the port connected on port2.  This parameter behaves the same
- *             way as port1.
- * @return 0 on success, -1 on error.
- */
-int xc_evtchn_bind_interdomain(int xc_handle,
-                               u32 dom1,
-                               u32 dom2,
-                               int *port1,
-                               int *port2);
-int xc_evtchn_bind_virq(int xc_handle,
-                        int virq,
-                        int *port);
-
-/**
- * This function will close a single port on an event channel.
- *
- * @parm xc_handle a handle to an open hypervisor interface
- * @parm dom the domain that the port exists on.  May be DOMID_SELF.
- * @parm port the port to close
- * @return 0 on success, -1 on error
- */
-int xc_evtchn_close(int xc_handle,
-                    u32 dom,   /* may be DOMID_SELF */
-                    int port);
-
-/**
- * This function generates a notify event on a bound port.
- *
- * Notifies can be read within Linux by opening /dev/xen/evtchn and reading
- * a 16 bit value.  The result will be the port the event occurred on.  When
- * events occur, the port is masked until the 16 bit port value is written back
- * to the file.  When /dev/xen/evtchn is opened, it has to be bound via an
- * ioctl to each port to listen on.  The ioctl for binding is _IO('E', 2).  The
- * parameter is the port to listen on.
- *
- * @parm xc_handle a handle to an open hypervisor interface
- * @parm local_port the port to generate the notify on
- * @return 0 on success, -1 on error
- */
-int xc_evtchn_send(int xc_handle,
-                   int local_port);
 int xc_evtchn_status(int xc_handle,
                      u32 dom, /* may be DOMID_SELF */
                      int port,

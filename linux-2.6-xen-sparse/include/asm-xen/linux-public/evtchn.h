@@ -72,9 +72,18 @@ struct ioctl_evtchn_unbind {
 	unsigned int port;
 };
 
+/*
+ * Unbind previously allocated @port.
+ */
+#define IOCTL_EVTCHN_NOTIFY				\
+	_IOC(_IOC_NONE, 'E', 4, sizeof(struct ioctl_evtchn_notify))
+struct ioctl_evtchn_notify {
+	unsigned int port;
+};
+
 /* Clear and reinitialise the event buffer. Clear error condition. */
 #define IOCTL_EVTCHN_RESET				\
-	_IOC(_IOC_NONE, 'E', 4, 0)
+	_IOC(_IOC_NONE, 'E', 5, 0)
 
 #endif /* __LINUX_PUBLIC_EVTCHN_H__ */
 

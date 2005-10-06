@@ -486,11 +486,9 @@ int main_loop(void)
                     do_ioapic();
 #endif
 		if (env->send_event) {
-			int ret;
-			ret = xc_evtchn_send(xc_handle, ioreq_local_port);
-			if (ret == -1) {
-				fprintf(logfile, "evtchn_send failed on port: %d\n", ioreq_local_port);
-			}
+			struct ioctl_evtchn_notify notify;
+			notify.port = ioreq_local_port;
+			(void)ioctl(evtchn_fd, IOCTL_EVTCHN_NOTIFY, &notify);
 		}
 	}
         destroy_vmx_domain();

@@ -433,7 +433,7 @@ static PyObject *pyxc_evtchn_alloc_unbound(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     u32 dom = DOMID_SELF, remote_dom;
-    int port = 0;
+    int port;
 
     static char *kwd_list[] = { "remote_dom", "dom", NULL };
 
@@ -441,95 +441,10 @@ static PyObject *pyxc_evtchn_alloc_unbound(PyObject *self,
                                       &remote_dom, &dom) )
         return NULL;
 
-    if ( xc_evtchn_alloc_unbound(xc->xc_handle, remote_dom, dom, &port) != 0 )
+    if ( (port = xc_evtchn_alloc_unbound(xc->xc_handle, dom, remote_dom)) < 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return PyInt_FromLong(port);
-}
-
-static PyObject *pyxc_evtchn_bind_interdomain(PyObject *self,
-                                              PyObject *args,
-                                              PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
-
-    u32 dom1 = DOMID_SELF, dom2 = DOMID_SELF;
-    int port1 = 0, port2 = 0;
-
-    static char *kwd_list[] = { "dom1", "dom2", "port1", "port2", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiii", kwd_list, 
-                                      &dom1, &dom2, &port1, &port2) )
-        return NULL;
-
-    if ( xc_evtchn_bind_interdomain(xc->xc_handle, dom1, 
-                                    dom2, &port1, &port2) != 0 )
-        return PyErr_SetFromErrno(xc_error);
-
-    return Py_BuildValue("{s:i,s:i}", 
-                         "port1", port1,
-                         "port2", port2);
-}
-
-static PyObject *pyxc_evtchn_bind_virq(PyObject *self,
-                                       PyObject *args,
-                                       PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
-
-    int virq, port;
-
-    static char *kwd_list[] = { "virq", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &virq) )
-        return NULL;
-
-    if ( xc_evtchn_bind_virq(xc->xc_handle, virq, &port) != 0 )
-        return PyErr_SetFromErrno(xc_error);
-
-    return PyInt_FromLong(port);
-}
-
-static PyObject *pyxc_evtchn_close(PyObject *self,
-                                   PyObject *args,
-                                   PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
-
-    u32 dom = DOMID_SELF;
-    int port;
-
-    static char *kwd_list[] = { "port", "dom", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
-                                      &port, &dom) )
-        return NULL;
-
-    if ( xc_evtchn_close(xc->xc_handle, dom, port) != 0 )
-        return PyErr_SetFromErrno(xc_error);
-
-    Py_INCREF(zero);
-    return zero;
-}
-
-static PyObject *pyxc_evtchn_send(PyObject *self,
-                                  PyObject *args,
-                                  PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
-
-    int port;
-
-    static char *kwd_list[] = { "port", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &port) )
-        return NULL;
-
-    if ( xc_evtchn_send(xc->xc_handle, port) != 0 )
-        return PyErr_SetFromErrno(xc_error);
-
-    Py_INCREF(zero);
-    return zero;
 }
 
 static PyObject *pyxc_evtchn_status(PyObject *self,
@@ -1031,38 +946,6 @@ static PyMethodDef pyxc_methods[] = {
       "Allocate an unbound local port that will await a remote connection.\n"
       " dom [int]: Remote domain to accept connections from.\n\n"
       "Returns: [int] Unbound event-channel port.\n" },
-
-    { "evtchn_bind_interdomain", 
-      (PyCFunction)pyxc_evtchn_bind_interdomain, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Open an event channel between two domains.\n"
-      " dom1 [int, SELF]: First domain to be connected.\n"
-      " dom2 [int, SELF]: Second domain to be connected.\n\n"
-      "Returns: [dict] dictionary is empty on failure.\n"
-      " port1 [int]: Port-id for endpoint at dom1.\n"
-      " port2 [int]: Port-id for endpoint at dom2.\n" },
-
-    { "evtchn_bind_virq", 
-      (PyCFunction)pyxc_evtchn_bind_virq, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Bind an event channel to the specified VIRQ.\n"
-      " virq [int]: VIRQ to bind.\n\n"
-      "Returns: [int] Bound event-channel port.\n" },
-
-    { "evtchn_close", 
-      (PyCFunction)pyxc_evtchn_close, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Close an event channel. If interdomain, sets remote end to 'unbound'.\n"
-      " dom  [int, SELF]: Dom-id of one endpoint of the channel.\n"
-      " port [int]:       Port-id of one endpoint of the channel.\n\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
-
-    { "evtchn_send", 
-      (PyCFunction)pyxc_evtchn_send, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Send an event along a locally-connected event channel.\n"
-      " port [int]: Port-id of a local channel endpoint.\n\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "evtchn_status", 
       (PyCFunction)pyxc_evtchn_status, 

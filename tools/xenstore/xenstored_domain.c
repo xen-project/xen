@@ -79,6 +79,17 @@ struct ringbuf_head
 	char buf[0];
 } __attribute__((packed));
 
+#ifndef TESTING
+static void evtchn_notify(int port)
+{
+	struct ioctl_evtchn_notify notify;
+	notify.port = port;
+	(void)ioctl(event_fd, IOCTL_EVTCHN_NOTIFY, &notify);
+}
+#else
+extern void evtchn_notify(int port);
+#endif
+
 /* FIXME: Mark connection as broken (close it?) when this happens. */
 static bool check_buffer(const struct ringbuf_head *h)
 {
@@ -164,9 +175,7 @@ static int writechn(struct connection *conn, const void *data, unsigned int len)
 	memcpy(dest, data, len);
 	mb();
 	update_output_chunk(conn->domain->output, len);
-	/* FIXME: Probably not neccessary. */
-	mb();
-	xc_evtchn_send(*xc_handle, conn->domain->port);
+	evtchn_notify(conn->domain->port);
 	return len;
 }
 
@@ -199,7 +208,7 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 
 	/* If it was full, tell them we've taken some. */
 	if (was_full)
-		xc_evtchn_send(*xc_handle, conn->domain->port);
+		evtchn_notify(conn->domain->port);
 	return len;
 }
 
@@ -249,7 +258,7 @@ static void domain_cleanup(void)
 }
 
 /* We scan all domains rather than use the information given here. */
-void handle_event(int event_fd)
+void handle_event(void)
 {
 	u16 port;
 

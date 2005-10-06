@@ -297,6 +297,24 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
+	case IOCTL_EVTCHN_NOTIFY: {
+		struct ioctl_evtchn_notify notify;
+
+		rc = -EFAULT;
+		if (copy_from_user(&notify, (void *)arg, sizeof(notify)))
+			break;
+
+		if (notify.port >= NR_EVENT_CHANNELS) {
+			rc = -EINVAL;
+		} else if (port_user[notify.port] != u) {
+			rc = -ENOTCONN;
+		} else {
+			notify_remote_via_evtchn(notify.port);
+			rc = 0;
+		}
+		break;
+	}
+
 	case IOCTL_EVTCHN_RESET: {
 		/* Initialise the ring to empty. Clear errors. */
 		u->ring_cons = u->ring_prod = u->ring_overflow = 0;
