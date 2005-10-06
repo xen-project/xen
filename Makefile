@@ -36,6 +36,12 @@ build: kernels
 	$(MAKE) -C tools build
 	$(MAKE) -C docs build
 
+# The test target is for unit tests that can run without an installation.  Of
+# course, many tests require a machine running Xen itself, and these are
+# handled elsewhere.
+test:
+	$(MAKE) -C tools/python test
+
 # build and install everything into local dist directory
 dist: DESTDIR=$(DISTDIR)/install
 dist: dist-xen dist-kernels dist-tools dist-docs
