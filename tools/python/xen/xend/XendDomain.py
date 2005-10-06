@@ -146,7 +146,6 @@ class XendDomain:
         if info:
             del self.domains[domid]
             info.cleanupDomain()
-            info.cleanupVm()
 
 
     def refresh(self):
@@ -161,25 +160,31 @@ class XendDomain:
             else:
                 self._delete_domain(d.getDomid())
         for d in doms:
-            if d not in self.domains and not doms[d]['dying']:
-                try:
-                    dominfo = XendDomainInfo.recreate(doms[d])
-                    self._add_domain(dominfo)
-                except:
-                    if d == PRIV_DOMAIN:
-                        log.exception(
-                            "Failed to recreate information for domain "
-                            "%d.  Doing nothing except crossing my "
-                            "fingers.", d)
-                    else:
-                        log.exception(
-                            "Failed to recreate information for domain "
-                            "%d.  Destroying it in the hope of "
-                            "recovery.", d)
-                        try:
-                            xc.domain_destroy(dom = d)
-                        except:
-                            log.exception('Destruction of %d failed.', d)
+            if d not in self.domains:
+                if doms[d]['dying']:
+                    log.error(
+                        'Cannot recreate information for dying domain %d.  '
+                        'Xend will ignore this domain from now on.',
+                        doms[d]['dom'])
+                else:
+                    try:
+                        dominfo = XendDomainInfo.recreate(doms[d])
+                        self._add_domain(dominfo)
+                    except:
+                        if d == PRIV_DOMAIN:
+                            log.exception(
+                                "Failed to recreate information for domain "
+                                "%d.  Doing nothing except crossing my "
+                                "fingers.", d)
+                        else:
+                            log.exception(
+                                "Failed to recreate information for domain "
+                                "%d.  Destroying it in the hope of "
+                                "recovery.", d)
+                            try:
+                                xc.domain_destroy(dom = d)
+                            except:
+                                log.exception('Destruction of %d failed.', d)
 
 
     ## public:
