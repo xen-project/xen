@@ -86,8 +86,7 @@ class DevController:
            
 
     def configurations(self):
-        return map(lambda x: self.configuration(int(x)),
-                   xstransact.List(self.frontendRoot()))
+        return map(self.configuration, self.deviceIDs())
 
 
     def configuration(self, devid):
@@ -176,7 +175,14 @@ class DevController:
         return xstransact.Read(backpath, *args)
 
 
-    ## private:
+    def deviceIDs(self):
+        """@return The IDs of each of the devices currently configured for
+        this instance's deviceClass.
+        """
+        return map(int, xstransact.List(self.frontendRoot()))
+
+
+## private:
 
     def writeDetails(self, config, devid, backDetails, frontDetails):
         """Write the details in the store to trigger creation of a device.

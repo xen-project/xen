@@ -23,7 +23,7 @@ import string
 from xen.util import blkif
 from xen.xend import sxp
 
-from xen.xend.server.DevController import DevController
+from DevController import DevController
 
 
 class BlkifController(DevController):
@@ -79,3 +79,23 @@ class BlkifController(DevController):
             result.append(['mode', 'w'])
 
         return result
+
+
+    def destroyDevice(self, devid):
+        """@see DevController.destroyDevice"""
+
+        # If we are given a device name, then look up the device ID from it,
+        # and destroy that ID instead.  If what we are given is an integer,
+        # then assume it's a device ID and pass it straight through to our
+        # superclass's method.
+
+        try:
+            DevController.destroyDevice(self, int(devid))
+        except ValueError:
+            for i in self.deviceIDs():
+                if self.readBackend(i, 'dev') == devid:
+                    DevController.destroyDevice(self, i)
+                    return
+            # Try this, but it's almost certainly going to throw VmError,
+            # since we can't find the device.
+            DevController.destroyDevice(self, int(devid))

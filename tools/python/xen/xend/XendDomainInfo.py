@@ -876,24 +876,28 @@ class XendDomainInfo:
     __repr__ = __str__
 
 
+    ## private:
+
     def createDevice(self, deviceClass, devconfig):
         return self.getDeviceController(deviceClass).createDevice(devconfig)
 
 
-    def configureDevice(self, deviceClass, devid, devconfig):
-        return self.getDeviceController(deviceClass).configureDevice(
+    def reconfigureDevice(self, deviceClass, devid, devconfig):
+        return self.getDeviceController(deviceClass).reconfigureDevice(
             devid, devconfig)
 
+
+    ## public:
 
     def destroyDevice(self, deviceClass, devid):
         return self.getDeviceController(deviceClass).destroyDevice(devid)
 
 
+    ## private:
+
     def getDeviceSxprs(self, deviceClass):
         return self.getDeviceController(deviceClass).sxprs()
 
-
-    ## private:
 
     def getDeviceConfigurations(self, deviceClass):
         return self.getDeviceController(deviceClass).configurations()
@@ -1234,7 +1238,7 @@ class XendDomainInfo:
         @param devid:      device id
         """
         deviceClass = sxp.name(dev_config)
-        self.configureDevice(deviceClass, devid, dev_config)
+        self.reconfigureDevice(deviceClass, devid, dev_config)
 
 
     ## private:

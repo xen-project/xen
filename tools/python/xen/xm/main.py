@@ -106,9 +106,10 @@ xm full list of subcommands:
   Virtual Device Commands:
     block-attach  <DomId> <BackDev> <FrontDev> <Mode> [BackDomId]
         Create a new virtual block device 
-    block-detach  <DomId> <DevId>  Destroy a domain's virtual block device
+    block-detach  <DomId> <DevId>  Destroy a domain's virtual block device,
+                                   where <DevId> may either be the device ID
+                                   or the device name as mounted in the guest.
     block-list    <DomId>          List virtual block devices for a domain
-    block-refresh <DomId> <DevId>  Refresh a virtual block device for a domain
     network-limit   <DomId> <Vif> <Credit> <Period>
         Limit the transmission rate of a virtual network interface
     network-list    <DomId>        List virtual network interfaces for a domain
@@ -522,25 +523,11 @@ def xm_block_attach(args):
     from xen.xend.XendClient import server
     server.xend_domain_device_create(dom, vbd)
 
-def xm_block_refresh(args):
-    arg_check(args,2,"block-refresh")
-
-    dom = args[0]
-    dev = args[1]
-
-    from xen.xend.XendClient import server
-    server.xend_domain_device_refresh(dom, 'vbd', dev)
-
 def xm_block_detach(args):
     arg_check(args,2,"block-detach")
 
     dom = args[0]
-
-    try:
-        dev = int(args[1])
-    except ValueError, e:
-        err("Invalid device id: %s" % args[1])
-        sys.exit(1)
+    dev = args[1]
 
     from xen.xend.XendClient import server
     server.xend_domain_device_destroy(dom, 'vbd', dev)
@@ -622,7 +609,6 @@ commands = {
     "block-attach": xm_block_attach,
     "block-detach": xm_block_detach,
     "block-list": xm_block_list,
-    "block-refresh": xm_block_refresh,
     # network
     "network-limit": xm_network_limit,
     "network-list": xm_network_list,
@@ -651,7 +637,6 @@ aliases = {
     "vbd-create": "block-create",
     "vbd-destroy": "block-destroy",
     "vbd-list": "block-list",
-    "vbd-refresh": "block-refresh",
     }
 
 help = {

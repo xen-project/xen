@@ -306,22 +306,22 @@ class Xend:
                              {'op'      : 'device_create',
                               'config'  : fileof(config) })
 
-    def xend_domain_device_refresh(self, id, type, idx):
+    def xend_domain_device_refresh(self, id, type, dev):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'device_refresh',
                               'type'    : type,
-                              'idx'     : idx })
+                              'dev'     : dev })
 
-    def xend_domain_device_destroy(self, id, type, idx):
+    def xend_domain_device_destroy(self, id, type, dev):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'device_destroy',
                               'type'    : type,
-                              'idx'     : idx })
+                              'dev'     : dev })
 
-    def xend_domain_device_configure(self, id, config, idx):
+    def xend_domain_device_configure(self, id, config, dev):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'device_configure',
-                              'idx'     : idx,
+                              'dev'     : dev,
                               'config'  : fileof(config) })
 
     def xend_vnets(self):

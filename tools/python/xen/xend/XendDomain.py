@@ -492,13 +492,6 @@ class XendDomain:
                              devconfig, devid)
 
     
-    def domain_device_refresh(self, domid, devtype, devid):
-        """Refresh a device."""
-        return self.callInfo(domid,
-                             XendDomainInfo.XendDomainInfo.device_refresh,
-                             devtype, devid)
-
-
     def domain_device_destroy(self, domid, devtype, devid):
         """Destroy a device."""
         return self.callInfo(domid,
