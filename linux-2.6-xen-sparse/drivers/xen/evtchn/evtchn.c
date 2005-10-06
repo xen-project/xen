@@ -44,9 +44,9 @@
 #include <linux/poll.h>
 #include <linux/irq.h>
 #include <linux/init.h>
-#define XEN_EVTCHN_MASK_OPS
-#include <asm-xen/evtchn.h>
 #include <linux/gfp.h>
+#include <asm-xen/evtchn.h>
+#include <asm-xen/linux-public/evtchn.h>
 
 struct per_user_data {
 	/* Notification ring, accessed via /dev/xen/evtchn. */
@@ -78,7 +78,8 @@ void evtchn_device_upcall(int port)
 			u->ring[EVTCHN_RING_MASK(u->ring_prod)] = (u16)port;
 			if (u->ring_cons == u->ring_prod++) {
 				wake_up_interruptible(&u->evtchn_wait);
-				kill_fasync(&u->evtchn_async_queue, SIGIO, POLL_IN);
+				kill_fasync(&u->evtchn_async_queue,
+					    SIGIO, POLL_IN);
 			}
 		} else {
 			u->ring_overflow = 1;
@@ -208,38 +209,100 @@ static ssize_t evtchn_write(struct file *file, const char *buf,
 static int evtchn_ioctl(struct inode *inode, struct file *file,
                         unsigned int cmd, unsigned long arg)
 {
-	int rc = 0;
+	int rc;
 	struct per_user_data *u = file->private_data;
+	evtchn_op_t op = { 0 };
 
 	spin_lock_irq(&port_user_lock);
     
 	switch (cmd) {
-	case EVTCHN_RESET:
-		/* Initialise the ring to empty. Clear errors. */
-		u->ring_cons = u->ring_prod = u->ring_overflow = 0;
-		break;
+	case IOCTL_EVTCHN_BIND_VIRQ: {
+		struct ioctl_evtchn_bind_virq bind;
 
-	case EVTCHN_BIND:
-		if (arg >= NR_EVENT_CHANNELS) {
-			rc = -EINVAL;
-		} else if (port_user[arg] != NULL) {
-			rc = -EISCONN;
-		} else {
-			port_user[arg] = u;
-			unmask_evtchn(arg);
-		}
-		break;
+		rc = -EFAULT;
+		if (copy_from_user(&bind, (void *)arg, sizeof(bind)))
+			break;
 
-	case EVTCHN_UNBIND:
-		if (arg >= NR_EVENT_CHANNELS) {
+		op.cmd              = EVTCHNOP_bind_virq;
+		op.u.bind_virq.virq = bind.virq;
+		op.u.bind_virq.vcpu = 0;
+		rc = HYPERVISOR_event_channel_op(&op);
+		if (rc != 0)
+			break;
+
+		rc = op.u.bind_virq.port;
+		port_user[rc] = u;
+		unmask_evtchn(rc);
+		break;
+	}
+
+	case IOCTL_EVTCHN_BIND_INTERDOMAIN: {
+		struct ioctl_evtchn_bind_interdomain bind;
+
+		rc = -EFAULT;
+		if (copy_from_user(&bind, (void *)arg, sizeof(bind)))
+			break;
+
+		op.cmd                      = EVTCHNOP_bind_interdomain;
+		op.u.bind_interdomain.dom1  = DOMID_SELF;
+		op.u.bind_interdomain.dom2  = bind.remote_domain;
+		op.u.bind_interdomain.port1 = 0;
+		op.u.bind_interdomain.port2 = bind.remote_port;
+		rc = HYPERVISOR_event_channel_op(&op);
+		if (rc != 0)
+			break;
+
+		rc = op.u.bind_interdomain.port1;
+		port_user[rc] = u;
+		unmask_evtchn(rc);
+		break;
+	}
+
+	case IOCTL_EVTCHN_BIND_UNBOUND_PORT: {
+		struct ioctl_evtchn_bind_unbound_port bind;
+
+		rc = -EFAULT;
+		if (copy_from_user(&bind, (void *)arg, sizeof(bind)))
+			break;
+
+		op.cmd                        = EVTCHNOP_alloc_unbound;
+		op.u.alloc_unbound.dom        = DOMID_SELF;
+		op.u.alloc_unbound.remote_dom = bind.remote_domain;
+		rc = HYPERVISOR_event_channel_op(&op);
+		if (rc != 0)
+			break;
+
+		rc = op.u.alloc_unbound.port;
+		port_user[rc] = u;
+		unmask_evtchn(rc);
+		break;
+	}
+
+	case IOCTL_EVTCHN_UNBIND: {
+		struct ioctl_evtchn_unbind unbind;
+
+		rc = -EFAULT;
+		if (copy_from_user(&unbind, (void *)arg, sizeof(unbind)))
+			break;
+
+		if (unbind.port >= NR_EVENT_CHANNELS) {
 			rc = -EINVAL;
-		} else if (port_user[arg] != u) {
+		} else if (port_user[unbind.port] != u) {
 			rc = -ENOTCONN;
 		} else {
-			port_user[arg] = NULL;
-			mask_evtchn(arg);
+			port_user[unbind.port] = NULL;
+			mask_evtchn(unbind.port);
+			rc = 0;
 		}
 		break;
+	}
+
+	case IOCTL_EVTCHN_RESET: {
+		/* Initialise the ring to empty. Clear errors. */
+		u->ring_cons = u->ring_prod = u->ring_overflow = 0;
+		rc = 0;
+		break;
+	}
 
 	default:
 		rc = -ENOSYS;
@@ -295,6 +358,7 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 {
 	int i;
 	struct per_user_data *u = filp->private_data;
+	evtchn_op_t op = { 0 };
 
 	spin_lock_irq(&port_user_lock);
 
@@ -302,11 +366,16 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 
 	for (i = 0; i < NR_EVENT_CHANNELS; i++)
 	{
-		if (port_user[i] == u)
-		{
-			port_user[i] = NULL;
-			mask_evtchn(i);
-		}
+		if (port_user[i] != u)
+			continue;
+
+		port_user[i] = NULL;
+		mask_evtchn(i);
+
+		op.cmd          = EVTCHNOP_close;
+		op.u.close.dom  = DOMID_SELF;
+		op.u.close.port = i;
+		BUG_ON(HYPERVISOR_event_channel_op(&op));
 	}
 
 	spin_unlock_irq(&port_user_lock);

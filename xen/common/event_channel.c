@@ -36,7 +36,13 @@
 #define evtchn_from_port(d,p) \
     (&(bucket_from_port(d,p))[(p)&(EVTCHNS_PER_BUCKET-1)])
 
-#define ERROR_EXIT(_errno) do { rc = (_errno); goto out; } while ( 0 )
+#define ERROR_EXIT(_errno)                                          \
+    do {                                                            \
+        DPRINTK("EVTCHNOP failure: domain %d, error %d, line %d\n", \
+                current->domain->domain_id, (_errno), __LINE__);    \
+        rc = (_errno);                                              \
+        goto out;                                                   \
+    } while ( 0 )
 
 static int get_free_port(struct domain *d)
 {

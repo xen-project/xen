@@ -1,7 +1,7 @@
 /******************************************************************************
- * privcmd.h
+ * evtchn.h
  * 
- * Interface to /proc/xen/privcmd.
+ * Interface to /dev/xen/evtchn.
  * 
  * Copyright (c) 2003-2005, K A Fraser
  * 
@@ -27,59 +27,56 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef __LINUX_PUBLIC_PRIVCMD_H__
-#define __LINUX_PUBLIC_PRIVCMD_H__
+#ifndef __LINUX_PUBLIC_EVTCHN_H__
+#define __LINUX_PUBLIC_EVTCHN_H__
 
-typedef struct privcmd_hypercall
-{
-	unsigned long op;
-	unsigned long arg[5];
-} privcmd_hypercall_t;
-
-typedef struct privcmd_mmap_entry {
-	unsigned long va;
-	unsigned long mfn;
-	unsigned long npages;
-} privcmd_mmap_entry_t; 
-
-typedef struct privcmd_mmap {
-	int num;
-	domid_t dom; /* target domain */
-	privcmd_mmap_entry_t *entry;
-} privcmd_mmap_t; 
-
-typedef struct privcmd_mmapbatch {
-	int num;     /* number of pages to populate */
-	domid_t dom; /* target domain */
-	unsigned long addr;  /* virtual address */
-	unsigned long *arr; /* array of mfns - top nibble set on err */
-} privcmd_mmapbatch_t; 
-
-typedef struct privcmd_blkmsg
-{
-	unsigned long op;
-	void         *buf;
-	int           buf_size;
-} privcmd_blkmsg_t;
+/* /dev/xen/evtchn resides at device number major=10, minor=201 */
+#define EVTCHN_MINOR 201
 
 /*
- * @cmd: IOCTL_PRIVCMD_HYPERCALL
- * @arg: &privcmd_hypercall_t
- * Return: Value returned from execution of the specified hypercall.
+ * Bind a fresh port to VIRQ @virq.
+ * Return allocated port.
  */
-#define IOCTL_PRIVCMD_HYPERCALL					\
-	_IOC(_IOC_NONE, 'P', 0, sizeof(privcmd_hypercall_t))
+#define IOCTL_EVTCHN_BIND_VIRQ				\
+	_IOC(_IOC_NONE, 'E', 0, sizeof(struct ioctl_evtchn_bind_virq))
+struct ioctl_evtchn_bind_virq {
+	unsigned int virq;
+};
 
-#define IOCTL_PRIVCMD_MMAP					\
-	_IOC(_IOC_NONE, 'P', 2, sizeof(privcmd_mmap_t))
-#define IOCTL_PRIVCMD_MMAPBATCH					\
-	_IOC(_IOC_NONE, 'P', 3, sizeof(privcmd_mmapbatch_t))
-#define IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN			\
-	_IOC(_IOC_READ, 'P', 4, sizeof(unsigned long))
-#define IOCTL_PRIVCMD_INITDOMAIN_STORE				\
-	_IOC(_IOC_READ, 'P', 5, 0)
+/*
+ * Bind a fresh port to remote <@remote_domain, @remote_port>.
+ * Return allocated port.
+ */
+#define IOCTL_EVTCHN_BIND_INTERDOMAIN			\
+	_IOC(_IOC_NONE, 'E', 1, sizeof(struct ioctl_evtchn_bind_interdomain))
+struct ioctl_evtchn_bind_interdomain {
+	unsigned int remote_domain, remote_port;
+};
 
-#endif /* __LINUX_PUBLIC_PRIVCMD_H__ */
+/*
+ * Allocate a fresh port for binding to @remote_domain.
+ * Return allocated port.
+ */
+#define IOCTL_EVTCHN_BIND_UNBOUND_PORT			\
+	_IOC(_IOC_NONE, 'E', 2, sizeof(struct ioctl_evtchn_bind_unbound_port))
+struct ioctl_evtchn_bind_unbound_port {
+	unsigned int remote_domain;
+};
+
+/*
+ * Unbind previously allocated @port.
+ */
+#define IOCTL_EVTCHN_UNBIND				\
+	_IOC(_IOC_NONE, 'E', 3, sizeof(struct ioctl_evtchn_unbind))
+struct ioctl_evtchn_unbind {
+	unsigned int port;
+};
+
+/* Clear and reinitialise the event buffer. Clear error condition. */
+#define IOCTL_EVTCHN_RESET				\
+	_IOC(_IOC_NONE, 'E', 4, 0)
+
+#endif /* __LINUX_PUBLIC_EVTCHN_H__ */
 
 /*
  * Local variables:

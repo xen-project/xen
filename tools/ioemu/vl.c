@@ -2806,9 +2806,9 @@ int main(int argc, char **argv)
 
             case QEMU_OPTION_p:
                 {
-                  extern short ioreq_port;
-                  ioreq_port = atoi(optarg);
-                  printf("port: %d\n", ioreq_port);
+                  extern short ioreq_remote_port;
+                  ioreq_remote_port = atoi(optarg);
+                  printf("port: %d\n", ioreq_remote_port);
                 }
                 break;
             case QEMU_OPTION_l:
