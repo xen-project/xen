@@ -25,8 +25,6 @@ from xen.xend import sxp
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 
-from xen.xend.server import channel
-
 
 xc = xen.lowlevel.xc.new()
 
@@ -168,11 +166,11 @@ class LinuxImageHandler(ImageHandler):
 
     def buildDomain(self):
         if self.vm.store_channel:
-            store_evtchn = self.vm.store_channel.port2
+            store_evtchn = self.vm.store_channel
         else:
             store_evtchn = 0
         if self.vm.console_channel:
-            console_evtchn = self.vm.console_channel.port2
+            console_evtchn = self.vm.console_channel
         else:
             console_evtchn = 0
 
@@ -228,16 +226,17 @@ class VmxImageHandler(ImageHandler):
 
     def buildDomain(self):
         # Create an event channel
-        self.device_channel = channel.eventChannel(0, self.vm.getDomid())
-        log.info("VMX device model port: %d", self.device_channel.port2)
+        self.device_channel = xc.evtchn_alloc_unbound(dom=self.vm.getDomid(),
+                                                      remote_dom=0)
+        log.info("VMX device model port: %d", self.device_channel)
         if self.vm.store_channel:
-            store_evtchn = self.vm.store_channel.port2
+            store_evtchn = self.vm.store_channel
         else:
             store_evtchn = 0
 
         log.debug("dom            = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
-        log.debug("control_evtchn = %d", self.device_channel.port2)
+        log.debug("control_evtchn = %d", self.device_channel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
         log.debug("flags          = %d", self.flags)
@@ -245,7 +244,7 @@ class VmxImageHandler(ImageHandler):
 
         ret = xc.vmx_build(dom            = self.vm.getDomid(),
                            image          = self.kernel,
-                           control_evtchn = self.device_channel.port2,
+                           control_evtchn = self.device_channel,
                            store_evtchn   = store_evtchn,
                            memsize        = self.vm.getMemoryTarget() / 1024,
                            flags          = self.flags,
@@ -334,7 +333,7 @@ class VmxImageHandler(ImageHandler):
         if len(vnc):
             args = args + vnc
         args = args + ([ "-d",  "%d" % self.vm.getDomid(),
-                  "-p", "%d" % self.device_channel.port1,
+                  "-p", "%d" % self.device_channel,
                   "-m", "%s" % (self.vm.getMemoryTarget() / 1024)])
         args = args + self.dmargs
         env = dict(os.environ)
@@ -358,8 +357,6 @@ class VmxImageHandler(ImageHandler):
         return vncconnect
 
     def destroy(self):
-        if self.device_channel:
-            self.device_channel.close()
         import signal
         if not self.pid:
             return

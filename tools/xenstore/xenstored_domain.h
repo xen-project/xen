@@ -20,7 +20,7 @@
 #ifndef _XENSTORED_DOMAIN_H
 #define _XENSTORED_DOMAIN_H
 
-void handle_event(int event_fd);
+void handle_event(void);
 
 /* domid, mfn, eventchn, path */
 void do_introduce(struct connection *conn, struct buffered_data *in);

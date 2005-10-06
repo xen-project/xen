@@ -36,12 +36,11 @@ static int xs_test_pid;
 static u16 port;
 
 /* The event channel maps to a signal, shared page to an mmapped file. */
-int xc_evtchn_send(int xc_handle __attribute__((unused)), int local_port)
+void evtchn_notify(int local_port)
 {
 	assert(local_port == port);
 	if (kill(xs_test_pid, SIGUSR2) != 0)
 		barf_perror("fake event channel failed");
-	return 0;
 }
 
 void *xc_map_foreign_range(int xc_handle, u32 dom __attribute__((unused)),
@@ -105,15 +104,6 @@ int xc_domain_getinfo(int xc_handle __attribute__((unused)),
         }
 
 	return 1;
-}
-
-int xc_evtchn_bind_virq(int xc_handle __attribute__((unused)),
-			int virq __attribute__((unused)),
-			int *port)
-{
-	if (port)
-		*port = 0;
-	return 0;
 }
 
 static void send_to_fd(int signo __attribute__((unused)))

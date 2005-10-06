@@ -49,10 +49,13 @@
 
 #include <xenctrl.h>
 #include <xen/io/ioreq.h>
+#include <xen/linux/evtchn.h>
 
 #include "cpu.h"
 #include "exec-all.h"
 #include "vl.h"
+
+extern int domid;
 
 void *shared_vram;
 
@@ -119,7 +122,7 @@ target_ulong cpu_get_phys_page_debug(CPUState *env, target_ulong addr)
 //the evtchn fd for polling
 int evtchn_fd = -1;
 //the evtchn port for polling the notification, should be inputed as bochs's parameter
-u16 ioreq_port = 0;
+u16 ioreq_remote_port, ioreq_local_port;
 
 //some functions to handle the io req packet
 void
@@ -156,9 +159,9 @@ ioreq_t* cpu_get_ioreq(void)
 	int rc;
 	u16 buf[2];
 	rc = read(evtchn_fd, buf, 2);
-	if (rc == 2 && buf[0] == ioreq_port){//got only one matched 16bit port index
+	if (rc == 2 && buf[0] == ioreq_local_port){//got only one matched 16bit port index
 		// unmask the wanted port again
-		write(evtchn_fd, &ioreq_port, 2);
+		write(evtchn_fd, &ioreq_local_port, 2);
 
 		//get the io packet from shared memory
 		return __cpu_get_ioreq();
@@ -417,7 +420,6 @@ do_interrupt(CPUState *env, int vector)
 void
 destroy_vmx_domain(void)
 {
-    extern int domid;
     extern FILE* logfile;
     char destroy_cmd[20];
     sprintf(destroy_cmd, "xm destroy %d", domid);
@@ -484,11 +486,9 @@ int main_loop(void)
                     do_ioapic();
 #endif
 		if (env->send_event) {
-			int ret;
-			ret = xc_evtchn_send(xc_handle, ioreq_port);
-			if (ret == -1) {
-				fprintf(logfile, "evtchn_send failed on port: %d\n", ioreq_port);
-			}
+			struct ioctl_evtchn_notify notify;
+			notify.port = ioreq_local_port;
+			(void)ioctl(evtchn_fd, IOCTL_EVTCHN_NOTIFY, &notify);
 		}
 	}
         destroy_vmx_domain();
@@ -499,7 +499,6 @@ static void
 qemu_vmx_reset(void *unused)
 {
     char cmd[255];
-    extern int domid;
 
     /* pause domain first, to avoid repeated reboot request*/ 
     xc_domain_pause (xc_handle, domid);
@@ -512,6 +511,8 @@ CPUState *
 cpu_init()
 {
 	CPUX86State *env;
+	struct ioctl_evtchn_bind_interdomain bind;
+	int rc;
       
         cpu_exec_init();
         qemu_register_reset(qemu_vmx_reset, NULL);
@@ -532,12 +533,14 @@ cpu_init()
 		return NULL;
 	}
 
-	fprintf(logfile, "listening to port: %d\n", ioreq_port);
-	/*unmask the wanted port -- bind*/
-	if (ioctl(evtchn_fd, ('E'<<8)|2, ioreq_port) == -1) {
+	bind.remote_domain = domid;
+	bind.remote_port   = ioreq_remote_port;
+	rc = ioctl(evtchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+	if (rc == -1) {
 		perror("ioctl");
 		return NULL;
 	}
+	ioreq_local_port = rc;
 
 	return env;
 }

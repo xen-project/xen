@@ -43,11 +43,7 @@ pdb_close (int xc_handle)
 
 
 #include <sys/ioctl.h>
-
-/* /dev/xen/evtchn ioctls */
-#define EVTCHN_RESET  _IO('E', 1)                   /* clear & reinit buffer */
-#define EVTCHN_BIND   _IO('E', 2)                   /* bind to event channel */
-#define EVTCHN_UNBIND _IO('E', 3)               /* unbind from event channel */
+#include <xen/linux/evtchn.h>
 
 int
 xen_evtchn_bind (int evtchn_fd, int idx)

@@ -129,21 +129,6 @@ static inline void notify_remote_via_evtchn(int port)
 	(void)HYPERVISOR_event_channel_op(&op);
 }
 
-/*
- * CHARACTER-DEVICE DEFINITIONS
- */
-
-/* /dev/xen/evtchn resides at device number major=10, minor=201 */
-#define EVTCHN_MINOR 201
-
-/* /dev/xen/evtchn ioctls: */
-/* EVTCHN_RESET: Clear and reinit the event buffer. Clear error condition. */
-#define EVTCHN_RESET  _IO('E', 1)
-/* EVTCHN_BIND: Bind to teh specified event-channel port. */
-#define EVTCHN_BIND   _IO('E', 2)
-/* EVTCHN_UNBIND: Unbind from the specified event-channel port. */
-#define EVTCHN_UNBIND _IO('E', 3)
-
 #endif /* __ASM_EVTCHN_H__ */
 
 /*

@@ -36,6 +36,8 @@
 #include "xenstored_watch.h"
 #include "xenstored_test.h"
 
+#include <xen/linux/evtchn.h>
+
 static int *xc_handle;
 static int eventchn_fd;
 static int virq_port;
@@ -77,8 +79,16 @@ struct ringbuf_head
 	char buf[0];
 } __attribute__((packed));
 
-#define EVENTCHN_BIND		_IO('E', 2)
-#define EVENTCHN_UNBIND 	_IO('E', 3)
+#ifndef TESTING
+static void evtchn_notify(int port)
+{
+	struct ioctl_evtchn_notify notify;
+	notify.port = port;
+	(void)ioctl(event_fd, IOCTL_EVTCHN_NOTIFY, &notify);
+}
+#else
+extern void evtchn_notify(int port);
+#endif
 
 /* FIXME: Mark connection as broken (close it?) when this happens. */
 static bool check_buffer(const struct ringbuf_head *h)
@@ -165,9 +175,7 @@ static int writechn(struct connection *conn, const void *data, unsigned int len)
 	memcpy(dest, data, len);
 	mb();
 	update_output_chunk(conn->domain->output, len);
-	/* FIXME: Probably not neccessary. */
-	mb();
-	xc_evtchn_send(*xc_handle, conn->domain->port);
+	evtchn_notify(conn->domain->port);
 	return len;
 }
 
@@ -200,21 +208,24 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 
 	/* If it was full, tell them we've taken some. */
 	if (was_full)
-		xc_evtchn_send(*xc_handle, conn->domain->port);
+		evtchn_notify(conn->domain->port);
 	return len;
 }
 
 static int destroy_domain(void *_domain)
 {
 	struct domain *domain = _domain;
+	struct ioctl_evtchn_unbind unbind;
 
 	list_del(&domain->list);
 
-	if (domain->port &&
-	    (ioctl(eventchn_fd, EVENTCHN_UNBIND, domain->port) != 0))
-		eprintf("> Unbinding port %i failed!\n", domain->port);
+	if (domain->port) {
+		unbind.port = domain->port;
+		if (ioctl(eventchn_fd, IOCTL_EVTCHN_UNBIND, &unbind) == -1)
+			eprintf("> Unbinding port %i failed!\n", domain->port);
+	}
 
-	if(domain->page)
+	if (domain->page)
 		munmap(domain->page, getpagesize());
 
 	return 0;
@@ -247,7 +258,7 @@ static void domain_cleanup(void)
 }
 
 /* We scan all domains rather than use the information given here. */
-void handle_event(int event_fd)
+void handle_event(void)
 {
 	u16 port;
 
@@ -278,6 +289,9 @@ static struct domain *new_domain(void *context, domid_t domid,
 				 const char *path)
 {
 	struct domain *domain;
+	struct ioctl_evtchn_bind_interdomain bind;
+	int rc;
+
 	domain = talloc(context, struct domain);
 	domain->port = 0;
 	domain->shutdown = 0;
@@ -298,10 +312,13 @@ static struct domain *new_domain(void *context, domid_t domid,
 	domain->output = domain->page + getpagesize()/2;
 
 	/* Tell kernel we're interested in this event. */
-	if (ioctl(eventchn_fd, EVENTCHN_BIND, port) != 0)
+	bind.remote_domain = domid;
+	bind.remote_port   = port;
+	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+	if (rc == -1)
 		return NULL;
 
-	domain->port = port;
+	domain->port = rc;
 	domain->conn = new_connection(writechn, readchn);
 	domain->conn->domain = domain;
 	return domain;
@@ -445,6 +462,8 @@ void restore_existing_connections(void)
 int domain_init(void)
 {
 	struct stat st;
+	struct ioctl_evtchn_bind_virq bind;
+	int rc;
 
 	/* The size of the ringbuffer: half a page minus head structure. */
 	ringbuf_datasize = getpagesize() / 2 - sizeof(struct ringbuf_head);
@@ -482,11 +501,11 @@ int domain_init(void)
 	if (eventchn_fd < 0)
 		barf_perror("Failed to open evtchn device");
 
-	if (xc_evtchn_bind_virq(*xc_handle, VIRQ_DOM_EXC, &virq_port))
-		barf_perror("Failed to bind to domain exception virq");
-
-	if (ioctl(eventchn_fd, EVENTCHN_BIND, virq_port) != 0)
+	bind.virq = VIRQ_DOM_EXC;
+	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
+	if (rc == -1)
 		barf_perror("Failed to bind to domain exception virq port");
+	virq_port = rc;
 
 	return eventchn_fd;
 }

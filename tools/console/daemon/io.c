@@ -1,4 +1,4 @@
-/*\
+/*
  *  Copyright (C) International Business Machines  Corp., 2005
  *  Author(s): Anthony Liguori <aliguori@us.ibm.com>
  *
@@ -16,14 +16,15 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-\*/
+ */
 
 #define _GNU_SOURCE
 
 #include "utils.h"
 #include "io.h"
-#include "xenctrl.h"
-#include "xs.h"
+#include <xenctrl.h>
+#include <xs.h>
+#include <xen/linux/evtchn.h>
 
 #include <malloc.h>
 #include <stdlib.h>
@@ -80,6 +81,13 @@ struct ring_head
 #define XENCONS_FULL(ring) (((ring)->prod - (ring)->cons) == XENCONS_RING_SIZE)
 #define XENCONS_SPACE(ring) (XENCONS_RING_SIZE - ((ring)->prod - (ring)->cons))
 
+static void evtchn_notify(struct domain *dom)
+{
+	struct ioctl_evtchn_notify notify;
+	notify.port = dom->local_port;
+	(void)ioctl(dom->evtchn_fd, IOCTL_EVTCHN_NOTIFY, &notify);
+}
+
 static void buffer_append(struct domain *dom)
 {
 	struct buffer *buffer = &dom->buffer;
@@ -120,7 +128,7 @@ static void buffer_append(struct domain *dom)
 	}
 
 	if (notify)
-		xc_evtchn_send(xc, dom->local_port);
+		evtchn_notify(dom);
 }
 
 static bool buffer_empty(struct buffer *buffer)
@@ -225,16 +233,14 @@ int xs_gather(struct xs_handle *xs, const char *dir, ...)
 	return ret;
 }
 
-#define EVENTCHN_BIND		_IO('E', 2)
-#define EVENTCHN_UNBIND 	_IO('E', 3)
-
 static int domain_create_ring(struct domain *dom)
 {
-	int err, local_port, ring_ref;
+	int err, remote_port, ring_ref, rc;
+	struct ioctl_evtchn_bind_interdomain bind;
 
 	err = xs_gather(xs, dom->conspath,
 			"ring-ref", "%u", &ring_ref,
-			"port", "%i", &local_port,
+			"port", "%i", &remote_port,
 			NULL);
 	if (err)
 		goto out;
@@ -252,26 +258,28 @@ static int domain_create_ring(struct domain *dom)
 		dom->ring_ref = ring_ref;
 	}
 
-	if (local_port != dom->local_port) {
-		dom->local_port = -1;
-		if (dom->evtchn_fd != -1)
-			close(dom->evtchn_fd);
-		/* Opening evtchn independently for each console is a bit
-		 * wastefule, but that's how the code is structured... */
-		dom->evtchn_fd = open("/dev/xen/evtchn", O_RDWR);
-		if (dom->evtchn_fd == -1) {
-			err = errno;
-			goto out;
-		}
- 
-		if (ioctl(dom->evtchn_fd, EVENTCHN_BIND, local_port) == -1) {
-			err = errno;
-			close(dom->evtchn_fd);
-			dom->evtchn_fd = -1;
-			goto out;
-		}
-		dom->local_port = local_port;
+	dom->local_port = -1;
+	if (dom->evtchn_fd != -1)
+		close(dom->evtchn_fd);
+
+	/* Opening evtchn independently for each console is a bit
+	 * wasteful, but that's how the code is structured... */
+	dom->evtchn_fd = open("/dev/xen/evtchn", O_RDWR);
+	if (dom->evtchn_fd == -1) {
+		err = errno;
+		goto out;
 	}
+ 
+	bind.remote_domain = dom->domid;
+	bind.remote_port   = remote_port;
+	rc = ioctl(dom->evtchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+	if (rc == -1) {
+		err = errno;
+		close(dom->evtchn_fd);
+		dom->evtchn_fd = -1;
+		goto out;
+	}
+	dom->local_port = rc;
 
  out:
 	return err;
@@ -439,7 +447,7 @@ static void handle_tty_read(struct domain *dom)
 			inring->buf[XENCONS_IDX(inring->prod)] = msg[i];
 			inring->prod++;
 		}
-		xc_evtchn_send(xc, dom->local_port);
+		evtchn_notify(dom);
 	} else {
 		close(dom->tty_fd);
 		dom->tty_fd = -1;

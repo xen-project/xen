@@ -126,8 +126,8 @@ def restore(xd, fd):
             raise XendError(
                 "not a valid guest state file: pfn count out of range")
 
-        store_evtchn = dominfo.store_channel.port2
-        console_evtchn = dominfo.console_channel.port2
+        store_evtchn = dominfo.store_channel
+        console_evtchn = dominfo.console_channel
 
         cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
                str(dominfo.getDomid()), str(nr_pfns),
@@ -146,7 +146,7 @@ def restore(xd, fd):
                           dominfo.getDomainPath())
                 IntroduceDomain(dominfo.getDomid(),
                                 store_mfn,
-                                dominfo.store_channel.port1,
+                                dominfo.store_channel,
                                 dominfo.getDomainPath())
             else:
                 m = re.match(r"^(console-mfn) (\d+)$", line)

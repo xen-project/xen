@@ -32,8 +32,6 @@ import errno
 import xen.lowlevel.xc
 from xen.util.blkif import blkdev_uname_to_file
 
-from xen.xend.server import channel
-
 from xen.xend import image
 from xen.xend import scheduler
 from xen.xend import sxp
@@ -785,32 +783,6 @@ class XendDomainInfo:
                           self.domid, self.info['name'])
 
 
-    def closeChannel(self, chan, entry):
-        """Close the given channel, if set, and remove the given entry in the
-        store.  Nothrow guarantee."""
-        
-        if chan:
-            chan.close()
-        try:
-            self.removeDom(entry)
-        except:
-            log.exception('Removing entry %s failed', entry)
-        
-
-    def closeStoreChannel(self):
-        """Close the store channel, if any.  Nothrow guarantee."""
-
-        self.closeChannel(self.store_channel, "store/port")
-        self.store_channel = None
-
-
-    def closeConsoleChannel(self):
-        """Close the console channel, if any.  Nothrow guarantee."""
-
-        self.closeChannel(self.console_channel, "console/port")
-        self.console_channel = None
-
-
     ## public:
 
     def setConsoleRef(self, ref):
@@ -964,12 +936,8 @@ class XendDomainInfo:
             sxpr.append(['up_time', str(up_time) ])
             sxpr.append(['start_time', str(self.info['start_time']) ])
 
-        if self.store_channel:
-            sxpr.append(self.store_channel.sxpr())
         if self.store_mfn:
             sxpr.append(['store_mfn', self.store_mfn])
-        if self.console_channel:
-            sxpr.append(['console_channel', self.console_channel.sxpr()])
         if self.console_mfn:
             sxpr.append(['console_mfn', self.console_mfn])
 
@@ -1077,7 +1045,7 @@ class XendDomainInfo:
         self.create_channel()
         self.image.createImage()
         IntroduceDomain(self.domid, self.store_mfn,
-                        self.store_channel.port1, self.dompath)
+                        self.store_channel, self.dompath)
 
 
     ## public:
@@ -1087,8 +1055,6 @@ class XendDomainInfo:
         guarantee."""
 
         self.release_devices()
-        self.closeStoreChannel()
-        self.closeConsoleChannel()
 
         if self.image:
             try:
@@ -1168,35 +1134,22 @@ class XendDomainInfo:
         
         @param path under which port is stored in db
         """
-        port = 0
         if path:
             try:
-                port = int(self.readDom(path))
+                return int(self.readDom(path))
             except:
                 # The port is not yet set, i.e. the channel has not yet been
                 # created.
                 pass
 
-        # Stale port information from above causes an Invalid Argument to be
-        # thrown by the eventChannel call below.  To recover, we throw away
-        # port if it turns out to be bad, and just create a new channel.
-        # If creating a new channel with two new ports fails, then something
-        # else is going wrong, so we bail.
-        while True:
-            try:
-                ret = channel.eventChannel(0, self.domid, port1 = port,
-                                           port2 = 0)
-                break
-            except:
-                log.exception("Exception in eventChannel(0, %d, %d, %d)",
-                              self.domid, port, 0)
-                if port == 0:
-                    raise
-                else:
-                    port = 0
-                    log.error("Recovering from above exception.")
-        self.storeDom(path, ret.port1)
-        return ret
+        try:
+            port = xc.evtchn_alloc_unbound(dom=self.domid, remote_dom=0)
+        except:
+            log.exception("Exception in alloc_unbound(%d)", self.domid)
+            raise
+
+        self.storeDom(path, port)
+        return port
 
     def create_channel(self):
         """Create the channels to the domain.
@@ -1423,11 +1376,11 @@ class XendDomainInfo:
 
 
     def initStoreConnection(self):
-        ref = xc.init_store(self.store_channel.port2)
+        ref = xc.init_store(self.store_channel)
         if ref and ref >= 0:
             self.setStoreRef(ref)
             try:
-                IntroduceDomain(self.domid, ref, self.store_channel.port1,
+                IntroduceDomain(self.domid, ref, self.store_channel,
                                 self.dompath)
             except RuntimeError, ex:
                 if ex.args[0] == errno.EISCONN:
