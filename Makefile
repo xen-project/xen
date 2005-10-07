@@ -3,8 +3,7 @@
 #
 
 KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
-# linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
-# You may use wildcards in the above e.g. KERNELS=*2.4*
+# You may use wildcards in the above e.g. KERNELS=*2.6*
 
 XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.$(kernel))) )
 
@@ -188,12 +187,5 @@ uninstall:
 	rm -rf $(D)/usr/share/man/man8/xen*
 
 # Legacy targets for compatibility
-linux24:
-	$(MAKE) 'KERNELS=linux-2.4*' kernels
-
 linux26:
 	$(MAKE) 'KERNELS=linux-2.6*' kernels
-
-netbsd20:
-	$(MAKE) netbsd-2.0-xenU-build
-

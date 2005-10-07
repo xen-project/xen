@@ -1,7 +1,7 @@
 \chapter{Installation}
 
 The Xen distribution includes three main components: Xen itself, ports
-of Linux 2.4 and 2.6 and NetBSD to run on Xen, and the userspace
+of Linux and NetBSD to run on Xen, and the userspace
 tools required to manage a Xen-based system.  This chapter describes
 how to install the Xen~2.0 distribution from source.  Alternatively,
 there may be pre-built packages available as part of your operating
@@ -169,7 +169,7 @@ KERNELS ?= mk.linux-2.6-xen0 mk.linux-2.6-xenU
 
 You can edit this line to include any set of operating system kernels
 which have configurations in the top-level \path{buildconfigs/}
-directory, for example \path{mk.linux-2.4-xenU} to build a Linux 2.4
+directory, for example \path{mk.linux-2.6-xenU} to build a Linux 2.6
 kernel containing only virtual device drivers.
 
 %% Inspect the Makefile if you want to see what goes on during a
@@ -188,10 +188,6 @@ kernel containing only virtual device drivers.
 
 %% After untaring the pristine kernel tree, the makefile uses the {\tt
 %%   mkbuildtree} script to add the Xen patches to the kernel.
-
-
-%% The procedure is similar to build the Linux 2.4 port: \\
-%% \verb!# LINUX_SRC=/path/to/linux2.4/source make linux24!
 
 
 %% \framebox{\parbox{5in}{
