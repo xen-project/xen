@@ -2806,7 +2806,7 @@ int main(int argc, char **argv)
 
             case QEMU_OPTION_p:
                 {
-                  extern short ioreq_remote_port;
+                  extern u16 ioreq_remote_port;
                   ioreq_remote_port = atoi(optarg);
                   printf("port: %d\n", ioreq_remote_port);
                 }

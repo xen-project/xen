@@ -120,10 +120,8 @@ tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 	int err;
 	evtchn_op_t op = {
 		.cmd = EVTCHNOP_bind_interdomain,
-		.u.bind_interdomain.dom1 = DOMID_SELF,
-		.u.bind_interdomain.dom2 = tpmif->domid,
-		.u.bind_interdomain.port1 = 0,
-		.u.bind_interdomain.port2 = evtchn };
+		.u.bind_interdomain.remote_dom = tpmif->domid,
+		.u.bind_interdomain.remote_port = evtchn };
 
 	if ((tpmif->tx_area = alloc_vm_area(PAGE_SIZE)) == NULL)
 		return -ENOMEM;
@@ -141,7 +139,7 @@ tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 		return err;
 	}
 
-	tpmif->evtchn = op.u.bind_interdomain.port1;
+	tpmif->evtchn = op.u.bind_interdomain.local_port;
 
 	tpmif->tx = (tpmif_tx_interface_t *)tpmif->tx_area->addr;
 

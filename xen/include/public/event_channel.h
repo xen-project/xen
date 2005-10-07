@@ -10,9 +10,9 @@
 #define __XEN_PUBLIC_EVENT_CHANNEL_H__
 
 /*
- * EVTCHNOP_alloc_unbound: Allocate a port in <dom> for later binding to
- * <remote_dom>. <port> may be wildcarded by setting to zero, in which case a
- * fresh port will be allocated, and the field filled in on return.
+ * EVTCHNOP_alloc_unbound: Allocate a port in domain <dom> and mark as
+ * accepting interdomain bindings from domain <remote_dom>. A fresh port
+ * is allocated in <dom> and returned as <port>.
  * NOTES:
  *  1. If the caller is unprivileged then <dom> must be DOMID_SELF.
  */
@@ -20,36 +20,24 @@
 typedef struct evtchn_alloc_unbound {
     /* IN parameters */
     domid_t dom, remote_dom;
-    /* IN/OUT parameters */
+    /* OUT parameters */
     u32     port;
 } evtchn_alloc_unbound_t;
 
 /*
  * EVTCHNOP_bind_interdomain: Construct an interdomain event channel between
- * <dom1> and <dom2>. Either <port1> or <port2> may be wildcarded by setting to
- * zero. On successful return both <port1> and <port2> are filled in and
- * <dom1,port1> is fully bound to <dom2,port2>.
- * 
- * NOTES:
- *  1. A wildcarded port is allocated from the relevant domain's free list
- *     (i.e., some port that was previously EVTCHNSTAT_closed). However, if the
- *     remote port pair is already fully bound then a port is not allocated,
- *     and instead the existing local port is returned to the caller.
- *  2. If the caller is unprivileged then <dom1> must be DOMID_SELF.
- *  3. If the caller is unprivileged and <dom2,port2> is EVTCHNSTAT_closed
- *     then <dom2> must be DOMID_SELF.
- *  4. If either port is already bound then it must be bound to the other
- *     specified domain and port (if not wildcarded).
- *  5. If either port is awaiting binding (EVTCHNSTAT_unbound) then it must
- *     be awaiting binding to the other domain, and the other port pair must
- *     be closed or unbound.
+ * the calling domain and <remote_dom>. <remote_dom,remote_port> must identify
+ * a port that is unbound and marked as accepting bindings from the calling
+ * domain. A fresh port is allocated in the calling domain and returned as
+ * <local_port>.
  */
 #define EVTCHNOP_bind_interdomain 0
 typedef struct evtchn_bind_interdomain {
     /* IN parameters. */
-    domid_t dom1, dom2;
-    /* IN/OUT parameters. */
-    u32     port1, port2;
+    domid_t remote_dom;
+    u32     remote_port;
+    /* OUT parameters. */
+    u32     local_port;
 } evtchn_bind_interdomain_t;
 
 /*
@@ -99,31 +87,24 @@ typedef struct evtchn_bind_ipi {
 } evtchn_bind_ipi_t;
 
 /*
- * EVTCHNOP_close: Close the communication channel which has an endpoint at
- * <dom, port>. If the channel is interdomain then the remote end is placed in
- * the unbound state (EVTCHNSTAT_unbound), awaiting a new connection.
- * NOTES:
- *  1. <dom> may be specified as DOMID_SELF.
- *  2. Only a sufficiently-privileged domain may close an event channel
- *     for which <dom> is not DOMID_SELF.
+ * EVTCHNOP_close: Close a local event channel <port>. If the channel is
+ * interdomain then the remote end is placed in the unbound state
+ * (EVTCHNSTAT_unbound), awaiting a new connection.
  */
 #define EVTCHNOP_close            3
 typedef struct evtchn_close {
     /* IN parameters. */
-    domid_t dom;
-    u32     port;
-    /* No OUT parameters. */
+    u32 port;
 } evtchn_close_t;
 
 /*
  * EVTCHNOP_send: Send an event to the remote end of the channel whose local
- * endpoint is <DOMID_SELF, local_port>.
+ * endpoint is <port>.
  */
 #define EVTCHNOP_send             4
 typedef struct evtchn_send {
     /* IN parameters. */
-    u32     local_port;
-    /* No OUT parameters. */
+    u32 port;
 } evtchn_send_t;
 
 /*

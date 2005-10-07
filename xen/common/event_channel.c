@@ -70,7 +70,7 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 {
     struct evtchn *chn;
     struct domain *d;
-    int            port = alloc->port;
+    int            port;
     domid_t        dom = alloc->dom;
     long           rc = 0;
 
@@ -84,39 +84,19 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 
     spin_lock(&d->evtchn_lock);
 
-    /* Obtain, or ensure that we already have, a valid <port>. */
-    if ( port == 0 )
-    {
-        if ( (port = get_free_port(d)) < 0 )
-            ERROR_EXIT(port);
-    }
-    else if ( !port_is_valid(d, port) )
-        ERROR_EXIT(-EINVAL);
+    if ( (port = get_free_port(d)) < 0 )
+        ERROR_EXIT(port);
     chn = evtchn_from_port(d, port);
 
-    /* Validate channel's current state. */
-    switch ( chn->state )
-    {
-    case ECS_FREE:
-        chn->state = ECS_UNBOUND;
-        chn->u.unbound.remote_domid = alloc->remote_dom;
-        break;
+    chn->state = ECS_UNBOUND;
+    chn->u.unbound.remote_domid = alloc->remote_dom;
 
-    case ECS_UNBOUND:
-        if ( chn->u.unbound.remote_domid != alloc->remote_dom )
-            ERROR_EXIT(-EINVAL);
-        break;
-
-    default:
-        ERROR_EXIT(-EINVAL);
-    }
+    alloc->port = port;
 
  out:
     spin_unlock(&d->evtchn_lock);
 
     put_domain(d);
-
-    alloc->port = port;
 
     return rc;
 }
@@ -124,136 +104,60 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 
 static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 {
-    struct evtchn *chn1, *chn2;
-    struct domain *d1, *d2;
-    int            port1 = bind->port1, port2 = bind->port2;
-    domid_t        dom1 = bind->dom1, dom2 = bind->dom2;
+    struct evtchn *lchn, *rchn;
+    struct domain *ld = current->domain, *rd;
+    int            lport, rport = bind->remote_port;
     long           rc = 0;
 
-    if ( !IS_PRIV(current->domain) && (dom1 != DOMID_SELF) )
-        return -EPERM;
-
-    if ( dom1 == DOMID_SELF )
-        dom1 = current->domain->domain_id;
-    if ( dom2 == DOMID_SELF )
-        dom2 = current->domain->domain_id;
-
-    if ( ((d1 = find_domain_by_id(dom1)) == NULL) ||
-         ((d2 = find_domain_by_id(dom2)) == NULL) )
-    {
-        if ( d1 != NULL )
-            put_domain(d1);
+    if ( (rd = find_domain_by_id(bind->remote_dom)) == NULL )
         return -ESRCH;
-    }
 
     /* Avoid deadlock by first acquiring lock of domain with smaller id. */
-    if ( d1 < d2 )
+    if ( ld < rd )
     {
-        spin_lock(&d1->evtchn_lock);
-        spin_lock(&d2->evtchn_lock);
+        spin_lock(&ld->evtchn_lock);
+        spin_lock(&rd->evtchn_lock);
     }
     else
     {
-        if ( d1 != d2 )
-            spin_lock(&d2->evtchn_lock);
-        spin_lock(&d1->evtchn_lock);
+        if ( ld != rd )
+            spin_lock(&rd->evtchn_lock);
+        spin_lock(&ld->evtchn_lock);
     }
 
-    /* Obtain, or ensure that we already have, a valid <port1>. */
-    if ( port1 == 0 )
-    {
-        if ( (port1 = get_free_port(d1)) < 0 )
-            ERROR_EXIT(port1);
-    }
-    else if ( !port_is_valid(d1, port1) )
+    if ( (lport = get_free_port(ld)) < 0 )
+        ERROR_EXIT(lport);
+    lchn = evtchn_from_port(ld, lport);
+
+    if ( !port_is_valid(rd, rport) )
         ERROR_EXIT(-EINVAL);
-    chn1 = evtchn_from_port(d1, port1);
-
-    /* Obtain, or ensure that we already have, a valid <port2>. */
-    if ( port2 == 0 )
-    {
-        /* Make port1 non-free while we allocate port2 (in case dom1==dom2). */
-        u16 state = chn1->state;
-        chn1->state = ECS_INTERDOMAIN;
-        port2 = get_free_port(d2);
-        chn1->state = state;
-        if ( port2 < 0 )
-            ERROR_EXIT(port2);
-    }
-    else if ( !port_is_valid(d2, port2) )
+    rchn = evtchn_from_port(rd, rport);
+    if ( (rchn->state != ECS_UNBOUND) ||
+         (rchn->u.unbound.remote_domid != ld->domain_id) )
         ERROR_EXIT(-EINVAL);
-    chn2 = evtchn_from_port(d2, port2);
 
-    /* Validate <dom1,port1>'s current state. */
-    switch ( chn1->state )
-    {
-    case ECS_FREE:
-        break;
-
-    case ECS_UNBOUND:
-        if ( chn1->u.unbound.remote_domid != dom2 )
-            ERROR_EXIT(-EINVAL);
-        break;
-
-    case ECS_INTERDOMAIN:
-        if ( chn1->u.interdomain.remote_dom != d2 )
-            ERROR_EXIT(-EINVAL);
-        if ( (chn1->u.interdomain.remote_port != port2) && (bind->port2 != 0) )
-            ERROR_EXIT(-EINVAL);
-        port2 = chn1->u.interdomain.remote_port;
-        goto out;
-
-    default:
-        ERROR_EXIT(-EINVAL);
-    }
-
-    /* Validate <dom2,port2>'s current state. */
-    switch ( chn2->state )
-    {
-    case ECS_FREE:
-        if ( !IS_PRIV(current->domain) && (dom2 != DOMID_SELF) )
-            ERROR_EXIT(-EPERM);
-        break;
-
-    case ECS_UNBOUND:
-        if ( chn2->u.unbound.remote_domid != dom1 )
-            ERROR_EXIT(-EINVAL);
-        break;
-
-    case ECS_INTERDOMAIN:
-        if ( chn2->u.interdomain.remote_dom != d1 )
-            ERROR_EXIT(-EINVAL);
-        if ( (chn2->u.interdomain.remote_port != port1) && (bind->port1 != 0) )
-            ERROR_EXIT(-EINVAL);
-        port1 = chn2->u.interdomain.remote_port;
-        goto out;
-
-    default:
-        ERROR_EXIT(-EINVAL);
-    }
+    lchn->u.interdomain.remote_dom  = rd;
+    lchn->u.interdomain.remote_port = (u16)rport;
+    lchn->state                     = ECS_INTERDOMAIN;
+    
+    rchn->u.interdomain.remote_dom  = ld;
+    rchn->u.interdomain.remote_port = (u16)lport;
+    rchn->state                     = ECS_INTERDOMAIN;
 
     /*
-     * Everything checked out okay -- bind <dom1,port1> to <dom2,port2>.
+     * We may have lost notifications on the remote unbound port. Fix that up
+     * here by conservatively always setting a notification on the local port.
      */
+    evtchn_set_pending(ld->vcpu[lchn->notify_vcpu_id], lport);
 
-    chn1->u.interdomain.remote_dom  = d2;
-    chn1->u.interdomain.remote_port = (u16)port2;
-    chn1->state                     = ECS_INTERDOMAIN;
-    
-    chn2->u.interdomain.remote_dom  = d1;
-    chn2->u.interdomain.remote_port = (u16)port1;
-    chn2->state                     = ECS_INTERDOMAIN;
+    bind->local_port = lport;
 
  out:
-    spin_unlock(&d1->evtchn_lock);
-    if ( d1 != d2 )
-        spin_unlock(&d2->evtchn_lock);
+    spin_unlock(&ld->evtchn_lock);
+    if ( ld != rd )
+        spin_unlock(&rd->evtchn_lock);
     
-    put_domain(d1);
-    put_domain(d2);
-
-    bind->port1 = port1;
-    bind->port2 = port2;
+    put_domain(rd);
 
     return rc;
 }
@@ -264,39 +168,34 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
     struct evtchn *chn;
     struct vcpu   *v;
     struct domain *d = current->domain;
-    int            port, virq = bind->virq;
+    int            port, virq = bind->virq, vcpu = bind->vcpu;
+    long           rc = 0;
 
     if ( virq >= ARRAY_SIZE(v->virq_to_evtchn) )
         return -EINVAL;
 
-    if ( (v = d->vcpu[bind->vcpu]) == NULL )
+    if ( (vcpu >= ARRAY_SIZE(d->vcpu)) || ((v = d->vcpu[vcpu]) == NULL) )
         return -ENOENT;
 
     spin_lock(&d->evtchn_lock);
 
-    /*
-     * Port 0 is the fallback port for VIRQs that haven't been explicitly
-     * bound yet.
-     */
-    if ( ((port = v->virq_to_evtchn[virq]) != 0) ||
-         ((port = get_free_port(d)) < 0) )
-        goto out;
+    if ( v->virq_to_evtchn[virq] != 0 )
+        ERROR_EXIT(-EEXIST);
+
+    if ( (port = get_free_port(d)) < 0 )
+        ERROR_EXIT(port);
 
     chn = evtchn_from_port(d, port);
     chn->state          = ECS_VIRQ;
-    chn->notify_vcpu_id = v->vcpu_id;
+    chn->notify_vcpu_id = vcpu;
     chn->u.virq         = virq;
 
-    v->virq_to_evtchn[virq] = port;
+    v->virq_to_evtchn[virq] = bind->port = port;
 
  out:
     spin_unlock(&d->evtchn_lock);
 
-    if ( port < 0 )
-        return port;
-
-    bind->port = port;
-    return 0;
+    return rc;
 }
 
 
@@ -304,27 +203,27 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
 {
     struct evtchn *chn;
     struct domain *d = current->domain;
-    int            port;
+    int            port, vcpu = bind->vcpu;
+    long           rc = 0;
 
-    if ( d->vcpu[bind->vcpu] == NULL )
+    if ( (vcpu >= ARRAY_SIZE(d->vcpu)) || (d->vcpu[vcpu] == NULL) )
         return -ENOENT;
 
     spin_lock(&d->evtchn_lock);
 
-    if ( (port = get_free_port(d)) >= 0 )
-    {
-        chn = evtchn_from_port(d, port);
-        chn->state          = ECS_IPI;
-        chn->notify_vcpu_id = bind->vcpu;
-    }
+    if ( (port = get_free_port(d)) < 0 )
+        ERROR_EXIT(port);
 
-    spin_unlock(&d->evtchn_lock);
-
-    if ( port < 0 )
-        return port;
+    chn = evtchn_from_port(d, port);
+    chn->state          = ECS_IPI;
+    chn->notify_vcpu_id = vcpu;
 
     bind->port = port;
-    return 0;
+
+ out:
+    spin_unlock(&d->evtchn_lock);
+
+    return rc;
 }
 
 
@@ -332,16 +231,19 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 {
     struct evtchn *chn;
     struct domain *d = current->domain;
-    int            port, rc, pirq = bind->pirq;
+    int            port, pirq = bind->pirq;
+    long           rc;
 
     if ( pirq >= ARRAY_SIZE(d->pirq_to_evtchn) )
         return -EINVAL;
 
     spin_lock(&d->evtchn_lock);
 
-    if ( ((rc = port = d->pirq_to_evtchn[pirq]) != 0) ||
-         ((rc = port = get_free_port(d)) < 0) )
-        goto out;
+    if ( d->pirq_to_evtchn[pirq] != 0 )
+        ERROR_EXIT(-EEXIST);
+
+    if ( (port = get_free_port(d)) < 0 )
+        ERROR_EXIT(port);
 
     chn = evtchn_from_port(d, port);
 
@@ -357,14 +259,12 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     chn->state  = ECS_PIRQ;
     chn->u.pirq = pirq;
 
+    bind->port = port;
+
  out:
     spin_unlock(&d->evtchn_lock);
 
-    if ( rc < 0 )
-        return rc;
-
-    bind->port = port;
-    return 0;
+    return rc;
 }
 
 
@@ -478,22 +378,7 @@ static long __evtchn_close(struct domain *d1, int port1)
 
 static long evtchn_close(evtchn_close_t *close)
 {
-    struct domain *d;
-    long           rc;
-    domid_t        dom = close->dom;
-
-    if ( dom == DOMID_SELF )
-        dom = current->domain->domain_id;
-    else if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
-    if ( (d = find_domain_by_id(dom)) == NULL )
-        return -ESRCH;
-
-    rc = __evtchn_close(d, close->port);
-
-    put_domain(d);
-    return rc;
+    return __evtchn_close(current->domain, close->port);
 }
 
 
@@ -522,6 +407,9 @@ long evtchn_send(int lport)
         break;
     case ECS_IPI:
         evtchn_set_pending(ld->vcpu[lchn->notify_vcpu_id], lport);
+        break;
+    case ECS_UNBOUND:
+        /* silently drop the notification */
         break;
     default:
         ret = -EINVAL;
@@ -611,9 +499,8 @@ static long evtchn_bind_vcpu(evtchn_bind_vcpu_t *bind)
     struct evtchn *chn;
     long           rc = 0;
 
-    if ( (vcpu >= MAX_VIRT_CPUS) || (d->vcpu[vcpu] == NULL) ) {
-        return -EINVAL;
-    }
+    if ( (vcpu >= ARRAY_SIZE(d->vcpu)) || (d->vcpu[vcpu] == NULL) )
+        return -ENOENT;
 
     spin_lock(&d->evtchn_lock);
 
@@ -689,7 +576,7 @@ long do_event_channel_op(evtchn_op_t *uop)
         break;
 
     case EVTCHNOP_send:
-        rc = evtchn_send(op.u.send.local_port);
+        rc = evtchn_send(op.u.send.port);
         break;
 
     case EVTCHNOP_status:

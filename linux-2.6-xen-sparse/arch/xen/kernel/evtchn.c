@@ -219,7 +219,6 @@ void unbind_virq_from_irq(int virq)
 	spin_lock(&irq_mapping_update_lock);
 
 	if (--irq_bindcount[irq] == 0) {
-		op.u.close.dom  = DOMID_SELF;
 		op.u.close.port = evtchn;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 
@@ -283,7 +282,6 @@ void unbind_ipi_from_irq(int ipi)
 	spin_lock(&irq_mapping_update_lock);
 
 	if (--irq_bindcount[irq] == 0) {
-		op.u.close.dom  = DOMID_SELF;
 		op.u.close.port = evtchn;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 
@@ -326,7 +324,6 @@ void unbind_evtchn_from_irq(unsigned int irq)
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((--irq_bindcount[irq] == 0) && (evtchn != -1)) {
-		op.u.close.dom  = DOMID_SELF;
 		op.u.close.port = evtchn;
 		BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 
@@ -513,7 +510,10 @@ static inline void pirq_query_unmask(int pirq)
 static unsigned int startup_pirq(unsigned int irq)
 {
 	evtchn_op_t op = { .cmd = EVTCHNOP_bind_pirq };
-	int evtchn;
+	int evtchn = irq_to_evtchn[irq];
+
+	if (VALID_EVTCHN(evtchn))
+		goto out;
 
 	op.u.bind_pirq.pirq  = irq;
 	/* NB. We are happy to share unless we are probing. */
@@ -532,6 +532,7 @@ static unsigned int startup_pirq(unsigned int irq)
 	evtchn_to_irq[evtchn] = irq;
 	irq_to_evtchn[irq]    = evtchn;
 
+ out:
 	unmask_evtchn(evtchn);
 	pirq_unmask_notify(irq_to_pirq(irq));
 
@@ -548,7 +549,6 @@ static void shutdown_pirq(unsigned int irq)
 
 	mask_evtchn(evtchn);
 
-	op.u.close.dom  = DOMID_SELF;
 	op.u.close.port = evtchn;
 	BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
 
