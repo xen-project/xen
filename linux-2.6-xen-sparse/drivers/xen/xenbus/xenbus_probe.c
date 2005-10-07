@@ -226,8 +226,8 @@ static int xenbus_dev_remove(struct device *_dev)
 	return drv->remove(dev);
 }
 
-static int xenbus_register_driver(struct xenbus_driver *drv,
-				  struct xen_bus_type *bus)
+static int xenbus_register_driver_common(struct xenbus_driver *drv,
+					 struct xen_bus_type *bus)
 {
 	int err;
 
@@ -243,15 +243,15 @@ static int xenbus_register_driver(struct xenbus_driver *drv,
 	return err;
 }
 
-int xenbus_register_device(struct xenbus_driver *drv)
+int xenbus_register_driver(struct xenbus_driver *drv)
 {
-	return xenbus_register_driver(drv, &xenbus_frontend);
+	return xenbus_register_driver_common(drv, &xenbus_frontend);
 }
-EXPORT_SYMBOL(xenbus_register_device);
+EXPORT_SYMBOL(xenbus_register_driver);
 
 int xenbus_register_backend(struct xenbus_driver *drv)
 {
-	return xenbus_register_driver(drv, &xenbus_backend);
+	return xenbus_register_driver_common(drv, &xenbus_backend);
 }
 
 void xenbus_unregister_driver(struct xenbus_driver *drv)
@@ -260,6 +260,7 @@ void xenbus_unregister_driver(struct xenbus_driver *drv)
 	driver_unregister(&drv->driver);
 	up(&xenbus_lock);
 }
+EXPORT_SYMBOL(xenbus_unregister_driver);
 
 struct xb_find_info
 {
@@ -347,6 +348,18 @@ static char *kasprintf(const char *fmt, ...)
 	return p;
 }
 
+static ssize_t xendev_show_nodename(struct device *dev, char *buf)
+{
+	return sprintf(buf, "%s\n", to_xenbus_device(dev)->nodename);
+}
+DEVICE_ATTR(nodename, S_IRUSR | S_IRGRP | S_IROTH, xendev_show_nodename, NULL);
+
+static ssize_t xendev_show_devtype(struct device *dev, char *buf)
+{
+	return sprintf(buf, "%s\n", to_xenbus_device(dev)->devicetype);
+}
+DEVICE_ATTR(devtype, S_IRUSR | S_IRGRP | S_IROTH, xendev_show_devtype, NULL);
+
 static int xenbus_probe_node(struct xen_bus_type *bus,
 			     const char *type,
 			     const char *nodename)
@@ -383,6 +396,9 @@ static int xenbus_probe_node(struct xen_bus_type *bus,
 		printk("XENBUS: Registering %s device %s: error %i\n",
 		       bus->bus.name, xendev->dev.bus_id, err);
 		kfree(xendev);
+	} else {
+		device_create_file(&xendev->dev, &dev_attr_nodename);
+		device_create_file(&xendev->dev, &dev_attr_devtype);
 	}
 	return err;
 }

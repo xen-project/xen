@@ -73,7 +73,7 @@ static inline struct xenbus_driver *to_xenbus_driver(struct device_driver *drv)
 	return container_of(drv, struct xenbus_driver, driver);
 }
 
-int xenbus_register_device(struct xenbus_driver *drv);
+int xenbus_register_driver(struct xenbus_driver *drv);
 int xenbus_register_backend(struct xenbus_driver *drv);
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 

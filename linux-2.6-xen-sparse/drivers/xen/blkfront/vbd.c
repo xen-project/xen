@@ -238,6 +238,7 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 	gd->first_minor = minor;
 	gd->fops = &xlvbd_block_fops;
 	gd->private_data = info;
+	gd->driverfs_dev = &(info->xbdev->dev);
 	set_capacity(gd, capacity);
 
 	if (xlvbd_init_blk_queue(gd, sector_size)) {

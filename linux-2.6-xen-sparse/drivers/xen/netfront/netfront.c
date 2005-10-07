@@ -88,11 +88,6 @@
 #endif
 
 
-#define NETIF_STATE_DISCONNECTED 0
-#define NETIF_STATE_CONNECTED    1
-
-static unsigned int netif_state = NETIF_STATE_DISCONNECTED;
-
 static void network_tx_buf_gc(struct net_device *dev);
 static void network_alloc_rx_buffers(struct net_device *dev);
 
@@ -858,7 +853,7 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	np->user_state    = UST_CLOSED;
 	np->handle        = handle;
 	np->xbdev         = dev;
-    
+
 	spin_lock_init(&np->tx_lock);
 	spin_lock_init(&np->rx_lock);
 
@@ -902,7 +897,9 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	netdev->features        = NETIF_F_IP_CSUM;
 
 	SET_ETHTOOL_OPS(netdev, &network_ethtool_ops);
-
+	SET_MODULE_OWNER(netdev);
+	SET_NETDEV_DEV(netdev, &dev->dev);
+    
 	if ((err = register_netdev(netdev)) != 0) {
 		printk(KERN_WARNING "%s> register_netdev err=%d\n",
 		       __FUNCTION__, err);
@@ -1176,8 +1173,6 @@ again:
 
 	info->backend = backend;
 
-	netif_state = NETIF_STATE_CONNECTED;
-
 	return 0;
 
  abort_transaction:
@@ -1276,30 +1271,7 @@ static struct xenbus_driver netfront = {
 
 static void __init init_net_xenbus(void)
 {
-	xenbus_register_device(&netfront);
-}
-
-static int wait_for_netif(void)
-{
-	int err = 0;
-	int i;
-
-	/*
-	 * We should figure out how many and which devices we need to
-	 * proceed and only wait for those.  For now, continue once the
-	 * first device is around.
-	 */
-	for ( i=0; netif_state != NETIF_STATE_CONNECTED && (i < 10*HZ); i++ )
-	{
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(1);
-	}
-
-	if (netif_state != NETIF_STATE_CONNECTED) {
-		WPRINTK("Timeout connecting to device!\n");
-		err = -ENOSYS;
-	}
-	return err;
+	xenbus_register_driver(&netfront);
 }
 
 static int __init netif_init(void)
@@ -1317,8 +1289,6 @@ static int __init netif_init(void)
 	(void)register_inetaddr_notifier(&notifier_inetdev);
 
 	init_net_xenbus();
-
-	wait_for_netif();
 
 	return err;
 }

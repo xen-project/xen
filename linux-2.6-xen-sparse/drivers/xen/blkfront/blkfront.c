@@ -53,8 +53,6 @@
 #define BLKIF_STATE_DISCONNECTED 0
 #define BLKIF_STATE_CONNECTED    1
 
-static unsigned int blkif_state = BLKIF_STATE_DISCONNECTED;
-
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
 #define GRANT_INVALID_REF	0
@@ -472,8 +470,6 @@ static void watch_for_status(struct xenbus_watch *watch, const char *node)
 	info->connected = BLKIF_STATE_CONNECTED;
 	xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
 
-	blkif_state = BLKIF_STATE_CONNECTED;
-
 	xenbus_dev_ok(info->xbdev);
 
 	/* Kick pending requests. */
@@ -716,29 +712,7 @@ static struct xenbus_driver blkfront = {
 
 static void __init init_blk_xenbus(void)
 {
-	xenbus_register_device(&blkfront);
-}
-
-static int wait_for_blkif(void)
-{
-	int err = 0;
-	int i;
-
-	/*
-	 * We should figure out how many and which devices we need to
-	 * proceed and only wait for those.  For now, continue once the
-	 * first device is around.
-	 */
-	for (i = 0; blkif_state != BLKIF_STATE_CONNECTED && (i < 10*HZ); i++) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(1);
-	}
-
-	if (blkif_state != BLKIF_STATE_CONNECTED) {
-		WPRINTK("Timeout connecting to device!\n");
-		err = -ENOSYS;
-	}
-	return err;
+	xenbus_register_driver(&blkfront);
 }
 
 static int __init xlblk_init(void)
@@ -750,8 +724,6 @@ static int __init xlblk_init(void)
 	IPRINTK("Initialising virtual block device driver\n");
 
 	init_blk_xenbus();
-
-	wait_for_blkif();
 
 	return 0;
 }

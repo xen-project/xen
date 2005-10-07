@@ -527,7 +527,7 @@ static struct xenbus_driver tpmfront = {
 
 static void __init init_tpm_xenbus(void)
 {
-	xenbus_register_device(&tpmfront);
+	xenbus_register_driver(&tpmfront);
 }
 
 
