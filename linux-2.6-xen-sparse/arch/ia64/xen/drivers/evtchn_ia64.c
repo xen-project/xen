@@ -67,12 +67,6 @@ void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id)
     evtchns[evtchn].handler = NULL;
 }
 
-void unbind_evtchn_from_irq(unsigned int evtchn)
-{
-	printk("unbind_evtchn_from_irq called... FIXME??\n");
-	while(1);
-}
-
 irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     u32            l1, l2;

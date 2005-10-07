@@ -183,6 +183,10 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 		.u.bind_interdomain.remote_dom = netif->domid,
 		.u.bind_interdomain.remote_port = evtchn };
 
+	/* Already connected through? */
+	if (netif->irq)
+		return 0;
+
 	netif->comms_area = alloc_vm_area(2*PAGE_SIZE);
 	if (netif->comms_area == NULL)
 		return -ENOMEM;
@@ -227,13 +231,12 @@ static void free_netif_callback(void *arg)
 {
 	netif_t *netif = (netif_t *)arg;
 
-	/*
-	 * This can't be done in netif_disconnect() because at that point
-	 * there may be outstanding requests in the network stack whose
-	 * asynchronous responses must still be notified to the remote driver.
-	 */
-	if (netif->irq)
-		unbind_evtchn_from_irqhandler(netif->irq, netif);
+	/* Already disconnected? */
+	if (!netif->irq)
+		return;
+
+	unbind_evtchn_from_irqhandler(netif->irq, netif);
+	netif->irq = 0;
 
 	unregister_netdev(netif->dev);
 
