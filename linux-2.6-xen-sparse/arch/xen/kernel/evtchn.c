@@ -296,7 +296,7 @@ void unbind_ipi_from_irq(int ipi)
 }
 EXPORT_SYMBOL(unbind_ipi_from_irq);
 
-int bind_evtchn_to_irq(unsigned int evtchn)
+static int bind_evtchn_to_irq(unsigned int evtchn)
 {
 	int irq;
 
@@ -314,9 +314,8 @@ int bind_evtchn_to_irq(unsigned int evtchn)
     
 	return irq;
 }
-EXPORT_SYMBOL(bind_evtchn_to_irq);
 
-void unbind_evtchn_from_irq(unsigned int irq)
+static void unbind_evtchn_from_irq(unsigned int irq)
 {
 	evtchn_op_t op = { .cmd = EVTCHNOP_close };
 	int evtchn = irq_to_evtchn[irq];
@@ -333,7 +332,6 @@ void unbind_evtchn_from_irq(unsigned int irq)
 
 	spin_unlock(&irq_mapping_update_lock);
 }
-EXPORT_SYMBOL(unbind_evtchn_from_irq);
 
 int bind_evtchn_to_irqhandler(
 	unsigned int evtchn,
@@ -347,8 +345,10 @@ int bind_evtchn_to_irqhandler(
 
 	irq = bind_evtchn_to_irq(evtchn);
 	retval = request_irq(irq, handler, irqflags, devname, dev_id);
-	if (retval != 0)
+	if (retval != 0) {
 		unbind_evtchn_from_irq(irq);
+		return retval;
+	}
 
 	return irq;
 }

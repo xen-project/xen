@@ -52,14 +52,6 @@ extern int  bind_ipi_to_irq(int ipi);
 extern void unbind_ipi_from_irq(int ipi);
 
 /*
- * Dynamically bind an event-channel port to Linux IRQ space.
- * BIND:   Returns IRQ or error.
- * UNBIND: Takes IRQ to unbind from; automatically closes the event channel.
- */
-extern int  bind_evtchn_to_irq(unsigned int evtchn);
-extern void unbind_evtchn_from_irq(unsigned int irq);
-
-/*
  * Dynamically bind an event-channel port to an IRQ-like callback handler.
  * On some platforms this may not be implemented via the Linux IRQ subsystem.
  * The IRQ argument passed to the callback handler is the same as returned

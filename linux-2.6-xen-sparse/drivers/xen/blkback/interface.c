@@ -74,6 +74,10 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 		.u.bind_interdomain.remote_dom = blkif->domid,
 		.u.bind_interdomain.remote_port = evtchn };
 
+	/* Already connected through? */
+	if (blkif->irq)
+		return 0;
+
 	if ( (blkif->blk_ring_area = alloc_vm_area(PAGE_SIZE)) == NULL )
 		return -ENOMEM;
 
@@ -107,8 +111,12 @@ static void free_blkif(void *arg)
 {
 	blkif_t *blkif = (blkif_t *)arg;
 
-	if (blkif->irq)
-		unbind_evtchn_from_irqhandler(blkif->irq, blkif);
+	/* Already disconnected? */
+	if (!blkif->irq)
+		return;
+
+	unbind_evtchn_from_irqhandler(blkif->irq, blkif);
+	blkif->irq = 0;
 
 	vbd_free(&blkif->vbd);
 

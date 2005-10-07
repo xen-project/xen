@@ -1,0 +1,82 @@
+#!/bin/sh
+
+set -e
+
+export PATH=/sbin:/bin:/usr/bin:/usr/sbin:$PATH
+
+expand_dev() {
+  local dev
+  case $1 in
+  /*)
+    dev=$1
+    ;;
+  *)
+    dev=/dev/$1
+    ;;
+  esac
+  echo -n $dev
+}
+
+write_dev() {
+  local major
+  local minor
+  local pdev
+	
+  major=$(stat -L -c %t "$1")
+  minor=$(stat -L -c %T "$1")
+  pdev=$(printf "0x%02x%02x" 0x$major 0x$minor)
+  xenstore-write "$XENBUS_PATH"/physical-device $pdev \
+      "$XENBUS_PATH"/node $1
+}
+
+t=$(xenstore-read "$XENBUS_PATH"/type)
+
+case $1 in 
+  bind)
+    p=$(xenstore-read "$XENBUS_PATH"/params)
+    case $t in 
+      phy)
+        dev=$(expand_dev $p)
+	write_dev "$dev"
+	exit 0
+	;;
+
+      file)
+	for dev in /dev/loop* ; do
+	  echo "dev is $dev, p is $p"
+	  if losetup $dev $p; then
+	    write_dev "$dev"
+            exit 0
+	  fi
+	done
+	exit 1
+	;;
+
+      *)
+        [ -x /etc/xen/scripts/block-"$t" ] && \
+	    /etc/xen/scripts/block-"$t" bind $p
+	;;
+    esac
+    ;;
+
+  unbind)
+    node=$(xenstore-read "$XENBUS_PATH"/node)
+    case $t in 
+      phy)
+	exit 0
+	;;
+
+      file)
+	losetup -d $node
+	exit 0
+	;;
+
+      *)
+        [ -x /etc/xen/scripts/block-"$t" ] && \
+	    /etc/xen/scripts/block-"$t" unbind $node
+	;;
+
+    esac
+    ;;
+
+esac
