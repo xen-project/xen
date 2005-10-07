@@ -663,6 +663,9 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 		else do_ssc(vcpu_get_gr(current,36), regs);
 	}
 	else if (iim == d->arch.breakimm) {
+		/* by default, do not continue */
+		v->arch.hypercall_continuation = 0;
+
 		if (ia64_hypercall(regs) &&
 		    !PSCBX(v, hypercall_continuation))
 			vcpu_increment_iip(current);
