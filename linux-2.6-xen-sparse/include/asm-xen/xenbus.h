@@ -33,9 +33,7 @@
 #include <linux/device.h>
 #include <linux/notifier.h>
 #include <asm/semaphore.h>
-
-/* FIXME there's got to be a better way to get at the XS_WATCH macros */
-#include <asm-xen/linux-public/xenstored.h>
+#include <asm-xen/xen-public/io/xs_wire.h>
 
 /* A xenbus device. */
 struct xenbus_device {

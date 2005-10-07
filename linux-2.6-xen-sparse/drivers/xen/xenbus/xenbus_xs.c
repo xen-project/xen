@@ -38,7 +38,6 @@
 #include <linux/fcntl.h>
 #include <linux/kthread.h>
 #include <asm-xen/xenbus.h>
-#include <asm-xen/linux-public/xenstored.h>
 #include "xenbus_comms.h"
 
 #define streq(a, b) (strcmp((a), (b)) == 0)

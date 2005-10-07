@@ -20,17 +20,9 @@
 #ifndef _XS_H
 #define _XS_H
 
-#include "xs_lib.h"
+#include <xs_lib.h>
 
 struct xs_handle;
-
-/* FIXME we shouldn't have to declare this in two places, what's the right
-   way to share things between xenstored.h and xs.h? */
-enum xs_watch_type
-{
-	XS_WATCH_PATH = 0,
-	XS_WATCH_TOKEN,
-};
 
 /* On failure, these routines set errno. */
 

@@ -44,7 +44,6 @@
 #include "list.h"
 #include "talloc.h"
 #include "xs_lib.h"
-#include "xenstored.h"
 #include "xenstored_core.h"
 #include "xenstored_watch.h"
 #include "xenstored_transaction.h"

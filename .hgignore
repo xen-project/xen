@@ -155,7 +155,7 @@
 ^tools/xenstore/xenstore-read$
 ^tools/xenstore/xenstore-rm$
 ^tools/xenstore/xenstore-write$
-^tools/xenstore/xs_dom0_test$
+^tools/xenstore/xs_crashme$
 ^tools/xenstore/xs_random$
 ^tools/xenstore/xs_stress$
 ^tools/xenstore/xs_tdb_dump$

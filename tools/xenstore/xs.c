@@ -33,8 +33,6 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include "xs.h"
-#include "xenstored.h"
-#include "xs_lib.h"
 #include "utils.h"
 
 struct xs_handle

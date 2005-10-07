@@ -113,9 +113,6 @@ mkdir  ${AD}/include/asm-xen/xen-public
 cd     ${AD}/include/asm-xen/xen-public
 relative_lndir ../../../${RS}/../xen/include/public
 
-cd ${AD}/include/asm-xen/linux-public
-ln -sf ../../../${RS}/../tools/xenstore/xenstored.h
-
 # Arch-specific post-processing
 cd ${AD}
 if [ -x arch/${LINUX_ARCH}/xen-mkbuildtree-post ]; then

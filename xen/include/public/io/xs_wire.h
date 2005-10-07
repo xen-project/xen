@@ -1,5 +1,6 @@
 /*
- * Simple prototyle Xen Store Daemon providing simple tree-like database.
+ * Details of the "wire" protocol between Xen Store Daemon and client
+ * library or guest kernel.
  * Copyright (C) 2005 Rusty Russell IBM Corporation
  *
  * This file may be distributed separately from the Linux kernel, or
@@ -24,8 +25,8 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef _XENSTORED_H
-#define _XENSTORED_H
+#ifndef _XS_WIRE_H
+#define _XS_WIRE_H
 
 enum xsd_sockmsg_type
 {
@@ -86,12 +87,10 @@ struct xsd_sockmsg
 	/* Generally followed by nul-terminated string(s). */
 };
 
-/* FIXME we shouldn't have to declare this in two places, what's the right
-   way to share things between xenstored.h and xs.h? */
 enum xs_watch_type
 {
 	XS_WATCH_PATH = 0,
 	XS_WATCH_TOKEN,
 };
 
-#endif /* _XENSTORED_H */
+#endif /* _XS_WIRE_H */

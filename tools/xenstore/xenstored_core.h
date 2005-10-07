@@ -26,7 +26,6 @@
 #include <stdint.h>
 #include <errno.h>
 #include "xs_lib.h"
-#include "xenstored.h"
 #include "list.h"
 #include "tdb.h"
 
