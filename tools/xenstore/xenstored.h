@@ -86,4 +86,12 @@ struct xsd_sockmsg
 	/* Generally followed by nul-terminated string(s). */
 };
 
+/* FIXME we shouldn't have to declare this in two places, what's the right
+   way to share things between xenstored.h and xs.h? */
+enum xs_watch_type
+{
+	XS_WATCH_PATH = 0,
+	XS_WATCH_TOKEN,
+};
+
 #endif /* _XENSTORED_H */

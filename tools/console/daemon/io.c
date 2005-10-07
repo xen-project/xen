@@ -491,14 +491,15 @@ static void handle_xs(int fd)
 	char **vec;
 	int domid;
 	struct domain *dom;
+	unsigned int num;
 
-	vec = xs_read_watch(xs);
+	vec = xs_read_watch(xs, &num);
 	if (!vec)
 		return;
 
-	if (!strcmp(vec[1], "domlist"))
+	if (!strcmp(vec[XS_WATCH_TOKEN], "domlist"))
 		enum_domains();
-	else if (sscanf(vec[1], "dom%u", &domid) == 1) {
+	else if (sscanf(vec[XS_WATCH_TOKEN], "dom%u", &domid) == 1) {
 		dom = lookup_domain(domid);
 		if (dom->is_dead == false)
 			domain_create_ring(dom);

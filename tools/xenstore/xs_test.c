@@ -489,8 +489,11 @@ static void do_watch(unsigned int handle, const char *node, const char *token,
 
 	/* Convenient for testing... */
 	if (swallow_event) {
-		char **vec = xs_read_watch(handles[handle]);
-		if (!vec || !streq(vec[0], node) || !streq(vec[1], token))
+		unsigned int num;
+		char **vec = xs_read_watch(handles[handle], &num);
+		if (!vec ||
+		    !streq(vec[XS_WATCH_PATH], node) ||
+		    !streq(vec[XS_WATCH_TOKEN], token))
 			failed(handle);
 		if (!xs_acknowledge_watch(handles[handle], token))
 			failed(handle);
@@ -522,6 +525,7 @@ static void do_waitwatch(unsigned int handle)
 	struct timeval tv = {.tv_sec = timeout_ms/1000,
 			     .tv_usec = (timeout_ms*1000)%1000000 };
 	fd_set set;
+	unsigned int num;
 
 	if (xs_fileno(handles[handle]) != -2) {
 		/* Manually select here so we can time out gracefully. */
@@ -537,16 +541,17 @@ static void do_waitwatch(unsigned int handle)
 		set_timeout();
 	}
 
-	vec = xs_read_watch(handles[handle]);
+	vec = xs_read_watch(handles[handle], &num);
 	if (!vec) {
 		failed(handle);
 		return;
 	}
 
 	if (handle)
-		output("%i:%s:%s\n", handle, vec[0], vec[1]);
+		output("%i:%s:%s\n", handle,
+		       vec[XS_WATCH_PATH], vec[XS_WATCH_TOKEN]);
 	else
-		output("%s:%s\n", vec[0], vec[1]);
+		output("%s:%s\n", vec[XS_WATCH_PATH], vec[XS_WATCH_TOKEN]);
 	free(vec);
 }
 

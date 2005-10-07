@@ -462,19 +462,20 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
     char **xsval = NULL;
     PyObject *token;
     int i;
+    unsigned int num;
 
     if (!xh)
         goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
         goto exit;
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_read_watch(xh);
+    xsval = xs_read_watch(xh, &num);
     Py_END_ALLOW_THREADS
     if (!xsval) {
         PyErr_SetFromErrno(PyExc_RuntimeError);
         goto exit;
     }
-    if (sscanf(xsval[1], "%li", (unsigned long *)&token) != 1) {
+    if (sscanf(xsval[XS_WATCH_TOKEN], "%li", (unsigned long *)&token) != 1) {
         PyErr_SetString(PyExc_RuntimeError, "invalid token");
         goto exit;
     }
@@ -487,7 +488,7 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
         goto exit;
     }
     /* Create tuple (path, token). */
-    val = Py_BuildValue("(sO)", xsval[0], token);
+    val = Py_BuildValue("(sO)", xsval[XS_WATCH_PATH], token);
  exit:
     if (xsval)
         free(xsval);

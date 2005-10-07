@@ -251,13 +251,14 @@ int xs_fire_next_watch(struct xs_handle *h)
     char *node = NULL;
     struct xenbus_watch *w;
     int er;
+    unsigned int num;
 
-    res = xs_read_watch(h);
+    res = xs_read_watch(h, &num);
     if (res == NULL) 
         return -EAGAIN; /* in O_NONBLOCK, read_watch returns 0... */
 
-    node  = res[0];
-    token = res[1];
+    node  = res[XS_WATCH_PATH];
+    token = res[XS_WATCH_TOKEN];
 
     er = xs_acknowledge_watch(h, token);
     if (er == 0)

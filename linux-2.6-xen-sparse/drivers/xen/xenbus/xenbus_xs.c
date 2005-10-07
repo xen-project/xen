@@ -200,14 +200,9 @@ static char *join(const char *dir, const char *name)
 	return buffer;
 }
 
-char **xenbus_directory(const char *dir, const char *node, unsigned int *num)
+static char **split(char *strings, unsigned int len, unsigned int *num)
 {
-	char *strings, *p, **ret;
-	unsigned int len;
-
-	strings = xs_single(XS_DIRECTORY, join(dir, node), &len);
-	if (IS_ERR(strings))
-		return (char **)strings;
+	char *p, **ret;
 
 	/* Count the strings. */
 	*num = count_strings(strings, len);
@@ -224,7 +219,20 @@ char **xenbus_directory(const char *dir, const char *node, unsigned int *num)
 	strings = (char *)&ret[*num];
 	for (p = strings, *num = 0; p < strings + len; p += strlen(p) + 1)
 		ret[(*num)++] = p;
+
 	return ret;
+}
+
+char **xenbus_directory(const char *dir, const char *node, unsigned int *num)
+{
+	char *strings;
+	unsigned int len;
+
+	strings = xs_single(XS_DIRECTORY, join(dir, node), &len);
+	if (IS_ERR(strings))
+		return (char **)strings;
+
+	return split(strings, len, num);
 }
 EXPORT_SYMBOL(xenbus_directory);
 
@@ -425,18 +433,19 @@ static int xs_watch(const char *path, const char *token)
 	return xs_error(xs_talkv(XS_WATCH, iov, ARRAY_SIZE(iov), NULL));
 }
 
-static char *xs_read_watch(char **token)
+static char **xs_read_watch(unsigned int *num)
 {
 	enum xsd_sockmsg_type type;
-	char *ret;
+	char *strings;
+	unsigned int len;
 
-	ret = read_reply(&type, NULL);
-	if (IS_ERR(ret))
-		return ret;
+	strings = read_reply(&type, &len);
+	if (IS_ERR(strings))
+		return (char **)strings;
 
 	BUG_ON(type != XS_WATCH_EVENT);
-	*token = ret + strlen(ret) + 1;
-	return ret;
+
+	return split(strings, len, num);
 }
 
 static int xs_acknowledge_watch(const char *token)
@@ -519,8 +528,8 @@ void reregister_xenbus_watches(void)
 static int watch_thread(void *unused)
 {
 	for (;;) {
-		char *token;
-		char *node = NULL;
+		char **vec = NULL;
+		unsigned int num;
 
 		wait_event(xb_waitq, xs_input_avail());
 
@@ -530,23 +539,23 @@ static int watch_thread(void *unused)
 		 */
 		down(&xenbus_lock);
 		if (xs_input_avail())
-			node = xs_read_watch(&token);
+			vec = xs_read_watch(&num);
 
-		if (node && !IS_ERR(node)) {
+		if (vec && !IS_ERR(vec)) {
 			struct xenbus_watch *w;
 			int err;
 
-			err = xs_acknowledge_watch(token);
+			err = xs_acknowledge_watch(vec[XS_WATCH_TOKEN]);
 			if (err)
 				printk(KERN_WARNING "XENBUS ack %s fail %i\n",
-				       node, err);
-			w = find_watch(token);
+				       vec[XS_WATCH_TOKEN], err);
+			w = find_watch(vec[XS_WATCH_TOKEN]);
 			BUG_ON(!w);
-			w->callback(w, node);
-			kfree(node);
-		} else if (node)
+			w->callback(w, vec[XS_WATCH_PATH]);
+			kfree(vec);
+		} else if (vec)
 			printk(KERN_WARNING "XENBUS xs_read_watch: %li\n",
-			       PTR_ERR(node));
+			       PTR_ERR(vec));
 		up(&xenbus_lock);
 	}
 }

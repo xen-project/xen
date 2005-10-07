@@ -449,25 +449,44 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
  * Returns array of two pointers: path and token, or NULL.
  * Call free() after use.
  */
-char **xs_read_watch(struct xs_handle *h)
+char **xs_read_watch(struct xs_handle *h, unsigned int *num)
 {
 	struct xsd_sockmsg msg;
 	char **ret;
+	char *strings;
+	unsigned int num_strings, i;
 
 	if (!read_all(h->fd, &msg, sizeof(msg)))
 		return NULL;
 
 	assert(msg.type == XS_WATCH_EVENT);
-	ret = malloc(sizeof(char *)*2 + msg.len);
-	if (!ret)
+	strings = malloc(msg.len);
+	if (!strings)
 		return NULL;
 
-	ret[0] = (char *)(ret + 2);
-	if (!read_all(h->fd, ret[0], msg.len)) {
-		free_no_errno(ret);
+	if (!read_all(h->fd, strings, msg.len)) {
+		free_no_errno(strings);
 		return NULL;
 	}
-	ret[1] = ret[0] + strlen(ret[0]) + 1;
+
+	num_strings = xs_count_strings(strings, msg.len);
+
+	ret = malloc(sizeof(char*) * num_strings + msg.len);
+	if (!ret) {
+		free_no_errno(strings);
+		return NULL;
+	}
+
+	ret[0] = (char *)(ret + num_strings);
+	memcpy(ret[0], strings, msg.len);
+	free(strings);
+
+	for (i = 1; i < num_strings; i++) {
+		ret[i] = ret[i - 1] + strlen(ret[i - 1]) + 1;
+	}
+
+	*num = num_strings;
+
 	return ret;
 }
 

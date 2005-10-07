@@ -24,6 +24,14 @@
 
 struct xs_handle;
 
+/* FIXME we shouldn't have to declare this in two places, what's the right
+   way to share things between xenstored.h and xs.h? */
+enum xs_watch_type
+{
+	XS_WATCH_PATH = 0,
+	XS_WATCH_TOKEN,
+};
+
 /* On failure, these routines set errno. */
 
 /* Connect to the xs daemon.
@@ -91,10 +99,10 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token);
 int xs_fileno(struct xs_handle *h);
 
 /* Find out what node change was on (will block if nothing pending).
- * Returns array of two pointers: path and token, or NULL.
- * Call free() after use.
+ * Returns array containing the path and token. Use XS_WATCH_* to access these
+ * elements. Call free() after use.
  */
-char **xs_read_watch(struct xs_handle *h);
+char **xs_read_watch(struct xs_handle *h, unsigned int *num);
 
 /* Acknowledge watch on node.  Watches must be acknowledged before
  * any other watches can be read.
