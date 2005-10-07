@@ -432,13 +432,13 @@ static PyObject *pyxc_evtchn_alloc_unbound(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom = DOMID_SELF, remote_dom;
+    u32 dom, remote_dom;
     int port;
 
-    static char *kwd_list[] = { "remote_dom", "dom", NULL };
+    static char *kwd_list[] = { "dom", "remote_dom", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list,
-                                      &remote_dom, &dom) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list,
+                                      &dom, &remote_dom) )
         return NULL;
 
     if ( (port = xc_evtchn_alloc_unbound(xc->xc_handle, dom, remote_dom)) < 0 )
@@ -943,8 +943,9 @@ static PyMethodDef pyxc_methods[] = {
     { "evtchn_alloc_unbound", 
       (PyCFunction)pyxc_evtchn_alloc_unbound,
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "Allocate an unbound local port that will await a remote connection.\n"
-      " dom [int]: Remote domain to accept connections from.\n\n"
+      "Allocate an unbound port that will await a remote connection.\n"
+      " dom        [int]: Domain whose port space to allocate from.\n"
+      " remote_dom [int]: Remote domain to accept connections from.\n\n"
       "Returns: [int] Unbound event-channel port.\n" },
 
     { "evtchn_status", 

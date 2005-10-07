@@ -223,7 +223,7 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 		if (copy_from_user(&bind, (void *)arg, sizeof(bind)))
 			break;
 
-		op.cmd              = EVTCHNOP_bind_virq;
+		op.cmd = EVTCHNOP_bind_virq;
 		op.u.bind_virq.virq = bind.virq;
 		op.u.bind_virq.vcpu = 0;
 		rc = HYPERVISOR_event_channel_op(&op);
@@ -243,16 +243,14 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 		if (copy_from_user(&bind, (void *)arg, sizeof(bind)))
 			break;
 
-		op.cmd                      = EVTCHNOP_bind_interdomain;
-		op.u.bind_interdomain.dom1  = DOMID_SELF;
-		op.u.bind_interdomain.dom2  = bind.remote_domain;
-		op.u.bind_interdomain.port1 = 0;
-		op.u.bind_interdomain.port2 = bind.remote_port;
+		op.cmd = EVTCHNOP_bind_interdomain;
+		op.u.bind_interdomain.remote_dom  = bind.remote_domain;
+		op.u.bind_interdomain.remote_port = bind.remote_port;
 		rc = HYPERVISOR_event_channel_op(&op);
 		if (rc != 0)
 			break;
 
-		rc = op.u.bind_interdomain.port1;
+		rc = op.u.bind_interdomain.local_port;
 		port_user[rc] = u;
 		unmask_evtchn(rc);
 		break;
@@ -265,7 +263,7 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 		if (copy_from_user(&bind, (void *)arg, sizeof(bind)))
 			break;
 
-		op.cmd                        = EVTCHNOP_alloc_unbound;
+		op.cmd = EVTCHNOP_alloc_unbound;
 		op.u.alloc_unbound.dom        = DOMID_SELF;
 		op.u.alloc_unbound.remote_dom = bind.remote_domain;
 		rc = HYPERVISOR_event_channel_op(&op);
@@ -292,6 +290,11 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 		} else {
 			port_user[unbind.port] = NULL;
 			mask_evtchn(unbind.port);
+
+			op.cmd = EVTCHNOP_close;
+			op.u.close.port = unbind.port;
+			BUG_ON(HYPERVISOR_event_channel_op(&op));
+
 			rc = 0;
 		}
 		break;
@@ -390,8 +393,7 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 		port_user[i] = NULL;
 		mask_evtchn(i);
 
-		op.cmd          = EVTCHNOP_close;
-		op.u.close.dom  = DOMID_SELF;
+		op.cmd = EVTCHNOP_close;
 		op.u.close.port = i;
 		BUG_ON(HYPERVISOR_event_channel_op(&op));
 	}

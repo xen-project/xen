@@ -180,10 +180,8 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	int err;
 	evtchn_op_t op = {
 		.cmd = EVTCHNOP_bind_interdomain,
-		.u.bind_interdomain.dom1 = DOMID_SELF,
-		.u.bind_interdomain.dom2 = netif->domid,
-		.u.bind_interdomain.port1 = 0,
-		.u.bind_interdomain.port2 = evtchn };
+		.u.bind_interdomain.remote_dom = netif->domid,
+		.u.bind_interdomain.remote_port = evtchn };
 
 	netif->comms_area = alloc_vm_area(2*PAGE_SIZE);
 	if (netif->comms_area == NULL)
@@ -202,7 +200,7 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 		return err;
 	}
 
-	netif->evtchn = op.u.bind_interdomain.port1;
+	netif->evtchn = op.u.bind_interdomain.local_port;
 
 	netif->irq = bind_evtchn_to_irqhandler(
 		netif->evtchn, netif_be_int, 0, netif->dev->name, netif);

@@ -197,6 +197,7 @@ def recreate(xeninfo):
         log.info("Recreating domain %d with new UUID %s.", domid, uuid)
 
         vm = XendDomainInfo(uuid, xeninfo, domid, True)
+        vm.removeDom()
         vm.storeVmDetails()
         vm.storeDomDetails()
 
