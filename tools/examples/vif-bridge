@@ -33,6 +33,7 @@
 
 # Exit if anything goes wrong
 set -e 
+export PATH=/sbin:/bin:/usr/bin:/usr/sbin:$PATH
 
 echo "*vif-bridge $*" >&2
 
