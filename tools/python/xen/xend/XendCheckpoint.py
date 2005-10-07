@@ -48,9 +48,10 @@ def save(fd, dominfo, live):
     config = sxp.to_string(dominfo.sxpr())
 
     domain_name = dominfo.getName()
-
-    if live:
-        dominfo.setName('migrating-' + domain_name)
+    # Rename the domain temporarily, so that we don't get a name clash if this
+    # domain is migrating (live or non-live) to the local host.  Doing such a
+    # thing is useful for debugging.
+    dominfo.setName('migrating-' + domain_name)
 
     try:
         write_exact(fd, pack("!i", len(config)),
@@ -85,8 +86,7 @@ def save(fd, dominfo, live):
         log.exception("Save failed on domain %s (%d).", domain_name,
                       dominfo.getDomid())
         try:
-            if live:
-                dominfo.setName(domain_name)
+            dominfo.setName(domain_name)
         except:
             log.exception("Failed to reset the migrating domain's name")
         raise Exception, exn
