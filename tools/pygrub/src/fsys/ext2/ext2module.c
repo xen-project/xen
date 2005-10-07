@@ -229,8 +229,13 @@ ext2_fs_open (Ext2Fs *fs, PyObject *args, PyObject *kwargs)
         snprintf(offsetopt, 29, "offset=%d", offset);
     }
 
+#ifdef HAVE_EXT2FS_OPEN2
     err = ext2fs_open2(name, offsetopt, flags, superblock, block_size, 
                        unix_io_manager, &efs);
+#else
+    err = ext2fs_open(name, flags, superblock, block_size,
+                      unix_io_manager, &efs);
+#endif
     if (err) {
         PyErr_SetString(PyExc_ValueError, "unable to open file");
         return NULL;
