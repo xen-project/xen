@@ -34,6 +34,9 @@
 #include <linux/notifier.h>
 #include <asm/semaphore.h>
 
+/* FIXME there's got to be a better way to get at the XS_WATCH macros */
+#include <asm-xen/linux-public/xenstored.h>
+
 /* A xenbus device. */
 struct xenbus_device {
 	char *devicetype;
@@ -113,7 +116,8 @@ struct xenbus_watch
 {
 	struct list_head list;
 	char *node;
-	void (*callback)(struct xenbus_watch *, const char *node);
+	void (*callback)(struct xenbus_watch *,
+			 const char **vec, unsigned int len);
 };
 
 /* notifer routines for when the xenstore comes up */

@@ -963,7 +963,8 @@ static struct xenbus_device_id netfront_ids[] = {
 	{ "" }
 };
 
-static void watch_for_status(struct xenbus_watch *watch, const char *node)
+static void watch_for_status(struct xenbus_watch *watch,
+			     const char **vec, unsigned int len)
 {
 }
 

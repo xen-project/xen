@@ -442,12 +442,16 @@ static struct xenbus_device_id blkfront_ids[] = {
 	{ "" }
 };
 
-static void watch_for_status(struct xenbus_watch *watch, const char *node)
+static void watch_for_status(struct xenbus_watch *watch,
+			     const char **vec, unsigned int len)
 {
 	struct blkfront_info *info;
 	unsigned int binfo;
 	unsigned long sectors, sector_size;
 	int err;
+	const char *node;
+
+	node = vec[XS_WATCH_PATH];
 
 	info = container_of(watch, struct blkfront_info, watch);
 	node += strlen(watch->node);
@@ -652,8 +656,17 @@ static int blkfront_probe(struct xenbus_device *dev,
 		return err;
 	}
 
-	/* Call once in case entries already there. */
-	watch_for_status(&info->watch, info->watch.node);
+	{
+		unsigned int len = max(XS_WATCH_PATH, XS_WATCH_TOKEN) + 1;
+		const char *vec[len];
+
+		vec[XS_WATCH_PATH] = info->watch.node;
+		vec[XS_WATCH_TOKEN] = NULL;
+
+		/* Call once in case entries already there. */
+		watch_for_status(&info->watch, vec, len);
+	}
+
 	return 0;
 }
 

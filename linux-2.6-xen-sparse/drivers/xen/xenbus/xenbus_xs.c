@@ -551,7 +551,7 @@ static int watch_thread(void *unused)
 				       vec[XS_WATCH_TOKEN], err);
 			w = find_watch(vec[XS_WATCH_TOKEN]);
 			BUG_ON(!w);
-			w->callback(w, vec[XS_WATCH_PATH]);
+			w->callback(w, (const char **)vec, num);
 			kfree(vec);
 		} else if (vec)
 			printk(KERN_WARNING "XENBUS xs_read_watch: %li\n",

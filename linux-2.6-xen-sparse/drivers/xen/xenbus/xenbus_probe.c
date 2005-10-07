@@ -562,14 +562,16 @@ static void dev_changed(const char *node, struct xen_bus_type *bus)
 	kfree(root);
 }
 
-static void frontend_changed(struct xenbus_watch *watch, const char *node)
+static void frontend_changed(struct xenbus_watch *watch,
+			     const char **vec, unsigned int len)
 {
-	dev_changed(node, &xenbus_frontend);
+	dev_changed(vec[XS_WATCH_PATH], &xenbus_frontend);
 }
 
-static void backend_changed(struct xenbus_watch *watch, const char *node)
+static void backend_changed(struct xenbus_watch *watch,
+			    const char **vec, unsigned int len)
 {
-	dev_changed(node, &xenbus_backend);
+	dev_changed(vec[XS_WATCH_PATH], &xenbus_backend);
 }
 
 /* We watch for devices appearing and vanishing. */

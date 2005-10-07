@@ -59,7 +59,8 @@ static int blkback_remove(struct xenbus_device *dev)
 }
 
 /* Front end tells us frame. */
-static void frontend_changed(struct xenbus_watch *watch, const char *node)
+static void frontend_changed(struct xenbus_watch *watch,
+			     const char **vec, unsigned int len)
 {
 	unsigned long ring_ref;
 	unsigned int evtchn;
@@ -68,7 +69,7 @@ static void frontend_changed(struct xenbus_watch *watch, const char *node)
 		= container_of(watch, struct backend_info, watch);
 
 	/* If other end is gone, delete ourself. */
-	if (node && !xenbus_exists(be->frontpath, "")) {
+	if (vec && !xenbus_exists(be->frontpath, "")) {
 		xenbus_rm(be->dev->nodename, "");
 		device_unregister(&be->dev->dev);
 		return;
@@ -106,7 +107,8 @@ abort:
    We provide event channel and device details to front end.
    Frontend supplies shared frame and event channel.
  */
-static void backend_changed(struct xenbus_watch *watch, const char *node)
+static void backend_changed(struct xenbus_watch *watch,
+			    const char **vec, unsigned int len)
 {
 	int err;
 	char *p;
@@ -129,7 +131,7 @@ static void backend_changed(struct xenbus_watch *watch, const char *node)
 		}
 
 		/* Pass in NULL node to skip exist test. */
-		frontend_changed(&be->watch, NULL);
+		frontend_changed(&be->watch, NULL, 0);
 	}
 }
 

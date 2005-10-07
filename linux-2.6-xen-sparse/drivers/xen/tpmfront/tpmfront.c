@@ -211,12 +211,14 @@ static int tpm_fe_send_upperlayer(const u8 * buf, size_t count,
  XENBUS support code
 **************************************************************/
 
-static void watch_for_status(struct xenbus_watch *watch, const char *node)
+static void watch_for_status(struct xenbus_watch *watch,
+			     const char **vec, unsigned int len)
 {
 	struct tpmfront_info *info;
 	int err;
 	unsigned long ready;
 	struct tpm_private *tp = &my_private;
+	const char *node = vec[XS_WATCH_PATH];
 
 	info = container_of(watch, struct tpmfront_info, watch);
 	node += strlen(watch->node);
