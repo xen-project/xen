@@ -47,8 +47,6 @@
 int hvm_enabled;
 
 #ifdef CONFIG_VMX
-
-int vmcs_size;
 unsigned int opt_vmx_debug_level = 0;
 integer_param("vmx_debug", opt_vmx_debug_level);
 

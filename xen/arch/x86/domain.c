@@ -323,47 +323,16 @@ void vcpu_migrate_cpu(struct vcpu *v, int newcpu)
 #ifdef CONFIG_VMX
 static int vmx_switch_on;
 
-static int vmx_final_setup_guest(
-    struct vcpu *v, struct vcpu_guest_context *ctxt)
+static void vmx_final_setup_guest(struct vcpu *v)
 {
-    int error;
-    struct cpu_user_regs *regs;
-    struct vmcs_struct *vmcs;
-
-    regs = &ctxt->user_regs;
-
-    /*
-     * Create a new VMCS
-     */
-    if (!(vmcs = alloc_vmcs())) {
-        printk("Failed to create a new VMCS\n");
-        return -ENOMEM;
-    }
-
-    memset(&v->arch.arch_vmx, 0, sizeof (struct arch_vmx_struct));
-
-    v->arch.arch_vmx.vmcs = vmcs;
-    error = construct_vmcs(
-        &v->arch.arch_vmx, regs, ctxt, VMCS_USE_HOST_ENV);
-    if ( error < 0 )
-    {
-        printk("Failed to construct a new VMCS\n");
-        goto out;
-    }
-
     v->arch.schedule_tail = arch_vmx_do_launch;
 
-#if defined (__i386__)
-    v->domain->arch.vmx_platform.real_mode_data = 
-        (unsigned long *) regs->esi;
-#endif
-
     if (v == v->domain->vcpu[0]) {
-        /* 
+        /*
          * Required to do this once per domain
          * XXX todo: add a seperate function to do these.
          */
-        memset(&v->domain->shared_info->evtchn_mask[0], 0xff, 
+        memset(&v->domain->shared_info->evtchn_mask[0], 0xff,
                sizeof(v->domain->shared_info->evtchn_mask));
 
         /* Put the domain in shadow mode even though we're going to be using
@@ -375,23 +344,6 @@ static int vmx_final_setup_guest(
 
     if (!vmx_switch_on)
         vmx_switch_on = 1;
-
-    return 0;
-
-out:
-    free_vmcs(vmcs);
-    if(v->arch.arch_vmx.io_bitmap_a != 0) {
-        free_xenheap_pages(
-            v->arch.arch_vmx.io_bitmap_a, get_order_from_bytes(0x1000));
-        v->arch.arch_vmx.io_bitmap_a = 0;
-    }
-    if(v->arch.arch_vmx.io_bitmap_b != 0) {
-        free_xenheap_pages(
-            v->arch.arch_vmx.io_bitmap_b, get_order_from_bytes(0x1000));
-        v->arch.arch_vmx.io_bitmap_b = 0;
-    }
-    v->arch.arch_vmx.vmcs = 0;
-    return error;
 }
 #endif
 
@@ -480,8 +432,7 @@ int arch_set_info_guest(
         if ( !pagetable_get_paddr(d->arch.phys_table) )
             d->arch.phys_table = v->arch.guest_table;
 
-        if ( (rc = vmx_final_setup_guest(v, c)) != 0 )
-            return rc;
+        vmx_final_setup_guest(v);
     }
 
     update_pagetables(v);
@@ -968,20 +919,7 @@ static void vmx_relinquish_resources(struct vcpu *v)
     if ( !VMX_DOMAIN(v) )
         return;
 
-    BUG_ON(v->arch.arch_vmx.vmcs == NULL);
-    free_vmcs(v->arch.arch_vmx.vmcs);
-    if(v->arch.arch_vmx.io_bitmap_a != 0) {
-        free_xenheap_pages(
-            v->arch.arch_vmx.io_bitmap_a, get_order_from_bytes(0x1000));
-        v->arch.arch_vmx.io_bitmap_a = 0;
-    }
-    if(v->arch.arch_vmx.io_bitmap_b != 0) {
-        free_xenheap_pages(
-            v->arch.arch_vmx.io_bitmap_b, get_order_from_bytes(0x1000));
-        v->arch.arch_vmx.io_bitmap_b = 0;
-    }
-    v->arch.arch_vmx.vmcs = 0;
-    
+    destroy_vmcs(&v->arch.arch_vmx);
     free_monitor_pagetable(v);
     rem_ac_timer(&v->domain->arch.vmx_platform.vmx_pit.pit_timer);
 }
