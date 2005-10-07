@@ -23,9 +23,15 @@ if ! [ -d $dst ]; then
 fi
 
 echo "Installing Xen from '$src' to '$dst'..."
-(cd $src; tar -cf - --exclude etc/init.d * ) | tar -C $dst -xf -
+(cd $src; tar -cf - --exclude etc/init.d --exclude etc/hotplug --exclude etc/udev * ) | tar -C $dst -xf -
 cp -fdRL $src/etc/init.d/* $dst/etc/init.d/
 echo "All done."
+
+if [ -x /sbin/udev ] && [ ! -z `udev -V` ] && [ `/sbin/udev -V` -ge 059 ]; then
+  cp -f $src/etc/udev/rules.d/*.rules $dst/etc/udev/rules.d/
+else
+  cp -f $src/etc/hotplug/*.agent $dst/etc/hotplug/
+fi
 
 echo "Checking to see whether prerequisite tools are installed..."
 cd $src/../check

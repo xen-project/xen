@@ -28,10 +28,23 @@ XEN_SCRIPTS += block-enbd
 XEN_HOTPLUG_DIR = /etc/hotplug
 XEN_HOTPLUG_SCRIPTS = xen-backend.agent
 
+UDEV_RULES_DIR = /etc/udev/rules.d
+UDEV_RULES = xen-backend.rules
+
+ifeq ($(findstring $(DISTDIR),$(DESTDIR)),$(DISTDIR))
+HOTPLUGS=install-hotplug install-udev
+else
+ifeq ($(shell [ -x /sbin/udev ] && [ ! -z `udev -V` ] && [ `/sbin/udev -V` -ge 059 ] && echo 1),1)
+HOTPLUGS=install-udev
+else
+HOTPLUGS=install-hotplug
+endif
+endif
+
 all:
 build:
 
-install: all install-initd install-configs install-scripts install-hotplug
+install: all install-initd install-configs install-scripts $(HOTPLUGS)
 
 install-initd:
 	[ -d $(DESTDIR)/etc/init.d ] || $(INSTALL_DIR) $(DESTDIR)/etc/init.d
@@ -62,6 +75,14 @@ install-hotplug:
 	for i in $(XEN_HOTPLUG_SCRIPTS); \
 	    do \
 	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_HOTPLUG_DIR); \
+	done
+
+install-udev:
+	[ -d $(DESTDIR)$(UDEV_RULES_DIR) ] || \
+		$(INSTALL_DIR) $(DESTDIR)$(UDEV_RULES_DIR)
+	for i in $(UDEV_RULES); \
+	    do \
+	    $(INSTALL_PROG) $$i $(DESTDIR)$(UDEV_RULES_DIR); \
 	done
 
 clean:
