@@ -153,6 +153,11 @@ def create(config):
     vm = XendDomainInfo(getUuid(), parseConfig(config))
     try:
         vm.construct()
+        vm.initDomain()
+        vm.construct_image()
+        vm.configure()
+        vm.storeVmDetails()
+        vm.storeDomDetails()
         vm.refreshShutdown()
         return vm
     except:
@@ -223,19 +228,14 @@ def restore(config):
     except TypeError, exn:
         raise VmError('Invalid ssidref in config: %s' % exn)
 
-    domid = xc.domain_create(ssidref = ssidref)
-    if domid < 0:
-        raise VmError('Creating domain failed for restore')
+    vm = XendDomainInfo(uuid, parseConfig(config))
     try:
-        vm = XendDomainInfo(uuid, parseConfig(config), domid)
-    except:
-        xc.domain_destroy(domid)
-        raise
-    try:
-        vm.storeVmDetails()
+        vm.construct()
         vm.configure()
         vm.create_channel()
+        vm.storeVmDetails()
         vm.storeDomDetails()
+        vm.refreshShutdown()
         return vm
     except:
         vm.destroy()
@@ -1001,12 +1001,6 @@ class XendDomainInfo:
         # shutdown_start_time from killing the domain, for example.
         self.removeDom()
 
-        self.initDomain()
-        self.construct_image()
-        self.configure()
-        self.storeVmDetails()
-        self.storeDomDetails()
-
 
     def initDomain(self):
         log.debug('XendDomainInfo.initDomain: %s %s %s',
@@ -1100,13 +1094,13 @@ class XendDomainInfo:
     def destroyDomain(self):
         log.debug("XendDomainInfo.destroyDomain(%s)", str(self.domid))
 
-        self.cleanupDomain()
-
         try:
             if self.domid is not None:
                 xc.domain_destroy(dom=self.domid)
         except:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
+
+        self.cleanupDomain()
 
 
     ## private:
