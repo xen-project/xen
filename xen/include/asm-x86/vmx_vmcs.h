@@ -71,6 +71,14 @@ struct msr_state{
     unsigned long shadow_gs;
 };
 
+struct mmio_op {
+    int                    flags;
+    int                    instr;       /* instruction */
+    unsigned long          operand[2];  /* operands */
+    unsigned long          immediate;   /* immediate portion */
+    struct cpu_user_regs   *inst_decoder_regs; /* current context */
+};
+
 #define PC_DEBUG_PORT   0x80 
 
 struct arch_vmx_struct {
@@ -83,7 +91,8 @@ struct arch_vmx_struct {
     unsigned long           cpu_state;
     unsigned long           cpu_based_exec_control;
     struct msr_state        msr_content;
-    void                   *io_bitmap_a, *io_bitmap_b;
+    struct mmio_op          mmio_op;  /* MMIO */
+    void                    *io_bitmap_a, *io_bitmap_b;
 };
 
 #define vmx_schedule_tail(next)         \

@@ -1,5 +1,5 @@
 /*
- * vmx_io.c: handling I/O, interrupts related VMX entry/exit 
+ * vmx_io.c: handling I/O, interrupts related VMX entry/exit
  * Copyright (c) 2004, Intel Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -42,7 +42,7 @@
 #ifdef CONFIG_VMX
 #if defined (__i386__)
 void load_cpu_user_regs(struct cpu_user_regs *regs)
-{ 
+{
     /*
      * Write the guest register value into VMCS
      */
@@ -52,7 +52,7 @@ void load_cpu_user_regs(struct cpu_user_regs *regs)
     __vmwrite(GUEST_RFLAGS, regs->eflags);
     if (regs->eflags & EF_TF)
         __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-    else 
+    else
         __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
 
     __vmwrite(GUEST_CS_SELECTOR, regs->cs);
@@ -189,7 +189,7 @@ void load_cpu_user_regs(struct cpu_user_regs *regs)
     __vmwrite(GUEST_RFLAGS, regs->rflags);
     if (regs->rflags & EF_TF)
         __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
-    else 
+    else
         __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
 
     __vmwrite(GUEST_CS_SELECTOR, regs->cs);
@@ -265,52 +265,52 @@ static void set_reg_value (int size, int index, int seg, struct cpu_user_regs *r
     }
 
     switch (index) {
-    case 0: 
+    case 0:
         __set_reg_value(&regs->rax, size, value);
         break;
-    case 1: 
+    case 1:
         __set_reg_value(&regs->rcx, size, value);
         break;
-    case 2: 
+    case 2:
         __set_reg_value(&regs->rdx, size, value);
         break;
-    case 3: 
+    case 3:
         __set_reg_value(&regs->rbx, size, value);
         break;
-    case 4: 
+    case 4:
         __set_reg_value(&regs->rsp, size, value);
         break;
-    case 5: 
+    case 5:
         __set_reg_value(&regs->rbp, size, value);
         break;
-    case 6: 
+    case 6:
         __set_reg_value(&regs->rsi, size, value);
         break;
-    case 7: 
+    case 7:
         __set_reg_value(&regs->rdi, size, value);
         break;
-    case 8: 
+    case 8:
         __set_reg_value(&regs->r8, size, value);
         break;
-    case 9: 
+    case 9:
         __set_reg_value(&regs->r9, size, value);
         break;
-    case 10: 
+    case 10:
         __set_reg_value(&regs->r10, size, value);
         break;
-    case 11: 
+    case 11:
         __set_reg_value(&regs->r11, size, value);
         break;
-    case 12: 
+    case 12:
         __set_reg_value(&regs->r12, size, value);
         break;
-    case 13: 
+    case 13:
         __set_reg_value(&regs->r13, size, value);
         break;
-    case 14: 
+    case 14:
         __set_reg_value(&regs->r14, size, value);
         break;
-    case 15: 
+    case 15:
         __set_reg_value(&regs->r15, size, value);
         break;
     default:
@@ -391,7 +391,7 @@ static inline void set_eflags_PF(int size, unsigned long v1,
 }
 
 static void vmx_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
-                           struct mi_per_cpu_info *mpcip)
+                           struct mmio_op *mmio_opp)
 {
     unsigned long old_eax;
     int sign = p->df ? -1 : 1;
@@ -399,15 +399,15 @@ static void vmx_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     if (p->dir == IOREQ_WRITE) {
         if (p->pdata_valid) {
             regs->esi += sign * p->count * p->size;
-            if (mpcip->flags & REPZ)
+            if (mmio_opp->flags & REPZ)
                 regs->ecx -= p->count;
         }
     } else {
-        if (mpcip->flags & OVERLAP) {
+        if (mmio_opp->flags & OVERLAP) {
             unsigned long addr;
 
             regs->edi += sign * p->count * p->size;
-            if (mpcip->flags & REPZ)
+            if (mmio_opp->flags & REPZ)
                 regs->ecx -= p->count;
 
             addr = regs->edi;
@@ -416,7 +416,7 @@ static void vmx_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             vmx_copy(&p->u.data, addr, p->size, VMX_COPY_OUT);
         } else if (p->pdata_valid) {
             regs->edi += sign * p->count * p->size;
-            if (mpcip->flags & REPZ)
+            if (mmio_opp->flags & REPZ)
                 regs->ecx -= p->count;
         } else {
             old_eax = regs->eax;
@@ -439,18 +439,18 @@ static void vmx_pio_assist(struct cpu_user_regs *regs, ioreq_t *p,
 }
 
 static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
-                            struct mi_per_cpu_info *mpcip)
+                            struct mmio_op *mmio_opp)
 {
     int sign = p->df ? -1 : 1;
     int size = -1, index = -1;
     unsigned long value = 0, diff = 0;
     unsigned long src, dst;
 
-    src = mpcip->operand[0];
-    dst = mpcip->operand[1];
+    src = mmio_opp->operand[0];
+    dst = mmio_opp->operand[1];
     size = operand_size(src);
 
-    switch (mpcip->instr) {
+    switch (mmio_opp->instr) {
     case INSTR_MOV:
         if (dst & REGISTER) {
             index = operand_index(dst);
@@ -475,7 +475,7 @@ static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         regs->esi += sign * p->count * p->size;
         regs->edi += sign * p->count * p->size;
 
-        if ((mpcip->flags & OVERLAP) && p->dir == IOREQ_READ) {
+        if ((mmio_opp->flags & OVERLAP) && p->dir == IOREQ_READ) {
             unsigned long addr = regs->edi;
 
             if (sign > 0)
@@ -483,14 +483,14 @@ static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             vmx_copy(&p->u.data, addr, p->size, VMX_COPY_OUT);
         }
 
-        if (mpcip->flags & REPZ)
+        if (mmio_opp->flags & REPZ)
             regs->ecx -= p->count;
         break;
 
     case INSTR_STOS:
         sign = p->df ? -1 : 1;
         regs->edi += sign * p->count * p->size;
-        if (mpcip->flags & REPZ)
+        if (mmio_opp->flags & REPZ)
             regs->ecx -= p->count;
         break;
 
@@ -500,7 +500,7 @@ static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             value = get_reg_value(size, index, 0, regs);
             diff = (unsigned long) p->u.data & value;
         } else if (src & IMMEDIATE) {
-            value = mpcip->immediate;
+            value = mmio_opp->immediate;
             diff = (unsigned long) p->u.data & value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
@@ -527,7 +527,7 @@ static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             value = get_reg_value(size, index, 0, regs);
             diff = (unsigned long) p->u.data | value;
         } else if (src & IMMEDIATE) {
-            value = mpcip->immediate;
+            value = mmio_opp->immediate;
             diff = (unsigned long) p->u.data | value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
@@ -554,7 +554,7 @@ static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             value = get_reg_value(size, index, 0, regs);
             diff = (unsigned long) p->u.data ^ value;
         } else if (src & IMMEDIATE) {
-            value = mpcip->immediate;
+            value = mmio_opp->immediate;
             diff = (unsigned long) p->u.data ^ value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
@@ -581,7 +581,7 @@ static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             value = get_reg_value(size, index, 0, regs);
             diff = (unsigned long) p->u.data - value;
         } else if (src & IMMEDIATE) {
-            value = mpcip->immediate;
+            value = mmio_opp->immediate;
             diff = (unsigned long) p->u.data - value;
         } else if (src & MEMORY) {
             index = operand_index(dst);
@@ -608,7 +608,7 @@ static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
             index = operand_index(src);
             value = get_reg_value(size, index, 0, regs);
         } else if (src & IMMEDIATE) {
-            value = mpcip->immediate;
+            value = mmio_opp->immediate;
         } else if (src & MEMORY) {
             index = operand_index(dst);
             value = get_reg_value(size, index, 0, regs);
@@ -629,21 +629,21 @@ static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
     load_cpu_user_regs(regs);
 }
 
-void vmx_io_assist(struct vcpu *v) 
+void vmx_io_assist(struct vcpu *v)
 {
     vcpu_iodata_t *vio;
     ioreq_t *p;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
-    struct mi_per_cpu_info *mpci_p;
+    struct mmio_op *mmio_opp;
     struct cpu_user_regs *inst_decoder_regs;
 
-    mpci_p = &v->domain->arch.vmx_platform.mpci;
-    inst_decoder_regs = mpci_p->inst_decoder_regs;
+    mmio_opp = &v->arch.arch_vmx.mmio_op;
+    inst_decoder_regs = mmio_opp->inst_decoder_regs;
 
     vio = get_vio(v->domain, v->vcpu_id);
 
     if (vio == 0) {
-        VMX_DBG_LOG(DBG_LEVEL_1, 
+        VMX_DBG_LOG(DBG_LEVEL_1,
                     "bad shared page: %lx", (unsigned long) vio);
         printf("bad shared page: %lx\n", (unsigned long) vio);
         domain_crash_synchronous();
@@ -660,15 +660,15 @@ void vmx_io_assist(struct vcpu *v)
             clear_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
 
             if (p->type == IOREQ_TYPE_PIO)
-                vmx_pio_assist(regs, p, mpci_p);
+                vmx_pio_assist(regs, p, mmio_opp);
             else
-                vmx_mmio_assist(regs, p, mpci_p);
+                vmx_mmio_assist(regs, p, mmio_opp);
         }
         /* else an interrupt send event raced us */
     }
 }
 
-int vmx_clear_pending_io_event(struct vcpu *v) 
+int vmx_clear_pending_io_event(struct vcpu *v)
 {
     struct domain *d = v->domain;
     int port = iopacket_port(d);
@@ -678,7 +678,7 @@ int vmx_clear_pending_io_event(struct vcpu *v)
         clear_bit(port>>5, &v->vcpu_info->evtchn_pending_sel);
 
     /* Note: VMX domains may need upcalls as well */
-    if (!v->vcpu_info->evtchn_pending_sel) 
+    if (!v->vcpu_info->evtchn_pending_sel)
         clear_bit(0, &v->vcpu_info->evtchn_upcall_pending);
 
     /* clear the pending bit for port */
@@ -688,18 +688,18 @@ int vmx_clear_pending_io_event(struct vcpu *v)
 /* Because we've cleared the pending events first, we need to guarantee that
  * all events to be handled by xen for VMX domains are taken care of here.
  *
- * interrupts are guaranteed to be checked before resuming guest. 
- * VMX upcalls have been already arranged for if necessary. 
+ * interrupts are guaranteed to be checked before resuming guest.
+ * VMX upcalls have been already arranged for if necessary.
  */
-void vmx_check_events(struct vcpu *d) 
+void vmx_check_events(struct vcpu *v)
 {
-    /* clear the event *before* checking for work. This should avoid 
+    /* clear the event *before* checking for work. This should avoid
        the set-and-check races */
     if (vmx_clear_pending_io_event(current))
-        vmx_io_assist(d);
+        vmx_io_assist(v);
 }
 
-/* On exit from vmx_wait_io, we're guaranteed to have a I/O response from 
+/* On exit from vmx_wait_io, we're guaranteed to have a I/O response from
    the device model */
 void vmx_wait_io()
 {
@@ -782,7 +782,7 @@ static __inline__ int find_highest_irq(u32 *pintr)
     return __fls(pintr[0]);
 }
 
-#define BSP_CPU(d)    (!(d->vcpu_id))
+#define BSP_CPU(v)    (!(v->vcpu_id))
 static inline void clear_extint(struct vcpu *v)
 {
     global_iodata_t *spg;
@@ -883,7 +883,7 @@ static inline int irq_masked(unsigned long eflags)
     return ((eflags & X86_EFLAGS_IF) == 0);
 }
 
-asmlinkage void vmx_intr_assist(void) 
+asmlinkage void vmx_intr_assist(void)
 {
     int intr_type = 0;
     int highest_vector;
@@ -945,19 +945,19 @@ asmlinkage void vmx_intr_assist(void)
     return;
 }
 
-void vmx_do_resume(struct vcpu *d) 
+void vmx_do_resume(struct vcpu *v)
 {
     vmx_stts();
 
-    if (event_pending(d)) {
-        vmx_check_events(d);
+    if (event_pending(v)) {
+        vmx_check_events(v);
 
-        if (test_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags))
+        if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags))
             vmx_wait_io();
     }
 
     /* We can't resume the guest if we're waiting on I/O */
-    ASSERT(!test_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags));
+    ASSERT(!test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags));
 }
 
 #endif /* CONFIG_VMX */

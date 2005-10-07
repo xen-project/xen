@@ -659,14 +659,14 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
 static void vmx_io_instruction(struct cpu_user_regs *regs,
                                unsigned long exit_qualification, unsigned long inst_len)
 {
-    struct mi_per_cpu_info *mpcip;
+    struct mmio_op *mmio_opp;
     unsigned long eip, cs, eflags;
     unsigned long port, size, dir;
     int vm86;
 
-    mpcip = &current->domain->arch.vmx_platform.mpci;
-    mpcip->instr = INSTR_PIO;
-    mpcip->flags = 0;
+    mmio_opp = &current->arch.arch_vmx.mmio_op;
+    mmio_opp->instr = INSTR_PIO;
+    mmio_opp->flags = 0;
 
     __vmread(GUEST_RIP, &eip);
     __vmread(GUEST_CS_SELECTOR, &cs);
@@ -700,7 +700,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
             addr = dir == IOREQ_WRITE ? regs->esi : regs->edi;
 
         if (test_bit(5, &exit_qualification)) { /* "rep" prefix */
-            mpcip->flags |= REPZ;
+            mmio_opp->flags |= REPZ;
             count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
         }
 
@@ -711,7 +711,7 @@ static void vmx_io_instruction(struct cpu_user_regs *regs,
         if ((addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK)) {
             unsigned long value = 0;
 
-            mpcip->flags |= OVERLAP;
+            mmio_opp->flags |= OVERLAP;
             if (dir == IOREQ_WRITE)
                 vmx_copy(&value, addr, size, VMX_COPY_IN);
             send_pio_req(regs, port, 1, size, value, dir, 0);
@@ -1695,7 +1695,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
                         (unsigned long)regs.eax, (unsigned long)regs.ebx,
                         (unsigned long)regs.ecx, (unsigned long)regs.edx,
                         (unsigned long)regs.esi, (unsigned long)regs.edi);
-            v->domain->arch.vmx_platform.mpci.inst_decoder_regs = &regs;
+            v->arch.arch_vmx.mmio_op.inst_decoder_regs = &regs;
 
             if (!(error = vmx_do_page_fault(va, &regs))) {
                 /*
