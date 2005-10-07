@@ -22,6 +22,7 @@
 #include <asm-xen/xen-public/grant_table.h>
 
 
+/* local data structures */
 struct data_exchange {
 	struct list_head pending_pak;
 	struct list_head current_pak;
@@ -45,7 +46,7 @@ struct packet {
 
 enum {
 	PACKET_FLAG_DISCARD_RESPONSE = 1,
-	PACKET_FLAG_SEND_CONTROLMESSAGE = 2,
+	PACKET_FLAG_CHECK_RESPONSESTATUS = 2,
 };
 
 static struct data_exchange dataex;
@@ -66,9 +67,26 @@ static int  packet_read_shmem(struct packet *pak,
 
 #define MAX_PENDING_REQS TPMIF_TX_RING_SIZE
 
-static multicall_entry_t tx_mcl[MAX_PENDING_REQS];
-
 #define MIN(x,y)  (x) < (y) ? (x) : (y)
+
+
+/***************************************************************
+ Buffer copying
+***************************************************************/
+static inline int
+copy_from_buffer(void *to,
+                 const void *from,
+                 unsigned long size,
+                 int userbuffer)
+{
+	if (userbuffer) {
+		if (copy_from_user(to, from, size))
+			return -EFAULT;
+	} else {
+		memcpy(to, from, size);
+	}
+	return 0;
+}
 
 /***************************************************************
  Packet-related functions
@@ -188,15 +206,25 @@ packet_write(struct packet *pak,
 	DPRINTK("Supposed to send %d bytes to front-end!\n",
 	        size);
 
-	if (0 != (pak->flags & PACKET_FLAG_SEND_CONTROLMESSAGE)) {
+	if (0 != (pak->flags & PACKET_FLAG_CHECK_RESPONSESTATUS)) {
 #ifdef CONFIG_XEN_TPMDEV_CLOSE_IF_VTPM_FAILS
 		u32 res;
-		memcpy(&res, &data[2+4], sizeof(res));
+		if (copy_from_buffer(&res,
+		                     &data[2+4],
+		                     sizeof(res),
+		                     userbuffer)) {
+			return -EFAULT;
+		}
+
 		if (res != 0) {
 			/*
-			 * Will close down this device and have the
+			 * Close down this device. Should have the
 			 * FE notified about closure.
 			 */
+			if (!pak->tpmif) {
+				return -EFAULT;
+			}
+			pak->tpmif->status = DISCONNECTING;
 		}
 #endif
 	}
@@ -226,16 +254,15 @@ _packet_write(struct packet *pak,
 	int rc = 0;
 	unsigned int i = 0;
 	unsigned int offset = 0;
-	multicall_entry_t *mcl;
 
-	if (tpmif == NULL)
+	if (tpmif == NULL) {
 		return -EFAULT;
+        }
 
-	if (tpmif->status != CONNECTED) {
+	if (tpmif->status == DISCONNECTED) {
 		return size;
 	}
 
-	mcl = tx_mcl;
 	while (offset < size && i < TPMIF_TX_RING_SIZE) {
 		unsigned int tocopy;
 		struct gnttab_map_grant_ref map_op;
@@ -272,22 +299,15 @@ _packet_write(struct packet *pak,
 					PAGE_SHIFT] =
 			FOREIGN_FRAME(map_op.dev_bus_addr >> PAGE_SHIFT);
 
-		tocopy = size - offset;
-		if (tocopy > PAGE_SIZE) {
-			tocopy = PAGE_SIZE;
-		}
-		if (userbuffer) {
-			if (copy_from_user((void *)(MMAP_VADDR(tpmif,i) |
-			                           (tx->addr & ~PAGE_MASK)),
-			                   (void __user *)&data[offset],
-			                   tocopy)) {
-				tpmif_put(tpmif);
-				return -EFAULT;
-			}
-		} else {
-			memcpy((void *)(MMAP_VADDR(tpmif,i) |
-					(tx->addr & ~PAGE_MASK)),
-			       &data[offset], tocopy);
+		tocopy = MIN(size - offset, PAGE_SIZE);
+
+		if (copy_from_buffer((void *)(MMAP_VADDR(tpmif,i)|
+		                     (tx->addr & ~PAGE_MASK)),
+		                     &data[offset],
+		                     tocopy,
+		                     userbuffer)) {
+			tpmif_put(tpmif);
+			return -EFAULT;
 		}
 		tx->size = tocopy;
 
@@ -306,8 +326,8 @@ _packet_write(struct packet *pak,
 	}
 
 	rc = offset;
-	DPRINTK("Notifying frontend via event channel %d\n",
-	        tpmif->evtchn);
+	DPRINTK("Notifying frontend via irq %d\n",
+	        tpmif->irq);
 	notify_remote_via_irq(tpmif->irq);
 
 	return rc;
@@ -705,9 +725,13 @@ static u8 destroy_cmd[] = {
 int tpmif_vtpm_open(tpmif_t *tpmif, domid_t domid, u32 instance)
 {
 	int rc = 0;
-	struct packet *pak = packet_alloc(tpmif, sizeof(create_cmd), create_cmd[0],
-	    PACKET_FLAG_DISCARD_RESPONSE|
-	    PACKET_FLAG_SEND_CONTROLMESSAGE);
+	struct packet *pak;
+
+	pak = packet_alloc(tpmif,
+	                   sizeof(create_cmd),
+	                   create_cmd[0],
+	                   PACKET_FLAG_DISCARD_RESPONSE|
+	                   PACKET_FLAG_CHECK_RESPONSESTATUS);
 	if (pak) {
 		u8 buf[sizeof(create_cmd)];
 		u32 domid_no = htonl((u32)domid);
@@ -742,8 +766,7 @@ int tpmif_vtpm_close(u32 instid)
 	pak = packet_alloc(NULL,
 	                   sizeof(create_cmd),
 	                   create_cmd[0],
-	                   PACKET_FLAG_DISCARD_RESPONSE|
-	                   PACKET_FLAG_SEND_CONTROLMESSAGE);
+	                   PACKET_FLAG_DISCARD_RESPONSE);
 	if (pak) {
 		u8 buf[sizeof(destroy_cmd)];
 		u32 instid_no = htonl(instid);
@@ -896,7 +919,8 @@ static int vtpm_receive(tpmif_t *tpmif, u32 size)
 	 */
 	if (size < 10 ||
 	    be32_to_cpu(*native_size) != size ||
-	    0 == dataex.has_opener) {
+	    0 == dataex.has_opener ||
+	    tpmif->status != CONNECTED) {
 	    	rc = -EINVAL;
 	    	goto failexit;
 	} else {

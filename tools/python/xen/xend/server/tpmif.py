@@ -37,7 +37,7 @@ class TPMifController(DevController):
 
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
-        
+
         devid = int(sxp.child_value(config, 'instance', '0'))
         log.info("The domain has a TPM with instance %d." % devid)
 
@@ -48,9 +48,7 @@ class TPMifController(DevController):
 
     def configuration(self, devid):
 
-        log.info("The configuration method is called.")
-
-        result = DevContoller.configuration(self, devid)
+        result = DevController.configuration(self, devid)
 
         (instance) = self.readBackend(devif,
                                       'instance')

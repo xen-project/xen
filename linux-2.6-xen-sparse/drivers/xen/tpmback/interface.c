@@ -67,7 +67,7 @@ tpmif_find(domid_t domid, long int instance)
 				tpmif_get(tpmif);
 				return tpmif;
 			} else {
-				return NULL;
+				return ERR_PTR(-EEXIST);
 			}
 		}
 	}
