@@ -53,6 +53,8 @@ struct vmcs_struct {
     unsigned char data [0]; /* vmcs size is read from MSR */
 };
 
+extern int vmcs_size;
+
 enum { 
     VMX_INDEX_MSR_LSTAR = 0,
     VMX_INDEX_MSR_STAR,
@@ -94,18 +96,11 @@ struct arch_vmx_struct {
 #define ARCH_VMX_VMCS_RESUME    2       /* Needs VMCS resume */
 #define ARCH_VMX_IO_WAIT        3       /* Waiting for I/O completion */
 
-void vmx_do_launch(struct vcpu *); 
-void vmx_do_resume(struct vcpu *); 
-void vmx_set_host_env(struct vcpu *);
-
+void vmx_do_resume(struct vcpu *);
 struct vmcs_struct *alloc_vmcs(void);
-void free_vmcs(struct vmcs_struct *);
-int  load_vmcs(struct arch_vmx_struct *, u64);
-int  store_vmcs(struct arch_vmx_struct *, u64);
-int  construct_vmcs(struct arch_vmx_struct *, struct cpu_user_regs *, 
-                    struct vcpu_guest_context *, int);
 int modify_vmcs(struct arch_vmx_struct *arch_vmx,
                 struct cpu_user_regs *regs);
+void destroy_vmcs(struct arch_vmx_struct *arch_vmx);
 
 #define VMCS_USE_HOST_ENV       1
 #define VMCS_USE_SEPARATE_ENV   0

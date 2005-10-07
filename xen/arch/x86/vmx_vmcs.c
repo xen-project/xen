@@ -37,6 +37,8 @@
 #endif
 #ifdef CONFIG_VMX
 
+int vmcs_size;
+
 struct vmcs_struct *alloc_vmcs(void)
 {
     struct vmcs_struct *vmcs;
@@ -51,13 +53,35 @@ struct vmcs_struct *alloc_vmcs(void)
     return vmcs;
 }
 
-void free_vmcs(struct vmcs_struct *vmcs)
+static void free_vmcs(struct vmcs_struct *vmcs)
 {
     int order;
 
     order = get_order_from_bytes(vmcs_size);
     free_xenheap_pages(vmcs, order);
 }
+
+static int load_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr)
+{
+    int error;
+
+    if ((error = __vmptrld(phys_ptr))) {
+        clear_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags);
+        return error;
+    }
+    set_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags);
+    return 0;
+}
+
+#if 0
+static int store_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr)
+{
+    /* take the current VMCS */
+    __vmptrst(phys_ptr);
+    clear_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags);
+    return 0;
+}
+#endif
 
 static inline int construct_vmcs_controls(struct arch_vmx_struct *arch_vmx)
 {
@@ -118,7 +142,7 @@ struct host_execution_env {
 #endif
 };
 
-static void vmx_setup_platform(struct vcpu *v, struct cpu_user_regs *regs)
+static void vmx_setup_platform(struct vcpu *v)
 {
     int i;
     unsigned char e820_map_nr;
@@ -161,9 +185,6 @@ static void vmx_setup_platform(struct vcpu *v, struct cpu_user_regs *regs)
     }
     unmap_domain_page(p);
 
-    if (v->vcpu_id)
-        return;
-
     /* Initialise shared page */
     mpfn = get_mfn_from_pfn(gpfn);
     if (mpfn == INVALID_MFN) {
@@ -184,7 +205,7 @@ static void vmx_setup_platform(struct vcpu *v, struct cpu_user_regs *regs)
               &v->domain->shared_info->evtchn_mask[0]);
 }
 
-void vmx_set_host_env(struct vcpu *v)
+static void vmx_set_host_env(struct vcpu *v)
 {
     unsigned int tr, cpu, error = 0;
     struct host_execution_env host_env;
@@ -209,14 +230,13 @@ void vmx_set_host_env(struct vcpu *v)
     error |= __vmwrite(HOST_TR_BASE, host_env.tr_base);
 }
 
-void vmx_do_launch(struct vcpu *v)
+static void vmx_do_launch(struct vcpu *v)
 {
 /* Update CR3, GDT, LDT, TR */
     unsigned int  error = 0;
     unsigned long pfn = 0;
     unsigned long cr0, cr4;
     struct pfn_info *page;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
 
     __asm__ __volatile__ ("mov %%cr0,%0" : "=r" (cr0) : );
 
@@ -246,7 +266,7 @@ void vmx_do_launch(struct vcpu *v)
     page = (struct pfn_info *) alloc_domheap_page(NULL);
     pfn = (unsigned long) (page - frame_table);
 
-    vmx_setup_platform(v, regs);
+    vmx_setup_platform(v);
 
     vmx_set_host_env(v);
 
@@ -267,8 +287,7 @@ void vmx_do_launch(struct vcpu *v)
 /*
  * Initially set the same environement as host.
  */
-static inline int
-construct_init_vmcs_guest(struct cpu_user_regs *regs)
+static inline int construct_init_vmcs_guest(cpu_user_regs_t *regs)
 {
     int error = 0;
     union vmcs_arbytes arbytes;
@@ -374,34 +393,33 @@ construct_init_vmcs_guest(struct cpu_user_regs *regs)
     return error;
 }
 
-static inline int construct_vmcs_host(struct host_execution_env *host_env)
+static inline int construct_vmcs_host()
 {
     int error = 0;
+#ifdef __x86_64__
+    unsigned long fs_base;
+    unsigned long gs_base;
+#endif
     unsigned long crn;
 
     /* Host Selectors */
-    host_env->ds_selector = __HYPERVISOR_DS;
-    error |= __vmwrite(HOST_ES_SELECTOR, host_env->ds_selector);
-    error |= __vmwrite(HOST_SS_SELECTOR, host_env->ds_selector);
-    error |= __vmwrite(HOST_DS_SELECTOR, host_env->ds_selector);
+    error |= __vmwrite(HOST_ES_SELECTOR, __HYPERVISOR_DS);
+    error |= __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
+    error |= __vmwrite(HOST_DS_SELECTOR, __HYPERVISOR_DS);
 #if defined (__i386__)
-    error |= __vmwrite(HOST_FS_SELECTOR, host_env->ds_selector);
-    error |= __vmwrite(HOST_GS_SELECTOR, host_env->ds_selector);
-    error |= __vmwrite(HOST_FS_BASE, host_env->ds_base);
-    error |= __vmwrite(HOST_GS_BASE, host_env->ds_base);
+    error |= __vmwrite(HOST_FS_SELECTOR, __HYPERVISOR_DS);
+    error |= __vmwrite(HOST_GS_SELECTOR, __HYPERVISOR_DS);
+    error |= __vmwrite(HOST_FS_BASE, 0);
+    error |= __vmwrite(HOST_GS_BASE, 0);
 
 #else
-    rdmsrl(MSR_FS_BASE, host_env->fs_base);
-    rdmsrl(MSR_GS_BASE, host_env->gs_base);
-    error |= __vmwrite(HOST_FS_BASE, host_env->fs_base);
-    error |= __vmwrite(HOST_GS_BASE, host_env->gs_base);
+    rdmsrl(MSR_FS_BASE, fs_base);
+    rdmsrl(MSR_GS_BASE, gs_base);
+    error |= __vmwrite(HOST_FS_BASE, fs_base);
+    error |= __vmwrite(HOST_GS_BASE, gs_base);
 
 #endif
-    host_env->cs_selector = __HYPERVISOR_CS;
-    error |= __vmwrite(HOST_CS_SELECTOR, host_env->cs_selector);
-
-    host_env->ds_base = 0;
-    host_env->cs_base = 0;
+    error |= __vmwrite(HOST_CS_SELECTOR, __HYPERVISOR_CS);
 
     __asm__ __volatile__ ("mov %%cr0,%0" : "=r" (crn) : );
     error |= __vmwrite(HOST_CR0, crn); /* same CR0 */
@@ -423,55 +441,58 @@ static inline int construct_vmcs_host(struct host_execution_env *host_env)
 
 /*
  * Need to extend to support full virtualization.
- * The variable use_host_env indicates if the new VMCS needs to use
- * the same setups as the host has (xenolinux).
  */
-
-int construct_vmcs(struct arch_vmx_struct *arch_vmx,
-                   struct cpu_user_regs *regs,
-                   struct vcpu_guest_context *ctxt,
-                   int use_host_env)
+static int construct_vmcs(struct arch_vmx_struct *arch_vmx,
+                          cpu_user_regs_t *regs)
 {
     int error;
+    long rc;
     u64 vmcs_phys_ptr;
 
-    struct host_execution_env host_env;
-
-    if (use_host_env != VMCS_USE_HOST_ENV)
-        return -EINVAL;
-
-    memset(&host_env, 0, sizeof(struct host_execution_env));
-
+    memset(arch_vmx, 0, sizeof(struct arch_vmx_struct));
+    /*
+     * Create a new VMCS
+     */
+    if (!(arch_vmx->vmcs = alloc_vmcs())) {
+        printk("Failed to create a new VMCS\n");
+        rc = -ENOMEM;
+        goto err_out;
+    }
     vmcs_phys_ptr = (u64) virt_to_phys(arch_vmx->vmcs);
 
-    if ((error = __vmpclear (vmcs_phys_ptr))) {
+    if ((error = __vmpclear(vmcs_phys_ptr))) {
         printk("construct_vmcs: VMCLEAR failed\n");
-        return -EINVAL;
+        rc = -EINVAL;
+        goto err_out;
     }
     if ((error = load_vmcs(arch_vmx, vmcs_phys_ptr))) {
         printk("construct_vmcs: load_vmcs failed: VMCS = %lx\n",
                (unsigned long) vmcs_phys_ptr);
-        return -EINVAL;
+        rc = -EINVAL;
+        goto err_out;
     }
     if ((error = construct_vmcs_controls(arch_vmx))) {
         printk("construct_vmcs: construct_vmcs_controls failed\n");
-        return -EINVAL;
+        rc = -EINVAL;
+        goto err_out;
     }
     /* host selectors */
-    if ((error = construct_vmcs_host(&host_env))) {
+    if ((error = construct_vmcs_host())) {
         printk("construct_vmcs: construct_vmcs_host failed\n");
-        return -EINVAL;
+        rc = -EINVAL;
+        goto err_out;
     }
     /* guest selectors */
     if ((error = construct_init_vmcs_guest(regs))) {
         printk("construct_vmcs: construct_vmcs_guest failed\n");
-        return -EINVAL;
+        rc = -EINVAL;
+        goto err_out;
     }
-
     if ((error |= __vmwrite(EXCEPTION_BITMAP,
                             MONITOR_DEFAULT_EXCEPTION_BITMAP))) {
         printk("construct_vmcs: setting Exception bitmap failed\n");
-        return -EINVAL;
+        rc = -EINVAL;
+        goto err_out;
     }
 
     if (regs->eflags & EF_TF)
@@ -480,6 +501,27 @@ int construct_vmcs(struct arch_vmx_struct *arch_vmx,
         __vm_clear_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_DB);
 
     return 0;
+
+err_out:
+    destroy_vmcs(arch_vmx);
+    return rc;
+}
+
+void destroy_vmcs(struct arch_vmx_struct *arch_vmx)
+{
+    if(arch_vmx->vmcs != NULL)
+        free_vmcs(arch_vmx->vmcs);
+    if(arch_vmx->io_bitmap_a != 0) {
+        free_xenheap_pages(
+            arch_vmx->io_bitmap_a, get_order_from_bytes(0x1000));
+        arch_vmx->io_bitmap_a = 0;
+    }
+    if(arch_vmx->io_bitmap_b != 0) {
+        free_xenheap_pages(
+            arch_vmx->io_bitmap_b, get_order_from_bytes(0x1000));
+        arch_vmx->io_bitmap_b = 0;
+    }
+    arch_vmx->vmcs = 0;
 }
 
 /*
@@ -503,26 +545,6 @@ int modify_vmcs(struct arch_vmx_struct *arch_vmx,
 
     __vmptrld(old_phys_ptr);
 
-    return 0;
-}
-
-int load_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr)
-{
-    int error;
-
-    if ((error = __vmptrld(phys_ptr))) {
-        clear_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags);
-        return error;
-    }
-    set_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags);
-    return 0;
-}
-
-int store_vmcs(struct arch_vmx_struct *arch_vmx, u64 phys_ptr)
-{
-    /* take the current VMCS */
-    __vmptrst(phys_ptr);
-    clear_bit(ARCH_VMX_VMCS_LOADED, &arch_vmx->flags);
     return 0;
 }
 
@@ -553,9 +575,19 @@ void arch_vmx_do_resume(struct vcpu *v)
 
 void arch_vmx_do_launch(struct vcpu *v)
 {
-    u64 vmcs_phys_ptr = (u64) virt_to_phys(v->arch.arch_vmx.vmcs);
+    int error;
+    cpu_user_regs_t *regs = &current->arch.guest_context.user_regs;
 
-    load_vmcs(&v->arch.arch_vmx, vmcs_phys_ptr);
+    error = construct_vmcs(&v->arch.arch_vmx, regs);
+    if ( error < 0 )
+    {
+        if (v->vcpu_id == 0) {
+            printk("Failed to construct a new VMCS for BSP.\n");
+        } else {
+            printk("Failed to construct a new VMCS for AP %d\n", v->vcpu_id);
+        }
+        domain_crash_synchronous();
+    }
     vmx_do_launch(v);
     reset_stack_and_jump(vmx_asm_do_launch);
 }

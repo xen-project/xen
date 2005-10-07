@@ -39,7 +39,6 @@ extern void arch_vmx_do_launch(struct vcpu *);
 extern void arch_vmx_do_resume(struct vcpu *);
 extern void arch_vmx_do_relaunch(struct vcpu *);
 
-extern int vmcs_size;
 extern unsigned int cpu_rev;
 
 /*
@@ -449,7 +448,7 @@ static inline void vmx_stts(void)
        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
 }
 
-/* Works only for ed == current */
+/* Works only for vcpu == current */
 static inline int vmx_paging_enabled(struct vcpu *v)
 {
     unsigned long cr0;
