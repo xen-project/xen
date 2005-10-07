@@ -1043,9 +1043,10 @@ BOOLEAN vcpu_timer_expired(VCPU *vcpu)
 void vcpu_safe_set_itm(unsigned long val)
 {
 	unsigned long epsilon = 100;
+	unsigned long flags;
 	UINT64 now = ia64_get_itc();
 
-	local_irq_disable();
+	local_irq_save(flags);
 	while (1) {
 //printf("*** vcpu_safe_set_itm: Setting itm to %lx, itc=%lx\n",val,now);
 		ia64_set_itm(val);
@@ -1053,7 +1054,7 @@ void vcpu_safe_set_itm(unsigned long val)
 		val = now + epsilon;
 		epsilon <<= 1;
 	}
-	local_irq_enable();
+	local_irq_restore(flags);
 }
 
 void vcpu_set_next_timer(VCPU *vcpu)
