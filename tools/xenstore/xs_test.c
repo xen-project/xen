@@ -198,7 +198,6 @@ static void __attribute__((noreturn)) usage(void)
 	     "  rm <path>\n"
 	     "  getperm <path>\n"
 	     "  setperm <path> <id> <flags> ...\n"
-	     "  shutdown\n"
 	     "  watch <path> <token>\n"
 	     "  watchnoack <path> <token>\n"
 	     "  waitwatch\n"
@@ -214,8 +213,6 @@ static void __attribute__((noreturn)) usage(void)
 	     "  notimeout\n"
 	     "  readonly\n"
 	     "  readwrite\n"
-	     "  noackwrite <path> <value>...\n"
-	     "  readack\n"
 	     "  dump\n");
 }
 
@@ -355,37 +352,6 @@ static void do_write(unsigned int handle, char *path, char *data)
 		failed(handle);
 }
 
-static void do_noackwrite(unsigned int handle,
-			  char *path, char *data)
-{
-	struct xsd_sockmsg msg;
-
-	msg.len = strlen(path) + 1 + strlen(data);
-	msg.type = XS_WRITE;
-	if (!write_all_choice(handles[handle]->fd, &msg, sizeof(msg)))
-		failed(handle);
-	if (!write_all_choice(handles[handle]->fd, path, strlen(path) + 1))
-		failed(handle);
-	if (!write_all_choice(handles[handle]->fd, data, strlen(data)))
-		failed(handle);
-	/* Do not wait for ack. */
-}
-
-static void do_readack(unsigned int handle)
-{
-	enum xsd_sockmsg_type type;
-	char *ret = NULL;
-
-	/* Watches can have fired before reply comes: daemon detects
-	 * and re-transmits, so we can ignore this. */
-	do {
-		free(ret);
-		ret = read_reply(handles[handle]->fd, &type, NULL);
-		if (!ret)
-			failed(handle);
-	} while (type == XS_WATCH_EVENT);
-}
-
 static void do_setid(unsigned int handle, char *id)
 {
 	if (!xs_bool(xs_debug_command(handles[handle], "setid", id,
@@ -472,12 +438,6 @@ static void do_setperm(unsigned int handle, char *path, char *line)
 	}
 
 	if (!xs_set_permissions(handles[handle], path, perms, i))
-		failed(handle);
-}
-
-static void do_shutdown(unsigned int handle)
-{
-	if (!xs_shutdown(handles[handle]))
 		failed(handle);
 }
 
@@ -780,8 +740,6 @@ static void do_command(unsigned int default_handle, char *line)
 		do_getperm(handle, arg(line, 1));
 	else if (streq(command, "setperm"))
 		do_setperm(handle, arg(line, 1), line);
-	else if (streq(command, "shutdown"))
-		do_shutdown(handle);
 	else if (streq(command, "watch"))
 		do_watch(handle, arg(line, 1), arg(line, 2), true);
 	else if (streq(command, "watchnoack"))
@@ -823,11 +781,7 @@ static void do_command(unsigned int default_handle, char *line)
 		readonly = false;
 		xs_daemon_close(handles[handle]);
 		handles[handle] = NULL;
-	} else if (streq(command, "noackwrite"))
-		do_noackwrite(handle, arg(line,1), arg(line,2));
-	else if (streq(command, "readack"))
-		do_readack(handle);
-	else
+	} else
 		barf("Unknown command %s", command);
 	fflush(stdout);
 	disarm_timeout();

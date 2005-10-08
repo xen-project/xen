@@ -150,7 +150,6 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 {
 	switch (type) {
 	case XS_DEBUG: return "DEBUG";
-	case XS_SHUTDOWN: return "SHUTDOWN";
 	case XS_DIRECTORY: return "DIRECTORY";
 	case XS_READ: return "READ";
 	case XS_GET_PERMS: return "GET_PERMS";
@@ -1082,17 +1081,6 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 	case XS_SET_PERMS:
 		do_set_perms(conn, in);
 		break;
-
-	case XS_SHUTDOWN:
-		/* FIXME: Implement gentle shutdown too. */
-		/* Only tools can do this. */
-		if (conn->id != 0 || !conn->can_write) {
-			send_error(conn, EACCES);
-			break;
-		}
-		send_ack(conn, XS_SHUTDOWN);
-		/* Everything hangs off auto-free context, freed at exit. */
-		exit(0);
 
 	case XS_DEBUG:
 		if (streq(in->buffer, "print"))

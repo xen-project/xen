@@ -31,7 +31,6 @@
 enum xsd_sockmsg_type
 {
 	XS_DEBUG,
-	XS_SHUTDOWN,
 	XS_DIRECTORY,
 	XS_READ,
 	XS_GET_PERMS,

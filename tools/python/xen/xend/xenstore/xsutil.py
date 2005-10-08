@@ -7,14 +7,17 @@
 import threading
 from xen.lowlevel import xs
 
-handles = {}
+xs_lock = threading.Lock()
+xs_handle = None
 
-# XXX need to g/c handles from dead threads
 def xshandle():
-    if not handles.has_key(threading.currentThread()):
-        handles[threading.currentThread()] = xs.open()
-    return handles[threading.currentThread()]
-
+    global xs_handle, xs_lock
+    if not xs_handle:
+        xs_lock.acquire()
+        if not xs_handle:
+            xs_handle = xs.open()
+        xs_lock.release()
+    return xs_handle
 
 def IntroduceDomain(domid, page, port, path):
     return xshandle().introduce_domain(domid, page, port, path)

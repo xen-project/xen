@@ -141,7 +141,4 @@ char *xs_get_domain_path(struct xs_handle *h, domid_t domid);
 char *xs_debug_command(struct xs_handle *h, const char *cmd,
 		       void *data, unsigned int len);
 
-/* Shut down the daemon. */
-bool xs_shutdown(struct xs_handle *h);
-
 #endif /* _XS_H */

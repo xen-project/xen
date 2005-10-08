@@ -879,20 +879,11 @@ static int daemon_pid;
 static void cleanup_xs_ops(void)
 {
 	char *cmd;
+
 	if (daemon_pid) {
-		struct xs_handle *h;
-		h = xs_daemon_open();
-		if (h) {
-			if (xs_shutdown(h)) {
-				waitpid(daemon_pid, NULL, 0);
-				daemon_pid = 0;
-			}
-			xs_daemon_close(h);
-		}
-		if (daemon_pid) {
-			kill(daemon_pid, SIGTERM);
-			waitpid(daemon_pid, NULL, 0);
-		}
+		kill(daemon_pid, SIGTERM);
+		waitpid(daemon_pid, NULL, 0);
+		daemon_pid = 0;
 	}
 	
 	cmd = talloc_asprintf(NULL, "rm -rf testsuite/tmp/*");
