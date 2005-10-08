@@ -425,12 +425,13 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
 static void vmx_do_no_device_fault(void)
 {
     unsigned long cr0;
+    struct vcpu *v = current;
 
     clts();
     setup_fpu(current);
-    __vmread_vcpu(CR0_READ_SHADOW, &cr0);
+    __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
     if (!(cr0 & X86_CR0_TS)) {
-        __vmread_vcpu(GUEST_CR0, &cr0);
+        __vmread_vcpu(v, GUEST_CR0, &cr0);
         cr0 &= ~X86_CR0_TS;
         __vmwrite(GUEST_CR0, cr0);
     }
@@ -1347,6 +1348,7 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
 {
     unsigned int gp, cr;
     unsigned long value;
+    struct vcpu *v = current;
 
     switch (exit_qualification & CONTROL_REG_ACCESS_TYPE) {
     case TYPE_MOV_TO_CR:
@@ -1369,17 +1371,17 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
         clts();
         setup_fpu(current);
 
-        __vmread_vcpu(GUEST_CR0, &value);
+        __vmread_vcpu(v, GUEST_CR0, &value);
         value &= ~X86_CR0_TS; /* clear TS */
         __vmwrite(GUEST_CR0, value);
 
-        __vmread_vcpu(CR0_READ_SHADOW, &value);
+        __vmread_vcpu(v, CR0_READ_SHADOW, &value);
         value &= ~X86_CR0_TS; /* clear TS */
         __vmwrite(CR0_READ_SHADOW, value);
         break;
     case TYPE_LMSW:
         TRACE_VMEXIT(1,TYPE_LMSW);
-        __vmread_vcpu(CR0_READ_SHADOW, &value);
+        __vmread_vcpu(v, CR0_READ_SHADOW, &value);
         value = (value & ~0xF) |
             (((exit_qualification & LMSW_SOURCE_DATA) >> 16) & 0xF);
         return vmx_set_cr0(value);

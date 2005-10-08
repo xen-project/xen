@@ -891,7 +891,7 @@ asmlinkage void vmx_intr_assist(void)
     struct vcpu *v = current;
 
     highest_vector = find_highest_pending_irq(v, &intr_type);
-    __vmread_vcpu(CPU_BASED_VM_EXEC_CONTROL, &cpu_exec_control);
+    __vmread_vcpu(v, CPU_BASED_VM_EXEC_CONTROL, &cpu_exec_control);
 
     if (highest_vector == -1) {
         disable_irq_window(cpu_exec_control);
