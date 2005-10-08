@@ -30,9 +30,15 @@ from getopt import getopt
 import socket
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
+
+import xen.xend.XendError
+import xen.xend.XendProtocol
+
 from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xm.opts import *
+
+
 shorthelp = """Usage: xm <subcommand> [args]
     Control, list, and manipulate Xen guest instances
 
@@ -80,8 +86,8 @@ xm full list of subcommands:
     shutdown [-w|-a] <DomId>  shutdown a domain
     sysrq   <DomId> <letter>  send a sysrq to a domain
     unpause <DomId>           unpause a paused domain
-    vcpu-enable <DomId> <VCPU>        disable VCPU in a domain
-    vcpu-disable <DomId> <VCPU>       enable VCPU in a domain
+    vcpu-enable <DomId> <VCPU>        enable VCPU in a domain
+    vcpu-disable <DomId> <VCPU>       disable VCPU in a domain
     vcpu-list <DomId>                 get the list of VCPUs for a domain
     vcpu-pin <DomId> <VCpu> <CPUS>    set which cpus a VCPU can use. 
 
@@ -100,9 +106,10 @@ xm full list of subcommands:
   Virtual Device Commands:
     block-attach  <DomId> <BackDev> <FrontDev> <Mode> [BackDomId]
         Create a new virtual block device 
-    block-detach  <DomId> <DevId>  Destroy a domain's virtual block device
+    block-detach  <DomId> <DevId>  Destroy a domain's virtual block device,
+                                   where <DevId> may either be the device ID
+                                   or the device name as mounted in the guest.
     block-list    <DomId>          List virtual block devices for a domain
-    block-refresh <DomId> <DevId>  Refresh a virtual block device for a domain
     network-limit   <DomId> <Vif> <Credit> <Period>
         Limit the transmission rate of a virtual network interface
     network-list    <DomId>        List virtual network interfaces for a domain
@@ -159,6 +166,9 @@ def handle_xend_error(cmd, dom, ex):
     error = str(ex)
     if error == "Not found" and dom != None:
         err("Domain '%s' not found when running 'xm %s'" % (dom, cmd))
+        sys.exit(1)
+    elif error == "Exception: Device not connected":
+        err("Device not connected")
         sys.exit(1)
     else:
         raise ex
@@ -513,15 +523,6 @@ def xm_block_attach(args):
     from xen.xend.XendClient import server
     server.xend_domain_device_create(dom, vbd)
 
-def xm_block_refresh(args):
-    arg_check(args,2,"block-refresh")
-
-    dom = args[0]
-    dev = args[1]
-
-    from xen.xend.XendClient import server
-    server.xend_domain_device_refresh(dom, 'vbd', dev)
-
 def xm_block_detach(args):
     arg_check(args,2,"block-detach")
 
@@ -608,7 +609,6 @@ commands = {
     "block-attach": xm_block_attach,
     "block-detach": xm_block_detach,
     "block-list": xm_block_list,
-    "block-refresh": xm_block_refresh,
     # network
     "network-limit": xm_network_limit,
     "network-list": xm_network_list,
@@ -637,7 +637,6 @@ aliases = {
     "vbd-create": "block-create",
     "vbd-destroy": "block-destroy",
     "vbd-list": "block-list",
-    "vbd-refresh": "block-refresh",
     }
 
 help = {
@@ -687,7 +686,6 @@ def main(argv=sys.argv):
     args = argv[2:]
     if cmd:
         try:
-            from xen.xend.XendClient import XendError
             rc = cmd(args)
             if rc:
                 usage()
@@ -698,7 +696,15 @@ def main(argv=sys.argv):
         except IOError:
             err("Most commands need root access.  Please try again as root")
             sys.exit(1)
-        except XendError, ex:
+        except xen.xend.XendError.XendError, ex:
+            if len(args) > 0:
+                handle_xend_error(argv[1], args[0], ex)
+            else:
+                print "Unexpected error:", sys.exc_info()[0]
+                print
+                print "Please report to xen-devel@lists.xensource.com"
+                raise
+        except xen.xend.XendProtocol.XendError, ex:
             if len(args) > 0:
                 handle_xend_error(argv[1], args[0], ex)
             else:
@@ -719,6 +725,3 @@ def main(argv=sys.argv):
 
 if __name__ == "__main__":
     main()
-
-
-

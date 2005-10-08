@@ -71,8 +71,7 @@ class SrvDomain(SrvDir):
 
     def op_destroy(self, op, req):
         fn = FormFn(self.xd.domain_destroy,
-                    [['dom',    'int'],
-                     ['reason', 'str']])
+                    [['dom',    'int']])
         val = fn(req.args, {'dom': self.dom.domid})
         req.setHeader("Location", "%s/.." % req.prePathURL())
         return val
@@ -157,19 +156,11 @@ class SrvDomain(SrvDir):
         val = fn(req.args, {'dom': self.dom.domid})
         return val
 
-    def op_device_refresh(self, op, req):
-        fn = FormFn(self.xd.domain_device_refresh,
-                    [['dom',  'int'],
-                     ['type', 'str'],
-                     ['idx',  'int']])
-        val = fn(req.args, {'dom': self.dom.domid})
-        return val
-
     def op_device_destroy(self, op, req):
         fn = FormFn(self.xd.domain_device_destroy,
                     [['dom',  'int'],
                      ['type', 'str'],
-                     ['idx',  'int']])
+                     ['dev',  'str']])
         val = fn(req.args, {'dom': self.dom.domid})
         return val
                 
@@ -177,7 +168,7 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_device_configure,
                     [['dom',    'int'],
                      ['config', 'sxpr'],
-                     ['idx',    'int']])
+                     ['dev',    'str']])
         val = fn(req.args, {'dom': self.dom.domid})
         return val
 
@@ -232,8 +223,6 @@ class SrvDomain(SrvDir):
 
         req.write('<form method="post" action="%s">' % url)
         req.write('<input type="submit" name="op" value="destroy">')
-        req.write('<input type="radio" name="reason" value="halt" checked>Halt')
-        req.write('<input type="radio" name="reason" value="reboot">Reboot')
         req.write('</form>')
 
         req.write('<form method="post" action="%s">' % url)

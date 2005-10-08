@@ -20,7 +20,7 @@
 #ifndef _XS_H
 #define _XS_H
 
-#include "xs_lib.h"
+#include <xs_lib.h>
 
 struct xs_handle;
 
@@ -91,10 +91,10 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token);
 int xs_fileno(struct xs_handle *h);
 
 /* Find out what node change was on (will block if nothing pending).
- * Returns array of two pointers: path and token, or NULL.
- * Call free() after use.
+ * Returns array containing the path and token. Use XS_WATCH_* to access these
+ * elements. Call free() after use.
  */
-char **xs_read_watch(struct xs_handle *h);
+char **xs_read_watch(struct xs_handle *h, unsigned int *num);
 
 /* Acknowledge watch on node.  Watches must be acknowledged before
  * any other watches can be read.
@@ -140,8 +140,5 @@ char *xs_get_domain_path(struct xs_handle *h, domid_t domid);
 /* Only useful for DEBUG versions */
 char *xs_debug_command(struct xs_handle *h, const char *cmd,
 		       void *data, unsigned int len);
-
-/* Shut down the daemon. */
-bool xs_shutdown(struct xs_handle *h);
 
 #endif /* _XS_H */

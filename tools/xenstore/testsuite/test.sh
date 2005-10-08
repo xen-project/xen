@@ -23,7 +23,8 @@ run_test()
 	    cat testsuite/tmp/xenstored_errors
 	    return 1
 	fi
-	echo shutdown | ./xs_test
+	kill $PID
+	sleep 1
 	return 0
     else
 	# In case daemon is wedged.

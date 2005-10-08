@@ -67,7 +67,7 @@ tpmif_find(domid_t domid, long int instance)
 				tpmif_get(tpmif);
 				return tpmif;
 			} else {
-				return NULL;
+				return ERR_PTR(-EEXIST);
 			}
 		}
 	}
@@ -117,8 +117,11 @@ unmap_frontend_page(tpmif_t *tpmif)
 int
 tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 {
-	evtchn_op_t op = {.cmd = EVTCHNOP_bind_interdomain };
 	int err;
+	evtchn_op_t op = {
+		.cmd = EVTCHNOP_bind_interdomain,
+		.u.bind_interdomain.remote_dom = tpmif->domid,
+		.u.bind_interdomain.remote_port = evtchn };
 
 	if ((tpmif->tx_area = alloc_vm_area(PAGE_SIZE)) == NULL)
 		return -ENOMEM;
@@ -129,10 +132,6 @@ tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 		return err;
 	}
 
-	op.u.bind_interdomain.dom1 = DOMID_SELF;
-	op.u.bind_interdomain.dom2 = tpmif->domid;
-	op.u.bind_interdomain.port1 = 0;
-	op.u.bind_interdomain.port2 = evtchn;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		unmap_frontend_page(tpmif);
@@ -140,7 +139,7 @@ tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 		return err;
 	}
 
-	tpmif->evtchn = op.u.bind_interdomain.port1;
+	tpmif->evtchn = op.u.bind_interdomain.local_port;
 
 	tpmif->tx = (tpmif_tx_interface_t *)tpmif->tx_area->addr;
 

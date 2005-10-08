@@ -23,7 +23,7 @@
 
 # Exit if anything goes wrong
 set -e 
-
+export PATH=/sbin:/bin:/usr/bin:/usr/sbin:$PATH
 echo "*vif-route $*" >&2
 
 # Operation name.

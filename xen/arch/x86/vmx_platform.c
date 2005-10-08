@@ -22,8 +22,8 @@
 #include <xen/mm.h>
 #include <asm/shadow.h>
 #include <xen/domain_page.h>
-#include <asm/page.h> 
-#include <xen/event.h> 
+#include <asm/page.h>
+#include <xen/event.h>
 #include <xen/trace.h>
 #include <asm/vmx.h>
 #include <asm/vmx_platform.h>
@@ -69,16 +69,16 @@ static inline long __get_reg_value(unsigned long reg, int size)
     }
 }
 
-long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs) 
+long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
 {
     if (size == BYTE) {
-        switch (index) { 
+        switch (index) {
         case 0: /* %al */
             return (char)(regs->rax & 0xFF);
         case 1: /* %cl */
             return (char)(regs->rcx & 0xFF);
         case 2: /* %dl */
-            return (char)(regs->rdx & 0xFF); 
+            return (char)(regs->rdx & 0xFF);
         case 3: /* %bl */
             return (char)(regs->rbx & 0xFF);
         case 4: /* %ah */
@@ -90,7 +90,7 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
         case 7: /* %bh */
             return (char)((regs->rbx & 0xFF00) >> 8);
         default:
-            printf("Error: (get_reg_value) Invalid index value\n"); 
+            printf("Error: (get_reg_value) Invalid index value\n");
             domain_crash_synchronous();
         }
         /* NOTREACHED */
@@ -114,7 +114,7 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
     case 14: return __get_reg_value(regs->r14, size);
     case 15: return __get_reg_value(regs->r15, size);
     default:
-        printf("Error: (get_reg_value) Invalid index value\n"); 
+        printf("Error: (get_reg_value) Invalid index value\n");
         domain_crash_synchronous();
     }
 }
@@ -131,7 +131,7 @@ void store_cpu_user_regs(struct cpu_user_regs *regs)
 }
 
 static inline long __get_reg_value(unsigned long reg, int size)
-{                    
+{
     switch(size) {
     case WORD:
         return (short)(reg & 0xFFFF);
@@ -144,15 +144,15 @@ static inline long __get_reg_value(unsigned long reg, int size)
 }
 
 long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
-{                    
+{
     if (size == BYTE) {
-        switch (index) { 
+        switch (index) {
         case 0: /* %al */
             return (char)(regs->eax & 0xFF);
         case 1: /* %cl */
             return (char)(regs->ecx & 0xFF);
         case 2: /* %dl */
-            return (char)(regs->edx & 0xFF); 
+            return (char)(regs->edx & 0xFF);
         case 3: /* %bl */
             return (char)(regs->ebx & 0xFF);
         case 4: /* %ah */
@@ -164,7 +164,7 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
         case 7: /* %bh */
             return (char)((regs->ebx & 0xFF00) >> 8);
         default:
-            printf("Error: (get_reg_value) Invalid index value\n"); 
+            printf("Error: (get_reg_value) Invalid index value\n");
             domain_crash_synchronous();
         }
     }
@@ -179,7 +179,7 @@ long get_reg_value(int size, int index, int seg, struct cpu_user_regs *regs)
     case 6: return __get_reg_value(regs->esi, size);
     case 7: return __get_reg_value(regs->edi, size);
     default:
-        printf("Error: (get_reg_value) Invalid index value\n"); 
+        printf("Error: (get_reg_value) Invalid index value\n");
         domain_crash_synchronous();
     }
 }
@@ -283,9 +283,9 @@ static inline int get_index(const unsigned char *inst, unsigned char rex)
 
     //Only one operand in the instruction is register
     if (mod == 3) {
-        return (rm + (rex_b << 3)); 
+        return (rm + (rex_b << 3));
     } else {
-        return (reg + (rex_r << 3)); 
+        return (reg + (rex_r << 3));
     }
     return 0;
 }
@@ -299,7 +299,7 @@ static void init_instruction(struct instruction *mmio_inst)
 
     mmio_inst->operand[0] = 0;
     mmio_inst->operand[1] = 0;
-        
+
     mmio_inst->flags = 0;
 }
 
@@ -498,12 +498,12 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
         instr->instr = INSTR_MOVS;
         instr->op_size = BYTE;
         return DECODE_success;
-            
+
     case 0xA5: /* movsw/movsl */
         instr->instr = INSTR_MOVS;
         GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
         return DECODE_success;
-    
+
     case 0xAA: /* stosb */
         instr->instr = INSTR_STOS;
         instr->op_size = BYTE;
@@ -513,7 +513,7 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
         instr->instr = INSTR_STOS;
         GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
         return DECODE_success;
-                    
+
     case 0xC6:
         if (((opcode[1] >> 3) & 7) == 0) { /* mov $imm8, m8 */
             instr->instr = INSTR_MOV;
@@ -522,11 +522,11 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
             instr->operand[0] = mk_operand(instr->op_size, 0, 0, IMMEDIATE);
             instr->immediate = get_immediate(vm86, opcode+1, instr->op_size);
             instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
-            
+
             return DECODE_success;
         } else
             return DECODE_failure;
-            
+
     case 0xC7:
         if (((opcode[1] >> 3) & 7) == 0) { /* mov $imm16/32, m16/32 */
             instr->instr = INSTR_MOV;
@@ -535,7 +535,7 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
             instr->operand[0] = mk_operand(instr->op_size, 0, 0, IMMEDIATE);
             instr->immediate = get_immediate(vm86, opcode+1, instr->op_size);
             instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
-            
+
             return DECODE_success;
         } else
             return DECODE_failure;
@@ -598,34 +598,34 @@ int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_l
     return inst_len;
 }
 
-void send_mmio_req(unsigned char type, unsigned long gpa, 
+void send_mmio_req(unsigned char type, unsigned long gpa,
                    unsigned long count, int size, long value, int dir, int pvalid)
 {
-    struct vcpu *d = current;
+    struct vcpu *v = current;
     vcpu_iodata_t *vio;
     ioreq_t *p;
     int vm86;
     struct cpu_user_regs *regs;
     extern long evtchn_send(int lport);
 
-    regs = current->domain->arch.vmx_platform.mpci.inst_decoder_regs;
+    regs = current->arch.arch_vmx.mmio_op.inst_decoder_regs;
 
-    vio = get_vio(d->domain, d->vcpu_id);
+    vio = get_vio(v->domain, v->vcpu_id);
     if (vio == NULL) {
         printf("bad shared page\n");
-        domain_crash_synchronous(); 
+        domain_crash_synchronous();
     }
 
     p = &vio->vp_ioreq;
 
     vm86 = regs->eflags & X86_EFLAGS_VM;
 
-    if (test_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags)) {
+    if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags)) {
         printf("VMX I/O has not yet completed\n");
         domain_crash_synchronous();
     }
 
-    set_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags);
+    set_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
     p->dir = dir;
     p->pdata_valid = pvalid;
 
@@ -647,27 +647,27 @@ void send_mmio_req(unsigned char type, unsigned long gpa,
 
     if (vmx_mmio_intercept(p)){
         p->state = STATE_IORESP_READY;
-        vmx_io_assist(d);
+        vmx_io_assist(v);
         return;
     }
 
-    evtchn_send(iopacket_port(d->domain));
+    evtchn_send(iopacket_port(v->domain));
     vmx_wait_io();
 }
 
 static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
-                          struct mi_per_cpu_info *mpcip, struct cpu_user_regs *regs)
+                          struct mmio_op *mmio_opp, struct cpu_user_regs *regs)
 {
     unsigned long value = 0;
     int index, size;
-    
+
     size = operand_size(inst->operand[0]);
 
-    mpcip->flags = inst->flags;
-    mpcip->instr = inst->instr;
-    mpcip->operand[0] = inst->operand[0]; /* source */
-    mpcip->operand[1] = inst->operand[1]; /* destination */
-    mpcip->immediate = inst->immediate;
+    mmio_opp->flags = inst->flags;
+    mmio_opp->instr = inst->instr;
+    mmio_opp->operand[0] = inst->operand[0]; /* source */
+    mmio_opp->operand[1] = inst->operand[1]; /* destination */
+    mmio_opp->immediate = inst->immediate;
 
     if (inst->operand[0] & REGISTER) { /* dest is memory */
         index = operand_index(inst->operand[0]);
@@ -687,19 +687,19 @@ static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
 
 #define GET_REPEAT_COUNT() \
      (mmio_inst.flags & REPZ ? (vm86 ? regs->ecx & 0xFFFF : regs->ecx) : 1)
- 
+
 void handle_mmio(unsigned long va, unsigned long gpa)
 {
     unsigned long eip, eflags, cs;
     unsigned long inst_len, inst_addr;
-    struct mi_per_cpu_info *mpcip;
+    struct mmio_op *mmio_opp;
     struct cpu_user_regs *regs;
     struct instruction mmio_inst;
     unsigned char inst[MAX_INST_LEN];
     int i, vm86, ret;
-     
-    mpcip = &current->domain->arch.vmx_platform.mpci;
-    regs = mpcip->inst_decoder_regs;
+
+    mmio_opp = &current->arch.arch_vmx.mmio_op;
+    regs = mmio_opp->inst_decoder_regs;
 
     __vmread(GUEST_RIP, &eip);
     __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
@@ -720,7 +720,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     }
 
     init_instruction(&mmio_inst);
-    
+
     if (vmx_decode(inst, &mmio_inst) == DECODE_failure) {
         printf("mmio opcode: va 0x%lx, gpa 0x%lx, len %ld:",
                va, gpa, inst_len);
@@ -735,7 +735,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 
     switch (mmio_inst.instr) {
     case INSTR_MOV:
-        mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mpcip, regs);
+        mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mmio_opp, regs);
         break;
 
     case INSTR_MOVS:
@@ -769,8 +769,8 @@ void handle_mmio(unsigned long va, unsigned long gpa)
             }
         }
 
-        mpcip->flags = mmio_inst.flags;
-        mpcip->instr = mmio_inst.instr;
+        mmio_opp->flags = mmio_inst.flags;
+        mmio_opp->instr = mmio_inst.instr;
 
         /*
          * In case of a movs spanning multiple pages, we break the accesses
@@ -785,7 +785,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         if ((addr & PAGE_MASK) != ((addr + size - 1) & PAGE_MASK)) {
             unsigned long value = 0;
 
-            mpcip->flags |= OVERLAP;
+            mmio_opp->flags |= OVERLAP;
 
             regs->eip -= inst_len; /* do not advance %eip */
 
@@ -808,7 +808,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     }
 
     case INSTR_MOVZ:
-        mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mpcip, regs);
+        mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mmio_opp, regs);
         break;
 
     case INSTR_STOS:
@@ -816,31 +816,31 @@ void handle_mmio(unsigned long va, unsigned long gpa)
          * Since the destination is always in (contiguous) mmio space we don't
          * need to break it up into pages.
          */
-        mpcip->flags = mmio_inst.flags;
-        mpcip->instr = mmio_inst.instr;
+        mmio_opp->flags = mmio_inst.flags;
+        mmio_opp->instr = mmio_inst.instr;
         send_mmio_req(IOREQ_TYPE_COPY, gpa,
                       GET_REPEAT_COUNT(), mmio_inst.op_size, regs->eax, IOREQ_WRITE, 0);
         break;
 
     case INSTR_OR:
-        mmio_operands(IOREQ_TYPE_OR, gpa, &mmio_inst, mpcip, regs);
+        mmio_operands(IOREQ_TYPE_OR, gpa, &mmio_inst, mmio_opp, regs);
         break;
 
     case INSTR_AND:
-        mmio_operands(IOREQ_TYPE_AND, gpa, &mmio_inst, mpcip, regs);
+        mmio_operands(IOREQ_TYPE_AND, gpa, &mmio_inst, mmio_opp, regs);
         break;
 
     case INSTR_XOR:
-        mmio_operands(IOREQ_TYPE_XOR, gpa, &mmio_inst, mpcip, regs);
+        mmio_operands(IOREQ_TYPE_XOR, gpa, &mmio_inst, mmio_opp, regs);
         break;
 
     case INSTR_CMP:        /* Pass through */
     case INSTR_TEST:
-        mpcip->flags = mmio_inst.flags;
-        mpcip->instr = mmio_inst.instr;
-        mpcip->operand[0] = mmio_inst.operand[0]; /* source */
-        mpcip->operand[1] = mmio_inst.operand[1]; /* destination */
-        mpcip->immediate = mmio_inst.immediate;
+        mmio_opp->flags = mmio_inst.flags;
+        mmio_opp->instr = mmio_inst.instr;
+        mmio_opp->operand[0] = mmio_inst.operand[0]; /* source */
+        mmio_opp->operand[1] = mmio_inst.operand[1]; /* destination */
+        mmio_opp->immediate = mmio_inst.immediate;
 
         /* send the request and wait for the value */
         send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, mmio_inst.op_size, 0, IOREQ_READ, 0);

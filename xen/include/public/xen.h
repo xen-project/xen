@@ -55,7 +55,7 @@
 #define __HYPERVISOR_update_va_mapping_otherdomain 22
 #define __HYPERVISOR_switch_vm86          23 /* x86/32 only */
 #define __HYPERVISOR_switch_to_user       23 /* x86/64 only */
-#define __HYPERVISOR_boot_vcpu            24
+#define __HYPERVISOR_vcpu_op              24
 #define __HYPERVISOR_set_segment_base     25 /* x86/64 only */
 #define __HYPERVISOR_mmuext_op            26
 #define __HYPERVISOR_acm_op               27
@@ -194,29 +194,6 @@ struct mmuext_op {
 #define UVMF_MULTI              (0UL<<2) /* Flush subset of TLBs. */
 #define UVMF_LOCAL              (0UL<<2) /* Flush local TLB.      */
 #define UVMF_ALL                (1UL<<2) /* Flush all TLBs.       */
-
-/*
- * Commands to HYPERVISOR_sched_op().
- */
-#define SCHEDOP_yield           0   /* Give up the CPU voluntarily.       */
-#define SCHEDOP_block           1   /* Block until an event is received.  */
-#define SCHEDOP_shutdown        2   /* Stop executing this domain.        */
-#define SCHEDOP_vcpu_down       3   /* make target VCPU not-runnable.     */
-#define SCHEDOP_vcpu_up         4   /* make target VCPU runnable.         */
-#define SCHEDOP_vcpu_pickle     5   /* save a vcpu's context to memory.   */
-#define SCHEDOP_cmdmask       255   /* 8-bit command. */
-#define SCHEDOP_reasonshift     8   /* 8-bit reason code. (SCHEDOP_shutdown) */
-#define SCHEDOP_vcpushift       8   /* 8-bit VCPU target. (SCHEDOP_up|down) */
-
-/*
- * Reason codes for SCHEDOP_shutdown. These may be interpreted by control 
- * software to determine the appropriate action. For the most part, Xen does
- * not care about the shutdown code (SHUTDOWN_crash excepted).
- */
-#define SHUTDOWN_poweroff   0  /* Domain exited normally. Clean up and kill. */
-#define SHUTDOWN_reboot     1  /* Clean up, kill, and then restart.          */
-#define SHUTDOWN_suspend    2  /* Clean up, save suspend info, kill.         */
-#define SHUTDOWN_crash      3  /* Tell controller we've crashed.             */
 
 /*
  * Commands to HYPERVISOR_console_io().

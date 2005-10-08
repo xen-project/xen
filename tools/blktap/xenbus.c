@@ -116,25 +116,25 @@ int xs_exists(struct xs_handle *h, const char *path)
 
 
 /* This assumes that the domain name we are looking for is unique! */
-char *get_dom_uuid(struct xs_handle *h, const char *name)
+char *get_dom_domid(struct xs_handle *h, const char *name)
 {
-    char **e, *val, *uuid = NULL;
+    char **e, *val, *domid = NULL;
     int num, i, len;
     char *path;
 
-    e = xs_directory(h, "/domain", &num);
+    e = xs_directory(h, "/local/domain", &num);
 
     i=0;
     while (i < num) {
-        asprintf(&path, "/domain/%s/name", e[i]);
+        asprintf(&path, "/local/domain/%s/name", e[i]);
         val = xs_read(h, path, &len);
         free(path);
         if (val == NULL)
             continue;
         if (strcmp(val, name) == 0) {
             /* match! */
-            asprintf(&path, "/domain/%s/uuid", e[i]);
-            uuid = xs_read(h, path, &len);
+            asprintf(&path, "/local/domain/%s/domid", e[i]);
+            domid = xs_read(h, path, &len);
             free(val);
             free(path);
             break;
@@ -144,7 +144,7 @@ char *get_dom_uuid(struct xs_handle *h, const char *name)
     }
 
     free(e);
-    return uuid;
+    return domid;
 }
 
 static int strsep_len(const char *str, char c, unsigned int len)
@@ -251,13 +251,14 @@ int xs_fire_next_watch(struct xs_handle *h)
     char *node = NULL;
     struct xenbus_watch *w;
     int er;
+    unsigned int num;
 
-    res = xs_read_watch(h);
+    res = xs_read_watch(h, &num);
     if (res == NULL) 
         return -EAGAIN; /* in O_NONBLOCK, read_watch returns 0... */
 
-    node  = res[0];
-    token = res[1];
+    node  = res[XS_WATCH_PATH];
+    token = res[XS_WATCH_TOKEN];
 
     er = xs_acknowledge_watch(h, token);
     if (er == 0)
@@ -553,15 +554,15 @@ static void blkback_probe(struct xs_handle *h, struct xenbus_watch *w,
 
 int add_blockdevice_probe_watch(struct xs_handle *h, const char *domname)
 {
-    char *uuid, *path;
+    char *domid, *path;
     struct xenbus_watch *vbd_watch;
     int er;
 
-    uuid = get_dom_uuid(h, domname);
+    domid = get_dom_domid(h, domname);
 
-    DPRINTF("%s: %s\n", domname, (uuid != NULL) ? uuid : "[ not found! ]");
+    DPRINTF("%s: %s\n", domname, (domid != NULL) ? domid : "[ not found! ]");
 
-    asprintf(&path, "/domain/%s/backend/vbd", uuid);
+    asprintf(&path, "/local/domain/%s/backend/vbd", domid);
     if (path == NULL) 
         return -ENOMEM;
 

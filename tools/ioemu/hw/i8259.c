@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
-#include "xenctrl.h"
-#include <io/ioreq.h>
+#include <xenctrl.h>
+#include <xen/io/ioreq.h>
 
 /* debug PIC */
 //#define DEBUG_PIC

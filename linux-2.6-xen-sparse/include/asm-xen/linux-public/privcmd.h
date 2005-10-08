@@ -3,7 +3,7 @@
  * 
  * Interface to /proc/xen/privcmd.
  * 
- * Copyright (c) 2003-2004, K A Fraser
+ * Copyright (c) 2003-2005, K A Fraser
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -27,39 +27,39 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef __PRIVCMD_H__
-#define __PRIVCMD_H__
+#ifndef __LINUX_PUBLIC_PRIVCMD_H__
+#define __LINUX_PUBLIC_PRIVCMD_H__
 
 typedef struct privcmd_hypercall
 {
-    unsigned long op;
-    unsigned long arg[5];
+	unsigned long op;
+	unsigned long arg[5];
 } privcmd_hypercall_t;
 
 typedef struct privcmd_mmap_entry {
-    unsigned long va;
-    unsigned long mfn;
-    unsigned long npages;
+	unsigned long va;
+	unsigned long mfn;
+	unsigned long npages;
 } privcmd_mmap_entry_t; 
 
 typedef struct privcmd_mmap {
-    int num;
-    domid_t dom; /* target domain */
-    privcmd_mmap_entry_t *entry;
+	int num;
+	domid_t dom; /* target domain */
+	privcmd_mmap_entry_t *entry;
 } privcmd_mmap_t; 
 
 typedef struct privcmd_mmapbatch {
-    int num;     /* number of pages to populate */
-    domid_t dom; /* target domain */
-    unsigned long addr;  /* virtual address */
-    unsigned long *arr; /* array of mfns - top nibble set on err */
+	int num;     /* number of pages to populate */
+	domid_t dom; /* target domain */
+	unsigned long addr;  /* virtual address */
+	unsigned long *arr; /* array of mfns - top nibble set on err */
 } privcmd_mmapbatch_t; 
 
 typedef struct privcmd_blkmsg
 {
-    unsigned long op;
-    void         *buf;
-    int           buf_size;
+	unsigned long op;
+	void         *buf;
+	int           buf_size;
 } privcmd_blkmsg_t;
 
 /*
@@ -67,16 +67,26 @@ typedef struct privcmd_blkmsg
  * @arg: &privcmd_hypercall_t
  * Return: Value returned from execution of the specified hypercall.
  */
-#define IOCTL_PRIVCMD_HYPERCALL         \
-    _IOC(_IOC_NONE, 'P', 0, sizeof(privcmd_hypercall_t))
+#define IOCTL_PRIVCMD_HYPERCALL					\
+	_IOC(_IOC_NONE, 'P', 0, sizeof(privcmd_hypercall_t))
 
-#define IOCTL_PRIVCMD_MMAP             \
-    _IOC(_IOC_NONE, 'P', 2, sizeof(privcmd_mmap_t))
-#define IOCTL_PRIVCMD_MMAPBATCH             \
-    _IOC(_IOC_NONE, 'P', 3, sizeof(privcmd_mmapbatch_t))
-#define IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN \
-    _IOC(_IOC_READ, 'P', 4, sizeof(unsigned long))
-#define IOCTL_PRIVCMD_INITDOMAIN_STORE \
-    _IOC(_IOC_READ, 'P', 5, 0)
+#define IOCTL_PRIVCMD_MMAP					\
+	_IOC(_IOC_NONE, 'P', 2, sizeof(privcmd_mmap_t))
+#define IOCTL_PRIVCMD_MMAPBATCH					\
+	_IOC(_IOC_NONE, 'P', 3, sizeof(privcmd_mmapbatch_t))
+#define IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN			\
+	_IOC(_IOC_READ, 'P', 4, sizeof(unsigned long))
+#define IOCTL_PRIVCMD_INITDOMAIN_STORE				\
+	_IOC(_IOC_READ, 'P', 5, 0)
 
-#endif /* __PRIVCMD_H__ */
+#endif /* __LINUX_PUBLIC_PRIVCMD_H__ */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

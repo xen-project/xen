@@ -553,9 +553,9 @@ static void net_tx_action(unsigned long unused)
 
 		/* No crossing a page as the payload mustn't fragment. */
 		if (unlikely((txreq.offset + txreq.size) >= PAGE_SIZE)) {
-			DPRINTK("txreq.addr: %lx, size: %u, end: %lu\n", 
-				txreq.addr, txreq.size, 
-				(txreq.addr &~PAGE_MASK) + txreq.size);
+			DPRINTK("txreq.offset: %x, size: %u, end: %lu\n", 
+				txreq.offset, txreq.size, 
+				(txreq.offset &~PAGE_MASK) + txreq.size);
 			make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
 			netif_put(netif);
 			continue;

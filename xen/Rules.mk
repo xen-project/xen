@@ -10,7 +10,8 @@ trace       ?= n
 domu_debug  ?= n
 crash_debug ?= n
 
-include $(BASEDIR)/../Config.mk
+XEN_ROOT=$(BASEDIR)/..
+include $(XEN_ROOT)/Config.mk
 
 # Set ARCH/SUBARCH appropriately.
 override COMPILE_SUBARCH := $(XEN_COMPILE_ARCH)

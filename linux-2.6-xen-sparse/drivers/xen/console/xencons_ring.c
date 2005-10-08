@@ -65,7 +65,8 @@ static int __xencons_ring_send(
 int xencons_ring_send(const char *data, unsigned len)
 {
 	int sent = __xencons_ring_send(outring(), data, len);
-	notify_remote_via_irq(xencons_irq);
+	/* Use evtchn: this is called early, before irq is set up. */
+	notify_remote_via_evtchn(xen_start_info->console_evtchn);
 	return sent;
 }	
 

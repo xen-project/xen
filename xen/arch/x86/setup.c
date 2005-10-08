@@ -418,6 +418,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     printk("System RAM: %luMB (%lukB)\n", 
            nr_pages >> (20 - PAGE_SHIFT),
            nr_pages << (PAGE_SHIFT - 10));
+    total_pages = nr_pages;
 
     init_frametable();
 
@@ -474,13 +475,14 @@ void __init __start_xen(multiboot_info_t *mbi)
     {
         static char dom0_cmdline[MAX_GUEST_CMDLINE];
 
-        /* Skip past the image name. */
+        /* Skip past the image name and copy to a local buffer. */
         while ( *cmdline == ' ' ) cmdline++;
         if ( (cmdline = strchr(cmdline, ' ')) != NULL )
+        {
             while ( *cmdline == ' ' ) cmdline++;
+            strcpy(dom0_cmdline, cmdline);
+        }
 
-        /* Copy the command line to a local buffer. */
-        strcpy(dom0_cmdline, cmdline);
         cmdline = dom0_cmdline;
 
         /* Append any extra parameters. */

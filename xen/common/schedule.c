@@ -36,6 +36,7 @@
 #include <xen/softirq.h>
 #include <xen/trace.h>
 #include <xen/mm.h>
+#include <public/sched.h>
 #include <public/sched_ctl.h>
 
 extern void arch_getdomaininfo_ctxt(struct vcpu *,
@@ -270,74 +271,11 @@ static long do_yield(void)
     return 0;
 }
 
-/* Mark target vcpu as non-runnable so it is not scheduled */
-static long do_vcpu_down(int vcpu)
-{
-    struct vcpu *target;
-    
-    if ( vcpu > MAX_VIRT_CPUS )
-        return -EINVAL;
-
-    target = current->domain->vcpu[vcpu];
-    if ( target == NULL )
-        return -ESRCH;
-    set_bit(_VCPUF_down, &target->vcpu_flags);
-
-    return 0;
-}
-
-/* Mark target vcpu as runnable and wake it */
-static long do_vcpu_up(int vcpu)
-{
-    struct vcpu *target;
-   
-    if (vcpu > MAX_VIRT_CPUS)
-        return -EINVAL;
-
-    target = current->domain->vcpu[vcpu];
-    if ( target == NULL )
-        return -ESRCH;
-    clear_bit(_VCPUF_down, &target->vcpu_flags);
-    /* wake vcpu */
-    vcpu_wake(target);
-
-    return 0;
-}
-
-static long do_vcpu_pickle(int vcpu, unsigned long arg)
-{
-    struct vcpu *v;
-    vcpu_guest_context_t *c;
-    int ret = 0;
-
-    if (vcpu >= MAX_VIRT_CPUS)
-        return -EINVAL;
-    v = current->domain->vcpu[vcpu];
-    if (!v)
-        return -ESRCH;
-    /* Don't pickle vcpus which are currently running */
-    if (!test_bit(_VCPUF_down, &v->vcpu_flags)) {
-        return -EBUSY;
-    }
-    c = xmalloc(vcpu_guest_context_t);
-    if (!c)
-        return -ENOMEM;
-    arch_getdomaininfo_ctxt(v, c);
-    if (copy_to_user((vcpu_guest_context_t *)arg,
-                     (const vcpu_guest_context_t *)c, sizeof(*c)))
-        ret = -EFAULT;
-    xfree(c);
-    return ret;
-}
-
-/*
- * Demultiplex scheduler-related hypercalls.
- */
-long do_sched_op(unsigned long op, unsigned long arg)
+long do_sched_op(int cmd, unsigned long arg)
 {
     long ret = 0;
 
-    switch ( op & SCHEDOP_cmdmask ) 
+    switch ( cmd )
     {
     case SCHEDOP_yield:
     {
@@ -354,24 +292,8 @@ long do_sched_op(unsigned long op, unsigned long arg)
     case SCHEDOP_shutdown:
     {
         TRACE_3D(TRC_SCHED_SHUTDOWN,
-                 current->domain->domain_id, current->vcpu_id,
-                 (op >> SCHEDOP_reasonshift));
-        domain_shutdown((u8)(op >> SCHEDOP_reasonshift));
-        break;
-    }
-    case SCHEDOP_vcpu_down:
-    {
-        ret = do_vcpu_down((int)(op >> SCHEDOP_vcpushift));
-        break;
-    }
-    case SCHEDOP_vcpu_up:
-    {
-        ret = do_vcpu_up((int)(op >> SCHEDOP_vcpushift));
-        break;
-    }
-    case SCHEDOP_vcpu_pickle:
-    {
-        ret = do_vcpu_pickle((int)(op >> SCHEDOP_vcpushift), arg);
+                 current->domain->domain_id, current->vcpu_id, arg);
+        domain_shutdown((u8)arg);
         break;
     }
 
@@ -395,8 +317,8 @@ long do_set_timer_op(s_time_t timeout)
     return 0;
 }
 
-/** sched_id - fetch ID of current scheduler */
-int sched_id()
+/* sched_id - fetch ID of current scheduler */
+int sched_id(void)
 {
     return ops.sched_id;
 }

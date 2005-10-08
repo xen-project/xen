@@ -33,6 +33,7 @@
 #include <linux/device.h>
 #include <linux/notifier.h>
 #include <asm/semaphore.h>
+#include <asm-xen/xen-public/io/xs_wire.h>
 
 /* A xenbus device. */
 struct xenbus_device {
@@ -73,7 +74,7 @@ static inline struct xenbus_driver *to_xenbus_driver(struct device_driver *drv)
 	return container_of(drv, struct xenbus_driver, driver);
 }
 
-int xenbus_register_device(struct xenbus_driver *drv);
+int xenbus_register_driver(struct xenbus_driver *drv);
 int xenbus_register_backend(struct xenbus_driver *drv);
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 
@@ -113,7 +114,8 @@ struct xenbus_watch
 {
 	struct list_head list;
 	char *node;
-	void (*callback)(struct xenbus_watch *, const char *node);
+	void (*callback)(struct xenbus_watch *,
+			 const char **vec, unsigned int len);
 };
 
 /* notifer routines for when the xenstore comes up */

@@ -2,6 +2,7 @@
 ## Xen controller daemon
 ## Copyright (c) 2004, K A Fraser (University of Cambridge)
 ## Copyright (C) 2004, Mike Wray <mike.wray@hp.com>
+## Copyright (C) 2005, XenSource Ltd
 ###########################################################
 
 import os
@@ -13,18 +14,12 @@ import pwd
 import re
 import traceback
 
-from xen.xend import EventServer
 from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
-from xen.xend import XendRoot
 
 import event
 import relocate
 from params import *
-
-
-eserver = EventServer.instance()
-xroot = XendRoot.instance()
 
 
 class Daemon:
@@ -71,14 +66,17 @@ class Daemon:
         @param pidfile: file to read
         @return pid or 0
         """
-        pid = 0
         if os.path.isfile(pidfile) and os.path.getsize(pidfile):
             try:
-                pid = open(pidfile, 'r').read()
-                pid = int(pid)
+                f = open(pidfile, 'r')
+                try:
+                    return int(f.read())
+                finally:
+                    f.close()
             except:
-                pid = 0
-        return pid
+                return 0
+        else:
+            return 0
 
     def find_process(self, pid, name):
         """Search for a process.
@@ -146,8 +144,10 @@ class Daemon:
         if self.child:
             # Parent
             pidfile = open(pidfile, 'w')
-            pidfile.write(str(self.child))
-            pidfile.close()
+            try:
+                pidfile.write(str(self.child))
+            finally:
+                pidfile.close()
 
         return self.child
 
@@ -200,8 +200,10 @@ class Daemon:
         if self.fork_pid(XEND_PID_FILE):
             os.close(w)
             r = os.fdopen(r, 'r')
-            s = r.read()
-            r.close()
+            try:
+                s = r.read()
+            finally:
+                r.close()
             if not len(s):
                 ret = 1
             else:

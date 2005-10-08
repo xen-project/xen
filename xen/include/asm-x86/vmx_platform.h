@@ -75,20 +75,11 @@ struct instruction {
 
 #define MAX_INST_LEN      32
 
-struct mi_per_cpu_info {
-    int                    flags;
-    int      instr;  /* instruction */
-    unsigned long          operand[2];  /* operands */
-    unsigned long          immediate;  /* immediate portion */
-    struct cpu_user_regs   *inst_decoder_regs; /* current context */
-};
-
 struct virtual_platform_def {
     unsigned long          *real_mode_data; /* E820, etc. */
     unsigned long          shared_page_va;
     struct vmx_virpit_t    vmx_pit;
     struct vmx_handler_t   vmx_handler;
-    struct mi_per_cpu_info mpci;  /* MMIO */
 };
 
 extern void handle_mmio(unsigned long, unsigned long);

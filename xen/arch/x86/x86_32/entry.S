@@ -808,7 +808,7 @@ ENTRY(hypercall_table)
         .long do_vm_assist
         .long do_update_va_mapping_otherdomain
         .long do_switch_vm86
-        .long do_boot_vcpu
+        .long do_vcpu_op
         .long do_ni_hypercall       /* 25 */
         .long do_mmuext_op
         .long do_acm_op             /* 27 */
@@ -841,7 +841,7 @@ ENTRY(hypercall_args_table)
         .byte 2 /* do_vm_assist         */
         .byte 5 /* do_update_va_mapping_otherdomain */
         .byte 0 /* do_switch_vm86       */
-        .byte 2 /* do_boot_vcpu         */
+        .byte 3 /* do_vcpu_op           */
         .byte 0 /* do_ni_hypercall      */  /* 25 */
         .byte 4 /* do_mmuext_op         */
         .byte 1 /* do_acm_op            */

@@ -6,3 +6,6 @@ vmlinuz: vmlinux-stripped FORCE
 
 vmlinux-stripped: vmlinux FORCE
 	$(call if_changed,objcopy)
+
+bzImage: vmlinuz
+	$(Q)$(LN) -sf ../../../vmlinuz $(srctree)/arch/xen/boot/bzImage

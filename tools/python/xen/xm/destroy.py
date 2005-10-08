@@ -21,18 +21,14 @@
 from xen.xend.XendClient import server
 from xen.xm.opts import *
 
-gopts = Opts(use="""[options] [DOM]
+gopts = Opts(use="""[DOM]
 
-Destroy a domain, optionally restarting it.
+Destroy a domain.
 """)
 
 gopts.opt('help', short='h',
          fn=set_true, default=0,
          use="Print this help.")
-
-gopts.opt('reboot', short='R',
-          fn=set_true, default=0,
-          use='Destroy and restart.')
 
 def main(argv):
     opts = gopts
@@ -42,10 +38,4 @@ def main(argv):
         return
     if len(args) < 1: opts.err('Missing domain')
     dom = args[0]
-    if opts.vals.reboot:
-        mode = 'reboot'
-    else:
-        mode = 'halt'
-    server.xend_domain_destroy(dom, mode)
-    
-        
+    server.xend_domain_destroy(dom)

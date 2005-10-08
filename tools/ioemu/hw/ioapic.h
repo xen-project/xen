@@ -26,9 +26,9 @@
 #ifndef __IOAPIC_H
 #define __IOAPIC_H
 
-#include "xenctrl.h"
-#include <io/ioreq.h>
-#include <io/vmx_vlapic.h>
+#include <xenctrl.h>
+#include <xen/io/ioreq.h>
+#include <xen/io/vmx_vlapic.h>
 
 #define IOAPIC_NUM_PINS 24
 #define IOAPIC_VERSION_ID 0x11

@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
 
 		if (i % print == 0)
 			write(1, ".", 1);
-		if (!xs_transaction_start(h, "/")) {
+		if (!xs_transaction_start(h)) {
 			kill_daemon(pid);
 			barf_perror("Starting transaction");
 		}

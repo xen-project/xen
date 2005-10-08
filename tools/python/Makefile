@@ -15,5 +15,8 @@ install: all
 	CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)"
 endif
 
+test:
+	export LD_LIBRARY_PATH=$$(readlink -f ../libxc):$$(readlink -f ../xenstore); python test.py -b -u
+
 clean:
 	rm -rf build *.pyc *.pyo *.o *.a *~

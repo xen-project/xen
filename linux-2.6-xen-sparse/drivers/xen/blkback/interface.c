@@ -68,8 +68,15 @@ static void unmap_frontend_page(blkif_t *blkif)
 int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 {
 	blkif_sring_t *sring;
-	evtchn_op_t op = { .cmd = EVTCHNOP_bind_interdomain };
 	int err;
+	evtchn_op_t op = {
+		.cmd = EVTCHNOP_bind_interdomain,
+		.u.bind_interdomain.remote_dom = blkif->domid,
+		.u.bind_interdomain.remote_port = evtchn };
+
+	/* Already connected through? */
+	if (blkif->irq)
+		return 0;
 
 	if ( (blkif->blk_ring_area = alloc_vm_area(PAGE_SIZE)) == NULL )
 		return -ENOMEM;
@@ -80,10 +87,6 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 		return err;
 	}
 
-	op.u.bind_interdomain.dom1 = DOMID_SELF;
-	op.u.bind_interdomain.dom2 = blkif->domid;
-	op.u.bind_interdomain.port1 = 0;
-	op.u.bind_interdomain.port2 = evtchn;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		unmap_frontend_page(blkif);
@@ -91,7 +94,7 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 		return err;
 	}
 
-	blkif->evtchn = op.u.bind_interdomain.port1;
+	blkif->evtchn = op.u.bind_interdomain.local_port;
 
 	sring = (blkif_sring_t *)blkif->blk_ring_area->addr;
 	SHARED_RING_INIT(sring);
@@ -108,8 +111,12 @@ static void free_blkif(void *arg)
 {
 	blkif_t *blkif = (blkif_t *)arg;
 
-	if (blkif->irq)
-		unbind_evtchn_from_irqhandler(blkif->irq, blkif);
+	/* Already disconnected? */
+	if (!blkif->irq)
+		return;
+
+	unbind_evtchn_from_irqhandler(blkif->irq, blkif);
+	blkif->irq = 0;
 
 	vbd_free(&blkif->vbd);
 

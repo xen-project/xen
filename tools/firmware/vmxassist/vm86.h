@@ -33,7 +33,7 @@ typedef int32_t            s32;
 typedef int64_t            s64;
 #endif
 
-#include <public/vmx_assist.h>
+#include <xen/vmx_assist.h>
 
 #define	NR_EXCEPTION_HANDLER	32
 #define	NR_INTERRUPT_HANDLERS	16

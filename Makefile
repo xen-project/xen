@@ -2,22 +2,10 @@
 # Grand Unified Makefile for Xen.
 #
 
-# Default is to install to local 'dist' directory.
-DISTDIR ?= $(CURDIR)/dist
-DESTDIR ?= $(DISTDIR)/install
-
-INSTALL		:= install
-INSTALL_DIR	:= $(INSTALL) -d -m0755
-INSTALL_DATA	:= $(INSTALL) -m0644
-INSTALL_PROG	:= $(INSTALL) -m0755
-
 KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
-# linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
-# You may use wildcards in the above e.g. KERNELS=*2.4*
+# You may use wildcards in the above e.g. KERNELS=*2.6*
 
 XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.$(kernel))) )
-
-export DESTDIR
 
 # Export target architecture overrides to Xen and Linux sub-trees.
 ifneq ($(XEN_TARGET_ARCH),)
@@ -28,6 +16,7 @@ endif
 # Default target must appear before any include lines
 all: dist
 
+XEN_ROOT=$(CURDIR)
 include Config.mk
 include buildconfigs/Rules.mk
 
@@ -46,24 +35,40 @@ build: kernels
 	$(MAKE) -C tools build
 	$(MAKE) -C docs build
 
+# The test target is for unit tests that can run without an installation.  Of
+# course, many tests require a machine running Xen itself, and these are
+# handled elsewhere.
+test:
+	$(MAKE) -C tools/python test
+
 # build and install everything into local dist directory
-dist: xen kernels tools docs
+dist: DESTDIR=$(DISTDIR)/install
+dist: dist-xen dist-kernels dist-tools dist-docs
 	$(INSTALL_DIR) $(DISTDIR)/check
 	$(INSTALL_DATA) ./COPYING $(DISTDIR)
 	$(INSTALL_DATA) ./README $(DISTDIR)
 	$(INSTALL_PROG) ./install.sh $(DISTDIR)
 	$(INSTALL_PROG) tools/check/chk tools/check/check_* $(DISTDIR)/check
+dist-%: DESTDIR=$(DISTDIR)/install
+dist-%: install-%
+	@: # do nothing
 
-xen:
+# Legacy dist targets
+xen: dist-xen
+tools: dist-tools
+kernels: dist-kernels
+docs: dist-docs
+
+install-xen:
 	$(MAKE) -C xen install
 
-tools:
+install-tools:
 	$(MAKE) -C tools install
 
-kernels:
+install-kernels:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-build || exit 1; done
 
-docs:
+install-docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
 
 dev-docs:
@@ -119,10 +124,6 @@ install-iptables:
 	tar -jxf iptables-1.2.11.tar.bz2
 	$(MAKE) -C iptables-1.2.11 PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install
 
-install-%: DESTDIR=
-install-%: %
-	@: # do nothing
-
 help:
 	@echo 'Installation targets:'
 	@echo '  install          - build and install everything'
@@ -161,7 +162,6 @@ help:
 	@echo '                     with extreme care!)'
 
 # Use this target with extreme care!
-uninstall: DESTDIR=
 uninstall: D=$(DESTDIR)
 uninstall:
 	[ -d $(D)/etc/xen ] && mv -f $(D)/etc/xen $(D)/etc/xen.old-`date +%s` || true
@@ -187,12 +187,5 @@ uninstall:
 	rm -rf $(D)/usr/share/man/man8/xen*
 
 # Legacy targets for compatibility
-linux24:
-	$(MAKE) 'KERNELS=linux-2.4*' kernels
-
 linux26:
 	$(MAKE) 'KERNELS=linux-2.6*' kernels
-
-netbsd20:
-	$(MAKE) netbsd-2.0-xenU-build
-

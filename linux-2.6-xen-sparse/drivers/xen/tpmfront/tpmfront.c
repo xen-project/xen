@@ -211,12 +211,14 @@ static int tpm_fe_send_upperlayer(const u8 * buf, size_t count,
  XENBUS support code
 **************************************************************/
 
-static void watch_for_status(struct xenbus_watch *watch, const char *node)
+static void watch_for_status(struct xenbus_watch *watch,
+			     const char **vec, unsigned int len)
 {
 	struct tpmfront_info *info;
 	int err;
 	unsigned long ready;
 	struct tpm_private *tp = &my_private;
+	const char *node = vec[XS_WATCH_PATH];
 
 	info = container_of(watch, struct tpmfront_info, watch);
 	node += strlen(watch->node);
@@ -244,9 +246,11 @@ static int setup_tpmring(struct xenbus_device *dev,
 {
 	tpmif_tx_interface_t *sring;
 	struct tpm_private *tp = &my_private;
-
-	evtchn_op_t op = { .cmd = EVTCHNOP_alloc_unbound };
 	int err;
+	evtchn_op_t op = {
+		.cmd = EVTCHNOP_alloc_unbound,
+		.u.alloc_unbound.dom = DOMID_SELF,
+		.u.alloc_unbound.remote_dom = backend_id } ;
 
 	sring = (void *)__get_free_page(GFP_KERNEL);
 	if (!sring) {
@@ -269,7 +273,6 @@ static int setup_tpmring(struct xenbus_device *dev,
 	}
 	info->ring_ref = err;
 
-	op.u.alloc_unbound.dom = backend_id;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		gnttab_end_foreign_access(info->ring_ref, 0);
@@ -278,7 +281,9 @@ static int setup_tpmring(struct xenbus_device *dev,
 		xenbus_dev_error(dev, err, "allocating event channel");
 		return err;
 	}
+
 	tpmif_connect(op.u.alloc_unbound.port, backend_id);
+
 	return 0;
 }
 
@@ -293,9 +298,9 @@ static void destroy_tpmring(struct tpmfront_info *info, struct tpm_private *tp)
 		tp->tx = NULL;
 	}
 
-	if (tpm->irq)
+	if (tp->irq)
 		unbind_evtchn_from_irqhandler(tp->irq, NULL);
-	tp->evtchn = tpm->irq = 0;
+	tp->evtchn = tp->irq = 0;
 }
 
 
@@ -439,26 +444,32 @@ static int tpmfront_remove(struct xenbus_device *dev)
 	return 0;
 }
 
-static int tpmfront_suspend(struct xenbus_device *dev)
+static int
+tpmfront_suspend(struct xenbus_device *dev)
 {
 	struct tpmfront_info *info = dev->data;
 	struct tpm_private *tp = &my_private;
+	u32 ctr = 0;
 
-	/* lock so no app can send */
+	/* lock, so no app can send */
 	down(&suspend_lock);
 
-	while (atomic_read(&tp->tx_busy)) {
-		printk("---- TPMIF: Outstanding request.\n");
-#if 0
+	while (atomic_read(&tp->tx_busy) && ctr <= 25) {
+	        if ((ctr % 10) == 0)
+			printk("INFO: Waiting for outstanding request.\n");
 		/*
-		 * Would like to wait until the outstanding request
-		 * has come back, but this does not work properly, yet.
+		 * Wait for a request to be responded to.
 		 */
-		interruptible_sleep_on_timeout(&tp->wait_q,
-		                               100);
-#else
-		break;
-#endif
+		interruptible_sleep_on_timeout(&tp->wait_q, 100);
+		ctr++;
+	}
+
+	if (atomic_read(&tp->tx_busy)) {
+		/*
+		 * A temporary work-around.
+		 */
+		printk("WARNING: Resetting busy flag.");
+		atomic_set(&tp->tx_busy, 0);
 	}
 
 	unregister_xenbus_watch(&info->watch);
@@ -466,44 +477,34 @@ static int tpmfront_suspend(struct xenbus_device *dev)
 	kfree(info->backend);
 	info->backend = NULL;
 
-	destroy_tpmring(info, tp);
-
 	return 0;
 }
 
-static int tpmif_recover(void)
-{
-	return 0;
-}
-
-static int tpmfront_resume(struct xenbus_device *dev)
+static int
+tpmfront_resume(struct xenbus_device *dev)
 {
 	struct tpmfront_info *info = dev->data;
-	int err;
+	int err = talk_to_backend(dev, info);
 
-	err = talk_to_backend(dev, info);
-	if (!err) {
-		tpmif_recover();
-	}
-
-	/* unlock so apps can resume */
+	/* unlock, so apps can resume sending */
 	up(&suspend_lock);
 
 	return err;
 }
 
-static void tpmif_connect(u16 evtchn, domid_t domid)
+static void
+tpmif_connect(u16 evtchn, domid_t domid)
 {
 	int err = 0;
 	struct tpm_private *tp = &my_private;
 
 	tp->evtchn = evtchn;
-	tp->backend_id  = domid;
+	tp->backend_id = domid;
 
-	err = bind_evtchn_to_irqhandler(
-		tp->evtchn,
-		tpmif_int, SA_SAMPLE_RANDOM, "tpmif", tp);
-	if ( err <= 0 ) {
+	err = bind_evtchn_to_irqhandler(tp->evtchn,
+					tpmif_int, SA_SAMPLE_RANDOM, "tpmif",
+					tp);
+	if (err <= 0) {
 		WPRINTK("bind_evtchn_to_irqhandler failed (err=%d)\n", err);
 		return;
 	}
@@ -528,7 +529,7 @@ static struct xenbus_driver tpmfront = {
 
 static void __init init_tpm_xenbus(void)
 {
-	xenbus_register_device(&tpmfront);
+	xenbus_register_driver(&tpmfront);
 }
 
 
@@ -638,7 +639,7 @@ tpm_xmit(struct tpm_private *tp,
 
 		if (NULL == txb) {
 			DPRINTK("txb (i=%d) is NULL. buffers initilized?\n", i);
-			DPRINTK("Not transmittin anything!\n");
+			DPRINTK("Not transmitting anything!\n");
 			spin_unlock_irq(&tp->tx_lock);
 			return -EFAULT;
 		}

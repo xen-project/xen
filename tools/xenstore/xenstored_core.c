@@ -44,13 +44,14 @@
 #include "list.h"
 #include "talloc.h"
 #include "xs_lib.h"
-#include "xenstored.h"
 #include "xenstored_core.h"
 #include "xenstored_watch.h"
 #include "xenstored_transaction.h"
 #include "xenstored_domain.h"
 #include "xenctrl.h"
 #include "tdb.h"
+
+int event_fd;
 
 static bool verbose;
 LIST_HEAD(connections);
@@ -149,7 +150,6 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 {
 	switch (type) {
 	case XS_DEBUG: return "DEBUG";
-	case XS_SHUTDOWN: return "SHUTDOWN";
 	case XS_DIRECTORY: return "DIRECTORY";
 	case XS_READ: return "READ";
 	case XS_GET_PERMS: return "GET_PERMS";
@@ -309,8 +309,7 @@ static int destroy_conn(void *_conn)
 	return 0;
 }
 
-static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock,
-			  int event_fd)
+static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock)
 {
 	struct connection *i;
 	int max;
@@ -1083,17 +1082,6 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		do_set_perms(conn, in);
 		break;
 
-	case XS_SHUTDOWN:
-		/* FIXME: Implement gentle shutdown too. */
-		/* Only tools can do this. */
-		if (conn->id != 0 || !conn->can_write) {
-			send_error(conn, EACCES);
-			break;
-		}
-		send_ack(conn, XS_SHUTDOWN);
-		/* Everything hangs off auto-free context, freed at exit. */
-		exit(0);
-
 	case XS_DEBUG:
 		if (streq(in->buffer, "print"))
 			xprintf("debug: %s", in->buffer + get_string(in, 0));
@@ -1464,7 +1452,7 @@ static struct option options[] = {
 
 int main(int argc, char *argv[])
 {
-	int opt, *sock, *ro_sock, event_fd, max;
+	int opt, *sock, *ro_sock, max;
 	struct sockaddr_un addr;
 	fd_set inset, outset;
 	bool dofork = true;
@@ -1568,7 +1556,7 @@ int main(int argc, char *argv[])
 #endif
 
 	/* Get ready to listen to the tools. */
-	max = initialize_set(&inset, &outset, *sock, *ro_sock, event_fd);
+	max = initialize_set(&inset, &outset, *sock, *ro_sock);
 
 	/* Main loop. */
 	/* FIXME: Rewrite so noone can starve. */
@@ -1588,7 +1576,7 @@ int main(int argc, char *argv[])
 			accept_connection(*ro_sock, false);
 
 		if (FD_ISSET(event_fd, &inset))
-			handle_event(event_fd);
+			handle_event();
 
 		list_for_each_entry(i, &connections, list) {
 			if (i->domain)
@@ -1624,7 +1612,6 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		max = initialize_set(&inset, &outset, *sock, *ro_sock,
-				     event_fd);
+		max = initialize_set(&inset, &outset, *sock, *ro_sock);
 	}
 }

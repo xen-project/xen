@@ -24,7 +24,6 @@
 #include "xs.h"
 #include "talloc.h"
 #include <errno.h>
-#include "xenstored.h"
 
 #define XSTEST
 #define RAND_FREQ 128 		/* One char in 32 is corrupted. */
@@ -231,20 +230,6 @@ static char *random_path(void)
 	return ret;
 }
 
-static int random_flags(int *state)
-{
-	switch (get_randomness(state) % 4) {
-	case 0:
-		return 0;
-	case 1:
-		return O_CREAT;
-	case 2:
-		return O_CREAT|O_EXCL;
-	default:
-		return get_randomness(state);
-	}
-}
-
 /* Do the next operation, return the results. */
 static void do_next_op(struct xs_handle *h, bool verbose)
 {
@@ -315,7 +300,7 @@ static void do_next_op(struct xs_handle *h, bool verbose)
 	case 7: {
 		if (verbose)
 			printf("START %s\n", name);
-		xs_transaction_start(h, name);
+		xs_transaction_start(h);
 		break;
 	}
 	case 8: {

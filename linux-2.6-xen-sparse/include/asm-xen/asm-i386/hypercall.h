@@ -31,6 +31,7 @@
 #define __HYPERCALL_H__
 
 #include <asm-xen/xen-public/xen.h>
+#include <asm-xen/xen-public/sched.h>
 
 #define _hypercall0(type, name)			\
 ({						\
@@ -160,41 +161,10 @@ HYPERVISOR_fpu_taskswitch(
 }
 
 static inline int
-HYPERVISOR_yield(
-	void)
+HYPERVISOR_sched_op(
+	int cmd, unsigned long arg)
 {
-	return _hypercall2(int, sched_op, SCHEDOP_yield, 0);
-}
-
-static inline int
-HYPERVISOR_block(
-	void)
-{
-	return _hypercall2(int, sched_op, SCHEDOP_block, 0);
-}
-
-static inline int
-HYPERVISOR_shutdown(
-	void)
-{
-	return _hypercall2(int, sched_op, SCHEDOP_shutdown |
-			   (SHUTDOWN_poweroff << SCHEDOP_reasonshift), 0);
-}
-
-static inline int
-HYPERVISOR_reboot(
-	void)
-{
-	return _hypercall2(int, sched_op, SCHEDOP_shutdown |
-			   (SHUTDOWN_reboot << SCHEDOP_reasonshift), 0);
-}
-
-static inline int
-HYPERVISOR_crash(
-	void)
-{
-	return _hypercall2(int, sched_op, SCHEDOP_shutdown |
-			   (SHUTDOWN_crash << SCHEDOP_reasonshift), 0);
+	return _hypercall2(int, sched_op, cmd, arg);
 }
 
 static inline long
@@ -316,63 +286,18 @@ HYPERVISOR_vm_assist(
 }
 
 static inline int
-HYPERVISOR_boot_vcpu(
-	unsigned long vcpu, vcpu_guest_context_t *ctxt)
+HYPERVISOR_vcpu_op(
+	int cmd, int vcpuid, void *extra_args)
 {
-	return _hypercall2(int, boot_vcpu, vcpu, ctxt);
-}
-
-static inline int
-HYPERVISOR_vcpu_up(
-	int vcpu)
-{
-	return _hypercall2(int, sched_op, SCHEDOP_vcpu_up |
-			   (vcpu << SCHEDOP_vcpushift), 0);
-}
-
-static inline int
-HYPERVISOR_vcpu_pickle(
-	int vcpu, vcpu_guest_context_t *ctxt)
-{
-	return _hypercall2(int, sched_op, SCHEDOP_vcpu_pickle |
-			   (vcpu << SCHEDOP_vcpushift), ctxt);
+	return _hypercall3(int, vcpu_op, cmd, vcpuid, extra_args);
 }
 
 static inline int
 HYPERVISOR_suspend(
 	unsigned long srec)
 {
-	int ret;
-	unsigned long ign1, ign2;
-
-	/* On suspend, control software expects a suspend record in %esi. */
-	__asm__ __volatile__ (
-		TRAP_INSTR
-		: "=a" (ret), "=b" (ign1), "=S" (ign2)
-		: "0" (__HYPERVISOR_sched_op),
-		"1" (SCHEDOP_shutdown | (SHUTDOWN_suspend <<
-					 SCHEDOP_reasonshift)), 
-		"2" (srec) : "memory", "ecx");
-
-	return ret;
-}
-
-static inline int
-HYPERVISOR_vcpu_down(
-	int vcpu)
-{
-	int ret;
-	unsigned long ign1;
-	/* Yes, I really do want to clobber edx here: when we resume a
-	   vcpu after unpickling a multi-processor domain, it returns
-	   here, but clobbers all of the call clobbered registers. */
-	__asm__ __volatile__ (
-		TRAP_INSTR
-		: "=a" (ret), "=b" (ign1)
-		: "0" (__HYPERVISOR_sched_op),
-		"1" (SCHEDOP_vcpu_down | (vcpu << SCHEDOP_vcpushift))
-		: "memory", "ecx", "edx" );
-	return ret;
+	return _hypercall3(int, sched_op, SCHEDOP_shutdown,
+			   SHUTDOWN_suspend, srec);
 }
 
 #endif /* __HYPERCALL_H__ */

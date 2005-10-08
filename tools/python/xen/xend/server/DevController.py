@@ -75,10 +75,29 @@ class DevController:
         """
 
         frontpath = self.frontendPath(devid)
-        backpath = xstransact.Read("%s/backend" % frontpath)
+        backpath = xstransact.Read(frontpath, "backend")
 
         xstransact.Remove(frontpath)
-        xstransact.Remove(backpath)
+
+        if backpath:
+            xstransact.Remove(backpath)
+        else:
+            raise VmError("Device not connected")
+           
+
+    def configurations(self):
+        return map(self.configuration, self.deviceIDs())
+
+
+    def configuration(self, devid):
+        """@return an s-expression giving the current configuration of the
+        specified device.  This would be suitable for giving to {@link
+        #createDevice} in order to recreate that device."""
+
+        backdomid = int(xstransact.Read(self.frontendPath(devid),
+                                        "backend-id"))
+
+        return [self.deviceClass, ['backend', backdomid]]
 
 
     def sxprs(self):
@@ -150,7 +169,20 @@ class DevController:
                 raise
 
 
-    ## private:
+    def readBackend(self, devid, *args):
+        frontpath = self.frontendPath(devid)
+        backpath = xstransact.Read(frontpath, "backend")
+        return xstransact.Read(backpath, *args)
+
+
+    def deviceIDs(self):
+        """@return The IDs of each of the devices currently configured for
+        this instance's deviceClass.
+        """
+        return map(int, xstransact.List(self.frontendRoot()))
+
+
+## private:
 
     def writeDetails(self, config, devid, backDetails, frontDetails):
         """Write the details in the store to trigger creation of a device.
@@ -167,8 +199,17 @@ class DevController:
         """
 
         import xen.xend.XendDomain
-        backdom = xen.xend.XendDomain.instance().domain_lookup_by_name(
-            sxp.child_value(config, 'backend', '0'))
+        xd = xen.xend.XendDomain.instance()
+
+        backdom_name = sxp.child_value(config, 'backend')
+        if backdom_name:
+            backdom = xd.domain_lookup_by_name_or_id_nr(backdom_name)
+        else:
+            backdom = xd.privilegedDomain()
+
+        if not backdom:
+            raise VmError("Cannot configure device for unknown backend %s" %
+                          backdom_name)
 
         frontpath = self.frontendPath(devid)
         backpath  = self.backendPath(backdom, devid)
@@ -197,9 +238,9 @@ class DevController:
     def backendPath(self, backdom, devid):
         """@param backdom [XendDomainInfo] The backend domain info."""
 
-        return "%s/backend/%s/%s/%d" % (backdom.getPath(),
+        return "%s/backend/%s/%s/%d" % (backdom.getDomainPath(),
                                         self.deviceClass,
-                                        self.vm.getUuid(), devid)
+                                        self.vm.getDomid(), devid)
 
 
     def frontendPath(self, devid):
@@ -207,8 +248,9 @@ class DevController:
 
 
     def frontendRoot(self):
-        return "%s/device/%s" % (self.vm.getPath(), self.deviceClass)
+        return "%s/device/%s" % (self.vm.getDomainPath(), self.deviceClass)
 
 
     def frontendMiscPath(self):
-        return "%s/device-misc/%s" % (self.vm.getPath(), self.deviceClass)
+        return "%s/device-misc/%s" % (self.vm.getDomainPath(),
+                                      self.deviceClass)

@@ -23,7 +23,7 @@ import string
 from xen.util import blkif
 from xen.xend import sxp
 
-from xen.xend.server.DevController import DevController
+from DevController import DevController
 
 
 class BlkifController(DevController):
@@ -40,14 +40,15 @@ class BlkifController(DevController):
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
         
-        typedev = sxp.child_value(config, 'dev')
-        if re.match('^ioemu:', typedev):
+        dev = sxp.child_value(config, 'dev')
+        if re.match('^ioemu:', dev):
             return (0,{},{})
 
-        devid = blkif.blkdev_name_to_number(sxp.child_value(config, 'dev'))
+        devid = blkif.blkdev_name_to_number(dev)
 
         (typ, params) = string.split(sxp.child_value(config, 'uname'), ':', 1)
-        back = { 'type' : typ,
+        back = { 'dev' : dev,
+                 'type' : typ,
                  'params' : params
                  }
 
@@ -57,3 +58,44 @@ class BlkifController(DevController):
         front = { 'virtual-device' : "%i" % devid }
 
         return (devid, back, front)
+
+
+    def configuration(self, devid):
+        """@see DevController.configuration"""
+
+        result = DevController.configuration(self, devid)
+
+        (dev, typ, params, ro) = self.readBackend(devid,
+                                                  'dev', 'type', 'params',
+                                                  'read-only')
+
+        if dev:
+            result.append(['dev', dev])
+        if typ and params:
+            result.append(['uname', typ + ":" + params])
+        if ro:
+            result.append(['mode', 'r'])
+        else:
+            result.append(['mode', 'w'])
+
+        return result
+
+
+    def destroyDevice(self, devid):
+        """@see DevController.destroyDevice"""
+
+        # If we are given a device name, then look up the device ID from it,
+        # and destroy that ID instead.  If what we are given is an integer,
+        # then assume it's a device ID and pass it straight through to our
+        # superclass's method.
+
+        try:
+            DevController.destroyDevice(self, int(devid))
+        except ValueError:
+            for i in self.deviceIDs():
+                if self.readBackend(i, 'dev') == devid:
+                    DevController.destroyDevice(self, i)
+                    return
+            # Try this, but it's almost certainly going to throw VmError,
+            # since we can't find the device.
+            DevController.destroyDevice(self, int(devid))

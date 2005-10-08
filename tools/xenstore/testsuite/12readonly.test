@@ -27,8 +27,6 @@ expect setperm failed: Permission denied
 setperm /test 100 NONE
 expect setperm failed: Permission denied
 setperm /test 100 NONE
-expect shutdown failed: Permission denied
-shutdown
 expect introduce failed: Permission denied
 introduce 1 100 7 /home
 

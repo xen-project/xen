@@ -12,7 +12,6 @@ from xen.lowlevel import xs
 class xswatch:
 
     watchThread = None
-    threadcond = threading.Condition()
     xs = None
     xslock = threading.Lock()
     
@@ -21,43 +20,31 @@ class xswatch:
         self.args = args
         self.kwargs = kwargs
         xswatch.watchStart()
-        xswatch.xslock.acquire()
         xswatch.xs.watch(path, self)
-        xswatch.xslock.release()
 
     def watchStart(cls):
-        cls.threadcond.acquire()
+        cls.xslock.acquire()
         if cls.watchThread:
-            cls.threadcond.release()
+            cls.xslock.release()
             return
+        # XXX: When we fix xenstored to have better watch semantics,
+        # this can change to shared xshandle(). Currently that would result
+        # in duplicate watch firings, thus failed extra xs.acknowledge_watch.
+        cls.xs = xs.open()
         cls.watchThread = threading.Thread(name="Watcher",
                                            target=cls.watchMain)
         cls.watchThread.setDaemon(True)
         cls.watchThread.start()
-        while cls.xs == None:
-            cls.threadcond.wait()
-        cls.threadcond.release()
+        cls.xslock.release()
 
     watchStart = classmethod(watchStart)
 
     def watchMain(cls):
-        cls.threadcond.acquire()
-        cls.xs = xs.open()
-        cls.threadcond.notifyAll()
-        cls.threadcond.release()
         while True:
             try:
-                (fd, _1, _2) = select.select([ cls.xs ], [], [])
-                cls.xslock.acquire()
-                # reconfirm ready to read with lock
-                (fd, _1, _2) = select.select([ cls.xs ], [], [], 0.001)
-                if not cls.xs in fd:
-                    cls.xslock.release()
-                    continue
                 we = cls.xs.read_watch()
                 watch = we[1]
                 cls.xs.acknowledge_watch(watch)
-                cls.xslock.release()
             except RuntimeError, ex:
                 print ex
                 raise

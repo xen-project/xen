@@ -13,10 +13,9 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
-from xen.xend import XendRoot
-xroot = XendRoot.instance()
 from xen.web.SrvDir import SrvDir
 
 class SrvRoot(SrvDir):
@@ -39,8 +38,6 @@ class SrvRoot(SrvDir):
             self.add(name, klass)
         for (name, klass) in self.subdirs:
             self.get(name)
-        xroot.start()
         
     def __repr__(self):
         return "<SrvRoot %x %s>" %(id(self), self.table.keys())
-

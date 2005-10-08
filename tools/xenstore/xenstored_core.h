@@ -26,7 +26,6 @@
 #include <stdint.h>
 #include <errno.h>
 #include "xs_lib.h"
-#include "xenstored.h"
 #include "list.h"
 #include "tdb.h"
 
@@ -172,5 +171,7 @@ void trace_create(const void *data, const char *type);
 void trace_destroy(const void *data, const char *type);
 void trace_watch_timeout(const struct connection *conn, const char *node, const char *token);
 void trace(const char *fmt, ...);
+
+extern int event_fd;
 
 #endif /* _XENSTORED_CORE_H */

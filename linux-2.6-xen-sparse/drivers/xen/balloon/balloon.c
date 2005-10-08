@@ -351,7 +351,8 @@ static struct xenbus_watch target_watch =
 };
 
 /* React to a change in the target key */
-static void watch_target(struct xenbus_watch *watch, const char *node)
+static void watch_target(struct xenbus_watch *watch,
+			 const char **vec, unsigned int len)
 {
 	unsigned long long new_target;
 	int err;

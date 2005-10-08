@@ -23,6 +23,8 @@
 #include <stdbool.h>
 #include <limits.h>
 #include <xenctrl.h>
+#include <errno.h>
+#include <xen/io/xs_wire.h>
 
 /* Bitmask of permissions. */
 enum xs_perm_type {

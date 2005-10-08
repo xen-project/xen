@@ -52,24 +52,30 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 				    pgprot_t prot,
 				    domid_t  domid)
 {
-	int i;
+	int i, rc;
 	unsigned long start_address;
-#define MAX_DIRECTMAP_MMU_QUEUE 130
-	mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *v = u, *w = u;
+	mmu_update_t *u, *v, *w;
+
+	u = v = w = (mmu_update_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
+	if (u == NULL)
+		return -ENOMEM;
 
 	start_address = address;
 
 	flush_cache_all();
 
 	for (i = 0; i < size; i += PAGE_SIZE) {
-		if ((v - u) == MAX_DIRECTMAP_MMU_QUEUE) {
+		if ((v - u) == (PAGE_SIZE / sizeof(mmu_update_t))) {
 			/* Fill in the PTE pointers. */
-			generic_page_range(mm, start_address, 
-					   address - start_address,
-					   direct_remap_area_pte_fn, &w);
+			rc = generic_page_range(mm, start_address, 
+						address - start_address,
+						direct_remap_area_pte_fn, &w);
+			if (rc)
+				goto out;
 			w = u;
+			rc = -EFAULT;
 			if (HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0)
-				return -EFAULT;
+				goto out;
 			v = u;
 			start_address = address;
 		}
@@ -89,13 +95,19 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 		/* get the ptep's filled in */
 		generic_page_range(mm, start_address, address - start_address,
 				   direct_remap_area_pte_fn, &w);
+		rc = -EFAULT;
 		if (unlikely(HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0))
-			return -EFAULT;
+			goto out;
 	}
 
+	rc = 0;
+
+ out:
 	flush_tlb_all();
 
-	return 0;
+	free_page((unsigned long)u);
+
+	return rc;
 }
 
 int direct_remap_pfn_range(struct vm_area_struct *vma,

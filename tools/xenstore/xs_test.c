@@ -198,7 +198,6 @@ static void __attribute__((noreturn)) usage(void)
 	     "  rm <path>\n"
 	     "  getperm <path>\n"
 	     "  setperm <path> <id> <flags> ...\n"
-	     "  shutdown\n"
 	     "  watch <path> <token>\n"
 	     "  watchnoack <path> <token>\n"
 	     "  waitwatch\n"
@@ -214,8 +213,6 @@ static void __attribute__((noreturn)) usage(void)
 	     "  notimeout\n"
 	     "  readonly\n"
 	     "  readwrite\n"
-	     "  noackwrite <path> <value>...\n"
-	     "  readack\n"
 	     "  dump\n");
 }
 
@@ -355,37 +352,6 @@ static void do_write(unsigned int handle, char *path, char *data)
 		failed(handle);
 }
 
-static void do_noackwrite(unsigned int handle,
-			  char *path, char *data)
-{
-	struct xsd_sockmsg msg;
-
-	msg.len = strlen(path) + 1 + strlen(data);
-	msg.type = XS_WRITE;
-	if (!write_all_choice(handles[handle]->fd, &msg, sizeof(msg)))
-		failed(handle);
-	if (!write_all_choice(handles[handle]->fd, path, strlen(path) + 1))
-		failed(handle);
-	if (!write_all_choice(handles[handle]->fd, data, strlen(data)))
-		failed(handle);
-	/* Do not wait for ack. */
-}
-
-static void do_readack(unsigned int handle)
-{
-	enum xsd_sockmsg_type type;
-	char *ret = NULL;
-
-	/* Watches can have fired before reply comes: daemon detects
-	 * and re-transmits, so we can ignore this. */
-	do {
-		free(ret);
-		ret = read_reply(handles[handle]->fd, &type, NULL);
-		if (!ret)
-			failed(handle);
-	} while (type == XS_WATCH_EVENT);
-}
-
 static void do_setid(unsigned int handle, char *id)
 {
 	if (!xs_bool(xs_debug_command(handles[handle], "setid", id,
@@ -475,12 +441,6 @@ static void do_setperm(unsigned int handle, char *path, char *line)
 		failed(handle);
 }
 
-static void do_shutdown(unsigned int handle)
-{
-	if (!xs_shutdown(handles[handle]))
-		failed(handle);
-}
-
 static void do_watch(unsigned int handle, const char *node, const char *token,
 		     bool swallow_event)
 {
@@ -489,8 +449,11 @@ static void do_watch(unsigned int handle, const char *node, const char *token,
 
 	/* Convenient for testing... */
 	if (swallow_event) {
-		char **vec = xs_read_watch(handles[handle]);
-		if (!vec || !streq(vec[0], node) || !streq(vec[1], token))
+		unsigned int num;
+		char **vec = xs_read_watch(handles[handle], &num);
+		if (!vec ||
+		    !streq(vec[XS_WATCH_PATH], node) ||
+		    !streq(vec[XS_WATCH_TOKEN], token))
 			failed(handle);
 		if (!xs_acknowledge_watch(handles[handle], token))
 			failed(handle);
@@ -522,6 +485,7 @@ static void do_waitwatch(unsigned int handle)
 	struct timeval tv = {.tv_sec = timeout_ms/1000,
 			     .tv_usec = (timeout_ms*1000)%1000000 };
 	fd_set set;
+	unsigned int num;
 
 	if (xs_fileno(handles[handle]) != -2) {
 		/* Manually select here so we can time out gracefully. */
@@ -537,16 +501,17 @@ static void do_waitwatch(unsigned int handle)
 		set_timeout();
 	}
 
-	vec = xs_read_watch(handles[handle]);
+	vec = xs_read_watch(handles[handle], &num);
 	if (!vec) {
 		failed(handle);
 		return;
 	}
 
 	if (handle)
-		output("%i:%s:%s\n", handle, vec[0], vec[1]);
+		output("%i:%s:%s\n", handle,
+		       vec[XS_WATCH_PATH], vec[XS_WATCH_TOKEN]);
 	else
-		output("%s:%s\n", vec[0], vec[1]);
+		output("%s:%s\n", vec[XS_WATCH_PATH], vec[XS_WATCH_TOKEN]);
 	free(vec);
 }
 
@@ -775,8 +740,6 @@ static void do_command(unsigned int default_handle, char *line)
 		do_getperm(handle, arg(line, 1));
 	else if (streq(command, "setperm"))
 		do_setperm(handle, arg(line, 1), line);
-	else if (streq(command, "shutdown"))
-		do_shutdown(handle);
 	else if (streq(command, "watch"))
 		do_watch(handle, arg(line, 1), arg(line, 2), true);
 	else if (streq(command, "watchnoack"))
@@ -818,11 +781,7 @@ static void do_command(unsigned int default_handle, char *line)
 		readonly = false;
 		xs_daemon_close(handles[handle]);
 		handles[handle] = NULL;
-	} else if (streq(command, "noackwrite"))
-		do_noackwrite(handle, arg(line,1), arg(line,2));
-	else if (streq(command, "readack"))
-		do_readack(handle);
-	else
+	} else
 		barf("Unknown command %s", command);
 	fflush(stdout);
 	disarm_timeout();

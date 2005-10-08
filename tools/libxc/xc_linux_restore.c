@@ -500,13 +500,13 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     }
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
-    pfn = ctxt.user_regs.esi;
+    pfn = ctxt.user_regs.edx;
     if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) )
     {
         ERR("Suspend record frame number is bad");
         goto out;
     }
-    ctxt.user_regs.esi = mfn = pfn_to_mfn_table[pfn];
+    ctxt.user_regs.edx = mfn = pfn_to_mfn_table[pfn];
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
     start_info->nr_pages    = nr_pfns;

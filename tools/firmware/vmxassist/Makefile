@@ -25,9 +25,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 TEXTADDR=0x000D0000
 
 DEFINES=-DDEBUG -DTEXTADDR=${TEXTADDR}
-XENINC=-I$(XEN_ROOT)/xen/include -I$(XEN_ROOT)/tools/libxc
-#DEFINES=-DDEBUG -DTEST -DTEXTADDR=${TEXTADDR}
-#XENINC=-I/home/leendert/xen/xeno-unstable.bk/xen/include
+XENINC=-I$(XEN_ROOT)/tools/libxc
 
 LD       = ld
 CC       = gcc

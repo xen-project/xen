@@ -20,13 +20,19 @@
 #define SHUTDOWN_POWEROFF  0
 #define SHUTDOWN_REBOOT    1
 #define SHUTDOWN_SUSPEND   2
+// Code 3 is SHUTDOWN_CRASH, which we don't use because the domain can only
+// report a crash, not be instructed to crash!
+// HALT is the same as POWEROFF, as far as we're concerned.  The tools use
+// the distinction when we return the reason code to them.
+#define SHUTDOWN_HALT      4
+
 
 void machine_restart(char * __unused)
 {
 	/* We really want to get pending console data out before we die. */
 	extern void xencons_force_flush(void);
 	xencons_force_flush();
-	HYPERVISOR_reboot();
+	HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_reboot);
 }
 
 void machine_halt(void)
@@ -39,7 +45,7 @@ void machine_power_off(void)
 	/* We really want to get pending console data out before we die. */
 	extern void xencons_force_flush(void);
 	xencons_force_flush();
-	HYPERVISOR_shutdown();
+	HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_poweroff);
 }
 
 int reboot_thru_bios = 0;	/* for dmi_scan.c */
@@ -74,11 +80,8 @@ static int __do_suspend(void *ignore)
 	extern unsigned long *pfn_to_mfn_frame_list[];
 
 #ifdef CONFIG_SMP
-	static vcpu_guest_context_t suspended_cpu_records[NR_CPUS];
-	cpumask_t prev_online_cpus, prev_present_cpus;
-
-	void save_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt);
-	int restore_vcpu_context(int vcpu, vcpu_guest_context_t *ctxt);
+	cpumask_t prev_online_cpus;
+	int vcpu_prepare(int vcpu);
 #endif
 
 	extern void xencons_resume(void);
@@ -98,25 +101,20 @@ static int __do_suspend(void *ignore)
 
 	xenbus_suspend();
 
-	preempt_disable();
+	lock_cpu_hotplug();
 #ifdef CONFIG_SMP
-	/* Take all of the other cpus offline.  We need to be careful not
-	   to get preempted between the final test for num_online_cpus()
-	   == 1 and disabling interrupts, since otherwise userspace could
-	   bring another cpu online, and then we'd be stuffed.  At the
-	   same time, cpu_down can reschedule, so we need to enable
-	   preemption while doing that.  This kind of sucks, but should be
-	   correct. */
-	/* (We don't need to worry about other cpus bringing stuff up,
-	   since by the time num_online_cpus() == 1, there aren't any
-	   other cpus) */
+	/*
+	 * Take all other CPUs offline. We hold the hotplug semaphore to
+	 * avoid other processes bringing up CPUs under our feet.
+	 */
 	cpus_clear(prev_online_cpus);
 	while (num_online_cpus() > 1) {
-		preempt_enable();
 		for_each_online_cpu(i) {
 			if (i == 0)
 				continue;
+			unlock_cpu_hotplug();
 			err = cpu_down(i);
+			lock_cpu_hotplug();
 			if (err != 0) {
 				printk(KERN_CRIT "Failed to take all CPUs "
 				       "down: %d.\n", err);
@@ -124,30 +122,21 @@ static int __do_suspend(void *ignore)
 			}
 			cpu_set(i, prev_online_cpus);
 		}
-		preempt_disable();
 	}
 #endif
 
-	__cli();
-
-	preempt_enable();
-
-#ifdef CONFIG_SMP
-	cpus_clear(prev_present_cpus);
-	for_each_present_cpu(i) {
-		if (i == 0)
-			continue;
-		save_vcpu_context(i, &suspended_cpu_records[i]);
-		cpu_set(i, prev_present_cpus);
-	}
-#endif
-
-	gnttab_suspend();
+	preempt_disable();
 
 #ifdef __i386__
 	mm_pin_all();
 	kmem_cache_shrink(pgd_cache);
 #endif
+
+	__cli();
+	preempt_enable();
+	unlock_cpu_hotplug();
+
+	gnttab_suspend();
 
 	HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 	clear_fixmap(FIX_SHARED_INFO);
@@ -155,8 +144,10 @@ static int __do_suspend(void *ignore)
 	xen_start_info->store_mfn = mfn_to_pfn(xen_start_info->store_mfn);
 	xen_start_info->console_mfn = mfn_to_pfn(xen_start_info->console_mfn);
 
-	/* We'll stop somewhere inside this hypercall.  When it returns,
-	   we'll start resuming after the restore. */
+	/*
+	 * We'll stop somewhere inside this hypercall. When it returns,
+	 * we'll start resuming after the restore.
+	 */
 	HYPERVISOR_suspend(virt_to_mfn(xen_start_info));
 
 	shutting_down = SHUTDOWN_INVALID; 
@@ -189,11 +180,6 @@ static int __do_suspend(void *ignore)
 
 	time_resume();
 
-#ifdef CONFIG_SMP
-	for_each_cpu_mask(i, prev_present_cpus)
-		restore_vcpu_context(i, &suspended_cpu_records[i]);
-#endif
-
 	__sti();
 
 	xencons_resume();
@@ -201,6 +187,9 @@ static int __do_suspend(void *ignore)
 	xenbus_resume();
 
 #ifdef CONFIG_SMP
+	for_each_present_cpu(i)
+		vcpu_prepare(i);
+
  out_reenable_cpus:
 	for_each_cpu_mask(i, prev_online_cpus) {
 		j = cpu_up(i);
@@ -230,6 +219,7 @@ static int shutdown_process(void *__unused)
 
 	switch (shutting_down) {
 	case SHUTDOWN_POWEROFF:
+	case SHUTDOWN_HALT:
 		if (execve("/sbin/poweroff", poweroff_argv, envp) < 0) {
 			sys_reboot(LINUX_REBOOT_MAGIC1,
 				   LINUX_REBOOT_MAGIC2,
@@ -311,6 +301,8 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
 		shutting_down = SHUTDOWN_REBOOT;
 	else if (strcmp(str, "suspend") == 0)
 		shutting_down = SHUTDOWN_SUSPEND;
+	else if (strcmp(str, "halt") == 0)
+		shutting_down = SHUTDOWN_HALT;
 	else {
 		printk("Ignoring shutdown request: %s\n", str);
 		shutting_down = SHUTDOWN_INVALID;

@@ -39,7 +39,6 @@ extern void arch_vmx_do_launch(struct vcpu *);
 extern void arch_vmx_do_resume(struct vcpu *);
 extern void arch_vmx_do_relaunch(struct vcpu *);
 
-extern int vmcs_size;
 extern unsigned int cpu_rev;
 
 /*
@@ -315,10 +314,8 @@ static always_inline int ___vmread (const unsigned long field,  void *ptr, const
 }
 
 
-static always_inline void __vmwrite_vcpu(unsigned long field, unsigned long value)
+static always_inline void __vmwrite_vcpu(struct vcpu *v, unsigned long field, unsigned long value)
 {
-    struct vcpu *v = current;
-
     switch(field) {
     case CR0_READ_SHADOW:
 	v->arch.arch_vmx.cpu_shadow_cr0 = value;
@@ -335,10 +332,8 @@ static always_inline void __vmwrite_vcpu(unsigned long field, unsigned long valu
     }
 }
 
-static always_inline void __vmread_vcpu(unsigned long field, unsigned long *value)
+static always_inline void __vmread_vcpu(struct vcpu *v, unsigned long field, unsigned long *value)
 {
-    struct vcpu *v = current;
-
     switch(field) {
     case CR0_READ_SHADOW:
 	*value = v->arch.arch_vmx.cpu_shadow_cr0;
@@ -353,24 +348,15 @@ static always_inline void __vmread_vcpu(unsigned long field, unsigned long *valu
 	printk("__vmread_cpu: invalid field %lx\n", field);
 	break;
     }
-
-   /* 
-    * __vmwrite() can be used for non-current vcpu, and it's possible that
-    * the vcpu field is not initialized at that case.
-    * 
-    */
-    if (!*value) {
-	__vmread(field, value);
-	__vmwrite_vcpu(field, *value);
-    }
 }
 
 static inline int __vmwrite (unsigned long field, unsigned long value)
 {
     unsigned long eflags;
+    struct vcpu *v = current;
 
     __asm__ __volatile__ ( VMWRITE_OPCODE
-                           MODRM_EAX_ECX       
+                           MODRM_EAX_ECX
                            :
                            : "a" (field) , "c" (value)
                            : "memory");
@@ -382,7 +368,7 @@ static inline int __vmwrite (unsigned long field, unsigned long value)
     case CR0_READ_SHADOW:
     case GUEST_CR0:
     case CPU_BASED_VM_EXEC_CONTROL:
-	__vmwrite_vcpu(field, value);
+	__vmwrite_vcpu(v, field, value);
 	break;
     }
 
@@ -438,23 +424,24 @@ static inline int __vmxon (u64 addr)
 static inline void vmx_stts(void)
 {
     unsigned long cr0;
+    struct vcpu *v = current;
 
-    __vmread_vcpu(GUEST_CR0, &cr0);
+    __vmread_vcpu(v, GUEST_CR0, &cr0);
     if (!(cr0 & X86_CR0_TS)) {
         __vmwrite(GUEST_CR0, cr0 | X86_CR0_TS);
     }
 
-    __vmread_vcpu(CR0_READ_SHADOW, &cr0);
+    __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
     if (!(cr0 & X86_CR0_TS))
        __vm_set_bit(EXCEPTION_BITMAP, EXCEPTION_BITMAP_NM);
 }
 
-/* Works only for ed == current */
+/* Works only for vcpu == current */
 static inline int vmx_paging_enabled(struct vcpu *v)
 {
     unsigned long cr0;
 
-    __vmread_vcpu(CR0_READ_SHADOW, &cr0);
+    __vmread_vcpu(v, CR0_READ_SHADOW, &cr0);
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
 }
 

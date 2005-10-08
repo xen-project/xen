@@ -1,4 +1,5 @@
 # Copyright (C) 2005 Christian Limpach <Christian.Limpach@cl.cam.ac.uk>
+# Copyright (C) 2005 XenSource Ltd
 
 # This file is subject to the terms and conditions of the GNU General
 # Public License.  See the file "COPYING" in the main directory of
@@ -7,15 +8,14 @@
 import os
 import re
 import select
+import string
 import sxp
-from string import join
 from struct import pack, unpack, calcsize
 
 from xen.util.xpopen import xPopen3
 
 import xen.lowlevel.xc
 
-import XendDomainInfo
 from xen.xend.xenstore.xsutil import IntroduceDomain
 
 from XendError import XendError
@@ -42,57 +42,55 @@ def read_exact(fd, size, errmsg):
         raise XendError(errmsg)
     return buf
 
-def save(xd, fd, dominfo, live):
+def save(fd, dominfo, live):
     write_exact(fd, SIGNATURE, "could not write guest state file: signature")
 
     config = sxp.to_string(dominfo.sxpr())
-    write_exact(fd, pack("!i", len(config)),
-                "could not write guest state file: config len")
-    write_exact(fd, config, "could not write guest state file: config")
 
-    # xc_save takes three customization parameters: maxit, max_f, and flags
-    # the last controls whether or not save is 'live', while the first two
-    # further customize behaviour when 'live' save is enabled. Passing "0"
-    # simply uses the defaults compiled into libxenguest; see the comments 
-    # and/or code in xc_linux_save() for more information. 
-    cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
-           str(dominfo.domid), "0", "0", str(int(live)) ]
-    log.info("[xc_save] " + join(cmd))
-    child = xPopen3(cmd, True, -1, [fd, xc.handle()])
-    
-    lasterr = ""
-    p = select.poll()
-    p.register(child.fromchild.fileno())
-    p.register(child.childerr.fileno())
-    while True: 
-        r = p.poll()
-        for (fd, event) in r:
-            if not event & select.POLLIN:
-                continue
-            if fd == child.childerr.fileno():
-                l = child.childerr.readline()
-                log.error(l.rstrip())
-                lasterr = l.rstrip()
-            if fd == child.fromchild.fileno():
-                l = child.fromchild.readline()
-                if l.rstrip() == "suspend":
-                    log.info("suspending %d" % dominfo.domid)
-                    xd.domain_shutdown(dominfo.domid, reason='suspend')
-                    dominfo.state_wait(XendDomainInfo.STATE_VM_SUSPENDED)
-                    log.info("suspend %d done" % dominfo.domid)
-                    child.tochild.write("done\n")
-                    child.tochild.flush()
-        if filter(lambda (fd, event): event & select.POLLHUP, r):
-            break
+    domain_name = dominfo.getName()
+    # Rename the domain temporarily, so that we don't get a name clash if this
+    # domain is migrating (live or non-live) to the local host.  Doing such a
+    # thing is useful for debugging.
+    dominfo.setName('migrating-' + domain_name)
 
-    if child.wait() >> 8 == 127:
-        lasterr = "popen %s failed" % PATH_XC_SAVE
-    if child.wait() != 0:
-        raise XendError("xc_save failed: %s" % lasterr)
+    try:
+        write_exact(fd, pack("!i", len(config)),
+                    "could not write guest state file: config len")
+        write_exact(fd, config, "could not write guest state file: config")
 
-    dominfo.closeStoreChannel()
-    xd.domain_destroy(dominfo.domid)
-    return None
+        # xc_save takes three customization parameters: maxit, max_f, and
+        # flags the last controls whether or not save is 'live', while the
+        # first two further customize behaviour when 'live' save is
+        # enabled. Passing "0" simply uses the defaults compiled into
+        # libxenguest; see the comments and/or code in xc_linux_save() for
+        # more information.
+        cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
+               str(dominfo.getDomid()), "0", "0", str(int(live)) ]
+        log.debug("[xc_save]: %s", string.join(cmd))
+
+        def saveInputHandler(line, tochild):
+            log.debug("In saveInputHandler %s", line)
+            if line == "suspend":
+                log.debug("Suspending %d ...", dominfo.getDomid())
+                dominfo.shutdown('suspend')
+                dominfo.waitForShutdown()
+                log.info("Domain %d suspended.", dominfo.getDomid())
+                tochild.write("done\n")
+                tochild.flush()
+
+        forkHelper(cmd, fd, saveInputHandler, False)
+
+        dominfo.destroyDomain()
+
+    except Exception, exn:
+        log.exception("Save failed on domain %s (%d).", domain_name,
+                      dominfo.getDomid())
+        try:
+            dominfo.setName(domain_name)
+        except:
+            log.exception("Failed to reset the migrating domain's name")
+        raise Exception, exn
+
 
 def restore(xd, fd):
     signature = read_exact(fd, len(SIGNATURE),
@@ -113,71 +111,98 @@ def restore(xd, fd):
         raise XendError("not a valid guest state file: config parse")
 
     vmconfig = p.get_val()
-    dominfo = xd.domain_configure(vmconfig)
 
-    l = read_exact(fd, sizeof_unsigned_long,
-                   "not a valid guest state file: pfn count read")
-    nr_pfns = unpack("=L", l)[0]   # XXX endianess
-    if nr_pfns > 1024*1024:     # XXX
-        raise XendError(
-            "not a valid guest state file: pfn count out of range")
+    dominfo = xd.restore_(vmconfig)
 
-    if dominfo.store_channel:
-        store_evtchn = dominfo.store_channel.port2
-    else:
-        store_evtchn = 0
+    assert dominfo.store_channel
+    assert dominfo.console_channel
+    assert dominfo.getDomainPath()
 
-    if dominfo.console_channel:
-        console_evtchn = dominfo.console_channel.port2
-    else:
-        console_evtchn = 0
+    try:
+        l = read_exact(fd, sizeof_unsigned_long,
+                       "not a valid guest state file: pfn count read")
+        nr_pfns = unpack("=L", l)[0]   # XXX endianess
+        if nr_pfns > 1024*1024:     # XXX
+            raise XendError(
+                "not a valid guest state file: pfn count out of range")
 
-    cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
-           str(dominfo.domid), str(nr_pfns),
-           str(store_evtchn), str(console_evtchn)]
-    log.info("[xc_restore] " + join(cmd))
+        store_evtchn = dominfo.store_channel
+        console_evtchn = dominfo.console_channel
+
+        cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
+               str(dominfo.getDomid()), str(nr_pfns),
+               str(store_evtchn), str(console_evtchn)]
+        log.debug("[xc_restore]: %s", string.join(cmd))
+
+        def restoreInputHandler(line, _):
+            m = re.match(r"^(store-mfn) (\d+)$", line)
+            if m:
+                store_mfn = int(m.group(2))
+                dominfo.setStoreRef(store_mfn)
+                log.debug("IntroduceDomain %d %d %d %s",
+                          dominfo.getDomid(),
+                          store_mfn,
+                          dominfo.store_channel,
+                          dominfo.getDomainPath())
+                IntroduceDomain(dominfo.getDomid(),
+                                store_mfn,
+                                dominfo.store_channel,
+                                dominfo.getDomainPath())
+            else:
+                m = re.match(r"^(console-mfn) (\d+)$", line)
+                if m:
+                    dominfo.setConsoleRef(int(m.group(2)))
+
+        forkHelper(cmd, fd, restoreInputHandler, True)
+
+        return dominfo
+    except:
+        dominfo.destroy()
+        raise
+
+
+def forkHelper(cmd, fd, inputHandler, closeToChild):
     child = xPopen3(cmd, True, -1, [fd, xc.handle()])
-    child.tochild.close()
 
-    lasterr = ""
-    p = select.poll()
-    p.register(child.fromchild.fileno())
-    p.register(child.childerr.fileno())
-    while True:
-        r = p.poll()
-        for (fd, event) in r:
-            if not event & select.POLLIN:
-                continue
-            if fd == child.childerr.fileno():
-                l = child.childerr.readline()
-                log.error(l.rstrip())
-                lasterr = l.rstrip()
-            if fd == child.fromchild.fileno():
-                l = child.fromchild.readline()
-                while l:
-                    log.info(l.rstrip())
-                    m = re.match(r"^(store-mfn) (\d+)\n$", l)
-                    if m:
-                        if dominfo.store_channel:
-                            dominfo.setStoreRef(int(m.group(2)))
-                            if dominfo.store_mfn >= 0:
-                                IntroduceDomain(dominfo.domid,
-                                                dominfo.store_mfn,
-                                                dominfo.store_channel.port1,
-                                                dominfo.path)
-                    m = re.match(r"^(console-mfn) (\d+)\n$", l)
-                    if m:
-                        dominfo.setConsoleRef(int(m.group(2)))
-                    try:
-                        l = child.fromchild.readline()
-                    except:
-                        l = None
-        if filter(lambda (fd, event): event & select.POLLHUP, r):
-            break
+    if closeToChild:
+        child.tochild.close()
+
+    try:
+        fds = [child.fromchild.fileno(),
+               child.childerr.fileno()]
+        p = select.poll()
+        map(p.register, fds)
+        while len(fds) > 0:
+            r = p.poll()
+            for (fd, event) in r:
+                if event & select.POLLIN:
+                    if fd == child.childerr.fileno():
+                        lasterr = child.childerr.readline().rstrip()
+                        log.error('%s', lasterr)
+                    else:
+                        l = child.fromchild.readline().rstrip()
+                        while l:
+                            log.debug('%s', l)
+                            inputHandler(l, child.tochild)
+                            try:
+                                l = child.fromchild.readline().rstrip()
+                            except:
+                                l = None
+
+                if event & select.POLLERR:
+                    raise XendError('Error reading from child process for %s',
+                                    cmd)
+
+                if event & select.POLLHUP:
+                    fds.remove(fd)
+                    p.unregister(fd)
+    finally:
+        child.fromchild.close()
+        child.childerr.close()
+        if not closeToChild:
+            child.tochild.close()
 
     if child.wait() >> 8 == 127:
-        lasterr = "popen %s failed" % PATH_XC_RESTORE
+        lasterr = "popen failed"
     if child.wait() != 0:
-        raise XendError("xc_restore failed: %s" % lasterr)
-
-    return dominfo
+        raise XendError("%s failed: %s" % (string.join(cmd), lasterr))

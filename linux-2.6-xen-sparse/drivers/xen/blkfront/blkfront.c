@@ -53,8 +53,6 @@
 #define BLKIF_STATE_DISCONNECTED 0
 #define BLKIF_STATE_CONNECTED    1
 
-static unsigned int blkif_state = BLKIF_STATE_DISCONNECTED;
-
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
 #define GRANT_INVALID_REF	0
@@ -444,12 +442,16 @@ static struct xenbus_device_id blkfront_ids[] = {
 	{ "" }
 };
 
-static void watch_for_status(struct xenbus_watch *watch, const char *node)
+static void watch_for_status(struct xenbus_watch *watch,
+			     const char **vec, unsigned int len)
 {
 	struct blkfront_info *info;
 	unsigned int binfo;
 	unsigned long sectors, sector_size;
 	int err;
+	const char *node;
+
+	node = vec[XS_WATCH_PATH];
 
 	info = container_of(watch, struct blkfront_info, watch);
 	node += strlen(watch->node);
@@ -472,8 +474,6 @@ static void watch_for_status(struct xenbus_watch *watch, const char *node)
 	info->connected = BLKIF_STATE_CONNECTED;
 	xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
 
-	blkif_state = BLKIF_STATE_CONNECTED;
-
 	xenbus_dev_ok(info->xbdev);
 
 	/* Kick pending requests. */
@@ -485,8 +485,11 @@ static void watch_for_status(struct xenbus_watch *watch, const char *node)
 static int setup_blkring(struct xenbus_device *dev, struct blkfront_info *info)
 {
 	blkif_sring_t *sring;
-	evtchn_op_t op = { .cmd = EVTCHNOP_alloc_unbound };
 	int err;
+	evtchn_op_t op = {
+		.cmd = EVTCHNOP_alloc_unbound,
+		.u.alloc_unbound.dom = DOMID_SELF,
+		.u.alloc_unbound.remote_dom = info->backend_id };
 
 	info->ring_ref = GRANT_INVALID_REF;
 
@@ -508,7 +511,6 @@ static int setup_blkring(struct xenbus_device *dev, struct blkfront_info *info)
 	}
 	info->ring_ref = err;
 
-	op.u.alloc_unbound.dom = info->backend_id;
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
 		gnttab_end_foreign_access(info->ring_ref, 0);
@@ -518,7 +520,9 @@ static int setup_blkring(struct xenbus_device *dev, struct blkfront_info *info)
 		xenbus_dev_error(dev, err, "allocating event channel");
 		return err;
 	}
+
 	blkif_connect(info, op.u.alloc_unbound.port);
+
 	return 0;
 }
 
@@ -652,8 +656,17 @@ static int blkfront_probe(struct xenbus_device *dev,
 		return err;
 	}
 
-	/* Call once in case entries already there. */
-	watch_for_status(&info->watch, info->watch.node);
+	{
+		unsigned int len = max(XS_WATCH_PATH, XS_WATCH_TOKEN) + 1;
+		const char *vec[len];
+
+		vec[XS_WATCH_PATH] = info->watch.node;
+		vec[XS_WATCH_TOKEN] = NULL;
+
+		/* Call once in case entries already there. */
+		watch_for_status(&info->watch, vec, len);
+	}
+
 	return 0;
 }
 
@@ -712,29 +725,7 @@ static struct xenbus_driver blkfront = {
 
 static void __init init_blk_xenbus(void)
 {
-	xenbus_register_device(&blkfront);
-}
-
-static int wait_for_blkif(void)
-{
-	int err = 0;
-	int i;
-
-	/*
-	 * We should figure out how many and which devices we need to
-	 * proceed and only wait for those.  For now, continue once the
-	 * first device is around.
-	 */
-	for (i = 0; blkif_state != BLKIF_STATE_CONNECTED && (i < 10*HZ); i++) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(1);
-	}
-
-	if (blkif_state != BLKIF_STATE_CONNECTED) {
-		WPRINTK("Timeout connecting to device!\n");
-		err = -ENOSYS;
-	}
-	return err;
+	xenbus_register_driver(&blkfront);
 }
 
 static int __init xlblk_init(void)
@@ -746,8 +737,6 @@ static int __init xlblk_init(void)
 	IPRINTK("Initialising virtual block device driver\n");
 
 	init_blk_xenbus();
-
-	wait_for_blkif();
 
 	return 0;
 }

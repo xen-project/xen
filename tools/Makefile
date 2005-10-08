@@ -22,7 +22,7 @@ SUBDIRS += xenstat
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 SUBDIRS += python
-#SUBDIRS += pygrub
+SUBDIRS += pygrub
 endif
 
 .PHONY: all install clean check check_clean ioemu eioemuinstall ioemuclean

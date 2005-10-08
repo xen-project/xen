@@ -88,7 +88,6 @@ archclean:
 
 CLEAN_FILES += include/asm-ia64/.offsets.h.stamp vmlinux.gz bootloader
 #CLEAN_FILES += include/asm-xen/xen-public include/asm-ia64/xen/asm-xsi-offsets.h
-#CLEAN_FILES += include/asm-xen/linux-public/xenstored.h
 #CLEAN_FILES += include/asm-xen/linux-public include/asm-xen/asm-ia64/hypervisor.h
 
 MRPROPER_FILES += include/asm-ia64/offsets.h
@@ -119,9 +118,6 @@ include/asm-ia64/.offsets.h.stamp:
 #	[ -e include/asm-xen/linux-public ] \
 #	 || ln -s $(XEN_PATH)/linux-2.6-xen-sparse/include/asm-xen/linux-public \
 		include/asm-xen/linux-public
-	[ -e include/asm-xen/linux-public/xenstored.h ] \
-	 || ln -s $(XEN_PATH)/tools/xenstore/xenstored.h \
-		include/asm-xen/linux-public/xenstored.h
 	[ -e include/asm-xen/asm-ia64/hypervisor.h ] \
 	 || ln -s $(XEN_PATH)/linux-2.6-xen-sparse/include/asm-xen/asm-ia64/hypervisor.h \
 		include/asm-xen/asm-ia64/hypervisor.h

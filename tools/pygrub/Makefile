@@ -15,4 +15,4 @@ install: all
 endif
 
 clean:
-	rm -rf build *.pyc *.pyo *.o *.a *~
+	rm -rf build tmp *.pyc *.pyo *.o *.a *~

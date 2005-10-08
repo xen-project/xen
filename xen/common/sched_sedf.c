@@ -500,9 +500,15 @@ static inline void update_queues(s_time_t now, struct list_head* runq,
                   curinf->vcpu->domain->domain_id,
                   curinf->vcpu->vcpu_id);
             __del_from_queue(curinf->vcpu);
-   
+
             /*move them to their next period*/
             curinf->deadl_abs += curinf->period;
+            /*ensure that the start of the next period is in the future*/
+            if (unlikely(PERIOD_BEGIN(curinf) < now)) {
+                curinf->deadl_abs += 
+                    (DIV_UP(now - PERIOD_BEGIN(curinf),
+                           curinf->period)) * curinf->period;
+            }
             /*and put them back into the queue*/
             __add_to_waitqueue_sort(curinf->vcpu);
             continue;
@@ -645,7 +651,7 @@ static inline struct task_slice sedf_do_extra_schedule (s_time_t now,
                                                         s_time_t end_xt, struct list_head *extraq[], int cpu) {
     struct task_slice   ret;
     struct sedf_vcpu_info *runinf;
- 
+    ASSERT(end_xt > now);
     /* Enough time left to use for extratime? */
     if (end_xt - now < EXTRA_QUANTUM)
         goto return_idle;

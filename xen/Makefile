@@ -1,7 +1,3 @@
-# Default is to install to local 'dist' directory.
-DISTDIR ?= ../dist
-DESTDIR ?= $(DISTDIR)/install
-
 INSTALL			= install
 INSTALL_DATA		= $(INSTALL) -m0644
 INSTALL_DIR		= $(INSTALL) -d -m0755

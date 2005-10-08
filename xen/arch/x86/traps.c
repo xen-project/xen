@@ -895,6 +895,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             *reg = pagetable_get_paddr(v->arch.guest_table);
             break;
 
+        case 4: /* Read CR4 */
+            /*
+             * Guests can read CR4 to see what features Xen has enabled. We
+             * therefore lie about PGE & PSE as they are unavailable to guests.
+             */
+            *reg = read_cr4() & ~(X86_CR4_PGE|X86_CR4_PSE);
+            break;
+
         default:
             goto fail;
         }
