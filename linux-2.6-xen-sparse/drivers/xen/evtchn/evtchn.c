@@ -206,6 +206,15 @@ static ssize_t evtchn_write(struct file *file, const char *buf,
 	return rc;
 }
 
+static void evtchn_bind_to_user(struct per_user_data *u, int port)
+{
+	spin_lock_irq(&port_user_lock);
+	BUG_ON(port_user[port] != NULL);
+	port_user[port] = u;
+	unmask_evtchn(port);
+	spin_unlock_irq(&port_user_lock);
+}
+
 static int evtchn_ioctl(struct inode *inode, struct file *file,
                         unsigned int cmd, unsigned long arg)
 {
@@ -213,8 +222,6 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 	struct per_user_data *u = file->private_data;
 	evtchn_op_t op = { 0 };
 
-	spin_lock_irq(&port_user_lock);
-    
 	switch (cmd) {
 	case IOCTL_EVTCHN_BIND_VIRQ: {
 		struct ioctl_evtchn_bind_virq bind;
@@ -231,8 +238,7 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 			break;
 
 		rc = op.u.bind_virq.port;
-		port_user[rc] = u;
-		unmask_evtchn(rc);
+		evtchn_bind_to_user(u, rc);
 		break;
 	}
 
@@ -251,8 +257,7 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 			break;
 
 		rc = op.u.bind_interdomain.local_port;
-		port_user[rc] = u;
-		unmask_evtchn(rc);
+		evtchn_bind_to_user(u, rc);
 		break;
 	}
 
@@ -271,8 +276,7 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 			break;
 
 		rc = op.u.alloc_unbound.port;
-		port_user[rc] = u;
-		unmask_evtchn(rc);
+		evtchn_bind_to_user(u, rc);
 		break;
 	}
 
@@ -283,20 +287,28 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 		if (copy_from_user(&unbind, (void *)arg, sizeof(unbind)))
 			break;
 
-		if (unbind.port >= NR_EVENT_CHANNELS) {
-			rc = -EINVAL;
-		} else if (port_user[unbind.port] != u) {
-			rc = -ENOTCONN;
-		} else {
-			port_user[unbind.port] = NULL;
-			mask_evtchn(unbind.port);
+		rc = -EINVAL;
+		if (unbind.port >= NR_EVENT_CHANNELS)
+			break;
 
-			op.cmd = EVTCHNOP_close;
-			op.u.close.port = unbind.port;
-			BUG_ON(HYPERVISOR_event_channel_op(&op));
-
-			rc = 0;
+		spin_lock_irq(&port_user_lock);
+    
+		rc = -ENOTCONN;
+		if (port_user[unbind.port] != u) {
+			spin_unlock_irq(&port_user_lock);
+			break;
 		}
+
+		port_user[unbind.port] = NULL;
+		mask_evtchn(unbind.port);
+
+		spin_unlock_irq(&port_user_lock);
+
+		op.cmd = EVTCHNOP_close;
+		op.u.close.port = unbind.port;
+		BUG_ON(HYPERVISOR_event_channel_op(&op));
+
+		rc = 0;
 		break;
 	}
 
@@ -320,7 +332,9 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 
 	case IOCTL_EVTCHN_RESET: {
 		/* Initialise the ring to empty. Clear errors. */
+		spin_lock_irq(&port_user_lock);
 		u->ring_cons = u->ring_prod = u->ring_overflow = 0;
+		spin_unlock_irq(&port_user_lock);
 		rc = 0;
 		break;
 	}
@@ -329,8 +343,6 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 		rc = -ENOSYS;
 		break;
 	}
-
-	spin_unlock_irq(&port_user_lock);   
 
 	return rc;
 }
