@@ -86,7 +86,7 @@ $(obj)/vsyscall-syms.o: $(src)/vsyscall.lds \
 	$(call if_changed,syscall)
 
 c-link	:=
-s-link	:= vsyscall-int80.o vsyscall-sysenter.o vsyscall-sigreturn.o vsyscall.lds.o vsyscall-note.o
+s-link	:= vsyscall-int80.o vsyscall-sysenter.o vsyscall-sigreturn.o vsyscall.lds.o
 
 $(patsubst %.o,$(obj)/%.c,$(c-obj-y) $(c-obj-m) $(c-link)) $(patsubst %.o,$(obj)/%.S,$(s-obj-y) $(s-link)):
 	@ln -fsn $(srctree)/arch/i386/kernel/$(notdir $@) $@
