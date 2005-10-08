@@ -17,7 +17,7 @@ then
 	mv arch/xen arch/xen.xen-x86
 	mkdir arch/xen
 	mv arch/xen.xen-x86/configs arch/xen
-	mv include/asm-generic include/asm-generic.xen-x86
+#	mv include/asm-generic include/asm-generic.xen-x86
 	mv include/linux include/linux.xen-x86
 	mkdir include/linux
 fi

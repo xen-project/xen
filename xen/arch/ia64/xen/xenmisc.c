@@ -16,6 +16,7 @@
 #include <xen/serial.h>
 #include <asm/io.h>
 #include <xen/softirq.h>
+#include <public/sched.h>
 
 efi_memory_desc_t ia64_efi_io_md;
 EXPORT_SYMBOL(ia64_efi_io_md);

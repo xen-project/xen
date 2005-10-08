@@ -15,6 +15,7 @@
 #include <asm/vcpu.h>
 #include <asm/dom_fw.h>
 #include <public/memory.h>
+#include <public/sched.h>
 
 extern unsigned long translate_domain_mpaddr(unsigned long);
 extern struct ia64_pal_retval xen_pal_emulator(UINT64,UINT64,UINT64,UINT64);

@@ -35,12 +35,18 @@ int bind_virq_to_irq(int virq)
 	while(1);
 }
 
+void notify_remote_via_irq(int virq)
+{
+	printk("notify_remote_via_irq called... FIXME??\n");
+	while(1);
+}
+
 void unbind_virq_from_evtchn(int virq)
 {
     evtchn_op_t op;
 
     op.cmd = EVTCHNOP_close;
-    op.u.close.dom = DOMID_SELF;
+//    op.u.close.dom = DOMID_SELF;
     op.u.close.port = virq_to_evtchn[virq];
     if ( HYPERVISOR_event_channel_op(&op) != 0 )
 	BUG();

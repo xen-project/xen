@@ -48,6 +48,7 @@ void force_evtchn_callback(void);
 // for drivers/xen/privcmd/privcmd.c
 #define direct_remap_pfn_range(a,b,c,d,e,f) remap_pfn_range(a,b,c,d,e)
 #define	pfn_to_mfn(x)	(x)
+#define	mfn_to_pfn(x)	(x)
 #define machine_to_phys_mapping 0
 
 #endif /* __HYPERVISOR_H__ */
