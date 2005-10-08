@@ -63,6 +63,9 @@ all: vmlinuz
 vmlinuz: vmlinux
 	$(Q)$(MAKE) $(build)=arch/xen/boot vmlinuz
 
+bzImage: vmlinuz
+	$(Q)$(MAKE) $(build)=arch/xen/boot bzImage
+
 XINSTALL_NAME ?= $(KERNELRELEASE)
 install: vmlinuz
 install kernel_install:
