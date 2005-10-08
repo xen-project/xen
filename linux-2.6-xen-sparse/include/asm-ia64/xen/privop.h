@@ -32,6 +32,7 @@
 #define	XEN_HYPER_ITR_D			break 0xf
 #define	XEN_HYPER_GET_RR		break 0x10
 #define	XEN_HYPER_SET_RR		break 0x11
+#define	XEN_HYPER_SET_KR		break 0x12
 #endif
 
 #ifndef __ASSEMBLY__
@@ -92,9 +93,6 @@ extern void xen_set_eflag(unsigned long);	/* see xen_ia64_setreg */
 	xen_set_virtual_psr_ic(0);					\
 	XEN_HYPER_SSM_I;						\
 })
-
-// for now, just use privop.  may use hyperprivop later
-/*#define xen_set_kr(regnum,val) (__ia64_setreg(regnum,val)) */
 
 /* turning off interrupts can be paravirtualized simply by writing
  * to a memory-mapped virtual psr.i bit (implemented as a 16-bit bool) */
@@ -157,6 +155,7 @@ extern void xen_set_tpr(unsigned long);
 extern void xen_eoi(void);
 extern void xen_set_rr(unsigned long index, unsigned long val);
 extern unsigned long xen_get_rr(unsigned long index);
+extern void xen_set_kr(unsigned long index, unsigned long val);
 
 /* Note: It may look wrong to test for running_on_xen in each case.
  * However regnum is always a constant so, as written, the compiler
@@ -193,9 +192,8 @@ extern unsigned long xen_get_rr(unsigned long index);
 ({									\
 	switch(regnum) {						\
 	case _IA64_REG_AR_KR0 ... _IA64_REG_AR_KR7:			\
-/* for now, just use privop.  may use hyperprivop later */		\
-/*		(running_on_xen) ?					\
-			xen_set_kr((regnum-_IA64_REG_AR_KR0), val) : */	\
+		(running_on_xen) ?					\
+			xen_set_kr((regnum-_IA64_REG_AR_KR0), val) :	\
 			__ia64_setreg(regnum,val);			\
 		break;							\
 	case _IA64_REG_CR_ITM:						\

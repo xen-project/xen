@@ -44,6 +44,7 @@
 #define    XEN_HYPER_ITR_D         0xf
 #define    XEN_HYPER_GET_RR        0x10
 #define    XEN_HYPER_SET_RR        0x11
+#define    XEN_HYPER_SET_KR        0x12
 
 #ifdef CONFIG_SMP
 #warning "FIXME: ptc.ga instruction requires spinlock for SMP"
@@ -168,6 +169,10 @@ GLOBAL_ENTRY(fast_hyperprivop)
 	// HYPERPRIVOP_THASH?
 	cmp.eq p7,p6=XEN_HYPER_THASH,r17
 (p7)	br.sptk.many hyper_thash;;
+
+	// HYPERPRIVOP_SET_KR?
+	cmp.eq p7,p6=XEN_HYPER_SET_KR,r17
+(p7)	br.sptk.many hyper_set_kr;;
 
 	// if not one of the above, give up for now and do it the slow way
 	br.sptk.many dispatch_break_fault ;;
@@ -1458,6 +1463,62 @@ ENTRY(hyper_set_rr)
 	rfi
 	;;
 END(hyper_set_rr)
+
+ENTRY(hyper_set_kr)
+	extr.u r25=r8,3,61;;
+	cmp.ne p7,p0=r0,r25	// if kr# > 7, go slow way
+(p7)	br.spnt.many dispatch_break_fault ;;
+#ifdef FAST_HYPERPRIVOP_CNT
+	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_SET_KR);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+	adds r21=XSI_KR0_OFS-XSI_PSR_IC_OFS,r18 ;;
+	shl r20=r8,3;;
+	add r22=r20,r21;;
+	st8 [r21]=r9;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar0=r9;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar1=r9;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar2=r9;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar3=r9;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar4=r9;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar5=r9;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar6=r9;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar7=r9;;
+	// done, mosey on back
+1:	mov r24=cr.ipsr
+	mov r25=cr.iip;;
+	extr.u r26=r24,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r25=16,r25
+(p7)	adds r26=1,r26
+	;;
+	dep r24=r26,r24,41,2
+	;;
+	mov cr.ipsr=r24
+	mov cr.iip=r25
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_set_kr)
 
 // this routine was derived from optimized assembly output from
 // vcpu_thash so it is dense and difficult to read but it works

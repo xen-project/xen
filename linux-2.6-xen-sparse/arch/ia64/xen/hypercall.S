@@ -202,6 +202,61 @@ GLOBAL_ENTRY(xen_set_rr)
 	;;
 END(xen_set_rr)
 
+GLOBAL_ENTRY(xen_set_kr)
+	movl r8=running_on_xen;;
+	ld4 r8=[r8];;
+	cmp.ne p7,p0=r8,r0;;
+(p7)	br.cond.spnt.few 1f;
+	;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar0=r9
+(p7)	br.ret.sptk.many rp;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar1=r9
+(p7)	br.ret.sptk.many rp;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar2=r9
+(p7)	br.ret.sptk.many rp;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar3=r9
+(p7)	br.ret.sptk.many rp;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar4=r9
+(p7)	br.ret.sptk.many rp;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar5=r9
+(p7)	br.ret.sptk.many rp;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar6=r9
+(p7)	br.ret.sptk.many rp;;
+	cmp.eq p7,p0=r8,r0
+	adds r8=-1,r8;;
+(p7)	mov ar7=r9
+(p7)	br.ret.sptk.many rp;;
+
+1:	movl r11=XSI_PSR_IC
+	mov r8=r32
+	mov r9=r33
+	;;
+	ld8 r10=[r11]
+	;;
+	st8 [r11]=r0
+	;;
+	XEN_HYPER_SET_KR
+	;;
+	st8 [r11]=r10
+	;;
+	br.ret.sptk.many rp
+	;;
+END(xen_set_rr)
+
 GLOBAL_ENTRY(xen_fc)
 	movl r8=running_on_xen;;
 	ld4 r8=[r8];;

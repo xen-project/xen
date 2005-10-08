@@ -757,12 +757,13 @@ priv_emulate(VCPU *vcpu, REGS *regs, UINT64 isr)
 #define HYPERPRIVOP_ITR_D		0xf
 #define HYPERPRIVOP_GET_RR		0x10
 #define HYPERPRIVOP_SET_RR		0x11
-#define HYPERPRIVOP_MAX			0x11
+#define HYPERPRIVOP_SET_KR		0x12
+#define HYPERPRIVOP_MAX			0x12
 
 char *hyperpriv_str[HYPERPRIVOP_MAX+1] = {
 	0, "rfi", "rsm.dt", "ssm.dt", "cover", "itc.d", "itc.i", "ssm.i",
 	"=ivr", "=tpr", "tpr=", "eoi", "itm=", "thash", "ptc.ga", "itr.d",
-	"=rr", "rr=",
+	"=rr", "rr=", "kr=",
 	0
 };
 
@@ -847,6 +848,9 @@ ia64_hyperprivop(unsigned long iim, REGS *regs)
 		return 1;
 	    case HYPERPRIVOP_SET_RR:
 		(void)vcpu_set_rr(v,regs->r8,regs->r9);
+		return 1;
+	    case HYPERPRIVOP_SET_KR:
+		(void)vcpu_set_ar(v,regs->r8,regs->r9);
 		return 1;
 	}
 	return 0;

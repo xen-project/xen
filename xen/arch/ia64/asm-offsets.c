@@ -69,6 +69,7 @@ void foo(void)
 	DEFINE(XSI_TPR_OFS, offsetof(mapped_regs_t, tpr));
 	DEFINE(XSI_PTA_OFS, offsetof(mapped_regs_t, pta));
 	DEFINE(XSI_ITV_OFS, offsetof(mapped_regs_t, itv));
+	DEFINE(XSI_KR0_OFS, offsetof(mapped_regs_t, krs[0]));
 	//DEFINE(IA64_TASK_BLOCKED_OFFSET,offsetof (struct task_struct, blocked));
 	//DEFINE(IA64_TASK_CLEAR_CHILD_TID_OFFSET,offsetof (struct task_struct, clear_child_tid));
 	//DEFINE(IA64_TASK_GROUP_LEADER_OFFSET, offsetof (struct task_struct, group_leader));
