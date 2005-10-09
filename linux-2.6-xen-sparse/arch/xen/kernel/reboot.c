@@ -270,7 +270,8 @@ static void __shutdown_handler(void *unused)
 	}
 }
 
-static void shutdown_handler(struct xenbus_watch *watch, const char *node)
+static void shutdown_handler(struct xenbus_watch *watch,
+			     const char **vec, unsigned int len)
 {
 	static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 	char *str;
@@ -315,7 +316,8 @@ static void shutdown_handler(struct xenbus_watch *watch, const char *node)
 }
 
 #ifdef CONFIG_MAGIC_SYSRQ
-static void sysrq_handler(struct xenbus_watch *watch, const char *node)
+static void sysrq_handler(struct xenbus_watch *watch, const char **vec,
+			  unsigned int len)
 {
 	char sysrq_key = '\0';
 	int err;
@@ -411,4 +413,3 @@ subsys_initcall(setup_shutdown_event);
  *  tab-width: 8
  * End:
  */
-#
