@@ -51,40 +51,28 @@ class SrvDomain(SrvDir):
         val = self.xd.domain_pause(self.dom.domid)
         return val
 
-    def op_shutdown(self, op, req):
-        fn = FormFn(self.xd.domain_shutdown,
-                    [['dom',    'int'],
-                     ['reason', 'str']])
-        val = fn(req.args, {'dom': self.dom.domid})
+    def acceptCommand(self, req):
         req.setResponseCode(http.ACCEPTED)
         req.setHeader("Location", "%s/.." % req.prePathURL())
-        return val
+
+    def op_shutdown(self, op, req):
+        self.acceptCommand(req)
+        return self.dom.shutdown(req.args['reason'][0])
 
     def op_sysrq(self, op, req):
-        fn = FormFn(self.xd.domain_sysrq,
-                    [['dom',    'int'],
-                     ['key',    'int']])
-        val = fn(req.args, {'dom' : self.dom.domid})
-        req.setResponseCode(http.ACCEPTED)
-        req.setHeader("Location", "%s/.." % req.prePathURL())
-        return val
+        self.acceptCommand(req)
+        return self.dom.send_sysrq(int(req.args['key'][0]))
 
     def op_destroy(self, op, req):
-        fn = FormFn(self.xd.domain_destroy,
-                    [['dom',    'int']])
-        val = fn(req.args, {'dom': self.dom.domid})
-        req.setHeader("Location", "%s/.." % req.prePathURL())
-        return val
+        self.acceptCommand(req)
+        return self.xd.domain_destroy(self.dom.domid)
 
     def op_save(self, op, req):
+        self.acceptCommand(req)
         return req.threadRequest(self.do_save, op, req)
 
     def do_save(self, op, req):
-        fn = FormFn(self.xd.domain_save,
-                    [['dom',  'int'],
-                     ['file', 'str']])
-        val = fn(req.args, {'dom': self.dom.domid})
-        return 0
+        return self.xd.domain_save(self.dom.domid, req.args['file'][0])
 
     def op_migrate(self, op, req):
         return req.threadRequest(self.do_migrate, op, req)
@@ -134,43 +122,39 @@ class SrvDomain(SrvDir):
                      ['memory', 'int']])
         val = fn(req.args, {'dom': self.dom.domid})
         return val
+
     
+    def call(self, fn, args, req):
+        return FormFn(fn, args)(req.args)
+
+
     def op_mem_target_set(self, op, req):
-        fn = FormFn(self.xd.domain_mem_target_set,
-                    [['dom',    'int'],
-                     ['target', 'int']])
-        val = fn(req.args, {'dom': self.dom.domid})
-        return val
+        return self.call(self.dom.setMemoryTarget
+                         [['target', 'int']],
+                         req)
 
     def op_devices(self, op, req):
-        fn = FormFn(self.xd.domain_devtype_ls,
-                    [['dom',    'int'],
-                     ['type',   'str']])
-        val = fn(req.args, {'dom': self.dom.domid})
-        return val
+        return self.call(self.dom.getDeviceSxprs,
+                         [['deviceClass', 'str']],
+                         req)
 
     def op_device_create(self, op, req):
-        fn = FormFn(self.xd.domain_device_create,
-                    [['dom',    'int'],
-                     ['config', 'sxpr']])
-        val = fn(req.args, {'dom': self.dom.domid})
-        return val
+        return self.call(self.dom.device_create,
+                         [['dev_config', 'sxpr']],
+                         req)
 
     def op_device_destroy(self, op, req):
-        fn = FormFn(self.xd.domain_device_destroy,
-                    [['dom',  'int'],
-                     ['type', 'str'],
-                     ['dev',  'str']])
-        val = fn(req.args, {'dom': self.dom.domid})
-        return val
+        return self.call(self.dom.destroyDevice,
+                         [['deviceClass', 'str'],
+                          ['devid',       'int']],
+                         req)
                 
     def op_device_configure(self, op, req):
-        fn = FormFn(self.xd.domain_device_configure,
-                    [['dom',    'int'],
-                     ['config', 'sxpr'],
-                     ['dev',    'str']])
-        val = fn(req.args, {'dom': self.dom.domid})
-        return val
+        return self.call(self.dom.device_configure,
+                         [['dev_config', 'sxpr'],
+                          ['devid',       'int']],
+                         req)
+
 
     def op_vif_limit_set(self, op, req):
         fn = FormFn(self.xd.domain_vif_limit_set,
@@ -182,12 +166,10 @@ class SrvDomain(SrvDir):
         return val
 
     def op_vcpu_hotplug(self, op, req):
-        fn = FormFn(self.xd.domain_vcpu_hotplug,
-                    [['dom', 'int'],
-                     ['vcpu', 'int'],
-                     ['state', 'int']])
-        val = fn(req.args, {'dom': self.dom.domid})
-        return val
+        return self.call(self.dom.vcpu_hotplug,
+                         [['vcpu', 'int'],
+                          ['state', 'int']],
+                         req)
 
     def render_POST(self, req):
         return self.perform(req)
@@ -201,7 +183,6 @@ class SrvDomain(SrvDir):
         #
         # if op and op[0] in ['vifs', 'vif', 'vbds', 'vbd', 'mem_target_set']:
         #    return self.perform(req)
-        self.dom.update()
         if self.use_sxp(req):
             req.setHeader("Content-Type", sxp.mime_type)
             sxp.show(self.dom.sxpr(), out=req)

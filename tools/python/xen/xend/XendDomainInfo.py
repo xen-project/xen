@@ -30,6 +30,7 @@ import threading
 import errno
 
 import xen.lowlevel.xc
+from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file
 
 from xen.xend import image
@@ -41,7 +42,8 @@ from xen.xend.XendLogging import log
 from xen.xend.XendError import XendError, VmError
 from xen.xend.XendRoot import get_component
 
-from xen.xend.uuid import getUuid
+from uuid import getUuid
+
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain
 
@@ -793,10 +795,12 @@ class XendDomainInfo:
 
     def setMemoryTarget(self, target):
         """Set the memory target of this domain.
-        @param target In KiB.
+        @param target In MiB.
         """
-        self.info['memory_KiB'] = target
-        self.storeDom("memory/target", target)
+        # Internally we use KiB, but the command interface uses MiB.
+        t = target << 10
+        self.info['memory_KiB'] = t
+        self.storeDom("memory/target", t)
 
 
     def update(self, info = None):
@@ -1366,7 +1370,10 @@ class XendDomainInfo:
         self.storeVm('vcpu_avail', self.info['vcpu_avail'])
         self.storeDom("cpu/%d/availability" % vcpu, availability)
 
-    def send_sysrq(self, key=0):
+
+    def send_sysrq(self, key):
+        asserts.isCharConvertible(key)
+
         self.storeDom("control/sysrq", '%c' % key)
 
 

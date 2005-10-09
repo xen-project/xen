@@ -359,20 +359,6 @@ class XendDomain:
             raise XendError(str(ex))
 
 
-    def domain_shutdown(self, domid, reason = 'poweroff'):
-        """Shutdown domain (nicely).
-
-        @param reason: shutdown reason: poweroff, reboot, suspend, halt
-        """
-        self.callInfo(domid, XendDomainInfo.XendDomainInfo.shutdown, reason)
-
-
-    def domain_sysrq(self, domid, key):
-        """Send a SysRq to the specified domain."""
-        return self.callInfo(domid, XendDomainInfo.XendDomainInfo.send_sysrq,
-                             key)
-
-
     def domain_destroy(self, domid):
         """Terminate domain immediately."""
 
@@ -475,37 +461,6 @@ class XendDomain:
             raise XendError(str(ex))
 
 
-    def domain_device_create(self, domid, devconfig):
-        """Create a new device for the specified domain.
-        """
-        return self.callInfo(domid,
-                             XendDomainInfo.XendDomainInfo.device_create,
-                             devconfig)
-
-
-    def domain_device_configure(self, domid, devconfig, devid):
-        """Configure an existing device in the specified domain.
-        @return: updated device configuration
-        """
-        return self.callInfo(domid,
-                             XendDomainInfo.XendDomainInfo.device_configure,
-                             devconfig, devid)
-
-    
-    def domain_device_destroy(self, domid, devtype, devid):
-        """Destroy a device."""
-        return self.callInfo(domid,
-                             XendDomainInfo.XendDomainInfo.destroyDevice,
-                             devtype, devid)
-
-
-    def domain_devtype_ls(self, domid, devtype):
-        """Get list of device sxprs for the specified domain."""
-        return self.callInfo(domid,
-                             XendDomainInfo.XendDomainInfo.getDeviceSxprs,
-                             devtype)
-
-
     def domain_vif_limit_set(self, domid, vif, credit, period):
         """Limit the vif's transmission rate
         """
@@ -536,44 +491,6 @@ class XendDomain:
                                        maxmem_kb = maxmem)
         except Exception, ex:
             raise XendError(str(ex))
-
-    def domain_mem_target_set(self, domid, mem):
-        """Set the memory target for a domain.
-
-        @param mem: memory target (in MiB)
-        """
-        self.callInfo(domid, XendDomainInfo.XendDomainInfo.setMemoryTarget,
-                      mem << 10)
-
-
-    def domain_vcpu_hotplug(self, domid, vcpu, state):
-        """Enable or disable specified VCPU in specified domain
-
-        @param vcpu: target VCPU in domain
-        @param state: which state VCPU will become
-        """
-        self.callInfo(domid, XendDomainInfo.XendDomainInfo.vcpu_hotplug, vcpu,
-                      state)
-
-
-    def domain_dumpcore(self, domid):
-        """Save a core dump for a crashed domain."""
-        self.callInfo(domid, XendDomainInfo.XendDomainInfo.dumpCore)
-
-
-    ## private:
-
-    def callInfo(self, domid, fn, *args, **kwargs):
-        try:
-            self.refresh()
-            dominfo = self.domains.get(domid)
-            if dominfo:
-                return fn(dominfo, *args, **kwargs)
-        except XendError:
-            raise
-        except Exception, exn:
-            log.exception("")
-            raise XendError(str(exn))
 
 
 def instance():
