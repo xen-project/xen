@@ -666,12 +666,16 @@ void unregister_xenstore_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL(unregister_xenstore_notifier);
 
-/* called from a thread in privcmd/privcmd.c */
+/* 
+** Called either from below xenbus_probe_init() initcall (for domUs) 
+** or, for dom0, from a thread created in privcmd/privcmd.c (after 
+** the user-space tools have invoked initDomainStore()) 
+*/
 int do_xenbus_probe(void *unused)
 {
 	int err = 0;
 
-	/* Initialize xenstore comms unless already done. */
+	/* Initialize the interface to xenstore. */
 	err = xs_init();
 	if (err) {
 		printk("XENBUS: Error initializing xenstore comms:"
@@ -703,6 +707,10 @@ static int __init xenbus_probe_init(void)
 	device_register(&xenbus_frontend.dev);
 	device_register(&xenbus_backend.dev);
 
+	/* 
+	** Domain0 doesn't have a store_evtchn yet - this will
+	** be set up later by xend invoking initDomainStore() 
+	*/
 	if (!xen_start_info->store_evtchn)
 		return 0;
 

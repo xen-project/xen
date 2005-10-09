@@ -780,6 +780,9 @@ static int read_thread(void *unused)
 	}
 }
 
+/*
+** Initialize the interface to xenstore. 
+*/
 int xs_init(void)
 {
 	int err;
@@ -793,6 +796,7 @@ int xs_init(void)
 	init_MUTEX(&xs_state.transaction_mutex);
 	xs_state.transaction_pid = -1;
 
+	/* Initialize the shared memory rings to talk to xenstored */
 	err = xb_init_comms();
 	if (err)
 		return err;

@@ -246,7 +246,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 				   PAGE_SHIFT);
 		ret = xen_start_info->store_mfn;
 
-		/* We'll return then this will wait for daemon to answer */
+		/* 
+		** Complete initialization of xenbus (viz. set up the 
+		** connection to xenstored now that it has started). 
+		*/
 		kthread_run(do_xenbus_probe, NULL, "xenbus_probe");
 	}
 	break;
