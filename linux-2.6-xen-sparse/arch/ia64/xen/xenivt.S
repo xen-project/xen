@@ -188,16 +188,26 @@ ENTRY(vhpt_miss)
 (p7)	tbit.nz.unc p10,p11=r19,32		// is it an instruction TLB miss?
 	dep r23=0,r20,0,PAGE_SHIFT		// clear low bits to get page address
 	;;
-(p10)	itc.i r18				// insert the instruction TLB entry
-(p11)	itc.d r18				// insert the data TLB entry
-(p6)	br.cond.spnt.many page_fault		// handle bad address/page not present (page fault)
 #ifdef CONFIG_XEN
+	mov r24=r8
+	mov r8=r18
+	;;
+(p10)	XEN_HYPER_ITC_D
+	;;
+(p11)	XEN_HYPER_ITC_I
+	;;
+	mov r8=r24
+	;;
+(p6)	br.cond.spnt.many page_fault		// handle bad address/page not present (page fault)
 	;;
 	movl r24=XSI_IFA
 	;;
 	st8 [r24]=r22
 	;;
 #else
+(p10)	itc.i r18				// insert the instruction TLB entry
+(p11)	itc.d r18				// insert the data TLB entry
+(p6)	br.cond.spnt.many page_fault		// handle bad address/page not present (page fault)
 	mov cr.ifa=r22
 #endif
 
@@ -828,7 +838,17 @@ ENTRY(iaccess_bit)
 	;;
 	cmp.eq p6,p7=r26,r18
 	;;
+#ifdef CONFIG_XEN
+	mov r26=r8
+	mov r8=r25
+	;;
+(p6)	XEN_HYPER_ITC_I
+	;;
+	mov r8=r26
+	;;
+#else
 (p6)	itc.i r25				// install updated PTE
+#endif
 	;;
 	/*
 	 * Tell the assemblers dependency-violation checker that the above "itc" instructions
@@ -905,7 +925,17 @@ ENTRY(daccess_bit)
 	;;
 	cmp.eq p6,p7=r26,r18
 	;;
+#ifdef CONFIG_XEN
+	mov r26=r8
+	mov r8=r25
+	;;
+(p6)	XEN_HYPER_ITC_D
+	;;
+	mov r8=r26
+	;;
+#else
 (p6)	itc.d r25				// install updated PTE
+#endif
 	/*
 	 * Tell the assemblers dependency-violation checker that the above "itc" instructions
 	 * cannot possibly affect the following loads:
@@ -1423,11 +1453,25 @@ ENTRY(dispatch_to_fault_handler)
 	SAVE_MIN_WITH_COVER_R19
 	alloc r14=ar.pfs,0,0,5,0
 	mov out0=r15
+#ifdef CONFIG_XEN
+	movl out1=XSI_ISR
+	;;
+	adds out2=XSI_IFA-XSI_ISR,out1
+	adds out3=XSI_IIM-XSI_ISR,out1
+	adds out4=XSI_ITIR-XSI_ISR,out1
+	;;
+	ld8 out1=[out1]
+	ld8 out2=[out2]
+	ld8 out3=[out4]
+	ld8 out4=[out4]
+	;;
+#else
 	mov out1=cr.isr
 	mov out2=cr.ifa
 	mov out3=cr.iim
 	mov out4=cr.itir
 	;;
+#endif
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
 	srlz.i					// guarantee that interruption collection is on
