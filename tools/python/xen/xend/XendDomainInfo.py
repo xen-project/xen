@@ -219,17 +219,12 @@ def recreate(xeninfo):
 def restore(config):
     """Create a domain and a VM object to do a restore.
 
-    @param config:    domain configuration
+    @param config: domain configuration
     """
 
     log.debug("XendDomainInfo.restore(%s)", config)
 
-    try:
-        uuid    =     sxp.child_value(config, 'uuid')
-        ssidref = int(sxp.child_value(config, 'ssidref'))
-    except TypeError, exn:
-        raise VmError('Invalid ssidref in config: %s' % exn)
-
+    uuid = sxp.child_value(config, 'uuid')
     vm = XendDomainInfo(uuid, parseConfig(config))
     try:
         vm.construct()
