@@ -18,5 +18,4 @@ expect 1:/test/2:token2
 1 waitwatch
 3 write /test/1 contents1
 4 write /test/3 contents3
-1 ackwatch token2
 1 close

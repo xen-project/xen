@@ -10,7 +10,6 @@ introduce 1 100 7 /my/home
 write /test contents2
 expect 1:/test:token
 1 waitwatch
-1 ackwatch token
 1 unwatch /test token
 release 1
 1 close
@@ -25,7 +24,6 @@ write /dir/test contents
 1 write /dir/test4 contents4
 expect 1:/dir/test:token
 1 waitwatch
-1 ackwatch token
 release 1
 1 close
 

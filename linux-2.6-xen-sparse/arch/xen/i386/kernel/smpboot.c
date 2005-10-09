@@ -1327,18 +1327,14 @@ static struct xenbus_watch cpu_watch = {
 	.callback = handle_vcpu_hotplug_event
 };
 
-/* NB: Assumes xenbus_lock is held! */
 static int setup_cpu_watcher(struct notifier_block *notifier,
 			      unsigned long event, void *data)
 {
-	int err = 0;
+	int err;
 
-	BUG_ON(down_trylock(&xenbus_lock) == 0);
 	err = register_xenbus_watch(&cpu_watch);
-
-	if (err) {
+	if (err)
 		printk("Failed to register watch on /cpu\n");
-	}
 
 	return NOTIFY_DONE;
 }

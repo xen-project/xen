@@ -154,7 +154,6 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 	case XS_READ: return "READ";
 	case XS_GET_PERMS: return "GET_PERMS";
 	case XS_WATCH: return "WATCH";
-	case XS_WATCH_ACK: return "WATCH_ACK";
 	case XS_UNWATCH: return "UNWATCH";
 	case XS_TRANSACTION_START: return "TRANSACTION_START";
 	case XS_TRANSACTION_END: return "TRANSACTION_END";
@@ -1103,10 +1102,6 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		do_watch(conn, in);
 		break;
 
-	case XS_WATCH_ACK:
-		do_watch_ack(conn, onearg(in));
-		break;
-
 	case XS_UNWATCH:
 		do_unwatch(conn, in);
 		break;
@@ -1167,11 +1162,6 @@ static void consider_message(struct connection *conn)
 	if (verbose)
 		xprintf("Got message %s len %i from %p\n",
 			sockmsg_string(type), conn->in->hdr.msg.len, conn);
-
-	/* We might get a command while waiting for an ack: this means
-	 * the other end discarded it: we will re-transmit. */
-	if (type != XS_WATCH_ACK)
-		conn->waiting_for_ack = NULL;
 
 	/* Careful: process_message may free connection.  We detach
 	 * "in" beforehand and allocate the new buffer to avoid
@@ -1266,7 +1256,6 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 
 	new->state = OK;
 	new->out = new->waiting_reply = NULL;
-	new->waiting_for_ack = NULL;
 	new->fd = -1;
 	new->id = 0;
 	new->domain = NULL;

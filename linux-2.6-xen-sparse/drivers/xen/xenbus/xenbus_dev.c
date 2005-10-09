@@ -46,85 +46,113 @@
 #include <asm/hypervisor.h>
 
 struct xenbus_dev_data {
-	/* Are there bytes left to be read in this message? */
-	int bytes_left;
-	/* Are we still waiting for the reply to a message we wrote? */
-	int awaiting_reply;
-	/* Buffer for outgoing messages. */
+	int in_transaction;
+
+	/* Partial request. */
 	unsigned int len;
 	union {
 		struct xsd_sockmsg msg;
 		char buffer[PAGE_SIZE];
 	} u;
+
+	/* Response queue. */
+#define MASK_READ_IDX(idx) ((idx)&(PAGE_SIZE-1))
+	char read_buffer[PAGE_SIZE];
+	unsigned int read_cons, read_prod;
+	wait_queue_head_t read_waitq;
 };
 
 static struct proc_dir_entry *xenbus_dev_intf;
 
-/* Reply can be long (dir, getperm): don't buffer, just examine
- * headers so we can discard rest if they die. */
 static ssize_t xenbus_dev_read(struct file *filp,
 			       char __user *ubuf,
 			       size_t len, loff_t *ppos)
 {
-	struct xenbus_dev_data *data = filp->private_data;
-	struct xsd_sockmsg msg;
-	int err;
+	struct xenbus_dev_data *u = filp->private_data;
+	int i;
 
-	/* Refill empty buffer? */
-	if (data->bytes_left == 0) {
-		if (len < sizeof(msg))
-			return -EINVAL;
+	if (wait_event_interruptible(u->read_waitq,
+				     u->read_prod != u->read_cons))
+		return -EINTR;
 
-		err = xb_read(&msg, sizeof(msg));
-		if (err)
-			return err;
-		data->bytes_left = msg.len;
-		if (ubuf && copy_to_user(ubuf, &msg, sizeof(msg)) != 0)
-			return -EFAULT;
-		/* We can receive spurious XS_WATCH_EVENT messages. */
-		if (msg.type != XS_WATCH_EVENT)
-			data->awaiting_reply = 0;
-		return sizeof(msg);
+	for (i = 0; i < len; i++) {
+		if (u->read_cons == u->read_prod)
+			break;
+		put_user(u->read_buffer[MASK_READ_IDX(u->read_cons)], ubuf+i);
+		u->read_cons++;
 	}
 
-	/* Don't read over next header, or over temporary buffer. */
-	if (len > sizeof(data->u.buffer))
-		len = sizeof(data->u.buffer);
-	if (len > data->bytes_left)
-		len = data->bytes_left;
-
-	err = xb_read(data->u.buffer, len);
-	if (err)
-		return err;
-
-	data->bytes_left -= len;
-	if (ubuf && copy_to_user(ubuf, data->u.buffer, len) != 0)
-		return -EFAULT;
-	return len;
+	return i;
 }
 
-/* We do v. basic sanity checking so they don't screw up kernel later. */
+static void queue_reply(struct xenbus_dev_data *u,
+			char *data, unsigned int len)
+{
+	int i;
+
+	for (i = 0; i < len; i++, u->read_prod++)
+		u->read_buffer[MASK_READ_IDX(u->read_prod)] = data[i];
+
+	BUG_ON((u->read_prod - u->read_cons) > sizeof(u->read_buffer));
+
+	wake_up(&u->read_waitq);
+}
+
 static ssize_t xenbus_dev_write(struct file *filp,
 				const char __user *ubuf,
 				size_t len, loff_t *ppos)
 {
-	struct xenbus_dev_data *data = filp->private_data;
-	int err;
+	struct xenbus_dev_data *u = filp->private_data;
+	void *reply;
+	int err = 0;
 
-	/* We gather data in buffer until we're ready to send it. */
-	if (len > data->len + sizeof(data->u))
+	if ((len + u->len) > sizeof(u->u.buffer))
 		return -EINVAL;
-	if (copy_from_user(data->u.buffer + data->len, ubuf, len) != 0)
+
+	if (copy_from_user(u->u.buffer + u->len, ubuf, len) != 0)
 		return -EFAULT;
-	data->len += len;
-	if (data->len >= sizeof(data->u.msg) + data->u.msg.len) {
-		err = xb_write(data->u.buffer, data->len);
-		if (err)
-			return err;
-		data->len = 0;
-		data->awaiting_reply = 1;
+
+	u->len += len;
+	if (u->len < (sizeof(u->u.msg) + u->u.msg.len))
+		return len;
+
+	switch (u->u.msg.type) {
+	case XS_TRANSACTION_START:
+	case XS_TRANSACTION_END:
+	case XS_DIRECTORY:
+	case XS_READ:
+	case XS_GET_PERMS:
+	case XS_RELEASE:
+	case XS_GET_DOMAIN_PATH:
+	case XS_WRITE:
+	case XS_MKDIR:
+	case XS_RM:
+	case XS_SET_PERMS:
+		reply = xenbus_dev_request_and_reply(&u->u.msg);
+		if (IS_ERR(reply))
+			err = PTR_ERR(reply);
+		else {
+			if (u->u.msg.type == XS_TRANSACTION_START)
+				u->in_transaction = 1;
+			if (u->u.msg.type == XS_TRANSACTION_END)
+				u->in_transaction = 0;
+			queue_reply(u, (char *)&u->u.msg, sizeof(u->u.msg));
+			queue_reply(u, (char *)reply, u->u.msg.len);
+			kfree(reply);
+		}
+		break;
+
+	default:
+		err = -EINVAL;
+		break;
 	}
-	return len;
+
+	if (err == 0) {
+		u->len = 0;
+		err = len;
+	}
+
+	return err;
 }
 
 static int xenbus_dev_open(struct inode *inode, struct file *filp)
@@ -134,7 +162,6 @@ static int xenbus_dev_open(struct inode *inode, struct file *filp)
 	if (xen_start_info->store_evtchn == 0)
 		return -ENOENT;
 
-	/* Don't try seeking. */
 	nonseekable_open(inode, filp);
 
 	u = kmalloc(sizeof(*u), GFP_KERNEL);
@@ -142,28 +169,21 @@ static int xenbus_dev_open(struct inode *inode, struct file *filp)
 		return -ENOMEM;
 
 	memset(u, 0, sizeof(*u));
+	init_waitqueue_head(&u->read_waitq);
 
 	filp->private_data = u;
-
-	down(&xenbus_lock);
 
 	return 0;
 }
 
 static int xenbus_dev_release(struct inode *inode, struct file *filp)
 {
-	struct xenbus_dev_data *data = filp->private_data;
+	struct xenbus_dev_data *u = filp->private_data;
 
-	/* Discard any unread replies. */
-	while (data->bytes_left || data->awaiting_reply)
-		xenbus_dev_read(filp, NULL, sizeof(data->u.buffer), NULL);
+	if (u->in_transaction)
+		xenbus_transaction_end(1);
 
-	/* Harmless if no transaction in progress. */
-	xenbus_transaction_end(1);
-
-	up(&xenbus_lock);
-
-	kfree(data);
+	kfree(u);
 
 	return 0;
 }

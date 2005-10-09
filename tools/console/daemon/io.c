@@ -505,7 +505,6 @@ static void handle_xs(int fd)
 			domain_create_ring(dom);
 	}
 
-	xs_acknowledge_watch(xs, vec[1]);
 	free(vec);
 }
 

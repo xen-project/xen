@@ -370,16 +370,11 @@ static void watch_target(struct xenbus_watch *watch,
     
 }
 
-/* Setup our watcher
-   NB: Assumes xenbus_lock is held!
-*/
 int balloon_init_watcher(struct notifier_block *notifier,
                          unsigned long event,
                          void *data)
 {
 	int err;
-
-	BUG_ON(down_trylock(&xenbus_lock) == 0);
 
 	err = register_xenbus_watch(&target_watch);
 	if (err)

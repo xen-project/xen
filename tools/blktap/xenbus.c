@@ -260,10 +260,6 @@ int xs_fire_next_watch(struct xs_handle *h)
     node  = res[XS_WATCH_PATH];
     token = res[XS_WATCH_TOKEN];
 
-    er = xs_acknowledge_watch(h, token);
-    if (er == 0)
-        warn("Couldn't acknowledge watch (%s)", token);
-
     w = find_watch(token);
     if (!w)
     {

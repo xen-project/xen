@@ -360,9 +360,6 @@ static struct xenbus_watch sysrq_watch = {
 
 static struct notifier_block xenstore_notifier;
 
-/* Setup our watcher
-   NB: Assumes xenbus_lock is held!
-*/
 static int setup_shutdown_watcher(struct notifier_block *notifier,
                                   unsigned long event,
                                   void *data)
@@ -371,8 +368,6 @@ static int setup_shutdown_watcher(struct notifier_block *notifier,
 #ifdef CONFIG_MAGIC_SYSRQ
 	int err2 = 0;
 #endif
-
-	BUG_ON(down_trylock(&xenbus_lock) == 0);
 
 	err1 = register_xenbus_watch(&shutdown_watch);
 #ifdef CONFIG_MAGIC_SYSRQ

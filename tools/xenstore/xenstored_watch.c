@@ -69,18 +69,14 @@ void queue_next_event(struct connection *conn)
 	if (conn->waiting_reply) {
 		conn->out = conn->waiting_reply;
 		conn->waiting_reply = NULL;
-		conn->waiting_for_ack = NULL;
 		return;
 	}
-
-	/* If we're already waiting for ack, don't queue more. */
-	if (conn->waiting_for_ack)
-		return;
 
 	list_for_each_entry(watch, &conn->watches, list) {
 		event = list_top(&watch->events, struct watch_event, list);
 		if (event) {
-			conn->waiting_for_ack = watch;
+			list_del(&event->list);
+			talloc_free(event);
 			send_reply(conn,XS_WATCH_EVENT,event->data,event->len);
 			break;
 		}
@@ -181,6 +177,15 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 		}
 	}
 
+	/* Check for duplicates. */
+	list_for_each_entry(watch, &conn->watches, list) {
+		if (streq(watch->node, vec[0]) &&
+                    streq(watch->token, vec[1])) {
+			send_error(conn, EEXIST);
+			return;
+		}
+	}
+
 	watch = talloc(conn, struct watch);
 	watch->node = talloc_strdup(watch, vec[0]);
 	watch->token = talloc_strdup(watch, vec[1]);
@@ -200,37 +205,6 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 	add_event(conn, watch, watch->node);
 }
 
-void do_watch_ack(struct connection *conn, const char *token)
-{
-	struct watch_event *event;
-
-	if (!token) {
-		send_error(conn, EINVAL);
-		return;
-	}
-
-	if (!conn->waiting_for_ack) {
-		send_error(conn, ENOENT);
-		return;
-	}
-
-	if (!streq(conn->waiting_for_ack->token, token)) {
-		/* They're confused: this will cause us to send event again */
-		conn->waiting_for_ack = NULL;
-		send_error(conn, EINVAL);
-		return;
-	}
-
-	/* Remove event: after ack sent, core will call queue_next_event */
-	event = list_top(&conn->waiting_for_ack->events, struct watch_event,
-			 list);
-	list_del(&event->list);
-	talloc_free(event);
-
-	conn->waiting_for_ack = NULL;
-	send_ack(conn, XS_WATCH_ACK);
-}
-
 void do_unwatch(struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
@@ -241,9 +215,6 @@ void do_unwatch(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
-	/* We don't need to worry if we're waiting for an ack for the
-	 * watch we're deleting: conn->waiting_for_ack was reset by
-	 * this command in consider_message anyway. */
 	node = canonicalize(conn, vec[0]);
 	list_for_each_entry(watch, &conn->watches, list) {
 		if (streq(watch->node, node) && streq(watch->token, vec[1])) {
@@ -261,11 +232,6 @@ void dump_watches(struct connection *conn)
 {
 	struct watch *watch;
 	struct watch_event *event;
-
-	if (conn->waiting_for_ack)
-		printf("    waiting_for_ack for watch on %s token %s\n",
-		       conn->waiting_for_ack->node,
-		       conn->waiting_for_ack->token);
 
 	list_for_each_entry(watch, &conn->watches, list) {
 		printf("    watch on %s token %s\n",

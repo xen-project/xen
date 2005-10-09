@@ -96,12 +96,6 @@ int xs_fileno(struct xs_handle *h);
  */
 char **xs_read_watch(struct xs_handle *h, unsigned int *num);
 
-/* Acknowledge watch on node.  Watches must be acknowledged before
- * any other watches can be read.
- * Returns false on failure.
- */
-bool xs_acknowledge_watch(struct xs_handle *h, const char *token);
-
 /* Remove a watch on a node: implicitly acks any outstanding watch.
  * Returns false on failure (no watch on that node).
  */

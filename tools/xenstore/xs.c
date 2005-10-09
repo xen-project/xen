@@ -78,9 +78,29 @@ struct xs_handle {
 
 	/* One transaction at a time. */
 	pthread_mutex_t transaction_mutex;
+	pthread_t transaction_pthread;
 };
 
 static void *read_thread(void *arg);
+
+static void request_mutex_acquire(struct xs_handle *h)
+{
+	/*
+	 * We can't distinguish non-transactional from transactional
+	 * requests right now. So temporarily acquire the transaction mutex
+	 * if this task is outside transaction context.
+ 	 */
+	if (h->transaction_pthread != pthread_self())
+		pthread_mutex_lock(&h->transaction_mutex);
+	pthread_mutex_lock(&h->request_mutex);
+}
+
+static void request_mutex_release(struct xs_handle *h)
+{
+	pthread_mutex_unlock(&h->request_mutex);
+	if (h->transaction_pthread != pthread_self())
+		pthread_mutex_unlock(&h->transaction_mutex);
+}
 
 int xs_fileno(struct xs_handle *h)
 {
@@ -163,6 +183,7 @@ static struct xs_handle *get_handle(const char *connect_to)
 
 	pthread_mutex_init(&h->request_mutex, NULL);
 	pthread_mutex_init(&h->transaction_mutex, NULL);
+	h->transaction_pthread = -1;
 
 	if (pthread_create(&h->read_thr, NULL, read_thread, h) != 0)
 		goto error;
@@ -316,7 +337,7 @@ static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
 	ignorepipe.sa_flags = 0;
 	sigaction(SIGPIPE, &ignorepipe, &oldact);
 
-	pthread_mutex_lock(&h->request_mutex);
+	request_mutex_acquire(h);
 
 	if (!xs_write_all(h->fd, &msg, sizeof(msg)))
 		goto fail;
@@ -329,7 +350,7 @@ static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
 	if (!ret)
 		goto fail;
 
-	pthread_mutex_unlock(&h->request_mutex);
+	request_mutex_release(h);
 
 	sigaction(SIGPIPE, &oldact, NULL);
 	if (msg.type == XS_ERROR) {
@@ -350,7 +371,7 @@ static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
 fail:
 	/* We're in a bad state, so close fd. */
 	saved_errno = errno;
-	pthread_mutex_unlock(&h->request_mutex);
+	request_mutex_release(h);
 	sigaction(SIGPIPE, &oldact, NULL);
 close_fd:
 	close(h->fd);
@@ -593,15 +614,6 @@ char **xs_read_watch(struct xs_handle *h, unsigned int *num)
 	return ret;
 }
 
-/* Acknowledge watch on node.  Watches must be acknowledged before
- * any other watches can be read.
- * Returns false on failure.
- */
-bool xs_acknowledge_watch(struct xs_handle *h, const char *token)
-{
-	return xs_bool(xs_single(h, XS_WATCH_ACK, token, NULL));
-}
-
 /* Remove a watch on a node.
  * Returns false on failure (no watch on that node).
  */
@@ -624,8 +636,18 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
  */
 bool xs_transaction_start(struct xs_handle *h)
 {
+	bool rc;
+
 	pthread_mutex_lock(&h->transaction_mutex);
-	return xs_bool(xs_single(h, XS_TRANSACTION_START, "", NULL));
+	h->transaction_pthread = pthread_self();
+
+	rc = xs_bool(xs_single(h, XS_TRANSACTION_START, "", NULL));
+	if (!rc) {
+		h->transaction_pthread = -1;
+		pthread_mutex_unlock(&h->transaction_mutex);
+	}
+
+	return rc;
 }
 
 /* End a transaction.
@@ -645,6 +667,7 @@ bool xs_transaction_end(struct xs_handle *h, bool abort)
 	
 	rc = xs_bool(xs_single(h, XS_TRANSACTION_END, abortstr, NULL));
 
+	h->transaction_pthread = -1;
 	pthread_mutex_unlock(&h->transaction_mutex);
 
 	return rc;

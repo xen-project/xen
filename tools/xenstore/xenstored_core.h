@@ -71,9 +71,6 @@ struct connection
 	/* Is this a read-only connection? */
 	bool can_write;
 
-	/* Are we waiting for a watch event ack? */
-	struct watch *waiting_for_ack;
-
 	/* Buffered incoming data. */
 	struct buffered_data *in;
 

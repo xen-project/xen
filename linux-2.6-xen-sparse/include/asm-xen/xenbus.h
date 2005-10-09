@@ -78,10 +78,6 @@ int xenbus_register_driver(struct xenbus_driver *drv);
 int xenbus_register_backend(struct xenbus_driver *drv);
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 
-/* Caller must hold this lock to call these functions: it's also held
- * across watch callbacks. */
-extern struct semaphore xenbus_lock;
-
 char **xenbus_directory(const char *dir, const char *node, unsigned int *num);
 void *xenbus_read(const char *dir, const char *node, unsigned int *len);
 int xenbus_write(const char *dir, const char *node, const char *string);
@@ -113,7 +109,11 @@ void xenbus_dev_ok(struct xenbus_device *dev);
 struct xenbus_watch
 {
 	struct list_head list;
+
+	/* Path being watched. */
 	char *node;
+
+	/* Callback (executed in a process context with no locks held). */
 	void (*callback)(struct xenbus_watch *,
 			 const char **vec, unsigned int len);
 };
@@ -124,7 +124,11 @@ void unregister_xenstore_notifier(struct notifier_block *nb);
 
 int register_xenbus_watch(struct xenbus_watch *watch);
 void unregister_xenbus_watch(struct xenbus_watch *watch);
-void reregister_xenbus_watches(void);
+void xs_suspend(void);
+void xs_resume(void);
+
+/* Used by xenbus_dev to borrow kernel's store connection. */
+void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg);
 
 /* Called from xen core code. */
 void xenbus_suspend(void);

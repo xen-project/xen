@@ -442,9 +442,6 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
 
 #define xspy_read_watch_doc "\n"				\
 	"Read a watch notification.\n"				\
-	"The notification must be acknowledged by passing\n"	\
-	"the token to acknowledge_watch().\n"			\
-	" path [string]: xenstore path.\n"			\
 	"\n"							\
 	"Returns: [tuple] (path, token).\n"			\
 	"Raises RuntimeError on error.\n"			\
@@ -492,44 +489,6 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
  exit:
     if (xsval)
         free(xsval);
-    return val;
-}
-
-#define xspy_acknowledge_watch_doc "\n"					\
-	"Acknowledge a watch notification that has been read.\n"	\
-	" token [string] : from the watch notification\n"		\
-	"\n"								\
-	"Returns None on success.\n"					\
-	"Raises RuntimeError on error.\n"				\
-	"\n"
-
-static PyObject *xspy_acknowledge_watch(PyObject *self, PyObject *args,
-                                        PyObject *kwds)
-{
-    static char *kwd_spec[] = { "token", NULL };
-    static char *arg_spec = "O";
-    PyObject *token;
-    char token_str[MAX_STRLEN(unsigned long) + 1];
-
-    struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
-    int xsval = 0;
-
-    if (!xh)
-        goto exit;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &token))
-        goto exit;
-    sprintf(token_str, "%li", (unsigned long)token);
-    Py_BEGIN_ALLOW_THREADS
-    xsval = xs_acknowledge_watch(xh, token_str);
-    Py_END_ALLOW_THREADS
-    if (!xsval) {
-        PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
-    }
-    Py_INCREF(Py_None);
-    val = Py_None;
- exit:
     return val;
 }
 
@@ -833,7 +792,6 @@ static PyMethodDef xshandle_methods[] = {
      XSPY_METH(set_permissions),
      XSPY_METH(watch),
      XSPY_METH(read_watch),
-     XSPY_METH(acknowledge_watch),
      XSPY_METH(unwatch),
      XSPY_METH(transaction_start),
      XSPY_METH(transaction_end),

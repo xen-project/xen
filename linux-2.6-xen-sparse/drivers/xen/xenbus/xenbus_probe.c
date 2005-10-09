@@ -43,6 +43,9 @@
 
 static struct notifier_block *xenstore_chain;
 
+/* Now used to protect xenbus probes against save/restore. */
+static DECLARE_MUTEX(xenbus_lock);
+
 /* If something in array of ids matches this device, return it. */
 static const struct xenbus_device_id *
 match_device(const struct xenbus_device_id *arr, struct xenbus_device *dev)
@@ -625,12 +628,13 @@ void xenbus_suspend(void)
 	down(&xenbus_lock);
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_dev);
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, suspend_dev);
+	xs_suspend();
 }
 
 void xenbus_resume(void)
 {
 	xb_init_comms();
-	reregister_xenbus_watches();
+	xs_resume();
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, resume_dev);
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, resume_dev);
 	up(&xenbus_lock);
@@ -685,6 +689,7 @@ int do_xenbus_probe(void *unused)
 	/* Notify others that xenstore is up */
 	notifier_call_chain(&xenstore_chain, 0, 0);
 	up(&xenbus_lock);
+
 	return 0;
 }
 
