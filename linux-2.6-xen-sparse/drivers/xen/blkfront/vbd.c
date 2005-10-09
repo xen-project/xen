@@ -160,7 +160,8 @@ xlbd_get_major_info(int vdevice)
 
 	mi = ((major_info[index] != NULL) ? major_info[index] :
 	      xlbd_alloc_major_info(major, minor, index));
-	mi->usage++;
+	if (mi)
+		mi->usage++;
 	return mi;
 }
 
