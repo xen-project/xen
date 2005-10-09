@@ -254,7 +254,7 @@ def parseConfig(config):
             return val
 
 
-    log.debug("parseConfig: config is %s" % str(config))
+    log.debug("parseConfig: config is %s", config)
 
     result = {}
 
@@ -312,7 +312,7 @@ def parseConfig(config):
             log.warn("Ignoring malformed and deprecated config option "
                      "restart = %s", restart)
 
-    log.debug("parseConfig: result is %s" % str(result))
+    log.debug("parseConfig: result is %s", result)
     return result
 
 
@@ -526,7 +526,7 @@ class XendDomainInfo:
 
         except KeyError, exn:
             log.exception(exn)
-            raise VmError('Unspecified domain detail: %s' % str(exn))
+            raise VmError('Unspecified domain detail: %s' % exn)
 
 
     def readVm(self, *args):
@@ -576,7 +576,7 @@ class XendDomainInfo:
             if self.infoIsSet(k):
                 to_store[k] = str(self.info[k])
 
-        log.debug("Storing VM details: %s" % str(to_store))
+        log.debug("Storing VM details: %s", to_store)
 
         self.writeVm(to_store)
 
@@ -602,7 +602,7 @@ class XendDomainInfo:
         for v in range(0, self.info['vcpus']):
             to_store["cpu/%d/availability" % v] = availability(v)
 
-        log.debug("Storing domain details: %s" % str(to_store))
+        log.debug("Storing domain details: %s", to_store)
 
         self.writeDom(to_store)
 
@@ -743,7 +743,7 @@ class XendDomainInfo:
 
     def shutdown(self, reason):
         if not reason in shutdown_reasons.values():
-            raise XendError('invalid reason:' + reason)
+            raise XendError('Invalid reason: %s' % reason)
         self.storeDom("control/shutdown", reason)
         if reason != 'suspend':
             self.storeDom('xend/shutdown_start_time', time.time())
@@ -985,8 +985,8 @@ class XendDomainInfo:
         """
 
         log.debug('XendDomainInfo.construct: %s %s',
-                  str(self.domid),
-                  str(self.info['ssidref']))
+                  self.domid,
+                  self.info['ssidref'])
 
         self.domid = xc.domain_create(dom = 0, ssidref = self.info['ssidref'])
 
@@ -1003,9 +1003,9 @@ class XendDomainInfo:
 
     def initDomain(self):
         log.debug('XendDomainInfo.initDomain: %s %s %s',
-                  str(self.domid),
-                  str(self.info['memory_KiB']),
-                  str(self.info['cpu_weight']))
+                  self.domid,
+                  self.info['memory_KiB'],
+                  self.info['cpu_weight'])
 
         if not self.infoIsSet('image'):
             raise VmError('Missing image in configuration')
@@ -1084,14 +1084,14 @@ class XendDomainInfo:
     def destroy(self):
         """Cleanup VM and destroy domain.  Nothrow guarantee."""
 
-        log.debug("XendDomainInfo.destroy: domid=%s", str(self.domid))
+        log.debug("XendDomainInfo.destroy: domid=%s", self.domid)
 
         self.cleanupVm()
         self.destroyDomain()
 
 
     def destroyDomain(self):
-        log.debug("XendDomainInfo.destroyDomain(%s)", str(self.domid))
+        log.debug("XendDomainInfo.destroyDomain(%s)", self.domid)
 
         try:
             if self.domid is not None:
@@ -1390,18 +1390,18 @@ class XendDomainInfo:
         dom = 0
         # get max number of vcpus to use for dom0 from config
         target = int(xroot.get_dom0_vcpus())
-        log.debug("number of vcpus to use is %d" % (target))
+        log.debug("number of vcpus to use is %d", target)
    
         # target = 0 means use all processors
         if target > 0:
             # count the number of online vcpus (cpu values in v2c map >= 0)
             vcpu_to_cpu = dom_get(dom)['vcpu_to_cpu']
             vcpus_online = len(filter(lambda x: x >= 0, vcpu_to_cpu))
-            log.debug("found %d vcpus online" % (vcpus_online))
+            log.debug("found %d vcpus online", vcpus_online)
 
             # disable any extra vcpus that are online over the requested target
             for vcpu in range(target, vcpus_online):
-                log.info("enforcement is disabling DOM%d VCPU%d" % (dom, vcpu))
+                log.info("enforcement is disabling DOM%d VCPU%d", dom, vcpu)
                 self.vcpu_hotplug(vcpu, 0)
 
 
