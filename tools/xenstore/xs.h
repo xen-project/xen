@@ -23,6 +23,7 @@
 #include <xs_lib.h>
 
 struct xs_handle;
+struct xs_transaction_handle;
 
 /* On failure, these routines set errno. */
 
@@ -44,41 +45,47 @@ void xs_daemon_close(struct xs_handle *);
  * Returns a malloced array: call free() on it after use.
  * Num indicates size.
  */
-char **xs_directory(struct xs_handle *h, const char *path, unsigned int *num);
+char **xs_directory(struct xs_handle *h, struct xs_transaction_handle *t,
+		    const char *path, unsigned int *num);
 
 /* Get the value of a single file, nul terminated.
  * Returns a malloced value: call free() on it after use.
  * len indicates length in bytes, not including terminator.
  */
-void *xs_read(struct xs_handle *h, const char *path, unsigned int *len);
+void *xs_read(struct xs_handle *h, struct xs_transaction_handle *t,
+	      const char *path, unsigned int *len);
 
 /* Write the value of a single file.
  * Returns false on failure.
  */
-bool xs_write(struct xs_handle *h, const char *path, const void *data,
-	      unsigned int len);
+bool xs_write(struct xs_handle *h, struct xs_transaction_handle *t,
+	      const char *path, const void *data, unsigned int len);
 
 /* Create a new directory.
  * Returns false on failure, or success if it already exists.
  */
-bool xs_mkdir(struct xs_handle *h, const char *path);
+bool xs_mkdir(struct xs_handle *h, struct xs_transaction_handle *t,
+	      const char *path);
 
 /* Destroy a file or directory (and children).
  * Returns false on failure, or success if it doesn't exist.
  */
-bool xs_rm(struct xs_handle *h, const char *path);
+bool xs_rm(struct xs_handle *h, struct xs_transaction_handle *t,
+	   const char *path);
 
 /* Get permissions of node (first element is owner, first perms is "other").
  * Returns malloced array, or NULL: call free() after use.
  */
 struct xs_permissions *xs_get_permissions(struct xs_handle *h,
+					  struct xs_transaction_handle *t,
 					  const char *path, unsigned int *num);
 
 /* Set permissions of node (must be owner).
  * Returns false on failure.
  */
-bool xs_set_permissions(struct xs_handle *h, const char *path,
-			struct xs_permissions *perms, unsigned int num_perms);
+bool xs_set_permissions(struct xs_handle *h, struct xs_transaction_handle *t,
+			const char *path, struct xs_permissions *perms,
+			unsigned int num_perms);
 
 /* Watch a node for changes (poll on fd to detect, or call read_watch()).
  * When the node (or any child) changes, fd will become readable.
@@ -104,16 +111,17 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token);
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
  * You can only have one transaction at any time.
- * Returns false on failure.
+ * Returns NULL on failure.
  */
-bool xs_transaction_start(struct xs_handle *h);
+struct xs_transaction_handle *xs_transaction_start(struct xs_handle *h);
 
 /* End a transaction.
  * If abandon is true, transaction is discarded instead of committed.
  * Returns false on failure: if errno == EAGAIN, you have to restart
  * transaction.
  */
-bool xs_transaction_end(struct xs_handle *h, bool abort);
+bool xs_transaction_end(struct xs_handle *h, struct xs_transaction_handle *t,
+			bool abort);
 
 /* Introduce a new domain.
  * This tells the store daemon about a shared memory page, event channel
@@ -136,3 +144,13 @@ char *xs_debug_command(struct xs_handle *h, const char *cmd,
 		       void *data, unsigned int len);
 
 #endif /* _XS_H */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

@@ -14,29 +14,34 @@ from xen.xend.xenstore.xsutil import xshandle
 class xstransact:
 
     def __init__(self, path):
-        self.in_transaction = False
         self.path = path.rstrip("/")
-        xshandle().transaction_start()
+        self.transaction = xshandle().transaction_start()
         self.in_transaction = True
 
     def __del__(self):
         if self.in_transaction:
-            xshandle().transaction_end(True)
+            xshandle().transaction_end(self.transaction, True)
 
     def commit(self):
         if not self.in_transaction:
             raise RuntimeError
         self.in_transaction = False
-        return xshandle().transaction_end(False)
+        rc = xshandle().transaction_end(self.transaction, False)
+        self.transaction = "0"
+        return rc
 
     def abort(self):
+        if not self.in_transaction:
+            return True
         self.in_transaction = False
-        return xshandle().transaction_end(True)
+        rc = xshandle().transaction_end(self.transaction, True)
+        self.transaction = "0"
+        return rc
 
     def _read(self, key):
         path = "%s/%s" % (self.path, key)
         try:
-            return xshandle().read(path)
+            return xshandle().read(self.transaction, path)
         except RuntimeError, ex:
             raise RuntimeError(ex.args[0],
                                '%s, while reading %s' % (ex.args[1], path))
@@ -50,7 +55,7 @@ class xstransact:
         instead.
         """
         if len(args) == 0:
-            return xshandle().read(self.path)
+            return xshandle().read(self.transaction, self.path)
         if len(args) == 1:
             return self._read(args[0])
         ret = []
@@ -61,7 +66,7 @@ class xstransact:
     def _write(self, key, data):
         path = "%s/%s" % (self.path, key)
         try:
-            xshandle().write(path, data)
+            xshandle().write(self.transaction, path, data)
         except RuntimeError, ex:
             raise RuntimeError(ex.args[0],
                                ('%s, while writing %s : %s' %
@@ -93,7 +98,7 @@ class xstransact:
 
     def _remove(self, key):
         path = "%s/%s" % (self.path, key)
-        return xshandle().rm(path)
+        return xshandle().rm(self.transaction, path)
 
     def remove(self, *args):
         """If no arguments are given, remove this transaction's path.
@@ -101,14 +106,14 @@ class xstransact:
         path, and remove each of those instead.
         """
         if len(args) == 0:
-            xshandle().rm(self.path)
+            xshandle().rm(self.transaction, self.path)
         else:
             for key in args:
                 self._remove(key)
 
     def _list(self, key):
         path = "%s/%s" % (self.path, key)
-        l = xshandle().ls(path)
+        l = xshandle().ls(self.transaction, path)
         if l:
             return map(lambda x: key + "/" + x, l)
         return []
@@ -120,7 +125,7 @@ class xstransact:
         path, and return the cumulative listing of each of those instead.
         """
         if len(args) == 0:
-            ret = xshandle().ls(self.path)
+            ret = xshandle().ls(self.transaction, self.path)
             if ret is None:
                 return []
             else:
@@ -136,11 +141,11 @@ class xstransact:
         ret = []
         for key in keys:
             new_subdir = subdir + "/" + key
-            l = xshandle().ls(new_subdir)
+            l = xshandle().ls(self.transaction, new_subdir)
             if l:
                 ret.append([key, self.list_recursive_(new_subdir, l)])
             else:
-                ret.append([key, xshandle().read(new_subdir)])
+                ret.append([key, xshandle().read(self.transaction, new_subdir)])
         return ret
 
 

@@ -69,15 +69,15 @@ static void frontend_changed(struct xenbus_watch *watch,
 	int i;
 
 	/* If other end is gone, delete ourself. */
-	if (vec && !xenbus_exists(be->frontpath, "")) {
-		xenbus_rm(be->dev->nodename, "");
+	if (vec && !xenbus_exists(NULL, be->frontpath, "")) {
+		xenbus_rm(NULL, be->dev->nodename, "");
 		device_unregister(&be->dev->dev);
 		return;
 	}
 	if (be->netif == NULL || be->netif->status == CONNECTED)
 		return;
 
-	mac = xenbus_read(be->frontpath, "mac", NULL);
+	mac = xenbus_read(NULL, be->frontpath, "mac", NULL);
 	if (IS_ERR(mac)) {
 		err = PTR_ERR(mac);
 		xenbus_dev_error(be->dev, err, "reading %s/mac",
@@ -98,7 +98,8 @@ static void frontend_changed(struct xenbus_watch *watch,
 	}
 	kfree(mac);
 
-	err = xenbus_gather(be->frontpath, "tx-ring-ref", "%lu", &tx_ring_ref,
+	err = xenbus_gather(NULL, be->frontpath,
+			    "tx-ring-ref", "%lu", &tx_ring_ref,
 			    "rx-ring-ref", "%lu", &rx_ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
@@ -137,7 +138,7 @@ static void backend_changed(struct xenbus_watch *watch,
 	struct xenbus_device *dev = be->dev;
 	u8 be_mac[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
 
-	err = xenbus_scanf(dev->nodename, "handle", "%li", &handle);
+	err = xenbus_scanf(NULL, dev->nodename, "handle", "%li", &handle);
 	if (XENBUS_EXIST_ERR(err))
 		return;
 	if (err < 0) {
@@ -188,7 +189,7 @@ static int netback_hotplug(struct xenbus_device *xdev, char **envp,
 
 	key = env_vars;
 	while (*key != NULL) {
-		val = xenbus_read(xdev->nodename, *key, NULL);
+		val = xenbus_read(NULL, xdev->nodename, *key, NULL);
 		if (!IS_ERR(val)) {
 			char buf[strlen(*key) + 4];
 			sprintf(buf, "%s=%%s", *key);
@@ -220,7 +221,7 @@ static int netback_probe(struct xenbus_device *dev,
 	memset(be, 0, sizeof(*be));
 
 	frontend = NULL;
-	err = xenbus_gather(dev->nodename,
+	err = xenbus_gather(NULL, dev->nodename,
 			    "frontend-id", "%li", &be->frontend_id,
 			    "frontend", NULL, &frontend,
 			    NULL);
@@ -232,7 +233,7 @@ static int netback_probe(struct xenbus_device *dev,
 				 dev->nodename);
 		goto free_be;
 	}
-	if (strlen(frontend) == 0 || !xenbus_exists(frontend, "")) {
+	if (strlen(frontend) == 0 || !xenbus_exists(NULL, frontend, "")) {
 		/* If we can't get a frontend path and a frontend-id,
 		 * then our bus-id is no longer valid and we need to
 		 * destroy the backend device.

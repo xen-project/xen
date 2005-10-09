@@ -66,12 +66,13 @@ static void frontend_changed(struct xenbus_watch *watch,
 	unsigned int evtchn;
 	unsigned long ready = 1;
 	int err;
+	struct xenbus_transaction *xbt;
 	struct backend_info *be
 		= container_of(watch, struct backend_info, watch);
 
 	/* If other end is gone, delete ourself. */
-	if (vec && !xenbus_exists(be->frontpath, "")) {
-		xenbus_rm(be->dev->nodename, "");
+	if (vec && !xenbus_exists(NULL, be->frontpath, "")) {
+		xenbus_rm(NULL, be->dev->nodename, "");
 		device_unregister(&be->dev->dev);
 		return;
 	}
@@ -79,7 +80,7 @@ static void frontend_changed(struct xenbus_watch *watch,
 	if (be->tpmif == NULL || be->tpmif->status == CONNECTED)
 		return;
 
-	err = xenbus_gather(be->frontpath,
+	err = xenbus_gather(NULL, be->frontpath,
 	                    "ring-ref", "%lu", &ringref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
@@ -115,20 +116,20 @@ static void frontend_changed(struct xenbus_watch *watch,
 	 * unless something bad happens
 	 */
 again:
-	err = xenbus_transaction_start();
-	if (err) {
+	xbt = xenbus_transaction_start();
+	if (IS_ERR(xbt)) {
 		xenbus_dev_error(be->dev, err, "starting transaction");
 		return;
 	}
 
-	err = xenbus_printf(be->dev->nodename,
+	err = xenbus_printf(xbt, be->dev->nodename,
 	                    "ready", "%lu", ready);
 	if (err) {
 		xenbus_dev_error(be->dev, err, "writing 'ready'");
 		goto abort;
 	}
 
-	err = xenbus_transaction_end(0);
+	err = xenbus_transaction_end(xbt, 0);
 	if (err == -EAGAIN)
 		goto again;
 	if (err) {
@@ -139,7 +140,7 @@ again:
 	xenbus_dev_ok(be->dev);
 	return;
 abort:
-	xenbus_transaction_end(1);
+	xenbus_transaction_end(xbt, 1);
 }
 
 
@@ -152,7 +153,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
 
-	err = xenbus_scanf(dev->nodename, "instance", "%li", &instance);
+	err = xenbus_scanf(NULL, dev->nodename, "instance", "%li", &instance);
 	if (XENBUS_EXIST_ERR(err))
 		return;
 	if (err < 0) {
@@ -205,7 +206,7 @@ static int tpmback_probe(struct xenbus_device *dev,
 	memset(be, 0, sizeof(*be));
 
 	frontend = NULL;
-	err = xenbus_gather(dev->nodename,
+	err = xenbus_gather(NULL, dev->nodename,
 			    "frontend-id", "%li", &be->frontend_id,
 			    "frontend", NULL, &frontend,
 			    NULL);
@@ -217,7 +218,7 @@ static int tpmback_probe(struct xenbus_device *dev,
 				 dev->nodename);
 		goto free_be;
 	}
-	if (strlen(frontend) == 0 || !xenbus_exists(frontend, "")) {
+	if (strlen(frontend) == 0 || !xenbus_exists(NULL, frontend, "")) {
 		/* If we can't get a frontend path and a frontend-id,
 		 * then our bus-id is no longer valid and we need to
 		 * destroy the backend device.

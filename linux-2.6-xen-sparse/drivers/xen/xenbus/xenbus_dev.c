@@ -181,7 +181,7 @@ static int xenbus_dev_release(struct inode *inode, struct file *filp)
 	struct xenbus_dev_data *u = filp->private_data;
 
 	if (u->in_transaction)
-		xenbus_transaction_end(1);
+		xenbus_transaction_end((struct xenbus_transaction *)1, 1);
 
 	kfree(u);
 

@@ -81,6 +81,10 @@ struct xs_handle {
 	pthread_t transaction_pthread;
 };
 
+struct xs_transaction_handle {
+	int id;
+};
+
 static void *read_thread(void *arg);
 
 static void request_mutex_acquire(struct xs_handle *h)
@@ -407,7 +411,8 @@ static bool xs_bool(char *reply)
 	return true;
 }
 
-char **xs_directory(struct xs_handle *h, const char *path, unsigned int *num)
+char **xs_directory(struct xs_handle *h, struct xs_transaction_handle *t,
+		    const char *path, unsigned int *num)
 {
 	char *strings, *p, **ret;
 	unsigned int len;
@@ -438,7 +443,8 @@ char **xs_directory(struct xs_handle *h, const char *path, unsigned int *num)
  * Returns a malloced value: call free() on it after use.
  * len indicates length in bytes, not including the nul.
  */
-void *xs_read(struct xs_handle *h, const char *path, unsigned int *len)
+void *xs_read(struct xs_handle *h, struct xs_transaction_handle *t,
+	      const char *path, unsigned int *len)
 {
 	return xs_single(h, XS_READ, path, len);
 }
@@ -446,8 +452,8 @@ void *xs_read(struct xs_handle *h, const char *path, unsigned int *len)
 /* Write the value of a single file.
  * Returns false on failure.
  */
-bool xs_write(struct xs_handle *h, const char *path,
-	      const void *data, unsigned int len)
+bool xs_write(struct xs_handle *h, struct xs_transaction_handle *t,
+	      const char *path, const void *data, unsigned int len)
 {
 	struct iovec iovec[2];
 
@@ -462,7 +468,8 @@ bool xs_write(struct xs_handle *h, const char *path,
 /* Create a new directory.
  * Returns false on failure, or success if it already exists.
  */
-bool xs_mkdir(struct xs_handle *h, const char *path)
+bool xs_mkdir(struct xs_handle *h, struct xs_transaction_handle *t,
+	      const char *path)
 {
 	return xs_bool(xs_single(h, XS_MKDIR, path, NULL));
 }
@@ -470,7 +477,8 @@ bool xs_mkdir(struct xs_handle *h, const char *path)
 /* Destroy a file or directory (directories must be empty).
  * Returns false on failure, or success if it doesn't exist.
  */
-bool xs_rm(struct xs_handle *h, const char *path)
+bool xs_rm(struct xs_handle *h, struct xs_transaction_handle *t,
+	   const char *path)
 {
 	return xs_bool(xs_single(h, XS_RM, path, NULL));
 }
@@ -479,6 +487,7 @@ bool xs_rm(struct xs_handle *h, const char *path)
  * Returns malloced array, or NULL: call free() after use.
  */
 struct xs_permissions *xs_get_permissions(struct xs_handle *h,
+					  struct xs_transaction_handle *t,
 					  const char *path, unsigned int *num)
 {
 	char *strings;
@@ -511,7 +520,9 @@ struct xs_permissions *xs_get_permissions(struct xs_handle *h,
 /* Set permissions of node (must be owner).
  * Returns false on failure.
  */
-bool xs_set_permissions(struct xs_handle *h, const char *path,
+bool xs_set_permissions(struct xs_handle *h,
+			struct xs_transaction_handle *t,
+			const char *path,
 			struct xs_permissions *perms,
 			unsigned int num_perms)
 {
@@ -632,9 +643,9 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
  * You can only have one transaction at any time.
- * Returns false on failure.
+ * Returns NULL on failure.
  */
-bool xs_transaction_start(struct xs_handle *h)
+struct xs_transaction_handle *xs_transaction_start(struct xs_handle *h)
 {
 	bool rc;
 
@@ -647,7 +658,7 @@ bool xs_transaction_start(struct xs_handle *h)
 		pthread_mutex_unlock(&h->transaction_mutex);
 	}
 
-	return rc;
+	return (struct xs_transaction_handle *)rc;
 }
 
 /* End a transaction.
@@ -655,10 +666,14 @@ bool xs_transaction_start(struct xs_handle *h)
  * Returns false on failure, which indicates an error: transactions will
  * not fail spuriously.
  */
-bool xs_transaction_end(struct xs_handle *h, bool abort)
+bool xs_transaction_end(struct xs_handle *h, struct xs_transaction_handle *t,
+			bool abort)
 {
 	char abortstr[2];
 	bool rc;
+
+	if (t == NULL)
+		return -EINVAL;
 
 	if (abort)
 		strcpy(abortstr, "F");

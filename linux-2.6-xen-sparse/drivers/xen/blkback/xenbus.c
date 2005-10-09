@@ -61,18 +61,19 @@ static void frontend_changed(struct xenbus_watch *watch,
 	unsigned long ring_ref;
 	unsigned int evtchn;
 	int err;
+	struct xenbus_transaction *xbt;
 	struct backend_info *be
 		= container_of(watch, struct backend_info, watch);
 
 	/* If other end is gone, delete ourself. */
-	if (vec && !xenbus_exists(be->frontpath, "")) {
+	if (vec && !xenbus_exists(NULL, be->frontpath, "")) {
 		device_unregister(&be->dev->dev);
 		return;
 	}
 	if (be->blkif == NULL || be->blkif->status == CONNECTED)
 		return;
 
-	err = xenbus_gather(be->frontpath, "ring-ref", "%lu", &ring_ref,
+	err = xenbus_gather(NULL, be->frontpath, "ring-ref", "%lu", &ring_ref,
 			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
 		xenbus_dev_error(be->dev, err,
@@ -84,7 +85,8 @@ static void frontend_changed(struct xenbus_watch *watch,
 	/* Map the shared frame, irq etc. */
 	err = blkif_map(be->blkif, ring_ref, evtchn);
 	if (err) {
-		xenbus_dev_error(be->dev, err, "mapping ring-ref %lu port %u",
+		xenbus_dev_error(be->dev, err,
+				 "mapping ring-ref %lu port %u",
 				 ring_ref, evtchn);
 		return;
 	}
@@ -92,13 +94,13 @@ static void frontend_changed(struct xenbus_watch *watch,
 
 again:
 	/* Supply the information about the device the frontend needs */
-	err = xenbus_transaction_start();
-	if (err) {
+	xbt = xenbus_transaction_start();
+	if (IS_ERR(xbt)) {
 		xenbus_dev_error(be->dev, err, "starting transaction");
 		return;
 	}
 
-	err = xenbus_printf(be->dev->nodename, "sectors", "%lu",
+	err = xenbus_printf(xbt, be->dev->nodename, "sectors", "%lu",
 			    vbd_size(&be->blkif->vbd));
 	if (err) {
 		xenbus_dev_error(be->dev, err, "writing %s/sectors",
@@ -107,14 +109,14 @@ again:
 	}
 
 	/* FIXME: use a typename instead */
-	err = xenbus_printf(be->dev->nodename, "info", "%u",
+	err = xenbus_printf(xbt, be->dev->nodename, "info", "%u",
 			    vbd_info(&be->blkif->vbd));
 	if (err) {
 		xenbus_dev_error(be->dev, err, "writing %s/info",
 				 be->dev->nodename);
 		goto abort;
 	}
-	err = xenbus_printf(be->dev->nodename, "sector-size", "%lu",
+	err = xenbus_printf(xbt, be->dev->nodename, "sector-size", "%lu",
 			    vbd_secsize(&be->blkif->vbd));
 	if (err) {
 		xenbus_dev_error(be->dev, err, "writing %s/sector-size",
@@ -122,7 +124,7 @@ again:
 		goto abort;
 	}
 
-	err = xenbus_transaction_end(0);
+	err = xenbus_transaction_end(xbt, 0);
 	if (err == -EAGAIN)
 		goto again;
 	if (err) {
@@ -136,7 +138,7 @@ again:
 	return;
 
  abort:
-	xenbus_transaction_end(1);
+	xenbus_transaction_end(xbt, 1);
 }
 
 /* 
@@ -154,7 +156,8 @@ static void backend_changed(struct xenbus_watch *watch,
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
 
-	err = xenbus_scanf(dev->nodename, "physical-device", "%li", &pdev);
+	err = xenbus_scanf(NULL, dev->nodename,
+			   "physical-device", "%li", &pdev);
 	if (XENBUS_EXIST_ERR(err))
 		return;
 	if (err < 0) {
@@ -169,7 +172,7 @@ static void backend_changed(struct xenbus_watch *watch,
 	be->pdev = pdev;
 
 	/* If there's a read-only node, we're read only. */
-	p = xenbus_read(dev->nodename, "read-only", NULL);
+	p = xenbus_read(NULL, dev->nodename, "read-only", NULL);
 	if (!IS_ERR(p)) {
 		be->readonly = 1;
 		kfree(p);
@@ -184,7 +187,8 @@ static void backend_changed(struct xenbus_watch *watch,
 		if (IS_ERR(be->blkif)) {
 			err = PTR_ERR(be->blkif);
 			be->blkif = NULL;
-			xenbus_dev_error(dev, err, "creating block interface");
+			xenbus_dev_error(dev, err,
+					 "creating block interface");
 			return;
 		}
 
@@ -192,7 +196,8 @@ static void backend_changed(struct xenbus_watch *watch,
 		if (err) {
 			blkif_put(be->blkif);
 			be->blkif = NULL;
-			xenbus_dev_error(dev, err, "creating vbd structure");
+			xenbus_dev_error(dev, err,
+					 "creating vbd structure");
 			return;
 		}
 
@@ -210,13 +215,14 @@ static int blkback_probe(struct xenbus_device *dev,
 
 	be = kmalloc(sizeof(*be), GFP_KERNEL);
 	if (!be) {
-		xenbus_dev_error(dev, -ENOMEM, "allocating backend structure");
+		xenbus_dev_error(dev, -ENOMEM,
+				 "allocating backend structure");
 		return -ENOMEM;
 	}
 	memset(be, 0, sizeof(*be));
 
 	frontend = NULL;
-	err = xenbus_gather(dev->nodename,
+	err = xenbus_gather(NULL, dev->nodename,
 			    "frontend-id", "%li", &be->frontend_id,
 			    "frontend", NULL, &frontend,
 			    NULL);
@@ -228,7 +234,7 @@ static int blkback_probe(struct xenbus_device *dev,
 				 dev->nodename);
 		goto free_be;
 	}
-	if (strlen(frontend) == 0 || !xenbus_exists(frontend, "")) {
+	if (strlen(frontend) == 0 || !xenbus_exists(NULL, frontend, "")) {
 		/* If we can't get a frontend path and a frontend-id,
 		 * then our bus-id is no longer valid and we need to
 		 * destroy the backend device.
@@ -244,7 +250,8 @@ static int blkback_probe(struct xenbus_device *dev,
 	err = register_xenbus_watch(&be->backend_watch);
 	if (err) {
 		be->backend_watch.node = NULL;
-		xenbus_dev_error(dev, err, "adding backend watch on %s",
+		xenbus_dev_error(dev, err,
+				 "adding backend watch on %s",
 				 dev->nodename);
 		goto free_be;
 	}
