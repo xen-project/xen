@@ -30,23 +30,23 @@
 
 enum xsd_sockmsg_type
 {
-	XS_DEBUG,
-	XS_DIRECTORY,
-	XS_READ,
-	XS_GET_PERMS,
-	XS_WATCH,
-	XS_UNWATCH,
-	XS_TRANSACTION_START,
-	XS_TRANSACTION_END,
-	XS_INTRODUCE,
-	XS_RELEASE,
-	XS_GET_DOMAIN_PATH,
-	XS_WRITE,
-	XS_MKDIR,
-	XS_RM,
-	XS_SET_PERMS,
-	XS_WATCH_EVENT,
-	XS_ERROR,
+    XS_DEBUG,
+    XS_DIRECTORY,
+    XS_READ,
+    XS_GET_PERMS,
+    XS_WATCH,
+    XS_UNWATCH,
+    XS_TRANSACTION_START,
+    XS_TRANSACTION_END,
+    XS_INTRODUCE,
+    XS_RELEASE,
+    XS_GET_DOMAIN_PATH,
+    XS_WRITE,
+    XS_MKDIR,
+    XS_RM,
+    XS_SET_PERMS,
+    XS_WATCH_EVENT,
+    XS_ERROR,
 };
 
 #define XS_WRITE_NONE "NONE"
@@ -56,38 +56,40 @@ enum xsd_sockmsg_type
 /* We hand errors as strings, for portability. */
 struct xsd_errors
 {
-	int errnum;
-	const char *errstring;
+    int errnum;
+    const char *errstring;
 };
 #define XSD_ERROR(x) { x, #x }
 static struct xsd_errors xsd_errors[] __attribute__((unused)) = {
-	XSD_ERROR(EINVAL),
-	XSD_ERROR(EACCES),
-	XSD_ERROR(EEXIST),
-	XSD_ERROR(EISDIR),
-	XSD_ERROR(ENOENT),
-	XSD_ERROR(ENOMEM),
-	XSD_ERROR(ENOSPC),
-	XSD_ERROR(EIO),
-	XSD_ERROR(ENOTEMPTY),
-	XSD_ERROR(ENOSYS),
-	XSD_ERROR(EROFS),
-	XSD_ERROR(EBUSY),
-	XSD_ERROR(EAGAIN),
-	XSD_ERROR(EISCONN),
+    XSD_ERROR(EINVAL),
+    XSD_ERROR(EACCES),
+    XSD_ERROR(EEXIST),
+    XSD_ERROR(EISDIR),
+    XSD_ERROR(ENOENT),
+    XSD_ERROR(ENOMEM),
+    XSD_ERROR(ENOSPC),
+    XSD_ERROR(EIO),
+    XSD_ERROR(ENOTEMPTY),
+    XSD_ERROR(ENOSYS),
+    XSD_ERROR(EROFS),
+    XSD_ERROR(EBUSY),
+    XSD_ERROR(EAGAIN),
+    XSD_ERROR(EISCONN),
 };
 struct xsd_sockmsg
 {
-	u32 type;
-	u32 len; 		/* Length of data following this. */
+    u32 type;  /* XS_??? */
+    u32 req_id;/* Request identifier, echoed in daemon's response.  */
+    u32 tx_id; /* Transaction id (0 if not related to a transaction). */
+    u32 len;   /* Length of data following this. */
 
-	/* Generally followed by nul-terminated string(s). */
+    /* Generally followed by nul-terminated string(s). */
 };
 
 enum xs_watch_type
 {
-	XS_WATCH_PATH = 0,
-	XS_WATCH_TOKEN,
+    XS_WATCH_PATH = 0,
+    XS_WATCH_TOKEN,
 };
 
 #endif /* _XS_WIRE_H */

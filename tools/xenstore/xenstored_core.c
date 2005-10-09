@@ -235,52 +235,50 @@ void trace(const char *fmt, ...)
 	talloc_free(str);
 }
 
-static bool write_message(struct connection *conn)
+static bool write_messages(struct connection *conn)
 {
 	int ret;
-	struct buffered_data *out = conn->out;
+	struct buffered_data *out, *tmp;
 
-	if (out->inhdr) {
-		if (verbose)
-			xprintf("Writing msg %s (%s) out to %p\n",
-				sockmsg_string(out->hdr.msg.type),
-				out->buffer, conn);
-		ret = conn->write(conn, out->hdr.raw + out->used,
-				  sizeof(out->hdr) - out->used);
+	list_for_each_entry_safe(out, tmp, &conn->out_list, list) {
+		if (out->inhdr) {
+			if (verbose)
+				xprintf("Writing msg %s (%s) out to %p\n",
+					sockmsg_string(out->hdr.msg.type),
+					out->buffer, conn);
+			ret = conn->write(conn, out->hdr.raw + out->used,
+					  sizeof(out->hdr) - out->used);
+			if (ret < 0)
+				return false;
+
+			out->used += ret;
+			if (out->used < sizeof(out->hdr))
+				return true;
+
+			out->inhdr = false;
+			out->used = 0;
+
+			/* Second write might block if non-zero. */
+			if (out->hdr.msg.len && !conn->domain)
+				return true;
+		}
+
+		ret = conn->write(conn, out->buffer + out->used,
+				  out->hdr.msg.len - out->used);
+
 		if (ret < 0)
 			return false;
 
 		out->used += ret;
-		if (out->used < sizeof(out->hdr))
+		if (out->used != out->hdr.msg.len)
 			return true;
 
-		out->inhdr = false;
-		out->used = 0;
+		trace_io(conn, "OUT", out);
 
-		/* Second write might block if non-zero. */
-		if (out->hdr.msg.len && !conn->domain)
-			return true;
+		list_del(&out->list);
+		talloc_free(out);
 	}
 
-	ret = conn->write(conn, out->buffer + out->used,
-			  out->hdr.msg.len - out->used);
-
-	if (ret < 0)
-		return false;
-
-	out->used += ret;
-	if (out->used != out->hdr.msg.len)
-		return true;
-
-	trace_io(conn, "OUT", out);
-	conn->out = NULL;
-	talloc_free(out);
-
-	queue_next_event(conn);
-
-	/* No longer busy? */
-	if (!conn->out)
-		conn->state = OK;
 	return true;
 }
 
@@ -297,9 +295,9 @@ static int destroy_conn(void *_conn)
 		FD_SET(conn->fd, &set);
 		none.tv_sec = none.tv_usec = 0;
 
-		while (conn->out
+		while (!list_empty(&conn->out_list)
 		       && select(conn->fd+1, NULL, &set, NULL, &none) == 1)
-			if (!write_message(conn))
+			if (!write_messages(conn))
 				break;
 		close(conn->fd);
 	}
@@ -326,9 +324,9 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock)
 	list_for_each_entry(i, &connections, list) {
 		if (i->domain)
 			continue;
-		if (i->state == OK)
+		if (list_empty(&i->out_list))
 			FD_SET(i->fd, inset);
-		if (i->out)
+		if (!list_empty(&i->out_list))
 			FD_SET(i->fd, outset);
 		if (i->fd > max)
 			max = i->fd;
@@ -594,14 +592,7 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 	bdata->hdr.msg.len = len;
 	memcpy(bdata->buffer, data, len);
 
-	/* There might be an event going out now.  Queue behind it. */
-	if (conn->out) {
-		assert(conn->out->hdr.msg.type == XS_WATCH_EVENT);
-		assert(!conn->waiting_reply);
-		conn->waiting_reply = bdata;
-	} else
-		conn->out = bdata;
-	conn->state = BUSY;
+	list_add_tail(&bdata->list, &conn->out_list);
 }
 
 /* Some routines (write, mkdir, etc) just need a non-error return */
@@ -1148,8 +1139,6 @@ static void consider_message(struct connection *conn)
 	enum xsd_sockmsg_type volatile type = conn->in->hdr.msg.type;
 	jmp_buf talloc_fail;
 
-	assert(conn->state == OK);
-
 	/* For simplicity, we kill the connection on OOM. */
 	talloc_set_fail_handler(out_of_mem, &talloc_fail);
 	if (setjmp(talloc_fail)) {
@@ -1186,10 +1175,7 @@ end:
 static void handle_input(struct connection *conn)
 {
 	int bytes;
-	struct buffered_data *in;
-
-	assert(conn->state == OK);
-	in = conn->in;
+	struct buffered_data *in = conn->in;
 
 	/* Not finished header yet? */
 	if (in->inhdr) {
@@ -1237,7 +1223,7 @@ bad_client:
 
 static void handle_output(struct connection *conn)
 {
-	if (!write_message(conn))
+	if (!write_messages(conn))
 		talloc_free(conn);
 }
 
@@ -1254,8 +1240,6 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	if (!new)
 		return NULL;
 
-	new->state = OK;
-	new->out = new->waiting_reply = NULL;
 	new->fd = -1;
 	new->id = 0;
 	new->domain = NULL;
@@ -1263,6 +1247,7 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	new->write = write;
 	new->read = read;
 	new->can_write = true;
+	INIT_LIST_HEAD(&new->out_list);
 	INIT_LIST_HEAD(&new->watches);
 
 	talloc_set_fail_handler(out_of_mem, &talloc_fail);
@@ -1317,23 +1302,17 @@ void dump_connection(void)
 	list_for_each_entry(i, &connections, list) {
 		printf("Connection %p:\n", i);
 		printf("    state = %s\n",
-		       i->state == OK ? "OK"
-		       : i->state == BUSY ? "BUSY"
-		       : "INVALID");
+		       list_empty(&i->out_list) ? "OK" : "BUSY");
 		if (i->id)
 			printf("    id = %i\n", i->id);
 		if (!i->in->inhdr || i->in->used)
 			printf("    got %i bytes of %s\n",
 			       i->in->used, i->in->inhdr ? "header" : "data");
+#if 0
 		if (i->out)
 			printf("    sending message %s (%s) out\n",
 			       sockmsg_string(i->out->hdr.msg.type),
 			       i->out->buffer);
-		if (i->waiting_reply)
-			printf("    ... and behind is queued %s (%s)\n",
-			       sockmsg_string(i->waiting_reply->hdr.msg.type),
-			       i->waiting_reply->buffer);
-#if 0
 		if (i->transaction)
 			dump_transaction(i);
 		if (i->domain)
@@ -1604,3 +1583,13 @@ int main(int argc, char *argv[])
 		max = initialize_set(&inset, &outset, *sock, *ro_sock);
 	}
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

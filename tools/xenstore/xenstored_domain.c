@@ -276,12 +276,14 @@ void handle_event(void)
 
 bool domain_can_read(struct connection *conn)
 {
-	return conn->state == OK && buffer_has_input(conn->domain->input);
+	return (list_empty(&conn->out_list) &&
+                buffer_has_input(conn->domain->input));
 }
 
 bool domain_can_write(struct connection *conn)
 {
-	return conn->out && buffer_has_output_room(conn->domain->output);
+	return (!list_empty(&conn->out_list) &&
+                buffer_has_output_room(conn->domain->output));
 }
 
 static struct domain *new_domain(void *context, domid_t domid,
