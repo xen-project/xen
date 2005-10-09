@@ -1578,7 +1578,7 @@ void smp_suspend(void)
 void smp_resume(void)
 {
 	smp_intr_init();
-	local_setup_timer_irq();
+	local_setup_timer();
 }
 
 void vcpu_prepare(int vcpu)
