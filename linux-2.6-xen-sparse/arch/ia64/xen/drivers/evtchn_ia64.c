@@ -35,11 +35,13 @@ int bind_virq_to_irq(int virq)
 	while(1);
 }
 
+#if 0
 void notify_remote_via_irq(int virq)
 {
 	printk("notify_remote_via_irq called... FIXME??\n");
 	while(1);
 }
+#endif
 
 void unbind_virq_from_evtchn(int virq)
 {
