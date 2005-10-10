@@ -79,6 +79,7 @@ static struct xs_handle xs_state;
 
 static LIST_HEAD(watches);
 static DEFINE_SPINLOCK(watches_lock);
+static struct workqueue_struct *watches_workq;
 
 static int get_error(const char *errorstring)
 {
@@ -626,7 +627,7 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 	up_read(&xs_state.suspend_mutex);
 
 	/* Make sure watch is not in use. */
-	flush_scheduled_work();
+	flush_workqueue(watches_workq);
 }
 EXPORT_SYMBOL(unregister_xenbus_watch);
 
@@ -708,7 +709,7 @@ static int process_msg(void)
 		msg->u.watch.handle = find_watch(
 			msg->u.watch.vec[XS_WATCH_TOKEN]);
 		if (msg->u.watch.handle != NULL) {
-			schedule_work(&msg->u.watch.work);
+			queue_work(watches_workq, &msg->u.watch.work);
 		} else {
 			kfree(msg->u.watch.vec);
 			kfree(msg);
@@ -737,9 +738,6 @@ static int read_thread(void *unused)
 	}
 }
 
-/*
-** Initialize the interface to xenstore. 
-*/
 int xs_init(void)
 {
 	int err;
@@ -756,8 +754,12 @@ int xs_init(void)
 	err = xb_init_comms();
 	if (err)
 		return err;
-	
-	reader = kthread_run(read_thread, NULL, "xenbusd");
+
+	/* Create our own workqueue for executing watch callbacks. */
+	watches_workq = create_singlethread_workqueue("xenwatch");
+	BUG_ON(watches_workq == NULL);
+
+	reader = kthread_run(read_thread, NULL, "xenbus");
 	if (IS_ERR(reader))
 		return PTR_ERR(reader);
 
