@@ -154,9 +154,9 @@ void do_transaction_end(struct connection *conn, const char *arg)
 		return;
 	}
 
-	/* Set to NULL so fire_watches sends events, tdb_context works. */
 	trans = conn->transaction;
 	conn->transaction = NULL;
+
 	/* Attach transaction to arg for auto-cleanup */
 	talloc_steal(arg, trans);
 

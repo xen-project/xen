@@ -276,8 +276,7 @@ void handle_event(void)
 
 bool domain_can_read(struct connection *conn)
 {
-	return (list_empty(&conn->out_list) &&
-                buffer_has_input(conn->domain->input));
+	return buffer_has_input(conn->domain->input);
 }
 
 bool domain_can_write(struct connection *conn)

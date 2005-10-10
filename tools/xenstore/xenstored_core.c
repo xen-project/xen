@@ -324,8 +324,7 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock)
 	list_for_each_entry(i, &connections, list) {
 		if (i->domain)
 			continue;
-		if (list_empty(&i->out_list))
-			FD_SET(i->fd, inset);
+		FD_SET(i->fd, inset);
 		if (!list_empty(&i->out_list))
 			FD_SET(i->fd, outset);
 		if (i->fd > max)
