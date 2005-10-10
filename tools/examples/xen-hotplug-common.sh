@@ -9,10 +9,10 @@ log() {
 }
 
 xenstore_read() {
-  local v=$(xenstore-read "$XENBUS_PATH"/type || true)
+  local v=$(xenstore-read "$@" || true)
   if [ "$v" == "" ]
   then
-    log error "xenstore-read $XENBUS_PATH/type failed."
+    log error "xenstore-read $@ failed."
     exit 1
   fi
   echo "$v"
