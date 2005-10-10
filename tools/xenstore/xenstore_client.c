@@ -20,11 +20,11 @@ static void
 usage(const char *progname)
 {
 #if defined(CLIENT_read)
-    errx(1, "Usage: %s [-h] [-p] key [...]", progname);
+    errx(1, "Usage: %s [-h] [-p] [-s] key [...]", progname);
 #elif defined(CLIENT_write)
-    errx(1, "Usage: %s [-h] key value [...]", progname);
+    errx(1, "Usage: %s [-h] [-s] key value [...]", progname);
 #elif defined(CLIENT_rm) || defined(CLIENT_exists) || defined(CLIENT_list)
-    errx(1, "Usage: %s [-h] key [...]", progname);
+    errx(1, "Usage: %s [-h] [-s] key [...]", progname);
 #endif
 }
 
