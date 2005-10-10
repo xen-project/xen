@@ -1087,7 +1087,8 @@ class XendDomainInfo:
         log.debug("XendDomainInfo.destroy: domid=%s", self.domid)
 
         self.cleanupVm()
-        self.destroyDomain()
+        if self.dompath is not None:
+                self.destroyDomain()
 
 
     def destroyDomain(self):
