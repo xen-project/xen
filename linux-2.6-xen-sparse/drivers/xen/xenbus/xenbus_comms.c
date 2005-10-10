@@ -128,7 +128,7 @@ int xb_write(const void *data, unsigned len)
 		void *dst;
 		unsigned int avail;
 
-		wait_event(xb_waitq, output_avail(out));
+		wait_event_interruptible(xb_waitq, output_avail(out));
 
 		mb();
 		h = *out;
@@ -136,6 +136,8 @@ int xb_write(const void *data, unsigned len)
 			return -EIO;
 
 		dst = get_output_chunk(&h, out->buf, &avail);
+		if (avail == 0)
+			continue;
 		if (avail > len)
 			avail = len;
 		memcpy(dst, data, avail);
@@ -167,7 +169,7 @@ int xb_read(void *data, unsigned len)
 		unsigned int avail;
 		const char *src;
 
-		wait_event(xb_waitq, xs_input_avail());
+		wait_event_interruptible(xb_waitq, xs_input_avail());
 
 		mb();
 		h = *in;
@@ -175,6 +177,8 @@ int xb_read(void *data, unsigned len)
 			return -EIO;
 
 		src = get_input_chunk(&h, in->buf, &avail);
+		if (avail == 0)
+			continue;
 		if (avail > len)
 			avail = len;
 		was_full = !output_avail(&h);

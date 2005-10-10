@@ -43,18 +43,18 @@
 #define streq(a, b) (strcmp((a), (b)) == 0)
 
 struct xs_stored_msg {
+	struct list_head list;
+
 	struct xsd_sockmsg hdr;
 
 	union {
-		/* Stored replies. */
+		/* Queued replies. */
 		struct {
-			struct list_head list;
 			char *body;
 		} reply;
 
-		/* Queued watch callbacks. */
+		/* Queued watch events. */
 		struct {
-			struct work_struct work;
 			struct xenbus_watch *handle;
 			char **vec;
 			unsigned int vec_size;
@@ -77,9 +77,23 @@ struct xs_handle {
 
 static struct xs_handle xs_state;
 
+/* List of registered watches, and a lock to protect it. */
 static LIST_HEAD(watches);
 static DEFINE_SPINLOCK(watches_lock);
-static struct workqueue_struct *watches_workq;
+
+/* List of pending watch calbback events, and a lock to protect it. */
+static LIST_HEAD(watch_events);
+static DEFINE_SPINLOCK(watch_events_lock);
+
+/*
+ * Details of the xenwatch callback kernel thread. The thread waits on the
+ * watch_events_waitq for work to do (queued on watch_events list). When it
+ * wakes up it acquires the xenwatch_mutex before reading the list and
+ * carrying out work.
+ */
+static pid_t xenwatch_pid;
+static DECLARE_MUTEX(xenwatch_mutex);
+static DECLARE_WAIT_QUEUE_HEAD(watch_events_waitq);
 
 static int get_error(const char *errorstring)
 {
@@ -105,14 +119,14 @@ static void *read_reply(enum xsd_sockmsg_type *type, unsigned int *len)
 
 	while (list_empty(&xs_state.reply_list)) {
 		spin_unlock(&xs_state.reply_lock);
-		wait_event(xs_state.reply_waitq,
-			   !list_empty(&xs_state.reply_list));
+		wait_event_interruptible(xs_state.reply_waitq,
+					 !list_empty(&xs_state.reply_list));
 		spin_lock(&xs_state.reply_lock);
 	}
 
 	msg = list_entry(xs_state.reply_list.next,
-			 struct xs_stored_msg, u.reply.list);
-	list_del(&msg->u.reply.list);
+			 struct xs_stored_msg, list);
+	list_del(&msg->list);
 
 	spin_unlock(&xs_state.reply_lock);
 
@@ -606,6 +620,7 @@ EXPORT_SYMBOL(register_xenbus_watch);
 
 void unregister_xenbus_watch(struct xenbus_watch *watch)
 {
+	struct xs_stored_msg *msg, *tmp;
 	char token[sizeof(watch) * 2 + 1];
 	int err;
 
@@ -626,8 +641,22 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 
 	up_read(&xs_state.suspend_mutex);
 
-	/* Make sure watch is not in use. */
-	flush_workqueue(watches_workq);
+	/* Cancel pending watch events. */
+	spin_lock(&watch_events_lock);
+	list_for_each_entry_safe(msg, tmp, &watch_events, list) {
+		if (msg->u.watch.handle != watch)
+			continue;
+		list_del(&msg->list);
+		kfree(msg->u.watch.vec);
+		kfree(msg);
+	}
+	spin_unlock(&watch_events_lock);
+
+	/* Flush any currently-executing callback, unless we are it. :-) */
+	if (current->pid != xenwatch_pid) {
+		down(&xenwatch_mutex);
+		up(&xenwatch_mutex);
+	}
 }
 EXPORT_SYMBOL(unregister_xenbus_watch);
 
@@ -653,16 +682,35 @@ void xs_resume(void)
 	up_write(&xs_state.suspend_mutex);
 }
 
-static void xenbus_fire_watch(void *arg)
+static int xenwatch_thread(void *unused)
 {
-	struct xs_stored_msg *msg = arg;
+	struct list_head *ent;
+	struct xs_stored_msg *msg;
 
-	msg->u.watch.handle->callback(msg->u.watch.handle,
-				      (const char **)msg->u.watch.vec,
-				      msg->u.watch.vec_size);
+	for (;;) {
+		wait_event_interruptible(watch_events_waitq,
+					 !list_empty(&watch_events));
 
-	kfree(msg->u.watch.vec);
-	kfree(msg);
+		down(&xenwatch_mutex);
+
+		spin_lock(&watch_events_lock);
+		ent = watch_events.next;
+		if (ent != &watch_events)
+			list_del(ent);
+		spin_unlock(&watch_events_lock);
+
+		if (ent != &watch_events) {
+			msg = list_entry(ent, struct xs_stored_msg, list);
+			msg->u.watch.handle->callback(
+				msg->u.watch.handle,
+				(const char **)msg->u.watch.vec,
+				msg->u.watch.vec_size);
+			kfree(msg->u.watch.vec);
+			kfree(msg);
+		}
+
+		up(&xenwatch_mutex);
+	}
 }
 
 static int process_msg(void)
@@ -696,8 +744,6 @@ static int process_msg(void)
 	body[msg->hdr.len] = '\0';
 
 	if (msg->hdr.type == XS_WATCH_EVENT) {
-		INIT_WORK(&msg->u.watch.work, xenbus_fire_watch, msg);
-
 		msg->u.watch.vec = split(body, msg->hdr.len,
 					 &msg->u.watch.vec_size);
 		if (IS_ERR(msg->u.watch.vec)) {
@@ -709,7 +755,10 @@ static int process_msg(void)
 		msg->u.watch.handle = find_watch(
 			msg->u.watch.vec[XS_WATCH_TOKEN]);
 		if (msg->u.watch.handle != NULL) {
-			queue_work(watches_workq, &msg->u.watch.work);
+			spin_lock(&watch_events_lock);
+			list_add_tail(&msg->list, &watch_events);
+			wake_up(&watch_events_waitq);
+			spin_unlock(&watch_events_lock);
 		} else {
 			kfree(msg->u.watch.vec);
 			kfree(msg);
@@ -718,7 +767,7 @@ static int process_msg(void)
 	} else {
 		msg->u.reply.body = body;
 		spin_lock(&xs_state.reply_lock);
-		list_add_tail(&msg->u.reply.list, &xs_state.reply_list);
+		list_add_tail(&msg->list, &xs_state.reply_list);
 		spin_unlock(&xs_state.reply_lock);
 		wake_up(&xs_state.reply_waitq);
 	}
@@ -726,7 +775,7 @@ static int process_msg(void)
 	return 0;
 }
 
-static int read_thread(void *unused)
+static int xenbus_thread(void *unused)
 {
 	int err;
 
@@ -741,7 +790,7 @@ static int read_thread(void *unused)
 int xs_init(void)
 {
 	int err;
-	struct task_struct *reader;
+	struct task_struct *task;
 
 	INIT_LIST_HEAD(&xs_state.reply_list);
 	spin_lock_init(&xs_state.reply_lock);
@@ -755,13 +804,14 @@ int xs_init(void)
 	if (err)
 		return err;
 
-	/* Create our own workqueue for executing watch callbacks. */
-	watches_workq = create_singlethread_workqueue("xenwatch");
-	BUG_ON(watches_workq == NULL);
+	task = kthread_run(xenwatch_thread, NULL, "xenwatch");
+	if (IS_ERR(task))
+		return PTR_ERR(task);
+	xenwatch_pid = task->pid;
 
-	reader = kthread_run(read_thread, NULL, "xenbus");
-	if (IS_ERR(reader))
-		return PTR_ERR(reader);
+	task = kthread_run(xenbus_thread, NULL, "xenbus");
+	if (IS_ERR(task))
+		return PTR_ERR(task);
 
 	return 0;
 }

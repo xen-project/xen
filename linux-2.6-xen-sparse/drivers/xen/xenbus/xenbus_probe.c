@@ -43,9 +43,6 @@
 
 static struct notifier_block *xenstore_chain;
 
-/* Now used to protect xenbus probes against save/restore. */
-static DECLARE_MUTEX(xenbus_lock);
-
 /* If something in array of ids matches this device, return it. */
 static const struct xenbus_device_id *
 match_device(const struct xenbus_device_id *arr, struct xenbus_device *dev)
@@ -232,18 +229,13 @@ static int xenbus_dev_remove(struct device *_dev)
 static int xenbus_register_driver_common(struct xenbus_driver *drv,
 					 struct xen_bus_type *bus)
 {
-	int err;
-
 	drv->driver.name = drv->name;
 	drv->driver.bus = &bus->bus;
 	drv->driver.owner = drv->owner;
 	drv->driver.probe = xenbus_dev_probe;
 	drv->driver.remove = xenbus_dev_remove;
 
-	down(&xenbus_lock);
-	err = driver_register(&drv->driver);
-	up(&xenbus_lock);
-	return err;
+	return driver_register(&drv->driver);
 }
 
 int xenbus_register_driver(struct xenbus_driver *drv)
@@ -259,9 +251,7 @@ int xenbus_register_backend(struct xenbus_driver *drv)
 
 void xenbus_unregister_driver(struct xenbus_driver *drv)
 {
-	down(&xenbus_lock);
 	driver_unregister(&drv->driver);
-	up(&xenbus_lock);
 }
 EXPORT_SYMBOL(xenbus_unregister_driver);
 
@@ -624,8 +614,6 @@ static int resume_dev(struct device *dev, void *data)
 
 void xenbus_suspend(void)
 {
-	/* We keep lock, so no comms can happen as page moves. */
-	down(&xenbus_lock);
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_dev);
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, suspend_dev);
 	xs_suspend();
@@ -637,14 +625,11 @@ void xenbus_resume(void)
 	xs_resume();
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, resume_dev);
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, resume_dev);
-	up(&xenbus_lock);
 }
 
 int register_xenstore_notifier(struct notifier_block *nb)
 {
 	int ret = 0;
-
-	down(&xenbus_lock);
 
 	if (xen_start_info->store_evtchn) {
 		ret = nb->notifier_call(nb, 0, NULL);
@@ -652,17 +637,13 @@ int register_xenstore_notifier(struct notifier_block *nb)
 		notifier_chain_register(&xenstore_chain, nb);
 	}
 
-	up(&xenbus_lock);
-
 	return ret;
 }
 EXPORT_SYMBOL(register_xenstore_notifier);
 
 void unregister_xenstore_notifier(struct notifier_block *nb)
 {
-	down(&xenbus_lock);
 	notifier_chain_unregister(&xenstore_chain, nb);
-	up(&xenbus_lock);
 }
 EXPORT_SYMBOL(unregister_xenstore_notifier);
 
@@ -683,16 +664,16 @@ int do_xenbus_probe(void *unused)
 		return err;
 	}
 
-	down(&xenbus_lock);
 	/* Enumerate devices in xenstore. */
 	xenbus_probe_devices(&xenbus_frontend);
 	xenbus_probe_devices(&xenbus_backend);
+
 	/* Watch for changes. */
 	register_xenbus_watch(&fe_watch);
 	register_xenbus_watch(&be_watch);
+
 	/* Notify others that xenstore is up */
 	notifier_call_chain(&xenstore_chain, 0, 0);
-	up(&xenbus_lock);
 
 	return 0;
 }
