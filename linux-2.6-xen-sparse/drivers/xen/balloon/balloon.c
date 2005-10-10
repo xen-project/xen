@@ -357,7 +357,7 @@ static void watch_target(struct xenbus_watch *watch,
 	unsigned long long new_target;
 	int err;
 
-	err = xenbus_scanf("memory", "target", "%llu", &new_target);
+	err = xenbus_scanf(NULL, "memory", "target", "%llu", &new_target);
 	if (err != 1) {
 		printk(KERN_ERR "Unable to read memory/target\n");
 		return;
@@ -370,16 +370,11 @@ static void watch_target(struct xenbus_watch *watch,
     
 }
 
-/* Setup our watcher
-   NB: Assumes xenbus_lock is held!
-*/
 int balloon_init_watcher(struct notifier_block *notifier,
                          unsigned long event,
                          void *data)
 {
 	int err;
-
-	BUG_ON(down_trylock(&xenbus_lock) == 0);
 
 	err = register_xenbus_watch(&target_watch);
 	if (err)

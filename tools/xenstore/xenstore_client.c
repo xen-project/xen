@@ -32,6 +32,7 @@ int
 main(int argc, char **argv)
 {
     struct xs_handle *xsh;
+    struct xs_transaction_handle *xth;
     bool success;
     int ret = 0;
 #if defined(CLIENT_read) || defined(CLIENT_list)
@@ -84,13 +85,13 @@ main(int argc, char **argv)
 #endif
 
   again:
-    success = xs_transaction_start(xsh);
-    if (!success)
+    xth = xs_transaction_start(xsh);
+    if (xth == NULL)
 	errx(1, "couldn't start transaction");
 
     while (optind < argc) {
 #if defined(CLIENT_read)
-	char *val = xs_read(xsh, argv[optind], NULL);
+	char *val = xs_read(xsh, xth, argv[optind], NULL);
 	if (val == NULL) {
 	    warnx("couldn't read path %s", argv[optind]);
 	    ret = 1;
@@ -102,7 +103,7 @@ main(int argc, char **argv)
 	free(val);
 	optind++;
 #elif defined(CLIENT_write)
-	success = xs_write(xsh, argv[optind], argv[optind + 1],
+	success = xs_write(xsh, xth, argv[optind], argv[optind + 1],
 			   strlen(argv[optind + 1]));
 	if (!success) {
 	    warnx("could not write path %s", argv[optind]);
@@ -111,7 +112,7 @@ main(int argc, char **argv)
 	}
 	optind += 2;
 #elif defined(CLIENT_rm)
-	success = xs_rm(xsh, argv[optind]);
+	success = xs_rm(xsh, xth, argv[optind]);
 	if (!success) {
 	    warnx("could not remove path %s", argv[optind]);
 	    ret = 1;
@@ -119,7 +120,7 @@ main(int argc, char **argv)
 	}
 	optind++;
 #elif defined(CLIENT_exists)
-	char *val = xs_read(xsh, argv[optind], NULL);
+	char *val = xs_read(xsh, xth, argv[optind], NULL);
 	if (val == NULL) {
 	    ret = 1;
 	    goto out;
@@ -128,7 +129,7 @@ main(int argc, char **argv)
 	optind++;
 #elif defined(CLIENT_list)
 	unsigned int i, num;
-	char **list = xs_directory(xsh, argv[optind], &num);
+	char **list = xs_directory(xsh, xth, argv[optind], &num);
 	if (list == NULL) {
 	    warnx("could not list path %s", argv[optind]);
 	    ret = 1;
@@ -145,7 +146,7 @@ main(int argc, char **argv)
     }
 
  out:
-    success = xs_transaction_end(xsh, ret ? true : false);
+    success = xs_transaction_end(xsh, xth, ret ? true : false);
     if (!success) {
 	if (ret == 0 && errno == EAGAIN)
 	    goto again;

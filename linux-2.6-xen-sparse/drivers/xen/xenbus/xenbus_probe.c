@@ -43,6 +43,9 @@
 
 static struct notifier_block *xenstore_chain;
 
+/* Now used to protect xenbus probes against save/restore. */
+static DECLARE_MUTEX(xenbus_lock);
+
 /* If something in array of ids matches this device, return it. */
 static const struct xenbus_device_id *
 match_device(const struct xenbus_device_id *arr, struct xenbus_device *dev)
@@ -125,7 +128,7 @@ static int backend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 
 	devid = strrchr(nodename, '/') + 1;
 
-	err = xenbus_gather(nodename, "frontend-id", "%i", &domid,
+	err = xenbus_gather(NULL, nodename, "frontend-id", "%i", &domid,
 			    "frontend", NULL, &frontend,
 			    NULL);
 	if (err)
@@ -133,7 +136,7 @@ static int backend_bus_id(char bus_id[BUS_ID_SIZE], const char *nodename)
 	if (strlen(frontend) == 0)
 		err = -ERANGE;
 
-	if (!err && !xenbus_exists(frontend, ""))
+	if (!err && !xenbus_exists(NULL, frontend, ""))
 		err = -ENOENT;
 
 	if (err) {
@@ -447,7 +450,7 @@ static int xenbus_probe_backend(const char *type, const char *domid)
 	if (!nodename)
 		return -ENOMEM;
 
-	dir = xenbus_directory(nodename, "", &dir_n);
+	dir = xenbus_directory(NULL, nodename, "", &dir_n);
 	if (IS_ERR(dir)) {
 		kfree(nodename);
 		return PTR_ERR(dir);
@@ -470,7 +473,7 @@ static int xenbus_probe_device_type(struct xen_bus_type *bus, const char *type)
 	unsigned int dir_n = 0;
 	int i;
 
-	dir = xenbus_directory(bus->root, type, &dir_n);
+	dir = xenbus_directory(NULL, bus->root, type, &dir_n);
 	if (IS_ERR(dir))
 		return PTR_ERR(dir);
 
@@ -489,7 +492,7 @@ static int xenbus_probe_devices(struct xen_bus_type *bus)
 	char **dir;
 	unsigned int i, dir_n;
 
-	dir = xenbus_directory(bus->root, "", &dir_n);
+	dir = xenbus_directory(NULL, bus->root, "", &dir_n);
 	if (IS_ERR(dir))
 		return PTR_ERR(dir);
 
@@ -535,7 +538,7 @@ static void dev_changed(const char *node, struct xen_bus_type *bus)
 	if (char_count(node, '/') < 2)
  		return;
 
-	exists = xenbus_exists(node, "");
+	exists = xenbus_exists(NULL, node, "");
 	if (!exists) {
 		xenbus_cleanup_devices(node, &bus->bus);
 		return;
@@ -625,12 +628,13 @@ void xenbus_suspend(void)
 	down(&xenbus_lock);
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_dev);
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, suspend_dev);
+	xs_suspend();
 }
 
 void xenbus_resume(void)
 {
 	xb_init_comms();
-	reregister_xenbus_watches();
+	xs_resume();
 	bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, resume_dev);
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, resume_dev);
 	up(&xenbus_lock);
@@ -662,12 +666,16 @@ void unregister_xenstore_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL(unregister_xenstore_notifier);
 
-/* called from a thread in privcmd/privcmd.c */
+/* 
+** Called either from below xenbus_probe_init() initcall (for domUs) 
+** or, for dom0, from a thread created in privcmd/privcmd.c (after 
+** the user-space tools have invoked initDomainStore()) 
+*/
 int do_xenbus_probe(void *unused)
 {
 	int err = 0;
 
-	/* Initialize xenstore comms unless already done. */
+	/* Initialize the interface to xenstore. */
 	err = xs_init();
 	if (err) {
 		printk("XENBUS: Error initializing xenstore comms:"
@@ -685,6 +693,7 @@ int do_xenbus_probe(void *unused)
 	/* Notify others that xenstore is up */
 	notifier_call_chain(&xenstore_chain, 0, 0);
 	up(&xenbus_lock);
+
 	return 0;
 }
 
@@ -698,6 +707,10 @@ static int __init xenbus_probe_init(void)
 	device_register(&xenbus_frontend.dev);
 	device_register(&xenbus_backend.dev);
 
+	/* 
+	** Domain0 doesn't have a store_evtchn yet - this will
+	** be set up later by xend invoking initDomainStore() 
+	*/
 	if (!xen_start_info->store_evtchn)
 		return 0;
 

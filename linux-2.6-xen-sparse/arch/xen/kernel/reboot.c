@@ -275,22 +275,23 @@ static void shutdown_handler(struct xenbus_watch *watch,
 {
 	static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 	char *str;
+	struct xenbus_transaction *xbt;
 	int err;
 
  again:
-	err = xenbus_transaction_start();
-	if (err)
+	xbt = xenbus_transaction_start();
+	if (IS_ERR(xbt))
 		return;
-	str = (char *)xenbus_read("control", "shutdown", NULL);
+	str = (char *)xenbus_read(xbt, "control", "shutdown", NULL);
 	/* Ignore read errors and empty reads. */
 	if (XENBUS_IS_ERR_READ(str)) {
-		xenbus_transaction_end(1);
+		xenbus_transaction_end(xbt, 1);
 		return;
 	}
 
-	xenbus_write("control", "shutdown", "");
+	xenbus_write(xbt, "control", "shutdown", "");
 
-	err = xenbus_transaction_end(0);
+	err = xenbus_transaction_end(xbt, 0);
 	if (err == -EAGAIN) {
 		kfree(str);
 		goto again;
@@ -320,23 +321,24 @@ static void sysrq_handler(struct xenbus_watch *watch, const char **vec,
 			  unsigned int len)
 {
 	char sysrq_key = '\0';
+	struct xenbus_transaction *xbt;
 	int err;
 
  again:
-	err = xenbus_transaction_start();
-	if (err)
+	xbt  = xenbus_transaction_start();
+	if (IS_ERR(xbt))
 		return;
-	if (!xenbus_scanf("control", "sysrq", "%c", &sysrq_key)) {
+	if (!xenbus_scanf(xbt, "control", "sysrq", "%c", &sysrq_key)) {
 		printk(KERN_ERR "Unable to read sysrq code in "
 		       "control/sysrq\n");
-		xenbus_transaction_end(1);
+		xenbus_transaction_end(xbt, 1);
 		return;
 	}
 
 	if (sysrq_key != '\0')
-		xenbus_printf("control", "sysrq", "%c", '\0');
+		xenbus_printf(xbt, "control", "sysrq", "%c", '\0');
 
-	err = xenbus_transaction_end(0);
+	err = xenbus_transaction_end(xbt, 0);
 	if (err == -EAGAIN)
 		goto again;
 
@@ -360,9 +362,6 @@ static struct xenbus_watch sysrq_watch = {
 
 static struct notifier_block xenstore_notifier;
 
-/* Setup our watcher
-   NB: Assumes xenbus_lock is held!
-*/
 static int setup_shutdown_watcher(struct notifier_block *notifier,
                                   unsigned long event,
                                   void *data)
@@ -371,8 +370,6 @@ static int setup_shutdown_watcher(struct notifier_block *notifier,
 #ifdef CONFIG_MAGIC_SYSRQ
 	int err2 = 0;
 #endif
-
-	BUG_ON(down_trylock(&xenbus_lock) == 0);
 
 	err1 = register_xenbus_watch(&shutdown_watch);
 #ifdef CONFIG_MAGIC_SYSRQ

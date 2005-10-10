@@ -122,7 +122,7 @@ static u32 shadow_tv_version;
 static u64 processed_system_time;   /* System time (ns) at last processing. */
 static DEFINE_PER_CPU(u64, processed_system_time);
 
-#define NS_PER_TICK (1000000000L/HZ)
+#define NS_PER_TICK (1000000000ULL/HZ)
 
 static inline void __normalize_time(time_t *sec, s64 *nsec)
 {
@@ -800,9 +800,9 @@ static inline u64 jiffies_to_st(unsigned long j)
 		delta = j - jiffies;
 		/* NB. The next check can trigger in some wrap-around cases,
 		 * but that's ok: we'll just end up with a shorter timeout. */
-		if (delta < 1)
+		if (delta < 1) 
 			delta = 1;
-		st = processed_system_time + (delta * NS_PER_TICK);
+		st = processed_system_time + ((u64)delta * NS_PER_TICK);
 	} while (read_seqretry(&xtime_lock, seq));
 
 	return st;
@@ -816,7 +816,7 @@ void stop_hz_timer(void)
 {
 	unsigned int cpu = smp_processor_id();
 	unsigned long j;
-
+	
 	/* s390 does this /before/ checking rcu_pending(). We copy them. */
 	cpu_set(cpu, nohz_cpu_mask);
 

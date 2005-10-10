@@ -8,6 +8,7 @@
 import select
 import threading
 from xen.lowlevel import xs
+from xen.xend.xenstore.xsutil import xshandle
 
 class xswatch:
 
@@ -27,10 +28,7 @@ class xswatch:
         if cls.watchThread:
             cls.xslock.release()
             return
-        # XXX: When we fix xenstored to have better watch semantics,
-        # this can change to shared xshandle(). Currently that would result
-        # in duplicate watch firings, thus failed extra xs.acknowledge_watch.
-        cls.xs = xs.open()
+        cls.xs = xshandle()
         cls.watchThread = threading.Thread(name="Watcher",
                                            target=cls.watchMain)
         cls.watchThread.setDaemon(True)
@@ -43,11 +41,10 @@ class xswatch:
         while True:
             try:
                 we = cls.xs.read_watch()
-                watch = we[1]
-                cls.xs.acknowledge_watch(watch)
             except RuntimeError, ex:
                 print ex
                 raise
+            watch = we[1]
             watch.fn(*watch.args, **watch.kwargs)
 
     watchMain = classmethod(watchMain)
