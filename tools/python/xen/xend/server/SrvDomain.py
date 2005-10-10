@@ -129,7 +129,7 @@ class SrvDomain(SrvDir):
 
 
     def op_mem_target_set(self, op, req):
-        return self.call(self.dom.setMemoryTarget
+        return self.call(self.dom.setMemoryTarget,
                          [['target', 'int']],
                          req)
 
