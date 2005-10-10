@@ -53,6 +53,14 @@ struct domain
 	/* Event channel port */
 	u16 port;
 
+	/* The remote end of the event channel, used only to validate
+	   repeated domain introductions. */
+	u16 remote_port;
+
+	/* The mfn associated with the event channel, used only to validate
+	   repeated domain introductions. */
+	unsigned long mfn;
+
 	/* Domain path in store. */
 	char *path;
 
@@ -322,14 +330,35 @@ static struct domain *new_domain(void *context, domid_t domid,
 	domain->port = rc;
 	domain->conn = new_connection(writechn, readchn);
 	domain->conn->domain = domain;
+
+	domain->remote_port = port;
+	domain->mfn = mfn;
+
 	return domain;
 }
+
+
+static struct domain *find_domain_by_domid(domid_t domid)
+{
+	struct domain *i;
+
+	list_for_each_entry(i, &domains, list) {
+		if (i->domid == domid)
+			return i;
+	}
+	return NULL;
+}
+
 
 /* domid, mfn, evtchn, path */
 void do_introduce(struct connection *conn, struct buffered_data *in)
 {
 	struct domain *domain;
 	char *vec[4];
+	domid_t domid;
+	unsigned long mfn;
+	u16 port;
+	const char *path;
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
 		send_error(conn, EINVAL);
@@ -341,36 +370,44 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
+	domid = atoi(vec[0]);
+	mfn = atol(vec[1]);
+	port = atoi(vec[2]);
+	path = vec[3];
+
 	/* Sanity check args. */
-	if ((atoi(vec[2]) <= 0) || !is_valid_nodename(vec[3])) {
+	if ((port <= 0) || !is_valid_nodename(path)) {
 		send_error(conn, EINVAL);
 		return;
 	}
-	/* Hang domain off "in" until we're finished. */
-	domain = new_domain(in, atoi(vec[0]), atol(vec[1]), atol(vec[2]),
-			    vec[3]);
-	if (!domain) {
-		send_error(conn, errno);
-		return;
+
+	domain = find_domain_by_domid(domid);
+
+	if (domain == NULL) {
+		/* Hang domain off "in" until we're finished. */
+		domain = new_domain(in, domid, mfn, port, path);
+		if (!domain) {
+			send_error(conn, errno);
+			return;
+		}
+
+		/* Now domain belongs to its connection. */
+		talloc_steal(domain->conn, domain);
+
+		fire_watches(conn, "@introduceDomain", false);
 	}
-
-	/* Now domain belongs to its connection. */
-	talloc_steal(domain->conn, domain);
-
-	fire_watches(conn, "@introduceDomain", false);
+	else {
+		/* Check that the given details match the ones we have
+		   previously recorded. */
+		if (port != domain->remote_port ||
+		    mfn != domain->mfn ||
+		    strcmp(path, domain->path) != 0) {
+			send_error(conn, EINVAL);
+			return;
+		}
+	}
 
 	send_ack(conn, XS_INTRODUCE);
-}
-
-static struct domain *find_domain_by_domid(domid_t domid)
-{
-	struct domain *i;
-
-	list_for_each_entry(i, &domains, list) {
-		if (i->domid == domid)
-			return i;
-	}
-	return NULL;
 }
 
 /* domid */
