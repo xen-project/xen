@@ -13,6 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
 """Xend root class.
@@ -29,7 +30,7 @@ import os.path
 import string
 import sys
 
-from XendLogging import XendLogging
+import XendLogging
 from XendError import XendError
 
 import sxp
@@ -92,7 +93,6 @@ class XendRoot:
     def __init__(self):
         self.config_path = None
         self.config = None
-        self.logging = None
         self.configure()
 
 
@@ -114,84 +114,22 @@ class XendRoot:
         """
         return self.components.get(name)
 
-    def _format(self, msg, args):
-        if args:
-            return str(msg) % args
-        else:
-            return str(msg)
-
-    def _log(self, mode, fmt, args):
-        """Logging function that uses the logger if it exists, otherwise
-        logs to stderr. We use this for XendRoot log messages because
-        they may be logged before the logger has been configured.
-        Other components can safely use the logger.
+    def _logError(self, fmt, args):
+        """Logging function to log to stderr. We use this for XendRoot log
+        messages because they may be logged before the logger has been
+        configured.  Other components can safely use the logger.
         """
-        log = self.get_logger()
-        if mode not in ['warning', 'info', 'debug', 'error']:
-            mode = 'info'
-        level = mode.upper()
-        if log:
-            getattr(log, mode)(fmt, *args)
-        else:
-            print >>sys.stderr, "xend", "[%s]" % level, self._format(fmt, args)
-
-    def logDebug(self, fmt, *args):
-        """Log a debug message.
-
-        @param fmt: message format
-        @param args: arguments
-        """
-        self._log('debug', fmt, args)
-        
-    def logInfo(self, fmt, *args):
-        """Log an info message.
-
-        @param fmt: message format
-        @param args: arguments
-        """
-        self._log('info', fmt, args)
-
-    def logWarning(self, fmt, *args):
-        """Log a warning message.
-
-        @param fmt: message format
-        @param args: arguments
-        """
-        self._log('warning', fmt, args)
-        
-    def logError(self, fmt, *args):
-        """Log an error message.
-
-        @param fmt: message format
-        @param args: arguments
-        """
-        self._log('error', fmt, args)
-        
-    def event_handler(self, event, val):
-        self.logInfo("EVENT> %s %s", str(event), str(val))
+        print >>sys.stderr, "xend [ERROR]", fmt % args
 
     def configure(self):
         self.set_config()
-        self.configure_logger()
-
-    def configure_logger(self):
         logfile = self.get_config_value("logfile", self.logfile_default)
         loglevel = self.get_config_value("loglevel", self.loglevel_default)
-        self.logging = XendLogging(logfile, level=loglevel)
+        XendLogging.init(logfile, level = loglevel)
 
         from xen.xend.server import params
         if params.XEND_DEBUG:
-            self.logging.addLogStderr()
-
-    def get_logging(self):
-        """Get the XendLogging instance.
-        """
-        return self.logging
-
-    def get_logger(self):
-        """Get the logger.
-        """
-        return self.logging and self.logging.getLogger()
+            XendLogging.addLogStderr()
 
     def set_config(self):
         """If the config file exists, read it. If not, ignore it.
@@ -200,7 +138,6 @@ class XendRoot:
         """
         self.config_path = os.getenv(self.config_var, self.config_default)
         if os.path.exists(self.config_path):
-            #self.logInfo('Reading config file %s', self.config_path)
             try:
                 fin = file(self.config_path, 'rb')
                 try:
@@ -210,10 +147,12 @@ class XendRoot:
                 config.insert(0, 'xend-config')
                 self.config = config
             except Exception, ex:
-                self.logError('Reading config file %s: %s', self.config_path, str(ex))
+                self._logError('Reading config file %s: %s',
+                               self.config_path, str(ex))
                 raise
         else:
-            self.logError('Config file does not exist: %s', self.config_path)
+            self._logError('Config file does not exist: %s',
+                           self.config_path)
             self.config = ['xend-config']
 
     def get_config(self, name=None):
@@ -338,11 +277,6 @@ def instance():
     except:
         inst = XendRoot()
     return inst
-
-def logger():
-    """Get the logger.
-    """
-    return instance().get_logger()
 
 def add_component(name, val):
     """Register a component with XendRoot.

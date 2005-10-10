@@ -13,11 +13,12 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
 from xen.web import static
 
-from xen.xend import XendRoot
+from xen.xend import XendLogging
 
 from xen.web.SrvDir import SrvDir
 
@@ -27,8 +28,8 @@ class SrvXendLog(SrvDir):
 
     def __init__(self):
         SrvDir.__init__(self)
-        logging = XendRoot.instance().get_logging()
-        self.logfile = static.File(logging.getLogFilename(), defaultType="text/plain")
+        self.logfile = static.File(XendLogging.getLogFilename(),
+                                   defaultType="text/plain")
         self.logfile.type = "text/plain"
         self.logfile.encoding = None
 

@@ -25,6 +25,7 @@ from xen.xend import scheduler
 from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend.XendError import XendError
+from xen.xend import XendLogging
 from xen.xend import XendRoot
 
 
@@ -146,11 +147,10 @@ class EventProtocol(protocol.Protocol):
 
     def op_log_stderr(self, _, v):
         mode = v[1]
-        logging = xroot.get_logging()
         if mode == 'on':
-            logging.addLogStderr()
+            XendLogging.addLogStderr()
         else:
-            logging.removeLogStderr()
+            XendLogging.removeLogStderr()
 
     def op_domain_ls(self, _1, _2):
         xd = xroot.get_component("xen.xend.XendDomain")
