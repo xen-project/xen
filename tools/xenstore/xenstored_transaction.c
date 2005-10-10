@@ -37,7 +37,7 @@
 
 struct changed_node
 {
-	/* The list within this transaction. */
+	/* List of all changed nodes in the context of this transaction. */
 	struct list_head list;
 
 	/* The name of the node. */
@@ -49,14 +49,14 @@ struct changed_node
 
 struct transaction
 {
-	/* Global list of transactions. */
+	/* List of all transactions active on this connection. */
 	struct list_head list;
+
+	/* Connection-local identifier for this transaction. */
+	u32 id;
 
 	/* Generation when transaction started. */
 	unsigned int generation;
-
-	/* My owner (conn->transaction == me). */
-	struct connection *conn;
 
 	/* TDB to work on, and filename */
 	TDB_CONTEXT *tdb;
@@ -65,7 +65,7 @@ struct transaction
 	/* List of changed nodes. */
 	struct list_head changes;
 };
-static LIST_HEAD(transactions);
+
 static unsigned int generation;
 
 /* Return tdb context to use for this connection. */
@@ -100,7 +100,6 @@ static int destroy_transaction(void *_transaction)
 {
 	struct transaction *trans = _transaction;
 
-	list_del(&trans->list);
 	trace_destroy(trans, "transaction");
 	if (trans->tdb)
 		tdb_close(trans->tdb);
@@ -108,10 +107,26 @@ static int destroy_transaction(void *_transaction)
 	return 0;
 }
 
-void do_transaction_start(struct connection *conn, struct buffered_data *in)
+struct transaction *transaction_lookup(struct connection *conn, u32 id)
 {
 	struct transaction *trans;
 
+	if (id == 0)
+		return NULL;
+
+	list_for_each_entry(trans, &conn->transaction_list, list)
+		if (trans->id == id)
+			return trans;
+
+	return ERR_PTR(-ENOENT);
+}
+
+void do_transaction_start(struct connection *conn, struct buffered_data *in)
+{
+	struct transaction *trans, *exists;
+	char id_str[20];
+
+	/* We don't support nested transactions. */
 	if (conn->transaction) {
 		send_error(conn, EBUSY);
 		return;
@@ -120,7 +135,6 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 	/* Attach transaction to input for autofree until it's complete */
 	trans = talloc(in, struct transaction);
 	INIT_LIST_HEAD(&trans->changes);
-	trans->conn = conn;
 	trans->generation = generation;
 	trans->tdb_name = talloc_asprintf(trans, "%s.%p",
 					  xs_daemon_tdb(), trans);
@@ -132,11 +146,19 @@ void do_transaction_start(struct connection *conn, struct buffered_data *in)
 	/* Make it close if we go away. */
 	talloc_steal(trans, trans->tdb);
 
+	/* Pick an unused transaction identifier. */
+	do {
+		trans->id = conn->next_transaction_id;
+		exists = transaction_lookup(conn, conn->next_transaction_id++);
+	} while (!IS_ERR(exists));
+
 	/* Now we own it. */
-	conn->transaction = talloc_steal(conn, trans);
-	list_add_tail(&trans->list, &transactions);
+	list_add_tail(&trans->list, &conn->transaction_list);
+	talloc_steal(conn, trans);
 	talloc_set_destructor(trans, destroy_transaction);
-	send_ack(conn, XS_TRANSACTION_START);
+
+	sprintf(id_str, "%u", trans->id);
+	send_reply(conn, XS_TRANSACTION_START, id_str, strlen(id_str)+1);
 }
 
 void do_transaction_end(struct connection *conn, const char *arg)
@@ -149,13 +171,13 @@ void do_transaction_end(struct connection *conn, const char *arg)
 		return;
 	}
 
-	if (!conn->transaction) {
+	if ((trans = conn->transaction) == NULL) {
 		send_error(conn, ENOENT);
 		return;
 	}
 
-	trans = conn->transaction;
 	conn->transaction = NULL;
+	list_del(&trans->list);
 
 	/* Attach transaction to arg for auto-cleanup */
 	talloc_steal(arg, trans);
@@ -181,3 +203,12 @@ void do_transaction_end(struct connection *conn, const char *arg)
 	send_ack(conn, XS_TRANSACTION_END);
 }
 
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

@@ -55,4 +55,34 @@ void xprintf(const char *fmt, ...);
 #define dprintf(_fmt, _args...) ((void)0)
 #endif
 
+/*
+ * Mux errno values onto returned pointers.
+ */
+
+static inline void *ERR_PTR(long error)
+{
+	return (void *)error;
+}
+
+static inline long PTR_ERR(const void *ptr)
+{
+	return (long)ptr;
+}
+
+static inline long IS_ERR(const void *ptr)
+{
+	return ((unsigned long)ptr > (unsigned long)-1000L);
+}
+
+
 #endif /* _UTILS_H */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

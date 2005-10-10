@@ -45,8 +45,14 @@
 #include <asm-xen/xen_proc.h>
 #include <asm/hypervisor.h>
 
+struct xenbus_dev_transaction {
+	struct list_head list;
+	struct xenbus_transaction *handle;
+};
+
 struct xenbus_dev_data {
-	int in_transaction;
+	/* In-progress transaction. */
+	struct list_head transactions;
 
 	/* Partial request. */
 	unsigned int len;
@@ -103,6 +109,7 @@ static ssize_t xenbus_dev_write(struct file *filp,
 				size_t len, loff_t *ppos)
 {
 	struct xenbus_dev_data *u = filp->private_data;
+	struct xenbus_dev_transaction *trans;
 	void *reply;
 	int err = 0;
 
@@ -129,13 +136,24 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	case XS_RM:
 	case XS_SET_PERMS:
 		reply = xenbus_dev_request_and_reply(&u->u.msg);
-		if (IS_ERR(reply))
+		if (IS_ERR(reply)) {
 			err = PTR_ERR(reply);
-		else {
-			if (u->u.msg.type == XS_TRANSACTION_START)
-				u->in_transaction = 1;
-			if (u->u.msg.type == XS_TRANSACTION_END)
-				u->in_transaction = 0;
+		} else {
+			if (u->u.msg.type == XS_TRANSACTION_START) {
+				trans = kmalloc(sizeof(*trans), GFP_KERNEL);
+				trans->handle = (struct xenbus_transaction *)
+					simple_strtoul(reply, NULL, 0);
+				list_add(&trans->list, &u->transactions);
+			} else if (u->u.msg.type == XS_TRANSACTION_END) {
+				list_for_each_entry(trans, &u->transactions,
+						    list)
+					if ((unsigned long)trans->handle ==
+					    (unsigned long)u->u.msg.tx_id)
+						break;
+				BUG_ON(&trans->list == &u->transactions);
+				list_del(&trans->list);
+				kfree(trans);
+			}
 			queue_reply(u, (char *)&u->u.msg, sizeof(u->u.msg));
 			queue_reply(u, (char *)reply, u->u.msg.len);
 			kfree(reply);
@@ -169,6 +187,7 @@ static int xenbus_dev_open(struct inode *inode, struct file *filp)
 		return -ENOMEM;
 
 	memset(u, 0, sizeof(*u));
+	INIT_LIST_HEAD(&u->transactions);
 	init_waitqueue_head(&u->read_waitq);
 
 	filp->private_data = u;
@@ -179,9 +198,13 @@ static int xenbus_dev_open(struct inode *inode, struct file *filp)
 static int xenbus_dev_release(struct inode *inode, struct file *filp)
 {
 	struct xenbus_dev_data *u = filp->private_data;
+	struct xenbus_dev_transaction *trans, *tmp;
 
-	if (u->in_transaction)
-		xenbus_transaction_end((struct xenbus_transaction *)1, 1);
+	list_for_each_entry_safe(trans, tmp, &u->transactions, list) {
+		xenbus_transaction_end(trans->handle, 1);
+		list_del(&trans->list);
+		kfree(trans);
+	}
 
 	kfree(u);
 

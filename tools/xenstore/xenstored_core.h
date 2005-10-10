@@ -71,8 +71,12 @@ struct connection
 	/* Buffered output data */
 	struct list_head out_list;
 
-	/* My transaction, if any. */
+	/* Transaction context for current request (NULL if none). */
 	struct transaction *transaction;
+
+	/* List of in-progress transactions. */
+	struct list_head transaction_list;
+	u32 next_transaction_id;
 
 	/* The domain I'm associated with, if any. */
 	struct domain *domain;

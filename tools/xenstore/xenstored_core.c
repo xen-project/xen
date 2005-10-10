@@ -238,46 +238,47 @@ void trace(const char *fmt, ...)
 static bool write_messages(struct connection *conn)
 {
 	int ret;
-	struct buffered_data *out, *tmp;
+	struct buffered_data *out;
 
-	list_for_each_entry_safe(out, tmp, &conn->out_list, list) {
-		if (out->inhdr) {
-			if (verbose)
-				xprintf("Writing msg %s (%s) out to %p\n",
-					sockmsg_string(out->hdr.msg.type),
-					out->buffer, conn);
-			ret = conn->write(conn, out->hdr.raw + out->used,
-					  sizeof(out->hdr) - out->used);
-			if (ret < 0)
-				return false;
+	out = list_top(&conn->out_list, struct buffered_data, list);
+	if (out == NULL)
+		return true;
 
-			out->used += ret;
-			if (out->used < sizeof(out->hdr))
-				return true;
-
-			out->inhdr = false;
-			out->used = 0;
-
-			/* Second write might block if non-zero. */
-			if (out->hdr.msg.len && !conn->domain)
-				return true;
-		}
-
-		ret = conn->write(conn, out->buffer + out->used,
-				  out->hdr.msg.len - out->used);
-
+	if (out->inhdr) {
+		if (verbose)
+			xprintf("Writing msg %s (%s) out to %p\n",
+				sockmsg_string(out->hdr.msg.type),
+				out->buffer, conn);
+		ret = conn->write(conn, out->hdr.raw + out->used,
+				  sizeof(out->hdr) - out->used);
 		if (ret < 0)
 			return false;
 
 		out->used += ret;
-		if (out->used != out->hdr.msg.len)
+		if (out->used < sizeof(out->hdr))
 			return true;
 
-		trace_io(conn, "OUT", out);
+		out->inhdr = false;
+		out->used = 0;
 
-		list_del(&out->list);
-		talloc_free(out);
+		/* Second write might block if non-zero. */
+		if (out->hdr.msg.len && !conn->domain)
+			return true;
 	}
+
+	ret = conn->write(conn, out->buffer + out->used,
+			  out->hdr.msg.len - out->used);
+	if (ret < 0)
+		return false;
+
+	out->used += ret;
+	if (out->used != out->hdr.msg.len)
+		return true;
+
+	trace_io(conn, "OUT", out);
+
+	list_del(&out->list);
+	talloc_free(out);
 
 	return true;
 }
@@ -1042,6 +1043,17 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
  */
 static void process_message(struct connection *conn, struct buffered_data *in)
 {
+	struct transaction *trans;
+
+	trans = transaction_lookup(conn, in->hdr.msg.tx_id);
+	if (IS_ERR(trans)) {
+		send_error(conn, -PTR_ERR(trans));
+		return;
+	}
+
+	assert(conn->transaction == NULL);
+	conn->transaction = trans;
+
 	switch (in->hdr.msg.type) {
 	case XS_DIRECTORY:
 		send_directory(conn, onearg(in));
@@ -1116,11 +1128,13 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		do_get_domain_path(conn, onearg(in));
 		break;
 
-	case XS_WATCH_EVENT:
 	default:
 		eprintf("Client unknown operation %i", in->hdr.msg.type);
 		send_error(conn, ENOSYS);
+		break;
 	}
+
+	conn->transaction = NULL;
 }
 
 static int out_of_mem(void *data)
@@ -1239,15 +1253,14 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	if (!new)
 		return NULL;
 
+	memset(new, 0, sizeof(*new));
 	new->fd = -1;
-	new->id = 0;
-	new->domain = NULL;
-	new->transaction = NULL;
 	new->write = write;
 	new->read = read;
 	new->can_write = true;
 	INIT_LIST_HEAD(&new->out_list);
 	INIT_LIST_HEAD(&new->watches);
+	INIT_LIST_HEAD(&new->transaction_list);
 
 	talloc_set_fail_handler(out_of_mem, &talloc_fail);
 	if (setjmp(talloc_fail)) {
@@ -1410,6 +1423,7 @@ static void daemonize(void)
 
 
 static struct option options[] = {
+	{ "no-domain-init", 0, NULL, 'D' },
 	{ "pid-file", 1, NULL, 'F' },
 	{ "no-fork", 0, NULL, 'N' },
 	{ "output-pid", 0, NULL, 'P' },
@@ -1424,11 +1438,15 @@ int main(int argc, char *argv[])
 	fd_set inset, outset;
 	bool dofork = true;
 	bool outputpid = false;
+	bool no_domain_init = false;
 	const char *pidfile = NULL;
 
-	while ((opt = getopt_long(argc, argv, "F:NPT:V", options,
+	while ((opt = getopt_long(argc, argv, "DF:NPT:V", options,
 				  NULL)) != -1) {
 		switch (opt) {
+		case 'D':
+			no_domain_init = true;
+			break;
 		case 'F':
 			pidfile = optarg;
 			break;
@@ -1501,7 +1519,8 @@ int main(int argc, char *argv[])
 	setup_structure();
 
 	/* Listen to hypervisor. */
-	event_fd = domain_init();
+	if (!no_domain_init)
+		event_fd = domain_init();
 
 	/* Restore existing connections. */
 	restore_existing_connections();

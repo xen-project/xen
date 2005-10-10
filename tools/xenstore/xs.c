@@ -75,36 +75,9 @@ struct xs_handle {
 
 	/* One request at a time. */
 	pthread_mutex_t request_mutex;
-
-	/* One transaction at a time. */
-	pthread_mutex_t transaction_mutex;
-	pthread_t transaction_pthread;
-};
-
-struct xs_transaction_handle {
-	int id;
 };
 
 static void *read_thread(void *arg);
-
-static void request_mutex_acquire(struct xs_handle *h)
-{
-	/*
-	 * We can't distinguish non-transactional from transactional
-	 * requests right now. So temporarily acquire the transaction mutex
-	 * if this task is outside transaction context.
- 	 */
-	if (h->transaction_pthread != pthread_self())
-		pthread_mutex_lock(&h->transaction_mutex);
-	pthread_mutex_lock(&h->request_mutex);
-}
-
-static void request_mutex_release(struct xs_handle *h)
-{
-	pthread_mutex_unlock(&h->request_mutex);
-	if (h->transaction_pthread != pthread_self())
-		pthread_mutex_unlock(&h->transaction_mutex);
-}
 
 int xs_fileno(struct xs_handle *h)
 {
@@ -186,8 +159,6 @@ static struct xs_handle *get_handle(const char *connect_to)
 	pthread_cond_init(&h->reply_condvar, NULL);
 
 	pthread_mutex_init(&h->request_mutex, NULL);
-	pthread_mutex_init(&h->transaction_mutex, NULL);
-	h->transaction_pthread = -1;
 
 	if (pthread_create(&h->read_thr, NULL, read_thread, h) != 0)
 		goto error;
@@ -223,7 +194,6 @@ void xs_daemon_close(struct xs_handle *h)
 {
 	struct xs_stored_msg *msg, *tmsg;
 
-	pthread_mutex_lock(&h->transaction_mutex);
 	pthread_mutex_lock(&h->request_mutex);
 	pthread_mutex_lock(&h->reply_mutex);
 	pthread_mutex_lock(&h->watch_mutex);
@@ -242,7 +212,6 @@ void xs_daemon_close(struct xs_handle *h)
 		free(msg);
 	}
 
-	pthread_mutex_unlock(&h->transaction_mutex);
 	pthread_mutex_unlock(&h->request_mutex);
 	pthread_mutex_unlock(&h->reply_mutex);
 	pthread_mutex_unlock(&h->watch_mutex);
@@ -321,8 +290,10 @@ static void *read_reply(
 }
 
 /* Send message to xs, get malloc'ed reply.  NULL and set errno on error. */
-static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
-		      const struct iovec *iovec, unsigned int num_vecs,
+static void *xs_talkv(struct xs_handle *h, struct xs_transaction_handle *t,
+		      enum xsd_sockmsg_type type,
+		      const struct iovec *iovec,
+		      unsigned int num_vecs,
 		      unsigned int *len)
 {
 	struct xsd_sockmsg msg;
@@ -331,6 +302,7 @@ static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
 	unsigned int i;
 	struct sigaction ignorepipe, oldact;
 
+	msg.tx_id = (u32)(unsigned long)t;
 	msg.type = type;
 	msg.len = 0;
 	for (i = 0; i < num_vecs; i++)
@@ -341,7 +313,7 @@ static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
 	ignorepipe.sa_flags = 0;
 	sigaction(SIGPIPE, &ignorepipe, &oldact);
 
-	request_mutex_acquire(h);
+	pthread_mutex_lock(&h->request_mutex);
 
 	if (!xs_write_all(h->fd, &msg, sizeof(msg)))
 		goto fail;
@@ -354,7 +326,7 @@ static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
 	if (!ret)
 		goto fail;
 
-	request_mutex_release(h);
+	pthread_mutex_unlock(&h->request_mutex);
 
 	sigaction(SIGPIPE, &oldact, NULL);
 	if (msg.type == XS_ERROR) {
@@ -375,7 +347,7 @@ static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
 fail:
 	/* We're in a bad state, so close fd. */
 	saved_errno = errno;
-	request_mutex_release(h);
+	pthread_mutex_unlock(&h->request_mutex);
 	sigaction(SIGPIPE, &oldact, NULL);
 close_fd:
 	close(h->fd);
@@ -393,14 +365,16 @@ static void free_no_errno(void *p)
 }
 
 /* Simplified version of xs_talkv: single message. */
-static void *xs_single(struct xs_handle *h, enum xsd_sockmsg_type type,
-		       const char *string, unsigned int *len)
+static void *xs_single(struct xs_handle *h, struct xs_transaction_handle *t,
+		       enum xsd_sockmsg_type type,
+		       const char *string,
+		       unsigned int *len)
 {
 	struct iovec iovec;
 
 	iovec.iov_base = (void *)string;
 	iovec.iov_len = strlen(string) + 1;
-	return xs_talkv(h, type, &iovec, 1, len);
+	return xs_talkv(h, t, type, &iovec, 1, len);
 }
 
 static bool xs_bool(char *reply)
@@ -417,7 +391,7 @@ char **xs_directory(struct xs_handle *h, struct xs_transaction_handle *t,
 	char *strings, *p, **ret;
 	unsigned int len;
 
-	strings = xs_single(h, XS_DIRECTORY, path, &len);
+	strings = xs_single(h, t, XS_DIRECTORY, path, &len);
 	if (!strings)
 		return NULL;
 
@@ -446,7 +420,7 @@ char **xs_directory(struct xs_handle *h, struct xs_transaction_handle *t,
 void *xs_read(struct xs_handle *h, struct xs_transaction_handle *t,
 	      const char *path, unsigned int *len)
 {
-	return xs_single(h, XS_READ, path, len);
+	return xs_single(h, t, XS_READ, path, len);
 }
 
 /* Write the value of a single file.
@@ -462,7 +436,8 @@ bool xs_write(struct xs_handle *h, struct xs_transaction_handle *t,
 	iovec[1].iov_base = (void *)data;
 	iovec[1].iov_len = len;
 
-	return xs_bool(xs_talkv(h, XS_WRITE, iovec, ARRAY_SIZE(iovec), NULL));
+	return xs_bool(xs_talkv(h, t, XS_WRITE, iovec,
+				ARRAY_SIZE(iovec), NULL));
 }
 
 /* Create a new directory.
@@ -471,7 +446,7 @@ bool xs_write(struct xs_handle *h, struct xs_transaction_handle *t,
 bool xs_mkdir(struct xs_handle *h, struct xs_transaction_handle *t,
 	      const char *path)
 {
-	return xs_bool(xs_single(h, XS_MKDIR, path, NULL));
+	return xs_bool(xs_single(h, t, XS_MKDIR, path, NULL));
 }
 
 /* Destroy a file or directory (directories must be empty).
@@ -480,7 +455,7 @@ bool xs_mkdir(struct xs_handle *h, struct xs_transaction_handle *t,
 bool xs_rm(struct xs_handle *h, struct xs_transaction_handle *t,
 	   const char *path)
 {
-	return xs_bool(xs_single(h, XS_RM, path, NULL));
+	return xs_bool(xs_single(h, t, XS_RM, path, NULL));
 }
 
 /* Get permissions of node (first element is owner).
@@ -494,7 +469,7 @@ struct xs_permissions *xs_get_permissions(struct xs_handle *h,
 	unsigned int len;
 	struct xs_permissions *ret;
 
-	strings = xs_single(h, XS_GET_PERMS, path, &len);
+	strings = xs_single(h, t, XS_GET_PERMS, path, &len);
 	if (!strings)
 		return NULL;
 
@@ -544,7 +519,7 @@ bool xs_set_permissions(struct xs_handle *h,
 			goto unwind;
 	}
 
-	if (!xs_bool(xs_talkv(h, XS_SET_PERMS, iov, 1+num_perms, NULL)))
+	if (!xs_bool(xs_talkv(h, t, XS_SET_PERMS, iov, 1+num_perms, NULL)))
 		goto unwind;
 	for (i = 0; i < num_perms; i++)
 		free(iov[i+1].iov_base);
@@ -571,7 +546,8 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 	iov[1].iov_base = (void *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_bool(xs_talkv(h, XS_WATCH, iov, ARRAY_SIZE(iov), NULL));
+	return xs_bool(xs_talkv(h, NULL, XS_WATCH, iov,
+				ARRAY_SIZE(iov), NULL));
 }
 
 /* Find out what node change was on (will block if nothing pending).
@@ -637,7 +613,8 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
 	iov[1].iov_base = (char *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_bool(xs_talkv(h, XS_UNWATCH, iov, ARRAY_SIZE(iov), NULL));
+	return xs_bool(xs_talkv(h, NULL, XS_UNWATCH, iov,
+				ARRAY_SIZE(iov), NULL));
 }
 
 /* Start a transaction: changes by others will not be seen during this
@@ -647,18 +624,17 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
  */
 struct xs_transaction_handle *xs_transaction_start(struct xs_handle *h)
 {
-	bool rc;
+	char *id_str;
+	unsigned long id;
 
-	pthread_mutex_lock(&h->transaction_mutex);
-	h->transaction_pthread = pthread_self();
+	id_str = xs_single(h, NULL, XS_TRANSACTION_START, "", NULL);
+	if (id_str == NULL)
+		return NULL;
 
-	rc = xs_bool(xs_single(h, XS_TRANSACTION_START, "", NULL));
-	if (!rc) {
-		h->transaction_pthread = -1;
-		pthread_mutex_unlock(&h->transaction_mutex);
-	}
+	id = strtoul(id_str, NULL, 0);
+	free(id_str);
 
-	return (struct xs_transaction_handle *)rc;
+	return (struct xs_transaction_handle *)id;
 }
 
 /* End a transaction.
@@ -670,22 +646,13 @@ bool xs_transaction_end(struct xs_handle *h, struct xs_transaction_handle *t,
 			bool abort)
 {
 	char abortstr[2];
-	bool rc;
-
-	if (t == NULL)
-		return -EINVAL;
 
 	if (abort)
 		strcpy(abortstr, "F");
 	else
 		strcpy(abortstr, "T");
 	
-	rc = xs_bool(xs_single(h, XS_TRANSACTION_END, abortstr, NULL));
-
-	h->transaction_pthread = -1;
-	pthread_mutex_unlock(&h->transaction_mutex);
-
-	return rc;
+	return xs_bool(xs_single(h, t, XS_TRANSACTION_END, abortstr, NULL));
 }
 
 /* Introduce a new domain.
@@ -713,7 +680,8 @@ bool xs_introduce_domain(struct xs_handle *h, domid_t domid, unsigned long mfn,
 	iov[3].iov_base = (char *)path;
 	iov[3].iov_len = strlen(path) + 1;
 
-	return xs_bool(xs_talkv(h, XS_INTRODUCE, iov, ARRAY_SIZE(iov), NULL));
+	return xs_bool(xs_talkv(h, NULL, XS_INTRODUCE, iov,
+				ARRAY_SIZE(iov), NULL));
 }
 
 bool xs_release_domain(struct xs_handle *h, domid_t domid)
@@ -722,7 +690,7 @@ bool xs_release_domain(struct xs_handle *h, domid_t domid)
 
 	sprintf(domid_str, "%u", domid);
 
-	return xs_bool(xs_single(h, XS_RELEASE, domid_str, NULL));
+	return xs_bool(xs_single(h, NULL, XS_RELEASE, domid_str, NULL));
 }
 
 char *xs_get_domain_path(struct xs_handle *h, domid_t domid)
@@ -731,7 +699,7 @@ char *xs_get_domain_path(struct xs_handle *h, domid_t domid)
 
 	sprintf(domid_str, "%u", domid);
 
-	return xs_single(h, XS_GET_DOMAIN_PATH, domid_str, NULL);
+	return xs_single(h, NULL, XS_GET_DOMAIN_PATH, domid_str, NULL);
 }
 
 /* Only useful for DEBUG versions */
@@ -745,7 +713,8 @@ char *xs_debug_command(struct xs_handle *h, const char *cmd,
 	iov[1].iov_base = data;
 	iov[1].iov_len = len;
 
-	return xs_talkv(h, XS_DEBUG, iov, ARRAY_SIZE(iov), NULL);
+	return xs_talkv(h, NULL, XS_DEBUG, iov,
+			ARRAY_SIZE(iov), NULL);
 }
 
 static void *read_thread(void *arg)

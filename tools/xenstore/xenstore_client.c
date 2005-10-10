@@ -34,14 +34,10 @@ main(int argc, char **argv)
     struct xs_handle *xsh;
     struct xs_transaction_handle *xth;
     bool success;
-    int ret = 0;
+    int ret = 0, socket = 0;
 #if defined(CLIENT_read) || defined(CLIENT_list)
     int prefix = 0;
 #endif
-
-    xsh = xs_domain_open();
-    if (xsh == NULL)
-	err(1, "xs_domain_open");
 
     while (1) {
 	int c, index = 0;
@@ -50,10 +46,11 @@ main(int argc, char **argv)
 #if defined(CLIENT_read) || defined(CLIENT_list)
 	    {"prefix", 0, 0, 'p'},
 #endif
+            {"socket", 0, 0, 's'},
 	    {0, 0, 0, 0}
 	};
 
-	c = getopt_long(argc, argv, "h"
+	c = getopt_long(argc, argv, "hs"
 #if defined(CLIENT_read) || defined(CLIENT_list)
 			"p"
 #endif
@@ -65,6 +62,9 @@ main(int argc, char **argv)
 	case 'h':
 	    usage(argv[0]);
 	    /* NOTREACHED */
+        case 's':
+            socket = 1;
+            break;
 #if defined(CLIENT_read) || defined(CLIENT_list)
 	case 'p':
 	    prefix = 1;
@@ -83,6 +83,10 @@ main(int argc, char **argv)
 	/* NOTREACHED */
     }
 #endif
+
+    xsh = socket ? xs_daemon_open() : xs_domain_open();
+    if (xsh == NULL)
+	err(1, socket ? "xs_daemon_open" : "xs_domain_open");
 
   again:
     xth = xs_transaction_start(xsh);
