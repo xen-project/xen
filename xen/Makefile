@@ -95,7 +95,7 @@ include/xen/compile.h: include/xen/compile.h.in include/xen/banner.h
 	    -e 's/@@version@@/$(XEN_VERSION)/g' \
 	    -e 's/@@subversion@@/$(XEN_SUBVERSION)/g' \
 	    -e 's/@@extraversion@@/$(XEN_EXTRAVERSION)/g' \
-	    -e 's!@@changeset@@!$(shell (hg parents | awk '{FS="changeset:[ ]+"}/^changeset/{CS=$$2};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null || (head -n 6 ChangeLog | awk -F: '/^changeset/{CS=$$3};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null || echo information unavailable)!g' \
+	    -e 's!@@changeset@@!$(shell ((hg parents || head -n 7 ../ChangeLog || echo date: unavailable) | awk '{FS="changeset:[ ]+"}/^changeset/{CS=$$2};{FS="date:[ ]+"}/^date/{D=$$2}; END {print D, CS}') 2>/dev/null)!g' \
 	    < include/xen/compile.h.in > $@.new
 	@cat include/xen/banner.h >> $@.new
 	@mv -f $@.new $@
