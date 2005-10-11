@@ -15,7 +15,7 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 XEN_ROOT	= ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-PROGRAMS_INSTALL_DIR	= /usr/libexec/xen
+PROGRAMS_INSTALL_DIR = /usr/$(LIBDIR)/xen/bin
 
 INCLUDES += -I $(XEN_LIBXC)
 

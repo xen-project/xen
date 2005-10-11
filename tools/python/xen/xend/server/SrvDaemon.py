@@ -38,7 +38,7 @@ class Daemon:
         pythonex = '(?P<python>\S*python\S*)'
         cmdex = '(?P<cmd>.*)'
         procre = re.compile('^\s*' + pidex + '\s*' + pythonex + '\s*' + cmdex + '$')
-        xendre = re.compile('^/usr/sbin/xend\s*(start|restart)\s*.*$')
+        xendre = re.compile('^\S+/xend\s*(start|restart)\s*.*$')
         procs = os.popen('ps -e -o pid,args 2>/dev/null')
         for proc in procs:
             pm = procre.match(proc)

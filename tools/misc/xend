@@ -2,9 +2,10 @@
 #  -*- mode: python; -*-
 #============================================================================
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
-"""Xen management daemon. Lives in /usr/sbin.
+"""Xen management daemon.
    Provides console server and HTTP management api.
 
    Run:
@@ -67,14 +68,14 @@ def check_user():
 
 def start_xenstored():
     XENSTORED_TRACE = os.getenv("XENSTORED_TRACE")
-    cmd = "/usr/sbin/xenstored --pid-file=/var/run/xenstore.pid"
+    cmd = "xenstored --pid-file=/var/run/xenstore.pid"
     if XENSTORED_TRACE:
         cmd += " -T /var/log/xenstored-trace.log"
     s,o = commands.getstatusoutput(cmd)
 
 def start_consoled():
     if os.fork() == 0:
-        os.execvp('/usr/sbin/xenconsoled', ['/usr/sbin/xenconsoled'])
+        os.execvp('xenconsoled', ['xenconsoled'])
             
 def main():
     try:

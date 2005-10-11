@@ -38,6 +38,8 @@ from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xm.opts import *
 
+import console
+
 
 shorthelp = """Usage: xm <subcommand> [args]
     Control, list, and manipulate Xen guest instances
@@ -442,12 +444,11 @@ def xm_console(args):
     from xen.xend.XendClient import server
     info = server.xend_domain(dom)
     domid = int(sxp.child_value(info, 'domid', '-1'))
-    cmd = "/usr/libexec/xen/xenconsole %d" % domid
-    os.execvp('/usr/libexec/xen/xenconsole', cmd.split())
-    console = sxp.child(info, "console")
+    console.execConsole(domid)
+
 
 def xm_top(args):
-    os.execv('/usr/sbin/xentop', ['/usr/sbin/xentop'])
+    os.execvp('xentop', ['xentop'])
 
 def xm_dmesg(args):
     

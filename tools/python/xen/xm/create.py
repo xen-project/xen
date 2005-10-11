@@ -14,11 +14,14 @@
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
 # Copyright (C) 2005 Nguyen Anh Quynh <aquynh@gmail.com>
+# Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
 """Domain creation.
 """
 import random
+import os
+import os.path
 import string
 import sys
 import socket
@@ -35,6 +38,9 @@ from xen.xend import XendRoot; xroot = XendRoot.instance()
 from xen.util import blkif
 
 from xen.xm.opts import *
+
+import console
+
 
 gopts = Opts(use="""[options] [vars]
 
@@ -879,8 +885,7 @@ def main(argv):
 
         dom = make_domain(opts, config)
         if opts.vals.console_autoconnect:
-            cmd = "/usr/libexec/xen/xenconsole %d" % dom
-            os.execvp('/usr/libexec/xen/xenconsole', cmd.split())
+            console.execConsole(dom)
         
 if __name__ == '__main__':
     main(sys.argv)
