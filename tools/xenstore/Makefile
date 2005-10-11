@@ -27,7 +27,7 @@ CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm
 CLIENTS += xenstore-write
 CLIENTS_OBJS := $(patsubst xenstore-%,xenstore_%.o,$(CLIENTS))
 
-all: libxenstore.so xenstored $(CLIENTS) xs_tdb_dump
+all: libxenstore.so xenstored $(CLIENTS) xs_tdb_dump xsls
 
 testcode: xs_test xenstored_test xs_random
 
@@ -39,6 +39,9 @@ $(CLIENTS): xenstore-%: xenstore_%.o
 
 $(CLIENTS_OBJS): xenstore_%.o: xenstore_client.c
 	$(COMPILE.c) -DCLIENT_$(*F) -o $@ $<
+
+xsls: xsls.o
+	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -L. -lxenstore -o $@
 
 xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_test.o xenstored_transaction_test.o xs_lib.o talloc_test.o fake_libxc.o utils.o tdb.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
@@ -134,6 +137,7 @@ install: libxenstore.so xenstored $(CLIENTS)
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/include
 	$(INSTALL_PROG) xenstored $(DESTDIR)/usr/sbin
 	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)/usr/bin
+	$(INSTALL_PROG) xsls $(DESTDIR)/usr/bin
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) libxenstore.so $(DESTDIR)/usr/$(LIBDIR)
 	$(INSTALL_DATA) xs.h $(DESTDIR)/usr/include
