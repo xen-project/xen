@@ -269,18 +269,22 @@ static unsigned int count_strings(const char *strings, unsigned int len)
 	return num;
 }
 
-/* Return the path to dir with /name appended. */ 
+/* Return the path to dir with /name appended. Buffer must be kfree()'ed. */ 
 static char *join(const char *dir, const char *name)
 {
-	static char buffer[4096];
+	char *buffer;
 
-	BUG_ON(strlen(dir) + strlen("/") + strlen(name) + 1 > sizeof(buffer));
+	buffer = kmalloc(strlen(dir) + strlen("/") + strlen(name) + 1,
+			 GFP_KERNEL);
+	if (buffer == NULL)
+		return ERR_PTR(-ENOMEM);
 
 	strcpy(buffer, dir);
 	if (!streq(name, "")) {
 		strcat(buffer, "/");
 		strcat(buffer, name);
 	}
+
 	return buffer;
 }
 
@@ -310,10 +314,15 @@ static char **split(char *strings, unsigned int len, unsigned int *num)
 char **xenbus_directory(struct xenbus_transaction *t,
 			const char *dir, const char *node, unsigned int *num)
 {
-	char *strings;
+	char *strings, *path;
 	unsigned int len;
 
-	strings = xs_single(t, XS_DIRECTORY, join(dir, node), &len);
+	path = join(dir, node);
+	if (IS_ERR(path))
+		return (char **)path;
+
+	strings = xs_single(t, XS_DIRECTORY, path, &len);
+	kfree(path);
 	if (IS_ERR(strings))
 		return (char **)strings;
 
@@ -343,7 +352,16 @@ EXPORT_SYMBOL(xenbus_exists);
 void *xenbus_read(struct xenbus_transaction *t,
 		  const char *dir, const char *node, unsigned int *len)
 {
-	return xs_single(t, XS_READ, join(dir, node), len);
+	char *path;
+	void *ret;
+
+	path = join(dir, node);
+	if (IS_ERR(path))
+		return (void *)path;
+
+	ret = xs_single(t, XS_READ, path, len);
+	kfree(path);
+	return ret;
 }
 EXPORT_SYMBOL(xenbus_read);
 
@@ -355,15 +373,20 @@ int xenbus_write(struct xenbus_transaction *t,
 {
 	const char *path;
 	struct kvec iovec[2];
+	int ret;
 
 	path = join(dir, node);
+	if (IS_ERR(path))
+		return PTR_ERR(path);
 
 	iovec[0].iov_base = (void *)path;
 	iovec[0].iov_len = strlen(path) + 1;
 	iovec[1].iov_base = (void *)string;
 	iovec[1].iov_len = strlen(string);
 
-	return xs_error(xs_talkv(t, XS_WRITE, iovec, ARRAY_SIZE(iovec), NULL));
+	ret = xs_error(xs_talkv(t, XS_WRITE, iovec, ARRAY_SIZE(iovec), NULL));
+	kfree(path);
+	return ret;
 }
 EXPORT_SYMBOL(xenbus_write);
 
@@ -371,14 +394,32 @@ EXPORT_SYMBOL(xenbus_write);
 int xenbus_mkdir(struct xenbus_transaction *t,
 		 const char *dir, const char *node)
 {
-	return xs_error(xs_single(t, XS_MKDIR, join(dir, node), NULL));
+	char *path;
+	int ret;
+
+	path = join(dir, node);
+	if (IS_ERR(path))
+		return PTR_ERR(path);
+
+	ret = xs_error(xs_single(t, XS_MKDIR, path, NULL));
+	kfree(path);
+	return ret;
 }
 EXPORT_SYMBOL(xenbus_mkdir);
 
 /* Destroy a file or directory (directories must be empty). */
 int xenbus_rm(struct xenbus_transaction *t, const char *dir, const char *node)
 {
-	return xs_error(xs_single(t, XS_RM, join(dir, node), NULL));
+	char *path;
+	int ret;
+
+	path = join(dir, node);
+	if (IS_ERR(path))
+		return PTR_ERR(path);
+
+	ret = xs_error(xs_single(t, XS_RM, path, NULL));
+	kfree(path);
+	return ret;
 }
 EXPORT_SYMBOL(xenbus_rm);
 
