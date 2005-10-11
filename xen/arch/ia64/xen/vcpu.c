@@ -1403,9 +1403,11 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 		return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
 
 	vcpu_thash(vcpu, address, iha);
-	if (__copy_from_user(&pte, (void *)(*iha), sizeof(pte)) != 0)
+	if (__copy_from_user(&pte, (void *)(*iha), sizeof(pte)) != 0) {
 // FIXME?: does itir get set for vhpt faults?
+		*itir = vcpu_get_itir_on_fault(vcpu,*iha);
 		return IA64_VHPT_FAULT;
+	}
 
 	/*
 	 * Optimisation: this VHPT walker aborts on not-present pages
@@ -1418,6 +1420,7 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 		vhpt_translate_count++;
 		return IA64_NO_FAULT;
 	}
+	*itir = vcpu_get_itir_on_fault(vcpu,address);
 	return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
 }
 
