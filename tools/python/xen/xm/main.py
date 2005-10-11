@@ -38,6 +38,8 @@ from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xm.opts import *
 
+import console
+
 
 shorthelp = """Usage: xm <subcommand> [args]
     Control, list, and manipulate Xen guest instances
@@ -225,25 +227,22 @@ def xm_list(args):
         if k in ['-v', '--vcpus']:
             show_vcpus = 1
 
-    domsinfo = []
     from xen.xend.XendClient import server
     if n == 0:
-        doms = server.xend_domains()
-        doms.sort()
+        doms = server.xend_list_domains()
     else:
-        doms = params
-    for dom in doms:
-        info = server.xend_domain(dom)
-        domsinfo.append(parse_doms_info(info))
+        doms = map(server.xend_domain, params)
                
     if use_long:
         for dom in doms:
-            info = server.xend_domain(dom)
-            PrettyPrint.prettyprint(info)
-    elif show_vcpus:
-        xm_show_vcpus(domsinfo)
+            PrettyPrint.prettyprint(doms)
     else:
-        xm_brief_list(domsinfo)
+        domsinfo = map(parse_doms_info, doms)
+
+        if show_vcpus:
+            xm_show_vcpus(domsinfo)
+        else:
+            xm_brief_list(domsinfo)
 
 def parse_doms_info(info):
     dominfo = {}
@@ -279,12 +278,12 @@ def parse_doms_info(info):
     return dominfo
         
 def xm_brief_list(domsinfo):
-    print 'Name              Id  Mem(MB)  CPU VCPU(s)  State  Time(s)'
+    print 'Name              ID  Mem(MiB)  CPU  VCPUs  State   Time(s)'
     for dominfo in domsinfo:
         if dominfo.has_key("ssidref1"):
-            print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f     s:%(ssidref2)02x/p:%(ssidref1)02x" % dominfo)
+            print ("%(name)-16s %(dom)3d  %(mem)8d  %(cpu)3s  %(vcpus)5d  %(state)5s  %(cpu_time)7.1f     s:%(ssidref2)02x/p:%(ssidref1)02x" % dominfo)
         else:
-            print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3s  %(vcpus)5d   %(state)5s  %(cpu_time)7.1f" % dominfo)
+            print ("%(name)-16s %(dom)3d  %(mem)8d  %(cpu)3s  %(vcpus)5d  %(state)5s  %(cpu_time)7.1f" % dominfo)
 
 def xm_show_vcpus(domsinfo):
     print 'Name              Id  VCPU  CPU  CPUMAP'
@@ -445,12 +444,11 @@ def xm_console(args):
     from xen.xend.XendClient import server
     info = server.xend_domain(dom)
     domid = int(sxp.child_value(info, 'domid', '-1'))
-    cmd = "/usr/libexec/xen/xenconsole %d" % domid
-    os.execvp('/usr/libexec/xen/xenconsole', cmd.split())
-    console = sxp.child(info, "console")
+    console.execConsole(domid)
+
 
 def xm_top(args):
-    os.execv('/usr/sbin/xentop', ['/usr/sbin/xentop'])
+    os.execvp('xentop', ['xentop'])
 
 def xm_dmesg(args):
     

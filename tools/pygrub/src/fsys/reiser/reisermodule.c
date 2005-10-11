@@ -46,7 +46,7 @@ void file_dal_close(dal_t *dal) {
 
 	if (!dal) return;
 
-	close((int)dal->dev);
+	close((size_t)dal->dev);
 	dal_free(dal);
 }
 

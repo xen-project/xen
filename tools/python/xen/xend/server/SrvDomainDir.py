@@ -22,12 +22,14 @@ from xen.web import http
 
 from xen.xend import sxp
 from xen.xend import XendDomain
+from xen.xend.XendDomainInfo import XendDomainInfo
 from xen.xend.Args import FormFn
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 
 from xen.web.SrvDir import SrvDir
 from SrvDomain import SrvDomain
+
 
 class SrvDomainDir(SrvDir):
     """Service that manages the domain directory.
@@ -124,28 +126,41 @@ class SrvDomainDir(SrvDir):
             out.close()
             return val
 
+
+    def op_list(self, _, req):
+        """List the details for this domain."""
+        self._list(req, True)
+
+
     def render_POST(self, req):
         return self.perform(req)
 
     def render_GET(self, req):
+        self._list(req, 'detail' in req.args and req.args['detail'] == ['1'])
+
+
+    def _list(self, req, detail):
         if self.use_sxp(req):
             req.setHeader("Content-Type", sxp.mime_type)
-            self.ls_domain(req, 1)
+            self.ls_domain(req, detail, True)
         else:
             req.write("<html><head></head><body>")
             self.print_path(req)
             self.ls(req)
-            self.ls_domain(req)
+            self.ls_domain(req, detail, False)
             self.form(req)
             req.write("</body></html>")
 
-    def ls_domain(self, req, use_sxp=0):
+
+    def ls_domain(self, req, detail, use_sxp):
         url = req.prePathURL()
         if not url.endswith('/'):
             url += '/'
         if use_sxp:
-            domains = self.xd.list_names()
-            sxp.show(domains, out=req)
+            if detail:
+                sxp.show(map(XendDomainInfo.sxpr, self.xd.list()), out=req)
+            else:
+                sxp.show(self.xd.list_names(), out=req)
         else:
             domains = self.xd.list_sorted()
             req.write('<ul>')
@@ -157,6 +172,7 @@ class SrvDomainDir(SrvDir):
                        d.getMemoryTarget(), d.getSsidref()))
                 req.write('</li>')
             req.write('</ul>')
+
 
     def form(self, req):
         """Generate the form(s) for domain dir operations.

@@ -1083,10 +1083,11 @@ static int talk_to_backend(struct xenbus_device *dev,
 {
 	char *backend, *mac, *e, *s;
 	const char *message;
+	struct xenbus_transaction *xbt;
 	int err, i;
 
 	backend = NULL;
-	err = xenbus_gather(dev->nodename,
+	err = xenbus_gather(NULL, dev->nodename,
 			    "backend-id", "%i", &info->backend_id,
 			    "backend", NULL, &backend,
 			    NULL);
@@ -1102,7 +1103,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 		goto out;
 	}
 
-	mac = xenbus_read(dev->nodename, "mac", NULL);
+	mac = xenbus_read(NULL, dev->nodename, "mac", NULL);
 	if (IS_ERR(mac)) {
 		err = PTR_ERR(mac);
 		xenbus_dev_error(dev, err, "reading %s/mac",
@@ -1131,32 +1132,32 @@ static int talk_to_backend(struct xenbus_device *dev,
 	}
 
 again:
-	err = xenbus_transaction_start();
-	if (err) {
+	xbt = xenbus_transaction_start();
+	if (IS_ERR(xbt)) {
 		xenbus_dev_error(dev, err, "starting transaction");
 		goto destroy_ring;
 	}
 
-	err = xenbus_printf(dev->nodename, "tx-ring-ref","%u",
+	err = xenbus_printf(xbt, dev->nodename, "tx-ring-ref","%u",
 			    info->tx_ring_ref);
 	if (err) {
 		message = "writing tx ring-ref";
 		goto abort_transaction;
 	}
-	err = xenbus_printf(dev->nodename, "rx-ring-ref","%u",
+	err = xenbus_printf(xbt, dev->nodename, "rx-ring-ref","%u",
 			    info->rx_ring_ref);
 	if (err) {
 		message = "writing rx ring-ref";
 		goto abort_transaction;
 	}
-	err = xenbus_printf(dev->nodename,
+	err = xenbus_printf(xbt, dev->nodename,
 			    "event-channel", "%u", info->evtchn);
 	if (err) {
 		message = "writing event-channel";
 		goto abort_transaction;
 	}
 
-	err = xenbus_transaction_end(0);
+	err = xenbus_transaction_end(xbt, 0);
 	if (err) {
 		if (err == -EAGAIN)
 			goto again;
@@ -1177,8 +1178,7 @@ again:
 	return 0;
 
  abort_transaction:
-	xenbus_transaction_end(1);
-	/* Have to do this *outside* transaction.  */
+	xenbus_transaction_end(xbt, 1);
 	xenbus_dev_error(dev, err, "%s", message);
  destroy_ring:
 	shutdown_device(info);
@@ -1201,7 +1201,7 @@ static int netfront_probe(struct xenbus_device *dev,
 	struct netfront_info *info;
 	unsigned int handle;
 
-	err = xenbus_scanf(dev->nodename, "handle", "%u", &handle);
+	err = xenbus_scanf(NULL, dev->nodename, "handle", "%u", &handle);
 	if (XENBUS_EXIST_ERR(err))
 		return err;
 	if (err < 0) {

@@ -12,26 +12,33 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
-# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
 # Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
-from xen.web import static
 
-from xen.xend import XendLogging
+LIB_BIN_32 = "/usr/lib/xen/bin"
+LIB_BIN_64 = "/usr/lib64/xen/bin"
 
-from xen.web.SrvDir import SrvDir
 
-class SrvXendLog(SrvDir):
-    """Xend log.
-    """
+import os
+import os.path
 
-    def __init__(self):
-        SrvDir.__init__(self)
-        self.logfile = static.File(XendLogging.getLogFilename(),
-                                   defaultType="text/plain")
-        self.logfile.type = "text/plain"
-        self.logfile.encoding = None
 
-    def render_GET(self, req):
-        return self.logfile.render(req)
+def execute(exe, args = None):
+    exepath = pathTo(exe)
+    a = [ exepath ]
+    if args:
+        a.extend(args)
+    os.execv(exepath, a)
+
+
+def pathTo(exe):
+    return os.path.join(path(), exe)
+
+
+def path():
+    machine = os.uname()[4]
+    if machine.find('64') != -1 and os.path.exists(LIB_BIN_64):
+        return LIB_BIN_64
+    else:
+        return LIB_BIN_32

@@ -154,7 +154,6 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 	case XS_READ: return "READ";
 	case XS_GET_PERMS: return "GET_PERMS";
 	case XS_WATCH: return "WATCH";
-	case XS_WATCH_ACK: return "WATCH_ACK";
 	case XS_UNWATCH: return "UNWATCH";
 	case XS_TRANSACTION_START: return "TRANSACTION_START";
 	case XS_TRANSACTION_END: return "TRANSACTION_END";
@@ -236,10 +235,14 @@ void trace(const char *fmt, ...)
 	talloc_free(str);
 }
 
-static bool write_message(struct connection *conn)
+static bool write_messages(struct connection *conn)
 {
 	int ret;
-	struct buffered_data *out = conn->out;
+	struct buffered_data *out;
+
+	out = list_top(&conn->out_list, struct buffered_data, list);
+	if (out == NULL)
+		return true;
 
 	if (out->inhdr) {
 		if (verbose)
@@ -265,7 +268,6 @@ static bool write_message(struct connection *conn)
 
 	ret = conn->write(conn, out->buffer + out->used,
 			  out->hdr.msg.len - out->used);
-
 	if (ret < 0)
 		return false;
 
@@ -274,14 +276,10 @@ static bool write_message(struct connection *conn)
 		return true;
 
 	trace_io(conn, "OUT", out);
-	conn->out = NULL;
+
+	list_del(&out->list);
 	talloc_free(out);
 
-	queue_next_event(conn);
-
-	/* No longer busy? */
-	if (!conn->out)
-		conn->state = OK;
 	return true;
 }
 
@@ -298,9 +296,9 @@ static int destroy_conn(void *_conn)
 		FD_SET(conn->fd, &set);
 		none.tv_sec = none.tv_usec = 0;
 
-		while (conn->out
+		while (!list_empty(&conn->out_list)
 		       && select(conn->fd+1, NULL, &set, NULL, &none) == 1)
-			if (!write_message(conn))
+			if (!write_messages(conn))
 				break;
 		close(conn->fd);
 	}
@@ -327,9 +325,8 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock)
 	list_for_each_entry(i, &connections, list) {
 		if (i->domain)
 			continue;
-		if (i->state == OK)
-			FD_SET(i->fd, inset);
-		if (i->out)
+		FD_SET(i->fd, inset);
+		if (!list_empty(&i->out_list))
 			FD_SET(i->fd, outset);
 		if (i->fd > max)
 			max = i->fd;
@@ -542,6 +539,9 @@ static struct buffered_data *new_buffer(void *ctx)
 	struct buffered_data *data;
 
 	data = talloc(ctx, struct buffered_data);
+	if (data == NULL)
+		return NULL;
+	
 	data->inhdr = true;
 	data->used = 0;
 	data->buffer = NULL;
@@ -586,23 +586,25 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 {
 	struct buffered_data *bdata;
 
-	/* When data gets freed, we want list entry is destroyed (so
-	 * list entry is a child). */
+	/* Message is a child of the connection context for auto-cleanup. */
 	bdata = new_buffer(conn);
 	bdata->buffer = talloc_array(bdata, char, len);
 
+	/* Echo request header in reply unless this is an async watch event. */
+	if (type != XS_WATCH_EVENT) {
+		memcpy(&bdata->hdr.msg, &conn->in->hdr.msg,
+		       sizeof(struct xsd_sockmsg));
+	} else {
+		memset(&bdata->hdr.msg, 0, sizeof(struct xsd_sockmsg));
+	}
+
+	/* Update relevant header fields and fill in the message body. */
 	bdata->hdr.msg.type = type;
 	bdata->hdr.msg.len = len;
 	memcpy(bdata->buffer, data, len);
 
-	/* There might be an event going out now.  Queue behind it. */
-	if (conn->out) {
-		assert(conn->out->hdr.msg.type == XS_WATCH_EVENT);
-		assert(!conn->waiting_reply);
-		conn->waiting_reply = bdata;
-	} else
-		conn->out = bdata;
-	conn->state = BUSY;
+	/* Queue for later transmission. */
+	list_add_tail(&bdata->list, &conn->out_list);
 }
 
 /* Some routines (write, mkdir, etc) just need a non-error return */
@@ -1053,6 +1055,17 @@ static void do_set_perms(struct connection *conn, struct buffered_data *in)
  */
 static void process_message(struct connection *conn, struct buffered_data *in)
 {
+	struct transaction *trans;
+
+	trans = transaction_lookup(conn, in->hdr.msg.tx_id);
+	if (IS_ERR(trans)) {
+		send_error(conn, -PTR_ERR(trans));
+		return;
+	}
+
+	assert(conn->transaction == NULL);
+	conn->transaction = trans;
+
 	switch (in->hdr.msg.type) {
 	case XS_DIRECTORY:
 		send_directory(conn, onearg(in));
@@ -1103,10 +1116,6 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		do_watch(conn, in);
 		break;
 
-	case XS_WATCH_ACK:
-		do_watch_ack(conn, onearg(in));
-		break;
-
 	case XS_UNWATCH:
 		do_unwatch(conn, in);
 		break;
@@ -1131,11 +1140,13 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 		do_get_domain_path(conn, onearg(in));
 		break;
 
-	case XS_WATCH_EVENT:
 	default:
 		eprintf("Client unknown operation %i", in->hdr.msg.type);
 		send_error(conn, ENOSYS);
+		break;
 	}
+
+	conn->transaction = NULL;
 }
 
 static int out_of_mem(void *data)
@@ -1145,43 +1156,25 @@ static int out_of_mem(void *data)
 
 static void consider_message(struct connection *conn)
 {
-	/*
-	 * 'volatile' qualifier prevents register allocation which fixes:
-	 *   warning: variable 'xxx' might be clobbered by 'longjmp' or 'vfork'
-	 */
-	struct buffered_data *volatile in = NULL;
-	enum xsd_sockmsg_type volatile type = conn->in->hdr.msg.type;
 	jmp_buf talloc_fail;
 
-	assert(conn->state == OK);
+	if (verbose)
+		xprintf("Got message %s len %i from %p\n",
+			sockmsg_string(conn->in->hdr.msg.type),
+			conn->in->hdr.msg.len, conn);
 
 	/* For simplicity, we kill the connection on OOM. */
 	talloc_set_fail_handler(out_of_mem, &talloc_fail);
 	if (setjmp(talloc_fail)) {
-		/* Free in before conn, in case it needs something. */
-		talloc_free(in);
 		talloc_free(conn);
 		goto end;
 	}
 
-	if (verbose)
-		xprintf("Got message %s len %i from %p\n",
-			sockmsg_string(type), conn->in->hdr.msg.len, conn);
+	process_message(conn, conn->in);
 
-	/* We might get a command while waiting for an ack: this means
-	 * the other end discarded it: we will re-transmit. */
-	if (type != XS_WATCH_ACK)
-		conn->waiting_for_ack = NULL;
-
-	/* Careful: process_message may free connection.  We detach
-	 * "in" beforehand and allocate the new buffer to avoid
-	 * touching conn after process_message.
-	 */
-	in = talloc_steal(talloc_autofree_context(), conn->in);
+	talloc_free(conn->in);
 	conn->in = new_buffer(conn);
-	process_message(conn, in);
 
-	talloc_free(in);
 end:
 	talloc_set_fail_handler(NULL, NULL);
 	if (talloc_total_blocks(NULL)
@@ -1196,10 +1189,7 @@ end:
 static void handle_input(struct connection *conn)
 {
 	int bytes;
-	struct buffered_data *in;
-
-	assert(conn->state == OK);
-	in = conn->in;
+	struct buffered_data *in = conn->in;
 
 	/* Not finished header yet? */
 	if (in->inhdr) {
@@ -1247,42 +1237,32 @@ bad_client:
 
 static void handle_output(struct connection *conn)
 {
-	if (!write_message(conn))
+	if (!write_messages(conn))
 		talloc_free(conn);
 }
 
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 {
-	/*
-	 * 'volatile' qualifier prevents register allocation which fixes:
-	 *   warning: variable 'xxx' might be clobbered by 'longjmp' or 'vfork'
-	 */
-	struct connection *volatile new;
-	jmp_buf talloc_fail;
+	struct connection *new;
 
 	new = talloc(talloc_autofree_context(), struct connection);
 	if (!new)
 		return NULL;
 
-	new->state = OK;
-	new->out = new->waiting_reply = NULL;
-	new->waiting_for_ack = NULL;
+	memset(new, 0, sizeof(*new));
 	new->fd = -1;
-	new->id = 0;
-	new->domain = NULL;
-	new->transaction = NULL;
 	new->write = write;
 	new->read = read;
 	new->can_write = true;
+	INIT_LIST_HEAD(&new->out_list);
 	INIT_LIST_HEAD(&new->watches);
+	INIT_LIST_HEAD(&new->transaction_list);
 
-	talloc_set_fail_handler(out_of_mem, &talloc_fail);
-	if (setjmp(talloc_fail)) {
+	new->in = new_buffer(new);
+	if (new->in == NULL) {
 		talloc_free(new);
 		return NULL;
 	}
-	new->in = new_buffer(new);
-	talloc_set_fail_handler(NULL, NULL);
 
 	list_add_tail(&new->list, &connections);
 	talloc_set_destructor(new, destroy_conn);
@@ -1328,23 +1308,17 @@ void dump_connection(void)
 	list_for_each_entry(i, &connections, list) {
 		printf("Connection %p:\n", i);
 		printf("    state = %s\n",
-		       i->state == OK ? "OK"
-		       : i->state == BUSY ? "BUSY"
-		       : "INVALID");
+		       list_empty(&i->out_list) ? "OK" : "BUSY");
 		if (i->id)
 			printf("    id = %i\n", i->id);
 		if (!i->in->inhdr || i->in->used)
 			printf("    got %i bytes of %s\n",
 			       i->in->used, i->in->inhdr ? "header" : "data");
+#if 0
 		if (i->out)
 			printf("    sending message %s (%s) out\n",
 			       sockmsg_string(i->out->hdr.msg.type),
 			       i->out->buffer);
-		if (i->waiting_reply)
-			printf("    ... and behind is queued %s (%s)\n",
-			       sockmsg_string(i->waiting_reply->hdr.msg.type),
-			       i->waiting_reply->buffer);
-#if 0
 		if (i->transaction)
 			dump_transaction(i);
 		if (i->domain)
@@ -1443,6 +1417,7 @@ static void daemonize(void)
 
 
 static struct option options[] = {
+	{ "no-domain-init", 0, NULL, 'D' },
 	{ "pid-file", 1, NULL, 'F' },
 	{ "no-fork", 0, NULL, 'N' },
 	{ "output-pid", 0, NULL, 'P' },
@@ -1457,11 +1432,15 @@ int main(int argc, char *argv[])
 	fd_set inset, outset;
 	bool dofork = true;
 	bool outputpid = false;
+	bool no_domain_init = false;
 	const char *pidfile = NULL;
 
-	while ((opt = getopt_long(argc, argv, "F:NPT:V", options,
+	while ((opt = getopt_long(argc, argv, "DF:NPT:V", options,
 				  NULL)) != -1) {
 		switch (opt) {
+		case 'D':
+			no_domain_init = true;
+			break;
 		case 'F':
 			pidfile = optarg;
 			break;
@@ -1534,7 +1513,8 @@ int main(int argc, char *argv[])
 	setup_structure();
 
 	/* Listen to hypervisor. */
-	event_fd = domain_init();
+	if (!no_domain_init)
+		event_fd = domain_init();
 
 	/* Restore existing connections. */
 	restore_existing_connections();
@@ -1615,3 +1595,13 @@ int main(int argc, char *argv[])
 		max = initialize_set(&inset, &outset, *sock, *ro_sock);
 	}
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

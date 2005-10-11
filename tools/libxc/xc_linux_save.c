@@ -35,7 +35,7 @@
 #define DEBUG 0
 
 #if 1
-#define ERR(_f, _a...) do { fprintf(stderr, _f , ## _a); fflush(stderr); } while (0)
+#define ERR(_f, _a...) do { fprintf(stderr, _f "\n" , ## _a); fflush(stderr); } while (0)
 #else
 #define ERR(_f, _a...) ((void)0)
 #endif

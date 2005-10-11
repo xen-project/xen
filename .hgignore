@@ -161,6 +161,7 @@
 ^tools/xenstore/xs_tdb_dump$
 ^tools/xenstore/xs_test$
 ^tools/xenstore/xs_watch_stress$
+^tools/xenstore/xsls$
 ^tools/xentrace/xenctx$
 ^tools/xentrace/xentrace$
 ^xen/BLOG$

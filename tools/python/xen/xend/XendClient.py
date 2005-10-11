@@ -196,6 +196,9 @@ class Xend:
     def xend_domains(self):
         return self.xendGet(self.domainurl())
 
+    def xend_list_domains(self):
+        return self.xendGet(self.domainurl(), {'detail': '1'})
+
     def xend_domain_create(self, conf):
         return self.xendPost(self.domainurl(),
                              {'op'      : 'create',

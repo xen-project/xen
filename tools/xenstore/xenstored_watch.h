@@ -23,17 +23,9 @@
 #include "xenstored_core.h"
 
 void do_watch(struct connection *conn, struct buffered_data *in);
-void do_watch_ack(struct connection *conn, const char *token);
 void do_unwatch(struct connection *conn, struct buffered_data *in);
 
-/* Is this a watch event message for this connection? */
-bool is_watch_event(struct connection *conn, struct buffered_data *out);
-
-/* Look through our watches: if any of them have an event, queue it. */
-void queue_next_event(struct connection *conn);
-
-/* Fire all watches: recurse means all the children are affected (ie. rm).
- */
+/* Fire all watches: recurse means all the children are affected (ie. rm). */
 void fire_watches(struct connection *conn, const char *name, bool recurse);
 
 void dump_watches(struct connection *conn);

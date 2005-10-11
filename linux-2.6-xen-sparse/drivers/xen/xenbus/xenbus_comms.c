@@ -128,19 +128,16 @@ int xb_write(const void *data, unsigned len)
 		void *dst;
 		unsigned int avail;
 
-		wait_event(xb_waitq, output_avail(out));
+		wait_event_interruptible(xb_waitq, output_avail(out));
 
-		/* Read, then check: not that we don't trust store.
-		 * Hell, some of my best friends are daemons.  But,
-		 * in this post-911 world... */
-		h = *out;
 		mb();
-		if (!check_buffer(&h)) {
-			set_current_state(TASK_RUNNING);
-			return -EIO; /* ETERRORIST! */
-		}
+		h = *out;
+		if (!check_buffer(&h))
+			return -EIO;
 
 		dst = get_output_chunk(&h, out->buf, &avail);
+		if (avail == 0)
+			continue;
 		if (avail > len)
 			avail = len;
 		memcpy(dst, data, avail);
@@ -172,15 +169,16 @@ int xb_read(void *data, unsigned len)
 		unsigned int avail;
 		const char *src;
 
-		wait_event(xb_waitq, xs_input_avail());
-		h = *in;
+		wait_event_interruptible(xb_waitq, xs_input_avail());
+
 		mb();
-		if (!check_buffer(&h)) {
-			set_current_state(TASK_RUNNING);
+		h = *in;
+		if (!check_buffer(&h))
 			return -EIO;
-		}
 
 		src = get_input_chunk(&h, in->buf, &avail);
+		if (avail == 0)
+			continue;
 		if (avail > len)
 			avail = len;
 		was_full = !output_avail(&h);
@@ -194,10 +192,6 @@ int xb_read(void *data, unsigned len)
 		if (was_full)
 			notify_remote_via_evtchn(xen_start_info->store_evtchn);
 	}
-
-	/* If we left something, wake watch thread to deal with it. */
-	if (xs_input_avail())
-		wake_up(&xb_waitq);
 
 	return 0;
 }

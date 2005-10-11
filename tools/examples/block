@@ -1,8 +1,7 @@
 #!/bin/sh
 
-set -e
-
-export PATH=/sbin:/bin:/usr/bin:/usr/sbin:$PATH
+dir=$(dirname "$0")
+. "$dir/xen-hotplug-common.sh"
 
 expand_dev() {
   local dev
@@ -25,15 +24,15 @@ write_dev() {
   major=$(stat -L -c %t "$1")
   minor=$(stat -L -c %T "$1")
   pdev=$(printf "0x%02x%02x" 0x$major 0x$minor)
-  xenstore-write "$XENBUS_PATH"/physical-device $pdev \
+  xenstore_write "$XENBUS_PATH"/physical-device $pdev \
       "$XENBUS_PATH"/node $1
 }
 
-t=$(xenstore-read "$XENBUS_PATH"/type)
+t=$(xenstore_read "$XENBUS_PATH"/type || true)
 
 case $1 in 
   bind)
-    p=$(xenstore-read "$XENBUS_PATH"/params)
+    p=$(xenstore_read "$XENBUS_PATH"/params)
     case $t in 
       phy)
         dev=$(expand_dev $p)
@@ -60,7 +59,7 @@ case $1 in
     ;;
 
   unbind)
-    node=$(xenstore-read "$XENBUS_PATH"/node)
+    node=$(xenstore_read "$XENBUS_PATH"/node)
     case $t in 
       phy)
 	exit 0

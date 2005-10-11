@@ -16,4 +16,3 @@ dir /home
 write /home/foo/bar contents
 expect 1:foo/bar:token
 1 waitwatch
-1 ackwatch token

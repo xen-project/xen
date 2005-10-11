@@ -12,26 +12,15 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
-# Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
 # Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
-from xen.web import static
 
-from xen.xend import XendLogging
+XENCONSOLE = "xenconsole"
 
-from xen.web.SrvDir import SrvDir
 
-class SrvXendLog(SrvDir):
-    """Xend log.
-    """
+import xen.util.auxbin
 
-    def __init__(self):
-        SrvDir.__init__(self)
-        self.logfile = static.File(XendLogging.getLogFilename(),
-                                   defaultType="text/plain")
-        self.logfile.type = "text/plain"
-        self.logfile.encoding = None
 
-    def render_GET(self, req):
-        return self.logfile.render(req)
+def execConsole(domid):
+    xen.util.auxbin.execute(XENCONSOLE, [str(domid)])

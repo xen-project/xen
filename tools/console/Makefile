@@ -3,7 +3,7 @@ XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 DAEMON_INSTALL_DIR = /usr/sbin
-CLIENT_INSTALL_DIR = /usr/libexec/xen
+CLIENT_INSTALL_DIR = /usr/$(LIBDIR)/xen/bin
 
 INSTALL         = install
 INSTALL_PROG    = $(INSTALL) -m0755

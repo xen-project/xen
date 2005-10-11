@@ -66,7 +66,7 @@ install-tools:
 	$(MAKE) -C tools install
 
 install-kernels:
-	for i in $(XKERNELS) ; do $(MAKE) $$i-build || exit 1; done
+	for i in $(XKERNELS) ; do $(MAKE) $$i-install || exit 1; done
 
 install-docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
@@ -179,7 +179,7 @@ uninstall:
 	rm -rf $(D)/usr/$(LIBDIR)/libxenctrl* $(D)/usr/$(LIBDIR)/libxenguest*
 	rm -rf $(D)/usr/$(LIBDIR)/libxenstore*
 	rm -rf $(D)/usr/$(LIBDIR)/python/xen $(D)/usr/$(LIBDIR)/xen 
-	rm -rf $(D)/usr/libexec/xen
+	rm -rf $(D)/usr/$(LIBDIR)/xen/bin
 	rm -rf $(D)/usr/sbin/xen* $(D)/usr/sbin/netfix $(D)/usr/sbin/xm
 	rm -rf $(D)/usr/share/doc/xen
 	rm -rf $(D)/usr/share/xen

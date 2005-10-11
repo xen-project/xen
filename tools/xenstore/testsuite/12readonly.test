@@ -36,4 +36,3 @@ watch / token
 1 write /test contents
 expect /test:token
 waitwatch
-ackwatch token

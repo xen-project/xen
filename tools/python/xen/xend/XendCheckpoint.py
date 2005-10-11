@@ -14,6 +14,8 @@ from struct import pack, unpack, calcsize
 
 from xen.util.xpopen import xPopen3
 
+import xen.util.auxbin
+
 import xen.lowlevel.xc
 
 from xen.xend.xenstore.xsutil import IntroduceDomain
@@ -21,9 +23,11 @@ from xen.xend.xenstore.xsutil import IntroduceDomain
 from XendError import XendError
 from XendLogging import log
 
+
 SIGNATURE = "LinuxGuestRecord"
-PATH_XC_SAVE = "/usr/libexec/xen/xc_save"
-PATH_XC_RESTORE = "/usr/libexec/xen/xc_restore"
+XC_SAVE = "xc_save"
+XC_RESTORE = "xc_restore"
+
 
 sizeof_int = calcsize("i")
 sizeof_unsigned_long = calcsize("L")
@@ -64,7 +68,7 @@ def save(fd, dominfo, live):
         # enabled. Passing "0" simply uses the defaults compiled into
         # libxenguest; see the comments and/or code in xc_linux_save() for
         # more information.
-        cmd = [PATH_XC_SAVE, str(xc.handle()), str(fd),
+        cmd = [xen.util.auxbin.pathTo(XC_SAVE), str(xc.handle()), str(fd),
                str(dominfo.getDomid()), "0", "0", str(int(live)) ]
         log.debug("[xc_save]: %s", string.join(cmd))
 
@@ -129,7 +133,7 @@ def restore(xd, fd):
         store_evtchn = dominfo.store_channel
         console_evtchn = dominfo.console_channel
 
-        cmd = [PATH_XC_RESTORE, str(xc.handle()), str(fd),
+        cmd = [xen.util.auxbin.pathTo(XC_RESTORE), str(xc.handle()), str(fd),
                str(dominfo.getDomid()), str(nr_pfns),
                str(store_evtchn), str(console_evtchn)]
         log.debug("[xc_restore]: %s", string.join(cmd))

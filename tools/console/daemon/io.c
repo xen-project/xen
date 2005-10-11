@@ -25,6 +25,7 @@
 #include <xenctrl.h>
 #include <xs.h>
 #include <xen/linux/evtchn.h>
+#include <xen/io/console.h>
 
 #include <malloc.h>
 #include <stdlib.h>
@@ -62,24 +63,11 @@ struct domain
 	char *conspath;
 	int ring_ref;
 	int local_port;
-	char *page;
 	int evtchn_fd;
+	struct xencons_interface *interface;
 };
 
 static struct domain *dom_head;
-
-struct ring_head
-{
-	u32 cons;
-	u32 prod;
-	char buf[0];
-} __attribute__((packed));
-
-#define PAGE_SIZE (getpagesize())
-#define XENCONS_RING_SIZE (PAGE_SIZE/2 - sizeof (struct ring_head))
-#define XENCONS_IDX(cnt) ((cnt) % XENCONS_RING_SIZE)
-#define XENCONS_FULL(ring) (((ring)->prod - (ring)->cons) == XENCONS_RING_SIZE)
-#define XENCONS_SPACE(ring) (XENCONS_RING_SIZE - ((ring)->prod - (ring)->cons))
 
 static void evtchn_notify(struct domain *dom)
 {
@@ -91,12 +79,12 @@ static void evtchn_notify(struct domain *dom)
 static void buffer_append(struct domain *dom)
 {
 	struct buffer *buffer = &dom->buffer;
-	struct ring_head *ring = (struct ring_head *)dom->page;
 	size_t size;
-	u32 oldcons;
+	XENCONS_RING_IDX oldcons;
 	int notify = 0;
+	struct xencons_interface *intf = dom->interface;
 
-	while ((size = ring->prod - ring->cons) != 0) {
+	while ((size = (intf->out_prod - intf->out_cons)) != 0) {
 		notify = 1;
 
 		if ((buffer->capacity - buffer->size) < size) {
@@ -108,12 +96,12 @@ static void buffer_append(struct domain *dom)
 			}
 		}
 
-		oldcons = ring->cons;
-		while (ring->cons < (oldcons + size)) {
-			buffer->data[buffer->size] =
-				ring->buf[XENCONS_IDX(ring->cons)];
+		oldcons = intf->out_cons;
+		while ((intf->out_cons - oldcons) < size) {
+			buffer->data[buffer->size] = intf->out[
+				MASK_XENCONS_IDX(intf->out_cons, intf->out)];
 			buffer->size++;
-			ring->cons++;
+			intf->out_cons++;
 		}
 
 		if (buffer->max_capacity &&
@@ -179,7 +167,7 @@ static int domain_create_tty(struct domain *dom)
 		success = asprintf(&path, "%s/tty", dom->conspath) != -1;
 		if (!success)
 			goto out;
-		success = xs_write(xs, path, slave, strlen(slave));
+		success = xs_write(xs, NULL, path, slave, strlen(slave));
 		free(path);
 		if (!success)
 			goto out;
@@ -187,7 +175,7 @@ static int domain_create_tty(struct domain *dom)
 		success = asprintf(&path, "%s/limit", dom->conspath) != -1;
 		if (!success)
 			goto out;
-		data = xs_read(xs, path, &len);
+		data = xs_read(xs, NULL, path, &len);
 		if (data) {
 			dom->buffer.max_capacity = strtoul(data, 0, 0);
 			free(data);
@@ -216,7 +204,7 @@ int xs_gather(struct xs_handle *xs, const char *dir, ...)
 		char *p;
 
 		asprintf(&path, "%s/%s", dir, name);
-		p = xs_read(xs, path, NULL);
+		p = xs_read(xs, NULL, path, NULL);
 		free(path);
 		if (p == NULL) {
 			ret = ENOENT;
@@ -246,12 +234,13 @@ static int domain_create_ring(struct domain *dom)
 		goto out;
 
 	if (ring_ref != dom->ring_ref) {
-		if (dom->page)
-			munmap(dom->page, getpagesize());
-		dom->page = xc_map_foreign_range(xc, dom->domid, getpagesize(),
-						 PROT_READ|PROT_WRITE,
-						 (unsigned long)ring_ref);
-		if (dom->page == NULL) {
+		if (dom->interface != NULL)
+			munmap(dom->interface, getpagesize());
+		dom->interface = xc_map_foreign_range(
+			xc, dom->domid, getpagesize(),
+			PROT_READ|PROT_WRITE,
+			(unsigned long)ring_ref);
+		if (dom->interface == NULL) {
 			err = EINVAL;
 			goto out;
 		}
@@ -334,7 +323,7 @@ static struct domain *create_domain(int domid)
 
 	dom->ring_ref = -1;
 	dom->local_port = -1;
-	dom->page = NULL;
+	dom->interface = NULL;
 	dom->evtchn_fd = -1;
 
 	if (!watch_domain(dom, true))
@@ -396,9 +385,9 @@ static void shutdown_domain(struct domain *d)
 {
 	d->is_dead = true;
 	watch_domain(d, false);
-	if (d->page)
-		munmap(d->page, getpagesize());
-	d->page = NULL;
+	if (d->interface != NULL)
+		munmap(d->interface, getpagesize());
+	d->interface = NULL;
 	if (d->evtchn_fd != -1)
 		close(d->evtchn_fd);
 	d->evtchn_fd = -1;
@@ -426,13 +415,21 @@ void enum_domains(void)
 
 static void handle_tty_read(struct domain *dom)
 {
-	ssize_t len;
+	ssize_t len = 0;
 	char msg[80];
-	struct ring_head *inring =
-		(struct ring_head *)(dom->page + PAGE_SIZE/2);
 	int i;
+	struct xencons_interface *intf = dom->interface;
+	XENCONS_RING_IDX filled = intf->in_prod - intf->in_cons;
 
-	len = read(dom->tty_fd, msg, MIN(XENCONS_SPACE(inring), sizeof(msg)));
+	if (sizeof(intf->in) > filled)
+		len = sizeof(intf->in) - filled;
+	if (len > sizeof(msg))
+		len = sizeof(msg);
+
+	if (len == 0)
+		return;
+
+	len = read(dom->tty_fd, msg, len);
 	if (len < 1) {
 		close(dom->tty_fd);
 		dom->tty_fd = -1;
@@ -444,8 +441,9 @@ static void handle_tty_read(struct domain *dom)
 		}
 	} else if (domain_is_valid(dom->domid)) {
 		for (i = 0; i < len; i++) {
-			inring->buf[XENCONS_IDX(inring->prod)] = msg[i];
-			inring->prod++;
+			intf->in[MASK_XENCONS_IDX(intf->in_prod, intf->in)] =
+				msg[i];
+			intf->in_prod++;
 		}
 		evtchn_notify(dom);
 	} else {
@@ -505,7 +503,6 @@ static void handle_xs(int fd)
 			domain_create_ring(dom);
 	}
 
-	xs_acknowledge_watch(xs, vec[1]);
 	free(vec);
 }
 
@@ -565,3 +562,13 @@ void handle_io(void)
 		}
 	} while (ret > -1);
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

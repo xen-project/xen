@@ -32,17 +32,6 @@
 #include "xenstored_test.h"
 #include "xenstored_domain.h"
 
-/* FIXME: time out unacked watches. */
-struct watch_event
-{
-	/* The events on this watch. */
-	struct list_head list;
-
-	/* Data to send (node\0token\0). */
-	unsigned int len;
-	char *data;
-};
-
 struct watch
 {
 	/* Watches on this connection */
@@ -58,54 +47,17 @@ struct watch
 	char *node;
 };
 
-/* Look through our watches: if any of them have an event, queue it. */
-void queue_next_event(struct connection *conn)
-{
-	struct watch_event *event;
-	struct watch *watch;
-
-	/* We had a reply queued already?  Send it: other end will
-	 * discard watch. */
-	if (conn->waiting_reply) {
-		conn->out = conn->waiting_reply;
-		conn->waiting_reply = NULL;
-		conn->waiting_for_ack = NULL;
-		return;
-	}
-
-	/* If we're already waiting for ack, don't queue more. */
-	if (conn->waiting_for_ack)
-		return;
-
-	list_for_each_entry(watch, &conn->watches, list) {
-		event = list_top(&watch->events, struct watch_event, list);
-		if (event) {
-			conn->waiting_for_ack = watch;
-			send_reply(conn,XS_WATCH_EVENT,event->data,event->len);
-			break;
-		}
-	}
-}
-
-static int destroy_watch_event(void *_event)
-{
-	struct watch_event *event = _event;
-
-	trace_destroy(event, "watch_event");
-	return 0;
-}
-
 static void add_event(struct connection *conn,
 		      struct watch *watch,
 		      const char *name)
 {
-	struct watch_event *event;
+	/* Data to send (node\0token\0). */
+	unsigned int len;
+	char *data;
 
 	if (!check_event_node(name)) {
 		/* Can this conn load node, or see that it doesn't exist? */
-		struct node *node;
-
-		node = get_node(conn, name, XS_PERM_READ);
+		struct node *node = get_node(conn, name, XS_PERM_READ);
 		if (!node && errno != ENOENT)
 			return;
 	}
@@ -116,14 +68,12 @@ static void add_event(struct connection *conn,
 			name++;
 	}
 
-	event = talloc(watch, struct watch_event);
-	event->len = strlen(name) + 1 + strlen(watch->token) + 1;
-	event->data = talloc_array(event, char, event->len);
-	strcpy(event->data, name);
-	strcpy(event->data + strlen(name) + 1, watch->token);
-	talloc_set_destructor(event, destroy_watch_event);
-	list_add_tail(&event->list, &watch->events);
-	trace_create(event, "watch_event");
+	len = strlen(name) + 1 + strlen(watch->token) + 1;
+	data = talloc_array(watch, char, len);
+	strcpy(data, name);
+	strcpy(data + strlen(name) + 1, watch->token);
+        send_reply(conn, XS_WATCH_EVENT, data, len);
+	talloc_free(data);
 }
 
 /* FIXME: we fail to fire on out of memory.  Should drop connections. */
@@ -143,11 +93,6 @@ void fire_watches(struct connection *conn, const char *name, bool recurse)
 				add_event(i, watch, name);
 			else if (recurse && is_child(watch->node, name))
 				add_event(i, watch, watch->node);
-			else
-				continue;
-			/* If connection not doing anything, queue this. */
-			if (i->state == OK)
-				queue_next_event(i);
 		}
 	}
 }
@@ -181,6 +126,15 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 		}
 	}
 
+	/* Check for duplicates. */
+	list_for_each_entry(watch, &conn->watches, list) {
+		if (streq(watch->node, vec[0]) &&
+                    streq(watch->token, vec[1])) {
+			send_error(conn, EEXIST);
+			return;
+		}
+	}
+
 	watch = talloc(conn, struct watch);
 	watch->node = talloc_strdup(watch, vec[0]);
 	watch->token = talloc_strdup(watch, vec[1]);
@@ -200,37 +154,6 @@ void do_watch(struct connection *conn, struct buffered_data *in)
 	add_event(conn, watch, watch->node);
 }
 
-void do_watch_ack(struct connection *conn, const char *token)
-{
-	struct watch_event *event;
-
-	if (!token) {
-		send_error(conn, EINVAL);
-		return;
-	}
-
-	if (!conn->waiting_for_ack) {
-		send_error(conn, ENOENT);
-		return;
-	}
-
-	if (!streq(conn->waiting_for_ack->token, token)) {
-		/* They're confused: this will cause us to send event again */
-		conn->waiting_for_ack = NULL;
-		send_error(conn, EINVAL);
-		return;
-	}
-
-	/* Remove event: after ack sent, core will call queue_next_event */
-	event = list_top(&conn->waiting_for_ack->events, struct watch_event,
-			 list);
-	list_del(&event->list);
-	talloc_free(event);
-
-	conn->waiting_for_ack = NULL;
-	send_ack(conn, XS_WATCH_ACK);
-}
-
 void do_unwatch(struct connection *conn, struct buffered_data *in)
 {
 	struct watch *watch;
@@ -241,9 +164,6 @@ void do_unwatch(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
-	/* We don't need to worry if we're waiting for an ack for the
-	 * watch we're deleting: conn->waiting_for_ack was reset by
-	 * this command in consider_message anyway. */
 	node = canonicalize(conn, vec[0]);
 	list_for_each_entry(watch, &conn->watches, list) {
 		if (streq(watch->node, node) && streq(watch->token, vec[1])) {
@@ -260,18 +180,19 @@ void do_unwatch(struct connection *conn, struct buffered_data *in)
 void dump_watches(struct connection *conn)
 {
 	struct watch *watch;
-	struct watch_event *event;
 
-	if (conn->waiting_for_ack)
-		printf("    waiting_for_ack for watch on %s token %s\n",
-		       conn->waiting_for_ack->node,
-		       conn->waiting_for_ack->token);
-
-	list_for_each_entry(watch, &conn->watches, list) {
+	list_for_each_entry(watch, &conn->watches, list)
 		printf("    watch on %s token %s\n",
 		       watch->node, watch->token);
-		list_for_each_entry(event, &watch->events, list)
-			printf("        event: %s\n", event->data);
-	}
 }
 #endif
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

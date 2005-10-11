@@ -52,6 +52,7 @@ struct xs_handle {
          * signals waiters.
          */
 	pthread_t read_thr;
+	int read_thr_exists;
 
 	/*
          * A list of fired watch messages, protected by a mutex. Users can
@@ -75,11 +76,9 @@ struct xs_handle {
 
 	/* One request at a time. */
 	pthread_mutex_t request_mutex;
-
-	/* One transaction at a time. */
-	pthread_mutex_t transaction_mutex;
 };
 
+static int read_message(struct xs_handle *h);
 static void *read_thread(void *arg);
 
 int xs_fileno(struct xs_handle *h)
@@ -134,7 +133,7 @@ static struct xs_handle *get_handle(const char *connect_to)
 	int fd = -1, saved_errno;
 
 	if (stat(connect_to, &buf) != 0)
-		goto error;
+		return NULL;
 
 	if (S_ISSOCK(buf.st_mode))
 		fd = get_socket(connect_to);
@@ -142,11 +141,17 @@ static struct xs_handle *get_handle(const char *connect_to)
 		fd = get_dev(connect_to);
 
 	if (fd == -1)
-		goto error;
+		return NULL;
 
 	h = malloc(sizeof(*h));
-	if (h == NULL)
-		goto error;
+	if (h == NULL) {
+		saved_errno = errno;
+		close(fd);
+		errno = saved_errno;
+		return NULL;
+	}
+
+	memset(h, 0, sizeof(*h));
 
 	h->fd = fd;
 
@@ -162,21 +167,8 @@ static struct xs_handle *get_handle(const char *connect_to)
 	pthread_cond_init(&h->reply_condvar, NULL);
 
 	pthread_mutex_init(&h->request_mutex, NULL);
-	pthread_mutex_init(&h->transaction_mutex, NULL);
-
-	if (pthread_create(&h->read_thr, NULL, read_thread, h) != 0)
-		goto error;
 
 	return h;
-
- error:
-	saved_errno = errno;
-	if (h != NULL)
-		free(h);
-	if (fd != -1)
-		close(fd);
-	errno = saved_errno;
-	return NULL;
 }
 
 struct xs_handle *xs_daemon_open(void)
@@ -198,14 +190,15 @@ void xs_daemon_close(struct xs_handle *h)
 {
 	struct xs_stored_msg *msg, *tmsg;
 
-	pthread_mutex_lock(&h->transaction_mutex);
 	pthread_mutex_lock(&h->request_mutex);
 	pthread_mutex_lock(&h->reply_mutex);
 	pthread_mutex_lock(&h->watch_mutex);
 
-	/* XXX FIXME: May leak an unpublished message buffer. */
-	pthread_cancel(h->read_thr);
-	pthread_join(h->read_thr, NULL);
+	if (h->read_thr_exists) {
+		/* XXX FIXME: May leak an unpublished message buffer. */
+		pthread_cancel(h->read_thr);
+		pthread_join(h->read_thr, NULL);
+	}
 
 	list_for_each_entry_safe(msg, tmsg, &h->reply_list, list) {
 		free(msg->body);
@@ -217,7 +210,6 @@ void xs_daemon_close(struct xs_handle *h)
 		free(msg);
 	}
 
-	pthread_mutex_unlock(&h->transaction_mutex);
 	pthread_mutex_unlock(&h->request_mutex);
 	pthread_mutex_unlock(&h->reply_mutex);
 	pthread_mutex_unlock(&h->watch_mutex);
@@ -277,6 +269,10 @@ static void *read_reply(
 	struct xs_stored_msg *msg;
 	char *body;
 
+	/* Read from comms channel ourselves if there is no reader thread. */
+	if (!h->read_thr_exists && (read_message(h) == -1))
+		return NULL;
+
 	pthread_mutex_lock(&h->reply_mutex);
 	while (list_empty(&h->reply_list))
 		pthread_cond_wait(&h->reply_condvar, &h->reply_mutex);
@@ -296,8 +292,10 @@ static void *read_reply(
 }
 
 /* Send message to xs, get malloc'ed reply.  NULL and set errno on error. */
-static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
-		      const struct iovec *iovec, unsigned int num_vecs,
+static void *xs_talkv(struct xs_handle *h, struct xs_transaction_handle *t,
+		      enum xsd_sockmsg_type type,
+		      const struct iovec *iovec,
+		      unsigned int num_vecs,
 		      unsigned int *len)
 {
 	struct xsd_sockmsg msg;
@@ -306,6 +304,7 @@ static void *xs_talkv(struct xs_handle *h, enum xsd_sockmsg_type type,
 	unsigned int i;
 	struct sigaction ignorepipe, oldact;
 
+	msg.tx_id = (u32)(unsigned long)t;
 	msg.type = type;
 	msg.len = 0;
 	for (i = 0; i < num_vecs; i++)
@@ -368,14 +367,16 @@ static void free_no_errno(void *p)
 }
 
 /* Simplified version of xs_talkv: single message. */
-static void *xs_single(struct xs_handle *h, enum xsd_sockmsg_type type,
-		       const char *string, unsigned int *len)
+static void *xs_single(struct xs_handle *h, struct xs_transaction_handle *t,
+		       enum xsd_sockmsg_type type,
+		       const char *string,
+		       unsigned int *len)
 {
 	struct iovec iovec;
 
 	iovec.iov_base = (void *)string;
 	iovec.iov_len = strlen(string) + 1;
-	return xs_talkv(h, type, &iovec, 1, len);
+	return xs_talkv(h, t, type, &iovec, 1, len);
 }
 
 static bool xs_bool(char *reply)
@@ -386,12 +387,13 @@ static bool xs_bool(char *reply)
 	return true;
 }
 
-char **xs_directory(struct xs_handle *h, const char *path, unsigned int *num)
+char **xs_directory(struct xs_handle *h, struct xs_transaction_handle *t,
+		    const char *path, unsigned int *num)
 {
 	char *strings, *p, **ret;
 	unsigned int len;
 
-	strings = xs_single(h, XS_DIRECTORY, path, &len);
+	strings = xs_single(h, t, XS_DIRECTORY, path, &len);
 	if (!strings)
 		return NULL;
 
@@ -417,16 +419,17 @@ char **xs_directory(struct xs_handle *h, const char *path, unsigned int *num)
  * Returns a malloced value: call free() on it after use.
  * len indicates length in bytes, not including the nul.
  */
-void *xs_read(struct xs_handle *h, const char *path, unsigned int *len)
+void *xs_read(struct xs_handle *h, struct xs_transaction_handle *t,
+	      const char *path, unsigned int *len)
 {
-	return xs_single(h, XS_READ, path, len);
+	return xs_single(h, t, XS_READ, path, len);
 }
 
 /* Write the value of a single file.
  * Returns false on failure.
  */
-bool xs_write(struct xs_handle *h, const char *path,
-	      const void *data, unsigned int len)
+bool xs_write(struct xs_handle *h, struct xs_transaction_handle *t,
+	      const char *path, const void *data, unsigned int len)
 {
 	struct iovec iovec[2];
 
@@ -435,36 +438,40 @@ bool xs_write(struct xs_handle *h, const char *path,
 	iovec[1].iov_base = (void *)data;
 	iovec[1].iov_len = len;
 
-	return xs_bool(xs_talkv(h, XS_WRITE, iovec, ARRAY_SIZE(iovec), NULL));
+	return xs_bool(xs_talkv(h, t, XS_WRITE, iovec,
+				ARRAY_SIZE(iovec), NULL));
 }
 
 /* Create a new directory.
  * Returns false on failure, or success if it already exists.
  */
-bool xs_mkdir(struct xs_handle *h, const char *path)
+bool xs_mkdir(struct xs_handle *h, struct xs_transaction_handle *t,
+	      const char *path)
 {
-	return xs_bool(xs_single(h, XS_MKDIR, path, NULL));
+	return xs_bool(xs_single(h, t, XS_MKDIR, path, NULL));
 }
 
 /* Destroy a file or directory (directories must be empty).
  * Returns false on failure, or success if it doesn't exist.
  */
-bool xs_rm(struct xs_handle *h, const char *path)
+bool xs_rm(struct xs_handle *h, struct xs_transaction_handle *t,
+	   const char *path)
 {
-	return xs_bool(xs_single(h, XS_RM, path, NULL));
+	return xs_bool(xs_single(h, t, XS_RM, path, NULL));
 }
 
 /* Get permissions of node (first element is owner).
  * Returns malloced array, or NULL: call free() after use.
  */
 struct xs_permissions *xs_get_permissions(struct xs_handle *h,
+					  struct xs_transaction_handle *t,
 					  const char *path, unsigned int *num)
 {
 	char *strings;
 	unsigned int len;
 	struct xs_permissions *ret;
 
-	strings = xs_single(h, XS_GET_PERMS, path, &len);
+	strings = xs_single(h, t, XS_GET_PERMS, path, &len);
 	if (!strings)
 		return NULL;
 
@@ -490,7 +497,9 @@ struct xs_permissions *xs_get_permissions(struct xs_handle *h,
 /* Set permissions of node (must be owner).
  * Returns false on failure.
  */
-bool xs_set_permissions(struct xs_handle *h, const char *path,
+bool xs_set_permissions(struct xs_handle *h,
+			struct xs_transaction_handle *t,
+			const char *path,
 			struct xs_permissions *perms,
 			unsigned int num_perms)
 {
@@ -512,7 +521,7 @@ bool xs_set_permissions(struct xs_handle *h, const char *path,
 			goto unwind;
 	}
 
-	if (!xs_bool(xs_talkv(h, XS_SET_PERMS, iov, 1+num_perms, NULL)))
+	if (!xs_bool(xs_talkv(h, t, XS_SET_PERMS, iov, 1+num_perms, NULL)))
 		goto unwind;
 	for (i = 0; i < num_perms; i++)
 		free(iov[i+1].iov_base);
@@ -534,12 +543,24 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 {
 	struct iovec iov[2];
 
+	/* We dynamically create a reader thread on demand. */
+	pthread_mutex_lock(&h->request_mutex);
+	if (!h->read_thr_exists) {
+		if (pthread_create(&h->read_thr, NULL, read_thread, h) != 0) {
+			pthread_mutex_unlock(&h->request_mutex);
+			return false;
+		}
+		h->read_thr_exists = 1;
+	}
+	pthread_mutex_unlock(&h->request_mutex);
+
 	iov[0].iov_base = (void *)path;
 	iov[0].iov_len = strlen(path) + 1;
 	iov[1].iov_base = (void *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_bool(xs_talkv(h, XS_WATCH, iov, ARRAY_SIZE(iov), NULL));
+	return xs_bool(xs_talkv(h, NULL, XS_WATCH, iov,
+				ARRAY_SIZE(iov), NULL));
 }
 
 /* Find out what node change was on (will block if nothing pending).
@@ -593,15 +614,6 @@ char **xs_read_watch(struct xs_handle *h, unsigned int *num)
 	return ret;
 }
 
-/* Acknowledge watch on node.  Watches must be acknowledged before
- * any other watches can be read.
- * Returns false on failure.
- */
-bool xs_acknowledge_watch(struct xs_handle *h, const char *token)
-{
-	return xs_bool(xs_single(h, XS_WATCH_ACK, token, NULL));
-}
-
 /* Remove a watch on a node.
  * Returns false on failure (no watch on that node).
  */
@@ -614,18 +626,28 @@ bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
 	iov[1].iov_base = (char *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_bool(xs_talkv(h, XS_UNWATCH, iov, ARRAY_SIZE(iov), NULL));
+	return xs_bool(xs_talkv(h, NULL, XS_UNWATCH, iov,
+				ARRAY_SIZE(iov), NULL));
 }
 
 /* Start a transaction: changes by others will not be seen during this
  * transaction, and changes will not be visible to others until end.
  * You can only have one transaction at any time.
- * Returns false on failure.
+ * Returns NULL on failure.
  */
-bool xs_transaction_start(struct xs_handle *h)
+struct xs_transaction_handle *xs_transaction_start(struct xs_handle *h)
 {
-	pthread_mutex_lock(&h->transaction_mutex);
-	return xs_bool(xs_single(h, XS_TRANSACTION_START, "", NULL));
+	char *id_str;
+	unsigned long id;
+
+	id_str = xs_single(h, NULL, XS_TRANSACTION_START, "", NULL);
+	if (id_str == NULL)
+		return NULL;
+
+	id = strtoul(id_str, NULL, 0);
+	free(id_str);
+
+	return (struct xs_transaction_handle *)id;
 }
 
 /* End a transaction.
@@ -633,21 +655,17 @@ bool xs_transaction_start(struct xs_handle *h)
  * Returns false on failure, which indicates an error: transactions will
  * not fail spuriously.
  */
-bool xs_transaction_end(struct xs_handle *h, bool abort)
+bool xs_transaction_end(struct xs_handle *h, struct xs_transaction_handle *t,
+			bool abort)
 {
 	char abortstr[2];
-	bool rc;
 
 	if (abort)
 		strcpy(abortstr, "F");
 	else
 		strcpy(abortstr, "T");
 	
-	rc = xs_bool(xs_single(h, XS_TRANSACTION_END, abortstr, NULL));
-
-	pthread_mutex_unlock(&h->transaction_mutex);
-
-	return rc;
+	return xs_bool(xs_single(h, t, XS_TRANSACTION_END, abortstr, NULL));
 }
 
 /* Introduce a new domain.
@@ -675,7 +693,8 @@ bool xs_introduce_domain(struct xs_handle *h, domid_t domid, unsigned long mfn,
 	iov[3].iov_base = (char *)path;
 	iov[3].iov_len = strlen(path) + 1;
 
-	return xs_bool(xs_talkv(h, XS_INTRODUCE, iov, ARRAY_SIZE(iov), NULL));
+	return xs_bool(xs_talkv(h, NULL, XS_INTRODUCE, iov,
+				ARRAY_SIZE(iov), NULL));
 }
 
 bool xs_release_domain(struct xs_handle *h, domid_t domid)
@@ -684,7 +703,7 @@ bool xs_release_domain(struct xs_handle *h, domid_t domid)
 
 	sprintf(domid_str, "%u", domid);
 
-	return xs_bool(xs_single(h, XS_RELEASE, domid_str, NULL));
+	return xs_bool(xs_single(h, NULL, XS_RELEASE, domid_str, NULL));
 }
 
 char *xs_get_domain_path(struct xs_handle *h, domid_t domid)
@@ -693,7 +712,7 @@ char *xs_get_domain_path(struct xs_handle *h, domid_t domid)
 
 	sprintf(domid_str, "%u", domid);
 
-	return xs_single(h, XS_GET_DOMAIN_PATH, domid_str, NULL);
+	return xs_single(h, NULL, XS_GET_DOMAIN_PATH, domid_str, NULL);
 }
 
 /* Only useful for DEBUG versions */
@@ -707,68 +726,76 @@ char *xs_debug_command(struct xs_handle *h, const char *cmd,
 	iov[1].iov_base = data;
 	iov[1].iov_len = len;
 
-	return xs_talkv(h, XS_DEBUG, iov, ARRAY_SIZE(iov), NULL);
+	return xs_talkv(h, NULL, XS_DEBUG, iov,
+			ARRAY_SIZE(iov), NULL);
+}
+
+static int read_message(struct xs_handle *h)
+{
+	struct xs_stored_msg *msg = NULL;
+	char *body = NULL;
+	int saved_errno;
+
+	/* Allocate message structure and read the message header. */
+	msg = malloc(sizeof(*msg));
+	if (msg == NULL)
+		goto error;
+	if (!read_all(h->fd, &msg->hdr, sizeof(msg->hdr)))
+		goto error;
+
+	/* Allocate and read the message body. */
+	body = msg->body = malloc(msg->hdr.len + 1);
+	if (body == NULL)
+		goto error;
+	if (!read_all(h->fd, body, msg->hdr.len))
+		goto error;
+	body[msg->hdr.len] = '\0';
+
+	if (msg->hdr.type == XS_WATCH_EVENT) {
+		pthread_mutex_lock(&h->watch_mutex);
+
+		/* Kick users out of their select() loop. */
+		if (list_empty(&h->watch_list) &&
+		    (h->watch_pipe[1] != -1))
+			while (write(h->watch_pipe[1], body, 1) != 1)
+				continue;
+
+		list_add_tail(&msg->list, &h->watch_list);
+		pthread_cond_signal(&h->watch_condvar);
+
+		pthread_mutex_unlock(&h->watch_mutex);
+	} else {
+		pthread_mutex_lock(&h->reply_mutex);
+
+		/* There should only ever be one response pending! */
+		if (!list_empty(&h->reply_list)) {
+			pthread_mutex_unlock(&h->reply_mutex);
+			goto error;
+		}
+
+		list_add_tail(&msg->list, &h->reply_list);
+		pthread_cond_signal(&h->reply_condvar);
+
+		pthread_mutex_unlock(&h->reply_mutex);
+	}
+
+	return 0;
+
+ error:
+	saved_errno = errno;
+	free(msg);
+	free(body);
+	errno = saved_errno;
+	return -1;
 }
 
 static void *read_thread(void *arg)
 {
 	struct xs_handle *h = arg;
-	struct xs_stored_msg *msg = NULL;
-	char *body = NULL;
 
-	for (;;) {
-		msg = NULL;
-		body = NULL;
+	while (read_message(h) != -1)
+		continue;
 
-		/* Allocate message structure and read the message header. */
-		msg = malloc(sizeof(*msg));
-		if (msg == NULL)
-			goto error;
-		if (!read_all(h->fd, &msg->hdr, sizeof(msg->hdr)))
-			goto error;
-
-		/* Allocate and read the message body. */
-		body = msg->body = malloc(msg->hdr.len + 1);
-		if (body == NULL)
-			goto error;
-		if (!read_all(h->fd, body, msg->hdr.len))
-			goto error;
-		body[msg->hdr.len] = '\0';
-
-		if (msg->hdr.type == XS_WATCH_EVENT) {
-			pthread_mutex_lock(&h->watch_mutex);
-
-			/* Kick users out of their select() loop. */
-			if (list_empty(&h->watch_list) &&
-			    (h->watch_pipe[1] != -1))
-				while (write(h->watch_pipe[1], body, 1) != 1)
-					continue;
-
-			list_add_tail(&msg->list, &h->watch_list);
-			pthread_cond_signal(&h->watch_condvar);
-
-			pthread_mutex_unlock(&h->watch_mutex);
-		} else {
-			pthread_mutex_lock(&h->reply_mutex);
-
-			/* There should only ever be one response pending! */
-			if (!list_empty(&h->reply_list)) {
-				pthread_mutex_unlock(&h->reply_mutex);
-				goto error;
-			}
-
-			list_add_tail(&msg->list, &h->reply_list);
-			pthread_cond_signal(&h->reply_condvar);
-
-			pthread_mutex_unlock(&h->reply_mutex);
-		}
-	}
-
- error:
-	if (body != NULL)
-		free(body);
-	if (msg != NULL)
-		free(msg);
 	return NULL;
 }
 

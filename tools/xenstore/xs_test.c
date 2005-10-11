@@ -42,6 +42,7 @@
 #define XSTEST
 
 static struct xs_handle *handles[10] = { NULL };
+static struct xs_transaction_handle *txh[10] = { NULL };
 
 static unsigned int timeout_ms = 500;
 static bool timeout_suppressed = true;
@@ -201,7 +202,6 @@ static void __attribute__((noreturn)) usage(void)
 	     "  watch <path> <token>\n"
 	     "  watchnoack <path> <token>\n"
 	     "  waitwatch\n"
-	     "  ackwatch <token>\n"
 	     "  unwatch <path> <token>\n"
 	     "  close\n"
 	     "  start <node>\n"
@@ -313,7 +313,7 @@ static void do_dir(unsigned int handle, char *path)
 	char **entries;
 	unsigned int i, num;
 
-	entries = xs_directory(handles[handle], path, &num);
+	entries = xs_directory(handles[handle], txh[handle], path, &num);
 	if (!entries) {
 		failed(handle);
 		return;
@@ -332,7 +332,7 @@ static void do_read(unsigned int handle, char *path)
 	char *value;
 	unsigned int len;
 
-	value = xs_read(handles[handle], path, &len);
+	value = xs_read(handles[handle], txh[handle], path, &len);
 	if (!value) {
 		failed(handle);
 		return;
@@ -348,7 +348,7 @@ static void do_read(unsigned int handle, char *path)
 
 static void do_write(unsigned int handle, char *path, char *data)
 {
-	if (!xs_write(handles[handle], path, data, strlen(data)))
+	if (!xs_write(handles[handle], txh[handle], path, data, strlen(data)))
 		failed(handle);
 }
 
@@ -361,13 +361,13 @@ static void do_setid(unsigned int handle, char *id)
 
 static void do_mkdir(unsigned int handle, char *path)
 {
-	if (!xs_mkdir(handles[handle], path))
+	if (!xs_mkdir(handles[handle], txh[handle], path))
 		failed(handle);
 }
 
 static void do_rm(unsigned int handle, char *path)
 {
-	if (!xs_rm(handles[handle], path))
+	if (!xs_rm(handles[handle], txh[handle], path))
 		failed(handle);
 }
 
@@ -376,7 +376,7 @@ static void do_getperm(unsigned int handle, char *path)
 	unsigned int i, num;
 	struct xs_permissions *perms;
 
-	perms = xs_get_permissions(handles[handle], path, &num);
+	perms = xs_get_permissions(handles[handle], txh[handle], path, &num);
 	if (!perms) {
 		failed(handle);
 		return;
@@ -437,7 +437,7 @@ static void do_setperm(unsigned int handle, char *path, char *line)
 			barf("bad flags %s\n", arg);
 	}
 
-	if (!xs_set_permissions(handles[handle], path, perms, i))
+	if (!xs_set_permissions(handles[handle], txh[handle], path, perms, i))
 		failed(handle);
 }
 
@@ -454,8 +454,6 @@ static void do_watch(unsigned int handle, const char *node, const char *token,
 		if (!vec ||
 		    !streq(vec[XS_WATCH_PATH], node) ||
 		    !streq(vec[XS_WATCH_TOKEN], token))
-			failed(handle);
-		if (!xs_acknowledge_watch(handles[handle], token))
 			failed(handle);
 	}
 }
@@ -515,12 +513,6 @@ static void do_waitwatch(unsigned int handle)
 	free(vec);
 }
 
-static void do_ackwatch(unsigned int handle, const char *token)
-{
-	if (!xs_acknowledge_watch(handles[handle], token))
-		failed(handle);
-}
-
 static void do_unwatch(unsigned int handle, const char *node, const char *token)
 {
 	if (!xs_unwatch(handles[handle], node, token))
@@ -529,14 +521,16 @@ static void do_unwatch(unsigned int handle, const char *node, const char *token)
 
 static void do_start(unsigned int handle)
 {
-	if (!xs_transaction_start(handles[handle]))
+	txh[handle] = xs_transaction_start(handles[handle]);
+	if (txh[handle] == NULL)
 		failed(handle);
 }
 
 static void do_end(unsigned int handle, bool abort)
 {
-	if (!xs_transaction_end(handles[handle], abort))
+	if (!xs_transaction_end(handles[handle], txh[handle], abort))
 		failed(handle);
+	txh[handle] = NULL;
 }
 
 static void do_introduce(unsigned int handle,
@@ -626,7 +620,8 @@ static void dump_dir(unsigned int handle,
 
 		sprintf(subnode, "%s/%s", node, dir[i]);
 
-		perms = xs_get_permissions(handles[handle], subnode,&numperms);
+		perms = xs_get_permissions(handles[handle], txh[handle],
+					   subnode,&numperms);
 		if (!perms) {
 			failed(handle);
 			return;
@@ -643,7 +638,8 @@ static void dump_dir(unsigned int handle,
 		output("\n");
 
 		/* Even directories can have contents. */
-		contents = xs_read(handles[handle], subnode, &len);
+		contents = xs_read(handles[handle], txh[handle], 
+				   subnode, &len);
 		if (!contents) {
 			if (errno != EISDIR)
 				failed(handle);
@@ -653,7 +649,8 @@ static void dump_dir(unsigned int handle,
 		}			
 
 		/* Every node is a directory. */
-		subdirs = xs_directory(handles[handle], subnode, &subnum);
+		subdirs = xs_directory(handles[handle], txh[handle], 
+				       subnode, &subnum);
 		if (!subdirs) {
 			failed(handle);
 			return;
@@ -668,7 +665,7 @@ static void dump(int handle)
 	char **subdirs;
 	unsigned int subnum;
 
-	subdirs = xs_directory(handles[handle], "/", &subnum);
+	subdirs = xs_directory(handles[handle], txh[handle], "/", &subnum);
 	if (!subdirs) {
 		failed(handle);
 		return;
@@ -746,13 +743,12 @@ static void do_command(unsigned int default_handle, char *line)
 		do_watch(handle, arg(line, 1), arg(line, 2), false);
 	else if (streq(command, "waitwatch"))
 		do_waitwatch(handle);
-	else if (streq(command, "ackwatch"))
-		do_ackwatch(handle, arg(line, 1));
 	else if (streq(command, "unwatch"))
 		do_unwatch(handle, arg(line, 1), arg(line, 2));
 	else if (streq(command, "close")) {
 		xs_daemon_close(handles[handle]);
 		handles[handle] = NULL;
+		txh[handle] = NULL;
 	} else if (streq(command, "start"))
 		do_start(handle);
 	else if (streq(command, "commit"))
@@ -836,3 +832,13 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

@@ -1327,18 +1327,14 @@ static struct xenbus_watch cpu_watch = {
 	.callback = handle_vcpu_hotplug_event
 };
 
-/* NB: Assumes xenbus_lock is held! */
 static int setup_cpu_watcher(struct notifier_block *notifier,
 			      unsigned long event, void *data)
 {
-	int err = 0;
+	int err;
 
-	BUG_ON(down_trylock(&xenbus_lock) == 0);
 	err = register_xenbus_watch(&cpu_watch);
-
-	if (err) {
+	if (err)
 		printk("Failed to register watch on /cpu\n");
-	}
 
 	return NOTIFY_DONE;
 }
@@ -1368,7 +1364,7 @@ static void handle_vcpu_hotplug_event(struct xenbus_watch *watch, const char *no
 			return;
 
 		/* get the state value */
-		err = xenbus_scanf(dir, "availability", "%s", state);
+		err = xenbus_scanf(NULL, dir, "availability", "%s", state);
 
 		if (err != 1) {
 			printk(KERN_ERR
@@ -1578,7 +1574,7 @@ void smp_suspend(void)
 void smp_resume(void)
 {
 	smp_intr_init();
-	local_setup_timer_irq();
+	local_setup_timer();
 }
 
 void vcpu_prepare(int vcpu)

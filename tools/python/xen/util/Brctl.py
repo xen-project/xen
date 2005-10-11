@@ -5,7 +5,6 @@ import os.path
 import re
 import sys
 
-os.defpath = os.defpath + ':/sbin:/usr/sbin:/usr/local/sbin'
 CMD_IFCONFIG = 'ifconfig'
 CMD_ROUTE    = 'route'
 CMD_BRCTL    = 'brctl'

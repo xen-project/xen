@@ -31,14 +31,19 @@
 
 struct buffered_data
 {
+	struct list_head list;
+
 	/* Are we still doing the header? */
 	bool inhdr;
+
 	/* How far are we? */
 	unsigned int used;
+
 	union {
 		struct xsd_sockmsg msg;
 		char raw[sizeof(struct xsd_sockmsg)];
 	} hdr;
+
 	/* The actual data. */
 	char *buffer;
 };
@@ -47,14 +52,6 @@ struct connection;
 typedef int connwritefn_t(struct connection *, const void *, unsigned int);
 typedef int connreadfn_t(struct connection *, void *, unsigned int);
 
-enum state
-{
-	/* Doing action, not listening */
-	BUSY,
-	/* Completed */
-	OK,
-};
-
 struct connection
 {
 	struct list_head list;
@@ -62,29 +59,24 @@ struct connection
 	/* The file descriptor we came in on. */
 	int fd;
 
-	/* Who am I?  0 for socket connections. */
+	/* Who am I? 0 for socket connections. */
 	domid_t id;
-
-	/* Blocked on transaction?  Busy? */
-	enum state state;
 
 	/* Is this a read-only connection? */
 	bool can_write;
-
-	/* Are we waiting for a watch event ack? */
-	struct watch *waiting_for_ack;
 
 	/* Buffered incoming data. */
 	struct buffered_data *in;
 
 	/* Buffered output data */
-	struct buffered_data *out;
+	struct list_head out_list;
 
-	/* If we had a watch fire outgoing when we needed to reply... */
-	struct buffered_data *waiting_reply;
-
-	/* My transaction, if any. */
+	/* Transaction context for current request (NULL if none). */
 	struct transaction *transaction;
+
+	/* List of in-progress transactions. */
+	struct list_head transaction_list;
+	u32 next_transaction_id;
 
 	/* The domain I'm associated with, if any. */
 	struct domain *domain;
@@ -175,3 +167,13 @@ void trace(const char *fmt, ...);
 extern int event_fd;
 
 #endif /* _XENSTORED_CORE_H */
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

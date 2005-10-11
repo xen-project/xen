@@ -87,8 +87,16 @@ ref-%/.valid-ref: pristine-%/.valid-pristine
 	touch $@ # update timestamp to avoid rebuild
 endif
 
-%-build:
+%-install:
 	$(MAKE) -f buildconfigs/mk.$* build
+
+%-dist: DESTDIR=$(DISTDIR)/install
+%-dist: %-install
+	@: # do nothing
+
+# Legacy dist target
+%-build: %-dist
+	@: # do nothing
 
 %-delete:
 	$(MAKE) -f buildconfigs/mk.$* delete

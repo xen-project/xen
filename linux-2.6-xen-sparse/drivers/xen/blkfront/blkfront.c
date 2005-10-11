@@ -460,7 +460,7 @@ static void watch_for_status(struct xenbus_watch *watch,
 	if (info->connected == BLKIF_STATE_CONNECTED)
 		return;
 
-	err = xenbus_gather(watch->node,
+	err = xenbus_gather(NULL, watch->node,
 			    "sectors", "%lu", &sectors,
 			    "info", "%u", &binfo,
 			    "sector-size", "%lu", &sector_size,
@@ -532,10 +532,11 @@ static int talk_to_backend(struct xenbus_device *dev,
 {
 	char *backend;
 	const char *message;
+	struct xenbus_transaction *xbt;
 	int err;
 
 	backend = NULL;
-	err = xenbus_gather(dev->nodename,
+	err = xenbus_gather(NULL, dev->nodename,
 			    "backend-id", "%i", &info->backend_id,
 			    "backend", NULL, &backend,
 			    NULL);
@@ -559,25 +560,26 @@ static int talk_to_backend(struct xenbus_device *dev,
 	}
 
 again:
-	err = xenbus_transaction_start();
-	if (err) {
+	xbt = xenbus_transaction_start();
+	if (IS_ERR(xbt)) {
 		xenbus_dev_error(dev, err, "starting transaction");
 		goto destroy_blkring;
 	}
 
-	err = xenbus_printf(dev->nodename, "ring-ref","%u", info->ring_ref);
+	err = xenbus_printf(xbt, dev->nodename,
+			    "ring-ref","%u", info->ring_ref);
 	if (err) {
 		message = "writing ring-ref";
 		goto abort_transaction;
 	}
-	err = xenbus_printf(dev->nodename,
+	err = xenbus_printf(xbt, dev->nodename,
 			    "event-channel", "%u", info->evtchn);
 	if (err) {
 		message = "writing event-channel";
 		goto abort_transaction;
 	}
 
-	err = xenbus_transaction_end(0);
+	err = xenbus_transaction_end(xbt, 0);
 	if (err) {
 		if (err == -EAGAIN)
 			goto again;
@@ -598,8 +600,7 @@ again:
 	return 0;
 
  abort_transaction:
-	xenbus_transaction_end(1);
-	/* Have to do this *outside* transaction.  */
+	xenbus_transaction_end(xbt, 1);
 	xenbus_dev_error(dev, err, "%s", message);
  destroy_blkring:
 	blkif_free(info);
@@ -620,7 +621,8 @@ static int blkfront_probe(struct xenbus_device *dev,
 	struct blkfront_info *info;
 
 	/* FIXME: Use dynamic device id if this is not set. */
-	err = xenbus_scanf(dev->nodename, "virtual-device", "%i", &vdevice);
+	err = xenbus_scanf(NULL, dev->nodename,
+			   "virtual-device", "%i", &vdevice);
 	if (XENBUS_EXIST_ERR(err))
 		return err;
 	if (err < 0) {

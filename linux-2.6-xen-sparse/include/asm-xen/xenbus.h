@@ -78,30 +78,35 @@ int xenbus_register_driver(struct xenbus_driver *drv);
 int xenbus_register_backend(struct xenbus_driver *drv);
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 
-/* Caller must hold this lock to call these functions: it's also held
- * across watch callbacks. */
-extern struct semaphore xenbus_lock;
+struct xenbus_transaction;
 
-char **xenbus_directory(const char *dir, const char *node, unsigned int *num);
-void *xenbus_read(const char *dir, const char *node, unsigned int *len);
-int xenbus_write(const char *dir, const char *node, const char *string);
-int xenbus_mkdir(const char *dir, const char *node);
-int xenbus_exists(const char *dir, const char *node);
-int xenbus_rm(const char *dir, const char *node);
-int xenbus_transaction_start(void);
-int xenbus_transaction_end(int abort);
+char **xenbus_directory(struct xenbus_transaction *t,
+			const char *dir, const char *node, unsigned int *num);
+void *xenbus_read(struct xenbus_transaction *t,
+		  const char *dir, const char *node, unsigned int *len);
+int xenbus_write(struct xenbus_transaction *t,
+		 const char *dir, const char *node, const char *string);
+int xenbus_mkdir(struct xenbus_transaction *t,
+		 const char *dir, const char *node);
+int xenbus_exists(struct xenbus_transaction *t,
+		  const char *dir, const char *node);
+int xenbus_rm(struct xenbus_transaction *t, const char *dir, const char *node);
+struct xenbus_transaction *xenbus_transaction_start(void);
+int xenbus_transaction_end(struct xenbus_transaction *t, int abort);
 
 /* Single read and scanf: returns -errno or num scanned if > 0. */
-int xenbus_scanf(const char *dir, const char *node, const char *fmt, ...)
-	__attribute__((format(scanf, 3, 4)));
+int xenbus_scanf(struct xenbus_transaction *t,
+		 const char *dir, const char *node, const char *fmt, ...)
+	__attribute__((format(scanf, 4, 5)));
 
 /* Single printf and write: returns -errno or 0. */
-int xenbus_printf(const char *dir, const char *node, const char *fmt, ...)
-	__attribute__((format(printf, 3, 4)));
+int xenbus_printf(struct xenbus_transaction *t,
+		  const char *dir, const char *node, const char *fmt, ...)
+	__attribute__((format(printf, 4, 5)));
 
 /* Generic read function: NULL-terminated triples of name,
  * sprintf-style type string, and pointer. Returns 0 or errno.*/
-int xenbus_gather(const char *dir, ...);
+int xenbus_gather(struct xenbus_transaction *t, const char *dir, ...);
 
 /* Report a (negative) errno into the store, with explanation. */
 void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt,...);
@@ -113,7 +118,11 @@ void xenbus_dev_ok(struct xenbus_device *dev);
 struct xenbus_watch
 {
 	struct list_head list;
+
+	/* Path being watched. */
 	char *node;
+
+	/* Callback (executed in a process context with no locks held). */
 	void (*callback)(struct xenbus_watch *,
 			 const char **vec, unsigned int len);
 };
@@ -124,7 +133,11 @@ void unregister_xenstore_notifier(struct notifier_block *nb);
 
 int register_xenbus_watch(struct xenbus_watch *watch);
 void unregister_xenbus_watch(struct xenbus_watch *watch);
-void reregister_xenbus_watches(void);
+void xs_suspend(void);
+void xs_resume(void);
+
+/* Used by xenbus_dev to borrow kernel's store connection. */
+void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg);
 
 /* Called from xen core code. */
 void xenbus_suspend(void);

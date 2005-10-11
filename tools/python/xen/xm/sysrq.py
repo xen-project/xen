@@ -1,16 +1,11 @@
 # (C) Matthew Bloch <matthew@bytemark.co.uk> 2004
+# Copyright (C) 2005 XenSource Ltd
 
-"""Domain shutdown.
+"""Domain sysrq.
 """
-import string
-import sys
-import time
 
 from xen.xend.XendClient import server
 from xen.xm.opts import *
-
-DOM0_NAME = 'Domain-0'
-DOM0_ID = '0'
 
 gopts = Opts(use="""[DOM] [letter]
 
