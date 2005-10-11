@@ -20,69 +20,48 @@
 #include <linux/sched.h>
 #include <linux/err.h>
 #include "xencons_ring.h"
-
-struct ring_head
-{
-	u32 cons;
-	u32 prod;
-	char buf[0];
-} __attribute__((packed));
+#include <asm-xen/xen-public/io/console.h>
 
 static int xencons_irq;
+static xencons_receiver_func *xencons_receiver;
 
-#define XENCONS_RING_SIZE (PAGE_SIZE/2 - sizeof (struct ring_head))
-#define XENCONS_IDX(cnt) ((cnt) % XENCONS_RING_SIZE)
-#define XENCONS_FULL(ring) (((ring)->prod - (ring)->cons) == XENCONS_RING_SIZE)
-
-static inline struct ring_head *outring(void)
+static inline struct xencons_interface *xencons_interface(void)
 {
 	return mfn_to_virt(xen_start_info->console_mfn);
 }
 
-static inline struct ring_head *inring(void)
-{
-	return mfn_to_virt(xen_start_info->console_mfn) + PAGE_SIZE/2;
-}
-
-
-/* don't block -  write as much as possible and return */
-static int __xencons_ring_send(
-	struct ring_head *ring, const char *data, unsigned len)
-{
-	int copied = 0;
-
-	mb();
-	while (copied < len && !XENCONS_FULL(ring)) {
-		ring->buf[XENCONS_IDX(ring->prod)] = data[copied];
-		ring->prod++;
-		copied++;
-	}
-	mb();
-
-	return copied;
-}
-
 int xencons_ring_send(const char *data, unsigned len)
 {
-	int sent = __xencons_ring_send(outring(), data, len);
+	int sent = 0;
+	struct xencons_interface *intf = xencons_interface();
+
+	while ((sent < len) &&
+	       (intf->out_prod - intf->out_cons) < sizeof(intf->out)) {
+		intf->out[MASK_XENCONS_IDX(intf->out_prod, intf->out)] =
+			data[sent];
+		intf->out_prod++;
+		sent++;
+	}
+
 	/* Use evtchn: this is called early, before irq is set up. */
 	notify_remote_via_evtchn(xen_start_info->console_evtchn);
+
 	return sent;
 }	
 
-
-static xencons_receiver_func *xencons_receiver;
-
 static irqreturn_t handle_input(int irq, void *unused, struct pt_regs *regs)
 {
-	struct ring_head *ring = inring();
-	while (ring->cons < ring->prod) {
-		if (xencons_receiver != NULL) {
-			xencons_receiver(ring->buf + XENCONS_IDX(ring->cons),
-					 1, regs);
-		}
-		ring->cons++;
+	struct xencons_interface *intf = xencons_interface();
+
+	while (intf->in_cons != intf->in_prod) {
+		if (xencons_receiver != NULL)
+			xencons_receiver(
+				intf->in + MASK_XENCONS_IDX(intf->in_cons,
+							    intf->in),
+				1, regs);
+		intf->in_cons++;
 	}
+
 	return IRQ_HANDLED;
 }
 
@@ -96,7 +75,7 @@ int xencons_ring_init(void)
 	int err;
 
 	if (xencons_irq)
-		unbind_evtchn_from_irqhandler(xencons_irq, inring());
+		unbind_evtchn_from_irqhandler(xencons_irq, NULL);
 	xencons_irq = 0;
 
 	if (!xen_start_info->console_evtchn)
@@ -104,7 +83,7 @@ int xencons_ring_init(void)
 
 	err = bind_evtchn_to_irqhandler(
 		xen_start_info->console_evtchn,
-		handle_input, 0, "xencons", inring());
+		handle_input, 0, "xencons", NULL);
 	if (err <= 0) {
 		xprintk("XEN console request irq failed %i\n", err);
 		return err;
