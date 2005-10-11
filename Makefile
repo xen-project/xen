@@ -66,7 +66,7 @@ install-tools:
 	$(MAKE) -C tools install
 
 install-kernels:
-	for i in $(XKERNELS) ; do $(MAKE) $$i-build || exit 1; done
+	for i in $(XKERNELS) ; do $(MAKE) $$i-install || exit 1; done
 
 install-docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
