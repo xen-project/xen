@@ -49,6 +49,8 @@ def init(filename, level=logging.INFO, maxBytes=None, backupCount=None):
     stderr unless addLogStderr() is called.
     """
 
+    global logfilename
+
     def openFileHandler(fname):
         return logging.handlers.RotatingFileHandler(fname,
                                                     mode='a',
