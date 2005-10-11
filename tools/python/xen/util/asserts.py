@@ -17,6 +17,11 @@
 
 
 def isCharConvertible(c):
+    """Assert that the given value is convertible to a character using the %c
+    conversion.  This implies that c is either an integer, or a character
+    (i.e. a string of length 1).
+    """
+    
     assert (isinstance(c, int) or
             (isinstance(c, str) and
              len(c) == 1)), "%s is not convertible to a character" % c
