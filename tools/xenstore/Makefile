@@ -129,7 +129,7 @@ TAGS:
 tarball: clean
 	cd .. && tar -c -j -v -h -f xenstore.tar.bz2 xenstore/
 
-install: libxenstore.so xenstored $(CLIENTS)
+install: libxenstore.so xenstored xsls $(CLIENTS)
 	$(INSTALL_DIR) -p $(DESTDIR)/var/run/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/var/lib/xenstored
 	$(INSTALL_DIR) -p $(DESTDIR)/usr/bin
