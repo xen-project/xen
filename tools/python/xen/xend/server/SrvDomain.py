@@ -135,24 +135,24 @@ class SrvDomain(SrvDir):
 
     def op_devices(self, op, req):
         return self.call(self.dom.getDeviceSxprs,
-                         [['deviceClass', 'str']],
+                         [['type', 'str']],
                          req)
 
     def op_device_create(self, op, req):
         return self.call(self.dom.device_create,
-                         [['dev_config', 'sxpr']],
+                         [['config', 'sxpr']],
                          req)
 
     def op_device_destroy(self, op, req):
         return self.call(self.dom.destroyDevice,
-                         [['deviceClass', 'str'],
-                          ['devid',       'int']],
+                         [['type', 'str'],
+                          ['dev',  'int']],
                          req)
                 
     def op_device_configure(self, op, req):
         return self.call(self.dom.device_configure,
-                         [['dev_config', 'sxpr'],
-                          ['devid',       'int']],
+                         [['config', 'sxpr'],
+                          ['dev',    'int']],
                          req)
 
 
