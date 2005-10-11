@@ -539,6 +539,9 @@ static struct buffered_data *new_buffer(void *ctx)
 	struct buffered_data *data;
 
 	data = talloc(ctx, struct buffered_data);
+	if (data == NULL)
+		return NULL;
+	
 	data->inhdr = true;
 	data->used = 0;
 	data->buffer = NULL;
@@ -583,15 +586,24 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 {
 	struct buffered_data *bdata;
 
-	/* When data gets freed, we want list entry is destroyed (so
-	 * list entry is a child). */
+	/* Message is a child of the connection context for auto-cleanup. */
 	bdata = new_buffer(conn);
 	bdata->buffer = talloc_array(bdata, char, len);
 
+	/* Echo request header in reply unless this is an async watch event. */
+	if (type != XS_WATCH_EVENT) {
+		memcpy(&bdata->hdr.msg, &conn->in->hdr.msg,
+		       sizeof(struct xsd_sockmsg));
+	} else {
+		memset(&bdata->hdr.msg, 0, sizeof(struct xsd_sockmsg));
+	}
+
+	/* Update relevant header fields and fill in the message body. */
 	bdata->hdr.msg.type = type;
 	bdata->hdr.msg.len = len;
 	memcpy(bdata->buffer, data, len);
 
+	/* Queue for later transmission. */
 	list_add_tail(&bdata->list, &conn->out_list);
 }
 
@@ -1144,36 +1156,25 @@ static int out_of_mem(void *data)
 
 static void consider_message(struct connection *conn)
 {
-	/*
-	 * 'volatile' qualifier prevents register allocation which fixes:
-	 *   warning: variable 'xxx' might be clobbered by 'longjmp' or 'vfork'
-	 */
-	struct buffered_data *volatile in = NULL;
-	enum xsd_sockmsg_type volatile type = conn->in->hdr.msg.type;
 	jmp_buf talloc_fail;
+
+	if (verbose)
+		xprintf("Got message %s len %i from %p\n",
+			sockmsg_string(conn->in->hdr.msg.type),
+			conn->in->hdr.msg.len, conn);
 
 	/* For simplicity, we kill the connection on OOM. */
 	talloc_set_fail_handler(out_of_mem, &talloc_fail);
 	if (setjmp(talloc_fail)) {
-		/* Free in before conn, in case it needs something. */
-		talloc_free(in);
 		talloc_free(conn);
 		goto end;
 	}
 
-	if (verbose)
-		xprintf("Got message %s len %i from %p\n",
-			sockmsg_string(type), conn->in->hdr.msg.len, conn);
+	process_message(conn, conn->in);
 
-	/* Careful: process_message may free connection.  We detach
-	 * "in" beforehand and allocate the new buffer to avoid
-	 * touching conn after process_message.
-	 */
-	in = talloc_steal(talloc_autofree_context(), conn->in);
+	talloc_free(conn->in);
 	conn->in = new_buffer(conn);
-	process_message(conn, in);
 
-	talloc_free(in);
 end:
 	talloc_set_fail_handler(NULL, NULL);
 	if (talloc_total_blocks(NULL)
@@ -1242,12 +1243,7 @@ static void handle_output(struct connection *conn)
 
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 {
-	/*
-	 * 'volatile' qualifier prevents register allocation which fixes:
-	 *   warning: variable 'xxx' might be clobbered by 'longjmp' or 'vfork'
-	 */
-	struct connection *volatile new;
-	jmp_buf talloc_fail;
+	struct connection *new;
 
 	new = talloc(talloc_autofree_context(), struct connection);
 	if (!new)
@@ -1262,13 +1258,11 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	INIT_LIST_HEAD(&new->watches);
 	INIT_LIST_HEAD(&new->transaction_list);
 
-	talloc_set_fail_handler(out_of_mem, &talloc_fail);
-	if (setjmp(talloc_fail)) {
+	new->in = new_buffer(new);
+	if (new->in == NULL) {
 		talloc_free(new);
 		return NULL;
 	}
-	new->in = new_buffer(new);
-	talloc_set_fail_handler(NULL, NULL);
 
 	list_add_tail(&new->list, &connections);
 	talloc_set_destructor(new, destroy_conn);
