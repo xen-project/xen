@@ -50,72 +50,33 @@ static bool readonly = false;
 static bool print_input = false;
 static unsigned int linenum = 0;
 
-struct ringbuf_head
-{
-	uint32_t write; /* Next place to write to */
-	uint32_t read; /* Next place to read from */
-	uint8_t flags;
-	char buf[0];
-} __attribute__((packed));
-
-static struct ringbuf_head *out, *in;
-static unsigned int ringbuf_datasize;
 static int daemon_pid;
+static struct xenstore_domain_interface *interface;
 
 /* FIXME: Mark connection as broken (close it?) when this happens. */
-static bool check_buffer(const struct ringbuf_head *h)
+static bool check_indexes(XENSTORE_RING_IDX cons, XENSTORE_RING_IDX prod)
 {
-	return (h->write < ringbuf_datasize && h->read < ringbuf_datasize);
+	return ((prod - cons) <= XENSTORE_RING_SIZE);
 }
 
-/* We can't fill last byte: would look like empty buffer. */
-static void *get_output_chunk(const struct ringbuf_head *h,
-			      void *buf, uint32_t *len)
+static void *get_output_chunk(XENSTORE_RING_IDX cons,
+			      XENSTORE_RING_IDX prod,
+			      char *buf, uint32_t *len)
 {
-	uint32_t read_mark;
-
-	if (h->read == 0)
-		read_mark = ringbuf_datasize - 1;
-	else
-		read_mark = h->read - 1;
-
-	/* Here to the end of buffer, unless they haven't read some out. */
-	*len = ringbuf_datasize - h->write;
-	if (read_mark >= h->write)
-		*len = read_mark - h->write;
-	return buf + h->write;
+	*len = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(prod);
+	if ((XENSTORE_RING_SIZE - (prod - cons)) < *len)
+		*len = XENSTORE_RING_SIZE - (prod - cons);
+	return buf + MASK_XENSTORE_IDX(prod);
 }
 
-static const void *get_input_chunk(const struct ringbuf_head *h,
-				   const void *buf, uint32_t *len)
+static const void *get_input_chunk(XENSTORE_RING_IDX cons,
+				   XENSTORE_RING_IDX prod,
+				   const char *buf, uint32_t *len)
 {
-	/* Here to the end of buffer, unless they haven't written some. */
-	*len = ringbuf_datasize - h->read;
-	if (h->write >= h->read)
-		*len = h->write - h->read;
-	return buf + h->read;
-}
-
-static int output_avail(struct ringbuf_head *out)
-{
-	unsigned int avail;
-
-	get_output_chunk(out, out->buf, &avail);
-	return avail != 0;
-}
-
-static void update_output_chunk(struct ringbuf_head *h, uint32_t len)
-{
-	h->write += len;
-	if (h->write == ringbuf_datasize)
-		h->write = 0;
-}
-
-static void update_input_chunk(struct ringbuf_head *h, uint32_t len)
-{
-	h->read += len;
-	if (h->read == ringbuf_datasize)
-		h->read = 0;
+	*len = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(cons);
+	if ((prod - cons) < *len)
+		*len = prod - cons;
+	return buf + MASK_XENSTORE_IDX(cons);
 }
 
 /* FIXME: We spin, and we're sloppy. */
@@ -123,25 +84,28 @@ static bool read_all_shmem(int fd __attribute__((unused)),
 			   void *data, unsigned int len)
 {
 	unsigned int avail;
-	int was_full;
+	struct xenstore_domain_interface *intf = interface;
+	XENSTORE_RING_IDX cons, prod;
+	const void *src;
 
-	if (!check_buffer(in))
-		barf("Corrupt buffer");
-
-	was_full = !output_avail(in);
 	while (len) {
-		const void *src = get_input_chunk(in, in->buf, &avail);
+		cons = intf->rsp_cons;
+		prod = intf->rsp_prod;
+		if (!check_indexes(cons, prod))
+			barf("Corrupt buffer");
+
+		src = get_input_chunk(cons, prod, intf->rsp, &avail);
 		if (avail > len)
 			avail = len;
 		memcpy(data, src, avail);
 		data += avail;
 		len -= avail;
-		update_input_chunk(in, avail);
+		intf->rsp_cons += avail;
 	}
 
 	/* Tell other end we read something. */
-	if (was_full)
-		kill(daemon_pid, SIGUSR2);
+	kill(daemon_pid, SIGUSR2);
+
 	return true;
 }
 
@@ -149,22 +113,28 @@ static bool write_all_shmem(int fd __attribute__((unused)),
 			    const void *data, unsigned int len)
 {
 	uint32_t avail;
-
-	if (!check_buffer(out))
-		barf("Corrupt buffer");
+	struct xenstore_domain_interface *intf = interface;
+	XENSTORE_RING_IDX cons, prod;
+	void *dst;
 
 	while (len) {
-		void *dst = get_output_chunk(out, out->buf, &avail);
+		cons = intf->req_cons;
+		prod = intf->req_prod;
+		if (!check_indexes(cons, prod))
+			barf("Corrupt buffer");
+
+		dst = get_output_chunk(cons, prod, intf->req, &avail);
 		if (avail > len)
 			avail = len;
 		memcpy(dst, data, avail);
 		data += avail;
 		len -= avail;
-		update_output_chunk(out, avail);
+		intf->req_prod += avail;
 	}
 
 	/* Tell other end we wrote something. */
 	kill(daemon_pid, SIGUSR2);
+
 	return true;
 }
 
@@ -552,21 +522,21 @@ static void do_introduce(unsigned int handle,
 			break;
 
 	fd = open("/tmp/xcmap", O_RDWR);
-	/* Set in and out pointers. */
-	out = mmap(NULL, getpagesize(), PROT_WRITE|PROT_READ, MAP_SHARED,fd,0);
-	if (out == MAP_FAILED)
+	/* Set shared comms page. */
+	interface = mmap(NULL, getpagesize(), PROT_WRITE|PROT_READ,
+			 MAP_SHARED,fd,0);
+	if (interface == MAP_FAILED)
 		barf_perror("Failed to map /tmp/xcmap page");
-	in = (void *)out + getpagesize() / 2;
 	close(fd);
 
 	/* Tell them the event channel and our PID. */
-	*(int *)((void *)out + 32) = getpid();
-	*(uint16_t *)((void *)out + 36) = atoi(eventchn);
+	*(int *)((void *)interface + 32) = getpid();
+	*(uint16_t *)((void *)interface + 36) = atoi(eventchn);
 
 	if (!xs_introduce_domain(handles[handle], atoi(domid),
 				 atol(mfn), atoi(eventchn), path)) {
 		failed(handle);
-		munmap(out, getpagesize());
+		munmap(interface, getpagesize());
 		return;
 	}
 	output("handle is %i\n", i);
@@ -576,7 +546,7 @@ static void do_introduce(unsigned int handle,
 	handles[i]->fd = -2;
 
 	/* Read in daemon pid. */
-	daemon_pid = *(int *)((void *)out + 32);
+	daemon_pid = *(int *)((void *)interface + 32);
 }
 
 static void do_release(unsigned int handle, const char *domid)
@@ -822,9 +792,6 @@ int main(int argc, char *argv[])
 	} else if (optind != argc)
 		usage();
 	
-
-	/* The size of the ringbuffer: half a page minus head structure. */
-	ringbuf_datasize = getpagesize() / 2 - sizeof(struct ringbuf_head);
 
 	signal(SIGALRM, alarmed);
 	while (fgets(line, sizeof(line), stdin))

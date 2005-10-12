@@ -1586,7 +1586,7 @@ int main(int argc, char *argv[])
 				goto more;
 			}
 
-			if (domain_can_write(i)) {
+			if (domain_can_write(i) && !list_empty(&i->out_list)) {
 				handle_output(i);
 				goto more;
 			}

@@ -33,29 +33,16 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/err.h>
+#include <asm-xen/xenbus.h>
 #include "xenbus_comms.h"
-
-#define RINGBUF_DATASIZE ((PAGE_SIZE / 2) - sizeof(struct ringbuf_head))
-struct ringbuf_head
-{
-	u32 write; /* Next place to write to */
-	u32 read; /* Next place to read from */
-	u8 flags;
-	char buf[0];
-} __attribute__((packed));
 
 static int xenbus_irq;
 
 DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
 
-static inline struct ringbuf_head *outbuf(void)
+static inline struct xenstore_domain_interface *xenstore_domain_interface(void)
 {
 	return mfn_to_virt(xen_start_info->store_mfn);
-}
-
-static inline struct ringbuf_head *inbuf(void)
-{
-	return mfn_to_virt(xen_start_info->store_mfn) + PAGE_SIZE/2;
 }
 
 static irqreturn_t wake_waiting(int irq, void *unused, struct pt_regs *regs)
@@ -64,86 +51,56 @@ static irqreturn_t wake_waiting(int irq, void *unused, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-static int check_buffer(const struct ringbuf_head *h)
+static int check_indexes(XENSTORE_RING_IDX cons, XENSTORE_RING_IDX prod)
 {
-	return (h->write < RINGBUF_DATASIZE && h->read < RINGBUF_DATASIZE);
+	return ((prod - cons) <= XENSTORE_RING_SIZE);
 }
 
-/* We can't fill last byte: would look like empty buffer. */
-static void *get_output_chunk(const struct ringbuf_head *h,
-			      void *buf, u32 *len)
+static void *get_output_chunk(XENSTORE_RING_IDX cons,
+			      XENSTORE_RING_IDX prod,
+			      char *buf, uint32_t *len)
 {
-	u32 read_mark;
-
-	if (h->read == 0)
-		read_mark = RINGBUF_DATASIZE - 1;
-	else
-		read_mark = h->read - 1;
-
-	/* Here to the end of buffer, unless they haven't read some out. */
-	*len = RINGBUF_DATASIZE - h->write;
-	if (read_mark >= h->write)
-		*len = read_mark - h->write;
-	return buf + h->write;
+	*len = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(prod);
+	if ((XENSTORE_RING_SIZE - (prod - cons)) < *len)
+		*len = XENSTORE_RING_SIZE - (prod - cons);
+	return buf + MASK_XENSTORE_IDX(prod);
 }
 
-static const void *get_input_chunk(const struct ringbuf_head *h,
-				   const void *buf, u32 *len)
+static const void *get_input_chunk(XENSTORE_RING_IDX cons,
+				   XENSTORE_RING_IDX prod,
+				   const char *buf, uint32_t *len)
 {
-	/* Here to the end of buffer, unless they haven't written some. */
-	*len = RINGBUF_DATASIZE - h->read;
-	if (h->write >= h->read)
-		*len = h->write - h->read;
-	return buf + h->read;
-}
-
-static void update_output_chunk(struct ringbuf_head *h, u32 len)
-{
-	h->write += len;
-	if (h->write == RINGBUF_DATASIZE)
-		h->write = 0;
-}
-
-static void update_input_chunk(struct ringbuf_head *h, u32 len)
-{
-	h->read += len;
-	if (h->read == RINGBUF_DATASIZE)
-		h->read = 0;
-}
-
-static int output_avail(struct ringbuf_head *out)
-{
-	unsigned int avail;
-
-	get_output_chunk(out, out->buf, &avail);
-	return avail != 0;
+	*len = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(cons);
+	if ((prod - cons) < *len)
+		*len = prod - cons;
+	return buf + MASK_XENSTORE_IDX(cons);
 }
 
 int xb_write(const void *data, unsigned len)
 {
-	struct ringbuf_head h;
-	struct ringbuf_head *out = outbuf();
+	struct xenstore_domain_interface *intf = xenstore_domain_interface();
+	XENSTORE_RING_IDX cons, prod;
 
-	do {
+	while (len != 0) {
 		void *dst;
 		unsigned int avail;
 
-		wait_event_interruptible(xb_waitq, output_avail(out));
+		wait_event_interruptible(xb_waitq,
+					 (intf->req_prod - intf->req_cons) !=
+					 XENSTORE_RING_SIZE);
 
-		/* Make local copy of header to check for sanity. */
-		h = *out;
-		if (!check_buffer(&h))
+		/* Read indexes, then verify. */
+		cons = intf->req_cons;
+		prod = intf->req_prod;
+		mb();
+		if (!check_indexes(cons, prod))
 			return -EIO;
 
-		dst = get_output_chunk(&h, out->buf, &avail);
+		dst = get_output_chunk(cons, prod, intf->req, &avail);
 		if (avail == 0)
 			continue;
 		if (avail > len)
 			avail = len;
-
-		/* Make sure we read header before we write data
-		 * (implied by data-dependency, but let's play safe). */
-		mb();
 
 		memcpy(dst, data, avail);
 		data += avail;
@@ -151,46 +108,39 @@ int xb_write(const void *data, unsigned len)
 
 		/* Other side must not see new header until data is there. */
 		wmb();
-		update_output_chunk(out, avail);
+		intf->req_prod += avail;
 
 		/* This implies mb() before other side sees interrupt. */
 		notify_remote_via_evtchn(xen_start_info->store_evtchn);
-	} while (len != 0);
+	}
 
 	return 0;
 }
 
-int xs_input_avail(void)
-{
-	unsigned int avail;
-	struct ringbuf_head *in = inbuf();
-
-	get_input_chunk(in, in->buf, &avail);
-	return avail != 0;
-}
-
 int xb_read(void *data, unsigned len)
 {
-	struct ringbuf_head h;
-	struct ringbuf_head *in = inbuf();
-	int was_full;
+	struct xenstore_domain_interface *intf = xenstore_domain_interface();
+	XENSTORE_RING_IDX cons, prod;
 
 	while (len != 0) {
 		unsigned int avail;
 		const char *src;
 
-		wait_event_interruptible(xb_waitq, xs_input_avail());
+		wait_event_interruptible(xb_waitq,
+					 intf->rsp_cons != intf->rsp_prod);
 
-		h = *in;
-		if (!check_buffer(&h))
+		/* Read indexes, then verify. */
+		cons = intf->rsp_cons;
+		prod = intf->rsp_prod;
+		mb();
+		if (!check_indexes(cons, prod))
 			return -EIO;
 
-		src = get_input_chunk(&h, in->buf, &avail);
+		src = get_input_chunk(cons, prod, intf->rsp, &avail);
 		if (avail == 0)
 			continue;
 		if (avail > len)
 			avail = len;
-		was_full = !output_avail(&h);
 
 		/* We must read header before we read data. */
 		rmb();
@@ -201,13 +151,12 @@ int xb_read(void *data, unsigned len)
 
 		/* Other side must not see free space until we've copied out */
 		mb();
+		intf->rsp_cons += avail;
 
-		update_input_chunk(in, avail);
 		pr_debug("Finished read of %i bytes (%i to go)\n", avail, len);
-		/* If it was full, tell them we've taken some. */
-		if (was_full)
-			/* Implies mb(): they will see new header. */
-			notify_remote_via_evtchn(xen_start_info->store_evtchn);
+
+		/* Implies mb(): they will see new header. */
+		notify_remote_via_evtchn(xen_start_info->store_evtchn);
 	}
 
 	return 0;

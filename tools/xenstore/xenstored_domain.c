@@ -42,7 +42,6 @@
 static int *xc_handle;
 static int eventchn_fd;
 static int virq_port;
-static unsigned int ringbuf_datasize;
 
 struct domain
 {
@@ -66,10 +65,7 @@ struct domain
 	char *path;
 
 	/* Shared page. */
-	void *page;
-
-	/* Input and output ringbuffer heads. */
-	struct ringbuf_head *input, *output;
+	struct xenstore_domain_interface *interface;
 
 	/* The connection associated with this. */
 	struct connection *conn;
@@ -79,14 +75,6 @@ struct domain
 };
 
 static LIST_HEAD(domains);
-
-struct ringbuf_head
-{
-	uint32_t write; /* Next place to write to */
-	uint32_t read; /* Next place to read from */
-	uint8_t flags;
-	char buf[0];
-} __attribute__((packed));
 
 #ifndef TESTING
 static void evtchn_notify(int port)
@@ -100,91 +88,57 @@ extern void evtchn_notify(int port);
 #endif
 
 /* FIXME: Mark connection as broken (close it?) when this happens. */
-static bool check_buffer(const struct ringbuf_head *h)
+static bool check_indexes(XENSTORE_RING_IDX cons, XENSTORE_RING_IDX prod)
 {
-	return (h->write < ringbuf_datasize && h->read < ringbuf_datasize);
+	return ((prod - cons) <= XENSTORE_RING_SIZE);
 }
 
-/* We can't fill last byte: would look like empty buffer. */
-static void *get_output_chunk(const struct ringbuf_head *h,
-			      void *buf, uint32_t *len)
+static void *get_output_chunk(XENSTORE_RING_IDX cons,
+			      XENSTORE_RING_IDX prod,
+			      char *buf, uint32_t *len)
 {
-	uint32_t read_mark;
-
-	if (h->read == 0)
-		read_mark = ringbuf_datasize - 1;
-	else
-		read_mark = h->read - 1;
-
-	/* Here to the end of buffer, unless they haven't read some out. */
-	*len = ringbuf_datasize - h->write;
-	if (read_mark >= h->write)
-		*len = read_mark - h->write;
-	return buf + h->write;
+	*len = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(prod);
+	if ((XENSTORE_RING_SIZE - (prod - cons)) < *len)
+		*len = XENSTORE_RING_SIZE - (prod - cons);
+	return buf + MASK_XENSTORE_IDX(prod);
 }
 
-static const void *get_input_chunk(const struct ringbuf_head *h,
-				   const void *buf, uint32_t *len)
+static const void *get_input_chunk(XENSTORE_RING_IDX cons,
+				   XENSTORE_RING_IDX prod,
+				   const char *buf, uint32_t *len)
 {
-	/* Here to the end of buffer, unless they haven't written some. */
-	*len = ringbuf_datasize - h->read;
-	if (h->write >= h->read)
-		*len = h->write - h->read;
-	return buf + h->read;
-}
-
-static void update_output_chunk(struct ringbuf_head *h, uint32_t len)
-{
-	h->write += len;
-	if (h->write == ringbuf_datasize)
-		h->write = 0;
-}
-
-static void update_input_chunk(struct ringbuf_head *h, uint32_t len)
-{
-	h->read += len;
-	if (h->read == ringbuf_datasize)
-		h->read = 0;
-}
-
-static bool buffer_has_input(const struct ringbuf_head *h)
-{
-	uint32_t len;
-
-	get_input_chunk(h, NULL, &len);
-	return (len != 0);
-}
-
-static bool buffer_has_output_room(const struct ringbuf_head *h)
-{
-	uint32_t len;
-
-	get_output_chunk(h, NULL, &len);
-	return (len != 0);
+	*len = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(cons);
+	if ((prod - cons) < *len)
+		*len = prod - cons;
+	return buf + MASK_XENSTORE_IDX(cons);
 }
 
 static int writechn(struct connection *conn, const void *data, unsigned int len)
 {
 	uint32_t avail;
 	void *dest;
-	struct ringbuf_head h;
+	struct xenstore_domain_interface *intf = conn->domain->interface;
+	XENSTORE_RING_IDX cons, prod;
 
-	/* Must read head once, and before anything else, and verified. */
-	h = *conn->domain->output;
+	/* Must read indexes once, and before anything else, and verified. */
+	cons = intf->rsp_cons;
+	prod = intf->rsp_prod;
 	mb();
-	if (!check_buffer(&h)) {
+	if (!check_indexes(cons, prod)) {
 		errno = EIO;
 		return -1;
 	}
 
-	dest = get_output_chunk(&h, conn->domain->output->buf, &avail);
+	dest = get_output_chunk(cons, prod, intf->rsp, &avail);
 	if (avail < len)
 		len = avail;
 
 	memcpy(dest, data, len);
 	mb();
-	update_output_chunk(conn->domain->output, len);
+	intf->rsp_prod += len;
+
 	evtchn_notify(conn->domain->port);
+
 	return len;
 }
 
@@ -192,32 +146,29 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 {
 	uint32_t avail;
 	const void *src;
-	struct ringbuf_head h;
-	bool was_full;
+	struct xenstore_domain_interface *intf = conn->domain->interface;
+	XENSTORE_RING_IDX cons, prod;
 
-	/* Must read head once, and before anything else, and verified. */
-	h = *conn->domain->input;
+	/* Must read indexes once, and before anything else, and verified. */
+	cons = intf->req_cons;
+	prod = intf->req_prod;
 	mb();
 
-	if (!check_buffer(&h)) {
+	if (!check_indexes(cons, prod)) {
 		errno = EIO;
 		return -1;
 	}
 
-	src = get_input_chunk(&h, conn->domain->input->buf, &avail);
+	src = get_input_chunk(cons, prod, intf->req, &avail);
 	if (avail < len)
 		len = avail;
 
-	was_full = !buffer_has_output_room(&h);
 	memcpy(data, src, len);
 	mb();
-	update_input_chunk(conn->domain->input, len);
-	/* FIXME: Probably not neccessary. */
-	mb();
+	intf->req_cons += len;
 
-	/* If it was full, tell them we've taken some. */
-	if (was_full)
-		evtchn_notify(conn->domain->port);
+	evtchn_notify(conn->domain->port);
+
 	return len;
 }
 
@@ -234,8 +185,8 @@ static int destroy_domain(void *_domain)
 			eprintf("> Unbinding port %i failed!\n", domain->port);
 	}
 
-	if (domain->page)
-		munmap(domain->page, getpagesize());
+	if (domain->interface)
+		munmap(domain->interface, getpagesize());
 
 	return 0;
 }
@@ -285,13 +236,14 @@ void handle_event(void)
 
 bool domain_can_read(struct connection *conn)
 {
-	return buffer_has_input(conn->domain->input);
+	struct xenstore_domain_interface *intf = conn->domain->interface;
+	return (intf->req_cons != intf->req_prod);
 }
 
 bool domain_can_write(struct connection *conn)
 {
-	return (!list_empty(&conn->out_list) &&
-                buffer_has_output_room(conn->domain->output));
+	struct xenstore_domain_interface *intf = conn->domain->interface;
+	return ((intf->rsp_prod - intf->rsp_cons) != XENSTORE_RING_SIZE);
 }
 
 static struct domain *new_domain(void *context, unsigned int domid,
@@ -307,19 +259,14 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	domain->shutdown = 0;
 	domain->domid = domid;
 	domain->path = talloc_strdup(domain, path);
-	domain->page = xc_map_foreign_range(*xc_handle, domain->domid,
-					    getpagesize(),
-					    PROT_READ|PROT_WRITE,
-					    mfn);
-	if (!domain->page)
+	domain->interface = xc_map_foreign_range(
+		*xc_handle, domain->domid,
+		getpagesize(), PROT_READ|PROT_WRITE, mfn);
+	if (!domain->interface)
 		return NULL;
 
 	list_add(&domain->list, &domains);
 	talloc_set_destructor(domain, destroy_domain);
-
-	/* One in each half of page. */
-	domain->input = domain->page;
-	domain->output = domain->page + getpagesize()/2;
 
 	/* Tell kernel we're interested in this event. */
 	bind.remote_domain = domid;
@@ -504,9 +451,6 @@ int domain_init(void)
 	struct ioctl_evtchn_bind_virq bind;
 	int rc;
 
-	/* The size of the ringbuffer: half a page minus head structure. */
-	ringbuf_datasize = getpagesize() / 2 - sizeof(struct ringbuf_head);
-
 	xc_handle = talloc(talloc_autofree_context(), int);
 	if (!xc_handle)
 		barf_perror("Failed to allocate domain handle");
@@ -548,3 +492,13 @@ int domain_init(void)
 
 	return eventchn_fd;
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */
