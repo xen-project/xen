@@ -33,7 +33,7 @@
 #include <sys/ioctl.h>
 #include <string.h>
 #include <netinet/in.h>
-#include "secpol_compat.h"
+#include <stdint.h>
 #include <xen/acm.h>
 #include <xen/acm_ops.h>
 #include <xen/linux/privcmd.h>

@@ -1,4 +1,3 @@
-
 /******************************************************************************
  * acm_ops.h
  *
@@ -32,44 +31,44 @@
 
 /************************************************************************/
 
-#define ACM_SETPOLICY        	4
+#define ACM_SETPOLICY         4
 typedef struct acm_setpolicy {
     /* OUT variables */
     void *pushcache;
-    u16 pushcache_size;
+    uint16_t pushcache_size;
 } acm_setpolicy_t;
 
 
-#define ACM_GETPOLICY        	5
+#define ACM_GETPOLICY         5
 typedef struct acm_getpolicy {
     /* OUT variables */
     void *pullcache;
-    u16 pullcache_size;
+    uint16_t pullcache_size;
 } acm_getpolicy_t;
 
 
-#define ACM_DUMPSTATS        	6
+#define ACM_DUMPSTATS         6
 typedef struct acm_dumpstats {
     void *pullcache;
-    u16 pullcache_size;
+    uint16_t pullcache_size;
 } acm_dumpstats_t;
 
 
-#define ACM_GETSSID          	7
+#define ACM_GETSSID           7
 enum get_type {UNSET, SSIDREF, DOMAINID};
 typedef struct acm_getssid {
-	enum get_type get_ssid_by;
-	union {
-		domaintype_t domainid;
-		ssidref_t    ssidref;
-	} id;
+    enum get_type get_ssid_by;
+    union {
+        domaintype_t domainid;
+        ssidref_t    ssidref;
+    } id;
     void *ssidbuf;
-    u16 ssidbuf_size;
+    uint16_t ssidbuf_size;
 } acm_getssid_t;
 
 typedef struct acm_op {
-    u32 cmd;
-    u32 interface_version;      /* ACM_INTERFACE_VERSION */
+    uint32_t cmd;
+    uint32_t interface_version;      /* ACM_INTERFACE_VERSION */
     union {
         acm_setpolicy_t setpolicy;
         acm_getpolicy_t getpolicy;
@@ -79,3 +78,13 @@ typedef struct acm_op {
 } acm_op_t;
 
 #endif                          /* __XEN_PUBLIC_ACM_OPS_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

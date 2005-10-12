@@ -18,8 +18,8 @@
 #define KOFFSET(_p)       ((_p)&~KZERO)
 
 static int parseaout9image(char *, unsigned long, struct domain_setup_info *);
-static int loadaout9image(char *, unsigned long, int, u32, unsigned long *, struct domain_setup_info *);
-static void copyout(int, u32, unsigned long *, unsigned long, void *, int);
+static int loadaout9image(char *, unsigned long, int, uint32_t, unsigned long *, struct domain_setup_info *);
+static void copyout(int, uint32_t, unsigned long *, unsigned long, void *, int);
 struct Exec *get_header(char *, unsigned long, struct Exec *);
 
 
@@ -79,7 +79,7 @@ static int
 loadaout9image(
     char *image,
     unsigned long image_size,
-    int xch, u32 dom,
+    int xch, uint32_t dom,
     unsigned long *parray,
     struct domain_setup_info *dsi)
 {
@@ -108,7 +108,7 @@ loadaout9image(
  */
 static void
 copyout(
-    int xch, u32 dom,
+    int xch, uint32_t dom,
     unsigned long *parray,
     unsigned long addr,
     void *buf,
@@ -135,8 +135,8 @@ copyout(
     }
 }
 
-#define swap16(_v) ((((u16)(_v)>>8)&0xff)|(((u16)(_v)&0xff)<<8))
-#define swap32(_v) (((u32)swap16((u16)(_v))<<16)|(u32)swap16((u32)((_v)>>16)))
+#define swap16(_v) ((((uint16_t)(_v)>>8)&0xff)|(((uint16_t)(_v)&0xff)<<8))
+#define swap32(_v) (((uint32_t)swap16((uint16_t)(_v))<<16)|(uint32_t)swap16((uint32_t)((_v)>>16)))
 
 /*
  * Decode the header from the start of image and return it.
@@ -147,7 +147,7 @@ get_header(
     unsigned long image_size,
     struct Exec *ehdr)
 {
-    u32 *v, x;
+    uint32_t *v, x;
     int i;
 
     if (A9_MAGIC == 0)
@@ -157,9 +157,9 @@ get_header(
         return 0;
 
     /* ... all big endian words */
-    v = (u32 *)ehdr;
+    v = (uint32_t *)ehdr;
     for (i = 0; i < sizeof(*ehdr); i += 4) {
-        x = *(u32 *)&image[i];
+        x = *(uint32_t *)&image[i];
         v[i/4] = swap32(x);
     }
 

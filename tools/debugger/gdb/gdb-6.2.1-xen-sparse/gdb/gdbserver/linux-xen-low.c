@@ -38,7 +38,7 @@
 #include <xenctrl.h>
 #define TRACE_ENTER /* printf("enter %s\n", __FUNCTION__) */
 
-long (*myptrace)(int xc_handle, enum __ptrace_request, u32, long, long);
+long (*myptrace)(int xc_handle, enum __ptrace_request, uint32_t, long, long);
 int (*myxcwait)(int xc_handle, int domain, int *status, int options) ;
 static int xc_handle;
 

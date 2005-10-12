@@ -12,9 +12,9 @@
 #include "ring.h"
 
 #ifndef blkif_vdev_t
-#define blkif_vdev_t   u16
+#define blkif_vdev_t   uint16_t
 #endif
-#define blkif_sector_t u64
+#define blkif_sector_t uint64_t
 
 #define BLKIF_OP_READ      0
 #define BLKIF_OP_WRITE     1
@@ -30,8 +30,8 @@
 #define BLKIF_MAX_SEGMENTS_PER_REQUEST 11
 
 typedef struct blkif_request {
-    u8             operation;    /* BLKIF_OP_???                         */
-    u8             nr_segments;  /* number of segments                   */
+    uint8_t        operation;    /* BLKIF_OP_???                         */
+    uint8_t        nr_segments;  /* number of segments                   */
     blkif_vdev_t   handle;       /* only for read/write requests         */
     unsigned long  id;           /* private guest value, echoed in resp  */
     blkif_sector_t sector_number;/* start sector idx on disk (r/w only)  */
@@ -51,8 +51,8 @@ typedef struct blkif_request {
 
 typedef struct blkif_response {
     unsigned long   id;              /* copied from request */
-    u8              operation;       /* copied from request */
-    s16             status;          /* BLKIF_RSP_???       */
+    uint8_t         operation;       /* copied from request */
+    int16_t         status;          /* BLKIF_RSP_???       */
 } blkif_response_t;
 
 #define BLKIF_RSP_ERROR  -1 /* non-specific 'error' */
@@ -72,3 +72,13 @@ DEFINE_RING_TYPES(blkif, blkif_request_t, blkif_response_t);
 #define VDISK_READONLY     0x4
 
 #endif /* __XEN_PUBLIC_IO_BLKIF_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

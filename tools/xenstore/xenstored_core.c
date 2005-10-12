@@ -378,7 +378,7 @@ bool is_child(const char *child, const char *parent)
 static struct node *read_node(struct connection *conn, const char *name)
 {
 	TDB_DATA key, data;
-	u32 *p;
+	uint32_t *p;
 	struct node *node;
 
 	key.dptr = (void *)name;
@@ -400,7 +400,7 @@ static struct node *read_node(struct connection *conn, const char *name)
 	talloc_steal(node, data.dptr);
 
 	/* Datalen, childlen, number of permissions */
-	p = (u32 *)data.dptr;
+	p = (uint32_t *)data.dptr;
 	node->num_perms = p[0];
 	node->datalen = p[1];
 	node->childlen = p[2];
@@ -423,14 +423,14 @@ static bool write_node(struct connection *conn, const struct node *node)
 	key.dptr = (void *)node->name;
 	key.dsize = strlen(node->name);
 
-	data.dsize = 3*sizeof(u32)
+	data.dsize = 3*sizeof(uint32_t)
 		+ node->num_perms*sizeof(node->perms[0])
 		+ node->datalen + node->childlen;
 	data.dptr = talloc_size(node, data.dsize);
-	((u32 *)data.dptr)[0] = node->num_perms;
-	((u32 *)data.dptr)[1] = node->datalen;
-	((u32 *)data.dptr)[2] = node->childlen;
-	p = data.dptr + 3 * sizeof(u32);
+	((uint32_t *)data.dptr)[0] = node->num_perms;
+	((uint32_t *)data.dptr)[1] = node->datalen;
+	((uint32_t *)data.dptr)[2] = node->childlen;
+	p = data.dptr + 3 * sizeof(uint32_t);
 
 	memcpy(p, node->perms, node->num_perms*sizeof(node->perms[0]));
 	p += node->num_perms*sizeof(node->perms[0]);
@@ -668,7 +668,7 @@ static char *perms_to_strings(const void *ctx,
 {
 	unsigned int i;
 	char *strings = NULL;
-	char buffer[MAX_STRLEN(domid_t) + 1];
+	char buffer[MAX_STRLEN(unsigned int) + 1];
 
 	for (*len = 0, i = 0; i < num; i++) {
 		if (!xs_perm_to_string(&perms[i], buffer))

@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <xenctrl.h>
 #include "xs.h"
 
 /** @file

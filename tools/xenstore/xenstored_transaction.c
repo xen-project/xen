@@ -53,7 +53,7 @@ struct transaction
 	struct list_head list;
 
 	/* Connection-local identifier for this transaction. */
-	u32 id;
+	uint32_t id;
 
 	/* Generation when transaction started. */
 	unsigned int generation;
@@ -107,7 +107,7 @@ static int destroy_transaction(void *_transaction)
 	return 0;
 }
 
-struct transaction *transaction_lookup(struct connection *conn, u32 id)
+struct transaction *transaction_lookup(struct connection *conn, uint32_t id)
 {
 	struct transaction *trans;
 

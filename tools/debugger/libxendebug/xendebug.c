@@ -41,8 +41,8 @@ typedef struct bwcpoint                           /* break/watch/catch point */
 {
     struct list_head list;
     unsigned long address;
-    u32 domain;
-    u8 old_value;                             /* old value for software bkpt */
+    uint32_t domain;
+    uint8_t old_value;                             /* old value for software bkpt */
 } bwcpoint_t, *bwcpoint_p;
 
 static bwcpoint_t bwcpoint_list;
@@ -52,7 +52,7 @@ static bwcpoint_t bwcpoint_list;
 typedef struct domain_context                 /* local cache of domain state */
 {
     struct list_head     list;
-    u32                  domid;
+    uint32_t                  domid;
     boolean              valid[MAX_VIRT_CPUS];
     vcpu_guest_context_t context[MAX_VIRT_CPUS];
 
@@ -92,7 +92,7 @@ xendebug_initialize()
 /**************/
 
 static domain_context_p
-xendebug_domain_context_search (u32 domid)
+xendebug_domain_context_search (uint32_t domid)
 {
     struct list_head *entry;
     domain_context_p  ctxt;
@@ -107,7 +107,7 @@ xendebug_domain_context_search (u32 domid)
 }
 
 static __inline__ domain_context_p
-xendebug_get_context (int xc_handle, u32 domid, u32 vcpu)
+xendebug_get_context (int xc_handle, uint32_t domid, uint32_t vcpu)
 {
     int rc;
     domain_context_p ctxt;
@@ -130,7 +130,7 @@ xendebug_get_context (int xc_handle, u32 domid, u32 vcpu)
 }
 
 static __inline__ int
-xendebug_set_context (int xc_handle, domain_context_p ctxt, u32 vcpu)
+xendebug_set_context (int xc_handle, domain_context_p ctxt, uint32_t vcpu)
 {
     dom0_op_t op;
     int rc;
@@ -157,8 +157,8 @@ xendebug_set_context (int xc_handle, domain_context_p ctxt, u32 vcpu)
 
 int
 xendebug_attach(int xc_handle,
-                u32 domid,
-                u32 vcpu)
+                uint32_t domid,
+                uint32_t vcpu)
 {
     domain_context_p ctxt;
 
@@ -176,8 +176,8 @@ xendebug_attach(int xc_handle,
 
 int
 xendebug_detach(int xc_handle,
-                u32 domid,
-                u32 vcpu)
+                uint32_t domid,
+                uint32_t vcpu)
 {
     domain_context_p ctxt;
     
@@ -197,8 +197,8 @@ xendebug_detach(int xc_handle,
 
 int
 xendebug_read_registers(int xc_handle,
-                        u32 domid,
-                        u32 vcpu,
+                        uint32_t domid,
+                        uint32_t vcpu,
                         cpu_user_regs_t **regs)
 {
     domain_context_p ctxt;
@@ -218,8 +218,8 @@ xendebug_read_registers(int xc_handle,
 
 int
 xendebug_read_fpregisters (int xc_handle,
-                           u32 domid,
-                           u32 vcpu,
+                           uint32_t domid,
+                           uint32_t vcpu,
                            char **regs)
 {
     domain_context_p ctxt;
@@ -239,8 +239,8 @@ xendebug_read_fpregisters (int xc_handle,
 
 int
 xendebug_write_registers(int xc_handle,
-                         u32 domid,
-                         u32 vcpu,
+                         uint32_t domid,
+                         uint32_t vcpu,
                          cpu_user_regs_t *regs)
 {
     domain_context_p ctxt;
@@ -260,8 +260,8 @@ xendebug_write_registers(int xc_handle,
 
 int
 xendebug_step(int xc_handle,
-              u32 domid,
-              u32 vcpu)
+              uint32_t domid,
+              uint32_t vcpu)
 {
     domain_context_p ctxt;
     int rc;
@@ -282,8 +282,8 @@ xendebug_step(int xc_handle,
 
 int
 xendebug_continue(int xc_handle,
-                  u32 domid,
-                  u32 vcpu)
+                  uint32_t domid,
+                  uint32_t vcpu)
 {
     domain_context_p ctxt;
     int rc;
@@ -310,8 +310,8 @@ xendebug_continue(int xc_handle,
 
 /* access to one page */
 static int
-xendebug_memory_page (domain_context_p ctxt, int xc_handle, u32 vcpu,
-                      int protection, unsigned long address, int length, u8 *buffer)
+xendebug_memory_page (domain_context_p ctxt, int xc_handle, uint32_t vcpu,
+                      int protection, unsigned long address, int length, uint8_t *buffer)
 {
     vcpu_guest_context_t *vcpu_ctxt = &ctxt->context[vcpu];
     unsigned long pde, page;
@@ -406,8 +406,8 @@ xendebug_memory_page (domain_context_p ctxt, int xc_handle, u32 vcpu,
 
 /* divide a memory operation into accesses to individual pages */
 static int
-xendebug_memory_op (domain_context_p ctxt, int xc_handle, u32 vcpu,
-                    int protection, unsigned long address, int length, u8 *buffer)
+xendebug_memory_op (domain_context_p ctxt, int xc_handle, uint32_t vcpu,
+                    int protection, unsigned long address, int length, uint8_t *buffer)
 {
     int      remain;              /* number of bytes to touch past this page */
     int      bytes   = 0;
@@ -429,11 +429,11 @@ xendebug_memory_op (domain_context_p ctxt, int xc_handle, u32 vcpu,
 
 int
 xendebug_read_memory(int xc_handle,
-                     u32 domid,
-                     u32 vcpu,
+                     uint32_t domid,
+                     uint32_t vcpu,
                      unsigned long address,
-                     u32 length,
-                     u8 *data)
+                     uint32_t length,
+                     uint8_t *data)
 {
     domain_context_p ctxt;
 
@@ -449,11 +449,11 @@ xendebug_read_memory(int xc_handle,
 
 int
 xendebug_write_memory(int xc_handle,
-                      u32 domid,
-                      u32 vcpu,
+                      uint32_t domid,
+                      uint32_t vcpu,
                       unsigned long address,
-                      u32 length,
-                      u8 *data)
+                      uint32_t length,
+                      uint8_t *data)
 {
     domain_context_p ctxt;
 
@@ -469,13 +469,13 @@ xendebug_write_memory(int xc_handle,
 
 int
 xendebug_insert_memory_breakpoint(int xc_handle,
-                                  u32 domid,
-                                  u32 vcpu,
+                                  uint32_t domid,
+                                  uint32_t vcpu,
                                   unsigned long address,
-                                  u32 length)
+                                  uint32_t length)
 {
     bwcpoint_p bkpt;
-    u8 breakpoint_opcode = 0xcc;
+    uint8_t breakpoint_opcode = 0xcc;
 
     printf("insert breakpoint %d:%lx %d\n",
             domid, address, length);
@@ -515,10 +515,10 @@ xendebug_insert_memory_breakpoint(int xc_handle,
 
 int
 xendebug_remove_memory_breakpoint(int xc_handle,
-                                  u32 domid,
-                                  u32 vcpu,
+                                  uint32_t domid,
+                                  uint32_t vcpu,
                                   unsigned long address,
-                                  u32 length)
+                                  uint32_t length)
 {
     bwcpoint_p bkpt = NULL;
 
@@ -552,7 +552,7 @@ int
 xendebug_query_domain_stop(int xc_handle, int *dom_list, int dom_list_size)
 {
     xc_dominfo_t *info;
-    u32 first_dom = 0;
+    uint32_t first_dom = 0;
     int max_doms = 1024;
     int nr_doms, loop;
     int count = 0;

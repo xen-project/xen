@@ -37,21 +37,21 @@ typedef struct _ACPI_TABLE_ALL{
 		ACPI_MULTIPLE_APIC_DESCRIPTION_TABLE *Madt;
 		ACPI_2_0_FACS *Facs;
 		unsigned char* Dsdt;
-		u32 RsdpOffset;
-		u32 RsdtOffset;
-		u32 XsdtOffset;
-		u32 FadtOffset;
-		u32 MadtOffset;
-		u32 FacsOffset;
-		u32 DsdtOffset;
+		uint32_t RsdpOffset;
+		uint32_t RsdtOffset;
+		uint32_t XsdtOffset;
+		uint32_t FadtOffset;
+		uint32_t MadtOffset;
+		uint32_t FacsOffset;
+		uint32_t DsdtOffset;
 }ACPI_TABLE_ALL;
 
 static 
 void
 MemCopy(void* src, void* dst, int len){
 
-	u8* src0=src;
-   	u8* dst0=dst;	
+	uint8_t* src0=src;
+   	uint8_t* dst0=dst;	
 
 	while(len--){
 		*(dst0++)=*(src0++);
@@ -62,8 +62,8 @@ static
 void
 SetCheckSum(
   void*  Table, 
-  u32 ChecksumOffset,
-  u32 Length
+  uint32_t ChecksumOffset,
+  uint32_t Length
 )
 /*
  * Routine Description:
@@ -76,23 +76,23 @@ SetCheckSum(
  * 	Length:         Length of Table
  */
 {
-	u8 Sum = 0;  
-	u8 *Ptr;
+	uint8_t Sum = 0;  
+	uint8_t *Ptr;
 
 	Ptr=Table;
 	Ptr[ChecksumOffset]=0;
 	while (Length--) {    
-		Sum = (u8)(Sum + (*Ptr++));
+		Sum = (uint8_t)(Sum + (*Ptr++));
 	}
 	
 	Ptr = Table;
-	Ptr[ChecksumOffset] = (u8) (0xff - Sum + 1);
+	Ptr[ChecksumOffset] = (uint8_t) (0xff - Sum + 1);
 }
 
 //
 //  FIELD_OFFSET - returns the byte offset to a field within a structure
 //
-#define FIELD_OFFSET(TYPE,Field) ((u32)(&(((TYPE *) 0)->Field)))
+#define FIELD_OFFSET(TYPE,Field) ((uint32_t)(&(((TYPE *) 0)->Field)))
 
 static
 void
@@ -106,9 +106,9 @@ UpdateTable(
  */
 {    
 	// RSDP Update	
-	table->Rsdp->RsdtAddress = (u32)(ACPI_PHYSICAL_ADDRESS+
+	table->Rsdp->RsdtAddress = (uint32_t)(ACPI_PHYSICAL_ADDRESS+
 					table->RsdtOffset);
-	table->Rsdp->XsdtAddress = (u64)(ACPI_PHYSICAL_ADDRESS+
+	table->Rsdp->XsdtAddress = (uint64_t)(ACPI_PHYSICAL_ADDRESS+
 					table->XsdtOffset);
 	SetCheckSum(table->Rsdp,
 					FIELD_OFFSET(ACPI_1_0_RSDP, Checksum),
@@ -122,37 +122,37 @@ UpdateTable(
 
 	
 	//RSDT Update
-	table->Rsdt->Entry[0] = (u32)(ACPI_PHYSICAL_ADDRESS + 
+	table->Rsdt->Entry[0] = (uint32_t)(ACPI_PHYSICAL_ADDRESS + 
 					table->FadtOffset);	
-	table->Rsdt->Entry[1] = (u32)(ACPI_PHYSICAL_ADDRESS + 
+	table->Rsdt->Entry[1] = (uint32_t)(ACPI_PHYSICAL_ADDRESS + 
 					table->MadtOffset);
 	table->Rsdt->Header.Length = sizeof (ACPI_TABLE_HEADER) +
-		   			2*sizeof(u32);
+		   			2*sizeof(uint32_t);
 	SetCheckSum(table->Rsdt,
 					FIELD_OFFSET(ACPI_TABLE_HEADER, Checksum),
 					table->Rsdt->Header.Length
 			   );	
 	
 	//XSDT	Update
-	table->Xsdt->Entry[0] = (u64)(ACPI_PHYSICAL_ADDRESS +
+	table->Xsdt->Entry[0] = (uint64_t)(ACPI_PHYSICAL_ADDRESS +
 					table->FadtOffset);
-	table->Xsdt->Entry[1] = (u64)(ACPI_PHYSICAL_ADDRESS + 
+	table->Xsdt->Entry[1] = (uint64_t)(ACPI_PHYSICAL_ADDRESS + 
 					table->MadtOffset);	
 	table->Xsdt->Header.Length = sizeof (ACPI_TABLE_HEADER) + 
-					2*sizeof(u64);
+					2*sizeof(uint64_t);
 	SetCheckSum(table->Xsdt,
 					FIELD_OFFSET(ACPI_TABLE_HEADER, Checksum),
 					table->Xsdt->Header.Length
 			   );
 
 	// FADT Update
-	table->Fadt->Dsdt = (u32)(ACPI_PHYSICAL_ADDRESS + 
+	table->Fadt->Dsdt = (uint32_t)(ACPI_PHYSICAL_ADDRESS + 
 					table->DsdtOffset);	
-	table->Fadt->XDsdt = (u64)(ACPI_PHYSICAL_ADDRESS + 
+	table->Fadt->XDsdt = (uint64_t)(ACPI_PHYSICAL_ADDRESS + 
 				   table->DsdtOffset);
-	table->Fadt->FirmwareCtrl = (u32)(ACPI_PHYSICAL_ADDRESS +
+	table->Fadt->FirmwareCtrl = (uint32_t)(ACPI_PHYSICAL_ADDRESS +
 					table->FacsOffset);
-	table->Fadt->XFirmwareCtrl = (u64)(ACPI_PHYSICAL_ADDRESS + 
+	table->Fadt->XFirmwareCtrl = (uint64_t)(ACPI_PHYSICAL_ADDRESS + 
 					table->FacsOffset);	
 	SetCheckSum(table->Fadt,
 					FIELD_OFFSET(ACPI_TABLE_HEADER, Checksum),
@@ -167,7 +167,7 @@ UpdateTable(
 }
 
 void
-AcpiBuildTable(u8* buf)
+AcpiBuildTable(uint8_t* buf)
 /*
  * Copy all the ACPI table to buffer
  * Buffer Layout:

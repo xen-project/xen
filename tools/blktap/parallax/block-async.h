@@ -14,7 +14,7 @@ struct io_ret
 {
     enum {IO_ADDR_T, IO_BLOCK_T, IO_INT_T} type;
     union {
-        u64   a;
+        uint64_t   a;
         char *b;
         int   i;
     } u;
@@ -38,8 +38,8 @@ struct radix_lock {
 };
 void radix_lock_init(struct radix_lock *r);
 
-void block_read(u64 addr, io_cb_t cb, void *param);
-void block_write(u64 addr, char *block, io_cb_t cb, void *param);
+void block_read(uint64_t addr, io_cb_t cb, void *param);
+void block_write(uint64_t addr, char *block, io_cb_t cb, void *param);
 void block_alloc(char *block, io_cb_t cb, void *param);
 void block_rlock(struct radix_lock *r, int row, io_cb_t cb, void *param);
 void block_wlock(struct radix_lock *r, int row, io_cb_t cb, void *param);
@@ -47,7 +47,7 @@ void block_runlock(struct radix_lock *r, int row, io_cb_t cb, void *param);
 void block_wunlock(struct radix_lock *r, int row, io_cb_t cb, void *param);
 void init_block_async(void);
 
-static inline u64 IO_ADDR(struct io_ret r)
+static inline uint64_t IO_ADDR(struct io_ret r)
 {
     assert(r.type == IO_ADDR_T);
     return r.u.a;

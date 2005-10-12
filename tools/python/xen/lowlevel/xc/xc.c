@@ -42,7 +42,7 @@ static PyObject *pyxc_domain_dumpcore(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
+    uint32_t dom;
     char *corefile;
 
     static char *kwd_list[] = { "dom", "corefile", NULL };
@@ -77,9 +77,9 @@ static PyObject *pyxc_domain_create(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32          dom = 0;
+    uint32_t          dom = 0;
     int          ret;
-    u32          ssidref = 0x0;
+    uint32_t          ssidref = 0x0;
 
     static char *kwd_list[] = { "dom", "ssidref", NULL };
 
@@ -99,7 +99,7 @@ static PyObject *pyxc_domain_pause(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
+    uint32_t dom;
 
     static char *kwd_list[] = { "dom", NULL };
 
@@ -119,7 +119,7 @@ static PyObject *pyxc_domain_unpause(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
+    uint32_t dom;
 
     static char *kwd_list[] = { "dom", NULL };
 
@@ -139,7 +139,7 @@ static PyObject *pyxc_domain_destroy(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
+    uint32_t dom;
 
     static char *kwd_list[] = { "dom", NULL };
 
@@ -159,7 +159,7 @@ static PyObject *pyxc_domain_pincpu(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
+    uint32_t dom;
     int vcpu = 0;
     cpumap_t cpumap = 0xFFFFFFFF;
 
@@ -182,7 +182,7 @@ static PyObject *pyxc_domain_setcpuweight(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
+    uint32_t dom;
     float cpuweight = 1;
 
     static char *kwd_list[] = { "dom", "cpuweight", NULL };
@@ -205,7 +205,7 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     XcObject *xc = (XcObject *)self;
     PyObject *list, *vcpu_list, *cpumap_list, *info_dict;
 
-    u32 first_dom = 0;
+    uint32_t first_dom = 0;
     int max_doms = 1024, nr_doms, i, j;
     xc_dominfo_t *info;
 
@@ -270,7 +270,7 @@ static PyObject *pyxc_linux_build(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
+    uint32_t dom;
     char *image, *ramdisk = NULL, *cmdline = "";
     int flags = 0, vcpus = 1;
     int store_evtchn, console_evtchn;
@@ -308,7 +308,7 @@ static PyObject *pyxc_vmx_build(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32   dom;
+    uint32_t   dom;
     char *image;
     int   control_evtchn, store_evtchn;
     int flags = 0, vcpus = 1;
@@ -373,10 +373,10 @@ static PyObject *pyxc_bvtsched_domain_set(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
-    u32 mcuadv;
+    uint32_t dom;
+    uint32_t mcuadv;
     int warpback; 
-    s32 warpvalue;
+    int32_t warpvalue;
     long long warpl;
     long long warpu;
 
@@ -401,10 +401,10 @@ static PyObject *pyxc_bvtsched_domain_get(PyObject *self,
                                           PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
-    u32 dom;
-    u32 mcuadv;
+    uint32_t dom;
+    uint32_t mcuadv;
     int warpback; 
-    s32 warpvalue;
+    int32_t warpvalue;
     long long warpl;
     long long warpu;
     
@@ -432,7 +432,7 @@ static PyObject *pyxc_evtchn_alloc_unbound(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom, remote_dom;
+    uint32_t dom, remote_dom;
     int port;
 
     static char *kwd_list[] = { "dom", "remote_dom", NULL };
@@ -454,7 +454,7 @@ static PyObject *pyxc_evtchn_status(PyObject *self,
     XcObject *xc = (XcObject *)self;
     PyObject *dict;
 
-    u32 dom = DOMID_SELF;
+    uint32_t dom = DOMID_SELF;
     int port, ret;
     xc_evtchn_status_t status;
 
@@ -507,7 +507,7 @@ static PyObject *pyxc_physdev_pci_access_modify(PyObject *self,
                                                 PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
-    u32 dom;
+    uint32_t dom;
     int bus, dev, func, enable, ret;
 
     static char *kwd_list[] = { "dom", "bus", "dev", "func", "enable", NULL };
@@ -635,9 +635,9 @@ static PyObject *pyxc_sedf_domain_set(PyObject *self,
                                          PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
-    u32 domid;
-    u64 period, slice, latency;
-    u16 extratime, weight;
+    uint32_t domid;
+    uint64_t period, slice, latency;
+    uint16_t extratime, weight;
     static char *kwd_list[] = { "dom", "period", "slice",
                                 "latency", "extratime", "weight",NULL };
     
@@ -658,9 +658,9 @@ static PyObject *pyxc_sedf_domain_get(PyObject *self,
                                          PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
-    u32 domid;
-    u64 period, slice,latency;
-    u16 weight, extratime;
+    uint32_t domid;
+    uint64_t period, slice,latency;
+    uint16_t weight, extratime;
     
     static char *kwd_list[] = { "dom", NULL };
 
@@ -685,7 +685,7 @@ static PyObject *pyxc_shadow_control(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
+    uint32_t dom;
     int op=0;
 
     static char *kwd_list[] = { "dom", "op", NULL };
@@ -707,7 +707,7 @@ static PyObject *pyxc_domain_setmaxmem(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
+    uint32_t dom;
     unsigned int maxmem_kb;
 
     static char *kwd_list[] = { "dom", "maxmem_kb", NULL };
@@ -729,7 +729,7 @@ static PyObject *pyxc_domain_memory_increase_reservation(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32 dom;
+    uint32_t dom;
     unsigned long mem_kb;
     unsigned int extent_order = 0 , address_bits = 0;
     unsigned long nr_extents;

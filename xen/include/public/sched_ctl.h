@@ -20,39 +20,49 @@
  * parameters
  */
 struct sched_ctl_cmd {
-    u32 sched_id;
-    u32 direction;
+    uint32_t sched_id;
+    uint32_t direction;
     union {
         struct bvt_ctl {
-            u32 ctx_allow;
+            uint32_t ctx_allow;
         } bvt;
     } u;
 };
 
 struct sched_adjdom_cmd {
-    u32     sched_id;
-    u32     direction;
-    domid_t domain;
+    uint32_t sched_id;
+    uint32_t direction;
+    domid_t  domain;
     union {
         struct bvt_adjdom
         {
-            u32 mcu_adv;            /* mcu advance: inverse of weight */
-            u32 warpback;           /* warp? */
-            s32 warpvalue;          /* warp value */
-            long long warpl;        /* warp limit */
-            long long warpu;        /* unwarp time requirement */
+            uint32_t mcu_adv;      /* mcu advance: inverse of weight */
+            uint32_t warpback;     /* warp? */
+            int32_t  warpvalue;    /* warp value */
+            int64_t  warpl;        /* warp limit */
+            int64_t  warpu;        /* unwarp time requirement */
         } bvt;
         
-	struct sedf_adjdom
+        struct sedf_adjdom
         {
-            u64 period;
-            u64 slice;
-            u64 latency;
-            u16 extratime;
-	    u16 weight;
+            uint64_t period;
+            uint64_t slice;
+            uint64_t latency;
+            uint16_t extratime;
+            uint16_t weight;
         } sedf;
 
     } u;
 };
 
 #endif /* __XEN_PUBLIC_SCHED_CTL_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

@@ -493,7 +493,7 @@ ioapic_deliver(IOAPICState *s, int irqno){
     }
 }
 
-static inline int __fls(u32 word)
+static inline int __fls(uint32_t word)
 {
     int bit;
     __asm__("bsrl %1,%0"
@@ -581,7 +581,7 @@ ioapic_legacy_irq(int irq, int level)
     ioapic_set_irq(ioapic, irq, level);
 }
 
-static inline int find_highest_bit(u32 *data, int length){
+static inline int find_highest_bit(uint32_t *data, int length){
         while(length && !data[--length]);
             return __fls(data[length]) +  32 * length;
 }

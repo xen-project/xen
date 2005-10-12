@@ -138,7 +138,7 @@ map_domain_va_pae(
     int perm)
 {
     unsigned long l2p, l1p, p, va = (unsigned long)guest_va;
-    u64 *l3, *l2, *l1;
+    uint64_t *l3, *l2, *l1;
     static void *v;
 
     FETCH_REGS(cpu);
@@ -319,7 +319,7 @@ long
 xc_ptrace(
     int xc_handle,
     enum __ptrace_request request,
-    u32 domid,
+    uint32_t domid,
     long eaddr,
     long edata)
 {

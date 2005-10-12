@@ -124,20 +124,23 @@ bool xs_transaction_end(struct xs_handle *h, struct xs_transaction_handle *t,
 			bool abort);
 
 /* Introduce a new domain.
- * This tells the store daemon about a shared memory page, event channel
- * and store path associated with a domain: the domain uses these to communicate.
+ * This tells the store daemon about a shared memory page, event channel and
+ * store path associated with a domain: the domain uses these to communicate.
  */
-bool xs_introduce_domain(struct xs_handle *h, domid_t domid, unsigned long mfn,
-                         unsigned int eventchn, const char *path);
+bool xs_introduce_domain(struct xs_handle *h,
+			 unsigned int domid,
+			 unsigned long mfn,
+                         unsigned int eventchn,
+			 const char *path);
 
 /* Release a domain.
  * Tells the store domain to release the memory page to the domain.
  */
-bool xs_release_domain(struct xs_handle *h, domid_t domid);
+bool xs_release_domain(struct xs_handle *h, unsigned int domid);
 
 /* Query the home path of a domain.
  */
-char *xs_get_domain_path(struct xs_handle *h, domid_t domid);
+char *xs_get_domain_path(struct xs_handle *h, unsigned int domid);
 
 /* Only useful for DEBUG versions */
 char *xs_debug_command(struct xs_handle *h, const char *cmd,

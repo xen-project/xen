@@ -11,7 +11,7 @@
 
 static int
 copy_from_domain_page(int xc_handle,
-                      u32 domid,
+                      uint32_t domid,
                       unsigned long *page_array,
                       unsigned long src_pfn,
                       void *dst_page)
@@ -27,7 +27,7 @@ copy_from_domain_page(int xc_handle,
 
 int 
 xc_domain_dumpcore(int xc_handle,
-                   u32 domid,
+                   uint32_t domid,
                    const char *corename)
 {
     unsigned long nr_pages;

@@ -151,7 +151,7 @@ evtchn_bind_interdomain (value remote_domain)
 }
 
 void *
-map_ring(u32 dom, unsigned long mfn )
+map_ring(uint32_t dom, unsigned long mfn )
 {
     return xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
                                 PROT_READ | PROT_WRITE, mfn);

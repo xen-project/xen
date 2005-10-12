@@ -11,14 +11,14 @@
  * The layout of the xen_bin_image table is:
  *
  * Offset Type Name          Note
- * 0      u32  magic         required
- * 4      u32  flags         required
- * 8      u32  checksum      required
- * 12     u32  header_addr   required
- * 16     u32  load_addr     required
- * 20     u32  load_end_addr required
- * 24     u32  bss_end_addr  required
- * 28     u32  entry_addr    required
+ * 0      uint32_t  magic         required
+ * 4      uint32_t  flags         required
+ * 8      uint32_t  checksum      required
+ * 12     uint32_t  header_addr   required
+ * 16     uint32_t  load_addr     required
+ * 20     uint32_t  load_end_addr required
+ * 24     uint32_t  bss_end_addr  required
+ * 28     uint32_t  entry_addr    required
  *
  * - magic
  *   Magic number identifying the table. For images to be loaded by Xen 3, the
@@ -105,7 +105,7 @@ parsebinimage(
     char *image, unsigned long image_size, struct domain_setup_info *dsi);
 static int
 loadbinimage(
-    char *image, unsigned long image_size, int xch, u32 dom,
+    char *image, unsigned long image_size, int xch, uint32_t dom,
     unsigned long *parray, struct domain_setup_info *dsi);
 
 int probe_bin(char *image,
@@ -237,7 +237,7 @@ static int parsebinimage(char *image,
 
 static int
 loadbinimage(
-    char *image, unsigned long image_size, int xch, u32 dom,
+    char *image, unsigned long image_size, int xch, uint32_t dom,
     unsigned long *parray, struct domain_setup_info *dsi)
 {
     unsigned long size;

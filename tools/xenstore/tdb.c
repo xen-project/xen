@@ -154,9 +154,9 @@ static void tdb_mmap(TDB_CONTEXT *tdb)
 }
 
 /* Endian conversion: we only ever deal with 4 byte quantities */
-static void *convert(void *buf, u32 size)
+static void *convert(void *buf, uint32_t size)
 {
-	u32 i, *p = buf;
+	uint32_t i, *p = buf;
 	for (i = 0; i < size / 4; i++)
 		p[i] = TDB_BYTEREV(p[i]);
 	return buf;
@@ -171,8 +171,8 @@ struct list_struct {
 	tdb_len rec_len; /* total byte length of record */
 	tdb_len key_len; /* byte length of key */
 	tdb_len data_len; /* byte length of data */
-	u32 full_hash; /* the full 32 bit hash of the key */
-	u32 magic;   /* try to catch errors */
+	uint32_t full_hash; /* the full 32 bit hash of the key */
+	uint32_t magic;   /* try to catch errors */
 	/* the following union is implied:
 		union {
 			char record[rec_len];
@@ -180,7 +180,7 @@ struct list_struct {
 				char key[key_len];
 				char data[data_len];
 			}
-			u32 totalsize; (tailer)
+			uint32_t totalsize; (tailer)
 		}
 	*/
 };
@@ -294,10 +294,10 @@ static int tdb_unlock(TDB_CONTEXT *tdb, int list,
 }
 
 /* This is based on the hash algorithm from gdbm */
-static u32 default_tdb_hash(TDB_DATA *key)
+static uint32_t default_tdb_hash(TDB_DATA *key)
 {
-	u32 value;	/* Used to compute the hash value.  */
-	u32   i;	/* Used to cycle through random values. */
+	uint32_t value;	/* Used to compute the hash value.  */
+	uint32_t   i;	/* Used to cycle through random values. */
 
 	/* Set the initial value from the key size. */
 	for (value = 0x238F13AF * key->dsize, i=0; i < key->dsize; i++)
@@ -399,7 +399,7 @@ static int tdb_read(TDB_CONTEXT *tdb,tdb_off off,void *buf,tdb_len len,int cv)
 static int tdb_key_eq(TDB_CONTEXT *tdb, tdb_off off, TDB_DATA key)
 {
 	char buf[64];
-	u32 len;
+	uint32_t len;
 
 	if (tdb_oob(tdb, off + key.dsize, 0) != 0)
 		return -1;
@@ -1030,7 +1030,7 @@ static int tdb_new_database(TDB_CONTEXT *tdb, int hash_size)
 
 /* Returns 0 on fail.  On success, return offset of record, and fills
    in rec */
-static tdb_off tdb_find(TDB_CONTEXT *tdb, TDB_DATA key, u32 hash,
+static tdb_off tdb_find(TDB_CONTEXT *tdb, TDB_DATA key, uint32_t hash,
 			struct list_struct *r)
 {
 	tdb_off rec_ptr;
@@ -1058,10 +1058,10 @@ static tdb_off tdb_find(TDB_CONTEXT *tdb, TDB_DATA key, u32 hash,
 }
 
 /* As tdb_find, but if you succeed, keep the lock */
-static tdb_off tdb_find_lock_hash(TDB_CONTEXT *tdb, TDB_DATA key, u32 hash, int locktype,
+static tdb_off tdb_find_lock_hash(TDB_CONTEXT *tdb, TDB_DATA key, uint32_t hash, int locktype,
 			     struct list_struct *rec)
 {
-	u32 rec_ptr;
+	uint32_t rec_ptr;
 
 	if (tdb_lock(tdb, BUCKET(hash), locktype) == -1)
 		return 0;
@@ -1089,7 +1089,7 @@ static struct tdb_errname {
 /* Error string for the last tdb error */
 const char *tdb_errorstr(TDB_CONTEXT *tdb)
 {
-	u32 i;
+	uint32_t i;
 	for (i = 0; i < sizeof(emap) / sizeof(struct tdb_errname); i++)
 		if (tdb->ecode == emap[i].ecode)
 			return emap[i].estring;
@@ -1101,7 +1101,7 @@ const char *tdb_errorstr(TDB_CONTEXT *tdb)
    on failure return -1.
 */
 
-static int tdb_update_hash(TDB_CONTEXT *tdb, TDB_DATA key, u32 hash, TDB_DATA dbuf)
+static int tdb_update_hash(TDB_CONTEXT *tdb, TDB_DATA key, uint32_t hash, TDB_DATA dbuf)
 {
 	struct list_struct rec;
 	tdb_off rec_ptr;
@@ -1141,7 +1141,7 @@ TDB_DATA tdb_fetch(TDB_CONTEXT *tdb, TDB_DATA key)
 	tdb_off rec_ptr;
 	struct list_struct rec;
 	TDB_DATA ret;
-	u32 hash;
+	uint32_t hash;
 
 	/* find which hash bucket it is in */
 	hash = tdb->hash_fn(&key);
@@ -1161,7 +1161,7 @@ TDB_DATA tdb_fetch(TDB_CONTEXT *tdb, TDB_DATA key)
    this doesn't match the conventions in the rest of this module, but is
    compatible with gdbm
 */
-static int tdb_exists_hash(TDB_CONTEXT *tdb, TDB_DATA key, u32 hash)
+static int tdb_exists_hash(TDB_CONTEXT *tdb, TDB_DATA key, uint32_t hash)
 {
 	struct list_struct rec;
 	
@@ -1173,7 +1173,7 @@ static int tdb_exists_hash(TDB_CONTEXT *tdb, TDB_DATA key, u32 hash)
 
 int tdb_exists(TDB_CONTEXT *tdb, TDB_DATA key)
 {
-	u32 hash = tdb->hash_fn(&key);
+	uint32_t hash = tdb->hash_fn(&key);
 	return tdb_exists_hash(tdb, key, hash);
 }
 
@@ -1210,7 +1210,7 @@ static int write_unlock_record(TDB_CONTEXT *tdb, tdb_off off)
 static int unlock_record(TDB_CONTEXT *tdb, tdb_off off)
 {
 	struct tdb_traverse_lock *i;
-	u32 count = 0;
+	uint32_t count = 0;
 
 	if (off == 0)
 		return 0;
@@ -1293,10 +1293,10 @@ static int tdb_next_lock(TDB_CONTEXT *tdb, struct tdb_traverse_lock *tlock,
 		   system (testing using ldbtest).
 		 */
 		if (!tlock->off && tlock->hash != 0) {
-			u32 off;
+			uint32_t off;
 			if (tdb->map_ptr) {
 				for (;tlock->hash < tdb->header.hash_size;tlock->hash++) {
-					if (0 != *(u32 *)(TDB_HASH_TOP(tlock->hash) + (unsigned char *)tdb->map_ptr)) {
+					if (0 != *(uint32_t *)(TDB_HASH_TOP(tlock->hash) + (unsigned char *)tdb->map_ptr)) {
 						break;
 					}
 				}
@@ -1459,7 +1459,7 @@ TDB_DATA tdb_firstkey(TDB_CONTEXT *tdb)
 /* find the next entry in the database, returning its key */
 TDB_DATA tdb_nextkey(TDB_CONTEXT *tdb, TDB_DATA oldkey)
 {
-	u32 oldhash;
+	uint32_t oldhash;
 	TDB_DATA key = tdb_null;
 	struct list_struct rec;
 	char *k = NULL;
@@ -1513,7 +1513,7 @@ TDB_DATA tdb_nextkey(TDB_CONTEXT *tdb, TDB_DATA oldkey)
 }
 
 /* delete an entry in the database given a key */
-static int tdb_delete_hash(TDB_CONTEXT *tdb, TDB_DATA key, u32 hash)
+static int tdb_delete_hash(TDB_CONTEXT *tdb, TDB_DATA key, uint32_t hash)
 {
 	tdb_off rec_ptr;
 	struct list_struct rec;
@@ -1529,7 +1529,7 @@ static int tdb_delete_hash(TDB_CONTEXT *tdb, TDB_DATA key, u32 hash)
 
 int tdb_delete(TDB_CONTEXT *tdb, TDB_DATA key)
 {
-	u32 hash = tdb->hash_fn(&key);
+	uint32_t hash = tdb->hash_fn(&key);
 	return tdb_delete_hash(tdb, key, hash);
 }
 
@@ -1541,7 +1541,7 @@ int tdb_delete(TDB_CONTEXT *tdb, TDB_DATA key)
 int tdb_store(TDB_CONTEXT *tdb, TDB_DATA key, TDB_DATA dbuf, int flag)
 {
 	struct list_struct rec;
-	u32 hash;
+	uint32_t hash;
 	tdb_off rec_ptr;
 	char *p = NULL;
 	int ret = 0;
@@ -1622,7 +1622,7 @@ fail:
    is <= the old data size and the key exists.
    on failure return -1. Record must be locked before calling.
 */
-static int tdb_append_inplace(TDB_CONTEXT *tdb, TDB_DATA key, u32 hash, TDB_DATA new_dbuf)
+static int tdb_append_inplace(TDB_CONTEXT *tdb, TDB_DATA key, uint32_t hash, TDB_DATA new_dbuf)
 {
 	struct list_struct rec;
 	tdb_off rec_ptr;
@@ -1656,7 +1656,7 @@ static int tdb_append_inplace(TDB_CONTEXT *tdb, TDB_DATA key, u32 hash, TDB_DATA
 int tdb_append(TDB_CONTEXT *tdb, TDB_DATA key, TDB_DATA new_dbuf)
 {
 	struct list_struct rec;
-	u32 hash;
+	uint32_t hash;
 	tdb_off rec_ptr;
 	char *p = NULL;
 	int ret = 0;
@@ -1790,7 +1790,7 @@ TDB_CONTEXT *tdb_open_ex(const char *name, int hash_size, int tdb_flags,
 	struct stat st;
 	int rev = 0, locked = 0;
 	uint8_t *vp;
-	u32 vertest;
+	uint32_t vertest;
 
 	if (!(tdb = talloc_zero(name, TDB_CONTEXT))) {
 		/* Can't log this */
@@ -1869,8 +1869,8 @@ TDB_CONTEXT *tdb_open_ex(const char *name, int hash_size, int tdb_flags,
 		rev = (tdb->flags & TDB_CONVERT);
 	}
 	vp = (uint8_t *)&tdb->header.version;
-	vertest = (((u32)vp[0]) << 24) | (((u32)vp[1]) << 16) |
-		  (((u32)vp[2]) << 8) | (u32)vp[3];
+	vertest = (((uint32_t)vp[0]) << 24) | (((uint32_t)vp[1]) << 16) |
+		  (((uint32_t)vp[2]) << 8) | (uint32_t)vp[3];
 	tdb->flags |= (vertest==TDB_VERSION) ? TDB_BIGENDIAN : 0;
 	if (!rev)
 		tdb->flags &= ~TDB_CONVERT;
@@ -2000,7 +2000,7 @@ int tdb_close(TDB_CONTEXT *tdb)
 /* lock/unlock entire database */
 int tdb_lockall(TDB_CONTEXT *tdb)
 {
-	u32 i;
+	uint32_t i;
 
 	/* There are no locks on read-only dbs */
 	if (tdb->read_only)
@@ -2011,7 +2011,7 @@ int tdb_lockall(TDB_CONTEXT *tdb)
 
 	/* If error, release locks we have... */
 	if (i < tdb->header.hash_size) {
-		u32 j;
+		uint32_t j;
 
 		for ( j = 0; j < i; j++)
 			tdb_unlock(tdb, j, F_WRLCK);
@@ -2022,7 +2022,7 @@ int tdb_lockall(TDB_CONTEXT *tdb)
 }
 void tdb_unlockall(TDB_CONTEXT *tdb)
 {
-	u32 i;
+	uint32_t i;
 	for (i=0; i < tdb->header.hash_size; i++)
 		tdb_unlock(tdb, i, F_WRLCK);
 }

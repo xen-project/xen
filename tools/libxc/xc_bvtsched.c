@@ -39,10 +39,10 @@ int xc_bvtsched_global_get(int xc_handle,
 }
 
 int xc_bvtsched_domain_set(int xc_handle,
-                           u32 domid,
-                           u32 mcuadv,
+                           uint32_t domid,
+                           uint32_t mcuadv,
                            int warpback,
-                           s32 warpvalue,
+                           int32_t warpvalue,
                            long long warpl,
                            long long warpu)
 {
@@ -64,10 +64,10 @@ int xc_bvtsched_domain_set(int xc_handle,
 
 
 int xc_bvtsched_domain_get(int xc_handle,
-                           u32 domid,
-                           u32 *mcuadv,
+                           uint32_t domid,
+                           uint32_t *mcuadv,
                            int *warpback,
-                           s32 *warpvalue,
+                           int32_t *warpvalue,
                            long long *warpl,
                            long long *warpu)
 {

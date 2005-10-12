@@ -204,7 +204,7 @@ dom_read_memory (value context, value address, value length)
     int loop;
     char *buffer;
     unsigned long my_address = Int32_val(address);
-    u32 my_length = Int_val(length);
+    uint32_t my_length = Int_val(length);
 
     printf ("(pdb) read memory\n");
 
@@ -260,7 +260,7 @@ dom_write_memory (value context, value address, value val_list)
 
     char buffer[4096];  /* a big buffer */
     unsigned long  my_address;
-    u32 length = 0;
+    uint32_t length = 0;
 
     printf ("(pdb) write memory\n");
 

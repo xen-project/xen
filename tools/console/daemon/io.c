@@ -474,7 +474,7 @@ static void handle_tty_write(struct domain *dom)
 
 static void handle_ring_read(struct domain *dom)
 {
-	u16 v;
+	uint16_t v;
 
 	if (!read_sync(dom->evtchn_fd, &v, sizeof(v)))
 		return;

@@ -73,14 +73,14 @@
  */
 typedef struct grant_entry {
     /* GTF_xxx: various type and flag information.  [XEN,GST] */
-    u16     flags;
+    uint16_t     flags;
     /* The domain being granted foreign privileges. [GST] */
     domid_t domid;
     /*
      * GTF_permit_access: Frame that @domid is allowed to map and access. [GST]
      * GTF_accept_transfer: Frame whose ownership transferred by @domid. [XEN]
      */
-    u32     frame;
+    uint32_t     frame;
 } grant_entry_t;
 
 /*
@@ -131,7 +131,7 @@ typedef struct grant_entry {
 /*
  * Reference to a grant entry in a specified domain's grant table.
  */
-typedef u16 grant_ref_t;
+typedef uint16_t grant_ref_t;
 
 /*
  * GNTTABOP_map_grant_ref: Map the grant entry (<dom>,<ref>) for access
@@ -153,13 +153,13 @@ typedef u16 grant_ref_t;
 #define GNTTABOP_map_grant_ref        0
 typedef struct gnttab_map_grant_ref {
     /* IN parameters. */
-    u64         host_addr;
-    domid_t     dom;
+    uint64_t host_addr;
+    domid_t  dom;
     grant_ref_t ref;
-    u16         flags;                /* GNTMAP_* */
+    uint16_t flags;               /* GNTMAP_* */
     /* OUT parameters. */
-    s16         handle;               /* +ve: handle; -ve: GNTST_* */
-    u64         dev_bus_addr;
+    int16_t  handle;              /* +ve: handle; -ve: GNTST_* */
+    uint64_t dev_bus_addr;
 } gnttab_map_grant_ref_t;
 
 /*
@@ -176,11 +176,11 @@ typedef struct gnttab_map_grant_ref {
 #define GNTTABOP_unmap_grant_ref      1
 typedef struct gnttab_unmap_grant_ref {
     /* IN parameters. */
-    u64         host_addr;
-    u64         dev_bus_addr;
-    u16         handle;
+    uint64_t host_addr;
+    uint64_t dev_bus_addr;
+    uint16_t handle;
     /* OUT parameters. */
-    s16         status;               /* GNTST_* */
+    int16_t  status;              /* GNTST_* */
 } gnttab_unmap_grant_ref_t;
 
 /*
@@ -195,10 +195,10 @@ typedef struct gnttab_unmap_grant_ref {
 #define GNTTABOP_setup_table          2
 typedef struct gnttab_setup_table {
     /* IN parameters. */
-    domid_t     dom;
-    u16         nr_frames;
+    domid_t  dom;
+    uint16_t nr_frames;
     /* OUT parameters. */
-    s16         status;               /* GNTST_* */
+    int16_t  status;              /* GNTST_* */
     unsigned long *frame_list;
 } gnttab_setup_table_t;
 
@@ -209,9 +209,9 @@ typedef struct gnttab_setup_table {
 #define GNTTABOP_dump_table           3
 typedef struct gnttab_dump_table {
     /* IN parameters. */
-    domid_t     dom;
+    domid_t dom;
     /* OUT parameters. */
-    s16         status;               /* GNTST_* */
+    int16_t status;               /* GNTST_* */
 } gnttab_dump_table_t;
 
 /*
@@ -223,10 +223,10 @@ typedef struct gnttab_dump_table {
 typedef struct {
     /* IN parameters. */
     unsigned long mfn;
-    domid_t     domid;
-    grant_ref_t ref;
+    domid_t       domid;
+    grant_ref_t   ref;
     /* OUT parameters. */
-    s16         status;
+    int16_t       status;
 } gnttab_transfer_t;
 
 /*
@@ -283,3 +283,13 @@ typedef struct {
 }
 
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

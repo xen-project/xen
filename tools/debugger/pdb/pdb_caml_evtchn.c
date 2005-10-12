@@ -125,7 +125,7 @@ evtchn_read (value fd)
 {
     CAMLparam1(fd);
 
-    u16 v;
+    uint16_t v;
     int bytes;
     int rc = -1;
     int myfd = Int_val(fd);
@@ -168,7 +168,7 @@ evtchn_unmask (value fd, value idx)
     CAMLparam1(fd);
 
     int myfd = Int_val(fd);
-    u16 myidx = Int_val(idx);
+    uint16_t myidx = Int_val(idx);
 
     (void)write(myfd, &myidx, sizeof(myidx));
 

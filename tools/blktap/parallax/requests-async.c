@@ -27,14 +27,14 @@
 #endif
 
 struct block_info {
-    u32        crc;
-    u32        unused;
+    uint32_t        crc;
+    uint32_t        unused;
 };
 
 struct io_req {
     enum { IO_OP_READ, IO_OP_WRITE } op;
-    u64        root;
-    u64        vaddr;
+    uint64_t        root;
+    uint64_t        vaddr;
     int        state;
     io_cb_t    cb;
     void      *param;
@@ -44,7 +44,7 @@ struct io_req {
     struct io_ret     retval;/* holds the return while we unlock. */
     char             *block; /* the block to write */
     radix_tree_node   radix[3];
-    u64               radix_addr[3];
+    uint64_t               radix_addr[3];
     struct block_info bi;
 };
 
@@ -129,7 +129,7 @@ enum radix_offsets {
 static void read_cb(struct io_ret ret, void *param);
 static void write_cb(struct io_ret ret, void *param);
 
-int vdi_read(vdi_t *vdi, u64 vaddr, io_cb_t cb, void *param)
+int vdi_read(vdi_t *vdi, uint64_t vaddr, io_cb_t cb, void *param)
 {
     struct io_req *req;
 
@@ -156,7 +156,7 @@ int vdi_read(vdi_t *vdi, u64 vaddr, io_cb_t cb, void *param)
 }
 
 
-int   vdi_write(vdi_t *vdi, u64 vaddr, char *block, 
+int   vdi_write(vdi_t *vdi, uint64_t vaddr, char *block, 
                 io_cb_t cb, void *param)
 {
     struct io_req *req;
@@ -177,8 +177,8 @@ int   vdi_write(vdi_t *vdi, u64 vaddr, char *block,
     req->block  = block;
     /* Todo: add a pseodoheader to the block to include some location   */
     /* information in the CRC as well.                                  */
-    req->bi.crc = (u32) crc32(0L, Z_NULL, 0); 
-    req->bi.crc = (u32) crc32(req->bi.crc, block, BLOCK_SIZE); 
+    req->bi.crc = (uint32_t) crc32(0L, Z_NULL, 0); 
+    req->bi.crc = (uint32_t) crc32(req->bi.crc, block, BLOCK_SIZE); 
     req->bi.unused = 0xdeadbeef;
 
     req->cb     = cb;
@@ -196,7 +196,7 @@ static void read_cb(struct io_ret ret, void *param)
 {
     struct io_req *req = (struct io_req *)param;
     radix_tree_node node;
-    u64 idx;
+    uint64_t idx;
     char *block;
     void *req_param;
 
@@ -268,15 +268,15 @@ static void read_cb(struct io_ret ret, void *param)
     }
     case READ_DATA:
     {
-        u32 crc;
+        uint32_t crc;
 
         DPRINTF("READ_DATA\n");
         block = IO_BLOCK(ret);
         if (block == NULL) goto fail;
 
         /* crc check */
-        crc = (u32) crc32(0L, Z_NULL, 0); 
-        crc = (u32) crc32(crc, block, BLOCK_SIZE); 
+        crc = (uint32_t) crc32(0L, Z_NULL, 0); 
+        crc = (uint32_t) crc32(crc, block, BLOCK_SIZE); 
         if (crc != req->bi.crc) {
             /* TODO: add a retry loop here.                          */
             /* Do this after the cache is added -- make sure to      */
@@ -359,7 +359,7 @@ static void write_cb(struct io_ret r, void *param)
 {
     struct io_req *req = (struct io_req *)param;
     radix_tree_node node;
-    u64 a, addr;
+    uint64_t a, addr;
     void *req_param;
     struct block_info *bi;
 
@@ -721,7 +721,7 @@ static void write_cb(struct io_ret r, void *param)
     }
 }
 
-char *vdi_read_s(vdi_t *vdi, u64 vaddr)
+char *vdi_read_s(vdi_t *vdi, uint64_t vaddr)
 {
     pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
     char *block = NULL;
@@ -742,7 +742,7 @@ char *vdi_read_s(vdi_t *vdi, u64 vaddr)
 }
 
 
-int vdi_write_s(vdi_t *vdi, u64 vaddr, char *block)
+int vdi_write_s(vdi_t *vdi, uint64_t vaddr, char *block)
 {
     pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
     int ret, result;

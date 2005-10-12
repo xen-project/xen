@@ -1,14 +1,14 @@
 #include "xg_private.h"
 #include "xenguest.h"
 
-int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters, 
-                  u32 max_factor, u32 flags)
+int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters, 
+                  uint32_t max_factor, uint32_t flags)
 {
     PERROR("xc_linux_save not implemented\n");
     return -1;
 }
 
-int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
+int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pfns,
                      unsigned int store_evtchn, unsigned long *store_mfn,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
@@ -17,7 +17,7 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
 }
 
 int xc_vmx_build(int xc_handle,
-                   u32 domid,
+                   uint32_t domid,
                    int memsize,
                    const char *image_name,
                    struct mem_map *mem_mapp,
@@ -35,7 +35,7 @@ int xc_vmx_build(int xc_handle,
 
 int
 xc_plan9_build(int xc_handle,
-               u32 domid,
+               uint32_t domid,
                const char *image_name,
                const char *cmdline,
                unsigned int control_evtchn, unsigned long flags)

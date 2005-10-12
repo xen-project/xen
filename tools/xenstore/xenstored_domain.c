@@ -36,6 +36,7 @@
 #include "xenstored_watch.h"
 #include "xenstored_test.h"
 
+#include <xenctrl.h>
 #include <xen/linux/evtchn.h>
 
 static int *xc_handle;
@@ -48,14 +49,14 @@ struct domain
 	struct list_head list;
 
 	/* The id of this domain */
-	domid_t domid;
+	unsigned int domid;
 
 	/* Event channel port */
-	u16 port;
+	uint16_t port;
 
 	/* The remote end of the event channel, used only to validate
 	   repeated domain introductions. */
-	u16 remote_port;
+	uint16_t remote_port;
 
 	/* The mfn associated with the event channel, used only to validate
 	   repeated domain introductions. */
@@ -81,9 +82,9 @@ static LIST_HEAD(domains);
 
 struct ringbuf_head
 {
-	u32 write; /* Next place to write to */
-	u32 read; /* Next place to read from */
-	u8 flags;
+	uint32_t write; /* Next place to write to */
+	uint32_t read; /* Next place to read from */
+	uint8_t flags;
 	char buf[0];
 } __attribute__((packed));
 
@@ -106,9 +107,9 @@ static bool check_buffer(const struct ringbuf_head *h)
 
 /* We can't fill last byte: would look like empty buffer. */
 static void *get_output_chunk(const struct ringbuf_head *h,
-			      void *buf, u32 *len)
+			      void *buf, uint32_t *len)
 {
-	u32 read_mark;
+	uint32_t read_mark;
 
 	if (h->read == 0)
 		read_mark = ringbuf_datasize - 1;
@@ -123,7 +124,7 @@ static void *get_output_chunk(const struct ringbuf_head *h,
 }
 
 static const void *get_input_chunk(const struct ringbuf_head *h,
-				   const void *buf, u32 *len)
+				   const void *buf, uint32_t *len)
 {
 	/* Here to the end of buffer, unless they haven't written some. */
 	*len = ringbuf_datasize - h->read;
@@ -132,14 +133,14 @@ static const void *get_input_chunk(const struct ringbuf_head *h,
 	return buf + h->read;
 }
 
-static void update_output_chunk(struct ringbuf_head *h, u32 len)
+static void update_output_chunk(struct ringbuf_head *h, uint32_t len)
 {
 	h->write += len;
 	if (h->write == ringbuf_datasize)
 		h->write = 0;
 }
 
-static void update_input_chunk(struct ringbuf_head *h, u32 len)
+static void update_input_chunk(struct ringbuf_head *h, uint32_t len)
 {
 	h->read += len;
 	if (h->read == ringbuf_datasize)
@@ -148,7 +149,7 @@ static void update_input_chunk(struct ringbuf_head *h, u32 len)
 
 static bool buffer_has_input(const struct ringbuf_head *h)
 {
-	u32 len;
+	uint32_t len;
 
 	get_input_chunk(h, NULL, &len);
 	return (len != 0);
@@ -156,7 +157,7 @@ static bool buffer_has_input(const struct ringbuf_head *h)
 
 static bool buffer_has_output_room(const struct ringbuf_head *h)
 {
-	u32 len;
+	uint32_t len;
 
 	get_output_chunk(h, NULL, &len);
 	return (len != 0);
@@ -164,7 +165,7 @@ static bool buffer_has_output_room(const struct ringbuf_head *h)
 
 static int writechn(struct connection *conn, const void *data, unsigned int len)
 {
-	u32 avail;
+	uint32_t avail;
 	void *dest;
 	struct ringbuf_head h;
 
@@ -189,7 +190,7 @@ static int writechn(struct connection *conn, const void *data, unsigned int len)
 
 static int readchn(struct connection *conn, void *data, unsigned int len)
 {
-	u32 avail;
+	uint32_t avail;
 	const void *src;
 	struct ringbuf_head h;
 	bool was_full;
@@ -268,7 +269,7 @@ static void domain_cleanup(void)
 /* We scan all domains rather than use the information given here. */
 void handle_event(void)
 {
-	u16 port;
+	uint16_t port;
 
 	if (read(event_fd, &port, sizeof(port)) != sizeof(port))
 		barf_perror("Failed to read from event fd");
@@ -293,7 +294,7 @@ bool domain_can_write(struct connection *conn)
                 buffer_has_output_room(conn->domain->output));
 }
 
-static struct domain *new_domain(void *context, domid_t domid,
+static struct domain *new_domain(void *context, unsigned int domid,
 				 unsigned long mfn, int port,
 				 const char *path)
 {
@@ -338,7 +339,7 @@ static struct domain *new_domain(void *context, domid_t domid,
 }
 
 
-static struct domain *find_domain_by_domid(domid_t domid)
+static struct domain *find_domain_by_domid(unsigned int domid)
 {
 	struct domain *i;
 
@@ -355,9 +356,9 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 {
 	struct domain *domain;
 	char *vec[4];
-	domid_t domid;
+	unsigned int domid;
 	unsigned long mfn;
-	u16 port;
+	uint16_t port;
 	const char *path;
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
@@ -414,7 +415,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 void do_release(struct connection *conn, const char *domid_str)
 {
 	struct domain *domain;
-	domid_t domid;
+	unsigned int domid;
 
 	if (!domid_str) {
 		send_error(conn, EINVAL);
@@ -453,7 +454,7 @@ void do_release(struct connection *conn, const char *domid_str)
 void do_get_domain_path(struct connection *conn, const char *domid_str)
 {
 	struct domain *domain;
-	domid_t domid;
+	unsigned int domid;
 
 	if (!domid_str) {
 		send_error(conn, EINVAL);

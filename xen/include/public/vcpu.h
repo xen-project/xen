@@ -52,3 +52,13 @@
 #define VCPUOP_is_up                3
 
 #endif /* __XEN_PUBLIC_VCPU_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

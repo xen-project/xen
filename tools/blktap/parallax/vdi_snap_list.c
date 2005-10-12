@@ -18,7 +18,7 @@
 int main(int argc, char *argv[])
 {
     vdi_t        *vdi;
-    u64           id;
+    uint64_t           id;
     int           i, max_snaps = -1;
     snap_block_t *blk;
     snap_id_t     sid;
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
         exit(-1);
     }
     
-    id = (u64) atoll(argv[1]);
+    id = (uint64_t) atoll(argv[1]);
     
     if ( argc > 2 ) {
         max_snaps = atoi(argv[2]);

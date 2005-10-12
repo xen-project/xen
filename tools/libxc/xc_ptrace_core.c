@@ -222,7 +222,7 @@ long
 xc_ptrace_core(
     int xc_handle,
     enum __ptrace_request request,
-    u32 domfd,
+    uint32_t domfd,
     long eaddr,
     long edata)
 {

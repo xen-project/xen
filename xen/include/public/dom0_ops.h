@@ -44,7 +44,7 @@ typedef struct sched_adjdom_cmd dom0_adjustdom_t;
 #define DOM0_CREATEDOMAIN      8
 typedef struct {
     /* IN parameters */
-    u32 ssidref;
+    uint32_t ssidref;
     /* IN/OUT parameters. */
     /* Identifier for new domain (auto-allocate if zero is specified). */
     domid_t domain;
@@ -53,7 +53,7 @@ typedef struct {
 #define DOM0_DESTROYDOMAIN     9
 typedef struct {
     /* IN variables. */
-    domid_t      domain;
+    domid_t domain;
 } dom0_destroydomain_t;
 
 #define DOM0_PAUSEDOMAIN      10
@@ -82,22 +82,22 @@ typedef struct {
 #define DOMFLAGS_CPUSHIFT       8
 #define DOMFLAGS_SHUTDOWNMASK 255 /* DOMFLAGS_SHUTDOWN guest-supplied code.  */
 #define DOMFLAGS_SHUTDOWNSHIFT 16
-    u32      flags;
+    uint32_t flags;
     unsigned long tot_pages;
     unsigned long max_pages;
     unsigned long shared_info_frame;       /* MFN of shared_info struct */
-    u64      cpu_time;
-    u32      n_vcpu;
-    s32      vcpu_to_cpu[MAX_VIRT_CPUS];  /* current mapping   */
+    uint64_t cpu_time;
+    uint32_t n_vcpu;
+    int32_t  vcpu_to_cpu[MAX_VIRT_CPUS];  /* current mapping   */
     cpumap_t cpumap[MAX_VIRT_CPUS];       /* allowable mapping */
-    u32	     ssidref;
+    uint32_t ssidref;
 } dom0_getdomaininfo_t;
 
 #define DOM0_SETDOMAININFO      13
 typedef struct {
     /* IN variables. */
-    domid_t                   domain;
-    u16                       vcpu;
+    domid_t               domain;
+    uint16_t              vcpu;
     /* IN/OUT parameters */
     vcpu_guest_context_t *ctxt;
 } dom0_setdomaininfo_t;
@@ -105,29 +105,29 @@ typedef struct {
 #define DOM0_MSR              15
 typedef struct {
     /* IN variables. */
-    u32 write;
-    u32 cpu_mask;
-    u32 msr;
-    u32 in1;
-    u32 in2;
+    uint32_t write;
+    uint32_t cpu_mask;
+    uint32_t msr;
+    uint32_t in1;
+    uint32_t in2;
     /* OUT variables. */
-    u32 out1;
-    u32 out2;
+    uint32_t out1;
+    uint32_t out2;
 } dom0_msr_t;
 
 #define DOM0_DEBUG            16
 typedef struct {
     /* IN variables. */
-    domid_t domain;
-    u8  opcode;
-    u32 in1;
-    u32 in2;
-    u32 in3;
-    u32 in4;
+    domid_t  domain;
+    uint8_t  opcode;
+    uint32_t in1;
+    uint32_t in2;
+    uint32_t in3;
+    uint32_t in4;
     /* OUT variables. */
-    u32 status;
-    u32 out1;
-    u32 out2;
+    uint32_t status;
+    uint32_t out1;
+    uint32_t out2;
 } dom0_debug_t;
 
 /*
@@ -137,9 +137,9 @@ typedef struct {
 #define DOM0_SETTIME          17
 typedef struct {
     /* IN variables. */
-    u32 secs;
-    u32 nsecs;
-    u64 system_time;
+    uint32_t secs;
+    uint32_t nsecs;
+    uint64_t system_time;
 } dom0_settime_t;
 
 #define DOM0_GETPAGEFRAMEINFO 18
@@ -159,7 +159,7 @@ typedef struct {
     domid_t domain;        /* To which domain does the frame belong?    */
     /* OUT variables. */
     /* Is the page PINNED to a type? */
-    u32 type;              /* see above type defs */
+    uint32_t type;              /* see above type defs */
 } dom0_getpageframeinfo_t;
 
 /*
@@ -168,10 +168,10 @@ typedef struct {
 #define DOM0_READCONSOLE      19
 typedef struct {
     /* IN variables. */
-    u32      clear;        /* Non-zero -> clear after reading. */
+    uint32_t clear;        /* Non-zero -> clear after reading. */
     /* IN/OUT variables. */
     char    *buffer;       /* In: Buffer start; Out: Used buffer start */
-    u32      count;        /* In: Buffer size;  Out: Used buffer size  */
+    uint32_t count;        /* In: Buffer size;  Out: Used buffer size  */
 } dom0_readconsole_t;
 
 /* 
@@ -181,7 +181,7 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t      domain;
-    u16          vcpu;
+    uint16_t          vcpu;
     cpumap_t     *cpumap;
 } dom0_pincpudomain_t;
 
@@ -192,13 +192,13 @@ typedef struct {
 #define DOM0_TBUF_GET_INFO     0
 #define DOM0_TBUF_SET_CPU_MASK 1
 #define DOM0_TBUF_SET_EVT_MASK 2
-    u8 op;
+    uint8_t op;
     /* IN/OUT variables */
     unsigned long cpu_mask;
-    u32           evt_mask;
+    uint32_t      evt_mask;
     /* OUT variables */
     unsigned long buffer_mfn;
-    u32      size;
+    uint32_t size;
 } dom0_tbufcontrol_t;
 
 /*
@@ -206,14 +206,14 @@ typedef struct {
  */
 #define DOM0_PHYSINFO         22
 typedef struct {
-    u32      threads_per_core;
-    u32      cores_per_socket;
-    u32      sockets_per_node;
-    u32      nr_nodes;
-    u32      cpu_khz;
+    uint32_t threads_per_core;
+    uint32_t cores_per_socket;
+    uint32_t sockets_per_node;
+    uint32_t nr_nodes;
+    uint32_t cpu_khz;
     unsigned long total_pages;
     unsigned long free_pages;
-    u32      hw_cap[8];
+    uint32_t hw_cap[8];
 } dom0_physinfo_t;
 
 /*
@@ -222,7 +222,7 @@ typedef struct {
 #define DOM0_SCHED_ID        24
 typedef struct {
     /* OUT variable */
-    u32 sched_id;
+    uint32_t sched_id;
 } dom0_sched_id_t;
 
 /* 
@@ -241,16 +241,16 @@ typedef struct {
 
 typedef struct dom0_shadow_control
 {
-    u32 fault_count;
-    u32 dirty_count;
-    u32 dirty_net_count;     
-    u32 dirty_block_count;     
+    uint32_t fault_count;
+    uint32_t dirty_count;
+    uint32_t dirty_net_count;     
+    uint32_t dirty_block_count;     
 } dom0_shadow_control_stats_t;
 
 typedef struct {
     /* IN variables. */
     domid_t        domain;
-    u32            op;
+    uint32_t       op;
     unsigned long *dirty_bitmap; /* pointer to locked buffer */
     /* IN/OUT variables. */
     unsigned long  pages;        /* size of buffer, updated with actual size */
@@ -286,10 +286,10 @@ typedef struct {
     /* IN variables. */
     unsigned long pfn;
     unsigned long nr_pfns;
-    u32           type;
+    uint32_t      type;
     /* OUT variables. */
-    u32           handle;
-    u32           reg;
+    uint32_t      handle;
+    uint32_t      reg;
 } dom0_add_memtype_t;
 
 /*
@@ -302,19 +302,19 @@ typedef struct {
 #define DOM0_DEL_MEMTYPE         32
 typedef struct {
     /* IN variables. */
-    u32      handle;
-    u32      reg;
+    uint32_t handle;
+    uint32_t reg;
 } dom0_del_memtype_t;
 
 /* Read current type of an MTRR (x86-specific). */
 #define DOM0_READ_MEMTYPE        33
 typedef struct {
     /* IN variables. */
-    u32      reg;
+    uint32_t reg;
     /* OUT variables. */
     unsigned long pfn;
     unsigned long nr_pfns;
-    u32      type;
+    uint32_t type;
 } dom0_read_memtype_t;
 
 /* Interface for controlling Xen software performance counters. */
@@ -323,39 +323,39 @@ typedef struct {
 #define DOM0_PERFCCONTROL_OP_RESET 1   /* Reset all counters to zero. */
 #define DOM0_PERFCCONTROL_OP_QUERY 2   /* Get perfctr information. */
 typedef struct {
-    u8      name[80];               /*  name of perf counter */
-    u32     nr_vals;                /* number of values for this counter */
-    u32     vals[64];               /* array of values */
+    uint8_t      name[80];             /*  name of perf counter */
+    uint32_t     nr_vals;              /* number of values for this counter */
+    uint32_t     vals[64];             /* array of values */
 } dom0_perfc_desc_t;
 typedef struct {
     /* IN variables. */
-    u32            op;                /*  DOM0_PERFCCONTROL_OP_??? */
+    uint32_t       op;                /*  DOM0_PERFCCONTROL_OP_??? */
     /* OUT variables. */
-    u32            nr_counters;       /*  number of counters */
+    uint32_t       nr_counters;       /*  number of counters */
     dom0_perfc_desc_t *desc;          /*  counter information (or NULL) */
 } dom0_perfccontrol_t;
 
 #define DOM0_MICROCODE           35
 typedef struct {
     /* IN variables. */
-    void   *data;                     /* Pointer to microcode data */
-    u32     length;                   /* Length of microcode data. */
+    void    *data;                    /* Pointer to microcode data */
+    uint32_t length;                  /* Length of microcode data. */
 } dom0_microcode_t;
 
 #define DOM0_IOPORT_PERMISSION   36
 typedef struct {
-    domid_t domain;                   /* domain to be affected */
-    u16     first_port;               /* first port int range */
-    u16     nr_ports;                 /* size of port range */
-    u16     allow_access;             /* allow or deny access to range? */
+    domid_t  domain;                  /* domain to be affected */
+    uint16_t first_port;              /* first port int range */
+    uint16_t nr_ports;                /* size of port range */
+    uint16_t allow_access;            /* allow or deny access to range? */
 } dom0_ioport_permission_t;
 
 #define DOM0_GETVCPUCONTEXT      37
 typedef struct {
-    domid_t domain;                   /* domain to be affected */
-    u16     vcpu;                     /* vcpu # */
+    domid_t  domain;                  /* domain to be affected */
+    uint16_t vcpu;                    /* vcpu # */
     vcpu_guest_context_t *ctxt;       /* NB. IN/OUT variable. */
-    u64     cpu_time;                 
+    uint64_t cpu_time;                 
 } dom0_getvcpucontext_t;
 
 #define DOM0_GETDOMAININFOLIST   38
@@ -382,14 +382,14 @@ typedef struct {
     /* OUT variables. */
     int nr_map_entries;
     struct dom0_memory_map_entry {
-        u64 start, end;
+        uint64_t start, end;
         int is_ram;
     } *memory_map;
 } dom0_physical_memory_map_t;
 
 typedef struct {
-    u32 cmd;
-    u32 interface_version; /* DOM0_INTERFACE_VERSION */
+    uint32_t cmd;
+    uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
     union {
         dom0_createdomain_t      createdomain;
         dom0_pausedomain_t       pausedomain;
@@ -426,3 +426,13 @@ typedef struct {
 } dom0_op_t;
 
 #endif /* __XEN_PUBLIC_DOM0_OPS_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

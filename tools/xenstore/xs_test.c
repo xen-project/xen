@@ -561,7 +561,7 @@ static void do_introduce(unsigned int handle,
 
 	/* Tell them the event channel and our PID. */
 	*(int *)((void *)out + 32) = getpid();
-	*(u16 *)((void *)out + 36) = atoi(eventchn);
+	*(uint16_t *)((void *)out + 36) = atoi(eventchn);
 
 	if (!xs_introduce_domain(handles[handle], atoi(domid),
 				 atol(mfn), atoi(eventchn), path)) {

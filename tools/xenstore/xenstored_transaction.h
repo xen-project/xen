@@ -25,7 +25,7 @@ struct transaction;
 void do_transaction_start(struct connection *conn, struct buffered_data *node);
 void do_transaction_end(struct connection *conn, const char *arg);
 
-struct transaction *transaction_lookup(struct connection *conn, u32 id);
+struct transaction *transaction_lookup(struct connection *conn, uint32_t id);
 
 /* This node was changed: can fail and longjmp. */
 void add_change_node(struct transaction *trans, const char *node,

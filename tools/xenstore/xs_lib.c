@@ -135,7 +135,7 @@ bool xs_strings_to_perms(struct xs_permissions *perms, unsigned int num,
 	return true;
 }
 
-/* Convert permissions to a string (up to len MAX_STRLEN(domid_t)+1). */
+/* Convert permissions to a string (up to len MAX_STRLEN(unsigned int)+1). */
 bool xs_perm_to_string(const struct xs_permissions *perm, char *buffer)
 {
 	switch (perm->perms) {

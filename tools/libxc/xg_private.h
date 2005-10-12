@@ -60,11 +60,11 @@ unsigned long csum_page (void * page);
 #define PAGE_SIZE               (1UL << PAGE_SHIFT)
 #define PAGE_MASK               (~(PAGE_SIZE-1))
 
-typedef u32 l1_pgentry_32_t;
-typedef u32 l2_pgentry_32_t;
-typedef u64 l1_pgentry_64_t;
-typedef u64 l2_pgentry_64_t;
-typedef u64 l3_pgentry_64_t;
+typedef uint32_t l1_pgentry_32_t;
+typedef uint32_t l2_pgentry_32_t;
+typedef uint64_t l1_pgentry_64_t;
+typedef uint64_t l2_pgentry_64_t;
+typedef uint64_t l3_pgentry_64_t;
 typedef unsigned long l1_pgentry_t;
 typedef unsigned long l2_pgentry_t;
 #if defined(__x86_64__)
@@ -129,7 +129,7 @@ struct domain_setup_info
 typedef int (*parseimagefunc)(char *image, unsigned long image_size,
 			      struct domain_setup_info *dsi);
 typedef int (*loadimagefunc)(char *image, unsigned long image_size, int xch,
-			     u32 dom, unsigned long *parray,
+			     uint32_t dom, unsigned long *parray,
 			     struct domain_setup_info *dsi);
 
 struct load_funcs
@@ -153,13 +153,13 @@ typedef struct mfn_mapper {
 
 unsigned long xc_get_m2p_start_mfn (int xc_handle);
 
-int xc_copy_to_domain_page(int xc_handle, u32 domid,
+int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
                             unsigned long dst_pfn, void *src_page);
 
 unsigned long xc_get_filesz(int fd);
 
 void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,
-                   int xch, u32 dom, unsigned long *parray,
+                   int xch, uint32_t dom, unsigned long *parray,
                    unsigned long vstart);
 
 int pin_table(int xc_handle, unsigned int type, unsigned long mfn,

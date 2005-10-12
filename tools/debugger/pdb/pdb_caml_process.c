@@ -404,7 +404,7 @@ proc_write_memory (value context, value address, value val_list)
 
     context_t ctx;
     pdb_request_t req;
-    u32 length = 0;
+    uint32_t length = 0;
 
     decode_context(&ctx, context);
 

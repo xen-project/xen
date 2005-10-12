@@ -99,7 +99,7 @@
 #define VGCF_IN_SYSCALL (1<<8)
 struct switch_to_user {
     /* Top of stack (%rsp at point of hypercall). */
-    u64 rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
+    uint64_t rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
     /* Bottom of switch_to_user stack frame. */
 };
 
@@ -118,54 +118,54 @@ struct switch_to_user {
 #define TI_SET_DPL(_ti,_dpl) ((_ti)->flags |= (_dpl))
 #define TI_SET_IF(_ti,_if)   ((_ti)->flags |= ((!!(_if))<<2))
 typedef struct trap_info {
-    u8       vector;       /* exception vector                              */
-    u8       flags;        /* 0-3: privilege level; 4: clear event enable?  */
-    u16      cs;           /* code selector                                 */
+    uint8_t       vector;  /* exception vector                              */
+    uint8_t       flags;   /* 0-3: privilege level; 4: clear event enable?  */
+    uint16_t      cs;      /* code selector                                 */
     unsigned long address; /* code offset                                   */
 } trap_info_t;
 
 #ifdef __GNUC__
 /* Anonymous union includes both 32- and 64-bit names (e.g., eax/rax). */
-#define __DECL_REG(name) union { u64 r ## name, e ## name; }
+#define __DECL_REG(name) union { uint64_t r ## name, e ## name; }
 #else
 /* Non-gcc sources must always use the proper 64-bit name (e.g., rax). */
-#define __DECL_REG(name) u64 r ## name
+#define __DECL_REG(name) uint64_t r ## name
 #endif
 
 typedef struct cpu_user_regs {
-    u64 r15;
-    u64 r14;
-    u64 r13;
-    u64 r12;
+    uint64_t r15;
+    uint64_t r14;
+    uint64_t r13;
+    uint64_t r12;
     __DECL_REG(bp);
     __DECL_REG(bx);
-    u64 r11;
-    u64 r10;
-    u64 r9;
-    u64 r8;
+    uint64_t r11;
+    uint64_t r10;
+    uint64_t r9;
+    uint64_t r8;
     __DECL_REG(ax);
     __DECL_REG(cx);
     __DECL_REG(dx);
     __DECL_REG(si);
     __DECL_REG(di);
-    u32 error_code;    /* private */
-    u32 entry_vector;  /* private */
+    uint32_t error_code;    /* private */
+    uint32_t entry_vector;  /* private */
     __DECL_REG(ip);
-    u16 cs, _pad0[1];
-    u8  saved_upcall_mask;
-    u8  _pad1[3];
+    uint16_t cs, _pad0[1];
+    uint8_t  saved_upcall_mask;
+    uint8_t  _pad1[3];
     __DECL_REG(flags);
     __DECL_REG(sp);
-    u16 ss, _pad2[3];
-    u16 es, _pad3[3];
-    u16 ds, _pad4[3];
-    u16 fs, _pad5[3]; /* Non-zero => takes precedence over fs_base.      */
-    u16 gs, _pad6[3]; /* Non-zero => takes precedence over gs_base_user. */
+    uint16_t ss, _pad2[3];
+    uint16_t es, _pad3[3];
+    uint16_t ds, _pad4[3];
+    uint16_t fs, _pad5[3]; /* Non-zero => takes precedence over fs_base.     */
+    uint16_t gs, _pad6[3]; /* Non-zero => takes precedence over gs_base_usr. */
 } cpu_user_regs_t;
 
 #undef __DECL_REG
 
-typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
+typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
 
 /*
  * The following is all CPU context. Note that the fpu_ctxt block is filled 
@@ -190,19 +190,27 @@ typedef struct vcpu_guest_context {
     unsigned long syscall_callback_eip;
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
     /* Segment base addresses. */
-    u64           fs_base;
-    u64           gs_base_kernel;
-    u64           gs_base_user;
+    uint64_t      fs_base;
+    uint64_t      gs_base_kernel;
+    uint64_t      gs_base_user;
 } vcpu_guest_context_t;
 
 typedef struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */
+    /* Frame containing list of mfns containing list of mfns containing p2m. */
     unsigned long pfn_to_mfn_frame_list_list; 
-                                            /* frame containing list of mfns
-					       containing list of mfns 
-					       containing the p2m table. */
 } arch_shared_info_t;
 
 #endif /* !__ASSEMBLY__ */
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

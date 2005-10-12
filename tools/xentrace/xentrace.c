@@ -45,8 +45,8 @@ typedef struct settings_st {
     char *outfile;
     struct timespec poll_sleep;
     unsigned long new_data_thresh;
-    u32 evt_mask;
-    u32 cpu_mask;
+    uint32_t evt_mask;
+    uint32_t cpu_mask;
 } settings_t;
 
 settings_t opts;
@@ -168,7 +168,7 @@ struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
  * @type:           the new mask type,0-event mask, 1-cpu mask
  *
  */
-void set_mask(u32 mask, int type)
+void set_mask(uint32_t mask, int type)
 {
     int ret;
     dom0_op_t op;                        /* dom0 op we'll build             */
@@ -496,7 +496,8 @@ const struct argp parser_def =
     "\v"
     "This tool is used to capture trace buffer data from Xen.  The data is "
     "output in a binary format, in the following order:\n\n"
-    "  CPU(uint) TSC(u64) EVENT(u32) D1 D2 D3 D4 D5 (all u32)\n\n"
+    "  CPU(uint) TSC(uint64_t) EVENT(uint32_t) D1 D2 D3 D4 D5 "
+    "(all uint32_t)\n\n"
     "The output should be parsed using the tool xentrace_format, which can "
     "produce human-readable output in ASCII format."
 };

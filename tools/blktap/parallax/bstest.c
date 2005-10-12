@@ -22,7 +22,7 @@
 #include <errno.h>
 #include "blockstore.h"
 
-int direct(char *host, u32 op, u64 id, int len) {
+int direct(char *host, uint32_t op, uint64_t id, int len) {
     struct sockaddr_in sn, peer;
     int sock;
     bsmsg_t msgbuf;
@@ -99,8 +99,8 @@ int direct(char *host, u32 op, u64 id, int len) {
 
 int main (int argc, char **argv) {
 
-    u32 op = 0;
-    u64 id = 0;
+    uint32_t op = 0;
+    uint64_t id = 0;
     int len = 0, rc;
     void *block;
 

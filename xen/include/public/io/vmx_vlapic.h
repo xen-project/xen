@@ -25,33 +25,43 @@
 #define VL_STATE_EOI_LOCK   3
 
 #define VLOCAL_APIC_MAX_INTS             256
-#define VLAPIC_INT_COUNT                (VLOCAL_APIC_MAX_INTS/(BITS_PER_BYTE * sizeof(u64)))
-#define VLAPIC_INT_COUNT_32             (VLOCAL_APIC_MAX_INTS/(BITS_PER_BYTE * sizeof(u32)))
+#define VLAPIC_INT_COUNT                (VLOCAL_APIC_MAX_INTS/(BITS_PER_BYTE * sizeof(uint64_t)))
+#define VLAPIC_INT_COUNT_32             (VLOCAL_APIC_MAX_INTS/(BITS_PER_BYTE * sizeof(uint32_t)))
 
 struct vapic_bus_message{
-   u8   deliv_mode:4;   /* deliver mode, including fixed, LPRI, etc */
-   u8   level:1;        /* level or edge */
-   u8   trig_mod:1;    /* assert or disassert */
-   u8   reserved:2;
-   u8   vector;
+   uint8_t   deliv_mode:4;   /* deliver mode, including fixed, LPRI, etc */
+   uint8_t   level:1;        /* level or edge */
+   uint8_t   trig_mod:1;    /* assert or disassert */
+   uint8_t   reserved:2;
+   uint8_t   vector;
 };
 
 typedef struct {
     /* interrupt for PIC and ext type IOAPIC interrupt */
-    u64   vl_ext_intr[VLAPIC_INT_COUNT];
-    u64   vl_ext_intr_mask[VLAPIC_INT_COUNT];
-    u64   vl_apic_intr[VLAPIC_INT_COUNT];
-    u64   vl_apic_tmr[VLAPIC_INT_COUNT];
-    u64   vl_eoi[VLAPIC_INT_COUNT];
-    u32   vl_lapic_id;
-    u32   direct_intr;
-    u32   vl_apr;
-    u32   vl_logical_dest;
-    u32   vl_dest_format;
-    u32   vl_arb_id;
-    u32   vl_state;
-    u32   apic_msg_count;
+    uint64_t   vl_ext_intr[VLAPIC_INT_COUNT];
+    uint64_t   vl_ext_intr_mask[VLAPIC_INT_COUNT];
+    uint64_t   vl_apic_intr[VLAPIC_INT_COUNT];
+    uint64_t   vl_apic_tmr[VLAPIC_INT_COUNT];
+    uint64_t   vl_eoi[VLAPIC_INT_COUNT];
+    uint32_t   vl_lapic_id;
+    uint32_t   direct_intr;
+    uint32_t   vl_apr;
+    uint32_t   vl_logical_dest;
+    uint32_t   vl_dest_format;
+    uint32_t   vl_arb_id;
+    uint32_t   vl_state;
+    uint32_t   apic_msg_count;
     struct vapic_bus_message  vl_apic_msg[24];
 } vlapic_info;
 
 #endif /* _VMX_VLAPIC_H_ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

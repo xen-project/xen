@@ -53,8 +53,8 @@ enum TDB_ERROR {TDB_SUCCESS=0, TDB_ERR_CORRUPT, TDB_ERR_IO, TDB_ERR_LOCK,
 		TDB_ERR_OOM, TDB_ERR_EXISTS, TDB_ERR_NOLOCK, TDB_ERR_LOCK_TIMEOUT,
 		TDB_ERR_NOEXIST};
 
-#ifndef u32
-#define u32 unsigned
+#ifndef uint32_t
+#define uint32_t unsigned
 #endif
 
 typedef struct TDB_DATA {
@@ -62,27 +62,27 @@ typedef struct TDB_DATA {
 	size_t dsize;
 } TDB_DATA;
 
-typedef u32 tdb_len;
-typedef u32 tdb_off;
+typedef uint32_t tdb_len;
+typedef uint32_t tdb_off;
 
 /* this is stored at the front of every database */
 struct tdb_header {
 	char magic_food[32]; /* for /etc/magic */
-	u32 version; /* version of the code */
-	u32 hash_size; /* number of hash entries */
+	uint32_t version; /* version of the code */
+	uint32_t hash_size; /* number of hash entries */
 	tdb_off rwlocks;
 	tdb_off reserved[31];
 };
 
 struct tdb_lock_type {
-	u32 count;
-	u32 ltype;
+	uint32_t count;
+	uint32_t ltype;
 };
 
 struct tdb_traverse_lock {
 	struct tdb_traverse_lock *next;
-	u32 off;
-	u32 hash;
+	uint32_t off;
+	uint32_t hash;
 };
 
 #ifndef PRINTF_ATTRIBUTE
@@ -99,19 +99,19 @@ typedef struct tdb_context {
 	struct tdb_lock_type *locked; /* array of chain locks */
 	enum TDB_ERROR ecode; /* error code for last tdb error */
 	struct tdb_header header; /* a cached copy of the header */
-	u32 flags; /* the flags passed to tdb_open */
+	uint32_t flags; /* the flags passed to tdb_open */
 	struct tdb_traverse_lock travlocks; /* current traversal locks */
 	struct tdb_context *next; /* all tdbs to avoid multiple opens */
 	dev_t device;	/* uniquely identifies this tdb */
 	ino_t inode;	/* uniquely identifies this tdb */
 	void (*log_fn)(struct tdb_context *tdb, int level, const char *, ...) PRINTF_ATTRIBUTE(3,4); /* logging function */
-	u32 (*hash_fn)(TDB_DATA *key);
+	uint32_t (*hash_fn)(TDB_DATA *key);
 	int open_flags; /* flags used in the open - needed by reopen */
 } TDB_CONTEXT;
 
 typedef int (*tdb_traverse_func)(TDB_CONTEXT *, TDB_DATA, TDB_DATA, void *);
 typedef void (*tdb_log_func)(TDB_CONTEXT *, int , const char *, ...);
-typedef u32 (*tdb_hash_func)(TDB_DATA *key);
+typedef uint32_t (*tdb_hash_func)(TDB_DATA *key);
 
 TDB_CONTEXT *tdb_open(const char *name, int hash_size, int tdb_flags,
 		      int open_flags, mode_t mode);

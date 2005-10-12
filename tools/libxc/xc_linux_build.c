@@ -64,7 +64,7 @@ static int probeimageformat(char *image,
 
 #define alloc_pt(ltab, vltab)                                           \
 do {                                                                    \
-    ltab = (u64)page_array[ppt_alloc++] << PAGE_SHIFT;                  \
+    ltab = (uint64_t)page_array[ppt_alloc++] << PAGE_SHIFT;                  \
     if ( vltab != NULL )                                                \
         munmap(vltab, PAGE_SIZE);                                       \
     if ( (vltab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,       \
@@ -76,7 +76,7 @@ do {                                                                    \
 
 #if defined(__i386__)
 
-static int setup_pg_tables(int xc_handle, u32 dom,
+static int setup_pg_tables(int xc_handle, uint32_t dom,
                            vcpu_guest_context_t *ctxt,
                            unsigned long dsi_v_start,
                            unsigned long v_end,
@@ -123,7 +123,7 @@ static int setup_pg_tables(int xc_handle, u32 dom,
     return -1;
 }
 
-static int setup_pg_tables_pae(int xc_handle, u32 dom,
+static int setup_pg_tables_pae(int xc_handle, uint32_t dom,
                                vcpu_guest_context_t *ctxt,
                                unsigned long dsi_v_start,
                                unsigned long v_end,
@@ -134,7 +134,7 @@ static int setup_pg_tables_pae(int xc_handle, u32 dom,
     l1_pgentry_64_t *vl1tab = NULL, *vl1e = NULL;
     l2_pgentry_64_t *vl2tab = NULL, *vl2e = NULL;
     l3_pgentry_64_t *vl3tab = NULL, *vl3e = NULL;
-    u64 l1tab, l2tab, l3tab;
+    uint64_t l1tab, l2tab, l3tab;
     unsigned long ppt_alloc, count, nmfn;
 
     /* First allocate page for page dir. */
@@ -173,7 +173,7 @@ static int setup_pg_tables_pae(int xc_handle, u32 dom,
             *vl2e++ = l1tab | L2_PROT;
         }
         
-        *vl1e = ((u64)page_array[count] << PAGE_SHIFT) | L1_PROT;
+        *vl1e = ((uint64_t)page_array[count] << PAGE_SHIFT) | L1_PROT;
         if ( (count >= ((vpt_start-dsi_v_start)>>PAGE_SHIFT)) &&
              (count <  ((vpt_end  -dsi_v_start)>>PAGE_SHIFT)) ) 
             *vl1e &= ~_PAGE_RW;
@@ -199,7 +199,7 @@ static int setup_pg_tables_pae(int xc_handle, u32 dom,
 
 #if defined(__x86_64__)
 
-static int setup_pg_tables_64(int xc_handle, u32 dom,
+static int setup_pg_tables_64(int xc_handle, uint32_t dom,
                               vcpu_guest_context_t *ctxt,
                               unsigned long dsi_v_start,
                               unsigned long v_end,
@@ -280,7 +280,7 @@ static int setup_pg_tables_64(int xc_handle, u32 dom,
 #ifdef __ia64__
 #include <asm/fpu.h> /* for FPSR_DEFAULT */
 static int setup_guest(int xc_handle,
-                       u32 dom,
+                       uint32_t dom,
                        char *image, unsigned long image_size,
                        gzFile initrd_gfd, unsigned long initrd_len,
                        unsigned long nr_pages,
@@ -346,7 +346,7 @@ static int setup_guest(int xc_handle,
     *store_mfn = page_array[1];
     *console_mfn = page_array[2];
     printf("store_mfn: 0x%lx, console_mfn: 0x%lx\n",
-           (u64)store_mfn, (u64)console_mfn);
+           (uint64_t)store_mfn, (uint64_t)console_mfn);
 
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, page_array[0]);
@@ -367,7 +367,7 @@ static int setup_guest(int xc_handle,
 }
 #else /* x86 */
 static int setup_guest(int xc_handle,
-                       u32 dom,
+                       uint32_t dom,
                        char *image, unsigned long image_size,
                        gzFile initrd_gfd, unsigned long initrd_len,
                        unsigned long nr_pages,
@@ -573,7 +573,7 @@ static int setup_guest(int xc_handle,
     {
         if ( xc_add_mmu_update(
             xc_handle, mmu,
-            ((u64)page_array[count] << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE,
+            ((uint64_t)page_array[count] << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE,
             count) )
         {
             fprintf(stderr,"m2p update failure p=%lx m=%lx\n",
@@ -679,7 +679,7 @@ static int setup_guest(int xc_handle,
 #endif
 
 int xc_linux_build(int xc_handle,
-                   u32 domid,
+                   uint32_t domid,
                    const char *image_name,
                    const char *ramdisk_name,
                    const char *cmdline,
@@ -735,7 +735,7 @@ int xc_linux_build(int xc_handle,
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
     if ( (xc_dom0_op(xc_handle, &op) < 0) || 
-         ((u16)op.u.getdomaininfo.domain != domid) )
+         ((uint16_t)op.u.getdomaininfo.domain != domid) )
     {
         PERROR("Could not get info on domain");
         goto error_out;

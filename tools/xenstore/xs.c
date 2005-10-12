@@ -304,7 +304,7 @@ static void *xs_talkv(struct xs_handle *h, struct xs_transaction_handle *t,
 	unsigned int i;
 	struct sigaction ignorepipe, oldact;
 
-	msg.tx_id = (u32)(unsigned long)t;
+	msg.tx_id = (uint32_t)(unsigned long)t;
 	msg.type = type;
 	msg.len = 0;
 	for (i = 0; i < num_vecs; i++)
@@ -510,7 +510,7 @@ bool xs_set_permissions(struct xs_handle *h,
 	iov[0].iov_len = strlen(path) + 1;
 	
 	for (i = 0; i < num_perms; i++) {
-		char buffer[MAX_STRLEN(domid_t)+1];
+		char buffer[MAX_STRLEN(unsigned int)+1];
 
 		if (!xs_perm_to_string(&perms[i], buffer))
 			goto unwind;
@@ -672,7 +672,8 @@ bool xs_transaction_end(struct xs_handle *h, struct xs_transaction_handle *t,
  * This tells the store daemon about a shared memory page and event channel
  * associated with a domain: the domain uses these to communicate.
  */
-bool xs_introduce_domain(struct xs_handle *h, domid_t domid, unsigned long mfn,
+bool xs_introduce_domain(struct xs_handle *h,
+			 unsigned int domid, unsigned long mfn,
 			 unsigned int eventchn, const char *path)
 {
 	char domid_str[MAX_STRLEN(domid)];
@@ -697,7 +698,7 @@ bool xs_introduce_domain(struct xs_handle *h, domid_t domid, unsigned long mfn,
 				ARRAY_SIZE(iov), NULL));
 }
 
-bool xs_release_domain(struct xs_handle *h, domid_t domid)
+bool xs_release_domain(struct xs_handle *h, unsigned int domid)
 {
 	char domid_str[MAX_STRLEN(domid)];
 
@@ -706,7 +707,7 @@ bool xs_release_domain(struct xs_handle *h, domid_t domid)
 	return xs_bool(xs_single(h, NULL, XS_RELEASE, domid_str, NULL));
 }
 
-char *xs_get_domain_path(struct xs_handle *h, domid_t domid)
+char *xs_get_domain_path(struct xs_handle *h, unsigned int domid)
 {
 	char domid_str[MAX_STRLEN(domid)];
 

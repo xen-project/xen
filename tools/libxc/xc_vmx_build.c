@@ -34,9 +34,9 @@
 #define E820_MAP_OFFSET      0x000002D0
 
 struct e820entry {
-    u64 addr;
-    u64 size;
-    u32 type;
+    uint64_t addr;
+    uint64_t size;
+    uint32_t type;
 } __attribute__((packed));
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
@@ -47,7 +47,7 @@ parseelfimage(
     char *elfbase, unsigned long elfsize, struct domain_setup_info *dsi);
 static int
 loadelfimage(
-    char *elfbase, int xch, u32 dom, unsigned long *parray,
+    char *elfbase, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi);
 
 static unsigned char build_e820map(void *e820_page, unsigned long mem_size)
@@ -122,7 +122,7 @@ static unsigned char build_e820map(void *e820_page, unsigned long mem_size)
  */
 #define VCPU_MAGIC 0x76637075 /* "vcpu" */
 static int
-set_nr_vcpus(int xc_handle, u32 dom, unsigned long *pfn_list,
+set_nr_vcpus(int xc_handle, uint32_t dom, unsigned long *pfn_list,
              struct domain_setup_info *dsi, unsigned long vcpus)
 {
     char          *va_map;
@@ -144,7 +144,7 @@ set_nr_vcpus(int xc_handle, u32 dom, unsigned long *pfn_list,
 }
 
 #ifdef __i386__
-static int zap_mmio_range(int xc_handle, u32 dom,
+static int zap_mmio_range(int xc_handle, uint32_t dom,
                           l2_pgentry_32_t *vl2tab,
                           unsigned long mmio_range_start,
                           unsigned long mmio_range_size)
@@ -173,7 +173,7 @@ static int zap_mmio_range(int xc_handle, u32 dom,
     return 0;
 }
 
-static int zap_mmio_ranges(int xc_handle, u32 dom, unsigned long l2tab,
+static int zap_mmio_ranges(int xc_handle, uint32_t dom, unsigned long l2tab,
                            unsigned char e820_map_nr, unsigned char *e820map)
 {
     unsigned int i;
@@ -197,7 +197,7 @@ static int zap_mmio_ranges(int xc_handle, u32 dom, unsigned long l2tab,
     return 0;
 }
 #else
-static int zap_mmio_range(int xc_handle, u32 dom,
+static int zap_mmio_range(int xc_handle, uint32_t dom,
                           l3_pgentry_t *vl3tab,
                           unsigned long mmio_range_start,
                           unsigned long mmio_range_size)
@@ -247,7 +247,7 @@ static int zap_mmio_range(int xc_handle, u32 dom,
     return 0;
 }
 
-static int zap_mmio_ranges(int xc_handle, u32 dom, unsigned long l3tab,
+static int zap_mmio_ranges(int xc_handle, uint32_t dom, unsigned long l3tab,
                            unsigned char e820_map_nr, unsigned char *e820map)
 {
     unsigned int i;
@@ -271,7 +271,7 @@ static int zap_mmio_ranges(int xc_handle, u32 dom, unsigned long l3tab,
 #endif
 
 static int setup_guest(int xc_handle,
-                       u32 dom, int memsize,
+                       uint32_t dom, int memsize,
                        char *image, unsigned long image_size,
                        unsigned long nr_pages,
                        vcpu_guest_context_t *ctxt,
@@ -595,7 +595,7 @@ static int vmx_identify(void)
 }
 
 int xc_vmx_build(int xc_handle,
-                 u32 domid,
+                 uint32_t domid,
                  int memsize,
                  const char *image_name,
                  unsigned int control_evtchn,
@@ -635,7 +635,7 @@ int xc_vmx_build(int xc_handle,
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
     if ( (xc_dom0_op(xc_handle, &op) < 0) ||
-         ((u16)op.u.getdomaininfo.domain != domid) )
+         ((uint16_t)op.u.getdomaininfo.domain != domid) )
     {
         PERROR("Could not get info on domain");
         goto error_out;
@@ -790,7 +790,7 @@ static int parseelfimage(char *elfbase,
 
 static int
 loadelfimage(
-    char *elfbase, int xch, u32 dom, unsigned long *parray,
+    char *elfbase, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi)
 {
     Elf32_Ehdr *ehdr = (Elf32_Ehdr *)elfbase;

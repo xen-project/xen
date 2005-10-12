@@ -83,7 +83,7 @@ int xc_sched_id(int xc_handle,
 }
 
 int xc_perfc_control(int xc_handle,
-                     u32 op,
+                     uint32_t op,
                      xc_perfc_desc_t *desc)
 {
     int rc;

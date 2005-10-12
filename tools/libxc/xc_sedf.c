@@ -11,7 +11,7 @@
 #include "xc_private.h"
 
 int xc_sedf_domain_set(int xc_handle,
-                          u32 domid, u64 period, u64 slice,u64 latency, u16 extratime,u16 weight)
+                          uint32_t domid, uint64_t period, uint64_t slice,uint64_t latency, uint16_t extratime,uint16_t weight)
 {
     dom0_op_t op;
     struct sedf_adjdom *p = &op.u.adjustdom.u.sedf;
@@ -29,7 +29,7 @@ int xc_sedf_domain_set(int xc_handle,
     return do_dom0_op(xc_handle, &op);
 }
 
-int xc_sedf_domain_get(int xc_handle, u32 domid, u64 *period, u64 *slice, u64* latency, u16* extratime, u16* weight)
+int xc_sedf_domain_get(int xc_handle, uint32_t domid, uint64_t *period, uint64_t *slice, uint64_t* latency, uint16_t* extratime, uint16_t* weight)
 {
     dom0_op_t op;
     int ret;

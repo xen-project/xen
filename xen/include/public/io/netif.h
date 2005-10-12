@@ -11,34 +11,34 @@
 
 typedef struct netif_tx_request {
     grant_ref_t gref;      /* Reference to buffer page */
-    u16      offset:15;    /* Offset within buffer page */
-    u16      csum_blank:1; /* Proto csum field blank?   */
-    u16      id;           /* Echoed in response message. */
-    u16      size;         /* Packet size in bytes.       */
+    uint16_t offset:15;    /* Offset within buffer page */
+    uint16_t csum_blank:1; /* Proto csum field blank?   */
+    uint16_t id;           /* Echoed in response message. */
+    uint16_t size;         /* Packet size in bytes.       */
 } netif_tx_request_t;
 
 typedef struct netif_tx_response {
-    u16      id;
-    s8       status;
+    uint16_t id;
+    int8_t   status;
 } netif_tx_response_t;
 
 typedef struct {
-    u16       id;       /* Echoed in response message.        */
-    grant_ref_t gref;	/* Reference to incoming granted frame */
+    uint16_t    id;        /* Echoed in response message.        */
+    grant_ref_t gref;      /* Reference to incoming granted frame */
 } netif_rx_request_t;
 
 typedef struct {
-    u16      offset;     /* Offset in page of start of received packet  */
-    u16      csum_valid; /* Protocol checksum is validated?       */
-    u16      id;
-    s16      status;     /* -ve: BLKIF_RSP_* ; +ve: Rx'ed pkt size. */
+    uint16_t offset;     /* Offset in page of start of received packet  */
+    uint16_t csum_valid; /* Protocol checksum is validated?       */
+    uint16_t id;
+    int16_t  status;     /* -ve: BLKIF_RSP_* ; +ve: Rx'ed pkt size. */
 } netif_rx_response_t;
 
 /*
  * We use a special capitalised type name because it is _essential_ that all 
  * arithmetic on indexes is done on an integer type of the correct size.
  */
-typedef u32 NETIF_RING_IDX;
+typedef uint32_t NETIF_RING_IDX;
 
 /*
  * Ring indexes are 'free running'. That is, they are not stored modulo the
@@ -91,3 +91,13 @@ typedef struct netif_rx_interface {
 #define NETIF_RSP_OKAY             0
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

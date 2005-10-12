@@ -48,3 +48,13 @@
 #define SHUTDOWN_crash      3  /* Tell controller we've crashed.             */
 
 #endif /* __XEN_PUBLIC_SCHED_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

@@ -8,7 +8,7 @@
 #include "xc_private.h"
 #include <xen/memory.h>
 
-void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
+void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
                            unsigned long *arr, int num )
 {
     privcmd_mmapbatch_t ioctlx; 
@@ -35,7 +35,7 @@ void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
 
 /*******************/
 
-void *xc_map_foreign_range(int xc_handle, u32 dom,
+void *xc_map_foreign_range(int xc_handle, uint32_t dom,
                            int size, int prot,
                            unsigned long mfn )
 {
@@ -66,7 +66,7 @@ void *xc_map_foreign_range(int xc_handle, u32 dom,
 
 /* NB: arr must be mlock'ed */
 int xc_get_pfn_type_batch(int xc_handle, 
-                          u32 dom, int num, unsigned long *arr)
+                          uint32_t dom, int num, unsigned long *arr)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO2;
@@ -79,7 +79,7 @@ int xc_get_pfn_type_batch(int xc_handle,
 #define GETPFN_ERR (~0U)
 unsigned int get_pfn_type(int xc_handle, 
                           unsigned long mfn, 
-                          u32 dom)
+                          uint32_t dom)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO;
@@ -258,7 +258,7 @@ long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 
     op.cmd = DOM0_GETVCPUCONTEXT;
     op.u.getvcpucontext.domain = (domid_t)domid;
-    op.u.getvcpucontext.vcpu   = (u16)vcpu;
+    op.u.getvcpucontext.vcpu   = (uint16_t)vcpu;
     op.u.getvcpucontext.ctxt   = NULL;
     if ( (do_dom0_op(xc_handle, &op) < 0) )
     {
@@ -282,7 +282,7 @@ unsigned long xc_get_m2p_start_mfn ( int xc_handle )
 }
 
 int xc_get_pfn_list(int xc_handle,
-                    u32 domid, 
+                    uint32_t domid, 
                     unsigned long *pfn_buf, 
                     unsigned long max_pfns)
 {
@@ -324,7 +324,7 @@ int xc_get_pfn_list(int xc_handle,
 
 #ifdef __ia64__
 int xc_ia64_get_pfn_list(int xc_handle,
-                         u32 domid, 
+                         uint32_t domid, 
                          unsigned long *pfn_buf, 
                          unsigned int start_page,
                          unsigned int nr_pages)
@@ -352,7 +352,7 @@ int xc_ia64_get_pfn_list(int xc_handle,
     return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
 }
 
-long xc_get_max_pages(int xc_handle, u32 domid)
+long xc_get_max_pages(int xc_handle, uint32_t domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETDOMAININFO;
@@ -362,7 +362,7 @@ long xc_get_max_pages(int xc_handle, u32 domid)
 }
 #endif
 
-long xc_get_tot_pages(int xc_handle, u32 domid)
+long xc_get_tot_pages(int xc_handle, uint32_t domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETDOMAININFO;
@@ -372,7 +372,7 @@ long xc_get_tot_pages(int xc_handle, u32 domid)
 }
 
 int xc_copy_to_domain_page(int xc_handle,
-                           u32 domid,
+                           uint32_t domid,
                            unsigned long dst_pfn, 
                            void *src_page)
 {
@@ -387,8 +387,8 @@ int xc_copy_to_domain_page(int xc_handle,
 
 unsigned long xc_get_filesz(int fd)
 {
-    u16 sig;
-    u32 _sz = 0;
+    uint16_t sig;
+    uint32_t _sz = 0;
     unsigned long sz;
 
     lseek(fd, 0, SEEK_SET);
@@ -408,7 +408,7 @@ unsigned long xc_get_filesz(int fd)
 }
 
 void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,
-                   int xch, u32 dom, unsigned long *parray,
+                   int xch, uint32_t dom, unsigned long *parray,
                    unsigned long vstart)
 {
     char *va;
@@ -460,7 +460,7 @@ int xc_version(int xc_handle, int cmd, void *arg)
 }
 
 unsigned long xc_make_page_below_4G(
-    int xc_handle, u32 domid, unsigned long mfn)
+    int xc_handle, uint32_t domid, unsigned long mfn)
 {
     unsigned long new_mfn;
 

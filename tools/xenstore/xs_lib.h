@@ -22,8 +22,8 @@
 
 #include <stdbool.h>
 #include <limits.h>
-#include <xenctrl.h>
 #include <errno.h>
+#include <stdint.h>
 #include <xen/io/xs_wire.h>
 
 /* Bitmask of permissions. */
@@ -58,7 +58,7 @@ bool xs_write_all(int fd, const void *data, unsigned int len);
 bool xs_strings_to_perms(struct xs_permissions *perms, unsigned int num,
 			 const char *strings);
 
-/* Convert permissions to a string (up to len MAX_STRLEN(domid_t)+1). */
+/* Convert permissions to a string (up to len MAX_STRLEN(unsigned int)+1). */
 bool xs_perm_to_string(const struct xs_permissions *perm, char *buffer);
 
 /* Given a string and a length, count how many strings (nul terms). */

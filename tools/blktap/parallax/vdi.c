@@ -132,9 +132,9 @@ vdi_t *vdi_create(snap_id_t *parent_snap, char *name)
 /* vdi_get and vdi_put currently act more like alloc/free -- they don't 
  * do refcount-based allocation.  
  */
-vdi_t *vdi_get(u64 vdi_id)
+vdi_t *vdi_get(uint64_t vdi_id)
 {
-    u64 vdi_blk;
+    uint64_t vdi_blk;
     vdi_t *vdi;
     
     vdi_blk = lookup(VDI_REG_HEIGHT, VDI_RADIX_ROOT, vdi_id);

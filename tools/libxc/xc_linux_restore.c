@@ -51,7 +51,7 @@ read_exact(int fd, void *buf, size_t count)
     return r;
 }
 
-int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
+int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pfns,
                      unsigned int store_evtchn, unsigned long *store_mfn,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
