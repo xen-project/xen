@@ -207,7 +207,6 @@ static int xenbus_dev_probe(struct device *_dev)
 	struct xenbus_device *dev = to_xenbus_device(_dev);
 	struct xenbus_driver *drv = to_xenbus_driver(_dev->driver);
 	const struct xenbus_device_id *id;
-	int ret;
 
 	if (!drv->probe)
 		return -ENODEV;
@@ -216,10 +215,7 @@ static int xenbus_dev_probe(struct device *_dev)
 	if (!id)
 		return -ENODEV;
 
-	down(&xenwatch_mutex);
-	ret = drv->probe(dev, id);
-	up(&xenwatch_mutex);
-	return ret;
+	return drv->probe(dev, id);
 }
 
 static int xenbus_dev_remove(struct device *_dev)
@@ -235,13 +231,18 @@ static int xenbus_dev_remove(struct device *_dev)
 static int xenbus_register_driver_common(struct xenbus_driver *drv,
 					 struct xen_bus_type *bus)
 {
+	int ret;
+
 	drv->driver.name = drv->name;
 	drv->driver.bus = &bus->bus;
 	drv->driver.owner = drv->owner;
 	drv->driver.probe = xenbus_dev_probe;
 	drv->driver.remove = xenbus_dev_remove;
 
-	return driver_register(&drv->driver);
+	down(&xenwatch_mutex);
+	ret = driver_register(&drv->driver);
+	up(&xenwatch_mutex);
+	return ret;
 }
 
 int xenbus_register_driver(struct xenbus_driver *drv)
