@@ -167,7 +167,8 @@ extern struct vcpu *idle_task[NR_CPUS];
 #define IDLE_DOMAIN_ID   (0x7FFFU)
 #define is_idle_task(_d) (test_bit(_DOMF_idle_domain, &(_d)->domain_flags))
 
-struct vcpu *alloc_vcpu(struct domain *d, unsigned int vcpu_id);
+struct vcpu *alloc_vcpu(
+    struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
 
 struct domain *alloc_domain(void);
 void free_domain(struct domain *d);

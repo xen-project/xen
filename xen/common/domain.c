@@ -36,16 +36,11 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     if ( (d = alloc_domain()) == NULL )
         return NULL;
 
-    v = d->vcpu[0];
+    d->domain_id = dom_id;
 
     atomic_set(&d->refcnt, 1);
-    atomic_set(&v->pausecnt, 0);
-
-    d->domain_id = dom_id;
-    v->processor = cpu;
 
     spin_lock_init(&d->big_lock);
-
     spin_lock_init(&d->page_alloc_lock);
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);
@@ -63,10 +58,16 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
         return NULL;
     }
     
+    if ( (v = alloc_vcpu(d, 0, cpu)) == NULL )
+    {
+        grant_table_destroy(d);
+        evtchn_destroy(d);
+        free_domain(d);
+        return NULL;
+    }
+
     arch_do_createdomain(v);
     
-    sched_add_domain(v);
-
     if ( !is_idle_task(d) )
     {
         write_lock(&domlist_lock);
@@ -369,8 +370,6 @@ int boot_vcpu(struct domain *d, int vcpuid, struct vcpu_guest_context *ctxt)
 
     if ( (rc = arch_set_info_guest(v, ctxt)) != 0 )
         return rc;
-
-    sched_add_domain(v);
 
     return rc;
 }

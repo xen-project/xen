@@ -93,7 +93,8 @@ void free_domain(struct domain *d)
     xfree(d);
 }
 
-struct vcpu *alloc_vcpu(struct domain *d, unsigned int vcpu_id)
+struct vcpu *alloc_vcpu(
+    struct domain *d, unsigned int vcpu_id, unsigned int cpu_id)
 {
     struct vcpu *v;
 
@@ -104,6 +105,7 @@ struct vcpu *alloc_vcpu(struct domain *d, unsigned int vcpu_id)
 
     v->domain = d;
     v->vcpu_id = vcpu_id;
+    v->processor = cpu_id;
     atomic_set(&v->pausecnt, 0);
     v->cpumap = CPUMAP_RUNANYWHERE;
 
@@ -116,18 +118,14 @@ struct vcpu *alloc_vcpu(struct domain *d, unsigned int vcpu_id)
         return NULL;
     }
 
-    if ( vcpu_id == 0 )
-        return v;
+    sched_add_domain(v);
 
-    v->vcpu_info = &d->shared_info->vcpu_data[vcpu_id];
-
-    d->vcpu[v->vcpu_id-1]->next_in_list = v;
-
-    v->processor = (d->vcpu[0]->processor + 1) % num_online_cpus();
-    if ( test_bit(_VCPUF_cpu_pinned, &d->vcpu[0]->vcpu_flags) )
-        set_bit(_VCPUF_cpu_pinned, &v->vcpu_flags);
-
-    set_bit(_VCPUF_down, &v->vcpu_flags);
+    if ( vcpu_id != 0 )
+    {
+        v->vcpu_info = &d->shared_info->vcpu_data[vcpu_id];
+        d->vcpu[v->vcpu_id-1]->next_in_list = v;
+        set_bit(_VCPUF_down, &v->vcpu_flags);
+    }
 
     return v;
 }
@@ -136,19 +134,10 @@ struct domain *alloc_domain(void)
 {
     struct domain *d;
 
-    if ( (d = xmalloc(struct domain)) == NULL )
-        return NULL;
-    
-    memset(d, 0, sizeof(*d));
-
-    if ( alloc_vcpu(d, 0) == NULL )
-        goto out;
+    if ( (d = xmalloc(struct domain)) != NULL )
+        memset(d, 0, sizeof(*d));
 
     return d;
-
- out:
-    xfree(d);
-    return NULL;
 }
 
 /*

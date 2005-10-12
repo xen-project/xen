@@ -560,7 +560,7 @@ int construct_dom0(struct domain *d,
     d->shared_info->n_vcpu = num_online_cpus();
 
     for ( i = 1; i < d->shared_info->n_vcpu; i++ )
-        (void)alloc_vcpu(d, i);
+        (void)alloc_vcpu(d, i, i % num_online_cpus());
 
     /* Set up monitor table */
     update_pagetables(v);

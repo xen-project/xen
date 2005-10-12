@@ -224,7 +224,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_MAX_VCPUS:
     {
         struct domain *d;
-        unsigned int i, max = op->u.max_vcpus.max;
+        unsigned int i, max = op->u.max_vcpus.max, cpu;
 
         ret = -EINVAL;
         if ( max > MAX_VIRT_CPUS )
@@ -250,8 +250,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         ret = -ENOMEM;
         for ( i = 0; i < max; i++ )
-            if ( (d->vcpu[i] == NULL) && (alloc_vcpu(d, i) == NULL) )
-                goto maxvcpu_out;
+        {
+            if ( d->vcpu[i] == NULL )
+            {
+                cpu = (d->vcpu[i-1]->processor + 1) % num_online_cpus();
+                if ( alloc_vcpu(d, i, cpu) == NULL )
+                    goto maxvcpu_out;
+            }
+        }
 
         ret = 0;
 
