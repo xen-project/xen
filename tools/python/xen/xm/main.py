@@ -169,11 +169,9 @@ def handle_xend_error(cmd, dom, ex):
     if error == "Not found" and dom != None:
         err("Domain '%s' not found when running 'xm %s'" % (dom, cmd))
         sys.exit(1)
-    elif error == "Exception: Device not connected":
-        err("Device not connected")
-        sys.exit(1)
     else:
-        raise ex
+        err(error)
+        sys.exit(1)
     
 
 #########################################################################

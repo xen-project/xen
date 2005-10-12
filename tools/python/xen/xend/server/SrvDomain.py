@@ -146,13 +146,13 @@ class SrvDomain(SrvDir):
     def op_device_destroy(self, op, req):
         return self.call(self.dom.destroyDevice,
                          [['type', 'str'],
-                          ['dev',  'int']],
+                          ['dev',  'str']],
                          req)
                 
     def op_device_configure(self, op, req):
         return self.call(self.dom.device_configure,
                          [['config', 'sxpr'],
-                          ['dev',    'int']],
+                          ['dev',    'str']],
                          req)
 
 

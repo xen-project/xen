@@ -22,6 +22,7 @@ import string
 
 from xen.util import blkif
 from xen.xend import sxp
+from xen.xend.XendError import VmError
 
 from xen.xend.server.DevController import DevController
 
