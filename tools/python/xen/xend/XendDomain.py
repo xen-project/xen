@@ -57,7 +57,7 @@ class XendDomain:
         # So we stuff the XendDomain instance (self) into xroot's components.
         xroot.add_component("xen.xend.XendDomain", self)
         self.domains = {}
-        self.domains_lock = threading.Condition()
+        self.domains_lock = threading.RLock()
         self.watchReleaseDomain()
 
         self.domains_lock.acquire()
@@ -318,7 +318,7 @@ class XendDomain:
             n = len(matching)
             if n == 1:
                 return matching[0]
-            elif n > 1:
+            elif n > 1 and not d.isTerminated():
                 log.error('Name uniqueness has been violated for name %s!  '
                           'Recovering by renaming:', name)
                 for d in matching:

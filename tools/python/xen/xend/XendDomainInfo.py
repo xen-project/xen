@@ -78,8 +78,8 @@ restart_modes = [
     "rename-restart"
     ]
 
-STATE_VM_OK         = "ok"
-STATE_VM_TERMINATED = "terminated"
+STATE_DOM_OK       = 1
+STATE_DOM_SHUTDOWN = 2
 
 """Flag for a block device backend domain."""
 SIF_BLK_BE_DOMAIN = (1<<4)
@@ -293,7 +293,7 @@ def parseConfig(config):
     restart = get_cfg('restart')
     if restart:
         def handle_restart(event, val):
-            if not event in result:
+            if result[event] is None:
                 result[event] = val
 
         if restart == "onreboot":
@@ -384,7 +384,7 @@ class XendDomainInfo:
         self.console_channel = None
         self.console_mfn = None
 
-        self.state = STATE_VM_OK
+        self.state = STATE_DOM_OK
         self.state_updated = threading.Condition()
         self.refresh_shutdown_lock = threading.Condition()
 
@@ -708,7 +708,7 @@ class XendDomainInfo:
                     self.clearRestart()
 
                     if reason == 'suspend':
-                        self.state_set(STATE_VM_TERMINATED)
+                        self.state_set(STATE_DOM_SHUTDOWN)
                         # Don't destroy the domain.  XendCheckpoint will do
                         # this once it has finished.
                     elif reason in ['poweroff', 'reboot']:
@@ -821,19 +821,31 @@ class XendDomainInfo:
 
     def state_set(self, state):
         self.state_updated.acquire()
-        if self.state != state:
-            self.state = state
-            self.state_updated.notifyAll()
-        self.state_updated.release()
+        try:
+            if self.state != state:
+                self.state = state
+                self.state_updated.notifyAll()
+        finally:
+            self.state_updated.release()
 
 
     ## public:
 
     def waitForShutdown(self):
         self.state_updated.acquire()
-        while self.state == STATE_VM_OK:
-            self.state_updated.wait()
-        self.state_updated.release()
+        try:
+            while self.state == STATE_DOM_OK:
+                self.state_updated.wait()
+        finally:
+            self.state_updated.release()
+
+
+    def isShutdown(self):
+        self.state_updated.acquire()
+        try:
+            return self.state == STATE_DOM_SHUTDOWN
+        finally:
+            self.state_updated.release()
 
 
     def __str__(self):
@@ -1065,11 +1077,11 @@ class XendDomainInfo:
 
         try:
             if not self.info['name'].startswith(ZOMBIE_PREFIX):
-                self.info['name'] = self.generateZombieName()
+                self.info['name'] = ZOMBIE_PREFIX + self.info['name']
         except:
             log.exception("Renaming Zombie failed.")
 
-        self.state_set(STATE_VM_TERMINATED)
+        self.state_set(STATE_DOM_SHUTDOWN)
 
 
     def cleanupVm(self):
@@ -1274,7 +1286,7 @@ class XendDomainInfo:
         log.info("Preserving dead domain %s (%d).", self.info['name'],
                  self.domid)
         self.storeDom('xend/shutdown_completed', 'True')
-        self.state_set(STATE_VM_TERMINATED)
+        self.state_set(STATE_DOM_SHUTDOWN)
 
 
     ## public:
@@ -1302,18 +1314,6 @@ class XendDomainInfo:
                 return name
             except VmError:
                 n += 1
-
-
-    def generateZombieName(self):
-        n = 0
-        name = ZOMBIE_PREFIX + self.info['name']
-        while True:
-            try:
-                self.check_name(name)
-                return name
-            except VmError:
-                n += 1
-                name = "%s%d-%s" % (ZOMBIE_PREFIX, n, self.info['name'])
 
 
     def configure_bootloader(self):
