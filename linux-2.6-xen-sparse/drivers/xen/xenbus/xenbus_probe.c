@@ -39,6 +39,8 @@
 #include <linux/notifier.h>
 #include "xenbus_comms.h"
 
+extern struct semaphore xenwatch_mutex;
+
 #define streq(a, b) (strcmp((a), (b)) == 0)
 
 static struct notifier_block *xenstore_chain;
@@ -205,6 +207,7 @@ static int xenbus_dev_probe(struct device *_dev)
 	struct xenbus_device *dev = to_xenbus_device(_dev);
 	struct xenbus_driver *drv = to_xenbus_driver(_dev->driver);
 	const struct xenbus_device_id *id;
+	int ret;
 
 	if (!drv->probe)
 		return -ENODEV;
@@ -213,7 +216,10 @@ static int xenbus_dev_probe(struct device *_dev)
 	if (!id)
 		return -ENODEV;
 
-	return drv->probe(dev, id);
+	down(&xenwatch_mutex);
+	ret = drv->probe(dev, id);
+	up(&xenwatch_mutex);
+	return ret;
 }
 
 static int xenbus_dev_remove(struct device *_dev)
