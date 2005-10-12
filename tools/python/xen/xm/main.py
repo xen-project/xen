@@ -688,11 +688,16 @@ def main(argv=sys.argv):
             if rc:
                 usage()
         except socket.error, ex:
-            print >>sys.stderr, ex
-            err("Error connecting to xend, is xend running?")
+            if os.geteuid() != 0:
+                err("Most commands need root access.  Please try again as root.")
+            else:
+                err("Error connecting to xend: %s.  Is xend running?" % ex[1])
             sys.exit(1)
         except IOError:
-            err("Most commands need root access.  Please try again as root")
+            if os.geteuid() != 0:
+                err("Most commands need root access.  Please try again as root.")
+            else:
+                err("Error connecting to xend: %s." % ex[1])
             sys.exit(1)
         except xen.xend.XendError.XendError, ex:
             if len(args) > 0:
