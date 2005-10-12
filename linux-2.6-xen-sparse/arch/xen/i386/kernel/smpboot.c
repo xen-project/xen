@@ -64,6 +64,7 @@
 
 #include <asm-xen/evtchn.h>
 #include <asm-xen/xen-public/vcpu.h>
+#include <asm-xen/xenbus.h>
 
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
@@ -1289,117 +1290,51 @@ void __devinit smp_prepare_boot_cpu(void)
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
-#include <asm-xen/xenbus.h>
-/* hotplug down/up funtion pointer and target vcpu */
-struct vcpu_hotplug_handler_t {
-	void (*fn) (int vcpu);
-	u32 vcpu;
-};
-static struct vcpu_hotplug_handler_t vcpu_hotplug_handler;
 
-static int vcpu_hotplug_cpu_process(void *unused)
+static void handle_vcpu_hotplug_event(
+	struct xenbus_watch *watch, const char **vec, unsigned int len)
 {
-	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
+	int err, cpu;
+	char dir[32], state[32];
+	char *cpustr;
+	const char *node = vec[XS_WATCH_PATH];
 
-	if (handler->fn) {
-		(*(handler->fn)) (handler->vcpu);
-		handler->fn = NULL;
+	if ((cpustr = strstr(node, "cpu/")) == NULL)
+		return;
+
+	sscanf(cpustr, "cpu/%d", &cpu);
+
+	sprintf(dir, "cpu/%d", cpu);
+	err = xenbus_scanf(NULL, dir, "availability", "%s", state);
+	if (err != 1) {
+		printk(KERN_ERR "XENBUS: Unable to read cpu state\n");
+		return;
 	}
-	return 0;
+
+	if (strcmp(state, "online") == 0)
+		(void)cpu_up(cpu);
+	else if (strcmp(state, "offline") == 0)
+		(void)cpu_down(cpu);
+	else
+		printk(KERN_ERR "XENBUS: unknown state(%s) on node(%s)\n",
+		       state, node);
 }
-
-static void __vcpu_hotplug_handler(void *unused)
-{
-	int err;
-
-	err = kernel_thread(vcpu_hotplug_cpu_process,
-			    NULL, CLONE_FS | CLONE_FILES);
-	if (err < 0)
-		printk(KERN_ALERT "Error creating hotplug_cpu process!\n");
-}
-
-static void handle_vcpu_hotplug_event(struct xenbus_watch *, const char *);
-static struct notifier_block xsn_cpu;
-
-/* xenbus watch struct */
-static struct xenbus_watch cpu_watch = {
-	.node = "cpu",
-	.callback = handle_vcpu_hotplug_event
-};
 
 static int setup_cpu_watcher(struct notifier_block *notifier,
 			      unsigned long event, void *data)
 {
-	int err;
-
-	err = register_xenbus_watch(&cpu_watch);
-	if (err)
-		printk("Failed to register watch on /cpu\n");
-
+	static struct xenbus_watch cpu_watch = {
+		.node = "cpu",
+		.callback = handle_vcpu_hotplug_event };
+	(void)register_xenbus_watch(&cpu_watch);
 	return NOTIFY_DONE;
-}
-
-static void handle_vcpu_hotplug_event(struct xenbus_watch *watch, const char *node)
-{
-	static DECLARE_WORK(vcpu_hotplug_work, __vcpu_hotplug_handler, NULL);
-	struct vcpu_hotplug_handler_t *handler = &vcpu_hotplug_handler;
-	ssize_t ret;
-	int err, cpu;
-	char state[8];
-	char dir[32];
-	char *cpustr;
-
-	/* get a pointer to start of cpu string */
-	if ((cpustr = strstr(node, "cpu/")) != NULL) {
-
-		/* find which cpu state changed, note vcpu for handler */
-		sscanf(cpustr, "cpu/%d", &cpu);
-		handler->vcpu = cpu;
-
-		/* calc the dir for xenbus read */
-		sprintf(dir, "cpu/%d", cpu);
-
-		/* make sure watch that was triggered is changes to the correct key */
-		if ((strcmp(node + strlen(dir), "/availability")) != 0)
-			return;
-
-		/* get the state value */
-		err = xenbus_scanf(NULL, dir, "availability", "%s", state);
-
-		if (err != 1) {
-			printk(KERN_ERR
-			       "XENBUS: Unable to read cpu state\n");
-			return;
-		}
-
-		/* if we detect a state change, take action */
-		if (strcmp(state, "online") == 0) {
-			/* offline -> online */
-			if (!cpu_isset(cpu, cpu_online_map)) {
-				handler->fn = (void *)&cpu_up;
-				ret = schedule_work(&vcpu_hotplug_work);
-			} 
-		} else if (strcmp(state, "offline") == 0) {
-			/* online -> offline */
-			if (cpu_isset(cpu, cpu_online_map)) {
-				handler->fn = (void *)&cpu_down;
-				ret = schedule_work(&vcpu_hotplug_work);
-			} 
-		} else {
-			printk(KERN_ERR
-			       "XENBUS: unknown state(%s) on node(%s)\n", state,
-			       node);
-		}
-	}
-	return;
 }
 
 static int __init setup_vcpu_hotplug_event(void)
 {
-	xsn_cpu.notifier_call = setup_cpu_watcher;
-
+	static struct notifier_block xsn_cpu = {
+		.notifier_call = setup_cpu_watcher };
 	register_xenstore_notifier(&xsn_cpu);
-
 	return 0;
 }
 
@@ -1623,3 +1558,13 @@ void vcpu_prepare(int vcpu)
 	(void)HYPERVISOR_vcpu_op(VCPUOP_initialise, vcpu, &ctxt);
 	(void)HYPERVISOR_vcpu_op(VCPUOP_up, vcpu, NULL);
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */
