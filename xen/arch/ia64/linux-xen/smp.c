@@ -63,9 +63,18 @@ void flush_tlb_mask(cpumask_t mask)
 //Huh? This seems to be used on ia64 even if !CONFIG_SMP
 void smp_send_event_check_mask(cpumask_t mask)
 {
-	printf("smp_send_event_check_mask called\n");
-	//dummy();
-	//send_IPI_mask(cpu_mask, EVENT_CHECK_VECTOR);
+    int cpu;
+
+    /*  Not for me.  */
+    cpu_clear(smp_processor_id(), mask);
+    if (cpus_empty(mask))
+        return;
+
+    printf("smp_send_event_check_mask called\n");
+
+    for (cpu = 0; cpu < NR_CPUS; ++cpu)
+        if (cpu_isset(cpu, mask))
+	    platform_send_ipi(cpu, IA64_IPI_RESCHEDULE, IA64_IPI_DM_INT, 0);
 }
 
 
@@ -249,6 +258,7 @@ send_IPI_self (int op)
 	send_IPI_single(smp_processor_id(), op);
 }
 
+#ifndef XEN
 /*
  * Called with preeemption disabled.
  */
@@ -257,6 +267,7 @@ smp_send_reschedule (int cpu)
 {
 	platform_send_ipi(cpu, IA64_IPI_RESCHEDULE, IA64_IPI_DM_INT, 0);
 }
+#endif
 
 void
 smp_flush_tlb_all (void)
@@ -395,15 +406,14 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 	if (wait)
 		atomic_set(&data.finished, 0);
 
-	printk("smp_call_function: about to spin_lock \n");
 	spin_lock(&call_lock);
-	printk("smp_call_function: done with spin_lock \n");
+#if 0 //def XEN
+	printk("smp_call_function: %d lock\n", smp_processor_id ());
+#endif
 
 	call_data = &data;
 	mb();	/* ensure store to call_data precedes setting of IPI_CALL_FUNC */
-	printk("smp_call_function: about to send_IPI \n");
 	send_IPI_allbutself(IPI_CALL_FUNC);
-	printk("smp_call_function: done with send_IPI \n");
 
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
@@ -414,9 +424,10 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 			cpu_relax();
 	call_data = NULL;
 
-	printk("smp_call_function: about to spin_unlock \n");
 	spin_unlock(&call_lock);
+#if 0 //def XEN
 	printk("smp_call_function: DONE WITH spin_unlock, returning \n");
+#endif
 	return 0;
 }
 EXPORT_SYMBOL(smp_call_function);

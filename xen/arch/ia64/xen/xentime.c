@@ -103,10 +103,10 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 #ifdef HEARTBEAT_FREQ
 	static long count = 0;
 	if (!(++count & ((HEARTBEAT_FREQ*1024)-1))) {
-		printf("Heartbeat... iip=%p,psr.i=%d,pend=%d\n",
-			regs->cr_iip,
+		printf("Heartbeat... iip=%p\n", /*",psr.i=%d,pend=%d\n", */
+			regs->cr_iip /*,
 			VCPU(current,interrupt_delivery_enabled),
-			VCPU(current,pending_interruption));
+			VCPU(current,pending_interruption) */);
 		count = 0;
 	}
 #endif

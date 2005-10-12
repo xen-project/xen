@@ -324,6 +324,9 @@ start_ap:
 	mov r16=-1
 (isBP)	br.cond.dpnt .load_current // BP stack is on region 5 --- no need to map it
 
+#ifndef XEN
+	// XEN:	stack is allocated in xenheap, which is currently always
+	//  mapped.
 	// load mapping for stack (virtaddr in r2, physaddr in r3)
 	rsm psr.ic
 	movl r17=PAGE_KERNEL
@@ -353,7 +356,8 @@ start_ap:
 	ssm psr.ic
 	srlz.d
   	;;
-
+#endif
+	
 .load_current:
 	// load the "current" pointer (r13) and ar.k6 with the current task
 #if defined(XEN) && defined(VALIDATE_VT)

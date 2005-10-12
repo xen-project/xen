@@ -35,7 +35,7 @@ xen_debug_irq(ia64_vector vector, struct pt_regs *regs)
 int
 xen_do_IRQ(ia64_vector vector)
 {
-	if (vector != 0xef) {
+	if (vector != IA64_TIMER_VECTOR && vector != IA64_IPI_VECTOR) {
 		extern void vcpu_pend_interrupt(void *, int);
 #if 0
 		if (firsttime[vector]) {
@@ -57,22 +57,18 @@ xen_do_IRQ(ia64_vector vector)
 	return(0);
 }
 
-/* From linux/kernel/softirq.c */
-#ifdef __ARCH_IRQ_EXIT_IRQS_DISABLED
-# define invoke_softirq()	__do_softirq()
-#else
-# define invoke_softirq()	do_softirq()
-#endif
-
 /*
  * Exit an interrupt context. Process softirqs if needed and possible:
  */
 void irq_exit(void)
 {
 	//account_system_vtime(current);
-	//sub_preempt_count(IRQ_EXIT_OFFSET);
-	if (!in_interrupt() && local_softirq_pending())
-		invoke_softirq();
+	sub_preempt_count(IRQ_EXIT_OFFSET);
+	if (!in_interrupt() && local_softirq_pending()) {
+		add_preempt_count(SOFTIRQ_OFFSET);
+		do_softirq();
+		sub_preempt_count(SOFTIRQ_OFFSET);
+	}
 	//preempt_enable_no_resched();
 }
 /* end from linux/kernel/softirq.c */

@@ -121,6 +121,7 @@ acpi_get_sysname (void)
 #ifdef CONFIG_ACPI_BOOT
 
 #define ACPI_MAX_PLATFORM_INTERRUPTS	256
+#define NR_IOSAPICS 4
 
 #if 0
 /* Array to record platform interrupt vectors for generic interrupt routing. */
@@ -162,7 +163,6 @@ static int			available_cpus __initdata;
 struct acpi_table_madt *	acpi_madt __initdata;
 static u8			has_8259;
 
-#if 0
 static int __init
 acpi_parse_lapic_addr_ovr (
 	acpi_table_entry_header *header, const unsigned long end)
@@ -247,11 +247,12 @@ acpi_parse_iosapic (acpi_table_entry_header *header, const unsigned long end)
 
 	acpi_table_print_madt_entry(header);
 
+#if 0
 	iosapic_init(iosapic->address, iosapic->global_irq_base);
+#endif
 
 	return 0;
 }
-
 
 static int __init
 acpi_parse_plat_int_src (
@@ -267,6 +268,7 @@ acpi_parse_plat_int_src (
 
 	acpi_table_print_madt_entry(header);
 
+#if 0
 	/*
 	 * Get vector assignment for this interrupt, set attributes,
 	 * and program the IOSAPIC routing table.
@@ -280,6 +282,7 @@ acpi_parse_plat_int_src (
 						(plintsrc->flags.trigger == 1) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 
 	platform_intr_list[plintsrc->type] = vector;
+#endif
 	return 0;
 }
 
@@ -297,12 +300,13 @@ acpi_parse_int_src_ovr (
 
 	acpi_table_print_madt_entry(header);
 
+#if 0
 	iosapic_override_isa_irq(p->bus_irq, p->global_irq,
 				 (p->flags.polarity == 1) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
 				 (p->flags.trigger == 1) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
+#endif
 	return 0;
 }
-
 
 static int __init
 acpi_parse_nmi_src (acpi_table_entry_header *header, const unsigned long end)
@@ -331,8 +335,10 @@ void __init acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 		 */
 		sal_platform_features |= IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT;
 
+#if 0
 		/*Start cyclone clock*/
 		cyclone_setup(0);
+#endif
 	}
 }
 
@@ -350,7 +356,9 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 #else
 	has_8259 = acpi_madt->flags.pcat_compat;
 #endif
+#if 0
 	iosapic_system_init(has_8259);
+#endif
 
 	/* Get base address of IPI Message Block */
 
@@ -364,7 +372,6 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 
 	return 0;
 }
-#endif
 
 #ifdef CONFIG_ACPI_NUMA
 
@@ -529,6 +536,7 @@ acpi_register_gsi (u32 gsi, int polarity, int trigger)
 	return acpi_register_irq(gsi, polarity, trigger);
 }
 EXPORT_SYMBOL(acpi_register_gsi);
+#endif
 static int __init
 acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 {
@@ -550,10 +558,11 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (fadt->iapc_boot_arch & BAF_LEGACY_DEVICES)
 		acpi_legacy_devices = 1;
 
+#if 0
 	acpi_register_gsi(fadt->sci_int, ACPI_ACTIVE_LOW, ACPI_LEVEL_SENSITIVE);
+#endif
 	return 0;
 }
-#endif
 
 unsigned long __init
 acpi_find_rsdp (void)
@@ -567,7 +576,6 @@ acpi_find_rsdp (void)
 	return rsdp_phys;
 }
 
-#if 0
 int __init
 acpi_boot_init (void)
 {
@@ -646,6 +654,7 @@ acpi_boot_init (void)
 	printk(KERN_INFO "%d CPUs available, %d CPUs total\n", available_cpus, total_cpus);
 	return 0;
 }
+#if 0
 int
 acpi_gsi_to_irq (u32 gsi, unsigned int *irq)
 {

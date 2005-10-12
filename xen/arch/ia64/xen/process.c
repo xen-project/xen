@@ -62,11 +62,23 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
 	return 0;
 }
 
+#include <xen/sched-if.h>
+
+extern struct schedule_data schedule_data[NR_CPUS];
+
 void schedule_tail(struct vcpu *next)
 {
 	unsigned long rr7;
 	//printk("current=%lx,shared_info=%lx\n",current,current->vcpu_info);
 	//printk("next=%lx,shared_info=%lx\n",next,next->vcpu_info);
+
+    // TG: Real HACK FIXME.
+    // This is currently necessary because when a new domain is started, 
+    // the context_switch function of xen/common/schedule.c(__enter_scheduler)
+    // never returns.  Therefore, the lock must be released.
+    // schedule_tail is only called when a domain is started.
+    spin_unlock_irq(&schedule_data[current->processor].schedule_lock);
+
 	/* rr7 will be postponed to last point when resuming back to guest */
     if(VMX_DOMAIN(current)){
     	vmx_load_all_rr(current);

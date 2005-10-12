@@ -23,6 +23,7 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
+#include <asm/hw_irq.h>
 //#include <asm/mpspec.h>
 #include <xen/irq.h>
 #include <xen/event.h>
@@ -75,35 +76,21 @@ void free_perdomain_pt(struct domain *d)
 	//free_page((unsigned long)d->mm.perdomain_pt);
 }
 
-int hlt_counter;
-
-void disable_hlt(void)
-{
-	hlt_counter++;
-}
-
-void enable_hlt(void)
-{
-	hlt_counter--;
-}
-
 static void default_idle(void)
 {
-	if ( hlt_counter == 0 )
-	{
+	int cpu = smp_processor_id();
 	local_irq_disable();
-	    if ( !softirq_pending(smp_processor_id()) )
+	if ( !softirq_pending(cpu))
 	        safe_halt();
-	    //else
-		local_irq_enable();
-	}
+	local_irq_enable();
 }
 
-void continue_cpu_idle_loop(void)
+static void continue_cpu_idle_loop(void)
 {
 	int cpu = smp_processor_id();
 	for ( ; ; )
 	{
+	printf ("idle%dD\n", cpu);
 #ifdef IA64
 //        __IRQ_STAT(cpu, idle_timestamp) = jiffies
 #else
@@ -111,23 +98,32 @@ void continue_cpu_idle_loop(void)
 #endif
 	    while ( !softirq_pending(cpu) )
 	        default_idle();
+	    add_preempt_count(SOFTIRQ_OFFSET);
 	    raise_softirq(SCHEDULE_SOFTIRQ);
 	    do_softirq();
+	    sub_preempt_count(SOFTIRQ_OFFSET);
 	}
 }
 
 void startup_cpu_idle_loop(void)
 {
+	int cpu = smp_processor_id ();
 	/* Just some sanity to ensure that the scheduler is set up okay. */
 	ASSERT(current->domain == IDLE_DOMAIN_ID);
+	printf ("idle%dA\n", cpu);
 	raise_softirq(SCHEDULE_SOFTIRQ);
+#if 0   /* All this work is done within continue_cpu_idle_loop  */
+	printf ("idle%dB\n", cpu);
+	asm volatile ("mov ar.k2=r0");
 	do_softirq();
+	printf ("idle%dC\n", cpu);
 
 	/*
 	 * Declares CPU setup done to the boot processor.
 	 * Therefore memory barrier to ensure state is visible.
 	 */
 	smp_mb();
+#endif
 #if 0
 //do we have to ensure the idle task has a shared page so that, for example,
 //region registers can be loaded from it.  Apparently not...
@@ -229,17 +225,21 @@ void arch_do_createdomain(struct vcpu *v)
 	v->arch.breakimm = d->arch.breakimm;
 
 	d->arch.sys_pgnr = 0;
-	d->arch.mm = xmalloc(struct mm_struct);
-	if (unlikely(!d->arch.mm)) {
-		printk("Can't allocate mm_struct for domain %d\n",d->domain_id);
-		return -ENOMEM;
-	}
-	memset(d->arch.mm, 0, sizeof(*d->arch.mm));
-	d->arch.mm->pgd = pgd_alloc(d->arch.mm);
-	if (unlikely(!d->arch.mm->pgd)) {
-		printk("Can't allocate pgd for domain %d\n",d->domain_id);
-		return -ENOMEM;
-	}
+	if (d->domain_id != IDLE_DOMAIN_ID) {
+		d->arch.mm = xmalloc(struct mm_struct);
+		if (unlikely(!d->arch.mm)) {
+			printk("Can't allocate mm_struct for domain %d\n",d->domain_id);
+			return -ENOMEM;
+		}
+		memset(d->arch.mm, 0, sizeof(*d->arch.mm));
+		d->arch.mm->pgd = pgd_alloc(d->arch.mm);
+		if (unlikely(!d->arch.mm->pgd)) {
+			printk("Can't allocate pgd for domain %d\n",d->domain_id);
+			return -ENOMEM;
+		}
+	} else
+ 		d->arch.mm = NULL;
+ 	printf ("arch_do_create_domain: domain=%p\n", d);
 }
 
 void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
