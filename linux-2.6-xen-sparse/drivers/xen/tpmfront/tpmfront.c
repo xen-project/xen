@@ -39,6 +39,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/tpmfe.h>
+#include <linux/err.h>
 
 #include <asm/semaphore.h>
 #include <asm/io.h>
@@ -372,7 +373,7 @@ again:
 	info->watch.callback = watch_for_status;
 	err = register_xenbus_watch(&info->watch);
 	if (err) {
-		message = "registering watch on backend";
+		xenbus_dev_error(dev, err, "registering watch on backend");
 		goto destroy_tpmring;
 	}
 
@@ -398,6 +399,8 @@ static int tpmfront_probe(struct xenbus_device *dev,
 	int err;
 	struct tpmfront_info *info;
 	int handle;
+	int len = max(XS_WATCH_PATH, XS_WATCH_TOKEN) + 1;
+	const char *vec[len];
 
 	err = xenbus_scanf(NULL, dev->nodename,
 	                   "handle", "%i", &handle);
@@ -426,6 +429,10 @@ static int tpmfront_probe(struct xenbus_device *dev,
 		dev->data = NULL;
 		return err;
 	}
+
+	vec[XS_WATCH_PATH]  = info->watch.node;
+	vec[XS_WATCH_TOKEN] = NULL;
+	watch_for_status(&info->watch, vec, len);
 
 	return 0;
 }

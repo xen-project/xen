@@ -17,6 +17,7 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/miscdevice.h>
+#include <linux/poll.h>
 #include <asm/uaccess.h>
 #include <asm-xen/xenbus.h>
 #include <asm-xen/xen-public/grant_table.h>
@@ -680,9 +681,14 @@ vtpm_op_release(struct inode *inode, struct file *file)
 }
 
 static unsigned int
-vtpm_op_poll(struct file *file, struct poll_table_struct *pst)
+vtpm_op_poll(struct file *file, struct poll_table_struct *pts)
 {
-	return 0;
+	unsigned int flags = POLLOUT | POLLWRNORM;
+	poll_wait(file, &dataex.wait_queue, pts);
+	if (!list_empty(&dataex.pending_pak)) {
+		flags |= POLLIN | POLLRDNORM;
+	}
+	return flags;
 }
 
 static struct file_operations vtpm_ops = {
