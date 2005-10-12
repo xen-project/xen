@@ -53,17 +53,17 @@ int main(int argc, char *argv[])
 		hdr = (void *)data.dptr;
 		if (data.dsize < sizeof(*hdr))
 			fprintf(stderr, "%.*s: BAD truncated\n",
-				key.dsize, key.dptr);
+				(int)key.dsize, key.dptr);
 		else if (data.dsize != total_size(hdr))
 			fprintf(stderr, "%.*s: BAD length %i for %i/%i/%i (%i)\n",
-				key.dsize, key.dptr, data.dsize,
+				(int)key.dsize, key.dptr, (int)data.dsize,
 				hdr->num_perms, hdr->datalen,
 				hdr->childlen, total_size(hdr));
 		else {
 			unsigned int i;
 			char *p;
 
-			printf("%.*s: ", key.dsize, key.dptr);
+			printf("%.*s: ", (int)key.dsize, key.dptr);
 			for (i = 0; i < hdr->num_perms; i++)
 				printf("%s%c%i",
 				       i == 0 ? "" : ",",
