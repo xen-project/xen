@@ -147,6 +147,17 @@ int xc_domain_dumpcore(int xc_handle,
                        uint32_t domid,
                        const char *corename);
 
+/*
+ * This function sets the maximum number vcpus that a domian may create.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface.
+ * @parm domid the domain id in which vcpus are to be created.
+ * @parm max the maximum number of vcpus that the domain may create.
+ * @return 0 on success, -1 on failure.
+ */
+int xc_domain_max_vcpus(int xc_handle,
+                        uint32_t domid, 
+                        unsigned int max);
 
 /**
  * This function pauses a domain. A paused domain still exists in memory

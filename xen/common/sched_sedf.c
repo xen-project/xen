@@ -1122,10 +1122,10 @@ static inline int should_switch(struct vcpu* cur,
 void sedf_wake(struct vcpu *d) {
     s_time_t              now = NOW();
     struct sedf_vcpu_info* inf = EDOM_INFO(d);
- 
+
     PRINT(3, "sedf_wake was called, domain-id %i.%i\n",d->domain->domain_id,
           d->vcpu_id);
- 
+
     if (unlikely(is_idle_task(d->domain)))
         return;
    

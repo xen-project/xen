@@ -149,14 +149,24 @@ void startup_cpu_idle_loop(void)
 	continue_cpu_idle_loop();
 }
 
-struct vcpu *arch_alloc_vcpu_struct(void)
+struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 {
-	/* Per-vp stack is used here. So we need keep vcpu
-	 * same page as per-vp stack */
-	return alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER);
+	struct vcpu *v;
+
+	if ((v = alloc_xenheap_pages(KERNEL_STACK_SIZE_ORDER)) == NULL)
+		return NULL;
+
+	memset(v, 0, sizeof(*v)); 
+        memcpy(&v->arch, &idle0_vcpu.arch, sizeof(v->arch));
+	v->arch.privregs = 
+		alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+	printf("arch_vcpu_info=%p\n", v->arch.privregs);
+	memset(v->arch.privregs, 0, PAGE_SIZE);
+
+	return v;
 }
 
-void arch_free_vcpu_struct(struct vcpu *v)
+void free_vcpu_struct(struct vcpu *v)
 {
 	free_xenheap_pages(v, KERNEL_STACK_SIZE_ORDER);
 }
@@ -194,12 +204,6 @@ void arch_do_createdomain(struct vcpu *v)
    		while (1);
 	}
 	memset(d->shared_info, 0, PAGE_SIZE);
-#if 0
-	d->vcpu[0].arch.privregs = 
-			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
-	printf("arch_vcpu_info=%p\n", d->vcpu[0].arch.privregs);
-	memset(d->vcpu.arch.privregs, 0, PAGE_SIZE);
-#endif
 	v->vcpu_info = &(d->shared_info->vcpu_data[0]);
 
 	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
@@ -249,13 +253,6 @@ void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 	printf("arch_getdomaininfo_ctxt\n");
 	c->regs = *regs;
 	c->vcpu.evtchn_vector = v->vcpu_info->arch.evtchn_vector;
-#if 0
-	if (c->vcpu.privregs && copy_to_user(c->vcpu.privregs,
-			v->vcpu_info->arch.privregs, sizeof(mapped_regs_t))) {
-		printk("Bad ctxt address: 0x%lx\n", c->vcpu.privregs);
-		return -EFAULT;
-	}
-#endif
 
 	c->shared = v->domain->shared_info->arch;
 }
@@ -279,12 +276,7 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 
 	    vmx_setup_platform(v, c);
 	}
-    else{
-    	v->arch.privregs =
-			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
-	    printf("arch_vcpu_info=%p\n", v->arch.privregs);
-    	memset(v->arch.privregs, 0, PAGE_SIZE);
-    }
+
 	*regs = c->regs;
 	new_thread(v, regs->cr_iip, 0, 0);
 
@@ -302,18 +294,6 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	/* Don't redo final setup */
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 	return 0;
-}
-
-void arch_do_boot_vcpu(struct vcpu *v)
-{
-	struct domain *d = v->domain;
-	printf("arch_do_boot_vcpu: not implemented\n");
-
-	d->vcpu[v->vcpu_id]->arch.privregs = 
-			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
-	printf("arch_vcpu_info=%p\n", d->vcpu[v->vcpu_id]->arch.privregs);
-	memset(d->vcpu[v->vcpu_id]->arch.privregs, 0, PAGE_SIZE);
-	return;
 }
 
 void domain_relinquish_resources(struct domain *d)
@@ -824,12 +804,12 @@ int construct_dom0(struct domain *d,
 	unsigned long ret, progress = 0;
 
 //printf("construct_dom0: starting\n");
-	/* Sanity! */
+
 #ifndef CLONE_DOMAIN0
-	if ( d != dom0 ) 
-	    BUG();
-	if ( test_bit(_DOMF_constructed, &d->domain_flags) ) 
-	    BUG();
+	/* Sanity! */
+	BUG_ON(d != dom0);
+	BUG_ON(d->vcpu[0] == NULL);
+	BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
 #endif
 
 	memset(&dsi, 0, sizeof(struct domain_setup_info));
@@ -992,14 +972,8 @@ int construct_dom0(struct domain *d,
 	printk("Dom0: 0x%lx, domain: 0x%lx\n", (u64)dom0, (u64)d);
 	if (vmx_dom0)
 	    vmx_final_setup_domain(dom0);
-    else{
-    	d->vcpu[0]->arch.privregs = 
-			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
-	    printf("arch_vcpu_info=%p\n", d->vcpu[0]->arch.privregs);
-    	memset(d->vcpu[0]->arch.privregs, 0, PAGE_SIZE);
-    }
 
-	set_bit(_DOMF_constructed, &d->domain_flags);
+	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
 	new_thread(v, pkern_entry, 0, 0);
 	physdev_init_dom0(d);
@@ -1031,7 +1005,7 @@ int construct_domU(struct domain *d,
 	unsigned long pkern_entry;
 
 #ifndef DOMU_AUTO_RESTART
-	if ( test_bit(_DOMF_constructed, &d->domain_flags) ) BUG();
+	BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
 #endif
 
 	printk("*** LOADING DOMAIN %d ***\n",d->domain_id);
@@ -1051,7 +1025,7 @@ int construct_domU(struct domain *d,
 	loaddomainelfimage(d,image_start);
 	printk("loaddomainelfimage returns\n");
 
-	set_bit(_DOMF_constructed, &d->domain_flags);
+	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
 	printk("calling new_thread, entry=%p\n",pkern_entry);
 #ifdef DOMU_AUTO_RESTART

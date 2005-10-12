@@ -212,21 +212,35 @@ void dump_pageframe_info(struct domain *d)
            page->u.inuse.type_info);
 }
 
-struct vcpu *arch_alloc_vcpu_struct(void)
+struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 {
-    return xmalloc(struct vcpu);
+    struct vcpu *v;
+
+    if ( (v = xmalloc(struct vcpu)) == NULL )
+        return NULL;
+
+    memset(v, 0, sizeof(*v));
+
+    memcpy(&v->arch, &idle0_vcpu.arch, sizeof(v->arch));
+    v->arch.flags = TF_kernel_mode;
+
+    if ( (v->vcpu_id = vcpu_id) != 0 )
+    {
+        v->arch.schedule_tail = d->vcpu[0]->arch.schedule_tail;
+        v->arch.perdomain_ptes =
+            d->arch.mm_perdomain_pt + (vcpu_id << PDPT_VCPU_SHIFT);
+        v->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
+            l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
+    }
+
+    return v;
 }
 
-/* We assume that vcpu 0 is always the last one to be freed in a
-   domain i.e. if v->vcpu_id == 0, the domain should be
-   single-processor. */
-void arch_free_vcpu_struct(struct vcpu *v)
+void free_vcpu_struct(struct vcpu *v)
 {
-    struct vcpu *p;
-    for_each_vcpu(v->domain, p) {
-        if (p->next_in_list == v)
-            p->next_in_list = v->next_in_list;
-    }
+    BUG_ON(v->next_in_list != NULL);
+    if ( v->vcpu_id != 0 )
+        v->domain->vcpu[v->vcpu_id - 1]->next_in_list = NULL;
     xfree(v);
 }
 
@@ -242,8 +256,6 @@ void free_perdomain_pt(struct domain *d)
 void arch_do_createdomain(struct vcpu *v)
 {
     struct domain *d = v->domain;
-
-    v->arch.flags = TF_kernel_mode;
 
     if ( is_idle_task(d) )
         return;
@@ -289,20 +301,6 @@ void arch_do_createdomain(struct vcpu *v)
     
     shadow_lock_init(d);        
     INIT_LIST_HEAD(&d->arch.free_shadow_frames);
-}
-
-void arch_do_boot_vcpu(struct vcpu *v)
-{
-    struct domain *d = v->domain;
-
-    v->arch.flags = TF_kernel_mode;
-
-    v->arch.schedule_tail = d->vcpu[0]->arch.schedule_tail;
-
-    v->arch.perdomain_ptes =
-        d->arch.mm_perdomain_pt + (v->vcpu_id << PDPT_VCPU_SHIFT);
-    v->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
-        l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
 }
 
 void vcpu_migrate_cpu(struct vcpu *v, int newcpu)

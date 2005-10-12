@@ -80,69 +80,59 @@ static struct scheduler ops;
 /* Per-CPU periodic timer sends an event to the currently-executing domain. */
 static struct ac_timer t_timer[NR_CPUS]; 
 
-void free_domain_struct(struct domain *d)
+void free_domain(struct domain *d)
 {
     int i;
 
     SCHED_OP(free_task, d);
-    /* vcpu 0 has to be the last one destructed. */
-    for (i = MAX_VIRT_CPUS-1; i >= 0; i--)
-        if ( d->vcpu[i] )
-            arch_free_vcpu_struct(d->vcpu[i]);
+
+    for ( i = MAX_VIRT_CPUS-1; i >= 0; i-- )
+        if ( d->vcpu[i] != NULL )
+            free_vcpu_struct(d->vcpu[i]);
 
     xfree(d);
 }
 
-struct vcpu *alloc_vcpu_struct(
-    struct domain *d, unsigned long vcpu)
+struct vcpu *alloc_vcpu(struct domain *d, unsigned int vcpu_id)
 {
-    struct vcpu *v, *vc;
+    struct vcpu *v;
 
-    ASSERT( d->vcpu[vcpu] == NULL );
+    BUG_ON(d->vcpu[vcpu_id] != NULL);
 
-    if ( (v = arch_alloc_vcpu_struct()) == NULL )
+    if ( (v = alloc_vcpu_struct(d, vcpu_id)) == NULL )
         return NULL;
 
-    memset(v, 0, sizeof(*v));
-
-    d->vcpu[vcpu] = v;
     v->domain = d;
-    v->vcpu_id = vcpu;
+    v->vcpu_id = vcpu_id;
+    atomic_set(&v->pausecnt, 0);
+    v->cpumap = CPUMAP_RUNANYWHERE;
+
+    d->vcpu[vcpu_id] = v;
 
     if ( SCHED_OP(alloc_task, v) < 0 )
-        goto out;
-
-    if ( vcpu != 0 )
     {
-        v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
-
-        for_each_vcpu( d, vc )
-        {
-            if ( (vc->next_in_list == NULL) ||
-                 (vc->next_in_list->vcpu_id > vcpu) )
-                break;
-        }
-        v->next_in_list  = vc->next_in_list;
-        vc->next_in_list = v;
-
-        if (test_bit(_VCPUF_cpu_pinned, &vc->vcpu_flags)) {
-            v->processor = (vc->processor + 1) % num_online_cpus();
-            set_bit(_VCPUF_cpu_pinned, &v->vcpu_flags);
-        } else {
-            v->processor = (vc->processor + 1) % num_online_cpus();
-        }
+        d->vcpu[vcpu_id] = NULL;
+        free_vcpu_struct(v);
+        return NULL;
     }
 
+    if ( vcpu_id == 0 )
+        return v;
+
+    v->vcpu_info = &d->shared_info->vcpu_data[vcpu_id];
+
+    d->vcpu[v->vcpu_id-1]->next_in_list = v;
+
+    v->processor = (d->vcpu[0]->processor + 1) % num_online_cpus();
+    if ( test_bit(_VCPUF_cpu_pinned, &d->vcpu[0]->vcpu_flags) )
+        set_bit(_VCPUF_cpu_pinned, &v->vcpu_flags);
+
+    set_bit(_VCPUF_down, &v->vcpu_flags);
+
     return v;
-
- out:
-    d->vcpu[vcpu] = NULL;
-    arch_free_vcpu_struct(v);
-
-    return NULL;
 }
 
-struct domain *alloc_domain_struct(void)
+struct domain *alloc_domain(void)
 {
     struct domain *d;
 
@@ -151,7 +141,7 @@ struct domain *alloc_domain_struct(void)
     
     memset(d, 0, sizeof(*d));
 
-    if ( alloc_vcpu_struct(d, 0) == NULL )
+    if ( alloc_vcpu(d, 0) == NULL )
         goto out;
 
     return d;
@@ -176,11 +166,6 @@ void sched_add_domain(struct vcpu *v)
         schedule_data[v->processor].curr = v;
         schedule_data[v->processor].idle = v;
         set_bit(_VCPUF_running, &v->vcpu_flags);
-    }
-    else
-    {
-        /* Must be unpaused by control software to start execution. */
-        set_bit(_VCPUF_ctrl_pause, &v->vcpu_flags);
     }
 
     SCHED_OP(add_task, v);

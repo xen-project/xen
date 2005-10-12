@@ -329,6 +329,15 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
     return err;
 }
 
+int xc_domain_max_vcpus(int xc_handle, uint32_t domid, unsigned int max)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_MAX_VCPUS;
+    op.u.max_vcpus.domain = (domid_t)domid;
+    op.u.max_vcpus.max    = max;
+    return do_dom0_op(xc_handle, &op);
+}
+
 /*
  * Local variables:
  * mode: C

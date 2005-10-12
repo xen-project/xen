@@ -387,6 +387,13 @@ typedef struct {
     } *memory_map;
 } dom0_physical_memory_map_t;
 
+#define DOM0_MAX_VCPUS 41
+typedef struct {
+    domid_t domain;             /* domain to be affected */
+    unsigned int max;           /* maximum number of vcpus */
+} dom0_max_vcpus_t;
+
+
 typedef struct {
     uint32_t cmd;
     uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
@@ -422,6 +429,7 @@ typedef struct {
         dom0_getdomaininfolist_t getdomaininfolist;
         dom0_platform_quirk_t    platform_quirk;
         dom0_physical_memory_map_t physical_memory_map;
+        dom0_max_vcpus_t         max_vcpus;
     } u;
 } dom0_op_t;
 

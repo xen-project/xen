@@ -93,6 +93,26 @@ static PyObject *pyxc_domain_create(PyObject *self,
     return PyInt_FromLong(dom);
 }
 
+static PyObject *pyxc_domain_max_vcpus(PyObject *self,
+                                            PyObject *args,
+                                            PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    uint32_t dom, max;
+
+    static char *kwd_list[] = { "dom", "max", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, &dom, &max) )
+        return NULL;
+
+    if ( xc_domain_max_vcpus(xc->xc_handle, dom, max) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+    
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyObject *pyxc_domain_pause(PyObject *self,
                                    PyObject *args,
                                    PyObject *kwds)
@@ -782,6 +802,14 @@ static PyMethodDef pyxc_methods[] = {
       "Create a new domain.\n"
       " dom    [int, 0]:        Domain identifier to use (allocated if zero).\n"
       "Returns: [int] new domain identifier; -1 on error.\n" },
+
+    { "domain_max_vcpus", 
+      (PyCFunction)pyxc_domain_max_vcpus,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Set the maximum number of VCPUs a domain may create.\n"
+      " dom       [int, 0]:      Domain identifier to use.\n"
+      " max     [int, 0]:      New maximum number of VCPUs in domain.\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_dumpcore", 
       (PyCFunction)pyxc_domain_dumpcore, 

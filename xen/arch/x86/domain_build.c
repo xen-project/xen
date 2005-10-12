@@ -14,6 +14,7 @@
 #include <xen/event.h>
 #include <xen/elf.h>
 #include <xen/kernel.h>
+#include <xen/domain.h>
 #include <asm/regs.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -146,10 +147,9 @@ int construct_dom0(struct domain *d,
         struct domain *d, l1_pgentry_t *p2m, unsigned long l2mfn);
 
     /* Sanity! */
-    if ( d->domain_id != 0 ) 
-        BUG();
-    if ( test_bit(_DOMF_constructed, &d->domain_flags) ) 
-        BUG();
+    BUG_ON(d->domain_id != 0);
+    BUG_ON(d->vcpu[0] == NULL);
+    BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
     dsi.image_addr = (unsigned long)image_start;
@@ -559,6 +559,9 @@ int construct_dom0(struct domain *d,
         d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
     d->shared_info->n_vcpu = num_online_cpus();
 
+    for ( i = 1; i < d->shared_info->n_vcpu; i++ )
+        (void)alloc_vcpu(d, i);
+
     /* Set up monitor table */
     update_pagetables(v);
 
@@ -657,7 +660,7 @@ int construct_dom0(struct domain *d,
 
     init_domain_time(d);
 
-    set_bit(_DOMF_constructed, &d->domain_flags);
+    set_bit(_VCPUF_initialised, &v->vcpu_flags);
 
     new_thread(v, dsi.v_kernentry, vstack_end, vstartinfo_start);
 

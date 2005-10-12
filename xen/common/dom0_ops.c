@@ -44,28 +44,24 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
     struct vcpu   *v;
     u64 cpu_time = 0;
     int vcpu_count = 0;
-    int flags = DOMFLAGS_PAUSED | DOMFLAGS_BLOCKED;
+    int flags = DOMFLAGS_BLOCKED;
     
     info->domain = d->domain_id;
     
     memset(&info->vcpu_to_cpu, -1, sizeof(info->vcpu_to_cpu));
     memset(&info->cpumap, 0, sizeof(info->cpumap));
-    
+
     /* 
-     * - domain is marked as paused or blocked only if all its vcpus 
-     *   are paused or blocked 
+     * - domain is marked as blocked only if all its vcpus are blocked
      * - domain is marked as running if any of its vcpus is running
      * - only map vcpus that aren't down.  Note, at some point we may
      *   wish to demux the -1 value to indicate down vs. not-ever-booted
-     *   
      */
     for_each_vcpu ( d, v ) {
         /* only map vcpus that are up */
         if ( !(test_bit(_VCPUF_down, &v->vcpu_flags)) )
             info->vcpu_to_cpu[v->vcpu_id] = v->processor;
         info->cpumap[v->vcpu_id] = v->cpumap;
-        if ( !(v->vcpu_flags & VCPUF_ctrl_pause) )
-            flags &= ~DOMFLAGS_PAUSED;
         if ( !(v->vcpu_flags & VCPUF_blocked) )
             flags &= ~DOMFLAGS_BLOCKED;
         if ( v->vcpu_flags & VCPUF_running )
@@ -78,8 +74,9 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
     info->n_vcpu = vcpu_count;
     
     info->flags = flags |
-        ((d->domain_flags & DOMF_dying)    ? DOMFLAGS_DYING    : 0) |
-        ((d->domain_flags & DOMF_shutdown) ? DOMFLAGS_SHUTDOWN : 0) |
+        ((d->domain_flags & DOMF_dying)      ? DOMFLAGS_DYING    : 0) |
+        ((d->domain_flags & DOMF_shutdown)   ? DOMFLAGS_SHUTDOWN : 0) |
+        ((d->domain_flags & DOMF_ctrl_pause) ? DOMFLAGS_PAUSED   : 0) |
         d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
 
     if (d->ssid != NULL)
@@ -97,6 +94,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     long ret = 0;
     dom0_op_t curop, *op = &curop;
     void *ssid = NULL; /* save security ptr between pre and post/fail hooks */
+    static spinlock_t dom0_lock = SPIN_LOCK_UNLOCKED;
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
@@ -109,6 +107,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     if ( acm_pre_dom0_op(op, &ssid) )
         return -EACCES;
+
+    spin_lock(&dom0_lock);
 
     switch ( op->cmd )
     {
@@ -150,7 +150,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         {
             ret = -EINVAL;
             if ( (d != current->domain) && 
-                 test_bit(_DOMF_constructed, &d->domain_flags) )
+                 test_bit(_VCPUF_initialised, &d->vcpu[0]->vcpu_flags) )
             {
                 domain_unpause_by_systemcontroller(d);
                 ret = 0;
@@ -167,17 +167,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         domid_t        dom;
         struct vcpu   *v;
         unsigned int   i, cnt[NR_CPUS] = { 0 };
-        static spinlock_t alloc_lock = SPIN_LOCK_UNLOCKED;
         static domid_t rover = 0;
-
-        spin_lock(&alloc_lock);
 
         dom = op->u.createdomain.domain;
         if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
         {
             ret = -EINVAL;
             if ( !is_free_domid(dom) )
-                goto alloc_out;
+                break;
         }
         else
         {
@@ -191,7 +188,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
             ret = -ENOMEM;
             if ( dom == rover )
-                goto alloc_out;
+                break;
 
             rover = dom;
         }
@@ -215,15 +212,51 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         ret = -ENOMEM;
         if ( (d = do_createdomain(dom, pro)) == NULL )
-            goto alloc_out;
+            break;
 
         ret = 0;
 
         op->u.createdomain.domain = d->domain_id;
         copy_to_user(u_dom0_op, op, sizeof(*op));
+    }
+    break;
 
-    alloc_out:
-        spin_unlock(&alloc_lock);
+    case DOM0_MAX_VCPUS:
+    {
+        struct domain *d;
+        unsigned int i, max = op->u.max_vcpus.max;
+
+        ret = -EINVAL;
+        if ( max > MAX_VIRT_CPUS )
+            break;
+
+        ret = -ESRCH;
+        if ( (d = find_domain_by_id(op->u.max_vcpus.domain)) == NULL )
+            break;
+
+        /*
+         * Can only create new VCPUs while the domain is not fully constructed
+         * (and hence not runnable). Xen needs auditing for races before
+         * removing this check.
+         */
+        ret = -EINVAL;
+        if ( test_bit(_VCPUF_initialised, &d->vcpu[0]->vcpu_flags) )
+            goto maxvcpu_out;
+
+        /* We cannot reduce maximum VCPUs. */
+        ret = -EINVAL;
+        if ( (max != MAX_VIRT_CPUS) && (d->vcpu[max] != NULL) )
+            goto maxvcpu_out;
+
+        ret = -ENOMEM;
+        for ( i = 0; i < max; i++ )
+            if ( (d->vcpu[i] == NULL) && (alloc_vcpu(d, i) == NULL) )
+                goto maxvcpu_out;
+
+        ret = 0;
+
+    maxvcpu_out:
+        put_domain(d);
     }
     break;
 
@@ -535,10 +568,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = arch_do_dom0_op(op,u_dom0_op);
 
     }
+
+    spin_unlock(&dom0_lock);
+
     if (!ret)
         acm_post_dom0_op(op, ssid);
     else
         acm_fail_dom0_op(op, ssid);
+
     return ret;
 }
 

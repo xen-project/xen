@@ -2,17 +2,18 @@
 #ifndef __XEN_DOMAIN_H__
 #define __XEN_DOMAIN_H__
 
+extern int boot_vcpu(
+    struct domain *d, int vcpuid, struct vcpu_guest_context *ctxt);
+
 /*
  * Arch-specifics.
  */
 
-struct vcpu *arch_alloc_vcpu_struct(void);
+struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id);
 
-extern void arch_free_vcpu_struct(struct vcpu *v);
+extern void free_vcpu_struct(struct vcpu *v);
 
 extern void arch_do_createdomain(struct vcpu *v);
-
-extern void arch_do_boot_vcpu(struct vcpu *v);
 
 extern int  arch_set_info_guest(
     struct vcpu *v, struct vcpu_guest_context *c);

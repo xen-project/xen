@@ -61,7 +61,8 @@ struct vcpu
     vcpu_info_t     *vcpu_info;
 
     struct domain   *domain;
-    struct vcpu *next_in_list;
+
+    struct vcpu     *next_in_list;
 
     struct ac_timer  timer;         /* one-shot timer for timeout values */
     unsigned long    sleep_tick;    /* tick at which this vcpu started sleep */
@@ -166,11 +167,10 @@ extern struct vcpu *idle_task[NR_CPUS];
 #define IDLE_DOMAIN_ID   (0x7FFFU)
 #define is_idle_task(_d) (test_bit(_DOMF_idle_domain, &(_d)->domain_flags))
 
-struct vcpu *alloc_vcpu_struct(struct domain *d,
-                                             unsigned long vcpu);
+struct vcpu *alloc_vcpu(struct domain *d, unsigned int vcpu_id);
 
-void free_domain_struct(struct domain *d);
-struct domain *alloc_domain_struct();
+struct domain *alloc_domain(void);
+void free_domain(struct domain *d);
 
 #define DOMAIN_DESTRUCTED (1<<31) /* assumes atomic_t is >= 32 bits */
 #define put_domain(_d) \
@@ -327,13 +327,15 @@ unsigned long __hypercall_create_continuation(
 extern struct domain *domain_hash[DOMAIN_HASH_SIZE];
 extern struct domain *domain_list;
 
-#define for_each_domain(_d) \
- for ( (_d) = domain_list; (_d) != NULL; (_d) = (_d)->next_in_list )
+#define for_each_domain(_d)                     \
+ for ( (_d) = domain_list;                      \
+       (_d) != NULL;                            \
+       (_d) = (_d)->next_in_list )
 
-#define for_each_vcpu(_d,_ed) \
- for ( (_ed) = (_d)->vcpu[0]; \
-       (_ed) != NULL;                \
-       (_ed) = (_ed)->next_in_list )
+#define for_each_vcpu(_d,_v)                    \
+ for ( (_v) = (_d)->vcpu[0];                    \
+       (_v) != NULL;                            \
+       (_v) = (_v)->next_in_list )
 
 /*
  * Per-VCPU flags (vcpu_flags).
@@ -345,57 +347,55 @@ extern struct domain *domain_list;
 #define _VCPUF_fpu_dirtied     1
 #define VCPUF_fpu_dirtied      (1UL<<_VCPUF_fpu_dirtied)
  /* Domain is blocked waiting for an event. */
-#define _VCPUF_blocked         3
+#define _VCPUF_blocked         2
 #define VCPUF_blocked          (1UL<<_VCPUF_blocked)
- /* Domain is paused by controller software. */
-#define _VCPUF_ctrl_pause      4
-#define VCPUF_ctrl_pause       (1UL<<_VCPUF_ctrl_pause)
  /* Currently running on a CPU? */
-#define _VCPUF_running         5
+#define _VCPUF_running         3
 #define VCPUF_running          (1UL<<_VCPUF_running)
  /* Disables auto-migration between CPUs. */
-#define _VCPUF_cpu_pinned      6
+#define _VCPUF_cpu_pinned      4
 #define VCPUF_cpu_pinned       (1UL<<_VCPUF_cpu_pinned)
  /* Domain migrated between CPUs. */
-#define _VCPUF_cpu_migrated    7
+#define _VCPUF_cpu_migrated    5
 #define VCPUF_cpu_migrated     (1UL<<_VCPUF_cpu_migrated)
  /* Initialization completed. */
-#define _VCPUF_initialised     8
+#define _VCPUF_initialised     6
 #define VCPUF_initialised      (1UL<<_VCPUF_initialised)
  /* VCPU is not-runnable */
-#define _VCPUF_down            9
+#define _VCPUF_down            7
 #define VCPUF_down             (1UL<<_VCPUF_down)
 
 /*
  * Per-domain flags (domain_flags).
  */
- /* Has the guest OS been fully built yet? */
-#define _DOMF_constructed      0
-#define DOMF_constructed       (1UL<<_DOMF_constructed)
  /* Is this one of the per-CPU idle domains? */
-#define _DOMF_idle_domain      1
+#define _DOMF_idle_domain      0
 #define DOMF_idle_domain       (1UL<<_DOMF_idle_domain)
  /* Is this domain privileged? */
-#define _DOMF_privileged       2
+#define _DOMF_privileged       1
 #define DOMF_privileged        (1UL<<_DOMF_privileged)
  /* May this domain do IO to physical devices? */
-#define _DOMF_physdev_access   3
+#define _DOMF_physdev_access   2
 #define DOMF_physdev_access    (1UL<<_DOMF_physdev_access)
  /* Guest shut itself down for some reason. */
-#define _DOMF_shutdown         4
+#define _DOMF_shutdown         3
 #define DOMF_shutdown          (1UL<<_DOMF_shutdown)
  /* Guest is in process of shutting itself down (becomes DOMF_shutdown). */
-#define _DOMF_shuttingdown     5
+#define _DOMF_shuttingdown     4
 #define DOMF_shuttingdown      (1UL<<_DOMF_shuttingdown)
  /* Death rattle. */
-#define _DOMF_dying            6
+#define _DOMF_dying            5
 #define DOMF_dying             (1UL<<_DOMF_dying)
+ /* Domain is paused by controller software. */
+#define _DOMF_ctrl_pause       6
+#define DOMF_ctrl_pause        (1UL<<_DOMF_ctrl_pause)
 
 static inline int domain_runnable(struct vcpu *v)
 {
     return ( (atomic_read(&v->pausecnt) == 0) &&
-             !(v->vcpu_flags & (VCPUF_blocked|VCPUF_ctrl_pause|VCPUF_down)) &&
-             !(v->domain->domain_flags & (DOMF_shutdown|DOMF_shuttingdown)) );
+             !(v->vcpu_flags & (VCPUF_blocked|VCPUF_down)) &&
+             !(v->domain->domain_flags &
+               (DOMF_shutdown|DOMF_shuttingdown|DOMF_ctrl_pause)) );
 }
 
 void vcpu_pause(struct vcpu *v);

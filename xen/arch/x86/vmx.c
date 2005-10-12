@@ -1674,7 +1674,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
             store_cpu_user_regs(&regs);
             __vm_clear_bit(GUEST_PENDING_DBG_EXCEPTIONS, PENDING_DEBUG_EXC_BS);
 
-            set_bit(_VCPUF_ctrl_pause, &current->vcpu_flags);
+            domain_pause_for_debugger();
             do_sched_op(SCHEDOP_yield);
 
             break;
