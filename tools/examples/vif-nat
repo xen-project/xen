@@ -23,7 +23,6 @@
 # Exit if anything goes wrong
 set -e 
 export PATH=/sbin:/bin:/usr/bin:/usr/sbin:$PATH
-echo "*vif-nat $*" >&2
 
 # Operation name.
 OP=$1
@@ -35,17 +34,25 @@ for arg ; do export "${arg}" ; done
 # Required parameters. Fail if not set.
 domain=${domain:?}
 vif=${vif:?}
-ip=${ip:?} 
+ip=${ip:-'169.254.1.1/24'}   #if not defined, give a default address 
 
-# strip /netmask
+echo "*vif-nat $OP domain=$domain vif=$vif ip=$ip" >&2
+
+#determine ip address and netmask 
 vif_ip=`echo ${ip} | awk -F/ '{print $1}'`
+bits=`echo ${ip} | awk -F/ '{print $2}'`
+intmask=$(( ((0xFFFFFFFF << ((32 - $bits)))) & 0xFFFFFFFF ))
+netmask=$(( (($intmask & 0xFF000000)) >> 24 ))
+netmask=$netmask.$(( (($intmask & 0x00FF0000)) >> 16 ))
+netmask=$netmask.$(( (($intmask & 0x0000FF00)) >> 8 ))
+netmask=$netmask.$(( $intmask & 0x000000FF ))
 
 main_ip=`ifconfig eth0 | grep "inet addr:" | sed -e 's/.*inet addr:\(\w\w*\.\w\w*\.\w\w*\.\w\w*\).*/\1/'`
 
 # Are we going up or down?
 case $OP in
     up)
-        ifconfig ${vif} ${vif_ip} netmask 255.255.255.0 up
+        ifconfig ${vif} ${vif_ip} netmask ${netmask} up
         echo 1 >/proc/sys/net/ipv4/conf/${vif}/proxy_arp
         iptcmd='-A'
         ipcmd='a'
