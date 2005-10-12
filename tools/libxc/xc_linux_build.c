@@ -502,7 +502,7 @@ static int setup_guest(int xc_handle,
 
     if ( (v_end - dsi.v_start) > (nr_pages * PAGE_SIZE) )
     {
-        printf("Initial guest OS requires too much space\n"
+        PERROR("Initial guest OS requires too much space\n"
                "(%luMB is greater than %luMB limit)\n",
                (v_end-dsi.v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
         goto error_out;
