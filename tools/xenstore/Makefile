@@ -40,8 +40,8 @@ $(CLIENTS): xenstore-%: xenstore_%.o
 $(CLIENTS_OBJS): xenstore_%.o: xenstore_client.c
 	$(COMPILE.c) -DCLIENT_$(*F) -o $@ $<
 
-xsls: xsls.o
-	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -lxenctrl -L. -lxenstore -o $@
+xsls: xsls.o libxenstore.so
+	$(LINK.o) $< $(LOADLIBES) $(LDLIBS) -lxenctrl -L. -lxenstore -o $@
 
 xenstored_test: xenstored_core_test.o xenstored_watch_test.o xenstored_domain_test.o xenstored_transaction_test.o xs_lib.o talloc_test.o fake_libxc.o utils.o tdb.o
 	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
