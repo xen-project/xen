@@ -79,44 +79,43 @@ static void evtchn_notify(struct domain *dom)
 static void buffer_append(struct domain *dom)
 {
 	struct buffer *buffer = &dom->buffer;
-	size_t size;
-	XENCONS_RING_IDX oldcons;
-	int notify = 0;
+	XENCONS_RING_IDX cons, prod, size;
 	struct xencons_interface *intf = dom->interface;
 
-	while ((size = (intf->out_prod - intf->out_cons)) != 0) {
-		notify = 1;
+	cons = intf->out_cons;
+	prod = intf->out_prod;
+	mb();
 
-		if ((buffer->capacity - buffer->size) < size) {
-			buffer->capacity += (size + 1024);
-			buffer->data = realloc(buffer->data, buffer->capacity);
-			if (buffer->data == NULL) {
-				dolog(LOG_ERR, "Memory allocation failed");
-				exit(ENOMEM);
-			}
-		}
+	size = prod - cons;
+	if ((size == 0) || (size > sizeof(intf->out)))
+		return;
 
-		oldcons = intf->out_cons;
-		while ((intf->out_cons - oldcons) < size) {
-			buffer->data[buffer->size] = intf->out[
-				MASK_XENCONS_IDX(intf->out_cons, intf->out)];
-			buffer->size++;
-			intf->out_cons++;
-		}
-
-		if (buffer->max_capacity &&
-		    buffer->size > buffer->max_capacity) {
-			memmove(buffer->data + (buffer->size -
-						buffer->max_capacity),
-				buffer->data, buffer->max_capacity);
-			buffer->data = realloc(buffer->data,
-					       buffer->max_capacity);
-			buffer->capacity = buffer->max_capacity;
+	if ((buffer->capacity - buffer->size) < size) {
+		buffer->capacity += (size + 1024);
+		buffer->data = realloc(buffer->data, buffer->capacity);
+		if (buffer->data == NULL) {
+			dolog(LOG_ERR, "Memory allocation failed");
+			exit(ENOMEM);
 		}
 	}
 
-	if (notify)
-		evtchn_notify(dom);
+	while (cons != prod)
+		buffer->data[buffer->size++] = intf->out[
+			MASK_XENCONS_IDX(cons++, intf->out)];
+
+	mb();
+	intf->out_cons = cons;
+	evtchn_notify(dom);
+
+	if (buffer->max_capacity &&
+	    buffer->size > buffer->max_capacity) {
+		memmove(buffer->data + (buffer->size -
+					buffer->max_capacity),
+			buffer->data, buffer->max_capacity);
+		buffer->data = realloc(buffer->data,
+				       buffer->max_capacity);
+		buffer->capacity = buffer->max_capacity;
+	}
 }
 
 static bool buffer_empty(struct buffer *buffer)
@@ -419,10 +418,14 @@ static void handle_tty_read(struct domain *dom)
 	char msg[80];
 	int i;
 	struct xencons_interface *intf = dom->interface;
-	XENCONS_RING_IDX filled = intf->in_prod - intf->in_cons;
+	XENCONS_RING_IDX cons, prod;
 
-	if (sizeof(intf->in) > filled)
-		len = sizeof(intf->in) - filled;
+	cons = intf->in_cons;
+	prod = intf->in_prod;
+	mb();
+
+	if (sizeof(intf->in) > (prod - cons))
+		len = sizeof(intf->in) - (prod - cons);
 	if (len > sizeof(msg))
 		len = sizeof(msg);
 
@@ -441,10 +444,11 @@ static void handle_tty_read(struct domain *dom)
 		}
 	} else if (domain_is_valid(dom->domid)) {
 		for (i = 0; i < len; i++) {
-			intf->in[MASK_XENCONS_IDX(intf->in_prod, intf->in)] =
+			intf->in[MASK_XENCONS_IDX(prod++, intf->in)] =
 				msg[i];
-			intf->in_prod++;
 		}
+		wmb();
+		intf->in_prod = prod;
 		evtchn_notify(dom);
 	} else {
 		close(dom->tty_fd);
