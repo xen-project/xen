@@ -130,7 +130,7 @@ int xb_write(const void *data, unsigned len)
 
 		wait_event_interruptible(xb_waitq, output_avail(out));
 
-		mb();
+		/* Make local copy of header to check for sanity. */
 		h = *out;
 		if (!check_buffer(&h))
 			return -EIO;
@@ -140,10 +140,20 @@ int xb_write(const void *data, unsigned len)
 			continue;
 		if (avail > len)
 			avail = len;
+
+		/* Make sure we read header before we write data
+		 * (implied by data-dependency, but let's play safe). */
+		mb();
+
 		memcpy(dst, data, avail);
 		data += avail;
 		len -= avail;
+
+		/* Other side must not see new header until data is there. */
+		wmb();
 		update_output_chunk(out, avail);
+
+		/* This implies mb() before other side sees interrupt. */
 		notify_remote_via_evtchn(xen_start_info->store_evtchn);
 	} while (len != 0);
 
@@ -171,7 +181,6 @@ int xb_read(void *data, unsigned len)
 
 		wait_event_interruptible(xb_waitq, xs_input_avail());
 
-		mb();
 		h = *in;
 		if (!check_buffer(&h))
 			return -EIO;
@@ -183,13 +192,21 @@ int xb_read(void *data, unsigned len)
 			avail = len;
 		was_full = !output_avail(&h);
 
+		/* We must read header before we read data. */
+		rmb();
+
 		memcpy(data, src, avail);
 		data += avail;
 		len -= avail;
+
+		/* Other side must not see free space until we've copied out */
+		mb();
+
 		update_input_chunk(in, avail);
 		pr_debug("Finished read of %i bytes (%i to go)\n", avail, len);
 		/* If it was full, tell them we've taken some. */
 		if (was_full)
+			/* Implies mb(): they will see new header. */
 			notify_remote_via_evtchn(xen_start_info->store_evtchn);
 	}
 
