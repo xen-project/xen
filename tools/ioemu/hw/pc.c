@@ -541,10 +541,10 @@ void pc_init(int ram_size, int vga_ram_size, int boot_device,
 
     if (pci_enabled) {
         for(i = 0; i < nb_nics; i++) {
-            if (nic_pcnet)
-                pci_pcnet_init(pci_bus, &nd_table[i]);
+            if (nic_ne2000)
+                pci_ne2000_init(pci_bus, &nd_table[i]);
             else
-                pci_ne2000_init(pci_bus, &nd_table[i]); 
+                pci_pcnet_init(pci_bus, &nd_table[i]); 
         }
         pci_piix3_ide_init(pci_bus, bs_table);
 #ifdef APIC_SUPPORT

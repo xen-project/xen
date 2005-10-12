@@ -257,7 +257,7 @@ class VmxImageHandler(ImageHandler):
     # Return a list of cmd line args to the device models based on the
     # xm config file
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
-        dmargs = [ 'cdrom', 'boot', 'fda', 'fdb',
+        dmargs = [ 'cdrom', 'boot', 'fda', 'fdb', 'ne2000', 
                    'localtime', 'serial', 'stdvga', 'isa', 'vcpus' ]
         ret = []
         for a in dmargs:
@@ -265,9 +265,10 @@ class VmxImageHandler(ImageHandler):
 
             # python doesn't allow '-' in variable names
             if a == 'stdvga': a = 'std-vga'
+            if a == 'ne2000': a = 'nic-ne2000'
 
             # Handle booleans gracefully
-            if a in ['localtime', 'std-vga', 'isa']:
+            if a in ['localtime', 'std-vga', 'isa', 'nic-ne2000']:
                 if v != None: v = int(v)
 
             log.debug("args: %s, val: %s" % (a,v))

@@ -125,7 +125,7 @@ QEMUTimer *gui_timer;
 QEMUTimer *polling_timer;
 int vm_running;
 int audio_enabled = 0;
-int nic_pcnet = 1;
+int nic_ne2000 = 0;
 int vcpus = 1;
 int sb16_enabled = 1;
 int adlib_enabled = 1;
@@ -2130,7 +2130,7 @@ void help(void)
            "-prep           Simulate a PREP system (default is PowerMAC)\n"
            "-g WxH[xDEPTH]  Set the initial VGA graphic mode\n"
 #endif
-           "-nic-pcnet     simulate an AMD PC-Net PCI ethernet adaptor\n"
+           "-nic-ne2000     simulate an Realtek ne2k PCI ethernet adaptor\n"
            "\n"
            "Network options:\n"
            "-nics n         simulate 'n' network cards [default=1]\n"
@@ -2247,7 +2247,7 @@ enum {
     QEMU_OPTION_no_code_copy,
     QEMU_OPTION_vcpus,
     QEMU_OPTION_pci,
-    QEMU_OPTION_nic_pcnet,
+    QEMU_OPTION_nic_ne2000,
     QEMU_OPTION_isa,
     QEMU_OPTION_prep,
     QEMU_OPTION_k,
@@ -2334,7 +2334,7 @@ const QEMUOption qemu_options[] = {
     
     /* temporary options */
     { "pci", 0, QEMU_OPTION_pci },
-    { "nic-pcnet", 0, QEMU_OPTION_nic_pcnet },
+    { "nic-ne2000", 0, QEMU_OPTION_nic_ne2000 },
     { "cirrusvga", 0, QEMU_OPTION_cirrusvga },
     { "vgaacc", HAS_ARG, QEMU_OPTION_vgaacc },
     { NULL },
@@ -2839,8 +2839,8 @@ int main(int argc, char **argv)
             case QEMU_OPTION_pci:
                 pci_enabled = 1;
                 break;
-            case QEMU_OPTION_nic_pcnet:
-                nic_pcnet = 1;
+            case QEMU_OPTION_nic_ne2000:
+                nic_ne2000 = 1;
                 break;
             case QEMU_OPTION_isa:
                 pci_enabled = 0;

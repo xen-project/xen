@@ -602,7 +602,7 @@ void pci_ne2000_init(PCIBus *bus, NetDriverState *nd);
 
 /* pcnet.c */
 
-extern int nic_pcnet;
+extern int nic_ne2000;
 
 void pci_pcnet_init(PCIBus *bus, NetDriverState *nd);
 
