@@ -23,7 +23,7 @@ import string
 from xen.util import blkif
 from xen.xend import sxp
 
-from DevController import DevController
+from xen.xend.server.DevController import DevController
 
 
 class BlkifController(DevController):
