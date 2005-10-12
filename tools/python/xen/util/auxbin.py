@@ -19,6 +19,10 @@
 LIB_BIN_32 = "/usr/lib/xen/bin"
 LIB_BIN_64 = "/usr/lib64/xen/bin"
 
+## The architectures on which the LIB_BIN_64 directory is used.  This
+# deliberately excludes ia64.
+LIB_64_ARCHS = [ 'x86_64', 'ppc64', 's390x', 'sparc64']
+
 
 import os
 import os.path
@@ -38,7 +42,7 @@ def pathTo(exe):
 
 def path():
     machine = os.uname()[4]
-    if machine.find('64') != -1 and os.path.exists(LIB_BIN_64):
+    if machine in LIB_64_ARCHS and os.path.exists(LIB_BIN_64):
         return LIB_BIN_64
     else:
         return LIB_BIN_32

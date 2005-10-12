@@ -4,6 +4,7 @@
  * this archive for more details.
  *
  * Copyright (C) 2005 by Christian Limpach
+ * Copyright (C) 2005 XenSource Ltd.
  *
  */
 
@@ -28,16 +29,71 @@ usage(const char *progname)
 #endif
 }
 
+
+static int
+perform(int optind, int argc, char **argv, struct xs_handle *xsh,
+        struct xs_transaction_handle *xth, int prefix)
+{
+    while (optind < argc) {
+#if defined(CLIENT_read)
+	char *val = xs_read(xsh, xth, argv[optind], NULL);
+	if (val == NULL) {
+	    warnx("couldn't read path %s", argv[optind]);
+	    return 1;
+	}
+	if (prefix)
+	    printf("%s: ", argv[optind]);
+	printf("%s\n", val);
+	free(val);
+	optind++;
+#elif defined(CLIENT_write)
+	if (!xs_write(xsh, xth, argv[optind], argv[optind + 1],
+                      strlen(argv[optind + 1]))) {
+	    warnx("could not write path %s", argv[optind]);
+	    return 1;
+	}
+	optind += 2;
+#elif defined(CLIENT_rm)
+	if (!xs_rm(xsh, xth, argv[optind])) {
+	    warnx("could not remove path %s", argv[optind]);
+	    return 1;
+	}
+	optind++;
+#elif defined(CLIENT_exists)
+	char *val = xs_read(xsh, xth, argv[optind], NULL);
+	if (val == NULL) {
+	    return 1;
+	}
+	free(val);
+	optind++;
+#elif defined(CLIENT_list)
+	unsigned int i, num;
+	char **list = xs_directory(xsh, xth, argv[optind], &num);
+	if (list == NULL) {
+	    warnx("could not list path %s", argv[optind]);
+	    return 1;
+	}
+	for (i = 0; i < num; i++) {
+	    if (prefix)
+		printf("%s/", argv[optind]);
+	    printf("%s\n", list[i]);
+	}
+	free(list);
+	optind++;
+#endif
+    }
+
+    return 0;
+}
+
+
 int
 main(int argc, char **argv)
 {
     struct xs_handle *xsh;
     struct xs_transaction_handle *xth;
-    bool success;
     int ret = 0, socket = 0;
-#if defined(CLIENT_read) || defined(CLIENT_list)
     int prefix = 0;
-#endif
 
     while (1) {
 	int c, index = 0;
@@ -93,65 +149,9 @@ main(int argc, char **argv)
     if (xth == NULL)
 	errx(1, "couldn't start transaction");
 
-    while (optind < argc) {
-#if defined(CLIENT_read)
-	char *val = xs_read(xsh, xth, argv[optind], NULL);
-	if (val == NULL) {
-	    warnx("couldn't read path %s", argv[optind]);
-	    ret = 1;
-	    goto out;
-	}
-	if (prefix)
-	    printf("%s: ", argv[optind]);
-	printf("%s\n", val);
-	free(val);
-	optind++;
-#elif defined(CLIENT_write)
-	success = xs_write(xsh, xth, argv[optind], argv[optind + 1],
-			   strlen(argv[optind + 1]));
-	if (!success) {
-	    warnx("could not write path %s", argv[optind]);
-	    ret = 1;
-	    goto out;
-	}
-	optind += 2;
-#elif defined(CLIENT_rm)
-	success = xs_rm(xsh, xth, argv[optind]);
-	if (!success) {
-	    warnx("could not remove path %s", argv[optind]);
-	    ret = 1;
-	    goto out;
-	}
-	optind++;
-#elif defined(CLIENT_exists)
-	char *val = xs_read(xsh, xth, argv[optind], NULL);
-	if (val == NULL) {
-	    ret = 1;
-	    goto out;
-	}
-	free(val);
-	optind++;
-#elif defined(CLIENT_list)
-	unsigned int i, num;
-	char **list = xs_directory(xsh, xth, argv[optind], &num);
-	if (list == NULL) {
-	    warnx("could not list path %s", argv[optind]);
-	    ret = 1;
-	    goto out;
-	}
-	for (i = 0; i < num; i++) {
-	    if (prefix)
-		printf("%s/", argv[optind]);
-	    printf("%s\n", list[i]);
-	}
-	free(list);
-	optind++;
-#endif
-    }
+    ret = perform(optind, argc, argv, xsh, xth, prefix);
 
- out:
-    success = xs_transaction_end(xsh, xth, ret ? true : false);
-    if (!success) {
+    if (!xs_transaction_end(xsh, xth, ret)) {
 	if (ret == 0 && errno == EAGAIN)
 	    goto again;
 	errx(1, "couldn't end transaction");
