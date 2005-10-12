@@ -96,6 +96,4 @@ class BlkifController(DevController):
                 if self.readBackend(i, 'dev') == devid:
                     DevController.destroyDevice(self, i)
                     return
-            # Try this, but it's almost certainly going to throw VmError,
-            # since we can't find the device.
-            DevController.destroyDevice(self, int(devid))
+            raise VmError("Device %s not connected" % devid)
