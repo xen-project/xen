@@ -471,6 +471,7 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
 #endif
 
         /* Unsupportable for virtualised CPUs. */
+        clear_bit(X86_FEATURE_VMXE & 31, &ecx);
         clear_bit(X86_FEATURE_MWAIT & 31, &ecx);
     }
 
