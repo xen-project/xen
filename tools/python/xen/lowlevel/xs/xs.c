@@ -513,6 +513,7 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
         goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
         goto exit;
+again:
     Py_BEGIN_ALLOW_THREADS
     xsval = xs_read_watch(xh, &num);
     Py_END_ALLOW_THREADS
@@ -529,8 +530,13 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
             break;
     }
     if (i == PyList_Size(xsh->watches)) {
-        PyErr_SetString(PyExc_RuntimeError, "invalid token");
-        goto exit;
+      /* We do not have a registered watch for the one that has just fired.
+         Ignore this -- a watch that has been recently deregistered can still
+         have watches in transit.  This is a blocking method, so go back to
+         read again.
+      */
+      free(xsval);
+      goto again;
     }
     /* Create tuple (path, token). */
     val = Py_BuildValue("(sO)", xsval[XS_WATCH_PATH], token);
