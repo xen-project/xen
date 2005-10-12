@@ -16,44 +16,38 @@
  *
  */
 #include "acpi2_0.h"
-#include "stdio.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-/*
- * Generate acpi table
- * write acpi table to binary: acpitable.bin
- *
- */
- 
-#define USAGE "Usage: acpi_gen filename \n" \
-			  "       generage acpitable and write to the binary \n" \
-			  "       filename - the binary name\n"
+#define USAGE	"Usage: acpi_gen filename \n"				\
+		"       generage acpitable and write to the binary \n"	\
+		"       filename - the binary name\n"
 
+int main(int argc, char **argv)
+{
+	char *filename;
+	char  buf[ACPI_TABLE_SIZE] = { 0 };
+	FILE *f;
 
-int main(int argc, char** argv){
-		char* filename;
-		char  buf[ACPI_TABLE_SIZE];
-		FILE* f=NULL;
-		int i;
+	if (argc < 2) {
+		fprintf(stderr,"%s",USAGE);
+		exit(1);
+	}
 
-		for (i=0; i<ACPI_TABLE_SIZE; i++){
-				buf[i]=0;
-		}
-
-		if (argc<2){
-				fprintf(stderr,"%s",USAGE);
-				exit(1);
-		}
-
-		filename = argv[1];
+	filename = argv[1];
 		
-		if(!(f=fopen(filename, "w+"))){
-				fprintf(stderr,"Can not open %s",filename);
-				exit(1);
-		}		
-        AcpiBuildTable(buf);
-		if (fwrite(buf, ACPI_TABLE_SIZE, 1, f)<1){
-				fprintf(stderr,"Can not write to %s\n",filename);
-				exit(1);
-		}
-		return 0;		
+	if ((f = fopen(filename, "w+")) == NULL) {
+		fprintf(stderr,"Can not open %s", filename);
+		exit(1);
+	}
+
+	AcpiBuildTable((uint8_t *)buf);
+
+	if (fwrite(buf, ACPI_TABLE_SIZE, 1, f) < 1) {
+		fprintf(stderr,"Can not write to %s\n", filename);
+		exit(1);
+	}
+
+	return 0;
 }
