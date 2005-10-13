@@ -25,7 +25,7 @@ void print_dir(struct xs_handle *h, char *path, int cur_depth)
         if (val == NULL)
             printf(":\n");
         else if ((unsigned)len > (151 - strlen(e[i])))
-            printf(" = \"%.*s...\"\n", 148 - strlen(e[i]), val);
+            printf(" = \"%.*s...\"\n", 148 - (int)strlen(e[i]), val);
         else
             printf(" = \"%s\"\n", val);
         free(val);
