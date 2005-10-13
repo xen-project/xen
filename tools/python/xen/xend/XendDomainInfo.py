@@ -1012,6 +1012,8 @@ class XendDomainInfo:
         # shutdown_start_time from killing the domain, for example.
         self.removeDom()
 
+        # Set maximum number of vcpus in domain
+        xc.domain_max_vcpus(self.domid, int(self.info['vcpus']))
 
     def initDomain(self):
         log.debug('XendDomainInfo.initDomain: %s %s %s',
@@ -1030,9 +1032,6 @@ class XendDomainInfo:
             self.image.handleBootloading()
 
         xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
-
-        # Set maximum number of vcpus in domain
-        xc.domain_max_vcpus(self.domid, int(self.info['vcpus']));
 
         # XXX Merge with configure_maxmem?
         m = self.image.getDomainMemory(self.info['memory_KiB'])
