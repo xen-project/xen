@@ -185,13 +185,11 @@ class EventFactory(protocol.ServerFactory):
         return EventProtocol(self.daemon)
 
 def listenEvent(daemon):
-    pass
-
-#     factory = EventFactory(daemon)
-#     if xroot.get_xend_unix_server():
-#         path = '/var/lib/xend/event-socket'
-#         unix.listenUNIX(path, factory)
-#     if xroot.get_xend_http_server():
-#         port = xroot.get_xend_event_port()
-#         interface = xroot.get_xend_address()
-#         tcp.listenTCP(port, factory, interface=interface)
+    factory = EventFactory(daemon)
+    if xroot.get_xend_unix_server():
+        path = '/var/lib/xend/event-socket'
+        unix.listenUNIX(path, factory)
+    if xroot.get_xend_http_server():
+        port = xroot.get_xend_event_port()
+        interface = xroot.get_xend_address()
+        tcp.listenTCP(port, factory, interface=interface)
