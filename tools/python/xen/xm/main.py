@@ -233,7 +233,7 @@ def xm_list(args):
                
     if use_long:
         for dom in doms:
-            PrettyPrint.prettyprint(doms)
+            PrettyPrint.prettyprint(dom)
     else:
         domsinfo = map(parse_doms_info, doms)
 
