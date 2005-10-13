@@ -1095,7 +1095,12 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
             if ( !get_page_type(page, PGT_writable_page) )
                 BUG();
             put_page_type(page);
-
+            /*
+             * We use tlbflush_timestamp as back pointer to smfn, and need to
+             * clean up it.
+             */
+            if ( shadow_mode_external(d) )
+                page->tlbflush_timestamp = 0;
             list_ent = page->list.next;
         }
     }

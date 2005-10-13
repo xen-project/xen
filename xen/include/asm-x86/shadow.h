@@ -718,6 +718,23 @@ shadow_unpin(unsigned long smfn)
     put_shadow_ref(smfn);
 }
 
+/*
+ * SMP issue. The following code assumes the shadow lock is held. Re-visit
+ * when working on finer-gained locks for shadow.
+ */
+static inline void set_guest_back_ptr(
+    struct domain *d, l1_pgentry_t spte, unsigned long smfn, unsigned int index)
+{
+    if ( shadow_mode_external(d) ) {
+        unsigned long gmfn;
+
+        ASSERT(shadow_lock_is_acquired(d));
+        gmfn = l1e_get_pfn(spte);
+        frame_table[gmfn].tlbflush_timestamp = smfn;
+        frame_table[gmfn].u.inuse.type_info &= ~PGT_va_mask;
+        frame_table[gmfn].u.inuse.type_info |= (unsigned long) index << PGT_va_shift;
+    }
+}
 
 /************************************************************************/
 #if CONFIG_PAGING_LEVELS <= 2
@@ -1611,10 +1628,11 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
             if ( l1e_get_flags(old_spte) & _PAGE_PRESENT )
                 shadow_put_page_from_l1e(old_spte, d);
         }
+
     }
 
+    set_guest_back_ptr(d, new_spte, l2e_get_pfn(sl2e), l1_table_offset(va));
     shadow_linear_pg_table[l1_linear_offset(va)] = new_spte;
-
     shadow_update_min_max(l2e_get_pfn(sl2e), l1_table_offset(va));
 }
 #endif
