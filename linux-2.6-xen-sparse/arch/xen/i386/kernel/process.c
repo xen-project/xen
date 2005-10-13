@@ -112,44 +112,6 @@ void xen_idle(void)
 	}
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
-#include <asm/nmi.h>
-#ifdef CONFIG_SMP
-extern void smp_suspend(void);
-extern void smp_resume(void);
-#endif
-/* We don't actually take CPU down, just spin without interrupts. */
-static inline void play_dead(void)
-{
-	/* Death loop */
-	while (__get_cpu_var(cpu_state) != CPU_UP_PREPARE)
-		HYPERVISOR_sched_op(SCHEDOP_yield, 0);
-
-	__flush_tlb_all();
-   /* 
-    * Restore IPI/IRQ mappings before marking online to prevent 
-    * race between pending interrupts and restoration of handler. 
-    */
-#ifdef CONFIG_SMP
-	local_irq_enable(); /* XXX Needed for smp_resume(). Clean me up. */
-	smp_resume();
-#endif
-	cpu_set(smp_processor_id(), cpu_online_map);
-}
-#else
-static inline void play_dead(void)
-{
-	BUG();
-}
-#endif /* CONFIG_HOTPLUG_CPU */
-
-void cpu_restore(void)
-{
-	play_dead();
-	local_irq_enable();
-	cpu_idle();
-}
-
 /*
  * The idle thread. There's no useful work to be
  * done, so just try to conserve power and have a
@@ -158,7 +120,9 @@ void cpu_restore(void)
  */
 void cpu_idle (void)
 {
+#if defined(CONFIG_HOTPLUG_CPU)
 	int cpu = _smp_processor_id();
+#endif
 
 	/* endless idle loop with no priority at all */
 	while (1) {
@@ -168,23 +132,12 @@ void cpu_idle (void)
 				__get_cpu_var(cpu_idle_state) = 0;
 			rmb();
 
+#if defined(CONFIG_HOTPLUG_CPU)
 			if (cpu_is_offline(cpu)) {
-				local_irq_disable();
-#ifdef CONFIG_SMP
-				smp_suspend();
-#endif
-#if defined(CONFIG_XEN) && defined(CONFIG_HOTPLUG_CPU)
-				/* Ack it.  From this point on until
-				   we get woken up, we're not allowed
-				   to take any locks.  In particular,
-				   don't printk. */
-				__get_cpu_var(cpu_state) = CPU_DEAD;
-				/* Tell hypervisor to take vcpu down. */
 				HYPERVISOR_vcpu_op(VCPUOP_down, cpu, NULL);
-#endif
-				play_dead();
 				local_irq_enable();
 			}
+#endif
 
 			__get_cpu_var(irq_stat).idle_timestamp = jiffies;
 			xen_idle();

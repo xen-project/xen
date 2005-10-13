@@ -1224,13 +1224,13 @@ void smp_intr_init(void)
 	int cpu = smp_processor_id();
 
 	per_cpu(resched_irq, cpu) =
-		bind_ipi_to_irq(RESCHEDULE_VECTOR);
+		bind_ipi_to_irq(RESCHEDULE_VECTOR, cpu);
 	sprintf(resched_name[cpu], "resched%d", cpu);
 	BUG_ON(request_irq(per_cpu(resched_irq, cpu), smp_reschedule_interrupt,
 	                   SA_INTERRUPT, resched_name[cpu], NULL));
 
 	per_cpu(callfunc_irq, cpu) =
-		bind_ipi_to_irq(CALL_FUNCTION_VECTOR);
+		bind_ipi_to_irq(CALL_FUNCTION_VECTOR, cpu);
 	sprintf(callfunc_name[cpu], "callfunc%d", cpu);
 	BUG_ON(request_irq(per_cpu(callfunc_irq, cpu),
 	                   smp_call_function_interrupt,
@@ -1242,10 +1242,10 @@ static void smp_intr_exit(void)
 	int cpu = smp_processor_id();
 
 	free_irq(per_cpu(resched_irq, cpu), NULL);
-	unbind_ipi_from_irq(RESCHEDULE_VECTOR);
+	unbind_ipi_from_irq(RESCHEDULE_VECTOR, cpu);
 
 	free_irq(per_cpu(callfunc_irq, cpu), NULL);
-	unbind_ipi_from_irq(CALL_FUNCTION_VECTOR);
+	unbind_ipi_from_irq(CALL_FUNCTION_VECTOR, cpu);
 }
 
 extern void local_setup_timer_irq(void);
