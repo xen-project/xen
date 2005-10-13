@@ -683,7 +683,6 @@ static int __cpuinit do_boot_cpu(int cpu, int apicid)
 	extern void hypervisor_callback(void);
 	extern void failsafe_callback(void);
 	extern void smp_trap_init(trap_info_t *);
-	int i;
 #endif
 	/*
 	 * We can't use kernel_thread since we must avoid to
@@ -1210,7 +1209,6 @@ void __cpuinit smp_cpus_done(unsigned int max_cpus)
 }
 
 #ifdef CONFIG_XEN
-extern int bind_ipi_to_irq(int ipi);
 extern irqreturn_t smp_reschedule_interrupt(int, void *, struct pt_regs *);
 extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
 
