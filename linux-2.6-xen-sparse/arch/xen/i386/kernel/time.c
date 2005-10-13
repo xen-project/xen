@@ -785,7 +785,7 @@ void __init time_init(void)
 	rdtscll(vxtime.last_tsc);
 #endif
 
-	per_cpu(timer_irq, 0) = bind_virq_to_irq(VIRQ_TIMER);
+	per_cpu(timer_irq, 0) = bind_virq_to_irq(VIRQ_TIMER, 0);
 	(void)setup_irq(per_cpu(timer_irq, 0), &irq_timer);
 }
 
@@ -852,21 +852,12 @@ void time_resume(void)
 
 #ifdef CONFIG_SMP
 static char timer_name[NR_CPUS][15];
-void local_setup_timer_irq(void)
-{
-	int cpu = smp_processor_id();
 
-	if (cpu == 0)
-		return;
-	per_cpu(timer_irq, cpu) = bind_virq_to_irq(VIRQ_TIMER);
-	sprintf(timer_name[cpu], "timer%d", cpu);
-	BUG_ON(request_irq(per_cpu(timer_irq, cpu), timer_interrupt,
-	                   SA_INTERRUPT, timer_name[cpu], NULL));
-}
-
-void local_setup_timer(void)
+void local_setup_timer(unsigned int cpu)
 {
-	int seq, cpu = smp_processor_id();
+	int seq;
+
+	BUG_ON(cpu == 0);
 
 	do {
 		seq = read_seqbegin(&xtime_lock);
@@ -874,17 +865,17 @@ void local_setup_timer(void)
 			per_cpu(shadow_time, cpu).system_timestamp;
 	} while (read_seqretry(&xtime_lock, seq));
 
-	local_setup_timer_irq();
+	per_cpu(timer_irq, cpu) = bind_virq_to_irq(VIRQ_TIMER, cpu);
+	sprintf(timer_name[cpu], "timer%d", cpu);
+	BUG_ON(request_irq(per_cpu(timer_irq, cpu), timer_interrupt,
+	                   SA_INTERRUPT, timer_name[cpu], NULL));
 }
 
-void local_teardown_timer_irq(void)
+void local_teardown_timer(unsigned int cpu)
 {
-	int cpu = smp_processor_id();
-
-	if (cpu == 0)
-		return;
+	BUG_ON(cpu == 0);
 	free_irq(per_cpu(timer_irq, cpu), NULL);
-	unbind_virq_from_irq(VIRQ_TIMER);
+	unbind_virq_from_irq(VIRQ_TIMER, cpu);
 }
 #endif
 

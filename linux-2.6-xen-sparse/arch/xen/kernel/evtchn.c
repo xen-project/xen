@@ -178,11 +178,10 @@ static int find_unbound_irq(void)
 	return irq;
 }
 
-int bind_virq_to_irq(int virq)
+int bind_virq_to_irq(int virq, int cpu)
 {
 	evtchn_op_t op = { .cmd = EVTCHNOP_bind_virq };
 	int evtchn, irq;
-	int cpu = smp_processor_id();
 
 	spin_lock(&irq_mapping_update_lock);
 
@@ -209,10 +208,9 @@ int bind_virq_to_irq(int virq)
 }
 EXPORT_SYMBOL(bind_virq_to_irq);
 
-void unbind_virq_from_irq(int virq)
+void unbind_virq_from_irq(int virq, int cpu)
 {
 	evtchn_op_t op = { .cmd = EVTCHNOP_close };
-	int cpu    = smp_processor_id();
 	int irq    = per_cpu(virq_to_irq, cpu)[virq];
 	int evtchn = irq_to_evtchn[irq];
 
@@ -240,11 +238,10 @@ void unbind_virq_from_irq(int virq)
 }
 EXPORT_SYMBOL(unbind_virq_from_irq);
 
-int bind_ipi_to_irq(int ipi)
+int bind_ipi_to_irq(int ipi, int cpu)
 {
 	evtchn_op_t op = { .cmd = EVTCHNOP_bind_ipi };
 	int evtchn, irq;
-	int cpu = smp_processor_id();
 
 	spin_lock(&irq_mapping_update_lock);
 
@@ -272,10 +269,9 @@ int bind_ipi_to_irq(int ipi)
 }
 EXPORT_SYMBOL(bind_ipi_to_irq);
 
-void unbind_ipi_from_irq(int ipi)
+void unbind_ipi_from_irq(int ipi, int cpu)
 {
 	evtchn_op_t op = { .cmd = EVTCHNOP_close };
-	int cpu    = smp_processor_id();
 	int evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi];
 	int irq    = evtchn_to_irq[evtchn];
 

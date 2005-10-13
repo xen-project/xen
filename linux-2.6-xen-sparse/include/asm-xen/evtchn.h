@@ -44,12 +44,12 @@
  */
 
 /* Dynamically bind a VIRQ source to Linux IRQ space. */
-extern int  bind_virq_to_irq(int virq);
-extern void unbind_virq_from_irq(int virq);
+extern int  bind_virq_to_irq(int virq, int cpu);
+extern void unbind_virq_from_irq(int virq, int cpu);
 
 /* Dynamically bind an IPI source to Linux IRQ space. */
-extern int  bind_ipi_to_irq(int ipi);
-extern void unbind_ipi_from_irq(int ipi);
+extern int  bind_ipi_to_irq(int ipi, int cpu);
+extern void unbind_ipi_from_irq(int ipi, int cpu);
 
 /*
  * Dynamically bind an event-channel port to an IRQ-like callback handler.

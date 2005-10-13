@@ -66,6 +66,9 @@
 #include <asm-xen/xen-public/vcpu.h>
 #include <asm-xen/xenbus.h>
 
+static void xen_smp_intr_init(unsigned int cpu);
+static void xen_smp_intr_exit(unsigned int cpu);
+
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
 
@@ -352,9 +355,9 @@ static atomic_t init_deasserted;
 static void __init smp_callin(void)
 {
 	int cpuid, phys_id;
+#if 0
 	unsigned long timeout;
 
-#if 0
 	/*
 	 * If waken up by an INIT in an 82489DX configuration
 	 * we may get here before an INIT-deassert IPI reaches
@@ -376,6 +379,7 @@ static void __init smp_callin(void)
 	}
 	Dprintk("CPU#%d (phys ID: %d) waiting for CALLOUT\n", cpuid, phys_id);
 
+#if 0
 	/*
 	 * STARTUP IPIs are fragile beasts as they might sometimes
 	 * trigger some glue motherboard logic. Complete APIC bus
@@ -403,7 +407,6 @@ static void __init smp_callin(void)
 		BUG();
 	}
 
-#if 0
 	/*
 	 * the boot CPU has finished the init stage and is spinning
 	 * on callin_map until we finish. We are free to set up this
@@ -448,8 +451,6 @@ static void __init smp_callin(void)
 
 static int cpucount;
 
-extern void local_setup_timer(void);
-
 /*
  * Activate a secondary processor.
  */
@@ -464,8 +465,6 @@ static void __init start_secondary(void *unused)
 	smp_callin();
 	while (!cpu_isset(smp_processor_id(), smp_commenced_mask))
 		rep_nop();
-	local_setup_timer();
-	smp_intr_init();
 	local_irq_enable();
 	/*
 	 * low-memory mappings have been cleared, flush them from
@@ -1133,7 +1132,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		return;
 	}
 
-	smp_intr_init();
+	xen_smp_intr_init(0);
 
 #if 0
 	connect_bsp_APIC();
@@ -1340,29 +1339,6 @@ static int __init setup_vcpu_hotplug_event(void)
 
 subsys_initcall(setup_vcpu_hotplug_event);
 
-/* must be called with the cpucontrol mutex held */
-static int __devinit cpu_enable(unsigned int cpu)
-{
-#ifdef CONFIG_SMP_ALTERNATIVES
-	if (num_online_cpus() == 1)
-		prepare_for_smp();
-#endif
-
-	/* get the target out of its holding state */
-	per_cpu(cpu_state, cpu) = CPU_UP_PREPARE;
-	wmb();
-
-	/* wait for the processor to ack it. timeout? */
-	while (!cpu_online(cpu))
-		cpu_relax();
-
-	fixup_irqs(cpu_online_map);
-
-	/* counter the disable in fixup_irqs() */
-	local_irq_enable();
-	return 0;
-}
-
 int __cpu_disable(void)
 {
 	cpumask_t map = cpu_online_map;
@@ -1385,27 +1361,22 @@ int __cpu_disable(void)
 	/* It's now safe to remove this processor from the online map */
 	cpu_clear(cpu, cpu_online_map);
 
-#ifdef CONFIG_SMP_ALTERNATIVES
-	if (num_online_cpus() == 1)
-		unprepare_for_smp();
-#endif
-
 	return 0;
 }
 
 void __cpu_die(unsigned int cpu)
 {
-	/* We don't do anything here: idle task is faking death itself. */
-	unsigned int i;
-
-	for (i = 0; i < 10; i++) {
-		/* They ack this in play_dead by setting CPU_DEAD */
-		if (per_cpu(cpu_state, cpu) == CPU_DEAD)
-			return;
+	while (HYPERVISOR_vcpu_op(VCPUOP_is_up, cpu, NULL)) {
 		current->state = TASK_UNINTERRUPTIBLE;
 		schedule_timeout(HZ/10);
 	}
- 	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
+
+	xen_smp_intr_exit(cpu);
+
+#ifdef CONFIG_SMP_ALTERNATIVES
+	if (num_online_cpus() == 1)
+		unprepare_for_smp();
+#endif
 }
 
 #else /* ... !CONFIG_HOTPLUG_CPU */
@@ -1430,23 +1401,16 @@ int __devinit __cpu_up(unsigned int cpu)
 		return -EIO;
 	}
 
-#ifdef CONFIG_HOTPLUG_CPU
-#ifdef CONFIG_XEN
-	/* Tell hypervisor to bring vcpu up. */
-	HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
-#endif
-	/* Already up, and in cpu_quiescent now? */
-	if (cpu_isset(cpu, smp_commenced_mask)) {
-		cpu_enable(cpu);
-		return 0;
-	}
+#ifdef CONFIG_SMP_ALTERNATIVES
+	if (num_online_cpus() == 1)
+		prepare_for_smp();
 #endif
 
-	local_irq_enable();
-	/* Unleash the CPU! */
+	xen_smp_intr_init(cpu);
 	cpu_set(cpu, smp_commenced_mask);
-	while (!cpu_isset(cpu, cpu_online_map))
-		mb();
+	cpu_set(cpu, cpu_online_map);
+	HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
+
 	return 0;
 }
 
@@ -1468,48 +1432,38 @@ void __init smp_cpus_done(unsigned int max_cpus)
 extern irqreturn_t smp_reschedule_interrupt(int, void *, struct pt_regs *);
 extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
 
-void smp_intr_init(void)
-{
-	int cpu = smp_processor_id();
+extern void local_setup_timer(unsigned int cpu);
+extern void local_teardown_timer(unsigned int cpu);
 
+static void xen_smp_intr_init(unsigned int cpu)
+{
 	per_cpu(resched_irq, cpu) =
-		bind_ipi_to_irq(RESCHEDULE_VECTOR);
+		bind_ipi_to_irq(RESCHEDULE_VECTOR, cpu);
 	sprintf(resched_name[cpu], "resched%d", cpu);
 	BUG_ON(request_irq(per_cpu(resched_irq, cpu), smp_reschedule_interrupt,
 	                   SA_INTERRUPT, resched_name[cpu], NULL));
 
 	per_cpu(callfunc_irq, cpu) =
-		bind_ipi_to_irq(CALL_FUNCTION_VECTOR);
+		bind_ipi_to_irq(CALL_FUNCTION_VECTOR, cpu);
 	sprintf(callfunc_name[cpu], "callfunc%d", cpu);
 	BUG_ON(request_irq(per_cpu(callfunc_irq, cpu),
 	                   smp_call_function_interrupt,
 	                   SA_INTERRUPT, callfunc_name[cpu], NULL));
+
+	if (cpu != 0)
+		local_setup_timer(cpu);
 }
 
-static void smp_intr_exit(void)
+static void xen_smp_intr_exit(unsigned int cpu)
 {
-	int cpu = smp_processor_id();
+	if (cpu != 0)
+		local_teardown_timer(cpu);
 
 	free_irq(per_cpu(resched_irq, cpu), NULL);
-	unbind_ipi_from_irq(RESCHEDULE_VECTOR);
+	unbind_ipi_from_irq(RESCHEDULE_VECTOR, cpu);
 
 	free_irq(per_cpu(callfunc_irq, cpu), NULL);
-	unbind_ipi_from_irq(CALL_FUNCTION_VECTOR);
-}
-
-extern void local_setup_timer_irq(void);
-extern void local_teardown_timer_irq(void);
-
-void smp_suspend(void)
-{
-	local_teardown_timer_irq();
-	smp_intr_exit();
-}
-
-void smp_resume(void)
-{
-	smp_intr_init();
-	local_setup_timer();
+	unbind_ipi_from_irq(CALL_FUNCTION_VECTOR, cpu);
 }
 
 void vcpu_prepare(int vcpu)
@@ -1517,7 +1471,6 @@ void vcpu_prepare(int vcpu)
 	extern void hypervisor_callback(void);
 	extern void failsafe_callback(void);
 	extern void smp_trap_init(trap_info_t *);
-	extern void cpu_restore(void);
 	vcpu_guest_context_t ctxt;
 	struct task_struct *idle = idle_task(vcpu);
 
@@ -1532,7 +1485,7 @@ void vcpu_prepare(int vcpu)
 	ctxt.user_regs.gs = 0;
 	ctxt.user_regs.ss = __KERNEL_DS;
 	ctxt.user_regs.cs = __KERNEL_CS;
-	ctxt.user_regs.eip = (unsigned long)cpu_restore;
+	ctxt.user_regs.eip = (unsigned long)cpu_idle;
 	ctxt.user_regs.esp = idle->thread.esp;
 	ctxt.user_regs.eflags = X86_EFLAGS_IF | X86_EFLAGS_IOPL_RING1;
 
@@ -1556,7 +1509,6 @@ void vcpu_prepare(int vcpu)
 	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 
 	(void)HYPERVISOR_vcpu_op(VCPUOP_initialise, vcpu, &ctxt);
-	(void)HYPERVISOR_vcpu_op(VCPUOP_up, vcpu, NULL);
 }
 
 /*
