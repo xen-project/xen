@@ -6,7 +6,8 @@
  */
 #define IA64_TR_SHARED_INFO	3	/* dtr3: page shared with domain */
 #define	IA64_TR_VHPT		4	/* dtr4: vhpt */
-#define IA64_TR_ARCH_INFO      5
+#define IA64_TR_ARCH_INFO	5
+#define IA64_TR_PERVP_VHPT	6
 
 /* Processor status register bits: */
 #define IA64_PSR_VM_BIT		46

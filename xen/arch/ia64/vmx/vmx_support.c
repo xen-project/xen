@@ -158,7 +158,7 @@ void vmx_intr_assist(struct vcpu *v)
 #ifdef V_IOSAPIC_READY
     vlapic_update_ext_irq(v);
 #else
-    panic("IOSAPIC model is missed in qemu\n");
+    //panic("IOSAPIC model is missed in qemu\n");
 #endif
     return;
 }

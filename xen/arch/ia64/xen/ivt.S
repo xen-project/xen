@@ -1460,7 +1460,28 @@ END(general_exception)
 // 0x5500 Entry 25 (size 16 bundles) Disabled FP-Register (35)
 ENTRY(disabled_fp_reg)
 #ifdef XEN
+#if 0
+	mov r20=pr
+	movl r16=0x2000000000000000
+	movl r17=0x2000000000176b60
+	mov r18=cr.iip
+	mov r19=rr[r16]
+	movl r22=0xe95d0439
+	;;
+	mov pr=r0,-1
+	;;
+	cmp.eq p6,p7=r22,r19
+	;;
+	(p6) cmp.eq p8,p9=r17,r18
+	(p8) br.sptk.few floating_panic
+	;;
+	mov pr=r20,-1
+	;;
+#endif
 	REFLECT(25)
+//floating_panic:
+//	br.sptk.many floating_panic
+	;;
 #endif
 	DBG_FAULT(25)
 	rsm psr.dfh		// ensure we can access fph

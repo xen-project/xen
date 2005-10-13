@@ -405,6 +405,7 @@ extern unsigned long totalram_pages;
 extern int nr_swap_pages;
 
 extern unsigned long *mpt_table;
+extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 #undef machine_to_phys_mapping
 #define machine_to_phys_mapping	mpt_table
 
@@ -433,10 +434,10 @@ extern unsigned long *mpt_table;
 
 #define __gpfn_is_mem(_d, gpfn)				\
 	(__gpfn_valid(_d, gpfn) ?			\
-	(lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT) & GPFN_IO_MASK) == GPFN_MEM) : 0)
+	((lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT)) & GPFN_IO_MASK) == GPFN_MEM) : 0)
 
 
-//#define __gpa_to_mpa(_d, gpa)   \
-//    ((__gpfn_to_mfn((_d),(gpa)>>PAGE_SHIFT)<<PAGE_SHIFT)|((gpa)&~PAGE_MASK))
+#define __gpa_to_mpa(_d, gpa)   \
+    ((__gpfn_to_mfn((_d),(gpa)>>PAGE_SHIFT)<<PAGE_SHIFT)|((gpa)&~PAGE_MASK))
 
 #endif /* __ASM_IA64_MM_H__ */

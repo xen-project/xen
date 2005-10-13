@@ -17,6 +17,7 @@
 #include <asm/io.h>
 #include <xen/softirq.h>
 #include <public/sched.h>
+#include <asm/vhpt.h>
 
 efi_memory_desc_t ia64_efi_io_md;
 EXPORT_SYMBOL(ia64_efi_io_md);
@@ -310,9 +311,13 @@ if (!cnt[id]--) { printk("%x",id); cnt[id] = 500000; }
 if (!i--) { printk("+",id); i = 1000000; }
 }
 
-	if (VMX_DOMAIN(current)){
+    if (VMX_DOMAIN(current)){
 		vmx_load_all_rr(current);
     }else{
+	extern char ia64_ivt;
+	ia64_set_iva(&ia64_ivt);
+	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
+		VHPT_ENABLED);
     	if (!is_idle_task(current->domain)) {
 	    	load_region_regs(current);
 		    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);

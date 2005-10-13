@@ -59,6 +59,8 @@ void foo(void)
 	DEFINE(XSI_BANKNUM_OFS, offsetof(mapped_regs_t, banknum));
 	DEFINE(XSI_BANK0_OFS, offsetof(mapped_regs_t, bank0_regs[0]));
 	DEFINE(XSI_BANK1_OFS, offsetof(mapped_regs_t, bank1_regs[0]));
+	DEFINE(XSI_B0NATS_OFS, offsetof(mapped_regs_t, vbnat));
+	DEFINE(XSI_B1NATS_OFS, offsetof(mapped_regs_t, vnat));
 	DEFINE(XSI_RR0_OFS, offsetof(mapped_regs_t, rrs[0]));
 	DEFINE(XSI_METAPHYS_OFS, offsetof(mapped_regs_t, metaphysical_mode));
 	DEFINE(XSI_PRECOVER_IFS_OFS, offsetof(mapped_regs_t, precover_ifs));
@@ -79,6 +81,7 @@ void foo(void)
 	//DEFINE(IA64_TASK_SIGHAND_OFFSET,offsetof (struct task_struct, sighand));
 	//DEFINE(IA64_TASK_SIGNAL_OFFSET,offsetof (struct task_struct, signal));
 	//DEFINE(IA64_TASK_TGID_OFFSET, offsetof (struct task_struct, tgid));
+	DEFINE(IA64_PGD, offsetof(struct domain, arch.mm));
 	DEFINE(IA64_TASK_THREAD_KSP_OFFSET, offsetof (struct vcpu, arch._thread.ksp));
 	DEFINE(IA64_TASK_THREAD_ON_USTACK_OFFSET, offsetof (struct vcpu, arch._thread.on_ustack));
 

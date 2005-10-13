@@ -271,7 +271,7 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 {
     IA64_PSR vpsr;
     CACHE_LINE_TYPE type;
-    u64 vhpt_adr;
+    u64 vhpt_adr, gppa;
     ISR misr;
     ia64_rr vrr;
     REGS *regs;
@@ -314,9 +314,9 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 //    prepare_if_physical_mode(v);
 
     if(data=vtlb_lookup_ex(vtlb, vrr.rid, vadr,type)){
-        if(v->domain!=dom0&&type==DSIDE_TLB && __gpfn_is_io(v->domain,data->ppn>>(PAGE_SHIFT-12))){
-            vadr=(vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
-            emulate_io_inst(v, vadr, data->ma);
+	gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
+        if(v->domain!=dom0&&type==DSIDE_TLB && __gpfn_is_io(v->domain,gppa>>PAGE_SHIFT)){
+            emulate_io_inst(v, gppa, data->ma);
             return IA64_FAULT;
         }
 

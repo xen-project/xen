@@ -47,6 +47,7 @@
 #include <asm/processor.h>
 #include <asm/vmx.h>
 #include <xen/mm.h>
+#include <public/arch-ia64.h>
 
 /* Global flag to identify whether Intel vmx feature is on */
 u32 vmx_enabled = 0;
@@ -134,39 +135,6 @@ vmx_init_env(void)
 	/* Init stub for rr7 switch */
 	vmx_init_double_mapping_stub();
 #endif 
-}
-
-void vmx_setup_platform(struct vcpu *v, struct vcpu_guest_context *c)
-{
-	struct domain *d = v->domain;
-	shared_iopage_t *sp;
-
-	ASSERT(d != dom0); /* only for non-privileged vti domain */
-	d->arch.vmx_platform.shared_page_va = __va(c->share_io_pg);
-	sp = get_sp(d);
-	memset((char *)sp,0,PAGE_SIZE);
-	/* FIXME: temp due to old CP */
-	sp->sp_global.eport = 2;
-#ifdef V_IOSAPIC_READY
-	sp->vcpu_number = 1;
-#endif
-	/* TEMP */
-	d->arch.vmx_platform.pib_base = 0xfee00000UL;
-
-	/* One more step to enable interrupt assist */
-	set_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags);
-	/* Only open one port for I/O and interrupt emulation */
-	if (v == d->vcpu[0]) {
-	    memset(&d->shared_info->evtchn_mask[0], 0xff,
-		sizeof(d->shared_info->evtchn_mask));
-	    clear_bit(iopacket_port(d), &d->shared_info->evtchn_mask[0]);
-	}
-
-	/* FIXME: only support PMT table continuously by far */
-//	d->arch.pmt = __va(c->pt_base);
-
-
-	vmx_final_setup_domain(d);
 }
 
 typedef union {
@@ -376,40 +344,6 @@ vmx_final_setup_domain(struct domain *d)
 	/* Other vmx specific initialization work */
 }
 
-/*
- * Following stuff should really move to domain builder. However currently
- * XEN/IA64 doesn't export physical -> machine page table to domain builder,
- * instead only the copy. Also there's no hypercall to notify hypervisor
- * IO ranges by far. Let's enhance it later.
- */
-
-#define MEM_G   (1UL << 30)	
-#define MEM_M   (1UL << 20)	
-
-#define MMIO_START       (3 * MEM_G)
-#define MMIO_SIZE        (512 * MEM_M)
-
-#define VGA_IO_START     0xA0000UL
-#define VGA_IO_SIZE      0x20000
-
-#define LEGACY_IO_START  (MMIO_START + MMIO_SIZE)
-#define LEGACY_IO_SIZE   (64*MEM_M)  
-
-#define IO_PAGE_START (LEGACY_IO_START + LEGACY_IO_SIZE)
-#define IO_PAGE_SIZE  PAGE_SIZE
-
-#define STORE_PAGE_START (IO_PAGE_START + IO_PAGE_SIZE)
-#define STORE_PAGE_SIZE	 PAGE_SIZE
-
-#define IO_SAPIC_START   0xfec00000UL
-#define IO_SAPIC_SIZE    0x100000
-
-#define PIB_START 0xfee00000UL
-#define PIB_SIZE 0x100000 
-
-#define GFW_START        (4*MEM_G -16*MEM_M)
-#define GFW_SIZE         (16*MEM_M)
-
 typedef struct io_range {
 	unsigned long start;
 	unsigned long size;
@@ -424,17 +358,25 @@ io_range_t io_ranges[] = {
 	{PIB_START, PIB_SIZE, GPFN_PIB},
 };
 
-#define VMX_SYS_PAGES	(2 + GFW_SIZE >> PAGE_SHIFT)
+#define VMX_SYS_PAGES	(2 + (GFW_SIZE >> PAGE_SHIFT))
 #define VMX_CONFIG_PAGES(d) ((d)->max_pages - VMX_SYS_PAGES)
 
 int vmx_alloc_contig_pages(struct domain *d)
 {
-	unsigned int order, i, j;
-	unsigned long start, end, pgnr, conf_nr;
+	unsigned int order;
+	unsigned long i, j, start, end, pgnr, conf_nr;
 	struct pfn_info *page;
 	struct vcpu *v = d->vcpu[0];
 
 	ASSERT(!test_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags));
+
+	/* Mark I/O ranges */
+	for (i = 0; i < (sizeof(io_ranges) / sizeof(io_range_t)); i++) {
+	    for (j = io_ranges[i].start;
+		 j < io_ranges[i].start + io_ranges[i].size;
+		 j += PAGE_SIZE)
+		map_domain_page(d, j, io_ranges[i].type);
+	}
 
 	conf_nr = VMX_CONFIG_PAGES(d);
 	order = get_order_from_pages(conf_nr);
@@ -462,10 +404,20 @@ int vmx_alloc_contig_pages(struct domain *d)
 
 	d->arch.max_pfn = end >> PAGE_SHIFT;
 
-	order = get_order_from_pages(VMX_SYS_PAGES);
+	order = get_order_from_pages(GFW_SIZE >> PAGE_SHIFT);
 	if (unlikely((page = alloc_domheap_pages(d, order, 0)) == NULL)) {
 	    printk("Could not allocate order=%d pages for vmx contig alloc\n",
 			order);
+	    return -1;
+	}
+
+	/* Map guest firmware */
+	pgnr = page_to_pfn(page);
+	for (i = GFW_START; i < GFW_START + GFW_SIZE; i += PAGE_SIZE, pgnr++)
+	    map_domain_page(d, i, pgnr << PAGE_SHIFT);
+
+	if (unlikely((page = alloc_domheap_pages(d, 1, 0)) == NULL)) {
+	    printk("Could not allocate order=1 pages for vmx contig alloc\n");
 	    return -1;
 	}
 
@@ -474,20 +426,42 @@ int vmx_alloc_contig_pages(struct domain *d)
 	map_domain_page(d, IO_PAGE_START, pgnr << PAGE_SHIFT);
 	pgnr++;
 	map_domain_page(d, STORE_PAGE_START, pgnr << PAGE_SHIFT);
-	pgnr++;
-
-	/* Map guest firmware */
-	for (i = GFW_START; i < GFW_START + GFW_SIZE; i += PAGE_SIZE, pgnr++)
-	    map_domain_page(d, i, pgnr << PAGE_SHIFT);
-
-	/* Mark I/O ranges */
-	for (i = 0; i < (sizeof(io_ranges) / sizeof(io_range_t)); i++) {
-	    for (j = io_ranges[i].start;
-		 j < io_ranges[i].start + io_ranges[i].size;
-		 j += PAGE_SIZE)
-		map_domain_page(d, j, io_ranges[i].type);
-	}
 
 	set_bit(ARCH_VMX_CONTIG_MEM, &v->arch.arch_vmx.flags);
 	return 0;
 }
+
+void vmx_setup_platform(struct vcpu *v, struct vcpu_guest_context *c)
+{
+	struct domain *d = v->domain;
+	shared_iopage_t *sp;
+
+	ASSERT(d != dom0); /* only for non-privileged vti domain */
+	d->arch.vmx_platform.shared_page_va =
+		__va(__gpa_to_mpa(d, IO_PAGE_START));
+	sp = get_sp(d);
+	//memset((char *)sp,0,PAGE_SIZE);
+	//sp->sp_global.eport = 2;
+#ifdef V_IOSAPIC_READY
+	sp->vcpu_number = 1;
+#endif
+	/* TEMP */
+	d->arch.vmx_platform.pib_base = 0xfee00000UL;
+
+	/* One more step to enable interrupt assist */
+	set_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags);
+	/* Only open one port for I/O and interrupt emulation */
+	if (v == d->vcpu[0]) {
+	    memset(&d->shared_info->evtchn_mask[0], 0xff,
+		sizeof(d->shared_info->evtchn_mask));
+	    clear_bit(iopacket_port(d), &d->shared_info->evtchn_mask[0]);
+	}
+
+	/* FIXME: only support PMT table continuously by far */
+//	d->arch.pmt = __va(c->pt_base);
+
+
+	vmx_final_setup_domain(d);
+}
+
+

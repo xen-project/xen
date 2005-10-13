@@ -900,10 +900,17 @@ GLOBAL_ENTRY(ia64_leave_kernel)
     adds r7 = PT(EML_UNAT)+16,r12
 	;;
     ld8 r7 = [r7]
+	;;
+#if 0
+leave_kernel_self:
+    cmp.ne p8,p0 = r0, r7
+(p8) br.sptk.few leave_kernel_self
+	;; 
+#endif
 (p6)	br.call.sptk.many b0=deliver_pending_interrupt
     ;;
 	mov ar.pfs=loc0
-    mov ar.unat=r7  /* load eml_unat  */
+	mov ar.unat=r7  /* load eml_unat  */
 	mov r31=r0
 
 

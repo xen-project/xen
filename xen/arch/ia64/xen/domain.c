@@ -59,6 +59,7 @@ unsigned long *domU_staging_area;
 
 // initialized by arch/ia64/setup.c:find_initrd()
 unsigned long initrd_start = 0, initrd_end = 0;
+extern unsigned long running_on_sim;
 
 #define IS_XEN_ADDRESS(d,a) ((a >= d->xen_vastart) && (a <= d->xen_vaend))
 
@@ -190,6 +191,9 @@ void arch_do_createdomain(struct vcpu *v)
    		while (1);
 	}
 	memset(d->shared_info, 0, PAGE_SIZE);
+	if (v == d->vcpu[0])
+	    memset(&d->shared_info->evtchn_mask[0], 0xff,
+		sizeof(d->shared_info->evtchn_mask));
 #if 0
 	d->vcpu[0].arch.privregs = 
 			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
@@ -270,6 +274,14 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	printf("arch_set_info_guest\n");
 	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             return 0;
+
+	/* Sync d/i cache conservatively */
+	if (!running_on_sim) {
+	    ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
+	    if (ret != PAL_STATUS_SUCCESS)
+	        panic("PAL CACHE FLUSH failed for domain.\n");
+	    printk("Sync i/d cache for dom0 image SUCC\n");
+	}
 
 	if (c->flags & VGCF_VMX_GUEST) {
 	    if (!vmx_enabled) {
@@ -547,7 +559,8 @@ tryagain:
 				if (pte_present(*pte)) {
 //printk("lookup_domain_page: found mapping for %lx, pte=%lx\n",mpaddr,pte_val(*pte));
 					return *(unsigned long *)pte;
-				}
+				} else if (VMX_DOMAIN(d->vcpu[0]))
+					return GPFN_INV_MASK;
 			}
 		}
 	}
@@ -799,7 +812,6 @@ void physdev_init_dom0(struct domain *d)
 	set_bit(_DOMF_physdev_access, &d->domain_flags);
 }
 
-extern unsigned long running_on_sim;
 unsigned int vmx_dom0 = 0;
 int construct_dom0(struct domain *d, 
 	               unsigned long image_start, unsigned long image_len, 

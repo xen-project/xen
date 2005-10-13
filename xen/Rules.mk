@@ -47,6 +47,7 @@ test-gcc-flag = $(shell $(CC) -v --help 2>&1 | grep -q " $(1) " && echo $(1))
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
+CFLAGS += -D__HYPERVISOR__
 ifneq ($(debug),y)
 CFLAGS += -DNDEBUG
 ifeq ($(verbose),y)

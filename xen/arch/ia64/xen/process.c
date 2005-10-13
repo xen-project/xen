@@ -745,6 +745,8 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	    case 26:
 printf("*** NaT fault... attempting to handle as privop\n");
 printf("isr=%p, ifa=%p,iip=%p,ipsr=%p\n",isr,ifa,regs->cr_iip,psr);
+		regs->eml_unat = 0;
+		return;
 		vector = priv_emulate(v,regs,isr);
 		if (vector == IA64_NO_FAULT) {
 printf("*** Handled privop masquerading as NaT fault\n");

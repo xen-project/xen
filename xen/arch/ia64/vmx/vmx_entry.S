@@ -720,11 +720,11 @@ GLOBAL_ENTRY(vmx_switch_rr7)
 
    // re-pin mappings for guest_vhpt
 
-   mov r24=IA64_TR_VHPT
+   mov r24=IA64_TR_PERVP_VHPT
    movl r25=PAGE_KERNEL
    ;;
    or loc5 = r25,loc5          // construct PA | page properties
-   mov r23 = VCPU_TLB_SHIFT<<2
+   mov r23 = IA64_GRANULE_SHIFT <<2
    ;;
    ptr.d   in3,r23
    ;;

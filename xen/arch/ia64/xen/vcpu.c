@@ -775,6 +775,7 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 	}
 #ifdef HEARTBEAT_FREQ
 	if (domid >= N_DOMS) domid = N_DOMS-1;
+#if 0
 	if (vector == (PSCB(vcpu,itv) & 0xff)) {
 	    if (!(++count[domid] & ((HEARTBEAT_FREQ*1024)-1))) {
 		printf("Dom%d heartbeat... ticks=%lx,nonticks=%lx\n",
@@ -783,6 +784,7 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 		//dump_runq();
 	    }
 	}
+#endif
 	else nonclockcount[domid]++;
 #endif
 	// now have an unmasked, pending, deliverable vector!

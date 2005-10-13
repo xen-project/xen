@@ -102,7 +102,7 @@ extern char _end[]; /* standard ELF symbol */
 #endif
 
 // xen/include/asm/config.h
-#define HZ 100
+//#define HZ 1000
 // FIXME SMP: leave SMP for a later time
 #define barrier() __asm__ __volatile__("": : :"memory")
 

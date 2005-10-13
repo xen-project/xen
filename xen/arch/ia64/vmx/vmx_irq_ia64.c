@@ -101,7 +101,10 @@ vmx_ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 
 		if (vector != IA64_TIMER_VECTOR) {
 			/* FIXME: Leave IRQ re-route later */
-			vmx_vcpu_pend_interrupt(dom0->vcpu[0],vector);
+			if (!VMX_DOMAIN(dom0->vcpu[0]))
+				vcpu_pend_interrupt(dom0->vcpu[0],vector);
+			else
+				vmx_vcpu_pend_interrupt(dom0->vcpu[0],vector);
 			wake_dom0 = 1;
 		}
 		else {	// FIXME: Handle Timer only now

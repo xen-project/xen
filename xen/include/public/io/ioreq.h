@@ -35,6 +35,13 @@
 #define IOREQ_TYPE_OR		3
 #define IOREQ_TYPE_XOR		4
 
+#ifdef __HYPERVISOR__
+#include <public/io/vmx_vlapic.h>
+#else
+#include <xen/io/vmx_vlapic.h>
+#endif
+
+
 /*
  * VMExit dispatcher should cooperate with instruction decoder to
  * prepare this structure and notify service OS and DM by sending
@@ -55,10 +62,6 @@ typedef struct {
     u8      type;		/* I/O type			*/
 } ioreq_t;
 
-#define MAX_VECTOR    256
-#define BITS_PER_BYTE   8
-#define INTR_LEN        (MAX_VECTOR/(BITS_PER_BYTE * sizeof(u64)))
-
 typedef struct {
     u64   pic_intr[INTR_LEN];
     u64   pic_mask[INTR_LEN];
@@ -67,10 +70,11 @@ typedef struct {
 
 typedef struct {
     ioreq_t         vp_ioreq;
-    unsigned long   vp_intr[INTR_LEN];
+    vl_apic_info    apic_intr;
 } vcpu_iodata_t;
 
 typedef struct {
+    int vcpu_number;
     global_iodata_t     sp_global;
     vcpu_iodata_t       vcpu_iodata[1];
 } shared_iopage_t;

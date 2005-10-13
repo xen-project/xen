@@ -99,6 +99,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long new_itm, old_itc;
 
+#if 0
 #define HEARTBEAT_FREQ 16	// period in seconds
 #ifdef HEARTBEAT_FREQ
 	static long count = 0;
@@ -110,6 +111,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		count = 0;
 	}
 #endif
+#endif
 	if (current->domain == dom0) {
 		// FIXME: there's gotta be a better way of doing this...
 		// We have to ensure that domain0 is launched before we
@@ -117,12 +119,14 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		//domain0_ready = 1; // moved to xensetup.c
 		VCPU(current,pending_interruption) = 1;
 	}
-	if (domain0_ready && vcpu_timer_expired(dom0->vcpu[0])) {
-		vcpu_pend_timer(dom0->vcpu[0]);
-		//vcpu_set_next_timer(dom0->vcpu[0]);
-		vcpu_wake(dom0->vcpu[0]);
+	if (domain0_ready && current->domain != dom0) {
+		if(vcpu_timer_expired(dom0->vcpu[0])) {
+			vcpu_pend_timer(dom0->vcpu[0]);
+			//vcpu_set_next_timer(dom0->vcpu[0]);
+			vcpu_wake(dom0->vcpu[0]);
+		}
 	}
-	if (!is_idle_task(current->domain) && current->domain != dom0) {
+	if (!is_idle_task(current->domain))  {
 		if (vcpu_timer_expired(current)) {
 			vcpu_pend_timer(current);
 			// ensure another timer interrupt happens even if domain doesn't
@@ -132,8 +136,11 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	}
 	new_itm = local_cpu_data->itm_next;
 
-	if (!time_after(ia64_get_itc(), new_itm))
+	if (!VMX_DOMAIN(current) && !time_after(ia64_get_itc(), new_itm))
 		return;
+
+	if (VMX_DOMAIN(current))
+		vcpu_wake(current);
 
 	while (1) {
 		new_itm += local_cpu_data->itm_delta;

@@ -177,13 +177,8 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 
             for ( i = start_page; i < (start_page + nr_pages); i++ )
             {
-                page = map_new_domain_page(d, i << PAGE_SHIFT);
-                if ( page == NULL )
-                {
-                    ret = -ENOMEM;
-                    break;
-                }
-                pfn = page_to_pfn(page);
+		pfn = __gpfn_to_mfn_foreign(d, i);
+
                 if ( put_user(pfn, buffer) )
                 {
                     ret = -EFAULT;
