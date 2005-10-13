@@ -313,18 +313,11 @@ class XendDomain:
     def domain_lookup_by_name_nr(self, name):
         self.domains_lock.acquire()
         try:
-            matching = filter(
-                lambda d: d.getName() == name and not d.isShutdown(),
-                self.domains.values())
+            matching = filter(lambda d: d.getName() == name,
+                              self.domains.values())
             n = len(matching)
             if n == 1:
                 return matching[0]
-            elif n > 1:
-                log.error('Name uniqueness has been violated for name %s!  '
-                          'Recovering by renaming:', name)
-                for d in matching:
-                    d.renameUniquely()
-
             return None
         finally:
             self.domains_lock.release()

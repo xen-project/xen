@@ -840,14 +840,6 @@ class XendDomainInfo:
             self.state_updated.release()
 
 
-    def isShutdown(self):
-        self.state_updated.acquire()
-        try:
-            return self.state == STATE_DOM_SHUTDOWN
-        finally:
-            self.state_updated.release()
-
-
     def __str__(self):
         s = "<domain"
         s += " id=" + str(self.domid)
@@ -1290,20 +1282,6 @@ class XendDomainInfo:
                  self.domid)
         self.storeDom('xend/shutdown_completed', 'True')
         self.state_set(STATE_DOM_SHUTDOWN)
-
-
-    ## public:
-
-    def renameUniquely(self):
-        """Rename this domain so that it has a unique name.  This is used by
-        XendDomain to recover from non-uniqueness errors; we should never have
-        allowed the system to reach this state in the first place."""
-        new_name = self.generateUniqueName()
-        
-        log.error('Renaming %s (%d, %s) to %s', self.info['name'], self.domid,
-                  self.uuid, new_name)
-
-        self.setName(new_name)
 
 
     # private:
