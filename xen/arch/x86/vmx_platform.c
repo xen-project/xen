@@ -643,13 +643,13 @@ void send_mmio_req(unsigned char type, unsigned long gpa,
     } else
         p->u.data = value;
 
-    p->state = STATE_IOREQ_READY;
-
     if (vmx_mmio_intercept(p)){
         p->state = STATE_IORESP_READY;
         vmx_io_assist(v);
         return;
     }
+
+    p->state = STATE_IOREQ_READY;
 
     evtchn_send(iopacket_port(v->domain));
     vmx_wait_io();

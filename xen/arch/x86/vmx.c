@@ -646,13 +646,13 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
     } else
         p->u.data = value;
 
-    p->state = STATE_IOREQ_READY;
-
     if (vmx_portio_intercept(p)) {
         /* no blocking & no evtchn notification */
         clear_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
         return;
     }
+
+    p->state = STATE_IOREQ_READY;
 
     evtchn_send(iopacket_port(v->domain));
     vmx_wait_io();
