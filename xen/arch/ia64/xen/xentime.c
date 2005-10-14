@@ -240,7 +240,7 @@ int reprogram_ac_timer(s_time_t timeout)
 	s_time_t expire;
 	unsigned long seq, cur_itc, itm_next;
 
-	if (!domain0_ready) return 1;
+	if (!domain0_ready || timeout == 0) return 1;
 
 	do {
 		seq = read_seqbegin(&xtime_lock);
