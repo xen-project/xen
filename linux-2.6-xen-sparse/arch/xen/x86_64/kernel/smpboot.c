@@ -1246,21 +1246,6 @@ static void smp_intr_exit(void)
 	unbind_ipi_from_irq(CALL_FUNCTION_VECTOR, cpu);
 }
 
-extern void local_setup_timer_irq(void);
-extern void local_teardown_timer_irq(void);
-
-void smp_suspend(void)
-{
-	local_teardown_timer_irq();
-	smp_intr_exit();
-}
-
-void smp_resume(void)
-{
-	smp_intr_init();
-	local_setup_timer_irq();
-}
-
 void vcpu_prepare(int vcpu)
 {
 }
