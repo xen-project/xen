@@ -1377,8 +1377,7 @@ class XendDomainInfo:
         # target = 0 means use all processors
         if target > 0:
             # count the number of online vcpus (cpu values in v2c map >= 0)
-            vcpu_to_cpu = dom_get(dom)['vcpu_to_cpu']
-            vcpus_online = len(filter(lambda x: x >= 0, vcpu_to_cpu))
+            vcpus_online = dom_get(dom)['vcpus']
             log.debug("found %d vcpus online", vcpus_online)
 
             # disable any extra vcpus that are online over the requested target

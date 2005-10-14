@@ -270,9 +270,9 @@ def parse_doms_info(info):
         vcpuinfo['dom']    = int(sxp.child_value(info, 'domid', '-1'))
         vcpuinfo['vcpu']   = int(count)
         vcpuinfo['cpu']    = int(cpu)
-        vcpuinfo['cpumap'] = int(cpumap[count])&mask
+        #vcpuinfo['cpumap'] = int(cpumap[count])&mask
         count = count + 1
-        dominfo['vcpulist'].append(vcpuinfo)
+        #dominfo['vcpulist'].append(vcpuinfo)
     return dominfo
         
 def xm_brief_list(domsinfo):

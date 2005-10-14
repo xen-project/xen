@@ -33,7 +33,7 @@ xc_domain_dumpcore(int xc_handle,
     unsigned long nr_pages;
     unsigned long *page_array;
     xc_dominfo_t info;
-    int i, j, vcpu_map_size, dump_fd;
+    int i, j, dump_fd;
     char *dump_mem, *dump_mem_start = NULL;
     struct xc_core_header header;
     vcpu_guest_context_t     ctxt[MAX_VIRT_CPUS];
@@ -54,18 +54,9 @@ xc_domain_dumpcore(int xc_handle,
         goto error_out;
     }
  
-    vcpu_map_size =  sizeof(info.vcpu_to_cpu) / sizeof(info.vcpu_to_cpu[0]);
-
-    for (i = 0, j = 0; i < vcpu_map_size; i++) {
-        if (info.vcpu_to_cpu[i] == -1) {
-            continue;
-        }
-        if (xc_domain_get_vcpu_context(xc_handle, domid, i, &ctxt[j])) {
-            PERROR("Could not get all vcpu contexts for domain");
-            goto error_out;
-        }
-        j++;
-    }
+    for (i = 0, j = 0; i < 32; i++)
+        if (xc_domain_get_vcpu_context(xc_handle, domid, i, &ctxt[j]) == 0)
+            j++;
  
     nr_pages = info.nr_pages;
 

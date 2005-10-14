@@ -11,6 +11,7 @@
 
 int xc_domain_create(int xc_handle,
                      uint32_t ssidref,
+                     xen_domain_handle_t handle,
                      uint32_t *pdomid)
 {
     int err;
@@ -19,6 +20,7 @@ int xc_domain_create(int xc_handle,
     op.cmd = DOM0_CREATEDOMAIN;
     op.u.createdomain.domain = (domid_t)*pdomid;
     op.u.createdomain.ssidref = ssidref;
+    memcpy(op.u.createdomain.handle, handle, sizeof(xen_domain_handle_t));
     if ( (err = do_dom0_op(xc_handle, &op)) != 0 )
         return err;
 
@@ -59,7 +61,7 @@ int xc_domain_destroy(int xc_handle,
 int xc_domain_pincpu(int xc_handle,
                      uint32_t domid, 
                      int vcpu,
-                     cpumap_t *cpumap)
+                     cpumap_t cpumap)
 {
     dom0_op_t op;
     op.cmd = DOM0_PINCPUDOMAIN;
@@ -112,10 +114,9 @@ int xc_domain_getinfo(int xc_handle,
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
         info->cpu_time = op.u.getdomaininfo.cpu_time;
         info->vcpus = op.u.getdomaininfo.n_vcpu;
-        memcpy(&info->vcpu_to_cpu, &op.u.getdomaininfo.vcpu_to_cpu, 
-               sizeof(info->vcpu_to_cpu));
-        memcpy(&info->cpumap, &op.u.getdomaininfo.cpumap, 
-               sizeof(info->cpumap));
+
+        memcpy(info->handle, op.u.getdomaininfo.handle,
+               sizeof(xen_domain_handle_t));
 
         next_domid = (uint16_t)op.u.getdomaininfo.domain + 1;
         info++;
@@ -166,19 +167,14 @@ int xc_domain_get_vcpu_context(int xc_handle,
     op.u.getvcpucontext.vcpu   = (uint16_t)vcpu;
     op.u.getvcpucontext.ctxt   = ctxt;
 
-    if ( (ctxt != NULL) &&
-         ((rc = mlock(ctxt, sizeof(*ctxt))) != 0) )
+    if ( (rc = mlock(ctxt, sizeof(*ctxt))) != 0 )
         return rc;
 
     rc = do_dom0_op(xc_handle, &op);
 
-    if ( ctxt != NULL )
-        safe_munlock(ctxt, sizeof(*ctxt));
+    safe_munlock(ctxt, sizeof(*ctxt));
 
-    if ( rc > 0 )
-        return -ESRCH;
-    else
-        return rc;
+    return rc;
 }
 
 

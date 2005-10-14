@@ -437,6 +437,8 @@ extern shared_info_t *HYPERVISOR_shared_info;
 
 typedef uint64_t cpumap_t;
 
+typedef uint8_t xen_domain_handle_t[16];
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __XEN_PUBLIC_XEN_H__ */

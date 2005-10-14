@@ -139,6 +139,9 @@ struct domain
     struct arch_domain arch;
 
     void *ssid; /* sHype security subject identifier */
+
+    /* Control-plane tools handle for this domain. */
+    xen_domain_handle_t handle;
 };
 
 struct domain_setup_info

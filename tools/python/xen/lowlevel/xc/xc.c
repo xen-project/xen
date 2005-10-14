@@ -77,17 +77,41 @@ static PyObject *pyxc_domain_create(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    uint32_t          dom = 0;
-    int          ret;
-    uint32_t          ssidref = 0x0;
+    uint32_t dom = 0;
+    int      ret, i;
+    uint32_t ssidref = 0;
+    PyObject *pyhandle = NULL;
+    xen_domain_handle_t handle = { 
+        0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+        0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef };
 
-    static char *kwd_list[] = { "dom", "ssidref", NULL };
+    static char *kwd_list[] = { "dom", "ssidref", "handle", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwd_list,
-                                      &dom, &ssidref))
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiO", kwd_list,
+                                      &dom, &ssidref, &pyhandle))
         return NULL;
 
-    if ( (ret = xc_domain_create(xc->xc_handle, ssidref, &dom)) < 0 )
+    if ( pyhandle != NULL )
+    {
+        if ( !PyList_Check(pyhandle) || 
+             (PyList_Size(pyhandle) != sizeof(xen_domain_handle_t)) )
+        {
+        out_exception:
+            errno = EINVAL;
+            PyErr_SetFromErrno(xc_error);
+            return NULL;
+        }
+
+        for ( i = 0; i < sizeof(xen_domain_handle_t); i++ )
+        {
+            PyObject *p = PyList_GetItem(pyhandle, i);
+            if ( !PyInt_Check(p) )
+                goto out_exception;
+            handle[i] = (uint8_t)PyInt_AsLong(p);
+        }
+    }
+
+    if ( (ret = xc_domain_create(xc->xc_handle, ssidref, handle, &dom)) < 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return PyInt_FromLong(dom);
@@ -181,7 +205,7 @@ static PyObject *pyxc_domain_pincpu(PyObject *self,
 
     uint32_t dom;
     int vcpu = 0;
-    cpumap_t cpumap = 0xFFFFFFFF;
+    cpumap_t cpumap = ~0ULL;
 
     static char *kwd_list[] = { "dom", "vcpu", "cpumap", NULL };
 
@@ -189,7 +213,7 @@ static PyObject *pyxc_domain_pincpu(PyObject *self,
                                       &dom, &vcpu, &cpumap) )
         return NULL;
 
-    if ( xc_domain_pincpu(xc->xc_handle, dom, vcpu, &cpumap) != 0 )
+    if ( xc_domain_pincpu(xc->xc_handle, dom, vcpu, cpumap) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -223,7 +247,7 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
                                      PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
-    PyObject *list, *vcpu_list, *cpumap_list, *info_dict;
+    PyObject *list, *info_dict;
 
     uint32_t first_dom = 0;
     int max_doms = 1024, nr_doms, i, j;
@@ -249,15 +273,9 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     list = PyList_New(nr_doms);
     for ( i = 0 ; i < nr_doms; i++ )
     {
-        vcpu_list = PyList_New(MAX_VIRT_CPUS);
-        cpumap_list = PyList_New(MAX_VIRT_CPUS);
-        for ( j = 0; j < MAX_VIRT_CPUS; j++ ) {
-            PyList_SetItem( vcpu_list, j, 
-                            Py_BuildValue("i", info[i].vcpu_to_cpu[j]));
-            PyList_SetItem( cpumap_list, j, 
-                            Py_BuildValue("i", info[i].cpumap[j]));
-        }
-                 
+        PyObject *pyhandle = PyList_New(sizeof(xen_domain_handle_t));
+        for ( j = 0; j < sizeof(xen_domain_handle_t); j++ )
+            PyList_SetItem(pyhandle, j, PyInt_FromLong(info[i].handle[j]));
         info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
                                   ",s:l,s:L,s:l,s:i,s:i}",
                                   "dom",       info[i].domid,
@@ -273,10 +291,8 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
                                   "maxmem_kb", info[i].max_memkb,
                                   "ssidref",   info[i].ssidref,
                                   "shutdown_reason", info[i].shutdown_reason);
-        PyDict_SetItemString( info_dict, "vcpu_to_cpu", vcpu_list );
-        PyDict_SetItemString( info_dict, "cpumap", cpumap_list );
-        PyList_SetItem( list, i, info_dict);
- 
+        PyDict_SetItemString(info_dict, "handle", pyhandle);
+        PyList_SetItem(list, i, info_dict);
     }
 
     free(info);

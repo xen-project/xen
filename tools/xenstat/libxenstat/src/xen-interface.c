@@ -178,16 +178,15 @@ long long xi_get_vcpu_usage(xi_handle *handle, unsigned int domain,
                             unsigned int vcpu)
 {
 	dom0_op_t op;
-	op.u.getvcpucontext.domain = domain;
-	op.u.getvcpucontext.vcpu = vcpu;
-	op.u.getvcpucontext.ctxt = NULL;
+	op.u.getvcpuinfo.domain = domain;
+	op.u.getvcpuinfo.vcpu   = vcpu;
 
-	if (xi_make_dom0_op(handle, &op, DOM0_GETVCPUCONTEXT) < 0) {
-		perror("DOM0_GETVCPUCONTEXT Hypercall failed");
+	if (xi_make_dom0_op(handle, &op, DOM0_GETVCPUINFO) < 0) {
+		perror("DOM0_GETVCPUINFO Hypercall failed");
 		return -1;
 	}
 
-	return op.u.getvcpucontext.cpu_time;
+	return op.u.getvcpuinfo.cpu_time;
 }
 
 /* gets xen version information from hypervisor */

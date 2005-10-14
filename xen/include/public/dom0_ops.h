@@ -45,6 +45,7 @@ typedef struct sched_adjdom_cmd dom0_adjustdom_t;
 typedef struct {
     /* IN parameters */
     uint32_t ssidref;
+    xen_domain_handle_t handle;
     /* IN/OUT parameters. */
     /* Identifier for new domain (auto-allocate if zero is specified). */
     domid_t domain;
@@ -88,9 +89,8 @@ typedef struct {
     unsigned long shared_info_frame;       /* MFN of shared_info struct */
     uint64_t cpu_time;
     uint32_t n_vcpu;
-    int32_t  vcpu_to_cpu[MAX_VIRT_CPUS];  /* current mapping   */
-    cpumap_t cpumap[MAX_VIRT_CPUS];       /* allowable mapping */
     uint32_t ssidref;
+    xen_domain_handle_t handle;
 } dom0_getdomaininfo_t;
 
 #define DOM0_SETDOMAININFO      13
@@ -180,9 +180,9 @@ typedef struct {
 #define DOM0_PINCPUDOMAIN     20
 typedef struct {
     /* IN variables. */
-    domid_t      domain;
-    uint16_t          vcpu;
-    cpumap_t     *cpumap;
+    domid_t   domain;
+    uint16_t  vcpu;
+    cpumap_t cpumap;
 } dom0_pincpudomain_t;
 
 /* Get trace buffers machine base address */
@@ -352,11 +352,23 @@ typedef struct {
 
 #define DOM0_GETVCPUCONTEXT      37
 typedef struct {
+    /* IN variables. */
     domid_t  domain;                  /* domain to be affected */
     uint16_t vcpu;                    /* vcpu # */
-    vcpu_guest_context_t *ctxt;       /* NB. IN/OUT variable. */
-    uint64_t cpu_time;                 
+    /* OUT variables. */
+    vcpu_guest_context_t *ctxt;
 } dom0_getvcpucontext_t;
+
+#define DOM0_GETVCPUINFO         43
+typedef struct {
+    /* IN variables. */
+    domid_t  domain;                  /* domain to be affected */
+    uint16_t vcpu;                    /* vcpu # */
+    /* OUT variables. */
+    uint64_t cpu_time;                 
+    uint32_t cpu;                     /* current mapping   */
+    cpumap_t cpumap;                  /* allowable mapping */
+} dom0_getvcpuinfo_t;
 
 #define DOM0_GETDOMAININFOLIST   38
 typedef struct {
@@ -426,10 +438,12 @@ typedef struct {
         dom0_microcode_t         microcode;
         dom0_ioport_permission_t ioport_permission;
         dom0_getvcpucontext_t    getvcpucontext;
+        dom0_getvcpuinfo_t       getvcpuinfo;
         dom0_getdomaininfolist_t getdomaininfolist;
         dom0_platform_quirk_t    platform_quirk;
         dom0_physical_memory_map_t physical_memory_map;
         dom0_max_vcpus_t         max_vcpus;
+        uint8_t                  pad[128];
     } u;
 } dom0_op_t;
 

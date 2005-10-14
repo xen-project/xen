@@ -420,6 +420,9 @@ void __init __start_xen(multiboot_info_t *mbi)
            nr_pages << (PAGE_SHIFT - 10));
     total_pages = nr_pages;
 
+    /* Sanity check for unwanted bloat of dom0_op_t structure. */
+    BUG_ON(sizeof(((dom0_op_t *)0)->u) != sizeof(((dom0_op_t *)0)->u.pad));
+
     init_frametable();
 
     end_boot_allocator();

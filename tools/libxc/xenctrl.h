@@ -123,23 +123,23 @@ int xc_waitdomain_core(
  */
 
 typedef struct {
-    uint32_t           domid;
-    uint32_t           ssidref;
+    uint32_t      domid;
+    uint32_t      ssidref;
     unsigned int  dying:1, crashed:1, shutdown:1, 
                   paused:1, blocked:1, running:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
     unsigned long nr_pages;
     unsigned long shared_info_frame;
-    uint64_t           cpu_time;
+    uint64_t      cpu_time;
     unsigned long max_memkb;
     unsigned int  vcpus;
-    int32_t           vcpu_to_cpu[MAX_VIRT_CPUS];
-    cpumap_t      cpumap[MAX_VIRT_CPUS];
+    xen_domain_handle_t handle;
 } xc_dominfo_t;
 
 typedef dom0_getdomaininfo_t xc_domaininfo_t;
 int xc_domain_create(int xc_handle, 
                      uint32_t ssidref,
+                     xen_domain_handle_t handle,
                      uint32_t *pdomid);
 
 
@@ -194,7 +194,8 @@ int xc_domain_destroy(int xc_handle,
 int xc_domain_pincpu(int xc_handle,
                      uint32_t domid,
                      int vcpu,
-                     cpumap_t *cpumap);
+                     cpumap_t cpumap);
+
 /**
  * This function will return information about one or more domains. It is
  * designed to iterate over the list of domains. If a single domain is

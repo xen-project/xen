@@ -99,7 +99,7 @@ static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
 static void do_task_queues(unsigned char key)
 {
     struct domain *d;
-    struct vcpu *v;
+    struct vcpu   *v;
     s_time_t       now = NOW();
 
     printk("'%c' pressed -> dumping task queues (now=0x%X:%08X)\n", key,
@@ -112,6 +112,12 @@ static void do_task_queues(unsigned char key)
         printk("Xen: DOM %u, flags=%lx refcnt=%d nr_pages=%d "
                "xenheap_pages=%d\n", d->domain_id, d->domain_flags,
                atomic_read(&d->refcnt), d->tot_pages, d->xenheap_pages);
+        printk("     handle=%02x%02x%02x%02x-%02x%02x%02x%02x-"
+               "%02x%02x%02x%02x-%02x%02x%02x%02x\n",
+               d->handle[ 0], d->handle[ 1], d->handle[ 2], d->handle[ 3],
+               d->handle[ 4], d->handle[ 5], d->handle[ 6], d->handle[ 7],
+               d->handle[ 8], d->handle[ 9], d->handle[10], d->handle[11],
+               d->handle[12], d->handle[13], d->handle[14], d->handle[15]);
 
         dump_pageframe_info(d);
                

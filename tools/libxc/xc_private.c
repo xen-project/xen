@@ -256,16 +256,15 @@ long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 {
     dom0_op_t op;
 
-    op.cmd = DOM0_GETVCPUCONTEXT;
-    op.u.getvcpucontext.domain = (domid_t)domid;
-    op.u.getvcpucontext.vcpu   = (uint16_t)vcpu;
-    op.u.getvcpucontext.ctxt   = NULL;
+    op.cmd = DOM0_GETVCPUINFO;
+    op.u.getvcpuinfo.domain = (domid_t)domid;
+    op.u.getvcpuinfo.vcpu   = (uint16_t)vcpu;
     if ( (do_dom0_op(xc_handle, &op) < 0) )
     {
         PERROR("Could not get info on domain");
         return -1;
     }
-    return op.u.getvcpucontext.cpu_time;
+    return op.u.getvcpuinfo.cpu_time;
 }
 
 
