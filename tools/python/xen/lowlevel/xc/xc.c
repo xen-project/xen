@@ -242,6 +242,47 @@ static PyObject *pyxc_domain_setcpuweight(PyObject *self,
     return zero;
 }
 
+static PyObject *pyxc_domain_sethandle(PyObject *self,
+                                       PyObject *args,
+                                       PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    int i;
+    uint32_t dom;
+    PyObject *pyhandle;
+    xen_domain_handle_t handle;
+
+    static char *kwd_list[] = { "dom", "handle", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iO", kwd_list, 
+                                      &dom, &pyhandle) )
+        return NULL;
+
+    if ( !PyList_Check(pyhandle) || 
+         (PyList_Size(pyhandle) != sizeof(xen_domain_handle_t)) )
+    {
+    out_exception:
+        errno = EINVAL;
+        PyErr_SetFromErrno(xc_error);
+        return NULL;
+    }
+
+    for ( i = 0; i < sizeof(xen_domain_handle_t); i++ )
+    {
+        PyObject *p = PyList_GetItem(pyhandle, i);
+        if ( !PyInt_Check(p) )
+            goto out_exception;
+        handle[i] = (uint8_t)PyInt_AsLong(p);
+    }
+
+    if ( xc_domain_sethandle(xc->xc_handle, dom, handle) < 0 )
+        return PyErr_SetFromErrno(xc_error);
+    
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyObject *pyxc_domain_getinfo(PyObject *self,
                                      PyObject *args,
                                      PyObject *kwds)
@@ -871,6 +912,14 @@ static PyMethodDef pyxc_methods[] = {
       "Set cpuweight scheduler parameter for domain.\n"
       " dom [int]:            Identifier of domain to be changed.\n"
       " cpuweight [float, 1]: VCPU being pinned.\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_sethandle", 
+      (PyCFunction)pyxc_domain_sethandle,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Set domain's opaque handle.\n"
+      " dom [int]:            Identifier of domain.\n"
+      " handle [list of 16 ints]: New opaque handle.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_getinfo", 

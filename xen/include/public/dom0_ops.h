@@ -405,6 +405,11 @@ typedef struct {
     unsigned int max;           /* maximum number of vcpus */
 } dom0_max_vcpus_t;
 
+#define DOM0_SETDOMAINHANDLE 44
+typedef struct {
+    domid_t domain;
+    xen_domain_handle_t handle;
+} dom0_setdomainhandle_t;
 
 typedef struct {
     uint32_t cmd;
@@ -443,6 +448,7 @@ typedef struct {
         dom0_platform_quirk_t    platform_quirk;
         dom0_physical_memory_map_t physical_memory_map;
         dom0_max_vcpus_t         max_vcpus;
+        dom0_setdomainhandle_t   setdomainhandle;
         uint8_t                  pad[128];
     } u;
 } dom0_op_t;

@@ -257,6 +257,8 @@ long long xc_domain_get_cpu_usage(int xc_handle,
                                   domid_t domid,
                                   int vcpu);
 
+int xc_domain_sethandle(int xc_handle, uint32_t domid, 
+                        xen_domain_handle_t handle);
 
 typedef dom0_shadow_control_stats_t xc_shadow_control_stats_t;
 int xc_shadow_control(int xc_handle,

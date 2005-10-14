@@ -334,6 +334,16 @@ int xc_domain_max_vcpus(int xc_handle, uint32_t domid, unsigned int max)
     return do_dom0_op(xc_handle, &op);
 }
 
+int xc_domain_sethandle(int xc_handle, uint32_t domid, 
+                        xen_domain_handle_t handle)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_SETDOMAINHANDLE;
+    op.u.setdomainhandle.domain = (domid_t)domid;
+    memcpy(op.u.setdomainhandle.handle, handle, sizeof(xen_domain_handle_t));
+    return do_dom0_op(xc_handle, &op);
+}
+
 /*
  * Local variables:
  * mode: C
