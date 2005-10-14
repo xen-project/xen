@@ -61,12 +61,23 @@ struct cpu_time {
 
 static struct cpu_time cpu_time[NR_CPUS];
 
-/* Protected by platform_timer_lock. */
+/*
+ * Protected by platform_timer_lock, which must be acquired with interrupts
+ * disabled because pit_overflow() is called from PIT ch0 interrupt context.
+ */
 static s_time_t stime_platform_stamp;
 static u64 platform_timer_stamp;
 static struct time_scale platform_timer_scale;
 static spinlock_t platform_timer_lock = SPIN_LOCK_UNLOCKED;
 static u64 (*read_platform_count)(void);
+
+/*
+ * Folding 16-bit PIT into 64-bit software counter is a really critical
+ * operation! We therefore do it directly in PIT ch0 interrupt handler,
+ * based on this flag.
+ */
+static int using_pit;
+static void pit_overflow(void);
 
 /*
  * 32-bit division of integer dividend and integer divisor yielding
@@ -135,14 +146,16 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
 
 void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
+    ASSERT(local_irq_is_enabled());
+
     if ( timer_ack ) 
     {
         extern spinlock_t i8259A_lock;
-        spin_lock(&i8259A_lock);
+        spin_lock_irq(&i8259A_lock);
         outb(0x0c, 0x20);
         /* Ack the IRQ; AEOI will end it automatically. */
         inb(0x20);
-        spin_unlock(&i8259A_lock);
+        spin_unlock_irq(&i8259A_lock);
     }
     
     /* Update jiffies counter. */
@@ -151,6 +164,9 @@ void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( !cpu_has_apic )
         raise_softirq(AC_TIMER_SOFTIRQ);
+
+    if ( using_pit )
+        pit_overflow();
 }
 
 static struct irqaction irq0 = { timer_interrupt, "timer", NULL};
@@ -280,7 +296,6 @@ static char *freq_string(u64 freq)
 /* Protected by platform_timer_lock. */
 static u64 pit_counter64;
 static u16 pit_stamp;
-static struct ac_timer pit_overflow_timer;
 
 static u16 pit_read_counter(void)
 {
@@ -292,17 +307,15 @@ static u16 pit_read_counter(void)
     return count;
 }
 
-static void pit_overflow(void *unused)
+static void pit_overflow(void)
 {
     u16 counter;
 
-    spin_lock(&platform_timer_lock);
+    spin_lock_irq(&platform_timer_lock);
     counter = pit_read_counter();
     pit_counter64 += (u16)(pit_stamp - counter);
     pit_stamp = counter;
-    spin_unlock(&platform_timer_lock);
-
-    set_ac_timer(&pit_overflow_timer, NOW() + MILLISECS(20));
+    spin_unlock_irq(&platform_timer_lock);
 }
 
 static u64 read_pit_count(void)
@@ -314,12 +327,12 @@ static int init_pit(void)
 {
     read_platform_count = read_pit_count;
 
-    init_ac_timer(&pit_overflow_timer, pit_overflow, NULL, 0);
-    pit_overflow(NULL);
+    pit_overflow();
     platform_timer_stamp = pit_counter64;
     set_time_scale(&platform_timer_scale, CLOCK_TICK_RATE);
 
     printk("Platform timer is %s PIT\n", freq_string(CLOCK_TICK_RATE));
+    using_pit = 1;
 
     return 1;
 }
@@ -337,11 +350,11 @@ static void hpet_overflow(void *unused)
 {
     u32 counter;
 
-    spin_lock(&platform_timer_lock);
+    spin_lock_irq(&platform_timer_lock);
     counter = hpet_read32(HPET_COUNTER);
     hpet_counter64 += (u32)(counter - hpet_stamp);
     hpet_stamp = counter;
-    spin_unlock(&platform_timer_lock);
+    spin_unlock_irq(&platform_timer_lock);
 
     set_ac_timer(&hpet_overflow_timer, NOW() + hpet_overflow_period);
 }
@@ -455,11 +468,11 @@ static void cyclone_overflow(void *unused)
 {
     u32 counter;
 
-    spin_lock(&platform_timer_lock);
+    spin_lock_irq(&platform_timer_lock);
     counter = *cyclone_timer;
     cyclone_counter64 += (u32)(counter - cyclone_stamp);
     cyclone_stamp = counter;
-    spin_unlock(&platform_timer_lock);
+    spin_unlock_irq(&platform_timer_lock);
 
     set_ac_timer(&cyclone_overflow_timer, NOW() + MILLISECS(20000));
 }
@@ -526,10 +539,10 @@ static s_time_t read_platform_stime(void)
     u64 counter;
     s_time_t stime;
 
-    spin_lock(&platform_timer_lock);
+    spin_lock_irq(&platform_timer_lock);
     counter = read_platform_count();
     stime   = __read_platform_stime(counter);
-    spin_unlock(&platform_timer_lock);
+    spin_unlock_irq(&platform_timer_lock);
 
     return stime;
 }
@@ -539,12 +552,12 @@ static void platform_time_calibration(void)
     u64 counter;
     s_time_t stamp;
 
-    spin_lock(&platform_timer_lock);
+    spin_lock_irq(&platform_timer_lock);
     counter = read_platform_count();
     stamp   = __read_platform_stime(counter);
     stime_platform_stamp = stamp;
     platform_timer_stamp = counter;
-    spin_unlock(&platform_timer_lock);
+    spin_unlock_irq(&platform_timer_lock);
 }
 
 static void init_platform_timer(void)
