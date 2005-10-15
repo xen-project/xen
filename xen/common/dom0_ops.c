@@ -446,8 +446,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             goto getvcpucontext_out;
 
         ret = -ESRCH;
-        v = d->vcpu[op->u.getvcpucontext.vcpu];
-        if ( (v == NULL) || !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+        if ( (v = d->vcpu[op->u.getvcpucontext.vcpu]) == NULL )
             goto getvcpucontext_out;
 
         ret = -ENOMEM;
