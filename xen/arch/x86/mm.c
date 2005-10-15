@@ -582,6 +582,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     unsigned long    pfn  = l1e_get_pfn(l1e);
     struct pfn_info *page = &frame_table[pfn];
     struct domain   *e;
+    struct vcpu     *v;
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || !pfn_valid(pfn) )
         return;
@@ -615,10 +616,12 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
         /* We expect this is rare so we blow the entire shadow LDT. */
         if ( unlikely(((page->u.inuse.type_info & PGT_type_mask) == 
                        PGT_ldt_page)) &&
-             unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) )
-
-            // XXX SMP BUG?
-            invalidate_shadow_ldt(e->vcpu[0]);
+             unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) &&
+             (d == e) )
+        {
+            for_each_vcpu ( d, v )
+                invalidate_shadow_ldt(v);
+        }
         put_page(page);
     }
 }
@@ -1311,7 +1314,7 @@ void free_page_type(struct pfn_info *page, unsigned long type)
         }
     }
 
-    switch (type  & PGT_type_mask)
+    switch ( type & PGT_type_mask )
     {
     case PGT_l1_page_table:
         free_l1_table(page);
