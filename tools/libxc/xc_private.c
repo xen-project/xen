@@ -114,11 +114,7 @@ int xc_mmuext_op(
         goto out1;
     }
 
-    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
-    {
-        fprintf(stderr, "Dom_mmuext operation failed (rc=%ld errno=%d)-- need to"
-                " rebuild the user-space tool set?\n",ret,errno);
-    }
+    ret = do_xen_hypercall(xc_handle, &hypercall);
 
     safe_munlock(op, nr_ops*sizeof(*op));
 
@@ -227,11 +223,7 @@ int xc_memory_op(int xc_handle,
         break;
     }
 
-    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
-    {
-        fprintf(stderr, "hypercall failed (rc=%ld errno=%d)-- need to"
-                " rebuild the user-space tool set?\n",ret,errno);
-    }
+    ret = do_xen_hypercall(xc_handle, &hypercall);
 
     switch ( cmd )
     {
