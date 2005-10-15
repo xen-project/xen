@@ -624,6 +624,17 @@ static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         set_eflags_SF(size, diff, regs);
         set_eflags_PF(size, diff, regs);
         break;
+
+    case INSTR_BT:
+        index = operand_index(src);
+        value = get_reg_value(size, index, 0, regs);
+
+        if (p->u.data & (1 << (value & ((1 << 5) - 1))))
+            regs->eflags |= X86_EFLAGS_CF;
+        else
+            regs->eflags &= ~X86_EFLAGS_CF;
+
+        break;
     }
 
     load_cpu_user_regs(regs);

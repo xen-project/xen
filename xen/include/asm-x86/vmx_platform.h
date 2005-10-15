@@ -27,8 +27,8 @@
 
 #define MAX_OPERAND_NUM 2
 
-#define mk_operand(size, index, seg, flag) \
-    (((size) << 24) | ((index) << 16) | ((seg) << 8) | (flag))
+#define mk_operand(size_reg, index, seg, flag) \
+    (((size_reg) << 24) | ((index) << 16) | ((seg) << 8) | (flag))
 
 #define operand_size(operand)   \
       ((operand >> 24) & 0xFF)
@@ -63,6 +63,7 @@
 #define INSTR_MOVZ 8
 #define INSTR_STOS 9
 #define INSTR_TEST 10
+#define INSTR_BT 11
 
 struct instruction {
     __s8    instr; /* instruction type */
