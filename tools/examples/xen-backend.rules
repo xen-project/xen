@@ -1,4 +1,4 @@
 SUBSYSTEM=="xen-backend", KERNEL=="vbd*", ACTION=="add", RUN+="/etc/xen/scripts/block bind"
 SUBSYSTEM=="xen-backend", KERNEL=="vbd*", ACTION=="remove", RUN+="/etc/xen/scripts/block unbind"
 SUBSYSTEM=="xen-backend", KERNEL=="vif*", ENV{PHYSDEVDRIVER}=="vif", ACTION=="online", RUN+="$env{script} up"
-SUBSYSTEM=="xen-backend", ACTION=="remove", RUN+="/usr/bin/xenstore-rm $env{XENBUS_PATH}"
+SUBSYSTEM=="xen-backend", ACTION=="remove", RUN+="/usr/bin/xenstore-rm -t $env{XENBUS_PATH}"

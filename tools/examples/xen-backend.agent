@@ -22,7 +22,7 @@ case "$ACTION" in
         ;;
     esac
     # remove device backend store entries
-    xenstore-rm "$XENBUS_PATH"
+    xenstore-rm -t "$XENBUS_PATH"
     ;;
   online)
     case "$PHYSDEVDRIVER" in
