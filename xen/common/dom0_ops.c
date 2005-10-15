@@ -447,7 +447,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         ret = -ESRCH;
         v = d->vcpu[op->u.getvcpucontext.vcpu];
-        if ( (v == NULL) || test_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( (v == NULL) || !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             goto getvcpucontext_out;
 
         ret = -ENOMEM;
@@ -490,10 +490,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             goto getvcpuinfo_out;
 
         ret = -ESRCH;
-        v = d->vcpu[op->u.getvcpuinfo.vcpu];
-        if ( (v == NULL) || test_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( (v = d->vcpu[op->u.getvcpuinfo.vcpu]) == NULL )
             goto getvcpuinfo_out;
 
+        op->u.getvcpuinfo.online   = !test_bit(_VCPUF_down, &v->vcpu_flags);
+        op->u.getvcpuinfo.blocked  = test_bit(_VCPUF_blocked, &v->vcpu_flags);
+        op->u.getvcpuinfo.running  = test_bit(_VCPUF_running, &v->vcpu_flags);
         op->u.getvcpuinfo.cpu_time = v->cpu_time;
         op->u.getvcpuinfo.cpu      = v->processor;
         op->u.getvcpuinfo.cpumap   = v->cpumap;

@@ -365,7 +365,10 @@ typedef struct {
     domid_t  domain;                  /* domain to be affected */
     uint16_t vcpu;                    /* vcpu # */
     /* OUT variables. */
-    uint64_t cpu_time;                 
+    uint8_t  online;                  /* currently online (not hotplugged)? */
+    uint8_t  blocked;                 /* blocked waiting for an event? */
+    uint8_t  running;                 /* currently scheduled on its CPU? */
+    uint64_t cpu_time;                /* total cpu time consumed (ns) */
     uint32_t cpu;                     /* current mapping   */
     cpumap_t cpumap;                  /* allowable mapping */
 } dom0_getvcpuinfo_t;
