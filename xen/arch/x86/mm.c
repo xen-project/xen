@@ -1755,7 +1755,7 @@ int do_mmuext_op(
             goto pin_page;
 
         case MMUEXT_UNPIN_TABLE:
-            if ( unlikely(!(okay = get_page_from_pagenr(mfn, FOREIGNDOM))) )
+            if ( unlikely(!(okay = get_page_from_pagenr(mfn, d))) )
             {
                 MEM_LOG("Mfn %lx bad domain (dom=%p)",
                         mfn, page_get_owner(page));
@@ -2908,6 +2908,7 @@ int revalidate_l1(
 {
     l1_pgentry_t ol1e, nl1e;
     int modified = 0, i;
+    struct vcpu *v;
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
@@ -2940,7 +2941,11 @@ int revalidate_l1(
              */
             memcpy(&l1page[i], &snapshot[i],
                    (L1_PAGETABLE_ENTRIES - i) * sizeof(l1_pgentry_t));
-            domain_crash();
+
+            /* Crash the offending domain. */
+            set_bit(_DOMF_ctrl_pause, &d->domain_flags);
+            for_each_vcpu ( d, v )
+                vcpu_sleep_nosync(v);
             break;
         }
         
@@ -3019,8 +3024,8 @@ void ptwr_flush(struct domain *d, const int which)
     modified = revalidate_l1(d, pl1e, d->arch.ptwr[which].page);
     unmap_domain_page(pl1e);
     perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
-    ptwr_eip_stat_update(  d->arch.ptwr[which].eip, d->domain_id, modified);
-    d->arch.ptwr[which].prev_nr_updates  = modified;
+    ptwr_eip_stat_update(d->arch.ptwr[which].eip, d->domain_id, modified);
+    d->arch.ptwr[which].prev_nr_updates = modified;
 
     /*
      * STEP 3. Reattach the L1 p.t. page into the current address space.
@@ -3369,7 +3374,9 @@ int ptwr_init(struct domain *d)
 
 void ptwr_destroy(struct domain *d)
 {
+    LOCK_BIGLOCK(d);
     cleanup_writable_pagetable(d);
+    UNLOCK_BIGLOCK(d);
     free_xenheap_page(d->arch.ptwr[PTWR_PT_ACTIVE].page);
     free_xenheap_page(d->arch.ptwr[PTWR_PT_INACTIVE].page);
 }

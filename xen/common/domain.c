@@ -290,6 +290,8 @@ void domain_pause(struct domain *d)
         atomic_inc(&v->pausecnt);
         vcpu_sleep_sync(v);
     }
+
+    sync_pagetable_state(d);
 }
 
 void vcpu_unpause(struct vcpu *v)
@@ -318,6 +320,8 @@ void domain_pause_by_systemcontroller(struct domain *d)
         for_each_vcpu ( d, v )
             vcpu_sleep_sync(v);
     }
+
+    sync_pagetable_state(d);
 }
 
 void domain_unpause_by_systemcontroller(struct domain *d)
