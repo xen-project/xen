@@ -1274,11 +1274,9 @@ unsigned long vhpt_translate_count = 0;
 
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
-	unsigned long pta, pta_mask, pte, ps, rid, itir_addr;
+	unsigned long pta, pte, rid, rr;
 	int i;
 	TR_ENTRY *trp;
-	IA64FAULT fault;
-	ia64_rr rr;
 
 	if (!(address >> 61)) {
 		if (!PSCB(vcpu,metaphysical_mode)) {
@@ -1295,7 +1293,9 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 		phys_translate_count++;
 		return IA64_NO_FAULT;
 	}
-	rid = virtualize_rid(vcpu,get_rr(address) & RR_RID_MASK);
+
+	rr = PSCB(vcpu,rrs)[address>>61];
+	rid = rr & RR_RID_MASK;
 	if (is_data) {
 		if (vcpu_quick_region_check(vcpu->arch.dtr_regions,address)) {
 			for (trp = vcpu->arch.dtrs, i = NDTRS; i; i--, trp++) {
@@ -1340,38 +1340,34 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 		//return (is_data ? IA64_DATA_TLB_VECTOR:IA64_INST_TLB_VECTOR);
 	}
 
+	*itir = rr & (RR_RID_MASK | RR_PS_MASK);
+	// note: architecturally, iha is optionally set for alt faults but
+	// xenlinux depends on it so should document it as part of PV interface
 	vcpu_thash(vcpu, address, iha);
-	rr.rrval = PSCB(vcpu,rrs)[address>>61];
-	fault = is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
-	if (!rr.ve || !(pta & IA64_PTA_VE)) {
-	// architecturally, iha is optionally set for alt faults but xenlinux
-	// depends on it so should document it as part of PV interface
-		fault += IA64_ALT_INST_TLB_VECTOR - IA64_INST_TLB_VECTOR;
-	}
+	if (!(rr & RR_VE_MASK) || !(pta & IA64_PTA_VE))
+		return (is_data ? IA64_ALT_DATA_TLB_VECTOR : IA64_ALT_INST_TLB_VECTOR);
 
 	/* avoid recursively walking (short format) VHPT */
-	else if (((address ^ pta) & ((itir_mask(pta) << 3) >> 3)) != 0) {
+	if (((address ^ pta) & ((itir_mask(pta) << 3) >> 3)) == 0)
+		return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
 
-		if (__copy_from_user(&pte, (void *)(*iha), sizeof(pte)) != 0)
-			// virtual VHPT walker "missed" in TLB
-			fault = IA64_VHPT_FAULT;
+	if (__copy_from_user(&pte, (void *)(*iha), sizeof(pte)) != 0)
+		// virtual VHPT walker "missed" in TLB
+		return IA64_VHPT_FAULT;
 
-		/*
-		* Optimisation: this VHPT walker aborts on not-present pages
-		* instead of inserting a not-present translation, this allows
-		* vectoring directly to the miss handler.
-		*/
-		else if (pte & _PAGE_P) {
-			*pteval = pte;
-			vhpt_translate_count++;
-			return IA64_NO_FAULT;
-		}
-	}
+	/*
+	* Optimisation: this VHPT walker aborts on not-present pages
+	* instead of inserting a not-present translation, this allows
+	* vectoring directly to the miss handler.
+	*/
+	if (!(pte & _PAGE_P))
+		return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
 
-	// for VHPT fault, use itir based on iha, not on fault address
-	itir_addr = (fault == IA64_VHPT_FAULT) ? *iha : address;
-	*itir = vcpu_get_itir_on_fault(vcpu,itir_addr);
-	return fault;
+	/* found mapping in guest VHPT! */
+	*itir = rr & RR_PS_MASK;
+	*pteval = pte;
+	vhpt_translate_count++;
+	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
