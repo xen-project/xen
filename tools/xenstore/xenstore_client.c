@@ -24,15 +24,32 @@ usage(const char *progname)
     errx(1, "Usage: %s [-h] [-p] [-s] key [...]", progname);
 #elif defined(CLIENT_write)
     errx(1, "Usage: %s [-h] [-s] key value [...]", progname);
-#elif defined(CLIENT_rm) || defined(CLIENT_exists) || defined(CLIENT_list)
+#elif defined(CLIENT_rm)
+    errx(1, "Usage: %s [-h] [-s] [-t] key [...]", progname);
+#elif defined(CLIENT_exists) || defined(CLIENT_list)
     errx(1, "Usage: %s [-h] [-s] key [...]", progname);
 #endif
 }
 
 
+#if defined(CLIENT_rm)
+static int
+do_rm(char * path, struct xs_handle *xsh, struct xs_transaction_handle *xth)
+{
+    if (xs_rm(xsh, xth, path)) {
+        return 0;
+    }
+    else {
+        warnx("could not remove path %s", path);
+        return 1;
+    }
+}
+#endif
+
+
 static int
 perform(int optind, int argc, char **argv, struct xs_handle *xsh,
-        struct xs_transaction_handle *xth, int prefix)
+        struct xs_transaction_handle *xth, int prefix, int tidy)
 {
     while (optind < argc) {
 #if defined(CLIENT_read)
@@ -54,10 +71,49 @@ perform(int optind, int argc, char **argv, struct xs_handle *xsh,
 	}
 	optind += 2;
 #elif defined(CLIENT_rm)
-	if (!xs_rm(xsh, xth, argv[optind])) {
-	    warnx("could not remove path %s", argv[optind]);
-	    return 1;
-	}
+        /* Remove the specified path.  If the tidy flag is set, then also
+           remove any containing directories that are both empty and have no
+           value attached, and repeat, recursing all the way up to the root if
+           necessary.
+        */
+
+        char *path = argv[optind];
+
+        if (tidy) {
+            /* Copy path, because we can't modify argv because we will need it
+               again if xs_transaction_end gives us EAGAIN. */
+            char *p = malloc(strlen(path) + 1);
+            strcpy(p, path);
+            path = p;
+
+        again:
+            if (do_rm(path, xsh, xth)) {
+                return 1;
+            }
+
+            char *slash = strrchr(p, '/');
+            if (slash) {
+                char *val;
+                *slash = '\0';
+                val = xs_read(xsh, xth, p, NULL);
+                if (val && strlen(val) == 0) {
+                    unsigned int num;
+                    char ** list = xs_directory(xsh, xth, p, &num);
+
+                    if (list && num == 0) {
+                        goto again;
+                    }
+                }
+            }
+
+            free(path);
+        }
+        else {
+            if (do_rm(path, xsh, xth)) {
+                return 1;
+            }
+        }
+
 	optind++;
 #elif defined(CLIENT_exists)
 	char *val = xs_read(xsh, xth, argv[optind], NULL);
@@ -94,21 +150,26 @@ main(int argc, char **argv)
     struct xs_transaction_handle *xth;
     int ret = 0, socket = 0;
     int prefix = 0;
+    int tidy = 0;
 
     while (1) {
 	int c, index = 0;
 	static struct option long_options[] = {
 	    {"help", 0, 0, 'h'},
+            {"socket", 0, 0, 's'},
 #if defined(CLIENT_read) || defined(CLIENT_list)
 	    {"prefix", 0, 0, 'p'},
+#elif defined(CLIENT_rm)
+            {"tidy",   0, 0, 't'},
 #endif
-            {"socket", 0, 0, 's'},
 	    {0, 0, 0, 0}
 	};
 
 	c = getopt_long(argc, argv, "hs"
 #if defined(CLIENT_read) || defined(CLIENT_list)
 			"p"
+#elif defined(CLIENT_rm)
+                        "t"
 #endif
 			, long_options, &index);
 	if (c == -1)
@@ -124,6 +185,10 @@ main(int argc, char **argv)
 #if defined(CLIENT_read) || defined(CLIENT_list)
 	case 'p':
 	    prefix = 1;
+	    break;
+#elif defined(CLIENT_rm)
+	case 't':
+	    tidy = 1;
 	    break;
 #endif
 	}
@@ -149,7 +214,7 @@ main(int argc, char **argv)
     if (xth == NULL)
 	errx(1, "couldn't start transaction");
 
-    ret = perform(optind, argc, argv, xsh, xth, prefix);
+    ret = perform(optind, argc, argv, xsh, xth, prefix, tidy);
 
     if (!xs_transaction_end(xsh, xth, ret)) {
 	if (ret == 0 && errno == EAGAIN)
