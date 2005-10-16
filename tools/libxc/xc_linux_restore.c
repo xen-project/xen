@@ -43,6 +43,8 @@ read_exact(int fd, void *buf, size_t count)
 
     while (r < count) {
         s = read(fd, &b[r], count - r);
+        if ((s == -1) && (errno == EINTR))
+            continue;
         if (s <= 0)
             break;
         r += s;

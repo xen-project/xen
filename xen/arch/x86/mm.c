@@ -366,9 +366,6 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
 
     if ( unlikely(!get_page_type(page, type)) )
     {
-        if ( (type & PGT_type_mask) != PGT_l1_page_table )
-            MEM_LOG("Bad page type for pfn %lx (%" PRtype_info ")", 
-                    page_nr, page->u.inuse.type_info);
         put_page(page);
         return 0;
     }
@@ -438,6 +435,7 @@ get_page_from_l1e(
 {
     unsigned long mfn = l1e_get_pfn(l1e);
     struct pfn_info *page = &frame_table[mfn];
+    int okay;
     extern int domain_iomem_in_pfn(struct domain *d, unsigned long pfn);
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
@@ -470,9 +468,17 @@ get_page_from_l1e(
         d = dom_io;
     }
 
-    return ((l1e_get_flags(l1e) & _PAGE_RW) ?
+    okay = ((l1e_get_flags(l1e) & _PAGE_RW) ?
             get_page_and_type(page, d, PGT_writable_page) :
             get_page(page, d));
+    if ( !okay )
+    {
+        MEM_LOG("Error getting mfn %lx (pfn %lx) from L1 entry %" PRIpte
+                " for dom%d",
+                mfn, get_pfn_from_mfn(mfn), l1e_get_intpte(l1e), d->domain_id);
+    }
+
+    return okay;
 }
 
 
@@ -682,6 +688,7 @@ static int alloc_l1_table(struct pfn_info *page)
     return 1;
 
  fail:
+    MEM_LOG("Failure in alloc_l1_table: entry %d", i);
     while ( i-- > 0 )
         if ( is_guest_l1_slot(i) )
             put_page_from_l1e(pl1e[i], d);
@@ -841,6 +848,7 @@ static int alloc_l2_table(struct pfn_info *page, unsigned long type)
     return 1;
 
  fail:
+    MEM_LOG("Failure in alloc_l2_table: entry %d", i);
     while ( i-- > 0 )
         if ( is_guest_l2_slot(type, i) )
             put_page_from_l2e(pl2e[i], pfn);
@@ -1453,7 +1461,7 @@ int get_page_type(struct pfn_info *page, unsigned long type)
                     if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
                          ((type & PGT_type_mask) != PGT_l1_page_table) )
                         MEM_LOG("Bad type (saw %" PRtype_info
-                                "!= exp %" PRtype_info ") "
+                                " != exp %" PRtype_info ") "
                                 "for mfn %lx (pfn %lx)",
                                 x, type, page_to_pfn(page),
                                 get_pfn_from_mfn(page_to_pfn(page)));
@@ -1494,11 +1502,10 @@ int get_page_type(struct pfn_info *page, unsigned long type)
         /* Try to validate page type; drop the new reference on failure. */
         if ( unlikely(!alloc_page_type(page, type)) )
         {
-            MEM_LOG("Error while validating pfn %lx for type %" PRtype_info "."
-                    " caf=%08x taf=%" PRtype_info,
-                    page_to_pfn(page), type,
-                    page->count_info,
-                    page->u.inuse.type_info);
+            MEM_LOG("Error while validating mfn %lx (pfn %lx) for type %"
+                    PRtype_info ": caf=%08x taf=%" PRtype_info,
+                    page_to_pfn(page), get_pfn_from_mfn(page_to_pfn(page)),
+                    type, page->count_info, page->u.inuse.type_info);
             /* Noone else can get a reference. We hold the only ref. */
             page->u.inuse.type_info = 0;
             return 0;
