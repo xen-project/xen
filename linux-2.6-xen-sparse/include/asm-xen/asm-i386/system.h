@@ -497,22 +497,11 @@ __asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
  * includes these barriers, for example.
  */
 
-/*
- * Don't use smp_processor_id() in preemptible code: debug builds will barf.
- * It's okay in these cases as we only read the upcall mask in preemptible
- * regions, which is always safe.
- */
-#ifdef CONFIG_SMP
-#define __this_cpu()	__smp_processor_id()
-#else
-#define __this_cpu()	0
-#endif
-
 #define __cli()								\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_data[__this_cpu()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
 	_vcpu->evtchn_upcall_mask = 1;					\
 	preempt_enable_no_resched();					\
 	barrier();							\
@@ -523,7 +512,7 @@ do {									\
 	vcpu_info_t *_vcpu;						\
 	barrier();							\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_data[__this_cpu()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
 	_vcpu->evtchn_upcall_mask = 0;					\
 	barrier(); /* unmask then check (avoid races) */		\
 	if ( unlikely(_vcpu->evtchn_upcall_pending) )			\
@@ -534,8 +523,10 @@ do {									\
 #define __save_flags(x)							\
 do {									\
 	vcpu_info_t *_vcpu;						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_data[__this_cpu()];	\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
 	(x) = _vcpu->evtchn_upcall_mask;				\
+	preempt_enable();						\
 } while (0)
 
 #define __restore_flags(x)						\
@@ -543,7 +534,7 @@ do {									\
 	vcpu_info_t *_vcpu;						\
 	barrier();							\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_data[__this_cpu()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
 	if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {			\
 		barrier(); /* unmask then check (avoid races) */	\
 		if ( unlikely(_vcpu->evtchn_upcall_pending) )		\
@@ -559,7 +550,7 @@ do {									\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	preempt_disable();						\
-	_vcpu = &HYPERVISOR_shared_info->vcpu_data[__this_cpu()];	\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
 	(x) = _vcpu->evtchn_upcall_mask;				\
 	_vcpu->evtchn_upcall_mask = 1;					\
 	preempt_enable_no_resched();					\
@@ -572,8 +563,15 @@ do {									\
 #define local_irq_disable()	__cli()
 #define local_irq_enable()	__sti()
 
+/* Cannot use preempt_enable() here as we would recurse in preempt_sched(). */
 #define irqs_disabled()							\
-	HYPERVISOR_shared_info->vcpu_data[__this_cpu()].evtchn_upcall_mask
+({	int ___x;							\
+	vcpu_info_t *_vcpu;						\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	___x = (_vcpu->evtchn_upcall_mask != 0);			\
+	preempt_enable_no_resched();					\
+	___x; })
 
 /*
  * disable hlt during certain critical i/o operations
