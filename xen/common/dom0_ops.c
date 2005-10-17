@@ -43,10 +43,10 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
 {
     struct vcpu   *v;
     u64 cpu_time = 0;
-    int vcpu_count = 0;
     int flags = DOMFLAGS_BLOCKED;
     
     info->domain = d->domain_id;
+    info->nr_online_vcpus = 0;
     
     /* 
      * - domain is marked as blocked only if all its vcpus are blocked
@@ -54,18 +54,18 @@ static void getdomaininfo(struct domain *d, dom0_getdomaininfo_t *info)
      */
     for_each_vcpu ( d, v ) {
         cpu_time += v->cpu_time;
+        info->max_vcpu_id = v->vcpu_id;
         if ( !test_bit(_VCPUF_down, &v->vcpu_flags) )
         {
             if ( !(v->vcpu_flags & VCPUF_blocked) )
                 flags &= ~DOMFLAGS_BLOCKED;
             if ( v->vcpu_flags & VCPUF_running )
                 flags |= DOMFLAGS_RUNNING;
-            vcpu_count++;
+            info->nr_online_vcpus++;
         }
     }
     
     info->cpu_time = cpu_time;
-    info->n_vcpu = vcpu_count;
     
     info->flags = flags |
         ((d->domain_flags & DOMF_dying)      ? DOMFLAGS_DYING    : 0) |

@@ -317,10 +317,13 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
         PyObject *pyhandle = PyList_New(sizeof(xen_domain_handle_t));
         for ( j = 0; j < sizeof(xen_domain_handle_t); j++ )
             PyList_SetItem(pyhandle, j, PyInt_FromLong(info[i].handle[j]));
-        info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
+        info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
                                   ",s:l,s:L,s:l,s:i,s:i}",
                                   "dom",       info[i].domid,
-                                  "vcpus",     info[i].vcpus,
+                                  /* XXX 'vcpus' field is obsolete! */
+                                  "vcpus",     info[i].nr_online_vcpus,
+                                  "online_vcpus", info[i].nr_online_vcpus,
+                                  "max_vcpu_id", info[i].max_vcpu_id,
                                   "dying",     info[i].dying,
                                   "crashed",   info[i].crashed,
                                   "shutdown",  info[i].shutdown,
@@ -339,6 +342,38 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     free(info);
 
     return list;
+}
+
+static PyObject *pyxc_vcpu_getinfo(PyObject *self,
+                                   PyObject *args,
+                                   PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    PyObject *info_dict;
+
+    uint32_t dom, vcpu = 0;
+    xc_vcpuinfo_t info;
+    int rc;
+
+    static char *kwd_list[] = { "dom", "vcpu", NULL };
+    
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list,
+                                      &dom, &vcpu) )
+        return NULL;
+
+    rc = xc_domain_get_vcpu_info(xc->xc_handle, dom, vcpu, &info);
+    if ( rc < 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    info_dict = Py_BuildValue("{s:i,s:i,s:i,s:L,s:i,s:i,s:i}",
+                              "online",   info.online,
+                              "blocked",  info.blocked,
+                              "running",  info.running,
+                              "cpu_time", info.cpu_time,
+                              "cpu",      info.cpu,
+                              "cpumap",   info.cpumap);
+
+    return info_dict;
 }
 
 static PyObject *pyxc_linux_build(PyObject *self,
@@ -947,6 +982,20 @@ static PyMethodDef pyxc_methods[] = {
       " shutdown_reason [int]: Numeric code from guest OS, explaining "
       "reason why it shut itself down.\n" 
       " vcpu_to_cpu [[int]]: List that maps VCPUS to CPUS\n" },
+
+    { "vcpu_getinfo", 
+      (PyCFunction)pyxc_vcpu_getinfo, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Get information regarding a VCPU.\n"
+      " dom  [int]:    Domain to retrieve info about.\n"
+      " vcpu [int, 0]: VCPU to retrieve info about.\n\n"
+      "Returns: [dict]\n"
+      " online   [int]:  Bool - Is this VCPU currently online?\n"
+      " blocked  [int]:  Bool - Is this VCPU blocked waiting for an event?\n"
+      " running  [int]:  Bool - Is this VCPU currently running on a CPU?\n"
+      " cpu_time [long]: CPU time consumed, in nanoseconds\n"
+      " cpumap   [int]:  Bitmap of CPUs this VCPU can run on\n"
+      " cpu      [int]:  CPU that this VCPU is currently bound to\n" },
 
     { "linux_build", 
       (PyCFunction)pyxc_linux_build, 

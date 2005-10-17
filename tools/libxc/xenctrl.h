@@ -132,7 +132,8 @@ typedef struct {
     unsigned long shared_info_frame;
     uint64_t      cpu_time;
     unsigned long max_memkb;
-    unsigned int  vcpus;
+    unsigned int  nr_online_vcpus;
+    unsigned int  max_vcpu_id;
     xen_domain_handle_t handle;
 } xc_dominfo_t;
 
@@ -249,6 +250,13 @@ int xc_domain_get_vcpu_context(int xc_handle,
                                uint32_t domid,
                                uint32_t vcpu,
                                vcpu_guest_context_t *ctxt);
+
+typedef dom0_getvcpuinfo_t xc_vcpuinfo_t;
+int xc_domain_get_vcpu_info(int xc_handle,
+                            uint32_t domid,
+                            uint32_t vcpu,
+                            xc_vcpuinfo_t *info);
+
 
 int xc_domain_setcpuweight(int xc_handle,
                            uint32_t domid,

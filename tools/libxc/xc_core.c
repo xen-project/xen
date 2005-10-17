@@ -33,10 +33,10 @@ xc_domain_dumpcore(int xc_handle,
     unsigned long nr_pages;
     unsigned long *page_array;
     xc_dominfo_t info;
-    int i, j, dump_fd;
+    int i, nr_vcpus = 0, dump_fd;
     char *dump_mem, *dump_mem_start = NULL;
     struct xc_core_header header;
-    vcpu_guest_context_t     ctxt[MAX_VIRT_CPUS];
+    vcpu_guest_context_t  ctxt[MAX_VIRT_CPUS];
 
  
     if ((dump_fd = open(corename, O_CREAT|O_RDWR, S_IWUSR|S_IRUSR)) < 0) {
@@ -54,24 +54,25 @@ xc_domain_dumpcore(int xc_handle,
         goto error_out;
     }
  
-    for (i = 0, j = 0; i < 32; i++)
-        if (xc_domain_get_vcpu_context(xc_handle, domid, i, &ctxt[j]) == 0)
-            j++;
+    for (i = 0; i < info.max_vcpu_id; i++)
+        if (xc_domain_get_vcpu_context(xc_handle, domid,
+                                       i, &ctxt[nr_vcpus]) == 0)
+            nr_vcpus++;
  
     nr_pages = info.nr_pages;
 
     header.xch_magic = 0xF00FEBED; 
-    header.xch_nr_vcpus = info.vcpus;
+    header.xch_nr_vcpus = nr_vcpus;
     header.xch_nr_pages = nr_pages;
     header.xch_ctxt_offset = sizeof(struct xc_core_header);
     header.xch_index_offset = sizeof(struct xc_core_header) +
-        sizeof(vcpu_guest_context_t)*info.vcpus;
+        sizeof(vcpu_guest_context_t)*nr_vcpus;
     header.xch_pages_offset = round_pgup(sizeof(struct xc_core_header) +
-                                         (sizeof(vcpu_guest_context_t) * info.vcpus) + 
+                                         (sizeof(vcpu_guest_context_t) * nr_vcpus) +
                                          (nr_pages * sizeof(unsigned long)));
 
     write(dump_fd, &header, sizeof(struct xc_core_header));
-    write(dump_fd, &ctxt, sizeof(ctxt[0]) * info.vcpus);
+    write(dump_fd, &ctxt, sizeof(ctxt[0]) * nr_vcpus);
 
     if ((page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL) {
         printf("Could not allocate memory\n");

@@ -229,7 +229,7 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 			domain->id = domaininfo[i].domain;
 			domain->state = domaininfo[i].flags;
 			domain->cpu_ns = domaininfo[i].cpu_time;
-			domain->num_vcpus = domaininfo[i].n_vcpu;
+			domain->num_vcpus = domaininfo[i].nr_online_vcpus;
 			domain->vcpus = NULL;
 			domain->cur_mem =
 			    ((unsigned long long)domaininfo[i].tot_pages)

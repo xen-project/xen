@@ -88,7 +88,8 @@ typedef struct {
     unsigned long max_pages;
     unsigned long shared_info_frame;       /* MFN of shared_info struct */
     uint64_t cpu_time;
-    uint32_t n_vcpu;
+    uint32_t nr_online_vcpus;     /* Number of VCPUs currently online. */
+    uint32_t max_vcpu_id;         /* Maximum VCPUID in use by this domain. */
     uint32_t ssidref;
     xen_domain_handle_t handle;
 } dom0_getdomaininfo_t;

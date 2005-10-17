@@ -113,7 +113,8 @@ int xc_domain_getinfo(int xc_handle,
         info->max_memkb = op.u.getdomaininfo.max_pages << (PAGE_SHIFT - 10);
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
         info->cpu_time = op.u.getdomaininfo.cpu_time;
-        info->vcpus = op.u.getdomaininfo.n_vcpu;
+        info->nr_online_vcpus = op.u.getdomaininfo.nr_online_vcpus;
+        info->max_vcpu_id = op.u.getdomaininfo.max_vcpu_id;
 
         memcpy(info->handle, op.u.getdomaininfo.handle,
                sizeof(xen_domain_handle_t));
@@ -342,6 +343,25 @@ int xc_domain_sethandle(int xc_handle, uint32_t domid,
     op.u.setdomainhandle.domain = (domid_t)domid;
     memcpy(op.u.setdomainhandle.handle, handle, sizeof(xen_domain_handle_t));
     return do_dom0_op(xc_handle, &op);
+}
+
+int xc_domain_get_vcpu_info(int xc_handle,
+                            uint32_t domid,
+                            uint32_t vcpu,
+                            xc_vcpuinfo_t *info)
+{
+    int rc;
+    dom0_op_t op;
+
+    op.cmd = DOM0_GETVCPUINFO;
+    op.u.getvcpuinfo.domain = (domid_t)domid;
+    op.u.getvcpuinfo.vcpu   = (uint16_t)vcpu;
+
+    rc = do_dom0_op(xc_handle, &op);
+
+    memcpy(info, &op.u.getvcpuinfo, sizeof(*info));
+
+    return rc;
 }
 
 /*
