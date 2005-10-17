@@ -24,6 +24,7 @@ Author: Mike Wray <mike.wray@hp.com>
 
 """
 
+import logging
 import string
 import time
 import threading
@@ -38,7 +39,6 @@ from xen.xend import scheduler
 from xen.xend import sxp
 from xen.xend import XendRoot
 from xen.xend.XendBootloader import bootloader
-from xen.xend.XendLogging import log
 from xen.xend.XendError import XendError, VmError
 from xen.xend.XendRoot import get_component
 
@@ -101,6 +101,9 @@ ZOMBIE_PREFIX = 'Zombie-'
 
 xc = xen.lowlevel.xc.new()
 xroot = XendRoot.instance()
+
+log = logging.getLogger("xend.XendDomainInfo")
+#log.setLevel(logging.TRACE)
 
 
 ## Configuration entries that we expect to round-trip -- be read from the
@@ -802,7 +805,7 @@ class XendDomainInfo:
         """Update with info from xc.domain_getinfo().
         """
 
-        log.debug("XendDomainInfo.update(%s) on domain %d", info, self.domid)
+        log.trace("XendDomainInfo.update(%s) on domain %d", info, self.domid)
 
         if not info:
             info = dom_get(self.domid)
@@ -813,7 +816,7 @@ class XendDomainInfo:
         self.validateInfo()
         self.refreshShutdown(info)
 
-        log.debug("XendDomainInfo.update done on domain %d: %s", self.domid,
+        log.trace("XendDomainInfo.update done on domain %d: %s", self.domid,
                   self.info)
 
 

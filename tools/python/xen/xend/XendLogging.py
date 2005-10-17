@@ -27,6 +27,14 @@ __all__ = [ 'log', 'init', 'getLogFilename', 'addLogStderr',
             'removeLogStderr' ]
 
 
+if not 'TRACE' in logging.__dict__:
+    logging.TRACE = logging.DEBUG - 1
+    logging.addLevelName(logging.TRACE,'TRACE')
+    def trace(self, *args, **kwargs):
+        self.log(logging.TRACE, *args, **kwargs)
+    logging.Logger.trace = trace
+
+
 log = logging.getLogger("xend")
 
 
