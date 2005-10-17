@@ -40,8 +40,9 @@
 #include <xen/linux/evtchn.h>
 
 static int *xc_handle;
-static int eventchn_fd;
 static int virq_port;
+
+int eventchn_fd = -1; 
 
 struct domain
 {
@@ -79,9 +80,11 @@ static LIST_HEAD(domains);
 #ifndef TESTING
 static void evtchn_notify(int port)
 {
+	int rc; 
+
 	struct ioctl_evtchn_notify notify;
 	notify.port = port;
-	(void)ioctl(event_fd, IOCTL_EVTCHN_NOTIFY, &notify);
+	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_NOTIFY, &notify);
 }
 #else
 extern void evtchn_notify(int port);
@@ -222,14 +225,14 @@ void handle_event(void)
 {
 	uint16_t port;
 
-	if (read(event_fd, &port, sizeof(port)) != sizeof(port))
+	if (read(eventchn_fd, &port, sizeof(port)) != sizeof(port))
 		barf_perror("Failed to read from event fd");
 
 	if (port == virq_port)
 		domain_cleanup();
 
 #ifndef TESTING
-	if (write(event_fd, &port, sizeof(port)) != sizeof(port))
+	if (write(eventchn_fd, &port, sizeof(port)) != sizeof(port))
 		barf_perror("Failed to write to event fd");
 #endif
 }
@@ -247,18 +250,18 @@ bool domain_can_write(struct connection *conn)
 }
 
 static struct domain *new_domain(void *context, unsigned int domid,
-				 unsigned long mfn, int port,
-				 const char *path)
+				 unsigned long mfn, int port)
 {
 	struct domain *domain;
 	struct ioctl_evtchn_bind_interdomain bind;
 	int rc;
 
+
 	domain = talloc(context, struct domain);
 	domain->port = 0;
 	domain->shutdown = 0;
 	domain->domid = domid;
-	domain->path = talloc_strdup(domain, path);
+	domain->path = talloc_asprintf(domain, "/local/domain/%d", domid);
 	domain->interface = xc_map_foreign_range(
 		*xc_handle, domain->domid,
 		getpagesize(), PROT_READ|PROT_WRITE, mfn);
@@ -269,13 +272,13 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	talloc_set_destructor(domain, destroy_domain);
 
 	/* Tell kernel we're interested in this event. */
-	bind.remote_domain = domid;
-	bind.remote_port   = port;
-	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
-	if (rc == -1)
-		return NULL;
+        bind.remote_domain = domid;
+        bind.remote_port   = port;
+        rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+        if (rc == -1)
+            return NULL;
+        domain->port = rc;
 
-	domain->port = rc;
 	domain->conn = new_connection(writechn, readchn);
 	domain->conn->domain = domain;
 
@@ -302,11 +305,10 @@ static struct domain *find_domain_by_domid(unsigned int domid)
 void do_introduce(struct connection *conn, struct buffered_data *in)
 {
 	struct domain *domain;
-	char *vec[4];
+	char *vec[3];
 	unsigned int domid;
 	unsigned long mfn;
 	uint16_t port;
-	const char *path;
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
 		send_error(conn, EINVAL);
@@ -321,10 +323,9 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 	domid = atoi(vec[0]);
 	mfn = atol(vec[1]);
 	port = atoi(vec[2]);
-	path = vec[3];
 
 	/* Sanity check args. */
-	if ((port <= 0) || !is_valid_nodename(path)) {
+	if (port <= 0) { 
 		send_error(conn, EINVAL);
 		return;
 	}
@@ -333,7 +334,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 
 	if (domain == NULL) {
 		/* Hang domain off "in" until we're finished. */
-		domain = new_domain(in, domid, mfn, port, path);
+		domain = new_domain(in, domid, mfn, port);
 		if (!domain) {
 			send_error(conn, errno);
 			return;
@@ -348,8 +349,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		/* Check that the given details match the ones we have
 		   previously recorded. */
 		if (port != domain->remote_port ||
-		    mfn != domain->mfn ||
-		    strcmp(path, domain->path) != 0) {
+		    mfn != domain->mfn) {
 			send_error(conn, EINVAL);
 			return;
 		}
@@ -440,9 +440,44 @@ void restore_existing_connections(void)
 {
 }
 
+static int dom0_init(void) 
+{ 
+        int rc, fd, port; 
+        unsigned long mfn; 
+        char str[20]; 
+        struct domain *dom0; 
+        
+        fd = open("/proc/xen/xsd_mfn", O_RDONLY); 
+        
+        rc = read(fd, str, sizeof(str)); 
+        str[rc] = '\0'; 
+        mfn = strtoul(str, NULL, 0); 
+        
+        close(fd); 
+        
+        fd = open("/proc/xen/xsd_port", O_RDONLY); 
+        
+        rc = read(fd, str, sizeof(str)); 
+        str[rc] = '\0'; 
+        port = strtoul(str, NULL, 0); 
+        
+        close(fd); 
+        
+        
+        dom0 = new_domain(NULL, 0, mfn, port); 
+        talloc_steal(dom0->conn, dom0); 
+
+        evtchn_notify(dom0->port); 
+
+        return 0; 
+}
+
+
+
 #define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
 #define EVTCHN_DEV_MAJOR 10
 #define EVTCHN_DEV_MINOR 201
+
 
 /* Returns the event channel handle. */
 int domain_init(void)
@@ -484,6 +519,9 @@ int domain_init(void)
 	if (eventchn_fd < 0)
 		barf_perror("Failed to open evtchn device");
 
+        if (dom0_init() != 0) 
+                barf_perror("Failed to initialize dom0 state"); 
+     
 	bind.virq = VIRQ_DOM_EXC;
 	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
 	if (rc == -1)

@@ -130,9 +130,7 @@ bool xs_transaction_end(struct xs_handle *h, struct xs_transaction_handle *t,
 bool xs_introduce_domain(struct xs_handle *h,
 			 unsigned int domid,
 			 unsigned long mfn,
-                         unsigned int eventchn,
-			 const char *path);
-
+                         unsigned int eventchn); 
 /* Release a domain.
  * Tells the store domain to release the memory page to the domain.
  */

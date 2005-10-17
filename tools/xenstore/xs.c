@@ -674,12 +674,12 @@ bool xs_transaction_end(struct xs_handle *h, struct xs_transaction_handle *t,
  */
 bool xs_introduce_domain(struct xs_handle *h,
 			 unsigned int domid, unsigned long mfn,
-			 unsigned int eventchn, const char *path)
+			 unsigned int eventchn)
 {
 	char domid_str[MAX_STRLEN(domid)];
 	char mfn_str[MAX_STRLEN(mfn)];
 	char eventchn_str[MAX_STRLEN(eventchn)];
-	struct iovec iov[4];
+	struct iovec iov[3];
 
 	sprintf(domid_str, "%u", domid);
 	sprintf(mfn_str, "%lu", mfn);
@@ -691,8 +691,6 @@ bool xs_introduce_domain(struct xs_handle *h,
 	iov[1].iov_len = strlen(mfn_str) + 1;
 	iov[2].iov_base = eventchn_str;
 	iov[2].iov_len = strlen(eventchn_str) + 1;
-	iov[3].iov_base = (char *)path;
-	iov[3].iov_len = strlen(path) + 1;
 
 	return xs_bool(xs_talkv(h, NULL, XS_INTRODUCE, iov,
 				ARRAY_SIZE(iov), NULL));

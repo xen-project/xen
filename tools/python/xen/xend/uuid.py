@@ -36,23 +36,27 @@ def getUuidUuidgen(random = True):
         cmd += " -r"
     else:
         cmd += " -t"
-    return commands.getoutput(cmd)
+    return fromString(commands.getoutput(cmd))
 
 
 def getUuidRandom():
     """Generate a random UUID."""
     
-    bytes = [ random.randint(0, 255) for i in range(0, 16) ]
-    # Encode the variant.
-    bytes[6] = (bytes[6] & 0x0f) | 0x40
-    bytes[8] = (bytes[8] & 0x3f) | 0x80
-    f = "%02x"
-    return ( "-".join([f*4, f*2, f*2, f*2, f*6]) % tuple(bytes) )
+    return [ random.randint(0, 255) for i in range(0, 16) ]
 
 
 #uuidFactory = getUuidUuidgen
 uuidFactory = getUuidRandom
 
 
-def getUuid():
+def create():
     return uuidFactory()
+
+
+def toString(u):
+    f = "%02x"
+    return ( "-".join([f*4, f*2, f*2, f*2, f*6]) % tuple(u) )
+
+def fromString(s):
+    s = s.replace('-', '')
+    return [ int(s[i : i + 2], 16) for i in range(0, 32, 2) ]

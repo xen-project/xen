@@ -21,8 +21,10 @@
  Nothing here is persistent (across reboots).
  Needs to be persistent for one uptime.
 """
-import os
+
 import logging
+import os
+import sys
 import threading
 
 import xen.lowlevel.xc
@@ -62,8 +64,11 @@ class XendDomain:
 
         self.domains_lock.acquire()
         try:
-            self.refresh(True)
+            self._add_domain(
+                XendDomainInfo.recreate(self.xen_domains()[PRIV_DOMAIN],
+                                        True))
             self.dom0_setup()
+            self.refresh(True)
         finally:
             self.domains_lock.release()
 
@@ -178,25 +183,23 @@ class XendDomain:
                             'Cannot recreate information for dying domain %d.'
                             '  Xend will ignore this domain from now on.',
                             doms[d]['dom'])
+                elif d == PRIV_DOMAIN:
+                    log.fatal(
+                        "No record of privileged domain %d!  Terminating.", d)
+                    sys.exit(1)
                 else:
                     try:
-                        dominfo = XendDomainInfo.recreate(doms[d])
-                        self._add_domain(dominfo)
+                        self._add_domain(
+                            XendDomainInfo.recreate(doms[d], False))
                     except:
-                        if d == PRIV_DOMAIN:
-                            log.exception(
-                                "Failed to recreate information for domain "
-                                "%d.  Doing nothing except crossing my "
-                                "fingers.", d)
-                        else:
-                            log.exception(
-                                "Failed to recreate information for domain "
-                                "%d.  Destroying it in the hope of "
-                                "recovery.", d)
-                            try:
-                                xc.domain_destroy(dom = d)
-                            except:
-                                log.exception('Destruction of %d failed.', d)
+                        log.exception(
+                            "Failed to recreate information for domain "
+                            "%d.  Destroying it in the hope of "
+                            "recovery.", d)
+                        try:
+                            xc.domain_destroy(dom = d)
+                        except:
+                            log.exception('Destruction of %d failed.', d)
 
 
     ## public:

@@ -236,12 +236,12 @@ int xc_domain_getinfolist(int xc_handle,
                           xc_domaininfo_t *info);
 
 /**
- * This function returns information about one domain.  This information is
- * more detailed than the information from xc_domain_getinfo().
+ * This function returns information about the execution context of a
+ * particular vcpu of a domain.
  *
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm domid the domain to get information from
- * @parm info a pointer to an xc_domaininfo_t to store the domain information
+ * @parm vcpu the vcpu number
  * @parm ctxt a pointer to a structure to store the execution context of the
  *            domain
  * @return 0 on success, -1 on failure
@@ -488,15 +488,6 @@ long xc_get_tot_pages(int xc_handle, uint32_t domid);
 int xc_dom0_op(int xc_handle, dom0_op_t *op);
 
 int xc_version(int xc_handle, int cmd, void *arg);
-
-/* Initializes the store (for dom0)
-   remote_port should be the remote end of a bound interdomain channel between
-   the store and dom0.
-
-   This function returns a shared frame that should be passed to
-   xs_introduce_domain
- */
-long xc_init_store(int xc_handle, int remote_port);
 
 /*
  * MMU updates.

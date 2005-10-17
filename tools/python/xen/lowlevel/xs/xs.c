@@ -686,7 +686,6 @@ static PyObject *xspy_transaction_end(PyObject *self, PyObject *args,
 	" dom  [int]   : domain id\n"					\
 	" page [long]  : address of domain's xenstore page\n"		\
 	" port [int]   : port the domain is using for xenstore\n"	\
-	" path [string]: path to the domain's data in xenstore\n"	\
 	"\n"								\
 	"Returns None on success.\n"					\
 	"Raises RuntimeError on error.\n"				\
@@ -695,12 +694,11 @@ static PyObject *xspy_transaction_end(PyObject *self, PyObject *args,
 static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
                                        PyObject *kwds)
 {
-    static char *kwd_spec[] = { "dom", "page", "port", "path", NULL };
-    static char *arg_spec = "iiis|";
+    static char *kwd_spec[] = { "dom", "page", "port", NULL };
+    static char *arg_spec = "iii";
     domid_t dom = 0;
     unsigned long page = 0;
     unsigned int port = 0;
-    char *path = NULL;
 
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
@@ -709,10 +707,10 @@ static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
     if (!xh)
         goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
-                                     &dom, &page, &port, &path))
+                                     &dom, &page, &port))
         goto exit;
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_introduce_domain(xh, dom, page, port, path);
+    xsval = xs_introduce_domain(xh, dom, page, port);
     Py_END_ALLOW_THREADS
     if (!xsval) {
         PyErr_SetFromErrno(PyExc_RuntimeError);

@@ -143,15 +143,13 @@ def restore(xd, fd):
             if m:
                 store_mfn = int(m.group(2))
                 dominfo.setStoreRef(store_mfn)
-                log.debug("IntroduceDomain %d %d %d %s",
+                log.debug("IntroduceDomain %d %d %d",
                           dominfo.getDomid(),
                           store_mfn,
-                          dominfo.store_channel,
-                          dominfo.getDomainPath())
+                          dominfo.store_channel)
                 IntroduceDomain(dominfo.getDomid(),
                                 store_mfn,
-                                dominfo.store_channel,
-                                dominfo.getDomainPath())
+                                dominfo.store_channel)
             else:
                 m = re.match(r"^(console-mfn) (\d+)$", line)
                 if m:
@@ -171,6 +169,7 @@ def forkHelper(cmd, fd, inputHandler, closeToChild):
     if closeToChild:
         child.tochild.close()
 
+    lasterr = "error unknown"
     try:
         fds = [child.fromchild.fileno(),
                child.childerr.fileno()]

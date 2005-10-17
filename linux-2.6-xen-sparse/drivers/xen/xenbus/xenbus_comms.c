@@ -36,7 +36,11 @@
 #include <asm-xen/xenbus.h>
 #include "xenbus_comms.h"
 
-static int xenbus_irq;
+static int xenbus_irq      = 0;
+
+extern void xenbus_probe(void *); 
+extern int xenstored_ready; 
+static DECLARE_WORK(probe_work, xenbus_probe, NULL);
 
 DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
 
@@ -47,6 +51,11 @@ static inline struct xenstore_domain_interface *xenstore_domain_interface(void)
 
 static irqreturn_t wake_waiting(int irq, void *unused, struct pt_regs *regs)
 {
+	if(unlikely(xenstored_ready == 0)) {
+		xenstored_ready = 1; 
+		schedule_work(&probe_work); 
+	} 
+
 	wake_up(&xb_waitq);
 	return IRQ_HANDLED;
 }
@@ -169,10 +178,6 @@ int xb_init_comms(void)
 
 	if (xenbus_irq)
 		unbind_evtchn_from_irqhandler(xenbus_irq, &xb_waitq);
-	xenbus_irq = 0;
-
-	if (!xen_start_info->store_evtchn)
-		return 0;
 
 	err = bind_evtchn_to_irqhandler(
 		xen_start_info->store_evtchn, wake_waiting,

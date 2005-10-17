@@ -28,7 +28,6 @@ import logging
 import string
 import time
 import threading
-import errno
 
 import xen.lowlevel.xc
 from xen.util import asserts
@@ -42,7 +41,7 @@ from xen.xend.XendBootloader import bootloader
 from xen.xend.XendError import XendError, VmError
 from xen.xend.XendRoot import get_component
 
-from uuid import getUuid
+import uuid
 
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain
@@ -153,7 +152,7 @@ def create(config):
 
     log.debug("XendDomainInfo.create(%s)", config)
 
-    vm = XendDomainInfo(getUuid(), parseConfig(config))
+    vm = XendDomainInfo(uuid.create(), parseConfig(config))
     try:
         vm.construct()
         vm.initDomain()
@@ -169,7 +168,7 @@ def create(config):
         raise
 
 
-def recreate(xeninfo):
+def recreate(xeninfo, priv):
     """Create the VM object for an existing domain.  The domain must not
     be dying, as the paths in the store should already have been removed,
     and asking us to recreate them causes problems."""
@@ -179,39 +178,52 @@ def recreate(xeninfo):
     assert not xeninfo['dying']
 
     domid = xeninfo['dom']
+    dompath = GetDomainPath(domid)
+    if not dompath:
+        raise XendError(
+            'No domain path in store for existing domain %d' % domid)
     try:
-        dompath = GetDomainPath(domid)
-        if not dompath:
-            raise XendError(
-                'No domain path in store for existing domain %d' % domid)
         vmpath = xstransact.Read(dompath, "vm")
         if not vmpath:
             raise XendError(
                 'No vm path in store for existing domain %d' % domid)
-        uuid = xstransact.Read(vmpath, "uuid")
-        if not uuid:
+        uuid1_str = xstransact.Read(vmpath, "uuid")
+        if not uuid1_str:
             raise XendError(
                 'No vm/uuid path in store for existing domain %d' % domid)
 
-        log.info("Recreating domain %d, UUID %s.", domid, uuid)
+        uuid1 = uuid.fromString(uuid1_str)
 
-        vm = XendDomainInfo(uuid, xeninfo, domid, True)
+        uuid2 = xeninfo['handle']
+
+        if uuid1 != uuid2:
+            raise XendError(
+                'Uuid in store does not match uuid for existing domain %d: '
+                '%s != %s' % (domid, uuid1_str, uuid.toString(uuid2)))
+
+        log.info("Recreating domain %d, UUID %s.", domid, uuid1_str)
+
+        vm = XendDomainInfo(uuid2, xeninfo, domid, dompath, True)
 
     except Exception, exn:
         log.warn(str(exn))
 
-        uuid = getUuid()
+        if priv:
+            new_uuid = [0 for i in range(0, 16)]
+        else:
+            new_uuid = uuid.create()
 
-        log.info("Recreating domain %d with new UUID %s.", domid, uuid)
+        log.info("Recreating domain %d with new UUID %s.", domid,
+                 uuid.toString(new_uuid))
 
-        vm = XendDomainInfo(uuid, xeninfo, domid, True)
+        vm = XendDomainInfo(new_uuid, xeninfo, domid, dompath, True)
         vm.removeDom()
         vm.storeVmDetails()
         vm.storeDomDetails()
 
-    vm.create_channel()
-    if domid == 0:
-        vm.initStoreConnection()
+    if domid != 0:
+        # Setup store and console channels 
+        vm.create_channels()
 
     vm.refreshShutdown(xeninfo)
     return vm
@@ -225,12 +237,12 @@ def restore(config):
 
     log.debug("XendDomainInfo.restore(%s)", config)
 
-    uuid = sxp.child_value(config, 'uuid')
-    vm = XendDomainInfo(uuid, parseConfig(config))
+    vm = XendDomainInfo(uuid.fromString(sxp.child_value(config, 'uuid')),
+                        parseConfig(config))
     try:
         vm.construct()
         vm.configure()
-        vm.create_channel()
+        vm.create_channels()
         vm.storeVmDetails()
         vm.storeDomDetails()
         vm.refreshShutdown()
@@ -355,9 +367,10 @@ class XendDomainInfo:
     MINIMUM_RESTART_TIME = 20
 
 
-    def __init__(self, uuid, info, domid = None, augment = False):
+    def __init__(self, uuidbytes, info, domid = None, dompath = None,
+                 augment = False):
 
-        self.uuid = uuid
+        self.uuidbytes = uuidbytes
         self.info = info
 
         if domid is not None:
@@ -367,11 +380,8 @@ class XendDomainInfo:
         else:
             self.domid = None
 
-        self.vmpath  = VMROOT + uuid
-        if self.domid is None:
-            self.dompath = None
-        else:
-            self.dompath = DOMROOT + str(self.domid)
+        self.vmpath  = VMROOT + uuid.toString(uuidbytes)
+        self.dompath = dompath
 
         if augment:
             self.augmentInfo()
@@ -440,6 +450,9 @@ class XendDomainInfo:
             defaultInfo('cpu',          lambda: None)
             defaultInfo('cpu_weight',   lambda: 1.0)
             defaultInfo('vcpus',        lambda: 1)
+
+            self.info['vcpus'] = int(self.info['vcpus'])
+
             defaultInfo('vcpu_avail',   lambda: (1 << self.info['vcpus']) - 1)
             defaultInfo('bootloader',   lambda: None)
             defaultInfo('backend',      lambda: [])
@@ -576,7 +589,7 @@ class XendDomainInfo:
 
     def storeVmDetails(self):
         to_store = {
-            'uuid':               self.uuid,
+            'uuid':               uuid.toString(self.uuidbytes),
 
             # XXX
             'memory/target':      str(self.info['memory_KiB'])
@@ -650,9 +663,6 @@ class XendDomainInfo:
 
     def getDomainPath(self):
         return self.dompath
-
-    def getUuid(self):
-        return self.uuid
 
 
     def getVCpuCount(self):
@@ -921,7 +931,7 @@ class XendDomainInfo:
     def sxpr(self):
         sxpr = ['domain',
                 ['domid',   self.domid],
-                ['uuid',    self.uuid],
+                ['uuid',    uuid.toString(self.uuidbytes)],
                 ['memory',  self.info['memory_KiB'] / 1024]]
 
         for e in ROUNDTRIPPING_CONFIG_ENTRIES:
@@ -1038,7 +1048,8 @@ class XendDomainInfo:
                   self.domid,
                   self.info['ssidref'])
 
-        self.domid = xc.domain_create(dom = 0, ssidref = self.info['ssidref'])
+        self.domid = xc.domain_create(dom = 0, ssidref = self.info['ssidref'],
+                                      handle = self.uuidbytes)
 
         if self.domid < 0:
             raise VmError('Creating domain failed: name=%s' %
@@ -1089,10 +1100,9 @@ class XendDomainInfo:
     def construct_image(self):
         """Construct the boot image for the domain.
         """
-        self.create_channel()
+        self.create_channels()
         self.image.createImage()
-        IntroduceDomain(self.domid, self.store_mfn,
-                        self.store_channel, self.dompath)
+        IntroduceDomain(self.domid, self.store_mfn, self.store_channel)
 
 
     ## public:
@@ -1199,7 +1209,7 @@ class XendDomainInfo:
         self.storeDom(path, port)
         return port
 
-    def create_channel(self):
+    def create_channels(self):
         """Create the channels to the domain.
         """
         self.store_channel = self.eventChannel("store/port")
@@ -1312,13 +1322,15 @@ class XendDomainInfo:
         """
         
         new_name = self.generateUniqueName()
-        new_uuid = getUuid()
+        new_uuid = uuid.create()
+        new_uuid_str = uuid.toString(new_uuid)
         log.info("Renaming dead domain %s (%d, %s) to %s (%s).",
-                 self.info['name'], self.domid, self.uuid, new_name, new_uuid)
+                 self.info['name'], self.domid, uuid.toString(self.uuidbytes),
+                 new_name, new_uuid_str)
         self.release_devices()
         self.info['name'] = new_name
-        self.uuid = new_uuid
-        self.vmpath = VMROOT + new_uuid
+        self.uuidbytes = new_uuid
+        self.vmpath = VMROOT + new_uuid_str
         self.storeVmDetails()
         self.preserve()
 
@@ -1382,20 +1394,6 @@ class XendDomainInfo:
         asserts.isCharConvertible(key)
 
         self.storeDom("control/sysrq", '%c' % key)
-
-
-    def initStoreConnection(self):
-        ref = xc.init_store(self.store_channel)
-        if ref and ref >= 0:
-            self.setStoreRef(ref)
-            try:
-                IntroduceDomain(self.domid, ref, self.store_channel,
-                                self.dompath)
-            except RuntimeError, ex:
-                if ex.args[0] == errno.EISCONN:
-                    pass
-                else:
-                    raise
 
 
     def infoIsSet(self, name):

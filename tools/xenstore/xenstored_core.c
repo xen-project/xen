@@ -51,7 +51,7 @@
 #include "xenctrl.h"
 #include "tdb.h"
 
-int event_fd;
+extern int eventchn_fd; /* in xenstored_domain.c */
 
 static bool verbose;
 LIST_HEAD(connections);
@@ -319,9 +319,9 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock)
 	FD_SET(ro_sock, inset);
 	if (ro_sock > max)
 		max = ro_sock;
-	FD_SET(event_fd, inset);
-	if (event_fd > max)
-		max = event_fd;
+	FD_SET(eventchn_fd, inset);
+	if (eventchn_fd > max)
+		max = eventchn_fd;
 	list_for_each_entry(i, &connections, list) {
 		if (i->domain)
 			continue;
@@ -1416,14 +1416,36 @@ static void daemonize(void)
 }
 
 
+static void usage(void)
+{
+	fprintf(stderr,
+"Usage:\n"
+"\n"
+"  xenstored <options>\n"
+"\n"
+"where options may include:\n"
+"\n"
+"  --no-domain-init    to state that xenstored should not initialise dom0,\n"
+"  --pid-file <file>   giving a file for the daemon's pid to be written,\n"
+"  --help              to output this message,\n"
+"  --no-fork           to request that the daemon does not fork,\n"
+"  --output-pid        to request that the pid of the daemon is output,\n"
+"  --trace-file <file> giving the file for logging, and\n"
+"  --verbose           to request verbose execution.\n");
+}
+
+
 static struct option options[] = {
 	{ "no-domain-init", 0, NULL, 'D' },
 	{ "pid-file", 1, NULL, 'F' },
+	{ "help", 0, NULL, 'H' },
 	{ "no-fork", 0, NULL, 'N' },
 	{ "output-pid", 0, NULL, 'P' },
 	{ "trace-file", 1, NULL, 'T' },
 	{ "verbose", 0, NULL, 'V' },
 	{ NULL, 0, NULL, 0 } };
+
+extern void dump_conn(struct connection *conn); 
 
 int main(int argc, char *argv[])
 {
@@ -1435,7 +1457,7 @@ int main(int argc, char *argv[])
 	bool no_domain_init = false;
 	const char *pidfile = NULL;
 
-	while ((opt = getopt_long(argc, argv, "DF:NPT:V", options,
+	while ((opt = getopt_long(argc, argv, "DF:HNPT:V", options,
 				  NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -1444,6 +1466,9 @@ int main(int argc, char *argv[])
 		case 'F':
 			pidfile = optarg;
 			break;
+		case 'H':
+			usage();
+			return 0;
 		case 'N':
 			dofork = false;
 			break;
@@ -1509,12 +1534,12 @@ int main(int argc, char *argv[])
 	    || listen(*ro_sock, 1) != 0)
 		barf_perror("Could not listen on sockets");
 
-	/* If we're the first, create .perms file for root. */
+	/* Setup the database */
 	setup_structure();
 
 	/* Listen to hypervisor. */
 	if (!no_domain_init)
-		event_fd = domain_init();
+		domain_init();
 
 	/* Restore existing connections. */
 	restore_existing_connections();
@@ -1555,7 +1580,7 @@ int main(int argc, char *argv[])
 		if (FD_ISSET(*ro_sock, &inset))
 			accept_connection(*ro_sock, false);
 
-		if (FD_ISSET(event_fd, &inset))
+		if (FD_ISSET(eventchn_fd, &inset))
 			handle_event();
 
 		list_for_each_entry(i, &connections, list) {

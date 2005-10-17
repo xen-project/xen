@@ -19,8 +19,8 @@ def xshandle():
         xs_lock.release()
     return xs_handle
 
-def IntroduceDomain(domid, page, port, path):
-    return xshandle().introduce_domain(domid, page, port, path)
+def IntroduceDomain(domid, page, port):
+    return xshandle().introduce_domain(domid, page, port)
 
 def GetDomainPath(domid):
     return xshandle().get_domain_path(domid)
