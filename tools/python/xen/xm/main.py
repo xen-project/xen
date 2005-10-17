@@ -370,6 +370,8 @@ def cpu_make_map(cpulist):
     return cpumap
 
 def xm_vcpu_pin(args):
+    arg_check(args, 3, "vcpu-pin")
+
     dom  = args[0]
     vcpu = int(args[1])
     cpumap = cpu_make_map(args[2])
@@ -378,6 +380,8 @@ def xm_vcpu_pin(args):
     server.xend_domain_pincpu(dom, vcpu, cpumap)
 
 def xm_mem_max(args):
+    arg_check(args, 2, "mem-max")
+
     dom = args[0]
     mem = int_unit(args[1], 'm')
 
@@ -385,6 +389,8 @@ def xm_mem_max(args):
     server.xend_domain_maxmem_set(dom, mem)
     
 def xm_mem_set(args):
+    arg_check(args, 2, "mem-set")
+
     dom = args[0]
     mem_target = int_unit(args[1], 'm')
 
