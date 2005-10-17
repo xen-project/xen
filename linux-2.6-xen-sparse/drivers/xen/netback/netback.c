@@ -781,12 +781,6 @@ static int __init netback_init(void)
 	int i;
 	struct page *page;
 
-	if (!(xen_start_info->flags & SIF_NET_BE_DOMAIN) &&
-	    !(xen_start_info->flags & SIF_INITDOMAIN))
-		return 0;
-
-	IPRINTK("Initialising Xen netif backend.\n");
-
 	/* We can increase reservation by this much in net_rx_action(). */
 	balloon_update_driver_allowance(NETIF_RX_RING_SIZE);
 

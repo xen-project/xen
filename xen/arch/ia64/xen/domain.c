@@ -351,7 +351,7 @@ void new_thread(struct vcpu *v,
 		}
 		VCPU(v, banknum) = 1;
 		VCPU(v, metaphysical_mode) = 1;
-		d->shared_info->arch.flags = (d == dom0) ? (SIF_INITDOMAIN|SIF_PRIVILEGED|SIF_BLK_BE_DOMAIN|SIF_NET_BE_DOMAIN|SIF_USB_BE_DOMAIN) : 0;
+		d->shared_info->arch.flags = (d == dom0) ? (SIF_INITDOMAIN|SIF_PRIVILEGED) : 0;
 	}
 }
 

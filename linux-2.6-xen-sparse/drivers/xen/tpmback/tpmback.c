@@ -1076,11 +1076,6 @@ static int __init
 tpmback_init(void)
 {
 	int rc;
-	if (!(xen_start_info->flags & SIF_TPM_BE_DOMAIN) &&
-	    !(xen_start_info->flags & SIF_INITDOMAIN)) {
-	    	printk(KERN_ALERT "Neither TPM-BE Domain nor INIT domain!\n");
-		return 0;
-	}
 
 	if ((rc = misc_register(&ibmvtpms_miscdevice)) != 0) {
 		printk(KERN_ALERT "Could not register misc device for TPM BE.\n");

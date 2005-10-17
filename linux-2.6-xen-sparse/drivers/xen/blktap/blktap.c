@@ -861,11 +861,7 @@ static int __init blkif_init(void)
 {
 	int i, j, err;
 	struct page *page;
-/*
-  if ( !(xen_start_info->flags & SIF_INITDOMAIN) &&
-  !(xen_start_info->flags & SIF_BLK_BE_DOMAIN) )
-  return 0;
-*/
+
 	blkif_interface_init();
 
 	page = balloon_alloc_empty_page_range(MMAP_PAGES);
