@@ -136,7 +136,7 @@ static void do_task_queues(unsigned char key)
                             &d->shared_info->evtchn_pending[0]),
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
                             &d->shared_info->evtchn_mask[0]),
-                   test_bit(v->virq_to_evtchn[VIRQ_DEBUG]>>5, 
+                   test_bit(v->virq_to_evtchn[VIRQ_DEBUG]/BITS_PER_LONG, 
                             &v->vcpu_info->evtchn_pending_sel));
             send_guest_virq(v, VIRQ_DEBUG);
         }

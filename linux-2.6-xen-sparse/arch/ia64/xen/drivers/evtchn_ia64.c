@@ -94,7 +94,7 @@ void notify_remote_via_irq(int irq)
 
 irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-    u32            l1, l2;
+    unsigned long  l1, l2;
     unsigned int   l1i, l2i, port;
     irqreturn_t (*handler)(int, void *, struct pt_regs *);
     shared_info_t *s = HYPERVISOR_shared_info;
@@ -108,14 +108,14 @@ irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     while ( l1 != 0 )
     {
         l1i = __ffs(l1);
-        l1 &= ~(1 << l1i);
+        l1 &= ~(1UL << l1i);
 
         while ( (l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i]) != 0 )
         {
             l2i = __ffs(l2);
-            l2 &= ~(1 << l2i);
+            l2 &= ~(1UL << l2i);
 
-            port = (l1i << 5) + l2i;
+            port = (l1i * BITS_PER_LONG) + l2i;
             if ( (handler = evtchns[port].handler) != NULL )
 	    {
 		clear_evtchn(port);

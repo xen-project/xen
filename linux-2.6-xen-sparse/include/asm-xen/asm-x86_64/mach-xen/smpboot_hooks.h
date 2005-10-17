@@ -52,4 +52,4 @@ static inline void smpboot_setup_io_apic(void)
 }
 
 
-#define	smp_found_config	(HYPERVISOR_shared_info->n_vcpu > 1)
+#define	smp_found_config	(xen_start_info->n_vcpu > 1)

@@ -50,6 +50,8 @@
 # endif
 #endif
 
+extern shared_info_t *HYPERVISOR_shared_info;
+
 /* arch/xen/i386/kernel/setup.c */
 extern start_info_t *xen_start_info;
 

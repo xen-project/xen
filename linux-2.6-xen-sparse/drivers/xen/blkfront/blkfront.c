@@ -725,21 +725,9 @@ static struct xenbus_driver blkfront = {
 	.suspend = blkfront_suspend,
 };
 
-static void __init init_blk_xenbus(void)
-{
-	xenbus_register_driver(&blkfront);
-}
-
 static int __init xlblk_init(void)
 {
-	if ((xen_start_info->flags & SIF_INITDOMAIN) ||
-	    (xen_start_info->flags & SIF_BLK_BE_DOMAIN) )
-		return 0;
-
-	IPRINTK("Initialising virtual block device driver\n");
-
-	init_blk_xenbus();
-
+	xenbus_register_driver(&blkfront);
 	return 0;
 }
 

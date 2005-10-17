@@ -684,15 +684,15 @@ int vmx_clear_pending_io_event(struct vcpu *v)
     struct domain *d = v->domain;
     int port = iopacket_port(d);
 
-    /* evtchn_pending is shared by other event channels in 0-31 range */
-    if (!d->shared_info->evtchn_pending[port>>5])
-        clear_bit(port>>5, &v->vcpu_info->evtchn_pending_sel);
+    /* evtchn_pending_sel bit is shared by other event channels. */
+    if (!d->shared_info->evtchn_pending[port/BITS_PER_LONG])
+        clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
 
-    /* Note: VMX domains may need upcalls as well */
+    /* Note: VMX domains may need upcalls as well. */
     if (!v->vcpu_info->evtchn_pending_sel)
         clear_bit(0, &v->vcpu_info->evtchn_upcall_pending);
 
-    /* clear the pending bit for port */
+    /* Clear the pending bit for port. */
     return test_and_clear_bit(port, &d->shared_info->evtchn_pending[0]);
 }
 
@@ -726,7 +726,7 @@ void vmx_wait_io()
             break;
         /* Events other than IOPACKET_PORT might have woken us up. In that
            case, safely go back to sleep. */
-        clear_bit(port>>5, &current->vcpu_info->evtchn_pending_sel);
+        clear_bit(port/BITS_PER_LONG, &current->vcpu_info->evtchn_pending_sel);
         clear_bit(0, &current->vcpu_info->evtchn_upcall_pending);
     } while(1);
 }

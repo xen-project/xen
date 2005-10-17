@@ -80,18 +80,7 @@ restart_modes = [
 STATE_DOM_OK       = 1
 STATE_DOM_SHUTDOWN = 2
 
-"""Flag for a block device backend domain."""
-SIF_BLK_BE_DOMAIN = (1<<4)
-
-"""Flag for a net device backend domain."""
-SIF_NET_BE_DOMAIN = (1<<5)
-
-"""Flag for a TPM device backend domain."""
-SIF_TPM_BE_DOMAIN = (1<<7)
-
-
 SHUTDOWN_TIMEOUT = 30
-
 
 DOMROOT = '/local/domain/'
 VMROOT  = '/vm/'
@@ -449,7 +438,7 @@ class XendDomainInfo:
             defaultInfo('on_crash',     lambda: "restart")
             defaultInfo('cpu',          lambda: None)
             defaultInfo('cpu_weight',   lambda: 1.0)
-            defaultInfo('vcpus',        lambda: 1)
+            defaultInfo('vcpus',        lambda: int(1))
 
             self.info['vcpus'] = int(self.info['vcpus'])
 
@@ -524,11 +513,6 @@ class XendDomainInfo:
 
             if self.info['maxmem_KiB'] > self.info['memory_KiB']:
                 self.info['maxmem_KiB'] = self.info['memory_KiB']
-
-            # Validate the given backend names.
-            for s in self.info['backend']:
-                if s not in backendFlags:
-                    raise VmError('Invalid backend type: %s' % s)
 
             for (n, c) in self.info['device']:
                 if not n or not c or n not in controllerClasses:
@@ -688,8 +672,7 @@ class XendDomainInfo:
 
 
     def getBackendFlags(self):
-        return reduce(lambda x, y: x | backendFlags[y],
-                      self.info['backend'], 0)
+        return 0
 
 
     def refreshShutdown(self, xeninfo = None):
@@ -1407,25 +1390,16 @@ class XendDomainInfo:
 implements the device control specific to that device-class."""
 controllerClasses = {}
 
-
-"""A map of backend names and the corresponding flag."""
-backendFlags = {}
-
-
-def addControllerClass(device_class, backend_name, backend_flag, cls):
+def addControllerClass(device_class, backend_name, cls):
     """Register a subclass of DevController to handle the named device-class.
-
-    @param backend_flag One of the SIF_XYZ_BE_DOMAIN constants, or None if
-    no flag is to be set.
     """
     cls.deviceClass = device_class
-    backendFlags[backend_name] = backend_flag
     controllerClasses[device_class] = cls
 
 
 from xen.xend.server import blkif, netif, tpmif, pciif, usbif
-addControllerClass('vbd',  'blkif', SIF_BLK_BE_DOMAIN, blkif.BlkifController)
-addControllerClass('vif',  'netif', SIF_NET_BE_DOMAIN, netif.NetifController)
-addControllerClass('vtpm', 'tpmif', SIF_TPM_BE_DOMAIN, tpmif.TPMifController)
-addControllerClass('pci',  'pciif', None,              pciif.PciController)
-addControllerClass('usb',  'usbif', None,              usbif.UsbifController)
+addControllerClass('vbd',  'blkif', blkif.BlkifController)
+addControllerClass('vif',  'netif', netif.NetifController)
+addControllerClass('vtpm', 'tpmif', tpmif.TPMifController)
+addControllerClass('pci',  'pciif', pciif.PciController)
+addControllerClass('usb',  'usbif', usbif.UsbifController)

@@ -71,8 +71,8 @@ static unsigned long pirq_needs_unmask_notify[NR_PIRQS/sizeof(unsigned long)];
 
 #ifdef CONFIG_SMP
 
-static u8  cpu_evtchn[NR_EVENT_CHANNELS];
-static u32 cpu_evtchn_mask[NR_CPUS][NR_EVENT_CHANNELS/32];
+static u8 cpu_evtchn[NR_EVENT_CHANNELS];
+static unsigned long cpu_evtchn_mask[NR_CPUS][NR_EVENT_CHANNELS/BITS_PER_LONG];
 
 #define active_evtchns(cpu,sh,idx)		\
 	((sh)->evtchn_pending[idx] &		\
@@ -137,7 +137,7 @@ EXPORT_SYMBOL(force_evtchn_callback);
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 {
-	u32     l1, l2;
+	unsigned long  l1, l2;
 	unsigned int   l1i, l2i, port;
 	int            irq, cpu = smp_processor_id();
 	shared_info_t *s = HYPERVISOR_shared_info;
@@ -149,13 +149,13 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 	l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
 	while (l1 != 0) {
 		l1i = __ffs(l1);
-		l1 &= ~(1 << l1i);
+		l1 &= ~(1UL << l1i);
         
 		while ((l2 = active_evtchns(cpu, s, l1i)) != 0) {
 			l2i = __ffs(l2);
-			l2 &= ~(1 << l2i);
+			l2 &= ~(1UL << l2i);
             
-			port = (l1i << 5) + l2i;
+			port = (l1i * BITS_PER_LONG) + l2i;
 			if ((irq = evtchn_to_irq[port]) != -1)
 				do_IRQ(irq, regs);
 			else

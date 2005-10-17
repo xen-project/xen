@@ -39,6 +39,7 @@
 #include <asm/ptrace.h>
 #include <asm/page.h>
 
+extern shared_info_t *HYPERVISOR_shared_info;
 extern start_info_t *xen_start_info;
 
 void force_evtchn_callback(void);
