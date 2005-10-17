@@ -671,10 +671,6 @@ class XendDomainInfo:
         self.storeDom("store/ring-ref", ref)
 
 
-    def getBackendFlags(self):
-        return 0
-
-
     def refreshShutdown(self, xeninfo = None):
         # If set at the end of this method, a restart is required, with the
         # given reason.  This restart has to be done out of the scope of

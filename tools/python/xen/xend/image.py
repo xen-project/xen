@@ -66,7 +66,6 @@ class ImageHandler:
         self.kernel = None
         self.ramdisk = None
         self.cmdline = None
-        self.flags = 0
 
         self.configure(imageConfig, deviceConfig)
 
@@ -118,7 +117,6 @@ class ImageHandler:
         """Build the domain boot image.
         """
         # Set params and call buildDomain().
-        self.flags = self.vm.getBackendFlags()
 
         if not os.path.isfile(self.kernel):
             raise VmError('Kernel image does not exist: %s' % self.kernel)
@@ -180,7 +178,6 @@ class LinuxImageHandler(ImageHandler):
         log.debug("console_evtchn = %d", console_evtchn)
         log.debug("cmdline        = %s", self.cmdline)
         log.debug("ramdisk        = %s", self.ramdisk)
-        log.debug("flags          = %d", self.flags)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
 
         ret = xc.linux_build(dom            = self.vm.getDomid(),
@@ -189,7 +186,6 @@ class LinuxImageHandler(ImageHandler):
                              console_evtchn = console_evtchn,
                              cmdline        = self.cmdline,
                              ramdisk        = self.ramdisk,
-                             flags          = self.flags,
                              vcpus          = self.vm.getVCpuCount())
         if isinstance(ret, dict):
             self.set_vminfo(ret)
@@ -239,7 +235,6 @@ class VmxImageHandler(ImageHandler):
         log.debug("control_evtchn = %d", self.device_channel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
-        log.debug("flags          = %d", self.flags)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
 
         ret = xc.vmx_build(dom            = self.vm.getDomid(),
@@ -247,7 +242,6 @@ class VmxImageHandler(ImageHandler):
                            control_evtchn = self.device_channel,
                            store_evtchn   = store_evtchn,
                            memsize        = self.vm.getMemoryTarget() / 1024,
-                           flags          = self.flags,
                            vcpus          = self.vm.getVCpuCount())
         if isinstance(ret, dict):
             self.set_vminfo(ret)
