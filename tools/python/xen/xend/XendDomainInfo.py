@@ -133,8 +133,6 @@ ROUNDTRIPPING_CONFIG_ENTRIES = [
 #                its VCPUs.  This is translated to
 #                <dompath>/cpu/<id>/availability = {online,offline} for use
 #                by the guest domain.
-#   vcpu_to_cpu: the current mapping between virtual CPUs and the physical
-#                CPU it is using.
 #   cpumap:      a list of bitmaps, one for each VCPU, giving the physical
 #                CPUs that that VCPU may use.
 #   cpu:         a configuration setting requesting that VCPU 0 is pinned to
@@ -392,6 +390,8 @@ class XendDomainInfo:
         self.refresh_shutdown_lock = threading.Condition()
 
 
+    ## private:
+
     def augmentInfo(self):
         """Augment self.info, as given to us through {@link #recreate}, with
         values taken from the store.  This recovers those values known to xend
@@ -544,8 +544,14 @@ class XendDomainInfo:
     def gatherVm(self, *args):
         return xstransact.Gather(self.vmpath, *args)
 
+
+    ## public:
+
     def storeVm(self, *args):
         return xstransact.Store(self.vmpath, *args)
+
+
+    ## private:
 
     def readDom(self, *args):
         return xstransact.Read(self.dompath, *args)
@@ -553,15 +559,20 @@ class XendDomainInfo:
     def writeDom(self, *args):
         return xstransact.Write(self.dompath, *args)
 
+
+    ## public:
+
     def removeDom(self, *args):
         return xstransact.Remove(self.dompath, *args)
 
-    def gatherDom(self, *args):
-        return xstransact.Gather(self.dompath, *args)
+
+    ## private:
 
     def storeDom(self, *args):
         return xstransact.Store(self.dompath, *args)
 
+
+    ## public:
 
     def storeVmDetails(self):
         to_store = {
@@ -596,18 +607,26 @@ class XendDomainInfo:
             if v:
                 to_store[k] = str(v)
 
+        to_store.update(self.vcpuDomDetails())
+
+        log.debug("Storing domain details: %s", to_store)
+
+        self.writeDom(to_store)
+
+
+    ## private:
+
+    def vcpuDomDetails(self):
         def availability(n):
             if self.info['vcpu_avail'] & (1 << n):
                 return 'online'
             else:
                 return 'offline'
 
+        result = {}
         for v in range(0, self.info['vcpus']):
-            to_store["cpu/%d/availability" % v] = availability(v)
-
-        log.debug("Storing domain details: %s", to_store)
-
-        self.writeDom(to_store)
+            result["cpu/%d/availability" % v] = availability(v)
+        return result
 
 
     def setDomid(self, domid):
@@ -635,8 +654,16 @@ class XendDomainInfo:
     def getUuid(self):
         return self.uuid
 
+
     def getVCpuCount(self):
         return self.info['vcpus']
+
+
+    def setVCpuCount(self, vcpus):
+        self.info['vcpu_avail'] = (1 << vcpus) - 1
+        self.storeVm('vcpu_avail', self.info['vcpu_avail'])
+        self.writeDom(self.vcpuDomDetails())
+
 
     def getSsidref(self):
         return self.info['ssidref']
@@ -872,11 +899,11 @@ class XendDomainInfo:
         return self.getDeviceController(deviceClass).destroyDevice(devid)
 
 
-    ## private:
-
     def getDeviceSxprs(self, deviceClass):
         return self.getDeviceController(deviceClass).sxprs()
 
+
+    ## private:
 
     def getDeviceConfigurations(self, deviceClass):
         return self.getDeviceController(deviceClass).configurations()
@@ -932,11 +959,6 @@ class XendDomainInfo:
         if self.infoIsSet('cpu_time'):
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])
         sxpr.append(['vcpus', self.info['vcpus']])
-        if self.infoIsSet('cpumap'):
-            sxpr.append(['cpumap', self.info['cpumap']])
-        if self.infoIsSet('vcpu_to_cpu'):
-            sxpr.append(['cpu', self.info['vcpu_to_cpu'][0]])
-            sxpr.append(['vcpu_to_cpu', self.prettyVCpuMap()])
             
         if self.infoIsSet('start_time'):
             up_time =  time.time() - self.info['start_time']
@@ -951,12 +973,33 @@ class XendDomainInfo:
         return sxpr
 
 
+    def getVCPUInfo(self):
+        try:
+            # We include the domain name and ID, to help xm.
+            sxpr = ['domain',
+                    ['domid',      self.domid],
+                    ['name',       self.info['name']],
+                    ['vcpu_count', self.info['vcpus']]]
+
+            for i in range(0, self.info['vcpus']):
+                info = xc.vcpu_getinfo(self.domid, i)
+
+                sxpr.append(['vcpu',
+                             ['number',   i],
+                             ['online',   info['online']],
+                             ['blocked',  info['blocked']],
+                             ['running',  info['running']],
+                             ['cpu_time', info['cpu_time'] / 1e9],
+                             ['cpu',      info['cpu']],
+                             ['cpumap',   info['cpumap']]])
+
+            return sxpr
+
+        except RuntimeError, exn:
+            raise XendError(str(exn))
+                      
+
     ## private:
-
-    def prettyVCpuMap(self):
-        return '|'.join(map(str,
-                            self.info['vcpu_to_cpu'][0:self.info['vcpus']]))
-
 
     def check_name(self, name):
         """Check if a vm name is valid. Valid names contain alphabetic characters,
@@ -1335,22 +1378,6 @@ class XendDomainInfo:
             xc.domain_setmaxmem(self.domid, maxmem_kb = m)
 
 
-    def vcpu_hotplug(self, vcpu, state):
-        """Disable or enable VCPU in domain.
-        """
-        if vcpu > self.info['vcpus']:
-            log.error("Invalid VCPU %d" % vcpu)
-            return
-        if int(state) == 0:
-            self.info['vcpu_avail'] &= ~(1 << vcpu)
-            availability = "offline"
-        else:
-            self.info['vcpu_avail'] &= (1 << vcpu)
-            availability = "online"
-        self.storeVm('vcpu_avail', self.info['vcpu_avail'])
-        self.storeDom("cpu/%d/availability" % vcpu, availability)
-
-
     def send_sysrq(self, key):
         asserts.isCharConvertible(key)
 
@@ -1369,24 +1396,6 @@ class XendDomainInfo:
                     pass
                 else:
                     raise
-
-
-    def dom0_enforce_vcpus(self):
-        dom = 0
-        # get max number of vcpus to use for dom0 from config
-        target = int(xroot.get_dom0_vcpus())
-        log.debug("number of vcpus to use is %d", target)
-   
-        # target = 0 means use all processors
-        if target > 0:
-            # count the number of online vcpus (cpu values in v2c map >= 0)
-            vcpus_online = dom_get(dom)['vcpus']
-            log.debug("found %d vcpus online", vcpus_online)
-
-            # disable any extra vcpus that are online over the requested target
-            for vcpu in range(target, vcpus_online):
-                log.info("enforcement is disabling DOM%d VCPU%d", dom, vcpu)
-                self.vcpu_hotplug(vcpu, 0)
 
 
     def infoIsSet(self, name):

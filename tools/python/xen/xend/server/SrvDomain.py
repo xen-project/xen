@@ -165,17 +165,25 @@ class SrvDomain(SrvDir):
         val = fn(req.args, {'dom': self.dom.domid})
         return val
 
-    def op_vcpu_hotplug(self, op, req):
-        return self.call(self.dom.vcpu_hotplug,
-                         [['vcpu', 'int'],
-                          ['state', 'int']],
+    def op_set_vcpus(self, op, req):
+        return self.call(self.dom.setVCpuCount,
+                         [['vcpus', 'int']],
                          req)
+
+
+    def op_vcpuinfo(self, _1, req):
+        return self.call(self.dom.getVCPUInfo, [], req)
+
 
     def render_POST(self, req):
         return self.perform(req)
         
     def render_GET(self, req):
         op = req.args.get('op')
+
+        if op and op[0] in ['vcpuinfo']:
+            return self.perform(req)
+
         #
         # XXX SMH: below may be useful once again if we ever try to get
         # the raw 'web' interface to xend working once more. But for now

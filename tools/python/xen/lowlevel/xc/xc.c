@@ -317,11 +317,9 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
         PyObject *pyhandle = PyList_New(sizeof(xen_domain_handle_t));
         for ( j = 0; j < sizeof(xen_domain_handle_t); j++ )
             PyList_SetItem(pyhandle, j, PyInt_FromLong(info[i].handle[j]));
-        info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
+        info_dict = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
                                   ",s:l,s:L,s:l,s:i,s:i}",
                                   "dom",       info[i].domid,
-                                  /* XXX 'vcpus' field is obsolete! */
-                                  "vcpus",     info[i].nr_online_vcpus,
                                   "online_vcpus", info[i].nr_online_vcpus,
                                   "max_vcpu_id", info[i].max_vcpu_id,
                                   "dying",     info[i].dying,
@@ -980,8 +978,7 @@ static PyMethodDef pyxc_methods[] = {
       " maxmem_kb [int]: Maximum memory limit, in kilobytes\n"
       " cpu_time [long]: CPU time consumed, in nanoseconds\n"
       " shutdown_reason [int]: Numeric code from guest OS, explaining "
-      "reason why it shut itself down.\n" 
-      " vcpu_to_cpu [[int]]: List that maps VCPUS to CPUS\n" },
+      "reason why it shut itself down.\n" },
 
     { "vcpu_getinfo", 
       (PyCFunction)pyxc_vcpu_getinfo, 

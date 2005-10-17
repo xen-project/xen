@@ -129,7 +129,14 @@ class XendDomain:
     def dom0_setup(self):
         """Expects to be protected by the domains_lock."""
         dom0 = self.domains[PRIV_DOMAIN]
-        dom0.dom0_enforce_vcpus()
+
+        # get max number of vcpus to use for dom0 from config
+        target = int(xroot.get_dom0_vcpus())
+        log.debug("number of vcpus to use is %d", target)
+   
+        # target == 0 means use all processors
+        if target > 0:
+            self.setVCpuCount(target)
 
 
     def _add_domain(self, info):

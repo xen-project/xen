@@ -199,6 +199,9 @@ class Xend:
     def xend_list_domains(self):
         return self.xendGet(self.domainurl(), {'detail': '1'})
 
+    def xend_domain_vcpuinfo(self, dom):
+        return self.xendGet(self.domainurl(dom), {'op': 'vcpuinfo'})
+
     def xend_domain_create(self, conf):
         return self.xendPost(self.domainurl(),
                              {'op'      : 'create',
@@ -286,11 +289,10 @@ class Xend:
                              'target'    : mem_target })
         return val
 
-    def xend_domain_vcpu_hotplug(self, id, vcpu, state):
-        return self.xendPost(self.domainurl(id),
-                            {'op'         : 'vcpu_hotplug',
-                             'vcpu'       : vcpu,
-                             'state'      : state })
+    def xend_domain_set_vcpus(self, dom, vcpus):
+        return self.xendPost(self.domainurl(dom),
+                            {'op'    : 'set_vcpus',
+                             'vcpus' : vcpus })
 
     def xend_domain_vif_limit(self, id, vif, credit, period):
         return self.xendPost(self.domainurl(id),
