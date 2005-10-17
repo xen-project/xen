@@ -42,6 +42,7 @@
 #include <asm-xen/xen-public/physdev.h>
 #include <asm/hypervisor.h>
 #include <asm-xen/evtchn.h>
+#include <linux/mc146818rtc.h> /* RTC_IRQ */
 
 /*
  * This lock protects updates to the following mapping and reference-count
@@ -743,6 +744,13 @@ void __init init_IRQ(void)
 	for (i = 0; i < NR_PIRQS; i++)
 	{
 		irq_bindcount[pirq_to_irq(i)] = 1;
+
+#ifdef RTC_IRQ
+		/* If not domain 0, force our RTC driver to fail its probe. */
+		if ((i == RTC_IRQ) &&
+		    !(xen_start_info->flags & SIF_INITDOMAIN))
+			continue;
+#endif
 
 		irq_desc[pirq_to_irq(i)].status  = IRQ_DISABLED;
 		irq_desc[pirq_to_irq(i)].action  = 0;
