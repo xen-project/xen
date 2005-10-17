@@ -439,7 +439,7 @@ class XendDomainInfo:
             defaultInfo('on_crash',     lambda: "restart")
             defaultInfo('cpu',          lambda: None)
             defaultInfo('cpu_weight',   lambda: 1.0)
-            defaultInfo('vcpus',        lambda: 1)
+            defaultInfo('vcpus',        lambda: int(1))
             defaultInfo('vcpu_avail',   lambda: (1 << self.info['vcpus']) - 1)
             defaultInfo('bootloader',   lambda: None)
             defaultInfo('backend',      lambda: [])

@@ -260,8 +260,11 @@ typedef struct
     unsigned long args[6];
 } multicall_entry_t;
 
-/* Event channel endpoints per domain. */
-#define NR_EVENT_CHANNELS 1024
+/*
+ * Event channel endpoints per domain:
+ *  1024 if a long is 32 bits; 4096 if a long is 64 bits.
+ */
+#define NR_EVENT_CHANNELS (sizeof(unsigned long) * sizeof(unsigned long) * 64)
 
 /*
  * Per-VCPU information goes here. This will be cleaned up more when Xen 
@@ -295,7 +298,7 @@ typedef struct vcpu_info {
      */
     uint8_t evtchn_upcall_pending;
     uint8_t evtchn_upcall_mask;
-    uint32_t evtchn_pending_sel;
+    unsigned long evtchn_pending_sel;
 #ifdef __ARCH_HAS_VCPU_INFO
     arch_vcpu_info_t arch;
 #endif
@@ -333,16 +336,14 @@ typedef struct shared_info {
 
     vcpu_time_info_t vcpu_time[MAX_VIRT_CPUS];
 
-    uint32_t n_vcpu;
-
     /*
-     * A domain can have up to 1024 "event channels" on which it can send
-     * and receive asynchronous event notifications. There are three classes
-     * of event that are delivered by this mechanism:
+     * A domain can create "event channels" on which it can send and receive
+     * asynchronous event notifications. There are three classes of event that
+     * are delivered by this mechanism:
      *  1. Bi-directional inter- and intra-domain connections. Domains must
-     *     arrange out-of-band to set up a connection (usually the setup
-     *     is initiated and organised by a privileged third party such as
-     *     software running in domain 0).
+     *     arrange out-of-band to set up a connection (usually by allocating
+     *     an unbound 'listener' port and avertising that via a storage service
+     *     such as xenstore).
      *  2. Physical interrupts. A domain with suitable hardware-access
      *     privileges can bind an event-channel port to a physical interrupt
      *     source.
@@ -350,8 +351,8 @@ typedef struct shared_info {
      *     port to a virtual interrupt source, such as the virtual-timer
      *     device or the emergency console.
      * 
-     * Event channels are addressed by a "port index" between 0 and 1023.
-     * Each channel is associated with two bits of information:
+     * Event channels are addressed by a "port index". Each channel is
+     * associated with two bits of information:
      *  1. PENDING -- notifies the domain that there is a pending notification
      *     to be processed. This bit is cleared by the guest.
      *  2. MASK -- if this bit is clear then a 0->1 transition of PENDING
@@ -363,11 +364,11 @@ typedef struct shared_info {
      * 
      * To expedite scanning of pending notifications, any 0->1 pending
      * transition on an unmasked channel causes a corresponding bit in a
-     * 32-bit selector to be set. Each bit in the selector covers a 32-bit
-     * word in the PENDING bitfield array.
+     * per-vcpu selector word to be set. Each bit in the selector covers a
+     * 'C long' in the PENDING bitfield array.
      */
-    uint32_t evtchn_pending[32];
-    uint32_t evtchn_mask[32];
+    unsigned long evtchn_pending[sizeof(unsigned long) * 8];
+    unsigned long evtchn_mask[sizeof(unsigned long) * 8];
 
     /*
      * Wallclock time: updated only by control software. Guests should base
@@ -422,6 +423,7 @@ typedef struct start_info {
     unsigned long mfn_list;     /* VIRTUAL address of page-frame list.    */
     unsigned long mod_start;    /* VIRTUAL address of pre-loaded module.  */
     unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
+    uint32_t n_vcpu;
     int8_t cmd_line[MAX_GUEST_CMDLINE];
 } start_info_t;
 

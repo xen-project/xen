@@ -1045,7 +1045,7 @@ static int __cpuinit smp_sanity_check(unsigned max_cpus)
 	 */
 	if (!max_cpus) {
 #ifdef CONFIG_XEN
-		HYPERVISOR_shared_info->n_vcpu = 1;
+		xen_start_info->n_vcpu = 1;
 #endif
 		printk(KERN_INFO "SMP mode deactivated, forcing use of dummy APIC emulation.\n");
 #ifndef CONFIG_XEN
@@ -1082,7 +1082,7 @@ void __cpuinit smp_prepare_cpus(unsigned int max_cpus)
 		int apicid = cpu_present_to_apicid(i);
 		if (physid_isset(apicid, phys_cpu_present_map)) {
 #else
-		if (i < HYPERVISOR_shared_info->n_vcpu) {
+		if (i < xen_start_info->n_vcpu) {
 #endif
 			cpu_set(i, cpu_present_map);
 			/* possible map would be different if we supported real

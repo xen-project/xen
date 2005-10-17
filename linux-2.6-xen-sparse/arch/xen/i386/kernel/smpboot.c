@@ -1123,7 +1123,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * If SMP should be disabled, then really disable it!
 	 */
 	if (!max_cpus) {
-		HYPERVISOR_shared_info->n_vcpu = 1;
+		xen_start_info->n_vcpu = 1;
 		printk(KERN_INFO "SMP mode deactivated, forcing use of dummy APIC emulation.\n");
 		smpboot_clear_io_apic_irqs();
 #if 0
@@ -1153,12 +1153,10 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 */
 	Dprintk("CPU present map: %lx\n", physids_coerce(phys_cpu_present_map));
 #endif
-	Dprintk("CPU present map: %lx\n",
-		(1UL << HYPERVISOR_shared_info->n_vcpu) - 1);
+	Dprintk("CPU present map: %lx\n", (1UL << xen_start_info->n_vcpu) - 1);
 
 	kicked = 1;
-	for (cpu = 1; kicked < NR_CPUS &&
-		     cpu < HYPERVISOR_shared_info->n_vcpu; cpu++) {
+	for (cpu = 1; kicked < NR_CPUS && cpu < xen_start_info->n_vcpu; cpu++) {
 		if (max_cpus <= cpucount+1)
 			continue;
 

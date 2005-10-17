@@ -519,9 +519,6 @@ static int setup_guest(int xc_handle,
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
 
-    shared_info->n_vcpu = vcpus;
-    printf(" VCPUS:         %d\n", shared_info->n_vcpu);
-
     munmap(shared_info, PAGE_SIZE);
 
     /* Populate the event channel port in the shared page */

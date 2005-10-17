@@ -636,6 +636,7 @@ static int setup_guest(int xc_handle,
     start_info->store_evtchn = store_evtchn;
     start_info->console_mfn   = *console_mfn;
     start_info->console_evtchn = console_evtchn;
+    start_info->n_vcpu       = vcpus;
     if ( initrd_len != 0 )
     {
         start_info->mod_start    = vinitrd_start;
@@ -652,9 +653,6 @@ static int setup_guest(int xc_handle,
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
-
-    shared_info->n_vcpu = vcpus;
-    printf(" VCPUS:         %d\n", shared_info->n_vcpu);
 
     munmap(shared_info, PAGE_SIZE);
 

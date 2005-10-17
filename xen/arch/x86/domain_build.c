@@ -557,10 +557,9 @@ int construct_dom0(struct domain *d,
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
-    d->shared_info->n_vcpu = num_online_cpus();
 
-    for ( i = 1; i < d->shared_info->n_vcpu; i++ )
-        (void)alloc_vcpu(d, i, i % num_online_cpus());
+    for ( i = 1; i < num_online_cpus(); i++ )
+        (void)alloc_vcpu(d, i, i);
 
     /* Set up monitor table */
     update_pagetables(v);
@@ -588,7 +587,8 @@ int construct_dom0(struct domain *d,
     /* Set up start info area. */
     si = (start_info_t *)vstartinfo_start;
     memset(si, 0, PAGE_SIZE);
-    si->nr_pages     = nr_pages;
+    si->nr_pages = nr_pages;
+    si->n_vcpu   = num_online_cpus();
 
     if ( opt_dom0_translate )
     {

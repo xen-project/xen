@@ -19,7 +19,7 @@ extern rwlock_t domlist_lock;
 /* A global pointer to the initial domain (DOM0). */
 extern struct domain *dom0;
 
-#define MAX_EVTCHNS        1024
+#define MAX_EVTCHNS        NR_EVENT_CHANNELS
 #define EVTCHNS_PER_BUCKET 128
 #define NR_EVTCHN_BUCKETS  (MAX_EVTCHNS / EVTCHNS_PER_BUCKET)
 
