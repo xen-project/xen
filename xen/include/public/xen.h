@@ -423,7 +423,6 @@ typedef struct start_info {
     unsigned long mfn_list;     /* VIRTUAL address of page-frame list.    */
     unsigned long mod_start;    /* VIRTUAL address of pre-loaded module.  */
     unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
-    uint32_t n_vcpu;
     int8_t cmd_line[MAX_GUEST_CMDLINE];
 } start_info_t;
 

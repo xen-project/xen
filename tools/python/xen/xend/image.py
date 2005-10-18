@@ -185,8 +185,7 @@ class LinuxImageHandler(ImageHandler):
                              store_evtchn   = store_evtchn,
                              console_evtchn = console_evtchn,
                              cmdline        = self.cmdline,
-                             ramdisk        = self.ramdisk,
-                             vcpus          = self.vm.getVCpuCount())
+                             ramdisk        = self.ramdisk)
         if isinstance(ret, dict):
             self.set_vminfo(ret)
             return 0

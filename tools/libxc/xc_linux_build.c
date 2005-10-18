@@ -289,7 +289,6 @@ static int setup_guest(int xc_handle,
                        const char *cmdline,
                        unsigned long shared_info_frame,
                        unsigned long flags,
-                       unsigned int vcpus,
                        unsigned int store_evtchn, unsigned long *store_mfn,
                        unsigned int console_evtchn, unsigned long *console_mfn)
 {
@@ -376,7 +375,6 @@ static int setup_guest(int xc_handle,
                        const char *cmdline,
                        unsigned long shared_info_frame,
                        unsigned long flags,
-                       unsigned int vcpus,
                        unsigned int store_evtchn, unsigned long *store_mfn,
                        unsigned int console_evtchn, unsigned long *console_mfn)
 {
@@ -636,7 +634,6 @@ static int setup_guest(int xc_handle,
     start_info->store_evtchn = store_evtchn;
     start_info->console_mfn   = *console_mfn;
     start_info->console_evtchn = console_evtchn;
-    start_info->n_vcpu       = vcpus;
     if ( initrd_len != 0 )
     {
         start_info->mod_start    = vinitrd_start;
@@ -682,7 +679,6 @@ int xc_linux_build(int xc_handle,
                    const char *ramdisk_name,
                    const char *cmdline,
                    unsigned long flags,
-                   unsigned int vcpus,
                    unsigned int store_evtchn,
                    unsigned long *store_mfn,
                    unsigned int console_evtchn,
@@ -756,8 +752,7 @@ int xc_linux_build(int xc_handle,
                      &vstartinfo_start, &vkern_entry,
                      &vstack_start, ctxt, cmdline,
                      op.u.getdomaininfo.shared_info_frame,
-                     flags, vcpus,
-                     store_evtchn, store_mfn,
+                     flags, store_evtchn, store_mfn,
                      console_evtchn, console_mfn) < 0 )
     {
         ERROR("Error constructing guest OS");

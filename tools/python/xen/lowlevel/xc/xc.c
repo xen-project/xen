@@ -382,7 +382,7 @@ static PyObject *pyxc_linux_build(PyObject *self,
 
     uint32_t dom;
     char *image, *ramdisk = NULL, *cmdline = "";
-    int flags = 0, vcpus = 1;
+    int flags = 0;
     int store_evtchn, console_evtchn;
     unsigned long store_mfn = 0;
     unsigned long console_mfn = 0;
@@ -390,19 +390,17 @@ static PyObject *pyxc_linux_build(PyObject *self,
     static char *kwd_list[] = { "dom", "store_evtchn", 
                                 "console_evtchn", "image", 
 				/* optional */
-				"ramdisk", "cmdline", "flags",
-				"vcpus", NULL };
+				"ramdisk", "cmdline", "flags", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssii", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiis|ssi", kwd_list,
                                       &dom, &store_evtchn,
 				      &console_evtchn, &image, 
 				      /* optional */
-				      &ramdisk, &cmdline, &flags,
-                                      &vcpus) )
+				      &ramdisk, &cmdline, &flags) )
         return NULL;
 
     if ( xc_linux_build(xc->xc_handle, dom, image,
-                        ramdisk, cmdline, flags, vcpus,
+                        ramdisk, cmdline, flags,
                         store_evtchn, &store_mfn, 
 			console_evtchn, &console_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);

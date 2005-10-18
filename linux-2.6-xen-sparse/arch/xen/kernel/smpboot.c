@@ -186,20 +186,20 @@ void vcpu_prepare(int vcpu)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	int cpu;
+	int cpu, rc;
 	struct task_struct *idle;
 
-	if (max_cpus == 0) {
-		xen_start_info->n_vcpu = 1;
+	if (max_cpus == 0)
 		return;
-	}
-
-	if (max_cpus < xen_start_info->n_vcpu)
-		xen_start_info->n_vcpu = max_cpus;
 
 	xen_smp_intr_init(0);
 
-	for (cpu = 1; cpu < xen_start_info->n_vcpu; cpu++) {
+	for (cpu = 1; cpu < max_cpus; cpu++) {
+		rc = HYPERVISOR_vcpu_op(VCPUOP_is_up, cpu, NULL);
+		if (rc == -ENOENT)
+			break;
+		BUG_ON(rc != 0);
+
 		cpu_data[cpu] = boot_cpu_data;
 		cpu_2_logical_apicid[cpu] = cpu;
 		x86_cpu_to_apicid[cpu] = cpu;
@@ -220,6 +220,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		make_page_readonly((void *)cpu_gdt_descr[cpu].address);
 
 		cpu_set(cpu, cpu_possible_map);
+		if (xen_start_info->flags & SIF_INITDOMAIN)
+			cpu_set(cpu, cpu_present_map);
 
 		vcpu_prepare(cpu);
 	}
@@ -243,6 +245,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 void __devinit smp_prepare_boot_cpu(void)
 {
 	cpu_possible_map = cpumask_of_cpu(0);
+	cpu_present_map  = cpumask_of_cpu(0);
 	cpu_online_map   = cpumask_of_cpu(0);
 
 	cpu_data[0] = boot_cpu_data;
@@ -257,20 +260,13 @@ void __devinit smp_prepare_boot_cpu(void)
 	cpu_set(0, cpu_core_map[0]);
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
-
-static void handle_vcpu_hotplug_event(
-	struct xenbus_watch *watch, const char **vec, unsigned int len)
+static void vcpu_hotplug(unsigned int cpu)
 {
-	int err, cpu;
+	int err;
 	char dir[32], state[32];
-	char *cpustr;
-	const char *node = vec[XS_WATCH_PATH];
 
-	if ((cpustr = strstr(node, "cpu/")) == NULL)
+	if ((cpu >= NR_CPUS) || !cpu_possible(cpu))
 		return;
-
-	sscanf(cpustr, "cpu/%d", &cpu);
 
 	sprintf(dir, "cpu/%d", cpu);
 	err = xenbus_scanf(NULL, dir, "availability", "%s", state);
@@ -279,22 +275,49 @@ static void handle_vcpu_hotplug_event(
 		return;
 	}
 
-	if (strcmp(state, "online") == 0)
+	if (strcmp(state, "online") == 0) {
+		cpu_set(cpu, cpu_present_map);
 		(void)cpu_up(cpu);
-	else if (strcmp(state, "offline") == 0)
+	} else if (strcmp(state, "offline") == 0) {
+#ifdef CONFIG_HOTPLUG_CPU
 		(void)cpu_down(cpu);
-	else
-		printk(KERN_ERR "XENBUS: unknown state(%s) on node(%s)\n",
-		       state, node);
+#else
+		printk(KERN_INFO "Ignoring CPU%d hotplug request\n", cpu);
+#endif
+	} else {
+		printk(KERN_ERR "XENBUS: unknown state(%s) on CPU%d\n",
+		       state, cpu);
+	}
+}
+
+static void handle_vcpu_hotplug_event(
+	struct xenbus_watch *watch, const char **vec, unsigned int len)
+{
+	int cpu;
+	char *cpustr;
+	const char *node = vec[XS_WATCH_PATH];
+
+	if ((cpustr = strstr(node, "cpu/")) != NULL) {
+		sscanf(cpustr, "cpu/%d", &cpu);
+		vcpu_hotplug(cpu);
+	}
 }
 
 static int setup_cpu_watcher(struct notifier_block *notifier,
 			      unsigned long event, void *data)
 {
+	int i;
+
 	static struct xenbus_watch cpu_watch = {
 		.node = "cpu",
 		.callback = handle_vcpu_hotplug_event };
 	(void)register_xenbus_watch(&cpu_watch);
+
+	for_each_cpu(i)
+		vcpu_hotplug(i);
+
+	printk(KERN_INFO "Brought up %ld CPUs\n", (long)num_online_cpus());
+
 	return NOTIFY_DONE;
 }
 
@@ -307,6 +330,8 @@ static int __init setup_vcpu_hotplug_event(void)
 }
 
 subsys_initcall(setup_vcpu_hotplug_event);
+
+#ifdef CONFIG_HOTPLUG_CPU
 
 int __cpu_disable(void)
 {
@@ -338,7 +363,7 @@ void __cpu_die(unsigned int cpu)
 #endif
 }
 
-#else /* ... !CONFIG_HOTPLUG_CPU */
+#else /* !CONFIG_HOTPLUG_CPU */
 
 int __cpu_disable(void)
 {

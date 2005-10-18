@@ -588,7 +588,6 @@ int construct_dom0(struct domain *d,
     si = (start_info_t *)vstartinfo_start;
     memset(si, 0, PAGE_SIZE);
     si->nr_pages = nr_pages;
-    si->n_vcpu   = num_online_cpus();
 
     if ( opt_dom0_translate )
     {
