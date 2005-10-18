@@ -445,7 +445,7 @@ void __cpuinit smp_callin(void)
 }
 
 #ifdef CONFIG_XEN
-extern void local_setup_timer(void);
+extern void local_setup_timer(unsigned int cpu);
 #endif
 
 /*
@@ -478,7 +478,7 @@ void __cpuinit start_secondary(void)
 
 	enable_APIC_timer();
 #else
-	local_setup_timer();
+	local_setup_timer(smp_processor_id());
 	smp_intr_init();
 	local_irq_enable();
 #endif
