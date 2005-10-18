@@ -313,10 +313,12 @@ static int setup_cpu_watcher(struct notifier_block *notifier,
 		.callback = handle_vcpu_hotplug_event };
 	(void)register_xenbus_watch(&cpu_watch);
 
-	for_each_cpu(i)
-		vcpu_hotplug(i);
-
-	printk(KERN_INFO "Brought up %ld CPUs\n", (long)num_online_cpus());
+	if (!(xen_start_info->flags & SIF_INITDOMAIN)) {
+		for_each_cpu(i)
+			vcpu_hotplug(i);
+		printk(KERN_INFO "Brought up %ld CPUs\n",
+		       (long)num_online_cpus());
+	}
 
 	return NOTIFY_DONE;
 }
