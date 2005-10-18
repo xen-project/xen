@@ -9,13 +9,45 @@
  */
 
 #include <err.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <xs.h>
-#include <errno.h>
+
+static char *output_buf = NULL;
+static int output_pos = 0;
+
+#if defined(CLIENT_read) || defined(CLIENT_list)
+static int output_size = 0;
+
+static void
+output(const char *fmt, ...) {
+    va_list ap;
+    int len;
+    char buf[1];
+
+    va_start(ap, fmt);
+    len = vsnprintf(buf, 1, fmt, ap);
+    if (len < 0)
+	err(1, "output");
+    va_end(ap);
+    if (len + 1 + output_pos > output_size) {
+	output_size += len + 1024;
+	output_buf = realloc(output_buf, output_size);
+	if (output_buf == NULL)
+	    err(1, "malloc");
+    }
+    va_start(ap, fmt);
+    if (vsnprintf(&output_buf[output_pos], len + 1, fmt, ap) != len)
+	err(1, "output");
+    va_end(ap);
+    output_pos += len;
+}
+#endif
 
 static void
 usage(const char *progname)
@@ -34,7 +66,7 @@ usage(const char *progname)
 
 #if defined(CLIENT_rm)
 static int
-do_rm(char * path, struct xs_handle *xsh, struct xs_transaction_handle *xth)
+do_rm(char *path, struct xs_handle *xsh, struct xs_transaction_handle *xth)
 {
     if (xs_rm(xsh, xth, path)) {
         return 0;
@@ -59,8 +91,8 @@ perform(int optind, int argc, char **argv, struct xs_handle *xsh,
 	    return 1;
 	}
 	if (prefix)
-	    printf("%s: ", argv[optind]);
-	printf("%s\n", val);
+	    output("%s: ", argv[optind]);
+	output("%s\n", val);
 	free(val);
 	optind++;
 #elif defined(CLIENT_write)
@@ -131,8 +163,8 @@ perform(int optind, int argc, char **argv, struct xs_handle *xsh,
 	}
 	for (i = 0; i < num; i++) {
 	    if (prefix)
-		printf("%s/", argv[optind]);
-	    printf("%s\n", list[i]);
+		output("%s/", argv[optind]);
+	    output("%s\n", list[i]);
 	}
 	free(list);
 	optind++;
@@ -217,9 +249,15 @@ main(int argc, char **argv)
     ret = perform(optind, argc, argv, xsh, xth, prefix, tidy);
 
     if (!xs_transaction_end(xsh, xth, ret)) {
-	if (ret == 0 && errno == EAGAIN)
+	if (ret == 0 && errno == EAGAIN) {
+	    output_pos = 0;
 	    goto again;
+	}
 	errx(1, "couldn't end transaction");
     }
+
+    if (output_pos)
+	printf("%s", output_buf);
+
     return ret;
 }
