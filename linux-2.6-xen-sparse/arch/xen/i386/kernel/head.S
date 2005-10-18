@@ -40,7 +40,7 @@
 ENTRY(startup_32)
 	movl %esi,xen_start_info
 
-#ifdef CONFIG_SMP
+#if 0
 ENTRY(startup_32_smp)
 #endif /* CONFIG_SMP */
 
@@ -78,7 +78,7 @@ checkCPUtype:
 	movl %eax,%gs
 	cld			# gcc2 wants the direction flag cleared at all times
 
-#ifdef CONFIG_SMP
+#if 0
 	movb ready, %cl	
 	cmpb $1,%cl
 	je 1f			# the first CPU calls start_kernel

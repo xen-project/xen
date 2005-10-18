@@ -113,14 +113,11 @@ EXPORT_SYMBOL(clear_page);
 
 EXPORT_SYMBOL(cpu_pda);
 #ifdef CONFIG_SMP
-EXPORT_SYMBOL(cpu_data);
-EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL(__write_lock_failed);
 EXPORT_SYMBOL(__read_lock_failed);
 
 EXPORT_SYMBOL(synchronize_irq);
 EXPORT_SYMBOL(smp_call_function);
-EXPORT_SYMBOL(cpu_callout_map);
 #endif
 
 #ifdef CONFIG_VT
