@@ -89,7 +89,8 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     chn = evtchn_from_port(d, port);
 
     chn->state = ECS_UNBOUND;
-    chn->u.unbound.remote_domid = alloc->remote_dom;
+    if ( (chn->u.unbound.remote_domid = alloc->remote_dom) == DOMID_SELF )
+        chn->u.unbound.remote_domid = current->domain->domain_id;
 
     alloc->port = port;
 
@@ -107,9 +108,13 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     struct evtchn *lchn, *rchn;
     struct domain *ld = current->domain, *rd;
     int            lport, rport = bind->remote_port;
+    domid_t        rdom = bind->remote_dom;
     long           rc = 0;
 
-    if ( (rd = find_domain_by_id(bind->remote_dom)) == NULL )
+    if ( rdom == DOMID_SELF )
+        rdom = current->domain->domain_id;
+
+    if ( (rd = find_domain_by_id(rdom)) == NULL )
         return -ESRCH;
 
     /* Avoid deadlock by first acquiring lock of domain with smaller id. */

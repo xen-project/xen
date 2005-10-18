@@ -15,6 +15,7 @@
  * is allocated in <dom> and returned as <port>.
  * NOTES:
  *  1. If the caller is unprivileged then <dom> must be DOMID_SELF.
+ *  2. <rdom> may be DOMID_SELF, allowing loopback connections.
  */
 #define EVTCHNOP_alloc_unbound    6
 typedef struct evtchn_alloc_unbound {
@@ -30,6 +31,8 @@ typedef struct evtchn_alloc_unbound {
  * a port that is unbound and marked as accepting bindings from the calling
  * domain. A fresh port is allocated in the calling domain and returned as
  * <local_port>.
+ * NOTES:
+ *  2. <remote_dom> may be DOMID_SELF, allowing loopback connections.
  */
 #define EVTCHNOP_bind_interdomain 0
 typedef struct evtchn_bind_interdomain {
