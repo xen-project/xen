@@ -141,7 +141,7 @@ class XendDomain:
    
         # target == 0 means use all processors
         if target > 0:
-            self.setVCpuCount(target)
+            dom0.setVCpuCount(target)
 
 
     def _add_domain(self, info):
