@@ -363,7 +363,7 @@ static PyObject *pyxc_vcpu_getinfo(PyObject *self,
     if ( rc < 0 )
         return PyErr_SetFromErrno(xc_error);
 
-    info_dict = Py_BuildValue("{s:i,s:i,s:i,s:L,s:i,s:i,s:i}",
+    info_dict = Py_BuildValue("{s:i,s:i,s:i,s:L,s:i,s:i}",
                               "online",   info.online,
                               "blocked",  info.blocked,
                               "running",  info.running,
