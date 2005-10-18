@@ -1187,14 +1187,6 @@ void __shadow_mode_disable(struct domain *d)
     if ( unlikely(!shadow_mode_enabled(d)) )
         return;
 
-    /*
-     * Currently this does not fix up page ref counts, so it is valid to call
-     * only when a domain is being destroyed.
-     */
-    BUG_ON(!test_bit(_DOMF_dying, &d->domain_flags) &&
-           shadow_mode_refcounts(d));
-    d->arch.shadow_tainted_refcnts = shadow_mode_refcounts(d);
-
     free_shadow_pages(d);
     free_writable_pte_predictions(d);
 

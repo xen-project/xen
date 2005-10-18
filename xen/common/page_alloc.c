@@ -610,8 +610,7 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
         for ( i = 0; i < (1 << order); i++ )
         {
             shadow_drop_references(d, &pg[i]);
-            ASSERT(((pg[i].u.inuse.type_info & PGT_count_mask) == 0) ||
-                   shadow_tainted_refcnts(d));
+            ASSERT((pg[i].u.inuse.type_info & PGT_count_mask) == 0);
             pg[i].tlbflush_timestamp  = tlbflush_current_time();
             pg[i].u.free.cpumask      = d->cpumask;
             list_del(&pg[i].list);

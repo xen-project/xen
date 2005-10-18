@@ -55,8 +55,6 @@
 #define shadow_mode_translate(_d) ((_d)->arch.shadow_mode & SHM_translate)
 #define shadow_mode_external(_d)  ((_d)->arch.shadow_mode & SHM_external)
 
-#define shadow_tainted_refcnts(_d) ((_d)->arch.shadow_tainted_refcnts)
-
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
 #define __shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START + \
      (SH_LINEAR_PT_VIRT_START >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT))))

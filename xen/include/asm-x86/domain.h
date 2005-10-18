@@ -32,8 +32,6 @@ struct arch_domain
     struct shadow_ops *ops;
     unsigned int shadow_mode;  /* flags to control shadow table operation */
     unsigned int shadow_nest;  /* Recursive depth of shadow_lock() nesting */
-    /* Shadow mode has tainted page reference counts? */
-    unsigned int shadow_tainted_refcnts;
 
     /* shadow hashtable */
     struct shadow_status *shadow_ht;
