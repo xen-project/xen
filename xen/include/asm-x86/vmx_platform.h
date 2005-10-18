@@ -77,10 +77,9 @@ struct instruction {
 #define MAX_INST_LEN      32
 
 struct virtual_platform_def {
-    unsigned long          *real_mode_data; /* E820, etc. */
     unsigned long          shared_page_va;
-    struct vmx_virpit_t    vmx_pit;
-    struct vmx_handler_t   vmx_handler;
+    struct vmx_virpit      vmx_pit;
+    struct vmx_io_handler  vmx_io_handler;
 };
 
 extern void handle_mmio(unsigned long, unsigned long);

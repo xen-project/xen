@@ -142,7 +142,7 @@ struct host_execution_env {
 #endif
 };
 
-static void vmx_setup_platform(struct vcpu *v)
+static void get_io_shared_page(struct vcpu *v)
 {
     int i;
     unsigned char e820_map_nr;
@@ -150,6 +150,9 @@ static void vmx_setup_platform(struct vcpu *v)
     unsigned char *p;
     unsigned long mpfn;
     unsigned long gpfn = 0;
+
+    if (!(VMX_DOMAIN(v) && (v->vcpu_id == 0)))
+        return;
 
     local_flush_tlb_pge();
 
@@ -203,6 +206,12 @@ static void vmx_setup_platform(struct vcpu *v)
 
     clear_bit(iopacket_port(v->domain),
               &v->domain->shared_info->evtchn_mask[0]);
+}
+
+static void vmx_setup_platform(struct vcpu *v)
+{
+    if (v->vcpu_id == 0)
+        get_io_shared_page(v);
 }
 
 static void vmx_set_host_env(struct vcpu *v)

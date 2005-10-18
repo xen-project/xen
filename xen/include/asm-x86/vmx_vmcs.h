@@ -29,7 +29,7 @@ extern void stop_vmx(void);
 
 #if defined (__x86_64__)
 extern void vmx_load_msrs(struct vcpu *n);
-void vmx_restore_msrs(struct vcpu *d);
+void vmx_restore_msrs(struct vcpu *v);
 #else
 #define vmx_load_msrs(_n)          ((void)0)
 #define vmx_restore_msrs(_v)       ((void)0)
@@ -55,7 +55,7 @@ struct vmcs_struct {
 
 extern int vmcs_size;
 
-enum { 
+enum {
     VMX_INDEX_MSR_LSTAR = 0,
     VMX_INDEX_MSR_STAR,
     VMX_INDEX_MSR_CSTAR,
@@ -79,7 +79,7 @@ struct mmio_op {
     struct cpu_user_regs   *inst_decoder_regs; /* current context */
 };
 
-#define PC_DEBUG_PORT   0x80 
+#define PC_DEBUG_PORT   0x80
 
 struct arch_vmx_struct {
     struct vmcs_struct      *vmcs;  /* VMCS pointer in virtual */
@@ -98,7 +98,7 @@ struct arch_vmx_struct {
 #define vmx_schedule_tail(next)         \
     (next)->thread.arch_vmx.arch_vmx_schedule_tail((next))
 
-#define VMX_DOMAIN(ed)   ((ed)->arch.arch_vmx.flags)
+#define VMX_DOMAIN(v)   ((v)->arch.arch_vmx.flags)
 
 #define ARCH_VMX_VMCS_LOADED    0       /* VMCS has been loaded and active */
 #define ARCH_VMX_VMCS_LAUNCH    1       /* Needs VMCS launch */
@@ -278,7 +278,8 @@ enum vmcs_field {
 extern unsigned int opt_vmx_debug_level;
 #define VMX_DBG_LOG(level, _f, _a...)           \
     if ((level) & opt_vmx_debug_level)          \
-        printk("[VMX]" _f "\n", ## _a )
+        printk("[VMX:%d.%d] " _f "\n",          \
+                current->domain->domain_id, current->vcpu_id, ## _a)
 #else
 #define VMX_DBG_LOG(level, _f, _a...)
 #endif

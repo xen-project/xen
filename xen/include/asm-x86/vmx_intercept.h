@@ -8,49 +8,52 @@
 #include <xen/errno.h>
 #include <public/io/ioreq.h>
 
-#define MAX_IO_HANDLER 10
+#define MAX_IO_HANDLER              4
 
-typedef int (*intercept_action_t)(ioreq_t*);
+#define VMX_PORTIO                  0
+#define VMX_MMIO                    1
 
-enum {PORTIO, MMIO};
+typedef int (*intercept_action_t)(ioreq_t *);
 
-struct vmx_handler_t {
-    int num_slot;
-    struct {
-        unsigned long       addr;
-        int type;
-        unsigned long       offset;
-        intercept_action_t  action;
-    } hdl_list[MAX_IO_HANDLER];
+struct io_handler {
+    int                 type;
+    unsigned long       addr;
+    unsigned long       size;
+    intercept_action_t  action;
+};
+
+struct vmx_io_handler {
+    int     num_slot;
+    struct  io_handler hdl_list[MAX_IO_HANDLER];
 };
 
 /* global io interception point in HV */
 extern int vmx_io_intercept(ioreq_t *p, int type);
-extern int register_io_handler(unsigned long addr, unsigned long offset, 
+extern int register_io_handler(unsigned long addr, unsigned long size,
                                intercept_action_t action, int type);
 
 static inline int vmx_portio_intercept(ioreq_t *p)
 {
-    return vmx_io_intercept(p, PORTIO);
+    return vmx_io_intercept(p, VMX_PORTIO);
 }
 
 static inline int vmx_mmio_intercept(ioreq_t *p)
 {
-    return vmx_io_intercept(p, MMIO);
+    return vmx_io_intercept(p, VMX_MMIO);
 }
 
-static inline int register_portio_handler(unsigned long addr, 
-                                          unsigned long offset, 
+static inline int register_portio_handler(unsigned long addr,
+                                          unsigned long size,
                                           intercept_action_t action)
 {
-    return register_io_handler(addr, offset, action, PORTIO);
+    return register_io_handler(addr, size, action, VMX_PORTIO);
 }
 
-static inline int register_mmio_handler(unsigned long addr, 
-                                        unsigned long offset, 
+static inline int register_mmio_handler(unsigned long addr,
+                                        unsigned long size,
                                         intercept_action_t action)
 {
-    return register_io_handler(addr, offset, action, MMIO);
+    return register_io_handler(addr, size, action, VMX_MMIO);
 }
 
 #endif /* _VMX_INTERCEPT_H */

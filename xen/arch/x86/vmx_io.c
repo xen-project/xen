@@ -848,7 +848,8 @@ static inline int find_highest_pending_irq(struct vcpu *v, int *type)
 static inline void
 interrupt_post_injection(struct vcpu * v, int vector, int type)
 {
-    struct vmx_virpit_t *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
+    struct vmx_virpit *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
+
     switch(type)
     {
     case VLAPIC_DELIV_MODE_EXT:
