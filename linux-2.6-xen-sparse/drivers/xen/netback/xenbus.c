@@ -28,10 +28,6 @@ struct backend_info
 	netif_t *netif;
 
 	long int frontend_id;
-#if 0
-	long int pdev;
-	long int readonly;
-#endif
 
 	/* watch back end for changes */
 	struct xenbus_watch backend_watch;
@@ -154,14 +150,6 @@ static void backend_changed(struct xenbus_watch *watch,
 			xenbus_dev_error(dev, err, "creating interface");
 			return;
 		}
-
-#if 0
-		err = vbd_create(be->netif, handle, be->pdev, be->readonly);
-		if (err) {
-			xenbus_dev_error(dev, err, "creating vbd structure");
-			return;
-		}
-#endif
 
 		kobject_hotplug(&dev->dev.kobj, KOBJ_ONLINE);
 

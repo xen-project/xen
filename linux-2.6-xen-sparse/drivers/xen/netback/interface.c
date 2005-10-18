@@ -58,7 +58,7 @@ netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 	dev = alloc_netdev(sizeof(netif_t), name, ether_setup);
 	if (dev == NULL) {
 		DPRINTK("Could not create netif: out of memory\n");
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	netif = netdev_priv(dev);
@@ -104,7 +104,7 @@ netif_t *alloc_netif(domid_t domid, unsigned int handle, u8 be_mac[ETH_ALEN])
 		DPRINTK("Could not register new net device %s: err=%d\n",
 			dev->name, err);
 		free_netdev(dev);
-		return NULL;
+		return ERR_PTR(err);
 	}
 
 	DPRINTK("Successfully created netif\n");
