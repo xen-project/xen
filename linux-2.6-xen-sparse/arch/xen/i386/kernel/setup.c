@@ -939,6 +939,8 @@ void __init find_max_pfn(void)
 	if ( xen_override_max_pfn < xen_start_info->nr_pages )
 		xen_override_max_pfn = xen_start_info->nr_pages;
 	max_pfn = xen_override_max_pfn;
+	/* 8MB slack, to make up for address space allocations in backends. */
+	max_pfn += 8 << (20 - PAGE_SHIFT);
 }
 #endif /* XEN */
 
@@ -1638,39 +1640,17 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 	/* Make sure we have a correctly sized P->M table. */
-	if (max_pfn != xen_start_info->nr_pages) {
-		phys_to_machine_mapping = alloc_bootmem_low_pages(
-			max_pfn * sizeof(unsigned long));
-
-		if (max_pfn > xen_start_info->nr_pages) {
-			/* set to INVALID_P2M_ENTRY */
-			memset(phys_to_machine_mapping, ~0,
-				max_pfn * sizeof(unsigned long));
-			memcpy(phys_to_machine_mapping,
-				(unsigned long *)xen_start_info->mfn_list,
-				xen_start_info->nr_pages * sizeof(unsigned long));
-		} else {
-			struct xen_memory_reservation reservation = {
-				.extent_start = (unsigned long *)xen_start_info->mfn_list + max_pfn,
-				.nr_extents   = xen_start_info->nr_pages - max_pfn,
-				.extent_order = 0,
-				.domid        = DOMID_SELF
-			};
-
-			memcpy(phys_to_machine_mapping,
-				(unsigned long *)xen_start_info->mfn_list,
-				max_pfn * sizeof(unsigned long));
-			BUG_ON(HYPERVISOR_memory_op(
-				XENMEM_decrease_reservation,
-				&reservation) !=
-			    (xen_start_info->nr_pages - max_pfn));
-		}
-		free_bootmem(
-			__pa(xen_start_info->mfn_list), 
-			PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
-			sizeof(unsigned long))));
-	}
-
+	phys_to_machine_mapping = alloc_bootmem_low_pages(
+		max_pfn * sizeof(unsigned long));
+	memset(phys_to_machine_mapping, ~0,
+		max_pfn * sizeof(unsigned long));
+	memcpy(phys_to_machine_mapping,
+		(unsigned long *)xen_start_info->mfn_list,
+		xen_start_info->nr_pages * sizeof(unsigned long));
+	free_bootmem(
+		__pa(xen_start_info->mfn_list), 
+		PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
+		sizeof(unsigned long))));
 
 	/* 
 	 * Initialise the list of the frames that specify the list of 

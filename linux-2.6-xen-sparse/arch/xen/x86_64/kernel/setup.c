@@ -429,7 +429,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 static void __init contig_initmem_init(void)
 {
         unsigned long bootmap_size = init_bootmem(start_pfn, end_pfn);
-        free_bootmem(0, end_pfn << PAGE_SHIFT);   
+        free_bootmem(0, xen_start_info->nr_pages << PAGE_SHIFT);
         reserve_bootmem(HIGH_MEMORY,
                         (PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1)
                         - HIGH_MEMORY);
@@ -734,19 +734,17 @@ void __init setup_arch(char **cmdline_p)
 	{
 		int i, j, k, fpp;
 		/* Make sure we have a large enough P->M table. */
-		if (end_pfn > xen_start_info->nr_pages) {
-			phys_to_machine_mapping = alloc_bootmem(
-				end_pfn * sizeof(unsigned long));
-			memset(phys_to_machine_mapping, ~0,
-			       end_pfn * sizeof(unsigned long));
-			memcpy(phys_to_machine_mapping,
-			       (unsigned long *)xen_start_info->mfn_list,
-			       xen_start_info->nr_pages * sizeof(unsigned long));
-			free_bootmem(
-				__pa(xen_start_info->mfn_list), 
-				PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
-						sizeof(unsigned long))));
-		}
+		phys_to_machine_mapping = alloc_bootmem(
+			end_pfn * sizeof(unsigned long));
+		memset(phys_to_machine_mapping, ~0,
+		       end_pfn * sizeof(unsigned long));
+		memcpy(phys_to_machine_mapping,
+		       (unsigned long *)xen_start_info->mfn_list,
+		       xen_start_info->nr_pages * sizeof(unsigned long));
+		free_bootmem(
+			__pa(xen_start_info->mfn_list), 
+			PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
+					sizeof(unsigned long))));
 
 		/* 
 		 * Initialise the list of the frames that specify the list of 

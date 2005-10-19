@@ -528,10 +528,13 @@ unsigned long __init e820_end_of_ram(void)
 {
         unsigned long max_end_pfn = xen_start_info->nr_pages;
 
-	if ( xen_override_max_pfn <  max_end_pfn)
+	if ( xen_override_max_pfn < max_end_pfn)
 		xen_override_max_pfn = max_end_pfn;
-	
-        return xen_override_max_pfn;
+
+	/* 8MB slack, to make up for address space allocations in backends. */
+	xen_override_max_pfn += 8 << (20 - PAGE_SHIFT);
+
+	return xen_override_max_pfn;
 }
 
 void __init e820_reserve_resources(void) 
