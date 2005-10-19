@@ -424,11 +424,11 @@ static PyObject *pyxc_vmx_build(PyObject *self,
     unsigned long store_mfn = 0;
 
     static char *kwd_list[] = { "dom", "control_evtchn", "store_evtchn",
-                                "memsize", "image", "flags", "vcpus", NULL };
+                                "memsize", "image", "vcpus", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiisii", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiisi", kwd_list,
                                       &dom, &control_evtchn, &store_evtchn,
-                                      &memsize, &image, &flags, &vcpus) )
+                                      &memsize, &image, &vcpus) )
         return NULL;
 
     if ( xc_vmx_build(xc->xc_handle, dom, memsize, image, control_evtchn,
@@ -968,12 +968,10 @@ static PyMethodDef pyxc_methods[] = {
     { "vmx_build", 
       (PyCFunction)pyxc_vmx_build, 
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "Build a new Linux guest OS.\n"
+      "Build a new VMX guest OS.\n"
       " dom     [int]:      Identifier of domain to build into.\n"
-      " image   [str]:      Name of kernel image file. May be gzipped.\n"
-      " memmap  [str]: 	    Memory map.\n\n"
-      " ramdisk [str, n/a]: Name of ramdisk file, if any.\n"
-      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
+      " image   [str]:      Name of VMX loader image file.\n"
+      " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "bvtsched_global_set",
