@@ -1,6 +1,8 @@
 set -e
 
-export PATH=/sbin:/bin:/usr/bin:/usr/sbin:$PATH
+export PATH="/sbin:/bin:/usr/bin:/usr/sbin:$PATH"
+export LANG="POSIX"
+unset $(set | grep ^LC_ | cut -d= -f1)
 
 log() {
   local level="$1"
