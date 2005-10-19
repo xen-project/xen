@@ -80,11 +80,12 @@ clean::
 	rm -f patches/*/.makedep
 
 ref-%/.valid-ref: pristine-%/.valid-pristine
+	set -e
 	rm -rf $(@D)
 	cp -al $(<D) $(@D)
-	which patch || exit 1
-	([ -d patches/$* ] && \
-	  for i in patches/$*/*.patch ; do ( cd $(@D) ; patch -p1 <../$$i || exit 1 ) ; done) || true
+	if [ -d patches/$* ] ; then \
+	    for i in patches/$*/*.patch ; do ( cd $(@D) ; patch -p1 <../$$i || exit 1 ) ; done ; \
+	fi
 	touch $@ # update timestamp to avoid rebuild
 endif
 
