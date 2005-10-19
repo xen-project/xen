@@ -246,8 +246,9 @@ static bool write_messages(struct connection *conn)
 
 	if (out->inhdr) {
 		if (verbose)
-			xprintf("Writing msg %s (%s) out to %p\n",
+			xprintf("Writing msg %s (%.*s) out to %p\n",
 				sockmsg_string(out->hdr.msg.type),
+				out->hdr.msg.len,
 				out->buffer, conn);
 		ret = conn->write(conn, out->hdr.raw + out->used,
 				  sizeof(out->hdr) - out->used);
@@ -946,9 +947,29 @@ static bool delete_child(struct connection *conn,
 	corrupt(conn, "Can't find child '%s' in %s", childname, node->name);
 }
 
+
+static int _rm(struct connection *conn, struct node *node, const char *name)
+{
+	/* Delete from parent first, then if something explodes fsck cleans. */
+	struct node *parent = read_node(conn, get_parent(name));
+	if (!parent) {
+		send_error(conn, EINVAL);
+		return 0;
+	}
+
+	if (!delete_child(conn, parent, basename(name))) {
+		send_error(conn, EINVAL);
+		return 0;
+	}
+
+	delete_node(conn, node);
+	return 1;
+}
+
+
 static void do_rm(struct connection *conn, const char *name)
 {
-	struct node *node, *parent;
+	struct node *node;
 
 	name = canonicalize(conn, name);
 	node = get_node(conn, name, XS_PERM_WRITE);
@@ -972,23 +993,23 @@ static void do_rm(struct connection *conn, const char *name)
 		return;
 	}
 
-	/* Delete from parent first, then if something explodes fsck cleans. */
-	parent = read_node(conn, get_parent(name));
-	if (!parent) {
-		send_error(conn, EINVAL);
-		return;
+	if (_rm(conn, node, name)) {
+		add_change_node(conn->transaction, name, true);
+		fire_watches(conn, name, true);
+		send_ack(conn, XS_RM);
 	}
-
-	if (!delete_child(conn, parent, basename(name))) {
-		send_error(conn, EINVAL);
-		return;
-	}
-
-	delete_node(conn, node);
-	add_change_node(conn->transaction, name, true);
-	fire_watches(conn, name, true);
-	send_ack(conn, XS_RM);
 }
+
+
+void internal_rm(const char *name)
+{
+	struct node *node = read_node(NULL, name);
+	if (!node) {
+		return;
+	}
+	_rm(NULL, node, name);
+}
+
 
 static void do_get_perms(struct connection *conn, const char *name)
 {

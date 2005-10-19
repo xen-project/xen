@@ -271,6 +271,8 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	list_add(&domain->list, &domains);
 	talloc_set_destructor(domain, destroy_domain);
 
+	internal_rm(domain->path);
+
 	/* Tell kernel we're interested in this event. */
         bind.remote_domain = domid;
         bind.remote_port   = port;

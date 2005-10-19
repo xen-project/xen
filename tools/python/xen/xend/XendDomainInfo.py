@@ -145,8 +145,6 @@ def create(config):
     try:
         vm.construct()
         vm.initDomain()
-        vm.construct_image()
-        vm.configure()
         vm.storeVmDetails()
         vm.storeDomDetails()
         vm.refreshShutdown()
@@ -167,6 +165,7 @@ def recreate(xeninfo, priv):
     assert not xeninfo['dying']
 
     domid = xeninfo['dom']
+    uuid1 = xeninfo['handle']
     dompath = GetDomainPath(domid)
     if not dompath:
         raise XendError(
@@ -176,43 +175,33 @@ def recreate(xeninfo, priv):
         if not vmpath:
             raise XendError(
                 'No vm path in store for existing domain %d' % domid)
-        uuid1_str = xstransact.Read(vmpath, "uuid")
-        if not uuid1_str:
+        uuid2_str = xstransact.Read(vmpath, "uuid")
+        if not uuid2_str:
             raise XendError(
                 'No vm/uuid path in store for existing domain %d' % domid)
 
-        uuid1 = uuid.fromString(uuid1_str)
-
-        uuid2 = xeninfo['handle']
+        uuid2 = uuid.fromString(uuid2_str)
 
         if uuid1 != uuid2:
             raise XendError(
                 'Uuid in store does not match uuid for existing domain %d: '
-                '%s != %s' % (domid, uuid1_str, uuid.toString(uuid2)))
+                '%s != %s' % (domid, uuid2_str, uuid.toString(uuid1)))
 
-        log.info("Recreating domain %d, UUID %s.", domid, uuid1_str)
+        log.info("Recreating domain %d, UUID %s.", domid, uuid2_str)
 
-        vm = XendDomainInfo(uuid2, xeninfo, domid, dompath, True)
+        vm = XendDomainInfo(uuid1, xeninfo, domid, dompath, True)
 
     except Exception, exn:
         log.warn(str(exn))
 
-        if priv:
-            new_uuid = [0 for i in range(0, 16)]
-        else:
-            new_uuid = uuid.create()
+        log.info("Recreating domain %d with UUID %s.", domid,
+                 uuid.toString(uuid1))
 
-        log.info("Recreating domain %d with new UUID %s.", domid,
-                 uuid.toString(new_uuid))
-
-        vm = XendDomainInfo(new_uuid, xeninfo, domid, dompath, True)
+        vm = XendDomainInfo(uuid1, xeninfo, domid, dompath, True)
         vm.removeDom()
+        vm.removeVm()
         vm.storeVmDetails()
         vm.storeDomDetails()
-
-    if domid != 0:
-        # Setup store and console channels 
-        vm.create_channels()
 
     vm.refreshShutdown(xeninfo)
     return vm
@@ -230,11 +219,8 @@ def restore(config):
                         parseConfig(config))
     try:
         vm.construct()
-        vm.configure()
-        vm.create_channels()
         vm.storeVmDetails()
-        vm.storeDomDetails()
-        vm.refreshShutdown()
+        vm.createChannels()
         return vm
     except:
         vm.destroy()
@@ -379,9 +365,9 @@ class XendDomainInfo:
 
         self.image = None
 
-        self.store_channel = None
+        self.store_port = None
         self.store_mfn = None
-        self.console_channel = None
+        self.console_port = None
         self.console_mfn = None
 
         self.state = STATE_DOM_OK
@@ -571,6 +557,18 @@ class XendDomainInfo:
 
     ## public:
 
+    def completeRestore(self, store_mfn, console_mfn):
+
+        self.store_mfn = store_mfn
+        self.console_mfn = console_mfn
+
+        self.introduceDomain()
+        self.create_devices()
+        self.storeDomDetails()
+        self.unpause()
+        self.refreshShutdown()
+
+
     def storeVmDetails(self):
         to_store = {
             'uuid':               uuid.toString(self.uuidbytes),
@@ -603,6 +601,15 @@ class XendDomainInfo:
         for (k, v) in self.info.items():
             if v:
                 to_store[k] = str(v)
+
+        def f(n, v):
+            if v is not None:
+                to_store[n] = str(v)
+
+        f('console/port',     self.console_port)
+        f('console/ring-ref', self.console_mfn)
+        f('store/port',       self.store_port)
+        f('store/ring-ref',   self.store_mfn)
 
         to_store.update(self.vcpuDomDetails())
 
@@ -649,6 +656,16 @@ class XendDomainInfo:
         return self.dompath
 
 
+    def getStorePort(self):
+        """For use only by image.py and XendCheckpoint.py."""
+        return self.store_port
+
+
+    def getConsolePort(self):
+        """For use only by image.py and XendCheckpoint.py"""
+        return self.console_port
+
+
     def getVCpuCount(self):
         return self.info['vcpus']
 
@@ -665,10 +682,6 @@ class XendDomainInfo:
     def getMemoryTarget(self):
         """Get this domain's target memory size, in KiB."""
         return self.info['memory_KiB']
-
-    def setStoreRef(self, ref):
-        self.store_mfn = ref
-        self.storeDom("store/ring-ref", ref)
 
 
     def refreshShutdown(self, xeninfo = None):
@@ -704,6 +717,11 @@ class XendDomainInfo:
                 return
 
             elif xeninfo['crashed']:
+                if self.readDom('xend/shutdown_completed'):
+                    # We've seen this shutdown already, but we are preserving
+                    # the domain for debugging.  Leave it alone.
+                    return
+
                 log.warn('Domain has crashed: name=%s id=%d.',
                          self.info['name'], self.domid)
 
@@ -735,6 +753,11 @@ class XendDomainInfo:
                     else:
                         self.destroy()
 
+            elif self.dompath is None:
+                # We have yet to manage to call introduceDomain on this
+                # domain.  This can happen if a restore is in progress, or has
+                # failed.  Ignore this domain.
+                pass
             else:
                 # Domain is alive.  If we are shutting it down, then check
                 # the timeout on that, and destroy it if necessary.
@@ -801,11 +824,6 @@ class XendDomainInfo:
 
 
     ## public:
-
-    def setConsoleRef(self, ref):
-        self.console_mfn = ref
-        self.storeDom("console/ring-ref", ref)
-
 
     def setMemoryTarget(self, target):
         """Set the memory target of this domain.
@@ -1034,14 +1052,19 @@ class XendDomainInfo:
             raise VmError('Creating domain failed: name=%s' %
                           self.info['name'])
 
-        self.dompath = DOMROOT + str(self.domid)
-
-        # Ensure that the domain entry is clean.  This prevents a stale
-        # shutdown_start_time from killing the domain, for example.
-        self.removeDom()
-
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['vcpus']))
+
+
+    def introduceDomain(self):
+        assert self.domid is not None
+        assert self.store_mfn is not None
+        assert self.store_port is not None
+        
+        IntroduceDomain(self.domid, self.store_mfn, self.store_port)
+        self.dompath = GetDomainPath(self.domid)
+        assert self.dompath
+
 
     def initDomain(self):
         log.debug('XendDomainInfo.initDomain: %s %s %s',
@@ -1061,27 +1084,27 @@ class XendDomainInfo:
 
         xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
 
-        # XXX Merge with configure_maxmem?
         m = self.image.getDomainMemory(self.info['memory_KiB'])
-        xc.domain_setmaxmem(self.domid, m)
+        xc.domain_setmaxmem(self.domid, maxmem_kb = m)
         xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
 
         cpu = self.info['cpu']
         if cpu is not None and cpu != -1:
             xc.domain_pincpu(self.domid, 0, 1 << cpu)
 
+        self.createChannels()
+
+        channel_details = self.image.createImage()
+
+        self.store_mfn = channel_details['store_mfn']
+        if 'console_mfn' in channel_details:
+            self.console_mfn = channel_details['console_mfn']
+
+        self.introduceDomain()
+
+        self.create_devices()
+
         self.info['start_time'] = time.time()
-
-        log.debug('init_domain> Created domain=%d name=%s memory=%d',
-                  self.domid, self.info['name'], self.info['memory_KiB'])
-
-
-    def construct_image(self):
-        """Construct the boot image for the domain.
-        """
-        self.create_channels()
-        self.image.createImage()
-        IntroduceDomain(self.domid, self.store_mfn, self.store_channel)
 
 
     ## public:
@@ -1166,33 +1189,22 @@ class XendDomainInfo:
                 break
 
 
-    def eventChannel(self, path=None):
-        """Create an event channel to the domain.
-        
-        @param path under which port is stored in db
+    def createChannels(self):
+        """Create the channels to the domain.
         """
-        if path:
-            try:
-                return int(self.readDom(path))
-            except:
-                # The port is not yet set, i.e. the channel has not yet been
-                # created.
-                pass
+        self.store_port = self.createChannel()
+        self.console_port = self.createChannel()
 
+
+    def createChannel(self):
+        """Create an event channel to the domain.
+        """
         try:
-            port = xc.evtchn_alloc_unbound(dom=self.domid, remote_dom=0)
+            return xc.evtchn_alloc_unbound(dom=self.domid, remote_dom=0)
         except:
             log.exception("Exception in alloc_unbound(%d)", self.domid)
             raise
 
-        self.storeDom(path, port)
-        return port
-
-    def create_channels(self):
-        """Create the channels to the domain.
-        """
-        self.store_channel = self.eventChannel("store/port")
-        self.console_channel = self.eventChannel("console/port")
 
     def create_configured_devices(self):
         for (n, c) in self.info['device']:
@@ -1229,6 +1241,14 @@ class XendDomainInfo:
         """
         deviceClass = sxp.name(dev_config)
         self.reconfigureDevice(deviceClass, devid, dev_config)
+
+
+    def pause(self):
+        xc.domain_pause(self.domid)
+
+
+    def unpause(self):
+        xc.domain_unpause(self.domid)
 
 
     ## private:
@@ -1280,7 +1300,7 @@ class XendDomainInfo:
                 xd = get_component('xen.xend.XendDomain')
                 new_dom = xd.domain_create(config)
                 try:
-                    xc.domain_unpause(new_dom.getDomid())
+                    new_dom.unpause()
                 except:
                     new_dom.destroy()
                     raise
@@ -1353,20 +1373,6 @@ class XendDomainInfo:
             log.error(msg)
             raise VmError(msg)
         self.config = sxp.merge(['vm', ['image', blcfg]], self.config)
-
-
-    def configure(self):
-        """Configure a vm.
-
-        """
-        self.configure_maxmem()
-        self.create_devices()
-
-
-    def configure_maxmem(self):
-        if self.image:
-            m = self.image.getDomainMemory(self.info['memory_KiB'])
-            xc.domain_setmaxmem(self.domid, maxmem_kb = m)
 
 
     def send_sysrq(self, key):

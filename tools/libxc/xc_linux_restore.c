@@ -642,16 +642,6 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pf
         goto out;
     }
 
-    DPRINTF("Domain ready to be unpaused\n");
-    op.cmd = DOM0_UNPAUSEDOMAIN;
-    op.u.unpausedomain.domain = (domid_t)dom;
-    rc = xc_dom0_op(xc_handle, &op);
-    if (rc == 0) {
-        /* Success: print the domain id. */
-        DPRINTF("DOM=%u\n", dom);
-        return 0;
-    }
-
  out:
     if ( (rc != 0) && (dom != 0) )
         xc_domain_destroy(xc_handle, dom);

@@ -347,7 +347,7 @@ class XendDomain:
             dominfo = self.domain_lookup(domid)
             log.info("Domain %s (%d) unpaused.", dominfo.getName(),
                      dominfo.getDomid())
-            return xc.domain_unpause(dom=dominfo.getDomid())
+            return dominfo.unpause()
         except Exception, ex:
             raise XendError(str(ex))
 
@@ -358,7 +358,7 @@ class XendDomain:
             dominfo = self.domain_lookup(domid)
             log.info("Domain %s (%d) paused.", dominfo.getName(),
                      dominfo.getDomid())
-            return xc.domain_pause(dom=dominfo.getDomid())
+            return dominfo.pause()
         except Exception, ex:
             raise XendError(str(ex))
 
