@@ -12,11 +12,14 @@ if os.path.exists("/usr/include/ext2fs/ext2_fs.h"):
     ext2defines = []
     cc = new_compiler()
     cc.add_library("ext2fs")
-    if cc.has_function("ext2fs_open2"):
-        ext2defines.append( ("HAVE_EXT2FS_OPEN2", None) )
-    else:
-        sys.stderr.write("WARNING: older version of e2fsprogs installed, not building full\n")
-        sys.stderr.write("         disk support for ext2.\n")
+    try:
+        if cc.has_function("ext2fs_open2"):
+            ext2defines.append( ("HAVE_EXT2FS_OPEN2", None) )
+        else:
+            sys.stderr.write("WARNING: older version of e2fsprogs installed, not building full\n")
+            sys.stderr.write("         disk support for ext2.\n")
+    except AttributeError:
+        pass
         
     ext2 = Extension("grub.fsys.ext2._pyext2",
                      extra_compile_args = extra_compile_args,
