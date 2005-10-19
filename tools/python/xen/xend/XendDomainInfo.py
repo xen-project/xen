@@ -1392,7 +1392,7 @@ class XendDomainInfo:
 implements the device control specific to that device-class."""
 controllerClasses = {}
 
-def addControllerClass(device_class, backend_name, cls):
+def addControllerClass(device_class, cls):
     """Register a subclass of DevController to handle the named device-class.
     """
     cls.deviceClass = device_class
@@ -1400,8 +1400,8 @@ def addControllerClass(device_class, backend_name, cls):
 
 
 from xen.xend.server import blkif, netif, tpmif, pciif, usbif
-addControllerClass('vbd',  'blkif', blkif.BlkifController)
-addControllerClass('vif',  'netif', netif.NetifController)
-addControllerClass('vtpm', 'tpmif', tpmif.TPMifController)
-addControllerClass('pci',  'pciif', pciif.PciController)
-addControllerClass('usb',  'usbif', usbif.UsbifController)
+addControllerClass('vbd',  blkif.BlkifController)
+addControllerClass('vif',  netif.NetifController)
+addControllerClass('vtpm', tpmif.TPMifController)
+addControllerClass('pci',  pciif.PciController)
+addControllerClass('usb',  usbif.UsbifController)
