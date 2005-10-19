@@ -269,6 +269,10 @@ class Xend:
                               'warpl'    : warpl,
                               'warpu'    : warpu })
 
+    def xend_domain_cpu_sedf_get(self, id):
+        return self.xendPost(self.domainurl(id),
+                             {'op' : 'cpu_sedf_get'})
+
     def xend_domain_cpu_sedf_set(self, id, period, slice, latency, extratime, weight):
         return self.xendPost(self.domainurl(id),
                              {'op'        : 'cpu_sedf_set',

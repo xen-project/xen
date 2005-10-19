@@ -739,8 +739,8 @@ static PyObject *pyxc_xeninfo(PyObject *self,
 
 
 static PyObject *pyxc_sedf_domain_set(PyObject *self,
-                                         PyObject *args,
-                                         PyObject *kwds)
+                                      PyObject *args,
+                                      PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
     uint32_t domid;
@@ -762,8 +762,8 @@ static PyObject *pyxc_sedf_domain_set(PyObject *self,
 }
 
 static PyObject *pyxc_sedf_domain_get(PyObject *self,
-                                         PyObject *args,
-                                         PyObject *kwds)
+                                      PyObject *args,
+                                      PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
     uint32_t domid;
@@ -779,12 +779,13 @@ static PyObject *pyxc_sedf_domain_get(PyObject *self,
                                 &slice,&latency,&extratime,&weight) )
         return PyErr_SetFromErrno(xc_error);
 
-    return Py_BuildValue("{s:i,s:L,s:L,s:L,s:i}",
+    return Py_BuildValue("{s:i,s:L,s:L,s:L,s:i,s:i}",
                          "domain",    domid,
                          "period",    period,
                          "slice",     slice,
 			 "latency",   latency,
-			 "extratime", extratime);
+			 "extratime", extratime,
+                         "weight",    weight);
 }
 
 static PyObject *pyxc_domain_setmaxmem(PyObject *self,
