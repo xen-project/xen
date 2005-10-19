@@ -33,7 +33,7 @@
 # The script used to start/stop networking for xend.
 (network-script    network-bridge)
 # The default bridge that virtual interfaces should be connected to.
-(vif-bridge        xen-br0)
+(vif-bridge        xenbr0)
 # The default script used to control virtual interfaces.
 (vif-script        vif-bridge)
 

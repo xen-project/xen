@@ -8,7 +8,7 @@
 #
 # Example invocation:
 #
-# vif-bridge up domain=VM1 vif=vif1.0 bridge=xen-br0 ip="128.232.38.45/28 10.10.10.55/24"
+# vif-bridge up domain=VM1 vif=vif1.0 bridge=xenbr0 ip="128.232.38.45/28 10.10.10.55/24"
 #
 #
 # Usage:

@@ -253,7 +253,7 @@ class XendRoot:
         return self.get_config_bool('enable-dump', 'no')
 
     def get_vif_bridge(self):
-        return self.get_config_value('vif-bridge', 'xen-br0')
+        return self.get_config_value('vif-bridge', 'xenbr0')
 
     def get_vif_script(self):
         return self.get_config_value('vif-script', 'vif-bridge')

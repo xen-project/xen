@@ -176,7 +176,7 @@ u32 varp_mcast_addr = 0;
 /** UDP port (network order). */
 u16 varp_port = 0;
 
-char *varp_device = "xen-br0";
+char *varp_device = "xenbr0";
 
 #define VarpTable_read_lock(z, flags)    do{ (flags) = 0; down(&(z)->lock); } while(0)
 #define VarpTable_read_unlock(z, flags)  do{ (flags) = 0; up(&(z)->lock); } while(0)
