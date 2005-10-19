@@ -105,6 +105,13 @@ class SrvDomain(SrvDir):
         return val
     
     
+    def op_cpu_sedf_get(self, op, req):
+        fn = FormFn(self.xd.domain_cpu_sedf_get,
+                    [['dom', 'int']])
+        val = fn(req.args, {'dom': self.dom.domid})
+        return val
+
+
     def op_cpu_sedf_set(self, op, req):
         fn = FormFn(self.xd.domain_cpu_sedf_set,
                     [['dom', 'int'],
