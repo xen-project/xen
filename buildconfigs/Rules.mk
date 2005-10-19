@@ -82,6 +82,7 @@ clean::
 ref-%/.valid-ref: pristine-%/.valid-pristine
 	rm -rf $(@D)
 	cp -al $(<D) $(@D)
+	which patch || exit 1
 	([ -d patches/$* ] && \
 	  for i in patches/$*/*.patch ; do ( cd $(@D) ; patch -p1 <../$$i || exit 1 ) ; done) || true
 	touch $@ # update timestamp to avoid rebuild
