@@ -267,6 +267,9 @@ class XendRoot:
     def get_dom0_vcpus(self):
         return self.get_config_int('dom0-cpus', self.dom0_vcpus_default)
 
+    def get_console_limit(self):
+        return self.get_config_int('console-limit', 1024)
+
 def instance():
     """Get an instance of XendRoot.
     Use this instead of the constructor.

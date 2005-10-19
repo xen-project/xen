@@ -20,6 +20,9 @@
 # Specifying the empty string '' allows all connections.
 (console-address   'localhost')
 
+# The limit (in kilobytes) on the size of the console buffer
+(console-limit 1024)
+
 ## Use the following if VIF traffic is routed.
 # The script used to start/stop networking for xend.
 #(network-script     network-route)
