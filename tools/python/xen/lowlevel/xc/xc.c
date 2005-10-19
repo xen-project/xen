@@ -787,28 +787,6 @@ static PyObject *pyxc_sedf_domain_get(PyObject *self,
 			 "extratime", extratime);
 }
 
-static PyObject *pyxc_shadow_control(PyObject *self,
-                                     PyObject *args,
-                                     PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
-
-    uint32_t dom;
-    int op=0;
-
-    static char *kwd_list[] = { "dom", "op", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
-                                      &dom, &op) )
-        return NULL;
-
-    if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0, NULL) < 0 )
-        return PyErr_SetFromErrno(xc_error);
-    
-    Py_INCREF(zero);
-    return zero;
-}
-
 static PyObject *pyxc_domain_setmaxmem(PyObject *self,
                                        PyObject *args,
                                        PyObject *kwds)
@@ -1114,14 +1092,6 @@ static PyMethodDef pyxc_methods[] = {
       "Get information about the Xen host\n"
       "Returns [dict]: information about Xen"
       "        [None]: on failure.\n" },
-
-    { "shadow_control", 
-      (PyCFunction)pyxc_shadow_control, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Set parameter for shadow pagetable interface\n"
-      " dom [int]:   Identifier of domain.\n"
-      " op [int, 0]: operation\n\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_setmaxmem", 
       (PyCFunction)pyxc_domain_setmaxmem, 

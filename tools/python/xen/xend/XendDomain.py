@@ -473,14 +473,7 @@ class XendDomain:
         if not dev:
             raise XendError("invalid vif")
         return dev.setCreditLimit(credit, period)
-        
-    def domain_shadow_control(self, domid, op):
-        """Shadow page control."""
-        dominfo = self.domain_lookup(domid)
-        try:
-            return xc.shadow_control(dominfo.getDomid(), op)
-        except Exception, ex:
-            raise XendError(str(ex))
+
 
     def domain_maxmem_set(self, domid, mem):
         """Set the memory limit for a domain.
