@@ -141,6 +141,7 @@ static void __init do_initcalls(void)
 static void __init start_of_day(void)
 {
     int i;
+    unsigned long vgdt;
 
     early_cpu_init();
 
@@ -158,10 +159,17 @@ static void __init start_of_day(void)
 
     arch_do_createdomain(current);
     
-    /* Map default GDT into their final position in the idle page table. */
-    map_pages_to_xen(
-        GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE,
-        virt_to_phys(gdt_table) >> PAGE_SHIFT, 1, PAGE_HYPERVISOR);
+    /*
+     * Map default GDT into its final positions in the idle page table. As
+     * noted in arch_do_createdomain(), we must map for every possible VCPU#.
+     */
+    vgdt = GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE;
+    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+    {
+        map_pages_to_xen(
+            vgdt, virt_to_phys(gdt_table) >> PAGE_SHIFT, 1, PAGE_HYPERVISOR);
+        vgdt += 1 << PDPT_VCPU_VA_SHIFT;
+    }
 
     find_smp_config();
 

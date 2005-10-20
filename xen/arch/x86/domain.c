@@ -226,11 +226,9 @@ struct vcpu *alloc_vcpu_struct(struct domain *d, unsigned int vcpu_id)
 
     if ( (v->vcpu_id = vcpu_id) != 0 )
     {
-        v->arch.schedule_tail = d->vcpu[0]->arch.schedule_tail;
+        v->arch.schedule_tail  = d->vcpu[0]->arch.schedule_tail;
         v->arch.perdomain_ptes =
             d->arch.mm_perdomain_pt + (vcpu_id << PDPT_VCPU_SHIFT);
-        v->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
-            l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
     }
 
     return v;
@@ -256,6 +254,7 @@ void free_perdomain_pt(struct domain *d)
 void arch_do_createdomain(struct vcpu *v)
 {
     struct domain *d = v->domain;
+    int vcpuid;
 
     if ( is_idle_task(d) )
         return;
@@ -275,8 +274,20 @@ void arch_do_createdomain(struct vcpu *v)
     set_pfn_from_mfn(virt_to_phys(d->arch.mm_perdomain_pt) >> PAGE_SHIFT,
             INVALID_M2P_ENTRY);
     v->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
-    v->arch.perdomain_ptes[FIRST_RESERVED_GDT_PAGE] =
-        l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
+
+    /*
+     * Map Xen segments into every VCPU's GDT, irrespective of whether every
+     * VCPU will actually be used. This avoids an NMI race during context
+     * switch: if we take an interrupt after switching CR3 but before switching
+     * GDT, and the old VCPU# is invalid in the new domain, we would otherwise
+     * try to load CS from an invalid table.
+     */
+    for ( vcpuid = 0; vcpuid < MAX_VIRT_CPUS; vcpuid++ )
+    {
+        d->arch.mm_perdomain_pt[
+            (vcpuid << PDPT_VCPU_SHIFT) + FIRST_RESERVED_GDT_PAGE] =
+            l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
+    }
 
     v->arch.guest_vtable  = __linear_l2_table;
     v->arch.shadow_vtable = __shadow_linear_l2_table;
