@@ -455,6 +455,11 @@ int direct_remap_pfn_range(struct vm_area_struct *vma,
                             unsigned long size, 
                             pgprot_t prot,
                             domid_t  domid);
+int direct_kernel_remap_pfn_range(unsigned long address, 
+				  unsigned long mfn,
+				  unsigned long size, 
+				  pgprot_t prot,
+				  domid_t  domid);
 int create_lookup_pte_addr(struct mm_struct *mm,
                            unsigned long address,
                            unsigned long *ptep);
