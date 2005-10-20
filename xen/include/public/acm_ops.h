@@ -27,36 +27,36 @@
  * This makes sure that old versions of acm tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define ACM_INTERFACE_VERSION   0xAAAA0004
+#define ACM_INTERFACE_VERSION   0xAAAA0005
 
 /************************************************************************/
 
 #define ACM_SETPOLICY         4
-typedef struct acm_setpolicy {
+struct acm_setpolicy {
     /* OUT variables */
     void *pushcache;
-    uint16_t pushcache_size;
-} acm_setpolicy_t;
+    uint32_t pushcache_size;
+};
 
 
 #define ACM_GETPOLICY         5
-typedef struct acm_getpolicy {
+struct acm_getpolicy {
     /* OUT variables */
     void *pullcache;
-    uint16_t pullcache_size;
-} acm_getpolicy_t;
+    uint32_t pullcache_size;
+};
 
 
 #define ACM_DUMPSTATS         6
-typedef struct acm_dumpstats {
+struct acm_dumpstats {
     void *pullcache;
-    uint16_t pullcache_size;
-} acm_dumpstats_t;
+    uint32_t pullcache_size;
+};
 
 
 #define ACM_GETSSID           7
-enum get_type {UNSET, SSIDREF, DOMAINID};
-typedef struct acm_getssid {
+enum get_type {UNSET=0, SSIDREF, DOMAINID};
+struct acm_getssid {
     enum get_type get_ssid_by;
     union {
         domaintype_t domainid;
@@ -64,18 +64,35 @@ typedef struct acm_getssid {
     } id;
     void *ssidbuf;
     uint16_t ssidbuf_size;
-} acm_getssid_t;
+};
 
-typedef struct acm_op {
+#define ACM_GETDECISION        8
+struct acm_getdecision {
+    enum get_type get_decision_by1; /* in */
+    enum get_type get_decision_by2;
+    union {
+        domaintype_t domainid;
+        ssidref_t    ssidref;
+    } id1;
+    union {
+        domaintype_t domainid;
+        ssidref_t    ssidref;
+    } id2;
+    enum acm_hook_type hook;
+    int acm_decision;           /* out */
+};
+
+struct acm_op {
     uint32_t cmd;
     uint32_t interface_version;      /* ACM_INTERFACE_VERSION */
     union {
-        acm_setpolicy_t setpolicy;
-        acm_getpolicy_t getpolicy;
-        acm_dumpstats_t dumpstats;
-        acm_getssid_t getssid;
+        struct acm_setpolicy setpolicy;
+        struct acm_getpolicy getpolicy;
+        struct acm_dumpstats dumpstats;
+        struct acm_getssid getssid;
+        struct acm_getdecision getdecision;
     } u;
-} acm_op_t;
+};
 
 #endif                          /* __XEN_PUBLIC_ACM_OPS_H__ */
 

@@ -67,7 +67,7 @@ static inline int do_xen_hypercall(int xc_handle,
                         (unsigned long) hypercall);
 }
 
-static inline int do_acm_op(int xc_handle, acm_op_t * op)
+static inline int do_acm_op(int xc_handle, struct acm_op * op)
 {
     int ret = -1;
     privcmd_hypercall_t hypercall;
@@ -275,10 +275,10 @@ void acm_dump_policy_buffer(void *buf, int buflen)
 /******************************* get policy ******************************/
 
 #define PULL_CACHE_SIZE		8192
-u8 pull_buffer[PULL_CACHE_SIZE];
+uint8_t pull_buffer[PULL_CACHE_SIZE];
 int acm_domain_getpolicy(int xc_handle)
 {
-    acm_op_t op;
+    struct acm_op op;
     int ret;
 
     memset(pull_buffer, 0x00, sizeof(pull_buffer));
@@ -299,7 +299,7 @@ int acm_domain_loadpolicy(int xc_handle, const char *filename)
     struct stat mystat;
     int ret, fd;
     off_t len;
-    u8 *buffer;
+    uint8_t *buffer;
 
     if ((ret = stat(filename, &mystat)))
     {
@@ -321,7 +321,7 @@ int acm_domain_loadpolicy(int xc_handle, const char *filename)
     }
     if (len == read(fd, buffer, len))
     {
-        acm_op_t op;
+        struct acm_op op;
         /* dump it and then push it down into xen/acm */
         acm_dump_policy_buffer(buffer, len);
         op.cmd = ACM_SETPOLICY;
@@ -368,8 +368,8 @@ void dump_ste_stats(struct acm_ste_stats_buffer *ste_stats)
 #define PULL_STATS_SIZE		8192
 int acm_domain_dumpstats(int xc_handle)
 {
-    u8 stats_buffer[PULL_STATS_SIZE];
-    acm_op_t op;
+    uint8_t stats_buffer[PULL_STATS_SIZE];
+    struct acm_op op;
     int ret;
     struct acm_stats_buffer *stats;
 
@@ -442,7 +442,7 @@ int acm_domain_getssid(int xc_handle, int argc, char * const argv[])
     /* this includes header and a set of types */
     #define MAX_SSIDBUFFER  2000
     int ret, i;
-    acm_op_t op;
+    struct acm_op op;
     struct acm_ssid_buffer *hdr;
     unsigned char *buf;
 	int nice_print = 1;

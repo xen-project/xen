@@ -1150,7 +1150,7 @@ void sedf_wake(struct vcpu *d) {
     inf->block_tot++;
 #endif
     if (unlikely(now < PERIOD_BEGIN(inf))) {
-    	PRINT(4,"extratime unblock\n");
+        PRINT(4,"extratime unblock\n");
         /* unblocking in extra-time! */
 #if (EXTRA == EXTRA_BLOCK_WEIGHT)
         if (inf->status & EXTRA_WANT_PEN_Q) {
@@ -1459,3 +1459,13 @@ struct scheduler sched_sedf_def = {
     .wake           = sedf_wake,
     .adjdom         = sedf_adjdom,
 };
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

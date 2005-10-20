@@ -43,6 +43,7 @@ endif
 build: mk-symlinks
 	$(MAKE) secpol_tool
 	$(MAKE) secpol_xml2bin
+	$(MAKE) get_decision
 	chmod 700 ./setlabel.sh
 	chmod 700 ./updategrub.sh
 	chmod 700 ./getlabel.sh
