@@ -87,6 +87,10 @@ VMROOT  = '/vm/'
 
 ZOMBIE_PREFIX = 'Zombie-'
 
+"""Minimum time between domain restarts in seconds."""
+MINIMUM_RESTART_TIME = 20
+
+
 xc = xen.lowlevel.xc.new()
 xroot = XendRoot.instance()
 
@@ -102,6 +106,7 @@ log = logging.getLogger("xend.XendDomainInfo")
 # file, so those are handled separately.
 ROUNDTRIPPING_CONFIG_ENTRIES = [
         ('name',         str),
+        ('uuid',         str),
         ('ssidref',      int),
         ('vcpus',        int),
         ('vcpu_avail',   int),
@@ -141,7 +146,7 @@ def create(config):
 
     log.debug("XendDomainInfo.create(%s)", config)
 
-    vm = XendDomainInfo(uuid.create(), parseConfig(config))
+    vm = XendDomainInfo(parseConfig(config))
     try:
         vm.construct()
         vm.initDomain()
@@ -166,10 +171,13 @@ def recreate(xeninfo, priv):
 
     domid = xeninfo['dom']
     uuid1 = xeninfo['handle']
+    xeninfo['uuid'] = uuid.toString(uuid1)
     dompath = GetDomainPath(domid)
     if not dompath:
         raise XendError(
             'No domain path in store for existing domain %d' % domid)
+
+    log.info("Recreating domain %d, UUID %s.", domid, xeninfo['uuid'])
     try:
         vmpath = xstransact.Read(dompath, "vm")
         if not vmpath:
@@ -185,19 +193,15 @@ def recreate(xeninfo, priv):
         if uuid1 != uuid2:
             raise XendError(
                 'Uuid in store does not match uuid for existing domain %d: '
-                '%s != %s' % (domid, uuid2_str, uuid.toString(uuid1)))
+                '%s != %s' % (domid, uuid2_str, xeninfo['uuid']))
 
-        log.info("Recreating domain %d, UUID %s.", domid, uuid2_str)
-
-        vm = XendDomainInfo(uuid1, xeninfo, domid, dompath, True)
+        vm = XendDomainInfo(xeninfo, domid, dompath, True)
 
     except Exception, exn:
-        log.warn(str(exn))
+        if True:
+            log.warn(str(exn))
 
-        log.info("Recreating domain %d with UUID %s.", domid,
-                 uuid.toString(uuid1))
-
-        vm = XendDomainInfo(uuid1, xeninfo, domid, dompath, True)
+        vm = XendDomainInfo(xeninfo, domid, dompath, True)
         vm.removeDom()
         vm.removeVm()
         vm.storeVmDetails()
@@ -215,8 +219,7 @@ def restore(config):
 
     log.debug("XendDomainInfo.restore(%s)", config)
 
-    vm = XendDomainInfo(uuid.fromString(sxp.child_value(config, 'uuid')),
-                        parseConfig(config))
+    vm = XendDomainInfo(parseConfig(config))
     try:
         vm.construct()
         vm.storeVmDetails()
@@ -335,18 +338,14 @@ def dom_get(dom):
     return None
 
 class XendDomainInfo:
-    """Virtual machine object."""
-
-    """Minimum time between domain restarts in seconds.
-    """
-    MINIMUM_RESTART_TIME = 20
 
 
-    def __init__(self, uuidbytes, info, domid = None, dompath = None,
-                 augment = False):
+    def __init__(self, info, domid = None, dompath = None, augment = False):
 
-        self.uuidbytes = uuidbytes
         self.info = info
+
+        if not self.infoIsSet('uuid'):
+            self.info['uuid'] = uuid.toString(uuid.create())
 
         if domid is not None:
             self.domid = domid
@@ -355,7 +354,7 @@ class XendDomainInfo:
         else:
             self.domid = None
 
-        self.vmpath  = VMROOT + uuid.toString(uuidbytes)
+        self.vmpath  = VMROOT + self.info['uuid']
         self.dompath = dompath
 
         if augment:
@@ -571,7 +570,7 @@ class XendDomainInfo:
 
     def storeVmDetails(self):
         to_store = {
-            'uuid':               uuid.toString(self.uuidbytes),
+            'uuid':               self.info['uuid'],
 
             # XXX
             'memory/target':      str(self.info['memory_KiB'])
@@ -928,7 +927,6 @@ class XendDomainInfo:
     def sxpr(self):
         sxpr = ['domain',
                 ['domid',   self.domid],
-                ['uuid',    uuid.toString(self.uuidbytes)],
                 ['memory',  self.info['memory_KiB'] / 1024]]
 
         for e in ROUNDTRIPPING_CONFIG_ENTRIES:
@@ -1045,8 +1043,9 @@ class XendDomainInfo:
                   self.domid,
                   self.info['ssidref'])
 
-        self.domid = xc.domain_create(dom = 0, ssidref = self.info['ssidref'],
-                                      handle = self.uuidbytes)
+        self.domid = xc.domain_create(
+            dom = 0, ssidref = self.info['ssidref'],
+            handle = uuid.fromString(self.info['uuid']))
 
         if self.domid < 0:
             raise VmError('Creating domain failed: name=%s' %
@@ -1253,31 +1252,12 @@ class XendDomainInfo:
 
     ## private:
 
-    def restart_check(self):
-        """Check if domain restart is OK.
-        To prevent restart loops, raise an error if it is
-        less than MINIMUM_RESTART_TIME seconds since the last restart.
-        """
-        tnow = time.time()
-        if self.restart_time is not None:
-            tdelta = tnow - self.restart_time
-            if tdelta < self.MINIMUM_RESTART_TIME:
-                self.restart_cancel()
-                msg = 'VM %s restarting too fast' % self.info['name']
-                log.error(msg)
-                raise VmError(msg)
-        self.restart_time = tnow
-        self.restart_count += 1
-
-
     def restart(self, rename = False):
         """Restart the domain after it has exited.
 
         @param rename True if the old domain is to be renamed and preserved,
         False if it is to be destroyed.
         """
-
-        #            self.restart_check()
 
         config = self.sxpr()
 
@@ -1290,11 +1270,27 @@ class XendDomainInfo:
 
         self.writeVm('xend/restart_in_progress', 'True')
 
+        now = time.time()
+        rst = self.readVm('xend/previous_restart_time')
+        log.error(rst)
+        if rst:
+            rst = float(rst)
+            timeout = now - rst
+            if timeout < MINIMUM_RESTART_TIME:
+                log.error(
+                    'VM %s restarting too fast (%f seconds since the last '
+                    'restart).  Refusing to restart to avoid loops.',
+                    self.info['name'], timeout)
+            self.destroy()
+            return
+
+        self.writeVm('xend/previous_restart_time', str(now))
+
         try:
             if rename:
                 self.preserveForRestart()
             else:
-                self.destroy()
+                self.destroyDomain()
                 
             try:
                 xd = get_component('xen.xend.XendDomain')
@@ -1321,15 +1317,14 @@ class XendDomainInfo:
         """
         
         new_name = self.generateUniqueName()
-        new_uuid = uuid.create()
-        new_uuid_str = uuid.toString(new_uuid)
+        new_uuid = uuid.toString(uuid.create())
         log.info("Renaming dead domain %s (%d, %s) to %s (%s).",
-                 self.info['name'], self.domid, uuid.toString(self.uuidbytes),
-                 new_name, new_uuid_str)
+                 self.info['name'], self.domid, self.info['uuid'],
+                 new_name, new_uuid)
         self.release_devices()
         self.info['name'] = new_name
-        self.uuidbytes = new_uuid
-        self.vmpath = VMROOT + new_uuid_str
+        self.info['uuid'] = new_uuid
+        self.vmpath = VMROOT + new_uuid
         self.storeVmDetails()
         self.preserve()
 
