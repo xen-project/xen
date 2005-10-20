@@ -90,7 +90,7 @@ void smp_prepare_boot_cpu(void);
 #define smp_processor_id()			0
 #endif
 #define hard_smp_processor_id()			0
-#define smp_call_function(func,info,retry,wait)	do {} while (0)
+#define smp_call_function(func,info,retry,wait)	({ do {} while (0); 0; })
 #define on_each_cpu(func,info,retry,wait)	({ func(info); 0; })
 #define num_booting_cpus()			1
 #define smp_prepare_boot_cpu()			do {} while (0)
