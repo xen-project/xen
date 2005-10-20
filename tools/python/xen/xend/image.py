@@ -311,7 +311,8 @@ class VmxImageHandler(ImageHandler):
                   "-m", "%s" % (self.vm.getMemoryTarget() / 1024)])
         args = args + self.dmargs
         env = dict(os.environ)
-        env['DISPLAY'] = self.display
+        if self.display:
+            env['DISPLAY'] = self.display
         log.info("spawning device models: %s %s", self.device_model, args)
         self.pid = os.spawnve(os.P_NOWAIT, self.device_model, args, env)
         log.info("device model pid: %d", self.pid)
