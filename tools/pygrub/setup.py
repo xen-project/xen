@@ -13,7 +13,7 @@ if os.path.exists("/usr/include/ext2fs/ext2_fs.h"):
     cc = new_compiler()
     cc.add_library("ext2fs")
     try:
-        if cc.has_function("ext2fs_open2"):
+        if hasattr(cc, "has_function") and cc.has_function("ext2fs_open2"):
             ext2defines.append( ("HAVE_EXT2FS_OPEN2", None) )
         else:
             sys.stderr.write("WARNING: older version of e2fsprogs installed, not building full\n")
