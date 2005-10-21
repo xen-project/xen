@@ -254,6 +254,7 @@ void free_perdomain_pt(struct domain *d)
 void arch_do_createdomain(struct vcpu *v)
 {
     struct domain *d = v->domain;
+    l1_pgentry_t gdt_l1e;
     int vcpuid;
 
     if ( is_idle_task(d) )
@@ -282,12 +283,10 @@ void arch_do_createdomain(struct vcpu *v)
      * GDT, and the old VCPU# is invalid in the new domain, we would otherwise
      * try to load CS from an invalid table.
      */
+    gdt_l1e = l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
     for ( vcpuid = 0; vcpuid < MAX_VIRT_CPUS; vcpuid++ )
-    {
         d->arch.mm_perdomain_pt[
-            (vcpuid << PDPT_VCPU_SHIFT) + FIRST_RESERVED_GDT_PAGE] =
-            l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
-    }
+            (vcpuid << PDPT_VCPU_SHIFT) + FIRST_RESERVED_GDT_PAGE] = gdt_l1e;
 
     v->arch.guest_vtable  = __linear_l2_table;
     v->arch.shadow_vtable = __shadow_linear_l2_table;
