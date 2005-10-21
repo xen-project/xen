@@ -14,6 +14,8 @@ import pwd
 import re
 import traceback
 
+import xen.lowlevel.xc
+
 from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
 
@@ -268,6 +270,10 @@ class Daemon:
     def run(self, status):
         try:
             log.info("Xend Daemon started")
+
+            xinfo = xen.lowlevel.xc.new().xeninfo()
+            log.info("Xend changeset: %s.", xinfo['xen_changeset'])
+
             event.listenEvent(self)
             relocate.listenRelocation()
             servers = SrvServer.create()
