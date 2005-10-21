@@ -271,8 +271,10 @@ class Daemon:
         try:
             log.info("Xend Daemon started")
 
-            xinfo = xen.lowlevel.xc.new().xeninfo()
+            xc = xen.lowlevel.xc.new()
+            xinfo = xc.xeninfo()
             log.info("Xend changeset: %s.", xinfo['xen_changeset'])
+            del xc
 
             event.listenEvent(self)
             relocate.listenRelocation()
