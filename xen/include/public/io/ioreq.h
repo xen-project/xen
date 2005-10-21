@@ -60,8 +60,10 @@ typedef struct {
 #define INTR_LEN        (MAX_VECTOR/(BITS_PER_BYTE * sizeof(uint64_t)))
 
 typedef struct {
-    uint64_t pic_intr[INTR_LEN];
-    uint64_t pic_mask[INTR_LEN];
+    uint16_t  pic_elcr;
+    uint16_t   pic_irr;
+    uint16_t   pic_last_irr;
+    uint16_t   pic_clear_irr;
     int      eport; /* Event channel port */
 } global_iodata_t;
 

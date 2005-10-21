@@ -34,6 +34,7 @@ extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_resume(void);
 extern void vmx_asm_do_launch(void);
 extern void vmx_intr_assist(void);
+extern void pic_irq_request(int *interrupt_request, int level);
 
 extern void arch_vmx_do_launch(struct vcpu *);
 extern void arch_vmx_do_resume(struct vcpu *);

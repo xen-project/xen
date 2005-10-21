@@ -647,8 +647,8 @@ void send_pio_req(struct cpu_user_regs *regs, unsigned long port,
         p->u.data = value;
 
     if (vmx_portio_intercept(p)) {
-        /* no blocking & no evtchn notification */
-        clear_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags);
+        p->state = STATE_IORESP_READY;
+        vmx_io_assist(v);
         return;
     }
 

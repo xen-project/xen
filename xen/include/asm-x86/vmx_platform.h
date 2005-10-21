@@ -24,6 +24,7 @@
 #include <asm/e820.h>
 #include <asm/vmx_virpit.h>
 #include <asm/vmx_intercept.h>
+#include <public/io/vmx_vpic.h>
 
 #define MAX_OPERAND_NUM 2
 
@@ -80,6 +81,8 @@ struct virtual_platform_def {
     unsigned long          shared_page_va;
     struct vmx_virpit      vmx_pit;
     struct vmx_io_handler  vmx_io_handler;
+    struct vmx_virpic      vmx_pic;
+    int                    interrupt_request;
 };
 
 extern void handle_mmio(unsigned long, unsigned long);

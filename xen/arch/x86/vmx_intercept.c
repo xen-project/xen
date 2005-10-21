@@ -209,8 +209,7 @@ static void pit_timer_fn(void *data)
     missed_ticks = (NOW() - vpit->scheduled)/(s_time_t) vpit->period;
 
     /* Set the pending intr bit, and send evtchn notification to myself. */
-    if (test_and_set_bit(vpit->vector, vpit->intr_bitmap))
-        vpit->pending_intr_nr++; /* already set, then count the pending intr */
+    vpit->pending_intr_nr++; /* already set, then count the pending intr */
     evtchn_set_pending(vpit->v, iopacket_port(vpit->v->domain));
 
     /* pick up missed timer tick */
@@ -230,11 +229,8 @@ void vmx_hooks_assist(struct vcpu *v)
 {
     vcpu_iodata_t *vio = get_vio(v->domain, v->vcpu_id);
     ioreq_t *p = &vio->vp_ioreq;
-    shared_iopage_t *sp = get_sp(v->domain);
-    u64 *intr = &(sp->sp_global.pic_intr[0]);
     struct vmx_virpit *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
     int rw_mode, reinit = 0;
-    int oldvec = 0;
 
     /* load init count*/
     if (p->state == STATE_IORESP_HOOK) {
@@ -243,7 +239,7 @@ void vmx_hooks_assist(struct vcpu *v)
             VMX_DBG_LOG(DBG_LEVEL_1, "VMX_PIT: guest reset PIT with channel %lx!\n", (unsigned long) ((p->u.data >> 24) & 0x3) );
             rem_ac_timer(&(vpit->pit_timer));
             reinit = 1;
-            oldvec = vpit->vector;
+ 
         }
         else
             init_ac_timer(&vpit->pit_timer, pit_timer_fn, vpit, v->processor);
@@ -257,12 +253,6 @@ void vmx_hooks_assist(struct vcpu *v)
             printk("VMX_PIT: guest programmed too small an init_val: %x\n",
                    vpit->init_val);
             vpit->period = 1000000;
-        }
-        vpit->vector = ((p->u.data >> 16) & 0xFF);
-
-        if( reinit && oldvec != vpit->vector){
-            clear_bit(oldvec, intr);
-            vpit->pending_intr_nr = 0;
         }
 
         vpit->channel = ((p->u.data >> 24) & 0x3);
@@ -287,7 +277,6 @@ void vmx_hooks_assist(struct vcpu *v)
             break;
         }
 
-        vpit->intr_bitmap = intr;
         vpit->v = v;
 
         vpit->scheduled = NOW() + vpit->period;
@@ -297,8 +286,9 @@ void vmx_hooks_assist(struct vcpu *v)
         p->state = STATE_IORESP_READY;
 
         /* register handler to intercept the PIT io when vm_exit */
-        if (!reinit)
+        if (!reinit) {
             register_portio_handler(0x40, 4, intercept_pit_io); 
+        }
     }
 }
 #endif /* CONFIG_VMX */

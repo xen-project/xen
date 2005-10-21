@@ -39,7 +39,6 @@
 #include <asm/msr.h>
 #include <asm/physdev.h>
 #include <xen/kernel.h>
-#include <public/io/ioreq.h>
 #include <xen/multicall.h>
 
 /* opt_noreboot: If true, machine will need manual reset on error. */

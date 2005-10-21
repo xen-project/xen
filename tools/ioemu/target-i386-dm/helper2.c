@@ -404,20 +404,6 @@ static __inline__ void atomic_set_bit(long nr, volatile void *addr)
 }
 
 void
-do_interrupt(CPUState *env, int vector)
-{
-	unsigned long *intr;
-
-	// Send a message on the event channel. Add the vector to the shared mem
-	// page.
-	intr = (unsigned long *) &(shared_page->sp_global.pic_intr[0]);
-	atomic_set_bit(vector, intr);
-        if (loglevel & CPU_LOG_INT)
-                fprintf(logfile, "injecting vector: %x\n", vector);
-	env->send_event = 1;
-}
-
-void
 destroy_vmx_domain(void)
 {
     extern FILE* logfile;
@@ -429,7 +415,6 @@ destroy_vmx_domain(void)
 
 int main_loop(void)
 {
-	int vector;
  	fd_set rfds;
 	struct timeval tv;
 	extern CPUState *global_env;
@@ -476,11 +461,6 @@ int main_loop(void)
 		ioapic_update_EOI();
 #endif
 		cpu_timer_handler(env);
-		if (env->interrupt_request & CPU_INTERRUPT_HARD) {
-                        env->interrupt_request &= ~CPU_INTERRUPT_HARD;
-			vector = cpu_get_pic_interrupt(env); 
-			do_interrupt(env, vector);
-		}
 #ifdef APIC_SUPPORT
 		if (ioapic_has_intr())
                     do_ioapic();

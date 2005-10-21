@@ -222,9 +222,7 @@ void pit_reset_vmx_vectors()
     int irq, i;
     PITChannelState *s;
 
-    /* Assumes PIT is wired to IRQ0 and -1 is uninitialized irq base */
-    if ((irq = pic_irq2vec(0)) == -1)
-        return;
+    irq = 0;
 
     for(i = 0; i < 3; i++) {
         if (pit_state.channels[i].vmx_channel)

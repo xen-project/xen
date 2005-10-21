@@ -8,7 +8,7 @@
 #include <xen/errno.h>
 #include <public/io/ioreq.h>
 
-#define MAX_IO_HANDLER              4
+#define MAX_IO_HANDLER              8
 
 #define VMX_PORTIO                  0
 #define VMX_MMIO                    1

@@ -210,8 +210,14 @@ static void get_io_shared_page(struct vcpu *v)
 
 static void vmx_setup_platform(struct vcpu *v)
 {
-    if (v->vcpu_id == 0)
+    struct virtual_platform_def  *platform;
+    if (v->vcpu_id == 0) {
         get_io_shared_page(v);
+        platform = &v->domain->arch.vmx_platform;
+        pic_init(&platform->vmx_pic,  pic_irq_request, 
+                 &platform->interrupt_request);
+        register_pic_io_hook();
+    }
 }
 
 static void vmx_set_host_env(struct vcpu *v)
@@ -275,7 +281,8 @@ static void vmx_do_launch(struct vcpu *v)
     page = (struct pfn_info *) alloc_domheap_page(NULL);
     pfn = (unsigned long) (page - frame_table);
 
-    vmx_setup_platform(v);
+    if ( v == v->domain->vcpu[0] )
+        vmx_setup_platform(v);
 
     vmx_set_host_env(v);
 
