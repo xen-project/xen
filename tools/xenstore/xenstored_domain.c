@@ -33,6 +33,7 @@
 #include "talloc.h"
 #include "xenstored_core.h"
 #include "xenstored_domain.h"
+#include "xenstored_proc.h"
 #include "xenstored_watch.h"
 #include "xenstored_test.h"
 
@@ -449,7 +450,7 @@ static int dom0_init(void)
         char str[20]; 
         struct domain *dom0; 
         
-        fd = open("/proc/xen/xsd_mfn", O_RDONLY); 
+        fd = open(XENSTORED_PROC_MFN, O_RDONLY); 
         
         rc = read(fd, str, sizeof(str)); 
         str[rc] = '\0'; 
@@ -457,7 +458,7 @@ static int dom0_init(void)
         
         close(fd); 
         
-        fd = open("/proc/xen/xsd_port", O_RDONLY); 
+        fd = open(XENSTORED_PROC_PORT, O_RDONLY); 
         
         rc = read(fd, str, sizeof(str)); 
         str[rc] = '\0'; 
