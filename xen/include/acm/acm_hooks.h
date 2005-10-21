@@ -15,6 +15,7 @@
  *      sHype hooks that are called throughout Xen.
  * 
  */
+
 #ifndef _ACM_HOOKS_H
 #define _ACM_HOOKS_H
 
@@ -89,8 +90,8 @@ struct acm_operations {
     /* policy management functions (must always be defined!) */
     int  (*init_domain_ssid)           (void **ssid, ssidref_t ssidref);
     void (*free_domain_ssid)           (void *ssid);
-    int  (*dump_binary_policy)         (u8 *buffer, u16 buf_size);
-    int  (*set_binary_policy)          (u8 *buffer, u16 buf_size);
+    int  (*dump_binary_policy)         (u8 *buffer, u32 buf_size);
+    int  (*set_binary_policy)          (u8 *buffer, u32 buf_size);
     int  (*dump_statistics)            (u8 *buffer, u16 buf_size);
     int  (*dump_ssid_types)            (ssidref_t ssidref, u8 *buffer, u16 buf_size);
     /* domain management control hooks (can be NULL) */
@@ -108,6 +109,8 @@ struct acm_operations {
     void (*fail_grant_map_ref)         (domid_t id);
     int  (*pre_grant_setup)            (domid_t id);
     void (*fail_grant_setup)           (domid_t id);
+    /* generic domain-requested decision hooks (can be NULL) */
+    int (*sharing)                     (ssidref_t ssidref1, ssidref_t ssidref2);
 };
 
 /* global variables */
@@ -144,6 +147,8 @@ static inline int acm_init(unsigned int *initrdidx,
 { return 0; }
 static inline void acm_post_domain0_create(domid_t domid) 
 { return; }
+static inline int acm_sharing(ssidref_t ssidref1, ssidref_t ssidref2)
+{ return 0; }
 
 #else
 
@@ -281,7 +286,8 @@ static inline int acm_pre_event_channel(evtchn_op_t *op)
         break;
     case EVTCHNOP_bind_interdomain:
         ret = acm_pre_eventchannel_interdomain(
-            op->u.bind_interdomain.dom1, op->u.bind_interdomain.dom2);
+            current->domain->domain_id,
+            op->u.bind_interdomain.remote_dom);
         break;
     default:
         ret = 0; /* ok */
@@ -341,6 +347,18 @@ static inline void acm_post_domain0_create(domid_t domid)
     acm_post_domain_create(domid, ACM_DOM0_SSIDREF);
 }
 
+static inline int acm_sharing(ssidref_t ssidref1, ssidref_t ssidref2)
+{
+    if ((acm_primary_ops->sharing != NULL) &&
+        acm_primary_ops->sharing(ssidref1, ssidref2))
+        return ACM_ACCESS_DENIED;
+    else if ((acm_secondary_ops->sharing != NULL) &&
+             acm_secondary_ops->sharing(ssidref1, ssidref2)) {
+        return ACM_ACCESS_DENIED;
+    } else
+        return ACM_ACCESS_PERMITTED;
+}
+
 extern int acm_init(unsigned int *initrdidx,
                     const multiboot_info_t *mbi,
                     unsigned long start);
@@ -348,3 +366,13 @@ extern int acm_init(unsigned int *initrdidx,
 #endif
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

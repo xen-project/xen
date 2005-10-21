@@ -199,7 +199,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         /*
          * If we're on a HT system, we only use the first HT for dom0, other 
          * domains will all share the second HT of each CPU. Since dom0 is on 
-	     * CPU 0, we favour high numbered CPUs in the event of a tie.
+         * CPU 0, we favour high numbered CPUs in the event of a tie.
          */
         pro = smp_num_siblings - 1;
         for ( i = pro; i < num_online_cpus(); i += smp_num_siblings )

@@ -52,9 +52,9 @@
 #define ACM_ERROR          -4
 
 /* External ACCESS DECISIONS */
-#define ACM_ACCESS_PERMITTED  0
-#define ACM_ACCESS_DENIED  -111
-#define ACM_NULL_POINTER_ERROR  -200
+#define ACM_ACCESS_PERMITTED        0
+#define ACM_ACCESS_DENIED           -111
+#define ACM_NULL_POINTER_ERROR      -200
 
 /* primary policy in lower 4 bits */
 #define ACM_NULL_POLICY 0
@@ -83,6 +83,9 @@
 
 /* defines a ssid reference used by xen */
 typedef uint32_t ssidref_t;
+
+/* hooks that are known to domains */
+enum acm_hook_type {NONE=0, SHARING};
 
 /* -------security policy relevant type definitions-------- */
 

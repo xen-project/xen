@@ -29,7 +29,7 @@
 //#define DEBUG_PIC
 
 //#define DEBUG_IRQ_LATENCY
-#define DEBUG_IRQ_COUNT
+//#define DEBUG_IRQ_COUNT
 
 extern void pit_reset_vmx_vectors();
 
