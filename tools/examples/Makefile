@@ -24,7 +24,7 @@ XEN_SCRIPTS += network-route vif-route
 XEN_SCRIPTS += network-nat vif-nat
 XEN_SCRIPTS += block
 XEN_SCRIPTS += block-enbd
-XEN_SCRIPTS += xen-hotplug-common.sh
+XEN_SCRIPTS += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
 
 XEN_HOTPLUG_DIR = /etc/hotplug
 XEN_HOTPLUG_SCRIPTS = xen-backend.agent

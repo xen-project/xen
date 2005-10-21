@@ -25,7 +25,7 @@
 #            higher value than its default of 1.
 # bridge     The bridge to use (default xenbr${vifnum}).
 # netdev     The interface to add to the bridge (default eth${vifnum}).
-# antispoof  Whether to use iptables to prevent spoofing (default yes).
+# antispoof  Whether to use iptables to prevent spoofing (default no).
 #
 # start:
 # Creates the bridge and enslaves netdev to it.
@@ -42,16 +42,8 @@
 #
 #============================================================================
 
-# Gentoo doesn't have ifup/ifdown: define appropriate alternatives
-which ifup >& /dev/null
-if [ "$?" != 0 -a -e /etc/conf.d/net ]; then
-    ifup() {
-        /etc/init.d/net.$1 start
-    }
-    ifdown() {
-        /etc/init.d/net.$1 stop
-    }
-fi
+dir=$(dirname "$0")
+. "$dir/xen-network-common.sh"
 
 # Exit if anything goes wrong.
 set -e 
@@ -66,13 +58,11 @@ for arg ; do export "${arg}" ; done
 vifnum=${vifnum:-0}
 bridge=${bridge:-xenbr${vifnum}}
 netdev=${netdev:-eth${vifnum}}
-antispoof=${antispoof:-yes}
+antispoof=${antispoof:-no}
 
 pdev="p${netdev}"
 vdev="veth${vifnum}"
 vif0="vif0.${vifnum}"
-
-echo "*network $OP bridge=$bridge netdev=$netdev antispoof=$antispoof vifnum=$vifnum" >&2
 
 legacy_mask_to_prefix() {
     mask=$1
@@ -178,15 +168,13 @@ add_to_bridge () {
     fi
 }
 
-# Usage: antispoofing dev bridge
 # Set the default forwarding policy for $dev to drop.
 # Allow forwarding to the bridge.
 antispoofing () {
-    local dev=$1
-    local bridge=$2
-
     iptables -P FORWARD DROP
-    iptables -A FORWARD -m physdev --physdev-in ${dev} -j ACCEPT
+    iptables -F FORWARD
+    iptables -A FORWARD -m physdev --physdev-in ${pdev} -j ACCEPT
+    iptables -A FORWARD -m physdev --physdev-in ${vif0} -j ACCEPT
 }
 
 # Usage: show_status dev bridge
@@ -263,7 +251,7 @@ op_start () {
     fi
 
     if [ ${antispoof} == 'yes' ] ; then
-	antispoofing ${netdev} ${bridge}
+	antispoofing
     fi
 }
 

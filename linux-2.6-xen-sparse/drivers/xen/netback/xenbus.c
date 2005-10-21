@@ -161,33 +161,26 @@ static void backend_changed(struct xenbus_watch *watch,
 static int netback_hotplug(struct xenbus_device *xdev, char **envp,
 			   int num_envp, char *buffer, int buffer_size)
 {
-	struct backend_info *be;
-	netif_t *netif;
-	char **key, *val;
+	struct backend_info *be = xdev->data;
+	netif_t *netif = be->netif;
 	int i = 0, length = 0;
-	static char *env_vars[] = { "script", "domain", "mac", "bridge", "ip",
-				    NULL };
 
-	be = xdev->data;
-	netif = be->netif;
+	char *val = xenbus_read(NULL, xdev->nodename, "script", NULL);
+	if (IS_ERR(val)) {
+		int err = PTR_ERR(val);
+		xenbus_dev_error(xdev, err, "reading script");
+		return err;
+	}
+	else {
+		add_hotplug_env_var(envp, num_envp, &i,
+				    buffer, buffer_size, &length,
+				    "script=%s", val);
+		kfree(val);
+	}
 
 	add_hotplug_env_var(envp, num_envp, &i,
 			    buffer, buffer_size, &length,
 			    "vif=%s", netif->dev->name);
-
-	key = env_vars;
-	while (*key != NULL) {
-		val = xenbus_read(NULL, xdev->nodename, *key, NULL);
-		if (!IS_ERR(val)) {
-			char buf[strlen(*key) + 4];
-			sprintf(buf, "%s=%%s", *key);
-			add_hotplug_env_var(envp, num_envp, &i,
-					    buffer, buffer_size, &length,
-					    buf, val);
-			kfree(val);
-		}
-		key++;
-	}
 
 	envp[i] = NULL;
 

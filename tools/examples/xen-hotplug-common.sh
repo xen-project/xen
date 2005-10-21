@@ -10,19 +10,20 @@ log() {
   logger -p "daemon.$level" -- "$0:" "$@" || echo "$0 $@" >&2
 }
 
+fatal() {
+  log err "$@"
+  exit 1
+}
+
 xenstore_read() {
   local v=$(xenstore-read "$@" || true)
-  if [ "$v" == "" ]
-  then
-    log error "xenstore-read $@ failed."
-    exit 1
-  fi
+  [ "$v" != "" ] || fatal "xenstore-read $@ failed."
   echo "$v"
 }
 
 xenstore_write() {
   log debug "Writing $@ to xenstore."
-  xenstore-write "$@" || log error "Writing $@ to xenstore failed."
+  xenstore-write "$@" || log err "Writing $@ to xenstore failed."
 }
 
 log debug "$@" "XENBUS_PATH=$XENBUS_PATH"
