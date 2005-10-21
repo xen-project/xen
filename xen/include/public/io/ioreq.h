@@ -29,18 +29,11 @@
 #define STATE_IORESP_READY      3
 #define STATE_IORESP_HOOK       4
 
-#define IOREQ_TYPE_PIO		0	/* pio */
-#define IOREQ_TYPE_COPY		1	/* mmio ops */
-#define IOREQ_TYPE_AND		2
-#define IOREQ_TYPE_OR		3
-#define IOREQ_TYPE_XOR		4
-
-#ifdef __HYPERVISOR__
-#include <public/io/vmx_vlapic.h>
-#else
-#include <xen/io/vmx_vlapic.h>
-#endif
-
+#define IOREQ_TYPE_PIO  0 /* pio */
+#define IOREQ_TYPE_COPY  1 /* mmio ops */
+#define IOREQ_TYPE_AND  2
+#define IOREQ_TYPE_OR  3
+#define IOREQ_TYPE_XOR  4
 
 /*
  * VMExit dispatcher should cooperate with instruction decoder to
@@ -48,35 +41,48 @@
  * virq 
  */
 typedef struct {
-    u64     addr;               /*  physical address            */
-    u64     size;               /*  size in bytes               */
-    u64     count;		/*  for rep prefixes            */
+    uint64_t addr;   /*  physical address            */
+    uint64_t size;   /*  size in bytes               */
+    uint64_t count;  /*  for rep prefixes            */
     union {
-        u64     data;           /*  data                        */
-        void    *pdata;         /*  pointer to data             */
+        uint64_t data;           /*  data                        */
+        void    *pdata;          /*  pointer to data             */
     } u;
-    u8      state:4;
-    u8      pdata_valid:1;	/* if 1, use pdata above        */
-    u8      dir:1;		/*  1=read, 0=write             */
-    u8      df:1;
-    u8      type;		/* I/O type			*/
+    uint8_t state:4;
+    uint8_t pdata_valid:1; /* if 1, use pdata above  */
+    uint8_t dir:1;   /*  1=read, 0=write             */
+    uint8_t df:1;
+    uint8_t type;    /* I/O type                     */
 } ioreq_t;
 
+#define MAX_VECTOR    256
+#define BITS_PER_BYTE   8
+#define INTR_LEN        (MAX_VECTOR/(BITS_PER_BYTE * sizeof(uint64_t)))
+
 typedef struct {
-    u64   pic_intr[INTR_LEN];
-    u64   pic_mask[INTR_LEN];
-    int     eport; /* Event channel port */
+    uint64_t pic_intr[INTR_LEN];
+    uint64_t pic_mask[INTR_LEN];
+    int      eport; /* Event channel port */
 } global_iodata_t;
 
 typedef struct {
-    ioreq_t         vp_ioreq;
-    vl_apic_info    apic_intr;
+    ioreq_t       vp_ioreq;
+    unsigned long vp_intr[INTR_LEN];
 } vcpu_iodata_t;
 
 typedef struct {
-    int vcpu_number;
-    global_iodata_t     sp_global;
-    vcpu_iodata_t       vcpu_iodata[1];
+    global_iodata_t sp_global;
+    vcpu_iodata_t   vcpu_iodata[1];
 } shared_iopage_t;
 
 #endif /* _IOREQ_H_ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
