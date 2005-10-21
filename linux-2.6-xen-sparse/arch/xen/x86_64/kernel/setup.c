@@ -733,6 +733,7 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_XEN
 	{
 		int i, j, k, fpp;
+
 		/* Make sure we have a large enough P->M table. */
 		phys_to_machine_mapping = alloc_bootmem(
 			end_pfn * sizeof(unsigned long));
@@ -745,6 +746,9 @@ void __init setup_arch(char **cmdline_p)
 			__pa(xen_start_info->mfn_list), 
 			PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
 					sizeof(unsigned long))));
+		make_pages_readonly((void *)xen_start_info->mfn_list,
+				    PFN_UP(xen_start_info->nr_pages *
+					   sizeof(unsigned long)));
 
 		/* 
 		 * Initialise the list of the frames that specify the list of 

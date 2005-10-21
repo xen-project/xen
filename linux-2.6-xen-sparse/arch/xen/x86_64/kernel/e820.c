@@ -519,7 +519,7 @@ void __init setup_memory_region(void)
 	e820_print_map(who);
 }
 
-#else  /* CONFIX_XEN */
+#else  /* CONFIG_XEN */
 
 extern unsigned long xen_override_max_pfn;
 extern union xen_start_info_union xen_start_info_union;
