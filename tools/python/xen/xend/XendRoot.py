@@ -64,7 +64,7 @@ class XendRoot:
     xend_address_default      = ''
 
     """Default for the flag indicating whether xend should run a relocation server."""
-    xend_relocation_server_default = 'yes'
+    xend_relocation_server_default = 'no'
 
     """Default interface address the xend relocation server listens at. """
     xend_relocation_address_default = ''
