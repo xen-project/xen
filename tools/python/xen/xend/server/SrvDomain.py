@@ -89,7 +89,7 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_pincpu,
                     [['dom', 'int'],
                      ['vcpu', 'int'],
-                     ['cpumap', 'int']])
+                     ['cpumap', 'str']])
         val = fn(req.args, {'dom': self.dom.domid})
         return val
 

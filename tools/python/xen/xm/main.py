@@ -289,6 +289,62 @@ def xm_vcpu_list(args):
         def get_info(n):
             return sxp.child_value(dom, n)
 
+        #
+        # convert a list of integers into a list of pairs indicating
+        # continuous sequences in the list:
+        #
+        # [0,1,2,3]   -> [(0,3)]
+        # [1,2,4,5]   -> [(1,2),(4,5)]
+        # [0]         -> [(0,0)]
+        # [0,1,4,6,7] -> [(0,1),(4,4),(6,7)]
+        #
+        def list_to_rangepairs(cmap):
+            cmap.sort()
+            pairs = []
+            x = y = 0
+            for i in range(0,len(cmap)):
+                try:
+                    if ((cmap[y+1] - cmap[i]) > 1):
+                        pairs.append((cmap[x],cmap[y]))
+                        x = y = i+1
+                    else:
+                        y = y + 1
+                # if we go off the end, then just add x to y
+                except IndexError:
+                    pairs.append((cmap[x],cmap[y]))
+
+            return pairs
+
+        #
+        # Convert pairs to range string, e.g: [(1,2),(3,3),(5,7)] -> 1-2,3,5-7
+        #
+        def format_pairs(pairs):
+            out = ""
+            for f,s in pairs:
+                if (f==s):
+                    out += '%d'%f
+                else:
+                    out += '%d-%d'%(f,s)
+                out += ','
+            # trim trailing ','
+            return out[:-1]
+
+        def format_cpumap(cpumap):
+            def uniq(x):
+               return [ u for u in x if u not in locals()['_[1]'] ]
+
+            from xen.xend.XendClient import server
+            for x in server.xend_node()[1:]:
+                if len(x) > 1 and x[0] == 'nr_cpus':
+                    nr_cpus = int(x[1])
+                    break
+ 
+            return format_pairs(
+                          list_to_rangepairs(
+                              map(lambda x: x % nr_cpus, 
+                                  uniq(map(lambda x: int(x), cpumap)) )))
+                
+
         name  =     get_info('name')
         domid = int(get_info('domid'))
 
@@ -299,7 +355,7 @@ def xm_vcpu_list(args):
 
             number   = vinfo('number',   int)
             cpu      = vinfo('cpu',      int)
-            cpumap   = vinfo('cpumap',   int)
+            cpumap   = format_cpumap(vinfo('cpumap', list))
             online   = vinfo('online',   int)
             cpu_time = vinfo('cpu_time', float)
             running  = vinfo('running',  int)
@@ -321,7 +377,7 @@ def xm_vcpu_list(args):
                 s = "--p"
 
             print (
-                "%(name)-32s %(domid)3d  %(number)4d  %(c)3s   %(s)-3s   %(cpu_time)7.1f  0x%(cpumap)x" %
+                "%(name)-32s %(domid)3d  %(number)4d  %(c)3s   %(s)-3s   %(cpu_time)7.1f  %(cpumap)s" %
                 locals())
 
 
@@ -355,7 +411,6 @@ def xm_subcommand(command, args):
 
 def cpu_make_map(cpulist):
     cpus = []
-    cpumap = 0
     for c in cpulist.split(','):
         if c.find('-') != -1:
             (x,y) = c.split('-')
@@ -364,10 +419,7 @@ def cpu_make_map(cpulist):
         else:
             cpus.append(int(c))
     cpus.sort()
-    for c in cpus:
-        cpumap = cpumap | 1<<c
-
-    return cpumap
+    return cpus
 
 def xm_vcpu_pin(args):
     arg_check(args, 3, "vcpu-pin")

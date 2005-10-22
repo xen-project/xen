@@ -204,15 +204,23 @@ static PyObject *pyxc_domain_pincpu(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     uint32_t dom;
-    int vcpu = 0;
+    int vcpu = 0, i;
     cpumap_t cpumap = ~0ULL;
+    PyObject *cpulist = NULL;
 
     static char *kwd_list[] = { "dom", "vcpu", "cpumap", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|ii", kwd_list, 
-                                      &dom, &vcpu, &cpumap) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|iO", kwd_list, 
+                                      &dom, &vcpu, &cpulist) )
         return NULL;
 
+    if ( (cpulist != NULL) && PyList_Check(cpulist) )
+    {
+        cpumap = 0ULL;
+        for ( i = 0; i < PyList_Size(cpulist); i++ ) 
+            cpumap |= (cpumap_t)1 << PyInt_AsLong(PyList_GetItem(cpulist, i));
+    }
+  
     if ( xc_domain_pincpu(xc->xc_handle, dom, vcpu, cpumap) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
@@ -347,11 +355,12 @@ static PyObject *pyxc_vcpu_getinfo(PyObject *self,
                                    PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
-    PyObject *info_dict;
+    PyObject *info_dict, *cpulist;
 
     uint32_t dom, vcpu = 0;
     xc_vcpuinfo_t info;
-    int rc;
+    int rc, i;
+    cpumap_t cpumap;
 
     static char *kwd_list[] = { "dom", "vcpu", NULL };
     
@@ -363,13 +372,22 @@ static PyObject *pyxc_vcpu_getinfo(PyObject *self,
     if ( rc < 0 )
         return PyErr_SetFromErrno(xc_error);
 
-    info_dict = Py_BuildValue("{s:i,s:i,s:i,s:L,s:i,s:i}",
+    info_dict = Py_BuildValue("{s:i,s:i,s:i,s:L,s:i}",
                               "online",   info.online,
                               "blocked",  info.blocked,
                               "running",  info.running,
                               "cpu_time", info.cpu_time,
-                              "cpu",      info.cpu,
-                              "cpumap",   info.cpumap);
+                              "cpu",      info.cpu);
+
+    cpumap = info.cpumap;
+    cpulist = PyList_New(0);
+    for ( i = 0; cpumap != 0; i++ )
+    {
+        if ( cpumap & 1 )
+            PyList_Append(cpulist, PyInt_FromLong(i));
+        cpumap >>= 1;
+    }
+    PyDict_SetItemString(info_dict, "cpumap", cpulist);
 
     return info_dict;
 }
@@ -896,7 +914,7 @@ static PyMethodDef pyxc_methods[] = {
       "Pin a VCPU to a specified set CPUs.\n"
       " dom [int]:     Identifier of domain to which VCPU belongs.\n"
       " vcpu [int, 0]: VCPU being pinned.\n"
-      " cpumap [int, -1]: Bitmap of usable CPUs.\n\n"
+      " cpumap [list, []]: list of usable CPUs.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_setcpuweight", 

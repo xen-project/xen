@@ -258,7 +258,7 @@ class Xend:
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'pincpu',
                               'vcpu'    : vcpu,
-                              'cpumap'  : cpumap })
+                              'cpumap'  : str(cpumap) })
 
     def xend_domain_cpu_bvt_set(self, id, mcuadv, warpback, warpvalue, warpl, warpu):
         return self.xendPost(self.domainurl(id),

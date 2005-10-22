@@ -980,6 +980,9 @@ class XendDomainInfo:
 
     def getVCPUInfo(self):
         try:
+            def filter_cpumap(map, max):
+                return filter(lambda x: x >= 0, map[0:max])
+
             # We include the domain name and ID, to help xm.
             sxpr = ['domain',
                     ['domid',      self.domid],
@@ -996,7 +999,8 @@ class XendDomainInfo:
                              ['running',  info['running']],
                              ['cpu_time', info['cpu_time'] / 1e9],
                              ['cpu',      info['cpu']],
-                             ['cpumap',   info['cpumap']]])
+                             ['cpumap',   filter_cpumap(info['cpumap'],
+                                                        self.info['vcpus'])]])
 
             return sxpr
 

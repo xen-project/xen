@@ -412,9 +412,12 @@ class XendDomain:
     def domain_pincpu(self, domid, vcpu, cpumap):
         """Set which cpus vcpu can use
 
-        @param cpumap:  bitmap of usable cpus
+        @param cpumap:  string repr of list of usable cpus
         """
         dominfo = self.domain_lookup(domid)
+        # convert cpumap string into a list of ints
+        cpumap = map(lambda x: int(x),
+                     cpumap.replace("[", "").replace("]", "").split(","))
         try:
             return xc.domain_pincpu(dominfo.getDomid(), vcpu, cpumap)
         except Exception, ex:
