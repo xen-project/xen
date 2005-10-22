@@ -39,6 +39,7 @@
 # todo Support security settings etc. in the config file.
 # todo Support command-line args.
 
+import fcntl
 from threading import Thread
 
 from xen.web.httpserver import HttpServer, UnixHttpServer
@@ -64,6 +65,11 @@ class XendServers:
         self.servers.append(server)
 
     def start(self, status):
+        # Running the network script will spawn another process, which takes
+        # the status fd with it unless we set FD_CLOEXEC.  Failing to do this
+        # causes the read in SrvDaemon to hang even when we have written here.
+        fcntl.fcntl(status, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
+        
         Vifctl.network('start')
         threads = []
         for server in self.servers:

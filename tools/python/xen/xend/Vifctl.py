@@ -20,8 +20,8 @@
 """
 import os
 
-import xen.util.process
 import XendRoot
+
 
 def network(op):
     """Call a network control script.
@@ -32,6 +32,4 @@ def network(op):
         raise ValueError('Invalid operation: ' + op)
     script = XendRoot.instance().get_network_script()
     if script:
-        xen.util.process.runscript(script + " " + op)
-        #os.spawnl(os.P_WAIT, script, script, op)
-
+        os.spawnl(os.P_WAIT, script, script, op)
