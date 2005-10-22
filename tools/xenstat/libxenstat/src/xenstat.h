@@ -119,6 +119,7 @@ xenstat_network *xenstat_domain_network(xenstat_domain * domain,
  */
 
 /* Get VCPU usage */
+unsigned int xenstat_vcpu_online(xenstat_vcpu * vcpu);
 unsigned long long xenstat_vcpu_ns(xenstat_vcpu * vcpu);
 
 

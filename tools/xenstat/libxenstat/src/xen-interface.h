@@ -41,5 +41,6 @@ int xi_get_physinfo(xi_handle *, dom0_physinfo_t *);
 int xi_get_domaininfolist(xi_handle *, dom0_getdomaininfo_t *, unsigned int,
                           unsigned int);
 
-/* Returns cpu usage data from dom0 */
-long long xi_get_vcpu_usage(xi_handle *, unsigned int, unsigned int);
+/* Get vcpu info from a domain */
+int xi_get_domain_vcpu_info(xi_handle *, unsigned int, unsigned int,
+                            dom0_getvcpuinfo_t *);

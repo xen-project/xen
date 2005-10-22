@@ -173,9 +173,9 @@ int xi_get_domaininfolist(xi_handle *handle, dom0_getdomaininfo_t *info,
 	return op.u.getdomaininfolist.num_domains;
 }
 
-/* Returns cpu usage data from dom0 */
-long long xi_get_vcpu_usage(xi_handle *handle, unsigned int domain,
-                            unsigned int vcpu)
+/* Get vcpu info from a domain */
+int xi_get_domain_vcpu_info(xi_handle *handle, unsigned int domain, 
+                            unsigned int vcpu, dom0_getvcpuinfo_t *info)
 {
 	dom0_op_t op;
 	op.u.getvcpuinfo.domain = domain;
@@ -186,7 +186,9 @@ long long xi_get_vcpu_usage(xi_handle *handle, unsigned int domain,
 		return -1;
 	}
 
-	return op.u.getvcpuinfo.cpu_time;
+	memcpy(info, &op.u.getvcpuinfo, sizeof(dom0_getvcpuinfo_t));
+
+	return 0;
 }
 
 /* gets xen version information from hypervisor */
