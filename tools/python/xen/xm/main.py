@@ -274,7 +274,7 @@ def xm_brief_list(doms):
 
 
 def xm_vcpu_list(args):
-    print 'Name                              ID  VCPU  CPU  State  Time(s)  CPU Map'
+    print 'Name                              ID  VCPU  CPU  State  Time(s)  CPU Affinity'
 
     from xen.xend.XendClient import server
     if args:
@@ -319,6 +319,8 @@ def xm_vcpu_list(args):
         # Convert pairs to range string, e.g: [(1,2),(3,3),(5,7)] -> 1-2,3,5-7
         #
         def format_pairs(pairs):
+            if not pairs:
+                return "no cpus"
             out = ""
             for f,s in pairs:
                 if (f==s):
@@ -330,24 +332,22 @@ def xm_vcpu_list(args):
             return out[:-1]
 
         def format_cpumap(cpumap):
-            def uniq(x):
-               return [ u for u in x if u not in locals()['_[1]'] ]
+            cpumap = map(lambda x: int(x), cpumap)
+            cpumap.sort()
 
             from xen.xend.XendClient import server
             for x in server.xend_node()[1:]:
                 if len(x) > 1 and x[0] == 'nr_cpus':
                     nr_cpus = int(x[1])
+                    cpumap = filter(lambda x: x < nr_cpus, cpumap)
+                    if len(cpumap) == nr_cpus:
+                        return "any cpu"
                     break
  
-            return format_pairs(
-                          list_to_rangepairs(
-                              map(lambda x: x % nr_cpus, 
-                                  uniq(map(lambda x: int(x), cpumap)) )))
-                
+            return format_pairs(list_to_rangepairs(cpumap))
 
         name  =     get_info('name')
         domid = int(get_info('domid'))
-
 
         for vcpu in sxp.children(dom, 'vcpu'):
             def vinfo(n, t):
