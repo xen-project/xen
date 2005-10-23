@@ -429,15 +429,15 @@ static PyObject *pyxc_linux_build(PyObject *self,
 }
 
 static PyObject *pyxc_vmx_build(PyObject *self,
-                                  PyObject *args,
-                                  PyObject *kwds)
+                                PyObject *args,
+                                PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
 
-    uint32_t   dom;
+    uint32_t dom;
     char *image;
-    int   control_evtchn, store_evtchn;
-    int flags = 0, vcpus = 1;
+    int control_evtchn, store_evtchn;
+    int vcpus = 1;
     int memsize;
     unsigned long store_mfn = 0;
 
@@ -450,7 +450,7 @@ static PyObject *pyxc_vmx_build(PyObject *self,
         return NULL;
 
     if ( xc_vmx_build(xc->xc_handle, dom, memsize, image, control_evtchn,
-                      flags, vcpus, store_evtchn, &store_mfn) != 0 )
+                      vcpus, store_evtchn, &store_mfn) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return Py_BuildValue("{s:i}", "store_mfn", store_mfn);

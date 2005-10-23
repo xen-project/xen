@@ -883,7 +883,7 @@ asmlinkage void vmx_intr_assist(void)
     int highest_vector;
     unsigned long intr_fields, eflags, interruptibility, cpu_exec_control;
     struct vcpu *v = current;
-    struct virtual_platform_def *plat=&v->domain->arch.vmx_platform;
+    struct vmx_platform *plat=&v->domain->arch.vmx_platform;
     struct vmx_virpit *vpit = &plat->vmx_pit;
     struct vmx_virpic *pic= &plat->vmx_pic;
 

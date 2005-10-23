@@ -142,7 +142,7 @@ struct host_execution_env {
 #endif
 };
 
-static void get_io_shared_page(struct vcpu *v)
+static void vmx_map_io_shared_page(struct domain *d)
 {
     int i;
     unsigned char e820_map_nr;
@@ -150,9 +150,6 @@ static void get_io_shared_page(struct vcpu *v)
     unsigned char *p;
     unsigned long mpfn;
     unsigned long gpfn = 0;
-
-    if (!(VMX_DOMAIN(v) && (v->vcpu_id == 0)))
-        return;
 
     local_flush_tlb_pge();
 
@@ -200,24 +197,61 @@ static void get_io_shared_page(struct vcpu *v)
         printk("Can not map io request shared page for VMX domain.\n");
         domain_crash();
     }
-    v->domain->arch.vmx_platform.shared_page_va = (unsigned long)p;
+    d->arch.vmx_platform.shared_page_va = (unsigned long)p;
 
-    VMX_DBG_LOG(DBG_LEVEL_1, "eport: %x\n", iopacket_port(v->domain));
+    VMX_DBG_LOG(DBG_LEVEL_1, "eport: %x\n", iopacket_port(d));
 
-    clear_bit(iopacket_port(v->domain),
-              &v->domain->shared_info->evtchn_mask[0]);
+    clear_bit(iopacket_port(d),
+              &d->shared_info->evtchn_mask[0]);
 }
 
-static void vmx_setup_platform(struct vcpu *v)
+#define VCPU_NR_PAGE        0x0009F000
+#define VCPU_NR_OFFSET      0x00000800
+#define VCPU_MAGIC          0x76637075  /* "vcpu" */
+
+static void vmx_set_vcpu_nr(struct domain *d)
 {
-    struct virtual_platform_def  *platform;
-    if (v->vcpu_id == 0) {
-        get_io_shared_page(v);
-        platform = &v->domain->arch.vmx_platform;
-        pic_init(&platform->vmx_pic,  pic_irq_request, 
-                 &platform->interrupt_request);
-        register_pic_io_hook();
+    unsigned char *p;
+    unsigned long mpfn;
+    unsigned int *vcpus;
+
+    mpfn = get_mfn_from_pfn(VCPU_NR_PAGE >> PAGE_SHIFT);
+    if (mpfn == INVALID_MFN) {
+        printk("Can not get vcpu number page mfn for VMX domain.\n");
+        domain_crash_synchronous();
     }
+
+    p = map_domain_page(mpfn);
+    if (p == NULL) {
+        printk("Can not map vcpu number page for VMX domain.\n");
+        domain_crash_synchronous();
+    }
+
+    vcpus = (unsigned int *)(p + VCPU_NR_OFFSET);
+    if (vcpus[0] != VCPU_MAGIC) {
+        printk("Bad vcpus magic, set vcpu number to 1 by default.\n");
+        d->arch.vmx_platform.nr_vcpu = 1;
+    }
+
+    d->arch.vmx_platform.nr_vcpu = vcpus[1];
+
+    unmap_domain_page(p);
+}
+
+static void vmx_setup_platform(struct domain* d)
+{
+    struct vmx_platform *platform;
+
+    if (!(VMX_DOMAIN(current) && (current->vcpu_id == 0)))
+        return;
+
+    vmx_map_io_shared_page(d);
+    vmx_set_vcpu_nr(d);
+
+    platform = &d->arch.vmx_platform;
+    pic_init(&platform->vmx_pic,  pic_irq_request, 
+             &platform->interrupt_request);
+    register_pic_io_hook();
 }
 
 static void vmx_set_host_env(struct vcpu *v)
@@ -249,9 +283,10 @@ static void vmx_do_launch(struct vcpu *v)
 {
 /* Update CR3, GDT, LDT, TR */
     unsigned int  error = 0;
-    unsigned long pfn = 0;
     unsigned long cr0, cr4;
-    struct pfn_info *page;
+
+    if (v->vcpu_id == 0)
+        vmx_setup_platform(v->domain);
 
     __asm__ __volatile__ ("mov %%cr0,%0" : "=r" (cr0) : );
 
@@ -277,12 +312,6 @@ static void vmx_do_launch(struct vcpu *v)
     error |= __vmwrite(CR4_READ_SHADOW, cr4);
 
     vmx_stts();
-
-    page = (struct pfn_info *) alloc_domheap_page(NULL);
-    pfn = (unsigned long) (page - frame_table);
-
-    if ( v == v->domain->vcpu[0] )
-        vmx_setup_platform(v);
 
     vmx_set_host_env(v);
 

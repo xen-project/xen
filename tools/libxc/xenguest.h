@@ -51,13 +51,11 @@ int xc_linux_build(int xc_handle,
                    unsigned int console_evtchn,
                    unsigned long *console_mfn);
 
-struct mem_map;
 int xc_vmx_build(int xc_handle,
                  uint32_t domid,
                  int memsize,
                  const char *image_name,
                  unsigned int control_evtchn,
-                 unsigned long flags,
                  unsigned int vcpus,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn);

@@ -77,8 +77,10 @@ struct instruction {
 
 #define MAX_INST_LEN      32
 
-struct virtual_platform_def {
+struct vmx_platform {
     unsigned long          shared_page_va;
+    unsigned int           nr_vcpu;
+
     struct vmx_virpit      vmx_pit;
     struct vmx_io_handler  vmx_io_handler;
     struct vmx_virpic      vmx_pic;

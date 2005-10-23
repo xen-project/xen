@@ -57,6 +57,47 @@ static unsigned long trace_values[NR_CPUS][4];
 #define TRACE_VMEXIT(index,value) ((void)0)
 #endif
 
+static int vmx_switch_on;
+
+void vmx_final_setup_guest(struct vcpu *v)
+{
+    v->arch.schedule_tail = arch_vmx_do_launch;
+
+    if ( v == v->domain->vcpu[0] )
+    {
+        /*
+         * Required to do this once per domain
+         * XXX todo: add a seperate function to do these.
+         */
+        memset(&v->domain->shared_info->evtchn_mask[0], 0xff,
+               sizeof(v->domain->shared_info->evtchn_mask));
+
+        /* Put the domain in shadow mode even though we're going to be using
+         * the shared 1:1 page table initially. It shouldn't hurt */
+        shadow_mode_enable(v->domain,
+                           SHM_enable|SHM_refcounts|
+                           SHM_translate|SHM_external);
+    }
+
+    vmx_switch_on = 1;
+}
+
+void vmx_relinquish_resources(struct vcpu *v)
+{
+    if ( !VMX_DOMAIN(v) )
+        return;
+
+    if (v->vcpu_id == 0) {
+        /* unmap IO shared page */
+        struct domain *d = v->domain;
+        unmap_domain_page((void *)d->arch.vmx_platform.shared_page_va);
+    }
+
+    destroy_vmcs(&v->arch.arch_vmx);
+    free_monitor_pagetable(v);
+    rem_ac_timer(&v->domain->arch.vmx_platform.vmx_pit.pit_timer);
+}
+
 #ifdef __x86_64__
 static struct msr_state percpu_msr[NR_CPUS];
 
@@ -76,6 +117,9 @@ void vmx_load_msrs(struct vcpu *n)
 {
     struct msr_state *host_state;
     host_state = &percpu_msr[smp_processor_id()];
+
+    if ( !vmx_switch_on )
+        return;
 
     while (host_state->flags){
         int i;

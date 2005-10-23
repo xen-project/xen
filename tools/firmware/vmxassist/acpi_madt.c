@@ -24,17 +24,19 @@
 
 extern int puts(const char *s);
 
-#define VCPU_MAGIC 0x76637075 /* "vcpu" */
+#define VCPU_NR_PAGE        0x0009F000
+#define VCPU_NR_OFFSET      0x00000800
+#define VCPU_MAGIC          0x76637075  /* "vcpu" */
 
 /* xc_vmx_builder wrote vcpu block at 0x9F800. Return it. */
-static int 
-get_vcpus(void)
+static int
+get_vcpu_nr(void)
 {
-	unsigned long *vcpus;
+	unsigned int *vcpus;
 
-	vcpus = (unsigned long *)0x9F800;
+	vcpus = (unsigned int *)(VCPU_NR_PAGE + VCPU_NR_OFFSET);
 	if (vcpus[0] != VCPU_MAGIC) {
-		puts("Bad vcpus magic, set vcpu number=1\n");
+		puts("Bad vcpus magic, set vcpu number to 1 by default.\n");
 		return 1;
 	}
 
@@ -123,7 +125,7 @@ int acpi_madt_update(unsigned char *acpi_start)
 	if (!madt)
 		return -1;
 
-	rc = acpi_madt_set_local_apics(get_vcpus(), madt);
+	rc = acpi_madt_set_local_apics(get_vcpu_nr(), madt);
 	if (rc != 0)
 		return rc;
 

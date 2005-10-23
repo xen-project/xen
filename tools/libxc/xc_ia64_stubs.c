@@ -24,7 +24,6 @@ int xc_vmx_build(int xc_handle,
                    const char *ramdisk_name,
                    const char *cmdline,
                    unsigned int control_evtchn,
-                   unsigned long flags,
                    unsigned int vcpus,
                    unsigned int store_evtchn,
                    unsigned long *store_mfn)

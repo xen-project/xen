@@ -503,6 +503,11 @@ static inline int vmx_reflect_exception(struct vcpu *v)
     return 0;
 }
 
+static inline unsigned int vmx_get_vcpu_nr(struct domain *d)
+{
+    return d->arch.vmx_platform.nr_vcpu;
+}
+
 static inline shared_iopage_t *get_sp(struct domain *d)
 {
     return (shared_iopage_t *) d->arch.vmx_platform.shared_page_va;

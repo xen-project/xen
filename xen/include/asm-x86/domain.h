@@ -61,8 +61,8 @@ struct arch_domain
 
     struct list_head free_shadow_frames;
 
-    pagetable_t  phys_table;               /* guest 1:1 pagetable */
-    struct virtual_platform_def vmx_platform;
+    pagetable_t         phys_table;         /* guest 1:1 pagetable */
+    struct vmx_platform vmx_platform;
 } __cacheline_aligned;
 
 struct arch_vcpu

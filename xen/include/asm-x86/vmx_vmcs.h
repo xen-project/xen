@@ -35,6 +35,9 @@ void vmx_restore_msrs(struct vcpu *v);
 #define vmx_restore_msrs(_v)       ((void)0)
 #endif
 
+void vmx_final_setup_guest(struct vcpu *v);
+void vmx_relinquish_resources(struct vcpu *v);
+
 void vmx_enter_scheduler(void);
 
 enum {

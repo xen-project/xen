@@ -784,7 +784,6 @@ opcode(struct regs *regs)
 				}
 				break;
 			case 0x09: /* wbinvd */
-				asm volatile ( "wbinvd" );
 				return OPC_EMULATED;
 			case 0x20: /* mov Rd, Cd (1h) */
 			case 0x22:

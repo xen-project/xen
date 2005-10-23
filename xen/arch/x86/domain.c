@@ -1,6 +1,6 @@
 /******************************************************************************
  * arch/x86/domain.c
- * 
+ *
  * x86-specific domain handling (e.g., register setup and context switching).
  */
 
@@ -144,9 +144,7 @@ void machine_restart(char * __unused)
     smp_send_stop();
     disable_IO_APIC();
 
-#ifdef CONFIG_VMX
     stop_vmx();
-#endif
 
     /* Rebooting needs to touch the page at absolute address 0. */
     *((unsigned short *)__va(0x472)) = reboot_mode;
@@ -204,7 +202,6 @@ void dump_pageframe_info(struct domain *d)
                page->u.inuse.type_info);
     }
 
-    
     page = virt_to_page(d->shared_info);
     printk("Shared_info@%p: caf=%08x, taf=%" PRtype_info "\n",
            _p(page_to_phys(page)), page->count_info,
@@ -260,7 +257,7 @@ void arch_do_createdomain(struct vcpu *v)
         return;
 
     v->arch.schedule_tail = continue_nonidle_task;
-    
+
     d->shared_info = alloc_xenheap_page();
     memset(d->shared_info, 0, PAGE_SIZE);
     v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
@@ -268,7 +265,7 @@ void arch_do_createdomain(struct vcpu *v)
     SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
     set_pfn_from_mfn(virt_to_phys(d->shared_info) >> PAGE_SHIFT,
             INVALID_M2P_ENTRY);
-    
+
     d->arch.mm_perdomain_pt = alloc_xenheap_page();
     memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE);
     set_pfn_from_mfn(virt_to_phys(d->arch.mm_perdomain_pt) >> PAGE_SHIFT,
@@ -293,22 +290,22 @@ void arch_do_createdomain(struct vcpu *v)
 #ifdef __x86_64__
     v->arch.guest_vl3table = __linear_l3_table;
     v->arch.guest_vl4table = __linear_l4_table;
-    
+
     d->arch.mm_perdomain_l2 = alloc_xenheap_page();
     memset(d->arch.mm_perdomain_l2, 0, PAGE_SIZE);
-    d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)] = 
+    d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)] =
         l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt),
                         __PAGE_HYPERVISOR);
     d->arch.mm_perdomain_l3 = alloc_xenheap_page();
     memset(d->arch.mm_perdomain_l3, 0, PAGE_SIZE);
-    d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] = 
+    d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] =
         l3e_from_page(virt_to_page(d->arch.mm_perdomain_l2),
                             __PAGE_HYPERVISOR);
 #endif
-    
+
     (void)ptwr_init(d);
-    
-    shadow_lock_init(d);        
+
+    shadow_lock_init(d);
     INIT_LIST_HEAD(&d->arch.free_shadow_frames);
 }
 
@@ -326,34 +323,6 @@ void vcpu_migrate_cpu(struct vcpu *v, int newcpu)
         v->arch.schedule_tail = arch_vmx_do_relaunch;
     }
 }
-
-#ifdef CONFIG_VMX
-static int vmx_switch_on;
-
-static void vmx_final_setup_guest(struct vcpu *v)
-{
-    v->arch.schedule_tail = arch_vmx_do_launch;
-
-    if (v == v->domain->vcpu[0]) {
-        /*
-         * Required to do this once per domain
-         * XXX todo: add a seperate function to do these.
-         */
-        memset(&v->domain->shared_info->evtchn_mask[0], 0xff,
-               sizeof(v->domain->shared_info->evtchn_mask));
-
-        /* Put the domain in shadow mode even though we're going to be using
-         * the shared 1:1 page table initially. It shouldn't hurt */
-        shadow_mode_enable(v->domain,
-                           SHM_enable|SHM_refcounts|
-                           SHM_translate|SHM_external);
-    }
-
-    if (!vmx_switch_on)
-        vmx_switch_on = 1;
-}
-#endif
-
 
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
 int arch_set_info_guest(
@@ -422,7 +391,7 @@ int arch_set_info_guest(
     }
     else if ( !(c->flags & VGCF_VMX_GUEST) )
     {
-        if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
+        if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d,
                                 PGT_base_page_table) )
             return -EINVAL;
     }
@@ -507,12 +476,6 @@ void toggle_guest_mode(struct vcpu *v)
         : "=r" (__r) : "r" (value), "0" (__r) );\
     __r; })
 
-#if CONFIG_VMX
-#define load_msrs(n)     if (vmx_switch_on) vmx_load_msrs(n)
-#else
-#define load_msrs(n)     ((void)0)
-#endif 
-
 /*
  * save_segments() writes a mask of segments which are dirty (non-zero),
  * allowing load_segments() to avoid some expensive segment loads and
@@ -590,7 +553,7 @@ static void load_segments(struct vcpu *n)
         struct cpu_user_regs *regs = guest_cpu_user_regs();
         unsigned long   *rsp =
             (n->arch.flags & TF_kernel_mode) ?
-            (unsigned long *)regs->rsp : 
+            (unsigned long *)regs->rsp :
             (unsigned long *)nctxt->kernel_sp;
 
         if ( !(n->arch.flags & TF_kernel_mode) )
@@ -690,9 +653,9 @@ long do_switch_to_user(void)
         regs->r11 = stu.r11;
         regs->rcx = stu.rcx;
     }
-    
+
     /* Saved %rax gets written back to regs->rax in entry.S. */
-    return stu.rax; 
+    return stu.rax;
 }
 
 #define switch_kernel_stack(_n,_c) ((void)0)
@@ -700,7 +663,6 @@ long do_switch_to_user(void)
 #elif defined(__i386__)
 
 #define load_segments(n) ((void)0)
-#define load_msrs(n)     ((void)0)
 #define save_segments(p) ((void)0)
 
 static inline void switch_kernel_stack(struct vcpu *n, unsigned int cpu)
@@ -725,7 +687,7 @@ static void __context_switch(void)
     if ( !is_idle_task(p->domain) )
     {
         memcpy(&p->arch.guest_context.user_regs,
-               stack_regs, 
+               stack_regs,
                CTXT_SWITCH_STACK_BYTES);
         unlazy_fpu(p);
         save_segments(p);
@@ -811,7 +773,7 @@ void context_switch_finalise(struct vcpu *next)
         {
             load_LDT(next);
             load_segments(next);
-            load_msrs(next);
+            vmx_load_msrs(next);
         }
     }
 
@@ -883,7 +845,7 @@ unsigned long __hypercall_create_continuation(
 #if defined(__i386__)
         regs->eax  = op;
         regs->eip -= 2;  /* re-execute 'int 0x82' */
-        
+
         for ( i = 0; i < nr_args; i++ )
         {
             switch ( i )
@@ -899,7 +861,7 @@ unsigned long __hypercall_create_continuation(
 #elif defined(__x86_64__)
         regs->rax  = op;
         regs->rip -= 2;  /* re-execute 'syscall' */
-        
+
         for ( i = 0; i < nr_args; i++ )
         {
             switch ( i )
@@ -919,20 +881,6 @@ unsigned long __hypercall_create_continuation(
 
     return op;
 }
-
-#ifdef CONFIG_VMX
-static void vmx_relinquish_resources(struct vcpu *v)
-{
-    if ( !VMX_DOMAIN(v) )
-        return;
-
-    destroy_vmcs(&v->arch.arch_vmx);
-    free_monitor_pagetable(v);
-    rem_ac_timer(&v->domain->arch.vmx_platform.vmx_pit.pit_timer);
-}
-#else
-#define vmx_relinquish_resources(_v) ((void)0)
-#endif
 
 static void relinquish_memory(struct domain *d, struct list_head *list)
 {
@@ -972,7 +920,7 @@ static void relinquish_memory(struct domain *d, struct list_head *list)
         for ( ; ; )
         {
             x = y;
-            if ( likely((x & (PGT_type_mask|PGT_validated)) != 
+            if ( likely((x & (PGT_type_mask|PGT_validated)) !=
                         (PGT_base_page_table|PGT_validated)) )
                 break;
 
@@ -1033,7 +981,7 @@ void domain_relinquish_resources(struct domain *d)
     shadow_mode_disable(d);
 
     /*
-     * Relinquish GDT mappings. No need for explicit unmapping of the LDT as 
+     * Relinquish GDT mappings. No need for explicit unmapping of the LDT as
      * it automatically gets squashed when the guest's mappings go away.
      */
     for_each_vcpu(d, v)
