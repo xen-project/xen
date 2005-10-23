@@ -107,7 +107,9 @@ def diagnose_devices():
                 print ("Cannot find backend path for device %s, %s." %
                        (deviceClass, device))
             else:
-                backend_error = xstransact.Read(backendPath, 'error')
+                backend_error = xstransact.Read(
+                    backendPath.replace('backend/', 'error/backend/'),
+                    'error')
 
                 if backend_error:
                     diagnose_device_error(backend_error)

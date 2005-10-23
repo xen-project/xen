@@ -15,9 +15,13 @@ case "$ACTION" in
       vbd)
 	/etc/xen/scripts/block unbind
         ;;
+      vif)
+        [ -n "$script" ] && $script down
+        ;;
     esac
     # remove device backend store entries
     xenstore-rm -t "$XENBUS_PATH"
+    xenstore-rm -t "error/$XENBUS_PATH"
     ;;
   online)
     case "$XENBUS_TYPE" in

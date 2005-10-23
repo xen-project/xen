@@ -516,17 +516,38 @@ int xenbus_printf(struct xenbus_transaction *t,
 }
 EXPORT_SYMBOL(xenbus_printf);
 
+/**
+ * Return the path to the error node for the given device, or NULL on failure.
+ * If the value returned is non-NULL, then it is the caller's to kfree.
+ */
+static char *error_path(struct xenbus_device *dev)
+{
+	char *path_buffer = kmalloc(strlen("error/") + strlen(dev->nodename) +
+				    1, GFP_KERNEL);
+	if (path_buffer == NULL) {
+		return NULL;
+	}
+
+	strcpy(path_buffer, "error/");
+	strcpy(path_buffer + strlen("error/"), dev->nodename);
+
+	return path_buffer;
+}
+
 /* Report a (negative) errno into the store, with explanation. */
 void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt, ...)
 {
 	va_list ap;
 	int ret;
 	unsigned int len;
-	char *printf_buffer;
+	char *printf_buffer = NULL, *path_buffer = NULL;
 
 	printf_buffer = kmalloc(PRINTF_BUFFER_SIZE, GFP_KERNEL);
-	if (printf_buffer == NULL)
+	if (printf_buffer == NULL) {
+		printk("xenbus: failed to write error node for %s (%d): %d\n",
+		       dev->nodename, err, errno);
 		goto fail;
+	}
 
 	len = sprintf(printf_buffer, "%i ", -err);
 	va_start(ap, fmt);
@@ -535,15 +556,26 @@ void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt, ...)
 
 	BUG_ON(len + ret > PRINTF_BUFFER_SIZE-1);
 	dev->has_error = 1;
-	if (xenbus_write(NULL, dev->nodename, "error", printf_buffer) != 0)
+
+	path_buffer = error_path(dev);
+
+	if (path_buffer == NULL) {
+		printk("xenbus: failed to write error node for %s (%s): %d\n",
+		       dev->nodename, printf_buffer, errno);
 		goto fail;
+	}
 
-	kfree(printf_buffer);
-	return;
+	if (xenbus_write(NULL, path_buffer, "error", printf_buffer) != 0) {
+		printk("xenbus: failed to write error node for %s (%s)\n",
+		       dev->nodename, printf_buffer);
+		goto fail;
+	}
 
- fail:
-	printk("xenbus: failed to write error node for %s (%s)\n",
-	       dev->nodename, printf_buffer);
+fail:
+	if (printf_buffer)
+		kfree(printf_buffer);
+	if (path_buffer)
+		kfree(path_buffer);
 }
 EXPORT_SYMBOL(xenbus_dev_error);
 
@@ -551,11 +583,21 @@ EXPORT_SYMBOL(xenbus_dev_error);
 void xenbus_dev_ok(struct xenbus_device *dev)
 {
 	if (dev->has_error) {
-		if (xenbus_rm(NULL, dev->nodename, "error") != 0)
+		char *path_buffer = error_path(dev);
+
+		if (path_buffer == NULL) {
+			printk("xenbus: failed to clear error node for %s: "
+			       "%d\n", dev->nodename, errno);
+			return;
+		}
+
+		if (xenbus_rm(NULL, path_buffer, "error") != 0)
 			printk("xenbus: failed to clear error node for %s\n",
 			       dev->nodename);
 		else
 			dev->has_error = 0;
+
+		kfree(path_buffer);
 	}
 }
 EXPORT_SYMBOL(xenbus_dev_ok);
