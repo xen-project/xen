@@ -243,11 +243,12 @@ class VmxImageHandler(ImageHandler):
             # Handle booleans gracefully
             if a in ['localtime', 'std-vga', 'isa', 'nic-ne2000']:
                 if v != None: v = int(v)
-
+                if v: ret.append("-%s" % a)
+            else:
+                if v:
+                    ret.append("-%s" % a)
+                    ret.append("%s" % v)
             log.debug("args: %s, val: %s" % (a,v))
-            if v: 
-                ret.append("-%s" % a)
-                ret.append("%s" % v)
 
         # Handle disk/network related options
         for (name, info) in deviceConfig:
