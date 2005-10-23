@@ -19,6 +19,7 @@
 struct vmx_virpit {
     /* for simulation of counter 0 in mode 2*/
     u32 period;		/* pit frequency in ns */
+    u64 period_cycles;	                /* pit frequency in cpu cycles */
     s_time_t scheduled;                 /* scheduled timer interrupt */
     unsigned int channel;  /* the pit channel, counter 0~2 */
     unsigned int pending_intr_nr; /* the couner for pending timer interrupts */

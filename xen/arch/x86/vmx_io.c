@@ -799,6 +799,7 @@ static inline void
 interrupt_post_injection(struct vcpu * v, int vector, int type)
 {
     struct vmx_virpit *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
+    u64    drift;
 
     switch(type)
     {
@@ -812,6 +813,13 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
                 vpit->pending_intr_nr--;
             }
             vpit->inject_point = NOW();
+            drift = vpit->period_cycles * vpit->pending_intr_nr;
+            drift = v->arch.arch_vmx.tsc_offset - drift;
+            __vmwrite(TSC_OFFSET, drift);
+
+#if defined (__i386__)
+            __vmwrite(TSC_OFFSET_HIGH, (drift >> 32));
+#endif
  
         }
         break;

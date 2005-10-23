@@ -96,6 +96,7 @@ struct arch_vmx_struct {
     struct msr_state        msr_content;
     struct mmio_op          mmio_op;  /* MMIO */
     void                    *io_bitmap_a, *io_bitmap_b;
+    u64                     tsc_offset;
 };
 
 #define vmx_schedule_tail(next)         \

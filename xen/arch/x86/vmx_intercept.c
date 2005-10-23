@@ -254,6 +254,8 @@ void vmx_hooks_assist(struct vcpu *v)
                    vpit->init_val);
             vpit->period = 1000000;
         }
+         vpit->period_cycles = (u64)vpit->period * cpu_khz / 1000000L;
+         printk("VMX_PIT: guest freq in cycles=%lld\n",(long long)vpit->period_cycles);
 
         vpit->channel = ((p->u.data >> 24) & 0x3);
         vpit->first_injected = 0;

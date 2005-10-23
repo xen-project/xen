@@ -65,6 +65,7 @@ extern unsigned int cpu_rev;
     CPU_BASED_MWAIT_EXITING | \
     CPU_BASED_MOV_DR_EXITING | \
     CPU_BASED_ACTIVATE_IO_BITMAP | \
+    CPU_BASED_USE_TSC_OFFSETING  | \
     CPU_BASED_UNCOND_IO_EXITING \
     )
 
