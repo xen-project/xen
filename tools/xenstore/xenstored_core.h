@@ -155,9 +155,6 @@ void __attribute__((noreturn)) corrupt(struct connection *conn,
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read);
 
 
-void internal_rm(const char *name);
-
-
 /* Is this a valid node name? */
 bool is_valid_nodename(const char *node);
 

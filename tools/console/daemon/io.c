@@ -301,10 +301,7 @@ static struct domain *create_domain(int domid)
 	}
 
 	dom->domid = domid;
-
 	dom->conspath = xs_get_domain_path(xs, dom->domid);
-	if (dom->conspath == NULL)
-		goto out;
 	s = realloc(dom->conspath, strlen(dom->conspath) +
 		    strlen("/console") + 1);
 	if (s == NULL)

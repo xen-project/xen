@@ -166,6 +166,7 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 	case XS_SET_PERMS: return "SET_PERMS";
 	case XS_WATCH_EVENT: return "WATCH_EVENT";
 	case XS_ERROR: return "ERROR";
+	case XS_IS_DOMAIN_INTRODUCED: return "XS_IS_DOMAIN_INTRODUCED";
 	default:
 		return "**UNKNOWN**";
 	}
@@ -1001,16 +1002,6 @@ static void do_rm(struct connection *conn, const char *name)
 }
 
 
-void internal_rm(const char *name)
-{
-	struct node *node = read_node(NULL, name);
-	if (!node) {
-		return;
-	}
-	_rm(NULL, node, name);
-}
-
-
 static void do_get_perms(struct connection *conn, const char *name)
 {
 	struct node *node;
@@ -1151,6 +1142,10 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 
 	case XS_INTRODUCE:
 		do_introduce(conn, in);
+		break;
+
+	case XS_IS_DOMAIN_INTRODUCED:
+		do_is_domain_introduced(conn, onearg(in));
 		break;
 
 	case XS_RELEASE:

@@ -250,6 +250,11 @@ bool domain_can_write(struct connection *conn)
 	return ((intf->rsp_prod - intf->rsp_cons) != XENSTORE_RING_SIZE);
 }
 
+static char *talloc_domain_path(void *context, unsigned int domid)
+{
+	return talloc_asprintf(context, "/local/domain/%u", domid);
+}
+
 static struct domain *new_domain(void *context, unsigned int domid,
 				 unsigned long mfn, int port)
 {
@@ -262,7 +267,7 @@ static struct domain *new_domain(void *context, unsigned int domid,
 	domain->port = 0;
 	domain->shutdown = 0;
 	domain->domid = domid;
-	domain->path = talloc_asprintf(domain, "/local/domain/%d", domid);
+	domain->path = talloc_domain_path(domain, domid);
 	domain->interface = xc_map_foreign_range(
 		*xc_handle, domain->domid,
 		getpagesize(), PROT_READ|PROT_WRITE, mfn);
@@ -271,8 +276,6 @@ static struct domain *new_domain(void *context, unsigned int domid,
 
 	list_add(&domain->list, &domains);
 	talloc_set_destructor(domain, destroy_domain);
-
-	internal_rm(domain->path);
 
 	/* Tell kernel we're interested in this event. */
         bind.remote_domain = domid;
@@ -403,25 +406,37 @@ void do_release(struct connection *conn, const char *domid_str)
 
 void do_get_domain_path(struct connection *conn, const char *domid_str)
 {
-	struct domain *domain;
-	unsigned int domid;
+	char *path;
 
 	if (!domid_str) {
 		send_error(conn, EINVAL);
 		return;
 	}
 
+	path = talloc_domain_path(conn, atoi(domid_str));
+
+	send_reply(conn, XS_GET_DOMAIN_PATH, path, strlen(path) + 1);
+
+	talloc_free(path);
+}
+
+void do_is_domain_introduced(struct connection *conn, const char *domid_str)
+{
+	int result;
+	unsigned int domid;
+
+        if (!domid_str) {
+                send_error(conn, EINVAL);
+                return;
+        }
+
 	domid = atoi(domid_str);
 	if (domid == DOMID_SELF)
-		domain = conn->domain;
+		result = 1;
 	else
-		domain = find_domain_by_domid(domid);
+		result = (find_domain_by_domid(domid) != NULL);
 
-	if (!domain)
-		send_error(conn, ENOENT);
-	else
-		send_reply(conn, XS_GET_DOMAIN_PATH, domain->path,
-			   strlen(domain->path) + 1);
+	send_reply(conn, XS_IS_DOMAIN_INTRODUCED, result ? "T" : "F", 2);
 }
 
 static int close_xc_handle(void *_handle)

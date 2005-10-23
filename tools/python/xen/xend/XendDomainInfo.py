@@ -198,7 +198,7 @@ def recreate(xeninfo, priv):
         vm = XendDomainInfo(xeninfo, domid, dompath, True)
 
     except Exception, exn:
-        if True:
+        if priv:
             log.warn(str(exn))
 
         vm = XendDomainInfo(xeninfo, domid, dompath, True)
@@ -223,7 +223,9 @@ def restore(config):
     try:
         vm.construct()
         vm.storeVmDetails()
+        vm.createDevices()
         vm.createChannels()
+        vm.storeDomDetails()
         return vm
     except:
         vm.destroy()
@@ -337,8 +339,8 @@ def dom_get(dom):
         log.debug("domain_getinfo(%d) failed, ignoring: %s", dom, str(err))
     return None
 
-class XendDomainInfo:
 
+class XendDomainInfo:
 
     def __init__(self, info, domid = None, dompath = None, augment = False):
 
@@ -558,13 +560,13 @@ class XendDomainInfo:
 
     def completeRestore(self, store_mfn, console_mfn):
 
+        log.debug("XendDomainInfo.completeRestore")
+
         self.store_mfn = store_mfn
         self.console_mfn = console_mfn
 
         self.introduceDomain()
-        self.create_devices()
         self.storeDomDetails()
-        self.unpause()
         self.refreshShutdown()
 
 
@@ -596,10 +598,6 @@ class XendDomainInfo:
             'console/limit':      str(xroot.get_console_limit() * 1024),
             'memory/target':      str(self.info['memory_KiB'])
             }
-
-        for (k, v) in self.info.items():
-            if v:
-                to_store[k] = str(v)
 
         def f(n, v):
             if v is not None:
@@ -1055,6 +1053,10 @@ class XendDomainInfo:
             raise VmError('Creating domain failed: name=%s' %
                           self.info['name'])
 
+        self.dompath = GetDomainPath(self.domid)
+
+        self.removeDom()
+
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['vcpus']))
 
@@ -1065,8 +1067,6 @@ class XendDomainInfo:
         assert self.store_port is not None
         
         IntroduceDomain(self.domid, self.store_mfn, self.store_port)
-        self.dompath = GetDomainPath(self.domid)
-        assert self.dompath
 
 
     def initDomain(self):
@@ -1105,7 +1105,7 @@ class XendDomainInfo:
 
         self.introduceDomain()
 
-        self.create_devices()
+        self.createDevices()
 
         self.info['start_time'] = time.time()
 
@@ -1209,22 +1209,20 @@ class XendDomainInfo:
             raise
 
 
-    def create_configured_devices(self):
-        for (n, c) in self.info['device']:
-            self.createDevice(n, c)
+    ## public:
 
-
-    def create_devices(self):
+    def createDevices(self):
         """Create the devices for a vm.
 
         @raise: VmError for invalid devices
         """
-        self.create_configured_devices()
+
+        for (n, c) in self.info['device']:
+            self.createDevice(n, c)
+
         if self.image:
             self.image.createDeviceModel()
 
-
-    ## public:
 
     def device_create(self, dev_config):
         """Create a new device.

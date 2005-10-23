@@ -47,6 +47,7 @@ enum xsd_sockmsg_type
     XS_SET_PERMS,
     XS_WATCH_EVENT,
     XS_ERROR,
+    XS_IS_DOMAIN_INTRODUCED
 };
 
 #define XS_WRITE_NONE "NONE"

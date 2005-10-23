@@ -26,6 +26,9 @@ void handle_event(void);
 void do_introduce(struct connection *conn, struct buffered_data *in);
 
 /* domid */
+void do_is_domain_introduced(struct connection *conn, const char *domid_str);
+
+/* domid */
 void do_release(struct connection *conn, const char *domid_str);
 
 /* domid */

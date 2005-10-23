@@ -696,13 +696,20 @@ bool xs_introduce_domain(struct xs_handle *h,
 				ARRAY_SIZE(iov), NULL));
 }
 
-bool xs_release_domain(struct xs_handle *h, unsigned int domid)
+static void * single_with_domid(struct xs_handle *h,
+				enum xsd_sockmsg_type type,
+				unsigned int domid)
 {
 	char domid_str[MAX_STRLEN(domid)];
 
 	sprintf(domid_str, "%u", domid);
 
-	return xs_bool(xs_single(h, NULL, XS_RELEASE, domid_str, NULL));
+	return xs_single(h, NULL, type, domid_str, NULL);
+}
+
+bool xs_release_domain(struct xs_handle *h, unsigned int domid)
+{
+	return xs_bool(single_with_domid(h, XS_RELEASE, domid));
 }
 
 char *xs_get_domain_path(struct xs_handle *h, unsigned int domid)
@@ -712,6 +719,12 @@ char *xs_get_domain_path(struct xs_handle *h, unsigned int domid)
 	sprintf(domid_str, "%u", domid);
 
 	return xs_single(h, NULL, XS_GET_DOMAIN_PATH, domid_str, NULL);
+}
+
+bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid)
+{
+	return strcmp("F",
+		      single_with_domid(h, XS_IS_DOMAIN_INTRODUCED, domid));
 }
 
 /* Only useful for DEBUG versions */

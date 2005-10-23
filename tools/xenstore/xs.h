@@ -140,6 +140,10 @@ bool xs_release_domain(struct xs_handle *h, unsigned int domid);
  */
 char *xs_get_domain_path(struct xs_handle *h, unsigned int domid);
 
+/* Return whether the domain specified has been introduced to xenstored.
+ */
+bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid);
+
 /* Only useful for DEBUG versions */
 char *xs_debug_command(struct xs_handle *h, const char *cmd,
 		       void *data, unsigned int len);

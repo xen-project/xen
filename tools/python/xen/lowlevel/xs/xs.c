@@ -795,11 +795,10 @@ static PyObject *xspy_close(PyObject *self, PyObject *args, PyObject *kwds)
 }
 
 #define xspy_get_domain_path_doc "\n"			\
-	"Return store path of domain.\n"		\
+	"Return store path of domain, whether or not the domain exists.\n" \
 	" domid [int]: domain id\n"			\
 	"\n"						\
 	"Returns: [string] domain store path.\n"	\
-	"         None if domid doesn't exist.\n"	\
 	"Raises RuntimeError on error.\n"		\
 	"\n"
 

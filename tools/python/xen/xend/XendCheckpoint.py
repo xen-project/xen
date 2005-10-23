@@ -144,6 +144,8 @@ def restore(xd, fd):
         if handler.store_mfn is None or handler.console_mfn is None:
             raise XendError('Could not read store/console MFN')
 
+        dominfo.unpause()
+
         dominfo.completeRestore(handler.store_mfn, handler.console_mfn)
 
         return dominfo
