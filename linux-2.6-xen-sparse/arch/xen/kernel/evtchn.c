@@ -42,6 +42,7 @@
 #include <asm-xen/xen-public/physdev.h>
 #include <asm/hypervisor.h>
 #include <asm-xen/evtchn.h>
+#include <linux/mc146818rtc.h> /* RTC_IRQ */
 
 /*
  * This lock protects updates to the following mapping and reference-count
@@ -70,8 +71,8 @@ static unsigned long pirq_needs_unmask_notify[NR_PIRQS/sizeof(unsigned long)];
 
 #ifdef CONFIG_SMP
 
-static u8  cpu_evtchn[NR_EVENT_CHANNELS];
-static u32 cpu_evtchn_mask[NR_CPUS][NR_EVENT_CHANNELS/32];
+static u8 cpu_evtchn[NR_EVENT_CHANNELS];
+static unsigned long cpu_evtchn_mask[NR_CPUS][NR_EVENT_CHANNELS/BITS_PER_LONG];
 
 #define active_evtchns(cpu,sh,idx)		\
 	((sh)->evtchn_pending[idx] &		\
@@ -136,7 +137,7 @@ EXPORT_SYMBOL(force_evtchn_callback);
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 {
-	u32     l1, l2;
+	unsigned long  l1, l2;
 	unsigned int   l1i, l2i, port;
 	int            irq, cpu = smp_processor_id();
 	shared_info_t *s = HYPERVISOR_shared_info;
@@ -148,13 +149,13 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 	l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
 	while (l1 != 0) {
 		l1i = __ffs(l1);
-		l1 &= ~(1 << l1i);
+		l1 &= ~(1UL << l1i);
         
 		while ((l2 = active_evtchns(cpu, s, l1i)) != 0) {
 			l2i = __ffs(l2);
-			l2 &= ~(1 << l2i);
+			l2 &= ~(1UL << l2i);
             
-			port = (l1i << 5) + l2i;
+			port = (l1i * BITS_PER_LONG) + l2i;
 			if ((irq = evtchn_to_irq[port]) != -1)
 				do_IRQ(irq, regs);
 			else
@@ -178,11 +179,10 @@ static int find_unbound_irq(void)
 	return irq;
 }
 
-int bind_virq_to_irq(int virq)
+int bind_virq_to_irq(int virq, int cpu)
 {
 	evtchn_op_t op = { .cmd = EVTCHNOP_bind_virq };
 	int evtchn, irq;
-	int cpu = smp_processor_id();
 
 	spin_lock(&irq_mapping_update_lock);
 
@@ -209,10 +209,9 @@ int bind_virq_to_irq(int virq)
 }
 EXPORT_SYMBOL(bind_virq_to_irq);
 
-void unbind_virq_from_irq(int virq)
+void unbind_virq_from_irq(int virq, int cpu)
 {
 	evtchn_op_t op = { .cmd = EVTCHNOP_close };
-	int cpu    = smp_processor_id();
 	int irq    = per_cpu(virq_to_irq, cpu)[virq];
 	int evtchn = irq_to_evtchn[irq];
 
@@ -240,11 +239,10 @@ void unbind_virq_from_irq(int virq)
 }
 EXPORT_SYMBOL(unbind_virq_from_irq);
 
-int bind_ipi_to_irq(int ipi)
+int bind_ipi_to_irq(int ipi, int cpu)
 {
 	evtchn_op_t op = { .cmd = EVTCHNOP_bind_ipi };
 	int evtchn, irq;
-	int cpu = smp_processor_id();
 
 	spin_lock(&irq_mapping_update_lock);
 
@@ -272,10 +270,9 @@ int bind_ipi_to_irq(int ipi)
 }
 EXPORT_SYMBOL(bind_ipi_to_irq);
 
-void unbind_ipi_from_irq(int ipi)
+void unbind_ipi_from_irq(int ipi, int cpu)
 {
 	evtchn_op_t op = { .cmd = EVTCHNOP_close };
-	int cpu    = smp_processor_id();
 	int evtchn = per_cpu(ipi_to_evtchn, cpu)[ipi];
 	int irq    = evtchn_to_irq[evtchn];
 
@@ -747,6 +744,13 @@ void __init init_IRQ(void)
 	for (i = 0; i < NR_PIRQS; i++)
 	{
 		irq_bindcount[pirq_to_irq(i)] = 1;
+
+#ifdef RTC_IRQ
+		/* If not domain 0, force our RTC driver to fail its probe. */
+		if ((i == RTC_IRQ) &&
+		    !(xen_start_info->flags & SIF_INITDOMAIN))
+			continue;
+#endif
 
 		irq_desc[pirq_to_irq(i)].status  = IRQ_DISABLED;
 		irq_desc[pirq_to_irq(i)].action  = 0;

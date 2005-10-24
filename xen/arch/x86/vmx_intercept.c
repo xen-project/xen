@@ -32,31 +32,36 @@
 
 #ifdef CONFIG_VMX
 
-/* Check if the request is handled inside xen
-   return value: 0 --not handled; 1 --handled */
+/*
+ * Check if the request is handled inside xen
+ * return value: 0 --not handled; 1 --handled
+ */
 int vmx_io_intercept(ioreq_t *p, int type)
 {
-    struct vcpu *d = current;
-    struct vmx_handler_t *handler = &(d->domain->arch.vmx_platform.vmx_handler);
+    struct vcpu *v = current;
+    struct vmx_io_handler *handler =
+                           &(v->domain->arch.vmx_platform.vmx_io_handler);
     int i;
-    unsigned long addr, offset;
+    unsigned long addr, size;
+
     for (i = 0; i < handler->num_slot; i++) {
         if( type != handler->hdl_list[i].type)
             continue;
-        addr   = handler->hdl_list[i].addr;
-        offset = handler->hdl_list[i].offset;
+        addr = handler->hdl_list[i].addr;
+        size = handler->hdl_list[i].size;
         if (p->addr >= addr &&
-            p->addr <  addr + offset)
+            p->addr <  addr + size)
             return handler->hdl_list[i].action(p);
     }
     return 0;
 }
 
-int register_io_handler(unsigned long addr, unsigned long offset, 
+int register_io_handler(unsigned long addr, unsigned long size,
                         intercept_action_t action, int type)
 {
-    struct vcpu *d = current;
-    struct vmx_handler_t *handler = &(d->domain->arch.vmx_platform.vmx_handler);
+    struct vcpu *v = current;
+    struct vmx_io_handler *handler =
+                             &(v->domain->arch.vmx_platform.vmx_io_handler);
     int num = handler->num_slot;
 
     if (num >= MAX_IO_HANDLER) {
@@ -65,15 +70,15 @@ int register_io_handler(unsigned long addr, unsigned long offset,
     }
 
     handler->hdl_list[num].addr = addr;
-    handler->hdl_list[num].offset = offset;
+    handler->hdl_list[num].size = size;
     handler->hdl_list[num].action = action;
     handler->hdl_list[num].type = type;
     handler->num_slot++;
-    return 1;
 
+    return 1;
 }
 
-static void pit_cal_count(struct vmx_virpit_t *vpit)
+static void pit_cal_count(struct vmx_virpit *vpit)
 {
     u64 nsec_delta = (unsigned int)((NOW() - vpit->inject_point));
     if (nsec_delta > vpit->period)
@@ -81,7 +86,7 @@ static void pit_cal_count(struct vmx_virpit_t *vpit)
     vpit->count = vpit->init_val - ((nsec_delta * PIT_FREQ / 1000000000ULL) % vpit->init_val );
 }
 
-static void pit_latch_io(struct vmx_virpit_t *vpit)
+static void pit_latch_io(struct vmx_virpit *vpit)
 {
     pit_cal_count(vpit);
 
@@ -103,11 +108,11 @@ static void pit_latch_io(struct vmx_virpit_t *vpit)
         vpit->count_MSB_latched=1;
         break;
     default:
-        BUG();
+        domain_crash_synchronous();
     }
 }
 
-static int pit_read_io(struct vmx_virpit_t *vpit)
+static int pit_read_io(struct vmx_virpit *vpit)
 {
     if(vpit->count_LSB_latched) {
         /* Read Least Significant Byte */
@@ -168,8 +173,8 @@ static void resume_pit_io(ioreq_t *p)
 /* the intercept action for PIT DM retval:0--not handled; 1--handled */
 int intercept_pit_io(ioreq_t *p)
 {
-    struct vcpu *d = current;
-    struct vmx_virpit_t *vpit = &(d->domain->arch.vmx_platform.vmx_pit);
+    struct vcpu *v = current;
+    struct vmx_virpit *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
 
     if (p->size != 1 ||
         p->pdata_valid ||
@@ -197,15 +202,14 @@ int intercept_pit_io(ioreq_t *p)
 /* hooks function for the PIT initialization response iopacket */
 static void pit_timer_fn(void *data)
 {
-    struct vmx_virpit_t *vpit = data;
+    struct vmx_virpit *vpit = data;
     s_time_t   next;
     int        missed_ticks;
 
     missed_ticks = (NOW() - vpit->scheduled)/(s_time_t) vpit->period;
 
     /* Set the pending intr bit, and send evtchn notification to myself. */
-    if (test_and_set_bit(vpit->vector, vpit->intr_bitmap))
-        vpit->pending_intr_nr++; /* already set, then count the pending intr */
+    vpit->pending_intr_nr++; /* already set, then count the pending intr */
     evtchn_set_pending(vpit->v, iopacket_port(vpit->v->domain));
 
     /* pick up missed timer tick */
@@ -221,44 +225,37 @@ static void pit_timer_fn(void *data)
 /* Only some PIT operations such as load init counter need a hypervisor hook.
  * leave all other operations in user space DM
  */
-void vmx_hooks_assist(struct vcpu *d)
+void vmx_hooks_assist(struct vcpu *v)
 {
-    vcpu_iodata_t * vio = get_vio(d->domain, d->vcpu_id);
+    vcpu_iodata_t *vio = get_vio(v->domain, v->vcpu_id);
     ioreq_t *p = &vio->vp_ioreq;
-    shared_iopage_t *sp = get_sp(d->domain);
-    u64 *intr = &(sp->sp_global.pic_intr[0]);
-    struct vmx_virpit_t *vpit = &(d->domain->arch.vmx_platform.vmx_pit);
+    struct vmx_virpit *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
     int rw_mode, reinit = 0;
-    int oldvec = 0;
 
     /* load init count*/
-    if (p->state == STATE_IORESP_HOOK) { 
+    if (p->state == STATE_IORESP_HOOK) {
         /* set up actimer, handle re-init */
         if ( active_ac_timer(&(vpit->pit_timer)) ) {
             VMX_DBG_LOG(DBG_LEVEL_1, "VMX_PIT: guest reset PIT with channel %lx!\n", (unsigned long) ((p->u.data >> 24) & 0x3) );
             rem_ac_timer(&(vpit->pit_timer));
             reinit = 1;
-            oldvec = vpit->vector;
+ 
         }
         else
-            init_ac_timer(&vpit->pit_timer, pit_timer_fn, vpit, d->processor);
+            init_ac_timer(&vpit->pit_timer, pit_timer_fn, vpit, v->processor);
 
         /* init count for this channel */
-        vpit->init_val = (p->u.data & 0xFFFF) ; 
+        vpit->init_val = (p->u.data & 0xFFFF) ;
         /* frequency(ns) of pit */
-        vpit->period = DIV_ROUND(((vpit->init_val) * 1000000000ULL), PIT_FREQ); 
+        vpit->period = DIV_ROUND(((vpit->init_val) * 1000000000ULL), PIT_FREQ);
         VMX_DBG_LOG(DBG_LEVEL_1,"VMX_PIT: guest set init pit freq:%u ns, initval:0x%x\n", vpit->period, vpit->init_val);
         if (vpit->period < 900000) { /* < 0.9 ms */
             printk("VMX_PIT: guest programmed too small an init_val: %x\n",
                    vpit->init_val);
             vpit->period = 1000000;
         }
-        vpit->vector = ((p->u.data >> 16) & 0xFF);
-
-        if( reinit && oldvec != vpit->vector){
-            clear_bit(oldvec, intr);
-            vpit->pending_intr_nr = 0;
-        }
+         vpit->period_cycles = (u64)vpit->period * cpu_khz / 1000000L;
+         printk("VMX_PIT: guest freq in cycles=%lld\n",(long long)vpit->period_cycles);
 
         vpit->channel = ((p->u.data >> 24) & 0x3);
         vpit->first_injected = 0;
@@ -282,8 +279,7 @@ void vmx_hooks_assist(struct vcpu *d)
             break;
         }
 
-        vpit->intr_bitmap = intr;
-        vpit->v = d;
+        vpit->v = v;
 
         vpit->scheduled = NOW() + vpit->period;
         set_ac_timer(&vpit->pit_timer, vpit->scheduled);
@@ -292,8 +288,9 @@ void vmx_hooks_assist(struct vcpu *d)
         p->state = STATE_IORESP_READY;
 
         /* register handler to intercept the PIT io when vm_exit */
-        if (!reinit)
+        if (!reinit) {
             register_portio_handler(0x40, 4, intercept_pit_io); 
+        }
     }
 }
 #endif /* CONFIG_VMX */

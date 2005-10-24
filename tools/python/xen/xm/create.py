@@ -364,6 +364,10 @@ gopts.var('nographic', val='no|yes',
           fn=set_bool, default=0,
           use="Should device models use graphics?")
 
+gopts.var('ne2000', val='no|yes',
+          fn=set_bool, default=0,
+          use="Should device models use ne2000?")
+
 gopts.var('vnc', val='',
           fn=set_value, default=None,
           use="""Should the device model use VNC?""")
@@ -540,7 +544,7 @@ def configure_vmx(opts, config_image, vals):
     """
     args = [ 'memmap', 'device_model', 'vcpus', 'cdrom',
              'boot', 'fda', 'fdb', 'localtime', 'serial', 'macaddr', 'stdvga', 
-             'isa', 'nographic', 'vnc', 'vncviewer', 'sdl', 'display']
+             'isa', 'nographic', 'vnc', 'vncviewer', 'sdl', 'display', 'ne2000']
     for a in args:
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])

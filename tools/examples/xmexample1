@@ -36,7 +36,7 @@ name = "ExampleDomain"
 
 # Optionally define mac and/or bridge for the network interfaces.
 # Random MACs are assigned if not given.
-#vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0' ]
+#vif = [ 'mac=aa:00:00:00:00:11, bridge=xenbr0' ]
 
 #----------------------------------------------------------------------------
 # Define the disk devices you want the domain to have access to, and

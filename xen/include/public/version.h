@@ -40,3 +40,13 @@ typedef struct xen_parameters_info {
 } xen_parameters_info_t;
 
 #endif /* __XEN_PUBLIC_VERSION_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

@@ -136,9 +136,6 @@ EXPORT_SYMBOL(cpu_sibling_map);
 #endif
 
 #ifdef CONFIG_SMP
-EXPORT_SYMBOL(cpu_data);
-EXPORT_SYMBOL(cpu_online_map);
-EXPORT_SYMBOL(cpu_callout_map);
 EXPORT_SYMBOL(__write_lock_failed);
 EXPORT_SYMBOL(__read_lock_failed);
 

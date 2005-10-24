@@ -30,10 +30,11 @@
 #include "xenstored_core.h"
 #include "xenstored_domain.h"
 #include "xenstored_test.h"
+#include <xenctrl.h>
 
 static int sigfd;
 static int xs_test_pid;
-static u16 port;
+static uint16_t port;
 
 /* The event channel maps to a signal, shared page to an mmapped file. */
 void evtchn_notify(int local_port)
@@ -43,7 +44,7 @@ void evtchn_notify(int local_port)
 		barf_perror("fake event channel failed");
 }
 
-void *xc_map_foreign_range(int xc_handle, u32 dom __attribute__((unused)),
+void *xc_map_foreign_range(int xc_handle, uint32_t dom __attribute__((unused)),
 			   int size, int prot,
 			   unsigned long mfn __attribute__((unused)))
 {
@@ -83,7 +84,7 @@ int xc_interface_close(int xc_handle)
 }
 
 int xc_domain_getinfo(int xc_handle __attribute__((unused)),
-		      u32 first_domid, unsigned int max_doms,
+		      uint32_t first_domid, unsigned int max_doms,
                       xc_dominfo_t *info)
 {
 	assert(max_doms == 1);

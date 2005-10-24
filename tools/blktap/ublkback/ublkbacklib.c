@@ -112,7 +112,7 @@ int ublkback_response(blkif_t *blkif, blkif_response_t *rsp, int batch_done);
 typedef struct image {
     /* These need to turn into an array/rbtree for multi-disk support. */
     int  fd;
-    u64  fsid;
+    uint64_t  fsid;
     blkif_vdev_t   vdevice;
     long int size;
     long int secsize;
@@ -190,7 +190,7 @@ int ublkback_new_blkif(blkif_t *blkif)
   }
 */
     if (image->size == 0)
-        image->size =((u64) 16836057);
+        image->size =((uint64_t) 16836057);
     image->secsize = 512;
     image->info = 0;
 
@@ -215,7 +215,7 @@ static int batch_count = 0;
 int ublkback_request(blkif_t *blkif, blkif_request_t *req, int batch_done)
 {
     int fd;
-    u64 sector;
+    uint64_t sector;
     char *spage, *dpage;
     int ret, i, idx;
     blkif_response_t *rsp;

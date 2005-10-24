@@ -40,12 +40,12 @@ do_gnttab_op(int xc_handle,
 
 
 int xc_gnttab_map_grant_ref(int         xc_handle,
-                            u64    host_virt_addr,
-                            u32         dom,
-                            u16         ref,
-                            u16         flags,
-                            s16        *handle,
-                            u64   *dev_bus_addr)
+                            uint64_t    host_virt_addr,
+                            uint32_t    dom,
+                            uint16_t    ref,
+                            uint16_t    flags,
+                            int16_t    *handle,
+                            uint64_t   *dev_bus_addr)
 {
     struct gnttab_map_grant_ref op;
     int rc;
@@ -67,10 +67,10 @@ int xc_gnttab_map_grant_ref(int         xc_handle,
 
 
 int xc_gnttab_unmap_grant_ref(int       xc_handle,
-                              u64  host_virt_addr,
-                              u64  dev_bus_addr,
-                              u16       handle,
-                              s16      *status)
+                              uint64_t  host_virt_addr,
+                              uint64_t  dev_bus_addr,
+                              uint16_t  handle,
+                              int16_t  *status)
 {
     struct gnttab_unmap_grant_ref op;
     int rc;
@@ -89,9 +89,9 @@ int xc_gnttab_unmap_grant_ref(int       xc_handle,
 }
 
 int xc_gnttab_setup_table(int        xc_handle,
-                          u32        dom,
-                          u16        nr_frames,
-                          s16       *status,
+                          uint32_t   dom,
+                          uint16_t   nr_frames,
+                          int16_t   *status,
                           unsigned long **frame_list)
 {
     struct gnttab_setup_table op;
@@ -111,8 +111,8 @@ int xc_gnttab_setup_table(int        xc_handle,
 }
 
 int xc_gnttab_dump_table(int        xc_handle,
-                         u32        dom,
-                         s16       *status)
+                         uint32_t   dom,
+                         int16_t   *status)
 {
     struct gnttab_dump_table op;
     int rc;

@@ -33,7 +33,7 @@ release:
 	cp VGABIOS-lgpl-latest.cirrus.debug.bin ../$(RELEASE).cirrus.debug.bin
 	tar czvf ../$(RELEASE).tgz --exclude CVS -C .. $(RELEASE)/
 
-vgabios.bin: vgabios.c vgabios.h vgafonts.h vgatables.h vbe.h vbe.c vbetables.h
+vgabios.bin: biossums vgabios.c vgabios.h vgafonts.h vgatables.h vbe.h vbe.c vbetables.h
 	$(GCC) -E -P vgabios.c $(VGABIOS_VERS) $(VGABIOS_DATE) > _vgabios_.c
 	$(BCC) -o vgabios.s -C-c -D__i86__ -S -0 _vgabios_.c
 	sed -e 's/^\.text//' -e 's/^\.data//' vgabios.s > _vgabios_.s
@@ -43,7 +43,7 @@ vgabios.bin: vgabios.c vgabios.h vgafonts.h vgatables.h vbe.h vbe.c vbetables.h
 	./biossums VGABIOS-lgpl-latest.bin
 	ls -l VGABIOS-lgpl-latest.bin
 
-vgabios.debug.bin: vgabios.c vgabios.h vgafonts.h vgatables.h vbe.h vbe.c vbetables.h
+vgabios.debug.bin: biossums vgabios.c vgabios.h vgafonts.h vgatables.h vbe.h vbe.c vbetables.h
 	$(GCC) -E -P vgabios.c $(VGABIOS_VERS) -DDEBUG $(VGABIOS_DATE) > _vgabios-debug_.c
 	$(BCC) -o vgabios-debug.s -C-c -D__i86__ -S -0 _vgabios-debug_.c
 	sed -e 's/^\.text//' -e 's/^\.data//' vgabios-debug.s > _vgabios-debug_.s
@@ -53,7 +53,7 @@ vgabios.debug.bin: vgabios.c vgabios.h vgafonts.h vgatables.h vbe.h vbe.c vbetab
 	./biossums VGABIOS-lgpl-latest.debug.bin
 	ls -l VGABIOS-lgpl-latest.debug.bin
 
-vgabios-cirrus.bin: vgabios.c vgabios.h vgafonts.h vgatables.h clext.c
+vgabios-cirrus.bin: biossums vgabios.c vgabios.h vgafonts.h vgatables.h clext.c
 	$(GCC) -E -P vgabios.c $(VGABIOS_VERS) -DCIRRUS $(VGABIOS_DATE) > _vgabios-cirrus_.c
 	$(BCC) -o vgabios-cirrus.s -C-c -D__i86__ -S -0 _vgabios-cirrus_.c
 	sed -e 's/^\.text//' -e 's/^\.data//' vgabios-cirrus.s > _vgabios-cirrus_.s
@@ -63,7 +63,7 @@ vgabios-cirrus.bin: vgabios.c vgabios.h vgafonts.h vgatables.h clext.c
 	./biossums VGABIOS-lgpl-latest.cirrus.bin
 	ls -l VGABIOS-lgpl-latest.cirrus.bin
 
-vgabios-cirrus.debug.bin: vgabios.c vgabios.h vgafonts.h vgatables.h clext.c
+vgabios-cirrus.debug.bin: biossums vgabios.c vgabios.h vgafonts.h vgatables.h clext.c
 	$(GCC) -E -P vgabios.c $(VGABIOS_VERS) -DCIRRUS -DCIRRUS_DEBUG $(VGABIOS_DATE) > _vgabios-cirrus-debug_.c
 	$(BCC) -o vgabios-cirrus-debug.s -C-c -D__i86__ -S -0 _vgabios-cirrus-debug_.c
 	sed -e 's/^\.text//' -e 's/^\.data//' vgabios-cirrus-debug.s > _vgabios-cirrus-debug_.s

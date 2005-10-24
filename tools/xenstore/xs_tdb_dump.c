@@ -11,13 +11,13 @@
 #include "utils.h"
 
 struct record_hdr {
-	u32 num_perms;
-	u32 datalen;
-	u32 childlen;
+	uint32_t num_perms;
+	uint32_t datalen;
+	uint32_t childlen;
 	struct xs_permissions perms[0];
 };
 
-static u32 total_size(struct record_hdr *hdr)
+static uint32_t total_size(struct record_hdr *hdr)
 {
 	return sizeof(*hdr) + hdr->num_perms * sizeof(struct xs_permissions) 
 		+ hdr->datalen + hdr->childlen;

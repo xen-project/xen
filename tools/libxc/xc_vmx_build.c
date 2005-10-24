@@ -29,14 +29,17 @@
 #define E820_SHARED_PAGE 17
 #define E820_XENSTORE    18
 
-#define E820_MAP_PAGE        0x00090000
-#define E820_MAP_NR_OFFSET   0x000001E8
-#define E820_MAP_OFFSET      0x000002D0
+#define E820_MAP_PAGE       0x00090000
+#define E820_MAP_NR_OFFSET  0x000001E8
+#define E820_MAP_OFFSET     0x000002D0
+
+#define VCPU_NR_PAGE        0x0009F000
+#define VCPU_NR_OFFSET      0x00000800
 
 struct e820entry {
-    u64 addr;
-    u64 size;
-    u32 type;
+    uint64_t addr;
+    uint64_t size;
+    uint32_t type;
 } __attribute__((packed));
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
@@ -47,7 +50,7 @@ parseelfimage(
     char *elfbase, unsigned long elfsize, struct domain_setup_info *dsi);
 static int
 loadelfimage(
-    char *elfbase, int xch, u32 dom, unsigned long *parray,
+    char *elfbase, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi);
 
 static unsigned char build_e820map(void *e820_page, unsigned long mem_size)
@@ -120,23 +123,22 @@ static unsigned char build_e820map(void *e820_page, unsigned long mem_size)
  * Use E820 reserved memory 0x9F800 to pass number of vcpus to vmxloader
  * vmxloader will use it to config ACPI MADT table
  */
-#define VCPU_MAGIC 0x76637075 /* "vcpu" */
-static int
-set_nr_vcpus(int xc_handle, u32 dom, unsigned long *pfn_list,
-             struct domain_setup_info *dsi, unsigned long vcpus)
+#define VCPU_MAGIC      0x76637075  /* "vcpu" */
+static int set_vcpu_nr(int xc_handle, uint32_t dom,
+                        unsigned long *pfn_list, unsigned int vcpus)
 {
-    char          *va_map;
-    unsigned long *va_vcpus;
+    char         *va_map;
+    unsigned int *va_vcpus;
 
-    va_map = xc_map_foreign_range(
-        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
-        pfn_list[(0x9F000 - dsi->v_start) >> PAGE_SHIFT]);
+    va_map = xc_map_foreign_range(xc_handle, dom,
+                                  PAGE_SIZE, PROT_READ|PROT_WRITE,
+                                  pfn_list[VCPU_NR_PAGE >> PAGE_SHIFT]);
     if ( va_map == NULL )
         return -1;
 
-    va_vcpus = (unsigned long *)(va_map + 0x800);
-    *va_vcpus++ = VCPU_MAGIC;
-    *va_vcpus++ = vcpus;
+    va_vcpus = (unsigned int *)(va_map + VCPU_NR_OFFSET);
+    va_vcpus[0] = VCPU_MAGIC;
+    va_vcpus[1] = vcpus;
 
     munmap(va_map, PAGE_SIZE);
 
@@ -144,7 +146,7 @@ set_nr_vcpus(int xc_handle, u32 dom, unsigned long *pfn_list,
 }
 
 #ifdef __i386__
-static int zap_mmio_range(int xc_handle, u32 dom,
+static int zap_mmio_range(int xc_handle, uint32_t dom,
                           l2_pgentry_32_t *vl2tab,
                           unsigned long mmio_range_start,
                           unsigned long mmio_range_size)
@@ -173,7 +175,7 @@ static int zap_mmio_range(int xc_handle, u32 dom,
     return 0;
 }
 
-static int zap_mmio_ranges(int xc_handle, u32 dom, unsigned long l2tab,
+static int zap_mmio_ranges(int xc_handle, uint32_t dom, unsigned long l2tab,
                            unsigned char e820_map_nr, unsigned char *e820map)
 {
     unsigned int i;
@@ -197,7 +199,7 @@ static int zap_mmio_ranges(int xc_handle, u32 dom, unsigned long l2tab,
     return 0;
 }
 #else
-static int zap_mmio_range(int xc_handle, u32 dom,
+static int zap_mmio_range(int xc_handle, uint32_t dom,
                           l3_pgentry_t *vl3tab,
                           unsigned long mmio_range_start,
                           unsigned long mmio_range_size)
@@ -247,7 +249,7 @@ static int zap_mmio_range(int xc_handle, u32 dom,
     return 0;
 }
 
-static int zap_mmio_ranges(int xc_handle, u32 dom, unsigned long l3tab,
+static int zap_mmio_ranges(int xc_handle, uint32_t dom, unsigned long l3tab,
                            unsigned char e820_map_nr, unsigned char *e820map)
 {
     unsigned int i;
@@ -271,13 +273,12 @@ static int zap_mmio_ranges(int xc_handle, u32 dom, unsigned long l3tab,
 #endif
 
 static int setup_guest(int xc_handle,
-                       u32 dom, int memsize,
+                       uint32_t dom, int memsize,
                        char *image, unsigned long image_size,
                        unsigned long nr_pages,
                        vcpu_guest_context_t *ctxt,
                        unsigned long shared_info_frame,
                        unsigned int control_evtchn,
-                       unsigned long flags,
                        unsigned int vcpus,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn)
@@ -366,7 +367,7 @@ static int setup_guest(int xc_handle,
         goto error_out;
 
     /* First allocate page for page dir or pdpt */
-    ppt_alloc = (vpt_start - dsi.v_start) >> PAGE_SHIFT;
+    ppt_alloc = vpt_start >> PAGE_SHIFT;
     if ( page_array[ppt_alloc] > 0xfffff )
     {
         unsigned long nmfn;
@@ -388,8 +389,8 @@ static int setup_guest(int xc_handle,
                                         l2tab >> PAGE_SHIFT)) == NULL )
         goto error_out;
     memset(vl2tab, 0, PAGE_SIZE);
-    vl2e = &vl2tab[l2_table_offset(dsi.v_start)];
-    for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
+    vl2e = &vl2tab[l2_table_offset(0)];
+    for ( count = 0; count < (v_end >> PAGE_SHIFT); count++ )
     {
         if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
         {
@@ -404,7 +405,7 @@ static int setup_guest(int xc_handle,
                 goto error_out;
             }
             memset(vl1tab, 0, PAGE_SIZE);
-            vl1e = &vl1tab[l1_table_offset(dsi.v_start + (count<<PAGE_SHIFT))];
+            vl1e = &vl1tab[l1_table_offset(count << PAGE_SHIFT)];
             *vl2e++ = l1tab | L2_PROT;
         }
 
@@ -436,9 +437,8 @@ static int setup_guest(int xc_handle,
         vl3tab[i] = l2tab | L3_PROT;
     }
 
-    vl3e = &vl3tab[l3_table_offset(dsi.v_start)];
-
-    for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
+    vl3e = &vl3tab[l3_table_offset(0)];
+    for ( count = 0; count < (v_end >> PAGE_SHIFT); count++ )
     {
         if (!(count & (1 << (L3_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)))){
             l2tab = vl3tab[count >> (L3_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT)]
@@ -452,7 +452,7 @@ static int setup_guest(int xc_handle,
                                                 l2tab >> PAGE_SHIFT)) == NULL )
                 goto error_out;
 
-            vl2e = &vl2tab[l2_table_offset(dsi.v_start + (count << PAGE_SHIFT))];
+            vl2e = &vl2tab[l2_table_offset(count << PAGE_SHIFT)];
         }
         if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 )
         {
@@ -467,7 +467,7 @@ static int setup_guest(int xc_handle,
                 goto error_out;
             }
             memset(vl1tab, 0, PAGE_SIZE);
-            vl1e = &vl1tab[l1_table_offset(dsi.v_start + (count<<PAGE_SHIFT))];
+            vl1e = &vl1tab[l1_table_offset(count << PAGE_SHIFT)];
             *vl2e++ = l1tab | L2_PROT;
         }
 
@@ -488,7 +488,10 @@ static int setup_guest(int xc_handle,
             goto error_out;
     }
 
-    set_nr_vcpus(xc_handle, dom, page_array, &dsi, vcpus);
+    if (set_vcpu_nr(xc_handle, dom, page_array, vcpus)) {
+        fprintf(stderr, "Couldn't set vcpu number for VMX guest.\n");
+        goto error_out;
+    }
 
     *store_mfn = page_array[(v_end-2) >> PAGE_SHIFT];
     shared_page_frame = (v_end - PAGE_SIZE) >> PAGE_SHIFT;
@@ -518,9 +521,6 @@ static int setup_guest(int xc_handle,
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
-
-    shared_info->n_vcpu = vcpus;
-    printf(" VCPUS:         %d\n", shared_info->n_vcpu);
 
     munmap(shared_info, PAGE_SIZE);
 
@@ -569,37 +569,34 @@ static int setup_guest(int xc_handle,
     return -1;
 }
 
-
 #define VMX_FEATURE_FLAG 0x20
 
 static int vmx_identify(void)
 {
     int eax, ecx;
 
-#ifdef __i386__
-    __asm__ __volatile__ ("pushl %%ebx; cpuid; popl %%ebx"
-                          : "=a" (eax), "=c" (ecx)
-                          : "0" (1)
-                          : "dx");
-#elif defined __x86_64__
-    __asm__ __volatile__ ("pushq %%rbx; cpuid; popq %%rbx"
-                          : "=a" (eax), "=c" (ecx)
-                          : "0" (1)
-                          : "dx");
+    __asm__ __volatile__ (
+#if defined(__i386__)
+                          "push %%ebx; cpuid; pop %%ebx"
+#elif defined(__x86_64__)
+                          "push %%rbx; cpuid; pop %%rbx"
 #endif
+                          : "=a" (eax), "=c" (ecx)
+                          : "0" (1)
+                          : "dx");
 
     if (!(ecx & VMX_FEATURE_FLAG)) {
         return -1;
     }
+
     return 0;
 }
 
 int xc_vmx_build(int xc_handle,
-                 u32 domid,
+                 uint32_t domid,
                  int memsize,
                  const char *image_name,
                  unsigned int control_evtchn,
-                 unsigned long flags,
                  unsigned int vcpus,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn)
@@ -635,7 +632,7 @@ int xc_vmx_build(int xc_handle,
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
     if ( (xc_dom0_op(xc_handle, &op) < 0) ||
-         ((u16)op.u.getdomaininfo.domain != domid) )
+         ((uint16_t)op.u.getdomaininfo.domain != domid) )
     {
         PERROR("Could not get info on domain");
         goto error_out;
@@ -654,9 +651,9 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    if ( setup_guest(xc_handle, domid, memsize, image, image_size, nr_pages,
-                     ctxt, op.u.getdomaininfo.shared_info_frame, control_evtchn,
-                     flags, vcpus, store_evtchn, store_mfn) < 0)
+    if ( setup_guest(xc_handle, domid, memsize, image, image_size,
+                     nr_pages, ctxt, op.u.getdomaininfo.shared_info_frame,
+                     control_evtchn, vcpus, store_evtchn, store_mfn) < 0)
     {
         ERROR("Error constructing guest OS");
         goto error_out;
@@ -790,7 +787,7 @@ static int parseelfimage(char *elfbase,
 
 static int
 loadelfimage(
-    char *elfbase, int xch, u32 dom, unsigned long *parray,
+    char *elfbase, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi)
 {
     Elf32_Ehdr *ehdr = (Elf32_Ehdr *)elfbase;

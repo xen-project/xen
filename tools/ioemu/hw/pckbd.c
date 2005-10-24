@@ -29,6 +29,9 @@
 /* debug PC keyboard : only mouse */
 //#define DEBUG_MOUSE
 
+/* enable synapatic touchpad device model */
+//#define SYNAPTIC
+
 /*	Keyboard Controller Commands */
 #define KBD_CCMD_READ_MODE	0x20	/* Read mode bits */
 #define KBD_CCMD_WRITE_MODE	0x60	/* Write mode bits */
@@ -117,10 +120,12 @@ typedef struct {
     int rptr, wptr, count;
 } KBDQueue;
 
+#ifdef SYNAPTIC
 typedef struct {
     int absolute;
     int high;
 } TouchPad;
+#endif
 
 typedef struct KBDState {
     KBDQueue queue;
@@ -142,7 +147,9 @@ typedef struct KBDState {
     int mouse_dy;
     int mouse_dz;
     uint8_t mouse_buttons;
+#ifdef SYNAPTIC
     TouchPad touchpad;
+#endif
 } KBDState;
 
 KBDState kbd_state;
@@ -399,6 +406,7 @@ static void kbd_mouse_send_packet(KBDState *s)
     dx1 = s->mouse_dx;
     dy1 = s->mouse_dy;
     dz1 = s->mouse_dz;
+#ifdef SYNAPTIC
     if (s->touchpad.absolute)
     {
 	int dz2, dleftnright, dg, df;
@@ -444,6 +452,7 @@ static void kbd_mouse_send_packet(KBDState *s)
 	kbd_queue(s, dy1 & 0xFF, 1);
 	return;
     }
+#endif
     /* XXX: increase range to 8 bits ? */
     if (dx1 > 127)
         dx1 = 127;
@@ -516,9 +525,11 @@ static void pc_kbd_mouse_event(void *opaque,
 
 static void kbd_write_mouse(KBDState *s, int val)
 {
+#ifdef SYNAPTIC
 /* variables needed to store synaptics command info */
 static int rr = 0, ss = 0, tt = 0, uu = 0, res_count = 0, last_com = 0;
 int spare;
+#endif
 #ifdef DEBUG_MOUSE
     printf("kbd: write mouse 0x%02x\n", val);
 #endif
@@ -536,7 +547,9 @@ int spare;
                 return;
             }
         }
+#ifdef SYNAPTIC
 	last_com = val;
+#endif
         switch(val) {
         case AUX_SET_SCALE11:
             s->mouse_status &= ~MOUSE_STATUS_SCALE21;
@@ -568,6 +581,7 @@ int spare;
             kbd_queue(s, AUX_ACK, 1);
             break;
         case AUX_GET_SCALE:
+#ifdef SYNAPTIC
 	    if (res_count == 4)
 	    {
 		    /* time for the special stuff */
@@ -681,6 +695,7 @@ int spare;
 		    }
 	    }
 	    else
+#endif
 	    {
 		    /* not a special command, just do the regular stuff */
             kbd_queue(s, AUX_ACK, 1);
@@ -705,14 +720,18 @@ int spare;
             s->mouse_sample_rate = 100;
             s->mouse_resolution = 2;
             s->mouse_status = 0;
+#ifdef SYNAPTIC
        	    s->touchpad.absolute = 0;
+#endif
             kbd_queue(s, AUX_ACK, 1);
             break;
         case AUX_RESET:
             s->mouse_sample_rate = 100;
             s->mouse_resolution = 2;
             s->mouse_status = 0;
+#ifdef SYNAPTIC
 	    s->touchpad.absolute = 0;
+#endif
             kbd_queue(s, AUX_ACK, 1);
             kbd_queue(s, 0xaa, 1);
             kbd_queue(s, s->mouse_type, 1);
@@ -722,6 +741,7 @@ int spare;
         }
         break;
     case AUX_SET_SAMPLE:
+#ifdef SYNAPTIC
 	if (res_count == 4 && val == 0x14)
 	{
 		/* time for the special stuff */
@@ -729,6 +749,7 @@ int spare;
 		val = (rr*64) + (ss*16) + (tt*4) + uu;
 		/* TODO: set the mode byte */
 	} else
+#endif
         s->mouse_sample_rate = val;
 #if 0
         /* detect IMPS/2 or IMEX */
@@ -762,6 +783,7 @@ int spare;
         s->mouse_write_cmd = -1;
         break;
     case AUX_SET_RES:
+#ifdef SYNAPTIC
 	if (last_com != AUX_SET_RES)
 	{
 		/* if its not 4 in a row, its not a command */
@@ -790,6 +812,7 @@ int spare;
 			uu = val;
 			break;
 	}
+#endif
         s->mouse_resolution = val;
         kbd_queue(s, AUX_ACK, 1);
         s->mouse_write_cmd = -1;
@@ -871,8 +894,10 @@ static void kbd_save(QEMUFile* f, void* opaque)
     qemu_put_be32s(f, &s->mouse_dy);
     qemu_put_be32s(f, &s->mouse_dz);
     qemu_put_8s(f, &s->mouse_buttons);
+#ifdef SYNAPTIC
     qemu_put_be32s(f, &s->touchpad.absolute);
     qemu_put_be32s(f, &s->touchpad.high);
+#endif
 }
 
 static int kbd_load(QEMUFile* f, void* opaque, int version_id)
@@ -897,8 +922,10 @@ static int kbd_load(QEMUFile* f, void* opaque, int version_id)
     qemu_get_be32s(f, &s->mouse_dy);
     qemu_get_be32s(f, &s->mouse_dz);
     qemu_get_8s(f, &s->mouse_buttons);
+#ifdef SYNAPTIC
     qemu_get_be32s(f, &s->touchpad.absolute);
     qemu_get_be32s(f, &s->touchpad.high);
+#endif
     return 0;
 }
 

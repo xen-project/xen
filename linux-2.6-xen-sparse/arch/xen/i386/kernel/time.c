@@ -122,7 +122,8 @@ static u32 shadow_tv_version;
 static u64 processed_system_time;   /* System time (ns) at last processing. */
 static DEFINE_PER_CPU(u64, processed_system_time);
 
-#define NS_PER_TICK (1000000000ULL/HZ)
+/* Must be signed, as it's compared with s64 quantities which can be -ve. */
+#define NS_PER_TICK (1000000000LL/HZ)
 
 static inline void __normalize_time(time_t *sec, s64 *nsec)
 {
@@ -235,9 +236,9 @@ static void __update_wallclock(time_t sec, long nsec)
 
 	/* Adjust wall-clock time base based on wall_jiffies ticks. */
 	wc_nsec = processed_system_time;
-	wc_nsec += (u64)sec * 1000000000ULL;
-	wc_nsec += (u64)nsec;
-	wc_nsec -= (jiffies - wall_jiffies) * (u64)(NSEC_PER_SEC / HZ);
+	wc_nsec += sec * (u64)NSEC_PER_SEC;
+	wc_nsec += nsec;
+	wc_nsec -= (jiffies - wall_jiffies) * (u64)NS_PER_TICK;
 
 	/* Split wallclock base into seconds and nanoseconds. */
 	tmp = wc_nsec;
@@ -437,7 +438,7 @@ int do_settimeofday(struct timespec *tv)
 	 * be stale, so we can retry with fresh ones.
 	 */
 	for ( ; ; ) {
-		nsec = (s64)tv->tv_nsec - (s64)get_nsec_offset(shadow);
+		nsec = tv->tv_nsec - get_nsec_offset(shadow);
 		if (time_values_up_to_date(cpu))
 			break;
 		get_time_values_from_xen();
@@ -558,7 +559,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 	while (!time_values_up_to_date(cpu));
 
-	if (unlikely(delta < (s64)-1000000) || unlikely(delta_cpu < 0)) {
+	if (unlikely(delta < -1000000LL) || unlikely(delta_cpu < 0)) {
 		printk("Timer ISR/%d: Time went backwards: "
 		       "delta=%lld cpu_delta=%lld shadow=%lld "
 		       "off=%lld processed=%lld cpu_processed=%lld\n",
@@ -784,7 +785,7 @@ void __init time_init(void)
 	rdtscll(vxtime.last_tsc);
 #endif
 
-	per_cpu(timer_irq, 0) = bind_virq_to_irq(VIRQ_TIMER);
+	per_cpu(timer_irq, 0) = bind_virq_to_irq(VIRQ_TIMER, 0);
 	(void)setup_irq(per_cpu(timer_irq, 0), &irq_timer);
 }
 
@@ -802,7 +803,7 @@ static inline u64 jiffies_to_st(unsigned long j)
 		 * but that's ok: we'll just end up with a shorter timeout. */
 		if (delta < 1) 
 			delta = 1;
-		st = processed_system_time + ((u64)delta * NS_PER_TICK);
+		st = processed_system_time + (delta * (u64)NS_PER_TICK);
 	} while (read_seqretry(&xtime_lock, seq));
 
 	return st;
@@ -851,21 +852,12 @@ void time_resume(void)
 
 #ifdef CONFIG_SMP
 static char timer_name[NR_CPUS][15];
-void local_setup_timer_irq(void)
-{
-	int cpu = smp_processor_id();
 
-	if (cpu == 0)
-		return;
-	per_cpu(timer_irq, cpu) = bind_virq_to_irq(VIRQ_TIMER);
-	sprintf(timer_name[cpu], "timer%d", cpu);
-	BUG_ON(request_irq(per_cpu(timer_irq, cpu), timer_interrupt,
-	                   SA_INTERRUPT, timer_name[cpu], NULL));
-}
-
-void local_setup_timer(void)
+void local_setup_timer(unsigned int cpu)
 {
-	int seq, cpu = smp_processor_id();
+	int seq;
+
+	BUG_ON(cpu == 0);
 
 	do {
 		seq = read_seqbegin(&xtime_lock);
@@ -873,17 +865,17 @@ void local_setup_timer(void)
 			per_cpu(shadow_time, cpu).system_timestamp;
 	} while (read_seqretry(&xtime_lock, seq));
 
-	local_setup_timer_irq();
+	per_cpu(timer_irq, cpu) = bind_virq_to_irq(VIRQ_TIMER, cpu);
+	sprintf(timer_name[cpu], "timer%d", cpu);
+	BUG_ON(request_irq(per_cpu(timer_irq, cpu), timer_interrupt,
+	                   SA_INTERRUPT, timer_name[cpu], NULL));
 }
 
-void local_teardown_timer_irq(void)
+void local_teardown_timer(unsigned int cpu)
 {
-	int cpu = smp_processor_id();
-
-	if (cpu == 0)
-		return;
+	BUG_ON(cpu == 0);
 	free_irq(per_cpu(timer_irq, cpu), NULL);
-	unbind_virq_from_irq(VIRQ_TIMER);
+	unbind_virq_from_irq(VIRQ_TIMER, cpu);
 }
 #endif
 

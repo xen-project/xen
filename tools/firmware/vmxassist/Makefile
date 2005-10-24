@@ -24,14 +24,14 @@ include $(XEN_ROOT)/tools/Rules.mk
 # The emulator code lives in ROM space
 TEXTADDR=0x000D0000
 
-DEFINES=-DDEBUG -DTEXTADDR=${TEXTADDR}
+DEFINES=-DDEBUG -D_ACPI_ -DTEXTADDR=$(TEXTADDR)
 XENINC=-I$(XEN_ROOT)/tools/libxc
 
 LD       = ld
 CC       = gcc
 CPP      = cpp -P
 OBJCOPY  = objcopy -p -O binary -R .note -R .comment -R .bss -S --gap-fill=0
-CFLAGS   = ${DEFINES} -I. $(XENINC) -Wall -fno-builtin -O2 -msoft-float
+CFLAGS   = $(DEFINES) -I. $(XENINC) -Wall -fno-builtin -O2 -msoft-float
 CFLAGS  += -m32 -march=i686
 LDFLAGS  = -m elf_i386
 
@@ -40,33 +40,33 @@ OBJECTS = head.o trap.o vm86.o setup.o util.o
 all: vmxloader
 
 vmxloader: roms.h vmxloader.c acpi.h acpi_madt.c
-	${CC} ${CFLAGS} ${DEFINES} -c vmxloader.c -c acpi_madt.c
+	$(CC) $(CFLAGS) $(DEFINES) -c vmxloader.c -c acpi_madt.c
 	$(CC) -o vmxloader.tmp -m32 -nostdlib -Wl,-N -Wl,-Ttext -Wl,0x100000 vmxloader.o acpi_madt.o
 	objcopy vmxloader.tmp vmxloader
 	rm -f vmxloader.tmp
 
-vmxassist.bin: vmxassist.ld ${OBJECTS}
-	${CPP} ${DEFINES} vmxassist.ld > vmxassist.tmp
-	${LD} -o vmxassist ${LDFLAGS} -nostdlib --fatal-warnings -N -T vmxassist.tmp ${OBJECTS}
+vmxassist.bin: vmxassist.ld $(OBJECTS)
+	$(CPP) $(DEFINES) vmxassist.ld > vmxassist.tmp
+	$(LD) -o vmxassist $(LDFLAGS) -nostdlib --fatal-warnings -N -T vmxassist.tmp $(OBJECTS)
 	nm -n vmxassist > vmxassist.sym
-	${OBJCOPY} vmxassist vmxassist.tmp
+	$(OBJCOPY) vmxassist vmxassist.tmp
 	dd if=vmxassist.tmp of=vmxassist.bin ibs=512 conv=sync
 	rm -f vmxassist.tmp
 
 head.o: machine.h head.S
-	${CC} ${CFLAGS} -D__ASSEMBLY__ ${DEFINES} -c head.S
+	$(CC) $(CFLAGS) -D__ASSEMBLY__ $(DEFINES) -c head.S
 
 trap.o: machine.h offsets.h trap.S
-	${CC} ${CFLAGS} -D__ASSEMBLY__ ${DEFINES} -c trap.S
+	$(CC) $(CFLAGS) -D__ASSEMBLY__ $(DEFINES) -c trap.S
 
 vm86.o: machine.h vm86.c
-	${CC} ${CFLAGS} -c vm86.c
+	$(CC) $(CFLAGS) -c vm86.c
 
 setup.o: machine.h setup.c
-	${CC} ${CFLAGS} -c setup.c
+	$(CC) $(CFLAGS) -c setup.c
 
 util.o: machine.h util.c
-	${CC} ${CFLAGS} -c util.c
+	$(CC) $(CFLAGS) -c util.c
 
 roms.h:	../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin ../vgabios/VGABIOS-lgpl-latest.cirrus.bin vmxassist.bin
 	./mkhex rombios ../rombios/BIOS-bochs-latest > roms.h
@@ -81,10 +81,10 @@ offsets.h: gen
 	./gen > offsets.h
 
 gen:	gen.c
-	${CC} ${CFLAGS} -o gen gen.c
+	$(HOSTCC) $(HOSTCFLAGS) -I. $(XENINC) -o gen gen.c
 
 clean:
 	rm -f vmxassist vmxassist.tmp vmxassist.bin vmxassist.run vmxassist.sym head.s roms.h acpi.h
-	rm -f vmxloader vmxloader.tmp vmxloader.o ${OBJECTS}
+	rm -f vmxloader vmxloader.tmp vmxloader.o $(OBJECTS)
 	rm -f gen gen.o offsets.h
 

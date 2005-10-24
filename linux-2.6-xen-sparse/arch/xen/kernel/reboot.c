@@ -26,7 +26,6 @@
 // the distinction when we return the reason code to them.
 #define SHUTDOWN_HALT      4
 
-
 void machine_restart(char * __unused)
 {
 	/* We really want to get pending console data out before we die. */
@@ -60,6 +59,8 @@ EXPORT_SYMBOL(machine_power_off);
 
 /* Ignore multiple shutdown requests. */
 static int shutting_down = SHUTDOWN_INVALID;
+static void __shutdown_handler(void *unused);
+static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 
 #ifndef CONFIG_HOTPLUG_CPU
 #define cpu_down(x) (-EOPNOTSUPP)
@@ -243,40 +244,46 @@ static int shutdown_process(void *__unused)
 	return 0;
 }
 
-static struct task_struct *kthread_create_on_cpu(int (*f)(void *arg),
-						 void *arg,
-						 const char *name,
-						 int cpu)
+static int kthread_create_on_cpu(int (*f)(void *arg),
+				 void *arg,
+				 const char *name,
+				 int cpu)
 {
 	struct task_struct *p;
 	p = kthread_create(f, arg, name);
+	if (IS_ERR(p))
+		return PTR_ERR(p);
 	kthread_bind(p, cpu);
 	wake_up_process(p);
-	return p;
+	return 0;
 }
 
 static void __shutdown_handler(void *unused)
 {
 	int err;
 
-	if (shutting_down != SHUTDOWN_SUSPEND) {
+	if (shutting_down != SHUTDOWN_SUSPEND)
 		err = kernel_thread(shutdown_process, NULL,
 				    CLONE_FS | CLONE_FILES);
-		if ( err < 0 )
-			printk(KERN_ALERT "Error creating shutdown "
-			       "process!\n");
-	} else {
-		kthread_create_on_cpu(__do_suspend, NULL, "suspender", 0);
+	else
+		err = kthread_create_on_cpu(__do_suspend, NULL, "suspend", 0);
+
+	if ( err < 0 ) {
+		printk(KERN_WARNING "Error creating shutdown process (%d): "
+		       "retrying...\n", -err);
+		schedule_delayed_work(&shutdown_work, HZ/2);
 	}
 }
 
 static void shutdown_handler(struct xenbus_watch *watch,
 			     const char **vec, unsigned int len)
 {
-	static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
 	char *str;
 	struct xenbus_transaction *xbt;
 	int err;
+
+	if (shutting_down != SHUTDOWN_INVALID)
+		goto out;
 
  again:
 	xbt = xenbus_transaction_start();
@@ -312,6 +319,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 
 	kfree(str);
 
+ out:
 	if (shutting_down != SHUTDOWN_INVALID)
 		schedule_work(&shutdown_work);
 }

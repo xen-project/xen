@@ -43,14 +43,15 @@ endif
 build: mk-symlinks
 	$(MAKE) secpol_tool
 	$(MAKE) secpol_xml2bin
+	$(MAKE) get_decision
 	chmod 700 ./setlabel.sh
 	chmod 700 ./updategrub.sh
 	chmod 700 ./getlabel.sh
 
-secpol_tool : secpol_tool.c secpol_compat.h
+secpol_tool : secpol_tool.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $<
 
-secpol_xml2bin : secpol_xml2bin.c secpol_xml2bin.h secpol_compat.h
+secpol_xml2bin : secpol_xml2bin.c secpol_xml2bin.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_XML2BIN) $(VALIDATE_SCHEMA) -o $@ $<
 
 clean:

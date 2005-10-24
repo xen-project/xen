@@ -64,7 +64,7 @@ class XendRoot:
     xend_address_default      = ''
 
     """Default for the flag indicating whether xend should run a relocation server."""
-    xend_relocation_server_default = 'yes'
+    xend_relocation_server_default = 'no'
 
     """Default interface address the xend relocation server listens at. """
     xend_relocation_address_default = ''
@@ -243,29 +243,35 @@ class XendRoot:
         """
         return self.get_config_value("xend-unix-path", self.xend_unix_path_default)
 
-    def get_block_script(self, type):
-        return self.get_config_value('block-%s' % type, '')
-
     def get_network_script(self):
-        return self.get_config_value('network-script', '')
+        """@return the script used to alter the network configuration when
+        Xend starts and stops, or None if no such script is specified."""
+        
+        s = self.get_config_value('network-script')
+
+        if s:
+            return os.path.join(self.network_script_dir, s)
+        else:
+            return None
+
 
     def get_enable_dump(self):
         return self.get_config_bool('enable-dump', 'no')
 
     def get_vif_bridge(self):
-        return self.get_config_value('vif-bridge', 'xen-br0')
+        return self.get_config_value('vif-bridge', 'xenbr0')
 
     def get_vif_script(self):
         return self.get_config_value('vif-script', 'vif-bridge')
-
-    def get_vif_antispoof(self):
-        return self.get_config_bool('vif-antispoof', 'yes')
 
     def get_dom0_min_mem(self):
         return self.get_config_int('dom0-min-mem', self.dom0_min_mem_default)
 
     def get_dom0_vcpus(self):
         return self.get_config_int('dom0-cpus', self.dom0_vcpus_default)
+
+    def get_console_limit(self):
+        return self.get_config_int('console-limit', 1024)
 
 def instance():
     """Get an instance of XendRoot.

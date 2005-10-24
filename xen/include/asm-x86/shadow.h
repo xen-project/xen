@@ -55,8 +55,6 @@
 #define shadow_mode_translate(_d) ((_d)->arch.shadow_mode & SHM_translate)
 #define shadow_mode_external(_d)  ((_d)->arch.shadow_mode & SHM_external)
 
-#define shadow_tainted_refcnts(_d) ((_d)->arch.shadow_tainted_refcnts)
-
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
 #define __shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START + \
      (SH_LINEAR_PT_VIRT_START >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT))))
@@ -304,10 +302,12 @@ struct shadow_status {
 
 struct out_of_sync_entry {
     struct out_of_sync_entry *next;
+    struct vcpu   *v;
     unsigned long gpfn;    /* why is this here? */
     unsigned long gmfn;
     unsigned long snapshot_mfn;
     unsigned long writable_pl1e; /* NB: this is a machine address */
+    unsigned long va;
 };
 
 #define out_of_sync_extra_size 127
@@ -386,6 +386,10 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
 
     nl1e = l1e;
     l1e_remove_flags(nl1e, _PAGE_GLOBAL);
+
+    if ( unlikely(l1e_get_flags(l1e) & L1_DISALLOW_MASK) )
+        return 0;
+
     res = get_page_from_l1e(nl1e, d);
 
     if ( unlikely(!res) && IS_PRIV(d) && !shadow_mode_translate(d) &&
@@ -718,6 +722,23 @@ shadow_unpin(unsigned long smfn)
     put_shadow_ref(smfn);
 }
 
+/*
+ * SMP issue. The following code assumes the shadow lock is held. Re-visit
+ * when working on finer-gained locks for shadow.
+ */
+static inline void set_guest_back_ptr(
+    struct domain *d, l1_pgentry_t spte, unsigned long smfn, unsigned int index)
+{
+    if ( shadow_mode_external(d) ) {
+        unsigned long gmfn;
+
+        ASSERT(shadow_lock_is_acquired(d));
+        gmfn = l1e_get_pfn(spte);
+        frame_table[gmfn].tlbflush_timestamp = smfn;
+        frame_table[gmfn].u.inuse.type_info &= ~PGT_va_mask;
+        frame_table[gmfn].u.inuse.type_info |= (unsigned long) index << PGT_va_shift;
+    }
+}
 
 /************************************************************************/
 #if CONFIG_PAGING_LEVELS <= 2
@@ -944,13 +965,15 @@ validate_pte_change(
             //
             perfc_incrc(validate_pte_changes3);
 
-            if ( (l1e_get_flags(new_spte) & _PAGE_PRESENT) &&
-                 !shadow_get_page_from_l1e(new_spte, d) )
-                new_spte = l1e_empty();
             if ( l1e_get_flags(old_spte) & _PAGE_PRESENT )
             {
                 shadow_put_page_from_l1e(old_spte, d);
                 need_flush = 1;
+            }
+            if ( (l1e_get_flags(new_spte) & _PAGE_PRESENT) &&
+                 !shadow_get_page_from_l1e(new_spte, d) ) {
+                new_spte = l1e_empty();
+                need_flush = -1; /* need to unshadow the page */
             }
         }
         else
@@ -1611,10 +1634,11 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
             if ( l1e_get_flags(old_spte) & _PAGE_PRESENT )
                 shadow_put_page_from_l1e(old_spte, d);
         }
+
     }
 
+    set_guest_back_ptr(d, new_spte, l2e_get_pfn(sl2e), l1_table_offset(va));
     shadow_linear_pg_table[l1_linear_offset(va)] = new_spte;
-
     shadow_update_min_max(l2e_get_pfn(sl2e), l1_table_offset(va));
 }
 #endif

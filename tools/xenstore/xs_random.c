@@ -594,19 +594,19 @@ static char *dump(struct ops *ops, void *h)
  * of bytes.  No alignment or length assumptions are made about
  * the input key.
  */
-static inline u32 jhash(const void *key, u32 length, u32 initval)
+static inline uint32_t jhash(const void *key, uint32_t length, uint32_t initval)
 {
-	u32 a, b, c, len;
-	const u8 *k = key;
+	uint32_t a, b, c, len;
+	const uint8_t *k = key;
 
 	len = length;
 	a = b = JHASH_GOLDEN_RATIO;
 	c = initval;
 
 	while (len >= 12) {
-		a += (k[0] +((u32)k[1]<<8) +((u32)k[2]<<16) +((u32)k[3]<<24));
-		b += (k[4] +((u32)k[5]<<8) +((u32)k[6]<<16) +((u32)k[7]<<24));
-		c += (k[8] +((u32)k[9]<<8) +((u32)k[10]<<16)+((u32)k[11]<<24));
+		a += (k[0] +((uint32_t)k[1]<<8) +((uint32_t)k[2]<<16) +((uint32_t)k[3]<<24));
+		b += (k[4] +((uint32_t)k[5]<<8) +((uint32_t)k[6]<<16) +((uint32_t)k[7]<<24));
+		c += (k[8] +((uint32_t)k[9]<<8) +((uint32_t)k[10]<<16)+((uint32_t)k[11]<<24));
 
 		__jhash_mix(a,b,c);
 
@@ -616,16 +616,16 @@ static inline u32 jhash(const void *key, u32 length, u32 initval)
 
 	c += length;
 	switch (len) {
-	case 11: c += ((u32)k[10]<<24);
-	case 10: c += ((u32)k[9]<<16);
-	case 9 : c += ((u32)k[8]<<8);
-	case 8 : b += ((u32)k[7]<<24);
-	case 7 : b += ((u32)k[6]<<16);
-	case 6 : b += ((u32)k[5]<<8);
+	case 11: c += ((uint32_t)k[10]<<24);
+	case 10: c += ((uint32_t)k[9]<<16);
+	case 9 : c += ((uint32_t)k[8]<<8);
+	case 8 : b += ((uint32_t)k[7]<<24);
+	case 7 : b += ((uint32_t)k[6]<<16);
+	case 6 : b += ((uint32_t)k[5]<<8);
 	case 5 : b += k[4];
-	case 4 : a += ((u32)k[3]<<24);
-	case 3 : a += ((u32)k[2]<<16);
-	case 2 : a += ((u32)k[1]<<8);
+	case 4 : a += ((uint32_t)k[3]<<24);
+	case 3 : a += ((uint32_t)k[2]<<16);
+	case 2 : a += ((uint32_t)k[1]<<8);
 	case 1 : a += k[0];
 	};
 
@@ -634,12 +634,12 @@ static inline u32 jhash(const void *key, u32 length, u32 initval)
 	return c;
 }
 
-/* A special optimized version that handles 1 or more of u32s.
- * The length parameter here is the number of u32s in the key.
+/* A special optimized version that handles 1 or more of uint32_ts.
+ * The length parameter here is the number of uint32_ts in the key.
  */
-static inline u32 jhash2(u32 *k, u32 length, u32 initval)
+static inline uint32_t jhash2(uint32_t *k, uint32_t length, uint32_t initval)
 {
-	u32 a, b, c, len;
+	uint32_t a, b, c, len;
 
 	a = b = JHASH_GOLDEN_RATIO;
 	c = initval;
@@ -672,7 +672,7 @@ static inline u32 jhash2(u32 *k, u32 length, u32 initval)
  * NOTE: In partilar the "c += length; __jhash_mix(a,b,c);" normally
  *       done at the end is not done here.
  */
-static inline u32 jhash_3words(u32 a, u32 b, u32 c, u32 initval)
+static inline uint32_t jhash_3words(uint32_t a, uint32_t b, uint32_t c, uint32_t initval)
 {
 	a += JHASH_GOLDEN_RATIO;
 	b += JHASH_GOLDEN_RATIO;
@@ -683,12 +683,12 @@ static inline u32 jhash_3words(u32 a, u32 b, u32 c, u32 initval)
 	return c;
 }
 
-static inline u32 jhash_2words(u32 a, u32 b, u32 initval)
+static inline uint32_t jhash_2words(uint32_t a, uint32_t b, uint32_t initval)
 {
 	return jhash_3words(a, b, 0, initval);
 }
 
-static inline u32 jhash_1word(u32 a, u32 initval)
+static inline uint32_t jhash_1word(uint32_t a, uint32_t initval)
 {
 	return jhash_3words(a, 0, 0, initval);
 }

@@ -24,7 +24,7 @@
 
 
 
-snap_block_t *snap_get_block(u64 block)
+snap_block_t *snap_get_block(uint64_t block)
 {
     snap_block_t *blk = (snap_block_t *)readblock(block);
     

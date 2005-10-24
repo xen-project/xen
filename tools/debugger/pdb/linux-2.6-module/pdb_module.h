@@ -9,7 +9,7 @@
 #define PDB_OPCODE_ATTACH 2
 typedef struct pdb_op_attach
 {
-    u32  domain;
+    uint32_t  domain;
 } pdb_op_attach_t, *pdb_op_attach_p;
 
 #define PDB_OPCODE_DETACH 3
@@ -17,43 +17,43 @@ typedef struct pdb_op_attach
 #define PDB_OPCODE_RD_REG 4
 typedef struct pdb_op_rd_reg
 {
-    u32 reg;
-    u32 value;
+    uint32_t reg;
+    uint32_t value;
 } pdb_op_rd_reg_t, *pdb_op_rd_reg_p;
 
 #define PDB_OPCODE_RD_REGS 5
 typedef struct pdb_op_rd_regs
 {
-    u32 reg[GDB_REGISTER_FRAME_SIZE];
+    uint32_t reg[GDB_REGISTER_FRAME_SIZE];
 } pdb_op_rd_regs_t, *pdb_op_rd_regs_p;
 
 #define PDB_OPCODE_WR_REG 6
 typedef struct pdb_op_wr_reg
 {
-    u32 reg;
-    u32 value;
+    uint32_t reg;
+    uint32_t value;
 } pdb_op_wr_reg_t, *pdb_op_wr_reg_p;
 
 #define PDB_OPCODE_RD_MEM 7
 typedef struct pdb_op_rd_mem_req
 {
-    u32 address;
-    u32 length;
+    uint32_t address;
+    uint32_t length;
 } pdb_op_rd_mem_req_t, *pdb_op_rd_mem_req_p;
 
 typedef struct pdb_op_rd_mem_resp
 {
-    u32 address;
-    u32 length;
-    u8  data[1024];
+    uint32_t address;
+    uint32_t length;
+    uint8_t  data[1024];
 } pdb_op_rd_mem_resp_t, *pdb_op_rd_mem_resp_p;
 
 #define PDB_OPCODE_WR_MEM 8
 typedef struct pdb_op_wr_mem
 {
-    u32 address;
-    u32 length;
-    u8  data[1024];                                             /* arbitrary */
+    uint32_t address;
+    uint32_t length;
+    uint8_t  data[1024];                                             /* arbitrary */
 } pdb_op_wr_mem_t, *pdb_op_wr_mem_p;
 
 #define PDB_OPCODE_CONTINUE 9
@@ -63,8 +63,8 @@ typedef struct pdb_op_wr_mem
 #define PDB_OPCODE_CLR_BKPT 12
 typedef struct pdb_op_bkpt
 {
-    u32 address;
-    u32 length;
+    uint32_t address;
+    uint32_t length;
 } pdb_op_bkpt_t, *pdb_op_bkpt_p;
 
 #define PDB_OPCODE_SET_WATCHPT 13
@@ -79,16 +79,16 @@ typedef struct pdb_op_watchpt
 #define BWC_WATCH_WRITE  102
 #define BWC_WATCH_READ   103
 #define BWC_WATCH_ACCESS 104
-    u32 type;
-    u32 address;
-    u32 length;
+    uint32_t type;
+    uint32_t address;
+    uint32_t length;
 } pdb_op_watchpt_t, *pdb_op_watchpt_p;
 
 
 typedef struct 
 {
-    u8   operation;       /* PDB_OPCODE_???      */
-    u32  process;
+    uint8_t   operation;       /* PDB_OPCODE_???      */
+    uint32_t  process;
     union
     {
         pdb_op_attach_t     attach;
@@ -107,10 +107,10 @@ typedef struct
 #define PDB_RESPONSE_ERROR -1
 
 typedef struct {
-    u8   operation;       /* copied from request */
-    u32  domain;          
-    u32  process;
-    s16  status;          /* PDB_RESPONSE_???    */
+    uint8_t  operation;       /* copied from request */
+    uint32_t domain;          
+    uint32_t process;
+    int16_t  status;          /* PDB_RESPONSE_???    */
     union
     {
         pdb_op_rd_reg_t      rd_reg;

@@ -16,15 +16,14 @@
 #define LSByte_multiple 2
 #define MSByte_multiple 3
 
-struct vmx_virpit_t {
+struct vmx_virpit {
     /* for simulation of counter 0 in mode 2*/
-    int vector;    /* the pit irq vector */
-    unsigned int period;  /* the frequency. e.g. 10ms*/
+    u32 period;		/* pit frequency in ns */
+    u64 period_cycles;	                /* pit frequency in cpu cycles */
     s_time_t scheduled;                 /* scheduled timer interrupt */
     unsigned int channel;  /* the pit channel, counter 0~2 */
-    u64  *intr_bitmap;
     unsigned int pending_intr_nr; /* the couner for pending timer interrupts */
-    unsigned long long inject_point; /* the time inject virt intr */
+    u64 inject_point; /* the time inject virt intr */
     struct ac_timer pit_timer;  /* periodic timer for mode 2*/
     int first_injected;                 /* flag to prevent shadow window */
 
@@ -39,6 +38,6 @@ struct vmx_virpit_t {
 };
 
 /* to hook the ioreq packet to get the PIT initializaiton info */
-extern void vmx_hooks_assist(struct vcpu *d);
+extern void vmx_hooks_assist(struct vcpu *v);
 
 #endif /* _VMX_VIRPIT_H_ */

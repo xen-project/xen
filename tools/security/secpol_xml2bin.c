@@ -37,7 +37,7 @@
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/xmlreader.h>
-#include "secpol_compat.h"
+#include <stdint.h>
 #include <xen/acm.h>
 
 #include "secpol_xml2bin.h"

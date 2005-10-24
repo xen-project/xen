@@ -34,14 +34,18 @@ int xencons_ring_send(const char *data, unsigned len)
 {
 	int sent = 0;
 	struct xencons_interface *intf = xencons_interface();
+	XENCONS_RING_IDX cons, prod;
 
-	while ((sent < len) &&
-	       (intf->out_prod - intf->out_cons) < sizeof(intf->out)) {
-		intf->out[MASK_XENCONS_IDX(intf->out_prod, intf->out)] =
-			data[sent];
-		intf->out_prod++;
-		sent++;
-	}
+	cons = intf->out_cons;
+	prod = intf->out_prod;
+	mb();
+	BUG_ON((prod - cons) > sizeof(intf->out));
+
+	while ((sent < len) && ((prod - cons) < sizeof(intf->out)))
+		intf->out[MASK_XENCONS_IDX(prod++, intf->out)] = data[sent++];
+
+	wmb();
+	intf->out_prod = prod;
 
 	/* Use evtchn: this is called early, before irq is set up. */
 	notify_remote_via_evtchn(xen_start_info->console_evtchn);
@@ -52,15 +56,22 @@ int xencons_ring_send(const char *data, unsigned len)
 static irqreturn_t handle_input(int irq, void *unused, struct pt_regs *regs)
 {
 	struct xencons_interface *intf = xencons_interface();
+	XENCONS_RING_IDX cons, prod;
 
-	while (intf->in_cons != intf->in_prod) {
+	cons = intf->in_cons;
+	prod = intf->in_prod;
+	mb();
+	BUG_ON((prod - cons) > sizeof(intf->in));
+
+	while (cons != prod) {
 		if (xencons_receiver != NULL)
 			xencons_receiver(
-				intf->in + MASK_XENCONS_IDX(intf->in_cons,
-							    intf->in),
+				intf->in + MASK_XENCONS_IDX(cons++, intf->in),
 				1, regs);
-		intf->in_cons++;
 	}
+
+	wmb();
+	intf->in_cons = cons;
 
 	return IRQ_HANDLED;
 }

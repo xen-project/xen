@@ -66,7 +66,6 @@ class ImageHandler:
         self.kernel = None
         self.ramdisk = None
         self.cmdline = None
-        self.flags = 0
 
         self.configure(imageConfig, deviceConfig)
 
@@ -112,13 +111,13 @@ class ImageHandler:
         """Entry point to create domain memory image.
         Override in subclass  if needed.
         """
-        self.createDomain()
+        return self.createDomain()
+
 
     def createDomain(self):
         """Build the domain boot image.
         """
         # Set params and call buildDomain().
-        self.flags = self.vm.getBackendFlags()
 
         if not os.path.isfile(self.kernel):
             raise VmError('Kernel image does not exist: %s' % self.kernel)
@@ -130,10 +129,15 @@ class ImageHandler:
         
         log.info("buildDomain os=%s dom=%d vcpus=%d", self.ostype,
                  self.vm.getDomid(), self.vm.getVCpuCount())
-        err = self.buildDomain()
-        if err != 0:
-            raise VmError('Building domain failed: ostype=%s dom=%d err=%d'
-                          % (self.ostype, self.vm.getDomid(), err))
+
+        result = self.buildDomain()
+
+        if isinstance(result, dict):
+            return result
+        else:
+            raise VmError('Building domain failed: ostype=%s dom=%d err=%s'
+                          % (self.ostype, self.vm.getDomid(), str(result)))
+
 
     def getDomainMemory(self, mem):
         """@return The memory required, in KiB, by the domain to store the
@@ -153,26 +157,14 @@ class ImageHandler:
         """Extra cleanup on domain destroy (define in subclass if needed)."""
         pass
 
-    def set_vminfo(self, d):
-        if d.has_key('store_mfn'):
-            self.vm.setStoreRef(d.get('store_mfn'))
-        if d.has_key('console_mfn'):
-            self.vm.setConsoleRef(d.get('console_mfn'))
-
 
 class LinuxImageHandler(ImageHandler):
 
     ostype = "linux"
 
     def buildDomain(self):
-        if self.vm.store_channel:
-            store_evtchn = self.vm.store_channel
-        else:
-            store_evtchn = 0
-        if self.vm.console_channel:
-            console_evtchn = self.vm.console_channel
-        else:
-            console_evtchn = 0
+        store_evtchn = self.vm.getStorePort()
+        console_evtchn = self.vm.getConsolePort()
 
         log.debug("dom            = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
@@ -180,21 +172,14 @@ class LinuxImageHandler(ImageHandler):
         log.debug("console_evtchn = %d", console_evtchn)
         log.debug("cmdline        = %s", self.cmdline)
         log.debug("ramdisk        = %s", self.ramdisk)
-        log.debug("flags          = %d", self.flags)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
 
-        ret = xc.linux_build(dom            = self.vm.getDomid(),
-                             image          = self.kernel,
-                             store_evtchn   = store_evtchn,
-                             console_evtchn = console_evtchn,
-                             cmdline        = self.cmdline,
-                             ramdisk        = self.ramdisk,
-                             flags          = self.flags,
-                             vcpus          = self.vm.getVCpuCount())
-        if isinstance(ret, dict):
-            self.set_vminfo(ret)
-            return 0
-        return ret
+        return xc.linux_build(dom            = self.vm.getDomid(),
+                              image          = self.kernel,
+                              store_evtchn   = store_evtchn,
+                              console_evtchn = console_evtchn,
+                              cmdline        = self.cmdline,
+                              ramdisk        = self.ramdisk)
 
 class VmxImageHandler(ImageHandler):
 
@@ -219,45 +204,33 @@ class VmxImageHandler(ImageHandler):
         self.dmargs += self.configVNC(imageConfig)
 
 
-    def createImage(self):
-        """Create a VM for the VMX environment.
-        """
-        self.createDomain()
-
     def buildDomain(self):
         # Create an event channel
         self.device_channel = xc.evtchn_alloc_unbound(dom=self.vm.getDomid(),
                                                       remote_dom=0)
         log.info("VMX device model port: %d", self.device_channel)
-        if self.vm.store_channel:
-            store_evtchn = self.vm.store_channel
-        else:
-            store_evtchn = 0
+
+        store_evtchn = self.vm.getStorePort()
 
         log.debug("dom            = %d", self.vm.getDomid())
         log.debug("image          = %s", self.kernel)
         log.debug("control_evtchn = %d", self.device_channel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
-        log.debug("flags          = %d", self.flags)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
 
-        ret = xc.vmx_build(dom            = self.vm.getDomid(),
-                           image          = self.kernel,
-                           control_evtchn = self.device_channel,
-                           store_evtchn   = store_evtchn,
-                           memsize        = self.vm.getMemoryTarget() / 1024,
-                           flags          = self.flags,
-                           vcpus          = self.vm.getVCpuCount())
-        if isinstance(ret, dict):
-            self.set_vminfo(ret)
-            return 0
-        return ret
+        return xc.vmx_build(dom            = self.vm.getDomid(),
+                            image          = self.kernel,
+                            control_evtchn = self.device_channel,
+                            store_evtchn   = store_evtchn,
+                            memsize        = self.vm.getMemoryTarget() / 1024,
+                            vcpus          = self.vm.getVCpuCount())
+
 
     # Return a list of cmd line args to the device models based on the
     # xm config file
     def parseDeviceModelArgs(self, imageConfig, deviceConfig):
-        dmargs = [ 'cdrom', 'boot', 'fda', 'fdb',
+        dmargs = [ 'cdrom', 'boot', 'fda', 'fdb', 'ne2000', 
                    'localtime', 'serial', 'stdvga', 'isa', 'vcpus' ]
         ret = []
         for a in dmargs:
@@ -265,15 +238,17 @@ class VmxImageHandler(ImageHandler):
 
             # python doesn't allow '-' in variable names
             if a == 'stdvga': a = 'std-vga'
+            if a == 'ne2000': a = 'nic-ne2000'
 
             # Handle booleans gracefully
-            if a in ['localtime', 'std-vga', 'isa']:
+            if a in ['localtime', 'std-vga', 'isa', 'nic-ne2000']:
                 if v != None: v = int(v)
-
+                if v: ret.append("-%s" % a)
+            else:
+                if v:
+                    ret.append("-%s" % a)
+                    ret.append("%s" % v)
             log.debug("args: %s, val: %s" % (a,v))
-            if v: 
-                ret.append("-%s" % a)
-                ret.append("%s" % v)
 
         # Handle disk/network related options
         for (name, info) in deviceConfig:
@@ -337,7 +312,8 @@ class VmxImageHandler(ImageHandler):
                   "-m", "%s" % (self.vm.getMemoryTarget() / 1024)])
         args = args + self.dmargs
         env = dict(os.environ)
-        env['DISPLAY'] = self.display
+        if self.display:
+            env['DISPLAY'] = self.display
         log.info("spawning device models: %s %s", self.device_model, args)
         self.pid = os.spawnve(os.P_NOWAIT, self.device_model, args, env)
         log.info("device model pid: %d", self.pid)

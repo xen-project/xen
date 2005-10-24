@@ -122,7 +122,7 @@ target_ulong cpu_get_phys_page_debug(CPUState *env, target_ulong addr)
 //the evtchn fd for polling
 int evtchn_fd = -1;
 //the evtchn port for polling the notification, should be inputed as bochs's parameter
-u16 ioreq_remote_port, ioreq_local_port;
+uint16_t ioreq_remote_port, ioreq_local_port;
 
 //some functions to handle the io req packet
 void
@@ -157,9 +157,9 @@ ioreq_t* __cpu_get_ioreq(void)
 ioreq_t* cpu_get_ioreq(void)
 {
 	int rc;
-	u16 buf[2];
-	rc = read(evtchn_fd, buf, 2);
-	if (rc == 2 && buf[0] == ioreq_local_port){//got only one matched 16bit port index
+	uint16_t port;
+	rc = read(evtchn_fd, &port, sizeof(port));
+	if ((rc == sizeof(port)) && (port == ioreq_local_port)) {
 		// unmask the wanted port again
 		write(evtchn_fd, &ioreq_local_port, 2);
 
@@ -208,13 +208,13 @@ extern void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                                    int len, int is_write);
 
 static inline void
-read_physical(u64 addr, unsigned long size, void *val)
+read_physical(uint64_t addr, unsigned long size, void *val)
 {
         return cpu_physical_memory_rw((target_phys_addr_t)addr, val, size, 0);
 }
 
 static inline void
-write_physical(u64 addr, unsigned long size, void *val)
+write_physical(uint64_t addr, unsigned long size, void *val)
 {
         return cpu_physical_memory_rw((target_phys_addr_t)addr, val, size, 1);
 }
@@ -404,20 +404,6 @@ static __inline__ void atomic_set_bit(long nr, volatile void *addr)
 }
 
 void
-do_interrupt(CPUState *env, int vector)
-{
-	unsigned long *intr;
-
-	// Send a message on the event channel. Add the vector to the shared mem
-	// page.
-	intr = (unsigned long *) &(shared_page->sp_global.pic_intr[0]);
-	atomic_set_bit(vector, intr);
-        if (loglevel & CPU_LOG_INT)
-                fprintf(logfile, "injecting vector: %x\n", vector);
-	env->send_event = 1;
-}
-
-void
 destroy_vmx_domain(void)
 {
     extern FILE* logfile;
@@ -429,7 +415,6 @@ destroy_vmx_domain(void)
 
 int main_loop(void)
 {
-	int vector;
  	fd_set rfds;
 	struct timeval tv;
 	extern CPUState *global_env;
@@ -476,11 +461,6 @@ int main_loop(void)
 		ioapic_update_EOI();
 #endif
 		cpu_timer_handler(env);
-		if (env->interrupt_request & CPU_INTERRUPT_HARD) {
-                        env->interrupt_request &= ~CPU_INTERRUPT_HARD;
-			vector = cpu_get_pic_interrupt(env); 
-			do_interrupt(env, vector);
-		}
 #ifdef APIC_SUPPORT
 		if (ioapic_has_intr())
                     do_ioapic();

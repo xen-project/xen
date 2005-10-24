@@ -1,10 +1,5 @@
 #! /bin/sh
 
-#ACTION=add
-#DEVPATH=/devices/xen-backend/vif-1-0
-#PHYSDEVDRIVER=vif
-#XENBUS_TYPE=vif
-
 PATH=/etc/xen/scripts:$PATH
 
 case "$ACTION" in
@@ -20,12 +15,16 @@ case "$ACTION" in
       vbd)
 	/etc/xen/scripts/block unbind
         ;;
+      vif)
+        [ -n "$script" ] && $script down
+        ;;
     esac
     # remove device backend store entries
-    xenstore-rm "$XENBUS_PATH"
+    xenstore-rm -t "$XENBUS_PATH"
+    xenstore-rm -t "error/$XENBUS_PATH"
     ;;
   online)
-    case "$PHYSDEVDRIVER" in
+    case "$XENBUS_TYPE" in
       vif)
         [ -n "$script" ] && $script up
         ;;

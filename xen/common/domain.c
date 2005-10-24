@@ -33,38 +33,41 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     struct domain *d, **pd;
     struct vcpu *v;
 
-    if ( (d = alloc_domain_struct()) == NULL )
+    if ( (d = alloc_domain()) == NULL )
         return NULL;
 
-    v = d->vcpu[0];
+    d->domain_id = dom_id;
 
     atomic_set(&d->refcnt, 1);
-    atomic_set(&v->pausecnt, 0);
-
-    d->domain_id = dom_id;
-    v->processor = cpu;
 
     spin_lock_init(&d->big_lock);
-
     spin_lock_init(&d->page_alloc_lock);
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);
 
     if ( d->domain_id == IDLE_DOMAIN_ID )
         set_bit(_DOMF_idle_domain, &d->domain_flags);
+    else
+        set_bit(_DOMF_ctrl_pause, &d->domain_flags);
 
     if ( !is_idle_task(d) &&
          ((evtchn_init(d) != 0) || (grant_table_create(d) != 0)) )
     {
         evtchn_destroy(d);
-        free_domain_struct(d);
+        free_domain(d);
         return NULL;
     }
     
+    if ( (v = alloc_vcpu(d, 0, cpu)) == NULL )
+    {
+        grant_table_destroy(d);
+        evtchn_destroy(d);
+        free_domain(d);
+        return NULL;
+    }
+
     arch_do_createdomain(v);
     
-    sched_add_domain(v);
-
     if ( !is_idle_task(d) )
     {
         write_lock(&domlist_lock);
@@ -224,11 +227,9 @@ void domain_pause_for_debugger(void)
      * must issue a PAUSEDOMAIN command to ensure that all execution
      * has ceased and guest state is committed to memory.
      */
+    set_bit(_DOMF_ctrl_pause, &d->domain_flags);
     for_each_vcpu ( d, v )
-    {
-        set_bit(_VCPUF_ctrl_pause, &v->vcpu_flags);
         vcpu_sleep_nosync(v);
-    }
 
     send_guest_virq(dom0->vcpu[0], VIRQ_DEBUGGER);
 }
@@ -267,7 +268,7 @@ void domain_destruct(struct domain *d)
     free_perdomain_pt(d);
     free_xenheap_page(d->shared_info);
 
-    free_domain_struct(d);
+    free_domain(d);
 
     send_guest_virq(dom0->vcpu[0], VIRQ_DOM_EXC);
 }
@@ -289,6 +290,8 @@ void domain_pause(struct domain *d)
         atomic_inc(&v->pausecnt);
         vcpu_sleep_sync(v);
     }
+
+    sync_pagetable_state(d);
 }
 
 void vcpu_unpause(struct vcpu *v)
@@ -310,21 +313,24 @@ void domain_pause_by_systemcontroller(struct domain *d)
 {
     struct vcpu *v;
 
-    for_each_vcpu ( d, v )
+    BUG_ON(current->domain == d);
+
+    if ( !test_and_set_bit(_DOMF_ctrl_pause, &d->domain_flags) )
     {
-        BUG_ON(v == current);
-        if ( !test_and_set_bit(_VCPUF_ctrl_pause, &v->vcpu_flags) )
+        for_each_vcpu ( d, v )
             vcpu_sleep_sync(v);
     }
+
+    sync_pagetable_state(d);
 }
 
 void domain_unpause_by_systemcontroller(struct domain *d)
 {
     struct vcpu *v;
 
-    for_each_vcpu ( d, v )
+    if ( test_and_clear_bit(_DOMF_ctrl_pause, &d->domain_flags) )
     {
-        if ( test_and_clear_bit(_VCPUF_ctrl_pause, &v->vcpu_flags) )
+        for_each_vcpu ( d, v )
             vcpu_wake(v);
     }
 }
@@ -345,61 +351,30 @@ int set_info_guest(struct domain *d, dom0_setdomaininfo_t *setdomaininfo)
     if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
         return -EINVAL;
     
-    if (test_bit(_DOMF_constructed, &d->domain_flags) && 
-        !test_bit(_VCPUF_ctrl_pause, &v->vcpu_flags))
+    if ( !test_bit(_DOMF_ctrl_pause, &d->domain_flags) )
         return -EINVAL;
 
     if ( (c = xmalloc(struct vcpu_guest_context)) == NULL )
         return -ENOMEM;
 
-    if ( copy_from_user(c, setdomaininfo->ctxt, sizeof(*c)) )
-    {
-        rc = -EFAULT;
-        goto out;
-    }
-    
-    if ( (rc = arch_set_info_guest(v, c)) != 0 )
-        goto out;
+    rc = -EFAULT;
+    if ( copy_from_user(c, setdomaininfo->ctxt, sizeof(*c)) == 0 )
+        rc = arch_set_info_guest(v, c);
 
-    set_bit(_DOMF_constructed, &d->domain_flags);
-
- out:    
     xfree(c);
     return rc;
 }
 
 int boot_vcpu(struct domain *d, int vcpuid, struct vcpu_guest_context *ctxt) 
 {
-    struct vcpu *v;
+    struct vcpu *v = d->vcpu[vcpuid];
     int rc;
 
-    ASSERT(d->vcpu[vcpuid] == NULL);
-
-    if ( alloc_vcpu_struct(d, vcpuid) == NULL )
-        return -ENOMEM;
-
-    v = d->vcpu[vcpuid];
-
-    atomic_set(&v->pausecnt, 0);
-    v->cpumap = CPUMAP_RUNANYWHERE;
-
-    memcpy(&v->arch, &idle0_vcpu.arch, sizeof(v->arch));
-
-    arch_do_boot_vcpu(v);
+    BUG_ON(test_bit(_VCPUF_initialised, &v->vcpu_flags));
 
     if ( (rc = arch_set_info_guest(v, ctxt)) != 0 )
-        goto out;
+        return rc;
 
-    sched_add_domain(v);
-
-    set_bit(_VCPUF_down, &v->vcpu_flags);
-    clear_bit(_VCPUF_ctrl_pause, &v->vcpu_flags);
-
-    return 0;
-
- out:
-    arch_free_vcpu_struct(d->vcpu[vcpuid]);
-    d->vcpu[vcpuid] = NULL;
     return rc;
 }
 
@@ -413,7 +388,7 @@ long do_vcpu_op(int cmd, int vcpuid, void *arg)
     if ( (vcpuid < 0) || (vcpuid >= MAX_VIRT_CPUS) )
         return -EINVAL;
 
-    if ( ((v = d->vcpu[vcpuid]) == NULL) && (cmd != VCPUOP_initialise) )
+    if ( (v = d->vcpu[vcpuid]) == NULL )
         return -ENOENT;
 
     switch ( cmd )
@@ -433,7 +408,9 @@ long do_vcpu_op(int cmd, int vcpuid, void *arg)
         }
 
         LOCK_BIGLOCK(d);
-        rc = (d->vcpu[vcpuid] == NULL) ? boot_vcpu(d, vcpuid, ctxt) : -EEXIST;
+        rc = -EEXIST;
+        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+            rc = boot_vcpu(d, vcpuid, ctxt);
         UNLOCK_BIGLOCK(d);
 
         xfree(ctxt);

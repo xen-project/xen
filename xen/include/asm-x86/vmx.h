@@ -34,6 +34,7 @@ extern void vmx_asm_vmexit_handler(struct cpu_user_regs);
 extern void vmx_asm_do_resume(void);
 extern void vmx_asm_do_launch(void);
 extern void vmx_intr_assist(void);
+extern void pic_irq_request(int *interrupt_request, int level);
 
 extern void arch_vmx_do_launch(struct vcpu *);
 extern void arch_vmx_do_resume(struct vcpu *);
@@ -64,6 +65,7 @@ extern unsigned int cpu_rev;
     CPU_BASED_MWAIT_EXITING | \
     CPU_BASED_MOV_DR_EXITING | \
     CPU_BASED_ACTIVATE_IO_BITMAP | \
+    CPU_BASED_USE_TSC_OFFSETING  | \
     CPU_BASED_UNCOND_IO_EXITING \
     )
 
@@ -500,6 +502,11 @@ static inline int vmx_reflect_exception(struct vcpu *v)
 
     vmx_inject_exception(v, vector, error_code);
     return 0;
+}
+
+static inline unsigned int vmx_get_vcpu_nr(struct domain *d)
+{
+    return d->arch.vmx_platform.nr_vcpu;
 }
 
 static inline shared_iopage_t *get_sp(struct domain *d)

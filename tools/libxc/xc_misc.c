@@ -83,7 +83,7 @@ int xc_sched_id(int xc_handle,
 }
 
 int xc_perfc_control(int xc_handle,
-                     u32 op,
+                     uint32_t op,
                      xc_perfc_desc_t *desc)
 {
     int rc;
@@ -129,11 +129,6 @@ int xc_msr_write(int xc_handle, int cpu_mask, int msr, unsigned int low,
     rc = do_dom0_op(xc_handle, &op);
     
     return rc;
-}
-
-long xc_init_store(int xc_handle, int remote_port)
-{
-    return ioctl(xc_handle, IOCTL_PRIVCMD_INITDOMAIN_STORE, remote_port);
 }
 
 /*

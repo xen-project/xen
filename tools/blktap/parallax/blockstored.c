@@ -21,9 +21,9 @@
 
 //#define BSDEBUG
 
-int readblock_into(u64 id, void *block);
+int readblock_into(uint64_t id, void *block);
 
-int open_socket(u16 port) {
+int open_socket(uint16_t port) {
     
     struct sockaddr_in sn;
     int sock;
@@ -75,7 +75,7 @@ void service_loop(void) {
         int rc, len;
         struct sockaddr_in from;
         size_t slen = sizeof(from);
-        u64 bid;
+        uint64_t bid;
 
         len = recvfrom(bssock, (void *)&msgbuf, sizeof(msgbuf), 0,
                        (struct sockaddr *)&from, &slen);
@@ -155,7 +155,7 @@ void service_loop(void) {
  *   @return: 0 if OK, other on error
  */
 
-int readblock_into(u64 id, void *block) {
+int readblock_into(uint64_t id, void *block) {
     if (lseek64(block_fp, ((off64_t) id - 1LL) * BLOCK_SIZE, SEEK_SET) < 0) {
         printf ("%Ld\n", (id - 1) * BLOCK_SIZE);
         perror("readblock lseek");
@@ -175,7 +175,7 @@ int readblock_into(u64 id, void *block) {
  *
  *   @return: zero on success, -1 on failure
  */
-int writeblock(u64 id, void *block) {
+int writeblock(uint64_t id, void *block) {
     if (lseek64(block_fp, ((off64_t) id - 1LL) * BLOCK_SIZE, SEEK_SET) < 0) {
         perror("writeblock lseek");
         return -1;
@@ -193,10 +193,10 @@ int writeblock(u64 id, void *block) {
  *
  *   @return: new id of block on disk
  */
-static u64 lastblock = 0;
+static uint64_t lastblock = 0;
 
-u64 allocblock(void *block) {
-    u64 lb;
+uint64_t allocblock(void *block) {
+    uint64_t lb;
     off64_t pos;
 
     retry:

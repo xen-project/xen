@@ -22,11 +22,11 @@ parseelfimage(
     char *image, unsigned long image_size, struct domain_setup_info *dsi);
 static int
 loadelfimage(
-    char *image, unsigned long image_size, int xch, u32 dom,
+    char *image, unsigned long image_size, int xch, uint32_t dom,
     unsigned long *parray, struct domain_setup_info *dsi);
 static int
 loadelfsymtab(
-    char *image, int xch, u32 dom, unsigned long *parray,
+    char *image, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi);
 
 int probe_elf(char *image,
@@ -168,7 +168,7 @@ static int parseelfimage(char *image,
 
 static int
 loadelfimage(
-    char *image, unsigned long elfsize, int xch, u32 dom,
+    char *image, unsigned long elfsize, int xch, uint32_t dom,
     unsigned long *parray, struct domain_setup_info *dsi)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)image;
@@ -219,7 +219,7 @@ loadelfimage(
 
 static int
 loadelfsymtab(
-    char *image, int xch, u32 dom, unsigned long *parray,
+    char *image, int xch, uint32_t dom, unsigned long *parray,
     struct domain_setup_info *dsi)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)image, *sym_ehdr;

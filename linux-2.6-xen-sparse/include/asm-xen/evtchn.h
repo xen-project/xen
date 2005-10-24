@@ -44,12 +44,12 @@
  */
 
 /* Dynamically bind a VIRQ source to Linux IRQ space. */
-extern int  bind_virq_to_irq(int virq);
-extern void unbind_virq_from_irq(int virq);
+extern int  bind_virq_to_irq(int virq, int cpu);
+extern void unbind_virq_from_irq(int virq, int cpu);
 
 /* Dynamically bind an IPI source to Linux IRQ space. */
-extern int  bind_ipi_to_irq(int ipi);
-extern void unbind_ipi_from_irq(int ipi);
+extern int  bind_ipi_to_irq(int ipi, int cpu);
+extern void unbind_ipi_from_irq(int ipi, int cpu);
 
 /*
  * Dynamically bind an event-channel port to an IRQ-like callback handler.
@@ -99,8 +99,9 @@ static inline void unmask_evtchn(int port)
 	 * like a real IO-APIC we 'lose the interrupt edge' if the channel is
 	 * masked.
 	 */
-	if (synch_test_bit         (port,    &s->evtchn_pending[0]) && 
-	    !synch_test_and_set_bit(port>>5, &vcpu_info->evtchn_pending_sel)) {
+	if (synch_test_bit(port, &s->evtchn_pending[0]) && 
+	    !synch_test_and_set_bit(port / BITS_PER_LONG,
+				    &vcpu_info->evtchn_pending_sel)) {
 		vcpu_info->evtchn_upcall_pending = 1;
 		if (!vcpu_info->evtchn_upcall_mask)
 			force_evtchn_callback();

@@ -21,33 +21,33 @@
 #define SECTOR_SHIFT   9 
 #endif
 
-#define FREEBLOCK_SIZE  (BLOCK_SIZE / sizeof(u64)) - (3 * sizeof(u64))
+#define FREEBLOCK_SIZE  (BLOCK_SIZE / sizeof(uint64_t)) - (3 * sizeof(uint64_t))
 #define FREEBLOCK_MAGIC 0x0fee0fee0fee0feeULL
 
 typedef struct {
-    u64 magic;
-    u64 next;
-    u64 count;
-    u64 list[FREEBLOCK_SIZE];
+    uint64_t magic;
+    uint64_t next;
+    uint64_t count;
+    uint64_t list[FREEBLOCK_SIZE];
 } freeblock_t; 
 
 #define BLOCKSTORE_MAGIC 0xaaaaaaa00aaaaaaaULL
 #define BLOCKSTORE_SUPER 1ULL
 
 typedef struct {
-    u64 magic;
-    u64 freelist_full;
-    u64 freelist_current;
+    uint64_t magic;
+    uint64_t freelist_full;
+    uint64_t freelist_current;
 } blockstore_super_t;
 
 extern void *newblock();
-extern void *readblock(u64 id);
-extern u64 allocblock(void *block);
-extern u64 allocblock_hint(void *block, u64 hint);
-extern int writeblock(u64 id, void *block);
+extern void *readblock(uint64_t id);
+extern uint64_t allocblock(void *block);
+extern uint64_t allocblock_hint(void *block, uint64_t hint);
+extern int writeblock(uint64_t id, void *block);
 
 /* Add this blockid to a freelist, to be recycled by the allocator. */
-extern void releaseblock(u64 id);
+extern void releaseblock(uint64_t id);
 
 /* this is a memory free() operation for block-sized allocations */
 extern void freeblock(void *block);
@@ -55,17 +55,17 @@ extern int __init_blockstore(void);
 
 /* debug for freelist. */
 void freelist_count(int print_each);
-#define ALLOCFAIL (((u64)(-1)))
+#define ALLOCFAIL (((uint64_t)(-1)))
 
 /* Distribution
  */
 #define BLOCKSTORED_PORT 9346
 
 struct bshdr_t_struct {
-    u32            operation;
-    u32            flags;
-    u64            id;
-    u64            luid;
+    uint32_t            operation;
+    uint32_t            flags;
+    uint64_t            id;
+    uint64_t            luid;
 } __attribute__ ((packed));
 typedef struct bshdr_t_struct bshdr_t;
 
@@ -76,9 +76,9 @@ struct bsmsg_t_struct {
 
 typedef struct bsmsg_t_struct bsmsg_t;
 
-#define MSGBUFSIZE_OP    sizeof(u32)
-#define MSGBUFSIZE_FLAGS (sizeof(u32) + sizeof(u32))
-#define MSGBUFSIZE_ID    (sizeof(u32) + sizeof(u32) + sizeof(u64) + sizeof(u64))
+#define MSGBUFSIZE_OP    sizeof(uint32_t)
+#define MSGBUFSIZE_FLAGS (sizeof(uint32_t) + sizeof(uint32_t))
+#define MSGBUFSIZE_ID    (sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(uint64_t))
 #define MSGBUFSIZE_BLOCK sizeof(bsmsg_t)
 
 #define BSOP_READBLOCK  0x01
@@ -113,9 +113,9 @@ typedef struct bsmsg_t_struct bsmsg_t;
 #define BSID_REPLICA2(_id) (((_id)>>40)&0xfffffULL)
 #define BSID_MAP(_id)      (((_id)>>60)&0xfULL)
 
-#define BSID(_map, _rep0, _rep1, _rep2) ((((u64)(_map))<<60) | \
-                                         (((u64)(_rep2))<<40) | \
-                                         (((u64)(_rep1))<<20) | ((u64)(_rep0)))
+#define BSID(_map, _rep0, _rep1, _rep2) ((((uint64_t)(_map))<<60) | \
+                                         (((uint64_t)(_rep2))<<40) | \
+                                         (((uint64_t)(_rep1))<<20) | ((uint64_t)(_rep0)))
 
 typedef struct bsserver_t_struct {
     char              *hostname;

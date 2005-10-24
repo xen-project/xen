@@ -24,7 +24,7 @@
 #define RADIX_TREE_MAP_MASK 0x1ff
 #define RADIX_TREE_MAP_ENTRIES 512
 
-typedef u64 *radix_tree_node;
+typedef uint64_t *radix_tree_node;
 
 
 /*
@@ -33,11 +33,11 @@ typedef u64 *radix_tree_node;
  * whether or not the block is writable, including the return
  * values of update and snapshot
  */
-u64 lookup(int height, u64 root, u64 key);
-u64 update(int height, u64 root, u64 key, u64 val);
-u64 snapshot(u64 root);
-int collapse(int height, u64 proot, u64 croot);
-int isprivate(int height, u64 root, u64 key);
+uint64_t lookup(int height, uint64_t root, uint64_t key);
+uint64_t update(int height, uint64_t root, uint64_t key, uint64_t val);
+uint64_t snapshot(uint64_t root);
+int collapse(int height, uint64_t proot, uint64_t croot);
+int isprivate(int height, uint64_t root, uint64_t key);
 
 
 void __rcache_init(void);

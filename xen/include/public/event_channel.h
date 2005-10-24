@@ -15,13 +15,14 @@
  * is allocated in <dom> and returned as <port>.
  * NOTES:
  *  1. If the caller is unprivileged then <dom> must be DOMID_SELF.
+ *  2. <rdom> may be DOMID_SELF, allowing loopback connections.
  */
 #define EVTCHNOP_alloc_unbound    6
 typedef struct evtchn_alloc_unbound {
     /* IN parameters */
-    domid_t dom, remote_dom;
+    domid_t  dom, remote_dom;
     /* OUT parameters */
-    u32     port;
+    uint32_t port;
 } evtchn_alloc_unbound_t;
 
 /*
@@ -30,14 +31,16 @@ typedef struct evtchn_alloc_unbound {
  * a port that is unbound and marked as accepting bindings from the calling
  * domain. A fresh port is allocated in the calling domain and returned as
  * <local_port>.
+ * NOTES:
+ *  2. <remote_dom> may be DOMID_SELF, allowing loopback connections.
  */
 #define EVTCHNOP_bind_interdomain 0
 typedef struct evtchn_bind_interdomain {
     /* IN parameters. */
-    domid_t remote_dom;
-    u32     remote_port;
+    domid_t  remote_dom;
+    uint32_t remote_port;
     /* OUT parameters. */
-    u32     local_port;
+    uint32_t local_port;
 } evtchn_bind_interdomain_t;
 
 /*
@@ -51,10 +54,10 @@ typedef struct evtchn_bind_interdomain {
 #define EVTCHNOP_bind_virq        1
 typedef struct evtchn_bind_virq {
     /* IN parameters. */
-    u32 virq;
-    u32 vcpu;
+    uint32_t virq;
+    uint32_t vcpu;
     /* OUT parameters. */
-    u32 port;
+    uint32_t port;
 } evtchn_bind_virq_t;
 
 /*
@@ -66,11 +69,11 @@ typedef struct evtchn_bind_virq {
 #define EVTCHNOP_bind_pirq        2
 typedef struct evtchn_bind_pirq {
     /* IN parameters. */
-    u32 pirq;
+    uint32_t pirq;
 #define BIND_PIRQ__WILL_SHARE 1
-    u32 flags; /* BIND_PIRQ__* */
+    uint32_t flags; /* BIND_PIRQ__* */
     /* OUT parameters. */
-    u32 port;
+    uint32_t port;
 } evtchn_bind_pirq_t;
 
 /*
@@ -81,9 +84,9 @@ typedef struct evtchn_bind_pirq {
  */
 #define EVTCHNOP_bind_ipi         7
 typedef struct evtchn_bind_ipi {
-    u32 vcpu;
+    uint32_t vcpu;
     /* OUT parameters. */
-    u32 port;
+    uint32_t port;
 } evtchn_bind_ipi_t;
 
 /*
@@ -94,7 +97,7 @@ typedef struct evtchn_bind_ipi {
 #define EVTCHNOP_close            3
 typedef struct evtchn_close {
     /* IN parameters. */
-    u32 port;
+    uint32_t port;
 } evtchn_close_t;
 
 /*
@@ -104,7 +107,7 @@ typedef struct evtchn_close {
 #define EVTCHNOP_send             4
 typedef struct evtchn_send {
     /* IN parameters. */
-    u32 port;
+    uint32_t port;
 } evtchn_send_t;
 
 /*
@@ -118,8 +121,8 @@ typedef struct evtchn_send {
 #define EVTCHNOP_status           5
 typedef struct evtchn_status {
     /* IN parameters */
-    domid_t dom;
-    u32     port;
+    domid_t  dom;
+    uint32_t port;
     /* OUT parameters */
 #define EVTCHNSTAT_closed       0  /* Channel is not in use.                 */
 #define EVTCHNSTAT_unbound      1  /* Channel is waiting interdom connection.*/
@@ -127,18 +130,18 @@ typedef struct evtchn_status {
 #define EVTCHNSTAT_pirq         3  /* Channel is bound to a phys IRQ line.   */
 #define EVTCHNSTAT_virq         4  /* Channel is bound to a virtual IRQ line */
 #define EVTCHNSTAT_ipi          5  /* Channel is bound to a virtual IPI line */
-    u32     status;
-    u32     vcpu;                  /* VCPU to which this channel is bound.   */
+    uint32_t status;
+    uint32_t vcpu;                 /* VCPU to which this channel is bound.   */
     union {
         struct {
-            domid_t dom;
+            domid_t  dom;
         } unbound; /* EVTCHNSTAT_unbound */
         struct {
-            domid_t dom;
-            u32     port;
+            domid_t  dom;
+            uint32_t port;
         } interdomain; /* EVTCHNSTAT_interdomain */
-        u32 pirq;      /* EVTCHNSTAT_pirq        */
-        u32 virq;      /* EVTCHNSTAT_virq        */
+        uint32_t pirq;      /* EVTCHNSTAT_pirq        */
+        uint32_t virq;      /* EVTCHNSTAT_virq        */
     } u;
 } evtchn_status_t;
 
@@ -155,12 +158,12 @@ typedef struct evtchn_status {
 #define EVTCHNOP_bind_vcpu        8
 typedef struct evtchn_bind_vcpu {
     /* IN parameters. */
-    u32 port;
-    u32 vcpu;
+    uint32_t port;
+    uint32_t vcpu;
 } evtchn_bind_vcpu_t;
 
 typedef struct evtchn_op {
-    u32 cmd; /* EVTCHNOP_* */
+    uint32_t cmd; /* EVTCHNOP_* */
     union {
         evtchn_alloc_unbound_t    alloc_unbound;
         evtchn_bind_interdomain_t bind_interdomain;
@@ -175,3 +178,13 @@ typedef struct evtchn_op {
 } evtchn_op_t;
 
 #endif /* __XEN_PUBLIC_EVENT_CHANNEL_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

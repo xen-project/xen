@@ -86,7 +86,7 @@ class SrvBase(resource.Resource):
             except Exception, exn:
                 log.exception("Request %s failed.", op)
                 if req.useSxp():
-                    return ['xend.err', "Exception: " + str(exn)]
+                    return ['xend.err', str(exn)]
                 else:
                     return "<p>%s</p>" % str(exn)
 

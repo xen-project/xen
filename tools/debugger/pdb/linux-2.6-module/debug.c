@@ -29,13 +29,13 @@ typedef struct bwcpoint                           /* break/watch/catch point */
     unsigned long address;
     int length;
 
-    u8  type;                                                     /* BWC_??? */
-    u8  mode;                   /* for BWC_PAGE, the current protection mode */
-    u32 process;
-    u8  error;                /* error occured when enabling: don't disable. */
+    uint8_t  type;                                                     /* BWC_??? */
+    uint8_t  mode;                   /* for BWC_PAGE, the current protection mode */
+    uint32_t process;
+    uint8_t  error;                /* error occured when enabling: don't disable. */
 
     /* original values */
-    u8    orig_bkpt;                               /* single byte breakpoint */
+    uint8_t    orig_bkpt;                               /* single byte breakpoint */
     pte_t orig_pte;
 
     struct list_head watchpt_read_list;     /* read watchpoints on this page */
@@ -109,7 +109,7 @@ pdb_bwc_print_list (void)
 }
 
 bwcpoint_p
-pdb_search_watchpoint (u32 process, unsigned long address)
+pdb_search_watchpoint (uint32_t process, unsigned long address)
 {
     bwcpoint_p bwc_watch = (bwcpoint_p) 0;
     bwcpoint_p bwc_entry = (bwcpoint_p) 0;
@@ -150,7 +150,7 @@ pdb_search_watchpoint (u32 process, unsigned long address)
 int
 pdb_suspend (struct task_struct *target)
 {
-    u32 rc = 0;
+    uint32_t rc = 0;
 
     force_sig(SIGSTOP, target);                    /* force_sig_specific ??? */
 
@@ -364,11 +364,11 @@ pdb_step (struct task_struct *target)
 
 int
 pdb_insert_memory_breakpoint (struct task_struct *target, 
-                              unsigned long address, u32 length)
+                              unsigned long address, uint32_t length)
 {
     int rc = 0;
     bwcpoint_p bkpt;
-    u8 breakpoint_opcode = 0xcc;
+    uint8_t breakpoint_opcode = 0xcc;
 
     printk("insert breakpoint %d:%lx len: %d\n", target->pid, address, length);
 
@@ -399,7 +399,7 @@ pdb_insert_memory_breakpoint (struct task_struct *target,
 
 int
 pdb_remove_memory_breakpoint (struct task_struct *target,
-                              unsigned long address, u32 length)
+                              unsigned long address, uint32_t length)
 {
     int rc = 0;
     bwcpoint_p bkpt = NULL;

@@ -17,7 +17,7 @@
 int main(int argc, char *argv[])
 {
     vdi_t  *vdi;
-    u64     id;
+    uint64_t     id;
     
     __init_blockstore();
     __init_vdi();
@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
         exit(-1);
     }
     
-    id = (u64) atoll(argv[1]);
+    id = (uint64_t) atoll(argv[1]);
     
     vdi = vdi_get(id);
     

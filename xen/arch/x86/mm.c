@@ -185,7 +185,7 @@ void arch_init_memory(void)
      * Any Xen-heap pages that we will allow to be mapped will have
      * their domain field set to dom_xen.
      */
-    dom_xen = alloc_domain_struct();
+    dom_xen = alloc_domain();
     atomic_set(&dom_xen->refcnt, 1);
     dom_xen->domain_id = DOMID_XEN;
 
@@ -194,7 +194,7 @@ void arch_init_memory(void)
      * This domain owns I/O pages that are within the range of the pfn_info
      * array. Mappings occur at the priv of the caller.
      */
-    dom_io = alloc_domain_struct();
+    dom_io = alloc_domain();
     atomic_set(&dom_io->refcnt, 1);
     dom_io->domain_id = DOMID_IO;
 
@@ -366,9 +366,6 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
 
     if ( unlikely(!get_page_type(page, type)) )
     {
-        if ( (type & PGT_type_mask) != PGT_l1_page_table )
-            MEM_LOG("Bad page type for pfn %lx (%" PRtype_info ")", 
-                    page_nr, page->u.inuse.type_info);
         put_page(page);
         return 0;
     }
@@ -438,6 +435,7 @@ get_page_from_l1e(
 {
     unsigned long mfn = l1e_get_pfn(l1e);
     struct pfn_info *page = &frame_table[mfn];
+    int okay;
     extern int domain_iomem_in_pfn(struct domain *d, unsigned long pfn);
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
@@ -470,9 +468,17 @@ get_page_from_l1e(
         d = dom_io;
     }
 
-    return ((l1e_get_flags(l1e) & _PAGE_RW) ?
+    okay = ((l1e_get_flags(l1e) & _PAGE_RW) ?
             get_page_and_type(page, d, PGT_writable_page) :
             get_page(page, d));
+    if ( !okay )
+    {
+        MEM_LOG("Error getting mfn %lx (pfn %lx) from L1 entry %" PRIpte
+                " for dom%d",
+                mfn, get_pfn_from_mfn(mfn), l1e_get_intpte(l1e), d->domain_id);
+    }
+
+    return okay;
 }
 
 
@@ -582,6 +588,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     unsigned long    pfn  = l1e_get_pfn(l1e);
     struct pfn_info *page = &frame_table[pfn];
     struct domain   *e;
+    struct vcpu     *v;
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || !pfn_valid(pfn) )
         return;
@@ -615,10 +622,12 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
         /* We expect this is rare so we blow the entire shadow LDT. */
         if ( unlikely(((page->u.inuse.type_info & PGT_type_mask) == 
                        PGT_ldt_page)) &&
-             unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) )
-
-            // XXX SMP BUG?
-            invalidate_shadow_ldt(e->vcpu[0]);
+             unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) &&
+             (d == e) )
+        {
+            for_each_vcpu ( d, v )
+                invalidate_shadow_ldt(v);
+        }
         put_page(page);
     }
 }
@@ -679,6 +688,7 @@ static int alloc_l1_table(struct pfn_info *page)
     return 1;
 
  fail:
+    MEM_LOG("Failure in alloc_l1_table: entry %d", i);
     while ( i-- > 0 )
         if ( is_guest_l1_slot(i) )
             put_page_from_l1e(pl1e[i], d);
@@ -838,6 +848,7 @@ static int alloc_l2_table(struct pfn_info *page, unsigned long type)
     return 1;
 
  fail:
+    MEM_LOG("Failure in alloc_l2_table: entry %d", i);
     while ( i-- > 0 )
         if ( is_guest_l2_slot(type, i) )
             put_page_from_l2e(pl2e[i], pfn);
@@ -1311,7 +1322,7 @@ void free_page_type(struct pfn_info *page, unsigned long type)
         }
     }
 
-    switch (type  & PGT_type_mask)
+    switch ( type & PGT_type_mask )
     {
     case PGT_l1_page_table:
         free_l1_table(page);
@@ -1450,7 +1461,7 @@ int get_page_type(struct pfn_info *page, unsigned long type)
                     if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
                          ((type & PGT_type_mask) != PGT_l1_page_table) )
                         MEM_LOG("Bad type (saw %" PRtype_info
-                                "!= exp %" PRtype_info ") "
+                                " != exp %" PRtype_info ") "
                                 "for mfn %lx (pfn %lx)",
                                 x, type, page_to_pfn(page),
                                 get_pfn_from_mfn(page_to_pfn(page)));
@@ -1491,11 +1502,10 @@ int get_page_type(struct pfn_info *page, unsigned long type)
         /* Try to validate page type; drop the new reference on failure. */
         if ( unlikely(!alloc_page_type(page, type)) )
         {
-            MEM_LOG("Error while validating pfn %lx for type %" PRtype_info "."
-                    " caf=%08x taf=%" PRtype_info,
-                    page_to_pfn(page), type,
-                    page->count_info,
-                    page->u.inuse.type_info);
+            MEM_LOG("Error while validating mfn %lx (pfn %lx) for type %"
+                    PRtype_info ": caf=%08x taf=%" PRtype_info,
+                    page_to_pfn(page), get_pfn_from_mfn(page_to_pfn(page)),
+                    type, page->count_info, page->u.inuse.type_info);
             /* Noone else can get a reference. We hold the only ref. */
             page->u.inuse.type_info = 0;
             return 0;
@@ -1752,7 +1762,7 @@ int do_mmuext_op(
             goto pin_page;
 
         case MMUEXT_UNPIN_TABLE:
-            if ( unlikely(!(okay = get_page_from_pagenr(mfn, FOREIGNDOM))) )
+            if ( unlikely(!(okay = get_page_from_pagenr(mfn, d))) )
             {
                 MEM_LOG("Mfn %lx bad domain (dom=%p)",
                         mfn, page_get_owner(page));
@@ -2905,6 +2915,7 @@ int revalidate_l1(
 {
     l1_pgentry_t ol1e, nl1e;
     int modified = 0, i;
+    struct vcpu *v;
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
@@ -2937,7 +2948,11 @@ int revalidate_l1(
              */
             memcpy(&l1page[i], &snapshot[i],
                    (L1_PAGETABLE_ENTRIES - i) * sizeof(l1_pgentry_t));
-            domain_crash();
+
+            /* Crash the offending domain. */
+            set_bit(_DOMF_ctrl_pause, &d->domain_flags);
+            for_each_vcpu ( d, v )
+                vcpu_sleep_nosync(v);
             break;
         }
         
@@ -3016,8 +3031,8 @@ void ptwr_flush(struct domain *d, const int which)
     modified = revalidate_l1(d, pl1e, d->arch.ptwr[which].page);
     unmap_domain_page(pl1e);
     perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
-    ptwr_eip_stat_update(  d->arch.ptwr[which].eip, d->domain_id, modified);
-    d->arch.ptwr[which].prev_nr_updates  = modified;
+    ptwr_eip_stat_update(d->arch.ptwr[which].eip, d->domain_id, modified);
+    d->arch.ptwr[which].prev_nr_updates = modified;
 
     /*
      * STEP 3. Reattach the L1 p.t. page into the current address space.
@@ -3366,7 +3381,9 @@ int ptwr_init(struct domain *d)
 
 void ptwr_destroy(struct domain *d)
 {
+    LOCK_BIGLOCK(d);
     cleanup_writable_pagetable(d);
+    UNLOCK_BIGLOCK(d);
     free_xenheap_page(d->arch.ptwr[PTWR_PT_ACTIVE].page);
     free_xenheap_page(d->arch.ptwr[PTWR_PT_INACTIVE].page);
 }

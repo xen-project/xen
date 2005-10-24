@@ -32,8 +32,6 @@ struct arch_domain
     struct shadow_ops *ops;
     unsigned int shadow_mode;  /* flags to control shadow table operation */
     unsigned int shadow_nest;  /* Recursive depth of shadow_lock() nesting */
-    /* Shadow mode has tainted page reference counts? */
-    unsigned int shadow_tainted_refcnts;
 
     /* shadow hashtable */
     struct shadow_status *shadow_ht;
@@ -63,8 +61,8 @@ struct arch_domain
 
     struct list_head free_shadow_frames;
 
-    pagetable_t  phys_table;               /* guest 1:1 pagetable */
-    struct virtual_platform_def vmx_platform;
+    pagetable_t         phys_table;         /* guest 1:1 pagetable */
+    struct vmx_platform vmx_platform;
 } __cacheline_aligned;
 
 struct arch_vcpu

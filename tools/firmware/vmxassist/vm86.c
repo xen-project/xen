@@ -465,7 +465,7 @@ movcr(struct regs *regs, unsigned prefix, unsigned opc)
  * Emulate a segment load in protected mode
  */
 int
-load_seg(unsigned long sel, u32 *base, u32 *limit, union vmcs_arbytes *arbytes)
+load_seg(unsigned long sel, uint32_t *base, uint32_t *limit, union vmcs_arbytes *arbytes)
 {
 	unsigned long long entry;
 
@@ -784,7 +784,6 @@ opcode(struct regs *regs)
 				}
 				break;
 			case 0x09: /* wbinvd */
-				asm volatile ( "wbinvd" );
 				return OPC_EMULATED;
 			case 0x20: /* mov Rd, Cd (1h) */
 			case 0x22:

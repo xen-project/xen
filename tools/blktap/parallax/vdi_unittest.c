@@ -39,9 +39,9 @@ void fill_test_pages(void)
     zero_page = newblock();
 }
 
-inline u64 make_vaddr(u64 L1, u64 L2, u64 L3)
+inline uint64_t make_vaddr(uint64_t L1, uint64_t L2, uint64_t L3)
 {
-    u64 ret = L1;
+    uint64_t ret = L1;
 
     ret = (ret << 9) | L2;
     ret = (ret << 9) | L3;
@@ -49,9 +49,9 @@ inline u64 make_vaddr(u64 L1, u64 L2, u64 L3)
     return ret;
 }
 
-void touch_block(vdi_t *vdi, u64 L1, u64 L2, u64 L3)
+void touch_block(vdi_t *vdi, uint64_t L1, uint64_t L2, uint64_t L3)
 {
-    u64 vaddr;
+    uint64_t vaddr;
     char *page = pages[next_page++];
     char *rpage = NULL;
 
@@ -76,9 +76,9 @@ void touch_block(vdi_t *vdi, u64 L1, u64 L2, u64 L3)
     freeblock(rpage);
 }
 
-void test_block(vdi_t *vdi, u64 L1, u64 L2, u64 L3, char *page)
+void test_block(vdi_t *vdi, uint64_t L1, uint64_t L2, uint64_t L3, char *page)
 {
-    u64 vaddr;
+    uint64_t vaddr;
     char *rpage = NULL;
 
     printf("TEST  (%3Lu, %3Lu, %3Lu)\n", L1, L2, L3);
@@ -103,7 +103,7 @@ void test_block(vdi_t *vdi, u64 L1, u64 L2, u64 L3, char *page)
 
 void coverage_test(vdi_t *vdi)
 {
-    u64 vaddr;
+    uint64_t vaddr;
     int i, j, k;
 
     /* Do a series of writes and reads to test all paths through the 
@@ -155,13 +155,13 @@ void coverage_test(vdi_t *vdi)
 int main(int argc, char *argv[])
 {
     vdi_t       *vdi;
-    u64          id;
+    uint64_t          id;
     int          fd;
     struct stat  st;
-    u64          tot_size;
+    uint64_t          tot_size;
     char         spage[BLOCK_SIZE];
     char        *dpage;
-    u64          vblock = 0, count=0;
+    uint64_t          vblock = 0, count=0;
     
     __init_blockstore();
     init_block_async();

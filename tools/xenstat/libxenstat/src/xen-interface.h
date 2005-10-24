@@ -16,16 +16,6 @@
  */
 
 #include <stdint.h>
-
-typedef int8_t   s8;
-typedef int16_t  s16;
-typedef int32_t  s32;
-typedef int64_t  s64;
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-
 #include <xen/xen.h>
 #include <xen/dom0_ops.h>
 #include <xen/sched.h>
@@ -51,5 +41,6 @@ int xi_get_physinfo(xi_handle *, dom0_physinfo_t *);
 int xi_get_domaininfolist(xi_handle *, dom0_getdomaininfo_t *, unsigned int,
                           unsigned int);
 
-/* Returns cpu usage data from dom0 */
-long long xi_get_vcpu_usage(xi_handle *, unsigned int, unsigned int);
+/* Get vcpu info from a domain */
+int xi_get_domain_vcpu_info(xi_handle *, unsigned int, unsigned int,
+                            dom0_getvcpuinfo_t *);

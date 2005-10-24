@@ -19,15 +19,15 @@
 typedef struct {
     unsigned long addr;   /* Machine address of packet.   */
     int      ref;         /* grant table access reference */
-    u16      id;          /* Echoed in response message.  */
-    u16      size;        /* Packet size in bytes.        */
+    uint16_t id;          /* Echoed in response message.  */
+    uint16_t size;        /* Packet size in bytes.        */
 } tpmif_tx_request_t;
 
 /*
  * The TPMIF_TX_RING_SIZE defines the number of pages the
  * front-end and backend can exchange (= size of array).
  */
-typedef u32 TPMIF_RING_IDX;
+typedef uint32_t TPMIF_RING_IDX;
 
 #define TPMIF_TX_RING_SIZE 10
 
@@ -42,3 +42,13 @@ typedef struct {
 } tpmif_tx_interface_t;
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

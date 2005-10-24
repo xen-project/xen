@@ -9,7 +9,7 @@
 #ifndef __XEN_PUBLIC_IO_CONSOLE_H__
 #define __XEN_PUBLIC_IO_CONSOLE_H__
 
-typedef u32 XENCONS_RING_IDX;
+typedef uint32_t XENCONS_RING_IDX;
 
 #define MASK_XENCONS_IDX(idx, ring) ((idx) & (sizeof(ring)-1))
 
@@ -21,3 +21,13 @@ struct xencons_interface {
 };
 
 #endif /* __XEN_PUBLIC_IO_CONSOLE_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

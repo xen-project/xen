@@ -13,41 +13,41 @@
 
 typedef struct physdevop_irq_status_query {
     /* IN */
-    u32 irq;
+    uint32_t irq;
     /* OUT */
 /* Need to call PHYSDEVOP_IRQ_UNMASK_NOTIFY when the IRQ has been serviced? */
 #define PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY (1<<0)
-    u32 flags;
+    uint32_t flags;
 } physdevop_irq_status_query_t;
 
 typedef struct physdevop_set_iopl {
     /* IN */
-    u32 iopl;
+    uint32_t iopl;
 } physdevop_set_iopl_t;
 
 typedef struct physdevop_set_iobitmap {
     /* IN */
-    u8 *bitmap;
-    u32 nr_ports;
+    uint8_t *bitmap;
+    uint32_t nr_ports;
 } physdevop_set_iobitmap_t;
 
 typedef struct physdevop_apic {
     /* IN */
-    u32 apic;
-    u32 offset;
+    uint32_t apic;
+    uint32_t offset;
     /* IN or OUT */
-    u32 value;
+    uint32_t value;
 } physdevop_apic_t; 
 
 typedef struct physdevop_irq {
     /* IN */
-    u32 irq;
+    uint32_t irq;
     /* OUT */
-    u32 vector;
+    uint32_t vector;
 } physdevop_irq_t; 
 
 typedef struct physdev_op {
-    u32 cmd;
+    uint32_t cmd;
     union {
         physdevop_irq_status_query_t      irq_status_query;
         physdevop_set_iopl_t              set_iopl;

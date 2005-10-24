@@ -51,7 +51,7 @@ struct xenstat_domain {
 	unsigned int id;
 	unsigned int state;
 	unsigned long long cpu_ns;
-	unsigned int num_vcpus;
+	unsigned int num_vcpus;		/* No. vcpus configured for domain */
 	xenstat_vcpu *vcpus;		/* Array of length num_vcpus */
 	unsigned long long cur_mem;	/* Current memory reservation */
 	unsigned long long max_mem;	/* Total memory allowed */
@@ -61,6 +61,7 @@ struct xenstat_domain {
 };
 
 struct xenstat_vcpu {
+	unsigned int online;
 	unsigned long long ns;
 };
 
@@ -229,7 +230,7 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 			domain->id = domaininfo[i].domain;
 			domain->state = domaininfo[i].flags;
 			domain->cpu_ns = domaininfo[i].cpu_time;
-			domain->num_vcpus = domaininfo[i].n_vcpu;
+			domain->num_vcpus = (domaininfo[i].max_vcpu_id+1);
 			domain->vcpus = NULL;
 			domain->cur_mem =
 			    ((unsigned long long)domaininfo[i].tot_pages)
@@ -344,7 +345,7 @@ unsigned long long xenstat_domain_cpu_ns(xenstat_domain * domain)
 	return domain->cpu_ns;
 }
 
-/* Find the number of VCPUs allocated to a domain */
+/* Find the number of VCPUs for a domain */
 unsigned int xenstat_domain_num_vcpus(xenstat_domain * domain)
 {
 	return domain->num_vcpus;
@@ -432,22 +433,24 @@ xenstat_network *xenstat_domain_network(xenstat_domain * domain,
 static int xenstat_collect_vcpus(xenstat_node * node)
 {
 	unsigned int i, vcpu;
+
 	/* Fill in VCPU information */
 	for (i = 0; i < node->num_domains; i++) {
 		node->domains[i].vcpus = malloc(node->domains[i].num_vcpus
 						* sizeof(xenstat_vcpu));
 		if (node->domains[i].vcpus == NULL)
 			return 0;
-
+	
 		for (vcpu = 0; vcpu < node->domains[i].num_vcpus; vcpu++) {
 			/* FIXME: need to be using a more efficient mechanism*/
-			long long vcpu_time;
-			vcpu_time = xi_get_vcpu_usage(node->handle->xihandle,
-						      node->domains[i].id,
-						      vcpu);
-			if (vcpu_time < 0)
+			dom0_getvcpuinfo_t info;
+
+			if (xi_get_domain_vcpu_info(node->handle->xihandle,
+			    node->domains[i].id, vcpu, &info) != 0)
 				return 0;
-			node->domains[i].vcpus[vcpu].ns = vcpu_time;
+
+			node->domains[i].vcpus[vcpu].online = info.online;
+			node->domains[i].vcpus[vcpu].ns = info.cpu_time;
 		}
 	}
 	return 1;
@@ -464,6 +467,12 @@ static void xenstat_free_vcpus(xenstat_node * node)
 /* Free VCPU information in handle - nothing to do */
 static void xenstat_uninit_vcpus(xenstat_handle * handle)
 {
+}
+
+/* Get VCPU online status */
+unsigned int xenstat_vcpu_online(xenstat_vcpu * vcpu)
+{
+	return vcpu->online;
 }
 
 /* Get VCPU usage */

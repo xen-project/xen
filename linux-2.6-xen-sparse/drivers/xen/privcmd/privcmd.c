@@ -25,8 +25,6 @@
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
-#include <asm-xen/xen-public/xen.h>
-#include <asm/hypervisor.h>
 #include <asm-xen/linux-public/privcmd.h>
 #include <asm/hypervisor.h>
 #include <asm-xen/xen-public/xen.h>
@@ -216,41 +214,6 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 			(*(unsigned long *)pmd) >> PAGE_SHIFT; 
 		ret = put_user(m2p_start_mfn, (unsigned long *)data) ?
 			-EFAULT: 0;
-	}
-	break;
-
-	case IOCTL_PRIVCMD_INITDOMAIN_STORE: {
-		extern int do_xenbus_probe(void*);
-		unsigned long page;
-
-		if (xen_start_info->store_evtchn != 0) {
-			ret = xen_start_info->store_mfn;
-			break;
-		}
-
-		/* Allocate page. */
-		page = get_zeroed_page(GFP_KERNEL);
-		if (!page) {
-			ret = -ENOMEM;
-			break;
-		}
-
-		/* We don't refcnt properly, so set reserved on page.
-		 * (this allocation is permanent) */
-		SetPageReserved(virt_to_page(page));
-
-		/* Initial connect. Setup channel and page. */
-		xen_start_info->store_evtchn = data;
-		xen_start_info->store_mfn =
-			pfn_to_mfn(virt_to_phys((void *)page) >>
-				   PAGE_SHIFT);
-		ret = xen_start_info->store_mfn;
-
-		/* 
-		** Complete initialization of xenbus (viz. set up the 
-		** connection to xenstored now that it has started). 
-		*/
-		kthread_run(do_xenbus_probe, NULL, "xenbus_probe");
 	}
 	break;
 

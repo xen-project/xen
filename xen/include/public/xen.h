@@ -213,7 +213,7 @@ struct mmuext_op {
 
 #ifndef __ASSEMBLY__
 
-typedef u16 domid_t;
+typedef uint16_t domid_t;
 
 /* Domain ids >= DOMID_FIRST_RESERVED cannot be used for ordinary domains. */
 #define DOMID_FIRST_RESERVED (0x7FF0U)
@@ -246,8 +246,8 @@ typedef u16 domid_t;
  */
 typedef struct
 {
-    u64 ptr;       /* Machine address of PTE. */
-    u64 val;       /* New contents of PTE.    */
+    uint64_t ptr;       /* Machine address of PTE. */
+    uint64_t val;       /* New contents of PTE.    */
 } mmu_update_t;
 
 /*
@@ -260,8 +260,11 @@ typedef struct
     unsigned long args[6];
 } multicall_entry_t;
 
-/* Event channel endpoints per domain. */
-#define NR_EVENT_CHANNELS 1024
+/*
+ * Event channel endpoints per domain:
+ *  1024 if a long is 32 bits; 4096 if a long is 64 bits.
+ */
+#define NR_EVENT_CHANNELS (sizeof(unsigned long) * sizeof(unsigned long) * 64)
 
 /*
  * Per-VCPU information goes here. This will be cleaned up more when Xen 
@@ -293,9 +296,9 @@ typedef struct vcpu_info {
      * an upcall activation. The mask is cleared when the VCPU requests
      * to block: this avoids wakeup-waiting races.
      */
-    u8 evtchn_upcall_pending;
-    u8 evtchn_upcall_mask;
-    u32 evtchn_pending_sel;
+    uint8_t evtchn_upcall_pending;
+    uint8_t evtchn_upcall_mask;
+    unsigned long evtchn_pending_sel;
 #ifdef __ARCH_HAS_VCPU_INFO
     arch_vcpu_info_t arch;
 #endif
@@ -311,17 +314,17 @@ typedef struct vcpu_time_info {
      * The correct way to interact with the version number is similar to
      * Linux's seqlock: see the implementations of read_seqbegin/read_seqretry.
      */
-    u32 version;
-    u64 tsc_timestamp;   /* TSC at last update of time vals.  */
-    u64 system_time;     /* Time, in nanosecs, since boot.    */
+    uint32_t version;
+    uint64_t tsc_timestamp;   /* TSC at last update of time vals.  */
+    uint64_t system_time;     /* Time, in nanosecs, since boot.    */
     /*
      * Current system time:
      *   system_time + ((tsc - tsc_timestamp) << tsc_shift) * tsc_to_system_mul
      * CPU frequency (Hz):
      *   ((10^9 << 32) / tsc_to_system_mul) >> tsc_shift
      */
-    u32 tsc_to_system_mul;
-    s8  tsc_shift;
+    uint32_t tsc_to_system_mul;
+    int8_t  tsc_shift;
 } vcpu_time_info_t;
 
 /*
@@ -333,16 +336,14 @@ typedef struct shared_info {
 
     vcpu_time_info_t vcpu_time[MAX_VIRT_CPUS];
 
-    u32 n_vcpu;
-
     /*
-     * A domain can have up to 1024 "event channels" on which it can send
-     * and receive asynchronous event notifications. There are three classes
-     * of event that are delivered by this mechanism:
+     * A domain can create "event channels" on which it can send and receive
+     * asynchronous event notifications. There are three classes of event that
+     * are delivered by this mechanism:
      *  1. Bi-directional inter- and intra-domain connections. Domains must
-     *     arrange out-of-band to set up a connection (usually the setup
-     *     is initiated and organised by a privileged third party such as
-     *     software running in domain 0).
+     *     arrange out-of-band to set up a connection (usually by allocating
+     *     an unbound 'listener' port and avertising that via a storage service
+     *     such as xenstore).
      *  2. Physical interrupts. A domain with suitable hardware-access
      *     privileges can bind an event-channel port to a physical interrupt
      *     source.
@@ -350,8 +351,8 @@ typedef struct shared_info {
      *     port to a virtual interrupt source, such as the virtual-timer
      *     device or the emergency console.
      * 
-     * Event channels are addressed by a "port index" between 0 and 1023.
-     * Each channel is associated with two bits of information:
+     * Event channels are addressed by a "port index". Each channel is
+     * associated with two bits of information:
      *  1. PENDING -- notifies the domain that there is a pending notification
      *     to be processed. This bit is cleared by the guest.
      *  2. MASK -- if this bit is clear then a 0->1 transition of PENDING
@@ -363,19 +364,19 @@ typedef struct shared_info {
      * 
      * To expedite scanning of pending notifications, any 0->1 pending
      * transition on an unmasked channel causes a corresponding bit in a
-     * 32-bit selector to be set. Each bit in the selector covers a 32-bit
-     * word in the PENDING bitfield array.
+     * per-vcpu selector word to be set. Each bit in the selector covers a
+     * 'C long' in the PENDING bitfield array.
      */
-    u32 evtchn_pending[32];
-    u32 evtchn_mask[32];
+    unsigned long evtchn_pending[sizeof(unsigned long) * 8];
+    unsigned long evtchn_mask[sizeof(unsigned long) * 8];
 
     /*
      * Wallclock time: updated only by control software. Guests should base
      * their gettimeofday() syscall on this wallclock-base value.
      */
-    u32 wc_version;      /* Version counter: see vcpu_time_info_t. */
-    u32 wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
-    u32 wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
+    uint32_t wc_version;      /* Version counter: see vcpu_time_info_t. */
+    uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
+    uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
 
     arch_shared_info_t arch;
 
@@ -411,32 +412,38 @@ typedef struct start_info {
     /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
     unsigned long nr_pages;     /* Total pages allocated to this domain.  */
     unsigned long shared_info;  /* MACHINE address of shared info struct. */
-    u32      flags;             /* SIF_xxx flags.                         */
+    uint32_t flags;             /* SIF_xxx flags.                         */
     unsigned long store_mfn;    /* MACHINE page number of shared page.    */
-    u16      store_evtchn;      /* Event channel for store communication. */
+    uint16_t store_evtchn;      /* Event channel for store communication. */
     unsigned long console_mfn;  /* MACHINE address of console page.       */
-    u16      console_evtchn;    /* Event channel for console messages.    */
+    uint16_t console_evtchn;    /* Event channel for console messages.    */
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).     */
     unsigned long pt_base;      /* VIRTUAL address of page directory.     */
     unsigned long nr_pt_frames; /* Number of bootstrap p.t. frames.       */
     unsigned long mfn_list;     /* VIRTUAL address of page-frame list.    */
     unsigned long mod_start;    /* VIRTUAL address of pre-loaded module.  */
     unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
-    s8 cmd_line[MAX_GUEST_CMDLINE];
+    int8_t cmd_line[MAX_GUEST_CMDLINE];
 } start_info_t;
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */
 #define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
-#define SIF_BLK_BE_DOMAIN (1<<4)  /* Is this a block backend domain? */
-#define SIF_NET_BE_DOMAIN (1<<5)  /* Is this a net backend domain? */
-#define SIF_USB_BE_DOMAIN (1<<6)  /* Is this a usb backend domain? */
-#define SIF_TPM_BE_DOMAIN (1<<7)  /* Is this a TPM backend domain? */
-/* For use in guest OSes. */
-extern shared_info_t *HYPERVISOR_shared_info;
 
-typedef u64 cpumap_t;
+typedef uint64_t cpumap_t;
+
+typedef uint8_t xen_domain_handle_t[16];
 
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __XEN_PUBLIC_XEN_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

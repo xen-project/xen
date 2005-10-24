@@ -51,7 +51,7 @@
 #include "xenctrl.h"
 #include "tdb.h"
 
-int event_fd;
+extern int eventchn_fd; /* in xenstored_domain.c */
 
 static bool verbose;
 LIST_HEAD(connections);
@@ -166,6 +166,7 @@ static char *sockmsg_string(enum xsd_sockmsg_type type)
 	case XS_SET_PERMS: return "SET_PERMS";
 	case XS_WATCH_EVENT: return "WATCH_EVENT";
 	case XS_ERROR: return "ERROR";
+	case XS_IS_DOMAIN_INTRODUCED: return "XS_IS_DOMAIN_INTRODUCED";
 	default:
 		return "**UNKNOWN**";
 	}
@@ -177,12 +178,18 @@ static void trace_io(const struct connection *conn,
 {
 	char string[64];
 	unsigned int i;
+	time_t now;
+	struct tm *tm;
 
 	if (tracefd < 0)
 		return;
 
+	now = time(NULL);
+	tm = localtime(&now);
+
 	write(tracefd, prefix, strlen(prefix));
-	sprintf(string, " %p ", conn);
+	sprintf(string, " %p %0d:%0d:%0d ", conn, tm->tm_hour, tm->tm_min,
+		tm->tm_sec);
 	write(tracefd, string, strlen(string));
 	write(tracefd, sockmsg_string(data->hdr.msg.type),
 	      strlen(sockmsg_string(data->hdr.msg.type)));
@@ -246,8 +253,9 @@ static bool write_messages(struct connection *conn)
 
 	if (out->inhdr) {
 		if (verbose)
-			xprintf("Writing msg %s (%s) out to %p\n",
+			xprintf("Writing msg %s (%.*s) out to %p\n",
 				sockmsg_string(out->hdr.msg.type),
+				out->hdr.msg.len,
 				out->buffer, conn);
 		ret = conn->write(conn, out->hdr.raw + out->used,
 				  sizeof(out->hdr) - out->used);
@@ -319,9 +327,9 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock)
 	FD_SET(ro_sock, inset);
 	if (ro_sock > max)
 		max = ro_sock;
-	FD_SET(event_fd, inset);
-	if (event_fd > max)
-		max = event_fd;
+	FD_SET(eventchn_fd, inset);
+	if (eventchn_fd > max)
+		max = eventchn_fd;
 	list_for_each_entry(i, &connections, list) {
 		if (i->domain)
 			continue;
@@ -378,7 +386,7 @@ bool is_child(const char *child, const char *parent)
 static struct node *read_node(struct connection *conn, const char *name)
 {
 	TDB_DATA key, data;
-	u32 *p;
+	uint32_t *p;
 	struct node *node;
 
 	key.dptr = (void *)name;
@@ -400,7 +408,7 @@ static struct node *read_node(struct connection *conn, const char *name)
 	talloc_steal(node, data.dptr);
 
 	/* Datalen, childlen, number of permissions */
-	p = (u32 *)data.dptr;
+	p = (uint32_t *)data.dptr;
 	node->num_perms = p[0];
 	node->datalen = p[1];
 	node->childlen = p[2];
@@ -423,14 +431,14 @@ static bool write_node(struct connection *conn, const struct node *node)
 	key.dptr = (void *)node->name;
 	key.dsize = strlen(node->name);
 
-	data.dsize = 3*sizeof(u32)
+	data.dsize = 3*sizeof(uint32_t)
 		+ node->num_perms*sizeof(node->perms[0])
 		+ node->datalen + node->childlen;
 	data.dptr = talloc_size(node, data.dsize);
-	((u32 *)data.dptr)[0] = node->num_perms;
-	((u32 *)data.dptr)[1] = node->datalen;
-	((u32 *)data.dptr)[2] = node->childlen;
-	p = data.dptr + 3 * sizeof(u32);
+	((uint32_t *)data.dptr)[0] = node->num_perms;
+	((uint32_t *)data.dptr)[1] = node->datalen;
+	((uint32_t *)data.dptr)[2] = node->childlen;
+	p = data.dptr + 3 * sizeof(uint32_t);
 
 	memcpy(p, node->perms, node->num_perms*sizeof(node->perms[0]));
 	p += node->num_perms*sizeof(node->perms[0]);
@@ -668,7 +676,7 @@ static char *perms_to_strings(const void *ctx,
 {
 	unsigned int i;
 	char *strings = NULL;
-	char buffer[MAX_STRLEN(domid_t) + 1];
+	char buffer[MAX_STRLEN(unsigned int) + 1];
 
 	for (*len = 0, i = 0; i < num; i++) {
 		if (!xs_perm_to_string(&perms[i], buffer))
@@ -946,9 +954,29 @@ static bool delete_child(struct connection *conn,
 	corrupt(conn, "Can't find child '%s' in %s", childname, node->name);
 }
 
+
+static int _rm(struct connection *conn, struct node *node, const char *name)
+{
+	/* Delete from parent first, then if something explodes fsck cleans. */
+	struct node *parent = read_node(conn, get_parent(name));
+	if (!parent) {
+		send_error(conn, EINVAL);
+		return 0;
+	}
+
+	if (!delete_child(conn, parent, basename(name))) {
+		send_error(conn, EINVAL);
+		return 0;
+	}
+
+	delete_node(conn, node);
+	return 1;
+}
+
+
 static void do_rm(struct connection *conn, const char *name)
 {
-	struct node *node, *parent;
+	struct node *node;
 
 	name = canonicalize(conn, name);
 	node = get_node(conn, name, XS_PERM_WRITE);
@@ -972,23 +1000,13 @@ static void do_rm(struct connection *conn, const char *name)
 		return;
 	}
 
-	/* Delete from parent first, then if something explodes fsck cleans. */
-	parent = read_node(conn, get_parent(name));
-	if (!parent) {
-		send_error(conn, EINVAL);
-		return;
+	if (_rm(conn, node, name)) {
+		add_change_node(conn->transaction, name, true);
+		fire_watches(conn, name, true);
+		send_ack(conn, XS_RM);
 	}
-
-	if (!delete_child(conn, parent, basename(name))) {
-		send_error(conn, EINVAL);
-		return;
-	}
-
-	delete_node(conn, node);
-	add_change_node(conn->transaction, name, true);
-	fire_watches(conn, name, true);
-	send_ack(conn, XS_RM);
 }
+
 
 static void do_get_perms(struct connection *conn, const char *name)
 {
@@ -1130,6 +1148,10 @@ static void process_message(struct connection *conn, struct buffered_data *in)
 
 	case XS_INTRODUCE:
 		do_introduce(conn, in);
+		break;
+
+	case XS_IS_DOMAIN_INTRODUCED:
+		do_is_domain_introduced(conn, onearg(in));
 		break;
 
 	case XS_RELEASE:
@@ -1416,14 +1438,36 @@ static void daemonize(void)
 }
 
 
+static void usage(void)
+{
+	fprintf(stderr,
+"Usage:\n"
+"\n"
+"  xenstored <options>\n"
+"\n"
+"where options may include:\n"
+"\n"
+"  --no-domain-init    to state that xenstored should not initialise dom0,\n"
+"  --pid-file <file>   giving a file for the daemon's pid to be written,\n"
+"  --help              to output this message,\n"
+"  --no-fork           to request that the daemon does not fork,\n"
+"  --output-pid        to request that the pid of the daemon is output,\n"
+"  --trace-file <file> giving the file for logging, and\n"
+"  --verbose           to request verbose execution.\n");
+}
+
+
 static struct option options[] = {
 	{ "no-domain-init", 0, NULL, 'D' },
 	{ "pid-file", 1, NULL, 'F' },
+	{ "help", 0, NULL, 'H' },
 	{ "no-fork", 0, NULL, 'N' },
 	{ "output-pid", 0, NULL, 'P' },
 	{ "trace-file", 1, NULL, 'T' },
 	{ "verbose", 0, NULL, 'V' },
 	{ NULL, 0, NULL, 0 } };
+
+extern void dump_conn(struct connection *conn); 
 
 int main(int argc, char *argv[])
 {
@@ -1435,7 +1479,7 @@ int main(int argc, char *argv[])
 	bool no_domain_init = false;
 	const char *pidfile = NULL;
 
-	while ((opt = getopt_long(argc, argv, "DF:NPT:V", options,
+	while ((opt = getopt_long(argc, argv, "DF:HNPT:V", options,
 				  NULL)) != -1) {
 		switch (opt) {
 		case 'D':
@@ -1444,6 +1488,9 @@ int main(int argc, char *argv[])
 		case 'F':
 			pidfile = optarg;
 			break;
+		case 'H':
+			usage();
+			return 0;
 		case 'N':
 			dofork = false;
 			break;
@@ -1509,12 +1556,12 @@ int main(int argc, char *argv[])
 	    || listen(*ro_sock, 1) != 0)
 		barf_perror("Could not listen on sockets");
 
-	/* If we're the first, create .perms file for root. */
+	/* Setup the database */
 	setup_structure();
 
 	/* Listen to hypervisor. */
 	if (!no_domain_init)
-		event_fd = domain_init();
+		domain_init();
 
 	/* Restore existing connections. */
 	restore_existing_connections();
@@ -1555,7 +1602,7 @@ int main(int argc, char *argv[])
 		if (FD_ISSET(*ro_sock, &inset))
 			accept_connection(*ro_sock, false);
 
-		if (FD_ISSET(event_fd, &inset))
+		if (FD_ISSET(eventchn_fd, &inset))
 			handle_event();
 
 		list_for_each_entry(i, &connections, list) {
@@ -1586,7 +1633,7 @@ int main(int argc, char *argv[])
 				goto more;
 			}
 
-			if (domain_can_write(i)) {
+			if (domain_can_write(i) && !list_empty(&i->out_list)) {
 				handle_output(i);
 				goto more;
 			}

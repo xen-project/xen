@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
     name[VDI_NAME_SZ] = '\0';    
     
     if ( argc > 3 ) {
-        id.block   = (u64)          atoll(argv[2]);
+        id.block   = (uint64_t)          atoll(argv[2]);
         id.index   = (unsigned int) atol (argv[3]);
         from_snap  = 1;
     }

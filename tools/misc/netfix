@@ -3,7 +3,7 @@
 #============================================================================
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 #============================================================================
-# Move the IP address from eth0 onto the Xen bridge (xen-br0).
+# Move the IP address from eth0 onto the Xen bridge (xenbr0).
 # Only works if the bridge control utils (brctl) have been installed.
 #============================================================================
 
@@ -19,7 +19,7 @@ long_options  = ['help', 'verbose', 'quiet',
                  'interface=', 'bridge=', 'create']
 
 defaults['interface'] = 'eth0'
-defaults['bridge'] = 'xen-br0'
+defaults['bridge'] = 'xenbr0'
 
 def usage():
     print """Usage:

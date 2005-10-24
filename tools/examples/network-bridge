@@ -5,8 +5,8 @@
 # The script name to use is defined in /etc/xen/xend-config.sxp
 # in the network-script field.
 #
-# This script creates a bridge (default xen-br0), adds a device
-# (default eth0) to it, copies the IP addresses from the device
+# This script creates a bridge (default xenbr${vifnum}), adds a device
+# (default eth${vifnum}) to it, copies the IP addresses from the device
 # to the bridge and adjusts the routes accordingly.
 #
 # If all goes well, this should ensure that networking stays up.
@@ -20,9 +20,12 @@
 #
 # Vars:
 #
-# bridge     The bridge to use (default xen-br0).
-# netdev     The interface to add to the bridge (default eth0).
-# antispoof  Whether to use iptables to prevent spoofing (default yes).
+# vifnum     Virtual device number to use (default 0). Numbers >=1
+#            require the netback driver to have nloopbacks set to a
+#            higher value than its default of 1.
+# bridge     The bridge to use (default xenbr${vifnum}).
+# netdev     The interface to add to the bridge (default eth${vifnum}).
+# antispoof  Whether to use iptables to prevent spoofing (default no).
 #
 # start:
 # Creates the bridge and enslaves netdev to it.
@@ -39,16 +42,8 @@
 #
 #============================================================================
 
-# Gentoo doesn't have ifup/ifdown: define appropriate alternatives
-which ifup >& /dev/null
-if [ "$?" != 0 -a -e /etc/conf.d/net ]; then
-    ifup() {
-        /etc/init.d/net.$1 start
-    }
-    ifdown() {
-        /etc/init.d/net.$1 stop
-    }
-fi
+dir=$(dirname "$0")
+. "$dir/xen-network-common.sh"
 
 # Exit if anything goes wrong.
 set -e 
@@ -60,11 +55,35 @@ shift
 # Pull variables in args in to environment.
 for arg ; do export "${arg}" ; done
 
-bridge=${bridge:-xen-br0}
-netdev=${netdev:-eth0}
+vifnum=${vifnum:-0}
+bridge=${bridge:-xenbr${vifnum}}
+netdev=${netdev:-eth${vifnum}}
 antispoof=${antispoof:-no}
 
-echo "*network $OP bridge=$bridge netdev=$netdev antispoof=$antispoof" >&2
+pdev="p${netdev}"
+vdev="veth${vifnum}"
+vif0="vif0.${vifnum}"
+
+legacy_mask_to_prefix() {
+    mask=$1
+    first=${mask%%.*}
+    second=${mask#*.}
+    third=${second#*.}
+    fourth=${third#*.}
+    second=${second%%.*}
+    third=${third%%.*}
+    declare -i INT FULLMASK BIT
+    INT=$((((($first*256)+$second)*256+$third)*256+$fourth))
+    FULLMASK=4294967295
+    BIT=1
+    for bit in `seq 32 -1 0`; do
+	if test $FULLMASK -eq $INT; then PREFIX=$bit; return; fi
+	FULLMASK=$(($FULLMASK-$BIT))
+	BIT=$((BIT*2))
+    done
+    echo "ERROR converting netmask $mask to prefix"
+    exit 1
+}
 
 # Usage: transfer_addrs src dst
 # Copy all IP addresses (including aliases) from device $src to device $dst.
@@ -99,6 +118,7 @@ s/inet/ip addr del/
 s@\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)/[0-9]\+@\1@
 s/${src}/dev ${src}/
 " | sh -e
+    ip link set dev ${dst} up
 }
 
 # Usage: transfer_routes src dst
@@ -131,11 +151,11 @@ create_bridge () {
 
     # Don't create the bridge if it already exists.
     if ! brctl show | grep -q ${bridge} ; then
-        brctl addbr ${bridge}
-        brctl stp ${bridge} off
-        brctl setfd ${bridge} 0
+	brctl addbr ${bridge}
+	brctl stp ${bridge} off
+	brctl setfd ${bridge} 0
     fi
-    ifconfig ${bridge} up
+    ip link set ${bridge} up
 }
 
 # Usage: add_to_bridge bridge dev
@@ -144,19 +164,17 @@ add_to_bridge () {
     local dev=$2
     # Don't add $dev to $bridge if it's already on a bridge.
     if ! brctl show | grep -q ${dev} ; then
-        brctl addif ${bridge} ${dev}
+	brctl addif ${bridge} ${dev}
     fi
 }
 
-# Usage: antispoofing dev bridge
 # Set the default forwarding policy for $dev to drop.
 # Allow forwarding to the bridge.
 antispoofing () {
-    local dev=$1
-    local bridge=$2
-
     iptables -P FORWARD DROP
-    iptables -A FORWARD -m physdev --physdev-in ${dev} -j ACCEPT
+    iptables -F FORWARD
+    iptables -A FORWARD -m physdev --physdev-in ${pdev} -j ACCEPT
+    iptables -A FORWARD -m physdev --physdev-in ${vif0} -j ACCEPT
 }
 
 # Usage: show_status dev bridge
@@ -166,8 +184,10 @@ show_status () {
     local bridge=$2
     
     echo '============================================================'
-    ifconfig ${dev}
-    ifconfig ${bridge}
+    ip addr show ${dev}
+    ip addr show ${bridge}
+    echo ' '
+    brctl show ${bridge}
     echo ' '
     ip route list
     echo ' '
@@ -177,100 +197,113 @@ show_status () {
 
 op_start () {
     if [ "${bridge}" == "null" ] ; then
-        return
+	return
     fi
 
     create_bridge ${bridge}
 
-    if ifconfig 2>/dev/null | grep -q veth0 ; then
-        return
+    if ! ip link show 2>/dev/null | grep -q "^[0-9]*: ${vdev}"; then
+	return
     fi
 
-    if ifconfig veth0 2>/dev/null | grep -q veth0 ; then
-	mac=`ifconfig ${netdev} | grep HWadd | sed -e 's/.*\(..:..:..:..:..:..\).*/\1/'`
-	if ! ifdown ${netdev} ; then
-		# if ifup didn't work, see if we have an ip= on cmd line
-		if egrep 'ip=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:' /proc/cmdline ; 
-		then
-                        kip=`sed -e 's!.*ip=\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\):.*!\1!' /proc/cmdline`
-                        kmask=`sed -e 's!.*ip=[^:]*:[^:]*:[^:]*:\([^:]*\):.*!\1!' /proc/cmdline` 
-                        kgate=`sed -e 's!.*ip=[^:]*:[^:]*:\([^:]*\):.*!\1!' /proc/cmdline`
-			ifconfig ${netdev} 0.0.0.0 down
-		fi
+    if ip link show ${vdev} 2>/dev/null >/dev/null; then
+	mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
+	eval `/sbin/getcfg -d /etc/sysconfig/network/ -f ifcfg- -- ${netdev}`
+	transfer_addrs ${netdev} ${vdev}
+	if ! ifdown ${netdev}; then
+	    # if ifup didn't work, see if we have an ip= on cmd line
+	    if egrep 'ip=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:' /proc/cmdline; then
+		kip=`sed -e 's!.*ip=\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\):.*!\1!' /proc/cmdline`
+		kmask=`sed -e 's!.*ip=[^:]*:[^:]*:[^:]*:\([^:]*\):.*!\1!' /proc/cmdline` 
+		kgate=`sed -e 's!.*ip=[^:]*:[^:]*:\([^:]*\):.*!\1!' /proc/cmdline`
+		ip link set ${netdev} down
+		ip addr flush ${netdev}
+	    fi
 	fi
-	ip link set ${netdev} name p${netdev}
-	ip link set veth0 name ${netdev}
-	ifconfig p${netdev} 0.0.0.0 -arp down
-	ifconfig p${netdev} hw ether fe:ff:ff:ff:ff:ff
-	ifconfig ${netdev} hw ether ${mac}
-	add_to_bridge ${bridge} vif0.0
-	add_to_bridge ${bridge} p${netdev}
+	ip link set ${netdev} name ${pdev}
+	ip link set ${vdev} name ${netdev}
+	ip link set ${pdev} down arp off
+	ip link set ${pdev} addr fe:ff:ff:ff:ff:ff
+	ip addr flush ${pdev}
+	ip link set ${netdev} addr ${mac} arp on
+	add_to_bridge ${bridge} ${vif0}
+	add_to_bridge ${bridge} ${pdev}
 	ip link set ${bridge} up
-	ip link set vif0.0 up
-	ip link set p${netdev} up
-	if ! ifup ${netdev} ; then
-		if [ ${kip} ] ; then
-			# use the addresses we grocked from /proc/cmdline	
-			ifconfig ${netdev} ${kip} 
-			[ ${kmask} ] && ifconfig ${netdev} netmask ${kmask} 
-			ifconfig ${netdev} up
-			[ ${kgate} ] && ip route add default via ${kgate}	
+	ip link set ${vif0} up
+	ip link set ${pdev} up 
+	if ! ifup ${HWD_CONFIG_0} ${netdev} ; then
+	    if [ ${kip} ] ; then
+		# use the addresses we grocked from /proc/cmdline
+		if [ -z "${kmask}" ]; then 
+		    PREFIX=32; 
+		else 
+		    legacy_to_prefix ${kmask};
 		fi
-        fi
+		ip addr add ${kip}/${PREFIX} dev ${netdev}
+		ip link set dev ${netdev} up
+		[ ${kgate} ] && ip route add default via ${kgate}
+	    fi
+	fi
     else
-	# old style without veth0
-	transfer_addrs ${netdev} ${bridge}
-        transfer_routes ${netdev} ${bridge}
+	# old style without ${vdev}
+	transfer_addrs  ${netdev} ${bridge}
+	transfer_routes ${netdev} ${bridge}
     fi
-    
+
     if [ ${antispoof} == 'yes' ] ; then
-        antispoofing ${netdev} ${bridge}
+	antispoofing
     fi
 }
 
 op_stop () {
-    if [ "${bridge}" == "null" ] ; then
-        return
+    if [ "${bridge}" == "null" ]; then
+	return
+    fi
+    if ! ip link show ${bridge} >/dev/null 2>&1; then
+	return
     fi
 
-    if ifconfig peth0 2>/dev/null | grep -q peth0 ; then
+    if ip link show ${pdev} 2>/dev/null >/dev/null; then
+	ip link set dev ${vif0} down
+	mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
+	transfer_addrs ${netdev} ${pdev}
+	ifdown ${netdev}
+	ip link set ${netdev} down arp off
+	ip link set ${netdev} addr fe:ff:ff:ff:ff:ff
+	ip link set ${pdev} down
+	ip addr flush ${netdev}
+	ip link set ${pdev} addr ${mac} arp on
 
-        ifconfig vif0.0 down
-        mac=`ifconfig eth0 | grep HWadd | \
-            sed -e 's/.*\(..:..:..:..:..:..\).*/\1/'`
-        ifconfig ${netdev} 0.0.0.0 down
-        ifconfig ${netdev} hw ether fe:ff:ff:ff:ff:ff
+	brctl delif ${bridge} ${pdev}
+	brctl delif ${bridge} ${vif0}
+	ip link set ${bridge} down
 
-        ifconfig p${netdev} down
-        ifconfig p${netdev} hw ether ${mac} arp 
-        brctl delif ${bridge} p${netdev}
-
-        ip link set eth0 name veth0
-        ip link set peth0 name eth0
-        ifconfig ${bridge} down
-        brctl delbr ${bridge}
-        ifup eth0
+	ip link set ${netdev} name ${vdev}
+	ip link set ${pdev} name ${netdev}
+	ifup ${netdev}
 
     else
-        transfer_routes ${bridge} ${netdev}
+	transfer_routes ${bridge} ${netdev}
+	ip link set ${bridge} down
     fi
+    brctl delbr ${bridge}
 }
 
 case ${OP} in
     start)
-        op_start
-        ;;
+	op_start
+	;;
     
     stop)
-        op_stop
-        ;;
+	op_stop
+	;;
 
     status)
-        show_status ${netdev} ${bridge}
-       ;;
+	show_status ${netdev} ${bridge}
+	;;
 
     *)
-       echo 'Unknown command: ' ${OP} >&2
-       echo 'Valid commands are: start, stop, status' >&2
-       exit 1
+	echo 'Unknown command: ' ${OP} >&2
+	echo 'Valid commands are: start, stop, status' >&2
+	exit 1
 esac

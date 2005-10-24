@@ -43,6 +43,8 @@ read_exact(int fd, void *buf, size_t count)
 
     while (r < count) {
         s = read(fd, &b[r], count - r);
+        if ((s == -1) && (errno == EINTR))
+            continue;
         if (s <= 0)
             break;
         r += s;
@@ -51,7 +53,7 @@ read_exact(int fd, void *buf, size_t count)
     return r;
 }
 
-int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
+int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pfns,
                      unsigned int store_evtchn, unsigned long *store_mfn,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
@@ -638,16 +640,6 @@ int xc_linux_restore(int xc_handle, int io_fd, u32 dom, unsigned long nr_pfns,
     {
         ERR("Couldn't build the domain");
         goto out;
-    }
-
-    DPRINTF("Domain ready to be unpaused\n");
-    op.cmd = DOM0_UNPAUSEDOMAIN;
-    op.u.unpausedomain.domain = (domid_t)dom;
-    rc = xc_dom0_op(xc_handle, &op);
-    if (rc == 0) {
-        /* Success: print the domain id. */
-        DPRINTF("DOM=%u\n", dom);
-        return 0;
     }
 
  out:

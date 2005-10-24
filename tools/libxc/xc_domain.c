@@ -10,8 +10,9 @@
 #include <xen/memory.h>
 
 int xc_domain_create(int xc_handle,
-                     u32 ssidref,
-                     u32 *pdomid)
+                     uint32_t ssidref,
+                     xen_domain_handle_t handle,
+                     uint32_t *pdomid)
 {
     int err;
     dom0_op_t op;
@@ -19,16 +20,17 @@ int xc_domain_create(int xc_handle,
     op.cmd = DOM0_CREATEDOMAIN;
     op.u.createdomain.domain = (domid_t)*pdomid;
     op.u.createdomain.ssidref = ssidref;
+    memcpy(op.u.createdomain.handle, handle, sizeof(xen_domain_handle_t));
     if ( (err = do_dom0_op(xc_handle, &op)) != 0 )
         return err;
 
-    *pdomid = (u16)op.u.createdomain.domain;
+    *pdomid = (uint16_t)op.u.createdomain.domain;
     return 0;
 }    
 
 
 int xc_domain_pause(int xc_handle, 
-                    u32 domid)
+                    uint32_t domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_PAUSEDOMAIN;
@@ -38,7 +40,7 @@ int xc_domain_pause(int xc_handle,
 
 
 int xc_domain_unpause(int xc_handle,
-                      u32 domid)
+                      uint32_t domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_UNPAUSEDOMAIN;
@@ -48,7 +50,7 @@ int xc_domain_unpause(int xc_handle,
 
 
 int xc_domain_destroy(int xc_handle,
-                      u32 domid)
+                      uint32_t domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_DESTROYDOMAIN;
@@ -57,9 +59,9 @@ int xc_domain_destroy(int xc_handle,
 }
 
 int xc_domain_pincpu(int xc_handle,
-                     u32 domid, 
+                     uint32_t domid, 
                      int vcpu,
-                     cpumap_t *cpumap)
+                     cpumap_t cpumap)
 {
     dom0_op_t op;
     op.cmd = DOM0_PINCPUDOMAIN;
@@ -71,12 +73,12 @@ int xc_domain_pincpu(int xc_handle,
 
 
 int xc_domain_getinfo(int xc_handle,
-                      u32 first_domid,
+                      uint32_t first_domid,
                       unsigned int max_doms,
                       xc_dominfo_t *info)
 {
     unsigned int nr_doms;
-    u32 next_domid = first_domid;
+    uint32_t next_domid = first_domid;
     dom0_op_t op;
     int rc = 0; 
 
@@ -88,7 +90,7 @@ int xc_domain_getinfo(int xc_handle,
         op.u.getdomaininfo.domain = (domid_t)next_domid;
         if ( (rc = do_dom0_op(xc_handle, &op)) < 0 )
             break;
-        info->domid      = (u16)op.u.getdomaininfo.domain;
+        info->domid      = (uint16_t)op.u.getdomaininfo.domain;
 
         info->dying    = !!(op.u.getdomaininfo.flags & DOMFLAGS_DYING);
         info->shutdown = !!(op.u.getdomaininfo.flags & DOMFLAGS_SHUTDOWN);
@@ -111,13 +113,13 @@ int xc_domain_getinfo(int xc_handle,
         info->max_memkb = op.u.getdomaininfo.max_pages << (PAGE_SHIFT - 10);
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
         info->cpu_time = op.u.getdomaininfo.cpu_time;
-        info->vcpus = op.u.getdomaininfo.n_vcpu;
-        memcpy(&info->vcpu_to_cpu, &op.u.getdomaininfo.vcpu_to_cpu, 
-               sizeof(info->vcpu_to_cpu));
-        memcpy(&info->cpumap, &op.u.getdomaininfo.cpumap, 
-               sizeof(info->cpumap));
+        info->nr_online_vcpus = op.u.getdomaininfo.nr_online_vcpus;
+        info->max_vcpu_id = op.u.getdomaininfo.max_vcpu_id;
 
-        next_domid = (u16)op.u.getdomaininfo.domain + 1;
+        memcpy(info->handle, op.u.getdomaininfo.handle,
+               sizeof(xen_domain_handle_t));
+
+        next_domid = (uint16_t)op.u.getdomaininfo.domain + 1;
         info++;
     }
 
@@ -127,7 +129,7 @@ int xc_domain_getinfo(int xc_handle,
 }
 
 int xc_domain_getinfolist(int xc_handle,
-                          u32 first_domain,
+                          uint32_t first_domain,
                           unsigned int max_domains,
                           xc_domaininfo_t *info)
 {
@@ -154,8 +156,8 @@ int xc_domain_getinfolist(int xc_handle,
 }
 
 int xc_domain_get_vcpu_context(int xc_handle,
-                               u32 domid,
-                               u32 vcpu,
+                               uint32_t domid,
+                               uint32_t vcpu,
                                vcpu_guest_context_t *ctxt)
 {
     int rc;
@@ -163,27 +165,22 @@ int xc_domain_get_vcpu_context(int xc_handle,
 
     op.cmd = DOM0_GETVCPUCONTEXT;
     op.u.getvcpucontext.domain = (domid_t)domid;
-    op.u.getvcpucontext.vcpu   = (u16)vcpu;
+    op.u.getvcpucontext.vcpu   = (uint16_t)vcpu;
     op.u.getvcpucontext.ctxt   = ctxt;
 
-    if ( (ctxt != NULL) &&
-         ((rc = mlock(ctxt, sizeof(*ctxt))) != 0) )
+    if ( (rc = mlock(ctxt, sizeof(*ctxt))) != 0 )
         return rc;
 
     rc = do_dom0_op(xc_handle, &op);
 
-    if ( ctxt != NULL )
-        safe_munlock(ctxt, sizeof(*ctxt));
+    safe_munlock(ctxt, sizeof(*ctxt));
 
-    if ( rc > 0 )
-        return -ESRCH;
-    else
-        return rc;
+    return rc;
 }
 
 
 int xc_shadow_control(int xc_handle,
-                      u32 domid, 
+                      uint32_t domid, 
                       unsigned int sop,
                       unsigned long *dirty_bitmap,
                       unsigned long pages,
@@ -207,7 +204,7 @@ int xc_shadow_control(int xc_handle,
 }
 
 int xc_domain_setcpuweight(int xc_handle,
-                           u32 domid,
+                           uint32_t domid,
                            float weight)
 {
     int sched_id;
@@ -221,9 +218,9 @@ int xc_domain_setcpuweight(int xc_handle,
     {
         case SCHED_BVT:
         {
-            u32 mcuadv;
+            uint32_t mcuadv;
             int warpback;
-            s32 warpvalue;
+            int32_t warpvalue;
             long long warpl;
             long long warpu;
 
@@ -250,7 +247,7 @@ int xc_domain_setcpuweight(int xc_handle,
 }
 
 int xc_domain_setmaxmem(int xc_handle,
-                        u32 domid, 
+                        uint32_t domid, 
                         unsigned int max_memkb)
 {
     dom0_op_t op;
@@ -261,7 +258,7 @@ int xc_domain_setmaxmem(int xc_handle,
 }
 
 int xc_domain_memory_increase_reservation(int xc_handle,
-                                          u32 domid, 
+                                          uint32_t domid, 
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned int address_bits,
@@ -293,7 +290,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
 }
 
 int xc_domain_memory_decrease_reservation(int xc_handle,
-                                          u32 domid, 
+                                          uint32_t domid, 
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned long *extent_start)
@@ -327,6 +324,44 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
     }
 
     return err;
+}
+
+int xc_domain_max_vcpus(int xc_handle, uint32_t domid, unsigned int max)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_MAX_VCPUS;
+    op.u.max_vcpus.domain = (domid_t)domid;
+    op.u.max_vcpus.max    = max;
+    return do_dom0_op(xc_handle, &op);
+}
+
+int xc_domain_sethandle(int xc_handle, uint32_t domid, 
+                        xen_domain_handle_t handle)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_SETDOMAINHANDLE;
+    op.u.setdomainhandle.domain = (domid_t)domid;
+    memcpy(op.u.setdomainhandle.handle, handle, sizeof(xen_domain_handle_t));
+    return do_dom0_op(xc_handle, &op);
+}
+
+int xc_domain_get_vcpu_info(int xc_handle,
+                            uint32_t domid,
+                            uint32_t vcpu,
+                            xc_vcpuinfo_t *info)
+{
+    int rc;
+    dom0_op_t op;
+
+    op.cmd = DOM0_GETVCPUINFO;
+    op.u.getvcpuinfo.domain = (domid_t)domid;
+    op.u.getvcpuinfo.vcpu   = (uint16_t)vcpu;
+
+    rc = do_dom0_op(xc_handle, &op);
+
+    memcpy(info, &op.u.getvcpuinfo, sizeof(*info));
+
+    return rc;
 }
 
 /*

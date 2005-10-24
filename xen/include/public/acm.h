@@ -8,7 +8,7 @@
  *
  * Contributors:
  * Stefan Berger <stefanb@watson.ibm.com> 
- *	added network byte order support for binary policies
+ * added network byte order support for binary policies
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -41,24 +41,24 @@
 #endif
 
 /* default ssid reference value if not supplied */
-#define ACM_DEFAULT_SSID 	0x0
+#define ACM_DEFAULT_SSID  0x0
 #define ACM_DEFAULT_LOCAL_SSID  0x0
 
 /* Internal ACM ERROR types */
-#define ACM_OK				 0
-#define ACM_UNDEF			-1
-#define ACM_INIT_SSID_ERROR		-2
-#define ACM_INIT_SOID_ERROR		-3
-#define ACM_ERROR		        -4
+#define ACM_OK     0
+#define ACM_UNDEF   -1
+#define ACM_INIT_SSID_ERROR  -2
+#define ACM_INIT_SOID_ERROR  -3
+#define ACM_ERROR          -4
 
 /* External ACCESS DECISIONS */
-#define ACM_ACCESS_PERMITTED		0
-#define ACM_ACCESS_DENIED		-111
-#define ACM_NULL_POINTER_ERROR		-200
+#define ACM_ACCESS_PERMITTED        0
+#define ACM_ACCESS_DENIED           -111
+#define ACM_NULL_POINTER_ERROR      -200
 
 /* primary policy in lower 4 bits */
-#define ACM_NULL_POLICY	0
-#define ACM_CHINESE_WALL_POLICY	1
+#define ACM_NULL_POLICY 0
+#define ACM_CHINESE_WALL_POLICY 1
 #define ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY 2
 
 /* combinations have secondary policy component in higher 4bit */
@@ -67,7 +67,7 @@
 
 /* policy: */
 #define ACM_POLICY_NAME(X) \
-	((X) == (ACM_NULL_POLICY)) ? "NULL policy" :                        \
+ ((X) == (ACM_NULL_POLICY)) ? "NULL policy" :                        \
     ((X) == (ACM_CHINESE_WALL_POLICY)) ? "CHINESE WALL policy" :        \
     ((X) == (ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY)) ? "SIMPLE TYPE ENFORCEMENT policy" : \
     ((X) == (ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY)) ? "CHINESE WALL AND SIMPLE TYPE ENFORCEMENT policy" : \
@@ -77,17 +77,20 @@
  * whenever the interpretation of the related
  * policy's data structure changes
  */
-#define ACM_POLICY_VERSION	1
-#define ACM_CHWALL_VERSION	1
-#define ACM_STE_VERSION		1
+#define ACM_POLICY_VERSION 1
+#define ACM_CHWALL_VERSION 1
+#define ACM_STE_VERSION  1
 
 /* defines a ssid reference used by xen */
-typedef u32 ssidref_t;
+typedef uint32_t ssidref_t;
+
+/* hooks that are known to domains */
+enum acm_hook_type {NONE=0, SHARING};
 
 /* -------security policy relevant type definitions-------- */
 
 /* type identifier; compares to "equal" or "not equal" */
-typedef u16 domaintype_t;
+typedef uint16_t domaintype_t;
 
 /* CHINESE WALL POLICY DATA STRUCTURES
  *
@@ -109,7 +112,7 @@ typedef u16 domaintype_t;
  *    with type i and is "1" otherwise.
  */
 /* high-16 = version, low-16 = check magic */
-#define ACM_MAGIC		0x0001debc
+#define ACM_MAGIC  0x0001debc
 
 /* each offset in bytes from start of the struct they
  * are part of */
@@ -123,62 +126,72 @@ typedef u16 domaintype_t;
  * tools that assume packed representations (e.g. the java tool)
  */
 struct acm_policy_buffer {
-	u32 policy_version; /* ACM_POLICY_VERSION */
-    u32 magic;
-	u32 len;
-	u32 primary_policy_code;
-	u32 primary_buffer_offset;
-	u32 secondary_policy_code;
-	u32 secondary_buffer_offset;
+    uint32_t policy_version; /* ACM_POLICY_VERSION */
+    uint32_t magic;
+    uint32_t len;
+    uint32_t primary_policy_code;
+    uint32_t primary_buffer_offset;
+    uint32_t secondary_policy_code;
+    uint32_t secondary_buffer_offset;
 };
 
 struct acm_chwall_policy_buffer {
-	u32 policy_version; /* ACM_CHWALL_VERSION */
-	u32 policy_code;
-	u32 chwall_max_types;
-	u32 chwall_max_ssidrefs;
-	u32 chwall_max_conflictsets;
-	u32 chwall_ssid_offset;
-	u32 chwall_conflict_sets_offset;
-	u32 chwall_running_types_offset;
-	u32 chwall_conflict_aggregate_offset;
+    uint32_t policy_version; /* ACM_CHWALL_VERSION */
+    uint32_t policy_code;
+    uint32_t chwall_max_types;
+    uint32_t chwall_max_ssidrefs;
+    uint32_t chwall_max_conflictsets;
+    uint32_t chwall_ssid_offset;
+    uint32_t chwall_conflict_sets_offset;
+    uint32_t chwall_running_types_offset;
+    uint32_t chwall_conflict_aggregate_offset;
 };
 
 struct acm_ste_policy_buffer {
-	u32 policy_version; /* ACM_STE_VERSION */
-	u32 policy_code;
-	u32 ste_max_types;
-	u32 ste_max_ssidrefs;
-	u32 ste_ssid_offset;
+    uint32_t policy_version; /* ACM_STE_VERSION */
+    uint32_t policy_code;
+    uint32_t ste_max_types;
+    uint32_t ste_max_ssidrefs;
+    uint32_t ste_ssid_offset;
 };
 
 struct acm_stats_buffer {
-    u32 magic;
-	u32 len;
-	u32 primary_policy_code;
-	u32 primary_stats_offset;
-	u32 secondary_policy_code;
-	u32 secondary_stats_offset;
+    uint32_t magic;
+    uint32_t len;
+    uint32_t primary_policy_code;
+    uint32_t primary_stats_offset;
+    uint32_t secondary_policy_code;
+    uint32_t secondary_stats_offset;
 };
 
 struct acm_ste_stats_buffer {
-	u32 ec_eval_count;
-	u32 gt_eval_count;
-	u32 ec_denied_count;
-	u32 gt_denied_count; 
-	u32 ec_cachehit_count;
-	u32 gt_cachehit_count;
+    uint32_t ec_eval_count;
+    uint32_t gt_eval_count;
+    uint32_t ec_denied_count;
+    uint32_t gt_denied_count; 
+    uint32_t ec_cachehit_count;
+    uint32_t gt_cachehit_count;
 };
 
 struct acm_ssid_buffer {
-	u32 len;
+    uint32_t len;
     ssidref_t ssidref;
-	u32 primary_policy_code;
-	u32 primary_max_types;
-    u32 primary_types_offset;
-	u32 secondary_policy_code;
-    u32 secondary_max_types;
-	u32 secondary_types_offset;
+    uint32_t primary_policy_code;
+    uint32_t primary_max_types;
+    uint32_t primary_types_offset;
+    uint32_t secondary_policy_code;
+    uint32_t secondary_max_types;
+    uint32_t secondary_types_offset;
 };
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

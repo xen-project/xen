@@ -33,8 +33,8 @@ static int do_evtchn_op(int xc_handle, evtchn_op_t *op)
 
 
 int xc_evtchn_alloc_unbound(int xc_handle,
-                            u32 dom,
-                            u32 remote_dom)
+                            uint32_t dom,
+                            uint32_t remote_dom)
 {
     int         rc;
     evtchn_op_t op = {
@@ -50,7 +50,7 @@ int xc_evtchn_alloc_unbound(int xc_handle,
 
 
 int xc_evtchn_status(int xc_handle,
-                     u32 dom,
+                     uint32_t dom,
                      int port,
                      xc_evtchn_status_t *status)
 {

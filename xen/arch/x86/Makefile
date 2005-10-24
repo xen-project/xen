@@ -4,6 +4,7 @@ include $(BASEDIR)/Rules.mk
 OBJS += $(patsubst %.S,%.o,$(wildcard $(TARGET_SUBARCH)/*.S))
 OBJS += $(patsubst %.c,%.o,$(wildcard $(TARGET_SUBARCH)/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard acpi/*.c))
+OBJS += $(patsubst %.c,%.o,$(wildcard dm/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard mtrr/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard genapic/*.c))
 OBJS += $(patsubst %.c,%.o,$(wildcard cpu/*.c))
@@ -66,6 +67,7 @@ clean:
 	rm -f x86_64/*.o x86_64/*~ x86_64/core
 	rm -f mtrr/*.o mtrr/*~ mtrr/core
 	rm -f acpi/*.o acpi/*~ acpi/core
+	rm -f dm/*.o dm/*~ dm/core
 	rm -f genapic/*.o genapic/*~ genapic/core
 	rm -f cpu/*.o cpu/*~ cpu/core
 

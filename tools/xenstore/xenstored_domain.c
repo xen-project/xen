@@ -33,29 +33,31 @@
 #include "talloc.h"
 #include "xenstored_core.h"
 #include "xenstored_domain.h"
+#include "xenstored_proc.h"
 #include "xenstored_watch.h"
 #include "xenstored_test.h"
 
+#include <xenctrl.h>
 #include <xen/linux/evtchn.h>
 
 static int *xc_handle;
-static int eventchn_fd;
 static int virq_port;
-static unsigned int ringbuf_datasize;
+
+int eventchn_fd = -1; 
 
 struct domain
 {
 	struct list_head list;
 
 	/* The id of this domain */
-	domid_t domid;
+	unsigned int domid;
 
 	/* Event channel port */
-	u16 port;
+	uint16_t port;
 
 	/* The remote end of the event channel, used only to validate
 	   repeated domain introductions. */
-	u16 remote_port;
+	uint16_t remote_port;
 
 	/* The mfn associated with the event channel, used only to validate
 	   repeated domain introductions. */
@@ -65,10 +67,7 @@ struct domain
 	char *path;
 
 	/* Shared page. */
-	void *page;
-
-	/* Input and output ringbuffer heads. */
-	struct ringbuf_head *input, *output;
+	struct xenstore_domain_interface *interface;
 
 	/* The connection associated with this. */
 	struct connection *conn;
@@ -79,144 +78,101 @@ struct domain
 
 static LIST_HEAD(domains);
 
-struct ringbuf_head
-{
-	u32 write; /* Next place to write to */
-	u32 read; /* Next place to read from */
-	u8 flags;
-	char buf[0];
-} __attribute__((packed));
-
 #ifndef TESTING
 static void evtchn_notify(int port)
 {
+	int rc; 
+
 	struct ioctl_evtchn_notify notify;
 	notify.port = port;
-	(void)ioctl(event_fd, IOCTL_EVTCHN_NOTIFY, &notify);
+	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_NOTIFY, &notify);
 }
 #else
 extern void evtchn_notify(int port);
 #endif
 
 /* FIXME: Mark connection as broken (close it?) when this happens. */
-static bool check_buffer(const struct ringbuf_head *h)
+static bool check_indexes(XENSTORE_RING_IDX cons, XENSTORE_RING_IDX prod)
 {
-	return (h->write < ringbuf_datasize && h->read < ringbuf_datasize);
+	return ((prod - cons) <= XENSTORE_RING_SIZE);
 }
 
-/* We can't fill last byte: would look like empty buffer. */
-static void *get_output_chunk(const struct ringbuf_head *h,
-			      void *buf, u32 *len)
+static void *get_output_chunk(XENSTORE_RING_IDX cons,
+			      XENSTORE_RING_IDX prod,
+			      char *buf, uint32_t *len)
 {
-	u32 read_mark;
-
-	if (h->read == 0)
-		read_mark = ringbuf_datasize - 1;
-	else
-		read_mark = h->read - 1;
-
-	/* Here to the end of buffer, unless they haven't read some out. */
-	*len = ringbuf_datasize - h->write;
-	if (read_mark >= h->write)
-		*len = read_mark - h->write;
-	return buf + h->write;
+	*len = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(prod);
+	if ((XENSTORE_RING_SIZE - (prod - cons)) < *len)
+		*len = XENSTORE_RING_SIZE - (prod - cons);
+	return buf + MASK_XENSTORE_IDX(prod);
 }
 
-static const void *get_input_chunk(const struct ringbuf_head *h,
-				   const void *buf, u32 *len)
+static const void *get_input_chunk(XENSTORE_RING_IDX cons,
+				   XENSTORE_RING_IDX prod,
+				   const char *buf, uint32_t *len)
 {
-	/* Here to the end of buffer, unless they haven't written some. */
-	*len = ringbuf_datasize - h->read;
-	if (h->write >= h->read)
-		*len = h->write - h->read;
-	return buf + h->read;
-}
-
-static void update_output_chunk(struct ringbuf_head *h, u32 len)
-{
-	h->write += len;
-	if (h->write == ringbuf_datasize)
-		h->write = 0;
-}
-
-static void update_input_chunk(struct ringbuf_head *h, u32 len)
-{
-	h->read += len;
-	if (h->read == ringbuf_datasize)
-		h->read = 0;
-}
-
-static bool buffer_has_input(const struct ringbuf_head *h)
-{
-	u32 len;
-
-	get_input_chunk(h, NULL, &len);
-	return (len != 0);
-}
-
-static bool buffer_has_output_room(const struct ringbuf_head *h)
-{
-	u32 len;
-
-	get_output_chunk(h, NULL, &len);
-	return (len != 0);
+	*len = XENSTORE_RING_SIZE - MASK_XENSTORE_IDX(cons);
+	if ((prod - cons) < *len)
+		*len = prod - cons;
+	return buf + MASK_XENSTORE_IDX(cons);
 }
 
 static int writechn(struct connection *conn, const void *data, unsigned int len)
 {
-	u32 avail;
+	uint32_t avail;
 	void *dest;
-	struct ringbuf_head h;
+	struct xenstore_domain_interface *intf = conn->domain->interface;
+	XENSTORE_RING_IDX cons, prod;
 
-	/* Must read head once, and before anything else, and verified. */
-	h = *conn->domain->output;
+	/* Must read indexes once, and before anything else, and verified. */
+	cons = intf->rsp_cons;
+	prod = intf->rsp_prod;
 	mb();
-	if (!check_buffer(&h)) {
+	if (!check_indexes(cons, prod)) {
 		errno = EIO;
 		return -1;
 	}
 
-	dest = get_output_chunk(&h, conn->domain->output->buf, &avail);
+	dest = get_output_chunk(cons, prod, intf->rsp, &avail);
 	if (avail < len)
 		len = avail;
 
 	memcpy(dest, data, len);
 	mb();
-	update_output_chunk(conn->domain->output, len);
+	intf->rsp_prod += len;
+
 	evtchn_notify(conn->domain->port);
+
 	return len;
 }
 
 static int readchn(struct connection *conn, void *data, unsigned int len)
 {
-	u32 avail;
+	uint32_t avail;
 	const void *src;
-	struct ringbuf_head h;
-	bool was_full;
+	struct xenstore_domain_interface *intf = conn->domain->interface;
+	XENSTORE_RING_IDX cons, prod;
 
-	/* Must read head once, and before anything else, and verified. */
-	h = *conn->domain->input;
+	/* Must read indexes once, and before anything else, and verified. */
+	cons = intf->req_cons;
+	prod = intf->req_prod;
 	mb();
 
-	if (!check_buffer(&h)) {
+	if (!check_indexes(cons, prod)) {
 		errno = EIO;
 		return -1;
 	}
 
-	src = get_input_chunk(&h, conn->domain->input->buf, &avail);
+	src = get_input_chunk(cons, prod, intf->req, &avail);
 	if (avail < len)
 		len = avail;
 
-	was_full = !buffer_has_output_room(&h);
 	memcpy(data, src, len);
 	mb();
-	update_input_chunk(conn->domain->input, len);
-	/* FIXME: Probably not neccessary. */
-	mb();
+	intf->req_cons += len;
 
-	/* If it was full, tell them we've taken some. */
-	if (was_full)
-		evtchn_notify(conn->domain->port);
+	evtchn_notify(conn->domain->port);
+
 	return len;
 }
 
@@ -233,8 +189,8 @@ static int destroy_domain(void *_domain)
 			eprintf("> Unbinding port %i failed!\n", domain->port);
 	}
 
-	if (domain->page)
-		munmap(domain->page, getpagesize());
+	if (domain->interface)
+		munmap(domain->interface, getpagesize());
 
 	return 0;
 }
@@ -268,66 +224,67 @@ static void domain_cleanup(void)
 /* We scan all domains rather than use the information given here. */
 void handle_event(void)
 {
-	u16 port;
+	uint16_t port;
 
-	if (read(event_fd, &port, sizeof(port)) != sizeof(port))
+	if (read(eventchn_fd, &port, sizeof(port)) != sizeof(port))
 		barf_perror("Failed to read from event fd");
 
 	if (port == virq_port)
 		domain_cleanup();
 
 #ifndef TESTING
-	if (write(event_fd, &port, sizeof(port)) != sizeof(port))
+	if (write(eventchn_fd, &port, sizeof(port)) != sizeof(port))
 		barf_perror("Failed to write to event fd");
 #endif
 }
 
 bool domain_can_read(struct connection *conn)
 {
-	return buffer_has_input(conn->domain->input);
+	struct xenstore_domain_interface *intf = conn->domain->interface;
+	return (intf->req_cons != intf->req_prod);
 }
 
 bool domain_can_write(struct connection *conn)
 {
-	return (!list_empty(&conn->out_list) &&
-                buffer_has_output_room(conn->domain->output));
+	struct xenstore_domain_interface *intf = conn->domain->interface;
+	return ((intf->rsp_prod - intf->rsp_cons) != XENSTORE_RING_SIZE);
 }
 
-static struct domain *new_domain(void *context, domid_t domid,
-				 unsigned long mfn, int port,
-				 const char *path)
+static char *talloc_domain_path(void *context, unsigned int domid)
+{
+	return talloc_asprintf(context, "/local/domain/%u", domid);
+}
+
+static struct domain *new_domain(void *context, unsigned int domid,
+				 unsigned long mfn, int port)
 {
 	struct domain *domain;
 	struct ioctl_evtchn_bind_interdomain bind;
 	int rc;
 
+
 	domain = talloc(context, struct domain);
 	domain->port = 0;
 	domain->shutdown = 0;
 	domain->domid = domid;
-	domain->path = talloc_strdup(domain, path);
-	domain->page = xc_map_foreign_range(*xc_handle, domain->domid,
-					    getpagesize(),
-					    PROT_READ|PROT_WRITE,
-					    mfn);
-	if (!domain->page)
+	domain->path = talloc_domain_path(domain, domid);
+	domain->interface = xc_map_foreign_range(
+		*xc_handle, domain->domid,
+		getpagesize(), PROT_READ|PROT_WRITE, mfn);
+	if (!domain->interface)
 		return NULL;
 
 	list_add(&domain->list, &domains);
 	talloc_set_destructor(domain, destroy_domain);
 
-	/* One in each half of page. */
-	domain->input = domain->page;
-	domain->output = domain->page + getpagesize()/2;
-
 	/* Tell kernel we're interested in this event. */
-	bind.remote_domain = domid;
-	bind.remote_port   = port;
-	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
-	if (rc == -1)
-		return NULL;
+        bind.remote_domain = domid;
+        bind.remote_port   = port;
+        rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_INTERDOMAIN, &bind);
+        if (rc == -1)
+            return NULL;
+        domain->port = rc;
 
-	domain->port = rc;
 	domain->conn = new_connection(writechn, readchn);
 	domain->conn->domain = domain;
 
@@ -338,7 +295,7 @@ static struct domain *new_domain(void *context, domid_t domid,
 }
 
 
-static struct domain *find_domain_by_domid(domid_t domid)
+static struct domain *find_domain_by_domid(unsigned int domid)
 {
 	struct domain *i;
 
@@ -354,11 +311,10 @@ static struct domain *find_domain_by_domid(domid_t domid)
 void do_introduce(struct connection *conn, struct buffered_data *in)
 {
 	struct domain *domain;
-	char *vec[4];
-	domid_t domid;
+	char *vec[3];
+	unsigned int domid;
 	unsigned long mfn;
-	u16 port;
-	const char *path;
+	uint16_t port;
 
 	if (get_strings(in, vec, ARRAY_SIZE(vec)) < ARRAY_SIZE(vec)) {
 		send_error(conn, EINVAL);
@@ -373,10 +329,9 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 	domid = atoi(vec[0]);
 	mfn = atol(vec[1]);
 	port = atoi(vec[2]);
-	path = vec[3];
 
 	/* Sanity check args. */
-	if ((port <= 0) || !is_valid_nodename(path)) {
+	if (port <= 0) { 
 		send_error(conn, EINVAL);
 		return;
 	}
@@ -385,7 +340,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 
 	if (domain == NULL) {
 		/* Hang domain off "in" until we're finished. */
-		domain = new_domain(in, domid, mfn, port, path);
+		domain = new_domain(in, domid, mfn, port);
 		if (!domain) {
 			send_error(conn, errno);
 			return;
@@ -400,8 +355,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		/* Check that the given details match the ones we have
 		   previously recorded. */
 		if (port != domain->remote_port ||
-		    mfn != domain->mfn ||
-		    strcmp(path, domain->path) != 0) {
+		    mfn != domain->mfn) {
 			send_error(conn, EINVAL);
 			return;
 		}
@@ -414,7 +368,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 void do_release(struct connection *conn, const char *domid_str)
 {
 	struct domain *domain;
-	domid_t domid;
+	unsigned int domid;
 
 	if (!domid_str) {
 		send_error(conn, EINVAL);
@@ -452,25 +406,37 @@ void do_release(struct connection *conn, const char *domid_str)
 
 void do_get_domain_path(struct connection *conn, const char *domid_str)
 {
-	struct domain *domain;
-	domid_t domid;
+	char *path;
 
 	if (!domid_str) {
 		send_error(conn, EINVAL);
 		return;
 	}
 
+	path = talloc_domain_path(conn, atoi(domid_str));
+
+	send_reply(conn, XS_GET_DOMAIN_PATH, path, strlen(path) + 1);
+
+	talloc_free(path);
+}
+
+void do_is_domain_introduced(struct connection *conn, const char *domid_str)
+{
+	int result;
+	unsigned int domid;
+
+        if (!domid_str) {
+                send_error(conn, EINVAL);
+                return;
+        }
+
 	domid = atoi(domid_str);
 	if (domid == DOMID_SELF)
-		domain = conn->domain;
+		result = 1;
 	else
-		domain = find_domain_by_domid(domid);
+		result = (find_domain_by_domid(domid) != NULL);
 
-	if (!domain)
-		send_error(conn, ENOENT);
-	else
-		send_reply(conn, XS_GET_DOMAIN_PATH, domain->path,
-			   strlen(domain->path) + 1);
+	send_reply(conn, XS_IS_DOMAIN_INTRODUCED, result ? "T" : "F", 2);
 }
 
 static int close_xc_handle(void *_handle)
@@ -492,9 +458,44 @@ void restore_existing_connections(void)
 {
 }
 
+static int dom0_init(void) 
+{ 
+        int rc, fd, port; 
+        unsigned long mfn; 
+        char str[20]; 
+        struct domain *dom0; 
+        
+        fd = open(XENSTORED_PROC_MFN, O_RDONLY); 
+        
+        rc = read(fd, str, sizeof(str)); 
+        str[rc] = '\0'; 
+        mfn = strtoul(str, NULL, 0); 
+        
+        close(fd); 
+        
+        fd = open(XENSTORED_PROC_PORT, O_RDONLY); 
+        
+        rc = read(fd, str, sizeof(str)); 
+        str[rc] = '\0'; 
+        port = strtoul(str, NULL, 0); 
+        
+        close(fd); 
+        
+        
+        dom0 = new_domain(NULL, 0, mfn, port); 
+        talloc_steal(dom0->conn, dom0); 
+
+        evtchn_notify(dom0->port); 
+
+        return 0; 
+}
+
+
+
 #define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
 #define EVTCHN_DEV_MAJOR 10
 #define EVTCHN_DEV_MINOR 201
+
 
 /* Returns the event channel handle. */
 int domain_init(void)
@@ -502,9 +503,6 @@ int domain_init(void)
 	struct stat st;
 	struct ioctl_evtchn_bind_virq bind;
 	int rc;
-
-	/* The size of the ringbuffer: half a page minus head structure. */
-	ringbuf_datasize = getpagesize() / 2 - sizeof(struct ringbuf_head);
 
 	xc_handle = talloc(talloc_autofree_context(), int);
 	if (!xc_handle)
@@ -539,6 +537,9 @@ int domain_init(void)
 	if (eventchn_fd < 0)
 		barf_perror("Failed to open evtchn device");
 
+        if (dom0_init() != 0) 
+                barf_perror("Failed to initialize dom0 state"); 
+     
 	bind.virq = VIRQ_DOM_EXC;
 	rc = ioctl(eventchn_fd, IOCTL_EVTCHN_BIND_VIRQ, &bind);
 	if (rc == -1)
@@ -547,3 +548,13 @@ int domain_init(void)
 
 	return eventchn_fd;
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

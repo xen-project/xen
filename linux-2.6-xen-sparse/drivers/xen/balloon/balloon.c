@@ -502,7 +502,7 @@ static int dealloc_pte_fn(
 		.extent_order = 0,
 		.domid        = DOMID_SELF
 	};
-	set_pte(pte, __pte_ma(0));
+	set_pte_at(&init_mm, addr, pte, __pte_ma(0));
 	phys_to_machine_mapping[__pa(addr) >> PAGE_SHIFT] =
 		INVALID_P2M_ENTRY;
 	BUG_ON(HYPERVISOR_memory_op(
@@ -521,10 +521,9 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 
 	scrub_pages(vstart, 1 << order);
 
+	balloon_lock(flags);
 	BUG_ON(generic_page_range(
 		&init_mm, vstart, PAGE_SIZE << order, dealloc_pte_fn, NULL));
-
-	balloon_lock(flags);
 	current_pages -= 1UL << order;
 	balloon_unlock(flags);
 

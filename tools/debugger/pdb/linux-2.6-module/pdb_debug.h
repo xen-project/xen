@@ -18,9 +18,9 @@ int pdb_continue (struct task_struct *target);
 int pdb_step (struct task_struct *target);
 
 int pdb_insert_memory_breakpoint (struct task_struct *target, 
-                                  unsigned long address, u32 length);
+                                  unsigned long address, uint32_t length);
 int pdb_remove_memory_breakpoint (struct task_struct *target,
-                                  unsigned long address, u32 length);
+                                  unsigned long address, uint32_t length);
 int pdb_insert_watchpoint (struct task_struct *target,
                            pdb_op_watchpt_p watchpt);
 int pdb_remove_watchpoint (struct task_struct *target,

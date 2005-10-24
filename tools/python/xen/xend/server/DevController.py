@@ -82,7 +82,7 @@ class DevController:
         if backpath:
             xstransact.Remove(backpath)
         else:
-            raise VmError("Device not connected")
+            raise VmError("Device %s not connected" % devid)
            
 
     def configurations(self):
@@ -160,7 +160,7 @@ class DevController:
                 if result:
                     result = int(result)
                 else:
-                    result = 1
+                    result = 0
                 t.write("nextDeviceID", str(result + 1))
                 if t.commit():
                     return result

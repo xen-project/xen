@@ -23,13 +23,13 @@
 int main(int argc, char *argv[])
 {
     vdi_t       *vdi;
-    u64          id;
+    uint64_t          id;
     int          fd;
     struct stat  st;
-    u64          tot_size;
+    uint64_t          tot_size;
     char         spage[BLOCK_SIZE], *dpage;
     char        *vpage;
-    u64          vblock = 0, count=0;
+    uint64_t          vblock = 0, count=0;
     
     __init_blockstore();
     init_block_async();
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
         exit(-1);
     }
         
-    id = (u64) atoll(argv[1]);
+    id = (uint64_t) atoll(argv[1]);
     
     vdi = vdi_get( id );
     
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
         exit(-1);
     }
     
-    tot_size = (u64) st.st_size;
+    tot_size = (uint64_t) st.st_size;
     printf("Testing VDI %Ld (%Ld bytes).\n", id, tot_size);
     
     printf("           ");

@@ -10,16 +10,6 @@
 #define XENCTRL_H
 
 #include <stdint.h>
-
-typedef uint8_t            u8;
-typedef uint16_t           u16;
-typedef uint32_t           u32;
-typedef uint64_t           u64;
-typedef int8_t             s8;
-typedef int16_t            s16;
-typedef int32_t            s32;
-typedef int64_t            s64;
-
 #include <sys/ptrace.h>
 #include <xen/xen.h>
 #include <xen/dom0_ops.h>
@@ -105,14 +95,14 @@ typedef struct xc_core_header {
 long xc_ptrace(
     int xc_handle,
     enum __ptrace_request request, 
-    u32  domid,
+    uint32_t  domid,
     long addr, 
     long data);
 
 long xc_ptrace_core(
     int xc_handle,
     enum __ptrace_request request, 
-    u32 domid, 
+    uint32_t domid, 
     long addr, 
     long data);
 
@@ -133,30 +123,42 @@ int xc_waitdomain_core(
  */
 
 typedef struct {
-    u32           domid;
-    u32           ssidref;
+    uint32_t      domid;
+    uint32_t      ssidref;
     unsigned int  dying:1, crashed:1, shutdown:1, 
                   paused:1, blocked:1, running:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
     unsigned long nr_pages;
     unsigned long shared_info_frame;
-    u64           cpu_time;
+    uint64_t      cpu_time;
     unsigned long max_memkb;
-    unsigned int  vcpus;
-    s32           vcpu_to_cpu[MAX_VIRT_CPUS];
-    cpumap_t      cpumap[MAX_VIRT_CPUS];
+    unsigned int  nr_online_vcpus;
+    unsigned int  max_vcpu_id;
+    xen_domain_handle_t handle;
 } xc_dominfo_t;
 
 typedef dom0_getdomaininfo_t xc_domaininfo_t;
 int xc_domain_create(int xc_handle, 
-                     u32 ssidref,
-                     u32 *pdomid);
+                     uint32_t ssidref,
+                     xen_domain_handle_t handle,
+                     uint32_t *pdomid);
 
 
 int xc_domain_dumpcore(int xc_handle, 
-                       u32 domid,
+                       uint32_t domid,
                        const char *corename);
 
+/*
+ * This function sets the maximum number vcpus that a domian may create.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface.
+ * @parm domid the domain id in which vcpus are to be created.
+ * @parm max the maximum number of vcpus that the domain may create.
+ * @return 0 on success, -1 on failure.
+ */
+int xc_domain_max_vcpus(int xc_handle,
+                        uint32_t domid, 
+                        unsigned int max);
 
 /**
  * This function pauses a domain. A paused domain still exists in memory
@@ -167,7 +169,7 @@ int xc_domain_dumpcore(int xc_handle,
  * @return 0 on success, -1 on failure.
  */
 int xc_domain_pause(int xc_handle, 
-                    u32 domid);
+                    uint32_t domid);
 /**
  * This function unpauses a domain.  The domain should have been previously
  * paused.
@@ -177,7 +179,7 @@ int xc_domain_pause(int xc_handle,
  * return 0 on success, -1 on failure
  */
 int xc_domain_unpause(int xc_handle, 
-                      u32 domid);
+                      uint32_t domid);
 
 /**
  * This function will destroy a domain.  Destroying a domain removes the domain
@@ -189,11 +191,12 @@ int xc_domain_unpause(int xc_handle,
  * @return 0 on success, -1 on failure
  */
 int xc_domain_destroy(int xc_handle, 
-                      u32 domid);
+                      uint32_t domid);
 int xc_domain_pincpu(int xc_handle,
-                     u32 domid,
+                     uint32_t domid,
                      int vcpu,
-                     cpumap_t *cpumap);
+                     cpumap_t cpumap);
+
 /**
  * This function will return information about one or more domains. It is
  * designed to iterate over the list of domains. If a single domain is
@@ -210,7 +213,7 @@ int xc_domain_pincpu(int xc_handle,
  * @return the number of domains enumerated or -1 on error
  */
 int xc_domain_getinfo(int xc_handle,
-                      u32 first_domid, 
+                      uint32_t first_domid, 
                       unsigned int max_doms,
                       xc_dominfo_t *info);
 
@@ -228,37 +231,46 @@ int xc_domain_getinfo(int xc_handle,
  * @return the number of domains enumerated or -1 on error
  */
 int xc_domain_getinfolist(int xc_handle,
-                          u32 first_domain,
+                          uint32_t first_domain,
                           unsigned int max_domains,
                           xc_domaininfo_t *info);
 
 /**
- * This function returns information about one domain.  This information is
- * more detailed than the information from xc_domain_getinfo().
+ * This function returns information about the execution context of a
+ * particular vcpu of a domain.
  *
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm domid the domain to get information from
- * @parm info a pointer to an xc_domaininfo_t to store the domain information
+ * @parm vcpu the vcpu number
  * @parm ctxt a pointer to a structure to store the execution context of the
  *            domain
  * @return 0 on success, -1 on failure
  */
 int xc_domain_get_vcpu_context(int xc_handle,
-                               u32 domid,
-                               u32 vcpu,
+                               uint32_t domid,
+                               uint32_t vcpu,
                                vcpu_guest_context_t *ctxt);
 
+typedef dom0_getvcpuinfo_t xc_vcpuinfo_t;
+int xc_domain_get_vcpu_info(int xc_handle,
+                            uint32_t domid,
+                            uint32_t vcpu,
+                            xc_vcpuinfo_t *info);
+
+
 int xc_domain_setcpuweight(int xc_handle,
-                           u32 domid,
+                           uint32_t domid,
                            float weight);
 long long xc_domain_get_cpu_usage(int xc_handle,
                                   domid_t domid,
                                   int vcpu);
 
+int xc_domain_sethandle(int xc_handle, uint32_t domid, 
+                        xen_domain_handle_t handle);
 
 typedef dom0_shadow_control_stats_t xc_shadow_control_stats_t;
 int xc_shadow_control(int xc_handle,
-                      u32 domid, 
+                      uint32_t domid, 
                       unsigned int sop,
                       unsigned long *dirty_bitmap,
                       unsigned long pages,
@@ -268,10 +280,10 @@ int xc_bvtsched_global_set(int xc_handle,
                            unsigned long ctx_allow);
 
 int xc_bvtsched_domain_set(int xc_handle,
-                           u32 domid,
-                           u32 mcuadv,
+                           uint32_t domid,
+                           uint32_t mcuadv,
                            int warpback,
-                           s32 warpvalue,
+                           int32_t warpvalue,
                            long long warpl,
                            long long warpu);
 
@@ -279,20 +291,24 @@ int xc_bvtsched_global_get(int xc_handle,
                            unsigned long *ctx_allow);
 
 int xc_bvtsched_domain_get(int xc_handle,
-                           u32 domid,
-                           u32 *mcuadv,
+                           uint32_t domid,
+                           uint32_t *mcuadv,
                            int *warpback,
-                           s32 *warpvalue,
+                           int32_t *warpvalue,
                            long long *warpl,
                            long long *warpu);
 
 int xc_sedf_domain_set(int xc_handle,
-                          u32 domid,
-                          u64 period, u64 slice, u64 latency, u16 extratime, u16 weight);
+                       uint32_t domid,
+                       uint64_t period, uint64_t slice,
+                       uint64_t latency, uint16_t extratime,
+                       uint16_t weight);
 
 int xc_sedf_domain_get(int xc_handle,
-                          u32 domid,
-                          u64* period, u64 *slice, u64 *latency, u16 *extratime, u16* weight);
+                       uint32_t domid,
+                       uint64_t* period, uint64_t *slice,
+                       uint64_t *latency, uint16_t *extratime,
+                       uint16_t *weight);
 
 typedef evtchn_status_t xc_evtchn_status_t;
 
@@ -311,16 +327,16 @@ typedef evtchn_status_t xc_evtchn_status_t;
  * @return allocated port (in @dom) on success, -1 on failure
  */
 int xc_evtchn_alloc_unbound(int xc_handle,
-                            u32 dom,
-                            u32 remote_dom);
+                            uint32_t dom,
+                            uint32_t remote_dom);
 
 int xc_evtchn_status(int xc_handle,
-                     u32 dom, /* may be DOMID_SELF */
+                     uint32_t dom, /* may be DOMID_SELF */
                      int port,
                      xc_evtchn_status_t *status);
 
 int xc_physdev_pci_access_modify(int xc_handle,
-                                 u32 domid,
+                                 uint32_t domid,
                                  int bus,
                                  int dev,
                                  int func,
@@ -339,29 +355,29 @@ int xc_sched_id(int xc_handle,
                 int *sched_id);
 
 int xc_domain_setmaxmem(int xc_handle,
-                        u32 domid, 
+                        uint32_t domid, 
                         unsigned int max_memkb);
 
 int xc_domain_memory_increase_reservation(int xc_handle,
-                                          u32 domid, 
+                                          uint32_t domid, 
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned int address_bits,
 					  unsigned long *extent_start);
 
 int xc_domain_memory_decrease_reservation(int xc_handle,
-                                          u32 domid, 
+                                          uint32_t domid, 
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
 					  unsigned long *extent_start);
 
-unsigned long xc_make_page_below_4G(int xc_handle, u32 domid, 
+unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid, 
 				    unsigned long mfn);
 
 typedef dom0_perfc_desc_t xc_perfc_desc_t;
 /* IMPORTANT: The caller is responsible for mlock()'ing the @desc array. */
 int xc_perfc_control(int xc_handle,
-                     u32 op,
+                     uint32_t op,
                      xc_perfc_desc_t *desc);
 
 /* read/write msr */
@@ -384,27 +400,29 @@ int xc_msr_write(int xc_handle, int cpu_mask, int msr, unsigned int low,
  * @parm prot same flag as in mmap().
  * @parm mfn the frame address to map.
  */
-void *xc_map_foreign_range(int xc_handle, u32 dom,
+void *xc_map_foreign_range(int xc_handle, uint32_t dom,
                             int size, int prot,
                             unsigned long mfn );
 
-void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
+void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
                            unsigned long *arr, int num );
 
-int xc_get_pfn_list(int xc_handle, u32 domid, unsigned long *pfn_buf, 
+int xc_get_pfn_list(int xc_handle, uint32_t domid, unsigned long *pfn_buf, 
                     unsigned long max_pfns);
 
-int xc_ia64_get_pfn_list(int xc_handle, u32 domid, unsigned long *pfn_buf, 
-                    unsigned int start_page, unsigned int nr_pages);
+int xc_ia64_get_pfn_list(int xc_handle, uint32_t domid,
+                         unsigned long *pfn_buf, 
+                         unsigned int start_page, unsigned int nr_pages);
 
-long xc_get_max_pages(int xc_handle, u32 domid);
+long xc_get_max_pages(int xc_handle, uint32_t domid);
 
 int xc_mmuext_op(int xc_handle, struct mmuext_op *op, unsigned int nr_ops,
 		 domid_t dom);
 
 int xc_memory_op(int xc_handle, int cmd, void *arg);
 
-int xc_get_pfn_type_batch(int xc_handle, u32 dom, int num, unsigned long *arr);
+int xc_get_pfn_type_batch(int xc_handle, uint32_t dom,
+                          int num, unsigned long *arr);
 
 
 /*\
@@ -438,47 +456,38 @@ int xc_grant_interface_open(void);
  */
 int xc_grant_interface_close(int xc_handle);
 
-int xc_gnttab_map_grant_ref(int  xc_handle,
-                            u64  host_virt_addr,
-                            u32  dom,
-                            u16  ref,
-                            u16  flags,
-                            s16 *handle,
-                            u64 *dev_bus_addr);
+int xc_gnttab_map_grant_ref(int      xc_handle,
+                            uint64_t host_virt_addr,
+                            uint32_t dom,
+                            uint16_t ref,
+                            uint16_t flags,
+                            int16_t *handle,
+                            uint64_t *dev_bus_addr);
 
 int xc_gnttab_unmap_grant_ref(int  xc_handle,
-                              u64  host_virt_addr,
-                              u64  dev_bus_addr,
-                              u16  handle,
-                              s16 *status);
+                              uint64_t  host_virt_addr,
+                              uint64_t  dev_bus_addr,
+                              uint16_t  handle,
+                              int16_t *status);
 
 int xc_gnttab_setup_table(int        xc_handle,
-                          u32        dom,
-                          u16        nr_frames,
-                          s16       *status,
+                          uint32_t   dom,
+                          uint16_t   nr_frames,
+                          int16_t   *status,
                           unsigned long **frame_list);
 
 /* Grant debug builds only: */
 int xc_gnttab_dump_table(int        xc_handle,
-                         u32        dom,
-                         s16       *status);
+                         uint32_t   dom,
+                         int16_t   *status);
 
 /* Get current total pages allocated to a domain. */
-long xc_get_tot_pages(int xc_handle, u32 domid);
+long xc_get_tot_pages(int xc_handle, uint32_t domid);
 
 /* Execute a privileged dom0 operation. */
 int xc_dom0_op(int xc_handle, dom0_op_t *op);
 
 int xc_version(int xc_handle, int cmd, void *arg);
-
-/* Initializes the store (for dom0)
-   remote_port should be the remote end of a bound interdomain channel between
-   the store and dom0.
-
-   This function returns a shared frame that should be passed to
-   xs_introduce_domain
- */
-long xc_init_store(int xc_handle, int remote_port);
 
 /*
  * MMU updates.

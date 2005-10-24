@@ -24,7 +24,7 @@ XEN_SCRIPTS += network-route vif-route
 XEN_SCRIPTS += network-nat vif-nat
 XEN_SCRIPTS += block
 XEN_SCRIPTS += block-enbd
-XEN_SCRIPTS += xen-hotplug-common.sh
+XEN_SCRIPTS += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
 
 XEN_HOTPLUG_DIR = /etc/hotplug
 XEN_HOTPLUG_SCRIPTS = xen-backend.agent
@@ -32,7 +32,9 @@ XEN_HOTPLUG_SCRIPTS = xen-backend.agent
 UDEV_RULES_DIR = /etc/udev/rules.d
 UDEV_RULES = xen-backend.rules
 
-ifeq ($(findstring $(DISTDIR),$(DESTDIR)),$(DISTDIR))
+DI = $(shell readlink -f $(DISTDIR))
+DE = $(shell readlink -f $(DESTDIR))
+ifeq ($(findstring $(DI),$(DE)),$(DI))
 HOTPLUGS=install-hotplug install-udev
 else
 ifeq ($(shell [ -x /sbin/udev ] && [ ! -z `udev -V` ] && [ `/sbin/udev -V` -ge 059 ] && echo 1),1)

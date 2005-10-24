@@ -28,10 +28,11 @@ static inline void evtchn_set_pending(struct vcpu *v, int port)
     shared_info_t *s = d->shared_info;
 
     /* These four operations must happen in strict order. */
-    if ( !test_and_set_bit(port,    &s->evtchn_pending[0]) &&
-         !test_bit        (port,    &s->evtchn_mask[0])    &&
-         !test_and_set_bit(port>>5, &v->vcpu_info->evtchn_pending_sel) &&
-         !test_and_set_bit(0,       &v->vcpu_info->evtchn_upcall_pending) )
+    if ( !test_and_set_bit(port, &s->evtchn_pending[0]) &&
+         !test_bit        (port, &s->evtchn_mask[0])    &&
+         !test_and_set_bit(port / BITS_PER_LONG,
+                           &v->vcpu_info->evtchn_pending_sel) &&
+         !test_and_set_bit(0, &v->vcpu_info->evtchn_upcall_pending) )
     {
         evtchn_notify(v);
     }

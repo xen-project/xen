@@ -118,9 +118,11 @@ def restore(xd, fd):
 
     dominfo = xd.restore_(vmconfig)
 
-    assert dominfo.store_channel
-    assert dominfo.console_channel
-    assert dominfo.getDomainPath()
+    store_port   = dominfo.getStorePort()
+    console_port = dominfo.getConsolePort()
+
+    assert store_port
+    assert console_port
 
     try:
         l = read_exact(fd, sizeof_unsigned_long,
@@ -130,39 +132,42 @@ def restore(xd, fd):
             raise XendError(
                 "not a valid guest state file: pfn count out of range")
 
-        store_evtchn = dominfo.store_channel
-        console_evtchn = dominfo.console_channel
-
-        cmd = [xen.util.auxbin.pathTo(XC_RESTORE), str(xc.handle()), str(fd),
-               str(dominfo.getDomid()), str(nr_pfns),
-               str(store_evtchn), str(console_evtchn)]
+        cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
+                        xc.handle(), fd, dominfo.getDomid(), nr_pfns,
+                        store_port, console_port])
         log.debug("[xc_restore]: %s", string.join(cmd))
 
-        def restoreInputHandler(line, _):
-            m = re.match(r"^(store-mfn) (\d+)$", line)
-            if m:
-                store_mfn = int(m.group(2))
-                dominfo.setStoreRef(store_mfn)
-                log.debug("IntroduceDomain %d %d %d %s",
-                          dominfo.getDomid(),
-                          store_mfn,
-                          dominfo.store_channel,
-                          dominfo.getDomainPath())
-                IntroduceDomain(dominfo.getDomid(),
-                                store_mfn,
-                                dominfo.store_channel,
-                                dominfo.getDomainPath())
-            else:
-                m = re.match(r"^(console-mfn) (\d+)$", line)
-                if m:
-                    dominfo.setConsoleRef(int(m.group(2)))
+        handler = RestoreInputHandler()
 
-        forkHelper(cmd, fd, restoreInputHandler, True)
+        forkHelper(cmd, fd, handler.handler, True)
+
+        if handler.store_mfn is None or handler.console_mfn is None:
+            raise XendError('Could not read store/console MFN')
+
+        dominfo.unpause()
+
+        dominfo.completeRestore(handler.store_mfn, handler.console_mfn)
 
         return dominfo
     except:
         dominfo.destroy()
         raise
+
+
+class RestoreInputHandler:
+    def __init__(self):
+        self.store_mfn = None
+        self.console_mfn = None
+
+
+    def handler(self, line, _):
+        m = re.match(r"^(store-mfn) (\d+)$", line)
+        if m:
+            self.store_mfn = int(m.group(2))
+        else:
+            m = re.match(r"^(console-mfn) (\d+)$", line)
+            if m:
+                self.console_mfn = int(m.group(2))
 
 
 def forkHelper(cmd, fd, inputHandler, closeToChild):
@@ -171,6 +176,7 @@ def forkHelper(cmd, fd, inputHandler, closeToChild):
     if closeToChild:
         child.tochild.close()
 
+    lasterr = "error unknown"
     try:
         fds = [child.fromchild.fileno(),
                child.childerr.fileno()]

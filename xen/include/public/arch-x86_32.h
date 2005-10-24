@@ -44,7 +44,6 @@
 /* And the trap vector is... */
 #define TRAP_INSTR "int $0x82"
 
-
 /*
  * Virtual addresses beyond this are not modifiable by guest OSes. The 
  * machine->physical mapping table starts at this address, read-only.
@@ -71,36 +70,36 @@
 #define TI_SET_DPL(_ti,_dpl) ((_ti)->flags |= (_dpl))
 #define TI_SET_IF(_ti,_if)   ((_ti)->flags |= ((!!(_if))<<2))
 typedef struct trap_info {
-    u8       vector;       /* exception vector                              */
-    u8       flags;        /* 0-3: privilege level; 4: clear event enable?  */
-    u16      cs;           /* code selector                                 */
+    uint8_t       vector;  /* exception vector                              */
+    uint8_t       flags;   /* 0-3: privilege level; 4: clear event enable?  */
+    uint16_t      cs;      /* code selector                                 */
     unsigned long address; /* code offset                                   */
 } trap_info_t;
 
 typedef struct cpu_user_regs {
-    u32 ebx;
-    u32 ecx;
-    u32 edx;
-    u32 esi;
-    u32 edi;
-    u32 ebp;
-    u32 eax;
-    u16 error_code;    /* private */
-    u16 entry_vector;  /* private */
-    u32 eip;
-    u16 cs;
-    u8  saved_upcall_mask;
-    u8  _pad0;
-    u32 eflags;
-    u32 esp;
-    u16 ss, _pad1;
-    u16 es, _pad2;
-    u16 ds, _pad3;
-    u16 fs, _pad4;
-    u16 gs, _pad5;
+    uint32_t ebx;
+    uint32_t ecx;
+    uint32_t edx;
+    uint32_t esi;
+    uint32_t edi;
+    uint32_t ebp;
+    uint32_t eax;
+    uint16_t error_code;    /* private */
+    uint16_t entry_vector;  /* private */
+    uint32_t eip;
+    uint16_t cs;
+    uint8_t  saved_upcall_mask;
+    uint8_t  _pad0;
+    uint32_t eflags;
+    uint32_t esp;
+    uint16_t ss, _pad1;
+    uint16_t es, _pad2;
+    uint16_t ds, _pad3;
+    uint16_t fs, _pad4;
+    uint16_t gs, _pad5;
 } cpu_user_regs_t;
 
-typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
+typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
 
 /*
  * The following is all CPU context. Note that the fpu_ctxt block is filled 
@@ -129,12 +128,20 @@ typedef struct vcpu_guest_context {
 
 typedef struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */
+    /* Frame containing list of mfns containing list of mfns containing p2m. */
     unsigned long pfn_to_mfn_frame_list_list; 
-                                            /* frame containing list of mfns
-					       containing list of mfns 
-					       containing the p2m table. */
 } arch_shared_info_t;
 
 #endif
 
 #endif
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

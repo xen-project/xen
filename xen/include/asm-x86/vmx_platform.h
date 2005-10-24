@@ -24,11 +24,12 @@
 #include <asm/e820.h>
 #include <asm/vmx_virpit.h>
 #include <asm/vmx_intercept.h>
+#include <public/io/vmx_vpic.h>
 
 #define MAX_OPERAND_NUM 2
 
-#define mk_operand(size, index, seg, flag) \
-    (((size) << 24) | ((index) << 16) | ((seg) << 8) | (flag))
+#define mk_operand(size_reg, index, seg, flag) \
+    (((size_reg) << 24) | ((index) << 16) | ((seg) << 8) | (flag))
 
 #define operand_size(operand)   \
       ((operand >> 24) & 0xFF)
@@ -63,6 +64,7 @@
 #define INSTR_MOVZ 8
 #define INSTR_STOS 9
 #define INSTR_TEST 10
+#define INSTR_BT 11
 
 struct instruction {
     __s8    instr; /* instruction type */
@@ -75,11 +77,14 @@ struct instruction {
 
 #define MAX_INST_LEN      32
 
-struct virtual_platform_def {
-    unsigned long          *real_mode_data; /* E820, etc. */
+struct vmx_platform {
     unsigned long          shared_page_va;
-    struct vmx_virpit_t    vmx_pit;
-    struct vmx_handler_t   vmx_handler;
+    unsigned int           nr_vcpu;
+
+    struct vmx_virpit      vmx_pit;
+    struct vmx_io_handler  vmx_io_handler;
+    struct vmx_virpic      vmx_pic;
+    int                    interrupt_request;
 };
 
 extern void handle_mmio(unsigned long, unsigned long);

@@ -14,6 +14,8 @@ import pwd
 import re
 import traceback
 
+import xen.lowlevel.xc
+
 from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
 
@@ -32,34 +34,6 @@ class Daemon:
         self.traceindent = 0
         self.child = 0 
         
-    def daemon_pids(self):
-        pids = []
-        pidex = '(?P<pid>\d+)'
-        pythonex = '(?P<python>\S*python\S*)'
-        cmdex = '(?P<cmd>.*)'
-        procre = re.compile('^\s*' + pidex + '\s*' + pythonex + '\s*' + cmdex + '$')
-        xendre = re.compile('^\S+/xend\s*(start|restart)\s*.*$')
-        procs = os.popen('ps -e -o pid,args 2>/dev/null')
-        for proc in procs:
-            pm = procre.match(proc)
-            if not pm: continue
-            xm = xendre.match(pm.group('cmd'))
-            if not xm: continue
-            pids.append(int(pm.group('pid')))
-        return pids
-
-    def new_cleanup(self, kill=0):
-        err = 0
-        pids = self.daemon_pids()
-        if kill:
-            for pid in pids:
-                print "Killing daemon pid=%d" % pid
-                os.kill(pid, signal.SIGHUP)
-        elif pids:
-            err = 1
-            print "Daemon already running: ", pids
-        return err
-
     def read_pid(self, pidfile):
         """Read process id from a file.
 
@@ -115,11 +89,8 @@ class Daemon:
             os.remove(pidfile)
         return running
 
-    def cleanup_xend(self, kill=False):
+    def cleanup_xend(self, kill):
         return self.cleanup_process(XEND_PID_FILE, "xend", kill)
-
-    def cleanup(self, kill=False):
-        self.cleanup_xend(kill=kill)
 
     def status(self):
         """Returns the status of the xend daemon.
@@ -156,16 +127,13 @@ class Daemon:
         # Detach from TTY.
         os.setsid()
 
-        # Detach from standard file descriptors.
-        # I do this at the file-descriptor level: the overlying Python file
-        # objects also use fd's 0, 1 and 2.
+        # Detach from standard file descriptors, and redirect them to
+        # /dev/null or the log as appropriate.
         os.close(0)
         os.close(1)
         os.close(2)
         if XEND_DEBUG:
             os.open('/dev/null', os.O_RDONLY)
-            # XXX KAF: Why doesn't this capture output from C extensions that
-            # fprintf(stdout) or fprintf(stderr) ??
             os.open(XEND_DEBUG_LOG, os.O_WRONLY|os.O_CREAT)
             os.dup(1)
         else:
@@ -180,7 +148,7 @@ class Daemon:
         0  Success
         4  Insufficient privileges
         """
-        xend_pid = self.cleanup_xend()
+        xend_pid = self.cleanup_xend(False)
 
         if self.set_user():
             return 4
@@ -294,11 +262,20 @@ class Daemon:
             return 1
 
     def stop(self):
-        return self.cleanup(kill=True)
+        result = self.cleanup_xend(True)
+        from xen.xend import Vifctl
+        Vifctl.network("stop")
+        return result
 
     def run(self, status):
         try:
             log.info("Xend Daemon started")
+
+            xc = xen.lowlevel.xc.new()
+            xinfo = xc.xeninfo()
+            log.info("Xend changeset: %s.", xinfo['xen_changeset'])
+            del xc
+
             event.listenEvent(self)
             relocate.listenRelocation()
             servers = SrvServer.create()

@@ -71,8 +71,7 @@ longhelp = """Usage: xm <subcommand> [args]
 xm full list of subcommands:
 
   Domain Commands:
-    console <DomId>         attach to console of DomId
-    cpus-list <DomId> <VCpu>          get the list of cpus for a VCPU
+    console <DomId>           attach to console of DomId
     create  <ConfigFile>      create a domain
     destroy <DomId>           terminate a domain immediately
     domid   <DomName>         convert a domain name to a domain id
@@ -88,10 +87,9 @@ xm full list of subcommands:
     shutdown [-w|-a] <DomId>  shutdown a domain
     sysrq   <DomId> <letter>  send a sysrq to a domain
     unpause <DomId>           unpause a paused domain
-    vcpu-enable <DomId> <VCPU>        enable VCPU in a domain
-    vcpu-disable <DomId> <VCPU>       disable VCPU in a domain
-    vcpu-list <DomId>                 get the list of VCPUs for a domain
-    vcpu-pin <DomId> <VCpu> <CPUS>    set which cpus a VCPU can use. 
+    set-vcpus <DomId> <VCPUs> enable the specified number of VCPUs in a domain
+    vcpu-list <DomId>         list the VCPUs for a domain
+    vcpu-pin <DomId> <VCPU> <CPUs>    set which cpus a VCPU can use. 
 
   Xen Host Commands:
     dmesg   [--clear]         read or clear Xen's message buffer
@@ -169,11 +167,9 @@ def handle_xend_error(cmd, dom, ex):
     if error == "Not found" and dom != None:
         err("Domain '%s' not found when running 'xm %s'" % (dom, cmd))
         sys.exit(1)
-    elif error == "Exception: Device not connected":
-        err("Device not connected")
-        sys.exit(1)
     else:
-        raise ex
+        err(error)
+        sys.exit(1)
     
 
 #########################################################################
@@ -211,6 +207,15 @@ def xm_restore(args):
     if id is not None:
         server.xend_domain_unpause(domid)
 
+
+def getDomains(domain_names):
+    from xen.xend.XendClient import server
+    if domain_names:
+        return map(server.xend_domain, domain_names)
+    else:
+        return server.xend_list_domains()
+
+
 def xm_list(args):
     use_long = 0
     show_vcpus = 0
@@ -220,80 +225,161 @@ def xm_list(args):
         err(opterr)
         sys.exit(1)
     
-    n = len(params)
     for (k, v) in options:
         if k in ['-l', '--long']:
             use_long = 1
         if k in ['-v', '--vcpus']:
             show_vcpus = 1
 
-    from xen.xend.XendClient import server
-    if n == 0:
-        doms = server.xend_list_domains()
-    else:
-        doms = map(server.xend_domain, params)
-               
-    if use_long:
-        for dom in doms:
-            PrettyPrint.prettyprint(doms)
-    else:
-        domsinfo = map(parse_doms_info, doms)
+    if show_vcpus:
+        print >>sys.stderr, (
+            "xm list -v is deprecated.  Please use xm vcpu-list.")
+        xm_vcpu_list(params)
+        return
 
-        if show_vcpus:
-            xm_show_vcpus(domsinfo)
-        else:
-            xm_brief_list(domsinfo)
+    doms = getDomains(params)
+
+    if use_long:
+        map(PrettyPrint.prettyprint, doms)
+    else:
+        xm_brief_list(doms)
+
 
 def parse_doms_info(info):
-    dominfo = {}
-    dominfo['dom'] = int(sxp.child_value(info, 'domid', '-1'))
-    dominfo['name'] = sxp.child_value(info, 'name', '??')
-    dominfo['mem'] = int(sxp.child_value(info, 'memory', '0'))
-    dominfo['cpu'] = str(sxp.child_value(info, 'cpu', '0'))
-    dominfo['vcpus'] = int(sxp.child_value(info, 'vcpus', '0'))
-    # if there is more than 1 cpu, the value doesn't mean much
-    if dominfo['vcpus'] > 1:
-        dominfo['cpu'] = '-'
-    dominfo['state'] = sxp.child_value(info, 'state', '??')
-    dominfo['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
-    # security identifiers
-    if ((int(sxp.child_value(info, 'ssidref', '0'))) != 0):
-        dominfo['ssidref1'] =  int(sxp.child_value(info, 'ssidref', '0')) & 0xffff
-        dominfo['ssidref2'] = (int(sxp.child_value(info, 'ssidref', '0')) >> 16) & 0xffff
-    # get out the vcpu information
-    dominfo['vcpulist'] = []
-    vcpu_to_cpu = sxp.child_value(info, 'vcpu_to_cpu', '-1').split('|')
-    cpumap = sxp.child_value(info, 'cpumap', [])
-    mask = ((int(sxp.child_value(info, 'vcpus', '0')))**2) - 1
-    count = 0
-    for cpu in vcpu_to_cpu:
-        vcpuinfo = {}
-        vcpuinfo['name']   = sxp.child_value(info, 'name', '??')
-        vcpuinfo['dom']    = int(sxp.child_value(info, 'domid', '-1'))
-        vcpuinfo['vcpu']   = int(count)
-        vcpuinfo['cpu']    = int(cpu)
-        vcpuinfo['cpumap'] = int(cpumap[count])&mask
-        count = count + 1
-        dominfo['vcpulist'].append(vcpuinfo)
-    return dominfo
-        
-def xm_brief_list(domsinfo):
-    print 'Name              ID  Mem(MiB)  CPU  VCPUs  State   Time(s)'
-    for dominfo in domsinfo:
-        if dominfo.has_key("ssidref1"):
-            print ("%(name)-16s %(dom)3d  %(mem)8d  %(cpu)3s  %(vcpus)5d  %(state)5s  %(cpu_time)7.1f     s:%(ssidref2)02x/p:%(ssidref1)02x" % dominfo)
-        else:
-            print ("%(name)-16s %(dom)3d  %(mem)8d  %(cpu)3s  %(vcpus)5d  %(state)5s  %(cpu_time)7.1f" % dominfo)
+    def get_info(n, t, d):
+        return t(sxp.child_value(info, n, d))
+    
+    return {
+        'dom'      : get_info('domid',    int,   -1),
+        'name'     : get_info('name',     str,   '??'),
+        'mem'      : get_info('memory',   int,   0),
+        'vcpus'    : get_info('vcpus',    int,   0),
+        'state'    : get_info('state',    str,   '??'),
+        'cpu_time' : get_info('cpu_time', float, 0),
+        'ssidref'  : get_info('ssidref',  int,   0),
+        }
 
-def xm_show_vcpus(domsinfo):
-    print 'Name              Id  VCPU  CPU  CPUMAP'
-    for dominfo in domsinfo:
-        for vcpuinfo in dominfo['vcpulist']:
-            print ("%(name)-16s %(dom)3d  %(vcpu)4d  %(cpu)3d  0x%(cpumap)x" %
-                   vcpuinfo)
+
+def xm_brief_list(doms):
+    print 'Name                              ID Mem(MiB) VCPUs State  Time(s)'
+    for dom in doms:
+        d = parse_doms_info(dom)
+        if (d['ssidref'] != 0):
+            d['ssidstr'] = (" s:%04x/p:%04x" % 
+                            ((d['ssidref'] >> 16) & 0xffff,
+                              d['ssidref']        & 0xffff))
+        else:
+            d['ssidstr'] = ""
+        print ("%(name)-32s %(dom)3d %(mem)8d %(vcpus)5d %(state)5s %(cpu_time)7.1f%(ssidstr)s" % d)
+
 
 def xm_vcpu_list(args):
-    xm_list(["-v"] + args)
+    print 'Name                              ID  VCPU  CPU  State  Time(s)  CPU Affinity'
+
+    from xen.xend.XendClient import server
+    if args:
+        dominfo = map(server.xend_domain_vcpuinfo, args)
+    else:
+        doms = server.xend_list_domains()
+        dominfo = map(
+            lambda x: server.xend_domain_vcpuinfo(sxp.child_value(x, 'name')),
+            doms)
+
+    for dom in dominfo:
+        def get_info(n):
+            return sxp.child_value(dom, n)
+
+        #
+        # convert a list of integers into a list of pairs indicating
+        # continuous sequences in the list:
+        #
+        # [0,1,2,3]   -> [(0,3)]
+        # [1,2,4,5]   -> [(1,2),(4,5)]
+        # [0]         -> [(0,0)]
+        # [0,1,4,6,7] -> [(0,1),(4,4),(6,7)]
+        #
+        def list_to_rangepairs(cmap):
+            cmap.sort()
+            pairs = []
+            x = y = 0
+            for i in range(0,len(cmap)):
+                try:
+                    if ((cmap[y+1] - cmap[i]) > 1):
+                        pairs.append((cmap[x],cmap[y]))
+                        x = y = i+1
+                    else:
+                        y = y + 1
+                # if we go off the end, then just add x to y
+                except IndexError:
+                    pairs.append((cmap[x],cmap[y]))
+
+            return pairs
+
+        #
+        # Convert pairs to range string, e.g: [(1,2),(3,3),(5,7)] -> 1-2,3,5-7
+        #
+        def format_pairs(pairs):
+            if not pairs:
+                return "no cpus"
+            out = ""
+            for f,s in pairs:
+                if (f==s):
+                    out += '%d'%f
+                else:
+                    out += '%d-%d'%(f,s)
+                out += ','
+            # trim trailing ','
+            return out[:-1]
+
+        def format_cpumap(cpumap):
+            cpumap = map(lambda x: int(x), cpumap)
+            cpumap.sort()
+
+            from xen.xend.XendClient import server
+            for x in server.xend_node()[1:]:
+                if len(x) > 1 and x[0] == 'nr_cpus':
+                    nr_cpus = int(x[1])
+                    cpumap = filter(lambda x: x < nr_cpus, cpumap)
+                    if len(cpumap) == nr_cpus:
+                        return "any cpu"
+                    break
+ 
+            return format_pairs(list_to_rangepairs(cpumap))
+
+        name  =     get_info('name')
+        domid = int(get_info('domid'))
+
+        for vcpu in sxp.children(dom, 'vcpu'):
+            def vinfo(n, t):
+                return t(sxp.child_value(vcpu, n))
+
+            number   = vinfo('number',   int)
+            cpu      = vinfo('cpu',      int)
+            cpumap   = format_cpumap(vinfo('cpumap', list))
+            online   = vinfo('online',   int)
+            cpu_time = vinfo('cpu_time', float)
+            running  = vinfo('running',  int)
+            blocked  = vinfo('blocked',  int)
+
+            if online:
+                c = str(cpu)
+                if running:
+                    s = 'r'
+                else:
+                    s = '-'
+                if blocked:
+                    s += 'b'
+                else:
+                    s += '-'
+                s += '-'
+            else:
+                c = "-"
+                s = "--p"
+
+            print (
+                "%(name)-32s %(domid)3d  %(number)4d  %(c)3s   %(s)-3s   %(cpu_time)7.1f  %(cpumap)s" %
+                locals())
+
 
 def xm_reboot(args):
     arg_check(args,1,"reboot")
@@ -325,7 +411,6 @@ def xm_subcommand(command, args):
 
 def cpu_make_map(cpulist):
     cpus = []
-    cpumap = 0
     for c in cpulist.split(','):
         if c.find('-') != -1:
             (x,y) = c.split('-')
@@ -334,14 +419,11 @@ def cpu_make_map(cpulist):
         else:
             cpus.append(int(c))
     cpus.sort()
-    for c in cpus:
-        cpumap = cpumap | 1<<c
-
-    return cpumap
+    return cpus
 
 def xm_vcpu_pin(args):
     arg_check(args, 3, "vcpu-pin")
-    
+
     dom  = args[0]
     vcpu = int(args[1])
     cpumap = cpu_make_map(args[2])
@@ -351,7 +433,7 @@ def xm_vcpu_pin(args):
 
 def xm_mem_max(args):
     arg_check(args, 2, "mem-max")
-    
+
     dom = args[0]
     mem = int_unit(args[1], 'm')
 
@@ -360,35 +442,16 @@ def xm_mem_max(args):
     
 def xm_mem_set(args):
     arg_check(args, 2, "mem-set")
-    
+
     dom = args[0]
     mem_target = int_unit(args[1], 'm')
 
     from xen.xend.XendClient import server
     server.xend_domain_mem_target_set(dom, mem_target)
     
-# TODO: why does this lookup by name?  and what if that fails!?
-def xm_vcpu_enable(args):
-    arg_check(args, 2, "vcpu-enable")
-    
-    name = args[0]
-    vcpu = int(args[1])
-    
+def xm_set_vcpus(args):
     from xen.xend.XendClient import server
-    dom = server.xend_domain(name)
-    id = sxp.child_value(dom, 'domid')
-    server.xend_domain_vcpu_hotplug(id, vcpu, 1)
-
-def xm_vcpu_disable(args):
-    arg_check(args, 2, "vcpu-disable")
-    
-    name = args[0]
-    vcpu = int(args[1])
-    
-    from xen.xend.XendClient import server
-    dom = server.xend_domain(name)
-    id = sxp.child_value(dom, 'domid')
-    server.xend_domain_vcpu_hotplug(id, vcpu, 0)
+    server.xend_domain_set_vcpus(args[0], int(args[1]))
 
 def xm_domid(args):
     name = args[0]
@@ -588,9 +651,7 @@ commands = {
     "mem-set": xm_mem_set,
     # cpu commands
     "vcpu-pin": xm_vcpu_pin,
-#    "cpus-list": xm_cpus_list,
-    "vcpu-enable": xm_vcpu_enable,
-    "vcpu-disable": xm_vcpu_disable,
+    "set-vcpus": xm_set_vcpus,
     "vcpu-list": xm_vcpu_list,
     # special
     "pause": xm_pause,
@@ -688,11 +749,16 @@ def main(argv=sys.argv):
             if rc:
                 usage()
         except socket.error, ex:
-            print >>sys.stderr, ex
-            err("Error connecting to xend, is xend running?")
+            if os.geteuid() != 0:
+                err("Most commands need root access.  Please try again as root.")
+            else:
+                err("Error connecting to xend: %s.  Is xend running?" % ex[1])
             sys.exit(1)
         except IOError:
-            err("Most commands need root access.  Please try again as root")
+            if os.geteuid() != 0:
+                err("Most commands need root access.  Please try again as root.")
+            else:
+                err("Error connecting to xend: %s." % ex[1])
             sys.exit(1)
         except xen.xend.XendError.XendError, ex:
             if len(args) > 0:

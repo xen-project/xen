@@ -22,8 +22,9 @@ import string
 
 from xen.util import blkif
 from xen.xend import sxp
+from xen.xend.XendError import VmError
 
-from DevController import DevController
+from xen.xend.server.DevController import DevController
 
 
 class BlkifController(DevController):
@@ -96,6 +97,4 @@ class BlkifController(DevController):
                 if self.readBackend(i, 'dev') == devid:
                     DevController.destroyDevice(self, i)
                     return
-            # Try this, but it's almost certainly going to throw VmError,
-            # since we can't find the device.
-            DevController.destroyDevice(self, int(devid))
+            raise VmError("Device %s not connected" % devid)

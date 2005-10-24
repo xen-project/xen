@@ -63,6 +63,11 @@ extern void set_ac_timer(struct ac_timer *timer, s_time_t expires);
  */
 extern void rem_ac_timer(struct ac_timer *timer);
 
+/*
+ * Initialisation. Must be called before any other ac_timer function.
+ */
+extern void ac_timer_init(void);
+
 #endif /* _AC_TIMER_H_ */
 
 /*

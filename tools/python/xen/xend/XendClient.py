@@ -199,6 +199,9 @@ class Xend:
     def xend_list_domains(self):
         return self.xendGet(self.domainurl(), {'detail': '1'})
 
+    def xend_domain_vcpuinfo(self, dom):
+        return self.xendGet(self.domainurl(dom), {'op': 'vcpuinfo'})
+
     def xend_domain_create(self, conf):
         return self.xendPost(self.domainurl(),
                              {'op'      : 'create',
@@ -255,7 +258,7 @@ class Xend:
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'pincpu',
                               'vcpu'    : vcpu,
-                              'cpumap'  : cpumap })
+                              'cpumap'  : str(cpumap) })
 
     def xend_domain_cpu_bvt_set(self, id, mcuadv, warpback, warpvalue, warpl, warpu):
         return self.xendPost(self.domainurl(id),
@@ -265,6 +268,10 @@ class Xend:
                               'warpvalue': warpvalue,
                               'warpl'    : warpl,
                               'warpu'    : warpu })
+
+    def xend_domain_cpu_sedf_get(self, id):
+        return self.xendPost(self.domainurl(id),
+                             {'op' : 'cpu_sedf_get'})
 
     def xend_domain_cpu_sedf_set(self, id, period, slice, latency, extratime, weight):
         return self.xendPost(self.domainurl(id),
@@ -286,11 +293,10 @@ class Xend:
                              'target'    : mem_target })
         return val
 
-    def xend_domain_vcpu_hotplug(self, id, vcpu, state):
-        return self.xendPost(self.domainurl(id),
-                            {'op'         : 'vcpu_hotplug',
-                             'vcpu'       : vcpu,
-                             'state'      : state })
+    def xend_domain_set_vcpus(self, dom, vcpus):
+        return self.xendPost(self.domainurl(dom),
+                            {'op'    : 'set_vcpus',
+                             'vcpus' : vcpus })
 
     def xend_domain_vif_limit(self, id, vif, credit, period):
         return self.xendPost(self.domainurl(id),

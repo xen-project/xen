@@ -78,7 +78,6 @@ extern void arch_init_memory(void);
 extern void init_IRQ(void);
 extern void trap_init(void);
 extern void early_time_init(void);
-extern void ac_timer_init(void);
 extern void initialize_keytable(void);
 extern void early_cpu_init(void);
 
@@ -142,6 +141,7 @@ static void __init do_initcalls(void)
 static void __init start_of_day(void)
 {
     int i;
+    unsigned long vgdt, gdt_pfn;
 
     early_cpu_init();
 
@@ -159,10 +159,17 @@ static void __init start_of_day(void)
 
     arch_do_createdomain(current);
     
-    /* Map default GDT into their final position in the idle page table. */
-    map_pages_to_xen(
-        GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE,
-        virt_to_phys(gdt_table) >> PAGE_SHIFT, 1, PAGE_HYPERVISOR);
+    /*
+     * Map default GDT into its final positions in the idle page table. As
+     * noted in arch_do_createdomain(), we must map for every possible VCPU#.
+     */
+    vgdt = GDT_VIRT_START(current) + FIRST_RESERVED_GDT_BYTE;
+    gdt_pfn = virt_to_phys(gdt_table) >> PAGE_SHIFT;
+    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+    {
+        map_pages_to_xen(vgdt, gdt_pfn, 1, PAGE_HYPERVISOR);
+        vgdt += 1 << PDPT_VCPU_VA_SHIFT;
+    }
 
     find_smp_config();
 
@@ -419,6 +426,9 @@ void __init __start_xen(multiboot_info_t *mbi)
            nr_pages >> (20 - PAGE_SHIFT),
            nr_pages << (PAGE_SHIFT - 10));
     total_pages = nr_pages;
+
+    /* Sanity check for unwanted bloat of dom0_op_t structure. */
+    BUG_ON(sizeof(((dom0_op_t *)0)->u) != sizeof(((dom0_op_t *)0)->u.pad));
 
     init_frametable();
 

@@ -36,7 +36,7 @@ static int control_fd = -1;
 #include "pdb_module.h"
 #include "pdb_caml_xen.h"
 
-void *map_ring(u32 dom, unsigned long mfn );
+void *map_ring(uint32_t dom, unsigned long mfn );
 
 /*
  * xcs_initialize_ring : int -> int32 -> int32
@@ -180,7 +180,7 @@ xcs_connect (value path, value msg_type)
     char *my_path = String_val(path);
     int my_msg_type = Int_val(msg_type);
     struct sockaddr_un addr;
-    u32 session_id = 0;
+    uint32_t session_id = 0;
     int data_fd;
     int ret, len;
     xcs_msg_t msg;

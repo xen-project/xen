@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
         exit(-1);
     }
     
-    id.block   = (u64)          atoll(argv[1]);
+    id.block   = (uint64_t)          atoll(argv[1]);
     id.index   = (unsigned int) atol (argv[2]);
     
     c_id = id;

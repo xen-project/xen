@@ -245,7 +245,7 @@ ratewrite(int io_fd, void *buf, int n)
     return write(io_fd, buf, n);
 }
 
-static int print_stats( int xc_handle, u32 domid, 
+static int print_stats( int xc_handle, uint32_t domid, 
                         int pages_sent, xc_shadow_control_stats_t *stats,
                         int print )
 {
@@ -299,7 +299,7 @@ static int print_stats( int xc_handle, u32 domid,
     return 0;
 }
 
-static int analysis_phase( int xc_handle, u32 domid, 
+static int analysis_phase( int xc_handle, uint32_t domid, 
                            int nr_pfns, unsigned long *arr, int runs )
 {
     long long start, now;
@@ -399,8 +399,8 @@ static int suspend_and_state(int xc_handle, int io_fd, int dom,
     return -1;
 }
 
-int xc_linux_save(int xc_handle, int io_fd, u32 dom, u32 max_iters, 
-                  u32 max_factor, u32 flags)
+int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters, 
+                  uint32_t max_factor, uint32_t flags)
 {
     xc_dominfo_t info;
 

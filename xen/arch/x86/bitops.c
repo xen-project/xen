@@ -29,7 +29,7 @@ unsigned int __find_next_bit(
     const unsigned long *p = addr + (offset / BITS_PER_LONG);
     unsigned int set, bit = offset & (BITS_PER_LONG - 1);
 
-    ASSERT(offset < size);
+    ASSERT(offset <= size);
 
     if ( bit != 0 )
     {
@@ -78,7 +78,7 @@ unsigned int __find_next_zero_bit(
     const unsigned long *p = addr + (offset / BITS_PER_LONG);
     unsigned int set, bit = offset & (BITS_PER_LONG - 1);
 
-    ASSERT(offset < size);
+    ASSERT(offset <= size);
 
     if ( bit != 0 )
     {

@@ -768,7 +768,7 @@ static int __init xencons_init(void)
 #endif
 
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
-		xencons_priv_irq = bind_virq_to_irq(VIRQ_CONSOLE);
+		xencons_priv_irq = bind_virq_to_irq(VIRQ_CONSOLE, 0);
 		(void)request_irq(xencons_priv_irq,
 				  xencons_priv_interrupt, 0, "console", NULL);
 	} else {

@@ -34,7 +34,6 @@ struct pt_regs;
 extern cpumask_t cpu_present_mask;
 extern cpumask_t cpu_possible_map;
 extern cpumask_t cpu_online_map;
-extern cpumask_t cpu_callout_map;
 
 /*
  * Private routines/data
@@ -52,8 +51,8 @@ extern void zap_low_mappings(void);
 void smp_stop_cpu(void);
 extern cpumask_t cpu_sibling_map[NR_CPUS];
 extern cpumask_t cpu_core_map[NR_CPUS];
-extern u8 phys_proc_id[NR_CPUS];
-extern u8 cpu_core_id[NR_CPUS];
+extern int phys_proc_id[NR_CPUS];
+extern int cpu_core_id[NR_CPUS];
 
 #define SMP_TRAMPOLINE_BASE 0x6000
 
@@ -65,7 +64,7 @@ extern u8 cpu_core_id[NR_CPUS];
 
 static inline int num_booting_cpus(void)
 {
-	return cpus_weight(cpu_callout_map);
+	return cpus_weight(cpu_possible_map);
 }
 
 #define __smp_processor_id() read_pda(cpunumber)

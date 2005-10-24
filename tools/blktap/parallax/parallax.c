@@ -330,8 +330,8 @@ pending_t pending_list[MAX_REQUESTS];
 struct cb_param {
     pending_t *pent;
     int       segment;
-    u64       sector; 
-    u64       vblock; /* for debug printing -- can be removed. */
+    uint64_t       sector; 
+    uint64_t       vblock; /* for debug printing -- can be removed. */
 };
 
 static void read_cb(struct io_ret r, void *in_param)
@@ -393,9 +393,9 @@ static void read_cb(struct io_ret r, void *in_param)
 int parallax_read(blkif_request_t *req, blkif_t *blkif)
 {
     blkif_response_t *rsp;
-    u64 vblock, gblock;
+    uint64_t vblock, gblock;
     vdi_t *vdi;
-    u64 sector;
+    uint64_t sector;
     int i;
     char *dpage, *spage;
     pending_t *pent;
@@ -475,9 +475,9 @@ static void write_cb(struct io_ret r, void *in_param)
 int parallax_write(blkif_request_t *req, blkif_t *blkif)
 {
     blkif_response_t *rsp;
-    u64 sector;
+    uint64_t sector;
     int i, writable = 0;
-    u64 vblock, gblock;
+    uint64_t vblock, gblock;
     char *spage;
     unsigned long size, offset, start;
     vdi_t *vdi;

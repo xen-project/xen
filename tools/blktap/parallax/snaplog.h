@@ -13,12 +13,12 @@
 #define __SNAPLOG_H__
 
 typedef struct snap_id {
-    u64            block;
+    uint64_t            block;
     unsigned int   index;
 } snap_id_t;
 
 typedef struct snap_rec {
-    u64            radix_root;
+    uint64_t            radix_root;
     struct timeval timestamp;
     /* flags: */
     unsigned       deleted:1;
@@ -38,7 +38,7 @@ int  snap_get_id(snap_id_t *id, snap_rec_t *target);
 static const snap_id_t null_snap_id = { 0, 0 }; 
 
 typedef struct snap_block_hdr {
-    u64            magic;
+    uint64_t            magic;
     snap_id_t      parent_block; /* parent block within this chain */
     snap_id_t      fork_block;   /* where this log was forked */
     unsigned       log_entries;  /* total entries since forking */
@@ -56,6 +56,6 @@ typedef struct snap_block {
 } snap_block_t;
     
 
-snap_block_t *snap_get_block(u64 block);
+snap_block_t *snap_get_block(uint64_t block);
 
 #endif /* __SNAPLOG_H__ */

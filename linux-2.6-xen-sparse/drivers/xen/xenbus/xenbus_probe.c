@@ -27,17 +27,28 @@
  */
 #define DEBUG
 
-#include <asm/hypervisor.h>
-#include <asm-xen/xenbus.h>
-#include <asm-xen/balloon.h>
 #include <linux/kernel.h>
 #include <linux/err.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/fcntl.h>
-#include <stdarg.h>
+#include <linux/mm.h>
 #include <linux/notifier.h>
+#include <linux/kthread.h>
+
+#include <asm/io.h>
+#include <asm/page.h>
+#include <asm/pgtable.h>
+#include <asm/hypervisor.h>
+#include <asm-xen/xenbus.h>
+#include <asm-xen/xen_proc.h>
+#include <asm-xen/balloon.h>
+#include <asm-xen/evtchn.h>
+#include <asm-xen/linux-public/evtchn.h>
+
 #include "xenbus_comms.h"
+
+extern struct semaphore xenwatch_mutex;
 
 #define streq(a, b) (strcmp((a), (b)) == 0)
 
@@ -229,13 +240,18 @@ static int xenbus_dev_remove(struct device *_dev)
 static int xenbus_register_driver_common(struct xenbus_driver *drv,
 					 struct xen_bus_type *bus)
 {
+	int ret;
+
 	drv->driver.name = drv->name;
 	drv->driver.bus = &bus->bus;
 	drv->driver.owner = drv->owner;
 	drv->driver.probe = xenbus_dev_probe;
 	drv->driver.remove = xenbus_dev_remove;
 
-	return driver_register(&drv->driver);
+	down(&xenwatch_mutex);
+	ret = driver_register(&drv->driver);
+	up(&xenwatch_mutex);
+	return ret;
 }
 
 int xenbus_register_driver(struct xenbus_driver *drv)
@@ -627,15 +643,19 @@ void xenbus_resume(void)
 	bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, resume_dev);
 }
 
+
+/* A flag to determine if xenstored is 'ready' (i.e. has started) */
+int xenstored_ready = 0; 
+
+
 int register_xenstore_notifier(struct notifier_block *nb)
 {
 	int ret = 0;
 
-	if (xen_start_info->store_evtchn) {
+        if(xenstored_ready > 0) 
 		ret = nb->notifier_call(nb, 0, NULL);
-	} else {
+	else 
 		notifier_chain_register(&xenstore_chain, nb);
-	}
 
 	return ret;
 }
@@ -647,22 +667,11 @@ void unregister_xenstore_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL(unregister_xenstore_notifier);
 
-/* 
-** Called either from below xenbus_probe_init() initcall (for domUs) 
-** or, for dom0, from a thread created in privcmd/privcmd.c (after 
-** the user-space tools have invoked initDomainStore()) 
-*/
-int do_xenbus_probe(void *unused)
-{
-	int err = 0;
 
-	/* Initialize the interface to xenstore. */
-	err = xs_init();
-	if (err) {
-		printk("XENBUS: Error initializing xenstore comms:"
-		       " %i\n", err);
-		return err;
-	}
+
+void xenbus_probe(void *unused)
+{
+	BUG_ON((xenstored_ready <= 0)); 
 
 	/* Enumerate devices in xenstore. */
 	xenbus_probe_devices(&xenbus_frontend);
@@ -675,27 +684,101 @@ int do_xenbus_probe(void *unused)
 	/* Notify others that xenstore is up */
 	notifier_call_chain(&xenstore_chain, 0, 0);
 
-	return 0;
+	return;
 }
+
+
+static struct proc_dir_entry *xsd_mfn_intf;
+static struct proc_dir_entry *xsd_port_intf;
+
+
+static int xsd_mfn_read(char *page, char **start, off_t off,
+                        int count, int *eof, void *data)
+{
+	int len; 
+	len  = sprintf(page, "%ld", xen_start_info->store_mfn); 
+	*eof = 1; 
+	return len; 
+}
+
+static int xsd_port_read(char *page, char **start, off_t off,
+			 int count, int *eof, void *data)
+{
+	int len; 
+
+	len  = sprintf(page, "%d", xen_start_info->store_evtchn); 
+	*eof = 1; 
+	return len; 
+}
+
 
 static int __init xenbus_probe_init(void)
 {
-	if (xen_init() < 0)
-		return -ENODEV;
+	int err = 0;
+	/* 
+	** Domain0 doesn't have a store_evtchn or store_mfn yet. 
+	*/
+	int dom0 = (xen_start_info->store_evtchn == 0);
 
+	printk("xenbus_probe_init\n");
+
+	if (xen_init() < 0) {
+		printk("xen_init failed\n");
+		return -ENODEV;
+	}
+
+	/* Register ourselves with the kernel bus & device subsystems */
 	bus_register(&xenbus_frontend.bus);
 	bus_register(&xenbus_backend.bus);
 	device_register(&xenbus_frontend.dev);
 	device_register(&xenbus_backend.dev);
 
-	/* 
-	** Domain0 doesn't have a store_evtchn yet - this will
-	** be set up later by xend invoking initDomainStore() 
-	*/
-	if (!xen_start_info->store_evtchn)
-		return 0;
+	if (dom0) {
 
-	do_xenbus_probe(NULL);
+		unsigned long page;
+		evtchn_op_t op = { 0 };
+
+
+		/* Allocate page. */
+		page = get_zeroed_page(GFP_KERNEL);
+		if (!page) 
+			return -ENOMEM; 
+
+		/* We don't refcnt properly, so set reserved on page.
+		 * (this allocation is permanent) */
+		SetPageReserved(virt_to_page(page));
+
+		xen_start_info->store_mfn =
+			pfn_to_mfn(virt_to_phys((void *)page) >>
+				   PAGE_SHIFT);
+		
+		/* Next allocate a local port which xenstored can bind to */
+		op.cmd = EVTCHNOP_alloc_unbound;
+		op.u.alloc_unbound.dom        = DOMID_SELF;
+		op.u.alloc_unbound.remote_dom = 0; 
+
+		BUG_ON(HYPERVISOR_event_channel_op(&op)); 
+		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
+
+		/* And finally publish the above info in /proc/xen */
+		if((xsd_mfn_intf = create_xen_proc_entry("xsd_mfn", 0400)))
+			xsd_mfn_intf->read_proc = xsd_mfn_read; 
+		if((xsd_port_intf = create_xen_proc_entry("xsd_port", 0400)))
+			xsd_port_intf->read_proc = xsd_port_read;
+	}
+
+	/* Initialize the interface to xenstore. */
+	err = xs_init(); 
+	if (err) {
+		printk("XENBUS: Error initializing xenstore comms: %i\n", err);
+		return err; 
+	}
+
+	if (!dom0) {
+		xenstored_ready = 1;
+		xenbus_probe(NULL);
+	}
+
 	return 0;
 }
 

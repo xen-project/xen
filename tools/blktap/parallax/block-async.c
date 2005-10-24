@@ -31,11 +31,11 @@
  */
 
 struct read_args {
-    u64 addr;
+    uint64_t addr;
 };
 
 struct write_args {
-    u64   addr;
+    uint64_t   addr;
     char *block;
 };
 
@@ -94,7 +94,7 @@ static void init_pending_io(void)
 		
 } 
 
-void block_read(u64 addr, io_cb_t cb, void *param)
+void block_read(uint64_t addr, io_cb_t cb, void *param)
 {
     struct pending_io_req *req;
     
@@ -113,7 +113,7 @@ void block_read(u64 addr, io_cb_t cb, void *param)
 }
 
 
-void block_write(u64 addr, char *block, io_cb_t cb, void *param)
+void block_write(uint64_t addr, char *block, io_cb_t cb, void *param)
 {
     struct pending_io_req *req;
     

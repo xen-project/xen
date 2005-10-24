@@ -10,6 +10,9 @@ import threading
 from xen.lowlevel import xs
 from xen.xend.xenstore.xsutil import xshandle
 
+from xen.xend.XendLogging import log
+
+
 class xswatch:
 
     watchThread = None
@@ -41,10 +44,13 @@ class xswatch:
         while True:
             try:
                 we = cls.xs.read_watch()
-            except RuntimeError, ex:
-                print ex
-                raise
-            watch = we[1]
-            watch.fn(*watch.args, **watch.kwargs)
+                watch = we[1]
+                watch.fn(*watch.args, **watch.kwargs)
+            except:
+                log.exception("read_watch failed")
+                # Ignore this exception -- there's no point throwing it
+                # further on because that will just kill the watcher thread,
+                # which achieves nothing.
+
 
     watchMain = classmethod(watchMain)

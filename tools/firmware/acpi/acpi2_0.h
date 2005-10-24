@@ -18,7 +18,21 @@
 #ifndef _ACPI_2_0_H_
 #define _ACPI_2_0_H_
 
-#include "xenctrl.h"  // for u8, u16, u32, u64 definition
+typedef unsigned char  uint8_t;
+typedef   signed char  int8_t;
+typedef unsigned short uint16_t;
+typedef   signed short int16_t;
+typedef unsigned int   uint32_t;
+typedef   signed int   int32_t;
+#ifdef __i386__
+typedef unsigned long long uint64_t;
+typedef   signed long long int64_t;
+#else
+typedef unsigned long uint64_t;
+typedef   signed long int64_t;
+#endif
+
+#include <xen/xen.h>
 
 #pragma pack (1)
 
@@ -27,15 +41,15 @@
 //
 
 typedef struct {
-		u32			Signature;
-		u32     	Length;
-		u8			Revision;
-		u8			Checksum;
-		u8			OemId[6];
-		u64			OemTableId;
-		u32			OemRevision;
-		u32			CreatorId;
-		u32			CreatorRevision;
+		uint32_t			Signature;
+		uint32_t     	Length;
+		uint8_t			Revision;
+		uint8_t			Checksum;
+		uint8_t			OemId[6];
+		uint64_t			OemTableId;
+		uint32_t			OemRevision;
+		uint32_t			CreatorId;
+		uint32_t			CreatorRevision;
 } ACPI_TABLE_HEADER;
 
 
@@ -49,11 +63,11 @@ typedef struct {
 // ACPI 2.0 Generic Address Space definition
 //
 typedef struct {
-		u8                            AddressSpaceId;
-		u8                            RegisterBitWidth;
-		u8                            RegisterBitOffset;
-		u8                            Reserved;
-		u64                           Address;
+		uint8_t                            AddressSpaceId;
+		uint8_t                            RegisterBitWidth;
+		uint8_t                            RegisterBitOffset;
+		uint8_t                            Reserved;
+		uint64_t                           Address;
 } ACPI_GENERIC_ADDRESS_STRUCTURE;
 
 //
@@ -70,11 +84,11 @@ typedef struct {
 // Root System Description Pointer Structure in ACPI 1.0
 //
 typedef struct {
-		u64                           Signature;
-		u8                            Checksum;
-		u8                            OemId[6];
-		u8                            Reserved;
-		u32                           RsdtAddress;
+		uint64_t                           Signature;
+		uint8_t                            Checksum;
+		uint8_t                            OemId[6];
+		uint8_t                            Reserved;
+		uint32_t                           RsdtAddress;
 } ACPI_1_0_RSDP;
 
 
@@ -82,15 +96,15 @@ typedef struct {
 // Root System Description Pointer Structure
 //
 typedef struct {
-		u64                           Signature;
-		u8                            Checksum;
-		u8                            OemId[6];
-		u8                            Revision;
-		u32                           RsdtAddress;
-		u32                           Length;
-		u64                           XsdtAddress;
-		u8                            ExtendedChecksum;
-		u8                            Reserved[3];
+		uint64_t                           Signature;
+		uint8_t                            Checksum;
+		uint8_t                            OemId[6];
+		uint8_t                            Revision;
+		uint32_t                           RsdtAddress;
+		uint32_t                           Length;
+		uint64_t                           XsdtAddress;
+		uint8_t                            ExtendedChecksum;
+		uint8_t                            Reserved[3];
 } ACPI_2_0_RSDP;
 
 
@@ -105,7 +119,7 @@ typedef struct {
 
 typedef struct {
 		ACPI_TABLE_HEADER Header;
-		u32 Entry[ACPI_MAX_NUM_TABLES];
+		uint32_t Entry[ACPI_MAX_NUM_TABLES];
 }ACPI_2_0_RSDT;
 
 //
@@ -120,7 +134,7 @@ typedef struct {
 
 typedef struct _ACPI_2_0_XSDT{
 		ACPI_TABLE_HEADER Header;
-		u64 Entry[ACPI_MAX_NUM_TABLES];
+		uint64_t Entry[ACPI_MAX_NUM_TABLES];
 }ACPI_2_0_XSDT;
 #define ACPI_2_0_XSDT_REVISION 0x01
 
@@ -130,49 +144,49 @@ typedef struct _ACPI_2_0_XSDT{
 
 typedef struct  {
 		ACPI_TABLE_HEADER               Header;
-		u32                                    FirmwareCtrl;
-		u32                                    Dsdt;
-		u8                                     Reserved0;
-		u8                                     PreferredPmProfile;
-		u16                                    SciInt;
-		u32                                    SmiCmd;
-		u8                                     AcpiEnable;
-		u8                                     AcpiDisable;
-		u8                                     S4BiosReq;
-		u8                                     PstateCnt;
-		u32                                    Pm1aEvtBlk;
-		u32                                    Pm1bEvtBlk;
-		u32                                    Pm1aCntBlk;
-		u32                                    Pm1bCntBlk;
-		u32                                    Pm2CntBlk;
-		u32                                    PmTmrBlk;
-		u32                                    Gpe0Blk;
-		u32                                    Gpe1Blk;
-		u8                                     Pm1EvtLen;
-		u8                                     Pm1CntLen;
-		u8                                     Pm2CntLen;
-		u8                                     PmTmrLen;
-		u8                                     Gpe0BlkLen;
-		u8                                     Gpe1BlkLen;
-		u8                                     Gpe1Base;
-		u8                                     CstCnt;
-		u16                                    PLvl2Lat;
-		u16                                    PLvl3Lat;
-		u16                                    FlushSize;
-		u16                                    FlushStride;
-		u8                                     DutyOffset;
-		u8                                     DutyWidth;
-		u8                                     DayAlrm;
-		u8                                     MonAlrm;
-		u8                                     Century;
-		u16                                    IaPcBootArch;
-		u8                                     Reserved1;
-		u32                                    Flags;
+		uint32_t                                    FirmwareCtrl;
+		uint32_t                                    Dsdt;
+		uint8_t                                     Reserved0;
+		uint8_t                                     PreferredPmProfile;
+		uint16_t                                    SciInt;
+		uint32_t                                    SmiCmd;
+		uint8_t                                     AcpiEnable;
+		uint8_t                                     AcpiDisable;
+		uint8_t                                     S4BiosReq;
+		uint8_t                                     PstateCnt;
+		uint32_t                                    Pm1aEvtBlk;
+		uint32_t                                    Pm1bEvtBlk;
+		uint32_t                                    Pm1aCntBlk;
+		uint32_t                                    Pm1bCntBlk;
+		uint32_t                                    Pm2CntBlk;
+		uint32_t                                    PmTmrBlk;
+		uint32_t                                    Gpe0Blk;
+		uint32_t                                    Gpe1Blk;
+		uint8_t                                     Pm1EvtLen;
+		uint8_t                                     Pm1CntLen;
+		uint8_t                                     Pm2CntLen;
+		uint8_t                                     PmTmrLen;
+		uint8_t                                     Gpe0BlkLen;
+		uint8_t                                     Gpe1BlkLen;
+		uint8_t                                     Gpe1Base;
+		uint8_t                                     CstCnt;
+		uint16_t                                    PLvl2Lat;
+		uint16_t                                    PLvl3Lat;
+		uint16_t                                    FlushSize;
+		uint16_t                                    FlushStride;
+		uint8_t                                     DutyOffset;
+		uint8_t                                     DutyWidth;
+		uint8_t                                     DayAlrm;
+		uint8_t                                     MonAlrm;
+		uint8_t                                     Century;
+		uint16_t                                    IaPcBootArch;
+		uint8_t                                     Reserved1;
+		uint32_t                                    Flags;
 		ACPI_GENERIC_ADDRESS_STRUCTURE    ResetReg;
-		u8                                     ResetValue;
-		u8                                     Reserved2[3];
-		u64                                    XFirmwareCtrl;
-		u64                                    XDsdt;
+		uint8_t                                     ResetValue;
+		uint8_t                                     Reserved2[3];
+		uint64_t                                    XFirmwareCtrl;
+		uint64_t                                    XDsdt;
 		ACPI_GENERIC_ADDRESS_STRUCTURE    XPm1aEvtBlk;
 		ACPI_GENERIC_ADDRESS_STRUCTURE    XPm1bEvtBlk;
 		ACPI_GENERIC_ADDRESS_STRUCTURE    XPm1aCntBlk;
@@ -212,15 +226,15 @@ typedef struct  {
 // Firmware ACPI Control Structure (FACS)
 //
 typedef struct {
-		u32                               Signature;
-		u32                               Length;
-		u32                               HardwareSignature;
-		u32                               FirmwareWakingVector;
-		u32                               GlobalLock;
-		u32                               Flags;
-		u64                               XFirmwareWakingVector;
-		u8                                Version;
-		u8                                Reserved[31];
+		uint32_t                               Signature;
+		uint32_t                               Length;
+		uint32_t                               HardwareSignature;
+		uint32_t                               FirmwareWakingVector;
+		uint32_t                               GlobalLock;
+		uint32_t                               Flags;
+		uint64_t                               XFirmwareWakingVector;
+		uint8_t                                Version;
+		uint8_t                                Reserved[31];
 } ACPI_2_0_FACS;
 
 #define ACPI_2_0_FACS_VERSION 0x01
@@ -230,8 +244,8 @@ typedef struct {
 //
 typedef struct {
 		ACPI_TABLE_HEADER                       Header;
-		u32                                     LocalApicAddress;
-		u32                                     Flags;
+		uint32_t                                     LocalApicAddress;
+		uint32_t                                     Flags;
 } ACPI_2_0_MADT;
 
 #define ACPI_2_0_MADT_REVISION 0x01
@@ -263,11 +277,11 @@ typedef struct {
 //
 
 typedef struct {
-		u8                                             Type;
-		u8                                             Length;
-		u8                                             AcpiProcessorId;
-		u8                                             ApicId;
-		u32                                            Flags;
+		uint8_t                                             Type;
+		uint8_t                                             Length;
+		uint8_t                                             AcpiProcessorId;
+		uint8_t                                             ApicId;
+		uint32_t                                            Flags;
 } ACPI_LOCAL_APIC_STRUCTURE;
 
 //
@@ -281,12 +295,12 @@ typedef struct {
 //
 
 typedef struct {
-		u8                                             Type;
-		u8                                             Length;
-		u8                                             IoApicId;
-		u8                                             Reserved;
-		u32                                            IoApicAddress;
-		u32                                            GlobalSystemInterruptBase;
+		uint8_t                                             Type;
+		uint8_t                                             Length;
+		uint8_t                                             IoApicId;
+		uint8_t                                             Reserved;
+		uint32_t                                            IoApicAddress;
+		uint32_t                                            GlobalSystemInterruptBase;
 } ACPI_IO_APIC_STRUCTURE;
 
 // Tabel Signature
@@ -312,6 +326,6 @@ typedef struct {
 #define ACPI_TABLE_SIZE (2*1024)  //Currently 2K is enough
 
 void
-AcpiBuildTable(u8* buf);
+AcpiBuildTable(uint8_t* buf);
 
 #endif

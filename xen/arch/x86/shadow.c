@@ -616,13 +616,6 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
         pt_va = ((va >> L1_PAGETABLE_SHIFT) & ~(entries - 1)) << L1_PAGETABLE_SHIFT;
         spl1e = (l1_pgentry_t *) __shadow_get_l1e(v, pt_va, &tmp_sl1e);
 
-        /*
-        gpl1e = &(linear_pg_table[l1_linear_offset(va) &
-                              ~(L1_PAGETABLE_ENTRIES-1)]);
-
-        spl1e = &(shadow_linear_pg_table[l1_linear_offset(va) &
-                                     ~(L1_PAGETABLE_ENTRIES-1)]);*/
-
         for ( i = 0; i < GUEST_L1_PAGETABLE_ENTRIES; i++ )
         {
             l1pte_propagate_from_guest(d, gpl1e[i], &sl1e);
@@ -645,7 +638,8 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
                 min = i;
             if ( likely(i > max) )
                 max = i;
-        }
+            set_guest_back_ptr(d, sl1e, sl1mfn, i);
+          }
 
         frame_table[sl1mfn].tlbflush_timestamp =
             SHADOW_ENCODE_MIN_MAX(min, max);
@@ -716,8 +710,8 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
         }
     }
 
+    set_guest_back_ptr(d, new_spte, l2e_get_pfn(sl2e), l1_table_offset(va));
     __shadow_set_l1e(v, va, &new_spte);
-
     shadow_update_min_max(l2e_get_pfn(sl2e), l1_table_offset(va));
 }
 
@@ -877,6 +871,7 @@ mark_mfn_out_of_sync(struct vcpu *v, unsigned long gpfn,
 
     perfc_incrc(shadow_mark_mfn_out_of_sync_calls);
 
+    entry->v = v;
     entry->gpfn = gpfn;
     entry->gmfn = mfn;
     entry->snapshot_mfn = shadow_make_snapshot(d, gpfn, mfn);
@@ -943,6 +938,7 @@ static void shadow_mark_va_out_of_sync(
     entry->writable_pl1e =
         l2e_get_paddr(sl2e) | (sizeof(l1_pgentry_t) * l1_table_offset(va));
     ASSERT( !(entry->writable_pl1e & (sizeof(l1_pgentry_t)-1)) );
+    entry->va = va;
 
     // Increment shadow's page count to represent the reference
     // inherent in entry->writable_pl1e
@@ -1135,6 +1131,24 @@ decrease_writable_pte_prediction(struct domain *d, unsigned long gpfn, unsigned 
     }
 }
 
+static int fix_entry(
+    struct domain *d, 
+    l1_pgentry_t *pt, u32 *found, int is_l1_shadow, u32 max_refs_to_find)
+{
+    l1_pgentry_t old = *pt;
+    l1_pgentry_t new = old;
+
+    l1e_remove_flags(new,_PAGE_RW);
+    if ( is_l1_shadow && !shadow_get_page_from_l1e(new, d) )
+        BUG();
+    (*found)++;
+    *pt = new;
+    if ( is_l1_shadow )
+        shadow_put_page_from_l1e(old, d);
+
+    return (*found == max_refs_to_find);
+}
+
 static u32 remove_all_write_access_in_ptpage(
     struct domain *d, unsigned long pt_pfn, unsigned long pt_mfn,
     unsigned long readonly_gpfn, unsigned long readonly_gmfn,
@@ -1156,49 +1170,28 @@ static u32 remove_all_write_access_in_ptpage(
 
     match = l1e_from_pfn(readonly_gmfn, flags);
 
-    // returns true if all refs have been found and fixed.
-    //
-    int fix_entry(int i)
-    {
-        l1_pgentry_t old = pt[i];
-        l1_pgentry_t new = old;
+    if ( shadow_mode_external(d) ) {
+        i = (frame_table[readonly_gmfn].u.inuse.type_info & PGT_va_mask) 
+            >> PGT_va_shift;
 
-        l1e_remove_flags(new,_PAGE_RW);
-        if ( is_l1_shadow && !shadow_get_page_from_l1e(new, d) )
-            BUG();
-        found++;
-        pt[i] = new;
-        if ( is_l1_shadow )
-            shadow_put_page_from_l1e(old, d);
-
-#if 0
-        printk("removed write access to pfn=%lx mfn=%lx in smfn=%lx entry %x "
-               "is_l1_shadow=%d\n",
-               readonly_gpfn, readonly_gmfn, pt_mfn, i, is_l1_shadow);
-#endif
-
-        return (found == max_refs_to_find);
-    }
-
-    i = readonly_gpfn & (GUEST_L1_PAGETABLE_ENTRIES - 1);
-    if ( !l1e_has_changed(pt[i], match, flags) && fix_entry(i) )
-    {
-        perfc_incrc(remove_write_fast_exit);
-        increase_writable_pte_prediction(d, readonly_gpfn, prediction);
-        unmap_domain_page(pt);
-        return found;
+        if ( (i >= 0 && i <= L1_PAGETABLE_ENTRIES) &&
+             !l1e_has_changed(pt[i], match, flags) && 
+             fix_entry(d, &pt[i], &found, is_l1_shadow, max_refs_to_find) &&
+             !prediction )
+            goto out;
     }
  
     for (i = 0; i < GUEST_L1_PAGETABLE_ENTRIES; i++)
     {
-        if ( unlikely(!l1e_has_changed(pt[i], match, flags)) && fix_entry(i) )
+        if ( unlikely(!l1e_has_changed(pt[i], match, flags)) && 
+             fix_entry(d, &pt[i], &found, is_l1_shadow, max_refs_to_find) )
             break;
     }
 
+out:
     unmap_domain_page(pt);
 
     return found;
-#undef MATCH_ENTRY
 }
 
 static int remove_all_write_access(
@@ -1206,8 +1199,8 @@ static int remove_all_write_access(
 {
     int i;
     struct shadow_status *a;
-    u32 found = 0, fixups, write_refs;
-    unsigned long prediction, predicted_gpfn, predicted_smfn;
+    u32 found = 0, write_refs;
+    unsigned long predicted_smfn;
 
     ASSERT(shadow_lock_is_acquired(d));
     ASSERT(VALID_MFN(readonly_gmfn));
@@ -1238,26 +1231,18 @@ static int remove_all_write_access(
         return 1;
     }
 
-    // Before searching all the L1 page tables, check the typical culprit first
-    //
-    if ( (prediction = predict_writable_pte_page(d, readonly_gpfn)) )
-    {
-        predicted_gpfn = prediction & PGT_mfn_mask;
-        if ( (predicted_smfn = __shadow_status(d, predicted_gpfn, PGT_l1_shadow)) &&
-             (fixups = remove_all_write_access_in_ptpage(d, predicted_gpfn, predicted_smfn, readonly_gpfn, readonly_gmfn, write_refs, prediction)) )
-        {
-            found += fixups;
-            if ( found == write_refs )
-            {
-                perfc_incrc(remove_write_predicted);
-                return 1;
-            }
-        }
-        else
-        {
-            perfc_incrc(remove_write_bad_prediction);
-            decrease_writable_pte_prediction(d, readonly_gpfn, prediction);
-        }
+    if ( shadow_mode_external(d) ) {
+        if (write_refs-- == 0) 
+            return 0;
+
+         // Use the back pointer to locate the shadow page that can contain
+         // the PTE of interest
+         if ( (predicted_smfn = frame_table[readonly_gmfn].tlbflush_timestamp) ) {
+             found += remove_all_write_access_in_ptpage(
+                 d, predicted_smfn, predicted_smfn, readonly_gpfn, readonly_gmfn, write_refs, 0);
+             if ( found == write_refs )
+                 return 0;
+         }
     }
 
     // Search all the shadow L1 page tables...
@@ -1276,7 +1261,7 @@ static int remove_all_write_access(
             {
                 found += remove_all_write_access_in_ptpage(d, a->gpfn_and_flags & PGT_mfn_mask, a->smfn, readonly_gpfn, readonly_gmfn, write_refs - found, a->gpfn_and_flags & PGT_mfn_mask);
                 if ( found == write_refs )
-                    return 1;
+                    return 0;
             }
 
             a = a->next;
@@ -1357,6 +1342,7 @@ static int resync_all(struct domain *d, u32 stype)
             guest_l1_pgentry_t *guest1 = guest;
             l1_pgentry_t *shadow1 = shadow;
             guest_l1_pgentry_t *snapshot1 = snapshot;
+            int unshadow_l1 = 0;
 
             ASSERT(VM_ASSIST(d, VMASST_TYPE_writable_pagetables) ||
                    shadow_mode_write_all(d));
@@ -1375,8 +1361,15 @@ static int resync_all(struct domain *d, u32 stype)
                 if ( (i < min_snapshot) || (i > max_snapshot) ||
                      guest_l1e_has_changed(guest1[i], snapshot1[i], PAGE_FLAG_MASK) )
                 {
-                    need_flush |= validate_pte_change(d, guest1[i], &shadow1[i]);
+                    int error; 
 
+                    error = validate_pte_change(d, guest1[i], &shadow1[i]);
+                    if ( error ==  -1 ) 
+                        unshadow_l1 = 1;
+                    else {
+                        need_flush |= error;
+                        set_guest_back_ptr(d, shadow1[i], smfn, i);
+                    }
                     // can't update snapshots of linear page tables -- they
                     // are used multiple times...
                     //
@@ -1388,6 +1381,19 @@ static int resync_all(struct domain *d, u32 stype)
             perfc_incrc(resync_l1);
             perfc_incr_histo(wpt_updates, changed, PT_UPDATES);
             perfc_incr_histo(l1_entries_checked, max_shadow - min_shadow + 1, PT_UPDATES);
+            if (unshadow_l1) {
+                pgentry_64_t l2e;
+
+                __shadow_get_l2e(entry->v, entry->va, &l2e);
+                if (entry_get_flags(l2e) & _PAGE_PRESENT) {
+                    entry_remove_flags(l2e, _PAGE_PRESENT);
+                    __shadow_set_l2e(entry->v, entry->va, &l2e);
+
+                    if (entry->v == current)
+                        need_flush = 1;
+                }
+            }
+
             break;
         }
 #if defined (__i386__)
@@ -1604,6 +1610,8 @@ static void sync_all(struct domain *d)
              !shadow_get_page_from_l1e(npte, d) )
             BUG();
         *ppte = npte;
+        set_guest_back_ptr(d, npte, (entry->writable_pl1e) >> PAGE_SHIFT, 
+                           (entry->writable_pl1e & ~PAGE_MASK)/sizeof(l1_pgentry_t));
         shadow_put_page_from_l1e(opte, d);
 
         unmap_domain_page(ppte);

@@ -713,13 +713,16 @@ void do_vcpu(xenstat_domain *domain)
 
 	num_vcpus = xenstat_domain_num_vcpus(domain);
 
-	/* for all vcpus dump out values */
+	/* for all online vcpus dump out values */
 	for (i=0; i< num_vcpus; i++) {
 		vcpu = xenstat_domain_vcpu(domain,i);
 
-		if (i != 0 && (i%5)==0)
-			print("\n        ");
-		print(" %2u: %10llus", i, xenstat_vcpu_ns(vcpu)/1000000000);
+		if (xenstat_vcpu_online(vcpu) > 0) {
+			if (i != 0 && (i%5)==0)
+				print("\n        ");
+			print(" %2u: %10llus", i, 
+					xenstat_vcpu_ns(vcpu)/1000000000);
+		}
 	}
 	print("\n");
 }

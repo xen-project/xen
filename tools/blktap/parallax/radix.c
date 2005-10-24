@@ -33,7 +33,7 @@ static  int rcache_count = 0;
 
 typedef struct rcache_st {
     radix_tree_node  *node;
-    u64               id;
+    uint64_t               id;
     struct rcache_st *hash_next;
     struct rcache_st *cache_next;
     struct rcache_st *cache_prev;
@@ -55,7 +55,7 @@ void __rcache_init(void)
 }
     
 
-void rcache_write(u64 id, radix_tree_node *node)
+void rcache_write(uint64_t id, radix_tree_node *node)
 {
     rcache_t *r, *tmp, **curs;
     
@@ -135,7 +135,7 @@ done:
     pthread_mutex_unlock(&rcache_mutex);
 }
 
-radix_tree_node *rcache_read(u64 id)
+radix_tree_node *rcache_read(uint64_t id)
 {
     rcache_t *r, *tmp;
     radix_tree_node *node = NULL;
@@ -181,7 +181,7 @@ done:
 }
 
 
-void *rc_readblock(u64 id)
+void *rc_readblock(uint64_t id)
 {
     void *ret;
     
@@ -197,9 +197,9 @@ void *rc_readblock(u64 id)
     return(ret);
 }
 
-u64 rc_allocblock(void *block)
+uint64_t rc_allocblock(void *block)
 {
-    u64 ret;
+    uint64_t ret;
     
     ret = allocblock(block);
     
@@ -209,7 +209,7 @@ u64 rc_allocblock(void *block)
     return(ret);
 }
 
-int rc_writeblock(u64 id, void *block)
+int rc_writeblock(uint64_t id, void *block)
 {
     int ret;
     
@@ -233,9 +233,9 @@ radix_tree_node cloneblock(radix_tree_node block);
  * whether or not the block is writable, including the return
  * values of update and snapshot
  */
-u64 lookup(int height, u64 root, u64 key);
-u64 update(int height, u64 root, u64 key, u64 val);
-u64 snapshot(u64 root);
+uint64_t lookup(int height, uint64_t root, uint64_t key);
+uint64_t update(int height, uint64_t root, uint64_t key, uint64_t val);
+uint64_t snapshot(uint64_t root);
 
 /**
  * cloneblock: clone an existing block in memory
@@ -264,9 +264,9 @@ radix_tree_node cloneblock(radix_tree_node block) {
  *   @return: value on success, zero on error
  */
 
-u64 lookup(int height, u64 root, u64 key) {
+uint64_t lookup(int height, uint64_t root, uint64_t key) {
     radix_tree_node node;
-    u64 mask = ONE;
+    uint64_t mask = ONE;
     
     assert(key >> height == 0);
 
@@ -275,7 +275,7 @@ u64 lookup(int height, u64 root, u64 key) {
 
     /* now carve off equal sized chunks at each step */
     for (;;) {
-        u64 oldroot;
+        uint64_t oldroot;
 
 #ifdef DEBUG
         printf("lookup: height=%3d root=%3Ld offset=%3d%s\n", height, root,
@@ -314,9 +314,9 @@ u64 lookup(int height, u64 root, u64 key) {
  *   @returns: (possibly new) root id on success (with LSB=1), 0 on failure
  */
 
-u64 update(int height, u64 root, u64 key, u64 val) {
+uint64_t update(int height, uint64_t root, uint64_t key, uint64_t val) {
     int offset;
-    u64 child;
+    uint64_t child;
     radix_tree_node node;
     
     /* base case--return val */
@@ -390,7 +390,7 @@ u64 update(int height, u64 root, u64 key, u64 val) {
  *
  *   @return: new root node, 0 on error
  */
-u64 snapshot(u64 root) {
+uint64_t snapshot(uint64_t root) {
     radix_tree_node node, newnode;
 
     if ((node = rc_readblock(getid(root))) == NULL)
@@ -418,7 +418,7 @@ u64 snapshot(u64 root) {
  * child are okay...)
  */
 
-int collapse(int height, u64 proot, u64 croot)
+int collapse(int height, uint64_t proot, uint64_t croot)
 {
     int i, numlinks, ret, total = 0;
     radix_tree_node pnode, cnode;
@@ -480,7 +480,7 @@ int collapse(int height, u64 proot, u64 croot)
 }
 
 
-void print_root(u64 root, int height, FILE *dot_f)
+void print_root(uint64_t root, int height, FILE *dot_f)
 {
     FILE *f;
     int i;
@@ -558,9 +558,9 @@ void print_root(u64 root, int height, FILE *dot_f)
 #ifdef RADIX_STANDALONE
 
 int main(int argc, char **argv) {
-    u64 key = ZERO, val = ZERO;
-    u64 root = writable(2ULL);
-    u64 p = ZERO, c = ZERO;
+    uint64_t key = ZERO, val = ZERO;
+    uint64_t root = writable(2ULL);
+    uint64_t p = ZERO, c = ZERO;
     int v;
     char buff[4096];
 

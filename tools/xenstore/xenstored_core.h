@@ -60,7 +60,7 @@ struct connection
 	int fd;
 
 	/* Who am I? 0 for socket connections. */
-	domid_t id;
+	unsigned int id;
 
 	/* Is this a read-only connection? */
 	bool can_write;
@@ -76,7 +76,7 @@ struct connection
 
 	/* List of in-progress transactions. */
 	struct list_head transaction_list;
-	u32 next_transaction_id;
+	uint32_t next_transaction_id;
 
 	/* The domain I'm associated with, if any. */
 	struct domain *domain;
@@ -153,6 +153,7 @@ void __attribute__((noreturn)) corrupt(struct connection *conn,
 				       const char *fmt, ...);
 
 struct connection *new_connection(connwritefn_t *write, connreadfn_t *read);
+
 
 /* Is this a valid node name? */
 bool is_valid_nodename(const char *node);

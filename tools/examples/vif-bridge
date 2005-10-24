@@ -3,22 +3,19 @@
 # /etc/xen/vif-bridge
 #
 # Script for configuring a vif in bridged mode.
-# Xend calls a vif script when bringing a vif up or down.
-# This script is the default - but it can be configured for each vif.
-#
-# Example invocation:
-#
-# vif-bridge up domain=VM1 vif=vif1.0 bridge=xen-br0 ip="128.232.38.45/28 10.10.10.55/24"
-#
+# The hotplugging system will call this script if it is specified either in
+# the device configuration given to Xend, or the default Xend configuration
+# in /etc/xen/xend-config.sxp.  If the script is specified in neither of those
+# places, then this script is the default.
 #
 # Usage:
-# vif-bridge (up|down) {VAR=VAL}*
+# vif-bridge (up|down)
 #
-# Vars:
+# Environment vars:
+# vif         vif interface name (required).
+# XENBUS_PATH path to this device's details in the XenStore (required).
 #
-# domain  name of the domain the interface is on (required).
-# vif     vif interface name (required).
-# mac     vif MAC address (required).
+# Read from the store:
 # bridge  bridge to add the vif to (required).
 # ip      list of IP networks for the vif, space-separated (optional).
 #
@@ -31,64 +28,30 @@
 # rules for its ip addresses (if any).
 #============================================================================
 
-# Exit if anything goes wrong
-set -e 
-export PATH=/sbin:/bin:/usr/bin:/usr/sbin:$PATH
+dir=$(dirname "$0")
+. "$dir/vif-common.sh"
 
-echo "*vif-bridge $*" >&2
+bridge=$(xenstore_read "$XENBUS_PATH/bridge")
 
-# Operation name.
-OP=$1
-shift
-
-# Pull variables in args into environment
-for arg ; do export "${arg}" ; done
-
-# Required parameters. Fail if not set.
-domain=${domain:?}
-vif=${vif:?}
-mac=${mac:?}
-bridge=${bridge:?}
-
-# Optional parameters. Set defaults.
-ip=${ip:-''}   # default to null (do nothing)
-
-# Are we going up or down?
-case $OP in
+case "$command" in
     up)
-        brcmd='addif'
-        iptcmd='-A'
+        if brctl show "$bridge" | grep "$vif" >&/dev/null
+        then
+          log debug "$vif already attached to $bridge"
+          exit 0
+        fi
+
+        brctl addif "$bridge" "$vif" ||
+          fatal "brctl addif $bridge $vif failed"
+
+        ifconfig "$vif" up || fatal "ifconfig $vif up failed"
         ;;
     down)
-        brcmd='delif'
-        iptcmd='-D'
-        ;;
-    *)
-        echo 'Invalid command: ' $OP >&2
-        echo 'Valid commands are: up, down' >&2
-        exit 1
+        # vifs are auto-removed from bridge.
+        ifconfig "$vif" down || fatal "ifconfig $vif down failed"
         ;;
 esac
 
-# Don't do anything if the bridge is "null".
-if [ "${bridge}" == "null" ] ; then
-    exit
-fi
+handle_iptable
 
-# Add vif to bridge. vifs are auto-removed from bridge.
-if [ "${brcmd}" == "addif" ] ; then
-    brctl ${brcmd} ${bridge} ${vif}
-fi
-ifconfig ${vif} $OP
-
-if [ "${ip}" ] ; then
-
-    # If we've been given a list of IP networks, allow pkts with these src addrs.
-    for addr in ${ip} ; do
-        iptables ${iptcmd} FORWARD -m physdev --physdev-in ${vif} -s ${addr} -j ACCEPT
-    done 
-
-    # Always allow us to talk to a DHCP server anyhow.
-    iptables ${iptcmd} FORWARD -m physdev --physdev-in ${vif} -p udp --sport 68 --dport 67 -j ACCEPT
-fi
-
+log debug "vif-bridge operation for $vif successful."

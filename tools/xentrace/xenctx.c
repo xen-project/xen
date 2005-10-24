@@ -81,7 +81,7 @@ void print_ctx(vcpu_guest_context_t *ctx1)
 }
 #endif
 
-void dump_ctx(u32 domid, u32 vcpu)
+void dump_ctx(uint32_t domid, uint32_t vcpu)
 {
     int ret;
     vcpu_guest_context_t ctx;

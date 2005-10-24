@@ -8,7 +8,8 @@ void print_dir(struct xs_handle *h, char *path, int cur_depth)
 {
     char **e;
     char newpath[512], *val;
-    int num, i, len;
+    int i;
+    unsigned int num, len;
 
     e = xs_directory(h, NULL, path, &num);
     if (e == NULL)
@@ -25,7 +26,7 @@ void print_dir(struct xs_handle *h, char *path, int cur_depth)
         if (val == NULL)
             printf(":\n");
         else if ((unsigned)len > (151 - strlen(e[i])))
-            printf(" = \"%.*s...\"\n", 148 - (int)strlen(e[i]), val);
+            printf(" = \"%.*s...\"\n", (int)(148 - strlen(e[i])), val);
         else
             printf(" = \"%s\"\n", val);
         free(val);

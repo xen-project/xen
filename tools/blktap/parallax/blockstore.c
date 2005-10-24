@@ -132,9 +132,9 @@ pthread_mutex_t ptmutex_luid;
 #define ENTER_LUID_CR pthread_mutex_lock(&ptmutex_luid)
 #define LEAVE_LUID_CR pthread_mutex_unlock(&ptmutex_luid)
 
-static u64 luid_cnt = 0x1000ULL;
-u64 new_luid(void) {
-    u64 luid;
+static uint64_t luid_cnt = 0x1000ULL;
+uint64_t new_luid(void) {
+    uint64_t luid;
     ENTER_LUID_CR;
     luid = luid_cnt++;
     LEAVE_LUID_CR;
@@ -539,7 +539,7 @@ pthread_t pthread_recv;
  * Reading                                                                   *
  *****************************************************************************/
 
-void *readblock_indiv(int server, u64 id) {
+void *readblock_indiv(int server, uint64_t id) {
     void *block;
     bsq_t *qe;
     int len, rc;
@@ -616,9 +616,9 @@ void *readblock_indiv(int server, u64 id) {
  *
  *   @return: pointer to block, NULL on error
  */
-void *readblock(u64 id) {
+void *readblock(uint64_t id) {
     int map = (int)BSID_MAP(id);
-    u64 xid;
+    uint64_t xid;
     static int i = CLUSTER_MAX_REPLICAS - 1;
     void *block = NULL;
 
@@ -670,7 +670,7 @@ void *readblock(u64 id) {
  * Writing                                                                   *
  *****************************************************************************/
 
-bsq_t *writeblock_indiv(int server, u64 id, void *block) {
+bsq_t *writeblock_indiv(int server, uint64_t id, void *block) {
 
     bsq_t *qe;
     int len;
@@ -709,7 +709,7 @@ bsq_t *writeblock_indiv(int server, u64 id, void *block) {
  *
  *   @return: zero on success, -1 on failure
  */
-int writeblock(u64 id, void *block) {
+int writeblock(uint64_t id, void *block) {
     
     int map = (int)BSID_MAP(id);
     int rep0 = bsclusters[map].servers[0];
@@ -805,11 +805,11 @@ int writeblock(u64 id, void *block) {
  *
  *   @return: new id of block on disk
  */
-u64 allocblock(void *block) {
+uint64_t allocblock(void *block) {
     return allocblock_hint(block, 0);
 }
 
-bsq_t *allocblock_hint_indiv(int server, void *block, u64 hint) {
+bsq_t *allocblock_hint_indiv(int server, void *block, uint64_t hint) {
     bsq_t *qe;
     int len;
 
@@ -846,14 +846,14 @@ bsq_t *allocblock_hint_indiv(int server, void *block, u64 hint) {
  *
  *   @return: new id of block on disk
  */
-u64 allocblock_hint(void *block, u64 hint) {
+uint64_t allocblock_hint(void *block, uint64_t hint) {
     int map = (int)hint;
     int rep0 = bsclusters[map].servers[0];
     int rep1 = bsclusters[map].servers[1];
     int rep2 = bsclusters[map].servers[2];
     bsq_t *reqs[3];
     int rc;
-    u64 id0, id1, id2;
+    uint64_t id0, id1, id2;
 
     reqs[0] = reqs[1] = reqs[2] = NULL;
 
@@ -938,7 +938,7 @@ u64 allocblock_hint(void *block, u64 hint) {
  *   @return: pointer to block, NULL on error
  */
 
-void *readblock(u64 id) {
+void *readblock(uint64_t id) {
     void *block;
     int block_fp;
    
@@ -980,7 +980,7 @@ err:
  *
  *   @return: zero on success, -1 on failure
  */
-int writeblock(u64 id, void *block) {
+int writeblock(uint64_t id, void *block) {
     
     int block_fp;
     
@@ -1014,8 +1014,8 @@ err:
  *   @return: new id of block on disk
  */
 
-u64 allocblock(void *block) {
-    u64 lb;
+uint64_t allocblock(void *block) {
+    uint64_t lb;
     off64_t pos;
     int block_fp;
     
@@ -1057,7 +1057,7 @@ err:
  *
  *   @return: new id of block on disk
  */
-u64 allocblock_hint(void *block, u64 hint) {
+uint64_t allocblock_hint(void *block, uint64_t hint) {
     return allocblock(block);
 }
 
@@ -1109,7 +1109,7 @@ static freeblock_t *new_freeblock(void)
     return fb;
 }
 
-void releaseblock(u64 id)
+void releaseblock(uint64_t id)
 {
     blockstore_super_t *bs_super;
     freeblock_t *fl_current;
@@ -1154,7 +1154,7 @@ void freelist_count(int print_each)
 {
     blockstore_super_t *bs_super;
     freeblock_t *fb;
-    u64 total = 0, next;
+    uint64_t total = 0, next;
     
     bs_super = (blockstore_super_t *) readblock(BLOCKSTORE_SUPER);
     
@@ -1205,7 +1205,7 @@ int __init_blockstore(void)
 {
     int i;
     blockstore_super_t *bs_super;
-    u64 ret;
+    uint64_t ret;
     int block_fp;
     
 #ifdef BLOCKSTORE_REMOTE

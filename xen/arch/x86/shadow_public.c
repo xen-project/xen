@@ -879,14 +879,6 @@ void __shadow_mode_disable(struct domain *d)
     if ( unlikely(!shadow_mode_enabled(d)) )
         return;
 
-    /*
-     * Currently this does not fix up page ref counts, so it is valid to call
-     * only when a domain is being destroyed.
-     */
-    BUG_ON(!test_bit(_DOMF_dying, &d->domain_flags) &&
-           shadow_mode_refcounts(d));
-    d->arch.shadow_tainted_refcnts = shadow_mode_refcounts(d);
-
     free_shadow_pages(d);
     free_writable_pte_predictions(d);
 
@@ -1095,7 +1087,12 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
             if ( !get_page_type(page, PGT_writable_page) )
                 BUG();
             put_page_type(page);
-
+            /*
+             * We use tlbflush_timestamp as back pointer to smfn, and need to
+             * clean up it.
+             */
+            if ( shadow_mode_external(d) )
+                page->tlbflush_timestamp = 0;
             list_ent = page->list.next;
         }
     }

@@ -123,9 +123,18 @@ int direct_remap_pfn_range(struct vm_area_struct *vma,
 	return __direct_remap_pfn_range(
 		vma->vm_mm, address, mfn, size, prot, domid);
 }
-
 EXPORT_SYMBOL(direct_remap_pfn_range);
 
+int direct_kernel_remap_pfn_range(unsigned long address, 
+				  unsigned long mfn,
+				  unsigned long size, 
+				  pgprot_t prot,
+				  domid_t  domid)
+{
+	return __direct_remap_pfn_range(
+		&init_mm, address, mfn, size, prot, domid);
+}
+EXPORT_SYMBOL(direct_kernel_remap_pfn_range);
 
 /* FIXME: This is horribly broken on PAE */ 
 static int lookup_pte_fn(

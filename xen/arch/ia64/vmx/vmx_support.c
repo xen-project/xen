@@ -49,7 +49,7 @@ void vmx_wait_io(void)
 	  */
 	if (test_and_clear_bit(port,
 		&d->shared_info->evtchn_pending[0])) {
-	    clear_bit(port>>5, &v->vcpu_info->evtchn_pending_sel);
+	    clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
 	    clear_bit(0, &v->vcpu_info->evtchn_upcall_pending);
 	    vmx_io_assist(v);
 	}
@@ -67,7 +67,7 @@ void vmx_wait_io(void)
 	     * nothing losed. Next loop will check I/O channel to fix this
 	     * window.
 	     */
-	    clear_bit(port>>5, &v->vcpu_info->evtchn_pending_sel);
+	    clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
 	}
 	else
 	    break;
@@ -139,8 +139,8 @@ void vmx_intr_assist(struct vcpu *v)
     /* Clear indicator specific to interrupt delivered from DM */
     if (test_and_clear_bit(port,
 		&d->shared_info->evtchn_pending[0])) {
-	if (!d->shared_info->evtchn_pending[port >> 5])
-	    clear_bit(port>>5, &v->vcpu_info->evtchn_pending_sel);
+	if (!d->shared_info->evtchn_pending[port/BITS_PER_LONG])
+	    clear_bit(port/BITS_PER_LONG, &v->vcpu_info->evtchn_pending_sel);
 
 	if (!v->vcpu_info->evtchn_pending_sel)
 	    clear_bit(0, &v->vcpu_info->evtchn_upcall_pending);

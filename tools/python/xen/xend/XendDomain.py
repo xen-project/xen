@@ -21,8 +21,10 @@
  Nothing here is persistent (across reboots).
  Needs to be persistent for one uptime.
 """
-import os
+
 import logging
+import os
+import sys
 import threading
 
 import xen.lowlevel.xc
@@ -57,13 +59,16 @@ class XendDomain:
         # So we stuff the XendDomain instance (self) into xroot's components.
         xroot.add_component("xen.xend.XendDomain", self)
         self.domains = {}
-        self.domains_lock = threading.Condition()
+        self.domains_lock = threading.RLock()
         self.watchReleaseDomain()
 
         self.domains_lock.acquire()
         try:
-            self.refresh(True)
+            self._add_domain(
+                XendDomainInfo.recreate(self.xen_domains()[PRIV_DOMAIN],
+                                        True))
             self.dom0_setup()
+            self.refresh(True)
         finally:
             self.domains_lock.release()
 
@@ -129,7 +134,14 @@ class XendDomain:
     def dom0_setup(self):
         """Expects to be protected by the domains_lock."""
         dom0 = self.domains[PRIV_DOMAIN]
-        dom0.dom0_enforce_vcpus()
+
+        # get max number of vcpus to use for dom0 from config
+        target = int(xroot.get_dom0_vcpus())
+        log.debug("number of vcpus to use is %d", target)
+   
+        # target == 0 means use all processors
+        if target > 0:
+            dom0.setVCpuCount(target)
 
 
     def _add_domain(self, info):
@@ -171,25 +183,23 @@ class XendDomain:
                             'Cannot recreate information for dying domain %d.'
                             '  Xend will ignore this domain from now on.',
                             doms[d]['dom'])
+                elif d == PRIV_DOMAIN:
+                    log.fatal(
+                        "No record of privileged domain %d!  Terminating.", d)
+                    sys.exit(1)
                 else:
                     try:
-                        dominfo = XendDomainInfo.recreate(doms[d])
-                        self._add_domain(dominfo)
+                        self._add_domain(
+                            XendDomainInfo.recreate(doms[d], False))
                     except:
-                        if d == PRIV_DOMAIN:
-                            log.exception(
-                                "Failed to recreate information for domain "
-                                "%d.  Doing nothing except crossing my "
-                                "fingers.", d)
-                        else:
-                            log.exception(
-                                "Failed to recreate information for domain "
-                                "%d.  Destroying it in the hope of "
-                                "recovery.", d)
-                            try:
-                                xc.domain_destroy(dom = d)
-                            except:
-                                log.exception('Destruction of %d failed.', d)
+                        log.exception(
+                            "Failed to recreate information for domain "
+                            "%d.  Destroying it in the hope of "
+                            "recovery.", d)
+                        try:
+                            xc.domain_destroy(dom = d)
+                        except:
+                            log.exception('Destruction of %d failed.', d)
 
 
     ## public:
@@ -318,12 +328,6 @@ class XendDomain:
             n = len(matching)
             if n == 1:
                 return matching[0]
-            elif n > 1:
-                log.error('Name uniqueness has been violated for name %s!  '
-                          'Recovering by renaming:', name)
-                for d in matching:
-                    d.renameUniquely()
-
             return None
         finally:
             self.domains_lock.release()
@@ -343,7 +347,7 @@ class XendDomain:
             dominfo = self.domain_lookup(domid)
             log.info("Domain %s (%d) unpaused.", dominfo.getName(),
                      dominfo.getDomid())
-            return xc.domain_unpause(dom=dominfo.getDomid())
+            return dominfo.unpause()
         except Exception, ex:
             raise XendError(str(ex))
 
@@ -354,7 +358,7 @@ class XendDomain:
             dominfo = self.domain_lookup(domid)
             log.info("Domain %s (%d) paused.", dominfo.getName(),
                      dominfo.getDomid())
-            return xc.domain_pause(dom=dominfo.getDomid())
+            return dominfo.pause()
         except Exception, ex:
             raise XendError(str(ex))
 
@@ -408,9 +412,12 @@ class XendDomain:
     def domain_pincpu(self, domid, vcpu, cpumap):
         """Set which cpus vcpu can use
 
-        @param cpumap:  bitmap of usable cpus
+        @param cpumap:  string repr of list of usable cpus
         """
         dominfo = self.domain_lookup(domid)
+        # convert cpumap string into a list of ints
+        cpumap = map(lambda x: int(x),
+                     cpumap.replace("[", "").replace("]", "").split(","))
         try:
             return xc.domain_pincpu(dominfo.getDomid(), vcpu, cpumap)
         except Exception, ex:
@@ -469,14 +476,7 @@ class XendDomain:
         if not dev:
             raise XendError("invalid vif")
         return dev.setCreditLimit(credit, period)
-        
-    def domain_shadow_control(self, domid, op):
-        """Shadow page control."""
-        dominfo = self.domain_lookup(domid)
-        try:
-            return xc.shadow_control(dominfo.getDomid(), op)
-        except Exception, ex:
-            raise XendError(str(ex))
+
 
     def domain_maxmem_set(self, domid, mem):
         """Set the memory limit for a domain.

@@ -55,8 +55,8 @@
 
 /* This structure represents a single trace buffer record. */
 struct t_rec {
-    u64 cycles;               /* cycle counter timestamp */
-    u32 event;                /* event ID                */
+    uint64_t cycles;          /* cycle counter timestamp */
+    uint32_t event;           /* event ID                */
     unsigned long data[5];    /* event data items        */
 };
 
@@ -75,3 +75,13 @@ struct t_buf {
 };
 
 #endif /* __XEN_PUBLIC_TRACE_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

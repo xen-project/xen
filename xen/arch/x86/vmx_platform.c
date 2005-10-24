@@ -371,7 +371,7 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
     unsigned long eflags;
     int index, vm86 = 0;
     unsigned char rex = 0;
-    unsigned char tmp_size = 0;
+    unsigned char size_reg = 0;
 
     init_instruction(instr);
 
@@ -428,33 +428,47 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
 
     case 0x80:
     case 0x81:
-        if (((opcode[1] >> 3) & 7) == 7) { /* cmp $imm, m32/16 */
-            instr->instr = INSTR_CMP;
+        {
+            unsigned char ins_subtype = (opcode[1] >> 3) & 7;
 
-            if (opcode[0] == 0x80)
-                GET_OP_SIZE_FOR_BYTE(instr->op_size);
-            else
+            if (opcode[0] == 0x80) {
+                GET_OP_SIZE_FOR_BYTE(size_reg);
+                instr->op_size = BYTE;
+            } else {
                 GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+                size_reg = instr->op_size;
+            }
 
-            instr->operand[0] = mk_operand(instr->op_size, 0, 0, IMMEDIATE);
-            instr->immediate = get_immediate(vm86, opcode+1, BYTE);
-            instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
+            instr->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
+            instr->immediate = get_immediate(vm86, opcode+1, instr->op_size);
+            instr->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
 
-            return DECODE_success;
-        } else
-            return DECODE_failure;
+            switch (ins_subtype) {
+                case 7: /* cmp $imm, m32/16 */
+                    instr->instr = INSTR_CMP;
+                    return DECODE_success;
+
+                case 1: /* or $imm, m32/16 */
+                    instr->instr = INSTR_OR;
+                    return DECODE_success;
+
+                default:
+                    printf("%x, This opcode isn't handled yet!\n", *opcode);
+                    return DECODE_failure;
+            }
+        }
 
     case 0x84:  /* test m8, r8 */
         instr->instr = INSTR_TEST;
         instr->op_size = BYTE;
-        GET_OP_SIZE_FOR_BYTE(tmp_size);
-        return mem_reg(tmp_size, opcode, instr, rex);
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return mem_reg(size_reg, opcode, instr, rex);
 
     case 0x88: /* mov r8, m8 */
         instr->instr = INSTR_MOV;
         instr->op_size = BYTE;
-        GET_OP_SIZE_FOR_BYTE(tmp_size);
-        return reg_mem(tmp_size, opcode, instr, rex);
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return reg_mem(size_reg, opcode, instr, rex);
 
     case 0x89: /* mov r32/16, m32/16 */
         instr->instr = INSTR_MOV;
@@ -464,8 +478,8 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
     case 0x8A: /* mov m8, r8 */
         instr->instr = INSTR_MOV;
         instr->op_size = BYTE;
-        GET_OP_SIZE_FOR_BYTE(tmp_size);
-        return mem_reg(tmp_size, opcode, instr, rex);
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return mem_reg(size_reg, opcode, instr, rex);
 
     case 0x8B: /* mov m32/16, r32/16 */
         instr->instr = INSTR_MOV;
@@ -475,8 +489,8 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
     case 0xA0: /* mov <addr>, al */
         instr->instr = INSTR_MOV;
         instr->op_size = BYTE;
-        GET_OP_SIZE_FOR_BYTE(tmp_size);
-        return mem_acc(tmp_size, instr);
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return mem_acc(size_reg, instr);
 
     case 0xA1: /* mov <addr>, ax/eax */
         instr->instr = INSTR_MOV;
@@ -486,8 +500,8 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
     case 0xA2: /* mov al, <addr> */
         instr->instr = INSTR_MOV;
         instr->op_size = BYTE;
-        GET_OP_SIZE_FOR_BYTE(tmp_size);
-        return acc_mem(tmp_size, instr);
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return acc_mem(size_reg, instr);
 
     case 0xA3: /* mov ax/eax, <addr> */
         instr->instr = INSTR_MOV;
@@ -541,13 +555,21 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
             return DECODE_failure;
 
     case 0xF6:
-        if (((opcode[1] >> 3) & 7) == 0) { /* testb $imm8, m8 */
+    case 0xF7:
+        if (((opcode[1] >> 3) & 7) == 0) { /* test $imm8/16/32, m8/16/32 */
             instr->instr = INSTR_TEST;
-            instr->op_size = BYTE;
 
-            instr->operand[0] = mk_operand(instr->op_size, 0, 0, IMMEDIATE);
+            if (opcode[0] == 0xF6) {
+                GET_OP_SIZE_FOR_BYTE(size_reg);
+                instr->op_size = BYTE;
+            } else {
+                GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+                size_reg = instr->op_size;
+            }
+
+            instr->operand[0] = mk_operand(size_reg, 0, 0, IMMEDIATE);
             instr->immediate = get_immediate(vm86, opcode+1, instr->op_size);
-            instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
+            instr->operand[1] = mk_operand(size_reg, 0, 0, MEMORY);
 
             return DECODE_success;
         } else
@@ -581,6 +603,14 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
             instr->operand[1] = mk_operand(LONG, index, 0, REGISTER);
         }
         instr->operand[0] = mk_operand(instr->op_size, 0, 0, MEMORY);
+        return DECODE_success;
+
+    case 0xA3: /* bt r32, m32 */
+        instr->instr = INSTR_BT;
+        index = get_index(opcode + 1, rex);
+        instr->op_size = LONG;
+        instr->operand[0] = mk_operand(instr->op_size, index, 0, REGISTER);
+        instr->operand[1] = mk_operand(instr->op_size, 0, 0, MEMORY);
         return DECODE_success;
 
     default:
@@ -643,13 +673,13 @@ void send_mmio_req(unsigned char type, unsigned long gpa,
     } else
         p->u.data = value;
 
-    p->state = STATE_IOREQ_READY;
-
     if (vmx_mmio_intercept(p)){
         p->state = STATE_IORESP_READY;
         vmx_io_assist(v);
         return;
     }
+
+    p->state = STATE_IOREQ_READY;
 
     evtchn_send(iopacket_port(v->domain));
     vmx_wait_io();
@@ -843,8 +873,27 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         mmio_opp->immediate = mmio_inst.immediate;
 
         /* send the request and wait for the value */
-        send_mmio_req(IOREQ_TYPE_COPY, gpa, 1, mmio_inst.op_size, 0, IOREQ_READ, 0);
+        send_mmio_req(IOREQ_TYPE_COPY, gpa, 1,
+                      mmio_inst.op_size, 0, IOREQ_READ, 0);
         break;
+
+    case INSTR_BT:
+        {
+            unsigned long value = 0;
+            int index, size;
+
+            mmio_opp->instr = mmio_inst.instr;
+            mmio_opp->operand[0] = mmio_inst.operand[0]; /* bit offset */
+            mmio_opp->operand[1] = mmio_inst.operand[1]; /* bit base */
+
+            index = operand_index(mmio_inst.operand[0]);
+            size = operand_size(mmio_inst.operand[0]);
+            value = get_reg_value(size, index, 0, regs);
+
+            send_mmio_req(IOREQ_TYPE_COPY, gpa + (value >> 5), 1,
+                          mmio_inst.op_size, 0, IOREQ_READ, 0);
+            break;
+        }
 
     default:
         printf("Unhandled MMIO instruction\n");

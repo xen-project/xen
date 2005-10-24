@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <xenctrl.h>
 #include "xs.h"
 
 /** @file
@@ -512,6 +513,7 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
         goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
         goto exit;
+again:
     Py_BEGIN_ALLOW_THREADS
     xsval = xs_read_watch(xh, &num);
     Py_END_ALLOW_THREADS
@@ -528,8 +530,13 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
             break;
     }
     if (i == PyList_Size(xsh->watches)) {
-        PyErr_SetString(PyExc_RuntimeError, "invalid token");
-        goto exit;
+      /* We do not have a registered watch for the one that has just fired.
+         Ignore this -- a watch that has been recently deregistered can still
+         have watches in transit.  This is a blocking method, so go back to
+         read again.
+      */
+      free(xsval);
+      goto again;
     }
     /* Create tuple (path, token). */
     val = Py_BuildValue("(sO)", xsval[XS_WATCH_PATH], token);
@@ -679,7 +686,6 @@ static PyObject *xspy_transaction_end(PyObject *self, PyObject *args,
 	" dom  [int]   : domain id\n"					\
 	" page [long]  : address of domain's xenstore page\n"		\
 	" port [int]   : port the domain is using for xenstore\n"	\
-	" path [string]: path to the domain's data in xenstore\n"	\
 	"\n"								\
 	"Returns None on success.\n"					\
 	"Raises RuntimeError on error.\n"				\
@@ -688,12 +694,11 @@ static PyObject *xspy_transaction_end(PyObject *self, PyObject *args,
 static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
                                        PyObject *kwds)
 {
-    static char *kwd_spec[] = { "dom", "page", "port", "path", NULL };
-    static char *arg_spec = "iiis|";
+    static char *kwd_spec[] = { "dom", "page", "port", NULL };
+    static char *arg_spec = "iii";
     domid_t dom = 0;
     unsigned long page = 0;
     unsigned int port = 0;
-    char *path = NULL;
 
     struct xs_handle *xh = xshandle(self);
     PyObject *val = NULL;
@@ -702,10 +707,10 @@ static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
     if (!xh)
         goto exit;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
-                                     &dom, &page, &port, &path))
+                                     &dom, &page, &port))
         goto exit;
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_introduce_domain(xh, dom, page, port, path);
+    xsval = xs_introduce_domain(xh, dom, page, port);
     Py_END_ALLOW_THREADS
     if (!xsval) {
         PyErr_SetFromErrno(PyExc_RuntimeError);
@@ -790,11 +795,10 @@ static PyObject *xspy_close(PyObject *self, PyObject *args, PyObject *kwds)
 }
 
 #define xspy_get_domain_path_doc "\n"			\
-	"Return store path of domain.\n"		\
+	"Return store path of domain, whether or not the domain exists.\n" \
 	" domid [int]: domain id\n"			\
 	"\n"						\
 	"Returns: [string] domain store path.\n"	\
-	"         None if domid doesn't exist.\n"	\
 	"Raises RuntimeError on error.\n"		\
 	"\n"
 
