@@ -46,8 +46,6 @@ GLOBAL_ENTRY(ia64_switch_to)
 	.prologue
 	alloc r16=ar.pfs,1,0,0,0
 #endif
-	.prologue
-	alloc r16=ar.pfs,1,0,0,0
 	DO_SAVE_SWITCH_STACK
 	.body
 
