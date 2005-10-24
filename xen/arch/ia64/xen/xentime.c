@@ -38,6 +38,20 @@ static s_time_t        stime_irq = 0x0;       /* System time at last 'time updat
 unsigned long itc_scale, ns_scale;
 unsigned long itc_at_irq;
 
+/* We don't expect an absolute cycle value here, since then no way
+ * to prevent overflow for large norminator. Normally this conversion
+ * is used for relative offset.
+ */
+u64 cycle_to_ns(u64 cycle)
+{
+    return (cycle * itc_scale) >> 32;
+}
+
+u64 ns_to_cycle(u64 ns)
+{
+    return (ns * ns_scale) >> 32;
+}
+
 static inline u64 get_time_delta(void)
 {
     s64      delta_itc;
@@ -52,19 +66,6 @@ static inline u64 get_time_delta(void)
     return cycle_to_ns(delta_itc);
 }
 
-/* We don't expect an absolute cycle value here, since then no way
- * to prevent overflow for large norminator. Normally this conversion
- * is used for relative offset.
- */
-u64 cycle_to_ns(u64 cycle)
-{
-    return (cycle * itc_scale) >> 32;
-}
-
-u64 ns_to_cycle(u64 ns)
-{
-    return (ns * ns_scale) >> 32;
-}
 
 s_time_t get_s_time(void)
 {

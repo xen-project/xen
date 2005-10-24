@@ -157,13 +157,6 @@ physical_itlb_miss_domn(VCPU *vcpu, u64 vadr)
 #endif
 
 void
-physical_itlb_miss(VCPU *vcpu, u64 vadr)
-{
-        physical_itlb_miss_dom0(vcpu, vadr);
-}
-
-
-void
 physical_itlb_miss_dom0(VCPU *vcpu, u64 vadr)
 {
     u64 psr;
@@ -183,6 +176,13 @@ physical_itlb_miss_dom0(VCPU *vcpu, u64 vadr)
     ia64_set_psr(psr);
     ia64_srlz_i();
     return;
+}
+
+
+void
+physical_itlb_miss(VCPU *vcpu, u64 vadr)
+{
+        physical_itlb_miss_dom0(vcpu, vadr);
 }
 
 
