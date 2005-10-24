@@ -70,6 +70,9 @@ spinlock_t balloon_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long current_pages;
 static unsigned long target_pages;
 
+/* VM /proc information for memory */
+extern unsigned long totalram_pages;
+
 /* We may hit the hard limit in Xen. If we do then we remember it. */
 static unsigned long hard_limit;
 
@@ -223,6 +226,7 @@ static int increase_reservation(unsigned long nr_pages)
 	}
 
 	current_pages += nr_pages;
+	totalram_pages = current_pages;
 
  out:
 	balloon_unlock(flags);
@@ -295,6 +299,7 @@ static int decrease_reservation(unsigned long nr_pages)
 		XENMEM_decrease_reservation, &reservation) != nr_pages);
 
 	current_pages -= nr_pages;
+	totalram_pages = current_pages;
 
 	balloon_unlock(flags);
 
