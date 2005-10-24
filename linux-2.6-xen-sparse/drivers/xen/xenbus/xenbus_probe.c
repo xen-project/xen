@@ -714,11 +714,7 @@ static int xsd_port_read(char *page, char **start, off_t off,
 
 static int __init xenbus_probe_init(void)
 {
-	int err = 0;
-	/* 
-	** Domain0 doesn't have a store_evtchn or store_mfn yet. 
-	*/
-	int dom0 = (xen_start_info->store_evtchn == 0);
+	int err = 0, dom0;
 
 	printk("xenbus_probe_init\n");
 
@@ -732,6 +728,11 @@ static int __init xenbus_probe_init(void)
 	bus_register(&xenbus_backend.bus);
 	device_register(&xenbus_frontend.dev);
 	device_register(&xenbus_backend.dev);
+
+	/*
+	** Domain0 doesn't have a store_evtchn or store_mfn yet.
+	*/
+	dom0 = (xen_start_info->store_evtchn == 0);
 
 	if (dom0) {
 

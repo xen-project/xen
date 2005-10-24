@@ -29,7 +29,7 @@ unsigned int bind_virq_to_evtchn(int virq)
     return op.u.bind_virq.port;
 }
 
-int bind_virq_to_irq(int virq)
+int bind_virq_to_irq(int virq, int cpu)
 {
 	printk("bind_virq_to_irq called... FIXME??\n");
 	while(1);
@@ -66,7 +66,11 @@ int bind_evtchn_to_irqhandler(unsigned int evtchn,
     evtchns[evtchn].handler = handler;
     evtchns[evtchn].dev_id = dev_id;
     unmask_evtchn(evtchn);
-    return 0;
+    //return 0;
+    /* On ia64, there's only one irq vector allocated for all event channels,
+     * so let's just return evtchn as handle for later communication
+     */
+    return evtchn;
 }
 
 void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id)
