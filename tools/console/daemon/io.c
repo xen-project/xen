@@ -163,14 +163,6 @@ static int domain_create_tty(struct domain *dom)
 			tcsetattr(master, TCSAFLUSH, &term);
 		}
 
-		success = asprintf(&path, "%s/tty", dom->conspath) != -1;
-		if (!success)
-			goto out;
-		success = xs_write(xs, NULL, path, slave, strlen(slave));
-		free(path);
-		if (!success)
-			goto out;
-
 		success = asprintf(&path, "%s/limit", dom->conspath) != -1;
 		if (!success)
 			goto out;
@@ -180,6 +172,14 @@ static int domain_create_tty(struct domain *dom)
 			free(data);
 		}
 		free(path);
+
+		success = asprintf(&path, "%s/tty", dom->conspath) != -1;
+		if (!success)
+			goto out;
+		success = xs_write(xs, NULL, path, slave, strlen(slave));
+		free(path);
+		if (!success)
+			goto out;
 	}
 
 	return master;
@@ -269,6 +269,18 @@ static int domain_create_ring(struct domain *dom)
 	}
 	dom->local_port = rc;
 
+	if (dom->tty_fd == -1) {
+		dom->tty_fd = domain_create_tty(dom);
+
+		if (dom->tty_fd == -1) {
+			err = errno;
+			close(dom->evtchn_fd);
+			dom->evtchn_fd = -1;
+			dom->local_port = -1;
+			goto out;
+		}
+	}
+
  out:
 	return err;
 }
@@ -309,7 +321,7 @@ static struct domain *create_domain(int domid)
 	dom->conspath = s;
 	strcat(dom->conspath, "/console");
 
-	dom->tty_fd = domain_create_tty(dom);
+	dom->tty_fd = -1;
 	dom->is_dead = false;
 	dom->buffer.data = 0;
 	dom->buffer.size = 0;
