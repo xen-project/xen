@@ -1829,6 +1829,7 @@ shadow_mark_mfn_out_of_sync(struct vcpu *v, unsigned long gpfn,
 
     perfc_incrc(shadow_mark_mfn_out_of_sync_calls);
 
+    entry->v = v;
     entry->gpfn = gpfn;
     entry->gmfn = mfn;
     entry->snapshot_mfn = shadow_make_snapshot(d, gpfn, mfn);
@@ -1875,6 +1876,7 @@ void shadow_mark_va_out_of_sync(
     entry->writable_pl1e =
         l2e_get_paddr(sl2e) | (sizeof(l1_pgentry_t) * l1_table_offset(va));
     ASSERT( !(entry->writable_pl1e & (sizeof(l1_pgentry_t)-1)) );
+    entry->va = va;
 
     // Increment shadow's page count to represent the reference
     // inherent in entry->writable_pl1e
@@ -2320,6 +2322,7 @@ static int resync_all(struct domain *d, u32 stype)
             l1_pgentry_t *guest1 = guest;
             l1_pgentry_t *shadow1 = shadow;
             l1_pgentry_t *snapshot1 = snapshot;
+            int unshadow_l1 = 0;
 
             ASSERT(VM_ASSIST(d, VMASST_TYPE_writable_pagetables) ||
                    shadow_mode_write_all(d));
@@ -2346,8 +2349,15 @@ static int resync_all(struct domain *d, u32 stype)
                 if ( (i < min_snapshot) || (i > max_snapshot) ||
                      l1e_has_changed(guest1[i], snapshot1[i], PAGE_FLAG_MASK) )
                 {
-                    need_flush |= validate_pte_change(d, guest1[i], &shadow1[i]);
-                    set_guest_back_ptr(d, shadow1[i], smfn, i);
+                    int error;
+
+                    error = validate_pte_change(d, guest1[i], &shadow1[i]);
+                    if ( error ==  -1 ) 
+                        unshadow_l1 = 1;
+                    else {
+                        need_flush |= error;
+                        set_guest_back_ptr(d, shadow1[i], smfn, i);
+                    }
 
                     // can't update snapshots of linear page tables -- they
                     // are used multiple times...
@@ -2359,6 +2369,19 @@ static int resync_all(struct domain *d, u32 stype)
             perfc_incrc(resync_l1);
             perfc_incr_histo(wpt_updates, changed, PT_UPDATES);
             perfc_incr_histo(l1_entries_checked, max_shadow - min_shadow + 1, PT_UPDATES);
+            if (unshadow_l1) {
+                l2_pgentry_t l2e;
+
+                __shadow_get_l2e(entry->v, entry->va, &l2e);
+                if (l2e_get_flags(l2e) & _PAGE_PRESENT) {
+                    l2e_remove_flags(l2e, _PAGE_PRESENT);
+                    __shadow_set_l2e(entry->v, entry->va, l2e);
+
+                    if (entry->v == current)
+                        need_flush = 1;
+                }
+            }
+
             break;
         }
         case PGT_l2_shadow:

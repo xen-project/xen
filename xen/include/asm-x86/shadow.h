@@ -302,10 +302,12 @@ struct shadow_status {
 
 struct out_of_sync_entry {
     struct out_of_sync_entry *next;
+    struct vcpu   *v;
     unsigned long gpfn;    /* why is this here? */
     unsigned long gmfn;
     unsigned long snapshot_mfn;
     unsigned long writable_pl1e; /* NB: this is a machine address */
+    unsigned long va;
 };
 
 #define out_of_sync_extra_size 127
@@ -384,6 +386,10 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
 
     nl1e = l1e;
     l1e_remove_flags(nl1e, _PAGE_GLOBAL);
+
+    if ( unlikely(l1e_get_flags(l1e) & L1_DISALLOW_MASK) )
+        return 0;
+
     res = get_page_from_l1e(nl1e, d);
 
     if ( unlikely(!res) && IS_PRIV(d) && !shadow_mode_translate(d) &&
@@ -959,13 +965,15 @@ validate_pte_change(
             //
             perfc_incrc(validate_pte_changes3);
 
-            if ( (l1e_get_flags(new_spte) & _PAGE_PRESENT) &&
-                 !shadow_get_page_from_l1e(new_spte, d) )
-                new_spte = l1e_empty();
             if ( l1e_get_flags(old_spte) & _PAGE_PRESENT )
             {
                 shadow_put_page_from_l1e(old_spte, d);
                 need_flush = 1;
+            }
+            if ( (l1e_get_flags(new_spte) & _PAGE_PRESENT) &&
+                 !shadow_get_page_from_l1e(new_spte, d) ) {
+                new_spte = l1e_empty();
+                need_flush = -1; /* need to unshadow the page */
             }
         }
         else
