@@ -342,12 +342,15 @@ class VmxImageHandler(ImageHandler):
 
     def getDomainMemory(self, mem):
         """@see ImageHandler.getDomainMemory"""
+	page_kb = 4
+	if os.uname()[4] == 'ia64':
+	    page_kb = 16
         # for ioreq_t and xenstore
         static_pages = 2
-        return mem + self.getPageTableSize(mem / 1024) + 4 * static_pages
+        return mem + (self.getPageTableSize(mem / 1024) + static_pages) * page_kb
             
     def getPageTableSize(self, mem_mb):
-        """Return the size of memory needed for 1:1 page tables for physical
+        """Return the pages of memory needed for 1:1 page tables for physical
            mode.
 
         @param mem_mb: size in MB
@@ -355,13 +358,13 @@ class VmxImageHandler(ImageHandler):
         """
         # 1 page for the PGD + 1 pte page for 4MB of memory (rounded)
         if os.uname()[4] == 'x86_64':
-            return (5 + ((mem_mb + 1) >> 1)) * 4
+            return 5 + ((mem_mb + 1) >> 1)
         elif os.uname()[4] == 'ia64':
-            # XEN/IA64 has p2m table allocated on demand, so only return
-            # guest firmware size here.
-            return 16 * 1024
+            # 1:1 pgtable is allocated on demand ia64, so just return rom size
+	    # for guest firmware
+            return 1024
         else:
-            return (1 + ((mem_mb + 3) >> 2)) * 4
+            return 1 + ((mem_mb + 3) >> 2)
 
 
 """Table of image handler classes for virtual machine images.  Indexed by
