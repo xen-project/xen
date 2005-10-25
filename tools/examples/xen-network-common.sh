@@ -16,11 +16,40 @@
 #
 
 
-# Gentoo doesn't have ifup/ifdown: define appropriate alternatives
-if ! which ifup >&/dev/null
+# On SuSE it is necessary to run a command before transfering addresses and
+# routes from the physical interface to the virtual.  This command creates a
+# variable $HWD_CONFIG_0 that specifies the appropriate configuration for
+# ifup.
+
+# Gentoo doesn't have ifup/ifdown, so we define appropriate alternatives.
+
+# Other platforms just use ifup / ifdown directly.
+
+##
+# preiftransfer
+#
+# @param $1 The current name for the physical device, which is also the name
+#           that the virtual device will take once the physical device has
+#           been renamed.
+
+if [ -e /etc/SuSE-release ]
+then
+  preiftransfer()
+  {
+    eval `/sbin/getcfg -d /etc/sysconfig/network/ -f ifcfg- -- $1`
+  }
+  ifup()
+  {
+    /sbin/ifup ${HWD_CONFIG_0} $1
+  }
+elif ! which ifup >&/dev/null
 then
   if [ -e /etc/conf.d/net ]
   then
+    preiftransfer()
+    {
+      true
+    }
     ifup()
     {
       /etc/init.d/net.$1 start
@@ -34,4 +63,9 @@ then
       "You don't have ifup and don't seem to be running Gentoo either!"
     exit 1
   fi
+else
+  preiftransfer()
+  {
+    true
+  }
 fi
