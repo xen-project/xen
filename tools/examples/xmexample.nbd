@@ -1,0 +1,13 @@
+kernel = "/boot/vmlinuz-2.6.13-15b-xen"
+ramdisk = "/boot/initrd-2.6.13-15b-xen"
+memory = 128
+name = "nbd4"
+nics=1
+# Please change MAC
+vif = [ 'mac=aa:cc:10:10:00:a0, bridge=xenbr0' ]
+# Please change PORT
+disk = [ 'nbd:134.100.233.115 20004,hda1,w' ]
+dhcp = "dhcp"
+hostname= "nbd4" 
+root = "/dev/hda1 ro"
+extra = "3"
