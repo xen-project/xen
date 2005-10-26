@@ -512,7 +512,9 @@ static void handle_xs(int fd)
 		enum_domains();
 	else if (sscanf(vec[XS_WATCH_TOKEN], "dom%u", &domid) == 1) {
 		dom = lookup_domain(domid);
-		if (dom->is_dead == false)
+		/* We may get watches firing for domains that have recently
+		   been removed, so dom may be NULL here. */
+		if (dom && dom->is_dead == false)
 			domain_create_ring(dom);
 	}
 
