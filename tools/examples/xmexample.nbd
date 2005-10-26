@@ -1,3 +1,13 @@
+#  -*- mode: python; -*-
+#
+# xm create configuration example.
+#
+# This configuration is appropriate for using Network Block Device (NBD)
+# filesystems.
+#
+# Each of these parameters will need changing to match your setup.
+# 
+
 kernel = "/boot/vmlinuz-2.6.13-15b-xen"
 ramdisk = "/boot/initrd-2.6.13-15b-xen"
 memory = 128
