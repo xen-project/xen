@@ -1,28 +1,20 @@
 #!/bin/sh
 
-# Usage: block-enbd [bind server ctl_port |unbind node]
-#
-# The file argument to the bind command is the file we are to bind to a
-# loop device.
+# Usage: block-nbd [bind server ctl_port |unbind node]
 #
 # The node argument to unbind is the name of the device node we are to
 # unbind.
 #
 # This assumes you're running a correctly configured server at the other end!
 
-set -e
+dir=$(dirname "$0")
+. "$dir/block-common.sh"
 
-#echo "block-enbd: $@" | logger -t xen
-
-case $1 in
+case "$command" in
   bind)
     for dev in /dev/nbd*; do
       if nbd-client $2 $3 $dev; then
-        major=$(stat -L -c %t "$dev")
-        minor=$(stat -L -c %T "$dev")
-        pdev=$(printf "0x%02x%02x" 0x$major 0x$minor)
-        xenstore-write "$XENBUS_PATH"/physical-device $pdev \
-          "$XENBUS_PATH"/node $dev
+        write_dev $dev
         exit 0
       fi
     done
