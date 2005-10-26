@@ -9,6 +9,7 @@ INSTALL_DATA	= $(INSTALL) -m0644
 # Init scripts.
 XEND_INITD = init.d/xend
 XENDOMAINS_INITD = init.d/xendomains
+XENDOMAINS_SYSCONFIG = init.d/sysconfig.xendomains
 
 # Xen configuration dir and configs to go there.
 XEN_CONFIG_DIR = /etc/xen
@@ -51,8 +52,10 @@ install: all install-initd install-configs install-scripts $(HOTPLUGS)
 
 install-initd:
 	[ -d $(DESTDIR)/etc/init.d ] || $(INSTALL_DIR) $(DESTDIR)/etc/init.d
+	[ -d $(DESTDIR)/etc/sysconfig ] || $(INSTALL_DIR) $(DESTDIR)/etc/sysconfig
 	$(INSTALL_PROG) $(XEND_INITD) $(DESTDIR)/etc/init.d
 	$(INSTALL_PROG) $(XENDOMAINS_INITD) $(DESTDIR)/etc/init.d
+	$(INSTALL_PROG) $(XENDOMAINS_SYSCONFIG) $(DESTDIR)/etc/sysconfig/xendomains
 
 install-configs: $(XEN_CONFIGS)
 	[ -d $(DESTDIR)$(XEN_CONFIG_DIR) ] || \
