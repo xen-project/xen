@@ -121,8 +121,33 @@ else
     }
 fi
 
+if ! which usleep >&/dev/null
+then
+  usleep()
+  {
+    if [ -n "$1" ]
+    then
+      sleep $(( $1 / 1000 ))
+    fi
+  }
+fi
+
 # Reset status of this service
 rc_reset
+
+##
+# Returns 0 (success) if the given parameter names a directory, and that
+# directory is not empty.
+#
+contains_something()
+{
+  if [ -d "$1" ] && [ `/bin/ls $1 | wc -l` -gt 0 ]
+  then
+    return 0
+  else
+    return 1
+  fi
+}
 
 # read name from xen config file
 rdname()
@@ -133,7 +158,8 @@ rdname()
 rdnames()
 {
     NAMES=
-    if test ! -d $XENDOMAINS_AUTO -o `/bin/ls $XENDOMAINS_AUTO | wc -l` -eq 0; then 
+    if ! contains_something "$XENDOMAINS_AUTO"
+    then 
 	return
     fi
     for dom in $XENDOMAINS_AUTO/*; do
@@ -177,9 +203,10 @@ start()
 	return; 
     fi
 
-    if test "$XENDOMAINS_RESTORE" = "true" -a -n "$XENDOMAINS_SAVE" \
-	    -a -d $XENDOMAINS_SAVE -a `/bin/ls $XENDOMAINS_SAVE | wc -l` -gt 0; then
-
+    if [ "$XENDOMAINS_RESTORE" = "true" ] &&
+       contains_something "$XENDOMAINS_SAVE"
+    then
+        mkdir -p $(dirname "$LOCKFILE")
 	touch $LOCKFILE
 	echo -n "Restoring Xen domains:"
 	for dom in $XENDOMAINS_SAVE/*; do
@@ -195,9 +222,8 @@ start()
 	done
     fi
 
-    if test -n "$XENDOMAINS_AUTO" -a -d $XENDOMAINS_AUTO \
-	    -a `/bin/ls $XENDOMAINS_AUTO | wc -l` -gt 0; then
-
+    if contains_something "$XENDOMAINS_AUTO"
+    then
 	touch $LOCKFILE
 	echo -n "Starting auto Xen domains:"
 	# We expect config scripts for auto starting domains to be in
@@ -378,8 +404,10 @@ check_domain_up()
 
 check_all_auto_domains_up()
 {
-    if test -z "$XENDOMAINS_AUTO" -o ! -d "$XENDOMAINS_AUTO" \
-	    -o `/bin/ls $XENDOMAINS_AUTO | wc -l` -eq 0; then return 0; fi
+    if ! contains_something "$XENDOMAINS_AUTO"
+    then
+      return 0
+    fi
     missing=
     for nm in $XENDOMAINS_AUTO/*; do
 	rdname $nm
@@ -399,8 +427,10 @@ check_all_auto_domains_up()
 
 check_all_saved_domains_up()
 {
-    if test -z "$XENDOMAINS_SAVE" -o ! -d "$XENDOMAINS_SAVE" \
-	    -o `/bin/ls $XENDOMAINS_SAVE | wc -l` -eq 0; then return 0; fi
+    if ! contains_something "$XENDOMAINS_SAVE" 
+    then
+      return 0
+    fi
     missing=`/bin/ls $XENDOMAINS_SAVE`
     echo -n " MISS SAVED: " $missing
     return 1
