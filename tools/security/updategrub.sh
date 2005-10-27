@@ -26,11 +26,16 @@ fi
 # Show usage of this program
 usage ()
 {
-	echo "Usage: $0 <policy name> <root of xen repository>"
-	echo ""
-	echo "<policy name>             : The name of the policy, i.e. xen_null"
-	echo "<root of xen repository>  : The root of the XEN repositrory."
-	echo ""
+echo "Use this tool to add the binary policy to the Xen grub entry and
+have Xen automatically enforce the policy when starting.
+
+Usage: $0 <policy name> <root of xen repository>
+
+<policy name>             : The name of the policy, i.e. xen_null
+<root of xen repository>  : The root of the XEN repository. Give
+                            complete path.
+
+"
 }
 
 # This function sets the global variable 'linux'
@@ -43,11 +48,24 @@ getLinuxVersion ()
 	for f in $path/linux-*-xen0 ; do
 		versionfile=$f/include/linux/version.h
 		if [ -r $versionfile ]; then
-			lnx=`cat $versionfile | \
-			     grep UTS_RELEASE | \
-			     awk '{             \
-			       len=length($3);  \
-			       print substr($3,2,len-2) }'`
+			lnx=`cat $versionfile |                \
+			     grep UTS_RELEASE |                \
+			     awk '{                            \
+			       len=length($3);                 \
+			       version=substr($3,2,len-2);     \
+			       split(version,numbers,".");     \
+			       if (numbers[4]=="") {           \
+			         printf("%s.%s.%s",            \
+			                 numbers[1],           \
+			                 numbers[2],           \
+			                 numbers[3]);          \
+			       } else {                        \
+			         printf("%s.%s.%s[.0-9]*-xen0",\
+			                numbers[1],            \
+			                numbers[2],            \
+			                numbers[3]);           \
+			       }                               \
+			     }'`
 		fi
 		if [ "$lnx" != "" ]; then
 			linux="[./0-9a-zA-z]*$lnx"
@@ -143,10 +161,19 @@ updateGrub ()
 		echo "Could not create temporary file! Aborting."
 		exit -1
 	fi
-	mv -f $tmpfile $grubconf
+	diff $tmpfile $grubconf > /dev/null
+	RES=$?
+	if [ "$RES" == "0" ]; then
+		echo "No changes were made to $grubconf."
+	else
+		echo "Successfully updated $grubconf."
+		mv -f $tmpfile $grubconf
+	fi
 }
 
 if [ "$1" == "" -o "$2" == "" ]; then
+	echo "Error: Not enough command line parameters."
+	echo ""
 	usage
 	exit -1
 fi
