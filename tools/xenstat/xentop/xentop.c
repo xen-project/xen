@@ -28,7 +28,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <xs.h>
 #include <xenstat.h>
 
 #define XENTOP_VERSION "1.0"
@@ -68,8 +67,6 @@ static int compare_domains(xenstat_domain **, xenstat_domain **);
 static unsigned long long tot_net_bytes( xenstat_domain *, int);
 
 /* Field functions */
-static int compare_domid(xenstat_domain *domain1, xenstat_domain *domain2);
-static void print_domid(xenstat_domain *domain);
 static int compare_state(xenstat_domain *domain1, xenstat_domain *domain2);
 static void print_state(xenstat_domain *domain);
 static int compare_cpu(xenstat_domain *domain1, xenstat_domain *domain2);
@@ -131,7 +128,6 @@ typedef struct field {
 } field;
 
 field fields[] = {
-//	{ FIELD_DOMID,   "DOMID",      5, compare_domid,   print_domid   },
 	{ FIELD_NAME,    "NAME",      10, compare_name,    print_name    },
 	{ FIELD_STATE,   "STATE",      6, compare_state,   print_state   },
 	{ FIELD_CPU,     "CPU(sec)",  10, compare_cpu,     print_cpu     },
@@ -348,18 +344,6 @@ static int compare_domains(xenstat_domain **domain1, xenstat_domain **domain2)
 }
 
 /* Field functions */
-
-/* Compares domain ids of two domains, returning -1,0,1 for <,=,> */
-int compare_domid(xenstat_domain *domain1, xenstat_domain *domain2)
-{
-	return compare(xenstat_domain_id(domain1), xenstat_domain_id(domain2));
-}
-
-/* Prints domain identification number */
-void print_domid(xenstat_domain *domain)
-{
-	print("%5u", xenstat_domain_id(domain));
-}
 
 /* Compare domain names, returning -1,0,1 for <,=,> */
 int compare_name(xenstat_domain *domain1, xenstat_domain *domain2)
