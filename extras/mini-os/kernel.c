@@ -61,7 +61,7 @@ void failsafe_callback(void);
 
 extern char shared_info[PAGE_SIZE];
 
-#define __pte(x) ((pte_t) { (0) } )
+#define __pte(x) ((pte_t) { (x) } )
 
 static shared_info_t *map_shared_info(unsigned long pa)
 {
@@ -150,5 +150,5 @@ void start_kernel(start_info_t *si)
 void do_exit(void)
 {
     printk("do_exit called!\n");
-    for ( ;; ) HYPERVISOR_shutdown();
+    for ( ;; ) HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_crash);
 }

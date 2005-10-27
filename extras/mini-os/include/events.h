@@ -47,7 +47,7 @@ static inline int notify_via_evtchn(int port)
 {
     evtchn_op_t op;
     op.cmd = EVTCHNOP_send;
-    op.u.send.local_port = port;
+    op.u.send.port = port;
     return HYPERVISOR_event_channel_op(&op);
 }
 

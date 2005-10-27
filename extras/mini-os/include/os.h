@@ -24,7 +24,7 @@
 #include <xen/xen.h>
 
 
-#define force_evtchn_callback() ((void)HYPERVISOR_xen_version(0))
+#define force_evtchn_callback() ((void)HYPERVISOR_xen_version(0, 0))
 
 #define __KERNEL_CS  FLAT_KERNEL_CS
 #define __KERNEL_DS  FLAT_KERNEL_DS
@@ -54,6 +54,8 @@
 
 /* Everything below this point is not included by assembler (.S) files. */
 #ifndef __ASSEMBLY__
+
+extern shared_info_t *HYPERVISOR_shared_info;
 
 void trap_init(void);
 
