@@ -305,6 +305,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 	for (i = info->ring.rsp_cons; i != rp; i++) {
 		unsigned long id;
+		int ret;
 
 		bret = RING_GET_RESPONSE(&info->ring, i);
 		id   = bret->id;
@@ -321,9 +322,10 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 				DPRINTK("Bad return from blkdev data "
 					"request: %x\n", bret->status);
 
-			BUG_ON(end_that_request_first(
+			ret = end_that_request_first(
 				req, (bret->status == BLKIF_RSP_OKAY),
-				req->hard_nr_sectors));
+				req->hard_nr_sectors);
+			BUG_ON(ret);
 			end_that_request_last(req);
 			break;
 		default:
