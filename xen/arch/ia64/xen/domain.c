@@ -28,6 +28,7 @@
 #include <xen/event.h>
 //#include <xen/shadow.h>
 #include <xen/console.h>
+#include <xen/compile.h>
 
 #include <xen/elf.h>
 //#include <asm/page.h>
@@ -930,6 +931,7 @@ int construct_dom0(struct domain *d,
 	si = (start_info_t *)alloc_xenheap_page();
 	memset(si, 0, PAGE_SIZE);
 	d->shared_info->arch.start_info_pfn = __pa(si) >> PAGE_SHIFT;
+	sprintf(si->magic, "Xen-%i.%i", XEN_VERSION, XEN_SUBVERSION);
 
 #if 0
 	si->nr_pages     = d->tot_pages;
