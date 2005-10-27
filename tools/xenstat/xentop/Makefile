@@ -26,7 +26,7 @@ mandir=$(prefix)/share/man
 man1dir=$(mandir)/man1
 sbindir=$(prefix)/sbin
 
-CFLAGS += -DGCC_PRINTF -Wall -Werror -I$(XEN_LIBXENSTAT)
+CFLAGS += -DGCC_PRINTF -Wall -I$(XEN_LIBXENSTAT)
 LDFLAGS += -L$(XEN_LIBXENSTAT)
 LDLIBS += -lxenstat -lncurses
 
