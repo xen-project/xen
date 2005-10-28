@@ -29,11 +29,11 @@
 #define STATE_IORESP_READY      3
 #define STATE_IORESP_HOOK       4
 
-#define IOREQ_TYPE_PIO  0 /* pio */
-#define IOREQ_TYPE_COPY  1 /* mmio ops */
-#define IOREQ_TYPE_AND  2
-#define IOREQ_TYPE_OR  3
-#define IOREQ_TYPE_XOR  4
+#define IOREQ_TYPE_PIO          0 /* pio */
+#define IOREQ_TYPE_COPY         1 /* mmio ops */
+#define IOREQ_TYPE_AND          2
+#define IOREQ_TYPE_OR           3
+#define IOREQ_TYPE_XOR          4
 
 /*
  * VMExit dispatcher should cooperate with instruction decoder to
@@ -55,9 +55,10 @@ typedef struct {
     uint8_t type;    /* I/O type                     */
 } ioreq_t;
 
-#define MAX_VECTOR    256
+#define MAX_VECTOR      256
 #define BITS_PER_BYTE   8
 #define INTR_LEN        (MAX_VECTOR/(BITS_PER_BYTE * sizeof(uint64_t)))
+#define INTR_LEN_32     (MAX_VECTOR/(BITS_PER_BYTE * sizeof(uint32_t)))
 
 typedef struct {
     uint16_t  pic_elcr;

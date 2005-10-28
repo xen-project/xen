@@ -158,6 +158,10 @@ gopts.var('cpu', val='CPU',
           fn=set_int, default=None,
           use="CPU to run the domain on.")
 
+gopts.var('lapic', val='LAPIC',
+          fn=set_int, default=0,
+          use="Disable or enable local APIC of VMX domain.")
+
 gopts.var('vcpus', val='VCPUS',
           fn=set_int, default=1,
           use="# of Virtual CPUS in domain.")
@@ -315,10 +319,6 @@ gopts.var('nfs_server', val="IPADDR",
 gopts.var('nfs_root', val="PATH",
           fn=set_value, default=None,
           use="Set the path of the root NFS directory.")
-
-gopts.var('memmap', val='FILE',
-          fn=set_value, default='',
-          use="Path to memap SXP file.")
 
 gopts.var('device_model', val='FILE',
           fn=set_value, default='',
@@ -542,9 +542,9 @@ def configure_vfr(opts, config, vals):
 def configure_vmx(opts, config_image, vals):
     """Create the config for VMX devices.
     """
-    args = [ 'memmap', 'device_model', 'vcpus', 'cdrom',
-             'boot', 'fda', 'fdb', 'localtime', 'serial', 'macaddr', 'stdvga', 
-             'isa', 'nographic', 'vnc', 'vncviewer', 'sdl', 'display', 'ne2000']
+    args = [ 'device_model', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
+             'localtime', 'serial', 'macaddr', 'stdvga', 'isa', 'nographic',
+             'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'lapic']
     for a in args:
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])

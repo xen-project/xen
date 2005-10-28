@@ -203,6 +203,10 @@ class VmxImageHandler(ImageHandler):
 
         self.dmargs += self.configVNC(imageConfig)
 
+        self.lapic = 0
+        lapic = sxp.child_value(imageConfig, 'lapic')
+        if not lapic is None:
+            self.lapic = int(lapic)
 
     def buildDomain(self):
         # Create an event channel
@@ -217,6 +221,7 @@ class VmxImageHandler(ImageHandler):
         log.debug("control_evtchn = %d", self.device_channel)
         log.debug("store_evtchn   = %d", store_evtchn)
         log.debug("memsize        = %d", self.vm.getMemoryTarget() / 1024)
+        log.debug("lapic          = %d", self.lapic)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
 
         return xc.vmx_build(dom            = self.vm.getDomid(),
@@ -224,6 +229,7 @@ class VmxImageHandler(ImageHandler):
                             control_evtchn = self.device_channel,
                             store_evtchn   = store_evtchn,
                             memsize        = self.vm.getMemoryTarget() / 1024,
+                            lapic          = self.lapic,
                             vcpus          = self.vm.getVCpuCount())
 
 
