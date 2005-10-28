@@ -1275,7 +1275,6 @@ class XendDomainInfo:
 
         now = time.time()
         rst = self.readVm('xend/previous_restart_time')
-        log.error(rst)
         if rst:
             rst = float(rst)
             timeout = now - rst
@@ -1284,8 +1283,8 @@ class XendDomainInfo:
                     'VM %s restarting too fast (%f seconds since the last '
                     'restart).  Refusing to restart to avoid loops.',
                     self.info['name'], timeout)
-            self.destroy()
-            return
+                self.destroy()
+                return
 
         self.writeVm('xend/previous_restart_time', str(now))
 
@@ -1306,7 +1305,11 @@ class XendDomainInfo:
             except:
                 log.exception('Failed to restart domain %d.', self.domid)
         finally:
-            self.removeVm('xend/restart_in_progress')
+            # new_dom's VM will be the same as this domain's VM, except where
+            # the rename flag has instructed us to call preserveForRestart.
+            # In that case, it is important that we use new_dom.removeVm, not
+            # self.removeVm.
+            new_dom.removeVm('xend/restart_in_progress')
             
         # self.configure_bootloader()
         #        self.exportToDB()
