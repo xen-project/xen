@@ -392,8 +392,11 @@ check_cache(struct domain *dom, domid_t rdom) {
     int i;
 
     printkd("checking cache: %x --> %x.\n", dom->domain_id, rdom);
+
+    if (dom->ssid == NULL)
+        return 0;
     ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
-                         (struct acm_ssid_domain *)(dom)->ssid);
+                         (struct acm_ssid_domain *)(dom->ssid));
 
     for(i=0; i< ACM_TE_CACHE_SIZE; i++) {
         if ((ste_ssid->ste_cache[i].valid == VALID) &&
@@ -412,6 +415,8 @@ cache_result(struct domain *subj, struct domain *obj) {
     struct ste_ssid *ste_ssid;
     int i;
     printkd("caching from doms: %x --> %x.\n", subj->domain_id, obj->domain_id);
+    if (subj->ssid == NULL)
+        return;
     ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
                          (struct acm_ssid_domain *)(subj)->ssid);
     for(i=0; i< ACM_TE_CACHE_SIZE; i++)
@@ -431,26 +436,34 @@ clean_id_from_cache(domid_t id)
     struct ste_ssid *ste_ssid;
     int i;
     struct domain **pd;
+    struct acm_ssid_domain *ssid;
 
     printkd("deleting cache for dom %x.\n", id);
-
     read_lock(&domlist_lock); /* look through caches of all domains */
     pd = &domain_list;
     for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list ) {
-        ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, 
-                             (struct acm_ssid_domain *)(*pd)->ssid);
+        ssid = (struct acm_ssid_domain *)((*pd)->ssid);
+
+        if (ssid == NULL)
+            continue; /* hanging domain structure, no ssid any more ... */
+        ste_ssid = GET_SSIDP(ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY, ssid);
+        if (!ste_ssid) {
+            printk("%s: deleting ID from cache ERROR (no ste_ssid)!\n",
+                   __func__);
+            goto out;
+        }
         for (i=0; i<ACM_TE_CACHE_SIZE; i++)
             if ((ste_ssid->ste_cache[i].valid == VALID) &&
-                (ste_ssid->ste_cache[i].id = id))
+                (ste_ssid->ste_cache[i].id == id))
                 ste_ssid->ste_cache[i].valid = FREE;
     }
+ out:
     read_unlock(&domlist_lock);
 }
 
 /***************************
  * Authorization functions
  **************************/
-
 static int 
 ste_pre_domain_create(void *subject_ssid, ssidref_t ssidref)
 {      
@@ -484,44 +497,13 @@ ste_post_domain_destroy(void *subject_ssid, domid_t id)
 
 /* -------- EVENTCHANNEL OPERATIONS -----------*/
 static int
-ste_pre_eventchannel_unbound(domid_t id) {
-    struct domain *subj, *obj;
-    int ret;
-    traceprintk("%s: dom%x-->dom%x.\n", 
-                __func__, current->domain->domain_id, id);
-
-    if (check_cache(current->domain, id)) {
-        atomic_inc(&ste_bin_pol.ec_cachehit_count);
-        return ACM_ACCESS_PERMITTED;
-    }
-    atomic_inc(&ste_bin_pol.ec_eval_count);
-    subj = current->domain;
-    obj = find_domain_by_id(id);
-
-    if (share_common_type(subj, obj)) {
-        cache_result(subj, obj);
-        ret = ACM_ACCESS_PERMITTED;
-    } else {
-        atomic_inc(&ste_bin_pol.ec_denied_count); 
-        ret = ACM_ACCESS_DENIED; 
-    }
-    if (obj != NULL)
-        put_domain(obj);
-    return ret;
-}
-
-static int
-ste_pre_eventchannel_interdomain(domid_t id1, domid_t id2)
-{
+ste_pre_eventchannel_unbound(domid_t id1, domid_t id2) {
     struct domain *subj, *obj;
     int ret;
     traceprintk("%s: dom%x-->dom%x.\n", __func__,
                 (id1 == DOMID_SELF) ? current->domain->domain_id : id1,
                 (id2 == DOMID_SELF) ? current->domain->domain_id : id2);
 
-    /* following is a bit longer but ensures that we
-     * "put" only domains that we where "find"-ing 
-     */
     if (id1 == DOMID_SELF) id1 = current->domain->domain_id;
     if (id2 == DOMID_SELF) id2 = current->domain->domain_id;
 
@@ -531,7 +513,7 @@ ste_pre_eventchannel_interdomain(domid_t id1, domid_t id2)
         ret = ACM_ACCESS_DENIED;
         goto out;
     }
-    /* cache check late, but evtchn is not on performance critical path */
+    /* cache check late */
     if (check_cache(subj, obj->domain_id)) {
         atomic_inc(&ste_bin_pol.ec_cachehit_count);
         ret = ACM_ACCESS_PERMITTED;
@@ -546,11 +528,55 @@ ste_pre_eventchannel_interdomain(domid_t id1, domid_t id2)
         atomic_inc(&ste_bin_pol.ec_denied_count); 
         ret = ACM_ACCESS_DENIED; 
     }
- out:
+  out:
     if (obj != NULL)
         put_domain(obj);
     if (subj != NULL)
         put_domain(subj);
+    return ret;
+}
+
+static int
+ste_pre_eventchannel_interdomain(domid_t id)
+{
+    struct domain *subj=NULL, *obj=NULL;
+    int ret;
+
+    traceprintk("%s: dom%x-->dom%x.\n", __func__,
+                current->domain->domain_id,
+                (id == DOMID_SELF) ? current->domain->domain_id : id);
+
+    /* following is a bit longer but ensures that we
+     * "put" only domains that we where "find"-ing 
+     */
+    if (id == DOMID_SELF) id = current->domain->domain_id;
+
+    subj = current->domain;
+    obj  = find_domain_by_id(id);
+    if (obj == NULL) {
+        ret = ACM_ACCESS_DENIED;
+        goto out;
+    }
+
+    /* cache check late, but evtchn is not on performance critical path */
+    if (check_cache(subj, obj->domain_id)) {
+        atomic_inc(&ste_bin_pol.ec_cachehit_count);
+        ret = ACM_ACCESS_PERMITTED;
+        goto out;
+    }
+
+    atomic_inc(&ste_bin_pol.ec_eval_count);
+
+    if (share_common_type(subj, obj)) {
+        cache_result(subj, obj);
+        ret = ACM_ACCESS_PERMITTED;
+    } else {
+        atomic_inc(&ste_bin_pol.ec_denied_count); 
+        ret = ACM_ACCESS_DENIED; 
+    }
+ out:
+    if (obj != NULL)
+        put_domain(obj);
     return ret;
 }
 

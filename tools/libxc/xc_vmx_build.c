@@ -279,6 +279,7 @@ static int setup_guest(int xc_handle,
                        vcpu_guest_context_t *ctxt,
                        unsigned long shared_info_frame,
                        unsigned int control_evtchn,
+                       unsigned int lapic,
                        unsigned int vcpus,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn)
@@ -554,7 +555,7 @@ static int setup_guest(int xc_handle,
     ctxt->user_regs.eax = 0;
     ctxt->user_regs.esp = 0;
     ctxt->user_regs.ebx = 0; /* startup_32 expects this to be 0 to signal boot cpu */
-    ctxt->user_regs.ecx = 0;
+    ctxt->user_regs.ecx = lapic;
     ctxt->user_regs.esi = 0;
     ctxt->user_regs.edi = 0;
     ctxt->user_regs.ebp = 0;
@@ -597,6 +598,7 @@ int xc_vmx_build(int xc_handle,
                  int memsize,
                  const char *image_name,
                  unsigned int control_evtchn,
+                 unsigned int lapic,
                  unsigned int vcpus,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn)
@@ -651,9 +653,9 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    if ( setup_guest(xc_handle, domid, memsize, image, image_size,
-                     nr_pages, ctxt, op.u.getdomaininfo.shared_info_frame,
-                     control_evtchn, vcpus, store_evtchn, store_mfn) < 0)
+    if ( setup_guest(xc_handle, domid, memsize, image, image_size, nr_pages,
+                     ctxt, op.u.getdomaininfo.shared_info_frame, control_evtchn,
+                     lapic, vcpus, store_evtchn, store_mfn) < 0)
     {
         ERROR("Error constructing guest OS");
         goto error_out;

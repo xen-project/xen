@@ -80,10 +80,13 @@ struct instruction {
 struct vmx_platform {
     unsigned long          shared_page_va;
     unsigned int           nr_vcpu;
+    unsigned int           lapic_enable;
 
     struct vmx_virpit      vmx_pit;
     struct vmx_io_handler  vmx_io_handler;
     struct vmx_virpic      vmx_pic;
+    unsigned char          round_info[256];
+    spinlock_t             round_robin_lock;
     int                    interrupt_request;
 };
 

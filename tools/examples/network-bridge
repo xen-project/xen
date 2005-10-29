@@ -208,7 +208,7 @@ op_start () {
 
     if ip link show ${vdev} 2>/dev/null >/dev/null; then
 	mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
-	eval `/sbin/getcfg -d /etc/sysconfig/network/ -f ifcfg- -- ${netdev}`
+	preiftransfer ${netdev}
 	transfer_addrs ${netdev} ${vdev}
 	if ! ifdown ${netdev}; then
 	    # if ifup didn't work, see if we have an ip= on cmd line
@@ -231,7 +231,7 @@ op_start () {
 	ip link set ${bridge} up
 	ip link set ${vif0} up
 	ip link set ${pdev} up 
-	if ! ifup ${HWD_CONFIG_0} ${netdev} ; then
+	if ! ifup ${netdev} ; then
 	    if [ ${kip} ] ; then
 		# use the addresses we grocked from /proc/cmdline
 		if [ -z "${kmask}" ]; then 

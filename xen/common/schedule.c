@@ -514,7 +514,7 @@ static void dom_timer_fn(void *data)
 /* Initialise the data structures. */
 void __init scheduler_init(void)
 {
-    int i;
+    int i, rc;
 
     open_softirq(SCHEDULE_SOFTIRQ, __enter_scheduler);
 
@@ -540,7 +540,9 @@ void __init scheduler_init(void)
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
 
-    BUG_ON(SCHED_OP(alloc_task, idle_task[0]) < 0);
+    rc = SCHED_OP(alloc_task, idle_task[0]);
+    BUG_ON(rc < 0);
+
     sched_add_domain(idle_task[0]);
 }
 

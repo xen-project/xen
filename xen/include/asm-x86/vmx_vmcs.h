@@ -22,6 +22,7 @@
 #include <asm/config.h>
 #include <asm/vmx_cpu.h>
 #include <asm/vmx_platform.h>
+#include <asm/vmx_vlapic.h>
 #include <public/vmx_assist.h>
 
 extern int start_vmx(void);
@@ -96,6 +97,7 @@ struct arch_vmx_struct {
     struct msr_state        msr_content;
     struct mmio_op          mmio_op;  /* MMIO */
     void                    *io_bitmap_a, *io_bitmap_b;
+    struct vlapic           *vlapic;
     u64                     tsc_offset;
 };
 
@@ -272,18 +274,21 @@ enum vmcs_field {
 
 #define VMX_DEBUG 1
 #if VMX_DEBUG
-#define DBG_LEVEL_0     (1 << 0)
-#define DBG_LEVEL_1     (1 << 1)
-#define DBG_LEVEL_2     (1 << 2)
-#define DBG_LEVEL_3     (1 << 3)
-#define DBG_LEVEL_IO    (1 << 4)
-#define DBG_LEVEL_VMMU  (1 << 5)
+#define DBG_LEVEL_0                 (1 << 0)
+#define DBG_LEVEL_1                 (1 << 1)
+#define DBG_LEVEL_2                 (1 << 2)
+#define DBG_LEVEL_3                 (1 << 3)
+#define DBG_LEVEL_IO                (1 << 4)
+#define DBG_LEVEL_VMMU              (1 << 5)
+#define DBG_LEVEL_VLAPIC            (1 << 6)
+#define DBG_LEVEL_VLAPIC_TIMER      (1 << 7)
+#define DBG_LEVEL_VLAPIC_INTERRUPT  (1 << 7)
 
 extern unsigned int opt_vmx_debug_level;
 #define VMX_DBG_LOG(level, _f, _a...)           \
     if ((level) & opt_vmx_debug_level)          \
         printk("[VMX:%d.%d] " _f "\n",          \
-                current->domain->domain_id, current->vcpu_id, ## _a)
+               current->domain->domain_id, current->vcpu_id, ## _a)
 #else
 #define VMX_DBG_LOG(level, _f, _a...)
 #endif

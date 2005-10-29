@@ -262,10 +262,7 @@ class Daemon:
             return 1
 
     def stop(self):
-        result = self.cleanup_xend(True)
-        from xen.xend import Vifctl
-        Vifctl.network("stop")
-        return result
+        return self.cleanup_xend(True)
 
     def run(self, status):
         try:

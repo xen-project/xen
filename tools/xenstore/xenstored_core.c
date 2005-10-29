@@ -188,7 +188,7 @@ static void trace_io(const struct connection *conn,
 	tm = localtime(&now);
 
 	write(tracefd, prefix, strlen(prefix));
-	sprintf(string, " %p %0d:%0d:%0d ", conn, tm->tm_hour, tm->tm_min,
+	sprintf(string, " %p %02d:%02d:%02d ", conn, tm->tm_hour, tm->tm_min,
 		tm->tm_sec);
 	write(tracefd, string, strlen(string));
 	write(tracefd, sockmsg_string(data->hdr.msg.type),

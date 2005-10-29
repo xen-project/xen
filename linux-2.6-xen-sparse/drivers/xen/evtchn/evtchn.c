@@ -282,6 +282,7 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 
 	case IOCTL_EVTCHN_UNBIND: {
 		struct ioctl_evtchn_unbind unbind;
+		int ret;
 
 		rc = -EFAULT;
 		if (copy_from_user(&unbind, (void *)arg, sizeof(unbind)))
@@ -306,7 +307,8 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 
 		op.cmd = EVTCHNOP_close;
 		op.u.close.port = unbind.port;
-		BUG_ON(HYPERVISOR_event_channel_op(&op));
+		ret = HYPERVISOR_event_channel_op(&op);
+		BUG_ON(ret);
 
 		rc = 0;
 		break;
@@ -399,6 +401,7 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 
 	for (i = 0; i < NR_EVENT_CHANNELS; i++)
 	{
+		int ret;
 		if (port_user[i] != u)
 			continue;
 
@@ -407,7 +410,8 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 
 		op.cmd = EVTCHNOP_close;
 		op.u.close.port = i;
-		BUG_ON(HYPERVISOR_event_channel_op(&op));
+		ret = HYPERVISOR_event_channel_op(&op);
+		BUG_ON(ret);
 	}
 
 	spin_unlock_irq(&port_user_lock);

@@ -14,6 +14,16 @@
 #define VMX_MMIO                    1
 
 typedef int (*intercept_action_t)(ioreq_t *);
+typedef unsigned long (*vmx_mmio_read_t)(struct vcpu *v,
+                                         unsigned long addr,
+                                         unsigned long length);
+
+typedef unsigned long (*vmx_mmio_write_t)(struct vcpu *v,
+                                         unsigned long addr,
+                                         unsigned long length,
+                                         unsigned long val);
+
+typedef int (*vmx_mmio_check_t)(struct vcpu *v, unsigned long addr);
 
 struct io_handler {
     int                 type;
@@ -27,6 +37,16 @@ struct vmx_io_handler {
     struct  io_handler hdl_list[MAX_IO_HANDLER];
 };
 
+struct vmx_mmio_handler {
+    vmx_mmio_check_t check_handler;
+    vmx_mmio_read_t read_handler;
+    vmx_mmio_write_t write_handler;
+};
+
+#define VMX_MMIO_HANDLER_NR 1
+
+extern struct vmx_mmio_handler vmx_mmio_handers[VMX_MMIO_HANDLER_NR];
+
 /* global io interception point in HV */
 extern int vmx_io_intercept(ioreq_t *p, int type);
 extern int register_io_handler(unsigned long addr, unsigned long size,
@@ -37,23 +57,13 @@ static inline int vmx_portio_intercept(ioreq_t *p)
     return vmx_io_intercept(p, VMX_PORTIO);
 }
 
-static inline int vmx_mmio_intercept(ioreq_t *p)
-{
-    return vmx_io_intercept(p, VMX_MMIO);
-}
+int vmx_mmio_intercept(ioreq_t *p);
 
 static inline int register_portio_handler(unsigned long addr,
                                           unsigned long size,
                                           intercept_action_t action)
 {
     return register_io_handler(addr, size, action, VMX_PORTIO);
-}
-
-static inline int register_mmio_handler(unsigned long addr,
-                                        unsigned long size,
-                                        intercept_action_t action)
-{
-    return register_io_handler(addr, size, action, VMX_MMIO);
 }
 
 #endif /* _VMX_INTERCEPT_H */

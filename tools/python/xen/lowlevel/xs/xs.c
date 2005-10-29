@@ -695,7 +695,7 @@ static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
                                        PyObject *kwds)
 {
     static char *kwd_spec[] = { "dom", "page", "port", NULL };
-    static char *arg_spec = "iii";
+    static char *arg_spec = "ili";
     domid_t dom = 0;
     unsigned long page = 0;
     unsigned int port = 0;

@@ -595,6 +595,7 @@ class XendDomainInfo:
         to_store = {
             'domid':              str(self.domid),
             'vm':                 self.vmpath,
+            'name':               self.info['name'],
             'console/limit':      str(xroot.get_console_limit() * 1024),
             'memory/target':      str(self.info['memory_KiB'])
             }

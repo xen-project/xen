@@ -15,6 +15,7 @@
 #include <xen/elf.h>
 #include <xen/kernel.h>
 #include <xen/domain.h>
+#include <xen/compile.h>
 #include <asm/regs.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -582,26 +583,23 @@ int construct_dom0(struct domain *d,
             _initrd_start, (_initrd_start+initrd_len+PAGE_SIZE-1) & PAGE_MASK);
     }
 
-    d->next_io_page = max_page;
-
     /* Set up start info area. */
     si = (start_info_t *)vstartinfo_start;
     memset(si, 0, PAGE_SIZE);
     si->nr_pages = nr_pages;
 
+    si->shared_info = virt_to_phys(d->shared_info);
     if ( opt_dom0_translate )
     {
-        si->shared_info  = d->next_io_page << PAGE_SHIFT;
-        set_pfn_from_mfn(virt_to_phys(d->shared_info) >> PAGE_SHIFT, d->next_io_page);
-        d->next_io_page++;
+        si->shared_info  = max_page << PAGE_SHIFT;
+        set_pfn_from_mfn(virt_to_phys(d->shared_info) >> PAGE_SHIFT, max_page);
     }
-    else
-        si->shared_info  = virt_to_phys(d->shared_info);
 
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
     si->pt_base      = vpt_start;
     si->nr_pt_frames = nr_pt_pages;
     si->mfn_list     = vphysmap_start;
+    sprintf(si->magic, "Xen-%i.%i", XEN_VERSION, XEN_SUBVERSION);
 
     /* Write the phys->machine and machine->phys table entries. */
     for ( pfn = 0; pfn < d->tot_pages; pfn++ )

@@ -252,6 +252,10 @@ static void vmx_setup_platform(struct domain* d)
     pic_init(&platform->vmx_pic,  pic_irq_request, 
              &platform->interrupt_request);
     register_pic_io_hook();
+
+    if ( vmx_apic_support(d) ) {
+        spin_lock_init(&d->arch.vmx_platform.round_robin_lock);
+    }
 }
 
 static void vmx_set_host_env(struct vcpu *v)
@@ -312,6 +316,9 @@ static void vmx_do_launch(struct vcpu *v)
     error |= __vmwrite(CR4_READ_SHADOW, cr4);
 
     vmx_stts();
+
+    if(vmx_apic_support(v->domain))
+        vlapic_init(v);
 
     vmx_set_host_env(v);
 

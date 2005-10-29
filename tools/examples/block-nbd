@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Usage: block-enbd [bind server ctl_port |unbind node]
+# Usage: block-nbd [bind server ctl_port |unbind node]
 #
 # The node argument to unbind is the name of the device node we are to
 # unbind.
@@ -12,8 +12,8 @@ dir=$(dirname "$0")
 
 case "$command" in
   bind)
-    for dev in /dev/nd*; do
-      if nbd-client $2:$3 $dev; then
+    for dev in /dev/nbd*; do
+      if nbd-client $2 $3 $dev; then
         write_dev $dev
         exit 0
       fi

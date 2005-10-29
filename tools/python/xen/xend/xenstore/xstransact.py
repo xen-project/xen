@@ -5,9 +5,6 @@
 # Public License.  See the file "COPYING" in the main directory of
 # this archive for more details.
 
-import errno
-import threading
-from xen.lowlevel import xs
 from xen.xend.xenstore.xsutil import xshandle
 
 
