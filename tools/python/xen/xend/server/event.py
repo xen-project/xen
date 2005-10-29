@@ -192,4 +192,5 @@ def listenEvent(daemon):
     if xroot.get_xend_http_server():
         port = xroot.get_xend_event_port()
         interface = xroot.get_xend_address()
-        tcp.listenTCP(port, factory, interface=interface)
+        l = tcp.listenTCP(port, factory, interface=interface)
+        l.setCloExec()
