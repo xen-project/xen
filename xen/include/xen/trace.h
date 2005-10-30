@@ -23,8 +23,6 @@
 #ifndef __XEN_TRACE_H__
 #define __XEN_TRACE_H__
 
-#ifdef TRACE_BUFFER
-
 #include <asm/page.h>
 #include <xen/types.h>
 #include <xen/sched.h>
@@ -119,18 +117,5 @@ static inline int trace(u32 event, unsigned long d1, unsigned long d2,
 #define TRACE_3D(event,d1,d2,d3)       trace_do_casts(event,d1,d2,d3,0, 0 )
 #define TRACE_4D(event,d1,d2,d3,d4)    trace_do_casts(event,d1,d2,d3,d4,0 )
 #define TRACE_5D(event,d1,d2,d3,d4,d5) trace_do_casts(event,d1,d2,d3,d4,d5)
-
-#else
-
-#define init_trace_bufs() ((void)0)
-
-#define TRACE_0D(event)                ((void)0)
-#define TRACE_1D(event,d)              ((void)0)
-#define TRACE_2D(event,d1,d2)          ((void)0)
-#define TRACE_3D(event,d1,d2,d3)       ((void)0)
-#define TRACE_4D(event,d1,d2,d3,d4)    ((void)0)
-#define TRACE_5D(event,d1,d2,d3,d4,d5) ((void)0)
-
-#endif /* TRACE_BUFFER */
 
 #endif /* __XEN_TRACE_H__ */

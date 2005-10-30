@@ -517,14 +517,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
-#ifdef TRACE_BUFFER
     case DOM0_TBUFCONTROL:
     {
         ret = tb_control(&op->u.tbufcontrol);
         copy_to_user(u_dom0_op, op, sizeof(*op));
     }
     break;
-#endif
     
     case DOM0_READCONSOLE:
     {

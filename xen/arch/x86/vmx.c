@@ -50,12 +50,8 @@ int hvm_enabled;
 unsigned int opt_vmx_debug_level = 0;
 integer_param("vmx_debug", opt_vmx_debug_level);
 
-#ifdef TRACE_BUFFER
 static unsigned long trace_values[NR_CPUS][4];
 #define TRACE_VMEXIT(index,value) trace_values[current->processor][index]=value
-#else
-#define TRACE_VMEXIT(index,value) ((void)0)
-#endif
 
 static int vmx_switch_on;
 
@@ -1686,13 +1682,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         return;
     }
 
-#ifdef TRACE_BUFFER
     {
         __vmread(GUEST_RIP, &eip);
         TRACE_3D(TRC_VMX_VMEXIT, v->domain->domain_id, eip, exit_reason);
         TRACE_VMEXIT(0,exit_reason);
     }
-#endif
 
     switch (exit_reason) {
     case EXIT_REASON_EXCEPTION_NMI:
@@ -1881,7 +1875,6 @@ asmlinkage void load_cr2(void)
 #endif
 }
 
-#ifdef TRACE_BUFFER
 asmlinkage void trace_vmentry (void)
 {
     TRACE_5D(TRC_VMENTRY,trace_values[current->processor][0],
@@ -1899,7 +1892,6 @@ asmlinkage void trace_vmexit (void)
     TRACE_3D(TRC_VMEXIT,0,0,0);
     return;
 }
-#endif
 #endif /* CONFIG_VMX */
 
 /*
