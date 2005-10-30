@@ -25,6 +25,7 @@ XEN_SCRIPTS += network-route vif-route
 XEN_SCRIPTS += network-nat vif-nat
 XEN_SCRIPTS += block
 XEN_SCRIPTS += block-enbd block-nbd
+XEN_SCRIPTS += xen-script-common.sh
 XEN_SCRIPTS += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
 XEN_SCRIPTS += block-common.sh
 

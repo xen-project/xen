@@ -16,7 +16,8 @@
 #
 
 
-set -e
+dir=$(dirname "$0")
+. "$dir/xen-script-common.sh"
 
 export PATH="/sbin:/bin:/usr/bin:/usr/sbin:$PATH"
 export LANG="POSIX"
@@ -33,15 +34,39 @@ fatal() {
   exit 1
 }
 
+##
+# xenstore_read <path>+
+#
+# Read each of the given paths, returning each result on a separate line, or
+# exit this script if any of the paths is missing.
+#
 xenstore_read() {
   local v=$(xenstore-read "$@" || true)
   [ "$v" != "" ] || fatal "xenstore-read $@ failed."
   echo "$v"
 }
 
+
+##
+# xenstore_read_default <path> <default>
+#
+# Read the given path, returning the value there or the given default if the
+# path is not present.
+#
+xenstore_read_default() {
+  xenstore-read "$1" || echo "$2"
+}
+
+
+##
+# xenstore_write (<path> <value>)+
+#
+# Write each of the key/value pairs to the store, and exit this script if any
+# such writing fails.
+#
 xenstore_write() {
   log debug "Writing $@ to xenstore."
-  xenstore-write "$@" || log err "Writing $@ to xenstore failed."
+  xenstore-write "$@" || fatal "Writing $@ to xenstore failed."
 }
 
 log debug "$@" "XENBUS_PATH=$XENBUS_PATH"
