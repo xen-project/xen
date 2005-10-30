@@ -91,6 +91,8 @@
 static void network_tx_buf_gc(struct net_device *dev);
 static void network_alloc_rx_buffers(struct net_device *dev);
 
+static void netif_free(struct netfront_info *info);
+
 static unsigned long rx_pfn_array[NETIF_RX_RING_SIZE];
 static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE+1];
 static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE];
@@ -978,6 +980,9 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 
 	info->tx_ring_ref = GRANT_INVALID_REF;
 	info->rx_ring_ref = GRANT_INVALID_REF;
+	info->rx = NULL;
+	info->tx = NULL;
+	info->irq = 0;
 
 	info->tx = (netif_tx_interface_t *)__get_free_page(GFP_KERNEL);
 	if (info->tx == 0) {
@@ -1022,40 +1027,24 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	return 0;
 
  out:
-	if (info->tx)
-		free_page((unsigned long)info->tx);
-	info->tx = 0;
-	if (info->rx)
-		free_page((unsigned long)info->rx);
-	info->rx = 0;
-
-	if (info->tx_ring_ref != GRANT_INVALID_REF)
-		gnttab_end_foreign_access(info->tx_ring_ref, 0);
-	info->tx_ring_ref = GRANT_INVALID_REF;
-
-	if (info->rx_ring_ref != GRANT_INVALID_REF)
-		gnttab_end_foreign_access(info->rx_ring_ref, 0);
-	info->rx_ring_ref = GRANT_INVALID_REF;
-
+	netif_free(info);
 	return err;
+}
+
+static void end_access(int ref, void *page)
+{
+	if (ref != GRANT_INVALID_REF)
+		gnttab_end_foreign_access(ref, 0, (unsigned long)page);
 }
 
 static void netif_free(struct netfront_info *info)
 {
-	if (info->tx)
-		free_page((unsigned long)info->tx);
-	info->tx = 0;
-	if (info->rx)
-		free_page((unsigned long)info->rx);
-	info->rx = 0;
-
-	if (info->tx_ring_ref != GRANT_INVALID_REF)
-		gnttab_end_foreign_access(info->tx_ring_ref, 0);
+	end_access(info->tx_ring_ref, info->tx);
+	end_access(info->rx_ring_ref, info->rx);
 	info->tx_ring_ref = GRANT_INVALID_REF;
-
-	if (info->rx_ring_ref != GRANT_INVALID_REF)
-		gnttab_end_foreign_access(info->rx_ring_ref, 0);
 	info->rx_ring_ref = GRANT_INVALID_REF;
+	info->tx = NULL;
+	info->rx = NULL;
 
 	if (info->irq)
 		unbind_evtchn_from_irqhandler(info->irq, info->netdev);

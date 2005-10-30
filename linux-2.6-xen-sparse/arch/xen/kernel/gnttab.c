@@ -165,25 +165,39 @@ gnttab_query_foreign_access(grant_ref_t ref)
 	return (nflags & (GTF_reading|GTF_writing));
 }
 
-void
+int
 gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
 {
 	u16 flags, nflags;
 
 	nflags = shared[ref].flags;
 	do {
-		if ( (flags = nflags) & (GTF_reading|GTF_writing) )
+		if ( (flags = nflags) & (GTF_reading|GTF_writing) ) {
 			printk(KERN_ALERT "WARNING: g.e. still in use!\n");
+			return 0;
+		}
 	}
 	while ((nflags = synch_cmpxchg(&shared[ref].flags, flags, 0)) !=
 	       flags);
+
+	return 1;
 }
 
 void
-gnttab_end_foreign_access(grant_ref_t ref, int readonly)
+gnttab_end_foreign_access(grant_ref_t ref, int readonly, unsigned long page)
 {
-	gnttab_end_foreign_access_ref(ref, readonly);
-	put_free_entry(ref);
+	if (gnttab_end_foreign_access_ref(ref, readonly)) {
+		put_free_entry(ref);
+		if (page != 0) {
+			free_page(page);
+		}
+	}
+	else {
+		/* XXX This needs to be fixed so that the ref and page are
+		   placed on a list to be freed up later. */
+		printk(KERN_WARNING
+		       "WARNING: leaking g.e. and page still in use!\n");
+	}
 }
 
 int

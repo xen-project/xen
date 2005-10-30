@@ -34,8 +34,21 @@ struct gnttab_free_callback {
 int gnttab_grant_foreign_access(domid_t domid, unsigned long frame,
 				int readonly);
 
-void gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly);
-void gnttab_end_foreign_access(grant_ref_t ref, int readonly);
+/*
+ * End access through the given grant reference, iff the grant entry is no
+ * longer in use.  Return 1 if the grant entry was freed, 0 if it is still in
+ * use.
+ */
+int gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly);
+
+/*
+ * Eventually end access through the given grant reference, and once that
+ * access has been ended, free the given page too.  Access will be ended
+ * immediately iff the grant entry is not in use, otherwise it will happen
+ * some time later.  page may be 0, in which case no freeing will occur.
+ */
+void gnttab_end_foreign_access(grant_ref_t ref, int readonly,
+			       unsigned long page);
 
 int gnttab_grant_foreign_transfer(domid_t domid);
 
