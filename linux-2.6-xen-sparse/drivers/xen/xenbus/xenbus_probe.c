@@ -552,7 +552,7 @@ static void dev_changed(const char *node, struct xen_bus_type *bus)
 
 	/* backend/<type>/... or device/<type>/... */
 	p = strchr(node, '/') + 1;
-	snprintf(type, BUS_ID_SIZE, "%.*s", strcspn(p, "/"), p);
+	snprintf(type, BUS_ID_SIZE, "%.*s", (int)strcspn(p, "/"), p);
 	type[BUS_ID_SIZE-1] = '\0';
 
 	rootlen = strsep_len(node, '/', bus->levels);
