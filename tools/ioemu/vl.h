@@ -178,6 +178,8 @@ typedef int IOCanRWHandler(void *opaque);
 
 int qemu_add_fd_read_handler(int fd, IOCanRWHandler *fd_can_read, 
                              IOReadHandler *fd_read, void *opaque);
+int qemu_add_fd_event_read_handler(int fd, IOCanRWHandler *fd_can_read, 
+                             IOReadHandler *fd_read, void *opaque);
 void qemu_del_fd_read_handler(int fd);
 
 /* character device */
@@ -791,5 +793,7 @@ void readline_start(const char *prompt, int is_password,
 #define DEFAULT_GDBSTUB_PORT 1234
 
 int gdbserver_start(int port);
+void update_select_wakeup_events(void);
+void tun_receive_handler();
 
 #endif /* VL_H */
