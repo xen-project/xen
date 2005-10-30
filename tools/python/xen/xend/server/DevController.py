@@ -69,9 +69,15 @@ class DevController:
     def destroyDevice(self, devid):
         """Destroy the specified device.
 
-        The implementation here simply deletes the appropriate paths from
-        the store.  This may be overridden by subclasses who need to perform
-        other tasks on destruction.
+        @param devid The device ID, or something device-specific from which
+        the device ID can be determined (such as a guest-side device name).
+
+        The implementation here simply deletes the appropriate paths from the
+        store.  This may be overridden by subclasses who need to perform other
+        tasks on destruction.  Further, the implementation here can only
+        accept integer device IDs, or values that can be converted to
+        integers.  Subclasses may accept other values and convert them to
+        integers before passing them here.
         """
 
         devid = int(devid)
