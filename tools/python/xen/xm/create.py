@@ -34,7 +34,6 @@ from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend.XendClient import server, XendError
 from xen.xend.XendBootloader import bootloader
-from xen.xend import XendRoot; xroot = XendRoot.instance()
 from xen.util import blkif
 
 from xen.xm.opts import *
@@ -254,7 +253,7 @@ gopts.var('vif', val="mac=MAC,be_mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM
           If mac is not specified a random MAC address is used.
           The MAC address of the backend interface can be selected with be_mac.
           If not specified then the network backend chooses it's own MAC address.
-          If bridge is not specified the default bridge is used.
+          If bridge is not specified the first bridge found is used.
           If script is not specified the default script is used.
           If backend is not specified the default backend driver domain is used.
           If vifname is not specified the backend virtual interface will have name vifD.N
@@ -380,6 +379,20 @@ gopts.var('display', val='DISPLAY',
           fn=set_value, default='localhost:0',
           use="X11 display to use")
 
+
+def err(msg):
+    """Print an error to stderr and exit.
+    """
+    print >>sys.stderr, "Error:", msg
+    sys.exit(1)
+
+
+def warn(msg):
+    """Print a warning to stdout.
+    """
+    print >>sys.stderr, "Warning:", msg
+
+
 def strip(pre, s):
     """Strip prefix 'pre' if present.
     """
@@ -388,7 +401,7 @@ def strip(pre, s):
     else:
         return s
 
-def configure_image(opts, vals):
+def configure_image(vals):
     """Create the image config.
     """
     config_image = [ vals.builder ]
@@ -407,7 +420,7 @@ def configure_image(opts, vals):
         config_image.append(['vcpus', vals.vcpus])
     return config_image
     
-def configure_disks(opts, config_devs, vals):
+def configure_disks(config_devs, vals):
     """Create the config for disks (virtual block devices).
     """
     for (uname, dev, mode, backend) in vals.disk:
@@ -419,19 +432,19 @@ def configure_disks(opts, config_devs, vals):
             config_vbd.append(['backend', backend])
         config_devs.append(['device', config_vbd])
 
-def configure_pci(opts, config_devs, vals):
+def configure_pci(config_devs, vals):
     """Create the config for pci devices.
     """
     for (bus, dev, func) in vals.pci:
         config_pci = ['pci', ['bus', bus], ['dev', dev], ['func', func]]
         config_devs.append(['device', config_pci])
 
-def configure_usb(opts, config_devs, vals):
+def configure_usb(config_devs, vals):
     for path in vals.usb:
         config_usb = ['usb', ['path', path]]
         config_devs.append(['device', config_usb])
 
-def configure_vtpm(opts, config_devs, vals):
+def configure_vtpm(config_devs, vals):
     """Create the config for virtual TPM interfaces.
     """
     vtpm = vals.vtpm
@@ -445,9 +458,9 @@ def configure_vtpm(opts, config_devs, vals):
             else:
                 try:
                     if int(instance) == 0:
-                        opts.err('VM config error: vTPM instance must not be 0.')
+                        err('VM config error: vTPM instance must not be 0.')
                 except ValueError:
-                    opts.err('Vm config error: could not parse instance number.')
+                    err('Vm config error: could not parse instance number.')
             backend = d.get('backend')
             config_vtpm = ['vtpm']
             if instance:
@@ -456,7 +469,7 @@ def configure_vtpm(opts, config_devs, vals):
                 config_vtpm.append(['backend', backend])
             config_devs.append(['device', config_vtpm])
 
-def configure_tpmif(opts, config_devs, vals):
+def configure_tpmif(config_devs, vals):
     """Create the config for virtual TPM interfaces.
     """
     tpmif = vals.tpmif
@@ -489,7 +502,7 @@ def randomMAC():
             random.randint(0x00, 0xff) ]
     return ':'.join(map(lambda x: "%02x" % x, mac))
 
-def configure_vifs(opts, config_devs, vals):
+def configure_vifs(config_devs, vals):
     """Create the config for virtual network interfaces.
     """
     vifs = vals.vif
@@ -508,6 +521,7 @@ def configure_vifs(opts, config_devs, vals):
             ip = d.get('ip')
             vifname = d.get('vifname')
         else:
+            
             mac = randomMAC()
             be_mac = None
             bridge = None
@@ -531,7 +545,7 @@ def configure_vifs(opts, config_devs, vals):
             config_vif.append(['ip', ip])
         config_devs.append(['device', config_vif])
 
-def configure_vfr(opts, config, vals):
+def configure_vfr(config, vals):
      if not vals.ipaddr: return
      config_vfr = ['vfr']
      idx = 0 # No way of saying which IP is for which vif?
@@ -539,7 +553,7 @@ def configure_vfr(opts, config, vals):
          config_vfr.append(['vif', ['id', idx], ['ip', ip]])
      config.append(config_vfr)
 
-def configure_vmx(opts, config_image, vals):
+def configure_vmx(config_image, vals):
     """Create the config for VMX devices.
     """
     args = [ 'memmap', 'device_model', 'vcpus', 'cdrom',
@@ -549,27 +563,32 @@ def configure_vmx(opts, config_image, vals):
         if (vals.__dict__[a]):
             config_image.append([a, vals.__dict__[a]])
 
-def run_bootloader(opts, vals):
+def run_bootloader(vals):
     if not os.access(vals.bootloader, os.X_OK):
-        opts.err("Bootloader isn't executable")
+        err("Bootloader isn't executable")
     if len(vals.disk) < 1:
-        opts.err("No disks configured and boot loader requested")
+        err("No disks configured and boot loader requested")
     (uname, dev, mode, backend) = vals.disk[0]
     file = blkif.blkdev_uname_to_file(uname)
 
     return bootloader(vals.bootloader, file, not vals.console_autoconnect,
                       vals.vcpus, vals.blentry)
 
-def make_config(opts, vals):
+def make_config(vals):
     """Create the domain configuration.
     """
     
-    config = ['vm',
-              ['name', vals.name ],
-              ['memory', vals.memory ],
-              ['ssidref', vals.ssidref ]]
-    if vals.maxmem:
-        config.append(['maxmem', vals.maxmem])
+    config = ['vm']
+
+    def add_conf(n):
+        if hasattr(vals, n):
+            v = getattr(vals, n)
+            if v:
+                config.append([n, v])
+
+    map(add_conf, ['name', 'memory', 'ssidref', 'maxmem', 'restart',
+                   'on_poweroff', 'on_reboot', 'on_crash'])
+    
     if vals.cpu is not None:
         config.append(['cpu', vals.cpu])
     if vals.cpu_weight is not None:
@@ -580,34 +599,26 @@ def make_config(opts, vals):
         config.append(['backend', ['netif']])
     if vals.tpmif:
         config.append(['backend', ['tpmif']])
-    if vals.restart:
-        config.append(['restart', vals.restart])
-    if vals.on_poweroff:
-        config.append(['on_poweroff', vals.on_poweroff])
-    if vals.on_reboot:
-        config.append(['on_reboot', vals.on_reboot])
-    if vals.on_crash:
-        config.append(['on_crash', vals.on_crash])
 
     if vals.bootloader:
         config.append(['bootloader', vals.bootloader])
-        config_image = run_bootloader(opts, vals)
+        config_image = run_bootloader(vals)
     else:
-        config_image = configure_image(opts, vals)
-    configure_vmx(opts, config_image, vals)
-    config.append(['image', config_image ])
+        config_image = configure_image(vals)
+    configure_vmx(config_image, vals)
+    config.append(['image', config_image])
 
     config_devs = []
-    configure_disks(opts, config_devs, vals)
-    configure_pci(opts, config_devs, vals)
-    configure_vifs(opts, config_devs, vals)
-    configure_usb(opts, config_devs, vals)
-    configure_vtpm(opts, config_devs, vals)
+    configure_disks(config_devs, vals)
+    configure_pci(config_devs, vals)
+    configure_vifs(config_devs, vals)
+    configure_usb(config_devs, vals)
+    configure_vtpm(config_devs, vals)
     config += config_devs
 
     return config
 
-def preprocess_disk(opts, vals):
+def preprocess_disk(vals):
     if not vals.disk: return
     disk = []
     for v in vals.disk:
@@ -618,23 +629,23 @@ def preprocess_disk(opts, vals):
         elif n == 4:
             pass
         else:
-            opts.err('Invalid disk specifier: ' + v)
+            err('Invalid disk specifier: ' + v)
         disk.append(d)
     vals.disk = disk
 
-def preprocess_pci(opts, vals):
+def preprocess_pci(vals):
     if not vals.pci: return
     pci = []
     for v in vals.pci:
         d = v.split(',')
         if len(d) != 3:
-            opts.err('Invalid pci specifier: ' + v)
+            err('Invalid pci specifier: ' + v)
         # Components are in hex: add hex specifier.
         hexd = map(lambda v: '0x'+v, d)
         pci.append(hexd)
     vals.pci = pci
 
-def preprocess_vifs(opts, vals):
+def preprocess_vifs(vals):
     if not vals.vif: return
     vifs = []
     for vif in vals.vif:
@@ -645,12 +656,12 @@ def preprocess_vifs(opts, vals):
             k = k.strip()
             v = v.strip()
             if k not in ['mac', 'be_mac', 'bridge', 'script', 'backend', 'ip', 'vifname']:
-                opts.err('Invalid vif specifier: ' + vif)
+                err('Invalid vif specifier: ' + vif)
             d[k] = v
         vifs.append(d)
     vals.vif = vifs
 
-def preprocess_vtpm(opts, vals):
+def preprocess_vtpm(vals):
     if not vals.vtpm: return
     vtpms = []
     for vtpm in vals.vtpm:
@@ -661,12 +672,12 @@ def preprocess_vtpm(opts, vals):
             k = k.strip()
             v = v.strip()
             if k not in ['backend', 'instance']:
-                opts.err('Invalid vtpm specifier: ' + vtpm)
+                err('Invalid vtpm specifier: ' + vtpm)
             d[k] = v
         vtpms.append(d)
     vals.vtpm = vtpms
 
-def preprocess_tpmif(opts, vals):
+def preprocess_tpmif(vals):
     if not vals.tpmif: return
     tpmifs = []
     for tpmif in vals.tpmif:
@@ -677,12 +688,12 @@ def preprocess_tpmif(opts, vals):
             k = k.strip()
             v = v.strip()
             if k not in ['frontend']:
-                opts.err('Invalid tpmif specifier: ' + vtpm)
+                err('Invalid tpmif specifier: ' + vtpm)
             d[k] = v
         tpmifs.append(d)
     vals.tpmif = tpmifs
 
-def preprocess_ip(opts, vals):
+def preprocess_ip(vals):
     if vals.ip or vals.dhcp != 'off':
         dummy_nfs_server = '1.2.3.4'
         ip = (vals.ip
@@ -696,10 +707,10 @@ def preprocess_ip(opts, vals):
         ip = ''
     vals.cmdline_ip = ip
 
-def preprocess_nfs(opts, vals):
+def preprocess_nfs(vals):
     if not vals.nfs_root: return
     if not vals.nfs_server:
-        opts.err('Must set nfs root and nfs server')
+        err('Must set nfs root and nfs server')
     nfs = 'nfsroot=' + vals.nfs_server + ':' + vals.nfs_root
     vals.extra = nfs + ' ' + vals.extra
 
@@ -745,14 +756,14 @@ def spawn_vnc(display):
 
     return VNC_BASE_PORT + display
     
-def preprocess_vnc(opts, vals):
+def preprocess_vnc(vals):
     """If vnc was specified, spawn a vncviewer in listen mode
     and pass its address to the domain on the kernel command line.
     """
     if not (vals.vnc and vals.vncviewer) or vals.dryrun: return
     vnc_display = choose_vnc_display()
     if not vnc_display:
-        opts.warn("No free vnc display")
+        warn("No free vnc display")
         return
     print 'VNC=', vnc_display
     vnc_port = spawn_vnc(vnc_display)
@@ -761,17 +772,17 @@ def preprocess_vnc(opts, vals):
         vnc = 'VNC_VIEWER=%s:%d' % (vnc_host, vnc_port)
         vals.extra = vnc + ' ' + vals.extra
     
-def preprocess(opts, vals):
+def preprocess(vals):
     if not vals.kernel:
-        opts.err("No kernel specified")
-    preprocess_disk(opts, vals)
-    preprocess_pci(opts, vals)
-    preprocess_vifs(opts, vals)
-    preprocess_ip(opts, vals)
-    preprocess_nfs(opts, vals)
-    preprocess_vnc(opts, vals)
-    preprocess_vtpm(opts, vals)
-    preprocess_tpmif(opts, vals)
+        err("No kernel specified")
+    preprocess_disk(vals)
+    preprocess_pci(vals)
+    preprocess_vifs(vals)
+    preprocess_ip(vals)
+    preprocess_nfs(vals)
+    preprocess_vnc(vals)
+    preprocess_vtpm(vals)
+    preprocess_tpmif(vals)
          
 def make_domain(opts, config):
     """Create, build and start a domain.
@@ -792,14 +803,14 @@ def make_domain(opts, config):
         import signal
         if vncpid:
             os.kill(vncpid, signal.SIGKILL)
-        opts.err(str(ex))
+        err(str(ex))
 
     dom = sxp.child_value(dominfo, 'name')
 
     if not opts.vals.paused:
         if server.xend_domain_unpause(dom) < 0:
             server.xend_domain_destroy(dom)
-            opts.err("Failed to unpause domain %s" % dom)
+            err("Failed to unpause domain %s" % dom)
     opts.info("Started domain %s" % (dom))
     return int(sxp.child_value(dominfo, 'domid'))
 
@@ -853,8 +864,8 @@ def balloon_out(dom0_min_mem, opts):
     del xc
     return ret
 
-def main(argv):
-    random.seed()
+
+def parseCommandLine(argv):
     opts = gopts
     args = opts.parse(argv)
     if opts.vals.help:
@@ -862,25 +873,43 @@ def main(argv):
     if opts.vals.help or opts.vals.help_config:
         opts.load_defconfig(help=1)
     if opts.vals.help or opts.vals.help_config:
-        return
+        return (None, None)
+
+    if not opts.vals.display:
+        opts.vals.display = os.getenv("DISPLAY")
+
     # Process remaining args as config variables.
     for arg in args:
         if '=' in arg:
             (var, val) = arg.strip().split('=', 1)
             gopts.setvar(var.strip(), val.strip())
-    opts.vals.display = os.getenv("DISPLAY")
     if opts.vals.config:
         config = opts.vals.config
     else:
         opts.load_defconfig()
-        preprocess(opts, opts.vals)
+        preprocess(opts.vals)
         if not opts.getopt('name') and opts.getopt('defconfig'):
             opts.setopt('name', os.path.basename(opts.getopt('defconfig')))
-        config = make_config(opts, opts.vals)
+        config = make_config(opts.vals)
+
+    return (opts, config)
+
+
+def main(argv):
+    random.seed()
+
+    (opts, config) = parseCommandLine(argv)
+
+    if not opts:
+        return
 
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:
+        from xen.xend import XendRoot
+
+        xroot = XendRoot.instance()
+
         dom0_min_mem = xroot.get_dom0_min_mem()
         if dom0_min_mem != 0:
             if balloon_out(dom0_min_mem, opts):
