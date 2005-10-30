@@ -114,7 +114,7 @@ class XendRoot:
         """
         return self.components.get(name)
 
-    def _logError(self, fmt, args):
+    def _logError(self, fmt, *args):
         """Logging function to log to stderr. We use this for XendRoot log
         messages because they may be logged before the logger has been
         configured.  Other components can safely use the logger.
@@ -144,7 +144,10 @@ class XendRoot:
                     config = sxp.parse(fin)
                 finally:
                     fin.close()
-                config.insert(0, 'xend-config')
+                if config is None:
+                    config = ['xend-config']
+                else:
+                    config.insert(0, 'xend-config')
                 self.config = config
             except Exception, ex:
                 self._logError('Reading config file %s: %s',
@@ -250,16 +253,15 @@ class XendRoot:
         s = self.get_config_value('network-script')
 
         if s:
-            return os.path.join(self.network_script_dir, s)
+            result = s.split(" ")
+            result[0] = os.path.join(self.network_script_dir, result[0])
+            return result
         else:
             return None
 
 
     def get_enable_dump(self):
         return self.get_config_bool('enable-dump', 'no')
-
-    def get_vif_bridge(self):
-        return self.get_config_value('vif-bridge', 'xenbr0')
 
     def get_vif_script(self):
         return self.get_config_value('vif-script', 'vif-bridge')

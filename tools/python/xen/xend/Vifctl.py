@@ -32,4 +32,5 @@ def network(op):
         raise ValueError('Invalid operation: ' + op)
     script = XendRoot.instance().get_network_script()
     if script:
-        os.spawnl(os.P_WAIT, script, script, op)
+        script.insert(1, op)
+        os.spawnv(os.P_WAIT, script[0], script)
