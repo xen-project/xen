@@ -50,7 +50,6 @@ typedef struct PCNetState_st PCNetState;
 struct PCNetState_st {
     PCIDevice dev;
     NetDriverState *nd;
-    QEMUTimer *poll_timer;
     int mmio_io_addr, rap, isr, lnkst;
     target_phys_addr_t rdra, tdra;
     uint8_t prom[16];
@@ -640,8 +639,6 @@ static void pcnet_poll_timer(void *opaque)
 {
     PCNetState *s = opaque;
 
-    qemu_del_timer(s->poll_timer);
-
     if (CSR_TDMD(s)) {
         pcnet_transmit(s);
     }
@@ -660,8 +657,6 @@ static void pcnet_poll_timer(void *opaque)
             } else
                 CSR_POLL(s) = t;
         }
-        qemu_mod_timer(s->poll_timer, 
-            pcnet_get_next_poll_time(s,qemu_get_clock(vm_clock)));
     }
 }
 
@@ -941,6 +936,7 @@ static void pcnet_ioport_writew(void *opaque, uint32_t addr, uint32_t val)
         }
     }
     pcnet_update_irq(s);
+    update_select_wakeup_events();
 }
 
 static uint32_t pcnet_ioport_readw(void *opaque, uint32_t addr)
@@ -966,6 +962,7 @@ static uint32_t pcnet_ioport_readw(void *opaque, uint32_t addr)
         }
     }
     pcnet_update_irq(s);
+    update_select_wakeup_events();
 #ifdef PCNET_DEBUG_IO
     printf("pcnet_ioport_readw addr=0x%08x val=0x%04x\n", addr, val & 0xffff);
 #endif
@@ -1000,6 +997,7 @@ static void pcnet_ioport_writel(void *opaque, uint32_t addr, uint32_t val)
 #endif        
     }
     pcnet_update_irq(s);
+    update_select_wakeup_events();
 }
 
 static uint32_t pcnet_ioport_readl(void *opaque, uint32_t addr)
@@ -1025,6 +1023,7 @@ static uint32_t pcnet_ioport_readl(void *opaque, uint32_t addr)
         }
     }
     pcnet_update_irq(s);
+    update_select_wakeup_events();
 #ifdef PCNET_DEBUG_IO
     printf("pcnet_ioport_readl addr=0x%08x val=0x%08x\n", addr, val);
 #endif
@@ -1210,8 +1209,6 @@ void pci_pcnet_init(PCIBus *bus, NetDriverState *nd)
     pci_register_io_region((PCIDevice *)d, 1, PCNET_PNPMMIO_SIZE, 
                            PCI_ADDRESS_SPACE_MEM, pcnet_mmio_map);
                            
-    d->poll_timer = qemu_new_timer(vm_clock, pcnet_poll_timer, d);
-
     d->nd = nd;
 
     pcnet_h_reset(d);
