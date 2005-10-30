@@ -112,6 +112,12 @@ xm full list of subcommands:
                                    where <DevId> may either be the device ID
                                    or the device name as mounted in the guest.
     block-list    <DomId>          List virtual block devices for a domain
+
+    network-attach  <DomID> [script=<script>] [ip=<ip>] [mac=<mac>]
+                            [bridge=<bridge>] [backend=<backDomID>]
+        Create a new virtual network device 
+    network-detach  <DomId> <DevId>  Destroy a domain's virtual network
+                                     device, where <DevId> is the device ID.
     network-limit   <DomId> <Vif> <Credit> <Period>
         Limit the transmission rate of a virtual network interface
     network-list    <DomId>        List virtual network interfaces for a domain
@@ -588,14 +594,39 @@ def xm_block_attach(args):
     from xen.xend.XendClient import server
     server.xend_domain_device_create(dom, vbd)
 
-def xm_block_detach(args):
-    arg_check(args,2,"block-detach")
+
+def xm_network_attach(args):
+    n = len(args)
+    if n == 0:
+        usage("network-attach")
+        
+    dom = args[0]
+    vif = ['vif']
+
+    for a in args[1:]:
+        vif.append(a.split("="))
+
+    from xen.xend.XendClient import server
+    server.xend_domain_device_create(dom, vif)
+
+
+def detach(args, command, deviceClass):
+    arg_check(args, 2, command)
 
     dom = args[0]
     dev = args[1]
 
     from xen.xend.XendClient import server
-    server.xend_domain_device_destroy(dom, 'vbd', dev)
+    server.xend_domain_device_destroy(dom, deviceClass, dev)
+
+
+def xm_block_detach(args):
+    detach(args, 'block-detach', 'vbd')
+
+
+def xm_network_detach(args):
+    detach(args, 'network-detach', 'vif')
+
 
 def xm_vnet_list(args):
     from xen.xend.XendClient import server
@@ -673,6 +704,8 @@ commands = {
     "block-detach": xm_block_detach,
     "block-list": xm_block_list,
     # network
+    "network-attach": xm_network_attach,
+    "network-detach": xm_network_detach,
     "network-limit": xm_network_limit,
     "network-list": xm_network_list,
     # vnet
