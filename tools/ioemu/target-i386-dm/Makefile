@@ -311,7 +311,7 @@ endif
 endif
 
 $(QEMU_SYSTEM): $(VL_OBJS) libqemu.a
-	$(CC) $(VL_LDFLAGS) -o $@ $^ $(LIBS) $(SDL_LIBS) $(VNC_LIBS) $(VL_LIBS)
+	$(CC) $(VL_LDFLAGS) -o $@ $^ $(LIBS) $(SDL_LIBS) $(VNC_LIBS) $(VL_LIBS) -lpthread
 
 vnc.o: vnc.c keyboard_rdesktop.c
 	$(CC) $(CFLAGS) $(DEFINES) $(VNC_CFLAGS) -c -o $@ $<
