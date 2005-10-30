@@ -283,7 +283,7 @@ static void shutdown_handler(struct xenbus_watch *watch,
 	int err;
 
 	if (shutting_down != SHUTDOWN_INVALID)
-		goto out;
+		return;
 
  again:
 	xbt = xenbus_transaction_start();
