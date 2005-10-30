@@ -91,8 +91,6 @@
 static void network_tx_buf_gc(struct net_device *dev);
 static void network_alloc_rx_buffers(struct net_device *dev);
 
-static void netif_free(struct netfront_info *info);
-
 static unsigned long rx_pfn_array[NETIF_RX_RING_SIZE];
 static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE+1];
 static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE];
@@ -191,6 +189,8 @@ static char *be_state_name[] = {
 	printk(KERN_INFO "xen_net: " fmt, ##args)
 #define WPRINTK(fmt, args...) \
 	printk(KERN_WARNING "xen_net: " fmt, ##args)
+
+static void netif_free(struct netfront_info *info);
 
 /** Send a packet on a net device to encourage switches to learn the
  * MAC. We send a fake ARP request.
