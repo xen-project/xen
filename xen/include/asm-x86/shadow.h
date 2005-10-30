@@ -387,7 +387,7 @@ shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
     nl1e = l1e;
     l1e_remove_flags(nl1e, _PAGE_GLOBAL);
 
-    if ( unlikely(l1e_get_flags(l1e) & L1_DISALLOW_MASK) )
+    if ( unlikely(l1e_get_flags(nl1e) & L1_DISALLOW_MASK) )
         return 0;
 
     res = get_page_from_l1e(nl1e, d);

@@ -1381,7 +1381,8 @@ static int resync_all(struct domain *d, u32 stype)
             perfc_incrc(resync_l1);
             perfc_incr_histo(wpt_updates, changed, PT_UPDATES);
             perfc_incr_histo(l1_entries_checked, max_shadow - min_shadow + 1, PT_UPDATES);
-            if (unshadow_l1) {
+            if ( d->arch.ops->guest_paging_levels == PAGING_L4 &&
+                 unshadow_l1 ) {
                 pgentry_64_t l2e;
 
                 __shadow_get_l2e(entry->v, entry->va, &l2e);
