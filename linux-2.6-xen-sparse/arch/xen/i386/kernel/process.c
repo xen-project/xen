@@ -483,6 +483,9 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		mcl->args[0] = 1;
 		mcl++;
 	}
+#if 0 /* lazy fpu sanity check */
+	else BUG_ON(!(read_cr0() & 8));
+#endif
 
 	/*
 	 * Reload esp0, LDT and the page table pointer:
