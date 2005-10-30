@@ -1,0 +1,87 @@
+=head1 NAME
+
+xmdomain.cfg - xm domain create config file format
+
+=head1 SYNOPSIS
+
+ /etc/xen/myxendomain
+ /etc/xen/myxendomain2
+ /etc/xen/auto/myxenautostarted
+
+=head1 DESCRIPTION
+
+The xm(1) program uses python executable config files to define
+domains to create from scratch.  Each of these config files needs to
+contain a number of required options, and may specify many more.
+
+Domain configuration files live in /etc/xen by default, though the
+full path to the config file must be specified in the I<xm create>
+command, so they can exist anywhere in the filesystem.
+
+/etc/xen/auto is a special case however, as domain config files in
+that directory will be started automatically at system boot if the
+xendomain init script is enabled.
+
+=head1 OPTIONS
+
+The following lists the most commonly used options for a domain config
+file.  
+
+=over 4
+
+=item I<kernel>
+
+The kernel image used in the domain.
+
+=item I<ramdisk>
+
+The initial ramdisk to be used in the domain.  Default xen domU
+kernels do not usually need a ramdisk.
+
+=item I<memory>
+
+The amount of memory, in megabytes to allocate to the domain when it
+starts.  Allocating insufficient memory for a domain may produce
+extremely bizarre behavior.
+
+=item I<name>
+
+A unique name for the domain.  You can not create 2 domains with the
+same name.
+
+=item I<root>
+
+Root stanza for the domain (required for Linux domains).
+
+=item I<disk>
+
+An array of disk stanzas 
+
+=back
+
+A bare minimal config file example might be as follows:
+
+    kernel = "/boot/vmlinuz-2.6-xenU"
+    memory = 128
+    name = "MyLinux"      
+    root = "/dev/hda1 ro"
+
+=head1 ADDITIONAL OPTIONS
+
+=over 4
+
+=item I<builder>
+
+=back
+
+=head1 SEE ALSO
+
+B<xm>(1)
+
+=head1 AUTHOR
+
+  Sean Dague <sean at dague dot net>
+
+=head1 BUGS
+
+Not all options are currently documented

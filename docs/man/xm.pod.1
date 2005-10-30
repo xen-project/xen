@@ -1,0 +1,254 @@
+=head1 NAME
+
+xm - Xen management user interface
+
+=head1 SYNOPSIS
+
+xm <subcommand> [args]
+
+=head1 DESCRIPTION
+
+The B<xm> program is the main interface for managing Xen guest domains. The program can be used to create, pause, and shutdown domains. It can also be used to list current domains, enable or pin VCPUs, and attach or detach virtual block devices. The B<xm> program relies upon B<xend>. The daemon must be running in order for the program to work.
+
+Domain name <DomName> can be substituted in the subcommands for Domain id <DomId>.
+
+=head1 DOMAIN SUBCOMMANDS
+
+=over 4
+
+=item I<console> <DomId>
+
+Attach to domain DomId's console.
+
+=item I<create> <CfgFile>
+
+Create a domain based on B<xmdomain.cfg> configuration file.
+
+=item I<destroy> <DomId>
+
+Terminate domain DomId immediately.
+
+=item I<domid> <DomName>
+
+Converts a domain name to a domain id.
+
+=item I<domname> <DomId>
+
+Converts a domain id to a domain name.
+
+=item I<help> [--long]
+
+Displays command's help message. The long option prints out the complete set of B<xm> subcommands.
+
+=item I<list> [DomId, ...]
+
+List information about domains.
+
+=item I<mem-max> <DomId> <Mem>
+
+Set domain maximum memory limit to Mem. Mem is in Megabytes. This is the upper memory mark for how much memory a domain can have.
+
+=item I<mem-set> <DomId> <Mem>
+
+Set domain's memory, in Megabytes. Mem must be less than or equal to the maximum memory for the domain.
+
+=item I<migrate> <DomId> <Host> [Options]
+
+Migrate a domain to another Host machine. B<Xend> must be running on other host machine and there must be sufficient resources as well.
+
+=over 4
+
+Additional Options:
+
+    -l, --live                    Use live migration.
+    -r, --resource <Mbit value>   Set resource level.
+
+=back
+
+=item I<pause> <DomId>
+
+Pause a domain's execution.
+
+=item I<reboot> [Options] <DomId>
+
+Reboot a domain.
+
+=over 4
+
+Additional Options:
+
+    -a, --all        reboot all domains.
+    -w, --wait       Wait for shutdown to complete.
+
+=back
+
+=item I<restore> <File>
+
+Create a domain from saved state File.
+
+=item I<save> <DomId> <File>
+
+Save domain state to File. Saves domain configuration to File as well.
+
+=item I<shutdown> [Options] <DomId>
+
+Shutdown a domain.
+
+=over 4
+
+Additional Options:
+
+    -a, --all        Shutdown all domains.
+    -H, --halt       Shutdown domain without reboot.
+    -R, --reboot     Shutdown and reboot domain.
+    -w, --wait       Wait for shutdown to complete.
+
+=back
+
+=item I<sysrq> <DomId> <letter>
+
+Send a sysrq to a domain.
+
+=item I<unpause> <DomId>
+
+Unpause a paused domain.
+
+=item I<set-vcpus> <DomId> <VCPUs>
+
+Enable a specific number of VCPUs for a domain. Subcommand only enables or disables already configured VCPUs for domain.
+
+=item I<vpcu-list> [DomID]
+
+Lists VCPU information for a specific domain or all domains if DomID not given.
+
+=item I<vcpu-pin> <DomId> <VCPU> <CPUs>
+
+Sets VCPU to only run on specific CPUs.
+
+=back
+
+=head1 XEN HOST SUBCOMMANDS
+
+=over 4
+
+=item I<dmesg> [OPTION]
+
+Read or clear Xen's message buffer. The buffer contains Xen boot, warning, and error messages.
+
+=over 4
+
+Additional Option:
+
+    -c, --clear        Clears Xen's message buffer.
+
+=back
+
+=item I<info>
+
+Get information about Xen host.
+
+=item I<log>
+
+Print B<xend> log.
+
+=item I<top>
+
+Monitor system and domains in real-time.
+
+=back
+
+=head1 SCHEDULER SUBCOMMANDS
+
+=over 4
+
+=item I<sched-bvt> <Parameters>
+
+Set Borrowed Virtual Time (BVT) scheduler parameters. There are five parameters, which are given in order below.
+
+=over 4
+
+Parameters:
+
+    mcuadv - Minimum Charging Unit (MCU) advance.
+    warpback - Warp back time allowed.
+    warpvalue - Warp value.
+    warpl - Warp maximum limit.
+    warpu - Unwarped minimum limit.
+
+=back 
+
+=item I<sched-bvt-ctxallow> <Allow>
+
+Sets the BVT scheduler's context switch allowance. Allow is the minimum time slice allowed to run before being pre-empted.
+
+=item I<sched-sedf> <Parameters>
+
+Set simple sEDF scheduler parameters. Use the following parametersin order.
+
+=over 4
+
+Parameters:
+
+    period - in nanoseconds
+    slice - in nanoseconds
+    latency-hint - scaled period if domain is doing heavy I/O
+    extratime - flag for allowing domain to run in extra time.
+    weight - another way of setting cpu slice.
+
+=back
+
+=back
+
+=head1 VIRTUAL DEVICE COMMANDS
+
+=over 4
+
+=item I<block-attach <DomId> <BackDev> <FrontDev> <Mode> [BackDomId]
+
+Create a new virtual block device.
+
+=item I<block-detach> <DomId> <DevId>
+
+Destroy a domain's virtual block device. DevId may either be a device ID or the device name as mounted in the guest.
+
+=item I<block-list> <DomId>
+
+List virtual block devices for a domain.
+
+=item I<network-limit> <DomId> <Vif> <Credit> <Period>
+
+Limit the transmission rate of a virtual network interface.
+
+=item I<network-list> <DomId>
+
+List virtual network interfaces for a domain.
+
+=back
+
+=head1 VNET COMMANDS
+
+=over 4
+
+=item I<vnet-list> [-l|--long]
+
+List vnets.
+
+=item I<vnet-create> <config>
+
+Create a vnet from a config file.
+
+=item I<vnet-delete> <vnetid>
+
+Delete a vnet.
+
+=back
+
+=head1 SEE ALSO
+
+B<xmdomain.cfg>(5)
+
+=head1 AUTHOR
+
+  Daniel Stekloff <dsteklof at us dot ibm dot com>
+
+=head1 BUGS
