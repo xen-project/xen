@@ -66,8 +66,16 @@ unsigned long phys_translate_count = 0;
 unsigned long vcpu_verbose = 0;
 #define verbose(a...) do {if (vcpu_verbose) printf(a);} while(0)
 
-extern TR_ENTRY *match_tr(VCPU *vcpu, unsigned long ifa);
-extern TR_ENTRY *match_dtlb(VCPU *vcpu, unsigned long ifa);
+//#define vcpu_quick_region_check(_tr_regions,_ifa)	1
+#define vcpu_quick_region_check(_tr_regions,_ifa)			\
+	(_tr_regions & (1 << ((unsigned long)_ifa >> 61)))
+#define vcpu_quick_region_set(_tr_regions,_ifa)				\
+	do {_tr_regions |= (1 << ((unsigned long)_ifa >> 61)); } while (0)
+
+// FIXME: also need to check && (!trp->key || vcpu_pkr_match(trp->key))
+#define vcpu_match_tr_entry(_trp,_ifa,_rid)				\
+	((_trp->p && (_trp->rid==_rid) && (_ifa >= _trp->vadr) &&	\
+	(_ifa < (_trp->vadr + (1L<< _trp->ps)) - 1)))
 
 /**************************************************************************
  VCPU general register access routines
@@ -620,7 +628,7 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 		return;
 	}
     if ( VMX_DOMAIN(vcpu) ) {
- 	    set_bit(vector,VCPU(vcpu,irr));
+	    set_bit(vector,VCPU(vcpu,irr));
     } else
     {
 	/* if (!test_bit(vector,PSCB(vcpu,delivery_mask))) return; */
@@ -630,16 +638,6 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 	set_bit(vector,PSCBX(vcpu,irr));
 	PSCB(vcpu,pending_interruption) = 1;
     }
-
-#if 0
-    /* Keir: I think you should unblock when an interrupt is pending. */
-    {
-        int running = test_bit(_VCPUF_running, &vcpu->vcpu_flags);
-        vcpu_unblock(vcpu);
-        if ( running )
-            smp_send_event_check_cpu(vcpu->processor);
-    }
-#endif
 }
 
 void early_tick(VCPU *vcpu)
@@ -710,14 +708,6 @@ UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 	}
 
 //printf("returned to caller\n");
-#if 0
-if (vector == (PSCB(vcpu,itv) & 0xff)) {
-	UINT64 now = ia64_get_itc();
-	UINT64 itm = PSCBX(vcpu,domain_itm);
-	if (now < itm) early_tick(vcpu);
-
-}
-#endif
 	return vector;
 }
 
@@ -775,6 +765,7 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 	}
 #ifdef HEARTBEAT_FREQ
 	if (domid >= N_DOMS) domid = N_DOMS-1;
+#if 0
 	if (vector == (PSCB(vcpu,itv) & 0xff)) {
 	    if (!(++count[domid] & ((HEARTBEAT_FREQ*1024)-1))) {
 		printf("Dom%d heartbeat... ticks=%lx,nonticks=%lx\n",
@@ -783,6 +774,7 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 		//dump_runq();
 	    }
 	}
+#endif
 	else nonclockcount[domid]++;
 #endif
 	// now have an unmasked, pending, deliverable vector!
@@ -1068,23 +1060,6 @@ void vcpu_set_next_timer(VCPU *vcpu)
 	/* gloss over the wraparound problem for now... we know it exists
 	 * but it doesn't matter right now */
 
-#if 0
-	/* ensure at least next SP tick is in the future */
-	if (!interval) PSCBX(vcpu,xen_itm) = now +
-#if 0
-		(running_on_sim() ? SIM_DEFAULT_CLOCK_RATE :
-					DEFAULT_CLOCK_RATE);
-#else
-	3000000;
-//printf("vcpu_set_next_timer: HACK!\n");
-#endif
-#if 0
-	if (PSCBX(vcpu,xen_itm) < now)
-		while (PSCBX(vcpu,xen_itm) < now + (interval>>1))
-			PSCBX(vcpu,xen_itm) += interval;
-#endif
-#endif
-
 	if (is_idle_task(vcpu->domain)) {
 //		printf("****** vcpu_set_next_timer called during idle!!\n");
 		vcpu_safe_set_itm(s);
@@ -1175,14 +1150,6 @@ void vcpu_pend_timer(VCPU *vcpu)
 		// don't deliver another
 		return;
 	}
-#if 0
-	// attempt to flag "timer tick before its due" source
-	{
-	UINT64 itm = PSCBX(vcpu,domain_itm);
-	UINT64 now = ia64_get_itc();
-	if (now < itm) printf("******* vcpu_pend_timer: pending before due!\n");
-	}
-#endif
 	vcpu_pend_interrupt(vcpu, itv);
 }
 
@@ -1196,33 +1163,6 @@ UINT64 vcpu_timer_pending_early(VCPU *vcpu)
 	if (!itm) return 0;
 	return (vcpu_deliverable_timer(vcpu) && (now < itm));
 }
-
-//FIXME: This is a hack because everything dies if a timer tick is lost
-void vcpu_poke_timer(VCPU *vcpu)
-{
-	UINT64 itv = PSCB(vcpu,itv) & 0xff;
-	UINT64 now = ia64_get_itc();
-	UINT64 itm = PSCBX(vcpu,domain_itm);
-	UINT64 irr;
-
-	if (vcpu_timer_disabled(vcpu)) return;
-	if (!itm) return;
-	if (itv != 0xefL) {
-		printf("vcpu_poke_timer: unimplemented itv=%lx!\n",itv);
-		while(1);
-	}
-	// using 0xef instead of itv so can get real irr
-	if (now > itm && !test_bit(0xefL, PSCBX(vcpu,insvc))) {
-		if (!test_bit(0xefL,PSCBX(vcpu,irr))) {
-			irr = ia64_getreg(_IA64_REG_CR_IRR3);
-			if (irr & (1L<<(0xef-0xc0))) return;
-if (now-itm>0x800000)
-printf("*** poking timer: now=%lx,vitm=%lx,xitm=%lx,itm=%lx\n",now,itm,local_cpu_data->itm_next,ia64_get_itm());
-			vcpu_pend_timer(vcpu);
-		}
-	}
-}
-
 
 /**************************************************************************
 Privileged operation emulation routines
@@ -1316,13 +1256,6 @@ IA64FAULT vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 	UINT64 VHPT_addr = VHPT_addr1 | ((VHPT_addr2a | VHPT_addr2b) << 15) |
 			VHPT_addr3;
 
-#if 0
-	if (VHPT_addr1 == 0xe000000000000000L) {
-	    printf("vcpu_thash: thash unsupported with rr7 @%lx\n",
-		PSCB(vcpu,iip));
-	    return (IA64_ILLOP_FAULT);
-	}
-#endif
 //verbose("vcpu_thash: vadr=%p, VHPT_addr=%p\n",vadr,VHPT_addr);
 	*pval = VHPT_addr;
 	return (IA64_NO_FAULT);
@@ -1341,9 +1274,9 @@ unsigned long vhpt_translate_count = 0;
 
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
-	unsigned long pta, pta_mask, pte, ps;
+	unsigned long pta, pte, rid, rr;
+	int i;
 	TR_ENTRY *trp;
-	ia64_rr rr;
 
 	if (!(address >> 61)) {
 		if (!PSCB(vcpu,metaphysical_mode)) {
@@ -1361,67 +1294,80 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 		return IA64_NO_FAULT;
 	}
 
-	/* check translation registers */
-	if ((trp = match_tr(vcpu,address))) {
-			tr_translate_count++;
-		*pteval = trp->page_flags;
-		*itir = trp->itir;
-		return IA64_NO_FAULT;
+	rr = PSCB(vcpu,rrs)[address>>61];
+	rid = rr & RR_RID_MASK;
+	if (is_data) {
+		if (vcpu_quick_region_check(vcpu->arch.dtr_regions,address)) {
+			for (trp = vcpu->arch.dtrs, i = NDTRS; i; i--, trp++) {
+				if (vcpu_match_tr_entry(trp,address,rid)) {
+					*pteval = trp->page_flags;
+					*itir = trp->itir;
+					tr_translate_count++;
+					return IA64_NO_FAULT;
+				}
+			}
+		}
+	}
+	// FIXME?: check itr's for data accesses too, else bad things happen?
+	/* else */ {
+		if (vcpu_quick_region_check(vcpu->arch.itr_regions,address)) {
+			for (trp = vcpu->arch.itrs, i = NITRS; i; i--, trp++) {
+				if (vcpu_match_tr_entry(trp,address,rid)) {
+					*pteval = trp->page_flags;
+					*itir = trp->itir;
+					tr_translate_count++;
+					return IA64_NO_FAULT;
+				}
+			}
+		}
 	}
 
 	/* check 1-entry TLB */
-	if ((trp = match_dtlb(vcpu,address))) {
-		dtlb_translate_count++;
+	// FIXME?: check dtlb for inst accesses too, else bad things happen?
+	trp = &vcpu->arch.dtlb;
+	if (/* is_data && */ vcpu_match_tr_entry(trp,address,rid)) {
 		if (vcpu->domain==dom0 && !in_tpa) *pteval = trp->page_flags;
 		else *pteval = vcpu->arch.dtlb_pte;
-//		printf("DTLB MATCH... NEW, DOM%s, %s\n", vcpu->domain==dom0?
-//			"0":"U", in_tpa?"vcpu_tpa":"ia64_do_page_fault");
 		*itir = trp->itir;
+		dtlb_translate_count++;
 		return IA64_NO_FAULT;
 	}
 
 	/* check guest VHPT */
 	pta = PSCB(vcpu,pta);
-	rr.rrval = PSCB(vcpu,rrs)[address>>61];
-	if (!rr.ve || !(pta & IA64_PTA_VE)) {
-// FIXME? does iha get set for alt faults? does xenlinux depend on it?
-		vcpu_thash(vcpu, address, iha);
-// FIXME?: does itir get set for alt faults?
-		*itir = vcpu_get_itir_on_fault(vcpu,address);
-		return (is_data ? IA64_ALT_DATA_TLB_VECTOR :
-				IA64_ALT_INST_TLB_VECTOR);
-	}
 	if (pta & IA64_PTA_VF) { /* long format VHPT - not implemented */
-		// thash won't work right?
 		panic_domain(vcpu_regs(vcpu),"can't do long format VHPT\n");
 		//return (is_data ? IA64_DATA_TLB_VECTOR:IA64_INST_TLB_VECTOR);
 	}
 
+	*itir = rr & (RR_RID_MASK | RR_PS_MASK);
+	// note: architecturally, iha is optionally set for alt faults but
+	// xenlinux depends on it so should document it as part of PV interface
+	vcpu_thash(vcpu, address, iha);
+	if (!(rr & RR_VE_MASK) || !(pta & IA64_PTA_VE))
+		return (is_data ? IA64_ALT_DATA_TLB_VECTOR : IA64_ALT_INST_TLB_VECTOR);
+
 	/* avoid recursively walking (short format) VHPT */
-	pta_mask = (itir_mask(pta) << 3) >> 3;
-	if (((address ^ pta) & pta_mask) == 0)
+	if (((address ^ pta) & ((itir_mask(pta) << 3) >> 3)) == 0)
 		return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
 
-	vcpu_thash(vcpu, address, iha);
-	if (__copy_from_user(&pte, (void *)(*iha), sizeof(pte)) != 0) {
-// FIXME?: does itir get set for vhpt faults?
-		*itir = vcpu_get_itir_on_fault(vcpu,*iha);
+	if (__copy_from_user(&pte, (void *)(*iha), sizeof(pte)) != 0)
+		// virtual VHPT walker "missed" in TLB
 		return IA64_VHPT_FAULT;
-	}
 
 	/*
-	 * Optimisation: this VHPT walker aborts on not-present pages
-	 * instead of inserting a not-present translation, this allows
-	 * vectoring directly to the miss handler.
-	 */
-	if (pte & _PAGE_P) {
-		*pteval = pte;
-		*itir = vcpu_get_itir_on_fault(vcpu,address);
-		vhpt_translate_count++;
-		return IA64_NO_FAULT;
-	}
-	*itir = vcpu_get_itir_on_fault(vcpu,address);
-	return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
+	* Optimisation: this VHPT walker aborts on not-present pages
+	* instead of inserting a not-present translation, this allows
+	* vectoring directly to the miss handler.
+	*/
+	if (!(pte & _PAGE_P))
+		return (is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR);
+
+	/* found mapping in guest VHPT! */
+	*itir = rr & RR_PS_MASK;
+	*pteval = pte;
+	vhpt_translate_count++;
+	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
@@ -1736,33 +1682,6 @@ static void vcpu_set_tr_entry(TR_ENTRY *trp, UINT64 pte, UINT64 itir, UINT64 ifa
 	}
 }
 
-TR_ENTRY *vcpu_match_tr_entry(VCPU *vcpu, TR_ENTRY *trp, UINT64 ifa, int count)
-{
-	unsigned long rid = (get_rr(ifa) & RR_RID_MASK);
-	int i;
-
-	for (i = 0; i < count; i++, trp++) {
-		if (!trp->p) continue;
-		if (physicalize_rid(vcpu,trp->rid) != rid) continue;
-		if (ifa < trp->vadr) continue;
-		if (ifa >= (trp->vadr + (1L << trp->ps)) - 1) continue;
-		//if (trp->key && !match_pkr(vcpu,trp->key)) continue;
-		return trp;
-	}
-	return 0;
-}
-
-TR_ENTRY *match_tr(VCPU *vcpu, unsigned long ifa)
-{
-	TR_ENTRY *trp;
-
-	trp = vcpu_match_tr_entry(vcpu,vcpu->arch.dtrs,ifa,NDTRS);
-	if (trp) return trp;
-	trp = vcpu_match_tr_entry(vcpu,vcpu->arch.itrs,ifa,NITRS);
-	if (trp) return trp;
-	return 0;
-}
-
 IA64FAULT vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 pte,
 		UINT64 itir, UINT64 ifa)
 {
@@ -1772,6 +1691,7 @@ IA64FAULT vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 pte,
 	trp = &PSCBX(vcpu,dtrs[slot]);
 //printf("***** itr.d: setting slot %d: ifa=%p\n",slot,ifa);
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
+	vcpu_quick_region_set(PSCBX(vcpu,dtr_regions),ifa);
 	return IA64_NO_FAULT;
 }
 
@@ -1784,6 +1704,7 @@ IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte,
 	trp = &PSCBX(vcpu,itrs[slot]);
 //printf("***** itr.i: setting slot %d: ifa=%p\n",slot,ifa);
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
+	vcpu_quick_region_set(PSCBX(vcpu,itr_regions),ifa);
 	return IA64_NO_FAULT;
 }
 
@@ -1833,17 +1754,6 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 		vcpu_set_tr_entry(&PSCBX(vcpu,dtlb),pte,ps<<2,vaddr);
 		PSCBX(vcpu,dtlb_pte) = mp_pte;
 	}
-}
-
-// NOTE: returns a physical pte, NOT a "metaphysical" pte, so do not check
-// the physical address contained for correctness
-TR_ENTRY *match_dtlb(VCPU *vcpu, unsigned long ifa)
-{
-	TR_ENTRY *trp;
-
-	if (trp = vcpu_match_tr_entry(vcpu,&vcpu->arch.dtlb,ifa,1))
-		return (&vcpu->arch.dtlb);
-	return 0UL;
 }
 
 IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
@@ -1952,12 +1862,14 @@ IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 IA64FAULT vcpu_ptr_d(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 {
 	printf("vcpu_ptr_d: Purging TLB is unsupported\n");
+	// don't forget to recompute dtr_regions
 	return (IA64_ILLOP_FAULT);
 }
 
 IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 {
 	printf("vcpu_ptr_i: Purging TLB is unsupported\n");
+	// don't forget to recompute itr_regions
 	return (IA64_ILLOP_FAULT);
 }
 

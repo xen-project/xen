@@ -38,6 +38,20 @@ static s_time_t        stime_irq = 0x0;       /* System time at last 'time updat
 unsigned long itc_scale, ns_scale;
 unsigned long itc_at_irq;
 
+/* We don't expect an absolute cycle value here, since then no way
+ * to prevent overflow for large norminator. Normally this conversion
+ * is used for relative offset.
+ */
+u64 cycle_to_ns(u64 cycle)
+{
+    return (cycle * itc_scale) >> 32;
+}
+
+u64 ns_to_cycle(u64 ns)
+{
+    return (ns * ns_scale) >> 32;
+}
+
 static inline u64 get_time_delta(void)
 {
     s64      delta_itc;
@@ -52,19 +66,6 @@ static inline u64 get_time_delta(void)
     return cycle_to_ns(delta_itc);
 }
 
-/* We don't expect an absolute cycle value here, since then no way
- * to prevent overflow for large norminator. Normally this conversion
- * is used for relative offset.
- */
-u64 cycle_to_ns(u64 cycle)
-{
-    return (cycle * itc_scale) >> 32;
-}
-
-u64 ns_to_cycle(u64 ns)
-{
-    return (ns * ns_scale) >> 32;
-}
 
 s_time_t get_s_time(void)
 {
@@ -99,16 +100,18 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long new_itm, old_itc;
 
+#if 0
 #define HEARTBEAT_FREQ 16	// period in seconds
 #ifdef HEARTBEAT_FREQ
 	static long count = 0;
 	if (!(++count & ((HEARTBEAT_FREQ*1024)-1))) {
-		printf("Heartbeat... iip=%p,psr.i=%d,pend=%d\n",
-			regs->cr_iip,
+		printf("Heartbeat... iip=%p\n", /*",psr.i=%d,pend=%d\n", */
+			regs->cr_iip /*,
 			VCPU(current,interrupt_delivery_enabled),
-			VCPU(current,pending_interruption));
+			VCPU(current,pending_interruption) */);
 		count = 0;
 	}
+#endif
 #endif
 	if (current->domain == dom0) {
 		// FIXME: there's gotta be a better way of doing this...
@@ -117,12 +120,14 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		//domain0_ready = 1; // moved to xensetup.c
 		VCPU(current,pending_interruption) = 1;
 	}
-	if (domain0_ready && vcpu_timer_expired(dom0->vcpu[0])) {
-		vcpu_pend_timer(dom0->vcpu[0]);
-		//vcpu_set_next_timer(dom0->vcpu[0]);
-		vcpu_wake(dom0->vcpu[0]);
+	if (domain0_ready && current->domain != dom0) {
+		if(vcpu_timer_expired(dom0->vcpu[0])) {
+			vcpu_pend_timer(dom0->vcpu[0]);
+			//vcpu_set_next_timer(dom0->vcpu[0]);
+			vcpu_wake(dom0->vcpu[0]);
+		}
 	}
-	if (!is_idle_task(current->domain) && current->domain != dom0) {
+	if (!is_idle_task(current->domain))  {
 		if (vcpu_timer_expired(current)) {
 			vcpu_pend_timer(current);
 			// ensure another timer interrupt happens even if domain doesn't
@@ -132,8 +137,11 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	}
 	new_itm = local_cpu_data->itm_next;
 
-	if (!time_after(ia64_get_itc(), new_itm))
+	if (!VMX_DOMAIN(current) && !time_after(ia64_get_itc(), new_itm))
 		return;
+
+	if (VMX_DOMAIN(current))
+		vcpu_wake(current);
 
 	while (1) {
 		new_itm += local_cpu_data->itm_delta;
@@ -233,7 +241,7 @@ int reprogram_ac_timer(s_time_t timeout)
 	s_time_t expire;
 	unsigned long seq, cur_itc, itm_next;
 
-	if (!domain0_ready) return 1;
+	if (!domain0_ready || timeout == 0) return 1;
 
 	do {
 		seq = read_seqbegin(&xtime_lock);

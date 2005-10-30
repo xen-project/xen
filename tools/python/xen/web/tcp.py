@@ -99,7 +99,7 @@ def listenTCP(port, factory, interface='', backlog=None):
     return l
 
 def SetCloExec(SocketListener):
-    SocketListener.SetCloExec()
+    SocketListener.setCloExec()
 
 def connectTCP(host, port, factory, timeout=None, bindAddress=None):
     c = TCPConnector(host, port, factory, timeout=timeout, bindAddress=bindAddress)

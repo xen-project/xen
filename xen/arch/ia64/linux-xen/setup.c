@@ -366,6 +366,7 @@ check_for_logical_procs (void)
 }
 #endif
 
+void __init
 #ifdef XEN
 early_setup_arch (char **cmdline_p)
 #else
@@ -377,14 +378,12 @@ setup_arch (char **cmdline_p)
 	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
 
 	*cmdline_p = __va(ia64_boot_param->command_line);
-#ifdef XEN
-	efi_init();
-#else
+#ifndef XEN
 	strlcpy(saved_command_line, *cmdline_p, COMMAND_LINE_SIZE);
+#endif
 
 	efi_init();
 	io_port_init();
-#endif
 
 #ifdef CONFIG_IA64_GENERIC
 	{
@@ -414,11 +413,17 @@ setup_arch (char **cmdline_p)
 #ifdef XEN
 	early_cmdline_parse(cmdline_p);
 	cmdline_parse(*cmdline_p);
-#undef CONFIG_ACPI_BOOT
 #endif
 	if (early_console_setup(*cmdline_p) == 0)
 		mark_bsp_online();
 
+#ifdef XEN
+}
+
+void __init
+late_setup_arch (char **cmdline_p)
+{
+#endif
 #ifdef CONFIG_ACPI_BOOT
 	/* Initialize the ACPI boot-time table parser */
 	acpi_table_init();
@@ -433,20 +438,16 @@ setup_arch (char **cmdline_p)
 
 #ifndef XEN
 	find_memory();
-#else
-	io_port_init();
-}
-
-void __init
-late_setup_arch (char **cmdline_p)
-{
-#undef CONFIG_ACPI_BOOT
-	acpi_table_init();
 #endif
+
 	/* process SAL system table: */
 	ia64_sal_init(efi.sal_systab);
 
 #ifdef CONFIG_SMP
+#ifdef XEN
+	init_smp_config ();
+#endif
+
 	cpu_physical_id(0) = hard_smp_processor_id();
 
 	cpu_set(0, cpu_sibling_map[0]);
@@ -768,6 +769,11 @@ cpu_init (void)
 
 	cpu_data = per_cpu_init();
 
+#ifdef XEN
+	printf ("cpu_init: current=%p, current->domain->arch.mm=%p\n",
+		current, current->domain->arch.mm);
+#endif
+
 	/*
 	 * We set ar.k3 so that assembly code in MCA handler can compute
 	 * physical addresses of per cpu variables with a simple:
@@ -886,6 +892,16 @@ cpu_init (void)
 	platform_cpu_init();
 #ifndef XEN
 	pm_idle = default_idle;
+#endif
+
+#ifdef XEN
+    /* surrender usage of kernel registers to domain, use percpu area instead */
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_IO_BASE] = ia64_get_kr(IA64_KR_IO_BASE);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_PER_CPU_DATA] = ia64_get_kr(IA64_KR_PER_CPU_DATA);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT_STACK] = ia64_get_kr(IA64_KR_CURRENT_STACK);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_FPU_OWNER] = ia64_get_kr(IA64_KR_FPU_OWNER);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT] = ia64_get_kr(IA64_KR_CURRENT);
+    __get_cpu_var(cpu_kr)._kr[IA64_KR_PT_BASE] = ia64_get_kr(IA64_KR_PT_BASE);
 #endif
 }
 

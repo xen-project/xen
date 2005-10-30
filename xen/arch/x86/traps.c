@@ -1147,6 +1147,9 @@ asmlinkage void do_nmi(struct cpu_user_regs *regs, unsigned long reason)
 
 asmlinkage int math_state_restore(struct cpu_user_regs *regs)
 {
+    struct trap_bounce *tb;
+    trap_info_t *ti;
+
     /* Prevent recursion. */
     clts();
 
@@ -1154,10 +1157,15 @@ asmlinkage int math_state_restore(struct cpu_user_regs *regs)
 
     if ( current->arch.guest_context.ctrlreg[0] & X86_CR0_TS )
     {
-        struct trap_bounce *tb = &current->arch.trap_bounce;
+        tb = &current->arch.trap_bounce;
+        ti = &current->arch.guest_context.trap_ctxt[TRAP_no_device];
+
         tb->flags = TBF_EXCEPTION;
-        tb->cs    = current->arch.guest_context.trap_ctxt[7].cs;
-        tb->eip   = current->arch.guest_context.trap_ctxt[7].address;
+        tb->cs    = ti->cs;
+        tb->eip   = ti->address;
+        if ( TI_GET_IF(ti) )
+            tb->flags |= TBF_INTERRUPT;
+
         current->arch.guest_context.ctrlreg[0] &= ~X86_CR0_TS;
     }
 
@@ -1169,6 +1177,7 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
     unsigned long condition;
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.trap_bounce;
+    trap_info_t *ti;
 
     __asm__ __volatile__("mov %%db6,%0" : "=r" (condition));
 
@@ -1198,9 +1207,12 @@ asmlinkage int do_debug(struct cpu_user_regs *regs)
     /* Save debug status register where guest OS can peek at it */
     v->arch.guest_context.debugreg[6] = condition;
 
+    ti = &v->arch.guest_context.trap_ctxt[TRAP_debug];
     tb->flags = TBF_EXCEPTION;
-    tb->cs    = v->arch.guest_context.trap_ctxt[TRAP_debug].cs;
-    tb->eip   = v->arch.guest_context.trap_ctxt[TRAP_debug].address;
+    tb->cs    = ti->cs;
+    tb->eip   = ti->address;
+    if ( TI_GET_IF(ti) )
+        tb->flags |= TBF_INTERRUPT;
 
  out:
     return EXCRET_not_a_fault;

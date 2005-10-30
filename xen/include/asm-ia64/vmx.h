@@ -25,6 +25,7 @@
 #define RR7_SWITCH_SHIFT	12	/* 4k enough */
 #include <public/io/ioreq.h>
 
+
 extern void identify_vmx_feature(void);
 extern unsigned int vmx_enabled;
 extern void vmx_init_env(void);

@@ -253,11 +253,11 @@ void start_kernel(void)
 printk("About to call scheduler_init()\n");
     scheduler_init();
     local_irq_disable();
+    init_IRQ ();
 printk("About to call init_xen_time()\n");
     init_xen_time(); /* initialise the time */
 printk("About to call ac_timer_init()\n");
     ac_timer_init();
-// init_xen_time(); ???
 
 #ifdef CONFIG_SMP
     if ( opt_nosmp )
@@ -276,6 +276,9 @@ printk("About to call ac_timer_init()\n");
 
     //BUG_ON(!local_irq_is_enabled());
 
+    /*  Enable IRQ to receive IPI (needed for ITC sync).  */
+    local_irq_enable();
+
 printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
     for_each_present_cpu ( i )
     {
@@ -287,24 +290,16 @@ printk("About to call __cpu_up(%d)\n",i);
 	}
     }
 
+    local_irq_disable();
+
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
     smp_cpus_done(max_cpus);
 #endif
 
-
-	// FIXME: Should the following be swapped and moved later?
-    schedulers_start();
     do_initcalls();
 printk("About to call sort_main_extable()\n");
     sort_main_extable();
 
-    /* surrender usage of kernel registers to domain, use percpu area instead */
-    __get_cpu_var(cpu_kr)._kr[IA64_KR_IO_BASE] = ia64_get_kr(IA64_KR_IO_BASE);
-    __get_cpu_var(cpu_kr)._kr[IA64_KR_PER_CPU_DATA] = ia64_get_kr(IA64_KR_PER_CPU_DATA);
-    __get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT_STACK] = ia64_get_kr(IA64_KR_CURRENT_STACK);
-    __get_cpu_var(cpu_kr)._kr[IA64_KR_FPU_OWNER] = ia64_get_kr(IA64_KR_FPU_OWNER);
-    __get_cpu_var(cpu_kr)._kr[IA64_KR_CURRENT] = ia64_get_kr(IA64_KR_CURRENT);
-    __get_cpu_var(cpu_kr)._kr[IA64_KR_PT_BASE] = ia64_get_kr(IA64_KR_PT_BASE);
 
     /* Create initial domain 0. */
 printk("About to call do_createdomain()\n");
@@ -342,6 +337,11 @@ printk("About to call construct_dom0()\n");
                         0,
 			0) != 0)
         panic("Could not set up DOM0 guest OS\n");
+
+    /* PIN domain0 on CPU 0.  */
+    dom0->vcpu[0]->cpumap=1;
+    set_bit(_VCPUF_cpu_pinned, &dom0->vcpu[0]->vcpu_flags);
+
 #ifdef CLONE_DOMAIN0
     {
     int i;
@@ -379,9 +379,16 @@ printk("About to call init_trace_bufs()\n");
 	domain_unpause_by_systemcontroller(clones[i]);
     }
 #endif
-    domain_unpause_by_systemcontroller(dom0);
     domain0_ready = 1;
+
     local_irq_enable();
+
+    printf("About to call schedulers_start dom0=%p, idle0_dom=%p\n",
+	   dom0, &idle0_domain);
+    schedulers_start();
+
+    domain_unpause_by_systemcontroller(dom0);
+
 printk("About to call startup_cpu_idle_loop()\n");
     startup_cpu_idle_loop();
 }

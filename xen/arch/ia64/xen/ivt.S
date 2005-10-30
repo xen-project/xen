@@ -484,6 +484,7 @@ END(alt_dtlb_miss)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1400 Entry 5 (size 64 bundles) Data nested TLB (6,45)
 ENTRY(nested_dtlb_miss)
+	DBG_FAULT(5)
 	/*
 	 * In the absence of kernel bugs, we get here when the virtually mapped linear
 	 * page table is accessed non-speculatively (e.g., in the Dirty-bit, Instruction
@@ -552,10 +553,10 @@ END(nested_dtlb_miss)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1800 Entry 6 (size 64 bundles) Instruction Key Miss (24)
 ENTRY(ikey_miss)
+	DBG_FAULT(6)
 #ifdef XEN
 	REFLECT(6)
 #endif
-	DBG_FAULT(6)
 	FAULT(6)
 END(ikey_miss)
 
@@ -597,10 +598,10 @@ END(page_fault)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1c00 Entry 7 (size 64 bundles) Data Key Miss (12,51)
 ENTRY(dkey_miss)
+	DBG_FAULT(7)
 #ifdef XEN
 	REFLECT(7)
 #endif
-	DBG_FAULT(7)
 	FAULT(7)
 END(dkey_miss)
 
@@ -608,10 +609,10 @@ END(dkey_miss)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2000 Entry 8 (size 64 bundles) Dirty-bit (54)
 ENTRY(dirty_bit)
+	DBG_FAULT(8)
 #ifdef XEN
 	REFLECT(8)
 #endif
-	DBG_FAULT(8)
 	/*
 	 * What we do here is to simply turn on the dirty bit in the PTE.  We need to
 	 * update both the page-table and the TLB entry.  To efficiently access the PTE,
@@ -673,6 +674,7 @@ END(dirty_bit)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2400 Entry 9 (size 64 bundles) Instruction Access-bit (27)
 ENTRY(iaccess_bit)
+	DBG_FAULT(9)
 #ifdef XEN
 	mov r31=pr;
 	mov r16=cr.isr
@@ -681,7 +683,6 @@ ENTRY(iaccess_bit)
 	movl r20=0x2400
 	br.sptk.many fast_access_reflect;;
 #endif
-	DBG_FAULT(9)
 	// Like Entry 8, except for instruction access
 	mov r16=cr.ifa				// get the address that caused the fault
 	movl r30=1f				// load continuation point in case of nested fault
@@ -746,6 +747,7 @@ END(iaccess_bit)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2800 Entry 10 (size 64 bundles) Data Access-bit (15,55)
 ENTRY(daccess_bit)
+	DBG_FAULT(10)
 #ifdef XEN
 	mov r31=pr;
 	mov r16=cr.isr
@@ -754,7 +756,6 @@ ENTRY(daccess_bit)
 	movl r20=0x2800
 	br.sptk.many fast_access_reflect;;
 #endif
-	DBG_FAULT(10)
 	// Like Entry 8, except for data access
 	mov r16=cr.ifa				// get the address that caused the fault
 	movl r30=1f				// load continuation point in case of nested fault
@@ -971,8 +972,10 @@ slow_interrupt:
 	mov out0=cr.ivr		// pass cr.ivr as first arg
 #endif
 	add out1=16,sp		// pass pointer to pt_regs as second arg
+#ifndef XEN
 	;;
 	srlz.d			// make sure we see the effect of cr.ivr
+#endif
 	movl r14=ia64_leave_kernel
 	;;
 	mov rp=r14
@@ -1363,10 +1366,10 @@ END(dispatch_to_fault_handler)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5000 Entry 20 (size 16 bundles) Page Not Present (10,22,49)
 ENTRY(page_not_present)
+	DBG_FAULT(20)
 #ifdef XEN
 	REFLECT(20)
 #endif
-	DBG_FAULT(20)
 	mov r16=cr.ifa
 	rsm psr.dt
 	/*
@@ -1386,10 +1389,10 @@ END(page_not_present)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5100 Entry 21 (size 16 bundles) Key Permission (13,25,52)
 ENTRY(key_permission)
+	DBG_FAULT(21)
 #ifdef XEN
 	REFLECT(21)
 #endif
-	DBG_FAULT(21)
 	mov r16=cr.ifa
 	rsm psr.dt
 	mov r31=pr
@@ -1402,10 +1405,10 @@ END(key_permission)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5200 Entry 22 (size 16 bundles) Instruction Access Rights (26)
 ENTRY(iaccess_rights)
+	DBG_FAULT(22)
 #ifdef XEN
 	REFLECT(22)
 #endif
-	DBG_FAULT(22)
 	mov r16=cr.ifa
 	rsm psr.dt
 	mov r31=pr
@@ -1418,6 +1421,7 @@ END(iaccess_rights)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5300 Entry 23 (size 16 bundles) Data Access Rights (14,53)
 ENTRY(daccess_rights)
+	DBG_FAULT(23)
 #ifdef XEN
 	mov r31=pr;
 	mov r16=cr.isr
@@ -1426,7 +1430,6 @@ ENTRY(daccess_rights)
 	movl r20=0x5300
 	br.sptk.many fast_access_reflect;;
 #endif
-	DBG_FAULT(23)
 	mov r16=cr.ifa
 	rsm psr.dt
 	mov r31=pr
@@ -1459,10 +1462,31 @@ END(general_exception)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5500 Entry 25 (size 16 bundles) Disabled FP-Register (35)
 ENTRY(disabled_fp_reg)
-#ifdef XEN
-	REFLECT(25)
-#endif
 	DBG_FAULT(25)
+#ifdef XEN
+#if 0
+	mov r20=pr
+	movl r16=0x2000000000000000
+	movl r17=0x2000000000176b60
+	mov r18=cr.iip
+	mov r19=rr[r16]
+	movl r22=0xe95d0439
+	;;
+	mov pr=r0,-1
+	;;
+	cmp.eq p6,p7=r22,r19
+	;;
+	(p6) cmp.eq p8,p9=r17,r18
+	(p8) br.sptk.few floating_panic
+	;;
+	mov pr=r20,-1
+	;;
+#endif
+	REFLECT(25)
+//floating_panic:
+//	br.sptk.many floating_panic
+	;;
+#endif
 	rsm psr.dfh		// ensure we can access fph
 	;;
 	srlz.d
@@ -1475,10 +1499,10 @@ END(disabled_fp_reg)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5600 Entry 26 (size 16 bundles) Nat Consumption (11,23,37,50)
 ENTRY(nat_consumption)
+	DBG_FAULT(26)
 #ifdef XEN
 	REFLECT(26)
 #endif
-	DBG_FAULT(26)
 	FAULT(26)
 END(nat_consumption)
 
@@ -1486,11 +1510,11 @@ END(nat_consumption)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5700 Entry 27 (size 16 bundles) Speculation (40)
 ENTRY(speculation_vector)
+	DBG_FAULT(27)
 #ifdef XEN
 	// this probably need not reflect...
 	REFLECT(27)
 #endif
-	DBG_FAULT(27)
 	/*
 	 * A [f]chk.[as] instruction needs to take the branch to the recovery code but
 	 * this part of the architecture is not implemented in hardware on some CPUs, such
@@ -1533,10 +1557,10 @@ END(speculation_vector)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5900 Entry 29 (size 16 bundles) Debug (16,28,56)
 ENTRY(debug_vector)
+	DBG_FAULT(29)
 #ifdef XEN
 	REFLECT(29)
 #endif
-	DBG_FAULT(29)
 	FAULT(29)
 END(debug_vector)
 
@@ -1544,10 +1568,10 @@ END(debug_vector)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5a00 Entry 30 (size 16 bundles) Unaligned Reference (57)
 ENTRY(unaligned_access)
+	DBG_FAULT(30)
 #ifdef XEN
 	REFLECT(30)
 #endif
-	DBG_FAULT(30)
 	mov r16=cr.ipsr
 	mov r31=pr		// prepare to save predicates
 	;;
@@ -1558,10 +1582,10 @@ END(unaligned_access)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5b00 Entry 31 (size 16 bundles) Unsupported Data Reference (57)
 ENTRY(unsupported_data_reference)
+	DBG_FAULT(31)
 #ifdef XEN
 	REFLECT(31)
 #endif
-	DBG_FAULT(31)
 	FAULT(31)
 END(unsupported_data_reference)
 
@@ -1569,10 +1593,10 @@ END(unsupported_data_reference)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5c00 Entry 32 (size 16 bundles) Floating-Point Fault (64)
 ENTRY(floating_point_fault)
+	DBG_FAULT(32)
 #ifdef XEN
 	REFLECT(32)
 #endif
-	DBG_FAULT(32)
 	FAULT(32)
 END(floating_point_fault)
 
@@ -1580,10 +1604,10 @@ END(floating_point_fault)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5d00 Entry 33 (size 16 bundles) Floating Point Trap (66)
 ENTRY(floating_point_trap)
+	DBG_FAULT(33)
 #ifdef XEN
 	REFLECT(33)
 #endif
-	DBG_FAULT(33)
 	FAULT(33)
 END(floating_point_trap)
 
@@ -1591,10 +1615,10 @@ END(floating_point_trap)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5e00 Entry 34 (size 16 bundles) Lower Privilege Transfer Trap (66)
 ENTRY(lower_privilege_trap)
+	DBG_FAULT(34)
 #ifdef XEN
 	REFLECT(34)
 #endif
-	DBG_FAULT(34)
 	FAULT(34)
 END(lower_privilege_trap)
 
@@ -1602,10 +1626,10 @@ END(lower_privilege_trap)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5f00 Entry 35 (size 16 bundles) Taken Branch Trap (68)
 ENTRY(taken_branch_trap)
+	DBG_FAULT(35)
 #ifdef XEN
 	REFLECT(35)
 #endif
-	DBG_FAULT(35)
 	FAULT(35)
 END(taken_branch_trap)
 
@@ -1613,10 +1637,10 @@ END(taken_branch_trap)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6000 Entry 36 (size 16 bundles) Single Step Trap (69)
 ENTRY(single_step_trap)
+	DBG_FAULT(36)
 #ifdef XEN
 	REFLECT(36)
 #endif
-	DBG_FAULT(36)
 	FAULT(36)
 END(single_step_trap)
 
@@ -1672,10 +1696,10 @@ END(single_step_trap)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6900 Entry 45 (size 16 bundles) IA-32 Exeception (17,18,29,41,42,43,44,58,60,61,62,72,73,75,76,77)
 ENTRY(ia32_exception)
+	DBG_FAULT(45)
 #ifdef XEN
 	REFLECT(45)
 #endif
-	DBG_FAULT(45)
 	FAULT(45)
 END(ia32_exception)
 
@@ -1683,10 +1707,10 @@ END(ia32_exception)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6a00 Entry 46 (size 16 bundles) IA-32 Intercept  (30,31,59,70,71)
 ENTRY(ia32_intercept)
+	DBG_FAULT(46)
 #ifdef XEN
 	REFLECT(46)
 #endif
-	DBG_FAULT(46)
 #ifdef	CONFIG_IA32_SUPPORT
 	mov r31=pr
 	mov r16=cr.isr
@@ -1716,10 +1740,10 @@ END(ia32_intercept)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6b00 Entry 47 (size 16 bundles) IA-32 Interrupt  (74)
 ENTRY(ia32_interrupt)
+	DBG_FAULT(47)
 #ifdef XEN
 	REFLECT(47)
 #endif
-	DBG_FAULT(47)
 #ifdef CONFIG_IA32_SUPPORT
 	mov r31=pr
 	br.sptk.many dispatch_to_ia32_handler

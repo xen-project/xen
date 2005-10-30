@@ -5,27 +5,16 @@
 #define VHPT_ENABLED_REGION_0_TO_6 1
 #define VHPT_ENABLED_REGION_7 0
 
+/* Size of the VHPT.  */
+#define	VHPT_SIZE_LOG2			24
 
-#if 0
+/* Number of entries in the VHPT.  The size of an entry is 4*8B == 32B */
+#define	VHPT_NUM_ENTRIES		(1 << (VHPT_SIZE_LOG2 - 5))
+
+#define VHPT_CACHE_MASK			(VHPT_NUM_ENTRIES - 1)
 #define	VHPT_CACHE_ENTRY_SIZE		64
-#define	VHPT_CACHE_MASK			2097151
-#define	VHPT_CACHE_NUM_ENTRIES		32768
-#define	VHPT_NUM_ENTRIES		2097152
-#define	VHPT_CACHE_ENTRY_SIZE_LOG2	6
-#define	VHPT_SIZE_LOG2			26	//????
-#define	VHPT_PAGE_SHIFT			26	//????
-#else
-//#define	VHPT_CACHE_NUM_ENTRIES		2048
-//#define	VHPT_NUM_ENTRIES		131072
-//#define	VHPT_CACHE_MASK			131071
-//#define	VHPT_SIZE_LOG2			22	//????
-#define	VHPT_CACHE_ENTRY_SIZE		64
-#define	VHPT_CACHE_NUM_ENTRIES		8192
-#define	VHPT_NUM_ENTRIES		524288
-#define	VHPT_CACHE_MASK			524287
-#define	VHPT_SIZE_LOG2			24	//????
-#define	VHPT_PAGE_SHIFT			24	//????
-#endif
+
+#define	VHPT_PAGE_SHIFT			VHPT_SIZE_LOG2
 
 // FIXME: These should be automatically generated
 
@@ -52,7 +41,7 @@
 // VHPT collison chain entry (part of the "V-Cache")
 // DO NOT CHANGE THE SIZE OF THIS STRUCTURE (see vhpt.S banked regs calculations)
 //
-typedef struct vcache_entry {
+struct vcache_entry {
     union {
         struct {
             unsigned long tag  : 63; // 0-62
@@ -123,12 +112,21 @@ struct vhpt_lf_entry {
 
 #define INVALID_TI_TAG 0x8000000000000000L
 
+extern void vhpt_init (void);
+extern void zero_vhpt_stats(void);
+extern int dump_vhpt_stats(char *buf);
+extern void vhpt_flush_address(unsigned long vadr, unsigned long addr_range);
+extern void vhpt_multiple_insert(unsigned long vaddr, unsigned long pte,
+				 unsigned long logps);
+extern void vhpt_insert (unsigned long vadr, unsigned long ptr,
+			 unsigned logps);
+extern void vhpt_flush(void);
 #endif /* !__ASSEMBLY */
 
 #if !VHPT_ENABLED
 #define VHPT_CCHAIN_LOOKUP(Name, i_or_d)
 #else
-#ifdef CONFIG_SMP
+#if 0 /* One VHPT per cpu! def CONFIG_SMP */
 #warning "FIXME SMP: VHPT_CCHAIN_LOOKUP needs a semaphore on the VHPT!"
 #endif
 

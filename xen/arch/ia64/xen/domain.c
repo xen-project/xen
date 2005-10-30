@@ -23,11 +23,13 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
+#include <asm/hw_irq.h>
 //#include <asm/mpspec.h>
 #include <xen/irq.h>
 #include <xen/event.h>
 //#include <xen/shadow.h>
 #include <xen/console.h>
+#include <xen/compile.h>
 
 #include <xen/elf.h>
 //#include <asm/page.h>
@@ -58,6 +60,7 @@ unsigned long *domU_staging_area;
 
 // initialized by arch/ia64/setup.c:find_initrd()
 unsigned long initrd_start = 0, initrd_end = 0;
+extern unsigned long running_on_sim;
 
 #define IS_XEN_ADDRESS(d,a) ((a >= d->xen_vastart) && (a <= d->xen_vaend))
 
@@ -75,35 +78,21 @@ void free_perdomain_pt(struct domain *d)
 	//free_page((unsigned long)d->mm.perdomain_pt);
 }
 
-int hlt_counter;
-
-void disable_hlt(void)
-{
-	hlt_counter++;
-}
-
-void enable_hlt(void)
-{
-	hlt_counter--;
-}
-
 static void default_idle(void)
 {
-	if ( hlt_counter == 0 )
-	{
+	int cpu = smp_processor_id();
 	local_irq_disable();
-	    if ( !softirq_pending(smp_processor_id()) )
+	if ( !softirq_pending(cpu))
 	        safe_halt();
-	    //else
-		local_irq_enable();
-	}
+	local_irq_enable();
 }
 
-void continue_cpu_idle_loop(void)
+static void continue_cpu_idle_loop(void)
 {
 	int cpu = smp_processor_id();
 	for ( ; ; )
 	{
+	printf ("idle%dD\n", cpu);
 #ifdef IA64
 //        __IRQ_STAT(cpu, idle_timestamp) = jiffies
 #else
@@ -111,23 +100,32 @@ void continue_cpu_idle_loop(void)
 #endif
 	    while ( !softirq_pending(cpu) )
 	        default_idle();
+	    add_preempt_count(SOFTIRQ_OFFSET);
 	    raise_softirq(SCHEDULE_SOFTIRQ);
 	    do_softirq();
+	    sub_preempt_count(SOFTIRQ_OFFSET);
 	}
 }
 
 void startup_cpu_idle_loop(void)
 {
+	int cpu = smp_processor_id ();
 	/* Just some sanity to ensure that the scheduler is set up okay. */
 	ASSERT(current->domain == IDLE_DOMAIN_ID);
+	printf ("idle%dA\n", cpu);
 	raise_softirq(SCHEDULE_SOFTIRQ);
+#if 0   /* All this work is done within continue_cpu_idle_loop  */
+	printf ("idle%dB\n", cpu);
+	asm volatile ("mov ar.k2=r0");
 	do_softirq();
+	printf ("idle%dC\n", cpu);
 
 	/*
 	 * Declares CPU setup done to the boot processor.
 	 * Therefore memory barrier to ensure state is visible.
 	 */
 	smp_mb();
+#endif
 #if 0
 //do we have to ensure the idle task has a shared page so that, for example,
 //region registers can be loaded from it.  Apparently not...
@@ -204,6 +202,15 @@ void arch_do_createdomain(struct vcpu *v)
    		while (1);
 	}
 	memset(d->shared_info, 0, PAGE_SIZE);
+	if (v == d->vcpu[0])
+	    memset(&d->shared_info->evtchn_mask[0], 0xff,
+		sizeof(d->shared_info->evtchn_mask));
+#if 0
+	d->vcpu[0].arch.privregs = 
+			alloc_xenheap_pages(get_order(sizeof(mapped_regs_t)));
+	printf("arch_vcpu_info=%p\n", d->vcpu[0].arch.privregs);
+	memset(d->vcpu.arch.privregs, 0, PAGE_SIZE);
+#endif
 	v->vcpu_info = &(d->shared_info->vcpu_data[0]);
 
 	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
@@ -233,17 +240,21 @@ void arch_do_createdomain(struct vcpu *v)
 	v->arch.breakimm = d->arch.breakimm;
 
 	d->arch.sys_pgnr = 0;
-	d->arch.mm = xmalloc(struct mm_struct);
-	if (unlikely(!d->arch.mm)) {
-		printk("Can't allocate mm_struct for domain %d\n",d->domain_id);
-		return -ENOMEM;
-	}
-	memset(d->arch.mm, 0, sizeof(*d->arch.mm));
-	d->arch.mm->pgd = pgd_alloc(d->arch.mm);
-	if (unlikely(!d->arch.mm->pgd)) {
-		printk("Can't allocate pgd for domain %d\n",d->domain_id);
-		return -ENOMEM;
-	}
+	if (d->domain_id != IDLE_DOMAIN_ID) {
+		d->arch.mm = xmalloc(struct mm_struct);
+		if (unlikely(!d->arch.mm)) {
+			printk("Can't allocate mm_struct for domain %d\n",d->domain_id);
+			return -ENOMEM;
+		}
+		memset(d->arch.mm, 0, sizeof(*d->arch.mm));
+		d->arch.mm->pgd = pgd_alloc(d->arch.mm);
+		if (unlikely(!d->arch.mm->pgd)) {
+			printk("Can't allocate pgd for domain %d\n",d->domain_id);
+			return -ENOMEM;
+		}
+	} else
+ 		d->arch.mm = NULL;
+ 	printf ("arch_do_create_domain: domain=%p\n", d);
 }
 
 void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
@@ -267,6 +278,14 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	printf("arch_set_info_guest\n");
 	if ( test_bit(_VCPUF_initialised, &v->vcpu_flags) )
             return 0;
+
+	/* Sync d/i cache conservatively */
+	if (!running_on_sim) {
+	    ret = ia64_pal_cache_flush(4, 0, &progress, NULL);
+	    if (ret != PAL_STATUS_SUCCESS)
+	        panic("PAL CACHE FLUSH failed for domain.\n");
+	    printk("Sync i/d cache for dom0 image SUCC\n");
+	}
 
 	if (c->flags & VGCF_VMX_GUEST) {
 	    if (!vmx_enabled) {
@@ -527,7 +546,8 @@ tryagain:
 				if (pte_present(*pte)) {
 //printk("lookup_domain_page: found mapping for %lx, pte=%lx\n",mpaddr,pte_val(*pte));
 					return *(unsigned long *)pte;
-				}
+				} else if (VMX_DOMAIN(d->vcpu[0]))
+					return GPFN_INV_MASK;
 			}
 		}
 	}
@@ -779,7 +799,6 @@ void physdev_init_dom0(struct domain *d)
 	set_bit(_DOMF_physdev_access, &d->domain_flags);
 }
 
-extern unsigned long running_on_sim;
 unsigned int vmx_dom0 = 0;
 int construct_dom0(struct domain *d, 
 	               unsigned long image_start, unsigned long image_len, 
@@ -930,6 +949,7 @@ int construct_dom0(struct domain *d,
 	si = (start_info_t *)alloc_xenheap_page();
 	memset(si, 0, PAGE_SIZE);
 	d->shared_info->arch.start_info_pfn = __pa(si) >> PAGE_SHIFT;
+	sprintf(si->magic, "Xen-%i.%i", XEN_VERSION, XEN_SUBVERSION);
 
 #if 0
 	si->nr_pages     = d->tot_pages;

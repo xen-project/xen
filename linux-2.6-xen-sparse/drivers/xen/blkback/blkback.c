@@ -108,6 +108,7 @@ static void fast_flush_area(int idx, int nr_pages)
 	struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	unsigned int i, invcount = 0;
 	u16 handle;
+	int ret;
 
 	for (i = 0; i < nr_pages; i++) {
 		handle = pending_handle(idx, i);
@@ -120,8 +121,9 @@ static void fast_flush_area(int idx, int nr_pages)
 		invcount++;
 	}
 
-	BUG_ON(HYPERVISOR_grant_table_op(
-		GNTTABOP_unmap_grant_ref, unmap, invcount));
+	ret = HYPERVISOR_grant_table_op(
+		GNTTABOP_unmap_grant_ref, unmap, invcount);
+	BUG_ON(ret);
 }
 
 
@@ -338,6 +340,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 	struct bio *bio = NULL, *biolist[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	int nbio = 0;
 	request_queue_t *q;
+	int ret;
 
 	/* Check that number of segments is sane. */
 	nseg = req->nr_segments;
@@ -367,8 +370,8 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 			map[i].flags |= GNTMAP_readonly;
 	}
 
-	BUG_ON(HYPERVISOR_grant_table_op(
-		GNTTABOP_map_grant_ref, map, nseg));
+	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, nseg);
+	BUG_ON(ret);
 
 	for (i = 0; i < nseg; i++) {
 		if (unlikely(map[i].handle < 0)) {
@@ -493,6 +496,7 @@ static int __init blkif_init(void)
 {
 	int i;
 	struct page *page;
+	int ret;
 
 	blkif_interface_init();
 
@@ -509,7 +513,8 @@ static int __init blkif_init(void)
 	spin_lock_init(&blkio_schedule_list_lock);
 	INIT_LIST_HEAD(&blkio_schedule_list);
 
-	BUG_ON(kernel_thread(blkio_schedule, 0, CLONE_FS | CLONE_FILES) < 0);
+	ret = kernel_thread(blkio_schedule, 0, CLONE_FS | CLONE_FILES);
+	BUG_ON(ret < 0);
 
 	blkif_xenbus_init();
 

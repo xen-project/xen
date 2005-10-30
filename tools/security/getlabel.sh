@@ -36,18 +36,21 @@ source labelfuncs.sh
 
 usage ()
 {
-	echo "Usage: $0 -sid <ssidref> [<policy name>] or"
-	echo "       $0 -dom <domid>   [<policy name>]  "
-	echo ""
-	echo "policy name : the name of the policy, i.e. 'chwall'"
-	echo "              If the policy name is omitted, the grub.conf"
-	echo "              entry of the running system is tried to be read"
-	echo "              and the policy name determined from there."
-	echo "ssidref     : an ssidref in hex or decimal format, i.e., '0x00010002'"
-	echo "              or '65538'"
-	echo "domid       : id of the domain, i.e., '1'; Use numbers from the 2nd"
-	echo "              column shown when invoking 'xm list'"
-	echo ""
+echo "Use this tool to display the label of a domain or the label that is
+corresponding to an ssidref given the name of the running policy.
+
+Usage: $0 -sid <ssidref> [<policy name>] or
+       $0 -dom <domid>   [<policy name>]
+
+policy name : the name of the policy, i.e. 'chwall'
+              If the policy name is omitted, the grub.conf
+              entry of the running system is tried to be read
+              and the policy name determined from there.
+ssidref     : an ssidref in hex or decimal format, i.e., '0x00010002'
+              or '65538'
+domid       : id of the domain, i.e., '1'; Use numbers from the 2nd
+              column shown when invoking 'xm list'
+"
 }
 
 

@@ -15,7 +15,8 @@
 #include <asm/regionreg.h>
 #include <asm/vhpt.h>
 #include <asm/vcpu.h>
-extern void ia64_new_rr7(unsigned long rid,void *shared_info, void *shared_arch_info);
+extern void ia64_new_rr7(unsigned long rid,void *shared_info, void *shared_arch_info, unsigned long p_vhpt, unsigned long v_pal);
+extern void *pal_vaddr;
 
 
 #define	IA64_MIN_IMPL_RID_BITS	(IA64_MIN_IMPL_RID_MSB+1)
@@ -66,9 +67,12 @@ unsigned long allocate_metaphysical_rr(void)
 {
 	ia64_rr rrv;
 
+	rrv.rrval = 0;	// Or else may see reserved bit fault
 	rrv.rid = allocate_reserved_rid();
 	rrv.ps = PAGE_SHIFT;
 	rrv.ve = 0;
+	/* Mangle metaphysical rid */
+	rrv.rrval = vmMangleRID(rrv.rrval);
 	return rrv.rrval;
 }
 
@@ -213,6 +217,7 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	unsigned long rreg = REGION_NUMBER(rr);
 	ia64_rr rrv, newrrv, memrrv;
 	unsigned long newrid;
+	extern unsigned long vhpt_paddr;
 
 	if (val == -1) return 1;
 
@@ -250,9 +255,10 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	newrrv.rid = newrid;
 	newrrv.ve = 1;  // VHPT now enabled for region 7!!
 	newrrv.ps = PAGE_SHIFT;
-	if (rreg == 0) v->arch.metaphysical_saved_rr0 = newrrv.rrval;
+	if (rreg == 0) v->arch.metaphysical_saved_rr0 =
+		vmMangleRID(newrrv.rrval);
 	if (rreg == 7) ia64_new_rr7(vmMangleRID(newrrv.rrval),v->vcpu_info,
-				v->arch.privregs);
+				v->arch.privregs, vhpt_paddr, pal_vaddr);
 	else set_rr(rr,newrrv.rrval);
 #endif
 	return 1;
@@ -265,7 +271,8 @@ int set_metaphysical_rr0(void)
 	ia64_rr rrv;
 	
 //	rrv.ve = 1; 	FIXME: TURN ME BACK ON WHEN VHPT IS WORKING
-	set_rr(0,v->arch.metaphysical_rr0);
+	ia64_set_rr(0,v->arch.metaphysical_rr0);
+	ia64_srlz_d();
 }
 
 // validates/changes region registers 0-6 in the currently executing domain
@@ -290,7 +297,7 @@ void init_all_rr(struct vcpu *v)
 	ia64_rr rrv;
 
 	rrv.rrval = 0;
-	rrv.rrval = v->domain->arch.metaphysical_rr0;
+	//rrv.rrval = v->domain->arch.metaphysical_rr0;
 	rrv.ps = PAGE_SHIFT;
 	rrv.ve = 1;
 if (!v->vcpu_info) { printf("Stopping in init_all_rr\n"); dummy(); }
@@ -343,12 +350,16 @@ unsigned long load_region_regs(struct vcpu *v)
 	if (VCPU(v,metaphysical_mode)) {
 		ia64_rr rrv;
 
+#if 0
 		rrv.rrval = 0;
 		rrv.rid = v->domain->arch.metaphysical_rr0;
 		rrv.ps = PAGE_SHIFT;
 		rrv.ve = 1;
 		rr0 = rrv.rrval;
 		set_rr_no_srlz(0x0000000000000000L, rr0);
+#endif
+		rr0 = v->domain->arch.metaphysical_rr0;
+		ia64_set_rr(0x0000000000000000L, rr0);
 		ia64_srlz_d();
 	}
 	else {

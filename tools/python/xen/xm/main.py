@@ -61,6 +61,8 @@ xm common subcommands:
     top                     monitor system and domains in real-time
     unpause <DomId>         unpause a paused domain
 
+<DomName> can be substituted for <DomId> in xm subcommands.
+
 For a complete list of subcommands run 'xm help --long'
 For more help on xm see the xm(1) man page
 For more help on xm create, see the xmdomain.cfg(5) man page"""
@@ -118,6 +120,8 @@ xm full list of subcommands:
     vnet-list   [-l|--long]    list vnets
     vnet-create <config>       create a vnet from a config file
     vnet-delete <vnetid>       delete a vnet
+
+<DomName> can be substituted for <DomId> in xm subcommands.
 
 For a short list of subcommands run 'xm help'
 For more help on xm see the xm(1) man page

@@ -48,11 +48,11 @@ END(platform_is_hp_ski)
 // FIXME? Note that this turns off the DB bit (debug)
 #define PSR_BITS_TO_SET	IA64_PSR_BN
 
-//extern void ia64_new_rr7(unsigned long rid,void *shared_info, void *shared_arch_info);
+//extern void ia64_new_rr7(unsigned long rid,void *shared_info, void *shared_arch_info, unsigned long p_vhpt, unsigned long v_pal);
 GLOBAL_ENTRY(ia64_new_rr7)
 	// not sure this unwind statement is correct...
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
-	alloc loc1 = ar.pfs, 3, 8, 0, 0
+	alloc loc1 = ar.pfs, 5, 9, 0, 0
 1:	{
 	  mov r28  = in0		// copy procedure index
 	  mov r8   = ip			// save ip to compute branch
@@ -63,10 +63,12 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	;;
 	tpa loc2=loc2			// grab this BEFORE changing rr7
 	;;
-#if VHPT_ENABLED
-	movl loc6=VHPT_ADDR
+	dep loc8=0,in4,60,4
 	;;
-	tpa loc6=loc6			// grab this BEFORE changing rr7
+#if VHPT_ENABLED
+	mov loc6=in3
+	;;
+	//tpa loc6=loc6			// grab this BEFORE changing rr7
 	;;
 #endif
 	mov loc5=in1
@@ -229,6 +231,21 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	mov r25=IA64_TR_ARCH_INFO
 	;;
 	itr.d dtr[r25]=r23		// wire in new mapping...
+	;;
+
+	//Purge/insert PAL TR
+	mov r24=IA64_TR_PALCODE
+	movl r25=PAGE_KERNEL
+	;;
+	or loc8=r25,loc8
+	mov r23=IA64_GRANULE_SHIFT<<2
+	;;
+	ptr.i	in4,r23
+	;;
+	mov cr.itir=r23
+	mov cr.ifa=in4
+	;;
+	itr.i itr[r24]=loc8
 	;;
 
 	// done, switch back to virtual and return

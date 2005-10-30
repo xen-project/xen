@@ -301,7 +301,7 @@ xen_pal_emulator(unsigned long index, unsigned long in1,
 	// pal code must be mapped by a TR when pal is called, however
 	// calls are rare enough that we will map it lazily rather than
 	// at every context switch
-	efi_map_pal_code();
+	//efi_map_pal_code();
 	switch (index) {
 	    case PAL_MEM_ATTRIB:
 		status = ia64_pal_mem_attrib(&r9);

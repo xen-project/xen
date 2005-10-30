@@ -112,9 +112,12 @@ static void free_mfn(unsigned long mfn)
 	spin_lock_irqsave(&mfn_lock, flags);
 	if ( alloc_index != MAX_MFN_ALLOC )
 		mfn_list[alloc_index++] = mfn;
-	else
-		BUG_ON(HYPERVISOR_memory_op(XENMEM_decrease_reservation,
-					    &reservation) != 1);
+	else {
+		int ret;
+		ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+					    &reservation);
+		BUG_ON(ret != 1);
+	}
 	spin_unlock_irqrestore(&mfn_lock, flags);
 }
 #endif
@@ -159,13 +162,15 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 */
 	if (skb_shared(skb) || skb_cloned(skb) || !is_xen_skb(skb)) {
 		int hlen = skb->data - skb->head;
+		int ret;
 		struct sk_buff *nskb = dev_alloc_skb(hlen + skb->len);
 		if ( unlikely(nskb == NULL) )
 			goto drop;
 		skb_reserve(nskb, hlen);
 		__skb_put(nskb, skb->len);
-		BUG_ON(skb_copy_bits(skb, -hlen, nskb->data - hlen,
-				     skb->len + hlen));
+		ret = skb_copy_bits(skb, -hlen, nskb->data - hlen,
+				     skb->len + hlen);
+		BUG_ON(ret);
 		nskb->dev = skb->dev;
 		nskb->proto_csum_valid = skb->proto_csum_valid;
 		dev_kfree_skb(skb);
@@ -218,6 +223,7 @@ static void net_rx_action(unsigned long unused)
 	struct sk_buff *skb;
 	u16 notify_list[NETIF_RX_RING_SIZE];
 	int notify_nr = 0;
+	int ret;
 
 	skb_queue_head_init(&rxq);
 
@@ -279,7 +285,8 @@ static void net_rx_action(unsigned long unused)
 	mcl++;
 
 	mcl[-2].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
-	BUG_ON(HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl) != 0);
+	ret = HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
+	BUG_ON(ret != 0);
 
 	mcl = rx_mcl;
 	if( HYPERVISOR_grant_table_op(GNTTABOP_transfer, grant_rx_op, 
@@ -421,6 +428,7 @@ inline static void net_tx_action_dealloc(void)
 	u16 pending_idx;
 	PEND_RING_IDX dc, dp;
 	netif_t *netif;
+	int ret;
 
 	dc = dealloc_cons;
 	dp = dealloc_prod;
@@ -436,8 +444,9 @@ inline static void net_tx_action_dealloc(void)
 		gop->handle       = grant_tx_ref[pending_idx];
 		gop++;
 	}
-	BUG_ON(HYPERVISOR_grant_table_op(
-		GNTTABOP_unmap_grant_ref, tx_unmap_ops, gop - tx_unmap_ops));
+	ret = HYPERVISOR_grant_table_op(
+		GNTTABOP_unmap_grant_ref, tx_unmap_ops, gop - tx_unmap_ops);
+	BUG_ON(ret);
 
 	while (dealloc_cons != dp) {
 		pending_idx = dealloc_ring[MASK_PEND_IDX(dealloc_cons++)];
@@ -477,6 +486,7 @@ static void net_tx_action(unsigned long unused)
 	NETIF_RING_IDX i;
 	gnttab_map_grant_ref_t *mop;
 	unsigned int data_len;
+	int ret;
 
 	if (dealloc_cons != dealloc_prod)
 		net_tx_action_dealloc();
@@ -599,8 +609,9 @@ static void net_tx_action(unsigned long unused)
 	if (mop == tx_map_ops)
 		return;
 
-	BUG_ON(HYPERVISOR_grant_table_op(
-		GNTTABOP_map_grant_ref, tx_map_ops, mop - tx_map_ops));
+	ret = HYPERVISOR_grant_table_op(
+		GNTTABOP_map_grant_ref, tx_map_ops, mop - tx_map_ops);
+	BUG_ON(ret);
 
 	mop = tx_map_ops;
 	while ((skb = __skb_dequeue(&tx_queue)) != NULL) {

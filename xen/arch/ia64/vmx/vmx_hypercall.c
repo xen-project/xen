@@ -22,7 +22,7 @@
 #include <xen/config.h>
 #include <xen/errno.h>
 #include <asm/vmx_vcpu.h>
-#include <public/xen.h>
+//#include <public/xen.h>
 #include <public/event_channel.h>
 #include <asm/vmmu.h>
 #include <asm/tlb.h>

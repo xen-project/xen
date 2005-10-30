@@ -17,6 +17,7 @@
 #include <asm/io.h>
 #include <xen/softirq.h>
 #include <public/sched.h>
+#include <asm/vhpt.h>
 
 efi_memory_desc_t ia64_efi_io_md;
 EXPORT_SYMBOL(ia64_efi_io_md);
@@ -280,6 +281,8 @@ void cs01foo(void) {}
 
 unsigned long context_switch_count = 0;
 
+#include <asm/vcpu.h>
+
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
 //printk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
@@ -287,7 +290,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 //prev->domain->domain_id,(long)prev&0xffffff,next->domain->domain_id,(long)next&0xffffff);
 //if (prev->domain->domain_id == 1 && next->domain->domain_id == 0) cs10foo();
 //if (prev->domain->domain_id == 0 && next->domain->domain_id == 1) cs01foo();
-//printk("@@sw %d->%d\n",prev->domain->domain_id,next->domain->domain_id);
+printk("@@sw%d/%x %d->%d\n",smp_processor_id(), hard_smp_processor_id (),
+       prev->domain->domain_id,next->domain->domain_id);
     if(VMX_DOMAIN(prev)){
     	vtm_domain_out(prev);
     }
@@ -307,9 +311,13 @@ if (!cnt[id]--) { printk("%x",id); cnt[id] = 500000; }
 if (!i--) { printk("+",id); i = 1000000; }
 }
 
-	if (VMX_DOMAIN(current)){
+    if (VMX_DOMAIN(current)){
 		vmx_load_all_rr(current);
     }else{
+	extern char ia64_ivt;
+	ia64_set_iva(&ia64_ivt);
+	ia64_set_pta(VHPT_ADDR | (1 << 8) | (VHPT_SIZE_LOG2 << 2) |
+		VHPT_ENABLED);
     	if (!is_idle_task(current->domain)) {
 	    	load_region_regs(current);
 		    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);

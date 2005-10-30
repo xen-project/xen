@@ -714,11 +714,7 @@ static int xsd_port_read(char *page, char **start, off_t off,
 
 static int __init xenbus_probe_init(void)
 {
-	int err = 0;
-	/* 
-	** Domain0 doesn't have a store_evtchn or store_mfn yet. 
-	*/
-	int dom0 = (xen_start_info->store_evtchn == 0);
+	int err = 0, dom0;
 
 	printk("xenbus_probe_init\n");
 
@@ -733,10 +729,16 @@ static int __init xenbus_probe_init(void)
 	device_register(&xenbus_frontend.dev);
 	device_register(&xenbus_backend.dev);
 
+	/*
+	** Domain0 doesn't have a store_evtchn or store_mfn yet.
+	*/
+	dom0 = (xen_start_info->store_evtchn == 0);
+
 	if (dom0) {
 
 		unsigned long page;
 		evtchn_op_t op = { 0 };
+		int ret;
 
 
 		/* Allocate page. */
@@ -757,7 +759,8 @@ static int __init xenbus_probe_init(void)
 		op.u.alloc_unbound.dom        = DOMID_SELF;
 		op.u.alloc_unbound.remote_dom = 0; 
 
-		BUG_ON(HYPERVISOR_event_channel_op(&op)); 
+		ret = HYPERVISOR_event_channel_op(&op);
+		BUG_ON(ret); 
 		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
 
 		/* And finally publish the above info in /proc/xen */

@@ -67,11 +67,7 @@
  */
 #define in_irq()		(hardirq_count())
 #define in_softirq()		(softirq_count())
-#ifdef XEN
-#define in_interrupt()		0 		// FIXME SMP LATER
-#else
 #define in_interrupt()		(irq_count())
-#endif
 
 #if defined(CONFIG_PREEMPT) && !defined(CONFIG_PREEMPT_BKL)
 # define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())

@@ -23,6 +23,7 @@
 #include <asm/vmx_platform.h>
 #include <asm/vmx_virpit.h>
 #include <asm/vmx_intercept.h>
+#include <asm/vmx_vlapic.h>
 #include <public/io/ioreq.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
@@ -31,6 +32,123 @@
 #include <xen/event.h>
 
 #ifdef CONFIG_VMX
+
+struct vmx_mmio_handler vmx_mmio_handers[VMX_MMIO_HANDLER_NR] =
+{
+    {
+        .check_handler = vlapic_range,
+        .read_handler  = vlapic_read,
+        .write_handler = vlapic_write
+    }
+};
+
+static inline void vmx_mmio_access(struct vcpu *v,
+                                   ioreq_t *p,
+                                   vmx_mmio_read_t read_handler,
+                                   vmx_mmio_write_t write_handler)
+{
+    ioreq_t *req;
+    vcpu_iodata_t *vio = get_vio(v->domain, v->vcpu_id);
+    unsigned int tmp1, tmp2;
+    unsigned long data;
+
+    if (vio == NULL) {
+        printk("vlapic_access: bad shared page\n");
+        domain_crash_synchronous();
+    }
+
+    req = &vio->vp_ioreq;
+
+    switch (req->type) {
+    case IOREQ_TYPE_COPY:
+    {
+        int sign = (req->df) ? -1 : 1, i;
+
+        if (!req->pdata_valid) {
+            if (req->dir == IOREQ_READ){
+                req->u.data = read_handler(v, req->addr, req->size);
+            } else {                 /* req->dir != IOREQ_READ */
+                write_handler(v, req->addr, req->size, req->u.data);
+            }
+        } else {                     /* !req->pdata_valid */
+            if (req->dir == IOREQ_READ) {
+                for (i = 0; i < req->count; i++) {
+                    data = read_handler(v,
+                      req->addr + (sign * i * req->size),
+                      req->size);
+                    vmx_copy(&data,
+                      (unsigned long)p->u.pdata + (sign * i * req->size),
+                      p->size,
+                      VMX_COPY_OUT);
+                }
+            } else {                  /* !req->dir == IOREQ_READ */
+                for (i = 0; i < req->count; i++) {
+                    vmx_copy(&data,
+                      (unsigned long)p->u.pdata + (sign * i * req->size),
+                      p->size,
+                      VMX_COPY_IN);
+                    write_handler(v,
+                      req->addr + (sign * i * req->size),
+                      req->size, data);
+                }
+            }
+        }
+        break;
+    }
+
+    case IOREQ_TYPE_AND:
+        tmp1 = read_handler(v, req->addr, req->size);
+        if (req->dir == IOREQ_WRITE) {
+            tmp2 = tmp1 & (unsigned long) req->u.data;
+            write_handler(v, req->addr, req->size, tmp2);
+        }
+        req->u.data = tmp1;
+        break;
+
+    case IOREQ_TYPE_OR:
+        tmp1 = read_handler(v, req->addr, req->size);
+        if (req->dir == IOREQ_WRITE) {
+            tmp2 = tmp1 | (unsigned long) req->u.data;
+            write_handler(v, req->addr, req->size, tmp2);
+        }
+        req->u.data = tmp1;
+        break;
+
+    case IOREQ_TYPE_XOR:
+        tmp1 = read_handler(v, req->addr, req->size);
+        if (req->dir == IOREQ_WRITE) {
+            tmp2 = tmp1 ^ (unsigned long) req->u.data;
+            write_handler(v, req->addr, req->size, tmp2);
+        }
+        req->u.data = tmp1;
+        break;
+
+    default:
+        printk("error ioreq type for local APIC %x\n", req->type);
+        domain_crash_synchronous();
+        break;
+    }
+}
+
+int vmx_mmio_intercept(ioreq_t *p)
+{
+    struct vcpu *v = current;
+    int i;
+    struct vmx_mmio_handler *handler = vmx_mmio_handers;
+
+    /* XXX currently only APIC use intercept */
+    if ( !vmx_apic_support(v->domain) )
+        return 0;
+
+    for ( i = 0; i < VMX_MMIO_HANDLER_NR; i++ ) {
+        if ( handler[i].check_handler(v, p->addr) ) {
+            vmx_mmio_access(v, p,
+              handler[i].read_handler, handler[i].write_handler);
+            return 1;
+        }
+    }
+    return 0;
+}
 
 /*
  * Check if the request is handled inside xen

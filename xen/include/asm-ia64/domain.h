@@ -49,6 +49,8 @@ struct arch_vcpu {
 	TR_ENTRY dtrs[NDTRS];
 	TR_ENTRY itlb;
 	TR_ENTRY dtlb;
+	unsigned int itr_regions;
+	unsigned int dtr_regions;
 	unsigned long itlb_pte;
 	unsigned long dtlb_pte;
 	unsigned long irr[4];

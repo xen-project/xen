@@ -38,6 +38,33 @@ typedef struct {
 
 #define INVALID_MFN       (~0UL)
 
+#define MEM_G   (1UL << 30)	
+#define MEM_M   (1UL << 20)	
+
+#define MMIO_START       (3 * MEM_G)
+#define MMIO_SIZE        (512 * MEM_M)
+
+#define VGA_IO_START     0xA0000UL
+#define VGA_IO_SIZE      0x20000
+
+#define LEGACY_IO_START  (MMIO_START + MMIO_SIZE)
+#define LEGACY_IO_SIZE   (64*MEM_M)  
+
+#define IO_PAGE_START (LEGACY_IO_START + LEGACY_IO_SIZE)
+#define IO_PAGE_SIZE  PAGE_SIZE
+
+#define STORE_PAGE_START (IO_PAGE_START + IO_PAGE_SIZE)
+#define STORE_PAGE_SIZE	 PAGE_SIZE
+
+#define IO_SAPIC_START   0xfec00000UL
+#define IO_SAPIC_SIZE    0x100000
+
+#define PIB_START 0xfee00000UL
+#define PIB_SIZE 0x100000 
+
+#define GFW_START        (4*MEM_G -16*MEM_M)
+#define GFW_SIZE         (16*MEM_M)
+
 /*
  * NB. This may become a 64-bit count with no shift. If this happens then the 
  * structure size will still be 8 bytes, so no other alignments will change.

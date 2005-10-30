@@ -56,6 +56,38 @@ extern struct ia64_sal_retval pal_emulator_static(UINT64);
 extern struct ia64_sal_retval sal_emulator(UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64);
 extern void rnat_consumption (VCPU *vcpu);
 #define DOMN_PAL_REQUEST    0x110000
+
+static UINT64 vec2off[68] = {0x0,0x400,0x800,0xc00,0x1000, 0x1400,0x1800,
+    0x1c00,0x2000,0x2400,0x2800,0x2c00,0x3000,0x3400,0x3800,0x3c00,0x4000,
+    0x4400,0x4800,0x4c00,0x5000,0x5100,0x5200,0x5300,0x5400,0x5500,0x5600,
+    0x5700,0x5800,0x5900,0x5a00,0x5b00,0x5c00,0x5d00,0x5e00,0x5f00,0x6000,
+    0x6100,0x6200,0x6300,0x6400,0x6500,0x6600,0x6700,0x6800,0x6900,0x6a00,
+    0x6b00,0x6c00,0x6d00,0x6e00,0x6f00,0x7000,0x7100,0x7200,0x7300,0x7400,
+    0x7500,0x7600,0x7700,0x7800,0x7900,0x7a00,0x7b00,0x7c00,0x7d00,0x7e00,
+    0x7f00,
+};
+
+
+
+void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
+     UINT64 vector,REGS *regs)
+{
+    VCPU *vcpu = current;
+    UINT64 viha,vpsr = vmx_vcpu_get_psr(vcpu);
+    if(!(vpsr&IA64_PSR_IC)&&(vector!=5)){
+        panic("Guest nested fault!");
+    }
+    VCPU(vcpu,isr)=isr;
+    VCPU(vcpu,iipa) = regs->cr_iip;
+    vector=vec2off[vector];
+    if (vector == IA64_BREAK_VECTOR || vector == IA64_SPECULATION_VECTOR)
+        VCPU(vcpu,iim) = iim;
+    else {
+        set_ifa_itir_iha(vcpu,ifa,1,1,1);
+    }
+    inject_guest_interruption(vcpu, vector);
+}
+
 IA64FAULT
 vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim)
 {
@@ -157,37 +189,6 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 		vmx_reflect_interruption(ifa,isr,iim,11,regs);
 }
 
-static UINT64 vec2off[68] = {0x0,0x400,0x800,0xc00,0x1000, 0x1400,0x1800,
-    0x1c00,0x2000,0x2400,0x2800,0x2c00,0x3000,0x3400,0x3800,0x3c00,0x4000,
-    0x4400,0x4800,0x4c00,0x5000,0x5100,0x5200,0x5300,0x5400,0x5500,0x5600,
-    0x5700,0x5800,0x5900,0x5a00,0x5b00,0x5c00,0x5d00,0x5e00,0x5f00,0x6000,
-    0x6100,0x6200,0x6300,0x6400,0x6500,0x6600,0x6700,0x6800,0x6900,0x6a00,
-    0x6b00,0x6c00,0x6d00,0x6e00,0x6f00,0x7000,0x7100,0x7200,0x7300,0x7400,
-    0x7500,0x7600,0x7700,0x7800,0x7900,0x7a00,0x7b00,0x7c00,0x7d00,0x7e00,
-    0x7f00,
-};
-
-
-
-void vmx_reflect_interruption(UINT64 ifa,UINT64 isr,UINT64 iim,
-     UINT64 vector,REGS *regs)
-{
-    VCPU *vcpu = current;
-    UINT64 viha,vpsr = vmx_vcpu_get_psr(vcpu);
-    if(!(vpsr&IA64_PSR_IC)&&(vector!=5)){
-        panic("Guest nested fault!");
-    }
-    VCPU(vcpu,isr)=isr;
-    VCPU(vcpu,iipa) = regs->cr_iip;
-    vector=vec2off[vector];
-    if (vector == IA64_BREAK_VECTOR || vector == IA64_SPECULATION_VECTOR)
-        VCPU(vcpu,iim) = iim;
-    else {
-        set_ifa_itir_iha(vcpu,ifa,1,1,1);
-    }
-    inject_guest_interruption(vcpu, vector);
-}
-
 
 void save_banked_regs_to_vpd(VCPU *v, REGS *regs)
 {
@@ -271,10 +272,10 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 {
     IA64_PSR vpsr;
     CACHE_LINE_TYPE type;
-    u64 vhpt_adr;
+    u64 vhpt_adr, gppa;
     ISR misr;
     ia64_rr vrr;
-    REGS *regs;
+//    REGS *regs;
     thash_cb_t *vtlb, *vhpt;
     thash_data_t *data, me;
     VCPU *v = current;
@@ -314,9 +315,9 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 //    prepare_if_physical_mode(v);
 
     if(data=vtlb_lookup_ex(vtlb, vrr.rid, vadr,type)){
-        if(v->domain!=dom0&&type==DSIDE_TLB && __gpfn_is_io(v->domain,data->ppn>>(PAGE_SHIFT-12))){
-            vadr=(vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
-            emulate_io_inst(v, vadr, data->ma);
+	gppa = (vadr&((1UL<<data->ps)-1))+(data->ppn>>(data->ps-12)<<data->ps);
+        if(v->domain!=dom0&&type==DSIDE_TLB && __gpfn_is_io(v->domain,gppa>>PAGE_SHIFT)){
+            emulate_io_inst(v, gppa, data->ma);
             return IA64_FAULT;
         }
 

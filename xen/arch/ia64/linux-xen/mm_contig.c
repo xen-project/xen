@@ -193,8 +193,8 @@ per_cpu_init (void)
 	 */
 	if (smp_processor_id() == 0) {
 #ifdef XEN
-		cpu_data = alloc_xenheap_pages(PERCPU_PAGE_SHIFT -
-			PAGE_SHIFT + get_order(NR_CPUS));
+		cpu_data = alloc_xenheap_pages(get_order(NR_CPUS
+							 * PERCPU_PAGE_SIZE));
 #else
 		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
 					   PERCPU_PAGE_SIZE, __pa(MAX_DMA_ADDRESS));

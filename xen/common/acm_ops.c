@@ -133,7 +133,10 @@ long do_acm_op(struct acm_op * u_acm_op)
             struct domain *subj = find_domain_by_id(op->u.getssid.id.domainid);
             if (!subj)
                 return -ESRCH; /* domain not found */
-
+            if (subj->ssid == NULL) {
+                put_domain(subj);
+                return -ESRCH;
+            }
             ssidref = ((struct acm_ssid_domain *)(subj->ssid))->ssidref;
             put_domain(subj);
         } else
@@ -167,6 +170,10 @@ long do_acm_op(struct acm_op * u_acm_op)
                 ret = -ESRCH; /* domain not found */
                 goto out;
             }
+            if (subj->ssid == NULL) {
+                put_domain(subj);
+                ret = -ESRCH;
+            }
             ssidref1 = ((struct acm_ssid_domain *)(subj->ssid))->ssidref;
             put_domain(subj);
         } else {
@@ -181,6 +188,10 @@ long do_acm_op(struct acm_op * u_acm_op)
             if (!subj) {
                 ret = -ESRCH; /* domain not found */
                 goto out;
+            }
+            if (subj->ssid == NULL) {
+                put_domain(subj);
+                return -ESRCH;
             }
             ssidref2 = ((struct acm_ssid_domain *)(subj->ssid))->ssidref;
             put_domain(subj);

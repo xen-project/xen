@@ -14,6 +14,10 @@
 #include <asm/system.h>
 #include <public/arch-ia64.h>
 
+#define	_PAGE_PPN_MASK	0x0003fffffffff000 //asm/pgtable.h doesn't do assembly
+#define PAGE_PHYS	0x0010000000000761 //__pgprot(__DIRTY_BITS|_PAGE_PL_2|_PAGE_AR_RWX)
+#define _PAGE_PL_2	(2<<7)
+
 #if 1	 // change to 0 to turn off all fast paths
 #define FAST_HYPERPRIVOPS
 #define FAST_HYPERPRIVOP_CNT
@@ -24,6 +28,7 @@
 #define FAST_RFI
 #define FAST_SSM_I
 #define FAST_PTC_GA
+#undef FAST_ITC	// working but default off for now
 #undef RFI_TO_INTERRUPT // not working yet
 #endif
 
@@ -802,8 +807,11 @@ just_do_rfi:
 	// OK, now all set to go except for switch to virtual bank1
 	mov r22=1;; st4 [r20]=r22;
 	mov r30=r2; mov r29=r3;;
+    adds r16=XSI_B1NATS_OFS-XSI_PSR_IC_OFS,r18
 	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
+    ld8 r16=[r16];;
+    mov ar.unat=r16;;
 	bsw.1;;
 	// FIXME?: ar.unat is not really handled correctly,
 	// but may not matter if the OS is NaT-clean
@@ -1663,10 +1671,159 @@ ENTRY(hyper_ptc_ga)
 	;;
 END(hyper_ptc_ga)
 
-ENTRY(hyper_itc_d)
-	br.spnt.many dispatch_break_fault ;;
-END(hyper_itc_d)
-
+//  Registers at entry
+//	r17 = break immediate (XEN_HYPER_ITC_D or I)
+//	r18 == XSI_PSR_IC_OFS
+//	r31 == pr
+GLOBAL_ENTRY(hyper_itc)
 ENTRY(hyper_itc_i)
+	// fall through, hyper_itc_d handles both i and d
+ENTRY(hyper_itc_d)
+#ifndef FAST_ITC
 	br.spnt.many dispatch_break_fault ;;
-END(hyper_itc_i)
+#endif
+	adds r23=XSI_ITIR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r23=[r23];;
+	extr.u r24=r23,2,6;;		// r24==logps
+	cmp.gt p7,p0=PAGE_SHIFT,r24
+(p7)	br.spnt.many dispatch_break_fault ;;
+	// translate_domain_pte(r8=pteval,PSCB(ifa)=address,r24=itir)
+	mov r19=1;;
+	shl r20=r19,r24;;
+	adds r20=-1,r20;;	// r20 == mask
+	movl r19=_PAGE_PPN_MASK;;
+	and r22=r8,r19;;	// r22 == pteval & _PAGE_PPN_MASK
+	andcm r19=r22,r20;;
+	adds r21=XSI_IFA_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r21=[r21];;
+	and r20=r21,r20;;
+	or r19=r19,r20;;	// r19 == mpaddr
+	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r27=[r27];;
+	adds r27=IA64_VCPU_DOMAIN_OFFSET,r27;;
+	ld8 r27=[r27];;
+// FIXME: is the global var dom0 always pinned? assume so for now
+	movl r28=dom0;;
+	ld8 r28=[r28];;
+// FIXME: for now, only handle dom0 (see lookup_domain_mpa below)
+	cmp.ne p7,p0=r27,r28
+(p7)	br.spnt.many dispatch_break_fault ;;
+	// if region 6, go slow way
+#ifdef FAST_HYPERPRIVOP_CNT
+	cmp.eq p6,p7=XEN_HYPER_ITC_D,r17;;
+(p6)	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_ITC_D);;
+(p7)	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_ITC_I);;
+	ld8 r21=[r20];;
+	adds r21=1,r21;;
+	st8 [r20]=r21;;
+#endif
+// FIXME: for now, just do domain0 and skip mpaddr range checks
+	dep r20=r0,r19,0,PAGE_SHIFT
+	movl r21=PAGE_PHYS ;;
+	or r20=r20,r21 ;;	// r20==return value from lookup_domain_mpa
+	// r8=pteval,r20=pteval2
+	movl r19=_PAGE_PPN_MASK
+	movl r21=_PAGE_PL_2;;
+	andcm r25=r8,r19;;	// r25==pteval & ~_PAGE_PPN_MASK
+	and r22=r20,r19;;
+	or r22=r22,r21;;
+	or r22=r22,r25;;	// r22==return value from translate_domain_pte
+	// done with translate_domain_pte
+	// now do vcpu_itc_no_srlz(vcpu,IorD,ifa,r22=pte,r8=mppte,r24=logps)
+// FIXME: for now, just domain0 and skip range check
+	// psr.ic already cleared
+	// NOTE: r24 still contains ps (from above)
+	shladd r24=r24,2,r0;;
+	mov cr.itir=r24;;
+	adds r23=XSI_IFA_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r23=[r23];;
+	mov cr.ifa=r23;;
+	cmp.eq p6,p7=XEN_HYPER_ITC_D,r17;;
+(p6)	itc.d r22;;
+(p7)	itc.i r22;;
+	dv_serialize_data
+	// FIXME: how do I make assembler warnings go away here?
+	// vhpt_insert(r23=vaddr,r22=pte,r24=logps<<2)
+	thash r28=r23
+	or r26=1,r22;;
+	ttag r21=r23
+	adds r25=8,r28
+	mov r19=r28;;
+	st8 [r25]=r24
+	adds r20=16,r28;;
+	st8 [r19]=r26
+	st8 [r20]=r21;;
+	// vcpu_set_tr_entry(trp,r22=pte|1,r24=itir,r23=ifa)
+	// TR_ENTRY = {page_flags,itir,addr,rid}
+	cmp.eq p6,p7=XEN_HYPER_ITC_D,r17
+	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r27=[r27];;
+	adds r28=IA64_VCPU_STARTING_RID_OFFSET,r27
+(p6)	adds r27=IA64_VCPU_DTLB_OFFSET,r27
+(p7)	adds r27=IA64_VCPU_ITLB_OFFSET,r27;;
+	st8 [r27]=r22,8;;	// page_flags: already has pl >= 2 and p==1
+	st8 [r27]=r24,8;;	// itir
+	mov r19=-4096;;
+	and r23=r23,r19;;
+	st8 [r27]=r23,8;;	// ifa & ~0xfff
+// ?? is virtualize_rid(v,get_rr(ifa))==vcpu_get_rr(ifa)?? YES!!
+	adds r29 = XSI_RR0_OFS-XSI_PSR_IC_OFS,r18
+	extr.u r25=r23,61,3;;
+	shladd r29=r25,3,r29;;
+	ld8 r29=[r29];;
+	movl r20=0xffffff00;;
+	and r29=r29,r20;;
+	st8 [r27]=r29,-8;;		// rid
+	//if ps > 12
+	cmp.eq p7,p0=12<<2,r24
+(p7)	br.cond.sptk.many 1f;;
+	// if (ps > 12) {
+	// trp->ppn &= ~((1UL<<(ps-12))-1); trp->vadr &= ~((1UL<<ps)-1); }
+	extr.u r29=r24,2,6
+	mov r28=1;;
+	shl r26=r28,r29;;
+	adds r29=-12,r29;;
+	shl r25=r28,r29;;
+	mov r29=-1
+	adds r26=-1,r26
+	adds r25=-1,r25;;
+	andcm r26=r29,r26	// ~((1UL<<ps)-1)
+	andcm r25=r29,r25;;	// ~((1UL<<(ps-12))-1)
+	ld8 r29=[r27];;
+	and r29=r29,r26;;
+	st8 [r27]=r29,-16;;
+	ld8 r29=[r27];;
+	extr.u r28=r29,12,38;;
+	movl r26=0xfffc000000000fff;;
+	and r29=r29,r26
+	and r28=r28,r25;;
+	shl r28=r28,12;;
+	or r29=r29,r28;;
+	st8 [r27]=r29;;
+1:	// done with vcpu_set_tr_entry
+	//PSCBX(vcpu,i/dtlb_pte) = mp_pte
+	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r27=[r27];;
+	cmp.eq p6,p7=XEN_HYPER_ITC_D,r17;;
+(p6)	adds r27=IA64_VCPU_DTLB_PTE_OFFSET,r27
+(p7)	adds r27=IA64_VCPU_ITLB_PTE_OFFSET,r27;;
+	st8 [r27]=r8;;
+	// done with vcpu_itc_no_srlz
+
+	// done, increment to point to next instruction
+	mov r29=cr.ipsr
+	mov r30=cr.iip;;
+	extr.u r26=r29,41,2 ;;
+	cmp.eq p6,p7=2,r26 ;;
+(p6)	mov r26=0
+(p6)	adds r30=16,r30
+(p7)	adds r26=1,r26
+	;;
+	dep r29=r26,r29,41,2
+	;;
+	mov cr.ipsr=r29
+	mov cr.iip=r30
+	mov pr=r31,-1 ;;
+	rfi
+	;;
+END(hyper_itc_d)

@@ -208,7 +208,7 @@ void block_domain(u32 millisecs)
     struct timeval tv;
     gettimeofday(&tv);
     HYPERVISOR_set_timer_op(monotonic_clock() + 1000000LL * (s64) millisecs);
-    HYPERVISOR_block();
+    HYPERVISOR_sched_op(SCHEDOP_block, 0);
 }
 
 

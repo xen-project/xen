@@ -88,6 +88,7 @@ static inline void __deprecated save_and_cli(unsigned long *x)
 #define save_and_cli(x)	save_and_cli(&x)
 #endif /* CONFIG_SMP */
 
+#ifndef XEN
 /* SoftIRQ primitives.  */
 #define local_bh_disable() \
 		do { add_preempt_count(SOFTIRQ_OFFSET); barrier(); } while (0)
@@ -95,6 +96,7 @@ static inline void __deprecated save_and_cli(unsigned long *x)
 		do { barrier(); sub_preempt_count(SOFTIRQ_OFFSET); } while (0)
 
 extern void local_bh_enable(void);
+#endif
 
 /* PLEASE, avoid to allocate new softirqs, if you need not _really_ high
    frequency threaded job scheduling. For almost all the purposes

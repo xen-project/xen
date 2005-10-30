@@ -281,5 +281,8 @@ ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect)
 	ipi_data = (delivery_mode << 8) | (vector & 0xff);
 	ipi_addr = ipi_base_addr + ((phys_cpu_id << 4) | ((redirect & 1) << 3));
 
+#ifdef XEN
+	printf ("send_ipi to %d (%x)\n", cpu, phys_cpu_id);
+#endif
 	writeq(ipi_data, ipi_addr);
 }

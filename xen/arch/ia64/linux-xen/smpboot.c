@@ -477,6 +477,22 @@ do_boot_cpu (int sapicid, int cpu)
 
 do_rest:
 	task_for_booting_cpu = c_idle.idle;
+#else
+	struct domain *idle;
+	struct vcpu *v;
+	void *stack;
+
+	if ( (idle = do_createdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
+		panic("failed 'createdomain' for CPU %d", cpu);
+	set_bit(_DOMF_idle_domain, &idle->domain_flags);
+	v = idle->vcpu[0];
+
+	printf ("do_boot_cpu: cpu=%d, domain=%p, vcpu=%p\n", cpu, idle, v);
+
+	task_for_booting_cpu = v;
+
+	/* Set cpu number.  */
+	get_thread_info(v)->cpu = cpu;
 #endif
 
 	Dprintk("Sending wakeup vector %lu to AP 0x%x/0x%x.\n", ap_wakeup_vector, cpu, sapicid);

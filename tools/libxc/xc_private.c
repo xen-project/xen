@@ -313,46 +313,6 @@ int xc_get_pfn_list(int xc_handle,
     return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
 }
 
-#ifdef __ia64__
-int xc_ia64_get_pfn_list(int xc_handle,
-                         uint32_t domid, 
-                         unsigned long *pfn_buf, 
-                         unsigned int start_page,
-                         unsigned int nr_pages)
-{
-    dom0_op_t op;
-    int ret;
-
-    op.cmd = DOM0_GETMEMLIST;
-    op.u.getmemlist.domain   = (domid_t)domid;
-    op.u.getmemlist.max_pfns = ((unsigned long)start_page << 32) | nr_pages;
-    op.u.getmemlist.buffer   = pfn_buf;
-
-    if ( mlock(pfn_buf, nr_pages * sizeof(unsigned long)) != 0 )
-    {
-        PERROR("Could not lock pfn list buffer");
-        return -1;
-    }    
-
-    /* XXX Hack to put pages in TLB, hypervisor should be able to handle this */
-    memset(pfn_buf, 0, nr_pages * sizeof(unsigned long));
-    ret = do_dom0_op(xc_handle, &op);
-
-    (void)munlock(pfn_buf, nr_pages * sizeof(unsigned long));
-
-    return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
-}
-
-long xc_get_max_pages(int xc_handle, uint32_t domid)
-{
-    dom0_op_t op;
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = (domid_t)domid;
-    return (do_dom0_op(xc_handle, &op) < 0) ? 
-        -1 : op.u.getdomaininfo.max_pages;
-}
-#endif
-
 long xc_get_tot_pages(int xc_handle, uint32_t domid)
 {
     dom0_op_t op;

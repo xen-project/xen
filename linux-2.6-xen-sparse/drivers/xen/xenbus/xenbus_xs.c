@@ -28,6 +28,7 @@
  * IN THE SOFTWARE.
  */
 
+#include <linux/unistd.h>
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/uio.h>

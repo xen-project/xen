@@ -34,7 +34,9 @@ struct vm_struct *alloc_vm_area(unsigned long size)
 
 void free_vm_area(struct vm_struct *area)
 {
-	BUG_ON(remove_vm_area(area->addr) != area);
+	struct vm_struct *ret;
+	ret = remove_vm_area(area->addr);
+	BUG_ON(ret != area);
 	kfree(area);
 }
 

@@ -17,10 +17,15 @@
 #include <asm/intrinsics.h>
 #include <asm/system.h>
 
+#define DEBUG_SPINLOCK
+
 typedef struct {
 	volatile unsigned int lock;
 #ifdef CONFIG_PREEMPT
 	unsigned int break_lock;
+#endif
+#ifdef DEBUG_SPINLOCK
+	void *locker;
 #endif
 #ifdef XEN
 	unsigned char recurse_cpu;
@@ -95,6 +100,10 @@ _raw_spin_lock_flags (spinlock_t *lock, unsigned long flags)
 		      "(p14) brl.call.spnt.many b6=ia64_spinlock_contention;;"
 		      : "=r"(ptr) : "r"(ptr), "r" (flags) : IA64_SPINLOCK_CLOBBERS);
 # endif /* CONFIG_MCKINLEY */
+#endif
+
+#ifdef DEBUG_SPINLOCK
+	asm volatile ("mov %0=ip" : "=r" (lock->locker));
 #endif
 }
 #define _raw_spin_lock(lock) _raw_spin_lock_flags(lock, 0)
