@@ -51,22 +51,22 @@ class NetifController(DevController):
         script = os.path.join(xroot.network_script_dir,
                               sxp.child_value(config, 'script',
                                               xroot.get_vif_script()))
-        bridge = sxp.child_value(config, 'bridge',
-                                 xroot.get_vif_bridge())
-        mac = sxp.child_value(config, 'mac')
+        bridge = sxp.child_value(config, 'bridge')
+        mac    = sxp.child_value(config, 'mac')
         ipaddr = _get_config_ipaddr(config)
 
         devid = self.allocateDeviceID()
 
         back = { 'script' : script,
-                 'mac' : mac,
-                 'bridge' : bridge,
+                 'mac'    : mac,
                  'handle' : "%i" % devid }
         if ipaddr:
             back['ip'] = ' '.join(ipaddr)
+        if bridge:
+            back['bridge'] = bridge
 
         front = { 'handle' : "%i" % devid,
-                  'mac' : mac }
+                  'mac'    : mac }
 
         return (devid, back, front)
 
