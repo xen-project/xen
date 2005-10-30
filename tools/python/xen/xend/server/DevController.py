@@ -74,6 +74,8 @@ class DevController:
         other tasks on destruction.
         """
 
+        devid = int(devid)
+        
         frontpath = self.frontendPath(devid)
         backpath = xstransact.Read(frontpath, "backend")
 
