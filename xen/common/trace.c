@@ -36,41 +36,17 @@ static unsigned int opt_tbuf_size = 0;
 integer_param("tbuf_size", opt_tbuf_size);
 
 /* Pointers to the meta-data objects for all system trace buffers */
-struct t_buf *t_bufs[NR_CPUS];
+static struct t_buf *t_bufs[NR_CPUS];
 
 /* a flag recording whether initialization has been done */
 /* or more properly, if the tbuf subsystem is enabled right now */
 int tb_init_done = 0;
 
 /* which CPUs tracing is enabled on */
-unsigned long tb_cpu_mask = (~0UL);
+static unsigned long tb_cpu_mask = (~0UL);
 
 /* which tracing events are enabled */
-u32 tb_event_mask = TRC_ALL;
-
-/**
- * init_trace_bufs - performs initialization of the per-cpu trace buffers.
- *
- * This function is called at start of day in order to initialize the per-cpu
- * trace buffers.  The trace buffers are then available for debugging use, via
- * the %TRACE_xD macros exported in <xen/trace.h>.
- */
-void init_trace_bufs(void)
-{
-    extern int alloc_trace_bufs(void);
-    
-    if ( opt_tbuf_size == 0 )
-    {
-        printk("Xen trace buffers: disabled\n");
-        return;
-    }
-
-    if (alloc_trace_bufs() == 0) {
-        printk("Xen trace buffers: initialised\n");
-        wmb(); /* above must be visible before tb_init_done flag set */
-        tb_init_done = 1;
-    }
-}
+static u32 tb_event_mask = TRC_ALL;
 
 /**
  * alloc_trace_bufs - performs initialization of the per-cpu trace buffers.
@@ -82,7 +58,7 @@ void init_trace_bufs(void)
  * This function may also be called later when enabling trace buffers 
  * via the SET_SIZE hypercall.
  */
-int alloc_trace_bufs(void)
+static int alloc_trace_bufs(void)
 {
     int           i, order;
     unsigned long nr_pages;
@@ -125,37 +101,52 @@ int alloc_trace_bufs(void)
  *
  * This function is called when the SET_SIZE hypercall is done.
  */
-int tb_set_size(int size)
+static int tb_set_size(int size)
 {
-    // There are three cases to handle:
-    //  1. Changing from 0 to non-zero ==> simple allocate
-    //  2. Changing from non-zero to 0 ==> simple deallocate
-    //  3. Changing size ==> deallocate and reallocate? Or disallow?
-    //     User can just do a change to 0, then a change to the new size.
-    //
-    // Tracing must be disabled (tb_init_done==0) before calling this
-    
-    if (opt_tbuf_size == 0 && size > 0) {
-        // What if size is too big? alloc_xenheap will complain.
-        opt_tbuf_size = size;
-        if (alloc_trace_bufs() != 0)
-            return -EINVAL;
-        wmb();
-        printk("Xen trace buffers: initialized\n");
-        return 0;
-    }
-    else if (opt_tbuf_size > 0 && size == 0) {
-        int order = get_order_from_pages(num_online_cpus() * opt_tbuf_size);
-        // is there a way to undo SHARE_PFN_WITH_DOMAIN?
-        free_xenheap_pages(t_bufs[0], order);
-        opt_tbuf_size = 0;
-        printk("Xen trace buffers: uninitialized\n");
-        return 0;
-    }
-    else {
-        printk("tb_set_size from %d to %d not implemented\n", opt_tbuf_size, size);
-        printk("change size from %d to 0, and then to %d\n",  opt_tbuf_size, size);
+    /*
+     * Setting size is a one-shot operation. It can be done either at
+     * boot time or via control tools, but not by both. Once buffers
+     * are created they cannot be destroyed.
+     */
+    if ( (opt_tbuf_size != 0) || (size <= 0) )
+    {
+        DPRINTK("tb_set_size from %d to %d not implemented\n",
+                opt_tbuf_size, size);
         return -EINVAL;
+    }
+
+    opt_tbuf_size = size;
+    if ( alloc_trace_bufs() != 0 )
+    {
+        opt_tbuf_size = 0;
+        return -EINVAL;
+    }
+
+    printk("Xen trace buffers: initialized\n");
+    return 0;
+}
+
+
+/**
+ * init_trace_bufs - performs initialization of the per-cpu trace buffers.
+ *
+ * This function is called at start of day in order to initialize the per-cpu
+ * trace buffers.  The trace buffers are then available for debugging use, via
+ * the %TRACE_xD macros exported in <xen/trace.h>.
+ */
+void init_trace_bufs(void)
+{
+    if ( opt_tbuf_size == 0 )
+    {
+        printk("Xen trace buffers: disabled\n");
+        return;
+    }
+
+    if ( alloc_trace_bufs() == 0 )
+    {
+        printk("Xen trace buffers: initialised\n");
+        wmb(); /* above must be visible before tb_init_done flag set */
+        tb_init_done = 1;
     }
 }
 
@@ -169,14 +160,17 @@ int tb_control(dom0_tbufcontrol_t *tbc)
     static spinlock_t lock = SPIN_LOCK_UNLOCKED;
     int rc = 0;
 
-    // Commenting this out since we have to allow some of these operations
-    // in order to enable dynamic control of the trace buffers.
-    //    if ( !tb_init_done )
-    //        return -EINVAL;
-
     spin_lock(&lock);
 
-    switch ( tbc->op)
+    if ( !tb_init_done &&
+         (tbc->op != DOM0_TBUF_SET_SIZE) &&
+         (tbc->op != DOM0_TBUF_ENABLE) )
+    {
+        spin_unlock(&lock);
+        return -EINVAL;
+    }
+
+    switch ( tbc->op )
     {
     case DOM0_TBUF_GET_INFO:
         tbc->cpu_mask   = tb_cpu_mask;
@@ -191,36 +185,88 @@ int tb_control(dom0_tbufcontrol_t *tbc)
         tb_event_mask = tbc->evt_mask;
         break;
     case DOM0_TBUF_SET_SIZE:
-        // Change trace buffer allocation.
-        // Trace buffers must be disabled to do this.
-        if (tb_init_done) {
-            printk("attempt to change size with tbufs enabled\n");
-            rc = -EINVAL;
-        }
-        else
-            rc = tb_set_size(tbc->size);
+        rc = !tb_init_done ? tb_set_size(tbc->size) : -EINVAL;
         break;
     case DOM0_TBUF_ENABLE:
-        // Enable trace buffers. Size must be non-zero, ie, buffers
-        // must already be allocated. 
-        if (opt_tbuf_size == 0) 
+        /* Enable trace buffers. Check buffers are already allocated. */
+        if ( opt_tbuf_size == 0 ) 
             rc = -EINVAL;
         else
             tb_init_done = 1;
         break;
     case DOM0_TBUF_DISABLE:
-        // Disable trace buffers. Just stops new records from being written,
-        // does not deallocate any memory.
+        /*
+         * Disable trace buffers. Just stops new records from being written,
+         * does not deallocate any memory.
+         */
         tb_init_done = 0;
-        printk("Xen trace buffers: disabled\n");
         break;
     default:
         rc = -EINVAL;
+        break;
     }
 
     spin_unlock(&lock);
 
     return rc;
+}
+
+/**
+ * trace - Enters a trace tuple into the trace buffer for the current CPU.
+ * @event: the event type being logged
+ * @d1...d5: the data items for the event being logged
+ *
+ * Logs a trace record into the appropriate buffer.  Returns nonzero on
+ * failure, otherwise 0.  Failure occurs only if the trace buffers are not yet
+ * initialised.
+ */
+void trace(u32 event, unsigned long d1, unsigned long d2,
+           unsigned long d3, unsigned long d4, unsigned long d5)
+{
+    atomic_t old, new, seen;
+    struct t_buf *buf;
+    struct t_rec *rec;
+
+    BUG_ON(!tb_init_done);
+
+    if ( (tb_event_mask & event) == 0 )
+        return;
+
+    /* match class */
+    if ( ((tb_event_mask >> TRC_CLS_SHIFT) & (event >> TRC_CLS_SHIFT)) == 0 )
+        return;
+
+    /* then match subclass */
+    if ( (((tb_event_mask >> TRC_SUBCLS_SHIFT) & 0xf )
+                & ((event >> TRC_SUBCLS_SHIFT) & 0xf )) == 0 )
+        return;
+
+    if ( (tb_cpu_mask & (1UL << smp_processor_id())) == 0 )
+        return;
+
+    /* Read tb_init_done /before/ t_bufs. */
+    rmb();
+
+    buf = t_bufs[smp_processor_id()];
+
+    do
+    {
+        old = buf->rec_idx;
+        _atomic_set(new, (_atomic_read(old) + 1) % buf->rec_num);
+        seen = atomic_compareandswap(old, new, &buf->rec_idx);
+    }
+    while ( unlikely(_atomic_read(seen) != _atomic_read(old)) );
+
+    wmb();
+
+    rec = &buf->rec[_atomic_read(old)];
+    rdtscll(rec->cycles);
+    rec->event   = event;
+    rec->data[0] = d1;
+    rec->data[1] = d2;
+    rec->data[2] = d3;
+    rec->data[3] = d4;
+    rec->data[4] = d5;
 }
 
 /*
