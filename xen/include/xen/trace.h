@@ -23,12 +23,8 @@
 #ifndef __XEN_TRACE_H__
 #define __XEN_TRACE_H__
 
-#include <asm/page.h>
-#include <xen/types.h>
-#include <xen/sched.h>
+#include <xen/config.h>
 #include <asm/atomic.h>
-#include <asm/current.h>
-#include <asm/msr.h>
 #include <public/dom0_ops.h>
 #include <public/trace.h>
 
@@ -46,7 +42,7 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
 /* Avoids troubling the caller with casting their arguments to a trace macro */
 #define trace_do_casts(e,d1,d2,d3,d4,d5) \
     do {                                 \
-        if ( tb_init_done )              \
+        if ( unlikely(tb_init_done) )    \
             trace(e,                     \
                  (unsigned long)d1,      \
                  (unsigned long)d2,      \

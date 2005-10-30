@@ -40,7 +40,7 @@ static struct t_buf *t_bufs[NR_CPUS];
 
 /* a flag recording whether initialization has been done */
 /* or more properly, if the tbuf subsystem is enabled right now */
-int tb_init_done = 0;
+int tb_init_done;
 
 /* which CPUs tracing is enabled on */
 static unsigned long tb_cpu_mask = (~0UL);
