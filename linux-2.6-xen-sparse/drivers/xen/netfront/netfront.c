@@ -877,6 +877,7 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	if (gnttab_alloc_grant_references(NETIF_TX_RING_SIZE,
 					  &np->gref_tx_head) < 0) {
 		printk(KERN_ALERT "#### netfront can't alloc tx grant refs\n");
+		err = -ENOMEM;
 		goto exit;
 	}
 	/* A grant for every rx ring slot */
@@ -884,6 +885,7 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 					  &np->gref_rx_head) < 0) {
 		printk(KERN_ALERT "#### netfront can't alloc rx grant refs\n");
 		gnttab_free_grant_references(np->gref_tx_head);
+		err = -ENOMEM;
 		goto exit;
 	}
 
