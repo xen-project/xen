@@ -317,11 +317,10 @@ static void shutdown_handler(struct xenbus_watch *watch,
 		shutting_down = SHUTDOWN_INVALID;
 	}
 
-	kfree(str);
-
- out:
 	if (shutting_down != SHUTDOWN_INVALID)
 		schedule_work(&shutdown_work);
+
+	kfree(str);
 }
 
 #ifdef CONFIG_MAGIC_SYSRQ
