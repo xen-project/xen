@@ -67,9 +67,6 @@ class UnixConnector(SocketConnector):
         self.addr = path
         self.timeout = timeout
 
-    def getDestination(self):
-        return self.addr
-
     def connectTransport(self):
         self.transport = UnixClientConnection(self.addr, self)
         self.transport.connect(self.timeout)
