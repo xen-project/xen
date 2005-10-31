@@ -187,6 +187,10 @@ ia64_hypercall (struct pt_regs *regs)
 		regs->r8 = do_console_io(regs->r14, regs->r15, regs->r16);
 		break;
 
+	    case __HYPERVISOR_xen_version:
+		regs->r8 = do_xen_version(regs->r14, regs->r15);
+		break;
+
 	    default:
 		printf("unknown hypercall %x\n", regs->r2);
 		regs->r8 = (unsigned long)-1;

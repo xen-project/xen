@@ -290,8 +290,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 //prev->domain->domain_id,(long)prev&0xffffff,next->domain->domain_id,(long)next&0xffffff);
 //if (prev->domain->domain_id == 1 && next->domain->domain_id == 0) cs10foo();
 //if (prev->domain->domain_id == 0 && next->domain->domain_id == 1) cs01foo();
-printk("@@sw%d/%x %d->%d\n",smp_processor_id(), hard_smp_processor_id (),
-       prev->domain->domain_id,next->domain->domain_id);
+//printk("@@sw%d/%x %d->%d\n",smp_processor_id(), hard_smp_processor_id (),
+//       prev->domain->domain_id,next->domain->domain_id);
     if(VMX_DOMAIN(prev)){
     	vtm_domain_out(prev);
     }
