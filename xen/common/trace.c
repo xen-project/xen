@@ -37,6 +37,8 @@ integer_param("tbuf_size", opt_tbuf_size);
 
 /* Pointers to the meta-data objects for all system trace buffers */
 static struct t_buf *t_bufs[NR_CPUS];
+static struct t_rec *t_recs[NR_CPUS];
+static int nr_recs;
 
 /* a flag recording whether initialization has been done */
 /* or more properly, if the tbuf subsystem is enabled right now */
@@ -70,6 +72,8 @@ static int alloc_trace_bufs(void)
 
     nr_pages = num_online_cpus() * opt_tbuf_size;
     order    = get_order_from_pages(nr_pages);
+    nr_recs  = (opt_tbuf_size * PAGE_SIZE - sizeof(struct t_buf)) /
+        sizeof(struct t_rec);
     
     if ( (rawbuf = alloc_xenheap_pages(order)) == NULL )
     {
@@ -84,13 +88,11 @@ static int alloc_trace_bufs(void)
     for_each_online_cpu ( i )
     {
         buf = t_bufs[i] = (struct t_buf *)&rawbuf[i*opt_tbuf_size*PAGE_SIZE];
-        
-        _atomic_set(buf->rec_idx, 0);
-        buf->rec_num  = (opt_tbuf_size * PAGE_SIZE - sizeof(struct t_buf))
-                        / sizeof(struct t_rec);
-        buf->rec      = (struct t_rec *)(buf + 1);
-        buf->rec_addr = __pa(buf->rec);
+        buf->cons = buf->prod = 0;
+        buf->nr_recs = nr_recs;
+        t_recs[i] = (struct t_rec *)(buf + 1);
     }
+
     return 0;
 }
 
@@ -223,9 +225,9 @@ int tb_control(dom0_tbufcontrol_t *tbc)
 void trace(u32 event, unsigned long d1, unsigned long d2,
            unsigned long d3, unsigned long d4, unsigned long d5)
 {
-    atomic_t old, new, seen;
     struct t_buf *buf;
     struct t_rec *rec;
+    unsigned long flags;
 
     BUG_ON(!tb_init_done);
 
@@ -249,17 +251,15 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
 
     buf = t_bufs[smp_processor_id()];
 
-    do
+    local_irq_save(flags);
+
+    if ( (buf->prod - buf->cons) >= nr_recs )
     {
-        old = buf->rec_idx;
-        _atomic_set(new, (_atomic_read(old) + 1) % buf->rec_num);
-        seen = atomic_compareandswap(old, new, &buf->rec_idx);
+        local_irq_restore(flags);
+        return;
     }
-    while ( unlikely(_atomic_read(seen) != _atomic_read(old)) );
 
-    wmb();
-
-    rec = &buf->rec[_atomic_read(old)];
+    rec = &t_recs[smp_processor_id()][buf->prod % nr_recs];
     rdtscll(rec->cycles);
     rec->event   = event;
     rec->data[0] = d1;
@@ -267,6 +267,11 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
     rec->data[2] = d3;
     rec->data[3] = d4;
     rec->data[4] = d5;
+
+    wmb();
+    buf->prod++;
+
+    local_irq_restore(flags);
 }
 
 /*

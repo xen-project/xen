@@ -23,9 +23,6 @@
 
 #include "xc_private.h"
 
-typedef struct { int counter; } atomic_t;
-#define _atomic_read(v)		((v).counter)
-
 #include <xen/trace.h>
 
 extern FILE *stderr;
@@ -148,7 +145,7 @@ struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
     }
 
     tbufs_mapped = xc_map_foreign_range(xc_handle, 0 /* Dom 0 ID */,
-                                        size * num, PROT_READ,
+                                        size * num, PROT_READ | PROT_WRITE,
                                         tbufs_mfn);
 
     xc_interface_close(xc_handle);
@@ -240,10 +237,7 @@ struct t_buf **init_bufs_ptrs(void *bufs_mapped, unsigned int num,
  * mapped in user space.  Note that the trace buffer metadata contains machine
  * pointers - the array returned allows more convenient access to them.
  */
-struct t_rec **init_rec_ptrs(unsigned long tbufs_mfn,
-                             struct t_buf *tbufs_mapped,
-                             struct t_buf **meta,
-                             unsigned int num)
+struct t_rec **init_rec_ptrs(struct t_buf **meta, unsigned int num)
 {
     int i;
     struct t_rec **data;
@@ -256,36 +250,9 @@ struct t_rec **init_rec_ptrs(unsigned long tbufs_mfn,
     }
 
     for ( i = 0; i < num; i++ )
-        data[i] = (struct t_rec *)(meta[i]->rec_addr - (tbufs_mfn<<XC_PAGE_SHIFT) /* XXX */
-                                   + (unsigned long)tbufs_mapped);
+        data[i] = (struct t_rec *)(meta[i] + 1);
 
     return data;
-}
-
-/**
- * init_tail_idxs - initialise an array of tail indexes
- * @bufs:           array of pointers to trace buffer metadata
- * @num:            number of trace buffers
- *
- * The tail indexes indicate where we're read to so far in the data array of a
- * trace buffer.  Each entry in this table corresponds to the tail index for a
- * particular trace buffer.
- */
-unsigned long *init_tail_idxs(struct t_buf **bufs, unsigned int num)
-{
-    int i;
-    unsigned long *tails = calloc(num, sizeof(unsigned int));
- 
-    if ( tails == NULL )
-    {
-        PERROR("Failed to allocate memory for tail pointers\n");
-        exit(EXIT_FAILURE);
-    }
-    
-    for ( i = 0; i<num; i++ )
-        tails[i] = _atomic_read(bufs[i]->rec_idx);
-
-    return tails;
 }
 
 /**
@@ -329,7 +296,6 @@ int monitor_tbufs(FILE *logfile)
     struct t_buf **meta;         /* pointers to the trace buffer metadata    */
     struct t_rec **data;         /* pointers to the trace buffer data areas
                                   * where they are mapped into user space.   */
-    unsigned long *cons;         /* store tail indexes for the trace buffers */
     unsigned long tbufs_mfn;     /* mfn of the tbufs                         */
     unsigned int  num;           /* number of trace buffers / logical CPUS   */
     unsigned long size;          /* size of a single trace buffer            */
@@ -346,19 +312,22 @@ int monitor_tbufs(FILE *logfile)
     size_in_recs = (size - sizeof(struct t_buf)) / sizeof(struct t_rec);
 
     /* build arrays of convenience ptrs */
-    meta  = init_bufs_ptrs (tbufs_mapped, num, size);
-    data  = init_rec_ptrs  (tbufs_mfn, tbufs_mapped, meta, num);
-    cons  = init_tail_idxs (meta, num);
+    meta  = init_bufs_ptrs(tbufs_mapped, num, size);
+    data  = init_rec_ptrs(meta, num);
 
     /* now, scan buffers for events */
     while ( !interrupted )
     {
-        for ( i = 0; ( i < num ) && !interrupted; i++ )
-            while( cons[i] != _atomic_read(meta[i]->rec_idx) )
+        for ( i = 0; (i < num) && !interrupted; i++ )
+        {
+            while ( meta[i]->cons != meta[i]->prod )
             {
-                write_rec(i, data[i] + cons[i], logfile);
-                cons[i] = (cons[i] + 1) % size_in_recs;
+                rmb(); /* read prod, then read item. */
+                write_rec(i, data[i] + meta[i]->cons % size_in_recs, logfile);
+                mb(); /* read item, then update cons. */
+                meta[i]->cons++;
             }
+        }
 
         nanosleep(&opts.poll_sleep, NULL);
     }
@@ -366,7 +335,6 @@ int monitor_tbufs(FILE *logfile)
     /* cleanup */
     free(meta);
     free(data);
-    free(cons);
     /* don't need to munmap - cleanup is automatic */
     fclose(logfile);
 

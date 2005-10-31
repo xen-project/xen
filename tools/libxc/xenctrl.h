@@ -507,12 +507,10 @@ long xc_get_tot_pages(int xc_handle, uint32_t domid);
 int xc_tbuf_enable(int xc_handle, int enable);
 
 /**
- * This function sets the size of the trace buffers. Setting it to zero
- * deallocates the memory used for trace buffers, and setting it to a
- * non-zero value specifies the number of pages per cpu to allocate.
- * To change the size of an existing allocation, you must first deallocate
- * it then reallocate it. No change in size is allowed when tracing is
- * enabled; A disable call must be made first.
+ * This function sets the size of the trace buffers. Setting the size
+ * is currently a one-shot operation that may be performed either at boot
+ * time or via this interface, not both. The buffer size must be set before
+ * enabling tracing.
  *
  * @parm xc_handle a handle to an open hypervisor interface
  * @parm size the size in pages per cpu for the trace buffers

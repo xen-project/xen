@@ -24,7 +24,6 @@
 #define __XEN_TRACE_H__
 
 #include <xen/config.h>
-#include <asm/atomic.h>
 #include <public/dom0_ops.h>
 #include <public/trace.h>
 
