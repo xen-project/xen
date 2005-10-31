@@ -682,14 +682,15 @@ int register_xenbus_watch(struct xenbus_watch *watch)
 
 	spin_lock(&watches_lock);
 	BUG_ON(find_watch(token));
+	list_add(&watch->list, &watches);
 	spin_unlock(&watches_lock);
 
 	err = xs_watch(watch->node, token);
 
 	/* Ignore errors due to multiple registration. */
-	if ((err == 0) || (err == -EEXIST)) {
+	if ((err != 0) && (err != -EEXIST)) {
 		spin_lock(&watches_lock);
-		list_add(&watch->list, &watches);
+		list_del(&watch->list);
 		spin_unlock(&watches_lock);
 	}
 
