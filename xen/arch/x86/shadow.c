@@ -228,18 +228,20 @@ alloc_shadow_page(struct domain *d,
                  */
                 page = alloc_domheap_pages(NULL, SL1_ORDER, 0);
                 if (!page)
-                    domain_crash_synchronous();
+                    goto no_shadow_page;
 
                 void *l1_0 = map_domain_page(page_to_pfn(page));
-                memset(l1_0,0,PAGE_SIZE);
+                memset(l1_0, 0, PAGE_SIZE);
                 unmap_domain_page(l1_0);
+
                 void *l1_1 = map_domain_page(page_to_pfn(page+1));
-                memset(l1_1,0,PAGE_SIZE);
+                memset(l1_1, 0, PAGE_SIZE);
                 unmap_domain_page(l1_1);
 #else
                 page = alloc_domheap_page(NULL);
                 if (!page)
-                    domain_crash_synchronous();
+                    goto no_shadow_page;
+
                 void *l1 = map_domain_page(page_to_pfn(page));
                 memset(l1, 0, PAGE_SIZE);
                 unmap_domain_page(l1);
@@ -248,6 +250,9 @@ alloc_shadow_page(struct domain *d,
             else
             {
                 page = alloc_domheap_page(NULL);
+                if (!page)
+                    goto no_shadow_page;
+
                 void *l1 = map_domain_page(page_to_pfn(page));
                 memset(l1, 0, PAGE_SIZE);
                 unmap_domain_page(l1);
@@ -255,22 +260,26 @@ alloc_shadow_page(struct domain *d,
         }
     }
     else {
+#if CONFIG_PAGING_LEVELS == 2
         page = alloc_domheap_page(NULL);
+#elif CONFIG_PAGING_LEVELS == 3
+        if ( psh_type == PGT_l3_shadow )
+            page = alloc_domheap_pages(NULL, 0, ALLOC_DOM_DMA);
+        else
+            page = alloc_domheap_page(NULL);
+#elif CONFIG_PAGING_LEVELS == 4
+        if ( (psh_type == PGT_l4_shadow) &&
+             (d->arch.ops->guest_paging_levels != PAGING_L4) )
+            page = alloc_domheap_pages(NULL, 0, ALLOC_DOM_DMA);
+        else
+            page = alloc_domheap_page(NULL);
+#endif
+        if (!page)
+            goto no_shadow_page;
+
         void *lp = map_domain_page(page_to_pfn(page));
         memset(lp, 0, PAGE_SIZE);
         unmap_domain_page(lp);
-
-    }
-    if ( unlikely(page == NULL) )
-    {
-        printk("Couldn't alloc shadow page! dom%d count=%d\n",
-               d->domain_id, d->arch.shadow_page_count);
-        printk("Shadow table counts: l1=%d l2=%d hl2=%d snapshot=%d\n",
-               perfc_value(shadow_l1_pages), 
-               perfc_value(shadow_l2_pages),
-               perfc_value(hl2_table_pages),
-               perfc_value(snapshot_pages));
-        BUG(); /* XXX FIXME: try a shadow flush to free up some memory. */
     }
 
     smfn = page_to_pfn(page);
@@ -359,7 +368,7 @@ alloc_shadow_page(struct domain *d,
 
     return smfn;
 
-  fail:
+fail:
     FSH_LOG("promotion of pfn=%lx mfn=%lx failed!  external gnttab refs?",
             gpfn, gmfn);
     if (psh_type == PGT_l1_shadow)
@@ -377,6 +386,20 @@ alloc_shadow_page(struct domain *d,
     }
     else
         free_domheap_page(page);
+
+    return 0;
+
+no_shadow_page:
+    ASSERT(page == NULL);
+    printk("Couldn't alloc shadow page! dom%d count=%d\n",
+           d->domain_id, d->arch.shadow_page_count);
+    printk("Shadow table counts: l1=%d l2=%d hl2=%d snapshot=%d\n",
+           perfc_value(shadow_l1_pages),
+           perfc_value(shadow_l2_pages),
+           perfc_value(hl2_table_pages),
+           perfc_value(snapshot_pages));
+    BUG(); /* XXX FIXME: try a shadow flush to free up some memory. */
+
     return 0;
 }
 

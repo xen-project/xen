@@ -1,14 +1,14 @@
 
 silent_which ()
 {
-        if ! `which $1 1>/dev/null 2>/dev/null`; then
+        which $1 1>/dev/null 2>/dev/null || {
                 echo "*************************************************"
                 echo "*************************************************"
                 echo "* WARNING: Package '$1' is required"
                 echo "*          to build Xen documentation"
                 echo "*************************************************"
                 echo "*************************************************"
-        fi
+        }
         which $1 1>/dev/null 2>/dev/null
 }
 
