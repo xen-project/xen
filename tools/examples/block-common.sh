@@ -42,10 +42,17 @@ write_dev() {
   local major
   local minor
   local pdev
-	
+  
   major=$(stat -L -c %t "$1")
   minor=$(stat -L -c %T "$1")
+ 
+  if [ -z $major  -o -z $minor ]; then
+    fatal "Backend device does not exist"
+  fi
+ 
   pdev=$(printf "0x%02x%02x" "0x$major" "0x$minor")
   xenstore_write "$XENBUS_PATH"/physical-device "$pdev" \
                  "$XENBUS_PATH"/node "$1"
+
+  success
 }

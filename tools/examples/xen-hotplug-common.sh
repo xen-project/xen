@@ -30,8 +30,14 @@ log() {
 }
 
 fatal() {
+  xenstore_write "$XENBUS_PATH"/hotplug-status error
   log err "$@"
   exit 1
+}
+
+success() {
+  # Tell DevController that backend is "connected"
+  xenstore_write "$XENBUS_PATH"/hotplug-status connected
 }
 
 ##

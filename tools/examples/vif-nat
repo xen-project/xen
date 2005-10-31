@@ -54,3 +54,5 @@ esac
 ip r ${ipcmd} ${ip} dev ${vif} src ${main_ip}
 
 handle_iptable()
+
+success
