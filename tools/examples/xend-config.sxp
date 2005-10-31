@@ -25,9 +25,6 @@
 # Port xend should use for the HTTP interface, if xend-http-server is set.
 #(xend-port            8000)
 
-# Port xend should use for the event interface.  This interface is deprecated.
-#(xend-event-port      8001)
-
 # Port xend should use for the relocation interface, if xend-relocation-server
 # is set.
 #(xend-relocation-port 8002)

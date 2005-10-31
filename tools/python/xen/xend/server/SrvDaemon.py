@@ -19,7 +19,6 @@ import xen.lowlevel.xc
 from xen.xend.server import SrvServer
 from xen.xend.XendLogging import log
 
-import event
 import relocate
 from params import *
 
@@ -273,7 +272,6 @@ class Daemon:
             log.info("Xend changeset: %s.", xinfo['xen_changeset'])
             del xc
 
-            event.listenEvent(self)
             relocate.listenRelocation()
             servers = SrvServer.create()
             self.daemonize()
