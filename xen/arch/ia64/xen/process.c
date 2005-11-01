@@ -184,6 +184,7 @@ void check_bad_nested_interruption(unsigned long isr, struct pt_regs *regs, unsi
 	if (!(PSCB(v,ipsr) & IA64_PSR_DT)) {
 		panic_domain(regs,"psr.dt off, trying to deliver nested dtlb!\n");
 	}
+	vector &= ~0xf;
 	if (vector != IA64_DATA_TLB_VECTOR &&
 		vector != IA64_ALT_DATA_TLB_VECTOR &&
 		vector != IA64_VHPT_TRANS_VECTOR) {
