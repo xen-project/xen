@@ -791,6 +791,9 @@ def main(argv=sys.argv):
             else:
                 err("Error connecting to xend: %s.  Is xend running?" % ex[1])
             sys.exit(1)
+        except KeyboardInterrupt:
+            print "Interrupted."
+            sys.exit(1)
         except IOError:
             if os.geteuid() != 0:
                 err("Most commands need root access.  Please try again as root.")
