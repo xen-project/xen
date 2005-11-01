@@ -236,8 +236,12 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		make_page_readonly((void *)cpu_gdt_descr[cpu].address);
 
 		cpu_set(cpu, cpu_possible_map);
+#ifdef CONFIG_HOTPLUG_CPU
 		if (xen_start_info->flags & SIF_INITDOMAIN)
 			cpu_set(cpu, cpu_present_map);
+#else
+		cpu_set(cpu, cpu_present_map);
+#endif
 
 		vcpu_prepare(cpu);
 	}
@@ -265,6 +269,8 @@ void __devinit smp_prepare_boot_cpu(void)
 	cpu_online_map   = cpumask_of_cpu(0);
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+
 static void vcpu_hotplug(unsigned int cpu)
 {
 	int err;
@@ -284,11 +290,7 @@ static void vcpu_hotplug(unsigned int cpu)
 		cpu_set(cpu, cpu_present_map);
 		(void)cpu_up(cpu);
 	} else if (strcmp(state, "offline") == 0) {
-#ifdef CONFIG_HOTPLUG_CPU
 		(void)cpu_down(cpu);
-#else
-		printk(KERN_INFO "Ignoring CPU%d hotplug request\n", cpu);
-#endif
 	} else {
 		printk(KERN_ERR "XENBUS: unknown state(%s) on CPU%d\n",
 		       state, cpu);
@@ -337,8 +339,6 @@ static int __init setup_vcpu_hotplug_event(void)
 }
 
 subsys_initcall(setup_vcpu_hotplug_event);
-
-#ifdef CONFIG_HOTPLUG_CPU
 
 int __cpu_disable(void)
 {
