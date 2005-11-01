@@ -704,7 +704,6 @@ static char *xenstat_get_domain_name(xenstat_handle *handle, unsigned int domain
 {
 	char path[80];
 	char *name;
-	unsigned int *len;
 	struct xs_transaction_handle *xstranshandle;
 
 	snprintf(path, sizeof(path),"/local/domain/%i/name", domain_id);
@@ -715,7 +714,7 @@ static char *xenstat_get_domain_name(xenstat_handle *handle, unsigned int domain
 		exit(1); /* Change this */
 	}
 
-	name = (char *) xs_read(handle->xshandle, xstranshandle, path, len);
+	name = (char *) xs_read(handle->xshandle, xstranshandle, path, NULL);
 	
 	xs_transaction_end(handle->xshandle, xstranshandle, false);
 
