@@ -83,9 +83,8 @@ void schedule_tail(struct vcpu *next)
     if(VMX_DOMAIN(current)){
     	vmx_load_all_rr(current);
     }else{
-	    if (rr7 = load_region_regs(current)) {
-		    printk("schedule_tail: change to rr7 not yet implemented\n");
-    	}
+	    load_region_regs(current);
+            vcpu_load_kernel_regs(current);
     }
 }
 

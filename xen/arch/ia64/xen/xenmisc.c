@@ -320,6 +320,7 @@ if (!i--) { printk("+",id); i = 1000000; }
 		VHPT_ENABLED);
     	if (!is_idle_task(current->domain)) {
 	    	load_region_regs(current);
+	    	vcpu_load_kernel_regs(current);
 		    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
     	}
 	    if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
