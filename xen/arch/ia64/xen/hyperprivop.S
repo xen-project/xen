@@ -1485,7 +1485,7 @@ ENTRY(hyper_set_kr)
 	adds r21=XSI_KR0_OFS-XSI_PSR_IC_OFS,r18 ;;
 	shl r20=r8,3;;
 	add r22=r20,r21;;
-	st8 [r21]=r9;;
+	st8 [r22]=r9;;
 	cmp.eq p7,p0=r8,r0
 	adds r8=-1,r8;;
 (p7)	mov ar0=r9;;
