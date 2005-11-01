@@ -160,12 +160,12 @@ memory at the request of the administrator or the user of the domain.
 \subsection{Setting memory footprints from dom0}
 
 The machine administrator can request that a domain alter its memory
-footprint using the \path{xm set-mem} command.  For instance, we can
+footprint using the \path{xm mem-set} command.  For instance, we can
 request that our example ttylinux domain reduce its memory footprint
 to 32 megabytes.
 
 \begin{verbatim}
-# xm set-mem ttylinux 32
+# xm mem-set ttylinux 32
 \end{verbatim}
 
 We can now see the result of this in the output of \path{xm list}:
@@ -181,7 +181,7 @@ The domain has responded to the request by returning memory to Xen. We
 can restore the domain to its original size using the command line:
 
 \begin{verbatim}
-# xm set-mem ttylinux 64
+# xm mem-set ttylinux 64
 \end{verbatim}
 
 \subsection{Setting memory footprints from within a domain}
