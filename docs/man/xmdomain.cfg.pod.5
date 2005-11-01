@@ -72,6 +72,57 @@ A bare minimal config file example might be as follows:
 
 =item I<builder>
 
+=back 
+
+=head1 DOMAIN SHUTDOWN OPTIONS
+
+There are 3 options which control domain shutdown (both planned and
+unplanned) under certain events.  The 3 events currently captured are:
+
+=over 4
+
+=item I<shutdown>
+
+Triggered on either an I<xm shutdown> or graceful shutdown from inside
+the DomU.
+
+=item I<reboot>
+
+Triggered on either an I<xm reboot> or graceful reboot from inside the
+DomU.
+
+=item I<crash>
+
+Triggered when a DomU goes to the crashed state for any reason.
+
+=back
+
+All of them take one of 4 valid states listed below.  
+
+=over 4
+
+=item I<destroy>
+
+The domain will be cleaned up completely.  No attempt at respawning
+will occur.  This is what a typical shutdown would look like.
+
+=item I<restart>
+
+The domain will be restarted with the same name as the old domain.
+This is what a typical reboot would look like.
+
+=item I<preserve>
+
+The domain will not be cleaned up at all.  This is often useful for
+crash state domains which ensures that enough evidence is to debug the
+real issue.
+
+=item I<rename-restart>
+
+The old domain will not be cleaned up, but will be renamed so a new
+domain can be restarted in it's place.  (TODO: what does this mean for
+resources?  What is the renamed name?)
+
 =back
 
 =head1 SEE ALSO
