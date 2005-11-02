@@ -180,8 +180,8 @@ TPM_RESULT VTSP_OSAP(const TCS_CONTEXT_HANDLE hContext,
   Crypto_GetRandom((BYTE *) &nonceOddOSAP, sizeof(TPM_NONCE) ); 
   
   TPMTRYRETURN( TCSP_OSAP(    hContext,
-			      TPM_ET_SRK,
-			      0, 
+			      entityType,
+			      entityValue, 
 			      nonceOddOSAP,
 			      &auth->AuthHandle, 
 			      &auth->NonceEven, 

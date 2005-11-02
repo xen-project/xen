@@ -37,18 +37,6 @@
 #include <stddef.h>             // for pointer NULL
 #include "tcg.h"
 
-// structure to enable use of FMT_SIZE32_DATA in BSG_Unpack
-typedef struct pack_buf_t {
-  UINT32 size;
-  BYTE * data;
-} pack_buf_t;
-
-// and a const version for Pack
-typedef struct pack_constbuf_t {
-  UINT32 size;
-  const BYTE* data;
-} pack_constbuf_t;
-
 typedef UINT32 tpm_size_t;
 
 // first version, probably will be expanded...
