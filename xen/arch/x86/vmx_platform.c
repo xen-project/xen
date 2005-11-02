@@ -303,20 +303,20 @@ static void init_instruction(struct instruction *mmio_inst)
     mmio_inst->flags = 0;
 }
 
-#define GET_OP_SIZE_FOR_BYTE(op_size)   \
-    do {    \
-     if (rex)   \
-     op_size = BYTE_64;  \
- else    \
-     op_size = BYTE;  \
+#define GET_OP_SIZE_FOR_BYTE(op_size)       \
+    do {                                    \
+        if (rex)                            \
+            op_size = BYTE_64;              \
+        else                                \
+            op_size = BYTE;                 \
     } while(0)
 
 #define GET_OP_SIZE_FOR_NONEBYTE(op_size)   \
-    do {    \
-     if (rex & 0x8)   \
-     op_size = QUAD;  \
- else if (op_size != WORD) \
-     op_size = LONG;  \
+    do {                                    \
+        if (rex & 0x8)                      \
+            op_size = QUAD;                 \
+        else if (op_size != WORD)           \
+            op_size = LONG;                 \
     } while(0)
 
 
@@ -398,8 +398,9 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
 
     case 0x20: /* and r8, m8 */
         instr->instr = INSTR_AND;
-        GET_OP_SIZE_FOR_BYTE(instr->op_size);
-        return reg_mem(instr->op_size, opcode, instr, rex);
+        instr->op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return reg_mem(size_reg, opcode, instr, rex);
 
     case 0x21: /* and r32/16, m32/16 */
         instr->instr = INSTR_AND;
@@ -413,8 +414,9 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
 
     case 0x30: /* xor r8, m8 */
         instr->instr = INSTR_XOR;
-        GET_OP_SIZE_FOR_BYTE(instr->op_size);
-        return reg_mem(instr->op_size, opcode, instr, rex);
+        instr->op_size = BYTE;
+        GET_OP_SIZE_FOR_BYTE(size_reg);
+        return reg_mem(size_reg, opcode, instr, rex);
 
     case 0x31: /* xor r32/16, m32/16 */
         instr->instr = INSTR_XOR;
@@ -592,7 +594,7 @@ static int vmx_decode(unsigned char *opcode, struct instruction *instr)
         instr->operand[1] = mk_operand(instr->op_size, index, 0, REGISTER);
         return DECODE_success;
 
-    case 0xB7: /* movz m16, r32 */
+    case 0xB7: /* movz m16/m32, r32/r64 */
         instr->instr = INSTR_MOVZ;
         index = get_index(opcode + 1, rex);
         if (rex & 0x8) {
@@ -689,9 +691,9 @@ static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
                           struct mmio_op *mmio_opp, struct cpu_user_regs *regs)
 {
     unsigned long value = 0;
-    int index, size;
+    int index, size_reg;
 
-    size = operand_size(inst->operand[0]);
+    size_reg = operand_size(inst->operand[0]);
 
     mmio_opp->flags = inst->flags;
     mmio_opp->instr = inst->instr;
@@ -701,14 +703,17 @@ static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
 
     if (inst->operand[0] & REGISTER) { /* dest is memory */
         index = operand_index(inst->operand[0]);
-        value = get_reg_value(size, index, 0, regs);
+        value = get_reg_value(size_reg, index, 0, regs);
         send_mmio_req(type, gpa, 1, inst->op_size, value, IOREQ_WRITE, 0);
     } else if (inst->operand[0] & IMMEDIATE) { /* dest is memory */
         value = inst->immediate;
         send_mmio_req(type, gpa, 1, inst->op_size, value, IOREQ_WRITE, 0);
     } else if (inst->operand[0] & MEMORY) { /* dest is register */
         /* send the request and wait for the value */
-        send_mmio_req(type, gpa, 1, inst->op_size, 0, IOREQ_READ, 0);
+        if (inst->instr == INSTR_MOVZ)
+            send_mmio_req(type, gpa, 1, size_reg, 0, IOREQ_READ, 0);
+        else
+            send_mmio_req(type, gpa, 1, inst->op_size, 0, IOREQ_READ, 0);
     } else {
         printf("mmio_operands: invalid operand\n");
         domain_crash_synchronous();
