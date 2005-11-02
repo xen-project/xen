@@ -27,6 +27,19 @@ l1_pgentry_t *mapcache;
 static unsigned int map_idx, epoch, shadow_epoch[NR_CPUS];
 static spinlock_t map_lock = SPIN_LOCK_UNLOCKED;
 
+/* Use a spare PTE bit to mark entries ready for recycling. */
+#define READY_FOR_TLB_FLUSH (1<<10)
+
+static void flush_all_ready_maps(void)
+{
+    l1_pgentry_t *cache = mapcache;
+    unsigned int i;
+
+    for ( i = 0; i < MAPCACHE_ENTRIES; i++ )
+        if ( (l1e_get_flags(cache[i]) & READY_FOR_TLB_FLUSH) )
+            cache[i] = l1e_empty();
+}
+
 void *map_domain_page(unsigned long pfn)
 {
     unsigned long va;
@@ -54,6 +67,7 @@ void *map_domain_page(unsigned long pfn)
         if ( unlikely(idx == 0) )
         {
             ASSERT(flush_count++ == 0);
+            flush_all_ready_maps();
             perfc_incrc(domain_page_tlb_flush);
             local_flush_tlb();
             shadow_epoch[cpu] = ++epoch;
@@ -75,5 +89,5 @@ void unmap_domain_page(void *va)
     ASSERT((void *)MAPCACHE_VIRT_START <= va);
     ASSERT(va < (void *)MAPCACHE_VIRT_END);
     idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
-    mapcache[idx] = l1e_empty();
+    l1e_add_flags(mapcache[idx], READY_FOR_TLB_FLUSH);
 }
