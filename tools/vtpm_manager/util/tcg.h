@@ -191,6 +191,20 @@ typedef struct TCS_AUTH {
   TPM_AUTHDATA  HMAC;
 } TCS_AUTH;
 
+// structures for dealing with sizes followed by buffers in all the
+// TCG structure.
+typedef struct pack_buf_t {
+  UINT32 size;
+  BYTE * data;
+} pack_buf_t;
+
+typedef struct pack_constbuf_t {
+  UINT32 size;
+  const BYTE* data;
+} pack_constbuf_t;
+
+
+
 // **************************** CONSTANTS *********************************
 
 // BOOL values

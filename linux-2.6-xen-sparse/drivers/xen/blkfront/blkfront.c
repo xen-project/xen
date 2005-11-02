@@ -458,7 +458,7 @@ static void watch_for_status(struct xenbus_watch *watch,
 	node += strlen(watch->node);
 
 	/* FIXME: clean up when error on the other end. */
-	if (info->connected == BLKIF_STATE_CONNECTED)
+	if ((info->connected == BLKIF_STATE_CONNECTED) || info->mi)
 		return;
 
 	err = xenbus_gather(NULL, watch->node,

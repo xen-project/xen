@@ -136,7 +136,7 @@ bool xs_introduce_domain(struct xs_handle *h,
  */
 bool xs_release_domain(struct xs_handle *h, unsigned int domid);
 
-/* Query the home path of a domain.
+/* Query the home path of a domain.  Call free() after use.
  */
 char *xs_get_domain_path(struct xs_handle *h, unsigned int domid);
 
