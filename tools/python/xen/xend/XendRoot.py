@@ -17,7 +17,7 @@
 #============================================================================
 
 """Xend root class.
-Creates the event server and handles configuration.
+Creates the servers and handles configuration.
 
 Other classes get config variables by importing this module,
 using instance() to get a XendRoot instance, and then
@@ -71,9 +71,6 @@ class XendRoot:
 
     """Default port xend serves HTTP at. """
     xend_port_default         = '8000'
-
-    """Default port xend serves events at. """
-    xend_event_port_default   = '8001'
 
     """Default port xend serves relocation at. """
     xend_relocation_port_default = '8002'
@@ -210,21 +207,16 @@ class XendRoot:
         """
         return self.get_config_int('xend-port', self.xend_port_default)
 
-    def get_xend_event_port(self):
-        """Get the port xend listens at for connection to its event server.
-        """
-        return self.get_config_int('xend-event-port', self.xend_event_port_default)
-
     def get_xend_relocation_port(self):
         """Get the port xend listens at for connection to its relocation server.
         """
         return self.get_config_int('xend-relocation-port', self.xend_relocation_port_default)
 
     def get_xend_address(self):
-        """Get the address xend listens at for its HTTP and event ports.
+        """Get the address xend listens at for its HTTP port.
         This defaults to the empty string which allows all hosts to connect.
         If this is set to 'localhost' only the localhost will be able to connect
-        to the HTTP and event ports.
+        to the HTTP port.
         """
         return self.get_config_value('xend-address', self.xend_address_default)
 
@@ -232,7 +224,7 @@ class XendRoot:
         """Get the address xend listens at for its relocation server port.
         This defaults to the empty string which allows all hosts to connect.
         If this is set to 'localhost' only the localhost will be able to connect
-        to the HTTP and event ports.
+        to the relocation port.
         """
         return self.get_config_value('xend-relocation-address', self.xend_relocation_address_default)
 

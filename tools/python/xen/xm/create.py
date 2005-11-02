@@ -376,7 +376,7 @@ gopts.var('sdl', val='',
           use="""Should the device model use SDL?""")
 
 gopts.var('display', val='DISPLAY',
-          fn=set_value, default='localhost:0',
+          fn=set_value, default=None,
           use="X11 display to use")
 
 

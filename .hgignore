@@ -28,6 +28,8 @@
 ^docs/interface/interface\.css$
 ^docs/interface/interface\.html$
 ^docs/interface/labels\.pl$
+^docs/man1/
+^docs/man5/
 ^docs/pdf/.*$
 ^docs/ps/.*$
 ^docs/user/WARNINGS$
@@ -162,6 +164,8 @@
 ^tools/xenstore/xs_test$
 ^tools/xenstore/xs_watch_stress$
 ^tools/xenstore/xsls$
+^tools/xentrace/setsize$
+^tools/xentrace/tbctl$
 ^tools/xentrace/xenctx$
 ^tools/xentrace/xentrace$
 ^xen/BLOG$

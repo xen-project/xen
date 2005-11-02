@@ -260,7 +260,7 @@ void trace(u32 event, unsigned long d1, unsigned long d2,
     }
 
     rec = &t_recs[smp_processor_id()][buf->prod % nr_recs];
-    rdtscll(rec->cycles);
+    rec->cycles  = (u64)get_cycles();
     rec->event   = event;
     rec->data[0] = d1;
     rec->data[1] = d2;

@@ -46,3 +46,5 @@ if [ "${ip}" ] ; then
 fi
 
 handle_iptable()
+
+success

@@ -191,10 +191,17 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	int cpu, rc;
 	struct task_struct *idle;
 
-	if (max_cpus == 0)
-		return;
+	cpu_data[0] = boot_cpu_data;
 
-	xen_smp_intr_init(0);
+	cpu_2_logical_apicid[0] = 0;
+	x86_cpu_to_apicid[0] = 0;
+
+	current_thread_info()->cpu = 0;
+	cpu_sibling_map[0] = cpumask_of_cpu(0);
+	cpu_core_map[0]    = cpumask_of_cpu(0);
+
+	if (max_cpus != 0)
+		xen_smp_intr_init(0);
 
 	for (cpu = 1; cpu < max_cpus; cpu++) {
 		rc = HYPERVISOR_vcpu_op(VCPUOP_is_up, cpu, NULL);
@@ -229,16 +236,20 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		make_page_readonly((void *)cpu_gdt_descr[cpu].address);
 
 		cpu_set(cpu, cpu_possible_map);
+#ifdef CONFIG_HOTPLUG_CPU
 		if (xen_start_info->flags & SIF_INITDOMAIN)
 			cpu_set(cpu, cpu_present_map);
+#else
+		cpu_set(cpu, cpu_present_map);
+#endif
 
 		vcpu_prepare(cpu);
 	}
 
 	/* Currently, Xen gives no dynamic NUMA/HT info. */
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		cpus_clear(cpu_sibling_map[cpu]);
-		cpus_clear(cpu_core_map[cpu]);
+	for (cpu = 1; cpu < NR_CPUS; cpu++) {
+		cpu_sibling_map[cpu] = cpumask_of_cpu(cpu);
+		cpu_core_map[cpu]    = cpumask_of_cpu(cpu);
 	}
 
 #ifdef CONFIG_X86_IO_APIC
@@ -256,18 +267,9 @@ void __devinit smp_prepare_boot_cpu(void)
 	cpu_possible_map = cpumask_of_cpu(0);
 	cpu_present_map  = cpumask_of_cpu(0);
 	cpu_online_map   = cpumask_of_cpu(0);
-
-	cpu_data[0] = boot_cpu_data;
-	cpu_2_logical_apicid[0] = 0;
-	x86_cpu_to_apicid[0] = 0;
-
-	current_thread_info()->cpu = 0;
-	cpus_clear(cpu_sibling_map[0]);
-	cpu_set(0, cpu_sibling_map[0]);
-
-	cpus_clear(cpu_core_map[0]);
-	cpu_set(0, cpu_core_map[0]);
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
 
 static void vcpu_hotplug(unsigned int cpu)
 {
@@ -288,11 +290,7 @@ static void vcpu_hotplug(unsigned int cpu)
 		cpu_set(cpu, cpu_present_map);
 		(void)cpu_up(cpu);
 	} else if (strcmp(state, "offline") == 0) {
-#ifdef CONFIG_HOTPLUG_CPU
 		(void)cpu_down(cpu);
-#else
-		printk(KERN_INFO "Ignoring CPU%d hotplug request\n", cpu);
-#endif
 	} else {
 		printk(KERN_ERR "XENBUS: unknown state(%s) on CPU%d\n",
 		       state, cpu);
@@ -341,8 +339,6 @@ static int __init setup_vcpu_hotplug_event(void)
 }
 
 subsys_initcall(setup_vcpu_hotplug_event);
-
-#ifdef CONFIG_HOTPLUG_CPU
 
 int __cpu_disable(void)
 {

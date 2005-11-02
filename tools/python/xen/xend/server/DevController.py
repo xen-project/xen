@@ -16,12 +16,18 @@
 # Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
+from threading import Event
 
 from xen.xend import sxp
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
-from xen.xend.xenstore.xstransact import xstransact
 
+from xen.xend.xenstore.xstransact import xstransact
+from xen.xend.xenstore.xswatch import xswatch
+
+DEVICE_CREATE_TIMEOUT = 120
+HOTPLUG_STATUS_NODE = "hotplug-status"
+HOTPLUG_STATUS_ERROR = "error"
 
 class DevController:
     """Abstract base class for a device controller.  Device controllers create
@@ -54,6 +60,18 @@ class DevController:
 
         self.writeDetails(config, devid, back, front)
 
+        status, fn_ret = self.waitForBackend(devid)
+        if status:
+            self.destroyDevice(devid)
+            raise VmError( ("Device %s (%s) could not be connected. "
+                            "Hotplug scripts not working") 
+                            % (devid, self.deviceClass))
+
+        elif fn_ret == HOTPLUG_STATUS_ERROR:
+            self.destroyDevice(devid)
+            raise VmError( ("Device %s (%s) could not be connected. "
+                            "Backend device not found!") 
+                            % (devid, self.deviceClass))
         return devid
 
 
@@ -241,6 +259,29 @@ class DevController:
 
         xstransact.Write(frontpath, frontDetails)
         xstransact.Write(backpath, backDetails)
+
+    def waitForBackend(self,devid):
+        ev = Event()
+
+        def hotplugStatus():
+            status = self.readBackend(devid, HOTPLUG_STATUS_NODE)
+            if status is not None:
+                watch.xs.unwatch(backpath, watch)
+                hotplugStatus.value = status
+                ev.set()
+
+        hotplugStatus.value = None
+        frontpath = self.frontendPath(devid)
+        backpath = xstransact.Read(frontpath, "backend")
+
+        watch = xswatch(backpath, hotplugStatus)
+
+        ev.wait(DEVICE_CREATE_TIMEOUT)
+        if ev.isSet():
+            return (0, hotplugStatus.value)
+        else:
+            return (-1, hotplugStatus.value)
+
 
 
     def backendPath(self, backdom, devid):
