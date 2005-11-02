@@ -7,9 +7,9 @@
 
 import os
 import re
-import select
 import string
 import sxp
+import threading
 from struct import pack, unpack, calcsize
 
 from xen.util.xpopen import xPopen3
@@ -81,6 +81,7 @@ def save(fd, dominfo, live):
                 log.info("Domain %d suspended.", dominfo.getDomid())
                 tochild.write("done\n")
                 tochild.flush()
+                log.debug('Written done')
 
         forkHelper(cmd, fd, saveInputHandler, False)
 
@@ -176,43 +177,42 @@ def forkHelper(cmd, fd, inputHandler, closeToChild):
     if closeToChild:
         child.tochild.close()
 
-    lasterr = "error unknown"
+    thread = threading.Thread(target = slurp, args = (child.childerr))
+    thread.start()
+
     try:
-        fds = [child.fromchild.fileno(),
-               child.childerr.fileno()]
-        p = select.poll()
-        map(p.register, fds)
-        while len(fds) > 0:
-            r = p.poll()
-            for (fd, event) in r:
-                if event & select.POLLIN:
-                    if fd == child.childerr.fileno():
-                        lasterr = child.childerr.readline().rstrip()
-                        log.error('%s', lasterr)
-                    else:
-                        l = child.fromchild.readline().rstrip()
-                        while l:
-                            log.debug('%s', l)
-                            inputHandler(l, child.tochild)
-                            try:
-                                l = child.fromchild.readline().rstrip()
-                            except:
-                                l = None
+        try:
+            while 1:
+                line = child.fromchild.readline()
+                if line == "":
+                    break
+                else:
+                    line = line.rstrip()
+                    log.debug('%s', line)
+                    inputHandler(line, child.tochild)
 
-                if event & select.POLLERR:
-                    raise XendError('Error reading from child process for %s',
-                                    cmd)
+            thread.join()
 
-                if event & select.POLLHUP:
-                    fds.remove(fd)
-                    p.unregister(fd)
+        except IOError, exn:
+            raise XendError('Error reading from child process for %s: %s' %
+                            (cmd, exn))
     finally:
         child.fromchild.close()
         child.childerr.close()
         if not closeToChild:
             child.tochild.close()
 
-    if child.wait() >> 8 == 127:
-        lasterr = "popen failed"
-    if child.wait() != 0:
-        raise XendError("%s failed: %s" % (string.join(cmd), lasterr))
+    status = child.wait()
+    if status >> 8 == 127:
+        raise XendError("%s failed: popen failed" % string.join(cmd))
+    elif status != 0:
+        raise XendError("%s failed" % string.join(cmd))
+
+
+def slurp(file):
+    while 1:
+        line = file.readline()
+        if line == "":
+            break
+        else:
+            log.error('%s', line)
