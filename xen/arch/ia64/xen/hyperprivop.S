@@ -807,6 +807,7 @@ just_do_rfi:
 	// OK, now all set to go except for switch to virtual bank1
 	mov r22=1;; st4 [r20]=r22;
 	mov r30=r2; mov r29=r3;;
+    mov r17=ar.unat;;
     adds r16=XSI_B1NATS_OFS-XSI_PSR_IC_OFS,r18
 	adds r2=XSI_BANK1_OFS-XSI_PSR_IC_OFS,r18;
 	adds r3=(XSI_BANK1_OFS+8)-XSI_PSR_IC_OFS,r18;;
@@ -832,6 +833,7 @@ just_do_rfi:
 	.mem.offset 8,0; ld8.fill r30=[r2],16 ;
 	.mem.offset 8,0; ld8.fill r31=[r3],16 ;;
 	bsw.0 ;;
+    mov ar.unat=r17;;
 	mov r2=r30; mov r3=r29;;
 1:	mov pr=r31,-1
 	;;
