@@ -366,20 +366,15 @@ static int reg_mem(unsigned char size, unsigned char *opcode,
     return DECODE_success;
 }
 
-static int vmx_decode(unsigned char *opcode, struct instruction *instr)
+static int vmx_decode(int vm86, unsigned char *opcode, struct instruction *instr)
 {
-    unsigned long eflags;
-    int index, vm86 = 0;
-    unsigned char rex = 0;
     unsigned char size_reg = 0;
+    unsigned char rex = 0;
+    int index;
 
     init_instruction(instr);
 
     opcode = check_prefix(opcode, instr, &rex);
-
-    __vmread(GUEST_RFLAGS, &eflags);
-    if (eflags & X86_EFLAGS_VM)
-        vm86 = 1;
 
     if (vm86) { /* meaning is reversed */
         if (instr->op_size == WORD)
@@ -636,7 +631,6 @@ void send_mmio_req(unsigned char type, unsigned long gpa,
     struct vcpu *v = current;
     vcpu_iodata_t *vio;
     ioreq_t *p;
-    int vm86;
     struct cpu_user_regs *regs;
     extern long evtchn_send(int lport);
 
@@ -649,8 +643,6 @@ void send_mmio_req(unsigned char type, unsigned long gpa,
     }
 
     p = &vio->vp_ioreq;
-
-    vm86 = regs->eflags & X86_EFLAGS_VM;
 
     if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags)) {
         printf("VMX I/O has not yet completed\n");
@@ -725,7 +717,6 @@ static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
 
 void handle_mmio(unsigned long va, unsigned long gpa)
 {
-    unsigned long eip, eflags, cs;
     unsigned long inst_len, inst_addr;
     struct mmio_op *mmio_opp;
     struct cpu_user_regs *regs;
@@ -734,18 +725,17 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     int i, vm86, ret;
 
     mmio_opp = &current->arch.arch_vmx.mmio_op;
+
     regs = mmio_opp->inst_decoder_regs;
+    store_cpu_user_regs(regs);
 
-    __vmread(GUEST_RIP, &eip);
     __vmread(VM_EXIT_INSTRUCTION_LEN, &inst_len);
-    __vmread(GUEST_RFLAGS, &eflags);
-    vm86 = eflags & X86_EFLAGS_VM;
 
-    if (vm86) {
-        __vmread(GUEST_CS_SELECTOR, &cs);
-        inst_addr = (cs << 4) + eip;
-    } else
-        inst_addr = eip;
+    vm86 = regs->eflags & X86_EFLAGS_VM;
+    if (vm86)
+        inst_addr = (regs->cs << 4) + regs->eip;
+    else
+        inst_addr = regs->eip;
 
     memset(inst, 0, MAX_INST_LEN);
     ret = inst_copy_from_guest(inst, inst_addr, inst_len);
@@ -756,7 +746,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 
     init_instruction(&mmio_inst);
 
-    if (vmx_decode(inst, &mmio_inst) == DECODE_failure) {
+    if (vmx_decode(vm86, inst, &mmio_inst) == DECODE_failure) {
         printf("mmio opcode: va 0x%lx, gpa 0x%lx, len %ld:",
                va, gpa, inst_len);
         for (i = 0; i < inst_len; i++)
@@ -765,7 +755,6 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         domain_crash_synchronous();
     }
 
-    store_cpu_user_regs(regs);
     regs->eip += inst_len; /* advance %eip */
 
     switch (mmio_inst.instr) {
@@ -783,16 +772,12 @@ void handle_mmio(unsigned long va, unsigned long gpa)
 
         /* determine non-MMIO address */
         if (vm86) {
-            unsigned long seg;
-
-            __vmread(GUEST_ES_SELECTOR, &seg);
-            if (((seg << 4) + (regs->edi & 0xFFFF)) == va) {
+            if (((regs->es << 4) + (regs->edi & 0xFFFF)) == va) {
                 dir = IOREQ_WRITE;
-                __vmread(GUEST_DS_SELECTOR, &seg);
-                addr = (seg << 4) + (regs->esi & 0xFFFF);
+                addr = (regs->ds << 4) + (regs->esi & 0xFFFF);
             } else {
                 dir = IOREQ_READ;
-                addr = (seg << 4) + (regs->edi & 0xFFFF);
+                addr = (regs->es << 4) + (regs->edi & 0xFFFF);
             }
         } else {
             if (va == regs->edi) {
