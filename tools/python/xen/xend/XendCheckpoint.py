@@ -177,7 +177,7 @@ def forkHelper(cmd, fd, inputHandler, closeToChild):
     if closeToChild:
         child.tochild.close()
 
-    thread = threading.Thread(target = slurp, args = (child.childerr))
+    thread = threading.Thread(target = slurp, args = (child.childerr,))
     thread.start()
 
     try:
