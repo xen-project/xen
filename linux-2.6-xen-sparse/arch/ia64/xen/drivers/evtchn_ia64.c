@@ -22,6 +22,7 @@ unsigned int bind_virq_to_evtchn(int virq)
 
     op.cmd = EVTCHNOP_bind_virq;
     op.u.bind_virq.virq = virq;
+    op.u.bind_virq.vcpu = 0;
     if ( HYPERVISOR_event_channel_op(&op) != 0 )
         BUG();
 

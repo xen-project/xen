@@ -1,7 +1,16 @@
-diff -Naur xen/console/console.c xen.patched/console/console.c
---- xen/console/console.c	2005-09-23 10:54:50.000000000 -0600
-+++ xen.patched/console/console.c	2005-09-23 10:57:51.000000000 -0600
-@@ -768,9 +768,16 @@
+--- xen/console/console.c	2005-11-02 14:13:07.000000000 +0100
++++ xen.patched/console/console.c	2005-11-02 14:21:20.000000000 +0100
+@@ -196,6 +196,9 @@
+ void xen_console_init(void)
+ #endif
+ {
++	if (xen_init() < 0)
++		return __RETCODE;
++
+ 	if (xen_start_info->flags & SIF_INITDOMAIN) {
+ 		if (xc_mode == XC_DEFAULT)
+ 			xc_mode = XC_SERIAL;
+@@ -768,9 +771,15 @@
  #endif
  
  	if (xen_start_info->flags & SIF_INITDOMAIN) {
@@ -10,8 +19,7 @@ diff -Naur xen/console/console.c xen.patched/console/console.c
 +		bind_evtchn_to_irqhandler(xencons_priv_irq,
 +				xencons_priv_interrupt, 0, "console", NULL);
 +#else
-+
- 		xencons_priv_irq = bind_virq_to_irq(VIRQ_CONSOLE);
+ 		xencons_priv_irq = bind_virq_to_irq(VIRQ_CONSOLE, 0);
  		(void)request_irq(xencons_priv_irq,
  				  xencons_priv_interrupt, 0, "console", NULL);
 +#endif
