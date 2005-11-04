@@ -196,6 +196,9 @@ static int __init xen_console_init(void)
 void xen_console_init(void)
 #endif
 {
+	if (xen_init() < 0)
+		return __RETCODE;
+
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
 		if (xc_mode == XC_DEFAULT)
 			xc_mode = XC_SERIAL;

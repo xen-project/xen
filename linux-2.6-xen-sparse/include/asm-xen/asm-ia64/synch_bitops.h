@@ -51,6 +51,8 @@ static __inline__ int synch_var_test_bit(int nr, volatile void * addr)
     return test_bit(nr, addr);
 }
 
+#define synch_cmpxchg	ia64_cmpxchg4_acq
+
 #define synch_test_bit(nr,addr) \
 (__builtin_constant_p(nr) ? \
  synch_const_test_bit((nr),(addr)) : \

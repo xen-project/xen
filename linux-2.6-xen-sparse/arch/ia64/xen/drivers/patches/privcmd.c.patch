@@ -1,16 +1,6 @@
 diff -Naur xen/privcmd/privcmd.c xen.patched/privcmd/privcmd.c
 --- xen/privcmd/privcmd.c	2005-09-23 10:54:50.000000000 -0600
 +++ xen.patched/privcmd/privcmd.c	2005-09-23 10:57:51.000000000 -0600
-@@ -134,6 +134,9 @@
- 				    > vma->vm_end )
- 					return -EINVAL;
- 
-+#ifdef __ia64__
-+#define	direct_remap_pfn_range(a,b,c,d,e,f) remap_pfn_range(a,b,c,d,e)
-+#endif
- 				if ((rc = direct_remap_pfn_range(
- 					vma,
- 					msg[j].va&PAGE_MASK, 
 @@ -180,6 +183,15 @@
  		for (i = 0; i < m.num; i++, addr += PAGE_SIZE, p++) {
  			if (get_user(mfn, p))

@@ -49,6 +49,7 @@
 #include <asm-xen/xenbus.h>
 #include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/gnttab.h>
+#include <asm/hypervisor.h>
 
 #define BLKIF_STATE_DISCONNECTED 0
 #define BLKIF_STATE_CONNECTED    1
@@ -727,6 +728,9 @@ static struct xenbus_driver blkfront = {
 
 static int __init xlblk_init(void)
 {
+	if (xen_init() < 0)
+		return -ENODEV;
+
 	xenbus_register_driver(&blkfront);
 	return 0;
 }

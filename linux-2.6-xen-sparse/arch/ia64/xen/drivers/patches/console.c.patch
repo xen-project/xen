@@ -1,15 +1,5 @@
 --- xen/console/console.c	2005-11-02 14:13:07.000000000 +0100
 +++ xen.patched/console/console.c	2005-11-02 14:21:20.000000000 +0100
-@@ -196,6 +196,9 @@
- void xen_console_init(void)
- #endif
- {
-+	if (xen_init() < 0)
-+		return __RETCODE;
-+
- 	if (xen_start_info->flags & SIF_INITDOMAIN) {
- 		if (xc_mode == XC_DEFAULT)
- 			xc_mode = XC_SERIAL;
 @@ -768,9 +771,15 @@
  #endif
  

@@ -13,6 +13,7 @@
 
 #include <linux/spinlock.h>
 #include <asm-xen/balloon.h>
+#include <asm/hypervisor.h>
 #include "common.h"
 
 /*
@@ -493,6 +494,9 @@ static int __init blkif_init(void)
 {
 	int i;
 	struct page *page;
+
+	if (xen_init() < 0)
+		return -ENODEV;
 
 	blkif_interface_init();
 

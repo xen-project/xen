@@ -20,6 +20,7 @@
 #include <linux/pagemap.h>
 #include <linux/seq_file.h>
 #include <linux/kthread.h>
+#include <asm/hypervisor.h>
 
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>

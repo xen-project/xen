@@ -26,6 +26,7 @@
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
+#include <asm/hypervisor.h>
 
 static inline int uncached_access(struct file *file)
 {
