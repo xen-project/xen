@@ -460,6 +460,8 @@ def xm_mem_set(args):
     server.xend_domain_mem_target_set(dom, mem_target)
     
 def xm_set_vcpus(args):
+    arg_check(args, 2, "set-vcpus")
+    
     from xen.xend.XendClient import server
     server.xend_domain_set_vcpus(args[0], int(args[1]))
 
