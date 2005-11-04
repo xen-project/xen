@@ -512,10 +512,10 @@ int cpu_get_pic_interrupt(struct vcpu *v, int *type)
     if ( !plat->interrupt_request )
         return -1;
 
+    plat->interrupt_request = 0;
     /* read the irq from the PIC */
     intno = pic_read_irq(s);
     *type = VLAPIC_DELIV_MODE_EXT;
-    plat->interrupt_request = 0;
     return intno;
 }
 

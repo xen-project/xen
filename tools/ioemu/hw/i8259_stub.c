@@ -55,13 +55,13 @@ void pic_set_irq(int irq, int level)
     if ( gio->pic_elcr & mask ) {
         /* level */
        if ( level ) {
-           atomic_set_bit(irq, &gio->pic_irr);
            atomic_clear_bit(irq, &gio->pic_clear_irr);
+           atomic_set_bit(irq, &gio->pic_irr);
            global_env->send_event = 1;
        }
        else {
-           atomic_set_bit(irq, &gio->pic_clear_irr);
            atomic_clear_bit(irq, &gio->pic_irr);
+           atomic_set_bit(irq, &gio->pic_clear_irr);
            global_env->send_event = 1;
        }
     }

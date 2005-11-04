@@ -881,6 +881,7 @@ asmlinkage void vmx_intr_assist(void)
     __vmread(VM_ENTRY_INTR_INFO_FIELD, &intr_fields);
 
     if (intr_fields & INTR_INFO_VALID_MASK) {
+        enable_irq_window(cpu_exec_control);
         VMX_DBG_LOG(DBG_LEVEL_1, "vmx_intr_assist: intr_fields: %lx",
                     intr_fields);
         return;
