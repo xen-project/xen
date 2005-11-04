@@ -987,17 +987,9 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         }
     }
 
-    printk("audit1\n");
-    _audit_domain(d, AUDIT_SHADOW_ALREADY_LOCKED | AUDIT_ERRORS_OK);
-    printk("audit1 done\n");
-
     // Get rid of any shadow pages from any previous shadow mode.
     //
     free_shadow_pages(d);
-
-    printk("audit2\n");
-    _audit_domain(d, AUDIT_SHADOW_ALREADY_LOCKED | AUDIT_ERRORS_OK);
-    printk("audit2 done\n");
 
     /*
      * Tear down it's counts by disassembling its page-table-based ref counts.
@@ -1043,10 +1035,6 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     }
 
     audit_adjust_pgtables(d, 1, 1);
-
-    printk("audit3\n");
-    _audit_domain(d, AUDIT_SHADOW_ALREADY_LOCKED | AUDIT_ERRORS_OK);
-    printk("audit3 done\n");
 
     return 0;
 
