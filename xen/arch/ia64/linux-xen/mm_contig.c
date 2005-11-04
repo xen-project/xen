@@ -16,7 +16,6 @@
  */
 #include <linux/config.h>
 #include <linux/bootmem.h>
-#include <linux/efi.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
 
@@ -26,6 +25,7 @@
 #include <asm/sections.h>
 #include <asm/mca.h>
 
+#include <linux/efi.h>
 #ifdef CONFIG_VIRTUAL_MEM_MAP
 static unsigned long num_dma_physpages;
 #endif
