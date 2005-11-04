@@ -36,7 +36,12 @@
 #endif
 
 #ifndef __ASSEMBLY__
+#ifdef MODULE
+extern int is_running_on_xen(void);
+#define running_on_xen (is_running_on_xen())
+#else
 extern int running_on_xen;
+#endif
 
 #define	XEN_HYPER_SSM_I			asm("break 0x7");
 #define	XEN_HYPER_GET_IVR		asm("break 0x8");
