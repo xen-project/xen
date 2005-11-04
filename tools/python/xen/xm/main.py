@@ -666,6 +666,10 @@ def xm_vnet_list(args):
 def xm_vnet_create(args):
     arg_check(args, 1, "vnet-create")
     conf = args[0]
+    if not os.access(conf, os.R_OK):
+        print "File not found: %s" % conf
+        sys.exit(1)
+
     from xen.xend.XendClient import server
     server.xend_vnet_create(conf)
 
@@ -800,7 +804,7 @@ def main(argv=sys.argv):
         except KeyboardInterrupt:
             print "Interrupted."
             sys.exit(1)
-        except IOError:
+        except IOError, ex:
             if os.geteuid() != 0:
                 err("Most commands need root access.  Please try again as root.")
             else:
