@@ -466,6 +466,8 @@ def xm_set_vcpus(args):
     server.xend_domain_set_vcpus(args[0], int(args[1]))
 
 def xm_domid(args):
+    arg_check(args, 1, "domid")
+
     name = args[0]
 
     from xen.xend.XendClient import server
@@ -473,6 +475,8 @@ def xm_domid(args):
     print sxp.child_value(dom, 'domid')
     
 def xm_domname(args):
+    arg_check(args, 1, "domname")
+
     name = args[0]
 
     from xen.xend.XendClient import server
