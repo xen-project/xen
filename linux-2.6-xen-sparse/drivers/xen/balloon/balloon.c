@@ -370,7 +370,7 @@ static void watch_target(struct xenbus_watch *watch,
 
 	err = xenbus_scanf(NULL, "memory", "target", "%llu", &new_target);
 	if (err != 1) {
-		printk(KERN_ERR "Unable to read memory/target\n");
+		/* This is ok (for domain0 at least) - so just return */
 		return;
 	} 
         
