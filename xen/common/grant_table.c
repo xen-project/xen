@@ -781,7 +781,7 @@ gnttab_transfer(
          * headroom.  Also, a domain mustn't have PGC_allocated
          * pages when it is dying.
          */
-        if ( unlikely(test_bit(DOMFLAGS_DYING, &e->domain_flags)) ||
+        if ( unlikely(test_bit(_DOMF_dying, &e->domain_flags)) ||
              unlikely(e->tot_pages >= e->max_pages) ||
              unlikely(!gnttab_prepare_for_transfer(e, d, gop->ref)) )
         {
