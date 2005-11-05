@@ -22,6 +22,9 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
+#ifdef __ia64__
+#include <xen/arch-ia64.h>
+#endif
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -517,6 +520,11 @@ int64_t cpu_get_real_ticks(void)
     val |= low;
     return val;
 }
+
+#elif defined(__ia64__)
+#include "ia64_intrinsic.h"
+#define cpu_get_reak_ticks()	\
+    ia64_getreg(_IA64_REG_AR_ITC)
 
 #else
 #error unsupported CPU
@@ -2375,6 +2383,7 @@ static uint8_t *signal_stack;
 
 #include <xg_private.h>
 
+#if defined(__i386__) || defined (__x86_64__)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 
@@ -2544,6 +2553,10 @@ void unset_vram_mapping(unsigned long addr, unsigned long end)
     /* FIXME Flush the shadow page */
     unsetup_mapping(xc_handle, domid, toptab, addr, end);
 }
+#elif defined(__ia64__)
+void set_vram_mapping(unsigned long addr, unsigned long end) {}
+void unset_vram_mapping(unsigned long addr, unsigned long end) {}
+#endif
 
 int main(int argc, char **argv)
 {
@@ -3018,9 +3031,14 @@ int main(int argc, char **argv)
     phys_ram_size = ram_size + vga_ram_size + bios_size;
 
     ram_pages = ram_size/PAGE_SIZE;
+#if defined(__i386__) || defined(__x86_64__)
     vgaram_pages =  (vga_ram_size -1)/PAGE_SIZE + 1;
     free_pages = vgaram_pages / L1_PAGETABLE_ENTRIES;
     extra_pages = vgaram_pages + free_pages;
+#else
+    /* Test vga acceleration later */
+    extra_pages = 0;
+#endif
 
     xc_handle = xc_interface_open();
 
@@ -3049,6 +3067,7 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
+#if defined(__i386__) || defined(__x86_64__)
     if ( xc_get_pfn_list(xc_handle, domid, page_array, nr_pages) != nr_pages )
     {
 	    perror("xc_get_pfn_list");
@@ -3077,8 +3096,6 @@ int main(int argc, char **argv)
  	    exit(-1);
      }
 
-
-
     memset(shared_vram, 0, vgaram_pages * PAGE_SIZE);
     toptab = page_array[ram_pages] << PAGE_SHIFT;
 
@@ -3087,7 +3104,31 @@ int main(int argc, char **argv)
  				       page_array[ram_pages]);
 
     freepage_array = &page_array[nr_pages - extra_pages];
- 
+#elif defined(__ia64__)
+    if ( xc_ia64_get_pfn_list(xc_handle, domid, page_array, 0, ram_pages) != ram_pages)
+    {
+        perror("xc_ia64_get_pfn_list");
+        exit(-1);
+    }
+
+    if ((phys_ram_base =  xc_map_foreign_batch(xc_handle, domid,
+						 PROT_READ|PROT_WRITE,
+						 page_array,
+						 ram_pages)) == 0) {
+	    perror("xc_map_foreign_batch");
+	    exit(-1);
+    }
+
+    if ( xc_ia64_get_pfn_list(xc_handle, domid, page_array, IO_PAGE_START>>PAGE_SHIFT, 1) != 1)
+    {
+        perror("xc_ia64_get_pfn_list");
+        exit(-1);
+    }
+
+    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+				       PROT_READ|PROT_WRITE,
+ 				       page_array[0]);
+#endif 
 
     fprintf(logfile, "shared page at pfn:%lx, mfn: %lx\n", (nr_pages-1), 
            (page_array[nr_pages - 1]));

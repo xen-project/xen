@@ -389,14 +389,6 @@ cpu_handle_ioreq(CPUState *env)
 
 int xc_handle;
 
-static __inline__ void atomic_set_bit(long nr, volatile void *addr)
-{
-        __asm__ __volatile__(
-                "lock ; bts %1,%0"
-                :"=m" (*(volatile long *)addr)
-                :"dIr" (nr));
-}
-
 void
 destroy_vmx_domain(void)
 {
