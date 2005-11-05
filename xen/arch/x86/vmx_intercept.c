@@ -317,27 +317,51 @@ int intercept_pit_io(ioreq_t *p)
     return 0;
 }
 
-/* hooks function for the PIT initialization response iopacket */
-static void pit_timer_fn(void *data)
+/* hooks function for the HLT instruction emulation wakeup */
+void hlt_timer_fn(void *data)
 {
-    struct vmx_virpit *vpit = data;
-    s_time_t   next;
+    struct vcpu *v = data;
+    
+    evtchn_set_pending(v, iopacket_port(v->domain));
+}
+
+static __inline__ void missed_ticks(struct vmx_virpit*vpit)
+{
     int        missed_ticks;
 
     missed_ticks = (NOW() - vpit->scheduled)/(s_time_t) vpit->period;
-
-    /* Set the pending intr bit, and send evtchn notification to myself. */
-    vpit->pending_intr_nr++; /* already set, then count the pending intr */
-    evtchn_set_pending(vpit->v, iopacket_port(vpit->v->domain));
-
-    /* pick up missed timer tick */
     if ( missed_ticks > 0 ) {
         vpit->pending_intr_nr += missed_ticks;
         vpit->scheduled += missed_ticks * vpit->period;
     }
-    next = vpit->scheduled + vpit->period;
-    set_ac_timer(&vpit->pit_timer, next);
-    vpit->scheduled = next;
+}
+
+/* hooks function for the PIT when the guest is active */
+static void pit_timer_fn(void *data)
+{
+    struct vcpu *v = data;
+    struct vmx_virpit *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
+
+    /* pick up missed timer tick */
+    missed_ticks(vpit);
+
+    vpit->pending_intr_nr++;
+    if ( test_bit(_VCPUF_running, &v->vcpu_flags) ) {
+        vpit->scheduled += vpit->period;
+        set_ac_timer(&vpit->pit_timer, vpit->scheduled);
+    }
+}
+
+void pickup_deactive_ticks(struct vmx_virpit *vpit)
+{
+
+    if ( !active_ac_timer(&(vpit->pit_timer)) ) {
+        /* pick up missed timer tick */
+        missed_ticks(vpit);
+    
+        vpit->scheduled += vpit->period;
+        set_ac_timer(&vpit->pit_timer, vpit->scheduled);
+    }
 }
 
 /* Only some PIT operations such as load init counter need a hypervisor hook.
@@ -359,8 +383,10 @@ void vmx_hooks_assist(struct vcpu *v)
             reinit = 1;
  
         }
-        else
-            init_ac_timer(&vpit->pit_timer, pit_timer_fn, vpit, v->processor);
+        else {
+            init_ac_timer(&vpit->pit_timer, pit_timer_fn, v, v->processor);
+            vpit->ticking = 1;
+        }
 
         /* init count for this channel */
         vpit->init_val = (p->u.data & 0xFFFF) ;
@@ -396,8 +422,6 @@ void vmx_hooks_assist(struct vcpu *v)
             printk("VMX_PIT:wrong PIT rw_mode!\n");
             break;
         }
-
-        vpit->v = v;
 
         vpit->scheduled = NOW() + vpit->period;
         set_ac_timer(&vpit->pit_timer, vpit->scheduled);

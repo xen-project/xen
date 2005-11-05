@@ -547,9 +547,6 @@ void pc_init(int ram_size, int vga_ram_size, int boot_device,
                 pci_pcnet_init(pci_bus, &nd_table[i]); 
         }
         pci_piix3_ide_init(pci_bus, bs_table);
-#ifdef APIC_SUPPORT
-        IOAPICInit();
-#endif
     } else {
         nb_nics1 = nb_nics;
         if (nb_nics1 > NE2000_NB_MAX)

@@ -99,6 +99,7 @@ struct arch_vmx_struct {
     void                    *io_bitmap_a, *io_bitmap_b;
     struct vlapic           *vlapic;
     u64                     tsc_offset;
+    struct ac_timer         hlt_timer;  /* hlt ins emulation wakeup timer */
 };
 
 #define vmx_schedule_tail(next)         \
@@ -116,6 +117,7 @@ struct vmcs_struct *alloc_vmcs(void);
 int modify_vmcs(struct arch_vmx_struct *arch_vmx,
                 struct cpu_user_regs *regs);
 void destroy_vmcs(struct arch_vmx_struct *arch_vmx);
+void hlt_timer_fn(void *data);
 
 #define VMCS_USE_HOST_ENV       1
 #define VMCS_USE_SEPARATE_ENV   0

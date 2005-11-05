@@ -60,9 +60,18 @@ int vlapic_find_highest_irr(struct vlapic *vlapic)
     return result;
 }
 
-inline int vmx_apic_support(struct domain *d)
+int vmx_apic_support(struct domain *d)
 {
     return d->arch.vmx_platform.lapic_enable;
+}
+
+s_time_t get_apictime_scheduled(struct vcpu *v)
+{
+    struct vlapic *vlapic = VLAPIC(v);
+
+    if ( !vmx_apic_support(v->domain) || !vlapic_lvt_timer_enabled(vlapic) )
+        return -1;
+    return vlapic->vlapic_timer.expires;
 }
 
 int vlapic_find_highest_isr(struct vlapic *vlapic)

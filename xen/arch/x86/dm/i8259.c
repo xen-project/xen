@@ -525,3 +525,16 @@ int is_pit_irq(struct vcpu *v, int irq, int type)
 
     return (irq == pit_vec);
 }
+
+int is_irq_enabled(struct vcpu *v, int irq)
+{
+    struct vmx_virpic *vpic=&v->domain->arch.vmx_platform.vmx_pic;
+        
+    if ( irq & 8 ) {
+        return !( (1 << (irq&7)) & vpic->pics[1].imr);
+    }
+    else {
+        return !( (1 << irq) & vpic->pics[0].imr);
+    }
+}
+

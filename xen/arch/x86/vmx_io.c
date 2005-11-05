@@ -931,6 +931,7 @@ asmlinkage void vmx_intr_assist(void)
 
 void vmx_do_resume(struct vcpu *v)
 {
+    struct vmx_virpit *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
     vmx_stts();
 
     if (event_pending(v)) {
@@ -939,6 +940,9 @@ void vmx_do_resume(struct vcpu *v)
         if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags))
             vmx_wait_io();
     }
+    /* pick up the elapsed PIT ticks and re-enable pit_timer */
+    if ( vpit->ticking )
+        pickup_deactive_ticks(vpit);
 
     /* We can't resume the guest if we're waiting on I/O */
     ASSERT(!test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags));

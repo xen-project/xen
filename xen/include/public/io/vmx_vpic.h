@@ -77,6 +77,7 @@ uint32_t pic_intack_read(struct vmx_virpic *s);
 void register_pic_io_hook (void);
 int cpu_get_pic_interrupt(struct vcpu *v, int *type);
 int is_pit_irq(struct vcpu *v, int irq, int type);
+int is_irq_enabled(struct vcpu *v, int irq);
 void do_pic_irqs (struct vmx_virpic *s, uint16_t irqs);
 void do_pic_irqs_clear (struct vmx_virpic *s, uint16_t irqs);
 

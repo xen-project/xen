@@ -43,6 +43,8 @@
 #endif
 #include <public/sched.h>
 #include <public/io/ioreq.h>
+#include <public/io/vmx_vpic.h>
+#include <public/io/vmx_vlapic.h>
 
 int hvm_enabled;
 
@@ -85,6 +87,8 @@ void vmx_final_setup_guest(struct vcpu *v)
 
 void vmx_relinquish_resources(struct vcpu *v)
 {
+    struct vmx_virpit *vpit;
+    
     if ( !VMX_DOMAIN(v) )
         return;
 
@@ -96,7 +100,12 @@ void vmx_relinquish_resources(struct vcpu *v)
 
     destroy_vmcs(&v->arch.arch_vmx);
     free_monitor_pagetable(v);
-    rem_ac_timer(&v->domain->arch.vmx_platform.vmx_pit.pit_timer);
+    vpit = &v->domain->arch.vmx_platform.vmx_pit;
+    if ( vpit->ticking && active_ac_timer(&(vpit->pit_timer)) )
+        rem_ac_timer(&vpit->pit_timer);
+    if ( active_ac_timer(&v->arch.arch_vmx.hlt_timer) ) {
+        rem_ac_timer(&v->arch.arch_vmx.hlt_timer);
+    }
     if ( vmx_apic_support(v->domain) ) {
         rem_ac_timer( &(VLAPIC(v)->vlapic_timer) );
         xfree( VLAPIC(v) );
@@ -1521,12 +1530,24 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
                 (unsigned long)regs->edx);
 }
 
-volatile unsigned long do_hlt_count;
 /*
  * Need to use this exit to reschedule
  */
 void vmx_vmexit_do_hlt(void)
 {
+    struct vcpu *v=current;
+    struct vmx_virpit *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
+    s_time_t   next_pit=-1,next_wakeup;
+
+    if ( !v->vcpu_id ) {
+        next_pit = get_pit_scheduled(v,vpit);
+    }
+    next_wakeup = get_apictime_scheduled(v);
+    if ( (next_pit != -1 && next_pit < next_wakeup) || next_wakeup == -1 ) {
+        next_wakeup = next_pit;
+    }
+    if ( next_wakeup != - 1 ) 
+        set_ac_timer(&current->arch.arch_vmx.hlt_timer, next_wakeup);
     do_block();
 }
 

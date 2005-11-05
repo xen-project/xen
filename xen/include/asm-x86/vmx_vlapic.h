@@ -239,7 +239,8 @@ struct vlapic* apic_round_robin(struct domain *d,
                                 uint8_t dest_mode,
                                 uint8_t vector,
                                 uint32_t bitmap);
-
+s_time_t get_apictime_scheduled(struct vcpu *v);
 int vmx_apic_support(struct domain *d);
 
 #endif /* VMX_VLAPIC_H */
+

@@ -8,6 +8,7 @@
 #include <xen/errno.h>
 #include <xen/ac_timer.h>
 #include <asm/vmx_vmcs.h>
+#include <public/io/vmx_vpic.h>
 
 #define PIT_FREQ 1193181
 
@@ -18,14 +19,15 @@
 
 struct vmx_virpit {
     /* for simulation of counter 0 in mode 2*/
-    u32 period;		/* pit frequency in ns */
     u64 period_cycles;	                /* pit frequency in cpu cycles */
+    u64 inject_point; /* the time inject virt intr */
     s_time_t scheduled;                 /* scheduled timer interrupt */
+    struct ac_timer pit_timer;  /* periodic timer for mode 2*/
     unsigned int channel;  /* the pit channel, counter 0~2 */
     unsigned int pending_intr_nr; /* the couner for pending timer interrupts */
-    u64 inject_point; /* the time inject virt intr */
-    struct ac_timer pit_timer;  /* periodic timer for mode 2*/
+    u32 period;		/* pit frequency in ns */
     int first_injected;                 /* flag to prevent shadow window */
+    int ticking;    /* indicating it is ticking */
 
     /* virtual PIT state for handle related I/O */
     int read_state;
@@ -34,10 +36,20 @@ struct vmx_virpit {
 
     unsigned int count;  /* the 16 bit channel count */
     unsigned int init_val; /* the init value for the counter */
-    struct vcpu *v;
 };
 
 /* to hook the ioreq packet to get the PIT initializaiton info */
 extern void vmx_hooks_assist(struct vcpu *v);
+
+static __inline__ s_time_t get_pit_scheduled(
+    struct vcpu *v, 
+    struct vmx_virpit *vpit)
+{
+    if ( is_irq_enabled(v, 0) ) {
+        return vpit->scheduled;
+    }
+    else
+        return -1;
+}
 
 #endif /* _VMX_VIRPIT_H_ */

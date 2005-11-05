@@ -456,17 +456,10 @@ int main_loop(void)
 #endif
 
 		main_loop_wait(0);
-#ifdef APIC_SUPPORT
-		ioapic_update_EOI();
-#endif
         tun_receive_handler(&rfds);
         if ( FD_ISSET(evtchn_fd, &rfds) ) {
             cpu_handle_ioreq(env);
         }
-#ifdef APIC_SUPPORT
-		if (ioapic_has_intr())
-                    do_ioapic();
-#endif
 		if (env->send_event) {
 			struct ioctl_evtchn_notify notify;
 			notify.port = ioreq_local_port;
