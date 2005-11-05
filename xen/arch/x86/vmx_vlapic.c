@@ -659,7 +659,7 @@ unsigned long vlapic_write(struct vcpu *v, unsigned long address,
         vlapic->spurious_vec = val & 0x1ff;
         if (!(vlapic->spurious_vec & 0x100)) {
             int i = 0;
-            for (i=0; i < VLAPIC_LVT_NUM; i++) 
+            for (i = 0; i < VLAPIC_LVT_NUM; i++)
                 vlapic->lvt[i] |= 0x10000;
             vlapic->status |= VLAPIC_SOFTWARE_DISABLE_MASK;
         }
@@ -723,10 +723,12 @@ unsigned long vlapic_write(struct vcpu *v, unsigned long address,
         vlapic->timer_current = val;
         vlapic->timer_current_update = NOW();
 
-        VMX_DBG_LOG(DBG_LEVEL_VLAPIC,
-          "timer_init %x timer_current %x timer_current_update %08x%08x",
-          vlapic->timer_initial, vlapic->timer_current, (uint32_t)(vlapic->timer_current_update>>32), (uint32_t)vlapic->timer_current_update);
-        vlapic_begin_timer(vlapic);
+        VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "timer_init %x timer_current %x"
+                    "timer_current_update %08x%08x",
+                    vlapic->timer_initial, vlapic->timer_current,
+                    (uint32_t)(vlapic->timer_current_update >> 32),
+                    (uint32_t)vlapic->timer_current_update);
+                    vlapic_begin_timer(vlapic);
         break;
 
     case APIC_TDCR:
@@ -920,19 +922,22 @@ void vlapic_post_injection(struct vcpu *v, int vector, int deliver_mode) {
 
 static int vlapic_reset(struct vlapic *vlapic)
 {
-    struct vcpu *v = vlapic->vcpu;
-    int apic_id = v->vcpu_id, i;
+    struct vcpu *v;
+    int apic_id, i;
 
-    if (!v || !vlapic)
-        return 0;
+    ASSERT( vlapic != NULL );
 
-    memset(vlapic, 0,sizeof(struct vlapic));
+    v = vlapic->vcpu;
 
-    v->arch.arch_vmx.vlapic = vlapic;
+    ASSERT( v != NULL );
+
+    apic_id = v->vcpu_id;
 
     vlapic->domain = v->domain;
 
     vlapic->id = apic_id;
+
+    vlapic->vcpu_id = v->vcpu_id;
 
     vlapic->version = VLAPIC_VERSION;
 
@@ -940,6 +945,7 @@ static int vlapic_reset(struct vlapic *vlapic)
 
     if (apic_id == 0)
         vlapic->apic_base_msr |= MSR_IA32_APICBASE_BSP;
+
     vlapic->base_address = vlapic_get_base_address(vlapic);
 
     for (i = 0; i < VLAPIC_LVT_NUM; i++)
@@ -949,9 +955,8 @@ static int vlapic_reset(struct vlapic *vlapic)
 
     vlapic->spurious_vec = 0xff;
 
-
     init_ac_timer(&vlapic->vlapic_timer,
-      vlapic_timer_fn, vlapic, v->processor);
+                  vlapic_timer_fn, vlapic, v->processor);
 
 #ifdef VLAPIC_NO_BIOS
     /*
@@ -966,10 +971,10 @@ static int vlapic_reset(struct vlapic *vlapic)
 #endif
 
     VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "vlapic_reset: "
-      "vcpu=%p id=%d vlapic_apic_base_msr=%08x%08x "
-      "vlapic_base_address=%0lx",
-      v, vlapic->id, (uint32_t)(vlapic->apic_base_msr >> 32),
-      (uint32_t)vlapic->apic_base_msr, vlapic->base_address);
+                "vcpu=%p id=%d vlapic_apic_base_msr=%08x%08x "
+                "vlapic_base_address=%0lx",
+                v, vlapic->id, (uint32_t)(vlapic->apic_base_msr >> 32),
+                (uint32_t)vlapic->apic_base_msr, vlapic->base_address);
 
     return 1;
 }
@@ -978,14 +983,19 @@ int vlapic_init(struct vcpu *v)
 {
     struct vlapic *vlapic = NULL;
 
+    ASSERT( v != NULL );
+
     VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "vlapic_init %d", v->vcpu_id);
 
     vlapic = xmalloc_bytes(sizeof(struct vlapic));
-
     if (!vlapic) {
         printk("malloc vlapic error for vcpu %x\n", v->vcpu_id);
         return -ENOMEM;
     }
+
+    memset(vlapic, 0, sizeof(struct vlapic));
+
+    VLAPIC(v) = vlapic;
 
     vlapic->vcpu = v;
 
