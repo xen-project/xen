@@ -241,6 +241,12 @@ gopts.var('pci', val='BUS,DEV,FUNC',
          For example '-pci c0,02,1a'.
          The option may be repeated to add more than one pci device.""")
 
+gopts.var('ioports', val='FROM[-TO]',
+          fn=append_value, default=[],
+          use="""Add a legacy I/O range to a domain, using given params (in hex).
+         For example '-ioports 02f8-02ff'.
+         The option may be repeated to add more than one i/o range.""")
+
 gopts.var('usb', val='PATH',
           fn=append_value, default=[],
           use="""Add a physical USB port to a domain, as specified by the path
@@ -439,6 +445,13 @@ def configure_pci(config_devs, vals):
         config_pci = ['pci', ['bus', bus], ['dev', dev], ['func', func]]
         config_devs.append(['device', config_pci])
 
+def configure_ioports(config_devs, vals):
+    """Create the config for legacy i/o ranges.
+    """
+    for (io_from, io_to) in vals.ioports:
+        config_ioports = ['ioports', ['from', io_from], ['to', io_to]]
+        config_devs.append(['device', config_ioports])
+
 def configure_usb(config_devs, vals):
     for path in vals.usb:
         config_usb = ['usb', ['path', path]]
@@ -611,6 +624,7 @@ def make_config(vals):
     config_devs = []
     configure_disks(config_devs, vals)
     configure_pci(config_devs, vals)
+    configure_ioports(config_devs, vals)
     configure_vifs(config_devs, vals)
     configure_usb(config_devs, vals)
     configure_vtpm(config_devs, vals)
@@ -645,6 +659,20 @@ def preprocess_pci(vals):
         pci.append(hexd)
     vals.pci = pci
 
+def preprocess_ioports(vals):
+    if not vals.ioports: return
+    ioports = []
+    for v in vals.ioports:
+        d = v.split('-')
+        if len(d) < 1 || len(d) > 2:
+            err('Invalid i/o port range specifier: ' + v)
+        if len(d) == 1:
+            d.append(d[0])
+        # Components are in hex: add hex specifier.
+        hexd = map(lambda v: '0x'+v, d)
+        ioports.append(hexd)
+    vals.ioports = ioports
+        
 def preprocess_vifs(vals):
     if not vals.vif: return
     vifs = []
@@ -777,6 +805,7 @@ def preprocess(vals):
         err("No kernel specified")
     preprocess_disk(vals)
     preprocess_pci(vals)
+    preprocess_ioports(vals)
     preprocess_vifs(vals)
     preprocess_ip(vals)
     preprocess_nfs(vals)
