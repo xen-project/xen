@@ -340,7 +340,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 	struct bio *bio = NULL, *biolist[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	int nbio = 0;
 	request_queue_t *q;
-	int ret;
+	int ret, errors = 0;
 
 	/* Check that number of segments is sane. */
 	nseg = req->nr_segments;
@@ -374,23 +374,23 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 	BUG_ON(ret);
 
 	for (i = 0; i < nseg; i++) {
-		if (unlikely(map[i].handle < 0)) {
-			DPRINTK("invalid buffer -- could not remap it\n");
-			fast_flush_area(pending_idx, nseg);
-			goto bad_descriptor;
+		if (likely(map[i].handle >= 0)) {
+			pending_handle(pending_idx, i) = map[i].handle;
+			phys_to_machine_mapping[__pa(MMAP_VADDR(
+				pending_idx, i)) >> PAGE_SHIFT] =
+				FOREIGN_FRAME(map[i].dev_bus_addr>>PAGE_SHIFT);
+			fas        = req->frame_and_sects[i];
+			seg[i].buf = map[i].dev_bus_addr | 
+				(blkif_first_sect(fas) << 9);
+		} else {
+			errors++;
 		}
-
-		phys_to_machine_mapping[__pa(MMAP_VADDR(
-			pending_idx, i)) >> PAGE_SHIFT] =
-			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT);
-
-		pending_handle(pending_idx, i) = map[i].handle;
 	}
 
-	for (i = 0; i < nseg; i++) {
-		fas         = req->frame_and_sects[i];
-		seg[i].buf  = map[i].dev_bus_addr | 
-			(blkif_first_sect(fas) << 9);
+	if (errors) {
+		DPRINTK("invalid buffer -- could not remap it\n");
+		fast_flush_area(pending_idx, nseg);
+		goto bad_descriptor;
 	}
 
 	if (vbd_translate(&preq, blkif, operation) != 0) {
