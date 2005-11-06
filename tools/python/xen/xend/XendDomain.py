@@ -492,40 +492,6 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
-    def domain_ioport_range_enable(self, domid, first, last):
-        """Enable access to a range of IO ports for a domain
-
-        @param first: first IO port
-        @param last: last IO port
-        @return: 0 on success, -1 on error
-        """
-        dominfo = self.domain_lookup(domid)
-        nr_ports = last - first + 1
-        try:
-            return xc.domain_ioport_permission(dominfo.getDomid(),
-                                               first_port = first,
-                                               nr_ports = nr_ports,
-                                               allow_access = 1)
-        except Exception, ex:
-            raise XendError(str(ex))
-
-    def domain_ioport_range_disable(self, domid, first, last):
-        """Disable access to a range of IO ports for a domain
-
-        @param first: first IO port
-        @param last: last IO port
-        @return: 0 on success, -1 on error
-        """
-        dominfo = self.domain_lookup(domid)
-        nr_ports = last - first + 1
-        try:
-            return xc.domain_ioport_permission(dominfo.getDomid(),
-                                               first_port = first,
-                                               nr_ports = nr_ports,
-                                               allow_access = 0)
-        except Exception, ex:
-            raise XendError(str(ex))
-
 
 def instance():
     """Singleton constructor. Use this instead of the class constructor.
