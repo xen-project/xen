@@ -56,6 +56,9 @@ boolean_param("dom0_shadow", opt_dom0_shadow);
 static unsigned int opt_dom0_translate = 0;
 boolean_param("dom0_translate", opt_dom0_translate);
 
+static char opt_dom0_ioports_disable[200] = "";
+string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
+
 #if defined(__i386__)
 /* No ring-3 access in initial leaf page tables. */
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
@@ -89,6 +92,43 @@ static struct pfn_info *alloc_chunk(struct domain *d, unsigned long max_pages)
         if ( order-- == 0 )
             break;
     return page;
+}
+
+static void process_dom0_ioports_disable()
+{
+    unsigned long io_from, io_to, io_nr;
+    char *t, *u, *s = opt_dom0_ioports_disable;
+
+    if ( *s == '\0' )
+        return;
+
+    while ( (t = strsep(&s, ",")) != NULL )
+    {
+        io_from = simple_strtoul(t, &u, 16);
+        if ( u == t )
+        {
+        parse_error:
+            printk("Invalid ioport range <%s> "
+                   "in dom0_ioports_disable, skipping\n", t);
+            continue;
+        }
+	
+        if ( *u == '\0' )
+            io_to = io_from;
+        else if ( *u == '-' )
+            io_to = simple_strtoul(u + 1, &u, 16);
+        else
+            goto parse_error;
+
+        if ( (*u != '\0') || (io_to < io_from) || (io_to >= 65536) )
+            goto parse_error;
+
+        printk("Disabling dom0 access to ioport range %04lx-%04lx\n",
+            io_from, io_to);
+
+        io_nr = io_to - io_from + 1;
+        physdev_modify_ioport_access_range(dom0, 0, io_from, io_nr);
+    }
 }
 
 int construct_dom0(struct domain *d,
@@ -716,6 +756,8 @@ int construct_dom0(struct domain *d,
     physdev_modify_ioport_access_range(dom0, 0, 0x40, 4);
     /* PIT Channel 2 / PC Speaker Control. */
     physdev_modify_ioport_access_range(dom0, 0, 0x61, 1);
+    /* Command-line passed i/o ranges */
+    process_dom0_ioports_disable();
 
     return 0;
 }
