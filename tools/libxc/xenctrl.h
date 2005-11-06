@@ -371,6 +371,12 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
                                           unsigned int extent_order,
 					  unsigned long *extent_start);
 
+int xc_domain_ioport_permission(int xc_handle,
+                                uint32_t domid,
+                                uint16_t first_port,
+                                uint16_t nr_ports,
+                                uint16_t allow_access);
+
 unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid, 
 				    unsigned long mfn);
 
