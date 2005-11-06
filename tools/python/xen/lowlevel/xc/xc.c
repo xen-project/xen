@@ -858,6 +858,29 @@ static PyObject *pyxc_domain_memory_increase_reservation(PyObject *self,
     return zero;
 }
 
+static PyObject *pyxc_domain_ioport_permission(PyObject *self,
+                                               PyObject *args,
+                                               PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    uint32_t dom;
+    int first_port, nr_ports, allow_access, ret;
+
+    static char *kwd_list[] = { "dom", "first_port", "nr_ports", "allow_access", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiii", kwd_list, 
+                                      &dom, &first_port, &nr_ports, &allow_access) )
+        return NULL;
+
+    ret = xc_domain_ioport_permission(
+        xc->xc_handle, dom, first_port, nr_ports, allow_access);
+    if ( ret != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyMethodDef pyxc_methods[] = {
     { "handle",
       (PyCFunction)pyxc_handle,
@@ -1125,6 +1148,16 @@ static PyMethodDef pyxc_methods[] = {
       "Increase a domain's memory reservation\n"
       " dom [int]: Identifier of domain.\n"
       " mem_kb [long]: .\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_ioport_permission",
+      (PyCFunction)pyxc_domain_ioport_permission,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Allow a domain access to a range of IO ports\n"
+      " dom          [int]: Identifier of domain to be allowed access.\n"
+      " first_port   [int]: First IO port\n"
+      " nr_ports     [int]: Number of IO ports\n"
+      " allow_access [int]: Non-zero means enable access; else disable access\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { NULL, NULL, 0, NULL }
