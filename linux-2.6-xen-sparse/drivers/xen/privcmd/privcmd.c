@@ -181,6 +181,15 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		for (i = 0; i < m.num; i++, addr += PAGE_SIZE, p++) {
 			if (get_user(mfn, p))
 				return -EFAULT;
+#ifdef __ia64__
+			ret = remap_pfn_range(vma,
+					      addr&PAGE_MASK,
+					      mfn,
+					      1<<PAGE_SHIFT,
+					      vma->vm_page_prot);
+			if (ret < 0)
+			    goto batch_err;
+#else
 
 			ret = create_lookup_pte_addr(vma->vm_mm, addr, &ptep);
 			if (ret)
@@ -191,6 +200,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 
 			if (HYPERVISOR_mmu_update(&u, 1, NULL, m.dom) < 0)
 				put_user(0xF0000000 | mfn, p);
+#endif
 		}
 
 		ret = 0;
@@ -206,6 +216,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	break;
 #endif
 
+#ifndef __ia64__
 	case IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN: {
 		unsigned long m2pv = (unsigned long)machine_to_phys_mapping;
 		pgd_t *pgd = pgd_offset_k(m2pv);
@@ -217,6 +228,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 			-EFAULT: 0;
 	}
 	break;
+#endif
 
 	default:
 		ret = -EINVAL;
