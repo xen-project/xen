@@ -120,8 +120,10 @@ real issue.
 =item I<rename-restart>
 
 The old domain will not be cleaned up, but will be renamed so a new
-domain can be restarted in it's place.  (TODO: what does this mean for
-resources?  What is the renamed name?)
+domain can be restarted in it's place.  The old domain will be renamed with
+a suffix -1, -2, etc, and assigned a new random UUID; the new domain will
+keep the original name and UUID.  The old domain will release the devices that
+it holds, so that the new one may take them.
 
 =back
 
