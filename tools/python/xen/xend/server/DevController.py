@@ -57,6 +57,8 @@ class DevController:
         @return The ID for the newly created device.
         """
         (devid, back, front) = self.getDeviceDetails(config)
+        if devid is None:
+            return 0
 
         self.writeDetails(config, devid, back, front)
 
