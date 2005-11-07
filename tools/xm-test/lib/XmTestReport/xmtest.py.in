@@ -1,0 +1,3 @@
+#!/usr/bin/python
+
+XM_TEST_VERSION = "@PACKAGE_VERSION@"

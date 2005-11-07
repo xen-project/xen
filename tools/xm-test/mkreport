@@ -1,0 +1,71 @@
+#!/usr/bin/perl
+
+open(LOG, $ARGV[0]);
+@lines = <LOG>;
+
+foreach $line (@lines) {
+    if ($line =~ /^[A-Z]+/) {
+	chomp($line);
+	($type, @rest) = split(/:/, $line);
+
+	$message = "";
+	foreach $chunk (@rest) {
+	    $message .= $chunk;
+	}
+	
+	if ($type eq "REASON") {
+
+	    $last_reason = $message ;
+
+	} elsif ($type =~ /X?FAIL/) {
+
+	    $rest[0] =~ /([^\. ]+)\.test/;
+	    $name = $1;
+
+	    $passfail = $type;
+	    $testname = $name;
+	    $extra    = "\n\t$last_reason\n";
+
+	    $last_reason = "Unknown reason";
+	    
+	} elsif ($type =~ /X?PASS/) {
+
+	    $rest[0] =~ /([^\. ]+)\.test/;
+	    $name = $1;
+
+	    $passfail = $type;
+	    $testname = $name;
+	    $extra    = "";
+
+	    $last_reason = "Unknown reason";
+
+	} else {
+
+	    $passfail = $type;
+	    $testname = "UNKN";
+	    $extra    = "Unknown status type $type!";
+
+	    $last_reason = "Unknown reason";
+
+	}
+
+	push(@results, ([$testname, $passfail, $extra]));
+
+    }
+
+}
+
+foreach $test (@results) {
+
+    
+    if ($tests{$test->[0]} eq undef) {
+	if ($test->[1] =~ /^X?FAIL/) {
+	    $fmt = "%5s: %s %s\n";
+	    printf($fmt, $test->[1], $test->[0], $test->[2]);
+	}
+	$tests{$test->[0]} = 1;
+    }
+
+
+}
+

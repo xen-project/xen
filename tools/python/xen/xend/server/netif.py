@@ -21,6 +21,7 @@
 """
 
 import os
+import random
 
 from xen.xend import sxp
 from xen.xend import XendRoot
@@ -29,6 +30,25 @@ from xen.xend.server.DevController import DevController
 
 
 xroot = XendRoot.instance()
+
+
+def randomMAC():
+    """Generate a random MAC address.
+
+    Uses OUI (Organizationally Unique Identifier) AA:00:00, an
+    unassigned one that used to belong to DEC. The OUI list is
+    available at 'standards.ieee.org'.
+
+    The remaining 3 fields are random, with the first bit of the first
+    random field set 0.
+
+    @return: MAC address string
+    """
+    mac = [ 0xaa, 0x00, 0x00,
+            random.randint(0x00, 0x7f),
+            random.randint(0x00, 0xff),
+            random.randint(0x00, 0xff) ]
+    return ':'.join(map(lambda x: "%02x" % x, mac))
 
 
 class NetifController(DevController):
@@ -56,6 +76,9 @@ class NetifController(DevController):
         ipaddr = _get_config_ipaddr(config)
 
         devid = self.allocateDeviceID()
+
+        if not mac:
+            mac = randomMAC()
 
         back = { 'script' : script,
                  'mac'    : mac,

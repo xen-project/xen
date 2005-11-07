@@ -1,0 +1,40 @@
+#!/usr/bin/python
+
+# Copyright (C) International Business Machines Corp., 2005
+# Author: Dan Smith <danms@us.ibm.com>
+
+import time
+
+from XmTestLib import *
+
+domain = XmTestDomain()
+
+try:
+    domain.start()
+except DomainError, e:
+    if verbose:
+        print "Failed to create test domain because:"
+        print e.extra
+    FAIL(str(e))
+
+# Make sure the domain isn't DOA
+try:
+    console = XmConsole(domain.getName())
+except ConsoleError, e:
+    FAIL(str(e))
+
+console.closeConsole()
+
+# Save it out
+try:
+    s, o = traceCommand("xm save %s /tmp/test.state" % domain.getName(),
+                        timeout=30)
+except TimeoutError, e:
+    FAIL(str(e))
+    
+if s != 0:
+    FAIL("save command exited %i != 0" % s)
+
+# Make sure it's gone
+if isDomainRunning(domain.getName()):
+    FAIL("Domain still running after save!")

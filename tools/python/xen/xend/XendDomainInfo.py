@@ -336,7 +336,7 @@ def dom_get(dom):
             return domlist[0]
     except Exception, err:
         # ignore missing domain
-        log.debug("domain_getinfo(%d) failed, ignoring: %s", dom, str(err))
+        log.trace("domain_getinfo(%d) failed, ignoring: %s", dom, str(err))
     return None
 
 
@@ -568,6 +568,8 @@ class XendDomainInfo:
         self.introduceDomain()
         self.storeDomDetails()
         self.refreshShutdown()
+
+        log.debug("XendDomainInfo.completeRestore done")
 
 
     def storeVmDetails(self):
@@ -1066,8 +1068,11 @@ class XendDomainInfo:
         assert self.domid is not None
         assert self.store_mfn is not None
         assert self.store_port is not None
-        
-        IntroduceDomain(self.domid, self.store_mfn, self.store_port)
+
+        try:
+            IntroduceDomain(self.domid, self.store_mfn, self.store_port)
+        except RuntimeError, exn:
+            raise XendError(str(exn))
 
 
     def initDomain(self):
