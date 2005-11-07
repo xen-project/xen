@@ -643,7 +643,7 @@ def preprocess_ioports(vals):
     ioports = []
     for v in vals.ioports:
         d = v.split('-')
-        if len(d) < 1 || len(d) > 2:
+        if len(d) < 1 or len(d) > 2:
             err('Invalid i/o port range specifier: ' + v)
         if len(d) == 1:
             d.append(d[0])
