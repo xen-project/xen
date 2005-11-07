@@ -1400,9 +1400,10 @@ def addControllerClass(device_class, cls):
     controllerClasses[device_class] = cls
 
 
-from xen.xend.server import blkif, netif, tpmif, pciif, usbif
+from xen.xend.server import blkif, netif, tpmif, pciif, iopif, usbif
 addControllerClass('vbd',  blkif.BlkifController)
 addControllerClass('vif',  netif.NetifController)
 addControllerClass('vtpm', tpmif.TPMifController)
 addControllerClass('pci',  pciif.PciController)
+addControllerClass('ioports', iopif.IOPortsController)
 addControllerClass('usb',  usbif.UsbifController)
