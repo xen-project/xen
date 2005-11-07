@@ -1283,6 +1283,9 @@ IA64FAULT vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 #define itir_mask(itir) (~((1UL << itir_ps(itir)) - 1))
 
 unsigned long vhpt_translate_count = 0;
+unsigned long fast_vhpt_translate_count = 0;
+unsigned long recover_to_page_fault_count = 0;
+unsigned long recover_to_break_fault_count = 0;
 
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {

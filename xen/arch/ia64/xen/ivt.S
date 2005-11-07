@@ -246,7 +246,8 @@ ENTRY(itlb_miss)
 #ifdef XEN
 	VHPT_CCHAIN_LOOKUP(itlb_miss,i)
 #ifdef VHPT_GLOBAL
-	br.cond.sptk page_fault
+//	br.cond.sptk page_fault
+	br.cond.sptk fast_tlb_miss_reflect
 	;;
 #endif
 #endif
@@ -297,7 +298,8 @@ ENTRY(dtlb_miss)
 #ifdef XEN
 	VHPT_CCHAIN_LOOKUP(dtlb_miss,d)
 #ifdef VHPT_GLOBAL
-	br.cond.sptk page_fault
+//	br.cond.sptk page_fault
+	br.cond.sptk fast_tlb_miss_reflect
 	;;
 #endif
 #endif
@@ -485,6 +487,11 @@ END(alt_dtlb_miss)
 // 0x1400 Entry 5 (size 64 bundles) Data nested TLB (6,45)
 ENTRY(nested_dtlb_miss)
 	DBG_FAULT(5)
+#ifdef XEN
+	mov b0=r30
+	br.sptk.many b0				// return to continuation point
+	;;
+#endif
 	/*
 	 * In the absence of kernel bugs, we get here when the virtually mapped linear
 	 * page table is accessed non-speculatively (e.g., in the Dirty-bit, Instruction
@@ -562,7 +569,11 @@ END(ikey_miss)
 
 	//-----------------------------------------------------------------------------------
 	// call do_page_fault (predicates are in r31, psr.dt may be off, r16 is faulting address)
+#ifdef XEN
+GLOBAL_ENTRY(page_fault)
+#else
 ENTRY(page_fault)
+#endif
 	ssm psr.dt
 	;;
 	srlz.i

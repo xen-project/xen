@@ -14,6 +14,7 @@
 #include <asm/system.h>
 #include <public/arch-ia64.h>
 
+
 #define	_PAGE_PPN_MASK	0x0003fffffffff000 //asm/pgtable.h doesn't do assembly
 #define PAGE_PHYS	0x0010000000000761 //__pgprot(__DIRTY_BITS|_PAGE_PL_2|_PAGE_AR_RWX)
 #define _PAGE_PL_2	(2<<7)
@@ -22,13 +23,14 @@
 #define FAST_HYPERPRIVOPS
 #define FAST_HYPERPRIVOP_CNT
 #define FAST_REFLECT_CNT
-//#define FAST_TICK
+//#define FAST_TICK // mostly working (unat problems) but default off for now
+//#define FAST_TLB_MISS_REFLECT	// mostly working but default off for now
+//#define FAST_ITC	// working but default off for now
 #define FAST_BREAK
 #define FAST_ACCESS_REFLECT
 #define FAST_RFI
 #define FAST_SSM_I
 #define FAST_PTC_GA
-#undef FAST_ITC	// working but default off for now
 #undef RFI_TO_INTERRUPT // not working yet
 #endif
 
@@ -705,6 +707,251 @@ GLOBAL_ENTRY(fast_access_reflect)
 	st8 [r23]=r22;;
 	br.cond.sptk.many fast_reflect;;
 
+// when we get to here, VHPT_CCHAIN_LOOKUP has failed and everything
+// is as it was at the time of original miss.  We want to preserve that
+// so if we get a nested fault, we can just branch to page_fault
+GLOBAL_ENTRY(fast_tlb_miss_reflect)
+#ifndef FAST_TLB_MISS_REFLECT // see beginning of file
+	br.spnt.few page_fault ;;
+#endif
+	mov r31=pr
+	mov r30=cr.ipsr
+	mov r29=cr.iip
+	mov r16=cr.isr
+	mov r17=cr.ifa;;
+	// for now, always take slow path for region 0 (e.g. metaphys mode)
+	extr.u r21=r17,61,3;;
+	cmp.eq p7,p0=r0,r21
+(p7)	br.spnt.few page_fault ;;
+	// always take slow path for PL0 (e.g. __copy_from_user)
+	extr.u r21=r30,IA64_PSR_CPL0_BIT,2 ;;
+	cmp.eq p7,p0=r21,r0
+(p7)	br.spnt.few page_fault ;;
+	// slow path if strange ipsr or isr bits set
+	extr.u r21=r30,IA64_PSR_BE_BIT,1 ;;
+	cmp.ne p7,p0=r21,r0
+(p7)	br.spnt.few page_fault ;;
+	extr.u r21=r30,IA64_PSR_PP_BIT,1 ;;
+	cmp.ne p7,p0=r21,r0
+(p7)	br.spnt.few page_fault ;;
+	movl r21=IA64_ISR_IR|IA64_ISR_SP|IA64_ISR_NA ;;
+	and r21=r16,r21;;
+	cmp.ne p7,p0=r0,r21
+(p7)	br.spnt.few page_fault ;;
+	// also take slow path if virtual psr.ic=0
+	movl r18=XSI_PSR_IC;;
+	ld4 r21=[r18];;
+	cmp.eq p7,p0=r0,r21
+(p7)	br.spnt.few page_fault ;;
+	// OK, if we get to here, we are doing a fast vcpu_translate.  Need to:
+	// 1) look in the virtual TR's (pinned), if not there
+	// 2) look in the 1-entry TLB (pinned), if not there
+	// 3) check the domain VHPT (NOT pinned, accesses domain memory!)
+	// If we find it in any of these places, we need to effectively do
+	// a hyper_itc_i/d
+
+	// short-term hack for now, if in region 5-7, take slow path
+	// since all Linux TRs are in region 5 or 7, we need not check TRs
+	extr.u r21=r17,61,3;;
+	cmp.le p7,p0=5,r21
+(p7)	br.spnt.few page_fault ;;
+fast_tlb_no_tr_match:
+	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
+	ld8 r27=[r27];;
+	tbit.nz p6,p7=r16,IA64_ISR_X_BIT;;
+(p6)	adds r25=IA64_VCPU_ITLB_OFFSET,r27;;
+(p7)	adds r25=IA64_VCPU_DTLB_OFFSET,r27;;
+	ld8 r20=[r25],8;;
+	tbit.z p7,p0=r20,0;;	// present?
+(p7)	br.cond.spnt.few 1f;;
+	// if ifa is in range of tlb, don't bother to check rid, go slow path
+	ld8 r21=[r25],8;;
+	mov r23=1
+	extr.u r21=r21,2,6;;
+	shl r22=r23,r21
+	ld8 r21=[r25],8;;
+	cmp.ltu p7,p0=r17,r21
+(p7)	br.cond.sptk.many 1f;
+	add r21=r22,r21;;
+	cmp.ltu p7,p0=r17,r21
+(p7)	br.cond.spnt.few page_fault;;
+	
+1:	// check the guest VHPT
+	adds r19 = XSI_PTA_OFS-XSI_PSR_IC_OFS, r18;;
+	ld8 r19=[r19];;
+	tbit.nz p7,p0=r19,IA64_PTA_VF_BIT;;	// long format VHPT
+(p7)	br.cond.spnt.few page_fault;;
+	// if (!rr.ve || !(pta & IA64_PTA_VE)) take slow way for now
+	// FIXME: later, we deliver an alt_d/i vector after thash and itir
+	tbit.z p7,p0=r19,IA64_PTA_VE_BIT;;	// 
+(p7)	br.cond.spnt.few page_fault;;
+	extr.u r25=r17,61,3;;
+	adds r21=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18 ;;
+	shl r25=r25,3;;
+	add r21=r21,r25;;
+	ld8 r22=[r21];;
+	tbit.z p7,p0=r22,0
+(p7)	br.cond.spnt.few page_fault;;
+
+	// compute and save away itir (r22 & RR_PS_MASK)
+	movl r21=0xfc;;
+	and r22=r22,r21;;
+	adds r21=XSI_ITIR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r21]=r22;;
+	
+	// save away ifa
+	adds r21=XSI_IFA_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r21]=r17;;
+	// see vcpu_thash to save away iha
+	shr.u r20 = r17, 61
+	addl r25 = 1, r0
+	movl r30 = 0xe000000000000000
+	;;
+	and r21 = r30, r17		// VHPT_Addr1
+	;;
+	shladd r28 = r20, 3, r18
+	adds r19 = XSI_PTA_OFS-XSI_PSR_IC_OFS, r18
+	;;
+	adds r27 = XSI_RR0_OFS-XSI_PSR_IC_OFS, r28
+	addl r28 = 32767, r0
+	ld8 r24 = [r19]			// pta
+	;;
+	ld8 r23 = [r27]			// rrs[vadr>>61]
+	extr.u r26 = r24, 2, 6
+	;;
+	extr.u r22 = r23, 2, 6
+	shl r30 = r25, r26
+	;;
+	shr.u r19 = r17, r22
+	shr.u r29 = r24, 15
+	;;
+	adds r30 = -1, r30
+	;;
+	shladd r27 = r19, 3, r0
+	extr.u r26 = r30, 15, 46
+	;;
+	andcm r24 = r29, r26
+	and r19 = r28, r27
+	shr.u r25 = r27, 15
+	;;
+	and r23 = r26, r25
+	;;
+	or r22 = r24, r23
+	;;
+	dep.z r20 = r22, 15, 46
+	;;
+	or r30 = r20, r21
+	;;
+	//or r8 = r19, r30
+	or r19 = r19, r30
+	;;
+	adds r23=XSI_IHA_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r23]=r19;;
+	// done with thash, check guest VHPT
+
+	adds r20 = XSI_PTA_OFS-XSI_PSR_IC_OFS, r18;;
+	ld8 r24 = [r20];;			// pta
+	// avoid recursively walking the VHPT
+	// if (((r17=address ^ r24=pta) & ((itir_mask(pta) << 3) >> 3)) != 0) {
+	mov r20=-8
+	xor r21=r17,r24
+	extr.u r24=r24,2,6;;
+	shl r20=r20,r24;;
+	shr.u r20=r20,3;;
+	and r21=r20,r21;;
+	cmp.eq p7,p0=r21,r0
+(p7)	br.cond.spnt.few 1f;;
+	// __copy_from_user(&pte, r19=(void *)(*iha), sizeof(pte)=8)
+	// prepare for possible nested dtlb fault
+	mov r29=b0
+	movl r30=guest_vhpt_miss;;
+	// now go fetch the entry from the guest VHPT
+	ld8 r20=[r19];;
+	// if we wind up here, we successfully loaded the VHPT entry
+
+	// this VHPT walker aborts on non-present pages instead
+	// of inserting a not-present translation, this allows
+	// vectoring directly to the miss handler
+	tbit.z p7,p0=r20,0
+(p7)	br.cond.spnt.few page_not_present;;
+
+#ifdef FAST_REFLECT_CNT
+	movl r21=fast_vhpt_translate_count;;
+	ld8 r22=[r21];;
+	adds r22=1,r22;;
+	st8 [r21]=r22;;
+#endif
+
+// prepare for fast_insert(PSCB(ifa),PSCB(itir),r16=pte)
+//	r16 == pte
+//	r17 == bit0: 1=inst, 0=data; bit1: 1=itc, 0=vcpu_translate
+//	r18 == XSI_PSR_IC_OFS
+//	r24 == ps
+//	r29 == saved value of b0 in case of recovery
+//	r30 == recovery ip if failure occurs
+//	r31 == pr
+	tbit.nz p6,p7=r16,IA64_ISR_X_BIT;;
+(p6)	mov r17=1;;
+(p7)	mov r17=0;;
+	mov r16=r20
+	mov r29=b0 ;;
+	movl r30=recover_and_page_fault ;;
+	adds r21=XSI_ITIR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r24=[r21];;
+	extr.u r24=r24,2,6;;
+	// IFA already in PSCB
+	br.cond.sptk.many fast_insert;;
+
+// we get here if fast_insert fails (e.g. due to metaphysical lookup)
+ENTRY(recover_and_page_fault)
+#ifdef FAST_REFLECT_CNT
+	movl r21=recover_to_page_fault_count;;
+	ld8 r22=[r21];;
+	adds r22=1,r22;;
+	st8 [r21]=r22;;
+#endif
+	mov b0=r29;;
+	br.cond.sptk.many page_fault;;
+
+// if we wind up here, we missed in guest VHPT so recover
+// from nested dtlb fault and reflect a tlb fault to the guest
+guest_vhpt_miss:
+	mov b0=r29;;
+	// fault = IA64_VHPT_FAULT
+	mov r20=r0
+	br.cond.sptk.many 1f;
+
+	// if we get to here, we are ready to reflect
+	// need to set up virtual ifa, iha, itir (fast_reflect handles
+	// virtual isr, iip, ipsr, ifs
+	// see vcpu_get_itir_on_fault: get ps,rid,(FIXME key) from rr[ifa]
+page_not_present:
+	tbit.nz p6,p7=r16,IA64_ISR_X_BIT;;
+(p6)	movl r20=0x400;;
+(p7)	movl r20=0x800;;
+
+1:	extr.u r25=r17,61,3;;
+	adds r21=XSI_RR0_OFS-XSI_PSR_IC_OFS,r18 ;;
+	shl r25=r25,3;;
+	add r21=r21,r25;;
+	ld8 r22=[r21];;
+	extr.u r22=r22,2,30;;
+	dep.z r22=r22,2,30;;
+	adds r23=XSI_ITIR_OFS-XSI_PSR_IC_OFS,r18 ;;
+	st8 [r23]=r22;;
+
+	// fast reflect expects
+	//	r16 == cr.isr
+	//	r18 == XSI_PSR_IC
+	//	r20 == offset into ivt
+	//	r29 == iip
+	//	r30 == ipsr
+	//	r31 == pr
+	//mov r16=cr.isr
+	mov r29=cr.iip
+	mov r30=cr.ipsr
+	br.sptk.many fast_reflect;;
+END(fast_tlb_miss_reflect)
 
 // ensure that, if giving up, registers at entry to fast_hyperprivop unchanged
 ENTRY(hyper_rfi)
@@ -1673,6 +1920,17 @@ ENTRY(hyper_ptc_ga)
 	;;
 END(hyper_ptc_ga)
 
+// recovery block for hyper_itc metaphysical memory lookup
+ENTRY(recover_and_dispatch_break_fault)
+#ifdef FAST_REFLECT_CNT
+	movl r21=recover_to_break_fault_count;;
+	ld8 r22=[r21];;
+	adds r22=1,r22;;
+	st8 [r21]=r22;;
+#endif
+	mov b0=r29 ;;
+	br.sptk.many dispatch_break_fault;;
+
 //  Registers at entry
 //	r17 = break immediate (XEN_HYPER_ITC_D or I)
 //	r18 == XSI_PSR_IC_OFS
@@ -1682,24 +1940,14 @@ ENTRY(hyper_itc_i)
 	// fall through, hyper_itc_d handles both i and d
 ENTRY(hyper_itc_d)
 #ifndef FAST_ITC
-	br.spnt.many dispatch_break_fault ;;
+	br.sptk.many dispatch_break_fault ;;
 #endif
+	// ensure itir.ps >= xen's pagesize
 	adds r23=XSI_ITIR_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r23=[r23];;
 	extr.u r24=r23,2,6;;		// r24==logps
 	cmp.gt p7,p0=PAGE_SHIFT,r24
 (p7)	br.spnt.many dispatch_break_fault ;;
-	// translate_domain_pte(r8=pteval,PSCB(ifa)=address,r24=itir)
-	mov r19=1;;
-	shl r20=r19,r24;;
-	adds r20=-1,r20;;	// r20 == mask
-	movl r19=_PAGE_PPN_MASK;;
-	and r22=r8,r19;;	// r22 == pteval & _PAGE_PPN_MASK
-	andcm r19=r22,r20;;
-	adds r21=XSI_IFA_OFS-XSI_PSR_IC_OFS,r18 ;;
-	ld8 r21=[r21];;
-	and r20=r21,r20;;
-	or r19=r19,r20;;	// r19 == mpaddr
 	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 	ld8 r27=[r27];;
 	adds r27=IA64_VCPU_DOMAIN_OFFSET,r27;;
@@ -1710,7 +1958,6 @@ ENTRY(hyper_itc_d)
 // FIXME: for now, only handle dom0 (see lookup_domain_mpa below)
 	cmp.ne p7,p0=r27,r28
 (p7)	br.spnt.many dispatch_break_fault ;;
-	// if region 6, go slow way
 #ifdef FAST_HYPERPRIVOP_CNT
 	cmp.eq p6,p7=XEN_HYPER_ITC_D,r17;;
 (p6)	movl r20=fast_hyperpriv_cnt+(8*XEN_HYPER_ITC_D);;
@@ -1719,19 +1966,47 @@ ENTRY(hyper_itc_d)
 	adds r21=1,r21;;
 	st8 [r20]=r21;;
 #endif
+(p6)	mov r17=2;;
+(p7)	mov r17=3;;
+	mov r29=b0 ;;
+	movl r30=recover_and_dispatch_break_fault ;;
+	mov r16=r8;;
+	// fall through
+
+
+// fast_insert(PSCB(ifa),r24=ps,r16=pte)
+//	r16 == pte
+//	r17 == bit0: 1=inst, 0=data; bit1: 1=itc, 0=vcpu_translate
+//	r18 == XSI_PSR_IC_OFS
+//	r24 == ps
+//	r29 == saved value of b0 in case of recovery
+//	r30 == recovery ip if failure occurs
+//	r31 == pr
+GLOBAL_ENTRY(fast_insert)
+	// translate_domain_pte(r16=pteval,PSCB(ifa)=address,r24=itir)
+	mov r19=1;;
+	shl r20=r19,r24;;
+	adds r20=-1,r20;;	// r20 == mask
+	movl r19=_PAGE_PPN_MASK;;
+	and r22=r16,r19;;	// r22 == pteval & _PAGE_PPN_MASK
+	andcm r19=r22,r20;;
+	adds r21=XSI_IFA_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r21=[r21];;
+	and r20=r21,r20;;
+	or r19=r19,r20;;	// r19 == mpaddr
 // FIXME: for now, just do domain0 and skip mpaddr range checks
 	dep r20=r0,r19,0,PAGE_SHIFT
 	movl r21=PAGE_PHYS ;;
 	or r20=r20,r21 ;;	// r20==return value from lookup_domain_mpa
-	// r8=pteval,r20=pteval2
+	// r16=pteval,r20=pteval2
 	movl r19=_PAGE_PPN_MASK
 	movl r21=_PAGE_PL_2;;
-	andcm r25=r8,r19;;	// r25==pteval & ~_PAGE_PPN_MASK
+	andcm r25=r16,r19;;	// r25==pteval & ~_PAGE_PPN_MASK
 	and r22=r20,r19;;
 	or r22=r22,r21;;
 	or r22=r22,r25;;	// r22==return value from translate_domain_pte
 	// done with translate_domain_pte
-	// now do vcpu_itc_no_srlz(vcpu,IorD,ifa,r22=pte,r8=mppte,r24=logps)
+	// now do vcpu_itc_no_srlz(vcpu,IorD,ifa,r22=pte,r16=mppte,r24=logps)
 // FIXME: for now, just domain0 and skip range check
 	// psr.ic already cleared
 	// NOTE: r24 still contains ps (from above)
@@ -1740,7 +2015,7 @@ ENTRY(hyper_itc_d)
 	adds r23=XSI_IFA_OFS-XSI_PSR_IC_OFS,r18 ;;
 	ld8 r23=[r23];;
 	mov cr.ifa=r23;;
-	cmp.eq p6,p7=XEN_HYPER_ITC_D,r17;;
+	tbit.z p6,p7=r17,0;;
 (p6)	itc.d r22;;
 (p7)	itc.i r22;;
 	dv_serialize_data
@@ -1757,7 +2032,7 @@ ENTRY(hyper_itc_d)
 	st8 [r20]=r21;;
 	// vcpu_set_tr_entry(trp,r22=pte|1,r24=itir,r23=ifa)
 	// TR_ENTRY = {page_flags,itir,addr,rid}
-	cmp.eq p6,p7=XEN_HYPER_ITC_D,r17
+	tbit.z p6,p7=r17,0;;
 	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 	ld8 r27=[r27];;
 	adds r28=IA64_VCPU_STARTING_RID_OFFSET,r27
@@ -1768,7 +2043,6 @@ ENTRY(hyper_itc_d)
 	mov r19=-4096;;
 	and r23=r23,r19;;
 	st8 [r27]=r23,8;;	// ifa & ~0xfff
-// ?? is virtualize_rid(v,get_rr(ifa))==vcpu_get_rr(ifa)?? YES!!
 	adds r29 = XSI_RR0_OFS-XSI_PSR_IC_OFS,r18
 	extr.u r25=r23,61,3;;
 	shladd r29=r25,3,r29;;
@@ -1806,13 +2080,16 @@ ENTRY(hyper_itc_d)
 	//PSCBX(vcpu,i/dtlb_pte) = mp_pte
 	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 	ld8 r27=[r27];;
-	cmp.eq p6,p7=XEN_HYPER_ITC_D,r17;;
+	tbit.z p6,p7=r17,0;;
 (p6)	adds r27=IA64_VCPU_DTLB_PTE_OFFSET,r27
 (p7)	adds r27=IA64_VCPU_ITLB_PTE_OFFSET,r27;;
-	st8 [r27]=r8;;
+	st8 [r27]=r16;;
 	// done with vcpu_itc_no_srlz
 
-	// done, increment to point to next instruction
+	// if hyper_itc, increment to point to next instruction
+	tbit.z p7,p0=r17,1
+(p7)	br.cond.sptk.few no_inc_iip;;
+
 	mov r29=cr.ipsr
 	mov r30=cr.iip;;
 	extr.u r26=r29,41,2 ;;
@@ -1824,8 +2101,11 @@ ENTRY(hyper_itc_d)
 	dep r29=r26,r29,41,2
 	;;
 	mov cr.ipsr=r29
-	mov cr.iip=r30
+	mov cr.iip=r30;;
+
+no_inc_iip:
 	mov pr=r31,-1 ;;
 	rfi
 	;;
-END(hyper_itc_d)
+END(fast_insert)
+
