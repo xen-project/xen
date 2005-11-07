@@ -276,8 +276,8 @@ static int setup_tpmring(struct xenbus_device *dev,
 
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
-		gnttab_end_foreign_access(info->ring_ref, 0);
-		free_page((unsigned long)sring);
+		gnttab_end_foreign_access(info->ring_ref, 0,
+					  (unsigned long)sring);
 		tp->tx = NULL;
 		xenbus_dev_error(dev, err, "allocating event channel");
 		return err;
@@ -294,8 +294,8 @@ static void destroy_tpmring(struct tpmfront_info *info, struct tpm_private *tp)
 	tpmif_set_connected_state(tp,0);
 
 	if ( tp->tx != NULL ) {
-		gnttab_end_foreign_access(info->ring_ref, 0);
-		free_page((unsigned long)tp->tx);
+		gnttab_end_foreign_access(info->ring_ref, 0,
+					  (unsigned long)tp->tx);
 		tp->tx = NULL;
 	}
 

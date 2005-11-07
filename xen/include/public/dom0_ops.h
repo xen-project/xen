@@ -193,6 +193,9 @@ typedef struct {
 #define DOM0_TBUF_GET_INFO     0
 #define DOM0_TBUF_SET_CPU_MASK 1
 #define DOM0_TBUF_SET_EVT_MASK 2
+#define DOM0_TBUF_SET_SIZE     3
+#define DOM0_TBUF_ENABLE       4
+#define DOM0_TBUF_DISABLE      5
     uint8_t op;
     /* IN/OUT variables */
     unsigned long cpu_mask;

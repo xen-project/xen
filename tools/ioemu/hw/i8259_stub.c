@@ -27,21 +27,6 @@
 #include "cpu.h"
 #include "cpu-all.h"
 
-static __inline__ void atomic_set_bit(long nr, volatile void *addr)
-{
-        __asm__ __volatile__(
-                "lock ; bts %1,%0"
-                :"=m" (*(volatile long *)addr)
-                :"dIr" (nr));
-}
-static __inline__ void atomic_clear_bit(long nr, volatile void *addr)
-{
-        __asm__ __volatile__(
-                "lock ; btr %1,%0"
-                :"=m" (*(volatile long *)addr)
-                :"dIr" (nr));
-}
-
 #include <vl.h>
 extern shared_iopage_t *shared_page;
 extern CPUState *global_env;
@@ -55,13 +40,13 @@ void pic_set_irq(int irq, int level)
     if ( gio->pic_elcr & mask ) {
         /* level */
        if ( level ) {
-           atomic_set_bit(irq, &gio->pic_irr);
            atomic_clear_bit(irq, &gio->pic_clear_irr);
+           atomic_set_bit(irq, &gio->pic_irr);
            global_env->send_event = 1;
        }
        else {
-           atomic_set_bit(irq, &gio->pic_clear_irr);
            atomic_clear_bit(irq, &gio->pic_irr);
+           atomic_set_bit(irq, &gio->pic_clear_irr);
            global_env->send_event = 1;
        }
     }

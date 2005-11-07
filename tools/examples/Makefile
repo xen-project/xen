@@ -9,6 +9,7 @@ INSTALL_DATA	= $(INSTALL) -m0644
 # Init scripts.
 XEND_INITD = init.d/xend
 XENDOMAINS_INITD = init.d/xendomains
+XENDOMAINS_SYSCONFIG = init.d/sysconfig.xendomains
 
 # Xen configuration dir and configs to go there.
 XEN_CONFIG_DIR = /etc/xen
@@ -24,8 +25,10 @@ XEN_SCRIPTS = network-bridge vif-bridge
 XEN_SCRIPTS += network-route vif-route
 XEN_SCRIPTS += network-nat vif-nat
 XEN_SCRIPTS += block
-XEN_SCRIPTS += block-enbd
+XEN_SCRIPTS += block-enbd block-nbd
+XEN_SCRIPTS += xen-script-common.sh
 XEN_SCRIPTS += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
+XEN_SCRIPTS += block-common.sh
 
 XEN_HOTPLUG_DIR = /etc/hotplug
 XEN_HOTPLUG_SCRIPTS = xen-backend.agent
@@ -52,8 +55,10 @@ install: all install-initd install-configs install-scripts $(HOTPLUGS)
 
 install-initd:
 	[ -d $(DESTDIR)/etc/init.d ] || $(INSTALL_DIR) $(DESTDIR)/etc/init.d
+	[ -d $(DESTDIR)/etc/sysconfig ] || $(INSTALL_DIR) $(DESTDIR)/etc/sysconfig
 	$(INSTALL_PROG) $(XEND_INITD) $(DESTDIR)/etc/init.d
 	$(INSTALL_PROG) $(XENDOMAINS_INITD) $(DESTDIR)/etc/init.d
+	$(INSTALL_PROG) $(XENDOMAINS_SYSCONFIG) $(DESTDIR)/etc/sysconfig/xendomains
 
 install-configs: $(XEN_CONFIGS)
 	[ -d $(DESTDIR)$(XEN_CONFIG_DIR) ] || \

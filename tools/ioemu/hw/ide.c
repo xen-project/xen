@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
+#include <pthread.h>
 
 /* debug IDE devices */
 //#define DEBUG_IDE
@@ -359,6 +360,48 @@ typedef struct PCIIDEState {
     IDEState ide_if[4];
     BMDMAState bmdma[2];
 } PCIIDEState;
+
+#define DMA_MULTI_THREAD
+
+#ifdef DMA_MULTI_THREAD
+
+static int file_pipes[2];
+
+static void ide_dma_loop(BMDMAState *bm);
+static void dma_thread_loop(BMDMAState *bm);
+
+static void *dma_thread_func(void* opaque)
+{
+    BMDMAState* req;
+
+    while (read(file_pipes[0], &req, sizeof(req))) {
+        dma_thread_loop(req);
+    }
+
+    return NULL;
+}
+
+static void dma_create_thread()
+{
+    pthread_t tid;
+    int rt;
+
+    if (pipe(file_pipes) != 0){
+        fprintf(stderr, "create pipe failed\n");
+        exit(1);
+    }
+
+    if ( (rt = pthread_create(&tid, NULL, dma_thread_func, NULL)) ) {
+        fprintf(stderr, "Oops, dma thread creation failed, errno=%d\n", rt);
+        exit(1);
+    }
+
+    if ( (rt = pthread_detach(tid)) ) {
+        fprintf(stderr, "Oops, dma thread detachment failed, errno=%d\n", rt);
+        exit(1);
+    }
+}
+#endif //DMA_MULTI_THREAD
 
 static void ide_dma_start(IDEState *s, IDEDMAFunc *dma_cb);
 
@@ -1978,7 +2021,15 @@ static void ide_map(PCIDevice *pci_dev, int region_num,
 
 /* XXX: full callback usage to prepare non blocking I/Os support -
    error handling */
+#ifdef DMA_MULTI_THREAD
 static void ide_dma_loop(BMDMAState *bm)
+{
+    write(file_pipes[1], &bm, sizeof(bm));
+}
+static void dma_thread_loop(BMDMAState *bm)
+#else 
+static void ide_dma_loop(BMDMAState *bm)
+#endif //DMA_MULTI_THREAD
 {
     struct {
         uint32_t addr;
@@ -2166,6 +2217,9 @@ void pci_ide_init(PCIBus *bus, BlockDriverState **hd_table)
         d->ide_if[i].pci_dev = (PCIDevice *)d;
     ide_init2(&d->ide_if[0], 16, hd_table[0], hd_table[1]);
     ide_init2(&d->ide_if[2], 16, hd_table[2], hd_table[3]);
+#ifdef DMA_MULTI_THREAD    
+    dma_create_thread();
+#endif //DMA_MULTI_THREAD    
 }
 
 /* hd_table must contain 4 block drivers */
@@ -2196,6 +2250,9 @@ void pci_piix3_ide_init(PCIBus *bus, BlockDriverState **hd_table)
     ide_init2(&d->ide_if[2], 15, hd_table[2], hd_table[3]);
     ide_init_ioport(&d->ide_if[0], 0x1f0, 0x3f6);
     ide_init_ioport(&d->ide_if[2], 0x170, 0x376);
+#ifdef DMA_MULTI_THREAD    
+    dma_create_thread();
+#endif //DMA_MULTI_THREAD    
 }
 
 /***********************************************************/

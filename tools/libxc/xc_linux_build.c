@@ -350,6 +350,8 @@ static int setup_guest(int xc_handle,
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, page_array[0]);
     memset(start_info, 0, sizeof(*start_info));
+    rc = xc_version(xc_handle, XENVER_version, NULL);
+    sprintf(start_info->magic, "Xen-%i.%i", rc >> 16, rc & (0xFFFF));
     start_info->flags        = flags;
     start_info->store_mfn    = nr_pages - 2;
     start_info->store_evtchn = store_evtchn;
@@ -624,6 +626,8 @@ static int setup_guest(int xc_handle,
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
         page_array[(vstartinfo_start-dsi.v_start)>>PAGE_SHIFT]);
     memset(start_info, 0, sizeof(*start_info));
+    rc = xc_version(xc_handle, XENVER_version, NULL);
+    sprintf(start_info->magic, "Xen-%i.%i", rc >> 16, rc & (0xFFFF));
     start_info->nr_pages     = nr_pages;
     start_info->shared_info  = shared_info_frame << PAGE_SHIFT;
     start_info->flags        = flags;

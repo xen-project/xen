@@ -6,7 +6,6 @@ verbose     ?= n
 debug       ?= n
 perfc       ?= n
 perfc_arrays?= n
-trace       ?= n
 domu_debug  ?= n
 crash_debug ?= n
 
@@ -69,10 +68,6 @@ CFLAGS += -DPERF_COUNTERS
 ifeq ($(perfc_arrays),y)
 CFLAGS += -DPERF_ARRAYS
 endif
-endif
-
-ifeq ($(trace),y)
-CFLAGS += -DTRACE_BUFFER
 endif
 
 CFLAGS := $(strip $(CFLAGS))

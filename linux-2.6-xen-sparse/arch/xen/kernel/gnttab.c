@@ -165,25 +165,39 @@ gnttab_query_foreign_access(grant_ref_t ref)
 	return (nflags & (GTF_reading|GTF_writing));
 }
 
-void
+int
 gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
 {
 	u16 flags, nflags;
 
 	nflags = shared[ref].flags;
 	do {
-		if ( (flags = nflags) & (GTF_reading|GTF_writing) )
+		if ( (flags = nflags) & (GTF_reading|GTF_writing) ) {
 			printk(KERN_ALERT "WARNING: g.e. still in use!\n");
+			return 0;
+		}
 	}
 	while ((nflags = synch_cmpxchg(&shared[ref].flags, flags, 0)) !=
 	       flags);
+
+	return 1;
 }
 
 void
-gnttab_end_foreign_access(grant_ref_t ref, int readonly)
+gnttab_end_foreign_access(grant_ref_t ref, int readonly, unsigned long page)
 {
-	gnttab_end_foreign_access_ref(ref, readonly);
-	put_free_entry(ref);
+	if (gnttab_end_foreign_access_ref(ref, readonly)) {
+		put_free_entry(ref);
+		if (page != 0) {
+			free_page(page);
+		}
+	}
+	else {
+		/* XXX This needs to be fixed so that the ref and page are
+		   placed on a list to be freed up later. */
+		printk(KERN_WARNING
+		       "WARNING: leaking g.e. and page still in use!\n");
+	}
 }
 
 int
@@ -346,6 +360,9 @@ grant_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	if ( hypercall.op != __HYPERVISOR_grant_table_op )
 		return -ENOSYS;
 
+#ifdef __ia64__
+	ret = HYPERVISOR_grant_table_op(hypercall.arg[0], (void *)hypercall.arg[1], hypercall.arg[2]);
+#else
 	/* hypercall-invoking asm taken from privcmd.c */
 	__asm__ __volatile__ (
 		"pushl %%ebx; pushl %%ecx; pushl %%edx; "
@@ -359,6 +376,7 @@ grant_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		TRAP_INSTR "; "
 		"popl %%edi; popl %%esi; popl %%edx; popl %%ecx; popl %%ebx"
 		: "=a" (ret) : "0" (&hypercall) : "memory" );
+#endif
 
 	return ret;
 }
@@ -423,8 +441,13 @@ gnttab_resume(void)
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1));
 	BUG_ON(setup.status != 0);
 
+#ifdef __ia64__
+	shared = __va(frames[0] << PAGE_SHIFT);
+	printk("grant table at %p\n", shared);
+#else
 	for (i = 0; i < NR_GRANT_FRAMES; i++)
 		set_fixmap(FIX_GNTTAB_END - i, frames[i] << PAGE_SHIFT);
+#endif
 
 	return 0;
 }
@@ -450,7 +473,9 @@ gnttab_init(void)
 
 	BUG_ON(gnttab_resume());
 
+#ifndef __ia64__
 	shared = (grant_entry_t *)fix_to_virt(FIX_GNTTAB_END);
+#endif
 
 	for (i = NR_RESERVED_ENTRIES; i < NR_GRANT_ENTRIES; i++)
 		gnttab_list[i] = i + 1;

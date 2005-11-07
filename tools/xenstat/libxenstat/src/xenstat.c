@@ -21,6 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <xen-interface.h>
+#include <xs.h>
 #include "xenstat.h"
 
 /*
@@ -31,6 +32,7 @@
 
 struct xenstat_handle {
 	xi_handle *xihandle;
+	struct xs_handle *xshandle; /* xenstore handle */
 	int page_size;
 	FILE *procnetdev;
 	char xen_version[VERSION_SIZE]; /* xen version running on this node */
@@ -49,6 +51,7 @@ struct xenstat_node {
 
 struct xenstat_domain {
 	unsigned int id;
+	char *name;
 	unsigned int state;
 	unsigned long long cpu_ns;
 	unsigned int num_vcpus;		/* No. vcpus configured for domain */
@@ -110,6 +113,7 @@ static void xenstat_free_xen_version(xenstat_node * node);
 static void xenstat_uninit_vcpus(xenstat_handle * handle);
 static void xenstat_uninit_networks(xenstat_handle * handle);
 static void xenstat_uninit_xen_version(xenstat_handle * handle);
+static char *xenstat_get_domain_name(xenstat_handle * handle, unsigned int domain_id);
 
 static xenstat_collector collectors[] = {
 	{ XENSTAT_VCPU, xenstat_collect_vcpus,
@@ -153,6 +157,13 @@ xenstat_handle *xenstat_init()
 		return NULL;
 	}
 
+	handle->xshandle = xs_daemon_open_readonly(); /* open handle to xenstore*/
+	if (handle->xshandle == NULL) {
+		perror("unable to open xenstore\n");
+		free(handle);
+		return NULL;
+	}
+
 	return handle;
 }
 
@@ -163,6 +174,7 @@ void xenstat_uninit(xenstat_handle * handle)
 		for (i = 0; i < NUM_COLLECTORS; i++)
 			collectors[i].uninit(handle);
 		xi_uninit(handle->xihandle);
+		xs_daemon_close(handle->xshandle);
 		free(handle);
 	}
 }
@@ -228,6 +240,7 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 		for (i = 0; i < new_domains; i++) {
 			/* Fill in domain using domaininfo[i] */
 			domain->id = domaininfo[i].domain;
+			domain->name = xenstat_get_domain_name(handle, domaininfo[i].domain);
 			domain->state = domaininfo[i].flags;
 			domain->cpu_ns = domaininfo[i].cpu_time;
 			domain->num_vcpus = (domaininfo[i].max_vcpu_id+1);
@@ -271,6 +284,11 @@ void xenstat_free_node(xenstat_node * node)
 
 	if (node) {
 		if (node->domains) {
+			for (i = 0; i < node->num_domains; i++) {
+				if (node->domains[i].name)
+					free(node->domains[i].name);
+			}
+
 			for (i = 0; i < NUM_COLLECTORS; i++)
 				if((node->flags & collectors[i].flag)
 				   == collectors[i].flag)
@@ -337,6 +355,12 @@ unsigned long long xenstat_node_cpu_hz(xenstat_node * node)
 unsigned xenstat_domain_id(xenstat_domain * domain)
 {
 	return domain->id;
+}
+
+/* Get the domain name for the domain */
+char *xenstat_domain_name(xenstat_domain * domain)
+{
+	return domain->name;
 }
 
 /* Get information about how much CPU time has been used */
@@ -675,3 +699,24 @@ static void xenstat_free_xen_version(xenstat_node * node)
 static void xenstat_uninit_xen_version(xenstat_handle * handle)
 {
 }
+
+static char *xenstat_get_domain_name(xenstat_handle *handle, unsigned int domain_id)
+{
+	char path[80];
+	char *name;
+	struct xs_transaction_handle *xstranshandle;
+
+	snprintf(path, sizeof(path),"/local/domain/%i/name", domain_id);
+	
+	xstranshandle = xs_transaction_start(handle->xshandle);
+	if (xstranshandle == NULL) {
+		perror("Unable to get transcation handle from xenstore\n");
+		exit(1); /* Change this */
+	}
+
+	name = (char *) xs_read(handle->xshandle, xstranshandle, path, NULL);
+	
+	xs_transaction_end(handle->xshandle, xstranshandle, false);
+
+	return name;
+}	

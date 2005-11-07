@@ -360,6 +360,22 @@ int iomem_index(target_phys_addr_t addr)
         return 0;
 }
 
+#ifdef __ia64__
+/* IA64 has seperate I/D cache, with coherence maintained by DMA controller.
+ * So to emulate right behavior that guest OS is assumed, we need to flush
+ * I/D cache here.
+ */
+static void sync_icache(unsigned long address, int len)
+{
+    int l;
+    for(l = 0; l < (len + 32); l += 32)
+	__ia64_fc(address + l);
+
+    ia64_sync_i();
+    ia64_srlz_i();
+}
+#endif 
+
 void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf, 
                             int len, int is_write)
 {
@@ -402,6 +418,9 @@ void cpu_physical_memory_rw(target_phys_addr_t addr, uint8_t *buf,
                 /* RAM case */
                 ptr = phys_ram_base + addr1;
                 memcpy(ptr, buf, l);
+#ifdef  __ia64__
+                sync_icache((unsigned long)ptr,l);
+#endif                
             }
         } else {
             if (io_index) {

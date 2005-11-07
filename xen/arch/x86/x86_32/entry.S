@@ -126,9 +126,7 @@
 ENTRY(vmx_asm_vmexit_handler)
         /* selectors are restored/saved by VMX */
         VMX_SAVE_ALL_NOSEGREGS
-#ifdef TRACE_BUFFER
         call trace_vmexit
-#endif
         call vmx_vmexit_handler
         jmp vmx_asm_do_resume
 
@@ -150,9 +148,7 @@ ENTRY(vmx_asm_vmexit_handler)
 /* vmx_restore_all_guest */
         call vmx_intr_assist
         call load_cr2
-#ifdef TRACE_BUFFER
         call trace_vmentry
-#endif
         .endif
         VMX_RESTORE_ALL_NOSEGREGS
         /* 

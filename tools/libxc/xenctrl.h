@@ -149,7 +149,7 @@ int xc_domain_dumpcore(int xc_handle,
                        const char *corename);
 
 /*
- * This function sets the maximum number vcpus that a domian may create.
+ * This function sets the maximum number of vcpus that a domain may create.
  *
  * @parm xc_handle a handle to an open hypervisor interface.
  * @parm domid the domain id in which vcpus are to be created.
@@ -371,6 +371,12 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
                                           unsigned int extent_order,
 					  unsigned long *extent_start);
 
+int xc_domain_ioport_permission(int xc_handle,
+                                uint32_t domid,
+                                uint16_t first_port,
+                                uint16_t nr_ports,
+                                uint16_t allow_access);
+
 unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid, 
 				    unsigned long mfn);
 
@@ -489,6 +495,45 @@ int xc_gnttab_dump_table(int        xc_handle,
 
 /* Get current total pages allocated to a domain. */
 long xc_get_tot_pages(int xc_handle, uint32_t domid);
+
+
+/*
+ * Trace Buffer Operations
+ */
+
+/**
+ * This function enables or disables tracing. Trace buffer memory must
+ * be already allocated by setting the size to a non-zero value, otherwise
+ * tracing cannot be enabled.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm enable the desired action, 1 for enable, 0 for disable
+ * @return 0 on success, -1 on failure.
+ */
+int xc_tbuf_enable(int xc_handle, int enable);
+
+/**
+ * This function sets the size of the trace buffers. Setting the size
+ * is currently a one-shot operation that may be performed either at boot
+ * time or via this interface, not both. The buffer size must be set before
+ * enabling tracing.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm size the size in pages per cpu for the trace buffers
+ * @return 0 on success, -1 on failure.
+ */
+int xc_tbuf_set_size(int xc_handle, uint32_t size);
+
+/**
+ * This function retrieves the current size of the trace buffers. 
+ * Note that the size returned is in terms of bytes, not pages.
+
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm size will contain the size in bytes for the trace buffers
+ * @return 0 on success, -1 on failure.
+ */
+int xc_tbuf_get_size(int xc_handle, uint32_t *size);
+
 
 /* Execute a privileged dom0 operation. */
 int xc_dom0_op(int xc_handle, dom0_op_t *op);

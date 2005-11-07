@@ -327,6 +327,7 @@ static void ne2000_ioport_write(void *opaque, uint32_t addr, uint32_t val)
             break;
         }
     }
+    update_select_wakeup_events();
 }
 
 static uint32_t ne2000_ioport_read(void *opaque, uint32_t addr)
@@ -373,6 +374,7 @@ static uint32_t ne2000_ioport_read(void *opaque, uint32_t addr)
             break;
         }
     }
+    update_select_wakeup_events();
 #ifdef DEBUG_NE2000
     printf("NE2000: read addr=0x%x val=%02x\n", addr, ret);
 #endif
@@ -476,6 +478,7 @@ static void ne2000_asic_ioport_write(void *opaque, uint32_t addr, uint32_t val)
         ne2000_mem_writeb(s, s->rsar, val);
         ne2000_dma_update(s, 1);
     }
+    update_select_wakeup_events();
 }
 
 static uint32_t ne2000_asic_ioport_read(void *opaque, uint32_t addr)
@@ -492,6 +495,7 @@ static uint32_t ne2000_asic_ioport_read(void *opaque, uint32_t addr)
         ret = ne2000_mem_readb(s, s->rsar);
         ne2000_dma_update(s, 1);
     }
+    update_select_wakeup_events();
 #ifdef DEBUG_NE2000
     printf("NE2000: asic read val=0x%04x\n", ret);
 #endif
@@ -510,6 +514,7 @@ static void ne2000_asic_ioport_writel(void *opaque, uint32_t addr, uint32_t val)
     /* 32 bit access */
     ne2000_mem_writel(s, s->rsar, val);
     ne2000_dma_update(s, 4);
+    update_select_wakeup_events();
 }
 
 static uint32_t ne2000_asic_ioport_readl(void *opaque, uint32_t addr)
@@ -520,6 +525,7 @@ static uint32_t ne2000_asic_ioport_readl(void *opaque, uint32_t addr)
     /* 32 bit access */
     ret = ne2000_mem_readl(s, s->rsar);
     ne2000_dma_update(s, 4);
+    update_select_wakeup_events();
 #ifdef DEBUG_NE2000
     printf("NE2000: asic readl val=0x%04x\n", ret);
 #endif
@@ -535,6 +541,7 @@ static uint32_t ne2000_reset_ioport_read(void *opaque, uint32_t addr)
 {
     NE2000State *s = opaque;
     ne2000_reset(s);
+    update_select_wakeup_events();
     return 0;
 }
 

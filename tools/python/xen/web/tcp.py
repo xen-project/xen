@@ -85,9 +85,6 @@ class TCPConnector(SocketConnector):
                 raise IOError("unknown service: " + ex)
         return port
 
-    def getDestination(self):
-        return (self.host, self.port)
-
     def connectTransport(self):
         self.transport = TCPClientConnection(
             self.host, self.port, self.bindAddress, self)
@@ -97,9 +94,6 @@ def listenTCP(port, factory, interface='', backlog=None):
     l = TCPListener(port, factory, interface=interface, backlog=backlog)
     l.startListening()
     return l
-
-def SetCloExec(SocketListener):
-    SocketListener.SetCloExec()
 
 def connectTCP(host, port, factory, timeout=None, bindAddress=None):
     c = TCPConnector(host, port, factory, timeout=timeout, bindAddress=bindAddress)

@@ -25,9 +25,6 @@
 # Port xend should use for the HTTP interface, if xend-http-server is set.
 #(xend-port            8000)
 
-# Port xend should use for the event interface.  This interface is deprecated.
-#(xend-event-port      8001)
-
 # Port xend should use for the relocation interface, if xend-relocation-server
 # is set.
 #(xend-relocation-port 8002)
@@ -48,19 +45,62 @@
 # The limit (in kilobytes) on the size of the console buffer
 #(console-limit 1024)
 
-## Use the following if VIF traffic is routed.
-# The script used to start/stop networking for xend.
-#(network-script     network-route)
-# The default script used to control virtual interfaces.
-#(vif-script         vif-route)
+##
+# To bridge network traffic, like this:
+#
+# dom0: fake eth0 -> vif0.0 -+
+#                            |
+#                          bridge -> real eth0 -> the network
+#                            |
+# domU: fake eth0 -> vifN.0 -+
+#
+# use
+#
+# (network-script network-bridge)
+#
+# Your eth0 is used as the outgoing interface, by default.  To use a different
+# one (e.g. eth1) use
+#
+# (network-script 'network-bridge netdev=eth1')
+#
+# The bridge is named xenbr0, by default.  To rename the bridge, use
+#
+# (network-script 'network-bridge bridge=<name>')
+#
+# It is possible to use the network-bridge script in more complicated
+# scenarios, such as having two outgoing interfaces, with two bridges, and
+# two fake interfaces per guest domain.  To do things like this, write
+# yourself a wrapper script, and call network-bridge from it, as appropriate.
+#
+(network-script network-bridge)
 
-## Use the following if VIF traffic is bridged.
-# The script used to start/stop networking for xend.
-(network-script    network-bridge)
-# The default bridge that virtual interfaces should be connected to.
-(vif-bridge        xenbr0)
-# The default script used to control virtual interfaces.
-(vif-script        vif-bridge)
+# The script used to control virtual interfaces.  This can be overridden on a
+# per-vif basis when creating a domain or a configuring a new vif.  The
+# vif-bridge script is designed for use with the network-bridge script, or
+# similar configurations.
+#
+# If you have overridden the bridge name using
+# (network-script 'network-bridge bridge=<name>') then you may wish to do the
+# same here.  The bridge name can also be set when creating a domain or
+# configuring a new vif, but a value specified here would act as a default.
+#
+# If you are using only one bridge, the vif-bridge script will discover that,
+# so there is no need to specify it explicitly.
+#
+(vif-script vif-bridge)
+
+
+## Use the following if network traffic is routed, as an alternative to the
+# settings for bridged networking given above.
+#(network-script network-route)
+#(vif-script     vif-route)
+
+
+## Use the following if network traffic is routed with NAT, as an alternative
+# to the settings for bridged networking given above.
+#(network-script network-nat)
+#(vif-script     vif-nat)
+
 
 # Dom0 will balloon out when needed to free memory for domU.
 # dom0-min-mem is the lowest memory level (in MB) dom0 will get down to.

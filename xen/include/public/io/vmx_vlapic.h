@@ -28,14 +28,6 @@
 #define VLAPIC_INT_COUNT                (VLOCAL_APIC_MAX_INTS/(BITS_PER_BYTE * sizeof(uint64_t)))
 #define VLAPIC_INT_COUNT_32             (VLOCAL_APIC_MAX_INTS/(BITS_PER_BYTE * sizeof(uint32_t)))
 
-struct vapic_bus_message{
-   uint8_t   deliv_mode:4;   /* deliver mode, including fixed, LPRI, etc */
-   uint8_t   level:1;        /* level or edge */
-   uint8_t   trig_mod:1;    /* assert or disassert */
-   uint8_t   reserved:2;
-   uint8_t   vector;
-};
-
 typedef struct {
     /* interrupt for PIC and ext type IOAPIC interrupt */
     uint64_t   vl_ext_intr[VLAPIC_INT_COUNT];
@@ -51,7 +43,6 @@ typedef struct {
     uint32_t   vl_arb_id;
     uint32_t   vl_state;
     uint32_t   apic_msg_count;
-    struct vapic_bus_message  vl_apic_msg[24];
 } vlapic_info;
 
 #endif /* _VMX_VLAPIC_H_ */

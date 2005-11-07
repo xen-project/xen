@@ -23,6 +23,7 @@ SRCS       += xc_misc.c
 SRCS       += xc_physdev.c
 SRCS       += xc_private.c
 SRCS       += xc_sedf.c
+SRCS       += xc_tbuf.c
 BUILD_SRCS += xc_linux_build.c
 BUILD_SRCS += xc_load_bin.c
 BUILD_SRCS += xc_load_elf.c

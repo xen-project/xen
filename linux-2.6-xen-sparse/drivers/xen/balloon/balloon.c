@@ -70,6 +70,9 @@ spinlock_t balloon_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long current_pages;
 static unsigned long target_pages;
 
+/* VM /proc information for memory */
+extern unsigned long totalram_pages;
+
 /* We may hit the hard limit in Xen. If we do then we remember it. */
 static unsigned long hard_limit;
 
@@ -188,12 +191,13 @@ static int increase_reservation(unsigned long nr_pages)
 	rc = HYPERVISOR_memory_op(
 		XENMEM_increase_reservation, &reservation);
 	if (rc < nr_pages) {
+		int ret;
 		/* We hit the Xen hard limit: reprobe. */
 		reservation.extent_start = mfn_list;
 		reservation.nr_extents   = rc;
-		BUG_ON(HYPERVISOR_memory_op(
-			XENMEM_decrease_reservation,
-			&reservation) != rc);
+		ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
+				&reservation);
+		BUG_ON(ret != rc);
 		hard_limit = current_pages + rc - driver_pages;
 		goto out;
 	}
@@ -210,11 +214,14 @@ static int increase_reservation(unsigned long nr_pages)
 		xen_machphys_update(mfn_list[i], pfn);
             
 		/* Link back into the page tables if not highmem. */
-		if (pfn < max_low_pfn)
-			BUG_ON(HYPERVISOR_update_va_mapping(
+		if (pfn < max_low_pfn) {
+			int ret;
+			ret = HYPERVISOR_update_va_mapping(
 				(unsigned long)__va(pfn << PAGE_SHIFT),
 				pfn_pte_ma(mfn_list[i], PAGE_KERNEL),
-				0));
+				0);
+			BUG_ON(ret);
+		}
 
 		/* Relinquish the page back to the allocator. */
 		ClearPageReserved(page);
@@ -223,6 +230,7 @@ static int increase_reservation(unsigned long nr_pages)
 	}
 
 	current_pages += nr_pages;
+	totalram_pages = current_pages;
 
  out:
 	balloon_unlock(flags);
@@ -238,6 +246,7 @@ static int decrease_reservation(unsigned long nr_pages)
 	struct page   *page;
 	void          *v;
 	int            need_sleep = 0;
+	int ret;
 	struct xen_memory_reservation reservation = {
 		.address_bits = 0,
 		.extent_order = 0,
@@ -264,8 +273,9 @@ static int decrease_reservation(unsigned long nr_pages)
 		if (!PageHighMem(page)) {
 			v = phys_to_virt(pfn << PAGE_SHIFT);
 			scrub_pages(v, 1);
-			BUG_ON(HYPERVISOR_update_va_mapping(
-				(unsigned long)v, __pte_ma(0), 0));
+			ret = HYPERVISOR_update_va_mapping(
+				(unsigned long)v, __pte_ma(0), 0);
+			BUG_ON(ret);
 		}
 #ifdef CONFIG_XEN_SCRUB_PAGES
 		else {
@@ -291,10 +301,11 @@ static int decrease_reservation(unsigned long nr_pages)
 
 	reservation.extent_start = mfn_list;
 	reservation.nr_extents   = nr_pages;
-	BUG_ON(HYPERVISOR_memory_op(
-		XENMEM_decrease_reservation, &reservation) != nr_pages);
+	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
+	BUG_ON(ret != nr_pages);
 
 	current_pages -= nr_pages;
+	totalram_pages = current_pages;
 
 	balloon_unlock(flags);
 
@@ -359,7 +370,7 @@ static void watch_target(struct xenbus_watch *watch,
 
 	err = xenbus_scanf(NULL, "memory", "target", "%llu", &new_target);
 	if (err != 1) {
-		printk(KERN_ERR "Unable to read memory/target\n");
+		/* This is ok (for domain0 at least) - so just return */
 		return;
 	} 
         
@@ -496,6 +507,7 @@ static int dealloc_pte_fn(
 	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
 {
 	unsigned long mfn = pte_mfn(*pte);
+	int ret;
 	struct xen_memory_reservation reservation = {
 		.extent_start = &mfn,
 		.nr_extents   = 1,
@@ -505,8 +517,8 @@ static int dealloc_pte_fn(
 	set_pte_at(&init_mm, addr, pte, __pte_ma(0));
 	phys_to_machine_mapping[__pa(addr) >> PAGE_SHIFT] =
 		INVALID_P2M_ENTRY;
-	BUG_ON(HYPERVISOR_memory_op(
-		XENMEM_decrease_reservation, &reservation) != 1);
+	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
+	BUG_ON(ret != 1);
 	return 0;
 }
 
@@ -514,6 +526,7 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 {
 	unsigned long vstart, flags;
 	unsigned int  order = get_order(nr_pages * PAGE_SIZE);
+	int ret;
 
 	vstart = __get_free_pages(GFP_KERNEL, order);
 	if (vstart == 0)
@@ -522,8 +535,9 @@ struct page *balloon_alloc_empty_page_range(unsigned long nr_pages)
 	scrub_pages(vstart, 1 << order);
 
 	balloon_lock(flags);
-	BUG_ON(generic_page_range(
-		&init_mm, vstart, PAGE_SIZE << order, dealloc_pte_fn, NULL));
+	ret = generic_page_range(
+		&init_mm, vstart, PAGE_SIZE << order, dealloc_pte_fn, NULL);
+	BUG_ON(ret);
 	current_pages -= 1UL << order;
 	balloon_unlock(flags);
 

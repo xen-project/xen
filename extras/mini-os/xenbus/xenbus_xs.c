@@ -39,7 +39,7 @@
 #include <wait.h>
 #include <sched.h>
 #include <semaphore.h>
-#include "xenstored.h"
+#include <xen/io/xs_wire.h>
 #include "xenbus_comms.h"
 
 #define streq(a, b) (strcmp((a), (b)) == 0)
@@ -408,7 +408,12 @@ static char *xs_read_watch(char **token)
 
 static int xs_acknowledge_watch(const char *token)
 {
+#if 0
 	return xs_error(xs_single(XS_WATCH_ACK, token, NULL));
+#else
+	/* XS_WATCH_ACK is no longer available */
+	return 0;
+#endif
 }
 
 static int xs_unwatch(const char *path, const char *token)

@@ -387,21 +387,7 @@ cpu_handle_ioreq(CPUState *env)
 	}
 }
 
-void
-cpu_timer_handler(CPUState *env)
-{
-	cpu_handle_ioreq(env);
-}
-
 int xc_handle;
-
-static __inline__ void atomic_set_bit(long nr, volatile void *addr)
-{
-        __asm__ __volatile__(
-                "lock ; bts %1,%0"
-                :"=m" (*(volatile long *)addr)
-                :"dIr" (nr));
-}
 
 void
 destroy_vmx_domain(void)
@@ -413,6 +399,8 @@ destroy_vmx_domain(void)
         fprintf(logfile, "%s failed.!\n", destroy_cmd);
 }
 
+fd_set wakeup_rfds;
+int    highest_fds;
 int main_loop(void)
 {
  	fd_set rfds;
@@ -425,8 +413,9 @@ int main_loop(void)
         extern void main_loop_wait(int);
 
  	/* Watch stdin (fd 0) to see when it has input. */
-	FD_ZERO(&rfds);
-
+	FD_ZERO(&wakeup_rfds);
+	FD_SET(evtchn_fd, &wakeup_rfds);
+	highest_fds = evtchn_fd;
 	while (1) {
                 if (vm_running) {
                     if (shutdown_requested) {
@@ -441,14 +430,16 @@ int main_loop(void)
 		/* Wait up to one seconds. */
 		tv.tv_sec = 0;
 		tv.tv_usec = 100000;
-		FD_SET(evtchn_fd, &rfds);
 
 		env->send_event = 0;
-		retval = select(evtchn_fd+1, &rfds, NULL, NULL, &tv);
+		retval = select(highest_fds+1, &wakeup_rfds, NULL, NULL, &tv);
 		if (retval == -1) {
 			perror("select");
 			return 0;
 		}
+        rfds = wakeup_rfds;
+        FD_ZERO(&wakeup_rfds);
+        FD_SET(evtchn_fd, &wakeup_rfds);
 
 #if __WORDSIZE == 32
 #define ULONGLONG_MAX   0xffffffffffffffffULL
@@ -457,14 +448,10 @@ int main_loop(void)
 #endif
 
 		main_loop_wait(0);
-#ifdef APIC_SUPPORT
-		ioapic_update_EOI();
-#endif
-		cpu_timer_handler(env);
-#ifdef APIC_SUPPORT
-		if (ioapic_has_intr())
-                    do_ioapic();
-#endif
+        tun_receive_handler(&rfds);
+        if ( FD_ISSET(evtchn_fd, &rfds) ) {
+            cpu_handle_ioreq(env);
+        }
 		if (env->send_event) {
 			struct ioctl_evtchn_notify notify;
 			notify.port = ioreq_local_port;

@@ -380,12 +380,21 @@ static void cleanup_domain(struct domain *d)
 	if (!buffer_empty(&d->buffer))
 		return;
 
-	if (d->buffer.data)
+	if (d->buffer.data) {
 		free(d->buffer.data);
-	d->buffer.data = NULL;
-	if (d->tty_fd != -1)
+		d->buffer.data = NULL;
+	}
+
+	if (d->tty_fd != -1) {
 		close(d->tty_fd);
-	d->tty_fd = -1;
+		d->tty_fd = -1;
+	}
+
+	if (d->conspath) {
+		free(d->conspath);
+		d->conspath = NULL;
+	}
+
 	remove_domain(d);
 }
 
@@ -512,7 +521,9 @@ static void handle_xs(int fd)
 		enum_domains();
 	else if (sscanf(vec[XS_WATCH_TOKEN], "dom%u", &domid) == 1) {
 		dom = lookup_domain(domid);
-		if (dom->is_dead == false)
+		/* We may get watches firing for domains that have recently
+		   been removed, so dom may be NULL here. */
+		if (dom && dom->is_dead == false)
 			domain_create_ring(dom);
 	}
 

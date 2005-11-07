@@ -1,0 +1,133 @@
+
+xm-test README
+
+Copyright (C) International Business Machines Corp., 2005
+Author(s): Dan Smith <danms@us.ibm.com> 
+  	   Woody Marvel <marvel@us.ibm.com>
+
+Overview
+========
+
+This suite provides a framework for testing the Xen userspace tools.
+The directory structure is:
+
+  ./xm-test
+   |
+   +-/lib: Python support libraries
+   |
+   +-/ramdisk: Staging area for building the test ramdisk
+   |
+   +-/tests
+   | |
+   | +-/create: Tests for the 'xm create' command
+   | +-/destroy: Tests for the 'xm destroy' command
+   |  . . .
+   |
+   +-/utils: Utility scripts for ramdisk building
+
+
+Building
+========
+
+Before the test suite can be used, the ramdisk must be built from
+source.  All source needed for this process is automatically
+downloaded, extracted, and compiled.  Due to the need to create
+special files, this process must be done as root:
+
+   # ./configure
+   # make
+
+NB: If you have the initrd.img from a previous version of xm-test, you
+can copy it into the ramdisk directory to eliminate the need to
+rebuild it.  So far, nothing has changed in the ramdisk since xm-test
+version 0.1.1.  If you do this, there is no need to run 'make' again.
+Simply copy the initrd.img file into ramdisk/ and then run the
+runtest.sh script.
+
+
+Running
+=======
+
+By running "./runtest.sh logfile" at the top level, all tests will be
+run in alphabetic order.  To run a specific test group, run "make
+check" from inside that group directory.  For example:
+
+   # cd tests/create
+   # make check
+
+The runtest.sh script will create several files, including a .report
+file, which is the cleaned up, email-friendly report of failures.
+Additionally, the script will submit your results to the development
+team for trend analysis.  This helps us determine the level of success
+people "out there" are having with different versions of Xen.
+
+If you wish to run xm-test in an automated batch environment, you can
+run the script with the "-b" flag, which will try to prevent it from
+asking any questions interactively.  You should run it manually at
+least once to generate the "contact_info" file, which will be used in
+subsequent runs.
+
+BIG FAT WARNING: The framework assumes it is running on a dedicated
+machine.  As such, the library automatically destroys any running
+DomUs on the sytem to provide each test with a "clean slate".
+
+
+Extending
+=========
+
+Additional tests may be added in existing groups to test additional
+cases for a given xm subcommand.  Test programs should be named
+according to the following scheme:
+	
+  XY_group_name_{pos,neg}.py
+
+Where:
+  XY        is the next number in line
+  group     is the name of the subcommand being tested
+  name      is the short name of the test
+  {pos,neg} denotes whether this is a positive or negative test case
+
+New subcommand groups should be added as directories named after the
+subcommand itself.  The "Makefile.am.template" should be copied into
+the new group directory as "Makefile.am".
+
+
+Developer Notes
+===============
+
+Our library provides a DomU console abstraction for automated
+execution of commands.  Please note that this is relatively fragile,
+and is intended for use only with the ramdisk built by the framework.
+Because the console experiences some occasional corruption, this
+method is not completely perfect at the moment, although the authors
+use it with relatively few problems.
+
+
+Known Issues
+============
+
+- 08/22/2005 Dan Smith:
+    Current versions of Xen experience long delays on
+    boot, due to the blkif frontend waiting (and timing
+    out) for the backend.  We now implicitly introduce
+    a pause in XmTestDomain.start() to remedy
+    this across all tests that need it.
+
+- 09/22/2005 Dan Smith:
+    The save, restore, and migrate tests have been turned
+    back on, as we have implemented timeout functionality 
+    in "traceCommand".  Since migrate is known to hang, we 
+    can now safely include it in the default test run, and
+    have it be killed if it never finishes.  As before,
+    feedback about these tests would be specifically
+    appreciated.
+
+Reporting Bugs
+==============
+
+If you find a bug in the test framework, report it to:
+
+   Dan Smith <danms@us.ibm.com>
+
+If you find a bug in a specific test case, contact the author of the
+test case first.

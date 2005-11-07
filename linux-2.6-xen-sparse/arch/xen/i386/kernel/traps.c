@@ -648,6 +648,12 @@ fastcall void do_int3(struct pt_regs *regs, long error_code)
 }
 #endif
 
+static inline void conditional_sti(struct pt_regs *regs)
+{
+	if ((uint8_t)(regs->xcs >> 16) == 0)
+		local_irq_enable();
+}
+
 /*
  * Our handling of the processor debug registers is non-trivial.
  * We do not clear them on entry and exit from the kernel. Therefore
@@ -680,11 +686,9 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
 					SIGTRAP) == NOTIFY_STOP)
 		return;
-#if 0
+
 	/* It's safe to allow irq's after DR6 has been saved */
-	if (regs->eflags & X86_EFLAGS_IF)
-		local_irq_enable();
-#endif
+	conditional_sti(regs);
 
 	/* Mask out spurious debug traps due to lazy DR7 setting */
 	if (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) {
@@ -967,15 +971,18 @@ void __init trap_init_f00f_bug(void)
 #endif
 
 
-/* NB. All these are "trap gates" (i.e. events_mask isn't cleared). */
+/*
+ * NB. All these are "trap gates" (i.e. events_mask isn't cleared) except
+ * for those that specify <dpl>|4 in the second field.
+ */
 static trap_info_t trap_table[] = {
 	{  0, 0, __KERNEL_CS, (unsigned long)divide_error		},
-	{  1, 0, __KERNEL_CS, (unsigned long)debug			},
-	{  3, 3, __KERNEL_CS, (unsigned long)int3			},
+	{  1, 0|4, __KERNEL_CS, (unsigned long)debug			},
+	{  3, 3|4, __KERNEL_CS, (unsigned long)int3			},
 	{  4, 3, __KERNEL_CS, (unsigned long)overflow			},
 	{  5, 3, __KERNEL_CS, (unsigned long)bounds			},
 	{  6, 0, __KERNEL_CS, (unsigned long)invalid_op			},
-	{  7, 0, __KERNEL_CS, (unsigned long)device_not_available	},
+	{  7, 0|4, __KERNEL_CS, (unsigned long)device_not_available	},
 	{  9, 0, __KERNEL_CS, (unsigned long)coprocessor_segment_overrun },
 	{ 10, 0, __KERNEL_CS, (unsigned long)invalid_TSS		},
 	{ 11, 0, __KERNEL_CS, (unsigned long)segment_not_present	},

@@ -80,6 +80,9 @@ unsigned long long xenstat_node_cpu_hz(xenstat_node * node);
 /* Get the domain ID for this domain */
 unsigned xenstat_domain_id(xenstat_domain * domain);
 
+/* Set the domain name for the domain */
+char *xenstat_domain_name(xenstat_domain * domain);
+
 /* Get information about how much CPU time has been used */
 unsigned long long xenstat_domain_cpu_ns(xenstat_domain * domain);
 

@@ -43,6 +43,8 @@
 #endif
 #include <public/sched.h>
 #include <public/io/ioreq.h>
+#include <public/io/vmx_vpic.h>
+#include <public/io/vmx_vlapic.h>
 
 int hvm_enabled;
 
@@ -50,12 +52,8 @@ int hvm_enabled;
 unsigned int opt_vmx_debug_level = 0;
 integer_param("vmx_debug", opt_vmx_debug_level);
 
-#ifdef TRACE_BUFFER
 static unsigned long trace_values[NR_CPUS][4];
 #define TRACE_VMEXIT(index,value) trace_values[current->processor][index]=value
-#else
-#define TRACE_VMEXIT(index,value) ((void)0)
-#endif
 
 static int vmx_switch_on;
 
@@ -65,6 +63,11 @@ void vmx_final_setup_guest(struct vcpu *v)
 
     if ( v == v->domain->vcpu[0] )
     {
+        v->domain->arch.vmx_platform.lapic_enable =
+            v->arch.guest_context.user_regs.ecx;
+        v->arch.guest_context.user_regs.ecx = 0;
+        VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "lapic enable is %d.\n",
+                    v->domain->arch.vmx_platform.lapic_enable);
         /*
          * Required to do this once per domain
          * XXX todo: add a seperate function to do these.
@@ -84,6 +87,8 @@ void vmx_final_setup_guest(struct vcpu *v)
 
 void vmx_relinquish_resources(struct vcpu *v)
 {
+    struct vmx_virpit *vpit;
+    
     if ( !VMX_DOMAIN(v) )
         return;
 
@@ -95,7 +100,16 @@ void vmx_relinquish_resources(struct vcpu *v)
 
     destroy_vmcs(&v->arch.arch_vmx);
     free_monitor_pagetable(v);
-    rem_ac_timer(&v->domain->arch.vmx_platform.vmx_pit.pit_timer);
+    vpit = &v->domain->arch.vmx_platform.vmx_pit;
+    if ( vpit->ticking && active_ac_timer(&(vpit->pit_timer)) )
+        rem_ac_timer(&vpit->pit_timer);
+    if ( active_ac_timer(&v->arch.arch_vmx.hlt_timer) ) {
+        rem_ac_timer(&v->arch.arch_vmx.hlt_timer);
+    }
+    if ( vmx_apic_support(v->domain) ) {
+        rem_ac_timer( &(VLAPIC(v)->vlapic_timer) );
+        xfree( VLAPIC(v) );
+    }
 }
 
 #ifdef __x86_64__
@@ -442,7 +456,9 @@ static int vmx_do_page_fault(unsigned long va, struct cpu_user_regs *regs)
 
     /* Use 1:1 page table to identify MMIO address space */
     if ( mmio_space(gpa) ){
-        if (gpa >= 0xFEE00000) { /* workaround for local APIC */
+        struct vcpu *v = current;
+        /* No support for APIC */
+        if (!vmx_apic_support(v->domain) && gpa >= 0xFEC00000) { 
             u32 inst_len;
             __vmread(VM_EXIT_INSTRUCTION_LEN, &(inst_len));
             __update_guest_eip(inst_len);
@@ -487,6 +503,7 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
 {
     unsigned int eax, ebx, ecx, edx;
     unsigned long eip;
+    struct vcpu *v = current;
 
     __vmread(GUEST_RIP, &eip);
 
@@ -500,6 +517,9 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct cpu_user_regs *regs)
     cpuid(input, &eax, &ebx, &ecx, &edx);
 
     if (input == 1) {
+        if ( vmx_apic_support(v->domain) &&
+                !vlapic_global_enabled((VLAPIC(v))) )
+            clear_bit(X86_FEATURE_APIC, &edx);
 #ifdef __i386__
         clear_bit(X86_FEATURE_PSE, &edx);
         clear_bit(X86_FEATURE_PAE, &edx);
@@ -1441,6 +1461,7 @@ static int vmx_cr_access(unsigned long exit_qualification, struct cpu_user_regs 
 static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
+    struct vcpu *v = current;
 
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_read: ecx=%lx, eax=%lx, edx=%lx",
                 (unsigned long)regs->ecx, (unsigned long)regs->eax,
@@ -1454,6 +1475,9 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
         break;
     case MSR_IA32_SYSENTER_EIP:
         __vmread(GUEST_SYSENTER_EIP, &msr_content);
+        break;
+    case MSR_IA32_APICBASE:
+        msr_content = VLAPIC(v) ? VLAPIC(v)->apic_base_msr : 0;
         break;
     default:
         if(long_mode_do_msr_read(regs))
@@ -1474,6 +1498,7 @@ static inline void vmx_do_msr_read(struct cpu_user_regs *regs)
 static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
 {
     u64 msr_content;
+    struct vcpu *v = current;
 
     VMX_DBG_LOG(DBG_LEVEL_1, "vmx_do_msr_write: ecx=%lx, eax=%lx, edx=%lx",
                 (unsigned long)regs->ecx, (unsigned long)regs->eax,
@@ -1491,6 +1516,9 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
     case MSR_IA32_SYSENTER_EIP:
         __vmwrite(GUEST_SYSENTER_EIP, msr_content);
         break;
+    case MSR_IA32_APICBASE:
+        vlapic_msr_set(VLAPIC(v), msr_content);
+        break;
     default:
         long_mode_do_msr_write(regs);
         break;
@@ -1502,12 +1530,24 @@ static inline void vmx_do_msr_write(struct cpu_user_regs *regs)
                 (unsigned long)regs->edx);
 }
 
-volatile unsigned long do_hlt_count;
 /*
  * Need to use this exit to reschedule
  */
 void vmx_vmexit_do_hlt(void)
 {
+    struct vcpu *v=current;
+    struct vmx_virpit *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
+    s_time_t   next_pit=-1,next_wakeup;
+
+    if ( !v->vcpu_id ) {
+        next_pit = get_pit_scheduled(v,vpit);
+    }
+    next_wakeup = get_apictime_scheduled(v);
+    if ( (next_pit != -1 && next_pit < next_wakeup) || next_wakeup == -1 ) {
+        next_wakeup = next_pit;
+    }
+    if ( next_wakeup != - 1 ) 
+        set_ac_timer(&current->arch.arch_vmx.hlt_timer, next_wakeup);
     do_block();
 }
 
@@ -1663,13 +1703,11 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs regs)
         return;
     }
 
-#ifdef TRACE_BUFFER
     {
         __vmread(GUEST_RIP, &eip);
         TRACE_3D(TRC_VMX_VMEXIT, v->domain->domain_id, eip, exit_reason);
         TRACE_VMEXIT(0,exit_reason);
     }
-#endif
 
     switch (exit_reason) {
     case EXIT_REASON_EXCEPTION_NMI:
@@ -1858,7 +1896,6 @@ asmlinkage void load_cr2(void)
 #endif
 }
 
-#ifdef TRACE_BUFFER
 asmlinkage void trace_vmentry (void)
 {
     TRACE_5D(TRC_VMENTRY,trace_values[current->processor][0],
@@ -1876,7 +1913,6 @@ asmlinkage void trace_vmexit (void)
     TRACE_3D(TRC_VMEXIT,0,0,0);
     return;
 }
-#endif
 #endif /* CONFIG_VMX */
 
 /*

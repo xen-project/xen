@@ -39,21 +39,27 @@ source labelfuncs.sh
 
 usage ()
 {
-	echo "Usage: $0 [Option] <vmfile> <label> [<policy name>]"
-	echo "    or $0 -l [<policy name>]"
-	echo ""
-	echo "Valid options are:"
-	echo "-r          : to relabel a file without being prompted"
-	echo ""
-	echo "vmfile      : XEN vm configuration file"
-	echo "label       : the label to map to an ssidref"
-	echo "policy name : the name of the policy, i.e. 'chwall'"
-	echo "              If the policy name is omitted, it is attempted"
-	echo "              to find the current policy's name in grub.conf."
-	echo ""
-	echo "-l [<policy name>] is used to show valid labels in the map file of"
-	echo "                   the given or current policy."
-	echo ""
+echo "Use this tool to put the ssidref corresponding to a label of a policy into
+the VM configuration file, or use it to display all labels of a policy.
+
+Usage: $0 [Option] <vmfile> <label> [<policy name>]
+    or $0 -l [<policy name>]
+
+Valid options are:
+-r          : to relabel a file without being prompted
+
+vmfile      : XEN vm configuration file; give complete path
+label       : the label to map to an ssidref
+policy name : the name of the policy, i.e. 'chwall'
+              If the policy name is omitted, it is attempted
+              to find the current policy's name in grub.conf.
+
+-l [<policy name>] is used to show valid labels in the map file of
+                   the given or current policy. If the policy name
+                   is omitted, it will be tried to determine the
+                   current policy from grub.conf (/boot/grub/grub.conf)
+
+"
 }
 
 
@@ -83,7 +89,7 @@ if [ "$mode" == "show" ]; then
 			exit -1;
 		fi
 	else
-		policy=$3;
+		policy=$1;
 	fi
 
 
@@ -92,7 +98,7 @@ if [ "$mode" == "show" ]; then
 	if [ "$res" != "0" ]; then
 		showLabels $mapfile
 	else
-		echo "Could not find map file for policy '$1'."
+		echo "Could not find map file for policy '$policy'."
 	fi
 elif [ "$mode" == "usage" ]; then
 	usage

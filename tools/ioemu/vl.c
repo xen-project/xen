@@ -22,6 +22,9 @@
  * THE SOFTWARE.
  */
 #include "vl.h"
+#ifdef __ia64__
+#include <xen/arch-ia64.h>
+#endif
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -517,6 +520,11 @@ int64_t cpu_get_real_ticks(void)
     val |= low;
     return val;
 }
+
+#elif defined(__ia64__)
+#include "ia64_intrinsic.h"
+#define cpu_get_reak_ticks()	\
+    ia64_getreg(_IA64_REG_AR_ITC)
 
 #else
 #error unsupported CPU
@@ -1528,7 +1536,7 @@ static void tun_add_read_packet(NetDriverState *nd,
                                 IOCanRWHandler *fd_can_read, 
                                 IOReadHandler *fd_read, void *opaque)
 {
-    qemu_add_fd_read_handler(nd->fd, fd_can_read, fd_read, opaque);
+    qemu_add_fd_event_read_handler(nd->fd, fd_can_read, fd_read, opaque);
 }
 
 static int net_tun_init(NetDriverState *nd)
@@ -1536,11 +1544,13 @@ static int net_tun_init(NetDriverState *nd)
     int pid, status;
     char *args[3];
     char **parg;
+    extern int highest_fds;
 
     nd->fd = tun_open(nd->ifname, sizeof(nd->ifname));
     if (nd->fd < 0)
         return -1;
 
+    if ( nd->fd > highest_fds ) highest_fds = nd->fd;
     /* try to launch network init script */
     pid = fork();
     if (pid >= 0) {
@@ -1628,6 +1638,7 @@ typedef struct IOHandlerRecord {
 } IOHandlerRecord;
 
 static IOHandlerRecord *first_io_handler;
+static IOHandlerRecord *first_eventio_handler;
 
 int qemu_add_fd_read_handler(int fd, IOCanRWHandler *fd_can_read, 
                              IOReadHandler *fd_read, void *opaque)
@@ -1643,6 +1654,23 @@ int qemu_add_fd_read_handler(int fd, IOCanRWHandler *fd_can_read,
     ioh->opaque = opaque;
     ioh->next = first_io_handler;
     first_io_handler = ioh;
+    return 0;
+}
+
+int qemu_add_fd_event_read_handler(int fd, IOCanRWHandler *fd_can_read, 
+                             IOReadHandler *fd_read, void *opaque)
+{
+    IOHandlerRecord *ioh;
+
+    ioh = qemu_mallocz(sizeof(IOHandlerRecord));
+    if (!ioh)
+        return -1;
+    ioh->fd = fd;
+    ioh->fd_can_read = fd_can_read;
+    ioh->fd_read = fd_read;
+    ioh->opaque = opaque;
+    ioh->next = first_eventio_handler;
+    first_eventio_handler = ioh;
     return 0;
 }
 
@@ -2355,6 +2383,7 @@ static uint8_t *signal_stack;
 
 #include <xg_private.h>
 
+#if defined(__i386__) || defined (__x86_64__)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 
@@ -2524,6 +2553,10 @@ void unset_vram_mapping(unsigned long addr, unsigned long end)
     /* FIXME Flush the shadow page */
     unsetup_mapping(xc_handle, domid, toptab, addr, end);
 }
+#elif defined(__ia64__)
+void set_vram_mapping(unsigned long addr, unsigned long end) {}
+void unset_vram_mapping(unsigned long addr, unsigned long end) {}
+#endif
 
 int main(int argc, char **argv)
 {
@@ -2998,9 +3031,14 @@ int main(int argc, char **argv)
     phys_ram_size = ram_size + vga_ram_size + bios_size;
 
     ram_pages = ram_size/PAGE_SIZE;
+#if defined(__i386__) || defined(__x86_64__)
     vgaram_pages =  (vga_ram_size -1)/PAGE_SIZE + 1;
     free_pages = vgaram_pages / L1_PAGETABLE_ENTRIES;
     extra_pages = vgaram_pages + free_pages;
+#else
+    /* Test vga acceleration later */
+    extra_pages = 0;
+#endif
 
     xc_handle = xc_interface_open();
 
@@ -3029,6 +3067,7 @@ int main(int argc, char **argv)
         exit(-1);
     }
 
+#if defined(__i386__) || defined(__x86_64__)
     if ( xc_get_pfn_list(xc_handle, domid, page_array, nr_pages) != nr_pages )
     {
 	    perror("xc_get_pfn_list");
@@ -3057,8 +3096,6 @@ int main(int argc, char **argv)
  	    exit(-1);
      }
 
-
-
     memset(shared_vram, 0, vgaram_pages * PAGE_SIZE);
     toptab = page_array[ram_pages] << PAGE_SHIFT;
 
@@ -3067,7 +3104,31 @@ int main(int argc, char **argv)
  				       page_array[ram_pages]);
 
     freepage_array = &page_array[nr_pages - extra_pages];
- 
+#elif defined(__ia64__)
+    if ( xc_ia64_get_pfn_list(xc_handle, domid, page_array, 0, ram_pages) != ram_pages)
+    {
+        perror("xc_ia64_get_pfn_list");
+        exit(-1);
+    }
+
+    if ((phys_ram_base =  xc_map_foreign_batch(xc_handle, domid,
+						 PROT_READ|PROT_WRITE,
+						 page_array,
+						 ram_pages)) == 0) {
+	    perror("xc_map_foreign_batch");
+	    exit(-1);
+    }
+
+    if ( xc_ia64_get_pfn_list(xc_handle, domid, page_array, IO_PAGE_START>>PAGE_SHIFT, 1) != 1)
+    {
+        perror("xc_ia64_get_pfn_list");
+        exit(-1);
+    }
+
+    shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+				       PROT_READ|PROT_WRITE,
+ 				       page_array[0]);
+#endif 
 
     fprintf(logfile, "shared page at pfn:%lx, mfn: %lx\n", (nr_pages-1), 
            (page_array[nr_pages - 1]));
@@ -3257,3 +3318,44 @@ int main(int argc, char **argv)
     quit_timers();
     return 0;
 }
+
+extern fd_set wakeup_rfds;
+void tun_receive_handler(fd_set *rfds)
+{
+    IOHandlerRecord *ioh;
+    static uint8_t buf[4096];
+    int n, max_size;
+
+    for (ioh = first_eventio_handler; ioh != NULL; ioh = ioh->next) {
+        if ( FD_ISSET(ioh->fd, rfds) ) {
+            max_size = ioh->fd_can_read(ioh->opaque);
+            if (max_size > 0) {
+                if (max_size > sizeof(buf))
+                    max_size = sizeof(buf);
+                n = read(ioh->fd, buf, max_size);
+                if (n >= 0) {
+                    ioh->fd_read(ioh->opaque, buf, n);
+                } 
+            }
+        }
+    }
+    update_select_wakeup_events();
+}
+
+void update_select_wakeup_events(void)
+{
+    IOHandlerRecord *ioh;
+    int max_size;
+
+    for(ioh = first_eventio_handler; ioh != NULL; ioh = ioh->next) {
+        FD_CLR(ioh->fd, &wakeup_rfds);
+        if (ioh->fd_can_read) {
+             max_size = ioh->fd_can_read(ioh->opaque);
+             if (max_size > 0) {
+                 FD_SET(ioh->fd, &wakeup_rfds);
+             }
+        }
+    }
+}
+
+

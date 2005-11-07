@@ -323,7 +323,7 @@ static u64 read_pit_count(void)
     return pit_counter64 + (u16)(pit_stamp - pit_read_counter());
 }
 
-static int init_pit(void)
+static void init_pit(void)
 {
     read_platform_count = read_pit_count;
 
@@ -333,8 +333,6 @@ static int init_pit(void)
 
     printk("Platform timer is %s PIT\n", freq_string(CLOCK_TICK_RATE));
     using_pit = 1;
-
-    return 1;
 }
 
 /************************************************************
@@ -563,7 +561,7 @@ static void platform_time_calibration(void)
 static void init_platform_timer(void)
 {
     if ( !init_cyclone() && !init_hpet() )
-        BUG_ON(!init_pit());
+        init_pit();
 }
 
 

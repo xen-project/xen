@@ -552,7 +552,7 @@ static void dev_changed(const char *node, struct xen_bus_type *bus)
 
 	/* backend/<type>/... or device/<type>/... */
 	p = strchr(node, '/') + 1;
-	snprintf(type, BUS_ID_SIZE, "%.*s", strcspn(p, "/"), p);
+	snprintf(type, BUS_ID_SIZE, "%.*s", (int)strcspn(p, "/"), p);
 	type[BUS_ID_SIZE-1] = '\0';
 
 	rootlen = strsep_len(node, '/', bus->levels);
@@ -738,6 +738,7 @@ static int __init xenbus_probe_init(void)
 
 		unsigned long page;
 		evtchn_op_t op = { 0 };
+		int ret;
 
 
 		/* Allocate page. */
@@ -758,7 +759,8 @@ static int __init xenbus_probe_init(void)
 		op.u.alloc_unbound.dom        = DOMID_SELF;
 		op.u.alloc_unbound.remote_dom = 0; 
 
-		BUG_ON(HYPERVISOR_event_channel_op(&op)); 
+		ret = HYPERVISOR_event_channel_op(&op);
+		BUG_ON(ret); 
 		xen_start_info->store_evtchn = op.u.alloc_unbound.port;
 
 		/* And finally publish the above info in /proc/xen */

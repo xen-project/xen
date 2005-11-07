@@ -77,7 +77,7 @@ libxenstore.so: xs.opic xs_lib.opic
 clean: testsuite-clean
 	rm -f *.o *.opic *.so
 	rm -f xenstored xs_random xs_stress xs_crashme
-	rm -f xs_test xenstored_test
+	rm -f xs_test xenstored_test xs_tdb_dump
 	$(RM) $(PROG_DEP)
 
 print-dir:

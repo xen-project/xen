@@ -190,6 +190,8 @@ static char *be_state_name[] = {
 #define WPRINTK(fmt, args...) \
 	printk(KERN_WARNING "xen_net: " fmt, ##args)
 
+static void netif_free(struct netfront_info *info);
+
 /** Send a packet on a net device to encourage switches to learn the
  * MAC. We send a fake ARP request.
  *
@@ -877,6 +879,7 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	if (gnttab_alloc_grant_references(NETIF_TX_RING_SIZE,
 					  &np->gref_tx_head) < 0) {
 		printk(KERN_ALERT "#### netfront can't alloc tx grant refs\n");
+		err = -ENOMEM;
 		goto exit;
 	}
 	/* A grant for every rx ring slot */
@@ -884,6 +887,7 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 					  &np->gref_rx_head) < 0) {
 		printk(KERN_ALERT "#### netfront can't alloc rx grant refs\n");
 		gnttab_free_grant_references(np->gref_tx_head);
+		err = -ENOMEM;
 		goto exit;
 	}
 
@@ -978,6 +982,9 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 
 	info->tx_ring_ref = GRANT_INVALID_REF;
 	info->rx_ring_ref = GRANT_INVALID_REF;
+	info->rx = NULL;
+	info->tx = NULL;
+	info->irq = 0;
 
 	info->tx = (netif_tx_interface_t *)__get_free_page(GFP_KERNEL);
 	if (info->tx == 0) {
@@ -1022,40 +1029,24 @@ static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
 	return 0;
 
  out:
-	if (info->tx)
-		free_page((unsigned long)info->tx);
-	info->tx = 0;
-	if (info->rx)
-		free_page((unsigned long)info->rx);
-	info->rx = 0;
-
-	if (info->tx_ring_ref != GRANT_INVALID_REF)
-		gnttab_end_foreign_access(info->tx_ring_ref, 0);
-	info->tx_ring_ref = GRANT_INVALID_REF;
-
-	if (info->rx_ring_ref != GRANT_INVALID_REF)
-		gnttab_end_foreign_access(info->rx_ring_ref, 0);
-	info->rx_ring_ref = GRANT_INVALID_REF;
-
+	netif_free(info);
 	return err;
+}
+
+static void end_access(int ref, void *page)
+{
+	if (ref != GRANT_INVALID_REF)
+		gnttab_end_foreign_access(ref, 0, (unsigned long)page);
 }
 
 static void netif_free(struct netfront_info *info)
 {
-	if (info->tx)
-		free_page((unsigned long)info->tx);
-	info->tx = 0;
-	if (info->rx)
-		free_page((unsigned long)info->rx);
-	info->rx = 0;
-
-	if (info->tx_ring_ref != GRANT_INVALID_REF)
-		gnttab_end_foreign_access(info->tx_ring_ref, 0);
+	end_access(info->tx_ring_ref, info->tx);
+	end_access(info->rx_ring_ref, info->rx);
 	info->tx_ring_ref = GRANT_INVALID_REF;
-
-	if (info->rx_ring_ref != GRANT_INVALID_REF)
-		gnttab_end_foreign_access(info->rx_ring_ref, 0);
 	info->rx_ring_ref = GRANT_INVALID_REF;
+	info->tx = NULL;
+	info->rx = NULL;
 
 	if (info->irq)
 		unbind_evtchn_from_irqhandler(info->irq, info->netdev);

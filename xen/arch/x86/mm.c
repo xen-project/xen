@@ -1164,6 +1164,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
 {
     l3_pgentry_t ol3e;
     unsigned long vaddr;
+    int okay;
 
     if ( unlikely(!is_guest_l3_slot(pgentry_ptr_to_slot(pl3e))) )
     {
@@ -1218,7 +1219,9 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         return 0;
     }
 
-    BUG_ON(!create_pae_xen_mappings(pl3e));
+    okay = create_pae_xen_mappings(pl3e);
+    BUG_ON(!okay);
+
     put_page_from_l3e(ol3e, pfn);
     return 1;
 }

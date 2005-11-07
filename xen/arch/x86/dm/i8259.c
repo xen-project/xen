@@ -32,8 +32,8 @@
 #include <public/io/ioreq.h>
 #include <asm/vmx.h>
 #include <public/io/vmx_vpic.h>
-#include <public/io/vmx_vlapic.h>
 #include <asm/current.h>
+#include <asm/vmx_vlapic.h>
 
 /* set irq level. If an edge is detected, then the IRR is set to 1 */
 static inline void pic_set_irq1(PicState *s, int irq, int level)
@@ -135,7 +135,6 @@ void do_pic_irqs (struct vmx_virpic *s, uint16_t irqs)
 {
     s->pics[1].irr |= (uint8_t)(irqs >> 8);
     s->pics[0].irr |= (uint8_t) irqs;
-    /* TODO for alt_irq_func */
     pic_update_irq(s);
 }
 
@@ -505,16 +504,37 @@ int cpu_get_pic_interrupt(struct vcpu *v, int *type)
 {
     int intno;
     struct vmx_virpic *s = &v->domain->arch.vmx_platform.vmx_pic;
-    
+    struct vmx_platform *plat = &v->domain->arch.vmx_platform;
+
+    if ( !vlapic_accept_pic_intr(v) )
+        return -1;
+
+    if ( !plat->interrupt_request )
+        return -1;
+
+    plat->interrupt_request = 0;
     /* read the irq from the PIC */
     intno = pic_read_irq(s);
     *type = VLAPIC_DELIV_MODE_EXT;
     return intno;
 }
 
-int is_pit_irq(struct vcpu *v, int irq)
+int is_pit_irq(struct vcpu *v, int irq, int type)
 {
     int  pit_vec = v->domain->arch.vmx_platform.vmx_pic.pics[0].irq_base;
 
     return (irq == pit_vec);
 }
+
+int is_irq_enabled(struct vcpu *v, int irq)
+{
+    struct vmx_virpic *vpic=&v->domain->arch.vmx_platform.vmx_pic;
+        
+    if ( irq & 8 ) {
+        return !( (1 << (irq&7)) & vpic->pics[1].imr);
+    }
+    else {
+        return !( (1 << irq) & vpic->pics[0].imr);
+    }
+}
+

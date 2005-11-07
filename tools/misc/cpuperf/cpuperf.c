@@ -16,7 +16,6 @@
 
 #include <sys/types.h>
 #include <sched.h>
-#include <error.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>

@@ -100,10 +100,10 @@ struct acm_operations {
     void (*fail_domain_create)         (void *subject_ssid, ssidref_t ssidref);
     void (*post_domain_destroy)        (void *object_ssid, domid_t id);
     /* event channel control hooks  (can be NULL) */
-    int  (*pre_eventchannel_unbound)      (domid_t id);
-    void (*fail_eventchannel_unbound)     (domid_t id);
-    int  (*pre_eventchannel_interdomain)  (domid_t id1, domid_t id2);
-    int  (*fail_eventchannel_interdomain) (domid_t id1, domid_t id2);
+    int  (*pre_eventchannel_unbound)      (domid_t id1, domid_t id2);
+    void (*fail_eventchannel_unbound)     (domid_t id1, domid_t id2);
+    int  (*pre_eventchannel_interdomain)  (domid_t id);
+    void (*fail_eventchannel_interdomain) (domid_t id);
     /* grant table control hooks (can be NULL)  */
     int  (*pre_grant_map_ref)          (domid_t id);
     void (*fail_grant_map_ref)         (domid_t id);
@@ -193,31 +193,31 @@ static inline void acm_post_domain_destroy(void *object_ssid, domid_t id)
     return;
 }
 
-static inline int acm_pre_eventchannel_unbound(domid_t id)
+static inline int acm_pre_eventchannel_unbound(domid_t id1, domid_t id2)
 {
     if ((acm_primary_ops->pre_eventchannel_unbound != NULL) && 
-        acm_primary_ops->pre_eventchannel_unbound(id))
+        acm_primary_ops->pre_eventchannel_unbound(id1, id2))
         return ACM_ACCESS_DENIED;
     else if ((acm_secondary_ops->pre_eventchannel_unbound != NULL) && 
-             acm_secondary_ops->pre_eventchannel_unbound(id)) {
+             acm_secondary_ops->pre_eventchannel_unbound(id1, id2)) {
         /* roll-back primary */
         if (acm_primary_ops->fail_eventchannel_unbound != NULL)
-            acm_primary_ops->fail_eventchannel_unbound(id);
+            acm_primary_ops->fail_eventchannel_unbound(id1, id2);
         return ACM_ACCESS_DENIED;
     } else
         return ACM_ACCESS_PERMITTED;
 }
 
-static inline int acm_pre_eventchannel_interdomain(domid_t id1, domid_t id2)
+static inline int acm_pre_eventchannel_interdomain(domid_t id)
 {
     if ((acm_primary_ops->pre_eventchannel_interdomain != NULL) &&
-        acm_primary_ops->pre_eventchannel_interdomain(id1, id2))
+        acm_primary_ops->pre_eventchannel_interdomain(id))
         return ACM_ACCESS_DENIED;
     else if ((acm_secondary_ops->pre_eventchannel_interdomain != NULL) &&
-             acm_secondary_ops->pre_eventchannel_interdomain(id1, id2)) {
+             acm_secondary_ops->pre_eventchannel_interdomain(id)) {
         /* roll-back primary */
         if (acm_primary_ops->fail_eventchannel_interdomain != NULL)
-            acm_primary_ops->fail_eventchannel_interdomain(id1, id2);
+            acm_primary_ops->fail_eventchannel_interdomain(id);
         return ACM_ACCESS_DENIED;
     } else
         return ACM_ACCESS_PERMITTED;
@@ -234,10 +234,22 @@ static inline int acm_pre_dom0_op(dom0_op_t *op, void **ssid)
             current->domain->ssid, op->u.createdomain.ssidref);
         break;
     case DOM0_DESTROYDOMAIN:
+        if (*ssid != NULL) {
+            printkd("%s: Warning. Overlapping destruction.\n", 
+                    __func__);
+            return -EACCES;
+        }
         d = find_domain_by_id(op->u.destroydomain.domain);
         if (d != NULL) {
             *ssid = d->ssid; /* save for post destroy when d is gone */
-            /* no policy-specific hook */
+            if (*ssid == NULL) {
+                printk("%s: Warning. Destroying domain without ssid pointer.\n", 
+                       __func__);
+                put_domain(d);
+                return -EACCES;
+            }
+            d->ssid = NULL; /* make sure it's not used any more */
+             /* no policy-specific hook */
             put_domain(d);
             ret = 0;
         }
@@ -248,7 +260,7 @@ static inline int acm_pre_dom0_op(dom0_op_t *op, void **ssid)
     return ret;
 }
 
-static inline void acm_post_dom0_op(dom0_op_t *op, void *ssid) 
+static inline void acm_post_dom0_op(dom0_op_t *op, void **ssid)
 {
     switch(op->cmd) {
     case DOM0_CREATEDOMAIN:
@@ -261,7 +273,8 @@ static inline void acm_post_dom0_op(dom0_op_t *op, void *ssid)
     case DOM0_DESTROYDOMAIN:
         acm_post_domain_destroy(ssid, op->u.destroydomain.domain);
         /* free security ssid for the destroyed domain (also if null policy */
-        acm_free_domain_ssid((struct acm_ssid_domain *)ssid);
+        acm_free_domain_ssid((struct acm_ssid_domain *)(*ssid));
+        *ssid = NULL;
         break;
     }
 }
@@ -282,12 +295,13 @@ static inline int acm_pre_event_channel(evtchn_op_t *op)
 
     switch(op->cmd) {
     case EVTCHNOP_alloc_unbound:
-        ret = acm_pre_eventchannel_unbound(op->u.alloc_unbound.dom);
+        ret = acm_pre_eventchannel_unbound(
+                  op->u.alloc_unbound.dom,
+                  op->u.alloc_unbound.remote_dom);
         break;
     case EVTCHNOP_bind_interdomain:
         ret = acm_pre_eventchannel_interdomain(
-            current->domain->domain_id,
-            op->u.bind_interdomain.remote_dom);
+                  op->u.bind_interdomain.remote_dom);
         break;
     default:
         ret = 0; /* ok */

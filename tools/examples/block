@@ -1,7 +1,7 @@
 #!/bin/sh
 
 dir=$(dirname "$0")
-. "$dir/xen-hotplug-common.sh"
+. "$dir/block-common.sh"
 
 expand_dev() {
   local dev
@@ -16,21 +16,9 @@ expand_dev() {
   echo -n $dev
 }
 
-write_dev() {
-  local major
-  local minor
-  local pdev
-	
-  major=$(stat -L -c %t "$1")
-  minor=$(stat -L -c %T "$1")
-  pdev=$(printf "0x%02x%02x" 0x$major 0x$minor)
-  xenstore_write "$XENBUS_PATH"/physical-device $pdev \
-      "$XENBUS_PATH"/node $1
-}
-
 t=$(xenstore_read "$XENBUS_PATH"/type || true)
 
-case $1 in 
+case "$command" in 
   bind)
     p=$(xenstore_read "$XENBUS_PATH"/params)
     case $t in 

@@ -67,8 +67,6 @@ static int compare_domains(xenstat_domain **, xenstat_domain **);
 static unsigned long long tot_net_bytes( xenstat_domain *, int);
 
 /* Field functions */
-static int compare_domid(xenstat_domain *domain1, xenstat_domain *domain2);
-static void print_domid(xenstat_domain *domain);
 static int compare_state(xenstat_domain *domain1, xenstat_domain *domain2);
 static void print_state(xenstat_domain *domain);
 static int compare_cpu(xenstat_domain *domain1, xenstat_domain *domain2);
@@ -91,6 +89,8 @@ static int compare_net_rx(xenstat_domain *domain1, xenstat_domain *domain2);
 static void print_net_rx(xenstat_domain *domain);
 static int compare_ssid(xenstat_domain *domain1, xenstat_domain *domain2);
 static void print_ssid(xenstat_domain *domain);
+static int compare_name(xenstat_domain *domain1, xenstat_domain *domain2);
+static void print_name(xenstat_domain *domain);
 
 /* Section printing functions */
 static void do_summary(void);
@@ -104,6 +104,7 @@ static void top(void);
 /* Field types */
 typedef enum field_id {
 	FIELD_DOMID,
+	FIELD_NAME,
 	FIELD_STATE,
 	FIELD_CPU,
 	FIELD_CPU_PCT,
@@ -127,7 +128,7 @@ typedef struct field {
 } field;
 
 field fields[] = {
-	{ FIELD_DOMID,   "DOMID",      5, compare_domid,   print_domid   },
+	{ FIELD_NAME,    "NAME",      10, compare_name,    print_name    },
 	{ FIELD_STATE,   "STATE",      6, compare_state,   print_state   },
 	{ FIELD_CPU,     "CPU(sec)",  10, compare_cpu,     print_cpu     },
 	{ FIELD_CPU_PCT, "CPU(%)",     6, compare_cpu_pct, print_cpu_pct },
@@ -344,16 +345,16 @@ static int compare_domains(xenstat_domain **domain1, xenstat_domain **domain2)
 
 /* Field functions */
 
-/* Compares domain ids of two domains, returning -1,0,1 for <,=,> */
-int compare_domid(xenstat_domain *domain1, xenstat_domain *domain2)
+/* Compare domain names, returning -1,0,1 for <,=,> */
+int compare_name(xenstat_domain *domain1, xenstat_domain *domain2)
 {
-	return compare(xenstat_domain_id(domain1), xenstat_domain_id(domain2));
+	return strcasecmp(xenstat_domain_name(domain1), xenstat_domain_name(domain2));
 }
 
-/* Prints domain identification number */
-void print_domid(xenstat_domain *domain)
+/* Prints domain name */
+void print_name(xenstat_domain *domain)
 {
-	print("%5u", xenstat_domain_id(domain));
+	print("%10s", xenstat_domain_name(domain));
 }
 
 struct {

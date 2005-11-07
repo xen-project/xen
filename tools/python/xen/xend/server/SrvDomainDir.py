@@ -25,7 +25,6 @@ from xen.xend import XendDomain
 from xen.xend.XendDomainInfo import XendDomainInfo
 from xen.xend.Args import FormFn
 from xen.xend.XendError import XendError
-from xen.xend.XendLogging import log
 
 from xen.web.SrvDir import SrvDir
 from SrvDomain import SrvDomain
@@ -52,7 +51,7 @@ class SrvDomainDir(SrvDir):
         else:
             return self.domain(x)
 
-    def op_create(self, op, req):
+    def op_create(self, _, req):
         """Create a domain.
         Expects the domain config in request parameter 'config' in SXP format.
         """
@@ -66,12 +65,12 @@ class SrvDomainDir(SrvDir):
             pin.input_eof()
             config = pin.get_val()
             ok = 1
+        except sxp.ParseError, ex:
+            errmsg = 'Invalid configuration ' + str(ex)
         except Exception, ex:
             print 'op_create> Exception in config', ex
             traceback.print_exc()
             errmsg = 'Configuration error ' + str(ex)
-        except sxp.ParseError, ex:
-            errmsg = 'Invalid configuration ' + str(ex)
         if not ok:
             raise XendError(errmsg)
         try:
@@ -108,7 +107,7 @@ class SrvDomainDir(SrvDir):
         """
         return req.threadRequest(self.do_restore, op, req)
 
-    def do_restore(self, op, req):
+    def do_restore(self, _, req):
         fn = FormFn(self.xd.domain_restore,
                     [['file', 'str']])
         dominfo = fn(req.args)

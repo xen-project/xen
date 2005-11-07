@@ -433,6 +433,15 @@ static inline int testandset (int *p)
 }
 #endif
 
+#ifdef __ia64__
+#include "ia64_intrinsic.h"
+static inline int testandset (int *p)
+{
+    uint32_t o = 0, n = 1;
+    return (int)cmpxchg_acq(p, o, n);
+}
+#endif
+
 #ifdef __s390__
 static inline int testandset (int *p)
 {

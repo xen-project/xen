@@ -413,6 +413,7 @@ static void fast_flush_area(int idx, int nr_pages)
 	unsigned int i, op = 0;
 	struct grant_handle_pair *handle;
 	unsigned long ptep;
+	int ret;
 
 	for ( i = 0; i < nr_pages; i++)
 	{
@@ -440,8 +441,8 @@ static void fast_flush_area(int idx, int nr_pages)
 		BLKTAP_INVALIDATE_HANDLE(handle);
 	}
 
-	BUG_ON(HYPERVISOR_grant_table_op(
-		GNTTABOP_unmap_grant_ref, unmap, op));
+	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, unmap, op);
+	BUG_ON(ret);
 
 	if (blktap_vma != NULL)
 		zap_page_range(blktap_vma, 
@@ -673,6 +674,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
 	int op, ret;
 	unsigned int nseg;
+	int retval;
 
 	/* Check that number of segments is sane. */
 	nseg = req->nr_segments;
@@ -740,8 +742,8 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 		op++;
 	}
 
-	BUG_ON(HYPERVISOR_grant_table_op(
-		GNTTABOP_map_grant_ref, map, op));
+	retval = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, op);
+	BUG_ON(retval);
 
 	op = 0;
 	for (i = 0; i < (req->nr_segments*2); i += 2) {
@@ -877,7 +879,8 @@ static int __init blkif_init(void)
 	spin_lock_init(&blkio_schedule_list_lock);
 	INIT_LIST_HEAD(&blkio_schedule_list);
 
-	BUG_ON(kernel_thread(blkio_schedule, 0, CLONE_FS | CLONE_FILES) < 0);
+	i = kernel_thread(blkio_schedule, 0, CLONE_FS | CLONE_FILES);
+	BUG_ON(i<0);
 
 	blkif_xenbus_init();
 

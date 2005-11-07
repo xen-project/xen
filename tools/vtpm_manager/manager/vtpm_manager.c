@@ -140,12 +140,15 @@ TPM_RESULT VTPM_Create_Service(){
   TPM_AUTHDATA sharedsecret;
   
   TPMTRYRETURN( VTSP_OSAP(vtpm_globals->manager_tcs_handle,
-			  TPM_ET_SRK,
-			  0, 
+			  TPM_ET_KEYHANDLE,
+			  TPM_SRK_KEYHANDLE, 
 			  (const TPM_AUTHDATA*)&vtpm_globals->srk_usage_auth,
 			  &sharedsecret, 
 			  &osap) ); 
-  
+
+  osap.fContinueAuthSession = FALSE;
+ 
+ 
   TPMTRYRETURN( VTSP_CreateWrapKey( vtpm_globals->manager_tcs_handle,
 				    TPM_KEY_BIND,
 				    (const TPM_AUTHDATA*)&vtpm_globals->storage_key_usage_auth,

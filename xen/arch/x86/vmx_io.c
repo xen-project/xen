@@ -36,9 +36,9 @@
 #include <asm/apic.h>
 #include <asm/shadow.h>
 
+#include <asm/vmx_vlapic.h>
 #include <public/io/ioreq.h>
 #include <public/io/vmx_vpic.h>
-#include <public/io/vmx_vlapic.h>
 
 #ifdef CONFIG_VMX
 #if defined (__i386__)
@@ -732,48 +732,6 @@ void vmx_wait_io()
     } while(1);
 }
 
-#if defined(__i386__) || defined(__x86_64__)
-static inline int __fls(u32 word)
-{
-    int bit;
-
-    __asm__("bsrl %1,%0"
-            :"=r" (bit)
-            :"rm" (word));
-    return word ? bit : -1;
-}
-#else
-#define __fls(x)  generic_fls(x)
-static __inline__ int generic_fls(u32 x)
-{
-    int r = 31;
-
-    if (!x)
-        return -1;
-    if (!(x & 0xffff0000u)) {
-        x <<= 16;
-        r -= 16;
-    }
-    if (!(x & 0xff000000u)) {
-        x <<= 8;
-        r -= 8;
-    }
-    if (!(x & 0xf0000000u)) {
-        x <<= 4;
-        r -= 4;
-    }
-    if (!(x & 0xc0000000u)) {
-        x <<= 2;
-        r -= 2;
-    }
-    if (!(x & 0x80000000u)) {
-        x <<= 1;
-        r -= 1;
-    }
-    return r;
-}
-#endif
-
 /* Simple minded Local APIC priority implementation. Fix later */
 static __inline__ int find_highest_irq(u32 *pintr)
 {
@@ -801,31 +759,31 @@ interrupt_post_injection(struct vcpu * v, int vector, int type)
     struct vmx_virpit *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
     u64    drift;
 
+    if ( is_pit_irq(v, vector, type) ) {
+        if ( !vpit->first_injected ) {
+            vpit->first_injected = 1;
+            vpit->pending_intr_nr = 0;
+        } else {
+            vpit->pending_intr_nr--;
+        }
+        vpit->inject_point = NOW();
+        drift = vpit->period_cycles * vpit->pending_intr_nr;
+        drift = v->arch.arch_vmx.tsc_offset - drift;
+        __vmwrite(TSC_OFFSET, drift);
+
+#if defined (__i386__)
+        __vmwrite(TSC_OFFSET_HIGH, (drift >> 32));
+#endif
+
+    }
+
     switch(type)
     {
     case VLAPIC_DELIV_MODE_EXT:
-        if ( is_pit_irq(v, vector) ) {
-            if ( !vpit->first_injected ) {
-                vpit->first_injected = 1;
-                vpit->pending_intr_nr = 0;
-            }
-            else {
-                vpit->pending_intr_nr--;
-            }
-            vpit->inject_point = NOW();
-            drift = vpit->period_cycles * vpit->pending_intr_nr;
-            drift = v->arch.arch_vmx.tsc_offset - drift;
-            __vmwrite(TSC_OFFSET, drift);
-
-#if defined (__i386__)
-            __vmwrite(TSC_OFFSET_HIGH, (drift >> 32));
-#endif
- 
-        }
         break;
 
     default:
-        printk("Not support interrupt type\n");
+        vlapic_post_injection(v, vector, type);
         break;
     }
 }
@@ -885,6 +843,24 @@ void vmx_pic_assist(struct vcpu *v)
 
 }
 
+int cpu_get_interrupt(struct vcpu *v, int *type)
+{
+    int intno;
+    struct vmx_virpic *s = &v->domain->arch.vmx_platform.vmx_pic;
+
+    if ( (intno = cpu_get_apic_interrupt(v, type)) != -1 ) {
+        /* set irq request if a PIC irq is still pending */
+        /* XXX: improve that */
+        pic_update_irq(s);
+        return intno;
+    }
+    /* read the irq from the PIC */
+    if ( (intno = cpu_get_pic_interrupt(v, type)) != -1 )
+        return intno;
+
+    return -1;
+}
+
 asmlinkage void vmx_intr_assist(void)
 {
     int intr_type = 0;
@@ -902,14 +878,10 @@ asmlinkage void vmx_intr_assist(void)
         pic_set_irq(pic, 0, 1);
     }
 
-    if ( !plat->interrupt_request ) {
-        disable_irq_window(cpu_exec_control);
-        return;
-    }
-
     __vmread(VM_ENTRY_INTR_INFO_FIELD, &intr_fields);
 
     if (intr_fields & INTR_INFO_VALID_MASK) {
+        enable_irq_window(cpu_exec_control);
         VMX_DBG_LOG(DBG_LEVEL_1, "vmx_intr_assist: intr_fields: %lx",
                     intr_fields);
         return;
@@ -928,16 +900,21 @@ asmlinkage void vmx_intr_assist(void)
         enable_irq_window(cpu_exec_control);
         return;
     }
-    plat->interrupt_request = 0;
-    highest_vector = cpu_get_pic_interrupt(v, &intr_type); 
+
+    highest_vector = cpu_get_interrupt(v, &intr_type); 
+
+    if (highest_vector == -1) {
+        disable_irq_window(cpu_exec_control);
+        return;
+    }
 
     switch (intr_type) {
     case VLAPIC_DELIV_MODE_EXT:
+    case VLAPIC_DELIV_MODE_FIXED:
+    case VLAPIC_DELIV_MODE_LPRI:
         vmx_inject_extint(v, highest_vector, VMX_INVALID_ERROR_CODE);
         TRACE_3D(TRC_VMX_INT, v->domain->domain_id, highest_vector, 0);
         break;
-    case VLAPIC_DELIV_MODE_FIXED:
-    case VLAPIC_DELIV_MODE_LPRI:
     case VLAPIC_DELIV_MODE_SMI:
     case VLAPIC_DELIV_MODE_NMI:
     case VLAPIC_DELIV_MODE_INIT:
@@ -954,6 +931,7 @@ asmlinkage void vmx_intr_assist(void)
 
 void vmx_do_resume(struct vcpu *v)
 {
+    struct vmx_virpit *vpit = &(v->domain->arch.vmx_platform.vmx_pit);
     vmx_stts();
 
     if (event_pending(v)) {
@@ -962,6 +940,9 @@ void vmx_do_resume(struct vcpu *v)
         if (test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags))
             vmx_wait_io();
     }
+    /* pick up the elapsed PIT ticks and re-enable pit_timer */
+    if ( vpit->ticking )
+        pickup_deactive_ticks(vpit);
 
     /* We can't resume the guest if we're waiting on I/O */
     ASSERT(!test_bit(ARCH_VMX_IO_WAIT, &v->arch.arch_vmx.flags));

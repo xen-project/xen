@@ -65,13 +65,10 @@ struct t_rec {
  * field, indexes into an array of struct t_rec's.
  */
 struct t_buf {
-    /* Used by both Xen and user space. */
-    atomic_t      rec_idx;   /* the next record to save to */
-    unsigned int  rec_num;   /* number of records in this trace buffer  */
-    /* Used by Xen only. */
-    struct t_rec  *rec;      /* start of records */
-    /* Used by user space only. */
-    unsigned long rec_addr;  /* machine address of the start of records */
+    unsigned int  cons;      /* Next item to be consumed by control tools. */
+    unsigned int  prod;      /* Next item to be produced by Xen.           */
+    unsigned int  nr_recs;   /* Number of records in this trace buffer.    */
+    /* 'nr_recs' records follow immediately after the meta-data header.    */
 };
 
 #endif /* __XEN_PUBLIC_TRACE_H__ */

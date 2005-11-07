@@ -61,6 +61,8 @@ xm common subcommands:
     top                     monitor system and domains in real-time
     unpause <DomId>         unpause a paused domain
 
+<DomName> can be substituted for <DomId> in xm subcommands.
+
 For a complete list of subcommands run 'xm help --long'
 For more help on xm see the xm(1) man page
 For more help on xm create, see the xmdomain.cfg(5) man page"""
@@ -110,6 +112,12 @@ xm full list of subcommands:
                                    where <DevId> may either be the device ID
                                    or the device name as mounted in the guest.
     block-list    <DomId>          List virtual block devices for a domain
+
+    network-attach  <DomID> [script=<script>] [ip=<ip>] [mac=<mac>]
+                            [bridge=<bridge>] [backend=<backDomID>]
+        Create a new virtual network device 
+    network-detach  <DomId> <DevId>  Destroy a domain's virtual network
+                                     device, where <DevId> is the device ID.
     network-limit   <DomId> <Vif> <Credit> <Period>
         Limit the transmission rate of a virtual network interface
     network-list    <DomId>        List virtual network interfaces for a domain
@@ -118,6 +126,8 @@ xm full list of subcommands:
     vnet-list   [-l|--long]    list vnets
     vnet-create <config>       create a vnet from a config file
     vnet-delete <vnetid>       delete a vnet
+
+<DomName> can be substituted for <DomId> in xm subcommands.
 
 For a short list of subcommands run 'xm help'
 For more help on xm see the xm(1) man page
@@ -450,10 +460,14 @@ def xm_mem_set(args):
     server.xend_domain_mem_target_set(dom, mem_target)
     
 def xm_set_vcpus(args):
+    arg_check(args, 2, "set-vcpus")
+    
     from xen.xend.XendClient import server
     server.xend_domain_set_vcpus(args[0], int(args[1]))
 
 def xm_domid(args):
+    arg_check(args, 1, "domid")
+
     name = args[0]
 
     from xen.xend.XendClient import server
@@ -461,6 +475,8 @@ def xm_domid(args):
     print sxp.child_value(dom, 'domid')
     
 def xm_domname(args):
+    arg_check(args, 1, "domname")
+
     name = args[0]
 
     from xen.xend.XendClient import server
@@ -584,14 +600,39 @@ def xm_block_attach(args):
     from xen.xend.XendClient import server
     server.xend_domain_device_create(dom, vbd)
 
-def xm_block_detach(args):
-    arg_check(args,2,"block-detach")
+
+def xm_network_attach(args):
+    n = len(args)
+    if n == 0:
+        usage("network-attach")
+        
+    dom = args[0]
+    vif = ['vif']
+
+    for a in args[1:]:
+        vif.append(a.split("="))
+
+    from xen.xend.XendClient import server
+    server.xend_domain_device_create(dom, vif)
+
+
+def detach(args, command, deviceClass):
+    arg_check(args, 2, command)
 
     dom = args[0]
     dev = args[1]
 
     from xen.xend.XendClient import server
-    server.xend_domain_device_destroy(dom, 'vbd', dev)
+    server.xend_domain_device_destroy(dom, deviceClass, dev)
+
+
+def xm_block_detach(args):
+    detach(args, 'block-detach', 'vbd')
+
+
+def xm_network_detach(args):
+    detach(args, 'network-detach', 'vif')
+
 
 def xm_vnet_list(args):
     from xen.xend.XendClient import server
@@ -625,6 +666,10 @@ def xm_vnet_list(args):
 def xm_vnet_create(args):
     arg_check(args, 1, "vnet-create")
     conf = args[0]
+    if not os.access(conf, os.R_OK):
+        print "File not found: %s" % conf
+        sys.exit(1)
+
     from xen.xend.XendClient import server
     server.xend_vnet_create(conf)
 
@@ -669,6 +714,8 @@ commands = {
     "block-detach": xm_block_detach,
     "block-list": xm_block_list,
     # network
+    "network-attach": xm_network_attach,
+    "network-detach": xm_network_detach,
     "network-limit": xm_network_limit,
     "network-list": xm_network_list,
     # vnet
@@ -754,7 +801,10 @@ def main(argv=sys.argv):
             else:
                 err("Error connecting to xend: %s.  Is xend running?" % ex[1])
             sys.exit(1)
-        except IOError:
+        except KeyboardInterrupt:
+            print "Interrupted."
+            sys.exit(1)
+        except IOError, ex:
             if os.geteuid() != 0:
                 err("Most commands need root access.  Please try again as root.")
             else:

@@ -1,0 +1,126 @@
+## Path: System/xen
+## Description: xen domain start/stop on boot
+## Type: string
+## Default: 
+#
+# The xendomains script can send SysRq requests to domains on shutdown.
+# If you don't want to MIGRATE, SAVE, or SHUTDOWN, this may be a possibility
+# to do a quick and dirty shutdown ("s e i u o") or at least sync the disks
+# of the domains ("s").
+#
+XENDOMAINS_SYSRQ=""
+
+## Type: integer 
+## Default: 100000
+#
+# If XENDOMAINS_SYSRQ is set, this variable determines how long to wait
+# (in microseconds) after each SysRq, so the domain has a chance to react.
+# If you want to a quick'n'dirty shutdown via SysRq, you may want to set
+# it to a relatively high value (1200000).
+#
+XENDOMAINS_USLEEP=100000
+
+## Type: string
+## Default: ""
+#
+# Set this to a non-empty string if you want to migrate virtual machines
+# on shutdown. The string will be passed to the xm migrate DOMID command
+# as is: It should contain the target IP address of the physical machine
+# to migrate to and optionally parameters like --live. Leave empty if
+# you don't want to try virtual machine relocation on shutdown.
+# If migration succeeds, neither SAVE nor SHUTDOWN will be executed for
+# that domain.
+#
+XENDOMAINS_MIGRATE=""
+
+## Type: string
+## Default: /var/lib/xen/save
+#
+# Directory to save running domains to when the system (dom0) is
+# shut down. Will also be used to restore domains from if # XENDOMAINS_RESTORE
+# is set (see below). Leave empty to disable domain saving on shutdown 
+# (e.g. because you rather shut domains down).
+# If domain saving does succeed, SHUTDOWN will not be executed.
+#
+XENDOMAINS_SAVE=/var/lib/xen/save
+
+## Type: string
+## Default: "--halt --wait"
+#
+# If neither MIGRATE nor SAVE were enabled or if they failed, you can
+# try to shut down a domain by sending it a shutdown request. To do this,
+# set this to "--halt --wait". Omit the "--wait" flag to avoid waiting
+# for the domain to be really down. Leave empty to skip domain shutdown.
+#
+XENDOMAINS_SHUTDOWN="--halt --wait"
+
+## Type: string
+## Default: "--all --halt --wait"
+#
+# After we have gone over all virtual machines (resp. all automatically
+# started ones, see XENDOMAINS_AUTO_ONLY below) in a loop and sent SysRq,
+# migrated, saved and/or shutdown according to the settings above, we
+# might want to shutdown the virtual machines that are still running
+# for some reason or another. To do this, set this variable to
+# "--all --halt --wait", it will be passed to xm shutdown.
+# Leave it empty not to do anything special here.
+# (Note: This will hit all virtual machines, even if XENDOMAINS_AUTO_ONLY
+# is set.)
+# 
+XENDOMAINS_SHUTDOWN_ALL="--all --halt --wait"
+
+## Type: boolean
+## Default: true
+#
+# This variable determines whether saved domains from XENDOMAINS_SAVE
+# will be restored on system startup. 
+#
+XENDOMAINS_RESTORE=true
+
+## Type: string
+## Default: /etc/xen/auto
+#
+# This variable sets the directory where domains configurations
+# are stored that should be started on system startup automatically.
+# Leave empty if you don't want to start domains automatically
+# (or just don't place any xen domain config files in that dir).
+# Note that the script tries to be clever if both RESTORE and AUTO are 
+# set: It will first restore saved domains and then only start domains
+# in AUTO which are not running yet. 
+# Note that the name matching is somewhat fuzzy.
+#
+XENDOMAINS_AUTO=/etc/xen/auto
+
+## Type: boolean
+## Default: false
+# 
+# If this variable is set to "true", only the domains started via config 
+# files in XENDOMAINS_AUTO will be treated according to XENDOMAINS_SYSRQ,
+# XENDOMAINS_MIGRATE, XENDOMAINS_SAVE, XENDMAINS_SHUTDOWN; otherwise
+# all running domains will be. 
+# Note that the name matching is somewhat fuzzy.
+# 
+XENDOMAINS_AUTO_ONLY=false
+
+## Type: integer
+## Default: 300
+#
+# On xendomains stop, a number of xm commands (xm migrate, save, shutdown,
+# shutdown --all) may be executed. In the worst case, these commands may
+# stall forever, which will prevent a successful shutdown of the machine.
+# If this variable is non-zero, the script will set up a watchdog timer
+# for every of these xm commands and time it out after the number of seconds
+# specified by this variable.
+# Note that SHUTDOWN_ALL will not be called if no virtual machines or only
+# zombies are still running, so you don't need to enable this timeout just
+# for the zombie case.
+# The setting should be large enough to make sure that migrate/save/shutdown
+# can succeed. If you do live migrations, keep in mind that live migration
+# of a 1GB machine over Gigabit ethernet may actually take something like
+# 100s (assuming that live migration uses 10% of the network # bandwidth).
+# Depending on the virtual machine, a shutdown may also require a significant
+# amount of time. So better setup this variable to a huge number and hope the
+# watchdog never fires.
+#
+XENDOMAINS_STOP_MAXWAIT=300
+

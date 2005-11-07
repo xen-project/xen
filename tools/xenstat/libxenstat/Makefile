@@ -38,13 +38,13 @@ SONAME_FLAGS=-Wl,-soname -Wl,libxenstat.so.$(MAJOR)
 
 WARN_FLAGS=-Wall -Werror
 
-CFLAGS+=-Isrc -I$(XEN_LIBXC)
+CFLAGS+=-Isrc -I$(XEN_LIBXC) -I$(XEN_XENSTORE)
 LDFLAGS+=-Lsrc
 
 all: $(LIB)
 
 $(LIB): $(OBJECTS)
-	$(AR) rc $@ $^
+	$(AR) rc $@ $^ $(XEN_XENSTORE)/libxenstore.so
 	$(RANLIB) $@
 
 $(SHLIB): $(OBJECTS)

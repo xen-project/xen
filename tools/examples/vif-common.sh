@@ -20,7 +20,7 @@ dir=$(dirname "$0")
 . "$dir/xen-hotplug-common.sh"
 . "$dir/xen-network-common.sh"
 
-command="$1"
+findCommand "$@"
 
 if [ "$command" != "up" ] && [ "$command" != "down" ]
 then
@@ -29,10 +29,19 @@ then
 fi
 
 
+# Parameters may be read from the environment, the command line arguments, and
+# the store, with overriding in that order.  The environment is given by the
+# driver, the command line is given by the Xend global configuration, and
+# store details are given by the per-domain or per-device configuration.
+
+evalVariables "$@"
+
+ip=${ip:-}
+ip=$(xenstore_read_default "$XENBUS_PATH/ip" "$ip")
+
+# Check presence of compulsory args.
 XENBUS_PATH="${XENBUS_PATH:?}"
 vif="${vif:?}"
-
-ip=$(xenstore-read "$XENBUS_PATH/ip" >&/dev/null || true)
 
 
 function frob_iptable()

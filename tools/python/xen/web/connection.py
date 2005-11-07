@@ -380,9 +380,6 @@ class SocketConnector:
         self.state = "disconnected"
         self.transport = None
 
-    def getDestination(self):
-        raise NotImplementedError()
-
     def connectTransport(self):
         raise NotImplementedError()
 

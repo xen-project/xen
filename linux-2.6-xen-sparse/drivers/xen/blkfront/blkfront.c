@@ -306,6 +306,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 	for (i = info->ring.rsp_cons; i != rp; i++) {
 		unsigned long id;
+		int ret;
 
 		bret = RING_GET_RESPONSE(&info->ring, i);
 		id   = bret->id;
@@ -322,9 +323,10 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 				DPRINTK("Bad return from blkdev data "
 					"request: %x\n", bret->status);
 
-			BUG_ON(end_that_request_first(
+			ret = end_that_request_first(
 				req, (bret->status == BLKIF_RSP_OKAY),
-				req->hard_nr_sectors));
+				req->hard_nr_sectors);
+			BUG_ON(ret);
 			end_that_request_last(req);
 			break;
 		default:
@@ -349,13 +351,12 @@ static void blkif_free(struct blkfront_info *info)
 	spin_unlock_irq(&blkif_io_lock);
 
 	/* Free resources associated with old device channel. */
-	if (info->ring.sring != NULL) {
-		free_page((unsigned long)info->ring.sring);
+	if (info->ring_ref != GRANT_INVALID_REF) {
+		gnttab_end_foreign_access(info->ring_ref, 0,
+					  (unsigned long)info->ring.sring);
+		info->ring_ref = GRANT_INVALID_REF;
 		info->ring.sring = NULL;
 	}
-	if (info->ring_ref != GRANT_INVALID_REF)
-		gnttab_end_foreign_access(info->ring_ref, 0);
-	info->ring_ref = GRANT_INVALID_REF;
 	if (info->irq)
 		unbind_evtchn_from_irqhandler(info->irq, info); 
 	info->evtchn = info->irq = 0;
@@ -458,7 +459,7 @@ static void watch_for_status(struct xenbus_watch *watch,
 	node += strlen(watch->node);
 
 	/* FIXME: clean up when error on the other end. */
-	if (info->connected == BLKIF_STATE_CONNECTED)
+	if ((info->connected == BLKIF_STATE_CONNECTED) || info->mi)
 		return;
 
 	err = xenbus_gather(NULL, watch->node,
@@ -514,10 +515,10 @@ static int setup_blkring(struct xenbus_device *dev, struct blkfront_info *info)
 
 	err = HYPERVISOR_event_channel_op(&op);
 	if (err) {
-		gnttab_end_foreign_access(info->ring_ref, 0);
+		gnttab_end_foreign_access(info->ring_ref, 0,
+					  (unsigned long)info->ring.sring);
 		info->ring_ref = GRANT_INVALID_REF;
-		free_page((unsigned long)info->ring.sring);
-		info->ring.sring = 0;
+		info->ring.sring = NULL;
 		xenbus_dev_error(dev, err, "allocating event channel");
 		return err;
 	}
@@ -742,7 +743,7 @@ static void blkif_completion(struct blk_shadow *s)
 	int i;
 	for (i = 0; i < s->req.nr_segments; i++)
 		gnttab_end_foreign_access(
-			blkif_gref_from_fas(s->req.frame_and_sects[i]), 0);
+			blkif_gref_from_fas(s->req.frame_and_sects[i]), 0, 0UL);
 }
 
 /*

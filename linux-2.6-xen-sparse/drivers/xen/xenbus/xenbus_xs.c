@@ -82,7 +82,7 @@ static struct xs_handle xs_state;
 static LIST_HEAD(watches);
 static DEFINE_SPINLOCK(watches_lock);
 
-/* List of pending watch calbback events, and a lock to protect it. */
+/* List of pending watch callback events, and a lock to protect it. */
 static LIST_HEAD(watch_events);
 static DEFINE_SPINLOCK(watch_events_lock);
 
@@ -544,11 +544,8 @@ void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt, ...)
 	char *printf_buffer = NULL, *path_buffer = NULL;
 
 	printf_buffer = kmalloc(PRINTF_BUFFER_SIZE, GFP_KERNEL);
-	if (printf_buffer == NULL) {
-		printk("xenbus: failed to write error node for %s (%d): %d\n",
-		       dev->nodename, err, errno);
+	if (printf_buffer == NULL)
 		goto fail;
-	}
 
 	len = sprintf(printf_buffer, "%i ", -err);
 	va_start(ap, fmt);
@@ -561,8 +558,8 @@ void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt, ...)
 	path_buffer = error_path(dev);
 
 	if (path_buffer == NULL) {
-		printk("xenbus: failed to write error node for %s (%s): %d\n",
-		       dev->nodename, printf_buffer, errno);
+		printk("xenbus: failed to write error node for %s (%s)\n",
+		       dev->nodename, printf_buffer);
 		goto fail;
 	}
 
@@ -587,8 +584,8 @@ void xenbus_dev_ok(struct xenbus_device *dev)
 		char *path_buffer = error_path(dev);
 
 		if (path_buffer == NULL) {
-			printk("xenbus: failed to clear error node for %s: "
-			       "%d\n", dev->nodename, errno);
+			printk("xenbus: failed to clear error node for %s\n",
+			       dev->nodename);
 			return;
 		}
 
@@ -685,14 +682,15 @@ int register_xenbus_watch(struct xenbus_watch *watch)
 
 	spin_lock(&watches_lock);
 	BUG_ON(find_watch(token));
+	list_add(&watch->list, &watches);
 	spin_unlock(&watches_lock);
 
 	err = xs_watch(watch->node, token);
 
 	/* Ignore errors due to multiple registration. */
-	if ((err == 0) || (err == -EEXIST)) {
+	if ((err != 0) && (err != -EEXIST)) {
 		spin_lock(&watches_lock);
-		list_add(&watch->list, &watches);
+		list_del(&watch->list);
 		spin_unlock(&watches_lock);
 	}
 

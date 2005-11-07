@@ -42,18 +42,13 @@
 #
 #============================================================================
 
+
 dir=$(dirname "$0")
+. "$dir/xen-script-common.sh"
 . "$dir/xen-network-common.sh"
 
-# Exit if anything goes wrong.
-set -e 
-
-# First arg is the operation.
-OP=$1
-shift
-
-# Pull variables in args in to environment.
-for arg ; do export "${arg}" ; done
+findCommand "$@"
+evalVariables "$@"
 
 vifnum=${vifnum:-0}
 bridge=${bridge:-xenbr${vifnum}}
@@ -200,15 +195,21 @@ op_start () {
 	return
     fi
 
-    create_bridge ${bridge}
-
     if ! ip link show 2>/dev/null | grep -q "^[0-9]*: ${vdev}"; then
-	return
+        echo "
+Link $vdev is missing.
+This may be because you have reached the limit of the number of interfaces
+that the loopback driver supports.  If the loopback driver is a module, you
+may raise this limit by passing it as a parameter (nloopbacks=<N>).
+" >&2
+        exit 1
     fi
+
+    create_bridge ${bridge}
 
     if ip link show ${vdev} 2>/dev/null >/dev/null; then
 	mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
-	eval `/sbin/getcfg -d /etc/sysconfig/network/ -f ifcfg- -- ${netdev}`
+	preiftransfer ${netdev}
 	transfer_addrs ${netdev} ${vdev}
 	if ! ifdown ${netdev}; then
 	    # if ifup didn't work, see if we have an ip= on cmd line
@@ -231,13 +232,13 @@ op_start () {
 	ip link set ${bridge} up
 	ip link set ${vif0} up
 	ip link set ${pdev} up 
-	if ! ifup ${HWD_CONFIG_0} ${netdev} ; then
+	if ! ifup ${netdev} ; then
 	    if [ ${kip} ] ; then
 		# use the addresses we grocked from /proc/cmdline
 		if [ -z "${kmask}" ]; then 
 		    PREFIX=32; 
 		else 
-		    legacy_to_prefix ${kmask};
+		    legacy_mask_to_prefix ${kmask};
 		fi
 		ip addr add ${kip}/${PREFIX} dev ${netdev}
 		ip link set dev ${netdev} up
@@ -289,7 +290,7 @@ op_stop () {
     brctl delbr ${bridge}
 }
 
-case ${OP} in
+case "$command" in
     start)
 	op_start
 	;;
@@ -303,7 +304,7 @@ case ${OP} in
 	;;
 
     *)
-	echo 'Unknown command: ' ${OP} >&2
+	echo "Unknown command: $command" >&2
 	echo 'Valid commands are: start, stop, status' >&2
 	exit 1
 esac

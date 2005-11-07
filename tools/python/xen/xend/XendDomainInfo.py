@@ -336,7 +336,7 @@ def dom_get(dom):
             return domlist[0]
     except Exception, err:
         # ignore missing domain
-        log.debug("domain_getinfo(%d) failed, ignoring: %s", dom, str(err))
+        log.trace("domain_getinfo(%d) failed, ignoring: %s", dom, str(err))
     return None
 
 
@@ -569,6 +569,8 @@ class XendDomainInfo:
         self.storeDomDetails()
         self.refreshShutdown()
 
+        log.debug("XendDomainInfo.completeRestore done")
+
 
     def storeVmDetails(self):
         to_store = {
@@ -595,6 +597,7 @@ class XendDomainInfo:
         to_store = {
             'domid':              str(self.domid),
             'vm':                 self.vmpath,
+            'name':               self.info['name'],
             'console/limit':      str(xroot.get_console_limit() * 1024),
             'memory/target':      str(self.info['memory_KiB'])
             }
@@ -1065,8 +1068,11 @@ class XendDomainInfo:
         assert self.domid is not None
         assert self.store_mfn is not None
         assert self.store_port is not None
-        
-        IntroduceDomain(self.domid, self.store_mfn, self.store_port)
+
+        try:
+            IntroduceDomain(self.domid, self.store_mfn, self.store_port)
+        except RuntimeError, exn:
+            raise XendError(str(exn))
 
 
     def initDomain(self):
@@ -1274,7 +1280,6 @@ class XendDomainInfo:
 
         now = time.time()
         rst = self.readVm('xend/previous_restart_time')
-        log.error(rst)
         if rst:
             rst = float(rst)
             timeout = now - rst
@@ -1283,8 +1288,8 @@ class XendDomainInfo:
                     'VM %s restarting too fast (%f seconds since the last '
                     'restart).  Refusing to restart to avoid loops.',
                     self.info['name'], timeout)
-            self.destroy()
-            return
+                self.destroy()
+                return
 
         self.writeVm('xend/previous_restart_time', str(now))
 
@@ -1305,7 +1310,11 @@ class XendDomainInfo:
             except:
                 log.exception('Failed to restart domain %d.', self.domid)
         finally:
-            self.removeVm('xend/restart_in_progress')
+            # new_dom's VM will be the same as this domain's VM, except where
+            # the rename flag has instructed us to call preserveForRestart.
+            # In that case, it is important that we use new_dom.removeVm, not
+            # self.removeVm.
+            new_dom.removeVm('xend/restart_in_progress')
             
         # self.configure_bootloader()
         #        self.exportToDB()
@@ -1396,9 +1405,10 @@ def addControllerClass(device_class, cls):
     controllerClasses[device_class] = cls
 
 
-from xen.xend.server import blkif, netif, tpmif, pciif, usbif
+from xen.xend.server import blkif, netif, tpmif, pciif, iopif, usbif
 addControllerClass('vbd',  blkif.BlkifController)
 addControllerClass('vif',  netif.NetifController)
 addControllerClass('vtpm', tpmif.TPMifController)
 addControllerClass('pci',  pciif.PciController)
+addControllerClass('ioports', iopif.IOPortsController)
 addControllerClass('usb',  usbif.UsbifController)

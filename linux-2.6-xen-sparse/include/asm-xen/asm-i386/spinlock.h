@@ -6,6 +6,7 @@
 #include <asm/page.h>
 #include <linux/config.h>
 #include <linux/compiler.h>
+#include <asm/smp_alt.h>
 
 asmlinkage int printk(const char * fmt, ...)
 	__attribute__ ((format (printf, 1, 2)));
@@ -47,8 +48,9 @@ typedef struct {
 #define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
 
 #define spin_lock_string \
-	"\n1:\t" \
-	"lock ; decb %0\n\t" \
+        "1:\n" \
+	LOCK \
+	"decb %0\n\t" \
 	"jns 3f\n" \
 	"2:\t" \
 	"rep;nop\n\t" \
@@ -58,8 +60,9 @@ typedef struct {
 	"3:\n\t"
 
 #define spin_lock_string_flags \
-	"\n1:\t" \
-	"lock ; decb %0\n\t" \
+        "1:\n" \
+	LOCK \
+	"decb %0\n\t" \
 	"jns 4f\n\t" \
 	"2:\t" \
 	"testl $0x200, %1\n\t" \
@@ -121,10 +124,34 @@ static inline void _raw_spin_unlock(spinlock_t *lock)
 static inline int _raw_spin_trylock(spinlock_t *lock)
 {
 	char oldval;
+#ifdef CONFIG_SMP_ALTERNATIVES
 	__asm__ __volatile__(
-		"xchgb %b0,%1"
+		"1:movb %1,%b0\n"
+		"movb $0,%1\n"
+		"2:"
+		".section __smp_alternatives,\"a\"\n"
+		".long 1b\n"
+		".long 3f\n"
+		".previous\n"
+		".section __smp_replacements,\"a\"\n"
+		"3: .byte 2b - 1b\n"
+		".byte 5f-4f\n"
+		".byte 0\n"
+		".byte 6f-5f\n"
+		".byte -1\n"
+		"4: xchgb %b0,%1\n"
+		"5: movb %1,%b0\n"
+		"movb $0,%1\n"
+		"6:\n"
+		".previous\n"
 		:"=q" (oldval), "=m" (lock->slock)
 		:"0" (0) : "memory");
+#else
+	__asm__ __volatile__(
+		"xchgb %b0,%1\n"
+		:"=q" (oldval), "=m" (lock->slock)
+		:"0" (0) : "memory");
+#endif
 	return oldval > 0;
 }
 
@@ -225,8 +252,8 @@ static inline void _raw_write_lock(rwlock_t *rw)
 	__build_write_lock(rw, "__write_lock_failed");
 }
 
-#define _raw_read_unlock(rw)		asm volatile("lock ; incl %0" :"=m" ((rw)->lock) : : "memory")
-#define _raw_write_unlock(rw)	asm volatile("lock ; addl $" RW_LOCK_BIAS_STR ",%0":"=m" ((rw)->lock) : : "memory")
+#define _raw_read_unlock(rw)	asm volatile(LOCK "incl %0" :"=m" ((rw)->lock) : : "memory")
+#define _raw_write_unlock(rw)	asm volatile(LOCK "addl $" RW_LOCK_BIAS_STR ",%0":"=m" ((rw)->lock) : : "memory")
 
 static inline int _raw_read_trylock(rwlock_t *lock)
 {

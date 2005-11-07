@@ -30,10 +30,14 @@
 #include "utils.h"
 #include "io.h"
 
-void usage(char *prg)
+static void usage(char *name)
 {
-	fprintf(stderr, 
-		"usage: %s [-h] [-V] [-v] [-i]\n", prg);
+	printf("Usage: %s [-h] [-V] [-v] [-i]\n", name);
+}
+
+static void version(char *name)
+{
+	printf("Xen Console Daemon 3.0\n");
 }
 
 int main(int argc, char **argv)
@@ -58,7 +62,7 @@ int main(int argc, char **argv)
 			usage(argv[0]);
 			exit(0);
 		case 'V':
-			//version(argv[0]);
+			version(argv[0]);
 			exit(0);
 		case 'v':
 			syslog_option |= LOG_PERROR;

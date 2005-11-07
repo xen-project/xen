@@ -48,10 +48,10 @@ cp arch/ia64/xen/drivers/evtchn_ia64.c drivers/xen/core
 cp arch/ia64/xen/drivers/motherboard.c drivers/acpi/motherboard.c
 
 #still a few x86-ism's in various drivers/xen files, patch them
-cd drivers/xen
-if [ ! -e ia64.patch.semaphore ]
-then
-	cat ../../arch/ia64/xen/drivers/patches/* | patch -p1 -b
-fi
-touch ia64.patch.semaphore
-cd ../..
+#cd drivers/xen
+#if [ ! -e ia64.patch.semaphore ]
+#then
+#	cat ../../arch/ia64/xen/drivers/patches/* | patch -p1 -b
+#fi
+#touch ia64.patch.semaphore
+#cd ../..

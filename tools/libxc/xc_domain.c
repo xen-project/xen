@@ -364,6 +364,23 @@ int xc_domain_get_vcpu_info(int xc_handle,
     return rc;
 }
 
+int xc_domain_ioport_permission(int xc_handle,
+                                uint32_t domid,
+                                uint16_t first_port,
+                                uint16_t nr_ports,
+                                uint16_t allow_access)
+{
+    dom0_op_t op;
+
+    op.cmd = DOM0_IOPORT_PERMISSION;
+    op.u.ioport_permission.domain = (domid_t)domid;
+    op.u.ioport_permission.first_port = first_port;
+    op.u.ioport_permission.nr_ports = nr_ports;
+    op.u.ioport_permission.allow_access = allow_access;
+
+    return do_dom0_op(xc_handle, &op);
+}
+
 /*
  * Local variables:
  * mode: C

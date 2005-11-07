@@ -17,7 +17,7 @@
 #============================================================================
 
 """Xend root class.
-Creates the event server and handles configuration.
+Creates the servers and handles configuration.
 
 Other classes get config variables by importing this module,
 using instance() to get a XendRoot instance, and then
@@ -72,9 +72,6 @@ class XendRoot:
     """Default port xend serves HTTP at. """
     xend_port_default         = '8000'
 
-    """Default port xend serves events at. """
-    xend_event_port_default   = '8001'
-
     """Default port xend serves relocation at. """
     xend_relocation_port_default = '8002'
 
@@ -114,7 +111,7 @@ class XendRoot:
         """
         return self.components.get(name)
 
-    def _logError(self, fmt, args):
+    def _logError(self, fmt, *args):
         """Logging function to log to stderr. We use this for XendRoot log
         messages because they may be logged before the logger has been
         configured.  Other components can safely use the logger.
@@ -144,7 +141,10 @@ class XendRoot:
                     config = sxp.parse(fin)
                 finally:
                     fin.close()
-                config.insert(0, 'xend-config')
+                if config is None:
+                    config = ['xend-config']
+                else:
+                    config.insert(0, 'xend-config')
                 self.config = config
             except Exception, ex:
                 self._logError('Reading config file %s: %s',
@@ -207,21 +207,16 @@ class XendRoot:
         """
         return self.get_config_int('xend-port', self.xend_port_default)
 
-    def get_xend_event_port(self):
-        """Get the port xend listens at for connection to its event server.
-        """
-        return self.get_config_int('xend-event-port', self.xend_event_port_default)
-
     def get_xend_relocation_port(self):
         """Get the port xend listens at for connection to its relocation server.
         """
         return self.get_config_int('xend-relocation-port', self.xend_relocation_port_default)
 
     def get_xend_address(self):
-        """Get the address xend listens at for its HTTP and event ports.
+        """Get the address xend listens at for its HTTP port.
         This defaults to the empty string which allows all hosts to connect.
         If this is set to 'localhost' only the localhost will be able to connect
-        to the HTTP and event ports.
+        to the HTTP port.
         """
         return self.get_config_value('xend-address', self.xend_address_default)
 
@@ -229,7 +224,7 @@ class XendRoot:
         """Get the address xend listens at for its relocation server port.
         This defaults to the empty string which allows all hosts to connect.
         If this is set to 'localhost' only the localhost will be able to connect
-        to the HTTP and event ports.
+        to the relocation port.
         """
         return self.get_config_value('xend-relocation-address', self.xend_relocation_address_default)
 
@@ -250,16 +245,15 @@ class XendRoot:
         s = self.get_config_value('network-script')
 
         if s:
-            return os.path.join(self.network_script_dir, s)
+            result = s.split(" ")
+            result[0] = os.path.join(self.network_script_dir, result[0])
+            return result
         else:
             return None
 
 
     def get_enable_dump(self):
         return self.get_config_bool('enable-dump', 'no')
-
-    def get_vif_bridge(self):
-        return self.get_config_value('vif-bridge', 'xenbr0')
 
     def get_vif_script(self):
         return self.get_config_value('vif-script', 'vif-bridge')

@@ -653,7 +653,7 @@ ENTRY(simd_coprocessor_error)
 ENTRY(device_not_available)
 	pushl $-1			# mark this as an int
 	SAVE_ALL
-	preempt_stop
+	#preempt_stop /* This is already an interrupt gate on Xen. */
 	call math_state_restore
 	jmp ret_from_exception
 

@@ -16,7 +16,8 @@
 # XENBUS_PATH path to this device's details in the XenStore (required).
 #
 # Read from the store:
-# bridge  bridge to add the vif to (required).
+# bridge  bridge to add the vif to (optional).  Defaults to searching for the
+#         bridge itself.
 # ip      list of IP networks for the vif, space-separated (optional).
 #
 # up:
@@ -31,7 +32,19 @@
 dir=$(dirname "$0")
 . "$dir/vif-common.sh"
 
-bridge=$(xenstore_read "$XENBUS_PATH/bridge")
+bridge=${bridge:-}
+bridge=$(xenstore_read_default "$XENBUS_PATH/bridge" "$bridge")
+
+if [ -z "$bridge" ]
+then
+  bridge=$(brctl show | cut -d "
+" -f 2 | cut -f 1)
+
+  if [ -z "$bridge" ]
+  then
+     fatal "Could not find bridge, and none was specified"
+  fi
+fi
 
 case "$command" in
     up)
@@ -45,6 +58,7 @@ case "$command" in
           fatal "brctl addif $bridge $vif failed"
 
         ifconfig "$vif" up || fatal "ifconfig $vif up failed"
+        success
         ;;
     down)
         # vifs are auto-removed from bridge.
@@ -54,4 +68,4 @@ esac
 
 handle_iptable
 
-log debug "vif-bridge operation for $vif successful."
+log debug "Successful vif-bridge operation for $vif, bridge $bridge."

@@ -21,6 +21,7 @@
 """
 
 import os
+import random
 
 from xen.xend import sxp
 from xen.xend import XendRoot
@@ -29,6 +30,25 @@ from xen.xend.server.DevController import DevController
 
 
 xroot = XendRoot.instance()
+
+
+def randomMAC():
+    """Generate a random MAC address.
+
+    Uses OUI (Organizationally Unique Identifier) AA:00:00, an
+    unassigned one that used to belong to DEC. The OUI list is
+    available at 'standards.ieee.org'.
+
+    The remaining 3 fields are random, with the first bit of the first
+    random field set 0.
+
+    @return: MAC address string
+    """
+    mac = [ 0xaa, 0x00, 0x00,
+            random.randint(0x00, 0x7f),
+            random.randint(0x00, 0xff),
+            random.randint(0x00, 0xff) ]
+    return ':'.join(map(lambda x: "%02x" % x, mac))
 
 
 class NetifController(DevController):
@@ -51,22 +71,25 @@ class NetifController(DevController):
         script = os.path.join(xroot.network_script_dir,
                               sxp.child_value(config, 'script',
                                               xroot.get_vif_script()))
-        bridge = sxp.child_value(config, 'bridge',
-                                 xroot.get_vif_bridge())
-        mac = sxp.child_value(config, 'mac')
+        bridge = sxp.child_value(config, 'bridge')
+        mac    = sxp.child_value(config, 'mac')
         ipaddr = _get_config_ipaddr(config)
 
         devid = self.allocateDeviceID()
 
+        if not mac:
+            mac = randomMAC()
+
         back = { 'script' : script,
-                 'mac' : mac,
-                 'bridge' : bridge,
+                 'mac'    : mac,
                  'handle' : "%i" % devid }
         if ipaddr:
             back['ip'] = ' '.join(ipaddr)
+        if bridge:
+            back['bridge'] = bridge
 
         front = { 'handle' : "%i" % devid,
-                  'mac' : mac }
+                  'mac'    : mac }
 
         return (devid, back, front)
 

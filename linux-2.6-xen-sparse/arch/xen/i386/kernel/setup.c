@@ -936,11 +936,15 @@ void __init find_max_pfn(void)
 /* We don't use the fake e820 because we need to respond to user override. */
 void __init find_max_pfn(void)
 {
-	if ( xen_override_max_pfn < xen_start_info->nr_pages )
-		xen_override_max_pfn = xen_start_info->nr_pages;
-	max_pfn = xen_override_max_pfn;
-	/* 8MB slack, to make up for address space allocations in backends. */
-	max_pfn += 8 << (20 - PAGE_SHIFT);
+	if (xen_override_max_pfn == 0) {
+		max_pfn = xen_start_info->nr_pages;
+		/* Default 8MB slack (to balance backend allocations). */
+		max_pfn += 8 << (20 - PAGE_SHIFT);
+	} else if (xen_override_max_pfn > xen_start_info->nr_pages) {
+		max_pfn = xen_override_max_pfn;
+	} else {
+		max_pfn = xen_start_info->nr_pages;
+	}
 }
 #endif /* XEN */
 

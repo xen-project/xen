@@ -520,7 +520,7 @@ void __init print_cpu_info(struct cpuinfo_x86 *c)
 		printk("\n");
 }
 
-cpumask_t cpu_initialized __initdata = CPU_MASK_NONE;
+cpumask_t cpu_initialized __cpuinitdata = CPU_MASK_NONE;
 
 /* This is hacky. :)
  * We're emulating future behavior.
@@ -562,7 +562,7 @@ void __init early_cpu_init(void)
 #endif
 }
 
-void __init cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
+void __cpuinit cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
 {
 	unsigned long frames[16];
 	unsigned long va;
@@ -585,7 +585,7 @@ void __init cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
  * and IDT. We reload them nevertheless, this function acts as a
  * 'CPU state barrier', nothing should get across.
  */
-void __init cpu_init (void)
+void __cpuinit cpu_init (void)
 {
 	int cpu = smp_processor_id();
 	struct tss_struct * t = &per_cpu(init_tss, cpu);

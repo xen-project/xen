@@ -107,7 +107,11 @@ struct iommu_regs {
 #define IOPTE_VALID         0x00000002 /* IOPTE is valid */
 #define IOPTE_WAZ           0x00000001 /* Write as zeros */
 
+#if defined(__i386__) || defined(__x86_64__)
 #define PAGE_SHIFT      12
+#elif defined(__ia64__)
+#define PAGE_SHIFT      14
+#endif
 #define PAGE_SIZE       (1 << PAGE_SHIFT)
 #define PAGE_MASK	(PAGE_SIZE - 1)
 
