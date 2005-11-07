@@ -59,7 +59,7 @@
 #endif
 
 // FIXME: turn off for now... but NaTs may crash Xen so re-enable soon!
-//#define HANDLE_AR_UNAT
+#define HANDLE_AR_UNAT
 
 // FIXME: This is defined in include/asm-ia64/hw_irq.h but this
 // doesn't appear to be include'able from assembly?
@@ -497,19 +497,29 @@ GLOBAL_ENTRY(fast_tick_reflect)
 	.mem.offset 0,0; st8.spill [r2]=r30,16;
 	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
 #ifdef HANDLE_AR_UNAT
-	// bank0 regs have no NaT bit, so ensure they are NaT clean
-	mov r16=r0; mov r17=r0; mov r18=r0; mov r19=r0;
-	mov r20=r0; mov r21=r0; mov r22=r0; mov r23=r0;
-	mov r24=r0; mov r25=r0; mov r26=r0; mov r27=r0;
-	mov r28=r0; mov r29=r0; mov r30=r0; movl r31=XSI_IPSR;;
+ 	// r16~r23 are preserved regsin bank0 regs, we need to restore them,
+    // r24~r31 are scratch regs, we don't need to handle NaT bit,
+    // because OS handler must assign it before access it
+    ld8 r16=[r2],16;
+    ld8 r17=[r3],16;;
+    ld8 r18=[r2],16;
+    ld8 r19=[r3],16;;
+    ld8 r20=[r2],16;
+    ld8 r21=[r3],16;;
+    ld8 r22=[r2],16;
+    ld8 r23=[r3],16;;
 #endif
-	bsw.0 ;;
-	mov r2=r30; mov r3=r29;;
+    movl r31=XSI_IPSR;;
+    bsw.0 ;;
+    mov r24=ar.unat;
+    mov r2=r30; mov r3=r29;;
 #ifdef HANDLE_AR_UNAT
-	mov ar.unat=r28;
+    mov ar.unat=r28;
 #endif
-	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
-	st4 [r20]=r0 ;;
+    adds r25=XSI_B1NATS_OFS-XSI_PSR_IC_OFS,r18 ;
+    adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
+    st8 [r25]=r24;
+    st4 [r20]=r0 ;;
 fast_tick_reflect_done:
 	mov pr=r31,-1 ;;
 	rfi
@@ -651,19 +661,28 @@ ENTRY(fast_reflect)
 	.mem.offset 0,0; st8.spill [r2]=r30,16;
 	.mem.offset 8,0; st8.spill [r3]=r31,16 ;;
 #ifdef HANDLE_AR_UNAT
-	// bank0 regs have no NaT bit, so ensure they are NaT clean
-	mov r16=r0; mov r17=r0; mov r18=r0; mov r19=r0;
-	mov r20=r0; mov r21=r0; mov r22=r0; mov r23=r0;
-	mov r24=r0; mov r25=r0; mov r26=r0; mov r27=r0;
-	mov r28=r0; mov r29=r0; mov r30=r0; movl r31=XSI_IPSR;;
+	// r16~r23 are preserved regsin bank0 regs, we need to restore them,
+    // r24~r31 are scratch regs, we don't need to handle NaT bit,
+    // because OS handler must assign it before access it
+	ld8 r16=[r2],16;
+    ld8 r17=[r3],16;;
+    ld8 r18=[r2],16;
+    ld8 r19=[r3],16;;
+	ld8 r20=[r2],16;
+    ld8 r21=[r3],16;;
+    ld8 r22=[r2],16;
+    ld8 r23=[r3],16;;
 #endif
 	movl r31=XSI_IPSR;;
 	bsw.0 ;;
+    mov r24=ar.unat;
 	mov r2=r30; mov r3=r29;;
 #ifdef HANDLE_AR_UNAT
 	mov ar.unat=r28;
 #endif
+    adds r25=XSI_B1NATS_OFS-XSI_PSR_IC_OFS,r18 ;
 	adds r20=XSI_BANKNUM_OFS-XSI_PSR_IC_OFS,r18 ;;
+    st8 [r25]=r24;
 	st4 [r20]=r0 ;;
 	mov pr=r31,-1 ;;
 	rfi
