@@ -56,6 +56,7 @@ extern int eventchn_fd; /* in xenstored_domain.c */
 static bool verbose;
 LIST_HEAD(connections);
 static int tracefd = -1;
+static char *tracefile = NULL;
 static TDB_CONTEXT *tdb_ctx;
 
 #ifdef TESTING
@@ -240,6 +241,21 @@ void trace(const char *fmt, ...)
 	va_end(arglist);
 	write(tracefd, str, strlen(str));
 	talloc_free(str);
+}
+
+void reopen_log()
+{
+	if (!tracefile)
+		return;
+
+	if (tracefd > 0)
+		close(tracefd);
+	tracefd = open(tracefile, O_WRONLY|O_CREAT|O_APPEND, 0600);
+	if (tracefd < 0) {
+		perror("Could not open tracefile");
+		return;
+	}
+	write(tracefd, "\n***\n", strlen("\n***\n"));
 }
 
 static bool write_messages(struct connection *conn)
@@ -1498,11 +1514,7 @@ int main(int argc, char *argv[])
 			outputpid = true;
 			break;
 		case 'T':
-			tracefd = open(optarg, O_WRONLY|O_CREAT|O_APPEND, 0600);
-			if (tracefd < 0)
-				barf_perror("Could not open tracefile %s",
-					    optarg);
-                        write(tracefd, "\n***\n", strlen("\n***\n"));
+			tracefile = optarg;
 			break;
 		case 'V':
 			verbose = true;
@@ -1511,6 +1523,8 @@ int main(int argc, char *argv[])
 	}
 	if (optind != argc)
 		barf("%s: No arguments desired", argv[0]);
+
+	reopen_log();
 
 	if (dofork) {
 		openlog("xenstored", 0, LOG_DAEMON);
@@ -1577,6 +1591,8 @@ int main(int argc, char *argv[])
 		close(STDOUT_FILENO);
 		close(STDERR_FILENO);
 	}
+
+	signal(SIGHUP, reopen_log);
 
 #ifdef TESTING
 	signal(SIGUSR1, stop_failtest);
