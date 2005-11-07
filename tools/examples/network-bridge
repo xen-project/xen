@@ -238,7 +238,7 @@ may raise this limit by passing it as a parameter (nloopbacks=<N>).
 		if [ -z "${kmask}" ]; then 
 		    PREFIX=32; 
 		else 
-		    legacy_to_prefix ${kmask};
+		    legacy_mask_to_prefix ${kmask};
 		fi
 		ip addr add ${kip}/${PREFIX} dev ${netdev}
 		ip link set dev ${netdev} up
