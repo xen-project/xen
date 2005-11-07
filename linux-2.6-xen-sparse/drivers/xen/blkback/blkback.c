@@ -114,10 +114,10 @@ static void fast_flush_area(int idx, int nr_pages)
 		handle = pending_handle(idx, i);
 		if (handle == BLKBACK_INVALID_HANDLE)
 			continue;
-		unmap[i].host_addr      = MMAP_VADDR(idx, i);
-		unmap[i].dev_bus_addr   = 0;
-		unmap[i].handle         = handle;
-		pending_handle(idx, i)  = BLKBACK_INVALID_HANDLE;
+		unmap[invcount].host_addr    = MMAP_VADDR(idx, i);
+		unmap[invcount].dev_bus_addr = 0;
+		unmap[invcount].handle       = handle;
+		pending_handle(idx, i) = BLKBACK_INVALID_HANDLE;
 		invcount++;
 	}
 
@@ -498,6 +498,9 @@ static int __init blkif_init(void)
 	struct page *page;
 	int ret;
 
+	for (i = 0; i < MMAP_PAGES; i++)
+		pending_grant_handles[i] = BLKBACK_INVALID_HANDLE;
+
 	blkif_interface_init();
 
 	page = balloon_alloc_empty_page_range(MMAP_PAGES);
@@ -517,8 +520,6 @@ static int __init blkif_init(void)
 	BUG_ON(ret < 0);
 
 	blkif_xenbus_init();
-
-	memset(pending_grant_handles,  BLKBACK_INVALID_HANDLE, MMAP_PAGES);
 
 	return 0;
 }
