@@ -129,8 +129,8 @@ static int __do_suspend(void *ignore)
 	preempt_disable();
 
 #ifdef __i386__
-	mm_pin_all();
 	kmem_cache_shrink(pgd_cache);
+	mm_pin_all();
 #endif
 
 	__cli();
