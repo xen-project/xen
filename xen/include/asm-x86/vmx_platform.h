@@ -24,6 +24,7 @@
 #include <asm/e820.h>
 #include <asm/vmx_virpit.h>
 #include <asm/vmx_intercept.h>
+#include <asm/vmx_vioapic.h>
 #include <public/io/vmx_vpic.h>
 
 #define MAX_OPERAND_NUM 2
@@ -85,6 +86,7 @@ struct vmx_platform {
     struct vmx_virpit      vmx_pit;
     struct vmx_io_handler  vmx_io_handler;
     struct vmx_virpic      vmx_pic;
+    struct vmx_vioapic      vmx_vioapic;
     unsigned char          round_info[256];
     spinlock_t             round_robin_lock;
     int                    interrupt_request;

@@ -307,6 +307,11 @@ vlapic_EOI_set(struct vlapic *vlapic)
 
     vlapic_clear_isr(vlapic, vector);
     vlapic_update_ppr(vlapic);
+
+    if (test_and_clear_bit(vector, &vlapic->tmr[0])) {
+        extern void ioapic_update_EOI(struct domain *d, int vector);
+        ioapic_update_EOI(vlapic->domain, vector);
+    }
 }
 
 int vlapic_check_vector(struct vlapic *vlapic,
@@ -968,6 +973,8 @@ static int vlapic_reset(struct vlapic *vlapic)
     vlapic->dest_format = 0xffffffffU;
 
     vlapic->spurious_vec = 0xff;
+
+    vmx_vioapic_add_lapic(vlapic, v);
 
     init_ac_timer(&vlapic->vlapic_timer,
                   vlapic_timer_fn, vlapic, v->processor);

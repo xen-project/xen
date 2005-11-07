@@ -34,12 +34,14 @@
 #ifdef CONFIG_VMX
 
 extern struct vmx_mmio_handler vlapic_mmio_handler;
+extern struct vmx_mmio_handler vioapic_mmio_handler;
 
-#define VMX_MMIO_HANDLER_NR 1
+#define VMX_MMIO_HANDLER_NR 2
 
 struct vmx_mmio_handler *vmx_mmio_handlers[VMX_MMIO_HANDLER_NR] =
 {
-    &vlapic_mmio_handler
+    &vlapic_mmio_handler,
+    &vioapic_mmio_handler
 };
 
 static inline void vmx_mmio_access(struct vcpu *v,
