@@ -19,7 +19,6 @@
 
 """Domain creation.
 """
-import random
 import os
 import os.path
 import string
@@ -497,24 +496,6 @@ def configure_tpmif(config_devs, vals):
             config_devs.append(['device', config_tpmif])
 
 
-def randomMAC():
-    """Generate a random MAC address.
-
-    Uses OUI (Organizationally Unique Identifier) AA:00:00, an
-    unassigned one that used to belong to DEC. The OUI list is
-    available at 'standards.ieee.org'.
-
-    The remaining 3 fields are random, with the first bit of the first
-    random field set 0.
-
-    @return: MAC address string
-    """
-    mac = [ 0xaa, 0x00, 0x00,
-            random.randint(0x00, 0x7f),
-            random.randint(0x00, 0xff),
-            random.randint(0x00, 0xff) ]
-    return ':'.join(map(lambda x: "%02x" % x, mac))
-
 def configure_vifs(config_devs, vals):
     """Create the config for virtual network interfaces.
     """
@@ -525,8 +506,6 @@ def configure_vifs(config_devs, vals):
         if idx < len(vifs):
             d = vifs[idx]
             mac = d.get('mac')
-            if not mac:
-                mac = randomMAC()
             be_mac = d.get('be_mac')
             bridge = d.get('bridge')
             script = d.get('script')
@@ -534,8 +513,7 @@ def configure_vifs(config_devs, vals):
             ip = d.get('ip')
             vifname = d.get('vifname')
         else:
-            
-            mac = randomMAC()
+            mac = None
             be_mac = None
             bridge = None
             script = None
@@ -543,7 +521,8 @@ def configure_vifs(config_devs, vals):
             ip = None
             vifname = None
         config_vif = ['vif']
-        config_vif.append(['mac', mac])
+        if mac:
+            config_vif.append(['mac', mac])
         if vifname:
             config_vif.append(['vifname', vifname])
         if be_mac:
@@ -925,8 +904,6 @@ def parseCommandLine(argv):
 
 
 def main(argv):
-    random.seed()
-
     (opts, config) = parseCommandLine(argv)
 
     if not opts:
