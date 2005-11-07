@@ -1,0 +1,47 @@
+#!/usr/bin/python
+
+# Copyright (C) International Business Machines Corp., 2005
+# Author: Dan Smith <danms@us.ibm.com>
+
+import time
+import re
+
+from XmTestLib import *
+
+domain = XmTestDomain()
+
+try:
+    domain.start()
+except DomainError, e:
+    if verbose:
+        print "Failed to create test domain because:"
+        print e.extra
+    FAIL(str(e))
+
+status, output = traceCommand("xm reboot %s" % domain.getName())
+
+if status != 0:
+    FAIL("xm reboot returned %i != 0" % status)
+
+time.sleep(15)
+
+try:
+    console = XmConsole(domain.getName())
+except ConsoleError, e:
+    FAIL(str(e))
+
+try:
+    console.sendInput("input")
+    run = console.runCmd("uptime")
+except ConsoleError, e:
+    FAIL(str(e))
+
+console.closeConsole()
+
+domain.destroy()
+
+items = re.split(" +", run["output"])
+uptime = int(items[3])
+if uptime > 1:
+    FAIL("Uptime too large (%i > 1 minutes); domain didn't reboot")
+

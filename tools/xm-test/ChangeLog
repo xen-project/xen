@@ -1,0 +1,11 @@
+0.1.1
+	Dan Smith <danms@us.ibm.com>
+
+	- More tests
+	- Added build check for Flex/Bison
+
+
+0.1.0
+	Dan Smith <danms@us.ibm.com>
+
+	- initial release
