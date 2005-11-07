@@ -543,8 +543,8 @@ void vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset,
     }
 }
 
-unsigned long vlapic_read(struct vcpu *v, unsigned long address,
-            unsigned long len)
+static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
+                                 unsigned long len)
 {
     unsigned int alignment;
     unsigned int tmp;
@@ -585,8 +585,8 @@ unsigned long vlapic_read(struct vcpu *v, unsigned long address,
     return result;
 }
 
-unsigned long vlapic_write(struct vcpu *v, unsigned long address,
-                  unsigned long len, unsigned long val)
+static void vlapic_write(struct vcpu *v, unsigned long address,
+                         unsigned long len, unsigned long val)
 {
     struct vlapic *vlapic = VLAPIC(v);
     unsigned int offset = address - vlapic->base_address;
@@ -758,10 +758,9 @@ unsigned long vlapic_write(struct vcpu *v, unsigned long address,
         printk("Local APIC Write to read-only register\n");
         break;
     }
-    return 1;
 }
 
-int vlapic_range(struct vcpu *v, unsigned long addr)
+static int vlapic_range(struct vcpu *v, unsigned long addr)
 {
     struct vlapic *vlapic = VLAPIC(v);
 
@@ -772,6 +771,12 @@ int vlapic_range(struct vcpu *v, unsigned long addr)
 
     return 0;
 }
+
+struct vmx_mmio_handler vlapic_mmio_handler = {
+    .check_handler = vlapic_range,
+    .read_handler = vlapic_read,
+    .write_handler = vlapic_write
+};
 
 void vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
 {

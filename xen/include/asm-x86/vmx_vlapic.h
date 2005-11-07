@@ -225,14 +225,6 @@ extern int vlapic_init(struct vcpu *vc);
 
 extern void vlapic_msr_set(struct vlapic *vlapic, uint64_t value);
 
-int vlapic_range(struct vcpu *v, unsigned long addr);
-
-unsigned long vlapic_write(struct vcpu *v, unsigned long address,
-                           unsigned long len, unsigned long val);
-
-unsigned long vlapic_read(struct vcpu *v, unsigned long address,
-                          unsigned long len);
-
 int vlapic_accept_pic_intr(struct vcpu *v);
 
 struct vlapic* apic_round_robin(struct domain *d,
