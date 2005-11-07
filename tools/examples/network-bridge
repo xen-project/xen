@@ -195,11 +195,17 @@ op_start () {
 	return
     fi
 
-    create_bridge ${bridge}
-
     if ! ip link show 2>/dev/null | grep -q "^[0-9]*: ${vdev}"; then
-	return
+        echo "
+Link $vdev is missing.
+This may be because you have reached the limit of the number of interfaces
+that the loopback driver supports.  If the loopback driver is a module, you
+may raise this limit by passing it as a parameter (nloopbacks=<N>).
+" >&2
+        exit 1
     fi
+
+    create_bridge ${bridge}
 
     if ip link show ${vdev} 2>/dev/null >/dev/null; then
 	mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
