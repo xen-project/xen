@@ -254,7 +254,10 @@ acm_init_domain_ssid(domid_t id, ssidref_t ssidref)
         return ACM_NULL_POINTER_ERROR;
     }
     if ((ssid = xmalloc(struct acm_ssid_domain)) == NULL)
+    {
+        put_domain(subj);
         return ACM_INIT_SSID_ERROR;
+    }
 
     ssid->datatype       = DOMAIN;
     ssid->subject        = subj;
