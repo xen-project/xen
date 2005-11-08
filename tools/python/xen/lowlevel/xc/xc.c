@@ -342,6 +342,7 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
                                   "ssidref",   info[i].ssidref,
                                   "shutdown_reason", info[i].shutdown_reason);
         PyDict_SetItemString(info_dict, "handle", pyhandle);
+        Py_DECREF(pyhandle);
         PyList_SetItem(list, i, info_dict);
     }
 
@@ -388,7 +389,7 @@ static PyObject *pyxc_vcpu_getinfo(PyObject *self,
         cpumap >>= 1;
     }
     PyDict_SetItemString(info_dict, "cpumap", cpulist);
-
+    Py_DECREF(cpulist);
     return info_dict;
 }
 
