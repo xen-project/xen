@@ -24,6 +24,7 @@ import xen.lowlevel.xc
 from xen.xend import sxp
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
+from xen.xend.server.netif import randomMAC
 
 
 xc = xen.lowlevel.xc.new()
@@ -276,6 +277,8 @@ class VmxImageHandler(ImageHandler):
                ret.append("%s" % vbdparam)
             if name == 'vif':
                mac = sxp.child_value(info, 'mac')
+               if mac == None:
+                   mac = randomMAC()
                ret.append("-macaddr")
                ret.append("%s" % mac)
             if name == 'vtpm':
