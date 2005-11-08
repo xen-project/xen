@@ -2,8 +2,8 @@ SUBDIRS =
 
 TESTS = 01_memset_basic_pos.test	\
         02_memset_badparm_neg.test 	\
-	04_memset_smallmem_pos.test     \
-	03_memset_random_pos.test
+	03_memset_random_pos.test	\
+	04_memset_smallmem_pos.test     	
 
 XFAIL_TESTS = 
 

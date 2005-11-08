@@ -2,7 +2,6 @@
 
 # Copyright (C) International Business Machines Corp., 2005
 # Copyright (C) XenSource Ltd, 2005
-# Author: Woody Marvel <marvel@us.ibm.com>
 # Author: Ewan Mellor <ewan@xensource.com>
 
 from XmTestLib import *

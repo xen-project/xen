@@ -12,10 +12,6 @@ TESTS = 01_block_attach_device_pos.test  \
 
 DISABLED = 
 
-XFAIL_TESTS = 07_block_attach_baddevice_neg.test \
-	08_block_attach_bad_filedevice_neg.test
-
-
 EXTRA_DIST = $(TESTS) $(XFAIL_TESTS)
 
 TESTS_ENVIRONMENT=@TENV@
