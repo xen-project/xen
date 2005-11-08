@@ -36,14 +36,6 @@ int bind_virq_to_irq(int virq, int cpu)
 	while(1);
 }
 
-#if 0
-void notify_remote_via_irq(int virq)
-{
-	printk("notify_remote_via_irq called... FIXME??\n");
-	while(1);
-}
-#endif
-
 void unbind_virq_from_evtchn(int virq)
 {
     evtchn_op_t op;
@@ -91,10 +83,9 @@ void unbind_evtchn_from_irq(unsigned int evtchn)
 
 void notify_remote_via_irq(int irq)
 {
-	int evtchn = virq_to_evtchn[irq];	// FIXME... is this right??
-
-	if (VALID_EVTCHN(evtchn))
-		notify_remote_via_evtchn(evtchn);
+	/* IA64 has same irq value as event channel vector */
+	if (VALID_EVTCHN(irq))
+		notify_remote_via_evtchn(irq);
 }
 
 irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
