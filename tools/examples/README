@@ -9,20 +9,29 @@ If you write a useful script and would like to share it, please do
 send it (preferably with a little summary to go in this file) to
 <xen-devel@lists.sourceforge.net> so we can add it to this directory.
 
+block               - called by xen-backend.agent to bind/unbind dev  
+block-common.sh     - sourced by block, block-*
 block-enbd          - binds/unbinds network block devices
-block-file          - binds/unbinds file to loopback device
-mem-map.sxp         - memory map xend configuration file.
-network             - default network setup script called by xend at startup.
-network-route       - default xen network start/stop script.
-network-nat         - default xen network start/stop script when using NAT.
-vif-bridge          - default virtual network interface setup script.
-vif-route           - default xen virtual network start/stop script
-vif-nat             - configures vif in routed-nat mode.
-xend-config.sxp     - default xend configuration file.
-xmexample1          - example configuration script for 'xm create'.
-xmexample2          - a more complex configuration script for 'xm create'.
+block-nbd           - binds/unbinds network block devices
+network-bridge      - xen network start/stop script when using bridging
+network-nat         - xen network start/stop script when using NAT
+network-route       - xen network start/stop script when using routing
+vif-bridge          - virtual network start/stop script in bridged mode
+vif-common.sh       - sourced by vif-bridge 
+vif-nat             - xen virtual network start/stop script in NAT mode 
+vif-route           - xen virtual network start/stop script in routed mode
+xen-backend.agent   - calls block, vif-* scripts to add, remove, hotplug 
+                      devices  
+xen-backend.rules   - hotplug script rules
+xend-config.sxp     - default xend configuration file
+xen-hotplug-common.sh - sourced by vif-common.sh
+xen-network-common.sh - sourced by vif-common.sh
+xen-script-common.sh  - sourced by network-bridge, xen-hotplug-common.sh
+xmexample1          - example configuration script for 'xm create'
+xmexample2          - a more complex configuration script for 'xm create'
 xmexample3          - an advanced configuration script for 'xm create' 
-                      that utilizes the vmid.
+                      that utilizes the vmid
+xmexample.nbd       - configuration script that uses NBD filesystems
 xmexample.vmx       - a configuration script for creating a vmx domain with
-                      'xm create'.
-
+                      'xm create'
+xmexample.vti       - a configuration script for creating a domain on vti
