@@ -507,7 +507,7 @@ get_page_from_l2e(
         l2e_get_pfn(l2e), PGT_l1_page_table | vaddr, d);
 
 #if CONFIG_PAGING_LEVELS == 2
-    if (!rc)
+    if ( unlikely(!rc) )
         rc = get_linear_pagetable(l2e, pfn, d);
 #endif
     return rc;
@@ -540,7 +540,7 @@ get_page_from_l3e(
         l3e_get_pfn(l3e),
         PGT_l2_page_table | vaddr, d);
 #if CONFIG_PAGING_LEVELS == 3
-    if (!rc)
+    if ( unlikely(!rc) )
         rc = get_linear_pagetable(l3e, pfn, d);
 #endif
     return rc;
@@ -575,9 +575,9 @@ get_page_from_l4e(
         PGT_l3_page_table | vaddr, d);
 
     if ( unlikely(!rc) )
-        return get_linear_pagetable(l4e, pfn, d);
+        rc = get_linear_pagetable(l4e, pfn, d);
 
-    return 1;
+    return rc;
 }
 
 #endif /* 4 level */
