@@ -45,15 +45,21 @@
 #define SHM_write_all (1<<2) /* allow write access to all guest pt pages,
                                 regardless of pte write permissions */
 #define SHM_log_dirty (1<<3) /* enable log dirty mode */
-#define SHM_translate (1<<4) /* do p2m tranaltion on guest tables */
-#define SHM_external  (1<<5) /* external page table, not used by Xen */
+#define SHM_translate (1<<4) /* Xen does p2m translation, not guest */
+#define SHM_external  (1<<5) /* Xen does not steal address space from the
+                                domain for its own booking; requires VT or
+                                similar mechanisms */
+#define SHM_wr_pt_pte (1<<6) /* guest allowed to set PAGE_RW bit in PTEs which
+                                point to page table pages. */
 
 #define shadow_mode_enabled(_d)   ((_d)->arch.shadow_mode)
 #define shadow_mode_refcounts(_d) ((_d)->arch.shadow_mode & SHM_refcounts)
+#define shadow_mode_write_l1(_d)  (VM_ASSIST(_d, VMASST_TYPE_writable_pagetables))
 #define shadow_mode_write_all(_d) ((_d)->arch.shadow_mode & SHM_write_all)
 #define shadow_mode_log_dirty(_d) ((_d)->arch.shadow_mode & SHM_log_dirty)
 #define shadow_mode_translate(_d) ((_d)->arch.shadow_mode & SHM_translate)
 #define shadow_mode_external(_d)  ((_d)->arch.shadow_mode & SHM_external)
+#define shadow_mode_wr_pt_pte(_d) ((_d)->arch.shadow_mode & SHM_wr_pt_pte)
 
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
 #define __shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START + \
@@ -324,8 +330,7 @@ struct out_of_sync_entry {
 
 #if SHADOW_DEBUG
 extern int shadow_status_noswap;
-#define _SHADOW_REFLECTS_SNAPSHOT ( 9)
-#define SHADOW_REFLECTS_SNAPSHOT  (1u << _SHADOW_REFLECTS_SNAPSHOT)
+#define SHADOW_REFLECTS_SNAPSHOT _PAGE_AVAIL0
 #endif
 
 #ifdef VERBOSE
@@ -1474,7 +1479,8 @@ static inline void set_shadow_status(
             if ( stype != PGT_writable_pred )
                 BUG(); // we should never replace entries into the hash table
             x->smfn = smfn;
-            put_page(pfn_to_page(gmfn)); // already had a ref...
+            if ( stype != PGT_writable_pred )
+                put_page(pfn_to_page(gmfn)); // already had a ref...
             goto done;
         }
 
@@ -1656,14 +1662,18 @@ shadow_mode_page_writable(unsigned long va, struct cpu_user_regs *regs, unsigned
          (type == PGT_writable_page) )
         type = shadow_max_pgtable_type(d, gpfn, NULL);
 
-    if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
-         (type == PGT_l1_page_table) &&
-         (va < HYPERVISOR_VIRT_START) &&
-         KERNEL_MODE(v, regs) )
-        return 1;
-
-    if ( shadow_mode_write_all(d) &&
-         type && (type <= PGT_l4_page_table) &&
+    // Strange but true: writable page tables allow kernel-mode access
+    // to L1 page table pages via write-protected PTEs...  Similarly, write 
+    // access to all page table pages is granted for shadow_mode_write_all
+    // clients.
+    //
+    if ( ((shadow_mode_write_l1(d) && (type == PGT_l1_page_table)) ||
+          (shadow_mode_write_all(d) && type && (type <= PGT_l4_page_table))) &&
+         ((va < HYPERVISOR_VIRT_START)
+#if defined(__x86_64__)
+          || (va >= HYPERVISOR_VIRT_END)
+#endif
+             ) &&
          KERNEL_MODE(v, regs) )
         return 1;
 
