@@ -33,13 +33,15 @@
 
 #ifdef CONFIG_VMX
 
-struct vmx_mmio_handler vmx_mmio_handers[VMX_MMIO_HANDLER_NR] =
+extern struct vmx_mmio_handler vlapic_mmio_handler;
+extern struct vmx_mmio_handler vioapic_mmio_handler;
+
+#define VMX_MMIO_HANDLER_NR 2
+
+struct vmx_mmio_handler *vmx_mmio_handlers[VMX_MMIO_HANDLER_NR] =
 {
-    {
-        .check_handler = vlapic_range,
-        .read_handler  = vlapic_read,
-        .write_handler = vlapic_write
-    }
+    &vlapic_mmio_handler,
+    &vioapic_mmio_handler
 };
 
 static inline void vmx_mmio_access(struct vcpu *v,
@@ -134,16 +136,16 @@ int vmx_mmio_intercept(ioreq_t *p)
 {
     struct vcpu *v = current;
     int i;
-    struct vmx_mmio_handler *handler = vmx_mmio_handers;
 
     /* XXX currently only APIC use intercept */
     if ( !vmx_apic_support(v->domain) )
         return 0;
 
     for ( i = 0; i < VMX_MMIO_HANDLER_NR; i++ ) {
-        if ( handler[i].check_handler(v, p->addr) ) {
+        if ( vmx_mmio_handlers[i]->check_handler(v, p->addr) ) {
             vmx_mmio_access(v, p,
-              handler[i].read_handler, handler[i].write_handler);
+                            vmx_mmio_handlers[i]->read_handler,
+                            vmx_mmio_handlers[i]->write_handler);
             return 1;
         }
     }

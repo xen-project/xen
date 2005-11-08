@@ -376,7 +376,6 @@ static void __init pagetable_init (void)
 		__PAGE_KERNEL_EXEC |= _PAGE_GLOBAL;
 	}
 
-	init_mm.context.pinned = 1;
 	kernel_physical_mapping_init(pgd_base);
 	remap_numa_kva();
 
@@ -689,6 +688,8 @@ void __init mem_init(void)
 #ifndef CONFIG_SMP
 	zap_low_mappings();
 #endif
+
+	set_bit(PG_pinned, &virt_to_page(init_mm.pgd)->flags);
 }
 
 kmem_cache_t *pgd_cache;

@@ -53,7 +53,7 @@ static inline void switch_mm(struct mm_struct *prev,
 	struct mmuext_op _op[2], *op = _op;
 
 	if (likely(prev != next)) {
-		if (!next->context.pinned)
+		if (!test_bit(PG_pinned, &virt_to_page(next->pgd)->flags))
 			mm_pin(next);
 
 		/* stop flush ipis for the previous mm */

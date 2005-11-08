@@ -27,6 +27,9 @@
 #include <asm-xen/foreign_page.h>
 #include <asm/hypervisor.h>
 
+static void __pgd_pin(pgd_t *pgd);
+static void __pgd_unpin(pgd_t *pgd);
+
 void show_mem(void)
 {
 	int total = 0, reserved = 0;
@@ -299,6 +302,8 @@ void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags; /* can be called from interrupt context */
 
+	BUG_ON(test_bit(PG_pinned, &virt_to_page(pgd)->flags));
+
 	if (HAVE_SHARED_KERNEL_PMD)
 		return;
 
@@ -311,6 +316,8 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	int i = 0;
 	pgd_t *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
+
+	BUG_ON(test_bit(PG_pinned, &virt_to_page(pgd)->flags));
 
 	if (PTRS_PER_PMD == 1 || !pgd)
 		return pgd;
@@ -351,15 +358,9 @@ out_oom:
 void pgd_free(pgd_t *pgd)
 {
 	int i;
-	pte_t *ptep = virt_to_ptep(pgd);
 
-	if (!pte_write(*ptep)) {
-		xen_pgd_unpin(__pa(pgd));
-		BUG_ON(HYPERVISOR_update_va_mapping(
-			(unsigned long)pgd,
-			pfn_pte(virt_to_phys(pgd)>>PAGE_SHIFT, PAGE_KERNEL),
-			0));
-	}
+	if (test_bit(PG_pinned, &virt_to_page(pgd)->flags))
+		__pgd_unpin(pgd);
 
 	/* in the PAE case user pgd entries are overwritten before usage */
 	if (PTRS_PER_PMD > 1) {
@@ -441,10 +442,7 @@ void make_pages_writable(void *va, unsigned int nr)
 }
 #endif /* CONFIG_XEN_SHADOW_MODE */
 
-LIST_HEAD(mm_unpinned);
-DEFINE_SPINLOCK(mm_unpinned_lock);
-
-static inline void mm_walk_set_prot(void *pt, pgprot_t flags)
+static inline void pgd_walk_set_prot(void *pt, pgprot_t flags)
 {
 	struct page *page = virt_to_page(pt);
 	unsigned long pfn = page_to_pfn(page);
@@ -456,103 +454,111 @@ static inline void mm_walk_set_prot(void *pt, pgprot_t flags)
 		pfn_pte(pfn, flags), 0));
 }
 
-static void mm_walk(struct mm_struct *mm, pgprot_t flags)
+static void pgd_walk(pgd_t *pgd_base, pgprot_t flags)
 {
-	pgd_t       *pgd;
-	pud_t       *pud;
-	pmd_t       *pmd;
-	pte_t       *pte;
-	int          g,u,m;
+	pgd_t *pgd = pgd_base;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+	int    g, u, m;
 
-	pgd = mm->pgd;
 	for (g = 0; g < USER_PTRS_PER_PGD; g++, pgd++) {
 		if (pgd_none(*pgd))
 			continue;
 		pud = pud_offset(pgd, 0);
 		if (PTRS_PER_PUD > 1) /* not folded */
-			mm_walk_set_prot(pud,flags);
+			pgd_walk_set_prot(pud,flags);
 		for (u = 0; u < PTRS_PER_PUD; u++, pud++) {
 			if (pud_none(*pud))
 				continue;
 			pmd = pmd_offset(pud, 0);
 			if (PTRS_PER_PMD > 1) /* not folded */
-				mm_walk_set_prot(pmd,flags);
+				pgd_walk_set_prot(pmd,flags);
 			for (m = 0; m < PTRS_PER_PMD; m++, pmd++) {
 				if (pmd_none(*pmd))
 					continue;
 				pte = pte_offset_kernel(pmd,0);
-				mm_walk_set_prot(pte,flags);
+				pgd_walk_set_prot(pte,flags);
 			}
 		}
 	}
+
+	BUG_ON(HYPERVISOR_update_va_mapping(
+		(unsigned long)pgd_base,
+		pfn_pte(virt_to_phys(pgd_base)>>PAGE_SHIFT, flags),
+		UVMF_TLB_FLUSH));
+}
+
+static void __pgd_pin(pgd_t *pgd)
+{
+	pgd_walk(pgd, PAGE_KERNEL_RO);
+	xen_pgd_pin(__pa(pgd));
+	set_bit(PG_pinned, &virt_to_page(pgd)->flags);
+}
+
+static void __pgd_unpin(pgd_t *pgd)
+{
+	xen_pgd_unpin(__pa(pgd));
+	pgd_walk(pgd, PAGE_KERNEL);
+	clear_bit(PG_pinned, &virt_to_page(pgd)->flags);
 }
 
 void mm_pin(struct mm_struct *mm)
 {
-    spin_lock(&mm->page_table_lock);
-
-    mm_walk(mm, PAGE_KERNEL_RO);
-    BUG_ON(HYPERVISOR_update_va_mapping(
-        (unsigned long)mm->pgd,
-        pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL_RO),
-        UVMF_TLB_FLUSH));
-    xen_pgd_pin(__pa(mm->pgd));
-    mm->context.pinned = 1;
-    spin_lock(&mm_unpinned_lock);
-    list_del(&mm->context.unpinned);
-    spin_unlock(&mm_unpinned_lock);
-
-    spin_unlock(&mm->page_table_lock);
+	spin_lock(&mm->page_table_lock);
+	__pgd_pin(mm->pgd);
+	spin_unlock(&mm->page_table_lock);
 }
 
 void mm_unpin(struct mm_struct *mm)
 {
-    spin_lock(&mm->page_table_lock);
-
-    xen_pgd_unpin(__pa(mm->pgd));
-    BUG_ON(HYPERVISOR_update_va_mapping(
-        (unsigned long)mm->pgd,
-        pfn_pte(virt_to_phys(mm->pgd)>>PAGE_SHIFT, PAGE_KERNEL), 0));
-    mm_walk(mm, PAGE_KERNEL);
-    xen_tlb_flush();
-    mm->context.pinned = 0;
-    spin_lock(&mm_unpinned_lock);
-    list_add(&mm->context.unpinned, &mm_unpinned);
-    spin_unlock(&mm_unpinned_lock);
-
-    spin_unlock(&mm->page_table_lock);
+	spin_lock(&mm->page_table_lock);
+	__pgd_unpin(mm->pgd);
+	spin_unlock(&mm->page_table_lock);
 }
 
 void mm_pin_all(void)
 {
-    while (!list_empty(&mm_unpinned))	
-	mm_pin(list_entry(mm_unpinned.next, struct mm_struct,
-			  context.unpinned));
+	struct page *page;
+	for (page = pgd_list; page; page = (struct page *)page->index) {
+		if (!test_bit(PG_pinned, &page->flags))
+			__pgd_pin((pgd_t *)page_address(page));
+	}
 }
 
 void _arch_exit_mmap(struct mm_struct *mm)
 {
-    struct task_struct *tsk = current;
+	struct task_struct *tsk = current;
 
-    task_lock(tsk);
+	task_lock(tsk);
 
-    /*
-     * We aggressively remove defunct pgd from cr3. We execute unmap_vmas()
-     * *much* faster this way, as no tlb flushes means bigger wrpt batches.
-     */
-    if ( tsk->active_mm == mm )
-    {
-        tsk->active_mm = &init_mm;
-        atomic_inc(&init_mm.mm_count);
+	/*
+	 * We aggressively remove defunct pgd from cr3. We execute unmap_vmas()
+	 * *much* faster this way, as no tlb flushes means bigger wrpt batches.
+	 */
+	if (tsk->active_mm == mm) {
+		tsk->active_mm = &init_mm;
+		atomic_inc(&init_mm.mm_count);
 
-        switch_mm(mm, &init_mm, tsk);
+		switch_mm(mm, &init_mm, tsk);
 
-        atomic_dec(&mm->mm_count);
-        BUG_ON(atomic_read(&mm->mm_count) == 0);
-    }
+		atomic_dec(&mm->mm_count);
+		BUG_ON(atomic_read(&mm->mm_count) == 0);
+	}
 
-    task_unlock(tsk);
+	task_unlock(tsk);
 
-    if ( mm->context.pinned && (atomic_read(&mm->mm_count) == 1) )
-        mm_unpin(mm);
+	if (test_bit(PG_pinned, &virt_to_page(mm->pgd)->flags) &&
+	    (atomic_read(&mm->mm_count) == 1))
+		mm_unpin(mm);
 }
+
+/*
+ * Local variables:
+ *  c-file-style: "linux"
+ *  indent-tabs-mode: t
+ *  c-indent-level: 8
+ *  c-basic-offset: 8
+ *  tab-width: 8
+ * End:
+ */

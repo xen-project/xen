@@ -28,6 +28,7 @@
 #include <asm/processor.h>
 #include <asm/msr.h>
 #include <asm/vmx.h>
+#include <asm/vmx_vioapic.h>
 #include <asm/flushtlb.h>
 #include <xen/event.h>
 #include <xen/kernel.h>
@@ -255,6 +256,7 @@ static void vmx_setup_platform(struct domain* d)
 
     if ( vmx_apic_support(d) ) {
         spin_lock_init(&d->arch.vmx_platform.round_robin_lock);
+        vmx_vioapic_init(d);
     }
 }
 
