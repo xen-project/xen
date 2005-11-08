@@ -263,6 +263,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         if ( unlikely(num > 1024) )
         {
             ret = -E2BIG;
+            put_domain(d);
             break;
         }
 

@@ -13,7 +13,6 @@ XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 SRCS       :=
-BUILD_SRCS :=
 SRCS       += xc_bvtsched.c
 SRCS       += xc_core.c
 SRCS       += xc_domain.c
@@ -24,24 +23,26 @@ SRCS       += xc_physdev.c
 SRCS       += xc_private.c
 SRCS       += xc_sedf.c
 SRCS       += xc_tbuf.c
-BUILD_SRCS += xc_linux_build.c
-BUILD_SRCS += xc_load_bin.c
-BUILD_SRCS += xc_load_elf.c
 
-ifeq ($(XEN_TARGET_ARCH),ia64)
-BUILD_SRCS += xc_ia64_stubs.c
-else
 ifeq ($(XEN_TARGET_ARCH),x86_32)
 SRCS       += xc_ptrace.c
 SRCS       += xc_ptrace_core.c
 endif
+
+BUILD_SRCS :=
+BUILD_SRCS += xc_linux_build.c
+BUILD_SRCS += xc_load_bin.c
+BUILD_SRCS += xc_load_elf.c
+BUILD_SRCS += xg_private.c
+
+ifeq ($(XEN_TARGET_ARCH),ia64)
+BUILD_SRCS += xc_ia64_stubs.c
+else
 BUILD_SRCS += xc_load_aout9.c
 BUILD_SRCS += xc_linux_restore.c
 BUILD_SRCS += xc_linux_save.c
 BUILD_SRCS += xc_vmx_build.c
 endif
-
-BUILD_SRCS += xg_private.c
 
 CFLAGS   += -Wall
 CFLAGS   += -Werror
@@ -105,7 +106,7 @@ install: build
 .PHONY: TAGS clean rpm install all
 
 TAGS:
-	etags -t $(SRCS) *.h
+	etags -t *.c *.h
 
 clean:
 	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen

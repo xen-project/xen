@@ -412,7 +412,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         for_each_vcpu(d, v)
         {
             if ( pagetable_get_paddr(v->arch.guest_table) )
-                adjust(&frame_table[pagetable_get_pfn(v->arch.guest_table)], 1);
+                adjust(&frame_table[pagetable_get_pfn(v->arch.guest_table)], !shadow_mode_refcounts(d));
             if ( pagetable_get_paddr(v->arch.shadow_table) )
                 adjust(&frame_table[pagetable_get_pfn(v->arch.shadow_table)], 0);
             if ( v->arch.monitor_shadow_ref )
