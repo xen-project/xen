@@ -624,6 +624,14 @@ static void free_shadow_pages(struct domain *d)
     // under us...  First, collect the list of pinned pages, then
     // free them.
     //
+    // FIXME: it would be good to just free all the pages referred to in
+    // the hash table without going through each of them to decrement their
+    // reference counts.  In shadow_mode_refcount(), we've gotta do the hard
+    // work, but only for L1 shadows.  If we're not in refcount mode, then
+    // there's no real hard work to do at all.  Need to be careful with the
+    // writable_pte_predictions and snapshot entries in the hash table, but
+    // that's about it.
+    //
     for ( i = 0; i < shadow_ht_buckets; i++ )
     {
         u32 count;
@@ -634,17 +642,51 @@ static void free_shadow_pages(struct domain *d)
             continue;
 
         count = 0;
-        for ( x = &d->arch.shadow_ht[i]; x != NULL; x = x->next )
-            if ( MFN_PINNED(x->smfn) )
-                count++;
+
+        for ( x = &d->arch.shadow_ht[i]; x != NULL; x = x->next ) {
+	    /* Skip entries that are writable_pred) */
+	    switch(x->gpfn_and_flags & PGT_type_mask){
+		case PGT_l1_shadow:
+		case PGT_l2_shadow:
+		case PGT_l3_shadow:
+		case PGT_l4_shadow:
+		case PGT_hl2_shadow:
+		    if ( MFN_PINNED(x->smfn) )
+			count++;
+		    break;
+		case PGT_snapshot:
+		case PGT_writable_pred:
+		    break;
+		default:
+		    BUG();
+
+	    }
+	}
+
         if ( !count )
             continue;
 
         mfn_list = xmalloc_array(unsigned long, count);
         count = 0;
-        for ( x = &d->arch.shadow_ht[i]; x != NULL; x = x->next )
-            if ( MFN_PINNED(x->smfn) )
-                mfn_list[count++] = x->smfn;
+        for ( x = &d->arch.shadow_ht[i]; x != NULL; x = x->next ) {
+	    /* Skip entries that are writable_pred) */
+	    switch(x->gpfn_and_flags & PGT_type_mask){
+		case PGT_l1_shadow:
+		case PGT_l2_shadow:
+		case PGT_l3_shadow:
+		case PGT_l4_shadow:
+		case PGT_hl2_shadow:
+		    if ( MFN_PINNED(x->smfn) )
+			mfn_list[count++] = x->smfn;
+		    break;
+		case PGT_snapshot:
+		case PGT_writable_pred:
+		    break;
+		default:
+		    BUG();
+
+	    }
+	}
 
         while ( count )
         {
@@ -779,6 +821,7 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn,
     unsigned long va = pfn << PAGE_SHIFT;
 
     ASSERT(tabpfn != 0);
+    ASSERT(shadow_lock_is_acquired(d));
 
     l2 = map_domain_page_with_cache(tabpfn, l2cache);
     l2e = l2[l2_table_offset(va)];
@@ -2037,7 +2080,12 @@ free_writable_pte_predictions(struct domain *d)
         while ( count )
         {
             count--;
+            /* delete_shadow_status() may do a shadow_audit(), so we need to
+             * keep an accurate count of writable_pte_predictions to keep it
+             * happy.
+             */
             delete_shadow_status(d, gpfn_list[count], 0, PGT_writable_pred);
+            perfc_decr(writable_pte_predictions);
         }
 
         xfree(gpfn_list);
@@ -2273,18 +2321,17 @@ static int resync_all(struct domain *d, u32 stype)
 
         if ( !smfn )
         {
+            // For heavy weight shadows: no need to update refcounts if
+            // there's no shadow page.
+            //
             if ( shadow_mode_refcounts(d) )
                 continue;
 
-            // For light weight shadows, even when no shadow page exists,
-            // we need to resync the refcounts to the new contents of the
-            // guest page.
-            // This only applies when we have writable page tables.
+            // For light weight shadows: only need up resync the refcounts to
+            // the new contents of the guest page iff this it has the right
+            // page type.
             //
-            if ( !shadow_mode_write_all(d) &&
-                 !((stype == PGT_l1_shadow) &&
-                   VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
-                // Page is not writable -- no resync necessary
+            if ( stype != ( pfn_to_page(entry->gmfn)->u.inuse.type_info & PGT_type_mask) )
                 continue;
         }
 
@@ -2312,8 +2359,8 @@ static int resync_all(struct domain *d, u32 stype)
             l1_pgentry_t *snapshot1 = snapshot;
             int unshadow_l1 = 0;
 
-            ASSERT(VM_ASSIST(d, VMASST_TYPE_writable_pagetables) ||
-                   shadow_mode_write_all(d));
+            ASSERT(shadow_mode_write_l1(d) ||
+                   shadow_mode_write_all(d) || shadow_mode_wr_pt_pte(d));
 
             if ( !shadow_mode_refcounts(d) )
                 revalidate_l1(d, guest1, snapshot1);
@@ -2380,7 +2427,7 @@ static int resync_all(struct domain *d, u32 stype)
             l2_pgentry_t *shadow2 = shadow;
             l2_pgentry_t *snapshot2 = snapshot;
 
-            ASSERT(shadow_mode_write_all(d));
+            ASSERT(shadow_mode_write_all(d) || shadow_mode_wr_pt_pte(d));
             BUG_ON(!shadow_mode_refcounts(d)); // not yet implemented
 
             changed = 0;
@@ -2426,7 +2473,7 @@ static int resync_all(struct domain *d, u32 stype)
             l2_pgentry_t *snapshot2 = snapshot;
             l1_pgentry_t *shadow2 = shadow;
             
-            ASSERT(shadow_mode_write_all(d));
+            ASSERT(shadow_mode_write_all(d) || shadow_mode_wr_pt_pte(d));
             BUG_ON(!shadow_mode_refcounts(d)); // not yet implemented
 
             changed = 0;
@@ -2619,8 +2666,13 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
                 goto fail;
             }
         }
+        else if ( unlikely(!shadow_mode_wr_pt_pte(d) && mfn_is_page_table(l1e_get_pfn(gpte))) )
+        {
+            SH_LOG("l1pte_write_fault: no write access to page table page");
+            domain_crash_synchronous();
+        }
 
-        if ( !l1pte_write_fault(v, &gpte, &spte, va) )
+        if ( unlikely(!l1pte_write_fault(v, &gpte, &spte, va)) )
         {
             SH_VVLOG("shadow_fault - EXIT: l1pte_write_fault failed");
             perfc_incrc(write_fault_bail);
@@ -2954,7 +3006,7 @@ mark_shadows_as_reflecting_snapshot(struct domain *d, unsigned long gpfn)
 // BUG: these are not SMP safe...
 static int sh_l2_present;
 static int sh_l1_present;
-char * sh_check_name;
+static char *sh_check_name;
 int shadow_status_noswap;
 
 #define v2m(_v, _adr) ({                                                     \
@@ -3054,7 +3106,7 @@ static int check_pte(
 
     guest_writable =
         (l1e_get_flags(eff_guest_pte) & _PAGE_RW) ||
-        (VM_ASSIST(d, VMASST_TYPE_writable_pagetables) && (level == 1) && mfn_out_of_sync(eff_guest_mfn));
+        (shadow_mode_write_l1(d) && (level == 1) && mfn_out_of_sync(eff_guest_mfn));
 
     if ( (l1e_get_flags(shadow_pte) & _PAGE_RW ) && !guest_writable )
     {

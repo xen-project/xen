@@ -271,6 +271,9 @@ extern void paging_init(void);
 #define _PAGE_PAT      0x080U
 #define _PAGE_PSE      0x080U
 #define _PAGE_GLOBAL   0x100U
+#define _PAGE_AVAIL0   0x200U
+#define _PAGE_AVAIL1   0x400U
+#define _PAGE_AVAIL2   0x800U
 #define _PAGE_AVAIL    0xE00U
 
 #define __PAGE_HYPERVISOR \
