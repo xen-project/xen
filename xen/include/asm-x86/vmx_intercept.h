@@ -18,10 +18,10 @@ typedef unsigned long (*vmx_mmio_read_t)(struct vcpu *v,
                                          unsigned long addr,
                                          unsigned long length);
 
-typedef unsigned long (*vmx_mmio_write_t)(struct vcpu *v,
-                                         unsigned long addr,
-                                         unsigned long length,
-                                         unsigned long val);
+typedef void (*vmx_mmio_write_t)(struct vcpu *v,
+                                 unsigned long addr,
+                                 unsigned long length,
+                                 unsigned long val);
 
 typedef int (*vmx_mmio_check_t)(struct vcpu *v, unsigned long addr);
 
@@ -42,10 +42,6 @@ struct vmx_mmio_handler {
     vmx_mmio_read_t read_handler;
     vmx_mmio_write_t write_handler;
 };
-
-#define VMX_MMIO_HANDLER_NR 1
-
-extern struct vmx_mmio_handler vmx_mmio_handers[VMX_MMIO_HANDLER_NR];
 
 /* global io interception point in HV */
 extern int vmx_io_intercept(ioreq_t *p, int type);

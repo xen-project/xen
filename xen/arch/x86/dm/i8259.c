@@ -33,6 +33,7 @@
 #include <asm/vmx.h>
 #include <public/io/vmx_vpic.h>
 #include <asm/current.h>
+#include <asm/vmx_vioapic.h>
 #include <asm/vmx_vlapic.h>
 
 /* set irq level. If an edge is detected, then the IRR is set to 1 */
@@ -124,6 +125,7 @@ void pic_set_irq_new(void *opaque, int irq, int level)
 {
     struct vmx_virpic *s = opaque;
 
+    vmx_vioapic_set_irq(current->domain, irq, level);
     pic_set_irq1(&s->pics[irq >> 3], irq & 7, level);
     /* used for IOAPIC irqs */
     if (s->alt_irq_func)
@@ -135,6 +137,7 @@ void do_pic_irqs (struct vmx_virpic *s, uint16_t irqs)
 {
     s->pics[1].irr |= (uint8_t)(irqs >> 8);
     s->pics[0].irr |= (uint8_t) irqs;
+    vmx_vioapic_do_irqs(current->domain, irqs);
     pic_update_irq(s);
 }
 
@@ -142,6 +145,7 @@ void do_pic_irqs_clear (struct vmx_virpic *s, uint16_t irqs)
 {
     s->pics[1].irr &= ~(uint8_t)(irqs >> 8);
     s->pics[0].irr &= ~(uint8_t) irqs;
+    vmx_vioapic_do_irqs_clear(current->domain, irqs);
     pic_update_irq(s);
 }
 
@@ -521,7 +525,13 @@ int cpu_get_pic_interrupt(struct vcpu *v, int *type)
 
 int is_pit_irq(struct vcpu *v, int irq, int type)
 {
-    int  pit_vec = v->domain->arch.vmx_platform.vmx_pic.pics[0].irq_base;
+    int pit_vec;
+
+    if (type == VLAPIC_DELIV_MODE_EXT)
+        pit_vec = v->domain->arch.vmx_platform.vmx_pic.pics[0].irq_base;
+    else
+        pit_vec =
+          v->domain->arch.vmx_platform.vmx_vioapic.redirtbl[0].RedirForm.vector;
 
     return (irq == pit_vec);
 }

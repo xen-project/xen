@@ -307,6 +307,11 @@ vlapic_EOI_set(struct vlapic *vlapic)
 
     vlapic_clear_isr(vlapic, vector);
     vlapic_update_ppr(vlapic);
+
+    if (test_and_clear_bit(vector, &vlapic->tmr[0])) {
+        extern void ioapic_update_EOI(struct domain *d, int vector);
+        ioapic_update_EOI(vlapic->domain, vector);
+    }
 }
 
 int vlapic_check_vector(struct vlapic *vlapic,
@@ -543,8 +548,8 @@ void vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset,
     }
 }
 
-unsigned long vlapic_read(struct vcpu *v, unsigned long address,
-            unsigned long len)
+static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
+                                 unsigned long len)
 {
     unsigned int alignment;
     unsigned int tmp;
@@ -585,8 +590,8 @@ unsigned long vlapic_read(struct vcpu *v, unsigned long address,
     return result;
 }
 
-unsigned long vlapic_write(struct vcpu *v, unsigned long address,
-                  unsigned long len, unsigned long val)
+static void vlapic_write(struct vcpu *v, unsigned long address,
+                         unsigned long len, unsigned long val)
 {
     struct vlapic *vlapic = VLAPIC(v);
     unsigned int offset = address - vlapic->base_address;
@@ -758,10 +763,9 @@ unsigned long vlapic_write(struct vcpu *v, unsigned long address,
         printk("Local APIC Write to read-only register\n");
         break;
     }
-    return 1;
 }
 
-int vlapic_range(struct vcpu *v, unsigned long addr)
+static int vlapic_range(struct vcpu *v, unsigned long addr)
 {
     struct vlapic *vlapic = VLAPIC(v);
 
@@ -772,6 +776,12 @@ int vlapic_range(struct vcpu *v, unsigned long addr)
 
     return 0;
 }
+
+struct vmx_mmio_handler vlapic_mmio_handler = {
+    .check_handler = vlapic_range,
+    .read_handler = vlapic_read,
+    .write_handler = vlapic_write
+};
 
 void vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
 {
@@ -963,6 +973,8 @@ static int vlapic_reset(struct vlapic *vlapic)
     vlapic->dest_format = 0xffffffffU;
 
     vlapic->spurious_vec = 0xff;
+
+    vmx_vioapic_add_lapic(vlapic, v);
 
     init_ac_timer(&vlapic->vlapic_timer,
                   vlapic_timer_fn, vlapic, v->processor);
