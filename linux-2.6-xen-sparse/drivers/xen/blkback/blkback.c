@@ -13,6 +13,7 @@
 
 #include <linux/spinlock.h>
 #include <asm-xen/balloon.h>
+#include <asm/hypervisor.h>
 #include "common.h"
 
 /*
@@ -30,10 +31,16 @@
 static unsigned long mmap_vstart;
 #define MMAP_PAGES						\
 	(MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST)
+#ifdef __ia64__
+static void *pending_vaddrs[MMAP_PAGES];
+#define MMAP_VADDR(_idx, _i) \
+	(unsigned long)(pending_vaddrs[((_idx) * BLKIF_MAX_SEGMENTS_PER_REQUEST) + (_i)])
+#else
 #define MMAP_VADDR(_req,_seg)						\
 	(mmap_vstart +							\
 	 ((_req) * BLKIF_MAX_SEGMENTS_PER_REQUEST * PAGE_SIZE) +	\
 	 ((_seg) * PAGE_SIZE))
+#endif
 
 /*
  * Each outstanding request that we've passed to the lower device layers has a 
@@ -376,9 +383,13 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 	for (i = 0; i < nseg; i++) {
 		if (likely(map[i].handle >= 0)) {
 			pending_handle(pending_idx, i) = map[i].handle;
+#ifdef __ia64__
+			MMAP_VADDR(pending_idx,i) = gnttab_map_vaddr(map[i]);
+#else
 			phys_to_machine_mapping[__pa(MMAP_VADDR(
 				pending_idx, i)) >> PAGE_SHIFT] =
 				FOREIGN_FRAME(map[i].dev_bus_addr>>PAGE_SHIFT);
+#endif
 			fas        = req->frame_and_sects[i];
 			seg[i].buf = map[i].dev_bus_addr | 
 				(blkif_first_sect(fas) << 9);
@@ -501,11 +512,27 @@ static int __init blkif_init(void)
 	for (i = 0; i < MMAP_PAGES; i++)
 		pending_grant_handles[i] = BLKBACK_INVALID_HANDLE;
 
+	if (xen_init() < 0)
+		return -ENODEV;
+
 	blkif_interface_init();
 
+#ifdef __ia64__
+    {
+	extern unsigned long alloc_empty_foreign_map_page_range(unsigned long pages);
+	int i;
+
+	mmap_vstart =  alloc_empty_foreign_map_page_range(MMAP_PAGES);
+	printk("Allocated mmap_vstart: 0x%lx\n", mmap_vstart);
+	for(i = 0; i < MMAP_PAGES; i++)
+	    pending_vaddrs[i] = mmap_vstart + (i << PAGE_SHIFT);
+	BUG_ON(mmap_vstart == NULL);
+    }
+#else
 	page = balloon_alloc_empty_page_range(MMAP_PAGES);
 	BUG_ON(page == NULL);
 	mmap_vstart = (unsigned long)pfn_to_kaddr(page_to_pfn(page));
+#endif
 
 	pending_cons = 0;
 	pending_prod = MAX_PENDING_REQS;

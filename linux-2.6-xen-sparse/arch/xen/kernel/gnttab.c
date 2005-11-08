@@ -337,49 +337,7 @@ gnttab_request_free_callback(struct gnttab_free_callback *callback,
 #ifdef CONFIG_PROC_FS
 
 static struct proc_dir_entry *grant_pde;
-
-static int
-grant_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
-	    unsigned long data)
-{
-	int                     ret;
-	privcmd_hypercall_t     hypercall;
-
-	/*
-	 * XXX Need safety checks here if using for anything other
-	 *     than debugging.
-	 */
-	return -ENOSYS;
-
-	if ( cmd != IOCTL_PRIVCMD_HYPERCALL )
-		return -ENOSYS;
-
-	if ( copy_from_user(&hypercall, (void *)data, sizeof(hypercall)) )
-		return -EFAULT;
-
-	if ( hypercall.op != __HYPERVISOR_grant_table_op )
-		return -ENOSYS;
-
-	/* hypercall-invoking asm taken from privcmd.c */
-	__asm__ __volatile__ (
-		"pushl %%ebx; pushl %%ecx; pushl %%edx; "
-		"pushl %%esi; pushl %%edi; "
-		"movl  4(%%eax),%%ebx ;"
-		"movl  8(%%eax),%%ecx ;"
-		"movl 12(%%eax),%%edx ;"
-		"movl 16(%%eax),%%esi ;"
-		"movl 20(%%eax),%%edi ;"
-		"movl   (%%eax),%%eax ;"
-		TRAP_INSTR "; "
-		"popl %%edi; popl %%esi; popl %%edx; popl %%ecx; popl %%ebx"
-		: "=a" (ret) : "0" (&hypercall) : "memory" );
-
-	return ret;
-}
-
-static struct file_operations grant_file_ops = {
-	ioctl:  grant_ioctl,
-};
+static struct file_operations grant_file_ops;
 
 static int
 grant_read(char *page, char **start, off_t off, int count, int *eof,
@@ -437,8 +395,13 @@ gnttab_resume(void)
 	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1));
 	BUG_ON(setup.status != 0);
 
+#ifdef __ia64__
+	shared = __va(frames[0] << PAGE_SHIFT);
+	printk("grant table at %p\n", shared);
+#else
 	for (i = 0; i < NR_GRANT_FRAMES; i++)
 		set_fixmap(FIX_GNTTAB_END - i, frames[i] << PAGE_SHIFT);
+#endif
 
 	return 0;
 }
@@ -464,7 +427,9 @@ gnttab_init(void)
 
 	BUG_ON(gnttab_resume());
 
+#ifndef __ia64__
 	shared = (grant_entry_t *)fix_to_virt(FIX_GNTTAB_END);
+#endif
 
 	for (i = NR_RESERVED_ENTRIES; i < NR_GRANT_ENTRIES; i++)
 		gnttab_list[i] = i + 1;

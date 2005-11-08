@@ -26,14 +26,14 @@ XEN_SCRIPTS += network-route vif-route
 XEN_SCRIPTS += network-nat vif-nat
 XEN_SCRIPTS += block
 XEN_SCRIPTS += block-enbd block-nbd
-XEN_SCRIPTS += xen-script-common.sh
-XEN_SCRIPTS += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
-XEN_SCRIPTS += block-common.sh
+XEN_SCRIPT_DATA = xen-script-common.sh
+XEN_SCRIPT_DATA += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
+XEN_SCRIPT_DATA += block-common.sh
 
 XEN_HOTPLUG_DIR = /etc/hotplug
 XEN_HOTPLUG_SCRIPTS = xen-backend.agent
 
-UDEV_RULES_DIR = /etc/udev/rules.d
+UDEV_RULES_DIR = /etc/udev
 UDEV_RULES = xen-backend.rules
 
 DI = $(shell readlink -f $(DISTDIR))
@@ -77,6 +77,10 @@ install-scripts:
 	    do \
 	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
 	done
+	for i in $(XEN_SCRIPT_DATA); \
+	    do \
+	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
+	done
 
 install-hotplug:
 	[ -d $(DESTDIR)$(XEN_HOTPLUG_DIR) ] || \
@@ -88,10 +92,12 @@ install-hotplug:
 
 install-udev:
 	[ -d $(DESTDIR)$(UDEV_RULES_DIR) ] || \
-		$(INSTALL_DIR) $(DESTDIR)$(UDEV_RULES_DIR)
+		$(INSTALL_DIR) $(DESTDIR)$(UDEV_RULES_DIR)/rules.d
 	for i in $(UDEV_RULES); \
 	    do \
-	    $(INSTALL_PROG) $$i $(DESTDIR)$(UDEV_RULES_DIR); \
+	    $(INSTALL_DATA) $$i $(DESTDIR)$(UDEV_RULES_DIR); \
+	    ( cd $(DESTDIR)$(UDEV_RULES_DIR)/rules.d ; \
+	        ln -sf ../$$i . ) \
 	done
 
 clean:

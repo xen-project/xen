@@ -83,9 +83,8 @@ void schedule_tail(struct vcpu *next)
     if(VMX_DOMAIN(current)){
     	vmx_load_all_rr(current);
     }else{
-	    if (rr7 = load_region_regs(current)) {
-		    printk("schedule_tail: change to rr7 not yet implemented\n");
-    	}
+	    load_region_regs(current);
+            vcpu_load_kernel_regs(current);
     }
 }
 
@@ -185,6 +184,7 @@ void check_bad_nested_interruption(unsigned long isr, struct pt_regs *regs, unsi
 	if (!(PSCB(v,ipsr) & IA64_PSR_DT)) {
 		panic_domain(regs,"psr.dt off, trying to deliver nested dtlb!\n");
 	}
+	vector &= ~0xf;
 	if (vector != IA64_DATA_TLB_VECTOR &&
 		vector != IA64_ALT_DATA_TLB_VECTOR &&
 		vector != IA64_VHPT_TRANS_VECTOR) {

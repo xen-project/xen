@@ -24,7 +24,6 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/time.h>
-#include <linux/efi.h>
 
 #include <asm/io.h>
 #include <asm/kregs.h>
@@ -32,6 +31,8 @@
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/mca.h>
+
+#include <linux/efi.h>
 
 #define EFI_DEBUG	0
 

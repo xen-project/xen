@@ -1,49 +1,43 @@
 diff -Naur xen/privcmd/privcmd.c xen.patched/privcmd/privcmd.c
 --- xen/privcmd/privcmd.c	2005-09-23 10:54:50.000000000 -0600
 +++ xen.patched/privcmd/privcmd.c	2005-09-23 10:57:51.000000000 -0600
-@@ -134,6 +134,9 @@
- 				    > vma->vm_end )
- 					return -EINVAL;
- 
+@@ -180,6 +183,15 @@
+ 		for (i = 0; i < m.num; i++, addr += PAGE_SIZE, p++) {
+ 			if (get_user(mfn, p))
+ 				return -EFAULT;
 +#ifdef __ia64__
-+#define	direct_remap_pfn_range(a,b,c,d,e,f) remap_pfn_range(a,b,c,d,e)
-+#endif
- 				if ((rc = direct_remap_pfn_range(
- 					vma,
- 					msg[j].va&PAGE_MASK, 
-@@ -148,6 +151,7 @@
- 	}
- 	break;
++			ret = remap_pfn_range(vma,
++					      addr&PAGE_MASK,
++					      mfn,
++					      1<<PAGE_SHIFT,
++					      vma->vm_page_prot);
++			if (ret < 0)
++			    goto batch_err;
++#else
  
-+#ifndef __ia64__
- 	case IOCTL_PRIVCMD_MMAPBATCH: {
- 		mmu_update_t u;
- 		privcmd_mmapbatch_t m;
-@@ -206,7 +210,9 @@
- 	}
+ 			ret = create_lookup_pte_addr(vma->vm_mm, addr, &ptep);
+ 			if (ret)
+@@ -190,6 +202,7 @@
+ 
+ 			if (HYPERVISOR_mmu_update(&u, 1, NULL, m.dom) < 0)
+ 				put_user(0xF0000000 | mfn, p);
++#endif
+ 		}
+ 
+ 		ret = 0;
+@@ -205,6 +218,7 @@
  	break;
  #endif
-+#endif
  
 +#ifndef __ia64__
  	case IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN: {
  		unsigned long m2pv = (unsigned long)machine_to_phys_mapping;
  		pgd_t *pgd = pgd_offset_k(m2pv);
-@@ -218,6 +224,7 @@
+@@ -216,6 +230,7 @@
  			-EFAULT: 0;
  	}
  	break;
 +#endif
  
- 	case IOCTL_PRIVCMD_INITDOMAIN_STORE: {
- 		extern int do_xenbus_probe(void*);
-@@ -241,6 +248,9 @@
- 
- 		/* Initial connect. Setup channel and page. */
- 		xen_start_info->store_evtchn = data;
-+#ifdef __ia64__
-+#define	pfn_to_mfn(x)	(x)
-+#endif
- 		xen_start_info->store_mfn =
- 			pfn_to_mfn(virt_to_phys((void *)page) >>
- 				   PAGE_SHIFT);
+ 	default:
+ 		ret = -EINVAL;

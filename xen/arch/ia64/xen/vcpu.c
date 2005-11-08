@@ -135,6 +135,18 @@ vcpu_set_gr(VCPU *vcpu, unsigned reg, UINT64 value)
  VCPU privileged application register access routines
 **************************************************************************/
 
+void vcpu_load_kernel_regs(VCPU *vcpu)
+{
+	ia64_set_kr(0, VCPU(vcpu, krs[0]));
+	ia64_set_kr(1, VCPU(vcpu, krs[1]));
+	ia64_set_kr(2, VCPU(vcpu, krs[2]));
+	ia64_set_kr(3, VCPU(vcpu, krs[3]));
+	ia64_set_kr(4, VCPU(vcpu, krs[4]));
+	ia64_set_kr(5, VCPU(vcpu, krs[5]));
+	ia64_set_kr(6, VCPU(vcpu, krs[6]));
+	ia64_set_kr(7, VCPU(vcpu, krs[7]));
+}
+
 IA64FAULT vcpu_set_ar(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
 	if (reg == 44) return (vcpu_set_itc(vcpu,val));
@@ -1271,6 +1283,9 @@ IA64FAULT vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 #define itir_mask(itir) (~((1UL << itir_ps(itir)) - 1))
 
 unsigned long vhpt_translate_count = 0;
+unsigned long fast_vhpt_translate_count = 0;
+unsigned long recover_to_page_fault_count = 0;
+unsigned long recover_to_break_fault_count = 0;
 
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
@@ -1872,4 +1887,3 @@ IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 	// don't forget to recompute itr_regions
 	return (IA64_ILLOP_FAULT);
 }
-

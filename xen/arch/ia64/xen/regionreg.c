@@ -341,23 +341,13 @@ virtualize_rid(struct vcpu *v, unsigned long rrval)
 // rr7 (because we have to to assembly and physical mode
 // to change rr7).  If no change to rr7 is required, returns 0.
 //
-unsigned long load_region_regs(struct vcpu *v)
+void load_region_regs(struct vcpu *v)
 {
 	unsigned long rr0, rr1,rr2, rr3, rr4, rr5, rr6, rr7;
 	// TODO: These probably should be validated
 	unsigned long bad = 0;
 
 	if (VCPU(v,metaphysical_mode)) {
-		ia64_rr rrv;
-
-#if 0
-		rrv.rrval = 0;
-		rrv.rid = v->domain->arch.metaphysical_rr0;
-		rrv.ps = PAGE_SHIFT;
-		rrv.ve = 1;
-		rr0 = rrv.rrval;
-		set_rr_no_srlz(0x0000000000000000L, rr0);
-#endif
 		rr0 = v->domain->arch.metaphysical_rr0;
 		ia64_set_rr(0x0000000000000000L, rr0);
 		ia64_srlz_d();
@@ -383,5 +373,4 @@ unsigned long load_region_regs(struct vcpu *v)
 	if (bad) {
 		panic_domain(0,"load_region_regs: can't set! bad=%lx\n",bad);
 	}
-	return 0;
 }

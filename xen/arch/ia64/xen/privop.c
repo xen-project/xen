@@ -1040,6 +1040,9 @@ extern unsigned long dtlb_translate_count;
 extern unsigned long tr_translate_count;
 extern unsigned long phys_translate_count;
 extern unsigned long vhpt_translate_count;
+extern unsigned long fast_vhpt_translate_count;
+extern unsigned long recover_to_page_fault_count;
+extern unsigned long recover_to_break_fault_count;
 extern unsigned long lazy_cover_count;
 extern unsigned long idle_when_pending;
 extern unsigned long pal_halt_light_count;
@@ -1049,9 +1052,12 @@ int dump_misc_stats(char *buf)
 {
 	char *s = buf;
 	s += sprintf(s,"Virtual TR translations: %d\n",tr_translate_count);
-	s += sprintf(s,"Virtual VHPT translations: %d\n",vhpt_translate_count);
+	s += sprintf(s,"Virtual VHPT slow translations: %d\n",vhpt_translate_count);
+	s += sprintf(s,"Virtual VHPT fast translations: %d\n",fast_vhpt_translate_count);
 	s += sprintf(s,"Virtual DTLB translations: %d\n",dtlb_translate_count);
 	s += sprintf(s,"Physical translations: %d\n",phys_translate_count);
+	s += sprintf(s,"Recoveries to page fault: %d\n",recover_to_page_fault_count);
+	s += sprintf(s,"Recoveries to break fault: %d\n",recover_to_break_fault_count);
 	s += sprintf(s,"Idle when pending: %d\n",idle_when_pending);
 	s += sprintf(s,"PAL_HALT_LIGHT (no pending): %d\n",pal_halt_light_count);
 	s += sprintf(s,"context switches: %d\n",context_switch_count);
@@ -1065,6 +1071,9 @@ void zero_misc_stats(void)
 	tr_translate_count = 0;
 	phys_translate_count = 0;
 	vhpt_translate_count = 0;
+	fast_vhpt_translate_count = 0;
+	recover_to_page_fault_count = 0;
+	recover_to_break_fault_count = 0;
 	lazy_cover_count = 0;
 	pal_halt_light_count = 0;
 	idle_when_pending = 0;
