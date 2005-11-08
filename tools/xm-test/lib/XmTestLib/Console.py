@@ -167,6 +167,8 @@ class XmConsole:
             if self.consoleFd in i:
                 try:
                     str = os.read(self.consoleFd, 1)
+                    if self.debugMe:
+                        sys.stdout.write(str)
                     bytes += 1
                 except:
                     raise ConsoleError("Failed to read from console (fd=%i)"
@@ -179,8 +181,6 @@ class XmConsole:
                                    % self.limit)
 
             if str == "\n":
-                if self.debugMe:
-                    print "%s\n" % line
                 if lines > 0:
                     output += line + "\n"
                     if saveHistory:
