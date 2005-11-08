@@ -74,7 +74,7 @@ class xstransact:
                                ('%s, while writing %s : %s' %
                                 (ex.args[1], path, str(data))))
 
-    def write(self, *args, **opts):
+    def write(self, *args):
         if len(args) == 0:
             raise TypeError
         if isinstance(args[0], dict):
@@ -235,11 +235,11 @@ class xstransact:
 
     Read = classmethod(Read)
 
-    def Write(cls, path, *args, **opts):
+    def Write(cls, path, *args):
         while True:
             t = cls(path)
             try:
-                t.write(*args, **opts)
+                t.write(*args)
                 if t.commit():
                     return
             except:
