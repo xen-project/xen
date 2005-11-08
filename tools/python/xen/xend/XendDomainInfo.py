@@ -90,6 +90,8 @@ ZOMBIE_PREFIX = 'Zombie-'
 """Minimum time between domain restarts in seconds."""
 MINIMUM_RESTART_TIME = 20
 
+RESTART_IN_PROGRESS = 'xend/restart_in_progress'
+
 
 xc = xen.lowlevel.xc.new()
 xroot = XendRoot.instance()
@@ -895,6 +897,14 @@ class XendDomainInfo:
         return self.getDeviceController(deviceClass).createDevice(devconfig)
 
 
+    def waitForDevices_(self, deviceClass):
+        return self.getDeviceController(deviceClass).waitForDevices()
+
+
+    def waitForDevice(self, deviceClass, devid):
+        return self.getDeviceController(deviceClass).waitForDevice(devid)
+
+
     def reconfigureDevice(self, deviceClass, devid, devconfig):
         return self.getDeviceController(deviceClass).reconfigureDevice(
             devid, devconfig)
@@ -1230,6 +1240,15 @@ class XendDomainInfo:
             self.image.createDeviceModel()
 
 
+    def waitForDevices(self):
+        """Wait for this domain's configured devices to connect.
+
+        @raise: VmError if any device fails to initialise.
+        """
+        for c in controllerClasses:
+            self.waitForDevices_(c)
+
+
     def device_create(self, dev_config):
         """Create a new device.
 
@@ -1237,6 +1256,7 @@ class XendDomainInfo:
         """
         dev_type = sxp.name(dev_config)
         devid = self.createDevice(dev_type, dev_config)
+        self.waitForDevice(dev_type, devid)
 #        self.config.append(['device', dev.getConfig()])
         return self.getDeviceController(dev_type).sxpr(devid)
 
@@ -1269,14 +1289,14 @@ class XendDomainInfo:
 
         config = self.sxpr()
 
-        if self.readVm('xend/restart_in_progress'):
+        if self.readVm(RESTART_IN_PROGRESS):
             log.error('Xend failed during restart of domain %d.  '
                       'Refusing to restart to avoid loops.',
                       self.domid)
             self.destroy()
             return
 
-        self.writeVm('xend/restart_in_progress', 'True')
+        self.writeVm(RESTART_IN_PROGRESS, 'True')
 
         now = time.time()
         rst = self.readVm('xend/previous_restart_time')
@@ -1298,26 +1318,28 @@ class XendDomainInfo:
                 self.preserveForRestart()
             else:
                 self.destroyDomain()
-                
+
+            # new_dom's VM will be the same as this domain's VM, except where
+            # the rename flag has instructed us to call preserveForRestart.
+            # In that case, it is important that we remove the
+            # RESTART_IN_PROGRESS node from the new domain, not the old one,
+            # once the new one is available.
+
+            new_dom = None
             try:
                 xd = get_component('xen.xend.XendDomain')
                 new_dom = xd.domain_create(config)
-                try:
-                    new_dom.unpause()
-                except:
-                    new_dom.destroy()
-                    raise
+                new_dom.unpause()
+                new_dom.removeVm(RESTART_IN_PROGRESS)
             except:
-                log.exception('Failed to restart domain %d.', self.domid)
-        finally:
-            # new_dom's VM will be the same as this domain's VM, except where
-            # the rename flag has instructed us to call preserveForRestart.
-            # In that case, it is important that we use new_dom.removeVm, not
-            # self.removeVm.
-            new_dom.removeVm('xend/restart_in_progress')
-            
-        # self.configure_bootloader()
-        #        self.exportToDB()
+                if new_dom:
+                    new_dom.removeVm(RESTART_IN_PROGRESS)
+                    new_dom.destroy()
+                else:
+                    self.removeVm(RESTART_IN_PROGRESS)
+                raise
+        except:
+            log.exception('Failed to restart domain %d.', self.domid)
 
 
     def preserveForRestart(self):

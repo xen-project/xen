@@ -815,6 +815,10 @@ def make_domain(opts, config):
 
     dom = sxp.child_value(dominfo, 'name')
 
+    if server.xend_domain_wait_for_devices(dom) < 0:
+        server.xend_domain_destroy(dom)
+        err("Device creation failed for domain %s" % dom)
+
     if not opts.vals.paused:
         if server.xend_domain_unpause(dom) < 0:
             server.xend_domain_destroy(dom)

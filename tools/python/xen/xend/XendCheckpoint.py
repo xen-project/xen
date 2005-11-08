@@ -209,9 +209,9 @@ def forkHelper(cmd, fd, inputHandler, closeToChild):
         raise XendError("%s failed" % string.join(cmd))
 
 
-def slurp(file):
+def slurp(infile):
     while 1:
-        line = file.readline()
+        line = infile.readline()
         if line == "":
             break
         else:
