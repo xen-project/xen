@@ -897,6 +897,14 @@ class XendDomainInfo:
         return self.getDeviceController(deviceClass).createDevice(devconfig)
 
 
+    def waitForDevices_(self, deviceClass):
+        return self.getDeviceController(deviceClass).waitForDevices()
+
+
+    def waitForDevice(self, deviceClass, devid):
+        return self.getDeviceController(deviceClass).waitForDevice(devid)
+
+
     def reconfigureDevice(self, deviceClass, devid, devconfig):
         return self.getDeviceController(deviceClass).reconfigureDevice(
             devid, devconfig)
@@ -1232,6 +1240,15 @@ class XendDomainInfo:
             self.image.createDeviceModel()
 
 
+    def waitForDevices(self):
+        """Wait for this domain's configured devices to connect.
+
+        @raise: VmError if any device fails to initialise.
+        """
+        for c in controllerClasses:
+            self.waitForDevices_(c)
+
+
     def device_create(self, dev_config):
         """Create a new device.
 
@@ -1239,6 +1256,7 @@ class XendDomainInfo:
         """
         dev_type = sxp.name(dev_config)
         devid = self.createDevice(dev_type, dev_config)
+        self.waitForDevice(dev_type, devid)
 #        self.config.append(['device', dev.getConfig()])
         return self.getDeviceController(dev_type).sxpr(devid)
 

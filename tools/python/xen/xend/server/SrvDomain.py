@@ -13,6 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 Xensource Ltd
 #============================================================================
 
 from xen.web import http
@@ -61,6 +62,10 @@ class SrvDomain(SrvDir):
     def op_sysrq(self, _, req):
         self.acceptCommand(req)
         return self.dom.send_sysrq(int(req.args['key'][0]))
+
+    def op_wait_for_devices(self, _, req):
+        self.acceptCommand(req)
+        return self.dom.waitForDevices()
 
     def op_destroy(self, _, req):
         self.acceptCommand(req)

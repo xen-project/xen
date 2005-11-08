@@ -62,6 +62,18 @@ class DevController:
 
         self.writeDetails(config, devid, back, front)
 
+        return devid
+
+
+    def waitForDevices(self):
+        log.debug("Waiting for devices %s.", self.deviceClass)
+        
+        return map(self.waitForDevice, self.deviceIDs())
+
+
+    def waitForDevice(self, devid):
+        log.debug("Waiting for %s.", devid)
+        
         status, fn_ret = self.waitForBackend(devid)
         if status:
             self.destroyDevice(devid)
@@ -74,7 +86,6 @@ class DevController:
             raise VmError( ("Device %s (%s) could not be connected. "
                             "Backend device not found!") 
                             % (devid, self.deviceClass))
-        return devid
 
 
     def reconfigureDevice(self, devid, config):
@@ -122,10 +133,11 @@ class DevController:
         specified device.  This would be suitable for giving to {@link
         #createDevice} in order to recreate that device."""
 
-        backdomid = int(xstransact.Read(self.frontendPath(devid),
-                                        "backend-id"))
-
-        return [self.deviceClass, ['backend', backdomid]]
+        backdomid = xstransact.Read(self.frontendPath(devid), "backend-id")
+        if backdomid is None:
+            raise VmError("Device %s not connected" % devid)
+        
+        return [self.deviceClass, ['backend', int(backdomid)]]
 
 
     def sxprs(self):
@@ -200,7 +212,10 @@ class DevController:
     def readBackend(self, devid, *args):
         frontpath = self.frontendPath(devid)
         backpath = xstransact.Read(frontpath, "backend")
-        return xstransact.Read(backpath, *args)
+        if backpath:
+            return xstransact.Read(backpath, *args)
+        else:
+            raise VmError("Device %s not connected" % devid)
 
 
     def deviceIDs(self):
@@ -242,6 +257,8 @@ class DevController:
         frontpath = self.frontendPath(devid)
         backpath  = self.backendPath(backdom, devid)
         
+        xstransact.Remove(backpath, HOTPLUG_STATUS_NODE)
+
         frontDetails.update({
             'backend' : backpath,
             'backend-id' : "%i" % backdom.getDomid()
@@ -266,7 +283,10 @@ class DevController:
         ev = Event()
 
         def hotplugStatus():
-            status = self.readBackend(devid, HOTPLUG_STATUS_NODE)
+            try:
+                status = self.readBackend(devid, HOTPLUG_STATUS_NODE)
+            except VmError:
+                status = "died"
             if status is not None:
                 watch.xs.unwatch(backpath, watch)
                 hotplugStatus.value = status
@@ -276,14 +296,16 @@ class DevController:
         frontpath = self.frontendPath(devid)
         backpath = xstransact.Read(frontpath, "backend")
 
-        watch = xswatch(backpath, hotplugStatus)
+        if backpath:
+            watch = xswatch(backpath, hotplugStatus)
 
-        ev.wait(DEVICE_CREATE_TIMEOUT)
-        if ev.isSet():
-            return (0, hotplugStatus.value)
+            ev.wait(DEVICE_CREATE_TIMEOUT)
+            if ev.isSet():
+                return (0, hotplugStatus.value)
+            else:
+                return (-1, hotplugStatus.value)
         else:
-            return (-1, hotplugStatus.value)
-
+            return (-1, "missing")
 
 
     def backendPath(self, backdom, devid):

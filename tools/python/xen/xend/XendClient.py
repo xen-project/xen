@@ -220,6 +220,10 @@ class Xend:
     def xend_domain(self, id):
         return self.xendGet(self.domainurl(id))
 
+    def xend_domain_wait_for_devices(self, id):
+        return self.xendPost(self.domainurl(id),
+                             {'op'      : 'wait_for_devices' })
+
     def xend_domain_unpause(self, id):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'unpause' })
