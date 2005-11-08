@@ -37,8 +37,10 @@
 
 extern void free_shadow_pages(struct domain *d);
 
+#if 0 // this code has not been updated for 32pae & 64 bit modes
 #if SHADOW_DEBUG
 static void mark_shadows_as_reflecting_snapshot(struct domain *d, unsigned long gpfn);
+#endif
 #endif
 
 #if CONFIG_PAGING_LEVELS == 3
@@ -898,8 +900,10 @@ mark_mfn_out_of_sync(struct vcpu *v, unsigned long gpfn,
     entry->snapshot_mfn = shadow_make_snapshot(d, gpfn, mfn);
     entry->writable_pl1e = -1;
 
+#if 0 // this code has not been updated for 32pae & 64 bit modes
 #if SHADOW_DEBUG
     mark_shadows_as_reflecting_snapshot(d, gpfn);
+#endif
 #endif
 
     // increment guest's ref count to represent the entry in the
@@ -1317,18 +1321,17 @@ static int resync_all(struct domain *d, u32 stype)
 
         if ( !smfn )
         {
+            // For heavy weight shadows: no need to update refcounts if
+            // there's no shadow page.
+            //
             if ( shadow_mode_refcounts(d) )
                 continue;
 
-            // For light weight shadows, even when no shadow page exists,
-            // we need to resync the refcounts to the new contents of the
-            // guest page.
-            // This only applies when we have writable page tables.
+            // For light weight shadows: only need up resync the refcounts to
+            // the new contents of the guest page iff this it has the right
+            // page type.
             //
-            if ( !shadow_mode_write_all(d) &&
-                 !((stype == PGT_l1_shadow) &&
-                   VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
-                // Page is not writable -- no resync necessary
+            if ( stype != ( pfn_to_page(entry->gmfn)->u.inuse.type_info & PGT_type_mask) )
                 continue;
         }
 
@@ -1365,8 +1368,8 @@ static int resync_all(struct domain *d, u32 stype)
             guest_l1_pgentry_t *snapshot1 = snapshot;
             int unshadow_l1 = 0;
 
-            ASSERT(VM_ASSIST(d, VMASST_TYPE_writable_pagetables) ||
-                   shadow_mode_write_all(d));
+            ASSERT(shadow_mode_write_l1(d) ||
+                   shadow_mode_write_all(d) || shadow_mode_wr_pt_pte(d));
 
             if ( !shadow_mode_refcounts(d) )
                 revalidate_l1(d, (l1_pgentry_t *)guest1, (l1_pgentry_t *)snapshot1);
@@ -1427,7 +1430,7 @@ static int resync_all(struct domain *d, u32 stype)
             l2_pgentry_t *shadow2 = shadow;
             l2_pgentry_t *snapshot2 = snapshot;
 
-            ASSERT(shadow_mode_write_all(d));
+            ASSERT(shadow_mode_write_all(d) || shadow_mode_wr_pt_pte(d));
             BUG_ON(!shadow_mode_refcounts(d)); // not yet implemented
 
             changed = 0;
@@ -1473,7 +1476,7 @@ static int resync_all(struct domain *d, u32 stype)
             l2_pgentry_t *snapshot2 = snapshot;
             l1_pgentry_t *shadow2 = shadow;
 
-            ASSERT(shadow_mode_write_all(d));
+            ASSERT(shadow_mode_write_all(d) || shadow_mode_wr_pt_pte(d));
             BUG_ON(!shadow_mode_refcounts(d)); // not yet implemented
 
             changed = 0;
@@ -1822,8 +1825,13 @@ static int shadow_fault_32(unsigned long va, struct cpu_user_regs *regs)
                 goto fail;
             }
         }
+        else if ( unlikely(!shadow_mode_wr_pt_pte(d) && mfn_is_page_table(l1e_get_pfn(gpte))) )
+        {
+            SH_LOG("l1pte_write_fault: no write access to page table page");
+            domain_crash_synchronous();
+        }
 
-        if ( !l1pte_write_fault(v, &gpte, &spte, va) )
+        if ( unlikely(!l1pte_write_fault(v, &gpte, &spte, va)) )
         {
             SH_VVLOG("shadow_fault - EXIT: l1pte_write_fault failed");
             perfc_incrc(write_fault_bail);
@@ -2072,6 +2080,7 @@ static void shadow_update_pagetables(struct vcpu *v)
 /************************************************************************/
 /************************************************************************/
 
+#if 0 // this code has not been updated for 32pae & 64 bit modes
 #if SHADOW_DEBUG
 
 // The following is entirely for _check_pagetable()'s benefit.
@@ -2118,8 +2127,8 @@ mark_shadows_as_reflecting_snapshot(struct domain *d, unsigned long gpfn)
 // BUG: these are not SMP safe...
 static int sh_l2_present;
 static int sh_l1_present;
-char * sh_check_name;
-int shadow_status_noswap;
+static char *sh_check_name;
+// int shadow_status_noswap; // declared in shadow32.c
 
 #define v2m(_v, _adr) ({                                                     \
     unsigned long _a  = (unsigned long)(_adr);                               \
@@ -2218,11 +2227,11 @@ static int check_pte(
 
     guest_writable =
         (l1e_get_flags(eff_guest_pte) & _PAGE_RW) ||
-        (VM_ASSIST(d, VMASST_TYPE_writable_pagetables) && (level == 1) && mfn_out_of_sync(eff_guest_mfn));
+        (shadow_mode_write_l1(d) && (level == 1) && mfn_out_of_sync(eff_guest_mfn));
 
     if ( (l1e_get_flags(shadow_pte) & _PAGE_RW ) && !guest_writable )
     {
-        printk("eff_guest_pfn=%lx eff_guest_mfn=%lx shadow_mfn=%lx t=0x%08x page_table_page=%d\n",
+        printk("eff_guest_pfn=%lx eff_guest_mfn=%lx shadow_mfn=%lx t=0x%08lx page_table_page=%d\n",
                eff_guest_pfn, eff_guest_mfn, shadow_mfn,
                frame_table[eff_guest_mfn].u.inuse.type_info,
                page_table_page);
@@ -2233,7 +2242,7 @@ static int check_pte(
          (l1e_get_flags(shadow_pte) & _PAGE_RW ) &&
          !(guest_writable && (l1e_get_flags(eff_guest_pte) & _PAGE_DIRTY)) )
     {
-        printk("eff_guest_pfn=%lx eff_guest_mfn=%lx shadow_mfn=%lx t=0x%08x page_table_page=%d\n",
+        printk("eff_guest_pfn=%lx eff_guest_mfn=%lx shadow_mfn=%lx t=0x%08lx page_table_page=%d\n",
                eff_guest_pfn, eff_guest_mfn, shadow_mfn,
                frame_table[eff_guest_mfn].u.inuse.type_info,
                page_table_page);
@@ -2393,13 +2402,12 @@ static int check_l2_table(
 }
 #undef FAILPT
 
-static int _check_pagetable(struct vcpu *v, char *s)
+int _check_pagetable(struct vcpu *v, char *s)
 {
     struct domain *d = v->domain;
 #if defined (__x86_64__)
     pagetable_t pt = ((v->arch.flags & TF_kernel_mode)?
-                      pagetable_get_pfn(v->arch.guest_table) :
-                      pagetable_get_pfn(v->arch.guest_table_user));
+                      v->arch.guest_table : v->arch.guest_table_user);
 #else
     pagetable_t pt = v->arch.guest_table;
 #endif
@@ -2539,6 +2547,7 @@ int _check_all_pagetables(struct vcpu *v, char *s)
 }
 
 #endif // SHADOW_DEBUG
+#endif // this code has not been updated for 32pae & 64 bit modes
 
 #if CONFIG_PAGING_LEVELS == 3
 static unsigned long shadow_l3_table(

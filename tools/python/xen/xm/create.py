@@ -756,7 +756,7 @@ def choose_vnc_display():
 vncpid = None
 
 def spawn_vnc(display):
-    vncargs = (["vncviewer" + "-log", "*:stdout:0",
+    vncargs = (["vncviewer", "-log", "*:stdout:0",
             "-listen", "%d" % (VNC_BASE_PORT + display) ])
     global vncpid    
     vncpid = os.spawnvp(os.P_NOWAIT, "vncviewer", vncargs)
