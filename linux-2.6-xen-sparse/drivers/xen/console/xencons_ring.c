@@ -86,7 +86,7 @@ int xencons_ring_init(void)
 	int err;
 
 	if (xencons_irq)
-		unbind_evtchn_from_irqhandler(xencons_irq, NULL);
+		unbind_from_irqhandler(xencons_irq, NULL);
 	xencons_irq = 0;
 
 	if (!xen_start_info->console_evtchn)

@@ -358,7 +358,7 @@ static void blkif_free(struct blkfront_info *info)
 		info->ring.sring = NULL;
 	}
 	if (info->irq)
-		unbind_evtchn_from_irqhandler(info->irq, info); 
+		unbind_from_irqhandler(info->irq, info); 
 	info->evtchn = info->irq = 0;
 }
 

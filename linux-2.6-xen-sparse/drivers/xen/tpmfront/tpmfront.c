@@ -300,7 +300,7 @@ static void destroy_tpmring(struct tpmfront_info *info, struct tpm_private *tp)
 	}
 
 	if (tp->irq)
-		unbind_evtchn_from_irqhandler(tp->irq, NULL);
+		unbind_from_irqhandler(tp->irq, NULL);
 	tp->evtchn = tp->irq = 0;
 }
 

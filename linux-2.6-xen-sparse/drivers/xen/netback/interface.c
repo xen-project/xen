@@ -241,7 +241,7 @@ static void free_netif_callback(void *arg)
 	if (!netif->irq)
 		return;
 
-	unbind_evtchn_from_irqhandler(netif->irq, netif);
+	unbind_from_irqhandler(netif->irq, netif);
 	netif->irq = 0;
 
 	unregister_netdev(netif->dev);

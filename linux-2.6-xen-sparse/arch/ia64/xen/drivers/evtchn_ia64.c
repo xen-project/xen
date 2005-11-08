@@ -30,12 +30,6 @@ unsigned int bind_virq_to_evtchn(int virq)
     return op.u.bind_virq.port;
 }
 
-int bind_virq_to_irq(int virq, int cpu)
-{
-	printk("bind_virq_to_irq called... FIXME??\n");
-	while(1);
-}
-
 #if 0
 void notify_remote_via_irq(int virq)
 {
@@ -43,19 +37,6 @@ void notify_remote_via_irq(int virq)
 	while(1);
 }
 #endif
-
-void unbind_virq_from_evtchn(int virq)
-{
-    evtchn_op_t op;
-
-    op.cmd = EVTCHNOP_close;
-//    op.u.close.dom = DOMID_SELF;
-    op.u.close.port = virq_to_evtchn[virq];
-    if ( HYPERVISOR_event_channel_op(&op) != 0 )
-	BUG();
-
-    virq_to_evtchn[virq] = -1;
-}
 
 int bind_evtchn_to_irqhandler(unsigned int evtchn,
                    irqreturn_t (*handler)(int, void *, struct pt_regs *),
