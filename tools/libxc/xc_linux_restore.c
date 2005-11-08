@@ -8,32 +8,30 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+
 #include "xg_private.h"
-#include <xenctrl.h>
-#include <xen/memory.h>
+#include "xg_save_restore.h"
 
-#define MAX_BATCH_SIZE 1024
 
-#define DEBUG 0
 
-#if 1
-#define ERR(_f, _a...) do { fprintf ( stderr, _f , ## _a ); fflush(stderr); } while(0)
-#else
-#define ERR(_f, _a...) ((void)0)
-#endif
+/* max mfn of the whole machine */
+static uint32_t max_mfn; 
 
-#if DEBUG
-#define DPRINTF(_f, _a...) do { fprintf ( stdout, _f , ## _a ); fflush(stdout); } while (0)
-#else
-#define DPRINTF(_f, _a...) ((void)0)
-#endif
+/* virtual starting address of the hypervisor */
+static uint32_t hvirt_start; 
 
-#define PROGRESS 0
-#if PROGRESS
-#define PPRINTF(_f, _a...) fprintf ( stderr, _f , ## _a ); fflush(stderr)
-#else
-#define PPRINTF(_f, _a...)
-#endif
+/* #levels of page tables used by the currrent guest */
+static uint32_t pt_levels; 
+
+/* total number of pages used by the current guest */
+static unsigned long max_pfn;
+
+/* Live mapping of the table mapping each PFN to its current MFN. */
+static unsigned long *live_p2m = NULL;
+
+/* A table mapping each PFN to its new MFN. */
+static unsigned long *p2m = NULL;
+
 
 static ssize_t
 read_exact(int fd, void *buf, size_t count)
@@ -45,24 +43,93 @@ read_exact(int fd, void *buf, size_t count)
         s = read(fd, &b[r], count - r);
         if ((s == -1) && (errno == EINTR))
             continue;
-        if (s <= 0)
+        if (s <= 0) { 
             break;
+        } 
         r += s;
     }
 
-    return r;
+    return (r == count) ? 1 : 0; 
 }
 
-int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pfns,
+
+/*
+** In the state file (or during transfer), all page-table pages are 
+** converted into a 'canonical' form where references to actual mfns 
+** are replaced with references to the corresponding pfns. 
+** This function inverts that operation, replacing the pfn values with 
+** the (now known) appropriate mfn values. 
+*/
+int uncanonicalize_pagetable(unsigned long type, void *page) 
+{ 
+    int i, pte_last, xen_start, xen_end; 
+    unsigned long pfn; 
+    uint64_t pte; 
+
+    /* 
+    ** We need to determine which entries in this page table hold
+    ** reserved hypervisor mappings. This depends on the current
+    ** page table type as well as the number of paging levels. 
+    */
+    xen_start = xen_end = pte_last = PAGE_SIZE / ((pt_levels == 2)? 4 : 8); 
+    
+    if (pt_levels == 2 && type == L2TAB)
+        xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT); 
+
+    if (pt_levels == 3 && type == L3TAB) 
+        xen_start = L3_PAGETABLE_ENTRIES_PAE; 
+
+
+    /* Now iterate through the page table, uncanonicalizing each PTE */
+    for(i = 0; i < pte_last; i++) { 
+        
+        if(pt_levels == 2) 
+            pte = ((uint32_t *)page)[i]; 
+        else 
+            pte = ((uint64_t *)page)[i]; 
+        
+        if(i >= xen_start && i < xen_end) 
+            pte = 0; 
+        
+        if(pte & _PAGE_PRESENT) { 
+            
+            pfn = pte >> PAGE_SHIFT; 
+            
+            if(pfn >= max_pfn) { 
+                ERR("Frame number in type %lu page table is out of range: "
+                    "i=%d pfn=0x%lx max_pfn=%lu", 
+                    type >> 28, i, pfn, max_pfn);
+                return 0; 
+            } 
+            
+            
+            if(type == L1TAB) 
+                pte &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PAT);
+            else 
+                pte &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PSE);
+            
+            pte |= p2m[pfn] << PAGE_SHIFT;
+            
+            if(pt_levels == 2) 
+                ((uint32_t *)page)[i] = (uint32_t)pte; 
+            else 
+                ((uint64_t *)page)[i] = (uint64_t)pte; 
+        }
+    }
+    
+    return 1; 
+}
+
+int xc_linux_restore(int xc_handle, int io_fd, 
+                     uint32_t dom, unsigned long nr_pfns, 
                      unsigned int store_evtchn, unsigned long *store_mfn,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
     dom0_op_t op;
-    int rc = 1, i, n, k;
-    unsigned long mfn, pfn, xpfn;
+    int rc = 1, i, n;
+    unsigned long mfn, pfn; 
     unsigned int prev_pc, this_pc;
     int verify = 0;
-    int err;
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
@@ -72,28 +139,20 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pf
     /* A copy of the CPU context of the guest. */
     vcpu_guest_context_t ctxt;
 
-    /* A table containg the type of each PFN (/not/ MFN!). */
+    /* A table containing the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
 
     /* A table of MFNs to map in the current region */
     unsigned long *region_mfn = NULL;
 
     /* A temporary mapping, and a copy, of one frame of guest memory. */
-    unsigned long *ppage = NULL;
+    unsigned long *page = NULL;
 
     /* A copy of the pfn-to-mfn table frame list. */
-    unsigned long pfn_to_mfn_frame_list[1024];
-
-    /* A table mapping each PFN to its new MFN. */
-    unsigned long *pfn_to_mfn_table = NULL;
-
-    /* used by mapper for updating the domain's copy of the table */
-    unsigned long *live_pfn_to_mfn_table = NULL;
+    unsigned long *p2m_frame_list = NULL; 
 
     /* A temporary mapping of the guest's start_info page. */
     start_info_t *start_info;
-
-    int pt_levels = 2; /* XXX auto-detect this */
 
     char *region_base;
 
@@ -102,37 +161,60 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pf
     /* used by debug verify code */
     unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
 
-#define MAX_PIN_BATCH 1024
     struct mmuext_op pin[MAX_PIN_BATCH];
     unsigned int nr_pins = 0;
 
-    DPRINTF("xc_linux_restore start: nr_pfns = %lx\n", nr_pfns);
+
+    max_pfn = nr_pfns; 
+
+    DPRINTF("xc_linux_restore start: max_pfn = %lx\n", max_pfn);
+
+
+    if(!get_platform_info(xc_handle, dom, 
+                          &max_mfn, &hvirt_start, &pt_levels)) {
+        ERR("Unable to get platform info."); 
+        return 1;
+    }
+
 
     if (mlock(&ctxt, sizeof(ctxt))) {
-        /* needed for when we do the build dom0 op, 
-           but might as well do early */
+        /* needed for build dom0 op, but might as well do early */
         ERR("Unable to mlock ctxt");
         return 1;
     }
 
-    if (read_exact(io_fd, pfn_to_mfn_frame_list, PAGE_SIZE) != PAGE_SIZE) {
-        ERR("read pfn_to_mfn_frame_list failed");
+
+    /* Only have to worry about vcpu 0 even for SMP */
+    if (xc_domain_get_vcpu_context( xc_handle, dom, 0, &ctxt)) {
+        ERR("Could not get vcpu context");
         goto out;
     }
 
-    /* We want zeroed memory so use calloc rather than malloc. */
-    pfn_to_mfn_table = calloc(4, nr_pfns);
-    pfn_type = calloc(4, nr_pfns);    
-    region_mfn = calloc(4, MAX_BATCH_SIZE);
+    
+    /* Read the saved P2M frame list */
+    if(!(p2m_frame_list = malloc(P2M_FL_SIZE))) { 
+        ERR("Couldn't allocate p2m_frame_list array");
+        goto out;
+    }
+    
+    if (!read_exact(io_fd, p2m_frame_list, P2M_FL_SIZE)) { 
+        ERR("read p2m_frame_list failed");
+        goto out;
+    }
 
-    if ((pfn_to_mfn_table == NULL) || (pfn_type == NULL) || 
-        (region_mfn == NULL)) {
+    
+    /* We want zeroed memory so use calloc rather than malloc. */
+    p2m        = calloc(sizeof(unsigned long), max_pfn); 
+    pfn_type   = calloc(sizeof(unsigned long), max_pfn);    
+    region_mfn = calloc(sizeof(unsigned long), MAX_BATCH_SIZE);
+
+    if ((p2m == NULL) || (pfn_type == NULL) || (region_mfn == NULL)) {
         ERR("memory alloc failed");
         errno = ENOMEM;
         goto out;
     }
     
-    if (mlock(region_mfn, 4 * MAX_BATCH_SIZE)) {
+    if (mlock(region_mfn, sizeof(unsigned long) * MAX_BATCH_SIZE)) {
         ERR("Could not mlock region_mfn");
         goto out;
     }
@@ -146,35 +228,30 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pf
     }
     shared_info_frame = op.u.getdomaininfo.shared_info_frame;
 
-    err = xc_domain_setmaxmem(xc_handle, dom, nr_pfns * PAGE_SIZE / 1024);
-    if (err != 0) {
+    if(xc_domain_setmaxmem(xc_handle, dom, PFN_TO_KB(max_pfn)) != 0) { 
         errno = ENOMEM;
         goto out;
     }
-
-    err = xc_domain_memory_increase_reservation(xc_handle, dom,
-                                                nr_pfns, 0, 0, NULL);
-    if (err != 0) {
-        ERR("Failed to increase reservation by %lx\n", 
-            nr_pfns * PAGE_SIZE / 1024); 
+    
+    if(xc_domain_memory_increase_reservation(
+           xc_handle, dom, max_pfn, 0, 0, NULL) != 0) { 
+        ERR("Failed to increase reservation by %lx KB\n", max_pfn); 
         errno = ENOMEM;
         goto out;
     }
 
     /* Build the pfn-to-mfn table. We choose MFN ordering returned by Xen. */
-    if (xc_get_pfn_list(xc_handle, dom, pfn_to_mfn_table, nr_pfns) !=
-        nr_pfns) {
+    if (xc_get_pfn_list(xc_handle, dom, p2m, max_pfn) != max_pfn) {
         ERR("Did not read correct number of frame numbers for new dom");
         goto out;
     }
-
-    mmu = xc_init_mmu_updates(xc_handle, dom);
-    if (mmu == NULL) {
+    
+    if(!(mmu = xc_init_mmu_updates(xc_handle, dom))) { 
         ERR("Could not initialise for MMU updates");
         goto out;
     }
 
-    DPRINTF("Reloading memory pages:   0%%");
+    DPRINTF("Reloading memory pages:   0%%\n");
 
     /*
      * Now simply read each saved frame into its new machine frame.
@@ -183,258 +260,229 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pf
     prev_pc = 0;
 
     n = 0;
-    while ( 1 )
-    {
+    while (1) { 
+
         int j;
         unsigned long region_pfn_type[MAX_BATCH_SIZE];
 
-        this_pc = (n * 100) / nr_pfns;
+        this_pc = (n * 100) / max_pfn;
         if ( (this_pc - prev_pc) >= 5 )
         {
             PPRINTF("\b\b\b\b%3d%%", this_pc);
             prev_pc = this_pc;
         }
 
-        if ( read_exact(io_fd, &j, sizeof(int)) != sizeof(int) )
-        {
+        if (!read_exact(io_fd, &j, sizeof(int))) { 
             ERR("Error when reading batch size");
             goto out;
         }
 
         PPRINTF("batch %d\n",j);
  
-        if ( j == -1 )
-        {
+        if (j == -1) {
             verify = 1;
-            printf("Entering page verify mode\n");
+            fprintf(stderr, "Entering page verify mode\n");
             continue;
         }
 
-        if ( j == 0 )
+        if (j == 0)
             break;  /* our work here is done */
 
-        if ( j > MAX_BATCH_SIZE )
-        {
+        if (j > MAX_BATCH_SIZE) { 
             ERR("Max batch size exceeded. Giving up.");
             goto out;
         }
  
-        if ( read_exact(io_fd, region_pfn_type, j*sizeof(unsigned long)) !=
-             j*sizeof(unsigned long) ) {
+        if (!read_exact(io_fd, region_pfn_type, j*sizeof(unsigned long))) { 
             ERR("Error when reading region pfn types");
             goto out;
         }
 
-        for ( i = 0; i < j; i++ )
-        {
-            if ( (region_pfn_type[i] & LTAB_MASK) == XTAB)
-            {
+        for (i = 0; i < j; i++) { 
+
+            if ((region_pfn_type[i] & LTAB_MASK) == XTAB)
                 region_mfn[i] = 0; /* we know map will fail, but don't care */
-            }
-            else
-            {  
-                pfn = region_pfn_type[i] & ~LTAB_MASK;
-                region_mfn[i] = pfn_to_mfn_table[pfn];
-            }          
+            else 
+                region_mfn[i] = p2m[region_pfn_type[i] & ~LTAB_MASK]; 
+
         }
  
-        if ( (region_base = xc_map_foreign_batch( xc_handle, dom, 
-                                                  PROT_WRITE,
-                                                  region_mfn,
-                                                  j )) == 0 )
-        {
+        if (!(region_base = xc_map_foreign_batch(
+                  xc_handle, dom, PROT_WRITE, region_mfn, j))) {  
             ERR("map batch failed");
             goto out;
         }
 
         for ( i = 0; i < j; i++ )
         {
-            unsigned long *ppage;
+            void *page;
+            unsigned long pagetype; 
 
-            pfn = region_pfn_type[i] & ~LTAB_MASK;
+            pfn      = region_pfn_type[i] & ~LTAB_MASK;
+            pagetype = region_pfn_type[i] & LTAB_MASK; 
 
-            if ( (region_pfn_type[i] & LTAB_MASK) == XTAB) continue;
-
-            if (pfn>nr_pfns)
-            {
+            if (pagetype == XTAB) 
+                /* a bogus/unmapped page: skip it */
+                continue;
+            
+            if (pfn > max_pfn) {
                 ERR("pfn out of range");
                 goto out;
             }
 
-            region_pfn_type[i] &= LTAB_MASK;
+            pfn_type[pfn] = pagetype; 
 
-            pfn_type[pfn] = region_pfn_type[i];
+            mfn = p2m[pfn];
 
-            mfn = pfn_to_mfn_table[pfn];
+            /* In verify mode, we use a copy; otherwise we work in place */
+            page = verify ? (void *)buf : (region_base + i*PAGE_SIZE); 
 
-            if ( verify )
-                ppage = (unsigned long*) buf;  /* debug case */
-            else
-                ppage = (unsigned long*) (region_base + i*PAGE_SIZE);
-
-            if ( read_exact(io_fd, ppage, PAGE_SIZE) != PAGE_SIZE )
-            {
-                ERR("Error when reading pagetable page");
+            if (!read_exact(io_fd, page, PAGE_SIZE)) { 
+                ERR("Error when reading page (type was %lx)", pagetype);
                 goto out;
             }
 
-            switch( region_pfn_type[i] & LTABTYPE_MASK )
-            {
-            case 0:
-                break;
+            pagetype &= LTABTYPE_MASK; 
 
-            case L1TAB:
-            {
-                for ( k = 0; k < 1024; k++ ) 
-                {
-                    if ( ppage[k] & _PAGE_PRESENT ) 
-                    {
-                        xpfn = ppage[k] >> PAGE_SHIFT;
-                        if ( xpfn >= nr_pfns )
-                        {
-                            ERR("Frame number in type %lu page "
-                                "table is out of range. i=%d k=%d "
-                                "pfn=0x%lx nr_pfns=%lu", 
-                                region_pfn_type[i]>>28, i, 
-                                k, xpfn, nr_pfns);
-                            goto out;
-                        }
+            if(pagetype >= L1TAB && pagetype <= L4TAB) { 
+                
+                /* 
+                ** A page table page - need to 'uncanonicalize' it, i.e. 
+                ** replace all the references to pfns with the corresponding 
+                ** mfns for the new domain. 
+                */ 
+                if(!uncanonicalize_pagetable(pagetype, page))
+                    goto out; 
 
-                        ppage[k] &= (PAGE_SIZE - 1) & 
-                            ~(_PAGE_GLOBAL | _PAGE_PAT);
-                        ppage[k] |= pfn_to_mfn_table[xpfn] << PAGE_SHIFT;
-                    }
-                }
-            }
-            break;
+            } else if(pagetype != NOTAB) { 
 
-            case L2TAB:
-            {
-                for ( k = 0; 
-                      k < (HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT); 
-                      k++ )
-                {
-                    if ( ppage[k] & _PAGE_PRESENT )
-                    {
-                        xpfn = ppage[k] >> PAGE_SHIFT;
-
-                        if ( xpfn >= nr_pfns )
-                        {
-                            ERR("Frame number in type %lu page"
-                                " table is out of range. i=%d k=%d "
-                                "pfn=%lu nr_pfns=%lu",
-                                region_pfn_type[i]>>28, i, k, 
-                                xpfn, nr_pfns);
-                            goto out;
-                        }
-
-                        ppage[k] &= (PAGE_SIZE - 1) & 
-                            ~(_PAGE_GLOBAL | _PAGE_PSE);
-                        ppage[k] |= pfn_to_mfn_table[xpfn] << PAGE_SHIFT;
-                    }
-                }
-            }
-            break;
-
-            default:
-                ERR("Bogus page type %lx page table is "
-                    "out of range. i=%d nr_pfns=%lu", 
-                    region_pfn_type[i], i, nr_pfns);
+                ERR("Bogus page type %lx page table is out of range: "
+                    "i=%d max_pfn=%lu", pagetype, i, max_pfn);
                 goto out;
 
-            } /* end of page type switch statement */
+            } 
 
-            if ( verify )
-            {
-                int res = memcmp(buf, (region_base + i*PAGE_SIZE), PAGE_SIZE );
-                if ( res )
-                {
+
+
+            if (verify) {
+
+                int res = memcmp(buf, (region_base + i*PAGE_SIZE), PAGE_SIZE);
+
+                if (res) { 
+
                     int v;
-                    printf("************** pfn=%lx type=%lx gotcs=%08lx "
-                           "actualcs=%08lx\n", pfn, pfn_type[pfn], 
-                           csum_page(region_base + i*PAGE_SIZE), 
-                           csum_page(buf));
-                    for ( v = 0; v < 4; v++ )
-                    {
-                        unsigned long *p = (unsigned long *)
+
+                    DPRINTF("************** pfn=%lx type=%lx gotcs=%08lx "
+                            "actualcs=%08lx\n", pfn, pfn_type[pfn], 
+                            csum_page(region_base + i*PAGE_SIZE), 
+                            csum_page(buf));
+
+                    for (v = 0; v < 4; v++) {
+                        
+                        unsigned long *p = (unsigned long *) 
                             (region_base + i*PAGE_SIZE);
-                        if ( buf[v] != p[v] )
-                            printf("    %d: %08lx %08lx\n",
-                                   v, buf[v], p[v] );
+                        if (buf[v] != p[v])
+                            DPRINTF("    %d: %08lx %08lx\n", v, buf[v], p[v]);
                     }
                 }
             }
 
-            if ( xc_add_mmu_update(xc_handle, mmu,
-                                   (mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE,
-                                   pfn) )
-            {
-                printf("machpys mfn=%ld pfn=%ld\n",mfn,pfn);
+            if (xc_add_mmu_update(xc_handle, mmu, 
+                                  (mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE,
+                                  pfn)) {
+                ERR("machpys mfn=%ld pfn=%ld", mfn, pfn);
                 goto out;
             }
-
         } /* end of 'batch' for loop */
 
-        munmap( region_base, j*PAGE_SIZE );
-        n+=j; /* crude stats */
+        munmap(region_base, j*PAGE_SIZE);
+        n+= j; /* crude stats */
     }
 
     DPRINTF("Received all pages\n");
 
-    if ( pt_levels == 3 )
-    {
+    if (pt_levels == 3) {
+
         /* Get all PGDs below 4GB. */
-        for ( i = 0; i < nr_pfns; i++ )
-        {
-            if ( ((pfn_type[i] & LTABTYPE_MASK) == L3TAB) &&
-                 (pfn_to_mfn_table[i] > 0xfffffUL) )
-            {
-                unsigned long new_mfn = xc_make_page_below_4G(
-                    xc_handle, dom, pfn_to_mfn_table[i]);
-                if ( new_mfn == 0 )
-                {
-                    fprintf(stderr, "Couldn't get a page below 4GB :-(\n");
+        for (i = 0; i < max_pfn; i++) {
+            
+            if (((pfn_type[i] & LTABTYPE_MASK)==L3TAB) && (p2m[i]>0xfffffUL)) {
+
+                unsigned long new_mfn; 
+
+                if (!(new_mfn=xc_make_page_below_4G(xc_handle, dom, p2m[i]))) {
+                    ERR("Couldn't get a page below 4GB :-(");
                     goto out;
                 }
-                pfn_to_mfn_table[i] = new_mfn;
-                if ( xc_add_mmu_update(
-                    xc_handle, mmu, (new_mfn << PAGE_SHIFT) |
-                    MMU_MACHPHYS_UPDATE, i) )
-                {
-                    fprintf(stderr, "Couldn't m2p on PAE root pgdir\n");
+                
+                p2m[i] = new_mfn;
+                if (xc_add_mmu_update(
+                        xc_handle, mmu, 
+                        (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, i)) {
+                    ERR("Couldn't m2p on PAE root pgdir");
                     goto out;
                 }
             }
         }
+        
     }
 
-    if ( xc_finish_mmu_updates(xc_handle, mmu) )
+
+    if (xc_finish_mmu_updates(xc_handle, mmu)) { 
+        ERR("Error doing finish_mmu_updates()"); 
         goto out;
+    } 
 
     /*
      * Pin page tables. Do this after writing to them as otherwise Xen
      * will barf when doing the type-checking.
      */
-    for ( i = 0; i < nr_pfns; i++ )
-    {
+    for (i = 0; i < max_pfn; i++) {
+
         if ( (pfn_type[i] & LPINTAB) == 0 )
             continue;
-        if ( pfn_type[i] == (L1TAB|LPINTAB) )
+        
+        switch(pfn_type[i]) { 
+
+        case (L1TAB|LPINTAB): 
             pin[nr_pins].cmd = MMUEXT_PIN_L1_TABLE;
-        else /* pfn_type[i] == (L2TAB|LPINTAB) */
+            break; 
+            
+        case (L2TAB|LPINTAB): 
             pin[nr_pins].cmd = MMUEXT_PIN_L2_TABLE;
-        pin[nr_pins].arg1.mfn = pfn_to_mfn_table[i];
-        if ( ++nr_pins == MAX_PIN_BATCH )
-        {
-            if ( xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0 )
+            break; 
+            
+        case (L3TAB|LPINTAB): 
+            pin[nr_pins].cmd = MMUEXT_PIN_L3_TABLE;
+            break; 
+
+        case (L4TAB|LPINTAB):
+            pin[nr_pins].cmd = MMUEXT_PIN_L4_TABLE;
+            break; 
+            
+        default: 
+            continue; 
+        }
+
+        pin[nr_pins].arg1.mfn = p2m[i];
+        
+        if (++nr_pins == MAX_PIN_BATCH) {
+            if (xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0) { 
+                ERR("Failed to pin batch of %d page tables", nr_pins); 
                 goto out;
+            } 
+            DPRINTF("successfully pinned batch of %d page tables", nr_pins); 
             nr_pins = 0;
         }
     }
-
-    if ( (nr_pins != 0) &&
-         (xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0) )
-        goto out;
+    
+    if (nr_pins != 0) { 
+        if((rc = xc_mmuext_op(xc_handle, pin, nr_pins, dom)) < 0) { 
+            ERR("Failed (2) to pin batch of %d page tables", nr_pins); 
+            DPRINTF("rc is %d\n", rc); 
+            goto out;
+        }
+    }
 
     DPRINTF("\b\b\b\b100%%\n");
     DPRINTF("Memory reloaded.\n");
@@ -445,111 +493,115 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pf
         unsigned long *pfntab;
         int rc;
 
-        if ( read_exact(io_fd, &count, sizeof(count)) != sizeof(count) )
-        {
+        if (!read_exact(io_fd, &count, sizeof(count))) { 
             ERR("Error when reading pfn count");
             goto out;
         }
 
-        pfntab = malloc( sizeof(unsigned int) * count );
-        if ( pfntab == NULL )
-        {
+        if(!(pfntab = malloc(sizeof(unsigned long) * count))) { 
             ERR("Out of memory");
             goto out;
         }
-
-        if ( read_exact(io_fd, pfntab, sizeof(unsigned int)*count) !=
-             sizeof(unsigned int)*count )
-        {
+        
+        if (!read_exact(io_fd, pfntab, sizeof(unsigned long)*count)) { 
             ERR("Error when reading pfntab");
             goto out;
         }
 
-        for ( i = 0; i < count; i++ )
-        {
-            unsigned long pfn = pfntab[i];
-            pfntab[i]=pfn_to_mfn_table[pfn];
-            pfn_to_mfn_table[pfn] = 0x80000001;  // not in pmap
-        }
+        for (i = 0; i < count; i++) {
 
-        if ( count > 0 )
-        {
+            unsigned long pfn = pfntab[i];
+
+            if(pfn > max_pfn) 
+                /* shouldn't happen - continue optimistically */
+                continue; 
+
+            pfntab[i] = p2m[pfn];
+            p2m[pfn]  = 0x80000001;  // not in pmap
+        }
+        
+        if (count > 0) {
+
             struct xen_memory_reservation reservation = {
                 .extent_start = pfntab,
                 .nr_extents   = count,
                 .extent_order = 0,
                 .domid        = dom
             };
-            if ( (rc = xc_memory_op(xc_handle,
-                                    XENMEM_decrease_reservation,
-                                    &reservation)) != count )
-            {
-                ERR("Could not decrease reservation : %d",rc);
+
+            if ((rc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
+                                   &reservation)) != count) { 
+                ERR("Could not decrease reservation : %d", rc);
                 goto out;
-            }
-            else
-            {
-                printf("Decreased reservation by %d pages\n", count);
-            }
+            } else
+                DPRINTF("Decreased reservation by %d pages\n", count);
         } 
     }
 
-    if ( read_exact(io_fd, &ctxt,            sizeof(ctxt)) != sizeof(ctxt) ||
-         read_exact(io_fd, shared_info_page, PAGE_SIZE) != PAGE_SIZE )
-    {
+    if (!read_exact(io_fd, &ctxt, sizeof(ctxt)) || 
+        !read_exact(io_fd, shared_info_page, PAGE_SIZE)) { 
         ERR("Error when reading ctxt or shared info page");
         goto out;
     }
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
     pfn = ctxt.user_regs.edx;
-    if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) )
-    {
+    if ((pfn >= max_pfn) || (pfn_type[pfn] != NOTAB)) {
         ERR("Suspend record frame number is bad");
         goto out;
     }
-    ctxt.user_regs.edx = mfn = pfn_to_mfn_table[pfn];
+    ctxt.user_regs.edx = mfn = p2m[pfn];
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
-    start_info->nr_pages    = nr_pfns;
+    start_info->nr_pages    = max_pfn;
     start_info->shared_info = shared_info_frame << PAGE_SHIFT;
     start_info->flags       = 0;
-    *store_mfn = start_info->store_mfn   =
-        pfn_to_mfn_table[start_info->store_mfn];
-    start_info->store_evtchn = store_evtchn;
-    *console_mfn = start_info->console_mfn   =
-        pfn_to_mfn_table[start_info->console_mfn];
-    start_info->console_evtchn = console_evtchn;
+    *store_mfn = start_info->store_mfn       = p2m[start_info->store_mfn];
+    start_info->store_evtchn                 = store_evtchn;
+    *console_mfn = start_info->console_mfn   = p2m[start_info->console_mfn];
+    start_info->console_evtchn               = console_evtchn;
     munmap(start_info, PAGE_SIZE);
 
     /* Uncanonicalise each GDT frame number. */
-    if ( ctxt.gdt_ents > 8192 )
-    {
+    if (ctxt.gdt_ents > 8192) {
         ERR("GDT entry count out of range");
         goto out;
     }
 
-    for ( i = 0; i < ctxt.gdt_ents; i += 512 )
-    {
+    for (i = 0; i < ctxt.gdt_ents; i += 512) {
         pfn = ctxt.gdt_frames[i];
-        if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) )
-        {
+        if ((pfn >= max_pfn) || (pfn_type[pfn] != NOTAB)) {
             ERR("GDT frame number is bad");
             goto out;
         }
-        ctxt.gdt_frames[i] = pfn_to_mfn_table[pfn];
+        ctxt.gdt_frames[i] = p2m[pfn];
     }
 
     /* Uncanonicalise the page table base pointer. */
     pfn = ctxt.ctrlreg[3] >> PAGE_SHIFT;
-    if ( (pfn >= nr_pfns) || ((pfn_type[pfn]&LTABTYPE_MASK) != L2TAB) )
-    {
-        printf("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx\n",
-               pfn, nr_pfns, pfn_type[pfn], (unsigned long)L2TAB);
+
+    if (pfn >= max_pfn) {
+        DPRINTF("PT base is bad: pfn=%lu max_pfn=%lu type=%08lx\n",
+                pfn, max_pfn, pfn_type[pfn]); 
         ERR("PT base is bad.");
         goto out;
     }
-    ctxt.ctrlreg[3] = pfn_to_mfn_table[pfn] << PAGE_SHIFT;
+
+    if ((pt_levels == 2) && ((pfn_type[pfn]&LTABTYPE_MASK) != L2TAB)) { 
+        DPRINTF("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx\n",
+                pfn, max_pfn, pfn_type[pfn], (unsigned long)L2TAB);
+        ERR("PT base is bad.");
+        goto out;
+    }
+
+    if ((pt_levels == 3) && ((pfn_type[pfn]&LTABTYPE_MASK) != L3TAB)) { 
+        DPRINTF("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx\n",
+                pfn, max_pfn, pfn_type[pfn], (unsigned long)L3TAB);
+        ERR("PT base is bad.");
+        goto out;
+    }
+    
+    ctxt.ctrlreg[3] = p2m[pfn] << PAGE_SHIFT;
 
     /* clear any pending events and the selector */
     memset(&(shared_info->evtchn_pending[0]), 0,
@@ -558,40 +610,31 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pf
         shared_info->vcpu_data[i].evtchn_pending_sel = 0;
 
     /* Copy saved contents of shared-info page. No checking needed. */
-    ppage = xc_map_foreign_range(
+    page = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_WRITE, shared_info_frame);
-    memcpy(ppage, shared_info, sizeof(shared_info_t));
-    munmap(ppage, PAGE_SIZE);
-
+    memcpy(page, shared_info, sizeof(shared_info_t));
+    munmap(page, PAGE_SIZE);
+    
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */
-    for ( i = 0; i < (nr_pfns+1023)/1024; i++ )
-    {
-        unsigned long pfn, mfn;
-
-        pfn = pfn_to_mfn_frame_list[i];
-        if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) )
-        {
+    for (i = 0; i < P2M_FL_ENTRIES; i++) {
+        pfn = p2m_frame_list[i];
+        if ((pfn >= max_pfn) || (pfn_type[pfn] != NOTAB)) {
             ERR("PFN-to-MFN frame number is bad");
             goto out;
         }
-        mfn = pfn_to_mfn_table[pfn];
-        pfn_to_mfn_frame_list[i] = mfn;
+
+        p2m_frame_list[i] = p2m[pfn];
     }
     
-    if ( (live_pfn_to_mfn_table = 
-          xc_map_foreign_batch(xc_handle, dom, 
-                               PROT_WRITE,
-                               pfn_to_mfn_frame_list,
-                               (nr_pfns+1023)/1024 )) == 0 )
-    {
-        ERR("Couldn't map pfn_to_mfn table");
+    /* Copy the P2M we've constructed to the 'live' P2M */
+    if (!(live_p2m = xc_map_foreign_batch(xc_handle, dom, PROT_WRITE, 
+                                          p2m_frame_list, P2M_FL_ENTRIES))) {
+        ERR("Couldn't map p2m table");
         goto out;
     }
 
-    memcpy(live_pfn_to_mfn_table, pfn_to_mfn_table, 
-           nr_pfns*sizeof(unsigned long) );
-
-    munmap(live_pfn_to_mfn_table, ((nr_pfns+1023)/1024)*PAGE_SIZE);
+    memcpy(live_p2m, p2m, P2M_SIZE); 
+    munmap(live_p2m, P2M_SIZE); 
 
     /*
      * Safety checking of saved context:
@@ -605,25 +648,23 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pf
      *  8. debugregs are checked by Xen.
      *  9. callback code selectors need checking.
      */
-    for ( i = 0; i < 256; i++ )
-    {
+    for ( i = 0; i < 256; i++ ) {
         ctxt.trap_ctxt[i].vector = i;
-        if ( (ctxt.trap_ctxt[i].cs & 3) == 0 )
+        if ((ctxt.trap_ctxt[i].cs & 3) == 0)
             ctxt.trap_ctxt[i].cs = FLAT_KERNEL_CS;
     }
-    if ( (ctxt.kernel_ss & 3) == 0 )
+    if ((ctxt.kernel_ss & 3) == 0)
         ctxt.kernel_ss = FLAT_KERNEL_DS;
 #if defined(__i386__)
-    if ( (ctxt.event_callback_cs & 3) == 0 )
+    if ((ctxt.event_callback_cs & 3) == 0)
         ctxt.event_callback_cs = FLAT_KERNEL_CS;
-    if ( (ctxt.failsafe_callback_cs & 3) == 0 )
+    if ((ctxt.failsafe_callback_cs & 3) == 0)
         ctxt.failsafe_callback_cs = FLAT_KERNEL_CS;
 #endif
-    if ( ((ctxt.ldt_base & (PAGE_SIZE - 1)) != 0) ||
-         (ctxt.ldt_ents > 8192) ||
-         (ctxt.ldt_base > HYPERVISOR_VIRT_START) ||
-         ((ctxt.ldt_base + ctxt.ldt_ents*8) > HYPERVISOR_VIRT_START) )
-    {
+    if (((ctxt.ldt_base & (PAGE_SIZE - 1)) != 0) ||
+        (ctxt.ldt_ents > 8192) ||
+        (ctxt.ldt_base > hvirt_start) ||
+        ((ctxt.ldt_base + ctxt.ldt_ents*8) > hvirt_start)) {
         ERR("Bad LDT base or size");
         goto out;
     }
@@ -636,8 +677,7 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pf
     op.u.setdomaininfo.ctxt   = &ctxt;
     rc = xc_dom0_op(xc_handle, &op);
 
-    if ( rc != 0 )
-    {
+    if (rc != 0) {
         ERR("Couldn't build the domain");
         goto out;
     }
@@ -646,9 +686,10 @@ int xc_linux_restore(int xc_handle, int io_fd, uint32_t dom, unsigned long nr_pf
     if ( (rc != 0) && (dom != 0) )
         xc_domain_destroy(xc_handle, dom);
     free(mmu);
-    free(pfn_to_mfn_table);
+    free(p2m);
     free(pfn_type);
 
     DPRINTF("Restore exit with rc=%d\n", rc);
+
     return rc;
 }

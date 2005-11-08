@@ -11,8 +11,10 @@
 #include <sys/stat.h>
 
 #include "xenctrl.h"
+#include "xenguest.h" 
 
 #include <xen/linux/privcmd.h>
+#include <xen/memory.h>
 
 char *xc_read_kernel_image(const char *filename, unsigned long *size);
 unsigned long csum_page (void * page);
