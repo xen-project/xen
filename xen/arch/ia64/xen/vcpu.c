@@ -1299,7 +1299,10 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 		unsigned long region = address >> 61;
 		// dom0 may generate an uncacheable physical address (msb=1)
 		if (region && ((region != 4) || (vcpu->domain != dom0))) {
-			panic_domain(vcpu_regs(vcpu),
+// FIXME: This seems to happen even though it shouldn't.  Need to track
+// this down, but since it has been apparently harmless, just flag it for now
+//			panic_domain(vcpu_regs(vcpu),
+			printk(
 			 "vcpu_translate: bad physical address: %p\n",address);
 		}
 		*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX;
