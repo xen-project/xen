@@ -26,6 +26,9 @@ name = "ExampleVMXDomain"
 # Which CPU to start domain on? 
 #cpu = -1   # leave to Xen to pick
 
+# Disable vif for now
+nics=0
+
 # Optionally define mac and/or bridge for the network interfaces.
 # Random MACs are assigned if not given.
 #vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0' ]

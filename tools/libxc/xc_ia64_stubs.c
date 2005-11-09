@@ -603,6 +603,7 @@ int xc_vmx_build(int xc_handle,
                  int memsize,
                  const char *image_name,
                  unsigned int control_evtchn,
+		 unsigned int lapic,
                  unsigned int vcpus,
                  unsigned int store_evtchn,
                  unsigned long *store_mfn)

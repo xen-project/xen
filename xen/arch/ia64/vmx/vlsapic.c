@@ -37,15 +37,9 @@
 #include <asm/hw_irq.h>
 #include <asm/vmx_pal_vsa.h>
 #include <asm/kregs.h>
+#include <asm/vmx_platform.h>
+#include <asm/vmx_vioapic.h>
 
-#define  SHARED_VLAPIC_INF
-#ifdef V_IOSAPIC_READY
-static inline vl_apic_info* get_psapic(VCPU *vcpu)
-{
-    shared_iopage_t  *sp = get_sp(vcpu->domain);
-    return &(sp->vcpu_iodata[vcpu->vcpu_id].apic_intr);
-}
-#endif
 //u64  fire_itc;
 //u64  fire_itc2;
 //u64  fire_itm;
@@ -273,48 +267,71 @@ static void update_vhpi(VCPU *vcpu, int vec)
 }
 
 #ifdef V_IOSAPIC_READY
-void vlapic_update_shared_info(VCPU *vcpu)
+/* Assist to check virtual interrupt lines */
+void vmx_virq_line_assist(struct vcpu *v)
 {
-    //int	i;
-    
-    vl_apic_info *ps;
+    global_iodata_t *spg = &get_sp(v->domain)->sp_global;
+    uint16_t *virq_line, irqs;
 
-    if (vcpu->domain == dom0)
-	return;
-
-    ps = get_psapic(vcpu);
-    ps->vl_lapic_id = ((VCPU(vcpu, lid) >> 16) & 0xffff) << 16; 
-    printf("vl_lapic_id = %x\n", ps->vl_lapic_id);
-    ps->vl_apr = 0;
-    // skip ps->vl_logical_dest && ps->vl_dest_format
-    // IPF support physical destination mode only
-    ps->vl_arb_id = 0;
-    /*
-    for ( i=0; i<4; i++ ) {
-    	ps->tmr[i] = 0;		// edge trigger 
+    virq_line = &spg->pic_irr;
+    if (*virq_line) {
+	do {
+	    irqs = *(volatile uint16_t*)virq_line;
+	} while ((uint16_t)cmpxchg(virq_line, irqs, 0) != irqs);
+	vmx_vioapic_do_irqs(v->domain, irqs);
     }
-    */
+
+    virq_line = &spg->pic_clear_irr;
+    if (*virq_line) {
+	do {
+	    irqs = *(volatile uint16_t*)virq_line;
+	} while ((uint16_t)cmpxchg(virq_line, irqs, 0) != irqs);
+	vmx_vioapic_do_irqs_clear(v->domain, irqs);
+    }
 }
 
-void vlapic_update_ext_irq(VCPU *vcpu)
+void vmx_virq_line_init(struct domain *d)
 {
-    int  vec;
+    global_iodata_t *spg = &get_sp(d)->sp_global;
+
+    spg->pic_elcr = 0xdef8; /* Level/Edge trigger mode */
+    spg->pic_irr = 0;
+    spg->pic_last_irr = 0;
+    spg->pic_clear_irr = 0;
+}
+
+int ioapic_match_logical_addr(vmx_vioapic_t *s, int number, uint16_t dest)
+{
+    return (VLAPIC_ID(s->lapic_info[number]) == dest);
+}
+
+struct vlapic* apic_round_robin(struct domain *d,
+				uint8_t dest_mode,
+				uint8_t vector,
+				uint32_t bitmap)
+{
+    uint8_t bit;
+    vmx_vioapic_t *s;
     
-    vl_apic_info *ps = get_psapic(vcpu);
-    while ( (vec = highest_bits(ps->irr)) != NULL_VECTOR ) {
-    	clear_bit (vec, ps->irr);
-        vmx_vcpu_pend_interrupt(vcpu, vec);
+    if (!bitmap) {
+	printk("<apic_round_robin> no bit on bitmap\n");
+	return NULL;
     }
+
+    s = &d->arch.vmx_platform.vmx_vioapic;
+    for (bit = 0; bit < s->lapic_count; bit++) {
+	if (bitmap & (1 << bit))
+	    return s->lapic_info[bit];
+    }
+
+    return NULL;
 }
 #endif
 
 void vlsapic_reset(VCPU *vcpu)
 {
     int     i;
-#ifdef V_IOSAPIC_READY
-    vl_apic_info  *psapic;	// shared lapic inf.
-#endif
-    
+
     VCPU(vcpu, lid) = ia64_getreg(_IA64_REG_CR_LID);
     VCPU(vcpu, ivr) = 0;
     VCPU(vcpu,tpr) = 0x10000;
@@ -331,9 +348,10 @@ void vlsapic_reset(VCPU *vcpu)
     for ( i=0; i<4; i++) {
         VLSAPIC_INSVC(vcpu,i) = 0;
     }
+
 #ifdef V_IOSAPIC_READY
-    vlapic_update_shared_info(vcpu);
-    //vlapic_update_shared_irr(vcpu);
+    vcpu->arch.arch_vmx.vlapic.vcpu = vcpu;
+    vmx_vioapic_add_lapic(&vcpu->arch.arch_vmx.vlapic, vcpu);
 #endif
     DPRINTK("VLSAPIC inservice base=%lp\n", &VLSAPIC_INSVC(vcpu,0) );
 }

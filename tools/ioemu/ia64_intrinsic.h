@@ -236,6 +236,7 @@ u64_t _InterlockedCompareExchange64_acq(volatile uint64_t *dest, uint64_t xchg, 
 #define __ia64_fc(addr)	asm volatile ("fc %0" :: "r"(addr) : "memory")
 #define ia64_sync_i()	asm volatile (";; sync.i" ::: "memory")
 
+register unsigned long ia64_r13 asm ("r13") __attribute_used__;
 #define __ia64_getreg(regnum)							\
 ({										\
 	uint64_t ia64_intri_res;							\

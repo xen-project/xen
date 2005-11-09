@@ -25,14 +25,13 @@
 #define RR7_SWITCH_SHIFT	12	/* 4k enough */
 #include <public/io/ioreq.h>
 
-
 extern void identify_vmx_feature(void);
 extern unsigned int vmx_enabled;
 extern void vmx_init_env(void);
-extern void vmx_final_setup_domain(struct domain *d);
+extern void vmx_final_setup_guest(struct vcpu *v);
 extern void vmx_save_state(struct vcpu *v);
 extern void vmx_load_state(struct vcpu *v);
-extern void vmx_setup_platform(struct vcpu *v, struct vcpu_guest_context *c);
+extern void vmx_setup_platform(struct domain *d, struct vcpu_guest_context *c);
 #ifdef XEN_DBL_MAPPING
 extern vmx_insert_double_mapping(u64,u64,u64,u64,u64);
 extern void vmx_purge_double_mapping(u64, u64, u64);
@@ -57,4 +56,22 @@ static inline shared_iopage_t *get_sp(struct domain *d)
 {
     return (shared_iopage_t *)d->arch.vmx_platform.shared_page_va;
 }
+
+typedef unsigned long (*vmx_mmio_read_t)(struct vcpu *v,
+                                         unsigned long addr,
+                                         unsigned long length);
+
+typedef void (*vmx_mmio_write_t)(struct vcpu *v,
+                                 unsigned long addr,
+                                 unsigned long length,
+                                 unsigned long val);
+
+typedef int (*vmx_mmio_check_t)(struct vcpu *v, unsigned long addr);
+
+struct vmx_mmio_handler {
+    vmx_mmio_check_t check_handler;
+    vmx_mmio_read_t read_handler;
+    vmx_mmio_write_t write_handler;
+};
+
 #endif /* _ASM_IA64_VT_H */

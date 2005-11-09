@@ -523,8 +523,8 @@ int64_t cpu_get_real_ticks(void)
 
 #elif defined(__ia64__)
 #include "ia64_intrinsic.h"
-#define cpu_get_reak_ticks()	\
-    ia64_getreg(_IA64_REG_AR_ITC)
+#define cpu_get_real_ticks()	\
+	__ia64_getreg(_IA64_REG_AR_ITC)
 
 #else
 #error unsupported CPU

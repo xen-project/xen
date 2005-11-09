@@ -25,6 +25,7 @@
 #ifndef __ASSEMBLY__
 
 #include <asm/vtm.h>
+#include <asm/vmx_platform.h>
 #include <public/arch-ia64.h>
 
 #define VPD_SHIFT	17	/* 128K requirement */
@@ -65,7 +66,8 @@ typedef struct {
 struct arch_vmx_struct {
 //    struct virutal_platform_def     vmx_platform;
 //	vpd_t       *vpd;
-	vtime_t	    vtm;
+    vtime_t	    vtm;
+    struct vlapic   vlapic;
     unsigned long   vrr[8];
     unsigned long   vkr[8];
     unsigned long   cr_iipa;   /* for emulation */
@@ -106,6 +108,7 @@ struct arch_vmx_struct {
 #define DBG_LEVEL_3     (1 << 3)
 #define DBG_LEVEL_IO    (1 << 4)
 #define DBG_LEVEL_VMMU  (1 << 5)
+#define DBG_LEVEL_IOAPIC 	(1 << 6)
 
 extern unsigned int opt_vmx_debug_level;
 #define VMX_DBG_LOG(level, _f, _a...)           \

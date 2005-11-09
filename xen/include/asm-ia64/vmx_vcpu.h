@@ -107,10 +107,6 @@ extern void vtm_set_itv(VCPU *vcpu);
 extern void vtm_interruption_update(VCPU *vcpu, vtime_t* vtm);
 extern void vtm_domain_out(VCPU *vcpu);
 extern void vtm_domain_in(VCPU *vcpu);
-#ifdef V_IOSAPIC_READY
-extern void vlapic_update_ext_irq(VCPU *vcpu);
-extern void vlapic_update_shared_info(VCPU *vcpu);
-#endif
 extern void vlsapic_reset(VCPU *vcpu);
 extern int vmx_check_pending_irq(VCPU *vcpu);
 extern void guest_write_eoi(VCPU *vcpu);
@@ -278,9 +274,6 @@ IA64FAULT
 vmx_vcpu_set_lid(VCPU *vcpu, u64 val)
 {
     VCPU(vcpu,lid)=val;
-#ifdef V_IOSAPIC_READY
-    vlapic_update_shared_info(vcpu);
-#endif
     return IA64_NO_FAULT;
 }
 extern IA64FAULT vmx_vcpu_set_tpr(VCPU *vcpu, u64 val);

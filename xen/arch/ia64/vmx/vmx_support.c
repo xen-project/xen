@@ -156,9 +156,8 @@ void vmx_intr_assist(struct vcpu *v)
 	panic("Corruption: bad shared page: %lx\n", (unsigned long)vio);
 
 #ifdef V_IOSAPIC_READY
-    vlapic_update_ext_irq(v);
-#else
-    //panic("IOSAPIC model is missed in qemu\n");
+    /* Confirm virtual interrupt line signals, and set pending bits in vpd */
+    vmx_virq_line_assist(v);
 #endif
     return;
 }

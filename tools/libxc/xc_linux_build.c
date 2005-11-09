@@ -783,7 +783,7 @@ int xc_linux_build(int xc_handle,
     /* currently done by hypervisor, should move here */
     /* ctxt->regs.r28 = dom_fw_setup(); */
     ctxt->vcpu.privregs = 0;
-    ctxt->sys_pgnr = nr_pages - 3;
+    ctxt->sys_pgnr = 3;
     i = 0; /* silence unused variable warning */
 #else /* x86 */
     /*

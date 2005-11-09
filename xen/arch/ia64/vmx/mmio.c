@@ -202,11 +202,13 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     return;
 }
 
+extern struct vmx_mmio_handler vioapic_mmio_handler;
 static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int dir)
 {
     struct virutal_platform_def *v_plat;
     //mmio_type_t iot;
     unsigned long iot;
+    struct vmx_mmio_handler *vioapic_handler = &vioapic_mmio_handler;
     iot=__gpfn_is_io(vcpu->domain, src_pa>>PAGE_SHIFT);
     v_plat = vmx_vcpu_get_plat(vcpu);
 
@@ -220,6 +222,11 @@ static void mmio_access(VCPU *vcpu, u64 src_pa, u64 *dest, size_t s, int ma, int
     case GPFN_GFW:
         break;
     case GPFN_IOSAPIC:
+	if (!dir)
+	    vioapic_handler->write_handler(vcpu, src_pa, s, *dest);
+	else
+	    *dest = vioapic_handler->read_handler(vcpu, src_pa, s);
+	break;
     case GPFN_FRAME_BUFFER:
     case GPFN_LOW_MMIO:
         low_mmio_access(vcpu, src_pa, dest, s, dir);

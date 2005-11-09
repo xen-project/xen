@@ -63,25 +63,6 @@
 
 #define IOAPIC_REG_VERSION 0x1
 
-#ifdef __ia64__
-typedef union RedirStatus
-{
-    uint64_t value;
-    struct {
-        uint16_t dest_id;
-        uint8_t reserved[3];
-        uint8_t reserve:7;
-        uint8_t mask:1;         /* interrupt mask*/
-        uint8_t trigmod:1;
-        uint8_t remoteirr:1;
-        uint8_t polarity:1;
-        uint8_t delivestatus:1;
-        uint8_t destmode:1;
-        uint8_t deliver_mode:3;
-        uint8_t vector;
-    } RedirForm;
-} RedirStatus;
-#else
 typedef union RedirStatus
 {
     uint64_t value;
@@ -95,11 +76,15 @@ typedef union RedirStatus
         uint8_t trigmod:1;
         uint8_t mask:1;         /* interrupt mask*/
         uint8_t reserve:7;
+#ifndef __ia64__
         uint8_t reserved[4];
         uint8_t dest_id;
+#else
+        uint8_t reserved[3];
+        uint16_t dest_id;
+#endif
     } RedirForm;
 } RedirStatus;
-#endif
 
 #define IOAPIC_MEM_LENGTH    0x100
 #define IOAPIC_ENABLE_MASK   0x0
