@@ -1296,9 +1296,12 @@ IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pt
 	TR_ENTRY *trp;
 
 	if (PSCB(vcpu,metaphysical_mode)) {
-		if (address >> 61)	// FIXME: need more precise check here
+		unsigned long region = address >> 61;
+		// dom0 may generate an uncacheable physical address (msb=1)
+		if (region && ((region != 4) || (vcpu->domain != dom0))) {
 			panic_domain(vcpu_regs(vcpu),
-				"vcpu_translate: bad physical address\n");
+			 "vcpu_translate: bad physical address: %p\n",address);
+		}
 		*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX;
 		*itir = PAGE_SHIFT << 2;
 		phys_translate_count++;
