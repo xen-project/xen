@@ -393,11 +393,22 @@ class XendDomainInfo:
                   ("on_crash",     str),
                   ("image",        str),
                   ("memory",       int),
+                  ("maxmem",       int),
                   ("vcpus",        int),
                   ("vcpu_avail",   int),
                   ("start_time", float))
 
-        from_store = self.gatherVm(*params)
+        try:
+            from_store = self.gatherVm(*params)
+        except ValueError, exn:
+            # One of the int/float entries in params has a corresponding store
+            # entry that is invalid.  We recover, because older versions of
+            # Xend may have put the entry there (memory/target, for example),
+            # but this is in general a bad situation to have reached.
+            log.exception(
+                "Store corrupted at %s!  Domain %d's configuration may be "
+                "affected.", self.vmpath, self.domid)
+            return
 
         map(lambda x, y: useIfNeeded(x[0], y), params, from_store)
 
