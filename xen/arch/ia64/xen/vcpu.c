@@ -1287,26 +1287,30 @@ unsigned long fast_vhpt_translate_count = 0;
 unsigned long recover_to_page_fault_count = 0;
 unsigned long recover_to_break_fault_count = 0;
 
+int warn_region0_address = 0; // FIXME later: tie to a boot parameter?
+
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
 	unsigned long pta, pte, rid, rr;
 	int i;
 	TR_ENTRY *trp;
 
-	if (!(address >> 61)) {
-		if (!PSCB(vcpu,metaphysical_mode)) {
-			REGS *regs = vcpu_regs(vcpu);
-			unsigned long viip = PSCB(vcpu,iip);
-			unsigned long vipsr = PSCB(vcpu,ipsr);
-			unsigned long iip = regs->cr_iip;
-			unsigned long ipsr = regs->cr_ipsr;
-			printk("vcpu_translate: bad address %p, viip=%p, vipsr=%p, iip=%p, ipsr=%p continuing\n", address, viip, vipsr, iip, ipsr);
-		}
-
+	if (PSCB(vcpu,metaphysical_mode)) {
+		if (address >> 61)	// FIXME: need more precise check here
+			panic_domain(vcpu_regs(vcpu),
+				"vcpu_translate: bad physical address\n");
 		*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX;
 		*itir = PAGE_SHIFT << 2;
 		phys_translate_count++;
 		return IA64_NO_FAULT;
+	}
+	else if (!(address >> 61) && warn_region0_address) {
+		REGS *regs = vcpu_regs(vcpu);
+		unsigned long viip = PSCB(vcpu,iip);
+		unsigned long vipsr = PSCB(vcpu,ipsr);
+		unsigned long iip = regs->cr_iip;
+		unsigned long ipsr = regs->cr_ipsr;
+		printk("vcpu_translate: bad address %p, viip=%p, vipsr=%p, iip=%p, ipsr=%p continuing\n", address, viip, vipsr, iip, ipsr);
 	}
 
 	rr = PSCB(vcpu,rrs)[address>>61];
