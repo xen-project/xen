@@ -476,7 +476,7 @@ void canonicalize_pagetable(unsigned long type, unsigned long pfn,
                 /* I don't think this should ever happen */
                 DPRINTF("FNI: [%08lx,%d] pte=%llx,"
                         " mfn=%08lx, pfn=%08lx [mfn]=%08lx\n",
-                        type, i, (uint64_t)pte, mfn, 
+                        type, i, (unsigned long long)pte, mfn, 
                         live_m2p[mfn],
                         (live_m2p[mfn] < max_pfn) ? 
                         live_p2m[live_m2p[mfn]] : 0xdeadbeaf);
@@ -1004,9 +1004,10 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     goto out;
                 }
                 
-                DPRINTF("SUSPEND shinfo %08lx eip %08u edx %08u\n",
-                        info.shared_info_frame,
-                        ctxt.user_regs.eip, ctxt.user_regs.edx);
+                DPRINTF("SUSPEND shinfo %08lx eip %08lx edx %08lx\n", 
+                        info.shared_info_frame, 
+                        (unsigned long)ctxt.user_regs.eip, 
+                        (unsigned long)ctxt.user_regs.edx);
             } 
             
             if (xc_shadow_control(xc_handle, dom, DOM0_SHADOW_CONTROL_OP_CLEAN,
