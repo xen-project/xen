@@ -79,8 +79,10 @@ static void skbuff_ctor(void *buf, kmem_cache_t *cachep, unsigned long unused)
 	while (skbuff_order_cachep[order] != cachep)
 		order++;
 
+	/* Do our best to allocate contiguous memory but fall back to IOMMU. */
 	if (order != 0)
-		xen_create_contiguous_region((unsigned long)buf, order);
+		(void)xen_create_contiguous_region(
+			(unsigned long)buf, order, 0);
 
 	scrub_pages(buf, 1 << order);
 }
