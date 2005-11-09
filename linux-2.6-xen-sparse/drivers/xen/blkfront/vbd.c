@@ -259,6 +259,7 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 		gd->flags |= GENHD_FL_CD;
 
 	add_disk(gd);
+	info->gd = gd;
 
 	return 0;
 
@@ -292,22 +293,19 @@ void
 xlvbd_del(struct blkfront_info *info)
 {
 	struct block_device *bd;
-	struct gendisk *gd;
-	int unused;
-	request_queue_t *rq;
 
 	bd = bdget(info->dev);
 	if (bd == NULL)
 		return;
 
-	gd = get_gendisk(info->dev, &unused);
-	rq = gd->queue;
+	if (info->gd == NULL)
+		return;
 
-	del_gendisk(gd);
-	put_disk(gd);
+	del_gendisk(info->gd);
+	put_disk(info->gd);
 	xlbd_put_major_info(info->mi);
 	info->mi = NULL;
-	blk_cleanup_queue(rq);
+	blk_cleanup_queue(info->rq);
 
 	bdput(bd);
 }
