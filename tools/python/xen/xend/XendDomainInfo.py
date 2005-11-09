@@ -113,6 +113,8 @@ ROUNDTRIPPING_CONFIG_ENTRIES = [
         ('vcpus',        int),
         ('vcpu_avail',   int),
         ('cpu_weight',   float),
+        ('memory',       int),
+        ('maxmem',       int),
         ('bootloader',   str),
         ('on_poweroff',  str),
         ('on_reboot',    str),
@@ -256,10 +258,6 @@ def parseConfig(config):
     for e in ROUNDTRIPPING_CONFIG_ENTRIES:
         result[e[0]] = get_cfg(e[0], e[1])
 
-    result['memory']    = get_cfg('memory',    int)
-    result['mem_kb']    = get_cfg('mem_kb',    int)
-    result['maxmem']    = get_cfg('maxmem',    int)
-    result['maxmem_kb'] = get_cfg('maxmem_kb', int)
     result['cpu']       = get_cfg('cpu',       int)
     result['image']     = get_cfg('image')
 
@@ -394,6 +392,7 @@ class XendDomainInfo:
                   ("on_reboot",    str),
                   ("on_crash",     str),
                   ("image",        str),
+                  ("memory",       int),
                   ("vcpus",        int),
                   ("vcpu_avail",   int),
                   ("start_time", float))
@@ -432,6 +431,9 @@ class XendDomainInfo:
             self.info['vcpus'] = int(self.info['vcpus'])
 
             defaultInfo('vcpu_avail',   lambda: (1 << self.info['vcpus']) - 1)
+
+            defaultInfo('memory',       lambda: 0)
+            defaultInfo('maxmem',       lambda: 0)
             defaultInfo('bootloader',   lambda: None)
             defaultInfo('backend',      lambda: [])
             defaultInfo('device',       lambda: [])
@@ -442,66 +444,12 @@ class XendDomainInfo:
             if isinstance(self.info['image'], str):
                 self.info['image'] = sxp.from_string(self.info['image'])
 
-            # Internally, we keep only maxmem_KiB, and not maxmem or maxmem_kb
-            # (which come from outside, and are in MiB and KiB respectively).
-            # This means that any maxmem or maxmem_kb settings here have come
-            # from outside, and maxmem_KiB must be updated to reflect them.
-            # If we have both maxmem and maxmem_kb and these are not
-            # consistent, then this is an error, as we've no way to tell which
-            # one takes precedence.
+            if self.info['memory'] == 0:
+                if self.infoIsSet('mem_kb'):
+                    self.info['memory'] = (self.info['mem_kb'] + 1023) / 1024
 
-            # Exactly the same thing applies to memory_KiB, memory, and
-            # mem_kb.
-
-            def discard_negatives(name):
-                if self.infoIsSet(name) and self.info[name] < 0:
-                    del self.info[name]
-
-            def valid_KiB_(mb_name, kb_name):
-                discard_negatives(kb_name)
-                discard_negatives(mb_name)
-                
-                if self.infoIsSet(kb_name):
-                    if self.infoIsSet(mb_name):
-                        mb = self.info[mb_name]
-                        kb = self.info[kb_name]
-                        if mb * 1024 == kb:
-                            return kb
-                        else:
-                            raise VmError(
-                                'Inconsistent %s / %s settings: %s / %s' %
-                                (mb_name, kb_name, mb, kb))
-                    else:
-                        return self.info[kb_name]
-                elif self.infoIsSet(mb_name):
-                    return self.info[mb_name] * 1024
-                else:
-                    return None
-
-            def valid_KiB(mb_name, kb_name):
-                result = valid_KiB_(mb_name, kb_name)
-                if result is None or result < 0:
-                    raise VmError('Invalid %s / %s: %s' %
-                                  (mb_name, kb_name, result))
-                else:
-                    return result
-
-            def delIf(name):
-                if name in self.info:
-                    del self.info[name]
-
-            self.info['memory_KiB'] = valid_KiB('memory', 'mem_kb')
-            delIf('memory')
-            delIf('mem_kb')
-            self.info['maxmem_KiB'] = valid_KiB_('maxmem', 'maxmem_kb')
-            delIf('maxmem')
-            delIf('maxmem_kb')
-
-            if not self.info['maxmem_KiB']:
-                self.info['maxmem_KiB'] = 1 << 30
-
-            if self.info['maxmem_KiB'] > self.info['memory_KiB']:
-                self.info['maxmem_KiB'] = self.info['memory_KiB']
+            if self.info['maxmem'] < self.info['memory']:
+                self.info['maxmem'] = self.info['memory']
 
             for (n, c) in self.info['device']:
                 if not n or not c or n not in controllerClasses:
@@ -576,17 +524,14 @@ class XendDomainInfo:
 
     def storeVmDetails(self):
         to_store = {
-            'uuid':               self.info['uuid'],
-
-            # XXX
-            'memory/target':      str(self.info['memory_KiB'])
+            'uuid':               self.info['uuid']
             }
 
         if self.infoIsSet('image'):
             to_store['image'] = sxp.to_string(self.info['image'])
 
-        for k in ['name', 'ssidref', 'on_poweroff', 'on_reboot', 'on_crash',
-                  'vcpus', 'vcpu_avail']:
+        for k in ['name', 'ssidref', 'memory', 'maxmem', 'on_poweroff',
+                  'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail']:
             if self.infoIsSet(k):
                 to_store[k] = str(self.info[k])
 
@@ -601,7 +546,7 @@ class XendDomainInfo:
             'vm':                 self.vmpath,
             'name':               self.info['name'],
             'console/limit':      str(xroot.get_console_limit() * 1024),
-            'memory/target':      str(self.info['memory_KiB'])
+            'memory/target':      str(self.info['memory'] * 1024)
             }
 
         def f(n, v):
@@ -682,8 +627,8 @@ class XendDomainInfo:
         return self.info['ssidref']
 
     def getMemoryTarget(self):
-        """Get this domain's target memory size, in KiB."""
-        return self.info['memory_KiB']
+        """Get this domain's target memory size, in KB."""
+        return self.info['memory'] * 1024
 
 
     def refreshShutdown(self, xeninfo = None):
@@ -831,10 +776,9 @@ class XendDomainInfo:
         """Set the memory target of this domain.
         @param target In MiB.
         """
-        # Internally we use KiB, but the command interface uses MiB.
-        t = target << 10
-        self.info['memory_KiB'] = t
-        self.storeDom("memory/target", t)
+        self.info['memory'] = target
+        self.storeVm("memory", target)
+        self.storeDom("memory/target", target << 10)
 
 
     def update(self, info = None):
@@ -883,7 +827,7 @@ class XendDomainInfo:
         s = "<domain"
         s += " id=" + str(self.domid)
         s += " name=" + self.info['name']
-        s += " memory=" + str(self.info['memory_KiB'] / 1024)
+        s += " memory=" + str(self.info['memory'])
         s += " ssidref=" + str(self.info['ssidref'])
         s += ">"
         return s
@@ -937,15 +881,12 @@ class XendDomainInfo:
 
     def sxpr(self):
         sxpr = ['domain',
-                ['domid',   self.domid],
-                ['memory',  self.info['memory_KiB'] / 1024]]
+                ['domid',   self.domid]]
 
         for e in ROUNDTRIPPING_CONFIG_ENTRIES:
             if self.infoIsSet(e[0]):
                 sxpr.append([e[0], self.info[e[0]]])
         
-        sxpr.append(['maxmem', self.info['maxmem_KiB'] / 1024])
-
         if self.infoIsSet('image'):
             sxpr.append(['image', self.info['image']])
 
@@ -1086,9 +1027,8 @@ class XendDomainInfo:
 
 
     def initDomain(self):
-        log.debug('XendDomainInfo.initDomain: %s %s %s',
+        log.debug('XendDomainInfo.initDomain: %s %s',
                   self.domid,
-                  self.info['memory_KiB'],
                   self.info['cpu_weight'])
 
         if not self.infoIsSet('image'):
@@ -1103,7 +1043,7 @@ class XendDomainInfo:
 
         xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
 
-        m = self.image.getDomainMemory(self.info['memory_KiB'])
+        m = self.image.getDomainMemory(self.info['memory'] * 1024)
         xc.domain_setmaxmem(self.domid, maxmem_kb = m)
         xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
 

@@ -118,6 +118,7 @@ static int get_platform_info(int xc_handle, uint32_t dom,
 /* Returns TRUE if the PFN is currently mapped */
 #define is_mapped(pfn_type) (!((pfn_type) & 0x80000000UL))
 
+#define INVALID_P2M_ENTRY   (~0UL) 
 
 
 

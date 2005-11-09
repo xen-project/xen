@@ -516,8 +516,8 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 /* shouldn't happen - continue optimistically */
                 continue; 
 
-            pfntab[i] = p2m[pfn];
-            p2m[pfn]  = 0x80000001;  // not in pmap
+            pfntab[i] = p2m[pfn];   
+            p2m[pfn]  = INVALID_P2M_ENTRY; // not in pseudo-physical map 
         }
         
         if (count > 0) {
