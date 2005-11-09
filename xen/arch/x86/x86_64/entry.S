@@ -370,27 +370,22 @@ FLT6:   movq  %rax,(%rsi)               # RIP
         subq  $8,%rsi
         movl  TRAPBOUNCE_error_code(%rdx),%eax
 FLT7:   movq  %rax,(%rsi)               # ERROR CODE
-        testb $TBF_EXCEPTION_CR2,%cl
-        jz    2f
-        subq  $8,%rsi
-        movq  TRAPBOUNCE_cr2(%rdx),%rax
-FLT8:   movq  %rax,(%rsi)               # CR2
 1:      testb $TBF_FAILSAFE,%cl
         jz    2f
         subq  $32,%rsi
         movl  %gs,%eax
-FLT9:   movq  %rax,24(%rsi)             # GS
+FLT8:   movq  %rax,24(%rsi)             # GS
         movl  %fs,%eax
-FLT10:  movq  %rax,16(%rsi)             # FS
+FLT9:   movq  %rax,16(%rsi)             # FS
         movl  %es,%eax
-FLT11:  movq  %rax,8(%rsi)              # ES
+FLT10:  movq  %rax,8(%rsi)              # ES
         movl  %ds,%eax
-FLT12:  movq  %rax,(%rsi)               # DS
+FLT11:  movq  %rax,(%rsi)               # DS
 2:      subq  $16,%rsi
         movq  UREGS_r11+8(%rsp),%rax
-FLT13:  movq  %rax,8(%rsi)              # R11
+FLT12:  movq  %rax,8(%rsi)              # R11
         movq  UREGS_rcx+8(%rsp),%rax
-FLT14:  movq  %rax,(%rsi)               # RCX
+FLT13:  movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         movl  $TRAP_syscall,UREGS_entry_vector+8(%rsp)
@@ -411,7 +406,6 @@ FLT14:  movq  %rax,(%rsi)               # RCX
         .quad  FLT8,domain_crash_synchronous ,  FLT9,domain_crash_synchronous
         .quad FLT10,domain_crash_synchronous , FLT11,domain_crash_synchronous
         .quad FLT12,domain_crash_synchronous , FLT13,domain_crash_synchronous
-        .quad FLT14,domain_crash_synchronous
 .previous
 
         ALIGN

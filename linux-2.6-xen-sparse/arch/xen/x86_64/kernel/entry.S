@@ -874,42 +874,8 @@ ENTRY(execve)
 	ret
 	CFI_ENDPROC
 
-
- /*
- * Copy error_entry because of the different stack frame
- */                        
 ENTRY(page_fault)
-        movq (%rsp),%rcx
-        movq 8(%rsp),%r11
-        addq $0x10,%rsp         # now %rsp points to %cr2
-        pushq %rax
-        leaq do_page_fault(%rip),%rax
-	cld	
-	subq  $13*8,%rsp
-	movq %rdx,12*8(%rsp)    # save %rdx
-	movq 13*8(%rsp),%rdx	# load rax
-	movq %rcx,11*8(%rsp)
-	movq %rdx,10*8(%rsp)	# store rax
-        movq %rsi,13*8(%rsp)    # now save %rsi
-        movq 14*8(%rsp),%rdx    # load %cr2, 3rd argument
-	movq %r8, 9*8(%rsp)
-	movq %r9, 8*8(%rsp)
-	movq %r10,7*8(%rsp)
-	movq %r11,6*8(%rsp)
-	movq %rbx,5*8(%rsp) 
-	movq %rbp,4*8(%rsp) 
-	movq %r12,3*8(%rsp) 
-	movq %r13,2*8(%rsp) 
-	movq %r14,1*8(%rsp) 
-	movq %r15,(%rsp)
-#if 0        
-	cmpl $__KERNEL_CS,CS(%rsp)
-	je  error_kernelspace
-#endif
-        /*
-         * 1st and 2nd arguments are set by error_call_handler
-         */
-        jmp error_call_handler
+	errorentry do_page_fault
 
 ENTRY(coprocessor_error)
 	zeroentry do_coprocessor_error
@@ -948,24 +914,15 @@ ENTRY(nmi)
 paranoid_exit:
 	testl %ebx,%ebx				/* swapgs needed? */
 	jnz paranoid_restore
+	testl $3,CS(%rsp)
+	jnz   paranoid_userspace
 paranoid_swapgs:	
-/*	swapgs */
+	swapgs
 paranoid_restore:	
 	RESTORE_ALL 8
-/*	iretq */
+	iretq
 paranoid_userspace:	
 	GET_THREAD_INFO(%rcx)
-#	movl threadinfo_flags(%rcx),%edx
-#	testl $_TIF_NEED_RESCHED,%edx
-#	jnz paranoid_resched
-#	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME|_TIF_SINGLESTEP),%edx
-#	jnz paranoid_signal
-#	jmp paranoid_swapgs
-#paranoid_resched:		
-#/*	sti */
-#	call schedule
-#	jmp paranoid_exit
-#paranoid_signal:		
 	movl threadinfo_flags(%rcx),%ebx
 	andl $_TIF_WORK_MASK,%ebx
 	jz paranoid_swapgs
@@ -975,13 +932,10 @@ paranoid_userspace:
 	testl $_TIF_NEED_RESCHED,%ebx
 	jnz paranoid_schedule
 	movl %ebx,%edx			/* arg3: thread flags */
-/*	sti */
-#	xorl %esi,%esi /* oldset */
-#	movq %rsp,%rdi /* &pt_regs */
+	sti
 	xorl %esi,%esi 			/* arg2: oldset */
 	movq %rsp,%rdi 			/* arg1: &pt_regs */
 	call do_notify_resume
-#	jmp paranoid_exit
 	cli
 	jmp paranoid_userspace
 paranoid_schedule:
@@ -1056,5 +1010,4 @@ ENTRY(machine_check)
 
 ENTRY(call_debug)
        zeroentry do_call_debug
-
 

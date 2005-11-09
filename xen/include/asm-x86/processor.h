@@ -121,7 +121,6 @@
 /* 'trap_bounce' flags values */
 #define TBF_EXCEPTION          1
 #define TBF_EXCEPTION_ERRCODE  2
-#define TBF_EXCEPTION_CR2      4
 #define TBF_INTERRUPT          8
 #define TBF_FAILSAFE          16
 

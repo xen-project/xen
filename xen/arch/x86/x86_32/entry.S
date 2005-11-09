@@ -401,30 +401,25 @@ FLT16:  movl %eax,%gs:8(%esi)
         subl $4,%esi                    # push error_code onto guest frame
         movl TRAPBOUNCE_error_code(%edx),%eax
 FLT17:  movl %eax,%gs:(%esi)
-        testb $TBF_EXCEPTION_CR2,%cl
-        jz   2f
-        subl $4,%esi                    # push %cr2 onto guest frame
-        movl TRAPBOUNCE_cr2(%edx),%eax
-FLT18:  movl %eax,%gs:(%esi)
 1:      testb $TBF_FAILSAFE,%cl
         jz   2f
         subl $16,%esi                # add DS/ES/FS/GS to failsafe stack frame
         testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
         jz   nvm86_2
         xorl %eax,%eax               # VM86: we write zero selector values
-FLT19:  movl %eax,%gs:(%esi) 
-FLT20:  movl %eax,%gs:4(%esi)
-FLT21:  movl %eax,%gs:8(%esi) 
-FLT22:  movl %eax,%gs:12(%esi)
+FLT18:  movl %eax,%gs:(%esi) 
+FLT19:  movl %eax,%gs:4(%esi)
+FLT20:  movl %eax,%gs:8(%esi) 
+FLT21:  movl %eax,%gs:12(%esi)
         jmp  2f
 nvm86_2:movl UREGS_ds+4(%esp),%eax   # non-VM86: write real selector values
-FLT23:  movl %eax,%gs:(%esi) 
+FLT22:  movl %eax,%gs:(%esi) 
         movl UREGS_es+4(%esp),%eax
-FLT24:  movl %eax,%gs:4(%esi)
+FLT23:  movl %eax,%gs:4(%esi)
         movl UREGS_fs+4(%esp),%eax
-FLT25:  movl %eax,%gs:8(%esi) 
+FLT24:  movl %eax,%gs:8(%esi) 
         movl UREGS_gs+4(%esp),%eax
-FLT26:  movl %eax,%gs:12(%esi)
+FLT25:  movl %eax,%gs:12(%esi)
 2:      testl $X86_EFLAGS_VM,UREGS_eflags+4(%esp)
         jz   nvm86_3
         xorl %eax,%eax      /* zero DS-GS, just as a real CPU would */
@@ -456,7 +451,6 @@ nvm86_3:/* Rewrite our stack frame and return to ring 1. */
         .long FLT20,domain_crash_synchronous , FLT21,domain_crash_synchronous
         .long FLT22,domain_crash_synchronous , FLT23,domain_crash_synchronous
         .long FLT24,domain_crash_synchronous , FLT25,domain_crash_synchronous
-        .long FLT26,domain_crash_synchronous
 .previous
 
         ALIGN
