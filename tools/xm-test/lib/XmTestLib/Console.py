@@ -83,8 +83,6 @@ class XmConsole:
             raise ConsoleError("Console didn't respond")
 
     def __addToHistory(self, line):
-        if self.debugMe:
-            print ">" + line
         self.historyBuffer.append(line);
         self.historyLines += 1;
         if self.historyLines > self.historyLimit:
