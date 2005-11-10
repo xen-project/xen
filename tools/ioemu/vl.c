@@ -124,6 +124,7 @@ int domid = -1;
 static char network_script[1024];
 int pit_min_timer_count = 0;
 int nb_nics;
+char bridge[16];
 NetDriverState nd_table[MAX_NICS];
 QEMUTimer *gui_timer;
 QEMUTimer *polling_timer;
@@ -1586,7 +1587,7 @@ static void tun_add_read_packet(NetDriverState *nd,
 static int net_tun_init(NetDriverState *nd)
 {
     int pid, status;
-    char *args[3];
+    char *args[4];
     char **parg;
     extern int highest_fds;
 
@@ -1602,6 +1603,7 @@ static int net_tun_init(NetDriverState *nd)
             parg = args;
             *parg++ = network_script;
             *parg++ = nd->ifname;
+            *parg++ = bridge;
             *parg++ = NULL;
             execv(network_script, args);
             exit(1);
@@ -2207,6 +2209,7 @@ void help(void)
            "Network options:\n"
            "-nics n         simulate 'n' network cards [default=1]\n"
            "-macaddr addr   set the mac address of the first interface\n"
+           "-bridge  br     set the bridge interface for nic\n"
            "-n script       set tap/tun network init script [default=%s]\n"
            "-tun-fd fd      use this fd as already opened tap/tun interface\n"
 #ifdef CONFIG_SLIRP
@@ -2297,6 +2300,7 @@ enum {
 
     QEMU_OPTION_nics,
     QEMU_OPTION_macaddr,
+    QEMU_OPTION_bridge,
     QEMU_OPTION_n,
     QEMU_OPTION_tun_fd,
     QEMU_OPTION_user_net,
@@ -2367,6 +2371,7 @@ const QEMUOption qemu_options[] = {
 
     { "nics", HAS_ARG, QEMU_OPTION_nics},
     { "macaddr", HAS_ARG, QEMU_OPTION_macaddr},
+    { "bridge", HAS_ARG, QEMU_OPTION_bridge},
     { "n", HAS_ARG, QEMU_OPTION_n },
     { "tun-fd", HAS_ARG, QEMU_OPTION_tun_fd },
 #ifdef CONFIG_SLIRP
@@ -2824,6 +2829,9 @@ int main(int argc, char **argv)
                     fprintf(stderr, "qemu: invalid number of network interfaces\n");
                     exit(1);
                 }
+                break;
+            case QEMU_OPTION_bridge:
+                pstrcpy(bridge, sizeof(bridge), optarg);
                 break;
             case QEMU_OPTION_macaddr:
                 {
