@@ -6,86 +6,147 @@
 #include <asm/hw_irq.h>
 #include <asm-xen/evtchn.h>
 
-#define MAX_EVTCHN 256
+#define MAX_EVTCHN 1024
 
-#define VALID_EVTCHN(_chn) ((_chn) >= 0)
+/* Xen will never allocate port zero for any purpose. */
+#define VALID_EVTCHN(_chn) (((_chn) != 0) && ((_chn) < MAX_EVTCHN))
 
+/* Binding types. Hey, only IRQT_VIRQ and IRQT_EVTCHN are supported now
+ * for XEN/IA64 - ktian1
+ */
+enum { IRQT_UNBOUND, IRQT_PIRQ, IRQT_VIRQ, IRQT_IPI, IRQT_EVTCHN };
+
+/* Constructor for packed IRQ information. */
+#define mk_irq_info(type, index, evtchn)				\
+	(((u32)(type) << 24) | ((u32)(index) << 16) | (u32)(evtchn))
+/* Convenient shorthand for packed representation of an unbound IRQ. */
+#define IRQ_UNBOUND	mk_irq_info(IRQT_UNBOUND, 0, 0)
+/* Accessor macros for packed IRQ information. */
+#define evtchn_from_irq(irq) ((u16)(irq_info[irq]))
+#define index_from_irq(irq)  ((u8)(irq_info[irq] >> 16))
+#define type_from_irq(irq)   ((u8)(irq_info[irq] >> 24))
+
+/* Packed IRQ information: binding type, sub-type index, and event channel. */
+static u32 irq_info[NR_IRQS];
+
+/* One note for XEN/IA64 is that we have all event channels bound to one
+ * physical irq vector. So we always mean evtchn vector identical to 'irq'
+ * vector in this context. - ktian1
+ */
 static struct {
 	irqreturn_t (*handler)(int, void *, struct pt_regs *);
 	void *dev_id;
+	char opened;	/* Whether allocated */
 } evtchns[MAX_EVTCHN];
 
-int virq_to_evtchn[NR_VIRQS] = {-1};
-unsigned int bind_virq_to_evtchn(int virq)
+/*
+ * This lock protects updates to the following mapping and reference-count
+ * arrays. The lock does not need to be acquired to read the mapping tables.
+ */
+static spinlock_t irq_mapping_update_lock;
+
+#define unbound_irq(e) (VALID_EVTCHN(e) && (!evtchns[(e)].opened))
+int bind_virq_to_irqhandler(
+	unsigned int virq,
+	unsigned int cpu,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id)
 {
     evtchn_op_t op;
+    int evtchn;
+
+    spin_lock(&irq_mapping_update_lock);
 
     op.cmd = EVTCHNOP_bind_virq;
     op.u.bind_virq.virq = virq;
-    op.u.bind_virq.vcpu = 0;
-    if ( HYPERVISOR_event_channel_op(&op) != 0 )
-        BUG();
+    op.u.bind_virq.vcpu = cpu;
+    BUG_ON(HYPERVISOR_event_channel_op(&op) != 0 );
+    evtchn = op.u.bind_virq.port;
 
-    virq_to_evtchn[virq] = op.u.bind_virq.port;
-    return op.u.bind_virq.port;
-}
+    if (!unbound_irq(evtchn))
+	return -EINVAL;
 
-int bind_virq_to_irq(int virq, int cpu)
-{
-	printk("bind_virq_to_irq called... FIXME??\n");
-	while(1);
-}
+    evtchns[evtchn].handler = handler;
+    evtchns[evtchn].dev_id = dev_id;
+    evtchns[evtchn].opened = 1;
+    irq_info[evtchn] = mk_irq_info(IRQT_VIRQ, virq, evtchn);
 
-void unbind_virq_from_evtchn(int virq)
-{
-    evtchn_op_t op;
-
-    op.cmd = EVTCHNOP_close;
-//    op.u.close.dom = DOMID_SELF;
-    op.u.close.port = virq_to_evtchn[virq];
-    if ( HYPERVISOR_event_channel_op(&op) != 0 )
-	BUG();
-
-    virq_to_evtchn[virq] = -1;
+    unmask_evtchn(evtchn);
+    spin_unlock(&irq_mapping_update_lock);
+    return evtchn;
 }
 
 int bind_evtchn_to_irqhandler(unsigned int evtchn,
                    irqreturn_t (*handler)(int, void *, struct pt_regs *),
                    unsigned long irqflags, const char * devname, void *dev_id)
 {
-    if (evtchn >= MAX_EVTCHN)
-        return -EINVAL;
+    spin_lock(&irq_mapping_update_lock);
+
+    if (!unbound_irq(evtchn))
+	return -EINVAL;
 
     evtchns[evtchn].handler = handler;
     evtchns[evtchn].dev_id = dev_id;
+    evtchns[evtchn].opened = 1;
+    irq_info[evtchn] = mk_irq_info(IRQT_EVTCHN, 0, evtchn);
+
     unmask_evtchn(evtchn);
-    //return 0;
-    /* On ia64, there's only one irq vector allocated for all event channels,
-     * so let's just return evtchn as handle for later communication
-     */
+    spin_unlock(&irq_mapping_update_lock);
     return evtchn;
 }
 
-void unbind_evtchn_from_irqhandler(unsigned int evtchn, void *dev_id)
+int bind_ipi_to_irqhandler(
+	unsigned int ipi,
+	unsigned int cpu,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id)
 {
-    if (evtchn >= MAX_EVTCHN)
+    printk("%s is called which has not been supported now...?\n", __FUNTION__);
+    while(1);
+}
+
+void unbind_from_irqhandler(unsigned int irq, void *dev_id)
+{
+    evtchn_op_t op;
+    int evtchn = evtchn_from_irq(irq);
+
+    spin_lock(&irq_mapping_update_lock);
+
+    if (unbound_irq(irq))
         return;
+
+    op.cmd = EVTCHNOP_close;
+    op.u.close.port = evtchn;
+    BUG_ON(HYPERVISOR_event_channel_op(&op) != 0);
+
+    switch (type_from_irq(irq)) {
+	case IRQT_VIRQ:
+	    /* Add smp stuff later... */
+	    break;
+	case IRQT_IPI:
+	    /* Add smp stuff later... */
+	    break;
+	default:
+	    break;
+    }
 
     mask_evtchn(evtchn);
     evtchns[evtchn].handler = NULL;
-}
+    evtchns[evtchn].opened = 0;
 
-void unbind_evtchn_from_irq(unsigned int evtchn)
-{
-	printk("unbind_evtchn_from_irq called... FIXME??\n");
-	while(1);
+    spin_unlock(&irq_mapping_update_lock);
 }
 
 void notify_remote_via_irq(int irq)
 {
-	/* IA64 has same irq value as event channel vector */
-	if (VALID_EVTCHN(irq))
-		notify_remote_via_evtchn(irq);
+	int evtchn = evtchn_from_irq(irq);
+
+	if (!unbound_irq(evtchn))
+		notify_remote_via_evtchn(evtchn);
 }
 
 irqreturn_t evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -158,9 +219,7 @@ void __init evtchn_init(void)
 
     vcpu_info->arch.evtchn_vector = evtchn_irq;
     printk("xen-event-channel using irq %d\n", evtchn_irq);
+
+    spin_lock_init(&irq_mapping_update_lock);
+    memset(evtchns, 0, sizeof(evtchns));
 }
-
-/* Following are set of interfaces unused on IA64/XEN, just keep it here */
-
-void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu) {}
-int teardown_irq(unsigned int irq, struct irqaction * old) {return 0;}
