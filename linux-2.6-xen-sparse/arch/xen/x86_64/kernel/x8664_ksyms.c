@@ -128,8 +128,10 @@ EXPORT_SYMBOL(get_wchan);
 
 EXPORT_SYMBOL(rtc_lock);
 
-/* EXPORT_SYMBOL_GPL(set_nmi_callback);
-   EXPORT_SYMBOL_GPL(unset_nmi_callback); */
+#ifdef CONFIG_X86_LOCAL_APIC
+EXPORT_SYMBOL_GPL(set_nmi_callback);
+EXPORT_SYMBOL_GPL(unset_nmi_callback);
+#endif
 
 /* Export string functions. We normally rely on gcc builtin for most of these,
    but gcc sometimes decides not to inline them. */    
