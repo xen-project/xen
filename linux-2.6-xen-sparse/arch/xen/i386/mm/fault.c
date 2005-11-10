@@ -279,14 +279,17 @@ static void dump_fault_path(unsigned long address)
  *	bit 1 == 0 means read, 1 means write
  *	bit 2 == 0 means kernel, 1 means user-mode
  */
-fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code,
-			      unsigned long address)
+fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
 	struct vm_area_struct * vma;
+	unsigned long address;
 	int write;
 	siginfo_t info;
+
+	address = HYPERVISOR_shared_info->vcpu_data[
+		smp_processor_id()].arch.cr2;
 
 	/* Set the "privileged fault" bit to something sane. */
 	error_code &= ~4;
@@ -297,11 +300,10 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
 					SIGSEGV) == NOTIFY_STOP)
 		return;
-#if 0
+
 	/* It's safe to allow irq's after cr2 has been saved */
-	if (regs->eflags & (X86_EFLAGS_IF|VM_MASK))
+	if ((uint8_t)(regs->xcs >> 16) == 0)
 		local_irq_enable();
-#endif
 
 	tsk = current;
 

@@ -81,7 +81,7 @@ VM_MASK		= 0x00020000
 #define evtchn_upcall_pending		/* 0 */
 #define evtchn_upcall_mask		1
 
-#define sizeof_vcpu_shift		3
+#define sizeof_vcpu_shift		4
 
 #ifdef CONFIG_SMP
 #define preempt_disable(reg)	incl TI_preempt_count(reg)
@@ -813,35 +813,9 @@ ENTRY(alignment_check)
 	pushl $do_alignment_check
 	jmp error_code
 
-# This handler is special, because it gets an extra value on its stack,
-# which is the linear faulting address.
-# fastcall register usage:  %eax = pt_regs, %edx = error code,
-#			    %ecx = fault address
 ENTRY(page_fault)
-	pushl %ds
-	pushl %eax
-	xorl %eax, %eax
-	pushl %ebp
-	pushl %edi
-	pushl %esi
-	pushl %edx
-	decl %eax			/* eax = -1 */
-	pushl %ecx
-	pushl %ebx
-	cld
-	pushl %es
-#	UNWIND_ESPFIX_STACK
-	popl %edi
-	movl ES(%esp), %ecx		/* get the faulting address */
-	movl ORIG_EAX(%esp), %edx	/* get the error code */
-	movl %eax, ORIG_EAX(%esp)
-	movl %edi, ES(%esp)
-	movl $(__KERNEL_DS),%eax
-	movl %eax, %ds
-	movl %eax, %es
-	movl %esp,%eax			/* pt_regs pointer */
-	call do_page_fault
-	jmp ret_from_exception
+	pushl $do_page_fault
+	jmp error_code
 
 #ifdef CONFIG_X86_MCE
 ENTRY(machine_check)

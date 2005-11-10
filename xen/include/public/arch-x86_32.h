@@ -132,6 +132,11 @@ typedef struct arch_shared_info {
     unsigned long pfn_to_mfn_frame_list_list; 
 } arch_shared_info_t;
 
+typedef struct {
+    unsigned long cr2;
+    unsigned long pad; /* sizeof(vcpu_info_t) == 16 */
+} arch_vcpu_info_t;
+
 #endif
 
 #endif

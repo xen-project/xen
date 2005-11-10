@@ -299,9 +299,7 @@ typedef struct vcpu_info {
     uint8_t evtchn_upcall_pending;
     uint8_t evtchn_upcall_mask;
     unsigned long evtchn_pending_sel;
-#ifdef __ARCH_HAS_VCPU_INFO
     arch_vcpu_info_t arch;
-#endif
 } vcpu_info_t;
 
 typedef struct vcpu_time_info {
