@@ -650,7 +650,7 @@ fastcall void do_int3(struct pt_regs *regs, long error_code)
 
 static inline void conditional_sti(struct pt_regs *regs)
 {
-	if ((uint8_t)(regs->xcs >> 16) == 0)
+	if (regs->eflags & (X86_EFLAGS_IF|VM_MASK))
 		local_irq_enable();
 }
 

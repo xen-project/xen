@@ -352,8 +352,6 @@ create_bounce_frame:
 FLT2:   movq  %rax,32(%rsi)             # SS
         movq  UREGS_rsp+8(%rsp),%rax
 FLT3:   movq  %rax,24(%rsi)             # RSP
-        movq  UREGS_eflags+8(%rsp),%rax
-FLT4:   movq  %rax,16(%rsi)             # RFLAGS
         movq  VCPU_vcpu_info(%rbx),%rax
         pushq VCPUINFO_upcall_mask(%rax)
         testb $TBF_INTERRUPT,%cl
@@ -362,7 +360,15 @@ FLT4:   movq  %rax,16(%rsi)             # RFLAGS
         popq  %rax
         shlq  $32,%rax                  # Bits 32-39: saved_upcall_mask
         movw  UREGS_cs+8(%rsp),%ax      # Bits  0-15: CS
-FLT5:   movq  %rax,8(%rsi)              # CS/saved_upcall_mask
+FLT4:   movq  %rax,8(%rsi)              # CS / saved_upcall_mask
+        shrq  $32,%rax
+        testb $0xFF,%al                 # Bits 0-7: saved_upcall_mask
+        setz  %ch                       # %ch == !saved_upcall_mask
+        movq  UREGS_eflags+8(%rsp),%rax
+        andq  $~X86_EFLAGS_IF,%rax
+        shlb  $1,%ch                    # Bit 9 (EFLAGS.IF)
+        orb   %ch,%ah                   # Fold EFLAGS.IF into %eax
+FLT5:   movq  %rax,16(%rsi)             # RFLAGS
         movq  UREGS_rip+8(%rsp),%rax
 FLT6:   movq  %rax,(%rsi)               # RIP
         testb $TBF_EXCEPTION_ERRCODE,%cl

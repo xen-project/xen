@@ -351,7 +351,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 					SIGSEGV) == NOTIFY_STOP)
 		return;
 
-	if (likely((uint8_t)(regs->cs >> 32) == 0))
+	if (likely(regs->eflags & X86_EFLAGS_IF))
 		local_irq_enable();
 
 	if (unlikely(page_fault_trace))

@@ -89,7 +89,7 @@ int register_die_notifier(struct notifier_block *nb)
 
 static inline void conditional_sti(struct pt_regs *regs)
 {
-	if ((uint8_t)(regs->cs >> 32) == 0)
+	if (regs->eflags & X86_EFLAGS_IF)
 		local_irq_enable();
 }
 

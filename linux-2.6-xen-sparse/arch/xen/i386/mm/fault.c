@@ -300,9 +300,8 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
 					SIGSEGV) == NOTIFY_STOP)
 		return;
-
 	/* It's safe to allow irq's after cr2 has been saved */
-	if ((uint8_t)(regs->xcs >> 16) == 0)
+	if (regs->eflags & (X86_EFLAGS_IF|VM_MASK))
 		local_irq_enable();
 
 	tsk = current;

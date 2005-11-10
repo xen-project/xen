@@ -647,7 +647,7 @@ long do_switch_to_user(void)
 
     regs->rip    = stu.rip;
     regs->cs     = stu.cs | 3; /* force guest privilege */
-    regs->rflags = stu.rflags;
+    regs->rflags = (stu.rflags & ~(EF_IOPL|EF_VM)) | EF_IE;
     regs->rsp    = stu.rsp;
     regs->ss     = stu.ss | 3; /* force guest privilege */
 

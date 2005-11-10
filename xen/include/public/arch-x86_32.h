@@ -90,7 +90,7 @@ typedef struct cpu_user_regs {
     uint16_t cs;
     uint8_t  saved_upcall_mask;
     uint8_t  _pad0;
-    uint32_t eflags;
+    uint32_t eflags;        /* eflags.IF == !saved_upcall_mask */
     uint32_t esp;
     uint16_t ss, _pad1;
     uint16_t es, _pad2;

@@ -156,7 +156,7 @@ ENTRY(vmx_asm_vmexit_handler)
          * By this time, all the setups in the VMCS must be complete.
          */
         .if \launch
-        /* VMLUANCH */
+        /* VMLAUNCH */
         .byte 0x0f,0x01,0xc2
         pushf
         call vm_launch_fail
@@ -394,7 +394,12 @@ FLT14:  movl %eax,%gs:(%esi)
         shll $16,%eax                    # Bits 16-23: saved_upcall_mask
         movw UREGS_cs+4(%esp),%ax        # Bits  0-15: CS
 FLT15:  movl %eax,%gs:4(%esi) 
+        test $0x00FF0000,%eax            # Bits 16-23: saved_upcall_mask
+        setz %ch                         # %ch == !saved_upcall_mask
         movl UREGS_eflags+4(%esp),%eax
+        andl $~X86_EFLAGS_IF,%eax
+        shlb $1,%ch                      # Bit 9 (EFLAGS.IF)
+        orb  %ch,%ah                     # Fold EFLAGS.IF into %eax
 FLT16:  movl %eax,%gs:8(%esi)
         test $TBF_EXCEPTION_ERRCODE,%cl
         jz   1f
