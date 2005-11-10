@@ -296,9 +296,8 @@ _packet_write(struct packet *pak,
 			DPRINTK(" Grant table operation failure !\n");
 			return 0;
 		}
-		phys_to_machine_mapping[__pa(MMAP_VADDR(tpmif,i)) >>
-					PAGE_SHIFT] =
-			FOREIGN_FRAME(map_op.dev_bus_addr >> PAGE_SHIFT);
+		set_phys_to_machine(__pa(MMAP_VADDR(tpmif,i)) >> PAGE_SHIFT,
+			FOREIGN_FRAME(map_op.dev_bus_addr >> PAGE_SHIFT));
 
 		tocopy = MIN(size - offset, PAGE_SIZE);
 
