@@ -94,7 +94,7 @@ config XEN_TPMDEV_CLOSE_IF_VTPM_FAILS
           Say Y if you want this feature.
 
 config XEN_BLKDEV_FRONTEND
-	bool "Block-device frontend driver"
+	tristate "Block-device frontend driver"
 	default y
 	help
 	  The block-device frontend driver allows the kernel to access block
@@ -103,7 +103,7 @@ config XEN_BLKDEV_FRONTEND
 	  (domain 0), then you almost certainly want to say Y here.
 
 config XEN_NETDEV_FRONTEND
-	bool "Network-device frontend driver"
+	tristate "Network-device frontend driver"
 	default y
 	help
 	  The network-device frontend driver allows the kernel to access
@@ -172,6 +172,10 @@ config XEN_X86_64
 endchoice
 
 endmenu
+
+config HAVE_ARCH_ALLOC_SKB
+	bool
+	default y
 
 config HAVE_ARCH_DEV_ALLOC_SKB
 	bool

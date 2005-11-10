@@ -113,7 +113,7 @@ static void free_blkif(void *arg)
 	blkif_t *blkif = (blkif_t *)arg;
 
 	if (blkif->irq)
-		unbind_evtchn_from_irqhandler(blkif->irq, blkif);
+		unbind_from_irqhandler(blkif->irq, blkif);
 
 	if (blkif->blk_ring.sring) {
 		unmap_frontend_page(blkif);

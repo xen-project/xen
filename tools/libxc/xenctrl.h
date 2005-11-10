@@ -17,6 +17,7 @@
 #include <xen/event_channel.h>
 #include <xen/sched.h>
 #include <xen/sched_ctl.h>
+#include <xen/memory.h>
 #include <xen/acm.h>
 
 #ifdef __ia64__

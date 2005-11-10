@@ -125,7 +125,7 @@ def becomeNonRoot():
         allusers = pwd.getpwall()
         for u in allusers:
             if u[0] == "nobody":
-                os.seteuid(u[2])
+                os.setreuid(u[2], u[2])
                 break
         if os.geteuid() == 0:
             FAIL("Could not become a non-root user")

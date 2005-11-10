@@ -162,7 +162,7 @@ __tpmif_disconnect_complete(void *arg)
 	tpmif_t *tpmif = (tpmif_t *) arg;
 
 	if (tpmif->irq)
-		unbind_evtchn_from_irqhandler(tpmif->irq, tpmif);
+		unbind_from_irqhandler(tpmif->irq, tpmif);
 
 	if (tpmif->tx) {
 		unmap_frontend_page(tpmif);

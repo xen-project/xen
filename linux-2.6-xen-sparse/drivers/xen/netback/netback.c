@@ -822,9 +822,13 @@ static int __init netback_init(void)
 
 	netif_xenbus_init();
 
-	(void)request_irq(bind_virq_to_irq(VIRQ_DEBUG, 0),
-			  netif_be_dbg, SA_SHIRQ, 
-			  "net-be-dbg", &netif_be_dbg);
+	(void)bind_virq_to_irqhandler(
+		VIRQ_DEBUG,
+		0,
+		netif_be_dbg,
+		SA_SHIRQ, 
+		"net-be-dbg",
+		&netif_be_dbg);
 
 	return 0;
 }

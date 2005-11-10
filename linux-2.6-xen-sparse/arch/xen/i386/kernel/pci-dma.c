@@ -152,8 +152,11 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 	ret = (void *)vstart;
 
 	if (ret != NULL) {
-		xen_create_contiguous_region(vstart, order);
-
+		/* NB. Hardcode 31 address bits for now: aacraid limitation. */
+		if (xen_create_contiguous_region(vstart, order, 31) != 0) {
+			free_pages(vstart, order);
+			return NULL;
+		}
 		memset(ret, 0, size);
 		*dma_handle = virt_to_bus(ret);
 	}

@@ -756,7 +756,7 @@ def choose_vnc_display():
 vncpid = None
 
 def spawn_vnc(display):
-    vncargs = (["vncviewer" + "-log", "*:stdout:0",
+    vncargs = (["vncviewer", "-log", "*:stdout:0",
             "-listen", "%d" % (VNC_BASE_PORT + display) ])
     global vncpid    
     vncpid = os.spawnvp(os.P_NOWAIT, "vncviewer", vncargs)
@@ -814,6 +814,10 @@ def make_domain(opts, config):
         err(str(ex))
 
     dom = sxp.child_value(dominfo, 'name')
+
+    if server.xend_domain_wait_for_devices(dom) < 0:
+        server.xend_domain_destroy(dom)
+        err("Device creation failed for domain %s" % dom)
 
     if not opts.vals.paused:
         if server.xend_domain_unpause(dom) < 0:

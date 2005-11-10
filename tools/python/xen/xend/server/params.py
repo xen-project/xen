@@ -44,8 +44,3 @@ XEND_DEBUG_LOG     = '/var/log/xend-debug.log'
 XEND_USER          = 'root'
 XEND_DEBUG         = getenv("XEND_DEBUG",     0, conv=int)
 XEND_DAEMONIZE     = getenv("XEND_DAEMONIZE", not XEND_DEBUG, conv=int)
-
-XENSTORED_PID_FILE = '/var/run/xenstored.pid'
-XENSTORED_RUN_DIR  = '/var/run/xenstored'
-XENSTORED_LIB_DIR  = '/var/lib/xenstored'
-XENSTORED_DEBUG    = getenv("XENSTORED_DEBUG", 0, conv=int)

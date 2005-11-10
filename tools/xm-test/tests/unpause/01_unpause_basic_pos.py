@@ -74,13 +74,14 @@ except ConsoleError, e:
     FAIL(str(e))
 try:
     run = console.runCmd("ls")
-    #If we get here, console attached to paused domain (unexpected)
-    FAIL("console attached to supposedly paused domain")
 except ConsoleError, e:
     pass
 
 # Close the console
 console.closeConsole()
+
+if run["return"] != 0:
+    FAIL("console failed to attach to supposedly unpaused domain")
 
 # Stop the domain (nice shutdown)
 domain.stop()

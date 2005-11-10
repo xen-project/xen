@@ -177,7 +177,7 @@ int xb_init_comms(void)
 	int err;
 
 	if (xenbus_irq)
-		unbind_evtchn_from_irqhandler(xenbus_irq, &xb_waitq);
+		unbind_from_irqhandler(xenbus_irq, &xb_waitq);
 
 	err = bind_evtchn_to_irqhandler(
 		xen_start_info->store_evtchn, wake_waiting,

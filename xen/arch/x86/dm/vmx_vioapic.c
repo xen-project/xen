@@ -297,12 +297,14 @@ static int ioapic_inj_irq(vmx_vioapic_t *s,
     switch (delivery_mode) {
     case VLAPIC_DELIV_MODE_FIXED:
     case VLAPIC_DELIV_MODE_LPRI:
-        if (test_and_set_bit(vector, &target->irr[0]) && trig_mode == 1) {
+        if (test_and_set_bit(vector, &VLAPIC_IRR(target)) && trig_mode == 1) {
             /* the level interrupt should not happen before it is cleard */
             printk("<ioapic_inj_irq> level interrupt happen before cleard\n");
         }
+#ifndef __ia64__
         if (trig_mode)
             test_and_set_bit(vector, &target->tmr[0]);
+#endif
         result = 1;
         break;
     default:
@@ -367,7 +369,7 @@ static uint32_t ioapic_get_delivery_bitmask(vmx_vioapic_t *s,
 
     if (dest_mode == 0) { /* Physical mode */
         for (i = 0; i < s->lapic_count; i++) {
-            if (s->lapic_info[i]->id == dest) {
+            if (VLAPIC_ID(s->lapic_info[i]) == dest) {
                 mask = 1 << i;
                 break;
             }

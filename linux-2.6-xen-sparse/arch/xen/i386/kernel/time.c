@@ -748,10 +748,19 @@ static void __init hpet_time_init(void)
 /* Dynamically-mapped IRQ. */
 DEFINE_PER_CPU(int, timer_irq);
 
-static struct irqaction irq_timer = {
-	timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "timer0",
-	NULL, NULL
-};
+extern void (*late_time_init)(void);
+static void setup_cpu0_timer_irq(void)
+{
+	per_cpu(timer_irq, 0) =
+		bind_virq_to_irqhandler(
+			VIRQ_TIMER,
+			0,
+			timer_interrupt,
+			SA_INTERRUPT,
+			"timer0",
+			NULL);
+	BUG_ON(per_cpu(timer_irq, 0) < 0);
+}
 
 void __init time_init(void)
 {
@@ -785,8 +794,8 @@ void __init time_init(void)
 	rdtscll(vxtime.last_tsc);
 #endif
 
-	per_cpu(timer_irq, 0) = bind_virq_to_irq(VIRQ_TIMER, 0);
-	(void)setup_irq(per_cpu(timer_irq, 0), &irq_timer);
+	/* Cannot request_irq() until kmem is initialised. */
+	late_time_init = setup_cpu0_timer_irq;
 }
 
 /* Convert jiffies to system time. */
@@ -865,17 +874,22 @@ void local_setup_timer(unsigned int cpu)
 			per_cpu(shadow_time, cpu).system_timestamp;
 	} while (read_seqretry(&xtime_lock, seq));
 
-	per_cpu(timer_irq, cpu) = bind_virq_to_irq(VIRQ_TIMER, cpu);
 	sprintf(timer_name[cpu], "timer%d", cpu);
-	BUG_ON(request_irq(per_cpu(timer_irq, cpu), timer_interrupt,
-	                   SA_INTERRUPT, timer_name[cpu], NULL));
+	per_cpu(timer_irq, cpu) =
+		bind_virq_to_irqhandler(
+			VIRQ_TIMER,
+			cpu,
+			timer_interrupt,
+			SA_INTERRUPT,
+			timer_name[cpu],
+			NULL);
+	BUG_ON(per_cpu(timer_irq, cpu) < 0);
 }
 
 void local_teardown_timer(unsigned int cpu)
 {
 	BUG_ON(cpu == 0);
-	free_irq(per_cpu(timer_irq, cpu), NULL);
-	unbind_virq_from_irq(VIRQ_TIMER, cpu);
+	unbind_from_irqhandler(per_cpu(timer_irq, cpu), NULL);
 }
 #endif
 

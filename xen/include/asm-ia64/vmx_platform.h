@@ -20,18 +20,54 @@
 #define __ASM_IA64_VMX_PLATFORM_H__
 
 #include <public/xen.h>
-
+#include <public/arch-ia64.h>
+#include <asm/vmx_vioapic.h>
 
 struct mmio_list;
 typedef struct virutal_platform_def {
-    //unsigned long          *real_mode_data; /* E820, etc. */
-    unsigned long          shared_page_va;
-    //struct vmx_virpit_t    vmx_pit;
-    //struct vmx_handler_t   vmx_handler;
-    //struct mi_per_cpu_info mpci;            /* MMIO */
+    unsigned long       shared_page_va;
     unsigned long       pib_base;
     unsigned char       xtp;
     struct mmio_list    *mmio;
+    /* One IOSAPIC now... */
+    struct vmx_vioapic   vmx_vioapic;
 } vir_plat_t;
+
+static inline int __fls(uint32_t word)
+{
+    long double d = word;
+    long exp;
+
+    __asm__ __volatile__ ("getf.exp %0=%1" : "=r"(exp) : "f"(d));
+    return word ? (exp - 0xffff) : -1;
+}
+
+/* This is a connect structure between vIOSAPIC model and vLSAPIC model.
+ * vlapic is required by vIOSAPIC model to manipulate pending bits, and
+ * we just map them into vpd here
+ */
+typedef struct vlapic {
+    struct vcpu	*vcpu;	/* Link to current vcpu */
+} vlapic_t;
+
+extern uint64_t dummy_tmr[];
+#define VCPU(_v,_x)	_v->arch.privregs->_x
+#define VLAPIC_ID(l) (uint16_t)(VCPU((l)->vcpu, lid) >> 16)
+#define VLAPIC_IRR(l) VCPU((l)->vcpu, irr[0])
+
+/* As long as we register vlsapic to ioapic controller, it's said enabled */
+#define vlapic_enabled(l) 1
+#define vmx_apic_support(d) 1
+
+#define VLAPIC_DELIV_MODE_FIXED		0x0
+#define VLAPIC_DELIV_MODE_REDIR		0x1
+#define VLAPIC_DELIV_MODE_LPRI		VLAPIC_DELIV_MODE_REDIR
+#define VLAPIC_DELIV_MODE_PMI		0x2
+#define VLAPIC_DELIV_MODE_SMI		0x2 /* For IA32 */
+#define VLAPIC_DELIV_MODE_RESERVED	0x3
+#define VLAPIC_DELIV_MODE_NMI		0x4
+#define VLAPIC_DELIV_MODE_INIT		0x5
+#define VLAPIC_DELIV_MODE_STARTUP	0x6 /* For IA32 */
+#define VLAPIC_DELIV_MODE_EXT		0x7
 
 #endif

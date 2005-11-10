@@ -117,6 +117,7 @@ void
 swiotlb_init_with_default_size (size_t default_size)
 {
 	unsigned long i, bytes;
+	int rc;
 
 	if (!iotlb_nslabs) {
 		iotlb_nslabs = (default_size >> IO_TLB_SHIFT);
@@ -137,8 +138,10 @@ swiotlb_init_with_default_size (size_t default_size)
 		      "Use dom0_mem Xen boot parameter to reserve\n"
 		      "some DMA memory (e.g., dom0_mem=-128M).\n");
 
-	xen_create_contiguous_region(
-		(unsigned long)iotlb_virt_start, get_order(bytes));
+	/* Hardcode 31 address bits for now: aacraid limitation. */
+	rc = xen_create_contiguous_region(
+		(unsigned long)iotlb_virt_start, get_order(bytes), 31);
+	BUG_ON(rc);
 
 	/*
 	 * Allocate and initialize the free list array.  This array is used

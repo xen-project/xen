@@ -771,15 +771,14 @@ static int __init xencons_init(void)
 #endif
 
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
-#ifdef __ia64__
-		xencons_priv_irq = bind_virq_to_evtchn(VIRQ_CONSOLE);
-		bind_evtchn_to_irqhandler(xencons_priv_irq,
-				xencons_priv_interrupt, 0, "console", NULL);
-#else
-		xencons_priv_irq = bind_virq_to_irq(VIRQ_CONSOLE, 0);
-		(void)request_irq(xencons_priv_irq,
-				  xencons_priv_interrupt, 0, "console", NULL);
-#endif
+		xencons_priv_irq = bind_virq_to_irqhandler(
+			VIRQ_CONSOLE,
+			0,
+			xencons_priv_interrupt,
+			0,
+			"console",
+			NULL);
+		BUG_ON(xencons_priv_irq < 0);
 	} else {
 		xencons_ring_register_receiver(xencons_rx);
 	}

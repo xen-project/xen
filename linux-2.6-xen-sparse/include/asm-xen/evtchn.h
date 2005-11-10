@@ -43,29 +43,41 @@
  * LOW-LEVEL DEFINITIONS
  */
 
-/* Dynamically bind a VIRQ source to Linux IRQ space. */
-extern int  bind_virq_to_irq(int virq, int cpu);
-extern void unbind_virq_from_irq(int virq, int cpu);
-
-/* Dynamically bind an IPI source to Linux IRQ space. */
-extern int  bind_ipi_to_irq(int ipi, int cpu);
-extern void unbind_ipi_from_irq(int ipi, int cpu);
-
 /*
- * Dynamically bind an event-channel port to an IRQ-like callback handler.
+ * Dynamically bind an event source to an IRQ-like callback handler.
  * On some platforms this may not be implemented via the Linux IRQ subsystem.
  * The IRQ argument passed to the callback handler is the same as returned
  * from the bind call. It may not correspond to a Linux IRQ number.
- * BIND:   Returns IRQ or error.
+ * Returns IRQ or negative errno.
  * UNBIND: Takes IRQ to unbind from; automatically closes the event channel.
  */
-extern int  bind_evtchn_to_irqhandler(
+extern int bind_evtchn_to_irqhandler(
 	unsigned int evtchn,
 	irqreturn_t (*handler)(int, void *, struct pt_regs *),
 	unsigned long irqflags,
 	const char *devname,
 	void *dev_id);
-extern void unbind_evtchn_from_irqhandler(unsigned int irq, void *dev_id);
+extern int bind_virq_to_irqhandler(
+	unsigned int virq,
+	unsigned int cpu,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id);
+extern int bind_ipi_to_irqhandler(
+	unsigned int ipi,
+	unsigned int cpu,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags,
+	const char *devname,
+	void *dev_id);
+
+/*
+ * Common unbind function for all event sources. Takes IRQ to unbind from.
+ * Automatically closes the underlying event channel (even for bindings
+ * made with bind_evtchn_to_irqhandler()).
+ */
+extern void unbind_from_irqhandler(unsigned int irq, void *dev_id);
 
 /*
  * Unlike notify_remote_via_evtchn(), this is safe to use across

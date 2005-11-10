@@ -1,0 +1,9 @@
+#! /bin/sh -ex
+
+# if libtool is ever added, turn this on
+# libtoolize --copy --force --automake
+aclocal
+automake --add-missing --copy --foreign
+autoconf
+chmod a+x runtest.sh
+

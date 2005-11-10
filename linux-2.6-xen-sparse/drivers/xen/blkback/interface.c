@@ -125,7 +125,7 @@ static void free_blkif(void *arg)
 	if (!blkif->irq)
 		return;
 
-	unbind_evtchn_from_irqhandler(blkif->irq, blkif);
+	unbind_from_irqhandler(blkif->irq, blkif);
 	blkif->irq = 0;
 
 	vbd_free(&blkif->vbd);

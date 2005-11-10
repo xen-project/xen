@@ -25,6 +25,10 @@ The directory structure is:
    |
    +-/utils: Utility scripts for ramdisk building
 
+Reports are posted here:
+
+   http://xmtest.dague.org
+
 
 Building
 ========
@@ -60,6 +64,10 @@ file, which is the cleaned up, email-friendly report of failures.
 Additionally, the script will submit your results to the development
 team for trend analysis.  This helps us determine the level of success
 people "out there" are having with different versions of Xen.
+
+Note: you should generally run xm-test with a minimum of memory
+allocated to Dom0.  More memory available for allocation to DomUs
+means a more rigorous test.
 
 If you wish to run xm-test in an automated batch environment, you can
 run the script with the "-b" flag, which will try to prevent it from

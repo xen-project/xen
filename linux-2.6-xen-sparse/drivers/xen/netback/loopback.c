@@ -29,7 +29,7 @@
 #include <linux/skbuff.h>
 #include <net/dst.h>
 
-static int nloopbacks = 1;
+static int nloopbacks = 8;
 module_param(nloopbacks, int, 0);
 MODULE_PARM_DESC(nloopbacks, "Number of netback-loopback devices to create");
 

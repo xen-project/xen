@@ -43,6 +43,7 @@ EXPORT_SYMBOL(gnttab_free_grant_references);
 EXPORT_SYMBOL(gnttab_free_grant_reference);
 EXPORT_SYMBOL(gnttab_claim_grant_reference);
 EXPORT_SYMBOL(gnttab_release_grant_reference);
+EXPORT_SYMBOL(gnttab_request_free_callback);
 EXPORT_SYMBOL(gnttab_grant_foreign_access_ref);
 EXPORT_SYMBOL(gnttab_grant_foreign_transfer_ref);
 
@@ -337,53 +338,7 @@ gnttab_request_free_callback(struct gnttab_free_callback *callback,
 #ifdef CONFIG_PROC_FS
 
 static struct proc_dir_entry *grant_pde;
-
-static int
-grant_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
-	    unsigned long data)
-{
-	int                     ret;
-	privcmd_hypercall_t     hypercall;
-
-	/*
-	 * XXX Need safety checks here if using for anything other
-	 *     than debugging.
-	 */
-	return -ENOSYS;
-
-	if ( cmd != IOCTL_PRIVCMD_HYPERCALL )
-		return -ENOSYS;
-
-	if ( copy_from_user(&hypercall, (void *)data, sizeof(hypercall)) )
-		return -EFAULT;
-
-	if ( hypercall.op != __HYPERVISOR_grant_table_op )
-		return -ENOSYS;
-
-#ifdef __ia64__
-	ret = HYPERVISOR_grant_table_op(hypercall.arg[0], (void *)hypercall.arg[1], hypercall.arg[2]);
-#else
-	/* hypercall-invoking asm taken from privcmd.c */
-	__asm__ __volatile__ (
-		"pushl %%ebx; pushl %%ecx; pushl %%edx; "
-		"pushl %%esi; pushl %%edi; "
-		"movl  4(%%eax),%%ebx ;"
-		"movl  8(%%eax),%%ecx ;"
-		"movl 12(%%eax),%%edx ;"
-		"movl 16(%%eax),%%esi ;"
-		"movl 20(%%eax),%%edi ;"
-		"movl   (%%eax),%%eax ;"
-		TRAP_INSTR "; "
-		"popl %%edi; popl %%esi; popl %%edx; popl %%ecx; popl %%ebx"
-		: "=a" (ret) : "0" (&hypercall) : "memory" );
-#endif
-
-	return ret;
-}
-
-static struct file_operations grant_file_ops = {
-	ioctl:  grant_ioctl,
-};
+static struct file_operations grant_file_ops;
 
 static int
 grant_read(char *page, char **start, off_t off, int count, int *eof,

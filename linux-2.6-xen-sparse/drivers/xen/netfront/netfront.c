@@ -1049,7 +1049,7 @@ static void netif_free(struct netfront_info *info)
 	info->rx = NULL;
 
 	if (info->irq)
-		unbind_evtchn_from_irqhandler(info->irq, info->netdev);
+		unbind_from_irqhandler(info->irq, info->netdev);
 	info->evtchn = info->irq = 0;
 }
 

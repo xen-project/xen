@@ -15,7 +15,7 @@ OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
 OBJS += vmx_init.o vmx_virt.o vmx_vcpu.o vmx_process.o vmx_vsa.o vmx_ivt.o\
 	vmx_phy_mode.o vmx_utility.o vmx_interrupt.o vmx_entry.o vmmu.o \
 	vtlb.o mmio.o vlsapic.o vmx_hypercall.o mm.o vmx_support.o \
-	pal_emul.o vmx_irq_ia64.o
+	pal_emul.o vmx_irq_ia64.o vmx_vioapic.o
 
 # lib files from xen/arch/ia64/linux/ (linux/arch/ia64/lib)
 OBJS +=	bitop.o clear_page.o flush.o copy_page_mck.o			\
@@ -68,6 +68,11 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 	 || ln -s $(BASEDIR)/include/xen $(BASEDIR)/include/linux
 	[ -e $(BASEDIR)/include/asm-ia64/xen ] \
 	 || ln -s $(BASEDIR)/include/asm-ia64/linux $(BASEDIR)/include/asm-ia64/xen
+# Link to DM file in Xen for ia64/vti
+	[ -e $(BASEDIR)/include/asm-ia64/vmx_vioapic.h ] \
+	 || ln -s ../../include/asm-x86/vmx_vioapic.h $(BASEDIR)/include/asm-ia64/vmx_vioapic.h
+	[ -e $(BASEDIR)/arch/ia64/vmx/vmx_vioapic.c ] \
+	 || ln -s ../../../arch/x86/dm/vmx_vioapic.c $(BASEDIR)/arch/ia64/vmx/vmx_vioapic.c
 # Solve circular reference on asm-offsets.h
 	[ -f $(BASEDIR)/include/asm-ia64/asm-offsets.h ] \
 	 || echo "#define IA64_TASK_SIZE 0" > $(BASEDIR)/include/asm-ia64/asm-offsets.h

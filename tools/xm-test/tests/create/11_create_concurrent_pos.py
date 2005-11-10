@@ -10,7 +10,7 @@ import random
 
 MIN_DOMS    = 10
 MAX_DOMS    = 50
-MEM_PER_DOM = 16
+MEM_PER_DOM = 24
 
 domains = []
 console = []

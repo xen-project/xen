@@ -279,8 +279,9 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	unsigned long flags;
 
 #ifdef CONFIG_X86_PAE
-	/* this gives us a page below 4GB */
-	xen_create_contiguous_region((unsigned long)pgd, 0);
+	/* Ensure pgd resides below 4GB. */
+	int rc = xen_create_contiguous_region((unsigned long)pgd, 0, 32);
+	BUG_ON(rc);
 #endif
 
 	if (!HAVE_SHARED_KERNEL_PMD)

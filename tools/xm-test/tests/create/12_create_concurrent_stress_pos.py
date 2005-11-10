@@ -7,7 +7,7 @@ from XmTestLib import *
 
 import time
 
-DOMS=2
+DOMS=5
 MEM=32
 DUR=60
 

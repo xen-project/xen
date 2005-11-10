@@ -358,7 +358,7 @@ static void blkif_free(struct blkfront_info *info)
 		info->ring.sring = NULL;
 	}
 	if (info->irq)
-		unbind_evtchn_from_irqhandler(info->irq, info); 
+		unbind_from_irqhandler(info->irq, info); 
 	info->evtchn = info->irq = 0;
 }
 
@@ -641,6 +641,7 @@ static int blkfront_probe(struct xenbus_device *dev,
 	info->vdevice = vdevice;
 	info->connected = BLKIF_STATE_DISCONNECTED;
 	info->mi = NULL;
+ 	info->gd = NULL;
 	INIT_WORK(&info->work, blkif_restart_queue, (void *)info);
 
 	info->shadow_free = 0;

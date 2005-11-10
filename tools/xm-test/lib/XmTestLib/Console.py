@@ -83,8 +83,6 @@ class XmConsole:
             raise ConsoleError("Console didn't respond")
 
     def __addToHistory(self, line):
-        if self.debugMe:
-            print ">" + line
         self.historyBuffer.append(line);
         self.historyLines += 1;
         if self.historyLines > self.historyLimit:
@@ -167,6 +165,8 @@ class XmConsole:
             if self.consoleFd in i:
                 try:
                     str = os.read(self.consoleFd, 1)
+                    if self.debugMe:
+                        sys.stdout.write(str)
                     bytes += 1
                 except:
                     raise ConsoleError("Failed to read from console (fd=%i)"
@@ -179,8 +179,6 @@ class XmConsole:
                                    % self.limit)
 
             if str == "\n":
-                if self.debugMe:
-                    print "%s\n" % line
                 if lines > 0:
                     output += line + "\n"
                     if saveHistory:

@@ -293,10 +293,14 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 		return -EINVAL;
 	    }
 
-	    vmx_setup_platform(v, c);
+	    if (v == d->vcpu[0])
+		vmx_setup_platform(d, c);
+
+	    vmx_final_setup_guest(v);
 	}
 
 	*regs = c->regs;
+	d->arch.sys_pgnr = c->sys_pgnr;
 	new_thread(v, regs->cr_iip, 0, 0);
 
  	v->vcpu_info->arch.evtchn_vector = c->vcpu.evtchn_vector;
@@ -307,7 +311,6 @@ int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 	}
 
 	v->arch.domain_itm_last = -1L;
-	d->arch.sys_pgnr = c->sys_pgnr;
 	d->shared_info->arch = c->shared;
 
 	/* Don't redo final setup */
@@ -991,7 +994,7 @@ int construct_dom0(struct domain *d,
 	 */
 	printk("Dom0: 0x%lx, domain: 0x%lx\n", (u64)dom0, (u64)d);
 	if (vmx_dom0)
-	    vmx_final_setup_domain(dom0);
+	    vmx_final_setup_guest(v);
 
 	set_bit(_VCPUF_initialised, &v->vcpu_flags);
 

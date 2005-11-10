@@ -116,6 +116,7 @@ struct blkfront_info
 	/* We watch the backend */
 	struct xenbus_watch watch;
 	dev_t dev;
+ 	struct gendisk *gd;
 	int vdevice;
 	blkif_vdev_t handle;
 	int connected;

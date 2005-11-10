@@ -351,7 +351,7 @@ static int setup_guest(int xc_handle,
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, page_array[0]);
     memset(start_info, 0, sizeof(*start_info));
     rc = xc_version(xc_handle, XENVER_version, NULL);
-    sprintf(start_info->magic, "Xen-%i.%i", rc >> 16, rc & (0xFFFF));
+    sprintf(start_info->magic, "xen-%i.%i", rc >> 16, rc & (0xFFFF));
     start_info->flags        = flags;
     start_info->store_mfn    = nr_pages - 2;
     start_info->store_evtchn = store_evtchn;
@@ -549,11 +549,10 @@ static int setup_guest(int xc_handle,
         rc = setup_pg_tables_pae(xc_handle, dom, ctxt,
                                  dsi.v_start, v_end,
                                  page_array, vpt_start, vpt_end);
-    else {
+    else
         rc = setup_pg_tables(xc_handle, dom, ctxt,
                              dsi.v_start, v_end,
                              page_array, vpt_start, vpt_end);
-    }
 #endif
 #if defined(__x86_64__)
     rc = setup_pg_tables_64(xc_handle, dom, ctxt,
@@ -627,7 +626,7 @@ static int setup_guest(int xc_handle,
         page_array[(vstartinfo_start-dsi.v_start)>>PAGE_SHIFT]);
     memset(start_info, 0, sizeof(*start_info));
     rc = xc_version(xc_handle, XENVER_version, NULL);
-    sprintf(start_info->magic, "Xen-%i.%i", rc >> 16, rc & (0xFFFF));
+    sprintf(start_info->magic, "xen-%i.%i", rc >> 16, rc & (0xFFFF));
     start_info->nr_pages     = nr_pages;
     start_info->shared_info  = shared_info_frame << PAGE_SHIFT;
     start_info->flags        = flags;
@@ -671,8 +670,10 @@ static int setup_guest(int xc_handle,
     return 0;
 
  error_out:
-    free(mmu);
-    free(page_array);
+    if ( mmu != NULL )
+        free(mmu);
+    if ( page_array != NULL )
+        free(page_array);
     return -1;
 }
 #endif
@@ -726,7 +727,7 @@ int xc_linux_build(int xc_handle,
 
     if ( mlock(&st_ctxt, sizeof(st_ctxt) ) )
     {   
-        PERROR("xc_linux_build: ctxt mlock failed");
+        PERROR("%s: ctxt mlock failed", __func__);
         return 1;
     }
 
@@ -767,7 +768,8 @@ int xc_linux_build(int xc_handle,
         close(initrd_fd);
     if ( initrd_gfd )
         gzclose(initrd_gfd);
-    free(image);
+    if ( image != NULL )
+        free(image);
 
 #ifdef __ia64__
     /* based on new_thread in xen/arch/ia64/domain.c */
@@ -781,7 +783,7 @@ int xc_linux_build(int xc_handle,
     /* currently done by hypervisor, should move here */
     /* ctxt->regs.r28 = dom_fw_setup(); */
     ctxt->vcpu.privregs = 0;
-    ctxt->sys_pgnr = nr_pages - 3;
+    ctxt->sys_pgnr = 3;
     i = 0; /* silence unused variable warning */
 #else /* x86 */
     /*
@@ -856,7 +858,8 @@ int xc_linux_build(int xc_handle,
         gzclose(initrd_gfd);
     else if ( initrd_fd >= 0 )
         close(initrd_fd);
-    free(image);
+    if ( image != NULL )
+        free(image);
 
     return -1;
 }

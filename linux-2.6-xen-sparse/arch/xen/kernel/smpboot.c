@@ -87,18 +87,27 @@ void __init smp_alloc_memory(void)
 
 static void xen_smp_intr_init(unsigned int cpu)
 {
-	per_cpu(resched_irq, cpu) =
-		bind_ipi_to_irq(RESCHEDULE_VECTOR, cpu);
 	sprintf(resched_name[cpu], "resched%d", cpu);
-	BUG_ON(request_irq(per_cpu(resched_irq, cpu), smp_reschedule_interrupt,
-	                   SA_INTERRUPT, resched_name[cpu], NULL));
+	per_cpu(resched_irq, cpu) =
+		bind_ipi_to_irqhandler(
+			RESCHEDULE_VECTOR,
+			cpu,
+			smp_reschedule_interrupt,
+			SA_INTERRUPT,
+			resched_name[cpu],
+			NULL);
+	BUG_ON(per_cpu(resched_irq, cpu) < 0);
 
-	per_cpu(callfunc_irq, cpu) =
-		bind_ipi_to_irq(CALL_FUNCTION_VECTOR, cpu);
 	sprintf(callfunc_name[cpu], "callfunc%d", cpu);
-	BUG_ON(request_irq(per_cpu(callfunc_irq, cpu),
-	                   smp_call_function_interrupt,
-	                   SA_INTERRUPT, callfunc_name[cpu], NULL));
+	per_cpu(callfunc_irq, cpu) =
+		bind_ipi_to_irqhandler(
+			CALL_FUNCTION_VECTOR,
+			cpu,
+			smp_call_function_interrupt,
+			SA_INTERRUPT,
+			callfunc_name[cpu],
+			NULL);
+	BUG_ON(per_cpu(callfunc_irq, cpu) < 0);
 
 	if (cpu != 0)
 		local_setup_timer(cpu);
@@ -110,11 +119,8 @@ static void xen_smp_intr_exit(unsigned int cpu)
 	if (cpu != 0)
 		local_teardown_timer(cpu);
 
-	free_irq(per_cpu(resched_irq, cpu), NULL);
-	unbind_ipi_from_irq(RESCHEDULE_VECTOR, cpu);
-
-	free_irq(per_cpu(callfunc_irq, cpu), NULL);
-	unbind_ipi_from_irq(CALL_FUNCTION_VECTOR, cpu);
+	unbind_from_irqhandler(per_cpu(resched_irq, cpu), NULL);
+	unbind_from_irqhandler(per_cpu(callfunc_irq, cpu), NULL);
 }
 #endif
 

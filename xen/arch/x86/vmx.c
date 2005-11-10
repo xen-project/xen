@@ -79,7 +79,7 @@ void vmx_final_setup_guest(struct vcpu *v)
          * the shared 1:1 page table initially. It shouldn't hurt */
         shadow_mode_enable(v->domain,
                            SHM_enable|SHM_refcounts|
-                           SHM_translate|SHM_external);
+                           SHM_translate|SHM_external|SHM_wr_pt_pte);
     }
 
     vmx_switch_on = 1;

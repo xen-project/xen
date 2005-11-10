@@ -127,13 +127,13 @@ static inline int __prepare_ICR2 (unsigned int mask)
 	return SET_APIC_DEST_FIELD(mask);
 }
 
-DECLARE_PER_CPU(int, ipi_to_evtchn[NR_IPIS]);
+DECLARE_PER_CPU(int, ipi_to_irq[NR_IPIS]);
 
 static inline void __send_IPI_one(unsigned int cpu, int vector)
 {
-	int evtchn = per_cpu(ipi_to_evtchn, cpu)[vector];
-	BUG_ON(evtchn < 0);
-	notify_remote_via_evtchn(evtchn);
+	int irq = per_cpu(ipi_to_irq, cpu)[vector];
+	BUG_ON(irq < 0);
+	notify_remote_via_irq(irq);
 }
 
 void __send_IPI_shortcut(unsigned int shortcut, int vector)

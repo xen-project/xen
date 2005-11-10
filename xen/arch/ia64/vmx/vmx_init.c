@@ -48,9 +48,11 @@
 #include <asm/vmx.h>
 #include <xen/mm.h>
 #include <public/arch-ia64.h>
+#include <asm/vmx_vioapic.h>
 
 /* Global flag to identify whether Intel vmx feature is on */
 u32 vmx_enabled = 0;
+unsigned int opt_vmx_debug_level = 0;
 static u32 vm_order;
 static u64 buffer_size;
 static u64 vp_env_info;
@@ -307,9 +309,8 @@ vmx_change_double_mapping(struct vcpu *v, u64 oldrr7, u64 newrr7)
  * is registered here.
  */
 void
-vmx_final_setup_domain(struct domain *d)
+vmx_final_setup_guest(struct vcpu *v)
 {
-	struct vcpu *v = d->vcpu[0];
 	vpd_t *vpd;
 
 	/* Allocate resources for vcpu 0 */
@@ -318,8 +319,7 @@ vmx_final_setup_domain(struct domain *d)
 	vpd = alloc_vpd();
 	ASSERT(vpd);
 
-//	v->arch.arch_vmx.vpd = vpd;
-    v->arch.privregs = vpd;
+	v->arch.privregs = vpd;
 	vpd->virt_env_vaddr = vm_buffer;
 
 	/* Per-domain vTLB and vhpt implementation. Now vmx domain will stick
@@ -341,7 +341,8 @@ vmx_final_setup_domain(struct domain *d)
 	vlsapic_reset(v);
 	vtm_init(v);
 
-	/* Other vmx specific initialization work */
+	/* One more step to enable interrupt assist */
+	set_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags);
 }
 
 typedef struct io_range {
@@ -431,9 +432,8 @@ int vmx_alloc_contig_pages(struct domain *d)
 	return 0;
 }
 
-void vmx_setup_platform(struct vcpu *v, struct vcpu_guest_context *c)
+void vmx_setup_platform(struct domain *d, struct vcpu_guest_context *c)
 {
-	struct domain *d = v->domain;
 	shared_iopage_t *sp;
 
 	ASSERT(d != dom0); /* only for non-privileged vti domain */
@@ -441,27 +441,19 @@ void vmx_setup_platform(struct vcpu *v, struct vcpu_guest_context *c)
 		__va(__gpa_to_mpa(d, IO_PAGE_START));
 	sp = get_sp(d);
 	//memset((char *)sp,0,PAGE_SIZE);
-	//sp->sp_global.eport = 2;
-#ifdef V_IOSAPIC_READY
-	sp->vcpu_number = 1;
-#endif
 	/* TEMP */
 	d->arch.vmx_platform.pib_base = 0xfee00000UL;
 
-	/* One more step to enable interrupt assist */
-	set_bit(ARCH_VMX_INTR_ASSIST, &v->arch.arch_vmx.flags);
 	/* Only open one port for I/O and interrupt emulation */
-	if (v == d->vcpu[0]) {
-	    memset(&d->shared_info->evtchn_mask[0], 0xff,
-		sizeof(d->shared_info->evtchn_mask));
-	    clear_bit(iopacket_port(d), &d->shared_info->evtchn_mask[0]);
-	}
+	memset(&d->shared_info->evtchn_mask[0], 0xff,
+	    sizeof(d->shared_info->evtchn_mask));
+	clear_bit(iopacket_port(d), &d->shared_info->evtchn_mask[0]);
 
-	/* FIXME: only support PMT table continuously by far */
-//	d->arch.pmt = __va(c->pt_base);
+	/* Initialize the virtual interrupt lines */
+	vmx_virq_line_init(d);
 
-
-	vmx_final_setup_domain(d);
+	/* Initialize iosapic model within hypervisor */
+	vmx_vioapic_init(d);
 }
 
 

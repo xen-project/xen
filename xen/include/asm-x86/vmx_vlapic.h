@@ -151,6 +151,9 @@ static __inline__ int find_highest_bit(uint32_t *data, int length)
 #define vlapic_global_enabled(vlapic)               \
   !(test_bit(_VLAPIC_GLOB_DISABLE, &(vlapic)->status))
 
+#define VLAPIC_IRR(t) ((t)->irr[0])
+#define VLAPIC_ID(t)  ((t)->id)
+
 typedef struct direct_intr_info {
     int deliver_mode;
     int source[6];
