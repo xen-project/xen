@@ -14,12 +14,12 @@
 #include <linux/spinlock.h>
 #include <linux/string.h>
 
-#include <asm/page.h>
-#include <asm/sal.h>
-#include <asm/pal.h>
 #ifdef XEN
 #include <linux/smp.h>
 #endif
+#include <asm/page.h>
+#include <asm/sal.h>
+#include <asm/pal.h>
 
  __cacheline_aligned DEFINE_SPINLOCK(sal_lock);
 unsigned long sal_platform_features;
