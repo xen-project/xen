@@ -76,6 +76,7 @@
 #endif /* CONFIG_SDL */
 
 #include "xenctrl.h"
+#include "xs.h"
 #include "exec-all.h"
 
 //#define DO_TB_FLUSH
@@ -1171,6 +1172,48 @@ CharDriverState *qemu_chr_open_stdio(void)
     return chr;
 }
 
+int store_console_dev(int domid, char *pts)
+{
+    int xc_handle;
+    unsigned int len = 0;
+    struct xs_handle *xs;
+    char *path;
+
+    xs = xs_daemon_open();
+    if (xs == NULL) {
+        fprintf(logfile, "Could not contact XenStore\n");
+        return -1;
+    }
+
+    xc_handle = xc_interface_open();
+    if (xc_handle == -1) {
+        fprintf(logfile, "xc_interface_open() error\n");
+        return -1;
+    }
+    
+    path = xs_get_domain_path(xs, domid);
+    if (path == NULL) {
+        fprintf(logfile, "xs_get_domain_path() error\n");
+        return -1;
+    }
+    path = realloc(path, strlen(path) + strlen("/console/tty") + 1);
+    if (path == NULL) {
+        fprintf(logfile, "realloc error\n");
+        return -1;
+    }
+    strcat(path, "/console/tty");
+    if (!xs_write(xs, NULL, path, pts, strlen(pts))) {
+        fprintf(logfile, "xs_write for console fail");
+        return -1;
+    }
+    
+    free(path);
+    xs_daemon_close(xs);
+    close(xc_handle);
+
+    return 0;
+}
+
 #if defined(__linux__)
 CharDriverState *qemu_chr_open_pty(void)
 {
@@ -1182,6 +1225,7 @@ CharDriverState *qemu_chr_open_pty(void)
         return NULL;
     }
     fprintf(stderr, "char device redirected to %s\n", slave_name);
+    store_console_dev(domid, slave_name);
     return qemu_chr_open_fd(master_fd, master_fd);
 }
 #else
@@ -2701,7 +2745,9 @@ int main(int argc, char **argv)
                 break;
             case QEMU_OPTION_nographic:
                 pstrcpy(monitor_device, sizeof(monitor_device), "stdio");
-                pstrcpy(serial_devices[0], sizeof(serial_devices[0]), "stdio");
+                if(!strcmp(serial_devices[0], "vc"))
+                    pstrcpy(serial_devices[0], sizeof(serial_devices[0]),
+                            "stdio");
                 nographic = 1;
                 break;
 #ifdef CONFIG_VNC
