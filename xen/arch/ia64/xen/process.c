@@ -760,6 +760,22 @@ printf("*** Handled privop masquerading as NaT fault\n");
 	    case 30:
 		// FIXME: Should we handle unaligned refs in Xen??
 		vector = IA64_UNALIGNED_REF_VECTOR; break;
+	    case 32:
+		printf("ia64_handle_reflection: handling FP fault");
+		vector = IA64_FP_FAULT_VECTOR; break;
+	    case 33:
+		printf("ia64_handle_reflection: handling FP trap");
+		vector = IA64_FP_TRAP_VECTOR; break;
+	    case 34:
+		printf("ia64_handle_reflection: handling lowerpriv trap");
+		vector = IA64_LOWERPRIV_TRANSFER_TRAP_VECTOR; break;
+	    case 35:
+		printf("ia64_handle_reflection: handling taken branch trap");
+		vector = IA64_TAKEN_BRANCH_TRAP_VECTOR; break;
+	    case 36:
+		printf("ia64_handle_reflection: handling single step trap");
+		vector = IA64_SINGLE_STEP_TRAP_VECTOR; break;
+
 	    default:
 		printf("ia64_handle_reflection: unhandled vector=0x%lx\n",vector);
 		while(vector);
