@@ -16,7 +16,7 @@
 #
 # Usage:
 #
-# network (start|stop|status) {VAR=VAL}*
+# network-bridge (start|stop|status) {VAR=VAL}*
 #
 # Vars:
 #
@@ -27,18 +27,27 @@
 # netdev     The interface to add to the bridge (default eth${vifnum}).
 # antispoof  Whether to use iptables to prevent spoofing (default no).
 #
+# Internal Vars:
+# pdev="p${netdev}"
+# vdev="veth${vifnum}"
+# vif0="vif0.${vifnum}"
+#
 # start:
-# Creates the bridge and enslaves netdev to it.
-# Copies the IP addresses from netdev to the bridge.
-# Deletes the routes to netdev and adds them on bridge.
+# Creates the bridge
+# Copies the IP and MAC addresses from netdev to vdev
+# Renames netdev to be pdev 
+# Renames vdev to be netdev 
+# Enslaves pdev, vdev to bridge
 #
 # stop:
-# Removes netdev from the bridge.
-# Deletes the routes to bridge and adds them to netdev.
+# Removes netdev from the bridge
+# Transfers addresses, routes from netdev to pdev
+# Renames netdev to vdev
+# Renames pdev to netdev 
+# Deletes bridge
 #
 # status:
-# Print ifconfig for netdev and bridge.
-# Print routes.
+# Print addresses, interfaces, routes
 #
 #============================================================================
 
@@ -97,23 +106,12 @@ s/inet/ip addr add/
 s@\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/[0-9]\+\)@\1@
 s/${src}/dev ${dst}/
 " | sh -e
-    # Remove automatic routes on destionation device
+    # Remove automatic routes on destination device
     ip route list | sed -ne "
 /dev ${dst}\( \|$\)/ {
   s/^/ip route del /
   p
 }" | sh -e
-}
-
-# Usage: del_addrs src
-del_addrs () {
-    local src=$1
-    ip addr show dev ${src} | egrep '^ *inet ' | sed -e "
-s/inet/ip addr del/
-s@\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)/[0-9]\+@\1@
-s/${src}/dev ${src}/
-" | sh -e
-    ip link set dev ${dst} up
 }
 
 # Usage: transfer_routes src dst
