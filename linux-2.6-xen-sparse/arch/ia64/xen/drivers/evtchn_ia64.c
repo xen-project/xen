@@ -105,7 +105,7 @@ int bind_ipi_to_irqhandler(
 	const char *devname,
 	void *dev_id)
 {
-    printk("%s is called which has not been supported now...?\n", __FUNTION__);
+    printk("%s is called which has not been supported now...?\n", __FUNCTION__);
     while(1);
 }
 
