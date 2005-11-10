@@ -258,6 +258,7 @@ class VmxImageHandler(ImageHandler):
             log.debug("args: %s, val: %s" % (a,v))
 
         # Handle disk/network related options
+        mac = None
         for (name, info) in deviceConfig:
             if name == 'vbd':
                uname = sxp.child_value(info, 'uname')
@@ -276,11 +277,21 @@ class VmxImageHandler(ImageHandler):
                ret.append("-%s" % vbddev)
                ret.append("%s" % vbdparam)
             if name == 'vif':
+               type = sxp.child_value(info, 'type')
+               if type != 'ioemu':
+                   continue
+               if mac != None:
+                   continue
                mac = sxp.child_value(info, 'mac')
+               bridge = sxp.child_value(info, 'bridge')
                if mac == None:
                    mac = randomMAC()
+               if bridge == None:
+                   bridge = 'xenbr0'
                ret.append("-macaddr")
                ret.append("%s" % mac)
+               ret.append("-bridge")
+               ret.append("%s" % bridge)
             if name == 'vtpm':
                instance = sxp.child_value(info, 'instance')
                ret.append("-instance")

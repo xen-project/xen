@@ -386,9 +386,9 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 #ifdef __ia64__
 			MMAP_VADDR(pending_idx,i) = gnttab_map_vaddr(map[i]);
 #else
-			phys_to_machine_mapping[__pa(MMAP_VADDR(
-				pending_idx, i)) >> PAGE_SHIFT] =
-				FOREIGN_FRAME(map[i].dev_bus_addr>>PAGE_SHIFT);
+			set_phys_to_machine(__pa(MMAP_VADDR(
+				pending_idx, i)) >> PAGE_SHIFT,
+				FOREIGN_FRAME(map[i].dev_bus_addr>>PAGE_SHIFT));
 #endif
 			fas        = req->frame_and_sects[i];
 			seg[i].buf = map[i].dev_bus_addr | 

@@ -905,30 +905,33 @@ void do_call_debug(struct pt_regs *regs)
 }
 
 
+/*
+ * NB. All these are "interrupt gates" (i.e. events_mask is set) because we
+ * specify <dpl>|4 in the second field.
+ */
 static trap_info_t trap_table[] = {
-        {  0, 0, (__KERNEL_CS|0x3), (unsigned long)divide_error               },
-        {  1, 0, (__KERNEL_CS|0x3), (unsigned long)debug                      },
-        {  3, 3, (__KERNEL_CS|0x3), (unsigned long)int3                       },
-        {  4, 3, (__KERNEL_CS|0x3), (unsigned long)overflow                   },
-        {  5, 3, (__KERNEL_CS|0x3), (unsigned long)bounds                     },
-        {  6, 0, (__KERNEL_CS|0x3), (unsigned long)invalid_op                 },
-        {  7, 0, (__KERNEL_CS|0x3), (unsigned long)device_not_available       },
-        {  9, 0, (__KERNEL_CS|0x3), (unsigned long)coprocessor_segment_overrun},
-        { 10, 0, (__KERNEL_CS|0x3), (unsigned long)invalid_TSS                },
-        { 11, 0, (__KERNEL_CS|0x3), (unsigned long)segment_not_present        },
-        { 12, 0, (__KERNEL_CS|0x3), (unsigned long)stack_segment              },
-        { 13, 0, (__KERNEL_CS|0x3), (unsigned long)general_protection         },
-        { 14, 0, (__KERNEL_CS|0x3), (unsigned long)page_fault                 },
-        { 15, 0, (__KERNEL_CS|0x3), (unsigned long)spurious_interrupt_bug     },
-        { 16, 0, (__KERNEL_CS|0x3), (unsigned long)coprocessor_error          },
-        { 17, 0, (__KERNEL_CS|0x3), (unsigned long)alignment_check            },
+        {  0, 0|4, (__KERNEL_CS|0x3), (unsigned long)divide_error               },
+        {  1, 0|4, (__KERNEL_CS|0x3), (unsigned long)debug                      },
+        {  3, 3|4, (__KERNEL_CS|0x3), (unsigned long)int3                       },
+        {  4, 3|4, (__KERNEL_CS|0x3), (unsigned long)overflow                   },
+        {  5, 3|4, (__KERNEL_CS|0x3), (unsigned long)bounds                     },
+        {  6, 0|4, (__KERNEL_CS|0x3), (unsigned long)invalid_op                 },
+        {  7, 0|4, (__KERNEL_CS|0x3), (unsigned long)device_not_available       },
+        {  9, 0|4, (__KERNEL_CS|0x3), (unsigned long)coprocessor_segment_overrun},
+        { 10, 0|4, (__KERNEL_CS|0x3), (unsigned long)invalid_TSS                },
+        { 11, 0|4, (__KERNEL_CS|0x3), (unsigned long)segment_not_present        },
+        { 12, 0|4, (__KERNEL_CS|0x3), (unsigned long)stack_segment              },
+        { 13, 0|4, (__KERNEL_CS|0x3), (unsigned long)general_protection         },
+        { 14, 0|4, (__KERNEL_CS|0x3), (unsigned long)page_fault                 },
+        { 15, 0|4, (__KERNEL_CS|0x3), (unsigned long)spurious_interrupt_bug     },
+        { 16, 0|4, (__KERNEL_CS|0x3), (unsigned long)coprocessor_error          },
+        { 17, 0|4, (__KERNEL_CS|0x3), (unsigned long)alignment_check            },
 #ifdef CONFIG_X86_MCE
-        { 18, 0, (__KERNEL_CS|0x3), (unsigned long)machine_check              },
+        { 18, 0|4, (__KERNEL_CS|0x3), (unsigned long)machine_check              },
 #endif
-        { 19, 0, (__KERNEL_CS|0x3), (unsigned long)simd_coprocessor_error     },
-        { SYSCALL_VECTOR, 3, (__KERNEL_CS|0x3), (unsigned long)system_call   },
+        { 19, 0|4, (__KERNEL_CS|0x3), (unsigned long)simd_coprocessor_error     },
 #ifdef CONFIG_IA32_EMULATION
-	{ IA32_SYSCALL_VECTOR, 3, (__KERNEL_CS|0x3), (unsigned long)ia32_syscall},
+	{ IA32_SYSCALL_VECTOR, 3|4, (__KERNEL_CS|0x3), (unsigned long)ia32_syscall},
 #endif
         {  0, 0,           0, 0                                              }
 };

@@ -34,6 +34,8 @@ if os.path.exists("/usr/include/reiserfs/reiserfs.h"):
     fsys_mods.append(reiser)
     fsys_pkgs.append("grub.fsys.reiser")
 
+pkgs = ['grub', 'grub.fsys']
+pkgs.extend(fsys_pkgs)
 setup(name='pygrub',
       version='0.3',
       description='Boot loader that looks a lot like grub for Xen',
@@ -42,8 +44,7 @@ setup(name='pygrub',
       license='GPL',
       package_dir={'grub': 'src'},
       scripts = ["src/pygrub"],
-      packages=['grub',
-                'grub.fsys'].extend(fsys_pkgs),
+      packages=pkgs,
       ext_modules = fsys_mods
       )
                

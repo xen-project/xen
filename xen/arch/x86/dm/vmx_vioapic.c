@@ -158,6 +158,14 @@ static unsigned long vmx_vioapic_read(struct vcpu *v,
     return result;
 }
 
+static void vmx_vioapic_update_imr(struct vmx_vioapic *s, int index)
+{
+   if (s->redirtbl[index].RedirForm.mask)
+       set_bit(index, &s->imr);
+   else
+       clear_bit(index, &s->imr);
+}
+
 static void vmx_vioapic_write_indirect(struct vmx_vioapic *s,
                                       unsigned long addr,
                                       unsigned long length,
@@ -200,6 +208,7 @@ static void vmx_vioapic_write_indirect(struct vmx_vioapic *s,
                     redir_content = ((redir_content >> 32) << 32) |
                                     (val & 0xffffffff);
                 s->redirtbl[redir_index].value = redir_content;
+                vmx_vioapic_update_imr(s, redir_index);
             } else  {
                 printk("vmx_vioapic_write_indirect "
                   "error register %x\n", s->ioregsel);
@@ -264,8 +273,10 @@ static void vmx_vioapic_reset(vmx_vioapic_t *s)
 
     memset(s, 0, sizeof(vmx_vioapic_t));
 
-    for (i = 0; i < IOAPIC_NUM_PINS; i++)
+    for (i = 0; i < IOAPIC_NUM_PINS; i++) {
         s->redirtbl[i].RedirForm.mask = 0x1;
+        vmx_vioapic_update_imr(s, i);
+    }
 }
 
 static void ioapic_update_config(vmx_vioapic_t *s,
@@ -422,7 +433,13 @@ static void ioapic_deliver(vmx_vioapic_t *s, int irqno)
 
         target = apic_round_robin(
                 s->domain, dest_mode, vector, deliver_bitmask);
-        ioapic_inj_irq(s, target, vector, trig_mode, delivery_mode);
+        if (target)
+            ioapic_inj_irq(s, target, vector, trig_mode, delivery_mode);
+        else{
+            VMX_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic deliver "
+              "null round robin mask %x vector %x delivery_mode %x\n",
+              deliver_bitmask, vector, deliver_bitmask);
+        }
         break;
     }
 
@@ -457,7 +474,7 @@ static int ioapic_get_highest_irq(vmx_vioapic_t *s)
 
     ASSERT(s);
 
-    irqs = s->irr & ~s->isr;
+    irqs = s->irr & ~s->isr & ~s->imr;
     return __fls(irqs);
 }
 
@@ -471,7 +488,7 @@ static void service_ioapic(vmx_vioapic_t *s)
         VMX_DBG_LOG(DBG_LEVEL_IOAPIC, "service_ioapic "
           "highest irqno %x\n", irqno);
 
-        if (!s->redirtbl[irqno].RedirForm.mask) {
+        if (!test_bit(irqno, &s->imr)) {
             ioapic_deliver(s, irqno);
         }
 
@@ -490,7 +507,7 @@ void vmx_vioapic_do_irqs(struct domain *d, uint16_t irqs)
     if (!vmx_apic_support(d))
         return;
 
-    s->irr |= irqs;
+    s->irr |= irqs & ~s->imr;
     service_ioapic(s);
 }
 
@@ -584,7 +601,9 @@ int vmx_vioapic_add_lapic(struct vlapic *vlapic, struct vcpu *v)
         domain_crash_synchronous();
     }
 
-    s->lapic_info[s->lapic_count ++] = vlapic;
+    /* update count later for race condition on interrupt */
+    s->lapic_info[s->lapic_count] = vlapic;
+    s->lapic_count ++;
 
     return s->lapic_count;
 }

@@ -565,8 +565,10 @@ static int setup_guest(int xc_handle,
     return 0;
 
  error_out:
-    free(mmu);
-    free(page_array);
+    if ( mmu != NULL )
+        free(mmu);
+    if ( page_array != NULL )
+        free(page_array);
     return -1;
 }
 
@@ -627,7 +629,7 @@ int xc_vmx_build(int xc_handle,
 
     if ( mlock(&st_ctxt, sizeof(st_ctxt) ) )
     {
-        PERROR("xc_vmx_build: ctxt mlock failed");
+        PERROR("%s: ctxt mlock failed", __func__);
         return 1;
     }
 
@@ -661,7 +663,8 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    free(image);
+    if ( image != NULL )
+        free(image);
 
     ctxt->flags = VGCF_VMX_GUEST;
     /* FPU is set up to default initial state. */
@@ -707,7 +710,8 @@ int xc_vmx_build(int xc_handle,
     return rc;
 
  error_out:
-    free(image);
+    if ( image != NULL )
+        free(image);
 
     return -1;
 }

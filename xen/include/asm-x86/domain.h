@@ -8,7 +8,6 @@
 
 struct trap_bounce {
     unsigned long  error_code;
-    unsigned long  cr2;
     unsigned short flags; /* TBF_ */
     unsigned short cs;
     unsigned long  eip;

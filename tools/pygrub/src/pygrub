@@ -89,8 +89,8 @@ def get_active_offset(file):
     buf = os.read(fd, 512)
     for poff in (446, 462, 478, 494): # partition offsets
         # active partition has 0x80 as the first byte
-        if struct.unpack("<c", buf[p:p+1]) == ('\x80',):
-            return struct.unpack("<", buf[p+8:p+12])[0] * SECTOR_SIZE
+        if struct.unpack("<c", buf[poff:poff+1]) == ('\x80',):
+            return struct.unpack("<L", buf[poff+8:poff+12])[0] * SECTOR_SIZE
     return -1
 
 def get_config(fn):
@@ -113,11 +113,13 @@ def get_config(fn):
             break
 
     if fs is not None:
-        if fs.file_exist("/boot/grub/menu.lst"):
-            grubfile = "/boot/grub/menu.lst"
-        elif fs.file_exist("/boot/grub/grub.conf"):
-            grubfile = "/boot/grub/grub.conf"
-        else:
+        grubfile = None
+        for f in ("/boot/grub/menu.lst", "/boot/grub/grub.conf",
+                  "/grub/menu.lst", "/grub/grub.conf"):
+            if fs.file_exist(f):
+                grubfile = f
+                break
+        if grubfile is None:
             raise RuntimeError, "we couldn't find /boot/grub{menu.lst,grub.conf} " + \
                                 "in the image provided. halt!"
         f = fs.open_file(grubfile)
@@ -169,7 +171,7 @@ def main(cf = None):
 #        if c == ord('q'):
 #            selected = -1
 #            break
-        elif c == ord('c'):
+        if c == ord('c'):
             # FIXME: needs to go to command line mode
             continue
         elif c == ord('a'):
@@ -261,7 +263,7 @@ if __name__ == "__main__":
 
     offset = 0
     if is_disk_image(file):
-        offset = get_active_offset(fn)
+        offset = get_active_offset(file)
         if offset == -1:
             raise RuntimeError, "Unable to find active partition on disk"
 

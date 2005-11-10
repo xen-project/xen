@@ -210,7 +210,7 @@ static int increase_reservation(unsigned long nr_pages)
 		BUG_ON(phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY);
 
 		/* Update P->M and M->P tables. */
-		phys_to_machine_mapping[pfn] = mfn_list[i];
+		set_phys_to_machine(pfn, mfn_list[i]);
 		xen_machphys_update(mfn_list[i], pfn);
             
 		/* Link back into the page tables if not highmem. */
@@ -295,7 +295,7 @@ static int decrease_reservation(unsigned long nr_pages)
 	/* No more mappings: invalidate P2M and add to balloon. */
 	for (i = 0; i < nr_pages; i++) {
 		pfn = mfn_to_pfn(mfn_list[i]);
-		phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
+		set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
 		balloon_append(pfn_to_page(pfn));
 	}
 
@@ -515,8 +515,7 @@ static int dealloc_pte_fn(
 		.domid        = DOMID_SELF
 	};
 	set_pte_at(&init_mm, addr, pte, __pte_ma(0));
-	phys_to_machine_mapping[__pa(addr) >> PAGE_SHIFT] =
-		INVALID_P2M_ENTRY;
+	set_phys_to_machine(__pa(addr) >> PAGE_SHIFT, INVALID_P2M_ENTRY);
 	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
 	BUG_ON(ret != 1);
 	return 0;

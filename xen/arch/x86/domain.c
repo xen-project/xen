@@ -407,6 +407,7 @@ int arch_set_info_guest(
         /* VMX uses the initially provided page tables as the P2M map. */
         if ( !pagetable_get_paddr(d->arch.phys_table) )
             d->arch.phys_table = v->arch.guest_table;
+        v->arch.guest_table = mk_pagetable(0);
 
         /* Initialize monitor page table */
         v->arch.monitor_table = mk_pagetable(0);
@@ -646,7 +647,7 @@ long do_switch_to_user(void)
 
     regs->rip    = stu.rip;
     regs->cs     = stu.cs | 3; /* force guest privilege */
-    regs->rflags = stu.rflags;
+    regs->rflags = (stu.rflags & ~(EF_IOPL|EF_VM)) | EF_IE;
     regs->rsp    = stu.rsp;
     regs->ss     = stu.ss | 3; /* force guest privilege */
 

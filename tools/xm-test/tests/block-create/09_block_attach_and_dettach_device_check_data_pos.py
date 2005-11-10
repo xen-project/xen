@@ -36,7 +36,9 @@ except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))
     
-os.system("mkfs.ext2 -F /dev/ram1")
+s, o = traceCommand("mke2fs -q -F /dev/ram1")
+if s != 0:
+    FAIL("mke2fs returned %i != 0" % s)
 
 for i in range(10):
 	status, output = traceCommand("xm block-attach %s phy:ram1 hda1 w" % domain.getName())

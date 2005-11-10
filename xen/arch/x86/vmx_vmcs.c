@@ -332,7 +332,7 @@ static void vmx_do_launch(struct vcpu *v)
     error |= __vmwrite(GUEST_TR_BASE, 0);
     error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
 
-    __vmwrite(GUEST_CR3, pagetable_get_paddr(v->arch.guest_table));
+    __vmwrite(GUEST_CR3, pagetable_get_paddr(v->domain->arch.phys_table));
     __vmwrite(HOST_CR3, pagetable_get_paddr(v->arch.monitor_table));
     __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 
