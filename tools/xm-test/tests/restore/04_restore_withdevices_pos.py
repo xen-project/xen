@@ -9,9 +9,9 @@ domain = XmTestDomain()
 
 domain.configAddDisk("phy:/dev/ram0", "hda1", "w")
 
-s, o = traceCommand("mkfs /dev/ram0")
+s, o = traceCommand("mke2fs -q /dev/ram0")
 if s != 0:
-    FAIL("Unable to mkfs /dev/ram0 in dom0")
+    FAIL("Unable to mke2fs /dev/ram0 in dom0")
 
 try:
     domain.start()
