@@ -208,6 +208,7 @@ fastcall void do_invalid_op(struct pt_regs *, unsigned long);
 static void dump_fault_path(unsigned long address)
 {
 	unsigned long *p, page;
+        unsigned long mfn; 
 
 	preempt_disable();
 	page = __pa(per_cpu(cur_pgd, smp_processor_id()));
@@ -217,20 +218,22 @@ static void dump_fault_path(unsigned long address)
 	p += (address >> 30) * 2;
 	printk(KERN_ALERT "%08lx -> *pde = %08lx:%08lx\n", page, p[1], p[0]);
 	if (p[0] & 1) {
-		page = p[0] & PAGE_MASK;
-		address &= 0x3fffffff;
-		page = machine_to_phys(page);
+                mfn  = (p[0] >> PAGE_SHIFT) | ((p[1] & 0x7) << 20); 
+		page = mfn_to_pfn(mfn) << PAGE_SHIFT; 
 		p  = (unsigned long *)__va(page);
+		address &= 0x3fffffff;
 		p += (address >> 21) * 2;
-		printk(KERN_ALERT "%08lx -> *pme = %08lx:%08lx\n", page, p[1], p[0]);
+		printk(KERN_ALERT "%08lx -> *pme = %08lx:%08lx\n", 
+                       page, p[1], p[0]);
 #ifndef CONFIG_HIGHPTE
 		if (p[0] & 1) {
-			page = p[0] & PAGE_MASK;
-			address &= 0x001fffff;
-			page = machine_to_phys(page);
-			p  = (unsigned long *) __va(page);
-			p += (address >> 12) * 2;
-			printk(KERN_ALERT "%08lx -> *pte = %08lx:%08lx\n", page, p[1], p[0]);
+                        mfn  = (p[0] >> PAGE_SHIFT) | ((p[1] & 0x7) << 20); 
+                        page = mfn_to_pfn(mfn) << PAGE_SHIFT; 
+                        p  = (unsigned long *) __va(page);
+                        address &= 0x001fffff;
+                        p += (address >> 12) * 2;
+			printk(KERN_ALERT "%08lx -> *pte = %08lx:%08lx\n", 
+                               page, p[1], p[0]);
 		}
 #endif
 	}
