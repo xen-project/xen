@@ -1287,36 +1287,26 @@ unsigned long fast_vhpt_translate_count = 0;
 unsigned long recover_to_page_fault_count = 0;
 unsigned long recover_to_break_fault_count = 0;
 
-int warn_region0_address = 0; // FIXME later: tie to a boot parameter?
-
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
 	unsigned long pta, pte, rid, rr;
 	int i;
 	TR_ENTRY *trp;
 
-	if (PSCB(vcpu,metaphysical_mode)) {
-		unsigned long region = address >> 61;
-		// dom0 may generate an uncacheable physical address (msb=1)
-		if (region && ((region != 4) || (vcpu->domain != dom0))) {
-// FIXME: This seems to happen even though it shouldn't.  Need to track
-// this down, but since it has been apparently harmless, just flag it for now
-//			panic_domain(vcpu_regs(vcpu),
-			printk(
-			 "vcpu_translate: bad physical address: %p\n",address);
+	if (!(address >> 61)) {
+		if (!PSCB(vcpu,metaphysical_mode)) {
+			REGS *regs = vcpu_regs(vcpu);
+			unsigned long viip = PSCB(vcpu,iip);
+			unsigned long vipsr = PSCB(vcpu,ipsr);
+			unsigned long iip = regs->cr_iip;
+			unsigned long ipsr = regs->cr_ipsr;
+			printk("vcpu_translate: bad address %p, viip=%p, vipsr=%p, iip=%p, ipsr=%p continuing\n", address, viip, vipsr, iip, ipsr);
 		}
+
 		*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX;
 		*itir = PAGE_SHIFT << 2;
 		phys_translate_count++;
 		return IA64_NO_FAULT;
-	}
-	else if (!(address >> 61) && warn_region0_address) {
-		REGS *regs = vcpu_regs(vcpu);
-		unsigned long viip = PSCB(vcpu,iip);
-		unsigned long vipsr = PSCB(vcpu,ipsr);
-		unsigned long iip = regs->cr_iip;
-		unsigned long ipsr = regs->cr_ipsr;
-		printk("vcpu_translate: bad address %p, viip=%p, vipsr=%p, iip=%p, ipsr=%p continuing\n", address, viip, vipsr, iip, ipsr);
 	}
 
 	rr = PSCB(vcpu,rrs)[address>>61];
