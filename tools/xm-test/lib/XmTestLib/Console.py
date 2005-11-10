@@ -23,13 +23,13 @@
      a _very_ specific value, set in the PROMPT
      variable of this script
 """
-import sys;
-import os;
-import pty;
-import tty;
-import termios;
-import fcntl;
-import select;
+import sys
+import os
+import pty
+import tty
+import termios
+import fcntl
+import select
 
 from Test import *
 
@@ -52,15 +52,15 @@ class XmConsole:
                             are included in the history buffer
         """
 
-        self.TIMEOUT          = 30;
-        self.PROMPT           = "@%@%> ";
-        self.domain           = domain;
-        self.historyBuffer    = [];
-        self.historyLines     = 0;
-        self.historyLimit     = historyLimit;
-        self.historySaveAll   = historySaveAll;
-        self.historySaveCmds  = historySaveCmds;
-        self.debugMe          = False;
+        self.TIMEOUT          = 30
+        self.PROMPT           = "@%@%> "
+        self.domain           = domain
+        self.historyBuffer    = []
+        self.historyLines     = 0
+        self.historyLimit     = historyLimit
+        self.historySaveAll   = historySaveAll
+        self.historySaveCmds  = historySaveCmds
+        self.debugMe          = False
         self.limit            = None
 
         consoleCmd = ["/usr/sbin/xm", "xm", "console", domain]
@@ -68,62 +68,62 @@ class XmConsole:
         if verbose:
             print "Console executing: " + str(consoleCmd)
 
-        pid, fd = pty.fork();
+        pid, fd = pty.fork()
 
         if pid == 0:
-            os.execvp("/usr/sbin/xm", consoleCmd[1:]);
+            os.execvp("/usr/sbin/xm", consoleCmd[1:])
 
-        self.consolePid = pid;
-        self.consoleFd  = fd;
+        self.consolePid = pid
+        self.consoleFd  = fd
 
-        tty.setraw(self.consoleFd, termios.TCSANOW);
+        tty.setraw(self.consoleFd, termios.TCSANOW)
             
         bytes = self.__chewall(self.consoleFd)
         if bytes < 0:
             raise ConsoleError("Console didn't respond")
 
     def __addToHistory(self, line):
-        self.historyBuffer.append(line);
-        self.historyLines += 1;
+        self.historyBuffer.append(line)
+        self.historyLines += 1
         if self.historyLines > self.historyLimit:
-            self.historyBuffer = self.historyBuffer[1:];
-            self.historyLines -= 1;
+            self.historyBuffer = self.historyBuffer[1:]
+            self.historyLines -= 1
 
 
     def clearHistory(self):
         """Clear the history buffer"""
-        self.historyBuffer = [];
-        self.historyLines = 0;
+        self.historyBuffer = []
+        self.historyLines = 0
 
 
     def getHistory(self):
         """Returns a string containing the entire history buffer"""
-        output = "";
+        output = ""
 
         for line in self.historyBuffer:
-            output += line + "\n";
+            output += line + "\n"
 
-        return output;
+        return output
 
 
     def setTimeout(self, timeout):
         """Sets the timeout used to determine if a remote command
         has blocked"""
-        self.TIMEOUT = timeout;
+        self.TIMEOUT = timeout
 
 
     def setPrompt(self, prompt):
         """Sets the string key used to delimit the end of command
         output"""
-        self.PROMPT = prompt;
+        self.PROMPT = prompt
 
 
     def __chewall(self, fd):
-        timeout = 0;
-        bytes   = 0;
+        timeout = 0
+        bytes   = 0
         
         while timeout < 3:
-            i, o, e = select.select([fd], [], [], 1);
+            i, o, e = select.select([fd], [], [], 1)
             if fd in i:
                 try:
                     foo = os.read(fd, 1)
@@ -143,7 +143,7 @@ class XmConsole:
         if self.debugMe:
             print "Ignored %i bytes of miscellaneous console output" % bytes
         
-        return bytes;
+        return bytes
 
 
     def __runCmd(self, command, saveHistory=True):
@@ -152,15 +152,15 @@ class XmConsole:
         lines  = 0
         bytes  = 0
 
-        self.__chewall(self.consoleFd);
+        self.__chewall(self.consoleFd)
 
         if verbose:
             print "[%s] Sending `%s'" % (self.domain, command)
 
-        os.write(self.consoleFd, "%s\n" % command);
+        os.write(self.consoleFd, "%s\n" % command)
 
         while 1==1:
-            i, o, e = select.select([self.consoleFd], [], [], self.TIMEOUT);
+            i, o, e = select.select([self.consoleFd], [], [], self.TIMEOUT)
 
             if self.consoleFd in i:
                 try:
@@ -182,59 +182,59 @@ class XmConsole:
                 if lines > 0:
                     output += line + "\n"
                     if saveHistory:
-                        self.__addToHistory(line);
+                        self.__addToHistory(line)
                 elif self.historySaveCmds and saveHistory:
-                    self.__addToHistory("*" + line);
-                lines += 1;
-                line = "";
+                    self.__addToHistory("*" + line)
+                lines += 1
+                line = ""
             elif str == "\r":
                 pass # ignore \r's
             else:
-                line += str;
+                line += str
 
             if line == self.PROMPT:
-                break;
+                break
 
-        return output;
+        return output
 
 
     def runCmd(self, command):
         """Runs a command on the remote terminal and returns the output
         as well as the return code.  For example:
         
-        ret = c.runCmd("ls");
-        print ret["output"];
-        sys.exit(run["return"]);
+        ret = c.runCmd("ls")
+        print ret["output"]
+        sys.exit(run["return"])
         
         """
 
         # Allow exceptions to bubble up
-        realOutput = self.__runCmd(command);
-        retOutput  = self.__runCmd("echo $?", saveHistory=False);
+        realOutput = self.__runCmd(command)
+        retOutput  = self.__runCmd("echo $?", saveHistory=False)
 
         try:
-            retCode =  int(retOutput);
+            retCode =  int(retOutput)
         except:
-            retCode = 255;
+            retCode = 255
         return {
             "output": realOutput,
             "return": retCode,
-            };
+            }
 
     def sendInput(self, input):
         """Sends input to the remote terminal, but doesn't check
         for a return code"""
-        realOutput = self.__runCmd(input);
+        realOutput = self.__runCmd(input)
         return {
             "output": realOutput,
             "return": 0,
-            };
+            }
 
     def closeConsole(self):
         """Closes the console connection and ensures that the console
         process is killed"""
-        os.close(self.consoleFd);
-        os.kill(self.consolePid, 2);
+        os.close(self.consoleFd)
+        os.kill(self.consolePid, 2)
 
 
     def setLimit(self, limit):
@@ -254,23 +254,23 @@ if __name__ == "__main__":
     code as the domU command.
     """
 
-    verbose = True;
+    verbose = True
     
     try:
-        t = XmConsole(sys.argv[1]);
+        t = XmConsole(sys.argv[1])
     except ConsoleError, e:
         print "Failed to attach to console (%s)" % str(e)
         sys.exit(255)
 
     try:
-        run = t.runCmd(sys.argv[2]);
+        run = t.runCmd(sys.argv[2])
     except ConsoleError, e:
         print "Console failed (%)" % str(e)
         sys.exit(255)
         
-    t.closeConsole();
+    t.closeConsole()
     
-    print run["output"],;
-    sys.exit(run["return"]);
+    print run["output"],
+    sys.exit(run["return"])
     
         
