@@ -1173,8 +1173,7 @@ again:
  destroy_ring:
 	shutdown_device(info);
  out:
-	if (backend)
-		kfree(backend);
+	kfree(backend);
 	return err;
 }
 

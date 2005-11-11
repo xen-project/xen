@@ -570,10 +570,8 @@ void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt, ...)
 	}
 
 fail:
-	if (printf_buffer)
-		kfree(printf_buffer);
-	if (path_buffer)
-		kfree(path_buffer);
+	kfree(printf_buffer);
+	kfree(path_buffer);
 }
 EXPORT_SYMBOL(xenbus_dev_error);
 
