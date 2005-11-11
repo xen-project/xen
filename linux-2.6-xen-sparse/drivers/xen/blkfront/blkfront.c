@@ -8,6 +8,7 @@
  * Copyright (c) 2004, Christian Limpach
  * Copyright (c) 2004, Andrew Warfield
  * Copyright (c) 2005, Christopher Clark
+ * Copyright (c) 2005, XenSource Ltd
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -31,6 +32,7 @@
  * IN THE SOFTWARE.
  */
 
+
 #if 1
 #define ASSERT(p)							   \
 	if (!(p)) { printk("Assertion '%s' failed, line %d, file %s", #p , \
@@ -38,6 +40,7 @@
 #else
 #define ASSERT(_p)
 #endif
+
 
 #include <linux/version.h>
 #include "block.h"
@@ -51,6 +54,7 @@
 #include <asm-xen/gnttab.h>
 #include <asm/hypervisor.h>
 
+
 #define BLKIF_STATE_DISCONNECTED 0
 #define BLKIF_STATE_CONNECTED    1
 
@@ -58,9 +62,304 @@
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
 #define GRANT_INVALID_REF	0
 
-static void kick_pending_request_queues(struct blkfront_info *info);
 
-static void blkif_completion(struct blk_shadow *s);
+static void connect(struct blkfront_info *);
+static void blkfront_closing(struct xenbus_device *);
+static int blkfront_remove(struct xenbus_device *);
+static int talk_to_backend(struct xenbus_device *, struct blkfront_info *);
+static int setup_blkring(struct xenbus_device *, struct blkfront_info *);
+
+static void kick_pending_request_queues(struct blkfront_info *);
+
+static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs);
+static void blkif_restart_queue(void *arg);
+static void blkif_recover(struct blkfront_info *);
+static void blkif_completion(struct blk_shadow *);
+static void blkif_free(struct blkfront_info *);
+
+
+/**
+ * Entry point to this code when a new device is created.  Allocate the basic
+ * structures and the ring buffer for communication with the backend, and
+ * inform the backend of the appropriate details for those.  Switch to
+ * Initialised state.
+ */
+static int blkfront_probe(struct xenbus_device *dev,
+			  const struct xenbus_device_id *id)
+{
+	int err, vdevice, i;
+	struct blkfront_info *info;
+
+	/* FIXME: Use dynamic device id if this is not set. */
+	err = xenbus_scanf(NULL, dev->nodename,
+			   "virtual-device", "%i", &vdevice);
+	if (err != 1) {
+		xenbus_dev_fatal(dev, err, "reading virtual-device");
+		return err;
+	}
+
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	if (!info) {
+		xenbus_dev_fatal(dev, -ENOMEM, "allocating info structure");
+		return -ENOMEM;
+	}
+	info->xbdev = dev;
+	info->vdevice = vdevice;
+	info->connected = BLKIF_STATE_DISCONNECTED;
+	info->mi = NULL;
+	info->gd = NULL;
+	INIT_WORK(&info->work, blkif_restart_queue, (void *)info);
+
+	info->shadow_free = 0;
+	memset(info->shadow, 0, sizeof(info->shadow));
+	for (i = 0; i < BLK_RING_SIZE; i++)
+		info->shadow[i].req.id = i+1;
+	info->shadow[BLK_RING_SIZE-1].req.id = 0x0fffffff;
+
+	/* Front end dir is a number, which is used as the id. */
+	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
+	dev->data = info;
+
+	err = talk_to_backend(dev, info);
+	if (err) {
+		kfree(info);
+		dev->data = NULL;
+		return err;
+	}
+
+	return 0;
+}
+
+
+/**
+ * We are reconnecting to the backend, due to a suspend/resume, or a backend
+ * driver restart.  We tear down our blkif structure and recreate it, but
+ * leave the device-layer structures intact so that this is transparent to the
+ * rest of the kernel.
+ */
+static int blkfront_resume(struct xenbus_device *dev)
+{
+	struct blkfront_info *info = dev->data;
+	int err;
+
+	DPRINTK("blkfront_resume: %s\n", dev->nodename);
+
+	blkif_free(info);
+
+	err = talk_to_backend(dev, info);
+	if (!err)
+		blkif_recover(info);
+
+	return err;
+}
+
+
+/* Common code used when first setting up, and when resuming. */
+static int talk_to_backend(struct xenbus_device *dev,
+			   struct blkfront_info *info)
+{
+	const char *message = NULL;
+	struct xenbus_transaction *xbt;
+	int err;
+
+	/* Create shared ring, alloc event channel. */
+	err = setup_blkring(dev, info);
+	if (err)
+		goto out;
+
+again:
+	xbt = xenbus_transaction_start();
+	if (IS_ERR(xbt)) {
+		xenbus_dev_fatal(dev, err, "starting transaction");
+		goto destroy_blkring;
+	}
+
+	err = xenbus_printf(xbt, dev->nodename,
+			    "ring-ref","%u", info->ring_ref);
+	if (err) {
+		message = "writing ring-ref";
+		goto abort_transaction;
+	}
+	err = xenbus_printf(xbt, dev->nodename,
+			    "event-channel", "%u", info->evtchn);
+	if (err) {
+		message = "writing event-channel";
+		goto abort_transaction;
+	}
+
+	err = xenbus_switch_state(dev, xbt, XenbusStateInitialised);
+	if (err) {
+		goto abort_transaction;
+	}
+
+	err = xenbus_transaction_end(xbt, 0);
+	if (err) {
+		if (err == -EAGAIN)
+			goto again;
+		xenbus_dev_fatal(dev, err, "completing transaction");
+		goto destroy_blkring;
+	}
+
+	return 0;
+
+ abort_transaction:
+	xenbus_transaction_end(xbt, 1);
+	if (message)
+		xenbus_dev_fatal(dev, err, "%s", message);
+ destroy_blkring:
+	blkif_free(info);
+ out:
+	return err;
+}
+
+
+static int setup_blkring(struct xenbus_device *dev,
+			 struct blkfront_info *info)
+{
+	blkif_sring_t *sring;
+	int err;
+
+	info->ring_ref = GRANT_INVALID_REF;
+
+	sring = (blkif_sring_t *)__get_free_page(GFP_KERNEL);
+	if (!sring) {
+		xenbus_dev_fatal(dev, -ENOMEM, "allocating shared ring");
+		return -ENOMEM;
+	}
+	SHARED_RING_INIT(sring);
+	FRONT_RING_INIT(&info->ring, sring, PAGE_SIZE);
+
+	err = xenbus_grant_ring(dev, virt_to_mfn(info->ring.sring));
+	if (err < 0) {
+		free_page((unsigned long)sring);
+		info->ring.sring = NULL;
+		goto fail;
+	}
+	info->ring_ref = err;
+
+	err = xenbus_alloc_evtchn(dev, &info->evtchn);
+	if (err)
+		goto fail;
+
+	err = bind_evtchn_to_irqhandler(
+		info->evtchn, blkif_int, SA_SAMPLE_RANDOM, "blkif", info);
+	if (err <= 0) {
+		xenbus_dev_fatal(dev, err,
+				 "bind_evtchn_to_irqhandler failed");
+		goto fail;
+	}
+	info->irq = err;
+
+	return 0;
+fail:
+	blkif_free(info);
+	return err;
+}
+
+
+/**
+ * Callback received when the backend's state changes.
+ */
+static void backend_changed(struct xenbus_device *dev,
+			    XenbusState backend_state)
+{
+	struct blkfront_info *info = dev->data;
+
+	DPRINTK("blkfront:backend_changed.\n");
+
+	switch (backend_state) {
+	case XenbusStateUnknown:
+	case XenbusStateInitialising:
+	case XenbusStateInitWait:
+	case XenbusStateInitialised:
+	case XenbusStateClosed:
+		break;
+
+	case XenbusStateConnected:
+		connect(info);
+		break;
+
+	case XenbusStateClosing:
+		blkfront_closing(dev);
+		break;
+	}
+}
+
+
+/* ** Connection ** */
+
+
+static void connect(struct blkfront_info *info)
+{
+	unsigned long sectors, sector_size;
+	unsigned int binfo;
+
+        if (info->connected == BLKIF_STATE_CONNECTED)
+		return;
+
+	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
+
+	int err = xenbus_gather(NULL, info->xbdev->otherend,
+				"sectors", "%lu", &sectors,
+				"info", "%u", &binfo,
+				"sector-size", "%lu", &sector_size,
+				NULL);
+	if (err) {
+		xenbus_dev_fatal(info->xbdev, err,
+				 "reading backend fields at %s",
+				 info->xbdev->otherend);
+		return;
+	}
+	
+        info->connected = BLKIF_STATE_CONNECTED;
+        xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
+	
+	err = xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected);
+	if (err)
+		return;
+	
+	/* Kick pending requests. */
+	spin_lock_irq(&blkif_io_lock);
+	kick_pending_request_queues(info);
+	spin_unlock_irq(&blkif_io_lock);
+}
+
+
+/**
+ * Handle the change of state of the backend to Closing.  We must delete our
+ * device-layer structures now, to ensure that writes are flushed through to
+ * the backend.  Once is this done, we can switch to Closed in
+ * acknowledgement.
+ */
+static void blkfront_closing(struct xenbus_device *dev)
+{
+	struct blkfront_info *info = dev->data;
+
+	DPRINTK("blkfront_closing: %s removed\n", dev->nodename);
+
+	if (info->mi) {
+		DPRINTK("Calling xlvbd_del\n");
+		xlvbd_del(info);
+		info->mi = NULL;
+	}
+
+	xenbus_switch_state(dev, NULL, XenbusStateClosed);
+}
+
+
+static int blkfront_remove(struct xenbus_device *dev)
+{
+	DPRINTK("blkfront_remove: %s removed\n", dev->nodename);
+
+	struct blkfront_info *info = dev->data;
+
+	blkif_free(info);
+
+	kfree(info);
+
+	return 0;
+}
+
 
 static inline int GET_ID_FROM_FREELIST(
 	struct blkfront_info *info)
@@ -214,7 +513,7 @@ static int blkif_queue_request(struct request *req)
 
 			gnttab_grant_foreign_access_ref(
 				ref,
-				info->backend_id,
+				info->xbdev->otherend_id,
 				buffer_mfn,
 				rq_data_dir(req) );
 
@@ -360,6 +659,15 @@ static void blkif_free(struct blkfront_info *info)
 	if (info->irq)
 		unbind_from_irqhandler(info->irq, info); 
 	info->evtchn = info->irq = 0;
+
+}
+
+static void blkif_completion(struct blk_shadow *s)
+{
+	int i;
+	for (i = 0; i < s->req.nr_segments; i++)
+		gnttab_end_foreign_access(
+			blkif_gref_from_fas(s->req.frame_and_sects[i]), 0, 0UL);
 }
 
 static void blkif_recover(struct blkfront_info *info)
@@ -400,7 +708,7 @@ static void blkif_recover(struct blkfront_info *info)
 		for (j = 0; j < req->nr_segments; j++)
 			gnttab_grant_foreign_access_ref(
 				blkif_gref_from_fas(req->frame_and_sects[j]),
-				info->backend_id,
+				info->xbdev->otherend_id,
 				pfn_to_mfn(info->shadow[req->id].frame[j]),
 				rq_data_dir(
 					(struct request *)
@@ -422,21 +730,8 @@ static void blkif_recover(struct blkfront_info *info)
 	info->connected = BLKIF_STATE_CONNECTED;
 }
 
-static void blkif_connect(struct blkfront_info *info, u16 evtchn)
-{
-	int err = 0;
 
-	info->evtchn = evtchn;
-
-	err = bind_evtchn_to_irqhandler(
-		info->evtchn, blkif_int, SA_SAMPLE_RANDOM, "blkif", info);
-	if (err <= 0) {
-		WPRINTK("bind_evtchn_to_irqhandler failed (err=%d)\n", err);
-		return;
-	}
-
-	info->irq = err;
-}
+/* ** Driver Registration ** */
 
 
 static struct xenbus_device_id blkfront_ids[] = {
@@ -444,278 +739,6 @@ static struct xenbus_device_id blkfront_ids[] = {
 	{ "" }
 };
 
-static void watch_for_status(struct xenbus_watch *watch,
-			     const char **vec, unsigned int len)
-{
-	struct blkfront_info *info;
-	unsigned int binfo;
-	unsigned long sectors, sector_size;
-	int err;
-	const char *node;
-
-	node = vec[XS_WATCH_PATH];
-
-	info = container_of(watch, struct blkfront_info, watch);
-	node += strlen(watch->node);
-
-	/* FIXME: clean up when error on the other end. */
-	if ((info->connected == BLKIF_STATE_CONNECTED) || info->mi)
-		return;
-
-	err = xenbus_gather(NULL, watch->node,
-			    "sectors", "%lu", &sectors,
-			    "info", "%u", &binfo,
-			    "sector-size", "%lu", &sector_size,
-			    NULL);
-	if (err) {
-		xenbus_dev_error(info->xbdev, err,
-				 "reading backend fields at %s", watch->node);
-		return;
-	}
-
-	info->connected = BLKIF_STATE_CONNECTED;
-	xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
-
-	xenbus_dev_ok(info->xbdev);
-
-	/* Kick pending requests. */
-	spin_lock_irq(&blkif_io_lock);
-	kick_pending_request_queues(info);
-	spin_unlock_irq(&blkif_io_lock);
-}
-
-static int setup_blkring(struct xenbus_device *dev, struct blkfront_info *info)
-{
-	blkif_sring_t *sring;
-	int err;
-	evtchn_op_t op = {
-		.cmd = EVTCHNOP_alloc_unbound,
-		.u.alloc_unbound.dom = DOMID_SELF,
-		.u.alloc_unbound.remote_dom = info->backend_id };
-
-	info->ring_ref = GRANT_INVALID_REF;
-
-	sring = (void *)__get_free_page(GFP_KERNEL);
-	if (!sring) {
-		xenbus_dev_error(dev, -ENOMEM, "allocating shared ring");
-		return -ENOMEM;
-	}
-	SHARED_RING_INIT(sring);
-	FRONT_RING_INIT(&info->ring, sring, PAGE_SIZE);
-
-	err = gnttab_grant_foreign_access(info->backend_id,
-					  virt_to_mfn(info->ring.sring), 0);
-	if (err == -ENOSPC) {
-		free_page((unsigned long)info->ring.sring);
-		info->ring.sring = 0;
-		xenbus_dev_error(dev, err, "granting access to ring page");
-		return err;
-	}
-	info->ring_ref = err;
-
-	err = HYPERVISOR_event_channel_op(&op);
-	if (err) {
-		gnttab_end_foreign_access(info->ring_ref, 0,
-					  (unsigned long)info->ring.sring);
-		info->ring_ref = GRANT_INVALID_REF;
-		info->ring.sring = NULL;
-		xenbus_dev_error(dev, err, "allocating event channel");
-		return err;
-	}
-
-	blkif_connect(info, op.u.alloc_unbound.port);
-
-	return 0;
-}
-
-/* Common code used when first setting up, and when resuming. */
-static int talk_to_backend(struct xenbus_device *dev,
-			   struct blkfront_info *info)
-{
-	char *backend;
-	const char *message;
-	struct xenbus_transaction *xbt;
-	int err;
-
-	backend = NULL;
-	err = xenbus_gather(NULL, dev->nodename,
-			    "backend-id", "%i", &info->backend_id,
-			    "backend", NULL, &backend,
-			    NULL);
-	if (XENBUS_EXIST_ERR(err))
-		goto out;
-	if (backend && strlen(backend) == 0) {
-		err = -ENOENT;
-		goto out;
-	}
-	if (err < 0) {
-		xenbus_dev_error(dev, err, "reading %s/backend or backend-id",
-				 dev->nodename);
-		goto out;
-	}
-
-	/* Create shared ring, alloc event channel. */
-	err = setup_blkring(dev, info);
-	if (err) {
-		xenbus_dev_error(dev, err, "setting up block ring");
-		goto out;
-	}
-
-again:
-	xbt = xenbus_transaction_start();
-	if (IS_ERR(xbt)) {
-		xenbus_dev_error(dev, err, "starting transaction");
-		goto destroy_blkring;
-	}
-
-	err = xenbus_printf(xbt, dev->nodename,
-			    "ring-ref","%u", info->ring_ref);
-	if (err) {
-		message = "writing ring-ref";
-		goto abort_transaction;
-	}
-	err = xenbus_printf(xbt, dev->nodename,
-			    "event-channel", "%u", info->evtchn);
-	if (err) {
-		message = "writing event-channel";
-		goto abort_transaction;
-	}
-
-	err = xenbus_transaction_end(xbt, 0);
-	if (err) {
-		if (err == -EAGAIN)
-			goto again;
-		xenbus_dev_error(dev, err, "completing transaction");
-		goto destroy_blkring;
-	}
-
-	info->watch.node = backend;
-	info->watch.callback = watch_for_status;
-	err = register_xenbus_watch(&info->watch);
-	if (err) {
-		message = "registering watch on backend";
-		goto destroy_blkring;
-	}
-
-	info->backend = backend;
-
-	return 0;
-
- abort_transaction:
-	xenbus_transaction_end(xbt, 1);
-	xenbus_dev_error(dev, err, "%s", message);
- destroy_blkring:
-	blkif_free(info);
- out:
-	kfree(backend);
-	return err;
-}
-
-/* Setup supplies the backend dir, virtual device.
-
-   We place an event channel and shared frame entries.
-   We watch backend to wait if it's ok. */
-static int blkfront_probe(struct xenbus_device *dev,
-			  const struct xenbus_device_id *id)
-{
-	int err, vdevice, i;
-	struct blkfront_info *info;
-
-	/* FIXME: Use dynamic device id if this is not set. */
-	err = xenbus_scanf(NULL, dev->nodename,
-			   "virtual-device", "%i", &vdevice);
-	if (XENBUS_EXIST_ERR(err))
-		return err;
-	if (err < 0) {
-		xenbus_dev_error(dev, err, "reading virtual-device");
-		return err;
-	}
-
-	info = kmalloc(sizeof(*info), GFP_KERNEL);
-	if (!info) {
-		xenbus_dev_error(dev, err, "allocating info structure");
-		return err;
-	}
-	info->xbdev = dev;
-	info->vdevice = vdevice;
-	info->connected = BLKIF_STATE_DISCONNECTED;
-	info->mi = NULL;
- 	info->gd = NULL;
-	INIT_WORK(&info->work, blkif_restart_queue, (void *)info);
-
-	info->shadow_free = 0;
-	memset(info->shadow, 0, sizeof(info->shadow));
-	for (i = 0; i < BLK_RING_SIZE; i++)
-		info->shadow[i].req.id = i+1;
-	info->shadow[BLK_RING_SIZE-1].req.id = 0x0fffffff;
-
-	/* Front end dir is a number, which is used as the id. */
-	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
-	dev->data = info;
-
-	err = talk_to_backend(dev, info);
-	if (err) {
-		kfree(info);
-		dev->data = NULL;
-		return err;
-	}
-
-	{
-		unsigned int len = max(XS_WATCH_PATH, XS_WATCH_TOKEN) + 1;
-		const char *vec[len];
-
-		vec[XS_WATCH_PATH] = info->watch.node;
-		vec[XS_WATCH_TOKEN] = NULL;
-
-		/* Call once in case entries already there. */
-		watch_for_status(&info->watch, vec, len);
-	}
-
-	return 0;
-}
-
-static int blkfront_remove(struct xenbus_device *dev)
-{
-	struct blkfront_info *info = dev->data;
-
-	if (info->backend)
-		unregister_xenbus_watch(&info->watch);
-
-	if (info->mi)
-		xlvbd_del(info);
-
-	blkif_free(info);
-
-	kfree(info->backend);
-	kfree(info);
-
-	return 0;
-}
-
-static int blkfront_suspend(struct xenbus_device *dev)
-{
-	struct blkfront_info *info = dev->data;
-
-	unregister_xenbus_watch(&info->watch);
-	kfree(info->backend);
-	info->backend = NULL;
-
-	return 0;
-}
-
-static int blkfront_resume(struct xenbus_device *dev)
-{
-	struct blkfront_info *info = dev->data;
-	int err;
-
-	blkif_free(info);
-
-	err = talk_to_backend(dev, info);
-	if (!err)
-		blkif_recover(info);
-
-	return err;
-}
 
 static struct xenbus_driver blkfront = {
 	.name = "vbd",
@@ -724,27 +747,28 @@ static struct xenbus_driver blkfront = {
 	.probe = blkfront_probe,
 	.remove = blkfront_remove,
 	.resume = blkfront_resume,
-	.suspend = blkfront_suspend,
+	.otherend_changed = backend_changed,
 };
+
 
 static int __init xlblk_init(void)
 {
 	if (xen_init() < 0)
 		return -ENODEV;
 
-	xenbus_register_driver(&blkfront);
-	return 0;
+	return xenbus_register_frontend(&blkfront);
 }
-
 module_init(xlblk_init);
 
-static void blkif_completion(struct blk_shadow *s)
+
+static void xlblk_exit(void)
 {
-	int i;
-	for (i = 0; i < s->req.nr_segments; i++)
-		gnttab_end_foreign_access(
-			blkif_gref_from_fas(s->req.frame_and_sects[i]), 0, 0UL);
+	return xenbus_unregister_driver(&blkfront);
 }
+module_exit(xlblk_exit);
+
+MODULE_LICENSE("BSD");
+
 
 /*
  * Local variables:

@@ -25,9 +25,22 @@ from xen.xend.XendLogging import log
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
 
-DEVICE_CREATE_TIMEOUT = 120
+DEVICE_CREATE_TIMEOUT = 5
 HOTPLUG_STATUS_NODE = "hotplug-status"
 HOTPLUG_STATUS_ERROR = "error"
+
+xenbusState = {
+    'Unknown'      : 0,
+    'Initialising' : 1,
+    'InitWait'     : 2,
+    'Initialised'  : 3,
+    'Connected'    : 4,
+    'Closing'      : 5,
+    'Closed'       : 6,
+    }
+
+xenbusState.update(dict(zip(xenbusState.values(), xenbusState.keys())))
+
 
 class DevController:
     """Abstract base class for a device controller.  Device controllers create
@@ -116,10 +129,8 @@ class DevController:
         frontpath = self.frontendPath(devid)
         backpath = xstransact.Read(frontpath, "backend")
 
-        xstransact.Remove(frontpath)
-
         if backpath:
-            xstransact.Remove(backpath)
+            xstransact.Write(backpath, 'state', str(xenbusState['Closing']))
         else:
             raise VmError("Device %s not connected" % devid)
            
@@ -257,18 +268,18 @@ class DevController:
         frontpath = self.frontendPath(devid)
         backpath  = self.backendPath(backdom, devid)
         
-        xstransact.Remove(backpath, HOTPLUG_STATUS_NODE)
-
         frontDetails.update({
             'backend' : backpath,
-            'backend-id' : "%i" % backdom.getDomid()
+            'backend-id' : "%i" % backdom.getDomid(),
+            'state' : str(xenbusState['Initialising'])
             })
 
 
         backDetails.update({
             'domain' : self.vm.getName(),
             'frontend' : frontpath,
-            'frontend-id' : "%i" % self.vm.getDomid()
+            'frontend-id' : "%i" % self.vm.getDomid(),
+            'state' : str(xenbusState['Initialising'])
             })
 
         log.debug('DevController: writing %s to %s.', str(frontDetails),
@@ -276,8 +287,20 @@ class DevController:
         log.debug('DevController: writing %s to %s.', str(backDetails),
                   backpath)
 
-        xstransact.Write(frontpath, frontDetails)
-        xstransact.Write(backpath, backDetails)
+        while True:
+            t = xstransact()
+            try:
+                t.remove2(backpath, HOTPLUG_STATUS_NODE)
+
+                t.write2(frontpath, frontDetails)
+                t.write2(backpath,  backDetails)
+
+                if t.commit():
+                    return
+            except:
+                t.abort()
+                raise
+
 
     def waitForBackend(self,devid):
         ev = Event()

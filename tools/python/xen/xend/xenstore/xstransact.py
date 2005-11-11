@@ -10,7 +10,7 @@ from xen.xend.xenstore.xsutil import xshandle
 
 class xstransact:
 
-    def __init__(self, path):
+    def __init__(self, path = ""):
         assert path is not None
         
         self.in_transaction = False # Set this temporarily -- if this
@@ -41,7 +41,7 @@ class xstransact:
         return rc
 
     def _read(self, key):
-        path = "%s/%s" % (self.path, key)
+        path = self.prependPath(key)
         try:
             return xshandle().read(self.transaction, path)
         except RuntimeError, ex:
@@ -66,7 +66,7 @@ class xstransact:
         return ret
 
     def _write(self, key, data):
-        path = "%s/%s" % (self.path, key)
+        path = self.prependPath(key)
         try:
             xshandle().write(self.transaction, path, data)
         except RuntimeError, ex:
@@ -99,7 +99,7 @@ class xstransact:
             raise TypeError
 
     def _remove(self, key):
-        path = "%s/%s" % (self.path, key)
+        path = self.prependPath(key)
         return xshandle().rm(self.transaction, path)
 
     def remove(self, *args):
@@ -114,7 +114,7 @@ class xstransact:
                 self._remove(key)
 
     def _list(self, key):
-        path = "%s/%s" % (self.path, key)
+        path = self.prependPath(key)
         l = xshandle().ls(self.transaction, path)
         if l:
             return map(lambda x: key + "/" + x, l)
@@ -213,6 +213,30 @@ class xstransact:
                 self._remove(key)
             else:
                 self._write(key, fmt % val)
+
+
+    def remove2(self, middlePath, *args):
+        self.callRebased(middlePath, self.remove, *args)
+
+
+    def write2(self, middlePath, *args):
+        self.callRebased(middlePath, self.write, *args)
+
+
+    def callRebased(self, middlePath, func, *args):
+        oldpath = self.path
+        self.path = self.prependPath(middlePath)
+        try:
+            func(*args)
+        finally:
+            self.path = oldpath
+
+
+    def prependPath(self, key):
+        if self.path:
+            return self.path + '/' + key
+        else:
+            return key
 
 
     def Read(cls, path, *args):

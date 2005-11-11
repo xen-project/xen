@@ -35,10 +35,48 @@
 #include <asm/semaphore.h>
 #include <asm-xen/xen-public/io/xs_wire.h>
 
+/* Register callback to watch this node. */
+struct xenbus_watch
+{
+	struct list_head list;
+
+	/* Path being watched. */
+	const char *node;
+
+	/* Callback (executed in a process context with no locks held). */
+	void (*callback)(struct xenbus_watch *,
+			 const char **vec, unsigned int len);
+};
+
+
+/* The state of either end of the Xenbus, i.e. the current communication
+   status of initialisation across the bus.  States here imply nothing about
+   the state of the connection between the driver and the kernel's device
+   layers.  */
+typedef enum
+{
+  XenbusStateUnknown      = 0,
+  XenbusStateInitialising = 1,
+  XenbusStateInitWait     = 2,  /* Finished early initialisation, but waiting
+                                   for information from the peer or hotplug
+				   scripts. */
+  XenbusStateInitialised  = 3,  /* Initialised and waiting for a connection
+				   from the peer. */
+  XenbusStateConnected    = 4,
+  XenbusStateClosing      = 5,  /* The device is being closed due to an error
+				   or an unplug event. */
+  XenbusStateClosed       = 6
+
+} XenbusState;
+
+
 /* A xenbus device. */
 struct xenbus_device {
-	char *devicetype;
-	char *nodename;
+	const char *devicetype;
+	const char *nodename;
+	const char *otherend;
+	int otherend_id;
+	struct xenbus_watch otherend_watch;
 	struct device dev;
 	int has_error;
 	void *data;
@@ -62,11 +100,14 @@ struct xenbus_driver {
 	const struct xenbus_device_id *ids;
 	int (*probe)(struct xenbus_device *dev,
 		     const struct xenbus_device_id *id);
+	void (*otherend_changed)(struct xenbus_device *dev,
+				 XenbusState backend_state);
 	int (*remove)(struct xenbus_device *dev);
 	int (*suspend)(struct xenbus_device *dev);
 	int (*resume)(struct xenbus_device *dev);
 	int (*hotplug)(struct xenbus_device *, char **, int, char *, int);
 	struct device_driver driver;
+	int (*read_otherend_details)(struct xenbus_device *dev);
 };
 
 static inline struct xenbus_driver *to_xenbus_driver(struct device_driver *drv)
@@ -74,7 +115,7 @@ static inline struct xenbus_driver *to_xenbus_driver(struct device_driver *drv)
 	return container_of(drv, struct xenbus_driver, driver);
 }
 
-int xenbus_register_driver(struct xenbus_driver *drv);
+int xenbus_register_frontend(struct xenbus_driver *drv);
 int xenbus_register_backend(struct xenbus_driver *drv);
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 
@@ -108,25 +149,6 @@ int xenbus_printf(struct xenbus_transaction *t,
  * sprintf-style type string, and pointer. Returns 0 or errno.*/
 int xenbus_gather(struct xenbus_transaction *t, const char *dir, ...);
 
-/* Report a (negative) errno into the store, with explanation. */
-void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt,...);
-
-/* Clear any error. */
-void xenbus_dev_ok(struct xenbus_device *dev);
-
-/* Register callback to watch this node. */
-struct xenbus_watch
-{
-	struct list_head list;
-
-	/* Path being watched. */
-	char *node;
-
-	/* Callback (executed in a process context with no locks held). */
-	void (*callback)(struct xenbus_watch *,
-			 const char **vec, unsigned int len);
-};
-
 /* notifer routines for when the xenstore comes up */
 int register_xenstore_notifier(struct notifier_block *nb);
 void unregister_xenstore_notifier(struct notifier_block *nb);
@@ -152,6 +174,89 @@ void xenbus_resume(void);
 })
 
 #define XENBUS_EXIST_ERR(err) ((err) == -ENOENT || (err) == -ERANGE)
+
+
+/**
+ * Register a watch on the given path, using the given xenbus_watch structure
+ * for storage, and the given callback function as the callback.  Return 0 on
+ * success, or -errno on error.  On success, the given path will be saved as
+ * watch->node, and remains the caller's to free.  On error, watch->node will
+ * be NULL, the device will switch to XenbusStateClosing, and the error will
+ * be saved in the store.
+ */
+int xenbus_watch_path(struct xenbus_device *dev, const char *path,
+		      struct xenbus_watch *watch, 
+		      void (*callback)(struct xenbus_watch *,
+				       const char **, unsigned int));
+
+
+/**
+ * Register a watch on the given path/path2, using the given xenbus_watch
+ * structure for storage, and the given callback function as the callback.
+ * Return 0 on success, or -errno on error.  On success, the watched path
+ * (path/path2) will be saved as watch->node, and becomes the caller's to
+ * kfree().  On error, watch->node will be NULL, so the caller has nothing to
+ * free, the device will switch to XenbusStateClosing, and the error will be
+ * saved in the store.
+ */
+int xenbus_watch_path2(struct xenbus_device *dev, const char *path,
+		       const char *path2, struct xenbus_watch *watch, 
+		       void (*callback)(struct xenbus_watch *,
+					const char **, unsigned int));
+
+
+/**
+ * Advertise in the store a change of the given driver to the given new_state.
+ * Perform the change inside the given transaction xbt.  xbt may be NULL, in
+ * which case this is performed inside its own transaction.  Return 0 on
+ * success, or -errno on error.  On error, the device will switch to
+ * XenbusStateClosing, and the error will be saved in the store.
+ */
+int xenbus_switch_state(struct xenbus_device *dev,
+			struct xenbus_transaction *xbt,
+			XenbusState new_state);
+
+
+/**
+ * Grant access to the given ring_mfn to the peer of the given device.  Return
+ * 0 on success, or -errno on error.  On error, the device will switch to
+ * XenbusStateClosing, and the error will be saved in the store.
+ */
+int xenbus_grant_ring(struct xenbus_device *dev, unsigned long ring_mfn);
+
+
+/**
+ * Allocate an event channel for the given xenbus_device, assigning the newly
+ * created local port to *port.  Return 0 on success, or -errno on error.  On
+ * error, the device will switch to XenbusStateClosing, and the error will be
+ * saved in the store.
+ */
+int xenbus_alloc_evtchn(struct xenbus_device *dev, int *port);
+
+
+/**
+ * Return the state of the driver rooted at the given store path, or
+ * XenbusStateClosed if no state can be read.
+ */
+XenbusState xenbus_read_driver_state(const char *path);
+
+
+/***
+ * Report the given negative errno into the store, along with the given
+ * formatted message.
+ */
+void xenbus_dev_error(struct xenbus_device *dev, int err, const char *fmt,
+		      ...);
+
+
+/***
+ * Equivalent to xenbus_dev_error(dev, err, fmt, args), followed by
+ * xenbus_switch_state(dev, NULL, XenbusStateClosing) to schedule an orderly
+ * closedown of this driver and its peer.
+ */
+void xenbus_dev_fatal(struct xenbus_device *dev, int err, const char *fmt,
+		      ...);
+
 
 #endif /* _ASM_XEN_XENBUS_H */
 

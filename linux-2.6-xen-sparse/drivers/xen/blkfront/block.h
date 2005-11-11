@@ -113,15 +113,11 @@ struct blk_shadow {
 struct blkfront_info
 {
 	struct xenbus_device *xbdev;
-	/* We watch the backend */
-	struct xenbus_watch watch;
 	dev_t dev;
  	struct gendisk *gd;
 	int vdevice;
 	blkif_vdev_t handle;
 	int connected;
-	char *backend;
-	int backend_id;
 	int ring_ref;
 	blkif_front_ring_t ring;
 	unsigned int evtchn, irq;
