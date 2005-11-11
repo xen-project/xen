@@ -45,6 +45,6 @@ if [ "${ip}" ] ; then
     done 
 fi
 
-handle_iptable()
+handle_iptable
 
 success
