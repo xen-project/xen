@@ -92,9 +92,10 @@ typedef union RedirStatus
 #define MAX_LAPIC_NUM        32
 
 typedef struct vmx_vioapic {
-    uint32_t ioregsel;
     uint32_t irr;
     uint32_t isr;           /* This is used for level trigger */
+    uint32_t imr;
+    uint32_t ioregsel;
     uint32_t flags;
     uint32_t lapic_count;
     uint32_t id;

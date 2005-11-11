@@ -271,12 +271,10 @@ typedef struct {
 
 typedef mapped_regs_t vpd_t;
 
-#define __ARCH_HAS_VCPU_INFO
-
 typedef struct {
     unsigned int flags;
     unsigned long start_info_pfn;
-} arch_shared_info_t;  // DON'T PACK 
+} arch_shared_info_t;
 
 typedef struct vcpu_guest_context {
 #define VGCF_FPU_VALID (1<<0)

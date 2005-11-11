@@ -342,8 +342,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		rx_pfn_array[i] = virt_to_mfn(skb->head);
 
 		/* Remove this page from map before passing back to Xen. */
-		phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] 
-			= INVALID_P2M_ENTRY;
+		set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT, INVALID_P2M_ENTRY);
 
 		MULTI_update_va_mapping(rx_mcl+i, (unsigned long)skb->head,
 					__pte(0), 0);
@@ -570,7 +569,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 					pfn_pte_ma(mfn, PAGE_KERNEL), 0);
 		mcl++;
 
-		phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = mfn;
+		set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT, mfn);
 
 		__skb_queue_tail(&rxq, skb);
 	}

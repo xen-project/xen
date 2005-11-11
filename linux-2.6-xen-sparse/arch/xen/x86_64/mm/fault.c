@@ -318,12 +318,12 @@ int exception_trace = 1;
  *	bit 2 == 0 means kernel, 1 means user-mode
  *      bit 3 == 1 means fault was an instruction fetch
  */
-asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code,
-       unsigned long address)
+asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
 	struct vm_area_struct * vma;
+	unsigned long address;
 	const struct exception_table_entry *fixup;
 	int write;
 	siginfo_t info;
@@ -342,6 +342,11 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 		}
 	}
 #endif
+
+	/* get the address */
+	address = HYPERVISOR_shared_info->vcpu_data[
+		smp_processor_id()].arch.cr2;
+
 	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
 					SIGSEGV) == NOTIFY_STOP)
 		return;

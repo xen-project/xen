@@ -241,11 +241,7 @@ console_initcall(xen_console_init);
 #endif
 
 /*** Useful function for console debugging -- goes straight to Xen. ***/
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 asmlinkage int xprintk(const char *fmt, ...)
-#else
-asmlinkage int xprintk(const char *fmt, ...)
-#endif
 {
 	va_list args;
 	int printk_len;

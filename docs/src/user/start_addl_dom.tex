@@ -40,8 +40,7 @@ configuration file. We provide two example files which you can use as
 a starting point:
 \begin{itemize}
 \item \path{/etc/xen/xmexample1} is a simple template configuration
-  file for describing a single VM.
-
+  file for describing a single VM\@.
 \item \path{/etc/xen/xmexample2} file is a template description that
   is intended to be reused for multiple virtual machines.  Setting the
   value of the \path{vmid} variable on the \path{xm} command line
@@ -54,17 +53,17 @@ you may wish to edit include:
 \begin{quote}
 \begin{description}
 \item[kernel] Set this to the path of the kernel you compiled for use
-  with Xen (e.g.\ \path{kernel = `/boot/vmlinuz-2.6-xenU'})
+  with Xen (e.g.\ \path{kernel = ``/boot/vmlinuz-2.6-xenU''})
 \item[memory] Set this to the size of the domain's memory in megabytes
   (e.g.\ \path{memory = 64})
 \item[disk] Set the first entry in this list to calculate the offset
-  of the domain's root partition, based on the domain ID.  Set the
+  of the domain's root partition, based on the domain ID\@.  Set the
   second to the location of \path{/usr} if you are sharing it between
-  domains (e.g.\ \path{disk = [`phy:your\_hard\_drive\%d,sda1,w' \%
+  domains (e.g.\ \path{disk = ['phy:your\_hard\_drive\%d,sda1,w' \%
     (base\_partition\_number + vmid),
-    `phy:your\_usr\_partition,sda6,r' ]}
+    'phy:your\_usr\_partition,sda6,r' ]}
 \item[dhcp] Uncomment the dhcp variable, so that the domain will
-  receive its IP address from a DHCP server (e.g.\ \path{dhcp=`dhcp'})
+  receive its IP address from a DHCP server (e.g.\ \path{dhcp=``dhcp''})
 \end{description}
 \end{quote}
 
@@ -72,7 +71,7 @@ You may also want to edit the {\bf vif} variable in order to choose
 the MAC address of the virtual ethernet interface yourself.  For
 example:
 \begin{quote}
-\verb_vif = [`mac=00:06:AA:F6:BB:B3']_
+\verb_vif = ['mac=00:06:AA:F6:BB:B3']_
 \end{quote}
 If you do not set this variable, \xend\ will automatically generate a
 random MAC address from an unused range.
@@ -116,6 +115,7 @@ distribution once they have mastered the basics\footnote{ttylinux is
   section of the project's SourceForge site (see
   \path{http://sf.net/projects/xen/}).
 \item Create a configuration file like the following:
+  \begin{quote}
 \begin{verbatim}
 kernel = "/boot/vmlinuz-2.6-xenU"
 memory = 64
@@ -124,11 +124,14 @@ nics = 1
 ip = "1.2.3.4"
 disk = ['file:/path/to/ttylinux/rootfs,sda1,w']
 root = "/dev/sda1 ro"
-\end{verbatim}
+\end{verbatim}    
+  \end{quote}
 \item Now start the domain and connect to its console:
+  \begin{quote}
 \begin{verbatim}
 xm create configfile -c
 \end{verbatim}
+  \end{quote}
 \item Login as root, password root.
 \end{enumerate}
 

@@ -412,16 +412,16 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.trap_bounce;
 
+    v->arch.guest_context.ctrlreg[2] = addr;
+    v->vcpu_info->arch.cr2           = addr;
+
     ti = &v->arch.guest_context.trap_ctxt[TRAP_page_fault];
-    tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE | TBF_EXCEPTION_CR2;
-    tb->cr2        = addr;
+    tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
     tb->error_code = error_code;
     tb->cs         = ti->cs;
     tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
         tb->flags |= TBF_INTERRUPT;
-
-    v->arch.guest_context.ctrlreg[2] = addr;
 }
 
 static int handle_perdomain_mapping_fault(
@@ -931,6 +931,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
         case 2: /* Write CR2 */
             v->arch.guest_context.ctrlreg[2] = *reg;
+            v->vcpu_info->arch.cr2           = *reg;
             break;
             
         case 3: /* Write CR3 */

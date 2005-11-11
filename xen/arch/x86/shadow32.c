@@ -997,7 +997,8 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     if ( new_modes & SHM_log_dirty )
     {
         ASSERT( !d->arch.shadow_dirty_bitmap );
-        d->arch.shadow_dirty_bitmap_size = (d->max_pages + 63) & ~63;
+        d->arch.shadow_dirty_bitmap_size = 
+            (d->shared_info->arch.max_pfn +  63) & ~63;
         d->arch.shadow_dirty_bitmap = 
             xmalloc_array(unsigned long, d->arch.shadow_dirty_bitmap_size /
                                          (8 * sizeof(unsigned long)));
@@ -1287,34 +1288,28 @@ static int shadow_mode_table_op(
         d->arch.shadow_dirty_net_count   = 0;
         d->arch.shadow_dirty_block_count = 0;
  
-        if ( (d->max_pages > sc->pages) || 
-             (sc->dirty_bitmap == NULL) || 
+        if ( (sc->dirty_bitmap == NULL) || 
              (d->arch.shadow_dirty_bitmap == NULL) )
         {
             rc = -EINVAL;
             break;
         }
- 
-        sc->pages = d->max_pages;
+
+        if(sc->pages > d->arch.shadow_dirty_bitmap_size)
+            sc->pages = d->arch.shadow_dirty_bitmap_size; 
 
 #define chunk (8*1024) /* Transfer and clear in 1kB chunks for L1 cache. */
-        for ( i = 0; i < d->max_pages; i += chunk )
+        for ( i = 0; i < sc->pages; i += chunk )
         {
-            int bytes = ((((d->max_pages - i) > chunk) ?
-                          chunk : (d->max_pages - i)) + 7) / 8;
+            int bytes = ((((sc->pages - i) > chunk) ?
+                          chunk : (sc->pages - i)) + 7) / 8;
      
             if (copy_to_user(
                     sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
                     d->arch.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
                     bytes))
             {
-                // copy_to_user can fail when copying to guest app memory.
-                // app should zero buffer after mallocing, and pin it
                 rc = -EINVAL;
-                memset(
-                    d->arch.shadow_dirty_bitmap + 
-                    (i/(8*sizeof(unsigned long))),
-                    0, (d->max_pages/8) - (i/(8*sizeof(unsigned long))));
                 break;
             }
 
@@ -1331,17 +1326,19 @@ static int shadow_mode_table_op(
         sc->stats.dirty_net_count   = d->arch.shadow_dirty_net_count;
         sc->stats.dirty_block_count = d->arch.shadow_dirty_block_count;
  
-        if ( (d->max_pages > sc->pages) || 
-             (sc->dirty_bitmap == NULL) || 
+
+        if ( (sc->dirty_bitmap == NULL) || 
              (d->arch.shadow_dirty_bitmap == NULL) )
         {
             rc = -EINVAL;
             break;
         }
  
-        sc->pages = d->max_pages;
-        if (copy_to_user(
-            sc->dirty_bitmap, d->arch.shadow_dirty_bitmap, (d->max_pages+7)/8))
+        if(sc->pages > d->arch.shadow_dirty_bitmap_size)
+            sc->pages = d->arch.shadow_dirty_bitmap_size; 
+
+        if (copy_to_user(sc->dirty_bitmap, 
+                         d->arch.shadow_dirty_bitmap, (sc->pages+7)/8))
         {
             rc = -EINVAL;
             break;

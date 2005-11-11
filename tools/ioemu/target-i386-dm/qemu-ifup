@@ -7,4 +7,4 @@ echo 'config qemu network with xen bridge for '
 echo $*
 
 ifconfig $1 0.0.0.0 up
-brctl addif xenbr0 $1
+brctl addif $2 $1

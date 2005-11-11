@@ -650,7 +650,7 @@ fastcall void do_int3(struct pt_regs *regs, long error_code)
 
 static inline void conditional_sti(struct pt_regs *regs)
 {
-	if ((uint8_t)(regs->xcs >> 16) == 0)
+	if (regs->eflags & (X86_EFLAGS_IF|VM_MASK))
 		local_irq_enable();
 }
 
@@ -972,7 +972,7 @@ void __init trap_init_f00f_bug(void)
 
 
 /*
- * NB. All these are "trap gates" (i.e. events_mask isn't cleared) except
+ * NB. All these are "trap gates" (i.e. events_mask isn't set) except
  * for those that specify <dpl>|4 in the second field.
  */
 static trap_info_t trap_table[] = {
@@ -988,7 +988,7 @@ static trap_info_t trap_table[] = {
 	{ 11, 0, __KERNEL_CS, (unsigned long)segment_not_present	},
 	{ 12, 0, __KERNEL_CS, (unsigned long)stack_segment		},
 	{ 13, 0, __KERNEL_CS, (unsigned long)general_protection		},
-	{ 14, 0, __KERNEL_CS, (unsigned long)page_fault			},
+	{ 14, 0|4, __KERNEL_CS, (unsigned long)page_fault		},
 	{ 15, 0, __KERNEL_CS, (unsigned long)fixup_4gb_segment		},
 	{ 16, 0, __KERNEL_CS, (unsigned long)coprocessor_error		},
 	{ 17, 0, __KERNEL_CS, (unsigned long)alignment_check		},

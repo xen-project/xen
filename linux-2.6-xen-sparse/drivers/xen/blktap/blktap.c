@@ -777,8 +777,8 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 		/* Set the necessary mappings in p2m and in the VM_FOREIGN 
 		 * vm_area_struct to allow user vaddr -> struct page lookups
 		 * to work.  This is needed for direct IO to foreign pages. */
-		phys_to_machine_mapping[__pa(kvaddr) >> PAGE_SHIFT] =
-			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT);
+		set_phys_to_machine(__pa(kvaddr) >> PAGE_SHIFT,
+				FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
 
 		offset = (uvaddr - blktap_vma->vm_start) >> PAGE_SHIFT;
 		((struct page **)blktap_vma->vm_private_data)[offset] =
