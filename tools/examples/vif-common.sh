@@ -53,7 +53,8 @@ function frob_iptable()
     local c="-D"
   fi
 
-  iptables "$c" FORWARD -m physdev --physdev-in "$vif" "$@" -j ACCEPT
+  iptables "$c" FORWARD -m physdev --physdev-in "$vif" "$@" -j ACCEPT ||
+    fatal "iptables $c FORWARD -m physdev --physdev-in $vif $@ -j ACCEPT failed"
 }
 
 
@@ -66,6 +67,11 @@ function frob_iptable()
 #
 function handle_iptable()
 {
+  if ! which iptables >&/dev/null
+  then
+    return
+  fi
+
   if [ "$ip" != "" ]
   then
       local addr
