@@ -398,14 +398,14 @@ void make_page_readonly(void *va)
 {
 	pte_t *pte = virt_to_ptep(va);
 	set_pte(pte, pte_wrprotect(*pte));
-	if ( (unsigned long)va >= (unsigned long)high_memory )
-	{
-		unsigned long phys;
-		phys = machine_to_phys(*(unsigned long *)pte & PAGE_MASK);
+	if ((unsigned long)va >= (unsigned long)high_memory) {
+		unsigned long pfn; 
+		pfn = pte_pfn(*pte); 
 #ifdef CONFIG_HIGHMEM
-		if ( (phys >> PAGE_SHIFT) < highstart_pfn )
+		if (pfn < highstart_pfn)
 #endif
-			make_lowmem_page_readonly(phys_to_virt(phys));
+			make_lowmem_page_readonly(
+				phys_to_virt(pfn << PAGE_SHIFT)); 
 	}
 }
 
@@ -413,21 +413,20 @@ void make_page_writable(void *va)
 {
 	pte_t *pte = virt_to_ptep(va);
 	set_pte(pte, pte_mkwrite(*pte));
-	if ( (unsigned long)va >= (unsigned long)high_memory )
-	{
-		unsigned long phys;
-		phys = machine_to_phys(*(unsigned long *)pte & PAGE_MASK);
+	if ((unsigned long)va >= (unsigned long)high_memory) {
+		unsigned long pfn; 
+		pfn = pte_pfn(*pte); 
 #ifdef CONFIG_HIGHMEM
-		if ( (phys >> PAGE_SHIFT) < highstart_pfn )
+		if (pfn < highstart_pfn)
 #endif
-			make_lowmem_page_writable(phys_to_virt(phys));
+			make_lowmem_page_writable(
+				phys_to_virt(pfn << PAGE_SHIFT)); 
 	}
 }
 
 void make_pages_readonly(void *va, unsigned int nr)
 {
-	while ( nr-- != 0 )
-	{
+	while (nr-- != 0) {
 		make_page_readonly(va);
 		va = (void *)((unsigned long)va + PAGE_SIZE);
 	}
@@ -435,8 +434,7 @@ void make_pages_readonly(void *va, unsigned int nr)
 
 void make_pages_writable(void *va, unsigned int nr)
 {
-	while ( nr-- != 0 )
-	{
+	while (nr-- != 0) {
 		make_page_writable(va);
 		va = (void *)((unsigned long)va + PAGE_SIZE);
 	}

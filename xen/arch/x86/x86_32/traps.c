@@ -84,32 +84,37 @@ void show_registers(struct cpu_user_regs *regs)
 
 void show_page_walk(unsigned long addr)
 {
-    unsigned long pfn = read_cr3() >> PAGE_SHIFT;
+    unsigned long mfn = read_cr3() >> PAGE_SHIFT;
     intpte_t *ptab, ent;
+    unsigned long pfn; 
 
     printk("Pagetable walk from %08lx:\n", addr);
 
 #ifdef CONFIG_X86_PAE
-    ptab = map_domain_page(pfn);
-    ent = ptab[l3_table_offset(addr)];
-    printk(" L3 = %"PRIpte"\n", ent);
+    ptab = map_domain_page(mfn);
+    ent  = ptab[l3_table_offset(addr)];
+    pfn  = machine_to_phys_mapping[(u32)(ent >> PAGE_SHIFT)]; 
+    printk(" L3 = %"PRIpte" %08lx\n", ent, pfn);
     unmap_domain_page(ptab);
     if ( !(ent & _PAGE_PRESENT) )
         return;
-    pfn = ent >> PAGE_SHIFT;
+    mfn = ent >> PAGE_SHIFT;
 #endif
 
-    ptab = map_domain_page(pfn);
-    ent = ptab[l2_table_offset(addr)];
-    printk("  L2 = %"PRIpte" %s\n", ent, (ent & _PAGE_PSE) ? "(PSE)" : "");
+    ptab = map_domain_page(mfn);
+    ent  = ptab[l2_table_offset(addr)];
+    pfn  = machine_to_phys_mapping[(u32)(ent >> PAGE_SHIFT)]; 
+    printk("  L2 = %"PRIpte" %08lx %s\n", ent, pfn, 
+           (ent & _PAGE_PSE) ? "(PSE)" : "");
     unmap_domain_page(ptab);
     if ( !(ent & _PAGE_PRESENT) || (ent & _PAGE_PSE) )
         return;
-    pfn = ent >> PAGE_SHIFT;
+    mfn = ent >> PAGE_SHIFT;
 
     ptab = map_domain_page(ent >> PAGE_SHIFT);
-    ent = ptab[l2_table_offset(addr)];
-    printk("   L1 = %"PRIpte"\n", ent);
+    ent  = ptab[l1_table_offset(addr)];
+    pfn  = machine_to_phys_mapping[(u32)(ent >> PAGE_SHIFT)]; 
+    printk("   L1 = %"PRIpte" %08lx\n", ent, pfn);
     unmap_domain_page(ptab);
 }
 
