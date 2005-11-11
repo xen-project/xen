@@ -581,25 +581,39 @@ static int vmx_decode(int vm86, unsigned char *opcode, struct instruction *instr
     }
 
     switch (*++opcode) {
-    case 0xB6: /* movz m8, r16/r32 */
-        instr->instr = INSTR_MOVZ;
+    case 0xB6: /* movzx m8, r16/r32/r64 */
+        instr->instr = INSTR_MOVZX;
         GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
         index = get_index(opcode + 1, rex);
         instr->operand[0] = mk_operand(BYTE, 0, 0, MEMORY);
         instr->operand[1] = mk_operand(instr->op_size, index, 0, REGISTER);
         return DECODE_success;
 
-    case 0xB7: /* movz m16/m32, r32/r64 */
-        instr->instr = INSTR_MOVZ;
+    case 0xB7: /* movzx m16/m32, r32/r64 */
+        instr->instr = INSTR_MOVZX;
+        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
         index = get_index(opcode + 1, rex);
-        if (rex & 0x8) {
-            instr->op_size = LONG;
-            instr->operand[1] = mk_operand(QUAD, index, 0, REGISTER);
-        } else {
-            instr->op_size = WORD;
-            instr->operand[1] = mk_operand(LONG, index, 0, REGISTER);
-        }
-        instr->operand[0] = mk_operand(instr->op_size, 0, 0, MEMORY);
+        if (rex & 0x8)
+            instr->operand[0] = mk_operand(LONG, 0, 0, MEMORY);
+        else
+            instr->operand[0] = mk_operand(WORD, 0, 0, MEMORY);
+        instr->operand[1] = mk_operand(instr->op_size, index, 0, REGISTER);
+        return DECODE_success;
+
+    case 0xBE: /* movsx m8, r16/r32/r64 */
+        instr->instr = INSTR_MOVSX;
+        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        index = get_index(opcode + 1, rex);
+        instr->operand[0] = mk_operand(BYTE, 0, 0, MEMORY);
+        instr->operand[1] = mk_operand(instr->op_size, index, 0, REGISTER);
+        return DECODE_success;
+
+    case 0xBF: /* movsx m16, r32/r64 */
+        instr->instr = INSTR_MOVSX;
+        GET_OP_SIZE_FOR_NONEBYTE(instr->op_size);
+        index = get_index(opcode + 1, rex);
+        instr->operand[0] = mk_operand(WORD, 0, 0, MEMORY);
+        instr->operand[1] = mk_operand(instr->op_size, index, 0, REGISTER);
         return DECODE_success;
 
     case 0xA3: /* bt r32, m32 */
@@ -702,7 +716,7 @@ static void mmio_operands(int type, unsigned long gpa, struct instruction *inst,
         send_mmio_req(type, gpa, 1, inst->op_size, value, IOREQ_WRITE, 0);
     } else if (inst->operand[0] & MEMORY) { /* dest is register */
         /* send the request and wait for the value */
-        if (inst->instr == INSTR_MOVZ)
+        if ( (inst->instr == INSTR_MOVZX) || (inst->instr == INSTR_MOVSX) )
             send_mmio_req(type, gpa, 1, size_reg, 0, IOREQ_READ, 0);
         else
             send_mmio_req(type, gpa, 1, inst->op_size, 0, IOREQ_READ, 0);
@@ -827,7 +841,8 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         break;
     }
 
-    case INSTR_MOVZ:
+    case INSTR_MOVZX:
+    case INSTR_MOVSX:
         mmio_operands(IOREQ_TYPE_COPY, gpa, &mmio_inst, mmio_opp, regs);
         break;
 
