@@ -31,6 +31,8 @@
 #include <xen/trace.h>
 
 #define MFN_PINNED(_x) (frame_table[_x].u.inuse.type_info & PGT_pinned)
+#define va_to_l1mfn(_ed, _va) \
+    (l2e_get_pfn(linear_l2_table(_ed)[_va>>L2_PAGETABLE_SHIFT]))
 
 static void shadow_free_snapshot(struct domain *d,
                                  struct out_of_sync_entry *entry);

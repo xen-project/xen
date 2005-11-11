@@ -232,9 +232,6 @@ typedef struct { u64 pfn; } pagetable_t;
 #define linear_l3_table(_ed) ((_ed)->arch.guest_vl3table)
 #define linear_l4_table(_ed) ((_ed)->arch.guest_vl4table)
 
-#define va_to_l1mfn(_ed, _va) \
-    (l2e_get_pfn(linear_l2_table(_ed)[_va>>L2_PAGETABLE_SHIFT]))
-
 #ifndef __ASSEMBLY__
 #if CONFIG_PAGING_LEVELS == 3
 extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];

@@ -29,6 +29,15 @@
 #include <asm/shadow.h>
 #include <asm/shadow_ops.h>
 
+extern struct shadow_ops MODE_B_HANDLER;
+
+#if CONFIG_PAGING_LEVELS == 3
+#define L4_PAGETABLE_SHIFT      39
+#define L4_PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
+typedef struct { intpte_t l4; } l4_pgentry_t;
+#define is_guest_l4_slot(_s) (1)
+#endif
+
 #define READ_FAULT  0
 #define WRITE_FAULT 1
 
@@ -94,6 +103,11 @@ static inline int  table_offset_64(unsigned long va, int level)
             return  (((va) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1));
         case 3:
             return  (((va) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1));
+#if CONFIG_PAGING_LEVELS == 3
+        case 4:
+            return PAE_SHADOW_SELF_ENTRY;
+#endif
+
 #if CONFIG_PAGING_LEVELS >= 4
 #ifndef GUEST_PGENTRY_32
         case 4:
@@ -127,57 +141,73 @@ static inline void free_out_of_sync_state(struct domain *d)
     }
 }
 
-static inline pgentry_64_t *__entry(
-    struct vcpu *v, u64 va, u32 flag)
+static inline int __entry(
+    struct vcpu *v, u64 va, pgentry_64_t *e_p, u32 flag)
 {
     int i;
     pgentry_64_t *le_e;
-    pgentry_64_t *le_p;
+    pgentry_64_t *le_p = NULL;
     unsigned long mfn;
     int index;
     u32 level = flag & L_MASK;
     struct domain *d = v->domain;
+    int root_level;
 
-    index = table_offset_64(va, ROOT_LEVEL_64);
-    if (flag & SHADOW_ENTRY)
+    if ( flag & SHADOW_ENTRY )
+    {
+	root_level =  ROOT_LEVEL_64;
+	index = table_offset_64(va, root_level);
         le_e = (pgentry_64_t *)&v->arch.shadow_vtable[index];
-    else
+    }
+    else /* guest entry */  
+    {
+        root_level = v->domain->arch.ops->guest_paging_levels;
+	index = table_offset_64(va, root_level);
         le_e = (pgentry_64_t *)&v->arch.guest_vtable[index];
-
+    }
     /*
      * If it's not external mode, then mfn should be machine physical.
      */
-    for (i = ROOT_LEVEL_64 - level; i > 0; i--) {
-        if (unlikely(!(entry_get_flags(*le_e) & _PAGE_PRESENT)))
-            return NULL;
-        mfn = entry_get_value(*le_e) >> PAGE_SHIFT;
-        if ((flag & GUEST_ENTRY) && shadow_mode_translate(d))
+    for (i = root_level - level; i > 0; i--) {
+        if ( unlikely(!(entry_get_flags(*le_e) & _PAGE_PRESENT)) ) {
+            if ( le_p )
+                unmap_domain_page(le_p);
+            return 0;
+        }
+        mfn = entry_get_pfn(*le_e);
+        if ( (flag & GUEST_ENTRY) && shadow_mode_translate(d) )
             mfn = get_mfn_from_pfn(mfn);
-        le_p = (pgentry_64_t *)phys_to_virt(mfn << PAGE_SHIFT);
+        if ( le_p )
+            unmap_domain_page(le_p);
+        le_p = (pgentry_64_t *)map_domain_page(mfn);
         index = table_offset_64(va, (level + i - 1));
         le_e = &le_p[index];
-
     }
-    return le_e;
+
+    if ( flag & SET_ENTRY )
+        *le_e = *e_p;
+    else
+        *e_p = *le_e;
+
+    if ( le_p )
+        unmap_domain_page(le_p);
+
+    return 1;
 
 }
 
-static inline pgentry_64_t *__rw_entry(
-    struct vcpu *ed, u64 va, void *e_p, u32 flag)
+static inline int __rw_entry(
+    struct vcpu *v, u64 va, void *e_p, u32 flag)
 {
-    pgentry_64_t *le_e = __entry(ed, va, flag);
     pgentry_64_t *e = (pgentry_64_t *)e_p;
-    if (le_e == NULL)
-        return NULL;
 
     if (e) {
-        if (flag & SET_ENTRY)
-            *le_e = *e;
-        else
-            *e = *le_e;
+        return __entry(v, va, e, flag);
     }
-    return le_e;
+
+    return 0;
 }
+
 #define __shadow_set_l4e(v, va, value) \
   __rw_entry(v, va, value, SHADOW_ENTRY | SET_ENTRY | PAGING_L4)
 #define __shadow_get_l4e(v, va, sl4e) \
@@ -204,7 +234,7 @@ static inline pgentry_64_t *__rw_entry(
 #define __guest_get_l3e(v, va, sl3e) \
   __rw_entry(v, va, gl3e, GUEST_ENTRY | GET_ENTRY | PAGING_L3)
 
-static inline void *  __guest_set_l2e(
+static inline int  __guest_set_l2e(
     struct vcpu *v, u64 va, void *value, int size)
 {
     switch(size) {
@@ -216,21 +246,21 @@ static inline void *  __guest_set_l2e(
                 l2va = (l2_pgentry_32_t *)v->arch.guest_vtable;
                 if (value)
                     l2va[l2_table_offset_32(va)] = *(l2_pgentry_32_t *)value;
-                return &l2va[l2_table_offset_32(va)];
+                return 1;
             }
         case 8:
             return __rw_entry(v, va, value, GUEST_ENTRY | SET_ENTRY | PAGING_L2);
         default:
             BUG();
-            return NULL;
+            return 0;
     }
-    return NULL;
+    return 0;
 }
 
 #define __guest_set_l2e(v, va, value) \
-  ( __typeof__(value) )__guest_set_l2e(v, (u64)va, value, sizeof(*value))
+    __guest_set_l2e(v, (u64)va, value, sizeof(*value))
 
-static inline void * __guest_get_l2e(
+static inline int  __guest_get_l2e(
   struct vcpu *v, u64 va, void *gl2e, int size)
 {
     switch(size) {
@@ -241,21 +271,21 @@ static inline void * __guest_get_l2e(
                 l2va = (l2_pgentry_32_t *)v->arch.guest_vtable;
                 if (gl2e)
                     *(l2_pgentry_32_t *)gl2e = l2va[l2_table_offset_32(va)];
-                return &l2va[l2_table_offset_32(va)];
+                return 1;
             }
         case 8:
             return __rw_entry(v, va, gl2e, GUEST_ENTRY | GET_ENTRY | PAGING_L2);
         default:
             BUG();
-            return NULL;
+            return 0;
     }
-    return NULL;
+    return 0;
 }
 
 #define __guest_get_l2e(v, va, gl2e) \
-  (__typeof__ (gl2e))__guest_get_l2e(v, (u64)va, gl2e, sizeof(*gl2e))
+    __guest_get_l2e(v, (u64)va, gl2e, sizeof(*gl2e))
 
-static inline void *  __guest_set_l1e(
+static inline int  __guest_set_l1e(
   struct vcpu *v, u64 va, void *value, int size)
 {
     switch(size) {
@@ -267,34 +297,34 @@ static inline void *  __guest_set_l1e(
                 unsigned long l1mfn;
 
                 if (!__guest_get_l2e(v, va, &gl2e))
-                    return NULL;
+                    return 0;
                 if (unlikely(!(l2e_get_flags_32(gl2e) & _PAGE_PRESENT)))
-                    return NULL;
+                    return 0;
 
                 l1mfn = get_mfn_from_pfn(
                   l2e_get_pfn(gl2e));
 
-                l1va = (l1_pgentry_32_t *)
-                  phys_to_virt(l1mfn << L1_PAGETABLE_SHIFT);
+                l1va = (l1_pgentry_32_t *)map_domain_page(l1mfn);
                 if (value)
                     l1va[l1_table_offset_32(va)] = *(l1_pgentry_32_t *)value;
+                unmap_domain_page(l1va);
 
-                return &l1va[l1_table_offset_32(va)];
+                return 1;
             }
 
         case 8:
             return __rw_entry(v, va, value, GUEST_ENTRY | SET_ENTRY | PAGING_L1);
         default:
             BUG();
-            return NULL;
+            return 0;
     }
-    return NULL;
+    return 0;
 }
 
 #define __guest_set_l1e(v, va, value) \
-  ( __typeof__(value) )__guest_set_l1e(v, (u64)va, value, sizeof(*value))
+     __guest_set_l1e(v, (u64)va, value, sizeof(*value))
 
-static inline void *  __guest_get_l1e(
+static inline int  __guest_get_l1e(
   struct vcpu *v, u64 va, void *gl1e, int size)
 {
     switch(size) {
@@ -306,34 +336,33 @@ static inline void *  __guest_get_l1e(
                 unsigned long l1mfn;
 
                 if (!(__guest_get_l2e(v, va, &gl2e)))
-                    return NULL;
+                    return 0;
 
 
                 if (unlikely(!(l2e_get_flags_32(gl2e) & _PAGE_PRESENT)))
-                    return NULL;
+                    return 0;
 
 
                 l1mfn = get_mfn_from_pfn(
                   l2e_get_pfn(gl2e));
-                l1va = (l1_pgentry_32_t *) phys_to_virt(
-                  l1mfn << L1_PAGETABLE_SHIFT);
+                l1va = (l1_pgentry_32_t *) map_domain_page(l1mfn);
                 if (gl1e)
                     *(l1_pgentry_32_t *)gl1e = l1va[l1_table_offset_32(va)];
-
-                return &l1va[l1_table_offset_32(va)];
+                unmap_domain_page(l1va);
+                return 1;
             }
         case 8:
             // 64-bit guest
             return __rw_entry(v, va, gl1e, GUEST_ENTRY | GET_ENTRY | PAGING_L1);
         default:
             BUG();
-            return NULL;
+            return 0;
     }
-    return NULL;
+    return 0;
 }
 
 #define __guest_get_l1e(v, va, gl1e) \
-  ( __typeof__(gl1e) )__guest_get_l1e(v, (u64)va, gl1e, sizeof(*gl1e))
+    __guest_get_l1e(v, (u64)va, gl1e, sizeof(*gl1e))
 
 static inline void entry_general(
   struct domain *d,
@@ -365,10 +394,16 @@ static inline void entry_general(
                 unmap_domain_page(l1_p);
             }
         } else {
-            sle = entry_from_pfn(
-                smfn,
-                (entry_get_flags(gle) | _PAGE_RW | _PAGE_ACCESSED) & ~_PAGE_AVAIL);
-            entry_add_flags(gle, _PAGE_ACCESSED);
+            if (d->arch.ops->guest_paging_levels <= PAGING_L3
+                    && level == PAGING_L3) {
+                sle = entry_from_pfn(smfn, entry_get_flags(gle));
+            } else {
+
+                sle = entry_from_pfn(
+                  smfn,
+                  (entry_get_flags(gle) | _PAGE_RW | _PAGE_ACCESSED) & ~_PAGE_AVAIL);
+                entry_add_flags(gle, _PAGE_ACCESSED);
+            }
         }
         // XXX mafetter: Hmm...
         //     Shouldn't the dirty log be checked/updated here?
@@ -392,7 +427,7 @@ static inline void entry_propagate_from_guest(
 
     if ( entry_get_flags(gle) & _PAGE_PRESENT ) {
         if ((entry_get_flags(gle) & _PAGE_PSE) && level == PAGING_L2) {
-            smfn =  __shadow_status(d, entry_get_value(gle) >> PAGE_SHIFT, PGT_fl1_shadow);
+            smfn =  __shadow_status(d, entry_get_pfn(gle), PGT_fl1_shadow);
         } else {
             smfn =  __shadow_status(d, entry_get_pfn(gle), 
               shadow_level_to_type((level -1 )));
