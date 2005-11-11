@@ -20,9 +20,9 @@
 #
 # Vars:
 #
-# vifnum     Virtual device number to use (default 0). Numbers >=1
+# vifnum     Virtual device number to use (default 0). Numbers >=8
 #            require the netback driver to have nloopbacks set to a
-#            higher value than its default of 1.
+#            higher value than its default of 8.
 # bridge     The bridge to use (default xenbr${vifnum}).
 # netdev     The interface to add to the bridge (default eth${vifnum}).
 # antispoof  Whether to use iptables to prevent spoofing (default no).

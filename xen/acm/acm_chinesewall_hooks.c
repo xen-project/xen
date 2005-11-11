@@ -117,8 +117,7 @@ static int chwall_init_domain_ssid(void **chwall_ssid, ssidref_t ssidref)
 static void chwall_free_domain_ssid(void *chwall_ssid)
 {
     traceprintk("%s.\n", __func__);
-    if (chwall_ssid != NULL)
-        xfree(chwall_ssid);
+    xfree(chwall_ssid);
     return;
 }
 
@@ -344,14 +343,10 @@ static int chwall_set_policy(u8 * buf, u32 buf_size)
     chwall_bin_pol.max_types = chwall_buf->chwall_max_types;
     chwall_bin_pol.max_ssidrefs = chwall_buf->chwall_max_ssidrefs;
     chwall_bin_pol.max_conflictsets = chwall_buf->chwall_max_conflictsets;
-    if (chwall_bin_pol.ssidrefs != NULL)
-        xfree(chwall_bin_pol.ssidrefs);
-    if (chwall_bin_pol.conflict_aggregate_set != NULL)
-        xfree(chwall_bin_pol.conflict_aggregate_set);
-    if (chwall_bin_pol.running_types != NULL)
-        xfree(chwall_bin_pol.running_types);
-    if (chwall_bin_pol.conflict_sets != NULL)
-        xfree(chwall_bin_pol.conflict_sets);
+    xfree(chwall_bin_pol.ssidrefs);
+    xfree(chwall_bin_pol.conflict_aggregate_set);
+    xfree(chwall_bin_pol.running_types);
+    xfree(chwall_bin_pol.conflict_sets);
     chwall_bin_pol.ssidrefs = ssids;
     chwall_bin_pol.conflict_aggregate_set = conflict_aggregate_set;
     chwall_bin_pol.running_types = running_types;
@@ -360,14 +355,10 @@ static int chwall_set_policy(u8 * buf, u32 buf_size)
 
  error_free:
     printk("%s: ERROR setting policy.\n", __func__);
-    if (ssids != NULL)
-        xfree(ssids);
-    if (conflict_sets != NULL)
-        xfree(conflict_sets);
-    if (running_types != NULL)
-        xfree(running_types);
-    if (conflict_aggregate_set != NULL)
-        xfree(conflict_aggregate_set);
+    xfree(ssids);
+    xfree(conflict_sets);
+    xfree(running_types);
+    xfree(conflict_aggregate_set);
     return -EFAULT;
 }
 

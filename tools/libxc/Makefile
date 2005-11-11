@@ -102,6 +102,7 @@ install: build
 	$(INSTALL_DATA) libxenguest.a $(DESTDIR)/usr/$(LIBDIR)
 	ln -sf libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/$(LIBDIR)/libxenguest.so.$(MAJOR)
 	ln -sf libxenguest.so.$(MAJOR) $(DESTDIR)/usr/$(LIBDIR)/libxenguest.so
+	$(INSTALL_DATA) xenguest.h $(DESTDIR)/usr/include
 
 .PHONY: TAGS clean rpm install all
 

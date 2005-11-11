@@ -167,9 +167,7 @@ static void inline
 packet_free(struct packet *pak)
 {
 	del_singleshot_timer_sync(&pak->processing_timer);
-	if (pak->data_buffer) {
-		kfree(pak->data_buffer);
-	}
+	kfree(pak->data_buffer);
 	/*
 	 * cannot do tpmif_put(pak->tpmif); bad things happen
 	 * on the last tpmif_put()

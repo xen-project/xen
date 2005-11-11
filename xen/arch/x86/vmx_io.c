@@ -459,14 +459,56 @@ static void vmx_mmio_assist(struct cpu_user_regs *regs, ioreq_t *p,
         }
         break;
 
-    case INSTR_MOVZ:
+    case INSTR_MOVZX:
         if (dst & REGISTER) {
-            index = operand_index(dst);
             switch (size) {
-            case BYTE: p->u.data = p->u.data & 0xFFULL; break;
-            case WORD: p->u.data = p->u.data & 0xFFFFULL; break;
-            case LONG: p->u.data = p->u.data & 0xFFFFFFFFULL; break;
+            case BYTE:
+                p->u.data &= 0xFFULL;
+                break;
+
+            case WORD:
+                p->u.data &= 0xFFFFULL;
+                break;
+
+            case LONG:
+                p->u.data &= 0xFFFFFFFFULL;
+                break;
+
+            default:
+                printk("Impossible source operand size of movzx instr: %d\n", size);
+                domain_crash_synchronous();
             }
+            index = operand_index(dst);
+            set_reg_value(operand_size(dst), index, 0, regs, p->u.data);
+        }
+        break;
+
+    case INSTR_MOVSX:
+        if (dst & REGISTER) {
+            switch (size) {
+            case BYTE:
+                p->u.data &= 0xFFULL;
+                if ( p->u.data & 0x80ULL )
+                    p->u.data |= 0xFFFFFFFFFFFFFF00ULL;
+                break;
+
+            case WORD:
+                p->u.data &= 0xFFFFULL;
+                if ( p->u.data & 0x8000ULL )
+                    p->u.data |= 0xFFFFFFFFFFFF0000ULL;
+                break;
+
+            case LONG:
+                p->u.data &= 0xFFFFFFFFULL;
+                if ( p->u.data & 0x80000000ULL )
+                    p->u.data |= 0xFFFFFFFF00000000ULL;
+                break;
+
+            default:
+                printk("Impossible source operand size of movsx instr: %d\n", size);
+                domain_crash_synchronous();
+            }
+            index = operand_index(dst);
             set_reg_value(operand_size(dst), index, 0, regs, p->u.data);
         }
         break;

@@ -130,8 +130,7 @@ static void
 ste_free_domain_ssid(void *ste_ssid)
 {
     traceprintk("%s.\n", __func__);
-    if (ste_ssid != NULL)
-        xfree(ste_ssid);
+    xfree(ste_ssid);
     return;
 }
 
@@ -320,8 +319,7 @@ ste_set_policy(u8 *buf, u32 buf_size)
     /* 3. replace old policy (activate new policy) */
     ste_bin_pol.max_types = ste_buf->ste_max_types;
     ste_bin_pol.max_ssidrefs = ste_buf->ste_max_ssidrefs;
-    if (ste_bin_pol.ssidrefs) 
-        xfree(ste_bin_pol.ssidrefs);
+    xfree(ste_bin_pol.ssidrefs);
     ste_bin_pol.ssidrefs = (domaintype_t *)ssidrefsbuf;
 
     /* clear all ste caches */
@@ -338,7 +336,7 @@ ste_set_policy(u8 *buf, u32 buf_size)
 
  error_free:
     printk("%s: ERROR setting policy.\n", __func__);
-    if (ssidrefsbuf != NULL) xfree(ssidrefsbuf);
+    xfree(ssidrefsbuf);
     return -EFAULT;
 }
 

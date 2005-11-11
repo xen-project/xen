@@ -567,7 +567,9 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
 
     if ( len != 4) {
         /* some bugs on kernel cause read this with byte*/
-        printk("Local APIC read with len = %lx, should be 4 instead\n", len);
+        VMX_DBG_LOG(DBG_LEVEL_VLAPIC,
+                    "Local APIC read with len = %lx, should be 4 instead\n",
+                    len);
     }
 
     alignment = offset & 0x3;

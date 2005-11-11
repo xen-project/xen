@@ -387,8 +387,7 @@ abort_transaction:
 destroy_tpmring:
 	destroy_tpmring(info, &my_private);
 out:
-	if (backend)
-		kfree(backend);
+	kfree(backend);
 	return err;
 }
 

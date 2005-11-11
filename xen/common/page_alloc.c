@@ -470,6 +470,9 @@ void free_xenheap_pages(void *v, unsigned int order)
 {
     unsigned long flags;
 
+    if ( v == NULL )
+        return;
+
     memguard_guard_range(v, 1 << (order + PAGE_SHIFT));    
 
     local_irq_save(flags);

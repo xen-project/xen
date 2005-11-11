@@ -97,9 +97,7 @@ static inline unsigned char *
 transmission_set_buffer(struct transmission *t,
                         unsigned char *buffer, unsigned int len)
 {
-	if (NULL != t->request) {
-		kfree(t->request);
-	}
+	kfree(t->request);
 	t->request = kmalloc(len, GFP_KERNEL);
 	if (t->request) {
 		memcpy(t->request,
@@ -113,12 +111,8 @@ transmission_set_buffer(struct transmission *t,
 static inline void
 transmission_free(struct transmission *t)
 {
-	if (t->request) {
-		kfree(t->request);
-	}
-	if (t->rcv_buffer) {
-		kfree(t->rcv_buffer);
-	}
+	kfree(t->request);
+	kfree(t->rcv_buffer);
 	kfree(t);
 }
 

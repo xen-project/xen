@@ -1,0 +1,85 @@
+\chapter{Securing Xen}
+
+This chapter describes how to secure a Xen system. It describes a number
+of scenarios and provides a corresponding set of best practices. It
+begins with a section devoted to understanding the security implications
+of a Xen system.
+
+
+\section{Xen Security Considerations}
+
+When deploying a Xen system, one must be sure to secure the management
+domain (Domain-0) as much as possible. If the management domain is
+compromised, all other domains are also vulnerable. The following are a
+set of best practices for Domain-0:
+
+\begin{enumerate}
+\item \textbf{Run the smallest number of necessary services.} The less
+  things that are present in a management partition, the better.
+  Remember, a service running as root in the management domain has full
+  access to all other domains on the system.
+\item \textbf{Use a firewall to restrict the traffic to the management
+    domain.} A firewall with default-reject rules will help prevent
+  attacks on the management domain.
+\item \textbf{Do not allow users to access Domain-0.} The Linux kernel
+  has been known to have local-user root exploits. If you allow normal
+  users to access Domain-0 (even as unprivileged users) you run the risk
+  of a kernel exploit making all of your domains vulnerable.
+\end{enumerate}
+
+\section{Security Scenarios}
+
+
+\subsection{The Isolated Management Network}
+
+In this scenario, each node has two network cards in the cluster. One
+network card is connected to the outside world and one network card is a
+physically isolated management network specifically for Xen instances to
+use.
+
+As long as all of the management partitions are trusted equally, this is
+the most secure scenario. No additional configuration is needed other
+than forcing Xend to bind to the management interface for relocation.
+
+\textbf{FIXME:} What is the option to allow for this?
+
+
+\subsection{A Subnet Behind a Firewall}
+
+In this scenario, each node has only one network card but the entire
+cluster sits behind a firewall. This firewall should do at least the
+following:
+
+\begin{enumerate}
+\item Prevent IP spoofing from outside of the subnet.
+\item Prevent access to the relocation port of any of the nodes in the
+  cluster except from within the cluster.
+\end{enumerate}
+
+The following iptables rules can be used on each node to prevent
+migrations to that node from outside the subnet assuming the main
+firewall does not do this for you:
+
+\begin{verbatim}
+# this command disables all access to the Xen relocation
+# port:
+iptables -A INPUT -p tcp --destination-port 8002 -j REJECT
+
+# this command enables Xen relocations only from the specific
+# subnet:
+iptables -I INPUT -p tcp -{}-source 192.168.1.1/8 \
+    --destination-port 8002 -j ACCEPT
+\end{verbatim}
+
+\subsection{Nodes on an Untrusted Subnet}
+
+Migration on an untrusted subnet is not safe in current versions of Xen.
+It may be possible to perform migrations through a secure tunnel via an
+VPN or SSH. The only safe option in the absence of a secure tunnel is to
+disable migration completely. The easiest way to do this is with
+iptables:
+
+\begin{verbatim}
+# this command disables all access to the Xen relocation port
+iptables -A INPUT -p tcp -{}-destination-port 8002 -j REJECT
+\end{verbatim}

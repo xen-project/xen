@@ -339,10 +339,8 @@ static int backend_remove(struct xs_handle *h, struct backend_info *be)
     /* Free everything else. */
     if (be->blkif)
         free_blkif(be->blkif);
-    if (be->frontpath)
-        free(be->frontpath);
-    if (be->backpath)
-        free(be->backpath);
+    free(be->frontpath);
+    free(be->backpath);
     free(be);
     return 0;
 }
@@ -406,8 +404,7 @@ static void frontend_changed(struct xs_handle *h, struct xenbus_watch *w,
     return;
 
  fail:
-    if (fepath)
-        free(fepath);
+    free(fepath);
 }
 
 
@@ -460,9 +457,7 @@ static void backend_changed(struct xs_handle *h, struct xenbus_watch *w,
     }
 
  fail:
-    if (path)
-        free(path);
-
+    free(path);
 }
 
 static void blkback_probe(struct xs_handle *h, struct xenbus_watch *w, 
@@ -537,12 +532,10 @@ static void blkback_probe(struct xs_handle *h, struct xenbus_watch *w,
 	return;
 
  free_be:
-	if ((be) && (be->backend_watch.node))
+	if (be && (be->backend_watch.node))
             unregister_xenbus_watch(h, &be->backend_watch);
-	if (frontend)
-            free(frontend);
-        if (bepath)
-            free(bepath);
+        free(frontend);
+        free(bepath);
 	free(be);
 	return;
 }

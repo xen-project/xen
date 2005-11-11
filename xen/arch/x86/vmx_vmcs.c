@@ -564,19 +564,14 @@ err_out:
 
 void destroy_vmcs(struct arch_vmx_struct *arch_vmx)
 {
-    if(arch_vmx->vmcs != NULL)
-        free_vmcs(arch_vmx->vmcs);
-    if(arch_vmx->io_bitmap_a != 0) {
-        free_xenheap_pages(
-            arch_vmx->io_bitmap_a, get_order_from_bytes(0x1000));
-        arch_vmx->io_bitmap_a = 0;
-    }
-    if(arch_vmx->io_bitmap_b != 0) {
-        free_xenheap_pages(
-            arch_vmx->io_bitmap_b, get_order_from_bytes(0x1000));
-        arch_vmx->io_bitmap_b = 0;
-    }
-    arch_vmx->vmcs = 0;
+    free_vmcs(arch_vmx->vmcs);
+    arch_vmx->vmcs = NULL;
+
+    free_xenheap_pages(arch_vmx->io_bitmap_a, get_order_from_bytes(0x1000));
+    arch_vmx->io_bitmap_a = NULL;
+
+    free_xenheap_pages(arch_vmx->io_bitmap_b, get_order_from_bytes(0x1000));
+    arch_vmx->io_bitmap_b = NULL;
 }
 
 /*

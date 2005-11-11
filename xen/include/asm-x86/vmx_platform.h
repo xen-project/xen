@@ -55,17 +55,18 @@
 #define REPNZ   0x2
 #define OVERLAP 0x4
 
-#define INSTR_PIO 1
-#define INSTR_OR 2
-#define INSTR_AND 3
-#define INSTR_XOR 4
-#define INSTR_CMP 5
-#define INSTR_MOV 6
-#define INSTR_MOVS 7
-#define INSTR_MOVZ 8
-#define INSTR_STOS 9
-#define INSTR_TEST 10
-#define INSTR_BT 11
+#define INSTR_PIO   1
+#define INSTR_OR    2
+#define INSTR_AND   3
+#define INSTR_XOR   4
+#define INSTR_CMP   5
+#define INSTR_MOV   6
+#define INSTR_MOVS  7
+#define INSTR_MOVZX 8
+#define INSTR_MOVSX 9
+#define INSTR_STOS  10
+#define INSTR_TEST  11
+#define INSTR_BT    12
 
 struct instruction {
     __s8    instr; /* instruction type */

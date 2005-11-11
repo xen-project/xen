@@ -75,6 +75,11 @@ config XEN_BLKDEV_GRANT
 	bool
 	default y
 
+config XEN_BLKDEV_FRONTEND
+	depends on XEN
+	bool
+	default y
+
 config SCHED_NO_NO_OMIT_FRAME_POINTER
 	bool
 	default y

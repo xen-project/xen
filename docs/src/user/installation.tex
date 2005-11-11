@@ -17,7 +17,7 @@ want to run more than one virtual machine; items marked `$*$' are only
 required if you wish to build from source.
 \begin{itemize}
 \item A working Linux distribution using the GRUB bootloader and
-  running on a P6-class (or newer) CPU.
+  running on a P6-class or newer CPU\@.
 \item [$\dag$] The \path{iproute2} package.
 \item [$\dag$] The Linux bridge-utils\footnote{Available from {\tt
       http://bridge.sourceforge.net}} (e.g., \path{/sbin/brctl})
@@ -30,29 +30,29 @@ required if you wish to build from source.
   alternatively it can be installed by running `{\sl make
     install-twisted}' in the root of the Xen source tree.
 \item [$*$] Build tools (gcc v3.2.x or v3.3.x, binutils, GNU make).
-\item [$*$] Development installation of libcurl (e.g., libcurl-devel)
-\item [$*$] Development installation of zlib (e.g., zlib-dev).
-\item [$*$] Development installation of Python v2.2 or later (e.g.,
+\item [$*$] Development installation of libcurl (e.g.,\ libcurl-devel).
+\item [$*$] Development installation of zlib (e.g.,\ zlib-dev).
+\item [$*$] Development installation of Python v2.2 or later (e.g.,\ 
   python-dev).
 \item [$*$] \LaTeX\ and transfig are required to build the
   documentation.
 \end{itemize}
 
-Once you have satisfied the relevant prerequisites, you can now
-install either a binary or source distribution of Xen.
+Once you have satisfied these prerequisites, you can now install
+either a binary or source distribution of Xen.
 
 
 \section{Installing from Binary Tarball}
 
 Pre-built tarballs are available for download from the Xen download
-page
-\begin{quote} {\tt http://xen.sf.net}
+page:
+\begin{quote} {\tt http://www.xensource.com/downloads/}
 \end{quote}
 
 Once you've downloaded the tarball, simply unpack and install:
 \begin{verbatim}
-# tar zxvf xen-2.0-install.tgz
-# cd xen-2.0-install
+# tar zxvf xen-3.0-install.tgz
+# cd xen-3.0-install
 # sh ./install.sh
 \end{verbatim}
 
@@ -62,48 +62,29 @@ as described in Section~\ref{s:configure}.
 
 \section{Installing from Source}
 
-This section describes how to obtain, build, and install Xen from
+This section describes how to obtain, build and install Xen from
 source.
 
 \subsection{Obtaining the Source}
 
-The Xen source tree is available as either a compressed source tar
-ball or as a clone of our master BitKeeper repository.
+The Xen source tree is available as either a compressed source tarball
+or as a clone of our master Mercurial repository.
 
 \begin{description}
 \item[Obtaining the Source Tarball]\mbox{} \\
-  Stable versions (and daily snapshots) of the Xen source tree are
-  available as compressed tarballs from the Xen download page
-  \begin{quote} {\tt http://xen.sf.net}
+  Stable versions and daily snapshots of the Xen source tree are
+  available from the Xen download page:
+  \begin{quote} {\tt \tt http://www.xensource.com/downloads/}
   \end{quote}
-
-\item[Using BitKeeper]\mbox{} \\
-  If you wish to install Xen from a clone of our latest BitKeeper
-  repository then you will need to install the BitKeeper tools.
-  Download instructions for BitKeeper can be obtained by filling out
-  the form at:
-  \begin{quote} {\tt http://www.bitmover.com/cgi-bin/download.cgi}
-\end{quote}
-The public master BK repository for the 2.0 release lives at:
-\begin{quote} {\tt bk://xen.bkbits.net/xen-2.0.bk}
-\end{quote} 
-You can use BitKeeper to download it and keep it updated with the
-latest features and fixes.
-
-Change to the directory in which you want to put the source code, then
-run:
-\begin{verbatim}
-# bk clone bk://xen.bkbits.net/xen-2.0.bk
-\end{verbatim}
-
-Under your current directory, a new directory named \path{xen-2.0.bk}
-has been created, which contains all the source code for Xen, the OS
-ports, and the control tools. You can update your repository with the
-latest changes at any time by running:
-\begin{verbatim}
-# cd xen-2.0.bk # to change into the local repository
-# bk pull       # to update the repository
-\end{verbatim}
+\item[Obtaining the source via Mercurial]\mbox{} \\
+  The source tree may also be obtained via the public Mercurial
+  repository hosted at:
+  \begin{quote}{\tt http://xenbits.xensource.com}.
+  \end{quote} See the instructions and the Getting Started Guide
+  referenced at:
+  \begin{quote}
+    {\tt http://www.xensource.com/downloads/}.
+  \end{quote}
 \end{description}
 
 % \section{The distribution}
@@ -124,7 +105,7 @@ latest changes at any time by running:
 
 \subsection{Building from Source}
 
-The top-level Xen Makefile includes a target `world' that will do the
+The top-level Xen Makefile includes a target ``world'' that will do the
 following:
 
 \begin{itemize}
@@ -132,17 +113,17 @@ following:
 \item Build the control tools, including \xend.
 \item Download (if necessary) and unpack the Linux 2.6 source code,
   and patch it for use with Xen.
-\item Build a Linux kernel to use in domain 0 and a smaller
+\item Build a Linux kernel to use in domain~0 and a smaller
   unprivileged kernel, which can optionally be used for unprivileged
   virtual machines.
 \end{itemize}
 
 After the build has completed you should have a top-level directory
-called \path{dist/} in which all resulting targets will be placed; of
-particular interest are the two kernels XenLinux kernel images, one
-with a `-xen0' extension which contains hardware device drivers and
-drivers for Xen's virtual devices, and one with a `-xenU' extension
-that just contains the virtual ones. These are found in
+called \path{dist/} in which all resulting targets will be placed. Of
+particular interest are the two XenLinux kernel images, one with a
+``-xen0'' extension which contains hardware device drivers and drivers
+for Xen's virtual devices, and one with a ``-xenU'' extension that
+just contains the virtual ones. These are found in
 \path{dist/install/boot/} along with the image for Xen itself and the
 configuration files used during the build.
 
@@ -150,17 +131,15 @@ The NetBSD port can be built using:
 \begin{quote}
 \begin{verbatim}
 # make netbsd20
-\end{verbatim}
-\end{quote}
+\end{verbatim}\end{quote}
 NetBSD port is built using a snapshot of the netbsd-2-0 cvs branch.
-The snapshot is downloaded as part of the build process, if it is not
+The snapshot is downloaded as part of the build process if it is not
 yet present in the \path{NETBSD\_SRC\_PATH} search path.  The build
-process also downloads a toolchain which includes all the tools
+process also downloads a toolchain which includes all of the tools
 necessary to build the NetBSD kernel under Linux.
 
-To customize further the set of kernels built you need to edit the
-top-level Makefile. Look for the line:
-
+To customize the set of kernels built you need to edit the top-level
+Makefile. Look for the line:
 \begin{quote}
 \begin{verbatim}
 KERNELS ?= mk.linux-2.6-xen0 mk.linux-2.6-xenU
@@ -189,7 +168,6 @@ kernel containing only virtual device drivers.
 %% After untaring the pristine kernel tree, the makefile uses the {\tt
 %%   mkbuildtree} script to add the Xen patches to the kernel.
 
-
 %% \framebox{\parbox{5in}{
 %%     {\bf Distro specific:} \\
 %%     {\it Gentoo} --- if not using udev (most installations,
@@ -201,7 +179,7 @@ kernel containing only virtual device drivers.
 % If you have an SMP machine you may wish to give the {\tt '-j4'}
 % argument to make to get a parallel build.
 
-If you wish to build a customized XenLinux kernel (e.g. to support
+If you wish to build a customized XenLinux kernel (e.g.\ to support
 additional devices or enable distribution-required features), you can
 use the standard Linux configuration mechanisms, specifying that the
 architecture being built for is \path{xen}, e.g:
@@ -215,21 +193,21 @@ architecture being built for is \path{xen}, e.g:
 \end{quote}
 
 You can also copy an existing Linux configuration (\path{.config})
-into \path{linux-2.6.11-xen0} and execute:
+into e.g.\ \path{linux-2.6.11-xen0} and execute:
 \begin{quote}
 \begin{verbatim}
 # make ARCH=xen oldconfig
 \end{verbatim}
 \end{quote}
 
-You may be prompted with some Xen-specific options; we advise
+You may be prompted with some Xen-specific options. We advise
 accepting the defaults for these options.
 
-Note that the only difference between the two types of Linux kernel
-that are built is the configuration file used for each.  The `U'
+Note that the only difference between the two types of Linux kernels
+that are built is the configuration file used for each.  The ``U''
 suffixed (unprivileged) versions don't contain any of the physical
 hardware device drivers, leading to a 30\% reduction in size; hence
-you may prefer these for your non-privileged domains.  The `0'
+you may prefer these for your non-privileged domains.  The ``0''
 suffixed privileged versions can be used to boot the system, as well
 as in driver domains and unprivileged domains.
 
@@ -259,10 +237,10 @@ destinations.
 
 The \path{dist/install/boot} directory will also contain the config
 files used for building the XenLinux kernels, and also versions of Xen
-and XenLinux kernels that contain debug symbols (\path{xen-syms-2.0.6}
-and \path{vmlinux-syms-2.6.11.11-xen0}) which are essential for
-interpreting crash dumps.  Retain these files as the developers may
-wish to see them if you post on the mailing list.
+and XenLinux kernels that contain debug symbols such as
+(\path{xen-syms-2.0.6} and \path{vmlinux-syms-2.6.11.11-xen0}) which
+are essential for interpreting crash dumps.  Retain these files as the
+developers may wish to see them if you post on the mailing list.
 
 
 \section{Configuration}
@@ -280,23 +258,23 @@ distribution.  The entry should look something like the following:
 
 {\small
 \begin{verbatim}
-title Xen 2.0 / XenLinux 2.6
-  kernel /boot/xen-2.0.gz dom0_mem=131072
+title Xen 3.0 / XenLinux 2.6
+  kernel /boot/xen-3.0.gz dom0_mem=131072
   module /boot/vmlinuz-2.6-xen0 root=/dev/sda4 ro console=tty0
 \end{verbatim}
 }
 
 The kernel line tells GRUB where to find Xen itself and what boot
-parameters should be passed to it (in this case, setting domain 0's
+parameters should be passed to it (in this case, setting the domain~0
 memory allocation in kilobytes and the settings for the serial port).
 For more details on the various Xen boot parameters see
 Section~\ref{s:xboot}.
 
 The module line of the configuration describes the location of the
 XenLinux kernel that Xen should start and the parameters that should
-be passed to it (these are standard Linux parameters, identifying the
+be passed to it. Tthese are standard Linux parameters, identifying the
 root device and specifying it be initially mounted read only and
-instructing that console output be sent to the screen).  Some
+instructing that console output be sent to the screen. Some
 distributions such as SuSE do not require the \path{ro} parameter.
 
 %% \framebox{\parbox{5in}{
@@ -307,24 +285,21 @@ distributions such as SuSE do not require the \path{ro} parameter.
 
 
 If you want to use an initrd, just add another \path{module} line to
-the configuration, as usual:
-
+the configuration, like:
 {\small
 \begin{verbatim}
   module /boot/my_initrd.gz
 \end{verbatim}
 }
 
-As always when installing a new kernel, it is recommended that you do
-not delete existing menu options from \path{menu.lst} --- you may want
-to boot your old Linux kernel in future, particularly if you have
-problems.
+When installing a new kernel, it is recommended that you do not delete
+existing menu options from \path{menu.lst}, as you may wish to boot
+your old Linux kernel in future, particularly if you have problems.
 
 \subsection{Serial Console (optional)}
 
 %% kernel /boot/xen-2.0.gz dom0_mem=131072 com1=115200,8n1
 %% module /boot/vmlinuz-2.6-xen0 root=/dev/sda4 ro
-
 
 In order to configure Xen serial console output, it is necessary to
 add an boot option to your GRUB config; e.g.\ replace the above kernel
@@ -343,24 +318,23 @@ One can also configure XenLinux to share the serial console; to
 achieve this append ``\path{console=ttyS0}'' to your module line.
 
 If you wish to be able to log in over the XenLinux serial console it
-is necessary to add a line into \path{/etc/inittab}, just as per
-regular Linux. Simply add the line:
+is necessary to add a line into \path{/etc/inittab}. Add the line:
 \begin{quote} {\small {\tt c:2345:respawn:/sbin/mingetty ttyS0}}
 \end{quote}
 
-and you should be able to log in. Note that to successfully log in as
-root over the serial line will require adding \path{ttyS0} to
-\path{/etc/securetty} in most modern distributions.
+and you should be able to log in. To successfully log in as root over
+the serial line will require adding \path{ttyS0} to
+\path{/etc/securetty} if it is not already there.
 
 \subsection{TLS Libraries}
 
 Users of the XenLinux 2.6 kernel should disable Thread Local Storage
-(e.g.\ by doing a \path{mv /lib/tls /lib/tls.disabled}) before
-attempting to run with a XenLinux kernel\footnote{If you boot without
+(TLS) (e.g.\ by doing a \path{mv /lib/tls /lib/tls.disabled}) before
+attempting to boot a XenLinux kernel\footnote{If you boot without
   first disabling TLS, you will get a warning message during the boot
   process. In this case, simply perform the rename after the machine
   is up and then run \texttt{/sbin/ldconfig} to make it take effect.}.
-You can always reenable it by restoring the directory to its original
+You can always reenable TLS by restoring the directory to its original
 location (i.e.\ \path{mv /lib/tls.disabled /lib/tls}).
 
 The reason for this is that the current TLS implementation uses
@@ -369,19 +343,19 @@ not disabled, an emulation mode is used within Xen which reduces
 performance substantially.
 
 We hope that this issue can be resolved by working with Linux
-distribution vendors to implement a minor backward-compatible change
+distributions to implement a minor backward-compatible change
 to the TLS library.
 
 
 \section{Booting Xen}
 
 It should now be possible to restart the system and use Xen.  Reboot
-as usual but choose the new Xen option when the Grub screen appears.
+and choose the new Xen option when the Grub screen appears.
 
 What follows should look much like a conventional Linux boot.  The
 first portion of the output comes from Xen itself, supplying low level
-information about itself and the machine it is running on.  The
-following portion of the output comes from XenLinux.
+information about itself and the underlying hardware.  The last
+portion of the output comes from XenLinux.
 
 You may see some errors during the XenLinux boot.  These are not
 necessarily anything to worry about --- they may result from kernel
@@ -389,5 +363,5 @@ configuration differences between your XenLinux kernel and the one you
 usually use.
 
 When the boot completes, you should be able to log into your system as
-usual.  If you are unable to log in to your system running Xen, you
-should still be able to reboot with your normal Linux kernel.
+usual.  If you are unable to log in, you should still be able to
+reboot with your normal Linux kernel.

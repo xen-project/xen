@@ -715,7 +715,7 @@ static void write_cb(struct io_ret r, void *param)
         r.u.i  = -1;
         /* free any saved node vals. */
         for (i=0; i<3; i++)
-            if (req->radix[i] != 0) free(req->radix[i]);
+            free(req->radix[i]);
         free(req);
         cb(r, req_param);
     }

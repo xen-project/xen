@@ -51,6 +51,12 @@ static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 	blkif->shmem_ref = shared_page;
 	blkif->shmem_handle = op.handle;
 
+#ifdef __ia64__
+	/* on some arch's, map_grant_ref behaves like mmap, in that the
+	 * passed address is a hint and a different address may be returned */
+	blkif->blk_ring_area->addr = gnttab_map_vaddr(op);
+#endif
+
 	return 0;
 }
 

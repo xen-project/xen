@@ -1348,8 +1348,7 @@ grant_table_create(
     if ( t != NULL )
     {
         xfree(t->active);
-        if ( t->maptrack != NULL )
-            free_xenheap_page(t->maptrack);
+        free_xenheap_page(t->maptrack);
         xfree(t);
     }
     return -ENOMEM;

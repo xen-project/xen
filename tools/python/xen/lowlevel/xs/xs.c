@@ -114,8 +114,7 @@ static PyObject *xspy_read(PyObject *self, PyObject *args, PyObject *kwds)
     }
     val = PyString_FromStringAndSize(xsval, xsval_n);
  exit:
-    if (xsval)
-        free(xsval);
+    free(xsval);
     return val;
 }
 
@@ -427,8 +426,7 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
     val = Py_None;
  exit:
     Py_XDECREF(tuple0);
-    if (xsperms)
-        free(xsperms);
+    free(xsperms);
     return val;
 }
 
@@ -541,8 +539,7 @@ again:
     /* Create tuple (path, token). */
     val = Py_BuildValue("(sO)", xsval[XS_WATCH_PATH], token);
  exit:
-    if (xsval)
-        free(xsval);
+    free(xsval);
     return val;
 }
 
