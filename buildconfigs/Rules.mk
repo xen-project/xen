@@ -84,7 +84,7 @@ ref-%/.valid-ref: pristine-%/.valid-pristine
 	rm -rf $(@D)
 	cp -al $(<D) $(@D)
 	if [ -d patches/$* ] ; then \
-	    for i in patches/$*/*.patch ; do ( cd $(@D) ; patch -p1 <../$$i || exit 1 ) ; done ; \
+	    for i in patches/$*/*.patch ; do patch -d $(@D) -p1 <$$i || exit 1 ; done ; \
 	fi
 	touch $@ # update timestamp to avoid rebuild
 endif
