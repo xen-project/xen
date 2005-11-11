@@ -196,10 +196,8 @@ static void load_symbols(struct elfhdr *ehdr, int fd)
 	goto error_freesyms;
 
     /* Commit */
-    if (disas_symtab)
-	qemu_free(disas_symtab); /* XXX Merge with old symbols? */
-    if (disas_strtab)
-	qemu_free(disas_strtab);
+    qemu_free(disas_symtab); /* XXX Merge with old symbols? */
+    qemu_free(disas_strtab);
     disas_symtab = syms;
     disas_num_syms = nsyms;
     disas_strtab = str;

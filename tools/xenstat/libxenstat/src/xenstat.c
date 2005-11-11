@@ -284,10 +284,8 @@ void xenstat_free_node(xenstat_node * node)
 
 	if (node) {
 		if (node->domains) {
-			for (i = 0; i < node->num_domains; i++) {
-				if (node->domains[i].name)
-					free(node->domains[i].name);
-			}
+			for (i = 0; i < node->num_domains; i++)
+				free(node->domains[i].name);
 
 			for (i = 0; i < NUM_COLLECTORS; i++)
 				if((node->flags & collectors[i].flag)

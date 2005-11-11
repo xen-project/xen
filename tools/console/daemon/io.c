@@ -344,8 +344,7 @@ static struct domain *create_domain(int domid)
 
 	return dom;
  out:
-	if (dom->conspath)
-		free(dom->conspath);
+	free(dom->conspath);
 	free(dom);
 	return NULL;
 }
@@ -380,20 +379,16 @@ static void cleanup_domain(struct domain *d)
 	if (!buffer_empty(&d->buffer))
 		return;
 
-	if (d->buffer.data) {
-		free(d->buffer.data);
-		d->buffer.data = NULL;
-	}
-
 	if (d->tty_fd != -1) {
 		close(d->tty_fd);
 		d->tty_fd = -1;
 	}
 
-	if (d->conspath) {
-		free(d->conspath);
-		d->conspath = NULL;
-	}
+	free(d->buffer.data);
+	d->buffer.data = NULL;
+
+	free(d->conspath);
+	d->conspath = NULL;
 
 	remove_domain(d);
 }

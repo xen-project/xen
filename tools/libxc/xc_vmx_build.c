@@ -565,10 +565,8 @@ static int setup_guest(int xc_handle,
     return 0;
 
  error_out:
-    if ( mmu != NULL )
-        free(mmu);
-    if ( page_array != NULL )
-        free(page_array);
+    free(mmu);
+    free(page_array);
     return -1;
 }
 
@@ -663,8 +661,7 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    if ( image != NULL )
-        free(image);
+    free(image);
 
     ctxt->flags = VGCF_VMX_GUEST;
     /* FPU is set up to default initial state. */
@@ -710,9 +707,7 @@ int xc_vmx_build(int xc_handle,
     return rc;
 
  error_out:
-    if ( image != NULL )
-        free(image);
-
+    free(image);
     return -1;
 }
 

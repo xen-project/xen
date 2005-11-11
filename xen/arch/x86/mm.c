@@ -3369,10 +3369,8 @@ int ptwr_init(struct domain *d)
 
     if ( (x == NULL) || (y == NULL) )
     {
-        if ( x != NULL )
-            free_xenheap_page(x);
-        if ( y != NULL )
-            free_xenheap_page(y);
+        free_xenheap_page(x);
+        free_xenheap_page(y);
         return -ENOMEM;
     }
 

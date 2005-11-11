@@ -1411,8 +1411,6 @@ static void manual_node(const char *name, const char *child)
 	talloc_free(node);
 }
 
-#
-
 static void setup_structure(void)
 {
 	char *tdbname;

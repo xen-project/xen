@@ -621,8 +621,7 @@ void evtchn_destroy(struct domain *d)
             (void)__evtchn_close(d, i);
 
     for ( i = 0; i < NR_EVTCHN_BUCKETS; i++ )
-        if ( d->evtchn[i] != NULL )
-            xfree(d->evtchn[i]);
+        xfree(d->evtchn[i]);
 }
 
 /*

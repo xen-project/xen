@@ -607,8 +607,7 @@ again:
  destroy_blkring:
 	blkif_free(info);
  out:
-	if (backend)
-		kfree(backend);
+	kfree(backend);
 	return err;
 }
 

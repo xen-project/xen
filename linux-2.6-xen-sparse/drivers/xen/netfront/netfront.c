@@ -917,7 +917,7 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	np->netdev = netdev;
 
  exit:
-	if ((err != 0) && (netdev != NULL))
+	if (err != 0)
 		kfree(netdev);
 	else if (val != NULL)
 		*val = netdev;
