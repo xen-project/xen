@@ -22,11 +22,20 @@ dir=$(dirname "$0")
 
 findCommand "$@"
 
-if [ "$command" != "up" ] && [ "$command" != "down" ]
+if [ "$command" != "online" ]  &&
+   [ "$command" != "offline" ] &&
+   [ "$command" != "add" ]     &&
+   [ "$command" != "remove" ]
 then
   log err "Invalid command: $command"
   exit 1
 fi
+
+case "$command" in
+    add | offline)
+        exit 0
+        ;;
+esac
 
 
 # Parameters may be read from the environment, the command line arguments, and
@@ -46,7 +55,7 @@ vif="${vif:?}"
 
 function frob_iptable()
 {
-  if [ "$command" == "up" ]
+  if [ "$command" == "online" ]
   then
     local c="-A"
   else

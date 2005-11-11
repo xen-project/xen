@@ -19,9 +19,12 @@
 dir=$(dirname "$0")
 . "$dir/xen-hotplug-common.sh"
 
-command="$1"
+findCommand "$@"
 
-if [ "$command" != "bind" ] && [ "$command" != "unbind" ]
+if [ "$command" != "online" ]  &&
+   [ "$command" != "offline" ] &&
+   [ "$command" != "add" ]     &&
+   [ "$command" != "remove" ]
 then
   log err "Invalid command: $command"
   exit 1

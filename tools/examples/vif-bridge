@@ -9,7 +9,7 @@
 # places, then this script is the default.
 #
 # Usage:
-# vif-bridge (up|down)
+# vif-bridge (add|remove|online|offline)
 #
 # Environment vars:
 # vif         vif interface name (required).
@@ -47,7 +47,7 @@ then
 fi
 
 case "$command" in
-    up)
+    online)
         if brctl show "$bridge" | grep "$vif" >&/dev/null
         then
           log debug "$vif already attached to $bridge"
@@ -58,9 +58,9 @@ case "$command" in
           fatal "brctl addif $bridge $vif failed"
 
         ifconfig "$vif" up || fatal "ifconfig $vif up failed"
-        success
         ;;
-    down)
+
+    remove)
         # vifs are auto-removed from bridge.
         ifconfig "$vif" down || fatal "ifconfig $vif down failed"
         ;;
@@ -69,3 +69,4 @@ esac
 handle_iptable
 
 log debug "Successful vif-bridge operation for $vif, bridge $bridge."
+success

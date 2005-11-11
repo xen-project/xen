@@ -3,6 +3,12 @@
 dir=$(dirname "$0")
 . "$dir/block-common.sh"
 
+case "$command" in
+    online | offline)
+        exit 0
+        ;;
+esac
+
 expand_dev() {
   local dev
   case $1 in
@@ -16,10 +22,10 @@ expand_dev() {
   echo -n $dev
 }
 
-t=$(xenstore_read "$XENBUS_PATH"/type || true)
+t=$(xenstore_read_default "$XENBUS_PATH"/type "MISSING")
 
 case "$command" in 
-  bind)
+  add)
     p=$(xenstore_read "$XENBUS_PATH"/params)
     case $t in 
       phy)
@@ -38,32 +44,25 @@ case "$command" in
 	done
 	exit 1
 	;;
-
-      *)
-        [ -x /etc/xen/scripts/block-"$t" ] && \
-	    /etc/xen/scripts/block-"$t" bind $p
-	;;
     esac
     ;;
 
-  unbind)
-    node=$(xenstore_read "$XENBUS_PATH"/node)
+  remove)
     case $t in 
       phy)
 	exit 0
 	;;
 
       file)
+        node=$(xenstore_read "$XENBUS_PATH"/node)
 	losetup -d $node
 	exit 0
 	;;
-
-      *)
-        [ -x /etc/xen/scripts/block-"$t" ] && \
-	    /etc/xen/scripts/block-"$t" unbind $node
-	;;
-
     esac
     ;;
 
 esac
+
+# If we've reached here, $t is neither phy nor file, so fire a helper script.
+[ -x /etc/xen/scripts/block-"$t" ] && \
+  /etc/xen/scripts/block-"$t" "$command" $node

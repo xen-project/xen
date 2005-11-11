@@ -9,7 +9,7 @@
 # places, then vif-bridge is the default.
 #
 # Usage:
-# vif-nat (up|down)
+# vif-nat (add|remove|online|offline)
 #
 # Environment vars:
 # vif         vif interface name (required).
@@ -40,12 +40,12 @@ netmask=$netmask.$(( $intmask & 0x000000FF ))
 main_ip=$(ip addr show eth0 | sed -e '/inet /!d;s/^.*inet \([^\s*]\)\s.*$/\1/')
 
 case "$command" in
-    up)
+    online)
         ifconfig ${vif} ${vif_ip} netmask ${netmask} up
         echo 1 >/proc/sys/net/ipv4/conf/${vif}/proxy_arp
         ipcmd='a'
         ;;
-    down)
+    remove)
         ifconfig ${vif} down
         ipcmd='d'
         ;;
