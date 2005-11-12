@@ -8,41 +8,148 @@ xm <subcommand> [args]
 
 =head1 DESCRIPTION
 
-The B<xm> program is the main interface for managing Xen guest domains. The program can be used to create, pause, and shutdown domains. It can also be used to list current domains, enable or pin VCPUs, and attach or detach virtual block devices. The B<xm> program relies upon B<xend>. The daemon must be running in order for the program to work.
+The B<xm> program is the main interface for managing Xen guest
+domains. The program can be used to create, pause, and shutdown
+domains. It can also be used to list current domains, enable or pin
+VCPUs, and attach or detach virtual block devices.
 
-Domain name <DomName> can be substituted in the subcommands for Domain id <DomId>.
+The basic structure of every xm command is almost always:
+
+  xm <SubCommand> <DomId> [OPTIONS]
+
+Where I<SubCommand> is one of the sub commands listed below, I<DomId>
+is the numeric domain id, or the domain name (which will be internally
+translated to domain id), and I<OPTIONS> are sub command specific
+options.  There are a few exceptions to this rule in the cases where
+the sub command in question acts on all domains, the entire machine,
+or directly on the xen hypervisor.  Those exceptions will be clear for
+each of those sub commands.
+
+=head1 NOTES
+
+All B<xm> opperations rely upon the Xen control daemon, aka B<xend>.
+For any xm commands to run xend must also be running.  For this reason
+you should start xend as a service when your system first boots using
+xen.
+
+Most B<xm> commands require root privledges to run due to the
+communications channels used to talk to the hypervisor.  Running as
+non root will return an error.
 
 =head1 DOMAIN SUBCOMMANDS
+
+The following sub commands manipulate domains directly, as stated
+previously most commands take DomId as the first parameter.
 
 =over 4
 
 =item I<console> <DomId>
 
-Attach to domain DomId's console.
+Attach to domain DomId's console.  If you've set up your Domains to
+have a traditional log in console this will look much like a normal
+text log in screen.
 
-=item I<create> <CfgFile>
+This uses the back end xenconsole service which currently only
+works for para-virtual domains.  
 
-Create a domain based on B<xmdomain.cfg> configuration file.
+The attached console will perform much like a standard serial console,
+so running curses based interfaces over the console B<is not
+advised>.  Vi tends to get very odd when using it over this interface.
+
+=item I<create> [-c] <ConfigFile> [Name=Value]..
+
+The create sub command requires a ConfigFile and can optional take a
+series of name value pairs that add to or override variables defined
+in the config file.  See L<xmdomain.cfg> for full details of that file
+format, and possible options used in either the ConfigFile or
+Name=Value combinations.
+
+ConfigFile can either be an absolute path to a file, or a relative
+path to a file located in /etc/xen.
+
+Create will return B<as soon> as the domain is started.  This B<does
+not> mean the guest OS in the domain has actually booted, or is
+available for input.
+
+B<OPTIONS>
+
+=over 4 
+
+=item I<-c>
+
+Attache console to the domain as soon as it has started.  This is
+useful for determining issues with crashing domains.
+
+=back
+
+B<EXAMPLES>
+
+=over 4
+
+=item Config file in /etc/xen
+
+xm create Fedora4
+
+This creates a domain with the file /etc/xen/Fedora4, and returns as
+soon as it is run.
+
+=item Creating a domain without ConfigFile
+
+ xm create /dev/null ramdisk=initrd.img \
+    kernel=/boot/vmlinuz-2.6.12.6-xenU \
+    name=ramdisk nics=0 vcpus=1 \
+    memory=64 root=/dev/ram0
+
+This creates the domain without using a config file (more specifically
+using /dev/null as an empty config file), kernel and ramdisk as
+specified, setting the name of the domain to "ramdisk", also disabling
+virtual networking.  (This example comes from the xm-test test suite.)
+
+=back
 
 =item I<destroy> <DomId>
 
-Terminate domain DomId immediately.
+Immediately terminate the domain DomId.  This doesn't give the domain
+OS any chance to react, and it the equivalent of ripping the power
+cord out on a physical machine.  In most cases you will want to use
+the B<shutdown> command instead.
 
 =item I<domid> <DomName>
 
-Converts a domain name to a domain id.
+Converts a domain name to a domain id using xend's internal mapping.
 
 =item I<domname> <DomId>
 
-Converts a domain id to a domain name.
+Converts a domain id to a domain name using xend's internal mapping.
 
 =item I<help> [--long]
 
-Displays command's help message. The long option prints out the complete set of B<xm> subcommands.
+Displays the short help message (i.e. common commands).
 
-=item I<list> [DomId, ...]
+The I<--long> option prints out the complete set of B<xm> subcommands,
+grouped by function.
 
-List information about domains.
+=item I<list> [--long] [DomId, ...]
+
+Prints information about running domains.
+
+An example format for the list is as follows:
+
+ Name                              ID Mem(MiB) VCPUs State  Time(s)
+ Domain-0                           0       98     1 r-----  5068.6
+ Fedora3                          164      128     1 r-----     7.6
+ Fedora4                          165      128     1 ------     0.6
+ Mandrake2006                     166      128     1 -b----     3.6
+ Mandrake10.2                     167      128     1 ------     2.5
+ Suse9.2                          168      100     1 ------     1.8
+
+Name is the name of the domain.  ID the domain numeric id.  Mem is the
+size of the memory allocated to the domain.  VCPUS is the number of
+VCPUS allocated to domain.  State is the run state (see below).  Time
+is the total run time of the domain as accounted for by Xen.
+
+The State field lists 6 states for a Xen Domain, and which ones the
+current Domain is in.
 
 =item I<mem-max> <DomId> <Mem>
 
@@ -227,6 +334,8 @@ List virtual network interfaces for a domain.
 
 =head1 VNET COMMANDS
 
+The Virtual Network interfaces for Xen 
+
 =over 4
 
 =item I<vnet-list> [-l|--long]
@@ -243,12 +352,15 @@ Delete a vnet.
 
 =back
 
+=head1 EXAMPLES
+
 =head1 SEE ALSO
 
 B<xmdomain.cfg>(5)
 
 =head1 AUTHOR
 
+  Sean Dague <sean at dague dot net>
   Daniel Stekloff <dsteklof at us dot ibm dot com>
 
 =head1 BUGS
