@@ -38,11 +38,13 @@ except ConsoleError, e:
     
 for i in range(10):
 	status, output = traceCommand("xm block-attach %s phy:ram1 sdb1 w" % domain.getName())
-	if status != 0:
-        	FAIL("xm block-attach returned invalid %i != 0" % status)
+        if i == 0 and status != 0:
+            FAIL("xm block attach returned invalid %i != 0" % status)
+	if i > 0 and status == 0:
+            FAIL("xm block-attach (repeat) returned invalid %i > 0" % status)
 	run = console.runCmd("cat /proc/partitions")
 	if not re.search("sdb1", run['output']):
-		FAIL("Device is not actually attached to domU")
+            FAIL("Device is not actually attached to domU")
 
 # Close the console
 console.closeConsole()
