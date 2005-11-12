@@ -45,7 +45,7 @@
 #include "tdb.h"
 #include <stdarg.h>
 #include "talloc.h"
-#define HAVE_MMAP
+#undef HAVE_MMAP
 #else
 #include "includes.h"
 #include "lib/tdb/include/tdb.h"
