@@ -565,7 +565,7 @@ def run_bootloader(vals):
     file = blkif.blkdev_uname_to_file(uname)
 
     return bootloader(vals.bootloader, file, not vals.console_autoconnect,
-                      vals.vcpus, vals.blentry)
+                      vals.vcpus, vals.bootentry)
 
 def make_config(vals):
     """Create the domain configuration.
@@ -781,7 +781,7 @@ def preprocess_vnc(vals):
         vals.extra = vnc + ' ' + vals.extra
     
 def preprocess(vals):
-    if not vals.kernel:
+    if not vals.kernel and not vals.bootloader:
         err("No kernel specified")
     preprocess_disk(vals)
     preprocess_pci(vals)

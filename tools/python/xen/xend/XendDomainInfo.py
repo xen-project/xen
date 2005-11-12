@@ -1049,9 +1049,6 @@ class XendDomainInfo:
                                   self.info['image'],
                                   self.info['device'])
 
-        if self.info['bootloader']:
-            self.image.handleBootloading()
-
         xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
 
         m = self.image.getDomainMemory(self.info['memory'] * 1024)
@@ -1073,6 +1070,9 @@ class XendDomainInfo:
         self.introduceDomain()
 
         self.createDevices()
+
+        if self.info['bootloader']:
+            self.image.cleanupBootloading()
 
         self.info['start_time'] = time.time()
 
@@ -1238,6 +1238,7 @@ class XendDomainInfo:
         False if it is to be destroyed.
         """
 
+        self.configure_bootloader()
         config = self.sxpr()
 
         if self.readVm(RESTART_IN_PROGRESS):
@@ -1340,8 +1341,9 @@ class XendDomainInfo:
         # FIXME: this assumes the disk is the first device and
         # that we're booting from the first disk
         blcfg = None
+        config = self.sxpr()
         # FIXME: this assumes that we want to use the first disk
-        dev = sxp.child_value(self.config, "device")
+        dev = sxp.child_value(config, "device")
         if dev:
             disk = sxp.child_value(dev, "uname")
             fn = blkdev_uname_to_file(disk)
@@ -1351,7 +1353,7 @@ class XendDomainInfo:
             msg = "Had a bootloader specified, but can't find disk"
             log.error(msg)
             raise VmError(msg)
-        self.config = sxp.merge(['vm', ['image', blcfg]], self.config)
+        self.info['image'] = sxp.to_string(blcfg)
 
 
     def send_sysrq(self, key):

@@ -95,7 +95,7 @@ class ImageHandler:
                         ("image/ramdisk", self.ramdisk))
 
 
-    def handleBootloading(self):
+    def cleanupBootloading(self):
         self.unlink(self.kernel)
         self.unlink(self.ramdisk)
 
