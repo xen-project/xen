@@ -36,6 +36,13 @@ Most B<xm> commands require root privledges to run due to the
 communications channels used to talk to the hypervisor.  Running as
 non root will return an error.
 
+Most B<xm> commands act asynchronously, so just because the B<xm>
+command returned, doesn't mean the action is complete.  This is
+important, as many operations on domains, like create and shutdown,
+can take considerable time (30 seconds or more) to bring the machine
+into a fully compliant state.  If you want to know when one of these
+actions has finished you must poll through xm list periodically.
+
 =head1 DOMAIN SUBCOMMANDS
 
 The following sub commands manipulate domains directly, as stated
@@ -86,19 +93,19 @@ B<EXAMPLES>
 
 =over 4
 
-=item Config file in /etc/xen
+=item I<with config file>
 
-xm create Fedora4
+  xm create Fedora4
 
 This creates a domain with the file /etc/xen/Fedora4, and returns as
 soon as it is run.
 
-=item Creating a domain without ConfigFile
-
- xm create /dev/null ramdisk=initrd.img \
-    kernel=/boot/vmlinuz-2.6.12.6-xenU \
-    name=ramdisk nics=0 vcpus=1 \
-    memory=64 root=/dev/ram0
+=item I<without config file>
+ 
+  xm create /dev/null ramdisk=initrd.img \
+     kernel=/boot/vmlinuz-2.6.12.6-xenU \
+     name=ramdisk nics=0 vcpus=1 \
+     memory=64 root=/dev/ram0
 
 This creates the domain without using a config file (more specifically
 using /dev/null as an empty config file), kernel and ramdisk as
@@ -131,7 +138,8 @@ grouped by function.
 
 =item I<list> [--long] [DomId, ...]
 
-Prints information about running domains.
+Prints information about one or more domains.  If no domains are
+specified it prints out information about all domains.
 
 An example format for the list is as follows:
 
@@ -148,44 +156,154 @@ size of the memory allocated to the domain.  VCPUS is the number of
 VCPUS allocated to domain.  State is the run state (see below).  Time
 is the total run time of the domain as accounted for by Xen.
 
-The State field lists 6 states for a Xen Domain, and which ones the
-current Domain is in.
-
-=item I<mem-max> <DomId> <Mem>
-
-Set domain maximum memory limit to Mem. Mem is in Megabytes. This is the upper memory mark for how much memory a domain can have.
-
-=item I<mem-set> <DomId> <Mem>
-
-Set domain's memory, in Megabytes. Mem must be less than or equal to the maximum memory for the domain.
-
-=item I<migrate> <DomId> <Host> [Options]
-
-Migrate a domain to another Host machine. B<Xend> must be running on other host machine and there must be sufficient resources as well.
+B<STATES>
 
 =over 4
 
-Additional Options:
+The State field lists 6 states for a Xen Domain, and which ones the
+current Domain is in.
 
-    -l, --live                    Use live migration.
-    -r, --resource <Mbit value>   Set resource level.
+=item I<r - running>
+
+The domain is currently running on a CPU
+
+=item I<b - blocked>
+
+The domain is blocked, and not running or runable.  This can be caused
+because the domain is waiting on IO (a traditional wait state) or has
+gone to sleep because there was nothing else for it to do.
+
+=item I<p - paused>
+
+The domain has been paused, usually occurring through the administrator
+running B<xm pause>.  When in a paused state the domain will still
+consume allocated resources like memory, but will not be eligible for
+scheduling by the Xen hypervisor.
+
+=item I<s - shutdown>
+
+FIXME: Why would you ever see this state?
+
+=item I<c - crashed>
+
+The domain has crashed, which is always a violent ending.  Usually
+this state can only occur if the domain has been configured not to
+restart on crash.  See L<xmdomain.cfg> for more info.
+
+=item I<d - dying>
+
+The domain is in process of dying, but hasn't completely shutdown or
+crashed.
+
+FIXME: Is this right?
+
+=back
+
+B<LONG OUTPUT>
+
+=over 4
+
+If I<--long> is specified, the output for xm list is not the table
+view shown above, but instead is an S-Expression representing all
+information known about all domains asked for.  This is mostly only
+useful for external programs to parse the data.
+
+B<Note:> there is no stable guarantees on the format of this data.
+Use at your own risk.
+
+=back
+
+B<NOTES>
+
+=over 4
+
+The Time column is deceptive.  Virtual IO (network and block devices)
+used by Domains requires coordination by Domain0, which means that
+Domain0 is actually charged for much of the time that a DomainU is
+doing IO.  Use of this time value to determine relative utilizations
+by domains is thus very suspect, as a high IO workload may show as
+less utilized than a high CPU workload.  Consider yourself warned.
+
+=back
+
+=item I<mem-max> <DomId> <Mem>
+
+Specify the maximum amount of memory the Domain is able to use.  Mem
+is specified in megabytes. 
+
+The mem-max value may not correspond to the actual memory used in the
+Domain, as it may balloon down it's memory to give more back to the OS.
+
+=item I<mem-set> <DomId> <Mem>
+
+Set the domain's used memory using the balloon driver.  Because this
+operation requires cooperation from the domain operating system, there
+is no guarantee that it will succeed.
+
+B<Warning:> there is no good way to know in advance how small of a
+mem-set will make a domain unstable and cause it to crash.  Be very
+careful when using this command on running domains.
+
+=item I<migrate> <DomId> <Host> [Options]
+
+Migrate a domain to another Host machine. B<Xend> must be running on
+other host machine, it must be running the same version of xen, it
+must have the migration tcp port open and accepting connections from
+the source host, and there must be sufficient resources for the domain
+to run (memory, disk, etc).
+
+Migration is pretty complicated, and has many security implications,
+please read the Xen Users Guide to ensure you understand the
+ramifications and limitations on migration before attempting it in
+production.
+
+B<OPTIONS>
+
+=over 4
+
+=item I<-l, --live>
+
+Use live migration.  This will migrate the domain between hosts
+without shutting down the domain.  See the Xen Users Guide for more
+information.
+
+=item I<-r, --resource> Mbs
+
+Set maximum Mbs allowed for migrating the domain.  This ensures that
+the network link is not saturated with migration traffic while
+attempting to do other useful work.
 
 =back
 
 =item I<pause> <DomId>
 
-Pause a domain's execution.
+Pause a domain.  When in a paused state the domain will still consume
+allocated resources like memory, but will not be eligible for
+scheduling by the Xen hypervisor.
 
 =item I<reboot> [Options] <DomId>
 
-Reboot a domain.
+Reboot a domain.  This acts just as if the domain had the B<reboot>
+command run from the console.  The command returns as soon as it has
+executed the reboot action, which may be significantly before the
+domain actually reboots.
+
+The behavior of what happens to a domain when it reboots is set by the
+B<on_reboot> parameter of the xmdomain.cfg file when the domain was
+created.
+
+B<OPTIONS>
 
 =over 4
 
-Additional Options:
+=item I<-a, --all>
 
-    -a, --all        reboot all domains.
-    -w, --wait       Wait for shutdown to complete.
+Reboot all domains
+
+=item I<-w, --wait>
+
+Wait for reboot to complete before returning.  This may take a while,
+as all services in the domain will have to be shut down cleanly.
 
 =back
 
