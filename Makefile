@@ -167,6 +167,9 @@ uninstall:
 	[ -d $(D)/etc/xen ] && mv -f $(D)/etc/xen $(D)/etc/xen.old-`date +%s` || true
 	rm -rf $(D)/etc/init.d/xend*
 	rm -rf $(D)/etc/hotplug/xen-backend.agent
+	rm -f  $(D)/etc/udev/rules.d/xen-backend.rules
+	rm -f  $(D)/etc/udev/xen-backend.rules
+	rm -f  $(D)/etc/sysconfig/xendomains
 	rm -rf $(D)/var/run/xen* $(D)/var/lib/xen*
 	rm -rf $(D)/boot/*xen*
 	rm -rf $(D)/lib/modules/*xen*
@@ -179,7 +182,8 @@ uninstall:
 	rm -rf $(D)/usr/$(LIBDIR)/libxenctrl* $(D)/usr/$(LIBDIR)/libxenguest*
 	rm -rf $(D)/usr/$(LIBDIR)/libxenstore*
 	rm -rf $(D)/usr/$(LIBDIR)/python/xen $(D)/usr/$(LIBDIR)/xen 
-	rm -rf $(D)/usr/$(LIBDIR)/xen/bin
+	rm -rf $(D)/usr/$(LIBDIR)/xen/
+	rm -rf $(D)/usr/lib/xen/
 	rm -rf $(D)/usr/sbin/xen* $(D)/usr/sbin/netfix $(D)/usr/sbin/xm
 	rm -rf $(D)/usr/share/doc/xen
 	rm -rf $(D)/usr/share/xen
