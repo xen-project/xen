@@ -495,6 +495,9 @@ static int setup_guest(int xc_handle,
     }
 
     *store_mfn = page_array[(v_end-2) >> PAGE_SHIFT];
+    if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) )
+        goto error_out;
+
     shared_page_frame = (v_end - PAGE_SIZE) >> PAGE_SHIFT;
 
     if ((e820_page = xc_map_foreign_range(
