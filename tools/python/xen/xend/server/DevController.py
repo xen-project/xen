@@ -306,6 +306,8 @@ class DevController:
         ev = Event()
 
         def hotplugStatus():
+            log.debug("hotplugStatus %d", devid)
+            
             try:
                 status = self.readBackend(devid, HOTPLUG_STATUS_NODE)
             except VmError:
