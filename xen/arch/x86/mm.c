@@ -3063,7 +3063,7 @@ static int ptwr_emulated_update(
     unsigned int bytes,
     unsigned int do_cmpxchg)
 {
-    unsigned long pfn;
+    unsigned long pfn, l1va;
     struct pfn_info *page;
     l1_pgentry_t pte, ol1e, nl1e, *pl1e;
     struct domain *d = current->domain;
@@ -3099,6 +3099,17 @@ static int ptwr_emulated_update(
         old <<= (offset)*8;
         old  |= full;
     }
+
+    /*
+     * We must not emulate an update to a PTE that is temporarily marked
+     * writable by the batched ptwr logic, else we can corrupt page refcnts! 
+     */
+    if ( ((l1va = d->arch.ptwr[PTWR_PT_ACTIVE].l1va) != 0) &&
+         (l1_linear_offset(l1va) == l1_linear_offset(addr)) )
+        ptwr_flush(d, PTWR_PT_ACTIVE);
+    if ( ((l1va = d->arch.ptwr[PTWR_PT_INACTIVE].l1va) != 0) &&
+         (l1_linear_offset(l1va) == l1_linear_offset(addr)) )
+        ptwr_flush(d, PTWR_PT_INACTIVE);
 
     /* Read the PTE that maps the page being updated. */
     if (__copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
@@ -3358,13 +3369,6 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     return EXCRET_fault_fixed;
 
  emulate:
-    /*
-     * Cleaning up avoids emulating an update to a PTE that is temporarily
-     * marked writable (_PAGE_RW) by the batched ptwr logic. If this were
-     * performance critical then the check could compare addr against l1va's in
-     * ptwr_emulated_update(). Without this flush we can corrupt page refcnts!
-     */
-    cleanup_writable_pagetable(d);
     if ( x86_emulate_memop(guest_cpu_user_regs(), addr,
                            &ptwr_mem_emulator, BITS_PER_LONG/8) )
         return 0;
