@@ -3358,6 +3358,13 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     return EXCRET_fault_fixed;
 
  emulate:
+    /*
+     * Cleaning up avoids emulating an update to a PTE that is temporarily
+     * marked writable (_PAGE_RW) by the batched ptwr logic. If this were
+     * performance critical then the check could compare addr against l1va's in
+     * ptwr_emulated_update(). Without this flush we can corrupt page refcnts!
+     */
+    cleanup_writable_pagetable(d);
     if ( x86_emulate_memop(guest_cpu_user_regs(), addr,
                            &ptwr_mem_emulator, BITS_PER_LONG/8) )
         return 0;
