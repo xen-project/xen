@@ -3125,7 +3125,10 @@ static int ptwr_emulated_update(
     /* Check the new PTE. */
     nl1e = l1e_from_intpte(val);
     if ( unlikely(!get_page_from_l1e(nl1e, d)) )
+    {
+        MEM_LOG("ptwr_emulate: could not get_page_from_l1e()");
         return X86EMUL_UNHANDLEABLE;
+    }
 
     /* Checked successfully: do the update (write or cmpxchg). */
     pl1e = map_domain_page(page_to_pfn(page));
@@ -3248,6 +3251,9 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     goto emulate; 
 #endif
 
+    PTWR_PRINTK("ptwr_page_fault on l1 pt at va %lx, pfn %lx, eip %lx\n",
+                addr, pfn, (unsigned long)regs->eip);
+    
     /* Get the L2 index at which this L1 p.t. is always mapped. */
     l2_idx = page->u.inuse.type_info & PGT_va_mask;
     if ( unlikely(l2_idx >= PGT_va_unknown) )
@@ -3292,10 +3298,6 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
         goto emulate;
     }
 
-    PTWR_PRINTK("[%c] page_fault on l1 pt at va %lx, pt for %08lx, "
-                "pfn %lx\n", PTWR_PRINT_WHICH,
-                addr, l2_idx << L2_PAGETABLE_SHIFT, pfn);
-    
     /*
      * We only allow one ACTIVE and one INACTIVE p.t. to be updated at at 
      * time. If there is already one, we must flush it out.
@@ -3313,6 +3315,10 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
         d->arch.ptwr[which].prev_nr_updates = 1;
         goto emulate;
     }
+
+    PTWR_PRINTK("[%c] batched ptwr_page_fault at va %lx, pt for %08lx, "
+                "pfn %lx\n", PTWR_PRINT_WHICH, addr,
+                l2_idx << L2_PAGETABLE_SHIFT, pfn);
 
     d->arch.ptwr[which].l1va   = addr | 1;
     d->arch.ptwr[which].l2_idx = l2_idx;
