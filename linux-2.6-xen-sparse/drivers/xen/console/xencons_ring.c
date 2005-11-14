@@ -30,12 +30,6 @@ static inline struct xencons_interface *xencons_interface(void)
 	return mfn_to_virt(xen_start_info->console_mfn);
 }
 
-static inline void notify_daemon(void)
-{
-	/* Use evtchn: this is called early, before irq is set up. */
-	notify_remote_via_evtchn(xen_start_info->console_evtchn);
-}
-
 int xencons_ring_send(const char *data, unsigned len)
 {
 	int sent = 0;
@@ -53,7 +47,8 @@ int xencons_ring_send(const char *data, unsigned len)
 	wmb();
 	intf->out_prod = prod;
 
-	notify_daemon();
+	/* Use evtchn: this is called early, before irq is set up. */
+	notify_remote_via_evtchn(xen_start_info->console_evtchn);
 
 	return sent;
 }	
@@ -75,10 +70,8 @@ static irqreturn_t handle_input(int irq, void *unused, struct pt_regs *regs)
 				1, regs);
 	}
 
-	mb();
+	wmb();
 	intf->in_cons = cons;
-
-	notify_daemon();
 
 	return IRQ_HANDLED;
 }
@@ -108,9 +101,6 @@ int xencons_ring_init(void)
 	}
 
 	xencons_irq = err;
-
-	/* In case we have in-flight data after save/restore... */
-	notify_daemon();
 
 	return 0;
 }

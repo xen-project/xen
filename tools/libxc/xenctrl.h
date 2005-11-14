@@ -424,9 +424,6 @@ int xc_ia64_get_pfn_list(int xc_handle, uint32_t domid,
 int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
 			   unsigned long dst_pfn, void *src_page);
 
-int xc_clear_domain_page(int xc_handle, uint32_t domid,
-                         unsigned long dst_pfn);
-
 int xc_ia64_copy_to_domain_pages(int xc_handle, uint32_t domid,
         void* src_page, unsigned long dst_pfn, int nr_pages);
 

@@ -36,7 +36,7 @@
 #include <asm-xen/xenbus.h>
 #include "xenbus_comms.h"
 
-static int xenbus_irq;
+static int xenbus_irq      = 0;
 
 extern void xenbus_probe(void *); 
 extern int xenstored_ready; 
@@ -51,7 +51,7 @@ static inline struct xenstore_domain_interface *xenstore_domain_interface(void)
 
 static irqreturn_t wake_waiting(int irq, void *unused, struct pt_regs *regs)
 {
-	if (unlikely(xenstored_ready == 0)) {
+	if(unlikely(xenstored_ready == 0)) {
 		xenstored_ready = 1; 
 		schedule_work(&probe_work); 
 	} 
@@ -188,6 +188,9 @@ int xb_init_comms(void)
 	}
 
 	xenbus_irq = err;
+
+	/* FIXME zero out page -- domain builder should probably do this*/
+	memset(mfn_to_virt(xen_start_info->store_mfn), 0, PAGE_SIZE);
 
 	return 0;
 }

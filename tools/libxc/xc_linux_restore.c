@@ -12,6 +12,8 @@
 #include "xg_private.h"
 #include "xg_save_restore.h"
 
+
+
 /* max mfn of the whole machine */
 static uint32_t max_mfn; 
 
