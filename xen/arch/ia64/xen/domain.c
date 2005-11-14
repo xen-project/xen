@@ -11,6 +11,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
@@ -48,9 +49,8 @@
 
 #define CONFIG_DOMAIN0_CONTIGUOUS
 unsigned long dom0_start = -1L;
-unsigned long dom0_size = 512*1024*1024; //FIXME: Should be configurable
-//FIXME: alignment should be 256MB, lest Linux use a 256MB page size
-unsigned long dom0_align = 256*1024*1024;
+unsigned long dom0_size = 512*1024*1024;
+unsigned long dom0_align = 64*1024*1024;
 #ifdef DOMU_BUILD_STAGING
 unsigned long domU_staging_size = 32*1024*1024; //FIXME: Should be configurable
 unsigned long domU_staging_start;
@@ -1154,3 +1154,54 @@ void sync_vcpu_execstate(struct vcpu *v)
 	}
 	// FIXME SMP: Anything else needed here for SMP?
 }
+
+// FIXME: It would be nice to print out a nice error message for bad
+//  values of these boot-time parameters, but it seems we are too early
+//  in the boot and attempts to print freeze the system?
+#define abort(x...) do {} while(0)
+#define warn(x...) do {} while(0)
+
+static void parse_dom0_mem(char *s)
+{
+	unsigned long bytes = parse_size_and_unit(s);
+
+	if (dom0_size < 4 * 1024 * 1024) {
+		abort("parse_dom0_mem: too small, boot aborted"
+			" (try e.g. dom0_mem=256M or dom0_mem=65536K)\n");
+	}
+	if (dom0_size % dom0_align) {
+		dom0_size = ((dom0_size / dom0_align) + 1) * dom0_align;
+		warn("parse_dom0_mem: dom0_size rounded up from"
+			" %lx to %lx bytes, due to dom0_align=%lx\n",
+			bytes,dom0_size,dom0_align);
+	}
+	else dom0_size = bytes;
+}
+custom_param("dom0_mem", parse_dom0_mem);
+
+
+static void parse_dom0_align(char *s)
+{
+	unsigned long bytes = parse_size_and_unit(s);
+
+	if ((bytes - 1) ^ bytes) { /* not a power of two */
+		abort("parse_dom0_align: dom0_align must be power of two, "
+			"boot aborted"
+			" (try e.g. dom0_align=256M or dom0_align=65536K)\n");
+	}
+	else if (bytes < PAGE_SIZE) {
+		abort("parse_dom0_align: dom0_align must be >= %ld, "
+			"boot aborted"
+			" (try e.g. dom0_align=256M or dom0_align=65536K)\n",
+			PAGE_SIZE);
+	}
+	else dom0_align = bytes;
+	if (dom0_size % dom0_align) {
+		dom0_size = (dom0_size / dom0_align + 1) * dom0_align;
+		warn("parse_dom0_align: dom0_size rounded up from"
+			" %ld to %ld bytes, due to dom0_align=%lx\n",
+			bytes,dom0_size,dom0_align);
+	}
+}
+custom_param("dom0_align", parse_dom0_align);
+
