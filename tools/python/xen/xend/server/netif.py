@@ -35,16 +35,16 @@ xroot = XendRoot.instance()
 def randomMAC():
     """Generate a random MAC address.
 
-    Uses OUI (Organizationally Unique Identifier) AA:00:00, an
-    unassigned one that used to belong to DEC. The OUI list is
-    available at 'standards.ieee.org'.
+    Uses OUI (Organizationally Unique Identifier) 00-16-3E, allocated to
+    Xensource, Inc. The OUI list is available at
+    http://standards.ieee.org/regauth/oui/oui.txt.
 
     The remaining 3 fields are random, with the first bit of the first
     random field set 0.
 
     @return: MAC address string
     """
-    mac = [ 0xaa, 0x00, 0x00,
+    mac = [ 0x00, 0x16, 0x3e,
             random.randint(0x00, 0x7f),
             random.randint(0x00, 0xff),
             random.randint(0x00, 0xff) ]
