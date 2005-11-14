@@ -619,7 +619,9 @@ static int setup_guest(int xc_handle,
 
     *store_mfn = page_array[(vstoreinfo_start-dsi.v_start) >> PAGE_SHIFT];
     *console_mfn = page_array[(vconsole_start-dsi.v_start) >> PAGE_SHIFT];
-
+    if ( xc_clear_domain_page(xc_handle, dom, *store_mfn) ||
+         xc_clear_domain_page(xc_handle, dom, *console_mfn) )
+        goto error_out;
 
     start_info = xc_map_foreign_range(
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,

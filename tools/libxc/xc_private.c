@@ -336,6 +336,19 @@ int xc_copy_to_domain_page(int xc_handle,
     return 0;
 }
 
+int xc_clear_domain_page(int xc_handle,
+                         uint32_t domid,
+                         unsigned long dst_pfn)
+{
+    void *vaddr = xc_map_foreign_range(
+        xc_handle, domid, PAGE_SIZE, PROT_WRITE, dst_pfn);
+    if ( vaddr == NULL )
+        return -1;
+    memset(vaddr, 0, PAGE_SIZE);
+    munmap(vaddr, PAGE_SIZE);
+    return 0;
+}
+
 unsigned long xc_get_filesz(int fd)
 {
     uint16_t sig;
