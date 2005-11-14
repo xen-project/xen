@@ -2529,7 +2529,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
              * not enough information in just a gpte to figure out how to
              * (re-)shadow this entry.
              */
-            domain_crash();
+            domain_crash(d);
         }
     
         rc = shadow_do_update_va_mapping(va, val, v);
@@ -2918,7 +2918,6 @@ int revalidate_l1(
 {
     l1_pgentry_t ol1e, nl1e;
     int modified = 0, i;
-    struct vcpu *v;
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
@@ -2944,7 +2943,6 @@ int revalidate_l1(
 
         if ( unlikely(!get_page_from_l1e(nl1e, d)) )
         {
-            MEM_LOG("ptwr: Could not re-validate l1 page");
             /*
              * Make the remaining p.t's consistent before crashing, so the
              * reference counts are correct.
@@ -2953,9 +2951,8 @@ int revalidate_l1(
                    (L1_PAGETABLE_ENTRIES - i) * sizeof(l1_pgentry_t));
 
             /* Crash the offending domain. */
-            set_bit(_DOMF_ctrl_pause, &d->domain_flags);
-            for_each_vcpu ( d, v )
-                vcpu_sleep_nosync(v);
+            MEM_LOG("ptwr: Could not revalidate l1 page");
+            domain_crash(d);
             break;
         }
         
@@ -3348,7 +3345,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
         /* Toss the writable pagetable state and crash. */
         unmap_domain_page(d->arch.ptwr[which].pl1e);
         d->arch.ptwr[which].l1va = 0;
-        domain_crash();
+        domain_crash(d);
         return 0;
     }
     

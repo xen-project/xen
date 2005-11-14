@@ -267,7 +267,7 @@ long do_sched_op(int cmd, unsigned long arg)
     {
         TRACE_3D(TRC_SCHED_SHUTDOWN,
                  current->domain->domain_id, current->vcpu_id, arg);
-        domain_shutdown((u8)arg);
+        domain_shutdown(current->domain, (u8)arg);
         break;
     }
 

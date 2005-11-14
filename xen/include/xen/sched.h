@@ -220,14 +220,15 @@ extern int set_info_guest(struct domain *d, dom0_setdomaininfo_t *);
 struct domain *find_domain_by_id(domid_t dom);
 extern void domain_destruct(struct domain *d);
 extern void domain_kill(struct domain *d);
-extern void domain_shutdown(u8 reason);
+extern void domain_shutdown(struct domain *d, u8 reason);
 extern void domain_pause_for_debugger(void);
 
 /*
- * Mark current domain as crashed. This function returns: the domain is not
- * synchronously descheduled from any processor.
+ * Mark specified domain as crashed. This function always returns, even if the
+ * caller is the specified domain. The domain is not synchronously descheduled
+ * from any processor.
  */
-extern void domain_crash(void);
+extern void domain_crash(struct domain *d);
 
 /*
  * Mark current domain as crashed and synchronously deschedule from the local
