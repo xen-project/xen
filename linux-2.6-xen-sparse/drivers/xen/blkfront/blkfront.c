@@ -293,17 +293,18 @@ static void connect(struct blkfront_info *info)
 {
 	unsigned long sectors, sector_size;
 	unsigned int binfo;
+	int err;
 
         if (info->connected == BLKIF_STATE_CONNECTED)
 		return;
 
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
 
-	int err = xenbus_gather(NULL, info->xbdev->otherend,
-				"sectors", "%lu", &sectors,
-				"info", "%u", &binfo,
-				"sector-size", "%lu", &sector_size,
-				NULL);
+	err = xenbus_gather(NULL, info->xbdev->otherend,
+			    "sectors", "%lu", &sectors,
+			    "info", "%u", &binfo,
+			    "sector-size", "%lu", &sector_size,
+			    NULL);
 	if (err) {
 		xenbus_dev_fatal(info->xbdev, err,
 				 "reading backend fields at %s",
@@ -349,9 +350,9 @@ static void blkfront_closing(struct xenbus_device *dev)
 
 static int blkfront_remove(struct xenbus_device *dev)
 {
-	DPRINTK("blkfront_remove: %s removed\n", dev->nodename);
-
 	struct blkfront_info *info = dev->data;
+
+	DPRINTK("blkfront_remove: %s removed\n", dev->nodename);
 
 	blkif_free(info);
 

@@ -118,10 +118,11 @@ static int netback_hotplug(struct xenbus_device *xdev, char **envp,
 	struct backend_info *be = xdev->data;
 	netif_t *netif = be->netif;
 	int i = 0, length = 0;
+	char *val;
 
 	DPRINTK("netback_hotplug");
 
-	char *val = xenbus_read(NULL, xdev->nodename, "script", NULL);
+	val = xenbus_read(NULL, xdev->nodename, "script", NULL);
 	if (IS_ERR(val)) {
 		int err = PTR_ERR(val);
 		xenbus_dev_fatal(xdev, err, "reading script");

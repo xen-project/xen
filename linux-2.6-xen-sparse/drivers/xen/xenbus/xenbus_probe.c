@@ -284,6 +284,7 @@ static void otherend_changed(struct xenbus_watch *watch,
 	struct xenbus_device *dev =
 		container_of(watch, struct xenbus_device, otherend_watch);
 	struct xenbus_driver *drv = to_xenbus_driver(dev->dev.driver);
+	XenbusState state;
 
 	/* Protect us against watches firing on old details when the otherend
 	   details change, say immediately after a resume. */
@@ -294,9 +295,10 @@ static void otherend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	XenbusState state = xenbus_read_driver_state(dev->otherend);
+	state = xenbus_read_driver_state(dev->otherend);
 
-	DPRINTK("state is %d, %s, %s", state, dev->otherend_watch.node, vec[XS_WATCH_PATH]);
+	DPRINTK("state is %d, %s, %s",
+		state, dev->otherend_watch.node, vec[XS_WATCH_PATH]);
 
 	drv->otherend_changed(dev, state);
 }
