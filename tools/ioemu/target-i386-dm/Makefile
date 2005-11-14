@@ -376,9 +376,9 @@ mixeng.o: mixeng.c mixeng.h mixeng_template.h
 
 clean:
 	rm -rf *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe slirp
+	rm -rf config.mak config.h
 
-distclean:
-	rm -rf *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe slirp
+distclean: clean
 
 install: all 
 	if [ ! -d $(INSTALL_DIR) ];then mkdir -p $(INSTALL_DIR);fi
