@@ -228,7 +228,7 @@ class XmTestDomain(XenDomain):
 #            status, output = traceCommand("xm list")
 
         XenDomain.start(self)
-        waitForBoot()
+#        waitForBoot()
 
     def startNow(self):
         XenDomain.start(self)

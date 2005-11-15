@@ -239,13 +239,13 @@ static pagetable_t page_table_convert(struct domain *d)
     
     l4page = alloc_domheap_page(NULL);
     if (l4page == NULL)
-        domain_crash();
+        domain_crash(d);
     l4 = map_domain_page(page_to_pfn(l4page));
     memset(l4, 0, PAGE_SIZE);
 
     l3page = alloc_domheap_page(NULL);
     if (l3page == NULL)
-        domain_crash();
+        domain_crash(d);
     l3 =  map_domain_page(page_to_pfn(l3page));
     memset(l3, 0, PAGE_SIZE);
 

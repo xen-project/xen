@@ -191,12 +191,12 @@ static inline int long_mode_do_msr_read(struct cpu_user_regs *regs)
     case MSR_FS_BASE:
         if (!(VMX_LONG_GUEST(vc)))
             /* XXX should it be GP fault */
-            domain_crash();
+            domain_crash(vc->domain);
         __vmread(GUEST_FS_BASE, &msr_content);
         break;
     case MSR_GS_BASE:
         if (!(VMX_LONG_GUEST(vc)))
-            domain_crash();
+            domain_crash(vc->domain);
         __vmread(GUEST_GS_BASE, &msr_content);
         break;
     case MSR_SHADOW_GS_BASE:
@@ -260,7 +260,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
     case MSR_FS_BASE:
     case MSR_GS_BASE:
         if (!(VMX_LONG_GUEST(vc)))
-            domain_crash();
+            domain_crash(vc->domain);
         if (!IS_CANO_ADDRESS(msr_content)){
             VMX_DBG_LOG(DBG_LEVEL_1, "Not cano address of msr write\n");
             vmx_inject_exception(vc, TRAP_gp_fault, 0);
@@ -273,7 +273,7 @@ static inline int long_mode_do_msr_write(struct cpu_user_regs *regs)
 
     case MSR_SHADOW_GS_BASE:
         if (!(VMX_LONG_GUEST(vc)))
-            domain_crash();
+            domain_crash(vc->domain);
         vc->arch.arch_vmx.msr_content.shadow_gs = msr_content;
         wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
         break;

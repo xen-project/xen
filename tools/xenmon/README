@@ -1,0 +1,104 @@
+Xen Performance Monitor
+-----------------------
+
+The xenmon tools make use of the existing xen tracing feature to provide fine
+grained reporting of various domain related metrics. It should be stressed that
+the xenmon.py script included here is just an example of the data that may be
+displayed. The xenbake demon keeps a large amount of history in a shared memory
+area that may be accessed by tools such as xenmon.
+
+For each domain, xenmon reports various metrics. One part of the display is a
+group of metrics that have been accumulated over the last second, while another
+part of the display shows data measured over 10 seconds. Other measurement
+intervals are possible, but we have just chosen 1s and 10s as an example.
+
+
+Execution Count
+---------------
+ o The number of times that a domain was scheduled to run (ie, dispatched) over
+ the measurement interval
+
+
+CPU usage
+---------
+ o Total time used over the measurement interval
+ o Usage expressed as a percentage of the measurement interval
+ o Average cpu time used during each execution of the domain
+
+
+Waiting time
+------------
+This is how much time the domain spent waiting to run, or put another way, the
+amount of time the domain spent in the "runnable" state (or on the run queue)
+but not actually running. Xenmon displays:
+
+ o Total time waiting over the measurement interval
+ o Wait time expressed as a percentage of the measurement interval
+ o Average waiting time for each execution of the domain
+
+Blocked time
+------------
+This is how much time the domain spent blocked (or sleeping); Put another way,
+the amount of time the domain spent not needing/wanting the cpu because it was
+waiting for some event (ie, I/O). Xenmon reports:
+
+ o Total time blocked over the measurement interval
+ o Blocked time expressed as a percentage of the measurement interval
+ o Blocked time per I/O (see I/O count below)
+
+Allocation time
+---------------
+This is how much cpu time was allocated to the domain by the scheduler; This is
+distinct from cpu usage since the "time slice" given to a domain is frequently
+cut short for one reason or another, ie, the domain requests I/O and blocks.
+Xenmon reports:
+
+ o Average allocation time per execution (ie, time slice)
+ o Min and Max allocation times
+
+I/O Count
+---------
+This is a rough measure of I/O requested by the domain. The number of page
+exchanges (or page "flips") between the domain and dom0 are counted. The
+number of pages exchanged may not accurately reflect the number of bytes
+transferred to/from a domain due to partial pages being used by the network
+protocols, etc. But it does give a good sense of the magnitude of I/O being
+requested by a domain. Xenmon reports:
+
+ o Total number of page exchanges during the measurement interval
+ o Average number of page exchanges per execution of the domain
+
+
+Usage Notes and issues
+----------------------
+ - Start xenmon by simply running xenmon.py; The xenbake demon is started and
+   stopped automatically by xenmon.
+ - To see the various options for xenmon, run xenmon -h. Ditto for xenbaked.
+ - xenmon also has an option (-n) to output log data to a file instead of the
+   curses interface.
+ - NDOMAINS is defined to be 32, but can be changed by recompiling xenbaked
+ - Xenmon.py appears to create 1-2% cpu overhead; Part of this is just the
+   overhead of the python interpreter. Part of it may be the number of trace
+   records being generated. The number of trace records generated can be
+   limited by setting the trace mask (with a dom0 Op), which controls which
+   events cause a trace record to be emitted.
+ - To exit xenmon, type 'q'
+ - To cycle the display to other physical cpu's, type 'c'
+
+Future Work
+-----------
+o RPC interface to allow external entities to programmatically access processed data
+o I/O Count batching to reduce number of trace records generated
+
+Case Study
+----------
+We have written a case study which demonstrates some of the usefulness of
+this tool and the metrics reported. It is available at:
+http://www.hpl.hp.com/techreports/2005/HPL-2005-187.html
+
+Authors
+-------
+Diwaker Gupta   <diwaker.gupta@hp.com>
+Rob Gardner     <rob.gardner@hp.com>
+Lucy Cherkasova <lucy.cherkasova.hp.com>
+

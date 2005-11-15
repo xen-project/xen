@@ -199,7 +199,7 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
 	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
 	if (pte)
-		make_page_readonly(pte);
+		make_lowmem_page_readonly(pte);
 	return pte;
 }
 
@@ -336,7 +336,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 		spin_lock_irqsave(&pgd_lock, flags);
 		memcpy(pmd, copy_pmd, PAGE_SIZE);
 		spin_unlock_irqrestore(&pgd_lock, flags);
-		make_page_readonly(pmd);
+		make_lowmem_page_readonly(pmd);
 		set_pgd(&pgd[USER_PTRS_PER_PGD], __pgd(1 + __pa(pmd)));
 	}
 
@@ -367,12 +367,12 @@ void pgd_free(pgd_t *pgd)
 	if (PTRS_PER_PMD > 1) {
 		for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
 			pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
-			make_page_writable(pmd);
+			make_lowmem_page_writable(pmd);
 			kmem_cache_free(pmd_cache, pmd);
 		}
 		if (!HAVE_SHARED_KERNEL_PMD) {
 			pmd_t *pmd = (void *)__va(pgd_val(pgd[USER_PTRS_PER_PGD])-1);
-			make_page_writable(pmd);
+			make_lowmem_page_writable(pmd);
 			memset(pmd, 0, PTRS_PER_PMD*sizeof(pmd_t));
 			kmem_cache_free(pmd_cache, pmd);
 		}
@@ -382,6 +382,7 @@ void pgd_free(pgd_t *pgd)
 }
 
 #ifndef CONFIG_XEN_SHADOW_MODE
+asmlinkage int xprintk(const char *fmt, ...);
 void make_lowmem_page_readonly(void *va)
 {
 	pte_t *pte = virt_to_ptep(va);
@@ -399,8 +400,7 @@ void make_page_readonly(void *va)
 	pte_t *pte = virt_to_ptep(va);
 	set_pte(pte, pte_wrprotect(*pte));
 	if ((unsigned long)va >= (unsigned long)high_memory) {
-		unsigned long pfn; 
-		pfn = pte_pfn(*pte); 
+		unsigned long pfn = pte_pfn(*pte);
 #ifdef CONFIG_HIGHMEM
 		if (pfn < highstart_pfn)
 #endif
@@ -414,8 +414,7 @@ void make_page_writable(void *va)
 	pte_t *pte = virt_to_ptep(va);
 	set_pte(pte, pte_mkwrite(*pte));
 	if ((unsigned long)va >= (unsigned long)high_memory) {
-		unsigned long pfn; 
-		pfn = pte_pfn(*pte); 
+		unsigned long pfn = pte_pfn(*pte); 
 #ifdef CONFIG_HIGHMEM
 		if (pfn < highstart_pfn)
 #endif
