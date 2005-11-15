@@ -13,15 +13,6 @@
  *
  */
 
-/*#define WAKE_HISTO*/
-/*#define BLOCKTIME_HISTO*/
-
-#if defined(WAKE_HISTO)
-#define BUCKETS 31
-#elif defined(BLOCKTIME_HISTO)
-#define BUCKETS 200
-#endif
-
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -45,6 +36,8 @@ extern void arch_getdomaininfo_ctxt(struct vcpu *,
 static char opt_sched[10] = "sedf";
 string_param("sched", opt_sched);
 
+/*#define WAKE_HISTO*/
+/*#define BLOCKTIME_HISTO*/
 #if defined(WAKE_HISTO)
 #define BUCKETS 31
 #elif defined(BLOCKTIME_HISTO)
@@ -205,9 +198,7 @@ void vcpu_wake(struct vcpu *v)
     if ( likely(domain_runnable(v)) )
     {
         SCHED_OP(wake, v);
-#ifdef WAKE_HISTO
         v->wokenup = NOW();
-#endif
     }
     clear_bit(_VCPUF_cpu_migrated, &v->vcpu_flags);
     spin_unlock_irqrestore(&schedule_data[v->processor].schedule_lock, flags);
@@ -416,10 +407,25 @@ static void __enter_scheduler(void)
         return continue_running(prev);
     }
 
+    TRACE_2D(TRC_SCHED_SWITCH_INFPREV,
+             prev->domain->domain_id, now - prev->lastschd);
+    TRACE_3D(TRC_SCHED_SWITCH_INFNEXT,
+             next->domain->domain_id, now - next->wokenup, r_time);
+
     clear_bit(_VCPUF_running, &prev->vcpu_flags);
     set_bit(_VCPUF_running, &next->vcpu_flags);
 
     perfc_incrc(sched_ctx);
+
+    /*
+     * Logic of wokenup field in domain struct:
+     * Used to calculate "waiting time", which is the time that a domain
+     * spends being "runnable", but not actually running. wokenup is set
+     * set whenever a domain wakes from sleeping. However, if wokenup is not
+     * also set here then a preempted runnable domain will get a screwed up
+     * "waiting time" value next time it is scheduled.
+     */
+    prev->wokenup = NOW();
 
 #if defined(WAKE_HISTO)
     if ( !is_idle_task(next->domain) && next->wokenup )

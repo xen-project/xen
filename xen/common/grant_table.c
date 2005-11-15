@@ -29,6 +29,7 @@
 #include <xen/shadow.h>
 #include <xen/mm.h>
 #include <acm/acm_hooks.h>
+#include <xen/trace.h>
 
 #if defined(CONFIG_X86_64)
 #define GRANT_PTE_FLAGS (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
@@ -379,6 +380,8 @@ __gnttab_map_grant_ref(
         }
     }
 
+    TRACE_1D(TRC_MEM_PAGE_GRANT_MAP, dom);
+
     ld->grant_table->maptrack[handle].domid         = dom;
     ld->grant_table->maptrack[handle].ref_and_flags =
         (ref << MAPTRACK_REF_SHIFT) |
@@ -462,6 +465,8 @@ __gnttab_unmap_grant_ref(
         (void)__put_user(GNTST_bad_domain, &uop->status);
         return GNTST_bad_domain;
     }
+
+    TRACE_1D(TRC_MEM_PAGE_GRANT_UNMAP, dom);
 
     act = &rd->grant_table->active[ref];
     sha = &rd->grant_table->shared[ref];
@@ -802,6 +807,8 @@ gnttab_transfer(
         page_set_owner(page, e);
         
         spin_unlock(&e->page_alloc_lock);
+
+        TRACE_1D(TRC_MEM_PAGE_GRANT_TRANSFER, e->domain_id);
         
         /* Tell the guest about its new page frame. */
         sha = &e->grant_table->shared[gop->ref];
