@@ -148,6 +148,8 @@
 ^tools/vtpm_manager/manager/vtpm_managerd$
 ^tools/xcutils/xc_restore$
 ^tools/xcutils/xc_save$
+^tools/xenmon/setmask$
+^tools/xenmon/xenbaked$
 ^tools/xenstat/xentop/xentop$
 ^tools/xenstore/testsuite/tmp/.*$
 ^tools/xenstore/xen$
