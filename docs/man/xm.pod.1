@@ -488,48 +488,125 @@ explainitory.
 
 =head1 SCHEDULER SUBCOMMANDS
 
+Xen ships with a number of domain schedulers, which can be set at boot
+time with the I<sched=> parameter on the Xen command line.  By
+default I<sedf> is used for scheduling.
+
 FIXME: we really need a scheduler expert to write up this section.
 
 =over 4
 
-=item I<sched-bvt> <Parameters>
+=item I<sched-bvt> <mcuadv> <warpback> <warpvalue> <warpl> <warpu>
+
+Performs runtime adjustments to the default parameters for the
+Borrowed Virtual Time (BVT) scheduler.  For full information on the
+BVT concept, please consult the base paper listed in the B<SEE ALSO>
+section.
 
 Set Borrowed Virtual Time (BVT) scheduler parameters. There are five
-parameters, which are given in order below.
+required parameters, which are given in order below.
+
+B<PARAMETERS>
 
 =over 4
 
-Parameters:
+=item L<mcuadv>
 
-    mcuadv - Minimum Charging Unit (MCU) advance.
-    warpback - Warp back time allowed.
-    warpvalue - Warp value.
-    warpl - Warp maximum limit.
-    warpu - Unwarped minimum limit.
+The MCU (Minimum Charging Unit) advance determines the proportional
+share of the CPU that a domain receives. It is set inversely
+proportionally to a domain's sharing weight.
+
+=item L<warpback>
+
+The amount of `virtual time' the domain is allowed to warp backwards.
+
+=item L<warpvalue>
+
+
+Warp value
+
+=item L<warpl>
+
+The warp limit is the maximum time a domain can run warped for.
+
+=item L<warpu>
+
+The unwarp requirement is the minimum time a domain must run unwarped
+for before it can warp again.
 
 =back 
 
 =item I<sched-bvt-ctxallow> <Allow>
 
-Sets the BVT scheduler's context switch allowance. Allow is the
-minimum time slice allowed to run before being pre-empted.
+Sets the BVT scheduler's context switch allowance. 
 
-=item I<sched-sedf> <Parameters>
+The context switch allowance is similar to the ``quantum'' in
+traditional schedulers. It is the minimum time that a scheduled domain
+will be allowed to run before being preempted.
 
-Set simple sEDF scheduler parameters. Use the following parametersin
-order.
+=item I<sched-sedf> <period> <slice> <latency-hint> <extratime> <weight>
+
+Set Simple EDF scheduler parameters.  This scheduler provides weighted
+CPU sharing in an intuitive way and uses realtime-algorithms to ensure
+time guarantees.  For more information see
+docs/misc/sedf_scheduler_mini-HOWTO.txt in the Xen distribution.
+
+B<PARAMETERS>
 
 =over 4
 
-Parameters:
+=item I<period>
 
-    period - in nanoseconds
-    slice - in nanoseconds
-    latency-hint - scaled period if domain is doing heavy I/O
-    extratime - flag for allowing domain to run in extra time.
-    weight - another way of setting cpu slice.
+The normal EDF scheduling usage in nanosecs
+
+=item I<slice>
+
+The normal EDF scheduling usage in nanosecs
+
+FIXME: these are lame, should explain more.
+
+=item I<latency-hint>
+
+Scaled period if domain is doing heavy I/O.
+
+=item I<extratime>
+
+Flag for allowing domain to run in extra time.
+
+=item I<weight>
+
+Another way of setting cpu slice.
 
 =back
+
+B<EXAMPLES>
+
+normal EDF (20ms/5ms):
+
+    xm sched-sedf <dom-id> 20000000 5000000 0 0 0
+  
+best-effort domains (i.e. non-realtime):
+
+    xm sched-sedf <dom-id> 20000000 0 0 1 0
+ 
+normal EDF (20ms/5ms) + share of extra-time:
+  
+    xm sched-sedf <dom-id> 20000000 5000000 0 1 0
+
+4 domains with weights 2:3:4:2
+
+    xm sched-sedf <d1> 0 0 0 0 2
+    xm sched-sedf <d2> 0 0 0 0 3
+    xm sched-sedf <d3> 0 0 0 0 4
+    xm sched-sedf <d4> 0 0 0 0 2
+  
+1 fully-specified (10ms/3ms) domain, 3 other domains share available
+rest in 2:7:3 ratio:   
+
+    xm sched-sedf <d1> 10000000 3000000 0 0 0   
+    xm sched-sedf <d2> 0 0 0 0 2   
+    xm sched-sedf <d3> 0 0 0 0 7
+    xm sched-sedf <d4> 0 0 0 0 3
 
 =back
 
@@ -541,7 +618,7 @@ event.
 
 =over 4
 
-=item I<block-attach <DomId> <BackDev> <FrontDev> <Mode> [BackDomId]
+=item I<block-attach> <DomId> <BackDev> <FrontDev> <Mode> [BackDomId]
 
 Create a new virtual block device
 
@@ -589,6 +666,12 @@ Delete a vnet.
 =head1 SEE ALSO
 
 B<xmdomain.cfg>(5)
+
+BVT scheduling paper: K.J. Duda and D.R. Cheriton. Borrowed Virtual
+Time (BVT) scheduling: supporting latency-sensitive threads in a
+general purpose scheduler. In proceedings of the 17th ACM SIGOPS
+Symposium on Operating Systems principles, volume 33(5) of ACM
+Operating Systems Review, pages 261-267
 
 =head1 AUTHOR
 
