@@ -60,7 +60,7 @@ case "$command" in
         ifconfig "$vif" up || fatal "ifconfig $vif up failed"
         ;;
 
-    remove)
+    offline)
         # vifs are auto-removed from bridge.
         ifconfig "$vif" down || fatal "ifconfig $vif down failed"
         ;;

@@ -32,7 +32,7 @@ then
 fi
 
 case "$command" in
-    add | offline)
+    add | remove)
         exit 0
         ;;
 esac

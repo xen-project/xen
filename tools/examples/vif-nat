@@ -45,7 +45,7 @@ case "$command" in
         echo 1 >/proc/sys/net/ipv4/conf/${vif}/proxy_arp
         ipcmd='a'
         ;;
-    remove)
+    offline)
         ifconfig ${vif} down
         ipcmd='d'
         ;;
