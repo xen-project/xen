@@ -438,8 +438,10 @@ class XendDomainInfo:
             defaultInfo('cpu',          lambda: None)
             defaultInfo('cpu_weight',   lambda: 1.0)
             defaultInfo('vcpus',        lambda: int(1))
+            defaultInfo('online_vcpus', lambda: self.info['vcpus'])
 
             self.info['vcpus'] = int(self.info['vcpus'])
+            defaultInfo('max_vcpu_id',  lambda: self.info['vcpus']-1)
 
             defaultInfo('vcpu_avail',   lambda: (1 << self.info['vcpus']) - 1)
 
@@ -927,6 +929,7 @@ class XendDomainInfo:
         if self.infoIsSet('cpu_time'):
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])
         sxpr.append(['vcpus', self.info['vcpus']])
+        sxpr.append(['online_vcpus', self.info['online_vcpus']])
             
         if self.infoIsSet('start_time'):
             up_time =  time.time() - self.info['start_time']
@@ -943,16 +946,13 @@ class XendDomainInfo:
 
     def getVCPUInfo(self):
         try:
-            def filter_cpumap(map, max):
-                return filter(lambda x: x >= 0, map[0:max])
-
             # We include the domain name and ID, to help xm.
             sxpr = ['domain',
                     ['domid',      self.domid],
                     ['name',       self.info['name']],
-                    ['vcpu_count', self.info['vcpus']]]
+                    ['vcpu_count', self.info['online_vcpus']]]
 
-            for i in range(0, self.info['vcpus']):
+            for i in range(0, self.info['max_vcpu_id']+1):
                 info = xc.vcpu_getinfo(self.domid, i)
 
                 sxpr.append(['vcpu',
@@ -962,8 +962,7 @@ class XendDomainInfo:
                              ['running',  info['running']],
                              ['cpu_time', info['cpu_time'] / 1e9],
                              ['cpu',      info['cpu']],
-                             ['cpumap',   filter_cpumap(info['cpumap'],
-                                                        self.info['vcpus'])]])
+                             ['cpumap',   info['cpumap']]])
 
             return sxpr
 
