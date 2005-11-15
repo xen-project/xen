@@ -188,7 +188,7 @@ static int __do_suspend(void *ignore)
 	xenbus_resume();
 
 #ifdef CONFIG_SMP
-	for_each_present_cpu(i)
+	for_each_cpu(i)
 		vcpu_prepare(i);
 
  out_reenable_cpus:
