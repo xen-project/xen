@@ -13,47 +13,45 @@ from xen.xend.XendLogging import log
 
 class xswatch:
 
-    watchThread = None
-    xs = None
-    xslock = threading.Lock()
-    
     def __init__(self, path, fn, *args, **kwargs):
         self.path = path
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
-        xswatch.watchStart()
-        xswatch.xs.watch(path, self)
+        watchStart()
+        xs.watch(path, self)
 
 
-    def watchStart(cls):
-        cls.xslock.acquire()
+watchThread = None
+xs = None
+xslock = threading.Lock()
+
+def watchStart():
+    global watchThread
+    global xs
+    
+    xslock.acquire()
+    try:
+        if watchThread:
+            return
+        xs = xshandle()
+        watchThread = threading.Thread(name="Watcher", target=watchMain)
+        watchThread.setDaemon(True)
+        watchThread.start()
+    finally:
+        xslock.release()
+
+
+def watchMain():
+    while True:
         try:
-            if cls.watchThread:
-                return
-            cls.xs = xshandle()
-            cls.watchThread = threading.Thread(name="Watcher",
-                                               target=cls.watchMain)
-            cls.watchThread.setDaemon(True)
-            cls.watchThread.start()
-        finally:
-            cls.xslock.release()
-
-    watchStart = classmethod(watchStart)
-
-
-    def watchMain(cls):
-        while True:
-            try:
-                we = cls.xs.read_watch()
-                watch = we[1]
-                res = watch.fn(*watch.args, **watch.kwargs)
-                if not res:
-                    cls.xs.unwatch(watch.path, watch)
-            except:
-                log.exception("read_watch failed")
-                # Ignore this exception -- there's no point throwing it
-                # further on because that will just kill the watcher thread,
-                # which achieves nothing.
-
-    watchMain = classmethod(watchMain)
+            we = xs.read_watch()
+            watch = we[1]
+            res = watch.fn(*watch.args, **watch.kwargs)
+            if not res:
+                xs.unwatch(watch.path, watch)
+        except:
+            log.exception("read_watch failed")
+            # Ignore this exception -- there's no point throwing it
+            # further on because that will just kill the watcher thread,
+            # which achieves nothing.
