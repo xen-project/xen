@@ -416,7 +416,7 @@ int main_loop(void)
 	FD_ZERO(&wakeup_rfds);
 	FD_SET(evtchn_fd, &wakeup_rfds);
 	highest_fds = evtchn_fd;
-	env->send_event = 0
+	env->send_event = 0;
 	while (1) {
                 if (vm_running) {
                     if (shutdown_requested) {
