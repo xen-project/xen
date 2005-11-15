@@ -16,7 +16,7 @@
  *
  * Copyright (C) 2005 Mike Wray Hewlett-Packard
  * Copyright (C) 2005 Christian Limpach <Christian.Limpach@cl.cam.ac.uk>
- *
+ * Copyright (C) 2005 XenSource Ltd.
  */
 
 #include <Python.h>
@@ -453,25 +453,20 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
 
     XsHandle *xsh = (XsHandle *)self;
     struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
     int xsval = 0;
 
     if (!xh)
-        goto exit;
+        return NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, 
                                      &path, &token))
-        goto exit;
-    Py_INCREF(token);
-    sprintf(token_str, "%li", (unsigned long)token);
-    Py_BEGIN_ALLOW_THREADS
-    xsval = xs_watch(xh, path, token_str);
-    Py_END_ALLOW_THREADS
-    if (!xsval) {
-        PyErr_SetFromErrno(PyExc_RuntimeError);
-        Py_DECREF(token);
-        goto exit;
-    }
+        return NULL;
 
+    /* Note that we have to store the watch token in the xs->watches list
+       before registering the watch with xs_watch, otherwise this function
+       races with xs_read_watch.
+    */
+
+    Py_INCREF(token);
     for (i = 0; i < PyList_Size(xsh->watches); i++) {
         if (PyList_GetItem(xsh->watches, i) == Py_None) {
             PyList_SetItem(xsh->watches, i, token);
@@ -480,10 +475,26 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
     }
     if (i == PyList_Size(xsh->watches))
         PyList_Append(xsh->watches, token);
+
+    sprintf(token_str, "%li", (unsigned long)token);
+    Py_BEGIN_ALLOW_THREADS
+    xsval = xs_watch(xh, path, token_str);
+    Py_END_ALLOW_THREADS
+    if (!xsval) {
+        for (i = 0; i < PyList_Size(xsh->watches); i++) {
+            if (PyList_GetItem(xsh->watches, i) == token) {
+                Py_INCREF(Py_None);
+                PyList_SetItem(xsh->watches, i,  Py_None);
+                break;
+            }
+        }
+
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        return NULL;
+    }
+
     Py_INCREF(Py_None);
-    val = Py_None;
- exit:
-    return val;
+    return Py_None;
 }
 
 #define xspy_read_watch_doc "\n"				\
@@ -944,3 +955,11 @@ PyMODINIT_FUNC initxs (void)
 
     module = Py_InitModule(PYPKG, xs_methods);
 }
+
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ */
