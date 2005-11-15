@@ -36,6 +36,7 @@ from xen.xend import XendCheckpoint
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 from xen.xend.server import relocate
+from xen.xend.xenstore.xswatch import xswatch
 
 
 xc = xen.lowlevel.xc.new()
@@ -58,9 +59,11 @@ class XendDomain:
         # to import XendDomain from XendDomainInfo causes unbounded recursion.
         # So we stuff the XendDomain instance (self) into xroot's components.
         xroot.add_component("xen.xend.XendDomain", self)
+
         self.domains = {}
         self.domains_lock = threading.RLock()
-        self.watchReleaseDomain()
+
+        xswatch("@releaseDomain", self.onReleaseDomain)
 
         self.domains_lock.acquire()
         try:
@@ -112,11 +115,7 @@ class XendDomain:
             self.refresh()
         finally:
             self.domains_lock.release()
-            
-
-    def watchReleaseDomain(self):
-        from xen.xend.xenstore.xswatch import xswatch
-        self.releaseDomain = xswatch("@releaseDomain", self.onReleaseDomain)
+        return 1
 
 
     def xen_domains(self):
