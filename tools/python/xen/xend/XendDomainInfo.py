@@ -437,12 +437,18 @@ class XendDomainInfo:
             defaultInfo('on_crash',     lambda: "restart")
             defaultInfo('cpu',          lambda: None)
             defaultInfo('cpu_weight',   lambda: 1.0)
-            defaultInfo('vcpus',        lambda: int(1))
+
+            # some domains don't have a config file (e.g. dom0 )
+            # to set number of vcpus so we derive available cpus
+            # from max_vcpu_id which is present for running domains.
+            if not self.infoIsSet('vcpus') and self.infoIsSet('max_vcpu_id'):
+                avail = int(self.info['max_vcpu_id'])+1
+            else:
+                avail = int(1)
+
+            defaultInfo('vcpus',        lambda: avail)
             defaultInfo('online_vcpus', lambda: self.info['vcpus'])
-
-            self.info['vcpus'] = int(self.info['vcpus'])
             defaultInfo('max_vcpu_id',  lambda: self.info['vcpus']-1)
-
             defaultInfo('vcpu_avail',   lambda: (1 << self.info['vcpus']) - 1)
 
             defaultInfo('memory',       lambda: 0)
