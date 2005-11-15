@@ -11,6 +11,7 @@ SUBDIRS += xcutils
 SUBDIRS += firmware
 SUBDIRS += security
 SUBDIRS += console
+SUBDIRS += xenmon
 ifeq ($(VTPM_TOOLS),y)
 SUBDIRS += vtpm_manager
 SUBDIRS += vtpm

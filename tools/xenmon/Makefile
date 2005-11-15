@@ -1,0 +1,51 @@
+# Copyright (C) HP Labs, Palo Alto and Fort Collins, 2005
+# Author: Diwaker Gupta <diwaker.gupta@hp.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; under version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+INSTALL         = install
+INSTALL_PROG    = $(INSTALL) -m0755
+INSTALL_DIR     = $(INSTALL) -d -m0755
+INSTALL_DATA    = $(INSTALL) -m064
+
+prefix=/usr/local
+mandir=$(prefix)/share/man
+man1dir=$(mandir)/man1
+sbindir=$(prefix)/sbin
+
+XEN_ROOT=../..
+include $(XEN_ROOT)/tools/Rules.mk
+
+CFLAGS += -Wall -Werror -g
+CFLAGS  += -I $(XEN_XC)
+CFLAGS  += -I $(XEN_LIBXC)
+LDFLAGS += -L $(XEN_LIBXC)
+
+BIN = setmask xenbaked
+SCRIPTS = xenmon.py
+
+all: build
+
+build: $(BIN)
+
+install: xenbaked setmask
+	[ -d $(DESTDIR)$(sbindir) ] || $(INSTALL_DIR) $(DESTDIR)$(sbindir)
+	$(INSTALL_PROG) xenbaked $(DESTDIR)$(sbindir)/xenbaked
+	$(INSTALL_PROG) setmask  $(DESTDIR)$(sbindir)/setmask
+	$(INSTALL_PROG) xenmon.py  $(DESTDIR)$(sbindir)/xenmon.py
+
+clean:
+	rm -f $(BIN)
+
+
+%: %.c Makefile
+	$(CC) $(CFLAGS) $(LDFLAGS) -lxenctrl -o $@ $<
+
+
