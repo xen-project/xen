@@ -62,26 +62,37 @@ class XmConsole:
         self.historySaveCmds  = historySaveCmds
         self.debugMe          = False
         self.limit            = None
+        self.delay            = 2
 
         consoleCmd = ["/usr/sbin/xm", "xm", "console", domain]
 
-        if verbose:
-            print "Console executing: " + str(consoleCmd)
+        start = time.time()
 
-        pid, fd = pty.fork()
+        while (time.time() - start) < self.TIMEOUT:
+            if verbose:
+                print "Console executing: %s" % str(consoleCmd)
 
-        if pid == 0:
-            os.execvp("/usr/sbin/xm", consoleCmd[1:])
+            pid, fd = pty.fork()
 
-        self.consolePid = pid
-        self.consoleFd  = fd
+            if pid == 0:
+                os.execvp("/usr/sbin/xm", consoleCmd[1:])
 
-        tty.setraw(self.consoleFd, termios.TCSANOW)
+            self.consolePid = pid
+            self.consoleFd  = fd
+
+            tty.setraw(self.consoleFd, termios.TCSANOW)
             
-        bytes = self.__chewall(self.consoleFd)
-        if bytes < 0:
-            raise ConsoleError("Console didn't respond")
+            bytes = self.__chewall(self.consoleFd)
 
+            if bytes > 0:
+                return
+
+            if verbose:
+                print "Console didn't attach, waiting %i sec..." % self.delay
+            time.sleep(self.delay)
+
+        raise ConsoleError("Console didn't respond after %i secs" % self.TIMEOUT)
+    
     def __addToHistory(self, line):
         self.historyBuffer.append(line)
         self.historyLines += 1
