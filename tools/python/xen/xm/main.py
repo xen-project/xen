@@ -260,13 +260,13 @@ def parse_doms_info(info):
         return t(sxp.child_value(info, n, d))
     
     return {
-        'dom'      : get_info('domid',    int,   -1),
-        'name'     : get_info('name',     str,   '??'),
-        'mem'      : get_info('memory',   int,   0),
-        'vcpus'    : get_info('vcpus',    int,   0),
-        'state'    : get_info('state',    str,   '??'),
-        'cpu_time' : get_info('cpu_time', float, 0),
-        'ssidref'  : get_info('ssidref',  int,   0),
+        'dom'      : get_info('domid',        int,   -1),
+        'name'     : get_info('name',         str,   '??'),
+        'mem'      : get_info('memory',       int,   0),
+        'vcpus'    : get_info('online_vcpus', int,   0),
+        'state'    : get_info('state',        str,   '??'),
+        'cpu_time' : get_info('cpu_time',     float, 0),
+        'ssidref'  : get_info('ssidref',      int,   0),
         }
 
 
