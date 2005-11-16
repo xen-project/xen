@@ -10,5 +10,5 @@ from XmTestLib import *
 status, output = traceCommand("xm -x")
 eyecatcher = "Error:"
 where = output.find(eyecatcher)
-if where != 0:
+if where == -1:
     FAIL("xm failed to report error for bad arg")

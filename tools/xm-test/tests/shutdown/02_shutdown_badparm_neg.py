@@ -32,7 +32,7 @@ ret, output = traceCommand("xm shutdown -x %s" % domain.getName())
 where = output.find(eyecatcher)
 if (ret == 0):
     FAIL("xm shutdown returned invalid %i == 0" % ret)
-elif where != 0:
+elif where == -1:
     FAIL("xm shutdown failed to report error for bad arg")
 
 # Stop the domain (nice shutdown)

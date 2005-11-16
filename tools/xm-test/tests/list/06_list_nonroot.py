@@ -11,5 +11,5 @@ becomeNonRoot()
 status, output = traceCommand("xm list")
 eyecatcher = "Error: Most commands need root access"
 where = output.find(eyecatcher)
-if where != 0:
+if where == -1:
     FAIL("xm help: didn't see the root hint, saw %s" % output)
