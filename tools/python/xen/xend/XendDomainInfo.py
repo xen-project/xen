@@ -597,7 +597,8 @@ class XendDomainInfo:
         if self.infoIsSet('image'):
             to_store['image'] = sxp.to_string(self.info['image'])
 
-        to_store['start_time'] = str(self.info['start_time'])
+        if self.infoIsSet('start_time'):
+            to_store['start_time'] = str(self.info['start_time'])
 
         log.debug("Storing VM details: %s", to_store)
 

@@ -629,7 +629,7 @@ static int setup_guest(int xc_handle,
     memset(start_info, 0, sizeof(*start_info));
     rc = xc_version(xc_handle, XENVER_version, NULL);
     sprintf(start_info->magic, "xen-%i.%i-x86_%d%s",
-            rc >> 16, rc & (0xFFFF), sizeof(long)*8,
+            rc >> 16, rc & (0xFFFF), (unsigned int)sizeof(long)*8,
             dsi.pae_kernel ? "p" : "");
     start_info->nr_pages     = nr_pages;
     start_info->shared_info  = shared_info_frame << PAGE_SHIFT;
