@@ -22,6 +22,10 @@ class xswatch:
         xs.watch(path, self)
 
 
+    def unwatch(self):
+        xs.unwatch(self.path, self)
+
+
 watchThread = None
 xs = None
 xslock = threading.Lock()
@@ -49,7 +53,7 @@ def watchMain():
             watch = we[1]
             res = watch.fn(*watch.args, **watch.kwargs)
             if not res:
-                xs.unwatch(watch.path, watch)
+                watch.unwatch()
         except:
             log.exception("read_watch failed")
             # Ignore this exception -- there's no point throwing it
