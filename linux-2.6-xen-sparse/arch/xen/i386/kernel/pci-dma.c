@@ -15,6 +15,7 @@
 #include <asm/io.h>
 #include <asm-xen/balloon.h>
 #include <asm/tlbflush.h>
+#include <asm/swiotlb.h>
 
 struct dma_coherent_mem {
 	void		*virt_base;
