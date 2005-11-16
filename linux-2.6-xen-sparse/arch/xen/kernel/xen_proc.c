@@ -1,6 +1,7 @@
 
 #include <linux/config.h>
 #include <linux/proc_fs.h>
+#include <asm-xen/xen_proc.h>
 
 static struct proc_dir_entry *xen_base;
 
