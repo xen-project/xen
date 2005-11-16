@@ -124,10 +124,12 @@ long do_xen_version(int cmd, void *arg)
         return 0;
     }
     
-    case XENVER_parameters:
+    case XENVER_platform_parameters:
     {
-        xen_parameters_info_t info = { .virt_start = HYPERVISOR_VIRT_START };
-        if ( copy_to_user(arg, &info, sizeof(info)) )
+        xen_platform_parameters_t params = {
+            .virt_start = HYPERVISOR_VIRT_START
+        };
+        if ( copy_to_user(arg, &params, sizeof(params)) )
             return -EFAULT;
         return 0;
         
