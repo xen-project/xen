@@ -53,6 +53,7 @@
 #include <asm-xen/xen-public/event_channel.h>
 #include <asm/hypervisor.h>
 #include <asm-xen/evtchn.h>
+#include <asm-xen/xencons.h>
 
 #include "xencons_ring.h"
 /*

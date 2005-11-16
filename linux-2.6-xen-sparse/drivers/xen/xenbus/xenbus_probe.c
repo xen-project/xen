@@ -854,7 +854,7 @@ int register_xenstore_notifier(struct notifier_block *nb)
 {
 	int ret = 0;
 
-        if(xenstored_ready > 0) 
+	if (xenstored_ready > 0) 
 		ret = nb->notifier_call(nb, 0, NULL);
 	else 
 		notifier_chain_register(&xenstore_chain, nb);
@@ -884,7 +884,7 @@ void xenbus_probe(void *unused)
 	register_xenbus_watch(&be_watch);
 
 	/* Notify others that xenstore is up */
-	notifier_call_chain(&xenstore_chain, 0, 0);
+	notifier_call_chain(&xenstore_chain, 0, NULL);
 }
 
 

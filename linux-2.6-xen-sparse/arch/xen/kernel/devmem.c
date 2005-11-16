@@ -79,7 +79,7 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 
 	if ((v = ioremap(p, count)) == NULL)
 		return -EFAULT;
-	if (copy_to_user(v, buf, count))
+	if (copy_from_user(v, buf, count))
 		goto out;
 
 	written = count;

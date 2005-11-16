@@ -351,7 +351,7 @@ static int setup_guest(int xc_handle,
         xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, page_array[0]);
     memset(start_info, 0, sizeof(*start_info));
     rc = xc_version(xc_handle, XENVER_version, NULL);
-    sprintf(start_info->magic, "xen-%i.%i", rc >> 16, rc & (0xFFFF));
+    sprintf(start_info->magic, "xen-%i.%i-ia64", rc >> 16, rc & (0xFFFF));
     start_info->flags        = flags;
     start_info->store_mfn    = nr_pages - 2;
     start_info->store_evtchn = store_evtchn;
@@ -628,7 +628,9 @@ static int setup_guest(int xc_handle,
         page_array[(vstartinfo_start-dsi.v_start)>>PAGE_SHIFT]);
     memset(start_info, 0, sizeof(*start_info));
     rc = xc_version(xc_handle, XENVER_version, NULL);
-    sprintf(start_info->magic, "xen-%i.%i", rc >> 16, rc & (0xFFFF));
+    sprintf(start_info->magic, "xen-%i.%i-x86_%d%s",
+            rc >> 16, rc & (0xFFFF), sizeof(long)*8,
+            dsi.pae_kernel ? "p" : "");
     start_info->nr_pages     = nr_pages;
     start_info->shared_info  = shared_info_frame << PAGE_SHIFT;
     start_info->flags        = flags;

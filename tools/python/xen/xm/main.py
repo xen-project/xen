@@ -118,8 +118,6 @@ xm full list of subcommands:
         Create a new virtual network device 
     network-detach  <DomId> <DevId>  Destroy a domain's virtual network
                                      device, where <DevId> is the device ID.
-    network-limit   <DomId> <Vif> <Credit> <Period>
-        Limit the transmission rate of a virtual network interface
     network-list    <DomId>        List virtual network interfaces for a domain
 
   Vnet commands:
@@ -557,13 +555,6 @@ def xm_log(args):
     from xen.xend.XendClient import server
     print server.xend_node_log()
 
-def xm_network_limit(args):
-    arg_check(args,4,"network-limit")
-    dom = args[0]
-    v = map(int, args[1:4])
-    from xen.xend.XendClient import server
-    server.xend_domain_vif_limit(dom, *v)
-
 def xm_network_list(args):
     arg_check(args,1,"network-list")
     dom = args[0]
@@ -716,7 +707,6 @@ commands = {
     # network
     "network-attach": xm_network_attach,
     "network-detach": xm_network_detach,
-    "network-limit": xm_network_limit,
     "network-list": xm_network_list,
     # vnet
     "vnet-list": xm_vnet_list,
@@ -739,7 +729,6 @@ for c in subcommands:
 aliases = {
     "balloon": "mem-set",
     "vif-list": "network-list",
-    "vif-limit": "network-limit",
     "vbd-create": "block-create",
     "vbd-destroy": "block-destroy",
     "vbd-list": "block-list",

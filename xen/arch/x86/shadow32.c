@@ -1826,7 +1826,7 @@ shadow_free_snapshot(struct domain *d, struct out_of_sync_entry *entry)
 }
 
 struct out_of_sync_entry *
-shadow_mark_mfn_out_of_sync(struct vcpu *v, unsigned long gpfn,
+__shadow_mark_mfn_out_of_sync(struct vcpu *v, unsigned long gpfn,
                              unsigned long mfn)
 {
     struct domain *d = v->domain;
@@ -1862,7 +1862,6 @@ shadow_mark_mfn_out_of_sync(struct vcpu *v, unsigned long gpfn,
     entry->v = v;
     entry->gpfn = gpfn;
     entry->gmfn = mfn;
-    entry->snapshot_mfn = shadow_make_snapshot(d, gpfn, mfn);
     entry->writable_pl1e = -1;
 
 #if SHADOW_DEBUG
@@ -1874,6 +1873,18 @@ shadow_mark_mfn_out_of_sync(struct vcpu *v, unsigned long gpfn,
     //
     get_page(page, d);
 
+    return entry;
+}
+
+struct out_of_sync_entry *
+shadow_mark_mfn_out_of_sync(struct vcpu *v, unsigned long gpfn,
+                             unsigned long mfn)
+{
+    struct out_of_sync_entry *entry =
+      __shadow_mark_mfn_out_of_sync(v, gpfn, mfn);
+    struct domain *d = v->domain;
+
+    entry->snapshot_mfn = shadow_make_snapshot(d, gpfn, mfn);
     // Add to the out-of-sync list
     //
     entry->next = d->arch.out_of_sync;
@@ -1886,8 +1897,9 @@ void shadow_mark_va_out_of_sync(
     struct vcpu *v, unsigned long gpfn, unsigned long mfn, unsigned long va)
 {
     struct out_of_sync_entry *entry =
-        shadow_mark_mfn_out_of_sync(v, gpfn, mfn);
+        __shadow_mark_mfn_out_of_sync(v, gpfn, mfn);
     l2_pgentry_t sl2e;
+    struct domain *d = v->domain;
 
     // We need the address of shadow PTE that maps @va.
     // It might not exist yet.  Make sure it's there.
@@ -1902,6 +1914,7 @@ void shadow_mark_va_out_of_sync(
     }
     ASSERT(l2e_get_flags(sl2e) & _PAGE_PRESENT);
 
+    entry->snapshot_mfn = shadow_make_snapshot(d, gpfn, mfn);
     // NB: this is stored as a machine address.
     entry->writable_pl1e =
         l2e_get_paddr(sl2e) | (sizeof(l1_pgentry_t) * l1_table_offset(va));
@@ -1913,6 +1926,11 @@ void shadow_mark_va_out_of_sync(
     //
     if ( !get_shadow_ref(l2e_get_pfn(sl2e)) )
         BUG();
+
+    // Add to the out-of-sync list
+    //
+    entry->next = d->arch.out_of_sync;
+    d->arch.out_of_sync = entry;
 
     FSH_LOG("mark_out_of_sync(va=%lx -> writable_pl1e=%lx)",
             va, entry->writable_pl1e);
