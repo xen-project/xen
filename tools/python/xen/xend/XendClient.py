@@ -302,13 +302,6 @@ class Xend:
                             {'op'    : 'set_vcpus',
                              'vcpus' : vcpus })
 
-    def xend_domain_vif_limit(self, id, vif, credit, period):
-        return self.xendPost(self.domainurl(id),
-                            { 'op'      : 'vif_limit_set',
-                              'vif'     : vif,
-                              'credit'  : credit,
-                              'period'  : period })
-
     def xend_domain_devices(self, id, type):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'devices',
