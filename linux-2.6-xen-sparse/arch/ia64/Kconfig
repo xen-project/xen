@@ -60,8 +60,8 @@ config ARCH_XEN
 	  TEMP ONLY. Needs to be on for drivers/xen to build.
 
 config XEN_PRIVILEGED_GUEST
-	bool
-	default y
+	bool "Privileged Guest"
+	default n
 	help
 	  Used in drivers/xen/privcmd.c.  Should go away?
 
@@ -79,6 +79,19 @@ config XEN_BLKDEV_FRONTEND
 	depends on XEN
 	bool
 	default y
+
+config XEN_VT
+	bool "Override for turning on CONFIG_VT for domU"
+	default y
+	help
+	  Hack to turn off CONFIG_VT for domU
+
+config VT
+	bool
+	default y if XEN && XEN_VT
+	default n if XEN && !XEN_VT
+	help
+	  Hack to turn off CONFIG_VT for domU
 
 config SCHED_NO_NO_OMIT_FRAME_POINTER
 	bool
