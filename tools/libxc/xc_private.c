@@ -260,18 +260,6 @@ long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 }
 
 
-unsigned long xc_get_m2p_start_mfn ( int xc_handle )
-{
-    unsigned long mfn;
-
-    if ( ioctl( xc_handle, IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN, &mfn ) < 0 )
-    {
-        perror("xc_get_m2p_start_mfn:");
-        return 0;
-    }
-    return mfn;
-}
-
 int xc_get_pfn_list(int xc_handle,
                     uint32_t domid, 
                     unsigned long *pfn_buf, 

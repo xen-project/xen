@@ -13,13 +13,13 @@
 #include "xg_save_restore.h"
 
 /* max mfn of the whole machine */
-static uint32_t max_mfn; 
+static unsigned long max_mfn; 
 
 /* virtual starting address of the hypervisor */
-static uint32_t hvirt_start; 
+static unsigned long hvirt_start; 
 
 /* #levels of page tables used by the currrent guest */
-static uint32_t pt_levels; 
+static unsigned int pt_levels; 
 
 /* total number of pages used by the current guest */
 static unsigned long max_pfn;
@@ -50,7 +50,6 @@ read_exact(int fd, void *buf, size_t count)
     return (r == count) ? 1 : 0; 
 }
 
-
 /*
 ** In the state file (or during transfer), all page-table pages are 
 ** converted into a 'canonical' form where references to actual mfns 
@@ -60,23 +59,11 @@ read_exact(int fd, void *buf, size_t count)
 */
 int uncanonicalize_pagetable(unsigned long type, void *page) 
 { 
-    int i, pte_last, xen_start, xen_end; 
+    int i, pte_last; 
     unsigned long pfn; 
     uint64_t pte; 
 
-    /* 
-    ** We need to determine which entries in this page table hold
-    ** reserved hypervisor mappings. This depends on the current
-    ** page table type as well as the number of paging levels. 
-    */
-    xen_start = xen_end = pte_last = PAGE_SIZE / ((pt_levels == 2)? 4 : 8); 
-    
-    if (pt_levels == 2 && type == L2TAB)
-        xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT); 
-
-    if (pt_levels == 3 && type == L3TAB) 
-        xen_start = L3_PAGETABLE_ENTRIES_PAE; 
-
+    pte_last = PAGE_SIZE / ((pt_levels == 2)? 4 : 8); 
 
     /* Now iterate through the page table, uncanonicalizing each PTE */
     for(i = 0; i < pte_last; i++) { 
@@ -85,13 +72,10 @@ int uncanonicalize_pagetable(unsigned long type, void *page)
             pte = ((uint32_t *)page)[i]; 
         else 
             pte = ((uint64_t *)page)[i]; 
-        
-        if(i >= xen_start && i < xen_end) 
-            pte = 0; 
-        
+
         if(pte & _PAGE_PRESENT) { 
-            
-            pfn = pte >> PAGE_SHIFT; 
+
+            pfn = (pte >> PAGE_SHIFT) & 0xffffffff;
             
             if(pfn >= max_pfn) { 
                 ERR("Frame number in type %lu page table is out of range: "
@@ -101,17 +85,16 @@ int uncanonicalize_pagetable(unsigned long type, void *page)
             } 
             
             
-            if(type == L1TAB) 
-                pte &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PAT);
-            else 
-                pte &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PSE);
-            
-            pte |= p2m[pfn] << PAGE_SHIFT;
-            
+            pte &= 0xffffff0000000fffULL;
+            pte |= (uint64_t)p2m[pfn] << PAGE_SHIFT;
+
             if(pt_levels == 2) 
                 ((uint32_t *)page)[i] = (uint32_t)pte; 
             else 
                 ((uint64_t *)page)[i] = (uint64_t)pte; 
+
+        
+
         }
     }
     
@@ -142,6 +125,9 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     /* A table of MFNs to map in the current region */
     unsigned long *region_mfn = NULL;
+
+    /* Types of the pfns in the current region */
+    unsigned long region_pfn_type[MAX_BATCH_SIZE];
 
     /* A temporary mapping, and a copy, of one frame of guest memory. */
     unsigned long *page = NULL;
@@ -233,10 +219,12 @@ int xc_linux_restore(int xc_handle, int io_fd,
     
     if(xc_domain_memory_increase_reservation(
            xc_handle, dom, max_pfn, 0, 0, NULL) != 0) { 
-        ERR("Failed to increase reservation by %lx KB\n", max_pfn); 
+        ERR("Failed to increase reservation by %lx KB\n", PFN_TO_KB(max_pfn));
         errno = ENOMEM;
         goto out;
     }
+
+    DPRINTF("Increased domain reservation by %lx KB\n", PFN_TO_KB(max_pfn)); 
 
     /* Build the pfn-to-mfn table. We choose MFN ordering returned by Xen. */
     if (xc_get_pfn_list(xc_handle, dom, p2m, max_pfn) != max_pfn) {
@@ -248,6 +236,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         ERR("Could not initialise for MMU updates");
         goto out;
     }
+
 
     DPRINTF("Reloading memory pages:   0%%\n");
 
@@ -261,7 +250,6 @@ int xc_linux_restore(int xc_handle, int io_fd,
     while (1) { 
 
         int j;
-        unsigned long region_pfn_type[MAX_BATCH_SIZE];
 
         this_pc = (n * 100) / max_pfn;
         if ( (this_pc - prev_pc) >= 5 )
@@ -322,7 +310,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
             if (pagetype == XTAB) 
                 /* a bogus/unmapped page: skip it */
                 continue;
-            
+
             if (pfn > max_pfn) {
                 ERR("pfn out of range");
                 goto out;
@@ -348,10 +336,20 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 ** A page table page - need to 'uncanonicalize' it, i.e. 
                 ** replace all the references to pfns with the corresponding 
                 ** mfns for the new domain. 
-                */ 
-                if(!uncanonicalize_pagetable(pagetype, page))
-                    goto out; 
+                ** 
+                ** On PAE we need to ensure that PGDs are in MFNs < 4G, and 
+                ** so we may need to update the p2m after the main loop. 
+                ** Hence we defer canonicalization of L1s until then. 
+                */
+                if(pt_levels != 3 || pagetype != L1TAB) { 
 
+                    if(!uncanonicalize_pagetable(pagetype, page)) {
+                        ERR("failed uncanonicalize pt!\n"); 
+                        goto out; 
+                    }
+
+                } 
+                    
             } else if(pagetype != NOTAB) { 
 
                 ERR("Bogus page type %lx page table is out of range: "
@@ -359,7 +357,6 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 goto out;
 
             } 
-
 
 
             if (verify) {
@@ -386,9 +383,9 @@ int xc_linux_restore(int xc_handle, int io_fd,
             }
 
             if (xc_add_mmu_update(xc_handle, mmu, 
-                                  (mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE,
-                                  pfn)) {
-                ERR("machpys mfn=%ld pfn=%ld", mfn, pfn);
+                                  (((unsigned long long)mfn) << PAGE_SHIFT) 
+                                  | MMU_MACHPHYS_UPDATE, pfn)) {
+                ERR("failed machpys update mfn=%lx pfn=%lx", mfn, pfn);
                 goto out;
             }
         } /* end of 'batch' for loop */
@@ -399,14 +396,39 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
     DPRINTF("Received all pages\n");
 
-    if (pt_levels == 3) {
+    if(pt_levels == 3) { 
 
-        /* Get all PGDs below 4GB. */
+        /* 
+        ** XXX SMH on PAE we need to ensure PGDs are in MFNs < 4G. This 
+        ** is a little awkward and involves (a) finding all such PGDs and
+        ** replacing them with 'lowmem' versions; (b) upating the p2m[] 
+        ** with the new info; and (c) canonicalizing all the L1s using the
+        ** (potentially updated) p2m[]. 
+        ** 
+        ** This is relatively slow (and currently involves two passes through
+        ** the pfn_type[] array), but at least seems to be correct. May wish
+        ** to consider more complex approaches to optimize this later. 
+        */
+
+        int j, k; 
+
+        /* First pass: find all L3TABs current in > 4G mfns and get new mfns */
         for (i = 0; i < max_pfn; i++) {
             
             if (((pfn_type[i] & LTABTYPE_MASK)==L3TAB) && (p2m[i]>0xfffffUL)) {
 
                 unsigned long new_mfn; 
+                uint64_t l3ptes[4]; 
+                uint64_t *l3tab; 
+
+                l3tab = (uint64_t *)
+                    xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, 
+                                         PROT_READ, p2m[i]); 
+
+                for(j = 0; j < 4; j++) 
+                    l3ptes[j] = l3tab[j]; 
+                
+                munmap(l3tab, PAGE_SIZE); 
 
                 if (!(new_mfn=xc_make_page_below_4G(xc_handle, dom, p2m[i]))) {
                     ERR("Couldn't get a page below 4GB :-(");
@@ -414,15 +436,58 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 }
                 
                 p2m[i] = new_mfn;
-                if (xc_add_mmu_update(
-                        xc_handle, mmu, 
-                        (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, i)) {
+                if (xc_add_mmu_update(xc_handle, mmu, 
+                                      (((unsigned long long)new_mfn) 
+                                       << PAGE_SHIFT) | 
+                                      MMU_MACHPHYS_UPDATE, i)) {
                     ERR("Couldn't m2p on PAE root pgdir");
                     goto out;
                 }
+                
+                l3tab = (uint64_t *)
+                    xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, 
+                                         PROT_READ | PROT_WRITE, p2m[i]); 
+                
+                for(j = 0; j < 4; j++) 
+                    l3tab[j] = l3ptes[j]; 
+                
+                munmap(l3tab, PAGE_SIZE); 
+                
             }
         }
-        
+
+        /* Second pass: find all L1TABs and uncanonicalize them */
+        j = 0; 
+
+        for(i = 0; i < max_pfn; i++) { 
+            
+            if (((pfn_type[i] & LTABTYPE_MASK)==L1TAB)) { 
+                region_mfn[j] = p2m[i]; 
+                j++; 
+            }
+
+            if(i == (max_pfn-1) || j == MAX_BATCH_SIZE) { 
+
+                if (!(region_base = xc_map_foreign_batch(
+                          xc_handle, dom, PROT_READ | PROT_WRITE, 
+                          region_mfn, j))) {  
+                    ERR("map batch failed");
+                    goto out;
+                }
+
+                for(k = 0; k < j; k++) {
+                    if(!uncanonicalize_pagetable(L1TAB, 
+                                                 region_base + k*PAGE_SIZE)) {
+                        ERR("failed uncanonicalize pt!\n"); 
+                        goto out; 
+                    } 
+                }
+                
+                munmap(region_base, j*PAGE_SIZE); 
+                j = 0; 
+            }
+        }
+
     }
 
 
@@ -430,6 +495,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         ERR("Error doing finish_mmu_updates()"); 
         goto out;
     } 
+
 
     /*
      * Pin page tables. Do this after writing to them as otherwise Xen
@@ -439,7 +505,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
 
         if ( (pfn_type[i] & LPINTAB) == 0 )
             continue;
-        
+
         switch(pfn_type[i]) { 
 
         case (L1TAB|LPINTAB): 
@@ -463,22 +529,15 @@ int xc_linux_restore(int xc_handle, int io_fd,
         }
 
         pin[nr_pins].arg1.mfn = p2m[i];
+
+        nr_pins ++; 
         
-        if (++nr_pins == MAX_PIN_BATCH) {
+        if (i == (max_pfn-1) || nr_pins == MAX_PIN_BATCH) {
             if (xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0) { 
                 ERR("Failed to pin batch of %d page tables", nr_pins); 
                 goto out;
             } 
-            DPRINTF("successfully pinned batch of %d page tables", nr_pins); 
             nr_pins = 0;
-        }
-    }
-    
-    if (nr_pins != 0) { 
-        if((rc = xc_mmuext_op(xc_handle, pin, nr_pins, dom)) < 0) { 
-            ERR("Failed (2) to pin batch of %d page tables", nr_pins); 
-            DPRINTF("rc is %d\n", rc); 
-            goto out;
         }
     }
 
@@ -579,23 +638,20 @@ int xc_linux_restore(int xc_handle, int io_fd,
     pfn = ctxt.ctrlreg[3] >> PAGE_SHIFT;
 
     if (pfn >= max_pfn) {
-        DPRINTF("PT base is bad: pfn=%lu max_pfn=%lu type=%08lx\n",
-                pfn, max_pfn, pfn_type[pfn]); 
-        ERR("PT base is bad.");
+        ERR("PT base is bad: pfn=%lu max_pfn=%lu type=%08lx",
+            pfn, max_pfn, pfn_type[pfn]); 
         goto out;
     }
 
     if ((pt_levels == 2) && ((pfn_type[pfn]&LTABTYPE_MASK) != L2TAB)) { 
-        DPRINTF("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx\n",
-                pfn, max_pfn, pfn_type[pfn], (unsigned long)L2TAB);
-        ERR("PT base is bad.");
+        ERR("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
+            pfn, max_pfn, pfn_type[pfn], (unsigned long)L2TAB);
         goto out;
     }
 
     if ((pt_levels == 3) && ((pfn_type[pfn]&LTABTYPE_MASK) != L3TAB)) { 
-        DPRINTF("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx\n",
-                pfn, max_pfn, pfn_type[pfn], (unsigned long)L3TAB);
-        ERR("PT base is bad.");
+        ERR("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
+            pfn, max_pfn, pfn_type[pfn], (unsigned long)L3TAB);
         goto out;
     }
     

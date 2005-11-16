@@ -136,21 +136,19 @@ int direct_kernel_remap_pfn_range(unsigned long address,
 }
 EXPORT_SYMBOL(direct_kernel_remap_pfn_range);
 
-/* FIXME: This is horribly broken on PAE */ 
 static int lookup_pte_fn(
 	pte_t *pte, struct page *pte_page, unsigned long addr, void *data)
 {
-	unsigned long *ptep = (unsigned long *)data;
+	uint64_t *ptep = (uint64_t *)data;
 	if (ptep)
-		*ptep = (pfn_to_mfn(page_to_pfn(pte_page)) <<
-			 PAGE_SHIFT) |
-			((unsigned long)pte & ~PAGE_MASK);
+		*ptep = ((uint64_t)pfn_to_mfn(page_to_pfn(pte_page)) <<
+			 PAGE_SHIFT) | ((unsigned long)pte & ~PAGE_MASK);
 	return 0;
 }
 
 int create_lookup_pte_addr(struct mm_struct *mm, 
 			   unsigned long address,
-			   unsigned long *ptep)
+			   uint64_t *ptep)
 {
 	return generic_page_range(mm, address, PAGE_SIZE, lookup_pte_fn, ptep);
 }
