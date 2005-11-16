@@ -298,7 +298,7 @@ void memset_io(volatile void __iomem *a, int b, size_t c);
  * used as the IO-area pointer (it can be iounmapped as well, so the
  * analogy with PCI is quite large):
  */
-#define __ISA_IO_base ((char __iomem *)(PAGE_OFFSET))
+#define __ISA_IO_base ((char __iomem *)(fix_to_virt(FIX_ISAMAP_BEGIN)))
 
 #define isa_readb(a) readb(__ISA_IO_base + (a))
 #define isa_readw(a) readw(__ISA_IO_base + (a))
