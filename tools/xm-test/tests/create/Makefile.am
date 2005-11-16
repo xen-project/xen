@@ -12,8 +12,8 @@ TESTS = 01_create_basic_pos.test \
 	11_create_concurrent_pos.test \
 	12_create_concurrent_stress_pos.test \
 	13_create_multinic_pos.test \
-	14_create_blockroot_pos.test
-
+	14_create_blockroot_pos.test \
+	15_create_smallmem_pos.test
 
 DISABLED_TESTS = 	05_create_noroot_noram_neg.test 
 
