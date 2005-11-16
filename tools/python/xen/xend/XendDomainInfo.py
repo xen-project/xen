@@ -45,6 +45,8 @@ import uuid
 
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain
+from xen.xend.xenstore.xswatch import xswatch
+
 
 """Shutdown code for poweroff."""
 DOMAIN_POWEROFF = 0
@@ -82,7 +84,6 @@ STATE_DOM_SHUTDOWN = 2
 
 SHUTDOWN_TIMEOUT = 30
 
-DOMROOT = '/local/domain/'
 VMROOT  = '/vm/'
 
 ZOMBIE_PREFIX = 'Zombie-'
@@ -100,26 +101,52 @@ log = logging.getLogger("xend.XendDomainInfo")
 #log.setLevel(logging.TRACE)
 
 
-## Configuration entries that we expect to round-trip -- be read from the
+##
+# All parameters of VMs that may be configured on-the-fly, or at start-up.
+# 
+VM_CONFIG_PARAMS = [
+    ('name',        str),
+    ('on_poweroff', str),
+    ('on_reboot',   str),
+    ('on_crash',    str),
+    ]
+
+
+##
+# Configuration entries that we expect to round-trip -- be read from the
 # config file or xc, written to save-files (i.e. through sxpr), and reused as
 # config on restart or restore, all without munging.  Some configuration
 # entries are munged for backwards compatibility reasons, or because they
 # don't come out of xc in the same form as they are specified in the config
 # file, so those are handled separately.
 ROUNDTRIPPING_CONFIG_ENTRIES = [
-        ('name',         str),
-        ('uuid',         str),
-        ('ssidref',      int),
-        ('vcpus',        int),
-        ('vcpu_avail',   int),
-        ('cpu_weight',   float),
-        ('memory',       int),
-        ('maxmem',       int),
-        ('bootloader',   str),
-        ('on_poweroff',  str),
-        ('on_reboot',    str),
-        ('on_crash',     str)
+    ('uuid',       str),
+    ('ssidref',    int),
+    ('vcpus',      int),
+    ('vcpu_avail', int),
+    ('cpu_weight', float),
+    ('memory',     int),
+    ('maxmem',     int),
+    ('bootloader', str),
     ]
+
+ROUNDTRIPPING_CONFIG_ENTRIES += VM_CONFIG_PARAMS
+
+
+##
+# All entries written to the store.  This is VM_CONFIGURATION_PARAMS, plus
+# those entries written to the store that cannot be reconfigured on-the-fly.
+#
+VM_STORE_ENTRIES = [
+    ('uuid',       str),
+    ('ssidref',    int),
+    ('vcpus',      int),
+    ('vcpu_avail', int),
+    ('memory',     int),
+    ('maxmem',     int),
+    ]
+
+VM_STORE_ENTRIES += VM_CONFIG_PARAMS
 
 
 #
@@ -156,6 +183,7 @@ def create(config):
         vm.initDomain()
         vm.storeVmDetails()
         vm.storeDomDetails()
+        vm.registerWatch()
         vm.refreshShutdown()
         return vm
     except:
@@ -211,6 +239,7 @@ def recreate(xeninfo, priv):
         vm.storeVmDetails()
         vm.storeDomDetails()
 
+    vm.registerWatch()
     vm.refreshShutdown(xeninfo)
     return vm
 
@@ -371,12 +400,50 @@ class XendDomainInfo:
         self.console_port = None
         self.console_mfn = None
 
+        self.vmWatch = None
+
         self.state = STATE_DOM_OK
         self.state_updated = threading.Condition()
         self.refresh_shutdown_lock = threading.Condition()
 
 
     ## private:
+
+    def readVMDetails(self, params):
+        """Read from the store all of those entries that we consider 
+        """
+        try:
+            return self.gatherVm(*params)
+        except ValueError:
+            # One of the int/float entries in params has a corresponding store
+            # entry that is invalid.  We recover, because older versions of
+            # Xend may have put the entry there (memory/target, for example),
+            # but this is in general a bad situation to have reached.
+            log.exception(
+                "Store corrupted at %s!  Domain %d's configuration may be "
+                "affected.", self.vmpath, self.domid)
+            return []
+
+
+    def storeChanged(self):
+        log.debug("XendDomainInfo.storeChanged");
+
+        changed = False
+        
+        def f(x, y):
+            if y is not None and self.info[x[0]] != y:
+                self.info[x[0]] = y
+                changed = True
+
+        map(f, VM_CONFIG_PARAMS, self.readVMDetails(VM_CONFIG_PARAMS))
+
+        if changed:
+            # Update the domain section of the store, as this contains some
+            # parameters derived from the VM configuration.
+            self.storeDomDetails()
+
+        return 1
+
 
     def augmentInfo(self):
         """Augment self.info, as given to us through {@link #recreate}, with
@@ -387,30 +454,8 @@ class XendDomainInfo:
             if not self.infoIsSet(name) and val is not None:
                 self.info[name] = val
 
-        params = (("name", str),
-                  ("on_poweroff",  str),
-                  ("on_reboot",    str),
-                  ("on_crash",     str),
-                  ("image",        str),
-                  ("memory",       int),
-                  ("maxmem",       int),
-                  ("vcpus",        int),
-                  ("vcpu_avail",   int),
-                  ("start_time", float))
-
-        try:
-            from_store = self.gatherVm(*params)
-        except ValueError, exn:
-            # One of the int/float entries in params has a corresponding store
-            # entry that is invalid.  We recover, because older versions of
-            # Xend may have put the entry there (memory/target, for example),
-            # but this is in general a bad situation to have reached.
-            log.exception(
-                "Store corrupted at %s!  Domain %d's configuration may be "
-                "affected.", self.vmpath, self.domid)
-            return
-
-        map(lambda x, y: useIfNeeded(x[0], y), params, from_store)
+        map(lambda x, y: useIfNeeded(x[0], y), VM_STORE_ENTRIES,
+            self.readVMDetails(VM_STORE_ENTRIES))
 
         device = []
         for c in controllerClasses:
@@ -536,23 +581,23 @@ class XendDomainInfo:
 
         self.introduceDomain()
         self.storeDomDetails()
+        self.registerWatch()
         self.refreshShutdown()
 
         log.debug("XendDomainInfo.completeRestore done")
 
 
     def storeVmDetails(self):
-        to_store = {
-            'uuid':               self.info['uuid']
-            }
+        to_store = {}
+
+        for k in VM_STORE_ENTRIES:
+            if self.infoIsSet(k[0]):
+                to_store[k[0]] = str(self.info[k[0]])
 
         if self.infoIsSet('image'):
             to_store['image'] = sxp.to_string(self.info['image'])
 
-        for k in ['name', 'ssidref', 'memory', 'maxmem', 'on_poweroff',
-                  'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail']:
-            if self.infoIsSet(k):
-                to_store[k] = str(self.info[k])
+        to_store['start_time'] = str(self.info['start_time'])
 
         log.debug("Storing VM details: %s", to_store)
 
@@ -599,13 +644,16 @@ class XendDomainInfo:
         return result
 
 
-    def setDomid(self, domid):
-        """Set the domain id.
+    ## public:
 
-        @param dom: domain id
-        """
-        self.domid = domid
-        self.storeDom("domid", self.domid)
+    def registerWatch(self):
+        """Register a watch on this VM's entries in the store, so that
+        when they are changed externally, we keep up to date.  This should
+        only be called by {@link #create}, {@link #recreate}, or {@link
+        #restore}, once the domain's details have been written, but before the
+        new instance is returned."""
+        self.vmWatch = xswatch(self.vmpath, self.storeChanged)
+
 
     def getDomid(self):
         return self.domid
@@ -1116,6 +1164,13 @@ class XendDomainInfo:
         """Cleanup VM resources.  Idempotent.  Nothrow guarantee."""
 
         try:
+            try:
+                if self.vmWatch:
+                    self.vmWatch.unwatch()
+                self.vmWatch = None
+            except:
+                log.exception("Unwatching VM path failed.")
+
             self.removeVm()
         except:
             log.exception("Removing VM path failed.")
