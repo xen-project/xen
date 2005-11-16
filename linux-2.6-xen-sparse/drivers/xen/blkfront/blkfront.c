@@ -679,7 +679,7 @@ static void blkif_recover(struct blkfront_info *info)
 	int j;
 
 	/* Stage 1: Make a safe copy of the shadow state. */
-	copy = (struct blk_shadow *)kmalloc(sizeof(info->shadow), GFP_KERNEL);
+	copy = kmalloc(sizeof(info->shadow), GFP_KERNEL);
 	BUG_ON(copy == NULL);
 	memcpy(copy, info->shadow, sizeof(info->shadow));
 
