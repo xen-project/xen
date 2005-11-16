@@ -49,6 +49,8 @@ struct mmio_list *lookup_mmio(u64 gpa, struct mmio_list *mio_base)
 #define PIB_OFST_INTA           0x1E0000
 #define PIB_OFST_XTP            0x1E0008
 
+static int write_ipi (VCPU *vcpu, uint64_t addr, uint64_t value);
+
 static void pib_write(VCPU *vcpu, void *src, uint64_t pib_off, size_t s, int ma)
 {
     switch (pib_off) {

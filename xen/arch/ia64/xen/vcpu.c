@@ -147,6 +147,9 @@ void vcpu_load_kernel_regs(VCPU *vcpu)
 	ia64_set_kr(7, VCPU(vcpu, krs[7]));
 }
 
+/* GCC 4.0.2 seems not to be able to suppress this call!.  */
+#define ia64_setreg_unknown_kr() return IA64_ILLOP_FAULT
+
 IA64FAULT vcpu_set_ar(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
 	if (reg == 44) return (vcpu_set_itc(vcpu,val));

@@ -131,7 +131,9 @@ extern void open_softirq(int nr, void (*action)(struct softirq_action*), void *d
 extern void softirq_init(void);
 #define __raise_softirq_irqoff(nr) do { local_softirq_pending() |= 1UL << (nr); } while (0)
 extern void FASTCALL(raise_softirq_irqoff(unsigned int nr));
+#ifndef XEN
 extern void FASTCALL(raise_softirq(unsigned int nr));
+#endif
 
 
 /* Tasklets --- multithreaded analogue of BHs.

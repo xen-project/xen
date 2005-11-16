@@ -1,6 +1,9 @@
 #ifndef __LINUX_GFP_H
 #define __LINUX_GFP_H
 
+#ifdef XEN
+#include <asm/bitops.h>
+#endif
 #include <linux/mmzone.h>
 #include <linux/stddef.h>
 #include <linux/linkage.h>

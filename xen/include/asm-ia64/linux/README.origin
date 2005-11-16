@@ -10,7 +10,6 @@ bitops.h		->linux/include/linux/bitops.h
 dma-mapping.h		->linux/include/linux/dma-mapping.h
 efi.h			->linux/include/linux/efi.h
 err.h			->linux/include/linux/err.h
-gfp.h			->linux/include/linux/gfp.h
 initrd.h		->linux/include/linux/initrd.h
 jiffies.h		->linux/include/linux/jiffies.h
 kmalloc_sizes.h		->linux/include/linux/kmalloc_sizes.h
