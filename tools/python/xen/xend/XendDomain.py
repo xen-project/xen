@@ -63,14 +63,19 @@ class XendDomain:
         self.domains = {}
         self.domains_lock = threading.RLock()
 
-        xswatch("@releaseDomain", self.onReleaseDomain)
-
         self.domains_lock.acquire()
         try:
             self._add_domain(
                 XendDomainInfo.recreate(self.xen_domains()[PRIV_DOMAIN],
                                         True))
             self.dom0_setup()
+
+            # This watch registration needs to be before the refresh call, so
+            # that we're sure that we haven't missed any releases, but inside
+            # the domains_lock, as we don't want the watch to fire until after
+            # the refresh call has completed.
+            xswatch("@releaseDomain", self.onReleaseDomain)
+            
             self.refresh(True)
         finally:
             self.domains_lock.release()
