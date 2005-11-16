@@ -467,17 +467,6 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
-
-    def domain_vif_limit_set(self, domid, vif, credit, period):
-        """Limit the vif's transmission rate
-        """
-        dominfo = self.domain_lookup(domid)
-        dev = dominfo.getDevice('vif', vif)
-        if not dev:
-            raise XendError("invalid vif")
-        return dev.setCreditLimit(credit, period)
-
-
     def domain_maxmem_set(self, domid, mem):
         """Set the memory limit for a domain.
 
