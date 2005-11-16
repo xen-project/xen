@@ -73,7 +73,7 @@ static unsigned long *live_m2p = NULL;
 */
 
 #define BITS_PER_LONG (sizeof(unsigned long) * 8) 
-#define BITMAP_SIZE   ((max_pfn + BITS_PER_LONG - 1) / BITS_PER_LONG)
+#define BITMAP_SIZE   ((max_pfn + 7) / 8)
 
 #define BITMAP_ENTRY(_nr,_bmap) \
    ((unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
