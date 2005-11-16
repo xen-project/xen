@@ -541,7 +541,7 @@ int direct_kernel_remap_pfn_range(unsigned long address,
 
 int create_lookup_pte_addr(struct mm_struct *mm,
                            unsigned long address,
-                           unsigned long *ptep);
+                           uint64_t *ptep);
 
 int touch_pte_range(struct mm_struct *mm,
                     unsigned long address,

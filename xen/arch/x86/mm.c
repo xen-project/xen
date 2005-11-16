@@ -898,6 +898,7 @@ static int alloc_l3_table(struct pfn_info *page, unsigned long type)
     return 1;
 
  fail:
+    MEM_LOG("Failure in alloc_l3_table: entry %d", i);
     while ( i-- > 0 )
         if ( is_guest_l3_slot(i) )
             put_page_from_l3e(pl3e[i], pfn);
@@ -948,6 +949,7 @@ static int alloc_l4_table(struct pfn_info *page, unsigned long type)
     return 1;
 
  fail:
+    MEM_LOG("Failure in alloc_l4_table: entry %d", i);
     while ( i-- > 0 )
         if ( is_guest_l4_slot(i) )
             put_page_from_l4e(pl4e[i], pfn);
