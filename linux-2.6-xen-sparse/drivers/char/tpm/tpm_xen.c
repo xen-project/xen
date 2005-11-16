@@ -438,7 +438,7 @@ static struct attribute* xen_attrs[] = {
 	&dev_attr_pcrs.attr,
 	&dev_attr_caps.attr,
 	&dev_attr_cancel.attr,
-	0,
+	NULL,
 };
 
 static struct attribute_group xen_attr_grp = { .attrs = xen_attrs };

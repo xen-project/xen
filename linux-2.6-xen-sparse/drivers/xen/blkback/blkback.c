@@ -543,7 +543,7 @@ static int __init blkif_init(void)
 	spin_lock_init(&blkio_schedule_list_lock);
 	INIT_LIST_HEAD(&blkio_schedule_list);
 
-	ret = kernel_thread(blkio_schedule, 0, CLONE_FS | CLONE_FILES);
+	ret = kernel_thread(blkio_schedule, NULL, CLONE_FS | CLONE_FILES);
 	BUG_ON(ret < 0);
 
 	blkif_xenbus_init();

@@ -752,7 +752,7 @@ void __init init_IRQ(void)
 		irq_bindcount[dynirq_to_irq(i)] = 0;
 
 		irq_desc[dynirq_to_irq(i)].status  = IRQ_DISABLED;
-		irq_desc[dynirq_to_irq(i)].action  = 0;
+		irq_desc[dynirq_to_irq(i)].action  = NULL;
 		irq_desc[dynirq_to_irq(i)].depth   = 1;
 		irq_desc[dynirq_to_irq(i)].handler = &dynirq_type;
 	}
@@ -770,7 +770,7 @@ void __init init_IRQ(void)
 #endif
 
 		irq_desc[pirq_to_irq(i)].status  = IRQ_DISABLED;
-		irq_desc[pirq_to_irq(i)].action  = 0;
+		irq_desc[pirq_to_irq(i)].action  = NULL;
 		irq_desc[pirq_to_irq(i)].depth   = 1;
 		irq_desc[pirq_to_irq(i)].handler = &pirq_type;
 	}
