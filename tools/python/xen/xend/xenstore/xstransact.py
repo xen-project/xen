@@ -177,18 +177,15 @@ class xstransact:
                 (key, fn, defval) = tup
 
             val = self._read(key)
-            # If fn is str, then this will successfully convert None to
-            # 'None'.  If it is int, then it will throw TypeError on None, or
-            # on any other non-integer value.  We have to, therefore, both
-            # check explicitly for None, and catch TypeError.  Either failure
-            # will result in defval being used instead.
+            # If fn is str, then this will successfully convert None to 'None'
+            # (which we don't want).  If it is int or float, then it will
+            # throw ValueError on any non-convertible value.  We check
+            # explicitly for None, using defval instead, but allow ValueError
+            # to propagate.
             if val is None:
                 val = defval
             else:
-                try:
-                    val = fn(val)
-                except TypeError:
-                    val = defval
+                val = fn(val)
             ret.append(val)
         if len(ret) == 1:
             return ret[0]

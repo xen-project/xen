@@ -277,6 +277,18 @@ void __devinit smp_prepare_boot_cpu(void)
 
 #ifdef CONFIG_HOTPLUG_CPU
 
+/*
+ * Initialize cpu_present_map late to skip SMP boot code in init/main.c.
+ * But do it early enough to catch critical for_each_present_cpu() loops
+ * in i386-specific code.
+ */
+static int __init initialize_cpu_present_map(void)
+{
+	cpu_present_map = cpu_possible_map;
+	return 0;
+}
+core_initcall(initialize_cpu_present_map);
+
 static void vcpu_hotplug(unsigned int cpu)
 {
 	int err;
@@ -293,7 +305,6 @@ static void vcpu_hotplug(unsigned int cpu)
 	}
 
 	if (strcmp(state, "online") == 0) {
-		cpu_set(cpu, cpu_present_map);
 		(void)cpu_up(cpu);
 	} else if (strcmp(state, "offline") == 0) {
 		(void)cpu_down(cpu);
