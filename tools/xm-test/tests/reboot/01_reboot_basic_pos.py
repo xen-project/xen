@@ -18,6 +18,13 @@ except DomainError, e:
         print e.extra
     FAIL(str(e))
 
+try:
+    console = XmConsole(domain.getName())
+except ConsoleError, e:
+    FAIL(str(e))
+
+console.closeConsole()
+
 status, output = traceCommand("xm reboot %s" % domain.getName())
 
 if status != 0:
@@ -40,8 +47,11 @@ console.closeConsole()
 
 domain.destroy()
 
-items = re.split(" +", run["output"])
-uptime = int(items[3])
-if uptime > 1:
-    FAIL("Uptime too large (%i > 1 minutes); domain didn't reboot")
+match = re.match("^[^up]*up ([0-9]+).*$", run["output"])
+if match:
+    if int(match.group(1)) > 1:
+        FAIL("Uptime too large (%i > 1 minutes); domain didn't reboot")
+else:
+    FAIL("Invalid uptime string: %s (%s)" % (run["output"], match.group(1)))
+
 
