@@ -34,10 +34,10 @@ typedef char xen_capabilities_info_t[1024];
 #define XENVER_changeset 4
 typedef char xen_changeset_info_t[64];
 
-#define XENVER_parameters 5
-typedef struct xen_parameters_info {
+#define XENVER_platform_parameters 5
+typedef struct xen_platform_parameters {
     unsigned long virt_start;
-} xen_parameters_info_t;
+} xen_platform_parameters_t;
 
 #endif /* __XEN_PUBLIC_VERSION_H__ */
 
