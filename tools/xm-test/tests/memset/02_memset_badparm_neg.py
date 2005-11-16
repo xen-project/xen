@@ -24,7 +24,7 @@ eyecatcher = "Error:"
 where = output.find(eyecatcher)
 if status == 0:
     FAIL("xm mem-set returned invalid %i == 0" % status)
-elif where > 1:
+elif where == -1:
     FAIL("xm mem-set failed to report error for missing arg")
 
 # destroy non existent parm input - negative test
@@ -32,7 +32,7 @@ status, output = traceCommand("xm mem-set -x")
 where = output.find(eyecatcher)
 if status == 0:
     FAIL("xm mem-set returned invalid %i == 0" % status)
-elif where != 0:
+elif where == -1:
     FAIL("xm mem-set failed to report error for bad arg")
 
 # destroy non existent domain - negative test
@@ -40,14 +40,14 @@ status, output = traceCommand("xm mem-set 6666")
 where = output.find(eyecatcher)
 if status == 0:
     FAIL("xm mem-set returned invalid %i == 0" % status)
-elif where != 0:
+elif where == -1:
     FAIL("xm mem-set failed to report error for invalid domid")
 
 # destroy non existent domain and memory - negative test
 status, output = traceCommand("xm mem-set 6666 64")
 where = output.find(eyecatcher)
 if status == 0:
-    FAIL("xm mem-set returned invalid %i != 0" % status)
-elif where != 0:
+    FAIL("xm mem-set returned invalid %i == -1" % status)
+elif where == -1:
     FAIL("xm mem-set failed to report error for invalid domid")
 

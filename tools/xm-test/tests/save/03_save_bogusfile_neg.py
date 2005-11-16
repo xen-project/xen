@@ -38,5 +38,5 @@ if status == 0:
     FAIL("xm save returned bad status, expected non 0, status is: %i" % status)
 elif where1 == 0:
     FAIL("xm save returned a stack dump, expected nice error message")
-elif where2 > 0:
+elif where2 == -1:
     FAIL("xm save returned bad output, expected Error:, output is: %s" % output)

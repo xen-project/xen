@@ -22,5 +22,5 @@ time.sleep(15)
 eyecatcher = "NOROOT"
 status, output = traceCommand("xm list")
 where = output.find(eyecatcher)
-if where != -1 :
+if where != -1:
 	FAIL("xm create test05 passed with no root and no ramdisk. Expected result: Fail.")

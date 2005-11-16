@@ -381,9 +381,9 @@ static void watch_target(struct xenbus_watch *watch,
     
 }
 
-int balloon_init_watcher(struct notifier_block *notifier,
-                         unsigned long event,
-                         void *data)
+static int balloon_init_watcher(struct notifier_block *notifier,
+                                unsigned long event,
+                                void *data)
 {
 	int err;
 

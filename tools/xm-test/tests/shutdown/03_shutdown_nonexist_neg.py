@@ -18,5 +18,5 @@ ret, output = traceCommand("xm shutdown 9999")
 where = output.find(eyecatcher)
 if (ret == 0):
     FAIL("xm shutdown returned invalid %i == 0" % ret)
-elif where != 0:
+elif where == -1:
     FAIL("xm shutdown failed to report error for bad domid")

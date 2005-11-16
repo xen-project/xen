@@ -402,11 +402,21 @@ int xc_version(int xc_handle, int cmd, void *arg)
 
     switch ( cmd )
     {
-    case XENVER_extraversion: argsize = sizeof(xen_extraversion_t); break;
-    case XENVER_compile_info: argsize = sizeof(xen_compile_info_t); break;
-    case XENVER_capabilities: argsize = sizeof(xen_capabilities_info_t); break;
-    case XENVER_changeset:    argsize = sizeof(xen_changeset_info_t); break;
-    case XENVER_parameters:   argsize = sizeof(xen_parameters_info_t); break;
+    case XENVER_extraversion:
+        argsize = sizeof(xen_extraversion_t);
+        break;
+    case XENVER_compile_info:
+        argsize = sizeof(xen_compile_info_t);
+        break;
+    case XENVER_capabilities:
+        argsize = sizeof(xen_capabilities_info_t);
+        break;
+    case XENVER_changeset:
+        argsize = sizeof(xen_changeset_info_t);
+        break;
+    case XENVER_platform_parameters:
+        argsize = sizeof(xen_platform_parameters_t);
+        break;
     }
 
     if ( (argsize != 0) && (mlock(arg, argsize) != 0) )

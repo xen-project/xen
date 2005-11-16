@@ -14,5 +14,5 @@ eyecatcher = "Error"
 where = output.find(eyecatcher)
 if status == 0:
     FAIL("xm reboot returned invalid %i == 0" % status )
-elif where > 1:
+elif where == -1:
     FAIL("xm reboot failed to report error for non-existent domain" )

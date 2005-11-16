@@ -61,20 +61,20 @@ static int get_platform_info(int xc_handle, uint32_t dom,
     
 { 
     xen_capabilities_info_t xen_caps = "";
-    xen_parameters_info_t xen_parms;
+    xen_platform_parameters_t xen_params;
     xc_physinfo_t physinfo;
     
     if (xc_physinfo(xc_handle, &physinfo) != 0) 
         return 0;
     
-    if (xc_version(xc_handle, XENVER_parameters, &xen_parms) != 0)
+    if (xc_version(xc_handle, XENVER_platform_parameters, &xen_params) != 0)
         return 0;
     
     if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0)
         return 0;
 
     *max_mfn =     physinfo.total_pages;
-    *hvirt_start = xen_parms.virt_start;
+    *hvirt_start = xen_params.virt_start;
 
     if (strstr(xen_caps, "xen-3.0-x86_64"))
         *pt_levels = 4;

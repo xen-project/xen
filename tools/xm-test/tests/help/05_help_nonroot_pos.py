@@ -13,5 +13,5 @@ becomeNonRoot()
 status, output = traceCommand("xm help")
 eyecatcher = "Usage:"
 where = output.find(eyecatcher)
-if where != 0:
+if where == -1:
     FAIL("xm help: didn't see the usage string")
