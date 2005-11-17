@@ -114,7 +114,7 @@ static void buffer_append(struct domain *dom)
 			buffer->data, buffer->max_capacity);
 		buffer->data = realloc(buffer->data,
 				       buffer->max_capacity);
-		buffer->capacity = buffer->max_capacity;
+		buffer->size = buffer->capacity = buffer->max_capacity;
 	}
 }
 
