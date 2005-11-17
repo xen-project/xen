@@ -56,6 +56,10 @@ extern struct ia64_boot_param {
 	__u64 fpswa;		/* physical address of the fpswa interface */
 	__u64 initrd_start;
 	__u64 initrd_size;
+//for loading initrd for dom0
+       __u64 domain_start;     /* virtual address where the boot time domain begins */
+       __u64 domain_size;      /* how big is the boot domain */
+
 } *ia64_boot_param;
 
 /*

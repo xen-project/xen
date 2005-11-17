@@ -686,6 +686,12 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	bp->console_info.orig_x = 0;
 	bp->console_info.orig_y = 24;
 	bp->fpswa = 0;
+        bp->initrd_start = (dom0_start+dom0_size) -
+                (PAGE_ALIGN(ia64_boot_param->initrd_size) + 4*1024*1024);
+        bp->initrd_size = ia64_boot_param->initrd_size;
+                printf(" initrd start %0xlx", bp->initrd_start);
+                printf(" initrd size %0xlx", bp->initrd_size);
+
 
 	return bp;
 }

@@ -823,6 +823,7 @@ int construct_dom0(struct domain *d,
 	unsigned long pkern_start;
 	unsigned long pkern_entry;
 	unsigned long pkern_end;
+	unsigned long pinitrd_start = 0;
 	unsigned long ret, progress = 0;
 
 //printf("construct_dom0: starting\n");
@@ -841,12 +842,6 @@ int construct_dom0(struct domain *d,
 	alloc_start = dom0_start;
 	alloc_end = dom0_start + dom0_size;
 	d->tot_pages = d->max_pages = dom0_size/PAGE_SIZE;
-	image_start = __va(ia64_boot_param->initrd_start);
-	image_len = ia64_boot_param->initrd_size;
-//printk("image_start=%lx, image_len=%lx\n",image_start,image_len);
-//printk("First word of image: %lx\n",*(unsigned long *)image_start);
-
-//printf("construct_dom0: about to call parseelfimage\n");
 	dsi.image_addr = (unsigned long)image_start;
 	dsi.image_len  = image_len;
 	rc = parseelfimage(&dsi);
@@ -883,11 +878,18 @@ int construct_dom0(struct domain *d,
 	    return -EINVAL;
 	}
 
+        if(initrd_start&&initrd_len){
+             pinitrd_start=(dom0_start+dom0_size) -
+                          (PAGE_ALIGN(initrd_len) + 4*1024*1024);
+
+             memcpy(__va(pinitrd_start),initrd_start,initrd_len);
+        }
+
 	printk("METAPHYSICAL MEMORY ARRANGEMENT:\n"
 	       " Kernel image:  %lx->%lx\n"
 	       " Entry address: %lx\n"
-	       " Init. ramdisk:   (NOT IMPLEMENTED YET)\n",
-	       pkern_start, pkern_end, pkern_entry);
+               " Init. ramdisk: %lx len %lx\n",
+               pkern_start, pkern_end, pkern_entry, pinitrd_start, initrd_len);
 
 	if ( (pkern_end - pkern_start) > (d->max_pages * PAGE_SIZE) )
 	{
