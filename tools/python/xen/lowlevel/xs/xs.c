@@ -21,6 +21,7 @@
 
 #include <Python.h>
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -70,6 +71,17 @@ static inline PyObject *pyvalue_str(char *val) {
             : PyErr_SetFromErrno(PyExc_RuntimeError));
 }
 
+static void remove_watch(XsHandle *xsh, PyObject *token);
+
+static PyObject *none(bool result);
+
+static int parse_transaction_path(PyObject *self, PyObject *args,
+                                  PyObject *kwds,
+                                  struct xs_handle **xh,
+                                  struct xs_transaction_handle **th,
+                                  char **path);
+
+
 #define xspy_read_doc "\n"			\
 	"Read data from a path.\n"		\
 	" path [string]: xenstore path\n"	\
@@ -81,42 +93,29 @@ static inline PyObject *pyvalue_str(char *val) {
 
 static PyObject *xspy_read(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwd_spec[] = { "transaction", "path", NULL };
-    static char *arg_spec = "ss";
-    char *path = NULL;
-
-    struct xs_handle *xh = xshandle(self);
-    char *xsval = NULL;
-    unsigned int xsval_n = 0;
-    PyObject *val = NULL;
-
+    struct xs_handle *xh;
     struct xs_transaction_handle *th;
-    char *thstr;
+    char *path;
 
-    if (!xh)
-        goto exit;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
-                                     &thstr, &path))
-        goto exit;
+    char *xsval;
+    unsigned int xsval_n;
 
-    th = (struct xs_transaction_handle *)strtoul(thstr, NULL, 16);
+    if (!parse_transaction_path(self, args, kwds, &xh, &th, &path))
+        return NULL;
 
     Py_BEGIN_ALLOW_THREADS
     xsval = xs_read(xh, th, path, &xsval_n);
     Py_END_ALLOW_THREADS
-    if (!xsval) {
-        if (errno == ENOENT) {
-            Py_INCREF(Py_None);
-            val = Py_None;
-        } else
-            PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
+    if (xsval) {
+        PyObject *val = PyString_FromStringAndSize(xsval, xsval_n);
+        free(xsval);
+        return val;
     }
-    val = PyString_FromStringAndSize(xsval, xsval_n);
- exit:
-    free(xsval);
-    return val;
+    else {
+        return none(errno == ENOENT);
+    }
 }
+
 
 #define xspy_write_doc "\n"					\
 	"Write data to a path.\n"				\
@@ -136,32 +135,26 @@ static PyObject *xspy_write(PyObject *self, PyObject *args, PyObject *kwds)
     int data_n = 0;
 
     struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
-    int xsval = 0;
+    bool result;
 
     struct xs_transaction_handle *th;
     char *thstr;
 
     if (!xh)
-        goto exit;
+        return NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &thstr, &path, &data, &data_n))
-        goto exit;
+        return NULL;
 
     th = (struct xs_transaction_handle *)strtoul(thstr, NULL, 16);
 
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_write(xh, th, path, data, data_n);
+    result = xs_write(xh, th, path, data, data_n);
     Py_END_ALLOW_THREADS
-    if (!xsval) {
-        PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
-    }
-    Py_INCREF(Py_None);
-    val = Py_None;
- exit:
-    return val;
+
+    return none(result);
 }
+
 
 #define xspy_ls_doc "\n"					\
 	"List a directory.\n"					\
@@ -174,46 +167,33 @@ static PyObject *xspy_write(PyObject *self, PyObject *args, PyObject *kwds)
 
 static PyObject *xspy_ls(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwd_spec[] = { "transaction", "path", NULL };
-    static char *arg_spec = "ss";
-    char *path = NULL;
-
-    struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
-    char **xsval = NULL;
-    unsigned int xsval_n = 0;
-    int i;
-
+    struct xs_handle *xh;
     struct xs_transaction_handle *th;
-    char *thstr;
+    char *path;
 
-    if (!xh)
-        goto exit;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
-                                     &thstr, &path))
-        goto exit;
+    char **xsval;
+    int xsval_n;
 
-
-    th = (struct xs_transaction_handle *)strtoul(thstr, NULL, 16);
+    if (!parse_transaction_path(self, args, kwds, &xh, &th, &path))
+        return NULL;
 
     Py_BEGIN_ALLOW_THREADS
     xsval = xs_directory(xh, th, path, &xsval_n);
     Py_END_ALLOW_THREADS
-    if (!xsval) {
-        if (errno == ENOENT) {
-            Py_INCREF(Py_None);
-            val = Py_None;
-        } else
-            PyErr_SetFromErrno(PyExc_RuntimeError);
-	goto exit;
+
+    if (xsval) {
+        int i;
+        PyObject *val = PyList_New(xsval_n);
+        for (i = 0; i < xsval_n; i++)
+            PyList_SetItem(val, i, PyString_FromString(xsval[i]));
+        free(xsval);
+        return val;
     }
-    val = PyList_New(xsval_n);
-    for (i = 0; i < xsval_n; i++)
-        PyList_SetItem(val, i, PyString_FromString(xsval[i]));
-    free(xsval);
- exit:
-    return val;
+    else {
+        return none(errno == ENOENT);
+    }
 }
+
 
 #define xspy_mkdir_doc "\n"					\
 	"Make a directory.\n"					\
@@ -225,37 +205,22 @@ static PyObject *xspy_ls(PyObject *self, PyObject *args, PyObject *kwds)
 
 static PyObject *xspy_mkdir(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwd_spec[] = { "transaction", "path", NULL };
-    static char *arg_spec = "ss";
-    char *path = NULL;
-
-    struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
-    int xsval = 0;
-
+    struct xs_handle *xh;
     struct xs_transaction_handle *th;
-    char *thstr;
+    char *path;
 
-    if (!xh)
-        goto exit;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
-                                     &thstr, &path))
-        goto exit;
+    bool result;
 
-    th = (struct xs_transaction_handle *)strtoul(thstr, NULL, 16);
+    if (!parse_transaction_path(self, args, kwds, &xh, &th, &path))
+        return NULL;
 
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_mkdir(xh, th, path);
+    result = xs_mkdir(xh, th, path);
     Py_END_ALLOW_THREADS
-    if (!xsval) {
-        PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
-    }
-    Py_INCREF(Py_None);
-    val = Py_None;
- exit:
-    return val;
+
+    return none(result);
 }
+
 
 #define xspy_rm_doc "\n"			\
 	"Remove a path.\n"			\
@@ -267,37 +232,22 @@ static PyObject *xspy_mkdir(PyObject *self, PyObject *args, PyObject *kwds)
 
 static PyObject *xspy_rm(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwd_spec[] = { "transaction", "path", NULL };
-    static char *arg_spec = "ss";
-    char *path = NULL;
-
-    struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
-    int xsval = 0;
-
+    struct xs_handle *xh;
     struct xs_transaction_handle *th;
-    char *thstr;
+    char *path;
 
-    if (!xh)
-        goto exit;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
-                                     &thstr, &path))
-        goto exit;
+    bool result;
 
-    th = (struct xs_transaction_handle *)strtoul(thstr, NULL, 16);
+    if (!parse_transaction_path(self, args, kwds, &xh, &th, &path))
+        return NULL;
 
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_rm(xh, th, path);
+    result = xs_rm(xh, th, path);
     Py_END_ALLOW_THREADS
-    if (!xsval && errno != ENOENT) {
-        PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
-    }
-    Py_INCREF(Py_None);
-    val = Py_None;
- exit:
-    return val;
+
+    return none(result || errno == ENOENT);
 }
+
 
 #define xspy_get_permissions_doc "\n"		\
 	"Get the permissions for a path\n"	\
@@ -315,7 +265,6 @@ static PyObject *xspy_get_permissions(PyObject *self, PyObject *args,
     char *path = NULL;
 
     struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
     struct xs_permissions *perms;
     unsigned int perms_n = 0;
     int i;
@@ -324,30 +273,34 @@ static PyObject *xspy_get_permissions(PyObject *self, PyObject *args,
     char *thstr;
 
     if (!xh)
-        goto exit;
+        return NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &thstr, &path))
-        goto exit;
+        return NULL;
 
     th = (struct xs_transaction_handle *)strtoul(thstr, NULL, 16);
 
     Py_BEGIN_ALLOW_THREADS
     perms = xs_get_permissions(xh, th, path, &perms_n);
     Py_END_ALLOW_THREADS
-    if (!perms) {
+
+    if (perms) {
+        PyObject *val = PyList_New(perms_n);
+        for (i = 0; i < perms_n; i++, perms++) {
+            PyObject *p = Py_BuildValue("{s:i,s:i,s:i}",
+                                        "dom",  perms->id,
+                                        "read", perms->perms & XS_PERM_READ,
+                                        "write",perms->perms & XS_PERM_WRITE);
+            PyList_SetItem(val, i, p);
+        }
+
+        free(perms);
+        return val;
+    }
+    else {
         PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
+        return NULL;
     }
-    val = PyList_New(perms_n);
-    for (i = 0; i < perms_n; i++, perms++) {
-        PyObject *p = Py_BuildValue("{s:i,s:i,s:i}",
-                                    "dom",   perms->id,
-                                    "read",  (perms->perms & XS_PERM_READ),
-                                    "write",  (perms->perms & XS_PERM_WRITE));
-        PyList_SetItem(val, i, p);
-    }
- exit:
-    return val;
 }
 
 #define xspy_set_permissions_doc "\n"		\
@@ -370,7 +323,7 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
     static char *perm_spec = "i|iiii";
 
     struct xs_handle *xh = xshandle(self);
-    int i, xsval;
+    int i, result;
     struct xs_permissions *xsperms = NULL;
     int xsperms_n = 0;
     PyObject *tuple0 = NULL;
@@ -416,9 +369,9 @@ static PyObject *xspy_set_permissions(PyObject *self, PyObject *args,
             xsperms[i].perms |= XS_PERM_WRITE;
     }
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_set_permissions(xh, th, path, xsperms, xsperms_n);
+    result = xs_set_permissions(xh, th, path, xsperms, xsperms_n);
     Py_END_ALLOW_THREADS
-    if (!xsval) {
+    if (!result) {
         PyErr_SetFromErrno(PyExc_RuntimeError);
         goto exit;
     }
@@ -453,7 +406,7 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
 
     XsHandle *xsh = (XsHandle *)self;
     struct xs_handle *xh = xshandle(self);
-    int xsval = 0;
+    int result = 0;
 
     if (!xh)
         return NULL;
@@ -466,10 +419,9 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
        races with xs_read_watch.
     */
 
-    Py_INCREF(token);
     for (i = 0; i < PyList_Size(xsh->watches); i++) {
         if (PyList_GetItem(xsh->watches, i) == Py_None) {
-            PyList_SetItem(xsh->watches, i, token);
+            PySequence_SetItem(xsh->watches, i, token);
             break;
         }
     }
@@ -478,24 +430,15 @@ static PyObject *xspy_watch(PyObject *self, PyObject *args, PyObject *kwds)
 
     sprintf(token_str, "%li", (unsigned long)token);
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_watch(xh, path, token_str);
+    result = xs_watch(xh, path, token_str);
     Py_END_ALLOW_THREADS
-    if (!xsval) {
-        for (i = 0; i < PyList_Size(xsh->watches); i++) {
-            if (PyList_GetItem(xsh->watches, i) == token) {
-                Py_INCREF(Py_None);
-                PyList_SetItem(xsh->watches, i,  Py_None);
-                break;
-            }
-        }
 
-        PyErr_SetFromErrno(PyExc_RuntimeError);
-        return NULL;
-    }
+    if (!result)
+        remove_watch(xsh, token);
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    return none(result);
 }
+
 
 #define xspy_read_watch_doc "\n"				\
 	"Read a watch notification.\n"				\
@@ -519,9 +462,10 @@ static PyObject *xspy_read_watch(PyObject *self, PyObject *args,
     unsigned int num;
 
     if (!xh)
-        goto exit;
+        return NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
-        goto exit;
+        return NULL;
+
 again:
     Py_BEGIN_ALLOW_THREADS
     xsval = xs_read_watch(xh, &num);
@@ -570,37 +514,25 @@ static PyObject *xspy_unwatch(PyObject *self, PyObject *args, PyObject *kwds)
     char *path = NULL;
     PyObject *token;
     char token_str[MAX_STRLEN(unsigned long) + 1];
-    int i;
 
     XsHandle *xsh = (XsHandle *)self;
     struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
-    int xsval = 0;
+    int result = 0;
 
     if (!xh)
-        goto exit;
+        return NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path,
                                      &token))
-        goto exit;
+        return NULL;
+
     sprintf(token_str, "%li", (unsigned long)token);
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_unwatch(xh, path, token_str);
+    result = xs_unwatch(xh, path, token_str);
     Py_END_ALLOW_THREADS
-    if (!xsval)
-        PyErr_SetFromErrno(PyExc_RuntimeError);
-    else {
-        Py_INCREF(Py_None);
-        val = Py_None;
-    }
-    for (i = 0; i < PyList_Size(xsh->watches); i++) {
-        if (token == PyList_GetItem(xsh->watches, i)) {
-            Py_INCREF(Py_None);
-            PyList_SetItem(xsh->watches, i, Py_None);
-            break;
-        }
-    }
- exit:
-    return val;
+
+    remove_watch(xsh, token);
+
+    return none(result);
 }
 
 #define xspy_transaction_start_doc "\n"				\
@@ -618,26 +550,25 @@ static PyObject *xspy_transaction_start(PyObject *self, PyObject *args,
     char *path = NULL;
 
     struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
     struct xs_transaction_handle *th;
     char thstr[20];
 
     if (!xh)
-        goto exit;
+        return NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec, &path))
-        goto exit;
+        return NULL;
+
     Py_BEGIN_ALLOW_THREADS
     th = xs_transaction_start(xh);
     Py_END_ALLOW_THREADS
+
     if (th == NULL) {
         PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
+        return NULL;
     }
 
     sprintf(thstr, "%lX", (unsigned long)th);
-    val = PyString_FromString(thstr);
- exit:
-    return val;
+    return PyString_FromString(thstr);
 }
 
 #define xspy_transaction_end_doc "\n"					\
@@ -657,37 +588,37 @@ static PyObject *xspy_transaction_end(PyObject *self, PyObject *args,
     int abort = 0;
 
     struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
-    int xsval = 0;
+    bool result;
 
     struct xs_transaction_handle *th;
     char *thstr;
 
     if (!xh)
-        goto exit;
+        return NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &thstr, &abort))
-        goto exit;
+        return NULL;
 
     th = (struct xs_transaction_handle *)strtoul(thstr, NULL, 16);
 
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_transaction_end(xh, th, abort);
+    result = xs_transaction_end(xh, th, abort);
     Py_END_ALLOW_THREADS
-    if (!xsval) {
-	if (errno == EAGAIN) {
-	    Py_INCREF(Py_False);
-	    val = Py_False;
-	    goto exit;
-	}
-        PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
+
+    if (result) {
+        Py_INCREF(Py_True);
+        return Py_True;
     }
-    Py_INCREF(Py_True);
-    val = Py_True;
- exit:
-    return val;
+    else if (errno == EAGAIN) {
+        Py_INCREF(Py_False);
+        return Py_False;
+    }
+    else {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        return NULL;
+    }
 }
+
 
 #define xspy_introduce_domain_doc "\n"					\
 	"Tell xenstore about a domain so it can talk to it.\n"		\
@@ -709,26 +640,21 @@ static PyObject *xspy_introduce_domain(PyObject *self, PyObject *args,
     unsigned int port = 0;
 
     struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
-    int xsval = 0;
+    bool result = 0;
 
     if (!xh)
-        goto exit;
+        return NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &dom, &page, &port))
-        goto exit;
+        return NULL;
+
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_introduce_domain(xh, dom, page, port);
+    result = xs_introduce_domain(xh, dom, page, port);
     Py_END_ALLOW_THREADS
-    if (!xsval) {
-        PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
-    }
-    Py_INCREF(Py_None);
-    val = Py_None;
- exit:
-    return val;
+
+    return none(result);
 }
+
 
 #define xspy_release_domain_doc "\n"					\
 	"Tell xenstore to release its channel to a domain.\n"		\
@@ -743,30 +669,25 @@ static PyObject *xspy_release_domain(PyObject *self, PyObject *args,
                                      PyObject *kwds)
 {
     static char *kwd_spec[] = { "dom", NULL };
-    static char *arg_spec = "i|";
+    static char *arg_spec = "i";
     domid_t dom;
 
     struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
-    int xsval = 0;
+    bool result = 0;
 
     if (!xh)
-        goto exit;
+        return NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &dom))
-        goto exit;
+        return NULL;
+
     Py_BEGIN_ALLOW_THREADS
-    xsval = xs_release_domain(xh, dom);
+    result = xs_release_domain(xh, dom);
     Py_END_ALLOW_THREADS
-    if (!xsval) {
-        PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
-    }
-    Py_INCREF(Py_None);
-    val = Py_None;
- exit:
-    return val;
+
+    return none(result);
 }
+
 
 #define xspy_close_doc "\n"			\
 	"Close the connection to xenstore.\n"	\
@@ -783,24 +704,24 @@ static PyObject *xspy_close(PyObject *self, PyObject *args, PyObject *kwds)
 
     XsHandle *xsh = (XsHandle *)self;
     struct xs_handle *xh = xshandle(self);
-    PyObject *val = NULL;
 
     if (!xh)
-        goto exit;
+        return NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec))
-        goto exit;
+        return NULL;
+
     for (i = 0; i < PyList_Size(xsh->watches); i++) {
         /* TODO: xs_unwatch watches */
-        Py_INCREF(Py_None);
-        PyList_SetItem(xsh->watches, i, Py_None);
+        PySequence_SetItem(xsh->watches, i, Py_None);
     }
+
     xs_daemon_close(xh);
     xsh->xh = NULL;
+
     Py_INCREF(Py_None);
-    val = Py_None;
- exit:
-    return val;
+    return Py_None;
 }
+
 
 #define xspy_get_domain_path_doc "\n"			\
 	"Return store path of domain, whether or not the domain exists.\n" \
@@ -819,29 +740,90 @@ static PyObject *xspy_get_domain_path(PyObject *self, PyObject *args,
 
     struct xs_handle *xh = xshandle(self);
     char *xsval = NULL;
-    PyObject *val = NULL;
 
     if (!xh)
-        goto exit;
+        return NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &domid))
-        goto exit;
+        return NULL;
+
     Py_BEGIN_ALLOW_THREADS
     xsval = xs_get_domain_path(xh, domid);
     Py_END_ALLOW_THREADS
-    if (!xsval) {
-        if (errno == ENOENT) {
-            Py_INCREF(Py_None);
-            val = Py_None;
-        } else
-            PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
+
+    if (xsval) {
+        PyObject *val = PyString_FromString(xsval);
+        free(xsval);
+        return val;
     }
-    val = PyString_FromString(xsval);
-    free(xsval);
- exit:
-    return val;
+    else {
+        return none(errno == ENOENT);
+    }
 }
+
+
+/**
+ * Remove the given token from the watches list belonging to the given
+ * XsHandle, if present.
+ */
+static void remove_watch(XsHandle *xsh, PyObject *token)
+{
+    int i;
+
+    for (i = 0; i < PyList_Size(xsh->watches); i++) {
+        if (PyList_GetItem(xsh->watches, i) == token) {
+            PySequence_SetItem(xsh->watches, i, Py_None);
+            return;
+        }
+    }
+}
+
+
+/**
+ * Parse transaction and path arguments from the given args and kwds,
+ * convert the given self value to an xs_handle, and return all three by
+ * reference.
+ * 
+ * @return 1 on success, in which case *xh, *th, and *path are valid, or 0 on
+ * failure.
+ */
+static int parse_transaction_path(PyObject *self, PyObject *args,
+                                  PyObject *kwds,
+                                  struct xs_handle **xh,
+                                  struct xs_transaction_handle **th,
+                                  char **path)
+{
+    static char *arg_spec = "ss";
+    static char *kwd_spec[] = { "transaction", "path", NULL };
+    char *thstr;
+
+    *xh = xshandle(self);
+
+    if (!xh)
+        return 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
+                                     &thstr, path))
+        return 0;
+
+    *th = (struct xs_transaction_handle *)strtoul(thstr, NULL, 16);
+
+    return 1;
+}
+
+
+static PyObject *none(bool result)
+{
+    if (result) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    else {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        return NULL;
+    }
+}
+
 
 #define XSPY_METH(_name) {			\
     .ml_name  = #_name,				\
@@ -871,9 +853,7 @@ static PyMethodDef xshandle_methods[] = {
 
 static PyObject *xshandle_getattr(PyObject *self, char *name)
 {
-    PyObject *val = NULL;
-    val = Py_FindMethod(xshandle_methods, self, name);
-    return val;
+    return Py_FindMethod(xshandle_methods, self, name);
 }
 
 static void xshandle_dealloc(PyObject *self)
