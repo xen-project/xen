@@ -38,26 +38,60 @@ source.  All source needed for this process is automatically
 downloaded, extracted, and compiled.  Due to the need to create
 special files, this process must be done as root:
 
+   # ./autogen
    # ./configure
    # make
 
-NB: If you have the initrd.img from a previous version of xm-test, you
-can copy it into the ramdisk directory to eliminate the need to
-rebuild it.  So far, nothing has changed in the ramdisk since xm-test
-version 0.1.1.  If you do this, there is no need to run 'make' again.
+NB: If you have the initrd.img from another installation of xm-test,
+you can copy it into the ramdisk directory to eliminate the need to
+rebuild it.  If you do this, there is no need to run 'make' again.
 Simply copy the initrd.img file into ramdisk/ and then run the
-runtest.sh script.
+runtest.sh script.  Note that in general, you should not attempt to
+use a ramdisk from a previous minor version of xm-test (i.e., don't
+use a ramdisk from 0.4.0 with 0.5.0.  0.5.0 should work for 0.5.3
+though)
 
 
 Running
 =======
 
-By running "./runtest.sh logfile" at the top level, all tests will be
-run in alphabetic order.  To run a specific test group, run "make
-check" from inside that group directory.  For example:
+To run the full test suite, do the following as root:
+
+   # ./runtest.sh <logfile>
+
+This will run all tests, as well as generate and submit a report at
+the end.  All output files will begin with "<logfile>."  If you wish to
+prevent submission of a report, add "-d" to the command line like this:
+
+   # ./runtest.sh -d <logfile>
+
+It may be useful to run tests without submission as above, and then
+submit the report at a later time.  To do so, run runtest.sh with the
+-s flag and the name of the previously-generated report:
+
+   # ./runtest.sh -s <logfile>
+
+For people needing a quick test run instead the full suite, a quick
+mode has been added that will attempt to run a representative subset
+of tests.  This is not a substitute for the whole suite, but will
+verify that some of the major functions of xen and xm are working:
+
+   # ./runtest.sh -q <logfile>
+
+Because of the current structure of the reporting software, submission
+of quick test run results is not supported.
+
+It may be desirable to run a specific test group.  This can be
+accomplished by doing the following:
 
    # cd tests/create
-   # make check
+   # TEST_VERBOSE=1 make check
+
+When developing or debugging a specific feature, a single test can be
+run to avoid having to run even a whole test group:
+
+   # cd tests/create
+   # TEST_VERBOSE=1 make check TESTS=01_create_basic_pos.test
 
 The runtest.sh script will create several files, including a .report
 file, which is the cleaned up, email-friendly report of failures.
@@ -69,15 +103,9 @@ Note: you should generally run xm-test with a minimum of memory
 allocated to Dom0.  More memory available for allocation to DomUs
 means a more rigorous test.
 
-If you wish to run xm-test in an automated batch environment, you can
-run the script with the "-b" flag, which will try to prevent it from
-asking any questions interactively.  You should run it manually at
-least once to generate the "contact_info" file, which will be used in
-subsequent runs.
-
-BIG FAT WARNING: The framework assumes it is running on a dedicated
-machine.  As such, the library automatically destroys any running
-DomUs on the sytem to provide each test with a "clean slate".
+BIG FAT WARNING: The test framework assumes it is running on a
+dedicated machine.  As such, the library automatically destroys any
+running DomUs on the system to provide each test with a "clean slate".
 
 
 Extending
@@ -99,6 +127,9 @@ New subcommand groups should be added as directories named after the
 subcommand itself.  The "Makefile.am.template" should be copied into
 the new group directory as "Makefile.am".
 
+See the Writing_Tests_HOWTO file for more detailed information on
+adding tests to the suite.
+
 
 Developer Notes
 ===============
@@ -114,21 +145,6 @@ use it with relatively few problems.
 Known Issues
 ============
 
-- 08/22/2005 Dan Smith:
-    Current versions of Xen experience long delays on
-    boot, due to the blkif frontend waiting (and timing
-    out) for the backend.  We now implicitly introduce
-    a pause in XmTestDomain.start() to remedy
-    this across all tests that need it.
-
-- 09/22/2005 Dan Smith:
-    The save, restore, and migrate tests have been turned
-    back on, as we have implemented timeout functionality 
-    in "traceCommand".  Since migrate is known to hang, we 
-    can now safely include it in the default test run, and
-    have it be killed if it never finishes.  As before,
-    feedback about these tests would be specifically
-    appreciated.
 
 Reporting Bugs
 ==============

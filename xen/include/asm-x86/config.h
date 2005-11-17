@@ -291,6 +291,9 @@ extern unsigned long xenheap_phys_end; /* user-configurable */
 
 #define PDPT_VCPU_SHIFT       5
 #define PDPT_VCPU_VA_SHIFT    (PDPT_VCPU_SHIFT + PAGE_SHIFT)
+#define PDPT_L1_ENTRIES       (MAX_VIRT_CPUS << PDPT_VCPU_SHIFT)
+#define PDPT_L2_ENTRIES       \
+    ((PDPT_L1_ENTRIES + (1 << PAGETABLE_ORDER) - 1) >> PAGETABLE_ORDER)
 
 #if defined(__x86_64__)
 #define ELFSIZE 64

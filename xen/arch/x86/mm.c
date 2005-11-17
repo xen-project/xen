@@ -738,7 +738,7 @@ static int create_pae_xen_mappings(l3_pgentry_t *pl3e)
     memcpy(&pl2e[L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)],
            &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
            L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
-    for ( i = 0; i < (PERDOMAIN_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
+    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
         pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
             l2e_from_page(
                 virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt) + i,

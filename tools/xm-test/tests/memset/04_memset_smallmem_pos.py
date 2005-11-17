@@ -36,6 +36,17 @@ try:
     # See if this hits the byte limit
     console.runCmd("ls")
 except ConsoleError, e:
-    FAIL(str(e))
+    if e.reason == RUNAWAY:
+        # Need to stop the domain before we restart the console daemon
+        domain.destroy()
+        if verbose:
+            print "*** Attempting restart of xenconsoled"
+            s, o = traceCommand("killall xenconsoled")
+            s, o = traceCommand("xenconsoled")
+            if s != 0:
+                print "*** Starting xenconsoled failed: %i" % s
+        FAIL("Bug #380: I crashed the console system")
+    else:
+        FAIL(str(e))
 
 domain.destroy()

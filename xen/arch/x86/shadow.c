@@ -2710,7 +2710,7 @@ static unsigned long shadow_l3_table(
            &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
            L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));       
 
-        for ( i = 0; i < (PERDOMAIN_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
+        for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
             spl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
                 l2e_from_page(
                     virt_to_page(page_get_owner(&frame_table[gmfn])->arch.mm_perdomain_pt) + i, 

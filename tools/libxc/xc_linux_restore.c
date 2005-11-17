@@ -146,7 +146,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
 
     struct mmuext_op pin[MAX_PIN_BATCH];
-    unsigned int nr_pins = 0;
+    unsigned int nr_pins; 
 
 
     max_pfn = nr_pfns; 
@@ -501,7 +501,16 @@ int xc_linux_restore(int xc_handle, int io_fd,
      * Pin page tables. Do this after writing to them as otherwise Xen
      * will barf when doing the type-checking.
      */
+    nr_pins = 0; 
     for (i = 0; i < max_pfn; i++) {
+
+        if (i == (max_pfn-1) || nr_pins == MAX_PIN_BATCH) {
+            if (xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0) { 
+                ERR("Failed to pin batch of %d page tables", nr_pins); 
+                goto out;
+            } 
+            nr_pins = 0;
+        }
 
         if ( (pfn_type[i] & LPINTAB) == 0 )
             continue;
@@ -529,16 +538,8 @@ int xc_linux_restore(int xc_handle, int io_fd,
         }
 
         pin[nr_pins].arg1.mfn = p2m[i];
+        nr_pins++; 
 
-        nr_pins ++; 
-        
-        if (i == (max_pfn-1) || nr_pins == MAX_PIN_BATCH) {
-            if (xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0) { 
-                ERR("Failed to pin batch of %d page tables", nr_pins); 
-                goto out;
-            } 
-            nr_pins = 0;
-        }
     }
 
     DPRINTF("\b\b\b\b100%%\n");
