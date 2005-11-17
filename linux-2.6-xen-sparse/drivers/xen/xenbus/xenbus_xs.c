@@ -199,6 +199,7 @@ static void *xs_talkv(struct xenbus_transaction *t,
 	int err;
 
 	msg.tx_id = (u32)(unsigned long)t;
+	msg.req_id = 0;
 	msg.type = type;
 	msg.len = 0;
 	for (i = 0; i < num_vecs; i++)
