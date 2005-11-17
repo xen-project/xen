@@ -33,9 +33,13 @@ import select
 
 from Test import *
 
+TIMEDOUT = 1
+RUNAWAY  = 2
+
 class ConsoleError(Exception):
-    def __init__(self, msg):
+    def __init__(self, msg, reason=TIMEDOUT):
         self.errMsg = msg
+        self.reason = reason
 
     def __str__(self):
         return str(self.errMsg)
@@ -149,7 +153,7 @@ class XmConsole:
 
             if self.limit and bytes >= self.limit:
                 raise ConsoleError("Console run-away (exceeded %i bytes)"
-                                   % self.limit)
+                                   % self.limit, RUNAWAY)
 
         if self.debugMe:
             print "Ignored %i bytes of miscellaneous console output" % bytes
@@ -187,7 +191,7 @@ class XmConsole:
 
             if self.limit and bytes >= self.limit:
                 raise ConsoleError("Console run-away (exceeded %i bytes)"
-                                   % self.limit)
+                                   % self.limit, RUNAWAY)
 
             if str == "\n":
                 if lines > 0:
