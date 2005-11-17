@@ -240,7 +240,10 @@ void free_vcpu_struct(struct vcpu *v)
 
 void free_perdomain_pt(struct domain *d)
 {
-    free_xenheap_page(d->arch.mm_perdomain_pt);
+    free_xenheap_pages(
+        d->arch.mm_perdomain_pt,
+        get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t)));
+
 #ifdef __x86_64__
     free_xenheap_page(d->arch.mm_perdomain_l2);
     free_xenheap_page(d->arch.mm_perdomain_l3);
@@ -251,7 +254,7 @@ void arch_do_createdomain(struct vcpu *v)
 {
     struct domain *d = v->domain;
     l1_pgentry_t gdt_l1e;
-    int vcpuid;
+    int vcpuid, pdpt_order;
 
     if ( is_idle_task(d) )
         return;
@@ -263,13 +266,10 @@ void arch_do_createdomain(struct vcpu *v)
     v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
     v->cpumap = CPUMAP_RUNANYWHERE;
     SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
-    set_pfn_from_mfn(virt_to_phys(d->shared_info) >> PAGE_SHIFT,
-            INVALID_M2P_ENTRY);
 
-    d->arch.mm_perdomain_pt = alloc_xenheap_page();
-    memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE);
-    set_pfn_from_mfn(virt_to_phys(d->arch.mm_perdomain_pt) >> PAGE_SHIFT,
-            INVALID_M2P_ENTRY);
+    pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
+    d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order);
+    memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE << pdpt_order);
     v->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
 
     /*
@@ -293,9 +293,11 @@ void arch_do_createdomain(struct vcpu *v)
 
     d->arch.mm_perdomain_l2 = alloc_xenheap_page();
     memset(d->arch.mm_perdomain_l2, 0, PAGE_SIZE);
-    d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)] =
-        l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt),
-                        __PAGE_HYPERVISOR);
+    for ( i = 0; i < (1 << pdpt_order); i++ )
+        d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)+i] =
+            l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt)+i,
+                          __PAGE_HYPERVISOR);
+
     d->arch.mm_perdomain_l3 = alloc_xenheap_page();
     memset(d->arch.mm_perdomain_l3, 0, PAGE_SIZE);
     d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] =
