@@ -305,6 +305,7 @@ static void *xs_talkv(struct xs_handle *h, struct xs_transaction_handle *t,
 	struct sigaction ignorepipe, oldact;
 
 	msg.tx_id = (uint32_t)(unsigned long)t;
+	msg.req_id = 0;
 	msg.type = type;
 	msg.len = 0;
 	for (i = 0; i < num_vecs; i++)
