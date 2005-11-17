@@ -466,11 +466,8 @@ acpi_update_madt_checksum (unsigned long phys_addr, unsigned long size)
 /* base is physical address of acpi table */
 void touch_acpi_table(void)
 {
-	u64 count = 0;
-	count = acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, NR_CPUS);
-	if ( count < 1)
+	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, 0) < 0)
 		printk("Error parsing MADT - no LAPIC entires\n");
-	printk("Total %d lsapic entry\n", count);
 	acpi_table_parse(ACPI_APIC, acpi_update_madt_checksum);
 
 	return;
