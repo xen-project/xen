@@ -550,10 +550,10 @@ will be allowed to run before being preempted.
 
 =item B<sched-sedf> I<period> I<slice> I<latency-hint> I<extratime> I<weight>
 
-Set Simple EDF scheduler parameters.  This scheduler provides weighted
-CPU sharing in an intuitive way and uses realtime-algorithms to ensure
-time guarantees.  For more information see
-docs/misc/sedf_scheduler_mini-HOWTO.txt in the Xen distribution.
+Set Simple EDF (Earliest Deadline First) scheduler parameters.  This
+scheduler provides weighted CPU sharing in an intuitive way and uses
+realtime-algorithms to ensure time guarantees.  For more information
+see docs/misc/sedf_scheduler_mini-HOWTO.txt in the Xen distribution.
 
 B<PARAMETERS>
 
@@ -640,10 +640,53 @@ sexpression formatted.
 
 =head2 NETWORK DEVICES
 
-=item B<network-attach> I<domain-id> I<[script=script]> I<[ip=ipaddr]>
+=item B<network-attach> I<domain-id> I<[script=scriptname]> I<[ip=ipaddr]>
 I<[mac=macaddr]> I<[bridge=bridge-name]> I<[backend=bedomain-id]>
 
+Creates a new network device in the domain specified by domain-id.  It
+takes the following optional options:
+
+B<OPTIONS>
+
+=over 4
+
+=item I<script=scriptname>
+
+Use the specified script name to bring up the network.  Defaults to
+the default setting in xend-config.sxp for I<vif-script>.
+
+=item I<ip=ipaddr>
+
+Passes the specified IP Address to the adapter on creation.  
+
+FIXME: this currently appears to be B<broken>.  I'm not sure under what
+circumstances this should actually work.
+
+=item I<mac=macaddr>
+
+The MAC address that the domain will see on its ethernet device.  If
+the device is not specified it will be randomly generated with the
+00:16:3e vendor id prefix.
+
+=item I<bridge=bridge-name>
+
+The name of the bridge to attach the vif to, in case you have more
+than one.  This defaults to 
+
+=item I<backend=bedomain-id>
+
+The backend domain id.  By default this is domain 0.
+
+=back
+
 =item B<network-detach> I<domain-id> I<devid>
+
+Removes the network device from the domain specified by I<domain-id>.
+I<devid> is the virtual interface device number within the domain
+(i.e. the 3 in vif22.3).
+
+FIXME: this is currently B<broken>.  Network devices aren't completely
+removed from domain 0.
 
 =item B<network-list> I<domain-id>
 
