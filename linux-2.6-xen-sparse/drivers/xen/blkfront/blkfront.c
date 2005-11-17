@@ -57,6 +57,7 @@
 
 #define BLKIF_STATE_DISCONNECTED 0
 #define BLKIF_STATE_CONNECTED    1
+#define BLKIF_STATE_SUSPENDED    2
 
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
     (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
@@ -75,7 +76,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs);
 static void blkif_restart_queue(void *arg);
 static void blkif_recover(struct blkfront_info *);
 static void blkif_completion(struct blk_shadow *);
-static void blkif_free(struct blkfront_info *);
+static void blkif_free(struct blkfront_info *, int);
 
 
 /**
@@ -144,7 +145,7 @@ static int blkfront_resume(struct xenbus_device *dev)
 
 	DPRINTK("blkfront_resume: %s\n", dev->nodename);
 
-	blkif_free(info);
+	blkif_free(info, 1);
 
 	err = talk_to_backend(dev, info);
 	if (!err)
@@ -207,7 +208,7 @@ again:
 	if (message)
 		xenbus_dev_fatal(dev, err, "%s", message);
  destroy_blkring:
-	blkif_free(info);
+	blkif_free(info, 0);
  out:
 	return err;
 }
@@ -252,7 +253,7 @@ static int setup_blkring(struct xenbus_device *dev,
 
 	return 0;
 fail:
-	blkif_free(info);
+	blkif_free(info, 0);
 	return err;
 }
 
@@ -295,7 +296,8 @@ static void connect(struct blkfront_info *info)
 	unsigned int binfo;
 	int err;
 
-        if (info->connected == BLKIF_STATE_CONNECTED)
+        if( (info->connected == BLKIF_STATE_CONNECTED) || 
+	    (info->connected == BLKIF_STATE_SUSPENDED) ) 
 		return;
 
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
@@ -354,7 +356,7 @@ static int blkfront_remove(struct xenbus_device *dev)
 
 	DPRINTK("blkfront_remove: %s removed\n", dev->nodename);
 
-	blkif_free(info);
+	blkif_free(info, 0);
 
 	kfree(info);
 
@@ -569,6 +571,7 @@ void do_blkif_request(request_queue_t *rq)
 			req->nr_sectors, req->buffer,
 			rq_data_dir(req) ? "write" : "read");
 
+
 		blkdev_dequeue_request(req);
 		if (blkif_queue_request(req)) {
 			blk_requeue_request(rq, req);
@@ -643,11 +646,12 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	return IRQ_HANDLED;
 }
 
-static void blkif_free(struct blkfront_info *info)
+static void blkif_free(struct blkfront_info *info, int suspend)
 {
 	/* Prevent new requests being issued until we fix things up. */
 	spin_lock_irq(&blkif_io_lock);
-	info->connected = BLKIF_STATE_DISCONNECTED;
+	info->connected = suspend ? 
+		BLKIF_STATE_SUSPENDED : BLKIF_STATE_DISCONNECTED; 
 	spin_unlock_irq(&blkif_io_lock);
 
 	/* Free resources associated with old device channel. */
