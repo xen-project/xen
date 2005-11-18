@@ -37,16 +37,10 @@
 #include <asm-xen/balloon.h>
 #include <asm-xen/xen-public/memory.h>
 #include <linux/module.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <linux/percpu.h>
 #include <asm/tlbflush.h>
-#endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define pte_offset_kernel pte_offset
-#define pud_t pgd_t
-#define pud_offset(d, va) d
-#elif defined(CONFIG_X86_64)
+#ifdef CONFIG_X86_64
 #define pmd_val_ma(v) (v).pmd
 #else
 #ifdef CONFIG_X86_PAE

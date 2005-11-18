@@ -32,11 +32,6 @@
 #include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/xen_proc.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define pud_t pgd_t
-#define pud_offset(d, va) d
-#endif
-
 static struct proc_dir_entry *privcmd_intf;
 
 static int privcmd_ioctl(struct inode *inode, struct file *file,
