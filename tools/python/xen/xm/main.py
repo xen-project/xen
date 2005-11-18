@@ -165,7 +165,6 @@ xm full list of subcommands:
 + block_list_help + help_spacer \
 + network_attach_help + help_spacer \
 + network_detach_help + help_spacer \
-+ network_limit_help + help_spacer \
 + network_list_help + """
 
   Vnet commands: """ + help_spacer \
