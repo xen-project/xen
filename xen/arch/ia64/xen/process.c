@@ -698,13 +698,10 @@ ia64_handle_privop (unsigned long ifa, struct pt_regs *regs, unsigned long isr, 
 	IA64FAULT vector;
 	struct domain *d = current->domain;
 	struct vcpu *v = current;
-	// FIXME: no need to pass itir in to this routine as we need to
-	// compute the virtual itir anyway (based on domain's RR.ps)
-	// AND ACTUALLY reflect_interruption doesn't use it anyway!
 	vector = priv_emulate(current,regs,isr);
 	if (vector != IA64_NO_FAULT && vector != IA64_RFI_IN_PROGRESS) {
-		PSCB(current,itir) =
-			vcpu_get_itir_on_fault(v,PSCB(current,ifa));
+		// Note: if a path results in a vector to reflect that requires
+		// iha/itir (e.g. vcpu_force_data_miss), they must be set there
 		reflect_interruption(isr,regs,vector);
 	}
 }

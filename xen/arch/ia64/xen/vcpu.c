@@ -1186,6 +1186,8 @@ Privileged operation emulation routines
 IA64FAULT vcpu_force_data_miss(VCPU *vcpu, UINT64 ifa)
 {
 	PSCB(vcpu,ifa) = ifa;
+	PSCB(vcpu,itir) = vcpu_get_itir_on_fault(vcpu,ifa);
+	vcpu_thash(current, ifa, &PSCB(current,iha));
 	return (vcpu_get_rr_ve(vcpu,ifa) ? IA64_DATA_TLB_VECTOR : IA64_ALT_DATA_TLB_VECTOR);
 }
 
