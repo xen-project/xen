@@ -171,6 +171,7 @@
 ^tools/xentrace/tbctl$
 ^tools/xentrace/xenctx$
 ^tools/xentrace/xentrace$
+^tools/xm-test/ramdisk/buildroot
 ^xen/BLOG$
 ^xen/TAGS$
 ^xen/arch/x86/asm-offsets\.s$
