@@ -1,0 +1,67 @@
+diff -Naur buildroot.orig/package/Config.in buildroot/package/Config.in
+--- buildroot.orig/package/Config.in	2005-11-15 07:30:21.000000000 -0800
++++ buildroot/package/Config.in	2005-11-15 07:30:54.000000000 -0800
+@@ -118,6 +118,6 @@
+ source "package/wireless-tools/Config.in"
+ source "package/xorg/Config.in"
+ source "package/zlib/Config.in"
+-
++source "package/hping/Config.in"
+ 
+ endmenu
+diff -Naur buildroot.orig/package/hping/Config.in buildroot/package/hping/Config.in
+--- buildroot.orig/package/hping/Config.in	1969-12-31 16:00:00.000000000 -0800
++++ buildroot/package/hping/Config.in	2005-11-14 14:13:20.000000000 -0800
+@@ -0,0 +1,5 @@
++config BR2_PACKAGE_HPING
++	bool "hping"
++	default y
++	help
++		This is the hping package
+diff -Naur buildroot.orig/package/hping/hping.mk buildroot/package/hping/hping.mk
+--- buildroot.orig/package/hping/hping.mk	1969-12-31 16:00:00.000000000 -0800
++++ buildroot/package/hping/hping.mk	2005-11-14 15:11:06.000000000 -0800
+@@ -0,0 +1,43 @@
++# Taken from the buildroot examples
++
++HPING_VERSION = 2.0.0-rc3
++HPING_TBALL = hping$(HPING_VERSION).tar.gz
++HPING_URL = http://www.hping.org/$(HPING_TBALL)
++HPING_DIR = $(BUILD_DIR)/hping2-rc3
++HPING_TARGET_BINARY = usr/bin/hping
++HPING_BINARY = hping
++
++$(DL_DIR)/$(HPING_TBALL):
++	$(WGET) -P $(DL_DIR) $(HPING_URL)
++
++$(HPING_DIR)/.source: $(DL_DIR)/$(HPING_TBALL)
++	tar xzf $(DL_DIR)/$(HPING_TBALL) -C $(BUILD_DIR)
++	touch $(HPING_DIR)/.source
++
++$(HPING_DIR)/.configured: $(HPING_DIR)/.source
++	(cd $(HPING_DIR); \
++	./configure; )
++	cat $(HPING_DIR)/Makefile | grep -v './hping2 -v' > $(HPING_DIR)/foo
++	mv $(HPING_DIR)/foo $(HPING_DIR)/Makefile
++	touch $(HPING_DIR)/.configured 
++
++$(HPING_DIR)/$(HPING_BINARY): $(HPING_DIR)/.configured
++	$(MAKE) CC=$(TARGET_CC) -C $(HPING_DIR)
++
++$(TARGET_DIR)/$(HPING_TARGET_BINARY): $(HPING_DIR)/$(HPING_BINARY)
++	cp $(HPING_DIR)/hping2 $(TARGET_DIR)/bin
++
++hping: $(TARGET_DIR)/$(HPING_TARGET_BINARY)
++
++hping-clean:
++	$(MAKE) prefix=$(TARGET_DIR)/usr -C $(HPING_DIR) uninstall
++	-$(MAKE) -C $(HPING_DIR) clean
++
++hping-dirclean:
++	rm -Rf $(HPING_DIR)
++
++ifeq ($(strip $(BR2_PACKAGE_HPING)),y)
++TARGETS += hping
++endif
++
++

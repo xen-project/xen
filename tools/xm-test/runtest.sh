@@ -61,10 +61,22 @@ runnable_tests() {
     fi
 
     # See if the ramdisk has been built
-    rdsize=$(stat -c %s ramdisk/initrd.img 2>/dev/null)
+    rdsize=$(stat -Lc %s ramdisk/initrd.img 2>/dev/null)
     if [ -z "$rdsize" ] || [ $rdsize -le 16384 ]; then
 	echo "Cannot find a valid ramdisk.  You need to run \"make\" or"
 	echo "copy in a previously-built ramdisk to the ramdisk/ directory"
+	exit 1
+    fi
+
+    # Figure out the version of the ramdisk link and compare it
+    # to what it should be as a cheap way of making sure we're
+    # using the right version
+    realrd=$(readlink ramdisk/initrd.img)
+    eval $(./lib/XmTestReport/xmtest.py)
+    rrdver="initrd-${XM_TEST_MAJ}.${XM_TEST_MIN}.img"
+    if [ "$realrd" != "$rrdver" ]; then
+	echo "Error: ramdisk/initrd.img is from an old version"
+	echo "You need to build a ramdisk from at least ${XM_TEST_MAJ}.${XM_TEST_MIN}"
 	exit 1
     fi
 
@@ -73,7 +85,7 @@ runnable_tests() {
 	echo "'xm list' failed: is xend running?"
 	exit 1
     fi
-    
+
 }
 
 # Get contact info if needed
