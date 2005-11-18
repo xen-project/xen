@@ -5,7 +5,8 @@ TESTS =	01_block-list_pos.test 	\
 	02_block-list_attachbd_pos.test \
 	03_block-list_anotherbd_pos.test \
 	04_block-list_nodb_pos.test \
-	05_block-list_nonexist_neg.test
+	05_block-list_nonexist_neg.test \
+	06_block-list_checkremove_pos.test
 
 XFAIL_TESTS = 
 
