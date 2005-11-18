@@ -409,7 +409,9 @@ void make_page_readonly(void *va)
 	if ((unsigned long)va >= (unsigned long)high_memory) {
 		unsigned long pfn = pte_pfn(*pte);
 #ifdef CONFIG_HIGHMEM
-		if (pfn < highstart_pfn)
+		if (pfn >= highstart_pfn)
+			kmap_flush_unused(); /* flush stale writable kmaps */
+		else
 #endif
 			make_lowmem_page_readonly(
 				phys_to_virt(pfn << PAGE_SHIFT)); 
