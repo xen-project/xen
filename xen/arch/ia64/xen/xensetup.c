@@ -268,9 +268,6 @@ void start_kernel(void)
     __ia64_init_fpu();
 
     alloc_dom0();
-#ifdef DOMU_BUILD_STAGING
-    alloc_domU_staging();
-#endif
 
     end_boot_allocator();
 

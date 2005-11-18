@@ -51,12 +51,6 @@
 unsigned long dom0_start = -1L;
 unsigned long dom0_size = 512*1024*1024;
 unsigned long dom0_align = 64*1024*1024;
-#ifdef DOMU_BUILD_STAGING
-unsigned long domU_staging_size = 32*1024*1024; //FIXME: Should be configurable
-unsigned long domU_staging_start;
-unsigned long domU_staging_align = 64*1024;
-unsigned long *domU_staging_area;
-#endif
 
 // initialized by arch/ia64/setup.c:find_initrd()
 unsigned long initrd_start = 0, initrd_end = 0;
@@ -750,46 +744,6 @@ void alloc_dom0(void)
 
 }
 
-#ifdef DOMU_BUILD_STAGING
-void alloc_domU_staging(void)
-{
-	domU_staging_size = 32*1024*1024; //FIXME: Should be configurable
-	printf("alloc_domU_staging: starting (initializing %d MB...)\n",domU_staging_size/(1024*1024));
-	domU_staging_start = alloc_boot_pages(
-            domU_staging_size >> PAGE_SHIFT, domU_staging_align >> PAGE_SHIFT);
-        domU_staging_start <<= PAGE_SHIFT;
-	if (!domU_staging_size) {
-		printf("alloc_domU_staging: can't allocate, spinning...\n");
-		while(1);
-	}
-	else domU_staging_area = (unsigned long *)__va(domU_staging_start);
-	printf("alloc_domU_staging: domU_staging_area=%p\n",domU_staging_area);
-
-}
-
-unsigned long
-domU_staging_read_8(unsigned long at)
-{
-	// no way to return errors so just do it
-	return domU_staging_area[at>>3];
-	
-}
-
-unsigned long
-domU_staging_write_32(unsigned long at, unsigned long a, unsigned long b,
-	unsigned long c, unsigned long d)
-{
-	if (at + 32 > domU_staging_size) return -1;
-	if (at & 0x1f) return -1;
-	at >>= 3;
-	domU_staging_area[at++] = a;
-	domU_staging_area[at++] = b;
-	domU_staging_area[at++] = c;
-	domU_staging_area[at] = d;
-	return 0;
-	
-}
-#endif
 
 /*
  * Domain 0 has direct access to all devices absolutely. However
@@ -1075,29 +1029,6 @@ void reconstruct_domU(struct vcpu *v)
 	new_thread(v, v->domain->arch.entry, 0, 0);
 }
 #endif
-
-// FIXME: When dom0 can construct domains, this goes away (or is rewritten)
-int launch_domainU(unsigned long size)
-{
-#ifdef CLONE_DOMAIN0
-	static int next = CLONE_DOMAIN0+1;
-#else
-	static int next = 1;
-#endif	
-
-	struct domain *d = do_createdomain(next,0);
-	if (!d) {
-		printf("launch_domainU: couldn't create\n");
-		return 1;
-	}
-	else next++;
-	if (construct_domU(d, (unsigned long)domU_staging_area, size,0,0,0)) {
-		printf("launch_domainU: couldn't construct(id=%d,%lx,%lx)\n",
-			d->domain_id,domU_staging_area,size);
-		return 2;
-	}
-	domain_unpause_by_systemcontroller(d);
-}
 
 void machine_restart(char * __unused)
 {
