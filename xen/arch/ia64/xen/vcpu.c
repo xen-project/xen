@@ -345,19 +345,17 @@ IA64FAULT vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
 
 IA64FAULT vcpu_get_psr(VCPU *vcpu, UINT64 *pval)
 {
-	UINT64 psr;
+	REGS *regs = vcpu_regs(vcpu);
 	struct ia64_psr newpsr;
 
-	// TODO: This needs to return a "filtered" view of
-	// the psr, not the actual psr.  Probably the psr needs
-	// to be a field in regs (in addition to ipsr).
-	__asm__ __volatile ("mov %0=psr;;" : "=r"(psr) :: "memory");
-	newpsr = *(struct ia64_psr *)&psr;
+	newpsr = *(struct ia64_psr *)&regs->cr_ipsr;
 	if (newpsr.cpl == 2) newpsr.cpl = 0;
 	if (PSCB(vcpu,interrupt_delivery_enabled)) newpsr.i = 1;
 	else newpsr.i = 0;
 	if (PSCB(vcpu,interrupt_collection_enabled)) newpsr.ic = 1;
 	else newpsr.ic = 0;
+	if (PSCB(vcpu,metaphysical_mode)) newpsr.dt = 0;
+	else newpsr.dt = 1;
 // FIXME: need new field in mapped_regs_t for virtual psr.pp (psr.be too?)
 	if (PSCB(vcpu,tmp[8])) newpsr.pp = 1;
 	else newpsr.pp = 0;
