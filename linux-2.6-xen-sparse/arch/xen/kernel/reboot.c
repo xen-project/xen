@@ -182,12 +182,20 @@ static int __do_suspend(void *ignore)
 
 	xencons_resume();
 
-	xenbus_resume();
-
 #ifdef CONFIG_SMP
 	for_each_cpu(i)
 		vcpu_prepare(i);
 
+#endif
+
+	/* 
+	** Only resume xenbus /after/ we've prepared our VCPUs; otherwise
+	** the VCPU hotplug callback can race with our vcpu_prepare
+	*/
+	xenbus_resume();
+
+
+#ifdef CONFIG_SMP
  out_reenable_cpus:
 	for_each_cpu_mask(i, prev_online_cpus) {
 		j = cpu_up(i);
