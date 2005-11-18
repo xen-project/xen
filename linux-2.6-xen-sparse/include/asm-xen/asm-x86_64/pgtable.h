@@ -29,9 +29,8 @@ extern void xen_init_pt(void);
 
 #define arbitrary_virt_to_machine(__va)					\
 ({									\
-	pte_t *__pte = virt_to_ptep(__va);				\
-	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
-	__pa | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
+	maddr_t m = (maddr_t)pte_mfn(*virt_to_ptep(__va)) << PAGE_SHIFT;\
+	m | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
 })
 #endif
 
