@@ -386,19 +386,26 @@ asmlinkage int xprintk(const char *fmt, ...);
 void make_lowmem_page_readonly(void *va)
 {
 	pte_t *pte = virt_to_ptep(va);
-	set_pte(pte, pte_wrprotect(*pte));
+	int rc = HYPERVISOR_update_va_mapping(
+		(unsigned long)va, pte_wrprotect(*pte), 0);
+	BUG_ON(rc);
 }
 
 void make_lowmem_page_writable(void *va)
 {
 	pte_t *pte = virt_to_ptep(va);
-	set_pte(pte, pte_mkwrite(*pte));
+	int rc = HYPERVISOR_update_va_mapping(
+		(unsigned long)va, pte_mkwrite(*pte), 0);
+	BUG_ON(rc);
 }
 
 void make_page_readonly(void *va)
 {
 	pte_t *pte = virt_to_ptep(va);
-	set_pte(pte, pte_wrprotect(*pte));
+	int rc = HYPERVISOR_update_va_mapping(
+		(unsigned long)va, pte_wrprotect(*pte), 0);
+	if (rc) /* fallback? */
+		xen_l1_entry_update(pte, pte_wrprotect(*pte));
 	if ((unsigned long)va >= (unsigned long)high_memory) {
 		unsigned long pfn = pte_pfn(*pte);
 #ifdef CONFIG_HIGHMEM
@@ -412,7 +419,10 @@ void make_page_readonly(void *va)
 void make_page_writable(void *va)
 {
 	pte_t *pte = virt_to_ptep(va);
-	set_pte(pte, pte_mkwrite(*pte));
+	int rc = HYPERVISOR_update_va_mapping(
+		(unsigned long)va, pte_mkwrite(*pte), 0);
+	if (rc) /* fallback? */
+		xen_l1_entry_update(pte, pte_mkwrite(*pte));
 	if ((unsigned long)va >= (unsigned long)high_memory) {
 		unsigned long pfn = pte_pfn(*pte); 
 #ifdef CONFIG_HIGHMEM
