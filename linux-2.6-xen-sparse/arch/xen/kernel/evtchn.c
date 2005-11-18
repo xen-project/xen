@@ -121,11 +121,7 @@ static void init_evtchn_cpu_bindings(void)
 
 /* Upcall to generic IRQ layer. */
 #ifdef CONFIG_X86
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,9)
 extern fastcall unsigned int do_IRQ(struct pt_regs *regs);
-#else
-extern asmlinkage unsigned int do_IRQ(struct pt_regs *regs);
-#endif
 #if defined (__i386__)
 #define IRQ_REG orig_eax
 #elif defined (__x86_64__)
