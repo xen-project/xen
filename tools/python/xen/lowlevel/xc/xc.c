@@ -49,19 +49,16 @@ static PyObject *pyxc_domain_dumpcore(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list,
                                       &dom, &corefile) )
-        goto exit;
+        return NULL;
 
     if ( (corefile == NULL) || (corefile[0] == '\0') )
-        goto exit;
+        return NULL;
 
     if ( xc_domain_dumpcore(xc->xc_handle, dom, corefile) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
     return zero;
-
- exit:
-    return NULL;
 }
 
 static PyObject *pyxc_handle(PyObject *self)
@@ -95,12 +92,7 @@ static PyObject *pyxc_domain_create(PyObject *self,
     {
         if ( !PyList_Check(pyhandle) || 
              (PyList_Size(pyhandle) != sizeof(xen_domain_handle_t)) )
-        {
-        out_exception:
-            errno = EINVAL;
-            PyErr_SetFromErrno(xc_error);
-            return NULL;
-        }
+            goto out_exception;
 
         for ( i = 0; i < sizeof(xen_domain_handle_t); i++ )
         {
@@ -115,6 +107,11 @@ static PyObject *pyxc_domain_create(PyObject *self,
         return PyErr_SetFromErrno(xc_error);
 
     return PyInt_FromLong(dom);
+
+out_exception:
+    errno = EINVAL;
+    PyErr_SetFromErrno(xc_error);
+    return NULL;
 }
 
 static PyObject *pyxc_domain_max_vcpus(PyObject *self,
@@ -270,10 +267,7 @@ static PyObject *pyxc_domain_sethandle(PyObject *self,
     if ( !PyList_Check(pyhandle) || 
          (PyList_Size(pyhandle) != sizeof(xen_domain_handle_t)) )
     {
-    out_exception:
-        errno = EINVAL;
-        PyErr_SetFromErrno(xc_error);
-        return NULL;
+        goto out_exception;
     }
 
     for ( i = 0; i < sizeof(xen_domain_handle_t); i++ )
@@ -289,7 +283,13 @@ static PyObject *pyxc_domain_sethandle(PyObject *self,
     
     Py_INCREF(zero);
     return zero;
+
+out_exception:
+    errno = EINVAL;
+    PyErr_SetFromErrno(xc_error);
+    return NULL;
 }
+
 
 static PyObject *pyxc_domain_getinfo(PyObject *self,
                                      PyObject *args,
