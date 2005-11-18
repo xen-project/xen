@@ -255,6 +255,9 @@ void arch_do_createdomain(struct vcpu *v)
     struct domain *d = v->domain;
     l1_pgentry_t gdt_l1e;
     int vcpuid, pdpt_order;
+#ifdef __x86_64__
+    int i;
+#endif
 
     if ( is_idle_task(d) )
         return;

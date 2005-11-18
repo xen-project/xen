@@ -225,6 +225,7 @@ BR2_PACKAGE_BUSYBOX_CONFIG="package/busybox/busybox.config"
 # BR2_PACKAGE_WIRELESS_TOOLS is not set
 # BR2_PACKAGE_XORG is not set
 # BR2_PACKAGE_ZLIB is not set
+BR2_PACKAGE_HPING=y
 
 #
 # Target Options

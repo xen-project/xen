@@ -45,11 +45,15 @@ special files, this process must be done as root:
 NB: If you have the initrd.img from another installation of xm-test,
 you can copy it into the ramdisk directory to eliminate the need to
 rebuild it.  If you do this, there is no need to run 'make' again.
-Simply copy the initrd.img file into ramdisk/ and then run the
-runtest.sh script.  Note that in general, you should not attempt to
-use a ramdisk from a previous minor version of xm-test (i.e., don't
-use a ramdisk from 0.4.0 with 0.5.0.  0.5.0 should work for 0.5.3
-though)
+Simply copy the initrd-X.Y.img file into ramdisk/ and then run:
+
+   # make existing
+
+This will set up the link so that xm-test will use the existing
+ramdisk.  Next, just run "runtest.sh" normally.  Note that in general,
+you should not attempt to use a ramdisk from a previous minor version
+of xm-test (i.e., don't use a ramdisk from 0.4.0 with 0.5.0.  0.5.0
+should work for 0.5.3 though)
 
 
 Running

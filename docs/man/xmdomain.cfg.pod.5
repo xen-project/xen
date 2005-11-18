@@ -1,6 +1,6 @@
 =head1 NAME
 
-xmdomain.cfg - xm domain create config file format
+xmdomain.cfg - xm domain config file format
 
 =head1 SYNOPSIS
 
@@ -10,17 +10,22 @@ xmdomain.cfg - xm domain create config file format
 
 =head1 DESCRIPTION
 
-The xm(1) program uses python executable config files to define
+The B<xm>(1) program uses python executable config files to define
 domains to create from scratch.  Each of these config files needs to
 contain a number of required options, and may specify many more.
 
-Domain configuration files live in /etc/xen by default, though the
-full path to the config file must be specified in the I<xm create>
-command, so they can exist anywhere in the filesystem.
+Domain configuration files live in /etc/xen by default, if you store
+config files anywhere else the full path to the config file must be
+specified in the I<xm create> command.
 
-/etc/xen/auto is a special case however, as domain config files in
-that directory will be started automatically at system boot if the
-xendomain init script is enabled.
+/etc/xen/auto is a special case.  Domain config files in that
+directory will be started automatically at system boot if the
+xendomain init script is enabled.  The contents of /etc/xen/auto
+should be symlinks to files in /etc/xen to allow I<xm create> to be
+used without full paths.
+
+Options are specified by I<name = value> statements in the
+xmdomain.cfg files.
 
 =head1 OPTIONS
 
@@ -29,50 +34,157 @@ file.
 
 =over 4
 
-=item I<kernel>
+=item B<kernel>
 
-The kernel image used in the domain.
+The kernel image for the domain.  The format of the parameter is the
+fully qualified path to the kernel image file,
+i.e. I</boot/vmlinuz-2.6.12-xenU>.
 
-=item I<ramdisk>
 
-The initial ramdisk to be used in the domain.  Default xen domU
-kernels do not usually need a ramdisk.
+=item B<ramdisk>
 
-=item I<memory>
+The initial ramdisk for the domain.  The format of the parameter is
+the fully qualified path to the initrd, i.e. I</boot/initrd.gz>.  On
+many Linux distros you will not need a ramdisk if using the default
+xen kernel.
 
-The amount of memory, in megabytes to allocate to the domain when it
+=item B<memory>
+
+The amount of RAM, in megabytes, to allocate to the domain when it
 starts.  Allocating insufficient memory for a domain may produce
-extremely bizarre behavior.
+extremely bizarre behavior.  If there isn't enough free memory left on
+the machine to fulfill this request, the domain will fail to start.
 
-=item I<name>
+Xen does not support overcommit of memory, so the total memory of all
+guests (+ 64 MB needed for Xen) must be less than or equal to the
+physical RAM in the machine.
 
-A unique name for the domain.  You can not create 2 domains with the
-same name.
+=item B<name>
 
-=item I<root>
+A unique name for the domain.  Attempting to create two domains with
+the same name will cause an error.
 
-Root stanza for the domain (required for Linux domains).
+=item B<root>
 
-=item I<disk>
+Specifies the root device for the domain.  This is required for Linux
+domains, and possibly other OSes.
 
-An array of disk stanzas 
+=item B<nics>
 
-=back
+The number of network interfaces allocated to the domain on boot.  It
+defaults to 1.
 
-A bare minimal config file example might be as follows:
+=item B<disk>
 
-    kernel = "/boot/vmlinuz-2.6-xenU"
-    memory = 128
-    name = "MyLinux"      
-    root = "/dev/hda1 ro"
+An array of block device stanzas, in the form:
 
-=head1 ADDITIONAL OPTIONS
+    disk = [ "stanza1", "stanza2", ... ]
+
+Each stanza has 3 terms, seperated by commas,
+"backend-dev,frontend-dev,mode".
 
 =over 4
 
-=item I<builder>
+=item I<backend-dev>
 
-=back 
+The device in the backend domain that will be exported to the guest
+(frontend) domain.  Supported formats include:
+
+I<phy:device> - export the physical device listed.  The device can be
+in symbolic form, as in sda7, or as the hex major/minor number, as in
+0x301 (which is hda1).
+
+I<file://path/to/file> - export the file listed as a loopback device.
+This will take care of the loopback setup before exporting the device.
+
+=item I<frontend-dev>
+
+How the device should appear in the guest domain.  The device can be
+in symbolic form, as in sda7, or as the hex major/minor number, as in
+0x301 (which is hda1).
+
+=item I<mode>
+
+The access mode for the device.  There are currently 2 valid options,
+I<r> (read-only), I<w> (read/write).
+
+=back
+
+=item B<vif>
+
+An arrray of virtual interface stanzas in the form:
+
+    vif = [ "stanza1", "stanza2", ... ]
+
+Each stanza specifies a set of I<name = value> options separated by
+commas, in the form: "name1=value1, name2=value2, ..."
+
+B<OPTIONS>
+
+=over 4
+
+=item I<bridge>
+
+The network bridge to be used for this device.  This is especially
+needed if multiple bridges exist on the machine.
+
+=item I<mac>
+
+The MAC address for the virtual interface.  If mac is not specified,
+one will be randomly chosen by xen with the 00:16:3e vendor id prefix.
+
+=back
+
+=back
+
+=head1 ADDITIONAL OPTIONS
+
+The following options are also supported in the config file, though
+are far more rarely used.
+
+=over 4
+
+=item B<builder>
+
+Which builder should be used to construct the domain.  This defaults
+to the I<linux> if not specified, which is the builder for
+paravirtualized Linux domains.
+
+=item B<cpu>
+
+Specifies which CPU the domain should be started on, where 0 specifies
+the first cpu, 1 the second, and so on.  This defaults to -1, which
+means Xen is free to pick which CPU to start on.
+
+=item B<extra>
+
+Extra information to append to the end of the kernel parameter line.
+The format is a string, the contents of which can be anything that the
+kernel supports.  For instance:
+
+    extra = "4"
+
+Will cause the domain to boot to runlevel 4.
+
+=item B<nfs_server>
+
+The IP address of the NFS server to use as the root device for the
+domain.  In order to do this you'll need to specify I<root=/dev/nfs>,
+and specify I<nfs_root>.
+
+=item B<nfs_root>
+
+The directory on the NFS server to be used as the root filesystem.
+Specified as a fully qualified path, i.e. I</full/path/to/root/dir>.
+
+=item B<vcpus>
+
+The number of virtual cpus to allocate to the domain.  In order to use
+this the xen kernel must be compiled with SMP support.
+
+This defaults to 1, meaning running the domain as a UP.
+
+=back
 
 =head1 DOMAIN SHUTDOWN OPTIONS
 
@@ -81,17 +193,17 @@ unplanned) under certain events.  The 3 events currently captured are:
 
 =over 4
 
-=item I<shutdown>
+=item B<on_shutdown>
 
 Triggered on either an I<xm shutdown> or graceful shutdown from inside
 the DomU.
 
-=item I<reboot>
+=item B<on_reboot>
 
 Triggered on either an I<xm reboot> or graceful reboot from inside the
 DomU.
 
-=item I<crash>
+=item B<on_crash>
 
 Triggered when a DomU goes to the crashed state for any reason.
 
@@ -101,29 +213,62 @@ All of them take one of 4 valid states listed below.
 
 =over 4
 
-=item I<destroy>
+=item B<destroy>
 
 The domain will be cleaned up completely.  No attempt at respawning
 will occur.  This is what a typical shutdown would look like.
 
-=item I<restart>
+=item B<restart>
 
 The domain will be restarted with the same name as the old domain.
 This is what a typical reboot would look like.
 
-=item I<preserve>
+=item B<preserve>
 
 The domain will not be cleaned up at all.  This is often useful for
 crash state domains which ensures that enough evidence is to debug the
 real issue.
 
-=item I<rename-restart>
+=item B<rename-restart>
 
 The old domain will not be cleaned up, but will be renamed so a new
 domain can be restarted in it's place.  The old domain will be renamed with
 a suffix -1, -2, etc, and assigned a new random UUID; the new domain will
 keep the original name and UUID.  The old domain will release the devices that
 it holds, so that the new one may take them.
+
+=back
+
+=head1 EXAMPLES
+
+The following are quick examples of ways that domains might be
+configured.  They should not be considered an exhaustive set.
+
+=over 4
+
+=item I<A Loopback File as Root>
+
+    kernel = "/boot/vmlinuz-2.6-xenU"
+    memory = 128
+    name = "MyLinux"      
+    root = "/dev/hda1 ro"
+    disk = [ "file:/var/xen/mylinux.img,hda1,w" ]
+
+This creates a domain called MyLinux with 128 MB of memory using a
+default xen kernel, and the file /var/xen/mylinux.img loopback mounted
+at hda1, which is the root filesystem.
+
+=item I<NFS Root>
+
+FIXME: write me
+
+=item I<LVM Root>
+
+FIXME: write me
+
+=item I<Two Networks>
+
+FIXME: write me
 
 =back
 

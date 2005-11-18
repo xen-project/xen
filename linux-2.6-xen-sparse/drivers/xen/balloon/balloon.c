@@ -91,7 +91,6 @@ static void balloon_process(void *unused);
 static DECLARE_WORK(balloon_worker, balloon_process, NULL);
 static struct timer_list balloon_timer;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 /* Use the private and mapping fields of struct page as a list. */
 #define PAGE_TO_LIST(p) ((struct list_head *)&p->private)
 #define LIST_TO_PAGE(l)				\
@@ -102,19 +101,6 @@ static struct timer_list balloon_timer;
 		p->mapping = NULL;		\
 		p->private = 0;			\
 	} while(0)
-#else
-/* There's a dedicated list field in struct page we can use.    */
-#define PAGE_TO_LIST(p) ( &p->list )
-#define LIST_TO_PAGE(l) ( list_entry(l, struct page, list) )
-#define UNLIST_PAGE(p)  ( list_del(&p->list) )
-#define pte_offset_kernel pte_offset
-#define pud_t pgd_t
-#define pud_offset(d, va) d
-#define pud_none(d) 0
-#define pud_bad(d) 0
-#define subsys_initcall(_fn) __initcall(_fn)
-#define pfn_to_page(_pfn) (mem_map + (_pfn))
-#endif
 
 #define IPRINTK(fmt, args...) \
 	printk(KERN_INFO "xen_mem: " fmt, ##args)

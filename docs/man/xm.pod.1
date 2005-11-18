@@ -626,12 +626,62 @@ event.
 
 =item B<block-attach> I<domain-id> I<be-dev> I<fe-dev> I<mode> I<[bedomain-id]>
 
-Create a new virtual block device
+Create a new virtual block device.  This will trigger a hotplug event
+for the guest.
+
+B<OPTIONS>
+
+=over 4
+
+=item I<domain-id>
+
+The domain id of the guest domain that the device will be attached to.
+
+=item I<be-dev>
+
+The device in the backend domain (usually domain 0) to be exported.
+This can be specified as a physical partition (phy:sda7) or as a file
+mounted as loopback (file://path/to/loop.iso).
+
+=item I<fe-dev>
+
+How the device should be presented to the guest domain.  It can be
+specified as either a symbolic name, such as /dev/hdc, for common
+devices, or by device id, such as 0x1400 (/dev/hdc device id in hex).
+
+=item I<mode>
+
+The access mode for the device from the guest domain.  Supported modes
+are I<rw> (read/write) or I<ro> (read-only).
+
+=item I<bedomain-id>
+
+The back end domain hosting the device.  This defaults to domain 0.
+
+=back
+
+B<EXAMPLES>
+
+=over 4
+
+=item I<Mount an ISO as a Disk>
+
+xm block-attach guestdomain file://path/to/dsl-2.0RC2.iso /dev/hdc ro
+
+This will mount the dsl iso as /dev/hdc in the guestdomain as a read
+only device.  This will probably not be detected as a cdrom by the
+guest, but mounting /dev/hdc manually will work.
+
+=back
 
 =item B<block-detach> I<domain-id> I<devid>
 
-Destroy a domain's virtual block device. DevId may either be a device
-ID or the device name as mounted in the guest.
+Destroy a domain's virtual block device. devid B<must> be the device
+id given to the device by domain 0.  You will need to run I<xm
+block-list> to determine that number.
+
+FIXME: this is currently B<broken>.  Even though a block device is
+removed from domU, it appears to still be allocated in the domain 0.
 
 =item B<block-list> I<domain-id>
 
@@ -722,7 +772,7 @@ Delete a vnet.
 
 =head1 SEE ALSO
 
-B<xmdomain.cfg>(5)
+B<xmdomain.cfg>(5), B<xentop>(1)
 
 BVT scheduling paper: K.J. Duda and D.R. Cheriton. Borrowed Virtual
 Time (BVT) scheduling: supporting latency-sensitive threads in a

@@ -1,6 +1,9 @@
 SUBDIRS = ramdisk tests
 EXTRA_DIST = lib runtest.sh mkreport
 
+existing:
+	$(MAKE) -C ramdisk existing
+
 # Remove any pyc's, CVS dirs, and prune the skel dirs
 dist-hook:
 	find $(distdir) -name '*~' -delete -print

@@ -39,15 +39,11 @@
 #include <asm/ptrace.h>
 #include <asm/page.h>
 #if defined(__i386__)
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #  ifdef CONFIG_X86_PAE
 #   include <asm-generic/pgtable-nopud.h>
 #  else
 #   include <asm-generic/pgtable-nopmd.h>
 #  endif
-# else
-#  define pud_t pgd_t
-# endif
 #endif
 
 extern shared_info_t *HYPERVISOR_shared_info;
@@ -112,22 +108,6 @@ void xen_invlpg_all(unsigned long ptr);
 void xen_tlb_flush_mask(cpumask_t *mask);
 void xen_invlpg_mask(cpumask_t *mask, unsigned long ptr);
 #endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-/* 
-** XXX SMH: 2.4 doesn't have percpu.h (or support SMP guests) so just 
-** include sufficient #defines to allow the below to build. 
-*/
-#define DEFINE_PER_CPU(type, name) \
-    __typeof__(type) per_cpu__##name
-
-#define per_cpu(var, cpu)           (*((void)cpu, &per_cpu__##var))
-#define __get_cpu_var(var)          per_cpu__##var
-#define DECLARE_PER_CPU(type, name) extern __typeof__(type) per_cpu__##name
-
-#define EXPORT_PER_CPU_SYMBOL(var) EXPORT_SYMBOL(per_cpu__##var)
-#define EXPORT_PER_CPU_SYMBOL_GPL(var) EXPORT_SYMBOL_GPL(per_cpu__##var)
-#endif /* linux < 2.6.0 */
 
 /* Returns zero on success else negative errno. */
 int xen_create_contiguous_region(
