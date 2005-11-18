@@ -410,7 +410,8 @@ int __devinit __cpu_up(unsigned int cpu)
 
 	xen_smp_intr_init(cpu);
 	cpu_set(cpu, cpu_online_map);
-	HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
+	if (HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL) != 0)
+		BUG();
 
 	return 0;
 }

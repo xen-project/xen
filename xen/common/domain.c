@@ -425,7 +425,9 @@ long do_vcpu_op(int cmd, int vcpuid, void *arg)
         break;
 
     case VCPUOP_up:
-        if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+            rc = -EINVAL;
+        else if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
             vcpu_wake(v);
         break;
 
