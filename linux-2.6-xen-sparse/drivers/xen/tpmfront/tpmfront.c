@@ -38,7 +38,7 @@
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
-#include <linux/tpmfe.h>
+#include <asm-xen/tpmfe.h>
 #include <linux/err.h>
 
 #include <asm/semaphore.h>
