@@ -22,9 +22,9 @@ import sys
 import time
 
 from xen.xend.XendClient import server
+from xen.xend import sxp
 from xen.xm.opts import *
 
-DOM0_NAME = 'Domain-0'
 DOM0_ID = '0'
 
 gopts = Opts(use="""[options] [DOM]
@@ -54,7 +54,8 @@ gopts.opt('reboot', short='R',
 
 def shutdown(opts, doms, mode, wait):
     if doms == None: doms = server.xend_domains()
-    for x in [DOM0_NAME, DOM0_ID]:
+    dom0_name = sxp.child_value(server.xend_domain(0), 'name')
+    for x in [dom0_name, DOM0_ID]:
         if x in doms:
             doms.remove(x)
     for d in doms:

@@ -15,6 +15,7 @@
 #include <asm-xen/xenbus.h>
 #include <linux/cpu.h>
 #include <linux/kthread.h>
+#include <asm-xen/xencons.h>
 
 #define SHUTDOWN_INVALID  -1
 #define SHUTDOWN_POWEROFF  0
@@ -29,7 +30,6 @@
 void machine_restart(char * __unused)
 {
 	/* We really want to get pending console data out before we die. */
-	extern void xencons_force_flush(void);
 	xencons_force_flush();
 	HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_reboot);
 }
@@ -42,7 +42,6 @@ void machine_halt(void)
 void machine_power_off(void)
 {
 	/* We really want to get pending console data out before we die. */
-	extern void xencons_force_flush(void);
 	xencons_force_flush();
 	HYPERVISOR_sched_op(SCHEDOP_shutdown, SHUTDOWN_poweroff);
 }
@@ -84,8 +83,6 @@ static int __do_suspend(void *ignore)
 	cpumask_t prev_online_cpus;
 	int vcpu_prepare(int vcpu);
 #endif
-
-	extern void xencons_resume(void);
 
 	int err = 0;
 
@@ -185,12 +182,20 @@ static int __do_suspend(void *ignore)
 
 	xencons_resume();
 
-	xenbus_resume();
-
 #ifdef CONFIG_SMP
-	for_each_present_cpu(i)
+	for_each_cpu(i)
 		vcpu_prepare(i);
 
+#endif
+
+	/* 
+	** Only resume xenbus /after/ we've prepared our VCPUs; otherwise
+	** the VCPU hotplug callback can race with our vcpu_prepare
+	*/
+	xenbus_resume();
+
+
+#ifdef CONFIG_SMP
  out_reenable_cpus:
 	for_each_cpu_mask(i, prev_online_cpus) {
 		j = cpu_up(i);

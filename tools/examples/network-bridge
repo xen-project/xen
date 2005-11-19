@@ -16,29 +16,38 @@
 #
 # Usage:
 #
-# network (start|stop|status) {VAR=VAL}*
+# network-bridge (start|stop|status) {VAR=VAL}*
 #
 # Vars:
 #
-# vifnum     Virtual device number to use (default 0). Numbers >=1
+# vifnum     Virtual device number to use (default 0). Numbers >=8
 #            require the netback driver to have nloopbacks set to a
-#            higher value than its default of 1.
+#            higher value than its default of 8.
 # bridge     The bridge to use (default xenbr${vifnum}).
 # netdev     The interface to add to the bridge (default eth${vifnum}).
 # antispoof  Whether to use iptables to prevent spoofing (default no).
 #
+# Internal Vars:
+# pdev="p${netdev}"
+# vdev="veth${vifnum}"
+# vif0="vif0.${vifnum}"
+#
 # start:
-# Creates the bridge and enslaves netdev to it.
-# Copies the IP addresses from netdev to the bridge.
-# Deletes the routes to netdev and adds them on bridge.
+# Creates the bridge
+# Copies the IP and MAC addresses from netdev to vdev
+# Renames netdev to be pdev 
+# Renames vdev to be netdev 
+# Enslaves pdev, vdev to bridge
 #
 # stop:
-# Removes netdev from the bridge.
-# Deletes the routes to bridge and adds them to netdev.
+# Removes netdev from the bridge
+# Transfers addresses, routes from netdev to pdev
+# Renames netdev to vdev
+# Renames pdev to netdev 
+# Deletes bridge
 #
 # status:
-# Print ifconfig for netdev and bridge.
-# Print routes.
+# Print addresses, interfaces, routes
 #
 #============================================================================
 
@@ -97,23 +106,12 @@ s/inet/ip addr add/
 s@\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/[0-9]\+\)@\1@
 s/${src}/dev ${dst}/
 " | sh -e
-    # Remove automatic routes on destionation device
+    # Remove automatic routes on destination device
     ip route list | sed -ne "
 /dev ${dst}\( \|$\)/ {
   s/^/ip route del /
   p
 }" | sh -e
-}
-
-# Usage: del_addrs src
-del_addrs () {
-    local src=$1
-    ip addr show dev ${src} | egrep '^ *inet ' | sed -e "
-s/inet/ip addr del/
-s@\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)/[0-9]\+@\1@
-s/${src}/dev ${src}/
-" | sh -e
-    ip link set dev ${dst} up
 }
 
 # Usage: transfer_routes src dst
@@ -139,6 +137,23 @@ transfer_routes () {
   d
 }" | sh -e
 }
+
+
+##
+# link_exists interface
+#
+# Returns 0 if the interface named exists (whether up or down), 1 otherwise.
+#
+link_exists()
+{
+    if ip link show "$1" >&/dev/null
+    then
+        return 0
+    else
+        return 1
+    fi
+}
+
 
 # Usage: create_bridge bridge
 create_bridge () {
@@ -195,8 +210,12 @@ op_start () {
 	return
     fi
 
-    if ! ip link show 2>/dev/null | grep -q "^[0-9]*: ${vdev}"; then
-        echo "
+    if ! link_exists "$vdev"; then
+        if link_exists "$pdev"; then
+            # The device is already up.
+            return
+        else
+            echo "
 Link $vdev is missing.
 This may be because you have reached the limit of the number of interfaces
 that the loopback driver supports.  If the loopback driver is a module, you
@@ -204,12 +223,13 @@ may raise this limit by passing it as a parameter (nloopbacks=<N>); if the
 driver is compiled statically into the kernel, then you may set the parameter
 using loopback.nloopbacks=<N> on the domain 0 kernel command line.
 " >&2
-        exit 1
+            exit 1
+        fi
     fi
 
     create_bridge ${bridge}
 
-    if ip link show ${vdev} 2>/dev/null >/dev/null; then
+    if link_exists "$vdev"; then
 	mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
 	preiftransfer ${netdev}
 	transfer_addrs ${netdev} ${vdev}
@@ -262,11 +282,11 @@ op_stop () {
     if [ "${bridge}" == "null" ]; then
 	return
     fi
-    if ! ip link show ${bridge} >/dev/null 2>&1; then
+    if ! link_exists "$bridge"; then
 	return
     fi
 
-    if ip link show ${pdev} 2>/dev/null >/dev/null; then
+    if link_exists "$pdev"; then
 	ip link set dev ${vif0} down
 	mac=`ip link show ${netdev} | grep 'link\/ether' | sed -e 's/.*ether \(..:..:..:..:..:..\).*/\1/'`
 	transfer_addrs ${netdev} ${pdev}

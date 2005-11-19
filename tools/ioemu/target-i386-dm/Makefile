@@ -7,7 +7,7 @@ INSTALL_DIR := $(DESTDIR)/usr/$(LIBDIR)/xen/bin
 TARGET_PATH=$(SRC_PATH)/target-$(TARGET_ARCH)
 VPATH=$(SRC_PATH):$(TARGET_PATH):$(SRC_PATH)/hw:$(SRC_PATH)/audio
 DEFINES=-I. -I$(TARGET_PATH) -I$(SRC_PATH)
-DEFINES+= -I$(XEN_ROOT)/tools/libxc
+DEFINES+= -I$(XEN_ROOT)/tools/libxc -I$(XEN_ROOT)/tools/xenstore
 ifdef CONFIG_USER_ONLY
 VPATH+=:$(SRC_PATH)/linux-user
 DEFINES+=-I$(SRC_PATH)/linux-user -I$(SRC_PATH)/linux-user/$(TARGET_ARCH)
@@ -188,7 +188,7 @@ endif
 #########################################################
 
 DEFINES+=-D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
-LIBS+=-lm -L../../libxc -lxenctrl -lxenguest
+LIBS+=-lm -L../../libxc -lxenctrl -lxenguest -L../../xenstore -lxenstore
 ifndef CONFIG_USER_ONLY
 LIBS+=-lz
 endif
@@ -376,9 +376,9 @@ mixeng.o: mixeng.c mixeng.h mixeng_template.h
 
 clean:
 	rm -rf *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe slirp
+	rm -rf config.mak config.h
 
-distclean:
-	rm -rf *.o  *.a *~ $(PROGS) gen-op.h opc.h op.h nwfpe slirp
+distclean: clean
 
 install: all 
 	if [ ! -d $(INSTALL_DIR) ];then mkdir -p $(INSTALL_DIR);fi

@@ -2,6 +2,7 @@
  * Virtual network driver for conversing with remote driver backends.
  * 
  * Copyright (c) 2002-2005, K A Fraser
+ * Copyright (c) 2005, XenSource Ltd
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -56,6 +57,7 @@
 #include <asm/uaccess.h>
 #include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/gnttab.h>
+#include <asm-xen/net_driver_util.h>
 
 #define GRANT_INVALID_REF	0
 
@@ -87,26 +89,11 @@
 #define TX_TEST_IDX req_cons  /* conservative: not seen all our requests? */
 #endif
 
-
-static void network_tx_buf_gc(struct net_device *dev);
-static void network_alloc_rx_buffers(struct net_device *dev);
-
 static unsigned long rx_pfn_array[NETIF_RX_RING_SIZE];
 static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE+1];
 static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE];
 
-#ifdef CONFIG_PROC_FS
-static int xennet_proc_init(void);
-static int xennet_proc_addif(struct net_device *dev);
-static void xennet_proc_delif(struct net_device *dev);
-#else
-#define xennet_proc_init()   (0)
-#define xennet_proc_addif(d) (0)
-#define xennet_proc_delif(d) ((void)0)
-#endif
-
-#define netfront_info net_private
-struct net_private
+struct netfront_info
 {
 	struct list_head list;
 	struct net_device *netdev;
@@ -154,9 +141,6 @@ struct net_private
 	grant_ref_t grant_rx_ref[NETIF_TX_RING_SIZE + 1]; 
 
 	struct xenbus_device *xbdev;
-	char *backend;
-	int backend_id;
-	struct xenbus_watch watch;
 	int tx_ring_ref;
 	int rx_ring_ref;
 	u8 mac[ETH_ALEN];
@@ -181,16 +165,256 @@ static char *be_state_name[] = {
 
 #ifdef DEBUG
 #define DPRINTK(fmt, args...) \
-	printk(KERN_ALERT "xen_net (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
+	printk(KERN_ALERT "netfront (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
 #else
 #define DPRINTK(fmt, args...) ((void)0)
 #endif
 #define IPRINTK(fmt, args...) \
-	printk(KERN_INFO "xen_net: " fmt, ##args)
+	printk(KERN_INFO "netfront: " fmt, ##args)
 #define WPRINTK(fmt, args...) \
-	printk(KERN_WARNING "xen_net: " fmt, ##args)
+	printk(KERN_WARNING "netfront: " fmt, ##args)
 
-static void netif_free(struct netfront_info *info);
+
+static int talk_to_backend(struct xenbus_device *, struct netfront_info *);
+static int setup_device(struct xenbus_device *, struct netfront_info *);
+static int create_netdev(int, struct xenbus_device *, struct net_device **);
+
+static void netfront_closing(struct xenbus_device *);
+
+static void end_access(int, void *);
+static void netif_disconnect_backend(struct netfront_info *);
+static void close_netdev(struct netfront_info *);
+static void netif_free(struct netfront_info *);
+
+static void show_device(struct netfront_info *);
+
+static void network_connect(struct net_device *);
+static void network_tx_buf_gc(struct net_device *);
+static void network_alloc_rx_buffers(struct net_device *);
+static int send_fake_arp(struct net_device *);
+
+static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs);
+
+#ifdef CONFIG_PROC_FS
+static int xennet_proc_init(void);
+static int xennet_proc_addif(struct net_device *dev);
+static void xennet_proc_delif(struct net_device *dev);
+#else
+#define xennet_proc_init()   (0)
+#define xennet_proc_addif(d) (0)
+#define xennet_proc_delif(d) ((void)0)
+#endif
+
+
+/**
+ * Entry point to this code when a new device is created.  Allocate the basic
+ * structures and the ring buffers for communication with the backend, and
+ * inform the backend of the appropriate details for those.  Switch to
+ * Connected state.
+ */
+static int netfront_probe(struct xenbus_device *dev,
+			  const struct xenbus_device_id *id)
+{
+	int err;
+	struct net_device *netdev;
+	struct netfront_info *info;
+	unsigned int handle;
+
+	err = xenbus_scanf(NULL, dev->nodename, "handle", "%u", &handle);
+	if (err != 1) {
+		xenbus_dev_fatal(dev, err, "reading handle");
+		return err;
+	}
+
+	err = create_netdev(handle, dev, &netdev);
+	if (err) {
+		xenbus_dev_fatal(dev, err, "creating netdev");
+		return err;
+	}
+
+	info = netdev_priv(netdev);
+	dev->data = info;
+
+	err = talk_to_backend(dev, info);
+	if (err) {
+		kfree(info);
+		dev->data = NULL;
+		return err;
+	}
+
+	return 0;
+}
+
+
+/**
+ * We are reconnecting to the backend, due to a suspend/resume, or a backend
+ * driver restart.  We tear down our netif structure and recreate it, but
+ * leave the device-layer structures intact so that this is transparent to the
+ * rest of the kernel.
+ */
+static int netfront_resume(struct xenbus_device *dev)
+{
+	struct netfront_info *info = dev->data;
+
+	DPRINTK("%s\n", dev->nodename);
+
+	netif_disconnect_backend(info);
+	return talk_to_backend(dev, info);
+}
+
+
+/* Common code used when first setting up, and when resuming. */
+static int talk_to_backend(struct xenbus_device *dev,
+			   struct netfront_info *info)
+{
+	const char *message;
+	struct xenbus_transaction *xbt;
+	int err;
+
+	err = xen_net_read_mac(dev, info->mac);
+	if (err) {
+		xenbus_dev_fatal(dev, err, "parsing %s/mac", dev->nodename);
+		goto out;
+	}
+
+	/* Create shared ring, alloc event channel. */
+	err = setup_device(dev, info);
+	if (err)
+		goto out;
+
+again:
+	xbt = xenbus_transaction_start();
+	if (IS_ERR(xbt)) {
+		xenbus_dev_fatal(dev, err, "starting transaction");
+		goto destroy_ring;
+	}
+
+	err = xenbus_printf(xbt, dev->nodename, "tx-ring-ref","%u",
+			    info->tx_ring_ref);
+	if (err) {
+		message = "writing tx ring-ref";
+		goto abort_transaction;
+	}
+	err = xenbus_printf(xbt, dev->nodename, "rx-ring-ref","%u",
+			    info->rx_ring_ref);
+	if (err) {
+		message = "writing rx ring-ref";
+		goto abort_transaction;
+	}
+	err = xenbus_printf(xbt, dev->nodename,
+			    "event-channel", "%u", info->evtchn);
+	if (err) {
+		message = "writing event-channel";
+		goto abort_transaction;
+	}
+
+	err = xenbus_printf(xbt, dev->nodename,
+			    "state", "%d", XenbusStateConnected);
+	if (err) {
+		message = "writing frontend XenbusStateConnected";
+		goto abort_transaction;
+	}
+
+	err = xenbus_transaction_end(xbt, 0);
+	if (err) {
+		if (err == -EAGAIN)
+			goto again;
+		xenbus_dev_fatal(dev, err, "completing transaction");
+		goto destroy_ring;
+	}
+
+	return 0;
+
+ abort_transaction:
+	xenbus_transaction_end(xbt, 1);
+	xenbus_dev_fatal(dev, err, "%s", message);
+ destroy_ring:
+	netif_free(info);
+ out:
+	return err;
+}
+
+
+static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
+{
+	int err;
+	struct net_device *netdev = info->netdev;
+
+	info->tx_ring_ref = GRANT_INVALID_REF;
+	info->rx_ring_ref = GRANT_INVALID_REF;
+	info->rx = NULL;
+	info->tx = NULL;
+	info->irq = 0;
+
+	info->tx = (netif_tx_interface_t *)__get_free_page(GFP_KERNEL);
+	if (!info->tx) {
+		err = -ENOMEM;
+		xenbus_dev_fatal(dev, err, "allocating tx ring page");
+		goto fail;
+	}
+	info->rx = (netif_rx_interface_t *)__get_free_page(GFP_KERNEL);
+	if (!info->rx) {
+		err = -ENOMEM;
+		xenbus_dev_fatal(dev, err, "allocating rx ring page");
+		goto fail;
+	}
+	memset(info->tx, 0, PAGE_SIZE);
+	memset(info->rx, 0, PAGE_SIZE);
+	info->backend_state = BEST_DISCONNECTED;
+
+	err = xenbus_grant_ring(dev, virt_to_mfn(info->tx));
+	if (err < 0)
+		goto fail;
+	info->tx_ring_ref = err;
+
+	err = xenbus_grant_ring(dev, virt_to_mfn(info->rx));
+	if (err < 0)
+		goto fail;
+	info->rx_ring_ref = err;
+
+	err = xenbus_alloc_evtchn(dev, &info->evtchn);
+	if (err)
+		goto fail;
+
+	memcpy(netdev->dev_addr, info->mac, ETH_ALEN);
+	network_connect(netdev);
+	info->irq = bind_evtchn_to_irqhandler(
+		info->evtchn, netif_int, SA_SAMPLE_RANDOM, netdev->name,
+		netdev);
+	(void)send_fake_arp(netdev);
+	show_device(info);
+
+	return 0;
+
+ fail:
+	netif_free(info);
+	return err;
+}
+
+
+/**
+ * Callback received when the backend's state changes.
+ */
+static void backend_changed(struct xenbus_device *dev,
+			    XenbusState backend_state)
+{
+	DPRINTK("\n");
+
+	switch (backend_state) {
+	case XenbusStateInitialising:
+	case XenbusStateInitWait:
+	case XenbusStateInitialised:
+	case XenbusStateConnected:
+	case XenbusStateUnknown:
+	case XenbusStateClosed:
+		break;
+
+	case XenbusStateClosing:
+		netfront_closing(dev);
+		break;
+	}
+}
+
 
 /** Send a packet on a net device to encourage switches to learn the
  * MAC. We send a fake ARP request.
@@ -220,9 +444,10 @@ static int send_fake_arp(struct net_device *dev)
 	return dev_queue_xmit(skb);
 }
 
+
 static int network_open(struct net_device *dev)
 {
-	struct net_private *np = netdev_priv(dev);
+	struct netfront_info *np = netdev_priv(dev);
 
 	memset(&np->stats, 0, sizeof(np->stats));
 
@@ -240,7 +465,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 {
 	NETIF_RING_IDX i, prod;
 	unsigned short id;
-	struct net_private *np = netdev_priv(dev);
+	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb;
 
 	if (np->backend_state != BEST_CONNECTED)
@@ -295,7 +520,7 @@ static void network_tx_buf_gc(struct net_device *dev)
 static void network_alloc_rx_buffers(struct net_device *dev)
 {
 	unsigned short id;
-	struct net_private *np = netdev_priv(dev);
+	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb;
 	int i, batch_target;
 	NETIF_RING_IDX req_prod = np->rx->req_prod;
@@ -337,13 +562,13 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 		ref = gnttab_claim_grant_reference(&np->gref_rx_head);
 		BUG_ON((signed short)ref < 0);
 		np->grant_rx_ref[id] = ref;
-		gnttab_grant_foreign_transfer_ref(ref, np->backend_id);
+		gnttab_grant_foreign_transfer_ref(ref,
+						  np->xbdev->otherend_id);
 		np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.gref = ref;
 		rx_pfn_array[i] = virt_to_mfn(skb->head);
 
 		/* Remove this page from map before passing back to Xen. */
-		phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] 
-			= INVALID_P2M_ENTRY;
+		set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT, INVALID_P2M_ENTRY);
 
 		MULTI_update_va_mapping(rx_mcl+i, (unsigned long)skb->head,
 					__pte(0), 0);
@@ -386,7 +611,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	unsigned short id;
-	struct net_private *np = netdev_priv(dev);
+	struct netfront_info *np = netdev_priv(dev);
 	netif_tx_request_t *tx;
 	NETIF_RING_IDX i;
 	grant_ref_t ref;
@@ -430,7 +655,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	BUG_ON((signed short)ref < 0);
 	mfn = virt_to_mfn(skb->data);
 	gnttab_grant_foreign_access_ref(
-		ref, np->backend_id, mfn, GNTMAP_readonly);
+		ref, np->xbdev->otherend_id, mfn, GNTMAP_readonly);
 	tx->gref = np->grant_tx_ref[id] = ref;
 	tx->offset = (unsigned long)skb->data & ~PAGE_MASK;
 	tx->size = skb->len;
@@ -467,7 +692,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 	struct net_device *dev = dev_id;
-	struct net_private *np = netdev_priv(dev);
+	struct netfront_info *np = netdev_priv(dev);
 	unsigned long flags;
 
 	spin_lock_irqsave(&np->tx_lock, flags);
@@ -484,7 +709,7 @@ static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 static int netif_poll(struct net_device *dev, int *pbudget)
 {
-	struct net_private *np = netdev_priv(dev);
+	struct netfront_info *np = netdev_priv(dev);
 	struct sk_buff *skb, *nskb;
 	netif_rx_response_t *rx;
 	NETIF_RING_IDX i, rp;
@@ -535,7 +760,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 		if(ref == GRANT_INVALID_REF) { 
 			printk(KERN_WARNING "Bad rx grant reference %d "
 			       "from dom %d.\n",
-			       ref, np->backend_id);
+			       ref, np->xbdev->otherend_id);
 			np->rx->ring[MASK_NETIF_RX_IDX(np->rx->req_prod)].
 				req.id = rx->id;
 			wmb();
@@ -570,7 +795,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 					pfn_pte_ma(mfn, PAGE_KERNEL), 0);
 		mcl++;
 
-		phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = mfn;
+		set_phys_to_machine(__pa(skb->head) >> PAGE_SHIFT, mfn);
 
 		__skb_queue_tail(&rxq, skb);
 	}
@@ -679,7 +904,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
 static int network_close(struct net_device *dev)
 {
-	struct net_private *np = netdev_priv(dev);
+	struct netfront_info *np = netdev_priv(dev);
 	np->user_state = UST_CLOSED;
 	netif_stop_queue(np->netdev);
 	return 0;
@@ -688,13 +913,13 @@ static int network_close(struct net_device *dev)
 
 static struct net_device_stats *network_get_stats(struct net_device *dev)
 {
-	struct net_private *np = netdev_priv(dev);
+	struct netfront_info *np = netdev_priv(dev);
 	return &np->stats;
 }
 
 static void network_connect(struct net_device *dev)
 {
-	struct net_private *np;
+	struct netfront_info *np;
 	int i, requeue_idx;
 	netif_tx_request_t *tx;
 	struct sk_buff *skb;
@@ -737,7 +962,7 @@ static void network_connect(struct net_device *dev)
 
 		tx->id = i;
 		gnttab_grant_foreign_access_ref(
-			np->grant_tx_ref[i], np->backend_id, 
+			np->grant_tx_ref[i], np->xbdev->otherend_id, 
 			virt_to_mfn(np->tx_skbs[i]->data),
 			GNTMAP_readonly); 
 		tx->gref = np->grant_tx_ref[i];
@@ -756,7 +981,7 @@ static void network_connect(struct net_device *dev)
 		if ((unsigned long)np->rx_skbs[i] < __PAGE_OFFSET)
 			continue;
 		gnttab_grant_foreign_transfer_ref(
-			np->grant_rx_ref[i], np->backend_id);
+			np->grant_rx_ref[i], np->xbdev->otherend_id);
 		np->rx->ring[requeue_idx].req.gref =
 			np->grant_rx_ref[i];
 		np->rx->ring[requeue_idx].req.id = i;
@@ -783,7 +1008,7 @@ static void network_connect(struct net_device *dev)
 	spin_unlock_irq(&np->tx_lock);
 }
 
-static void show_device(struct net_private *np)
+static void show_device(struct netfront_info *np)
 {
 #ifdef DEBUG
 	if (np) {
@@ -800,27 +1025,9 @@ static void show_device(struct net_private *np)
 #endif
 }
 
-/*
- * Move the vif into connected state.
- * Sets the mac and event channel from the message.
- * Binds the irq to the event channel.
- */
-static void 
-connect_device(struct net_private *np, unsigned int evtchn)
-{
-	struct net_device *dev = np->netdev;
-	memcpy(dev->dev_addr, np->mac, ETH_ALEN);
-	np->evtchn = evtchn;
-	network_connect(dev);
-	np->irq = bind_evtchn_to_irqhandler(
-		np->evtchn, netif_int, SA_SAMPLE_RANDOM, dev->name, dev);
-	(void)send_fake_arp(dev);
-	show_device(np);
-}
-
 static void netif_uninit(struct net_device *dev)
 {
-	struct net_private *np = netdev_priv(dev);
+	struct netfront_info *np = netdev_priv(dev);
 	gnttab_free_grant_references(np->gref_tx_head);
 	gnttab_free_grant_references(np->gref_rx_head);
 }
@@ -841,9 +1048,9 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 {
 	int i, err = 0;
 	struct net_device *netdev = NULL;
-	struct net_private *np = NULL;
+	struct netfront_info *np = NULL;
 
-	if ((netdev = alloc_etherdev(sizeof(struct net_private))) == NULL) {
+	if ((netdev = alloc_etherdev(sizeof(struct netfront_info))) == NULL) {
 		printk(KERN_WARNING "%s> alloc_etherdev failed.\n",
 		       __FUNCTION__);
 		err = -ENOMEM;
@@ -918,7 +1125,7 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	np->netdev = netdev;
 
  exit:
-	if ((err != 0) && (netdev != NULL))
+	if (err != 0)
 		kfree(netdev);
 	else if (val != NULL)
 		*val = netdev;
@@ -928,15 +1135,6 @@ static int create_netdev(int handle, struct xenbus_device *dev,
 	gnttab_free_grant_references(np->gref_tx_head);
 	gnttab_free_grant_references(np->gref_rx_head);
 	goto exit;
-}
-
-static int destroy_netdev(struct net_device *netdev)
-{
-#ifdef CONFIG_PROC_FS
-	xennet_proc_delif(netdev);
-#endif
-        unregister_netdev(netdev);
-	return 0;
 }
 
 /*
@@ -956,91 +1154,70 @@ inetdev_notify(struct notifier_block *this, unsigned long event, void *ptr)
 	return NOTIFY_DONE;
 }
 
-static struct notifier_block notifier_inetdev = {
-	.notifier_call  = inetdev_notify,
-	.next           = NULL,
-	.priority       = 0
-};
 
-static struct xenbus_device_id netfront_ids[] = {
-	{ "vif" },
-	{ "" }
-};
+/* ** Close down ** */
 
-static void watch_for_status(struct xenbus_watch *watch,
-			     const char **vec, unsigned int len)
+
+/**
+ * Handle the change of state of the backend to Closing.  We must delete our
+ * device-layer structures now, to ensure that writes are flushed through to
+ * the backend.  Once is this done, we can switch to Closed in
+ * acknowledgement.
+ */
+static void netfront_closing(struct xenbus_device *dev)
 {
+	struct netfront_info *info = dev->data;
+
+	DPRINTK("netfront_closing: %s removed\n", dev->nodename);
+
+	close_netdev(info);
+
+	xenbus_switch_state(dev, NULL, XenbusStateClosed);
 }
 
-static int setup_device(struct xenbus_device *dev, struct netfront_info *info)
+
+static int netfront_remove(struct xenbus_device *dev)
 {
-	int err;
-	evtchn_op_t op = {
-		.cmd = EVTCHNOP_alloc_unbound,
-		.u.alloc_unbound.dom = DOMID_SELF,
-		.u.alloc_unbound.remote_dom = info->backend_id };
+	struct netfront_info *info = dev->data;
 
-	info->tx_ring_ref = GRANT_INVALID_REF;
-	info->rx_ring_ref = GRANT_INVALID_REF;
-	info->rx = NULL;
-	info->tx = NULL;
-	info->irq = 0;
+	DPRINTK("%s\n", dev->nodename);
 
-	info->tx = (netif_tx_interface_t *)__get_free_page(GFP_KERNEL);
-	if (info->tx == 0) {
-		err = -ENOMEM;
-		xenbus_dev_error(dev, err, "allocating tx ring page");
-		goto out;
-	}
-	info->rx = (netif_rx_interface_t *)__get_free_page(GFP_KERNEL);
-	if (info->rx == 0) {
-		err = -ENOMEM;
-		xenbus_dev_error(dev, err, "allocating rx ring page");
-		goto out;
-	}
-	memset(info->tx, 0, PAGE_SIZE);
-	memset(info->rx, 0, PAGE_SIZE);
-	info->backend_state = BEST_DISCONNECTED;
-
-	err = gnttab_grant_foreign_access(info->backend_id,
-					  virt_to_mfn(info->tx), 0);
-	if (err < 0) {
-		xenbus_dev_error(dev, err, "granting access to tx ring page");
-		goto out;
-	}
-	info->tx_ring_ref = err;
-
-	err = gnttab_grant_foreign_access(info->backend_id,
-					  virt_to_mfn(info->rx), 0);
-	if (err < 0) {
-		xenbus_dev_error(dev, err, "granting access to rx ring page");
-		goto out;
-	}
-	info->rx_ring_ref = err;
-
-	err = HYPERVISOR_event_channel_op(&op);
-	if (err) {
-		xenbus_dev_error(dev, err, "allocating event channel");
-		goto out;
-	}
-
-	connect_device(info, op.u.alloc_unbound.port);
+	netif_free(info);
+	kfree(info);
 
 	return 0;
-
- out:
-	netif_free(info);
-	return err;
 }
 
-static void end_access(int ref, void *page)
-{
-	if (ref != GRANT_INVALID_REF)
-		gnttab_end_foreign_access(ref, 0, (unsigned long)page);
-}
 
 static void netif_free(struct netfront_info *info)
 {
+	netif_disconnect_backend(info);
+	close_netdev(info);
+}
+
+
+static void close_netdev(struct netfront_info *info)
+{
+	if (info->netdev) {
+#ifdef CONFIG_PROC_FS
+		xennet_proc_delif(info->netdev);
+#endif
+		unregister_netdev(info->netdev);
+		info->netdev = NULL;
+	}
+}
+
+
+static void netif_disconnect_backend(struct netfront_info *info)
+{
+	/* Stop old i/f to prevent errors whilst we rebuild the state. */
+	spin_lock_irq(&info->tx_lock);
+	spin_lock(&info->rx_lock);
+	netif_stop_queue(info->netdev);
+	/* info->backend_state = BEST_DISCONNECTED; */
+	spin_unlock(&info->rx_lock);
+	spin_unlock_irq(&info->tx_lock);
+    
 	end_access(info->tx_ring_ref, info->tx);
 	end_access(info->rx_ring_ref, info->rx);
 	info->tx_ring_ref = GRANT_INVALID_REF;
@@ -1053,203 +1230,22 @@ static void netif_free(struct netfront_info *info)
 	info->evtchn = info->irq = 0;
 }
 
-/* Stop network device and free tx/rx queues and irq. */
-static void shutdown_device(struct net_private *np)
+
+static void end_access(int ref, void *page)
 {
-	/* Stop old i/f to prevent errors whilst we rebuild the state. */
-	spin_lock_irq(&np->tx_lock);
-	spin_lock(&np->rx_lock);
-	netif_stop_queue(np->netdev);
-	/* np->backend_state = BEST_DISCONNECTED; */
-	spin_unlock(&np->rx_lock);
-	spin_unlock_irq(&np->tx_lock);
-    
-	/* Free resources. */
-	netif_free(np);
+	if (ref != GRANT_INVALID_REF)
+		gnttab_end_foreign_access(ref, 0, (unsigned long)page);
 }
 
-/* Common code used when first setting up, and when resuming. */
-static int talk_to_backend(struct xenbus_device *dev,
-			   struct netfront_info *info)
-{
-	char *backend, *mac, *e, *s;
-	const char *message;
-	struct xenbus_transaction *xbt;
-	int err, i;
 
-	backend = NULL;
-	err = xenbus_gather(NULL, dev->nodename,
-			    "backend-id", "%i", &info->backend_id,
-			    "backend", NULL, &backend,
-			    NULL);
-	if (XENBUS_EXIST_ERR(err))
-		goto out;
-	if (backend && strlen(backend) == 0) {
-		err = -ENOENT;
-		goto out;
-	}
-	if (err < 0) {
-		xenbus_dev_error(dev, err, "reading %s/backend or backend-id",
-				 dev->nodename);
-		goto out;
-	}
+/* ** Driver registration ** */
 
-	mac = xenbus_read(NULL, dev->nodename, "mac", NULL);
-	if (IS_ERR(mac)) {
-		err = PTR_ERR(mac);
-		xenbus_dev_error(dev, err, "reading %s/mac",
-				 dev->nodename);
-		goto out;
-	}
-	s = mac;
-	for (i = 0; i < ETH_ALEN; i++) {
-		info->mac[i] = simple_strtoul(s, &e, 16);
-		if (s == e || (e[0] != ':' && e[0] != 0)) {
-			kfree(mac);
-			err = -ENOENT;
-			xenbus_dev_error(dev, err, "parsing %s/mac",
-					 dev->nodename);
-			goto out;
-		}
-		s = &e[1];
-	}
-	kfree(mac);
 
-	/* Create shared ring, alloc event channel. */
-	err = setup_device(dev, info);
-	if (err) {
-		xenbus_dev_error(dev, err, "setting up ring");
-		goto out;
-	}
+static struct xenbus_device_id netfront_ids[] = {
+	{ "vif" },
+	{ "" }
+};
 
-again:
-	xbt = xenbus_transaction_start();
-	if (IS_ERR(xbt)) {
-		xenbus_dev_error(dev, err, "starting transaction");
-		goto destroy_ring;
-	}
-
-	err = xenbus_printf(xbt, dev->nodename, "tx-ring-ref","%u",
-			    info->tx_ring_ref);
-	if (err) {
-		message = "writing tx ring-ref";
-		goto abort_transaction;
-	}
-	err = xenbus_printf(xbt, dev->nodename, "rx-ring-ref","%u",
-			    info->rx_ring_ref);
-	if (err) {
-		message = "writing rx ring-ref";
-		goto abort_transaction;
-	}
-	err = xenbus_printf(xbt, dev->nodename,
-			    "event-channel", "%u", info->evtchn);
-	if (err) {
-		message = "writing event-channel";
-		goto abort_transaction;
-	}
-
-	err = xenbus_transaction_end(xbt, 0);
-	if (err) {
-		if (err == -EAGAIN)
-			goto again;
-		xenbus_dev_error(dev, err, "completing transaction");
-		goto destroy_ring;
-	}
-
-	info->watch.node = backend;
-	info->watch.callback = watch_for_status;
-	err = register_xenbus_watch(&info->watch);
-	if (err) {
-		message = "registering watch on backend";
-		goto destroy_ring;
-	}
-
-	info->backend = backend;
-
-	return 0;
-
- abort_transaction:
-	xenbus_transaction_end(xbt, 1);
-	xenbus_dev_error(dev, err, "%s", message);
- destroy_ring:
-	shutdown_device(info);
- out:
-	if (backend)
-		kfree(backend);
-	return err;
-}
-
-/*
- * Setup supplies the backend dir, virtual device.
- * We place an event channel and shared frame entries.
- * We watch backend to wait if it's ok.
- */
-static int netfront_probe(struct xenbus_device *dev,
-			  const struct xenbus_device_id *id)
-{
-	int err;
-	struct net_device *netdev;
-	struct netfront_info *info;
-	unsigned int handle;
-
-	err = xenbus_scanf(NULL, dev->nodename, "handle", "%u", &handle);
-	if (XENBUS_EXIST_ERR(err))
-		return err;
-	if (err < 0) {
-		xenbus_dev_error(dev, err, "reading handle");
-		return err;
-	}
-
-	err = create_netdev(handle, dev, &netdev);
-	if (err) {
-		xenbus_dev_error(dev, err, "creating netdev");
-		return err;
-	}
-
-	info = netdev_priv(netdev);
-	dev->data = info;
-
-	err = talk_to_backend(dev, info);
-	if (err) {
-		destroy_netdev(netdev);
-		kfree(netdev);
-		dev->data = NULL;
-		return err;
-	}
-
-	return 0;
-}
-
-static int netfront_remove(struct xenbus_device *dev)
-{
-	struct netfront_info *info = dev->data;
-
-	if (info->backend)
-		unregister_xenbus_watch(&info->watch);
-
-	netif_free(info);
-
-	kfree(info->backend);
-	kfree(info);
-
-	return 0;
-}
-
-static int netfront_suspend(struct xenbus_device *dev)
-{
-	struct netfront_info *info = dev->data;
-	unregister_xenbus_watch(&info->watch);
-	kfree(info->backend);
-	info->backend = NULL;
-	return 0;
-}
-
-static int netfront_resume(struct xenbus_device *dev)
-{
-	struct netfront_info *info = dev->data;
-	netif_free(info);
-	return talk_to_backend(dev, info);
-}
 
 static struct xenbus_driver netfront = {
 	.name = "vif",
@@ -1258,13 +1254,15 @@ static struct xenbus_driver netfront = {
 	.probe = netfront_probe,
 	.remove = netfront_remove,
 	.resume = netfront_resume,
-	.suspend = netfront_suspend,
+	.otherend_changed = backend_changed,
 };
 
-static void __init init_net_xenbus(void)
-{
-	xenbus_register_driver(&netfront);
-}
+
+static struct notifier_block notifier_inetdev = {
+	.notifier_call  = inetdev_notify,
+	.next           = NULL,
+	.priority       = 0
+};
 
 static int __init netif_init(void)
 {
@@ -1280,14 +1278,24 @@ static int __init netif_init(void)
 
 	(void)register_inetaddr_notifier(&notifier_inetdev);
 
-	init_net_xenbus();
-
-	return err;
+	return xenbus_register_frontend(&netfront);
 }
+module_init(netif_init);
+
 
 static void netif_exit(void)
 {
+	unregister_inetaddr_notifier(&notifier_inetdev);
+
+	return xenbus_unregister_driver(&netfront);
 }
+module_exit(netif_exit);
+
+MODULE_LICENSE("BSD");
+ 
+ 
+/* ** /proc **/
+
 
 #ifdef CONFIG_PROC_FS
 
@@ -1300,7 +1308,7 @@ static int xennet_proc_read(
 {
 	struct net_device *dev =
 		(struct net_device *)((unsigned long)data & ~3UL);
-	struct net_private *np = netdev_priv(dev);
+	struct netfront_info *np = netdev_priv(dev);
 	int len = 0, which_target = (long)data & 3;
     
 	switch (which_target)
@@ -1326,7 +1334,7 @@ static int xennet_proc_write(
 {
 	struct net_device *dev =
 		(struct net_device *)((unsigned long)data & ~3UL);
-	struct net_private *np = netdev_priv(dev);
+	struct netfront_info *np = netdev_priv(dev);
 	int which_target = (long)data & 3;
 	char string[64];
 	long target;
@@ -1440,8 +1448,6 @@ static void xennet_proc_delif(struct net_device *dev)
 
 #endif
 
-module_init(netif_init);
-module_exit(netif_exit);
 
 /*
  * Local variables:

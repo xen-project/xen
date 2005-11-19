@@ -36,6 +36,7 @@ from xen.xend import XendCheckpoint
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 from xen.xend.server import relocate
+from xen.xend.xenstore.xswatch import xswatch
 
 
 xc = xen.lowlevel.xc.new()
@@ -58,9 +59,9 @@ class XendDomain:
         # to import XendDomain from XendDomainInfo causes unbounded recursion.
         # So we stuff the XendDomain instance (self) into xroot's components.
         xroot.add_component("xen.xend.XendDomain", self)
+
         self.domains = {}
         self.domains_lock = threading.RLock()
-        self.watchReleaseDomain()
 
         self.domains_lock.acquire()
         try:
@@ -68,6 +69,13 @@ class XendDomain:
                 XendDomainInfo.recreate(self.xen_domains()[PRIV_DOMAIN],
                                         True))
             self.dom0_setup()
+
+            # This watch registration needs to be before the refresh call, so
+            # that we're sure that we haven't missed any releases, but inside
+            # the domains_lock, as we don't want the watch to fire until after
+            # the refresh call has completed.
+            xswatch("@releaseDomain", self.onReleaseDomain)
+            
             self.refresh(True)
         finally:
             self.domains_lock.release()
@@ -112,11 +120,7 @@ class XendDomain:
             self.refresh()
         finally:
             self.domains_lock.release()
-            
-
-    def watchReleaseDomain(self):
-        from xen.xend.xenstore.xswatch import xswatch
-        self.releaseDomain = xswatch("@releaseDomain", self.onReleaseDomain)
+        return 1
 
 
     def xen_domains(self):
@@ -466,17 +470,6 @@ class XendDomain:
             return xc.sedf_domain_get(dominfo.getDomid())
         except Exception, ex:
             raise XendError(str(ex))
-
-
-    def domain_vif_limit_set(self, domid, vif, credit, period):
-        """Limit the vif's transmission rate
-        """
-        dominfo = self.domain_lookup(domid)
-        dev = dominfo.getDevice('vif', vif)
-        if not dev:
-            raise XendError("invalid vif")
-        return dev.setCreditLimit(credit, period)
-
 
     def domain_maxmem_set(self, domid, mem):
         """Set the memory limit for a domain.

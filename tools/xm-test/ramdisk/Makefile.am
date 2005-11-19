@@ -1,5 +1,5 @@
 
-EXTRA_DIST = skel configs
+EXTRA_DIST = skel configs patches
 
 BR_TAR = buildroot-20050823.tar.bz2
 BR_URL = http://buildroot.uclibc.org/downloads/snapshots/$(BR_TAR)
@@ -8,6 +8,9 @@ BR_SRC = buildroot
 BR_IMG = $(BR_SRC)/rootfs.i386.ext2
 
 BR_ROOT = build_i386/root
+
+XMTEST_MAJ_VER = $(shell echo @PACKAGE_VERSION@ | perl -pe 's/(\d+)\.(\d+)\.\d+/\1.\2/')
+XMTEST_VER_IMG = initrd-$(XMTEST_MAJ_VER).img
 
 all: initrd.img
 
@@ -21,12 +24,21 @@ $(BR_IMG): $(BR_SRC)
 	cp configs/buildroot $(BR_SRC)/.config
 	cp configs/busybox $(BR_SRC)/package/busybox/busybox.config
 	cp configs/uClibc $(BR_SRC)/toolchain/uClibc/uClibc.config
+	(for i in patches/buildroot/*.patch; do \
+	  cd $(BR_SRC) && patch -p1 <../$$i; done )
 	cd $(BR_SRC) && make oldconfig && make
 
-initrd.img: $(BR_IMG)
+$(XMTEST_VER_IMG): $(BR_IMG)
 	(cd skel; tar cf - .) | (cd $(BR_SRC)/$(BR_ROOT); tar xvf -)
 	cd $(BR_SRC) && make
-	cp $(BR_IMG) initrd.img
+	cp $(BR_IMG) initrd-$(XMTEST_MAJ_VER).img
+
+initrd.img: $(XMTEST_VER_IMG)
+	ln -sf $(XMTEST_VER_IMG) initrd.img
+
+existing:
+	@[ -f $(XMTEST_VER_IMG) ] && ln -sf $(XMTEST_VER_IMG) initrd.img || \
+	echo Error, $(XMTEST_VER_IMG) not found
 
 clean-local: am_config_clean-local
 

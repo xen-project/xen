@@ -604,8 +604,7 @@ void *readblock_indiv(int server, uint64_t id) {
     return block;
 
     err:
-    if (qe->block)
-        free(qe->block);
+    free(qe->block);
     free((void *)qe);
     return NULL;
 }
@@ -1072,7 +1071,7 @@ uint64_t allocblock_hint(void *block, uint64_t hint) {
  *
  *   @return: pointer to new block, NULL on error
  */
-void *newblock() {
+void *newblock(void) {
     void *block = malloc(BLOCK_SIZE);
     if (block == NULL) {
         perror("newblock");
@@ -1089,7 +1088,6 @@ void *newblock() {
  *   @block: block to be freed
  */
 void freeblock(void *block) {
-    if (block != NULL)
         free(block);
 }
 

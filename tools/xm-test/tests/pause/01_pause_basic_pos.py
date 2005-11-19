@@ -49,12 +49,9 @@ status, output = traceCommand("xm pause %s" % domain.getName())
 if status != 0:
 	FAIL("xm pause returned invalid %i != 0", status)
 
-# Attach a console to it
+# Try to attach a console to it
 try:
     console = XmConsole(domain.getName(), historySaveCmds=True)
-except ConsoleError, e:
-    FAIL(str(e))
-try:
     run = console.runCmd("ls")
     #If we get here, console attached to paused domain (unexpected)
     FAIL("console attached to supposedly paused domain")

@@ -416,6 +416,7 @@ int main_loop(void)
 	FD_ZERO(&wakeup_rfds);
 	FD_SET(evtchn_fd, &wakeup_rfds);
 	highest_fds = evtchn_fd;
+	env->send_event = 0;
 	while (1) {
                 if (vm_running) {
                     if (shutdown_requested) {
@@ -431,7 +432,6 @@ int main_loop(void)
 		tv.tv_sec = 0;
 		tv.tv_usec = 100000;
 
-		env->send_event = 0;
 		retval = select(highest_fds+1, &wakeup_rfds, NULL, NULL, &tv);
 		if (retval == -1) {
 			perror("select");
@@ -447,12 +447,13 @@ int main_loop(void)
 #define ULONGLONG_MAX   ULONG_MAX
 #endif
 
-		main_loop_wait(0);
         tun_receive_handler(&rfds);
         if ( FD_ISSET(evtchn_fd, &rfds) ) {
             cpu_handle_ioreq(env);
         }
+		main_loop_wait(0);
 		if (env->send_event) {
+		    env->send_event = 0;
 			struct ioctl_evtchn_notify notify;
 			notify.port = ioreq_local_port;
 			(void)ioctl(evtchn_fd, IOCTL_EVTCHN_NOTIFY, &notify);

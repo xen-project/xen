@@ -28,7 +28,7 @@
 #include <asm/vmx.h>
 #include <asm/vmx_platform.h>
 #include <asm/vmx_vlapic.h>
-
+#include <asm/vmx_vioapic.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <asm/current.h>
@@ -119,22 +119,35 @@ uint32_t vlapic_update_ppr(struct vlapic *vlapic)
 }
 
 /* This only for fixed delivery mode */
-int vlapic_match_dest(struct vlapic *target, struct vlapic *source,
-                      int short_hand, int dest, int dest_mode,
-                      int delivery_mode)
+static int vlapic_match_dest(struct vcpu *v, struct vlapic *source,
+                             int short_hand, int dest, int dest_mode,
+                             int delivery_mode)
 {
     int result = 0;
+    struct vlapic *target = VLAPIC(v);
 
     VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "vlapic_match_dest: "
                 "target %p source %p dest %x dest_mode %x short_hand %x "
                 "delivery_mode %x",
                 target, source, dest, dest_mode, short_hand, delivery_mode);
 
+    if ( unlikely(!target) &&
+         ( (delivery_mode != VLAPIC_DELIV_MODE_INIT) &&
+           (delivery_mode != VLAPIC_DELIV_MODE_STARTUP) &&
+           (delivery_mode != VLAPIC_DELIV_MODE_NMI) )) {
+        VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "vlapic_match_dest "
+                    "uninitialized target v %p delivery_mode %x dest %x\n",
+                    v, delivery_mode, dest);
+        return result;
+    }
+
     switch (short_hand) {
     case VLAPIC_NO_SHORTHAND:
         if (!dest_mode) {   /* Physical */
-            result = (target->id == dest);
+            result = ((target ? target->id : v->vcpu_id ) == dest);
         } else {            /* Logical */
+            if (!target)
+                break;
             if (((target->dest_format >> 28) & 0xf) == 0xf) {   /* Flat mode */
                 result = (target->logical_dest >> 24) & dest;
             } else {
@@ -176,17 +189,18 @@ int vlapic_match_dest(struct vlapic *target, struct vlapic *source,
  * Add a pending IRQ into lapic.
  * Return 1 if successfully added and 0 if discarded.
  */
-int vlapic_accept_irq(struct vlapic *vlapic, int delivery_mode,
-                      int vector, int level, int trig_mode)
+static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
+                             int vector, int level, int trig_mode)
 {
-    int	result = 1;
+    int	result = 0;
+    struct vlapic *vlapic = VLAPIC(v);
 
     switch (delivery_mode) {
     case VLAPIC_DELIV_MODE_FIXED:
     case VLAPIC_DELIV_MODE_LPRI:
         /* FIXME add logic for vcpu on reset */
-        if (!vlapic->vcpu || !vlapic_enabled(vlapic))
-            return 0;
+        if (unlikely(!vlapic || !vlapic_enabled(vlapic)))
+            return result;
 
         if (test_and_set_bit(vector, &vlapic->irr[0])) {
             printk("<vlapic_accept_irq>"
@@ -199,6 +213,7 @@ int vlapic_accept_irq(struct vlapic *vlapic, int delivery_mode,
             }
         }
         evtchn_set_pending(vlapic->vcpu, iopacket_port(vlapic->domain));
+        result = 1;
         break;
 
     case VLAPIC_DELIV_MODE_RESERVED:
@@ -269,15 +284,12 @@ struct vlapic* apic_round_robin(struct domain *d,
 
     old = next = d->arch.vmx_platform.round_info[vector];
 
-    next++;
-    if (next == MAX_VIRT_CPUS || !d->vcpu[next])
-        next = 0;
-
     do {
         /* the vcpu array is arranged according to vcpu_id */
         if (test_bit(next, &bitmap)) {
             target = d->vcpu[next]->arch.arch_vmx.vlapic;
-            if (!vlapic_enabled(target)) {
+
+            if (!target || !vlapic_enabled(target)) {
                 printk("warning: targe round robin local apic disabled\n");
                 /* XXX should we domain crash?? Or should we return NULL */
             }
@@ -285,7 +297,9 @@ struct vlapic* apic_round_robin(struct domain *d,
         }
 
         next ++;
-        if (next == MAX_VIRT_CPUS || !d->vcpu[next])
+        if (!d->vcpu[next] ||
+            !test_bit(_VCPUF_initialised, &d->vcpu[next]->vcpu_flags) ||
+            next == MAX_VIRT_CPUS)
             next = 0;
     }while(next != old);
 
@@ -308,10 +322,8 @@ vlapic_EOI_set(struct vlapic *vlapic)
     vlapic_clear_isr(vlapic, vector);
     vlapic_update_ppr(vlapic);
 
-    if (test_and_clear_bit(vector, &vlapic->tmr[0])) {
-        extern void ioapic_update_EOI(struct domain *d, int vector);
+    if (test_and_clear_bit(vector, &vlapic->tmr[0]))
         ioapic_update_EOI(vlapic->domain, vector);
-    }
 }
 
 int vlapic_check_vector(struct vlapic *vlapic,
@@ -319,7 +331,7 @@ int vlapic_check_vector(struct vlapic *vlapic,
 {
     if ((dm == VLAPIC_DELIV_MODE_FIXED) && (vector < 16)) {
         vlapic->err_status |= 0x40;
-        vlapic_accept_irq(vlapic, VLAPIC_DELIV_MODE_FIXED,
+        vlapic_accept_irq(vlapic->vcpu, VLAPIC_DELIV_MODE_FIXED,
           vlapic_lvt_vector(vlapic, VLAPIC_LVT_ERROR), 0, 0);
         printk("<vlapic_check_vector>: check fail\n");
         return 0;
@@ -340,7 +352,6 @@ void vlapic_ipi(struct vlapic *vlapic)
 
     struct vlapic *target;
     struct vcpu *v = NULL;
-    int result = 0;
     uint32_t lpr_map;
 
     VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "vlapic_ipi: "
@@ -352,32 +363,27 @@ void vlapic_ipi(struct vlapic *vlapic)
                 delivery_mode, vector);
 
     for_each_vcpu ( vlapic->domain, v ) {
-        target = VLAPIC(v);
-        if (vlapic_match_dest(target, vlapic, short_hand,
+        if (vlapic_match_dest(v, vlapic, short_hand,
                               dest, dest_mode, delivery_mode)) {
             if (delivery_mode == VLAPIC_DELIV_MODE_LPRI) {
                 set_bit(v->vcpu_id, &lpr_map);
-            }else
-                result = vlapic_accept_irq(target, delivery_mode,
-                  vector, level, trig_mode);
+            } else
+                vlapic_accept_irq(v, delivery_mode,
+                                  vector, level, trig_mode);
         }
     }
 
     if (delivery_mode == VLAPIC_DELIV_MODE_LPRI) {
-        extern struct vlapic*
-          apic_round_robin(struct domain *d,
-            uint8_t dest_mode, uint8_t vector, uint32_t bitmap);
-
         v = vlapic->vcpu;
         target = apic_round_robin(v->domain, dest_mode, vector, lpr_map);
 
         if (target)
-            vlapic_accept_irq(target, delivery_mode,
-              vector, level, trig_mode);
+            vlapic_accept_irq(target->vcpu, delivery_mode,
+                              vector, level, trig_mode);
     }
 }
 
-void vlapic_begin_timer(struct vlapic *vlapic)
+static void vlapic_begin_timer(struct vlapic *vlapic)
 {
     s_time_t cur = NOW(), offset;
 
@@ -559,7 +565,9 @@ static unsigned long vlapic_read(struct vcpu *v, unsigned long address,
 
     if ( len != 4) {
         /* some bugs on kernel cause read this with byte*/
-        printk("Local APIC read with len = %lx, should be 4 instead\n", len);
+        VMX_DBG_LOG(DBG_LEVEL_VLAPIC,
+                    "Local APIC read with len = %lx, should be 4 instead\n",
+                    len);
     }
 
     alignment = offset & 0x3;
@@ -737,12 +745,13 @@ static void vlapic_write(struct vcpu *v, unsigned long address,
         vlapic->timer_current = val;
         vlapic->timer_current_update = NOW();
 
+        vlapic_begin_timer(vlapic);
+
         VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "timer_init %x timer_current %x"
                     "timer_current_update %08x%08x",
                     vlapic->timer_initial, vlapic->timer_current,
                     (uint32_t)(vlapic->timer_current_update >> 32),
                     (uint32_t)vlapic->timer_current_update);
-                    vlapic_begin_timer(vlapic);
         break;
 
     case APIC_TDCR:
@@ -827,6 +836,7 @@ void vlapic_timer_fn(void *data)
         }
         else
             vlapic->intr_pending_count[vlapic_lvt_vector(vlapic, VLAPIC_LVT_TIMER)]++;
+        evtchn_set_pending(vlapic->vcpu, iopacket_port(vlapic->domain));
     }
 
     vlapic->timer_current_update = NOW();

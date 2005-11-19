@@ -2,35 +2,25 @@
 
 PATH=/etc/xen/scripts:$PATH
 
+case "$XENBUS_TYPE" in
+  vbd)
+    /etc/xen/scripts/block "$ACTION"
+    ;;
+  vif)
+    [ -n "$script" ] && $script "$ACTION"
+    ;;
+esac
+
 case "$ACTION" in
   add)
-    case "$XENBUS_TYPE" in
-      vbd)
-	/etc/xen/scripts/block bind
-        ;;
-    esac
     ;;
   remove)
-    case "$XENBUS_TYPE" in
-      vbd)
-	/etc/xen/scripts/block unbind
-        ;;
-      vif)
-        [ -n "$script" ] && $script down
-        ;;
-    esac
     # remove device backend store entries
-    xenstore-rm -t "$XENBUS_PATH"
-    xenstore-rm -t "error/$XENBUS_PATH"
+    xenstore-rm -t "$XENBUS_PATH"       || true
+    xenstore-rm -t "error/$XENBUS_PATH" || true
     ;;
   online)
-    case "$XENBUS_TYPE" in
-      vif)
-        [ -n "$script" ] && $script up
-        ;;
-    esac
     ;;
   offline)
     ;;
 esac
-

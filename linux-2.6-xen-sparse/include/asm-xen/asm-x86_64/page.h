@@ -88,6 +88,11 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
 	return pfn;
 }
 
+static inline void set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+{
+	phys_to_machine_mapping[pfn] = mfn;
+}
+
 /* Definitions for machine and pseudophysical addresses. */
 typedef unsigned long paddr_t;
 typedef unsigned long maddr_t;

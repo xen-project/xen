@@ -56,6 +56,7 @@ extern int eventchn_fd; /* in xenstored_domain.c */
 static bool verbose;
 LIST_HEAD(connections);
 static int tracefd = -1;
+static int reopen_log_pipe[2];
 static char *tracefile = NULL;
 static TDB_CONTEXT *tdb_ctx;
 
@@ -243,20 +244,34 @@ void trace(const char *fmt, ...)
 	talloc_free(str);
 }
 
-void reopen_log()
-{
-	if (!tracefile)
-		return;
 
-	if (tracefd > 0)
-		close(tracefd);
-	tracefd = open(tracefile, O_WRONLY|O_CREAT|O_APPEND, 0600);
-	if (tracefd < 0) {
-		perror("Could not open tracefile");
-		return;
-	}
-	write(tracefd, "\n***\n", strlen("\n***\n"));
+/**
+ * Signal handler for SIGHUP, which requests that the trace log is reopened
+ * (in the main loop).  A single byte is written to reopen_log_pipe, to awaken
+ * the select() in the main loop.
+ */
+static void trigger_reopen_log(int signal __attribute__((unused)))
+{
+	char c = 'A';
+	write(reopen_log_pipe[1], &c, 1);
 }
+
+
+static void reopen_log()
+{
+	if (tracefile) {
+		if (tracefd > 0)
+			close(tracefd);
+
+		tracefd = open(tracefile, O_WRONLY|O_CREAT|O_APPEND, 0600);
+
+		if (tracefd < 0)
+			perror("Could not open tracefile");
+		else
+			write(tracefd, "\n***\n", strlen("\n***\n"));
+	}
+}
+
 
 static bool write_messages(struct connection *conn)
 {
@@ -331,29 +346,33 @@ static int destroy_conn(void *_conn)
 	return 0;
 }
 
+
+static void set_fd(int fd, fd_set *set, int *max)
+{
+	FD_SET(fd, set);
+	if (fd > *max)
+		*max = fd;
+}
+
+
 static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock)
 {
 	struct connection *i;
-	int max;
+	int max = -1;
 
 	FD_ZERO(inset);
 	FD_ZERO(outset);
-	FD_SET(sock, inset);
-	max = sock;
-	FD_SET(ro_sock, inset);
-	if (ro_sock > max)
-		max = ro_sock;
-	FD_SET(eventchn_fd, inset);
-	if (eventchn_fd > max)
-		max = eventchn_fd;
+
+	set_fd(sock,               inset, &max);
+	set_fd(ro_sock,            inset, &max);
+	set_fd(eventchn_fd,        inset, &max);
+	set_fd(reopen_log_pipe[0], inset, &max);
 	list_for_each_entry(i, &connections, list) {
 		if (i->domain)
 			continue;
-		FD_SET(i->fd, inset);
+		set_fd(i->fd, inset, &max);
 		if (!list_empty(&i->out_list))
 			FD_SET(i->fd, outset);
-		if (i->fd > max)
-			max = i->fd;
 	}
 	return max;
 }
@@ -1392,8 +1411,6 @@ static void manual_node(const char *name, const char *child)
 	talloc_free(node);
 }
 
-#
-
 static void setup_structure(void)
 {
 	char *tdbname;
@@ -1570,6 +1587,10 @@ int main(int argc, char *argv[])
 	    || listen(*ro_sock, 1) != 0)
 		barf_perror("Could not listen on sockets");
 
+	if (pipe(reopen_log_pipe)) {
+		barf_perror("pipe");
+	}
+
 	/* Setup the database */
 	setup_structure();
 
@@ -1592,7 +1613,7 @@ int main(int argc, char *argv[])
 		close(STDERR_FILENO);
 	}
 
-	signal(SIGHUP, reopen_log);
+	signal(SIGHUP, trigger_reopen_log);
 
 #ifdef TESTING
 	signal(SIGUSR1, stop_failtest);
@@ -1610,6 +1631,12 @@ int main(int argc, char *argv[])
 			if (errno == EINTR)
 				continue;
 			barf_perror("Select failed");
+		}
+
+		if (FD_ISSET(reopen_log_pipe[0], &inset)) {
+			char c;
+			read(reopen_log_pipe[0], &c, 1);
+			reopen_log();
 		}
 
 		if (FD_ISSET(*sock, &inset))

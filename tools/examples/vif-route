@@ -9,7 +9,7 @@
 # places, then vif-bridge is the default.
 #
 # Usage:
-# vif-route (up|down)
+# vif-route (add|remove|online|offline)
 #
 # Environment vars:
 # vif         vif interface name (required).
@@ -26,12 +26,12 @@ dir=$(dirname "$0")
 main_ip=$(ip addr show eth0 | sed -e '/inet /!d;s/^.*inet \([^\s*]\)\s.*$/\1/')
 
 case "$command" in
-    up)
+    online)
         ifconfig ${vif} ${main_ip} netmask 255.255.255.255 up
         echo 1 >/proc/sys/net/ipv4/conf/${vif}/proxy_arp
         ipcmd='a'
         ;;
-    down)
+    offline)
         ifdown ${vif}
         ipcmd='d'
         ;;
@@ -45,6 +45,6 @@ if [ "${ip}" ] ; then
     done 
 fi
 
-handle_iptable()
+handle_iptable
 
 success

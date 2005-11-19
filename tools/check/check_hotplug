@@ -7,7 +7,7 @@ function error {
    exit 1
 }
 
-if [ -x /sbin/udev ] && [ ! -z `udev -V` ] && [ `udev -V` -ge 059 ]; then
+if [ -x /sbin/udev ] && [ ! -z `/sbin/udev -V` ] && [ `/sbin/udev -V` -ge 059 ]; then
   exit 0
 fi
 

@@ -148,6 +148,8 @@
 ^tools/vtpm_manager/manager/vtpm_managerd$
 ^tools/xcutils/xc_restore$
 ^tools/xcutils/xc_save$
+^tools/xenmon/setmask$
+^tools/xenmon/xenbaked$
 ^tools/xenstat/xentop/xentop$
 ^tools/xenstore/testsuite/tmp/.*$
 ^tools/xenstore/xen$
@@ -169,6 +171,7 @@
 ^tools/xentrace/tbctl$
 ^tools/xentrace/xenctx$
 ^tools/xentrace/xentrace$
+^tools/xm-test/ramdisk/buildroot
 ^xen/BLOG$
 ^xen/TAGS$
 ^xen/arch/x86/asm-offsets\.s$

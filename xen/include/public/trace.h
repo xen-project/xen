@@ -14,6 +14,7 @@
 #define TRC_SCHED   0x0002f000    /* Xen Scheduler trace      */
 #define TRC_DOM0OP  0x0004f000    /* Xen DOM0 operation trace */
 #define TRC_VMX     0x0008f000    /* Xen VMX trace            */
+#define TRC_MEM     0x000af000    /* Xen memory trace         */
 #define TRC_ALL     0xfffff000
 
 /* Trace subclasses */
@@ -40,6 +41,12 @@
 #define TRC_SCHED_S_TIMER_FN    (TRC_SCHED + 11)
 #define TRC_SCHED_T_TIMER_FN    (TRC_SCHED + 12)
 #define TRC_SCHED_DOM_TIMER_FN  (TRC_SCHED + 13)
+#define TRC_SCHED_SWITCH_INFPREV (TRC_SCHED + 14)
+#define TRC_SCHED_SWITCH_INFNEXT (TRC_SCHED + 15)
+
+#define TRC_MEM_PAGE_GRANT_MAP      (TRC_MEM + 1)
+#define TRC_MEM_PAGE_GRANT_UNMAP    (TRC_MEM + 2)
+#define TRC_MEM_PAGE_GRANT_TRANSFER (TRC_MEM + 3)
 
 /* trace events per subclass */
 #define TRC_VMX_VMEXIT          (TRC_VMXEXIT + 1)

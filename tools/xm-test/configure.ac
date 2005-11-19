@@ -1,7 +1,7 @@
 # xm-test configure.ac input script
 
 # Basic header information
-AC_INIT([xm-test], [0.5.0])
+AC_INIT([xm-test], [0.6.0])
 AM_INIT_AUTOMAKE([1.7 foreign])
 
 # Check for dependencies
@@ -65,5 +65,6 @@ AC_CONFIG_FILES([
     lib/XmTestLib/config.py
     ])
 
-
 AC_OUTPUT
+
+chmod a+x lib/XmTestReport/xmtest.py

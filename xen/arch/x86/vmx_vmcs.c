@@ -157,13 +157,13 @@ static void vmx_map_io_shared_page(struct domain *d)
     mpfn = get_mfn_from_pfn(E820_MAP_PAGE >> PAGE_SHIFT);
     if (mpfn == INVALID_MFN) {
         printk("Can not find E820 memory map page for VMX domain.\n");
-        domain_crash();
+        domain_crash(d);
     }
 
     p = map_domain_page(mpfn);
     if (p == NULL) {
         printk("Can not map E820 memory map page for VMX domain.\n");
-        domain_crash();
+        domain_crash(d);
     }
 
     e820_map_nr = *(p + E820_MAP_NR_OFFSET);
@@ -182,7 +182,7 @@ static void vmx_map_io_shared_page(struct domain *d)
         printk("Can not get io request shared page"
                " from E820 memory map for VMX domain.\n");
         unmap_domain_page(p);
-        domain_crash();
+        domain_crash(d);
     }
     unmap_domain_page(p);
 
@@ -190,13 +190,13 @@ static void vmx_map_io_shared_page(struct domain *d)
     mpfn = get_mfn_from_pfn(gpfn);
     if (mpfn == INVALID_MFN) {
         printk("Can not find io request shared page for VMX domain.\n");
-        domain_crash();
+        domain_crash(d);
     }
 
     p = map_domain_page(mpfn);
     if (p == NULL) {
         printk("Can not map io request shared page for VMX domain.\n");
-        domain_crash();
+        domain_crash(d);
     }
     d->arch.vmx_platform.shared_page_va = (unsigned long)p;
 
@@ -332,7 +332,7 @@ static void vmx_do_launch(struct vcpu *v)
     error |= __vmwrite(GUEST_TR_BASE, 0);
     error |= __vmwrite(GUEST_TR_LIMIT, 0xff);
 
-    __vmwrite(GUEST_CR3, pagetable_get_paddr(v->arch.guest_table));
+    __vmwrite(GUEST_CR3, pagetable_get_paddr(v->domain->arch.phys_table));
     __vmwrite(HOST_CR3, pagetable_get_paddr(v->arch.monitor_table));
     __vmwrite(HOST_RSP, (unsigned long)get_stack_bottom());
 
@@ -564,19 +564,14 @@ err_out:
 
 void destroy_vmcs(struct arch_vmx_struct *arch_vmx)
 {
-    if(arch_vmx->vmcs != NULL)
-        free_vmcs(arch_vmx->vmcs);
-    if(arch_vmx->io_bitmap_a != 0) {
-        free_xenheap_pages(
-            arch_vmx->io_bitmap_a, get_order_from_bytes(0x1000));
-        arch_vmx->io_bitmap_a = 0;
-    }
-    if(arch_vmx->io_bitmap_b != 0) {
-        free_xenheap_pages(
-            arch_vmx->io_bitmap_b, get_order_from_bytes(0x1000));
-        arch_vmx->io_bitmap_b = 0;
-    }
-    arch_vmx->vmcs = 0;
+    free_vmcs(arch_vmx->vmcs);
+    arch_vmx->vmcs = NULL;
+
+    free_xenheap_pages(arch_vmx->io_bitmap_a, get_order_from_bytes(0x1000));
+    arch_vmx->io_bitmap_a = NULL;
+
+    free_xenheap_pages(arch_vmx->io_bitmap_b, get_order_from_bytes(0x1000));
+    arch_vmx->io_bitmap_b = NULL;
 }
 
 /*

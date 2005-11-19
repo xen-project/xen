@@ -438,9 +438,8 @@ void make_pages_writable(void *va, unsigned int nr);
 
 #define arbitrary_virt_to_machine(__va)					\
 ({									\
-	pte_t *__pte = virt_to_ptep(__va);				\
-	maddr_t __pa = (maddr_t)pte_mfn(*__pte) << PAGE_SHIFT;		\
-	__pa | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
+	maddr_t m = (maddr_t)pte_mfn(*virt_to_ptep(__va)) << PAGE_SHIFT;\
+	m | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
 })
 
 #endif /* !__ASSEMBLY__ */
@@ -450,11 +449,11 @@ void make_pages_writable(void *va, unsigned int nr);
 #endif /* !CONFIG_DISCONTIGMEM */
 
 int direct_remap_pfn_range(struct vm_area_struct *vma,
-                            unsigned long address, 
-                            unsigned long mfn,
-                            unsigned long size, 
-                            pgprot_t prot,
-                            domid_t  domid);
+                           unsigned long address, 
+                           unsigned long mfn,
+                           unsigned long size, 
+                           pgprot_t prot,
+                           domid_t  domid);
 int direct_kernel_remap_pfn_range(unsigned long address, 
 				  unsigned long mfn,
 				  unsigned long size, 
@@ -462,7 +461,7 @@ int direct_kernel_remap_pfn_range(unsigned long address,
 				  domid_t  domid);
 int create_lookup_pte_addr(struct mm_struct *mm,
                            unsigned long address,
-                           unsigned long *ptep);
+                           uint64_t *ptep);
 int touch_pte_range(struct mm_struct *mm,
                     unsigned long address,
                     unsigned long size);

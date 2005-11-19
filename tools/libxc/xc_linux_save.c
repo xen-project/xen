@@ -27,13 +27,13 @@
 
 
 /* max mfn of the whole machine */
-static uint32_t max_mfn; 
+static unsigned long max_mfn; 
 
 /* virtual starting address of the hypervisor */
-static uint32_t hvirt_start; 
+static unsigned long hvirt_start; 
 
 /* #levels of page tables used by the currrent guest */
-static uint32_t pt_levels; 
+static unsigned int pt_levels; 
 
 /* total number of pages used by the current guest */
 static unsigned long max_pfn;
@@ -73,7 +73,7 @@ static unsigned long *live_m2p = NULL;
 */
 
 #define BITS_PER_LONG (sizeof(unsigned long) * 8) 
-#define BITMAP_SIZE   ((max_pfn + BITS_PER_LONG - 1) / BITS_PER_LONG)
+#define BITMAP_SIZE   ((max_pfn + BITS_PER_LONG - 1) / 8)
 
 #define BITMAP_ENTRY(_nr,_bmap) \
    ((unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
@@ -500,6 +500,70 @@ void canonicalize_pagetable(unsigned long type, unsigned long pfn,
 
 
 
+static unsigned long *xc_map_m2p(int xc_handle, 
+                                 unsigned long max_mfn, 
+                                 int prot) 
+{ 
+    privcmd_m2pmfns_t m2p_mfns; 
+    privcmd_mmap_t ioctlx; 
+    privcmd_mmap_entry_t *entries; 
+    unsigned long m2p_chunks, m2p_size; 
+    unsigned long *m2p; 
+    int i, rc; 
+
+    m2p_size   = M2P_SIZE(max_mfn); 
+    m2p_chunks = M2P_CHUNKS(max_mfn); 
+
+
+    m2p_mfns.num = m2p_chunks; 
+
+    if(!(m2p_mfns.arr = malloc(m2p_chunks * sizeof(unsigned long)))) { 
+        ERR("failed to allocate space for m2p mfns!\n"); 
+        return NULL; 
+    } 
+
+    if (ioctl(xc_handle, IOCTL_PRIVCMD_GET_MACH2PHYS_MFNS, &m2p_mfns) < 0) {
+        ERR("xc_get_m2p_mfns:"); 
+        return NULL;
+    }
+
+    if((m2p = mmap(NULL, m2p_size, prot, 
+                   MAP_SHARED, xc_handle, 0)) == MAP_FAILED) {
+        ERR("failed to mmap m2p"); 
+        return NULL; 
+    } 
+    
+
+    if(!(entries = malloc(m2p_chunks * sizeof(privcmd_mmap_entry_t)))) { 
+        ERR("failed to allocate space for mmap entries!\n"); 
+        return NULL; 
+    } 
+
+
+    ioctlx.num   = m2p_chunks;
+    ioctlx.dom   = DOMID_XEN; 
+    ioctlx.entry = entries; 
+    
+    for(i=0; i < m2p_chunks; i++) { 
+        
+        entries[i].va = (unsigned long)(((void *)m2p) + (i * M2P_CHUNK_SIZE)); 
+        entries[i].mfn = m2p_mfns.arr[i]; 
+        entries[i].npages = M2P_CHUNK_SIZE >> PAGE_SHIFT;
+
+    }
+
+    if((rc = ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx)) < 0) {
+        ERR("ioctl_mmap failed (rc = %d)", rc); 
+        return NULL; 
+    }
+        
+    free(m2p_mfns.arr); 
+    free(entries); 
+
+    return m2p; 
+}
+
+
 
 int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters, 
                   uint32_t max_factor, uint32_t flags)
@@ -531,16 +595,12 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* A copy of the pfn-to-mfn table frame list. */
     unsigned long *p2m_frame_list = NULL;
 
-    unsigned long m2p_start_mfn;
-    
     /* Live mapping of shared info structure */
     shared_info_t *live_shinfo = NULL;
 
     /* base of the region in which domain memory is mapped */
     unsigned char *region_base = NULL;
 
-
-    
     /* power of 2 order of max_pfn */
     int order_nr; 
 
@@ -563,9 +623,6 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         max_factor = DEF_MAX_FACTOR; 
     
     initialize_mbit_rate(); 
-
-    DPRINTF("xc_linux_save start DOM%u live=%s\n", dom, live ? 
-            "true" : "false"); 
 
     if(!get_platform_info(xc_handle, dom, 
                           &max_mfn, &hvirt_start, &pt_levels)) {
@@ -647,11 +704,13 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Setup the mfn_to_pfn table mapping */
-    m2p_start_mfn = xc_get_m2p_start_mfn(xc_handle);
-    live_m2p      = xc_map_foreign_range(xc_handle, DOMID_XEN, M2P_SIZE, 
-                                         PROT_READ, m2p_start_mfn);
+    if(!(live_m2p = xc_map_m2p(xc_handle, max_mfn, PROT_READ))) { 
+        ERR("Failed to map live M2P table"); 
+        goto out; 
+    } 
+
     
-    /* Get a local copy fo the live_P2M_frame_list */
+    /* Get a local copy of the live_P2M_frame_list */
     if(!(p2m_frame_list = malloc(P2M_FL_SIZE))) { 
         ERR("Couldn't allocate p2m_frame_list array");
         goto out;
@@ -662,11 +721,18 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     for (i = 0; i < max_pfn; i += ulpp) {
         if (!translate_mfn_to_pfn(&p2m_frame_list[i/ulpp])) { 
             ERR("Frame# in pfn-to-mfn frame list is not in pseudophys");
+            ERR("entry %d: p2m_frame_list[%ld] is 0x%lx", i, i/ulpp, 
+                p2m_frame_list[i/ulpp]); 
             goto out;
         }
     }
 
     /* Domain is still running at this point */
+
+    if (live && (pt_levels != 2)) {
+        ERR("Live migration supported only for 32-bit non-pae");
+        goto out;
+    }
 
     if (live) {
 
@@ -693,20 +759,14 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         
     }
 
-#if 0
-    sent_last_iter = 0xFFFFFFFF; /* Pretend we sent a /lot/ last time */
-#else
-    sent_last_iter = 1 << 20; 
-#endif
+    /* pretend we sent all the pages last iteration */
+    sent_last_iter = max_pfn; 
 
 
     /* calculate the power of 2 order of max_pfn, e.g.
        15->4 16->4 17->5 */
     for (i = max_pfn-1, order_nr = 0; i ; i >>= 1, order_nr++)
         continue;
-
-#undef BITMAP_SIZE
-#define BITMAP_SIZE ((1<<20)/8) 
 
     /* Setup to_send / to_fix and to_skip bitmaps */
     to_send = malloc(BITMAP_SIZE); 
@@ -922,10 +982,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
 
                 /* write out pages in batch */
-                if (pagetype == XTAB) {
-                    DPRINTF("SKIP BOGUS page %i mfn %08lx\n", j, pfn_type[j]);
+                if (pagetype == XTAB)
                     continue;
-                }
 
                 pagetype &= LTABTYPE_MASK; 
                 
@@ -950,10 +1008,10 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             } /* end of the write out for this batch */
             
             sent_this_iter += batch;
-            
-        } /* end of this while loop for this iteration */
+
+            munmap(region_base, batch*PAGE_SIZE);
         
-        munmap(region_base, batch*PAGE_SIZE);
+        } /* end of this while loop for this iteration */
         
       skip: 
         
@@ -1027,13 +1085,9 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     DPRINTF("All memory is saved\n");
 
-    /* Success! */
-    rc = 0;
-    
-    /* ^^^^^^ XXX SMH: hmm.. not sure that's really success! */
-    
     /* Zero terminate */
-    if (!write_exact(io_fd, &rc, sizeof(int))) { 
+    i = 0; 
+    if (!write_exact(io_fd, &i, sizeof(int))) { 
         ERR("Error when writing to state file (6)");
         goto out;
     }
@@ -1043,17 +1097,17 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         unsigned int i,j;
         unsigned long pfntab[1024]; 
 
-        for ( i = 0, j = 0; i < max_pfn; i++ ) {
-            if ( ! is_mapped(live_p2m[i]) )
+        for (i = 0, j = 0; i < max_pfn; i++) {
+            if (!is_mapped(live_p2m[i]))
                 j++;
         }
-
+        
         if(!write_exact(io_fd, &j, sizeof(unsigned int))) { 
             ERR("Error when writing to state file (6a)");
             goto out;
         }	
         
-        for ( i = 0, j = 0; i < max_pfn; ) {
+        for (i = 0, j = 0; i < max_pfn; ) {
 
             if (!is_mapped(live_p2m[i]))
                 pfntab[j++] = i;
@@ -1097,7 +1151,10 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         ERR("Error when writing to state file (1)");
         goto out;
     }
-    
+
+    /* Success! */
+    rc = 0;
+
  out:
 
     if (live_shinfo)
@@ -1110,7 +1167,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         munmap(live_p2m, P2M_SIZE); 
 
     if(live_m2p) 
-        munmap(live_m2p, M2P_SIZE); 
+        munmap(live_m2p, M2P_SIZE(max_mfn)); 
 
     free(pfn_type);
     free(pfn_batch);

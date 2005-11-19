@@ -77,7 +77,7 @@ int xc_ia64_copy_to_domain_pages(int xc_handle, uint32_t domid,
 {
     // N.B. gva should be page aligned
     
-    unsigned long *page_array=NULL;
+    unsigned long *page_array = NULL;
     int i;
 
     if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL ){
@@ -99,8 +99,7 @@ int xc_ia64_copy_to_domain_pages(int xc_handle, uint32_t domid,
     return 0;
     
 error_out:
-    if (page_array)
-        free(page_array);
+    free(page_array);
     return -1;
 }
 
@@ -657,8 +656,7 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    if ( image != NULL )
-        free(image);
+    free(image);
 
     ctxt->flags = VGCF_VMX_GUEST;
     ctxt->regs.cr_iip = 0x80000000ffffffb0UL;
@@ -675,9 +673,7 @@ int xc_vmx_build(int xc_handle,
     return rc;
 
  error_out:
-    if ( image != NULL )
-        free(image);
-
+    free(image);
     return -1;
 }
 

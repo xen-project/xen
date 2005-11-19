@@ -639,7 +639,8 @@ int construct_dom0(struct domain *d,
     si->pt_base      = vpt_start;
     si->nr_pt_frames = nr_pt_pages;
     si->mfn_list     = vphysmap_start;
-    sprintf(si->magic, "Xen-%i.%i", XEN_VERSION, XEN_SUBVERSION);
+    sprintf(si->magic, "xen-%i.%i-x86_%d%s",
+            XEN_VERSION, XEN_SUBVERSION, BITS_PER_LONG, xen_pae ? "p" : "");
 
     /* Write the phys->machine and machine->phys table entries. */
     for ( pfn = 0; pfn < d->tot_pages; pfn++ )

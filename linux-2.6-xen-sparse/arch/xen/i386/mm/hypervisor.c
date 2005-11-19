@@ -37,16 +37,10 @@
 #include <asm-xen/balloon.h>
 #include <asm-xen/xen-public/memory.h>
 #include <linux/module.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <linux/percpu.h>
 #include <asm/tlbflush.h>
-#endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define pte_offset_kernel pte_offset
-#define pud_t pgd_t
-#define pud_offset(d, va) d
-#elif defined(CONFIG_X86_64)
+#ifdef CONFIG_X86_64
 #define pmd_val_ma(v) (v).pmd
 #else
 #ifdef CONFIG_X86_PAE
@@ -342,8 +336,8 @@ int xen_create_contiguous_region(
 		mfn = pte_mfn(*pte);
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			vstart + (i*PAGE_SIZE), __pte_ma(0), 0));
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
-			INVALID_P2M_ENTRY;
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
+			INVALID_P2M_ENTRY);
 		BUG_ON(HYPERVISOR_memory_op(
 			XENMEM_decrease_reservation, &reservation) != 1);
 	}
@@ -361,7 +355,7 @@ int xen_create_contiguous_region(
 			vstart + (i*PAGE_SIZE),
 			pfn_pte_ma(mfn+i, PAGE_KERNEL), 0));
 		xen_machphys_update(mfn+i, (__pa(vstart)>>PAGE_SHIFT)+i);
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = mfn+i;
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, mfn+i);
 	}
 
 	flush_tlb_all();
@@ -383,7 +377,7 @@ int xen_create_contiguous_region(
 			vstart + (i*PAGE_SIZE),
 			pfn_pte_ma(mfn, PAGE_KERNEL), 0));
 		xen_machphys_update(mfn, (__pa(vstart)>>PAGE_SHIFT)+i);
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = mfn;
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, mfn);
 	}
 
 	flush_tlb_all();
@@ -422,8 +416,8 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		mfn = pte_mfn(*pte);
 		BUG_ON(HYPERVISOR_update_va_mapping(
 			vstart + (i*PAGE_SIZE), __pte_ma(0), 0));
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
-			INVALID_P2M_ENTRY;
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
+			INVALID_P2M_ENTRY);
 		BUG_ON(HYPERVISOR_memory_op(
 			XENMEM_decrease_reservation, &reservation) != 1);
 	}
@@ -436,7 +430,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 			vstart + (i*PAGE_SIZE),
 			pfn_pte_ma(mfn, PAGE_KERNEL), 0));
 		xen_machphys_update(mfn, (__pa(vstart)>>PAGE_SHIFT)+i);
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = mfn;
+		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, mfn);
 	}
 
 	flush_tlb_all();

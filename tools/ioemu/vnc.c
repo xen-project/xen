@@ -187,8 +187,7 @@ static void mouse_find_bounding_box_of_difference(int* x,int* y,int* w,int* h) {
 
 static void start_mouse_calibration() {
 	int size = screen->height*screen->paddedWidthInBytes;
-	if(mouse_magic->calibration)
-		free(mouse_magic->calibration);
+	free(mouse_magic->calibration);
 	mouse_magic->calibration = malloc(size);
 	memcpy(mouse_magic->calibration, screen->frameBuffer, size);
 	calibration_step=0;
@@ -198,8 +197,7 @@ static void start_mouse_calibration() {
 }
 
 static void stop_mouse_calibration() {
-	if(mouse_magic->calibration)
-		free(mouse_magic->calibration);
+	free(mouse_magic->calibration);
 	mouse_magic->calibration = 0;
 }
 

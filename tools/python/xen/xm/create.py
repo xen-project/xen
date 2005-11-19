@@ -255,10 +255,11 @@ gopts.var('ipaddr', val="IPADDR",
           fn=append_value, default=[],
           use="Add an IP address to the domain.")
 
-gopts.var('vif', val="mac=MAC,be_mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM,vifname=NAME",
+gopts.var('vif', val="type=TYPE,mac=MAC,be_mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM,vifname=NAME",
           fn=append_value, default=[],
           use="""Add a network interface with the given MAC address and bridge.
           The vif is configured by calling the given configuration script.
+          If type is not specified, default is netfront not ioemu device.
           If mac is not specified a random MAC address is used.
           The MAC address of the backend interface can be selected with be_mac.
           If not specified then the network backend chooses it's own MAC address.
@@ -355,10 +356,6 @@ gopts.var('isa', val='no|yes',
 gopts.var('cdrom', val='FILE',
           fn=set_value, default='',
           use="Path to cdrom")
-
-gopts.var('macaddr', val='MACADDR',
-          fn=set_value, default='',
-          use="Macaddress of the first network interface")
 
 gopts.var('boot', val="a|b|c|d",
           fn=set_value, default='c',
@@ -512,6 +509,7 @@ def configure_vifs(config_devs, vals):
             backend = d.get('backend')
             ip = d.get('ip')
             vifname = d.get('vifname')
+            type = d.get('type')
         else:
             mac = None
             be_mac = None
@@ -520,6 +518,7 @@ def configure_vifs(config_devs, vals):
             backend = None
             ip = None
             vifname = None
+            type = None
         config_vif = ['vif']
         if mac:
             config_vif.append(['mac', mac])
@@ -535,6 +534,8 @@ def configure_vifs(config_devs, vals):
             config_vif.append(['backend', backend])
         if ip:
             config_vif.append(['ip', ip])
+        if type:
+            config_vif.append(['type', type])
         config_devs.append(['device', config_vif])
 
 def configure_vfr(config, vals):
@@ -549,7 +550,7 @@ def configure_vmx(config_image, vals):
     """Create the config for VMX devices.
     """
     args = [ 'device_model', 'vcpus', 'cdrom', 'boot', 'fda', 'fdb',
-             'localtime', 'serial', 'macaddr', 'stdvga', 'isa', 'nographic',
+             'localtime', 'serial', 'stdvga', 'isa', 'nographic',
              'vnc', 'vncviewer', 'sdl', 'display', 'ne2000', 'lapic']
     for a in args:
         if (vals.__dict__[a]):
@@ -564,7 +565,7 @@ def run_bootloader(vals):
     file = blkif.blkdev_uname_to_file(uname)
 
     return bootloader(vals.bootloader, file, not vals.console_autoconnect,
-                      vals.vcpus, vals.blentry)
+                      vals.vcpus, vals.bootentry)
 
 def make_config(vals):
     """Create the domain configuration.
@@ -662,7 +663,7 @@ def preprocess_vifs(vals):
             (k, v) = b.strip().split('=', 1)
             k = k.strip()
             v = v.strip()
-            if k not in ['mac', 'be_mac', 'bridge', 'script', 'backend', 'ip', 'vifname']:
+            if k not in ['type', 'mac', 'be_mac', 'bridge', 'script', 'backend', 'ip', 'vifname']:
                 err('Invalid vif specifier: ' + vif)
             d[k] = v
         vifs.append(d)
@@ -780,7 +781,7 @@ def preprocess_vnc(vals):
         vals.extra = vnc + ' ' + vals.extra
     
 def preprocess(vals):
-    if not vals.kernel:
+    if not vals.kernel and not vals.bootloader:
         err("No kernel specified")
     preprocess_disk(vals)
     preprocess_pci(vals)
@@ -903,6 +904,9 @@ def parseCommandLine(argv):
         if not opts.getopt('name') and opts.getopt('defconfig'):
             opts.setopt('name', os.path.basename(opts.getopt('defconfig')))
         config = make_config(opts.vals)
+
+    if type(config) == str:
+        config = sxp.parse(file(config))[0]
 
     return (opts, config)
 

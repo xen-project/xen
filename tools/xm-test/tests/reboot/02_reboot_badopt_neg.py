@@ -25,7 +25,7 @@ where = output.find(eyecatcher)
 if status == 0:
     domain.destroy()
     FAIL("xm reboot returned invalid %i == 0" % status )
-elif where > 1:
+elif where == -1:
     domain.destroy()
     FAIL("xm reboot failed to report error for bad arg")
 

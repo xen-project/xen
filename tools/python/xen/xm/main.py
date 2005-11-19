@@ -40,26 +40,81 @@ from xen.xm.opts import *
 
 import console
 
+# Strings for shorthelp
+console_help = "console <DomId>                  Attach to domain DomId's console."
+create_help =  """create [-c] <ConfigFile>
+               [Name=Value]..       Create a domain based on Config File"""
+destroy_help = "destroy <DomId>                  Terminate a domain immediately"
+help_help =    "help                             Display this message"
+list_help =    "list [--long] [DomId, ...]       List information about domains"
+mem_max_help = "mem-max <DomId> <Mem>            Set maximum memory reservation for a domain"
+mem_set_help = "mem-set <DomId> <Mem>            Adjust the current memory usage for a domain"
+migrate_help = "migrate <DomId> <Host>           Migrate a domain to another machine"
+pause_help =   "pause <DomId>                    Pause execution of a domain"
+reboot_help =  "reboot <DomId> [-w][-a]          Reboot a domain"
+restore_help = "restore <File>                   Create a domain from a saved state file"
+save_help =    "save <DomId> <File>              Save domain state (and config) to file"
+shutdown_help ="shutdown <DomId> [-w][-a][-R|-H] Shutdown a domain"
+top_help =     "top                              Monitor system and domains in real-time"
+unpause_help = "unpause <DomId>                  Unpause a paused domain"
+
+help_spacer = """
+   """
+
+# Strings for longhelp
+sysrq_help =   "sysrq   <DomId> <letter>         Send a sysrq to a domain"
+domid_help =   "domid <DomName>                  Converts a domain name to a domain id"
+domname_help = "domname <DomId>                  Convert a domain id to a domain name"
+set_vcpus_help = """set-vcpus <DomId> <VCPUs>        Enable the specified number of VCPUs in a
+                                    domain"""
+vcpu_list_help = "vcpu-list <DomId>                List the VCPUs for a domain (or all domains)"
+vcpu_pin_help = "vcpu-pin <DomId> <VCPU> <CPUs>   Set which cpus a VCPU can use" 
+dmesg_help =   "dmesg [--clear]                  Read or clear Xen's message buffer"
+info_help =    "info                             Get information about the xen host"
+log_help = "log      Print the xend log"
+sched_bvt_help = """sched-bvt <Parameters>           Set Borrowed Virtual Time scheduler
+                                    parameters"""
+sched_bvt_ctxallow_help = """sched-bvt-ctxallow <Allow>       Set the BVT scheduler context switch
+                                    allowance"""
+sched_sedf_help = "sched-sedf <Parameters>          Set simple EDF parameters"
+block_attach_help = """block-attach <DomId> <BackDev> <FrontDev> <Mode>
+                [BackDomId]         Create a new virtual block device"""
+block_detach_help = """block-detach  <DomId> <DevId>    Destroy a domain's virtual block device,
+                                    where <DevId> may either be the device ID
+                                    or the device name as mounted in the guest"""
+
+block_list_help = "block-list <DomId>               List virtual block devices for a domain"
+network_attach_help = """network-attach  <DomID> [script=<script>] [ip=<ip>] [mac=<mac>]
+                           [bridge=<bridge>] [backend=<backDomID>]
+                                    Create a new virtual network device """
+network_detach_help = """network-detach  <DomId> <DevId>  Destroy a domain's virtual network
+                                    device, where <DevId> is the device ID."""
+
+network_list_help = "network-list <DomId>             List virtual network interfaces for a domain"
+vnet_list_help = "vnet-list [-l|--long]            list vnets"
+vnet_create_help = "vnet-create <config>             create a vnet from a config file"
+vnet_delete_help = "vnet-delete <vnetid>             delete a vnet"
+
 
 shorthelp = """Usage: xm <subcommand> [args]
     Control, list, and manipulate Xen guest instances
 
-xm common subcommands:
-    console <DomId>         attach to console of DomId
-    create <CfgFile>        create a domain based on Config File
-    destroy <DomId>         terminate a domain immediately
-    help                    display this message
-    list [DomId, ...]       list information about domains
-    mem-max <DomId> <Mem>   set the maximum memory reservation for a domain
-    mem-set <DomId> <Mem>   adjust the current memory usage for a domain
-    migrate <DomId> <Host>  migrate a domain to another machine
-    pause <DomId>           pause execution of a domain
-    reboot <DomId>          reboot a domain
-    restore <File>          create a domain from a saved state file
-    save <DomId> <File>     save domain state (and config) to file
-    shutdown <DomId>        shutdown a domain
-    top                     monitor system and domains in real-time
-    unpause <DomId>         unpause a paused domain
+xm common subcommands:"""  + help_spacer \
++ console_help + help_spacer \
++ create_help + help_spacer \
++ destroy_help + help_spacer \
++ help_help    + help_spacer \
++ list_help    + help_spacer \
++ mem_max_help + help_spacer \
++ mem_set_help + help_spacer \
++ migrate_help + help_spacer \
++ pause_help   + help_spacer \
++ reboot_help  + help_spacer \
++ restore_help + help_spacer \
++ save_help    + help_spacer \
++ shutdown_help + help_spacer \
++ top_help     + help_spacer \
++ unpause_help + """
 
 <DomName> can be substituted for <DomId> in xm subcommands.
 
@@ -72,66 +127,101 @@ longhelp = """Usage: xm <subcommand> [args]
 
 xm full list of subcommands:
 
-  Domain Commands:
-    console <DomId>           attach to console of DomId
-    create  <ConfigFile>      create a domain
-    destroy <DomId>           terminate a domain immediately
-    domid   <DomName>         convert a domain name to a domain id
-    domname <DomId>           convert a domain id to a domain name
-    list                      list information about domains
-    mem-max <DomId> <Mem>     set domain maximum memory limit
-    mem-set <DomId> <Mem>     set the domain's memory dynamically
-    migrate <DomId> <Host>    migrate a domain to another machine
-    pause   <DomId>           pause execution of a domain
-    reboot   [-w|-a] <DomId>  reboot a domain
-    restore <File>            create a domain from a saved state file
-    save    <DomId> <File>    save domain state (and config) to file
-    shutdown [-w|-a] <DomId>  shutdown a domain
-    sysrq   <DomId> <letter>  send a sysrq to a domain
-    unpause <DomId>           unpause a paused domain
-    set-vcpus <DomId> <VCPUs> enable the specified number of VCPUs in a domain
-    vcpu-list <DomId>         list the VCPUs for a domain
-    vcpu-pin <DomId> <VCPU> <CPUs>    set which cpus a VCPU can use. 
+  Domain Commands: """ + help_spacer \
++ console_help + help_spacer \
++ create_help + help_spacer \
++ destroy_help + help_spacer \
++ domid_help   + help_spacer \
++ domname_help   + help_spacer \
++ list_help    + help_spacer \
++ mem_max_help + help_spacer \
++ mem_set_help + help_spacer \
++ migrate_help + help_spacer \
++ pause_help   + help_spacer \
++ reboot_help  + help_spacer \
++ restore_help + help_spacer \
++ save_help    + help_spacer \
++ shutdown_help + help_spacer \
++ sysrq_help + help_spacer \
++ top_help     + help_spacer \
++ unpause_help + help_spacer \
++ set_vcpus_help + help_spacer \
++ vcpu_pin_help + """
 
-  Xen Host Commands:
-    dmesg   [--clear]         read or clear Xen's message buffer
-    info                      get information about the xen host
-    log                       print the xend log
-    top                       monitor system and domains in real-time
+   Xen Host Commands: """ + help_spacer \
++ dmesg_help + help_spacer \
++ info_help + help_spacer \
++ log_help  + help_spacer \
++ top_help  + """
 
-  Scheduler Commands:
-    sched-bvt <options>       set BVT scheduler parameters
-    sched-bvt-ctxallow <Allow>
-        Set the BVT scheduler context switch allowance
-    sched-sedf <options>      set simple EDF parameters
+  Scheduler Commands: """ + help_spacer \
++ sched_bvt_help + help_spacer \
++ sched_bvt_ctxallow_help + help_spacer \
++ sched_sedf_help + """
 
-  Virtual Device Commands:
-    block-attach  <DomId> <BackDev> <FrontDev> <Mode> [BackDomId]
-        Create a new virtual block device 
-    block-detach  <DomId> <DevId>  Destroy a domain's virtual block device,
-                                   where <DevId> may either be the device ID
-                                   or the device name as mounted in the guest.
-    block-list    <DomId>          List virtual block devices for a domain
+  Virtual Device Commands:"""  + help_spacer \
++ block_attach_help + help_spacer \
++ block_detach_help + help_spacer \
++ block_list_help + help_spacer \
++ network_attach_help + help_spacer \
++ network_detach_help + help_spacer \
++ network_list_help + """
 
-    network-attach  <DomID> [script=<script>] [ip=<ip>] [mac=<mac>]
-                            [bridge=<bridge>] [backend=<backDomID>]
-        Create a new virtual network device 
-    network-detach  <DomId> <DevId>  Destroy a domain's virtual network
-                                     device, where <DevId> is the device ID.
-    network-limit   <DomId> <Vif> <Credit> <Period>
-        Limit the transmission rate of a virtual network interface
-    network-list    <DomId>        List virtual network interfaces for a domain
-
-  Vnet commands:
-    vnet-list   [-l|--long]    list vnets
-    vnet-create <config>       create a vnet from a config file
-    vnet-delete <vnetid>       delete a vnet
+  Vnet commands: """ + help_spacer \
++ vnet_list_help + help_spacer \
++ vnet_create_help + help_spacer \
++ vnet_delete_help + """
 
 <DomName> can be substituted for <DomId> in xm subcommands.
 
 For a short list of subcommands run 'xm help'
 For more help on xm see the xm(1) man page
 For more help on xm create, see the xmdomain.cfg(5) man page"""
+
+# array for xm help <command>
+help = {
+    "--long": longhelp,
+    "console": console_help,
+    "create": create_help,
+    "destroy": destroy_help,
+    "domid ": domid_help,
+    "domname": domname_help,
+    "list": list_help,
+    "mem-max": mem_max_help,
+    "mem-set": mem_set_help,
+    "migrate": migrate_help,
+    "pause": pause_help,
+    "reboot": reboot_help,
+    "restore": restore_help,
+    "save":  save_help,
+    "shutdown": shutdown_help,
+    "sysrq": sysrq_help,
+    "unpause": unpause_help,
+    "set-vcpus": set_vcpus_help,
+    "vcpu-list": vcpu_list_help,
+    "vcpu-pin": vcpu_pin_help,
+#  Xen Host Commands:
+    "dmesg": dmesg_help,
+    "info":  info_help,
+    "log":   log_help,
+    "top":  top_help,
+#  Scheduler Commands:
+    "sched-bvt": sched_bvt_help,
+    "sched-bvt-ctxallow": sched_bvt_ctxallow_help,
+    "sched-sedf":  sched_sedf_help,
+
+#  Virtual Device Commands:
+    "block-attach": block_attach_help,
+    "block-detach": block_detach_help,
+    "block-list": block_list_help,
+    "network-attach": network_attach_help,
+    "network-detach": network_detach_help,
+    "network-list":  network_list_help,
+# Vnet commands:
+    "vnet-list": vnet_list_help,
+    "vnet-create": vnet_create_help,
+    "vnet-delete": vnet_delete_help
+   }
 
 ####################################################################
 #
@@ -260,13 +350,13 @@ def parse_doms_info(info):
         return t(sxp.child_value(info, n, d))
     
     return {
-        'dom'      : get_info('domid',    int,   -1),
-        'name'     : get_info('name',     str,   '??'),
-        'mem'      : get_info('memory',   int,   0),
-        'vcpus'    : get_info('vcpus',    int,   0),
-        'state'    : get_info('state',    str,   '??'),
-        'cpu_time' : get_info('cpu_time', float, 0),
-        'ssidref'  : get_info('ssidref',  int,   0),
+        'dom'      : get_info('domid',        int,   -1),
+        'name'     : get_info('name',         str,   '??'),
+        'mem'      : get_info('memory',       int,   0),
+        'vcpus'    : get_info('online_vcpus', int,   0),
+        'state'    : get_info('state',        str,   '??'),
+        'cpu_time' : get_info('cpu_time',     float, 0),
+        'ssidref'  : get_info('ssidref',      int,   0),
         }
 
 
@@ -557,13 +647,6 @@ def xm_log(args):
     from xen.xend.XendClient import server
     print server.xend_node_log()
 
-def xm_network_limit(args):
-    arg_check(args,4,"network-limit")
-    dom = args[0]
-    v = map(int, args[1:4])
-    from xen.xend.XendClient import server
-    server.xend_domain_vif_limit(dom, *v)
-
 def xm_network_list(args):
     arg_check(args,1,"network-list")
     dom = args[0]
@@ -716,7 +799,6 @@ commands = {
     # network
     "network-attach": xm_network_attach,
     "network-detach": xm_network_detach,
-    "network-limit": xm_network_limit,
     "network-list": xm_network_list,
     # vnet
     "vnet-list": xm_vnet_list,
@@ -739,15 +821,10 @@ for c in subcommands:
 aliases = {
     "balloon": "mem-set",
     "vif-list": "network-list",
-    "vif-limit": "network-limit",
     "vbd-create": "block-create",
     "vbd-destroy": "block-destroy",
     "vbd-list": "block-list",
     }
-
-help = {
-    "--long": longhelp
-   }
 
 
 def xm_lookup_cmd(cmd):
@@ -770,7 +847,7 @@ def deprecated(old,new):
 
 def usage(cmd=None):
     if help.has_key(cmd):
-        print help[cmd]
+        print "   " + help[cmd]
     else:
         print shorthelp
     sys.exit(1)

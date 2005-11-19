@@ -49,19 +49,16 @@ static PyObject *pyxc_domain_dumpcore(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list,
                                       &dom, &corefile) )
-        goto exit;
+        return NULL;
 
     if ( (corefile == NULL) || (corefile[0] == '\0') )
-        goto exit;
+        return NULL;
 
     if ( xc_domain_dumpcore(xc->xc_handle, dom, corefile) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
     return zero;
-
- exit:
-    return NULL;
 }
 
 static PyObject *pyxc_handle(PyObject *self)
@@ -95,12 +92,7 @@ static PyObject *pyxc_domain_create(PyObject *self,
     {
         if ( !PyList_Check(pyhandle) || 
              (PyList_Size(pyhandle) != sizeof(xen_domain_handle_t)) )
-        {
-        out_exception:
-            errno = EINVAL;
-            PyErr_SetFromErrno(xc_error);
-            return NULL;
-        }
+            goto out_exception;
 
         for ( i = 0; i < sizeof(xen_domain_handle_t); i++ )
         {
@@ -115,6 +107,11 @@ static PyObject *pyxc_domain_create(PyObject *self,
         return PyErr_SetFromErrno(xc_error);
 
     return PyInt_FromLong(dom);
+
+out_exception:
+    errno = EINVAL;
+    PyErr_SetFromErrno(xc_error);
+    return NULL;
 }
 
 static PyObject *pyxc_domain_max_vcpus(PyObject *self,
@@ -270,10 +267,7 @@ static PyObject *pyxc_domain_sethandle(PyObject *self,
     if ( !PyList_Check(pyhandle) || 
          (PyList_Size(pyhandle) != sizeof(xen_domain_handle_t)) )
     {
-    out_exception:
-        errno = EINVAL;
-        PyErr_SetFromErrno(xc_error);
-        return NULL;
+        goto out_exception;
     }
 
     for ( i = 0; i < sizeof(xen_domain_handle_t); i++ )
@@ -289,7 +283,13 @@ static PyObject *pyxc_domain_sethandle(PyObject *self,
     
     Py_INCREF(zero);
     return zero;
+
+out_exception:
+    errno = EINVAL;
+    PyErr_SetFromErrno(xc_error);
+    return NULL;
 }
+
 
 static PyObject *pyxc_domain_getinfo(PyObject *self,
                                      PyObject *args,
@@ -721,7 +721,7 @@ static PyObject *pyxc_xeninfo(PyObject *self,
     xen_compile_info_t xen_cc;
     xen_changeset_info_t xen_chgset;
     xen_capabilities_info_t xen_caps;
-    xen_parameters_info_t xen_parms;
+    xen_platform_parameters_t p_parms;
     long xen_version;
     char str[128];
 
@@ -739,17 +739,17 @@ static PyObject *pyxc_xeninfo(PyObject *self,
     if ( xc_version(xc->xc_handle, XENVER_capabilities, &xen_caps) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
-    if ( xc_version(xc->xc_handle, XENVER_parameters, &xen_parms) != 0 )
+    if ( xc_version(xc->xc_handle, XENVER_platform_parameters, &p_parms) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
-    sprintf(str,"virt_start=0x%lx",xen_parms.virt_start);
+    sprintf(str, "virt_start=0x%lx", p_parms.virt_start);
 
     return Py_BuildValue("{s:i,s:i,s:s,s:s,s:s,s:s,s:s,s:s,s:s,s:s}",
                          "xen_major", xen_version >> 16,
                          "xen_minor", (xen_version & 0xffff),
                          "xen_extra", xen_extra,
                          "xen_caps",  xen_caps,
-                         "xen_params", str,
+                         "platform_params", str,
                          "xen_changeset", xen_chgset,
                          "cc_compiler", xen_cc.compiler,
                          "cc_compile_by", xen_cc.compile_by,

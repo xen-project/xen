@@ -138,6 +138,14 @@ extern void shadow_l2_normal_pt_update(struct domain *d,
                                        struct domain_mmap_cache *cache);
 #if CONFIG_PAGING_LEVELS >= 3
 #include <asm/page-guest32.h>
+/*
+ * va_mask cannot be used because it's used by the shadow hash.
+ * Use the score area for for now.
+ */
+#define is_xen_l2_slot(t,s)                                                    \
+    ( ((((t) & PGT_score_mask) >> PGT_score_shift) == 3) &&                    \
+      ((s) >= (L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES - 1))) )
+
 extern unsigned long gva_to_gpa(unsigned long gva);
 extern void shadow_l3_normal_pt_update(struct domain *d,
                                        unsigned long pa, l3_pgentry_t l3e,
@@ -458,7 +466,7 @@ static inline void shadow_put_page(struct domain *d,
 
 /************************************************************************/
 
-static inline int __mark_dirty(struct domain *d, unsigned int mfn)
+static inline int __mark_dirty(struct domain *d, unsigned long mfn)
 {
     unsigned long pfn;
     int           rc = 0;
@@ -906,7 +914,7 @@ static inline void l2pde_general(
         guest_l2e_add_flags(gpde, _PAGE_ACCESSED);
 
         *gpde_p = gpde;
-    }
+    } 
 
     if ( l2e_get_intpte(spde) || l2e_get_intpte(gpde) )
         SH_VVLOG("%s: gpde=%" PRIpte ", new spde=%" PRIpte, __func__,
@@ -1355,7 +1363,7 @@ static inline void put_shadow_status(struct domain *d)
 }
 
 
-static inline void delete_shadow_status( 
+static inline void delete_shadow_status(
     struct domain *d, unsigned long gpfn, unsigned long gmfn, unsigned int stype)
 {
     struct shadow_status *p, *x, *n, *head;
@@ -1454,7 +1462,7 @@ static inline void set_shadow_status(
     ASSERT(stype && !(stype & ~PGT_type_mask));
 
     x = head = hash_bucket(d, gpfn);
-   
+
     SH_VLOG("set gpfn=%lx smfn=%lx t=%lx bucket=%p(%p)",
              gpfn, smfn, stype, x, x->next);
     shadow_audit(d, 0);
@@ -1584,7 +1592,7 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    l2_pgentry_t sl2e;
+    l2_pgentry_t sl2e = {0};
 
     __shadow_get_l2e(v, va, &sl2e);
     if ( !(l2e_get_flags(sl2e) & _PAGE_PRESENT) )
@@ -1731,7 +1739,7 @@ static inline void update_pagetables(struct vcpu *v)
 #ifdef CONFIG_VMX
     if ( VMX_DOMAIN(v) )
         paging_enabled = vmx_paging_enabled(v);
-            
+
     else
 #endif
         // HACK ALERT: there's currently no easy way to figure out if a domU
@@ -1757,7 +1765,7 @@ static inline void update_pagetables(struct vcpu *v)
         if ( shadow_mode_enabled(d) )
             v->arch.monitor_table = v->arch.shadow_table;
         else
-#ifdef __x86_64__
+#if CONFIG_PAGING_LEVELS == 4
         if ( !(v->arch.flags & TF_kernel_mode) )
             v->arch.monitor_table = v->arch.guest_table_user;
         else

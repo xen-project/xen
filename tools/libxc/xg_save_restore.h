@@ -4,6 +4,8 @@
 ** Defintions and utilities for save / restore. 
 */
 
+#include "xc_private.h"
+
 #define DEBUG    1
 #define PROGRESS 0
 
@@ -55,26 +57,25 @@ while (0)
 ** Returns 1 on success, 0 on failure. 
 */
 static int get_platform_info(int xc_handle, uint32_t dom, 
-                             /* OUT */ uint32_t *max_mfn,  
-                             /* OUT */ uint32_t *hvirt_start, 
-                             /* OUT */ uint32_t *pt_levels)
+                             /* OUT */ unsigned long *max_mfn,  
+                             /* OUT */ unsigned long *hvirt_start, 
+                             /* OUT */ unsigned int *pt_levels)
     
 { 
     xen_capabilities_info_t xen_caps = "";
-    xen_parameters_info_t xen_parms;
-    xc_physinfo_t physinfo;
+    xen_platform_parameters_t xen_params;
     
-    if (xc_physinfo(xc_handle, &physinfo) != 0) 
-        return 0;
-    
-    if (xc_version(xc_handle, XENVER_parameters, &xen_parms) != 0)
+
+    if (xc_version(xc_handle, XENVER_platform_parameters, &xen_params) != 0)
         return 0;
     
     if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0)
         return 0;
 
-    *max_mfn =     physinfo.total_pages;
-    *hvirt_start = xen_parms.virt_start;
+    if (xc_memory_op(xc_handle, XENMEM_maximum_ram_page, max_mfn) != 0)
+        return 0; 
+    
+    *hvirt_start = xen_params.virt_start;
 
     if (strstr(xen_caps, "xen-3.0-x86_64"))
         *pt_levels = 4;
@@ -95,13 +96,22 @@ static int get_platform_info(int xc_handle, uint32_t dom,
 ** entry tell us whether or not the the PFN is currently mapped.
 */
 
-#define PFN_TO_KB(_pfn) ((_pfn) * PAGE_SIZE / 1024)
+#define PFN_TO_KB(_pfn) ((_pfn) << (PAGE_SHIFT - 10))
 #define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 
-/* Size in bytes of the M2P and P2M (both rounded up to nearest PAGE_SIZE) */
-#define M2P_SIZE ROUNDUP((max_mfn * sizeof(unsigned long)), PAGE_SHIFT) 
-#define P2M_SIZE ROUNDUP((max_pfn * sizeof(unsigned long)), PAGE_SHIFT) 
 
+/* 
+** The M2P is made up of some number of 'chunks' of at least 2MB in size. 
+** The below definitions and utility function(s) deal with mapping the M2P 
+** regarldess of the underlying machine memory size or architecture. 
+*/
+#define M2P_SHIFT       L2_PAGETABLE_SHIFT_PAE 
+#define M2P_CHUNK_SIZE  (1 << M2P_SHIFT) 
+#define M2P_SIZE(_m)    ROUNDUP(((_m) * sizeof(unsigned long)), M2P_SHIFT) 
+#define M2P_CHUNKS(_m)  (M2P_SIZE((_m)) >> M2P_SHIFT)
+
+/* Size in bytes of the P2M (rounded up to the nearest PAGE_SIZE bytes) */
+#define P2M_SIZE        ROUNDUP((max_pfn * sizeof(unsigned long)), PAGE_SHIFT) 
 
 /* Number of unsigned longs in a page */
 #define ulpp            (PAGE_SIZE/sizeof(unsigned long))

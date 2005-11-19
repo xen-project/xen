@@ -12,5 +12,5 @@ eyecatcher = "Error:"
 where = output.find(eyecatcher)
 if status == 0:
     FAIL("xm destroy returned invalid %i != 0" % status)
-elif where > 1:
+elif where == -1:
     FAIL("xm destroy failed to report error for bad domid")

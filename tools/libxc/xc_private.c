@@ -260,18 +260,6 @@ long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 }
 
 
-unsigned long xc_get_m2p_start_mfn ( int xc_handle )
-{
-    unsigned long mfn;
-
-    if ( ioctl( xc_handle, IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN, &mfn ) < 0 )
-    {
-        perror("xc_get_m2p_start_mfn:");
-        return 0;
-    }
-    return mfn;
-}
-
 int xc_get_pfn_list(int xc_handle,
                     uint32_t domid, 
                     unsigned long *pfn_buf, 
@@ -336,6 +324,19 @@ int xc_copy_to_domain_page(int xc_handle,
     return 0;
 }
 
+int xc_clear_domain_page(int xc_handle,
+                         uint32_t domid,
+                         unsigned long dst_pfn)
+{
+    void *vaddr = xc_map_foreign_range(
+        xc_handle, domid, PAGE_SIZE, PROT_WRITE, dst_pfn);
+    if ( vaddr == NULL )
+        return -1;
+    memset(vaddr, 0, PAGE_SIZE);
+    munmap(vaddr, PAGE_SIZE);
+    return 0;
+}
+
 unsigned long xc_get_filesz(int fd)
 {
     uint16_t sig;
@@ -389,11 +390,21 @@ int xc_version(int xc_handle, int cmd, void *arg)
 
     switch ( cmd )
     {
-    case XENVER_extraversion: argsize = sizeof(xen_extraversion_t); break;
-    case XENVER_compile_info: argsize = sizeof(xen_compile_info_t); break;
-    case XENVER_capabilities: argsize = sizeof(xen_capabilities_info_t); break;
-    case XENVER_changeset:    argsize = sizeof(xen_changeset_info_t); break;
-    case XENVER_parameters:   argsize = sizeof(xen_parameters_info_t); break;
+    case XENVER_extraversion:
+        argsize = sizeof(xen_extraversion_t);
+        break;
+    case XENVER_compile_info:
+        argsize = sizeof(xen_compile_info_t);
+        break;
+    case XENVER_capabilities:
+        argsize = sizeof(xen_capabilities_info_t);
+        break;
+    case XENVER_changeset:
+        argsize = sizeof(xen_changeset_info_t);
+        break;
+    case XENVER_platform_parameters:
+        argsize = sizeof(xen_platform_parameters_t);
+        break;
     }
 
     if ( (argsize != 0) && (mlock(arg, argsize) != 0) )

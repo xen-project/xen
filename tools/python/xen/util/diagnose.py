@@ -22,6 +22,7 @@ from xen.xend import sxp
 from xen.xend.XendClient import server
 from xen.xend.XendError import XendError
 from xen.xend.xenstore.xstransact import xstransact
+from xen.xend.server import DevController
 
 import xen.xend.XendProtocol
 
@@ -107,34 +108,57 @@ def diagnose_devices():
                 print ("Cannot find backend path for device %s, %s." %
                        (deviceClass, device))
             else:
-                backend_error = xstransact.Read(
-                    backendPath.replace('backend/', 'error/backend/'),
-                    'error')
+                frontend_state = xstransact.Read(frontendPath, 'state')
+                backend_state  = xstransact.Read(backendPath,  'state')
 
-                if backend_error:
-                    diagnose_device_error(backend_error)
+                print "Backend is in state %s." %  stateString(backend_state)
+                print "Frontend is in state %s." % stateString(frontend_state)
+
+                check_for_error(True)
+                check_for_error(False)
+
+                diagnose_hotplugging()
 
 
-def diagnose_device_error(err):
-    if re.search("2 reading .*/ring-ref and event-channel", err):
-        print ("Backend is stuck waiting for frontend for device %s, %s." %
-               (deviceClass, device))
-        diagnose_stuck_frontend()
+def check_for_error(backend):
+    if backend:
+        path = backendPath.replace('backend/', 'error/backend/')
     else:
-        print ("Device %s, %s shows error %s." %
-               (deviceClass, device, err))
+        path = frontendPath.replace('device/', 'error/device/')
+
+    err = xstransact.Read(path, 'error')
+
+    if err:
+        print ("%s for device %s, %s shows error %s." %
+               (backend and 'Backend' or 'Frontend', deviceClass, device,
+                err))
 
 
-def diagnose_stuck_frontend():
-    if deviceClass == "vbd":
+def diagnose_hotplugging():
+    if deviceClass == 'vbd':
         phy = xstransact.Read(backendPath, 'physical-device')
 
         if phy:
-            print ("Device %s, %s hotplugging has completed successfully." %
-                   (deviceClass, device))
+            print ('Device %s, %s hotplugging has completed successfully, '
+                   'and is connected to physical device %s.' %
+                   (deviceClass, device, phy))
         else:
-            print ("Device %s, %s hotplugging failed." %
+            print ('Device %s, %s hotplugging failed.' %
                    (deviceClass, device))
+    elif deviceClass == 'vif':
+        handle = xstransact.Read(backendPath, 'handle')
+
+        if handle:
+            print ('Device %s, %s hotplugging has completed successfully, '
+                   'and is using handle %s.' %
+                   (deviceClass, device, handle))
+        else:
+            print ('Device %s, %s hotplugging failed.' %
+                   (deviceClass, device))
+
+
+def stateString(state):
+    return state and DevController.xenbusState[int(state)] or '<None>'
 
 
 def main(argv = None):

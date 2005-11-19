@@ -616,8 +616,7 @@ static void BSG_Destroy_private(BSG_Type type, BSG_BYTE** src) {
   else if (format == __FMT_SIZE || format == __FMT_HSIZE) {
     s += size;
     BSG_BYTE* ptr = *(BSG_BYTE**) s;
-    if (ptr)
-      free(ptr);
+    free(ptr);
     s += sizeof(void*);
   } else if (format == __FMT_PACKED) {
 

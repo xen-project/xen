@@ -64,6 +64,9 @@ int shadow_set_guest_paging_levels(struct domain *d, int levels)
 #if CONFIG_PAGING_LEVELS == 2
         if ( d->arch.ops != &MODE_A_HANDLER )
             d->arch.ops = &MODE_A_HANDLER;
+#elif CONFIG_PAGING_LEVELS == 3
+        if ( d->arch.ops != &MODE_B_HANDLER )
+            d->arch.ops = &MODE_B_HANDLER;
 #elif CONFIG_PAGING_LEVELS == 4
         if ( d->arch.ops != &MODE_D_HANDLER )
             d->arch.ops = &MODE_D_HANDLER;
@@ -138,7 +141,92 @@ unsigned long gva_to_gpa(unsigned long gva)
 }
 /****************************************************************************/
 /****************************************************************************/
-#if CONFIG_PAGING_LEVELS >= 4
+#if CONFIG_PAGING_LEVELS >= 3
+
+static void inline
+free_shadow_fl1_table(struct domain *d, unsigned long smfn)
+{
+    l1_pgentry_t *pl1e = map_domain_page(smfn);
+    int i;
+
+    for (i = 0; i < L1_PAGETABLE_ENTRIES; i++)
+        put_page_from_l1e(pl1e[i], d);
+}
+
+/*
+ * Free l2, l3, l4 shadow tables
+ */
+
+void free_fake_shadow_l2(struct domain *d,unsigned long smfn);
+
+static void inline
+free_shadow_tables(struct domain *d, unsigned long smfn, u32 level)
+{
+    pgentry_64_t *ple = map_domain_page(smfn);
+    int i, external = shadow_mode_external(d);
+
+#if CONFIG_PAGING_LEVELS >=3
+    if ( d->arch.ops->guest_paging_levels == PAGING_L2 )
+    {
+        struct pfn_info *page = &frame_table[smfn];
+        for ( i = 0; i < PDP_ENTRIES; i++ )
+        {
+            if ( entry_get_flags(ple[i]) & _PAGE_PRESENT )
+                free_fake_shadow_l2(d,entry_get_pfn(ple[i]));
+        }
+
+        page = &frame_table[entry_get_pfn(ple[0])];
+        free_domheap_pages(page, SL2_ORDER);
+        unmap_domain_page(ple);
+    }
+    else
+#endif
+    {
+        /*
+         * No Xen mappings in external pages
+         */
+        if ( external )
+        {
+            for ( i = 0; i < PAGETABLE_ENTRIES; i++ )
+                if ( entry_get_flags(ple[i]) & _PAGE_PRESENT )
+                    put_shadow_ref(entry_get_pfn(ple[i]));
+        } 
+        else
+        {
+            for ( i = 0; i < PAGETABLE_ENTRIES; i++ )
+            {
+                /* 
+                 * List the skip/break conditions to avoid freeing
+                 * Xen private mappings.
+                 */
+#if CONFIG_PAGING_LEVELS == 2
+                if ( level == PAGING_L2 && !is_guest_l2_slot(0, i) )
+                    continue;
+#endif
+#if CONFIG_PAGING_LEVELS == 3
+                if ( level == PAGING_L3 && i == L3_PAGETABLE_ENTRIES )
+                    break;
+                if ( level == PAGING_L2 )
+                {
+                    struct pfn_info *page = &frame_table[smfn]; 
+                    if ( is_xen_l2_slot(page->u.inuse.type_info, i) )
+                        continue;
+                }
+#endif
+#if CONFIG_PAGING_LEVELS == 4
+                if ( level == PAGING_L4 && !is_guest_l4_slot(i))
+                    continue;
+#endif
+                if ( entry_get_flags(ple[i]) & _PAGE_PRESENT )
+                    put_shadow_ref(entry_get_pfn(ple[i]));
+            }
+        }
+        unmap_domain_page(ple);
+    }
+}
+#endif
+
+#if CONFIG_PAGING_LEVELS == 4
 /*
  * Convert PAE 3-level page-table to 4-level page-table
  */
@@ -151,13 +239,13 @@ static pagetable_t page_table_convert(struct domain *d)
     
     l4page = alloc_domheap_page(NULL);
     if (l4page == NULL)
-        domain_crash();
+        domain_crash(d);
     l4 = map_domain_page(page_to_pfn(l4page));
     memset(l4, 0, PAGE_SIZE);
 
     l3page = alloc_domheap_page(NULL);
     if (l3page == NULL)
-        domain_crash();
+        domain_crash(d);
     l3 =  map_domain_page(page_to_pfn(l3page));
     memset(l3, 0, PAGE_SIZE);
 
@@ -202,55 +290,6 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     v->arch.monitor_table = mk_pagetable(mmfn << PAGE_SHIFT);
     v->arch.monitor_vtable = (l2_pgentry_t *) mpl4e;
 }
-
-static void inline
-free_shadow_fl1_table(struct domain *d, unsigned long smfn)
-{
-    l1_pgentry_t *pl1e = map_domain_page(smfn);
-    int i;
-
-    for (i = 0; i < L1_PAGETABLE_ENTRIES; i++)
-        put_page_from_l1e(pl1e[i], d);
-}
-
-/*
- * Free l2, l3, l4 shadow tables
- */
-
-void free_fake_shadow_l2(struct domain *d,unsigned long smfn);
-
-static void inline
-free_shadow_tables(struct domain *d, unsigned long smfn, u32 level)
-{
-    pgentry_64_t *ple = map_domain_page(smfn);
-    int i, external = shadow_mode_external(d);
-    struct pfn_info *page = &frame_table[smfn];
-
-    if (d->arch.ops->guest_paging_levels == PAGING_L2)
-    {
-#if CONFIG_PAGING_LEVELS >=4
-        for ( i = 0; i < PDP_ENTRIES; i++ )
-        {
-            if (entry_get_flags(ple[i]) & _PAGE_PRESENT )
-                free_fake_shadow_l2(d,entry_get_pfn(ple[i]));
-        }
-   
-        page = &frame_table[entry_get_pfn(ple[0])];
-        free_domheap_pages(page, SL2_ORDER);
-        unmap_domain_page(ple);
-#endif
-    }
-    else
-    {
-        for ( i = 0; i < PAGETABLE_ENTRIES; i++ )
-            if ( external || is_guest_l4_slot(i) )
-                if ( entry_get_flags(ple[i]) & _PAGE_PRESENT )
-                    put_shadow_ref(entry_get_pfn(ple[i]));
-
-        unmap_domain_page(ple);
-    }
-}
-
 
 void free_monitor_pagetable(struct vcpu *v)
 {
@@ -299,11 +338,9 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     mpl2e = (l2_pgentry_t *)map_domain_page(mmfn);
     memset(mpl2e, 0, PAGE_SIZE);
 
-#ifdef __i386__ /* XXX screws x86/64 build */
     memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
-#endif
 
     mpl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
         l2e_from_paddr(__pa(d->arch.mm_perdomain_pt),
@@ -333,7 +370,7 @@ void free_monitor_pagetable(struct vcpu *v)
     unsigned long mfn;
 
     ASSERT( pagetable_get_paddr(v->arch.monitor_table) );
-    
+
     mpl2e = v->arch.monitor_vtable;
 
     /*
@@ -517,13 +554,11 @@ free_shadow_hl2_table(struct domain *d, unsigned long smfn)
 
     SH_VVLOG("%s: smfn=%lx freed", __func__, smfn);
 
-#ifdef __i386__
+#if CONFIG_PAGING_LEVELS == 2
     if ( shadow_mode_external(d) )
         limit = L2_PAGETABLE_ENTRIES;
     else
         limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
-#else
-    limit = 0; /* XXX x86/64 XXX */
 #endif
 
     for ( i = 0; i < limit; i++ )
@@ -584,10 +619,11 @@ void free_shadow_page(unsigned long smfn)
 
     ASSERT( ! IS_INVALID_M2P_ENTRY(gpfn) );
 #if CONFIG_PAGING_LEVELS >=4
-    if (type == PGT_fl1_shadow) {
+    if ( type == PGT_fl1_shadow ) 
+    {
         unsigned long mfn;
         mfn = __shadow_status(d, gpfn, PGT_fl1_shadow);
-        if (!mfn)
+        if ( !mfn )
             gpfn |= (1UL << 63);
     }
 #endif
@@ -602,7 +638,7 @@ void free_shadow_page(unsigned long smfn)
         free_shadow_l1_table(d, smfn);
         d->arch.shadow_page_count--;
         break;
-#if defined (__i386__)
+#if CONFIG_PAGING_LEVELS == 2
     case PGT_l2_shadow:
         perfc_decr(shadow_l2_pages);
         shadow_demote(d, gpfn, gmfn);
@@ -616,7 +652,8 @@ void free_shadow_page(unsigned long smfn)
         free_shadow_hl2_table(d, smfn);
         d->arch.hl2_page_count--;
         break;
-#else
+#endif
+#if CONFIG_PAGING_LEVELS >= 3
     case PGT_l2_shadow:
     case PGT_l3_shadow:
     case PGT_l4_shadow:
@@ -630,7 +667,6 @@ void free_shadow_page(unsigned long smfn)
         d->arch.shadow_page_count--;
         break;
 #endif
-
     case PGT_snapshot:
         perfc_decr(apshot_pages);
         break;
@@ -782,7 +818,7 @@ void free_shadow_pages(struct domain *d)
         }
     }
 
-#if defined (__i386__)
+#if CONFIG_PAGING_LEVELS == 2
     // For external shadows, remove the monitor table's refs
     //
     if ( shadow_mode_external(d) )
@@ -928,7 +964,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     ASSERT(!(d->arch.shadow_mode & ~mode));
 
 #if defined(CONFIG_PAGING_LEVELS)
-    if(!shadow_set_guest_paging_levels(d, 
+    if(!shadow_set_guest_paging_levels(d,
                                        CONFIG_PAGING_LEVELS)) {
         printk("Unsupported guest paging levels\n");
         domain_crash_synchronous(); /* need to take a clean path */
@@ -968,7 +1004,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         else
             v->arch.shadow_vtable = NULL;
         
-#if defined (__i386__)
+#if CONFIG_PAGING_LEVELS == 2
         /*
          * arch.hl2_vtable
          */
@@ -1009,7 +1045,8 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     if ( new_modes & SHM_log_dirty )
     {
         ASSERT( !d->arch.shadow_dirty_bitmap );
-        d->arch.shadow_dirty_bitmap_size = (d->max_pages + 63) & ~63;
+        d->arch.shadow_dirty_bitmap_size = 
+            (d->shared_info->arch.max_pfn +  63) & ~63;
         d->arch.shadow_dirty_bitmap = 
             xmalloc_array(unsigned long, d->arch.shadow_dirty_bitmap_size /
                           (8 * sizeof(unsigned long)));
@@ -1163,34 +1200,29 @@ static int shadow_mode_table_op(
         d->arch.shadow_dirty_net_count   = 0;
         d->arch.shadow_dirty_block_count = 0;
  
-        if ( (d->max_pages > sc->pages) || 
-             (sc->dirty_bitmap == NULL) || 
+
+        if ( (sc->dirty_bitmap == NULL) || 
              (d->arch.shadow_dirty_bitmap == NULL) )
         {
             rc = -EINVAL;
             break;
         }
- 
-        sc->pages = d->max_pages;
+
+        if(sc->pages > d->arch.shadow_dirty_bitmap_size)
+            sc->pages = d->arch.shadow_dirty_bitmap_size; 
 
 #define chunk (8*1024) /* Transfer and clear in 1kB chunks for L1 cache. */
-        for ( i = 0; i < d->max_pages; i += chunk )
+        for ( i = 0; i < sc->pages; i += chunk )
         {
-            int bytes = ((((d->max_pages - i) > chunk) ?
-                          chunk : (d->max_pages - i)) + 7) / 8;
+            int bytes = ((((sc->pages - i) > chunk) ?
+                          chunk : (sc->pages - i)) + 7) / 8;
 
             if (copy_to_user(
                 sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
                 d->arch.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
                 bytes))
             {
-                // copy_to_user can fail when copying to guest app memory.
-                // app should zero buffer after mallocing, and pin it
                 rc = -EINVAL;
-                memset(
-                    d->arch.shadow_dirty_bitmap + 
-                    (i/(8*sizeof(unsigned long))),
-                    0, (d->max_pages/8) - (i/(8*sizeof(unsigned long))));
                 break;
             }
             memset(
@@ -1206,17 +1238,18 @@ static int shadow_mode_table_op(
         sc->stats.dirty_net_count   = d->arch.shadow_dirty_net_count;
         sc->stats.dirty_block_count = d->arch.shadow_dirty_block_count;
  
-        if ( (d->max_pages > sc->pages) || 
-             (sc->dirty_bitmap == NULL) || 
+        if ( (sc->dirty_bitmap == NULL) || 
              (d->arch.shadow_dirty_bitmap == NULL) )
         {
             rc = -EINVAL;
             break;
         }
  
-        sc->pages = d->max_pages;
-        if (copy_to_user(
-            sc->dirty_bitmap, d->arch.shadow_dirty_bitmap, (d->max_pages+7)/8))
+        if(sc->pages > d->arch.shadow_dirty_bitmap_size)
+            sc->pages = d->arch.shadow_dirty_bitmap_size; 
+
+        if (copy_to_user(sc->dirty_bitmap, 
+                         d->arch.shadow_dirty_bitmap, (sc->pages+7)/8))
         {
             rc = -EINVAL;
             break;
@@ -1411,7 +1444,7 @@ void shadow_l1_normal_pt_update(
     sl1mfn = __shadow_status(current->domain, pa >> PAGE_SHIFT, PGT_l1_shadow);
     if ( sl1mfn )
     {
-        SH_VVLOG("shadow_l1_normal_pt_update pa=%p, gpte=%" PRIpte,
+        SH_VVLOG("shadow_l1_normal_pt_update pa=%p, gpde=%" PRIpte,
                  (void *)pa, l1e_get_intpte(gpte));
         l1pte_propagate_from_guest(current->domain, gpte, &spte);
 
@@ -1450,7 +1483,7 @@ void shadow_l2_normal_pt_update(
 #if CONFIG_PAGING_LEVELS >= 3
 void shadow_l3_normal_pt_update(
     struct domain *d,
-    unsigned long pa, l3_pgentry_t gpde,
+    unsigned long pa, l3_pgentry_t l3e,
     struct domain_mmap_cache *cache)
 {
     unsigned long sl3mfn;
@@ -1461,11 +1494,10 @@ void shadow_l3_normal_pt_update(
     sl3mfn = __shadow_status(current->domain, pa >> PAGE_SHIFT, PGT_l3_shadow);
     if ( sl3mfn )
     {
-        SH_VVLOG("shadow_l3_normal_pt_update pa=%p, gpde=%" PRIpte,
-                 (void *)pa, l3e_get_intpte(gpde));
-
+        SH_VVLOG("shadow_l3_normal_pt_update pa=%p, l3e=%" PRIpte,
+                 (void *)pa, l3e_get_intpte(l3e));
         spl3e = (pgentry_64_t *) map_domain_page_with_cache(sl3mfn, cache);
-        validate_entry_change(d, (pgentry_64_t *) &gpde,
+        validate_entry_change(d, (pgentry_64_t *) &l3e,
                               &spl3e[(pa & ~PAGE_MASK) / sizeof(l3_pgentry_t)], 
                               shadow_type_to_level(PGT_l3_shadow));
         unmap_domain_page_with_cache(spl3e, cache);
@@ -1478,7 +1510,7 @@ void shadow_l3_normal_pt_update(
 #if CONFIG_PAGING_LEVELS >= 4
 void shadow_l4_normal_pt_update(
     struct domain *d,
-    unsigned long pa, l4_pgentry_t gpde,
+    unsigned long pa, l4_pgentry_t l4e,
     struct domain_mmap_cache *cache)
 {
     unsigned long sl4mfn;
@@ -1489,11 +1521,10 @@ void shadow_l4_normal_pt_update(
     sl4mfn = __shadow_status(current->domain, pa >> PAGE_SHIFT, PGT_l4_shadow);
     if ( sl4mfn )
     {
-        SH_VVLOG("shadow_l4_normal_pt_update pa=%p, gpde=%" PRIpte,
-                 (void *)pa, l4e_get_intpte(gpde));
-
+        SH_VVLOG("shadow_l4_normal_pt_update pa=%p, l4e=%" PRIpte,
+                 (void *)pa, l4e_get_intpte(l4e));
         spl4e = (pgentry_64_t *)map_domain_page_with_cache(sl4mfn, cache);
-        validate_entry_change(d, (pgentry_64_t *)&gpde,
+        validate_entry_change(d, (pgentry_64_t *)&l4e,
                               &spl4e[(pa & ~PAGE_MASK) / sizeof(l4_pgentry_t)], 
                               shadow_type_to_level(PGT_l4_shadow));
         unmap_domain_page_with_cache(spl4e, cache);
@@ -1557,8 +1588,6 @@ void
 remove_shadow(struct domain *d, unsigned long gpfn, u32 stype)
 {
     unsigned long smfn;
-
-    //printk("%s(gpfn=%lx, type=%x)\n", __func__, gpfn, stype);
 
     shadow_lock(d);
 

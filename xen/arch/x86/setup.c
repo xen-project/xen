@@ -430,6 +430,10 @@ void __init __start_xen(multiboot_info_t *mbi)
     /* Sanity check for unwanted bloat of dom0_op_t structure. */
     BUG_ON(sizeof(((dom0_op_t *)0)->u) != sizeof(((dom0_op_t *)0)->u.pad));
 
+    BUG_ON(sizeof(start_info_t) > PAGE_SIZE);
+    BUG_ON(sizeof(shared_info_t) > PAGE_SIZE);
+    BUG_ON(sizeof(vcpu_info_t) != (sizeof(unsigned long) * 4));
+
     init_frametable();
 
     end_boot_allocator();

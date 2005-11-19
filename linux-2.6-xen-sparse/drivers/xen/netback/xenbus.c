@@ -1,5 +1,6 @@
 /*  Xenbus code for netif backend
     Copyright (C) 2005 Rusty Russell <rusty@rustcorp.com.au>
+    Copyright (C) 2005 XenSource Ltd
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -15,160 +16,116 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
+
+
 #include <stdarg.h>
 #include <linux/module.h>
 #include <asm-xen/xenbus.h>
+#include <asm-xen/net_driver_util.h>
 #include "common.h"
+
+
+#if 0
+#undef DPRINTK
+#define DPRINTK(fmt, args...) \
+    printk("netback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
+#endif
+
 
 struct backend_info
 {
 	struct xenbus_device *dev;
-
-	/* our communications channel */
 	netif_t *netif;
-
-	long int frontend_id;
-
-	/* watch back end for changes */
 	struct xenbus_watch backend_watch;
-
-	/* watch front end for changes */
-	struct xenbus_watch watch;
-	char *frontpath;
+	XenbusState frontend_state;
 };
+
+
+static int connect_rings(struct backend_info *);
+static void connect(struct backend_info *);
+static void maybe_connect(struct backend_info *);
+static void backend_changed(struct xenbus_watch *, const char **,
+			    unsigned int);
+
 
 static int netback_remove(struct xenbus_device *dev)
 {
 	struct backend_info *be = dev->data;
 
-	if (be->watch.node)
-		unregister_xenbus_watch(&be->watch);
-	unregister_xenbus_watch(&be->backend_watch);
-	if (be->netif)
+	if (be->backend_watch.node) {
+		unregister_xenbus_watch(&be->backend_watch);
+		kfree(be->backend_watch.node);
+		be->backend_watch.node = NULL;
+	}
+	if (be->netif) {
 		netif_disconnect(be->netif);
-	if (be->frontpath)
-		kfree(be->frontpath);
+		be->netif = NULL;
+	}
 	kfree(be);
+	dev->data = NULL;
 	return 0;
 }
 
-/* Front end tells us frame. */
-static void frontend_changed(struct xenbus_watch *watch, 
-			     const char **vec, unsigned int len)
-{
-	unsigned long tx_ring_ref, rx_ring_ref;
-	unsigned int evtchn;
-	int err;
-	struct backend_info *be
-		= container_of(watch, struct backend_info, watch);
-	char *mac, *e, *s;
-	int i;
 
-	/* If other end is gone, delete ourself. */
-	if (vec && !xenbus_exists(NULL, be->frontpath, "")) {
-		xenbus_rm(NULL, be->dev->nodename, "");
-		device_unregister(&be->dev->dev);
-		return;
-	}
-	if (be->netif == NULL || be->netif->status == CONNECTED)
-		return;
-
-	mac = xenbus_read(NULL, be->frontpath, "mac", NULL);
-	if (IS_ERR(mac)) {
-		err = PTR_ERR(mac);
-		xenbus_dev_error(be->dev, err, "reading %s/mac",
-				 be->dev->nodename);
-		return;
-	}
-	s = mac;
-	for (i = 0; i < ETH_ALEN; i++) {
-		be->netif->fe_dev_addr[i] = simple_strtoul(s, &e, 16);
-		if (s == e || (e[0] != ':' && e[0] != 0)) {
-			kfree(mac);
-			err = -ENOENT;
-			xenbus_dev_error(be->dev, err, "parsing %s/mac",
-					 be->dev->nodename);
-			return;
-		}
-		s = &e[1];
-	}
-	kfree(mac);
-
-	err = xenbus_gather(NULL, be->frontpath,
-			    "tx-ring-ref", "%lu", &tx_ring_ref,
-			    "rx-ring-ref", "%lu", &rx_ring_ref,
-			    "event-channel", "%u", &evtchn, NULL);
-	if (err) {
-		xenbus_dev_error(be->dev, err,
-				 "reading %s/ring-ref and event-channel",
-				 be->frontpath);
-		return;
-	}
-
-	/* Map the shared frame, irq etc. */
-	err = netif_map(be->netif, tx_ring_ref, rx_ring_ref, evtchn);
-	if (err) {
-		xenbus_dev_error(be->dev, err,
-				 "mapping shared-frames %lu/%lu port %u",
-				 tx_ring_ref, rx_ring_ref, evtchn);
-		return;
-	}
-
-	xenbus_dev_ok(be->dev);
-
-	return;
-}
-
-/* 
-   Setup supplies physical device.  
-   We provide event channel and device details to front end.
-   Frontend supplies shared frame and event channel.
+/**
+ * Entry point to this code when a new device is created.  Allocate the basic
+ * structures, and watch the store waiting for the hotplug scripts to tell us
+ * the device's handle.  Switch to InitWait.
  */
-static void backend_changed(struct xenbus_watch *watch,
-			    const char **vec, unsigned int len)
+static int netback_probe(struct xenbus_device *dev,
+			 const struct xenbus_device_id *id)
 {
 	int err;
-	long int handle;
-	struct backend_info *be
-		= container_of(watch, struct backend_info, backend_watch);
-	struct xenbus_device *dev = be->dev;
-	u8 be_mac[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
+	struct backend_info *be = kmalloc(sizeof(struct backend_info),
+					  GFP_KERNEL);
+	if (!be) {
+		xenbus_dev_fatal(dev, -ENOMEM,
+				 "allocating backend structure");
+		return -ENOMEM;
+	}
+	memset(be, 0, sizeof(*be));
 
-	err = xenbus_scanf(NULL, dev->nodename, "handle", "%li", &handle);
-	if (XENBUS_EXIST_ERR(err))
-		return;
-	if (err < 0) {
-		xenbus_dev_error(dev, err, "reading handle");
-		return;
+	be->dev = dev;
+	dev->data = be;
+
+	err = xenbus_watch_path2(dev, dev->nodename, "handle",
+				 &be->backend_watch, backend_changed);
+	if (err)
+		goto fail;
+
+	err = xenbus_switch_state(dev, NULL, XenbusStateInitWait);
+	if (err) {
+		goto fail;
 	}
 
-	if (be->netif == NULL) {
-		be->netif = alloc_netif(be->frontend_id, handle, be_mac);
-		if (IS_ERR(be->netif)) {
-			err = PTR_ERR(be->netif);
-			be->netif = NULL;
-			xenbus_dev_error(dev, err, "creating interface");
-			return;
-		}
+	return 0;
 
-		kobject_hotplug(&dev->dev.kobj, KOBJ_ONLINE);
-
-		/* Pass in NULL node to skip exist test. */
-		frontend_changed(&be->watch, NULL, 0);
-	}
+fail:
+	DPRINTK("failed");
+	netback_remove(dev);
+	return err;
 }
 
+
+/**
+ * Handle the creation of the hotplug script environment.  We add the script
+ * and vif variables to the environment, for the benefit of the vif-* hotplug
+ * scripts.
+ */
 static int netback_hotplug(struct xenbus_device *xdev, char **envp,
 			   int num_envp, char *buffer, int buffer_size)
 {
 	struct backend_info *be = xdev->data;
 	netif_t *netif = be->netif;
 	int i = 0, length = 0;
+	char *val;
 
-	char *val = xenbus_read(NULL, xdev->nodename, "script", NULL);
+	DPRINTK("netback_hotplug");
+
+	val = xenbus_read(NULL, xdev->nodename, "script", NULL);
 	if (IS_ERR(val)) {
 		int err = PTR_ERR(val);
-		xenbus_dev_error(xdev, err, "reading script");
+		xenbus_dev_fatal(xdev, err, "reading script");
 		return err;
 	}
 	else {
@@ -187,82 +144,161 @@ static int netback_hotplug(struct xenbus_device *xdev, char **envp,
 	return 0;
 }
 
-static int netback_probe(struct xenbus_device *dev,
-			 const struct xenbus_device_id *id)
+
+/**
+ * Callback received when the hotplug scripts have placed the handle node.
+ * Read it, and create a netif structure.  If the frontend is ready, connect.
+ */
+static void backend_changed(struct xenbus_watch *watch,
+			    const char **vec, unsigned int len)
 {
-	struct backend_info *be;
-	char *frontend;
+	int err;
+	long handle;
+	struct backend_info *be
+		= container_of(watch, struct backend_info, backend_watch);
+	struct xenbus_device *dev = be->dev;
+
+	DPRINTK("");
+
+	err = xenbus_scanf(NULL, dev->nodename, "handle", "%li", &handle);
+	if (XENBUS_EXIST_ERR(err)) {
+		/* Since this watch will fire once immediately after it is
+		   registered, we expect this.  Ignore it, and wait for the
+		   hotplug scripts. */
+		return;
+	}
+	if (err != 1) {
+		xenbus_dev_fatal(dev, err, "reading handle");
+		return;
+	}
+
+	if (be->netif == NULL) {
+		u8 be_mac[ETH_ALEN] = { 0, 0, 0, 0, 0, 0 };
+
+		be->netif = alloc_netif(dev->otherend_id, handle, be_mac);
+		if (IS_ERR(be->netif)) {
+			err = PTR_ERR(be->netif);
+			be->netif = NULL;
+			xenbus_dev_fatal(dev, err, "creating interface");
+			return;
+		}
+
+		kobject_hotplug(&dev->dev.kobj, KOBJ_ONLINE);
+
+		maybe_connect(be);
+	}
+}
+
+
+/**
+ * Callback received when the frontend's state changes.
+ */
+static void frontend_changed(struct xenbus_device *dev,
+			     XenbusState frontend_state)
+{
+	struct backend_info *be = dev->data;
+
+	DPRINTK("");
+
+	be->frontend_state = frontend_state;
+
+	switch (frontend_state) {
+	case XenbusStateInitialising:
+	case XenbusStateInitialised:
+		break;
+
+	case XenbusStateConnected:
+		maybe_connect(be);
+		break;
+
+	case XenbusStateClosing:
+		xenbus_switch_state(dev, NULL, XenbusStateClosing);
+		break;
+
+	case XenbusStateClosed:
+		device_unregister(&be->dev->dev);
+		break;
+
+	case XenbusStateUnknown:
+	case XenbusStateInitWait:
+	default:
+		xenbus_dev_fatal(be->dev, -EINVAL, "saw state %d at frontend",
+				 frontend_state);
+		break;
+	}
+}
+
+
+/* ** Connection ** */
+
+
+static void maybe_connect(struct backend_info *be)
+{
+	if (be->netif != NULL && be->frontend_state == XenbusStateConnected) {
+		connect(be);
+	}
+}
+
+
+static void connect(struct backend_info *be)
+{
+	int err;
+	struct xenbus_device *dev = be->dev;
+
+	err = connect_rings(be);
+	if (err)
+		return;
+
+	err = xen_net_read_mac(dev, be->netif->fe_dev_addr);
+	if (err) {
+		xenbus_dev_fatal(dev, err, "parsing %s/mac", dev->nodename);
+		return;
+	}
+
+	xenbus_switch_state(dev, NULL, XenbusStateConnected);
+}
+
+
+static int connect_rings(struct backend_info *be)
+{
+	struct xenbus_device *dev = be->dev;
+	unsigned long tx_ring_ref, rx_ring_ref;
+	unsigned int evtchn;
 	int err;
 
-	be = kmalloc(sizeof(*be), GFP_KERNEL);
-	if (!be) {
-		xenbus_dev_error(dev, -ENOMEM, "allocating backend structure");
-		return -ENOMEM;
-	}
-	memset(be, 0, sizeof(*be));
+	DPRINTK("");
 
-	frontend = NULL;
-	err = xenbus_gather(NULL, dev->nodename,
-			    "frontend-id", "%li", &be->frontend_id,
-			    "frontend", NULL, &frontend,
-			    NULL);
-	if (XENBUS_EXIST_ERR(err))
-		goto free_be;
-	if (err < 0) {
-		xenbus_dev_error(dev, err,
-				 "reading %s/frontend or frontend-id",
-				 dev->nodename);
-		goto free_be;
-	}
-	if (strlen(frontend) == 0 || !xenbus_exists(NULL, frontend, "")) {
-		/* If we can't get a frontend path and a frontend-id,
-		 * then our bus-id is no longer valid and we need to
-		 * destroy the backend device.
-		 */
-		err = -ENOENT;
-		goto free_be;
-	}
-
-	be->dev = dev;
-	be->backend_watch.node = dev->nodename;
-	be->backend_watch.callback = backend_changed;
-	/* Registration implicitly calls backend_changed. */
-	err = register_xenbus_watch(&be->backend_watch);
+	err = xenbus_gather(NULL, dev->otherend,
+			    "tx-ring-ref", "%lu", &tx_ring_ref,
+			    "rx-ring-ref", "%lu", &rx_ring_ref,
+			    "event-channel", "%u", &evtchn, NULL);
 	if (err) {
-		be->backend_watch.node = NULL;
-		xenbus_dev_error(dev, err, "adding backend watch on %s",
-				 dev->nodename);
-		goto free_be;
+		xenbus_dev_fatal(dev, err,
+				 "reading %s/ring-ref and event-channel",
+				 dev->otherend);
+		return err;
 	}
 
-	be->frontpath = frontend;
-	be->watch.node = be->frontpath;
-	be->watch.callback = frontend_changed;
-	err = register_xenbus_watch(&be->watch);
+	/* Map the shared frame, irq etc. */
+	err = netif_map(be->netif, tx_ring_ref, rx_ring_ref, evtchn);
 	if (err) {
-		be->watch.node = NULL;
-		xenbus_dev_error(dev, err,
-				 "adding frontend watch on %s",
-				 be->frontpath);
-		goto free_be;
+		xenbus_dev_fatal(dev, err,
+				 "mapping shared-frames %lu/%lu port %u",
+				 tx_ring_ref, rx_ring_ref, evtchn);
+		return err;
 	}
-
-	dev->data = be;
 	return 0;
-
- free_be:
-	if (be->backend_watch.node)
-		unregister_xenbus_watch(&be->backend_watch);
-	if (frontend)
-		kfree(frontend);
-	kfree(be);
-	return err;
 }
+
+
+/* ** Driver Registration ** */
+
 
 static struct xenbus_device_id netback_ids[] = {
 	{ "vif" },
 	{ "" }
 };
+
 
 static struct xenbus_driver netback = {
 	.name = "vif",
@@ -271,12 +307,15 @@ static struct xenbus_driver netback = {
 	.probe = netback_probe,
 	.remove = netback_remove,
 	.hotplug = netback_hotplug,
+	.otherend_changed = frontend_changed,
 };
+
 
 void netif_xenbus_init(void)
 {
 	xenbus_register_backend(&netback);
 }
+
 
 /*
  * Local variables:

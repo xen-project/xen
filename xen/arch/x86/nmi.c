@@ -49,8 +49,6 @@ static unsigned int nmi_timer_ticks[NR_CPUS];
 #define P6_EVENT_CPU_CLOCKS_NOT_HALTED	0x79
 #define P6_NMI_EVENT		P6_EVENT_CPU_CLOCKS_NOT_HALTED
 
-#define MSR_P4_PERFCTR0		0x300
-#define MSR_P4_CCCR0		0x360
 #define P4_ESCR_EVENT_SELECT(N)	((N)<<25)
 #define P4_CCCR_OVF_PMI0	(1<<26)
 #define P4_CCCR_OVF_PMI1	(1<<27)
@@ -61,13 +59,10 @@ static unsigned int nmi_timer_ticks[NR_CPUS];
 #define P4_CCCR_ESCR_SELECT(N)	((N)<<13)
 #define P4_CCCR_ENABLE		(1<<12)
 /* 
- * Set up IQ_COUNTER0 to behave like a clock, by having IQ_CCCR0 filter
+ * Set up IQ_PERFCTR0 to behave like a clock, by having IQ_CCCR0 filter
  * CRU_ESCR0 (with any non-null event selector) through a complemented
  * max threshold. [IA32-Vol3, Section 14.9.9] 
  */
-#define MSR_P4_IQ_COUNTER0	0x30C
-#define MSR_P4_IQ_CCCR0		0x36C
-#define MSR_P4_CRU_ESCR0	0x3B8 /* ESCR no. 4 */
 #define P4_NMI_CRU_ESCR0	P4_ESCR_EVENT_SELECT(0x3F)
 #define P4_NMI_IQ_CCCR0	\
     (P4_CCCR_OVF_PMI0|P4_CCCR_THRESHOLD(15)|P4_CCCR_COMPLEMENT| \
@@ -183,7 +178,7 @@ static int __pminit setup_p4_watchdog(void)
     if (!(misc_enable & MSR_IA32_MISC_ENABLE_PERF_AVAIL))
         return 0;
 
-    nmi_perfctr_msr = MSR_P4_IQ_COUNTER0;
+    nmi_perfctr_msr = MSR_P4_IQ_PERFCTR0;
     nmi_p4_cccr_val = P4_NMI_IQ_CCCR0;
     if ( smp_num_siblings == 2 )
         nmi_p4_cccr_val |= P4_CCCR_OVF_PMI1;
@@ -196,13 +191,13 @@ static int __pminit setup_p4_watchdog(void)
     clear_msr_range(0x3C0, 6);
     clear_msr_range(0x3C8, 6);
     clear_msr_range(0x3E0, 2);
-    clear_msr_range(MSR_P4_CCCR0, 18);
-    clear_msr_range(MSR_P4_PERFCTR0, 18);
+    clear_msr_range(MSR_P4_BPU_CCCR0, 18);
+    clear_msr_range(MSR_P4_BPU_PERFCTR0, 18);
         
     wrmsr(MSR_P4_CRU_ESCR0, P4_NMI_CRU_ESCR0, 0);
     wrmsr(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0 & ~P4_CCCR_ENABLE, 0);
-    Dprintk("setting P4_IQ_COUNTER0 to 0x%08lx\n", -(cpu_khz/nmi_hz*1000));
-    wrmsr(MSR_P4_IQ_COUNTER0, -(cpu_khz/nmi_hz*1000), -1);
+    Dprintk("setting P4_IQ_PERFCTR0 to 0x%08lx\n", -(cpu_khz/nmi_hz*1000));
+    wrmsr(MSR_P4_IQ_PERFCTR0, -(cpu_khz/nmi_hz*1000), -1);
     apic_write(APIC_LVTPC, APIC_DM_NMI);
     wrmsr(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val, 0);
 
@@ -314,7 +309,7 @@ void nmi_watchdog_tick(struct cpu_user_regs * regs)
 
     if ( nmi_perfctr_msr )
     {
-        if ( nmi_perfctr_msr == MSR_P4_IQ_COUNTER0 )
+        if ( nmi_perfctr_msr == MSR_P4_IQ_PERFCTR0 )
         {
             /*
              * P4 quirks:

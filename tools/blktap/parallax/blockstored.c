@@ -232,7 +232,7 @@ uint64_t allocblock(void *block) {
  *
  *   @return: pointer to new block, NULL on error
  */
-void *newblock() {
+void *newblock(void) {
     void *block = malloc(BLOCK_SIZE);
     if (block == NULL) {
         perror("newblock");
@@ -249,7 +249,6 @@ void *newblock() {
  *   @block: block to be freed
  */
 void freeblock(void *block) {
-    if (block != NULL)
         free(block);
 }
 

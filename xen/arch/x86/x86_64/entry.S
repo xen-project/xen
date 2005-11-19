@@ -352,8 +352,6 @@ create_bounce_frame:
 FLT2:   movq  %rax,32(%rsi)             # SS
         movq  UREGS_rsp+8(%rsp),%rax
 FLT3:   movq  %rax,24(%rsi)             # RSP
-        movq  UREGS_eflags+8(%rsp),%rax
-FLT4:   movq  %rax,16(%rsi)             # RFLAGS
         movq  VCPU_vcpu_info(%rbx),%rax
         pushq VCPUINFO_upcall_mask(%rax)
         testb $TBF_INTERRUPT,%cl
@@ -362,7 +360,15 @@ FLT4:   movq  %rax,16(%rsi)             # RFLAGS
         popq  %rax
         shlq  $32,%rax                  # Bits 32-39: saved_upcall_mask
         movw  UREGS_cs+8(%rsp),%ax      # Bits  0-15: CS
-FLT5:   movq  %rax,8(%rsi)              # CS/saved_upcall_mask
+FLT4:   movq  %rax,8(%rsi)              # CS / saved_upcall_mask
+        shrq  $32,%rax
+        testb $0xFF,%al                 # Bits 0-7: saved_upcall_mask
+        setz  %ch                       # %ch == !saved_upcall_mask
+        movq  UREGS_eflags+8(%rsp),%rax
+        andq  $~X86_EFLAGS_IF,%rax
+        shlb  $1,%ch                    # Bit 9 (EFLAGS.IF)
+        orb   %ch,%ah                   # Fold EFLAGS.IF into %eax
+FLT5:   movq  %rax,16(%rsi)             # RFLAGS
         movq  UREGS_rip+8(%rsp),%rax
 FLT6:   movq  %rax,(%rsi)               # RIP
         testb $TBF_EXCEPTION_ERRCODE,%cl
@@ -370,27 +376,22 @@ FLT6:   movq  %rax,(%rsi)               # RIP
         subq  $8,%rsi
         movl  TRAPBOUNCE_error_code(%rdx),%eax
 FLT7:   movq  %rax,(%rsi)               # ERROR CODE
-        testb $TBF_EXCEPTION_CR2,%cl
-        jz    2f
-        subq  $8,%rsi
-        movq  TRAPBOUNCE_cr2(%rdx),%rax
-FLT8:   movq  %rax,(%rsi)               # CR2
 1:      testb $TBF_FAILSAFE,%cl
         jz    2f
         subq  $32,%rsi
         movl  %gs,%eax
-FLT9:   movq  %rax,24(%rsi)             # GS
+FLT8:   movq  %rax,24(%rsi)             # GS
         movl  %fs,%eax
-FLT10:  movq  %rax,16(%rsi)             # FS
+FLT9:   movq  %rax,16(%rsi)             # FS
         movl  %es,%eax
-FLT11:  movq  %rax,8(%rsi)              # ES
+FLT10:  movq  %rax,8(%rsi)              # ES
         movl  %ds,%eax
-FLT12:  movq  %rax,(%rsi)               # DS
+FLT11:  movq  %rax,(%rsi)               # DS
 2:      subq  $16,%rsi
         movq  UREGS_r11+8(%rsp),%rax
-FLT13:  movq  %rax,8(%rsi)              # R11
+FLT12:  movq  %rax,8(%rsi)              # R11
         movq  UREGS_rcx+8(%rsp),%rax
-FLT14:  movq  %rax,(%rsi)               # RCX
+FLT13:  movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         movl  $TRAP_syscall,UREGS_entry_vector+8(%rsp)
@@ -411,7 +412,6 @@ FLT14:  movq  %rax,(%rsi)               # RCX
         .quad  FLT8,domain_crash_synchronous ,  FLT9,domain_crash_synchronous
         .quad FLT10,domain_crash_synchronous , FLT11,domain_crash_synchronous
         .quad FLT12,domain_crash_synchronous , FLT13,domain_crash_synchronous
-        .quad FLT14,domain_crash_synchronous
 .previous
 
         ALIGN

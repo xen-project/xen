@@ -32,11 +32,6 @@
 #include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/xen_proc.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define pud_t pgd_t
-#define pud_offset(d, va) d
-#endif
-
 static struct proc_dir_entry *privcmd_intf;
 
 static int privcmd_ioctl(struct inode *inode, struct file *file,
@@ -152,7 +147,8 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		privcmd_mmapbatch_t m;
 		struct vm_area_struct *vma = NULL;
 		unsigned long *p, addr;
-		unsigned long mfn, ptep;
+		unsigned long mfn; 
+		uint64_t ptep;
 		int i;
 
 		if (copy_from_user(&m, (void *)data, sizeof(m))) {
@@ -217,15 +213,38 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 #endif
 
 #ifndef __ia64__
-	case IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN: {
-		unsigned long m2pv = (unsigned long)machine_to_phys_mapping;
-		pgd_t *pgd = pgd_offset_k(m2pv);
-		pud_t *pud = pud_offset(pgd, m2pv);
-		pmd_t *pmd = pmd_offset(pud, m2pv);
-		unsigned long m2p_start_mfn =
-			(*(unsigned long *)pmd) >> PAGE_SHIFT; 
-		ret = put_user(m2p_start_mfn, (unsigned long *)data) ?
-			-EFAULT: 0;
+	case IOCTL_PRIVCMD_GET_MACH2PHYS_MFNS: {
+		pgd_t *pgd; 
+		pud_t *pud; 
+		pmd_t *pmd; 
+		unsigned long m2pv, m2p_mfn; 	
+		privcmd_m2pmfns_t m; 
+		unsigned long *p; 
+		int i; 
+
+		if (copy_from_user(&m, (void *)data, sizeof(m)))
+			return -EFAULT;
+
+		m2pv = (unsigned long)machine_to_phys_mapping;
+
+		p = m.arr; 
+
+		for (i=0; i < m.num; i++) { 
+			pgd = pgd_offset_k(m2pv);
+			pud = pud_offset(pgd, m2pv);
+			pmd = pmd_offset(pud, m2pv);
+			m2p_mfn  = (*(uint64_t *)pmd >> PAGE_SHIFT)&0xFFFFFFFF;
+			m2p_mfn += pte_index(m2pv);
+
+			if (put_user(m2p_mfn, p + i))
+				return -EFAULT;
+
+			m2pv += (1 << 21); 
+		}
+
+		ret = 0; 
+		break; 
+
 	}
 	break;
 #endif

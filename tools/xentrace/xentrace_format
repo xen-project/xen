@@ -85,7 +85,9 @@ defs = read_defs(arg[0])
 
 # structure of trace record + prepended CPU id (as output by xentrace):
 # CPU(I) TSC(Q) EVENT(L) D1(L) D2(L) D3(L) D4(L) D5(L)
-TRCREC = "IQLLLLLL"
+# read CPU id separately to avoid structure packing problems on 64-bit arch.
+CPUREC = "I"
+TRCREC = "QLLLLLL"
 
 last_tsc = [0,0,0,0,0,0,0,0]
 
@@ -94,11 +96,16 @@ i=0
 while not interrupted:
     try:
 	i=i+1
+        line = sys.stdin.read(struct.calcsize(CPUREC))
+        if not line:
+            break
+        cpu = struct.unpack(CPUREC, line)[0]
+
         line = sys.stdin.read(struct.calcsize(TRCREC))
         if not line:
             break
 
-        (cpu, tsc, event, d1, d2, d3, d4, d5) = struct.unpack(TRCREC, line)
+        (tsc, event, d1, d2, d3, d4, d5) = struct.unpack(TRCREC, line)
 
 	#tsc = (tscH<<32) | tscL
 

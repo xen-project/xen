@@ -153,8 +153,6 @@ typedef struct mfn_mapper {
     
 } mfn_mapper_t;
 
-unsigned long xc_get_m2p_start_mfn (int xc_handle);
-
 int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
                             unsigned long dst_pfn, void *src_page);
 

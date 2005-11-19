@@ -91,7 +91,6 @@ static void balloon_process(void *unused);
 static DECLARE_WORK(balloon_worker, balloon_process, NULL);
 static struct timer_list balloon_timer;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 /* Use the private and mapping fields of struct page as a list. */
 #define PAGE_TO_LIST(p) ((struct list_head *)&p->private)
 #define LIST_TO_PAGE(l)				\
@@ -102,19 +101,6 @@ static struct timer_list balloon_timer;
 		p->mapping = NULL;		\
 		p->private = 0;			\
 	} while(0)
-#else
-/* There's a dedicated list field in struct page we can use.    */
-#define PAGE_TO_LIST(p) ( &p->list )
-#define LIST_TO_PAGE(l) ( list_entry(l, struct page, list) )
-#define UNLIST_PAGE(p)  ( list_del(&p->list) )
-#define pte_offset_kernel pte_offset
-#define pud_t pgd_t
-#define pud_offset(d, va) d
-#define pud_none(d) 0
-#define pud_bad(d) 0
-#define subsys_initcall(_fn) __initcall(_fn)
-#define pfn_to_page(_pfn) (mem_map + (_pfn))
-#endif
 
 #define IPRINTK(fmt, args...) \
 	printk(KERN_INFO "xen_mem: " fmt, ##args)
@@ -210,7 +196,7 @@ static int increase_reservation(unsigned long nr_pages)
 		BUG_ON(phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY);
 
 		/* Update P->M and M->P tables. */
-		phys_to_machine_mapping[pfn] = mfn_list[i];
+		set_phys_to_machine(pfn, mfn_list[i]);
 		xen_machphys_update(mfn_list[i], pfn);
             
 		/* Link back into the page tables if not highmem. */
@@ -295,7 +281,7 @@ static int decrease_reservation(unsigned long nr_pages)
 	/* No more mappings: invalidate P2M and add to balloon. */
 	for (i = 0; i < nr_pages; i++) {
 		pfn = mfn_to_pfn(mfn_list[i]);
-		phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
+		set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
 		balloon_append(pfn_to_page(pfn));
 	}
 
@@ -381,9 +367,9 @@ static void watch_target(struct xenbus_watch *watch,
     
 }
 
-int balloon_init_watcher(struct notifier_block *notifier,
-                         unsigned long event,
-                         void *data)
+static int balloon_init_watcher(struct notifier_block *notifier,
+                                unsigned long event,
+                                void *data)
 {
 	int err;
 
@@ -515,8 +501,7 @@ static int dealloc_pte_fn(
 		.domid        = DOMID_SELF
 	};
 	set_pte_at(&init_mm, addr, pte, __pte_ma(0));
-	phys_to_machine_mapping[__pa(addr) >> PAGE_SHIFT] =
-		INVALID_P2M_ENTRY;
+	set_phys_to_machine(__pa(addr) >> PAGE_SHIFT, INVALID_P2M_ENTRY);
 	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
 	BUG_ON(ret != 1);
 	return 0;

@@ -154,7 +154,7 @@ typedef struct cpu_user_regs {
     uint16_t cs, _pad0[1];
     uint8_t  saved_upcall_mask;
     uint8_t  _pad1[3];
-    __DECL_REG(flags);
+    __DECL_REG(flags);      /* rflags.IF == !saved_upcall_mask */
     __DECL_REG(sp);
     uint16_t ss, _pad2[3];
     uint16_t es, _pad3[3];
@@ -200,6 +200,11 @@ typedef struct arch_shared_info {
     /* Frame containing list of mfns containing list of mfns containing p2m. */
     unsigned long pfn_to_mfn_frame_list_list; 
 } arch_shared_info_t;
+
+typedef struct {
+    unsigned long cr2;
+    unsigned long pad; /* sizeof(vcpu_info_t) == 32 */
+} arch_vcpu_info_t;
 
 #endif /* !__ASSEMBLY__ */
 

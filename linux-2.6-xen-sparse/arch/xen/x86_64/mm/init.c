@@ -55,11 +55,9 @@ extern char _stext[];
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 extern unsigned long start_pfn;
 
-static int init_mapping_done;
-
 /*
  * Use this until direct mapping is established, i.e. before __va() is 
- * avaialble in init_memory_mapping().
+ * available in init_memory_mapping().
  */
 
 #define addr_to_page(addr, page)				\
@@ -68,91 +66,65 @@ static int init_mapping_done;
 	(((mfn_to_pfn((addr) >> PAGE_SHIFT)) << PAGE_SHIFT) +	\
 	__START_KERNEL_map)))
 
-static void __make_page_readonly(unsigned long va)
+static void early_make_page_readonly(void *va)
 {
-	unsigned long addr;
+	unsigned long addr, _va = (unsigned long)va;
 	pte_t pte, *ptep;
 	unsigned long *page = (unsigned long *) init_level4_pgt;
 
-	addr = (unsigned long) page[pgd_index(va)];
+	addr = (unsigned long) page[pgd_index(_va)];
 	addr_to_page(addr, page);
 
-	addr = page[pud_index(va)];
+	addr = page[pud_index(_va)];
 	addr_to_page(addr, page);
 
-	addr = page[pmd_index(va)];
+	addr = page[pmd_index(_va)];
 	addr_to_page(addr, page);
 
-	ptep = (pte_t *) &page[pte_index(va)];
-	pte.pte = (ptep->pte & ~_PAGE_RW);
-	xen_l1_entry_update(ptep, pte);
-	__flush_tlb_one(addr);
+	ptep = (pte_t *) &page[pte_index(_va)];
+
+	pte.pte = ptep->pte & ~_PAGE_RW;
+	if (HYPERVISOR_update_va_mapping(_va, pte, 0))
+		BUG();
 }
 
-static void __make_page_writable(unsigned long va)
-{
-	unsigned long addr;
-	pte_t pte, *ptep;
-	unsigned long *page = (unsigned long *) init_level4_pgt;
-
-	addr = (unsigned long) page[pgd_index(va)];
-	addr_to_page(addr, page);
-
-	addr = page[pud_index(va)];
-	addr_to_page(addr, page);
- 
-	addr = page[pmd_index(va)];
-	addr_to_page(addr, page);
-
-	ptep = (pte_t *) &page[pte_index(va)];
-	pte.pte = (ptep->pte | _PAGE_RW);
-	xen_l1_entry_update(ptep, pte);
-	__flush_tlb_one(addr);
-}
-
-
-/*
- * Assume the translation is already established.
- */
 void make_page_readonly(void *va)
 {
-	pgd_t* pgd; pud_t *pud; pmd_t* pmd; pte_t pte, *ptep;
+	pgd_t *pgd; pud_t *pud; pmd_t *pmd; pte_t pte, *ptep;
 	unsigned long addr = (unsigned long) va;
 
-	if (!init_mapping_done) {
-		__make_page_readonly(addr);
-		return;
-	}
-  
 	pgd = pgd_offset_k(addr);
 	pud = pud_offset(pgd, addr);
 	pmd = pmd_offset(pud, addr);
 	ptep = pte_offset_kernel(pmd, addr);
-	pte.pte = (ptep->pte & ~_PAGE_RW);
-	xen_l1_entry_update(ptep, pte);
-	__flush_tlb_one(addr);
+
+	pte.pte = ptep->pte & ~_PAGE_RW;
+	if (HYPERVISOR_update_va_mapping(addr, pte, 0))
+		xen_l1_entry_update(ptep, pte); /* fallback */
+
+	if ((addr >= VMALLOC_START) && (addr < VMALLOC_END))
+		make_page_readonly(__va(pte_pfn(pte) << PAGE_SHIFT));
 }
 
 void make_page_writable(void *va)
 {
-	pgd_t* pgd; pud_t *pud; pmd_t* pmd; pte_t pte, *ptep;
+	pgd_t *pgd; pud_t *pud; pmd_t *pmd; pte_t pte, *ptep;
 	unsigned long addr = (unsigned long) va;
-
-	if (!init_mapping_done) {
-		__make_page_writable(addr);
-		return;
-	}
 
 	pgd = pgd_offset_k(addr);
 	pud = pud_offset(pgd, addr);
 	pmd = pmd_offset(pud, addr);
 	ptep = pte_offset_kernel(pmd, addr);
-	pte.pte = (ptep->pte | _PAGE_RW);
-	xen_l1_entry_update(ptep, pte);
-	__flush_tlb_one(addr);
+
+	pte.pte = ptep->pte | _PAGE_RW;
+	if (HYPERVISOR_update_va_mapping(addr, pte, 0))
+		xen_l1_entry_update(ptep, pte); /* fallback */
+
+	if ((addr >= VMALLOC_START) && (addr < VMALLOC_END))
+		make_page_writable(__va(pte_pfn(pte) << PAGE_SHIFT));
 }
 
-void make_pages_readonly(void* va, unsigned nr)
+void make_pages_readonly(void *va, unsigned nr)
 {
 	while (nr-- != 0) {
 		make_page_readonly(va);
@@ -160,7 +132,7 @@ void make_pages_readonly(void* va, unsigned nr)
 	}
 }
 
-void make_pages_writable(void* va, unsigned nr)
+void make_pages_writable(void *va, unsigned nr)
 {
 	while (nr-- != 0) {
 		make_page_writable(va);
@@ -457,7 +429,7 @@ static void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned lon
 		} 
 
 		pmd = alloc_static_page(&pmd_phys);
-                make_page_readonly(pmd);
+                early_make_page_readonly(pmd);
                 xen_pmd_pin(pmd_phys);
 		set_pud(pud, __pud(pmd_phys | _KERNPG_TABLE));
 
@@ -487,7 +459,7 @@ static void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned lon
                                 __set_pte(pte, __pte(paddr | _KERNPG_TABLE));
                         }
                         pte = pte_save;
-                        make_page_readonly(pte);  
+                        early_make_page_readonly(pte);  
                         xen_pte_pin(pte_phys);
 			set_pmd(pmd, __pmd(pte_phys | _KERNPG_TABLE));
 		}
@@ -536,11 +508,11 @@ void __init xen_init_pt(void)
 		      _KERNPG_TABLE | _PAGE_USER);
         memcpy((void *)level2_kernel_pgt, page, PAGE_SIZE);
 
-	make_page_readonly(init_level4_pgt);
-	make_page_readonly(init_level4_user_pgt);
-	make_page_readonly(level3_kernel_pgt);
-	make_page_readonly(level3_user_pgt);
-	make_page_readonly(level2_kernel_pgt);
+	early_make_page_readonly(init_level4_pgt);
+	early_make_page_readonly(init_level4_user_pgt);
+	early_make_page_readonly(level3_kernel_pgt);
+	early_make_page_readonly(level3_user_pgt);
+	early_make_page_readonly(level2_kernel_pgt);
 
 	xen_pgd_pin(__pa_symbol(init_level4_pgt));
 	xen_pgd_pin(__pa_symbol(init_level4_user_pgt));
@@ -578,7 +550,7 @@ void __init extend_init_mapping(void)
 		pmd = (pmd_t *)&page[pmd_index(va)];
 		if (pmd_none(*pmd)) {
 			pte_page = alloc_static_page(&phys);
-			make_page_readonly(pte_page);
+			early_make_page_readonly(pte_page);
 			xen_pte_pin(phys);
 			set_pmd(pmd, __pmd(phys | _KERNPG_TABLE | _PAGE_USER));
 		} else {
@@ -625,7 +597,7 @@ void __init init_memory_mapping(unsigned long start, unsigned long end)
 	for (; start < end; start = next) {
 		unsigned long pud_phys; 
 		pud_t *pud = alloc_static_page(&pud_phys);
-		make_page_readonly(pud);
+		early_make_page_readonly(pud);
 		xen_pud_pin(pud_phys);
 		next = start + PGDIR_SIZE;
 		if (next > end) 
@@ -640,7 +612,6 @@ void __init init_memory_mapping(unsigned long start, unsigned long end)
 	BUG_ON(start_pfn != (table_start + (tables_space >> PAGE_SHIFT)));
 
 	__flush_tlb_all();
-	init_mapping_done = 1;
 }
 
 extern struct x8664_pda cpu_pda[NR_CPUS];

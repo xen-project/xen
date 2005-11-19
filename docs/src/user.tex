@@ -9,7 +9,6 @@
 \latexhtml{\newcommand{\path}[1]{{\small {\tt #1}}}}{\newcommand{\path}[1]{{\tt #1}}}
 
 
-
 \begin{document}
 
 % TITLE PAGE
@@ -21,23 +20,23 @@
 \vfill
 \vfill
 \begin{tabular}{l}
-{\Huge \bf Users' manual} \\[4mm]
-{\huge Xen v2.0 for x86} \\[80mm]
+{\Huge \bf Users' Manual} \\[4mm]
+{\huge Xen v3.0} \\[80mm]
 
-{\Large Xen is Copyright (c) 2002-2004, The Xen Team} \\[3mm]
+{\Large Xen is Copyright (c) 2002-2005, The Xen Team} \\[3mm]
 {\Large University of Cambridge, UK} \\[20mm]
 \end{tabular}
 \end{center}
 
-{\bf
-DISCLAIMER: This documentation is currently under active development
-and as such there may be mistakes and omissions --- watch out for
-these and please report any you find to the developer's mailing list.
-Contributions of material, suggestions and corrections are welcome.
-}
+{\bf DISCLAIMER: This documentation is currently under active
+  development and as such there may be mistakes and omissions ---
+  watch out for these and please report any you find to the
+  developers' mailing list.  Contributions of material, suggestions
+  and corrections are welcome.}
 
 \vfill
 \cleardoublepage
+
 
 % TABLE OF CONTENTS
 \pagestyle{plain}
@@ -45,6 +44,7 @@ Contributions of material, suggestions and corrections are welcome.
 { \parskip 0pt plus 1pt
   \tableofcontents }
 \cleardoublepage
+
 
 % PREPARE FOR MAIN TEXT
 \pagenumbering{arabic}
@@ -68,7 +68,7 @@ Contributions of material, suggestions and corrections are welcome.
 %% Chapter Installation moved to installation.tex
 \include{src/user/installation}
 
-%% Chapter Starting Additional Domains  moved to start_addl_dom.tex
+%% Chapter Starting Additional Domains moved to start_addl_dom.tex
 \include{src/user/start_addl_dom}
 
 %% Chapter Domain Management Tools moved to domain_mgmt.tex
@@ -87,6 +87,9 @@ Contributions of material, suggestions and corrections are welcome.
 %% Chapter Domain Configuration moved to domain_configuration.tex
 \include{src/user/domain_configuration}
 
+%% Chapter Securing Xen
+\include{src/user/securing_xen}
+
 %% Chapter Build, Boot and Debug Options moved to build.tex
 \include{src/user/build}
 
@@ -99,25 +102,25 @@ that bug reports, suggestions and contributions related to the
 software (or the documentation) should be sent to the Xen developers'
 mailing list (address below).
 
+
 \section{Other Documentation}
 
 For developers interested in porting operating systems to Xen, the
-{\em Xen Interface Manual} is distributed in the \path{docs/}
-directory of the Xen source distribution.  
+\emph{Xen Interface Manual} is distributed in the \path{docs/}
+directory of the Xen source distribution.
 
-%Various HOWTOs are available in \path{docs/HOWTOS} but this content is
-%being integrated into this manual.
+% Various HOWTOs are available in \path{docs/HOWTOS} but this content
+% is being integrated into this manual.
 
 
 \section{Online References}
 
 The official Xen web site is found at:
-\begin{quote}
-{\tt http://www.cl.cam.ac.uk/netos/xen/}
+\begin{quote} {\tt http://www.cl.cam.ac.uk/netos/xen/}
 \end{quote}
 
-This contains links to the latest versions of all on-line 
-documentation (including the lateset version of the FAQ). 
+This contains links to the latest versions of all online
+documentation, including the latest version of the FAQ.
 
 
 \section{Mailing Lists}
@@ -126,17 +129,17 @@ There are currently four official Xen mailing lists:
 
 \begin{description}
 \item[xen-devel@lists.xensource.com] Used for development
-discussions and bug reports.  Subscribe at: \\
-{\small {\tt http://lists.xensource.com/xen-devel}}
+  discussions and bug reports.  Subscribe at: \\
+  {\small {\tt http://lists.xensource.com/xen-devel}}
 \item[xen-users@lists.xensource.com] Used for installation and usage
-discussions and requests for help.  Subscribe at: \\
-{\small {\tt http://lists.xensource.com/xen-users}}
+  discussions and requests for help.  Subscribe at: \\
+  {\small {\tt http://lists.xensource.com/xen-users}}
 \item[xen-announce@lists.xensource.com] Used for announcements only.
-Subscribe at: \\
-{\small {\tt http://lists.xensource.com/xen-announce}}
-\item[xen-changelog@lists.xensource.com]  Changelog feed
-from the unstable and 2.0 trees - developer oriented.  Subscribe at: \\
-{\small {\tt http://lists.xensource.com/xen-changelog}}
+  Subscribe at: \\
+  {\small {\tt http://lists.xensource.com/xen-announce}}
+\item[xen-changelog@lists.xensource.com] Changelog feed
+  from the unstable and 2.0 trees - developer oriented.  Subscribe at: \\
+  {\small {\tt http://lists.xensource.com/xen-changelog}}
 \end{description}
 
 
@@ -149,9 +152,9 @@ from the unstable and 2.0 trees - developer oriented.  Subscribe at: \\
 %% Chapter Installing Xen on Red Hat moved to redhat.tex
 \include{src/user/redhat}
 
-
 %% Chapter Glossary of Terms moved to glossary.tex
 \include{src/user/glossary}
+
 
 
 \end{document}
@@ -181,36 +184,35 @@ from the unstable and 2.0 trees - developer oriented.  Subscribe at: \\
 %% # import xenctl.utils
 %% # help(xenctl.utils)
 
-%% You can use these modules to write your own custom scripts or you can
-%% customise the scripts supplied in the Xen distribution.
+%% You can use these modules to write your own custom scripts or you
+%% can customise the scripts supplied in the Xen distribution.
 
 
 
 % Explain about AGP GART
 
 
-%% If you're not intending to configure the new domain with an IP address
-%% on your LAN, then you'll probably want to use NAT. The
-%% 'xen_nat_enable' installs a few useful iptables rules into domain0 to
-%% enable NAT. [NB: We plan to support RSIP in future]
-
+%% If you're not intending to configure the new domain with an IP
+%% address on your LAN, then you'll probably want to use NAT. The
+%% 'xen_nat_enable' installs a few useful iptables rules into domain0
+%% to enable NAT. [NB: We plan to support RSIP in future]
 
 
 
 %% Installing the file systems from the CD
 %% =======================================
 
-%% If you haven't got an existing Linux installation onto which you can
-%% just drop down the Xen and Xenlinux images, then the file systems on
-%% the CD provide a quick way of doing an install. However, you would be
-%% better off in the long run doing a proper install of your preferred
-%% distro and installing Xen onto that, rather than just doing the hack
-%% described below:
+%% If you haven't got an existing Linux installation onto which you
+%% can just drop down the Xen and Xenlinux images, then the file
+%% systems on the CD provide a quick way of doing an install. However,
+%% you would be better off in the long run doing a proper install of
+%% your preferred distro and installing Xen onto that, rather than
+%% just doing the hack described below:
 
-%% Choose one or two partitions, depending on whether you want a separate
-%% /usr or not. Make file systems on it/them e.g.: 
-%%   mkfs -t ext3 /dev/hda3
-%%   [or mkfs -t ext2 /dev/hda3 && tune2fs -j /dev/hda3 if using an old
+%% Choose one or two partitions, depending on whether you want a
+%% separate /usr or not. Make file systems on it/them e.g.:
+%% mkfs -t ext3 /dev/hda3
+%% [or mkfs -t ext2 /dev/hda3 && tune2fs -j /dev/hda3 if using an old
 %% version of mkfs]
 
 %% Next, mount the file system(s) e.g.:
@@ -224,12 +226,14 @@ from the unstable and 2.0 trees - developer oriented.  Subscribe at: \\
 %% configuration. Changing the password file (etc/shadow) is probably a
 %% good idea too.
 
-%% To install the usr file system, copy the file system from CD on /usr,
-%% though leaving out the "XenDemoCD" and "boot" directories:
-%%   cd /usr && cp -a X11R6 etc java libexec root src bin dict kerberos local sbin tmp doc include lib man share /mnt/usr
+%% To install the usr file system, copy the file system from CD on
+%% /usr, though leaving out the "XenDemoCD" and "boot" directories:
+%%   cd /usr && cp -a X11R6 etc java libexec root src bin dict kerberos
+%%    local sbin tmp doc include lib man share /mnt/usr
 
 %% If you intend to boot off these file systems (i.e. use them for
-%% domain 0), then you probably want to copy the /usr/boot directory on
-%% the cd over the top of the current symlink to /boot on your root
-%% filesystem (after deleting the current symlink) i.e.:
+%% domain 0), then you probably want to copy the /usr/boot
+%% directory on the cd over the top of the current symlink to /boot
+%% on your root filesystem (after deleting the current symlink)
+%% i.e.:
 %%   cd /mnt/root ; rm boot ; cp -a /usr/boot .

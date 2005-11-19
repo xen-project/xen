@@ -738,7 +738,7 @@ static int create_pae_xen_mappings(l3_pgentry_t *pl3e)
     memcpy(&pl2e[L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)],
            &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
            L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
-    for ( i = 0; i < (PERDOMAIN_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
+    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
         pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
             l2e_from_page(
                 virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt) + i,
@@ -898,6 +898,7 @@ static int alloc_l3_table(struct pfn_info *page, unsigned long type)
     return 1;
 
  fail:
+    MEM_LOG("Failure in alloc_l3_table: entry %d", i);
     while ( i-- > 0 )
         if ( is_guest_l3_slot(i) )
             put_page_from_l3e(pl3e[i], pfn);
@@ -948,6 +949,7 @@ static int alloc_l4_table(struct pfn_info *page, unsigned long type)
     return 1;
 
  fail:
+    MEM_LOG("Failure in alloc_l4_table: entry %d", i);
     while ( i-- > 0 )
         if ( is_guest_l4_slot(i) )
             put_page_from_l4e(pl4e[i], pfn);
@@ -1461,6 +1463,22 @@ int get_page_type(struct pfn_info *page, unsigned long type)
             {
                 if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
                 {
+                    if ( current->domain == page_get_owner(page) )
+                    {
+                        /*
+                         * This ensures functions like set_gdt() see up-to-date
+                         * type info without needing to clean up writable p.t.
+                         * state on the fast path.
+                         */
+                        LOCK_BIGLOCK(current->domain);
+                        cleanup_writable_pagetable(current->domain);
+                        y = page->u.inuse.type_info;
+                        UNLOCK_BIGLOCK(current->domain);
+                        /* Can we make progress now? */
+                        if ( ((y & PGT_type_mask) == (type & PGT_type_mask)) ||
+                             ((y & PGT_count_mask) == 0) )
+                            goto again;
+                    }
                     if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
                          ((type & PGT_type_mask) != PGT_l1_page_table) )
                         MEM_LOG("Bad type (saw %" PRtype_info
@@ -2529,7 +2547,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
              * not enough information in just a gpte to figure out how to
              * (re-)shadow this entry.
              */
-            domain_crash();
+            domain_crash(d);
         }
     
         rc = shadow_do_update_va_mapping(va, val, v);
@@ -2918,7 +2936,6 @@ int revalidate_l1(
 {
     l1_pgentry_t ol1e, nl1e;
     int modified = 0, i;
-    struct vcpu *v;
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
@@ -2944,7 +2961,6 @@ int revalidate_l1(
 
         if ( unlikely(!get_page_from_l1e(nl1e, d)) )
         {
-            MEM_LOG("ptwr: Could not re-validate l1 page");
             /*
              * Make the remaining p.t's consistent before crashing, so the
              * reference counts are correct.
@@ -2953,9 +2969,8 @@ int revalidate_l1(
                    (L1_PAGETABLE_ENTRIES - i) * sizeof(l1_pgentry_t));
 
             /* Crash the offending domain. */
-            set_bit(_DOMF_ctrl_pause, &d->domain_flags);
-            for_each_vcpu ( d, v )
-                vcpu_sleep_nosync(v);
+            MEM_LOG("ptwr: Could not revalidate l1 page");
+            domain_crash(d);
             break;
         }
         
@@ -3066,7 +3081,7 @@ static int ptwr_emulated_update(
     unsigned int bytes,
     unsigned int do_cmpxchg)
 {
-    unsigned long pfn;
+    unsigned long pfn, l1va;
     struct pfn_info *page;
     l1_pgentry_t pte, ol1e, nl1e, *pl1e;
     struct domain *d = current->domain;
@@ -3103,6 +3118,17 @@ static int ptwr_emulated_update(
         old  |= full;
     }
 
+    /*
+     * We must not emulate an update to a PTE that is temporarily marked
+     * writable by the batched ptwr logic, else we can corrupt page refcnts! 
+     */
+    if ( ((l1va = d->arch.ptwr[PTWR_PT_ACTIVE].l1va) != 0) &&
+         (l1_linear_offset(l1va) == l1_linear_offset(addr)) )
+        ptwr_flush(d, PTWR_PT_ACTIVE);
+    if ( ((l1va = d->arch.ptwr[PTWR_PT_INACTIVE].l1va) != 0) &&
+         (l1_linear_offset(l1va) == l1_linear_offset(addr)) )
+        ptwr_flush(d, PTWR_PT_INACTIVE);
+
     /* Read the PTE that maps the page being updated. */
     if (__copy_from_user(&pte, &linear_pg_table[l1_linear_offset(addr)],
                          sizeof(pte)))
@@ -3128,7 +3154,10 @@ static int ptwr_emulated_update(
     /* Check the new PTE. */
     nl1e = l1e_from_intpte(val);
     if ( unlikely(!get_page_from_l1e(nl1e, d)) )
+    {
+        MEM_LOG("ptwr_emulate: could not get_page_from_l1e()");
         return X86EMUL_UNHANDLEABLE;
+    }
 
     /* Checked successfully: do the update (write or cmpxchg). */
     pl1e = map_domain_page(page_to_pfn(page));
@@ -3251,6 +3280,9 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
     goto emulate; 
 #endif
 
+    PTWR_PRINTK("ptwr_page_fault on l1 pt at va %lx, pfn %lx, eip %lx\n",
+                addr, pfn, (unsigned long)regs->eip);
+    
     /* Get the L2 index at which this L1 p.t. is always mapped. */
     l2_idx = page->u.inuse.type_info & PGT_va_mask;
     if ( unlikely(l2_idx >= PGT_va_unknown) )
@@ -3295,10 +3327,6 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
         goto emulate;
     }
 
-    PTWR_PRINTK("[%c] page_fault on l1 pt at va %lx, pt for %08lx, "
-                "pfn %lx\n", PTWR_PRINT_WHICH,
-                addr, l2_idx << L2_PAGETABLE_SHIFT, pfn);
-    
     /*
      * We only allow one ACTIVE and one INACTIVE p.t. to be updated at at 
      * time. If there is already one, we must flush it out.
@@ -3316,6 +3344,10 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
         d->arch.ptwr[which].prev_nr_updates = 1;
         goto emulate;
     }
+
+    PTWR_PRINTK("[%c] batched ptwr_page_fault at va %lx, pt for %08lx, "
+                "pfn %lx\n", PTWR_PRINT_WHICH, addr,
+                l2_idx << L2_PAGETABLE_SHIFT, pfn);
 
     d->arch.ptwr[which].l1va   = addr | 1;
     d->arch.ptwr[which].l2_idx = l2_idx;
@@ -3348,7 +3380,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr,
         /* Toss the writable pagetable state and crash. */
         unmap_domain_page(d->arch.ptwr[which].pl1e);
         d->arch.ptwr[which].l1va = 0;
-        domain_crash();
+        domain_crash(d);
         return 0;
     }
     
@@ -3369,10 +3401,8 @@ int ptwr_init(struct domain *d)
 
     if ( (x == NULL) || (y == NULL) )
     {
-        if ( x != NULL )
-            free_xenheap_page(x);
-        if ( y != NULL )
-            free_xenheap_page(y);
+        free_xenheap_page(x);
+        free_xenheap_page(y);
         return -ENOMEM;
     }
 

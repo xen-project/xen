@@ -436,9 +436,7 @@ static struct miscdevice evtchn_miscdev = {
 	.minor        = EVTCHN_MINOR,
 	.name         = "evtchn",
 	.fops         = &evtchn_fops,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	.devfs_name   = "misc/evtchn",
-#endif
 };
 
 static int __init evtchn_init(void)

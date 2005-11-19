@@ -22,11 +22,20 @@ dir=$(dirname "$0")
 
 findCommand "$@"
 
-if [ "$command" != "up" ] && [ "$command" != "down" ]
+if [ "$command" != "online" ]  &&
+   [ "$command" != "offline" ] &&
+   [ "$command" != "add" ]     &&
+   [ "$command" != "remove" ]
 then
   log err "Invalid command: $command"
   exit 1
 fi
+
+case "$command" in
+    add | remove)
+        exit 0
+        ;;
+esac
 
 
 # Parameters may be read from the environment, the command line arguments, and
@@ -46,14 +55,17 @@ vif="${vif:?}"
 
 function frob_iptable()
 {
-  if [ "$command" == "up" ]
+  if [ "$command" == "online" ]
   then
     local c="-A"
   else
     local c="-D"
   fi
 
-  iptables "$c" FORWARD -m physdev --physdev-in "$vif" "$@" -j ACCEPT
+  iptables "$c" FORWARD -m physdev --physdev-in "$vif" "$@" -j ACCEPT ||
+    log err \
+     "iptables $c FORWARD -m physdev --physdev-in $vif $@ -j ACCEPT failed.
+If you are using iptables, this may affect networking for guest domains."
 }
 
 
@@ -66,6 +78,15 @@ function frob_iptable()
 #
 function handle_iptable()
 {
+  # Check for a working iptables installation.  Checking for the iptables
+  # binary is not sufficient, because the user may not have the appropriate
+  # modules installed.  If iptables is not working, then there's no need to do
+  # anything with it, so we can just return.
+  if ! iptables -L >&/dev/null
+  then
+    return
+  fi
+
   if [ "$ip" != "" ]
   then
       local addr

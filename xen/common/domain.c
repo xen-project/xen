@@ -125,18 +125,27 @@ void domain_kill(struct domain *d)
 }
 
 
-void domain_crash(void)
+void domain_crash(struct domain *d)
 {
-    printk("Domain %d (vcpu#%d) crashed on cpu#%d:\n",
-           current->domain->domain_id, current->vcpu_id, smp_processor_id());
-    show_registers(guest_cpu_user_regs());
-    domain_shutdown(SHUTDOWN_crash);
+    if ( d == current->domain )
+    {
+        printk("Domain %d (vcpu#%d) crashed on cpu#%d:\n",
+               d->domain_id, current->vcpu_id, smp_processor_id());
+        show_registers(guest_cpu_user_regs());
+    }
+    else
+    {
+        printk("Domain %d reported crashed by domain %d on cpu#%d:\n",
+               d->domain_id, current->domain->domain_id, smp_processor_id());
+    }
+
+    domain_shutdown(d, SHUTDOWN_crash);
 }
 
 
 void domain_crash_synchronous(void)
 {
-    domain_crash();
+    domain_crash(current->domain);
     for ( ; ; )
         do_softirq();
 }
@@ -178,10 +187,9 @@ static __init int domain_shutdown_finaliser_init(void)
 __initcall(domain_shutdown_finaliser_init);
 
 
-void domain_shutdown(u8 reason)
+void domain_shutdown(struct domain *d, u8 reason)
 {
-    struct domain *d = current->domain;
-    struct vcpu   *v;
+    struct vcpu *v;
 
     if ( d->domain_id == 0 )
     {
@@ -417,7 +425,9 @@ long do_vcpu_op(int cmd, int vcpuid, void *arg)
         break;
 
     case VCPUOP_up:
-        if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
+        if ( !test_bit(_VCPUF_initialised, &v->vcpu_flags) )
+            rc = -EINVAL;
+        else if ( test_and_clear_bit(_VCPUF_down, &v->vcpu_flags) )
             vcpu_wake(v);
         break;
 

@@ -10,7 +10,7 @@ from xen.xend.xenstore.xsutil import xshandle
 
 class xstransact:
 
-    def __init__(self, path):
+    def __init__(self, path = ""):
         assert path is not None
         
         self.in_transaction = False # Set this temporarily -- if this
@@ -41,7 +41,7 @@ class xstransact:
         return rc
 
     def _read(self, key):
-        path = "%s/%s" % (self.path, key)
+        path = self.prependPath(key)
         try:
             return xshandle().read(self.transaction, path)
         except RuntimeError, ex:
@@ -66,7 +66,7 @@ class xstransact:
         return ret
 
     def _write(self, key, data):
-        path = "%s/%s" % (self.path, key)
+        path = self.prependPath(key)
         try:
             xshandle().write(self.transaction, path, data)
         except RuntimeError, ex:
@@ -99,7 +99,7 @@ class xstransact:
             raise TypeError
 
     def _remove(self, key):
-        path = "%s/%s" % (self.path, key)
+        path = self.prependPath(key)
         return xshandle().rm(self.transaction, path)
 
     def remove(self, *args):
@@ -114,7 +114,7 @@ class xstransact:
                 self._remove(key)
 
     def _list(self, key):
-        path = "%s/%s" % (self.path, key)
+        path = self.prependPath(key)
         l = xshandle().ls(self.transaction, path)
         if l:
             return map(lambda x: key + "/" + x, l)
@@ -177,18 +177,15 @@ class xstransact:
                 (key, fn, defval) = tup
 
             val = self._read(key)
-            # If fn is str, then this will successfully convert None to
-            # 'None'.  If it is int, then it will throw TypeError on None, or
-            # on any other non-integer value.  We have to, therefore, both
-            # check explicitly for None, and catch TypeError.  Either failure
-            # will result in defval being used instead.
+            # If fn is str, then this will successfully convert None to 'None'
+            # (which we don't want).  If it is int or float, then it will
+            # throw ValueError on any non-convertible value.  We check
+            # explicitly for None, using defval instead, but allow ValueError
+            # to propagate.
             if val is None:
                 val = defval
             else:
-                try:
-                    val = fn(val)
-                except TypeError:
-                    val = defval
+                val = fn(val)
             ret.append(val)
         if len(ret) == 1:
             return ret[0]
@@ -213,6 +210,30 @@ class xstransact:
                 self._remove(key)
             else:
                 self._write(key, fmt % val)
+
+
+    def remove2(self, middlePath, *args):
+        self.callRebased(middlePath, self.remove, *args)
+
+
+    def write2(self, middlePath, *args):
+        self.callRebased(middlePath, self.write, *args)
+
+
+    def callRebased(self, middlePath, func, *args):
+        oldpath = self.path
+        self.path = self.prependPath(middlePath)
+        try:
+            func(*args)
+        finally:
+            self.path = oldpath
+
+
+    def prependPath(self, key):
+        if self.path:
+            return self.path + '/' + key
+        else:
+            return key
 
 
     def Read(cls, path, *args):

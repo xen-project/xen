@@ -129,7 +129,7 @@ def restore(xd, fd):
         l = read_exact(fd, sizeof_unsigned_long,
                        "not a valid guest state file: pfn count read")
         nr_pfns = unpack("=L", l)[0]   # XXX endianess
-        if nr_pfns > 1024*1024:     # XXX
+        if nr_pfns > 16*1024*1024:     # XXX 
             raise XendError(
                 "not a valid guest state file: pfn count out of range")
 

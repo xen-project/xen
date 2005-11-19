@@ -393,8 +393,7 @@ TPM_RESULT VTPM_LoadService(void) {
   vtpmlogerror(VTPM_LOG_VTPM, "Failed to load service data with error = %s\n", tpm_get_error_name(status));
  egress:
   
-  if (flat_global)
-    free(flat_global);
+  free(flat_global);
   close(fh);
   
   return status;

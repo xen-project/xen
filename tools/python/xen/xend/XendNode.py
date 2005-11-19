@@ -75,7 +75,7 @@ class XendNode:
                 ['xen_minor', xinfo['xen_minor']],
                 ['xen_extra', xinfo['xen_extra']],
                 ['xen_caps',  xinfo['xen_caps']],
-                ['xen_params',xinfo['xen_params']],
+                ['platform_params',xinfo['platform_params']],
                 ['xen_changeset', xinfo['xen_changeset']],
                 ['cc_compiler', xinfo['cc_compiler']],
                 ['cc_compile_by', xinfo['cc_compile_by']],

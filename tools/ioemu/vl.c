@@ -76,6 +76,7 @@
 #endif /* CONFIG_SDL */
 
 #include "xenctrl.h"
+#include "xs.h"
 #include "exec-all.h"
 
 //#define DO_TB_FLUSH
@@ -123,6 +124,7 @@ int domid = -1;
 static char network_script[1024];
 int pit_min_timer_count = 0;
 int nb_nics;
+char bridge[16];
 NetDriverState nd_table[MAX_NICS];
 QEMUTimer *gui_timer;
 QEMUTimer *polling_timer;
@@ -135,7 +137,7 @@ int adlib_enabled = 1;
 int gus_enabled = 1;
 int pci_enabled = 1;
 int prep_enabled = 0;
-int rtc_utc = 1;
+int rtc_utc = 0;
 int cirrus_vga_enabled = 1;
 int vga_accelerate = 1;
 int graphic_width = 800;
@@ -1171,6 +1173,48 @@ CharDriverState *qemu_chr_open_stdio(void)
     return chr;
 }
 
+int store_console_dev(int domid, char *pts)
+{
+    int xc_handle;
+    unsigned int len = 0;
+    struct xs_handle *xs;
+    char *path;
+
+    xs = xs_daemon_open();
+    if (xs == NULL) {
+        fprintf(logfile, "Could not contact XenStore\n");
+        return -1;
+    }
+
+    xc_handle = xc_interface_open();
+    if (xc_handle == -1) {
+        fprintf(logfile, "xc_interface_open() error\n");
+        return -1;
+    }
+    
+    path = xs_get_domain_path(xs, domid);
+    if (path == NULL) {
+        fprintf(logfile, "xs_get_domain_path() error\n");
+        return -1;
+    }
+    path = realloc(path, strlen(path) + strlen("/console/tty") + 1);
+    if (path == NULL) {
+        fprintf(logfile, "realloc error\n");
+        return -1;
+    }
+    strcat(path, "/console/tty");
+    if (!xs_write(xs, NULL, path, pts, strlen(pts))) {
+        fprintf(logfile, "xs_write for console fail");
+        return -1;
+    }
+    
+    free(path);
+    xs_daemon_close(xs);
+    close(xc_handle);
+
+    return 0;
+}
+
 #if defined(__linux__)
 CharDriverState *qemu_chr_open_pty(void)
 {
@@ -1182,6 +1226,7 @@ CharDriverState *qemu_chr_open_pty(void)
         return NULL;
     }
     fprintf(stderr, "char device redirected to %s\n", slave_name);
+    store_console_dev(domid, slave_name);
     return qemu_chr_open_fd(master_fd, master_fd);
 }
 #else
@@ -1542,7 +1587,7 @@ static void tun_add_read_packet(NetDriverState *nd,
 static int net_tun_init(NetDriverState *nd)
 {
     int pid, status;
-    char *args[3];
+    char *args[4];
     char **parg;
     extern int highest_fds;
 
@@ -1558,6 +1603,7 @@ static int net_tun_init(NetDriverState *nd)
             parg = args;
             *parg++ = network_script;
             *parg++ = nd->ifname;
+            *parg++ = bridge;
             *parg++ = NULL;
             execv(network_script, args);
             exit(1);
@@ -2163,6 +2209,7 @@ void help(void)
            "Network options:\n"
            "-nics n         simulate 'n' network cards [default=1]\n"
            "-macaddr addr   set the mac address of the first interface\n"
+           "-bridge  br     set the bridge interface for nic\n"
            "-n script       set tap/tun network init script [default=%s]\n"
            "-tun-fd fd      use this fd as already opened tap/tun interface\n"
 #ifdef CONFIG_SLIRP
@@ -2253,6 +2300,7 @@ enum {
 
     QEMU_OPTION_nics,
     QEMU_OPTION_macaddr,
+    QEMU_OPTION_bridge,
     QEMU_OPTION_n,
     QEMU_OPTION_tun_fd,
     QEMU_OPTION_user_net,
@@ -2323,6 +2371,7 @@ const QEMUOption qemu_options[] = {
 
     { "nics", HAS_ARG, QEMU_OPTION_nics},
     { "macaddr", HAS_ARG, QEMU_OPTION_macaddr},
+    { "bridge", HAS_ARG, QEMU_OPTION_bridge},
     { "n", HAS_ARG, QEMU_OPTION_n },
     { "tun-fd", HAS_ARG, QEMU_OPTION_tun_fd },
 #ifdef CONFIG_SLIRP
@@ -2701,7 +2750,9 @@ int main(int argc, char **argv)
                 break;
             case QEMU_OPTION_nographic:
                 pstrcpy(monitor_device, sizeof(monitor_device), "stdio");
-                pstrcpy(serial_devices[0], sizeof(serial_devices[0]), "stdio");
+                if(!strcmp(serial_devices[0], "vc"))
+                    pstrcpy(serial_devices[0], sizeof(serial_devices[0]),
+                            "stdio");
                 nographic = 1;
                 break;
 #ifdef CONFIG_VNC
@@ -2778,6 +2829,9 @@ int main(int argc, char **argv)
                     fprintf(stderr, "qemu: invalid number of network interfaces\n");
                     exit(1);
                 }
+                break;
+            case QEMU_OPTION_bridge:
+                pstrcpy(bridge, sizeof(bridge), optarg);
                 break;
             case QEMU_OPTION_macaddr:
                 {

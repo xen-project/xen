@@ -15,5 +15,5 @@ from XmTestLib import *
 status, output = traceCommand("xm create -x")
 eyecatcher = "Error:"
 where = output.find(eyecatcher)
-if where != 0:
+if where == -1:
     FAIL("xm create failed to report error on bad arg")

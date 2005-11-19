@@ -1,4 +1,5 @@
-SUBSYSTEM=="xen-backend", KERNEL=="vbd*", ACTION=="add", RUN+="/etc/xen/scripts/block bind"
-SUBSYSTEM=="xen-backend", KERNEL=="vbd*", ACTION=="remove", RUN+="/etc/xen/scripts/block unbind"
-SUBSYSTEM=="xen-backend", KERNEL=="vif*", ACTION=="online", RUN+="$env{script} up"
+SUBSYSTEM=="xen-backend", KERNEL=="vbd*", RUN+="/etc/xen/scripts/block $env{ACTION}"
+SUBSYSTEM=="xen-backend", KERNEL=="vif*", ACTION=="online", RUN+="$env{script} online"
+SUBSYSTEM=="xen-backend", KERNEL=="vif*", ACTION=="offline", RUN+="$env{script} offline"
 SUBSYSTEM=="xen-backend", ACTION=="remove", RUN+="/usr/bin/xenstore-rm -t $env{XENBUS_PATH}"
+SUBSYSTEM=="xen-backend", ACTION=="remove", RUN+="/usr/bin/xenstore-rm -t error/$env{XENBUS_PATH}"

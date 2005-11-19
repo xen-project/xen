@@ -92,9 +92,10 @@ typedef union RedirStatus
 #define MAX_LAPIC_NUM        32
 
 typedef struct vmx_vioapic {
-    uint32_t ioregsel;
     uint32_t irr;
     uint32_t isr;           /* This is used for level trigger */
+    uint32_t imr;
+    uint32_t ioregsel;
     uint32_t flags;
     uint32_t lapic_count;
     uint32_t id;
@@ -112,6 +113,8 @@ void vmx_vioapic_do_irqs(struct domain *d, uint16_t irqs);
 void vmx_vioapic_set_irq(struct domain *d, int irq, int level);
 
 int vmx_vioapic_add_lapic(struct vlapic *vlapic, struct vcpu *v);
+
+void ioapic_update_EOI(struct domain *d, int vector);
 
 #ifdef VMX_DOMAIN_SAVE_RESTORE
 void ioapic_save(QEMUFile* f, void* opaque);

@@ -299,9 +299,7 @@ typedef struct vcpu_info {
     uint8_t evtchn_upcall_pending;
     uint8_t evtchn_upcall_mask;
     unsigned long evtchn_pending_sel;
-#ifdef __ARCH_HAS_VCPU_INFO
     arch_vcpu_info_t arch;
-#endif
 } vcpu_info_t;
 
 typedef struct vcpu_time_info {
@@ -410,7 +408,7 @@ typedef struct shared_info {
 #define MAX_GUEST_CMDLINE 1024
 typedef struct start_info {
     /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
-    char magic[32];             /* "Xen-<version>.<subversion>". */
+    char magic[32];             /* "xen-<version>-<platform>".            */
     unsigned long nr_pages;     /* Total pages allocated to this domain.  */
     unsigned long shared_info;  /* MACHINE address of shared info struct. */
     uint32_t flags;             /* SIF_xxx flags.                         */

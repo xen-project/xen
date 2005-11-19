@@ -25,9 +25,28 @@ from xen.xend.XendLogging import log
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
 
-DEVICE_CREATE_TIMEOUT = 120
+DEVICE_CREATE_TIMEOUT = 5
 HOTPLUG_STATUS_NODE = "hotplug-status"
 HOTPLUG_STATUS_ERROR = "error"
+
+Connected = 1
+Died      = 2
+Error     = 3
+Missing   = 4
+Timeout   = 5
+
+xenbusState = {
+    'Unknown'      : 0,
+    'Initialising' : 1,
+    'InitWait'     : 2,
+    'Initialised'  : 3,
+    'Connected'    : 4,
+    'Closing'      : 5,
+    'Closed'       : 6,
+    }
+
+xenbusState.update(dict(zip(xenbusState.values(), xenbusState.keys())))
+
 
 class DevController:
     """Abstract base class for a device controller.  Device controllers create
@@ -74,18 +93,28 @@ class DevController:
     def waitForDevice(self, devid):
         log.debug("Waiting for %s.", devid)
         
-        status, fn_ret = self.waitForBackend(devid)
-        if status:
-            self.destroyDevice(devid)
-            raise VmError( ("Device %s (%s) could not be connected. "
-                            "Hotplug scripts not working") 
-                            % (devid, self.deviceClass))
+        status = self.waitForBackend(devid)
 
-        elif fn_ret == HOTPLUG_STATUS_ERROR:
+        if status == Timeout:
             self.destroyDevice(devid)
-            raise VmError( ("Device %s (%s) could not be connected. "
-                            "Backend device not found!") 
-                            % (devid, self.deviceClass))
+            raise VmError("Device %s (%s) could not be connected. "
+                          "Hotplug scripts not working" %
+                          (devid, self.deviceClass))
+
+        elif status == Error:
+            self.destroyDevice(devid)
+            raise VmError("Device %s (%s) could not be connected. "
+                          "Backend device not found" %
+                          (devid, self.deviceClass))
+
+        elif status == Missing:
+            raise VmError("Device %s (%s) could not be connected. "
+                          "Device not found" % (devid, self.deviceClass))
+
+        elif status == Died:
+            self.destroyDevice(devid)
+            raise VmError("Device %s (%s) could not be connected. "
+                          "Device has died" % (devid, self.deviceClass))
 
 
     def reconfigureDevice(self, devid, config):
@@ -116,10 +145,8 @@ class DevController:
         frontpath = self.frontendPath(devid)
         backpath = xstransact.Read(frontpath, "backend")
 
-        xstransact.Remove(frontpath)
-
         if backpath:
-            xstransact.Remove(backpath)
+            xstransact.Write(backpath, 'state', str(xenbusState['Closing']))
         else:
             raise VmError("Device %s not connected" % devid)
            
@@ -257,18 +284,18 @@ class DevController:
         frontpath = self.frontendPath(devid)
         backpath  = self.backendPath(backdom, devid)
         
-        xstransact.Remove(backpath, HOTPLUG_STATUS_NODE)
-
         frontDetails.update({
             'backend' : backpath,
-            'backend-id' : "%i" % backdom.getDomid()
+            'backend-id' : "%i" % backdom.getDomid(),
+            'state' : str(xenbusState['Initialising'])
             })
 
 
         backDetails.update({
             'domain' : self.vm.getName(),
             'frontend' : frontpath,
-            'frontend-id' : "%i" % self.vm.getDomid()
+            'frontend-id' : "%i" % self.vm.getDomid(),
+            'state' : str(xenbusState['Initialising'])
             })
 
         log.debug('DevController: writing %s to %s.', str(frontDetails),
@@ -276,36 +303,37 @@ class DevController:
         log.debug('DevController: writing %s to %s.', str(backDetails),
                   backpath)
 
-        xstransact.Write(frontpath, frontDetails)
-        xstransact.Write(backpath, backDetails)
-
-    def waitForBackend(self,devid):
-        ev = Event()
-
-        def hotplugStatus():
+        while True:
+            t = xstransact()
             try:
-                status = self.readBackend(devid, HOTPLUG_STATUS_NODE)
-            except VmError:
-                status = "died"
-            if status is not None:
-                watch.xs.unwatch(backpath, watch)
-                hotplugStatus.value = status
-                ev.set()
+                t.remove2(backpath, HOTPLUG_STATUS_NODE)
 
-        hotplugStatus.value = None
+                t.write2(frontpath, frontDetails)
+                t.write2(backpath,  backDetails)
+
+                if t.commit():
+                    return
+            except:
+                t.abort()
+                raise
+
+
+    def waitForBackend(self, devid):
+
         frontpath = self.frontendPath(devid)
         backpath = xstransact.Read(frontpath, "backend")
 
         if backpath:
-            watch = xswatch(backpath, hotplugStatus)
+            statusPath = backpath + '/' + HOTPLUG_STATUS_NODE
+            ev = Event()
+            result = { 'status': Timeout }
+            
+            xswatch(statusPath, hotplugStatusCallback, statusPath, ev, result)
 
             ev.wait(DEVICE_CREATE_TIMEOUT)
-            if ev.isSet():
-                return (0, hotplugStatus.value)
-            else:
-                return (-1, hotplugStatus.value)
+            return result['status']
         else:
-            return (-1, "missing")
+            return Missing
 
 
     def backendPath(self, backdom, devid):
@@ -327,3 +355,25 @@ class DevController:
     def frontendMiscPath(self):
         return "%s/device-misc/%s" % (self.vm.getDomainPath(),
                                       self.deviceClass)
+
+
+def hotplugStatusCallback(statusPath, ev, result):
+    log.debug("hotplugStatusCallback %s.", statusPath)
+
+    try:
+        status = xstransact.Read(statusPath)
+
+        if status is not None:
+            if status == HOTPLUG_STATUS_ERROR:
+                result['status'] = Error
+            else:
+                result['status'] = Connected
+        else:
+            return 1
+    except VmError:
+        result['status'] = Died
+
+    log.debug("hotplugStatusCallback %d.", result['status'])
+
+    ev.set()
+    return 0

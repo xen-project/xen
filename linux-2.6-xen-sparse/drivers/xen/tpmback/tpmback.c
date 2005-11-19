@@ -167,9 +167,7 @@ static void inline
 packet_free(struct packet *pak)
 {
 	del_singleshot_timer_sync(&pak->processing_timer);
-	if (pak->data_buffer) {
-		kfree(pak->data_buffer);
-	}
+	kfree(pak->data_buffer);
 	/*
 	 * cannot do tpmif_put(pak->tpmif); bad things happen
 	 * on the last tpmif_put()
@@ -296,9 +294,8 @@ _packet_write(struct packet *pak,
 			DPRINTK(" Grant table operation failure !\n");
 			return 0;
 		}
-		phys_to_machine_mapping[__pa(MMAP_VADDR(tpmif,i)) >>
-					PAGE_SHIFT] =
-			FOREIGN_FRAME(map_op.dev_bus_addr >> PAGE_SHIFT);
+		set_phys_to_machine(__pa(MMAP_VADDR(tpmif,i)) >> PAGE_SHIFT,
+			FOREIGN_FRAME(map_op.dev_bus_addr >> PAGE_SHIFT));
 
 		tocopy = MIN(size - offset, PAGE_SIZE);
 

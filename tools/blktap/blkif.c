@@ -108,8 +108,7 @@ void free_blkif(blkif_t *blkif)
         }
         pblkif = &curs->hash_next;
     }
-    if (blkif != NULL)
-        free(blkif);
+    free(blkif);
 }
 
 void blkif_register_request_hook(blkif_t *blkif, char *name, 

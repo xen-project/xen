@@ -121,11 +121,7 @@ static void init_evtchn_cpu_bindings(void)
 
 /* Upcall to generic IRQ layer. */
 #ifdef CONFIG_X86
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,9)
 extern fastcall unsigned int do_IRQ(struct pt_regs *regs);
-#else
-extern asmlinkage unsigned int do_IRQ(struct pt_regs *regs);
-#endif
 #if defined (__i386__)
 #define IRQ_REG orig_eax
 #elif defined (__x86_64__)
@@ -752,7 +748,7 @@ void __init init_IRQ(void)
 		irq_bindcount[dynirq_to_irq(i)] = 0;
 
 		irq_desc[dynirq_to_irq(i)].status  = IRQ_DISABLED;
-		irq_desc[dynirq_to_irq(i)].action  = 0;
+		irq_desc[dynirq_to_irq(i)].action  = NULL;
 		irq_desc[dynirq_to_irq(i)].depth   = 1;
 		irq_desc[dynirq_to_irq(i)].handler = &dynirq_type;
 	}
@@ -770,7 +766,7 @@ void __init init_IRQ(void)
 #endif
 
 		irq_desc[pirq_to_irq(i)].status  = IRQ_DISABLED;
-		irq_desc[pirq_to_irq(i)].action  = 0;
+		irq_desc[pirq_to_irq(i)].action  = NULL;
 		irq_desc[pirq_to_irq(i)].depth   = 1;
 		irq_desc[pirq_to_irq(i)].handler = &pirq_type;
 	}

@@ -248,8 +248,7 @@ static void net_rx_action(unsigned long unused)
 		 * Set the new P2M table entry before reassigning the old data
 		 * page. Heed the comment in pgtable-2level.h:pte_page(). :-)
 		 */
-		phys_to_machine_mapping[__pa(skb->data) >> PAGE_SHIFT] =
-			new_mfn;
+		set_phys_to_machine(__pa(skb->data) >> PAGE_SHIFT, new_mfn);
 
 		MULTI_update_va_mapping(mcl, vdata,
 					pfn_pte_ma(new_mfn, PAGE_KERNEL), 0);
@@ -631,9 +630,9 @@ static void net_tx_action(unsigned long unused)
 				pending_idx;
 			continue;
 		}
-		phys_to_machine_mapping[
-			__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT] =
-			FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT);
+		set_phys_to_machine(
+			__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT,
+			FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT));
 		grant_tx_ref[pending_idx] = mop->handle;
 
 		data_len = (txreq.size > PKT_PROT_LEN) ?
