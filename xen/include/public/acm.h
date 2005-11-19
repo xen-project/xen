@@ -60,6 +60,7 @@
 #define ACM_NULL_POLICY 0
 #define ACM_CHINESE_WALL_POLICY 1
 #define ACM_SIMPLE_TYPE_ENFORCEMENT_POLICY 2
+#define ACM_POLICY_UNDEFINED 15
 
 /* combinations have secondary policy component in higher 4bit */
 #define ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY \
