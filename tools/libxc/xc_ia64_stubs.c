@@ -7,6 +7,21 @@
 #include "xen/arch-ia64.h"
 #include <xen/io/ioreq.h>
 
+/* this is a very ugly way of getting FPSR_DEFAULT.  struct ia64_fpreg is
+ * mysteriously declared in two places: /usr/include/asm/fpu.h and
+ * /usr/include/bits/sigcontext.h.  The former also defines FPSR_DEFAULT,
+ * the latter doesn't but is included (indirectly) by xg_private.h */
+#define __ASSEMBLY__
+#include <asm/fpu.h>
+#undef __IA64_UL
+#define __IA64_UL(x)           ((unsigned long)(x))
+#undef __ASSEMBLY__
+                                                                                
+unsigned long xc_ia64_fpsr_default(void)
+{
+        return FPSR_DEFAULT;
+}
+
 int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters, 
                   uint32_t max_factor, uint32_t flags)
 {
