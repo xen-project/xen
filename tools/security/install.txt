@@ -24,11 +24,13 @@ exclusively (chwall_ste --> {chwall, ste}).
        # cd "xen_root"
        # edit/xemacs/vi Config.mk
 
-       change the line:
-       ACM_USE_SECURITY_POLICY ?= ACM_NULL_POLICY
+       change the lines:
+       ACM_SECURITY ?= n
+       ACM_DEFAULT_SECURITY_POLICY ?= ACM_NULL_POLICY
 
        to:
-       ACM_USE_SECURITY_POLICY ?= ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY
+       ACM_SECURITY ?= y
+       ACM_DEFAULT_SECURITY_POLICY ?= ACM_CHINESE_WALL_AND_SIMPLE_TYPE_ENFORCEMENT_POLICY
 
        # make all
        # ./install.sh

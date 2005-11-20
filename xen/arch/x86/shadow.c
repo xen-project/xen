@@ -47,13 +47,14 @@ static void mark_shadows_as_reflecting_snapshot(struct domain *d, unsigned long 
 #if CONFIG_PAGING_LEVELS == 3
 static unsigned long shadow_l3_table(
     struct domain *d, unsigned long gpfn, unsigned long gmfn);
-static inline void validate_bl2e_change( struct domain *d,
-    guest_root_pgentry_t *new_gle_p, pgentry_64_t *shadow_l3, int index);
 #endif
 
 #if CONFIG_PAGING_LEVELS == 4
 static unsigned long shadow_l4_table(
     struct domain *d, unsigned long gpfn, unsigned long gmfn);
+#endif
+
+#if CONFIG_PAGING_LEVELS >= 3
 static void shadow_map_into_current(struct vcpu *v,
     unsigned long va, unsigned int from, unsigned int to);
 static inline void validate_bl2e_change( struct domain *d,
@@ -669,6 +670,7 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
     }
 }
 
+#if CONFIG_PAGING_LEVELS == 2
 static void
 shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
 {
@@ -750,7 +752,6 @@ shadow_set_l1e(unsigned long va, l1_pgentry_t new_spte, int create_l1_shadow)
     shadow_update_min_max(l2e_get_pfn(sl2e), l1_table_offset(va));
 }
 
-#if CONFIG_PAGING_LEVELS == 2
 static void shadow_invlpg_32(struct vcpu *v, unsigned long va)
 {
     struct domain *d = v->domain;
@@ -780,6 +781,73 @@ static void shadow_invlpg_32(struct vcpu *v, unsigned long va)
     shadow_unlock(d);
 }
 #endif /* CONFIG_PAGING_LEVELS == 2 */
+
+#if CONFIG_PAGING_LEVELS >= 3
+static void shadow_set_l1e_64(
+    unsigned long va, pgentry_64_t *sl1e_p,
+    int create_l1_shadow)
+{
+    struct vcpu *v = current;
+    struct domain *d = v->domain;
+    pgentry_64_t sle;
+    pgentry_64_t sle_up = {0};
+    l1_pgentry_t old_spte;
+    l1_pgentry_t sl1e = *(l1_pgentry_t *)sl1e_p;
+    int i;
+    unsigned long orig_va = 0;
+
+    if ( d->arch.ops->guest_paging_levels == PAGING_L2 ) 
+    {
+        /* This is for 32-bit VMX guest on 64-bit host */
+        orig_va = va;
+        va = va & (~((1<<L2_PAGETABLE_SHIFT_32)-1));
+    }
+
+    for ( i = PAGING_L4; i >= PAGING_L2; i-- )
+    {
+        if ( !__rw_entry(v, va, &sle, SHADOW_ENTRY | GET_ENTRY | i) )
+        {
+            sl1e = l1e_empty();
+            goto out;
+        }
+        if ( !(entry_get_flags(sle) & _PAGE_PRESENT) )
+        {
+            if ( create_l1_shadow )
+            {
+                perfc_incrc(shadow_set_l3e_force_map);
+                shadow_map_into_current(v, va, i-1, i);
+                __rw_entry(v, va, &sle, SHADOW_ENTRY | GET_ENTRY | i);
+            }
+        }
+        if ( i < PAGING_L4 )
+            shadow_update_min_max(entry_get_pfn(sle_up), table_offset_64(va, i));
+        sle_up = sle;
+    }
+
+    if ( d->arch.ops->guest_paging_levels == PAGING_L2 )
+    {
+        va = orig_va;
+    }
+
+    if ( shadow_mode_refcounts(d) )
+    {
+        __shadow_get_l1e(v, va, &old_spte);
+        if ( l1e_has_changed(old_spte, sl1e, _PAGE_RW | _PAGE_PRESENT) )
+        {
+            if ( (l1e_get_flags(sl1e) & _PAGE_PRESENT) &&
+                 !shadow_get_page_from_l1e(sl1e, d) )
+                sl1e = l1e_empty();
+            if ( l1e_get_flags(old_spte) & _PAGE_PRESENT )
+                put_page_from_l1e(old_spte, d);
+        }
+    }
+
+out:
+    __shadow_set_l1e(v, va, &sl1e);
+
+    shadow_update_min_max(entry_get_pfn(sle_up), guest_l1_table_offset(va));
+}
+#endif /* CONFIG_PAGING_LEVELS >= 3 */
 
 static struct out_of_sync_entry *
 shadow_alloc_oos_entry(struct domain *d)
@@ -1996,8 +2064,11 @@ static int do_update_va_mapping(unsigned long va,
     __shadow_sync_va(v, va);
 
     l1pte_propagate_from_guest(d, *(guest_l1_pgentry_t *)&val, &spte);
+#if CONFIG_PAGING_LEVELS == 2
     shadow_set_l1e(va, spte, 0);
-
+#elif CONFIG_PAGING_LEVELS >= 3
+    shadow_set_l1e_64(va, (pgentry_64_t *) &spte, 0);
+#endif
     /*
      * If we're in log-dirty mode then we need to note that we've updated
      * the PTE in the PT-holding page. We need the machine frame number
@@ -3011,71 +3082,6 @@ static void shadow_set_l2e_64(unsigned long va, l2_pgentry_t sl2e,
     shadow_update_min_max(l3e_get_pfn(sl3e), l2_table_offset(va));
 }
 
-
-static void shadow_set_l1e_64(
-    unsigned long va, pgentry_64_t *sl1e_p,
-    int create_l1_shadow)
-{
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
-    pgentry_64_t sle;
-    pgentry_64_t sle_up = {0};
-    l1_pgentry_t old_spte;
-    l1_pgentry_t sl1e = *(l1_pgentry_t *)sl1e_p;
-    int i;
-    unsigned long orig_va = 0;
-
-    if ( d->arch.ops->guest_paging_levels == PAGING_L2 ) 
-    {
-        /* This is for 32-bit VMX guest on 64-bit host */
-        orig_va = va;
-        va = va & (~((1<<L2_PAGETABLE_SHIFT_32)-1));
-    }
-
-    for (i = PAGING_L4; i >= PAGING_L2; i--) 
-    {
-        if (!__rw_entry(v, va, &sle, SHADOW_ENTRY | GET_ENTRY | i)) {
-            printk("<%s> i = %d\n", __func__, i);
-            BUG();
-        }
-        if ( !(entry_get_flags(sle) & _PAGE_PRESENT) ) {
-            if ( create_l1_shadow ) {
-                perfc_incrc(shadow_set_l3e_force_map);
-                shadow_map_into_current(v, va, i-1, i);
-                __rw_entry(v, va, &sle, SHADOW_ENTRY | GET_ENTRY | i);
-            } else {
-#if 0
-                printk("For non VMX shadow, create_l1_shadow:%d\n", create_l1_shadow);
-#endif
-            }
-        }
-        if( i < PAGING_L4 )
-            shadow_update_min_max(entry_get_pfn(sle_up), table_offset_64(va, i));
-        sle_up = sle;
-    }
-
-    if ( d->arch.ops->guest_paging_levels == PAGING_L2 ) {
-        va = orig_va;
-    }
-
-    if ( shadow_mode_refcounts(d) )
-    {
-        __shadow_get_l1e(v, va, &old_spte);
-        ESH_LOG("old_sl1e: %lx, new_sl1e: %lx\n", l1e_get_intpte(old_spte), l1e_get_intpte(sl1e));
-        if ( l1e_has_changed(old_spte, sl1e, _PAGE_RW | _PAGE_PRESENT) )
-            {
-                if ( (l1e_get_flags(sl1e) & _PAGE_PRESENT) &&
-                     !shadow_get_page_from_l1e(sl1e, d) )
-                    sl1e = l1e_empty();
-                if ( l1e_get_flags(old_spte) & _PAGE_PRESENT )
-                    put_page_from_l1e(old_spte, d);
-            }
-    }
-
-    __shadow_set_l1e(v, va, &sl1e);
-
-    shadow_update_min_max(entry_get_pfn(sle_up), guest_l1_table_offset(va));
-}
 
 /* As 32-bit guest don't support 4M page yet,
  * we don't concern double compile for this function

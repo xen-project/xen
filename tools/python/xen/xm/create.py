@@ -905,9 +905,6 @@ def parseCommandLine(argv):
             opts.setopt('name', os.path.basename(opts.getopt('defconfig')))
         config = make_config(opts.vals)
 
-    if type(config) == str:
-        config = sxp.parse(file(config))[0]
-
     return (opts, config)
 
 

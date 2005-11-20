@@ -288,10 +288,10 @@ config HAVE_DEC_LOCK
 # actually 64 maximum, but you need to fix the APIC code first
 # to use clustered mode or whatever your big iron needs
 config NR_CPUS
-	int "Maximum number of CPUs (2-8)"
-	range 2 8
+	int "Maximum number of CPUs (2-255)"
+	range 2 255
 	depends on SMP
-	default "8"
+	default "16"
 	help
 	  This allows you to specify the maximum number of CPUs which this
 	  kernel will support.  The maximum supported value is 32 and the

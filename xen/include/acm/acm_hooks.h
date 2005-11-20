@@ -127,7 +127,7 @@ extern struct acm_operations *acm_secondary_ops;
 # define traceprintk(fmt, args...)
 #endif
 
-#if (ACM_USE_SECURITY_POLICY == ACM_NULL_POLICY)
+#ifndef ACM_SECURITY
 
 static inline int acm_pre_dom0_op(dom0_op_t *op, void **ssid) 
 { return 0; }

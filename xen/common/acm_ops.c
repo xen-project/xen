@@ -29,7 +29,7 @@
 #include <public/sched_ctl.h>
 #include <acm/acm_hooks.h>
 
-#if (ACM_USE_SECURITY_POLICY == ACM_NULL_POLICY)
+#ifndef ACM_SECURITY
 
 long do_acm_op(struct acm_op * u_acm_op)
 {

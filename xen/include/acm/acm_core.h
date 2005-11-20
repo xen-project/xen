@@ -28,9 +28,6 @@
 struct acm_binary_policy {
     u16 primary_policy_code;
     u16 secondary_policy_code;
-    void *primary_binary_policy;                                 
-    void *secondary_binary_policy;
- 
 };
 
 struct chwall_binary_policy {
@@ -53,6 +50,7 @@ struct ste_binary_policy {
 };
 
 /* global acm policy */
+extern u16 acm_active_security_policy;
 extern struct acm_binary_policy acm_bin_pol;
 extern struct chwall_binary_policy chwall_bin_pol;
 extern struct ste_binary_policy ste_bin_pol;
@@ -120,6 +118,7 @@ struct ste_ssid {
 /* protos */
 int acm_init_domain_ssid(domid_t id, ssidref_t ssidref);
 void acm_free_domain_ssid(struct acm_ssid_domain *ssid);
+int acm_init_binary_policy(u32 policy_code);
 int acm_set_policy(void *buf, u32 buf_size, int isuserbuffer);
 int acm_get_policy(void *buf, u32 buf_size);
 int acm_dump_statistics(void *buf, u16 buf_size);

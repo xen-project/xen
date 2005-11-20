@@ -56,17 +56,29 @@ acm_set_policy(void *buf, u32 buf_size, int isuserbuffer)
     /* 2. some sanity checking */
     pol = (struct acm_policy_buffer *)policy_buffer;
 
-    if ((ntohl(pol->magic) != ACM_MAGIC) || 
-        (ntohl(pol->policy_version) != ACM_POLICY_VERSION) ||
-        (ntohl(pol->primary_policy_code) != acm_bin_pol.primary_policy_code) ||
-        (ntohl(pol->secondary_policy_code) != acm_bin_pol.secondary_policy_code))
+    if ((ntohl(pol->magic) != ACM_MAGIC) ||
+        (buf_size != ntohl(pol->len)) ||
+        (ntohl(pol->policy_version) != ACM_POLICY_VERSION))
     {
-        printkd("%s: Wrong policy magics or versions!\n", __func__);
+        printk("%s: ERROR in Magic, Version, or buf size.\n", __func__);
         goto error_free;
     }
-    if (buf_size != ntohl(pol->len))
+
+    if (acm_active_security_policy == ACM_POLICY_UNDEFINED) {
+        /* setup the policy with the boot policy */
+        if (acm_init_binary_policy((ntohl(pol->secondary_policy_code) << 4) |
+                                   ntohl(pol->primary_policy_code))) {
+            goto error_free;
+        }
+        acm_active_security_policy =
+            (acm_bin_pol.secondary_policy_code << 4) | acm_bin_pol.primary_policy_code;
+    }
+
+    /* once acm_active_security_policy is set, it cannot be changed */
+    if ((ntohl(pol->primary_policy_code) != acm_bin_pol.primary_policy_code) ||
+        (ntohl(pol->secondary_policy_code) != acm_bin_pol.secondary_policy_code))
     {
-        printk("%s: ERROR in buf size.\n", __func__);
+        printkd("%s: Wrong policy type in boot policy!\n", __func__);
         goto error_free;
     }
 
