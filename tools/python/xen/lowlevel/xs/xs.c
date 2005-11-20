@@ -172,7 +172,7 @@ static PyObject *xspy_ls(PyObject *self, PyObject *args, PyObject *kwds)
     char *path;
 
     char **xsval;
-    int xsval_n;
+    unsigned int xsval_n;
 
     if (!parse_transaction_path(self, args, kwds, &xh, &th, &path))
         return NULL;
