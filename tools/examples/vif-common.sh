@@ -82,7 +82,7 @@ function handle_iptable()
   # binary is not sufficient, because the user may not have the appropriate
   # modules installed.  If iptables is not working, then there's no need to do
   # anything with it, so we can just return.
-  if ! iptables -L >&/dev/null
+  if ! iptables -L -n >&/dev/null
   then
     return
   fi
