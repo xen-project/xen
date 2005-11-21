@@ -136,6 +136,7 @@ long do_memory_op(int cmd, void *arg)
     struct domain *d;
     int rc, start_extent, op, flags = 0, preempted = 0;
     struct xen_memory_reservation reservation;
+    domid_t domid;
 
     op = cmd & ((1 << START_EXTENT_SHIFT) - 1);
 
@@ -191,9 +192,26 @@ long do_memory_op(int cmd, void *arg)
         break;
 
     case XENMEM_maximum_ram_page:
-        if ( put_user(max_page, (unsigned long *)arg) )
+        rc = max_page;
+        break;
+
+    case XENMEM_current_reservation:
+    case XENMEM_maximum_reservation:
+        if ( get_user(domid, (domid_t *)arg) )
             return -EFAULT;
-        rc = 0;
+
+        if ( likely((domid = (unsigned long)arg) == DOMID_SELF) )
+            d = current->domain;
+        else if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+        else if ( (d = find_domain_by_id(domid)) == NULL )
+            return -ESRCH;
+
+        rc = (op == XENMEM_current_reservation) ? d->tot_pages : d->max_pages;
+
+        if ( unlikely(domid != DOMID_SELF) )
+            put_domain(d);
+
         break;
 
     default:

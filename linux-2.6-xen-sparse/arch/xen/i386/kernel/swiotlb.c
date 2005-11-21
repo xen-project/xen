@@ -178,6 +178,8 @@ swiotlb_init_with_default_size (size_t default_size)
 void
 swiotlb_init(void)
 {
+	long ram_end;
+
 	/* The user can forcibly enable swiotlb. */
 	if (swiotlb_force)
 		swiotlb = 1;
@@ -187,9 +189,7 @@ swiotlb_init(void)
          * which we take to mean more than 2GB.
          */
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
-		unsigned long ram_end;
-		if (HYPERVISOR_memory_op(XENMEM_maximum_ram_page, &ram_end))
-			BUG();
+		ram_end = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
 		if (ram_end > 0x7ffff)
 			swiotlb = 1;
 	}

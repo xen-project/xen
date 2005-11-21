@@ -64,7 +64,6 @@ static int get_platform_info(int xc_handle, uint32_t dom,
 { 
     xen_capabilities_info_t xen_caps = "";
     xen_platform_parameters_t xen_params;
-    
 
     if (xc_version(xc_handle, XENVER_platform_parameters, &xen_params) != 0)
         return 0;
@@ -72,8 +71,7 @@ static int get_platform_info(int xc_handle, uint32_t dom,
     if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0)
         return 0;
 
-    if (xc_memory_op(xc_handle, XENMEM_maximum_ram_page, max_mfn) != 0)
-        return 0; 
+    *max_mfn = xc_memory_op(xc_handle, XENMEM_maximum_ram_page, NULL);
     
     *hvirt_start = xen_params.virt_start;
 
