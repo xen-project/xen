@@ -424,7 +424,7 @@ class XendDomainInfo:
             return []
 
 
-    def storeChanged(self):
+    def storeChanged(self, _):
         log.trace("XendDomainInfo.storeChanged");
 
         changed = False

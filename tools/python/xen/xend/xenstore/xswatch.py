@@ -51,7 +51,7 @@ def watchMain():
         try:
             we = xs.read_watch()
             watch = we[1]
-            res = watch.fn(*watch.args, **watch.kwargs)
+            res = watch.fn(we[0], *watch.args, **watch.kwargs)
             if not res:
                 watch.unwatch()
         except:
