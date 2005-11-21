@@ -289,7 +289,6 @@ static inline void shadow_mode_disable(struct domain *d)
 
 #define __gpfn_to_mfn(_d, gpfn)                        \
     ({                                                 \
-        ASSERT(current->domain == (_d));               \
         (shadow_mode_translate(_d))                    \
         ? get_mfn_from_pfn(gpfn)                \
         : (gpfn);                                      \
