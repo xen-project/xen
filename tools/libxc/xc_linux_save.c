@@ -798,6 +798,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     pfn_batch = calloc(MAX_BATCH_SIZE, sizeof(unsigned long));
 
     if ((pfn_type == NULL) || (pfn_batch == NULL)) {
+        ERR("failed to alloc memory for pfn_type and/or pfn_batch arays."); 
         errno = ENOMEM;
         goto out;
     }
@@ -817,7 +818,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         for (i = 0; i < max_pfn; i++) {
 
             mfn = live_p2m[i];
-            if((live_m2p[mfn] != i) && (mfn != 0xffffffffUL)) { 
+            if((mfn != 0xffffffffUL) && (live_m2p[mfn] != i)) { 
                 DPRINTF("i=0x%x mfn=%lx live_m2p=%lx\n", i, 
                         mfn, live_m2p[mfn]);
                 err++;
@@ -912,7 +913,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                        unless its sent sooner anyhow */
 
                     set_bit(n, to_fix);
-                    if(iter > 1)
+                    if( (iter > 1) && IS_REAL_PFN(n) )
                         DPRINTF("netbuf race: iter %d, pfn %x. mfn %lx\n",
                                 iter, n, pfn_type[batch]);
                     continue;
@@ -1157,6 +1158,13 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
  out:
 
+    if (live) {
+        if(xc_shadow_control(xc_handle, dom, DOM0_SHADOW_CONTROL_OP_OFF, 
+                             NULL, 0, NULL ) < 0) { 
+            DPRINTF("Warning - couldn't disable shadow mode");
+        }
+    }
+    
     if (live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);
     

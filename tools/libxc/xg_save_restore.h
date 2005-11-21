@@ -125,6 +125,12 @@ static int get_platform_info(int xc_handle, uint32_t dom,
 /* Number of entries in the pfn_to_mfn_frame_list_list */
 #define P2M_FLL_ENTRIES (((max_pfn)+(ulpp*ulpp)-1)/(ulpp*ulpp))
 
+/* Current guests allow 8MB 'slack' in their P2M */
+#define NR_SLACK_ENTRIES   ((8 * 1024 * 1024) / PAGE_SIZE)
+
+/* Is the given PFN within the 'slack' region at the top of the P2M? */
+#define IS_REAL_PFN(_pfn)  ((max_pfn - (_pfn)) > NR_SLACK_ENTRIES) 
+
 /* Returns TRUE if the PFN is currently mapped */
 #define is_mapped(pfn_type) (!((pfn_type) & 0x80000000UL))
 
