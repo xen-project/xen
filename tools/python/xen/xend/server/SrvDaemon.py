@@ -300,3 +300,25 @@ def instance():
     except:
         inst = Daemon()
     return inst
+
+
+def main(argv = None):
+    global XEND_DAEMONIZE
+    
+    XEND_DAEMONIZE = 0
+    if argv is None:
+        argv = sys.argv
+
+    try:
+        daemon = instance()
+    
+        r,w = os.pipe()
+        daemon.run(os.fdopen(w, 'w'))
+        return 0
+    except Exception, exn:
+        log.fatal(exn)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
