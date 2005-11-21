@@ -24,6 +24,7 @@
 #include <asm/io.h>
 #include <asm/pci.h>
 #include <asm/dma.h>
+#include <asm-xen/xen-public/memory.h>
 
 #define OFFSET(val,align) ((unsigned long)((val) & ( (align) - 1)))
 
@@ -186,10 +187,10 @@ swiotlb_init(void)
          * which we take to mean more than 2GB.
          */
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
-		dom0_op_t op;
-		op.cmd = DOM0_PHYSINFO;
-		if ((HYPERVISOR_dom0_op(&op) == 0) &&
-		    (op.u.physinfo.total_pages > 0x7ffff))
+		unsigned long ram_end;
+		if (HYPERVISOR_memory_op(XENMEM_maximum_ram_page, &ram_end))
+			BUG();
+		if (ram_end > 0x7ffff)
 			swiotlb = 1;
 	}
 
