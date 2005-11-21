@@ -849,7 +849,7 @@ def balloon_out(dom0_min_mem, opts):
     timeout = 20 # 2s
     ret = 1
 
-    xc = xen.lowlevel.xc.new()
+    xc = xen.lowlevel.xc.xc()
     free_mem = xc.physinfo()['free_pages'] / 256
     domU_need_mem = opts.vals.memory + SLACK 
 

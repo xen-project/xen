@@ -93,7 +93,7 @@ MINIMUM_RESTART_TIME = 20
 RESTART_IN_PROGRESS = 'xend/restart_in_progress'
 
 
-xc = xen.lowlevel.xc.new()
+xc = xen.lowlevel.xc.xc()
 xroot = XendRoot.instance()
 
 log = logging.getLogger("xend.XendDomainInfo")

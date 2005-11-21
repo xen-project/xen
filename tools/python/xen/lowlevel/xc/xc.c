@@ -23,7 +23,8 @@
 #define PyMODINIT_FUNC DL_EXPORT(void)
 #endif
 
-#define XENPKG "xen.lowlevel.xc"
+#define PKG "xen.lowlevel.xc"
+#define CLS "xc"
 
 static PyObject *xc_error, *zero;
 
@@ -1055,81 +1056,109 @@ static PyMethodDef pyxc_methods[] = {
 };
 
 
-/*
- * Definitions for the 'Xc' module wrapper.
- */
-
-staticforward PyTypeObject PyXcType;
-
-static PyObject *PyXc_new(PyObject *self, PyObject *args)
-{
-    XcObject *xc;
-
-    if ( !PyArg_ParseTuple(args, ":new") )
-        return NULL;
-
-    xc = PyObject_New(XcObject, &PyXcType);
-
-    if ( (xc->xc_handle = xc_interface_open()) == -1 )
-    {
-        PyObject_Del((PyObject *)xc);
-        return PyErr_SetFromErrno(xc_error);
-    }
-
-    return (PyObject *)xc;
-}
-
 static PyObject *PyXc_getattr(PyObject *obj, char *name)
 {
     return Py_FindMethod(pyxc_methods, obj, name);
 }
 
-static void PyXc_dealloc(PyObject *self)
+static PyObject *PyXc_new(PyTypeObject *type, PyObject *args)
 {
-    XcObject *xc = (XcObject *)self;
-    (void)xc_interface_close(xc->xc_handle);
-    PyObject_Del(self);
+    XcObject *self = (XcObject *)type->tp_alloc(type, 0);
+
+    if (self == NULL)
+        return NULL;
+
+    self->xc_handle = NULL;
+
+    return (PyObject *)self;
+}
+
+static int
+PyXc_init(XcObject *self, PyObject *args, PyObject *kwds)
+{
+    if ((self->xc_handle = xc_interface_open()) == -1) {
+        PyErr_SetFromErrno(PyExc_RuntimeError);
+        return -1;
+    }
+
+    return 0;
+}
+
+static void PyXc_dealloc(XcObject *self)
+{
+    if (self->xc_handle) {
+        xc_interface_close(self->xc_handle);
+        self->xc_handle = NULL;
+    }
+
+    self->ob_type->tp_free((PyObject *)self);
 }
 
 static PyTypeObject PyXcType = {
-    PyObject_HEAD_INIT(&PyType_Type)
+    PyObject_HEAD_INIT(NULL)
     0,
-    "Xc",
+    PKG "." CLS,
     sizeof(XcObject),
     0,
-    PyXc_dealloc,    /* tp_dealloc     */
-    NULL,            /* tp_print       */
-    PyXc_getattr,    /* tp_getattr     */
-    NULL,            /* tp_setattr     */
-    NULL,            /* tp_compare     */
-    NULL,            /* tp_repr        */
-    NULL,            /* tp_as_number   */
-    NULL,            /* tp_as_sequence */
-    NULL,            /* tp_as_mapping  */
-    NULL             /* tp_hash        */
+    (destructor)PyXc_dealloc,     /* tp_dealloc        */
+    NULL,                         /* tp_print          */
+    PyXc_getattr,                 /* tp_getattr        */
+    NULL,                         /* tp_setattr        */
+    NULL,                         /* tp_compare        */
+    NULL,                         /* tp_repr           */
+    NULL,                         /* tp_as_number      */
+    NULL,                         /* tp_as_sequence    */
+    NULL,                         /* tp_as_mapping     */
+    NULL,                         /* tp_hash           */
+    NULL,                         /* tp_call           */
+    NULL,                         /* tp_str            */
+    NULL,                         /* tp_getattro       */
+    NULL,                         /* tp_setattro       */
+    NULL,                         /* tp_as_buffer      */
+    Py_TPFLAGS_DEFAULT,           /* tp_flags          */
+    "Xen client connections",     /* tp_doc            */
+    NULL,                         /* tp_traverse       */
+    NULL,                         /* tp_clear          */
+    NULL,                         /* tp_richcompare    */
+    0,                            /* tp_weaklistoffset */
+    NULL,                         /* tp_iter           */
+    NULL,                         /* tp_iternext       */
+    pyxc_methods,                 /* tp_methods        */
+    NULL,                         /* tp_members        */
+    NULL,                         /* tp_getset         */
+    NULL,                         /* tp_base           */
+    NULL,                         /* tp_dict           */
+    NULL,                         /* tp_descr_get      */
+    NULL,                         /* tp_descr_set      */
+    0,                            /* tp_dictoffset     */
+    (initproc)PyXc_init,          /* tp_init           */
+    NULL,                         /* tp_alloc          */
+    PyXc_new,                     /* tp_new            */
 };
 
-static PyMethodDef PyXc_methods[] = {
-    { "new", PyXc_new, METH_VARARGS, "Create a new " XENPKG " object." },
-    { NULL, NULL, 0, NULL }
-};
+static PyMethodDef xc_methods[] = { { NULL } };
 
 PyMODINIT_FUNC initxc(void)
 {
-    PyObject *m, *d;
+    PyObject *m;
 
-    m = Py_InitModule(XENPKG, PyXc_methods);
+    if (PyType_Ready(&PyXcType) < 0)
+        return;
 
-    d = PyModule_GetDict(m);
-    xc_error = PyErr_NewException(XENPKG ".error", NULL, NULL);
-    PyDict_SetItemString(d, "error", xc_error);
-    PyDict_SetItemString(d, "VIRQ_DOM_EXC", PyInt_FromLong(VIRQ_DOM_EXC));
+    m = Py_InitModule(PKG, PyXc_methods);
 
+    if (m == NULL)
+      return;
+
+    xc_error = PyErr_NewException(PKG ".error", NULL, NULL);
     zero = PyInt_FromLong(0);
 
     /* KAF: This ensures that we get debug output in a timely manner. */
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
+
+    Py_INCREF(&PyXcType);
+    PyModule_AddObject(m, CLS, (PyObject *)&PyXcType);
 }
 
 

@@ -28,7 +28,7 @@ from xen.xend.XendError import VmError
 from xen.xend.server.DevController import DevController
 
 
-xc = xen.lowlevel.xc.new()
+xc = xen.lowlevel.xc.xc()
 
 
 def parse_ioport(val):

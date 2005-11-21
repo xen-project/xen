@@ -27,7 +27,7 @@ from xen.xend.XendLogging import log
 from xen.xend.server.netif import randomMAC
 
 
-xc = xen.lowlevel.xc.new()
+xc = xen.lowlevel.xc.xc()
 
 
 MAX_GUEST_CMDLINE = 1024

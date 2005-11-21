@@ -33,7 +33,7 @@ sizeof_int = calcsize("i")
 sizeof_unsigned_long = calcsize("L")
 
 
-xc = xen.lowlevel.xc.new()
+xc = xen.lowlevel.xc.xc()
 
 
 def write_exact(fd, buf, errmsg):

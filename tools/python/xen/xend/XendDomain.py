@@ -39,7 +39,7 @@ from xen.xend.server import relocate
 from xen.xend.xenstore.xswatch import xswatch
 
 
-xc = xen.lowlevel.xc.new()
+xc = xen.lowlevel.xc.xc()
 xroot = XendRoot.instance()
 
 
@@ -201,7 +201,7 @@ class XendDomain:
                             "%d.  Destroying it in the hope of "
                             "recovery.", d)
                         try:
-                            xc.domain_destroy(dom = d)
+                            xc.domain_destroy(d)
                         except:
                             log.exception('Destruction of %d failed.', d)
 
@@ -378,7 +378,7 @@ class XendDomain:
             val = dominfo.destroy()
         else:
             try:
-                val = xc.domain_destroy(dom=domid)
+                val = xc.domain_destroy(domid)
             except Exception, ex:
                 raise XendError(str(ex))
         return val       

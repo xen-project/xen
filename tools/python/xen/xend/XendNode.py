@@ -28,7 +28,7 @@ import xen.lowlevel.xc
 class XendNode:
 
     def __init__(self):
-        self.xc = xen.lowlevel.xc.new()
+        self.xc = xen.lowlevel.xc.xc()
 
     def shutdown(self):
         return 0
@@ -40,7 +40,7 @@ class XendNode:
         return 0
     
     def cpu_bvt_slice_set(self, ctx_allow):
-        return self.xc.bvtsched_global_set(ctx_allow=ctx_allow)
+        return self.xc.bvtsched_global_set(ctx_allow)
 
     def cpu_bvt_slice_get(self):
         return self.xc.bvtsched_global_get()

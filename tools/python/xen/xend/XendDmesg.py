@@ -22,7 +22,7 @@ import xen.lowlevel.xc
 
 class XendDmesg:
     def __init__(self):
-        self.xc = xen.lowlevel.xc.new()
+        self.xc = xen.lowlevel.xc.xc()
 
     def info(self):
         return self.xc.readconsolering()
