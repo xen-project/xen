@@ -60,6 +60,14 @@ class Opt:
         self.value = None
         self.set(default)
 
+
+    def reset(self):
+        self.specified_opt = None
+        self.specified_val = None
+        self.value = None
+        self.set(self.default)
+
+
     def __repr__(self):
         return self.name + '=' + str(self.specified_val)
 
@@ -222,6 +230,14 @@ class Opts:
         self.vars = {}
         # Option to use for bare words.
         self.default_opt = None
+
+
+    def reset(self):
+        self.vals = OptVals()
+        self.vars = {}
+        for opt in self.options:
+            opt.reset()
+
 
     def __repr__(self):
         return '\n'.join(map(str, self.options))
@@ -416,22 +432,22 @@ class Opts:
         are used to set options with the same names.
         Variables are not used to set options that are already specified.
         """
-        # Create global and lobal dicts for the file.
+        # Create global and local dicts for the file.
         # Initialize locals to the vars.
         # Use exec to do the standard imports and
         # define variables we are passing to the script.
-        globals = {}
-        locals = {}
-        locals.update(self.vars)
+        globs = {}
+        locs = {}
+        locs.update(self.vars)
         cmd = '\n'.join(self.imports + 
                         [ "from xen.xm.help import Vars",
                           "xm_file = '%s'" % defconfig,
                           "xm_help = %d" % help,
                           "xm_vars = Vars(xm_file, xm_help, locals())"
                           ])
-        exec cmd in globals, locals
+        exec cmd in globs, locs
         try:
-            execfile(defconfig, globals, locals)
+            execfile(defconfig, globs, locs)
         except:
             if not help: raise
         if help:
@@ -444,7 +460,7 @@ class Opts:
                    types.IntType,
                    types.FloatType
                    ]
-        for (k, v) in locals.items():
+        for (k, v) in locs.items():
             if self.specified(k): continue
             if not(type(v) in vtypes): continue
             self.setopt(k, v)

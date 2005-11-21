@@ -879,33 +879,33 @@ def balloon_out(dom0_min_mem, opts):
 
 
 def parseCommandLine(argv):
-    opts = gopts
-    args = opts.parse(argv)
-    if opts.vals.help:
-        opts.usage()
-    if opts.vals.help or opts.vals.help_config:
-        opts.load_defconfig(help=1)
-    if opts.vals.help or opts.vals.help_config:
+    gopts.reset()
+    args = gopts.parse(argv)
+    if gopts.vals.help:
+        gopts.usage()
+    if gopts.vals.help or gopts.vals.help_config:
+        gopts.load_defconfig(help=1)
+    if gopts.vals.help or gopts.vals.help_config:
         return (None, None)
 
-    if not opts.vals.display:
-        opts.vals.display = os.getenv("DISPLAY")
+    if not gopts.vals.display:
+        gopts.vals.display = os.getenv("DISPLAY")
 
     # Process remaining args as config variables.
     for arg in args:
         if '=' in arg:
             (var, val) = arg.strip().split('=', 1)
             gopts.setvar(var.strip(), val.strip())
-    if opts.vals.config:
-        config = opts.vals.config
+    if gopts.vals.config:
+        config = gopts.vals.config
     else:
-        opts.load_defconfig()
-        preprocess(opts.vals)
-        if not opts.getopt('name') and opts.getopt('defconfig'):
-            opts.setopt('name', os.path.basename(opts.getopt('defconfig')))
-        config = make_config(opts.vals)
+        gopts.load_defconfig()
+        preprocess(gopts.vals)
+        if not gopts.getopt('name') and gopts.getopt('defconfig'):
+            gopts.setopt('name', os.path.basename(gopts.getopt('defconfig')))
+        config = make_config(gopts.vals)
 
-    return (opts, config)
+    return (gopts, config)
 
 
 def main(argv):
