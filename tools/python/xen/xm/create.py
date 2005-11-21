@@ -909,7 +909,10 @@ def parseCommandLine(argv):
 
 
 def main(argv):
-    (opts, config) = parseCommandLine(argv)
+    try:
+        (opts, config) = parseCommandLine(argv)
+    except StandardError, ex:
+        err(str(ex))
 
     if not opts:
         return
@@ -924,8 +927,7 @@ def main(argv):
         dom0_min_mem = xroot.get_dom0_min_mem()
         if dom0_min_mem != 0:
             if balloon_out(dom0_min_mem, opts):
-                print >>sys.stderr, "error: cannot allocate enough memory for domain"
-                sys.exit(1)
+                err("cannot allocate enough memory for domain")
 
         dom = make_domain(opts, config)
         if opts.vals.console_autoconnect:
