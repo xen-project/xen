@@ -920,9 +920,9 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     struct vcpu *v;
     int new_modes = (mode & ~d->arch.shadow_mode);
 
-    // Gotta be adding something to call this function.
-    ASSERT(new_modes);
-
+    if(!new_modes) /* Nothing to do - return success */
+        return 0; 
+        
     // can't take anything away by calling this function.
     ASSERT(!(d->arch.shadow_mode & ~mode));
 

@@ -214,13 +214,6 @@ int xc_memory_op(int xc_handle,
             goto out1;
         }
         break;
-    case XENMEM_maximum_ram_page:
-        if ( mlock(arg, sizeof(unsigned long)) != 0 )
-        {
-            PERROR("Could not mlock");
-            goto out1;
-        }
-        break;
     }
 
     ret = do_xen_hypercall(xc_handle, &hypercall);
@@ -233,9 +226,6 @@ int xc_memory_op(int xc_handle,
         if ( reservation->extent_start != NULL )
             safe_munlock(reservation->extent_start,
                          reservation->nr_extents * sizeof(unsigned long));
-        break;
-    case XENMEM_maximum_ram_page:
-        safe_munlock(arg, sizeof(unsigned long));
         break;
     }
 

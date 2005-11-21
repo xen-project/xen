@@ -9,15 +9,13 @@
 #ifndef __XEN_PUBLIC_MEMORY_H__
 #define __XEN_PUBLIC_MEMORY_H__
 
-/* arg == addr of struct xen_memory_reservation. */
+/*
+ * Increase or decrease the specified domain's memory reservation. Returns a
+ * -ve errcode on failure, or the # extents successfully allocated or freed.
+ * arg == addr of struct xen_memory_reservation.
+ */
 #define XENMEM_increase_reservation 0
-
-/* arg == addr of struct xen_memory_reservation. */
 #define XENMEM_decrease_reservation 1
-
-/* arg == addr of unsigned long. */
-#define XENMEM_maximum_ram_page     2
-
 typedef struct xen_memory_reservation {
 
     /*
@@ -46,6 +44,21 @@ typedef struct xen_memory_reservation {
     domid_t        domid;
 
 } xen_memory_reservation_t;
+
+/*
+ * Returns the maximum machine frame number of mapped RAM in this system.
+ * This command always succeeds (it never returns an error code).
+ * arg == NULL.
+ */
+#define XENMEM_maximum_ram_page     2
+
+/*
+ * Returns the current or maximum memory reservation, in pages, of the
+ * specified domain (may be DOMID_SELF). Returns -ve errcode on failure.
+ * arg == addr of domid_t.
+ */
+#define XENMEM_current_reservation  3
+#define XENMEM_maximum_reservation  4
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 
