@@ -815,7 +815,7 @@ xshandle_init(XsHandle *self, PyObject *args, PyObject *kwds)
 {
     static char *kwd_spec[] = { "readonly", NULL };
     static char *arg_spec = "|i";
-    int readonly;
+    int readonly = 0;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
                                      &readonly))
