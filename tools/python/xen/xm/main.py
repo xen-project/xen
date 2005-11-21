@@ -182,7 +182,7 @@ For more help on xm create, see the xmdomain.cfg(5) man page"""
 help = {
     "--long": longhelp,
     "console": console_help,
-    "create": create_help,
+# create is handled specially
     "destroy": destroy_help,
     "domid ": domid_help,
     "domname": domname_help,
@@ -846,6 +846,9 @@ def deprecated(old,new):
     err('Option %s is the new replacement, see "xm help %s" for more info' % (new, new))
 
 def usage(cmd=None):
+    if cmd = 'create'
+        xm_subcommand("create", "--help")
+        sys.exit(1)
     if help.has_key(cmd):
         print "   " + help[cmd]
     else:
