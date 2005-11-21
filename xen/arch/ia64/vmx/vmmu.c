@@ -157,11 +157,13 @@ static thash_cb_t *init_domain_vhpt(struct vcpu *d)
     printk("Allocate domain vhpt at 0x%lx\n", (u64)vbase);
     memset(vbase, 0, VCPU_TLB_SIZE);
     vcur = (void*)((u64)vbase + VCPU_TLB_SIZE);
-    vhpt = --((thash_cb_t*)vcur);
+    vcur -= sizeof (thash_cb_t);
+    vhpt = vcur;
     vhpt->ht = THASH_VHPT;
     vhpt->vcpu = d;
     vhpt->hash_func = machine_thash;
-    vs = --((vhpt_special *)vcur);
+    vs -= sizeof (vhpt_special);
+    vs = vcur;
 
     /* Setup guest pta */
     pta_value.val = 0;
@@ -199,10 +201,12 @@ thash_cb_t *init_domain_tlb(struct vcpu *d)
     printk("Allocate domain tlb at 0x%lx\n", (u64)vbase);
     memset(vbase, 0, VCPU_TLB_SIZE);
     vcur = (void*)((u64)vbase + VCPU_TLB_SIZE);
-    tlb = --((thash_cb_t*)vcur);
+    vcur -= sizeof (thash_cb_t);
+    tlb = vcur;
     tlb->ht = THASH_TLB;
     tlb->vcpu = d;
-    ts = --((tlb_special_t *)vcur);
+    vcur -= sizeof (tlb_special_t);
+    ts = vcur;
     tlb->ts = ts;
     tlb->ts->vhpt = init_domain_vhpt(d);
     tlb->hash_func = machine_thash;

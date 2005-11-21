@@ -2,7 +2,7 @@ include $(BASEDIR)/Rules.mk
 
 VPATH = xen vmx linux linux-xen
 
-OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
+OBJS = xensetup.o setup.o time.o irq.o process.o smp.o \
 	xenmisc.o acpi.o hypercall.o \
 	machvec.o dom0_ops.o domain.o hpsimserial.o pcdp.o \
 	idle0_task.o pal.o hpsim.o efi.o efi_stub.o ivt.o mm_contig.o \
@@ -10,7 +10,7 @@ OBJS = xensetup.o setup.o time.o irq.o ia64_ksyms.o process.o smp.o \
 	extable.o linuxextable.o sort.o xenirq.o xentime.o \
 	regionreg.o entry.o unaligned.o privop.o vcpu.o \
 	irq_ia64.o irq_lsapic.o vhpt.o xenasm.o hyperprivop.o dom_fw.o \
-	grant_table.o sn_console.o
+	grant_table.o sn_console.o # ia64_ksyms.o 
 
 OBJS += vmx_init.o vmx_virt.o vmx_vcpu.o vmx_process.o vmx_vsa.o vmx_ivt.o\
 	vmx_phy_mode.o vmx_utility.o vmx_interrupt.o vmx_entry.o vmmu.o \
@@ -45,7 +45,7 @@ asm-offsets.s: asm-offsets.c $(BASEDIR)/include/asm-ia64/.offsets.h.stamp $(BASE
 
 asm-xsi-offsets.s: asm-xsi-offsets.c 
 	$(CC) $(CFLAGS) -S -o $@ $<
-	
+
 $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h: asm-xsi-offsets.s
 	@(set -e; \
 	  echo "/*"; \

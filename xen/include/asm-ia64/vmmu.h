@@ -222,7 +222,10 @@ typedef struct thash_cb {
 #define ITR(hcb,id)             ((hcb)->ts->itr[id])
 #define DTR(hcb,id)             ((hcb)->ts->dtr[id])
 #define INVALIDATE_HASH(hcb,hash)           {   \
-           INVALID_ENTRY(hcb, hash) = 1;        \
+           if ((hcb)->ht==THASH_TLB)            \
+             INVALID_TLB(hash) = 1;             \
+           else                                 \
+             INVALID_VHPT(hash) = 1;            \
            hash->next = NULL; }
 
 #define PURGABLE_ENTRY(hcb,en)  1

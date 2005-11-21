@@ -698,13 +698,10 @@ ia64_handle_privop (unsigned long ifa, struct pt_regs *regs, unsigned long isr, 
 	IA64FAULT vector;
 	struct domain *d = current->domain;
 	struct vcpu *v = current;
-	// FIXME: no need to pass itir in to this routine as we need to
-	// compute the virtual itir anyway (based on domain's RR.ps)
-	// AND ACTUALLY reflect_interruption doesn't use it anyway!
 	vector = priv_emulate(current,regs,isr);
 	if (vector != IA64_NO_FAULT && vector != IA64_RFI_IN_PROGRESS) {
-		PSCB(current,itir) =
-			vcpu_get_itir_on_fault(v,PSCB(current,ifa));
+		// Note: if a path results in a vector to reflect that requires
+		// iha/itir (e.g. vcpu_force_data_miss), they must be set there
 		reflect_interruption(isr,regs,vector);
 	}
 }
@@ -743,10 +740,15 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		vector = IA64_DISABLED_FPREG_VECTOR;
 		break;
 	    case 26:
+		if (((isr >> 4L) & 0xfL) == 1) {
+			//regs->eml_unat = 0;  FIXME: DO WE NEED THIS??
+			printf("ia64_handle_reflection: handling regNaT fault");
+			vector = IA64_NAT_CONSUMPTION_VECTOR; break;
+		}
 printf("*** NaT fault... attempting to handle as privop\n");
 printf("isr=%p, ifa=%p,iip=%p,ipsr=%p\n",isr,ifa,regs->cr_iip,psr);
-		regs->eml_unat = 0;
-		return;
+		//regs->eml_unat = 0;  FIXME: DO WE NEED THIS???
+		// certain NaT faults are higher priority than privop faults
 		vector = priv_emulate(v,regs,isr);
 		if (vector == IA64_NO_FAULT) {
 printf("*** Handled privop masquerading as NaT fault\n");

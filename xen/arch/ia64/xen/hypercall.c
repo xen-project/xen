@@ -123,32 +123,16 @@ ia64_hypercall (struct pt_regs *regs)
 		// FIXME: need fixes in efi.h from 2.6.9
 		regs->r8 = EFI_UNSUPPORTED;
 		break;
-	    case 0xffff: // test dummy hypercall
+	    case 0xffff:
 		regs->r8 = dump_privop_counts_to_user(
 			vcpu_get_gr(v,32),
 			vcpu_get_gr(v,33));
 		break;
-	    case 0xfffe: // test dummy hypercall
+	    case 0xfffe:
 		regs->r8 = zero_privop_counts_to_user(
 			vcpu_get_gr(v,32),
 			vcpu_get_gr(v,33));
 		break;
-	    case 0xfffd: // test dummy hypercall
-		regs->r8 = launch_domainU(
-			vcpu_get_gr(v,32));
-		break;
-	    case 0xfffc: // test dummy hypercall
-		regs->r8 = domU_staging_write_32(
-			vcpu_get_gr(v,32),
-			vcpu_get_gr(v,33),
-			vcpu_get_gr(v,34),
-			vcpu_get_gr(v,35),
-			vcpu_get_gr(v,36));
-		break;
-	    case 0xfffb: // test dummy hypercall
-		regs->r8 = domU_staging_read_8(vcpu_get_gr(v,32));
-		break;
-
 	    case __HYPERVISOR_dom0_op:
 		regs->r8 = do_dom0_op(regs->r14);
 		break;

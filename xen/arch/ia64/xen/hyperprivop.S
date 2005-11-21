@@ -1967,6 +1967,12 @@ ENTRY(hyper_itc_d)
 	extr.u r24=r23,2,6;;		// r24==logps
 	cmp.gt p7,p0=PAGE_SHIFT,r24
 (p7)	br.spnt.many dispatch_break_fault ;;
+	adds r21=XSI_IFA_OFS-XSI_PSR_IC_OFS,r18 ;;
+	ld8 r21=[r21];;
+	// for now, punt on region0 inserts
+	extr.u r21=r21,61,3;;
+	cmp.eq p7,p0=r21,r0
+(p7)	br.spnt.many dispatch_break_fault ;;
 	movl r27=THIS_CPU(cpu_kr)+IA64_KR_CURRENT_OFFSET;;
 	ld8 r27=[r27];;
 	adds r27=IA64_VCPU_DOMAIN_OFFSET,r27;;

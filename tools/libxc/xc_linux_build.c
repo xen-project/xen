@@ -278,7 +278,8 @@ static int setup_pg_tables_64(int xc_handle, uint32_t dom,
 #endif
 
 #ifdef __ia64__
-#include <asm/fpu.h> /* for FPSR_DEFAULT */
+extern unsigned long xc_ia64_fpsr_default(void);
+
 static int setup_guest(int xc_handle,
                        uint32_t dom,
                        char *image, unsigned long image_size,
@@ -780,7 +781,7 @@ int xc_linux_build(int xc_handle,
     ctxt->regs.cr_ipsr = 0; /* all necessary bits filled by hypervisor */
     ctxt->regs.cr_iip = vkern_entry;
     ctxt->regs.cr_ifs = 1UL << 63;
-    ctxt->regs.ar_fpsr = FPSR_DEFAULT;
+    ctxt->regs.ar_fpsr = xc_ia64_fpsr_default();
     /* currently done by hypervisor, should move here */
     /* ctxt->regs.r28 = dom_fw_setup(); */
     ctxt->vcpu.privregs = 0;

@@ -466,11 +466,8 @@ acpi_update_madt_checksum (unsigned long phys_addr, unsigned long size)
 /* base is physical address of acpi table */
 void touch_acpi_table(void)
 {
-	u64 count = 0;
-	count = acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, NR_CPUS);
-	if ( count < 1)
+	if (acpi_table_parse_madt(ACPI_MADT_LSAPIC, acpi_update_lsapic, 0) < 0)
 		printk("Error parsing MADT - no LAPIC entires\n");
-	printk("Total %d lsapic entry\n", count);
 	acpi_table_parse(ACPI_APIC, acpi_update_madt_checksum);
 
 	return;
@@ -686,6 +683,12 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	bp->console_info.orig_x = 0;
 	bp->console_info.orig_y = 24;
 	bp->fpswa = 0;
+        bp->initrd_start = (dom0_start+dom0_size) -
+                (PAGE_ALIGN(ia64_boot_param->initrd_size) + 4*1024*1024);
+        bp->initrd_size = ia64_boot_param->initrd_size;
+                printf(" initrd start %0xlx", bp->initrd_start);
+                printf(" initrd size %0xlx", bp->initrd_size);
+
 
 	return bp;
 }

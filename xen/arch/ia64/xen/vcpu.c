@@ -147,6 +147,9 @@ void vcpu_load_kernel_regs(VCPU *vcpu)
 	ia64_set_kr(7, VCPU(vcpu, krs[7]));
 }
 
+/* GCC 4.0.2 seems not to be able to suppress this call!.  */
+#define ia64_setreg_unknown_kr() return IA64_ILLOP_FAULT
+
 IA64FAULT vcpu_set_ar(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
 	if (reg == 44) return (vcpu_set_itc(vcpu,val));
@@ -342,19 +345,17 @@ IA64FAULT vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
 
 IA64FAULT vcpu_get_psr(VCPU *vcpu, UINT64 *pval)
 {
-	UINT64 psr;
+	REGS *regs = vcpu_regs(vcpu);
 	struct ia64_psr newpsr;
 
-	// TODO: This needs to return a "filtered" view of
-	// the psr, not the actual psr.  Probably the psr needs
-	// to be a field in regs (in addition to ipsr).
-	__asm__ __volatile ("mov %0=psr;;" : "=r"(psr) :: "memory");
-	newpsr = *(struct ia64_psr *)&psr;
+	newpsr = *(struct ia64_psr *)&regs->cr_ipsr;
 	if (newpsr.cpl == 2) newpsr.cpl = 0;
 	if (PSCB(vcpu,interrupt_delivery_enabled)) newpsr.i = 1;
 	else newpsr.i = 0;
 	if (PSCB(vcpu,interrupt_collection_enabled)) newpsr.ic = 1;
 	else newpsr.ic = 0;
+	if (PSCB(vcpu,metaphysical_mode)) newpsr.dt = 0;
+	else newpsr.dt = 1;
 // FIXME: need new field in mapped_regs_t for virtual psr.pp (psr.be too?)
 	if (PSCB(vcpu,tmp[8])) newpsr.pp = 1;
 	else newpsr.pp = 0;
@@ -1183,6 +1184,8 @@ Privileged operation emulation routines
 IA64FAULT vcpu_force_data_miss(VCPU *vcpu, UINT64 ifa)
 {
 	PSCB(vcpu,ifa) = ifa;
+	PSCB(vcpu,itir) = vcpu_get_itir_on_fault(vcpu,ifa);
+	vcpu_thash(current, ifa, &PSCB(current,iha));
 	return (vcpu_get_rr_ve(vcpu,ifa) ? IA64_DATA_TLB_VECTOR : IA64_ALT_DATA_TLB_VECTOR);
 }
 
@@ -1256,7 +1259,6 @@ IA64FAULT vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 	UINT64 Mask = (1L << pta_sz) - 1;
 	UINT64 Mask_60_15 = (Mask >> 15) & 0x3fffffffffff;
 	UINT64 compMask_60_15 = ~Mask_60_15;
-	//UINT64 rr_ps = RR_TO_PS(get_rr(vadr));
 	UINT64 rr_ps = vcpu_get_rr_ps(vcpu,vadr);
 	UINT64 VHPT_offset = (vadr >> rr_ps) << 3;
 	UINT64 VHPT_addr1 = vadr & 0xe000000000000000L;
@@ -1287,29 +1289,39 @@ unsigned long fast_vhpt_translate_count = 0;
 unsigned long recover_to_page_fault_count = 0;
 unsigned long recover_to_break_fault_count = 0;
 
+int warn_region0_address = 0; // FIXME later: tie to a boot parameter?
+
 IA64FAULT vcpu_translate(VCPU *vcpu, UINT64 address, BOOLEAN is_data, UINT64 *pteval, UINT64 *itir, UINT64 *iha)
 {
+	unsigned long region = address >> 61;
 	unsigned long pta, pte, rid, rr;
 	int i;
 	TR_ENTRY *trp;
 
-	if (!(address >> 61)) {
-		if (!PSCB(vcpu,metaphysical_mode)) {
-			REGS *regs = vcpu_regs(vcpu);
-			unsigned long viip = PSCB(vcpu,iip);
-			unsigned long vipsr = PSCB(vcpu,ipsr);
-			unsigned long iip = regs->cr_iip;
-			unsigned long ipsr = regs->cr_ipsr;
-			printk("vcpu_translate: bad address %p, viip=%p, vipsr=%p, iip=%p, ipsr=%p continuing\n", address, viip, vipsr, iip, ipsr);
+	if (PSCB(vcpu,metaphysical_mode) && !(!is_data && region)) {
+		// dom0 may generate an uncacheable physical address (msb=1)
+		if (region && ((region != 4) || (vcpu->domain != dom0))) {
+// FIXME: This seems to happen even though it shouldn't.  Need to track
+// this down, but since it has been apparently harmless, just flag it for now
+//			panic_domain(vcpu_regs(vcpu),
+			printk(
+			 "vcpu_translate: bad physical address: %p\n",address);
 		}
-
 		*pteval = (address & _PAGE_PPN_MASK) | __DIRTY_BITS | _PAGE_PL_2 | _PAGE_AR_RWX;
 		*itir = PAGE_SHIFT << 2;
 		phys_translate_count++;
 		return IA64_NO_FAULT;
 	}
+	else if (!region && warn_region0_address) {
+		REGS *regs = vcpu_regs(vcpu);
+		unsigned long viip = PSCB(vcpu,iip);
+		unsigned long vipsr = PSCB(vcpu,ipsr);
+		unsigned long iip = regs->cr_iip;
+		unsigned long ipsr = regs->cr_ipsr;
+		printk("vcpu_translate: bad address %p, viip=%p, vipsr=%p, iip=%p, ipsr=%p continuing\n", address, viip, vipsr, iip, ipsr);
+	}
 
-	rr = PSCB(vcpu,rrs)[address>>61];
+	rr = PSCB(vcpu,rrs)[region];
 	rid = rr & RR_RID_MASK;
 	if (is_data) {
 		if (vcpu_quick_region_check(vcpu->arch.dtr_regions,address)) {
@@ -1685,7 +1697,7 @@ static void vcpu_set_tr_entry(TR_ENTRY *trp, UINT64 pte, UINT64 itir, UINT64 ifa
 	UINT64 ps;
 
 	trp->itir = itir;
-	trp->rid = virtualize_rid(current, get_rr(ifa) & RR_RID_MASK);
+	trp->rid = VCPU(current,rrs[ifa>>61]) & RR_RID_MASK;
 	trp->p = 1;
 	ps = trp->ps;
 	trp->page_flags = pte;
@@ -1760,7 +1772,8 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 	// PAGE_SIZE mapping in the vhpt for now, else purging is complicated
 	else vhpt_insert(vaddr,pte,PAGE_SHIFT<<2);
 #endif
-	if ((mp_pte == -1UL) || (IorD & 0x4)) return;  // don't place in 1-entry TLB
+	if ((mp_pte == -1UL) || (IorD & 0x4)) // don't place in 1-entry TLB
+		return;
 	if (IorD & 0x1) {
 		vcpu_set_tr_entry(&PSCBX(vcpu,itlb),pte,ps<<2,vaddr);
 		PSCBX(vcpu,itlb_pte) = mp_pte;
@@ -1775,6 +1788,7 @@ IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
 	unsigned long pteval, logps = (itir >> 2) & 0x3f;
 	unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
+	BOOLEAN swap_rr0 = (!(ifa>>61) && PSCB(vcpu,metaphysical_mode));
 
 	if (logps < PAGE_SHIFT) {
 		printf("vcpu_itc_d: domain trying to use smaller page size!\n");
@@ -1784,7 +1798,9 @@ IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 	//itir = (itir & ~0xfc) | (PAGE_SHIFT<<2); // ignore domain's pagesize
 	pteval = translate_domain_pte(pte,ifa,itir);
 	if (!pteval) return IA64_ILLOP_FAULT;
+	if (swap_rr0) set_one_rr(0x0,PSCB(vcpu,rrs[0]));
 	vcpu_itc_no_srlz(vcpu,2,ifa,pteval,pte,logps);
+	if (swap_rr0) set_metaphysical_rr0();
 	return IA64_NO_FAULT;
 }
 
@@ -1792,6 +1808,7 @@ IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 {
 	unsigned long pteval, logps = (itir >> 2) & 0x3f;
 	unsigned long translate_domain_pte(UINT64,UINT64,UINT64);
+	BOOLEAN swap_rr0 = (!(ifa>>61) && PSCB(vcpu,metaphysical_mode));
 
 	// FIXME: validate ifa here (not in Xen space), COULD MACHINE CHECK!
 	if (logps < PAGE_SHIFT) {
@@ -1803,7 +1820,9 @@ IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 	pteval = translate_domain_pte(pte,ifa,itir);
 	// FIXME: what to do if bad physical address? (machine check?)
 	if (!pteval) return IA64_ILLOP_FAULT;
+	if (swap_rr0) set_one_rr(0x0,PSCB(vcpu,rrs[0]));
 	vcpu_itc_no_srlz(vcpu, 1,ifa,pteval,pte,logps);
+	if (swap_rr0) set_metaphysical_rr0();
 	return IA64_NO_FAULT;
 }
 

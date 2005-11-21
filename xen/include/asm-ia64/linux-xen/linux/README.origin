@@ -6,5 +6,6 @@
 # easily updated to future versions of the corresponding Linux files.
 
 cpumask.h 		-> linux/include/linux/cpumask.h
+gfp.h	 		-> linux/include/linux/gfp.h
 hardirq.h 		-> linux/include/linux/hardirq.h
 interrupt.h 		-> linux/include/linux/interrupt.h

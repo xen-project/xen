@@ -11,6 +11,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
@@ -48,15 +49,8 @@
 
 #define CONFIG_DOMAIN0_CONTIGUOUS
 unsigned long dom0_start = -1L;
-unsigned long dom0_size = 512*1024*1024; //FIXME: Should be configurable
-//FIXME: alignment should be 256MB, lest Linux use a 256MB page size
-unsigned long dom0_align = 256*1024*1024;
-#ifdef DOMU_BUILD_STAGING
-unsigned long domU_staging_size = 32*1024*1024; //FIXME: Should be configurable
-unsigned long domU_staging_start;
-unsigned long domU_staging_align = 64*1024;
-unsigned long *domU_staging_area;
-#endif
+unsigned long dom0_size = 512*1024*1024;
+unsigned long dom0_align = 64*1024*1024;
 
 // initialized by arch/ia64/setup.c:find_initrd()
 unsigned long initrd_start = 0, initrd_end = 0;
@@ -750,46 +744,6 @@ void alloc_dom0(void)
 
 }
 
-#ifdef DOMU_BUILD_STAGING
-void alloc_domU_staging(void)
-{
-	domU_staging_size = 32*1024*1024; //FIXME: Should be configurable
-	printf("alloc_domU_staging: starting (initializing %d MB...)\n",domU_staging_size/(1024*1024));
-	domU_staging_start = alloc_boot_pages(
-            domU_staging_size >> PAGE_SHIFT, domU_staging_align >> PAGE_SHIFT);
-        domU_staging_start <<= PAGE_SHIFT;
-	if (!domU_staging_size) {
-		printf("alloc_domU_staging: can't allocate, spinning...\n");
-		while(1);
-	}
-	else domU_staging_area = (unsigned long *)__va(domU_staging_start);
-	printf("alloc_domU_staging: domU_staging_area=%p\n",domU_staging_area);
-
-}
-
-unsigned long
-domU_staging_read_8(unsigned long at)
-{
-	// no way to return errors so just do it
-	return domU_staging_area[at>>3];
-	
-}
-
-unsigned long
-domU_staging_write_32(unsigned long at, unsigned long a, unsigned long b,
-	unsigned long c, unsigned long d)
-{
-	if (at + 32 > domU_staging_size) return -1;
-	if (at & 0x1f) return -1;
-	at >>= 3;
-	domU_staging_area[at++] = a;
-	domU_staging_area[at++] = b;
-	domU_staging_area[at++] = c;
-	domU_staging_area[at] = d;
-	return 0;
-	
-}
-#endif
 
 /*
  * Domain 0 has direct access to all devices absolutely. However
@@ -823,6 +777,7 @@ int construct_dom0(struct domain *d,
 	unsigned long pkern_start;
 	unsigned long pkern_entry;
 	unsigned long pkern_end;
+	unsigned long pinitrd_start = 0;
 	unsigned long ret, progress = 0;
 
 //printf("construct_dom0: starting\n");
@@ -841,12 +796,6 @@ int construct_dom0(struct domain *d,
 	alloc_start = dom0_start;
 	alloc_end = dom0_start + dom0_size;
 	d->tot_pages = d->max_pages = dom0_size/PAGE_SIZE;
-	image_start = __va(ia64_boot_param->initrd_start);
-	image_len = ia64_boot_param->initrd_size;
-//printk("image_start=%lx, image_len=%lx\n",image_start,image_len);
-//printk("First word of image: %lx\n",*(unsigned long *)image_start);
-
-//printf("construct_dom0: about to call parseelfimage\n");
 	dsi.image_addr = (unsigned long)image_start;
 	dsi.image_len  = image_len;
 	rc = parseelfimage(&dsi);
@@ -883,11 +832,18 @@ int construct_dom0(struct domain *d,
 	    return -EINVAL;
 	}
 
+        if(initrd_start&&initrd_len){
+             pinitrd_start=(dom0_start+dom0_size) -
+                          (PAGE_ALIGN(initrd_len) + 4*1024*1024);
+
+             memcpy(__va(pinitrd_start),initrd_start,initrd_len);
+        }
+
 	printk("METAPHYSICAL MEMORY ARRANGEMENT:\n"
 	       " Kernel image:  %lx->%lx\n"
 	       " Entry address: %lx\n"
-	       " Init. ramdisk:   (NOT IMPLEMENTED YET)\n",
-	       pkern_start, pkern_end, pkern_entry);
+               " Init. ramdisk: %lx len %lx\n",
+               pkern_start, pkern_end, pkern_entry, pinitrd_start, initrd_len);
 
 	if ( (pkern_end - pkern_start) > (d->max_pages * PAGE_SIZE) )
 	{
@@ -1074,29 +1030,6 @@ void reconstruct_domU(struct vcpu *v)
 }
 #endif
 
-// FIXME: When dom0 can construct domains, this goes away (or is rewritten)
-int launch_domainU(unsigned long size)
-{
-#ifdef CLONE_DOMAIN0
-	static int next = CLONE_DOMAIN0+1;
-#else
-	static int next = 1;
-#endif	
-
-	struct domain *d = do_createdomain(next,0);
-	if (!d) {
-		printf("launch_domainU: couldn't create\n");
-		return 1;
-	}
-	else next++;
-	if (construct_domU(d, (unsigned long)domU_staging_area, size,0,0,0)) {
-		printf("launch_domainU: couldn't construct(id=%d,%lx,%lx)\n",
-			d->domain_id,domU_staging_area,size);
-		return 2;
-	}
-	domain_unpause_by_systemcontroller(d);
-}
-
 void machine_restart(char * __unused)
 {
 	if (platform_is_hp_ski()) dummy();
@@ -1154,3 +1087,54 @@ void sync_vcpu_execstate(struct vcpu *v)
 	}
 	// FIXME SMP: Anything else needed here for SMP?
 }
+
+// FIXME: It would be nice to print out a nice error message for bad
+//  values of these boot-time parameters, but it seems we are too early
+//  in the boot and attempts to print freeze the system?
+#define abort(x...) do {} while(0)
+#define warn(x...) do {} while(0)
+
+static void parse_dom0_mem(char *s)
+{
+	unsigned long bytes = parse_size_and_unit(s);
+
+	if (dom0_size < 4 * 1024 * 1024) {
+		abort("parse_dom0_mem: too small, boot aborted"
+			" (try e.g. dom0_mem=256M or dom0_mem=65536K)\n");
+	}
+	if (dom0_size % dom0_align) {
+		dom0_size = ((dom0_size / dom0_align) + 1) * dom0_align;
+		warn("parse_dom0_mem: dom0_size rounded up from"
+			" %lx to %lx bytes, due to dom0_align=%lx\n",
+			bytes,dom0_size,dom0_align);
+	}
+	else dom0_size = bytes;
+}
+custom_param("dom0_mem", parse_dom0_mem);
+
+
+static void parse_dom0_align(char *s)
+{
+	unsigned long bytes = parse_size_and_unit(s);
+
+	if ((bytes - 1) ^ bytes) { /* not a power of two */
+		abort("parse_dom0_align: dom0_align must be power of two, "
+			"boot aborted"
+			" (try e.g. dom0_align=256M or dom0_align=65536K)\n");
+	}
+	else if (bytes < PAGE_SIZE) {
+		abort("parse_dom0_align: dom0_align must be >= %ld, "
+			"boot aborted"
+			" (try e.g. dom0_align=256M or dom0_align=65536K)\n",
+			PAGE_SIZE);
+	}
+	else dom0_align = bytes;
+	if (dom0_size % dom0_align) {
+		dom0_size = (dom0_size / dom0_align + 1) * dom0_align;
+		warn("parse_dom0_align: dom0_size rounded up from"
+			" %ld to %ld bytes, due to dom0_align=%lx\n",
+			bytes,dom0_size,dom0_align);
+	}
+}
+custom_param("dom0_align", parse_dom0_align);
+

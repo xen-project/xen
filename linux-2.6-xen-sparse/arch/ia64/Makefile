@@ -60,10 +60,15 @@ core-$(CONFIG_IA64_GENERIC) 	+= arch/ia64/dig/
 core-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/dig/
 core-$(CONFIG_IA64_HP_ZX1_SWIOTLB) += arch/ia64/dig/
 core-$(CONFIG_IA64_SGI_SN2)	+= arch/ia64/sn/
-core-$(CONFIG_XEN)		+= arch/ia64/xen/ arch/ia64/hp/sim/
+core-$(CONFIG_XEN)		+= arch/ia64/xen/
 
 drivers-$(CONFIG_PCI)		+= arch/ia64/pci/
+ifneq ($(CONFIG_XEN),y)
 drivers-$(CONFIG_IA64_HP_SIM)	+= arch/ia64/hp/sim/
+endif
+ifneq ($(CONFIG_IA64_GENERIC),y)
+drivers-$(CONFIG_XEN)		+= arch/ia64/hp/sim/
+endif
 drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/
 drivers-$(CONFIG_IA64_HP_ZX1_SWIOTLB) += arch/ia64/hp/common/ arch/ia64/hp/zx1/
 drivers-$(CONFIG_IA64_GENERIC)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/ arch/ia64/hp/sim/ arch/ia64/sn/

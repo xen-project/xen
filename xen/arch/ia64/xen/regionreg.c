@@ -190,12 +190,6 @@ set_rr(unsigned long rr, unsigned long rrval)
 	ia64_srlz_d();
 }
 
-unsigned long
-get_rr(unsigned long rr)
-{
-	return vmUnmangleRID(ia64_get_rr(rr));
-}
-
 static inline int validate_page_size(unsigned long ps)
 {
 	switch(ps) {

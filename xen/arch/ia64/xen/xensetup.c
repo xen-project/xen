@@ -153,7 +153,8 @@ void start_kernel(void)
     void *heap_start;
     int i;
     unsigned long max_mem, nr_pages, firsthole_start;
-    unsigned long dom0_memory_start, dom0_memory_end;
+    unsigned long dom0_memory_start, dom0_memory_size;
+    unsigned long dom0_initrd_start, dom0_initrd_size;
     unsigned long initial_images_start, initial_images_end;
 
     running_on_sim = is_platform_hp_ski();
@@ -190,8 +191,30 @@ void start_kernel(void)
     firsthole_start = 0;
     efi_memmap_walk(xen_find_first_hole, &firsthole_start);
 
+    if (ia64_boot_param->domain_start == 0
+	|| ia64_boot_param->domain_size == 0) {
+	    /* This is possible only with the old elilo, which does not support
+	       a vmm.  Fix now, and continue without initrd.  */
+	    printk ("Your elilo is not Xen-aware.  Bootparams fixed\n");
+	    ia64_boot_param->domain_start = ia64_boot_param->initrd_start;
+	    ia64_boot_param->domain_size = ia64_boot_param->initrd_size;
+	    ia64_boot_param->initrd_start = 0;
+	    ia64_boot_param->initrd_size = 0;
+    }
+
     initial_images_start = xenheap_phys_end;
-    initial_images_end = initial_images_start + ia64_boot_param->initrd_size;
+    initial_images_end = initial_images_start +
+       PAGE_ALIGN(ia64_boot_param->domain_size);
+
+    /* also reserve space for initrd */
+    if (ia64_boot_param->initrd_start && ia64_boot_param->initrd_size)
+       initial_images_end += PAGE_ALIGN(ia64_boot_param->initrd_size);
+    else {
+       /* sanity cleanup */
+       ia64_boot_param->initrd_size = 0;
+       ia64_boot_param->initrd_start = 0;
+    }
+
 
     /* Later may find another memory trunk, even away from xen image... */
     if (initial_images_end > firsthole_start) {
@@ -203,11 +226,21 @@ void start_kernel(void)
 
     /* This copy is time consuming, but elilo may load Dom0 image
      * within xenheap range */
-    printk("ready to move Dom0 to 0x%lx...", initial_images_start);
+    printk("ready to move Dom0 to 0x%lx with len %lx...", initial_images_start,
+          ia64_boot_param->domain_size);
+
     memmove(__va(initial_images_start),
+          __va(ia64_boot_param->domain_start),
+          ia64_boot_param->domain_size);
+//    ia64_boot_param->domain_start = initial_images_start;
+
+    printk("ready to move initrd to 0x%lx with len %lx...",
+          initial_images_start+PAGE_ALIGN(ia64_boot_param->domain_size),
+          ia64_boot_param->initrd_size);
+    memmove(__va(initial_images_start+PAGE_ALIGN(ia64_boot_param->domain_size)),
+
 	   __va(ia64_boot_param->initrd_start),
 	   ia64_boot_param->initrd_size);
-    ia64_boot_param->initrd_start = initial_images_start;
     printk("Done\n");
 
     /* first find highest page frame number */
@@ -235,9 +268,6 @@ void start_kernel(void)
     __ia64_init_fpu();
 
     alloc_dom0();
-#ifdef DOMU_BUILD_STAGING
-    alloc_domU_staging();
-#endif
 
     end_boot_allocator();
 
@@ -329,13 +359,16 @@ printk("About to call do_createdomain()\n");
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
-printk("About to call construct_dom0()\n");
-    dom0_memory_start = __va(ia64_boot_param->initrd_start);
-    dom0_memory_end = ia64_boot_param->initrd_size;
-    if ( construct_dom0(dom0, dom0_memory_start, dom0_memory_end,
-			0,
-                        0,
-			0) != 0)
+    printk("About to call construct_dom0()\n");
+    dom0_memory_start = __va(initial_images_start);
+    dom0_memory_size = ia64_boot_param->domain_size;
+    dom0_initrd_start = __va(initial_images_start +
+			     PAGE_ALIGN(ia64_boot_param->domain_size));
+    dom0_initrd_size = ia64_boot_param->initrd_size;
+ 
+    if ( construct_dom0(dom0, dom0_memory_start, dom0_memory_size,
+                        dom0_initrd_start,dom0_initrd_size,
+  			0) != 0)
         panic("Could not set up DOM0 guest OS\n");
 
     /* PIN domain0 on CPU 0.  */
@@ -345,22 +378,28 @@ printk("About to call construct_dom0()\n");
 #ifdef CLONE_DOMAIN0
     {
     int i;
-    dom0_memory_start = __va(ia64_boot_param->initrd_start);
-    dom0_memory_end = ia64_boot_param->initrd_size;
+    dom0_memory_start = __va(ia64_boot_param->domain_start);
+    dom0_memory_size = ia64_boot_param->domain_size;
+
     for (i = 0; i < CLONE_DOMAIN0; i++) {
-printk("CONSTRUCTING DOMAIN0 CLONE #%d\n",i+1);
-        if ( construct_domU(clones[i], dom0_memory_start, dom0_memory_end,
-                        0, 
-                        0,
-			0) != 0)
+      printk("CONSTRUCTING DOMAIN0 CLONE #%d\n",i+1);
+      if ( construct_domU(clones[i], dom0_memory_start, dom0_memory_size,
+			  dom0_initrd_start,dom0_initrd_size,
+			  0) != 0)
             panic("Could not set up DOM0 clone %d\n",i);
     }
     }
 #endif
 
     /* The stash space for the initial kernel image can now be freed up. */
-    init_domheap_pages(ia64_boot_param->initrd_start,
-		       ia64_boot_param->initrd_start + ia64_boot_param->initrd_size);
+    init_domheap_pages(ia64_boot_param->domain_start,
+                       ia64_boot_param->domain_size);
+    /* throw away initrd area passed from elilo */
+    if (ia64_boot_param->initrd_size) {
+        init_domheap_pages(ia64_boot_param->initrd_start,
+                          ia64_boot_param->initrd_size);
+    }
+
     if (!running_on_sim)  // slow on ski and pages are pre-initialized to zero
 	scrub_heap_pages();
 

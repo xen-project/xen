@@ -3,7 +3,7 @@
 
 #include <xen/config.h>
 #ifdef LINUX_2_6
-#include <xen/gfp.h>
+#include <linux/gfp.h>
 #endif
 #include <xen/list.h>
 #include <xen/spinlock.h>
