@@ -789,84 +789,119 @@ static PyObject *xshandle_getattr(PyObject *self, char *name)
     return Py_FindMethod(xshandle_methods, self, name);
 }
 
-static void xshandle_dealloc(PyObject *self)
+static PyObject *
+xshandle_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    XsHandle *xh = (XsHandle*)self;
-    if (xh->xh) {
-        xs_daemon_close(xh->xh);
-        xh->xh = NULL;
-    }
-    PyObject_Del(self);
-}
+    XsHandle *self = (XsHandle *)type->tp_alloc(type, 0);
 
-static PyTypeObject xshandle_type = {
-    PyObject_HEAD_INIT(&PyType_Type)
-    0,
-    "xshandle",
-    sizeof(XsHandle),
-    0,
-    xshandle_dealloc,   /* tp_dealloc     */
-    NULL,               /* tp_print       */
-    xshandle_getattr,   /* tp_getattr     */
-    NULL,               /* tp_setattr     */
-    NULL,               /* tp_compare     */
-    NULL,               /* tp_repr        */
-    NULL,               /* tp_as_number   */
-    NULL,               /* tp_as_sequence */
-    NULL,               /* tp_as_mapping  */
-    NULL                /* tp_hash        */
-};
-
-static PyObject *xshandle_open(PyObject *self, PyObject *args, PyObject *kwds)
-{
-    static char *kwd_spec[] = { "readonly", NULL };
-    static char *arg_spec = "|i";
-    int readonly = 0;
-
-    XsHandle *xsh = NULL;
-    PyObject *val = NULL;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
-                                     &readonly))
+    if (self == NULL)
         return NULL;
 
-    xsh = PyObject_New(XsHandle, &xshandle_type);
-    if (!xsh)
-        return NULL;
-    xsh->watches = PyList_New(0);
-    if (!xsh->watches)
-        goto exit;
-    xsh->xh = (readonly ? xs_daemon_open_readonly() : xs_daemon_open());
-    if (!xsh->xh) {
-        Py_DECREF(xsh->watches);
-        PyErr_SetFromErrno(PyExc_RuntimeError);
-        goto exit;
-    }
-    val = (PyObject *)xsh;
-    return val;
- exit:
-    PyObject_Del(xsh);
+    self->xh = NULL;
+    self->watches = PyList_New(0);
+    if (!self->watches)
+        goto fail;
+
+    return (PyObject *)self;
+fail:
+    /* Decreasing the object's reference to 0 will result in xshandle_dealloc
+       being called. */
+    Py_DECREF(self);
     return NULL;
 }
 
-static PyMethodDef xs_methods[] = {
-    { .ml_name  = "open",
-      .ml_meth  = (PyCFunction)xshandle_open,
-      .ml_flags = (METH_VARARGS | METH_KEYWORDS), 
-      .ml_doc   = "\n"
-      "Open a connection to the xenstore daemon.\n"
-      "Returns: xs connection object.\n"
-      "Raises RuntimeError on error.\n"
-      "\n"
-    },
-    { /* Terminator. */ }
+static int
+xshandle_init(XsHandle *self, PyObject *args, PyObject *kwds)
+{
+    static char *kwd_spec[] = { "readonly", NULL };
+    static char *arg_spec = "|i";
+    int readonly;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, arg_spec, kwd_spec,
+                                     &readonly))
+        goto fail;
+
+    self->xh = (readonly ? xs_daemon_open_readonly() : xs_daemon_open());
+    if (!self->xh)
+        goto fail;
+
+    return 0;
+
+ fail:
+    PyErr_SetFromErrno(PyExc_RuntimeError);
+    return -1;
+}
+
+static void xshandle_dealloc(XsHandle *self)
+{
+    if (self->xh) {
+        xs_daemon_close(self->xh);
+        self->xh = NULL;
+    }
+
+    Py_XDECREF(self->watches);
+
+    self->ob_type->tp_free((PyObject *)self);
+}
+
+static PyTypeObject xshandle_type = {
+    PyObject_HEAD_INIT(NULL)
+    0,
+    "xen.lowlevel.xs.xs",
+    sizeof(XsHandle),
+    0,
+    (destructor)xshandle_dealloc, /* tp_dealloc        */
+    NULL,                         /* tp_print          */
+    xshandle_getattr,             /* tp_getattr        */
+    NULL,                         /* tp_setattr        */
+    NULL,                         /* tp_compare        */
+    NULL,                         /* tp_repr           */
+    NULL,                         /* tp_as_number      */
+    NULL,                         /* tp_as_sequence    */
+    NULL,                         /* tp_as_mapping     */
+    NULL,                         /* tp_hash           */
+    NULL,                         /* tp_call           */
+    NULL,                         /* tp_str            */
+    NULL,                         /* tp_getattro       */
+    NULL,                         /* tp_setattro       */
+    NULL,                         /* tp_as_buffer      */
+    Py_TPFLAGS_DEFAULT,           /* tp_flags          */
+    "Xenstore connections",       /* tp_doc            */
+    NULL,                         /* tp_traverse       */
+    NULL,                         /* tp_clear          */
+    NULL,                         /* tp_richcompare    */
+    0,                            /* tp_weaklistoffset */
+    NULL,                         /* tp_iter           */
+    NULL,                         /* tp_iternext       */
+    xshandle_methods,             /* tp_methods        */
+    NULL,                         /* tp_members        */
+    NULL,                         /* tp_getset         */
+    NULL,                         /* tp_base           */
+    NULL,                         /* tp_dict           */
+    NULL,                         /* tp_descr_get      */
+    NULL,                         /* tp_descr_set      */
+    0,                            /* tp_dictoffset     */
+    (initproc)xshandle_init,      /* tp_init           */
+    NULL,                         /* tp_alloc          */
+    xshandle_new,                 /* tp_new            */
 };
 
-PyMODINIT_FUNC initxs (void)
-{
-    PyObject *module;
+static PyMethodDef xs_methods[] = { { NULL } };
 
-    module = Py_InitModule(PYPKG, xs_methods);
+PyMODINIT_FUNC initxs(void)
+{
+    PyObject* m;
+
+    if (PyType_Ready(&xshandle_type) < 0)
+        return;
+
+    m = Py_InitModule("xen.lowlevel.xs", xs_methods);
+
+    if (m == NULL)
+      return;
+
+    Py_INCREF(&xshandle_type);
+    PyModule_AddObject(m, "xs", (PyObject *)&xshandle_type);
 }
 
 

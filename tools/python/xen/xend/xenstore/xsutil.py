@@ -5,7 +5,7 @@
 # this archive for more details.
 
 import threading
-from xen.lowlevel import xs
+import xen.lowlevel.xs
 
 xs_lock = threading.Lock()
 xs_handle = None
@@ -15,7 +15,7 @@ def xshandle():
     if not xs_handle:
         xs_lock.acquire()
         if not xs_handle:
-            xs_handle = xs.open()
+            xs_handle = xen.lowlevel.xs.xs()
         xs_lock.release()
     return xs_handle
 
