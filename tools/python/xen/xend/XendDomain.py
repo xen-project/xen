@@ -114,7 +114,7 @@ class XendDomain:
 
     ## private:
 
-    def onReleaseDomain(self):
+    def onReleaseDomain(self, _):
         self.domains_lock.acquire()
         try:
             self.refresh()

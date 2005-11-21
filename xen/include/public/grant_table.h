@@ -215,9 +215,12 @@ typedef struct gnttab_dump_table {
 } gnttab_dump_table_t;
 
 /*
- * GNTTABOP_transfer_grant_ref: Transfer <frame> to a foreign domain.  The
- * foreign domain has previously registered the details of the transfer.
- * These can be identified from <handle>, a grant reference.
+ * GNTTABOP_transfer_grant_ref: Transfer <frame> to a foreign domain. The
+ * foreign domain has previously registered its interest in the transfer via
+ * <domid, ref>.
+ * 
+ * Note that, even if the transfer fails, the specified page no longer belongs
+ * to the calling domain *unless* the error is GNTST_bad_page.
  */
 #define GNTTABOP_transfer                4
 typedef struct {
@@ -269,6 +272,7 @@ typedef struct {
 #define GNTST_bad_dev_addr     (-6) /* Inappropriate device address to unmap.*/
 #define GNTST_no_device_space  (-7) /* Out of space in I/O MMU.              */
 #define GNTST_permission_denied (-8) /* Not enough privilege for operation.  */
+#define GNTST_bad_page         (-9) /* Specified page was invalid for op.    */
 
 #define GNTTABOP_error_msgs {                   \
     "okay",                                     \

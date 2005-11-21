@@ -328,7 +328,7 @@ class DevController:
             ev = Event()
             result = { 'status': Timeout }
             
-            xswatch(statusPath, hotplugStatusCallback, statusPath, ev, result)
+            xswatch(statusPath, hotplugStatusCallback, ev, result)
 
             ev.wait(DEVICE_CREATE_TIMEOUT)
             return result['status']
