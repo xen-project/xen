@@ -846,7 +846,7 @@ def deprecated(old,new):
     err('Option %s is the new replacement, see "xm help %s" for more info' % (new, new))
 
 def usage(cmd=None):
-    if cmd = 'create'
+    if cmd == 'create':
         xm_subcommand("create", "--help")
         sys.exit(1)
     if help.has_key(cmd):
