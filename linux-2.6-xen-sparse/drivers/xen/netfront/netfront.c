@@ -739,14 +739,23 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	     (i != rp) && (work_done < budget);
 	     i++, work_done++) {
 		rx = &np->rx->ring[MASK_NETIF_RX_IDX(i)].resp;
+
 		/*
-		 * An error here is very odd. Usually indicates a backend bug,
-		 * low-mem condition, or we didn't have reservation headroom.
-		 */
-		if (unlikely(rx->status <= 0)) {
+                 * This definitely indicates a bug, either in this driver or
+                 * in the backend driver. In future this should flag the bad
+                 * situation to the system controller to reboot the backed.
+                 */
+		if ((ref = np->grant_rx_ref[rx->id]) == GRANT_INVALID_REF) {
+			WPRINTK("Bad rx response id %d.\n", rx->id);
+			work_done--;
+			continue;
+		}
+
+		/* Memory pressure, insufficient buffer headroom, ... */
+		if ((mfn = gnttab_end_foreign_transfer_ref(ref)) == 0) {
 			if (net_ratelimit())
-				printk(KERN_WARNING "Bad rx buffer "
-				       "(memory squeeze?).\n");
+				WPRINTK("Unfulfilled rx req (id=%d, st=%d).\n",
+					rx->id, rx->status);
 			np->rx->ring[MASK_NETIF_RX_IDX(np->rx->req_prod)].
 				req.id = rx->id;
 			wmb();
@@ -755,23 +764,8 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 			continue;
 		}
 
-		ref = np->grant_rx_ref[rx->id]; 
-
-		if(ref == GRANT_INVALID_REF) { 
-			printk(KERN_WARNING "Bad rx grant reference %d "
-			       "from dom %d.\n",
-			       ref, np->xbdev->otherend_id);
-			np->rx->ring[MASK_NETIF_RX_IDX(np->rx->req_prod)].
-				req.id = rx->id;
-			wmb();
-			np->rx->req_prod++;
-			work_done--;
-			continue;
-		}
-
-		np->grant_rx_ref[rx->id] = GRANT_INVALID_REF;
-		mfn = gnttab_end_foreign_transfer_ref(ref);
 		gnttab_release_grant_reference(&np->gref_rx_head, ref);
+		np->grant_rx_ref[rx->id] = GRANT_INVALID_REF;
 
 		skb = np->rx_skbs[rx->id];
 		ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);

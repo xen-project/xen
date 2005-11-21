@@ -99,7 +99,6 @@ static unsigned long alloc_mfn(void)
 	return mfn;
 }
 
-#if 0
 static void free_mfn(unsigned long mfn)
 {
 	unsigned long flags;
@@ -120,7 +119,6 @@ static void free_mfn(unsigned long mfn)
 	}
 	spin_unlock_irqrestore(&mfn_lock, flags);
 }
-#endif
 
 static inline void maybe_schedule_tx_action(void)
 {
@@ -287,28 +285,19 @@ static void net_rx_action(unsigned long unused)
 	ret = HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
 	BUG_ON(ret != 0);
 
-	mcl = rx_mcl;
-	if( HYPERVISOR_grant_table_op(GNTTABOP_transfer, grant_rx_op, 
-				      gop - grant_rx_op)) { 
-		/*
-		 * The other side has given us a bad grant ref, or has no 
-		 * headroom, or has gone away. Unfortunately the current grant
-		 * table code doesn't inform us which is the case, so not much
-		 * we can do. 
-		 */
-		DPRINTK("net_rx: transfer to DOM%u failed; dropping (up to) "
-			"%d packets.\n",
-			grant_rx_op[0].domid, gop - grant_rx_op); 
-	}
-	gop = grant_rx_op;
+	ret = HYPERVISOR_grant_table_op(GNTTABOP_transfer, grant_rx_op, 
+					gop - grant_rx_op);
+	BUG_ON(ret != 0);
 
+	mcl = rx_mcl;
+	gop = grant_rx_op;
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
 		netif   = netdev_priv(skb->dev);
 		size    = skb->tail - skb->data;
 
 		/* Rederive the machine addresses. */
-		new_mfn = mcl[0].args[1] >> PAGE_SHIFT;
-		old_mfn = 0; /* XXX Fix this so we can free_mfn() on error! */
+		new_mfn = mcl->args[1] >> PAGE_SHIFT;
+		old_mfn = gop->mfn;
 		atomic_set(&(skb_shinfo(skb)->dataref), 1);
 		skb_shinfo(skb)->nr_frags = 0;
 		skb_shinfo(skb)->frag_list = NULL;
@@ -321,10 +310,10 @@ static void net_rx_action(unsigned long unused)
 
 		/* Check the reassignment error code. */
 		status = NETIF_RSP_OKAY;
-		if(gop->status != 0) { 
+		if (gop->status != 0) { 
 			DPRINTK("Bad status %d from grant transfer to DOM%u\n",
 				gop->status, netif->domid);
-			/* XXX SMH: should free 'old_mfn' here */
+			free_mfn(old_mfn);
 			status = NETIF_RSP_ERROR; 
 		}
 		irq = netif->irq;
