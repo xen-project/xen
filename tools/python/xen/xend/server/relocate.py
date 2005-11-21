@@ -22,7 +22,6 @@ import StringIO
 
 from xen.web import protocol, tcp, unix
 
-from xen.xend import scheduler
 from xen.xend import sxp
 from xen.xend.XendError import XendError
 from xen.xend import XendRoot
@@ -39,7 +38,7 @@ class RelocationProtocol(protocol.Protocol):
     """
 
     def __init__(self):
-        #protocol.Protocol.__init__(self)
+        protocol.Protocol.__init__(self)
         self.parser = sxp.Parser()
 
     def dataReceived(self, data):
@@ -59,11 +58,6 @@ class RelocationProtocol(protocol.Protocol):
     def loseConnection(self):
         if self.transport:
             self.transport.loseConnection()
-        if self.connected:
-            scheduler.now(self.connectionLost)
-
-    def connectionLost(self, reason=None):
-        pass
 
     def send_reply(self, sxpr):
         io = StringIO.StringIO()
@@ -91,7 +85,7 @@ class RelocationProtocol(protocol.Protocol):
     def opname(self, name):
          return 'op_' + name.replace('.', '_')
 
-    def operror(self, name, req):
+    def operror(self, name, _):
         raise XendError('Invalid operation: ' +name)
 
     def dispatch(self, req):
@@ -100,7 +94,7 @@ class RelocationProtocol(protocol.Protocol):
         op_method = getattr(self, op_method_name, self.operror)
         return op_method(op_name, req)
 
-    def op_help(self, name, req):
+    def op_help(self, _1, _2):
         def nameop(x):
             if x.startswith('op_'):
                 return x[3:].replace('_', '.')
@@ -110,10 +104,10 @@ class RelocationProtocol(protocol.Protocol):
         l = [ nameop(k) for k in dir(self) if k.startswith('op_') ]
         return l
 
-    def op_quit(self, name, req):
+    def op_quit(self, _1, _2):
         self.loseConnection()
 
-    def op_receive(self, name, req):
+    def op_receive(self, name, _):
         if self.transport:
             self.send_reply(["ready", name])
             self.transport.sock.setblocking(1)
@@ -124,26 +118,15 @@ class RelocationProtocol(protocol.Protocol):
             log.error(name + ": no transport")
             raise XendError(name + ": no transport")
 
-class RelocationFactory(protocol.ServerFactory):
-    """Asynchronous handler for the relocation server socket.
-    """
-
-    def __init__(self):
-        #protocol.ServerFactory.__init__(self)
-        pass
-
-    def buildProtocol(self, addr):
-        return RelocationProtocol()
 
 def listenRelocation():
-    factory = RelocationFactory()
     if xroot.get_xend_unix_server():
         path = '/var/lib/xend/relocation-socket'
-        unix.listenUNIX(path, factory)
+        unix.listenUNIX(path, RelocationProtocol)
     if xroot.get_xend_relocation_server():
         port = xroot.get_xend_relocation_port()
         interface = xroot.get_xend_relocation_address()
-        l = tcp.listenTCP(port, factory, interface=interface)
+        l = tcp.listenTCP(port, RelocationProtocol, interface=interface)
         l.setCloExec()
 
 def setupRelocation(dst, port):

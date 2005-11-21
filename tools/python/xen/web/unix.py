@@ -13,6 +13,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd.
 #============================================================================
 
 import sys
@@ -23,13 +24,10 @@ import os.path
 from connection import *
 from protocol import *
 
-class UnixServerConnection(SocketServerConnection):
-    pass
-
 class UnixListener(SocketListener):
 
-    def __init__(self, path, factory, backlog=None):
-        SocketListener.__init__(self, factory, backlog=backlog)
+    def __init__(self, path, protocol, backlog=None):
+        SocketListener.__init__(self, protocol, backlog=backlog)
         self.path = path
         
     def createSocket(self):
@@ -48,7 +46,7 @@ class UnixListener(SocketListener):
         return sock
 
     def acceptConnection(self, sock, protocol, addr):
-        return UnixServerConnection(sock, protocol, self.path, self)
+        return SocketServerConnection(sock, protocol, self.path, self)
 
 class UnixClientConnection(SocketClientConnection):
 
@@ -62,34 +60,21 @@ class UnixClientConnection(SocketClientConnection):
     
 class UnixConnector(SocketConnector):
 
-    def __init__(self, path, factory, timeout=None):
-        SocketConnector.__init__(self, factory)
+    def __init__(self, path, protocol, timeout=None):
+        SocketConnector.__init__(self, protocol)
         self.addr = path
         self.timeout = timeout
 
-    def connectTransport(self):
+    def connect(self):
         self.transport = UnixClientConnection(self.addr, self)
         self.transport.connect(self.timeout)
 
-def listenUNIX(path, factory, backlog=None):
-    l = UnixListener(path, factory, backlog=backlog)
+def listenUNIX(path, protocol, backlog=None):
+    l = UnixListener(path, protocol, backlog=backlog)
     l.startListening()
     return l
 
-def connectUNIX(path, factory, timeout=None):
-    c = UnixConnector(path, factory, timeout=timeout)
+def connectUNIX(path, protocol, timeout=None):
+    c = UnixConnector(path, protocol, timeout=timeout)
     c.connect()
     return c
-
-def main(argv):
-    path = "/tmp/test-foo"
-    if argv[1] == "client":
-        c = connectUNIX(path, TestClientFactory())
-        print "client:", c
-    else:
-        s = listenUNIX(path, TestServeractory())
-        print "server:", s
-
-if __name__ == "__main__":
-    main(sys.argv)
-
