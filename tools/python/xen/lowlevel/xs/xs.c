@@ -41,7 +41,8 @@
 #define PyMODINIT_FUNC DL_EXPORT(void)
 #endif
 
-#define PYPKG    "xen.lowlevel.xs"
+#define PKG "xen.lowlevel.xs"
+#define CLS "xs"
 
 /** Python wrapper round an xs handle.
  */
@@ -847,7 +848,7 @@ static void xshandle_dealloc(XsHandle *self)
 static PyTypeObject xshandle_type = {
     PyObject_HEAD_INIT(NULL)
     0,
-    "xen.lowlevel.xs.xs",
+    PKG "." CLS,
     sizeof(XsHandle),
     0,
     (destructor)xshandle_dealloc, /* tp_dealloc        */
@@ -895,13 +896,13 @@ PyMODINIT_FUNC initxs(void)
     if (PyType_Ready(&xshandle_type) < 0)
         return;
 
-    m = Py_InitModule("xen.lowlevel.xs", xs_methods);
+    m = Py_InitModule(PKG, xs_methods);
 
     if (m == NULL)
       return;
 
     Py_INCREF(&xshandle_type);
-    PyModule_AddObject(m, "xs", (PyObject *)&xshandle_type);
+    PyModule_AddObject(m, CLS, (PyObject *)&xshandle_type);
 }
 
 
