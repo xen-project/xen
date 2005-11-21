@@ -48,9 +48,9 @@ fi
 
 case "$command" in
     online)
-        if brctl show "$bridge" | grep "$vif" >&/dev/null
+        if brctl show | grep "$vif" >&/dev/null
         then
-          log debug "$vif already attached to $bridge"
+          log debug "$vif already attached to a bridge"
           exit 0
         fi
 
