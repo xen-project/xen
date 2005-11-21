@@ -6,8 +6,10 @@ function error {
    echo '  *** Check for the hotplug scripts (hotplug) FAILED'
    exit 1
 }
+[ -x "$(which udevinfo)" ] && \
+  UDEV_VERSION=$(udevinfo -V | sed -e 's/^.*\s\([0-9]\+\)[^0-9]*/\1/')
 
-if [ -x /sbin/udev ] && [ ! -z `/sbin/udev -V` ] && [ `/sbin/udev -V` -ge 059 ]; then
+if [ -n "$UDEV_VERSION" ] && [ $UDEV_VERSION -ge 059 ]; then
   exit 0
 fi
 
