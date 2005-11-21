@@ -99,27 +99,6 @@ static unsigned long alloc_mfn(void)
 	return mfn;
 }
 
-static void free_mfn(unsigned long mfn)
-{
-	unsigned long flags;
-	struct xen_memory_reservation reservation = {
-		.extent_start = &mfn,
-		.nr_extents   = 1,
-		.extent_order = 0,
-		.domid        = DOMID_SELF
-	};
-	spin_lock_irqsave(&mfn_lock, flags);
-	if ( alloc_index != MAX_MFN_ALLOC )
-		mfn_list[alloc_index++] = mfn;
-	else {
-		int ret;
-		ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
-					    &reservation);
-		BUG_ON(ret != 1);
-	}
-	spin_unlock_irqrestore(&mfn_lock, flags);
-}
-
 static inline void maybe_schedule_tx_action(void)
 {
 	smp_mb();
@@ -306,14 +285,18 @@ static void net_rx_action(unsigned long unused)
 		netif->stats.tx_packets++;
 
 		/* The update_va_mapping() must not fail. */
-		BUG_ON(mcl[0].result != 0);
+		BUG_ON(mcl->result != 0);
 
 		/* Check the reassignment error code. */
 		status = NETIF_RSP_OKAY;
 		if (gop->status != 0) { 
 			DPRINTK("Bad status %d from grant transfer to DOM%u\n",
 				gop->status, netif->domid);
-			free_mfn(old_mfn);
+			/*
+                         * Page no longer belongs to us unless GNTST_bad_page,
+                         * but that should be a fatal error anyway.
+                         */
+			BUG_ON(gop->status == GNTST_bad_page);
 			status = NETIF_RSP_ERROR; 
 		}
 		irq = netif->irq;

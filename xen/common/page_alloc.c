@@ -645,7 +645,9 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
     }
     else
     {
-        /* Freeing an anonymous domain-heap page. */
+        /* Freeing anonymous domain-heap pages. */
+        for ( i = 0; i < (1 << order); i++ )
+            pg[i].u.free.cpumask = CPU_MASK_NONE;
         free_heap_pages(pfn_dom_zone_type(page_to_pfn(pg)), pg, order);
         drop_dom_ref = 0;
     }
