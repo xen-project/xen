@@ -34,7 +34,6 @@ from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file
 
 from xen.xend import image
-from xen.xend import scheduler
 from xen.xend import sxp
 from xen.xend import XendRoot
 from xen.xend.XendBootloader import bootloader
