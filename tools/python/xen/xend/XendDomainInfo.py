@@ -1098,36 +1098,40 @@ class XendDomainInfo:
         if not self.infoIsSet('image'):
             raise VmError('Missing image in configuration')
 
-        self.image = image.create(self,
-                                  self.info['image'],
-                                  self.info['device'])
+        try:
+            self.image = image.create(self,
+                                      self.info['image'],
+                                      self.info['device'])
 
-        xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
+            xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
 
-        m = self.image.getDomainMemory(self.info['memory'] * 1024)
-        xc.domain_setmaxmem(self.domid, maxmem_kb = m)
-        xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
+            m = self.image.getDomainMemory(self.info['memory'] * 1024)
+            xc.domain_setmaxmem(self.domid, maxmem_kb = m)
+            xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
 
-        cpu = self.info['cpu']
-        if cpu is not None and cpu != -1:
-            xc.domain_pincpu(self.domid, 0, 1 << cpu)
+            cpu = self.info['cpu']
+            if cpu is not None and cpu != -1:
+                xc.domain_pincpu(self.domid, 0, 1 << cpu)
 
-        self.createChannels()
+            self.createChannels()
 
-        channel_details = self.image.createImage()
+            channel_details = self.image.createImage()
 
-        self.store_mfn = channel_details['store_mfn']
-        if 'console_mfn' in channel_details:
-            self.console_mfn = channel_details['console_mfn']
+            self.store_mfn = channel_details['store_mfn']
+            if 'console_mfn' in channel_details:
+                self.console_mfn = channel_details['console_mfn']
 
-        self.introduceDomain()
+            self.introduceDomain()
 
-        self.createDevices()
+            self.createDevices()
 
-        if self.info['bootloader']:
-            self.image.cleanupBootloading()
+            if self.info['bootloader']:
+                self.image.cleanupBootloading()
 
-        self.info['start_time'] = time.time()
+            self.info['start_time'] = time.time()
+
+        except RuntimeError, exn:
+            raise VmError(str(exn))
 
 
     ## public:
