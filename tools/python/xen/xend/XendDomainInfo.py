@@ -1272,7 +1272,7 @@ class XendDomainInfo:
         dev_type = sxp.name(dev_config)
         devid = self.createDevice(dev_type, dev_config)
         self.waitForDevice(dev_type, devid)
-#        self.config.append(['device', dev.getConfig()])
+        self.info['device'].append((dev_type, dev_config))
         return self.getDeviceController(dev_type).sxpr(devid)
 
 
