@@ -1061,14 +1061,14 @@ static PyObject *PyXc_getattr(PyObject *obj, char *name)
     return Py_FindMethod(pyxc_methods, obj, name);
 }
 
-static PyObject *PyXc_new(PyTypeObject *type, PyObject *args)
+static PyObject *PyXc_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     XcObject *self = (XcObject *)type->tp_alloc(type, 0);
 
     if (self == NULL)
         return NULL;
 
-    self->xc_handle = NULL;
+    self->xc_handle = -1;
 
     return (PyObject *)self;
 }
@@ -1086,9 +1086,9 @@ PyXc_init(XcObject *self, PyObject *args, PyObject *kwds)
 
 static void PyXc_dealloc(XcObject *self)
 {
-    if (self->xc_handle) {
+    if (self->xc_handle != -1) {
         xc_interface_close(self->xc_handle);
-        self->xc_handle = NULL;
+        self->xc_handle = -1;
     }
 
     self->ob_type->tp_free((PyObject *)self);
@@ -1145,7 +1145,7 @@ PyMODINIT_FUNC initxc(void)
     if (PyType_Ready(&PyXcType) < 0)
         return;
 
-    m = Py_InitModule(PKG, PyXc_methods);
+    m = Py_InitModule(PKG, xc_methods);
 
     if (m == NULL)
       return;
