@@ -706,35 +706,34 @@ gnttab_transfer(
     struct pfn_info *page;
     u32 _d, _nd, x, y;
     int i;
-    int result = GNTST_okay;
     grant_entry_t *sha;
+    gnttab_transfer_t gop;
 
     for ( i = 0; i < count; i++ )
     {
-        gnttab_transfer_t *gop = &uop[i];
+        /* Read from caller address space. */
+        if ( unlikely(__copy_from_user(&gop, &uop[i], sizeof(gop))) )
+        {
+            /* Caller error: bail immediately. */
+            DPRINTK("gnttab_transfer: error reading req %d/%d\n", i, count);
+            return -EFAULT;
+        }
 
-        page = &frame_table[gop->mfn];
-        
-        if ( unlikely(IS_XEN_HEAP_FRAME(page)))
+        /* Check the passed page frame for basic validity. */
+        page = &frame_table[gop.mfn];
+        if ( unlikely(!pfn_valid(gop.mfn) || IS_XEN_HEAP_FRAME(page)) )
         { 
-            printk("gnttab_transfer: xen heap frame mfn=%lx\n", 
-                   (unsigned long) gop->mfn);
-            gop->status = GNTST_bad_virt_addr;
-            continue;
-        }
-        
-        if ( unlikely(!pfn_valid(page_to_pfn(page))) )
-        {
-            printk("gnttab_transfer: invalid pfn for mfn=%lx\n", 
-                   (unsigned long) gop->mfn);
-            gop->status = GNTST_bad_virt_addr;
-            continue;
+            /* Caller error: bail immediately. */
+            DPRINTK("gnttab_transfer: out-of-range or xen frame %lx\n",
+                    (unsigned long)gop.mfn);
+            return -EINVAL;
         }
 
-        if ( unlikely((e = find_domain_by_id(gop->domid)) == NULL) )
+        /* Find the target domain. */
+        if ( unlikely((e = find_domain_by_id(gop.domid)) == NULL) )
         {
-            printk("gnttab_transfer: can't find domain %d\n", gop->domid);
-            gop->status = GNTST_bad_domain;
+            DPRINTK("gnttab_transfer: can't find domain %d\n", gop.domid);
+            (void)__put_user(GNTST_bad_domain, &uop[i].status);
             continue;
         }
 
@@ -752,15 +751,16 @@ gnttab_transfer(
         do {
             x = y;
             if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
-                         (1 | PGC_allocated)) || unlikely(_nd != _d)) {
-                printk("gnttab_transfer: Bad page values %p: ed=%p(%u), sd=%p,"
+                         (1 | PGC_allocated)) || unlikely(_nd != _d)) { 
+                /* Caller error: bail immediately. */
+                DPRINTK("gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
                        " caf=%08x, taf=%" PRtype_info "\n", 
                        (void *) page_to_pfn(page),
                         d, d->domain_id, unpickle_domptr(_nd), x, 
                         page->u.inuse.type_info);
                 spin_unlock(&d->page_alloc_lock);
                 put_domain(e);
-                return 0;
+                return -EINVAL;
             }
             __asm__ __volatile__(
                 LOCK_PREFIX "cmpxchg8b %2"
@@ -788,16 +788,16 @@ gnttab_transfer(
          */
         if ( unlikely(test_bit(_DOMF_dying, &e->domain_flags)) ||
              unlikely(e->tot_pages >= e->max_pages) ||
-             unlikely(!gnttab_prepare_for_transfer(e, d, gop->ref)) )
+             unlikely(!gnttab_prepare_for_transfer(e, d, gop.ref)) )
         {
             DPRINTK("gnttab_transfer: Transferee has no reservation headroom "
                     "(%d,%d) or provided a bad grant ref (%08x) or "
                     "is dying (%lx)\n",
-                    e->tot_pages, e->max_pages, gop->ref, e->domain_flags);
+                    e->tot_pages, e->max_pages, gop.ref, e->domain_flags);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
-            gop->status = result = GNTST_general_error;
-            break;
+            (void)__put_user(GNTST_general_error, &uop[i].status);
+            continue;
         }
 
         /* Okay, add the page to 'e'. */
@@ -805,23 +805,23 @@ gnttab_transfer(
             get_knownalive_domain(e);
         list_add_tail(&page->list, &e->page_list);
         page_set_owner(page, e);
-        
+
         spin_unlock(&e->page_alloc_lock);
 
         TRACE_1D(TRC_MEM_PAGE_GRANT_TRANSFER, e->domain_id);
-        
+
         /* Tell the guest about its new page frame. */
-        sha = &e->grant_table->shared[gop->ref];
-        sha->frame = gop->mfn;
+        sha = &e->grant_table->shared[gop.ref];
+        sha->frame = gop.mfn;
         wmb();
         sha->flags |= GTF_transfer_completed;
-        
+
         put_domain(e);
-        
-        gop->status = GNTST_okay;
+
+        (void)__put_user(GNTST_okay, &uop[i].status);
     }
 
-    return result;
+    return 0;
 }
 
 long 
