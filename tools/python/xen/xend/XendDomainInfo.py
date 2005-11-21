@@ -426,7 +426,7 @@ class XendDomainInfo:
 
 
     def storeChanged(self):
-        log.debug("XendDomainInfo.storeChanged");
+        log.trace("XendDomainInfo.storeChanged");
 
         changed = False
         
