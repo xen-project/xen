@@ -714,26 +714,18 @@ gnttab_transfer(
         /* Read from caller address space. */
         if ( unlikely(__copy_from_user(&gop, &uop[i], sizeof(gop))) )
         {
-            /* Caller error: bail immediately. */
             DPRINTK("gnttab_transfer: error reading req %d/%d\n", i, count);
-            return -EFAULT;
+            (void)__put_user(GNTST_bad_page, &uop[i].status);
+            return -EFAULT; /* This is *very* fatal. */
         }
 
         /* Check the passed page frame for basic validity. */
         page = &frame_table[gop.mfn];
         if ( unlikely(!pfn_valid(gop.mfn) || IS_XEN_HEAP_FRAME(page)) )
         { 
-            /* Caller error: bail immediately. */
             DPRINTK("gnttab_transfer: out-of-range or xen frame %lx\n",
                     (unsigned long)gop.mfn);
-            return -EINVAL;
-        }
-
-        /* Find the target domain. */
-        if ( unlikely((e = find_domain_by_id(gop.domid)) == NULL) )
-        {
-            DPRINTK("gnttab_transfer: can't find domain %d\n", gop.domid);
-            (void)__put_user(GNTST_bad_domain, &uop[i].status);
+            (void)__put_user(GNTST_bad_page, &uop[i].status);
             continue;
         }
 
@@ -752,15 +744,14 @@ gnttab_transfer(
             x = y;
             if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
                          (1 | PGC_allocated)) || unlikely(_nd != _d)) { 
-                /* Caller error: bail immediately. */
                 DPRINTK("gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
                        " caf=%08x, taf=%" PRtype_info "\n", 
                        (void *) page_to_pfn(page),
                         d, d->domain_id, unpickle_domptr(_nd), x, 
                         page->u.inuse.type_info);
                 spin_unlock(&d->page_alloc_lock);
-                put_domain(e);
-                return -EINVAL;
+                (void)__put_user(GNTST_bad_page, &uop[i].status);
+                continue;
             }
             __asm__ __volatile__(
                 LOCK_PREFIX "cmpxchg8b %2"
@@ -778,6 +769,16 @@ gnttab_transfer(
         list_del(&page->list);
 
         spin_unlock(&d->page_alloc_lock);
+
+        /* Find the target domain. */
+        if ( unlikely((e = find_domain_by_id(gop.domid)) == NULL) )
+        {
+            DPRINTK("gnttab_transfer: can't find domain %d\n", gop.domid);
+            (void)__put_user(GNTST_bad_domain, &uop[i].status);
+            page->count_info &= ~(PGC_count_mask|PGC_allocated);
+            free_domheap_page(page);
+            continue;
+        }
 
         spin_lock(&e->page_alloc_lock);
 
@@ -797,6 +798,8 @@ gnttab_transfer(
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
             (void)__put_user(GNTST_general_error, &uop[i].status);
+            page->count_info &= ~(PGC_count_mask|PGC_allocated);
+            free_domheap_page(page);
             continue;
         }
 

@@ -789,7 +789,7 @@ class XendDomainInfo:
                         log.debug(
                             "Scheduling refreshShutdown on domain %d in %ds.",
                             self.domid, timeout)
-                        scheduler.later(timeout, self.refreshShutdown)
+                        threading.Timer(timeout, self.refreshShutdown).start()
         finally:
             self.refresh_shutdown_lock.release()
 
@@ -830,7 +830,7 @@ class XendDomainInfo:
         try:
             corefile = "/var/xen/dump/%s.%s.core" % (self.info['name'],
                                                      self.domid)
-            xc.domain_dumpcore(dom = self.domid, corefile = corefile)
+            xc.domain_dumpcore(self.domid, corefile)
 
         except:
             log.exception("XendDomainInfo.dumpCore failed: id = %s name = %s",
@@ -1106,7 +1106,7 @@ class XendDomainInfo:
             xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
 
             m = self.image.getDomainMemory(self.info['memory'] * 1024)
-            xc.domain_setmaxmem(self.domid, maxmem_kb = m)
+            xc.domain_setmaxmem(self.domid, m)
             xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
 
             cpu = self.info['cpu']
@@ -1195,7 +1195,7 @@ class XendDomainInfo:
 
         try:
             if self.domid is not None:
-                xc.domain_destroy(dom=self.domid)
+                xc.domain_destroy(self.domid)
         except:
             log.exception("XendDomainInfo.destroy: xc.domain_destroy failed.")
 
