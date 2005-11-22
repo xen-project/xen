@@ -731,7 +731,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     if (live && (pt_levels != 2)) {
         ERR("Live migration supported only for 32-bit non-pae");
-        goto out;
+        live = 0;
     }
 
     if (live) {
