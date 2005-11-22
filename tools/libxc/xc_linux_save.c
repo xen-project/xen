@@ -470,10 +470,9 @@ void canonicalize_pagetable(unsigned long type, unsigned long pfn,
         if (pte & _PAGE_PRESENT) {
             
             mfn = (pte >> PAGE_SHIFT) & 0xfffffff;      
-            pfn = live_m2p[mfn];
-            
             if (!MFN_IS_IN_PSEUDOPHYS_MAP(mfn)) {
-                /* I don't think this should ever happen */
+                /* This will happen if the type info is stale which 
+                   is quite feasible under live migration */
                 DPRINTF("FNI: [%08lx,%d] pte=%llx,"
                         " mfn=%08lx, pfn=%08lx [mfn]=%08lx\n",
                         type, i, (unsigned long long)pte, mfn, 
@@ -482,7 +481,10 @@ void canonicalize_pagetable(unsigned long type, unsigned long pfn,
                         live_p2m[live_m2p[mfn]] : 0xdeadbeaf);
                 
                 pfn = 0; /* be suspicious */
-            }
+            } else 
+                pfn = live_m2p[mfn];
+            
+
             
             pte &= 0xffffff0000000fffULL;
             pte |= (uint64_t)pfn << PAGE_SHIFT;
@@ -1031,7 +1033,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         if (last_iter && debug){
             int minusone = -1;
-            memset( to_send, 0xff, (max_pfn+8)/8 );
+            memset(to_send, 0xff, BITMAP_SIZE); 
             debug = 0;
             fprintf(stderr, "Entering debug resend-all mode\n");
     
