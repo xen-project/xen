@@ -481,6 +481,7 @@ struct fake_acpi_tables {
 	struct fadt_descriptor_rev2 fadt;
 	struct facs_descriptor_rev2 facs;
 	struct acpi_table_header dsdt;
+	u8 aml[16];
 	struct acpi_table_madt madt;
 	struct acpi_table_lsapic lsapic;
 	u8 pm1a_evt_blk[4];
@@ -564,17 +565,26 @@ dom_fw_fake_acpi(struct fake_acpi_tables *tables)
 	                                        ACPI_RSDP_CHECKSUM_LENGTH);
 	rsdp->ext_checksum = generate_acpi_checksum(rsdp, rsdp->length);
 
-	/*
-	 * setup DSDT - ACPI generates a warning because there's no AML
-	 * in the DSDT.  Revisit to add dummy AML stub.
-	 */ 
+	/* setup DSDT with trivial namespace. */ 
 	strncpy(dsdt->signature, DSDT_SIG, 4);
 	dsdt->revision = 1;
-	dsdt->length = sizeof(struct acpi_table_header);
+	dsdt->length = sizeof(struct acpi_table_header) + sizeof(tables->aml);
 	strcpy(dsdt->oem_id, "XEN");
 	strcpy(dsdt->oem_table_id, "Xen/ia64");
 	strcpy(dsdt->asl_compiler_id, "XEN");
 	dsdt->asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+
+	/* Trivial namespace, avoids ACPI CA complaints */
+	tables->aml[0] = 0x10; /* Scope */
+	tables->aml[1] = 0x12; /* length/offset to next object */
+	strncpy(&tables->aml[2], "_SB_", 4);
+
+	/* The processor object isn't absolutely necessary, revist for SMP */
+	tables->aml[6] = 0x5b; /* processor object */
+	tables->aml[7] = 0x83;
+	tables->aml[8] = 0x0b; /* next */
+	strncpy(&tables->aml[9], "CPU0", 4);
+
 	dsdt->checksum = generate_acpi_checksum(dsdt, dsdt->length);
 
 	/* setup MADT */
