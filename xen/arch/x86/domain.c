@@ -960,8 +960,7 @@ void domain_relinquish_resources(struct domain *d)
 
     ptwr_destroy(d);
 
-    /* Release device mappings of other domains */
-    gnttab_release_dev_mappings(d->grant_table);
+    gnttab_release_mappings(d);
 
     /* Drop the in-use references to page-table bases. */
     for_each_vcpu ( d, v )

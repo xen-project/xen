@@ -594,23 +594,26 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
         return;
 
     e = page_get_owner(page);
-    if ( unlikely(e != d) )
+
+    /*
+     * Check if this is a mapping that was established via a grant reference.
+     * If it was then we should not be here: we require that such mappings are
+     * explicitly destroyed via the grant-table interface.
+     * 
+     * The upshot of this is that the guest can end up with active grants that
+     * it cannot destroy (because it no longer has a PTE to present to the
+     * grant-table interface). This can lead to subtle hard-to-catch bugs,
+     * hence a special grant PTE flag can be enabled to catch the bug early.
+     * 
+     * (Note that the undestroyable active grants are not a security hole in
+     * Xen. All active grants can safely be cleaned up when the domain dies.)
+     */
+    if ( (l1e_get_flags(l1e) & _PAGE_GNTTAB) &&
+         !(d->domain_flags & (DOMF_shutdown|DOMF_dying)) )
     {
-        /*
-         * Unmap a foreign page that may have been mapped via a grant table.
-         * Note that this can fail for a privileged domain that can map foreign
-         * pages via MMUEXT_SET_FOREIGNDOM. Such domains can have some mappings
-         * counted via a grant entry and some counted directly in the page
-         * structure's reference count. Note that reference counts won't get
-         * dangerously confused as long as we always try to decrement the
-         * grant entry first. We may end up with a mismatch between which
-         * mappings and which unmappings are counted via the grant entry, but
-         * really it doesn't matter as privileged domains have carte blanche.
-         */
-        if (likely(gnttab_check_unmap(e, d, pfn,
-                                      !(l1e_get_flags(l1e) & _PAGE_RW))))
-            return;
-        /* Assume this mapping was made via MMUEXT_SET_FOREIGNDOM... */
+        MEM_LOG("Attempt to implicitly unmap a granted PTE %" PRIpte,
+                l1e_get_intpte(l1e));
+        domain_crash(d);
     }
 
     if ( l1e_get_flags(l1e) & _PAGE_RW )
@@ -2317,7 +2320,6 @@ int update_grant_pte_mapping(
 
     ASSERT(spin_is_locked(&d->big_lock));
     ASSERT(!shadow_mode_refcounts(d));
-    ASSERT((l1e_get_flags(_nl1e) & L1_DISALLOW_MASK) == 0);
 
     gpfn = pte_addr >> PAGE_SHIFT;
     mfn = __gpfn_to_mfn(d, gpfn);
@@ -2452,7 +2454,6 @@ int update_grant_va_mapping(
     
     ASSERT(spin_is_locked(&d->big_lock));
     ASSERT(!shadow_mode_refcounts(d));
-    ASSERT((l1e_get_flags(_nl1e) & L1_DISALLOW_MASK) == 0);
 
     /*
      * This is actually overkill - we don't need to sync the L1 itself,

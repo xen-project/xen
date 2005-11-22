@@ -94,10 +94,6 @@ int grant_table_create(
 void grant_table_destroy(
     struct domain *d);
 
-/* Destroy host-CPU mappings via a grant-table entry. */
-int gnttab_check_unmap(
-    struct domain *rd, struct domain *ld, unsigned long frame, int readonly);
-
 /*
  * Check that the given grant reference (rd,ref) allows 'ld' to transfer
  * ownership of a page frame. If so, lock down the grant entry.
@@ -106,8 +102,9 @@ int
 gnttab_prepare_for_transfer(
     struct domain *rd, struct domain *ld, grant_ref_t ref);
 
-/* Domain death release of granted device mappings of other domains.*/
+/* Domain death release of granted mappings of other domains' memory. */
 void
-gnttab_release_dev_mappings(grant_table_t *gt);
+gnttab_release_mappings(
+    struct domain *d);
 
 #endif /* __XEN_GRANT_H__ */
