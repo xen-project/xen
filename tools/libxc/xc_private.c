@@ -68,7 +68,7 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
 int xc_get_pfn_type_batch(int xc_handle, 
                           uint32_t dom, int num, unsigned long *arr)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     op.cmd = DOM0_GETPAGEFRAMEINFO2;
     op.u.getpageframeinfo2.domain = (domid_t)dom;
     op.u.getpageframeinfo2.num    = num;
@@ -81,7 +81,7 @@ unsigned int get_pfn_type(int xc_handle,
                           unsigned long mfn, 
                           uint32_t dom)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     op.cmd = DOM0_GETPAGEFRAMEINFO;
     op.u.getpageframeinfo.pfn    = mfn;
     op.u.getpageframeinfo.domain = (domid_t)dom;
@@ -99,7 +99,7 @@ int xc_mmuext_op(
     unsigned int nr_ops,
     domid_t dom)
 {
-    privcmd_hypercall_t hypercall;
+    DECLARE_HYPERCALL;
     long ret = -EINVAL;
 
     hypercall.op     = __HYPERVISOR_mmuext_op;
@@ -125,7 +125,7 @@ int xc_mmuext_op(
 static int flush_mmu_updates(int xc_handle, xc_mmu_t *mmu)
 {
     int err = 0;
-    privcmd_hypercall_t hypercall;
+    DECLARE_HYPERCALL;
 
     if ( mmu->idx == 0 )
         return 0;
@@ -188,7 +188,7 @@ int xc_memory_op(int xc_handle,
                  int cmd,
                  void *arg)
 {
-    privcmd_hypercall_t hypercall;
+    DECLARE_HYPERCALL;
     struct xen_memory_reservation *reservation = arg;
     long ret = -EINVAL;
 
@@ -236,7 +236,7 @@ int xc_memory_op(int xc_handle,
 
 long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
 
     op.cmd = DOM0_GETVCPUINFO;
     op.u.getvcpuinfo.domain = (domid_t)domid;
@@ -255,13 +255,16 @@ int xc_get_pfn_list(int xc_handle,
                     unsigned long *pfn_buf, 
                     unsigned long max_pfns)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     int ret;
     op.cmd = DOM0_GETMEMLIST;
     op.u.getmemlist.domain   = (domid_t)domid;
     op.u.getmemlist.max_pfns = max_pfns;
     op.u.getmemlist.buffer   = pfn_buf;
 
+#ifdef VALGRIND
+    memset(pfn_buf, 0, max_pfns * sizeof(unsigned long));
+#endif
 
     if ( mlock(pfn_buf, max_pfns * sizeof(unsigned long)) != 0 )
     {
@@ -293,7 +296,7 @@ int xc_get_pfn_list(int xc_handle,
 
 long xc_get_tot_pages(int xc_handle, uint32_t domid)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
     return (do_dom0_op(xc_handle, &op) < 0) ? 
@@ -402,6 +405,11 @@ int xc_version(int xc_handle, int cmd, void *arg)
         PERROR("Could not lock memory for version hypercall");
         return -ENOMEM;
     }
+
+#ifdef VALGRIND
+    if (argsize != 0)
+        memset(arg, 0, argsize);
+#endif
 
     rc = do_xen_version(xc_handle, cmd, arg);
 

@@ -106,7 +106,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                      unsigned int store_evtchn, unsigned long *store_mfn,
                      unsigned int console_evtchn, unsigned long *console_mfn)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     int rc = 1, i, n;
     unsigned long mfn, pfn; 
     unsigned int prev_pc, this_pc;

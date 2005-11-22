@@ -25,7 +25,7 @@ int xc_readconsolering(int xc_handle,
                        int clear)
 {
     int ret;
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     char *buffer = *pbuffer;
     unsigned int nr_chars = *pnr_chars;
 
@@ -52,7 +52,7 @@ int xc_physinfo(int xc_handle,
                 xc_physinfo_t *put_info)
 {
     int ret;
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     
     op.cmd = DOM0_PHYSINFO;
     op.interface_version = DOM0_INTERFACE_VERSION;
@@ -69,7 +69,7 @@ int xc_sched_id(int xc_handle,
                 int *sched_id)
 {
     int ret;
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     
     op.cmd = DOM0_SCHED_ID;
     op.interface_version = DOM0_INTERFACE_VERSION;
@@ -83,25 +83,25 @@ int xc_sched_id(int xc_handle,
 }
 
 int xc_perfc_control(int xc_handle,
-                     uint32_t op,
+                     uint32_t opcode,
                      xc_perfc_desc_t *desc)
 {
     int rc;
-    dom0_op_t dop;
+    DECLARE_DOM0_OP;
 
-    dop.cmd = DOM0_PERFCCONTROL;
-    dop.u.perfccontrol.op   = op;
-    dop.u.perfccontrol.desc = desc;
+    op.cmd = DOM0_PERFCCONTROL;
+    op.u.perfccontrol.op   = opcode;
+    op.u.perfccontrol.desc = desc;
 
-    rc = do_dom0_op(xc_handle, &dop);
+    rc = do_dom0_op(xc_handle, &op);
 
-    return (rc == 0) ? dop.u.perfccontrol.nr_counters : rc;
+    return (rc == 0) ? op.u.perfccontrol.nr_counters : rc;
 }
 
 long long xc_msr_read(int xc_handle, int cpu_mask, int msr)
 {
     int rc;    
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     
     op.cmd = DOM0_MSR;
     op.u.msr.write = 0;
@@ -117,7 +117,7 @@ int xc_msr_write(int xc_handle, int cpu_mask, int msr, unsigned int low,
                   unsigned int high)
 {
     int rc;    
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     
     op.cmd = DOM0_MSR;
     op.u.msr.write = 1;

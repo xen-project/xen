@@ -11,7 +11,7 @@
 int xc_bvtsched_global_set(int xc_handle,
                            unsigned long ctx_allow)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
 
     op.cmd = DOM0_SCHEDCTL;
     op.u.schedctl.sched_id = SCHED_BVT;
@@ -24,7 +24,7 @@ int xc_bvtsched_global_set(int xc_handle,
 int xc_bvtsched_global_get(int xc_handle,
                            unsigned long *ctx_allow)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     int ret;
     
     op.cmd = DOM0_SCHEDCTL;
@@ -46,7 +46,7 @@ int xc_bvtsched_domain_set(int xc_handle,
                            long long warpl,
                            long long warpu)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     struct bvt_adjdom *bvtadj = &op.u.adjustdom.u.bvt;
 
     op.cmd = DOM0_ADJUSTDOM;
@@ -72,7 +72,7 @@ int xc_bvtsched_domain_get(int xc_handle,
                            long long *warpu)
 {
     
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     int ret;
     struct bvt_adjdom *adjptr = &op.u.adjustdom.u.bvt;
 

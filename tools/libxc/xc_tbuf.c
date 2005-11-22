@@ -10,7 +10,7 @@
 
 int xc_tbuf_enable(int xc_handle, int enable)
 {
-  dom0_op_t op;
+  DECLARE_DOM0_OP;
 
   op.cmd = DOM0_TBUFCONTROL;
   op.interface_version = DOM0_INTERFACE_VERSION;
@@ -24,7 +24,7 @@ int xc_tbuf_enable(int xc_handle, int enable)
 
 int xc_tbuf_set_size(int xc_handle, uint32_t size)
 {
-  dom0_op_t op;
+  DECLARE_DOM0_OP;
 
   op.cmd = DOM0_TBUFCONTROL;
   op.interface_version = DOM0_INTERFACE_VERSION;
@@ -37,7 +37,7 @@ int xc_tbuf_set_size(int xc_handle, uint32_t size)
 int xc_tbuf_get_size(int xc_handle, uint32_t *size)
 {
   int rc;
-  dom0_op_t op;
+  DECLARE_DOM0_OP;
 
   op.cmd = DOM0_TBUFCONTROL;
   op.interface_version = DOM0_INTERFACE_VERSION;

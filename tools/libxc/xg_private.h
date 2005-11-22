@@ -16,6 +16,16 @@
 #include <xen/linux/privcmd.h>
 #include <xen/memory.h>
 
+/* valgrind cannot see when a hypercall has filled in some values.  For this
+   reason, we must zero the dom0_op_t instance before a call, if using
+   valgrind.  */
+#ifdef VALGRIND
+#define DECLARE_DOM0_OP dom0_op_t op; memset(&op, 0, sizeof(op))
+#else
+#define DECLARE_DOM0_OP dom0_op_t op
+#endif
+
+
 char *xc_read_kernel_image(const char *filename, unsigned long *size);
 unsigned long csum_page (void * page);
 

@@ -12,7 +12,7 @@
 static int do_evtchn_op(int xc_handle, evtchn_op_t *op)
 {
     int ret = -1;
-    privcmd_hypercall_t hypercall;
+    DECLARE_HYPERCALL;
 
     hypercall.op     = __HYPERVISOR_event_channel_op;
     hypercall.arg[0] = (unsigned long)op;

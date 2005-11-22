@@ -13,7 +13,7 @@
 int xc_sedf_domain_set(int xc_handle,
                           uint32_t domid, uint64_t period, uint64_t slice,uint64_t latency, uint16_t extratime,uint16_t weight)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     struct sedf_adjdom *p = &op.u.adjustdom.u.sedf;
 
     op.cmd = DOM0_ADJUSTDOM;
@@ -31,7 +31,7 @@ int xc_sedf_domain_set(int xc_handle,
 
 int xc_sedf_domain_get(int xc_handle, uint32_t domid, uint64_t *period, uint64_t *slice, uint64_t* latency, uint16_t* extratime, uint16_t* weight)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     int ret;
     struct sedf_adjdom *p = &op.u.adjustdom.u.sedf;
 

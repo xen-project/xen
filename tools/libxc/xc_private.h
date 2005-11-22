@@ -17,6 +17,19 @@
 
 #include <xen/linux/privcmd.h>
 
+/* valgrind cannot see when a hypercall has filled in some values.  For this
+   reason, we must zero the privcmd_hypercall_t or dom0_op_t instance before a
+   call, if using valgrind.  */
+#ifdef VALGRIND
+#define DECLARE_HYPERCALL privcmd_hypercall_t hypercall; \
+  memset(&hypercall, 0, sizeof(hypercall))
+#define DECLARE_DOM0_OP dom0_op_t op; memset(&op, 0, sizeof(op))
+#else
+#define DECLARE_HYPERCALL privcmd_hypercall_t hypercall
+#define DECLARE_DOM0_OP dom0_op_t op
+#endif
+
+
 #define PAGE_SHIFT              XC_PAGE_SHIFT
 #define PAGE_SIZE               (1UL << PAGE_SHIFT)
 #define PAGE_MASK               (~(PAGE_SIZE-1))
@@ -61,7 +74,7 @@ static inline int do_xen_hypercall(int xc_handle,
 
 static inline int do_xen_version(int xc_handle, int cmd, void *dest)
 {
-    privcmd_hypercall_t hypercall;
+    DECLARE_HYPERCALL;
 
     hypercall.op     = __HYPERVISOR_xen_version;
     hypercall.arg[0] = (unsigned long) cmd;
@@ -73,7 +86,7 @@ static inline int do_xen_version(int xc_handle, int cmd, void *dest)
 static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
 {
     int ret = -1;
-    privcmd_hypercall_t hypercall;
+    DECLARE_HYPERCALL;
 
     op->interface_version = DOM0_INTERFACE_VERSION;
 

@@ -283,7 +283,7 @@ xc_waitdomain(
     int *status,
     int options)
 {
-    dom0_op_t op;
+    DECLARE_DOM0_OP;
     int retval;
     struct timespec ts;
     ts.tv_sec = 0;
@@ -323,7 +323,7 @@ xc_ptrace(
     long eaddr,
     long edata)
 {
-    dom0_op_t       op;
+    DECLARE_DOM0_OP;
     int             status = 0;
     struct gdb_regs pt;
     long            retval = 0;

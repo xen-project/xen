@@ -17,7 +17,7 @@ do_gnttab_op(int xc_handle,
              unsigned long count)
 {
     int ret = -1;
-    privcmd_hypercall_t hypercall;
+    DECLARE_HYPERCALL;
 
     hypercall.op     = __HYPERVISOR_grant_table_op;
     hypercall.arg[0] = cmd;
