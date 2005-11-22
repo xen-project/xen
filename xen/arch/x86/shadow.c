@@ -207,6 +207,7 @@ alloc_shadow_page(struct domain *d,
     struct pfn_info *page;
     unsigned long smfn;
     int pin = 0;
+    void *l1, *lp;
 
     // Currently, we only keep pre-zero'ed pages around for use as L1's...
     // This will change.  Soon.
@@ -232,19 +233,19 @@ alloc_shadow_page(struct domain *d,
                 if (!page)
                     goto no_shadow_page;
 
-                void *l1_0 = map_domain_page(page_to_pfn(page));
-                memset(l1_0, 0, PAGE_SIZE);
-                unmap_domain_page(l1_0);
+                l1 = map_domain_page(page_to_pfn(page));
+                memset(l1, 0, PAGE_SIZE);
+                unmap_domain_page(l1);
 
-                void *l1_1 = map_domain_page(page_to_pfn(page+1));
-                memset(l1_1, 0, PAGE_SIZE);
-                unmap_domain_page(l1_1);
+                l1 = map_domain_page(page_to_pfn(page+1));
+                memset(l1, 0, PAGE_SIZE);
+                unmap_domain_page(l1);
 #else
                 page = alloc_domheap_page(NULL);
                 if (!page)
                     goto no_shadow_page;
 
-                void *l1 = map_domain_page(page_to_pfn(page));
+                l1 = map_domain_page(page_to_pfn(page));
                 memset(l1, 0, PAGE_SIZE);
                 unmap_domain_page(l1);
 #endif
@@ -255,7 +256,7 @@ alloc_shadow_page(struct domain *d,
                 if (!page)
                     goto no_shadow_page;
 
-                void *l1 = map_domain_page(page_to_pfn(page));
+                l1 = map_domain_page(page_to_pfn(page));
                 memset(l1, 0, PAGE_SIZE);
                 unmap_domain_page(l1);
             }
@@ -279,7 +280,7 @@ alloc_shadow_page(struct domain *d,
         if (!page)
             goto no_shadow_page;
 
-        void *lp = map_domain_page(page_to_pfn(page));
+        lp = map_domain_page(page_to_pfn(page));
         memset(lp, 0, PAGE_SIZE);
         unmap_domain_page(lp);
     }
@@ -588,9 +589,11 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
     }
 
 #ifndef NDEBUG
-    l2_pgentry_t old_sl2e;
-    __shadow_get_l2e(v, va, &old_sl2e);
-    ASSERT( !(l2e_get_flags(old_sl2e) & _PAGE_PRESENT) );
+    {
+        l2_pgentry_t old_sl2e;
+        __shadow_get_l2e(v, va, &old_sl2e);
+        ASSERT(!(l2e_get_flags(old_sl2e) & _PAGE_PRESENT));
+    }
 #endif
 
 #if CONFIG_PAGING_LEVELS >=3
@@ -952,14 +955,16 @@ __mark_mfn_out_of_sync(struct vcpu *v, unsigned long gpfn,
     ASSERT(pfn_valid(mfn));
 
 #ifndef NDEBUG
-    u32 type = page->u.inuse.type_info & PGT_type_mask;
-    if ( shadow_mode_refcounts(d) )
     {
-        ASSERT(type == PGT_writable_page);
-    }
-    else
-    {
-        ASSERT(type && (type < PGT_l4_page_table));
+        u32 type = page->u.inuse.type_info & PGT_type_mask;
+        if ( shadow_mode_refcounts(d) )
+        {
+            ASSERT(type == PGT_writable_page);
+        }
+        else
+        {
+            ASSERT(type && (type < PGT_l4_page_table));
+        }
     }
 #endif
 
@@ -1438,6 +1443,8 @@ static int resync_all(struct domain *d, u32 stype)
     int need_flush = 0, external = shadow_mode_external(d);
     int unshadow;
     int changed;
+    u32 min_max_shadow, min_max_snapshot;
+    int min_shadow, max_shadow, min_snapshot, max_snapshot;
 
     ASSERT(shadow_lock_is_acquired(d));
 
@@ -1466,7 +1473,7 @@ static int resync_all(struct domain *d, u32 stype)
                 continue;
         }
 
-       FSH_LOG("resyncing t=%08x gpfn=%lx gmfn=%lx smfn=%lx snapshot_mfn=%lx",
+        FSH_LOG("resyncing t=%08x gpfn=%lx gmfn=%lx smfn=%lx snapshot_mfn=%lx",
                 stype, entry->gpfn, entry->gmfn, smfn, entry->snapshot_mfn);
 
         // Compare guest's new contents to its snapshot, validating
@@ -1482,16 +1489,16 @@ static int resync_all(struct domain *d, u32 stype)
 
         unshadow = 0;
 
-        u32 min_max_shadow = pfn_to_page(smfn)->tlbflush_timestamp;
-        int min_shadow = SHADOW_MIN(min_max_shadow);
-        int max_shadow = SHADOW_MAX(min_max_shadow);
+        min_max_shadow = pfn_to_page(smfn)->tlbflush_timestamp;
+        min_shadow     = SHADOW_MIN(min_max_shadow);
+        max_shadow     = SHADOW_MAX(min_max_shadow);
 
-        u32 min_max_snapshot =
-          pfn_to_page(entry->snapshot_mfn)->tlbflush_timestamp;
-        int min_snapshot = SHADOW_MIN(min_max_snapshot);
-        int max_snapshot = SHADOW_MAX(min_max_snapshot);
+        min_max_snapshot= pfn_to_page(entry->snapshot_mfn)->tlbflush_timestamp;
+        min_snapshot    = SHADOW_MIN(min_max_snapshot);
+        max_snapshot    = SHADOW_MAX(min_max_snapshot);
 
-        switch ( stype ) {
+        switch ( stype )
+        {
         case PGT_l1_shadow:
         {
             guest_l1_pgentry_t *guest1 = guest;
@@ -1680,9 +1687,9 @@ static int resync_all(struct domain *d, u32 stype)
             changed = 0;
             for ( i = 0; i < GUEST_ROOT_PAGETABLE_ENTRIES; i++ )
             {
+                guest_root_pgentry_t new_root_e = guest_root[i];
                 if ( !is_guest_l4_slot(i) && !external )
                     continue;
-                guest_root_pgentry_t new_root_e = guest_root[i];
                 if ( root_entry_has_changed(
                         new_root_e, snapshot_root[i], PAGE_FLAG_MASK))
                 {
@@ -1749,6 +1756,7 @@ static void sync_all(struct domain *d)
 {
     struct out_of_sync_entry *entry;
     int need_flush = 0;
+    l1_pgentry_t *ppte, opte, npte;
 
     perfc_incrc(shadow_sync_all);
 
@@ -1764,11 +1772,10 @@ static void sync_all(struct domain *d)
         if ( entry->writable_pl1e & (sizeof(l1_pgentry_t)-1) )
             continue;
 
-        l1_pgentry_t *ppte = (l1_pgentry_t *)(
+        ppte = (l1_pgentry_t *)(
             (char *)map_domain_page(entry->writable_pl1e >> PAGE_SHIFT) +
             (entry->writable_pl1e & ~PAGE_MASK));
-        l1_pgentry_t opte = *ppte;
-        l1_pgentry_t npte = opte;
+        opte = npte = *ppte;
         l1e_remove_flags(npte, _PAGE_RW);
 
         if ( (l1e_get_flags(npte) & _PAGE_PRESENT) &&
@@ -2821,6 +2828,7 @@ static inline unsigned long init_bl2(l4_pgentry_t *spl4e, unsigned long smfn)
     unsigned int count;
     unsigned long sl2mfn;
     struct pfn_info *page;
+    void *l2;
 
     memset(spl4e, 0, PAGE_SIZE);
 
@@ -2835,7 +2843,7 @@ static inline unsigned long init_bl2(l4_pgentry_t *spl4e, unsigned long smfn)
     for (count = 0; count < PDP_ENTRIES; count++)
     {
         sl2mfn = page_to_pfn(page+count);
-        void *l2 = map_domain_page(sl2mfn);
+        l2 = map_domain_page(sl2mfn);
         memset(l2, 0, PAGE_SIZE);
         unmap_domain_page(l2);
         spl4e[count] = l4e_from_pfn(sl2mfn, _PAGE_PRESENT);

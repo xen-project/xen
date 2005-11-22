@@ -786,6 +786,7 @@ void free_shadow_pages(struct domain *d)
     int                   i;
     struct shadow_status *x;
     struct vcpu          *v;
+    struct list_head *list_ent, *tmp;
 
     /*
      * WARNING! The shadow page table must not currently be in use!
@@ -884,15 +885,14 @@ void free_shadow_pages(struct domain *d)
         xfree(mfn_list);
     }
 
-    // Now free the pre-zero'ed pages from the domain
-    //
-    struct list_head *list_ent, *tmp;
+    /* Now free the pre-zero'ed pages from the domain. */
     list_for_each_safe(list_ent, tmp, &d->arch.free_shadow_frames)
     {
+        struct pfn_info *page = list_entry(list_ent, struct pfn_info, list);
+
         list_del(list_ent);
         perfc_decr(free_l1_pages);
 
-        struct pfn_info *page = list_entry(list_ent, struct pfn_info, list);
         if (d->arch.ops->guest_paging_levels == PAGING_L2)
         {
 #if CONFIG_PAGING_LEVELS >=4
@@ -912,6 +912,11 @@ void free_shadow_pages(struct domain *d)
 
 void __shadow_mode_disable(struct domain *d)
 {
+    struct vcpu *v;
+#ifndef NDEBUG
+    int i;
+#endif
+
     if ( unlikely(!shadow_mode_enabled(d)) )
         return;
 
@@ -919,7 +924,6 @@ void __shadow_mode_disable(struct domain *d)
     free_writable_pte_predictions(d);
 
 #ifndef NDEBUG
-    int i;
     for ( i = 0; i < shadow_ht_buckets; i++ )
     {
         if ( d->arch.shadow_ht[i].gpfn_and_flags != 0 )
@@ -936,11 +940,8 @@ void __shadow_mode_disable(struct domain *d)
     free_shadow_ht_entries(d);
     free_out_of_sync_entries(d);
 
-    struct vcpu *v;
     for_each_vcpu(d, v)
-    {
         update_pagetables(v);
-    }
 }
 
 
@@ -1608,14 +1609,18 @@ remove_shadow(struct domain *d, unsigned long gpfn, u32 stype)
 unsigned long
 gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 {
-    ASSERT( shadow_mode_translate(d) );
+    unsigned long va, tabpfn;
+    l1_pgentry_t *l1, l1e;
+    l2_pgentry_t *l2, l2e;
+
+    ASSERT(shadow_mode_translate(d));
 
     perfc_incrc(gpfn_to_mfn_foreign);
 
-    unsigned long va = gpfn << PAGE_SHIFT;
-    unsigned long tabpfn = pagetable_get_pfn(d->arch.phys_table);
-    l2_pgentry_t *l2 = map_domain_page(tabpfn);
-    l2_pgentry_t l2e = l2[l2_table_offset(va)];
+    va = gpfn << PAGE_SHIFT;
+    tabpfn = pagetable_get_pfn(d->arch.phys_table);
+    l2 = map_domain_page(tabpfn);
+    l2e = l2[l2_table_offset(va)];
     unmap_domain_page(l2);
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
     {
@@ -1623,8 +1628,8 @@ gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
                d->domain_id, gpfn, l2e_get_intpte(l2e));
         return INVALID_MFN;
     }
-    l1_pgentry_t *l1 = map_domain_page(l2e_get_pfn(l2e));
-    l1_pgentry_t l1e = l1[l1_table_offset(va)];
+    l1 = map_domain_page(l2e_get_pfn(l2e));
+    l1e = l1[l1_table_offset(va)];
     unmap_domain_page(l1);
 
 #if 0

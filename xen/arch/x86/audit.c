@@ -55,10 +55,11 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
     void _adjust(struct pfn_info *page, int adjtype ADJUST_EXTRA_ARGS)
     {
+        int count;
+
         if ( adjtype )
         {
-            // adjust the type count
-            //
+            /* adjust the type count */
             int tcount = page->u.inuse.type_info & PGT_count_mask;
             tcount += dir;
             ttot++;
@@ -92,10 +93,8 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                 page->u.inuse.type_info += dir;
         }
 
-        // adjust the general count
-        //
-        int count = page->count_info & PGC_count_mask;
-        count += dir;
+        /* adjust the general count */
+        count = (page->count_info & PGC_count_mask) + dir;
         ctot++;
 
         if ( count < 0 )
@@ -124,6 +123,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
     {
         unsigned long *pt = map_domain_page(mfn);
         int i;
+        u32 page_type;
 
         for ( i = 0; i < l2limit; i++ )
         {
@@ -147,8 +147,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                             continue;
                         }
 
-                        u32 page_type = l1page->u.inuse.type_info & PGT_type_mask;
-
+                        page_type = l1page->u.inuse.type_info & PGT_type_mask;
                         if ( page_type != PGT_l1_shadow )
                         {
                             printk("Audit %d: [Shadow L2 mfn=%lx i=%x] "
@@ -174,8 +173,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                             continue;
                         }
 
-                        u32 page_type = l1page->u.inuse.type_info & PGT_type_mask;
-
+                        page_type = l1page->u.inuse.type_info & PGT_type_mask;
                         if ( page_type == PGT_l2_page_table )
                         {
                             printk("Audit %d: [%x] Found %s Linear PT "
@@ -741,6 +739,7 @@ void _audit_domain(struct domain *d, int flags)
     while ( list_ent != &d->page_list )
     {
         u32 page_type;
+        unsigned long pfn;
 
         page = list_entry(list_ent, struct pfn_info, list);
         mfn = page_to_pfn(page);
@@ -797,7 +796,7 @@ void _audit_domain(struct domain *d, int flags)
                 printk("out of sync page mfn=%lx is not a page table\n", mfn);
                 errors++;
             }
-            unsigned long pfn = __mfn_to_gpfn(d, mfn);
+            pfn = __mfn_to_gpfn(d, mfn);
             if ( !__shadow_status(d, pfn, PGT_snapshot) )
             {
                 printk("out of sync page mfn=%lx doesn't have a snapshot\n",

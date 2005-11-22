@@ -173,11 +173,12 @@ extern void vmx_shadow_clear_state(struct domain *);
 static inline int page_is_page_table(struct pfn_info *page)
 {
     struct domain *owner = page_get_owner(page);
+    u32 type_info;
 
     if ( owner && shadow_mode_refcounts(owner) )
         return page->count_info & PGC_page_table;
 
-    u32 type_info = page->u.inuse.type_info & PGT_type_mask;
+    type_info = page->u.inuse.type_info & PGT_type_mask;
     return type_info && (type_info <= PGT_l4_page_table);
 }
 

@@ -521,9 +521,9 @@ get_page_from_l3e(
     l3_pgentry_t l3e, unsigned long pfn,
     struct domain *d, unsigned long vaddr)
 {
-    ASSERT( !shadow_mode_refcounts(d) );
-
     int rc;
+
+    ASSERT(!shadow_mode_refcounts(d));
 
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
         return 1;
@@ -1880,19 +1880,18 @@ int do_mmuext_op(
 
         case MMUEXT_SET_LDT:
         {
+            unsigned long ptr  = op.arg1.linear_addr;
+            unsigned long ents = op.arg2.nr_ents;
+
             if ( shadow_mode_external(d) )
             {
                 MEM_LOG("ignoring SET_LDT hypercall from external "
                         "domain %u", d->domain_id);
                 okay = 0;
-                break;
             }
-
-            unsigned long ptr  = op.arg1.linear_addr;
-            unsigned long ents = op.arg2.nr_ents;
-            if ( ((ptr & (PAGE_SIZE-1)) != 0) || 
-                 (ents > 8192) ||
-                 !array_access_ok(ptr, ents, LDT_ENTRY_SIZE) )
+            else if ( ((ptr & (PAGE_SIZE-1)) != 0) || 
+                      (ents > 8192) ||
+                      !array_access_ok(ptr, ents, LDT_ENTRY_SIZE) )
             {
                 okay = 0;
                 MEM_LOG("Bad args to SET_LDT: ptr=%lx, ents=%lx", ptr, ents);

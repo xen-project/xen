@@ -109,7 +109,7 @@ perform(int optind, int argc, char **argv, struct xs_handle *xsh,
            necessary.
         */
 
-        char *path = argv[optind];
+        char *slash, *path = argv[optind];
 
         if (tidy) {
             /* Copy path, because we can't modify argv because we will need it
@@ -123,7 +123,7 @@ perform(int optind, int argc, char **argv, struct xs_handle *xsh,
                 return 1;
             }
 
-            char *slash = strrchr(p, '/');
+            slash = strrchr(p, '/');
             if (slash) {
                 char *val;
                 *slash = '\0';

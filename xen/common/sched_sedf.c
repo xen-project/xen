@@ -704,11 +704,12 @@ static struct task_slice sedf_do_schedule(s_time_t now)
     struct list_head     *waitq    = WAITQ(cpu);
 #if (EXTRA > EXTRA_OFF)
     struct sedf_vcpu_info *inf     = EDOM_INFO(current);
-    struct list_head     *extraq[] = {EXTRAQ(cpu, EXTRA_PEN_Q),
-                                      EXTRAQ(cpu, EXTRA_UTIL_Q)};
+    struct list_head      *extraq[] = {
+        EXTRAQ(cpu, EXTRA_PEN_Q), EXTRAQ(cpu, EXTRA_UTIL_Q)};
 #endif
-    struct task_slice          ret;
-    /*int i = 0;*/
+    struct sedf_vcpu_info *runinf, *waitinf;
+    struct task_slice      ret;
+
     /*idle tasks don't need any of the following stuf*/
     if (is_idle_task(current->domain))
         goto check_waitq;
@@ -737,7 +738,6 @@ static struct task_slice sedf_do_schedule(s_time_t now)
  
     /*now simply pick the first domain from the runqueue, which has the
       earliest deadline, because the list is sorted*/
-    struct sedf_vcpu_info *runinf, *waitinf;
  
     if (!list_empty(runq)) {
         runinf   = list_entry(runq->next,struct sedf_vcpu_info,list);

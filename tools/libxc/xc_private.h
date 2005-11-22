@@ -21,9 +21,8 @@
    reason, we must zero the privcmd_hypercall_t or dom0_op_t instance before a
    call, if using valgrind.  */
 #ifdef VALGRIND
-#define DECLARE_HYPERCALL privcmd_hypercall_t hypercall; \
-  memset(&hypercall, 0, sizeof(hypercall))
-#define DECLARE_DOM0_OP dom0_op_t op; memset(&op, 0, sizeof(op))
+#define DECLARE_HYPERCALL privcmd_hypercall_t hypercall = { 0 }
+#define DECLARE_DOM0_OP dom0_op_t op = { 0 }
 #else
 #define DECLARE_HYPERCALL privcmd_hypercall_t hypercall
 #define DECLARE_DOM0_OP dom0_op_t op

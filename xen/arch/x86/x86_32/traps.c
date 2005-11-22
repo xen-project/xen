@@ -167,6 +167,7 @@ asmlinkage void smp_deferred_nmi(struct cpu_user_regs regs)
 
 void __init percpu_traps_init(void)
 {
+    struct tss_struct *tss = &doublefault_tss;
     asmlinkage int hypercall(void);
 
     if ( smp_processor_id() != 0 )
@@ -184,7 +185,6 @@ void __init percpu_traps_init(void)
      * Make a separate task for double faults. This will get us debug output if
      * we blow the kernel stack.
      */
-    struct tss_struct *tss = &doublefault_tss;
     memset(tss, 0, sizeof(*tss));
     tss->ds     = __HYPERVISOR_DS;
     tss->es     = __HYPERVISOR_DS;

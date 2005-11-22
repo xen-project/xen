@@ -20,7 +20,7 @@
    reason, we must zero the dom0_op_t instance before a call, if using
    valgrind.  */
 #ifdef VALGRIND
-#define DECLARE_DOM0_OP dom0_op_t op; memset(&op, 0, sizeof(op))
+#define DECLARE_DOM0_OP dom0_op_t op = { 0 }
 #else
 #define DECLARE_DOM0_OP dom0_op_t op
 #endif
