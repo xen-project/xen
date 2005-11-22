@@ -1381,8 +1381,11 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     switch ( op )
     {
     case DOM0_SHADOW_CONTROL_OP_OFF:
-        __shadow_sync_all(d);
-        __shadow_mode_disable(d);
+        if ( shadow_mode_enabled(d) )
+        {
+            __shadow_sync_all(d);
+            __shadow_mode_disable(d);
+        }
         break;
 
     case DOM0_SHADOW_CONTROL_OP_ENABLE_TEST:
