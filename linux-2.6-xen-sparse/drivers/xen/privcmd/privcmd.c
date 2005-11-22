@@ -222,6 +222,17 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		unsigned long *p; 
 		int i; 
 
+#if defined (__x86_64__)
+		/* 
+		** XXX SMH: the below procedure won't work for 64 since 
+		** we don't have access to the memory which maps the M2P. 
+		** A proper fix will probably involve moving this 
+		** functionality to Xen - for now just return an error 
+		** here rather than GPF'ing in the kernel. 
+		*/
+		ret = -EINVAL; 
+		break; 
+#endif
 		if (copy_from_user(&m, (void *)data, sizeof(m)))
 			return -EFAULT;
 
