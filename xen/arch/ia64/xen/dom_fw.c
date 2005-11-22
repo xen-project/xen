@@ -13,6 +13,7 @@
 #include <asm/io.h>
 #include <asm/pal.h>
 #include <asm/sal.h>
+#include <xen/compile.h>
 #include <xen/acpi.h>
 
 #include <asm/dom_fw.h>
@@ -437,29 +438,29 @@ acpi_update_lsapic (acpi_table_entry_header *header)
 	return 0;
 }
 
+static u8
+generate_acpi_checksum(void *tbl, unsigned long len)
+{
+	u8 *ptr, sum = 0;
+
+	for (ptr = tbl; len > 0 ; len--, ptr++)
+		sum += *ptr;
+
+	return 0 - sum;
+}
+
 static int
 acpi_update_madt_checksum (unsigned long phys_addr, unsigned long size)
 {
-	u8 checksum=0;
-    	u8* ptr;
-	int len;
 	struct acpi_table_madt* acpi_madt;
 
 	if (!phys_addr || !size)
 		return -EINVAL;
 
 	acpi_madt = (struct acpi_table_madt *) __va(phys_addr);
-	acpi_madt->header.checksum=0;
+	acpi_madt->header.checksum = 0;
+	acpi_madt->header.checksum = generate_acpi_checksum(acpi_madt, size);
 
-    	/* re-calculate MADT checksum */
-	ptr = (u8*)acpi_madt;
-    	len = acpi_madt->header.length;
-	while (len>0){
-		checksum = (u8)( checksum + (*ptr++) );
-		len--;
-	}
-    	acpi_madt->header.checksum = 0x0 - checksum;	
-	
 	return 0;
 }
 
@@ -473,6 +474,128 @@ void touch_acpi_table(void)
 	return;
 }
 
+struct fake_acpi_tables {
+	struct acpi20_table_rsdp rsdp;
+	struct xsdt_descriptor_rev2 xsdt;
+	u64 madt_ptr;
+	struct fadt_descriptor_rev2 fadt;
+	struct facs_descriptor_rev2 facs;
+	struct acpi_table_header dsdt;
+	struct acpi_table_madt madt;
+	struct acpi_table_lsapic lsapic;
+	u8 pm1a_evt_blk[4];
+	u8 pm1a_cnt_blk[1];
+	u8 pm_tmr_blk[4];
+};
+
+/* Create enough of an ACPI structure to make the guest OS ACPI happy. */
+void
+dom_fw_fake_acpi(struct fake_acpi_tables *tables)
+{
+	struct acpi20_table_rsdp *rsdp = &tables->rsdp;
+	struct xsdt_descriptor_rev2 *xsdt = &tables->xsdt;
+	struct fadt_descriptor_rev2 *fadt = &tables->fadt;
+	struct facs_descriptor_rev2 *facs = &tables->facs;
+	struct acpi_table_header *dsdt = &tables->dsdt;
+	struct acpi_table_madt *madt = &tables->madt;
+	struct acpi_table_lsapic *lsapic = &tables->lsapic;
+
+	memset(tables, 0, sizeof(struct fake_acpi_tables));
+
+	/* setup XSDT (64bit version of RSDT) */
+	strncpy(xsdt->signature, XSDT_SIG, 4);
+	/* XSDT points to both the FADT and the MADT, so add one entry */
+	xsdt->length = sizeof(struct xsdt_descriptor_rev2) + sizeof(u64);
+	xsdt->revision = 1;
+	strcpy(xsdt->oem_id, "XEN");
+	strcpy(xsdt->oem_table_id, "Xen/ia64");
+	strcpy(xsdt->asl_compiler_id, "XEN");
+	xsdt->asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+
+	xsdt->table_offset_entry[0] = dom_pa(fadt);
+	tables->madt_ptr = dom_pa(madt);
+
+	xsdt->checksum = generate_acpi_checksum(xsdt, xsdt->length);
+
+	/* setup FADT */
+	strncpy(fadt->signature, FADT_SIG, 4);
+	fadt->length = sizeof(struct fadt_descriptor_rev2);
+	fadt->revision = FADT2_REVISION_ID;
+	strcpy(fadt->oem_id, "XEN");
+	strcpy(fadt->oem_table_id, "Xen/ia64");
+	strcpy(fadt->asl_compiler_id, "XEN");
+	fadt->asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+
+	strncpy(facs->signature, FACS_SIG, 4);
+	facs->version = 1;
+	facs->length = sizeof(struct facs_descriptor_rev2);
+
+	fadt->xfirmware_ctrl = dom_pa(facs);
+	fadt->Xdsdt = dom_pa(dsdt);
+
+	/*
+	 * All of the below FADT entries are filled it to prevent warnings
+	 * from sanity checks in the ACPI CA.  Emulate required ACPI hardware
+	 * registers in system memory.
+	 */
+	fadt->pm1_evt_len = 4;
+	fadt->xpm1a_evt_blk.address_space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
+	fadt->xpm1a_evt_blk.register_bit_width = 8;
+	fadt->xpm1a_evt_blk.address = dom_pa(&tables->pm1a_evt_blk);
+	fadt->pm1_cnt_len = 1;
+	fadt->xpm1a_cnt_blk.address_space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
+	fadt->xpm1a_cnt_blk.register_bit_width = 8;
+	fadt->xpm1a_cnt_blk.address = dom_pa(&tables->pm1a_cnt_blk);
+	fadt->pm_tm_len = 4;
+	fadt->xpm_tmr_blk.address_space_id = ACPI_ADR_SPACE_SYSTEM_MEMORY;
+	fadt->xpm_tmr_blk.register_bit_width = 8;
+	fadt->xpm_tmr_blk.address = dom_pa(&tables->pm_tmr_blk);
+
+	fadt->checksum = generate_acpi_checksum(fadt, fadt->length);
+
+	/* setup RSDP */
+	strncpy(rsdp->signature, RSDP_SIG, 8);
+	strcpy(rsdp->oem_id, "XEN");
+	rsdp->revision = 2; /* ACPI 2.0 includes XSDT */
+	rsdp->length = sizeof(struct acpi20_table_rsdp);
+	rsdp->xsdt_address = dom_pa(xsdt);
+
+	rsdp->checksum = generate_acpi_checksum(rsdp,
+	                                        ACPI_RSDP_CHECKSUM_LENGTH);
+	rsdp->ext_checksum = generate_acpi_checksum(rsdp, rsdp->length);
+
+	/*
+	 * setup DSDT - ACPI generates a warning because there's no AML
+	 * in the DSDT.  Revisit to add dummy AML stub.
+	 */ 
+	strncpy(dsdt->signature, DSDT_SIG, 4);
+	dsdt->revision = 1;
+	dsdt->length = sizeof(struct acpi_table_header);
+	strcpy(dsdt->oem_id, "XEN");
+	strcpy(dsdt->oem_table_id, "Xen/ia64");
+	strcpy(dsdt->asl_compiler_id, "XEN");
+	dsdt->asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+	dsdt->checksum = generate_acpi_checksum(dsdt, dsdt->length);
+
+	/* setup MADT */
+	strncpy(madt->header.signature, APIC_SIG, 4);
+	madt->header.revision = 2;
+	madt->header.length = sizeof(struct acpi_table_madt) +
+	                      sizeof(struct acpi_table_lsapic);
+	strcpy(madt->header.oem_id, "XEN");
+	strcpy(madt->header.oem_table_id, "Xen/ia64");
+	strcpy(madt->header.asl_compiler_id, "XEN");
+	madt->header.asl_compiler_revision = (XEN_VERSION<<16)|(XEN_SUBVERSION);
+
+	/* A single LSAPIC entry describes the CPU.  Revisit for SMP guests */
+	lsapic->header.type = ACPI_MADT_LSAPIC;
+	lsapic->header.length = sizeof(struct acpi_table_lsapic);
+	lsapic->flags.enabled = 1;
+
+	madt->header.checksum = generate_acpi_checksum(madt,
+	                                               madt->header.length);
+	return;
+}
 
 struct ia64_boot_param *
 dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_size)
@@ -620,6 +743,22 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 			i++;
 		}
 		printf("\n");
+	} else {
+		i = 1;
+
+		if ((unsigned long)fw_mem + fw_mem_size - (unsigned long)cp >=
+		    sizeof(struct fake_acpi_tables)) {
+			struct fake_acpi_tables *acpi_tables;
+
+			acpi_tables = (void *)cp;
+			cp += sizeof(struct fake_acpi_tables);
+			dom_fw_fake_acpi(acpi_tables);
+
+			efi_tables[i].guid = ACPI_20_TABLE_GUID;
+			efi_tables[i].table = dom_pa(acpi_tables);
+			printf(" ACPI 2.0=%0xlx",efi_tables[i].table);
+			i++;
+		}
 	}
 
 	/* fill in the SAL system table: */
