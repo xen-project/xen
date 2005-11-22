@@ -47,6 +47,7 @@
 #include <asm/kregs.h>
 #include <asm/vmx.h>
 #include <asm/vmx_mm_def.h>
+#include <asm/vmx_phy_mode.h>
 #include <xen/mm.h>
 /* reset all PSR field to 0, except up,mfl,mfh,pk,dt,rt,mc,it */
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
@@ -267,6 +268,12 @@ void leave_hypervisor_tail(struct pt_regs *regs)
 
 extern ia64_rr vmx_vcpu_rr(VCPU *vcpu,UINT64 vadr);
 
+static int vmx_handle_lds(REGS* regs)
+{
+    regs->cr_ipsr |=IA64_PSR_ED;
+    return IA64_FAULT;
+}
+
 /* We came here because the H/W VHPT walker failed to find an entry */
 void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
 {
@@ -294,18 +301,19 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
         return;
     }
 */
-
-    if((vec==1)&&(!vpsr.it)){
-        physical_itlb_miss(v, vadr);
-        return;
-    }
-    if((vec==2)&&(!vpsr.dt)){
-        if(v->domain!=dom0&&__gpfn_is_io(v->domain,(vadr<<1)>>(PAGE_SHIFT+1))){
-            emulate_io_inst(v,((vadr<<1)>>1),4);   //  UC
-        }else{
-            physical_dtlb_miss(v, vadr);
+    if(is_physical_mode(v)&&(!(vadr<<1>>62))){
+        if(vec==1){
+            physical_itlb_miss(v, vadr);
+            return;
         }
-        return;
+        if(vec==2){
+            if(v->domain!=dom0&&__gpfn_is_io(v->domain,(vadr<<1)>>(PAGE_SHIFT+1))){
+                emulate_io_inst(v,((vadr<<1)>>1),4);   //  UC
+            }else{
+                physical_dtlb_miss(v, vadr);
+            }
+            return;
+        }
     }
     vrr = vmx_vcpu_rr(v, vadr);
     if(vec == 1) type = ISIDE_TLB;
@@ -336,7 +344,8 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
             } else{
                 if(misr.sp){
                     //TODO  lds emulation
-                    panic("Don't support speculation load");
+                    //panic("Don't support speculation load");
+                    return vmx_handle_lds(regs);
                 }else{
                     nested_dtlb(v);
                     return IA64_FAULT;
@@ -353,8 +362,9 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
                     return IA64_FAULT;
                 }else{
                     if(misr.sp){
-                        //TODO  lds emulation
-                        panic("Don't support speculation load");
+                    //TODO  lds emulation
+                    //panic("Don't support speculation load");
+                    return vmx_handle_lds(regs);
                     }else{
                         nested_dtlb(v);
                         return IA64_FAULT;
@@ -367,8 +377,9 @@ void vmx_hpw_miss(u64 vadr , u64 vec, REGS* regs)
                     return IA64_FAULT;
                 }else{
                     if(misr.sp){
-                        //TODO  lds emulation
-                        panic("Don't support speculation load");
+                    //TODO  lds emulation
+                    //panic("Don't support speculation load");
+                    return vmx_handle_lds(regs);
                     }else{
                         nested_dtlb(v);
                         return IA64_FAULT;

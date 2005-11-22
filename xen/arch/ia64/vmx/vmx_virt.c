@@ -835,6 +835,7 @@ IA64FAULT vmx_emul_mov_to_rr(VCPU *vcpu, INST64 inst)
 
 IA64FAULT vmx_emul_mov_to_dbr(VCPU *vcpu, INST64 inst)
 {
+    return IA64_NO_FAULT;
     u64 r3,r2;
 #ifdef  CHECK_FAULT
     IA64_PSR vpsr;
@@ -858,6 +859,7 @@ IA64FAULT vmx_emul_mov_to_dbr(VCPU *vcpu, INST64 inst)
 
 IA64FAULT vmx_emul_mov_to_ibr(VCPU *vcpu, INST64 inst)
 {
+    return IA64_NO_FAULT;
     u64 r3,r2;
 #ifdef  CHECK_FAULT
     IA64_PSR vpsr;
@@ -1272,8 +1274,7 @@ IA64FAULT vmx_emul_mov_from_cr(VCPU *vcpu, INST64 inst)
         case 74:return vmx_cr_get(cmcv);
         case 80:return vmx_cr_get(lrr0);
         case 81:return vmx_cr_get(lrr1);
-        default:
-            panic("Read reserved cr register");
+        default: return IA64_NO_FAULT;
     }
 }
 
