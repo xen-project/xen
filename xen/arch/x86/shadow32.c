@@ -2426,7 +2426,8 @@ static int resync_all(struct domain *d, u32 stype)
 
                 __shadow_get_l2e(entry->v, entry->va, &l2e);
                 if (l2e_get_flags(l2e) & _PAGE_PRESENT) {
-                    l2e_remove_flags(l2e, _PAGE_PRESENT);
+                    put_shadow_ref(l2e_get_pfn(l2e)); 
+                    l2e = l2e_empty();
                     __shadow_set_l2e(entry->v, entry->va, l2e);
 
                     if (entry->v == current)
