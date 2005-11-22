@@ -23,6 +23,9 @@ extern unsigned int PAGE_HYPERVISOR;
 extern unsigned int PAGE_HYPERVISOR_NOCACHE;
 #endif
 
+#define GRANT_PTE_FLAGS \
+    (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_GNTTAB)
+
 #endif /* __X86_32_PAGE_H__ */
 
 /*

@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.12-xen0
-# Sat Oct 15 00:13:28 2005
+# Linux kernel version: 2.6.12.6-xen
+# Mon Nov 21 10:35:31 2005
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -2474,8 +2474,8 @@ CONFIG_USB_HIDDEV=y
 #
 # USB HID Boot Protocol drivers
 #
-CONFIG_USB_KBD=y
-CONFIG_USB_MOUSE=y
+CONFIG_USB_KBD=m
+CONFIG_USB_MOUSE=m
 CONFIG_USB_AIPTEK=m
 CONFIG_USB_WACOM=m
 CONFIG_USB_KBTAB=m

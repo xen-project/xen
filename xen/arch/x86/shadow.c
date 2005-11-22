@@ -1536,12 +1536,13 @@ static int resync_all(struct domain *d, u32 stype)
             perfc_incr_histo(l1_entries_checked, max_shadow - min_shadow + 1, PT_UPDATES);
             if ( d->arch.ops->guest_paging_levels >= PAGING_L3 &&
                  unshadow_l1 ) {
-                pgentry_64_t l2e = {0};
+                pgentry_64_t l2e;
 
                 __shadow_get_l2e(entry->v, entry->va, &l2e);
 
                 if ( entry_get_flags(l2e) & _PAGE_PRESENT ) {
-                    entry_remove_flags(l2e, _PAGE_PRESENT);
+                    put_shadow_ref(entry_get_pfn(l2e));
+                    l2e = entry_empty();
                     __shadow_set_l2e(entry->v, entry->va, &l2e);
 
                     if (entry->v == current)
