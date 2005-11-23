@@ -44,6 +44,9 @@ static unsigned long *live_p2m = NULL;
 /* Live mapping of system MFN to PFN table. */
 static unsigned long *live_m2p = NULL;
 
+/* grep fodder: machine_to_phys */
+
+#define mfn_to_pfn(_mfn) live_m2p[(_mfn)]
 
 /*
  * Returns TRUE if the given machine frame number has a unique mapping
@@ -51,8 +54,8 @@ static unsigned long *live_m2p = NULL;
  */
 #define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn)          \
 (((_mfn) < (max_mfn)) &&                        \
- ((live_m2p[_mfn] < (max_pfn)) &&               \
-  (live_p2m[live_m2p[_mfn]] == (_mfn))))
+ ((mfn_to_pfn(_mfn) < (max_pfn)) &&               \
+  (live_p2m[mfn_to_pfn(_mfn)] == (_mfn))))
     
  
 /* Returns TRUE if MFN is successfully converted to a PFN. */
@@ -63,7 +66,7 @@ static unsigned long *live_m2p = NULL;
     if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )                       \
         _res = 0;                                               \
     else                                                        \
-        *(_pmfn) = live_m2p[mfn];                               \
+        *(_pmfn) = mfn_to_pfn(mfn);                             \
     _res;                                                       \
 })
 
@@ -477,9 +480,7 @@ void canonicalize_pagetable(unsigned long type, unsigned long pfn,
                         type, i, (unsigned long long)pte, mfn); 
                 pfn = 0; /* zap it - we'll retransmit this page later */
             } else 
-                pfn = live_m2p[mfn];
-            
-
+                pfn = mfn_to_pfn(mfn);
             
             pte &= 0xffffff0000000fffULL;
             pte |= (uint64_t)pfn << PAGE_SHIFT;
@@ -815,9 +816,9 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         for (i = 0; i < max_pfn; i++) {
 
             mfn = live_p2m[i];
-            if((mfn != 0xffffffffUL) && (live_m2p[mfn] != i)) { 
+            if((mfn != 0xffffffffUL) && (mfn_to_pfn(mfn) != i)) { 
                 DPRINTF("i=0x%x mfn=%lx live_m2p=%lx\n", i, 
-                        mfn, live_m2p[mfn]);
+                        mfn, mfn_to_pfn(mfn));
                 err++;
             }
         }
@@ -882,7 +883,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     DPRINTF("%d pfn= %08lx mfn= %08lx %d  [mfn]= %08lx\n",
                             iter, (unsigned long)n, live_p2m[n],
                             test_bit(n, to_send), 
-                            live_m2p[live_p2m[n]&0xFFFFF]);
+                            mfn_to_pfn(live_p2m[n]&0xFFFFF));
                 }
                 
                 if (!last_iter && test_bit(n, to_send)&& test_bit(n, to_skip)) 
@@ -954,7 +955,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                             iter, 
                             (pfn_type[j] & LTAB_MASK) | pfn_batch[j],
                             pfn_type[j],
-                            live_m2p[pfn_type[j]&(~LTAB_MASK)],
+                            mfn_to_pfn(pfn_type[j]&(~LTAB_MASK)),
                             csum_page(region_base + (PAGE_SIZE*j)));
                 
                 /* canonicalise mfn->pfn */
@@ -1141,7 +1142,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         ERR("PT base is not in range of pseudophys map");
         goto out;
     }
-    ctxt.ctrlreg[3] = live_m2p[ctxt.ctrlreg[3] >> PAGE_SHIFT] <<
+    ctxt.ctrlreg[3] = mfn_to_pfn(ctxt.ctrlreg[3] >> PAGE_SHIFT) <<
         PAGE_SHIFT;
 
     if (!write_exact(io_fd, &ctxt, sizeof(ctxt)) ||

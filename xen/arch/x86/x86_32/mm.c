@@ -106,7 +106,9 @@ void __init paging_init(void)
         idle_pg_table_l2[l2_linear_offset(RO_MPT_VIRT_START) + i] =
             l2e_from_page(pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW);
     }
-    memset((void *)RDWR_MPT_VIRT_START, 0x55, mpt_size);
+
+    for ( i = 0; i < max_page; i++)
+        set_pfn_from_mfn(i, 0x55555555);
 
     /* Create page tables for ioremap(). */
     for ( i = 0; i < (IOREMAP_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
