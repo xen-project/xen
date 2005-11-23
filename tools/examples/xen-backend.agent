@@ -15,6 +15,9 @@ case "$ACTION" in
   add)
     ;;
   remove)
+    # remove device frontend store entries
+    xenstore-rm -t $(xenstore-read "$XENBUS_PATH/frontend") || true
+
     # remove device backend store entries
     xenstore-rm -t "$XENBUS_PATH"       || true
     xenstore-rm -t "error/$XENBUS_PATH" || true
