@@ -8,7 +8,6 @@ XEN_TARGET_X86_PAE  ?= n
 # Tools to run on system hosting the build
 HOSTCC     = gcc
 HOSTCFLAGS = -Wall -Werror -Wstrict-prototypes -O2 -fomit-frame-pointer
-HOSTCFLAGS += -Wdeclaration-after-statement
 
 AS         = $(CROSS_COMPILE)as
 LD         = $(CROSS_COMPILE)ld
@@ -39,7 +38,10 @@ EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBDIR)
 endif
 
-CFLAGS += -Wdeclaration-after-statement 
+test-gcc-flag = $(shell $(CC) -v --help 2>&1 | grep -q " $(1) " && echo $(1))
+
+HOSTCFLAGS += $(call test-gcc-flag,-Wdeclaration-after-statement)
+CFLAGS     += $(call test-gcc-flag,-Wdeclaration-after-statement)
 
 LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i)) 
 CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))
