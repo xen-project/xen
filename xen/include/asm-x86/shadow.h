@@ -283,21 +283,23 @@ static inline void shadow_mode_disable(struct domain *d)
 
 /************************************************************************/
 
-#define __mfn_to_gpfn(_d, mfn)                         \
-    ( (shadow_mode_translate(_d))                      \
-      ? get_pfn_from_mfn(mfn)                                   \
+#define __mfn_to_gpfn(_d, mfn)                  \
+    ( (shadow_mode_translate(_d))               \
+      ? get_pfn_from_mfn(mfn)                   \
       : (mfn) )
 
-#define __gpfn_to_mfn(_d, gpfn)                        \
-    ({                                                 \
-        (shadow_mode_translate(_d))                    \
-        ? get_mfn_from_pfn(gpfn)                \
-        : (gpfn);                                      \
+#define __gpfn_to_mfn(_d, gpfn)                 \
+    ({                                          \
+        (shadow_mode_translate(_d))             \
+        ? (((_d) == current->domain) ?          \
+           get_mfn_from_pfn(gpfn) :             \
+           gpfn_to_mfn_foreign((_d), (gpfn)))   \
+        : (gpfn);                               \
     })
 
-#define __gpfn_to_mfn_foreign(_d, gpfn)                \
-    ( (shadow_mode_translate(_d))                      \
-      ? gpfn_to_mfn_foreign(_d, gpfn)                  \
+#define __gpfn_to_mfn_foreign(_d, gpfn)         \
+    ( (shadow_mode_translate(_d))               \
+      ? gpfn_to_mfn_foreign(_d, gpfn)           \
       : (gpfn) )
 
 extern unsigned long gpfn_to_mfn_foreign(
