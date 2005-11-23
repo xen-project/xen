@@ -62,7 +62,7 @@ case "$command" in
 
     offline)
         # vifs are auto-removed from bridge.
-        ifconfig "$vif" down || fatal "ifconfig $vif down failed"
+        ifconfig "$vif" down || log err "ifconfig $vif down failed"
         ;;
 esac
 
