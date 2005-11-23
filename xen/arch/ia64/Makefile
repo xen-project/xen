@@ -10,7 +10,7 @@ OBJS = xensetup.o setup.o time.o irq.o process.o smp.o \
 	extable.o linuxextable.o sort.o xenirq.o xentime.o \
 	regionreg.o entry.o unaligned.o privop.o vcpu.o \
 	irq_ia64.o irq_lsapic.o vhpt.o xenasm.o hyperprivop.o dom_fw.o \
-	grant_table.o sn_console.o # ia64_ksyms.o 
+	sn_console.o # ia64_ksyms.o 
 
 OBJS += vmx_init.o vmx_virt.o vmx_vcpu.o vmx_process.o vmx_vsa.o vmx_ivt.o\
 	vmx_phy_mode.o vmx_utility.o vmx_interrupt.o vmx_entry.o vmmu.o \

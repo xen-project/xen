@@ -330,20 +330,7 @@ __gnttab_map_grant_ref(
 
     if ( dev_hst_ro_flags & GNTMAP_host_map )
     {
-        /* Write update into the pagetable. */
-        l1_pgentry_t pte;
-        pte = l1e_from_pfn(frame, GRANT_PTE_FLAGS);
-        
-        if ( (dev_hst_ro_flags & GNTMAP_application_map) )
-            l1e_add_flags(pte,_PAGE_USER);
-        if ( !(dev_hst_ro_flags & GNTMAP_readonly) )
-            l1e_add_flags(pte,_PAGE_RW);
-
-        if ( dev_hst_ro_flags & GNTMAP_contains_pte )
-            rc = update_grant_pte_mapping(addr, pte, led);
-        else
-            rc = update_grant_va_mapping(addr, pte, led);
-
+        rc = create_grant_host_mapping(addr, frame, dev_hst_ro_flags);
         if ( rc < 0 )
         {
             /* Failure: undo and abort. */
@@ -488,16 +475,8 @@ __gnttab_unmap_grant_ref(
          (flags & GNTMAP_host_map) &&
          ((act->pin & (GNTPIN_hstw_mask | GNTPIN_hstr_mask)) > 0))
     {
-        if ( flags & GNTMAP_contains_pte )
-        {
-            if ( (rc = clear_grant_pte_mapping(addr, frame, ld)) < 0 )
-                goto unmap_out;
-        }
-        else
-        {
-            if ( (rc = clear_grant_va_mapping(addr, frame)) < 0 )
-                goto unmap_out;
-        }
+        if ( (rc = destroy_grant_host_mapping(addr, frame, flags)) < 0 )
+            goto unmap_out;
 
         map->ref_and_flags &= ~GNTMAP_host_map;
 
@@ -512,9 +491,8 @@ __gnttab_unmap_grant_ref(
     }
 
     /* If just unmapped a writable mapping, mark as dirtied */
-    if ( unlikely(shadow_mode_log_dirty(rd)) &&
-         !(flags & GNTMAP_readonly) )
-         mark_dirty(rd, frame);
+    if ( !(flags & GNTMAP_readonly) )
+         gnttab_log_dirty(rd, frame);
 
     /* If the last writable mapping has been removed, put_page_type */
     if ( ((act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0) &&
@@ -599,9 +577,8 @@ gnttab_setup_table(
         ASSERT(d->grant_table != NULL);
         (void)put_user(GNTST_okay, &uop->status);
         for ( i = 0; i < op.nr_frames; i++ )
-            (void)put_user(
-                (virt_to_phys(d->grant_table->shared) >> PAGE_SHIFT) + i,
-                &uop->frame_list[i]);
+            (void)put_user(gnttab_shared_mfn(d, d->grant_table, i),
+                           &uop->frame_list[i]);
     }
 
     put_domain(d);
@@ -698,7 +675,6 @@ gnttab_transfer(
     struct domain *d = current->domain;
     struct domain *e;
     struct pfn_info *page;
-    u32 _d, _nd, x, y;
     int i;
     grant_entry_t *sha;
     gnttab_transfer_t gop;
@@ -723,46 +699,11 @@ gnttab_transfer(
             continue;
         }
 
-        spin_lock(&d->page_alloc_lock);
-
-        /*
-         * The tricky bit: atomically release ownership while
-         * there is just one benign reference to the page
-         * (PGC_allocated). If that reference disappears then the
-         * deallocation routine will safely spin.
-         */
-        _d  = pickle_domptr(d);
-        _nd = page->u.inuse._domain;
-        y   = page->count_info;
-        do {
-            x = y;
-            if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
-                         (1 | PGC_allocated)) || unlikely(_nd != _d)) { 
-                DPRINTK("gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
-                       " caf=%08x, taf=%" PRtype_info "\n", 
-                       (void *) page_to_pfn(page),
-                        d, d->domain_id, unpickle_domptr(_nd), x, 
-                        page->u.inuse.type_info);
-                spin_unlock(&d->page_alloc_lock);
-                (void)__put_user(GNTST_bad_page, &uop[i].status);
-                continue;
-            }
-            __asm__ __volatile__(
-                LOCK_PREFIX "cmpxchg8b %2"
-                : "=d" (_nd), "=a" (y),
-                "=m" (*(volatile u64 *)(&page->count_info))
-                : "0" (_d), "1" (x), "c" (NULL), "b" (x) );
-        } while (unlikely(_nd != _d) || unlikely(y != x));
-
-        /*
-         * Unlink from 'd'. At least one reference remains (now
-         * anonymous), so noone else is spinning to try to delete
-         * this page from 'd'.
-         */
-        d->tot_pages--;
-        list_del(&page->list);
-
-        spin_unlock(&d->page_alloc_lock);
+        if ( steal_page_for_grant_transfer(d, page) < 0 )
+        {
+            (void)__put_user(GNTST_bad_page, &uop[i].status);
+            continue;
+        }
 
         /* Find the target domain. */
         if ( unlikely((e = find_domain_by_id(gop.domid)) == NULL) )
@@ -991,14 +932,7 @@ grant_table_create(
     memset(t->shared, 0, NR_GRANT_FRAMES * PAGE_SIZE);
 
     for ( i = 0; i < NR_GRANT_FRAMES; i++ )
-    {
-        SHARE_PFN_WITH_DOMAIN(
-            virt_to_page((char *)t->shared + (i * PAGE_SIZE)),
-            d);
-        set_pfn_from_mfn(
-            (virt_to_phys(t->shared) >> PAGE_SHIFT) + i,
-            INVALID_M2P_ENTRY);
-    }
+        gnttab_create_shared_mfn(d, t, i);
 
     /* Okay, install the structure. */
     wmb(); /* avoid races with lock-free access to d->grant_table */

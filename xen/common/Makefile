@@ -1,10 +1,6 @@
 
 include $(BASEDIR)/Rules.mk
 
-ifeq ($(TARGET_ARCH),ia64)
-OBJS := $(subst grant_table.o,,$(OBJS))
-endif
-
 ifneq ($(perfc),y)
 OBJS := $(subst perfc.o,,$(OBJS))
 endif

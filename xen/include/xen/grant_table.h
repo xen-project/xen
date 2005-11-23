@@ -4,7 +4,7 @@
  * Mechanism for granting foreign access to page frames, and receiving
  * page-ownership transfers.
  * 
- * Copyright (c) 2004 K A Fraser
+ * Copyright (c) 2004-2005 K A Fraser
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,11 +21,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __XEN_GRANT_H__
-#define __XEN_GRANT_H__
+#ifndef __XEN_GRANT_TABLE_H__
+#define __XEN_GRANT_TABLE_H__
 
 #include <xen/config.h>
 #include <public/grant_table.h>
+#include <asm/grant_table.h>
 
 /* Active grant entry - used for shadowing GTF_permit_access grants. */
 typedef struct {
@@ -51,7 +52,6 @@ typedef struct {
 #define GNTPIN_devr_inc      (1 << GNTPIN_devr_shift)
 #define GNTPIN_devr_mask     (0xFFU << GNTPIN_devr_shift)
 
-#define ORDER_GRANT_FRAMES   2
 #define NR_GRANT_FRAMES      (1U << ORDER_GRANT_FRAMES)
 #define NR_GRANT_ENTRIES     \
     ((NR_GRANT_FRAMES << PAGE_SHIFT) / sizeof(grant_entry_t))
@@ -107,4 +107,4 @@ void
 gnttab_release_mappings(
     struct domain *d);
 
-#endif /* __XEN_GRANT_H__ */
+#endif /* __XEN_GRANT_TABLE_H__ */

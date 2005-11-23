@@ -2306,7 +2306,7 @@ int do_mmu_update(
 }
 
 
-int update_grant_pte_mapping(
+static int create_grant_pte_mapping(
     unsigned long pte_addr, l1_pgentry_t _nl1e, struct vcpu *v)
 {
     int rc = GNTST_okay;
@@ -2368,7 +2368,7 @@ int update_grant_pte_mapping(
     return rc;
 }
 
-int clear_grant_pte_mapping(
+static int destroy_grant_pte_mapping(
     unsigned long addr, unsigned long frame, struct domain *d)
 {
     int rc = GNTST_okay;
@@ -2445,7 +2445,7 @@ int clear_grant_pte_mapping(
 }
 
 
-int update_grant_va_mapping(
+static int create_grant_va_mapping(
     unsigned long va, l1_pgentry_t _nl1e, struct vcpu *v)
 {
     l1_pgentry_t *pl1e, ol1e;
@@ -2475,7 +2475,8 @@ int update_grant_va_mapping(
     return GNTST_okay;
 }
 
-int clear_grant_va_mapping(unsigned long addr, unsigned long frame)
+static int destroy_grant_va_mapping(
+    unsigned long addr, unsigned long frame)
 {
     l1_pgentry_t *pl1e, ol1e;
     
@@ -2508,6 +2509,74 @@ int clear_grant_va_mapping(unsigned long addr, unsigned long frame)
     return 0;
 }
 
+int create_grant_host_mapping(
+    unsigned long addr, unsigned long frame, unsigned int flags)
+{
+    l1_pgentry_t pte = l1e_from_pfn(frame, GRANT_PTE_FLAGS);
+        
+    if ( (flags & GNTMAP_application_map) )
+        l1e_add_flags(pte,_PAGE_USER);
+    if ( !(flags & GNTMAP_readonly) )
+        l1e_add_flags(pte,_PAGE_RW);
+
+    if ( flags & GNTMAP_contains_pte )
+        return create_grant_pte_mapping(addr, pte, current);
+    return create_grant_va_mapping(addr, pte, current);
+}
+
+int destroy_grant_host_mapping(
+    unsigned long addr, unsigned long frame, unsigned int flags)
+{
+    if ( flags & GNTMAP_contains_pte )
+        return destroy_grant_pte_mapping(addr, frame, current->domain);
+    return destroy_grant_va_mapping(addr, frame);
+}
+
+int steal_page_for_grant_transfer(
+    struct domain *d, struct pfn_info *page)
+{
+    u32 _d, _nd, x, y;
+
+    spin_lock(&d->page_alloc_lock);
+
+    /*
+     * The tricky bit: atomically release ownership while there is just one 
+     * benign reference to the page (PGC_allocated). If that reference 
+     * disappears then the deallocation routine will safely spin.
+     */
+    _d  = pickle_domptr(d);
+    _nd = page->u.inuse._domain;
+    y   = page->count_info;
+    do {
+        x = y;
+        if (unlikely((x & (PGC_count_mask|PGC_allocated)) !=
+                     (1 | PGC_allocated)) || unlikely(_nd != _d)) { 
+            DPRINTK("gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
+                    " caf=%08x, taf=%" PRtype_info "\n", 
+                    (void *) page_to_pfn(page),
+                    d, d->domain_id, unpickle_domptr(_nd), x, 
+                    page->u.inuse.type_info);
+            spin_unlock(&d->page_alloc_lock);
+            return -1;
+        }
+        __asm__ __volatile__(
+            LOCK_PREFIX "cmpxchg8b %2"
+            : "=d" (_nd), "=a" (y),
+            "=m" (*(volatile u64 *)(&page->count_info))
+            : "0" (_d), "1" (x), "c" (NULL), "b" (x) );
+    } while (unlikely(_nd != _d) || unlikely(y != x));
+
+    /*
+     * Unlink from 'd'. At least one reference remains (now anonymous), so 
+     * noone else is spinning to try to delete this page from 'd'.
+     */
+    d->tot_pages--;
+    list_del(&page->list);
+
+    spin_unlock(&d->page_alloc_lock);
+
+    return 0;
+}
 
 int do_update_va_mapping(unsigned long va, u64 val64,
                          unsigned long flags)
