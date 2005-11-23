@@ -13,6 +13,7 @@ SUBDIRS = 	               	\
 		list		\
 		memmax		\
 		memset		\
+		network-attach	\
 		pause		\
 		reboot 		\
 		sedf		\
