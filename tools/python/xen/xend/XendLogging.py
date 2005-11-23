@@ -42,7 +42,7 @@ DEFAULT_MAX_BYTES = 1 << 20  # 1MB
 DEFAULT_BACKUP_COUNT = 5
 
 STDERR_FORMAT = "[%(name)s] %(levelname)s (%(module)s:%(lineno)d) %(message)s"
-LOGFILE_FORMAT = "[%(asctime)s %(name)s] %(levelname)s (%(module)s:%(lineno)d) %(message)s"
+LOGFILE_FORMAT = "[%(asctime)s %(name)s %(thread)d] %(levelname)s (%(module)s:%(lineno)d) %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
