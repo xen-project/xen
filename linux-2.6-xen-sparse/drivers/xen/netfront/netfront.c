@@ -155,6 +155,8 @@ struct netfront_info
 	   (_list)[0]  = (_list)[_id];				\
 	   (unsigned short)_id; })
 
+#define DEBUG 1
+
 #ifdef DEBUG
 static char *be_state_name[] = {
 	[BEST_CLOSED]       = "closed",
@@ -900,7 +902,7 @@ static int network_close(struct net_device *dev)
 {
 	struct netfront_info *np = netdev_priv(dev);
 	np->user_state = UST_CLOSED;
-	netif_stop_queue(np->netdev);
+	netif_stop_queue(dev);
 	return 0;
 }
 
@@ -1163,8 +1165,6 @@ static void netfront_closing(struct xenbus_device *dev)
 	struct netfront_info *info = dev->data;
 
 	DPRINTK("netfront_closing: %s removed\n", dev->nodename);
-
-	close_netdev(info);
 
 	xenbus_switch_state(dev, NULL, XenbusStateClosed);
 }
