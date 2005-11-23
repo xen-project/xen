@@ -13,6 +13,18 @@ from xen.xend.XendLogging import log
 
 class xswatch:
 
+    ##
+    # Create a watch on the given path in the store.  The watch will fire
+    # immediately, then subsequently each time the watched path is changed,
+    # until the watch is deregistered, either by the return value from the
+    # watch callback being False, or by an explicit call to unwatch.
+    #
+    # @param fn The function to be called when the watch fires.  This function
+    # should take the path that has changed as its first argument, followed by
+    # the extra arguments given to this constructor, if any.  It should return
+    # True if the watch is to remain registered, or False if it is to be
+    # deregistered.
+    #
     def __init__(self, path, fn, *args, **kwargs):
         self.path = path
         self.fn = fn
