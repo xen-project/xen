@@ -847,7 +847,8 @@ def deprecated(old,new):
 
 def usage(cmd=None):
     if cmd == 'create':
-        xm_subcommand("create", "--help")
+        mycmd = xm_lookup_cmd(cmd)
+        mycmd( ['--help'] )
         sys.exit(1)
     if help.has_key(cmd):
         print "   " + help[cmd]

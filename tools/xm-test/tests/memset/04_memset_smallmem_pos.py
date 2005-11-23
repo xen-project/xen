@@ -30,7 +30,7 @@ if status != 0:
     FAIL("xm mem-set %s %i returned invalid %i != 0" %
          (domain.getName(), domain.minSafeMem(), status))
 
-console.setLimit(8192)
+console.setLimit(65536)
 
 try:
     # See if this hits the byte limit
@@ -39,13 +39,15 @@ except ConsoleError, e:
     if e.reason == RUNAWAY:
         # Need to stop the domain before we restart the console daemon
         domain.destroy()
-        if verbose:
+        if isConsoleDead():
             print "*** Attempting restart of xenconsoled"
             s, o = traceCommand("killall xenconsoled")
             s, o = traceCommand("xenconsoled")
             if s != 0:
                 print "*** Starting xenconsoled failed: %i" % s
-        FAIL("Bug #380: I crashed the console system")
+            FAIL("Bug #380: I crashed the console system")
+        else:
+            FAIL("Bug #145: Ballooning DomU too low caused run-away")
     else:
         FAIL(str(e))
 
