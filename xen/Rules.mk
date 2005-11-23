@@ -2,8 +2,8 @@
 # If you change any of these configuration options then you must
 # 'make clean' before rebuilding.
 #
-verbose     ?= n
-debug       ?= n
+verbose     ?= y
+debug       ?= y
 perfc       ?= n
 perfc_arrays?= n
 domu_debug  ?= n

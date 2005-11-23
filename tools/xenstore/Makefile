@@ -12,7 +12,7 @@ BASECFLAGS=-Wall -g -Werror
 # Make gcc generate dependencies.
 BASECFLAGS += -Wp,-MD,.$(@F).d
 PROG_DEP = .*.d
-BASECFLAGS+= -O3 $(PROFILE)
+BASECFLAGS+= -O0 -ggdb3 $(PROFILE)
 #BASECFLAGS+= -I$(XEN_ROOT)/tools
 BASECFLAGS+= -I$(XEN_ROOT)/tools/libxc
 BASECFLAGS+= -I.

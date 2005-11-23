@@ -9,7 +9,7 @@ INSTALL         = install
 INSTALL_PROG    = $(INSTALL) -m0755
 INSTALL_DIR     = $(INSTALL) -d -m0755
 
-CFLAGS  += -Wall -Werror -g3
+CFLAGS  += -Wall -Werror -ggdb3 -O0
 
 CFLAGS  += -I $(XEN_LIBXC)
 CFLAGS  += -I $(XEN_XENSTORE)

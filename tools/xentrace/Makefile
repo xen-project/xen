@@ -14,7 +14,7 @@ CFLAGS  += -I $(XEN_LIBXC)
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
 
-BIN      = xentrace tbctl setsize
+BIN      = xentrace tbctl setsize xenctx
 SCRIPTS  = xentrace_format
 MAN1     = $(wildcard *.1)
 MAN8     = $(wildcard *.8)
