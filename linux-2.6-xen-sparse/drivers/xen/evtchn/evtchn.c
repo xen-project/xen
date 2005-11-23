@@ -89,7 +89,7 @@ void evtchn_device_upcall(int port)
 	spin_unlock(&port_user_lock);
 }
 
-static ssize_t evtchn_read(struct file *file, char *buf,
+static ssize_t evtchn_read(struct file *file, char __user *buf,
                            size_t count, loff_t *ppos)
 {
 	int rc;
@@ -168,7 +168,7 @@ static ssize_t evtchn_read(struct file *file, char *buf,
 	return rc;
 }
 
-static ssize_t evtchn_write(struct file *file, const char *buf,
+static ssize_t evtchn_write(struct file *file, const char __user *buf,
                             size_t count, loff_t *ppos)
 {
 	int  rc, i;
@@ -220,6 +220,7 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 {
 	int rc;
 	struct per_user_data *u = file->private_data;
+	void __user *uarg = (void __user *) arg;
 	evtchn_op_t op = { 0 };
 
 	switch (cmd) {
@@ -227,7 +228,7 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 		struct ioctl_evtchn_bind_virq bind;
 
 		rc = -EFAULT;
-		if (copy_from_user(&bind, (void *)arg, sizeof(bind)))
+		if (copy_from_user(&bind, uarg, sizeof(bind)))
 			break;
 
 		op.cmd = EVTCHNOP_bind_virq;
@@ -246,7 +247,7 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 		struct ioctl_evtchn_bind_interdomain bind;
 
 		rc = -EFAULT;
-		if (copy_from_user(&bind, (void *)arg, sizeof(bind)))
+		if (copy_from_user(&bind, uarg, sizeof(bind)))
 			break;
 
 		op.cmd = EVTCHNOP_bind_interdomain;
@@ -265,7 +266,7 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 		struct ioctl_evtchn_bind_unbound_port bind;
 
 		rc = -EFAULT;
-		if (copy_from_user(&bind, (void *)arg, sizeof(bind)))
+		if (copy_from_user(&bind, uarg, sizeof(bind)))
 			break;
 
 		op.cmd = EVTCHNOP_alloc_unbound;
@@ -285,7 +286,7 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 		int ret;
 
 		rc = -EFAULT;
-		if (copy_from_user(&unbind, (void *)arg, sizeof(unbind)))
+		if (copy_from_user(&unbind, uarg, sizeof(unbind)))
 			break;
 
 		rc = -EINVAL;
@@ -318,7 +319,7 @@ static int evtchn_ioctl(struct inode *inode, struct file *file,
 		struct ioctl_evtchn_notify notify;
 
 		rc = -EFAULT;
-		if (copy_from_user(&notify, (void *)arg, sizeof(notify)))
+		if (copy_from_user(&notify, uarg, sizeof(notify)))
 			break;
 
 		if (notify.port >= NR_EVENT_CHANNELS) {

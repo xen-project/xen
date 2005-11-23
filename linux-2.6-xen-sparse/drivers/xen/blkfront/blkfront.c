@@ -441,7 +441,7 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
 	case CDROMMULTISESSION:
 		DPRINTK("FIXME: support multisession CDs later\n");
 		for (i = 0; i < sizeof(struct cdrom_multisession); i++)
-			if (put_user(0, (char *)(argument + i)))
+			if (put_user(0, (char __user *)(argument + i)))
 				return -EFAULT;
 		return 0;
 
