@@ -14,6 +14,10 @@
 
 #define L1_CACHE_SHIFT_MAX 7	/* largest L1 which this arch supports */
 
+#ifdef XEN
+# define SMP_CACHE_SHIFT	L1_CACHE_SHIFT
+# define SMP_CACHE_BYTES	L1_CACHE_BYTES
+#else
 #ifdef CONFIG_SMP
 # define SMP_CACHE_SHIFT	L1_CACHE_SHIFT
 # define SMP_CACHE_BYTES	L1_CACHE_BYTES
@@ -25,6 +29,7 @@
    */
 # define SMP_CACHE_SHIFT	3
 # define SMP_CACHE_BYTES	(1 << 3)
+#endif
 #endif
 
 #endif /* _ASM_IA64_CACHE_H */
