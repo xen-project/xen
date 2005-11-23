@@ -8,7 +8,9 @@
 import os
 import signal
 import sys
+import thread
 import threading
+import time
 import linecache
 import pwd
 import re
@@ -201,6 +203,8 @@ class Daemon:
                 pass
 
     def print_trace(self, string):
+        self.tracefile.write(time.strftime("%Y-%m-%d %H:%M:%S "))
+        self.tracefile.write("%10x" % thread.get_ident())
         for i in range(self.traceindent):
             ch = " "
             if (i % 5):
