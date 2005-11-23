@@ -43,8 +43,6 @@ CFLAGS += -DACM_SECURITY
 endif
 ALL_OBJS += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
 
-test-gcc-flag = $(shell $(CC) -v --help 2>&1 | grep -q " $(1) " && echo $(1))
-
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 ifneq ($(debug),y)
