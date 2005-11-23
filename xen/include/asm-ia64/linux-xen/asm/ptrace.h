@@ -98,6 +98,19 @@
 #ifdef XEN
 #include <public/arch-ia64.h>
 #define pt_regs cpu_user_regs
+
+/*  User regs at placed at the end of the vcpu area.
+    Convert a vcpu pointer to a regs pointer.
+    Note: this is the same as ia64_task_regs, but it uses a Xen-friendly name.
+*/
+struct vcpu;
+static inline struct cpu_user_regs *
+vcpu_regs (struct vcpu *v)
+{
+  return (struct cpu_user_regs *) ((unsigned long) v + IA64_STK_OFFSET) - 1;
+}
+
+
 #else
 struct pt_regs {
 	/* The following registers are saved by SAVE_MIN: */

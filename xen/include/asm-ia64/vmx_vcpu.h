@@ -44,8 +44,6 @@
 #define VRN7    0x7UL
 // for vlsapic
 #define  VLSAPIC_INSVC(vcpu, i) ((vcpu)->arch.insvc[i])
-// this def for vcpu_regs won't work if kernel stack is present
-#define	vcpu_regs(vcpu) (((struct pt_regs *) ((char *) (vcpu) + IA64_STK_OFFSET)) - 1)
 //#define	VMX_VPD(x,y)	((x)->arch.arch_vmx.vpd->y)
 
 #define VMX(x,y)  ((x)->arch.arch_vmx.y)

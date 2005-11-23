@@ -72,7 +72,7 @@ int grant_table_create(struct domain *d) { return 0; }
 void grant_table_destroy(struct domain *d) { return; }
 #endif
 
-struct pt_regs *guest_cpu_user_regs(void) { return ia64_task_regs(current); }
+struct pt_regs *guest_cpu_user_regs(void) { return vcpu_regs(current); }
 
 void raise_actimer_softirq(void)
 {

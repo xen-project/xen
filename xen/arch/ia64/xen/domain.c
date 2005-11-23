@@ -165,7 +165,7 @@ void free_vcpu_struct(struct vcpu *v)
 
 static void init_switch_stack(struct vcpu *v)
 {
-	struct pt_regs *regs = (struct pt_regs *) ((unsigned long) v + IA64_STK_OFFSET) - 1;
+	struct pt_regs *regs = vcpu_regs (v);
 	struct switch_stack *sw = (struct switch_stack *) regs - 1;
 	extern void ia64_ret_from_clone;
 
@@ -253,7 +253,7 @@ void arch_do_createdomain(struct vcpu *v)
 
 void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 {
-	struct pt_regs *regs = (struct pt_regs *) ((unsigned long) v + IA64_STK_OFFSET) - 1;
+	struct pt_regs *regs = vcpu_regs (v);
 
 	printf("arch_getdomaininfo_ctxt\n");
 	c->regs = *regs;
@@ -264,7 +264,7 @@ void arch_getdomaininfo_ctxt(struct vcpu *v, struct vcpu_guest_context *c)
 
 int arch_set_info_guest(struct vcpu *v, struct vcpu_guest_context *c)
 {
-	struct pt_regs *regs = (struct pt_regs *) ((unsigned long) v + IA64_STK_OFFSET) - 1;
+	struct pt_regs *regs = vcpu_regs (v);
 	struct domain *d = v->domain;
 	int i, rc, ret;
 	unsigned long progress = 0;
@@ -335,7 +335,7 @@ void new_thread(struct vcpu *v,
 	if (d == dom0) start_pc += dom0_start;
 #endif
 
-	regs = (struct pt_regs *) ((unsigned long) v + IA64_STK_OFFSET) - 1;
+	regs = vcpu_regs (v);
 	if (VMX_DOMAIN(v)) {
 		/* dt/rt/it:1;i/ic:1, si:1, vm/bn:1, ac:1 */
 		regs->cr_ipsr = 0x501008826008; /* Need to be expanded as macro */
