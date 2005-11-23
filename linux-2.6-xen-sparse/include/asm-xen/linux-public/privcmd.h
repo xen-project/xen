@@ -30,6 +30,10 @@
 #ifndef __LINUX_PUBLIC_PRIVCMD_H__
 #define __LINUX_PUBLIC_PRIVCMD_H__
 
+#ifndef __user
+#define __user
+#endif
+
 typedef struct privcmd_hypercall
 {
 	unsigned long op;
@@ -45,19 +49,19 @@ typedef struct privcmd_mmap_entry {
 typedef struct privcmd_mmap {
 	int num;
 	domid_t dom; /* target domain */
-	privcmd_mmap_entry_t *entry;
+	privcmd_mmap_entry_t __user *entry;
 } privcmd_mmap_t; 
 
 typedef struct privcmd_mmapbatch {
 	int num;     /* number of pages to populate */
 	domid_t dom; /* target domain */
 	unsigned long addr;  /* virtual address */
-	unsigned long *arr; /* array of mfns - top nibble set on err */
+	unsigned long __user *arr; /* array of mfns - top nibble set on err */
 } privcmd_mmapbatch_t; 
 
 typedef struct privcmd_m2pmfns { 
 	int num;    /* max number of mfns to return */
-	unsigned long *arr; /* array of mfns */
+	unsigned long __user *arr; /* array of mfns */
 } privcmd_m2pmfns_t; 
 
 typedef struct privcmd_blkmsg

@@ -38,13 +38,13 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
                          unsigned int cmd, unsigned long data)
 {
 	int ret = -ENOSYS;
+	void __user *udata = (void __user *) data;
 
 	switch (cmd) {
 	case IOCTL_PRIVCMD_HYPERCALL: {
 		privcmd_hypercall_t hypercall;
   
-		if (copy_from_user(&hypercall, (void *)data,
-				   sizeof(hypercall)))
+		if (copy_from_user(&hypercall, udata, sizeof(hypercall)))
 			return -EFAULT;
 
 #if defined(__i386__)
@@ -97,10 +97,11 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	case IOCTL_PRIVCMD_MMAP: {
 #define PRIVCMD_MMAP_SZ 32
 		privcmd_mmap_t mmapcmd;
-		privcmd_mmap_entry_t msg[PRIVCMD_MMAP_SZ], *p;
+		privcmd_mmap_entry_t msg[PRIVCMD_MMAP_SZ];
+		privcmd_mmap_entry_t __user *p;
 		int i, rc;
 
-		if (copy_from_user(&mmapcmd, (void *)data, sizeof(mmapcmd)))
+		if (copy_from_user(&mmapcmd, udata, sizeof(mmapcmd)))
 			return -EFAULT;
 
 		p = mmapcmd.entry;
@@ -146,12 +147,12 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		mmu_update_t u;
 		privcmd_mmapbatch_t m;
 		struct vm_area_struct *vma = NULL;
-		unsigned long *p, addr;
-		unsigned long mfn; 
+		unsigned long __user *p;
+		unsigned long addr, mfn; 
 		uint64_t ptep;
 		int i;
 
-		if (copy_from_user(&m, (void *)data, sizeof(m))) {
+		if (copy_from_user(&m, udata, sizeof(m))) {
 			ret = -EFAULT;
 			goto batch_err;
 		}
@@ -219,7 +220,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		pmd_t *pmd; 
 		unsigned long m2pv, m2p_mfn; 	
 		privcmd_m2pmfns_t m; 
-		unsigned long *p; 
+		unsigned long __user *p;
 		int i; 
 
 #if defined (__x86_64__)
@@ -233,7 +234,8 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		ret = -EINVAL; 
 		break; 
 #endif
-		if (copy_from_user(&m, (void *)data, sizeof(m)))
+
+		if (copy_from_user(&m, udata, sizeof(m)))
 			return -EFAULT;
 
 		m2pv = (unsigned long)machine_to_phys_mapping;

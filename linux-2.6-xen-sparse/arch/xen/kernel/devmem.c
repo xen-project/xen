@@ -45,7 +45,7 @@ static ssize_t read_mem(struct file * file, char __user * buf,
 {
 	unsigned long i, p = *ppos;
 	ssize_t read = -EFAULT;
-	void *v;
+	void __iomem *v;
 
 	if ((v = ioremap(p, count)) == NULL) {
 		/*
@@ -75,7 +75,7 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 {
 	unsigned long p = *ppos;
 	ssize_t written = -EFAULT;
-	void *v;
+	void __iomem *v;
 
 	if ((v = ioremap(p, count)) == NULL)
 		return -EFAULT;
