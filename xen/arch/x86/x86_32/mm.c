@@ -107,7 +107,8 @@ void __init paging_init(void)
             l2e_from_page(pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW);
     }
 
-    for ( i = 0; i < max_page; i++)
+    /* Fill with an obvious debug pattern. */
+    for ( i = 0; i < (mpt_size / BYTES_PER_LONG); i++)
         set_pfn_from_mfn(i, 0x55555555);
 
     /* Create page tables for ioremap(). */

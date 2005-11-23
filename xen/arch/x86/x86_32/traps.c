@@ -93,7 +93,7 @@ void show_page_walk(unsigned long addr)
 #ifdef CONFIG_X86_PAE
     ptab = map_domain_page(mfn);
     ent  = ptab[l3_table_offset(addr)];
-    pfn  = machine_to_phys_mapping[(u32)(ent >> PAGE_SHIFT)]; 
+    pfn  = get_pfn_from_mfn((u32)(ent >> PAGE_SHIFT)); 
     printk(" L3 = %"PRIpte" %08lx\n", ent, pfn);
     unmap_domain_page(ptab);
     if ( !(ent & _PAGE_PRESENT) )
@@ -103,7 +103,7 @@ void show_page_walk(unsigned long addr)
 
     ptab = map_domain_page(mfn);
     ent  = ptab[l2_table_offset(addr)];
-    pfn  = get_pfn_from_mfn(ent >> PAGE_SHIFT);
+    pfn  = get_pfn_from_mfn((u32)(ent >> PAGE_SHIFT));
     printk("  L2 = %"PRIpte" %08lx %s\n", ent, pfn, 
            (ent & _PAGE_PSE) ? "(PSE)" : "");
     unmap_domain_page(ptab);
@@ -113,7 +113,7 @@ void show_page_walk(unsigned long addr)
 
     ptab = map_domain_page(ent >> PAGE_SHIFT);
     ent  = ptab[l1_table_offset(addr)];
-    pfn  = get_pfn_from_mfn(ent >> PAGE_SHIFT);
+    pfn  = get_pfn_from_mfn((u32)(ent >> PAGE_SHIFT));
     printk("   L1 = %"PRIpte" %08lx\n", ent, pfn);
     unmap_domain_page(ptab);
 }
