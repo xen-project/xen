@@ -111,9 +111,7 @@ void *_xmalloc(size_t size, size_t align)
     unsigned long flags;
 
     /* We currently always return cacheline aligned. */
-#ifndef __ia64__
     BUG_ON(align > SMP_CACHE_BYTES);
-#endif
 
     /* Add room for header, pad to align next header. */
     size += sizeof(struct xmalloc_hdr);
