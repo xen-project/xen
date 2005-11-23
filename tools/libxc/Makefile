@@ -52,7 +52,7 @@ CFLAGS   += $(INCLUDES) -I.
 
 # Define this to make it possible to run valgrind on code linked with these
 # libraries.
-CFLAGS   += -DVALGRIND # -O0 -ggdb3
+#CFLAGS   += -DVALGRIND -O0 -ggdb3
 
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d

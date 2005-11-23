@@ -11,7 +11,7 @@ dir=$(dirname "$0")
 . "$dir/block-common.sh"
 
 case "$command" in
-  add)
+  bind)
     for dev in /dev/nbd*; do
       if nbd-client $2 $3 $dev; then
         write_dev $dev
@@ -20,7 +20,7 @@ case "$command" in
     done
     exit 1
     ;;
-  remove)
+  unbind)
     nbd-client -d $2
     exit 0
     ;;

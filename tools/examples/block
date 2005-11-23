@@ -3,6 +3,12 @@
 dir=$(dirname "$0")
 . "$dir/block-common.sh"
 
+case "$command" in
+    online | offline)
+        exit 0
+        ;;
+esac
+
 expand_dev() {
   local dev
   case $1 in

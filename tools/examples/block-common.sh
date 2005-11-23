@@ -21,7 +21,9 @@ dir=$(dirname "$0")
 
 findCommand "$@"
 
-if [ "$command" != "add" ] &&
+if [ "$command" != "online" ]  &&
+   [ "$command" != "offline" ] &&
+   [ "$command" != "add" ]     &&
    [ "$command" != "remove" ]
 then
   log err "Invalid command: $command"

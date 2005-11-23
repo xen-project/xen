@@ -480,7 +480,6 @@ static int setup_guest(int xc_handle,
 
 #define _p(a) ((void *) (a))
 
-#if 0
     printf("VIRTUAL MEMORY ARRANGEMENT:\n"
            " Loaded kernel: %p->%p\n"
            " Init. ramdisk: %p->%p\n"
@@ -501,7 +500,6 @@ static int setup_guest(int xc_handle,
            _p(vstack_start), _p(vstack_end),
            _p(dsi.v_start), _p(v_end));
     printf(" ENTRY ADDRESS: %p\n", _p(dsi.v_kernentry));
-#endif
 
     if ( ((v_end - dsi.v_start)>>PAGE_SHIFT) > nr_pages )
     {

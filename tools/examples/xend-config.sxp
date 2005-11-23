@@ -34,7 +34,7 @@
 # Specifying 'localhost' prevents remote connections.
 # Specifying the empty string '' (the default) allows all connections.
 #(xend-address '')
-#(xend-address localhost)
+(xend-address localhost)
 
 # Address xend should listen on for relocation-socket connections, if
 # xend-relocation-server is set.
