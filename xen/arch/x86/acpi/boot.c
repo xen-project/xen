@@ -602,7 +602,8 @@ acpi_process_madt(void)
 		error = acpi_parse_madt_lapic_entries();
 		if (!error) {
 			acpi_lapic = 1;
-
+			generic_bigsmp_probe();
+ 
 			/*
 			 * Parse MADT IO-APIC entries
 			 */
