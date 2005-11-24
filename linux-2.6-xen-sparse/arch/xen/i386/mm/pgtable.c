@@ -303,14 +303,15 @@ void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags; /* can be called from interrupt context */
 
-	BUG_ON(test_bit(PG_pinned, &virt_to_page(pgd)->flags));
-
 	if (HAVE_SHARED_KERNEL_PMD)
 		return;
 
 	spin_lock_irqsave(&pgd_lock, flags);
 	pgd_list_del(pgd);
 	spin_unlock_irqrestore(&pgd_lock, flags);
+
+	if (test_bit(PG_pinned, &virt_to_page(pgd)->flags))
+		__pgd_unpin(pgd);
 }
 
 pgd_t *pgd_alloc(struct mm_struct *mm)
@@ -318,7 +319,8 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	int i = 0;
 	pgd_t *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
 
-	BUG_ON(test_bit(PG_pinned, &virt_to_page(pgd)->flags));
+	if (test_bit(PG_pinned, &virt_to_page(pgd)->flags))
+		__pgd_unpin(pgd);
 
 	if (PTRS_PER_PMD == 1 || !pgd)
 		return pgd;
@@ -345,7 +347,11 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
 		if (!pmd)
 			goto out_oom;
+		preempt_disable();
+		if (test_bit(PG_pinned, &virt_to_page(pgd)->flags))
+			make_lowmem_page_readonly(pmd);
 		set_pgd(&pgd[i], __pgd(1 + __pa(pmd)));
+		preempt_enable();
 	}
 	return pgd;
 
@@ -367,11 +373,13 @@ void pgd_free(pgd_t *pgd)
 	if (PTRS_PER_PMD > 1) {
 		for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
 			pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
+			set_pgd(&pgd[i], __pgd(0));
 			make_lowmem_page_writable(pmd);
 			kmem_cache_free(pmd_cache, pmd);
 		}
 		if (!HAVE_SHARED_KERNEL_PMD) {
 			pmd_t *pmd = (void *)__va(pgd_val(pgd[USER_PTRS_PER_PGD])-1);
+			set_pgd(&pgd[USER_PTRS_PER_PGD], __pgd(0));
 			make_lowmem_page_writable(pmd);
 			memset(pmd, 0, PTRS_PER_PMD*sizeof(pmd_t));
 			kmem_cache_free(pmd_cache, pmd);
