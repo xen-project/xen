@@ -173,6 +173,7 @@ long do_acm_op(struct acm_op * u_acm_op)
             if (subj->ssid == NULL) {
                 put_domain(subj);
                 ret = -ESRCH;
+                goto out;
             }
             ssidref1 = ((struct acm_ssid_domain *)(subj->ssid))->ssidref;
             put_domain(subj);
