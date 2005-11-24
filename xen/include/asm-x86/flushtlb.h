@@ -97,7 +97,7 @@ extern void write_cr3(unsigned long cr3);
 extern void flush_tlb_all_pge(void);
 extern void __flush_tlb_mask(cpumask_t mask, unsigned long va);
 #define flush_tlb_mask(mask)       __flush_tlb_mask(mask,FLUSHVA_ALL)
-#define flush_tlb_one_mask(mask,v) __flush_tlb_mask(mask,v)
+#define flush_tlb_one_mask(mask,v) __flush_tlb_mask(mask,(unsigned long)(v))
 #endif
 
 #endif /* __FLUSHTLB_H__ */
