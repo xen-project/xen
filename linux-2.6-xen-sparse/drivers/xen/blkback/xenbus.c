@@ -230,9 +230,8 @@ static void frontend_changed(struct xenbus_device *dev,
 
 static void maybe_connect(struct backend_info *be)
 {
-	if (be->pdev != 0L && be->blkif->status == CONNECTED) {
+	if (be->pdev != 0L && be->blkif->status == CONNECTED)
 		connect(be);
-	}
 }
 
 
