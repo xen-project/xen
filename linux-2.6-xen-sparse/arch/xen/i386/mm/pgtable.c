@@ -27,8 +27,9 @@
 #include <asm-xen/foreign_page.h>
 #include <asm/hypervisor.h>
 
-static void __pgd_pin(pgd_t *pgd);
-static void __pgd_unpin(pgd_t *pgd);
+static void pgd_test_and_unpin(pgd_t *pgd);
+#define suspend_disable	preempt_disable
+#define suspend_enable	preempt_enable
 
 void show_mem(void)
 {
@@ -310,8 +311,7 @@ void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	pgd_list_del(pgd);
 	spin_unlock_irqrestore(&pgd_lock, flags);
 
-	if (test_bit(PG_pinned, &virt_to_page(pgd)->flags))
-		__pgd_unpin(pgd);
+	pgd_test_and_unpin(pgd);
 }
 
 pgd_t *pgd_alloc(struct mm_struct *mm)
@@ -319,8 +319,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	int i = 0;
 	pgd_t *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
 
-	if (test_bit(PG_pinned, &virt_to_page(pgd)->flags))
-		__pgd_unpin(pgd);
+	pgd_test_and_unpin(pgd);
 
 	if (PTRS_PER_PMD == 1 || !pgd)
 		return pgd;
@@ -347,11 +346,11 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
 		if (!pmd)
 			goto out_oom;
-		preempt_disable();
+		suspend_disable();
 		if (test_bit(PG_pinned, &virt_to_page(pgd)->flags))
 			make_lowmem_page_readonly(pmd);
 		set_pgd(&pgd[i], __pgd(1 + __pa(pmd)));
-		preempt_enable();
+		suspend_enable();
 	}
 	return pgd;
 
@@ -366,8 +365,8 @@ void pgd_free(pgd_t *pgd)
 {
 	int i;
 
-	if (test_bit(PG_pinned, &virt_to_page(pgd)->flags))
-		__pgd_unpin(pgd);
+	suspend_disable();
+	pgd_test_and_unpin(pgd);
 
 	/* in the PAE case user pgd entries are overwritten before usage */
 	if (PTRS_PER_PMD > 1) {
@@ -385,6 +384,9 @@ void pgd_free(pgd_t *pgd)
 			kmem_cache_free(pmd_cache, pmd);
 		}
 	}
+
+	suspend_enable();
+
 	/* in the non-PAE case, free_pgtables() clears user pgd entries */
 	kmem_cache_free(pgd_cache, pgd);
 }
@@ -509,6 +511,9 @@ static void pgd_walk(pgd_t *pgd_base, pgprot_t flags)
 
 static void __pgd_pin(pgd_t *pgd)
 {
+	/* PAE PGDs with no kernel PMD cannot be pinned. Bail right now. */
+	if ((PTRS_PER_PMD > 1) && pgd_none(pgd[USER_PTRS_PER_PGD]))
+		return;
 	pgd_walk(pgd, PAGE_KERNEL_RO);
 	xen_pgd_pin(__pa(pgd));
 	set_bit(PG_pinned, &virt_to_page(pgd)->flags);
@@ -519,6 +524,14 @@ static void __pgd_unpin(pgd_t *pgd)
 	xen_pgd_unpin(__pa(pgd));
 	pgd_walk(pgd, PAGE_KERNEL);
 	clear_bit(PG_pinned, &virt_to_page(pgd)->flags);
+}
+
+static void pgd_test_and_unpin(pgd_t *pgd)
+{
+	suspend_disable();
+	if (test_bit(PG_pinned, &virt_to_page(pgd)->flags))
+		__pgd_unpin(pgd);
+	suspend_enable();
 }
 
 void mm_pin(struct mm_struct *mm)
