@@ -74,7 +74,6 @@ struct t_rec {
 struct t_buf {
     unsigned int  cons;      /* Next item to be consumed by control tools. */
     unsigned int  prod;      /* Next item to be produced by Xen.           */
-    unsigned int  nr_recs;   /* Number of records in this trace buffer.    */
     /* 'nr_recs' records follow immediately after the meta-data header.    */
 };
 

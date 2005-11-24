@@ -89,7 +89,6 @@ static int alloc_trace_bufs(void)
     {
         buf = t_bufs[i] = (struct t_buf *)&rawbuf[i*opt_tbuf_size*PAGE_SIZE];
         buf->cons = buf->prod = 0;
-        buf->nr_recs = nr_recs;
         t_recs[i] = (struct t_rec *)(buf + 1);
     }
 
