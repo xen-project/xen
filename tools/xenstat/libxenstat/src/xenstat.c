@@ -702,19 +702,12 @@ static char *xenstat_get_domain_name(xenstat_handle *handle, unsigned int domain
 {
 	char path[80];
 	char *name;
-	struct xs_transaction_handle *xstranshandle;
 
 	snprintf(path, sizeof(path),"/local/domain/%i/name", domain_id);
 	
-	xstranshandle = xs_transaction_start(handle->xshandle);
-	if (xstranshandle == NULL) {
-		perror("Unable to get transcation handle from xenstore\n");
-		exit(1); /* Change this */
-	}
-
-	name = (char *) xs_read(handle->xshandle, xstranshandle, path, NULL);
-	
-	xs_transaction_end(handle->xshandle, xstranshandle, false);
+	name = xs_read(handle->xshandle, NULL, path, NULL);
+	if (name == NULL)
+		name = strdup(" ");
 
 	return name;
 }	
