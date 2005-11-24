@@ -472,13 +472,6 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                             errors++;
                         }
 
-                        if ( (page->u.inuse.type_info & PGT_pinned) != PGT_pinned )
-                        {
-                            printk("Audit %d: L2 mfn=%lx not pinned t=%"
-				   PRtype_info "\n",
-                                   d->domain_id, mfn, page->u.inuse.type_info);
-                            errors++;
-                        }
                     }
                 }
 

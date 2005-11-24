@@ -343,19 +343,15 @@ extern int shadow_status_noswap;
 #define SHADOW_REFLECTS_SNAPSHOT _PAGE_AVAIL0
 #endif
 
-#ifdef VERBOSE
+#if SHADOW_VERBOSE_DEBUG
 #define SH_LOG(_f, _a...)                                               \
     printk("DOM%uP%u: SH_LOG(%d): " _f "\n",                            \
        current->domain->domain_id , current->processor, __LINE__ , ## _a )
-#else
-#define SH_LOG(_f, _a...) ((void)0)
-#endif
-
-#if SHADOW_VERBOSE_DEBUG
 #define SH_VLOG(_f, _a...)                                              \
     printk("DOM%uP%u: SH_VLOG(%d): " _f "\n",                           \
            current->domain->domain_id, current->processor, __LINE__ , ## _a )
 #else
+#define SH_LOG(_f, _a...) ((void)0)
 #define SH_VLOG(_f, _a...) ((void)0)
 #endif
 
