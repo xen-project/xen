@@ -1757,6 +1757,7 @@ static void sync_all(struct domain *d)
     struct out_of_sync_entry *entry;
     int need_flush = 0;
     l1_pgentry_t *ppte, opte, npte;
+    cpumask_t other_vcpus_mask;
 
     perfc_incrc(shadow_sync_all);
 
@@ -1789,23 +1790,15 @@ static void sync_all(struct domain *d)
         unmap_domain_page(ppte);
     }
 
-    // XXX mafetter: SMP
-    //
-    // With the current algorithm, we've gotta flush all the TLBs
-    // before we can safely continue.  I don't think we want to
-    // do it this way, so I think we should consider making
-    // entirely private copies of the shadow for each vcpu, and/or
-    // possibly having a mix of private and shared shadow state
-    // (any path from a PTE that grants write access to an out-of-sync
-    // page table page needs to be vcpu private).
-    //
-#if 0 // this should be enabled for SMP guests...
-    flush_tlb_mask(cpu_online_map);
-#endif
+    /* Other VCPUs mustn't use the revoked writable mappings. */
+    other_vcpus_mask = d->cpumask;
+    cpu_clear(smp_processor_id(), other_vcpus_mask);
+    flush_tlb_mask(other_vcpus_mask);
+
+    /* Flush ourself later. */
     need_flush = 1;
 
-    // Second, resync all L1 pages, then L2 pages, etc...
-    //
+    /* Second, resync all L1 pages, then L2 pages, etc... */
     need_flush |= resync_all(d, PGT_l1_shadow);
 
 #if CONFIG_PAGING_LEVELS == 2
@@ -1858,8 +1851,7 @@ static inline int l1pte_write_fault(
     SH_VVLOG("l1pte_write_fault: updating spte=0x%" PRIpte " gpte=0x%" PRIpte,
              l1e_get_intpte(spte), l1e_get_intpte(gpte));
 
-    if ( shadow_mode_log_dirty(d) )
-        __mark_dirty(d, gmfn);
+    __mark_dirty(d, gmfn);
 
     if ( mfn_is_page_table(gmfn) )
         shadow_mark_va_out_of_sync(v, gpfn, gmfn, va);
@@ -2021,9 +2013,7 @@ static int shadow_fault_32(unsigned long va, struct cpu_user_regs *regs)
             domain_crash_synchronous();
         }
 
-        // if necessary, record the page table page as dirty
-        if ( unlikely(shadow_mode_log_dirty(d)) )
-            __mark_dirty(d, __gpfn_to_mfn(d, l2e_get_pfn(gpde)));
+        __mark_dirty(d, __gpfn_to_mfn(d, l2e_get_pfn(gpde)));
     }
 
     shadow_set_l1e(va, spte, 1);
@@ -2082,8 +2072,7 @@ static int do_update_va_mapping(unsigned long va,
      * the PTE in the PT-holding page. We need the machine frame number
      * for this.
      */
-    if ( shadow_mode_log_dirty(d) )
-        __mark_dirty(d, va_to_l1mfn(v, va));
+    __mark_dirty(d, va_to_l1mfn(v, va));
 
     shadow_unlock(d);
 
@@ -3189,11 +3178,7 @@ static inline int l2e_rw_fault(
                 l1e_remove_flags(sl1e, _PAGE_RW);
             }
         } else {
-            /* log dirty*/
-            /*
-               if ( shadow_mode_log_dirty(d) )
-               __mark_dirty(d, gmfn);
-             */
+            /* __mark_dirty(d, gmfn); */
         }
        // printk("<%s> gpfn: %lx, mfn: %lx, sl1e: %lx\n", __func__, gpfn, mfn, l1e_get_intpte(sl1e));
         /* The shadow entrys need setup before shadow_mark_va_out_of_sync()*/
@@ -3476,9 +3461,7 @@ check_writeable:
         if (unlikely(!__guest_set_l1e(v, va, &gl1e))) 
             domain_crash_synchronous();
 
-        // if necessary, record the page table page as dirty
-        if ( unlikely(shadow_mode_log_dirty(d)) )
-            __mark_dirty(d, __gpfn_to_mfn(d, l2e_get_pfn(gl2e)));
+        __mark_dirty(d, __gpfn_to_mfn(d, l2e_get_pfn(gl2e)));
     }
 
     shadow_set_l1e_64(va, (pgentry_64_t *)&sl1e, 1);

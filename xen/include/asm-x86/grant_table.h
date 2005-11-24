@@ -33,10 +33,6 @@ int steal_page_for_grant_transfer(
 #define gnttab_shared_mfn(d, t, i)                      \
     ((virt_to_phys((t)->shared) >> PAGE_SHIFT) + (i))
 
-#define gnttab_log_dirty(d, f)                          \
-    do {                                                \
-        if ( unlikely(shadow_mode_log_dirty((d))) )     \
-            mark_dirty((d), (f));                       \
-    } while ( 0 )
+#define gnttab_log_dirty(d, f) mark_dirty((d), (f))
 
 #endif /* __ASM_GRANT_TABLE_H__ */

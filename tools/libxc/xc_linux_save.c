@@ -727,8 +727,8 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     /* Domain is still running at this point */
 
-    if (live && (pt_levels != 2)) {
-        ERR("Live migration supported only for 32-bit non-pae");
+    if (live && (pt_levels == 4)) {
+        ERR("Live migration not supported for 64-bit guests");
         live = 0;
     }
 

@@ -1274,8 +1274,6 @@ static int shadow_mode_table_op(
 
         d->arch.shadow_fault_count       = 0;
         d->arch.shadow_dirty_count       = 0;
-        d->arch.shadow_dirty_net_count   = 0;
-        d->arch.shadow_dirty_block_count = 0;
 
         break;
    
@@ -1284,13 +1282,9 @@ static int shadow_mode_table_op(
 
         sc->stats.fault_count       = d->arch.shadow_fault_count;
         sc->stats.dirty_count       = d->arch.shadow_dirty_count;
-        sc->stats.dirty_net_count   = d->arch.shadow_dirty_net_count;
-        sc->stats.dirty_block_count = d->arch.shadow_dirty_block_count;
 
         d->arch.shadow_fault_count       = 0;
         d->arch.shadow_dirty_count       = 0;
-        d->arch.shadow_dirty_net_count   = 0;
-        d->arch.shadow_dirty_block_count = 0;
  
         if ( (sc->dirty_bitmap == NULL) || 
              (d->arch.shadow_dirty_bitmap == NULL) )
@@ -1327,9 +1321,6 @@ static int shadow_mode_table_op(
     case DOM0_SHADOW_CONTROL_OP_PEEK:
         sc->stats.fault_count       = d->arch.shadow_fault_count;
         sc->stats.dirty_count       = d->arch.shadow_dirty_count;
-        sc->stats.dirty_net_count   = d->arch.shadow_dirty_net_count;
-        sc->stats.dirty_block_count = d->arch.shadow_dirty_block_count;
- 
 
         if ( (sc->dirty_bitmap == NULL) || 
              (d->arch.shadow_dirty_bitmap == NULL) )
@@ -2563,6 +2554,7 @@ void __shadow_sync_all(struct domain *d)
     struct out_of_sync_entry *entry;
     int need_flush = 0;
     l1_pgentry_t *ppte, opte, npte;
+    cpumask_t other_vcpus_mask;
 
     perfc_incrc(shadow_sync_all);
 
@@ -2595,23 +2587,15 @@ void __shadow_sync_all(struct domain *d)
         unmap_domain_page(ppte);
     }
 
-    // XXX mafetter: SMP
-    //
-    // With the current algorithm, we've gotta flush all the TLBs
-    // before we can safely continue.  I don't think we want to
-    // do it this way, so I think we should consider making
-    // entirely private copies of the shadow for each vcpu, and/or
-    // possibly having a mix of private and shared shadow state
-    // (any path from a PTE that grants write access to an out-of-sync
-    // page table page needs to be vcpu private).
-    //
-#if 0 // this should be enabled for SMP guests...
-    flush_tlb_mask(cpu_online_map);
-#endif
+    /* Other VCPUs mustn't use the revoked writable mappings. */
+    other_vcpus_mask = d->cpumask;
+    cpu_clear(smp_processor_id(), other_vcpus_mask);
+    flush_tlb_mask(other_vcpus_mask);
+
+    /* Flush ourself later. */
     need_flush = 1;
 
-    // Second, resync all L1 pages, then L2 pages, etc...
-    //
+    /* Second, resync all L1 pages, then L2 pages, etc... */
     need_flush |= resync_all(d, PGT_l1_shadow);
     if ( shadow_mode_translate(d) )
         need_flush |= resync_all(d, PGT_hl2_shadow);
@@ -2738,9 +2722,7 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
             domain_crash_synchronous();
         }
 
-        // if necessary, record the page table page as dirty
-        if ( unlikely(shadow_mode_log_dirty(d)) )
-            __mark_dirty(d, __gpfn_to_mfn(d, l2e_get_pfn(gpde)));
+        __mark_dirty(d, __gpfn_to_mfn(d, l2e_get_pfn(gpde)));
     }
 
     shadow_set_l1e(va, spte, 1);
@@ -2837,8 +2819,6 @@ int shadow_do_update_va_mapping(unsigned long va,
 
     shadow_lock(d);
 
-    //printk("%s(va=%p, val=%p)\n", __func__, (void *)va, (void *)l1e_get_intpte(val));
-        
     // This is actually overkill - we don't need to sync the L1 itself,
     // just everything involved in getting to this L1 (i.e. we need
     // linear_pg_table[l1_linear_offset(va)] to be in sync)...
@@ -2853,10 +2833,8 @@ int shadow_do_update_va_mapping(unsigned long va,
      * the PTE in the PT-holding page. We need the machine frame number
      * for this.
      */
-    if ( shadow_mode_log_dirty(d) )
-        __mark_dirty(d, va_to_l1mfn(v, va));
+    __mark_dirty(d, va_to_l1mfn(v, va));
 
-// out:
     shadow_unlock(d);
 
     return rc;

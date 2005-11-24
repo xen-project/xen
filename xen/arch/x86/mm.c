@@ -1289,6 +1289,11 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
 
 int alloc_page_type(struct pfn_info *page, unsigned long type)
 {
+    struct domain *owner = page_get_owner(page);
+
+    if ( owner != NULL )
+        mark_dirty(owner, page_to_pfn(page));
+
     switch ( type & PGT_type_mask )
     {
     case PGT_l1_page_table:
@@ -1318,16 +1323,14 @@ void free_page_type(struct pfn_info *page, unsigned long type)
     struct domain *owner = page_get_owner(page);
     unsigned long gpfn;
 
-    if ( owner != NULL )
+    if ( unlikely((owner != NULL) && shadow_mode_enabled(owner)) )
     {
+        mark_dirty(owner, page_to_pfn(page));
         if ( unlikely(shadow_mode_refcounts(owner)) )
             return;
-        if ( unlikely(shadow_mode_enabled(owner)) )
-        {
-            gpfn = __mfn_to_gpfn(owner, page_to_pfn(page));
-            ASSERT(VALID_M2P(gpfn));
-            remove_shadow(owner, gpfn, type & PGT_type_mask);
-        }
+        gpfn = __mfn_to_gpfn(owner, page_to_pfn(page));
+        ASSERT(VALID_M2P(gpfn));
+        remove_shadow(owner, gpfn, type & PGT_type_mask);
     }
 
     switch ( type & PGT_type_mask )
@@ -2203,8 +2206,7 @@ int do_mmu_update(
                     {
                         shadow_lock(d);
 
-                        if ( shadow_mode_log_dirty(d) )
-                            __mark_dirty(d, mfn);
+                        __mark_dirty(d, mfn);
 
                         if ( page_is_page_table(page) &&
                              !page_out_of_sync(page) )
@@ -2263,13 +2265,7 @@ int do_mmu_update(
             set_pfn_from_mfn(mfn, gpfn);
             okay = 1;
 
-            /*
-             * If in log-dirty mode, mark the corresponding
-             * page as dirty.
-             */
-            if ( unlikely(shadow_mode_log_dirty(FOREIGNDOM)) &&
-                 mark_dirty(FOREIGNDOM, mfn) )
-                FOREIGNDOM->arch.shadow_dirty_block_count++;
+            mark_dirty(FOREIGNDOM, mfn);
 
             put_page(&frame_table[mfn]);
             break;
@@ -2841,8 +2837,7 @@ long do_update_descriptor(u64 pa, u64 desc)
     {
         shadow_lock(dom);
 
-        if ( shadow_mode_log_dirty(dom) )
-            __mark_dirty(dom, mfn);
+        __mark_dirty(dom, mfn);
 
         if ( page_is_page_table(page) && !page_out_of_sync(page) )
             shadow_mark_mfn_out_of_sync(current, gpfn, mfn);
