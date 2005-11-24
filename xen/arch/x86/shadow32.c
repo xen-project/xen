@@ -2554,6 +2554,7 @@ void __shadow_sync_all(struct domain *d)
     struct out_of_sync_entry *entry;
     int need_flush = 0;
     l1_pgentry_t *ppte, opte, npte;
+    cpumask_t other_vcpus_mask;
 
     perfc_incrc(shadow_sync_all);
 
@@ -2586,23 +2587,15 @@ void __shadow_sync_all(struct domain *d)
         unmap_domain_page(ppte);
     }
 
-    // XXX mafetter: SMP
-    //
-    // With the current algorithm, we've gotta flush all the TLBs
-    // before we can safely continue.  I don't think we want to
-    // do it this way, so I think we should consider making
-    // entirely private copies of the shadow for each vcpu, and/or
-    // possibly having a mix of private and shared shadow state
-    // (any path from a PTE that grants write access to an out-of-sync
-    // page table page needs to be vcpu private).
-    //
-#if 0 // this should be enabled for SMP guests...
-    flush_tlb_mask(cpu_online_map);
-#endif
+    /* Other VCPUs mustn't use the revoked writable mappings. */
+    other_vcpus_mask = d->cpumask;
+    cpu_clear(smp_processor_id(), other_vcpus_mask);
+    flush_tlb_mask(other_vcpus_mask);
+
+    /* Flush ourself later. */
     need_flush = 1;
 
-    // Second, resync all L1 pages, then L2 pages, etc...
-    //
+    /* Second, resync all L1 pages, then L2 pages, etc... */
     need_flush |= resync_all(d, PGT_l1_shadow);
     if ( shadow_mode_translate(d) )
         need_flush |= resync_all(d, PGT_hl2_shadow);

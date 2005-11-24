@@ -596,8 +596,8 @@ update_hl2e(struct vcpu *v, unsigned long va)
         if ( need_flush )
         {
             perfc_incrc(update_hl2e_invlpg);
-            // SMP BUG???
-            local_flush_tlb_one(&linear_pg_table[l1_linear_offset(va)]);
+            flush_tlb_one_mask(v->domain->cpumask,
+                               &linear_pg_table[l1_linear_offset(va)]);
         }
     }
 }
