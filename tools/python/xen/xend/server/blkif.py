@@ -93,8 +93,10 @@ class BlkifController(DevController):
         try:
             DevController.destroyDevice(self, int(devid))
         except ValueError:
+            devid_end = devid.split('/')[-1]
             for i in self.deviceIDs():
-                if self.readBackend(i, 'dev') == devid:
+                d = self.readBackend(i, 'dev')
+                if d == devid or d == devid_end:
                     DevController.destroyDevice(self, i)
                     return
             raise VmError("Device %s not connected" % devid)
