@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.12.6-xen
-# Wed Nov 23 20:41:53 2005
+# Wed Nov 23 21:01:11 2005
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -135,7 +135,7 @@ CONFIG_NR_CPUS=8
 CONFIG_PREEMPT=y
 CONFIG_PREEMPT_BKL=y
 # CONFIG_X86_REBOOTFIXUPS is not set
-CONFIG_MICROCODE=m
+CONFIG_MICROCODE=y
 CONFIG_X86_CPUID=m
 CONFIG_SWIOTLB=y
 
