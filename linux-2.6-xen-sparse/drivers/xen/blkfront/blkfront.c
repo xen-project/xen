@@ -117,6 +117,8 @@ static int blkfront_probe(struct xenbus_device *dev,
 		info->shadow[i].req.id = i+1;
 	info->shadow[BLK_RING_SIZE-1].req.id = 0x0fffffff;
 
+	info->users = 0;
+
 	/* Front end dir is a number, which is used as the id. */
 	info->handle = simple_strtoul(strrchr(dev->nodename,'/')+1, NULL, 0);
 	dev->data = info;
@@ -265,6 +267,7 @@ static void backend_changed(struct xenbus_device *dev,
 			    XenbusState backend_state)
 {
 	struct blkfront_info *info = dev->data;
+	struct block_device *bd;
 
 	DPRINTK("blkfront:backend_changed.\n");
 
@@ -281,7 +284,18 @@ static void backend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		blkfront_closing(dev);
+		bd = bdget(info->dev);
+		if (bd == NULL)
+			xenbus_dev_fatal(dev, -ENODEV, "bdget failed");
+
+		down(&bd->bd_sem);
+		if (info->users > 0)
+			xenbus_dev_error(dev, -EBUSY,
+					 "Device in use; refusing to close");
+		else
+			blkfront_closing(dev);
+		up(&bd->bd_sem);
+		bdput(bd);
 		break;
 	}
 }
@@ -414,12 +428,26 @@ static void blkif_restart_queue_callback(void *arg)
 
 int blkif_open(struct inode *inode, struct file *filep)
 {
+	struct blkfront_info *info = inode->i_bdev->bd_disk->private_data;
+	info->users++;
 	return 0;
 }
 
 
 int blkif_release(struct inode *inode, struct file *filep)
 {
+	struct blkfront_info *info = inode->i_bdev->bd_disk->private_data;
+	info->users--;
+	if (info->users == 0) {
+		/* Check whether we have been instructed to close.  We will
+		   have ignored this request initially, as the device was
+		   still mounted. */
+		struct xenbus_device * dev = info->xbdev;
+		XenbusState state = xenbus_read_driver_state(dev->otherend);
+
+		if (state == XenbusStateClosing)
+			blkfront_closing(dev);
+	}
 	return 0;
 }
 
