@@ -29,7 +29,11 @@ static struct ns16550 {
     int baud, data_bits, parity, stop_bits, irq;
     unsigned long io_base;   /* I/O port or memory-mapped I/O address. */
     char *remapped_io_base;  /* Remapped virtual address of mmap I/O.  */ 
+    /* UART with IRQ line: interrupt-driven I/O. */
     struct irqaction irqaction;
+    /* UART with no IRQ line: periodically-polled I/O. */
+    struct ac_timer timer;
+    unsigned int timeout_ms;
 } ns16550_com[2] = { { 0 } };
 
 /* Register offsets */
@@ -121,6 +125,21 @@ static void ns16550_interrupt(
     }
 }
 
+static void ns16550_poll(void *data)
+{
+    struct serial_port *port = data;
+    struct ns16550 *uart = port->uart;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+
+    while ( ns_read_reg(uart, LSR) & LSR_DR )
+        serial_rx_interrupt(port, regs);
+
+    if ( ns_read_reg(uart, LSR) & LSR_THRE )
+        serial_tx_interrupt(port, regs);
+
+    set_ac_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
+}
+
 static int ns16550_tx_empty(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
@@ -181,24 +200,35 @@ static void ns16550_init_preirq(struct serial_port *port)
 static void ns16550_init_postirq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
-    int rc;
+    int rc, bits;
 
-    if ( uart->irq <= 0 )
+    if ( uart->irq < 0 )
         return;
 
     serial_async_transmit(port);
 
-    uart->irqaction.handler = ns16550_interrupt;
-    uart->irqaction.name    = "ns16550";
-    uart->irqaction.dev_id  = port;
-    if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
-        printk("ERROR: Failed to allocate na16550 IRQ %d\n", uart->irq);
+    if ( uart->irq == 0 )
+    {
+        /* Polled mode. Calculate time to fill RX FIFO and/or empty TX FIFO. */
+        bits = uart->data_bits + uart->stop_bits + !!uart->parity;
+        uart->timeout_ms = (bits * port->tx_fifo_size * 1000) / uart->baud;
+        init_ac_timer(&uart->timer, ns16550_poll, port, 0);
+        set_ac_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
+    }
+    else
+    {
+        uart->irqaction.handler = ns16550_interrupt;
+        uart->irqaction.name    = "ns16550";
+        uart->irqaction.dev_id  = port;
+        if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
+            printk("ERROR: Failed to allocate na16550 IRQ %d\n", uart->irq);
 
-    /* Master interrupt enable; also keep DTR/RTS asserted. */
-    ns_write_reg(uart, MCR, MCR_OUT2 | MCR_DTR | MCR_RTS);
+        /* Master interrupt enable; also keep DTR/RTS asserted. */
+        ns_write_reg(uart, MCR, MCR_OUT2 | MCR_DTR | MCR_RTS);
 
-    /* Enable receive and transmit interrupts. */
-    ns_write_reg(uart, IER, IER_ERDAI | IER_ETHREI);
+        /* Enable receive and transmit interrupts. */
+        ns_write_reg(uart, IER, IER_ERDAI | IER_ETHREI);
+    }
 }
 
 #ifdef CONFIG_X86
