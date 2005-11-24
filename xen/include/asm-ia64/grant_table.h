@@ -16,7 +16,7 @@
 
 #define gnttab_shared_mfn(d, t, i)                                      \
     ( ((d) == dom0) ?                                                   \
-      ((virt_to_phys((t)shared) >> PAGE_SHIFT) + (i)) :                 \
+      ((virt_to_phys((t)->shared) >> PAGE_SHIFT) + (i)) :               \
       (map_domain_page((d), 1UL<<40, virt_to_phys((t)->shared)),        \
        1UL << (40 - PAGE_SHIFT))                                        \
     )

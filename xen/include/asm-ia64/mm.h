@@ -82,7 +82,7 @@ struct page
 #define PGT_l2_page_table   (2<<29) /* using this page as an L2 page table? */
 #define PGT_l3_page_table   (3<<29) /* using this page as an L3 page table? */
 #define PGT_l4_page_table   (4<<29) /* using this page as an L4 page table? */
-#define PGT_writeable_page  (5<<29) /* has writable mappings of this page? */
+#define PGT_writable_page   (5<<29) /* has writable mappings of this page? */
 #define PGT_type_mask       (5<<29) /* Bits 29-31. */
 
  /* Has this page been validated for use as its current type? */
