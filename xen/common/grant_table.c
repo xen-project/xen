@@ -726,10 +726,11 @@ gnttab_transfer(
              unlikely(e->tot_pages >= e->max_pages) ||
              unlikely(!gnttab_prepare_for_transfer(e, d, gop.ref)) )
         {
-            DPRINTK("gnttab_transfer: Transferee has no reservation headroom "
-                    "(%d,%d) or provided a bad grant ref (%08x) or "
-                    "is dying (%lx)\n",
-                    e->tot_pages, e->max_pages, gop.ref, e->domain_flags);
+            if ( !test_bit(_DOMF_dying, &e->domain_flags) )
+                DPRINTK("gnttab_transfer: Transferee has no reservation "
+                        "headroom (%d,%d) or provided a bad grant ref (%08x) "
+                        "or is dying (%lx)\n",
+                        e->tot_pages, e->max_pages, gop.ref, e->domain_flags);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
             (void)__put_user(GNTST_general_error, &uop[i].status);
