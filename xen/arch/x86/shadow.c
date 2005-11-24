@@ -1858,8 +1858,7 @@ static inline int l1pte_write_fault(
     SH_VVLOG("l1pte_write_fault: updating spte=0x%" PRIpte " gpte=0x%" PRIpte,
              l1e_get_intpte(spte), l1e_get_intpte(gpte));
 
-    if ( shadow_mode_log_dirty(d) )
-        __mark_dirty(d, gmfn);
+    __mark_dirty(d, gmfn);
 
     if ( mfn_is_page_table(gmfn) )
         shadow_mark_va_out_of_sync(v, gpfn, gmfn, va);
@@ -2021,9 +2020,7 @@ static int shadow_fault_32(unsigned long va, struct cpu_user_regs *regs)
             domain_crash_synchronous();
         }
 
-        // if necessary, record the page table page as dirty
-        if ( unlikely(shadow_mode_log_dirty(d)) )
-            __mark_dirty(d, __gpfn_to_mfn(d, l2e_get_pfn(gpde)));
+        __mark_dirty(d, __gpfn_to_mfn(d, l2e_get_pfn(gpde)));
     }
 
     shadow_set_l1e(va, spte, 1);
@@ -2082,8 +2079,7 @@ static int do_update_va_mapping(unsigned long va,
      * the PTE in the PT-holding page. We need the machine frame number
      * for this.
      */
-    if ( shadow_mode_log_dirty(d) )
-        __mark_dirty(d, va_to_l1mfn(v, va));
+    __mark_dirty(d, va_to_l1mfn(v, va));
 
     shadow_unlock(d);
 
@@ -3189,11 +3185,7 @@ static inline int l2e_rw_fault(
                 l1e_remove_flags(sl1e, _PAGE_RW);
             }
         } else {
-            /* log dirty*/
-            /*
-               if ( shadow_mode_log_dirty(d) )
-               __mark_dirty(d, gmfn);
-             */
+            /* __mark_dirty(d, gmfn); */
         }
        // printk("<%s> gpfn: %lx, mfn: %lx, sl1e: %lx\n", __func__, gpfn, mfn, l1e_get_intpte(sl1e));
         /* The shadow entrys need setup before shadow_mark_va_out_of_sync()*/
@@ -3476,9 +3468,7 @@ check_writeable:
         if (unlikely(!__guest_set_l1e(v, va, &gl1e))) 
             domain_crash_synchronous();
 
-        // if necessary, record the page table page as dirty
-        if ( unlikely(shadow_mode_log_dirty(d)) )
-            __mark_dirty(d, __gpfn_to_mfn(d, l2e_get_pfn(gl2e)));
+        __mark_dirty(d, __gpfn_to_mfn(d, l2e_get_pfn(gl2e)));
     }
 
     shadow_set_l1e_64(va, (pgentry_64_t *)&sl1e, 1);

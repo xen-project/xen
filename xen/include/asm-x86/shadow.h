@@ -468,21 +468,18 @@ static inline void shadow_put_page(struct domain *d,
 
 /************************************************************************/
 
-static inline int __mark_dirty(struct domain *d, unsigned long mfn)
+static inline void __mark_dirty(struct domain *d, unsigned long mfn)
 {
     unsigned long pfn;
-    int           rc = 0;
 
     ASSERT(shadow_lock_is_acquired(d));
+
+    if ( likely(!shadow_mode_log_dirty(d)) || !VALID_MFN(mfn) )
+        return;
+
     ASSERT(d->arch.shadow_dirty_bitmap != NULL);
 
-    if ( !VALID_MFN(mfn) )
-        return rc;
-
-    // N.B. This doesn't use __mfn_to_gpfn().
-    // This wants the nice compact set of PFNs from 0..domain's max,
-    // which __mfn_to_gpfn() only returns for translated domains.
-    //
+    /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_pfn_from_mfn(mfn);
 
     /*
@@ -491,16 +488,13 @@ static inline int __mark_dirty(struct domain *d, unsigned long mfn)
      * Nothing to do here...
      */
     if ( unlikely(IS_INVALID_M2P_ENTRY(pfn)) )
-        return rc;
+        return;
 
-    if ( likely(pfn < d->arch.shadow_dirty_bitmap_size) )
+    /* N.B. Can use non-atomic TAS because protected by shadow_lock. */
+    if ( likely(pfn < d->arch.shadow_dirty_bitmap_size) &&
+         !__test_and_set_bit(pfn, d->arch.shadow_dirty_bitmap) )
     {
-        /* N.B. Can use non-atomic TAS because protected by shadow_lock. */
-        if ( !__test_and_set_bit(pfn, d->arch.shadow_dirty_bitmap) )
-        {
-            d->arch.shadow_dirty_count++;
-            rc = 1;
-        }
+        d->arch.shadow_dirty_count++;
     }
 #ifndef NDEBUG
     else if ( mfn < max_page )
@@ -513,18 +507,17 @@ static inline int __mark_dirty(struct domain *d, unsigned long mfn)
                frame_table[mfn].u.inuse.type_info );
     }
 #endif
-
-    return rc;
 }
 
 
-static inline int mark_dirty(struct domain *d, unsigned int mfn)
+static inline void mark_dirty(struct domain *d, unsigned int mfn)
 {
-    int rc;
-    shadow_lock(d);
-    rc = __mark_dirty(d, mfn);
-    shadow_unlock(d);
-    return rc;
+    if ( unlikely(shadow_mode_log_dirty(d)) )
+    {
+        shadow_lock(d);
+        __mark_dirty(d, mfn);
+        shadow_unlock(d);
+    }
 }
 
 
@@ -566,8 +559,7 @@ __guest_set_l2e(
     if ( unlikely(shadow_mode_translate(d)) )
         update_hl2e(v, va);
 
-    if ( unlikely(shadow_mode_log_dirty(d)) )
-        __mark_dirty(d, pagetable_get_pfn(v->arch.guest_table));
+    __mark_dirty(d, pagetable_get_pfn(v->arch.guest_table));
 }
 
 static inline void
@@ -787,8 +779,7 @@ static inline int l1pte_write_fault(
     SH_VVLOG("l1pte_write_fault: updating spte=0x%" PRIpte " gpte=0x%" PRIpte,
              l1e_get_intpte(spte), l1e_get_intpte(gpte));
 
-    if ( shadow_mode_log_dirty(d) )
-        __mark_dirty(d, gmfn);
+    __mark_dirty(d, gmfn);
 
     if ( mfn_is_page_table(gmfn) )
         shadow_mark_va_out_of_sync(v, gpfn, gmfn, va);
@@ -1324,46 +1315,6 @@ shadow_max_pgtable_type(struct domain *d, unsigned long gpfn,
 
     return pttype;
 }
-
-/*
- * N.B. We can make this locking more fine grained (e.g., per shadow page) if
- * it ever becomes a problem, but since we need a spin lock on the hash table 
- * anyway it's probably not worth being too clever.
- */
-static inline unsigned long get_shadow_status(
-    struct domain *d, unsigned long gpfn, unsigned long stype)
-{
-    unsigned long res;
-
-    ASSERT(shadow_mode_enabled(d));
-
-    /*
-     * If we get here we know that some sort of update has happened to the
-     * underlying page table page: either a PTE has been updated, or the page
-     * has changed type. If we're in log dirty mode, we should set the
-     * appropriate bit in the dirty bitmap.
-     * N.B. The VA update path doesn't use this and is handled independently. 
-     *
-     * XXX need to think this through for vmx guests, but probably OK
-     */
-
-    shadow_lock(d);
-
-    if ( shadow_mode_log_dirty(d) )
-        __mark_dirty(d, __gpfn_to_mfn(d, gpfn));
-
-    if ( !(res = __shadow_status(d, gpfn, stype)) )
-        shadow_unlock(d);
-
-    return res;
-}
-
-
-static inline void put_shadow_status(struct domain *d)
-{
-    shadow_unlock(d);
-}
-
 
 static inline void delete_shadow_status(
     struct domain *d, unsigned long gpfn, unsigned long gmfn, unsigned int stype)
