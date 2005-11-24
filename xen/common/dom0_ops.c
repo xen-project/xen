@@ -102,7 +102,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         return -EACCES;
 
     if ( acm_pre_dom0_op(op, &ssid) )
-        return -EACCES;
+        return -EPERM;
 
     spin_lock(&dom0_lock);
 
