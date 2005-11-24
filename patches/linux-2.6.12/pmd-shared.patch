@@ -1,15 +1,3 @@
-diff -urNpP linux-2.6.12/arch/i386/mm/init.c linux-2.6.12.new/arch/i386/mm/init.c
---- linux-2.6.12/arch/i386/mm/init.c	2005-06-17 20:48:29.000000000 +0100
-+++ linux-2.6.12.new/arch/i386/mm/init.c	2005-07-11 16:28:09.778165582 +0100
-@@ -634,7 +634,7 @@ void __init pgtable_cache_init(void)
- 				PTRS_PER_PGD*sizeof(pgd_t),
- 				0,
- 				pgd_ctor,
--				PTRS_PER_PMD == 1 ? pgd_dtor : NULL);
-+				pgd_dtor);
- 	if (!pgd_cache)
- 		panic("pgtable_cache_init(): Cannot create pgd cache");
- }
 diff -urNpP linux-2.6.12/arch/i386/mm/pageattr.c linux-2.6.12.new/arch/i386/mm/pageattr.c
 --- linux-2.6.12/arch/i386/mm/pageattr.c	2005-06-17 20:48:29.000000000 +0100
 +++ linux-2.6.12.new/arch/i386/mm/pageattr.c	2005-07-11 16:28:09.775165494 +0100
@@ -23,31 +11,45 @@ diff -urNpP linux-2.6.12/arch/i386/mm/pageattr.c linux-2.6.12.new/arch/i386/mm/p
  
  	spin_lock_irqsave(&pgd_lock, flags);
 diff -urNpP linux-2.6.12/arch/i386/mm/pgtable.c linux-2.6.12.new/arch/i386/mm/pgtable.c
---- linux-2.6.12/arch/i386/mm/pgtable.c	2005-06-17 20:48:29.000000000 +0100
-+++ linux-2.6.12.new/arch/i386/mm/pgtable.c	2005-07-11 16:32:01.478023726 +0100
-@@ -199,14 +199,14 @@ void pgd_ctor(void *pgd, kmem_cache_t *c
+--- linux-2.6.12/arch/i386/mm/pgtable.c	2005-11-24 21:51:49.000000000 +0000
++++ linux-2.6.12.new/arch/i386/mm/pgtable.c	2005-11-24 22:06:04.000000000 +0000
+@@ -199,19 +199,22 @@ void pgd_ctor(void *pgd, kmem_cache_t *c
  {
  	unsigned long flags;
  
 -	if (PTRS_PER_PMD == 1)
-+	if (!HAVE_SHARED_KERNEL_PMD)
- 		spin_lock_irqsave(&pgd_lock, flags);
- 
- 	memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
- 			swapper_pg_dir + USER_PTRS_PER_PGD,
- 			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
- 
+-		spin_lock_irqsave(&pgd_lock, flags);
+-
+-	memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
+-			swapper_pg_dir + USER_PTRS_PER_PGD,
+-			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+-
 -	if (PTRS_PER_PMD > 1)
-+	if (HAVE_SHARED_KERNEL_PMD)
- 		return;
- 
- 	pgd_list_add(pgd);
-@@ -214,11 +214,13 @@ void pgd_ctor(void *pgd, kmem_cache_t *c
- 	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
+-		return;
+-
+-	pgd_list_add(pgd);
+-	spin_unlock_irqrestore(&pgd_lock, flags);
+-	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
++	if (PTRS_PER_PMD > 1) {
++		if (HAVE_SHARED_KERNEL_PMD)
++			memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
++			       swapper_pg_dir, sizeof(pgd_t));
++	} else {
++		if (!HAVE_SHARED_KERNEL_PMD)
++			spin_lock_irqsave(&pgd_lock, flags);
++		memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
++		       swapper_pg_dir + USER_PTRS_PER_PGD,
++		       (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
++		memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
++		if (!HAVE_SHARED_KERNEL_PMD) {
++			pgd_list_add(pgd);
++			spin_unlock_irqrestore(&pgd_lock, flags);
++		}
++	}
  }
  
--/* never called when PTRS_PER_PMD > 1 */
- void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
+ /* never called when PTRS_PER_PMD > 1 */
+@@ -219,6 +222,9 @@ void pgd_dtor(void *pgd, kmem_cache_t *c
  {
  	unsigned long flags; /* can be called from interrupt context */
  
@@ -57,38 +59,32 @@ diff -urNpP linux-2.6.12/arch/i386/mm/pgtable.c linux-2.6.12.new/arch/i386/mm/pg
  	spin_lock_irqsave(&pgd_lock, flags);
  	pgd_list_del(pgd);
  	spin_unlock_irqrestore(&pgd_lock, flags);
-@@ -226,12 +228,29 @@ void pgd_dtor(void *pgd, kmem_cache_t *c
- 
- pgd_t *pgd_alloc(struct mm_struct *mm)
- {
--	int i;
-+	int i = 0;
- 	pgd_t *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
- 
- 	if (PTRS_PER_PMD == 1 || !pgd)
- 		return pgd;
- 
+@@ -238,6 +244,24 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
+ 			goto out_oom;
+ 		set_pgd(&pgd[i], __pgd(1 + __pa(pmd)));
+ 	}
++
 +	if (!HAVE_SHARED_KERNEL_PMD) {
-+		/* alloc and copy kernel pmd */
 +		unsigned long flags;
 +		pgd_t *copy_pgd = pgd_offset_k(PAGE_OFFSET);
 +		pud_t *copy_pud = pud_offset(copy_pgd, PAGE_OFFSET);
 +		pmd_t *copy_pmd = pmd_offset(copy_pud, PAGE_OFFSET);
 +		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
-+		if (0 == pmd)
++                ++i;
++		if (!pmd)
 +			goto out_oom;
 +
 +		spin_lock_irqsave(&pgd_lock, flags);
 +		memcpy(pmd, copy_pmd, PAGE_SIZE);
-+		spin_unlock_irqrestore(&pgd_lock, flags);
 +		set_pgd(&pgd[USER_PTRS_PER_PGD], __pgd(1 + __pa(pmd)));
++		pgd_list_add(pgd);
++		spin_unlock_irqrestore(&pgd_lock, flags);
 +	}
 +
-+	/* alloc user pmds */
- 	for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
- 		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
- 		if (!pmd)
-@@ -252,9 +271,16 @@ void pgd_free(pgd_t *pgd)
+ 	return pgd;
+ 
+ out_oom:
+@@ -252,9 +276,21 @@ void pgd_free(pgd_t *pgd)
  	int i;
  
  	/* in the PAE case user pgd entries are overwritten before usage */
@@ -101,7 +97,12 @@ diff -urNpP linux-2.6.12/arch/i386/mm/pgtable.c linux-2.6.12.new/arch/i386/mm/pg
 +			kmem_cache_free(pmd_cache, pmd);
 +		}
 +		if (!HAVE_SHARED_KERNEL_PMD) {
++			unsigned long flags;
 +			pmd_t *pmd = (void *)__va(pgd_val(pgd[USER_PTRS_PER_PGD])-1);
++			spin_lock_irqsave(&pgd_lock, flags);
++			pgd_list_del(pgd);
++			spin_unlock_irqrestore(&pgd_lock, flags);
++			memset(pmd, 0, PTRS_PER_PMD*sizeof(pmd_t));
 +			kmem_cache_free(pmd_cache, pmd);
 +		}
 +	}

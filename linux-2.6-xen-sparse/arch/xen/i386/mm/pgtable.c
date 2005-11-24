@@ -28,8 +28,6 @@
 #include <asm/hypervisor.h>
 
 static void pgd_test_and_unpin(pgd_t *pgd);
-#define suspend_disable	preempt_disable
-#define suspend_enable	preempt_enable
 
 void show_mem(void)
 {
@@ -279,26 +277,31 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags;
 
-#ifdef CONFIG_X86_PAE
-	/* Ensure pgd resides below 4GB. */
-	int rc = xen_create_contiguous_region((unsigned long)pgd, 0, 32);
-	BUG_ON(rc);
+	if (PTRS_PER_PMD > 1) {
+#ifdef CONFIG_XEN
+		/* Ensure pgd resides below 4GB. */
+		int rc = xen_create_contiguous_region(
+			(unsigned long)pgd, 0, 32);
+		BUG_ON(rc);
 #endif
-
-	if (HAVE_SHARED_KERNEL_PMD) {
+		if (HAVE_SHARED_KERNEL_PMD)
+			memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
+			       swapper_pg_dir, sizeof(pgd_t));
+	} else {
+		if (!HAVE_SHARED_KERNEL_PMD)
+			spin_lock_irqsave(&pgd_lock, flags);
 		memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
 		       swapper_pg_dir + USER_PTRS_PER_PGD,
 		       (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
-		return;
+		memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
+		if (!HAVE_SHARED_KERNEL_PMD) {
+			pgd_list_add(pgd);
+			spin_unlock_irqrestore(&pgd_lock, flags);
+		}
 	}
-
-	memset(pgd, 0, PTRS_PER_PGD*sizeof(pgd_t));
-
-	spin_lock_irqsave(&pgd_lock, flags);
-	pgd_list_add(pgd);
-	spin_unlock_irqrestore(&pgd_lock, flags);
 }
 
+/* never called when PTRS_PER_PMD > 1 */
 void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags; /* can be called from interrupt context */
@@ -315,7 +318,7 @@ void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 
 pgd_t *pgd_alloc(struct mm_struct *mm)
 {
-	int i = 0;
+	int i;
 	pgd_t *pgd = kmem_cache_alloc(pgd_cache, GFP_KERNEL);
 
 	pgd_test_and_unpin(pgd);
@@ -323,34 +326,31 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	if (PTRS_PER_PMD == 1 || !pgd)
 		return pgd;
 
+	for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
+		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
+		if (!pmd)
+			goto out_oom;
+		set_pgd(&pgd[i], __pgd(1 + __pa(pmd)));
+	}
+
 	if (!HAVE_SHARED_KERNEL_PMD) {
-		/* alloc and copy kernel pmd */
 		unsigned long flags;
 		pgd_t *copy_pgd = pgd_offset_k(PAGE_OFFSET);
 		pud_t *copy_pud = pud_offset(copy_pgd, PAGE_OFFSET);
 		pmd_t *copy_pmd = pmd_offset(copy_pud, PAGE_OFFSET);
 		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
-		if (0 == pmd)
+		++i;
+		if (!pmd)
 			goto out_oom;
 
 		spin_lock_irqsave(&pgd_lock, flags);
 		memcpy(pmd, copy_pmd, PAGE_SIZE);
-		spin_unlock_irqrestore(&pgd_lock, flags);
 		make_lowmem_page_readonly(pmd);
 		set_pgd(&pgd[USER_PTRS_PER_PGD], __pgd(1 + __pa(pmd)));
+		pgd_list_add(pgd);
+		spin_unlock_irqrestore(&pgd_lock, flags);
 	}
 
-	/* alloc user pmds */
-	for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
-		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
-		if (!pmd)
-			goto out_oom;
-		suspend_disable();
-		if (test_bit(PG_pinned, &virt_to_page(pgd)->flags))
-			make_lowmem_page_readonly(pmd);
-		set_pgd(&pgd[i], __pgd(1 + __pa(pmd)));
-		suspend_enable();
-	}
 	return pgd;
 
 out_oom:
@@ -364,28 +364,25 @@ void pgd_free(pgd_t *pgd)
 {
 	int i;
 
-	suspend_disable();
 	pgd_test_and_unpin(pgd);
 
 	/* in the PAE case user pgd entries are overwritten before usage */
 	if (PTRS_PER_PMD > 1) {
 		for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
 			pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
-			set_pgd(&pgd[i], __pgd(0));
-			make_lowmem_page_writable(pmd);
 			kmem_cache_free(pmd_cache, pmd);
 		}
 		if (!HAVE_SHARED_KERNEL_PMD) {
+			unsigned long flags;
 			pmd_t *pmd = (void *)__va(pgd_val(pgd[USER_PTRS_PER_PGD])-1);
-			set_pgd(&pgd[USER_PTRS_PER_PGD], __pgd(0));
+			spin_lock_irqsave(&pgd_lock, flags);
+			pgd_list_del(pgd);
+			spin_unlock_irqrestore(&pgd_lock, flags);
 			make_lowmem_page_writable(pmd);
 			memset(pmd, 0, PTRS_PER_PMD*sizeof(pmd_t));
 			kmem_cache_free(pmd_cache, pmd);
 		}
 	}
-
-	suspend_enable();
-
 	/* in the non-PAE case, free_pgtables() clears user pgd entries */
 	kmem_cache_free(pgd_cache, pgd);
 }
@@ -510,9 +507,6 @@ static void pgd_walk(pgd_t *pgd_base, pgprot_t flags)
 
 static void __pgd_pin(pgd_t *pgd)
 {
-	/* PAE PGDs with no kernel PMD cannot be pinned. Bail right now. */
-	if ((PTRS_PER_PMD > 1) && pgd_none(pgd[USER_PTRS_PER_PGD]))
-		return;
 	pgd_walk(pgd, PAGE_KERNEL_RO);
 	xen_pgd_pin(__pa(pgd));
 	set_bit(PG_pinned, &virt_to_page(pgd)->flags);
@@ -527,10 +521,8 @@ static void __pgd_unpin(pgd_t *pgd)
 
 static void pgd_test_and_unpin(pgd_t *pgd)
 {
-	suspend_disable();
 	if (test_bit(PG_pinned, &virt_to_page(pgd)->flags))
 		__pgd_unpin(pgd);
-	suspend_enable();
 }
 
 void mm_pin(struct mm_struct *mm)

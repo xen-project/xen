@@ -708,7 +708,7 @@ void __init pgtable_cache_init(void)
 			panic("pgtable_cache_init(): cannot create pmd cache");
 	}
 	pgd_cache = kmem_cache_create("pgd",
-#if 0 /* How the heck _this_ works in native linux ??? */
+#ifndef CONFIG_XEN
 				PTRS_PER_PGD*sizeof(pgd_t),
 				PTRS_PER_PGD*sizeof(pgd_t),
 #else
@@ -717,7 +717,7 @@ void __init pgtable_cache_init(void)
 #endif
 				0,
 				pgd_ctor,
-				pgd_dtor);
+				PTRS_PER_PMD == 1 ? pgd_dtor : NULL);
 	if (!pgd_cache)
 		panic("pgtable_cache_init(): Cannot create pgd cache");
 }
