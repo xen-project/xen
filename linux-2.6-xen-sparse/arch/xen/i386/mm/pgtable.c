@@ -285,19 +285,18 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	BUG_ON(rc);
 #endif
 
-	if (!HAVE_SHARED_KERNEL_PMD)
-		spin_lock_irqsave(&pgd_lock, flags);
-
-	memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
-			swapper_pg_dir + USER_PTRS_PER_PGD,
-			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
-
-	if (HAVE_SHARED_KERNEL_PMD)
+	if (HAVE_SHARED_KERNEL_PMD) {
+		memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
+		       swapper_pg_dir + USER_PTRS_PER_PGD,
+		       (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
 		return;
+	}
 
+	memset(pgd, 0, PTRS_PER_PGD*sizeof(pgd_t));
+
+	spin_lock_irqsave(&pgd_lock, flags);
 	pgd_list_add(pgd);
 	spin_unlock_irqrestore(&pgd_lock, flags);
-	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
 }
 
 void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
