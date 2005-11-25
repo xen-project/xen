@@ -14,6 +14,7 @@ usage() {
     echo "  -q          : run a quick test set"
     echo "  -e <email>  : set email address for report"
     echo "  -s <report> : just submit report <report>"
+    echo "  -h | --help : show this help"
 }
 
 # Just submit the report
@@ -218,6 +219,10 @@ while [ $# -gt 0 ]
       -s)
 	  run=no
 	  ;;
+      -h|--help)
+          usage
+          exit 0
+          ;;
       *)
 	  REPORT=$1
 	  break
