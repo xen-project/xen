@@ -47,4 +47,8 @@ fi
 
 handle_iptable
 
-success
+log debug "Successful vif-route $command for $vif."
+if [ "$command" == "online" ]
+then
+  success
+fi

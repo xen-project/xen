@@ -55,4 +55,8 @@ ip r ${ipcmd} ${ip} dev ${vif} src ${main_ip}
 
 handle_iptable
 
-success
+log debug "Successful vif-nat $command for $vif."
+if [ "$command" == "online" ]
+then
+  success
+fi
