@@ -262,13 +262,24 @@ void cpu_register_physical_memory(target_phys_addr_t start_addr,
                                   unsigned long size,
                                   unsigned long phys_offset)
 {
-        if (mmio_cnt == MAX_MMIO) {
-                fprintf(logfile, "too many mmio regions\n");
-                exit(-1);
+    int i;
+
+    for (i = 0; i < mmio_cnt; i++) { 
+        if(mmio[i].start == start_addr) {
+            mmio[i].io_index = phys_offset;
+            mmio[i].size = size;
+            return;
         }
-        mmio[mmio_cnt].io_index = phys_offset;
-        mmio[mmio_cnt].start = start_addr;
-        mmio[mmio_cnt++].size = size;
+    }
+
+    if (mmio_cnt == MAX_MMIO) {
+        fprintf(logfile, "too many mmio regions\n");
+        exit(-1);
+    }
+
+    mmio[mmio_cnt].io_index = phys_offset;
+    mmio[mmio_cnt].start = start_addr;
+    mmio[mmio_cnt++].size = size;
 }
 
 /* mem_read and mem_write are arrays of functions containing the
