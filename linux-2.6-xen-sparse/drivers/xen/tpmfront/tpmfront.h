@@ -1,12 +1,17 @@
 #ifndef TPM_FRONT_H
 #define TPM_FRONT_H
 
+#ifndef TRUE
+#define TRUE 1
+#define FALSE 0
+#endif
 
-struct tpm_private
-{
+struct tpm_private {
 	tpmif_tx_interface_t *tx;
-	unsigned int evtchn, irq;
-	int connected;
+	unsigned int evtchn;
+	unsigned int irq;
+	u8 is_connected;
+	u8 is_suspended;
 
 	spinlock_t tx_lock;
 
@@ -16,25 +21,18 @@ struct tpm_private
 	void *tx_remember;
 	domid_t backend_id;
 	wait_queue_head_t wait_q;
+
 };
 
-
-struct tpmfront_info
-{
-	struct xenbus_watch watch;
-	int handle;
+struct tpmfront_info {
 	struct xenbus_device *dev;
-	char *backend;
 	int ring_ref;
-	domid_t backend_id;
 };
 
-
-struct tx_buffer
-{
+struct tx_buffer {
 	unsigned int size;	// available space in data
 	unsigned int len;	// used space in data
-	unsigned char *data;    // pointer to a page
+	unsigned char *data;	// pointer to a page
 };
 
 #endif

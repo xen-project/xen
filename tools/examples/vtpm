@@ -1,0 +1,23 @@
+#!/bin/sh
+
+dir=$(dirname "$0")
+. "$dir/vtpm-common.sh"
+
+
+case "$command" in
+    online | offline)
+        exit 0
+        ;;
+esac
+
+case "$command" in
+  add)
+    vtpm_create_instance
+  ;;
+  remove)
+    vtpm_remove_instance
+  ;;
+esac
+
+log debug "Successful vTPM operation '$command'."
+success
