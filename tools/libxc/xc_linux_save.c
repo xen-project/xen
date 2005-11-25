@@ -502,7 +502,7 @@ static unsigned long *xc_map_m2p(int xc_handle,
                                  unsigned long max_mfn, 
                                  int prot) 
 { 
-    privcmd_m2pmfns_t m2p_mfns; 
+    struct xen_machphys_mfn_list xmml;
     privcmd_mmap_t ioctlx; 
     privcmd_mmap_entry_t *entries; 
     unsigned long m2p_chunks, m2p_size; 
@@ -512,50 +512,45 @@ static unsigned long *xc_map_m2p(int xc_handle,
     m2p_size   = M2P_SIZE(max_mfn); 
     m2p_chunks = M2P_CHUNKS(max_mfn); 
 
-
-    m2p_mfns.num = m2p_chunks; 
-
-    if(!(m2p_mfns.arr = malloc(m2p_chunks * sizeof(unsigned long)))) { 
+    xmml.max_extents = m2p_chunks;
+    if (!(xmml.extent_start = malloc(m2p_chunks * sizeof(unsigned long)))) { 
         ERR("failed to allocate space for m2p mfns!\n"); 
         return NULL; 
     } 
 
-    if (ioctl(xc_handle, IOCTL_PRIVCMD_GET_MACH2PHYS_MFNS, &m2p_mfns) < 0) {
+    if (xc_memory_op(xc_handle, XENMEM_machphys_mfn_list, &xmml) ||
+        (xmml.nr_extents != m2p_chunks)) {
         ERR("xc_get_m2p_mfns:"); 
         return NULL;
     }
 
-    if((m2p = mmap(NULL, m2p_size, prot, 
-                   MAP_SHARED, xc_handle, 0)) == MAP_FAILED) {
+    if ((m2p = mmap(NULL, m2p_size, prot, 
+                    MAP_SHARED, xc_handle, 0)) == MAP_FAILED) {
         ERR("failed to mmap m2p"); 
         return NULL; 
     } 
-    
 
-    if(!(entries = malloc(m2p_chunks * sizeof(privcmd_mmap_entry_t)))) { 
+    if (!(entries = malloc(m2p_chunks * sizeof(privcmd_mmap_entry_t)))) { 
         ERR("failed to allocate space for mmap entries!\n"); 
         return NULL; 
     } 
-
 
     ioctlx.num   = m2p_chunks;
     ioctlx.dom   = DOMID_XEN; 
     ioctlx.entry = entries; 
     
-    for(i=0; i < m2p_chunks; i++) { 
-        
+    for (i=0; i < m2p_chunks; i++) { 
         entries[i].va = (unsigned long)(((void *)m2p) + (i * M2P_CHUNK_SIZE)); 
-        entries[i].mfn = m2p_mfns.arr[i]; 
+        entries[i].mfn = xmml.extent_start[i];
         entries[i].npages = M2P_CHUNK_SIZE >> PAGE_SHIFT;
-
     }
 
-    if((rc = ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx)) < 0) {
+    if ((rc = ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx)) < 0) {
         ERR("ioctl_mmap failed (rc = %d)", rc); 
         return NULL; 
     }
-        
-    free(m2p_mfns.arr); 
+
+    free(xmml.extent_start);
     free(entries); 
 
     return m2p; 

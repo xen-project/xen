@@ -27,6 +27,7 @@
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/fixmap.h>
+#include <public/memory.h>
 
 extern l1_pgentry_t *mapcache;
 
@@ -184,6 +185,41 @@ void subarch_init_memory(struct domain *dom_xen)
     }
 }
 
+long arch_memory_op(int op, void *arg)
+{
+    struct xen_machphys_mfn_list xmml;
+    unsigned long mfn;
+    unsigned int i, max;
+    long rc = 0;
+
+    switch ( op )
+    {
+    case XENMEM_machphys_mfn_list:
+        if ( copy_from_user(&xmml, arg, sizeof(xmml)) )
+            return -EFAULT;
+
+        max = min_t(unsigned int, xmml.max_extents, mpt_size >> 21);
+
+        for ( i = 0; i < max; i++ )
+        {
+            mfn = l2e_get_pfn(idle_pg_table_l2[l2_linear_offset(
+                RDWR_MPT_VIRT_START + (i << 21))]) + l1_table_offset(i << 21);
+            if ( put_user(mfn, &xmml.extent_start[i]) )
+                return -EFAULT;
+        }
+
+        if ( put_user(i, &((struct xen_machphys_mfn_list *)arg)->nr_extents) )
+            return -EFAULT;
+
+        break;
+
+    default:
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
+}
 
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {

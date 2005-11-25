@@ -215,7 +215,7 @@ long do_memory_op(int cmd, void *arg)
         break;
 
     default:
-        rc = -ENOSYS;
+        rc = arch_memory_op(op, arg);
         break;
     }
 
