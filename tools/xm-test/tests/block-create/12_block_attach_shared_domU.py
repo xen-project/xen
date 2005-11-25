@@ -18,7 +18,7 @@ except DomainError, e:
 
 try:
     dom2.start()
+    dom1.destroy()
     FAIL("Bug #331: Started a DomU with write access to an in-use block device")
 except DomainError, e:
-    pass
-    
+    dom1.destroy()
