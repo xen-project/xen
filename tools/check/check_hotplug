@@ -7,7 +7,7 @@ function error {
    exit 1
 }
 [ -x "$(which udevinfo)" ] && \
-  UDEV_VERSION=$(udevinfo -V | sed -e 's/^.*\s\([0-9]\+\)[^0-9]*/\1/')
+  UDEV_VERSION=$(udevinfo -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/')
 
 if [ -n "$UDEV_VERSION" ] && [ $UDEV_VERSION -ge 059 ]; then
   exit 0
