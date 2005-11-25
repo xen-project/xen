@@ -78,6 +78,7 @@ int uncanonicalize_pagetable(unsigned long type, void *page)
             pfn = (pte >> PAGE_SHIFT) & 0xffffffff;
             
             if(pfn >= max_pfn) { 
+                /* This "page table page" is probably not one; bail. */
                 ERR("Frame number in type %lu page table is out of range: "
                     "i=%d pfn=0x%lx max_pfn=%lu", 
                     type >> 28, i, pfn, max_pfn);
@@ -111,6 +112,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     unsigned long mfn, pfn; 
     unsigned int prev_pc, this_pc;
     int verify = 0;
+    int nraces = 0; 
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
@@ -344,8 +346,15 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 if(pt_levels != 3 || pagetype != L1TAB) { 
 
                     if(!uncanonicalize_pagetable(pagetype, page)) {
-                        ERR("failed uncanonicalize pt!\n"); 
-                        goto out; 
+                        /* 
+                        ** Failing to uncanonicalize a page table can be ok
+                        ** under live migration since the pages type may have
+                        ** changed by now (and we'll get an update later). 
+                        */
+                        DPRINTF("PT L%ld race on pfn=%08lx mfn=%08lx\n", 
+                                pagetype >> 28, pfn, mfn); 
+                        nraces++; 
+                        continue; 
                     }
 
                 } 
@@ -394,7 +403,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
         n+= j; /* crude stats */
     }
 
-    DPRINTF("Received all pages\n");
+    DPRINTF("Received all pages (%d races)\n", nraces);
 
     if(pt_levels == 3) { 
 
