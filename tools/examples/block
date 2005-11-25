@@ -3,12 +3,6 @@
 dir=$(dirname "$0")
 . "$dir/block-common.sh"
 
-case "$command" in
-    online | offline)
-        exit 0
-        ;;
-esac
-
 expand_dev() {
   local dev
   case $1 in
@@ -22,21 +16,122 @@ expand_dev() {
   echo -n $dev
 }
 
-t=$(xenstore_read_default "$XENBUS_PATH"/type "MISSING")
+
+##
+# check_sharing device device_major_minor writable
+#
+# Check whether the device requested is already in use.  To use the device in
+# read-only mode, it may be in use in read-only mode, but may not be in use in
+# read-write anywhere at all.  To use the device in read-write mode, it must
+# not be in use anywhere at all.
+#
+check_sharing()
+{
+
+  local dev="$1"
+  local devmm="$2"
+  local writable="$3"
+  local file
+
+  if [ "$writable" ]
+  then
+    toskip="^$"
+  else
+    toskip="^[^ ]* [^ ]* [^ ]* ro "
+  fi
+
+  for file in $(cat /proc/mounts | grep -v "$toskip" | cut -f 1 -d ' ')
+  do
+    if [ -e "$file" ]
+    then
+      local d=$(device_major_minor "$file")
+
+      if [ "$d" == "$devmm" ]
+      then
+        if [ "$writable" ]
+        then
+          m1=""
+          m2=""
+        else
+          m1="read-write "
+          m2="read-only "
+        fi
+
+        ebusy \
+"Device $dev is mounted ${m1}in the privileged domain,
+and so cannot be mounted ${m2}by a guest."
+      fi
+    fi
+  done
+
+  for file in /sys/devices/xen-backend/*/physical_device
+  do
+    if [ -e "$file" ] # Cope with no devices, i.e. the * above did not expand.
+    then
+      local d=$(cat "$file")
+      if [ "$d" == "$devmm" ]
+      then
+        if [ "$writable" ]
+        then
+          ebusy \
+"Device $dev is already mounted in a guest domain, and so
+cannot be mounted read-write now."
+        else
+          local m=$(cat "${file/physical_device/mode}")
+
+          if expr index "$m" 'w' >/dev/null
+          then
+            ebusy \
+"Device $dev is already mounted read-write in a guest domain,
+and so cannot be mounted read-only again."
+          fi
+        fi
+      fi
+    fi
+  done
+}
+
+
+check_device_sharing()
+{
+  local dev="$1"
+  local devmm=$(device_major_minor "$dev")
+  local mode=$(xenstore_read "$XENBUS_PATH/mode")
+
+  if ! expr index "$mode" 'w' >/dev/null
+  then
+    # No w implies read-only use; sharing with writers must be prevented.
+    check_sharing "$dev" "$devmm" ""
+  elif ! expr index "$mode" '!' >/dev/null
+  then
+    # No exclamation mark implies all sharing must be prevented.
+    check_sharing "$dev" "$devmm" 1
+  fi
+}
+
+
+t=$(xenstore_read_default "$XENBUS_PATH/type" "MISSING")
 
 case "$command" in 
   add)
-    p=$(xenstore_read "$XENBUS_PATH"/params)
+    phys=$(xenstore_read_default "$XENBUS_PATH/physical-device" "MISSING")
+    if [ "$phys" != "MISSING" ]
+    then
+      # Depending upon the hotplug configuration, it is possible for this
+      # script to be called twice, so just bail.
+      exit 0
+    fi
+    p=$(xenstore_read "$XENBUS_PATH/params")
     case $t in 
       phy)
         dev=$(expand_dev $p)
+        check_device_sharing "$dev"
 	write_dev "$dev"
 	exit 0
 	;;
 
       file)
 	for dev in /dev/loop* ; do
-	  echo "dev is $dev, p is $p"
 	  if losetup $dev $p; then
 	    write_dev "$dev"
             exit 0
@@ -54,7 +149,7 @@ case "$command" in
 	;;
 
       file)
-        node=$(xenstore_read "$XENBUS_PATH"/node)
+        node=$(xenstore_read "$XENBUS_PATH/node")
 	losetup -d $node
 	exit 0
 	;;

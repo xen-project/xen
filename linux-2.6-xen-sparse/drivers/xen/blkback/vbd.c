@@ -9,10 +9,6 @@
 #include "common.h"
 #include <asm-xen/xenbus.h>
 
-static inline dev_t vbd_map_devnum(u32 cookie)
-{
-	return MKDEV(BLKIF_MAJOR(cookie), BLKIF_MINOR(cookie));
-}
 #define vbd_sz(_v)   ((_v)->bdev->bd_part ?				\
 	(_v)->bdev->bd_part->nr_sects : (_v)->bdev->bd_disk->capacity)
 #define bdev_put(_b) blkdev_put(_b)
@@ -32,8 +28,8 @@ unsigned long vbd_secsize(struct vbd *vbd)
 	return bdev_hardsect_size(vbd->bdev);
 }
 
-int vbd_create(blkif_t *blkif, blkif_vdev_t handle,
-	       u32 pdevice, int readonly)
+int vbd_create(blkif_t *blkif, blkif_vdev_t handle, unsigned major,
+	       unsigned minor, int readonly)
 {
 	struct vbd *vbd;
 
@@ -42,10 +38,10 @@ int vbd_create(blkif_t *blkif, blkif_vdev_t handle,
 	vbd->readonly = readonly;
 	vbd->type     = 0;
 
-	vbd->pdevice  = pdevice;
+	vbd->pdevice  = MKDEV(major, minor);
 
 	vbd->bdev = open_by_devnum(
-		vbd_map_devnum(vbd->pdevice),
+		vbd->pdevice,
 		vbd->readonly ? FMODE_READ : FMODE_WRITE);
 	if (IS_ERR(vbd->bdev)) {
 		DPRINTK("vbd_creat: device %08x doesn't exist.\n",

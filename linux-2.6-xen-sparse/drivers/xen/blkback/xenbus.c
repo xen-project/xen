@@ -37,8 +37,9 @@ struct backend_info
 	blkif_t *blkif;
 	struct xenbus_watch backend_watch;
 
-	long int pdev;
-	long int readonly;
+	unsigned major;
+	unsigned minor;
+	char *mode;
 };
 
 
@@ -47,6 +48,25 @@ static void connect(struct backend_info *);
 static int connect_ring(struct backend_info *);
 static void backend_changed(struct xenbus_watch *, const char **,
 			    unsigned int);
+
+
+static ssize_t show_physical_device(struct device *_dev, char *buf)
+{
+	struct xenbus_device *dev = to_xenbus_device(_dev);
+	struct backend_info *be = dev->data;
+	return sprintf(buf, "%x:%x\n", be->major, be->minor);
+}
+DEVICE_ATTR(physical_device, S_IRUSR | S_IRGRP | S_IROTH,
+	    show_physical_device, NULL);
+
+
+static ssize_t show_mode(struct device *_dev, char *buf)
+{
+	struct xenbus_device *dev = to_xenbus_device(_dev);
+	struct backend_info *be = dev->data;
+	return sprintf(buf, "%s\n", be->mode);
+}
+DEVICE_ATTR(mode, S_IRUSR | S_IRGRP | S_IROTH, show_mode, NULL);
 
 
 static int blkback_remove(struct xenbus_device *dev)
@@ -64,6 +84,10 @@ static int blkback_remove(struct xenbus_device *dev)
 		blkif_put(be->blkif);
 		be->blkif = NULL;
 	}
+
+	device_remove_file(&dev->dev, &dev_attr_physical_device);
+	device_remove_file(&dev->dev, &dev_attr_mode);
+
 	kfree(be);
 	dev->data = NULL;
 	return 0;
@@ -73,7 +97,7 @@ static int blkback_remove(struct xenbus_device *dev)
 /**
  * Entry point to this code when a new device is created.  Allocate the basic
  * structures, and watch the store waiting for the hotplug scripts to tell us
- * the device's physical-device.  Switch to InitWait.
+ * the device's physical major and minor numbers.  Switch to InitWait.
  */
 static int blkback_probe(struct xenbus_device *dev,
 			 const struct xenbus_device_id *id)
@@ -119,64 +143,71 @@ fail:
 
 /**
  * Callback received when the hotplug scripts have placed the physical-device
- * node.  Read it and the read-only node, and create a vbd.  If the frontend
- * is ready, connect.
+ * node.  Read it and the mode node, and create a vbd.  If the frontend is
+ * ready, connect.
  */
 static void backend_changed(struct xenbus_watch *watch,
 			    const char **vec, unsigned int len)
 {
 	int err;
-	char *p;
-	long pdev;
+	unsigned major;
+	unsigned minor;
 	struct backend_info *be
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
 
 	DPRINTK("");
 
-	err = xenbus_scanf(NULL, dev->nodename,
-			   "physical-device", "%li", &pdev);
+	err = xenbus_scanf(NULL, dev->nodename, "physical-device", "%x:%x",
+			   &major, &minor);
 	if (XENBUS_EXIST_ERR(err)) {
 		/* Since this watch will fire once immediately after it is
 		   registered, we expect this.  Ignore it, and wait for the
 		   hotplug scripts. */
 		return;
 	}
-	if (err != 1) {
+	if (err != 2) {
 		xenbus_dev_fatal(dev, err, "reading physical-device");
 		return;
 	}
-	if (be->pdev && be->pdev != pdev) {
+
+	if (be->major && be->minor &&
+	    (be->major != major || be->minor != minor)) {
 		printk(KERN_WARNING
-		       "blkback: changing physical-device (from %ld to %ld) "
-		       "not supported.\n", be->pdev, pdev);
+		       "blkback: changing physical device (from %x:%x to "
+		       "%x:%x) not supported.\n", be->major, be->minor,
+		       major, minor);
 		return;
 	}
 
-	/* If there's a read-only node, we're read only. */
-	p = xenbus_read(NULL, dev->nodename, "read-only", NULL);
-	if (!IS_ERR(p)) {
-		be->readonly = 1;
-		kfree(p);
+	be->mode = xenbus_read(NULL, dev->nodename, "mode", NULL);
+	if (IS_ERR(be->mode)) {
+		err = PTR_ERR(be->mode);
+		be->mode = NULL;
+		xenbus_dev_fatal(dev, err, "reading mode");
+		return;
 	}
 
-	if (be->pdev == 0L) {
+	if (be->major == 0 && be->minor == 0) {
 		/* Front end dir is a number, which is used as the handle. */
 
-		long handle;
+		char *p = strrchr(dev->otherend, '/') + 1;
+		long handle = simple_strtoul(p, NULL, 0);
 
-		p = strrchr(dev->otherend, '/') + 1;
-		handle = simple_strtoul(p, NULL, 0);
+		be->major = major;
+		be->minor = minor;
 
-		be->pdev = pdev;
-
-		err = vbd_create(be->blkif, handle, be->pdev, be->readonly);
+		err = vbd_create(be->blkif, handle, major, minor,
+				 (NULL == strchr(be->mode, 'w')));
 		if (err) {
-			be->pdev = 0L;
-			xenbus_dev_fatal(dev, err,
-					 "creating vbd structure");
+			be->major = 0;
+			be->minor = 0;
+			xenbus_dev_fatal(dev, err, "creating vbd structure");
 			return;
 		}
+
+		device_create_file(&dev->dev, &dev_attr_physical_device);
+		device_create_file(&dev->dev, &dev_attr_mode);
 
 		maybe_connect(be);
 	}
@@ -230,7 +261,8 @@ static void frontend_changed(struct xenbus_device *dev,
 
 static void maybe_connect(struct backend_info *be)
 {
-	if (be->pdev != 0L && be->blkif->status == CONNECTED)
+	if ((be->major != 0 || be->minor != 0) &&
+	    be->blkif->status == CONNECTED)
 		connect(be);
 }
 

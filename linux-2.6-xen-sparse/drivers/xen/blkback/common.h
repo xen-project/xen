@@ -78,8 +78,8 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn);
 	} while (0)
 
 /* Create a vbd. */
-int vbd_create(blkif_t *blkif, blkif_vdev_t vdevice, u32 pdevice,
-	       int readonly);
+int vbd_create(blkif_t *blkif, blkif_vdev_t vdevice, unsigned major,
+	       unsigned minor, int readonly);
 void vbd_free(struct vbd *vbd);
 
 unsigned long vbd_size(struct vbd *vbd);

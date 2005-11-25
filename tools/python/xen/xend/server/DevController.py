@@ -27,13 +27,16 @@ from xen.xend.xenstore.xswatch import xswatch
 
 DEVICE_CREATE_TIMEOUT = 5
 HOTPLUG_STATUS_NODE = "hotplug-status"
+HOTPLUG_ERROR_NODE  = "hotplug-error"
 HOTPLUG_STATUS_ERROR = "error"
+HOTPLUG_STATUS_BUSY  = "busy"
 
 Connected = 1
 Died      = 2
 Error     = 3
 Missing   = 4
 Timeout   = 5
+Busy      = 6
 
 xenbusState = {
     'Unknown'      : 0,
@@ -99,7 +102,8 @@ class DevController:
                 log.debug('DevController: writing %s to %s.', str(back),
                           backpath)
 
-                t.remove2(backpath, HOTPLUG_STATUS_NODE)
+                t.remove(frontpath)
+                t.remove(backpath)
 
                 t.write2(frontpath, front)
                 t.write2(backpath,  back)
@@ -125,23 +129,37 @@ class DevController:
         if status == Timeout:
             self.destroyDevice(devid)
             raise VmError("Device %s (%s) could not be connected. "
-                          "Hotplug scripts not working" %
+                          "Hotplug scripts not working." %
                           (devid, self.deviceClass))
 
         elif status == Error:
             self.destroyDevice(devid)
             raise VmError("Device %s (%s) could not be connected. "
-                          "Backend device not found" %
+                          "Backend device not found." %
                           (devid, self.deviceClass))
 
         elif status == Missing:
             raise VmError("Device %s (%s) could not be connected. "
-                          "Device not found" % (devid, self.deviceClass))
+                          "Device not found." % (devid, self.deviceClass))
 
         elif status == Died:
             self.destroyDevice(devid)
             raise VmError("Device %s (%s) could not be connected. "
-                          "Device has died" % (devid, self.deviceClass))
+                          "Device has died." % (devid, self.deviceClass))
+
+        elif status == Busy:
+            err = None
+            frontpath = self.frontendPath(devid)
+            backpath = xstransact.Read(frontpath, "backend")
+            if backpath:
+                err = xstransact.Read(backpath, HOTPLUG_ERROR_NODE)
+            if not err:
+                err = "Busy."
+                
+            self.destroyDevice(devid)
+            raise VmError("Device %s (%s) could not be connected.\n%s" %
+                          (devid, self.deviceClass, err))
+
 
 
     def reconfigureDevice(self, devid, config):
@@ -384,6 +402,8 @@ def hotplugStatusCallback(statusPath, ev, result):
         if status is not None:
             if status == HOTPLUG_STATUS_ERROR:
                 result['status'] = Error
+            elif status == HOTPLUG_STATUS_BUSY:
+                result['status'] = Busy
             else:
                 result['status'] = Connected
         else:
