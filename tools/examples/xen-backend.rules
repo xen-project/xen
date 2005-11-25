@@ -1,4 +1,5 @@
 SUBSYSTEM=="xen-backend", KERNEL=="vbd*", RUN+="/etc/xen/scripts/block $env{ACTION}"
+SUBSYSTEM=="xen-backend", KERNEL=="vtpm*", RUN+="/etc/xen/scripts/vtpm $env{ACTION}"
 SUBSYSTEM=="xen-backend", KERNEL=="vif*", ACTION=="online", RUN+="$env{script} online"
 SUBSYSTEM=="xen-backend", KERNEL=="vif*", ACTION=="offline", RUN+="$env{script} offline"
 SUBSYSTEM=="xen-backend", ACTION=="remove", RUN+="/bin/bash -c '/usr/bin/xenstore-rm -t $$(/usr/bin/xenstore-read $env{XENBUS_PATH}/frontend)'"

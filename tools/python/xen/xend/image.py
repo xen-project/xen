@@ -293,7 +293,7 @@ class VmxImageHandler(ImageHandler):
                ret.append("-bridge")
                ret.append("%s" % bridge)
             if name == 'vtpm':
-               instance = sxp.child_value(info, 'instance')
+               instance = sxp.child_value(info, 'pref_instance')
                ret.append("-instance")
                ret.append("%s" % instance)
         return ret

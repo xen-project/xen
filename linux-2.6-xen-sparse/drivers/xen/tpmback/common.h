@@ -28,7 +28,7 @@
 #endif
 
 typedef struct tpmif_st {
-        struct list_head tpmif_list;
+	struct list_head tpmif_list;
 	/* Unique identifier for this interface. */
 	domid_t domid;
 	unsigned int handle;
@@ -82,6 +82,11 @@ int vtpm_release_packets(tpmif_t * tpmif, int send_msgs);
 extern int num_frontends;
 
 #define MMAP_VADDR(t,_req) ((t)->mmap_vstart + ((_req) * PAGE_SIZE))
+
+#ifndef TRUE
+#define TRUE 1
+#define FALSE 0
+#endif
 
 #endif /* __TPMIF__BACKEND__COMMON_H__ */
 

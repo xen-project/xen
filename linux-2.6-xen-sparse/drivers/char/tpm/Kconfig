@@ -18,15 +18,6 @@ config TCG_TPM
 	  compile this driver as a module, choose M here; the module 
 	  will be called tpm. If unsure, say N.
 
-config TCG_TIS
-	tristate "TPM Interface Specification 1.2 Interface"
-	depends on TCG_TPM
-	---help---
-	  If you have a TPM security chip that is compliant with the
-	  TCG TIS 1.2 TPM specification say Yes and it will be accessible
-	  from within Linux.  To compile this driver as a module, choose
-	  M here; the module will be called tpm_tis.
-
 config TCG_NSC
 	tristate "National Semiconductor TPM Interface"
 	depends on TCG_TPM

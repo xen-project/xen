@@ -73,7 +73,14 @@ information about the domain where the virtual TPM is running and
 where the TPM backend has been compiled into - this has to be 
 domain 0  at the moment - and which TPM instance the user domain
 is supposed to talk to. Note that each running VM must use a 
-different instance and that using instance 0 is NOT allowed.
+different instance and that using instance 0 is NOT allowed. The
+instance parameter is taken as the desired instance number, but
+the actual instance number that is assigned to the virtual machine
+can be different. This is the case if for example that particular
+instance is already used by another virtual machine. The association
+of which TPM instance number is used by which virtual machine is
+kept in the file /etc/xen/vtpm.db. Associations are maintained by
+domain name and instance number.
 
 Note: If you do not want TPM functionality for your user domain simply
 leave out the 'vtpm' line in the configuration file.
