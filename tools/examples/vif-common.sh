@@ -63,6 +63,7 @@ function frob_iptable()
   fi
 
   iptables "$c" FORWARD -m physdev --physdev-in "$vif" "$@" -j ACCEPT ||
+    [ "$c" == "-D" ] ||
     log err \
      "iptables $c FORWARD -m physdev --physdev-in $vif $@ -j ACCEPT failed.
 If you are using iptables, this may affect networking for guest domains."
