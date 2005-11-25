@@ -10,7 +10,7 @@ def count_eth(console):
         run = console.runCmd("ifconfig -a | grep eth")
     except ConsoleError, e:
         FAIL(str(e))
-    return = len(run['output'].splitlines())
+    return len(run['output'].splitlines())
 
 def network_attach(domain_name, console):
     eths_before = count_eth(console)
