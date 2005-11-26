@@ -71,11 +71,11 @@ if status != 0:
 try:
     console = XmConsole(domain.getName(), historySaveCmds=True)
 except ConsoleError, e:
-    FAIL(str(e))
+    pass
 try:
     run = console.runCmd("ls")
 except ConsoleError, e:
-    pass
+    FAIL(str(e))
 
 # Close the console
 console.closeConsole()
