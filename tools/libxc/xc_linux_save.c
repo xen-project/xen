@@ -457,6 +457,15 @@ void canonicalize_pagetable(unsigned long type, unsigned long pfn,
             xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff; 
     }
 
+	if (pt_levels == 4 && type == L4TAB) { 
+		/* 
+        ** XXX SMH: should compute these from hvirt_start (which we have) 
+		** and hvirt_end (which we don't) 
+        */
+		xen_start = 256; 
+		xen_end   = 272; 
+	}
+
     /* Now iterate through the page table, canonicalizing each PTE */
     for (i = 0; i < pte_last; i++ ) {
 
@@ -721,12 +730,6 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Domain is still running at this point */
-
-    if (live && (pt_levels == 4)) {
-        ERR("Live migration not supported for 64-bit guests");
-        live = 0;
-    }
-
     if (live) {
 
         if (xc_shadow_control(xc_handle, dom, 
@@ -811,7 +814,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         for (i = 0; i < max_pfn; i++) {
 
             mfn = live_p2m[i];
-            if((mfn != 0xffffffffUL) && (mfn_to_pfn(mfn) != i)) { 
+            if((mfn != INVALID_P2M_ENTRY) && (mfn_to_pfn(mfn) != i)) { 
                 DPRINTF("i=0x%x mfn=%lx live_m2p=%lx\n", i, 
                         mfn, mfn_to_pfn(mfn));
                 err++;
