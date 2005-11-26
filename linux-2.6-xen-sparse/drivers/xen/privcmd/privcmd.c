@@ -213,55 +213,6 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 	break;
 #endif
 
-#ifndef __ia64__
-	case IOCTL_PRIVCMD_GET_MACH2PHYS_MFNS: {
-		pgd_t *pgd; 
-		pud_t *pud; 
-		pmd_t *pmd; 
-		unsigned long m2pv, m2p_mfn; 	
-		privcmd_m2pmfns_t m; 
-		unsigned long __user *p;
-		int i; 
-
-#if defined (__x86_64__)
-		/* 
-		** XXX SMH: the below procedure won't work for 64 since 
-		** we don't have access to the memory which maps the M2P. 
-		** A proper fix will probably involve moving this 
-		** functionality to Xen - for now just return an error 
-		** here rather than GPF'ing in the kernel. 
-		*/
-		ret = -EINVAL; 
-		break; 
-#endif
-
-		if (copy_from_user(&m, udata, sizeof(m)))
-			return -EFAULT;
-
-		m2pv = (unsigned long)machine_to_phys_mapping;
-
-		p = m.arr; 
-
-		for (i=0; i < m.num; i++) { 
-			pgd = pgd_offset_k(m2pv);
-			pud = pud_offset(pgd, m2pv);
-			pmd = pmd_offset(pud, m2pv);
-			m2p_mfn  = (*(uint64_t *)pmd >> PAGE_SHIFT)&0xFFFFFFFF;
-			m2p_mfn += pte_index(m2pv);
-
-			if (put_user(m2p_mfn, p + i))
-				return -EFAULT;
-
-			m2pv += (1 << 21); 
-		}
-
-		ret = 0; 
-		break; 
-
-	}
-	break;
-#endif
-
 	default:
 		ret = -EINVAL;
 		break;

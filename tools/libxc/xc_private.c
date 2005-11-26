@@ -190,6 +190,7 @@ int xc_memory_op(int xc_handle,
 {
     DECLARE_HYPERCALL;
     struct xen_memory_reservation *reservation = arg;
+    struct xen_machphys_mfn_list *xmml = arg;
     long ret = -EINVAL;
 
     hypercall.op     = __HYPERVISOR_memory_op;
@@ -214,6 +215,20 @@ int xc_memory_op(int xc_handle,
             goto out1;
         }
         break;
+    case XENMEM_machphys_mfn_list:
+        if ( mlock(xmml, sizeof(*xmml)) != 0 )
+        {
+            PERROR("Could not mlock");
+            goto out1;
+        }
+        if ( mlock(xmml->extent_start,
+                   xmml->max_extents * sizeof(unsigned long)) != 0 )
+        {
+            PERROR("Could not mlock");
+            safe_munlock(xmml, sizeof(*xmml));
+            goto out1;
+        }
+        break;
     }
 
     ret = do_xen_hypercall(xc_handle, &hypercall);
@@ -226,6 +241,11 @@ int xc_memory_op(int xc_handle,
         if ( reservation->extent_start != NULL )
             safe_munlock(reservation->extent_start,
                          reservation->nr_extents * sizeof(unsigned long));
+        break;
+    case XENMEM_machphys_mfn_list:
+        safe_munlock(xmml, sizeof(*xmml));
+        safe_munlock(xmml->extent_start,
+                     xmml->max_extents * sizeof(unsigned long));
         break;
     }
 

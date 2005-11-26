@@ -297,13 +297,11 @@ void free_monitor_pagetable(struct vcpu *v)
 
     /*
      * free monitor_table.
-     * Note: for VMX guest, only BSP need do this free.
      */
-    if (!(VMX_DOMAIN(v) && v->vcpu_id)) {
-        mfn = pagetable_get_pfn(v->arch.monitor_table);
-        unmap_domain_page(v->arch.monitor_vtable);
-        free_domheap_page(&frame_table[mfn]);
-    }
+    mfn = pagetable_get_pfn(v->arch.monitor_table);
+    unmap_domain_page(v->arch.monitor_vtable);
+    free_domheap_page(&frame_table[mfn]);
+
     v->arch.monitor_table = mk_pagetable(0);
     v->arch.monitor_vtable = 0;
 }
@@ -396,18 +394,15 @@ void free_monitor_pagetable(struct vcpu *v)
 
     /*
      * Then free monitor_table.
-     * Note: for VMX guest, only BSP need do this free.
      */
-    if (!(VMX_DOMAIN(v) && v->vcpu_id)) {
-        mfn = pagetable_get_pfn(v->arch.monitor_table);
-        unmap_domain_page(v->arch.monitor_vtable);
-        free_domheap_page(&frame_table[mfn]);
-    }
+    mfn = pagetable_get_pfn(v->arch.monitor_table);
+    unmap_domain_page(v->arch.monitor_vtable);
+    free_domheap_page(&frame_table[mfn]);
 
     v->arch.monitor_table = mk_pagetable(0);
     v->arch.monitor_vtable = 0;
 }
-#endif 
+#endif
 
 static void
 shadow_free_snapshot(struct domain *d, struct out_of_sync_entry *entry)

@@ -35,6 +35,7 @@ AC_CONFIG_FILES([
     Makefile 
     ramdisk/Makefile
     tests/Makefile
+    tests/_sanity/Makefile
     tests/block-list/Makefile
     tests/block-create/Makefile
     tests/block-destroy/Makefile

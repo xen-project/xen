@@ -440,4 +440,7 @@ extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr);
 #define __gpa_to_mpa(_d, gpa)   \
     ((__gpfn_to_mfn((_d),(gpa)>>PAGE_SHIFT)<<PAGE_SHIFT)|((gpa)&~PAGE_MASK))
 
+/* Arch-specific portion of memory_op hypercall. */
+#define arch_memory_op(op, arg) (-ENOSYS)
+
 #endif /* __ASM_IA64_MM_H__ */

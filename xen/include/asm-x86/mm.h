@@ -379,6 +379,9 @@ int new_guest_cr3(unsigned long pfn);
 
 void propagate_page_fault(unsigned long addr, u16 error_code);
 
-extern int __sync_lazy_execstate(void);
+int __sync_lazy_execstate(void);
+
+/* Arch-specific portion of memory_op hypercall. */
+long arch_memory_op(int op, void *arg);
 
 #endif /* __ASM_X86_MM_H__ */
