@@ -139,6 +139,7 @@ class DevController:
                           (devid, self.deviceClass))
 
         elif status == Missing:
+            # Don't try to destroy the device; it's already gone away.
             raise VmError("Device %s (%s) could not be connected. "
                           "Device not found." % (devid, self.deviceClass))
 
