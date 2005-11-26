@@ -34,8 +34,8 @@ XENBUS_PATH="${XENBUS_PATH:?}"
 
 ebusy()
 {
-  xenstore_write "$XENBUS_PATH/hotplug-status" busy
-  xenstore_write "$XENBUS_PATH/hotplug-error" "$*"
+  xenstore_write "$XENBUS_PATH/hotplug-error" "$*" \
+                 "$XENBUS_PATH/hotplug-status" busy
   log err "$@"
   exit 1
 }
