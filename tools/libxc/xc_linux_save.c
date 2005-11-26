@@ -457,14 +457,14 @@ void canonicalize_pagetable(unsigned long type, unsigned long pfn,
             xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff; 
     }
 
-	if (pt_levels == 4 && type == L4TAB) { 
-		/* 
+    if (pt_levels == 4 && type == L4TAB) { 
+        /*
         ** XXX SMH: should compute these from hvirt_start (which we have) 
-		** and hvirt_end (which we don't) 
+        ** and hvirt_end (which we don't) 
         */
-		xen_start = 256; 
-		xen_end   = 272; 
-	}
+        xen_start = 256; 
+        xen_end   = 272; 
+    }
 
     /* Now iterate through the page table, canonicalizing each PTE */
     for (i = 0; i < pte_last; i++ ) {
