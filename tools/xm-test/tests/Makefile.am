@@ -25,15 +25,7 @@ SUBDIRS = 	               	\
 		enforce_dom0_cpus	\
 		save restore migrate
 
-DISABLED_TESTS = save	\
-	        restore \
-	        migrate
-
-TESTS =
-
-XFAIL_TESTS = 
-
-EXTRA_DIST = $(TESTS) $(XFAIL_TESTS) $(SUBDIRS) $(DISABLED_TESTS) Makefile.am.template
+EXTRA_DIST = $(SUBDIRS) Makefile.am.template
 
 %.test: %.py
 	cp $< $@
