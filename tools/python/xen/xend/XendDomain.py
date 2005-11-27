@@ -480,8 +480,7 @@ class XendDomain:
         dominfo = self.domain_lookup(domid)
         maxmem = int(mem) * 1024
         try:
-            return xc.domain_setmaxmem(dominfo.getDomid(),
-                                       maxmem_kb = maxmem)
+            return xc.domain_setmaxmem(dominfo.getDomid(), maxmem)
         except Exception, ex:
             raise XendError(str(ex))
 
