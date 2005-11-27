@@ -4,6 +4,7 @@ TESTS = 01_create_basic_pos.test \
 	02_create_noparm_neg.test \
 	03_create_badparm_neg.test \
 	04_create_conflictname_neg.test \
+	05_create_noroot_noram_neg.test \
 	06_create_mem_neg.test \
 	07_create_mem64_pos.test \
 	08_create_mem128_pos.test \
@@ -14,10 +15,6 @@ TESTS = 01_create_basic_pos.test \
 	13_create_multinic_pos.test \
 	14_create_blockroot_pos.test \
 	15_create_smallmem_pos.test
-
-DISABLED_TESTS = 	05_create_noroot_noram_neg.test 
-
-XFAIL_TESTS = 13_create_multinic_pos.test
 
 EXTRA_DIST = $(TESTS) $(XFAIL_TESTS)
 
