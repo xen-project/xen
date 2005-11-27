@@ -63,6 +63,9 @@ if not isDomainRunning(domain.getName()):
 # Make sure it's alive
 try:
     newConsole = XmConsole(domain.getName())
+    run = newConsole.runCmd("ls")
+    if run["return"] != 0:
+        FAIL("Unable to read from restored domain")
 except ConsoleError, e:
     FAIL("Restored domain is dead (%s)" % str(e))
 

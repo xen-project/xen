@@ -70,9 +70,6 @@ if status != 0:
 # Are we still alive after all that?
 try:
     console = XmConsole(domain.getName(), historySaveCmds=True)
-except ConsoleError, e:
-    pass
-try:
     run = console.runCmd("ls")
 except ConsoleError, e:
     FAIL(str(e))

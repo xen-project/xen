@@ -66,37 +66,25 @@ class XmConsole:
         self.historySaveCmds  = historySaveCmds
         self.debugMe          = False
         self.limit            = None
-        self.delay            = 2
 
         consoleCmd = ["/usr/sbin/xm", "xm", "console", domain]
 
-        start = time.time()
+        if verbose:
+            print "Console executing: %s" % str(consoleCmd)
 
-        while (time.time() - start) < self.TIMEOUT:
-            if verbose:
-                print "Console executing: %s" % str(consoleCmd)
+        pid, fd = pty.fork()
 
-            pid, fd = pty.fork()
+        if pid == 0:
+            os.execvp("/usr/sbin/xm", consoleCmd[1:])
 
-            if pid == 0:
-                os.execvp("/usr/sbin/xm", consoleCmd[1:])
+        self.consolePid = pid
+        self.consoleFd  = fd
 
-            self.consolePid = pid
-            self.consoleFd  = fd
+        tty.setraw(self.consoleFd, termios.TCSANOW)
 
-            tty.setraw(self.consoleFd, termios.TCSANOW)
-            
-            bytes = self.__chewall(self.consoleFd)
+        self.__chewall(self.consoleFd)
 
-            if bytes > 0:
-                return
 
-            if verbose:
-                print "Console didn't attach, waiting %i sec..." % self.delay
-            time.sleep(self.delay)
-
-        raise ConsoleError("Console didn't respond after %i secs" % self.TIMEOUT)
-    
     def __addToHistory(self, line):
         self.historyBuffer.append(line)
         self.historyLines += 1
@@ -145,8 +133,8 @@ class XmConsole:
                     if self.debugMe:
                         sys.stdout.write(foo)
                     bytes += 1
-                except:
-                    timeout += 1
+                except Exception, exn:
+                    raise ConsoleError(str(exn))
 
             else:
                 timeout += 1
@@ -174,7 +162,7 @@ class XmConsole:
 
         os.write(self.consoleFd, "%s\n" % command)
 
-        while 1==1:
+        while True:
             i, o, e = select.select([self.consoleFd], [], [], self.TIMEOUT)
 
             if self.consoleFd in i:
@@ -183,9 +171,10 @@ class XmConsole:
                     if self.debugMe:
                         sys.stdout.write(str)
                     bytes += 1
-                except:
-                    raise ConsoleError("Failed to read from console (fd=%i)"
-                                       % self.consoleFd)
+                except Exception, exn:
+                    raise ConsoleError(
+                        "Failed to read from console (fd=%i): %s" %
+                        (self.consoleFd, exn))
             else:
                 raise ConsoleError("Timed out waiting for console")
 
