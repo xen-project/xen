@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -x
+
 dir=$(dirname "$0")
 . "$dir/block-common.sh"
 
@@ -17,8 +19,24 @@ expand_dev() {
 }
 
 
+canonicalise_mode()
+{
+  local mode="$1"
+
+  if ! expr index "$mode" 'w' >/dev/null
+  then
+    echo 'ro'
+  elif ! expr index "$mode" '!' >/dev/null
+  then
+    echo 'rw'
+  else
+    echo 'no'
+  fi
+}
+
+
 ##
-# check_sharing device device_major_minor writable
+# check_sharing device device_major_minor mode
 #
 # Check whether the device requested is already in use.  To use the device in
 # read-only mode, it may be in use in read-only mode, but may not be in use in
@@ -27,13 +45,13 @@ expand_dev() {
 #
 check_sharing()
 {
-
   local dev="$1"
-  local devmm="$2"
-  local writable="$3"
+  local mode="$2"
+
+  local devmm=$(device_major_minor "$dev")
   local file
 
-  if [ "$writable" ]
+  if [ "$mode" == 'rw' ]
   then
     toskip="^$"
   else
@@ -48,18 +66,8 @@ check_sharing()
 
       if [ "$d" == "$devmm" ]
       then
-        if [ "$writable" ]
-        then
-          m1=""
-          m2=""
-        else
-          m1="read-write "
-          m2="read-only "
-        fi
-
-        ebusy \
-"Device $dev is mounted ${m1}in the privileged domain,
-and so cannot be mounted ${m2}by a guest."
+        echo 'local'
+        return
       fi
     fi
   done
@@ -71,73 +79,182 @@ and so cannot be mounted ${m2}by a guest."
       local d=$(cat "$file")
       if [ "$d" == "$devmm" ]
       then
-        if [ "$writable" ]
+        if [ "$mode" == 'rw' ]
         then
-          ebusy \
-"Device $dev is already mounted in a guest domain, and so
-cannot be mounted read-write now."
+          echo 'guest'
+          return
         else
           local m=$(cat "${file/physical_device/mode}")
 
           if expr index "$m" 'w' >/dev/null
           then
-            ebusy \
-"Device $dev is already mounted read-write in a guest domain,
-and so cannot be mounted read-only again."
+            echo 'guest'
+            return
           fi
         fi
       fi
     fi
   done
+
+  echo 'ok'
 }
 
 
 check_device_sharing()
 {
   local dev="$1"
-  local devmm=$(device_major_minor "$dev")
-  local mode=$(xenstore_read "$XENBUS_PATH/mode")
+  local mode=$(canonicalise_mode "$2")
+  local result
 
-  if ! expr index "$mode" 'w' >/dev/null
+  if [ "$mode" == 'no' ]
   then
-    # No w implies read-only use; sharing with writers must be prevented.
-    check_sharing "$dev" "$devmm" ""
-  elif ! expr index "$mode" '!' >/dev/null
+    return 0
+  fi
+
+  result=$(check_sharing "$dev" "$mode")
+
+  if [ "$result" != 'ok' ]
   then
-    # No exclamation mark implies all sharing must be prevented.
-    check_sharing "$dev" "$devmm" 1
+    do_ebusy "Device $dev is mounted " "$mode" "$result"
   fi
 }
 
 
-t=$(xenstore_read_default "$XENBUS_PATH/type" "MISSING")
+check_file_sharing()
+{
+  local file="$1"
+  local dev="$2"
+  local mode="$3"
 
-case "$command" in 
+  result=$(check_sharing "$dev" "$mode")
+
+  if [ "$result" != 'ok' ]
+  then
+    do_ebusy "File $file is loopback-mounted through $dev,
+which is mounted " "$mode" "$result"
+  fi
+}
+
+
+do_ebusy()
+{
+  local prefix="$1"
+  local mode="$2"
+  local result="$3"
+
+  if [ "$result" == 'guest' ]
+  then
+    dom='a guest '
+    when='now'
+  else
+    dom='the privileged '
+    when='by a guest'
+  fi
+
+  if [ "$mode" == 'rw' ]
+  then
+    m1=''
+    m2=''
+  else
+    m1='read-write '
+    m2='read-only '
+  fi
+
+  ebusy \
+"${prefix}${m1}in ${dom}domain,
+and so cannot be mounted ${m2}${when}."
+}
+
+
+t=$(xenstore_read_default "$XENBUS_PATH/type" 'MISSING')
+
+case "$command" in
   add)
-    phys=$(xenstore_read_default "$XENBUS_PATH/physical-device" "MISSING")
-    if [ "$phys" != "MISSING" ]
+    phys=$(xenstore_read_default "$XENBUS_PATH/physical-device" 'MISSING')
+    if [ "$phys" != 'MISSING' ]
     then
       # Depending upon the hotplug configuration, it is possible for this
       # script to be called twice, so just bail.
       exit 0
     fi
+
     p=$(xenstore_read "$XENBUS_PATH/params")
+    mode=$(xenstore_read "$XENBUS_PATH/mode")
+
     case $t in 
       phy)
         dev=$(expand_dev $p)
-        check_device_sharing "$dev"
+        check_device_sharing "$dev" "$mode"
 	write_dev "$dev"
 	exit 0
 	;;
 
       file)
-	for dev in /dev/loop* ; do
-	  if losetup $dev $p; then
-	    write_dev "$dev"
-            exit 0
-	  fi
-	done
-	exit 1
+        # Canonicalise the file, for sharing check comparison, and the mode
+        # for ease of use here.
+        file=$(readlink -f "$p")
+        mode=$(canonicalise_mode "$mode")
+
+        if [ "$mode" == 'rw' ] && ! stat "$file" -c %A | grep w >&/dev/null
+        then
+          ebusy \
+"File $file is read-only, and so I will not
+mount it read-write in a guest domain."
+        fi
+
+        loopdev=''
+
+	for dev in /dev/loop*
+        do
+          if [ ! -b "$dev" ]
+          then
+            continue
+          fi
+
+          f=$(losetup "$dev" 2>/dev/null) || f='()'
+          f=$(echo "$f" | sed -e 's/.*(\(.*\)).*/\1/g')
+
+          log err "$file $f $dev"
+
+          if [ "$f" ]
+          then
+            # $dev is in use.  Check sharing.
+
+            if [ "$mode" == 'no' ]
+            then
+              continue
+            fi
+
+            f=$(readlink -f "$f")
+
+            if [ "$f" == "$file" ]
+            then
+              check_file_sharing "$file" "$dev" "$mode"
+            fi
+          else
+            # $dev is not in use, so we'll remember it for use later; we want
+            # to finish the sharing check first.
+            
+            if [ "$loopdev" == '' ]
+            then
+              loopdev="$dev"
+            fi
+          fi
+        done
+
+        if [ "$loopdev" == '' ]
+        then
+          fatal 'Failed to find an unused loop device'
+        fi
+
+        if losetup "$loopdev" "$file"
+        then
+          xenstore_write "$XENBUS_PATH/node" "$loopdev"
+          write_dev "$loopdev"
+          exit 0
+        else
+          fatal "losetup $loopdev $file failed"
+        fi
 	;;
     esac
     ;;
@@ -150,7 +267,7 @@ case "$command" in
 
       file)
         node=$(xenstore_read "$XENBUS_PATH/node")
-	losetup -d $node
+	losetup -d "$node"
 	exit 0
 	;;
     esac
