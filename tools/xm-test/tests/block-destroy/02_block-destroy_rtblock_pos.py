@@ -16,8 +16,7 @@ except DomainError, e:
 
 status, output = traceCommand("xm block-attach %s phy:/dev/ram0 hda1 w" % domain.getName())
 if status != 0:
-    # Disabled for now, since block-attach doesn't work
-    #FAIL("Failed to attach block device")
+    FAIL("Failed to attach block device")
     pass
 
 try:
