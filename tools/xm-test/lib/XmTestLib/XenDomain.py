@@ -89,7 +89,7 @@ class XenDomain:
         ret, output = traceCommand(commandLine);
 
         try:
-            self.domID = int(domid(self.domName));
+            self.domID = self.getId()
         except:
             self.domID = -1;
 
