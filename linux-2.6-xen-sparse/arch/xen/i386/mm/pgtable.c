@@ -278,26 +278,22 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	unsigned long flags;
 
 	if (PTRS_PER_PMD > 1) {
-#ifdef CONFIG_XEN
 		/* Ensure pgd resides below 4GB. */
 		int rc = xen_create_contiguous_region(
 			(unsigned long)pgd, 0, 32);
 		BUG_ON(rc);
-#endif
 		if (HAVE_SHARED_KERNEL_PMD)
 			memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
-			       swapper_pg_dir, sizeof(pgd_t));
+			       swapper_pg_dir + USER_PTRS_PER_PGD,
+			       (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
 	} else {
-		if (!HAVE_SHARED_KERNEL_PMD)
-			spin_lock_irqsave(&pgd_lock, flags);
+		spin_lock_irqsave(&pgd_lock, flags);
 		memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
 		       swapper_pg_dir + USER_PTRS_PER_PGD,
 		       (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
 		memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
-		if (!HAVE_SHARED_KERNEL_PMD) {
-			pgd_list_add(pgd);
-			spin_unlock_irqrestore(&pgd_lock, flags);
-		}
+		pgd_list_add(pgd);
+		spin_unlock_irqrestore(&pgd_lock, flags);
 	}
 }
 
@@ -305,9 +301,6 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags; /* can be called from interrupt context */
-
-	if (HAVE_SHARED_KERNEL_PMD)
-		return;
 
 	spin_lock_irqsave(&pgd_lock, flags);
 	pgd_list_del(pgd);
@@ -335,18 +328,24 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 
 	if (!HAVE_SHARED_KERNEL_PMD) {
 		unsigned long flags;
-		pgd_t *copy_pgd = pgd_offset_k(PAGE_OFFSET);
-		pud_t *copy_pud = pud_offset(copy_pgd, PAGE_OFFSET);
-		pmd_t *copy_pmd = pmd_offset(copy_pud, PAGE_OFFSET);
-		pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
-		++i;
-		if (!pmd)
-			goto out_oom;
+
+		for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
+			pmd_t *pmd = kmem_cache_alloc(pmd_cache, GFP_KERNEL);
+			if (!pmd)
+				goto out_oom;
+			set_pgd(&pgd[USER_PTRS_PER_PGD], __pgd(1 + __pa(pmd)));
+		}
 
 		spin_lock_irqsave(&pgd_lock, flags);
-		memcpy(pmd, copy_pmd, PAGE_SIZE);
-		make_lowmem_page_readonly(pmd);
-		set_pgd(&pgd[USER_PTRS_PER_PGD], __pgd(1 + __pa(pmd)));
+		for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
+			unsigned long v = (unsigned long)i << PGDIR_SHIFT;
+			pgd_t *kpgd = pgd_offset_k(v);
+			pud_t *kpud = pud_offset(kpgd, v);
+			pmd_t *kpmd = pmd_offset(kpud, v);
+			pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
+			memcpy(pmd, kpmd, PAGE_SIZE);
+			make_lowmem_page_readonly(pmd);
+		}
 		pgd_list_add(pgd);
 		spin_unlock_irqrestore(&pgd_lock, flags);
 	}
@@ -374,13 +373,15 @@ void pgd_free(pgd_t *pgd)
 		}
 		if (!HAVE_SHARED_KERNEL_PMD) {
 			unsigned long flags;
-			pmd_t *pmd = (void *)__va(pgd_val(pgd[USER_PTRS_PER_PGD])-1);
 			spin_lock_irqsave(&pgd_lock, flags);
 			pgd_list_del(pgd);
 			spin_unlock_irqrestore(&pgd_lock, flags);
-			make_lowmem_page_writable(pmd);
-			memset(pmd, 0, PTRS_PER_PMD*sizeof(pmd_t));
-			kmem_cache_free(pmd_cache, pmd);
+			for (i = USER_PTRS_PER_PGD; i < PTRS_PER_PGD; i++) {
+				pmd_t *pmd = (void *)__va(pgd_val(pgd[i])-1);
+				make_lowmem_page_writable(pmd);
+				memset(pmd, 0, PTRS_PER_PMD*sizeof(pmd_t));
+				kmem_cache_free(pmd_cache, pmd);
+			}
 		}
 	}
 	/* in the non-PAE case, free_pgtables() clears user pgd entries */

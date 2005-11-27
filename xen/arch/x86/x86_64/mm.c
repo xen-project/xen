@@ -190,7 +190,9 @@ long arch_memory_op(int op, void *arg)
         if ( copy_from_user(&xmml, arg, sizeof(xmml)) )
             return -EFAULT;
 
-        for ( v = RDWR_MPT_VIRT_START; v != RDWR_MPT_VIRT_END; v += 1 << 21 )
+        for ( i = 0, v = RDWR_MPT_VIRT_START;
+              (i != xmml.max_extents) && (v != RDWR_MPT_VIRT_END);
+              i++, v += 1 << 21 )
         {
             l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
                 l3_table_offset(v)];
@@ -200,11 +202,8 @@ long arch_memory_op(int op, void *arg)
             if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
                 break;
             mfn = l2e_get_pfn(l2e) + l1_table_offset(v);
-            if ( i == xmml.max_extents )
-                break;
             if ( put_user(mfn, &xmml.extent_start[i]) )
                 return -EFAULT;
-            i++;
         }
 
         if ( put_user(i, &((struct xen_machphys_mfn_list *)arg)->nr_extents) )
