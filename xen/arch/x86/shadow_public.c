@@ -390,8 +390,6 @@ void free_monitor_pagetable(struct vcpu *v)
         put_shadow_ref(mfn);
     }
 
-    unmap_domain_page(mpl2e);
-
     /*
      * Then free monitor_table.
      */
