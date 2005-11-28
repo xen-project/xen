@@ -83,17 +83,6 @@ check-for-zlib:
 	false; \
 	fi
 
-LINUX_ROOT := $(XEN_ROOT)/linux-2.6-xen-sparse
-mk-symlinks:
-	[ -e xen/linux ] || mkdir -p xen/linux
-	[ -e xen/io ]    || mkdir -p xen/io
-	( cd xen >/dev/null ; \
-	  ln -sf ../$(XEN_ROOT)/xen/include/public/*.h . )
-	( cd xen/io >/dev/null ; \
-	   ln -sf ../../$(XEN_ROOT)/xen/include/public/io/*.h . )
-	( cd xen/linux >/dev/null ; \
-	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )
-
 install: build
 	[ -d $(DESTDIR)/usr/$(LIBDIR) ] || $(INSTALL_DIR) $(DESTDIR)/usr/$(LIBDIR)
 	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
