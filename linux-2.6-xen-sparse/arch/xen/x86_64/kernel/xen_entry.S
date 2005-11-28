@@ -5,7 +5,7 @@
 #define evtchn_upcall_pending		0
 #define evtchn_upcall_mask		1
 
-#define sizeof_vcpu_shift		5
+#define sizeof_vcpu_shift		6
 
 #ifdef CONFIG_SMP
 //#define preempt_disable(reg)	incl threadinfo_preempt_count(reg)

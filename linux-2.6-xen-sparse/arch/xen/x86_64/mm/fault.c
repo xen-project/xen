@@ -344,7 +344,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 #endif
 
 	/* get the address */
-	address = HYPERVISOR_shared_info->vcpu_data[
+	address = HYPERVISOR_shared_info->vcpu_info[
 		smp_processor_id()].arch.cr2;
 
 	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,

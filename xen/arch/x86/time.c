@@ -683,8 +683,11 @@ static inline void version_update_end(u32 *version)
 
 static inline void __update_dom_time(struct vcpu *v)
 {
-    struct cpu_time       *t = &cpu_time[smp_processor_id()];
-    struct vcpu_time_info *u = &v->domain->shared_info->vcpu_time[v->vcpu_id];
+    struct cpu_time       *t;
+    struct vcpu_time_info *u;
+
+    t = &cpu_time[smp_processor_id()];
+    u = &v->domain->shared_info->vcpu_info[v->vcpu_id].time;
 
     version_update_begin(&u->version);
 
@@ -698,7 +701,7 @@ static inline void __update_dom_time(struct vcpu *v)
 
 void update_dom_time(struct vcpu *v)
 {
-    if ( v->domain->shared_info->vcpu_time[v->vcpu_id].tsc_timestamp != 
+    if ( v->domain->shared_info->vcpu_info[v->vcpu_id].time.tsc_timestamp != 
          cpu_time[smp_processor_id()].local_tsc_stamp )
         __update_dom_time(v);
 }

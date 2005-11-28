@@ -657,7 +657,7 @@ static int setup_guest(int xc_handle,
     memset(shared_info, 0, sizeof(shared_info_t));
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
+        shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
 
     munmap(shared_info, PAGE_SIZE);
 

@@ -205,7 +205,7 @@ void arch_do_createdomain(struct vcpu *v)
 	printf("arch_vcpu_info=%p\n", d->vcpu[0].arch.privregs);
 	memset(d->vcpu.arch.privregs, 0, PAGE_SIZE);
 #endif
-	v->vcpu_info = &(d->shared_info->vcpu_data[0]);
+	v->vcpu_info = &(d->shared_info->vcpu_info[0]);
 
 	d->max_pages = (128UL*1024*1024)/PAGE_SIZE; // 128MB default // FIXME
 
@@ -867,7 +867,7 @@ int construct_dom0(struct domain *d,
 
 	/* Mask all upcalls... */
 	for ( i = 1; i < MAX_VIRT_CPUS; i++ )
-	    d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
+	    d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
 
 #ifdef VALIDATE_VT 
 	/* Construct a frame-allocation list for the initial domain, since these
@@ -997,7 +997,7 @@ int construct_domU(struct domain *d,
 
 	/* Mask all upcalls... */
 	for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-		d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
+		d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
 
 	/* Copy the OS image. */
 	printk("calling loaddomainelfimage(%p,%p)\n",d,image_start);

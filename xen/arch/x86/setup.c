@@ -432,7 +432,7 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     BUG_ON(sizeof(start_info_t) > PAGE_SIZE);
     BUG_ON(sizeof(shared_info_t) > PAGE_SIZE);
-    BUG_ON(sizeof(vcpu_info_t) != (sizeof(unsigned long) * 4));
+    BUG_ON(sizeof(vcpu_info_t) != 64);
 
     init_frametable();
 
