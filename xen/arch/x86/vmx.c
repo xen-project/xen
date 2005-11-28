@@ -61,23 +61,30 @@ void vmx_final_setup_guest(struct vcpu *v)
 {
     v->arch.schedule_tail = arch_vmx_do_launch;
 
-    if ( v == v->domain->vcpu[0] )
+    if ( v->vcpu_id == 0 )
     {
-        v->domain->arch.vmx_platform.lapic_enable =
-            v->arch.guest_context.user_regs.ecx;
+        struct domain *d = v->domain;
+        struct vcpu *vc;
+
+        d->arch.vmx_platform.lapic_enable = v->arch.guest_context.user_regs.ecx;
         v->arch.guest_context.user_regs.ecx = 0;
         VMX_DBG_LOG(DBG_LEVEL_VLAPIC, "lapic enable is %d.\n",
-                    v->domain->arch.vmx_platform.lapic_enable);
+                    d->arch.vmx_platform.lapic_enable);
+
+        /* Initialize monitor page table */
+        for_each_vcpu(d, vc)
+            vc->arch.monitor_table = mk_pagetable(0);
+
         /*
          * Required to do this once per domain
          * XXX todo: add a seperate function to do these.
          */
-        memset(&v->domain->shared_info->evtchn_mask[0], 0xff,
-               sizeof(v->domain->shared_info->evtchn_mask));
+        memset(&d->shared_info->evtchn_mask[0], 0xff,
+               sizeof(d->shared_info->evtchn_mask));
 
         /* Put the domain in shadow mode even though we're going to be using
          * the shared 1:1 page table initially. It shouldn't hurt */
-        shadow_mode_enable(v->domain,
+        shadow_mode_enable(d,
                            SHM_enable|SHM_refcounts|
                            SHM_translate|SHM_external|SHM_wr_pt_pte);
     }

@@ -414,9 +414,6 @@ int arch_set_info_guest(
             d->arch.phys_table = v->arch.guest_table;
         v->arch.guest_table = mk_pagetable(0);
 
-        /* Initialize monitor page table */
-        v->arch.monitor_table = mk_pagetable(0);
-
         vmx_final_setup_guest(v);
     }
 

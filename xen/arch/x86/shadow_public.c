@@ -390,8 +390,6 @@ void free_monitor_pagetable(struct vcpu *v)
         put_shadow_ref(mfn);
     }
 
-    unmap_domain_page(mpl2e);
-
     /*
      * Then free monitor_table.
      */
@@ -1593,7 +1591,7 @@ remove_shadow(struct domain *d, unsigned long gpfn, u32 stype)
 }
 
 unsigned long
-gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
+get_mfn_from_pfn_foreign(struct domain *d, unsigned long gpfn)
 {
     unsigned long va, tabpfn;
     l1_pgentry_t *l1, l1e;
@@ -1601,7 +1599,7 @@ gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 
     ASSERT(shadow_mode_translate(d));
 
-    perfc_incrc(gpfn_to_mfn_foreign);
+    perfc_incrc(get_mfn_from_pfn_foreign);
 
     va = gpfn << PAGE_SHIFT;
     tabpfn = pagetable_get_pfn(d->arch.phys_table);
@@ -1610,8 +1608,8 @@ gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
     unmap_domain_page(l2);
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
     {
-        printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l2e=%" PRIpte "\n",
-               d->domain_id, gpfn, l2e_get_intpte(l2e));
+        printk("%s(d->id=%d, gpfn=%lx) => 0 l2e=%" PRIpte "\n",
+               __func__, d->domain_id, gpfn, l2e_get_intpte(l2e));
         return INVALID_MFN;
     }
     l1 = map_domain_page(l2e_get_pfn(l2e));
@@ -1619,14 +1617,14 @@ gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
     unmap_domain_page(l1);
 
 #if 0
-    printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => %lx tabpfn=%lx l2e=%lx l1tab=%lx, l1e=%lx\n",
-           d->domain_id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, tabpfn, l2e, l1tab, l1e);
+    printk("%s(d->id=%d, gpfn=%lx) => %lx tabpfn=%lx l2e=%lx l1tab=%lx, l1e=%lx\n",
+           __func__, d->domain_id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, tabpfn, l2e, l1tab, l1e);
 #endif
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
     {
-        printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l1e=%" PRIpte "\n",
-               d->domain_id, gpfn, l1e_get_intpte(l1e));
+        printk("%s(d->id=%d, gpfn=%lx) => 0 l1e=%" PRIpte "\n",
+               __func__, d->domain_id, gpfn, l1e_get_intpte(l1e));
         return INVALID_MFN;
     }
 
