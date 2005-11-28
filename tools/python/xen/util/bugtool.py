@@ -22,6 +22,7 @@ import httplib
 import re
 import os
 import os.path
+import StringIO
 import sys
 import tarfile
 import tempfile
@@ -53,12 +54,16 @@ def main(argv = None):
     print '''
 This application will collate the Xen dmesg output, details of the hardware
 configuration of your machine, information about the build of Xen that you are
-using, plus, if you allow it, various logs.  These logs may contain private
-information, and if you are at all worried about that, you should exit now.
+using, plus, if you allow it, various logs.
 
 The information collated can either be posted to a Xen Bugzilla bug (this bug
 must already exist in the system, and you must be a registered user there), or
 it can be saved as a .tar.bz2 for sending or archiving.
+
+The collated logs may contain private information, and if you are at all
+worried about that, you should exit now, or you should explicitly exclude
+those logs from the archive.
+
 '''
     
     bugball = []
@@ -201,35 +206,13 @@ def prettyDict(d):
     return '\n'.join([format % i for i in d.items()]) + '\n'
 
 
-class string_iterator:
+class string_iterator(StringIO.StringIO):
     def __init__(self, name, val):
+        StringIO.StringIO.__init__(self, val)
         self.name = name
-        self.val = val
-        self.vallist = val.splitlines(True)
-        self.line = 0
-    
-    def readlines(self):
-        return self.vallist
-
-    def readline(self):
-        result = self.vallist[line]
-        line += 1
-        return result
-
-    def read(self, n = None):
-        if n is None:
-            return self.val
-        else:
-            return self.val[0:n]
-
-    def close(self):
-        pass
 
     def size(self):
-        return len(self.val)
-
-    def seek(self, _1, _2 = None):
-        pass
+        return len(self.getvalue())
 
 
 def yes(prompt):
