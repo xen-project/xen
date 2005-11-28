@@ -1075,8 +1075,8 @@ static void shadow_mark_va_out_of_sync(
     entry->next = d->arch.out_of_sync;
     d->arch.out_of_sync = entry;
 
-    FSH_LOG("mark_out_of_sync(va=%lx -> writable_pl1e=%lx)",
-            va, entry->writable_pl1e);
+    FSH_LOG("%s(va=%lx -> writable_pl1e=%lx)",
+            __func__, va, entry->writable_pl1e);
 }
 
 /*
