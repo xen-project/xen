@@ -28,7 +28,7 @@ cp -fdRL $src/etc/init.d/* $dst/etc/init.d/
 echo "All done."
 
 [ -x "$(which udevinfo)" ] && \
-  UDEV_VERSION=$(udevinfo -V | sed -e 's/^.*\s\([0-9]\+\)[^0-9]*/\1/')
+  UDEV_VERSION=$(udevinfo -V | sed -e 's/^.*\ \([0-9]\+\)[^0-9]*/\1/')
 
 if [ -n "$UDEV_VERSION" ] && [ $UDEV_VERSION -ge 059 ]; then
   cp -f $src/etc/udev/rules.d/*.rules $dst/etc/udev/rules.d/
