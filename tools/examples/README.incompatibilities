@@ -23,3 +23,9 @@ appropriately.  See xen-network-common.sh for details.
 Gentoo doesn't have ifup/ifdown; appropriate alternatives are defined in
 xen-network-common.sh.
 
+
+sed
+---
+
+\s is not supported in regexps on Debian etch (sed 4.1.2), Ubuntu 4.10.  We
+hand-craft character classes instead.

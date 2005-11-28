@@ -103,3 +103,37 @@ function handle_iptable()
       frob_iptable
   fi
 }
+
+
+##
+# ip_of interface
+#
+# Print the IP address currently in use at the given interface, or nothing if
+# the interface is not up.
+#
+function ip_of()
+{
+  ip addr show "$1" | sed -n 's/^.*inet \([0-9.]*\).*$/\1/p'
+}
+
+
+##
+# dom0_ip
+#
+# Print the IP address of the interface in dom0 through which we are routing.
+# This is the IP address on the interface specified as "netdev" as a parameter
+# to these scripts, or eth0 by default.  This function will call fatal if no
+# such interface could be found.
+#
+function dom0_ip()
+{
+  local nd=${netdev:-eth0}
+  local result=$(ip_of "$nd")
+  if [ -z "$result" ]
+  then
+      fatal
+"$netdev is not up.  Bring it up or specify another interface with " \
+"netdev=<if> as a parameter to $0."
+  fi
+  echo "$result"
+}

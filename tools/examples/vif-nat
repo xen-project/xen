@@ -37,7 +37,7 @@ netmask=$netmask.$(( (($intmask & 0x00FF0000)) >> 16 ))
 netmask=$netmask.$(( (($intmask & 0x0000FF00)) >> 8 ))
 netmask=$netmask.$(( $intmask & 0x000000FF ))
 
-main_ip=$(ip addr show eth0 | sed -e '/inet /!d;s/^.*inet \([^\s*]\)\s.*$/\1/')
+main_ip=$(dom0_ip)
 
 case "$command" in
     online)
