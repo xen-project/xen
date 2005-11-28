@@ -54,8 +54,7 @@ def create():
 
 
 def toString(u):
-    f = "%02x"
-    return ( "-".join([f*4, f*2, f*2, f*2, f*6]) % tuple(u) )
+    return "-".join(["%02x" * 4] * 4) % tuple(u)
 
 def fromString(s):
     s = s.replace('-', '')
