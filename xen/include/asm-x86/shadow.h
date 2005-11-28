@@ -285,22 +285,19 @@ static inline void shadow_mode_disable(struct domain *d)
 
 #define __mfn_to_gpfn(_d, mfn)                         \
     ( (shadow_mode_translate(_d))                      \
-      ? get_pfn_from_mfn(mfn)                                   \
+      ? get_pfn_from_mfn(mfn)                          \
       : (mfn) )
 
 #define __gpfn_to_mfn(_d, gpfn)                        \
     ({                                                 \
-        (shadow_mode_translate(_d))                    \
-        ? get_mfn_from_pfn(gpfn)                \
+        unlikely(shadow_mode_translate(_d))            \
+        ? (likely(current->domain == (_d))             \
+           ? get_mfn_from_pfn(gpfn)                    \
+           : get_mfn_from_pfn_foreign(_d, gpfn))       \
         : (gpfn);                                      \
     })
 
-#define __gpfn_to_mfn_foreign(_d, gpfn)                \
-    ( (shadow_mode_translate(_d))                      \
-      ? gpfn_to_mfn_foreign(_d, gpfn)                  \
-      : (gpfn) )
-
-extern unsigned long gpfn_to_mfn_foreign(
+extern unsigned long get_mfn_from_pfn_foreign(
     struct domain *d, unsigned long gpfn);
 
 /************************************************************************/
@@ -871,18 +868,7 @@ static inline void hl2e_propagate_from_guest(
 
     if ( l2e_get_flags(gpde) & _PAGE_PRESENT )
     {
-        if ( unlikely((current->domain != d) && !shadow_mode_external(d)) )
-        {
-            // Can't use __gpfn_to_mfn() if we don't have one of this domain's
-            // page tables currently installed.
-            // This isn't common -- it only happens during shadow mode setup
-            // and mode changes.
-            //
-            mfn = gpfn_to_mfn_foreign(d, pfn);
-        }
-        else
-            mfn = __gpfn_to_mfn(d, pfn);
-
+        mfn = __gpfn_to_mfn(d, pfn);
         if ( VALID_MFN(mfn) && (mfn < max_page) )
             hl2e = l1e_from_pfn(mfn, __PAGE_HYPERVISOR);
     }

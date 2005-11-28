@@ -1607,7 +1607,7 @@ remove_shadow(struct domain *d, unsigned long gpfn, u32 stype)
 }
 
 unsigned long
-gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
+get_mfn_from_pfn_foreign(struct domain *d, unsigned long gpfn)
 {
     unsigned long va, tabpfn;
     l1_pgentry_t *l1, l1e;
@@ -1615,7 +1615,7 @@ gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 
     ASSERT(shadow_mode_translate(d));
 
-    perfc_incrc(gpfn_to_mfn_foreign);
+    perfc_incrc(get_mfn_from_pfn_foreign);
 
     va = gpfn << PAGE_SHIFT;
     tabpfn = pagetable_get_pfn(d->arch.phys_table);

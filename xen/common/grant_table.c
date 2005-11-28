@@ -234,7 +234,7 @@ __gnttab_map_grant_ref(
 
         /* rmb(); */ /* not on x86 */
 
-        frame = __gpfn_to_mfn_foreign(rd, sha->frame);
+        frame = __gpfn_to_mfn(rd, sha->frame);
 
         if ( unlikely(!pfn_valid(frame)) ||
              unlikely(!((dev_hst_ro_flags & GNTMAP_readonly) ?
