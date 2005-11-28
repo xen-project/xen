@@ -1440,8 +1440,8 @@ get_mfn_from_pfn_foreign(struct domain *d, unsigned long gpfn)
     unmap_domain_page(l2);
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
     {
-        printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l2e=%" PRIpte "\n",
-               d->domain_id, gpfn, l2e_get_intpte(l2e));
+        printk("%s(d->id=%d, gpfn=%lx) => 0 l2e=%" PRIpte "\n",
+               __func__, d->domain_id, gpfn, l2e_get_intpte(l2e));
         return INVALID_MFN;
     }
     l1 = map_domain_page(l2e_get_pfn(l2e));
@@ -1449,14 +1449,14 @@ get_mfn_from_pfn_foreign(struct domain *d, unsigned long gpfn)
     unmap_domain_page(l1);
 
 #if 0
-    printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => %lx tabpfn=%lx l2e=%lx l1tab=%lx, l1e=%lx\n",
-           d->domain_id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, tabpfn, l2e, l1tab, l1e);
+    printk("%s(d->id=%d, gpfn=%lx) => %lx tabpfn=%lx l2e=%lx l1tab=%lx, l1e=%lx\n",
+           __func__, d->domain_id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, tabpfn, l2e, l1tab, l1e);
 #endif
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
     {
-        printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%lx) => 0 l1e=%" PRIpte "\n",
-               d->domain_id, gpfn, l1e_get_intpte(l1e));
+        printk("%s(d->id=%d, gpfn=%lx) => 0 l1e=%" PRIpte "\n",
+               __func__, d->domain_id, gpfn, l1e_get_intpte(l1e));
         return INVALID_MFN;
     }
 
@@ -1945,8 +1945,8 @@ void shadow_mark_va_out_of_sync(
     entry->next = d->arch.out_of_sync;
     d->arch.out_of_sync = entry;
 
-    FSH_LOG("mark_out_of_sync(va=%lx -> writable_pl1e=%lx)",
-            va, entry->writable_pl1e);
+    FSH_LOG("%s(va=%lx -> writable_pl1e=%lx)",
+            __func__, va, entry->writable_pl1e);
 }
 
 /*
