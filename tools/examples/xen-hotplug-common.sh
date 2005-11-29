@@ -40,6 +40,17 @@ success() {
   xenstore_write "$XENBUS_PATH"/hotplug-status connected
 }
 
+do_or_die() {
+  "$@" || fatal "$@ failed"
+}
+
+sigerr() {
+  fatal "$0" "$@" "failed; error detected."
+}
+
+trap sigerr ERR
+
+
 ##
 # xenstore_read <path>+
 #
