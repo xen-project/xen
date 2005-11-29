@@ -1032,6 +1032,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     if ( shadow_mode_refcounts(d) )
     {
         struct list_head *list_ent; 
+        struct pfn_info *page;
 
         /*
          * Tear down its counts by disassembling its page-table-based refcounts
@@ -1059,8 +1060,8 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
         for (list_ent = d->page_list.next; list_ent != &d->page_list; 
              list_ent = page->list.next) {
             
-            struct pfn_info *page = list_entry(list_ent, 
-                                               struct pfn_info, list);
+            page = list_entry(list_ent, struct pfn_info, list);
+
             if ( !get_page_type(page, PGT_writable_page) )
                 BUG();
             put_page_type(page);
