@@ -89,29 +89,34 @@ check_sharing()
     fi
   done
 
-  for file in /sys/devices/xen-backend/*/physical_device
-  do
-    if [ -e "$file" ] # Cope with no devices, i.e. the * above did not expand.
-    then
-      local d=$(cat "$file")
-      if [ "$d" == "$devmm" ]
-      then
-        if [ "$mode" == 'w' ]
-        then
-          echo 'guest'
-          return
-        else
-          local m=$(cat "${file/physical_device/mode}")
+##
+## XXX SMH: the below causes live migration on localhost to fail sometimes
+## since the source domain may still appear to be using a local device. 
+## For now simply comment it out - a proper fix will come in due course. 
 
-          if expr index "$m" 'w' >/dev/null
-          then
-            echo 'guest'
-            return
-          fi
-        fi
-      fi
-    fi
-  done
+#   for file in /sys/devices/xen-backend/*/physical_device
+#   do
+#     if [ -e "$file" ] # Cope with no devices, i.e. the * above did not expand.
+#     then
+#       local d=$(cat "$file")
+#       if [ "$d" == "$devmm" ]
+#       then
+#         if [ "$mode" == 'w' ]
+#         then
+#           echo 'guest'
+#           return
+#         else
+#           local m=$(cat "${file/physical_device/mode}")
+
+#           if expr index "$m" 'w' >/dev/null
+#           then
+#             echo 'guest'
+#             return
+#           fi
+#         fi
+#       fi
+#     fi
+#   done
 
   echo 'ok'
 }
