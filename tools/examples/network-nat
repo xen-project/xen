@@ -13,35 +13,69 @@
 #
 # netdev     The gateway interface (default eth0).
 # antispoof  Whether to use iptables to prevent spoofing (default no).
+# dhcp       Whether to alter the local DHCP configuration (default no).
 #
 #============================================================================
 
+dir=$(dirname "$0")
+. "$dir/xen-script-common.sh"
+. "$dir/xen-network-common.sh"
 
-
-# Exit if anything goes wrong.
-set -e 
-
-# First arg is the operation.
-OP=$1
-shift
-
-# Pull variables in args in to environment.
-for arg ; do export "${arg}" ; done
+findCommand "$@"
+evalVariables "$@"
 
 netdev=${netdev:-eth0}
 # antispoofing not yet implemented
 antispoof=${antispoof:-no}
+dhcp=${dhcp:-no}
 
-echo "*network-nat $OP netdev=$netdev antispoof=$antispoof" >&2
+if [ "$dhcp" != 'no' ]
+then
+  dhcpd_conf_file=$(find_dhcpd_conf_file)
+  dhcpd_init_file=$(find_dhcpd_init_file)
+  if [ -z "$dhcpd_conf_file" ] || [ -z "$dhcpd_init_file" ]
+  then
+    echo 'Failed to find dhcpd configuration or init file.' >&2
+    exit 1
+  fi
+fi
+
+
+function dhcp_start()
+{
+  if ! grep -q "subnet 10.0.0.0" "$dhcpd_conf_file"
+  then
+    echo >>"$dhcpd_conf_file" "subnet 10.0.0.0 netmask 255.255.0.0 {}"
+  fi
+
+  "$dhcpd_init_file" restart
+}
+
+
+function dhcp_stop()
+{
+  local tmpfile=$(mktemp)
+  grep -v "subnet 10.0.0.0" "$dhcpd_conf_file" >"$tmpfile"
+  if diff "$tmpfile" "$dhcpd_conf_file" >&/dev/null
+  then
+    rm "$tmpfile"
+  else
+    mv "$tmpfile" "$dhcpd_conf_file"
+  fi
+
+  "$dhcpd_init_file" restart
+}
 
 
 op_start() {
 	echo 1 >/proc/sys/net/ipv4/ip_forward
 	iptables -t nat -A POSTROUTING -o ${netdev} -j MASQUERADE
+        [ "$dhcp" != 'no' ] && dhcp_start
 }
 
 
 op_stop() {
+        [ "$dhcp" != 'no' ] && dhcp_stop
 	iptables -t nat -D POSTROUTING -o ${netdev} -j MASQUERADE
 }
 
@@ -57,7 +91,7 @@ show_status() {
 
 }
 
-case ${OP} in
+case "$command" in
     start)
         op_start
         ;;
@@ -71,7 +105,7 @@ case ${OP} in
        ;;
 
     *)
-       echo 'Unknown command: ' ${OP} >&2
+       echo "Unknown command: $command" >&2
        echo 'Valid commands are: start, stop, status' >&2
        exit 1
 esac

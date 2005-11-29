@@ -15,43 +15,141 @@
 # vif         vif interface name (required).
 # XENBUS_PATH path to this device's details in the XenStore (required).
 #
+# Parameters:
+# dhcp        Whether to alter the local DHCP configuration to include this
+#             new host (default no).
+#
 # Read from the store:
 # ip      list of IP networks for the vif, space-separated (default given in
 #         this script).
 #============================================================================
 
+
 dir=$(dirname "$0")
 . "$dir/vif-common.sh"
 
-if [ "$ip" == "" ]
+dhcp=${dhcp:-no}
+
+if [ "$dhcp" != 'no' ]
 then
-  ip='169.254.1.1/24'
+  dhcpd_conf_file=$(find_dhcpd_conf_file)
+  dhcpd_init_file=$(find_dhcpd_init_file)
+  if [ -z "$dhcpd_conf_file" ] || [ -z "$dhcpd_init_file" ]
+  then
+    echo 'Failed to find dhcpd configuration or init file.' >&2
+    exit 1
+  fi
 fi
 
-#determine ip address and netmask 
+
+ip_from_dom()
+{
+  local domid=$(echo "$XENBUS_PATH" | sed -n 's#.*/\([0-9]*\)/[0-9]*$#\1#p')
+  local vifid=$(echo "$XENBUS_PATH" | sed -n 's#.*/[0-9]*/\([0-9]*\)$#\1#p')
+
+  local domid1=$(( $domid / 256 ))
+  local domid2=$(( $domid % 256 ))
+  vifid=$(( $vifid + 1 ))
+
+  echo "10.$domid1.$domid2.$vifid/16"
+}
+
+
+routing_ip()
+{
+  echo $(echo $1 | awk -F. '{print $1"."$2"."$3"."$4 + 127}')
+}
+
+
+dotted_quad()
+{
+ echo\
+ $(( ($1 & 0xFF000000) >> 24))\
+.$(( ($1 & 0x00FF0000) >> 16))\
+.$(( ($1 & 0x0000FF00) >> 8 ))\
+.$((  $1 & 0x000000FF       ))
+}
+
+
+if [ "$ip" == "" ]
+then
+  ip=$(ip_from_dom)
+fi
+
+router_ip=$(routing_ip "$ip")
+
+# Split the given IP/bits pair.
 vif_ip=`echo ${ip} | awk -F/ '{print $1}'`
 bits=`echo ${ip} | awk -F/ '{print $2}'`
-intmask=$(( ((0xFFFFFFFF << ((32 - $bits)))) & 0xFFFFFFFF ))
-netmask=$(( (($intmask & 0xFF000000)) >> 24 ))
-netmask=$netmask.$(( (($intmask & 0x00FF0000)) >> 16 ))
-netmask=$netmask.$(( (($intmask & 0x0000FF00)) >> 8 ))
-netmask=$netmask.$(( $intmask & 0x000000FF ))
+
+# Convert $bits and $vif_ip to integers, mask appropriately to get a network
+# address, and convert them both to dotted quads.
+
+intmask=$(( (0xFFFFFFFF << (32 - $bits)) & 0xFFFFFFFF ))
+vif_int=$(( $(echo "((($vif_ip" | sed -e 's#\.#)\*256\+#g') ))
+
+netmask=$(dotted_quad $intmask)
+network=$(dotted_quad $(( $vif_int & $intmask )) )
 
 main_ip=$(dom0_ip)
 
+
+dhcp_remove_entry()
+{
+  local tmpfile=$(mktemp)
+  grep -v "host Xen-${vif/./-}" "$dhcpd_conf_file" >"$tmpfile"
+  if diff "$tmpfile" "$dhcpd_conf_file" >/dev/null
+  then
+    rm "$tmpfile"
+  else
+    mv "$tmpfile" "$dhcpd_conf_file"
+  fi
+}
+
+
+dhcp_up()
+{
+  dhcp_remove_entry
+  mac=$(xenstore_read "$XENBUS_PATH/mac")
+  echo >>"$dhcpd_conf_file" \
+"host Xen-${vif/./-} { hardware ethernet $mac; fixed-address $vif_ip; option routers $router_ip; }"
+
+  "$dhcpd_init_file" restart
+}
+
+
+dhcp_down()
+{
+  dhcp_remove_entry
+  "$dhcpd_init_file" restart || true # We need to ignore failure because
+                                     # ISC dhcpd 3 borks if there is nothing
+                                     # for it to do, which is the case if
+                                     # the outgoing interface is not
+                                     # configured to offer leases and there
+                                     # are no vifs.
+}
+
+
 case "$command" in
     online)
-        ifconfig ${vif} ${vif_ip} netmask ${netmask} up
+        if ip route | grep -q "dev $vif"
+        then
+          log debug "$vif already up"
+          exit 0
+        fi
+
+        do_or_die ip link set "$vif" up arp on
+        do_or_die ip addr add "$router_ip" dev "$vif"
+        do_or_die ip route add "$vif_ip" dev "$vif" src "$main_ip"
         echo 1 >/proc/sys/net/ipv4/conf/${vif}/proxy_arp
-        ipcmd='a'
+        [ "$dhcp" != 'no' ] && dhcp_up
         ;;
     offline)
-        ifconfig ${vif} down
-        ipcmd='d'
+        [ "$dhcp" != 'no' ] && dhcp_down
+        ifconfig "$vif" down || true
         ;;
 esac
 
-ip r ${ipcmd} ${ip} dev ${vif} src ${main_ip}
 
 handle_iptable
 
