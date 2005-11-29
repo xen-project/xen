@@ -2680,6 +2680,16 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
             domain_crash_synchronous();
         }
 
+        /* User access violation in guest? */
+        if ( unlikely((regs->error_code & 4) && 
+                      !(l1e_get_flags(gpte) & _PAGE_USER)))
+        {
+            SH_VVLOG("shadow_fault - EXIT: wr fault on super page (%" PRIpte ")", 
+                    l1e_get_intpte(gpte));
+            goto fail;
+
+        }
+
         if ( unlikely(!l1pte_write_fault(v, &gpte, &spte, va)) )
         {
             SH_VVLOG("shadow_fault - EXIT: l1pte_write_fault failed");
@@ -2693,6 +2703,16 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     }
     else
     {
+        /* Read-protection violation in guest? */
+        if ( unlikely((regs->error_code & 1) ))
+        {
+            SH_VVLOG("shadow_fault - EXIT: read fault on super page (%" PRIpte ")", 
+                    l1e_get_intpte(gpte));
+            goto fail;
+
+        }
+
+
         if ( !l1pte_read_fault(d, &gpte, &spte) )
         {
             SH_VVLOG("shadow_fault - EXIT: l1pte_read_fault failed");
