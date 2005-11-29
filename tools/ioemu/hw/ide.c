@@ -669,6 +669,8 @@ static int ide_read_dma_cb(IDEState *s,
     }
     if (s->io_buffer_index >= s->io_buffer_size && s->nsector == 0) {
         s->status = READY_STAT | SEEK_STAT;
+        s->bmdma->status &= ~BM_STATUS_DMAING;
+        s->bmdma->status |= BM_STATUS_INT;
         ide_set_irq(s);
 #ifdef DEBUG_IDE_ATAPI
         printf("dma status=0x%x\n", s->status);
@@ -736,6 +738,8 @@ static int ide_write_dma_cb(IDEState *s,
             if (n == 0) {
                 /* end of transfer */
                 s->status = READY_STAT | SEEK_STAT;
+                s->bmdma->status &= ~BM_STATUS_DMAING;
+                s->bmdma->status |= BM_STATUS_INT;
                 ide_set_irq(s);
                 return 0;
             }
@@ -983,6 +987,8 @@ static int ide_atapi_cmd_read_dma_cb(IDEState *s,
     if (s->packet_transfer_size <= 0) {
         s->status = READY_STAT;
         s->nsector = (s->nsector & ~7) | ATAPI_INT_REASON_IO | ATAPI_INT_REASON_CD;
+        s->bmdma->status &= ~BM_STATUS_DMAING;
+        s->bmdma->status |= BM_STATUS_INT;
         ide_set_irq(s);
 #ifdef DEBUG_IDE_ATAPI
         printf("dma status=0x%x\n", s->status);
@@ -2065,8 +2071,6 @@ static void ide_dma_loop(BMDMAState *bm)
     }
     /* end of transfer */
  the_end:
-    bm->status &= ~BM_STATUS_DMAING;
-    bm->status |= BM_STATUS_INT;
     bm->dma_cb = NULL;
     bm->ide_if = NULL;
 }
