@@ -1078,7 +1078,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     free_shadow_pages(d);
 
     /*
-     * Tear down it's counts by disassembling its page-table-based ref counts.
+     * Tear down its counts by disassembling its page-table-based ref counts.
      * Also remove CR3's gcount/tcount.
      * That leaves things like GDTs and LDTs and external refs in tact.
      *

@@ -342,14 +342,10 @@ free_shadow_hl2_table(struct domain *d, unsigned long smfn)
 
     SH_VVLOG("%s: smfn=%lx freed", __func__, smfn);
 
-#ifdef __i386__
     if ( shadow_mode_external(d) )
         limit = L2_PAGETABLE_ENTRIES;
     else
         limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
-#else
-    limit = 0; /* XXX x86/64 XXX */
-#endif
 
     for ( i = 0; i < limit; i++ )
     {
@@ -740,11 +736,9 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     mpl2e = (l2_pgentry_t *)map_domain_page(mmfn);
     memset(mpl2e, 0, PAGE_SIZE);
 
-#ifdef __i386__ /* XXX screws x86/64 build */
     memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
-#endif
 
     mpl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
         l2e_from_paddr(__pa(d->arch.mm_perdomain_pt),
@@ -1034,7 +1028,7 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     free_shadow_pages(d);
 
     /*
-     * Tear down it's counts by disassembling its page-table-based ref counts.
+     * Tear down its counts by disassembling its page-table-based ref counts.
      * Also remove CR3's gcount/tcount.
      * That leaves things like GDTs and LDTs and external refs in tact.
      *
@@ -3274,14 +3268,10 @@ int check_l2_table(
                l2e_get_intpte(match));
     }
 
-#ifdef __i386__
     if ( shadow_mode_external(d) )
         limit = L2_PAGETABLE_ENTRIES;
     else
         limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
-#else
-    limit = 0; /* XXX x86/64 XXX */
-#endif
 
     /* Check the whole L2. */
     for ( i = 0; i < limit; i++ )
@@ -3343,14 +3333,10 @@ int _check_pagetable(struct vcpu *v, char *s)
     spl2e = (l2_pgentry_t *) map_domain_page(smfn);
 
     /* Go back and recurse. */
-#ifdef __i386__
     if ( shadow_mode_external(d) )
         limit = L2_PAGETABLE_ENTRIES;
     else
         limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
-#else
-    limit = 0; /* XXX x86/64 XXX */
-#endif
 
     for ( i = 0; i < limit; i++ )
     {
@@ -3366,11 +3352,6 @@ int _check_pagetable(struct vcpu *v, char *s)
 
     unmap_domain_page(spl2e);
     unmap_domain_page(gpl2e);
-
-#if 0
-    SH_VVLOG("PT verified : l2_present = %d, l1_present = %d",
-             sh_l2_present, sh_l1_present);
-#endif
 
  out:
     if ( errors )
