@@ -25,7 +25,7 @@ from xen.xend.XendLogging import log
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
 
-DEVICE_CREATE_TIMEOUT = 5
+DEVICE_CREATE_TIMEOUT = 10
 HOTPLUG_STATUS_NODE = "hotplug-status"
 HOTPLUG_ERROR_NODE  = "hotplug-error"
 HOTPLUG_STATUS_ERROR = "error"
