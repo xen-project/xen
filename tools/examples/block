@@ -202,59 +202,61 @@ case "$command" in
 mount it read-write in a guest domain."
         fi
 
-        loopdev=''
 
-	for dev in /dev/loop*
-        do
-          if [ ! -b "$dev" ]
-          then
-            continue
-          fi
-
-          f=$(losetup "$dev" 2>/dev/null) || f='()'
-          f=$(echo "$f" | sed -e 's/.*(\(.*\)).*/\1/g')
-
-          log err "$file $f $dev"
-
-          if [ "$f" ]
-          then
-            # $dev is in use.  Check sharing.
-
-            if [ "$mode" == 'no' ]
+	while true
+        do 
+          loopdev=''
+          for dev in /dev/loop*
+          do
+            if [ ! -b "$dev" ]
             then
               continue
             fi
 
-            f=$(readlink -f "$f")
+            f=$(losetup "$dev" 2>/dev/null) || f='()'
+            f=$(echo "$f" | sed -e 's/.*(\(.*\)).*/\1/g')
 
-            if [ "$f" == "$file" ]
+            log err "$file $f $dev"
+
+            if [ "$f" ]
             then
-              check_file_sharing "$file" "$dev" "$mode"
+              # $dev is in use.  Check sharing.
+              if [ "$mode" == 'no' ]
+              then
+                continue
+              fi
+
+              f=$(readlink -f "$f")
+
+              if [ "$f" == "$file" ]
+              then
+                check_file_sharing "$file" "$dev" "$mode"
+              fi
+            else
+              # $dev is not in use, so we'll remember it for use later; we want
+              # to finish the sharing check first.
+              
+              if [ "$loopdev" == '' ]
+              then
+                loopdev="$dev"
+              fi
             fi
-          else
-            # $dev is not in use, so we'll remember it for use later; we want
-            # to finish the sharing check first.
-            
-            if [ "$loopdev" == '' ]
-            then
-              loopdev="$dev"
-            fi
+          done
+
+          if [ "$loopdev" == '' ]
+          then
+            fatal 'Failed to find an unused loop device'
           fi
-        done
-
-        if [ "$loopdev" == '' ]
-        then
-          fatal 'Failed to find an unused loop device'
-        fi
-
-        if losetup "$loopdev" "$file"
-        then
-          xenstore_write "$XENBUS_PATH/node" "$loopdev"
-          write_dev "$loopdev"
-          exit 0
-        else
-          fatal "losetup $loopdev $file failed"
-        fi
+          if losetup "$loopdev" "$file"
+          then
+	    log err "mapped $file using $loopdev"
+            xenstore_write "$XENBUS_PATH/node" "$loopdev"
+            write_dev "$loopdev"
+            exit 0
+          else
+            log err "losetup $loopdev $file failed, retry"
+          fi
+	done
 	;;
     esac
     ;;

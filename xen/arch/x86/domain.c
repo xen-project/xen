@@ -266,7 +266,7 @@ void arch_do_createdomain(struct vcpu *v)
 
     d->shared_info = alloc_xenheap_page();
     memset(d->shared_info, 0, PAGE_SIZE);
-    v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
+    v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
     v->cpumap = CPUMAP_RUNANYWHERE;
     SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
 

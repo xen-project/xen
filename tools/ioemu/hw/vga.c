@@ -1834,16 +1834,6 @@ void vga_bios_init(VGAState *s)
 
     /* TODO:add vbe support if enable it */
 
-    FILE *qemuf = fopen("/etc/xen/qemu-vgaram-bin", "rb");
-    if (!qemuf) {
-        fprintf(logfile, "open qemu vgaram binary failed!\n");
-    } else {
-        /*load vram contents, else vga console can't boot */
-        qemu_get_buffer(qemuf, s->vram_ptr, 256*1024);
-
-        fclose(qemuf);
-    }
-
 }
 
 void vga_common_init(VGAState *s, DisplayState *ds, uint8_t *vga_ram_base, 

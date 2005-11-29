@@ -162,7 +162,7 @@ def send(bug, conn, fd, filename, username, password):
             print >>sys.stderr, (
                 'Attach failed: %s %s.' % (response.status, response.reason))
         elif not m or m.group(1) != 'Changes Submitted':
-            print >>sys.syderr, (
+            print >>sys.stderr, (
                 'Attach failed: got a page titled %s.' % m.group(1))
         else:
             print "Attaching %s to bug %d succeeded." % (filename, bug)

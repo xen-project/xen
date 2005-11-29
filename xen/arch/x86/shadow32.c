@@ -342,14 +342,10 @@ free_shadow_hl2_table(struct domain *d, unsigned long smfn)
 
     SH_VVLOG("%s: smfn=%lx freed", __func__, smfn);
 
-#ifdef __i386__
     if ( shadow_mode_external(d) )
         limit = L2_PAGETABLE_ENTRIES;
     else
         limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
-#else
-    limit = 0; /* XXX x86/64 XXX */
-#endif
 
     for ( i = 0; i < limit; i++ )
     {
@@ -740,11 +736,9 @@ static void alloc_monitor_pagetable(struct vcpu *v)
     mpl2e = (l2_pgentry_t *)map_domain_page(mmfn);
     memset(mpl2e, 0, PAGE_SIZE);
 
-#ifdef __i386__ /* XXX screws x86/64 build */
     memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
-#endif
 
     mpl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
         l2e_from_paddr(__pa(d->arch.mm_perdomain_pt),
@@ -1033,36 +1027,40 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     //
     free_shadow_pages(d);
 
-    /*
-     * Tear down it's counts by disassembling its page-table-based ref counts.
-     * Also remove CR3's gcount/tcount.
-     * That leaves things like GDTs and LDTs and external refs in tact.
-     *
-     * Most pages will be writable tcount=0.
-     * Some will still be L1 tcount=0 or L2 tcount=0.
-     * Maybe some pages will be type none tcount=0.
-     * Pages granted external writable refs (via grant tables?) will
-     * still have a non-zero tcount.  That's OK.
-     *
-     * gcounts will generally be 1 for PGC_allocated.
-     * GDTs and LDTs will have additional gcounts.
-     * Any grant-table based refs will still be in the gcount.
-     *
-     * We attempt to grab writable refs to each page (thus setting its type).
-     * Immediately put back those type refs.
-     *
-     * Assert that no pages are left with L1/L2/L3/L4 type.
-     */
-    audit_adjust_pgtables(d, -1, 1);
-
     d->arch.shadow_mode = mode;
 
     if ( shadow_mode_refcounts(d) )
     {
-        struct list_head *list_ent = d->page_list.next;
-        while ( list_ent != &d->page_list )
-        {
-            struct pfn_info *page = list_entry(list_ent, struct pfn_info, list);
+        struct list_head *list_ent; 
+
+        /*
+         * Tear down its counts by disassembling its page-table-based refcounts
+         * Also remove CR3's gcount/tcount.
+         * That leaves things like GDTs and LDTs and external refs in tact.
+         *
+         * Most pages will be writable tcount=0.
+         * Some will still be L1 tcount=0 or L2 tcount=0.
+         * Maybe some pages will be type none tcount=0.
+         * Pages granted external writable refs (via grant tables?) will
+         * still have a non-zero tcount.  That's OK.
+         *
+         * gcounts will generally be 1 for PGC_allocated.
+         * GDTs and LDTs will have additional gcounts.
+         * Any grant-table based refs will still be in the gcount.
+         *
+         * We attempt to grab writable refs to each page thus setting its type
+         * Immediately put back those type refs.
+         *
+         * Assert that no pages are left with L1/L2/L3/L4 type.
+         */
+        audit_adjust_pgtables(d, -1, 1);
+
+
+        for (list_ent = d->page_list.next; list_ent != &d->page_list; 
+             list_ent = page->list.next) {
+            
+            struct pfn_info *page = list_entry(list_ent, 
+                                               struct pfn_info, list);
             if ( !get_page_type(page, PGT_writable_page) )
                 BUG();
             put_page_type(page);
@@ -1070,13 +1068,13 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
              * We use tlbflush_timestamp as back pointer to smfn, and need to
              * clean up it.
              */
-            if ( shadow_mode_external(d) )
+            if (shadow_mode_external(d))
                 page->tlbflush_timestamp = 0;
-            list_ent = page->list.next;
         }
+        
+        audit_adjust_pgtables(d, 1, 1);
+  
     }
-
-    audit_adjust_pgtables(d, 1, 1);
 
     return 0;
 
@@ -2146,7 +2144,7 @@ static u32 remove_all_write_access_in_ptpage(
         i = (frame_table[readonly_gmfn].u.inuse.type_info & PGT_va_mask) 
             >> PGT_va_shift;
 
-        if ( (i >= 0 && i <= L1_PAGETABLE_ENTRIES) &&
+        if ( (i >= 0 && i < L1_PAGETABLE_ENTRIES) &&
              !l1e_has_changed(pt[i], match, flags) && 
              fix_entry(d, &pt[i], &found, is_l1_shadow, max_refs_to_find) &&
              !prediction )
@@ -2680,6 +2678,16 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
             domain_crash_synchronous();
         }
 
+        /* User access violation in guest? */
+        if ( unlikely((regs->error_code & 4) && 
+                      !(l1e_get_flags(gpte) & _PAGE_USER)))
+        {
+            SH_VVLOG("shadow_fault - EXIT: wr fault on super page (%" PRIpte ")", 
+                    l1e_get_intpte(gpte));
+            goto fail;
+
+        }
+
         if ( unlikely(!l1pte_write_fault(v, &gpte, &spte, va)) )
         {
             SH_VVLOG("shadow_fault - EXIT: l1pte_write_fault failed");
@@ -2693,6 +2701,16 @@ int shadow_fault(unsigned long va, struct cpu_user_regs *regs)
     }
     else
     {
+        /* Read-protection violation in guest? */
+        if ( unlikely((regs->error_code & 1) ))
+        {
+            SH_VVLOG("shadow_fault - EXIT: read fault on super page (%" PRIpte ")", 
+                    l1e_get_intpte(gpte));
+            goto fail;
+
+        }
+
+
         if ( !l1pte_read_fault(d, &gpte, &spte) )
         {
             SH_VVLOG("shadow_fault - EXIT: l1pte_read_fault failed");
@@ -3254,14 +3272,10 @@ int check_l2_table(
                l2e_get_intpte(match));
     }
 
-#ifdef __i386__
     if ( shadow_mode_external(d) )
         limit = L2_PAGETABLE_ENTRIES;
     else
         limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
-#else
-    limit = 0; /* XXX x86/64 XXX */
-#endif
 
     /* Check the whole L2. */
     for ( i = 0; i < limit; i++ )
@@ -3323,14 +3337,10 @@ int _check_pagetable(struct vcpu *v, char *s)
     spl2e = (l2_pgentry_t *) map_domain_page(smfn);
 
     /* Go back and recurse. */
-#ifdef __i386__
     if ( shadow_mode_external(d) )
         limit = L2_PAGETABLE_ENTRIES;
     else
         limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
-#else
-    limit = 0; /* XXX x86/64 XXX */
-#endif
 
     for ( i = 0; i < limit; i++ )
     {
@@ -3346,11 +3356,6 @@ int _check_pagetable(struct vcpu *v, char *s)
 
     unmap_domain_page(spl2e);
     unmap_domain_page(gpl2e);
-
-#if 0
-    SH_VVLOG("PT verified : l2_present = %d, l1_present = %d",
-             sh_l2_present, sh_l1_present);
-#endif
 
  out:
     if ( errors )

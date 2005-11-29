@@ -38,6 +38,8 @@ struct vbd {
 	struct block_device *bdev;
 }; 
 
+struct backend_info; 
+
 typedef struct blkif_st {
 	/* Unique identifier for this interface. */
 	domid_t           domid;
@@ -48,8 +50,10 @@ typedef struct blkif_st {
 	/* Comms information. */
 	blkif_back_ring_t blk_ring;
 	struct vm_struct *blk_ring_area;
-	/* VBDs attached to this interface. */
+	/* The VBD attached to this interface. */
 	struct vbd        vbd;
+	/* Back pointer to the backend_info. */
+	struct backend_info *be; 
 	/* Private fields. */
 	enum { DISCONNECTED, CONNECTED } status;
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
@@ -102,6 +106,8 @@ void blkif_deschedule(blkif_t *blkif);
 void blkif_xenbus_init(void);
 
 irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs);
+
+void update_blkif_status(blkif_t *blkif); 
 
 #endif /* __BLKIF__BACKEND__COMMON_H__ */
 

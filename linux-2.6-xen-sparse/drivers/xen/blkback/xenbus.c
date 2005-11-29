@@ -50,6 +50,16 @@ static void backend_changed(struct xenbus_watch *, const char **,
 			    unsigned int);
 
 
+void update_blkif_status(blkif_t *blkif)
+{ 
+	if(blkif->irq && blkif->vbd.bdev) {
+		blkif->status = CONNECTED; 
+		(void)blkif_be_int(0, blkif, NULL); 
+	}
+	maybe_connect(blkif->be); 
+}
+
+
 static ssize_t show_physical_device(struct device *_dev, char *buf)
 {
 	struct xenbus_device *dev = to_xenbus_device(_dev);
@@ -81,6 +91,7 @@ static int blkback_remove(struct xenbus_device *dev)
 		be->backend_watch.node = NULL;
 	}
 	if (be->blkif) {
+		be->blkif->status = DISCONNECTED; 
 		blkif_put(be->blkif);
 		be->blkif = NULL;
 	}
@@ -122,6 +133,9 @@ static int blkback_probe(struct xenbus_device *dev,
 		xenbus_dev_fatal(dev, err, "creating block interface");
 		goto fail;
 	}
+
+	/* setup back pointer */
+	be->blkif->be = be; 
 
 	err = xenbus_watch_path2(dev, dev->nodename, "physical-device",
 				 &be->backend_watch, backend_changed);
@@ -209,7 +223,8 @@ static void backend_changed(struct xenbus_watch *watch,
 		device_create_file(&dev->dev, &dev_attr_physical_device);
 		device_create_file(&dev->dev, &dev_attr_mode);
 
-		maybe_connect(be);
+		/* We're potentially connected now */
+		update_blkif_status(be->blkif); 
 	}
 }
 
@@ -235,7 +250,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		if (err) {
 			return;
 		}
-		maybe_connect(be);
+		update_blkif_status(be->blkif); 
 		break;
 
 	case XenbusStateClosing:

@@ -671,7 +671,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     memset(&(shared_info->evtchn_pending[0]), 0,
            sizeof (shared_info->evtchn_pending));
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        shared_info->vcpu_data[i].evtchn_pending_sel = 0;
+        shared_info->vcpu_info[i].evtchn_pending_sel = 0;
 
     /* Copy saved contents of shared-info page. No checking needed. */
     page = xc_map_foreign_range(

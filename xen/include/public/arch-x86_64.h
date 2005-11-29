@@ -203,7 +203,7 @@ typedef struct arch_shared_info {
 
 typedef struct {
     unsigned long cr2;
-    unsigned long pad; /* sizeof(vcpu_info_t) == 32 */
+    unsigned long pad; /* sizeof(vcpu_info_t) == 64 */
 } arch_vcpu_info_t;
 
 #endif /* !__ASSEMBLY__ */

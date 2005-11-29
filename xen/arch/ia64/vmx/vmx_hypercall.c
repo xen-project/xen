@@ -198,7 +198,7 @@ static int do_set_shared_page(VCPU *vcpu, u64 gpa)
     if (o_info) {
     	memcpy((void*)d->shared_info, (void*)o_info, PAGE_SIZE);
     	for_each_vcpu(d, v) {
-	        v->vcpu_info = &d->shared_info->vcpu_data[v->vcpu_id];
+	        v->vcpu_info = &d->shared_info->vcpu_info[v->vcpu_id];
     	}
     	/* If original page belongs to xen heap, then relinguish back
     	 * to xen heap. Or else, leave to domain itself to decide.

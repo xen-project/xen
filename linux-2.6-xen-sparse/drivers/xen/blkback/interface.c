@@ -112,7 +112,9 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 
 	blkif->irq = bind_evtchn_to_irqhandler(
 		blkif->evtchn, blkif_be_int, 0, "blkif-backend", blkif);
-	blkif->status = CONNECTED;
+
+	/* We're potentially connected now */
+	update_blkif_status(blkif); 
 
 	return 0;
 }

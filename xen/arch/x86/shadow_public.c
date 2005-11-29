@@ -1077,36 +1077,40 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
     //
     free_shadow_pages(d);
 
-    /*
-     * Tear down it's counts by disassembling its page-table-based ref counts.
-     * Also remove CR3's gcount/tcount.
-     * That leaves things like GDTs and LDTs and external refs in tact.
-     *
-     * Most pages will be writable tcount=0.
-     * Some will still be L1 tcount=0 or L2 tcount=0.
-     * Maybe some pages will be type none tcount=0.
-     * Pages granted external writable refs (via grant tables?) will
-     * still have a non-zero tcount.  That's OK.
-     *
-     * gcounts will generally be 1 for PGC_allocated.
-     * GDTs and LDTs will have additional gcounts.
-     * Any grant-table based refs will still be in the gcount.
-     *
-     * We attempt to grab writable refs to each page (thus setting its type).
-     * Immediately put back those type refs.
-     *
-     * Assert that no pages are left with L1/L2/L3/L4 type.
-     */
-    audit_adjust_pgtables(d, -1, 1);
-
     d->arch.shadow_mode = mode;
 
     if ( shadow_mode_refcounts(d) )
     {
-        struct list_head *list_ent = d->page_list.next;
-        while ( list_ent != &d->page_list )
-        {
-            struct pfn_info *page = list_entry(list_ent, struct pfn_info, list);
+        struct list_head *list_ent; 
+
+        /*
+         * Tear down its counts by disassembling its page-table-based refcounts
+         * Also remove CR3's gcount/tcount.
+         * That leaves things like GDTs and LDTs and external refs in tact.
+         *
+         * Most pages will be writable tcount=0.
+         * Some will still be L1 tcount=0 or L2 tcount=0.
+         * Maybe some pages will be type none tcount=0.
+         * Pages granted external writable refs (via grant tables?) will
+         * still have a non-zero tcount.  That's OK.
+         *
+         * gcounts will generally be 1 for PGC_allocated.
+         * GDTs and LDTs will have additional gcounts.
+         * Any grant-table based refs will still be in the gcount.
+         *
+         * We attempt to grab writable refs to each page thus setting its type
+         * Immediately put back those type refs.
+         *
+         * Assert that no pages are left with L1/L2/L3/L4 type.
+         */
+        audit_adjust_pgtables(d, -1, 1);
+
+
+        for (list_ent = d->page_list.next; list_ent != &d->page_list; 
+             list_ent = page->list.next) {
+            
+            struct pfn_info *page = list_entry(list_ent, 
+                                               struct pfn_info, list);
             if ( !get_page_type(page, PGT_writable_page) )
                 BUG();
             put_page_type(page);
@@ -1114,13 +1118,13 @@ int __shadow_mode_enable(struct domain *d, unsigned int mode)
              * We use tlbflush_timestamp as back pointer to smfn, and need to
              * clean up it.
              */
-            if ( shadow_mode_external(d) )
+            if (shadow_mode_external(d))
                 page->tlbflush_timestamp = 0;
-            list_ent = page->list.next;
         }
+        
+        audit_adjust_pgtables(d, 1, 1);
+  
     }
-
-    audit_adjust_pgtables(d, 1, 1);
 
     return 0;
 
