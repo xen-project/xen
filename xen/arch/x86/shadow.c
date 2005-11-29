@@ -1333,7 +1333,7 @@ static u32 remove_all_write_access_in_ptpage(
         i = (frame_table[readonly_gmfn].u.inuse.type_info & PGT_va_mask)
             >> PGT_va_shift;
 
-        if ( (i >= 0 && i <= L1_PAGETABLE_ENTRIES) &&
+        if ( (i >= 0 && i < L1_PAGETABLE_ENTRIES) &&
              !l1e_has_changed(pt[i], match, flags) &&
              fix_entry(d, &pt[i], &found, is_l1_shadow, max_refs_to_find) &&
              !prediction )
