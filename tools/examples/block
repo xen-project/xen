@@ -1,7 +1,5 @@
 #!/bin/sh
 
-set -x
-
 dir=$(dirname "$0")
 . "$dir/block-common.sh"
 
@@ -19,29 +17,48 @@ expand_dev() {
 }
 
 
+##
+# canonicalise_mode mode
+#
+# Takes the given mode, which may be r, w, ro, rw, w!, or rw!, or variations
+# thereof, and canonicalises them to one of
+#
+#   'r': perform checks for a new read-only mount;
+#   'w': perform checks for a read-write mount; or
+#   '!': perform no checks at all.
+#
 canonicalise_mode()
 {
   local mode="$1"
 
   if ! expr index "$mode" 'w' >/dev/null
   then
-    echo 'ro'
+    echo 'r'
   elif ! expr index "$mode" '!' >/dev/null
   then
-    echo 'rw'
+    echo 'w'
   else
-    echo 'no'
+    echo '!'
   fi
 }
 
 
 ##
-# check_sharing device device_major_minor mode
+# check_sharing device mode
 #
 # Check whether the device requested is already in use.  To use the device in
 # read-only mode, it may be in use in read-only mode, but may not be in use in
 # read-write anywhere at all.  To use the device in read-write mode, it must
 # not be in use anywhere at all.
+#
+# Prints one of
+#
+#    'local': the device may not be used because it is mounted in the current
+#             (i.e. the privileged domain) in a way incompatible with the
+#             requested mode;
+#    'guest': the device may not be used because it already mounted by a guest
+#             in a way incompatible with the requested mode; or
+#    'ok':    the device may be used.
 #
 check_sharing()
 {
@@ -51,7 +68,7 @@ check_sharing()
   local devmm=$(device_major_minor "$dev")
   local file
 
-  if [ "$mode" == 'rw' ]
+  if [ "$mode" == 'w' ]
   then
     toskip="^$"
   else
@@ -79,7 +96,7 @@ check_sharing()
       local d=$(cat "$file")
       if [ "$d" == "$devmm" ]
       then
-        if [ "$mode" == 'rw' ]
+        if [ "$mode" == 'w' ]
         then
           echo 'guest'
           return
@@ -100,13 +117,18 @@ check_sharing()
 }
 
 
+##
+# check_device_sharing dev mode
+#
+# Perform the sharing check for the given physical device and mode.
+#
 check_device_sharing()
 {
   local dev="$1"
   local mode=$(canonicalise_mode "$2")
   local result
 
-  if [ "$mode" == 'no' ]
+  if [ "$mode" == '!' ]
   then
     return 0
   fi
@@ -120,6 +142,12 @@ check_device_sharing()
 }
 
 
+##
+# check_device_sharing file dev mode
+#
+# Perform the sharing check for the given file mounted through the given
+# loopback interface, in the given mode.
+#
 check_file_sharing()
 {
   local file="$1"
@@ -136,6 +164,13 @@ which is mounted " "$mode" "$result"
 }
 
 
+##
+# do_ebusy prefix mode result
+#
+# Helper function for check_device_sharing check_file_sharing, calling ebusy
+# with an error message constructed from the given prefix, mode, and result
+# from a call to check_sharing.
+#
 do_ebusy()
 {
   local prefix="$1"
@@ -151,7 +186,7 @@ do_ebusy()
     when='by a guest'
   fi
 
-  if [ "$mode" == 'rw' ]
+  if [ "$mode" == 'w' ]
   then
     m1=''
     m2=''
@@ -195,7 +230,7 @@ case "$command" in
         file=$(readlink -f "$p")
         mode=$(canonicalise_mode "$mode")
 
-        if [ "$mode" == 'rw' ] && ! stat "$file" -c %A | grep w >&/dev/null
+        if [ "$mode" == 'w' ] && ! stat "$file" -c %A | grep -q w
         then
           ebusy \
 "File $file is read-only, and so I will not
@@ -221,7 +256,7 @@ mount it read-write in a guest domain."
             if [ "$f" ]
             then
               # $dev is in use.  Check sharing.
-              if [ "$mode" == 'no' ]
+              if [ "$mode" == '!' ]
               then
                 continue
               fi
