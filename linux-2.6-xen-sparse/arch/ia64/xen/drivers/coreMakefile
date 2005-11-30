@@ -10,7 +10,7 @@ $(obj)/vmlinux.lds.S:
 	@ln -fsn $(srctree)/arch/$(XENARCH)/kernel/vmlinux.lds.S $@
 
 
-obj-y   := gnttab.o devmem.o
+obj-y   := gnttab.o
 obj-$(CONFIG_PROC_FS) += xen_proc.o
 
 ifeq ($(ARCH),ia64)
