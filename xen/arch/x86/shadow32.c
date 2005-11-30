@@ -2911,6 +2911,8 @@ void __update_pagetables(struct vcpu *v)
      */
     if ( unlikely(!(smfn = __shadow_status(d, gpfn, PGT_base_page_table))) )
         smfn = shadow_l2_table(d, gpfn, gmfn);
+    else
+        shadow_sync_all(d);
     if ( !get_shadow_ref(smfn) )
         BUG();
     old_smfn = pagetable_get_pfn(v->arch.shadow_table);
