@@ -249,7 +249,7 @@ _packet_write(struct packet *pak,
 	 * and send it to the front end.
 	 */
 	tpmif_t *tpmif = pak->tpmif;
-	u16 handle;
+	grant_handle_t handle;
 	int rc = 0;
 	unsigned int i = 0;
 	unsigned int offset = 0;
@@ -290,7 +290,7 @@ _packet_write(struct packet *pak,
 
 		handle = map_op.handle;
 
-		if (map_op.handle < 0) {
+		if (map_op.status) {
 			DPRINTK(" Grant table operation failure !\n");
 			return 0;
 		}
@@ -427,7 +427,7 @@ packet_read_shmem(struct packet *pak,
 	u32 i = (last_read / PAGE_SIZE);
 	u32 pg_offset = last_read & (PAGE_SIZE - 1);
 	u32 to_copy;
-	u16 handle;
+	grant_handle_t handle;
 
 	tpmif_tx_request_t *tx;
 	tx = &tpmif->tx->ring[0].req;
@@ -455,7 +455,7 @@ packet_read_shmem(struct packet *pak,
 			BUG();
 		}
 
-		if (map_op.handle < 0) {
+		if (map_op.status) {
 			DPRINTK(" Grant table operation failure !\n");
 			return -EFAULT;
 		}

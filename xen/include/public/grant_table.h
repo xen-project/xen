@@ -134,6 +134,11 @@ typedef struct grant_entry {
 typedef uint32_t grant_ref_t;
 
 /*
+ * Handle to track a mapping created via a grant reference.
+ */
+typedef uint32_t grant_handle_t;
+
+/*
  * GNTTABOP_map_grant_ref: Map the grant entry (<dom>,<ref>) for access
  * by devices and/or host CPUs. If successful, <handle> is a tracking number
  * that must be presented later to destroy the mapping(s). On error, <handle>
@@ -154,11 +159,12 @@ typedef uint32_t grant_ref_t;
 typedef struct gnttab_map_grant_ref {
     /* IN parameters. */
     uint64_t host_addr;
-    domid_t  dom;
-    grant_ref_t ref;
     uint32_t flags;               /* GNTMAP_* */
+    grant_ref_t ref;
+    domid_t  dom;
     /* OUT parameters. */
-    int32_t  handle;              /* +ve: handle; -ve: GNTST_* */
+    int16_t  status;              /* GNTST_* */
+    grant_handle_t handle;
     uint64_t dev_bus_addr;
 } gnttab_map_grant_ref_t;
 
@@ -178,9 +184,9 @@ typedef struct gnttab_unmap_grant_ref {
     /* IN parameters. */
     uint64_t host_addr;
     uint64_t dev_bus_addr;
-    uint32_t handle;
+    grant_handle_t handle;
     /* OUT parameters. */
-    int32_t  status;              /* GNTST_* */
+    int16_t  status;              /* GNTST_* */
 } gnttab_unmap_grant_ref_t;
 
 /*
@@ -198,7 +204,7 @@ typedef struct gnttab_setup_table {
     domid_t  dom;
     uint32_t nr_frames;
     /* OUT parameters. */
-    int32_t  status;              /* GNTST_* */
+    int16_t  status;              /* GNTST_* */
     unsigned long *frame_list;
 } gnttab_setup_table_t;
 
@@ -211,7 +217,7 @@ typedef struct gnttab_dump_table {
     /* IN parameters. */
     domid_t dom;
     /* OUT parameters. */
-    int32_t status;               /* GNTST_* */
+    int16_t status;               /* GNTST_* */
 } gnttab_dump_table_t;
 
 /*
@@ -229,7 +235,7 @@ typedef struct {
     domid_t       domid;
     grant_ref_t   ref;
     /* OUT parameters. */
-    int32_t       status;
+    int16_t       status;
 } gnttab_transfer_t;
 
 /*

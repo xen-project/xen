@@ -64,7 +64,7 @@ typedef struct blkif_st {
 
 	struct work_struct free_work;
 
-	u16              shmem_handle;
+	grant_handle_t   shmem_handle;
 	grant_ref_t      shmem_ref;
 } blkif_t;
 

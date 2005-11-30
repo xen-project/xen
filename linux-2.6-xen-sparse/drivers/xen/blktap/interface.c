@@ -43,9 +43,9 @@ static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 	unlock_vm_area(blkif->blk_ring_area);
 	BUG_ON(ret);
 
-	if (op.handle < 0) {
+	if (op.status) {
 		DPRINTK(" Grant table operation failure !\n");
-		return op.handle;
+		return op.status;
 	}
 
 	blkif->shmem_ref    = shared_page;

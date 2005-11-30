@@ -43,7 +43,7 @@ typedef struct blkif_request {
 typedef struct blkif_response {
     uint64_t        id;              /* copied from request */
     uint8_t         operation;       /* copied from request */
-    int32_t         status;          /* BLKIF_RSP_???       */
+    int16_t         status;          /* BLKIF_RSP_???       */
 } blkif_response_t;
 
 #define BLKIF_RSP_ERROR  -1 /* non-specific 'error' */

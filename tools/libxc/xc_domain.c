@@ -365,9 +365,9 @@ int xc_domain_get_vcpu_info(int xc_handle,
 
 int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t domid,
-                                uint16_t first_port,
-                                uint16_t nr_ports,
-                                uint16_t allow_access)
+                                uint32_t first_port,
+                                uint32_t nr_ports,
+                                uint32_t allow_access)
 {
     DECLARE_DOM0_OP;
 

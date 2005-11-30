@@ -177,8 +177,8 @@ extern inline domid_t ID_TO_DOM(unsigned long id)
  */
 struct grant_handle_pair
 {
-	u16  kernel;
-	u16  user;
+	grant_handle_t kernel;
+	grant_handle_t user;
 };
 static struct grant_handle_pair pending_grant_handles[MMAP_PAGES];
 #define pending_handle(_idx, _i) \
@@ -755,17 +755,17 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 		uvaddr = MMAP_VADDR(user_vstart, pending_idx, i/2);
 		kvaddr = MMAP_VADDR(mmap_vstart, pending_idx, i/2);
 
-		if (unlikely(map[i].handle < 0)) {
+		if (unlikely(map[i].status)) {
 			DPRINTK("Error on kernel grant mapping (%d)\n",
-				map[i].handle);
-			ret = map[i].handle;
+				map[i].status);
+			ret = map[i].status;
 			cancel = 1;
 		}
 
-		if (unlikely(map[i+1].handle < 0)) {
+		if (unlikely(map[i+1].status)) {
 			DPRINTK("Error on user grant mapping (%d)\n",
-				map[i+1].handle);
-			ret = map[i+1].handle;
+				map[i+1].status);
+			ret = map[i+1].status;
 			cancel = 1;
 		}
 

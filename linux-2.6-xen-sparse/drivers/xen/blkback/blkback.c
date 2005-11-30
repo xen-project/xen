@@ -88,10 +88,10 @@ static inline void flush_plugged_queue(void)
  * handle returned must be used to unmap the frame. This is needed to
  * drop the ref count on the frame.
  */
-static u16 pending_grant_handles[MMAP_PAGES];
+static grant_handle_t pending_grant_handles[MMAP_PAGES];
 #define pending_handle(_idx, _i) \
     (pending_grant_handles[((_idx) * BLKIF_MAX_SEGMENTS_PER_REQUEST) + (_i)])
-#define BLKBACK_INVALID_HANDLE (0xFFFF)
+#define BLKBACK_INVALID_HANDLE (~0)
 
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
 /*
@@ -114,7 +114,7 @@ static void fast_flush_area(int idx, int nr_pages)
 {
 	struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	unsigned int i, invcount = 0;
-	u16 handle;
+	grant_handle_t handle;
 	int ret;
 
 	for (i = 0; i < nr_pages; i++) {
@@ -381,7 +381,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 	BUG_ON(ret);
 
 	for (i = 0; i < nseg; i++) {
-		if (likely(map[i].handle >= 0)) {
+		if (likely(map[i].status == 0)) {
 			pending_handle(pending_idx, i) = map[i].handle;
 #ifdef __ia64__
 			MMAP_VADDR(pending_idx,i) = gnttab_map_vaddr(map[i]);
