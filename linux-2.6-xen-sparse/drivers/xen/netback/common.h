@@ -45,9 +45,9 @@ typedef struct netif_st {
 	u8               fe_dev_addr[6];
 
 	/* Physical parameters of the comms window. */
-	u16              tx_shmem_handle;
+	grant_handle_t   tx_shmem_handle;
 	grant_ref_t      tx_shmem_ref; 
-	u16              rx_shmem_handle;
+	grant_handle_t   rx_shmem_handle;
 	grant_ref_t      rx_shmem_ref; 
 	unsigned int     evtchn;
 	unsigned int     irq;

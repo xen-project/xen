@@ -11,7 +11,6 @@
 int request_print(blkif_request_t *req)
 {
     int i;
-    unsigned long fas;
     
     if ( (req->operation == BLKIF_OP_READ) ||
          (req->operation == BLKIF_OP_WRITE) )
@@ -24,12 +23,10 @@ int request_print(blkif_request_t *req)
         
         
         for (i=0; i < req->nr_segments; i++) {
-            fas = req->frame_and_sects[i];
-            printf("              (pf: 0x%8lx start: %lu stop: %lu)\n",
-                    (fas & PAGE_MASK),
-                    blkif_first_sect(fas),
-                    blkif_last_sect(fas)
-                    );
+            printf("              (gref: 0x%8x start: %u stop: %u)\n",
+                   req->seg[i].gref,
+                   req->seg[i].first_sect,
+                   req->seg[i].last_sect);
         }
             
     } else {

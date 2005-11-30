@@ -32,13 +32,12 @@
 #include <asm/vmx.h>
 #include <asm/vmx_vmcs.h>
 #include <asm/vmx_platform.h>
-#include <asm/vmx_virpit.h>
+#include <asm/vmx_vpit.h>
 #include <asm/apic.h>
 #include <asm/shadow.h>
-
+#include <asm/vmx_vpic.h>
 #include <asm/vmx_vlapic.h>
 #include <public/io/ioreq.h>
-#include <public/io/vmx_vpic.h>
 
 #ifdef CONFIG_VMX
 #if defined (__i386__)

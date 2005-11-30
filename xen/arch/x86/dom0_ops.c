@@ -144,7 +144,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         unsigned int p;
 
         ret = -EINVAL;
-        if ( (fp + np) >= 65536 )
+        if ( (fp + np) > 65536 )
             break;
 
         ret = -ESRCH;

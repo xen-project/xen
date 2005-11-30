@@ -1176,7 +1176,6 @@ CharDriverState *qemu_chr_open_stdio(void)
 int store_console_dev(int domid, char *pts)
 {
     int xc_handle;
-    unsigned int len = 0;
     struct xs_handle *xs;
     char *path;
 
@@ -1218,15 +1217,19 @@ int store_console_dev(int domid, char *pts)
 #if defined(__linux__)
 CharDriverState *qemu_chr_open_pty(void)
 {
-    char slave_name[1024];
     int master_fd, slave_fd;
+    struct termios term;
 
-    /* Not satisfying */
-    if (openpty(&master_fd, &slave_fd, slave_name, NULL, NULL) < 0) {
+    if (openpty(&master_fd, &slave_fd, NULL, NULL, NULL) < 0)
         return NULL;
-    }
-    fprintf(stderr, "char device redirected to %s\n", slave_name);
-    store_console_dev(domid, slave_name);
+
+    /* Set raw attributes on the pty. */
+    cfmakeraw(&term);
+    tcsetattr(slave_fd, TCSAFLUSH, &term);
+
+    fprintf(stderr, "char device redirected to %s\n", ptsname(slave_fd));
+    store_console_dev(domid, ptsname(slave_fd));
+
     return qemu_chr_open_fd(master_fd, master_fd);
 }
 #else

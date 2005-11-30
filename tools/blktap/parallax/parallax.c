@@ -280,8 +280,7 @@ int parallax_probe(blkif_request_t *req, blkif_t *blkif)
       goto err;
 
     /* Make sure the buffer is page-sized. */
-    if ( (blkif_first_sect(req->frame_and_sects[0]) != 0) ||
-       (blkif_last_sect (req->frame_and_sects[0]) != 7) )
+    if ( (req->seg[0].first_sect != 0) || (req->seg[0].last_sect != 7) )
       goto err;
 
     /* fill the list of devices */
@@ -350,17 +349,16 @@ static void read_cb(struct io_ret r, void *in_param)
     /* Calculate read size and offset within the read block. */
 
     offset = (param->sector << SECTOR_SHIFT) % BLOCK_SIZE;
-    size = ( blkif_last_sect (req->frame_and_sects[segment]) -
-             blkif_first_sect(req->frame_and_sects[segment]) + 1
-        ) << SECTOR_SHIFT;
-    start = blkif_first_sect(req->frame_and_sects[segment]) 
-        << SECTOR_SHIFT;
+    size = (req->seg[segment].last_sect - req->seg[segment].first_sect + 1) <<
+        SECTOR_SHIFT;
+    start = req->seg[segment].first_sect << SECTOR_SHIFT;
 
     DPRINTF("ParallaxRead: sect: %lld (%ld,%ld),  "
             "vblock %llx, "
             "size %lx\n", 
-            param->sector, blkif_first_sect(p->req->frame_and_sects[segment]),
-            blkif_last_sect (p->req->frame_and_sects[segment]),
+            param->sector,
+            p->req->seg[segment].first_sect,
+            p->req->seg[segment].last_sect,
             param->vblock, size); 
 
     memcpy(dpage + start, spage + offset, size);
@@ -506,16 +504,15 @@ int parallax_write(blkif_request_t *req, blkif_t *blkif)
         /* Calculate read size and offset within the read block. */
         
         offset = (sector << SECTOR_SHIFT) % BLOCK_SIZE;
-        size = ( blkif_last_sect (req->frame_and_sects[i]) -
-                 blkif_first_sect(req->frame_and_sects[i]) + 1
-            ) << SECTOR_SHIFT;
-        start = blkif_first_sect(req->frame_and_sects[i]) << SECTOR_SHIFT;
+        size = (req->seg[i].last_sect - req->seg[i].first_sect + 1) <<
+            SECTOR_SHIFT;
+        start = req->seg[i].first_sect << SECTOR_SHIFT;
 
         DPRINTF("ParallaxWrite: sect: %lld (%ld,%ld),  "
                 "vblock %llx, gblock %llx, "
                 "size %lx\n", 
-                sector, blkif_first_sect(req->frame_and_sects[i]),
-                blkif_last_sect (req->frame_and_sects[i]),
+                sector, 
+                req->seg[i].first_sect, req->seg[i].last_sect,
                 vblock, gblock, size); 
       
         /* XXX: For now we just freak out if they try to write a   */

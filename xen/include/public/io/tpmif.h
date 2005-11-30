@@ -18,7 +18,7 @@
 
 typedef struct {
     unsigned long addr;   /* Machine address of packet.   */
-    int      ref;         /* grant table access reference */
+    grant_ref_t ref;      /* grant table access reference */
     uint16_t id;          /* Echoed in response message.  */
     uint16_t size;        /* Packet size in bytes.        */
 } tpmif_tx_request_t;

@@ -43,8 +43,8 @@
 #endif
 #include <public/sched.h>
 #include <public/io/ioreq.h>
-#include <public/io/vmx_vpic.h>
-#include <public/io/vmx_vlapic.h>
+#include <asm/vmx_vpic.h>
+#include <asm/vmx_vlapic.h>
 
 int hvm_enabled;
 

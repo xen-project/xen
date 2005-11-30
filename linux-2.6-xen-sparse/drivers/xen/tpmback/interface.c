@@ -91,9 +91,9 @@ map_frontend_page(tpmif_t *tpmif, unsigned long shared_page)
 	unlock_vm_area(tpmif->tx_area);
 	BUG_ON(ret);
 
-	if (op.handle < 0) {
+	if (op.status) {
 		DPRINTK(" Grant table operation failure !\n");
-		return op.handle;
+		return op.status;
 	}
 
 	tpmif->shmem_ref = shared_page;

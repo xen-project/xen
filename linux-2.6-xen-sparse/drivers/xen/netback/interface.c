@@ -127,9 +127,9 @@ static int map_frontend_pages(
 	unlock_vm_area(netif->comms_area);
 	BUG_ON(ret);
 
-	if (op.handle < 0) { 
+	if (op.status) { 
 		DPRINTK(" Gnttab failure mapping tx_ring_ref!\n");
-		return op.handle;
+		return op.status;
 	}
 
 	netif->tx_shmem_ref    = tx_ring_ref;
@@ -145,9 +145,9 @@ static int map_frontend_pages(
 	unlock_vm_area(netif->comms_area);
 	BUG_ON(ret);
 
-	if (op.handle < 0) { 
+	if (op.status) {
 		DPRINTK(" Gnttab failure mapping rx_ring_ref!\n");
-		return op.handle;
+		return op.status;
 	}
 
 	netif->rx_shmem_ref    = rx_ring_ref;

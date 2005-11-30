@@ -114,13 +114,13 @@ __gnttab_map_grant_ref(
                    (GNTMAP_device_map|GNTMAP_host_map)) == 0) )
     {
         DPRINTK("Bad ref (%d) or flags (%x).\n", ref, dev_hst_ro_flags);
-        (void)__put_user(GNTST_bad_gntref, &uop->handle);
+        (void)__put_user(GNTST_bad_gntref, &uop->status);
         return GNTST_bad_gntref;
     }
 
     if ( acm_pre_grant_map_ref(dom) )
     {
-        (void)__put_user(GNTST_permission_denied, &uop->handle);
+        (void)__put_user(GNTST_permission_denied, &uop->status);
         return GNTST_permission_denied;
     }
 
@@ -130,7 +130,7 @@ __gnttab_map_grant_ref(
         if ( rd != NULL )
             put_domain(rd);
         DPRINTK("Could not find domain %d\n", dom);
-        (void)__put_user(GNTST_bad_domain, &uop->handle);
+        (void)__put_user(GNTST_bad_domain, &uop->status);
         return GNTST_bad_domain;
     }
 
@@ -145,7 +145,7 @@ __gnttab_map_grant_ref(
         {
             put_domain(rd);
             DPRINTK("Maptrack table is at maximum size.\n");
-            (void)__put_user(GNTST_no_device_space, &uop->handle);
+            (void)__put_user(GNTST_no_device_space, &uop->status);
             return GNTST_no_device_space;
         }
 
@@ -155,7 +155,7 @@ __gnttab_map_grant_ref(
         {
             put_domain(rd);
             DPRINTK("No more map handles available.\n");
-            (void)__put_user(GNTST_no_device_space, &uop->handle);
+            (void)__put_user(GNTST_no_device_space, &uop->status);
             return GNTST_no_device_space;
         }
 
@@ -370,6 +370,7 @@ __gnttab_map_grant_ref(
 
     (void)__put_user((u64)frame << PAGE_SHIFT, &uop->dev_bus_addr);
     (void)__put_user(handle, &uop->handle);
+    (void)__put_user(GNTST_okay, &uop->status);
 
     put_domain(rd);
     return rc;
@@ -377,7 +378,7 @@ __gnttab_map_grant_ref(
 
  unlock_out:
     spin_unlock(&rd->grant_table->lock);
-    (void)__put_user(rc, &uop->handle);
+    (void)__put_user(rc, &uop->status);
     put_maptrack_handle(ld->grant_table, handle);
     return rc;
 }
@@ -400,7 +401,7 @@ __gnttab_unmap_grant_ref(
 {
     domid_t          dom;
     grant_ref_t      ref;
-    u16              handle;
+    grant_handle_t   handle;
     struct domain   *ld, *rd;
     active_grant_entry_t *act;
     grant_entry_t   *sha;
@@ -957,7 +958,7 @@ gnttab_release_mappings(
     grant_table_t        *gt = d->grant_table;
     grant_mapping_t      *map;
     grant_ref_t           ref;
-    u16                   handle;
+    grant_handle_t        handle;
     struct domain        *rd;
     active_grant_entry_t *act;
     grant_entry_t        *sha;

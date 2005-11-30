@@ -2154,7 +2154,8 @@ static void shadow_update_pagetables(struct vcpu *v)
 #elif CONFIG_PAGING_LEVELS == 4
         smfn = shadow_l4_table(d, gpfn, gmfn);
 #endif
-    }
+    }else
+        shadow_sync_all(d);
     if ( !get_shadow_ref(smfn) )
         BUG();
     old_smfn = pagetable_get_pfn(v->arch.shadow_table);

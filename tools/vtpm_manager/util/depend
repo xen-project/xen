@@ -1,7 +1,0 @@
-hashtable.o: hashtable.c hashtable.h hashtable_private.h
-hashtable_itr.o: hashtable_itr.c hashtable.h hashtable_private.h \
-  hashtable_itr.h
-bsg.o: bsg.c tcg.h ../crypto/crypto.h ../crypto/sym_crypto.h buffer.h \
-  bsg.h log.h
-log.o: log.c buffer.h tcg.h
-buffer.o: buffer.c tcg.h bsg.h buffer.h
