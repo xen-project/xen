@@ -93,24 +93,6 @@ class XendRoot:
         self.configure()
 
 
-    def add_component(self, name, val):
-        """Add a xend component.
-
-        @param name: component name
-        @param val:  component object
-        """
-        self.components[name] = val
-
-    def get_component(self, name):
-        """Get a xend component from its name.
-        This is used as a work-round for problems caused by mutually
-        recursive imports.
-
-        @param name: component name
-        @return: component object (or None)
-        """
-        return self.components.get(name)
-
     def _logError(self, fmt, *args):
         """Logging function to log to stderr. We use this for XendRoot log
         messages because they may be logged before the logger has been
@@ -277,21 +259,3 @@ def instance():
     except:
         inst = XendRoot()
     return inst
-
-def add_component(name, val):
-    """Register a component with XendRoot.
-    This is used to work-round import cycles.
-
-    @param name: component name
-    @param val:  component value (often a module)
-    """
-    return instance().add_component(name, val)
-
-def get_component(name):
-    """Get a component.
-    This is used to work-round import cycles.
-
-    @param name: component name
-    @return component or None
-    """
-    return instance().get_component(name)

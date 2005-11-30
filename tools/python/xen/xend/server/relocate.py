@@ -23,15 +23,11 @@ import StringIO
 from xen.web import protocol, tcp, unix
 
 from xen.xend import sxp
-from xen.xend.XendError import XendError
+from xen.xend import XendDomain
 from xen.xend import XendRoot
+from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 
-
-xroot = XendRoot.instance()
-
-
-DEBUG = 0
 
 class RelocationProtocol(protocol.Protocol):
     """Asynchronous handler for a connected relocation socket.
@@ -111,8 +107,8 @@ class RelocationProtocol(protocol.Protocol):
         if self.transport:
             self.send_reply(["ready", name])
             self.transport.sock.setblocking(1)
-            xd = xroot.get_component("xen.xend.XendDomain")
-            xd.domain_restore_fd(self.transport.sock.fileno())
+            XendDomain.instance().domain_restore_fd(
+                self.transport.sock.fileno())
             self.transport.sock.setblocking(0)
         else:
             log.error(name + ": no transport")
@@ -120,6 +116,7 @@ class RelocationProtocol(protocol.Protocol):
 
 
 def listenRelocation():
+    xroot = XendRoot.instance()
     if xroot.get_xend_unix_server():
         path = '/var/lib/xend/relocation-socket'
         unix.listenUNIX(path, RelocationProtocol)
@@ -128,15 +125,3 @@ def listenRelocation():
         interface = xroot.get_xend_relocation_address()
         l = tcp.listenTCP(port, RelocationProtocol, interface=interface)
         l.setCloExec()
-
-def setupRelocation(dst, port):
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((dst, port))
-    except socket.error, err:
-        raise XendError("can't connect: %s" % err[1])
-
-    sock.send("receive\n")
-    print sock.recv(80)
-
-    return sock
