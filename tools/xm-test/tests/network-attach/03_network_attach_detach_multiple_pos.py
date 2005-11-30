@@ -24,6 +24,9 @@ except DomainError, e:
 # Attach a console to it
 try:
     console = XmConsole(domain.getName(), historySaveCmds=True)
+    # network-detach is crashing, so we enable console debugging
+    # for now, so that reports include the oops
+    console.debugMe = True
 except ConsoleError, e:
     FAIL(str(e))
 
