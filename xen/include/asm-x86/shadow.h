@@ -317,7 +317,7 @@ struct out_of_sync_entry {
     unsigned long gpfn;    /* why is this here? */
     unsigned long gmfn;
     unsigned long snapshot_mfn;
-    unsigned long writable_pl1e; /* NB: this is a machine address */
+    physaddr_t writable_pl1e; /* NB: this is a machine address */
     unsigned long va;
 };
 
