@@ -293,11 +293,7 @@ void domain_pause(struct domain *d)
     struct vcpu *v;
 
     for_each_vcpu( d, v )
-    {
-        BUG_ON(v == current);
-        atomic_inc(&v->pausecnt);
-        vcpu_sleep_sync(v);
-    }
+        vcpu_pause(v);
 
     sync_pagetable_state(d);
 }
