@@ -48,8 +48,8 @@ struct sched_adjdom_cmd {
             uint64_t period;
             uint64_t slice;
             uint64_t latency;
-            uint16_t extratime;
-            uint16_t weight;
+            uint32_t extratime;
+            uint32_t weight;
         } sedf;
 
     } u;

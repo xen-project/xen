@@ -33,6 +33,9 @@
 #include <linux/blkdev.h>
 #include <linux/list.h>
 
+#define BLKIF_MAJOR(dev) ((dev)>>8)
+#define BLKIF_MINOR(dev) ((dev) & 0xff)
+
 /*
  * For convenience we distinguish between ide, scsi and 'other' (i.e.,
  * potentially combinations of the two) in the naming scheme and in a few other

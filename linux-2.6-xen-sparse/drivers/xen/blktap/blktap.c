@@ -713,7 +713,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 		/* Map the remote page to kernel. */
 		map[op].host_addr = kvaddr;
 		map[op].dom   = blkif->domid;
-		map[op].ref   = blkif_gref_from_fas(req->frame_and_sects[i]);
+		map[op].ref   = req->seg[i].gref;
 		map[op].flags = GNTMAP_host_map;
 		/* This needs a bit more thought in terms of interposition: 
 		 * If we want to be able to modify pages during write using 
@@ -733,7 +733,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 
 		map[op].host_addr = ptep;
 		map[op].dom       = blkif->domid;
-		map[op].ref       = blkif_gref_from_fas(req->frame_and_sects[i]);
+		map[op].ref       = req->seg[i].gref;
 		map[op].flags     = GNTMAP_host_map | GNTMAP_application_map
 			| GNTMAP_contains_pte;
 		/* Above interposition comment applies here as well. */

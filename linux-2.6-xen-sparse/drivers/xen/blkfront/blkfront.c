@@ -32,7 +32,6 @@
  * IN THE SOFTWARE.
  */
 
-
 #if 1
 #define ASSERT(p)							   \
 	if (!(p)) { printk("Assertion '%s' failed, line %d, file %s", #p , \
@@ -40,7 +39,6 @@
 #else
 #define ASSERT(_p)
 #endif
-
 
 #include <linux/version.h>
 #include "block.h"
@@ -54,15 +52,13 @@
 #include <asm-xen/gnttab.h>
 #include <asm/hypervisor.h>
 
-
 #define BLKIF_STATE_DISCONNECTED 0
 #define BLKIF_STATE_CONNECTED    1
 #define BLKIF_STATE_SUSPENDED    2
 
 #define MAXIMUM_OUTSTANDING_BLOCK_REQS \
-    (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLKIF_RING_SIZE)
+    (BLKIF_MAX_SEGMENTS_PER_REQUEST * BLK_RING_SIZE)
 #define GRANT_INVALID_REF	0
-
 
 static void connect(struct blkfront_info *);
 static void blkfront_closing(struct xenbus_device *);
@@ -551,8 +547,11 @@ static int blkif_queue_request(struct request *req)
 			info->shadow[id].frame[ring_req->nr_segments] =
 				mfn_to_pfn(buffer_mfn);
 
-			ring_req->frame_and_sects[ring_req->nr_segments] =
-				blkif_fas_from_gref(ref, fsect, lsect);
+			ring_req->seg[ring_req->nr_segments] =
+				(struct blkif_request_segment) {
+					.gref       = ref,
+					.first_sect = fsect, 
+					.last_sect  = lsect };
 
 			ring_req->nr_segments++;
 		}
@@ -699,8 +698,7 @@ static void blkif_completion(struct blk_shadow *s)
 {
 	int i;
 	for (i = 0; i < s->req.nr_segments; i++)
-		gnttab_end_foreign_access(
-			blkif_gref_from_fas(s->req.frame_and_sects[i]), 0, 0UL);
+		gnttab_end_foreign_access(s->req.seg[i].gref, 0, 0UL);
 }
 
 static void blkif_recover(struct blkfront_info *info)
@@ -740,7 +738,7 @@ static void blkif_recover(struct blkfront_info *info)
 		/* Rewrite any grant references invalidated by susp/resume. */
 		for (j = 0; j < req->nr_segments; j++)
 			gnttab_grant_foreign_access_ref(
-				blkif_gref_from_fas(req->frame_and_sects[j]),
+				req->seg[j].gref,
 				info->xbdev->otherend_id,
 				pfn_to_mfn(info->shadow[req->id].frame[j]),
 				rq_data_dir(
