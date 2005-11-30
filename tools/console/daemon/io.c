@@ -376,9 +376,6 @@ static void remove_domain(struct domain *dom)
 
 static void cleanup_domain(struct domain *d)
 {
-	if (!buffer_empty(&d->buffer))
-		return;
-
 	if (d->tty_fd != -1) {
 		close(d->tty_fd);
 		d->tty_fd = -1;
