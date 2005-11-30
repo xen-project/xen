@@ -97,7 +97,7 @@ class Machine:
                      "cores_per_socket" : "Unknown",
                      "threads_per_core" : "Unknown",
                      "cpu_mhz"          : "Unknown",
-                     "memory"           : "Unknown"}
+                     "total_memory"     : "Unknown"}
 
         xen = self.__getXenInfo(xenValues)
         cpu = self.__getCpuInfo(cpuValues)

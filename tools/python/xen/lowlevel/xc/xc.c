@@ -575,6 +575,13 @@ static PyObject *pyxc_readconsolering(XcObject *self,
     return PyString_FromStringAndSize(str, count);
 }
 
+
+static unsigned long pages_to_mb(unsigned long pages)
+{
+    return (pages * (XC_PAGE_SIZE / 1024) + 1023) / 1024;
+}
+
+
 static PyObject *pyxc_physinfo(XcObject *self)
 {
     xc_physinfo_t info;
@@ -599,8 +606,8 @@ static PyObject *pyxc_physinfo(XcObject *self)
                          "cores_per_socket", info.cores_per_socket,
                          "sockets_per_node", info.sockets_per_node,
                          "nr_nodes",         info.nr_nodes,
-                         "total_pages",      info.total_pages,
-                         "free_pages",       info.free_pages,
+                         "total_memory",     pages_to_mb(info.total_pages),
+                         "free_memory",      pages_to_mb(info.free_pages),
                          "cpu_khz",          info.cpu_khz,
                          "hw_caps",          cpu_cap);
 }

@@ -57,30 +57,45 @@ class XendNode:
                 ['machine', mch]]
 
     def physinfo(self):
-        pinfo = self.xc.physinfo()
-        info = [['nr_cpus',          pinfo['nr_nodes']*pinfo['sockets_per_node']*pinfo['cores_per_socket']*pinfo['threads_per_core']],
-                ['nr_nodes',         pinfo['nr_nodes']],
-                ['sockets_per_node', pinfo['sockets_per_node']],
-                ['cores_per_socket', pinfo['cores_per_socket']],
-                ['threads_per_core', pinfo['threads_per_core']],
-                ['cpu_mhz',          pinfo['cpu_khz']/1000],
-                ['hw_caps',          pinfo['hw_caps']],
-                ['memory',           pinfo['total_pages']/256],
-                ['free_memory',      pinfo['free_pages']/256]]
-        return info
-        
+        info = self.xc.physinfo()
+
+        info['nr_cpus'] = (info['nr_nodes'] *
+                           info['sockets_per_node'] *
+                           info['cores_per_socket'] *
+                           info['threads_per_core'])
+        info['cpu_mhz'] = info['cpu_khz'] / 1000
+
+        ITEM_ORDER = ['nr_cpus',
+                      'nr_nodes',
+                      'sockets_per_node',
+                      'cores_per_socket',
+                      'threads_per_core',
+                      'cpu_mhz',
+                      'hw_caps',
+                      'total_memory',
+                      'free_memory',
+                      ]
+
+        return [[k, info[k]] for k in ITEM_ORDER]
+
+
     def xeninfo(self):
-        xinfo = self.xc.xeninfo()
-        return [['xen_major', xinfo['xen_major']],
-                ['xen_minor', xinfo['xen_minor']],
-                ['xen_extra', xinfo['xen_extra']],
-                ['xen_caps',  xinfo['xen_caps']],
-                ['platform_params',xinfo['platform_params']],
-                ['xen_changeset', xinfo['xen_changeset']],
-                ['cc_compiler', xinfo['cc_compiler']],
-                ['cc_compile_by', xinfo['cc_compile_by']],
-                ['cc_compile_domain', xinfo['cc_compile_domain']],
-                ['cc_compile_date', xinfo['cc_compile_date']]]
+        info = self.xc.xeninfo()
+
+        ITEM_ORDER = ['xen_major',
+                      'xen_minor',
+                      'xen_extra',
+                      'xen_caps',
+                      'platform_params',
+                      'xen_changeset',
+                      'cc_compiler',
+                      'cc_compile_by',
+                      'cc_compile_domain',
+                      'cc_compile_date',
+                      ]
+
+        return [[k, info[k]] for k in ITEM_ORDER]
+
 
 def instance():
     global inst
