@@ -10,7 +10,7 @@
 #define PROGRESS 0
 
 #define ERR(_f, _a...) do {                     \
-    fprintf(stderr, _f "\n" , ## _a);           \
+    fprintf(stderr, _f ": %d\n" , ## _a, errno);\
     fflush(stderr); }                           \
 while (0)
 

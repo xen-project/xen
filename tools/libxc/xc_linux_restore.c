@@ -221,7 +221,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
     
     if(xc_domain_memory_increase_reservation(
            xc_handle, dom, max_pfn, 0, 0, NULL) != 0) { 
-        ERR("Failed to increase reservation by %lx KB\n", PFN_TO_KB(max_pfn));
+        ERR("Failed to increase reservation by %lx KB", PFN_TO_KB(max_pfn));
         errno = ENOMEM;
         goto out;
     }
@@ -487,7 +487,7 @@ int xc_linux_restore(int xc_handle, int io_fd,
                 for(k = 0; k < j; k++) {
                     if(!uncanonicalize_pagetable(L1TAB, 
                                                  region_base + k*PAGE_SIZE)) {
-                        ERR("failed uncanonicalize pt!\n"); 
+                        ERR("failed uncanonicalize pt!"); 
                         goto out; 
                     } 
                 }
