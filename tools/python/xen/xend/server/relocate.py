@@ -16,7 +16,6 @@
 # Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
-import socket
 import sys
 import StringIO
 

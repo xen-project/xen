@@ -171,7 +171,7 @@ class XendRoot:
         v = self.get_config_value(name, val)
         try:
             return int(v)
-        except Exception, ex:
+        except Exception:
             raise XendError("invalid xend config %s: expected int: %s" % (name, v))
 
     def get_xend_http_server(self):

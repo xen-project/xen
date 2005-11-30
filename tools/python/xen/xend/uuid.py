@@ -25,14 +25,14 @@ import commands
 import random
 
 
-def getUuidUuidgen(random = True):
+def getUuidUuidgen(randomly = True):
     """Generate a UUID using the command uuidgen.
 
-    If random is true (default) generates a random uuid.
-    If random is false generates a time-based uuid.
+    If randomly is true (default) generates a random uuid.
+    If randomly is false generates a time-based uuid.
     """
     cmd = "uuidgen"
-    if random:
+    if randomly:
         cmd += " -r"
     else:
         cmd += " -t"
@@ -42,7 +42,7 @@ def getUuidUuidgen(random = True):
 def getUuidRandom():
     """Generate a random UUID."""
     
-    return [ random.randint(0, 255) for i in range(0, 16) ]
+    return [ random.randint(0, 255) for _ in range(0, 16) ]
 
 
 #uuidFactory = getUuidUuidgen

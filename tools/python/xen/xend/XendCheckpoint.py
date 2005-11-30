@@ -18,8 +18,6 @@ import xen.util.auxbin
 
 import xen.lowlevel.xc
 
-from xen.xend.xenstore.xsutil import IntroduceDomain
-
 from XendError import XendError
 from XendLogging import log
 
