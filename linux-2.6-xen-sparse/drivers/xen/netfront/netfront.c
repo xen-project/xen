@@ -616,6 +616,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	RING_IDX i;
 	grant_ref_t ref;
 	unsigned long mfn;
+	int notify;
 
 	if (unlikely(np->tx_full)) {
 		printk(KERN_ALERT "%s: full queue wasn't stopped!\n",
@@ -661,9 +662,10 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	tx->size = skb->len;
 	tx->csum_blank = (skb->ip_summed == CHECKSUM_HW);
 
-	wmb(); /* Ensure that backend will see the request. */
 	np->tx.req_prod_pvt = i + 1;
-	RING_PUSH_REQUESTS(&np->tx);
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&np->tx, notify);
+	if (notify)
+		notify_remote_via_irq(np->irq);
 
 	network_tx_buf_gc(dev);
 
@@ -676,13 +678,6 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	np->stats.tx_bytes += skb->len;
 	np->stats.tx_packets++;
-
-	/* Only notify Xen if we really have to. */
-	mb();
-	if (np->tx.sring->server_is_sleeping) {
-		np->tx.sring->server_is_sleeping = 0;
-		notify_remote_via_irq(np->irq);
-	}
 
 	return 0;
 
@@ -761,7 +756,8 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 					rx->id, rx->status);
 			RING_GET_REQUEST(&np->rx, np->rx.req_prod_pvt)->id =
 				rx->id;
-			wmb();
+			RING_GET_REQUEST(&np->rx, np->rx.req_prod_pvt)->gref =
+				ref;
 			np->rx.req_prod_pvt++;
 			RING_PUSH_REQUESTS(&np->rx);
 			work_done--;
@@ -882,14 +878,9 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 	if (work_done < budget) {
 		local_irq_save(flags);
 
-		np->rx.sring->rsp_event = i + 1;
-    
-		/* Deal with hypervisor racing our resetting of rx_event. */
-		mb();
-		if (np->rx.sring->rsp_prod == i) {
+		RING_FINAL_CHECK_FOR_RESPONSES(&np->rx, more_to_do);
+		if (!more_to_do)
 			__netif_rx_complete(dev);
-			more_to_do = 0;
-		}
 
 		local_irq_restore(flags);
 	}
@@ -930,7 +921,6 @@ static void network_connect(struct net_device *dev)
 
 	/* Step 1: Reinitialise variables. */
 	np->tx_full = 0;
-	np->rx.sring->rsp_event = np->tx.sring->rsp_event = 1;
 
 	/*
 	 * Step 2: Rebuild the RX and TX ring contents.
@@ -972,7 +962,7 @@ static void network_connect(struct net_device *dev)
 		np->stats.tx_bytes += skb->len;
 		np->stats.tx_packets++;
 	}
-	wmb();
+
 	np->tx.req_prod_pvt = requeue_idx;
 	RING_PUSH_REQUESTS(&np->tx);
 
@@ -987,7 +977,7 @@ static void network_connect(struct net_device *dev)
 		RING_GET_REQUEST(&np->rx, requeue_idx)->id = i;
 		requeue_idx++; 
 	}
-	wmb();                
+
 	np->rx.req_prod_pvt = requeue_idx;
 	RING_PUSH_REQUESTS(&np->rx);
 
@@ -998,7 +988,6 @@ static void network_connect(struct net_device *dev)
 	 * packets.
 	 */
 	np->backend_state = BEST_CONNECTED;
-	wmb();
 	notify_remote_via_irq(np->irq);
 	network_tx_buf_gc(dev);
 

@@ -375,7 +375,7 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 static unsigned int blktap_poll(struct file *file, poll_table *wait)
 {
 	poll_wait(file, &blktap_wait, wait);
-	if (RING_HAS_UNPUSHED_REQUESTS(&blktap_ufe_ring)) {
+	if (blktap_ufe_ring.req_prod_pvt != blktap_ufe_ring.sring->req_prod) {
 		flush_tlb_all();
 		RING_PUSH_REQUESTS(&blktap_ufe_ring);
 		return POLLIN | POLLRDNORM;

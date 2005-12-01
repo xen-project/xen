@@ -44,9 +44,6 @@ static mmu_update_t rx_mmu[NET_RX_RING_SIZE];
 static gnttab_transfer_t grant_rx_op[MAX_PENDING_REQS];
 static unsigned char rx_notify[NR_IRQS];
 
-/* Don't currently gate addition of an interface to the tx scheduling list. */
-#define tx_work_exists(_if) (1)
-
 static unsigned long mmap_vstart;
 #define MMAP_VADDR(_req) (mmap_vstart + ((_req) * PAGE_SIZE))
 
@@ -377,25 +374,22 @@ static void add_to_net_schedule_list_tail(netif_t *netif)
  * aggressive in avoiding new-packet notifications -- frontend only needs to
  * send a notification if there are no outstanding unreceived responses.
  * If we may be buffer transmit buffers for any reason then we must be rather
- * more conservative and advertise that we are 'sleeping' this connection here.
+ * more conservative and treat this as the final check for pending work.
  */
 void netif_schedule_work(netif_t *netif)
 {
-	if (RING_HAS_UNCONSUMED_REQUESTS(&netif->tx)) {
+	int more_to_do;
+
+#ifdef CONFIG_XEN_NETDEV_PIPELINED_TRANSMITTER
+	more_to_do = RING_HAS_UNCONSUMED_REQUESTS(&netif->tx);
+#else
+	RING_FINAL_CHECK_FOR_REQUESTS(&netif->tx, more_to_do);
+#endif
+
+	if (more_to_do) {
 		add_to_net_schedule_list_tail(netif);
 		maybe_schedule_tx_action();
 	}
-#ifndef CONFIG_XEN_NETDEV_PIPELINED_TRANSMITTER
-	else {
-		netif->tx.sring->server_is_sleeping = 1;
-		mb();
-		if (RING_HAS_UNCONSUMED_REQUESTS(&netif->tx)) {
-			netif->tx.sring->server_is_sleeping = 0;
-			add_to_net_schedule_list_tail(netif);
-			maybe_schedule_tx_action();
-		}
-	}
-#endif
 }
 
 void netif_deschedule_work(netif_t *netif)
@@ -447,26 +441,6 @@ inline static void net_tx_action_dealloc(void)
         
 		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
 
-		/*
-		 * Scheduling checks must happen after the above response is
-		 * posted. This avoids a possible race with a guest OS on
-		 * another CPU if that guest is testing against 'resp_prod'
-		 * when deciding whether to notify us when it queues additional
-                 * packets.
-		 */
-		mb();
-
-		if (RING_HAS_UNCONSUMED_REQUESTS(&netif->tx)) {
-			add_to_net_schedule_list_tail(netif);
-		} else {
-			netif->tx.sring->server_is_sleeping = 1;
-			mb();
-			if (RING_HAS_UNCONSUMED_REQUESTS(&netif->tx)) {
-				netif->tx.sring->server_is_sleeping = 0;
-				add_to_net_schedule_list_tail(netif);
-			}
-		}
-
 		netif_put(netif);
 	}
 }
@@ -482,7 +456,7 @@ static void net_tx_action(unsigned long unused)
 	RING_IDX i;
 	gnttab_map_grant_ref_t *mop;
 	unsigned int data_len;
-	int ret;
+	int ret, work_to_do;
 
 	if (dealloc_cons != dealloc_prod)
 		net_tx_action_dealloc();
@@ -496,8 +470,8 @@ static void net_tx_action(unsigned long unused)
 		netif_get(netif);
 		remove_from_net_schedule_list(netif);
 
-		/* Work to do? */
-		if (!RING_HAS_UNCONSUMED_REQUESTS(&netif->tx)) {
+		RING_FINAL_CHECK_FOR_REQUESTS(&netif->tx, work_to_do);
+		if (!work_to_do) {
 			netif_put(netif);
 			continue;
 		}
@@ -695,10 +669,8 @@ static void netif_page_release(struct page *page)
 irqreturn_t netif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 {
 	netif_t *netif = dev_id;
-	if (tx_work_exists(netif)) {
-		add_to_net_schedule_list_tail(netif);
-		maybe_schedule_tx_action();
-	}
+	add_to_net_schedule_list_tail(netif);
+	maybe_schedule_tx_action();
 	return IRQ_HANDLED;
 }
 
@@ -708,17 +680,25 @@ static void make_tx_response(netif_t *netif,
 {
 	RING_IDX i = netif->tx.rsp_prod_pvt;
 	netif_tx_response_t *resp;
+	int notify;
 
 	resp = RING_GET_RESPONSE(&netif->tx, i);
 	resp->id     = id;
 	resp->status = st;
-	wmb();
-	netif->tx.rsp_prod_pvt = ++i;
-	RING_PUSH_RESPONSES(&netif->tx);
 
-	mb(); /* Update producer before checking event threshold. */
-	if (i == netif->tx.sring->rsp_event)
+	netif->tx.rsp_prod_pvt = ++i;
+	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&netif->tx, notify);
+	if (notify)
 		notify_remote_via_irq(netif->irq);
+
+#ifdef CONFIG_XEN_NETDEV_PIPELINED_TRANSMITTER
+	if (i == netif->tx.req_cons) {
+		int more_to_do;
+		RING_FINAL_CHECK_FOR_REQUESTS(&netif->tx, more_to_do);
+		if (more_to_do)
+			add_to_net_schedule_list_tail(netif);
+	}
+#endif
 }
 
 static int make_rx_response(netif_t *netif, 
@@ -730,6 +710,7 @@ static int make_rx_response(netif_t *netif,
 {
 	RING_IDX i = netif->rx.rsp_prod_pvt;
 	netif_rx_response_t *resp;
+	int notify;
 
 	resp = RING_GET_RESPONSE(&netif->rx, i);
 	resp->offset     = offset;
@@ -738,12 +719,11 @@ static int make_rx_response(netif_t *netif,
 	resp->status     = (s16)size;
 	if (st < 0)
 		resp->status = (s16)st;
-	wmb();
-	netif->rx.rsp_prod_pvt = ++i;
-	RING_PUSH_RESPONSES(&netif->rx);
 
-	mb(); /* Update producer before checking event threshold. */
-	return (i == netif->rx.sring->rsp_event);
+	netif->rx.rsp_prod_pvt = ++i;
+	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&netif->rx, notify);
+
+	return notify;
 }
 
 static irqreturn_t netif_be_dbg(int irq, void *dev_id, struct pt_regs *regs)
