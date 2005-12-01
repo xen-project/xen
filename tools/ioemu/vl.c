@@ -2907,7 +2907,7 @@ int main(int argc, char **argv)
                 break;
             case QEMU_OPTION_p:
                 {
-                    extern uint16_t ioreq_remote_port;
+                    extern evtchn_port_t ioreq_remote_port;
                     ioreq_remote_port = atoi(optarg);
                     fprintf(logfile, "eport: %d\n", ioreq_remote_port);
                 }
