@@ -90,6 +90,11 @@ if s != 0:
 
 try:
     console = XmConsole(domain.getName())
+    # Enable debug dumping, as this causes an Oops on x86_64
+    console.debugMe = True
+
+    # In case the domain is rebooted
+    console.sendInput("ls")
 
     run = console.runCmd("ls | grep proc")
     if run["return"] != 0:

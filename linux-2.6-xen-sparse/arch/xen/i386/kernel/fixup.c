@@ -56,9 +56,11 @@ fastcall void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 	DP("***************************************************************");
 	DP("***************************************************************");
 	DP("** WARNING: Currently emulating unsupported memory accesses  **");
-	DP("**          in /lib/tls libraries. The emulation is very     **");
+	DP("**          in /lib/tls glibc libraries. The emulation is    **");
 	DP("**          slow. To ensure full performance you should      **");
-	DP("**          execute the following as root:                   **");
+	DP("**          install a 'xen-friendly' (nosegneg) version of   **");
+	DP("**          the library, or disable tls support by executing **");
+	DP("**          the following as root:                           **");
 	DP("**          mv /lib/tls /lib/tls.disabled                    **");
 	DP("** Offending process: %-38.38s **", info);
 	DP("***************************************************************");

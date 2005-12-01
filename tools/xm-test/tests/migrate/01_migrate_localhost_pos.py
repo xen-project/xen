@@ -38,8 +38,8 @@ except ConsoleError, e:
 try:
     # Activate the console
     console.sendInput("foo")
-    # Make sure a command succeeds
-    run = console.runCmd("ls /bin")
+    # Set a variable to check on the other side
+    run = console.runCmd("foo=bar")
 except ConsoleError, e:
     FAIL(str(e))
 
@@ -66,18 +66,21 @@ if (old_domid == new_domid):
 # Attach a console to it
 try:
     console = XmConsole(domain.getName(), historySaveCmds=True)
+    console.debugMe = True
 except ConsoleError, e:
     pass
+
+console.sendInput("ls")
 
 # Run 'ls'
 try:
     # Check the dmesg output on the domU
-    run = console.runCmd("ls /bin")
+    run = console.runCmd("echo xx$foo")
 except ConsoleError, e:
     FAIL(str(e))
-
-if not re.search("chmod", run["output"]):
-    FAIL("invalid console output from ls after migration")
+    
+if not re.search("bar", run["output"]):
+    FAIL("Migrated domain has been reset")
 
 # Close the console
 console.closeConsole()

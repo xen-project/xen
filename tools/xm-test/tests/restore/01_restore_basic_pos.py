@@ -25,6 +25,8 @@ except DomainError, e:
 # Make sure the domain isn't DOA
 try:
     console = XmConsole(domain.getName())
+    console.sendInput("input")
+    console.runCmd("foo=bar")
 except ConsoleError, e:
     FAIL(str(e))
 
@@ -63,9 +65,12 @@ if not isDomainRunning(domain.getName()):
 # Make sure it's alive
 try:
     newConsole = XmConsole(domain.getName())
-    run = newConsole.runCmd("ls")
-    if run["return"] != 0:
-        FAIL("Unable to read from restored domain")
+    # Enable debug dumping because this generates a Oops on x86_64
+    newConsole.debugMe = True
+    newConsole.sendInput("ls")
+    run = newConsole.runCmd("echo xx$foo")
+    if not re.search("bar", run["output"]):
+        FAIL("Restored domain has been reset")
 except ConsoleError, e:
     FAIL("Restored domain is dead (%s)" % str(e))
 

@@ -4,7 +4,6 @@ TESTS = 01_create_basic_pos.test \
 	02_create_noparm_neg.test \
 	03_create_badparm_neg.test \
 	04_create_conflictname_neg.test \
-	05_create_noroot_noram_neg.test \
 	06_create_mem_neg.test \
 	07_create_mem64_pos.test \
 	08_create_mem128_pos.test \
