@@ -40,10 +40,18 @@ def write_exact(fd, buf, errmsg):
         raise XendError(errmsg)
 
 def read_exact(fd, size, errmsg):
-    buf = os.read(fd, size)
-    if len(buf) != size:
-        raise XendError(errmsg)
+    buf  = '' 
+    while size != 0: 
+        str = os.read(fd, size)
+        if not len(str):
+            log.error("read_exact: EOF trying to read %d (buf='%s')" % \
+                      (size, buf))
+            raise XendError(errmsg)
+        size = size - len(str)
+        buf  = buf + str
     return buf
+
+
 
 def save(fd, dominfo, live):
     write_exact(fd, SIGNATURE, "could not write guest state file: signature")
