@@ -33,6 +33,7 @@ import xen.lowlevel.xc
 from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file
 
+import balloon
 import image
 import sxp
 import uuid
@@ -226,13 +227,13 @@ def recreate(xeninfo, priv):
                 'Uuid in store does not match uuid for existing domain %d: '
                 '%s != %s' % (domid, uuid2_str, xeninfo['uuid']))
 
-        vm = XendDomainInfo(xeninfo, domid, dompath, True)
+        vm = XendDomainInfo(xeninfo, domid, dompath, True, priv)
 
     except Exception, exn:
         if priv:
             log.warn(str(exn))
 
-        vm = XendDomainInfo(xeninfo, domid, dompath, True)
+        vm = XendDomainInfo(xeninfo, domid, dompath, True, priv)
         vm.removeDom()
         vm.removeVm()
         vm.storeVmDetails()
@@ -369,7 +370,8 @@ def dom_get(dom):
 
 class XendDomainInfo:
 
-    def __init__(self, info, domid = None, dompath = None, augment = False):
+    def __init__(self, info, domid = None, dompath = None, augment = False,
+                 priv = False):
 
         self.info = info
 
@@ -387,7 +389,7 @@ class XendDomainInfo:
         self.dompath = dompath
 
         if augment:
-            self.augmentInfo()
+            self.augmentInfo(priv)
 
         self.validateInfo()
 
@@ -443,7 +445,7 @@ class XendDomainInfo:
         return 1
 
 
-    def augmentInfo(self):
+    def augmentInfo(self, priv):
         """Augment self.info, as given to us through {@link #recreate}, with
         values taken from the store.  This recovers those values known to xend
         but not to the hypervisor.
@@ -452,8 +454,15 @@ class XendDomainInfo:
             if not self.infoIsSet(name) and val is not None:
                 self.info[name] = val
 
-        map(lambda x, y: useIfNeeded(x[0], y), VM_STORE_ENTRIES,
-            self.readVMDetails(VM_STORE_ENTRIES))
+        if priv:
+            entries = VM_STORE_ENTRIES[:]
+            entries.remove(('memory', int))
+            entries.remove(('maxmem', int))
+        else:
+            entries = VM_STORE_ENTRIES
+
+        map(lambda x, y: useIfNeeded(x[0], y), entries,
+            self.readVMDetails(entries))
 
         device = []
         for c in controllerClasses:
@@ -842,6 +851,9 @@ class XendDomainInfo:
         """Set the memory target of this domain.
         @param target In MiB.
         """
+        log.debug("Setting memory target of domain %s (%d) to %d MiB.",
+                  self.info['name'], self.domid, target)
+        
         self.info['memory'] = target
         self.storeVm("memory", target)
         self.storeDom("memory/target", target << 10)
@@ -1105,6 +1117,7 @@ class XendDomainInfo:
             xc.domain_setcpuweight(self.domid, self.info['cpu_weight'])
 
             m = self.image.getDomainMemory(self.info['memory'] * 1024)
+            balloon.free(m)
             xc.domain_setmaxmem(self.domid, m)
             xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
 

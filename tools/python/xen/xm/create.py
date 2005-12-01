@@ -798,57 +798,6 @@ def make_domain(opts, config):
     opts.info("Started domain %s" % (dom))
     return int(sxp.child_value(dominfo, 'domid'))
 
-def get_dom0_alloc():
-    """Return current allocation memory of dom0 (in MB). Return 0 on error"""
-    PROC_XEN_BALLOON = "/proc/xen/balloon"
-
-    f = open(PROC_XEN_BALLOON, "r")
-    line = f.readline()
-    for x in line.split():
-        for n in x:
-            if not n.isdigit():
-                break
-        else:
-            f.close()
-            return int(x)/1024
-    f.close()
-    return 0
-
-def balloon_out(dom0_min_mem, opts):
-    """Balloon out memory from dom0 if necessary"""
-    SLACK = 4
-    timeout = 20 # 2s
-    ret = 1
-
-    xc = xen.lowlevel.xc.xc()
-    free_mem = xc.physinfo()['free_pages'] / 256
-    domU_need_mem = opts.vals.memory + SLACK 
-
-    # we already have enough free memory, return success
-    if free_mem >= domU_need_mem:
-        del xc
-        return 0
-
-    dom0_cur_alloc = get_dom0_alloc()
-    dom0_new_alloc = dom0_cur_alloc - (domU_need_mem - free_mem)
-    if dom0_new_alloc < dom0_min_mem:
-        dom0_new_alloc = dom0_min_mem
-
-    server.xend_domain_mem_target_set(0, dom0_new_alloc)
-
-    while timeout > 0:
-        time.sleep(0.1) # sleep 100ms
-
-        free_mem = xc.physinfo()['free_pages'] / 256
-        if free_mem >= domU_need_mem:
-            ret = 0
-            break
-        timeout -= 1
-
-    del xc
-    return ret
-
-
 def parseCommandLine(argv):
     gopts.reset()
     args = gopts.parse(argv)
@@ -891,15 +840,6 @@ def main(argv):
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:
-        from xen.xend import XendRoot
-
-        xroot = XendRoot.instance()
-
-        dom0_min_mem = xroot.get_dom0_min_mem()
-        if dom0_min_mem != 0:
-            if balloon_out(dom0_min_mem, opts):
-                err("cannot allocate enough memory for domain")
-
         dom = make_domain(opts, config)
         if opts.vals.console_autoconnect:
             console.execConsole(dom)

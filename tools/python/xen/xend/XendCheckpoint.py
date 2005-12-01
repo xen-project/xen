@@ -18,6 +18,7 @@ import xen.util.auxbin
 
 import xen.lowlevel.xc
 
+import balloon
 from XendError import XendError
 from XendLogging import log
 
@@ -131,6 +132,8 @@ def restore(xd, fd):
             raise XendError(
                 "not a valid guest state file: pfn count out of range")
 
+        balloon.free(xc.pages_to_kib(nr_pfns))
+
         cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
                         xc.handle(), fd, dominfo.getDomid(), nr_pfns,
                         store_port, console_port])
@@ -213,4 +216,4 @@ def slurp(infile):
         if line == "":
             break
         else:
-            log.error('%s', line)
+            log.error('%s', line.strip())
