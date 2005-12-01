@@ -69,10 +69,17 @@ those logs from the archive.
     bugball = []
 
     xc = xen.lowlevel.xc.xc()
-    bugball.append(string_iterator('xen-dmesg', xc.readconsolering()))
-    bugball.append(string_iterator('physinfo',  prettyDict(xc.physinfo())))
-    bugball.append(string_iterator('xeninfo',   prettyDict(xc.xeninfo())))
-    del xc
+
+    def do(n, f):
+        try:
+            s = f()
+        except Exception, exn:
+            s = str(exn)
+        bugball.append(string_iterator(n, s))
+
+    do('xen-dmesg', lambda: xc.readconsolering())
+    do('physinfo',  lambda: prettyDict(xc.physinfo()))
+    do('xeninfo',   lambda: prettyDict(xc.xeninfo()))
 
     for filename in FILES_TO_SEND:
         if not os.path.exists(filename):
