@@ -1752,7 +1752,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 	} else {
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 		extern const struct consw xennull_con;
 		extern int console_use_vt;
 #if defined(CONFIG_VGA_CONSOLE)
