@@ -300,6 +300,10 @@ static void backend_changed(struct xenbus_device *dev,
 /* ** Connection ** */
 
 
+/* 
+** Invoked when the backend is finally 'ready' (and has told produced 
+** the details about the physical device - #sectors, size, etc). 
+*/
 static void connect(struct blkfront_info *info)
 {
 	unsigned long sectors, sector_size;
@@ -324,19 +328,16 @@ static void connect(struct blkfront_info *info)
 		return;
 	}
 	
-        info->connected = BLKIF_STATE_CONNECTED;
         xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
-	
-	err = xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected);
-	if (err)
-		return;
+
+	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
 	
 	/* Kick pending requests. */
 	spin_lock_irq(&blkif_io_lock);
+	info->connected = BLKIF_STATE_CONNECTED;
 	kick_pending_request_queues(info);
 	spin_unlock_irq(&blkif_io_lock);
 }
-
 
 /**
  * Handle the change of state of the backend to Closing.  We must delete our
@@ -770,11 +771,20 @@ static void blkif_recover(struct blkfront_info *info)
 
 	kfree(copy);
 
-	/* Kicks things back into life. */
+	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
+	
+	/* Now safe for us to use the shared ring */
+	spin_lock_irq(&blkif_io_lock);
+        info->connected = BLKIF_STATE_CONNECTED;
+	spin_unlock_irq(&blkif_io_lock);
+
+	/* Send off requeued requests */
 	flush_requests(info);
 
-	/* Now safe to let other people use the interface. */
-	info->connected = BLKIF_STATE_CONNECTED;
+	/* Kick any other new requests queued since we resumed */
+	spin_lock_irq(&blkif_io_lock);
+	kick_pending_request_queues(info);
+	spin_unlock_irq(&blkif_io_lock);
 }
 
 

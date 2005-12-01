@@ -677,7 +677,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                              live_shinfo->arch.pfn_to_mfn_frame_list_list);
 
     if (!live_p2m_frame_list_list) {
-        ERR("Couldn't map p2m_frame_list_list");
+        ERR("Couldn't map p2m_frame_list_list (errno %d)", errno);
         goto out;
     }
 
