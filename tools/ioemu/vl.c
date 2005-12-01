@@ -1227,8 +1227,8 @@ CharDriverState *qemu_chr_open_pty(void)
     cfmakeraw(&term);
     tcsetattr(slave_fd, TCSAFLUSH, &term);
 
-    fprintf(stderr, "char device redirected to %s\n", ptsname(slave_fd));
-    store_console_dev(domid, ptsname(slave_fd));
+    fprintf(stderr, "char device redirected to %s\n", ptsname(master_fd));
+    store_console_dev(domid, ptsname(master_fd));
 
     return qemu_chr_open_fd(master_fd, master_fd);
 }
