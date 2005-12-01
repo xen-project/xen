@@ -821,7 +821,7 @@ def balloon_out(dom0_min_mem, opts):
     ret = 1
 
     xc = xen.lowlevel.xc.xc()
-    free_mem = xc.physinfo()['free_pages'] / 256
+    free_mem = xc.physinfo()['free_memory']
     domU_need_mem = opts.vals.memory + SLACK 
 
     # we already have enough free memory, return success
@@ -839,7 +839,7 @@ def balloon_out(dom0_min_mem, opts):
     while timeout > 0:
         time.sleep(0.1) # sleep 100ms
 
-        free_mem = xc.physinfo()['free_pages'] / 256
+        free_mem = xc.physinfo()['free_memory']
         if free_mem >= domU_need_mem:
             ret = 0
             break
