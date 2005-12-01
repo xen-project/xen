@@ -1009,6 +1009,15 @@ static int _rm(struct connection *conn, struct node *node, const char *name)
 }
 
 
+static void internal_rm(const char *name)
+{
+	char *tname = talloc_strdup(talloc_autofree_context(), name);
+	struct node *node = read_node(NULL, tname);
+	if (node)
+		_rm(NULL, node, tname);
+}
+
+
 static void do_rm(struct connection *conn, const char *name)
 {
 	struct node *node;
@@ -1417,7 +1426,24 @@ static void setup_structure(void)
 	tdbname = talloc_strdup(talloc_autofree_context(), xs_daemon_tdb());
 	tdb_ctx = tdb_open(tdbname, 0, TDB_FLAGS, O_RDWR, 0);
 
-	if (!tdb_ctx) {
+	if (tdb_ctx) {
+		/* XXX When we make xenstored able to restart, this will have
+		   to become cleverer, checking for existing domains and not
+		   removing the corresponding entries, but for now xenstored
+		   cannot be restarted without losing all the registered
+		   watches, which breaks all the backend drivers anyway.  We
+		   can therefore get away with just clearing /local and
+		   expecting Xend to put the appropriate entries back in.
+
+		   When this change is made it is important to note that
+		   dom0's entries must be cleaned up on reboot _before_ this
+		   daemon starts, otherwise the backend drivers and dom0's
+		   balloon driver will pick up stale entries.  In the case of
+		   the balloon driver, this can be fatal.
+		*/
+		internal_rm("/local");
+	}
+	else {
 		tdb_ctx = tdb_open(tdbname, 7919, TDB_FLAGS, O_RDWR|O_CREAT,
 				   0640);
 		if (!tdb_ctx)
