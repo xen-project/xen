@@ -70,6 +70,19 @@ config XEN_NETDEV_BACKEND
 	  network devices to other guests via a high-performance shared-memory
 	  interface.
 
+config XEN_NETDEV_PIPELINED_TRANSMITTER
+	bool "Pipelined transmitter (DANGEROUS)"
+	depends on XEN_NETDEV_BACKEND
+	default n
+	help
+	  If the net backend is a dumb domain, such as a transparent Ethernet
+	  bridge with no local IP interface, it is safe to say Y here to get
+	  slightly lower network overhead.
+	  If the backend has a local IP interface; or may be doing smart things
+	  like reassembling packets to perform firewall filtering; or if you
+	  are unsure; or if you experience network hangs when this option is
+	  enabled; then you must say N here.
+
 config XEN_TPMDEV_FRONTEND
         bool "TPM-device frontend driver"
         default n
@@ -110,23 +123,6 @@ config XEN_NETDEV_FRONTEND
 	  network interfaces within another guest OS. Unless you are building a
 	  dedicated device-driver domain, or your master control domain
 	  (domain 0), then you almost certainly want to say Y here.
-
-config XEN_NETDEV_FRONTEND_PIPELINED_TRANSMITTER
-	bool "Pipelined transmitter (DANGEROUS)"
-	depends on XEN_NETDEV_FRONTEND
-	default n
-	help
-	  The driver will assume that the backend is pipelining packets for
-	  transmission: whenever packets are pending in the remote backend,
-	  the driver will not send asynchronous notifications when it queues
-	  additional packets for transmission.
-	  If the backend is a dumb domain, such as a transparent Ethernet
-	  bridge with no local IP interface, it is safe to say Y here to get
-	  slightly lower network overhead.
-	  If the backend has a local IP interface; or may be doing smart things
-	  like reassembling packets to perform firewall filtering; or if you
-	  are unsure; or if you experience network hangs when this option is
-	  enabled; then you must say N here.
 
 config XEN_BLKDEV_TAP
 	bool "Block device tap driver"

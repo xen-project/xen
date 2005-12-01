@@ -107,7 +107,6 @@ int blkif_map(blkif_t *blkif, unsigned long shared_page, unsigned int evtchn)
 	blkif->evtchn = op.u.bind_interdomain.local_port;
 
 	sring = (blkif_sring_t *)blkif->blk_ring_area->addr;
-	SHARED_RING_INIT(sring);
 	BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
 
 	blkif->irq = bind_evtchn_to_irqhandler(

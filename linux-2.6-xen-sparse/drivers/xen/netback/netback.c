@@ -38,8 +38,8 @@ static struct timer_list net_timer;
 #define MAX_PENDING_REQS 256
 
 static struct sk_buff_head rx_queue;
-static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE*2+1];
-static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE];
+static multicall_entry_t rx_mcl[NET_RX_RING_SIZE*2+1];
+static mmu_update_t rx_mmu[NET_RX_RING_SIZE];
 
 static gnttab_transfer_t grant_rx_op[MAX_PENDING_REQS];
 static unsigned char rx_notify[NR_IRQS];
@@ -126,8 +126,9 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* Drop the packet if the target domain has no receive buffers. */
 	if (!netif->active || 
-	    (netif->rx_req_cons == netif->rx->req_prod) ||
-	    ((netif->rx_req_cons-netif->rx_resp_prod) == NETIF_RX_RING_SIZE))
+	    (netif->rx_req_cons_peek == netif->rx.sring->req_prod) ||
+	    ((netif->rx_req_cons_peek - netif->rx.rsp_prod_pvt) ==
+	     NET_RX_RING_SIZE))
 		goto drop;
 
 	/*
@@ -154,7 +155,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		skb = nskb;
 	}
 
-	netif->rx_req_cons++;
+	netif->rx_req_cons_peek++;
 	netif_get(netif);
 
 	skb_queue_tail(&rx_queue, skb);
@@ -198,7 +199,7 @@ static void net_rx_action(unsigned long unused)
 	unsigned long vdata, old_mfn, new_mfn;
 	struct sk_buff_head rxq;
 	struct sk_buff *skb;
-	u16 notify_list[NETIF_RX_RING_SIZE];
+	u16 notify_list[NET_RX_RING_SIZE];
 	int notify_nr = 0;
 	int ret;
 
@@ -233,9 +234,9 @@ static void net_rx_action(unsigned long unused)
 
 		gop->mfn = old_mfn;
 		gop->domid = netif->domid;
-		gop->ref = netif->rx->ring[
-			MASK_NETIF_RX_IDX(netif->rx_resp_prod_copy)].req.gref;
-		netif->rx_resp_prod_copy++;
+		gop->ref = RING_GET_REQUEST(
+			&netif->rx, netif->rx.req_cons)->gref;
+		netif->rx.req_cons++;
 		gop++;
 
 		mmu->ptr = ((maddr_t)new_mfn << PAGE_SHIFT) |
@@ -300,8 +301,7 @@ static void net_rx_action(unsigned long unused)
 			status = NETIF_RSP_ERROR; 
 		}
 		irq = netif->irq;
-		id = netif->rx->ring[
-			MASK_NETIF_RX_IDX(netif->rx_resp_prod)].req.id;
+		id = RING_GET_REQUEST(&netif->rx, netif->rx.rsp_prod_pvt)->id;
 		if (make_rx_response(netif, id, status,
 				     (unsigned long)skb->data & ~PAGE_MASK,
 				     size, skb->proto_csum_valid) &&
@@ -371,13 +371,31 @@ static void add_to_net_schedule_list_tail(netif_t *netif)
 	spin_unlock_irq(&net_schedule_list_lock);
 }
 
+/*
+ * Note on CONFIG_XEN_NETDEV_PIPELINED_TRANSMITTER:
+ * If this driver is pipelining transmit requests then we can be very
+ * aggressive in avoiding new-packet notifications -- frontend only needs to
+ * send a notification if there are no outstanding unreceived responses.
+ * If we may be buffer transmit buffers for any reason then we must be rather
+ * more conservative and advertise that we are 'sleeping' this connection here.
+ */
 void netif_schedule_work(netif_t *netif)
 {
-	if ((netif->tx_req_cons != netif->tx->req_prod) &&
-	    ((netif->tx_req_cons-netif->tx_resp_prod) != NETIF_TX_RING_SIZE)) {
+	if (RING_HAS_UNCONSUMED_REQUESTS(&netif->tx)) {
 		add_to_net_schedule_list_tail(netif);
 		maybe_schedule_tx_action();
 	}
+#ifndef CONFIG_XEN_NETDEV_PIPELINED_TRANSMITTER
+	else {
+		netif->tx.sring->server_is_sleeping = 1;
+		mb();
+		if (RING_HAS_UNCONSUMED_REQUESTS(&netif->tx)) {
+			netif->tx.sring->server_is_sleeping = 0;
+			add_to_net_schedule_list_tail(netif);
+			maybe_schedule_tx_action();
+		}
+	}
+#endif
 }
 
 void netif_deschedule_work(netif_t *netif)
@@ -437,11 +455,18 @@ inline static void net_tx_action_dealloc(void)
                  * packets.
 		 */
 		mb();
-		if ((netif->tx_req_cons != netif->tx->req_prod) &&
-		    ((netif->tx_req_cons-netif->tx_resp_prod) !=
-		     NETIF_TX_RING_SIZE))
+
+		if (RING_HAS_UNCONSUMED_REQUESTS(&netif->tx)) {
 			add_to_net_schedule_list_tail(netif);
-        
+		} else {
+			netif->tx.sring->server_is_sleeping = 1;
+			mb();
+			if (RING_HAS_UNCONSUMED_REQUESTS(&netif->tx)) {
+				netif->tx.sring->server_is_sleeping = 0;
+				add_to_net_schedule_list_tail(netif);
+			}
+		}
+
 		netif_put(netif);
 	}
 }
@@ -454,7 +479,7 @@ static void net_tx_action(unsigned long unused)
 	netif_t *netif;
 	netif_tx_request_t txreq;
 	u16 pending_idx;
-	NETIF_RING_IDX i;
+	RING_IDX i;
 	gnttab_map_grant_ref_t *mop;
 	unsigned int data_len;
 	int ret;
@@ -472,16 +497,14 @@ static void net_tx_action(unsigned long unused)
 		remove_from_net_schedule_list(netif);
 
 		/* Work to do? */
-		i = netif->tx_req_cons;
-		if ((i == netif->tx->req_prod) ||
-		    ((i-netif->tx_resp_prod) == NETIF_TX_RING_SIZE)) {
+		if (!RING_HAS_UNCONSUMED_REQUESTS(&netif->tx)) {
 			netif_put(netif);
 			continue;
 		}
 
+		i = netif->tx.req_cons;
 		rmb(); /* Ensure that we see the request before we copy it. */
-		memcpy(&txreq, &netif->tx->ring[MASK_NETIF_TX_IDX(i)].req, 
-		       sizeof(txreq));
+		memcpy(&txreq, RING_GET_REQUEST(&netif->tx, i), sizeof(txreq));
 		/* Credit-based scheduling. */
 		if (txreq.size > netif->remaining_credit) {
 			unsigned long now = jiffies;
@@ -515,12 +538,7 @@ static void net_tx_action(unsigned long unused)
 		}
 		netif->remaining_credit -= txreq.size;
 
-		/*
-		 * Why the barrier? It ensures that the frontend sees updated
-		 * req_cons before we check for more work to schedule.
-		 */
-		netif->tx->req_cons = ++netif->tx_req_cons;
-		mb();
+		netif->tx.req_cons++;
 
 		netif_schedule_work(netif);
 
@@ -688,17 +706,18 @@ static void make_tx_response(netif_t *netif,
                              u16      id,
                              s8       st)
 {
-	NETIF_RING_IDX i = netif->tx_resp_prod;
+	RING_IDX i = netif->tx.rsp_prod_pvt;
 	netif_tx_response_t *resp;
 
-	resp = &netif->tx->ring[MASK_NETIF_TX_IDX(i)].resp;
+	resp = RING_GET_RESPONSE(&netif->tx, i);
 	resp->id     = id;
 	resp->status = st;
 	wmb();
-	netif->tx->resp_prod = netif->tx_resp_prod = ++i;
+	netif->tx.rsp_prod_pvt = ++i;
+	RING_PUSH_RESPONSES(&netif->tx);
 
 	mb(); /* Update producer before checking event threshold. */
-	if (i == netif->tx->event)
+	if (i == netif->tx.sring->rsp_event)
 		notify_remote_via_irq(netif->irq);
 }
 
@@ -709,10 +728,10 @@ static int make_rx_response(netif_t *netif,
                             u16      size,
                             u16      csum_valid)
 {
-	NETIF_RING_IDX i = netif->rx_resp_prod;
+	RING_IDX i = netif->rx.rsp_prod_pvt;
 	netif_rx_response_t *resp;
 
-	resp = &netif->rx->ring[MASK_NETIF_RX_IDX(i)].resp;
+	resp = RING_GET_RESPONSE(&netif->rx, i);
 	resp->offset     = offset;
 	resp->csum_valid = csum_valid;
 	resp->id         = id;
@@ -720,10 +739,11 @@ static int make_rx_response(netif_t *netif,
 	if (st < 0)
 		resp->status = (s16)st;
 	wmb();
-	netif->rx->resp_prod = netif->rx_resp_prod = ++i;
+	netif->rx.rsp_prod_pvt = ++i;
+	RING_PUSH_RESPONSES(&netif->rx);
 
 	mb(); /* Update producer before checking event threshold. */
-	return (i == netif->rx->event);
+	return (i == netif->rx.sring->rsp_event);
 }
 
 static irqreturn_t netif_be_dbg(int irq, void *dev_id, struct pt_regs *regs)
@@ -739,16 +759,16 @@ static irqreturn_t netif_be_dbg(int irq, void *dev_id, struct pt_regs *regs)
 		netif = list_entry(ent, netif_t, list);
 		printk(KERN_ALERT " %d: private(rx_req_cons=%08x "
 		       "rx_resp_prod=%08x\n",
-		       i, netif->rx_req_cons, netif->rx_resp_prod);
+		       i, netif->rx.req_cons, netif->rx.rsp_prod_pvt);
 		printk(KERN_ALERT "   tx_req_cons=%08x tx_resp_prod=%08x)\n",
-		       netif->tx_req_cons, netif->tx_resp_prod);
+		       netif->tx.req_cons, netif->tx.rsp_prod_pvt);
 		printk(KERN_ALERT "   shared(rx_req_prod=%08x "
 		       "rx_resp_prod=%08x\n",
-		       netif->rx->req_prod, netif->rx->resp_prod);
+		       netif->rx.sring->req_prod, netif->rx.sring->rsp_prod);
 		printk(KERN_ALERT "   rx_event=%08x tx_req_prod=%08x\n",
-		       netif->rx->event, netif->tx->req_prod);
+		       netif->rx.sring->rsp_event, netif->tx.sring->req_prod);
 		printk(KERN_ALERT "   tx_resp_prod=%08x, tx_event=%08x)\n",
-		       netif->tx->resp_prod, netif->tx->event);
+		       netif->tx.sring->rsp_prod, netif->tx.sring->rsp_event);
 		i++;
 	}
 
@@ -764,7 +784,7 @@ static int __init netback_init(void)
 	struct page *page;
 
 	/* We can increase reservation by this much in net_rx_action(). */
-	balloon_update_driver_allowance(NETIF_RX_RING_SIZE);
+	balloon_update_driver_allowance(NET_RX_RING_SIZE);
 
 	skb_queue_head_init(&rx_queue);
 	skb_queue_head_init(&tx_queue);

@@ -184,6 +184,8 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	      unsigned long rx_ring_ref, unsigned int evtchn)
 {
 	int err;
+	netif_tx_sring_t *txs;
+	netif_rx_sring_t *rxs;
 	evtchn_op_t op = {
 		.cmd = EVTCHNOP_bind_interdomain,
 		.u.bind_interdomain.remote_dom = netif->domid,
@@ -216,10 +218,15 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 		netif->evtchn, netif_be_int, 0, netif->dev->name, netif);
 	disable_irq(netif->irq);
 
-	netif->tx = (netif_tx_interface_t *)netif->comms_area->addr;
-	netif->rx = (netif_rx_interface_t *)
+	txs = (netif_tx_sring_t *)netif->comms_area->addr;
+	BACK_RING_INIT(&netif->tx, txs, PAGE_SIZE);
+
+	rxs = (netif_rx_sring_t *)
 		((char *)netif->comms_area->addr + PAGE_SIZE);
-	netif->tx->resp_prod = netif->rx->resp_prod = 0;
+	BACK_RING_INIT(&netif->rx, rxs, PAGE_SIZE);
+
+	netif->rx_req_cons_peek = 0;
+
 	netif_get(netif);
 	wmb(); /* Other CPUs see new state before interface is started. */
 
@@ -246,7 +253,7 @@ static void free_netif_callback(void *arg)
 
 	unregister_netdev(netif->dev);
 
-	if (netif->tx) {
+	if (netif->tx.sring) {
 		unmap_frontend_pages(netif);
 		free_vm_area(netif->comms_area);
 	}

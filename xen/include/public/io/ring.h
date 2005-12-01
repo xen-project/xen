@@ -1,3 +1,6 @@
+
+
+
 /*
  * Shared producer-consumer ring macros.
  * Tim Deegan and Andrew Warfield November 2004.
@@ -22,7 +25,7 @@ typedef unsigned int RING_IDX;
  * power of two (so we can mask with (size-1) to loop around).
  */
 #define __RING_SIZE(_s, _sz) \
-    (__RD32(((_sz) - 2*sizeof(RING_IDX)) / sizeof((_s)->ring[0])))
+    (__RD32(((_sz) - (long)&(_s)->ring + (long)(_s)) / sizeof((_s)->ring[0])))
 
 /*
  *  Macros to make the correct C datatypes for a new kind of ring.
@@ -65,6 +68,8 @@ union __name##_sring_entry {                                            \
 struct __name##_sring {                                                 \
     RING_IDX req_prod;                                                  \
     RING_IDX rsp_prod;                                                  \
+    RING_IDX rsp_event; /* notify client when rsp_prod == rsp_event */  \
+    uint8_t  server_is_sleeping; /* notify server to kick off work  */  \
     union __name##_sring_entry ring[1]; /* variable-length */           \
 };                                                                      \
                                                                         \
