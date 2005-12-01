@@ -56,7 +56,10 @@
 //Huh? This seems to be used on ia64 even if !CONFIG_SMP
 void flush_tlb_mask(cpumask_t mask)
 {
+#ifdef CONFIG_SMP
+    printf("flush_tlb_mask called, not implemented for SMP\n");
 	dummy();
+#endif
 }
 //#if CONFIG_SMP || IA64
 #if CONFIG_SMP
