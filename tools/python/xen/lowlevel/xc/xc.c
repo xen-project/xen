@@ -576,6 +576,17 @@ static PyObject *pyxc_readconsolering(XcObject *self,
 }
 
 
+static PyObject *pyxc_pages_to_kib(XcObject *self, PyObject *args)
+{
+    unsigned long pages;
+
+    if (!PyArg_ParseTuple(args, "l", &pages))
+        return NULL;
+
+    return PyLong_FromUnsignedLong(pages * (XC_PAGE_SIZE / 1024));
+}
+
+
 static unsigned long pages_to_mb(unsigned long pages)
 {
     return (pages * (XC_PAGE_SIZE / 1024) + 1023) / 1024;
@@ -1058,6 +1069,12 @@ static PyMethodDef pyxc_methods[] = {
       " nr_ports     [int]: Number of IO ports\n"
       " allow_access [int]: Non-zero means enable access; else disable access\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "pages_to_kib",
+      (PyCFunction)pyxc_pages_to_kib,
+      METH_VARARGS, "\n"
+      "Returns: [int]: The size in KiB of memory spanning the given number "
+      "of pages.\n" },
 
     { NULL, NULL, 0, NULL }
 };
