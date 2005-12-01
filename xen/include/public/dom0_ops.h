@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA1012
+#define DOM0_INTERFACE_VERSION   0xAAAA1014
 
 /************************************************************************/
 
@@ -98,7 +98,7 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t               domain;
-    uint16_t              vcpu;
+    uint32_t              vcpu;
     /* IN/OUT parameters */
     vcpu_guest_context_t *ctxt;
 } dom0_setdomaininfo_t;
@@ -107,7 +107,7 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     uint32_t write;
-    uint32_t cpu_mask;
+    cpumap_t cpu_mask;
     uint32_t msr;
     uint32_t in1;
     uint32_t in2;
@@ -115,21 +115,6 @@ typedef struct {
     uint32_t out1;
     uint32_t out2;
 } dom0_msr_t;
-
-#define DOM0_DEBUG            16
-typedef struct {
-    /* IN variables. */
-    domid_t  domain;
-    uint8_t  opcode;
-    uint32_t in1;
-    uint32_t in2;
-    uint32_t in3;
-    uint32_t in4;
-    /* OUT variables. */
-    uint32_t status;
-    uint32_t out1;
-    uint32_t out2;
-} dom0_debug_t;
 
 /*
  * Set clock such that it would read <secs,nsecs> after 00:00:00 UTC,
@@ -182,8 +167,8 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t   domain;
-    uint16_t  vcpu;
-    cpumap_t cpumap;
+    uint32_t  vcpu;
+    cpumap_t  cpumap;
 } dom0_pincpudomain_t;
 
 /* Get trace buffers machine base address */
@@ -196,9 +181,9 @@ typedef struct {
 #define DOM0_TBUF_SET_SIZE     3
 #define DOM0_TBUF_ENABLE       4
 #define DOM0_TBUF_DISABLE      5
-    uint8_t op;
+    uint32_t      op;
     /* IN/OUT variables */
-    unsigned long cpu_mask;
+    cpumap_t      cpu_mask;
     uint32_t      evt_mask;
     /* OUT variables */
     unsigned long buffer_mfn;
@@ -327,7 +312,7 @@ typedef struct {
 #define DOM0_PERFCCONTROL_OP_RESET 1   /* Reset all counters to zero. */
 #define DOM0_PERFCCONTROL_OP_QUERY 2   /* Get perfctr information. */
 typedef struct {
-    uint8_t      name[80];             /*  name of perf counter */
+    uint8_t      name[80];             /* name of perf counter */
     uint32_t     nr_vals;              /* number of values for this counter */
     uint32_t     vals[64];             /* array of values */
 } dom0_perfc_desc_t;
@@ -349,16 +334,16 @@ typedef struct {
 #define DOM0_IOPORT_PERMISSION   36
 typedef struct {
     domid_t  domain;                  /* domain to be affected */
-    uint16_t first_port;              /* first port int range */
-    uint16_t nr_ports;                /* size of port range */
-    uint16_t allow_access;            /* allow or deny access to range? */
+    uint32_t first_port;              /* first port int range */
+    uint32_t nr_ports;                /* size of port range */
+    uint8_t  allow_access;            /* allow or deny access to range? */
 } dom0_ioport_permission_t;
 
 #define DOM0_GETVCPUCONTEXT      37
 typedef struct {
     /* IN variables. */
     domid_t  domain;                  /* domain to be affected */
-    uint16_t vcpu;                    /* vcpu # */
+    uint32_t vcpu;                    /* vcpu # */
     /* OUT variables. */
     vcpu_guest_context_t *ctxt;
 } dom0_getvcpucontext_t;
@@ -367,7 +352,7 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t  domain;                  /* domain to be affected */
-    uint16_t vcpu;                    /* vcpu # */
+    uint32_t vcpu;                    /* vcpu # */
     /* OUT variables. */
     uint8_t  online;                  /* currently online (not hotplugged)? */
     uint8_t  blocked;                 /* blocked waiting for an event? */
@@ -381,35 +366,36 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t               first_domain;
-    unsigned int          max_domains;
+    uint32_t              max_domains;
     dom0_getdomaininfo_t *buffer;
     /* OUT variables. */
-    unsigned int          num_domains;
+    uint32_t              num_domains;
 } dom0_getdomaininfolist_t;
 
 #define DOM0_PLATFORM_QUIRK      39  
 #define QUIRK_NOIRQBALANCING  1
 typedef struct {
     /* IN variables. */
-    int quirk_id;
+    uint32_t quirk_id;
 } dom0_platform_quirk_t;
 
 #define DOM0_PHYSICAL_MEMORY_MAP 40
 typedef struct {
     /* IN variables. */
-    int max_map_entries;
+    uint32_t max_map_entries;
     /* OUT variables. */
-    int nr_map_entries;
+    uint32_t nr_map_entries;
     struct dom0_memory_map_entry {
         uint64_t start, end;
-        int is_ram;
+        uint32_t flags; /* reserved */
+        uint8_t  is_ram;
     } *memory_map;
 } dom0_physical_memory_map_t;
 
 #define DOM0_MAX_VCPUS 41
 typedef struct {
-    domid_t domain;             /* domain to be affected */
-    unsigned int max;           /* maximum number of vcpus */
+    domid_t  domain;        /* domain to be affected */
+    uint32_t max;           /* maximum number of vcpus */
 } dom0_max_vcpus_t;
 
 #define DOM0_SETDOMAINHANDLE 44
@@ -433,7 +419,6 @@ typedef struct {
         dom0_getdomaininfo_t     getdomaininfo;
         dom0_getpageframeinfo_t  getpageframeinfo;
         dom0_msr_t               msr;
-        dom0_debug_t             debug;
         dom0_settime_t           settime;
         dom0_readconsole_t       readconsole;
         dom0_pincpudomain_t      pincpudomain;

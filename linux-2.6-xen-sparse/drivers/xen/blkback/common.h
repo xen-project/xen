@@ -66,8 +66,8 @@ typedef struct blkif_st {
 
 	struct work_struct free_work;
 
-	u16         shmem_handle;
-	grant_ref_t shmem_ref;
+	grant_handle_t shmem_handle;
+	grant_ref_t    shmem_ref;
 } blkif_t;
 
 blkif_t *alloc_blkif(domid_t domid);

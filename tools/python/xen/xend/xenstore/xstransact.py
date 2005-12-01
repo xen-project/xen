@@ -198,9 +198,10 @@ class xstransact:
             if len(tup) == 2:
                 (key, val) = tup
                 try:
-                    fmt = { str : "%s",
-                            int : "%i",
-                            float : "%f",
+                    fmt = { str        : "%s",
+                            int        : "%i",
+                            float      : "%f",
+                            long       : "%li",
                             type(None) : None }[type(val)]
                 except KeyError:
                     raise TypeError

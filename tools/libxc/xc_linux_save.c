@@ -523,13 +523,13 @@ static unsigned long *xc_map_m2p(int xc_handle,
 
     xmml.max_extents = m2p_chunks;
     if (!(xmml.extent_start = malloc(m2p_chunks * sizeof(unsigned long)))) { 
-        ERR("failed to allocate space for m2p mfns!\n"); 
+        ERR("failed to allocate space for m2p mfns"); 
         return NULL; 
     } 
 
     if (xc_memory_op(xc_handle, XENMEM_machphys_mfn_list, &xmml) ||
         (xmml.nr_extents != m2p_chunks)) {
-        ERR("xc_get_m2p_mfns:"); 
+        ERR("xc_get_m2p_mfns"); 
         return NULL;
     }
 
@@ -540,7 +540,7 @@ static unsigned long *xc_map_m2p(int xc_handle,
     } 
 
     if (!(entries = malloc(m2p_chunks * sizeof(privcmd_mmap_entry_t)))) { 
-        ERR("failed to allocate space for mmap entries!\n"); 
+        ERR("failed to allocate space for mmap entries"); 
         return NULL; 
     } 
 
@@ -794,7 +794,7 @@ int xc_linux_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     pfn_batch = calloc(MAX_BATCH_SIZE, sizeof(unsigned long));
 
     if ((pfn_type == NULL) || (pfn_batch == NULL)) {
-        ERR("failed to alloc memory for pfn_type and/or pfn_batch arays."); 
+        ERR("failed to alloc memory for pfn_type and/or pfn_batch arrays"); 
         errno = ENOMEM;
         goto out;
     }

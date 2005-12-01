@@ -100,7 +100,7 @@ class XendClientProtocol:
         """
         return self.xendRequest(url, "POST", args)
 
-    def handleStatus(self, version, status, message):
+    def handleStatus(self, _, status, message):
         """Handle the status returned from the request.
         """
         status = int(status)
@@ -114,8 +114,8 @@ class XendClientProtocol:
         """Handle the data returned in response to the request.
         """
         if data is None: return None
-        type = self.getHeader('Content-Type')
-        if type != sxp.mime_type:
+        typ = self.getHeader('Content-Type')
+        if typ != sxp.mime_type:
             return data
         try:
             pin = sxp.Parser()
@@ -205,5 +205,5 @@ class UnixXendClientProtocol(HttpXendClientProtocol):
             path = xroot.get_xend_unix_path()
         self.path = path
 
-    def makeConnection(self, url):
+    def makeConnection(self, _):
         return UnixConnection(self.path)

@@ -21,7 +21,7 @@
 #include <xen/types.h>
 #include <asm/vmx.h>
 #include <asm/vmx_platform.h>
-#include <asm/vmx_virpit.h>
+#include <asm/vmx_vpit.h>
 #include <asm/vmx_intercept.h>
 #include <asm/vmx_vlapic.h>
 #include <public/io/ioreq.h>

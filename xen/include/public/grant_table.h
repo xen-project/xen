@@ -73,14 +73,14 @@
  */
 typedef struct grant_entry {
     /* GTF_xxx: various type and flag information.  [XEN,GST] */
-    uint16_t     flags;
+    uint16_t flags;
     /* The domain being granted foreign privileges. [GST] */
-    domid_t domid;
+    domid_t  domid;
     /*
      * GTF_permit_access: Frame that @domid is allowed to map and access. [GST]
      * GTF_accept_transfer: Frame whose ownership transferred by @domid. [XEN]
      */
-    uint32_t     frame;
+    uint32_t frame;
 } grant_entry_t;
 
 /*
@@ -131,7 +131,12 @@ typedef struct grant_entry {
 /*
  * Reference to a grant entry in a specified domain's grant table.
  */
-typedef uint16_t grant_ref_t;
+typedef uint32_t grant_ref_t;
+
+/*
+ * Handle to track a mapping created via a grant reference.
+ */
+typedef uint32_t grant_handle_t;
 
 /*
  * GNTTABOP_map_grant_ref: Map the grant entry (<dom>,<ref>) for access
@@ -154,11 +159,12 @@ typedef uint16_t grant_ref_t;
 typedef struct gnttab_map_grant_ref {
     /* IN parameters. */
     uint64_t host_addr;
-    domid_t  dom;
+    uint32_t flags;               /* GNTMAP_* */
     grant_ref_t ref;
-    uint16_t flags;               /* GNTMAP_* */
+    domid_t  dom;
     /* OUT parameters. */
-    int16_t  handle;              /* +ve: handle; -ve: GNTST_* */
+    int16_t  status;              /* GNTST_* */
+    grant_handle_t handle;
     uint64_t dev_bus_addr;
 } gnttab_map_grant_ref_t;
 
@@ -178,7 +184,7 @@ typedef struct gnttab_unmap_grant_ref {
     /* IN parameters. */
     uint64_t host_addr;
     uint64_t dev_bus_addr;
-    uint16_t handle;
+    grant_handle_t handle;
     /* OUT parameters. */
     int16_t  status;              /* GNTST_* */
 } gnttab_unmap_grant_ref_t;
@@ -196,7 +202,7 @@ typedef struct gnttab_unmap_grant_ref {
 typedef struct gnttab_setup_table {
     /* IN parameters. */
     domid_t  dom;
-    uint16_t nr_frames;
+    uint32_t nr_frames;
     /* OUT parameters. */
     int16_t  status;              /* GNTST_* */
     unsigned long *frame_list;
@@ -283,7 +289,8 @@ typedef struct {
     "invalid virtual address",                  \
     "invalid device address",                   \
     "no spare translation slot in the I/O MMU", \
-    "permission denied"                         \
+    "permission denied",                        \
+    "bad page"                                  \
 }
 
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */

@@ -68,7 +68,7 @@ static PEND_RING_IDX dealloc_prod, dealloc_cons;
 
 static struct sk_buff_head tx_queue;
 
-static u16 grant_tx_ref[MAX_PENDING_REQS];
+static grant_handle_t grant_tx_handle[MAX_PENDING_REQS];
 static gnttab_unmap_grant_ref_t tx_unmap_ops[MAX_PENDING_REQS];
 static gnttab_map_grant_ref_t tx_map_ops[MAX_PENDING_REQS];
 
@@ -412,7 +412,7 @@ inline static void net_tx_action_dealloc(void)
 		pending_idx = dealloc_ring[MASK_PEND_IDX(dc++)];
 		gop->host_addr    = MMAP_VADDR(pending_idx);
 		gop->dev_bus_addr = 0;
-		gop->handle       = grant_tx_ref[pending_idx];
+		gop->handle       = grant_tx_handle[pending_idx];
 		gop++;
 	}
 	ret = HYPERVISOR_grant_table_op(
@@ -592,7 +592,7 @@ static void net_tx_action(unsigned long unused)
 		       sizeof(txreq));
 
 		/* Check the remap error code. */
-		if (unlikely(mop->handle < 0)) {
+		if (unlikely(mop->status)) {
 			printk(KERN_ALERT "#### netback grant fails\n");
 			make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
 			netif_put(netif);
@@ -605,7 +605,7 @@ static void net_tx_action(unsigned long unused)
 		set_phys_to_machine(
 			__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT,
 			FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT));
-		grant_tx_ref[pending_idx] = mop->handle;
+		grant_tx_handle[pending_idx] = mop->handle;
 
 		data_len = (txreq.size > PKT_PROT_LEN) ?
 			PKT_PROT_LEN : txreq.size;

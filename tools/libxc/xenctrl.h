@@ -13,6 +13,7 @@
 #include <sys/ptrace.h>
 #include <xen/xen.h>
 #include <xen/dom0_ops.h>
+#include <xen/grant_table.h>
 #include <xen/version.h>
 #include <xen/event_channel.h>
 #include <xen/sched.h>
@@ -374,9 +375,9 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
 
 int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t domid,
-                                uint16_t first_port,
-                                uint16_t nr_ports,
-                                uint16_t allow_access);
+                                uint32_t first_port,
+                                uint32_t nr_ports,
+                                uint32_t allow_access);
 
 unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid, 
 				    unsigned long mfn);
@@ -475,15 +476,16 @@ int xc_grant_interface_close(int xc_handle);
 int xc_gnttab_map_grant_ref(int      xc_handle,
                             uint64_t host_virt_addr,
                             uint32_t dom,
-                            uint16_t ref,
+                            grant_ref_t ref,
                             uint16_t flags,
-                            int16_t *handle,
+                            int16_t *status,
+                            grant_handle_t *handle,
                             uint64_t *dev_bus_addr);
 
 int xc_gnttab_unmap_grant_ref(int  xc_handle,
                               uint64_t  host_virt_addr,
                               uint64_t  dev_bus_addr,
-                              uint16_t  handle,
+                              grant_handle_t handle,
                               int16_t *status);
 
 int xc_gnttab_setup_table(int        xc_handle,

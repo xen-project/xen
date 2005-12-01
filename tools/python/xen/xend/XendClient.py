@@ -232,6 +232,11 @@ class Xend:
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'pause' })
 
+    def xend_domain_rename(self, id, name):
+        return self.xendPost(self.domainurl(id),
+                             {'op'      : 'rename',
+                              'name'    : name})
+
     def xend_domain_shutdown(self, id, reason):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'shutdown',

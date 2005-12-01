@@ -24,7 +24,7 @@ for line in lines:
         map[pieces[0]] = pieces[1]
 
 for field in ["cores_per_socket", "threads_per_core", "cpu_mhz",
-              "memory", "free_memory", "xen_major", "xen_minor"]:
+              "total_memory", "free_memory", "xen_major", "xen_minor"]:
     val = map[field]
     if not val.isdigit():
         FAIL("Numeric field %s not all-numbers: %s" % (field, val))

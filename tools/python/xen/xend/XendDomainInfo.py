@@ -33,14 +33,14 @@ import xen.lowlevel.xc
 from xen.util import asserts
 from xen.util.blkif import blkdev_uname_to_file
 
-from xen.xend import image
-from xen.xend import sxp
-from xen.xend import XendRoot
+import image
+import sxp
+import uuid
+import XendDomain
+import XendRoot
+
 from xen.xend.XendBootloader import bootloader
 from xen.xend.XendError import XendError, VmError
-from xen.xend.XendRoot import get_component
-
-import uuid
 
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain
@@ -338,9 +338,8 @@ def parseConfig(config):
 
 
 def domain_by_name(name):
-    # See comment in XendDomain constructor.
-    xd = get_component('xen.xend.XendDomain')
-    return xd.domain_lookup_by_name_nr(name)
+    return XendDomain.instance().domain_lookup_by_name_nr(name)
+
 
 def shutdown_reason(code):
     """Get a shutdown reason from a code.
@@ -1343,8 +1342,7 @@ class XendDomainInfo:
 
             new_dom = None
             try:
-                xd = get_component('xen.xend.XendDomain')
-                new_dom = xd.domain_create(config)
+                new_dom = XendDomain.instance().domain_create(config)
                 new_dom.unpause()
                 new_dom.removeVm(RESTART_IN_PROGRESS)
             except:

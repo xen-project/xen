@@ -410,9 +410,9 @@ typedef struct start_info {
     unsigned long shared_info;  /* MACHINE address of shared info struct. */
     uint32_t flags;             /* SIF_xxx flags.                         */
     unsigned long store_mfn;    /* MACHINE page number of shared page.    */
-    uint16_t store_evtchn;      /* Event channel for store communication. */
+    uint32_t store_evtchn;      /* Event channel for store communication. */
     unsigned long console_mfn;  /* MACHINE address of console page.       */
-    uint16_t console_evtchn;    /* Event channel for console messages.    */
+    uint32_t console_evtchn;    /* Event channel for console messages.    */
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).     */
     unsigned long pt_base;      /* VIRTUAL address of page directory.     */
     unsigned long nr_pt_frames; /* Number of bootstrap p.t. frames.       */

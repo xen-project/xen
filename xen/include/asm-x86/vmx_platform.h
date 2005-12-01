@@ -22,10 +22,10 @@
 
 #include <public/xen.h>
 #include <asm/e820.h>
-#include <asm/vmx_virpit.h>
+#include <asm/vmx_vpit.h>
 #include <asm/vmx_intercept.h>
 #include <asm/vmx_vioapic.h>
-#include <public/io/vmx_vpic.h>
+#include <asm/vmx_vpic.h>
 
 #define MAX_OPERAND_NUM 2
 

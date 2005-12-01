@@ -88,10 +88,10 @@ static inline void flush_plugged_queue(void)
  * handle returned must be used to unmap the frame. This is needed to
  * drop the ref count on the frame.
  */
-static u16 pending_grant_handles[MMAP_PAGES];
+static grant_handle_t pending_grant_handles[MMAP_PAGES];
 #define pending_handle(_idx, _i) \
     (pending_grant_handles[((_idx) * BLKIF_MAX_SEGMENTS_PER_REQUEST) + (_i)])
-#define BLKBACK_INVALID_HANDLE (0xFFFF)
+#define BLKBACK_INVALID_HANDLE (~0)
 
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
 /*
@@ -114,7 +114,7 @@ static void fast_flush_area(int idx, int nr_pages)
 {
 	struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	unsigned int i, invcount = 0;
-	u16 handle;
+	grant_handle_t handle;
 	int ret;
 
 	for (i = 0; i < nr_pages; i++) {
@@ -335,7 +335,6 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 {
 	extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
 	int operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
-	unsigned long fas = 0;
 	int i, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
 	pending_req_t *pending_req;
 	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST];
@@ -362,16 +361,17 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 	preq.nr_sects      = 0;
 
 	for (i = 0; i < nseg; i++) {
-		fas         = req->frame_and_sects[i];
-		seg[i].nsec = blkif_last_sect(fas) - blkif_first_sect(fas) + 1;
+		seg[i].nsec = req->seg[i].last_sect -
+			req->seg[i].first_sect + 1;
 
-		if (seg[i].nsec <= 0)
+		if ((req->seg[i].last_sect >= (PAGE_SIZE >> 9)) ||
+		    (seg[i].nsec <= 0))
 			goto bad_descriptor;
 		preq.nr_sects += seg[i].nsec;
 
 		map[i].host_addr = MMAP_VADDR(pending_idx, i);
 		map[i].dom = blkif->domid;
-		map[i].ref = blkif_gref_from_fas(fas);
+		map[i].ref = req->seg[i].gref;
 		map[i].flags = GNTMAP_host_map;
 		if ( operation == WRITE )
 			map[i].flags |= GNTMAP_readonly;
@@ -381,7 +381,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 	BUG_ON(ret);
 
 	for (i = 0; i < nseg; i++) {
-		if (likely(map[i].handle >= 0)) {
+		if (likely(map[i].status == 0)) {
 			pending_handle(pending_idx, i) = map[i].handle;
 #ifdef __ia64__
 			MMAP_VADDR(pending_idx,i) = gnttab_map_vaddr(map[i]);
@@ -390,9 +390,8 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 				pending_idx, i)) >> PAGE_SHIFT,
 				FOREIGN_FRAME(map[i].dev_bus_addr>>PAGE_SHIFT));
 #endif
-			fas        = req->frame_and_sects[i];
-			seg[i].buf = map[i].dev_bus_addr | 
-				(blkif_first_sect(fas) << 9);
+			seg[i].buf = map[i].dev_bus_addr |
+				(req->seg[i].first_sect << 9);
 		} else {
 			errors++;
 		}

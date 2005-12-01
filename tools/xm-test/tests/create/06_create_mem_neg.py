@@ -31,6 +31,7 @@ domain1=XenDomain(opts1)
 
 try:
     domain1.start()
+    eyecatcher1 = "Created"
 except DomainError, e:
     eyecatcher1 = "Fail"
 
@@ -41,7 +42,7 @@ if eyecatcher1 != "Fail":
 
 # Test 2: create a domain with mem>sys_mem
 
-mem = int(getInfo("free_memory"))
+mem = int(getInfo("total_memory"))
 extreme_mem = str(mem + 100)
 
 opts2=  {
@@ -56,6 +57,7 @@ domain2=XenDomain(opts2)
 
 try:
     domain2.start()
+    eyecatcher2 = "Created"
 except DomainError, e:
     eyecatcher2 = "Fail"
 

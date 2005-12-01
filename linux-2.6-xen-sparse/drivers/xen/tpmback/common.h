@@ -54,7 +54,7 @@ typedef struct tpmif_st {
 
 	struct work_struct work;
 
-	u16 shmem_handle;
+	grant_handle_t shmem_handle;
 	grant_ref_t shmem_ref;
 } tpmif_t;
 

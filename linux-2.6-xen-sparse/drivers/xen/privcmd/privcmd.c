@@ -33,6 +33,7 @@
 #include <asm-xen/xen_proc.h>
 
 static struct proc_dir_entry *privcmd_intf;
+static struct proc_dir_entry *capabilities_intf;
 
 static int privcmd_ioctl(struct inode *inode, struct file *file,
                          unsigned int cmd, unsigned long data)
@@ -234,12 +235,28 @@ static struct file_operations privcmd_file_ops = {
 	.mmap  = privcmd_mmap,
 };
 
+static int capabilities_read(char *page, char **start, off_t off,
+                        int count, int *eof, void *data)
+{
+	int len = 0;
+	*page = 0;
+
+	if (xen_start_info->flags & SIF_INITDOMAIN)
+		len = sprintf( page, "control_d\n" );
+
+	*eof = 1;
+	return len;
+}
 
 static int __init privcmd_init(void)
 {
 	privcmd_intf = create_xen_proc_entry("privcmd", 0400);
 	if (privcmd_intf != NULL)
 		privcmd_intf->proc_fops = &privcmd_file_ops;
+
+	capabilities_intf = create_xen_proc_entry("capabilities", 0400 );
+	if (capabilities_intf != NULL)
+		capabilities_intf->read_proc = capabilities_read;
 
 	return 0;
 }
