@@ -25,7 +25,7 @@ import os
 import os.path
 import sys
 import re
-from getopt import getopt
+import getopt
 import socket
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -38,6 +38,14 @@ from xen.xend import sxp
 from xen.xm.opts import *
 
 import console
+
+
+# getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use
+# getopt.getopt if gnu_getopt is not available.  This will mean that options
+# may only be specified before positional arguments.
+if not hasattr(getopt, 'gnu_getopt'):
+    getopt.gnu_getopt = getopt.getopt
+
 
 # Strings for shorthelp
 console_help = "console <DomId>                  Attach to domain DomId's console."
@@ -332,8 +340,8 @@ def xm_list(args):
     use_long = 0
     show_vcpus = 0
     try:
-        (options, params) = getopt(args, 'lv', ['long','vcpus'])
-    except GetoptError, opterr:
+        (options, params) = getopt.gnu_getopt(args, 'lv', ['long','vcpus'])
+    except getopt.GetoptError, opterr:
         err(opterr)
         sys.exit(1)
     
@@ -729,8 +737,8 @@ def xm_network_detach(args):
 def xm_vnet_list(args):
     from xen.xend.XendClient import server
     try:
-        (options, params) = getopt(args, 'l', ['long'])
-    except GetoptError, opterr:
+        (options, params) = getopt.gnu_getopt(args, 'l', ['long'])
+    except getopt.GetoptError, opterr:
         err(opterr)
         sys.exit(1)
     

@@ -13,11 +13,12 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #============================================================================
 # Copyright (C) 2004, 2005 Mike Wray <mike.wray@hp.com>
+# Copyright (C) 2005 XenSource Ltd.
 #============================================================================
 
 """Object-oriented command-line option support.
 """
-from getopt import getopt, GetoptError
+import getopt
 import os
 import os.path
 import sys
@@ -333,9 +334,10 @@ class Opts:
         while args:
             # let getopt parse whatever it feels like -- if anything
             try:
-                (xvals, args) = getopt(args[0:],
-                                       self.short_opts(), self.long_opts())
-            except GetoptError, err:
+                (xvals, args) = getopt.getopt(args[0:],
+                                              self.short_opts(),
+                                              self.long_opts())
+            except getopt.GetoptError, err:
                 self.err(str(err))
                 
             for (k, v) in xvals:
