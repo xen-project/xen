@@ -395,16 +395,11 @@ static inline void ADD_ID_TO_FREELIST(
 
 static inline void flush_requests(struct blkfront_info *info)
 {
-	RING_IDX old_prod = info->ring.sring->req_prod;
+	int notify;
 
-	RING_PUSH_REQUESTS(&info->ring);
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&info->ring, notify);
 
-	/*
-         * Send new requests /then/ check if any old requests are still in
-         * flight. If so then there is no need to send a notification.
-         */
-	mb();
-	if (info->ring.sring->rsp_prod == old_prod)
+	if (notify)
 		notify_remote_via_irq(info->irq);
 }
 
