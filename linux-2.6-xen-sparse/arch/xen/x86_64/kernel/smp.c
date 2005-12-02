@@ -31,8 +31,6 @@
 #ifdef CONFIG_XEN
 #include <asm-xen/evtchn.h>
 
-#define xxprint(msg) HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg)
-
 #else
 /*
  *	Smarter SMP flushing macros. 
@@ -379,8 +377,6 @@ void smp_stop_cpu(void)
 	local_irq_disable();
 #ifndef CONFIG_XEN
 	disable_local_APIC();
-#else
-	xxprint("stop_this_cpu disable_local_APIC\n");
 #endif
 	local_irq_enable(); 
 }
@@ -409,9 +405,7 @@ void smp_send_stop(void)
 		spin_unlock(&call_lock);
 
 	local_irq_disable();
-#ifdef CONFIG_XEN
-	xxprint("stop_this_cpu disable_local_APIC\n");
-#else
+#ifndef CONFIG_XEN
 	disable_local_APIC();
 #endif
 	local_irq_enable();

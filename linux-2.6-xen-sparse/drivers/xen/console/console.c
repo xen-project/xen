@@ -134,19 +134,21 @@ static struct tty_driver *xencons_driver;
 static void kcons_write(
 	struct console *c, const char *s, unsigned int count)
 {
-	int           i;
+	int           i = 0;
 	unsigned long flags;
 
 	spin_lock_irqsave(&xencons_lock, flags);
-    
-	for (i = 0; i < count; i++) {
-		if ((wp - wc) >= (wbuf_size - 1))
-			break;
-		if ((wbuf[WBUF_MASK(wp++)] = s[i]) == '\n')
-			wbuf[WBUF_MASK(wp++)] = '\r';
-	}
 
-	__xencons_tx_flush();
+	while (i < count) {
+		for (; i < count; i++) {
+			if ((wp - wc) >= (wbuf_size - 1))
+				break;
+			if ((wbuf[WBUF_MASK(wp++)] = s[i]) == '\n')
+				wbuf[WBUF_MASK(wp++)] = '\r';
+		}
+
+		__xencons_tx_flush();
+	}
 
 	spin_unlock_irqrestore(&xencons_lock, flags);
 }

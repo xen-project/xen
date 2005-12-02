@@ -15,6 +15,7 @@
 
 #include <asm/hypervisor.h>
 #include <asm-xen/evtchn.h>
+#include <asm-xen/xencons.h>
 #include <linux/wait.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
@@ -96,7 +97,7 @@ int xencons_ring_init(void)
 		xen_start_info->console_evtchn,
 		handle_input, 0, "xencons", NULL);
 	if (err <= 0) {
-		xprintk("XEN console request irq failed %i\n", err);
+		printk(KERN_ERR "XEN console request irq failed %i\n", err);
 		return err;
 	}
 
