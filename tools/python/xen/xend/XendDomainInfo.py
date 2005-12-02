@@ -1016,9 +1016,9 @@ class XendDomainInfo:
         if self.infoIsSet('image'):
             sxpr.append(['image', self.info['image']])
 
-        if self.infoIsSet('device'):
-            for (_, c) in self.info['device']:
-                sxpr.append(['device', c])
+        for cls in controllerClasses:
+            for config in self.getDeviceConfigurations(cls):
+                sxpr.append(['device', config])
 
         def stateChar(name):
             if name in self.info:
