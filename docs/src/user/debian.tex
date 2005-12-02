@@ -8,8 +8,8 @@ requiring the host system to have any Debian-specific software (such as
 Here's some info on how to install Debian 3.1 (Sarge) for an
 unprivileged Xen domain:
 
+\section{Filesystem Setup}
 \begin{enumerate}
-
 \item Set up Xen and test that it's working, as described earlier in
   this manual.
 
@@ -35,7 +35,9 @@ mkswap /path/swapimage
 \begin{verbatim}
 mount -o loop /path/diskimage /mnt/disk
 \end{verbatim}
-
+\end{enumerate}
+\section{Bootstrapping}
+\begin{enumerate}
 \item Install \path{debootstrap}. Make sure you have debootstrap
   installed on the host. If you are running Debian Sarge (3.1 / testing)
   or unstable you can install it by running \path{apt-get install
@@ -48,7 +50,10 @@ debootstrap --arch i386 sarge /mnt/disk  \
             http://ftp.<countrycode>.debian.org/debian
 \end{verbatim}
   You may use any Debian mirror that you want.
+\end{enumerate}
 
+\section{Configuration}
+\begin{enumerate}
 \item When debootstrap completes successfully, modify settings:
 \begin{verbatim}
 chroot /mnt/disk /bin/bash
@@ -98,7 +103,10 @@ umount /mnt/disk
 disk = [ 'file:/path/diskimage,sda1,w', 'file:/path/swapimage,sda2,w' ]
 root = "/dev/sda1 ro"
 \end{verbatim}
+\end{enumerate}
 
+\section{Starting the New Domain}
+\begin{enumerate}
 \item Start the new domain
 \begin{verbatim}
 xm create -f domain_config_file

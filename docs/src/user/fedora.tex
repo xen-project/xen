@@ -1,61 +1,66 @@
-\chapter{Installing Xen on Red~Hat or Fedora Core}
+\chapter{Installing Xen on Red~Hat or Fedora~Core}
 
-When using Xen / XenLinux on a standard Linux distribution there are a
-couple of things to watch out for:
+\section{Tips}
+Here are a few pointers about using Xen / XenLinux on a Red~Hat or
+Fedora~Core distribution:
 
-Note that, because domains greater than 0 don't have any privileged
-access at all, certain commands in the default boot sequence will fail
-e.g.\ attempts to update the hwclock, change the console font, update
-the keytable map, start apmd (power management), or gpm (mouse
-cursor).  Either ignore the errors (they should be harmless), or
-remove them from the startup scripts.  Deleting the following links
-are a good start: {\path{S24pcmcia}}, {\path{S09isdn}},
-{\path{S17keytable}}, {\path{S26apmd}}, {\path{S85gpm}}.
+\begin{enumerate}
+\item Note that, because domains greater than~0 don't have any
+  privileged access at all, certain commands in the default boot
+  sequence will fail e.g.\ attempts to update the hwclock, change the
+  console font, update the keytable map, start apmd (power management),
+  or gpm (mouse cursor). Either ignore the errors (they should be
+  harmless), or remove them from the startup scripts. Deleting the
+  following links are a good start: {\path{S24pcmcia}},
+  {\path{S09isdn}}, {\path{S17keytable}}, {\path{S26apmd}},
+  {\path{S85gpm}}.
 
-If you want to use a single root file system that works cleanly for
-both domain~0 and unprivileged domains, a useful trick is to use
-different `init' run levels. For example, use run level 3 for
-domain~0, and run level 4 for other domains. This enables different
-startup scripts to be run in depending on the run level number passed
-on the kernel command line.
+\item If you want to use a single root file system that works cleanly
+  for both domain~0 and unprivileged domains, a useful trick is to use
+  different `init' run levels. For example, use run level 3 for
+  domain~0, and run level 4 for other domains. This enables different
+  startup scripts to be run in depending on the run level number passed
+  on the kernel command line.
 
-If using NFS root files systems mounted either from an external server
-or from domain0 there are a couple of other gotchas.  The default
-{\path{/etc/sysconfig/iptables}} rules block NFS, so part way through
-the boot sequence things will suddenly go dead.
+\item If using NFS root files systems mounted either from an external
+  server or from domain0 there are a couple of other gotchas. The
+  default {\path{/etc/sysconfig/iptables}} rules block NFS, so part way
+  through the boot sequence things will suddenly go dead.
 
-If you're planning on having a separate NFS {\path{/usr}} partition,
-the RH9 boot scripts don't make life easy - they attempt to mount NFS
-file systems way to late in the boot process. The easiest way I found
-to do this was to have a {\path{/linuxrc}} script run ahead of
-{\path{/sbin/init}} that mounts {\path{/usr}}:
+\item If you're planning on having a separate NFS {\path{/usr}}
+  partition, the RH9 boot scripts don't make life easy - they attempt to
+  mount NFS file systems way to late in the boot process. The easiest
+  way I found to do this was to have a {\path{/linuxrc}} script run
+  ahead of {\path{/sbin/init}} that mounts {\path{/usr}}:
 
-\begin{quote}
-  \begin{small}\begin{verbatim}
+  \begin{quote}
+    \begin{small}\begin{verbatim}
  #!/bin/bash
  /sbin/ipconfig lo 127.0.0.1
  /sbin/portmap
  /bin/mount /usr
  exec /sbin/init "$@" <>/dev/console 2>&1
 \end{verbatim}\end{small}
-\end{quote}
+  \end{quote}
 
 %% $ XXX SMH: font lock fix :-)
 
-The one slight complication with the above is that
-{\path{/sbin/portmap}} is dynamically linked against
-{\path{/usr/lib/libwrap.so.0}} Since this is in {\path{/usr}}, it
-won't work. This can be solved by copying the file (and link) below
-the {\path{/usr}} mount point, and just let the file be `covered' when
-the mount happens.
+  The one slight complication with the above is that
+  {\path{/sbin/portmap}} is dynamically linked against
+  {\path{/usr/lib/libwrap.so.0}} Since this is in {\path{/usr}}, it
+  won't work. This can be solved by copying the file (and link) below
+  the {\path{/usr}} mount point, and just let the file be `covered' when
+  the mount happens.
 
-In some installations, where a shared read-only {\path{/usr}} is being
-used, it may be desirable to move other large directories over into
-the read-only {\path{/usr}}. For example, you might replace
-{\path{/bin}}, {\path{/lib}} and {\path{/sbin}} with links into
-{\path{/usr/root/bin}}, {\path{/usr/root/lib}} and
-{\path{/usr/root/sbin}} respectively. This creates other problems for
-running the {\path{/linuxrc}} script, requiring bash, portmap, mount,
-ifconfig, and a handful of other shared libraries to be copied below
-the mount point --- a simple statically-linked C program would solve
-this problem.
+\item In some installations, where a shared read-only {\path{/usr}} is
+  being used, it may be desirable to move other large directories over
+  into the read-only {\path{/usr}}. For example, you might replace
+  {\path{/bin}}, {\path{/lib}} and {\path{/sbin}} with links into
+  {\path{/usr/root/bin}}, {\path{/usr/root/lib}} and
+  {\path{/usr/root/sbin}} respectively. This creates other problems for
+  running the {\path{/linuxrc}} script, requiring bash, portmap, mount,
+  ifconfig, and a handful of other shared libraries to be copied below
+  the mount point --- a simple statically-linked C program would solve
+  this problem.
+
+\end{enumerate}
