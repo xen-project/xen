@@ -25,7 +25,7 @@ static int  make_rx_response(netif_t *netif,
                              s8       st,
                              u16      offset,
                              u16      size,
-                             u16      csum_valid);
+                             u16      flags);
 
 static void net_tx_action(unsigned long unused);
 static DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
@@ -301,7 +301,8 @@ static void net_rx_action(unsigned long unused)
 		id = RING_GET_REQUEST(&netif->rx, netif->rx.rsp_prod_pvt)->id;
 		if (make_rx_response(netif, id, status,
 				     (unsigned long)skb->data & ~PAGE_MASK,
-				     size, skb->proto_csum_valid) &&
+				     size, skb->proto_csum_valid ?
+				     NETRXF_csum_valid : 0) &&
 		    (rx_notify[irq] == 0)) {
 			rx_notify[irq] = 1;
 			notify_list[notify_nr++] = irq;
@@ -632,7 +633,7 @@ static void net_tx_action(unsigned long unused)
                  */
 		skb->ip_summed        = CHECKSUM_UNNECESSARY;
 		skb->proto_csum_valid = 1;
-		skb->proto_csum_blank = txreq.csum_blank;
+		skb->proto_csum_blank = !!(txreq.flags & NETTXF_csum_blank);
 
 		netif->stats.rx_bytes += txreq.size;
 		netif->stats.rx_packets++;
@@ -706,7 +707,7 @@ static int make_rx_response(netif_t *netif,
                             s8       st,
                             u16      offset,
                             u16      size,
-                            u16      csum_valid)
+                            u16      flags)
 {
 	RING_IDX i = netif->rx.rsp_prod_pvt;
 	netif_rx_response_t *resp;
@@ -714,7 +715,7 @@ static int make_rx_response(netif_t *netif,
 
 	resp = RING_GET_RESPONSE(&netif->rx, i);
 	resp->offset     = offset;
-	resp->csum_valid = csum_valid;
+	resp->flags      = flags;
 	resp->id         = id;
 	resp->status     = (s16)size;
 	if (st < 0)
