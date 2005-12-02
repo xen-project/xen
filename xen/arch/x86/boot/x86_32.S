@@ -242,10 +242,10 @@ ENTRY(gdt_table)
 #ifdef CONFIG_X86_PAE
 ENTRY(idle_pg_table)
 ENTRY(idle_pg_table_l3)
-        .quad 0x100000 + 0x2000 + STACK_SIZE + 1*PAGE_SIZE + 0x01
-        .quad 0x100000 + 0x2000 + STACK_SIZE + 2*PAGE_SIZE + 0x01
-        .quad 0x100000 + 0x2000 + STACK_SIZE + 3*PAGE_SIZE + 0x01
-        .quad 0x100000 + 0x2000 + STACK_SIZE + 4*PAGE_SIZE + 0x01
+        .long idle_pg_table_l2 + 0*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
+        .long idle_pg_table_l2 + 1*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
+        .long idle_pg_table_l2 + 2*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
+        .long idle_pg_table_l2 + 3*PAGE_SIZE + 0x01 - __PAGE_OFFSET, 0
 .section ".bss.page_aligned","w"
 ENTRY(idle_pg_table_l2)
         .fill 4*PAGE_SIZE,1,0
