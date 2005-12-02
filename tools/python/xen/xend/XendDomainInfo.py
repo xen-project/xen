@@ -286,6 +286,7 @@ def parseConfig(config):
         result[e[0]] = get_cfg(e[0], e[1])
 
     result['cpu']       = get_cfg('cpu',       int)
+    result['cpus']      = get_cfg('cpus',      str)
     result['image']     = get_cfg('image')
 
     try:
@@ -298,6 +299,43 @@ def parseConfig(config):
         raise VmError(
             'Invalid configuration setting: vcpus = %s: %s' %
             (sxp.child_value(result['image'], 'vcpus', 1), str(exn)))
+
+    try:
+        # support legacy config files with 'cpu' parameter
+        # NB: prepending to list to support previous behavior
+        #     where 'cpu' parameter pinned VCPU0.
+        if result['cpu']:
+           if result['cpus']:
+               result['cpus'] = "%s,%s" % (str(result['cpu']), result['cpus'])
+           else:
+               result['cpus'] = str(result['cpu'])
+
+        # convert 'cpus' string to list of ints
+        # 'cpus' supports a list of ranges (0-3), seperated by
+        # commas, and negation, (^1).  
+        # Precedence is settled by  order of the string:
+        #     "0-3,^1"   -> [0,2,3]
+        #     "0-3,^1,1" -> [0,1,2,3]
+        if result['cpus']:
+            cpus = []
+            for c in result['cpus'].split(','):
+                if c.find('-') != -1:             
+                    (x,y) = c.split('-')
+                    for i in range(int(x),int(y)+1):
+                        cpus.append(int(i))
+                else:
+                    # remove this element from the list 
+                    if c[0] == '^':
+                        cpus = [x for x in cpus if x != int(c[1])]
+                    else:
+                        cpus.append(int(c))
+
+            result['cpus'] = cpus
+        
+    except ValueError, exn:
+        raise VmError(
+            'Invalid configuration setting: cpus = %s: %s' %
+            (result['cpus'], exn))
 
     result['backend'] = []
     for c in sxp.children(config, 'backend'):
@@ -486,6 +524,7 @@ class XendDomainInfo:
             defaultInfo('on_reboot',    lambda: "restart")
             defaultInfo('on_crash',     lambda: "restart")
             defaultInfo('cpu',          lambda: None)
+            defaultInfo('cpus',         lambda: [])
             defaultInfo('cpu_weight',   lambda: 1.0)
 
             # some domains don't have a config file (e.g. dom0 )
@@ -1130,9 +1169,15 @@ class XendDomainInfo:
             xc.domain_setmaxmem(self.domid, m)
             xc.domain_memory_increase_reservation(self.domid, m, 0, 0)
 
-            cpu = self.info['cpu']
-            if cpu is not None and cpu != -1:
-                xc.domain_pincpu(self.domid, 0, 1 << cpu)
+            # repin domain vcpus if a restricted cpus list is provided
+            # this is done prior to memory allocation to aide in memory
+            # distribution for NUMA systems.
+            cpus = self.info['cpus']
+            if cpus is not None and len(cpus) > 0:
+                for v in range(0, self.info['max_vcpu_id']+1):
+                    # pincpu takes a list of ints
+                    cpu = [ int( cpus[v % len(cpus)] ) ]
+                    xc.domain_pincpu(self.domid, v, cpu)
 
             self.createChannels()
 

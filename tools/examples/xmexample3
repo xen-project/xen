@@ -51,9 +51,11 @@ memory = 64
 # so we use the vmid to create a name.
 name = "VM%d" % vmid
 
-# Which CPU to start domain on? 
-#cpu = -1   # leave to Xen to pick
-cpu = vmid  # set based on vmid (mod number of CPUs)
+# List of which CPUS this domain is allowed to use, default Xen picks
+#cpus = ""         # leave to Xen to pick
+#cpus = "0"        # all vcpus run on CPU0
+#cpus = "0-3,5,^1" # run on cpus 0,2,3,5
+cpus = "%s" % vmid # set based on vmid (mod number of CPUs)
 
 #----------------------------------------------------------------------------
 # Define network interfaces.
