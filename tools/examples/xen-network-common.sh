@@ -93,5 +93,5 @@ find_dhcpd_conf_file()
 
 find_dhcpd_init_file()
 {
-  first_file -x /etc/init.d/dhcp3-server /etc/init.d/dhcp
+  first_file -x /etc/init.d/{dhcp3-server,dhcp,dhcpd}
 }
