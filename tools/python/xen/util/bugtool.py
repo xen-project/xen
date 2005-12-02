@@ -41,9 +41,10 @@ ATTACH_PATTERN = \
 
 TITLE_RE = re.compile(r'<title>(.*)</title>')
 
-FILES_TO_SEND = [ '/var/log/syslog', '/var/log/messages', '/var/log/debug',
-                  '/var/log/xend.log', '/var/log/xend-debug.log',
-                  '/var/log/xenstored-trace.log' ]
+FILES_TO_SEND = [ '/var/log/' + x for x in 
+                  [ 'syslog', 'messages', 'debug',
+                    'xend.log', 'xend-debug.log', 'xenstored-trace.log',
+                    'xen-hotplug.log' ] ]
 #FILES_TO_SEND = [  ]
 
 
