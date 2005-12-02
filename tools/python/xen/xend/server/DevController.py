@@ -105,6 +105,13 @@ class DevController:
                 t.remove(frontpath)
                 t.remove(backpath)
 
+                t.mkdir(backpath)
+                import xen.xend.XendDomain
+                t.set_permissions(backpath,
+                                  {'dom': xen.xend.XendDomain.PRIV_DOMAIN },
+                                  {'dom'  : self.vm.getDomid(),
+                                   'read' : True })
+
                 t.write2(frontpath, front)
                 t.write2(backpath,  back)
 

@@ -287,6 +287,7 @@ static struct domain *new_domain(void *context, unsigned int domid,
 
 	domain->conn = new_connection(writechn, readchn);
 	domain->conn->domain = domain;
+	domain->conn->id = domid;
 
 	domain->remote_port = port;
 	domain->mfn = mfn;

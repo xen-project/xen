@@ -213,6 +213,27 @@ class xstransact:
                 self._write(key, fmt % val)
 
 
+    def mkdir(self, *args):
+        if len(args) == 0:
+            xshandle().mkdir(self.transaction, self.path)
+        else:
+            for key in args:
+                xshandle().mkdir(self.transaction, self.prependPath(key))
+
+
+    def set_permissions(self, *args):
+        if len(args) == 0:
+            raise TypeError
+        elif isinstance(args[0], str):
+            self.callRebased(args[0], self.set_permissions, *args[1:])
+        else:
+            if not self.path:
+                raise RuntimeError('Cannot set permissions on the root')
+
+            xshandle().set_permissions(self.transaction, self.path,
+                                       list(args))
+
+
     def remove2(self, middlePath, *args):
         self.callRebased(middlePath, self.remove, *args)
 
@@ -245,29 +266,11 @@ class xstransact:
         given path, and return a list composed of the values at each of those
         instead.  This operation is performed inside a transaction.
         """
-        while True:
-            t = cls(path)
-            try:
-                v = t.read(*args)
-                t.abort()
-                return v
-            except:
-                t.abort()
-                raise
-
+        return complete(path, lambda t: t.read(*args))
     Read = classmethod(Read)
 
     def Write(cls, path, *args):
-        while True:
-            t = cls(path)
-            try:
-                t.write(*args)
-                if t.commit():
-                    return
-            except:
-                t.abort()
-                raise
-
+        complete(path, lambda t: t.write(*args))
     Write = classmethod(Write)
 
     def Remove(cls, path, *args):
@@ -275,16 +278,7 @@ class xstransact:
         each further argument as a subpath to the given path, and remove each
         of those instead.  This operation is performed inside a transaction.
         """
-        while True:
-            t = cls(path)
-            try:
-                t.remove(*args)
-                if t.commit():
-                    return
-            except:
-                t.abort()
-                raise
-
+        complete(path, lambda t: t.remove(*args))
     Remove = classmethod(Remove)
 
     def List(cls, path, *args):
@@ -294,16 +288,7 @@ class xstransact:
         and return the cumulative listing of each of those instead.  This
         operation is performed inside a transaction.
         """
-        while True:
-            t = cls(path)
-            try:
-                v = t.list(*args)
-                if t.commit():
-                    return v
-            except:
-                t.abort()
-                raise
-
+        return complete(path, lambda t: t.list(*args))
     List = classmethod(List)
 
     def ListRecursive(cls, path, *args):
@@ -313,40 +298,33 @@ class xstransact:
         subpath to the given path, and return the cumulative listing of each
         of those instead.  This operation is performed inside a transaction.
         """
-        while True:
-            t = cls(path)
-            try:
-                v = t.list_recursive(*args)
-                if t.commit():
-                    return v
-            except:
-                t.abort()
-                raise
-
+        return complete(path, lambda t: t.list_recursive(*args))
     ListRecursive = classmethod(ListRecursive)
 
     def Gather(cls, path, *args):
-        while True:
-            t = cls(path)
-            try:
-                v = t.gather(*args)
-                if t.commit():
-                    return v
-            except:
-                t.abort()
-                raise
-
+        return complete(path, lambda t: t.gather(*args))
     Gather = classmethod(Gather)
 
     def Store(cls, path, *args):
-        while True:
-            t = cls(path)
-            try:
-                v = t.store(*args)
-                if t.commit():
-                    return v
-            except:
-                t.abort()
-                raise
-
+        complete(path, lambda t: t.store(*args))
     Store = classmethod(Store)
+
+    def SetPermissions(cls, path, *args):
+        complete(path, lambda t: t.set_permissions(*args))
+    SetPermissions = classmethod(SetPermissions)
+
+    def Mkdir(cls, path, *args):
+        complete(path, lambda t: t.mkdir(*args))
+    Mkdir = classmethod(Mkdir)
+
+
+def complete(path, f):
+    while True:
+        t = xstransact(path)
+        try:
+            result = f(t)
+            if t.commit():
+                return result
+        except:
+            t.abort()
+            raise

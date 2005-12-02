@@ -36,6 +36,7 @@ from xen.xend import XendRoot
 from xen.xend import XendCheckpoint
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
+from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
 
 
@@ -46,6 +47,8 @@ xroot = XendRoot.instance()
 __all__ = [ "XendDomain" ]
 
 PRIV_DOMAIN = 0
+VMROOT = '/vm/'
+
 
 class XendDomain:
     """Index of all domains. Singleton.
@@ -64,6 +67,9 @@ class XendDomain:
     # instance() must be able to return a valid instance of this class even
     # during this initialisation.
     def init(self):
+        xstransact.Mkdir(VMROOT)
+        xstransact.SetPermissions(VMROOT, { 'dom' : PRIV_DOMAIN })
+
         self.domains_lock.acquire()
         try:
             self._add_domain(

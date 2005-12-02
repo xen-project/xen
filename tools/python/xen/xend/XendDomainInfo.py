@@ -43,7 +43,7 @@ import XendRoot
 from xen.xend.XendBootloader import bootloader
 from xen.xend.XendError import XendError, VmError
 
-from xen.xend.xenstore.xstransact import xstransact
+from xen.xend.xenstore.xstransact import xstransact, complete
 from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain
 from xen.xend.xenstore.xswatch import xswatch
 
@@ -83,8 +83,6 @@ STATE_DOM_OK       = 1
 STATE_DOM_SHUTDOWN = 2
 
 SHUTDOWN_TIMEOUT = 30
-
-VMROOT  = '/vm/'
 
 ZOMBIE_PREFIX = 'Zombie-'
 
@@ -234,7 +232,7 @@ def recreate(xeninfo, priv):
             log.warn(str(exn))
 
         vm = XendDomainInfo(xeninfo, domid, dompath, True, priv)
-        vm.removeDom()
+        vm.recreateDom()
         vm.removeVm()
         vm.storeVmDetails()
         vm.storeDomDetails()
@@ -385,7 +383,7 @@ class XendDomainInfo:
         else:
             self.domid = None
 
-        self.vmpath  = VMROOT + self.info['uuid']
+        self.vmpath  = XendDomain.VMROOT + self.info['uuid']
         self.dompath = dompath
 
         if augment:
@@ -569,6 +567,14 @@ class XendDomainInfo:
 
     def removeDom(self, *args):
         return xstransact.Remove(self.dompath, *args)
+
+    def recreateDom(self):
+        complete(self.dompath, lambda t: self._recreateDom(t))
+
+    def _recreateDom(self, t):
+        t.remove()
+        t.mkdir()
+        t.set_permissions({ 'dom' : self.domid })
 
 
     ## private:
@@ -1084,7 +1090,7 @@ class XendDomainInfo:
 
         self.dompath = GetDomainPath(self.domid)
 
-        self.removeDom()
+        self.recreateDom()
 
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['vcpus']))
@@ -1384,7 +1390,7 @@ class XendDomainInfo:
         self.release_devices()
         self.info['name'] = new_name
         self.info['uuid'] = new_uuid
-        self.vmpath = VMROOT + new_uuid
+        self.vmpath = XendDomain.VMROOT + new_uuid
         self.storeVmDetails()
         self.preserve()
 
