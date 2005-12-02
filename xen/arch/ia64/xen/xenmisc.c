@@ -141,10 +141,12 @@ void init_percpu_info(void)
     //memset(percpu_info, 0, sizeof(percpu_info));
 }
 
+#if 0
 void free_page_type(struct pfn_info *page, unsigned int type)
 {
 	dummy();
 }
+#endif
 
 ///////////////////////////////
 //// misc memory stuff

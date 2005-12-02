@@ -35,6 +35,7 @@ extern unsigned long dom_fw_setup(struct domain *, char *, int);
  * rp=b0 indicates the return point.
  *
  * A single hypercall is used for all PAL calls.
+ * The hypercall stub is pal_call_stub (xenasm.S).  Its size is 2 bundles.
  */
 
 #define FW_HYPERCALL_PAL_CALL_INDEX	0x80UL
@@ -53,7 +54,7 @@ extern unsigned long dom_fw_setup(struct domain *, char *, int);
  * A single hypercall is used for all SAL calls.
  */
 
-#define FW_HYPERCALL_SAL_CALL_INDEX	0x81UL
+#define FW_HYPERCALL_SAL_CALL_INDEX	0x82UL
 #define FW_HYPERCALL_SAL_CALL_PADDR	FW_HYPERCALL_PADDR(FW_HYPERCALL_SAL_CALL_INDEX)
 #define FW_HYPERCALL_SAL_CALL		0x1001UL
 
@@ -117,3 +118,12 @@ extern unsigned long dom_fw_setup(struct domain *, char *, int);
 #define FW_HYPERCALL_EFI_SET_VARIABLE_PADDR		FW_HYPERCALL_PADDR(FW_HYPERCALL_EFI_SET_VARIABLE_INDEX)
 #define FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT_PADDR	FW_HYPERCALL_PADDR(FW_HYPERCALL_EFI_GET_NEXT_HIGH_MONO_COUNT_INDEX)
 #define FW_HYPERCALL_EFI_RESET_SYSTEM_PADDR		FW_HYPERCALL_PADDR(FW_HYPERCALL_EFI_RESET_SYSTEM_INDEX)
+
+extern struct ia64_pal_retval xen_pal_emulator(UINT64,UINT64,UINT64,UINT64);
+extern struct sal_ret_values sal_emulator (long index, unsigned long in1, unsigned long in2, unsigned long in3, unsigned long in4, unsigned long in5, unsigned long in6, unsigned long in7);
+extern struct ia64_pal_retval pal_emulator_static (unsigned long);
+
+extern void build_pal_hypercall_bundles(unsigned long *imva, unsigned long brkimm, unsigned long hypnum);
+extern void build_hypercall_bundle(UINT64 *imva, UINT64 brkimm, UINT64 hypnum, UINT64 ret);
+
+

@@ -10,6 +10,7 @@
 #include <asm/vcpu.h>
 #include <asm/processor.h>
 #include <asm/delay.h>	// Debug only
+#include <asm/dom_fw.h>
 //#include <debug.h>
 
 long priv_verbose=0;
@@ -53,6 +54,39 @@ void build_hypercall_bundle(UINT64 *imva, UINT64 brkimm, UINT64 hypnum, UINT64 r
 	
 	*imva++ = bundle.i64[0]; *imva = bundle.i64[1];
 }
+
+void build_pal_hypercall_bundles(UINT64 *imva, UINT64 brkimm, UINT64 hypnum)
+{
+	extern unsigned long pal_call_stub[];
+	IA64_BUNDLE bundle;
+	INST64_A5 slot_a5;
+	INST64_M37 slot_m37;
+
+	/* The source of the hypercall stub is the pal_call_stub function
+	   defined in xenasm.S.  */
+
+	/* Copy the first bundle and patch the hypercall number.  */
+	bundle.i64[0] = pal_call_stub[0];
+	bundle.i64[1] = pal_call_stub[1];
+	slot_a5.inst = bundle.slot0;
+	slot_a5.imm7b = hypnum;
+	slot_a5.imm9d = hypnum >> 7;
+	slot_a5.imm5c = hypnum >> 16;
+	bundle.slot0 = slot_a5.inst;
+	imva[0] = bundle.i64[0];
+	imva[1] = bundle.i64[1];
+	
+	/* Copy the second bundle and patch the hypercall vector.  */
+	bundle.i64[0] = pal_call_stub[2];
+	bundle.i64[1] = pal_call_stub[3];
+	slot_m37.inst = bundle.slot0;
+	slot_m37.imm20a = brkimm;
+	slot_m37.i = brkimm >> 20;
+	bundle.slot0 = slot_m37.inst;
+	imva[2] = bundle.i64[0];
+	imva[3] = bundle.i64[1];
+}
+
 
 /**************************************************************************
 Privileged operation emulation routines

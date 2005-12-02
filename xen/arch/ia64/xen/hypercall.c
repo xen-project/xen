@@ -18,8 +18,6 @@
 #include <public/sched.h>
 
 extern unsigned long translate_domain_mpaddr(unsigned long);
-extern struct ia64_pal_retval xen_pal_emulator(UINT64,UINT64,UINT64,UINT64);
-extern struct ia64_sal_retval sal_emulator(UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64);
 
 unsigned long idle_when_pending = 0;
 unsigned long pal_halt_light_count = 0;
@@ -28,8 +26,7 @@ int
 ia64_hypercall (struct pt_regs *regs)
 {
 	struct vcpu *v = (struct domain *) current;
-	struct ia64_sal_retval x;
-	struct ia64_pal_retval y;
+	struct sal_ret_values x;
 	unsigned long *tv, *tc;
 	int pi;
 
@@ -62,25 +59,33 @@ ia64_hypercall (struct pt_regs *regs)
 				pal_halt_light_count++;
 				do_sched_op(SCHEDOP_yield);
 			}
-			//break;
+			regs->r8 = 0;
+			regs->r9 = 0;
+			regs->r10 = 0;
+			regs->r11 = 0;
 		}
-		else if (regs->r28 >= PAL_COPY_PAL) {	/* FIXME */
-			printf("stacked PAL hypercalls not supported\n");
-			regs->r8 = -1;
-			break;
+		else {
+			struct ia64_pal_retval y;
+
+			if (regs->r28 >= PAL_COPY_PAL)
+				y = xen_pal_emulator
+					(regs->r28, vcpu_get_gr (v, 33),
+					 vcpu_get_gr (v, 34),
+					 vcpu_get_gr (v, 35));
+			else
+				y = xen_pal_emulator(regs->r28,regs->r29,
+						     regs->r30,regs->r31);
+			regs->r8 = y.status; regs->r9 = y.v0;
+			regs->r10 = y.v1; regs->r11 = y.v2;
 		}
-		else y = xen_pal_emulator(regs->r28,regs->r29,
-						regs->r30,regs->r31);
-		regs->r8 = y.status; regs->r9 = y.v0;
-		regs->r10 = y.v1; regs->r11 = y.v2;
 		break;
 	    case FW_HYPERCALL_SAL_CALL:
 		x = sal_emulator(vcpu_get_gr(v,32),vcpu_get_gr(v,33),
 			vcpu_get_gr(v,34),vcpu_get_gr(v,35),
 			vcpu_get_gr(v,36),vcpu_get_gr(v,37),
 			vcpu_get_gr(v,38),vcpu_get_gr(v,39));
-		regs->r8 = x.status; regs->r9 = x.v0;
-		regs->r10 = x.v1; regs->r11 = x.v2;
+		regs->r8 = x.r8; regs->r9 = x.r9;
+		regs->r10 = x.r10; regs->r11 = x.r11;
 		break;
 	    case FW_HYPERCALL_EFI_RESET_SYSTEM:
 		printf("efi.reset_system called ");

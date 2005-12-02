@@ -33,8 +33,6 @@
 #include <xen/multicall.h>
 
 extern unsigned long vcpu_get_itir_on_fault(struct vcpu *, UINT64);
-extern struct ia64_sal_retval pal_emulator_static(UINT64);
-extern struct ia64_sal_retval sal_emulator(UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64);
 
 extern unsigned long dom0_start, dom0_size;
 

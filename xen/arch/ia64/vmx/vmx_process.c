@@ -53,8 +53,6 @@
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
 
 
-extern struct ia64_sal_retval pal_emulator_static(UINT64);
-extern struct ia64_sal_retval sal_emulator(UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64);
 extern void rnat_consumption (VCPU *vcpu);
 #define DOMN_PAL_REQUEST    0x110000
 
@@ -110,14 +108,15 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 	}
 #endif
 	if (iim == d->arch.breakimm) {
-		struct ia64_sal_retval x;
+		struct ia64_pal_retval y;
+		struct sal_ret_values x;
 		switch (regs->r2) {
 		    case FW_HYPERCALL_PAL_CALL:
 			//printf("*** PAL hypercall: index=%d\n",regs->r28);
 			//FIXME: This should call a C routine
-			x = pal_emulator_static(VCPU(v, vgr[12]));
-			regs->r8 = x.status; regs->r9 = x.v0;
-			regs->r10 = x.v1; regs->r11 = x.v2;
+			y = pal_emulator_static(VCPU(v, vgr[12]));
+			regs->r8 = y.status; regs->r9 = y.v0;
+			regs->r10 = y.v1; regs->r11 = y.v2;
 #if 0
 			if (regs->r8)
 				printk("Failed vpal emulation, with index:0x%lx\n",
@@ -131,8 +130,8 @@ vmx_ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long is
 					 sal_param[2], sal_param[3],
 					 sal_param[4], sal_param[5],
 					 sal_param[6], sal_param[7]);
-			regs->r8 = x.status; regs->r9 = x.v0;
-			regs->r10 = x.v1; regs->r11 = x.v2;
+			regs->r8 = x.r8; regs->r9 = x.r9;
+			regs->r10 = x.r10; regs->r11 = x.r11;
 #if 0
 			if (regs->r8)
 				printk("Failed vsal emulation, with index:0x%lx\n",
