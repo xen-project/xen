@@ -21,7 +21,6 @@ SECTIONS
   _etext = .;			/* End of text section */
 
   .rodata : { *(.rodata) *(.rodata.*) } :text
-  .kstrtab : { *(.kstrtab) } :text
 
   . = ALIGN(32);		/* Exception table */
   __start___ex_table = .;
@@ -33,23 +32,10 @@ SECTIONS
   __pre_ex_table : { *(__pre_ex_table) } :text
   __stop___pre_ex_table = .;
 
-  __start___ksymtab = .;	/* Kernel symbol table */
-  __ksymtab : { *(__ksymtab) } :text
-  __stop___ksymtab = .;
-
-  __start___kallsyms = .;	/* All kernel symbols */
-  __kallsyms : { *(__kallsyms) } :text
-  __stop___kallsyms = .;
-
   .data : {			/* Data */
 	*(.data)
 	CONSTRUCTORS
 	} :text
-
-  _edata = .;			/* End of data section */
-
-  . = ALIGN(8192);		/* init_task */
-  .data.init_task : { *(.data.init_task) } :text
 
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
@@ -62,10 +48,13 @@ SECTIONS
   __initcall_start = .;
   .initcall.init : { *(.initcall.init) } :text
   __initcall_end = .;
+  . = ALIGN(8192);
   __init_end = .;
 
   __bss_start = .;		/* BSS */
   .bss : {
+	*(.bss.twopage_aligned)
+	*(.bss.page_aligned)
 	*(.bss)
 	} :text
   _end = . ;

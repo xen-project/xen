@@ -222,6 +222,7 @@ static void do_read(int fd, void *data, int len)
 
 int main(int argc, char **argv)
 {
+    u64        final_exec_addr;
     u32        loadbase, dat_siz, mem_siz;
     char      *inimage, *outimage;
     int        infd, outfd;
@@ -234,15 +235,17 @@ int main(int argc, char **argv)
     Elf64_Ehdr in64_ehdr;
     Elf64_Phdr in64_phdr;
 
-    if ( argc != 4 )
+    if ( argc != 5 )
     {
-        fprintf(stderr, "Usage: mkelf32 <in-image> <out-image> <load-base>\n");
+        fprintf(stderr, "Usage: mkelf32 <in-image> <out-image> "
+                "<load-base> <final-exec-addr>\n");
         return 1;
     }
 
     inimage  = argv[1];
     outimage = argv[2];
     loadbase = strtoul(argv[3], NULL, 16);
+    final_exec_addr = strtoul(argv[4], NULL, 16);
 
     infd = open(inimage, O_RDONLY);
     if ( infd == -1 )
@@ -286,7 +289,10 @@ int main(int argc, char **argv)
 
         (void)lseek(infd, in32_phdr.p_offset, SEEK_SET);
         dat_siz = (u32)in32_phdr.p_filesz;
-        mem_siz = (u32)in32_phdr.p_memsz;
+
+        /* Do not use p_memsz: it does not include BSS alignment padding. */
+        /*mem_siz = (u32)in32_phdr.p_memsz;*/
+        mem_siz = (u32)(final_exec_addr - in32_phdr.p_vaddr);
         break;
 
     case ELFCLASS64:
@@ -314,7 +320,10 @@ int main(int argc, char **argv)
 
         (void)lseek(infd, in64_phdr.p_offset, SEEK_SET);
         dat_siz = (u32)in64_phdr.p_filesz;
-        mem_siz = (u32)in64_phdr.p_memsz;
+
+        /* Do not use p_memsz: it does not include BSS alignment padding. */
+        /*mem_siz = (u32)in64_phdr.p_memsz;*/
+        mem_siz = (u32)(final_exec_addr - in64_phdr.p_vaddr);
         break;
 
     default:

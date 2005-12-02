@@ -37,7 +37,8 @@ endif
 default: $(TARGET)
 
 $(TARGET): $(TARGET)-syms boot/mkelf32
-	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000
+	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
+	`nm $(TARGET)-syms | sort | tail -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
 
 $(CURDIR)/arch.o: $(OBJS)
 	$(LD) $(LDFLAGS) -r -o $@ $(OBJS)
