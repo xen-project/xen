@@ -11,6 +11,8 @@
 
 #include "ring.h"
 
+#include <asm-xen/gnttab.h>	/* for grant_ref_t */
+
 /*
  * Front->back notifications: When enqueuing a new request, sending a
  * notification can be made conditional on req_event (i.e., the generic

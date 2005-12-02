@@ -69,6 +69,8 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 	[ -e $(BASEDIR)/include/asm-ia64/xen ] \
 	 || ln -s $(BASEDIR)/include/asm-ia64/linux $(BASEDIR)/include/asm-ia64/xen
 # Link to DM file in Xen for ia64/vti
+	[ -e $(BASEDIR)/include/asm-ia64/vmx_vpic.h ] \
+	 || ln -s ../../include/asm-x86/vmx_vpic.h $(BASEDIR)/include/asm-ia64/vmx_vpic.h
 	[ -e $(BASEDIR)/include/asm-ia64/vmx_vioapic.h ] \
 	 || ln -s ../../include/asm-x86/vmx_vioapic.h $(BASEDIR)/include/asm-ia64/vmx_vioapic.h
 	[ -e $(BASEDIR)/arch/ia64/vmx/vmx_vioapic.c ] \
