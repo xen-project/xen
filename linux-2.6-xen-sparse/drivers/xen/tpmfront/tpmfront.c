@@ -44,6 +44,7 @@
 #include <asm/semaphore.h>
 #include <asm/io.h>
 #include <asm-xen/evtchn.h>
+#include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/xen-public/io/tpmif.h>
 #include <asm/uaccess.h>
 #include <asm-xen/xenbus.h>
