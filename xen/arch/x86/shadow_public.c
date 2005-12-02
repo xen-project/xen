@@ -1425,7 +1425,7 @@ alloc_p2m_table(struct domain *d)
 
 void shadow_l1_normal_pt_update(
     struct domain *d,
-    unsigned long pa, l1_pgentry_t gpte,
+    physaddr_t pa, l1_pgentry_t gpte,
     struct domain_mmap_cache *cache)
 {
     unsigned long sl1mfn;    
@@ -1450,7 +1450,7 @@ void shadow_l1_normal_pt_update(
 
 void shadow_l2_normal_pt_update(
     struct domain *d,
-    unsigned long pa, l2_pgentry_t gpde,
+    physaddr_t pa, l2_pgentry_t gpde,
     struct domain_mmap_cache *cache)
 {
     unsigned long sl2mfn;
@@ -1475,7 +1475,7 @@ void shadow_l2_normal_pt_update(
 #if CONFIG_PAGING_LEVELS >= 3
 void shadow_l3_normal_pt_update(
     struct domain *d,
-    unsigned long pa, l3_pgentry_t l3e,
+    physaddr_t pa, l3_pgentry_t l3e,
     struct domain_mmap_cache *cache)
 {
     unsigned long sl3mfn;
@@ -1502,7 +1502,7 @@ void shadow_l3_normal_pt_update(
 #if CONFIG_PAGING_LEVELS >= 4
 void shadow_l4_normal_pt_update(
     struct domain *d,
-    unsigned long pa, l4_pgentry_t l4e,
+    physaddr_t pa, l4_pgentry_t l4e,
     struct domain_mmap_cache *cache)
 {
     unsigned long sl4mfn;
