@@ -55,7 +55,6 @@
 #include <asm-xen/evtchn.h>
 #include <asm-xen/xencons.h>
 
-#include "xencons_ring.h"
 /*
  * Modes:
  *  'xencons=off'  [XC_OFF]:     Console is disabled.
@@ -247,7 +246,6 @@ void xencons_force_flush(void)
 	if (xen_start_info->flags & SIF_INITDOMAIN)
 		return;
 
-
 	/* Spin until console data is flushed through to the daemon. */
 	while (wc != wp) {
 		int sent = 0;
@@ -271,8 +269,7 @@ static struct tty_struct *xencons_tty;
 static int xencons_priv_irq;
 static char x_char;
 
-/* Non-privileged receive callback. */
-static void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
+void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
 {
 	int           i;
 	unsigned long flags;
@@ -311,10 +308,9 @@ static void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
 	spin_unlock_irqrestore(&xencons_lock, flags);
 }
 
-/* Privileged and non-privileged transmit worker. */
 static void __xencons_tx_flush(void)
 {
-	int sz, work_done = 0;
+	int sent, sz, work_done = 0;
 
 	if (xen_start_info->flags & SIF_INITDOMAIN) {
 		if (x_char) {
@@ -340,20 +336,18 @@ static void __xencons_tx_flush(void)
 		}
 
 		while (wc != wp) {
-			int sent;
 			sz = wp - wc;
 			if (sz > (wbuf_size - WBUF_MASK(wc)))
 				sz = wbuf_size - WBUF_MASK(wc);
 			sent = xencons_ring_send(&wbuf[WBUF_MASK(wc)], sz);
-			if (sent > 0) {
-				wc += sent;
-				work_done = 1;
-			}
+			if (sent == 0)
+				break;
+			wc += sent;
+			work_done = 1;
 		}
 	}
 
-	if (work_done && (xencons_tty != NULL))
-	{
+	if (work_done && (xencons_tty != NULL)) {
 		wake_up_interruptible(&xencons_tty->write_wait);
 		if ((xencons_tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
 		    (xencons_tty->ldisc.write_wakeup != NULL))
@@ -361,31 +355,26 @@ static void __xencons_tx_flush(void)
 	}
 }
 
+void xencons_tx(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&xencons_lock, flags);
+	__xencons_tx_flush();
+	spin_unlock_irqrestore(&xencons_lock, flags);
+}
+
 /* Privileged receive callback and transmit kicker. */
 static irqreturn_t xencons_priv_interrupt(int irq, void *dev_id,
                                           struct pt_regs *regs)
 {
-	static char   rbuf[16];
-	int           i, l;
-	unsigned long flags;
+	static char rbuf[16];
+	int         l;
 
-	spin_lock_irqsave(&xencons_lock, flags);
+	while ((l = HYPERVISOR_console_io(CONSOLEIO_read, 16, rbuf)) > 0)
+		xencons_rx(rbuf, l, regs);
 
-	if (xencons_tty != NULL)
-	{
-		/* Receive work. */
-		while ((l = HYPERVISOR_console_io(
-			CONSOLEIO_read, 16, rbuf)) > 0)
-			for (i = 0; i < l; i++)
-				tty_insert_flip_char(xencons_tty, rbuf[i], 0);
-		if (xencons_tty->flip.count != 0)
-			tty_flip_buffer_push(xencons_tty);
-	}
-
-	/* Transmit work. */
-	__xencons_tx_flush();
-
-	spin_unlock_irqrestore(&xencons_lock, flags);
+	xencons_tx();
 
 	return IRQ_HANDLED;
 }
@@ -664,7 +653,8 @@ static int __init xencons_init(void)
 	if ((rc = tty_register_driver(DRV(xencons_driver))) != 0) {
 		printk("WARNING: Failed to register Xen virtual "
 		       "console driver as '%s%d'\n",
-		       DRV(xencons_driver)->name, DRV(xencons_driver)->name_base);
+		       DRV(xencons_driver)->name,
+		       DRV(xencons_driver)->name_base);
 		put_tty_driver(xencons_driver);
 		xencons_driver = NULL;
 		return rc;
@@ -681,8 +671,6 @@ static int __init xencons_init(void)
 			"console",
 			NULL);
 		BUG_ON(xencons_priv_irq < 0);
-	} else {
-		xencons_ring_register_receiver(xencons_rx);
 	}
 
 	printk("Xen virtual console successfully installed as %s%d\n",

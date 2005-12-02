@@ -389,7 +389,6 @@ void pgd_free(pgd_t *pgd)
 }
 
 #ifndef CONFIG_XEN_SHADOW_MODE
-asmlinkage int xprintk(const char *fmt, ...);
 void make_lowmem_page_readonly(void *va)
 {
 	pte_t *pte = virt_to_ptep(va);

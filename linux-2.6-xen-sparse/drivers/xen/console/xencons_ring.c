@@ -19,11 +19,9 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/err.h>
-#include "xencons_ring.h"
 #include <asm-xen/xen-public/io/console.h>
 
 static int xencons_irq;
-static xencons_receiver_func *xencons_receiver;
 
 static inline struct xencons_interface *xencons_interface(void)
 {
@@ -69,10 +67,8 @@ static irqreturn_t handle_input(int irq, void *unused, struct pt_regs *regs)
 	BUG_ON((prod - cons) > sizeof(intf->in));
 
 	while (cons != prod) {
-		if (xencons_receiver != NULL)
-			xencons_receiver(
-				intf->in + MASK_XENCONS_IDX(cons++, intf->in),
-				1, regs);
+		xencons_rx(intf->in+MASK_XENCONS_IDX(cons,intf->in), 1, regs);
+		cons++;
 	}
 
 	mb();
@@ -80,12 +76,9 @@ static irqreturn_t handle_input(int irq, void *unused, struct pt_regs *regs)
 
 	notify_daemon();
 
-	return IRQ_HANDLED;
-}
+	xencons_tx();
 
-void xencons_ring_register_receiver(xencons_receiver_func *f)
-{
-	xencons_receiver = f;
+	return IRQ_HANDLED;
 }
 
 int xencons_ring_init(void)
