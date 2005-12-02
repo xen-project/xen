@@ -1,9 +1,9 @@
-\chapter{Installation}
+\chapter{Basic Installation}
 
 The Xen distribution includes three main components: Xen itself, ports
 of Linux and NetBSD to run on Xen, and the userspace
 tools required to manage a Xen-based system.  This chapter describes
-how to install the Xen~2.0 distribution from source.  Alternatively,
+how to install the Xen~3.0 distribution from source.  Alternatively,
 there may be pre-built packages available as part of your operating
 system distribution.
 
@@ -122,16 +122,16 @@ just contains the virtual ones. These are found in
 \path{dist/install/boot/} along with the image for Xen itself and the
 configuration files used during the build.
 
-The NetBSD port can be built using:
-\begin{quote}
-\begin{verbatim}
-# make netbsd20
-\end{verbatim}\end{quote}
-NetBSD port is built using a snapshot of the netbsd-2-0 cvs branch.
-The snapshot is downloaded as part of the build process if it is not
-yet present in the \path{NETBSD\_SRC\_PATH} search path.  The build
-process also downloads a toolchain which includes all of the tools
-necessary to build the NetBSD kernel under Linux.
+%The NetBSD port can be built using:
+%\begin{quote}
+%\begin{verbatim}
+%# make netbsd20
+%\end{verbatim}\end{quote}
+%NetBSD port is built using a snapshot of the netbsd-2-0 cvs branch.
+%The snapshot is downloaded as part of the build process if it is not
+%yet present in the \path{NETBSD\_SRC\_PATH} search path.  The build
+%process also downloads a toolchain which includes all of the tools
+%necessary to build the NetBSD kernel under Linux.
 
 To customize the set of kernels built you need to edit the top-level
 Makefile. Look for the line:
@@ -169,7 +169,7 @@ kernel containing only virtual device drivers.
 %%     currently), you'll need to enable devfs and devfs mount at boot
 %%     time in the xen0 config.  }}
 
-\subsection{Custom XenLinux Builds}
+\subsection{Custom Kernels}
 
 % If you have an SMP machine you may wish to give the {\tt '-j4'}
 % argument to make to get a parallel build.
@@ -206,7 +206,7 @@ you may prefer these for your non-privileged domains.  The ``0''
 suffixed privileged versions can be used to boot the system, as well
 as in driver domains and unprivileged domains.
 
-\subsection{Installing the Binaries}
+\subsection{Installing Generated Binaries}
 
 The files produced by the build process are stored under the
 \path{dist/install/} directory. To install them in their default
@@ -307,7 +307,7 @@ line with:
 \end{quote}
 
 This configures Xen to output on COM1 at 115,200 baud, 8 data bits, 1
-stop bit and no parity. Modify these parameters for your set up.
+stop bit and no parity. Modify these parameters for your environment.
 
 One can also configure XenLinux to share the serial console; to
 achieve this append ``\path{console=ttyS0}'' to your module line.
@@ -325,38 +325,38 @@ the serial line will require adding \path{ttyS0} to
 
 Users of the XenLinux 2.6 kernel should disable Thread Local Storage
 (TLS) (e.g.\ by doing a \path{mv /lib/tls /lib/tls.disabled}) before
-attempting to boot a XenLinux kernel\footnote{If you boot without
-  first disabling TLS, you will get a warning message during the boot
-  process. In this case, simply perform the rename after the machine
-  is up and then run \texttt{/sbin/ldconfig} to make it take effect.}.
-You can always reenable TLS by restoring the directory to its original
-location (i.e.\ \path{mv /lib/tls.disabled /lib/tls}).
+attempting to boot a XenLinux kernel\footnote{If you boot without first
+  disabling TLS, you will get a warning message during the boot process.
+  In this case, simply perform the rename after the machine is up and
+  then run \path{/sbin/ldconfig} to make it take effect.}. You can
+always reenable TLS by restoring the directory to its original location
+(i.e.\ \path{mv /lib/tls.disabled /lib/tls}).
 
 The reason for this is that the current TLS implementation uses
-segmentation in a way that is not permissible under Xen.  If TLS is
-not disabled, an emulation mode is used within Xen which reduces
-performance substantially.
+segmentation in a way that is not permissible under Xen. If TLS is not
+disabled, an emulation mode is used within Xen which reduces performance
+substantially.
 
 We hope that this issue can be resolved by working with Linux
-distributions to implement a minor backward-compatible change
-to the TLS library.
+distributions to implement a minor backward-compatible change to the TLS
+library.
 
 
 \section{Booting Xen}
 
-It should now be possible to restart the system and use Xen.  Reboot
-and choose the new Xen option when the Grub screen appears.
+It should now be possible to restart the system and use Xen. Reboot and
+choose the new Xen option when the Grub screen appears.
 
-What follows should look much like a conventional Linux boot.  The
-first portion of the output comes from Xen itself, supplying low level
-information about itself and the underlying hardware.  The last
-portion of the output comes from XenLinux.
+What follows should look much like a conventional Linux boot. The first
+portion of the output comes from Xen itself, supplying low level
+information about itself and the underlying hardware. The last portion
+of the output comes from XenLinux.
 
-You may see some errors during the XenLinux boot.  These are not
+You may see some errors during the XenLinux boot. These are not
 necessarily anything to worry about --- they may result from kernel
 configuration differences between your XenLinux kernel and the one you
 usually use.
 
 When the boot completes, you should be able to log into your system as
-usual.  If you are unable to log in, you should still be able to
-reboot with your normal Linux kernel.
+usual. If you are unable to log in, you should still be able to reboot
+with your normal Linux kernel.

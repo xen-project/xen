@@ -1,0 +1,25 @@
+\chapter{Debugging and Tracing}
+
+\section{Debugging}
+\label{s:keys}
+
+Xen has a set of debugging features that can be useful to try and figure
+out what's going on. Hit ``h'' on the serial line (if you specified a baud
+rate on the Xen command line) or ScrollLock-h on the keyboard to get a
+list of supported commands.
+
+If you have a crash you'll likely get a crash dump containing an EIP
+(PC) which, along with an \path{objdump -d image}, can be useful in
+figuring out what's happened. Debug a Xenlinux image just as you would
+any other Linux kernel.
+
+%% We supply a handy debug terminal program which you can find in
+%% \path{/usr/local/src/xen-2.0.bk/tools/misc/miniterm/} This should
+%% be built and executed on another machine that is connected via a
+%% null modem cable. Documentation is included.  Alternatively, if the
+%% Xen machine is connected to a serial-port server then we supply a
+%% dumb TCP terminal client, {\tt xencons}.
+
+\section{Tracing}
+
+Placeholder.

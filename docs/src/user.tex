@@ -29,10 +29,10 @@
 \end{center}
 
 {\bf DISCLAIMER: This documentation is currently under active
-  development and as such there may be mistakes and omissions ---
-  watch out for these and please report any you find to the
-  developers' mailing list.  Contributions of material, suggestions
-  and corrections are welcome.}
+  development and as such there may be mistakes and omissions --- watch
+  out for these and please report any you find to the developers'
+  mailing list. Contributions of material, suggestions and corrections
+  are welcome.}
 
 \vfill
 \cleardoublepage
@@ -60,102 +60,84 @@
 \setstretch{1.1}
 
 
-\part{Introduction and Tutorial}
+\part{Introduction}
 
 %% Chapter Introduction moved to introduction.tex
 \include{src/user/introduction}
 
-%% Chapter Installation moved to installation.tex
+
+\part{Installation}
+
+%% Chapter Basic Installation
 \include{src/user/installation}
 
-%% Chapter Starting Additional Domains moved to start_addl_dom.tex
+%% Chapter Installing Xen on Debian
+\include{src/user/debian}
+
+%% Chapter Installing Xen on Fedora Core
+\include{src/user/fedora}
+
+%% Chapter Installing Xen on Gentoo Linux
+\include{src/user/gentoo}
+
+%% Chapter Installing Xen on Red Hat Enterprise Linux (RHEL)
+\include{src/user/rhel}
+
+%% Chapter Installing Xen on SuSE or SuSE SLES
+\include{src/user/suse}
+
+
+\part{Configuration and Management}
+
+%% Chapter Starting Additional Domains
 \include{src/user/start_addl_dom}
 
-%% Chapter Domain Management Tools moved to domain_mgmt.tex
+%% Chapter Domain Management Tools
 \include{src/user/domain_mgmt}
 
-%% Chapter Domain Filesystem Storage moved to domain_filesystem.tex
+%% Chapter Domain Filesystem Storage
 \include{src/user/domain_filesystem}
 
-
-
-\part{User Reference Documentation}
-
-%% Chapter Control Software moved to control_software.tex
-\include{src/user/control_software}
-
-%% Chapter Domain Configuration moved to domain_configuration.tex
+%% Chapter Domain Configuration
 \include{src/user/domain_configuration}
 
 %% Chapter Securing Xen
 \include{src/user/securing_xen}
 
-%% Chapter Build, Boot and Debug Options moved to build.tex
-\include{src/user/build}
+
+\part{Troubleshooting}
+
+%% Chapter Monitoring Xen
+\include{src/user/monitoring_xen}
+
+%% Chapter Debugging and Tracing
+\include{src/user/debugging}
+
+%% Chapter Known Problems
+\include{src/user/known_problems}
+
+%% Chapter Testing Xen
+\include{src/user/testing}
 
 
-\chapter{Further Support}
+\part{Reference Documentation}
 
-If you have questions that are not answered by this manual, the
-sources of information listed below may be of interest to you.  Note
-that bug reports, suggestions and contributions related to the
-software (or the documentation) should be sent to the Xen developers'
-mailing list (address below).
+%% Chapter Control Software
+\include{src/user/control_software}
 
+%% Chapter Build and Boot Options
+\include{src/user/options}
 
-\section{Other Documentation}
-
-For developers interested in porting operating systems to Xen, the
-\emph{Xen Interface Manual} is distributed in the \path{docs/}
-directory of the Xen source distribution.
-
-% Various HOWTOs are available in \path{docs/HOWTOS} but this content
-% is being integrated into this manual.
+%% Chapter Further Support
+\include{src/user/further_support}
 
 
-\section{Online References}
-
-The official Xen web site is found at:
-\begin{quote} {\tt http://www.cl.cam.ac.uk/netos/xen/}
-\end{quote}
-
-This contains links to the latest versions of all online
-documentation, including the latest version of the FAQ.
-
-
-\section{Mailing Lists}
-
-There are currently four official Xen mailing lists:
-
-\begin{description}
-\item[xen-devel@lists.xensource.com] Used for development
-  discussions and bug reports.  Subscribe at: \\
-  {\small {\tt http://lists.xensource.com/xen-devel}}
-\item[xen-users@lists.xensource.com] Used for installation and usage
-  discussions and requests for help.  Subscribe at: \\
-  {\small {\tt http://lists.xensource.com/xen-users}}
-\item[xen-announce@lists.xensource.com] Used for announcements only.
-  Subscribe at: \\
-  {\small {\tt http://lists.xensource.com/xen-announce}}
-\item[xen-changelog@lists.xensource.com] Changelog feed
-  from the unstable and 2.0 trees - developer oriented.  Subscribe at: \\
-  {\small {\tt http://lists.xensource.com/xen-changelog}}
-\end{description}
-
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \appendix
 
-%% Chapter Installing Xen / XenLinux on Debian moved to debian.tex
-\include{src/user/debian}
-
-%% Chapter Installing Xen on Red Hat moved to redhat.tex
-\include{src/user/redhat}
-
 %% Chapter Glossary of Terms moved to glossary.tex
 \include{src/user/glossary}
-
-
 
 \end{document}
 
