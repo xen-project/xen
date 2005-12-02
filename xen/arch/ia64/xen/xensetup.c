@@ -289,6 +289,11 @@ printk("About to call init_xen_time()\n");
 printk("About to call ac_timer_init()\n");
     ac_timer_init();
 
+#ifdef CONFIG_XEN_CONSOLE_INPUT	/* CONFIG_SERIAL_8250_CONSOLE=n in dom0! */
+    initialize_keytable();
+    serial_init_postirq();
+#endif
+
 #ifdef CONFIG_SMP
     if ( opt_nosmp )
     {
@@ -407,7 +412,7 @@ printk("About to call init_trace_bufs()\n");
     init_trace_bufs();
 
     /* Give up the VGA console if DOM0 is configured to grab it. */
-#ifndef IA64
+#ifdef CONFIG_XEN_CONSOLE_INPUT	/* CONFIG_SERIAL_8250_CONSOLE=n in dom0! */
     console_endboot(cmdline && strstr(cmdline, "tty0"));
 #endif
 
