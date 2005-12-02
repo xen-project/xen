@@ -1,7 +1,7 @@
 \chapter{Starting Additional Domains}
 
 The first step in creating a new domain is to prepare a root
-filesystem for it to boot from.  Typically, this might be stored in a
+filesystem for it to boot.  Typically, this might be stored in a
 normal partition, an LVM or other volume manager partition, a disk
 file or on an NFS server.  A simple way to do this is simply to boot
 from your standard OS install CD and install the distribution into
@@ -11,6 +11,10 @@ To start the \xend\ control daemon, type
 \begin{quote}
   \verb!# xend start!
 \end{quote}
+
+%% KMS: If we're going to use '# cmd' syntax we should be consistent
+%% about it and have a conventions section noting that '#' == root
+%% prompt.
 
 If you wish the daemon to start automatically, see the instructions in
 Section~\ref{s:xend}. Once the daemon is running, you can use the
@@ -70,11 +74,21 @@ you may wish to edit include:
 You may also want to edit the {\bf vif} variable in order to choose
 the MAC address of the virtual ethernet interface yourself.  For
 example:
+%% KMS:  We should indicate "safe" ranges to use.
 \begin{quote}
 \verb_vif = ['mac=00:06:AA:F6:BB:B3']_
 \end{quote}
 If you do not set this variable, \xend\ will automatically generate a
-random MAC address from an unused range.
+random MAC address from the range 00:16:3E:xx:xx:xx.  Generated MACs are
+not tested for possible collisions, however likelihood of this is low at
+\begin{math} 1:2^{48}.\end{math}  XenSource Inc.  gives permission for
+anyone to use addresses randomly allocated from this range for use by
+their Xen domains.
+
+
+For a list of IEEE
+assigned MAC organizationally unique identifiers (OUI), see \newline
+{\tt http://standards.ieee.org/regauth/oui/oui.txt}
 
 
 \section{Booting the Domain}
