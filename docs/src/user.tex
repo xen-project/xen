@@ -60,8 +60,6 @@
 \setstretch{1.1}
 
 
-\part{Introduction}
-
 %% Chapter Introduction moved to introduction.tex
 \include{src/user/introduction}
 
@@ -80,38 +78,77 @@
 %% Chapter Installing Xen on Gentoo Linux
 \include{src/user/gentoo}
 
+%% Chapter Installing Xen on SuSE or SuSE SLES
+\include{src/user/suse}
+
 %% Chapter Installing Xen on Red Hat Enterprise Linux (RHEL)
 \include{src/user/rhel}
 
-%% Chapter Installing Xen on SuSE or SuSE SLES
-\include{src/user/suse}
+% Chapter dom0 Installation
+\include{src/user/dom0_installation}
+
+% Chapter domU Installation
+\include{src/user/domU_installation}
+
+% Building Xen
+\include{src/user/building_xen}
+
+% Booting Xen
+\include{src/user/booting_xen}
 
 
 \part{Configuration and Management}
 
+%% Chapter Domain Management Tools and Daemons
+\include{src/user/domain_mgmt}
+
 %% Chapter Starting Additional Domains
 \include{src/user/start_addl_dom}
 
-%% Chapter Domain Management Tools
-\include{src/user/domain_mgmt}
-
-%% Chapter Domain Filesystem Storage
-\include{src/user/domain_filesystem}
-
 %% Chapter Domain Configuration
 \include{src/user/domain_configuration}
+
+% Chapter Console Management
+\include{src/user/console_management}
+
+% Chapter Network Management
+\include{src/user/network_management}
+
+% Chapter Storage and FileSytem Management
+\include{src/user/domain_filesystem}
+
+% Chapter Memory Management
+\include{src/user/memory_management}
+
+% Chapter CPU Management
+\include{src/user/cpu_management}
+
+% Chapter Scheduler Management
+\include{src/user/scheduler_management}
+
+% Chapter Migrating Domains
+\include{src/user/migrating_domains}
 
 %% Chapter Securing Xen
 \include{src/user/securing_xen}
 
 
-\part{Troubleshooting}
+\part{Monitoring and Troubleshooting}
 
 %% Chapter Monitoring Xen
 \include{src/user/monitoring_xen}
 
-%% Chapter Debugging and Tracing
+% Chapter xenstat
+\include{src/user/xenstat}
+
+% Chapter Log Files
+\include{src/user/logfiles}
+
+%% Chapter Debugging
 \include{src/user/debugging}
+
+% Chapter xentrace
+\include{src/user/xentrace}
 
 %% Chapter Known Problems
 \include{src/user/known_problems}

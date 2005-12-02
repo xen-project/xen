@@ -2,11 +2,11 @@
 
 The Debian project provides a tool called \path{debootstrap} which
 allows a base Debian system to be installed into a filesystem without
-requiring the host system to have any Debian-specific software (such
-as \path{apt}).
+requiring the host system to have any Debian-specific software (such as
+\path{apt}).
 
-Here's some info how to install Debian 3.1 (Sarge) for an unprivileged
-Xen domain:
+Here's some info on how to install Debian 3.1 (Sarge) for an
+unprivileged Xen domain:
 
 \begin{enumerate}
 
@@ -14,13 +14,12 @@ Xen domain:
   this manual.
 
 \item Create disk images for rootfs and swap. Alternatively, you might
-  create dedicated partitions, LVM logical volumes, etc.\ if that
-  suits your setup.
+  create dedicated partitions, LVM logical volumes, etc.\ if that suits
+  your setup.
 \begin{verbatim}
 dd if=/dev/zero of=/path/diskimage bs=1024k count=size_in_mbytes
 dd if=/dev/zero of=/path/swapimage bs=1024k count=size_in_mbytes
 \end{verbatim}
-
   If you're going to use this filesystem / disk image only as a
   `template' for other vm disk images, something like 300 MB should be
   enough. (of course it depends what kind of packages you are planning
@@ -38,25 +37,25 @@ mount -o loop /path/diskimage /mnt/disk
 \end{verbatim}
 
 \item Install \path{debootstrap}. Make sure you have debootstrap
-  installed on the host.  If you are running Debian Sarge (3.1 /
-  testing) or unstable you can install it by running \path{apt-get
-    install debootstrap}.  Otherwise, it can be downloaded from the
-  Debian project website.
+  installed on the host. If you are running Debian Sarge (3.1 / testing)
+  or unstable you can install it by running \path{apt-get install
+    debootstrap}. Otherwise, it can be downloaded from the Debian
+  project website.
 
 \item Install Debian base to the disk image:
 \begin{verbatim}
 debootstrap --arch i386 sarge /mnt/disk  \
             http://ftp.<countrycode>.debian.org/debian
 \end{verbatim}
-
-  You can use any other Debian http/ftp mirror you want.
+  You may use any Debian mirror that you want.
 
 \item When debootstrap completes successfully, modify settings:
 \begin{verbatim}
 chroot /mnt/disk /bin/bash
 \end{verbatim}
 
-Edit the following files using vi or nano and make needed changes:
+  Edit the following files using vi or nano and make any required
+  changes:
 \begin{verbatim}
 /etc/hostname
 /etc/hosts
@@ -65,36 +64,36 @@ Edit the following files using vi or nano and make needed changes:
 /etc/networks
 \end{verbatim}
 
-Set up access to the services, edit:
+  Set up access to the services. Edit:
 \begin{verbatim}
 /etc/hosts.deny
 /etc/hosts.allow
 /etc/inetd.conf
 \end{verbatim}
 
-Add Debian mirror to:   
+  Add Debian mirror to:
 \begin{verbatim}
 /etc/apt/sources.list
 \end{verbatim}
 
-Create fstab like this:
+  Create fstab like this:
 \begin{verbatim}
 /dev/sda1       /       ext3    errors=remount-ro       0       1
 /dev/sda2       none    swap    sw                      0       0
 proc            /proc   proc    defaults                0       0
 \end{verbatim}
 
-Logout
+  Logout
 
 \item Unmount the disk image
 \begin{verbatim}
 umount /mnt/disk
 \end{verbatim}
 
-\item Create Xen 2.0 configuration file for the new domain. You can
-  use the example-configurations coming with Xen as a template.
+\item Create Xen 3.0 configuration file for the new domain. You may use
+  the example-configurations provided with Xen as a template.
 
-  Make sure you have the following set up:
+  Make sure you have the correctly configured:
 \begin{verbatim}
 disk = [ 'file:/path/diskimage,sda1,w', 'file:/path/swapimage,sda2,w' ]
 root = "/dev/sda1 ro"
@@ -105,21 +104,20 @@ root = "/dev/sda1 ro"
 xm create -f domain_config_file
 \end{verbatim}
 
-Check that the new domain is running:
+  Check that the new domain is running:
 \begin{verbatim}
 xm list
 \end{verbatim}
 
-\item Attach to the console of the new domain.  You should see
-  something like this when starting the new domain:
+\item Attach to the console of the new domain. You should see something
+  like this when starting the new domain:
 
 \begin{verbatim}
 Started domain testdomain2, console on port 9626
 \end{verbatim}
         
-  There you can see the ID of the console: 26. You can also list the
-  consoles with \path{xm consoles} (ID is the last two digits of the
-  port number.)
+  You can see the ID of the console: 26. You can also list the consoles
+  with \path{xm consoles}. ID is the last two digits of the port number.
 
   Attach to the console:
 
@@ -127,28 +125,26 @@ Started domain testdomain2, console on port 9626
 xm console 26
 \end{verbatim}
 
-  or by telnetting to the port 9626 of localhost (the xm console
-  program works better).
+  or by telnetting to the port 9626 of localhost. The xm console program
+  works better.
 
 \item Log in and run base-config
 
-  As a default there's no password for the root.
+  By default there is no password set for root.
 
-  Check that everything looks OK, and the system started without
-  errors.  Check that the swap is active, and the network settings are
-  correct.
+  Check that everything looks OK, and the system started without errors.
+  Check that the swap is active, and the network settings are correct.
 
-  Run \path{/usr/sbin/base-config} to set up the Debian settings.
+  Run \path{/usr/sbin/base-config} to configure the Debian settings.
 
-  Set up the password for root using passwd.
+  Set the password for root using \path{passwd}.
 
-\item Done. You can exit the console by pressing {\path{Ctrl + ]}}
+\item Done. You may exit the console by pressing {\path{Ctrl + ]}}
 
 \end{enumerate}
 
-
-If you need to create new domains, you can just copy the contents of
-the `template'-image to the new disk images, either by mounting the
-template and the new image, and using \path{cp -a} or \path{tar} or by
-simply copying the image file.  Once this is done, modify the
-image-specific settings (hostname, network settings, etc).
+If you need to create new domains, you can copy the contents of the
+`template'-image to the new disk images, either by mounting the template
+and the new image, and using \path{cp -a} or \path{tar} or by simply
+copying the image file. Once this is done, modify the image-specific
+settings (hostname, network settings, etc).

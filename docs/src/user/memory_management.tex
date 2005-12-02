@@ -1,0 +1,51 @@
+\chapter{Memory Management}
+
+\section{Managing Domain Memory}
+
+XenLinux domains have the ability to relinquish / reclaim machine
+memory at the request of the administrator or the user of the domain.
+
+\subsection{Setting memory footprints from dom0}
+
+The machine administrator can request that a domain alter its memory
+footprint using the \path{xm mem-set} command.  For instance, we can
+request that our example ttylinux domain reduce its memory footprint
+to 32 megabytes.
+
+\begin{verbatim}
+# xm mem-set ttylinux 32
+\end{verbatim}
+
+We can now see the result of this in the output of \path{xm list}:
+
+\begin{verbatim}
+# xm list
+Name              Id  Mem(MB)  CPU  State  Time(s)  Console
+Domain-0           0      251    0  r----    172.2        
+ttylinux           5       31    0  -b---      4.3    9605
+\end{verbatim}
+
+The domain has responded to the request by returning memory to Xen. We
+can restore the domain to its original size using the command line:
+
+\begin{verbatim}
+# xm mem-set ttylinux 64
+\end{verbatim}
+
+\subsection{Setting memory footprints from within a domain}
+
+The virtual file \path{/proc/xen/balloon} allows the owner of a domain
+to adjust their own memory footprint.  Reading the file (e.g.\
+\path{cat /proc/xen/balloon}) prints out the current memory footprint
+of the domain.  Writing the file (e.g.\ \path{echo new\_target >
+  /proc/xen/balloon}) requests that the kernel adjust the domain's
+memory footprint to a new value.
+
+\subsection{Setting memory limits}
+
+Xen associates a memory size limit with each domain.  By default, this
+is the amount of memory the domain is originally started with,
+preventing the domain from ever growing beyond this size.  To permit a
+domain to grow beyond its original allocation or to prevent a domain
+you've shrunk from reclaiming the memory it relinquished, use the
+\path{xm maxmem} command.

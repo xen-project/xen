@@ -1,40 +1,39 @@
 \chapter{Basic Installation}
 
 The Xen distribution includes three main components: Xen itself, ports
-of Linux and NetBSD to run on Xen, and the userspace
-tools required to manage a Xen-based system.  This chapter describes
-how to install the Xen~3.0 distribution from source.  Alternatively,
-there may be pre-built packages available as part of your operating
-system distribution.
+of Linux and NetBSD to run on Xen, and the userspace tools required to
+manage a Xen-based system. This chapter describes how to install the
+Xen~3.0 distribution from source. Alternatively, there may be pre-built
+packages available as part of your operating system distribution.
 
 
 \section{Prerequisites}
 \label{sec:prerequisites}
 
-The following is a full list of prerequisites.  Items marked `$\dag$'
-are required by the \xend\ control tools, and hence required if you
-want to run more than one virtual machine; items marked `$*$' are only
-required if you wish to build from source.
+The following is a full list of prerequisites. Items marked `$\dag$' are
+required by the \xend\ control tools, and hence required if you want to
+run more than one virtual machine; items marked `$*$' are only required
+if you wish to build from source.
 \begin{itemize}
-\item A working Linux distribution using the GRUB bootloader and
-  running on a P6-class or newer CPU\@.
+\item A working Linux distribution using the GRUB bootloader and running
+  on a P6-class or newer CPU\@.
 \item [$\dag$] The \path{iproute2} package.
 \item [$\dag$] The Linux bridge-utils\footnote{Available from {\tt
       http://bridge.sourceforge.net}} (e.g., \path{/sbin/brctl})
 \item [$\dag$] The Linux hotplug system\footnote{Available from {\tt
-      http://linux-hotplug.sourceforge.net/}} (e.g., \path{/sbin/hotplug}
-      and related scripts)
+      http://linux-hotplug.sourceforge.net/}} (e.g.,
+  \path{/sbin/hotplug} and related scripts)
 \item [$*$] Build tools (gcc v3.2.x or v3.3.x, binutils, GNU make).
 \item [$*$] Development installation of libcurl (e.g.,\ libcurl-devel).
 \item [$*$] Development installation of zlib (e.g.,\ zlib-dev).
-\item [$*$] Development installation of Python v2.2 or later (e.g.,\ 
+\item [$*$] Development installation of Python v2.2 or later (e.g.,\
   python-dev).
 \item [$*$] \LaTeX\ and transfig are required to build the
   documentation.
 \end{itemize}
 
-Once you have satisfied these prerequisites, you can now install
-either a binary or source distribution of Xen.
+Once you have satisfied these prerequisites, you can now install either
+a binary or source distribution of Xen.
 
 
 \section{Installing from Binary Tarball}
@@ -51,14 +50,13 @@ Once you've downloaded the tarball, simply unpack and install:
 # sh ./install.sh
 \end{verbatim}
 
-Once you've installed the binaries you need to configure your system
-as described in Section~\ref{s:configure}.
+Once you've installed the binaries you need to configure your system as
+described in Section~\ref{s:configure}.
 
 
 \section{Installing from Source}
 
-This section describes how to obtain, build and install Xen from
-source.
+This section describes how to obtain, build and install Xen from source.
 
 \subsection{Obtaining the Source}
 
@@ -106,11 +104,11 @@ following:
 \begin{itemize}
 \item Build Xen.
 \item Build the control tools, including \xend.
-\item Download (if necessary) and unpack the Linux 2.6 source code,
-  and patch it for use with Xen.
-\item Build a Linux kernel to use in domain~0 and a smaller
-  unprivileged kernel, which can optionally be used for unprivileged
-  virtual machines.
+\item Download (if necessary) and unpack the Linux 2.6 source code, and
+  patch it for use with Xen.
+\item Build a Linux kernel to use in domain~0 and a smaller unprivileged
+  kernel, which can optionally be used for unprivileged virtual
+  machines.
 \end{itemize}
 
 After the build has completed you should have a top-level directory
@@ -187,24 +185,24 @@ architecture being built for is \path{xen}, e.g:
 \end{verbatim}
 \end{quote}
 
-You can also copy an existing Linux configuration (\path{.config})
-into e.g.\ \path{linux-2.6.11-xen0} and execute:
+You can also copy an existing Linux configuration (\path{.config}) into
+e.g.\ \path{linux-2.6.11-xen0} and execute:
 \begin{quote}
 \begin{verbatim}
 # make ARCH=xen oldconfig
 \end{verbatim}
 \end{quote}
 
-You may be prompted with some Xen-specific options. We advise
-accepting the defaults for these options.
+You may be prompted with some Xen-specific options. We advise accepting
+the defaults for these options.
 
 Note that the only difference between the two types of Linux kernels
-that are built is the configuration file used for each.  The ``U''
+that are built is the configuration file used for each. The ``U''
 suffixed (unprivileged) versions don't contain any of the physical
-hardware device drivers, leading to a 30\% reduction in size; hence
-you may prefer these for your non-privileged domains.  The ``0''
-suffixed privileged versions can be used to boot the system, as well
-as in driver domains and unprivileged domains.
+hardware device drivers, leading to a 30\% reduction in size; hence you
+may prefer these for your non-privileged domains. The ``0'' suffixed
+privileged versions can be used to boot the system, as well as in driver
+domains and unprivileged domains.
 
 \subsection{Installing Generated Binaries}
 
@@ -217,8 +215,8 @@ locations, do:
 \end{verbatim}
 \end{quote}
 
-Alternatively, users with special installation requirements may wish
-to install them manually by copying the files to their appropriate
+Alternatively, users with special installation requirements may wish to
+install them manually by copying the files to their appropriate
 destinations.
 
 %% Files in \path{install/boot/} include:
@@ -233,23 +231,23 @@ destinations.
 The \path{dist/install/boot} directory will also contain the config
 files used for building the XenLinux kernels, and also versions of Xen
 and XenLinux kernels that contain debug symbols such as
-(\path{xen-syms-2.0.6} and \path{vmlinux-syms-2.6.11.11-xen0}) which
-are essential for interpreting crash dumps.  Retain these files as the
+(\path{xen-syms-2.0.6} and \path{vmlinux-syms-2.6.11.11-xen0}) which are
+essential for interpreting crash dumps. Retain these files as the
 developers may wish to see them if you post on the mailing list.
 
 
 \section{Configuration}
 \label{s:configure}
 
-Once you have built and installed the Xen distribution, it is simple
-to prepare the machine for booting and running Xen.
+Once you have built and installed the Xen distribution, it is simple to
+prepare the machine for booting and running Xen.
 
 \subsection{GRUB Configuration}
 
 An entry should be added to \path{grub.conf} (often found under
 \path{/boot/} or \path{/boot/grub/}) to allow Xen / XenLinux to boot.
 This file is sometimes called \path{menu.lst}, depending on your
-distribution.  The entry should look something like the following:
+distribution. The entry should look something like the following:
 
 {\small
 \begin{verbatim}
@@ -266,11 +264,11 @@ For more details on the various Xen boot parameters see
 Section~\ref{s:xboot}.
 
 The module line of the configuration describes the location of the
-XenLinux kernel that Xen should start and the parameters that should
-be passed to it. Tthese are standard Linux parameters, identifying the
-root device and specifying it be initially mounted read only and
-instructing that console output be sent to the screen. Some
-distributions such as SuSE do not require the \path{ro} parameter.
+XenLinux kernel that Xen should start and the parameters that should be
+passed to it. Tthese are standard Linux parameters, identifying the root
+device and specifying it be initially mounted read only and instructing
+that console output be sent to the screen. Some distributions such as
+SuSE do not require the \path{ro} parameter.
 
 %% \framebox{\parbox{5in}{
 %%     {\bf Distro specific:} \\
@@ -278,30 +276,26 @@ distributions such as SuSE do not require the \path{ro} parameter.
 %%     kernel command line, since the partition won't be remounted rw
 %%     during boot.  }}
 
-
-If you want to use an initrd, just add another \path{module} line to
-the configuration, like:
-{\small
+If you want to use an initrd, just add another \path{module} line to the
+configuration, like: {\small
 \begin{verbatim}
   module /boot/my_initrd.gz
 \end{verbatim}
 }
 
 When installing a new kernel, it is recommended that you do not delete
-existing menu options from \path{menu.lst}, as you may wish to boot
-your old Linux kernel in future, particularly if you have problems.
+existing menu options from \path{menu.lst}, as you may wish to boot your
+old Linux kernel in future, particularly if you have problems.
 
 \subsection{Serial Console (optional)}
 
 %% kernel /boot/xen-2.0.gz dom0_mem=131072 com1=115200,8n1
 %% module /boot/vmlinuz-2.6-xen0 root=/dev/sda4 ro
 
-In order to configure Xen serial console output, it is necessary to
-add an boot option to your GRUB config; e.g.\ replace the above kernel
-line with:
-\begin{quote}
-{\small
-\begin{verbatim}
+In order to configure Xen serial console output, it is necessary to add
+an boot option to your GRUB config; e.g.\ replace the above kernel line
+with:
+\begin{quote} {\small \begin{verbatim}
    kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
 \end{verbatim}}
 \end{quote}
@@ -309,11 +303,11 @@ line with:
 This configures Xen to output on COM1 at 115,200 baud, 8 data bits, 1
 stop bit and no parity. Modify these parameters for your environment.
 
-One can also configure XenLinux to share the serial console; to
-achieve this append ``\path{console=ttyS0}'' to your module line.
+One can also configure XenLinux to share the serial console; to achieve
+this append ``\path{console=ttyS0}'' to your module line.
 
-If you wish to be able to log in over the XenLinux serial console it
-is necessary to add a line into \path{/etc/inittab}. Add the line:
+If you wish to be able to log in over the XenLinux serial console it is
+necessary to add a line into \path{/etc/inittab}. Add the line:
 \begin{quote} {\small {\tt c:2345:respawn:/sbin/mingetty ttyS0}}
 \end{quote}
 

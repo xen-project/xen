@@ -1,101 +1,10 @@
 \chapter{Control Software} 
 
-The Xen control software includes the \xend\ node control daemon
-(which must be running), the xm command line tools, and the prototype
-xensv web interface.
-
-\section{\Xend\ (node control daemon)}
-\label{s:xend}
-
-The Xen Daemon (\Xend) performs system management functions related to
-virtual machines.  It forms a central point of control for a machine
-and can be controlled using an HTTP-based protocol.  \Xend\ must be
-running in order to start and manage virtual machines.
-
-\Xend\ must be run as root because it needs access to privileged
-system management functions.  A small set of commands may be issued on
-the \xend\ command line:
-
-\begin{tabular}{ll}
-  \verb!# xend start! & start \xend, if not already running \\
-  \verb!# xend stop!  & stop \xend\ if already running       \\
-  \verb!# xend restart! & restart \xend\ if running, otherwise start it \\
-  % \verb!# xend trace_start! & start \xend, with very detailed debug logging \\
-  \verb!# xend status! & indicates \xend\ status by its return code
-\end{tabular}
-
-A SysV init script called {\tt xend} is provided to start \xend\ at
-boot time.  {\tt make install} installs this script in
-\path{/etc/init.d}.  To enable it, you have to make symbolic links in
-the appropriate runlevel directories or use the {\tt chkconfig} tool,
-where available.
-
-Once \xend\ is running, more sophisticated administration can be done
-using the xm tool (see Section~\ref{s:xm}) and the experimental Xensv
-web interface (see Section~\ref{s:xensv}).
-
-As \xend\ runs, events will be logged to \path{/var/log/xend.log} and,
-if the migration assistant daemon (\path{xfrd}) has been started,
-\path{/var/log/xfrd.log}. These may be of use for troubleshooting
-problems.
-
-\section{Xm (command line interface)}
-\label{s:xm}
-
-The xm tool is the primary tool for managing Xen from the console.
-The general format of an xm command line is:
-
-\begin{verbatim}
-# xm command [switches] [arguments] [variables]
-\end{verbatim}
-
-The available \emph{switches} and \emph{arguments} are dependent on
-the \emph{command} chosen.  The \emph{variables} may be set using
-declarations of the form {\tt variable=value} and command line
-declarations override any of the values in the configuration file
-being used, including the standard variables described above and any
-custom variables (for instance, the \path{xmdefconfig} file uses a
-{\tt vmid} variable).
-
-The available commands are as follows:
-
-\begin{description}
-\item[mem-set] Request a domain to adjust its memory footprint.
-\item[create] Create a new domain.
-\item[destroy] Kill a domain immediately.
-\item[list] List running domains.
-\item[shutdown] Ask a domain to shutdown.
-\item[dmesg] Fetch the Xen (not Linux!) boot output.
-\item[consoles] Lists the available consoles.
-\item[console] Connect to the console for a domain.
-\item[help] Get help on xm commands.
-\item[save] Suspend a domain to disk.
-\item[restore] Restore a domain from disk.
-\item[pause] Pause a domain's execution.
-\item[unpause] Un-pause a domain.
-\item[pincpu] Pin a domain to a CPU.
-\item[bvt] Set BVT scheduler parameters for a domain.
-\item[bvt\_ctxallow] Set the BVT context switching allowance for the
-  system.
-\item[atropos] Set the atropos parameters for a domain.
-\item[rrobin] Set the round robin time slice for the system.
-\item[info] Get information about the Xen host.
-\item[call] Call a \xend\ HTTP API function directly.
-\end{description}
-
-For a detailed overview of switches, arguments and variables to each
-command try
-\begin{quote}
-\begin{verbatim}
-# xm help command
-\end{verbatim}
-\end{quote}
-
 \section{Xensv (web control interface)}
 \label{s:xensv}
 
 Xensv is the experimental web control interface for managing a Xen
-machine.  It can be used to perform some (but not yet all) of the
+machine. It can be used to perform some (but not yet all) of the
 management tasks that can be done using the xm tool.
 
 It can be started using:
@@ -107,7 +16,7 @@ and stopped using:
   \verb_# xensv stop_
 \end{quote}
 
-By default, Xensv will serve out the web interface on port 8080.  This
+By default, Xensv will serve out the web interface on port 8080. This
 can be changed by editing
 \path{/usr/lib/python2.3/site-packages/xen/sv/params.py}.
 
