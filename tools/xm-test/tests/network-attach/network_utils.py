@@ -28,7 +28,7 @@ def network_detach(domain_name, console, num=0):
     eths_before = count_eth(console)
     status, output = traceCommand("xm network-detach %s %d" % (domain_name, num))
     if status != 0:
-        return -1, "xm network-attach returned invalid %i != 0" % status
+        return -1, "xm network-detach returned invalid %i != 0" % status
 
     eths_after = count_eth(console)
     if eths_after != (eths_before-1):
