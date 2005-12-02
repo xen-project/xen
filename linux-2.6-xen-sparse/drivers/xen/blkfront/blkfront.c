@@ -311,7 +311,7 @@ static void connect(struct blkfront_info *info)
 	int err;
 
         if( (info->connected == BLKIF_STATE_CONNECTED) || 
-	    (info->connected == BLKIF_STATE_SUSPENDED) ) 
+	    (info->connected == BLKIF_STATE_SUSPENDED) )
 		return;
 
 	DPRINTK("blkfront.c:connect:%s.\n", info->xbdev->otherend);
@@ -327,16 +327,18 @@ static void connect(struct blkfront_info *info)
 				 info->xbdev->otherend);
 		return;
 	}
-	
+
         xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
 
 	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
-	
+
 	/* Kick pending requests. */
 	spin_lock_irq(&blkif_io_lock);
 	info->connected = BLKIF_STATE_CONNECTED;
 	kick_pending_request_queues(info);
 	spin_unlock_irq(&blkif_io_lock);
+
+	add_disk(info->gd);
 }
 
 /**
@@ -395,16 +397,11 @@ static inline void ADD_ID_TO_FREELIST(
 
 static inline void flush_requests(struct blkfront_info *info)
 {
-	RING_IDX old_prod = info->ring.sring->req_prod;
+	int notify;
 
-	RING_PUSH_REQUESTS(&info->ring);
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&info->ring, notify);
 
-	/*
-         * Send new requests /then/ check if any old requests are still in
-         * flight. If so then there is no need to send a notification.
-         */
-	mb();
-	if (info->ring.sring->rsp_prod == old_prod)
+	if (notify)
 		notify_remote_via_irq(info->irq);
 }
 
@@ -593,7 +590,6 @@ void do_blkif_request(request_queue_t *rq)
 
 	while ((req = elv_next_request(rq)) != NULL) {
 		info = req->rq_disk->private_data;
-
 		if (!blk_fs_request(req)) {
 			end_request(req, 0);
 			continue;

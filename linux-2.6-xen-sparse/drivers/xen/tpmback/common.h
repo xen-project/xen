@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <asm-xen/evtchn.h>
 #include <asm-xen/driver_util.h>
+#include <asm-xen/xen-public/grant_table.h>
 #include <asm-xen/xen-public/io/tpmif.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>

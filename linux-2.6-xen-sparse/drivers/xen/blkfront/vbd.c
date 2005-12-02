@@ -261,7 +261,6 @@ xlvbd_alloc_gendisk(int minor, blkif_sector_t capacity, int vdevice,
 	if (vdisk_info & VDISK_CDROM)
 		gd->flags |= GENHD_FL_CD;
 
-	add_disk(gd);
 	info->gd = gd;
 
 	return 0;

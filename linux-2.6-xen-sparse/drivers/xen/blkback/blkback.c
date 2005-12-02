@@ -498,10 +498,14 @@ static void make_response(blkif_t *blkif, unsigned long id,
          * notifications if requests are already in flight (lower overheads
          * and promotes batching).
          */
-	if (!__on_blkdev_list(blkif) &&
-	    RING_HAS_UNCONSUMED_REQUESTS(blk_ring)) {
-		add_to_blkdev_list_tail(blkif);
-		maybe_trigger_blkio_schedule();
+	mb();
+	if (!__on_blkdev_list(blkif)) {
+		int more_to_do;
+		RING_FINAL_CHECK_FOR_REQUESTS(blk_ring, more_to_do);
+		if (more_to_do) {
+			add_to_blkdev_list_tail(blkif);
+			maybe_trigger_blkio_schedule();
+		}
 	}
 
 	if (notify)

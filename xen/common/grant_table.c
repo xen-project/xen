@@ -74,7 +74,7 @@ __gnttab_map_grant_ref(
     grant_ref_t    ref;
     struct domain *ld, *rd;
     struct vcpu   *led;
-    u16            dev_hst_ro_flags;
+    u32            dev_hst_ro_flags;
     int            handle;
     u64            addr;
     unsigned long  frame = 0;

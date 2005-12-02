@@ -131,10 +131,10 @@ extern int set_p2m_entry(
 extern void remove_shadow(struct domain *d, unsigned long gpfn, u32 stype);
 
 extern void shadow_l1_normal_pt_update(struct domain *d,
-                                       unsigned long pa, l1_pgentry_t l1e,
+                                       physaddr_t pa, l1_pgentry_t l1e,
                                        struct domain_mmap_cache *cache);
 extern void shadow_l2_normal_pt_update(struct domain *d,
-                                       unsigned long pa, l2_pgentry_t l2e,
+                                       physaddr_t pa, l2_pgentry_t l2e,
                                        struct domain_mmap_cache *cache);
 #if CONFIG_PAGING_LEVELS >= 3
 #include <asm/page-guest32.h>
@@ -148,12 +148,12 @@ extern void shadow_l2_normal_pt_update(struct domain *d,
 
 extern unsigned long gva_to_gpa(unsigned long gva);
 extern void shadow_l3_normal_pt_update(struct domain *d,
-                                       unsigned long pa, l3_pgentry_t l3e,
+                                       physaddr_t pa, l3_pgentry_t l3e,
                                        struct domain_mmap_cache *cache);
 #endif
 #if CONFIG_PAGING_LEVELS >= 4
 extern void shadow_l4_normal_pt_update(struct domain *d,
-                                       unsigned long pa, l4_pgentry_t l4e,
+                                       physaddr_t pa, l4_pgentry_t l4e,
                                        struct domain_mmap_cache *cache);
 #endif
 extern int shadow_do_update_va_mapping(unsigned long va,

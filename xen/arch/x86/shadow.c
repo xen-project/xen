@@ -2750,10 +2750,10 @@ static unsigned long shadow_l3_table(
                     g2mfn, g2mfn);
                 BUG(); /* XXX Deal gracefully with failure. */
             }
-
-            if (!get_shadow_ref(s2mfn))
-                BUG();
         } 
+
+        if (!get_shadow_ref(s2mfn))
+            BUG();
             
         /* Map shadow L2 into shadow L3 */
         spl3e[L3_PAGETABLE_ENTRIES - 1] = l3e_from_pfn(s2mfn, _PAGE_PRESENT);
@@ -3526,10 +3526,11 @@ static void shadow_invlpg_64(struct vcpu *v, unsigned long va)
 
     shadow_lock(d);
 
+    __shadow_sync_va(v, va);
+
     if ( __shadow_get_l1e(v, va, &old_sl1e) )
         if ( l1e_get_flags(old_sl1e) & _PAGE_PRESENT )
-            put_page_from_l1e(old_sl1e, d);
-
+            shadow_put_page_from_l1e(old_sl1e, d);
 
     sl1e = l1e_empty();
     __shadow_set_l1e(v, va, &sl1e);

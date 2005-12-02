@@ -18,17 +18,21 @@
  * or rsp_event field in the shared ring.
  */
 
+/* Protocol checksum field is blank in the packet (hardware offload)? */
+#define _NETTXF_csum_blank (0)
+#define  NETTXF_csum_blank (1U<<_NETTXF_csum_blank)
+
 typedef struct netif_tx_request {
     grant_ref_t gref;      /* Reference to buffer page */
-    uint16_t offset:15;    /* Offset within buffer page */
-    uint16_t csum_blank:1; /* Proto csum field blank?   */
+    uint16_t offset;       /* Offset within buffer page */
+    uint16_t flags;        /* NETTXF_* */
     uint16_t id;           /* Echoed in response message. */
     uint16_t size;         /* Packet size in bytes.       */
 } netif_tx_request_t;
 
 typedef struct netif_tx_response {
     uint16_t id;
-    int8_t   status;
+    int16_t  status;       /* NETIF_RSP_* */
 } netif_tx_response_t;
 
 typedef struct {
@@ -36,11 +40,15 @@ typedef struct {
     grant_ref_t gref;      /* Reference to incoming granted frame */
 } netif_rx_request_t;
 
+/* Protocol checksum already validated (e.g., performed by hardware)? */
+#define _NETRXF_csum_valid (0)
+#define  NETRXF_csum_valid (1U<<_NETRXF_csum_valid)
+
 typedef struct {
-    uint16_t offset;     /* Offset in page of start of received packet  */
-    uint16_t csum_valid; /* Protocol checksum is validated?       */
     uint16_t id;
-    int16_t  status;     /* -ve: BLKIF_RSP_* ; +ve: Rx'ed pkt size. */
+    uint16_t offset;       /* Offset in page of start of received packet  */
+    uint16_t flags;        /* NETRXF_* */
+    int16_t  status;       /* -ve: BLKIF_RSP_* ; +ve: Rx'ed pkt size. */
 } netif_rx_response_t;
 
 /*

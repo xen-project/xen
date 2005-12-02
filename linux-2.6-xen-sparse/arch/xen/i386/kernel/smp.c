@@ -28,8 +28,6 @@
 #endif
 #include <asm-xen/evtchn.h>
 
-#define xxprint(msg) HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg)
-
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
  *
@@ -542,9 +540,7 @@ static void stop_this_cpu (void * dummy)
 	 */
 	cpu_clear(smp_processor_id(), cpu_online_map);
 	local_irq_disable();
-#if 1
-	xxprint("stop_this_cpu disable_local_APIC\n");
-#else
+#if 0
 	disable_local_APIC();
 #endif
 	if (cpu_data[smp_processor_id()].hlt_works_ok)
@@ -561,9 +557,7 @@ void smp_send_stop(void)
 	smp_call_function(stop_this_cpu, NULL, 1, 0);
 
 	local_irq_disable();
-#if 1
-	xxprint("smp_send_stop disable_local_APIC\n");
-#else
+#if 0
 	disable_local_APIC();
 #endif
 	local_irq_enable();
