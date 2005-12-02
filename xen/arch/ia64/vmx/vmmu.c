@@ -162,7 +162,7 @@ static thash_cb_t *init_domain_vhpt(struct vcpu *d)
     vhpt->ht = THASH_VHPT;
     vhpt->vcpu = d;
     vhpt->hash_func = machine_thash;
-    vs -= sizeof (vhpt_special);
+    vcur -= sizeof (vhpt_special);
     vs = vcur;
 
     /* Setup guest pta */
