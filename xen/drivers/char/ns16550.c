@@ -211,7 +211,8 @@ static void ns16550_init_postirq(struct serial_port *port)
     {
         /* Polled mode. Calculate time to fill RX FIFO and/or empty TX FIFO. */
         bits = uart->data_bits + uart->stop_bits + !!uart->parity;
-        uart->timeout_ms = (bits * port->tx_fifo_size * 1000) / uart->baud;
+        uart->timeout_ms = max_t(
+            unsigned int, 1, (bits * port->tx_fifo_size * 1000) / uart->baud);
         init_ac_timer(&uart->timer, ns16550_poll, port, 0);
         set_ac_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
     }
