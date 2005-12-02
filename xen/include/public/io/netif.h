@@ -11,6 +11,13 @@
 
 #include "ring.h"
 
+/*
+ * Note that there is *never* any need to notify the backend when enqueuing
+ * receive requests (netif_rx_request_t). Notifications after enqueuing any
+ * other type of message should be conditional on the appropriate req_event
+ * or rsp_event field in the shared ring.
+ */
+
 typedef struct netif_tx_request {
     grant_ref_t gref;      /* Reference to buffer page */
     uint16_t offset:15;    /* Offset within buffer page */

@@ -67,6 +67,7 @@ struct bvt_cpu_info
 #define MCU            (s32)MICROSECS(100)    /* Minimum unit */
 #define MCU_ADVANCE    10                     /* default weight */
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
+#define CTX_MIN        (s32)MICROSECS(10)     /* Low limit for ctx_allow */
 static s32 ctx_allow = (s32)MILLISECS(5);     /* context switch allowance */
 
 static inline void __add_to_runqueue_head(struct vcpu *d)
@@ -297,7 +298,11 @@ static int bvt_ctl(struct sched_ctl_cmd *cmd)
     if ( cmd->direction == SCHED_INFO_PUT )
         ctx_allow = params->ctx_allow;
     else
+    {
+        if ( ctx_allow < CTX_MIN )
+            ctx_allow = CTX_MIN;
         params->ctx_allow = ctx_allow;
+    }
     
     return 0;
 }

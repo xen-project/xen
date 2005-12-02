@@ -397,6 +397,7 @@ class XendDomain:
             raise XendError("can't connect: %s" % err[1])
 
         sock.send("receive\n")
+        sock.recv(80) 
         XendCheckpoint.save(sock.fileno(), dominfo, live)
 
 

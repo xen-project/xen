@@ -334,7 +334,7 @@ int xc_evtchn_alloc_unbound(int xc_handle,
 
 int xc_evtchn_status(int xc_handle,
                      uint32_t dom, /* may be DOMID_SELF */
-                     int port,
+                     evtchn_port_t port,
                      xc_evtchn_status_t *status);
 
 int xc_physdev_pci_access_modify(int xc_handle,

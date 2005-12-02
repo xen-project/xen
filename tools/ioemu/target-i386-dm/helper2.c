@@ -125,7 +125,7 @@ int evtchn_fd = -1;
 
 //the evtchn port for polling the notification,
 //should be inputed as bochs's parameter
-uint16_t ioreq_remote_port, ioreq_local_port;
+evtchn_port_t ioreq_remote_port, ioreq_local_port;
 
 //some functions to handle the io req packet
 void sp_info()
@@ -170,12 +170,12 @@ ioreq_t* __cpu_get_ioreq(void)
 ioreq_t* cpu_get_ioreq(void)
 {
     int rc;
-    uint16_t port;
+    evtchn_port_t port;
 
     rc = read(evtchn_fd, &port, sizeof(port));
     if ((rc == sizeof(port)) && (port == ioreq_local_port)) {
         // unmask the wanted port again
-        write(evtchn_fd, &ioreq_local_port, 2);
+        write(evtchn_fd, &ioreq_local_port, sizeof(port));
 
         //get the io packet from shared memory
         return __cpu_get_ioreq();

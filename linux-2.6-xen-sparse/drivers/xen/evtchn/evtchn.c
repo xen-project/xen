@@ -50,9 +50,9 @@
 
 struct per_user_data {
 	/* Notification ring, accessed via /dev/xen/evtchn. */
-#define EVTCHN_RING_SIZE     2048  /* 2048 16-bit entries */
+#define EVTCHN_RING_SIZE     (PAGE_SIZE / sizeof(evtchn_port_t))
 #define EVTCHN_RING_MASK(_i) ((_i)&(EVTCHN_RING_SIZE-1))
-	u16 *ring;
+	evtchn_port_t *ring;
 	unsigned int ring_cons, ring_prod, ring_overflow;
 
 	/* Processes wait on this queue when ring is empty. */
@@ -75,7 +75,7 @@ void evtchn_device_upcall(int port)
 
 	if ((u = port_user[port]) != NULL) {
 		if ((u->ring_prod - u->ring_cons) < EVTCHN_RING_SIZE) {
-			u->ring[EVTCHN_RING_MASK(u->ring_prod)] = (u16)port;
+			u->ring[EVTCHN_RING_MASK(u->ring_prod)] = port;
 			if (u->ring_cons == u->ring_prod++) {
 				wake_up_interruptible(&u->evtchn_wait);
 				kill_fasync(&u->evtchn_async_queue,
@@ -94,52 +94,40 @@ static ssize_t evtchn_read(struct file *file, char __user *buf,
 {
 	int rc;
 	unsigned int c, p, bytes1 = 0, bytes2 = 0;
-	DECLARE_WAITQUEUE(wait, current);
 	struct per_user_data *u = file->private_data;
 
-	add_wait_queue(&u->evtchn_wait, &wait);
+	/* Whole number of ports. */
+	count &= ~(sizeof(evtchn_port_t)-1);
 
-	count &= ~1; /* even number of bytes */
-
-	if (count == 0) {
-		rc = 0;
-		goto out;
-	}
+	if (count == 0)
+		return 0;
 
 	if (count > PAGE_SIZE)
 		count = PAGE_SIZE;
 
 	for (;;) {
-		set_current_state(TASK_INTERRUPTIBLE);
+		if (u->ring_overflow)
+			return -EFBIG;
 
 		if ((c = u->ring_cons) != (p = u->ring_prod))
 			break;
 
-		if (u->ring_overflow) {
-			rc = -EFBIG;
-			goto out;
-		}
+		if (file->f_flags & O_NONBLOCK)
+			return -EAGAIN;
 
-		if (file->f_flags & O_NONBLOCK) {
-			rc = -EAGAIN;
-			goto out;
-		}
-
-		if (signal_pending(current)) {
-			rc = -ERESTARTSYS;
-			goto out;
-		}
-
-		schedule();
+		rc = wait_event_interruptible(
+			u->evtchn_wait, u->ring_cons != u->ring_prod);
+		if (rc)
+			return rc;
 	}
 
 	/* Byte lengths of two chunks. Chunk split (if any) is at ring wrap. */
 	if (((c ^ p) & EVTCHN_RING_SIZE) != 0) {
 		bytes1 = (EVTCHN_RING_SIZE - EVTCHN_RING_MASK(c)) *
-			sizeof(u16);
-		bytes2 = EVTCHN_RING_MASK(p) * sizeof(u16);
+			sizeof(evtchn_port_t);
+		bytes2 = EVTCHN_RING_MASK(p) * sizeof(evtchn_port_t);
 	} else {
-		bytes1 = (p - c) * sizeof(u16);
+		bytes1 = (p - c) * sizeof(evtchn_port_t);
 		bytes2 = 0;
 	}
 
@@ -153,32 +141,26 @@ static ssize_t evtchn_read(struct file *file, char __user *buf,
 
 	if (copy_to_user(buf, &u->ring[EVTCHN_RING_MASK(c)], bytes1) ||
 	    ((bytes2 != 0) &&
-	     copy_to_user(&buf[bytes1], &u->ring[0], bytes2))) {
-		rc = -EFAULT;
-		goto out;
-	}
+	     copy_to_user(&buf[bytes1], &u->ring[0], bytes2)))
+		return -EFAULT;
 
-	u->ring_cons += (bytes1 + bytes2) / sizeof(u16);
+	u->ring_cons += (bytes1 + bytes2) / sizeof(evtchn_port_t);
 
-	rc = bytes1 + bytes2;
-
- out:
-	__set_current_state(TASK_RUNNING);
-	remove_wait_queue(&u->evtchn_wait, &wait);
-	return rc;
+	return bytes1 + bytes2;
 }
 
 static ssize_t evtchn_write(struct file *file, const char __user *buf,
                             size_t count, loff_t *ppos)
 {
 	int  rc, i;
-	u16 *kbuf = (u16 *)__get_free_page(GFP_KERNEL);
+	evtchn_port_t *kbuf = (evtchn_port_t *)__get_free_page(GFP_KERNEL);
 	struct per_user_data *u = file->private_data;
 
 	if (kbuf == NULL)
 		return -ENOMEM;
 
-	count &= ~1; /* even number of bytes */
+	/* Whole number of ports. */
+	count &= ~(sizeof(evtchn_port_t)-1);
 
 	if (count == 0) {
 		rc = 0;
@@ -194,7 +176,7 @@ static ssize_t evtchn_write(struct file *file, const char __user *buf,
 	}
 
 	spin_lock_irq(&port_user_lock);
-	for (i = 0; i < (count/2); i++)
+	for (i = 0; i < (count/sizeof(evtchn_port_t)); i++)
 		if ((kbuf[i] < NR_EVENT_CHANNELS) && (port_user[kbuf[i]] == u))
 			unmask_evtchn(kbuf[i]);
 	spin_unlock_irq(&port_user_lock);
@@ -379,8 +361,8 @@ static int evtchn_open(struct inode *inode, struct file *filp)
 	memset(u, 0, sizeof(*u));
 	init_waitqueue_head(&u->evtchn_wait);
 
-	if ((u->ring = (u16 *)__get_free_page(GFP_KERNEL)) == NULL)
-	{
+	u->ring = (evtchn_port_t *)__get_free_page(GFP_KERNEL);
+	if (u->ring == NULL) {
 		kfree(u);
 		return -ENOMEM;
 	}
@@ -400,8 +382,7 @@ static int evtchn_release(struct inode *inode, struct file *filp)
 
 	free_page((unsigned long)u->ring);
 
-	for (i = 0; i < NR_EVENT_CHANNELS; i++)
-	{
+	for (i = 0; i < NR_EVENT_CHANNELS; i++) {
 		int ret;
 		if (port_user[i] != u)
 			continue;
@@ -447,10 +428,9 @@ static int __init evtchn_init(void)
 	spin_lock_init(&port_user_lock);
 	memset(port_user, 0, sizeof(port_user));
 
-	/* (DEVFS) create '/dev/misc/evtchn'. */
+	/* Create '/dev/misc/evtchn'. */
 	err = misc_register(&evtchn_miscdev);
-	if (err != 0)
-	{
+	if (err != 0) {
 		printk(KERN_ALERT "Could not register /dev/misc/evtchn\n");
 		return err;
 	}

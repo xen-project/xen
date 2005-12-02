@@ -300,6 +300,10 @@ static void backend_changed(struct xenbus_device *dev,
 /* ** Connection ** */
 
 
+/* 
+** Invoked when the backend is finally 'ready' (and has told produced 
+** the details about the physical device - #sectors, size, etc). 
+*/
 static void connect(struct blkfront_info *info)
 {
 	unsigned long sectors, sector_size;
@@ -324,19 +328,16 @@ static void connect(struct blkfront_info *info)
 		return;
 	}
 	
-        info->connected = BLKIF_STATE_CONNECTED;
         xlvbd_add(sectors, info->vdevice, binfo, sector_size, info);
-	
-	err = xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected);
-	if (err)
-		return;
+
+	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
 	
 	/* Kick pending requests. */
 	spin_lock_irq(&blkif_io_lock);
+	info->connected = BLKIF_STATE_CONNECTED;
 	kick_pending_request_queues(info);
 	spin_unlock_irq(&blkif_io_lock);
 }
-
 
 /**
  * Handle the change of state of the backend to Closing.  We must delete our
@@ -394,8 +395,17 @@ static inline void ADD_ID_TO_FREELIST(
 
 static inline void flush_requests(struct blkfront_info *info)
 {
+	RING_IDX old_prod = info->ring.sring->req_prod;
+
 	RING_PUSH_REQUESTS(&info->ring);
-	notify_remote_via_irq(info->irq);
+
+	/*
+         * Send new requests /then/ check if any old requests are still in
+         * flight. If so then there is no need to send a notification.
+         */
+	mb();
+	if (info->ring.sring->rsp_prod == old_prod)
+		notify_remote_via_irq(info->irq);
 }
 
 static void kick_pending_request_queues(struct blkfront_info *info)
@@ -631,6 +641,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 		return IRQ_HANDLED;
 	}
 
+ again:
 	rp = info->ring.sring->rsp_prod;
 	rmb(); /* Ensure we see queued responses up to 'rp'. */
 
@@ -665,6 +676,15 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	}
 
 	info->ring.rsp_cons = i;
+
+	if (i != info->ring.req_prod_pvt) {
+		int more_to_do;
+		RING_FINAL_CHECK_FOR_RESPONSES(&info->ring, more_to_do);
+		if (more_to_do)
+			goto again;
+	} else {
+		info->ring.sring->rsp_event = i + 1;
+	}
 
 	kick_pending_request_queues(info);
 
@@ -751,14 +771,20 @@ static void blkif_recover(struct blkfront_info *info)
 
 	kfree(copy);
 
-	/* info->ring->req_prod will be set when we flush_requests().*/
-	wmb();
+	(void)xenbus_switch_state(info->xbdev, NULL, XenbusStateConnected); 
+	
+	/* Now safe for us to use the shared ring */
+	spin_lock_irq(&blkif_io_lock);
+        info->connected = BLKIF_STATE_CONNECTED;
+	spin_unlock_irq(&blkif_io_lock);
 
-	/* Kicks things back into life. */
+	/* Send off requeued requests */
 	flush_requests(info);
 
-	/* Now safe to let other people use the interface. */
-	info->connected = BLKIF_STATE_CONNECTED;
+	/* Kick any other new requests queued since we resumed */
+	spin_lock_irq(&blkif_io_lock);
+	kick_pending_request_queues(info);
+	spin_unlock_irq(&blkif_io_lock);
 }
 
 

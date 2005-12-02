@@ -51,7 +51,7 @@ int xc_evtchn_alloc_unbound(int xc_handle,
 
 int xc_evtchn_status(int xc_handle,
                      uint32_t dom,
-                     int port,
+                     evtchn_port_t port,
                      xc_evtchn_status_t *status)
 {
     int         rc;

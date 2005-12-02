@@ -11,6 +11,19 @@
 
 #include "ring.h"
 
+/*
+ * Front->back notifications: When enqueuing a new request, there is no
+ * need to send a notification if there are old requests still in flight
+ * (that is, old_req_prod != sring->rsp_prod). The backend guarantees to check
+ * for new requests after queuing the response for the last in-flight request.
+ * (NB. The generic req_event mechanism is not used for blk requests.)
+ * 
+ * Back->front notifications: When enqueuing a new response, sending a
+ * notification can be made conditional on rsp_event (i.e., the generic
+ * hold-off mechanism provided by the ring macros). Frontends must set
+ * rsp_event appropriately (e.g., using RING_FINAL_CHECK_FOR_RESPONSES()).
+ */
+
 #ifndef blkif_vdev_t
 #define blkif_vdev_t   uint16_t
 #endif
